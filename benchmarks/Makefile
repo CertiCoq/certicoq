@@ -1,9 +1,11 @@
 COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R ./ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
 CCOMPILER=gcc
-CFILES=demo1 demo2 list_sum
-# vs_easy vs_hard Binom.main Color.main
+CFILES= demo1 demo2 list_sum vs_easy vs_hard binom color
 
-cfiles: $(CFILES)
+EXEC=$(CFILES) $(patsubst %, %_cps, $(CFILES))
+
+cfiles: $(CFILES)e
+exec: $(EXEC)
 all: copy lib tests cfiles
 
 copy:
@@ -27,6 +29,7 @@ clean:
 	rm -f ./glue.*.*.c
 	rm -f ./glue.*.*.h
 	rm -f ./*.vo
+	rm -f $(EXEC)
 
 lib/Makefile:
 	cd lib; coq_makefile -f _CoqProject -o Makefile
@@ -36,6 +39,7 @@ lib: lib/Makefile
 
 tests: tests.v
 	coqc $(COQOPTS) tests.v
+
 
 $(CFILES):
 	$(CCOMPILER) -o $@_cps -Wno-everything -O2 $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@.c

@@ -80,40 +80,36 @@ Definition makeArgList (vs : list positive) : list N := rev (makeArgList' vs).
 
 Definition fun_info_env : Type := M.t (positive * fun_tag).
 
-
 (* Compute a fun_env by looking at the number of arguments functions
    are applied to, assumes that all functions sharing the same tags have the same arity *)
-Fixpoint compute_fun_env' (n : nat) (nenv : name_env) (s : list string) (fenv : fun_env)  (e : exp) : fun_env * (list string) :=
+Fixpoint compute_fun_env' (n : nat) (nenv : name_env) (fenv : fun_env)  (e : exp) : fun_env :=
   match n with
-  | 0 => (fenv, s)
+  | 0 => fenv
   | S n' =>
     match e with
-    | Econstr x t vs e' => compute_fun_env' n' nenv s fenv e'
-    | Ecase x cs => fold_left (fun p e => compute_fun_env' n' nenv (snd p) (fst p) e) (map snd cs) (fenv, s)
-    | Eproj x t n v e' => compute_fun_env' n' nenv s fenv e'
+    | Econstr x t vs e' => compute_fun_env' n' nenv fenv e'
+    | Ecase x cs => fold_left (fun p e => compute_fun_env' n' nenv p e) (map snd cs) fenv
+    | Eproj x t n v e' => compute_fun_env' n' nenv fenv e'
     | Eletapp x f t vs e' =>
-      let s' := "App: Adding function " ++ get_fname f nenv ++ " with arity " ++ (nat2string10 (length vs)) in
-      compute_fun_env' n' nenv (s' :: s) (M.set t (N.of_nat (length vs), makeArgList vs) fenv) e'
+      compute_fun_env' n' nenv (M.set t (N.of_nat (length vs), makeArgList vs) fenv) e'
     | Efun fnd e' =>
-      let (fenv', s') := compute_fun_env_fundefs n' nenv s fnd fenv in
-      compute_fun_env' n' nenv s' fenv' e'
-    | Eapp x t vs => (M.set t (N.of_nat (length vs) , makeArgList vs) fenv,
-                      ("App: Adding function " ++ get_fname x nenv ++ " with arity " ++ (nat2string10 (length vs))) :: s)
-    | Eprim x p vs e' => compute_fun_env' n' nenv s fenv e'
-    | Ehalt x => (fenv, s)
+      let fenv' := compute_fun_env_fundefs n' nenv fnd fenv in
+      compute_fun_env' n' nenv fenv' e'
+    | Eapp x t vs => M.set t (N.of_nat (length vs) , makeArgList vs) fenv
+    | Eprim x p vs e' => compute_fun_env' n' nenv fenv e'
+    | Ehalt x => fenv
     end
   end
-with compute_fun_env_fundefs n nenv s fnd fenv : fun_env * (list string):=
+with compute_fun_env_fundefs n nenv fnd fenv : fun_env :=
   match n with
-  | 0 => (fenv, s)
+  | 0 => fenv
   | S n' =>
     match fnd with
-    | Fnil => (fenv, s)
+    | Fnil => fenv
     | Fcons f t vs e fnd' =>
-      let s' := "Fun: Adding function " ++ get_fname f nenv ++ " with arity " ++ (nat2string10 (length vs)) in
       let fenv' := M.set t (N.of_nat (length vs) , makeArgList vs) fenv in
-      let (fenv'', s'') := compute_fun_env' n' nenv (s' :: s) fenv' e in
-      compute_fun_env_fundefs n' nenv s'' fnd' fenv''
+      let fenv'' := compute_fun_env' n' nenv fenv' e in
+      compute_fun_env_fundefs n' nenv fnd' fenv''
     end
   end.
 
@@ -147,10 +143,8 @@ Fixpoint compute_fun_env_fds fnd fenv:=
 (* fun_env maps tags to function info  *)
 
 (* fun_env maps tags to function info *)
-Definition compute_fun_env (nenv : name_env) (e : exp) : fun_env * string :=
-  let (fenv, log) := compute_fun_env' (max_depth e) nenv [] (M.empty fun_ty_info) e in
-  (fenv, String.concat Pipeline_utils.newline (rev log)).
-
+Definition compute_fun_env (nenv : name_env) (e : exp) : fun_env :=
+  compute_fun_env' (max_depth e) nenv (M.empty fun_ty_info) e.   
 
 Fixpoint get_allocs (e : exp) : list positive :=
   match e with
@@ -1704,10 +1698,10 @@ End Check.
 Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_env) :
   error (M.t BasicAst.name * Clight.program * Clight.program) * string :=
   let e := wrap_in_fun e in
-  let (fenv, log) := compute_fun_env nenv0 e in
+  let fenv := compute_fun_env nenv0 e in
   let ienv := compute_ind_env cenv in
   (* debug *)
-  let dbg := (cps_show.show_exp nenv0 cenv false e) ++ Pipeline_utils.newline ++ log ++ Pipeline_utils.newline ++ check_tags fenv nenv0 e in
+  (* let dbg := (cps_show.show_exp nenv0 cenv false e) ++ Pipeline_utils.newline ++ log ++ Pipeline_utils.newline ++ check_tags fenv nenv0 e in *)
   (* end debug *)
   let p'' := make_defs args_opt e fenv cenv ienv nenv0 in
   (* state *)
@@ -1731,7 +1725,7 @@ Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_e
                   (M.set exportIdent (nNamed "export"%string) nenv),
             body, head)
   in
-  (err, dbg).
+  (err, "").
 
 Definition err {A : Type} (s : String.string) : res A :=
   Error ((MSG s) :: nil).

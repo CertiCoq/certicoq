@@ -22,9 +22,8 @@ CertiCoq Compile "anf" demo2.
 Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
 
 CertiCoq Compile list_sum.
-CertiCoq Compile "anf" "debug" list_sum.
+CertiCoq Compile "anf" list_sum.
 
-(* 
 Import VeriStar.
 
 Definition vs_easy :=
@@ -39,8 +38,8 @@ Definition vs_hard :=
   | _ => false
   end.
 
-CertiCoq Compile "time" vs_easy. 
-CertiCoq Compile "time" "anf"  vs_easy.
+CertiCoq Compile "time" vs_easy.
+CertiCoq Compile "anf"  vs_easy.
 
 (* Zoe: Compiling with the CPS pipeline takes much longer for vs_easy.
    The overhead seems to come from the C translation: (maybe has to do with dbg/error messages?)
@@ -69,9 +68,13 @@ Debug: Time elapsed in L7:  2.394216 *)
 CertiCoq Compile vs_hard.
 CertiCoq Compile "anf" vs_hard.
 
-CertiCoq Compile Binom.main. (* returns nat *)
-CertiCoq Compile "anf" Binom.main.  (* returns nat *)
 
-CertiCoq Compile Color.main.
-CertiCoq Compile "anf" Color.main.
-*)
+Definition binom := Binom.main.
+
+CertiCoq Compile binom. (* returns nat *)
+CertiCoq Compile "anf" binom.  (* returns nat *)
+
+Definition color := Color.main.
+
+CertiCoq Compile color.
+CertiCoq Compile "anf" color.

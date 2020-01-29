@@ -26,7 +26,6 @@ Require Import Clightdefs.
 Require Import L6.cps_show.
 Require Import L6_to_Clight.
 
-
 Import MonadNotation.
 Open Scope monad_scope.
 
@@ -117,6 +116,7 @@ Section Helpers.
       ; fun'_info   : def_info
       ; type'_info  : def_info
       ; unk_info    : def_info
+      ; prop_info   : def_info
       }.
 
   (* Enumerate items starting from 0. *)
@@ -316,6 +316,7 @@ Section Externs.
     '(_fun',   ty_fun',   def_fun')   <- string_literal "fun_lit"    "<fun>" ;;
     '(_type',  ty_type',  def_type')  <- string_literal "type_lit"   "<type>" ;;
     '(_unk,    ty_unk,    def_unk)    <- string_literal "unk_lit"    "<unk>" ;;
+    '(_prop,   ty_prop,   def_prop)   <- string_literal "prop_lit"   "<prop>" ;;
     _printf <- gensym "printf" ;;
     _is_ptr <- gensym "is_ptr" ;;
     let toolbox :=
@@ -329,6 +330,7 @@ Section Externs.
          ; fun'_info   := (_fun',   ty_fun')
          ; type'_info  := (_type',  ty_type')
          ; unk_info    := (_unk,    ty_unk)
+         ; prop_info   := (_prop,   ty_prop)
          |} in
     let dfs :=
       ((_lparen, def_lparen) ::
@@ -337,6 +339,7 @@ Section Externs.
        (_fun', def_fun') ::
        (_type', def_type') ::
        (_unk, def_unk) ::
+       (_prop, def_prop) ::
        (_printf,
         Gfun (External (EF_external "printf"
                           (mksignature (AST.Tint :: nil)
@@ -441,38 +444,52 @@ Section L1Types.
       end
     end.
 
-  (*
-  (* Checks if there's a [ty_info] in the list with the same [kername] *)
-  Fixpoint found_up_to_kername (k : kername) (l : list ty_info) : bool :=
-    match l with
-      | nil => false
-      | x :: xs => if string_dec k (ty_name x)
-                   then true
-                   else found_up_to_kername k xs
-    end.
-
-  (* Removes the [ty_info]s from the list with duplicate [kername]s,
-     keeps the last one. *)
-  Fixpoint nodup_up_to_kername (l : list ty_info) : list ty_info :=
-    match l with
-      | nil => nil
-      | x :: xs => if found_up_to_kername (ty_name x) xs
-                   then nodup_up_to_kername xs
-                   else x :: nodup_up_to_kername xs
-    end.
-  *)
-
   (* Generates the initial ind_L1_env *)
   Definition propagate_types
              (gs : Ast.global_env)
              : gState (list (ind_L1_tag * ty_info)) :=
     let singles := get_single_types gs in
-    (* for debugging purposes: *)
-    log ("Propagating types: " ++ String.concat ", " (map ty_name singles)) ;;
     let res := enumerate_pos singles in
     let ienv : ind_L1_env := set_list res (M.empty _) in
     put_ind_L1_env ienv ;;
     ret res.
+
+  (* Checks is the type in question is of sort [Prop]. *)
+  Definition is_prop_type (info : ty_info) : bool :=
+    let fix check_last (e : Ast.term) : bool :=
+        match e with
+          | Ast.tProd _ _ e' => check_last e'
+          (* | Ast.tSort (utils.NEL.sing (Universes.Level.lProp, _)) => true *)
+          | Ast.tSort u =>
+              (String.eqb (AstUtils.string_of_sort u) ("[Prop]"%string))
+               (* hacky but there's a module issue if you try to do it right *)
+          | _ => false
+        end
+    in let check_elims (l : list Universes.sort_family) : bool :=
+        match l with
+        | _ :: nil => true (* hacky but the only case with 1 elt is Prop *)
+        | _ => false
+        end
+   in orb (check_last (Ast.ind_type (ty_body info)))
+          (check_elims (Ast.ind_kelim (ty_body info))).
+
+  (* Takes in a list of types and removes the ones that are of sort [Prop].
+     [Set] and [Type] are fine. CertiCoq erases [Prop]s early on,
+     so no glue code is needed for those types. *)
+  Fixpoint filter_prop_types
+           (l : list (ind_L1_tag * ty_info)) : gState (list (ind_L1_tag * ty_info)) :=
+    match l with
+    | nil => ret nil
+    | (itag, info) :: xs =>
+      if is_prop_type info
+      then
+        log ("Skipping type of sort Prop: " ++ ty_name info) ;;
+        filter_prop_types xs
+      else
+        log ("Including type: " ++ ty_name info) ;;
+        rest <- filter_prop_types xs ;;
+        ret ((itag, info) :: rest)
+    end.
 
 End L1Types.
 
@@ -600,12 +617,12 @@ Section Printers.
           else find_param_fun_name param xs
     end.
 
+  (* FIXME currently we assume all print functions have the same type,
+     but that's not correct.
+     Print functions for parametrized types take > 1 arguments. *)
   Definition ty_printer : type := Tfunction (Tcons val Tnil) tvoid cc_default.
-  (* Fixpoint ty_printer' (params : nat) : type := *)
-  (*   match params with *)
-  (*     | O => Tnil *)
-  (*   Tfunction (Tcons val Tnil) tvoid cc_default. *)
 
+  (* FIXME handle parameters of sort [Prop] *)
   Fixpoint spine_to_args
            (spine : list dissected_type)
            (params : list (string * ident)) : gState (option (list expr)) :=
@@ -623,8 +640,8 @@ Section Printers.
         end
     | dInd arg_type_name :: spine' =>
         (* We check [arg_type_name] against fully qualified [kername]s
-            like "Coq.Init.Datatypes.nat". We should only use [kername]s
-            since they're globally unique. *)
+           like "Coq.Init.Datatypes.nat". We should only use [kername]s
+           since they're globally unique. *)
         tagM <- get_tag_from_type_name arg_type_name ;;
         match tagM with
         | None => ret None
@@ -683,7 +700,7 @@ Section Printers.
         let (_fun, ty_fun) := fun'_info toolbox in
         let (_type, ty_type) := type'_info toolbox in
         let (_unk, ty_unk) := unk_info toolbox in
-
+        let (_prop, ty_prop) := prop_info toolbox in
 
         (* function calls to printf *)
         let print_ctor_name : statement :=
@@ -706,6 +723,9 @@ Section Printers.
         let print_unk : statement :=
             Scall None (Evar _printf ty_printf)
                        (Evar _unk ty_unk :: nil) in
+        let print_prop : statement :=
+            Scall None (Evar _printf ty_printf)
+                       (Evar _prop ty_prop :: nil) in
 
         (* Generates a single function call to a printer with the right argument type *)
         let rec_print_call
@@ -767,16 +787,19 @@ Section Printers.
                            " in recursive call") ;;
                       ret Sskip
                   | Some printer , Some info => (* success! *)
-                      let spine_args :=
-                          firstn (length (ty_params info)) spine_args in (* hacky *)
-                      ret (Scall None (Evar printer ty_printer) (* FIXME wrong type *)
-                             (Ederef
-                                 (Ebinop Oadd
-                                         (Ecast
-                                           (Evar _args (tptr tvoid))
-                                           (tptr val))
-                                         (Econst_int (Int.repr (Z.of_nat i)) val)
-                                         (tptr val)) val :: spine_args))
+                      if is_prop_type info
+                      then ret print_prop
+                      else
+                        let spine_args := (* taking in only the parameters *)
+                            firstn (length (ty_params info)) spine_args in
+                        ret (Scall None (Evar printer ty_printer) (* FIXME wrong type *)
+                              (Ederef
+                                  (Ebinop Oadd
+                                          (Ecast
+                                            (Evar _args (tptr tvoid))
+                                            (tptr val))
+                                          (Econst_int (Int.repr (Z.of_nat i)) val)
+                                          (tptr val)) val :: spine_args))
                   end
               end
           | _ => (* TODO expand this for other cases *)
@@ -800,7 +823,6 @@ Section Printers.
 
         (* Generates cases for the switch statement in the print function *)
         let fix switch_cases
-                (params : list string)
                 (ctors : list (ctor_L1_index * (BasicAst.ident * Ast.term * nat)))
                 : gState labeled_statements :=
           match ctors with
@@ -808,7 +830,7 @@ Section Printers.
           | (ctag, (_, ty, arity)) :: ctors' =>
             let (args, rt) := dissect_types params (dInd name :: nil) ty in
             calls <- rec_print_calls (enumerate_nat args) ;;
-            rest <- switch_cases params ctors' ;;
+            rest <- switch_cases ctors' ;;
             accM <- get_ctor_arg_accessor_env itag ctag ;;
             match accM with
             | Some (ty_acc, _acc) =>
@@ -831,7 +853,7 @@ Section Printers.
             end
           end in
 
-        entire_switch <- switch_cases params (enumerate_pos ctors) ;;
+        entire_switch <- switch_cases (enumerate_pos ctors) ;;
         let body :=
           Scall (Some _tag)
              (Evar gtname (Tfunction (Tcons val Tnil) tuint cc_default))
@@ -1080,7 +1102,7 @@ Section CConstructors.
         constr_fun_id <- gensym (make_name cname) ;;
         argv_ident <- gensym "argv" ;;
         arg_list <- make_arg_list ar ;;
-        let asgn_s := make_constrAsgn argv_ident arg_list in
+        let asgn_s := make_constrAsgn argv_ident arg_list in (* TODO move this fn from L6_to_Clight to here*)
         let header := c_int ((Z.shiftl (Z.of_nat ar) 10) + (Z.of_nat ord)) val in
         let body :=
             Sassign (Field(var argv_ident, 0%Z)) header ;;;
@@ -1139,7 +1161,7 @@ Definition make_glue_program
         (gs : Ast.global_env)
         : gState (option Clight.program * option Clight.program) :=
   '(externs, toolbox) <- make_externs ;;
-  singles <- propagate_types gs ;;
+  singles <- (propagate_types >=> filter_prop_types) gs ;;
   name_defs <- make_name_arrays singles ;;
   ctor_defs <- constructors_for_tys singles ;;
   structs <- args_structs_from_types singles ;;

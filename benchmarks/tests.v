@@ -9,11 +9,12 @@ From CertiCoq.Plugin Require Import CertiCoq.
 Open Scope string.
 
 Import ListNotations.
+Import VeriStar.
 
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
 
-CertiCoq Compile demo1.
+CertiCoq Compile  demo1.
 CertiCoq Compile "anf" demo1.
 
 CertiCoq Compile demo2.
@@ -24,7 +25,6 @@ Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
 CertiCoq Compile list_sum.
 CertiCoq Compile "anf" list_sum.
 
-Import VeriStar.
 
 Definition vs_easy :=
   match vs.main with
@@ -67,7 +67,6 @@ Debug: Time elapsed in L7:  2.394216 *)
 
 CertiCoq Compile vs_hard.
 CertiCoq Compile "anf" vs_hard.
-
 
 Definition binom := Binom.main.
 

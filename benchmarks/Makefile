@@ -1,12 +1,20 @@
 COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R ./ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
 CCOMPILER=gcc
-CFILES= demo1 demo2 list_sum vs_easy vs_hard binom color
 
-EXEC=$(CFILES) $(patsubst %, %_cps, $(CFILES))
+# Names of the benchmarks
+TESTS=$(shell cat TESTS)
+# Names of the generated cfiles
+CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, CertiCoq.Benchmarks.tests.%.c, $(TESTS))
+# Names of the generated executables
+EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS))
 
-cfiles: $(CFILES)e
-exec: $(EXEC)
-all: copy lib tests cfiles
+default: copy exec run
+all: copy lib exec run
+
+.PHONY: all default clean lib cleanlib tests run
+
+$(CFILES): tests
+exec: $(TESTS)
 
 copy:
 	cp ../theories/Runtime/gc.c ./
@@ -18,7 +26,6 @@ copy:
 	cp ../theories/Runtime/config.h ./
 
 clean:
-	$(MAKE) clean -C lib
 	rm -f ./gc.c
 	rm -f ./gc.h
 	rm -f ./values.h
@@ -37,10 +44,15 @@ lib/Makefile:
 lib: lib/Makefile
 	$(MAKE) -C lib
 
+cleanlib:
+	$(MAKE) clean -C lib
+
 tests: tests.v
 	coqc $(COQOPTS) tests.v
 
-
-$(CFILES):
+$(TESTS): $(CFILES)
 	$(CCOMPILER) -o $@_cps -Wno-everything -O2 $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@.c
 	$(CCOMPILER) -o $@ -Wno-everything -O2 $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue.CertiCoq.Benchmarks.tests.$@.c
+
+run: run.sh
+	sh run.sh

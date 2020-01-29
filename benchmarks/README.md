@@ -1,30 +1,34 @@
 CertiCoq Benchmarks
-  as featured in
-"Verified Extraction for Coq"
-  a thesis by
-Olivier Savary Belanger
-===========================
+-------------------
+To compile the Coq benchmarks to C, compile and run the C files simply run
 
-This file describes the procedure to extract and compile (using CertiCoq and Compcert), and run the benchmarks described in Chapter 5 of "Verified Extraction for Coq" [1]. 
+  # make all
 
-INSTALLATION:
----------------------------
-Before running the benchmarks:
-1) Install CertiCoq (see ../README.md)
-  a) To get the average time of 10 runs for each phase, go to ../theories/extraction/extraction.v and comment out every versions of AstCommon.timePhase other than T2.
-  b) To get the whole compilation time, go to ../theories/extraction/extraction.v and comment out every versions of AstCommon.timePhase other than T1
-2) Install Compcert (version 3.6)
+This will also compile the necessary libraries located in ./lib. To avoid
+recompiling the library in the future compile with
+
+  # make
+
+To clean and recompile the library run
+
+  # make cleanlib
+  # make lib
+
+Some of these benchmarks are featured in Olivier Savary Belanger's thesis [1],
+for an old version of the compiler.
+
+How to add new benchmarks
+-------------------------
+To add a new benchmark
+
+1) Go to tests.v and add your bencmark program at the end of the file. The
+   top-level definition that is complied should be defined in the file tests.v
+   (not just imported). Write command to compile both the CPS and ANF versions
+   (otherwise the bencmarking automation will not work.
+
+2) Go to file TESTS, add the name of the new benchmark at the end of the file.
 
 
-RUNNING THE BENCHMARKS:
----------------------------
-To run all the benchmarks, run the "benchmarks" Make target in the current folder:
-# make benchmarks
-File "benchmarks.expected" was generated using
-# make benchmarks > benchmarks.expected
-with AstCommon.timePhase T2.
-
-
-Bibliography
-------------
+References
+----------
 [1] Savary Belanger, Olivier. Verified Extraction for Coq. PhD Thesis, Princeton University, 2019.

@@ -622,7 +622,9 @@ Section Printers.
      Print functions for parametrized types take > 1 arguments. *)
   Definition ty_printer : type := Tfunction (Tcons val Tnil) tvoid cc_default.
 
-  (* FIXME handle parameters of sort [Prop] *)
+  (* Takes a spine of the type that is about to be printed,
+     and returns the correct list of printer functions for it,
+     some of which may be the parameters of the type *)
   Fixpoint spine_to_args
            (spine : list dissected_type)
            (params : list (string * ident)) : gState (option (list expr)) :=
@@ -763,45 +765,48 @@ Section Printers.
                  like "Coq.Init.Datatypes.nat". We should only use [kername]s
                  since they're globally unique. *)
               tagM <- get_tag_from_type_name arg_type_name ;;
-              spineM <- spine_to_args spine param_table ;;
-              match tagM, spineM with
-              | None, _ =>
+              match tagM with
+              | None =>
                   log ("No L1 tag for the type " ++ name ++
                        " for the #" ++ show_nat i ++
                        " constructor that takes " ++ arg_type_name) ;;
                   ret Sskip (* ideally shouldn't happen *)
-              | _, None =>
-                  log ("Couldn't create spine application for the type " ++ name ++
-                       " for the #" ++ show_nat i ++
-                       " constructor that takes " ++ arg_type_name) ;;
-                  ret Sskip (* ideally shouldn't happen *)
-              | Some tag, Some spine_args =>
-                  printerM <- get_print_env tag ;;
+              | Some tag =>
                   infoM <- get_ind_L1_env tag ;;
-                  match printerM , infoM with
-                  | None , _ =>
-                      log ("Can't find printer for the type " ++ name) ;;
-                      ret Sskip
-                  | _ , None =>
+                  match infoM with
+                  | None =>
                       log ("Can't find info for the type " ++ name ++
                            " in recursive call") ;;
                       ret Sskip
-                  | Some printer , Some info => (* success! *)
+                  | Some info =>
                       if is_prop_type info
                       then ret print_prop
                       else
-                        let spine_args := (* taking in only the parameters *)
-                            firstn (length (ty_params info)) spine_args in
-                        ret (Scall None (Evar printer ty_printer) (* FIXME wrong type *)
-                              (Ederef
-                                  (Ebinop Oadd
-                                          (Ecast
-                                            (Evar _args (tptr tvoid))
-                                            (tptr val))
-                                          (Econst_int (Int.repr (Z.of_nat i)) val)
-                                          (tptr val)) val :: spine_args))
+                        spineM <- spine_to_args spine param_table ;;
+                        printerM <- get_print_env tag ;;
+                        match spineM, printerM with
+                        | None , _ =>
+                            log ("Couldn't create spine application for the type " ++ name ++
+                                " for the #" ++ show_nat i ++
+                                " constructor that takes " ++ arg_type_name) ;;
+                            ret Sskip (* ideally shouldn't happen *)
+                        | _ , None =>
+                            log ("Can't find printer for the type " ++ name) ;;
+                            ret Sskip
+                        | Some spine_args , Some printer =>
+                            let spine_args := (* taking in only the parameters *)
+                                firstn (length (ty_params info)) spine_args in
+                            ret (Scall None (Evar printer ty_printer) (* FIXME wrong type *)
+                                  (Ederef
+                                      (Ebinop Oadd
+                                              (Ecast
+                                                (Evar _args (tptr tvoid))
+                                                (tptr val))
+                                              (Econst_int (Int.repr (Z.of_nat i)) val)
+                                              (tptr val)) val :: spine_args))
+                        end
                   end
-              end
+             end
           | _ => (* TODO expand this for other cases *)
               log ("Found a non-inductive constructor argument for " ++ name) ;;
               ret print_unk

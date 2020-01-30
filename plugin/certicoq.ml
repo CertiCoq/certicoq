@@ -9,36 +9,45 @@ open Ast_quoter
 open ExceptionMonad
 open AstCommon
 
+type command_args =
+ | ANF
+ | TIME
+ | OPT of int
+ | DEBUG
+ | ARGS of int 
+
 
 type options =
   { cps   : bool;
     time  : bool;
     opt   : int;
-    debug : bool; }
+    debug : bool;
+    args  : int;
+  }
 
 let default_options : options =
   { cps  = true;
     time = false;
     opt  = 0;
     debug = false;
+    args = 5;
   }
 
 type 'a error = Res of 'a | Error of string
 
 
 let options_help : string =
-  "List of valid options: \"direct\", \"-o1\", \"time\", \"debug\"\n"
+  "List of valid options: -anf -time -o1 -debug -args X"
 
-
-let parse_options (l : string list) : options error =
+let make_options (l : command_args list) : options error =
   let rec aux (o : options) l =
     match l with
     | [] -> Res o
-    | "anf"   :: xs -> aux {o with cps = false} xs
-    | "time"  :: xs -> aux {o with time = true} xs
-    | "-o1"   :: xs -> aux {o with opt = 1} xs
-    | "debug" :: xs -> aux {o with debug = true} xs
-    | x       :: xs -> Error ("Unsupported option " ^ x)
+    | ANF     :: xs -> aux {o with cps = false} xs
+    | TIME    :: xs -> aux {o with time = true} xs
+    | OPT n   :: xs -> aux {o with opt = n} xs
+    | DEBUG   :: xs -> aux {o with debug = true} xs
+    | ARGS n  :: xs -> aux {o with args = n} xs
   in aux default_options l
 
 let pr_char c = str (Char.escaped c)
@@ -68,7 +77,8 @@ let compile opts gr =
   let olevel = coq_nat_of_int opts.opt in
   let timing = opts.time in
   let debug  = opts.debug in
-  
+  let args = coq_nat_of_int opts.args in
+
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let sigma, c = Evarutil.new_global sigma gr in
@@ -83,7 +93,7 @@ let compile opts gr =
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   let fuel = coq_nat_of_int 10000 in
   let nenv = 
-    let p = Pipeline.compile cps olevel timing term in
+    let p = Pipeline.compile cps olevel timing args term in
     match p with
     | (Ret ((nenv, header), prg), dbg) ->
       debug_msg debug "Finished compiling, printing to file.";

@@ -11,14 +11,24 @@ Open Scope string.
 Import ListNotations.
 Import VeriStar.
 
+
+(* TODO: Eventually move somewhere else and also add the option to print help.
+Valid options:
+-anf    : to use direct-style compilation
+-time   : to time phases
+-o1     : to use optimizing pipeline
+-debug  : to print debug messages 
+-args X : to use X arguments in the C generated code (+1 for the thread_info)
+*)
+
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
-
-CertiCoq Compile  demo1.
-CertiCoq Compile "anf" demo1.
+ 
+CertiCoq Compile demo1.
+CertiCoq Compile -anf demo1.
 
 CertiCoq Compile demo2.
-CertiCoq Compile "anf" demo2.
+CertiCoq Compile -anf demo2.
 
 Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
 
@@ -38,8 +48,8 @@ Definition vs_hard :=
   | _ => false
   end.
 
-CertiCoq Compile "time" vs_easy.
-CertiCoq Compile "anf"  vs_easy.
+CertiCoq Compile -time vs_easy.
+CertiCoq Compile -anf  vs_easy.
 
 (* Zoe: Compiling with the CPS pipeline takes much longer for vs_easy.
    The overhead seems to come from the C translation: (maybe has to do with dbg/error messages?)
@@ -66,14 +76,14 @@ Debug: Time elapsed in L6 Pipeline:  0.148308
 Debug: Time elapsed in L7:  2.394216 *)
 
 CertiCoq Compile vs_hard.
-CertiCoq Compile "anf" vs_hard.
+CertiCoq Compile -anf vs_hard.
 
 Definition binom := Binom.main.
 
 CertiCoq Compile binom. (* returns nat *)
-CertiCoq Compile "anf" binom.  (* returns nat *)
+CertiCoq Compile -anf binom.  (* returns nat *)
 
 Definition color := Color.main.
 
 CertiCoq Compile color.
-CertiCoq Compile "anf" color.
+CertiCoq Compile -anf color.

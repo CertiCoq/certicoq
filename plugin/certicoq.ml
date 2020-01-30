@@ -14,7 +14,7 @@ type command_args =
  | TIME
  | OPT of int
  | DEBUG
- | ARGS of int 
+ | ARGS of int
 
 
 type options =
@@ -74,10 +74,11 @@ let debug_msg (flag : bool) (s : string) =
 let compile opts gr =
   (* get opts *)
   let cps    = opts.cps in
+  let args = coq_nat_of_int opts.args in
   let olevel = coq_nat_of_int opts.opt in
   let timing = opts.time in
   let debug  = opts.debug in
-  let args = coq_nat_of_int opts.args in
+  let options = Pipeline.make_opts cps args olevel timing debug in
 
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -92,8 +93,8 @@ let compile opts gr =
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   let fuel = coq_nat_of_int 10000 in
-  let nenv = 
-    let p = Pipeline.compile cps olevel timing args term in
+  let nenv =
+    let p = Pipeline.compile options term in
     match p with
     | (Ret ((nenv, header), prg), dbg) ->
       debug_msg debug "Finished compiling, printing to file.";
@@ -112,7 +113,7 @@ let compile opts gr =
       CErrors.user_err ~hdr:"template-coq" (str "Could not compile: " ++ (pr_char_list s) ++ str ("\n" ^ "Pipeline debug: \n" ^ string_of_chars dbg))
   in
   let time = Unix.gettimeofday() in
-  (match Pipeline.make_glue term with
+  (match Pipeline.make_glue options term with
   | Ret (((nenv, header), prg), logs) ->
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Generated glue code in %f s.." time);

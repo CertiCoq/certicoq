@@ -1184,8 +1184,10 @@ Definition make_glue_program
        mk_prog_opt composites glob_defs
                    main_ident true).
 
+Require Import Common.Pipeline_utils.
 (* The entry point glue code generation *)
 Definition generate_glue
+           (opts : Options)
            (p : Ast.program) (* an L1 program *)
            : name_env * option Clight.program * option Clight.program * list string :=
   let (globs, _) := p in

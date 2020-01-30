@@ -96,6 +96,7 @@ Separate Extraction
          Floats.Float32.to_bits Floats.Float.to_bits
          String.length
          Compiler.pipeline.printProg
+         Compiler.pipeline.make_opts
          Compiler.pipeline.compile
          Compiler.pipeline.make_glue.
          (* L7.Clightexec.run. *)

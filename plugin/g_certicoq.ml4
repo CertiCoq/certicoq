@@ -7,18 +7,14 @@ open Pp
 open Certicoq
 open Ltac_plugin
 
-open Tacarg
-open Vernacexpr
-open Pcoq
-open Genarg
 
 
-
-VERNAC ARGUMENT EXTEND cargs
+VERNAC ARGUMENT EXTEND cargs 
 | [ "-anf" ] -> [ ANF ]
 | [ "-time" ] -> [ TIME ]
 | [ "-o1" ] -> [ OPT(1) ]
 | [ "-debug" ] -> [ DEBUG ]
+(* | [ "-args" int(n) ] -> [ ARGS(n) ] *)
 | [ "-args" "0" ] -> [ ARGS(0) ]
 | [ "-args" "1" ] -> [ ARGS(1) ]
 | [ "-args" "2" ] -> [ ARGS(2) ]
@@ -45,7 +41,7 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
 | [ "CertiCoq" "Compile" cargs_list(l) global(gr) ] -> [
     let gr = Nametab.global gr in
     match Certicoq.make_options l with
-    | Res opts -> Certicoq.compile opts gr
+    | Res opts -> Certicoq.compile_with_glue opts gr
     | Error s -> Feedback.msg_error (Pp.str s ++ Pp.str "\n" ++ Pp.str Certicoq.options_help)
   ]
 (* | [ "CertiCoq" "Show" "L6" "Opt" int(n) global(gr) ] -> [ *)

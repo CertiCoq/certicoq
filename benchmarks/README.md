@@ -26,7 +26,10 @@ To add a new benchmark
    (not just imported). Write command to compile both the CPS and ANF versions
    (otherwise the bencmarking automation will not work.
 
-2) Go to file TESTS, add the name of the new benchmark at the end of the file.
+2) Create a file named <benchmark_name>_main.c to run the benchmark and print
+   the result
+
+3) Go to file TESTS, add the name of the new benchmark at the end of the file.
 
 
 References

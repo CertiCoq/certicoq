@@ -44,8 +44,10 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
     | Res opts -> Certicoq.compile_with_glue opts gr
     | Error s -> Feedback.msg_error (Pp.str s ++ Pp.str "\n" ++ Pp.str Certicoq.options_help)
   ]
-(* | [ "CertiCoq" "Show" "L6" "Opt" int(n) global(gr) ] -> [ *)
-(*     let gr = Nametab.global gr in *)
-(*     Certicoq.show_l6 (coq_nat_of_int n) gr *)
-(*   ] *)
+| [ "CertiCoq" "Show" "IR" cargs_list(l) global(gr) ] -> [
+    let gr = Nametab.global gr in
+    match Certicoq.make_options l with
+    | Res opts -> Certicoq.show_ir opts gr
+    | Error s -> Feedback.msg_error (Pp.str s ++ Pp.str "\n" ++ Pp.str Certicoq.options_help)
+  ]
 END

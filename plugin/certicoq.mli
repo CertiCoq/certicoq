@@ -22,5 +22,4 @@ val options_help : string
 val compile_with_glue : options -> Names.GlobRef.t -> unit
 val compile_only : options -> Names.GlobRef.t -> unit
 val generate_glue_only : options -> Names.GlobRef.t -> unit
-
-(* val show_l6 : Metacoq_template_plugin.Datatypes.nat -> Globnames.global_reference -> unit *)
+val show_ir : options -> Names.GlobRef.t -> unit

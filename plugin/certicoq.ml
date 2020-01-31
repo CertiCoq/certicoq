@@ -106,7 +106,7 @@ let compile opts term const =
 
   let p = Pipeline.compile options term in
   match p with
-  | (Ret ((nenv, header), prg), dbg) ->
+  | (CompM.Ret ((nenv, header), prg), dbg) ->
     debug_msg debug "Finished compiling, printing to file.";
     let time = Unix.gettimeofday() in
     (* Zoe: Make suffix appear only in testing/debugging mode *)
@@ -119,8 +119,10 @@ let compile opts term const =
     Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
     debug_msg debug "Pipeline debug:";
     debug_msg debug (string_of_chars dbg)
-  | (Err s, dbg) ->
-    CErrors.user_err ~hdr:"template-coq" (str "Could not compile: " ++ (pr_char_list s) ++ str ("\n" ^ "Pipeline debug: \n" ^ string_of_chars dbg))
+  | (CompM.Err s, dbg) ->
+    debug_msg debug "Pipeline debug:";
+    debug_msg debug (string_of_chars dbg);
+    CErrors.user_err ~hdr:"pipeline" (str "Could not compile: " ++ (pr_char_list s) ++ str "\n")
 
 (* Generate glue code for the compiled program *)
 let generate_glue opts term const =
@@ -129,7 +131,7 @@ let generate_glue opts term const =
 
   let time = Unix.gettimeofday() in
   (match Pipeline.make_glue options term with
-  | Ret (((nenv, header), prg), logs) ->
+  | CompM.Ret (((nenv, header), prg), logs) ->
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Generated glue code in %f s.." time);
     (match logs with [] -> () | _ ->
@@ -142,8 +144,8 @@ let generate_glue opts term const =
 
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Printed glue code to file in %f s.." time)
-  | Exc s ->
-    CErrors.user_err ~hdr:"template-coq" (str "Could not generate glue code: " ++ pr_char_list s))
+  | CompM.Err s ->
+    CErrors.user_err ~hdr:"glue-code" (str "Could not generate glue code: " ++ pr_char_list s))
 
 
 let compile_with_glue opts gr =
@@ -159,28 +161,29 @@ let generate_glue_only opts gr =
   let (term, const) = quote opts gr in
   generate_glue opts term const
 
+let print_to_file (s : string) (file : string) =
+  let f = open_out file in
+  Printf.fprintf f "%s\n" s;
+  close_out f
 
-(* For emitting L6 code *)
-(* let show_l6 olevel gr = *)
-(*   let env = Global.env () in *)
-(*   let sigma = Evd.from_env env in *)
-(*   let sigma, c = Evarutil.new_global sigma gr in *)
-(*   let const = match gr with *)
-(*     | Globnames.ConstRef c -> c *)
-(*     | _ -> CErrors.user_err ~hdr:"template-coq" *)
-(*        (Printer.pr_global gr ++ str" is not a constant definition") in *)
-(*   Feedback.msg_debug (str"Quoting"); *)
-(*   let time = Unix.gettimeofday() in *)
-(*   let term = quote_term_rec env (EConstr.to_constr sigma c) in *)
-(*   let time = (Unix.gettimeofday() -. time) in *)
-(*   Feedback.msg_debug (str(Printf.sprintf "Finished quoting in %f s.. compiling to L7." time)); *)
-(*   let fuel = coq_nat_of_int 10000 in *)
-(*   let p = AllInstances.emit_L6_anf fuel olevel term in *)
-(*   match p with *)
-(*   | Ret str -> *)
-(*      let l6f = (Names.KerName.to_string (Names.Constant.canonical const) ^ ".l6") in *)
-(*      let f = open_out l6f in *)
-(*      Printf.fprintf f "%s" (string_of_chars str); *)
-(*      close_out f; *)
-(*   | Exc s -> *)
-(*      CErrors.user_err ~hdr:"template-coq" (str "Could not compile: " ++ pr_char_list s) *)
+let show_ir opts gr =
+  let (term, const) = quote opts gr in
+  let debug = opts.debug in
+  let options = make_pipeline_options opts in
+  let p = Pipeline.show_IR options term in
+  match p with
+  | (Ret prg, dbg) ->
+    debug_msg debug "Finished compiling, printing to file.";
+    let time = Unix.gettimeofday() in
+    let suff = if opts.cps then "_cps" else "" ^ if opts.olevel <> 0 then "_opt" else "" in
+    let file = (Names.KerName.to_string (Names.Constant.canonical const)) ^ suff ^ ".ir" in
+    print_to_file (string_of_chars prg) file;
+    let time = (Unix.gettimeofday() -. time) in
+    Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
+    debug_msg debug "Pipeline debug:";
+    debug_msg debug (string_of_chars dbg)
+  | (CompM.Err s, dbg) ->
+    debug_msg debug "Pipeline debug:";
+    debug_msg debug (string_of_chars dbg);
+    CErrors.user_err ~hdr:"show-ir" (str "Could not compile: " ++ (pr_char_list s) ++ str "\n")
+

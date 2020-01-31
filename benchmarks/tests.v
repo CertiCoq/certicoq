@@ -19,6 +19,10 @@ Valid options:
 -o1     : to use optimizing pipeline
 -debug  : to print debug messages 
 -args X : to use X arguments in the C generated code (+1 for the thread_info)
+
+
+To print the backend IR (aka L6) you can use the command
+CertiCoq Show IR <global_id>.
 *)
 
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).

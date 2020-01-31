@@ -98,6 +98,6 @@ Separate Extraction
          Compiler.pipeline.printProg
          Compiler.pipeline.make_opts
          Compiler.pipeline.compile
-         Compiler.pipeline.make_glue.
-         (* L7.Clightexec.run. *)
+         Compiler.pipeline.make_glue
+         Compiler.pipeline.show_IR.
 Cd "..".

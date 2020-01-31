@@ -13,11 +13,9 @@ type options =
     args      : int;
   }
 
-type 'a error = Res of 'a | Error of string
-
 val default_options : options
-val make_options : command_args list -> options error
-val options_help : string
+val make_options : command_args list -> options
+val help_msg : string
 
 val compile_with_glue : options -> Names.GlobRef.t -> unit
 val compile_only : options -> Names.GlobRef.t -> unit

@@ -19,14 +19,15 @@ END
 VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
 | [ "CertiCoq" "Compile" cargs_list(l) global(gr) ] -> [
     let gr = Nametab.global gr in
-    match Certicoq.make_options l with
-    | Res opts -> Certicoq.compile_with_glue opts gr
-    | Error s -> Feedback.msg_error (Pp.str s ++ Pp.str "\n" ++ Pp.str Certicoq.options_help)
+    let opts = Certicoq.make_options l in
+    Certicoq.compile_with_glue opts gr
   ]
 | [ "CertiCoq" "Show" "IR" cargs_list(l) global(gr) ] -> [
     let gr = Nametab.global gr in
-    match Certicoq.make_options l with
-    | Res opts -> Certicoq.show_ir opts gr
-    | Error s -> Feedback.msg_error (Pp.str s ++ Pp.str "\n" ++ Pp.str Certicoq.options_help)
+    let opts = Certicoq.make_options l in
+    Certicoq.show_ir opts gr
+  ]
+| [ "CertiCoq" "-help" ] -> [
+    Feedback.msg_info (str help_msg)
   ]
 END

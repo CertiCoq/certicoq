@@ -56,15 +56,29 @@ let default_options : options =
     args   = 5;
   }
 
-type 'a error = Res of 'a | Error of string
+let help_msg : string =
+  "Usage:\n\
+To compile an program named <gid> type:\n\
+   CertiCoq Compile [options] <gid>.\n\n\
+To show this help message type:\n\
+   CertiCoq -help.\n\n\
+To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
+   CertiCoq Show IR [options] <global_identifier>.\n\n
+Valid options:\n\
+-direct :  Produce direct-style code (as opposed to he default which is continuation-passing style)\n\
+-time   :  Time each compilation phase\n\
+-o1     :  Perform more aggressive optimizations (currently unboxing of closure environments)\n\
+-bebug  :  Show debugging information\n\
+-args X :  Specify how many arguments are used in the C translation (on top of the thread_info argument)\n\
+\n\
+To show this help message type:\n\
+CertiCoq -help.\n"
 
-let options_help : string =
-  "List of valid options: -anf -time -o1 -debug -args X"
 
-let make_options (l : command_args list) : options error =
+let make_options (l : command_args list) : options =
   let rec aux (o : options) l =
     match l with
-    | [] -> Res o
+    | [] -> o
     | ANF     :: xs -> aux {o with cps = false} xs
     | TIME    :: xs -> aux {o with time = true} xs
     | OPT n   :: xs -> aux {o with olevel = n} xs

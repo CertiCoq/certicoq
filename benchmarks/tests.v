@@ -11,6 +11,7 @@ Open Scope string.
 Import ListNotations.
 Import VeriStar.
 
+CertiCoq -help.
 
 (* TODO: Eventually move somewhere else and also add the option to print help.
 Valid options:
@@ -30,6 +31,7 @@ Definition demo2 := List.map negb [true; false; true].
  
 CertiCoq Compile demo1.
 CertiCoq Compile -anf demo1.
+CertiCoq Compile -anf -o1 demo1.
 
 CertiCoq Compile demo2.
 CertiCoq Compile -anf demo2.

@@ -117,6 +117,8 @@ Section Helpers.
       ; type'_info  : def_info
       ; unk_info    : def_info
       ; prop_info   : def_info
+      ; get_unboxed_ordinal_info : def_info
+      ; get_boxed_ordinal_info   : def_info
       }.
 
   (* Enumerate items starting from 0. *)
@@ -309,6 +311,33 @@ Section Externs.
   Definition ty_printf : type :=
     Tfunction (Tcons (tptr tschar) Tnil) tint cc_default.
 
+  Definition get_unboxed_ordinal : gState def :=
+    gname <- gensym "get_unboxed_ordinal" ;;
+    _v <- gensym "v" ;;
+    ret (gname,
+         Gfun (Internal
+                 {| fn_return := tuint
+                  ; fn_callconv := cc_default
+                  ; fn_params := (_v, val) :: nil
+                  ; fn_vars := nil
+                  ; fn_temps := nil
+                  ; fn_body := (Sreturn (Some (Ebinop Oshr (var _v) (make_cint 1 val) val)))
+                  |})).
+
+  Definition get_boxed_ordinal : gState def :=
+    gname <- gensym "get_boxed_ordinal" ;;
+    _v <- gensym "v" ;;
+    ret (gname,
+         Gfun (Internal
+                 {| fn_return := tuint
+                  ; fn_callconv := cc_default
+                  ; fn_params := (_v, val) :: nil
+                  ; fn_vars := nil
+                  ; fn_temps := nil
+                  ; fn_body :=
+                      (Sreturn (Some (Ebinop Oand (Field(var _v, -1)) (make_cint 255 val) val)))
+                  |})).
+
   Definition make_externs : gState (defs * toolbox_info) :=
     '(_lparen, ty_lparen, def_lparen) <- string_literal "lparen_lit" "(" ;;
     '(_rparen, ty_rparen, def_rparen) <- string_literal "rparen_lit" ")" ;;
@@ -319,6 +348,9 @@ Section Externs.
     '(_prop,   ty_prop,   def_prop)   <- string_literal "prop_lit"   "<prop>" ;;
     _printf <- gensym "printf" ;;
     _is_ptr <- gensym "is_ptr" ;;
+    '(_guo, def_guo) <- get_unboxed_ordinal ;;
+    '(_gbo, def_gbo) <- get_boxed_ordinal ;;
+
     let toolbox :=
         {| printf_info :=
               (_printf, Tfunction (Tcons (tptr tschar) Tnil) tint cc_default)
@@ -331,6 +363,10 @@ Section Externs.
          ; type'_info  := (_type',  ty_type')
          ; unk_info    := (_unk,    ty_unk)
          ; prop_info   := (_prop,   ty_prop)
+         ; get_unboxed_ordinal_info :=
+              (_guo, Tfunction (Tcons val Tnil) tuint cc_default)
+         ; get_boxed_ordinal_info :=
+              (_gbo, Tfunction (Tcons val Tnil) tuint cc_default)
          |} in
     let dfs :=
       ((_lparen, def_lparen) ::
@@ -351,7 +387,8 @@ Section Externs.
                           (mksignature (val_typ :: nil) None cc_default))
                         (Tcons val Tnil)
                         (Tint IBool Unsigned noattr) cc_default)) ::
-
+       (_guo, def_guo) ::
+       (_gbo, def_gbo) ::
        nil) in
     ret (dfs, toolbox).
 
@@ -1031,28 +1068,62 @@ End ArgsStructs.
 Section CtorEnumTag.
   Variable toolbox : toolbox_info.
 
+  SearchAbout (Z -> Z).
+  Fixpoint match_ordinals_with_tag
+           (ctors : list (BasicAst.ident * Ast.TemplateTerm.term * nat))
+           (boxed unboxed total : nat)
+           : list (nat * nat) * list (nat * nat) :=
+    match ctors with
+    | nil => (nil, nil)
+    | (_, _, arity) :: ctors' =>
+        if arity
+        then
+          let (bs, us) := match_ordinals_with_tag ctors' boxed (S unboxed) (S total) in
+          (bs, (unboxed, total) :: us)
+        else
+          let (bs, us) := match_ordinals_with_tag ctors' (S boxed) unboxed (S total) in
+          ((boxed, total) :: bs, us)
+    end.
+
+  Fixpoint matches_to_LS
+           (pairs : list (nat * nat)) : labeled_statements :=
+    match pairs with
+    | nil => LSnil
+    | (ordinal, tag) :: pairs' =>
+      LScons (Some (Z.of_nat ordinal))
+             (Sreturn (Some (Econst_int (Int.repr (Z.of_nat tag)) tuint)))
+             (matches_to_LS pairs')
+    end.
+
   Fixpoint get_enum_tag_from_types
           (tys : list (ind_L1_tag * ty_info))
           : gState defs :=
     match tys with
     | nil => ret nil
-    | (itag, {| ty_name := kn ; ty_body := _ |}) :: tys' =>
+    | (itag, {| ty_name := kn ; ty_body := one |}) :: tys' =>
         _b <- gensym "b" ;;
+        _t <- gensym "t" ;;
         _v <- gensym "v" ;;
         let (_is_ptr, ty_is_ptr) := is_ptr_info toolbox in
+        let (_guo, ty_guo) := get_unboxed_ordinal_info toolbox in
+        let (_gbo, ty_gbo) := get_boxed_ordinal_info toolbox in
+        let (boxed, unboxed) := match_ordinals_with_tag (Ast.ind_ctors one) 0 0 0 in
         let body :=
           Scall (Some _b) (Evar _is_ptr ty_is_ptr) (Evar _v val :: nil) ;;;
           Sifthenelse
             (Evar _b tbool)
-            (Sreturn (Some (Ebinop Oand (Field(var _v, -1)) (make_cint 255 val) val)))
-            (Sreturn (Some (Ebinop Oshr (var _v) (make_cint 1 val) val))) in
+            (Scall (Some _t) (Evar _gbo ty_gbo) (Evar _v val :: nil) ;;;
+             Sswitch (Evar _t tuint) (matches_to_LS boxed))
+            (Scall (Some _t) (Evar _guo ty_guo) (Evar _v val :: nil) ;;;
+             Sswitch (Evar _t tuint) (matches_to_LS unboxed))
+            in
         gname <- gensym ("get_" ++ sanitize_qualified kn ++ "_tag") ;;
         let f := (gname,
                   Gfun (Internal
                           {| fn_return := tuint
                            ; fn_callconv := cc_default
                            ; fn_params := (_v, val) :: nil
-                           ; fn_vars := (_b, tbool) :: nil
+                           ; fn_vars := (_b, tbool) :: (_t, tuint) :: nil
                            ; fn_temps := nil
                            ; fn_body := body
                            |})) in

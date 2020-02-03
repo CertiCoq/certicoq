@@ -1068,15 +1068,14 @@ End ArgsStructs.
 Section CtorEnumTag.
   Variable toolbox : toolbox_info.
 
-  SearchAbout (Z -> Z).
   Fixpoint match_ordinals_with_tag
            (ctors : list (BasicAst.ident * Ast.TemplateTerm.term * nat))
            (boxed unboxed total : nat)
            : list (nat * nat) * list (nat * nat) :=
     match ctors with
     | nil => (nil, nil)
-    | (_, _, arity) :: ctors' =>
-        if arity
+    | ctor :: ctors' =>
+        if unbox_check ctor
         then
           let (bs, us) := match_ordinals_with_tag ctors' boxed (S unboxed) (S total) in
           (bs, (unboxed, total) :: us)
@@ -1108,25 +1107,38 @@ Section CtorEnumTag.
         let (_guo, ty_guo) := get_unboxed_ordinal_info toolbox in
         let (_gbo, ty_gbo) := get_boxed_ordinal_info toolbox in
         let (boxed, unboxed) := match_ordinals_with_tag (Ast.ind_ctors one) 0 0 0 in
-        let body :=
-          Scall (Some _b) (Evar _is_ptr ty_is_ptr) (Evar _v val :: nil) ;;;
-          Sifthenelse
-            (Evar _b tbool)
-            (Scall (Some _t) (Evar _gbo ty_gbo) (Evar _v val :: nil) ;;;
-             Sswitch (Evar _t tuint) (matches_to_LS boxed))
-            (Scall (Some _t) (Evar _guo ty_guo) (Evar _v val :: nil) ;;;
-             Sswitch (Evar _t tuint) (matches_to_LS unboxed))
-            in
+        let (vars, body) := match boxed, unboxed with
+          | nil, nil => (* if there are no constructors, just return 0 *)
+             (nil, Sreturn (Some (Econst_int (Int.repr 0) tuint)))
+          | nil, _ => (* if all ctors are unboxed, then just call get_unboxed_ordinal *)
+             ((_t, tuint) :: nil,
+              Scall (Some _t) (Evar _guo ty_guo) (Evar _v val :: nil) ;;;
+              Sreturn (Some (Evar _t tuint)))
+          | _, nil => (* if all ctors are unboxed, then just call get_boxed_ordinal *)
+             ((_t, tuint) :: nil,
+              Scall (Some _t) (Evar _gbo ty_gbo) (Evar _v val :: nil) ;;;
+              Sreturn (Some (Evar _t tuint)))
+          | _, _ => (* if there are boxed and unboxed constructors, then if and switch *)
+            let body :=
+              Scall (Some _b) (Evar _is_ptr ty_is_ptr) (Evar _v val :: nil) ;;;
+              Sifthenelse
+                (Evar _b tbool)
+                (Scall (Some _t) (Evar _gbo ty_gbo) (Evar _v val :: nil) ;;;
+                Sswitch (Evar _t tuint) (matches_to_LS boxed))
+                (Scall (Some _t) (Evar _guo ty_guo) (Evar _v val :: nil) ;;;
+                Sswitch (Evar _t tuint) (matches_to_LS unboxed))
+            in ((_b, tbool) :: (_t, tuint) :: nil, body)
+          end in
         gname <- gensym ("get_" ++ sanitize_qualified kn ++ "_tag") ;;
         let f := (gname,
                   Gfun (Internal
                           {| fn_return := tuint
-                           ; fn_callconv := cc_default
-                           ; fn_params := (_v, val) :: nil
-                           ; fn_vars := (_b, tbool) :: (_t, tuint) :: nil
-                           ; fn_temps := nil
-                           ; fn_body := body
-                           |})) in
+                          ; fn_callconv := cc_default
+                          ; fn_params := (_v, val) :: nil
+                          ; fn_vars := vars
+                          ; fn_temps := nil
+                          ; fn_body := body
+                          |})) in
         set_get_tag_env itag gname ;;
         rest <- get_enum_tag_from_types tys' ;;
         ret (f :: rest)

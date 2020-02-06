@@ -46,6 +46,27 @@ Definition make_rec_env (fnlst : efnlst) (rho : env) : env :=
   in
   make_env_aux fnlst 0.
 
+(* writing nested fix outside for proof *)
+Fixpoint make_env_aux (funcs : efnlst) (n : N) (fnlst : efnlst) (rho : env) :=
+  match funcs with
+  | eflnil => rho
+  | eflcons na e funcs' =>
+    let rec_env := make_env_aux funcs' (n + 1) fnlst rho in
+    ((ClosFix_v rho fnlst n) :: rec_env)
+  end.
+
+Lemma make_rec_env_aux_eq :
+  forall fnlst rho, 
+    make_rec_env fnlst rho = make_env_aux fnlst 0 fnlst rho.
+Proof.
+  intros fnlst rho. unfold make_rec_env.
+  generalize dependent 0. generalize fnlst at 1 4.  
+  induction fnlst.
+  - simpl. reflexivity.
+  - intros fnlst1 n1. simpl.
+    f_equal. eapply IHfnlst.
+Qed. 
+
 Fixpoint exps_to_list (es : expression.exps) : list exp :=
   match es with
   | enil => nil
@@ -2219,6 +2240,37 @@ Proof.
     + eassumption.
 Qed.
 
+(* l is list_to_zero efnlength es *)
+Fixpoint sbst_fix_n_rec (es : efnlst) (e : exp) (l : list nat) (n : N) : exp :=
+  match l with
+  | nil => e
+  | cons ndx l' => let e' := e {n ::= Fix_e es (N.of_nat ndx)} in
+                   sbst_fix_n_rec es e' l' n
+  end.
+
+Definition sbst_fix_n (es : efnlst) (e : exp) (n : N) : exp :=
+  let les := efnlength es in
+  fold_left (fun (e0 : exp) (ndx : nat) => e0 {n ::= Fix_e es (N.of_nat ndx)})
+            (list_to_zero les) e.
+
+Lemma sbst_fix_n_sbst_fix_eq :
+  forall es e,
+    sbst_fix_n es e 0 = sbst_fix es e.
+Proof. 
+  intros es e.
+  unfold sbst_fix. unfold sbst_fix_n. reflexivity.
+Qed.
+
+Lemma sbst_fix_n_rec_sbst_fix_eq :
+  forall es e,
+    sbst_fix_n_rec es e (list_to_zero (efnlength es)) 0 = sbst_fix es e.
+Proof.
+  intros es e. unfold sbst_fix.
+  generalize dependent e. induction (list_to_zero (efnlength es)); intros e.
+  - simpl. reflexivity.
+  - simpl. erewrite IHl. reflexivity.
+Qed. 
+
 Lemma parallel_sbst_with_sbst_fix :
   forall efns1 efns2 e rho,
     Forall well_formed_val rho ->
@@ -2250,9 +2302,6 @@ Proof.
     inv H1.
     simpl in H1. inv H1.
     inv H2.
-    (* rewrite using parallel_sbst_with_sbst *) simpl. 
-    (* erewrite <- IHefns1 with (n := (1 + efnlst_length efns2)). *)
-    (* simpl. unfold sbst_fix. simpl.  *)
 Abort. 
 
 Lemma eval_is_value_env :

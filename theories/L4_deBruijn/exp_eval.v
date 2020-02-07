@@ -2383,39 +2383,39 @@ Proof.
 Qed.
 
 Definition parallel_sbst_make_rec_env_exp e :=
-  forall rho rhof,
-    exp_wf (list.NLength (rhof ++ rho)) e ->
-    parallel_sbst e 0 (map val_to_exp (rhof ++ rho)) =
+  forall rho rhof n,
+    exp_wf (n + list.NLength (rhof ++ rho)) e ->
+    parallel_sbst e n (map val_to_exp (rhof ++ rho)) =
     parallel_sbst
-      (parallel_sbst e (list.NLength rhof) (map val_to_exp rho))
-      0
+      (parallel_sbst e (n + list.NLength rhof) (map val_to_exp rho))
+      n
       (map val_to_exp rhof).
 
 Definition parallel_sbst_make_rec_env_exps es :=
-   forall rho rhof,
-    exps_wf (list.NLength (rhof ++ rho)) es ->
-    parallel_sbsts es 0 (map val_to_exp (rhof ++ rho)) =
+   forall rho rhof n,
+    exps_wf (n + list.NLength (rhof ++ rho)) es ->
+    parallel_sbsts es n (map val_to_exp (rhof ++ rho)) =
     parallel_sbsts
-      (parallel_sbsts es (list.NLength rhof) (map val_to_exp rho))
-      0
+      (parallel_sbsts es (n + list.NLength rhof) (map val_to_exp rho))
+      n
       (map val_to_exp rhof).
 
 Definition parallel_sbst_make_rec_env_efnlst efns :=
-  forall rho rhof,
-    efnlst_wf (list.NLength (rhof ++ rho)) efns ->
-    parallel_sbst_efnlst efns 0 (map val_to_exp (rhof ++ rho)) =
+  forall rho rhof n,
+    efnlst_wf (n + list.NLength (rhof ++ rho)) efns ->
+    parallel_sbst_efnlst efns n (map val_to_exp (rhof ++ rho)) =
     parallel_sbst_efnlst
-      (parallel_sbst_efnlst efns (list.NLength rhof) (map val_to_exp rho))
-      0
+      (parallel_sbst_efnlst efns (n + list.NLength rhof) (map val_to_exp rho))
+      n
       (map val_to_exp rhof).
 
 Definition parallel_sbst_make_rec_env_branches bs :=
-  forall rho rhof,
-    branches_wf (list.NLength (rhof ++ rho)) bs ->
-    parallel_sbst_branches bs 0 (map val_to_exp (rhof ++ rho)) =
+  forall rho rhof n,
+    branches_wf (n + list.NLength (rhof ++ rho)) bs ->
+    parallel_sbst_branches bs n (map val_to_exp (rhof ++ rho)) =
     parallel_sbst_branches
-      (parallel_sbst_branches bs (list.NLength rhof) (map val_to_exp rho))
-      0
+      (parallel_sbst_branches bs (n + list.NLength rhof) (map val_to_exp rho))
+      n
       (map val_to_exp rhof).
 
 Lemma parallel_sbst_make_rec_env :
@@ -2425,27 +2425,81 @@ Lemma parallel_sbst_make_rec_env :
   (forall bs, parallel_sbst_make_rec_env_branches bs).
 Proof.
   eapply my_exp_ind; unfold parallel_sbst_make_rec_env_exp.
-  - intros n rho rhof Hwf.
+  - intros i rho rhof n Hwf.
     simpl. inv Hwf.
-    destruct (n <? 0) eqn: H2.
-    + eapply OrdersEx.N_as_OT.ltb_lt in H2.
-      zify. omega.
-    + destruct (n <? list.NLength rhof) eqn: H3.
-      * simpl. destruct (n <? 0) eqn: H4.
-        eapply OrdersEx.N_as_OT.ltb_lt in H4.
-        zify. omega.
+    destruct (i <? n) eqn: H2.
+    + destruct (i <? n + list.NLength rhof) eqn: H3.
+      * simpl. rewrite H2. reflexivity.
+      * eapply N.ltb_ge in H3.
+        rewrite app_length_N in H1. rewrite N.add_assoc in H1.
+        eapply OrdersEx.N_as_OT.ltb_lt in H2.
+        zify. omega. 
+    + destruct (i <? n + list.NLength rhof) eqn: H3.
+      * simpl. destruct (i <? n) eqn: H4.
+        congruence.
         eapply OrdersEx.N_as_OT.ltb_lt in H3.
         rewrite map_app. eapply nlt_len_nth_eq_app.
         rewrite map_length.
-        rewrite N.sub_0_r. rewrite app_length_N in H1.
+        rewrite app_length_N in H1.
         unfold list.NLength in H3.
-        eapply N2Nat_inj_lt in H3. rewrite Nnat.Nat2N.id in H3.
-        eassumption.
-      * (* write parallel_sbst lemma? *)
-        admit.
-  - intros na e IH rho rhof Hwf.
-    simpl. f_equal.
-Abort. 
+        eapply N.ltb_ge in H4.
+        zify. omega. 
+      * admit.
+  - intros na e IH rho rhof n Hwf.
+    simpl. inv Hwf. f_equal.
+    rewrite <- N.add_assoc. rewrite (N.add_comm (list.NLength rhof) 1).
+    rewrite N.add_assoc. eapply IH.
+    rewrite N.add_assoc in H1. rewrite (N.add_comm n 1). eassumption.
+  - intros e1 IH1 e2 IH2 rho rhof n Hwf.
+    simpl. inv Hwf. f_equal.
+    eapply IH1. eassumption.
+    eapply IH2. eassumption.
+  - unfold parallel_sbst_make_rec_env_exps.
+    intros dc es IH rho rhof n Hwf.
+    simpl. inv Hwf. f_equal.
+    eapply IH. eassumption.
+  - unfold parallel_sbst_make_rec_env_branches. 
+    intros e IH1 pars bs IH2 rho rhof n Hwf.
+    simpl. inv Hwf. f_equal.
+    + eapply IH1. eassumption.
+    + eapply IH2. eassumption.
+  - intros na e1 IH1 e2 IH2 rho rhof n Hwf.
+    simpl. inv Hwf. f_equal.
+    + eapply IH1. eassumption.
+    + rewrite <- N.add_assoc. rewrite (N.add_comm (list.NLength rhof) 1).
+      rewrite N.add_assoc. eapply IH2.
+      rewrite N.add_assoc in H4. rewrite (N.add_comm n 1). eassumption.
+  - unfold parallel_sbst_make_rec_env_efnlst.
+    intros efns IH i rho rhof n Hwf.
+    simpl. rewrite parallel_sbst_inv_efnlst_length. inv Hwf. f_equal.
+    rewrite <- N.add_assoc.
+    rewrite (N.add_comm (list.NLength rhof) (efnlst_length efns)).
+    rewrite N.add_assoc. eapply IH.
+    rewrite N.add_assoc in H1. rewrite (N.add_comm n (efnlst_length efns)).
+    eassumption.
+  - simpl. reflexivity.
+  - unfold parallel_sbst_make_rec_env_exps. simpl. reflexivity.
+  - unfold parallel_sbst_make_rec_env_exps.
+    intros e IH1 es IH2 rho rhof n Hwf.
+    simpl. inv Hwf. f_equal.
+    + eapply IH1. eassumption.
+    + eapply IH2. eassumption.
+  - unfold parallel_sbst_make_rec_env_efnlst. simpl. reflexivity.
+  - unfold parallel_sbst_make_rec_env_efnlst.
+    intros na e IH1 efns IH2 rho rhof n Hwf.
+    simpl. inv Hwf. f_equal.
+    + eapply IH1. eassumption.
+    + eapply IH2. eassumption.
+  - unfold parallel_sbst_make_rec_env_branches. simpl. reflexivity.
+  - unfold parallel_sbst_make_rec_env_branches.
+    intros dc p e IH1 bs IH2 rho rhof n Hwf.
+    simpl. inv Hwf. destruct p. simpl. f_equal.
+    + rewrite <- N.add_assoc.
+      rewrite (N.add_comm (list.NLength rhof) n0). rewrite N.add_assoc.
+      eapply IH1. simpl in H2.
+      rewrite N.add_assoc in H2. rewrite (N.add_comm n n0). eassumption.
+    + eapply IH2. eassumption.
+Admitted.
 
 (* change exp_wf 0 e *)
 Lemma parallel_sbst_with_sbst_fix :

@@ -55,12 +55,43 @@ Fixpoint make_env_aux (funcs : efnlst) (n : N) (fnlst : efnlst) (rho : env) :=
     ((ClosFix_v rho fnlst n) :: rec_env)
   end.
 
+Definition make_rec_env_nil (fnlst : efnlst) (rho : env) : env :=
+  let fix make_env_aux funcs n :=
+      match funcs with
+      | eflnil => nil
+      | eflcons na e fnlst' =>
+        let rec_env := make_env_aux fnlst' (n + 1) in
+        ((ClosFix_v rho fnlst n) :: rec_env)
+      end
+  in
+  make_env_aux fnlst 0.
+
+Fixpoint make_env_aux_nil (funcs : efnlst) (n : N) (fnlst : efnlst) (rho : env) :=
+  match funcs with
+  | eflnil => nil
+  | eflcons na e funcs' =>
+    let rec_env := make_env_aux_nil funcs' (n + 1) fnlst rho in
+    ((ClosFix_v rho fnlst n) :: rec_env)
+  end.
+
 Lemma make_rec_env_aux_eq :
   forall fnlst rho, 
     make_rec_env fnlst rho = make_env_aux fnlst 0 fnlst rho.
 Proof.
   intros fnlst rho. unfold make_rec_env.
   generalize dependent 0. generalize fnlst at 1 4.  
+  induction fnlst.
+  - simpl. reflexivity.
+  - intros fnlst1 n1. simpl.
+    f_equal. eapply IHfnlst.
+Qed.
+
+Lemma make_rec_env_aux_nil_eq :
+  forall fnlst rho,
+    make_rec_env_nil fnlst rho = make_env_aux_nil fnlst 0 fnlst rho.
+Proof.
+  intros fnlst rho. unfold make_rec_env_nil.
+  generalize dependent 0. generalize fnlst at 1 4.
   induction fnlst.
   - simpl. reflexivity.
   - intros fnlst1 n1. simpl.
@@ -532,7 +563,57 @@ Proof.
     specialize (Hlen efns (eflcons n e efns) efns 1 0).
     erewrite Hlen. reflexivity.
     intros Hfalse; discriminate.
+Qed.
+
+Lemma make_env_aux_nil_length:
+  forall efns rho n,
+    list.NLength (make_env_aux_nil efns n efns rho) =
+    efnlst_length efns.
+Proof.
+  intros efns rho.
+  generalize efns at 2.
+  induction efns.
+  - unfold list.NLength. reflexivity.
+  - intros efns' n1. unfold list.NLength in *.
+    simpl. rewrite Pos.of_nat_succ.
+    rewrite <- positive_nat_N.
+    rewrite Nat2Pos.id.
+    rewrite Nnat.Nat2N.inj_succ.
+    rewrite <- N.add_1_r.
+    rewrite <- N.add_comm. f_equal.
+    eapply IHefns.
+    intros Hfalse; discriminate.
 Qed. 
+
+Lemma make_rec_env_nil_length:
+  forall efns rho,
+    list.NLength (make_rec_env_nil efns rho) =
+    efnlst_length efns.
+Proof.
+  intros efns rho.
+  rewrite make_rec_env_aux_nil_eq.
+  eapply make_env_aux_nil_length.
+Qed. 
+
+Lemma make_env_aux_app :
+  forall efns rho n,
+    make_env_aux efns n efns rho = (make_env_aux_nil efns n efns rho) ++ rho.
+Proof.
+  intros efns rho. generalize efns at 2 4.
+  induction efns.
+  - simpl. reflexivity.
+  - intros efns' n1.
+    simpl. f_equal. eapply IHefns.
+Qed. 
+
+Lemma make_rec_env_app :
+  forall efns rho,
+    make_rec_env efns rho = make_rec_env_nil efns rho ++ rho.
+Proof.
+  intros efns rho.
+  rewrite make_rec_env_aux_eq. rewrite make_rec_env_aux_nil_eq.
+  eapply make_env_aux_app. 
+Qed.     
 
 (* not required for now *)
 Lemma make_rec_env_wf:
@@ -1423,6 +1504,25 @@ Proof.
     omega.
 Qed.
 
+Lemma nlt_len_nth_eq_app:
+  forall (A : Type) (l1 l2 : list A) (n : N) (default1 default2 : A),
+    (N.to_nat n < Datatypes.length l1)%nat ->
+    nth (N.to_nat n) (l1 ++ l2) default1 = nth (N.to_nat n) l1 default2.
+Proof.
+  intros A l1 l2 n default1 default2 Hlt.
+  generalize dependent n.
+  induction l1; intros n Hlt.
+  - simpl in Hlt. inv Hlt.
+  - simpl in *. destruct (N.to_nat n) eqn: Hn.
+    reflexivity.
+    assert (Heq : ((N.to_nat n) - (N.to_nat 1%N))%nat = n0).
+    { simpl. rewrite Pos2Nat.inj_1. omega. }
+    rewrite <- Nnat.N2Nat.inj_sub in Heq.
+    rewrite <- N.pred_sub in Heq.
+    rewrite <- Heq. eapply IHl1.
+    omega.
+Qed. 
+
 (* Statements of Lemmas *)
 Definition equiv_semantics_stmt_exp e := 
   forall rho e',
@@ -2084,7 +2184,7 @@ Proof.
       destruct (N.eq_dec n j).
       zify. omega.
       reflexivity.
-      zify. omega.  
+      zify. omega. 
       (* -- *)
       destruct (N.eq_dec n (i + 1)). simpl.
       destruct (lt_dec (n - 1) i). 
@@ -2261,7 +2361,18 @@ Proof.
   unfold sbst_fix. unfold sbst_fix_n. reflexivity.
 Qed.
 
-Lemma sbst_fix_n_rec_sbst_fix_eq :
+Lemma efnlength_eq_efnlst_length :
+  forall efns,
+    efnlength efns = N.to_nat (efnlst_length efns).
+Proof.
+  intros efns. induction efns.
+  - simpl. reflexivity.
+  - simpl. rewrite IHefns.
+    rewrite <- Nnat.N2Nat.inj_succ. rewrite <- N.add_1_l.
+    reflexivity.
+Qed. 
+
+Lemma sbst_fix_n_rec_eq :
   forall es e,
     sbst_fix_n_rec es e (list_to_zero (efnlength es)) 0 = sbst_fix es e.
 Proof.
@@ -2269,12 +2380,78 @@ Proof.
   generalize dependent e. induction (list_to_zero (efnlength es)); intros e.
   - simpl. reflexivity.
   - simpl. erewrite IHl. reflexivity.
-Qed. 
+Qed.
 
+Definition parallel_sbst_make_rec_env_exp e :=
+  forall rho rhof,
+    exp_wf (list.NLength (rhof ++ rho)) e ->
+    parallel_sbst e 0 (map val_to_exp (rhof ++ rho)) =
+    parallel_sbst
+      (parallel_sbst e (list.NLength rhof) (map val_to_exp rho))
+      0
+      (map val_to_exp rhof).
+
+Definition parallel_sbst_make_rec_env_exps es :=
+   forall rho rhof,
+    exps_wf (list.NLength (rhof ++ rho)) es ->
+    parallel_sbsts es 0 (map val_to_exp (rhof ++ rho)) =
+    parallel_sbsts
+      (parallel_sbsts es (list.NLength rhof) (map val_to_exp rho))
+      0
+      (map val_to_exp rhof).
+
+Definition parallel_sbst_make_rec_env_efnlst efns :=
+  forall rho rhof,
+    efnlst_wf (list.NLength (rhof ++ rho)) efns ->
+    parallel_sbst_efnlst efns 0 (map val_to_exp (rhof ++ rho)) =
+    parallel_sbst_efnlst
+      (parallel_sbst_efnlst efns (list.NLength rhof) (map val_to_exp rho))
+      0
+      (map val_to_exp rhof).
+
+Definition parallel_sbst_make_rec_env_branches bs :=
+  forall rho rhof,
+    branches_wf (list.NLength (rhof ++ rho)) bs ->
+    parallel_sbst_branches bs 0 (map val_to_exp (rhof ++ rho)) =
+    parallel_sbst_branches
+      (parallel_sbst_branches bs (list.NLength rhof) (map val_to_exp rho))
+      0
+      (map val_to_exp rhof).
+
+Lemma parallel_sbst_make_rec_env :
+  (forall e, parallel_sbst_make_rec_env_exp e) /\
+  (forall es, parallel_sbst_make_rec_env_exps es) /\
+  (forall fnlst, parallel_sbst_make_rec_env_efnlst fnlst) /\
+  (forall bs, parallel_sbst_make_rec_env_branches bs).
+Proof.
+  eapply my_exp_ind; unfold parallel_sbst_make_rec_env_exp.
+  - intros n rho rhof Hwf.
+    simpl. inv Hwf.
+    destruct (n <? 0) eqn: H2.
+    + eapply OrdersEx.N_as_OT.ltb_lt in H2.
+      zify. omega.
+    + destruct (n <? list.NLength rhof) eqn: H3.
+      * simpl. destruct (n <? 0) eqn: H4.
+        eapply OrdersEx.N_as_OT.ltb_lt in H4.
+        zify. omega.
+        eapply OrdersEx.N_as_OT.ltb_lt in H3.
+        rewrite map_app. eapply nlt_len_nth_eq_app.
+        rewrite map_length.
+        rewrite N.sub_0_r. rewrite app_length_N in H1.
+        unfold list.NLength in H3.
+        eapply N2Nat_inj_lt in H3. rewrite Nnat.Nat2N.id in H3.
+        eassumption.
+      * (* write parallel_sbst lemma? *)
+        admit.
+  - intros na e IH rho rhof Hwf.
+    simpl. f_equal.
+Abort. 
+
+(* change exp_wf 0 e *)
 Lemma parallel_sbst_with_sbst_fix :
   forall efns1 efns2 e rho,
     Forall well_formed_val rho ->
-    exp_wf 0 e ->
+    exp_wf (list.NLength rho + efnlst_length efns1) e ->
     Forall2
       (fun s t : name * exp =>
          let (n_s, e_s) := s in
@@ -2289,19 +2466,25 @@ Proof.
   { eapply Forall2_length in Hall.
     rewrite !efnlst_length_is_Datatypes_length.
     rewrite Hall. reflexivity. }
-  generalize dependent (efnlst_length efns1).
-  generalize dependent efns2. 
-  induction efns1.
-  - intros efns2 n Hall Hlen.
-    inv Hall. destruct efns2.
-    simpl. unfold sbst_fix. simpl.
-    unfold make_rec_env. reflexivity.
-    inv H.
-  - intros efns2 n1 Hall Hlen.
-    inversion Hall. destruct efns2.
-    inv H1.
-    simpl in H1. inv H1.
-    inv H2.
+  erewrite <- sbst_fix_n_rec_eq.
+  erewrite make_rec_env_aux_eq.
+  unfold sbst_env in Hall.
+  rewrite efnlength_eq_efnlst_length.
+  (* generalize dependent (efnlst_length efns1). *)
+  (* generalize efns2 at 4. *)
+  (* generalize dependent efns2. *)
+  (* induction efns1. *)
+  (* - intros efns2 efns' n Hall Hlen. *)
+  (*   simpl. destruct efns2. inv Hall. *)
+  (*   simpl. reflexivity. *)
+  (*   inv Hall. *)
+  (* - intros efns2 efns' n1 Hall Hlen. *)
+  (*   destruct efns2. *)
+  (*   + inv Hall. *)
+  (*   + inv Hall. destruct H2.  *)
+  (*     specialize (IHefns1 (eflcons n0 e1 efns2) efns' *)
+  (*                         (efnlst_length (eflcons n0 e1 efns2))). *)
+  (*     rewrite <- IHefns1. simpl. f_equal.  *)      
 Abort. 
 
 Lemma eval_is_value_env :
@@ -2709,7 +2892,7 @@ Proof.
       -- rewrite <- Heqf in Hwff. eapply Hwff.
          eassumption. inv HClosFix_wf. eassumption.
       -- rewrite <- Heq.
-         unfold sbst_env. simpl. eapply f_equal2.
+         unfold sbst_env in *. simpl. eapply f_equal2.
          ++ admit. (* TODO lemma *)
          ++ eapply rel_value_then_val_to_exp in Hr2. rewrite <- Hr2.
             symmetry. eapply parallel_sbst_inv_wf.

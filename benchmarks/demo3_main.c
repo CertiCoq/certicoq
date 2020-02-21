@@ -1,6 +1,6 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
 #include "gc.h"
 #include <time.h>
 
@@ -20,21 +20,15 @@ _Bool is_ptr(value s) {
   return (_Bool) Is_block(s);
 }
 
-void* calls(struct thread_info* tinfo, value clos, int n,...)
+value calls(struct thread_info* tinfo, value clos, unsigned int n, ...)
 {
   value v = clos;
   va_list args;
-  va_start(args,n);
+  va_start(args, n);
 
-  while(n != 0) {
-    if (0 > n) {
-    printf("No negative argument numbers are allowed.");
-    n = 0;
-    } else {
-      v = va_arg(args, unsigned long long);
-      clos = call(tinfo, clos,v);
-      n = n - 1;
-    }
+  for(; n != 0; n--) {
+    v = va_arg(args, unsigned long long);
+    clos = call(tinfo, clos, v);
   }
   va_end(args);
   return clos;

@@ -1435,49 +1435,48 @@ Definition mk_prog_opt
 
 
 Section FunctionCalls.
-  (* Glue code for function calls, adapted from OSB to work with different number of parameters *)
+  (* Glue code for function calls, adapted by Kathrin Stark from
+     Olivier Savary Belanger's work with different number of parameters *)
 
-  (* Necessary variables. TODO: Export them into the toolbox once updated. *)
-  Variable (threadInfIdent : ident).
-  Variable (argsIdent : ident).
-  Variable (haltIdent : ident).
-  Variable (halt_cloIdent: ident).
+  Variable toolbox : toolbox_info.
+  Let _thread_info : ident := thread_info_type _ (thread_info_info toolbox).
+  Let _args : ident := args_info _ (thread_info_info toolbox).
 
   (* Notations, from OSB *)
   Notation " a '::=' b " := (Sset a b) (at level 50).
-  Notation "'funVar' x" := (Evar x (funTy threadInfIdent)) (at level 20).
+  Notation "'funVar' x" := (Evar x (funTy _thread_info)) (at level 20).
 
   (* Definition of halt and halt_clo.
       Generate a function equivalent to halt, receives a tinfo and
       - for c_args = 1 the environment,
       - for c_args >= 2 the environment and the result.
-      Hence, if c_args >= 2 we additionally have to put the result into *tinfo.args[1].
-  *)
-
+      Hence, if c_args >= 2 we additionally have to put
+      the result into *tinfo.args[1]. *)
   Definition make_halt
             (c_args : nat)
-            : gState ((ident * globdef Clight.fundef type)
-                        * (ident * globdef Clight.fundef type)) :=
-    envIdent <- gensym "env";;
-    argIdent <- gensym "arg";;
-    tinfIdent <- gensym "tinfo";;
-    let argsExpr :=  (Efield (tinfd threadInfIdent tinfIdent) argsIdent valPtr) in (* TODO: Duplication? *)
-    let args_halt := (tinfIdent, (threadInf threadInfIdent)) :: (envIdent, val) :: (argIdent, val) ::  nil in
+            : gState (def * def) :=
+    _env <- gensym "env" ;;
+    _arg <- gensym "arg" ;;
+    _tinfo <- gensym "tinfo" ;;
+    _halt <- gensym "halt" ;;
+    let '(_halt_clo, ty_halt_clo) := halt_clo_info toolbox in
+    let argsExpr := Efield (tinfd _thread_info _tinfo) _args valPtr in (* TODO: Duplication? *)
+    let args_halt := (_tinfo, (threadInf _thread_info)) ::
+                     (_env, val) ::
+                     (_arg, val) :: nil in
     let halt_stm := if 2 <=? c_args
-                    then Sassign (Field(argsExpr, Z.of_nat 1)) (Etempvar argIdent val);;; Sreturn None
+                    then Sassign (Field(argsExpr, Z.of_nat 1)) (Etempvar _arg val);;; Sreturn None
                     else (Sreturn None) in
-    ret ((* halt *)
-        (haltIdent, Gfun (Internal (mkfunction Tvoid cc_default
-                                                (firstn (S c_args) args_halt)
-                                                nil nil halt_stm))),
-        (* halt_clo *)
-        (halt_cloIdent,
-          Gvar (mkglobvar (tarray uval 2)
-                          ((Init_addrof haltIdent Ptrofs.zero) :: Init_int 1 :: nil)
+    ret ((_halt, (* halt *)
+          Gfun (Internal (mkfunction Tvoid cc_default
+                                     (firstn (S c_args) args_halt)
+                                     nil nil halt_stm))),
+         (_halt_clo, (* halt_clo *)
+          Gvar (mkglobvar ty_halt_clo
+                          ((Init_addrof _halt Ptrofs.zero) :: Init_int 1 :: nil)
                           true false))).
 
-
-  Definition condif (b: bool) s1 s2 :=
+  Definition condif (b : bool) (s1 s2 : statement) : statement :=
     if b then s1 ;;; s2 else s2.
 
   (* Function calls.
@@ -1490,61 +1489,66 @@ Section FunctionCalls.
     If c_args = 2, as before but omit the environment and the halting closure.
     If c_args >= 3, no elements have to be put into the argument array.
 
-    Call function with respective arguments.
-  *)
-
+    Call function with respective arguments. *)
   Definition make_call
             (c_args : nat)
-            (closIdent : ident)
-            (fIdent : ident)
-            (envIdent : ident)
-            (argsExpr : expr)
-            (argIdent : ident)
-            (tinfIdent : ident) : statement :=
-    let closExpr := Etempvar closIdent valPtr in
-    let fargs := tinf threadInfIdent tinfIdent ::
-                 Etempvar envIdent val ::
-                 Evar haltIdent val ::
-                 Etempvar argIdent val :: nil in
+            : gState def :=
+    _clo <- gensym "clo" ;;
+    _f <- gensym "f" ;;
+    _env <- gensym "envi" ;;
+    _ret <- gensym "ret" ;;
+    _arg <- gensym "arg" ;;
+    _tinfo <- gensym "tinfo";;
+    let '(_halt_clo, _) := halt_clo_info toolbox in
+
+    let argsExpr := Efield (tinfd _thread_info _tinfo) _args valPtr in
+
+    let closExpr := Etempvar _clo valPtr in
+    let fargs := tinf _thread_info _tinfo ::
+                 Etempvar _env val ::
+                 Evar _halt_clo val ::
+                 Etempvar _arg val :: nil in
     let forcelist :=
         if c_args <=? 0 then Tnil else
         if c_args <=? 1 then Tcons val Tnil else
         if c_args <=? 2 then Tcons val (Tcons val Tnil) else
         Tcons val (Tcons val (Tcons val Tnil)) in (* TODO: Make this better. *)
-    let ret_ty := Tpointer (Tfunction (Tcons (threadInf threadInfIdent) forcelist) Tvoid cc_default) noattr in
-    fIdent ::= (Field(closExpr , Z.of_nat 0)) ;;;
-    envIdent ::= (Field(closExpr, Z.of_nat 1)) ;;;
-    condif (c_args <=? 0) (Sassign (Field(argsExpr, Z.of_nat 0)) (Etempvar envIdent val))
-      (condif (c_args <=? 1) (Sassign (Field(argsExpr, Z.of_nat 1)) (Evar haltIdent val))
-        (condif (c_args <=? 2) (Sassign (Field(argsExpr, Z.of_nat 2)) (Etempvar argIdent val))
-          (Scall None ([ret_ty] (funVar fIdent)) (firstn (S c_args) fargs)))).
+    let ret_ty := Tpointer (Tfunction (Tcons (threadInf _thread_info) forcelist)
+                                      Tvoid cc_default) noattr in
+    let asgn_s :=
+        (_f ::= (Field(closExpr , Z.of_nat 0)) ;;;
+         _env ::= (Field(closExpr, Z.of_nat 1)) ;;;
+         condif (c_args <=? 0) (Sassign (Field(argsExpr, Z.of_nat 0)) (Etempvar _env val))
+           (condif (c_args <=? 1) (Sassign (Field(argsExpr, Z.of_nat 1)) (Evar _halt_clo val))
+             (condif (c_args <=? 2) (Sassign (Field(argsExpr, Z.of_nat 2)) (Etempvar _arg val))
+               (Scall None ([ret_ty] (funVar _f)) (firstn (S c_args) fargs))))) in
 
-  Definition make_call_wrapper
-            (c_args : nat)
-            : gState (ident * globdef Clight.fundef type) :=
-      closIdent <- gensym "clo" ;;
-      fIdent <- gensym "f" ;;
-      envIdent <- gensym "envi" ;;
-      retIdent <- gensym "ret" ;;
-      argIdent <- gensym "arg" ;;
-      tinfIdent <- gensym "tinfo";;
+    let body_s := asgn_s ;;;
+                  _ret ::= (Field(argsExpr, Z.of_nat 1)) ;;;
+                  Sreturn (Some (Etempvar _ret valPtr)) in
 
-      let argsExpr :=  (Efield (tinfd threadInfIdent tinfIdent) argsIdent valPtr) in
-      let left_args := make_proj argsExpr 2 1 in
-      let asgn_s := make_call c_args closIdent fIdent envIdent argsExpr argIdent tinfIdent in
-      let return_s := (retIdent ::= (Field(argsExpr, Z.of_nat 1))) in
-      let body_s := Ssequence
-                      (asgn_s)
-                      (return_s ;;; Sreturn  (Some (Etempvar retIdent valPtr))) in
-
-      let params := (tinfIdent, (threadInf threadInfIdent)) :: (closIdent, val) :: (argIdent,val) :: nil in
-      let vars := (fIdent, valPtr) :: (envIdent, valPtr) :: (retIdent, valPtr) :: nil in
-      callIdent <- gensym "call" ;;
-      ret (callIdent, Gfun (Internal (mkfunction (Tpointer Tvoid noattr)
-                                                cc_default params nil vars body_s))).
+    let params := (_tinfo, (threadInf _thread_info)) :: (_clo, val) :: (_arg, val) :: nil in
+    let vars := (_f, valPtr) :: (_env, valPtr) :: (_ret, valPtr) :: nil in
+    _call <- gensym "call" ;;
+    ret (_call,
+         Gfun (Internal (mkfunction (Tpointer Tvoid noattr)
+                                    cc_default params nil vars body_s))).
 
 End FunctionCalls.
 
+(* A helper function needed to satisfy a condition about composites *)
+Definition mk_prog_opt
+           (composites : list composite_definition)
+           (ds : defs)
+           (main : ident)
+           (add_comp : bool)
+           : option Clight.program :=
+  let composites := if add_comp then composites else nil in
+  let res := Ctypes.make_program composites ds nil main in
+  match res with
+  | Error e => None
+  | OK p => Some p
+  end.
 
 (* Generates the header and the source programs *)
 Definition make_glue_program

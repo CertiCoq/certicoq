@@ -45,6 +45,9 @@ Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 Notation "'Field(' t ',' n ')'" :=
   ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
 
+Definition multiple (xs : list statement) : statement :=
+  fold_right Ssequence Sskip xs.
+
 Definition uval : type := if Archi.ptr64 then ulongTy else uintTy.
 Definition max_args : Z := 1024.
 
@@ -1276,8 +1279,13 @@ Section FunctionCalls.
      Olivier Savary Belanger's work with different number of parameters *)
 
   Variable toolbox : toolbox_info.
+  Variable opts : Options.
   Let _thread_info : ident := thread_info_type _ (thread_info_info toolbox).
   Let _args : ident := args_info _ (thread_info_info toolbox).
+  Let c_args : nat := c_args opts.
+
+  Local Variant Backend := ANF | CPS.
+  Let backend := if direct opts then ANF else CPS.
 
   (* Notations, from OSB *)
   Notation " a '::=' b " := (Sset a b) (at level 50).
@@ -1289,9 +1297,7 @@ Section FunctionCalls.
       - for c_args >= 2 the environment and the result.
       Hence, if c_args >= 2 we additionally have to put
       the result into *tinfo.args[1]. *)
-  Definition make_halt
-            (c_args : nat)
-            : gState (def * def) :=
+  Definition make_halt : gState (def * def) :=
     _env <- gensym "env" ;;
     _arg <- gensym "arg" ;;
     _tinfo <- gensym "tinfo" ;;
@@ -1313,11 +1319,9 @@ Section FunctionCalls.
                           ((Init_addrof _halt Ptrofs.zero) :: Init_int 1 :: nil)
                           true false))).
 
-  Definition condif (b : bool) (s1 s2 : statement) : statement :=
-    if b then s1 ;;; s2 else s2.
-
   (* Function calls.
 
+    For the CPS backend: (written by Kathrin)
     What to push in the argument array depends on c_args:
     If c_args = 0, then environment, the halting closure,
                     and the (single) argument have to be put into
@@ -1325,11 +1329,20 @@ Section FunctionCalls.
     If c_args = 1, as before but omit the environment and hand it over directly.
     If c_args = 2, as before but omit the environment and the halting closure.
     If c_args >= 3, no elements have to be put into the argument array.
+    Call function with respective arguments.
 
-    Call function with respective arguments. *)
-  Definition make_call
-            (c_args : nat)
-            : gState def :=
+    For the ANF backend: (added by Joomy)
+    This is just tentative.
+    It does the same except it doesn't assign/pass the halting closure.
+    It probably needs to do something with stack frames at some point,
+    we leave that as TODO for now.
+    This version works for some examples in ANF but it's not extensively tested.
+
+    It may also be a good idea to separate the ANF call function entirely.
+    Maybe a separate call_anf function in C or
+    a separate make_call_anf function in the glue code generator.
+  *)
+  Definition make_call : gState def :=
     _clo <- gensym "clo" ;;
     _f <- gensym "f" ;;
     _env <- gensym "envi" ;;
@@ -1341,35 +1354,59 @@ Section FunctionCalls.
     let argsExpr := Efield (tinfd _thread_info _tinfo) _args valPtr in
 
     let closExpr := Etempvar _clo valPtr in
-    let fargs := tinf _thread_info _tinfo ::
-                 Etempvar _env val ::
-                 Evar _halt_clo val ::
-                 Etempvar _arg val :: nil in
-    let forcelist :=
-        if c_args <=? 0 then Tnil else
-        if c_args <=? 1 then Tcons val Tnil else
-        if c_args <=? 2 then Tcons val (Tcons val Tnil) else
-        Tcons val (Tcons val (Tcons val Tnil)) in (* TODO: Make this better. *)
+    let fargs_anf := tinf _thread_info _tinfo ::
+                     Etempvar _env val ::
+                     Etempvar _arg val :: nil in
+    let fargs_cps := tinf _thread_info _tinfo ::
+                     Etempvar _env val ::
+                     Evar _halt_clo val ::
+                     Etempvar _arg val :: nil in
+    let fargs := match backend with ANF => fargs_anf | CPS => fargs_cps end in
+    let forcelist_anf :=
+        nth c_args ((* if c_args = 0 *) Tnil ::
+                    (* if c_args = 1 *) Tcons val Tnil :: nil)
+            (* else *) (Tcons val (Tcons val Tnil)) in
+    let forcelist_cps :=
+        nth c_args ((* if c_args = 0 *) Tnil ::
+                    (* if c_args = 1 *) Tcons val Tnil ::
+                    (* if c_args = 2 *) Tcons val (Tcons val Tnil) :: nil)
+            (* else *) (Tcons val (Tcons val (Tcons val Tnil))) in
+    let forcelist := match backend with ANF => forcelist_anf | CPS => forcelist_cps end in
     let ret_ty := Tpointer (Tfunction (Tcons (threadInf _thread_info) forcelist)
                                       Tvoid cc_default) noattr in
-    let asgn_s :=
-        (_f ::= (Field(closExpr , Z.of_nat 0)) ;;;
-         _env ::= (Field(closExpr, Z.of_nat 1)) ;;;
-         condif (c_args <=? 0) (Sassign (Field(argsExpr, Z.of_nat 0)) (Etempvar _env val))
-           (condif (c_args <=? 1) (Sassign (Field(argsExpr, Z.of_nat 1)) (Evar _halt_clo val))
-             (condif (c_args <=? 2) (Sassign (Field(argsExpr, Z.of_nat 2)) (Etempvar _arg val))
-               (Scall None ([ret_ty] (funVar _f)) (firstn (S c_args) fargs))))) in
 
-    let body_s := asgn_s ;;;
-                  _ret ::= (Field(argsExpr, Z.of_nat 1)) ;;;
-                  Sreturn (Some (Etempvar _ret valPtr)) in
+    let body :=
+      _f ::= Field(closExpr , Z.of_nat 0) ;;;
+      _env ::= Field(closExpr, Z.of_nat 1) ;;;
+      multiple (skipn c_args
+                (* if c_args is 0 don't skip any, if it's 1 skip the first one and so on *)
+                 match backend with
+                 | ANF =>
+                    (Sassign (Field(argsExpr, Z.of_nat 0)) (Etempvar _env val) ::
+                     Sassign (Field(argsExpr, Z.of_nat 1)) (Etempvar _arg val) :: nil)
+                 | CPS =>
+                    (Sassign (Field(argsExpr, Z.of_nat 0)) (Etempvar _env val) ::
+                     Sassign (Field(argsExpr, Z.of_nat 1)) (Evar _halt_clo val) ::
+                     Sassign (Field(argsExpr, Z.of_nat 2)) (Etempvar _arg val) :: nil)
+                 end) ;;;
+      Scall None ([ret_ty] (funVar _f)) (firstn (S c_args) fargs) ;;;
+      _ret ::= Field(argsExpr, Z.of_nat 1) ;;;
+      Sreturn (Some (Etempvar _ret valPtr)) in
 
     let params := (_tinfo, (threadInf _thread_info)) :: (_clo, val) :: (_arg, val) :: nil in
     let vars := (_f, valPtr) :: (_env, valPtr) :: (_ret, valPtr) :: nil in
     _call <- gensym "call" ;;
     ret (_call,
-         Gfun (Internal (mkfunction (Tpointer Tvoid noattr)
-                                    cc_default params nil vars body_s))).
+         Gfun (Internal
+                 {| fn_return := Tpointer Tvoid noattr
+                  ; fn_callconv := cc_default
+                  ; fn_params := (_tinfo, (threadInf _thread_info)) ::
+                                 (_clo, val) ::
+                                 (_arg, val) :: nil
+                  ; fn_vars := nil
+                  ; fn_temps := (_f, valPtr) :: (_env, valPtr) :: (_ret, valPtr) :: nil
+                  ; fn_body := body
+                  |})).
 
 End FunctionCalls.
 
@@ -1400,8 +1437,8 @@ Definition make_glue_program
   get_tag_defs <- get_enum_tag_from_types toolbox singles ;;
   make_printer_names singles;;
   printer_defs <- generate_printers toolbox singles ;;
-  halt_defs <- make_halt toolbox (c_args opts) ;;
-  call_def <- make_call toolbox (c_args opts);;
+  halt_defs <- make_halt toolbox opts ;;
+  call_def <- make_call toolbox opts ;;
   nenv <- gets gstate_nenv ;;
   let (comp_structs, struct_defs) := List.split structs in
   let composites := comp_tinfo ++ comp_structs in

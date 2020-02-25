@@ -7,7 +7,6 @@ Require Import Coq.ZArith.ZArith
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
-               ExtLib.Data.Monads.StateMonad
                ExtLib.Data.String.
 
 From MetaCoq.Template Require Import BasicAst.
@@ -23,10 +22,10 @@ Require Import compcert.common.AST
                compcert.exportclight.Clightdefs.
 
 Require Import L6.cps
-               L6.identifiers.
-
-Require Import L6.cps_show
-               L6_to_Clight.
+               L6.identifiers
+               L6.cps_show
+               L6_to_Clight
+               compM.
 
 Import MonadNotation.
 Open Scope monad_scope.
@@ -48,7 +47,6 @@ Notation "'Field(' t ',' n ')'" :=
 Definition multiple (xs : list statement) : statement :=
   fold_right Ssequence Sskip xs.
 
-Definition uval : type := if Archi.ptr64 then ulongTy else uintTy.
 Definition max_args : Z := 1024.
 
 (* aliases for Clight AST types *)
@@ -229,63 +227,66 @@ Section GState.
       ; gstate_log    : list string
       }.
 
-  Definition gState : Type -> Type := StateMonad.state gstate_data.
+  Definition glueM : Type -> Type := compM Options gstate_data.
+
+  Definition gets {A : Type} (f : gstate_data -> A) : glueM A :=
+    s <- get ;; ret (f s).
 
   (* generate fresh [ident] and record it to the [name_env]
      with the given [string] *)
-  Definition gensym (s : string) : gState ident :=
+  Definition gensym (s : string) : glueM ident :=
     '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
     let nenv := M.set n (nNamed s) nenv in
     put (Build_gstate_data ((n+1)%positive) ienv nenv gtenv cnenv caaenv penv log) ;;
     ret n.
 
-  Definition set_print_env (k : ind_L1_tag) (v : ident) : gState unit :=
+  Definition set_print_env (k : ind_L1_tag) (v : ident) : glueM unit :=
     '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
     let penv := M.set k v penv in
     put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
 
-  Definition get_print_env (k : ind_L1_tag) : gState (option ident) :=
+  Definition get_print_env (k : ind_L1_tag) : glueM (option ident) :=
     penv <- gets gstate_penv ;;
     ret (M.get k penv).
 
-  Definition set_get_tag_env (k : ind_L1_tag) (v : ident) : gState unit :=
+  Definition set_get_tag_env (k : ind_L1_tag) (v : ident) : glueM unit :=
     '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
     let gtenv := M.set k v gtenv in
     put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
 
-  Definition get_get_tag_env (k : ind_L1_tag) : gState (option ident) :=
+  Definition get_get_tag_env (k : ind_L1_tag) : glueM (option ident) :=
     gtenv <- gets gstate_gtenv ;;
     ret (M.get k gtenv).
 
-  Definition get_ctor_names_env (k : ind_L1_tag) : gState (option (ident * type)) :=
+  Definition get_ctor_names_env (k : ind_L1_tag) : glueM (option (ident * type)) :=
     cnenv <- gets gstate_cnenv ;;
     ret (M.get k cnenv).
 
-  Definition set_ctor_names_env (k : ind_L1_tag) (v : ident * type) : gState unit :=
+  Definition set_ctor_names_env (k : ind_L1_tag) (v : ident * type) : glueM unit :=
     '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
     let cnenv := M.set k v cnenv in
     put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
 
   Definition get_ctor_arg_accessor_env
              (k1 : ind_L1_tag) (k2: ctor_L1_index)
-             : gState (option (type * ident)) :=
+             : glueM (option (type * ident)) :=
     caaenv <- gets gstate_caaenv ;;
     ret (get_2d k1 k2 caaenv).
 
   Definition set_ctor_arg_accessor_env
-             (k1 : ind_L1_tag) (k2 : ctor_L1_index) (v : type * ident) : gState unit :=
+             (k1 : ind_L1_tag) (k2 : ctor_L1_index) (v : type * ident) : glueM unit :=
     '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
     let caaenv := set_2d k1 k2 v caaenv in
     put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
 
-  Definition get_ind_L1_env (k : ind_L1_tag) : gState (option ty_info) :=
+  Definition get_ind_L1_env (k : ind_L1_tag) : glueM (option ty_info) :=
     ienv <- gets gstate_ienv ;;
     ret (M.get k ienv).
 
   (* A hacky way to get the [ind_L1_tag] of a type from its name.
      This is necessary because of a shortcoming of Template Coq.
      (mutually recursive type names aren't fully qualified) *)
-  Definition get_tag_from_type_name (s : kername) : gState (option ind_L1_tag) :=
+  Definition get_tag_from_type_name (s : kername) : glueM (option ind_L1_tag) :=
     let find (prev : option ind_L1_tag)
              (tag : ind_L1_tag)
              (info : ty_info) : option ind_L1_tag :=
@@ -296,13 +297,13 @@ Section GState.
     ienv <- gets gstate_ienv ;;
     ret (M.fold find ienv None).
 
-  Definition put_ind_L1_env (ienv : ind_L1_env) : gState unit :=
+  Definition put_ind_L1_env (ienv : ind_L1_env) : glueM unit :=
     '(Build_gstate_data n _ nenv gtenv cnenv caaenv penv log) <- get ;;
     put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
 
   (* logs are appended to the list and the list is reversed
      at the end to keep them in chronological order *)
-  Definition log (s : string) : gState unit :=
+  Definition log (s : string) : glueM unit :=
     '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
     put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv (s :: log)).
 
@@ -320,7 +321,7 @@ Section Externs.
 
   (* Creates a global variable with a string literal constant *)
   Definition string_literal (name : string) (literal : string)
-            : gState (ident * type * globdef fundef type) :=
+            : glueM (ident * type * globdef fundef type) :=
     ident <- gensym name ;;
     let len := String.length literal in
     let init := string_as_array literal in
@@ -331,7 +332,7 @@ Section Externs.
   Definition ty_printf : type :=
     Tfunction (Tcons (tptr tschar) Tnil) tint cc_default.
 
-  Definition get_unboxed_ordinal : gState def :=
+  Definition get_unboxed_ordinal : glueM def :=
     gname <- gensym "get_unboxed_ordinal" ;;
     _v <- gensym "v" ;;
     ret (gname,
@@ -344,7 +345,7 @@ Section Externs.
                   ; fn_body := (Sreturn (Some (Ebinop Oshr (var _v) (make_cint 1 val) val)))
                   |})).
 
-  Definition get_boxed_ordinal : gState def :=
+  Definition get_boxed_ordinal : glueM def :=
     gname <- gensym "get_boxed_ordinal" ;;
     _v <- gensym "v" ;;
     ret (gname,
@@ -358,7 +359,7 @@ Section Externs.
                       (Sreturn (Some (Ebinop Oand (Field(var _v, -1)) (make_cint 255 val) val)))
                   |})).
 
-  Definition make_externs : gState (composite_definitions * defs * toolbox_info) :=
+  Definition make_externs : glueM (composite_definitions * defs * toolbox_info) :=
     '(_lparen, ty_lparen, def_lparen) <- string_literal "lparen_lit" "(" ;;
     '(_rparen, ty_rparen, def_rparen) <- string_literal "rparen_lit" ")" ;;
     '(_space,  ty_space,  def_space)  <- string_literal "space_lit"  " " ;;
@@ -528,7 +529,7 @@ Section L1Types.
   (* Generates the initial ind_L1_env *)
   Definition propagate_types
              (gs : Ast.global_env)
-             : gState (list (ind_L1_tag * ty_info)) :=
+             : glueM (list (ind_L1_tag * ty_info)) :=
     let singles := get_single_types gs in
     let res := enumerate_pos singles in
     let ienv : ind_L1_env := set_list res (M.empty _) in
@@ -558,7 +559,7 @@ Section L1Types.
      [Set] and [Type] are fine. CertiCoq erases [Prop]s early on,
      so no glue code is needed for those types. *)
   Fixpoint filter_prop_types
-           (l : list (ind_L1_tag * ty_info)) : gState (list (ind_L1_tag * ty_info)) :=
+           (l : list (ind_L1_tag * ty_info)) : glueM (list (ind_L1_tag * ty_info)) :=
     match l with
     | nil => ret nil
     | (itag, info) :: xs =>
@@ -670,7 +671,7 @@ Section Printers.
     printer functions for each type because they can be mutually recursive. *)
   Fixpoint make_printer_names
           (tys : list (ind_L1_tag * ty_info))
-          : gState unit :=
+          : glueM unit :=
     match tys with
     | nil => ret tt
     | (tag, {| ty_name := kn ; ty_body := ty |}) :: tys' =>
@@ -679,7 +680,7 @@ Section Printers.
         make_printer_names tys'
     end.
 
-  Fixpoint gen_param_fun_names (params : list string) : gState (list (string * ident)) :=
+  Fixpoint gen_param_fun_names (params : list string) : glueM (list (string * ident)) :=
     match params with
     | nil => ret nil
     | x :: xs =>
@@ -708,7 +709,7 @@ Section Printers.
      some of which may be the parameters of the type *)
   Fixpoint spine_to_args
            (spine : list dissected_type)
-           (params : list (string * ident)) : gState (option (list expr)) :=
+           (params : list (string * ident)) : glueM (option (list expr)) :=
     match spine with
     | nil => ret (Some nil)
     | dParam p :: spine' =>
@@ -749,7 +750,7 @@ Section Printers.
 
   Definition generate_printer
              (info : ind_L1_tag * ty_info)
-            : gState (option def) :=
+            : glueM (option def) :=
     let '(itag, {| ty_name := name ; ty_body := b ; ty_params := params |}) := info in
     let basename := Ast.ind_name b in
     let ctors := Ast.ind_ctors b in
@@ -812,7 +813,7 @@ Section Printers.
 
         (* Generates a single function call to a printer with the right argument type *)
         let rec_print_call
-            (arg : nat * dissected_type) : gState statement :=
+            (arg : nat * dissected_type) : glueM statement :=
           match arg with
           | (_, dFun) =>
               ret (Scall None (Evar _printf ty_printf)
@@ -896,7 +897,7 @@ Section Printers.
         (* Generates function calls to printers with the right argument types *)
         let fix rec_print_calls
                 (args : list (nat * dissected_type))
-                : gState statement :=
+                : glueM statement :=
           match args with
           | nil => ret Sskip
           | arg :: nil => (* to handle the separator *)
@@ -910,7 +911,7 @@ Section Printers.
         (* Generates cases for the switch statement in the print function *)
         let fix switch_cases
                 (ctors : list (ctor_L1_index * (BasicAst.ident * Ast.term * nat)))
-                : gState labeled_statements :=
+                : glueM labeled_statements :=
           match ctors with
           | nil => ret LSnil
           | (ctag, (_, ty, arity)) :: ctors' =>
@@ -981,7 +982,7 @@ Section Printers.
 
   Fixpoint generate_printers
           (tys : list (ind_L1_tag * ty_info))
-          : gState defs :=
+          : glueM defs :=
     match tys with
     | nil => ret nil
     | ty :: tys' =>
@@ -1019,7 +1020,7 @@ Section CtorArrays.
            (tag : ind_L1_tag)
            (kn : kername)
            (ctors : list (BasicAst.ident * Ast.term * nat))
-           : gState def :=
+           : glueM def :=
     let (max_len, init_l) := normalized_names_array ctors 1 in
     let ty := tarray (tarray tschar (Z.of_nat max_len))
                      (Z.of_nat (length ctors)) in
@@ -1029,7 +1030,7 @@ Section CtorArrays.
 
   Fixpoint make_name_arrays
            (tys : list (ind_L1_tag * ty_info))
-           : gState defs :=
+           : glueM defs :=
     match tys with
     | nil => ret nil
     | (tag, {| ty_name := kn; ty_body := b |}) :: tys' =>
@@ -1047,7 +1048,7 @@ Section ArgsStructs.
            (name : BasicAst.ident)
            (i : nat) (* initially 0 *)
            (j : nat) (* initially the arity *)
-           : gState members :=
+           : glueM members :=
     match j with
     | O => ret nil
     | S j' =>
@@ -1060,7 +1061,7 @@ Section ArgsStructs.
           (itag : ind_L1_tag)
           (qp : qualifying_prefix)
           (ctors : list (ctor_L1_index * (BasicAst.ident * Ast.term * nat)))
-          : gState (list (composite_definition * def)) :=
+          : glueM (list (composite_definition * def)) :=
     match ctors with
     | nil => ret nil
     | (ctag, ctor) :: ctors' =>
@@ -1097,7 +1098,7 @@ Section ArgsStructs.
 
   Fixpoint args_structs_from_types
           (tys : list (ind_L1_tag * ty_info))
-          : gState (list (composite_definition * def)) :=
+          : glueM (list (composite_definition * def)) :=
     match tys with
     | nil => ret nil
     | (itag, {| ty_body := ty ; ty_name := kn |}) :: tys' =>
@@ -1140,7 +1141,7 @@ Section CtorEnumTag.
 
   Fixpoint get_enum_tag_from_types
           (tys : list (ind_L1_tag * ty_info))
-          : gState defs :=
+          : glueM defs :=
     match tys with
     | nil => ret nil
     | (itag, {| ty_name := kn ; ty_body := one |}) :: tys' =>
@@ -1193,7 +1194,7 @@ End CtorEnumTag.
 Section CConstructors.
 
   Fixpoint make_arg_list'
-           (n : nat) : gState (list (ident * type)) :=
+           (n : nat) : glueM (list (ident * type)) :=
     match n with
     | O => ret nil
     | S n' =>
@@ -1203,14 +1204,14 @@ Section CConstructors.
     end.
 
   Definition make_arg_list
-             (n : nat) : gState (list (ident * type)) :=
+             (n : nat) : glueM (list (ident * type)) :=
     rest <- make_arg_list' n ;;
     ret (rev rest).
 
   Fixpoint constructors_from_ctors
           (name_ty : kername) (* like bool or nat *)
           (ctors : list ctor_info) (* name, arity, ordinal *)
-          : gState defs :=
+          : glueM defs :=
     let make_name (cname : string) : string :=
       ("make_" ++ sanitize_qualified name_ty ++ "_" ++ cname)%string in
     match ctors with
@@ -1256,7 +1257,7 @@ Section CConstructors.
 
   Fixpoint constructors_for_tys
           (tys : list (ind_L1_tag * ty_info))
-          : gState defs :=
+          : glueM defs :=
     match tys with
       | nil => ret nil
       | (itag, {| ty_name := kn ; ty_body := ty |}) :: tys' =>
@@ -1279,13 +1280,13 @@ Section FunctionCalls.
      Olivier Savary Belanger's work with different number of parameters *)
 
   Variable toolbox : toolbox_info.
-  Variable opts : Options.
+  (* Variable opts : Options. *)
   Let _thread_info : ident := thread_info_type _ (thread_info_info toolbox).
   Let _args : ident := args_info _ (thread_info_info toolbox).
-  Let c_args : nat := c_args opts.
+  (* Let c_args : nat := c_args opts. *)
 
   Local Variant Backend := ANF | CPS.
-  Let backend := if direct opts then ANF else CPS.
+  (* Let backend := if direct opts then ANF else CPS. *)
 
   (* Notations, from OSB *)
   Notation " a '::=' b " := (Sset a b) (at level 50).
@@ -1297,7 +1298,9 @@ Section FunctionCalls.
       - for c_args >= 2 the environment and the result.
       Hence, if c_args >= 2 we additionally have to put
       the result into *tinfo.args[1]. *)
-  Definition make_halt : gState (def * def) :=
+  Definition make_halt : glueM (def * def) :=
+    opts <- ask ;;
+    let c_args : nat := c_args opts in
     _env <- gensym "env" ;;
     _arg <- gensym "arg" ;;
     _tinfo <- gensym "tinfo" ;;
@@ -1342,7 +1345,11 @@ Section FunctionCalls.
     Maybe a separate call_anf function in C or
     a separate make_call_anf function in the glue code generator.
   *)
-  Definition make_call : gState def :=
+  Definition make_call : glueM def :=
+    opts <- ask ;;
+    let c_args : nat := c_args opts in
+    let backend := if direct opts then ANF else CPS in
+
     _clo <- gensym "clo" ;;
     _f <- gensym "f" ;;
     _env <- gensym "envi" ;;
@@ -1426,9 +1433,8 @@ Definition mk_prog_opt
 
 (* Generates the header and the source programs *)
 Definition make_glue_program
-           (opts : Options)
            (gs : Ast.global_env)
-           : gState (option Clight.program * option Clight.program) :=
+           : glueM (option Clight.program * option Clight.program) :=
   '(comp_tinfo, externs, toolbox) <- make_externs ;;
   singles <- (propagate_types >=> filter_prop_types) gs ;;
   name_defs <- make_name_arrays singles ;;
@@ -1437,8 +1443,8 @@ Definition make_glue_program
   get_tag_defs <- get_enum_tag_from_types toolbox singles ;;
   make_printer_names singles;;
   printer_defs <- generate_printers toolbox singles ;;
-  halt_defs <- make_halt toolbox opts ;;
-  call_def <- make_call toolbox opts ;;
+  halt_defs <- make_halt toolbox ;;
+  call_def <- make_call toolbox ;;
   nenv <- gets gstate_nenv ;;
   let (comp_structs, struct_defs) := List.split structs in
   let composites := comp_tinfo ++ comp_structs in
@@ -1456,7 +1462,7 @@ Definition make_glue_program
 Definition generate_glue
            (opts : Options)
            (p : Ast.program) (* an L1 program *)
-           : name_env * option Clight.program * option Clight.program * list string :=
+           : error (name_env * option Clight.program * option Clight.program * list string) :=
   let (globs, _) := p in
   let init : gstate_data :=
       {| gstate_gensym := 2%positive
@@ -1468,9 +1474,13 @@ Definition generate_glue
        ; gstate_penv   := M.empty _
        ; gstate_log    := nil
        |} in
-  let '((header, source), st) := runState (make_glue_program opts globs) init in
+  let '(err, st) := runState (make_glue_program globs) opts init in
   let nenv := gstate_nenv st in
-  (nenv (* the name environment to be passed to C generation *) ,
-   header (* the header content *),
-   source (* the source content *),
-   (rev (gstate_log st)) (* logged messages *)).
+  match err with
+  | Ret (header, source) =>
+    Ret (nenv (* the name environment to be passed to C generation *) ,
+         header (* the header content *),
+         source (* the source content *),
+         rev (gstate_log st) (* logged messages *))
+  | Err s => Err s
+  end.

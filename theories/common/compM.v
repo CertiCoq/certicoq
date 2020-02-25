@@ -123,6 +123,7 @@ Global Arguments get {_ _}.
 
 Global Arguments failwith {_ _ _} _.
 
+Global Arguments ask {_ _}.
 
 Section Hoare.
 

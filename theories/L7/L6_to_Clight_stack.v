@@ -1211,6 +1211,7 @@ Definition inf_vars :=
   (threadInfIdent, (nNamed "thread_info"%string)) ::
   (tinfIdent, (nNamed "tinfo"%string)) ::
   (heapInfIdent, (nNamed "heap"%string)) ::
+  (caseIdent, (nNamed "arg"%string)) ::
   (numArgsIdent, (nNamed "num_args"%string)) ::
   (stackframeTIdent, (nNamed "stack_frame"%string)) ::
   (frameIdent, nNamed "frame"%string) ::

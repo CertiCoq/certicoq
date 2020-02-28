@@ -103,7 +103,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
 
 
 (* Optimizing L6 pipeline *)
-Definition L6_pipeline  (opt cps : bool) (t : L6_FullTerm) : error L6_FullTerm :=
+Definition L6_pipeline  (opt cps : bool) (args : nat) (t : L6_FullTerm) : error L6_FullTerm :=
   let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
   (* make compilation state *)
   let c_data :=
@@ -123,7 +123,7 @@ Definition L6_pipeline  (opt cps : bool) (t : L6_FullTerm) : error L6_FullTerm :
       (* Shrink reduction *)
       let e3 := shrink_cps.shrink_top e2 in
       (* lambda lifting *)
-      let (e_rr4, c_data) := if opt then lambda_lift e3 c_data else (compM.Ret e3, c_data)in
+      let (e_rr4, c_data) := if opt then lambda_lift e3 args c_data else (compM.Ret e3, c_data)in
       e4 <- e_rr4 ;;
       (* Shrink reduction *)
       let e5 := shrink_cps.shrink_top e4 in
@@ -158,5 +158,6 @@ Definition L6_trans : CertiCoqTrans L6_FullTerm L6_FullTerm :=
     debug_msg "Compiling L6" ;;
     opts <- get_options ;;
     let cps := negb (direct opts) in
+    let args := c_args opts in
     let o := (0 <? (o_level opts))%nat in
-    LiftErrorCertiCoqTrans "L6 Pipeline" (L6_pipeline o cps) src.
+    LiftErrorCertiCoqTrans "L6 Pipeline" (L6_pipeline o cps args) src.

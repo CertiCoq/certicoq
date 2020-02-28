@@ -18,6 +18,8 @@ Open Scope monad_scope.
 
 (** * Lambda lifting *)
 
+(* XXX TODO Comments are not uptodate with the implementation *)
+
 (** This transformation assumes that all bindings are unique and disjoint from
     the free variables of an expression.
 
@@ -98,6 +100,7 @@ Section LambdaLifting.
   (* Decision about Lambda Lifting of rec functions *)
   Context (lift :  bool ->    (* True if it's a rec call (directly or from a nested function) *)
                    bool).    (* Lifting decision *)
+  Context (max_args : nat). (* Maximum number of arguments that a function can have *)
   
   Inductive VarInfo : Type :=
   (* A variable that is free in the current function definition.
@@ -112,8 +115,8 @@ Section LambdaLifting.
   Inductive FunInfo : Type := 
   (* A known function. The first argument is the name of the lambda lifted version,
    the second the new fun_tag and the third and forth the are free variables of the
-   function as a list and as a set *)
-  | Fun : var -> fun_tag -> list var -> PS.t -> FunInfo.
+   function as a list and as a set. The fifth argument is the fvs that are passed as args  *)
+  | Fun : var -> fun_tag -> list var -> PS.t -> list var -> FunInfo.
 
   (* Maps variables to [FunInfo] *)
   Definition FunInfoMap := Maps.PTree.t FunInfo.
@@ -206,7 +209,7 @@ Section LambdaLifting.
         let fvset'' := add_list scope fvset' ys in 
         exp_true_fv_aux e (add x scope) fvset''
       | Efun defs e =>
-        let fvs':=  fundefs_fv defs in 
+        let fvs':= fundefs_fv defs in
         let '(scope', fvset') := fundefs_true_fv_aux defs scope fvset in 
         exp_true_fv_aux e scope' fvset'
       | Eapp x ft xs =>
@@ -259,7 +262,14 @@ Section LambdaLifting.
       end
     | Fnil => ret (Hole_c, fvm)
     end.
-  
+
+  Definition fundefs_max_params (B: fundefs) : nat :=
+    (fix aux B p : nat :=      
+      match B with
+      | Fcons f ft xs e B =>
+        aux B (max (length xs) p)
+      | Fnil => 0
+      end) B 0.
 
   Definition name_block B :=
     match B with
@@ -309,13 +319,16 @@ Section LambdaLifting.
       b_name <- get_pp_name (name_block B) ;;
       fv_names <- get_pp_names_list (PS.elements sfvsi) ;;
       log_msg (String.concat " " ("Block" :: b_name :: "has fvs :" :: fv_names)) ;;
-
+      (* END DEBUG *)
       let is_closed := match fvs with [] => true | _ => false end in
-      maps' <- add_functions B fvs sfvs fm gfuns is_closed ;;
+      (* Number of argument slots available. By convention lift exactly the same no of args in each function *)
+      let lifted_args := max_args - max_params in
+      maps' <- add_functions B fvs sfvs fm gfuns is_closed lifted_args;;
       let (fm', gfuns') := maps' in
       let names := fundefs_names B in
       let scope' := PS.union names scope in
-      B' <- fundefs_lambda_lift B B names (PS.union names active_funs) fvm fm' gfuns' ;;
+      let max_params := fundefs_max_params B in
+      B' <- fundefs_lambda_lift B B names (PS.union names active_funs) fvm fm' gfuns' lifted_args ;;
       cm <- make_wrappers B fvm fm' ;;
       let (C, fvm') := cm in
       e' <- exp_lambda_lift e (PS.union names scope) active_funs fvm' fm' gfuns' ;;
@@ -338,7 +351,7 @@ Section LambdaLifting.
       ret (Eprim x f (rename_lst fvm ys) e')
     | Ehalt x => ret (Ehalt (rename fvm x))
     end
-  with fundefs_lambda_lift B Bfull (fnames : FVSet) active_funs fvm (fm : FunInfoMap) (gfuns : GFunMap) :=
+  with fundefs_lambda_lift B Bfull (fnames : FVSet) active_funs fvm (fm : FunInfoMap) (gfuns : GFunMap) (fv_no : nat) :=
          match B with
          | Fcons f ft xs e B => 
            match M.get f fm with
@@ -357,7 +370,7 @@ Section LambdaLifting.
                (* Variables in scope are : 1. Whatever variables are locally bound (current functions, arguments, local defs)
                   and 2. The FVs of the current function *)
                e' <- exp_lambda_lift e (PS.union fnames (union_list sfvs xs)) active_funs fvm'' fm gfuns ;;
-               B' <- fundefs_lambda_lift B Bfull fnames active_funs fvm fm gfuns ;;
+               B' <- fundefs_lambda_lift B Bfull fnames active_funs fvm fm gfuns fv_no ;;
                ret (Fcons f' ft' (xs ++ ys) (C |[ e' ]|)  B')
              end
            | None => ret (Fcons f ft xs e B) (* should never match *)
@@ -389,8 +402,8 @@ Definition lift_rec (is_rec : bool) := is_rec.
 
 Definition lift_conservative (is_rec : bool) := false.
 
-Definition lambda_lift (e : exp) (c : comp_data) : error exp * comp_data :=
-  let '(e', (c', _)) := run_compM (exp_lambda_lift lift_rec e PS.empty PS.empty (Maps.PTree.empty VarInfo)
+Definition lambda_lift (e : exp) (args : nat) (c : comp_data) : error exp * comp_data :=
+  let '(e', (c', _)) := run_compM (exp_lambda_lift lift_rec args e PS.empty PS.empty (Maps.PTree.empty VarInfo)
                                                    (Maps.PTree.empty FunInfo) (M.empty GFunInfo))
                                   c tt in  
   (e', c').

@@ -28,6 +28,7 @@ CertiCoq Show IR <global_id>.
 
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
+Definition demo3 := andb. 
  
 CertiCoq Compile demo1.
 CertiCoq Compile -anf demo1.
@@ -36,10 +37,14 @@ CertiCoq Compile -anf -o1 demo1.
 CertiCoq Compile demo2.
 CertiCoq Compile -anf demo2.
 
+(* Also works for CPS, when choosing another number of arguments, e.g. -args 1 *)
+CertiCoq Compile demo3.
+CertiCoq Compile -anf demo3.
+
 Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
 
 CertiCoq Compile list_sum.
-CertiCoq Compile "anf" list_sum.
+CertiCoq Compile -anf list_sum.
 
 
 Definition vs_easy :=

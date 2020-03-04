@@ -372,17 +372,21 @@ arguments are:
     - update the conId_map with a pair relating the nCon'th constructor of ind to the ctor_tag of the current constructor
 
    *)
-  Fixpoint convert_cnstrs (tyname:string) (cct:list ctor_tag) (itC:list AstCommon.Cnstr) (ind:BasicAst.inductive) (nCon:N) (niT:ind_tag) (ce:ctor_env) (dcm:conId_map) :=
+  Fixpoint convert_cnstrs (tyname:string) (cct:list ctor_tag) (itC:list AstCommon.Cnstr) (ind:BasicAst.inductive) (nCon:N) (unboxed : N) (boxed : N) (niT:ind_tag) (ce:ctor_env) (dcm:conId_map) :=
     match (cct, itC) with
       | (cn::cct', cst::icT') =>
         let (cname, ccn) := cst in
+        let is_unboxed := Nat.eqb ccn 0 in
         let info := {| ctor_name := BasicAst.nNamed cname
                      ; ctor_ind_name := BasicAst.nNamed tyname
                      ; ctor_ind_tag := niT
                      ; ctor_arity := N.of_nat ccn
-                     ; ctor_ordinal := nCon
+                     ; ctor_ordinal := if is_unboxed then unboxed else boxed
                      |} in
-        convert_cnstrs tyname cct' icT' ind (nCon+1)%N niT
+        convert_cnstrs tyname cct' icT' ind (nCon+1)%N
+                       (if is_unboxed then unboxed + 1 else unboxed)
+                       (if is_unboxed then boxed else boxed + 1)
+                       niT
                        (M.set cn info ce)
                        (((ind,nCon), cn)::dcm (** Remove this now that params are always 0? *))
       | (_, _) => (ce, dcm)
@@ -401,7 +405,7 @@ arguments are:
       | nil => ice
       | (AstCommon.mkItyp itN itC ) ::typ' =>
         let (cct, ncT') := fromN ncT (length itC) in
-        let (ce', dcm') := convert_cnstrs itN cct itC (BasicAst.mkInd idBundle n) 0 niT ce dcm in
+        let (ce', dcm') := convert_cnstrs itN cct itC (BasicAst.mkInd idBundle n) 0 0 0 niT ce dcm in
         let ityi := combine cct (map (fun (c:AstCommon.Cnstr) => let (_, n) := c in N.of_nat n) itC) in
         convert_typack typ' idBundle (n+1) (M.set niT ityi ie, ce', ncT', (Pos.succ niT) , dcm')
     end.

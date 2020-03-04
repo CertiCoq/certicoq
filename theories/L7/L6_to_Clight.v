@@ -1264,7 +1264,8 @@ Definition add_inf_vars (nenv : name_env) : name_env :=
                                                M.set threadInfIdent (nNamed "thread_info"%string) (
                                                        M.set tinfIdent (nNamed "tinfo"%string) (
                                                                M.set heapInfIdent (nNamed "heap"%string) (
-                                                                     M.set numArgsIdent (nNamed "num_args"%string) nenv)))))))))).
+                                                                     M.set caseIdent (nNamed "arg"%string) (
+                                                                           M.set numArgsIdent (nNamed "num_args"%string) nenv))))))))))).
 
 
 

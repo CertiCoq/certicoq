@@ -259,23 +259,8 @@ match e with
   | Some bs =>
     let ys' := live_args ys bs in
     e' <- eliminate_expr L e';;
-    if is_nil ys' then
-    (* All arguments are redundant, keep the first.
-     * I'm not sure if this is the optimal strategy.
-     * An alternative would be to construct a unit value and pass as the argument
-     * but that may be better or worse in terms of allocation *)
-      match ys with
-      | [] =>
-        (* get fresh ftag -- Currently don't care about tag sharing *)
-        ft <- get_fun_tag 0 ;;
-        ret (Eletapp x f ft [] e')
-      | [y] | _ :: y :: _ =>
-        ft <- get_fun_tag 1 ;;
-        ret (Eletapp x f ft [y] e')
-      end
-    else 
-      ft <- get_fun_tag (length ys') ;;
-      ret (Eletapp x f ft ys' e')
+    ft <- get_fun_tag (length ys') ;;
+    ret (Eletapp x f ft ys' e')
   | None =>
     ret (Eletapp x f ft ys e')
   end
@@ -298,18 +283,8 @@ match e with
   match get_fun_vars L f with
   | Some bs =>
     let ys' := live_args ys bs in
-    if is_nil ys' then
-      match ys with
-      | [] =>
-        ft <- get_fun_tag 0 ;;
-        ret (Eapp f ft [])
-      | [y] | _ :: y :: _ =>
-        ft <- get_fun_tag 1 ;;
-        ret (Eapp f ft [y])
-      end
-    else
-      ft <- get_fun_tag (length ys') ;;
-      ret (Eapp f ft ys')
+    ft <- get_fun_tag (length ys') ;;
+    ret (Eapp f ft ys')
   | None => ret (Eapp f ft ys)
   end
 end.
@@ -321,18 +296,10 @@ Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : elimM fundefs :=
     match get_fun_vars L f with
     | Some bs =>
       let ys' := live_args ys bs in
-      let ys'' :=
-          if is_nil ys' then
-            match ys with
-            | [] => []
-            | [y] |  _ :: y ::  _  => [y]    (* avoid keeping the (empty) closure environment (?) *)
-            end
-          else ys'
-      in 
       e' <- eliminate_expr L e ;;
       B'' <- eliminate_fundefs B' L ;;
-      ft <- get_fun_tag (length ys'') ;;
-      ret (Fcons f ft ys'' e' B'')
+      ft <- get_fun_tag (length ys') ;;
+      ret (Fcons f ft ys' e' B'')
     | None => failwith "Known function not found in live_fun map"
     end
   | Fnil => ret Fnil

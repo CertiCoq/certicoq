@@ -158,6 +158,6 @@ Definition L6_trans : CertiCoqTrans L6_FullTerm L6_FullTerm :=
     debug_msg "Compiling L6" ;;
     opts <- get_options ;;
     let cps := negb (direct opts) in
-    let args := c_args opts in
+    let args := fv_args opts in
     let o := (0 <? (o_level opts))%nat in
     LiftErrorCertiCoqTrans "L6 Pipeline" (L6_pipeline o cps args) src.

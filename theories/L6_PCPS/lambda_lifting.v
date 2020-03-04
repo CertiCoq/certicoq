@@ -113,35 +113,46 @@ Section LambdaLifting.
   Definition VarInfoMap := Maps.PTree.t VarInfo.
 
   Inductive FunInfo : Type := 
-  (* A known function. The first argument is the name of the lambda lifted version,
-   the second the new fun_tag and the third and forth the are free variables of the
-   function as a list and as a set. The fifth argument is the fvs that are passed as args  *)
-  | Fun : var -> fun_tag -> list var -> PS.t -> list var -> FunInfo.
+  (* A known function. *)
+  | Fun :
+      var ->        (* New name for the lambda lifted version *)
+      fun_tag ->    (* New fun_tag *)
+      list var ->   (* Free variables as list *)
+      PS.t ->       (* Free variables as sets *)
+      list var ->   (* Lifted variables *)
+      FunInfo.
 
   (* Maps variables to [FunInfo] *)
   Definition FunInfoMap := Maps.PTree.t FunInfo.
 
   (* A global function name *)
-  Inductive GFunInfo : Type := GFun : var -> GFunInfo.
+  Inductive GFunInfo : Type :=
+    GFun : var -> GFunInfo (* Original global function *)
+  | LGFun : GFunInfo.
 
   Definition GFunMap := M.t GFunInfo.
 
   Definition lambdaM := @compM' unit.
 
-  Fixpoint add_functions (B : fundefs) (fvs : list var) (sfvs : PS.t) (m : FunInfoMap) (gfuns : GFunMap)
-           (is_closed : bool)
+  Fixpoint add_functions (B : fundefs) (fvs : list var) (sfvs : PS.t) (args : list var)
+           (m : FunInfoMap) (gfuns : GFunMap)
     : lambdaM (FunInfoMap * GFunMap):=
     match B with
     | Fcons f ft xs _ B =>
-      maps <- add_functions B fvs sfvs m gfuns is_closed ;;
+      maps <- add_functions B fvs sfvs args m gfuns ;;
       let '(m', gfuns') := maps in
       (* new name for lambda lifted definition - this function will always be known *)
       f' <- get_name f "_lifted";;
-      (* new fun_tag for lambda listed definition *)
+      (* new fun_tag for lambda lifted definition *)
       ft' <- get_ftag (N.of_nat (length xs)) ;;
+      (* is the original function closed? *)
+      let is_closed := match fvs with [] => true | _ => false end in
+      (* is the lifted function closed? *)
+      let is_closed_lifted := Nat.eqb (length fvs) (length args) in
       (* if the function block is closed add it to the global function map *)
       let gfuns'' := if is_closed then M.set f (GFun f') gfuns' else gfuns' in
-      ret (M.set f (Fun f' ft' fvs sfvs) m', gfuns'')
+      let gfuns''' := if is_closed_lifted then M.set f' LGFun gfuns' else gfuns' in
+      ret (M.set f (Fun f' ft' fvs sfvs args) m', gfuns'')
     | Fnil => ret (m, gfuns)
     end.
   
@@ -171,22 +182,54 @@ Section LambdaLifting.
     end.
 
   Definition FVMap := Maps.PTree.t PS.t.
+  
+  Fixpoint make_wrappers (B: fundefs) (fvm : VarInfoMap) (fm: FunInfoMap) : lambdaM (exp_ctx * VarInfoMap):=
+    match B with
+    | Fcons f ft xs e B =>
+      match M.get f fm with
+      | Some inf =>
+        match inf with
+        | Fun f' ft' fvs sfvs args =>
+          g <- get_name f "_wrapper" ;;
+          xs' <- get_names_lst xs "" ;;
+          cm <- make_wrappers B fvm fm ;;
+          let (c, fvm') := cm in
+          let fvm'' := M.set f (WrapperFun g) fvm' in
+          ret (Efun1_c (Fcons g ft xs' (Eapp f' ft' (xs' ++ (rename_lst fvm args))) Fnil) c, fvm'')
+        end
+      | None => failwith "make_wrappers: Function not found"
+      end
+    | Fnil => ret (Hole_c, fvm) 
+    end.
+
+  Definition fundefs_max_params (B: fundefs) : nat :=
+    (fix aux B p : nat :=      
+       match B with
+       | Fcons f ft xs e B =>
+         aux B (max (length xs) p)
+       | Fnil => 0
+       end) B 0.
+
+  Definition name_block B :=
+    match B with
+    | Fcons f _ _ _ _ => f
+    | Fnil => 1%positive
+    end.
 
   Section TrueFV.
-    
+
+    (* Returns the FV of an exp after a function call is replaced with lambda lifted version *)
+
     Variable (funmap : FunInfoMap).
     Variable (active_fun : FVSet). (* Functions whose scope is currently active *)
-  
-    (** The set of the *true* free variables of an [exp]. The true free variables
-    are the variables that appear free plus the free variables of the known
-    functions that are called inside the expression. Relies on the the
-    assumption that the free and bound variables are disjoint. *)
+
+
     Fixpoint exp_true_fv_aux (e : exp)
              (scope  : FVSet) (* the current variables in scope. Initially empty *)
              (fvset : PS.t) : PS.t :=
       match e with
       | Econstr x c ys e =>
-        let fvset' := add_list scope fvset ys in 
+        let fvset' := add_list scope fvset ys in
         exp_true_fv_aux e (add x scope) fvset'
       | Ecase x pats =>
         let fvset' := fold_left (fun fvs p => exp_true_fv_aux (snd p) scope fvs) pats fvset in
@@ -198,35 +241,35 @@ Section LambdaLifting.
         let fvset' := match funmap ! f with
                       | Some inf => (* A known function call that can be lifted *)
                         match inf with
-                        | Fun f' ft' fvs _ =>
-                          let is_rec := PS.mem f' active_fun in
-                          if lift is_rec then union_list fvset fvs  (* f' should not count as a fv since it's a known closed function *)
+                        | Fun f' ft' fvs _ _ =>
+                          let is_in_scope := PS.mem f active_fun in (* XXX update lifting decisions *)
+                          if lift is_in_scope then union_list fvset (f' :: fvs)
                           else if mem f scope then fvset else PS.add f fvset
                         end
                       | None => if mem f scope then fvset else PS.add f fvset
                       end
         in
-        let fvset'' := add_list scope fvset' ys in 
+        let fvset'' := add_list scope fvset' ys in
         exp_true_fv_aux e (add x scope) fvset''
       | Efun defs e =>
         let fvs':= fundefs_fv defs in
-        let '(scope', fvset') := fundefs_true_fv_aux defs scope fvset in 
+        let '(scope', fvset') := fundefs_true_fv_aux defs scope fvset in
         exp_true_fv_aux e scope' fvset'
-      | Eapp x ft xs =>
-        let fvset' := match funmap ! x with
+      | Eapp f ft xs =>
+        let fvset' := match funmap ! f with
                       | Some inf => (* A known function call that can be lifted *)
                         match inf with
-                        | Fun f' ft' fvs _ =>
-                          let is_rec := PS.mem f' active_fun in
-                          if lift is_rec then union_list fvset fvs (* count the fvs of the known function (LL def -> closed) but not its name *) 
-                          else if mem x scope then fvset else PS.add x fvset
+                        | Fun f' ft' fvs _ _ =>
+                          let is_in_scope := PS.mem f active_fun in
+                          if lift is_in_scope then union_list fvset (f' :: fvs)
+                          else if mem f scope then fvset else PS.add f fvset
                         end
-                      | None => if mem x scope then fvset else PS.add x fvset
+                      | None => if mem f scope then fvset else PS.add f fvset
                       end
         in
         add_list scope fvset' xs
       | Eprim x prim ys e =>
-        let fvset' := add_list scope fvset ys in 
+        let fvset' := add_list scope fvset ys in
         exp_true_fv_aux e (add x scope) fvset'
       | Ehalt x => if mem x scope then fvset else PS.add x fvset
     end
@@ -240,43 +283,25 @@ Section LambdaLifting.
   
     Definition exp_true_fv e := exp_true_fv_aux e PS.empty PS.empty.
     
-    Definition fundefs_true_fv B := snd (fundefs_true_fv_aux B PS.empty PS.empty). 
+    Definition fundefs_true_fv B := snd (fundefs_true_fv_aux B PS.empty PS.empty).
     
   End TrueFV.
-  
-  Fixpoint make_wrappers (B: fundefs) (fvm : VarInfoMap) (fm: FunInfoMap) : lambdaM (exp_ctx * VarInfoMap):=
-    match B with
-    | Fcons f ft xs e B =>
-      match M.get f fm with
-      | Some inf =>
-        match inf with
-        | Fun f' ft' fvs sfvs =>
-          g <- get_name f "_wrapper" ;;
-          xs' <- get_names_lst xs "" ;;
-          cm <- make_wrappers B fvm fm ;;
-          let (c, fvm') := cm in
-          let fvm'' := M.set f (WrapperFun g) fvm' in
-          ret (Efun1_c (Fcons g ft xs' (Eapp f' ft' (xs' ++ (rename_lst fvm fvs))) Fnil) c, fvm'')
-        end
-      | None => ret (Hole_c, fvm) (* should never match *)
+
+
+  (* TODO move *)
+  Definition subset_list (l : list var) (s : PS.t) :=
+    fold_left (fun b e => PS.mem e s && b) l true. 
+
+  Fixpoint take {A} (n: nat) (l : list A) :=
+    match n with
+    | 0 => []
+    | S n =>
+      match l with
+      | [] => []
+      | x :: xs => x :: take n l
       end
-    | Fnil => ret (Hole_c, fvm)
-    end.
+    end. 
 
-  Definition fundefs_max_params (B: fundefs) : nat :=
-    (fix aux B p : nat :=      
-      match B with
-      | Fcons f ft xs e B =>
-        aux B (max (length xs) p)
-      | Fnil => 0
-      end) B 0.
-
-  Definition name_block B :=
-    match B with
-    | Fcons f _ _ _ _ => f
-    | Fnil => 1%positive
-    end.
-  
   Fixpoint exp_lambda_lift (e : exp) (scope: PS.t) (active_funs : PS.t)
            (fvm : VarInfoMap) (fm : FunInfoMap) (gfuns : GFunMap) : lambdaM exp :=
     match e with
@@ -302,28 +327,31 @@ Section LambdaLifting.
       match fm ! f with
       | Some inf =>
         match inf with
-        | Fun f' ft' fvs sfvs =>
+        | Fun f' ft' fvs sfvs args =>
           (* only call the known function if its free variables can be accessed *)
-          if PS.subset sfvs scope || lift (PS.mem f active_funs) then 
-            ret (Eletapp x (rename fvm f') ft' (rename_lst fvm (ys ++ fvs)) e')
+          (* TODO : lift the arguments that are available at the time of the call? *)
+          if subset_list args scope || lift (PS.mem f active_funs) then 
+            ret (Eletapp x (rename fvm f') ft' (rename_lst fvm (ys ++ args)) e')
           else ret (Eletapp x (rename fvm f) ft (rename_lst fvm ys) e')
         end
       | None =>
         ret (Eletapp x (rename fvm f) ft (rename_lst fvm ys) e')
       end
     | Efun B e =>
+      (* Find the free variables of the fundefs *)
       let sfvsi := fundefs_true_fv fm active_funs B in
+      (* Remove global functions *)
       let sfvs := PS.filter (fun x => match M.get x gfuns with Some _ => false | None => true end) sfvsi in
+      (* Turn to list *)
       let fvs := PS.elements sfvs in
       (* DEBUG *)
       b_name <- get_pp_name (name_block B) ;;
       fv_names <- get_pp_names_list (PS.elements sfvsi) ;;
       log_msg (String.concat " " ("Block" :: b_name :: "has fvs :" :: fv_names)) ;;
       (* END DEBUG *)
-      let is_closed := match fvs with [] => true | _ => false end in
-      (* Number of argument slots available. By convention lift exactly the same no of args in each function *)
-      let lifted_args := max_args - max_params in
-      maps' <- add_functions B fvs sfvs fm gfuns is_closed lifted_args;;
+      (* Number of argument slots available. By convention lift exactly the same no of args in each mut. rec. function *)
+      let lifted_args := max_args - (fundefs_max_params B) in
+      maps' <- add_functions B fvs sfvs (take lifted_args fvs) fm gfuns ;;
       let (fm', gfuns') := maps' in
       let names := fundefs_names B in
       let scope' := PS.union names scope in
@@ -337,10 +365,10 @@ Section LambdaLifting.
       match fm ! f with
       | Some inf =>
         match inf with
-        | Fun f' ft' fvs sfvs =>
+        | Fun f' ft' fvs sfvs args =>
           (* only call the known function if its free variables can be accessed *)
           if PS.subset sfvs scope || lift (PS.mem f active_funs) then 
-            ret (Eapp (rename fvm f') ft' (rename_lst fvm (xs ++ fvs)))
+            ret (Eapp (rename fvm f') ft' (rename_lst fvm (xs ++ args)))
           else ret (Eapp (rename fvm f) ft (rename_lst fvm xs))
         end
       | None =>
@@ -357,13 +385,13 @@ Section LambdaLifting.
            match M.get f fm with
            | Some inf =>
              match inf with
-             | Fun f' ft' fvs sfvs =>
+             | Fun f' ft' fvs sfvs args =>
                (* Debug *)
                f_str <- get_pp_name f ;;
                fv_names <- get_pp_names_list fvs ;;
                log_msg (String.concat " " (f_str :: "has fvs :" :: fv_names)) ;;
                (* *)
-               p <- add_free_vars fvs fvm ;;
+               p <- add_free_vars args fvm ;;
                let (ys, fvm') := p in
                cm <- make_wrappers Bfull fvm' fm ;;
                let (C, fvm'') := cm in
@@ -531,3 +559,4 @@ with Fundefs_lambda_lift :
      | LL_Fnil :
          forall ζ σ S,
            Fundefs_lambda_lift ζ σ Fnil S Fnil S.
+

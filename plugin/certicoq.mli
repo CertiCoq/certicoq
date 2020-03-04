@@ -4,13 +4,15 @@ type command_args =
  | OPT of int
  | DEBUG
  | ARGS of int 
+ | FVARGS of int (* The number of fvs passed as params and the original params shall not exceed this number *)
 
 type options =
   { cps       : bool;
     time      : bool;
-    olevel : int;
+    olevel    : int;
     debug     : bool;
     args      : int;
+    fv_args   : int; 
   }
 
 val default_options : options

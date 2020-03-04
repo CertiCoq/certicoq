@@ -39,6 +39,7 @@ type command_args =
  | OPT of int
  | DEBUG
  | ARGS of int
+ | FVARGS of int (* The number of fvs passed as params and the original params shall not exceed this number *)
 
 type options =
   { cps       : bool;
@@ -46,14 +47,16 @@ type options =
     olevel    : int;
     debug     : bool;
     args      : int;
+    fv_args   : int;
   }
 
 let default_options : options =
-  { cps    = true;
-    time   = false;
-    olevel = 0;
-    debug  = false;
-    args   = 5;
+  { cps     = true;
+    time    = false;
+    olevel  = 0;
+    debug   = false;
+    args    = 5;
+    fv_args = 10;
   }
 
 let help_msg : string =
@@ -79,11 +82,12 @@ let make_options (l : command_args list) : options =
   let rec aux (o : options) l =
     match l with
     | [] -> o
-    | ANF     :: xs -> aux {o with cps = false} xs
-    | TIME    :: xs -> aux {o with time = true} xs
-    | OPT n   :: xs -> aux {o with olevel = n} xs
-    | DEBUG   :: xs -> aux {o with debug = true} xs
-    | ARGS n  :: xs -> aux {o with args = n} xs
+    | ANF      :: xs -> aux {o with cps = false} xs
+    | TIME     :: xs -> aux {o with time = true} xs
+    | OPT n    :: xs -> aux {o with olevel = n} xs
+    | DEBUG    :: xs -> aux {o with debug = true} xs
+    | ARGS n   :: xs -> aux {o with args = n} xs
+    | FVARGS n :: xs -> aux {o with fv_args = n} xs
   in aux default_options l
 
 let make_pipeline_options (opts : options) =
@@ -92,7 +96,8 @@ let make_pipeline_options (opts : options) =
   let olevel = coq_nat_of_int opts.olevel in
   let timing = opts.time in
   let debug  = opts.debug in
-  Pipeline.make_opts cps args olevel timing debug
+  let fv_args = coq_nat_of_int opts.fv_args in 
+  Pipeline.make_opts cps args fv_args olevel timing debug
 
 (** Main Compilation Functions *)
 

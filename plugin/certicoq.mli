@@ -5,6 +5,7 @@ type command_args =
  | DEBUG
  | ARGS of int 
  | FVARGS of int (* The number of fvs passed as params and the original params shall not exceed this number *)
+ | EXT of string (* Filename extension to be appended to the file name *)
 
 type options =
   { cps       : bool;
@@ -12,7 +13,8 @@ type options =
     olevel    : int;
     debug     : bool;
     args      : int;
-    fv_args   : int; 
+    fv_args   : int;
+    ext       : string;
   }
 
 val default_options : options

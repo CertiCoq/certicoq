@@ -40,7 +40,8 @@ type command_args =
  | DEBUG
  | ARGS of int
  | FVARGS of int (* The number of fvs passed as params and the original params shall not exceed this number *)
-
+ | EXT of string (* Filename extension to be appended to the file name *)
+ 
 type options =
   { cps       : bool;
     time      : bool;
@@ -48,15 +49,17 @@ type options =
     debug     : bool;
     args      : int;
     fv_args   : int;
+    ext       : string;
   }
 
 let default_options : options =
-  { cps     = true;
-    time    = false;
-    olevel  = 0;
-    debug   = false;
-    args    = 5;
-    fv_args = 10;
+  { cps       = true;
+    time      = false;
+    olevel    = 0;
+    debug     = false;
+    args      = 5;
+    fv_args   = 10;
+    ext       = "";
   }
 
 let help_msg : string =
@@ -73,6 +76,7 @@ Valid options:\n\
 -o1     :  Perform more aggressive optimizations (currently unboxing of closure environments)\n\
 -bebug  :  Show debugging information\n\
 -args X :  Specify how many arguments are used in the C translation (on top of the thread_info argument)\n\
+-ext S  :  Specify the string s to be appended to the file name\n\
 \n\
 To show this help message type:\n\
 CertiCoq -help.\n"
@@ -88,6 +92,7 @@ let make_options (l : command_args list) : options =
     | DEBUG    :: xs -> aux {o with debug = true} xs
     | ARGS n   :: xs -> aux {o with args = n} xs
     | FVARGS n :: xs -> aux {o with fv_args = n} xs
+    | EXT s    :: xs -> aux {o with ext = s} xs
   in aux default_options l
 
 let make_pipeline_options (opts : options) =
@@ -129,7 +134,7 @@ let compile opts term const =
     debug_msg debug "Finished compiling, printing to file.";
     let time = Unix.gettimeofday() in
     (* Zoe: Make suffix appear only in testing/debugging mode *)
-    let suff = if opts.cps then "_cps" else "" ^ if opts.olevel <> 0 then "_opt" else "" in
+    let suff = opts.ext in
     let cstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
     let hstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
     Pipeline.printProg (nenv,prg) cstr;

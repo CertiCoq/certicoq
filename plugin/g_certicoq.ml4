@@ -14,9 +14,10 @@ VERNAC ARGUMENT EXTEND cargs
 | [ "-o1" ] -> [ OPT(1) ]
 | [ "-debug" ] -> [ DEBUG ]
 | [ "-args" natural(n) ] -> [ ARGS(n) ]
-| [ "-fvargs" natural(n) ] -> [FVARGS(n) ]
-(* Zoe: -fvargs only for my convinience in pameterizing lambda lifting and
+| [ "-fvargs" natural(n) ] -> [ FVARGS(n) ]
+(* Zoe: -fvargs only for my convenience in pameterizing lambda lifting and
    measuring performance. Not intended for user purposes. *)
+| [ "-ext" string(s) ] -> [ EXT(s) ]
 END
 
 VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY

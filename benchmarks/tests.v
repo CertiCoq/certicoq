@@ -30,20 +30,19 @@ Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
 Definition demo3 := andb. 
  
-CertiCoq Compile demo1.
+CertiCoq Compile -ext "_cps" demo1.
 CertiCoq Compile -anf demo1.
-CertiCoq Compile -anf -o1 demo1.
 
-CertiCoq Compile demo2.
+CertiCoq Compile -ext "_cps" demo2.
 CertiCoq Compile -anf demo2.
 
 (* Also works for CPS, when choosing another number of arguments, e.g. -args 1 *)
-CertiCoq Compile demo3.
+CertiCoq Compile -ext "_cps" demo3.
 CertiCoq Compile -anf demo3.
 
 Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
 
-CertiCoq Compile list_sum.
+CertiCoq Compile -ext "_cps" list_sum.
 CertiCoq Compile -anf list_sum.
 
 
@@ -59,7 +58,7 @@ Definition vs_hard :=
   | _ => false
   end.
 
-CertiCoq Compile -time vs_easy.
+CertiCoq Compile -ext "_cps" -time vs_easy.
 CertiCoq Compile -anf  vs_easy.
 
 (* Zoe: Compiling with the CPS pipeline takes much longer for vs_easy.
@@ -86,15 +85,15 @@ Debug: Time elapsed in L6 ANF:  0.020384
 Debug: Time elapsed in L6 Pipeline:  0.148308
 Debug: Time elapsed in L7:  2.394216 *)
 
-CertiCoq Compile vs_hard.
+CertiCoq Compile -ext "_cps" vs_hard.
 CertiCoq Compile -anf vs_hard.
 
 Definition binom := Binom.main.
 
-CertiCoq Compile binom. (* returns nat *)
+CertiCoq Compile -ext "_cps" binom. (* returns nat *)
 CertiCoq Compile -anf binom.  (* returns nat *)
 
 Definition color := Color.main.
 
-CertiCoq Compile color.
+CertiCoq Compile -ext "_cps" color.
 CertiCoq Compile -anf color.

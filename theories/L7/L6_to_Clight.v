@@ -1005,7 +1005,9 @@ Fixpoint translate_funs
                                            limitIdent ::= Efield tinfd limitIdent valPtr ;;;
                                            argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);;;
                                            reserve_body gcArrIdent 2%Z ;;;
-                                           body))))
+                                           body ;;;
+                                           Efield tinfd allocIdent valPtr :::= allocPtr ;;;
+                                           Efield tinfd limitIdent valPtr :::= limitPtr))))
             :: funs)
   | _ => None
   end.
@@ -1033,7 +1035,9 @@ Fixpoint translate_funs_fast
                                            limitIdent ::= Efield tinfd limitIdent valPtr ;;;
                                            argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);;;
                                            reserve_body gcArrIdent 2%Z ;;;
-                                           body))))
+                                           body ;;;
+                                           Efield tinfd allocIdent valPtr :::= allocPtr ;;;
+                                           Efield tinfd limitIdent valPtr :::= limitPtr))))
              :: funs)
   | _ => None
   end.

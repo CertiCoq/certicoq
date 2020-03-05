@@ -133,7 +133,6 @@ let compile opts term const =
   | (CompM.Ret ((nenv, header), prg), dbg) ->
     debug_msg debug "Finished compiling, printing to file.";
     let time = Unix.gettimeofday() in
-    (* Zoe: Make suffix appear only in testing/debugging mode *)
     let suff = opts.ext in
     let cstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
     let hstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
@@ -161,8 +160,9 @@ let generate_glue opts term const =
     (match logs with [] -> () | _ ->
       debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
-    let cstr = Quoted.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ ".c") in
-    let hstr = Quoted.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ ".h") in
+    let suff = opts.ext in
+    let cstr = Quoted.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
+    let hstr = Quoted.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
     Pipeline.printProg (nenv, prg) cstr;
     Pipeline.printProg (nenv, header) hstr;
 

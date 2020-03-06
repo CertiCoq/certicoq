@@ -298,7 +298,7 @@ Section LambdaLifting.
     | S n =>
       match l with
       | [] => []
-      | x :: xs => x :: take n l
+      | x :: xs => x :: take n xs
       end
     end. 
 

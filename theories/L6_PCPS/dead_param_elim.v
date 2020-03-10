@@ -245,24 +245,45 @@ Definition get_fun_tag (n : nat) : elimM fun_tag :=
     ret ft
   end.       
   
-         
+
+Definition show_bool (b : bool) : string :=
+  if b then "true" else "false".
+
+
+Fixpoint show_bool_list (bs : list bool) : string :=
+  match bs with
+  | [] => ""
+  | b :: bs =>
+    String.concat " " [show_bool b ; show_bool_list bs]
+  end.
+
+
+
 Fixpoint eliminate_expr (L : live_fun) (e : exp) : elimM exp := 
 match e with 
 | Econstr x t ys e' =>
-  e' <- eliminate_expr L e' ;;
-  ret (Econstr x t ys e')
+  e'' <- eliminate_expr L e' ;;
+  ret (Econstr x t ys e'')
 | Eproj x t m y e' =>
-  e' <- eliminate_expr L e' ;;
-  ret (Eproj x t m y e')
+  e'' <- eliminate_expr L e' ;;
+  ret (Eproj x t m y e'')
 | Eletapp x f ft ys e' =>
+  f_str <- get_pp_name f ;;
+  state.log_msg (String.concat " " ["Letapp" ; f_str ]) ;;
   match get_fun_vars L f with
   | Some bs =>
+    ys_or <- get_pp_names_list ys ;;    
+    state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;; 
     let ys' := live_args ys bs in
-    e' <- eliminate_expr L e';;
+    e'' <- eliminate_expr L e';;
     ft <- get_fun_tag (length ys') ;;
-    ret (Eletapp x f ft ys' e')
+    ys_names <- get_pp_names_list ys' ;;
+    (* state.log_msg (String.concat " " ["Function entry" ; f_str ; "found"; "id"; cps_show.show_pos f]) ;; *)
+    (* state.log_msg (String.concat " " ("New params" :: ys_names)) ;;    *)
+    ret (Eletapp x f ft ys' e'')
   | None =>
-    ret (Eletapp x f ft ys e')
+    e'' <- eliminate_expr L e' ;;
+    ret (Eletapp x f ft ys e'')
   end
 | Ecase x P =>
   P' <- (fix mapM_LD (l : list (ctor_tag * exp)) : elimM (list (ctor_tag * exp)) :=
@@ -277,8 +298,8 @@ match e with
 | Ehalt x => ret (Ehalt x)
 | Efun fl e' => ret e
 | Eprim x f ys e' =>
-  e' <- eliminate_expr L e' ;;
-  ret (Eprim x f ys e')
+  e'' <- eliminate_expr L e' ;;
+  ret (Eprim x f ys e'')
 | Eapp f ft ys => 
   match get_fun_vars L f with
   | Some bs =>
@@ -296,6 +317,12 @@ Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : elimM fundefs :=
     match get_fun_vars L f with
     | Some bs =>
       let ys' := live_args ys bs in
+      f_str <- get_pp_name f ;;
+      ys_names <- get_pp_names_list ys' ;;
+      ys_or <- get_pp_names_list ys ;;
+      (* state.log_msg (String.concat " " ["Def Function entry" ; f_str ; "found" ; "id"; cps_show.show_pos f]) ;; *)
+      (* state.log_msg (String.concat " " ("Def New params" :: ys_names)) ;; *)
+      (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;;  *)
       e' <- eliminate_expr L e ;;
       B'' <- eliminate_fundefs B' L ;;
       ft <- get_fun_tag (length ys') ;;
@@ -305,22 +332,31 @@ Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : elimM fundefs :=
   | Fnil => ret Fnil
   end. 
 
+Definition log_prog (e : exp) (c_data : comp_data) : comp_data :=
+  match c_data with
+  | mkCompData nv nc ni nf cenv fenv nenv log =>
+    let msg := cps_show.show_exp nenv cenv false e in
+    mkCompData nv nc ni nf cenv fenv nenv ("term" :: msg :: log)      
+  end.
+           
 Fixpoint eliminate (e : exp) (c_data : comp_data) : error exp * comp_data := 
-match e with 
-| Efun B e' =>
-  match find_live e with
-  | Some L =>
-    let m := make_arityMap e (M.empty _) in
-    match run_compM (eliminate_fundefs B L) c_data m with
-    | (Ret B', (c_data, m)) => 
-      match run_compM (eliminate_expr L e') c_data m with
-      | (Ret e'', (c_data, m)) =>
-        (Ret (Efun B' e''), c_data)
+  let c_data := log_prog e c_data in
+  match e with 
+  | Efun B e' =>
+    match find_live e with
+    | Some L =>
+      let m := make_arityMap e (M.empty _) in
+      match run_compM (eliminate_fundefs B L) c_data m with
+      | (Ret B', (c_data, m)) => 
+        match run_compM (eliminate_expr L e') c_data m with
+        | (Ret e'', (c_data, m)) =>
+          let c_data := log_prog (Efun B' e'') c_data in
+          (Ret (Efun B' e''), c_data)
+        | (Err s, (c_data, m)) => (Err s, c_data)
+        end
       | (Err s, (c_data, m)) => (Err s, c_data)
       end
-    | (Err s, (c_data, m)) => (Err s, c_data)
+    | None => (Err "Dead param elim: find_live failed", c_data)
     end
-  | None => (Err "Dead param elim: find_live failed", c_data)
-  end
-| _ => (Err "Dead param elim: find_live failed", c_data)
-end.
+  | _ => (Err "Dead param elim: find_live failed", c_data)
+  end.

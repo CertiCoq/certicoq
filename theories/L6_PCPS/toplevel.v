@@ -103,7 +103,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
 
 
 (* Optimizing L6 pipeline *)
-Definition L6_pipeline  (opt cps : bool) (args : nat) (t : L6_FullTerm) : error L6_FullTerm :=
+Definition L6_pipeline  (opt cps : bool) (args : nat) (t : L6_FullTerm) : error L6_FullTerm * string :=
   let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
   (* make compilation state *)
   let c_data :=
@@ -123,7 +123,7 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (t : L6_FullTerm) : error 
       (* Shrink reduction *)
       let e3 := shrink_cps.shrink_top e2 in
       (* lambda lifting *)
-      let (e_rr4, c_data) := if opt then lambda_lift e3 args c_data else (compM.Ret e3, c_data)in
+      let (e_rr4, c_data) := if opt then lambda_lift e3 args c_data else (compM.Ret e3, c_data) in
       e4 <- e_rr4 ;;
       (* Shrink reduction *)
       let e5 := shrink_cps.shrink_top e4 in
@@ -138,19 +138,18 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (t : L6_FullTerm) : error 
       (* Shrink reduction *)
       let e6 := shrink_cps.shrink_top e5 in
       (* Dead parameter elimination *)
-      (* let (e_err7, c_data) := dead_param_elim.eliminate e6 c_data in *)
-      (* e7 <- e_err7 ;; *)
+      let (e_err7, c_data) := dead_param_elim.eliminate e6 c_data in
+      e7 <- e_err7 ;;
       (* Shrink reduction *)
-      (* let e8 := shrink_cps.shrink_top e7 in *)
-      let e7 := shrink_cps.shrink_top e6 in
-      ret (e7, c_data)
+      let e8 := shrink_cps.shrink_top e7 in
+      ret (e8, c_data)
   in
   match res with
   | compM.Err s =>
-    Err ("Failed compiling L6 program: " ++ s)%string
+    (Err ("Failed compiling L6 program: " ++ s)%string, "")
   | compM.Ret (e, c_data) =>
     let (_, ctag, itag, ftag, cenv, fenv, nenv, log) := c_data in
-    Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e) 
+    (Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e), log_to_string log)
   end.
 
 Definition L6_trans : CertiCoqTrans L6_FullTerm L6_FullTerm :=
@@ -160,4 +159,59 @@ Definition L6_trans : CertiCoqTrans L6_FullTerm L6_FullTerm :=
     let cps := negb (direct opts) in
     let args := fv_args opts in
     let o := (0 <? (o_level opts))%nat in
-    LiftErrorCertiCoqTrans "L6 Pipeline" (L6_pipeline o cps args) src.
+    LiftErrorLogCertiCoqTrans "L6 Pipeline" (L6_pipeline o cps args) src.
+
+(* 
+Require Import Common.Pipeline_utils Common.compM Common.
+Require Import L1g.toplevel.
+Require Import L2k.toplevel.
+Require Import L4.toplevel.
+Require Import L6.toplevel L6.cps_show L6.state Compiler.pipeline maps_util.
+Require Import ExtLib.Structures.Monad Strings.String.
+
+Import MonadNotation.
+Open Scope monad_scope.
+
+Open Scope Z_scope.
+Require Import ZArith.
+
+
+Definition debug_ANF (p : Template.Ast.program) :=
+  p <- compile_L1g p ;;
+  p <- compile_L2k p ;;
+  p <- compile_L2k_eta p ;;
+  p <- compile_L4 p ;;
+  p <- compile_L6_ANF p ;;
+  L6_trans p.
+
+Definition compile_L6_ANF_show (e: Template.Ast.program) : string  :=
+  match run_pipeline _ _ default_opts e debug_ANF with
+  | (compM.Ret (pr, cenv, vtag, itag, nenv, fenv, rho, term), _) =>
+    cps_show.show_exp nenv cenv false term
+  | (compM.Err s, _) => s
+  end.
+
+Fixpoint loop_add n (f : Datatypes.unit -> nat) : nat :=
+  match n with
+  | 0%nat => f tt
+  | S n => f tt + loop_add n f
+  end.
+
+
+Require Import List.
+Import ListNotations.
+
+Definition clos_loop (u : Datatypes.unit) : nat :=
+  ((fix list_add k1 k2 k3 l : nat :=
+      match l with
+      | [] => 0%nat
+      | x::xs =>
+       let clos z := (k1 + k2 + k3 + z)%nat in
+       ((clos x) + list_add k1 k2 k3 xs)%nat
+      end) 0 0 0 (List.repeat 0 (100*10)))%nat.
+
+(* Quote Recursively Definition clos := (loop_add (1%nat) clos_loop). *)
+
+(* Definition demo1_ANF := Eval native_compute in (compile_L6_ANF_show clos). *)
+
+*) 

@@ -119,7 +119,7 @@ match e with
      | (c', e') :: l'=>
        let S' := live_expr L e' S in
        mapM_LD S' l'
-     end) S P
+     end) S' P
 | Ehalt x => PS.add x S 
 | Eapp f t ys =>  
   let S' := PS.add f S in

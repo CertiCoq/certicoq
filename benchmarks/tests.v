@@ -29,7 +29,7 @@ CertiCoq Show IR <global_id>.
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
 Definition demo3 := andb. 
- 
+  
 CertiCoq Compile -ext "_cps" demo1.
 CertiCoq Compile -anf demo1.
 

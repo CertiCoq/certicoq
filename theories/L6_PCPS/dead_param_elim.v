@@ -137,7 +137,7 @@ Definition update_live_fun (L : live_fun) (f : var) (xs : list var) (S : PS.t) :
         | x :: xs, b :: bs =>
           let (bs', d) := update_bs xs bs in
           let b' := PS.mem x S in
-          (b' :: bs', (negb (eqb b b') || d))
+          ((b' || b) :: bs', (negb (eqb b b') || d))
         end in
     let (bs, diff) := update_bs xs bs in
     Some (set_fun_vars L f bs, diff)
@@ -320,9 +320,9 @@ Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : elimM fundefs :=
       f_str <- get_pp_name f ;;
       ys_names <- get_pp_names_list ys' ;;
       ys_or <- get_pp_names_list ys ;;
-      (* state.log_msg (String.concat " " ["Def Function entry" ; f_str ; "found" ; "id"; cps_show.show_pos f]) ;; *)
-      (* state.log_msg (String.concat " " ("Def New params" :: ys_names)) ;; *)
-      (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;;  *)
+      state.log_msg (String.concat " " ["Def Function entry" ; f_str ; "found" ; "id"; cps_show.show_pos f]) ;;
+      state.log_msg (String.concat " " ("Def New params" :: ys_names)) ;;
+      state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;;
       e' <- eliminate_expr L e ;;
       B'' <- eliminate_fundefs B' L ;;
       ft <- get_fun_tag (length ys') ;;

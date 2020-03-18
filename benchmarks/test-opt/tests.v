@@ -53,10 +53,10 @@ Definition clos := loop_add 1 clos_loop.
 CertiCoq Compile -ext "_cps" clos.
 CertiCoq Compile -anf clos.
 CertiCoq Compile -anf -o1 -ext "_opt" clos.
-CertiCoq Show IR -debug clos.
+(* CertiCoq Show IR -debug clos. *)
 
-CertiCoq Show IR -anf -debug clos.
-CertiCoq Show IR -anf -debug -o1 -ext "_opt" clos.
+(* CertiCoq Show IR -anf -debug clos. *)
+(* CertiCoq Show IR -anf -debug -o1 -ext "_opt" clos. *)
 
 
 Definition addxy (x y : nat) (l : list nat) := 
@@ -73,7 +73,7 @@ CertiCoq Compile -ext "_cps" rec_clos.
 CertiCoq Compile -anf rec_clos.
 CertiCoq Compile -anf -o1 -ext "_opt" rec_clos.
 CertiCoq Show IR -anf rec_clos.
-CertiCoq Show IR -anf -o1 -ext "_opt" rec_clos.
+CertiCoq Show IR -anf -o1 -ext "_opt" -dev 2 rec_clos.
 
 
 

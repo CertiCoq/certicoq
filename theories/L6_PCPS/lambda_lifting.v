@@ -4,7 +4,7 @@
 
 Require Import Common.compM.
 Require Import L6.cps L6.cps_util L6.ctx L6.state L6.set_util L6.identifiers L6.List_util
-        L6.functions L6.Ensembles_util.
+        L6.functions L6.Ensembles_util L6.uncurry.
 Require Import Coq.ZArith.Znumtheory Coq.Strings.String.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
@@ -101,6 +101,8 @@ Section LambdaLifting.
   Context (lift :  bool ->    (* True if it's a rec call (directly or from a nested function) *)
                    bool).    (* Lifting decision *)
   Context (max_args : nat). (* Maximum number of arguments that a function can have *)
+  Context (max_push : nat). (* Maximum amount of times that a lifted var is allows to be stored in the stack. *)
+                          (* To calculate the tradeoff between projecting from environment/stack push *)
   
   Inductive VarInfo : Type :=
   (* A variable that is free in the current function definition.
@@ -300,8 +302,74 @@ Section LambdaLifting.
       | [] => []
       | x :: xs => x :: take n xs
       end
+    end.
+
+  Fixpoint occurs_in_exp (k:var) (curr_f: PS.t) (e:exp) : bool :=
+    match e with
+    | Econstr z _ xs e1 =>
+      eq_var z k || occurs_in_vars k xs || occurs_in_exp k curr_f e1
+    | Ecase x arms =>
+      eq_var k x ||
+              (fix occurs_in_arms (arms: list (ctor_tag * exp)) : bool :=
+                 match arms with
+                 | nil => false
+                 | p::arms1 => match p with
+                               | (_,e) => occurs_in_exp k curr_f e || occurs_in_arms arms1
+                               end
+                 end) arms
+    | Eproj z _ _ x e1 =>
+      eq_var z k || eq_var k x || occurs_in_exp k curr_f e1
+    | Eletapp z f _ xs e1 =>
+      (* If the call is recursive, then after lambda lifting k will appear free in the subexpression *)
+      eq_var z k || eq_var f k || PS.mem f curr_f || occurs_in_vars k xs || occurs_in_exp k curr_f e1
+    | Efun fds e =>
+      occurs_in_fundefs k curr_f fds || occurs_in_exp k curr_f e
+    | Eapp x _ xs => eq_var k x || PS.mem x curr_f || occurs_in_vars k xs
+    | Eprim z _ xs e1 =>
+      eq_var z k || occurs_in_vars k xs || occurs_in_exp k curr_f e1
+    | Ehalt x => eq_var x k
+    end
+  (* Returns true iff [k] occurs within the function definitions [fds] *)
+  with occurs_in_fundefs (k:var) (curr_f: PS.t) (fds:fundefs) : bool :=
+         match fds with
+         | Fnil => false
+         | Fcons z _ zs e fds1 =>
+           eq_var z k || occurs_in_vars k zs || occurs_in_exp k curr_f e ||
+                   occurs_in_fundefs k curr_f fds1
+         end.
+
+
+
+  (* Calculate how many times an argument has to be pushed on to the shadow stack because
+   * of intermediate calls. Assumes unique binders *)
+  Fixpoint stack_push (x : var) (curr_f : PS.t) (e : exp) : nat :=
+    match e with
+    | Econstr _ _ _ e
+    | Eproj _ _ _ _ e
+    | Eprim _ _ _ e 
+    | Efun _ e =>
+      stack_push x curr_f e
+    | Eapp _ _ _
+    | Ehalt _ => 0
+    | Ecase _ P =>
+      fold_left (fun n br => max n (stack_push x curr_f (snd br))) P 0
+    | Eletapp _ f ft ys e =>
+      let n := stack_push x curr_f e in
+      (* Before the call, if x is used in e, then it has to be stored *)
+      if occurs_in_exp x curr_f e then n + 1 else n
     end. 
 
+  Fixpoint stack_push_fundefs_aux (x : var) (curr_f : PS.t)  (B : fundefs) : nat :=
+    match B with
+    | Fcons f ft xs e B' =>
+      max (stack_push x curr_f e) (stack_push_fundefs_aux x curr_f B')
+    | Fnil => 0
+    end.
+  
+  Definition stack_push_fundefs (x : var) (B : fundefs) : nat :=
+    stack_push_fundefs_aux x (fundefs_names B) B. 
+  
+  
   Fixpoint exp_lambda_lift (e : exp) (scope: PS.t) (active_funs : PS.t)
            (fvm : VarInfoMap) (fm : FunInfoMap) (gfuns : GFunMap) : lambdaM exp :=
     match e with
@@ -344,6 +412,8 @@ Section LambdaLifting.
       let sfvs := PS.filter (fun x => match M.get x gfuns with Some _ => false | None => true end) sfvsi in
       (* Turn to list *)
       let fvs := PS.elements sfvs in
+      (* Filter out arguments that is expensive to lift *)
+      let lfvs := List.filter (fun x => let n := stack_push_fundefs x B in Nat.leb n max_push) fvs in
       (* DEBUG *)
       b_name <- get_pp_name (name_block B) ;;
       fv_names <- get_pp_names_list (PS.elements sfvsi) ;;
@@ -351,7 +421,7 @@ Section LambdaLifting.
       (* END DEBUG *)
       (* Number of argument slots available. By convention lift exactly the same no of args in each mut. rec. function *)
       let lifted_args := max_args - (fundefs_max_params B) in
-      maps' <- add_functions B fvs sfvs (take lifted_args fvs) fm gfuns ;;
+      maps' <- add_functions B fvs sfvs (take lifted_args lfvs) fm gfuns ;;
       let (fm', gfuns') := maps' in
       let names := fundefs_names B in
       let scope' := PS.union names scope in
@@ -430,8 +500,8 @@ Definition lift_rec (is_rec : bool) := is_rec.
 
 Definition lift_conservative (is_rec : bool) := false.
 
-Definition lambda_lift (e : exp) (args : nat) (c : comp_data) : error exp * comp_data :=
-  let '(e', (c', _)) := run_compM (exp_lambda_lift lift_rec args e PS.empty PS.empty (Maps.PTree.empty VarInfo)
+Definition lambda_lift (e : exp) (args : nat) (no_push : nat) (c : comp_data) : error exp * comp_data :=
+  let '(e', (c', _)) := run_compM (exp_lambda_lift lift_rec args no_push e PS.empty PS.empty (Maps.PTree.empty VarInfo)
                                                    (Maps.PTree.empty FunInfo) (M.empty GFunInfo))
                                   c tt in  
   (e', c').

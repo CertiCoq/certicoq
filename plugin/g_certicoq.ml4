@@ -17,6 +17,7 @@ VERNAC ARGUMENT EXTEND cargs
 | [ "-fvargs" natural(n) ] -> [ FVARGS(n) ]
 (* Zoe: -fvargs only for my convenience in parameterizing lambda lifting and
    measuring performance. Not intended for user purposes. *)
+| [ "-dev" natural(n) ] -> [ FVARGS(n) ]
 | [ "-ext" string(s) ] -> [ EXT(s) ]
 END
 

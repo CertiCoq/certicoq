@@ -103,7 +103,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
 
 
 (* Optimizing L6 pipeline *)
-Definition L6_pipeline  (opt cps : bool) (args : nat) (t : L6_FullTerm) : error L6_FullTerm * string :=
+Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_FullTerm) : error L6_FullTerm * string :=
   let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
   (* make compilation state *)
   let c_data :=
@@ -123,7 +123,7 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (t : L6_FullTerm) : error 
       (* Shrink reduction *)
       let e3 := shrink_cps.shrink_top e2 in
       (* lambda lifting *)
-      let (e_rr4, c_data) := if opt then lambda_lift e3 args c_data else (compM.Ret e3, c_data) in
+      let (e_rr4, c_data) := if opt then lambda_lift e3 args no_push c_data else (compM.Ret e3, c_data) in
       e4 <- e_rr4 ;;
       (* Shrink reduction *)
       let e5 := shrink_cps.shrink_top e4 in
@@ -158,8 +158,9 @@ Definition L6_trans : CertiCoqTrans L6_FullTerm L6_FullTerm :=
     opts <- get_options ;;
     let cps := negb (direct opts) in
     let args := fv_args opts in
+    let no_push := dev opts in (* temporarily use dev for the number of times a var can be pushed on the shadow stack *)
     let o := (0 <? (o_level opts))%nat in
-    LiftErrorLogCertiCoqTrans "L6 Pipeline" (L6_pipeline o cps args) src.
+    LiftErrorLogCertiCoqTrans "L6 Pipeline" (L6_pipeline o cps args no_push) src.
 
 (* 
 Require Import Common.Pipeline_utils Common.compM Common.

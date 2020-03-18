@@ -41,7 +41,8 @@ type command_args =
  | ARGS of int
  | FVARGS of int (* The number of fvs passed as params and the original params shall not exceed this number *)
  | EXT of string (* Filename extension to be appended to the file name *)
- 
+ | DEV of int    (* For development purposes *)
+
 type options =
   { cps       : bool;
     time      : bool;
@@ -50,6 +51,7 @@ type options =
     args      : int;
     fv_args   : int;
     ext       : string;
+    dev       : int;
   }
 
 let default_options : options =
@@ -60,6 +62,7 @@ let default_options : options =
     args      = 5;
     fv_args   = 10;
     ext       = "";
+    dev       = 0;
   }
 
 let help_msg : string =
@@ -93,6 +96,7 @@ let make_options (l : command_args list) : options =
     | ARGS n   :: xs -> aux {o with args = n} xs
     | FVARGS n :: xs -> aux {o with fv_args = n} xs
     | EXT s    :: xs -> aux {o with ext = s} xs
+    | DEV n    :: xs -> aux {o with dev = n} xs
   in aux default_options l
 
 let make_pipeline_options (opts : options) =
@@ -101,8 +105,9 @@ let make_pipeline_options (opts : options) =
   let olevel = coq_nat_of_int opts.olevel in
   let timing = opts.time in
   let debug  = opts.debug in
-  let fv_args = coq_nat_of_int opts.fv_args in 
-  Pipeline.make_opts cps args fv_args olevel timing debug
+  let fv_args = coq_nat_of_int opts.fv_args in
+  let dev = coq_nat_of_int opts.dev in
+  Pipeline.make_opts cps args fv_args olevel timing debug dev
 
 (** Main Compilation Functions *)
 

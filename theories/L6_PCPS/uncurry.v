@@ -40,6 +40,7 @@ Section UNCURRY.
     end.
 
   (* Returns true iff [k] occurs (at all) within the expression [e] *)
+  (* TODO: move to identifier utils *)
   Fixpoint occurs_in_exp (k:var) (e:exp) : bool :=
     match e with
     | Econstr z _ xs e1 =>

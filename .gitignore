@@ -29,3 +29,13 @@ myMain.ml
 myMain.mli
 vs.ml
 vs.mli
+benchmarks/demo1
+benchmarks/demo2
+benchmarks/CertiCoq.Benchmarks.*.c
+benchmarks/CertiCoq.Benchmarks.*.h
+test_plugin.*.c
+test_plugin.*.h
+benchmarks/config.h
+benchmarks/gc.h
+benchmarks/values.h
+benchmarks/main.c

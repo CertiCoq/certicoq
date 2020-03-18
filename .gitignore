@@ -25,3 +25,7 @@ Makefile.plugin.conf
 /plugin/extraction
 theories/.coqdeps.d
 libraries/.coqdeps.d
+myMain.ml
+myMain.mli
+vs.ml
+vs.mli

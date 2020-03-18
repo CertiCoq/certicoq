@@ -5,7 +5,7 @@
 [submodule "submodules/SquiggleEq"]
 	path = submodules/SquiggleEq
 	url = https://github.com/mattam82/SquiggleEq.git
-	branch = fix-8.10
+	branch = fix-8.11
 [submodule "submodules/paramcoq"]
 	path = submodules/paramcoq
 	url = https://github.com/coq-community/paramcoq.git

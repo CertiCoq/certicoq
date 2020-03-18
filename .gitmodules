@@ -4,8 +4,8 @@
 	branch = v8.8
 [submodule "submodules/SquiggleEq"]
 	path = submodules/SquiggleEq
-	url = https://github.com/aa755/SquiggleEq.git
-	branch = vcoq87
+	url = https://github.com/mattam82/SquiggleEq.git
+	branch = fix-8.10
 [submodule "submodules/paramcoq"]
 	path = submodules/paramcoq
 	url = https://github.com/coq-community/paramcoq.git

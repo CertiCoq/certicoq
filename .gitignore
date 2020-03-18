@@ -23,3 +23,5 @@ Makefile.conf
 Makefile.plugin.conf
 /plugin/Makefile
 /plugin/extraction
+theories/.coqdeps.d
+libraries/.coqdeps.d

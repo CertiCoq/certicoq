@@ -36,13 +36,13 @@ Proof.
   intros n m. lia.
 Qed.
 
-Lemma Nmax_plusr: forall x y, exists j, Nmax x y = j + y.
+Lemma Nmax_plusr: forall x y, exists j, N.max x y = j + y.
 Proof.
   intros x y. destruct (N.max_spec x y) as [[h j]|[h j]].  
   - exists 0. lia. 
   - exists (x - y). replace (x - y + y) with x. assumption. lia.
 Qed.
-Lemma Nmax_plusl: forall x y, exists j, Nmax x y = j + x.
+Lemma Nmax_plusl: forall x y, exists j, N.max x y = j + x.
 Proof.
   intros x y. replace (N.max x y) with (N.max y x); try lia.
   apply Nmax_plusr.

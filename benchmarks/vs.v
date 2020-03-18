@@ -79,6 +79,13 @@ Definition elemb (n : nat) := existsb (fun m => Nat.eqb n m).
 
 Require Import ZArith.
 
+Notation Ppred := Pos.pred.
+Notation Ple := Pos.le.
+Notation Plt := Pos.lt.
+Notation Ncompare := N.compare.
+Notation Nle := N.le.
+Notation Psucc := Pos.succ.
+
 Lemma Ppred_decrease n : (n<>1)%positive -> (nat_of_P (Ppred n)<nat_of_P n)%nat.
 Proof.
 intros; destruct (Psucc_pred n) as [Hpred | Hpred]; try contradiction;
@@ -696,9 +703,9 @@ Definition clause_length (cl : clause) : Z :=
   | NegSpaceClause gamma sigma delta => 
       Zlength gamma + Zlength sigma + Zlength delta
   end%Z.
-
+  
 Definition compare_clause_length (cl1 cl2 : clause) := 
-   Zcompare (clause_length cl1) (clause_length cl2).
+   Z.compare (clause_length cl1) (clause_length cl2).
 
 Definition compare_clause'1 (cl1 cl2 : clause) : comparison :=
   match compare_clause_length cl1 cl2 with

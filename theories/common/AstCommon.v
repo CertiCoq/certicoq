@@ -54,10 +54,6 @@ Proof.
   apply Bool.bool_dec. apply level_dec.
 Defined.
 
-Lemma universe_dec: forall x y : universe, {x = y} + {x <> y}.
-  decide equality; apply level_bool_dec.
-Defined.
-
 Lemma cast_kind_dec: forall (c1 c2:cast_kind), {c1 = c2}+{c1 <> c2}.
 induction c1; induction c2;
 try (solve [right; intros; discriminate]);
@@ -105,15 +101,6 @@ Proof.
 Defined.
 
 Instance InductiveEq: Eq inductive := { eq_dec := inductive_dec }.
-
-(** certiCoq representation of sorts **)
-Inductive Srt := SProp | SSet | SType.
-
-Lemma Srt_dec: forall (s1 s2:Srt), {s1 = s2}+{s1 <> s2}.
-induction s1; induction s2;
-try (solve [right; intros h; discriminate]);
-try (solve [left; reflexivity]).
-Defined.
 
 
 (** certiCoq representation of inductive types **)

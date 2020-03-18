@@ -93,9 +93,9 @@ Proof.
               end); simpl; reflexivity.
 Admitted.
 
-Instance ascii_reftype : ReferenceType ascii :=
-  { reference_compare := ascii_compare }.
+Instance ascii_reftype : ReferenceType ascii.
 Proof.
+  refine {| reference_compare := ascii_compare |}.
   intro. exact Space. intro c. exact (String c EmptyString).
   esplit. repeat red.
   intros.
@@ -109,9 +109,9 @@ Proof.
   rewrite N.compare_lt_iff in *. N.order.
 Defined.
   
-Instance string_reftype : ReferenceType string :=
-  { reference_compare := string_compare }.
+Instance string_reftype : ReferenceType string.
 Proof.
+  refine {| reference_compare := string_compare |}.
   exact id. exact id.
   esplit. repeat red.
   intros.

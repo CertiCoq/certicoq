@@ -526,8 +526,8 @@ Lemma append_nil_1:
   - simpl in h. discriminate h.
 Qed.
 
-Lemma nat_compare_EQ: forall n, nat_compare n n = Eq.
-  intro n. apply (proj2 (nat_compare_eq_iff n n)). reflexivity.
+Lemma nat_compare_EQ: forall n, Nat.compare n n = Eq.
+  intro n. apply (proj2 (Nat.compare_eq_iff n n)). reflexivity.
 Qed.
 Hint Rewrite nat_compare_EQ.
 

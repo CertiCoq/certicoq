@@ -5,6 +5,7 @@
 *)
 Require Import Common.AstCommon.
 Require Import List.
+Require Import Ascii.
 Require Import String.
 Require Import L6.cps.
 Require Import ExtLib.Data.String.

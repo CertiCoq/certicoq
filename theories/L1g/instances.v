@@ -17,7 +17,7 @@ Defined.
 Instance WfL1gTerm: GoodTerm (Program L1g.compile.Term) :=
   fun P:Program Term =>
     match P with
-      mkPgm trm env => WFapp trm /\ WFaEnv env
+      mkPgm trm env => WFapp trm /\ WFaEnv WFapp env
     end.
 
 Require Import SquiggleEq.UsefulTypes.
@@ -86,7 +86,8 @@ Require Import String.
 
 Definition translateTo `{CerticoqTranslation (Program L1g.compile.Term) Lj}
   (p:Template.Ast.program): exception Lj :=
-  let db := debug ("Translating from template to L1 " ++ nl ++ Pretty.print_term (AstUtils.empty_ext (fst p)) nil true (snd p)) in
+  let db := debug ("Translating from template to L1 " ++ nl ++ Pretty.print_term 
+    (Ast.empty_ext (fst p)) nil true (snd p)) in
   let l1g:= db (L1g.compile.program_Program p) in
   let db := debug ("Result" ++ nl ++ L1g.term.print_term l1g.(main)) in
   db (translate (Program L1g.compile.Term) Lj l1g).

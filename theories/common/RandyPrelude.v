@@ -13,6 +13,8 @@ Require Import Coq.Bool.Bool.
 Require Import Coq.Bool.DecBool.
 Require Import Coq.omega.Omega.
 Require Import Common.exceptionMonad.
+Require Import FunInd.
+Require Import Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -21,7 +23,6 @@ Set Implicit Arguments.
 
 (** named cases from Software Foundations **)
 Section PP.
-Require Import Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
 Local Open Scope string_scope.
 
 Definition digit_to_string (n:nat): string :=
@@ -609,8 +610,6 @@ Proof.
   intros. rewrite ascii_dec_ascii_eq_bool. apply ascii_eq_bool_neq.
   assumption.
 Qed.
-
-Require Import FunInd.
 
 Function string_eq_bool (a1 a2:string) : bool :=
   match a1, a2 with

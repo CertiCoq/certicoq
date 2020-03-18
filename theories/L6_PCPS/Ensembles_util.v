@@ -2,8 +2,9 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From Coq Require Import Classes.Morphisms Arith NArith.BinNat Lists.List Sets.Ensembles Sorting.Permutation.
+From Coq Require Import Classes.Morphisms Arith NArith.BinNat Lists.List Sorting.Permutation.
 From compcert.lib Require Import Coqlib.
+From Coq Require Import Sets.Ensembles.
 
 Import ListNotations.
 
@@ -11,10 +12,10 @@ Close Scope Z_scope.
 
 Ltac inv H := inversion H; clear H;  subst.
 
-Hint Constructors Singleton.
-Hint Constructors Union.
-Hint Constructors Intersection.
-Hint Unfold In.
+Hint Constructors Singleton : core.
+Hint Constructors Union : core.
+Hint Constructors Intersection : core.
+Hint Unfold In : core.
 
 Create HintDb Ensembles_DB.
 
@@ -227,7 +228,7 @@ Proof.
 Qed.
 
 Instance Proper_In {A} :
-  Proper (Same_set A ==> Logic.eq ==> iff) (In A).
+  Proper (Same_set A ==> Logic.eq ==> iff) (Ensembles.In A).
 Proof.
   constructor; intros H'; subst; destruct H as [H1 H2]; eauto.
 Qed.

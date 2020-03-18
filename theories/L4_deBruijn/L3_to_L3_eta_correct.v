@@ -5,7 +5,8 @@
 
 Require Import FunInd.
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
-        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz
+        Coq.Bool.Bool.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
@@ -17,6 +18,8 @@ Require Import L3_eta_crct.
 Module L3C := L3_eta_crct.
 
 Set Keyed Unification.
+
+Coercion Is_true : bool >-> Sortclass.
 
 Lemma Lookup_trans_env e nm t :
   LookupDfn nm e t -> LookupDfn nm (transEnv e) (trans t).
@@ -249,7 +252,7 @@ Proof.
   simpl. now apply IHn.
 Qed.
 
-Lemma isLambda_trans n : ~ isLambda n -> ~ isLambda (trans n).
+Lemma isLambda_trans n : ~ L2k.term.isLambda n -> ~ term.isLambda (trans n).
 Proof.
   intros nlam Htr. dstrctn Htr. apply nlam.
   destruct n; try discriminate; repeat eexists.

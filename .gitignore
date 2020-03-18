@@ -39,3 +39,5 @@ benchmarks/config.h
 benchmarks/gc.h
 benchmarks/values.h
 benchmarks/main.c
+theories/.Makefile.d
+libraries/.Makefile.d

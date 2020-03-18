@@ -1134,7 +1134,7 @@ Lemma WFapp_mkApp:
   forall args t, WFapp (mkApp t args) -> WFapp t /\ WFapps args.
 Proof.
   induction args; intros.
-  - cbn in H. intuition.
+  - cbn in H. intuition. constructor.
   - change (WFapp (mkApp (TApp t a) args)) in H.
     specialize (IHargs _ H). destruct IHargs. inversion_Clear H0.
     split.
@@ -1494,7 +1494,7 @@ Qed.
 
 Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
   match tbod with
-    | TRel m => match nat_compare n m with
+    | TRel m => match Nat.compare n m with
                   | Datatypes.Eq => tin
                   | Gt => TRel m
                   | Lt => TRel (pred m)
@@ -1558,7 +1558,7 @@ Proof.
   try (solve[constructor; intuition]).  
   - destruct (lt_eq_lt_dec n0 n) as [[h | h] | h].
     + rewrite (proj1 (nat_compare_lt _ _) h). apply IRelLt. assumption.
-    + rewrite (proj2 (nat_compare_eq_iff _ _) h). subst. apply IRelEq.
+    + rewrite (proj2 (Nat.compare_eq_iff _ _) h). subst. apply IRelEq.
     + rewrite (proj1 (nat_compare_gt _ _)). apply IRelGt.
       assumption. assumption.
 Qed.
@@ -1588,7 +1588,7 @@ Proof.
   try (solve [unfold instantiate; constructor]).
   - destruct (lt_eq_lt_dec n m) as [[h|h]|h]; unfold instantiate.
     + rewrite (proj1 (nat_compare_lt _ _) h). constructor.
-    + rewrite (proj2 (nat_compare_eq_iff _ _) h). assumption.
+    + rewrite (proj2 (Nat.compare_eq_iff _ _) h). assumption.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
   - change (WFapp (TLambda nm (instantiate t (S n) bod))). constructor.
     + apply H0. assumption.

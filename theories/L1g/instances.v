@@ -49,7 +49,7 @@ Proof.
   induction 1; cbn; intros; repeat econstructor; try assumption.
   - destruct (flattenApp fn). intuition.
   - destruct (flattenApp fn); simpl in *.
-    apply append_pres_WFapps; intuition.
+    apply append_pres_WFapps; intuition. constructor; auto. constructor.
 Qed.
 
 Global Instance QuestionHeadL1gTerm: QuestionHead (Program L1g.compile.Term) :=

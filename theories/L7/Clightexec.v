@@ -534,7 +534,7 @@ Function stepstar (ge: genv) (s: state) (nenv:M.t BasicAst.name) (fuel: Z)  {mea
   if Z.leb fuel Z0 
   then OutOfTime s
   else match step ge s with OK s' =>
-          if is_stopped s' then Result s' else stepstar ge s' nenv (Zpred fuel)
+          if is_stopped s' then Result s' else stepstar ge s' nenv (Z.pred fuel)
                        | Error err => certiClasses.Error (print_error err (Some nenv)) (Some s)
      end.
 Proof.

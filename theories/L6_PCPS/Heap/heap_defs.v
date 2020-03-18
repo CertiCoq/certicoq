@@ -2441,11 +2441,11 @@ Module HeapDefs (H : Heap) .
     rewrite FromSet_empty, Union_Empty_set_neut_r...
   Qed.
   
-  Instance ToMSet_env_locs (S : Ensemble var) (rho : env) (HS : ToMSet S) : ToMSet (env_locs rho S) :=
-    {
-      mset := env_locs_set rho mset
-    }.
+  Instance ToMSet_env_locs (S : Ensemble var) (rho : env) (HS : ToMSet S) : ToMSet (env_locs rho S).
   Proof.
+    refine {|
+      mset := env_locs_set rho mset
+    |}.
     eapply env_locs_set_correct. eapply mset_eq.
   Qed.
 

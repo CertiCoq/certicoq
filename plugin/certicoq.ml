@@ -25,7 +25,7 @@ let compile gr =
   Feedback.msg_debug (str"Quoting");
   let term = quote_term_rec env (EConstr.to_constr sigma c) in
   Feedback.msg_debug (str"Finished quoting.. compiling to L7.");
-  match AllInstances.compile_template_L7 term with
+  match AllInstances.compile_template_L7 (Obj.magic term) with
   | Ret ((nenv, header), prg) ->
      Feedback.msg_debug (str"Finished compiling, printing to file.");
      let str = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ ".c") in

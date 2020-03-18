@@ -2456,19 +2456,14 @@ Proof.
     eassumption.
 Qed.
 
-Instance Occurs_free_ToMSet (e : exp) : ToMSet (occurs_free e) :=
-  {
-    mset := exp_fv e
-  }.
-Proof.
+Instance Occurs_free_ToMSet (e : exp) : ToMSet (occurs_free e).
+Proof. refine {| mset := exp_fv e |}.
   eapply exp_fv_correct.
 Qed.
 
-Instance Occurs_free_fundefs_ToMSet (B : fundefs) : ToMSet (occurs_free_fundefs B) :=
-  {
-    mset := fundefs_fv B
-  }.
+Instance Occurs_free_fundefs_ToMSet (B : fundefs) : ToMSet (occurs_free_fundefs B).
 Proof.
+  refine {| mset := fundefs_fv B |}.
   eapply fundefs_fv_correct.
 Qed.
 

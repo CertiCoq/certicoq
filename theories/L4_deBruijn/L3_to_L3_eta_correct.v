@@ -338,7 +338,7 @@ Proof.
   - cbn. destruct (lt_eq_lt_dec n0 n); cbn.
     + destruct s.
       * rewrite (proj1 (nat_compare_lt n0 n)); try omega. reflexivity.
-      * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial. 
+      * subst. rewrite (proj2 (Nat.compare_eq_iff _ _)); trivial. 
     + rewrite (proj1 (nat_compare_gt n0 n)); try intro; trivial.
   - cbn. now rewrite H, H0.
   - cbn. now rewrite H, H0.

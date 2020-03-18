@@ -57,7 +57,8 @@ Extract Inductive Decimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun 
 Extract Inlined Constant RandyPrelude.ascii_dec_bool => "(=)".
 
 (* Avoid name clashes with OCaml or Coq module names *)
-Extraction Blacklist List String Nat Int Ast univ uGraph Char OrderedType
+Extraction Blacklist config List String Nat Int Ast Universes UnivSubst Typing Retyping 
+           OrderedType Logic Common Equality Char char uGraph
            Instances Classes Term Monad Coqlib Errors Compile Checker Eq Classes0.
 
 (* Cutting the dependency to R. 

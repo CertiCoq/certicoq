@@ -1014,14 +1014,14 @@ Section uncurry_correct.
   Lemma eq_var_iff_Singleton_l : forall b a, eq_var a b = true <-> In _ [set a] b.
   Proof.
     split; intros H; destruct (eq_var a b) eqn:Heq; try congruence.
-    rewrite Peqb_eq in Heq; now subst.
+    rewrite Pos.eqb_eq in Heq; now subst.
     rewrite Pos.eqb_neq in Heq; contradiction Heq; now inv H.
   Qed.
 
   Lemma eq_var_iff_Singleton_r : forall a b, eq_var a b = true <-> In _ [set b] a.
   Proof.
     split; intros H; destruct (eq_var a b) eqn:Heq; try congruence.
-    rewrite Peqb_eq in Heq; now subst.
+    rewrite Pos.eqb_eq in Heq; now subst.
     rewrite Pos.eqb_neq in Heq; contradiction Heq; now inv H.
   Qed.
 

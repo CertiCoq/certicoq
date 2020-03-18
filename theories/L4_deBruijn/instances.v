@@ -710,7 +710,7 @@ Closed under the global context
 (* this proof, which was developed later, uses lemmas in the certiclasses library *)
 Module SimplerProof.
 
-Let certiL4_5_to_L5Val:
+  Local Definition certiL4_5_to_L5Val:
   CerticoqTranslation (cTerm certiL4_5) (cTerm certiL5):=
   @liftTotal _ _ (fun x => (fst x, (cps_cvt_val (snd x)))).
 
@@ -802,23 +802,10 @@ auto.
 Qed. *)
 
 (* Move to L4_5_to_L5 *)
-Lemma eval_preserves_isprog :
-  forall (e v : L4_5_Term),  eval e v ->  isprogram e -> isprogram v.
-Proof using.
-  unfold isprogram. split.  repnd. eauto with eval.
-
-  (* Move to L4_5_to_L5 *)
-Set Nested Proofs Allowed.
-  
-Lemma eval_preserves_isprog :
-  forall (e v : L4_5_Term),  eval e v ->  isprogram e -> isprogram v.
-Proof using.
-  unfold isprogram. split.  repnd. eauto with eval.
-Abort.
 
 Global Instance evalPreservesGood :
   Proper (eval ==> Basics.impl) (@goodTerm L4_5_Term _).
-Proof using.
+Proof.
   intros e v Hev Hg.
   hnf. autounfold with certiclasses eval in *. repnd.
   dands; eauto with eval typeclass_instances.

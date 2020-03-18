@@ -44,7 +44,7 @@ Proof.
 Defined.
 
 
-Global Instance certiL2k: CerticoqLanguage (Program L2k.compile.Term).
+Global Instance certiL2k: CerticoqLanguage (Program L2k.compile.Term) := {}.
 
 Instance certiL2_to_L2k: 
   CerticoqTotalTranslation (Program L1g.compile.Term)

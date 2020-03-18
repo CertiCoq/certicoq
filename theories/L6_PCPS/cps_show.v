@@ -110,15 +110,16 @@ Definition newline : M unit := emit (String chr_newline EmptyString).
 
 (* We assume each expression starts on a fresh newline, and that it
    should be indented by [indent] characters. *)
-Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
-  tab indent ;; 
+
+Fixpoint emit_exp (indent:nat) (e:exp) {struct e} : M unit :=
+  tab indent ;;
   match e with
   | Econstr x tg xs e =>
     emit "let " ;; emit (show_var x) ;;
          (* emit " := con_" ;; emit (show_pos tg) ;; *)
-    emit " := ";;emit (show_con tg);;     
+    emit " := " ;; emit (show_con tg) ;;
     emit (show_vars xs) ;; emit " in " ;; newline ;; 
-    emit_exp indent e
+    emit_exp indent e 
   | Eproj x tg n y e =>
     emit "let " ;; emit (show_var x) ;;
     emit " := proj_" ;; emit (show_binnat n) ;; emit " " ;;
@@ -129,7 +130,7 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
     emit "let " ;; emit (show_var x) ;;
     emit " := prim_" ;; emit (show_pos p) ;; emit (show_vars ys) ;;
     emit " in " ;; newline ;; 
-    emit_exp indent e
+    emit_exp indent e  
   | Ecase x arms =>
     emit "case " ;; emit (show_var x) ;; emit " of {" ;; newline ;;
          (fix iter (xs : list (cTag*exp)) : M unit :=
@@ -162,7 +163,7 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
   end%string.
 About fold_left.
 
-Fixpoint emit_val (indent:nat) (v:val) : M unit :=
+Fixpoint emit_val (indent:nat) (v:val) {struct v}: M unit :=
   tab indent ;;
       match v with 
         | Vconstr tg l =>
@@ -192,7 +193,7 @@ Definition show_val (v:val) : string :=
           (show_tree (snd (runState (emit_val 0 v) Emp))).
 
 
-Fixpoint emit_env' (indent:nat) (rhol:list (positive* val)):M unit :=
+Fixpoint emit_env' (indent:nat) (rhol:list (positive* val)) {struct rhol}:M unit :=
   match rhol with
     | cons (p, v)  rhol' =>
       emit "| "%string;;emit (show_var p);;emit " |->"%string;; newline;;
@@ -201,7 +202,7 @@ Fixpoint emit_env' (indent:nat) (rhol:list (positive* val)):M unit :=
     | nil => newline
   end.
 
-Fixpoint emit_cenv' (indent:nat) (cenvl:list (positive*cTyInfo)):M unit :=
+Fixpoint emit_cenv' (indent:nat) (cenvl:list (positive*cTyInfo)) {struct cenvl} : M unit :=
   match cenvl with
     | cons (p, (name, _, it, arr, ord)) cenvl' =>
       emit "| "%string;;emit (show_pos p);;emit " |-> ("%string;;

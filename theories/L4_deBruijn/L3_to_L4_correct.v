@@ -1219,7 +1219,8 @@ Proof.
   induction e; intros.
   simpl in H.
   inv H. inv H4. simpl in *. exists [], t'. intuition.
-
+  constructor.
+  
   inv H.
   inv wfe'.
   specialize (IHe _ H3 H2).

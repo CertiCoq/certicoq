@@ -41,3 +41,7 @@ benchmarks/values.h
 benchmarks/main.c
 theories/.Makefile.d
 libraries/.Makefile.d
+benchmarks/vs
+plugin/.Makefile.d
+CertiCoq.Benchmarks.Binom.main.c
+CertiCoq.Benchmarks.Binom.main.h

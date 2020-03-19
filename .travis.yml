@@ -16,9 +16,8 @@ env:
   global:
   - NJOBS=2
   - COMPILER="4.07.1"
-  - CAMLP5_VER="7.05"
   - FINDLIB_VER="1.8.0"
-  - COQ_VER="8.9.1"
+  - COQ_VER="8.11.0"
 
 install:
 - curl -sL https://raw.githubusercontent.com/ocaml/opam/master/shell/install.sh > install.sh
@@ -31,7 +30,7 @@ install:
 - eval $(opam config env)
 - opam config list
 - opam repo add coq-released https://coq.inria.fr/opam/released || echo "coq-released registered"
-- opam install -j ${NJOBS} -y camlp5.${CAMLP5_VER} ocamlfind.${FINDLIB_VER} coq.${COQ_VER}
+- opam install -j ${NJOBS} -y ocamlfind.${FINDLIB_VER} coq.${COQ_VER}
 - opam list
 
 matrix:

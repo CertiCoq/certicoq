@@ -270,6 +270,8 @@ extraction/specif.ml
 extraction/specif.mli
 extraction/stateMonad.ml
 extraction/stateMonad.mli
+extraction/ssrbool.mli
+extraction/ssrbool.ml
 extraction/string0.ml
 extraction/string0.mli
 extraction/string1.ml

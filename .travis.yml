@@ -37,8 +37,8 @@ matrix:
   include:
     - name: "Local build"
       env: TARGET=ci
-#    - name: "Opam installation"
-#      env: TARGET=ci-opam
+#   - name: "Opam installation"
+#     env: TARGET=ci-opam
 
 script:
  - make -j ${NJOBS} ${TARGET}

@@ -7,6 +7,7 @@ Require Import L4.L3_to_L3_eta.
 Require Import L4.L3_eta_crct.
 Require Import L4.L3_to_L3_eta_correct.
 Require Import L4.L3_to_L4_correct.
+
 Require L2k.
 Require Import L2k.instances.
 
@@ -190,8 +191,6 @@ Global  Instance certiL3_eta_to_L4:
   fun p =>
     Ret ( L4.L3_to_L4.inductive_env (AstCommon.env p),
    (L3_to_L4.translate_program (AstCommon.env p) (main p))).
-
-Require Import L4.L3_to_L4_correct.
 
 Lemma same_args_same_obs n t e t' :
   same_args same_obs t e = true -> L2k.term.tnth n t = Some t' ->

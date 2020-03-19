@@ -6,13 +6,13 @@ Require Import Common.AstCommon.
 Require Import L6.cps L6.cps_util L6.set_util L6.relations L6.hoisting L6.identifiers L6.ctx
         L6.Ensembles_util L6.List_util L6.alpha_conv L6.functions.
 Require Import Coq.ZArith.Znumtheory.
+Require Import compcert.lib.Maps.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Coq.Strings.String.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
 Import ListNotations Nnat MonadNotation.
 
-Require Import compcert.lib.Maps.
 
 Open Scope ctx_scope.
 Open Scope monad_scope.

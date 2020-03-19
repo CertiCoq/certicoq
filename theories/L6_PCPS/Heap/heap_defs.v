@@ -2,13 +2,13 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
+ From compcert.lib Require Import Coqlib.
+ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms.
 From CertiCoq.L6 Require Import cps cps_util List_util Ensembles_util functions
         identifiers tactics set_util map_util.
 From CertiCoq.L6.Heap Require Import heap.
-From compcert.lib Require Import Coqlib.
 
 Import ListNotations.
 

@@ -472,7 +472,7 @@ Proof.
 Qed.
 
 
-Lemma mkApp_mkApp' fn args x : mkApp fn args = Some x ->
+Lemma mkApp_mkApp' fn args x : L2k.term.mkApp fn args = Some x ->
                               mkApp' fn args = x.
 Proof.
   induction args in fn, x |- *. simpl. now intros [= ->].
@@ -502,16 +502,16 @@ Proof.
 Qed.
 
 Lemma mkApp_mkApp'_notc fn args : ~ isConstruct_discr fn ->
-                                  mkApp fn args = Some (mkApp' fn args).
+                                  L2k.term.mkApp fn args = Some (mkApp' fn args).
 Proof.
   induction args in fn |- *. simpl. trivial.
   simpl. intros Hfn.
   destruct fn; simpl; intros; eauto. intuition.
 Qed.
 
-Lemma mkApp_mkApp'_etac fn args : mkApp fn args = Some (mkApp' fn args) ->
+Lemma mkApp_mkApp'_etac fn args : L2k.term.mkApp fn args = Some (mkApp' fn args) ->
                                   forall k,
-                                    mkApp (eta_expand k (trans fn)) (trans_terms args) =
+                                    L2k.term.mkApp (eta_expand k (trans fn)) (trans_terms args) =
                                     Some (mkApp' (eta_expand k (trans fn)) (trans_terms args)).
 Proof.
   induction args in fn |- *. simpl. trivial.

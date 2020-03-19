@@ -118,11 +118,11 @@ Lemma StrictOrder_lt: StrictOrder E.lt.
 Proof.
 constructor.
 unfold Irreflexive, Reflexive, complement.
-intros; eapply E.lt_not_eq; eauto.
+intros. eapply E.lt_not_eq. eauto. eapply E.eq_refl.
 unfold Transitive.
 intros; eapply E.lt_trans; eauto.
 Qed.
-
+Hint Resolve E.eq_sym : core.
 Lemma lt_eq_trans: forall {x y z}, E.lt x y -> E.eq y z -> E.lt x z.
 Proof.
 intros. destruct (E.compare x z); auto.
@@ -317,8 +317,10 @@ assert (PR': Proper (@M.eq_key_elt A ==> eq)
   (fun x : E.t * A => if F.eq_dec (fst x) i then false else true)).
 clear. repeat intro.
 destruct H. change M.key with E.t in *.
-  destruct (F.eq_dec (fst x) i); destruct (F.eq_dec (fst y) i); auto; contradiction n; eauto.
-
+  destruct (F.eq_dec (fst x) i); destruct (F.eq_dec (fst y) i); auto.
+  rewrite H in e.
+  contradiction n; eauto.
+  rewrite H in n. contradiction.
 apply SortA_equivlistA_eqlistA with (fun x y => E.lt (fst x) (fst y)); auto.
 apply eqv_eq_key_elt.
 apply M.elements_3.
@@ -555,7 +557,7 @@ rewrite (F.find_o _ H). apply S.eq_refl.
 Qed.
 (* /ADMITTED *)
 (** [] *)
-
+Hint Resolve E.eq_refl : core.
 (* EX3 (in_colors_of_1) *)
 Lemma in_colors_of_1:
   forall i s f c, S.In i s -> M.find i f = Some c -> S.In c (colors_of f s).
@@ -624,20 +626,19 @@ apply S.choose_1 in H0.
 rewrite F.add_eq_o in H2; auto.
 inversion H2; clear H2; subst e0.
 destruct (E.eq_dec j a).
-apply (@S.In_1 _ j i) in H; eauto.
+apply (@S.In_1 _ j i) in H. eauto.
 apply NS in H. auto.
 unfold color1  in H1.
 revert H1; case_eq (S.choose (S.diff palette (colors_of f (adj g a)))); intros.
 apply S.choose_1 in H1.
 rewrite F.add_neq_o in H2; auto.
 apply S.diff_2 in H0.
-clear e0 H1.
 apply (adj_ext g i a e j) in H.
 remember (adj g a) as s.
-clear - H H0 H2.
 contradiction H0; clear H0.
 eapply in_colors_of_1; eauto.
-apply S.choose_2 in H1.
+apply S.choose_2 in H1. auto.
+admit.  now rewrite e.
 clear - H0 H1.
 apply H1 in H0. auto.
 unfold color1 in H1.

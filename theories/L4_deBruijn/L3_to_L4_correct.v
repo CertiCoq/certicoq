@@ -6,9 +6,9 @@
   + move to an enriched Crct_Term predicate after L3_eta for is_n_lambda of branches (last 2 admits here)
 *)
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
-        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 Require Export Common.Common.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
+        Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
 (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
@@ -25,8 +25,9 @@ Require Import L3_to_L3_eta.
 Require Import L3_eta_crct.
 Require Import L3_to_L3_eta_correct.
 
-Require Import L4.expression.
 Require Import L4.L3_to_L4.
+Require Import L4.expression.
+Require Import Coq.Lists.List.
 Unset Keyed Unification.
 
 (** Tactics *)
@@ -153,7 +154,7 @@ Fixpoint is_n_lam n t :=
           end
   end.
 
-Hint Resolve (proj1 Crct_WFTrm).
+Hint Resolve (proj1 Crct_WFTrm) : core.
 
 Lemma LookupDfn_pres_Crct:
   forall p n t, crctTerm p n t ->
@@ -1245,7 +1246,7 @@ Qed.
 
 Lemma exp_wf_mkLets n e t :
   wf_tr_pre_environ e ->
-  exp_wf (N.of_nat (n + length e))%nat t -> exp_wf (N.of_nat n) (mkLets e t).
+  exp_wf (N.of_nat (n + List.length e))%nat t -> exp_wf (N.of_nat n) (mkLets e t).
 Proof.
   revert n t; induction e; simpl; intros.
   
@@ -1278,7 +1279,7 @@ Lemma eval_lets e e' t t' :
   eval (subst_env e' t) t' ->
   eval (mkLets e t) t'.
 Proof.
-  revert t t' e'. pattern e. refine (RandyPrelude.wf_ind (@length _) _ _ e). clear.
+  revert t t' e'. pattern e. refine (RandyPrelude.wf_ind (@List.length _) _ _ e). clear.
   simpl. intros k IHk ? ?. destruct k using rev_ind; intros; simpl in *.
   + inv H; simpl. trivial.
   + simpl. clear IHk0.
@@ -1463,7 +1464,7 @@ Lemma subst_env_aux_sbst_fix_aux e dts e1 :
      (subst_env_aux e (1 + efnlst_length dts) e1) 1.
 Proof.
   revert dts e1.
-  pattern e. refine (RandyPrelude.wf_ind (@length _) _ _ e). clear. intros.
+  pattern e. refine (RandyPrelude.wf_ind (@List.length _) _ _ e). clear. intros.
   destruct t.
   - simpl. intros.
     unfold subst_env_aux. simpl.

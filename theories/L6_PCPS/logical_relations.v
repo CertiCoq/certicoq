@@ -2,10 +2,10 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
+Require Import compcert.lib.Coqlib.
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
         Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
 Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.Ensembles_util L6.List_util.
-Require Import compcert.lib.Coqlib.
 
 Import ListNotations.
 

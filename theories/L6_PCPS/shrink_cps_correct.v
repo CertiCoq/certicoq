@@ -7,12 +7,13 @@ Import RelationClasses.
 Require compcert.lib.Maps.
 Require Import ExtLib.Data.Bool.
 Require Coq.funind.Recdef.
+Require Import compcert.lib.Coqlib.
 Import Nnat.
 Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz Coq.Sets.Ensembles Coq.Logic.Decidable Coq.Lists.ListDec.
 Require Import Libraries.CpdtTactics Coq.Sorting.Permutation.
 Require Import Libraries.HashMap.
 Require Import Libraries.maps_util.
-Require Import compcert.lib.Coqlib L6.Ensembles_util. 
+Require Import L6.Ensembles_util. 
 Require Import L6.cps.
 Require Import L6.ctx L6.logical_relations.
 Require Import L6.cps_util L6.List_util L6.shrink_cps L6.eval L6.set_util L6.identifiers L6.stemctx.

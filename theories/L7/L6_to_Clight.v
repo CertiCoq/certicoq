@@ -5,6 +5,7 @@
  *)
 Require Import Coq.ZArith.ZArith
         Coq.Program.Basics
+        Coq.Strings.Ascii
         Coq.Strings.String
         Coq.Lists.List List_util.
 
@@ -25,6 +26,8 @@ Require Import compcert.common.AST
         compcert.cfrontend.Ctypes
         compcert.cfrontend.Clight
         compcert.common.Values.
+
+Require Import Clightdefs.
 
 Require Import L6.cps
                L6.identifiers.
@@ -789,10 +792,7 @@ Fixpoint make_ind_array (l : list N) : list init_data :=
   | n :: l' => (Init_int (Z.of_N n)) :: (make_ind_array l')
   end.
 
-
-
-
-(* representation of pos as string *)
+  (* representation of pos as string *)
 Fixpoint pos2string' p s :=
   match p with
   | xI p' => pos2string' p' (String "1" s)
@@ -923,10 +923,6 @@ Definition make_defs (e : exp) (fenv : fEnv) (cenv: cEnv) (ienv : n_iEnv) (nenv 
              end
            | None => ret None
            end.
-
-Require Import Clightdefs.
-
-
 
 Definition composites : list composite_definition :=
  (Composite threadInfIdent Struct

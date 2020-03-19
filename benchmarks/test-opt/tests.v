@@ -65,22 +65,22 @@ Definition addxy (x y : nat) (l : list nat) :=
      | [] => []
      | z :: zs => (z + x + y) :: aux zs
      end) in
-  f l.
+  f l. 
 
 Definition rec_clos := addxy 1 2 (List.repeat 0 (100*500)).
 
 CertiCoq Compile -ext "_cps" rec_clos.
 CertiCoq Compile -anf rec_clos.
 CertiCoq Compile -anf -o1 -ext "_opt" rec_clos.
-CertiCoq Show IR -anf rec_clos.
-CertiCoq Show IR -anf -o1 -ext "_opt" -dev 2 rec_clos.
+CertiCoq Show IR -anf rec_clos. 
+CertiCoq Show IR -anf -o1 -ext "_opt" -debug -dev 5 rec_clos.
 
 
 
 Definition intxy (x y : nat) (l : list nat):= 
   let f := (fix aux l acc :=
      match l with
-     | [] => acc 
+     | [] => acc  
      | z :: zs => aux zs (z :: x :: y :: acc)
      end) in
   f l [].

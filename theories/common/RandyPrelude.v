@@ -530,7 +530,7 @@ Qed.
 Lemma nat_compare_EQ: forall n, Nat.compare n n = Eq.
   intro n. apply (proj2 (Nat.compare_eq_iff n n)). reflexivity.
 Qed.
-Hint Rewrite nat_compare_EQ.
+Hint Rewrite nat_compare_EQ : core.
 
 Lemma notNone_Some:
   forall (A:Type) (o:option A), o <> None -> exists a, o = Some a.
@@ -634,7 +634,7 @@ Proof.
     - destruct _x. elim y. destruct _x; elim y. }
   intros. apply j. reflexivity.  
 Qed.
-Hint Resolve string_eq_bool_rfl.
+Hint Resolve string_eq_bool_rfl : core.
 
 Lemma string_eq_bool_eq:
   forall (s1 s2:string), string_eq_bool s1 s2 = true -> s1 = s2.

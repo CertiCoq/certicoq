@@ -471,7 +471,7 @@ Qed.
   
 Lemma var_cspec : StrictCompSpec (@Logic.eq var) Ident.lt Ident.compare.
 Proof. split; [apply Ident.lt_strorder|apply Ident.compare_spec]. Qed.
-Hint Resolve var_cspec.
+Hint Resolve var_cspec : core.
 
 Definition pure_atom_cmp (a a': pure_atom) : comparison :=
  match a, a' with
@@ -693,7 +693,7 @@ Proof.
   - admit.
   - intros. unfold CompSpec. admit.
 Admitted.
-Hint Resolve clause_cspec'.
+Hint Resolve clause_cspec' : core.
 
 Definition clause_length (cl : clause) : Z := 
   match cl with 

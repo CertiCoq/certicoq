@@ -30,7 +30,7 @@ Inductive WNorm: Term -> Prop :=
 with WNorms: Terms -> Prop :=
 | WNtnil: WNorms tnil
 | WNtcons: forall t ts, WNorm t -> WNorms ts -> WNorms (tcons t ts).
-Hint Constructors WNorm WNorm.
+Hint Constructors WNorm WNorm : core.
 Scheme WNorm_ind' := Induction for WNorm Sort Prop
       with WNorms_ind' := Induction for WNorms Sort Prop.
 Combined Scheme WNormWNorms_ind from WNorm_ind', WNorms_ind'.

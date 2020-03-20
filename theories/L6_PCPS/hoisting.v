@@ -200,7 +200,7 @@ Inductive no_fun_defs : fundefs -> Prop  :=
 | Fnil_no_fun :
     no_fun_defs Fnil.
 
-Hint Constructors no_fun no_fun_defs.
+Hint Constructors no_fun no_fun_defs : core.
 
 Lemma no_fun_split_fds B B' B'' :
   no_fun_defs B -> no_fun_defs B' ->

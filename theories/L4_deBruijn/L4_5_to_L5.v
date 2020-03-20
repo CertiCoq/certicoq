@@ -1073,7 +1073,7 @@ We can either have separate clauses as in L4_5.eval, or have the following rule
     eval_c (Call_c (apply_bterm bt sub) k arg) v ->
     eval_c (Call_c (Fix_c' lbt i) k arg) v.
 
-Hint Constructors eval_c.
+Hint Constructors eval_c : core.
 
 
 (*

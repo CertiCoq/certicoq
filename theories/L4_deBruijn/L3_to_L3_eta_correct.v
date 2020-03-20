@@ -149,7 +149,7 @@ Lemma wcbvEval_no_step e s t : WcbvEval e s t -> WcbvEval e t t.
 Proof.
   apply WcbvEval_no_further.
 Qed.
-Hint Resolve wcbvEval_no_step.
+Hint Resolve wcbvEval_no_step : core.
 
 
 Function mkApp' (fn : Term) (ts : Terms) :=

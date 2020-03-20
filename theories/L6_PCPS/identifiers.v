@@ -327,8 +327,8 @@ with occurs_free_fundefs : fundefs -> Ensemble var :=
       x <> f ->
       occurs_free_fundefs (Fcons f tau ys e defs) x.
 
-Hint Constructors occurs_free.
-Hint Constructors occurs_free_fundefs.
+Hint Constructors occurs_free : core.
+Hint Constructors occurs_free_fundefs : core.
 
 (** [occurs_free_applied e] is the set of free variables of [e] that appear in applied position *)
 Inductive occurs_free_applied : exp -> Ensemble var :=
@@ -1007,8 +1007,8 @@ with funs_in_fundef : fundefs -> fundefs -> Prop :=
       funs_in_fundef fs fs' ->
       funs_in_fundef fs (Fcons x tau ys e fs').
 
-Hint Constructors funs_in_exp.
-Hint Constructors funs_in_fundef.
+Hint Constructors funs_in_exp : core.
+Hint Constructors funs_in_fundef : core.
 
 Lemma split_fds_funs_in_fundef_l B1 B2 B3 B :
   split_fds B1 B2 B3 ->
@@ -1149,8 +1149,8 @@ with bound_var_fundefs : fundefs -> Ensemble var :=
       bound_var e x ->
       bound_var_fundefs (Fcons f tau ys e defs) x.
 
-Hint Constructors bound_var.
-Hint Constructors bound_var_fundefs.
+Hint Constructors bound_var : core.
+Hint Constructors bound_var_fundefs : core.
 
 (** ** Useful set equalities *)
 
@@ -2812,8 +2812,8 @@ with bound_var_fundefs_ctx: fundefs_ctx -> Ensemble var :=
                           bound_var_fundefs_ctx cfds v ->
                           bound_var_fundefs_ctx (Fcons2_c f t xs e cfds) v.
 
-Hint Constructors bound_var_ctx.
-Hint Constructors bound_var_fundefs_ctx.
+Hint Constructors bound_var_ctx : core.
+Hint Constructors bound_var_fundefs_ctx : core.
 
 Lemma bound_var_Econstr_c x t ys c :
   Same_set _ (bound_var_ctx (Econstr_c x t ys c))
@@ -3174,8 +3174,8 @@ with unique_bindings_fundefs_c : fundefs_ctx -> Prop :=
 
 
 
-Local Hint Constructors unique_bindings_c unique_bindings_fundefs_c.
-Local Hint Constructors unique_bindings unique_bindings_fundefs. 
+Local Hint Constructors unique_bindings_c unique_bindings_fundefs_c : core.
+Local Hint Constructors unique_bindings unique_bindings_fundefs : core. 
 
 
 Theorem unique_bindings_Ecase_app :
@@ -3639,7 +3639,7 @@ Proof.
 Qed.
 
 
-Local Hint Constructors bound_var bound_var_fundefs.
+Local Hint Constructors bound_var bound_var_fundefs : core.
 
 
 Lemma bound_var_dec :
@@ -3745,7 +3745,7 @@ Proof.
 Qed.
 
 
-Local Hint Constructors bound_var_ctx bound_var_fundefs_ctx.
+Local Hint Constructors bound_var_ctx bound_var_fundefs_ctx : core.
 
 Theorem bound_var_ctx_dec :
   forall c, Decidable (bound_var_ctx c).
@@ -4166,7 +4166,7 @@ with occurs_free_fundefs_ctx : fundefs_ctx -> Ensemble var :=
             x <> f ->
             occurs_free_fundefs_ctx (Fcons2_c f tau ys e defs) x.
 
-Hint Constructors occurs_free_ctx occurs_free_fundefs.
+Hint Constructors occurs_free_ctx occurs_free_fundefs : core.
 
 Lemma occurs_free_Econstr_c x t ys e :
   Same_set var (occurs_free_ctx (Econstr_c x t ys e))

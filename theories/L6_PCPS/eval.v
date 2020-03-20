@@ -5,6 +5,7 @@ Import ListNotations.
 Require Import Coq.Strings.String.
 From CertiCoq.Common Require Import AstCommon exceptionMonad.
 From CertiCoq.L6 Require Import cps cps_util List_util size_cps.
+Require Import ExtLib.Structures.Monad.
 
 
 
@@ -76,9 +77,6 @@ Section EVAL.
       forall x v rho,
         M.get x rho = Some v ->
         bstep_e rho (Ehalt x) v 0.
-
- 
-  Require Import ExtLib.Structures.Monad.
 
 
   (* fuel-based evaluator, could also use n from bstep_e with a termination lex (n, e) *)

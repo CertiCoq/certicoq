@@ -314,7 +314,7 @@ Module HeapEquiv (H : Heap).
         destruct Har as [Heq2 [v1' [v2' [Heq _]]]]; discriminate.
         destruct Har as [Heq2 [vs2 [Heq _]]]; discriminate.
     - destruct (get l1 H1) eqn:Hget1.
-      + destruct b as [ c vs1 | v1 v2 | rho1 B1 off1 ].
+      + destruct b as [ c vs1 | v1 v2 | rho1 ].
         * destruct (get l2 H2) eqn:Hget2; try now firstorder.
           destruct b as [c' vs2 | |]; try now firstorder.
           intros [Heq1 [Heq Hall]] n. subst. rewrite !res_approx_fuel_eq.
@@ -441,7 +441,7 @@ Module HeapEquiv (H : Heap).
     - induction i as [i IHi] using lt_wf_rec.
       intros [β [v H1]]. rewrite res_approx_fuel_eq. destruct v.
       simpl. destruct (get l H1) eqn:Hgetl; eauto. 
-      destruct b as [c vs | vq vw | rho B f]. 
+      destruct b as [c vs | vq vw | rho ]. 
       + split; eauto. eexists; split; eauto.
         intros i' Hlt.
         eapply Forall2_refl; intros l'. eapply IHi in Hlt.
@@ -463,7 +463,7 @@ Module HeapEquiv (H : Heap).
       destruct v1 as [l1 | B1 f1]; destruct v2 as [l2 | B2 f2]; destruct v3 as [l3 | B3 f3];
       try contradiction.
       { destruct (get l1 H1) eqn:Hget1; eauto.
-        destruct b as [c vs1 | vq  vw | rho1 B f].
+        destruct b as [c vs1 | vq  vw | rho1 ].
         + edestruct Hap1 as [Heq1 [vs2 [Hget2 Hall2]]]. rewrite Hget2 in Hap2.
           destruct Hap2 as [Heq2 [vs3 [Hget3 Hall3]]].
           split; eauto. congruence. eexists; split; eauto.

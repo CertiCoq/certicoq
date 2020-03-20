@@ -39,8 +39,8 @@ Qed.
 
 Definition ecTrm := ecTrm.
 Definition ecTyp := ecTyp Term.
-Hint Constructors AstCommon.fresh.
-Hint Constructors AstCommon.Lookup.
+Hint Constructors AstCommon.fresh : core.
+Hint Constructors AstCommon.Lookup : core.
 
 (** correctness specification for programs (including local closure) **)
 Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
@@ -85,7 +85,7 @@ with crctDs: environ Term -> nat -> Defs -> Prop :=
      | cdsCons: forall p n dnm bod ix ds,
          isLambda bod -> crctTerm p n bod -> crctDs p n ds ->
          crctDs p n (dcons dnm bod ix ds).
-Hint Constructors crctTerm  crctBs crctDs crctEnv.
+Hint Constructors crctTerm  crctBs crctDs crctEnv : core.
 Scheme crct_ind' := Minimality for crctTerm Sort Prop
   with crctBs_ind' := Minimality for crctBs Sort Prop
   with crctDs_ind' := Minimality for crctDs Sort Prop
@@ -140,7 +140,7 @@ Lemma Crct_Up:
 Proof.
   intros. eapply Crct_UP. eassumption. omega.
 Qed.
-Hint Resolve Crct_Up Crct_UP.
+Hint Resolve Crct_Up Crct_UP : core.
   
 Lemma Crct_fresh_Pocc:
   (forall p n t, crctTerm p n t -> forall nm, fresh nm p -> ~ PoccTrm nm t) /\

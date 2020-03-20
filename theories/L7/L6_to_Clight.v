@@ -33,10 +33,10 @@ Require Import L6.cps
                L6.identifiers.
 
 (* Axioms that are only realized in ocaml *)
-Variable (print_Clight : Clight.program -> unit).
-Variable (print_Clight_dest : Clight.program -> String.string -> unit).
-Variable (print_Clight_dest_names' : Clight.program -> list (positive * name) -> String.string -> unit).
-Variable (print : String.string -> unit).
+Parameter (print_Clight : Clight.program -> unit).
+Parameter (print_Clight_dest : Clight.program -> String.string -> unit).
+Parameter (print_Clight_dest_names' : Clight.program -> list (positive * name) -> String.string -> unit).
+Parameter (print : String.string -> unit).
 
 
 Section TRANSLATION.

@@ -766,25 +766,25 @@ Section uncurry_correct.
       intros contra; subst; contradiction H2; now right.
   Qed.
 
-  Hint Resolve Union_demorgan.
-  Hint Resolve negb_not.
-  Hint Resolve Disjoint_Singleton_In.
-  Hint Resolve not_Disjoint_Singleton_In.
-  Hint Resolve used_vars_dec.
-  Hint Resolve used_vars_fundefs_dec.
-  Hint Resolve bound_var_dec.
-  Hint Resolve bound_var_fundefs_dec.
-  Hint Resolve Decidable_occurs_free.
-  Hint Resolve Decidable_occurs_free_fundefs.
-  Hint Resolve Decidable_Union.
-  Hint Resolve Decidable_Intersection.
-  Hint Resolve Decidable_Setminus.
-  Hint Resolve Decidable_singleton_var.
-  Hint Resolve Decidable_FromList.
-  Hint Resolve Decidable_occurs_free.
-  Hint Resolve name_in_fundefs_bound_var_fundefs.
-  Hint Constructors Union.
-  Hint Constructors or.
+  Hint Resolve Union_demorgan : core.
+  Hint Resolve negb_not : core.
+  Hint Resolve Disjoint_Singleton_In : core.
+  Hint Resolve not_Disjoint_Singleton_In : core.
+  Hint Resolve used_vars_dec : core.
+  Hint Resolve used_vars_fundefs_dec : core.
+  Hint Resolve bound_var_dec : core.
+  Hint Resolve bound_var_fundefs_dec : core.
+  Hint Resolve Decidable_occurs_free : core.
+  Hint Resolve Decidable_occurs_free_fundefs : core.
+  Hint Resolve Decidable_Union : core.
+  Hint Resolve Decidable_Intersection : core.
+  Hint Resolve Decidable_Setminus : core.
+  Hint Resolve Decidable_singleton_var : core.
+  Hint Resolve Decidable_FromList : core.
+  Hint Resolve Decidable_occurs_free : core.
+  Hint Resolve name_in_fundefs_bound_var_fundefs : core.
+  Hint Constructors Union : core.
+  Hint Constructors or : core.
 
   Local Ltac simplify_boolean_exprs := 
     simpl in *;
@@ -1189,8 +1189,8 @@ Section uncurry_correct.
         (M.set g true m).
         (* TODO: restrict ft1? *)
 
-  Hint Constructors uncurry_step.
-  Hint Constructors uncurry_fundefs_step.
+  Hint Constructors uncurry_step : core.
+  Hint Constructors uncurry_fundefs_step : core.
 
   Scheme uncurry_step_mut := Minimality for uncurry_step Sort Prop
   with uncurry_step_fundefs_mut := Minimality for uncurry_fundefs_step Sort Prop.
@@ -3072,7 +3072,7 @@ Section uncurry_correct.
     unique_bindings_fundefs f1.
   Proof. apply uncurry_step_preserves_unique_bindings_mut. Qed.
 
-  Hint Constructors unique_bindings.
+  Hint Constructors unique_bindings : core.
 
   Lemma uncurry_fundefs_step_unique_names : forall a f s m f1 s1 m1,
     used_vars_fundefs f \subset s ->
@@ -3889,8 +3889,8 @@ Section uncurry_correct.
         uncurry_rel_fundefs n f1 s1 m1 f2 s2 m2 ->
         uncurry_rel_fundefs (S n) f s m f2 s2 m2.
 
-  Hint Constructors uncurry_rel.
-  Hint Constructors uncurry_rel_fundefs.
+  Hint Constructors uncurry_rel : core.
+  Hint Constructors uncurry_rel_fundefs : core.
 
   Lemma uncurry_rel_Sn : forall n e s m e1 s1 m1,
     uncurry_rel (S n) e s m e1 s1 m1 -> exists e2 s2 m2,

@@ -1185,7 +1185,7 @@ Proof.
 Qed.
 
 
-Local Hint Constructors num_occur num_occur_fds num_occur_case num_occur_ec num_occur_fdc.
+Local Hint Constructors num_occur num_occur_fds num_occur_case num_occur_ec num_occur_fdc : core.
 
 Theorem num_occur_app_ctx_mut: 
   forall e x, 

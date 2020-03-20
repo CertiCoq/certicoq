@@ -35,7 +35,7 @@ Inductive WNorm: Term -> Prop :=
     ~ isLambda fn -> ~ isFix fn -> fn <> TProof ->
     WNorm t ->
     WNorm (TApp fn t).
-Hint Constructors WNorm.
+Hint Constructors WNorm : core.
 
 (** WNorm is decidable **
 Ltac rght := solve [right; intros h; inversion_Clear h;

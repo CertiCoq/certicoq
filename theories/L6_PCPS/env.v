@@ -123,6 +123,7 @@ with well_scoped_fundefs_ctx : env -> fundefs_ctx -> env -> Prop :=
       (forall v, well_scoped_fundefs_ctx (M.set f v Γ) cdefs Γ') ->
       well_scoped_fundefs_ctx Γ (Fcons2_c f tau xs e cdefs) Γ'.
 
+Declare Scope env_scope.
 
 Notation "Γ '⊢' e" := (well_scoped_exp Γ e) (at level 30, no associativity)
                       : env_scope.

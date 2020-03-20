@@ -206,7 +206,7 @@ Inductive WFaEc: envClass -> Prop :=
 | wfaecTrm: forall t, WFapp t -> WFaEc (ecTrm t)
 | wfaecTyp: forall n i, WFaEc (ecTyp n i)
 | wfaecAx: WFaEc (ecAx).
-Hint Constructors WFaEc.
+Hint Constructors WFaEc : core.
 
 (** An environ is an association list of envClass. **)
 Definition environ := list (string * envClass).
@@ -240,7 +240,7 @@ Inductive fresh (nm:string) : environ -> Prop :=
 | fcons: forall s p ec,
          fresh nm p -> nm <> s -> fresh nm ((s,ec)::p)
 | fnil: fresh nm nil.
-Hint Constructors fresh.
+Hint Constructors fresh : core.
 
 Lemma fresh_dec: forall nm p, (fresh nm p) \/ ~(fresh nm p).
 induction p.
@@ -276,7 +276,7 @@ Inductive WFaEnv: environ -> Prop :=
 | wfaenil: WFaEnv nil
 | wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p -> 
                    forall nm, fresh nm p -> WFaEnv ((nm, ec) :: p).
-Hint Constructors WFaEnv.
+Hint Constructors WFaEnv : core.
 
 (** looking a name up in an environment **)
 (** Hack: we code axioms in the environment as ecTyp with itypPack = nil **)
@@ -284,7 +284,7 @@ Inductive Lookup: string -> environ -> envClass -> Prop :=
 | LHit: forall s p t, Lookup s ((s,t)::p) t
 | LMiss: forall s1 s2 p t ec,
            s2 <> s1 -> Lookup s2 p ec -> Lookup s2 ((s1,t)::p) ec.
-Hint Constructors Lookup.
+Hint Constructors Lookup : core.
 Definition LookupDfn s p t := Lookup s p (ecTrm t).
 Definition LookupTyp s p n i := Lookup s p (ecTyp n i) /\ i <> nil.
 Definition LookupAx s p := Lookup s p ecAx.

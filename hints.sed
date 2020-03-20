@@ -1,1 +1,1 @@
-s/Hint \([^:]*\)\./Hint \1 : core\./
+s/Hint \([^:]*\)\.$/Hint \1 : core\./

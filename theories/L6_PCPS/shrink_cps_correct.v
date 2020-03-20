@@ -6810,7 +6810,7 @@ Proof.
   auto.
 Qed.
 
-Hint Resolve not_Range_map_eq not_Dom_map_eq.
+Hint Resolve not_Range_map_eq not_Dom_map_eq : core.
 
 Theorem one_rename_all_ns_mut: forall y x sig,
                                  ~ Range_map sig x  ->
@@ -7348,7 +7348,7 @@ Inductive gen_sr_rw : relation exp :=
 Definition gsr_clos := clos_refl_trans exp gen_sr_rw.
 
 
-Local Hint Constructors rw.
+Local Hint Constructors rw : core.
 
 Theorem Disjoint_dom_map :
   forall (sig:M.t M.elt) S,
@@ -7528,7 +7528,7 @@ Proof.
       * omega.
 Qed.
 
-Local Hint Constructors num_occur num_occur_fds num_occur_case num_occur_ec num_occur_fdc.
+Local Hint Constructors num_occur num_occur_fds num_occur_case num_occur_ec num_occur_fdc : core.
 
 (** If a variable is not in the range of a substitution, applying the 
 substitution to a term cannot increase the occurence count for that variable. *)

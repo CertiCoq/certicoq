@@ -51,8 +51,8 @@ Import ListNotations.
                                                                       bound_stem_fundefs_ctx cfds v ->
                                                                       bound_stem_fundefs_ctx (Fcons2_c f t xs e cfds) v.
 
-  Hint Constructors bound_stem_ctx.
-  Hint Constructors bound_stem_fundefs_ctx.
+  Hint Constructors bound_stem_ctx : core.
+  Hint Constructors bound_stem_fundefs_ctx : core.
 
 
   Lemma bound_stem_Econstr_c x t ys c :
@@ -232,8 +232,8 @@ Import ListNotations.
   .
 
   
-  Hint Constructors bound_not_stem_ctx.
-  Hint Constructors bound_not_stem_fundefs_ctx.
+  Hint Constructors bound_not_stem_ctx : core.
+  Hint Constructors bound_not_stem_fundefs_ctx : core.
 
     Lemma bound_not_stem_Econstr_c x t ys c :
     Same_set _ (bound_not_stem_ctx (Econstr_c x t ys c))

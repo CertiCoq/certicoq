@@ -43,7 +43,7 @@ Lemma L3_crctEnv_inv d e : L2k.program.crctEnv (d :: e) -> L2k.program.crctEnv e
 Proof.
   intros. inv H. apply L2k.program.Crct_CrctEnv in H4. easy. auto.
 Qed.
-Hint Resolve L3_crctEnv_inv.
+Hint Resolve L3_crctEnv_inv : core.
 
 Lemma leb_refl b : Bool.leb b b.
 Proof.
@@ -774,7 +774,6 @@ Module SimplerProof.
    Qed.
 End SimplerProof.
 
-SearchAbout isprogram (bterm []).
 Ltac isprogd :=
 unfold apply_bterm in *;
 unfold subst in *;

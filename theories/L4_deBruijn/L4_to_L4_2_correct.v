@@ -433,7 +433,7 @@ Global Instance EqIfRstring : EqIfR Coq_o_Strings_o_String_o_string_R.
 Proof using.
 Admitted.
 
-Let L4Opid_R := CertiCoq_o_L4_o_polyEval_o_L4Opid_R.
+Local Definition L4Opid_R := CertiCoq_o_L4_o_polyEval_o_L4Opid_R.
 Global Instance EqIfRL4Opid : EqIfR L4Opid_R.
 Proof using.
   constructor; intros Hyp; subst.
@@ -441,12 +441,12 @@ Proof using.
   unfold dcon in *.
 Admitted.
 
-Let TermAbs_R_NamedDBUnstrict :=
+Local Definition TermAbs_R_NamedDBUnstrict :=
   (@TermAbs_R_NamedDBUnstrict BasicAst.name NVar _ L4Opid _ _ _ _  _ _ BasicAst.nAnon mkNVar getNId getIdMkNVar
      L4Opid_R EqIfRL4Opid).
 
 (* deprecated. delete *)
-Let TermAbs_R_NamedDB2 :=
+Local Definition TermAbs_R_NamedDB2 :=
   (@TermAbs_R_NamedDB BasicAst.name NVar _ L4Opid _ _ _ _  _ _ BasicAst.nAnon mkNVar getNId getIdMkNVar
      L4Opid_R EqIfRL4Opid).
 

@@ -3399,7 +3399,6 @@ Section CONTRACT.
     exists x0. apply M.elements_correct. auto.
   Qed.
 
-  SearchAbout rename_all occurs_free.
   (* Variables are bound by (1) binding on the stem (2) mutually rec. functions *)
   Theorem occurs_free_app_bound_stem x e:        
     occurs_free e x ->
@@ -4725,8 +4724,8 @@ Section CONTRACT.
   
 
 
-  Hint Constructors bound_not_stem_ctx.
-  Hint Constructors bound_not_stem_fundefs_ctx.
+  Hint Constructors bound_not_stem_ctx : core.
+  Hint Constructors bound_not_stem_fundefs_ctx : core.
 
 
 

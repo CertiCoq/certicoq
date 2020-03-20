@@ -240,7 +240,7 @@ Definition isLambda (t:Term) : Prop :=
 Lemma IsLambda: forall nm bod, isLambda (TLambda nm bod).
 intros. exists nm, bod. reflexivity.
 Qed.
-Hint Resolve IsLambda.
+Hint Resolve IsLambda : core.
 Lemma isLambda_dec: forall t, {isLambda t}+{~ isLambda t}.
 induction t;
   try (solve [right; intros h; unfold isLambda in h;
@@ -265,7 +265,7 @@ Definition isApp (t:Term) : Prop :=
 Lemma IsApp: forall fn arg args, isApp (TApp fn arg args).
 intros. exists fn, arg, args. reflexivity.
 Qed.
-Hint Resolve IsApp.
+Hint Resolve IsApp : core.
 Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
 destruct t; try (right; not_isApp). 
 left. auto.
@@ -276,7 +276,7 @@ Definition isFix (t:Term) : Prop :=
 Lemma IsFix: forall ds n, isFix (TFix ds n).
 intros. exists ds, n. reflexivity.
 Qed.
-Hint Resolve IsFix.
+Hint Resolve IsFix : core.
 Lemma isFix_dec: forall t, {isFix t}+{~ isFix t}.
 Proof.
   induction t;
@@ -289,7 +289,7 @@ Definition isProof (t:Term) : Prop := t = TProof.
 Lemma IsProof: isProof TProof.
 intros. reflexivity.
 Qed.
-Hint Resolve IsProof.
+Hint Resolve IsProof : core.
 Lemma isProof_dec: forall t, {isProof t}+{~ isProof t}.
 Proof.
   destruct t;
@@ -310,7 +310,7 @@ Definition isConstruct (t:Term) : Prop :=
 Lemma IsConstruct: forall i n np na, isConstruct (TConstruct i n np na).
 intros. exists i, n, np, na. reflexivity.
 Qed.
-Hint Resolve IsConstruct.
+Hint Resolve IsConstruct : core.
 Lemma isConstruct_dec: forall t, {isConstruct t}+{~ isConstruct t}.
 Proof.
   destruct t; try (right; not_isConstruct).
@@ -341,7 +341,7 @@ Inductive isCanonical : Term -> Prop :=
 | canC: forall (i:inductive) (n np na:nat), isCanonical (TConstruct i n np na)
 | canA: forall (arg:Term) (args:Terms) (i:inductive) (n np na:nat), 
     isCanonical (TApp (TConstruct i n np na) arg args).
-Hint Constructors isCanonical.
+Hint Constructors isCanonical : core.
 
 Lemma isCanonical_dec: forall t, isCanonical t \/ ~ isCanonical t.
 Proof.
@@ -745,7 +745,7 @@ Inductive MkApp :Term -> Terms -> Term -> Prop :=
 | maDum: forall cs, MkApp TDummy cs TDummy
 | maNil: forall fn, ~ isApp fn -> MkApp fn tnil fn
 | maCons: forall fn c cs, ~ isApp fn -> MkApp fn (tcons c cs) (TApp fn c cs).
-Hint Constructors MkApp.
+Hint Constructors MkApp : core.
 
 Lemma MkApp_tcons_isApp:
   forall fn bs res,
@@ -976,7 +976,7 @@ with WFappDs: Defs -> Prop :=
 | wfadcons: forall nm bod arg ds,
     WFapp bod -> WFappDs ds ->
     WFappDs (dcons nm bod arg ds).
-Hint Constructors WFapp WFapps WFappBs WFappDs.
+Hint Constructors WFapp WFapps WFappBs WFappDs : core.
 Scheme WFapp_ind' := Minimality for WFapp Sort Prop
   with WFapps_ind' := Minimality for WFapps Sort Prop
   with WFappBs_ind' := Minimality for WFappBs Sort Prop
@@ -1128,7 +1128,7 @@ with WFTrmDs: Defs -> nat -> Prop :=
      | wfdcons: forall n nm bod arg ds,
          WFTrm bod n -> WFTrmDs ds n ->
          WFTrmDs (dcons nm bod arg ds) n.
-Hint Constructors WFTrm WFTrms WFTrmBs WFTrmDs.
+Hint Constructors WFTrm WFTrms WFTrmBs WFTrmDs : core.
 Scheme WFTrm_ind' := Minimality for WFTrm Sort Prop
   with WFTrms_ind' := Minimality for WFTrms Sort Prop
   with WFTrmBs_ind' := Minimality for WFTrmBs Sort Prop
@@ -1183,7 +1183,7 @@ with PoccDefs : Defs -> Prop :=
            PoccTrm db -> PoccDefs (dcons dn db dra ds)
 | PoDtl: forall dn db dra ds,
            PoccDefs ds -> PoccDefs (dcons dn db dra ds).
-Hint Constructors PoccTrm PoccTrms PoccBrs PoccDefs.
+Hint Constructors PoccTrm PoccTrms PoccBrs PoccDefs : core.
 Scheme poTrm_ind' := Minimality for PoccTrm Sort Prop
   with poTrms_ind' := Minimality for PoccTrms Sort Prop
   with poBrs_ind' := Minimality for PoccBrs Sort Prop
@@ -1436,7 +1436,7 @@ with InstantiateDefs: nat -> Defs -> Defs -> Prop :=
             InstantiateDefs n ds ids ->
             InstantiateDefs n (dcons nm bod rarg ds)
                             (dcons nm ibod rarg ids).
-Hint Constructors Instantiate Instantiates InstantiateBrs InstantiateDefs.
+Hint Constructors Instantiate Instantiates InstantiateBrs InstantiateDefs : core.
 Scheme Instantiate_ind' := Induction for Instantiate Sort Prop
   with Instantiates_ind' := Induction for Instantiates Sort Prop
   with InstantiateBrs_ind' := Induction for InstantiateBrs Sort Prop

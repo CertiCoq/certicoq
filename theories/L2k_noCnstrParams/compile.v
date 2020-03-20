@@ -54,7 +54,7 @@ with Brs : Type :=
 with Defs : Type :=
 | dnil : Defs
 | dcons : name -> Term -> nat -> Defs -> Defs.
-Hint Constructors Term Terms Brs Defs.
+Hint Constructors Term Terms Brs Defs : core.
 Scheme Trm_ind' := Induction for Term Sort Prop
   with Trms_ind' := Induction for Terms Sort Prop
   with Brs_ind' := Induction for Brs Sort Prop
@@ -231,7 +231,7 @@ Definition isApp (t:Term) : Prop :=
 Lemma IsApp: forall fn arg, isApp (TApp fn arg).
   intros. exists fn, arg. reflexivity.
 Qed.
-Hint Resolve IsApp.
+Hint Resolve IsApp : core.
 Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
   destruct t; try (right; not_isApp). left. auto.
 Qed.

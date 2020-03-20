@@ -1328,7 +1328,7 @@ with WNeutral : Term -> Prop :=
 | WNApp f a : WNeutral f -> WNorm a -> WNeutral (TApp f a)
 | WNCase mch n brs : WNeutral mch -> WNorms (terms_of_brs brs) -> WNeutral (TCase n mch brs).
 
-Hint Constructors WNorm WNeutral WNorms.
+Hint Constructors WNorm WNeutral WNorms : core.
 Scheme WNorm_ind' := Induction for WNorm Sort Prop
   with WNeutral_ind' := Induction for WNeutral Sort Prop
   with WNorms_ind' := Induction for WNorms Sort Prop.

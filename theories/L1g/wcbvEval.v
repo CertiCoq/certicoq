@@ -63,7 +63,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     List.nth_error args (npars + arg) = Some x ->
     WcbvEval p x res ->
     WcbvEval p (TProj (ind, npars, arg) bod) res.
-Hint Constructors WcbvEval.
+Hint Constructors WcbvEval : core.
 
 (** when reduction stops **)
 Definition no_Wcbv_step (p:environ Term) (t:Term) : Prop :=

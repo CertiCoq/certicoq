@@ -13,17 +13,20 @@ From CertiCoq.L6 Require Import cps cps_util eval shrink_cps L5_to_L6 beta_contr
 From CertiCoq.L7 Require Import L6_to_Clight.
 
 
+Require Import ExtLib.Data.Monads.OptionMonad.
+Require Import ExtLib.Structures.Monads.
+
 
 (* 1 - environment of primitive operations
    2 - environment of constructors (from which datatypes can be reconstructed)
    3 - name environment mapping variables to their original name if it exists
    4 - a map from function tags to information about that class of function
 *)
-Let L6env : Type := prims * cEnv *  nEnv * fEnv.
+Local Definition L6env : Type := prims * cEnv *  nEnv * fEnv.
 
-Let L6term: Type := env * cps.exp.
+Local Definition L6term: Type := env * cps.exp.
 
-Let L6val: Type := cps.val.
+Local Definition L6val: Type := cps.val.
 
 (* A: Should pr cenv env be particular values? The translation from L5a doesn't produce
   these values. If it did, we could make the terms contain this information, as in L3 *)
@@ -101,10 +104,6 @@ Definition Γ := 2%positive.
 (*            Eproj f' bogus_clo_tag 0%N f *)
 (*                  (Eproj Γ bogus_clo_tag 1%N f *)
 (*                         (Eapp f' t (Γ :: xs)))). *)
-
-Require Import ExtLib.Data.Monads.OptionMonad.
-
-Require Import ExtLib.Structures.Monads.
   
 
 Instance certiL5_t0_L6: 

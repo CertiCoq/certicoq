@@ -22,6 +22,18 @@ Open Scope N_scope.
 Require Import L4.L4_to_L4_1_to_L4_2.
 Require Import L4.L4_5_to_L5.
 Require Import SquiggleEq.list.
+Require Import Common.TermAbs.  
+Require Import SquiggleEq.tactics.
+Require Import SquiggleEq.LibTactics.
+Require Import SquiggleEq.AssociationList.
+
+Require Import SquiggleEq.alphaeq.
+Require Import SquiggleEq.UsefulTypes.
+Require Import DecidableClass.
+Require Import L4_to_L4_2_correct.
+Require Import Datatypes.
+Require Import SetoidList.
+Require Import List.
 
 Definition L4_5_Term :Type := (@NTerm NVar L4_5Opid).
 Definition L4_5_BTerm :Type := (@BTerm NVar L4_5Opid).
@@ -29,7 +41,6 @@ Definition L4_5_BTerm :Type := (@BTerm NVar L4_5Opid).
 Section PolyEval45.
 
 
-Require Import Common.TermAbs.  
 Context {Abs4_4a: @TermAbs (@L4_5Opid)}.
 
 Local Notation AbsTerm := (AbsTerm _ Abs4_4a).
@@ -133,14 +144,6 @@ Fixpoint L4_2_to_L4_5 (e:L4_2_Term) : L4_5_Term :=
     end
   end.
 
-Require Import Common.TermAbs.
-Require Import SquiggleEq.tactics.
-Require Import SquiggleEq.LibTactics.
-
-
-Require Import SquiggleEq.AssociationList.
-
-
 Section evaln42_45.
 
 Lemma L4_2_to_L4_5_fvars t:
@@ -208,12 +211,6 @@ Proof using.
     erewrite map_ext by (intros; rewrite numBvarsBtMapNt; auto); auto.
 Qed.
 
-
-Require Import SquiggleEq.alphaeq.
-Require Import SquiggleEq.UsefulTypes.
-Require Import DecidableClass.
-
-
 Lemma ssubst_aux_commute f sub:
   ssubst_aux (L4_2_to_L4_5 f) (map_sub_range L4_2_to_L4_5 sub) =
     L4_2_to_L4_5 (ssubst_aux f sub).
@@ -251,7 +248,6 @@ Proof using.
   simpl. unfold isprogram, closed in *. rewrite L4_2_to_L4_5_fvars; tauto.
 Qed.
 
-Require Import L4_to_L4_2_correct.
 Import L42.
 Lemma fixwf_commute f:
    L4_5_to_L5.fixwf (L4_2_to_L4_5 f)  = fixwf f.
@@ -566,9 +562,8 @@ Proof using.
   apply eval_Fix_e.
 Qed.
 
-Print Assumptions L4_2_to_L4_5_correct.
+(*Print Assumptions L4_2_to_L4_5_correct.  *)
 (* Closed under the global context *)
-Print L4_5Opid.
 
 Section L4_5_postproc.
 Fixpoint let_bindn (lv : list NVar) (lbt : list L4_5_Term) (last: L4_5_Term):=
@@ -773,9 +768,6 @@ Proof using.
   + apply sub_range_rel_sub_filter. assumption.
 Qed.
 
-
-Require Import List.
-
 Lemma fvars_letbindn t cargs2 vn:
   disjoint vn (flat_map free_vars cargs2) ->
   length vn= length cargs2 ->
@@ -937,7 +929,6 @@ Proof using.
 Qed.
 Locate liftRbt.
 
-Print Match_e.
     (* Move to L4_5_to_L5.v *)
 Lemma unify_Match_e d brs lbt sig:
   (sig = map (fun b : dcon * BTerm => (fst b, num_bvars (snd b))) brs) ->
@@ -950,8 +941,6 @@ Proof using.
   intros. subst. auto.
 Qed.
 
-Require Import Datatypes.
-  Require Import SetoidList.
   Lemma eval_letbindc d lv  v cargs:
     closed v
   ->   flat_map free_vars cargs = []

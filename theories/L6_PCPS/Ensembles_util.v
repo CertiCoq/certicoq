@@ -21,6 +21,8 @@ Create HintDb Ensembles_DB.
 
 (** * Usefull notations. Inspired from https://github.com/QuickChick/QuickChick/blob/master/src/Sets.v *)
 
+Declare Scope Ensembles_scope.
+
 Notation "x \in A" := (Ensembles.In _ A x) (at level 70, only parsing) : Ensembles_scope.
 
 Infix "<-->" := (Ensembles.Same_set _) (at level 70, no associativity) : Ensembles_scope.
@@ -1629,16 +1631,16 @@ Hint Extern 1 (Included _
 rewrite (Union_commut C A) : Ensembles_DB.
 
 Hint Extern 1 (Same_set _ (Union _ ?A (Union _ _ _)) (Union _ (Union _ ?A ?B) ?C)) =>
-rewrite <- (Union_assoc A B C).
+rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
 Hint Extern 1 (Same_set _ (Union _ (Union _ ?A ?B) ?C) (Union _ ?A (Union _ _ _))) =>
-rewrite <- (Union_assoc A B C).
+rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
 Hint Extern 1 (Included _ (Union _ ?A (Union _ _ _)) (Union _ (Union _ ?A ?B) ?C)) =>
-rewrite <- (Union_assoc A B C).
+rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
 Hint Extern 1 (Included _ (Union _ (Union _ ?A ?B) ?C) (Union _ ?A (Union _ _ _))) =>
-rewrite <- (Union_assoc A B C).
+rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
 Hint Extern 5 (Disjoint _ ?A ?B) =>
 eapply Disjoint_Included_r; [| eassumption ] : Ensembles_DB.

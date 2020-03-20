@@ -21,7 +21,7 @@ Require Import Integers.
 (*From Flocq*)
 Require Import Binary Bits Core.
 Require Import Fappli_IEEE_extra.
-Require Import Program.
+Require Import Program Lra.
 Require Archi.
 
 Close Scope R_scope.
@@ -385,8 +385,8 @@ Qed.
 
 (** Properties of conversions to/from in-memory representation.
   The conversions are bijective (one-to-one). *)
-Require Import Lra.
-Theorem of_to_bits:
+
+  Theorem of_to_bits:
   forall f, of_bits (to_bits f) = f.
 Proof.
   intros; unfold of_bits, to_bits, bits_of_b64, b64_of_bits.

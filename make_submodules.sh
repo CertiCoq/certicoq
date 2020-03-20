@@ -3,7 +3,7 @@
 DOCLEAN=$1
 
 clean() {
-    if [[ "$DOCLEAN" == "noclean" ]]; then
+    if [ "$DOCLEAN" = "noclean" ]; then
         echo "Warning: not cleaning"
     else
         git clean -dfx

@@ -45,9 +45,9 @@ submodules:
 plugin: plugin/CertiCoq.vo
 
 ci:
-	git submodule update --init
-	sh make_submodules.sh
-	# make all plugin
-	# make install
+	# git submodule update --init
+	# sh make_submodules.sh
+	make all plugin
+	make install
 
 .PHONY: submodules

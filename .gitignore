@@ -45,3 +45,4 @@ benchmarks/vs
 plugin/.Makefile.d
 CertiCoq.Benchmarks.Binom.main.c
 CertiCoq.Benchmarks.Binom.main.h
+plugin/g_certicoq.ml

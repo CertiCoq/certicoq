@@ -670,18 +670,27 @@ Proof.
   - simpl. rewrite IHefns.
     rewrite <- Nnat.N2Nat.inj_succ. rewrite <- N.add_1_l.
     reflexivity.
-Qed. 
+Qed.
 
-Lemma make_rec_env_rev_order_exists fnlst rho :
+Lemma wf_ClosFix_impl:
+  forall fnlst rho n m,
+    well_formed_val (ClosFix_v rho fnlst n) ->
+    well_formed_val (ClosFix_v rho fnlst m).
+Proof.
+  intros fnlst rho n m H.
+  inv H. constructor; eassumption.
+Qed. 
+  
+Lemma make_rec_env_rev_order_exists fnlst rho n:
   exists rhof,
     make_rec_env_rev_order fnlst rho = rhof ++ rho /\
     list.NLength rhof = efnlst_length fnlst /\
-    (well_formed_val (ClosFix_v rho fnlst (efnlst_length fnlst)) ->
+    (well_formed_val (ClosFix_v rho fnlst n) ->
      well_formed_env (rhof ++ rho)).
 Proof.
   unfold make_rec_env_rev_order.
   pose proof (efnlength_eq_efnlst_length fnlst) as Hlen.
-  revert Hlen. generalize fnlst at 3 6 7. 
+  revert Hlen. generalize fnlst at 3 6. 
   induction fnlst; intros fnlst' Hlen.
   - exists nil. repeat split; eauto.
     intros Hwf; inv Hwf. simpl. eassumption.
@@ -695,8 +704,10 @@ Proof.
       * unfold list.NLength in *. simpl.
         zify. omega.
       * intros Hwf1. 
-        simpl. constructor. admit. admit. 
-Admitted. 
+        simpl. constructor.
+        -- eapply wf_ClosFix_impl. eapply Hwf1.
+        -- eapply Hwf in Hwf1. eassumption. 
+Qed. 
 
 Lemma make_rec_env_length :
   forall efns rho,
@@ -891,9 +902,22 @@ Proof.
   eassumption.
 Qed.
 
-(* Lemma make_rec_env_to_zero_wf : *)
-(*   forall efns rho, *)
-(*     Forall well_formed_val rho -> *)
+Lemma make_rec_env_to_zero_wf :
+  forall efns rho n,
+    well_formed_val (ClosFix_v rho efns n) ->
+    well_formed_env (make_rec_env_to_zero efns rho).
+Proof.
+  intros efns rho n H. inv H.
+  unfold make_rec_env_to_zero.
+  revert H4. generalize efns at 1 2 3. 
+  induction efns; intros efns' Hwf.
+  - constructor.
+  - simpl. constructor. 
+    + constructor. eassumption.
+      intros fs Heq. specialize (Hwf fs Heq).
+      eassumption.
+    + eapply IHefns. eassumption.
+Qed. 
 
 (* not required for now *)
 Lemma make_rec_env_wf:
@@ -907,7 +931,8 @@ Proof.
   - simpl in *. unfold well_formed_env.
     unfold make_rec_env. constructor.
     + constructor. eassumption. 
-Admitted.    
+Admitted.
+
 
 Lemma enthopt_inlist_Forall (P : exp -> Prop) :
   forall efnl n e,
@@ -1307,25 +1332,26 @@ Proof.
     eapply well_formed_in_env_App in H5.
     destruct H5 as [He1 He2].
     specialize (H0 He1 H6). inv H0.
-    edestruct (make_rec_env_exists fnlst rho' 0) as (rhof & Heqf & Hlenf & Hwff).
-    assert (Ha1 : well_formed_in_env e' (make_rec_env fnlst rho')).
+    edestruct (make_rec_env_rev_order_exists fnlst rho' n)
+      as (rhof & Heqf & Hlenf & Hwff).
+    assert (Ha1 : well_formed_in_env e' (make_rec_env_rev_order fnlst rho')).
     { rewrite Heqf.
       specialize (H9 rhof Hlenf).  
       eapply enthopt_inlist_Forall in H9; destruct H9; eauto. }
-    assert (Ha2 : well_formed_env (make_rec_env fnlst rho')).
+    assert (Ha2 : well_formed_env (make_rec_env_rev_order fnlst rho')).
     { rewrite Heqf. eapply Hwff. constructor. eassumption.
-      eassumption. eassumption. }
+      eassumption. }
     assert (Happ :
-              well_formed_in_env (e' $ (val_to_exp v2)) (make_rec_env fnlst rho')).
+              well_formed_in_env (e' $ (val_to_exp v2))
+                                 (make_rec_env_rev_order fnlst rho')).
     { constructor. eassumption.
       eapply weaken_closed. eapply val_to_exp_is_wf.
       eapply H3; eassumption. } 
-    (* specialize (H4 Happ Ha2). inv H4. *)
-    (* + constructor. eassumption. *)
-    (* + constructor. *)
-    (* + constructor; eassumption.  *)
-  (* + constructor. eassumption. eassumption.  *)
-    admit. 
+    specialize (H4 Happ Ha2). inv H4.
+    + constructor. eassumption.
+    + constructor.
+    + constructor; eassumption.
+    + constructor. eassumption. eassumption.
   - (* Match *)
     eapply H3.
     + unfold well_formed_in_env. inv H4.
@@ -1344,7 +1370,7 @@ Proof.
     eapply well_formed_in_env_App in H3.
     destruct H3 as [Hf8 He].
     eapply H0; eassumption.
-Admitted.
+Qed. 
 
 (* the exps in this inductive relation should satisfy is_valueb *)
 Inductive rel_value: expression.exp -> value -> Prop :=
@@ -2993,8 +3019,9 @@ Proof.
 Qed. 
 
 Lemma parallel_sbst_sbst_fix_aux :
-  forall e efns1 efns2 rho,
+  forall e efns1 efns2 rho n,
     Forall well_formed_val rho ->
+    well_formed_val (ClosFix_v rho efns2 n) ->
     exp_wf (efnlst_length efns1) e ->
     Forall2
       (fun s t : name * exp =>
@@ -3006,7 +3033,7 @@ Lemma parallel_sbst_sbst_fix_aux :
     parallel_sbst e 0 (map val_to_exp (make_rec_env_to_zero efns2 rho)).
 Proof.
   unfold sbst_env.
-  intros e efns1 efns2 rho Hrho Hwf Hall.
+  intros e efns1 efns2 rho n Hrho Hval Hwf Hall.
   assert (Hl: efnlst_length efns1 = efnlst_length efns2).
   { eapply Forall2_length in Hall.
     rewrite !efnlst_length_is_Datatypes_length.
@@ -3058,19 +3085,19 @@ Proof.
     unfold list.NLength in *. rewrite Henv.
     simpl. rewrite N.add_0_r. rewrite <- Hl. eassumption.
   - constructor.
-  - eapply Forall_rev. admit.
+  - eapply Forall_rev. eapply make_rec_env_to_zero_wf. eassumption.
   - rewrite list_to_exps_exps_to_list_inv.
     eapply utils.Forall2_rev.
     induction (make_rec_env_to_zero efns2 rho).
     + econstructor.
     + simpl. econstructor.
       eapply rel_value_val_to_exp. eapply IHe0.
-Admitted. 
+Qed. 
 
-(* change exp_wf 0 e *)
 Lemma parallel_sbst_with_sbst_fix :
-  forall efns1 efns2 e rho,
+  forall efns1 efns2 e rho n,
     Forall well_formed_val rho ->
+    well_formed_val (ClosFix_v rho efns2 n) ->
     exp_wf (list.NLength rho + efnlst_length efns1) e ->
     Forall2
       (fun s t : name * exp =>
@@ -3081,7 +3108,7 @@ Lemma parallel_sbst_with_sbst_fix :
     sbst_fix efns1 (parallel_sbst e (efnlst_length efns1) (map val_to_exp rho)) =
     parallel_sbst e 0 (map val_to_exp (make_rec_env_rev_order efns2 rho)).
 Proof.
-  intros efns1 efns2 e rho Hrho Hwf Hall.
+  intros efns1 efns2 e rho n Hrho Hval Hwf Hall.
   assert (Hl: efnlst_length efns1 = efnlst_length efns2).
   { eapply Forall2_length in Hall.
     rewrite !efnlst_length_is_Datatypes_length.
@@ -3092,12 +3119,19 @@ Proof.
   edestruct parallel_sbst_env_app as (Henv & _).
   rewrite Henv.
   - rewrite N.add_0_l. rewrite make_rec_env_to_zero_length.
-    rewrite <- Hl. admit.
+    rewrite <- Hl. eapply parallel_sbst_sbst_fix_aux.
+    + eassumption.
+    + eassumption.
+    + eapply parallel_sbst_makes_wf.
+      unfold list.NLength in *. rewrite map_length.
+      rewrite N.add_comm. eassumption.
+      eapply val_to_exp_rho. eassumption.
+    + eassumption. 
   - eassumption.
   - rewrite N.add_0_l. rewrite app_length_N.
     rewrite make_rec_env_to_zero_length. rewrite <- Hl.
     rewrite N.add_comm. eassumption. 
-Admitted. 
+Qed. 
 
 Lemma eval_is_value_env :
   forall e e', is_value_env e -> eval e e' -> e = e'.
@@ -3520,20 +3554,37 @@ Proof.
       { eapply enthopt_parallel_sbst; eassumption. }
       destruct Hadm as [y [Hnth' Heq]].
 
+      assert (Hl: efnlst_length es = efnlst_length fnlst_t).
+      { eapply Forall2_length in H8.
+        rewrite !efnlst_length_is_Datatypes_length.
+        unfold lst_s in H8. unfold lst_t in H8.
+        rewrite H8. reflexivity. }
+
       (* to change *)
-      edestruct (make_rec_env_exists fnlst_t rho0 k2) as (rhof & Heqf & Hlenf & Hwff).
+      edestruct (make_rec_env_rev_order_exists fnlst_t rho0 k2)
+        as (rhof & Heqf & Hlenf & Hwff).
       edestruct (H1 (make_rec_env_rev_order fnlst_t rho0) (y $ (val_to_exp v2'))).
       -- econstructor. 
          ++ eapply nthopt_preserves_wf; try eassumption.
             eapply well_formed_ClosFix_impl_efnlst_wf_rev. eassumption. 
          ++ eapply weaken_closed. eapply val_to_exp_is_wf.
             eapply eval_env_preserves_well_formed; eassumption.
-      -- admit. 
-         (* rewrite <- Heqf in Hwff. eapply Hwff. *)
-         (* eassumption. inv HClosFix_wf. eassumption. *)
+      -- rewrite <- Heqf in Hwff. eapply Hwff.
+         eassumption. 
       -- rewrite <- Heq.
          unfold sbst_env in *. simpl. eapply f_equal2.
-         ++ admit. (* TODO lemma *)
+         ++ eapply parallel_sbst_with_sbst_fix; try eassumption; inv HClosFix_wf. 
+            eassumption.
+            eapply enthopt_inlist_Forall.
+            specialize (H9 rhof Hlenf).
+            eapply utils.Forall_impl.
+            eapply H9.
+            { intros x Hcon. destruct x.
+              destruct Hcon. unfold well_formed_in_env in H5.
+              rewrite app_length_N in H5.
+              rewrite <- Hl in Hlenf. rewrite <- Hlenf.
+              rewrite N.add_comm. eassumption. }
+            eapply Hnth'.  
          ++ eapply rel_value_then_val_to_exp in Hr2. rewrite <- Hr2.
             symmetry. eapply parallel_sbst_inv_wf.
             rewrite Hr2. eapply val_to_exp_is_wf.
@@ -3592,7 +3643,7 @@ Proof.
         inv H1. eapply H7.
         eassumption.
         inv H3. reflexivity.
-Admitted. 
+Qed. 
   
 Lemma equiv_semantics_fwd_version1:
   (forall e, equiv_semantics_stmt_exp e) /\

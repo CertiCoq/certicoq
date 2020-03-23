@@ -23,7 +23,7 @@ Module Type HASHMAP.
     forall i m x i' m',
       get i m = Some x -> hash x m = (i',m') -> get i m' = Some x.
   Parameter elements: t -> list (index * Domain.t).
-  Hypothesis elements_spec: forall i m v,
+  Parameter elements_spec: forall i m v,
                               get i m = Some v <-> 
                               nth_error (elements m) (pred (Pos.to_nat i)) = Some (i,v).
 End HASHMAP.

@@ -28,6 +28,7 @@ Require Import Common.classes Common.AstCommon.
 
 Require Import L4.polyEval.
 
+Require Import Common.certiClasses.
 
 (*
 Instance NatEq : Eq nat := { eq_dec := eq_nat_dec }.
@@ -182,13 +183,16 @@ Instance CPSGenericTermSig : GenericTermSig L5Opid:=
   OpBindings := CPSOpBindings;
 |}.
 
-Section cpsPolyEval.
-
-  Require Import Common.TermAbs.
+Require Import Common.TermAbs.
 Require Import Common.ExtLibMisc.
 Require Import ExtLib.Structures.Monads.
 Require Import ExtLib.Data.Monads.OptionMonad.
 Import Monad.MonadNotation.
+Require Import List.
+Require Import certiClasses.
+
+Section cpsPolyEval.
+
 Open Scope monad_scope.
 
 
@@ -205,9 +209,6 @@ Local Notation absMakeBTerm := (absMakeBTerm _ Abs5a).
 Typeclasses eauto :=4.
 
 Open Scope program_scope.
-
-Require Import List.
-Require Import certiClasses.
 
 Local Notation "' x" := (certiClasses.injectOption x) (at level 50).
 
@@ -271,6 +272,7 @@ end.
 End cpsPolyEval.
 
 Require Import L4.varInterface.
+Require Import List.
 
 Section VarsOf2Class.
 
@@ -470,7 +472,6 @@ Proof using.
   congruence.
 Qed.  
   
-Require Import Common.certiClasses.
 (* Enables the ⇓ notation.
 Local Instances are cleared at the end of a section.
 A more specific instance
@@ -509,7 +510,6 @@ Proof using.
 Qed.
 
 Local Opaque ssubst.
-Require Import List.
 
 (* will be used in eval_reduces_fvars and cps_cvt_corr *)
 Lemma subset_fvars_fix : forall bt lbt,

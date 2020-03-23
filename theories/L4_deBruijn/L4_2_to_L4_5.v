@@ -35,6 +35,11 @@ Require Import Datatypes.
 Require Import SetoidList.
 Require Import List.
 
+Require Import Common.ExtLibMisc.
+Require Import ExtLib.Structures.Monads.
+Require Import ExtLib.Data.Monads.OptionMonad.
+Import Monad.MonadNotation.
+
 Definition L4_5_Term :Type := (@NTerm NVar L4_5Opid).
 Definition L4_5_BTerm :Type := (@BTerm NVar L4_5Opid).
 
@@ -55,12 +60,6 @@ Typeclasses eauto :=4.
 
 Open Scope program_scope.
 
-Require Import List.
-
-Require Import Common.ExtLibMisc.
-Require Import ExtLib.Structures.Monads.
-Require Import ExtLib.Data.Monads.OptionMonad.
-Import Monad.MonadNotation.
 Open Scope monad_scope.
 
 (* modified from L4.polyEval.eval_n to remove the cases for \box *)

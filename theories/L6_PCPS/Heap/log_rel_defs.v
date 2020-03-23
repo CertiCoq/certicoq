@@ -8,6 +8,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
 From CertiCoq.L6 Require Import functions cps eval cps_util identifiers ctx Ensembles_util set_util
                  List_util Heap.heap Heap.heap_defs Heap.space_sem Heap.GC tactics map_util.
 From compcert Require Import lib.Coqlib.
+Require Import Coq.Classes.Morphisms Coq.Classes.RelationClasses.
 
 
 Module LogRelDefs (H : Heap).
@@ -49,7 +50,7 @@ Module LogRelDefs (H : Heap).
   Definition Inj := loc -> loc.
   
   (** Tag for closure records *)
-  Variable (clo_tag : cTag).
+  Parameter (clo_tag : cTag).
 
   Definition exp_rel : Type :=
     IInv -> IInv -> Inv -> Inj ->
@@ -122,8 +123,6 @@ Module LogRelDefs (H : Heap).
       
     End ExpRelDef.
     
-
-    Require Import Coq.Classes.Morphisms Coq.Classes.RelationClasses.
     
     Definition fun_body_args : Tlist :=      
       Tcons IInv (Tcons IInv (Tcons Inv (Tcons Inj (Tcons (list value) (Tcons (heap block) (Tcons (list value) (Tcons (heap block) (Tcons Conf (Tcons Conf Tnil))))))))).    

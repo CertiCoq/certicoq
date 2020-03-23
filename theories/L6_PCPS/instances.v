@@ -8,8 +8,9 @@ From CertiCoq.Common Require Import certiClasses certiClassesLinkable Common.
 Require Import Coq.Unicode.Utf8.
 
 Require Import ZArith.
-From CertiCoq.L6 Require Import cps cps_util eval shrink_cps L5_to_L6 beta_contraction uncurry closure_conversion
+From CertiCoq.L6 Require Import cps cps_util eval shrink_cps L5_to_L6 beta_contraction uncurry 
      hoisting Heap.dead_param_elim lambda_lifting.
+Require Import CertiCoq.L6.closure_conversion.
 From CertiCoq.L7 Require Import L6_to_Clight.
 
 

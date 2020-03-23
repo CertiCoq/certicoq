@@ -8,7 +8,8 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
 From CertiCoq.L6 Require Import functions cps ctx cps_util identifiers ctx Ensembles_util
      List_util tactics set_util map_util.
 
-From CertiCoq.L6.Heap Require Import heap heap_defs heap_equiv GC space_sem cc_log_rel closure_conversion.
+From CertiCoq.L6.Heap Require Import heap heap_defs heap_equiv GC space_sem cc_log_rel.
+Require Import CertiCoq.L6.Heap.closure_conversion.
 
 From compcert.lib Require Import Coqlib.
 

@@ -3,8 +3,8 @@
  *)
 
 From CertiCoq.L6 Require Import cps size_cps cps_util set_util hoisting identifiers ctx
-                       Ensembles_util List_util functions closure_conversion
-                       closure_conversion_util eval logical_relations.
+                       Ensembles_util List_util functions eval logical_relations.
+Require Import CertiCoq.L6.closure_conversion CertiCoq.L6.closure_conversion_util.
 Require Import compcert.lib.Coqlib.
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums

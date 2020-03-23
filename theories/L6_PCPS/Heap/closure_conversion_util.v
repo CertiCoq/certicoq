@@ -4,8 +4,8 @@
 
 From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx
                          Ensembles_util List_util functions tactics.
-From CertiCoq.L6.Heap Require Import closure_conversion heap heap_defs space_sem compat.
-
+From CertiCoq.L6.Heap Require Import heap heap_defs space_sem compat.
+Require Import CertiCoq.L6.Heap.closure_conversion.
 From compcert.lib Require Import Coqlib.
 
 From Coq Require Import ZArith.Znumtheory ArithRing Relations.Relations Arith.Wf_nat

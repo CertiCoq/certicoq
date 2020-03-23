@@ -2,7 +2,8 @@ From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx Ensembles_
      List_util functions tactics map_util.
 
 From CertiCoq.L6.Heap Require Import heap heap_defs 
-     cc_log_rel compat closure_conversion closure_conversion_util GC.
+     cc_log_rel compat GC.
+Require Import CertiCoq.L6.Heap.closure_conversion CertiCoq.L6.Heap.closure_conversion_util.
 
 From Coq Require Import ZArith.Znumtheory Arith Arith.Wf_nat Relations.Relations
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums

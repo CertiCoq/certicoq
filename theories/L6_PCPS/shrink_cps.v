@@ -1401,7 +1401,9 @@ Section CONTRACT.
            | _ => existT _ (Eapp f' t ys', count, im) (ble_refl im)
          end)
     end.
-    Solve Obligations with (program_simpl; unfold term_sub_inl_size; simpl;  rewrite <- Nat.add_succ_r;  rewrite <- Nat.add_lt_mono_l;  eapply Nat.le_lt_trans; [apply sub_set_size | (simpl; unfold lt; reflexivity)]).
+    Solve Obligations with (program_simpl; unfold term_sub_inl_size; simpl;
+      rewrite <- ?Nat.add_succ_r;  rewrite <- ?Nat.add_lt_mono_l;  
+      try (eapply Nat.le_lt_trans; [apply sub_set_size | (simpl; unfold lt; reflexivity)])).
   Next Obligation. 
     unfold term_sub_inl_size in *; simpl in *.
     assert (term_size k < term_size (Ecase v cl))%nat.

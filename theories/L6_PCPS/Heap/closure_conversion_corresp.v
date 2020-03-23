@@ -4,7 +4,8 @@
 
 From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx
                          Ensembles_util List_util hoare functions tactics.
-From CertiCoq.L6.Heap Require Import closure_conversion closure_conversion_util.
+
+Require Import CertiCoq.L6.Heap.closure_conversion CertiCoq.L6.Heap.closure_conversion_util.
 
 From compcert.lib Require Import Coqlib.
 

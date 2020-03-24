@@ -10,10 +10,11 @@ Require compcert.lib.Maps.
 Require Recdef.
 Import Nnat.
 
-Require Import L4.expression.
+Require Import L4.expression L4.exp_eval.
 
 Require Import cps.
 Require Import cps_show.
+Require Import eval.
 Require Import ctx.
 
 Require Import ExtLib.Data.Monads.OptionMonad.
@@ -446,6 +447,53 @@ Definition convert_top (ee:ienv * expression.exp) :
               (cps.Eapp f kon_tag (k::nil))))
     end.
 
+
+(* Fixpoint cps_cvt_val (v : exp_eval.value) (vn : list var) (k : var) *)
+(*          (next : symgen) (tgm : constr_env) : option (cps.val * symgen) := *)
+(*   match v with *)
+(*   | Con_v dc vs => *)
+(*     let c_tag := dcon_to_tag dc tgm in *)
+(*     r <- cps_cvt_env vs vn k next tgm;; *)
+(*       let (vs', next) := r in *)
+(*       ret (Vconst c_tag vs', next) *)
+(*   | Clos_v rho na e => *)
+(*     r1 <- cps_cvt_env rho vn k next tgm;; *)
+(*       (* make map of values? *) *)
+(*       let (rho', next) := r in *)
+(*       let (k1, next) := gensym next (nNamed "k_lam"%string) in *)
+(*       let (x1, next) := gensym next (nNamed "x_lam"%string) in *)
+(*       let (f, next) := gensym next n in *)
+(*       r2 <- cps_cvt e (x1::vn) k1 (next) tgm;; *)
+(*          let (e', next) := r : (cps.exp * symgen) in *)
+(*          ret ((* map *), (cps.Efun *)
+(*                             (Fcons f func_tag (x1::k1::nil) e' Fnil) *)
+(*                             (cps.Eapp k kon_tag (f::nil))), next) *)
+(*   | ClosFix_v rho efns n => *)
+(*     (* TODO *) *)
+(*     ret (Vint 0, next) *)
+(*   | Prf_v => *)
+(*     (* TODO *) *)
+(*     ret (Vint 0, next) *)
+(*   end *)
+(* with cps_cvt_env (vs : list exp_eval.value) (vn : list var) (k : var) *)
+(*                  (next : symgen) (tgm : constr_env) := *)
+(*        match vs with *)
+(*        | nil => ret (nil, next) *)
+(*        | cons v vs' => *)
+(*          let r1 <- cps_cvt_val v vn k next tgm;; *)
+(*                 let (v', next) := r1 in *)
+(*                 let r2 <- cps_cvt_env vs' vn k next tgm;; *)
+(*                        let (vs', next) := r2 in *)
+(*                        ret (cons v vs, next) *)
+(*        end. *)
+
+(* written very informally *)
+Lemma cps_cvt_correct:
+  forall rho e v,
+    eval_env rho e v ->
+    cps_cvt_env rho k = rho' ->
+    cps_cvt e k = e' ->
+    exists v', bstep_e rho' e' v' /\ cps_cvt_val v k = v'.
 
 
 (* testing code *)

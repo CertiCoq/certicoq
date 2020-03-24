@@ -3644,7 +3644,8 @@ Proof.
         eassumption.
         inv H3. reflexivity.
 Qed. 
-  
+
+(*
 Lemma equiv_semantics_fwd_version1:
   (forall e, equiv_semantics_stmt_exp e) /\
   (forall es,  equiv_semantics_stmt_exps es) /\
@@ -3786,4 +3787,4 @@ assert (Hb: forall l,
                  find_branch dc2 l
                              (parallel_sbst_branches b 0 (map val_to_exp rho))
                  = Some e' ->
-                 exists e'', find_branch dc2 l b = Some e'').
+                 exists e'', find_branch dc2 l b = Some e''). *)

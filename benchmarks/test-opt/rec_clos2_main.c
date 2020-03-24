@@ -21,11 +21,14 @@ int main(int argc, char *argv[]) {
   struct thread_info* tinfo;
   clock_t start, end;
   double msec, sec;
+  // Specify number of runs to be executed
+  int n = 1;
+  if (argc > 0) n = atoi(argv[1]);
 
   tinfo = make_tinfo();
   start = clock();
   // Run Coq program
-  body(tinfo);
+  for (int i = 0; i < n; i ++) body(tinfo);
   end = clock();
 
   val = tinfo -> args[1];

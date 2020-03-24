@@ -72,26 +72,22 @@ Definition rec_clos := addxy 1 2 (List.repeat 0 (100*500)).
 CertiCoq Compile -ext "_cps" rec_clos.
 CertiCoq Compile -anf rec_clos.
 CertiCoq Compile -anf -o1 -ext "_opt" rec_clos.
-CertiCoq Show IR -anf rec_clos. 
-CertiCoq Show IR -anf -o1 -ext "_opt" -debug -dev 5 rec_clos.
 
 
 
-Definition intxy (x y : nat) (l : list nat):= 
+Definition intxy (x : nat) (l : list nat):= 
   let f := (fix aux l acc :=
      match l with
      | [] => acc  
-     | z :: zs => aux zs (z :: x :: y :: acc)
+     | z :: zs => aux zs (z :: x :: acc)
      end) in
   f l [].
 
-Definition rec_clos2 := intxy 1 2 (List.repeat 0 (100*500)).
+Definition rec_clos2 := intxy 1 (List.repeat 0 (100*500)).
 
 CertiCoq Compile -ext "_cps" rec_clos2.
 CertiCoq Compile -anf rec_clos2.
 CertiCoq Compile -anf -o1 -ext "_opt" rec_clos2.
-CertiCoq Show IR -anf rec_clos2.
-CertiCoq Show IR -anf -o1 -ext "_opt" rec_clos2.
 
 
 

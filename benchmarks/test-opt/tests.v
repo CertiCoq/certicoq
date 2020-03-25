@@ -51,6 +51,7 @@ Definition clos_loop (u : unit) : nat :=
 Definition clos := loop_add 1 clos_loop.
 
 CertiCoq Compile -ext "_cps" clos.
+CertiCoq Compile -o1 -ext "_cps_opt" clos.
 CertiCoq Compile -anf clos.
 CertiCoq Compile -anf -o1 -ext "_opt" clos.
 (* CertiCoq Show IR -debug clos. *)
@@ -70,23 +71,25 @@ Definition addxy (x y : nat) (l : list nat) :=
 Definition rec_clos := addxy 1 2 (List.repeat 0 (100*500)).
 
 CertiCoq Compile -ext "_cps" rec_clos.
+CertiCoq Compile -o1 -ext "_cps_opt" rec_clos.
 CertiCoq Compile -anf rec_clos.
 CertiCoq Compile -anf -o1 -ext "_opt" rec_clos.
 
 
 
-Definition intxy (x : nat) (l : list nat):= 
+Definition intxy (x y : nat) (l : list nat):= 
   let f := (fix aux l acc :=
      match l with
      | [] => acc  
-     | z :: zs => aux zs (z :: x :: acc)
+     | z :: zs => aux zs (z :: x :: y :: acc)
      end) in
   f l [].
 
-Definition rec_clos2 := intxy 1 (List.repeat 0 (100*500)).
+Definition rec_clos2 := intxy 1 2 (List.repeat 0 (100*500)).
 
 CertiCoq Compile -ext "_cps" rec_clos2.
-CertiCoq Compile -anf rec_clos2.
+CertiCoq Compile -o1 -args 1 -ext "_cps_opt" rec_clos2.
+CertiCoq Compile -anf -args 1 rec_clos2.
 CertiCoq Compile -anf -o1 -ext "_opt" rec_clos2.
 
 

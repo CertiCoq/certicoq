@@ -30,12 +30,12 @@ extraction/bracket.ml
 extraction/bracket.mli
 extraction/camlcoq.ml
 extraction/camlcoq.mli
-extraction/certiClasses.ml
-extraction/certiClasses.mli
-extraction/certiClasses2.ml
-extraction/certiClasses2.mli
-extraction/cexec.ml
-extraction/cexec.mli
+# extraction/certiClasses.ml
+# extraction/certiClasses.mli
+# extraction/certiClasses2.ml
+# extraction/certiClasses2.mli
+# extraction/cexec.ml
+# extraction/cexec.mli
 extraction/char0.ml
 extraction/char0.mli
 extraction/classes1.ml
@@ -44,8 +44,8 @@ extraction/clight.ml
 extraction/clight.mli
 extraction/clightdefs.ml
 extraction/clightdefs.mli
-extraction/clightexec.ml
-extraction/clightexec.mli
+# extraction/clightexec.ml
+# extraction/clightexec.mli
 extraction/closure_conversion.ml
 extraction/closure_conversion.mli
 extraction/compM.ml
@@ -106,8 +106,8 @@ extraction/fappli_IEEE_extra.ml
 extraction/fappli_IEEE_extra.mli
 extraction/floats.ml
 extraction/floats.mli
-extraction/globalenvs.ml
-extraction/globalenvs.mli
+# extraction/globalenvs.ml
+# extraction/globalenvs.mli
 extraction/glue.ml
 extraction/glue.mli
 extraction/hoisting.ml
@@ -168,12 +168,12 @@ extraction/map_util.ml
 extraction/map_util.mli
 extraction/maps.ml
 extraction/maps.mli
-extraction/memdata.ml
-extraction/memdata.mli
-extraction/memory.ml
-extraction/memory.mli
-extraction/memtype.ml
-extraction/memtype.mli
+# extraction/memdata.ml
+# extraction/memdata.mli
+# extraction/memory.ml
+# extraction/memory.mli
+# extraction/memtype.ml
+# extraction/memtype.mli
 extraction/monad0.ml
 extraction/monad0.mli
 extraction/monadState.ml
@@ -182,8 +182,8 @@ extraction/monad_utils.ml
 extraction/monad_utils.mli
 extraction/nPeano.ml
 extraction/nPeano.mli
-extraction/optionMonad.ml
-extraction/optionMonad.mli
+# extraction/optionMonad.ml
+# extraction/optionMonad.mli
 extraction/orders.ml
 extraction/orders.mli
 extraction/ordersEx.ml
@@ -260,8 +260,8 @@ extraction/string1.ml
 extraction/string1.mli
 extraction/templateToPCUIC.ml
 extraction/templateToPCUIC.mli
-extraction/term0.ml
-extraction/term0.mli
+# extraction/term0.ml
+# extraction/term0.mli
 extraction/termAbs.ml
 extraction/termAbs.mli
 extraction/terms.ml

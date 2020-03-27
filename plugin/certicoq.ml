@@ -72,7 +72,7 @@ To compile an program named <gid> type:\n\
 To show this help message type:\n\
    CertiCoq -help.\n\n\
 To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
-   CertiCoq Show IR [options] <global_identifier>.\n\n
+   CertiCoq Show IR [options] <global_identifier>.\n\n\
 Valid options:\n\
 -direct :  Produce direct-style code (as opposed to he default which is continuation-passing style)\n\
 -time   :  Time each compilation phase\n\
@@ -201,7 +201,7 @@ let show_ir opts gr =
   let options = make_pipeline_options opts in
   let p = Pipeline.show_IR options term in
   match p with
-  | (Ret prg, dbg) ->
+  | (CompM.Ret prg, dbg) ->
     debug_msg debug "Finished compiling, printing to file.";
     let time = Unix.gettimeofday() in
     let suff = if opts.cps then "_cps" else "" ^ if opts.olevel <> 0 then "_opt" else "" in

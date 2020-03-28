@@ -1,6 +1,7 @@
 (* Conversion from L4.expression to L6.cps *)
 
 Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
+Require Import Program Arith.
 Require Import ExtLib.Data.String.
 Require Import Common.AstCommon.
 Require Import Znumtheory.
@@ -447,62 +448,91 @@ Definition convert_top (ee:ienv * expression.exp) :
               (cps.Eapp f kon_tag (k::nil))))
     end.
 
+Fixpoint rho_names (rho : exp_eval.env) : list name :=
+  match rho with
+  | nil => nil
+  | cons v rho' =>
+    let na := nNamed "rho_elt"%string in
+    (na :: (rho_names rho'))
+  end.
 
-(* Fixpoint cps_cvt_val (v : exp_eval.value) (vn : list var) (k : var) *)
-(*          (next : symgen) (tgm : constr_env) : option (cps.val * symgen) := *)
-(*   match v with *)
-(*   | Con_v dc vs => *)
-(*     let c_tag := dcon_to_tag dc tgm in *)
-(*     r <- cps_cvt_env vs vn k next tgm;; *)
-(*       let (vs', next) := r in *)
-(*       ret (Vconst c_tag vs', next) *)
-(*   | Clos_v rho na e => *)
-(*     r1 <- cps_cvt_env rho vn k next tgm;; *)
-(*       (* make map of values? *) *)
-(*       let (rho', next) := r in *)
-(*       let (k1, next) := gensym next (nNamed "k_lam"%string) in *)
-(*       let (x1, next) := gensym next (nNamed "x_lam"%string) in *)
-(*       let (f, next) := gensym next n in *)
-(*       r2 <- cps_cvt e (x1::vn) k1 (next) tgm;; *)
-(*          let (e', next) := r : (cps.exp * symgen) in *)
-(*          ret ((* map *), (cps.Efun *)
-(*                             (Fcons f func_tag (x1::k1::nil) e' Fnil) *)
-(*                             (cps.Eapp k kon_tag (f::nil))), next) *)
-(*   | ClosFix_v rho efns n => *)
-(*     (* TODO *) *)
-(*     ret (Vint 0, next) *)
-(*   | Prf_v => *)
-(*     (* TODO *) *)
-(*     ret (Vint 0, next) *)
-(*   end *)
-(* with cps_cvt_env (vs : list exp_eval.value) (vn : list var) (k : var) *)
-(*                  (next : symgen) (tgm : constr_env) := *)
-(*        match vs with *)
-(*        | nil => ret (nil, next) *)
-(*        | cons v vs' => *)
-(*          let r1 <- cps_cvt_val v vn k next tgm;; *)
-(*                 let (v', next) := r1 in *)
-(*                 let r2 <- cps_cvt_env vs' vn k next tgm;; *)
-(*                        let (vs', next) := r2 in *)
-(*                        ret (cons v vs, next) *)
-(*        end. *)
+(*
+Fixpoint cps_cvt_val (v : exp_eval.value) (next : symgen)
+         (tgm : constr_env) {struct v} : option (cps.val * symgen) :=
+  match v with
+  | Con_v dc vs =>
+    let c_tag := dcon_to_tag dc tgm in
+    r <- cps_cvt_env vs next tgm;;
+      let (vs', next) := r : (list val * symgen) in
+      ret (Vconstr c_tag (List.rev vs'), next)
+  | Clos_v rho na e =>
+    r1 <- cps_cvt_env rho next tgm;;
+      let (rho', next) := r1 : (list val * symgen) in
+      let lnames := rho_names rho in
+      let (vars, next) := gensym_n next lnames in
+      m <- set_lists vars rho' (M.empty val);;
+        let (k1, next) := gensym next (nNamed "k_lam"%string) in
+        let (x1, next) := gensym next (nNamed "x_lam"%string) in
+        let (f, next) := gensym next na in
+        r2 <- cps_cvt e (x1::vars) k1 (next) tgm;;
+           let (e', next) := r2 : (cps.exp * symgen) in
+           ret (Vfun m (Fcons f func_tag (x1::k1::nil) e' Fnil) f, next)
+  | ClosFix_v rho efns n =>
+    r1 <- cps_cvt_env rho next tgm;;
+      let (rho', next) := r1 : (list val * symgen) in
+      let lnames := rho_names rho in
+      let (vars, next) := gensym_n next lnames in
+      m <- set_lists vars rho' (M.empty val);;
+        let (fnlst_length, names_lst) := efnlst_names efns in
+        let (nlst, next) := gensym_n next names_lst in
+        r2 <- cps_cvt_efnlst efns (nlst ++ vars) nlst next tgm;;
+           let (fdefs, next) := r2 : (fundefs * symgen) in
+           let i := (nth nlst (N.to_nat n)) in
+           ret (Vfun m fdefs i, next)
+  | Prf_v => (* TODO *)
+    ret (Vint 0, next)
+  end
+with cps_cvt_env (vs : list exp_eval.value) (next : symgen)
+                 (tgm : constr_env) {struct vs} : option (list cps.val * symgen) :=
+       (* let (vs', next) := List.fold_right *)
+       (*                   (fun v p => *)
+       (*                      let (l, n) := p : (list val * symgen) in *)
+       (*                      r <- cps_cvt_val v n tgm;; *)
+       (*                        let (val', n') := r : (val * symgen) in *)
+       (*                        (val'::l, n')) *)
+       (*                   (nil, next) *)
+       (*                   vs *)
+       (* in *)
+       (* ret (vs', next). *)
+       match vs with
+       | nil => ret (nil, next)
+       | cons v vs' =>
+         r1 <- cps_cvt_val v next tgm;;
+            let (v', next) := r1 : (val * symgen) in
+                r2 <- cps_cvt_env vs' next tgm;;
+                   let (vs'', next) := r2 : (list val * symgen) in
+                   ret (cons v' vs'', next)
+       end.
 
-(* written very informally *)
+                    
 Lemma cps_cvt_correct:
-  forall rho e v,
+  forall rho x k vk e v v' v'',
     eval_env rho e v ->
     cps_cvt_env rho k = rho' ->
     cps_cvt e k = e' ->
-    exists v', bstep_e rho' e' v' /\ cps_cvt_val v k = v'.
+    cps_cvt_val v k = v' ->
+    bstep_e [k ~> vk, x ~> v'] (Eapp k x) v'' ->
+    bstep_e (rho'[k ~> vk]) e' v''.
 
 
+
+  
 (* testing code *)
 
-(*
-Require Import Compiler.allInstances.
 
-(* Require Import L6.cps L6.cps_show instances.
-From CertiCoq.L7 Require Import L6_to_Clight. *)
+(* Require Import Compiler.allInstances. *)
+
+From CertiCoq.L7 Require Import L6_to_Clight. 
 
 Definition print_BigStepResult_L6 p  n:=
   let '((prim,cenv, nenv, fenv), (rho, e)) := p in

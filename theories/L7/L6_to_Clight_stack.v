@@ -583,8 +583,9 @@ Definition isPtr (x : positive) :=
     (c_int 0 val).
  *)
 
-Definition isPtr (retId:positive) (v:positive) :=
-  Scall (Some retId) ptr ([val](var v) :: nil).
+Definition isPtr (retId:positive) (v:positive) : expr:=
+  Ebinop Oeq (Ebinop Oand (Evar v val) (Econst_int Int.one intTy) boolTy)
+         (Econst_int Int.zero intTy) boolTy.
 
 (* XXX before it was total *)
 Definition isBoxed (cenv:ctor_env) (ienv : n_ind_env) (ct : ctor_tag) : error bool :=
@@ -715,12 +716,12 @@ Definition reserve_num (n : nat) (funInf : positive) (l : Z) (stack_vars : list 
         Sskip), slots).
 
 Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_statements) :=
-  (isPtr caseIdent x;
-     Sifthenelse
-       (bvar caseIdent)
-       (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
-       (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val)
-                ls')).
+  (Sifthenelse
+     (* XXX case ident is  *)
+     (isPtr caseIdent x)
+     (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
+     (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val)
+              ls')).
 
 
 (** * Shadow stack strategy *)

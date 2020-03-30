@@ -75,23 +75,54 @@ CertiCoq Compile -o1 -ext "_cps_opt" rec_clos.
 CertiCoq Compile -anf rec_clos.
 CertiCoq Compile -anf -o1 -ext "_opt" rec_clos.
 
+Definition repeat {A} (x : A) (n : nat) : list A :=
+  (fix aux (x : A) (n : nat) acc :=
+     match n with
+     | 0 => acc
+     | S k => aux x k (x :: acc)
+     end) x n [].
 
 
-Definition intxy (x y : nat) (l : list nat):= 
+Definition intxy (x y w : nat) (l : list nat):= 
   let f := (fix aux l acc :=
      match l with
      | [] => acc  
-     | z :: zs => aux zs (z :: x :: y :: acc)
+     | z :: zs => aux zs (z :: x :: y :: w :: acc)
      end) in
   f l [].
 
-Definition rec_clos2 := intxy 1 2 (List.repeat 0 (100*500)).
+Definition rec_clos2 := intxy 1 2 3 (repeat 0 (100*50)).
 
 CertiCoq Compile -ext "_cps" rec_clos2.
-CertiCoq Compile -o1 -args 1 -ext "_cps_opt" rec_clos2.
-CertiCoq Compile -anf -args 1 rec_clos2.
+CertiCoq Compile -o1 -ext "_cps_opt" rec_clos2.
+CertiCoq Compile -anf rec_clos2.
 CertiCoq Compile -anf -o1 -ext "_opt" rec_clos2.
+CertiCoq Show IR -anf rec_clos2.
+CertiCoq Show IR -anf -o1 -ext "_opt" rec_clos2.
 
+
+(* Fixpoint ack (m : nat) := *)
+(*   fix aux (n : nat) := *)
+(*     match m with *)
+(*     | 0 => n + 1 *)
+(*     | S m => *)
+(*       match n with *)
+(*       | 0 => ack m 1 *)
+(*       | S n => ack m (aux n) *)
+(*       end *)
+(*     end. *)
+
+
+(* Fixpoint test (m n : nat) := *)
+(*   fix aux (l : nat) := *)
+(*     match m with *)
+(*     | 0 => n + 1 *)
+(*     | S m => *)
+(*       match l with *)
+(*       | 0 => test m 1 *)
+(*       | S n => ack m (aux n) *)
+(*       end *)
+(*     end. *)
 
 
 (* TODO: Eventually move somewhere else and also add the option to print help.

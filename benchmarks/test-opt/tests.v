@@ -91,7 +91,7 @@ Definition intxy (x y w : nat) (l : list nat):=
      end) in
   f l [].
 
-Definition rec_clos2 := intxy 1 2 3 (repeat 0 (100*50)).
+Definition rec_clos2 := intxy 1 2 3 (repeat 0 (1000*500)).
 
 CertiCoq Compile -ext "_cps" rec_clos2.
 CertiCoq Compile -o1 -ext "_cps_opt" rec_clos2.

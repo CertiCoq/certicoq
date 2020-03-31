@@ -456,9 +456,20 @@ Fixpoint rho_names (rho : exp_eval.env) : list name :=
     (na :: (rho_names rho'))
   end.
 
-(*
+
 Fixpoint cps_cvt_val (v : exp_eval.value) (next : symgen)
          (tgm : constr_env) {struct v} : option (cps.val * symgen) :=
+  let fix cps_cvt_env vs next tgm :=
+       match vs with
+       | nil => ret (nil, next)
+       | cons v vs' =>
+         r1 <- cps_cvt_val v next tgm;;
+            let (v', next) := r1 : (val * symgen) in
+                r2 <- cps_cvt_env vs' next tgm;;
+                   let (vs'', next) := r2 : (list val * symgen) in
+                   ret (cons v' vs'', next)
+       end
+  in
   match v with
   | Con_v dc vs =>
     let c_tag := dcon_to_tag dc tgm in
@@ -489,41 +500,20 @@ Fixpoint cps_cvt_val (v : exp_eval.value) (next : symgen)
            let (fdefs, next) := r2 : (fundefs * symgen) in
            let i := (nth nlst (N.to_nat n)) in
            ret (Vfun m fdefs i, next)
-  | Prf_v => (* TODO *)
+  | _ => (* TODO *)
     ret (Vint 0, next)
-  end
-with cps_cvt_env (vs : list exp_eval.value) (next : symgen)
-                 (tgm : constr_env) {struct vs} : option (list cps.val * symgen) :=
-       (* let (vs', next) := List.fold_right *)
-       (*                   (fun v p => *)
-       (*                      let (l, n) := p : (list val * symgen) in *)
-       (*                      r <- cps_cvt_val v n tgm;; *)
-       (*                        let (val', n') := r : (val * symgen) in *)
-       (*                        (val'::l, n')) *)
-       (*                   (nil, next) *)
-       (*                   vs *)
-       (* in *)
-       (* ret (vs', next). *)
-       match vs with
-       | nil => ret (nil, next)
-       | cons v vs' =>
-         r1 <- cps_cvt_val v next tgm;;
-            let (v', next) := r1 : (val * symgen) in
-                r2 <- cps_cvt_env vs' next tgm;;
-                   let (vs'', next) := r2 : (list val * symgen) in
-                   ret (cons v' vs'', next)
-       end.
+  end.
 
                     
 Lemma cps_cvt_correct:
-  forall rho x k vk e v v' v'',
+  forall rho x k vk e v v' v'' cnstrs,
     eval_env rho e v ->
-    cps_cvt_env rho k = rho' ->
+    cps_cvt_env rho = rho' ->
+    (* convert_top ? *)
     cps_cvt e k = e' ->
     cps_cvt_val v k = v' ->
-    bstep_e [k ~> vk, x ~> v'] (Eapp k x) v'' ->
-    bstep_e (rho'[k ~> vk]) e' v''.
-
+    bstep_e (M.set x v' (M.set k vk (M.empty val))) (Eapp k x) v'' ->
+    bstep_e (M.set k vk rho') e' v''.
 
 
   
@@ -532,7 +522,78 @@ Lemma cps_cvt_correct:
 
 (* Require Import Compiler.allInstances. *)
 
-From CertiCoq.L7 Require Import L6_to_Clight. 
+From CertiCoq.L7 Require Import L6_to_Clight.
+
+Require Import ExtLib.Structures.Monad.
+
+(* Added for L6_evaln *)
+Require Import exceptionMonad.
+
+Import MonadNotation.
+Open Scope monad_scope.
+
+(* Let L6env : Type := prims * ctor_env *  cps_util.name_env * fun_env. *)
+
+(* Let L6term: Type := eval.env * cps.exp. *)
+
+(* Let L6val: Type := cps.val. *)
+
+(* From CertiCoq.Common Require Import certiClasses certiClassesLinkable classes RandyPrelude AstCommon. *)
+
+(* Import MonadNotation. *)
+(* Open Scope monad_scope. *)
+
+(* Instance bigStepOpSemL6Term : BigStepOpSem (L6env * L6term) L6val := *)
+(*   λ p v, *)
+(*   let '(pr, cenv, nenv, fenv, (rho, e)) := p in *)
+(*   (* should not modify pr, cenv and nenv *) *)
+(*   ∃ (n:nat), L6.eval.bstep_e pr cenv rho e v n. *)
+
+(* Require Import certiClasses2. *)
+
+(* Instance certiL6 : CerticoqLanguage (L6env * L6term) := {}. *)
+(* Eval compute in cValue certiL6. *)
+
+(* Instance L6_evaln: BigStepOpSemExec (cTerm certiL6) (cValue certiL6) := *)
+(*   fun n p => *)
+(*     let '((penv, cenv, nenv, fenv), (rho, e)) := p in *)
+(*     match bstep_f penv cenv rho e n with *)
+(*     | exceptionMonad.Exc s => Error s None *)
+(*     | Ret (inl t) => OutOfTime ((penv,cenv,nenv, fenv), t) *)
+(*     | Ret (inr v) => Result v *)
+(*     end. *)
+
+Inductive bigStepResult {Term Value : Type} : Type :=
+    Result : Value -> bigStepResult 
+  | OutOfTime : Term -> bigStepResult 
+  | Error : string -> option Term -> bigStepResult.
+
+Inductive bigStepResultSimpl (Term : Type) : Type :=
+  ResultS : Term -> bigStepResultSimpl Term
+| OutOfTimeS : Term -> bigStepResultSimpl Term
+| ErrorS : string-> bigStepResultSimpl Term. 
+
+Definition L6_evaln_fun n p : @bigStepResult (env * exp) cps.val :=
+  let '((penv, cenv, nenv, fenv), (rho, e)) := p
+  : ((prims * ctor_env * name_env * fun_env) * (env * cps.exp)) in
+  match bstep_f penv cenv rho e n with
+  | exceptionMonad.Exc s => Error s None
+  | Ret (inl t) => OutOfTime t
+  | Ret (inr v) => Result v
+  end.
+
+Definition print_BigStepResult_L6 p n :=
+  let '((penv, cenv, nenv, fenv), (rho, e)) :=
+      p : ((prims * ctor_env * name_env * fun_env) * (env * cps.exp)) in
+  L7.L6_to_Clight.print (
+      match (bstep_f penv cenv rho e n) with
+      | exceptionMonad.Exc s => s
+      | Ret (inl t) =>
+        let (rho', e') := t : (env * cps.exp) in
+        "Out of time:" ++ (show_cenv cenv) ++ (show_env nenv cenv false rho') ++
+                       (show_exp nenv cenv false e')
+      | Ret (inr v) => show_val nenv cenv false v
+      end).
 
 Definition print_BigStepResult_L6 p  n:=
   let '((prim,cenv, nenv, fenv), (rho, e)) := p in
@@ -633,4 +694,3 @@ Extract Constant   varImplDummyPair.varClassNVar =>
 " (fun f (p:int*bool) -> varClass0 (f (fst p)))".
 
 Extraction "test1.ml" test_result.
-*)

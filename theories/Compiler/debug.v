@@ -51,13 +51,19 @@ Definition compile_L6_ANF_show (e: Template.Ast.program) : string  :=
   | (compM.Err s, _) => s
   end.
 
+Definition compile_L4_AST (e: Template.Ast.program) : error L4.expression.exp :=
+  match run_pipeline _ _ default_opts e compile_to_L4 with
+  | (compM.Ret (ienv, term), _) => compM.Ret term
+  | (compM.Err s, _) => compM.Err s
+  end.
+
 
 Quote Recursively Definition demo1 := (List.app (List.repeat true 5) (List.repeat false 3)).
 
 (* Definition demo1_CPS := Eval native_compute in (compile_L6_show demo1). *)
 Definition demo1_ANF := Eval native_compute in (compile_L6_ANF_show demo1).
 Definition demo1_CPS := Eval native_compute in (compile_L6_show demo1).
-Definition demo1_L4 := Eval native_compute in (compile_to_L4 demo1). 
+Definition demo1_L4 := Eval native_compute in (compile_L4_AST demo1). 
 
 Definition demo1_L6_anf := Eval native_compute in (compile_L6_anf_show false demo1).
 Definition demo1_L6_init := Eval native_compute in (compile_anf_show false demo1).

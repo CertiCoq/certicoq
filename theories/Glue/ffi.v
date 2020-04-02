@@ -133,6 +133,7 @@ Definition make_curried_fn
      This works for C generation sorta by accident, but if we wanted to
      prove anything about the Clight code we generate, this wouldn't work. *)
   _thread_info <- gensym "thread_info" ;;
+  _alloc <- gensym "alloc" ;;
   _args <- gensym "args" ;;
   _tinfo <- gensym "tinfo" ;;
   _env <- gensym "env" ;;
@@ -163,6 +164,16 @@ Definition make_curried_fn
                      Sassign (Etempvar _arg val) (Field(args_expr, Z.of_nat 2)) :: nil)
                  end) in
 
+
+
+  (* tinfo->alloc *)
+  let alloc_expr :=
+      (Efield (Ederef (Evar _tinfo (threadInf _thread_info))
+                      (threadStructInf _thread_info))
+              _alloc (tptr val)) in
+  (* tinfo->alloc += n; *)
+  let alloc_incr (n : Z) :=
+      Sassign alloc_expr (add alloc_expr (c_int n tint)) in
   (* Now, there are two different kinds of functions we can generate here.
      One for currying (if arity > 0) and
      one for calling linked C function from the extern. (if arity = 0) *)
@@ -181,22 +192,41 @@ Definition make_curried_fn
         let '(args, ss) := List.split res in
         _res <- gensym "result" ;;
         let call := Scall (Some _res)
-                          (Evar _next_fn (Tfunction (repeat_typelist val arity) val cc_default))
-                          (map (fun '(_n, t) => Etempvar _n t) args) in
-        ret (_res, args, multiple ss ;;; call)
+                          (Evar _next_fn
+                                (Tfunction (Tcons (threadInf _thread_info)
+                                                  (repeat_typelist val arity))
+                                           val cc_default))
+                          (Evar _tinfo (threadInf _thread_info) ::
+                           map (fun '(_n, t) => Etempvar _n t) args) in
+        (* Put the result in a pair of [A * World]
+           because that's how [IO] is defined *)
+        _pair <- gensym "pair" ;;
+        let s :=
+            Sassign (Etempvar _pair val) ([val] alloc_expr) ;;;
+            Sassign (Field(var _pair, 0%Z)) (c_int 2048 val) ;;;
+            Sassign (Field(var _pair, 1%Z)) (Evar _res val) ;;;
+            Sassign (Field(var _pair, 2%Z)) (Evar _arg val) ;;;
+            alloc_incr 3%Z in
+        ret (_pair,
+             (_res, val) :: (_pair, val) :: args,
+             multiple ss ;;; call ;;; s)
       | S _ => (* We should create an env and a closure *)
         _new_env <- gensym "new_env" ;;
         _new_clo <- gensym "new_clo" ;;
         let create_env :=
+            Sassign (Etempvar _new_env val) ([val] alloc_expr) ;;;
             Sassign (Field(var _new_env, 0%Z)) (c_int 2048 val) ;;;
             Sassign (Field(var _new_env, 1%Z)) (Evar _arg val) ;;;
-            Sassign (Field(var _new_env, 2%Z)) (Evar _env val) in
+            Sassign (Field(var _new_env, 2%Z)) (Evar _env val) ;;;
+            alloc_incr 3%Z in
         let create_clo :=
+            Sassign (Etempvar _new_clo val) ([val] alloc_expr) ;;;
             Sassign (Field(var _new_clo, 0%Z)) (c_int 2048 val) ;;;
             Sassign (Field(var _new_clo, 1%Z)) (Evar _next_fn val) ;;;
-            Sassign (Field(var _new_clo, 2%Z)) (Evar _new_env val) in
+            Sassign (Field(var _new_clo, 2%Z)) (Evar _new_env val) ;;;
+            alloc_incr 3%Z in
         ret (_new_clo,
-             ((_new_env, val) :: (_new_clo, val) :: nil),
+             (_new_env, val) :: (_new_clo, val) :: nil,
              create_env ;;; create_clo)
       end ;;
   (* Return whatever temp variable is supposed to be returned,
@@ -275,14 +305,24 @@ Definition make_one_field
   let (kn, t) := field in
   let (arity, is_io) := type_to_args t in
   _extern_fn <- gensym kn ;;
+  _thread_info <- gensym "thread_info" ;;
   let extern_def :=
     (_extern_fn,
      Gfun (External (EF_external kn
                  (mksignature (val_typ :: nil) None cc_default))
-               (repeat_typelist val arity)
+               (Tcons (threadInf _thread_info) (repeat_typelist val arity))
                val cc_default)) in
   rest <- make_curried_fns kn arity arity _extern_fn ;;
-  ret (extern_def :: rest).
+  match rest with
+  | nil => log "No curried functions!" ;; failwith ""
+  | (_entry, _) :: _ =>
+    _clo <- gensym (kn ++ "_clo") ;;
+    let clo_ty := tarray val 2 in
+    let clo_data := Init_addrof _entry Ptrofs.zero :: Init_int8 (Int.repr 1) :: nil in
+    let clo_def := (_clo, Gvar (mkglobvar clo_ty clo_data true false)) in
+    (* We have to put [clo_def] at the end so that it's a declared identifier *)
+    ret (extern_def :: rev rest ++ (clo_def :: nil))
+  end.
 
 Fixpoint make_all_fields
          (fields : list (kername * Ast.term))
@@ -295,10 +335,24 @@ Fixpoint make_all_fields
       ret (f' ++ fs')
   end.
 
+Definition make_toolbox : ffiM composite_definitions :=
+  _thread_info <- gensym "thread_info" ;;
+  _alloc <- gensym "alloc" ;;
+  _limit <- gensym "limit" ;;
+  _heap <- gensym "heap" ;;
+  _args <- gensym "args" ;;
+  let comp :=
+    Composite _thread_info Struct
+      ((_alloc, valPtr) ::
+      (_limit, valPtr) ::
+      (_heap, tptr (Tstruct _heap noattr)) ::
+      (_args, Tarray uval max_args noattr) :: nil) noattr :: nil in
+  ret comp.
+
 Definition make_ffi_program
            (fields : list (kername * Ast.term))
            : ffiM (option Clight.program * option Clight.program) :=
-  let composites := nil in
+  composites <- make_toolbox ;;
   field_defs <- make_all_fields fields ;;
   let glob_defs := field_defs in
   nenv <- gets fstate_nenv ;;

@@ -100,5 +100,6 @@ Separate Extraction
          Compiler.pipeline.make_opts
          Compiler.pipeline.compile
          Compiler.pipeline.make_glue
+         Compiler.pipeline.make_ffi
          Compiler.pipeline.show_IR.
 Cd "..".

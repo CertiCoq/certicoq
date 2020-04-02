@@ -25,34 +25,12 @@ Require Import L6.cps
                L6.identifiers
                L6.cps_show
                L6_to_Clight
-               compM.
+               compM
+               glue_utils.
 
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
 
-Definition main_ident : positive := 1.
-
-Notation "'var' x" := (Etempvar x val) (at level 20).
-
-Notation " p ';;;' q " := (Ssequence p q)
-                          (at level 100, format " p ';;;' '//' q ").
-
-Notation "'*' p " := (Ederef p val) (at level 40).
-
-Notation "'[' t ']' e " := (Ecast e t) (at level 34).
-
-Notation "'Field(' t ',' n ')'" :=
-  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
-
-Definition multiple (xs : list statement) : statement :=
-  fold_right Ssequence Sskip xs.
-
-Definition max_args : Z := 1024.
-
-(* aliases for Clight AST types *)
-Definition def : Type := ident * globdef fundef type.
-Definition defs : Type := list def.
-Definition composite_definitions : Type := list composite_definition.
 
 (* A record that holds L1 information about Coq types. *)
 Record ty_info : Type :=
@@ -138,40 +116,6 @@ Section Helpers.
       ; thread_info_info : thread_info_bundle ident
       ; halt_clo_info : def_info
       }.
-
-  (* Enumerate items starting from 0. *)
-  Definition enumerate_nat {a : Type} (xs : list a) : list (nat * a) :=
-    let fix aux (n : nat) (xs : list a) :=
-          match xs with
-          | nil => nil
-          | x :: xs => (n, x) :: aux (S n) xs
-          end
-    in aux O xs.
-
-  (* Enumerate items starting from 1, because that's the smallest [positive]. *)
-  Definition enumerate_pos {a : Type} (xs : list a) : list (positive * a) :=
-    let fix aux (n : positive) (xs : list a) :=
-          match xs with
-          | nil => nil
-          | x :: xs => (n, x) :: aux (Pos.succ n) xs
-          end
-    in aux 1%positive xs.
-
-  (* Lookup in a 2D dictionary. *)
-  Definition get_2d {A : Type} (k1 k2 : positive) (m : M.t (M.t A)) : option A :=
-    match M.get k1 m with
-    | None => None
-    | Some m2 => M.get k2 m2
-    end.
-
-  (* Insertion in a 2D dictionary. *)
-  Definition set_2d {A : Type}
-             (k1 k2 : positive) (v : A) (m : M.t (M.t A)) : M.t (M.t A) :=
-    let sub_map := match M.get k1 m with
-                   | None => M.empty A
-                   | Some m2 => m2
-                   end
-    in M.set k1 (M.set k2 v sub_map) m.
 
 End Helpers.
 
@@ -448,44 +392,6 @@ Section L1Types.
     | (_, _, arity) :: ctors' =>
         max arity (get_max_ctor_arity ctors')
     end.
-
-  Fixpoint split_aux (acc : string) (sep : Ascii.ascii) (s : string) : list string :=
-    match s with
-    | EmptyString => acc :: nil
-    | String c s' =>
-      if Char.ascii_dec sep c
-          then acc :: split_aux EmptyString sep s'
-          else split_aux (acc ++ String c EmptyString) sep s'
-    end.
-
-  Definition split (c : Ascii.ascii) (s : string) : list string :=
-    split_aux EmptyString c s.
-
- Definition qualifying_prefix := string.
- Definition base_name := string.
- Definition sanitized_name := string.
-
- (* takes a fully qualified name and removes the base name,
-    leaving behind the qualifying prefix.
-    e.g. "Coq.Init.Datatypes.bool" becomes "Coq.Init.Datatypes." *)
- Require Import Coq.Strings.Ascii.
-               
- Definition find_qualifying_prefix (n : kername) : qualifying_prefix :=
-   match rev (split "." n) with
-   | nil => (* not possible *) ""%string
-   | base :: rest => String.concat "." (rev (""%string :: rest))
-   end.
-
- (* takes a fully qualified name and gives the base name *)
-  Definition find_base_name (n : kername) : base_name :=
-    match rev (split "." n) with
-    | nil => (* not possible *) ""%string
-    | base :: rest => base
-    end.
-
-  (* Takes in "M1.M2.tau" and returns "M1_M2_tau". *)
-  Definition sanitize_qualified (n : kername) : sanitized_name :=
-    String.concat "_" (split "." n).
 
   (* takes an inductive type declaration and returns
      the qualifying prefix for the name and the type definition *)
@@ -1418,168 +1324,6 @@ Section FunctionCalls.
                   |})).
 
 End FunctionCalls.
-
-(* A helper function needed to satisfy a condition about composites *)
-Definition mk_prog_opt
-           (composites : list composite_definition)
-           (ds : defs)
-           (main : ident)
-           (add_comp : bool)
-           : option Clight.program :=
-  let composites := if add_comp then composites else nil in
-  let res := Ctypes.make_program composites ds nil main in
-  match res with
-  | Error e => None
-  | OK p => Some p
-  end.
-
-
-Section FunctionCalls.
-  (* Glue code for function calls, adapted by Kathrin Stark from
-     Olivier Savary Belanger's work with different number of parameters *)
-
-  Variable toolbox : toolbox_info.
-  Let _thread_info : ident := thread_info_type _ (thread_info_info toolbox).
-  Let _args : ident := args_info _ (thread_info_info toolbox).
-
-  (* Notations, from OSB *)
-  Notation " a '::=' b " := (Sset a b) (at level 50).
-  Notation "'funVar' x" := (Evar x (funTy _thread_info)) (at level 20).
-
-  (* Definition of halt and halt_clo.
-      Generate a function equivalent to halt, receives a tinfo and
-      - for c_args = 1 the environment,
-      - for c_args >= 2 the environment and the result.
-      Hence, if c_args >= 2 we additionally have to put
-      the result into *tinfo.args[1]. *)
-  Definition make_halt
-            (c_args : nat)
-            : gState (def * def) :=
-    _env <- gensym "env" ;;
-    _arg <- gensym "arg" ;;
-    _tinfo <- gensym "tinfo" ;;
-    _halt <- gensym "halt" ;;
-    let '(_halt_clo, ty_halt_clo) := halt_clo_info toolbox in
-    let argsExpr := Efield (tinfd _thread_info _tinfo) _args valPtr in (* TODO: Duplication? *)
-    let args_halt := (_tinfo, (threadInf _thread_info)) ::
-                     (_env, val) ::
-                     (_arg, val) :: nil in
-    let halt_stm := if 2 <=? c_args
-                    then Sassign (Field(argsExpr, Z.of_nat 1)) (Etempvar _arg val);;; Sreturn None
-                    else (Sreturn None) in
-    ret ((_halt, (* halt *)
-          Gfun (Internal (mkfunction Tvoid cc_default
-                                     (firstn (S c_args) args_halt)
-                                     nil nil halt_stm))),
-         (_halt_clo, (* halt_clo *)
-          Gvar (mkglobvar ty_halt_clo
-                          ((Init_addrof _halt Ptrofs.zero) :: Init_int 1 :: nil)
-                          true false))).
-
-  (* Function calls.
-
-    For the CPS backend: (written by Kathrin)
-    What to push in the argument array depends on c_args:
-    If c_args = 0, then environment, the halting closure,
-                    and the (single) argument have to be put into
-                    arg[0], arg[1], and arg[2] respectively.
-    If c_args = 1, as before but omit the environment and hand it over directly.
-    If c_args = 2, as before but omit the environment and the halting closure.
-    If c_args >= 3, no elements have to be put into the argument array.
-    Call function with respective arguments.
-
-    For the ANF backend: (added by Joomy)
-    This is just tentative.
-    It does the same except it doesn't assign/pass the halting closure.
-    It probably needs to do something with stack frames at some point,
-    we leave that as TODO for now.
-    This version works for some examples in ANF but it's not extensively tested.
-
-    It may also be a good idea to separate the ANF call function entirely.
-    Maybe a separate call_anf function in C or
-    a separate make_call_anf function in the glue code generator.
-  *)
-  Definition make_call : gState def :=
-    _clo <- gensym "clo" ;;
-    _f <- gensym "f" ;;
-    _env <- gensym "envi" ;;
-    _ret <- gensym "ret" ;;
-    _arg <- gensym "arg" ;;
-    _tinfo <- gensym "tinfo";;
-    let '(_halt_clo, _) := halt_clo_info toolbox in
-
-    let argsExpr := Efield (tinfd _thread_info _tinfo) _args valPtr in
-
-    let closExpr := Etempvar _clo valPtr in
-    let fargs_anf := tinf _thread_info _tinfo ::
-                     Etempvar _env val ::
-                     Etempvar _arg val :: nil in
-    let fargs_cps := tinf _thread_info _tinfo ::
-                     Etempvar _env val ::
-                     Evar _halt_clo val ::
-                     Etempvar _arg val :: nil in
-    let fargs := match backend with ANF => fargs_anf | CPS => fargs_cps end in
-    let forcelist_anf :=
-        nth c_args ((* if c_args = 0 *) Tnil ::
-                    (* if c_args = 1 *) Tcons val Tnil :: nil)
-            (* else *) (Tcons val (Tcons val Tnil)) in
-    let forcelist_cps :=
-        nth c_args ((* if c_args = 0 *) Tnil ::
-                    (* if c_args = 1 *) Tcons val Tnil ::
-                    (* if c_args = 2 *) Tcons val (Tcons val Tnil) :: nil)
-            (* else *) (Tcons val (Tcons val (Tcons val Tnil))) in
-    let forcelist := match backend with ANF => forcelist_anf | CPS => forcelist_cps end in
-    let ret_ty := Tpointer (Tfunction (Tcons (threadInf _thread_info) forcelist)
-                                      Tvoid cc_default) noattr in
-
-    let body :=
-      _f ::= Field(closExpr , Z.of_nat 0) ;;;
-      _env ::= Field(closExpr, Z.of_nat 1) ;;;
-      multiple (skipn c_args
-                (* if c_args is 0 don't skip any, if it's 1 skip the first one and so on *)
-                 match backend with
-                 | ANF =>
-                    (Sassign (Field(argsExpr, Z.of_nat 0)) (Etempvar _env val) ::
-                     Sassign (Field(argsExpr, Z.of_nat 1)) (Etempvar _arg val) :: nil)
-                 | CPS =>
-                    (Sassign (Field(argsExpr, Z.of_nat 0)) (Etempvar _env val) ::
-                     Sassign (Field(argsExpr, Z.of_nat 1)) (Evar _halt_clo val) ::
-                     Sassign (Field(argsExpr, Z.of_nat 2)) (Etempvar _arg val) :: nil)
-                 end) ;;;
-      Scall None ([ret_ty] (funVar _f)) (firstn (S c_args) fargs) ;;;
-      _ret ::= Field(argsExpr, Z.of_nat 1) ;;;
-      Sreturn (Some (Etempvar _ret valPtr)) in
-
-    let params := (_tinfo, (threadInf _thread_info)) :: (_clo, val) :: (_arg, val) :: nil in
-    let vars := (_f, valPtr) :: (_env, valPtr) :: (_ret, valPtr) :: nil in
-    _call <- gensym "call" ;;
-    ret (_call,
-         Gfun (Internal
-                 {| fn_return := Tpointer Tvoid noattr
-                  ; fn_callconv := cc_default
-                  ; fn_params := (_tinfo, (threadInf _thread_info)) ::
-                                 (_clo, val) ::
-                                 (_arg, val) :: nil
-                  ; fn_vars := nil
-                  ; fn_temps := (_f, valPtr) :: (_env, valPtr) :: (_ret, valPtr) :: nil
-                  ; fn_body := body
-                  |})).
-
-End FunctionCalls.
-
-(* A helper function needed to satisfy a condition about composites *)
-Definition mk_prog_opt
-           (composites : list composite_definition)
-           (ds : defs)
-           (main : ident)
-           (add_comp : bool)
-           : option Clight.program :=
-  let composites := if add_comp then composites else nil in
-  let res := Ctypes.make_program composites ds nil main in
-  match res with
-  | Error e => None
-  | OK p => Some p
-  end.
 
 (* Generates the header and the source programs *)
 Definition make_glue_program

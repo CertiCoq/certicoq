@@ -215,3 +215,47 @@ let show_ir opts gr =
     debug_msg debug "Pipeline debug:";
     debug_msg debug (string_of_chars dbg);
     CErrors.user_err ~hdr:"show-ir" (str "Could not compile: " ++ (pr_char_list s) ++ str "\n")
+
+
+(* Quote Coq inductive type *)
+let quote_ind opts gr : TemplateASTQuoter.quoted_program * string =
+  let debug = opts.debug in
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let sigma, c = Evarutil.new_global sigma gr in
+  let name = match gr with
+    | Globnames.IndRef i -> 
+        let (mut, _) = i in
+        Names.KerName.to_string (Names.MutInd.canonical mut)
+    | _ -> CErrors.user_err ~hdr:"template-coq"
+       (Printer.pr_global gr ++ str " is not an inductive type") in
+  debug_msg debug "Quoting";
+  let time = Unix.gettimeofday() in
+  let term = quote_term_rec env (EConstr.to_constr sigma c) in
+  let time = (Unix.gettimeofday() -. time) in
+  debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
+  (term, name)
+
+let ffi_command opts gr =
+  let (term, name) = quote_ind opts gr in
+  let debug = opts.debug in
+  let options = make_pipeline_options opts in
+
+  let time = Unix.gettimeofday() in
+  (match Pipeline.make_ffi options term with
+  | CompM.Ret (((nenv, header), prg), logs) ->
+    let time = (Unix.gettimeofday() -. time) in
+    debug_msg debug (Printf.sprintf "Generated FFI glue code in %f s.." time);
+    (match logs with [] -> () | _ ->
+      debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
+    let time = Unix.gettimeofday() in
+    let suff = if opts.cps then "_cps" else "" ^ if opts.olevel <> 0 then "_opt" else "" in
+    let cstr = Quoted.string_to_list ("ffi." ^ name ^ suff ^ ".c") in
+    let hstr = Quoted.string_to_list ("ffi." ^ name ^ suff ^ ".h") in
+    Pipeline.printProg (nenv, prg) cstr;
+    Pipeline.printProg (nenv, header) hstr;
+
+    let time = (Unix.gettimeofday() -. time) in
+    debug_msg debug (Printf.sprintf "Printed FFI glue code to file in %f s.." time)
+  | CompM.Err s ->
+    CErrors.user_err ~hdr:"ffi-glue-code" (str "Could not generate FFI glue code: " ++ pr_char_list s))

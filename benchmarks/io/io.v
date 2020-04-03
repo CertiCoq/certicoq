@@ -38,4 +38,5 @@ Definition prog {ffi : FFI} : IO unit :=
   name <- scan_string ;;
   print_string ("Hello " ++ name ++ "!").
 
-CertiCoq Compile prog.
+CertiCoq FFI -args 5 FFI.
+CertiCoq Compile -args 5 prog.

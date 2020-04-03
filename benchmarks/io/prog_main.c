@@ -5,29 +5,27 @@
 #include <time.h>
 #include "gc.h"
 
-/* 
-gcc -o wp_cps -Wno-everything -O2 wp_main.c gc.c Top.wp_cps.c glue.Top.wp_cps.c
-gcc -o wp_cps -Wno-everything -O2 wp_main.c gc.c Top.wp.c glue.Top.wp.c
-*/
-
 extern void body(struct thread_info *);
 extern value args[];
 
 extern struct thread_info;
-extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
-extern void print_Coq_Init_Datatypes_bool(unsigned long long);
-extern value get_Coq_Init_Datatypes_pair_args(unsigned long long);
-extern value get_Coq_Strings_String_string_tag(unsigned long long);
-extern value get_Coq_Init_Datatypes_bool_tag(unsigned long long);
+extern void print_Coq_Init_Datatypes_bool(value);
+extern value get_Coq_Init_Datatypes_pair_args(value);
+extern value get_Coq_Strings_String_string_tag(value);
+extern value get_Coq_Init_Datatypes_bool_tag(value);
 extern value make_Coq_Init_Datatypes_bool_true(void);
 extern value make_Coq_Init_Datatypes_bool_false(void);
 extern value make_Coq_Init_Datatypes_unit_tt(void);
 extern value make_Coq_Strings_String_string_EmptyString(void);
 extern value make_Coq_Strings_String_string_String(value, value, value**);
 extern void print_Coq_Init_Datatypes_unit(value);
-extern void* call(struct thread_info *tinfo, unsigned long long clos, unsigned long long arg0);
-
+extern void* call(struct thread_info *tinfo, value clos, value arg0);
 extern value make_Top_FFI_Build_FFI(value, value, value, value**);
+
+extern value const print_string_clo[2];
+extern value const scan_string_clo[2];
+extern value const print_time_clo[2];
+
 
 _Bool is_ptr(value s) {
   return (_Bool) Is_block(s);
@@ -42,9 +40,10 @@ unsigned char ascii_to_char(value x) {
   return c;
 }
 
-void print_string_2(struct thread_info *tinfo, value env, value *k, value world) { 
+value print_string(struct thread_info *tinfo, value s) {
   unsigned int tag;
-  value temp = *((unsigned long long *) env); // get the first thing in the env
+  value temp = s;
+
   while(1) {
     tag = get_Coq_Strings_String_string_tag(temp);
     if(tag == 1) {
@@ -58,41 +57,8 @@ void print_string_2(struct thread_info *tinfo, value env, value *k, value world)
   printf("\n");
   fflush(stdout);
 
-  value k_code = *(k + 0LLU);
-  value k_env = *(k + 1LLU);
-
-  value *pair = tinfo->alloc;
-  *((value *) pair + 0LLU) = 2048LLU;
-  *((value *) pair + 1LLU) = make_Coq_Init_Datatypes_unit_tt();
-  *((value *) pair + 2LLU) = world;
-  tinfo->alloc += 3;
-  pair += 1LLU;
-
-  ((void (*)(struct thread_info *, value, value)) k_code)(tinfo, k_env, pair);
-  return; 
+  return make_Coq_Init_Datatypes_unit_tt();
 }
-
-void print_string_1(struct thread_info *tinfo, value env, value *k, value s) { 
-  value *new_env = tinfo->alloc;
-  *((value *) new_env + 0LLU) = 2048LLU;
-  *((value *) new_env + 1LLU) = s;
-  *((value *) new_env + 2LLU) = env;
-  tinfo->alloc += 3;
-  new_env += 1LLU;
-
-  value *new_clo = tinfo->alloc;
-  *((value *) new_clo + 0LLU) = 2048LLU;
-  *((value *) new_clo + 1LLU) = print_string_2;
-  *((value *) new_clo + 2LLU) = new_env;
-  tinfo->alloc += 3;
-  new_clo += 1LLU;
-
-  value k_code = *(k + 0LLU);
-  value k_env = *(k + 1LLU);
-  ((void (*)(struct thread_info *, value, value)) k_code)(tinfo, k_env, new_clo);
-}
-
-value const print_string_clo[2] = { &print_string_1, 1LL, };
 
 value alloc_make_Coq_Strings_Ascii_ascii_Ascii(struct thread_info *tinfo, value arg0, value arg1, value arg2, value arg3, value arg4, value arg5, value arg6, value arg7)
 {
@@ -144,44 +110,20 @@ value string_to_value(struct thread_info *tinfo, char *s) {
   return temp;
 }
 
-void scan_string(struct thread_info *tinfo, value env, value *k, value world) { 
+value scan_string(struct thread_info *tinfo) { 
   char input[100];
   scanf("%s", input);
 
   value s = string_to_value(tinfo, input);
-  value *y = tinfo->alloc;
-  *(y + 0LLU) = 2048LLU;
-  *(y + 1LLU) = s;
-  *(y + 2LLU) = world;
-  y += 1LLU;
-  tinfo->alloc += 3;
-
-  value k_code = *(k + 0LLU);
-  value k_env = *(k + 1LLU);
-
-  ((void (*)(struct thread_info *, value, value)) k_code)(tinfo, k_env, y);
-  return; 
+  return s;
 }
-value const scan_string_clo[2] = { &scan_string, 1LL, };
 
-void print_time(struct thread_info *tinfo, value env, value *k, value world) { 
+value print_time(struct thread_info *tinfo) { 
   clock_t now = clock();
   printf("%lu\n", now);
   fflush(stdout);
-
-  value *y = tinfo->alloc;
-  *(y + 0LLU) = 2048LLU;
-  *(y + 1LLU) = 1;
-  *(y + 2LLU) = world;
-  y += 1LLU;
-  tinfo->alloc += 3;
-
-  value k_code = *(k + 0LLU);
-  value k_env = *(k + 1LLU);
-  ((void (*)(struct thread_info *, value, value)) k_code)(tinfo, k_env, y);
-  return; 
+  return make_Coq_Init_Datatypes_unit_tt(); 
 }
-value const print_time_clo[2] = { &print_time, 1LL, };
 
 value calls(struct thread_info* tinfo, value clos, unsigned int n, ...)
 {
@@ -190,7 +132,7 @@ value calls(struct thread_info* tinfo, value clos, unsigned int n, ...)
   va_start(args, n);
 
   for(; n != 0; n--) {
-    v = va_arg(args, unsigned long long);
+    v = va_arg(args, value);
     clos = call(tinfo, clos, v);
   }
   va_end(args);

@@ -171,9 +171,14 @@ Definition make_curried_fn
       (Efield (Ederef (Evar _tinfo (threadInf _thread_info))
                       (threadStructInf _thread_info))
               _alloc (tptr val)) in
+  (* e += n; *)
+  let self_incr (e : expr) (n : Z) :=
+      Sassign e (add e (c_int n val)) in
+  let ptr_self_incr (e : expr) (n : Z) :=
+      Sassign e (add ([tptr val] e) (c_int n val)) in
   (* tinfo->alloc += n; *)
   let alloc_incr (n : Z) :=
-      Sassign alloc_expr (add alloc_expr (c_int n tint)) in
+      self_incr alloc_expr n in
   (* Now, there are two different kinds of functions we can generate here.
      One for currying (if arity > 0) and
      one for calling linked C function from the extern. (if arity = 0) *)
@@ -206,7 +211,8 @@ Definition make_curried_fn
             Sassign (Field(var _pair, 0%Z)) (c_int 2048 val) ;;;
             Sassign (Field(var _pair, 1%Z)) (Evar _res val) ;;;
             Sassign (Field(var _pair, 2%Z)) (Evar _arg val) ;;;
-            alloc_incr 3%Z in
+            alloc_incr 3%Z ;;;
+            ptr_self_incr (Etempvar _pair val) 1%Z in
         ret (_pair,
              (_res, val) :: (_pair, val) :: args,
              multiple ss ;;; call ;;; s)
@@ -218,13 +224,15 @@ Definition make_curried_fn
             Sassign (Field(var _new_env, 0%Z)) (c_int 2048 val) ;;;
             Sassign (Field(var _new_env, 1%Z)) (Evar _arg val) ;;;
             Sassign (Field(var _new_env, 2%Z)) (Evar _env val) ;;;
-            alloc_incr 3%Z in
+            alloc_incr 3%Z ;;;
+            ptr_self_incr (Etempvar _new_env val) 1%Z in
         let create_clo :=
             Sassign (Etempvar _new_clo val) ([val] alloc_expr) ;;;
             Sassign (Field(var _new_clo, 0%Z)) (c_int 2048 val) ;;;
             Sassign (Field(var _new_clo, 1%Z)) (Evar _next_fn val) ;;;
             Sassign (Field(var _new_clo, 2%Z)) (Evar _new_env val) ;;;
-            alloc_incr 3%Z in
+            alloc_incr 3%Z ;;;
+            ptr_self_incr (Etempvar _new_clo val) 1%Z in
         ret (_new_clo,
              (_new_env, val) :: (_new_clo, val) :: nil,
              create_env ;;; create_clo)
@@ -252,7 +260,7 @@ Definition make_curried_fn
                                           Tvoid cc_default) noattr in
         multiple (skipn c_args
           (Sassign (Field(args_expr, Z.of_nat 1)) (Field(var _k, 1%Z)) ::
-            Sassign (Field(args_expr, Z.of_nat 2)) (Evar _ret val) :: nil)) ;;;
+           Sassign (Field(args_expr, Z.of_nat 2)) (Evar _ret val) :: nil)) ;;;
         Scall None ([ret_ty] (Field(var _k, 0%Z)))
               ((Evar _tinfo (threadInf _thread_info)) ::
                 firstn c_args ((Field(var _k, 1%Z)) :: (Evar _ret val) :: nil))

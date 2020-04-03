@@ -27,5 +27,8 @@ clean:
 	rm -f ./*.glob
 
 prog:
-	$(CCOMPILER) -o prog_cps -Wno-everything -O2 prog_main.c gc.c Top.prog_cps.c glue.Top.prog_cps.c
+	$(CCOMPILER) -o prog_cps -Wno-everything -O2 prog_main.c gc.c Top.prog_cps.c glue.Top.prog_cps.c ffi.Top.FFI_cps.c
 	# $(CCOMPILER) -o prog -Wno-everything -O2 prog_main.c gc_stack.c CertiCoq.Benchmarks.tests.prog.c glue.CertiCoq.Benchmarks.tests.prog.c
+
+debug:
+	$(CCOMPILER) -o prog_cps -Wno-everything prog_main.c gc.c Top.prog_cps.c glue.Top.prog_cps.c ffi.Top.FFI_cps.c -g

@@ -1116,6 +1116,11 @@ Section CConstructors.
     rest <- make_arg_list' n ;;
     ret (rev rest).
 
+
+  Variable toolbox : toolbox_info.
+  Let _thread_info : ident := thread_info_type _ (thread_info_info toolbox).
+  Let _alloc : ident := alloc_info _ (thread_info_info toolbox).
+
   Fixpoint constructors_from_ctors
           (name_ty : kername) (* like bool or nat *)
           (ctors : list ctor_info) (* name, arity, ordinal *)
@@ -1140,6 +1145,11 @@ Section CConstructors.
         rest <- constructors_from_ctors name_ty ctors ;;
         ret (f :: rest)
     | (* Boxed *) {| ctor_name := cname ; ctor_arity := ar ; ctor_ordinal := ord |} :: ctors =>
+        (* We generate two different kind of constructors,
+           one that takes an address to write to,
+           and one that writes to the GC heap. *)
+
+        (* 1st kind of constructor: takes address *)
         constr_fun_id <- gensym (make_name cname) ;;
         argv_ident <- gensym "argv" ;;
         arg_list <- make_arg_list ar ;;
@@ -1159,8 +1169,41 @@ Section CConstructors.
                            ; fn_temps := nil
                            ; fn_body := body
                            |})) in
+
+        (* 2nd kind of constructor: writes to GC heap *)
+        constr_fun_id <- gensym ("alloc_" ++ make_name cname) ;;
+        _tinfo <- gensym "tinfo" ;;
+        (* tinfo->alloc *)
+        let alloc_expr :=
+            (Efield (Ederef (Evar _tinfo (threadInf _thread_info))
+                            (threadStructInf _thread_info))
+                    _alloc (tptr val)) in
+        (* e += n; *)
+        let self_incr (e : expr) (n : Z) :=
+            Sassign e (add e (c_int n val)) in
+        (* tinfo->alloc += n; *)
+        let alloc_incr (n : Z) :=
+            self_incr alloc_expr n in
+
+        let body :=
+            Sassign (Etempvar argv_ident val) ([val] alloc_expr) ;;;
+            asgn_s ;;;
+            alloc_incr (Z.of_nat (S ar)) ;;;
+            Sreturn (Some (add (Evar argv_ident argvTy) (c_int 1%Z val))) in
+
+        let g := (constr_fun_id,
+                  Gfun (Internal
+                          {| fn_return := val
+                           ; fn_callconv := cc_default
+                           ; fn_params := ((_tinfo, threadInf _thread_info) :: nil)
+                                          ++ arg_list
+                           ; fn_vars := ((argv_ident, argvTy) :: nil)
+                           ; fn_temps := nil
+                           ; fn_body := body
+                           |})) in
+
         rest <- constructors_from_ctors name_ty ctors ;;
-        ret (f :: rest)
+        ret (f :: g :: rest)
     end.
 
   Fixpoint constructors_for_tys
@@ -1332,7 +1375,7 @@ Definition make_glue_program
   '(comp_tinfo, externs, toolbox) <- make_externs ;;
   singles <- (propagate_types >=> filter_prop_types) gs ;;
   name_defs <- make_name_arrays singles ;;
-  ctor_defs <- constructors_for_tys singles ;;
+  ctor_defs <- constructors_for_tys toolbox singles ;;
   structs <- args_structs_from_types singles ;;
   get_tag_defs <- get_enum_tag_from_types toolbox singles ;;
   make_printer_names singles;;

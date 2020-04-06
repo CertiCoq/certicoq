@@ -296,7 +296,7 @@ Definition valPtr : type :=
   Tpointer val {| attr_volatile := false; attr_alignas := None |}.
 
 Definition argvTy : type :=
-  Tpointer valPtr {| attr_volatile := false; attr_alignas := None |}.
+  Tpointer val {| attr_volatile := false; attr_alignas := None |}.
 
 Definition boolTy : type :=
   Tint IBool Unsigned noattr.

@@ -3,7 +3,7 @@
   for a vernacular command that takes an FFI type class:
 
   Class StringFFI : Type :=
-    Build_FFI
+    Build_StringFFI
       { print_string : string -> IO unit
       ; scan_string : IO string
       }.

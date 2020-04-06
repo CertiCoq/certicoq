@@ -349,7 +349,7 @@ Notation valPtr := (Tpointer val {| attr_volatile := false; attr_alignas := None
 Notation valPtrPtr := (Tpointer valPtr {| attr_volatile := false; attr_alignas := None |}).
 
 Notation argvTy :=
-  (Tpointer valPtr {| attr_volatile := false; attr_alignas := None |}).
+  (Tpointer val {| attr_volatile := false; attr_alignas := None |}).
 
 Notation boolTy := (Tint IBool Unsigned noattr).
 

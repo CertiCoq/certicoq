@@ -387,6 +387,75 @@ Inductive eval_env: env -> exp -> value -> Prop :=
       eval_env rho e e' ->
       eval_env rho (App_e f e) Prf_v.
 
+Fixpoint eval_env_f (rho : env) (e : exp) {struct e} : option value :=
+  match e with
+  | Var_e x => Some (nth (N.to_nat x) rho Prf_v)
+  | Lam_e na e1 => Some (Clos_v rho na e1)
+ (*
+  | App_e e1 e2 =>
+    match eval_env_f rho e1 with
+    | Some (Clos_v rho' na e1') =>
+      match eval_env_f rho e2 with
+      | Some v2 =>
+        eval_env_f (v2::rho') e1'
+      | None => None
+      end
+    | Some (ClosFix_v rho' efns n) =>
+      match enthopt (N.to_nat n) efns with
+      | Some e' => 
+        let rho'' := make_rec_env_rev_order efns rho' in
+        match eval_env_f rho e2 with
+        | Some v2 =>
+          eval_env_f rho'' (App_e e' (val_to_exp v2))
+        | None => None
+        end
+      | None => None
+      end
+    | Some Prf_v => Some Prf_v
+    | _ => None
+    end
+  *)
+  | Let_e na e1 e2 =>
+    match eval_env_f rho e1 with
+    | Some v1 =>
+      eval_env_f (v1::rho) e2
+    | None => None
+    end
+  | Con_e dc es =>
+    match eval_env_exps_f rho es with
+    | Some vs => Some (Con_v dc vs)
+    | None => None
+    end
+  | Fix_e efns n => Some (ClosFix_v rho efns n)
+  (*
+  | Match_e e1 n bs =>
+    match eval_env_f rho e1 with
+    | Some (Con_v dc vs) =>
+      match find_branch dc (N.of_nat (List.length vs)) bs with
+      | Some e' =>
+        eval_env_f ((List.rev vs) ++ rho) e'
+      | None => None
+      end
+    | _ => None
+    end
+   *)
+  | _ => Some (Prf_v)
+  end
+with eval_env_exps_f (rho : env) (es : exps) {struct es} : option (list value) :=
+       match es with
+       | enil => Some nil
+       | econs e es' =>
+         match eval_env_f rho e with
+         | Some e' => 
+           match eval_env_exps_f rho es' with
+           | Some es'' => Some (cons e' es'')
+           | None => None
+           end
+         | None => None
+         end
+       end.
+         
+
 (* not being used for semantics *)
 Inductive evals_env: env -> exps -> list value -> Prop :=
 | evals_nil: forall (rho: env),

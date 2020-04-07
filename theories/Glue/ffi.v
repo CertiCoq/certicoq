@@ -73,7 +73,6 @@ Section FState.
 
 End FState.
 
-
 (* Takes a MetaCoq type for an FFI function,
    returns its arity and whether it's in IO. *)
 Fixpoint type_to_args
@@ -83,6 +82,17 @@ Fixpoint type_to_args
       let (n, b) := type_to_args e' in (S n, b)
   | Ast.tApp (Ast.tConst "Top.IO"%string _) _ => (0, true)
   | _ => (0, false)
+  end.
+
+(* Takes a MetaCoq constructor type (a pi type),
+   skips the number of parameters in the type.
+   Doesn't fail if there aren't enough pi types etc. *)
+Fixpoint skip_params
+         (params : nat)
+         (e : Ast.term) : Ast.term :=
+  match params, e with
+  | S params', Ast.tProd _ _ e' => skip_params params' e'
+  | _ , _ => e
   end.
 
 (* Same function as [repeat] but for [typelist]s instead of [list]s. *)
@@ -296,7 +306,7 @@ Fixpoint make_curried_fns
       match rest with
       | nil =>
           (* There will always be a world function for 0 arity *)
-          log "Impossible: no world function" ;; failwith "Impossible"
+          failwith "Impossible: no world function"
       | (_prev_fn, _) :: _ =>
           d <- make_curried_fn kn num arity _prev_fn ;;
           ret (d :: rest)
@@ -322,7 +332,7 @@ Definition make_one_field
                val cc_default)) in
   rest <- make_curried_fns kn arity arity _extern_fn ;;
   match rest with
-  | nil => log "No curried functions!" ;; failwith ""
+  | nil => failwith "No curried functions!"
   | (_entry, _) :: _ =>
     _clo <- gensym (kn ++ "_clo") ;;
     let clo_ty := tarray val 2 in
@@ -376,7 +386,6 @@ Definition get_constructors
            (p : Ast.program)
            : ffiM (list (kername * Ast.term)) :=
   let '(globs, _) := p in
-  let err := failwith "Couldn't get the type." in
 
   let fix pi_types_to_class_fields
           (e : Ast.term) : ffiM (list (kername * Ast.term)) :=
@@ -386,22 +395,26 @@ Definition get_constructors
         rest <- pi_types_to_class_fields e' ;;
         ret ((field_name, t) :: rest)
     | Ast.tRel _ => ret nil
+    | Ast.tApp _ _ => ret nil
     | _ =>
-      log "Unrecognized pattern in converting pi types to class fields." ;; err
+      failwith "Unrecognized pattern in converting pi types to class fields."
     end in
 
   match last_error globs with
   | Some (ind_name, Ast.InductiveDecl mut) =>
+      (* Assuming we don't have mutually recursive type classes *)
       match Ast.ind_bodies mut with
       | one :: nil =>
           match Ast.ind_ctors one with
-          | (_, pi_types, _ ) :: nil => pi_types_to_class_fields pi_types
-          | _ => log "Not a single constructor in the type." ;; err
+          | (_, pi_types, _ ) :: nil =>
+              let pi_types' := skip_params (Ast.ind_npars mut) pi_types in
+              pi_types_to_class_fields pi_types'
+          | _ => failwith "Not a single constructor in the type."
           end
-      | _ => log "Not a single type in the mutually inductive block." ;; err
+      | _ => failwith "Not a single type in the mutually inductive block."
       end
-  | Some _ => log "The last declaration is not an inductive declaration." ;; err
-  | None => log "The quoted term didn't contain any inductive types." ;; err
+  | Some _ => failwith "The last declaration is not an inductive declaration."
+  | None => failwith "The quoted term didn't contain any inductive types."
   end.
 
 Definition generate_ffi

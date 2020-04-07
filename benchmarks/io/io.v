@@ -1,42 +1,38 @@
 Require Import Arith List String.
 Require Import ExtLib.Structures.Monad.
-Require Import ExtLib.Data.Monads.StateMonad.
 From CertiCoq.Plugin Require Import CertiCoq.
 
 Import MonadNotation.
 Open Scope monad_scope.
 
-Module Type IO_Type.
-  Parameter World : Type.
-  Parameter IO : Type -> Type.
-  Parameter IO_Monad : Monad IO.
-End IO_Type.
-
-Module IO_Defs <: IO_Type.
-  Axiom World : Type.
-  (* Definition World := unit. *)
-  Definition IO (A : Type) : Type := World -> A * World.
-  Instance IO_Monad : Monad IO :=
-    { ret  := fun _ v => fun s => (v, s)
-    ; bind := fun _ _ c1 c2 => fun s => let (v, s) := c1 s in (c2 v) s
+Class IO_Types : Type :=
+  Build_IO_Types
+    { World : Type
+    ; IO : Type -> Type
     }.
-End IO_Defs.
 
-Import IO_Defs.
+Class IO_Impl `{IO_Types} : Type :=
+  Build_IO_Impl
+    { io_ret : forall (A : Type), A -> IO A
+    ; io_bind : forall (A B : Type), IO A -> (A -> IO B) -> IO B
+    }.
 
-Instance IO_Monad : Monad IO := IO_Monad.
+Instance IO_Monad `{IO_Impl} : Monad IO :=
+  { ret  := io_ret
+  ; bind := io_bind
+  }.
 
-Class FFI : Type :=
-  Build_FFI
+Class StringFFI `{IO_Impl} : Type :=
+  Build_StringFFI
     { print_string : string -> IO unit
     ; scan_string : IO string
-    ; print_time : IO unit
     }.
 
-Definition prog {ffi : FFI} : IO unit :=
+Definition prog `{StringFFI} : IO unit :=
   print_string "What's your name?" ;;
   name <- scan_string ;;
   print_string ("Hello " ++ name ++ "!").
 
-CertiCoq FFI -args 5 FFI.
-CertiCoq Compile -args 5 prog.
+CertiCoq FFI IO_Impl.
+CertiCoq FFI StringFFI.
+CertiCoq Compile prog.

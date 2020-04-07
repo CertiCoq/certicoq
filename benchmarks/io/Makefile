@@ -23,12 +23,13 @@ clean:
 	rm -f ./*.*.h
 	rm -f ./glue.*.*.c
 	rm -f ./glue.*.*.h
+	rm -f ./ffi.*.*.c
+	rm -f ./ffi.*.*.h
 	rm -f ./*.vo
 	rm -f ./*.glob
 
 prog:
-	$(CCOMPILER) -o prog_cps -Wno-everything -O2 prog_main.c gc.c Top.prog_cps.c glue.Top.prog_cps.c ffi.Top.FFI_cps.c
-	# $(CCOMPILER) -o prog -Wno-everything -O2 prog_main.c gc_stack.c CertiCoq.Benchmarks.tests.prog.c glue.CertiCoq.Benchmarks.tests.prog.c
+	$(CCOMPILER) -o prog_cps -Wno-everything -O2 prog_main.c gc.c Top.prog_cps.c glue.Top.prog_cps.c ffi.Top.IO_Impl_cps.c ffi.Top.StringFFI_cps.c
 
 debug:
-	$(CCOMPILER) -o prog_cps -Wno-everything prog_main.c gc.c Top.prog_cps.c glue.Top.prog_cps.c ffi.Top.FFI_cps.c -g
+	$(CCOMPILER) -o prog_cps -Wno-everything prog_main.c gc.c Top.prog_cps.c glue.Top.prog_cps.c ffi.Top.IO_Impl_cps.c ffi.Top.StringFFI_cps.c -g

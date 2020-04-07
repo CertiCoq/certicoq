@@ -555,6 +555,26 @@ Definition FunsFVs (ζ : var -> option (var * fun_tag * list var)) : Ensemble va
   fun v => exists f f' ft' fvs, ζ f = Some (f', ft', fvs) /\
                         Ensembles.In _ (FromList fvs) v.
 
+Inductive Make_wrappers :
+  (var -> option (var * fun_tag * list var)) ->
+  (var -> var) ->
+  fundefs ->
+  Ensemble var ->
+  exp_ctx ->
+  Ensemble var ->
+  (var -> var) ->
+  Prop :=
+| MW_Fnil :
+    forall ζ σ S, Make_wrappers ζ σ Fnil S Hole_c S σ
+| MW_Fcons :
+    forall  (ζ : var -> option (var * fun_tag * list var)) σ σ' f ft xs xs' e B C S S' f' ft' fvs g,
+      ζ f = Some (f', ft', fvs) ->
+      (FromList xs') \subset S ->
+      g \in (S \\ FromList xs') ->
+      Make_wrappers ζ (σ {f ~> g}) B (S \\ FromList xs' \\ [set g]) C S' σ ->
+      Make_wrappers ζ σ (Fcons f ft xs e B) S (Efun1_c (Fcons f ft xs' (Eapp f' ft' (xs' ++ (map σ fvs))) Fnil) C) S' σ'. 
+
+
 Inductive Exp_lambda_lift :
   (var -> option (var * fun_tag * list var)) ->
   (var -> var) ->
@@ -579,15 +599,38 @@ Inductive Exp_lambda_lift :
     forall ζ σ x t N y e e' S S',
       Exp_lambda_lift ζ (σ {x ~> x}) e S e' S' ->
       Exp_lambda_lift ζ σ (Eproj x t N y e) S (Eproj x t N (σ y) e') S'
-| LL_Efun :
+| LL_Efun1 : (* wrappers are mutually defined *)
     forall B B' e e' σ σ' ζ ζ' fvs S S' S'' S''',
       Included _ (FromList fvs) (Union _ (occurs_free_fundefs B)
                                        (Union _ (FunsFVs ζ) (LiftedFuns ζ))) ->
       NoDup fvs ->
       Add_functions B fvs σ ζ S σ' ζ' S' ->
-      Fundefs_lambda_lift ζ' σ' B S' B' S'' ->
+      Fundefs_lambda_lift1 ζ' σ' B S' B' S'' ->
       Exp_lambda_lift ζ' σ' e S'' e' S''' ->
       Exp_lambda_lift ζ σ (Efun B e) S (Efun B' e') S'''
+| LL_Efun2 : (* wrappers are defined *)
+    forall B B' e e' C σ σ' σ'' ζ ζ' fvs S S' S'' S''' S'''',
+      Included _ (FromList fvs) (Union _ (occurs_free_fundefs B)
+                                       (Union _ (FunsFVs ζ) (LiftedFuns ζ))) ->
+      NoDup fvs ->
+      Add_functions B fvs σ ζ S σ' ζ' S' ->
+      Fundefs_lambda_lift2 ζ' σ' B S' B' S'' ->
+      Make_wrappers ζ σ' B S'' C S''' σ'' ->
+      Exp_lambda_lift ζ' σ'' e S''' e' S'''' ->
+      Exp_lambda_lift ζ σ (Efun B e) S (Efun B' (C|[ e' ]|)) S''''
+| LL_Efun3 : (* No Lambda Lifting *)
+    forall B e e' σ ζ S S',
+      Exp_lambda_lift ζ σ e S e' S' ->
+      Exp_lambda_lift ζ σ (Efun B e) S (Efun B e') S'
+| LL_Eletapp_known :
+    forall ζ σ x f ft xs e e' f' ft' fvs S S',
+      ζ f = Some (f', ft', fvs) ->
+      Exp_lambda_lift ζ σ e S e' S' ->
+      Exp_lambda_lift ζ σ (Eletapp x f ft xs e) S (Eletapp x (σ f') ft' (map σ (xs ++ fvs)) e') S'
+| LL_Eletapp_unknown :
+    forall ζ σ x f ft xs e e' S S',
+      Exp_lambda_lift ζ σ e S e' S' ->
+      Exp_lambda_lift ζ σ (Eletapp x f ft xs e) S (Eletapp x f ft xs e') S'
 | LL_Eapp_known :
     forall ζ σ f ft xs f' ft' fvs S,
       ζ f = Some (f', ft', fvs) -> 
@@ -602,7 +645,7 @@ Inductive Exp_lambda_lift :
 | LL_Ehalt :
     forall ζ σ x S,
       Exp_lambda_lift ζ σ (Ehalt x) S (Ehalt (σ x)) S
-with Fundefs_lambda_lift :
+with Fundefs_lambda_lift1 :
   (var -> option (var * fun_tag * list var)) ->
   (var -> var) ->
   fundefs ->
@@ -610,7 +653,7 @@ with Fundefs_lambda_lift :
   fundefs ->
   Ensemble var ->
   Prop :=
-     | LL_Fcons :
+     | LL_Fcons1 :
          forall ζ σ f ft xs xs' e e' B B' S S' S'' f' ft' fvs ys,
            ζ f = Some (f', ft', fvs) ->
            Included _ (FromList ys) S ->
@@ -621,12 +664,36 @@ with Fundefs_lambda_lift :
            Exp_lambda_lift ζ (σ <{ (xs ++ fvs) ~> (xs ++ ys) }>)
                            e (Setminus _ (Setminus _ S (FromList ys)) (FromList xs'))
                            e' S' ->
-           Fundefs_lambda_lift ζ σ B S' B' S'' ->
-           Fundefs_lambda_lift ζ σ (Fcons f ft xs e B) S
-                               (Fcons f' ft' (xs ++ ys) e'
-                                      (Fcons f ft xs'
-                                             (Eapp f' ft' (xs' ++ (map σ fvs))) B')) S''
-     | LL_Fnil :
+           Fundefs_lambda_lift1 ζ σ B S' B' S'' ->
+           Fundefs_lambda_lift1 ζ σ (Fcons f ft xs e B) S
+                                (Fcons f' ft' (xs ++ ys) e'
+                                       (Fcons f ft xs'
+                                              (Eapp f' ft' (xs' ++ (map σ fvs))) B')) S''
+     | LL_Fnil1 :
          forall ζ σ S,
-           Fundefs_lambda_lift ζ σ Fnil S Fnil S.
+           Fundefs_lambda_lift1 ζ σ Fnil S Fnil S
+with Fundefs_lambda_lift2 :
+  (var -> option (var * fun_tag * list var)) ->
+  (var -> var) ->
+  fundefs ->
+  Ensemble var ->
+  fundefs ->
+  Ensemble var ->
+  Prop :=
+     | LL_Fcons2 :
+         forall ζ σ f ft xs xs' e e' B B' S S' S'' f' ft' fvs ys,
+           ζ f = Some (f', ft', fvs) ->
+           Included _ (FromList ys) S ->
+           Included _ (FromList xs') (Setminus _ S (FromList ys)) ->
+           NoDup ys -> NoDup xs' ->
+           length ys = length fvs ->
+           Exp_lambda_lift ζ (σ <{ (xs ++ fvs) ~> (xs ++ ys) }>)
+                           e (Setminus _ S (FromList ys))
+                           e' S' ->
+           Fundefs_lambda_lift2 ζ σ B S' B' S'' ->
+           Fundefs_lambda_lift2 ζ σ (Fcons f ft xs e B) S
+                                (Fcons f' ft' (xs ++ ys) e' B') S''
+     | LL_Fnil2 :
+         forall ζ σ S,
+           Fundefs_lambda_lift2 ζ σ Fnil S Fnil S.
 

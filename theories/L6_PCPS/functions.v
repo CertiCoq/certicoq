@@ -1129,3 +1129,28 @@ Proof.
   intros Hin1 Hsub x1 x2 H1 H2 Heq. eapply Hin1; eauto.
   rewrite !Hsub; eassumption.
 Qed.
+
+
+(** * left inverse properties *)
+
+Definition left_inverse {A B} (f : A -> B) (h : B -> A) :=
+  f_eq  (f ∘ h) id.
+
+
+Parameter (M : nat).
+
+
+Definition f (c : nat) := (c + M*c)%nat.
+
+Definition h (x : nat) := (x/(1 + M))%nat.
+
+Lemma left_inverse_f : left_inverse h f.
+Proof.
+  unfold left_inverse, f_eq, h, f, compose. intros x. 
+  replace x with (1 * x)%nat at 1 by omega.
+  rewrite <- Nat.mul_add_distr_r.
+  rewrite Nat.mul_comm.                       
+  rewrite Nat.div_mul; try omega.
+  reflexivity.
+Qed.
+d

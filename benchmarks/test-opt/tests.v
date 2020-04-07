@@ -60,15 +60,15 @@ CertiCoq Compile -anf -o1 -ext "_opt" clos.
 (* CertiCoq Show IR -anf -debug -o1 -ext "_opt" clos. *)
 
 
-Definition addxy (x y : nat) (l : list nat) := 
+Definition addxy (x y w : nat) (l : list nat) := 
   let f := (fix aux l :=
      match l with
      | [] => []
-     | z :: zs => (z + x + y) :: aux zs
+     | z :: zs => (z + x + y + w) :: aux zs
      end) in
   f l. 
 
-Definition rec_clos := addxy 1 2 (List.repeat 0 (100*500)).
+Definition rec_clos := addxy 1 2 3 (List.repeat 0 (100*500)).
 
 CertiCoq Compile -ext "_cps" rec_clos.
 CertiCoq Compile -o1 -ext "_cps_opt" rec_clos.
@@ -76,10 +76,10 @@ CertiCoq Compile -anf rec_clos.
 CertiCoq Compile -anf -o1 -ext "_opt" rec_clos.
 
 Definition repeat {A} (x : A) (n : nat) : list A :=
-  (fix aux (x : A) (n : nat) acc :=
+  (fix rep (x : A) (n : nat) acc :=
      match n with
      | 0 => acc
-     | S k => aux x k (x :: acc)
+     | S k => rep x k (x :: acc)
      end) x n [].
 
 
@@ -91,7 +91,15 @@ Definition intxy (x y w : nat) (l : list nat):=
      end) in
   f l [].
 
-Definition rec_clos2 := intxy 1 2 3 (repeat 0 (1000*500)).
+Definition intxy' (x y w : nat) (l : list nat) := 
+  let f := (fix aux l :=
+     match l with
+     | [] => []  
+     | z :: zs => z :: x :: y :: w :: aux zs
+     end) in
+  f l.
+
+Definition rec_clos2 := intxy 1 2 3 (repeat 0 (100*500)).
 
 CertiCoq Compile -ext "_cps" rec_clos2.
 CertiCoq Compile -o1 -ext "_cps_opt" rec_clos2.
@@ -112,17 +120,23 @@ CertiCoq Show IR -anf -o1 -ext "_opt" rec_clos2.
 (*       end *)
 (*     end. *)
 
+(* Fixpoint merge (l1 l2:list nat) acc : list nat := *)
+(*   match l1, l2 with *)
+(*   | nil, _ => l2 *)
+(*   | _, nil => l1 *)
+(*   | x1::l1', x2::l2' => *)
+(*     if leb x1 x2 then x1 :: merge l1' l2 *)
+(*     else *)
+(*       x2 :: (fix merge_aux (l2:list nat) := *)
+(*                match l2 with *)
+(*                | nil => l1 *)
+(*                | x2::l2' => *)
+(*                  if leb x1 x2 then x1::merge l1' l2 *)
+(*                  else x2:: merge_aux l2' *)
+(*                end) l2' *)
+(*          end. *)
 
-(* Fixpoint test (m n : nat) := *)
-(*   fix aux (l : nat) := *)
-(*     match m with *)
-(*     | 0 => n + 1 *)
-(*     | S m => *)
-(*       match l with *)
-(*       | 0 => test m 1 *)
-(*       | S n => ack m (aux n) *)
-(*       end *)
-(*     end. *)
+
 
 
 (* TODO: Eventually move somewhere else and also add the option to print help.

@@ -9,8 +9,8 @@ extern void body(struct thread_info *);
 extern value args[];
 
 extern struct thread_info;
-extern value get_Coq_Strings_String_string_tag(value);
-extern value get_Coq_Init_Datatypes_bool_tag(value);
+extern unsigned int get_Coq_Strings_String_string_tag(value);
+extern unsigned int get_Coq_Init_Datatypes_bool_tag(value);
 extern value make_Coq_Init_Datatypes_bool_true(void);
 extern value make_Coq_Init_Datatypes_bool_false(void);
 extern value make_Coq_Init_Datatypes_unit_tt(void);
@@ -43,15 +43,13 @@ unsigned char ascii_to_char(value x) {
 }
 
 value print_string(struct thread_info *tinfo, value s) {
-  unsigned int tag;
   value temp = s;
 
   while(1) {
-    tag = get_Coq_Strings_String_string_tag(temp);
+    unsigned int tag = get_Coq_Strings_String_string_tag(temp);
     if(tag == 1) {
-        printf("%c", ascii_to_char(temp));
-        fflush(stdout);
-        temp = *((value *) temp + 1ULL);
+      printf("%c", ascii_to_char(temp));
+      temp = *((value *) temp + 1ULL);
     } else {
       break;
     }

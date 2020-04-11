@@ -387,6 +387,7 @@ Inductive eval_env: env -> exp -> value -> Prop :=
       eval_env rho e e' ->
       eval_env rho (App_e f e) Prf_v.
 
+(* fuel-based interpreter *)
 Fixpoint eval_env_f (n : nat) (rho : env) (e : exp) : option value :=
   match n with
   | O => None

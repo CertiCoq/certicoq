@@ -866,6 +866,20 @@ Proof.
     repeat eexists; eauto.
 Qed.
 
+Lemma domain_extend_is_Some_Same_set {A} f x (y : A) :
+  domain (f {x ~> Some y}) <--> (domain f :|: [set x]).
+Proof. 
+  split; intros z H.
+  - destruct H as [w H'].
+    destruct (peq x z); subst; eauto.
+    rewrite extend_gso in H'; eauto. left.
+    eexists; eauto.
+  - destruct (peq x z); subst; eauto.
+    + eexists. rewrite extend_gss; eauto.
+    + inv H. destruct H0.
+      eexists. rewrite extend_gso; eauto.
+      inv H0; congruence.
+Qed.
 
 (** * Lemmas about [image'] *)
 
@@ -973,11 +987,77 @@ Proof.
       rewrite extend_gss. reflexivity.
 Qed.
 
+Lemma image'_Singleton_is_Some {A B} (f : A -> option B) x y :
+  f x = Some y ->
+  (image' f ([set x])) <--> [set y].
+Proof.
+  split; intros z H'.
+  - destruct H' as [w [Hin Heq ]].
+    inv Hin. rewrite Heq in H; inv H. eauto.
+  - inv H'. eexists; split; eauto.
+Qed.
+
+Lemma image'_extend_is_Some {B} f x y S :
+  Included B (image' (f {x ~> Some y}) S)
+           (Union _ (image' f (Setminus _ S (Singleton _ x))) (Singleton _ y)).
+Proof.
+  intros z H'. 
+  destruct H' as [w [Hin Heq ]].
+  destruct (peq x w); subst.
+  - rewrite extend_gss in Heq. inv Heq.
+    eauto.
+  - rewrite extend_gso in Heq; eauto.
+    left. eexists; split; eauto.
+    constructor; eauto. intros Hc; inv Hc; congruence.
+Qed.
+
+Lemma image'_extend_is_Some_In_P {B} f x y S :
+  In _ S x ->
+  Same_set B (image' (f {x ~> Some y}) S)
+           (Union _ (image' f (Setminus _ S (Singleton _ x))) (Singleton _ y)).
+Proof.
+  intros Hin. split.
+  - now apply image'_extend_is_Some; eauto.
+  - intros z H'. inv H'.
+    + destruct H as [w [Hin' Heq]].
+      destruct (peq x w); subst.
+      * inv Hin'. exfalso; eauto.
+      * inv Hin'. eexists; split; eauto.
+        rewrite extend_gso; eauto.
+    + inv H. eexists; split; eauto.
+      rewrite extend_gss; eauto.
+Qed.
+
+Lemma image'_extend_is_Some_not_In_P {B} f x y S :
+  ~ In _ S x ->
+  Same_set B (image' (f {x ~> Some y}) S) (image' f S).
+Proof.
+  intros Hnin. split.
+  - intros z H'. 
+    destruct H' as [w [Hin Heq ]].
+    destruct (peq x w); subst.
+    + rewrite extend_gss in Heq. inv Heq. exfalso; eauto.
+    + rewrite extend_gso in Heq; eauto.
+      eexists; split; eauto.
+  - intros z [w [Hin Heq]]. 
+    destruct (peq x w); subst.
+    + exfalso; eauto.
+    + eexists; split; eauto. rewrite extend_gso; eauto.
+Qed.
+
 Instance Proper_image'_Same_set {A B} :
   Proper (eq ==> Same_set A ==> Same_set B) image'.
 Proof.
   intros f1 f2 Hfeq s1 s2 Hseq; split; intros x [y [Hin Heq]];
-  subst; eexists; split; eauto; eapply Hseq; eauto.
+    subst; eexists; split; eauto; eapply Hseq; eauto.
+Qed.
+
+Lemma image'_feq_subdomain {A B} (f1 f2 : A -> option B) S :
+  f_eq_subdomain S f1 f2 ->
+  image' f1 S <--> image' f2 S.
+Proof.
+  intros Heq; split; intros x [y [Hin Heq']]; eexists; split; eauto.
+  now rewrite <- Heq; eauto. now rewrite Heq; eauto.
 Qed.
 
 
@@ -1153,4 +1233,3 @@ Proof.
   rewrite Nat.div_mul; try omega.
   reflexivity.
 Qed.
-d

@@ -1803,6 +1803,24 @@ Proof.
   intros Hc; eapply H0; constructor; eauto.
 Qed.
 
+
+Lemma Setminus_Setminus_Same_set A (S1 S2 S3 : Ensemble A) :
+  Decidable S3 ->
+  S3 \subset S1 ->
+  (S1 \\ (S2 \\ S3)) <--> ((S1 \\ S2) :|: S3).
+Proof.
+  intros Hd Hin. split.
+  now apply Setminus_Setminus_Included.
+  destruct Hd as [D]. intros x H. destruct (D x) as [Hin' | Hnin].
+  - constructor. now eapply Hin.
+    intros Hc; inv Hc; eauto.
+  - inv H.
+    + inv H0. constructor; eauto. intros Hc.
+      inv Hc; eauto.
+    + exfalso; eauto.
+Qed.
+
+
 Lemma Same_set_Intersection_Setminus {A: Type} (S1 S2 S3 : Ensemble A)
       {_ : Decidable S3}:
   S2 \subset S3 ->

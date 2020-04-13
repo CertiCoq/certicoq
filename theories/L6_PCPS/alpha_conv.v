@@ -822,6 +822,31 @@ Section Alpha_conv_correct.
     eexists; split; eauto. eapply preord_val_monotonic; eauto.
   Qed.
 
+  Lemma preord_env_P_inj_extend_not_In_P_r k S σ rho1 rho2 x y :
+    preord_env_P_inj S k σ rho1 rho2 -> 
+    ~ x \in S ->
+    preord_env_P_inj S k (σ {x ~> y}) rho1 rho2.
+  Proof.
+    intros Hpre Hnin z Hp v1 Hget.
+    edestruct Hpre as [v2 [Hget2 Hpre2]]; eauto.
+    repeat eexists; eauto. rewrite extend_gso; eauto.
+    intros Hc. subst. contradiction.
+  Qed.
+
+  Lemma preord_env_P_inj_set_extend_not_In_P_r S k f rho1 rho2 x y v :
+    preord_env_P_inj S k f rho1 rho2 ->
+    ~ x \in S ->
+    ~ y \in (image f S) ->
+    preord_env_P_inj S k (f {x ~> y}) rho1 (M.set y v rho2).
+  Proof.
+    intros Henv Hnin Hnin' z Hy v' Hget.
+    edestruct Henv as [v'' [Hget' Hv]]; eauto.
+    eexists; split; eauto.
+    rewrite extend_gso, M.gso. eassumption.
+    intros Hc; subst. eapply Hnin'. now eexists; eauto.
+    intros Hc. subst. contradiction.
+  Qed.  
+
   Global Instance preord_env_P_inj_proper  :
     Proper (Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
            preord_env_P_inj.

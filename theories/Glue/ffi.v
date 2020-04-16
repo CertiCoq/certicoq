@@ -269,8 +269,8 @@ Definition make_curried_fn
         let ret_ty := Tpointer (Tfunction (Tcons (threadInf _thread_info) forcelist)
                                           Tvoid cc_default) noattr in
         multiple (skipn c_args
-          (Sassign (Field(args_expr, Z.of_nat 1)) (Field(var _k, 1%Z)) ::
-           Sassign (Field(args_expr, Z.of_nat 2)) (Evar _ret val) :: nil)) ;;;
+          (Sassign (Field(args_expr, Z.of_nat 0)) (Field(var _k, 1%Z)) ::
+           Sassign (Field(args_expr, Z.of_nat 1)) (Evar _ret val) :: nil)) ;;;
         Scall None ([ret_ty] (Field(var _k, 0%Z)))
               ((Evar _tinfo (threadInf _thread_info)) ::
                 firstn c_args ((Field(var _k, 1%Z)) :: (Evar _ret val) :: nil))

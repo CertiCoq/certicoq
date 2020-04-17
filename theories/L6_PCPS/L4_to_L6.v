@@ -17,6 +17,7 @@ Require Import cps.
 Require Import cps_show.
 Require Import eval.
 Require Import ctx.
+Require Import alpha_conv.
 
 Require Import ExtLib.Data.Monads.OptionMonad.
 Require Import ExtLib.Structures.Monads.
@@ -104,6 +105,23 @@ Definition gensym_n : symgen -> list name -> (list var * symgen) :=
                   let '(ilst, nenv', next) := gensym_n' i nenv nlst in
                   (ilst, SG (next, nenv'))
                 end.
+
+Fixpoint gensym_n_nAnon' (i : var) (env : name_env )
+         (n : nat) : (list var * name_env * var) :=
+  match n with
+  | O => (nil, env, i)
+  | S n' =>
+    let env' := M.set i nAnon env in
+    let '(vlst, env'', next_var) := gensym_n_nAnon' (Pos.succ i) env' n' in
+    (i::vlst, env'', next_var)
+  end.
+
+Definition gensym_n_nAnon (s : symgen) (n : nat) : (list var * symgen) :=
+  match s with
+    SG (i, nenv) =>
+    let '(ilist, nenv', next_var) := gensym_n_nAnon' i nenv n in
+    (ilist, SG (next_var, nenv'))
+  end.
 
 Fixpoint gen_nlst (n : nat) : list name :=
   match n with
@@ -276,7 +294,6 @@ Fixpoint cps_cvt_exps (ts : list (cps.exp * var * var)) (vx : list var) (k : var
   end.
 
 (* returns cps exp, var and next fresh var *)
-(* use monadic interface to get fresh variable *)
 Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
          (tgm : constr_env) : option (cps.exp * symgen) :=
   match e with
@@ -428,6 +445,70 @@ with cps_cvt_branches (bl : expression.branches_e) (vn : list var) (k : var)
                ret ((tg, app_ctx_f ctx_p ce)::cbl, next)
        end.
 
+Inductive fresh_var : var -> symgen -> Prop :=
+| is_fresh :
+    forall v1 v2 nenv,
+      (v1 >= v2)%positive ->
+      fresh_var v1 (SG (v2, nenv)). 
+
+(* scratch *)
+(* how to ensure fresh variables? *)
+Inductive cps_cvt_rel : expression.exp -> list var -> var -> cps.exp -> Prop :=
+| e_Var :
+    forall v vn x k,
+      v = (nth vn (N.to_nat x)) ->
+      cps_cvt_rel (Var_e x) vn k (cps.Eapp k kon_tag (v::nil))
+| e_Lam :
+    forall na e1 e1' x1 vn k k1 f,
+      cps_cvt_rel e1 (x1::vn) k1 e1' ->
+      cps_cvt_rel (Lam_e na e1) vn k (cps.Efun
+                                        (Fcons f func_tag (x1::k1::nil) e1' Fnil)
+                                        (cps.Eapp k kon_tag (f::nil)))
+| e_App :
+    forall e1 e1' e2 e2' k k1 k2 x1 x2 vn,
+      cps_cvt_rel e1 vn k1 e1' ->
+      cps_cvt_rel e2 vn k2 e2' ->
+      cps_cvt_rel (App_e e1 e2)
+                  vn
+                  k
+                  (cps.Efun
+                     (Fcons k1 kon_tag (x1::nil)
+                            (cps.Efun
+                               (Fcons k2 kon_tag (x2::nil)
+                                      (cps.Eapp x1 func_tag
+                                                (x2::k::nil)) Fnil)
+                               e2') Fnil)
+                     e1')
+| e_Let :
+    forall na e1 e1' e2 e2' x vn k k1,
+      cps_cvt_rel e2 (x::vn) k e2' ->
+      cps_cvt_rel e1 vn k1 e1' ->
+      cps_cvt_rel (Let_e na e1 e2) vn k (cps.Efun
+                                           (Fcons k1 kon_tag (x::nil) e2' Fnil)
+                                           e1')
+| e_Fix :
+    forall fnlst i i' nlst vn k fdefs,
+      List.length nlst = efnlength fnlst ->
+      cps_cvt_rel_efnlst fnlst (nlst ++ vn) nlst fdefs ->
+      i' = (nth nlst (N.to_nat i)) ->
+      cps_cvt_rel (Fix_e fnlst i) vn k (cps.Efun fdefs
+                                                 (cps.Eapp k kon_tag (i'::nil)))
+with cps_cvt_rel_efnlst :
+       expression.efnlst -> list var -> list var -> fundefs -> Prop :=
+     | e_Eflnil :
+         forall vn nlst,
+           cps_cvt_rel_efnlst eflnil vn nlst Fnil
+     | e_Eflcons :
+         forall vn nlst e1 e1' fnlst' fdefs' cvar n1 na x k',
+           cps_cvt_rel e1 (x::vn) k' e1' ->
+           cps_cvt_rel_efnlst fnlst' vn (List.tl nlst) fdefs' ->
+           List.hd_error nlst = Some cvar ->
+           cps_cvt_rel_efnlst
+             (eflcons n1 (Lam_e na e1) fnlst')
+             vn
+             nlst
+             (Fcons cvar func_tag (x::k'::nil) e1' fdefs').                       
+
 
 Definition convert_top (ee:ienv * expression.exp) :
   option (ctor_env * name_env * fun_env * ctor_tag * ind_tag * cps.exp) :=
@@ -455,7 +536,6 @@ Fixpoint rho_names (rho : exp_eval.env) : list name :=
     let na := nNamed "rho_elt"%string in
     (na :: (rho_names rho'))
   end.
-
 
 Fixpoint cps_cvt_val (v : exp_eval.value) (next : symgen)
          (tgm : constr_env) {struct v} : option (cps.val * symgen) :=
@@ -516,16 +596,29 @@ Fixpoint cps_cvt_env (vs : list exp_eval.value) (next : symgen)
           ret (cons v' vs'', next)
   end.
 
-(*
+(* scratch *)
+(* Inductive cps_cvt_val_rel : exp_eval.value -> cps.val -> Prop := *)
+(* | v_Clos : *)
+(*     cps_cvt_env_rel rho rho' -> *)
+    
+    
+
+(* cenv needs to related to dcon? *)
 Lemma cps_cvt_correct:
-  forall rho x k vk e v v' v'' cnstrs,
+  forall e m rho rho' rhomap x k vk e' v v' v'' v''' penv cenv
+         vars cnstrs next1 next2 next3 next4 next5,
     eval_env rho e v ->
-    cps_cvt_env rho = rho' ->
-    cps_cvt e k = e' ->
-    cps_cvt_val v k = v' ->
-    bstep_e (M.set x v' (M.set k vk (M.empty val))) (Eapp k x) v'' ->
-    bstep_e (M.set k vk rho') e' v''.
-*)
+    cps_cvt_env rho next1 cnstrs = Some (rho', next2) ->
+    gensym_n_nAnon next2 (List.length rho') = (vars, next3) ->
+    set_lists vars rho' (M.empty val) = Some rhomap ->
+    cps_cvt e vars k next3 cnstrs = Some (e', next4) ->
+    cps_cvt_val v next1 cnstrs = Some (v', next5) ->
+    bstep_e penv cenv (M.set x v' (M.set k vk (M.empty val))) (Eapp k kon_tag (x::nil)) v'' m ->
+    exists n, bstep_e penv cenv (M.set k vk rhomap) e' v''' n /\
+    exists f, (Alpha_conv_val v'' v''' f).
+Proof.
+  intros e. eapply my_exp_ind. 
+Abort. 
   
 (* testing code *)
 

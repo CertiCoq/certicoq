@@ -130,7 +130,7 @@ Inductive Alpha_conv_val :
   val -> val -> (* the two related values *)
   (var -> var) -> (* the current renaming of fvs *)
   Prop :=
-| Alpha_VConstr :
+| Alpha_Vconstr :
     forall t vs vs' f,
       Forall2 (fun v v' => Alpha_conv_val v v' f) vs vs' ->
       Alpha_conv_val (Vconstr t vs) (Vconstr t vs') f
@@ -138,11 +138,10 @@ Inductive Alpha_conv_val :
     forall rho rho' fdefs fdefs' x x' f,
       f x = x' ->
       Alpha_conv_fundefs fdefs fdefs' f ->
-      (* Forall (fun (p : var * val) => *)
-      (*           let (y, v) := p in *)
-      (*           let y' := f y in *)
-      (*           (forall v', M.get y' rho' = Some v' -> *)
-      (*                      Alpha_conv_val v v' f)) (M.elements rho) -> *)
+      (forall x v, x \in occurs_free_fundefs fdefs ->
+                         M.get x rho = Some v ->
+                         exists v', M.get (f x) rho' =
+                                    Some v' /\ Alpha_conv_val v v' f) ->
       Alpha_conv_val (Vfun rho fdefs x) (Vfun rho' fdefs' x') f
 | Alpha_Vint :
     forall n f,

@@ -847,6 +847,35 @@ Section Alpha_conv_correct.
     intros Hc. subst. contradiction.
   Qed.  
 
+  Lemma preord_env_P_inj_def_funs_neq_l S k σ rho1 rho2 B0 B :
+    preord_env_P_inj S k σ rho1 rho2->
+    Disjoint _ S (name_in_fundefs B) ->
+    preord_env_P_inj S k σ (def_funs B0 B rho1 rho1) rho2.
+  Proof. 
+    intros Henv Hd x Hin v Hget.
+    rewrite def_funs_neq in Hget. now eapply Henv.
+    intros Hc. eapply Hd. constructor; eauto. 
+  Qed.
+
+  Lemma preord_env_P_inj_def_funs_neq_r S k σ rho1 rho2 B0 B :
+    preord_env_P_inj S k σ rho1 rho2->
+    Disjoint _ (image σ S) (name_in_fundefs B) ->
+    preord_env_P_inj S k σ rho1 (def_funs B0 B rho2 rho2).
+  Proof. 
+    intros Henv Hd x Hin v Hget.
+    rewrite def_funs_neq. now eapply Henv.
+    intros Hc. eapply Hd. constructor; eauto. now eapply In_image. 
+  Qed.
+
+  Lemma preord_env_P_inj_f_eq_subdomain S k rho1 rho2 f f':
+    preord_env_P_inj S k f rho1 rho2 ->
+    f_eq_subdomain S f f' ->
+    preord_env_P_inj S k f' rho1 rho2.
+  Proof. 
+    intros Henv Hfeq y Hin. rewrite <- Hfeq; eauto.
+  Qed.
+
+
   Global Instance preord_env_P_inj_proper  :
     Proper (Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
            preord_env_P_inj.

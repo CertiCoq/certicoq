@@ -59,6 +59,23 @@ CertiCoq Compile -anf -o1 -ext "_opt" clos.
 (* CertiCoq Show IR -anf -debug clos. *)
 (* CertiCoq Show IR -anf -debug -o1 -ext "_opt" clos. *)
 
+Fixpoint even (n : nat) : bool :=
+  match n with
+  | O => true
+  | S n' => odd n'
+  end
+with
+odd (n : nat) : bool :=
+  let del (x : nat) := x in 
+  match n with
+  | 0 => false
+  | S n' => even n'
+  end
+with del (n : nat) : bool := false.
+
+Definition delt := andb true (even 10).
+
+CertiCoq Show IR  -debug delt.
 
 Definition addxy (x y w : nat) (l : list nat) := 
   let f := (fix aux l :=

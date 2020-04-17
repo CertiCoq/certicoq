@@ -2,7 +2,7 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From CertiCoq.L6 Require Import Ensembles_util.
+From CertiCoq.L6 Require Import Ensembles_util tactics.
 From compcert.lib Require Import Coqlib.
 From Coq Require Import Numbers.BinNums NArith.BinNat PArith.BinPos Relations.Relations
      Classes.Morphisms Lists.List Sets.Ensembles Program.Basics.
@@ -173,6 +173,13 @@ Proof.
 Qed.
 
 
+Lemma f_eq_subdomain_trans {A} S (f g h : positive -> A) :
+  f_eq_subdomain S f g -> f_eq_subdomain S g h -> f_eq_subdomain S f h.
+Proof.
+  eapply equivalence_f_eq_subdomain.
+Qed.
+  
+
 Lemma compose_extend_l S (C : Type) f (g : positive -> positive) (x : positive) (y : C) :
   injective_subdomain S g ->
   x \in S -> 
@@ -184,6 +191,17 @@ Proof.
   - rewrite peq_true. reflexivity.
   - rewrite peq_false. reflexivity.  intros Hc.
     eapply n. eapply Hinj; eassumption.
+Qed. 
+
+Lemma map_f_eq_subdomain {A B} (f g : A -> B) l :
+  f_eq_subdomain (FromList l) f g -> 
+  map f l = map g l.
+Proof.
+  intros Hf. induction l.
+  - reflexivity.
+  - simpl. rewrite IHl. rewrite Hf. reflexivity.
+    now left. eapply f_eq_subdomain_antimon; [| eassumption ].
+    normalize_sets; now eauto with Ensembles_DB.
 Qed. 
 
 (** * Lemmas about [image] *)
@@ -371,6 +389,19 @@ Proof.
   intros Hc. subst. contradiction.
 Qed.
 
+Lemma f_eq_subdomain_extend_lst_Disjoint {A} S xs vs (f : positive -> A) :
+  Disjoint _ (FromList xs) S ->
+  f_eq_subdomain S (f <{ xs ~> vs }>) f.
+Proof.
+  intros Hd. revert vs; induction xs; simpl; intros vs.
+  - reflexivity.
+  - destruct vs. reflexivity. normalize_sets. 
+    eapply f_eq_subdomain_extend_not_In_S_l.
+    + intros Hc. eapply Hd. constructor; eauto.
+    + eapply IHxs. now eauto with Ensembles_DB.
+Qed.
+
+
 Lemma map_extend_not_In {A} f l x (x' : A) :
   ~ In _ (FromList l) x ->
   map (f{x~>x'}) l = map f l.
@@ -452,6 +483,16 @@ Lemma In_image {A B} S f x:
 Proof.
   intros; repeat eexists; eauto.
 Qed.
+
+Lemma image_Setminus {A B} S1 S2 {Hd: Decidable S2} (f : A -> B) :
+  image f S1 \\ image f S2 \subset image f (S1 \\ S2). 
+Proof.
+  intros x Hin. inv Hin. destruct Hd as [D]. 
+  destruct H as [y [Hin' Heq]]. subst. destruct (D y).
+  - exfalso. eapply H0. eapply In_image. eassumption.
+  - eapply In_image. constructor; eauto.
+Qed.
+
 
 Lemma Included_image_extend g S x (x' : positive) :
   ~ In _ S x ->

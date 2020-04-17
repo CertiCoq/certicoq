@@ -3,7 +3,7 @@
  *)
 
 Require Import Common.compM.
-Require Import L6.cps L6.cps_util L6.ctx L6.state L6.set_util L6.identifiers L6.List_util
+Require Import L6.alpha_conv L6.cps L6.cps_util L6.ctx L6.state L6.set_util L6.identifiers L6.List_util
         L6.functions L6.Ensembles_util L6.uncurry L6.tactics.
 Require Import Coq.ZArith.Znumtheory Coq.Strings.String.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
@@ -562,19 +562,20 @@ Inductive Make_wrappers :
   (var -> var) ->
   fundefs ->
   Ensemble var ->
-  exp_ctx ->
+  fundefs ->
   Ensemble var ->
   (var -> var) ->
   Prop :=
 | MW_Fnil :
-    forall ζ σ S, Make_wrappers ζ σ Fnil S Hole_c S σ
+    forall ζ σ S, Make_wrappers ζ σ Fnil S Fnil S σ
 | MW_Fcons :
-    forall  (ζ : var -> option (var * fun_tag * list var)) σ σ' f ft xs xs' e B C S S' f' ft' fvs g,
+    forall  (ζ : var -> option (var * fun_tag * list var)) σ σ' f ft xs xs' e B fds S S' f' ft' fvs g,
       ζ f = Some (f', ft', fvs) ->
       (FromList xs') \subset S ->
+      NoDup xs' -> length xs = length xs' ->
       g \in (S \\ FromList xs') ->
-      Make_wrappers ζ (σ {f ~> g}) B (S \\ FromList xs' \\ [set g]) C S' σ' ->
-      Make_wrappers ζ σ (Fcons f ft xs e B) S (Efun1_c (Fcons g ft xs' (Eapp f' ft' (xs' ++ (map σ fvs))) Fnil) C) S' σ'. 
+      Make_wrappers ζ σ B (S \\ FromList xs' \\ [set g]) fds S' σ' ->
+      Make_wrappers ζ σ (Fcons f ft xs e B) S (Fcons g ft xs' (Eapp f' ft' (xs' ++ (map σ fvs))) fds) S' (σ' {f ~> g}). 
 
 
 Inductive Exp_lambda_lift :
@@ -611,18 +612,18 @@ Inductive Exp_lambda_lift :
       Exp_lambda_lift ζ' σ' e S'' e' S''' ->
       Exp_lambda_lift ζ σ (Efun B e) S (Efun B' e') S'''
 | LL_Efun2 : (* wrappers are defined afterwards *)
-    forall B B' e e' C σ σ' σ'' ζ ζ' fvs S S' S'' S''' S'''',
+    forall B B' e e' fds σ σ' σ'' ζ ζ' fvs S S' S'' S''' S'''',
       Included _ (FromList fvs) (Union _ (occurs_free_fundefs B)
                                        (Union _ (FunsFVs ζ) (LiftedFuns ζ))) ->
       NoDup fvs ->
       Add_functions B fvs σ ζ S σ' ζ' S' ->
       Fundefs_lambda_lift2 ζ' σ' B B S' B' S'' ->
-      Make_wrappers ζ σ' B S'' C S''' σ'' ->
+      Make_wrappers ζ σ' B S'' fds S''' σ'' ->
       Exp_lambda_lift ζ' σ'' e S''' e' S'''' ->
-      Exp_lambda_lift ζ σ (Efun B e) S (Efun B' (C|[ e' ]|)) S''''
+      Exp_lambda_lift ζ σ (Efun B e) S (Efun B' (Efun fds e')) S''''
 | LL_Efun3 : (* No Lambda Lifting *)
     forall B e e' σ ζ S S',
-      Exp_lambda_lift ζ σ e S e' S' ->
+      Exp_lambda_lift ζ (extend_fundefs σ B B) e S e' S' ->
       Exp_lambda_lift ζ σ (Efun B e) S (Efun B e') S'
 | LL_Eletapp_known :
     forall ζ σ x f ft xs e e' f' ft' fvs S S',
@@ -632,7 +633,7 @@ Inductive Exp_lambda_lift :
 | LL_Eletapp_unknown :
     forall ζ σ x f ft xs e e' S S',
       Exp_lambda_lift ζ σ e S e' S' ->
-      Exp_lambda_lift ζ σ (Eletapp x f ft xs e) S (Eletapp x f ft xs e') S'
+      Exp_lambda_lift ζ σ (Eletapp x f ft xs e) S (Eletapp x (σ f) ft xs e') S'
 | LL_Eapp_known :
     forall ζ σ f ft xs f' ft' fvs S,
       ζ f = Some (f', ft', fvs) -> 
@@ -683,16 +684,16 @@ with Fundefs_lambda_lift2 :
   Ensemble var ->
   Prop :=
      | LL_Fcons2 :
-         forall ζ σ σ' f ft xs e e' B0 B B' S S' S'' S''' f' ft' fvs ys C,
+         forall ζ σ σ' f ft xs e e' B0 B B' S S' S'' S''' f' ft' fvs ys fds,
            ζ f = Some (f', ft', fvs) ->
            Included _ (FromList ys) S ->
            NoDup ys ->
            length ys = length fvs ->
-           Make_wrappers ζ σ B0 (S \\ FromList ys) C S' σ' ->  
-           Exp_lambda_lift ζ (σ' <{ (xs ++ fvs) ~> (xs ++ ys) }>) e S' e' S'' ->
+           Make_wrappers ζ (σ <{ (xs ++ fvs) ~> (xs ++ ys) }>) B0 (S \\ FromList ys) fds S' σ' ->  
+           Exp_lambda_lift ζ σ' e S' e' S'' ->
            Fundefs_lambda_lift2 ζ σ B0 B S'' B' S''' ->
            Fundefs_lambda_lift2 ζ σ B0 (Fcons f ft xs e B) S
-                                (Fcons f' ft' (xs ++ ys) (C |[ e' ]|) B') S'''
+                                (Fcons f' ft' (xs ++ ys) (Efun fds e') B') S'''
      | LL_Fnil2 :
          forall ζ σ S B0,
            Fundefs_lambda_lift2 ζ σ B0 Fnil S Fnil S.
@@ -1241,6 +1242,17 @@ Proof with now eauto with Ensembles_DB.
   - rewrite image'_Empty_set, Setminus_Same_set_Empty_set... 
 Qed.
 
+Lemma Add_functions_σ_eq_alt (B : fundefs) (fvs : list var) (σ : var -> var) (ζ : var -> option (var * fun_tag * list var)) 
+      (Q S : Ensemble var) (σ' : var -> var) (ζ' : var -> option (var * fun_tag * list var)) (S' : Ensemble var) :
+  Add_functions B fvs σ ζ S σ' ζ' S' ->
+  Disjoint _ Q (name_in_fundefs B :|: (S \\ S')) ->
+  f_eq_subdomain Q σ σ'.
+Proof.
+  intros. eapply f_eq_subdomain_antimon; [| eapply Add_functions_σ_eq; eassumption ].
+  intros x Hin Hin'. eapply H0; constructor; eauto.
+Qed. 
+
+
 (** * Lemmas about [Make_wrappers] *)
 
 Lemma Make_wrappers_free_set_Included ζ σ B S C S' ζ' :
@@ -1258,10 +1270,114 @@ Lemma Make_wrapper_image Q ζ σ B S C S' σ' :
 Proof.
   intros Hw Hd. induction Hw.
   - reflexivity.
-  - rewrite <- IHHw. rewrite image_extend_not_In_S.
-    reflexivity. intros Hc. eapply Hd. constructor. eassumption. now left.
-    sets.
-Qed.  
+  - rewrite image_extend_not_In_S. eapply IHHw.
+    now sets.
+    intros Hc. eapply Hd. constructor. eassumption. now left.
+Qed.
+
+Lemma Make_wrappers_f_eq_subdomain Q ζ σ B S C S' σ' :
+  Make_wrappers ζ σ B S C S' σ' ->
+  Disjoint _ Q (name_in_fundefs B) ->
+  f_eq_subdomain Q σ σ'.
+Proof.
+  intros Hw Hd. induction Hw.
+  - reflexivity.
+  - eapply f_eq_subdomain_extend_not_In_S_r.
+    intros Hc. eapply Hd. constructor. eassumption. now left.
+    eapply IHHw. sets.
+Qed.
+
+Lemma Make_wrapper_image_name_in_fundefs ζ σ B S C S' σ' :
+  Make_wrappers ζ σ B S C S' σ' ->
+  unique_bindings_fundefs B ->
+  image σ' (name_in_fundefs B) \subset S \\ S'.
+Proof.
+  intros Hw Hun. induction Hw.
+  - rewrite image_Empty_set, Setminus_Same_set_Empty_set. reflexivity.
+  - inv Hun. simpl. rewrite image_Union, image_Singleton.
+    eapply Union_Included.
+    + rewrite extend_gss. apply Singleton_Included. inv H3. constructor; eauto.
+      intros Hc. eapply Make_wrappers_free_set_Included in Hc; [| eassumption ]. inv Hc. now eauto.
+    + rewrite image_extend_not_In_S. eapply Included_trans. eapply IHHw. eassumption.
+      now sets. intros Hc. eapply H10. eapply name_in_fundefs_bound_var_fundefs. eassumption.
+Qed.
+
+Lemma Make_wrappers_find_def f1 f2 z B S1 fds S2 f ft xs e :
+  Make_wrappers z f1 B S1 fds S2 f2 ->
+  find_def f B = Some (ft, xs, e) ->
+  Disjoint _ (FunsFVs z) (name_in_fundefs B) -> 
+  unique_bindings_fundefs B -> 
+  exists f' ft' fvs g xs',
+    z f = Some (f', ft', fvs) /\
+    FromList xs' \subset S1 /\
+    g \in S1 \\ FromList xs' /\
+          length xs = length xs' /\ NoDup xs' /\            
+          f2 f = g /\
+          find_def g fds = Some (ft, xs', Eapp f' ft' (xs' ++ map f1 fvs)).
+Proof.
+  intros Hw Hdef Hd Hun. induction Hw.
+  - inv Hdef.
+  - simpl in Hdef.
+    destruct (M.elt_eq f f0); subst.
+    + inv Hdef.
+      do 5 eexists. repeat (split; first eassumption).
+      split.
+      * rewrite extend_gss. reflexivity.
+      * simpl. rewrite peq_true. reflexivity.
+    + inv Hun. edestruct IHHw as (f'' & ft'' & fvs' & g1 & xs'' & Hzeq & Hsub & Hin & Hleq & Hnd  & Heq & Hf); eauto.
+      now sets. 
+      do 4 eexists. exists xs''. repeat (split; first eassumption).
+      split; [| split; [| split; [| split; [| split ]]]]; try eassumption.
+      * eapply Included_trans. eassumption. sets.
+      * eapply Included_trans; [| | eapply Hin ]. reflexivity. sets.
+      * rewrite extend_gso; eassumption.
+      * simpl. rewrite peq_false; eauto. 
+        intros Hc. subst. inv Hin. inv H4; eauto.
+Qed.
+
+
+Lemma Make_wrappers_name_in_fundefs z f1 B S1 fds S2 f2 :
+  Make_wrappers z f1 B S1 fds S2 f2 ->
+  name_in_fundefs fds \subset S1 \\ S2.
+Proof.
+  intros Hw; induction Hw. now sets.
+  simpl. eapply Union_Included. eapply Singleton_Included. inv H3; eauto.
+  constructor; eauto.
+  intros Hc. eapply Make_wrappers_free_set_Included in Hc; [| eassumption ].
+  inv Hc; eauto.
+  eapply Included_trans. eapply IHHw. sets.
+Qed.
+
+Lemma Make_wrappers_name_in_fundefs_image z f1 B S1 fds S2 f2 :
+  Make_wrappers z f1 B S1 fds S2 f2 ->
+  unique_bindings_fundefs B ->
+  name_in_fundefs fds <--> image f2 (name_in_fundefs B).
+Proof.
+  intros Hw Hun; induction Hw.
+  - simpl. rewrite image_Empty_set. reflexivity.
+  - simpl. rewrite image_Union, image_Singleton. rewrite extend_gss.
+    eapply Same_set_Union_compat. reflexivity.
+    inv Hun. rewrite image_extend_not_In_S. eapply IHHw. eassumption.
+    intros Hc. eapply H10. eapply name_in_fundefs_bound_var_fundefs. eassumption.
+Qed.
+
+
+Lemma Make_wrappers_image_Included S z f1 B S1 fds S2 f2 :
+  Make_wrappers z f1 B S1 fds S2 f2 ->
+  image f2 S \subset image f1 (S \\ name_in_fundefs B) :|: (S1 \\ S2).
+Proof.
+  intros Hw; revert S; induction Hw; intros Q.
+  - simpl. sets.
+  - simpl. eapply Included_trans.
+    eapply image_extend_Included'. eapply Union_Included.
+    + eapply Included_trans. eapply IHHw.
+      eapply Included_Union_compat; [| now sets ].
+      now xsets.
+    + eapply Included_Union_preserv_r. eapply Singleton_Included. inv H3.
+      constructor; eauto. intros Hc. eapply Make_wrappers_free_set_Included in Hc; [| eassumption ].
+      inv Hc. now eauto. 
+Qed.
+
 
 (** * Lemmas about [Exp_lambda_lift] and [Fundefs_lambda_lift] *)
 
@@ -1422,15 +1538,15 @@ Lemma Fundefs_lambda_lift_find_def2 σ ζ S1 B0 B1 S2 B2 f t xs1 e1 f' t' fvs :
   Disjoint _ (bound_var_fundefs B1) (LiftedFuns ζ) ->
   injective_subdomain (name_in_fundefs B1) (lifted_name ζ) ->
   find_def f B1 = Some (t, xs1, e1) ->
-  exists (ys : list var) (e2 : exp) S2 S3 S4 σ' C,
-    find_def f' B2 = Some (t', xs1 ++ ys, C |[ e2 ]|) /\
+  exists (ys : list var) (e2 : exp) S2 S3 S4 σ' fds,
+    find_def f' B2 = Some (t', xs1 ++ ys, Efun fds e2) /\
     NoDup ys /\
     length ys = length fvs /\
     FromList ys \subset S1 /\
     S2 \subset S1 \\ FromList ys /\
     Disjoint _ (FromList ys) S2 /\
-    Make_wrappers ζ σ B0 S2 C S3 σ' /\ 
-    Exp_lambda_lift ζ (σ' <{ xs1 ++ fvs ~> xs1 ++ ys }>) e1 S3 e2 S4.
+    Make_wrappers ζ (σ <{ xs1 ++ fvs ~> xs1 ++ ys }>) B0 S2 fds S3 σ' /\ 
+    Exp_lambda_lift ζ σ' e1 S3 e2 S4.
 Proof with now eauto with Ensembles_DB.
   intros Hll. induction Hll; intros Heq HD Hinj Hdef.
   - assert (Heq' := lifted_name_eq _ _ _ _ _ Heq).
@@ -1442,7 +1558,7 @@ Proof with now eauto with Ensembles_DB.
       * simpl. rewrite peq_true. reflexivity.
       * sets.
       * sets.
-    + destruct IHHll as (ys' & e2 & S2 & S3 & S4 & σ'' & C' & Hf1 & Hnd1 & Heq1 & Hs1 & Hs2 & Hd1 & Hw & Hexp).
+    + destruct IHHll as (ys' & e2 & S2 & S3 & S4 & σ'' & fds' & Hf1 & Hnd1 & Heq1 & Hs1 & Hs2 & Hd1 & Hw & Hexp).
       eassumption. normalize_bound_var_in_ctx...
       eapply injective_subdomain_antimon. eassumption.
       now eauto with Ensembles_DB. eassumption.

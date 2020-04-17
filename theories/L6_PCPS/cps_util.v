@@ -819,6 +819,12 @@ Definition binding_in_map {A} (S : Ensemble M.elt) (map : M.t A) : Prop :=
 Definition binding_not_in_map {A} (S : Ensemble M.elt) (map : M.t A) :=
   forall x : M.elt, In M.elt S x -> M.get x map = None.
 
+Lemma binding_in_map_Empty_set A (rho : M.t A) :
+  binding_in_map (Empty_set _) rho.
+Proof.
+  intros x Hin. inv Hin.
+Qed.
+
 
 (** * Lemmas about [binding_in_map] *)
 

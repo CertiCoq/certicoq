@@ -618,22 +618,23 @@ Inductive Exp_lambda_lift :
       NoDup fvs ->
       Add_functions B fvs σ ζ S σ' ζ' S' ->
       Fundefs_lambda_lift2 ζ' σ' B B S' B' S'' ->
-      Make_wrappers ζ σ' B S'' fds S''' σ'' ->
+      Make_wrappers ζ' σ' B S'' fds S''' σ'' ->
       Exp_lambda_lift ζ' σ'' e S''' e' S'''' ->
       Exp_lambda_lift ζ σ (Efun B e) S (Efun B' (Efun fds e')) S''''
 | LL_Efun3 : (* No Lambda Lifting *)
-    forall B e e' σ ζ S S',
-      Exp_lambda_lift ζ (extend_fundefs σ B B) e S e' S' ->
-      Exp_lambda_lift ζ σ (Efun B e) S (Efun B e') S'
+    forall B B' e e' σ ζ S S' S'',
+      Fundefs_lambda_lift3 ζ σ B B S B' S' ->
+      Exp_lambda_lift ζ (extend_fundefs σ B B) e S' e' S'' ->
+      Exp_lambda_lift ζ σ (Efun B e) S (Efun B' e') S''
 | LL_Eletapp_known :
     forall ζ σ x f ft xs e e' f' ft' fvs S S',
       ζ f = Some (f', ft', fvs) ->
-      Exp_lambda_lift ζ σ e S e' S' ->
+      Exp_lambda_lift ζ (σ {x ~> x}) e S e' S' ->
       Exp_lambda_lift ζ σ (Eletapp x f ft xs e) S (Eletapp x (σ f') ft' (map σ (xs ++ fvs)) e') S'
 | LL_Eletapp_unknown :
     forall ζ σ x f ft xs e e' S S',
-      Exp_lambda_lift ζ σ e S e' S' ->
-      Exp_lambda_lift ζ σ (Eletapp x f ft xs e) S (Eletapp x (σ f) ft xs e') S'
+      Exp_lambda_lift ζ  (σ {x ~> x}) e S e' S' ->
+      Exp_lambda_lift ζ σ (Eletapp x f ft xs e) S (Eletapp x (σ f) ft (map σ xs) e') S'
 | LL_Eapp_known :
     forall ζ σ f ft xs f' ft' fvs S,
       ζ f = Some (f', ft', fvs) -> 
@@ -696,7 +697,24 @@ with Fundefs_lambda_lift2 :
                                 (Fcons f' ft' (xs ++ ys) (Efun fds e') B') S'''
      | LL_Fnil2 :
          forall ζ σ S B0,
-           Fundefs_lambda_lift2 ζ σ B0 Fnil S Fnil S.
+           Fundefs_lambda_lift2 ζ σ B0 Fnil S Fnil S
+with Fundefs_lambda_lift3 :
+  (var -> option (var * fun_tag * list var)) ->
+  (var -> var) ->
+  fundefs ->
+  fundefs ->
+  Ensemble var ->
+  fundefs ->
+  Ensemble var ->
+  Prop :=
+     | LL_Fcons3 :
+         forall ζ σ  f ft xs e e' B0 B B' S S' S'',
+           Exp_lambda_lift ζ ((extend_fundefs σ B0 B0) <{ xs ~> xs }>) e S e' S' ->
+           Fundefs_lambda_lift3 ζ σ B0 B S' B' S'' ->
+           Fundefs_lambda_lift3 ζ σ B0 (Fcons f ft xs e B) S (Fcons f ft xs e' B') S''
+     | LL_Fnil3 :
+         forall ζ σ B0 S,
+           Fundefs_lambda_lift3 ζ σ B0 Fnil S Fnil S.
 
 
 (** * Some syntactic properties of  the lambda lifting relation *)
@@ -1413,26 +1431,33 @@ Lemma Lambda_lift_free_set_Included_mut :
       Included _ S' S) /\
   (forall B B0 ζ σ S B' S',
       Fundefs_lambda_lift1 ζ σ B S B' S' \/
-      Fundefs_lambda_lift2 ζ σ B0 B S B' S' ->
+      Fundefs_lambda_lift2 ζ σ B0 B S B' S' \/
+      Fundefs_lambda_lift3 ζ σ B0 B S B' S' ->
       Included _ S' S).
 Proof with now eauto with Ensembles_DB.
   exp_defs_induction IHe IHl IHB; intros; inv H; try inv H0; try now eauto with Ensembles_DB.
   - eapply Included_trans. now eapply IHl; eauto.
     eapply IHe; eauto.
   - eapply Included_trans. now eapply IHe; eauto.
-    eapply Included_trans. now eapply (IHB f2); eauto.
+    eapply Included_trans. eapply (IHB f2); eauto.
     eapply Add_functions_free_set_Included; eauto.
   - eapply Included_trans. now eapply IHe; eauto.
     eapply Included_trans. now eapply Make_wrappers_free_set_Included; eauto.
     eapply Included_trans. now eapply IHB; eauto. 
     eapply Add_functions_free_set_Included; eauto.
+  - eapply Included_trans. now eapply IHe; eauto.
+    eapply (IHB f2); eauto.
   - eapply Included_trans. now eapply (IHB f5); eauto. 
     eapply Included_trans. now eapply IHe; eauto.
     now sets. 
-  - eapply Included_trans. now eapply IHB; eauto.
+  - inv H. eapply Included_trans. now eapply IHB; eauto.
     eapply Included_trans. now eapply IHe; eauto.
     eapply Included_trans. now eapply Make_wrappers_free_set_Included; eauto.     
     now sets.
+  - inv H. eapply Included_trans. now eapply (IHB B0); eauto.
+    now eapply IHe; eauto.
+  - inv H. reflexivity.
+  - inv H. reflexivity.
 Qed.
 
 Corollary Exp_Lambda_lift_free_set_Included :
@@ -1458,6 +1483,15 @@ Corollary Fundefs_Lambda_lift_free_set_Included2 :
     Included _ S' S.
 Proof.
   destruct Lambda_lift_free_set_Included_mut; eauto.
+Qed.
+
+Corollary Fundefs_Lambda_lift_free_set_Included3 :
+  forall B B0 ζ σ S B' S',
+    Fundefs_lambda_lift3 ζ σ B0 B S B' S' ->
+    Included _ S' S.
+Proof.
+  intros B; intros.
+  destruct Lambda_lift_free_set_Included_mut as [_ HB]. eapply HB with (B0 := B0); eauto.
 Qed.
 
 Lemma Fundefs_lambda_lift_find_def1 σ ζ S1 B1 S2 B2 f t xs1 e1 f' t' fvs :
@@ -1578,6 +1612,28 @@ Proof with now eauto with Ensembles_DB.
         eapply Included_Setminus_compat; [| reflexivity ]. 
         eapply Included_trans. eapply Exp_Lambda_lift_free_set_Included. eassumption.
         eapply Included_trans. eapply Make_wrappers_free_set_Included. eassumption. now sets.
+  - inv Hdef.
+Qed.
+
+Lemma Fundefs_lambda_lift_find_def3 σ ζ S1 B B1 S2 B2 f t xs1 e1 :
+  Fundefs_lambda_lift3 ζ σ B B1 S1 B2 S2 ->
+  find_def f B1 = Some (t, xs1, e1) ->
+  exists (e2 : exp) S1' S2',
+    find_def f B2 = Some (t, xs1, e2) /\
+    S1' \subset S1 /\
+    Exp_lambda_lift ζ ((extend_fundefs σ B B) <{ xs1 ~> xs1 }>) e1 S1' e2 S2'.
+Proof with now eauto with Ensembles_DB.
+  intros Hll. induction Hll; intros (* Heq HD Hinj *) Hdef.
+  - simpl in Hdef. destruct (M.elt_eq f f0); subst.
+    + inv Hdef. do 3 eexists. split; [| split ].
+      * simpl. rewrite peq_true. reflexivity.
+      * reflexivity.
+      * sets.
+    + simpl. rewrite peq_false; eauto.
+      destruct IHHll as (e2 & S1' & S2' & Hf1 & Hsub1 & Hexp).
+      eassumption. do 3 eexists; split; [| split ]; [ eassumption | | eassumption ].
+      eapply Included_trans. eassumption.
+      eapply Exp_Lambda_lift_free_set_Included. eassumption.
   - inv Hdef.
 Qed.
 

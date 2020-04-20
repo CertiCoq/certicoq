@@ -1439,34 +1439,64 @@ Section Log_rel.
     intros. eapply preord_val_trans; eauto.
   Qed.
 
-  Context (HIncl1 : forall i e1 rho1 e2 rho2, inclusion _ P1 (fun c1 c2 => PG i (e1, rho1, c1) (e2, rho2, c2))).
+  Context (HIncl1 : forall i e1 rho1 e2 rho2, inclusion _ P1 (fun c1 c2 => PG i (e1, rho1, c1) (e2, rho2, c2)))
+          (Hcomp : post_compat P1 P1)
+          (Hletapp : post_letapp_compat PG P1 P1)
+          (Hrefl : post_refl P1).
 
-  Lemma preord_env_P_def_funs_pre' k (S1 S2 : var -> Prop) B rho1 rho2 :
-    preord_env_P S1 k PG rho1 rho2 ->
-    (forall x, S2 x -> S1 x) -> 
-    (forall m (rho rho' : env) (e : exp),
-       m <  k ->
-       preord_env_P S1 m PG rho rho' ->
-       preord_exp m P1 PG (e, rho) (e, rho')) ->
-    preord_env_P S2 k PG (def_funs B B rho1 rho1) (def_funs B B rho2 rho2).
+
+  Lemma preord_env_P_def_funs_pre' k (S1 : var -> Prop) B B' rho1 rho2 :
+    preord_env_P (S1 \\ name_in_fundefs B) k PG rho1 rho2 ->
+
+    name_in_fundefs B \subset name_in_fundefs B' ->
+    occurs_free_fundefs B' \subset S1 ->
+    Disjoint _ (occurs_free_fundefs B') (name_in_fundefs B) ->
+    
+    (forall m (* S1  *)(rho rho' : env) (e : exp),
+        m <  k ->
+        preord_env_P (occurs_free e) m PG rho rho' ->
+        preord_exp m P1 PG (e, rho) (e, rho')) ->
+    
+    preord_env_P S1 k PG (def_funs B' B rho1 rho1) (def_funs B' B rho2 rho2).
   Proof.
-    generalize B at 1 3. revert S1 S2 B rho1 rho2.
-    induction k as [ k IH' ] using lt_wf_rec1. intros S1 S2 B.
-    induction B; intros rho rho2 B' Henv Hyp1 Hyp2 x HP.
-    - simpl. apply preord_var_env_extend; eauto.
-      + eapply IHB; eauto.
+    revert B B' S1 rho1 rho2.
+    induction k as [ k IH' ] using lt_wf_rec1. intros B.
+    induction B; intros B' S1 rho rho2 Henv Hname Hfv Hdis Hyp1.
+    - simpl. eapply preord_env_P_extend.
+      + eapply IHB; eauto. eapply preord_env_P_antimon. eassumption. simpl. sets.
+        eapply Included_trans; [| eassumption ]. now sets.
+        eapply Included_Setminus; now sets. now sets.
       + rewrite preord_val_eq.
         intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
-        edestruct (@set_lists_length val) as [rho2' Hs']; eauto.
+        edestruct (@set_lists_length val) as [rho2' Hs']; eauto. 
         exists xs1. exists e1. exists rho2'. split; eauto.
         split. eauto. intros Hleq Hpre.
-        eapply preord_exp_post_monotonic; [| eapply Hyp2 ]; try omega.
-        now eauto.
-        eapply preord_env_P_set_lists_l; eauto.
-        eapply IH'; try omega; eauto. 
-        eapply preord_env_P_monotonic; [| eauto]. omega.
-        intros. eapply Hyp2; eauto. omega.
-    - simpl. eauto.
+        
+        eapply preord_exp_post_monotonic; [| eapply Hyp1 ]. eapply HIncl1. eassumption.
+        eapply preord_env_P_set_lists_l with (P1 := occurs_free e1 \\ FromList xs1); try eassumption; try now eauto.
+        eapply preord_env_P_antimon with (P2 := occurs_free_fundefs B' :|: name_in_fundefs B'). 
+        eapply IH'. eassumption. rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
+        eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega. simpl.
+        
+        eapply Included_Setminus. now sets. eapply Included_trans; [| eassumption ]. sets. reflexivity.
+        now sets. eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint.
+
+        intros. eapply Hyp1. omega. eassumption.
+
+        eapply Setminus_Included_Included_Union. eapply Included_trans. eapply occurs_free_in_fun.
+        eapply find_def_correct. eassumption. now sets.
+    - simpl. eapply preord_env_P_antimon. eassumption. sets. 
+  Qed.
+  
+  Lemma preord_env_P_def_funs_alt k (S1 : var -> Prop) B rho1 rho2 :
+    preord_env_P (S1 \\ name_in_fundefs B) k PG rho1 rho2 ->
+    occurs_free_fundefs B \subset S1 ->
+    Disjoint _ (occurs_free_fundefs B) (name_in_fundefs B) ->
+    preord_env_P S1 k PG (def_funs B B rho1 rho1) (def_funs B B rho2 rho2).
+  Proof.
+    intros H HS HD. eapply preord_env_P_def_funs_pre'. eassumption. reflexivity. eassumption. eassumption.
+    intros. eapply preord_exp_refl; eauto.
+    intros. eapply HIncl1. eassumption. 
   Qed.
 
   (** Commutativity property *)  

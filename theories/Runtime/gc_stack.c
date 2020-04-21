@@ -3,7 +3,12 @@
 #include <assert.h>
 #include "config.h"
 #include "values.h"
-#include "gc.h"
+#include "gc_stack.h"
+
+/* A version of GC that scans a stack in order to find the roots. It is useful
+ * when compiling direct-style programs
+ */
+
 
 /* A "space" describes one generation of the generational collector. */
 struct space {
@@ -23,17 +28,17 @@ struct space {
 #ifndef NURSERY_SIZE
 #define NURSERY_SIZE (1<<16)
 #endif
-/* The size of generation 0 (the "nursery") should approximately match the 
+/* The size of generation 0 (the "nursery") should approximately match the
    size of the level-2 cache of the machine, according to:
-      Cache Performance of Fast-Allocating Programs, 
-      by Marcelo J. R. Goncalves and Andrew W. Appel. 
+      Cache Performance of Fast-Allocating Programs,
+      by Marcelo J. R. Goncalves and Andrew W. Appel.
       7th Int'l Conf. on Functional Programming and Computer Architecture,
       pp. 293-305, ACM Press, June 1995.
-   We estimate this as 256 kilobytes 
+   We estimate this as 256 kilobytes
      (which is the size of the Intel Core i7 per-core L2 cache).
     http://www.tomshardware.com/reviews/Intel-i7-nehalem-cpu,2041-10.html
     https://en.wikipedia.org/wiki/Nehalem_(microarchitecture)
-   Empirical measurements show that 64k works well 
+   Empirical measurements show that 64k works well
     (or anything in the range from 32k to 128k).
 */
 
@@ -66,11 +71,11 @@ void printtree(FILE *f, struct heap *h, value v) {
       int i;
       fprintf(f,"%d(", Tag_hd(hd));
       for(i=0; i<sz-1; i++) {
-	printtree(f,h,Field(v,i));
-	fprintf(f,",");
+        printtree(f,h,Field(v,i));
+        fprintf(f,",");
       }
       if (i<sz)
-	printtree(f,h,Field(v,i));
+        printtree(f,h,Field(v,i));
       fprintf(f,")");
     }
     else {
@@ -87,14 +92,14 @@ void printroots (FILE *f, struct heap *h,
    roots = fi+2;
    n = fi[1];
    args = ti->args;
-  
+
   for(i = 0; i < n; i++) {
     fprintf(f,"%d[%8x]:",roots[i],args[roots[i]]);
     printtree(f, h, args[roots[i]]);
     fprintf(f,"\n");
   }
   fprintf(f,"\n");
-}  
+}
 
 #endif
 
@@ -117,70 +122,105 @@ void forward (value *from_start,  /* beginning of from-space */
    then make *p point at the corresponding object in to-space.
    If such an object did not already exist, create it at address *next
     (and increment *next by the size of the object).
-   If *p is not a pointer into from-space, then leave it alone. 
+   If *p is not a pointer into from-space, then leave it alone.
 
    The depth parameter may be set to 0 for ordinary breadth-first
    collection.  Setting depth to a small integer (perhaps 10)
    may improve the cache locality of the copied graph.
 */
- {
+{
   value v = *p;
   if(Is_block(v)) {
 
+    /* printf("Start: %lld end"" %lld word %lld \n", from_start, from_limit, v); */
+    /* if  (v == 4360698480) printf ("Found it\n"); */
     if(Is_from(from_start, from_limit, v)) {
-
-      header_t hd = Hd_val(v); 
+      /* printf("Moving\n"); */
+      header_t hd = Hd_val(v);
       if(hd == 0) { /* already forwarded */
-	*p = Field(v,0);
+        *p = Field(v,0);
       } else {
-	int i;
-	int sz;
-	value *new;
+        int i;
+        int sz;
+        value *new;
         sz = Wosize_hd(hd);
-	new = *next+1;
-	*next = new+sz; 
-	for(i = -1; i < sz; i++) {
-	  Field(new, i) = Field(v, i);
-	}
-	Hd_val(v) = 0;
-	Field(v, 0) = (value)new;
-	*p = (value)new;
-	if (depth>0)
-	  for (i=0; i<sz; i++)
-	    forward(from_start, from_limit, next, &Field(new,i), depth-1);
+        new = *next+1;
+        *next = new+sz;
+        if (sz > 50) printf("Moving value %lld with tag %lld with %d fields\n", v, hd, sz);
+        for(i = -1; i < sz; i++) {
+          /* printf("Moving field %d\n", i); */
+          Field(new, i) = Field(v, i);
+        }
+        Hd_val(v) = 0;
+        Field(v, 0) = (value)new;
+        *p = (value)new;
+        /* printf("New %lld\n", new); */
+        /* if (*p == 73832) printf("Found it\n"); */
+        if (depth>0)
+          for (i=0; i<sz; i++)
+            forward(from_start, from_limit, next, &Field(new,i), depth-1);
       }
     }
   }
 }
 
 void forward_roots (value *from_start,  /* beginning of from-space */
-		    value *from_limit,  /* end of from-space */
+                    value *from_limit,  /* end of from-space */
 		    value **next,       /* next available spot in to-space */
 		    fun_info fi,        /* which args contain live roots? */
 		    struct thread_info *ti) /* where's the args array? */
-/* Forward each live root in the args array */
+/* Forward each live root in the args array and the stack */
  {
    value *args; int n; uintnat i;
    const uintnat *roots = fi+2;
+   struct stack_frame *frame = ti->fp;
+
    n = fi[1];
    args = ti->args;
-  
+   /* First forward the arg array */
    for(i = 0; i < n; i++) {
      assert (roots[i] < MAX_ARGS);
      forward(from_start, from_limit, next, args+roots[i], DEPTH);
+   };
+   /* Then scan the stack by traversing the stack pointers */
+   value **live, **curr, **limit, val;
+   header_t hd; int sz;
+   /* printf("Scaning frame \n"); */
+   while (frame != NULL) {
+     live = frame->roots;
+     curr = live;
+     limit = frame->next;
+     /* printf("Scanning frame \n"); */
+     /* int cnt = 0; */
+     while (curr < limit) {
+       /* printf("%d \n", cnt); */
+       /* cnt ++; */
+       /* printf("Before \n"); */
+       /* Curr has the stack address of the local */
+       val = **curr;
+       if Is_block(val) {
+           hd = Hd_val(val);
+           sz = Wosize_hd(hd);
+           /* printf("Moving root %lld with tag %ldd and %d fields\n", val, hd, sz); */
+       }
+       forward(from_start, from_limit, next, Field(curr,0), DEPTH);
+       /* printf("After \n"); */
+       curr ++;
+     }
+     frame = frame->prev;
    }
-}  
+   /* printf("Scanned frames\n"); */
+}
 
 #define No_scan_tag 251
 #define No_scan(t) ((t) >= No_scan_tag)
-
 void do_scan(value *from_start,  /* beginning of from-space */
 	     value *from_limit,  /* end of from-space */
 	     value *scan,        /* start of unforwarded part of to-space */
  	     value **next)       /* next available spot in to-space */
 /* Forward each word in the to-space between scan and *next.
   In the process, next may increase, so keep doing it until scan catches up.
-  Leave alone:  header words, and "no_scan" (nonpointer) data. 
+  Leave alone:  header words, and "no_scan" (nonpointer) data.
 */
 {
   value *s;
@@ -192,13 +232,15 @@ void do_scan(value *from_start,  /* beginning of from-space */
     if (!No_scan(tag)) {
       intnat j;
       for(j = 1; j <= sz; j++) {
-	forward (from_start, from_limit, next, &Field(s, j), DEPTH);
+        /* printf("before \n"); */
+        forward (from_start, from_limit, next, &Field(s, j), DEPTH);
+        /* printf("after \n"); */
       }
     }
     s += 1+sz;
   }
 }
-	     
+
 void do_generation (struct space *from,  /* descriptor of from-space */
 		    struct space *to,    /* descriptor of to-space */
 		    fun_info fi,         /* which args contain live roots? */
@@ -213,7 +255,7 @@ void do_generation (struct space *from,  /* descriptor of from-space */
   if(0)  fprintf(stderr,"%5.3f%% occupancy\n",
 	  (to->next-p)/(double)(from->next-from->start));
   from->next=from->start;
-}  
+}
 
 #if 0
 /* This "gensize" function is only useful if the desired ratio is >2,
@@ -234,7 +276,7 @@ uintnat gensize(uintnat words)
   n = d*RATIO;
   assert (n >= 2*words);
   return n;
-}  
+}
 #endif
 
 void create_space(struct space *s,  /* which generation to create */
@@ -280,20 +322,20 @@ struct thread_info *make_tinfo(void) {
     fprintf(stderr, "Could not allocate thread_info struct\n");
     exit(1);
   }
-  
 
-    
+
+
   tinfo->heap=h;
   tinfo->alloc=h->spaces[0].start;
   tinfo->limit=h->spaces[0].limit;
-
+  tinfo->fp=NULL; /* the initial stack pointer is NULL */
   return tinfo;
 }
 
 void resume(fun_info fi, struct thread_info *ti)
 /* When the garbage collector is all done, it does not "return"
    to the mutator; instead, it uses this function (which does not return)
-   to resume the mutator by invoking the continuation, fi->fun.  
+   to resume the mutator by invoking the continuation, fi->fun.
    But first, "resume" informs the mutator
    of the new values for the alloc and limit pointers.
 */
@@ -308,7 +350,8 @@ void resume(fun_info fi, struct thread_info *ti)
     abort_with ("Nursery is too small for function's num_allocs\n");
   ti->alloc = lo;
   ti->limit = hi;
-}  
+  /* printf ("end gc\n"); */
+}
 
 void garbage_collect(fun_info fi, struct thread_info *ti)
 /* See the header file for the interface-spec of this function. */
@@ -322,7 +365,8 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
     return;
   } else {
     int i;
-    assert (h->spaces[0].limit == ti->limit);  
+    /* printf("In GC\n"); */
+    assert (h->spaces[0].limit == ti->limit);
     h->spaces[0].next = ti->alloc; /* this line is probably unnecessary */
     for (i=0; i<MAX_SPACES-1; i++) {
       /* Starting with the youngest generation, collect each generation
@@ -332,19 +376,18 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
 
       /* If the next generation does not yet exist, create it */
       if (h->spaces[i+1].start==NULL) {
-	int w = h->spaces[i].limit-h->spaces[i].start;
-	create_space(h->spaces+(i+1), RATIO*w);
+        int w = h->spaces[i].limit-h->spaces[i].start;
+        create_space(h->spaces+(i+1), RATIO*w);
       }
       /* Copy all the objects in generation i, into generation i+1 */
-  if(0)
-      fprintf(stderr, "Generation %d:  ", i);
+      if(0) fprintf(stderr, "Generation %d:  ", i);
       do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
       /* If there's enough space in gen i+1 to guarantee that the
          NEXT collection into i+1 will succeed, we can stop here */
       if (h->spaces[i].limit - h->spaces[i].start
-	  <= h->spaces[i+1].limit - h->spaces[i+1].next) {
-	 resume(fi,ti);
-	 return;
+          <= h->spaces[i+1].limit - h->spaces[i+1].next) {
+        resume(fi,ti);
+        return;
       }
     }
     /* If we get to i==MAX_SPACES, that's bad news */
@@ -352,7 +395,7 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
   }
   /* Can't reach this point */
   assert(0);
-} 
+}
 
 /* REMARK.  The generation-management policy in the garbage_collect function
    has a potential flaw.  Whenever a record is copied, it is promoted to
@@ -361,7 +404,7 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
    when it's time to collect the oldest generation (and we can tell
    it's the oldest, at least because create_space() fails), do some
    reorganization instead of failing.
- */
+*/
 
 void reset_heap (struct heap *h) {
   fprintf(stderr, "Debug: in reset_heap\n");
@@ -369,7 +412,7 @@ void reset_heap (struct heap *h) {
   for (i=0; i<MAX_SPACES; i++)
     h->spaces[i].next = h->spaces[i].start;
 }
-  
+
 
 void free_heap (struct heap *h) {
   fprintf(stderr, "Debug: in free_heap\n");
@@ -383,31 +426,31 @@ void free_heap (struct heap *h) {
 }
 
 int garbage_collect_all(fun_info fi, struct thread_info *ti) {
-    struct heap *h = ti->heap;
-    if (h==NULL) {
-        h = create_heap();
-        ti->heap = h;
-    }
-    int i;
+  struct heap *h = ti->heap;
+  if (h==NULL) {
+    h = create_heap();
+    ti->heap = h;
+  }
+  int i;
 
-    assert (h->spaces[0].limit == ti->limit);  
-    for (i=0; i < MAX_SPACES - 1 && h->spaces[i+1].start != NULL; i++) {
-      
-        do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
-    }
-    
-    /* If i is the nursery, its next won't be tracked, so need to be set to alloc */
-    if(i == 0){
-      h->spaces[i].next = ti->alloc;
-    }
-    return i;
+  assert (h->spaces[0].limit == ti->limit);
+  for (i=0; i < MAX_SPACES - 1 && h->spaces[i+1].start != NULL; i++) {
+
+    do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
+  }
+
+  /* If i is the nursery, its next won't be tracked, so need to be set to alloc */
+  if(i == 0){
+    h->spaces[i].next = ti->alloc;
+  }
+  return i;
 }
 
 uintnat const fake_fi[3] = {0, 1, 1};
 
 
 
-/* export (deep copy if boxed) the first field of args */ 
+/* export (deep copy if boxed) the first field of args */
 void* export(struct thread_info *ti) {
 
   /* if args[1] is unboxed, return it */
@@ -416,24 +459,24 @@ void* export(struct thread_info *ti) {
   }
 
   /* otherwise collect all that is reachable from it to the last generation, then compact it into value_sp */
-    int gen_level = garbage_collect_all(fake_fi, ti);
-    struct space* sp = ti->heap->spaces+gen_level;
-    struct space* fake_sp = (struct space*)malloc(sizeof(struct space));
-    
-    create_space(fake_sp, sp->next - sp->start);
-    do_generation(sp, fake_sp, fake_fi, ti);
-   
-    struct space* value_sp = (struct space*)malloc(sizeof(struct space));
-    create_space(value_sp, fake_sp->next - fake_sp->start);
-    do_generation(fake_sp, value_sp, fake_fi, ti);
+  int gen_level = garbage_collect_all(fake_fi, ti);
+  struct space* sp = ti->heap->spaces+gen_level;
+  struct space* fake_sp = (struct space*)malloc(sizeof(struct space));
 
-    /* offset start by the header */
-    void* result_block = (void *)(value_sp->start +1);   
+  create_space(fake_sp, sp->next - sp->start);
+  do_generation(sp, fake_sp, fake_fi, ti);
 
-    free(fake_sp->start);
-    free(fake_sp);
-    free(value_sp);       
-    
+  struct space* value_sp = (struct space*)malloc(sizeof(struct space));
+  create_space(value_sp, fake_sp->next - fake_sp->start);
+  do_generation(fake_sp, value_sp, fake_fi, ti);
 
-    return result_block;
+  /* offset start by the header */
+  void* result_block = (void *)(value_sp->start +1);
+
+  free(fake_sp->start);
+  free(fake_sp);
+  free(value_sp);
+
+
+  return result_block;
 }

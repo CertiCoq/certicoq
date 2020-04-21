@@ -671,6 +671,14 @@ Hint Resolve Included_Union_preserv_l Included_Union_preserv_r Setminus_Included
 
 (** ** Disjoint properties *)
 
+Lemma Disjoint_In_l {A} (s1 s2 : Ensemble A) x :
+  Disjoint _ s1 s2 ->
+  x \in s1 ->
+  ~ x \in s2.
+Proof.
+  intros Hd Hin Hc. eapply Hd. constructor; eauto.
+Qed.
+
 Lemma Disjoint_Setminus_l {A} s1 s2 s3 :
   Included A s3 s2 ->
   Disjoint A (Setminus A s1 s2) s3.
@@ -1797,6 +1805,24 @@ Proof.
   left; constructor; eauto.
   intros Hc; eapply H0; constructor; eauto.
 Qed.
+
+
+Lemma Setminus_Setminus_Same_set A (S1 S2 S3 : Ensemble A) :
+  Decidable S3 ->
+  S3 \subset S1 ->
+  (S1 \\ (S2 \\ S3)) <--> ((S1 \\ S2) :|: S3).
+Proof.
+  intros Hd Hin. split.
+  now apply Setminus_Setminus_Included.
+  destruct Hd as [D]. intros x H. destruct (D x) as [Hin' | Hnin].
+  - constructor. now eapply Hin.
+    intros Hc; inv Hc; eauto.
+  - inv H.
+    + inv H0. constructor; eauto. intros Hc.
+      inv Hc; eauto.
+    + exfalso; eauto.
+Qed.
+
 
 Lemma Same_set_Intersection_Setminus {A: Type} (S1 S2 S3 : Ensemble A)
       {_ : Decidable S3}:

@@ -86,19 +86,18 @@ Extract Constant debug => "(fun msg x -> Certicoq_debug.certicoq_msg_debug msg; 
 Definition nl : string := String (Ascii.ascii_of_nat 10) EmptyString.
 
 Definition translateTo `{CerticoqTranslation (Program L1g.compile.Term) Lj}
-  (p:Template.Ast.program): exception Lj :=
-  let db := debug ("Translating from template to L1 " ++ nl ++ Pretty.print_term 
-    (Ast.empty_ext (fst p)) nil true (snd p)) in
+  (o:Opt) (p:Template.Ast.program): exception Lj :=
+  let db := debug ("Translating from template to L1 " ++ nl ++ Pretty.print_term (AstUtils.empty_ext (fst p)) nil true (snd p)) in
   let l1g:= db (L1g.compile.program_Program p) in
   let db := debug ("Result" ++ nl ++ L1g.term.print_term l1g.(main)) in
-  db (translate (Program L1g.compile.Term) Lj l1g).
+  db (translate (Program L1g.compile.Term) Lj o l1g).
 
-Arguments translateTo Lj {H} p.
+Arguments translateTo Lj {H} o p.
 
 Definition ctranslateTo {Term Value BigStep WF QH ObsS }
   (Lj: @CerticoqLanguage Term Value BigStep WF QH ObsS)
-   `{CerticoqTranslation (Program L1g.compile.Term) (cTerm Lj)}
-  : Template.Ast.program -> exception (cTerm Lj) :=
+  `{CerticoqTranslation (Program L1g.compile.Term) (cTerm Lj)}
+  : Opt -> Template.Ast.program -> exception (cTerm Lj) :=
   translateTo (cTerm Lj).
 
 Arguments ctranslateTo {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} p.
@@ -107,10 +106,10 @@ Definition ctranslateEval {Term Value BigStep WF QH ObsS }
   (Lj: @CerticoqLanguage Term Value BigStep WF QH ObsS)
    `{CerticoqTranslation (Program L1g.compile.Term) (cTerm Lj)}
    `{BigStepOpSemExec (cTerm Lj) (cValue Lj)}
-  (p: Template.Ast.program) (n:nat) : bigStepResult (cTerm Lj) (cValue Lj) :=
-  match translateTo (cTerm Lj) p with
+   (o: Opt) (p: Template.Ast.program) (n:nat) : bigStepResult (cTerm Lj) (cValue Lj) :=
+  match translateTo (cTerm Lj) o p with
   | Ret e => bigStepEvaln n e
   | Exc s => Error s None 
   end.
 
-Arguments ctranslateEval {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} {H0} p n.
+Arguments ctranslateEval {Term0} {Value} {BigStep} {WF} {QH} {ObsS} Lj {H} {H0} o p n.

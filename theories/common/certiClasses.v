@@ -132,24 +132,27 @@ Definition liftExc {T:Type} (R: T->T->Prop) (oa1 oa2 : exception T) :=
   | _,_ => False
   end.
 
+(* Optimization flags *)
+Inductive Opt : Type := | Flag : nat -> Opt.
+
 Class CerticoqTranslation (Src Dst : Type) : Type
-  := translate : Src -> exception Dst.
+  := translate : Opt -> Src -> exception Dst.
 
 Class CerticoqTotalTranslation (Src Dst : Type) : Type
-  := translateT : Src -> Dst.
+  := translateT : Opt -> Src -> Dst.
 
 Arguments translate  Src Dst {CerticoqTranslation} s.
 Arguments translateT  Src Dst {CerticoqTotalTranslation} s.
 
 Instance liftTotal `{CerticoqTotalTranslation Src Dst} : CerticoqTranslation Src Dst :=
-  fun (x:Src) => Ret (translateT Src Dst x). 
+  fun opt (x:Src) => Ret (translateT Src Dst opt x). 
 
 
 Definition goodPreserving `{CerticoqTranslation Src Dst}
     `{GoodTerm Src} `{GoodTerm Dst} : Prop := 
-  ∀ (s: Src), 
+  ∀ (s: Src) (o: Opt), 
     goodTerm s 
-    -> match translate Src Dst s with
+    -> match translate Src Dst o s with
       | Ret t => goodTerm t
       | Exc _ => False
       end.
@@ -160,10 +163,10 @@ Definition bigStepPreserving `{CerticoqTranslation Src Dst}
   `{CerticoqTranslation SrcValue DstValue}
    `{BigStepOpSem Src SrcValue} `{BigStepOpSem Dst DstValue} `{GoodTerm Src}
   :=
-   ∀ (s:Src) (sv: SrcValue), 
-    goodTerm s 
-    -> s ⇓ sv
-    -> (translate Src Dst s) ⇓ (translate SrcValue DstValue sv).
+    ∀ (s:Src) (sv: SrcValue) (o:Opt), 
+      goodTerm s 
+      -> s ⇓ sv
+      -> (translate Src Dst o s) ⇓ (translate SrcValue DstValue o sv).
 
 Arguments bigStepPreserving Src Dst {H} {SrcValue} {DstValue} {H0} {H1} {H2} {H3}.
 
@@ -172,8 +175,7 @@ Require Import Common.exceptionMonad.
 Global Instance composeTranslation `{CerticoqTranslation Src Inter} 
   `{CerticoqTranslation Inter Dst} :
   `{CerticoqTranslation Src Dst} :=
-λ s, bind (translate Src Inter s) (translate Inter Dst).
-
+  λ o s, bind (translate Src Inter o s) (translate Inter Dst o).
 
 Lemma composePreservesGood (Src Inter Dst: Type)
   {goodi: GoodTerm Inter}
@@ -185,14 +187,12 @@ goodPreserving Src Inter
 -> goodPreserving Inter Dst
 -> goodPreserving Src Dst.
 Proof.
-  intros Hsi Hit s Hs.
-  apply Hsi in Hs.
-  unfold composeTranslation, bind.
+  intros Hsi Hit s o Hs.
+  unfold goodPreserving, composeTranslation, bind in *.
   unfold translate in *.
-  destruct (t1 s); [contradiction|].
-  apply Hit in Hs.
-  unfold translate in *.
-  assumption.
+  eapply Hsi with (o := o) in Hs.
+  destruct (t1 o s); [contradiction|].
+  eapply Hit. assumption.
 Qed.
 
 
@@ -206,10 +206,10 @@ Definition obsPreserving
   `{CerticoqTranslation Src Dst} 
    `{BigStepOpSem Src SrcValue} `{BigStepOpSem Dst DstValue} `{GoodTerm Src}
   :=
-   ∀ (s:Src) (sv: SrcValue), 
-    goodTerm s 
-    -> (s ⇓ sv)
-    -> ∃ (dv: DstValue), (translate Src Dst s) ⇓ (Ret dv) ∧ sv ⊑ dv.
+   ∀ (o : Opt) (s:Src) (sv: SrcValue), 
+     goodTerm s 
+     -> (s ⇓ sv)
+     -> ∃ (dv: DstValue), (translate Src Dst o s) ⇓ (Ret dv) ∧ sv ⊑ dv.
 End obsPreserving.
 
 (* 
@@ -235,11 +235,11 @@ Definition deterministicBigStep `{BigStepOpSem Term Value} :=
 Arguments deterministicBigStep Term {Value} {H}.
 
 Definition totalTranslation `{CerticoqTranslation Src Dst} : Prop :=
-  ∀ (s:Src), 
-match translate Src Dst s with
-| Ret _ => True
-| Exc _ => False
-end.
+  ∀ (o:Opt) (s:Src), 
+    match translate Src Dst o s with
+    | Ret _ => True
+    | Exc _ => False
+    end.
 
 
 Lemma deterministicBigStepLiftExc `{BigStepOpSem Term Value}:
@@ -260,11 +260,10 @@ Qed.
 Definition bigStepReflecting `{CerticoqTranslation Src Dst}
   `{CerticoqTranslation SrcValue DstValue}  
    `{BigStepOpSem Src SrcValue} `{BigStepOpSem Dst DstValue} 
-   (s:Src)
-    : Prop :=
- ∀ (dv: DstValue), 
-    (translate Src Dst s) ⇓ (Ret dv)
-    -> ∃ (sv:SrcValue), s ⇓ sv ∧ Ret dv = translate SrcValue DstValue sv.
+   (o:Opt) (s:Src) : Prop :=
+  ∀ (dv: DstValue), 
+    (translate Src Dst o s) ⇓ (Ret dv)
+    -> ∃ (sv:SrcValue), s ⇓ sv ∧ Ret dv = translate SrcValue DstValue o sv.
 
 
 Section obsPreserving2.
@@ -274,15 +273,14 @@ Notation "s ⊑ t" := (VR s t) (at level 65).
 (* Similar to the new +, except this one does not enforce preservation of non-termination *)
 Definition obsReflecting `{CerticoqTranslation Src Dst}
    `{BigStepOpSem Src SrcValue} `{BigStepOpSem Dst DstValue} 
-   (s:Src)
-    : Prop :=
+   (o:Opt) (s:Src) : Prop :=
  ∀ (dv: DstValue), 
-    (translate Src Dst s) ⇓ (Ret dv)
-    -> ∃ (sv:SrcValue), s ⇓ sv ∧ sv ⊑ dv .
+   (translate Src Dst o s) ⇓ (Ret dv)
+   -> ∃ (sv:SrcValue), s ⇓ sv ∧ sv ⊑ dv .
     
 End obsPreserving2.
 
-Arguments bigStepReflecting Src Dst {H} {SrcValue} {DstValue} {H0} {H1} {H2} s.
+Arguments bigStepReflecting Src Dst {H} {SrcValue} {DstValue} {H0} {H1} {H2} o s.
 
 
 Lemma bigStepPreservingReflecting 
@@ -294,12 +292,12 @@ Lemma bigStepPreservingReflecting
   `{BigStepOpSem Dst DstValue}
   {_:bigStepPreserving Src Dst} :
   (deterministicBigStep Dst)
-  -> ∀ (s:Src), 
+  -> ∀ (o:Opt) (s:Src), 
     goodTerm s
     -> normalizes s
-    -> bigStepReflecting Src Dst s.
+    -> bigStepReflecting Src Dst o s.
 Proof.
-  intros Hd ? Hp Hn ? Ht.
+  intros Hd o s Hp Hn ? Ht.
   destruct Hn as [d  Hn].
   exists d. split;[assumption|].
   apply deterministicBigStepLiftExc in Hd.
@@ -322,12 +320,12 @@ Lemma obsPreservingReflecting
   (RV : SrcValue → DstValue → Prop)
   {Ho:obsPreserving Src Dst RV} : (* * *)
   (deterministicBigStep Dst)
-  -> ∀ (s:Src), 
+  -> ∀ (o:Opt) (s:Src), 
     goodTerm s
     -> normalizes s
-    -> obsReflecting Src Dst RV s. (* + *)
+    -> obsReflecting Src Dst RV o s. (* + *)
 Proof.
-  intros Hd ? Hp Hn ? Ht.
+  intros Hd o s Hp Hn ? Ht.
   destruct Hn as [sv  Hn].
   pose proof Hn as Hnb.
   eapply Ho in Hn;[| assumption].
@@ -352,9 +350,9 @@ repeat decide equality.
 Defined.
 
 Lemma goodPreservingId {Src:Type} {Hg: GoodTerm Src}:
-  @goodPreserving Src Src (fun x => Ret x) _ _.
+  @goodPreserving Src Src (fun o x => Ret x) _ _.
 Proof using.
-  intros ? ?.
+  intros ? ? ?. 
   simpl. assumption.
 Qed.
 

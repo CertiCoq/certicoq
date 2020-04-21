@@ -1,5 +1,5 @@
 #!/bin/sh
 
-file=${1-allInstances.native}
+file=${1-pipeline.native}
 ocamlbuild -lib Str $file
 ./$file

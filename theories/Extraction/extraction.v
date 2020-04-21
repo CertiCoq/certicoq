@@ -11,10 +11,9 @@ Require compcert.common.AST
         compcert.common.Globalenvs
         Int31.
 
-Require L6.L5_to_L6
-        L7.L6_to_Clight
-        L7.Clightexec
-        Compiler.allInstances.
+Require L7.Clightexec
+        Glue.glue
+        Compiler.pipeline.
 
 (* Standard lib *)
 Require Import ExtrOcamlBasic.
@@ -29,18 +28,37 @@ Extract Constant L6_to_Clight.print_Clight_dest => "PrintClight.print_dest".
 Extract Constant L6_to_Clight.print_Clight_dest_names' => "PrintClight.print_dest_names".
 Extract Constant L6_to_Clight.print => "print_string".
 
-(* TEMP STUFF *)
-(* OS: This is now defined in allInstances
-Extract Constant L6_to_Clight.allocIdent => "Camlcoq.P.of_int 28".
-Extract Constant L6_to_Clight.limitIdent => "Camlcoq.P.of_int 29".
-Extract Constant L6_to_Clight.argsIdent => "Camlcoq.P.of_int 26".
-Extract Constant L6_to_Clight.gcIdent => "Camlcoq.P.of_int 80".
-Extract Constant L6_to_Clight.mainIdent => "Camlcoq.P.of_int 81".
-Extract Constant L6_to_Clight.bodyIdent => "Camlcoq.P.of_int 90".
-Extract Constant L6_to_Clight.threadInfIdent => "Camlcoq.P.of_int 31".
-Extract Constant L6_to_Clight.tinfIdent => "Camlcoq.P.of_int 91".
-Extract Constant L6_to_Clight.heapInfIdent => "Camlcoq.P.of_int 95".
-Extract Constant L6_to_Clight.numArgsIdent => "Camlcoq.P.of_int 97". *)
+
+(* Timing *)
+(* T0 : No timing *)
+(*
+Extract Constant AstCommon.timePhase => "(fun c x -> x ())".
+*)
+
+(* T1 : Time each phase, print to debug *)
+
+Extract Constant AstCommon.timePhase =>
+"(fun c x -> let time = Unix.gettimeofday() in
+                            let temp = x () in
+                            let time = (Unix.gettimeofday() -. time) in
+              Feedback.msg_debug (Pp.str (Printf.sprintf ""Time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time));
+              temp)".
+
+(* T2 : Time each phase 10 times, print average to debug
+debug: Feedback.msg_debug (Pp.str (Printf.sprintf ""%f""  (Unix.gettimeofday() -. time)));   *)
+
+(** **  Zoe : I'm commenting timing out for now because it blocks computation inside Coq when we want to test
+              comp passes. TODO add compiler opt *)
+
+(* Extract Constant AstCommon.timePhase => *)
+(* "(fun c x -> let time = Unix.gettimeofday() in *)
+(*              let temp = ref (x ()) in *)
+(*              for i = 2 to 10 do *)
+(*               temp := x () *)
+(*              done; *)
+(*              let time = ((Unix.gettimeofday() -. time) /. 10.) in *)
+(*               Feedback.msg_debug (Pp.str (Printf.sprintf ""Average time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time)); *)
+(*               !temp)". *)
 
 
 (* Int31 *)
@@ -61,7 +79,7 @@ Extraction Blacklist config List String Nat Int Ast Universes UnivSubst Typing R
            OrderedType Logic Common Equality Char char uGraph
            Instances Classes Term Monad Coqlib Errors Compile Checker Eq Classes0.
 
-(* Cutting the dependency to R. 
+(* Cutting the dependency to R.
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".
 Extract Inlined Constant Fappli_IEEE.FF2R => "fun _ -> assert false".
 Extract Inlined Constant Fappli_IEEE.B2R => "fun _ -> assert false".
@@ -74,11 +92,13 @@ Separate Extraction
          Csyntax
          Ctypes.make_program
          AST.signature_main
-(*         Floats.Float32.from_parsed Floats.Float.from_parsed
+         Floats.Float32.from_parsed Floats.Float.from_parsed
          Floats.Float32.of_bits Floats.Float.of_bits
-         Floats.Float32.to_bits Floats.Float.to_bits *)
+         Floats.Float32.to_bits Floats.Float.to_bits
          String.length
-         Compiler.allInstances.printProg
-         Compiler.allInstances.compile_template_L7
-         L7.Clightexec.run. 
+         Compiler.pipeline.printProg
+         Compiler.pipeline.make_opts
+         Compiler.pipeline.compile
+         Compiler.pipeline.make_glue
+         Compiler.pipeline.show_IR.
 Cd "..".

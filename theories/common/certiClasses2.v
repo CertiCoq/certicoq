@@ -88,7 +88,7 @@ with obsLeOp : option SrcValue -> option DstValue -> Prop :=
 
 (** Sometimes, the greatest fixedpoint is obtained at \omega.
 *)
-Inductive obsLeInd : nat-> SrcValue -> DstValue -> Prop :=
+Inductive obsLeInd : nat -> SrcValue -> DstValue -> Prop :=
 | obsLeS: forall m (s : SrcValue) (d : DstValue),
     yesPreserved s d
     -> (forall n:nat, liftLe (obsLeInd m) (observeNthSubterm n s) (observeNthSubterm n d))
@@ -239,20 +239,20 @@ Global Instance composeCerticoqTranslationCorrect
 Proof.
   destruct Ht1, Ht2.
   constructor;[eapply composePreservesGood; eauto; fail|].
-  intros ? ? Hgood Hev.
-  apply obsePres0 in Hev;[| assumption].
-  apply certiGoodPres3 in Hgood.
+  intros ? ? ? Hgood Hev.
+  unfold goodPreserving, obsPreserving in *.
+  eapply obsePres0 with (o:=o) in Hev; [| assumption].
+  eapply certiGoodPres3 with (o:=o) in Hgood.
   unfold composeTranslation, translate in *.
-  destruct (t1 s); compute in Hev; try contradiction.
+  destruct (t1 o s); compute in Hev; try contradiction.
   destruct Hev as [iv Hev].
   destruct Hev as [Hev Hoeq].
-  apply obsePres1 in Hev;[| assumption].
-  destruct Hev as [dv Hc].
+  edestruct obsePres1 with (o:=o) as [dv [Hsd Hsubd]].
+  now apply Hgood. eassumption. 
+
   exists dv. compute.
-  compute in Hc. split;[tauto|].
-  apply proj2 in Hc. revert Hc Hoeq. clear.
-  intros ? ?.
-  eapply obsLeTrns with (i:=iv); eauto.
+  compute in Hsd. split;[tauto|].
+  eapply obsLeTrns with (i0 := iv); assumption.
 Qed.
 
 End YesNoQuestions.
@@ -308,8 +308,8 @@ Definition valueTypeTranslateLe (SrcValue DstValue : Type)
            `{QuestionHead DstValue}
            `{ObserveNthSubterm SrcValue}
            `{ObserveNthSubterm DstValue} : Prop :=
-  forall (sv: SrcValue) (dv: DstValue),
-    translate _ DstValue sv = Ret dv -> sv ⊑ dv.
+  forall (o: Opt) (sv: SrcValue) (dv: DstValue),
+    translate _ DstValue o sv = Ret dv -> sv ⊑ dv.
 
 Lemma certicoqTranslationCorrect_suff1
   `{Ls: CerticoqLanguage Src SrcValue}
@@ -323,13 +323,14 @@ Lemma certicoqTranslationCorrect_suff1
   CerticoqTranslationCorrect Ls Ld.
 Proof using.
   constructor;[assumption|].
-  intros ? ? Hgs Hev.
-  apply bgs in Hev;[| assumption].
+  intros ? ? ? Hgs Hev.
+  unfold bigStepPreserving in *.
+  eapply bgs with (o:=o) in Hev;[| assumption].
   hnf in Hev.
-  specialize (gp s Hgs).
-  specialize (vt sv).
-  destruct (translate Src Dst s); simpl in *; try contradiction.
-  destruct (translate SrcValue DstValue sv) as [ | dv]; simpl in *; try contradiction.
+  specialize (gp s o Hgs).
+  specialize (vt o sv).
+  destruct (translate Src Dst o s); simpl in *; try contradiction.
+  destruct (translate SrcValue DstValue o sv) as [ | dv]; simpl in *; try contradiction.
   eauto.
 Qed.
 
@@ -344,8 +345,8 @@ Definition valuePredTranslateLe (Src Dst : Type)
            `{QuestionHead Dst}
            `{ObserveNthSubterm Src}
            `{ObserveNthSubterm Dst} : Prop :=
-  forall (sv: Src) (dv: Dst),
-    isValue sv -> translate _ Dst sv = Ret dv -> sv ⊑ dv.
+  forall (o: Opt) (sv: Src) (dv: Dst),
+    isValue sv -> translate _ Dst o sv = Ret dv -> sv ⊑ dv.
 
 Lemma certicoqTranslationCorrect_suff2
   `{Ls: CerticoqLanguage Src SrcValue}
@@ -361,15 +362,16 @@ Lemma certicoqTranslationCorrect_suff2
   CerticoqTranslationCorrect Ls Ld.
 Proof using.
   constructor;[assumption|].
-  intros ? ? Hgs Hev.
+  intros ? ? ? Hgs Hev.
   pose proof Hev as Hevb.
-  apply bgs in Hev;[| assumption].
+  unfold bigStepPreserving in bgs.
+  eapply bgs with (o:=o) in Hev;[| assumption].
   apply isvc in Hevb.
   hnf in Hev.
-  specialize (gp s Hgs).
-  specialize (vt sv).
-  destruct (translate Src Dst s); simpl in *; try contradiction.
-  destruct (translate SrcValue DstValue sv) as [ | dv]; simpl in *; try contradiction.
+  specialize (gp s o Hgs).
+  specialize (vt o sv).
+  destruct (translate Src Dst o s); simpl in *; try contradiction.
+  destruct (translate SrcValue DstValue o sv) as [ | dv]; simpl in *; try contradiction.
   eauto.
 Qed.
 
@@ -380,8 +382,8 @@ Definition valuePredTranslateYesPreserved (Src Dst : Type)
            `{QuestionHead Dst}
            `{ObserveNthSubterm Src}
            `{ObserveNthSubterm Dst} : Prop :=
-  forall (sv: Src) (dv: Dst),
-    isValue sv -> translate _ Dst sv = Ret dv ->
+  forall (o:Opt) (sv: Src) (dv: Dst),
+    isValue sv -> translate _ Dst o sv = Ret dv ->
     yesPreserved sv dv.
 
 Definition valuePredTranslateObserveNthCommute (Src Dst : Type)
@@ -391,9 +393,9 @@ Definition valuePredTranslateObserveNthCommute (Src Dst : Type)
            `{QuestionHead Dst}
            `{ObserveNthSubterm Src}
            `{ObserveNthSubterm Dst} : Prop :=
-  forall (sv: Src) (dv: Dst) n,
-    isValue sv -> translate _ Dst sv = Ret dv ->
-    option_map (translate _ Dst) (observeNthSubterm n sv) =
+  forall (o:Opt) (sv: Src) (dv: Dst) n,
+    isValue sv -> translate _ Dst o sv = Ret dv ->
+    option_map (translate _ Dst o) (observeNthSubterm n sv) =
     option_map (@Ret _) (observeNthSubterm n dv)
     /\ (match (observeNthSubterm n sv)  with
        | Some s => isValue s
@@ -416,15 +418,15 @@ Lemma valuePredTranslateLe_suff  (Src Dst : Type)
 Proof using.
   intros Ho Hy.
   cofix valuePredTranslateLe_suff.
-  intros ? ? Hv Ht.
+  intros ? ? ? Hv Ht.
   constructor;[eauto|].
   intros.
-  specialize (Ho _ _ n Hv Ht).
+  specialize (Ho o _ _ n Hv Ht).
   destruct (observeNthSubterm n sv);[| constructor].
   simpl in Ho. repnd.
   destruct (observeNthSubterm n dv); inverts Ho0.
-  constructor.
-  apply valuePredTranslateLe_suff; auto.
+  constructor. 
+  eapply valuePredTranslateLe_suff; eauto.
 Qed.  
   
 Lemma certicoqTranslationCorrect_suff3

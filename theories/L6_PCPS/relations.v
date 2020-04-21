@@ -3,7 +3,7 @@
  *)
 
 Require Import Coq.Relations.Relations Coq.Classes.RelationClasses.
-From CertiCoq.L6 Require Import cps ctx tactics.
+From CertiCoq Require Import L6.cps L6.ctx L6.tactics.
 
 Section Relations.
 

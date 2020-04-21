@@ -251,7 +251,7 @@ Qed.
 
 Section CCUtils.
   
-  Variable clo_tag : cTag.
+  Variable clo_tag : ctor_tag.
 
   Lemma project_var_Scope Scope Scope' Funs Funs' fenv c Γ FVs x C :
     project_var clo_tag Scope Funs fenv c Γ FVs x C Scope' Funs' ->
@@ -363,7 +363,7 @@ Section CCUtils.
 
 
   Lemma project_var_Union_eq (Scope Scope' Funs Funs' : Ensemble var) 
-        (fenv : var -> var) (c : cTag) (Γ : var) (FVs : list var) 
+        (fenv : var -> var) (c : ctor_tag) (Γ : var) (FVs : list var) 
         (xs : var) (C1 : exp_ctx) :
     project_var clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs' ->
     ~ xs \in FromList FVs ->
@@ -1178,7 +1178,7 @@ Section CCUtils.
     unfold FV. normalize_sets...
   Qed. 
 
-  Lemma Closure_conversion_fundefs_numOf_fundefs Funs (c : cTag) 
+  Lemma Closure_conversion_fundefs_numOf_fundefs Funs (c : ctor_tag) 
         (FVs : list var) (B1 B2 : fundefs) :
     Closure_conversion_fundefs clo_tag Funs c FVs B1 B2 ->
     numOf_fundefs B1 = numOf_fundefs B2.
@@ -1327,7 +1327,7 @@ Section CCUtils.
   
   Lemma project_vars_ToMSet (Scope1 Scope2 : Ensemble var)
         { Hs : ToMSet Scope1 } (Funs1 Funs2 : Ensemble var) { Hf : ToMSet Funs1 } (fenv : var -> var) 
-        (c : cTag) (Γ : var) (FVs : list var) (ys : list var) 
+        (c : ctor_tag) (Γ : var) (FVs : list var) (ys : list var) 
         (C1 : exp_ctx) :
     project_vars clo_tag Scope1 Funs1 fenv c Γ FVs ys C1 Scope2 Funs2 -> ToMSet Scope2.
   Proof.
@@ -1364,7 +1364,7 @@ Section CCUtils.
   Lemma project_vars_ToMSet_Funs (Scope1 : Ensemble positive) (Scope2 : Ensemble var)
         { Hs : ToMSet Scope1 } 
         (Funs1 Funs2 : Ensemble var)  { Hf : ToMSet Funs1 } (fenv : var -> var) 
-        (c : cTag) (Γ : var) (FVs : list var) (ys : list var) 
+        (c : ctor_tag) (Γ : var) (FVs : list var) (ys : list var) 
         (C1 : exp_ctx) :
     project_vars clo_tag Scope1 Funs1 fenv c Γ FVs ys C1 Scope2 Funs2 -> ToMSet Funs2.
   Proof.
@@ -1398,7 +1398,7 @@ Section CCUtils.
   Qed.
   
   Lemma project_var_Setminus_eq (Scope Scope' Funs Funs' : Ensemble var) 
-        (fenv : var -> var) (c : cTag) (Γ : var) (FVs : list var) 
+        (fenv : var -> var) (c : ctor_tag) (Γ : var) (FVs : list var) 
         (xs : var) (C1 : exp_ctx) :
     project_var clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs' ->
     Funs' \\ Scope' \subset Funs \\ Scope.
@@ -1412,7 +1412,7 @@ Section CCUtils.
   Qed.
 
   Lemma project_vars_Setminus_eq (Scope Scope' Funs Funs' : Ensemble var) 
-        (fenv : var -> var) (c : cTag) (Γ : var) (FVs : list var) 
+        (fenv : var -> var) (c : ctor_tag) (Γ : var) (FVs : list var) 
         (xs : list var) (C1 : exp_ctx) :
     project_vars clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs' ->
     Funs' \\ Scope' \subset Funs \\ Scope.
@@ -1432,7 +1432,7 @@ Module CCUtil (H : Heap).
 
   Import H C C.LR C.LR.Sem C.LR.Sem.GC C.LR.Sem.GC.Equiv C.LR.Sem.GC.Equiv.Defs.
 
-  Variable clo_tag : cTag.
+  Variable clo_tag : ctor_tag.
 
 
   Lemma project_var_get Scope Scope' Funs Funs' fenv c Γ FVs x C1 rho1 H1 rho2 H2 m y:
@@ -1469,11 +1469,11 @@ Module CCUtil (H : Heap).
       eapply project_vars_Scope_l; eassumption.
   Qed.
   
-  Lemma project_var_getlist Scope Scope' Funs Funs' fenv c Γ FVs x C1 rho1 H1 rho2 H2 m ys :
+  Lemma project_var_get_list Scope Scope' Funs Funs' fenv c Γ FVs x C1 rho1 H1 rho2 H2 m ys :
     project_var clo_tag Scope Funs fenv c Γ FVs x C1 Scope' Funs' ->
     ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
     Disjoint _ (Scope' \\ Scope) (FromList ys) ->
-    getlist ys rho1 = getlist ys rho2. 
+    get_list ys rho1 = get_list ys rho2. 
   Proof.
     revert rho1 H1 rho2 H2 m; induction ys; intros rho1 H1 rho2 H2 m Hproj Hctx Hnin.
     - reflexivity. 
@@ -1486,11 +1486,11 @@ Module CCUtil (H : Heap).
   Qed.        
   
 
-  Lemma project_vars_getlist Scope Scope' Funs Funs' fenv c Γ FVs xs C1 rho1 H1 rho2 H2 m ys :
+  Lemma project_vars_get_list Scope Scope' Funs Funs' fenv c Γ FVs xs C1 rho1 H1 rho2 H2 m ys :
     project_vars clo_tag Scope Funs fenv c Γ FVs xs C1 Scope' Funs'->
     ctx_to_heap_env_CC C1 H1 rho1 H2 rho2 m ->
     Disjoint _ (Scope' \\ Scope) (FromList ys) ->
-    getlist ys rho1 = getlist ys rho2. 
+    get_list ys rho1 = get_list ys rho2. 
   Proof.
     revert rho1 H1 rho2 H2 m; induction ys; intros rho1 H1 rho2 H2 m  Hproj Hctx Hnin.
     - reflexivity. 
@@ -1819,17 +1819,17 @@ Module CCUtil (H : Heap).
   Qed.
 
 
-  Lemma restrict_env_getlist S rho rho' xs vs :
+  Lemma restrict_env_get_list S rho rho' xs vs :
     Restrict_env S rho rho' -> 
-    getlist xs rho = Some vs -> 
+    get_list xs rho = Some vs -> 
     FromList xs \subset S ->
-    getlist xs rho' = Some vs. 
+    get_list xs rho' = Some vs. 
   Proof with (now eauto with Ensembles_DB).
     revert vs. induction xs; intros vs HR Hget Hin.
     - inv Hget. reflexivity.
     - simpl in Hget.
       destruct (M.get a rho) eqn:Hgeta; try congruence.
-      destruct (getlist xs rho) eqn:Hgetxs; try congruence.
+      destruct (get_list xs rho) eqn:Hgetxs; try congruence.
       inv Hget. normalize_sets.
       assert (HR' := HR). 
       simpl. destruct HR as [Heq _].

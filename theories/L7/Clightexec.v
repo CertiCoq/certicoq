@@ -12,11 +12,12 @@
 
 (** Animating the CompCert Clight semantics *)
 
+Require Import Common.Common SquiggleEq.UsefulTypes.
+
 Require Import String.
 Require Import Axioms.
 Require Import Classical.
 Require Import Coqlib.
-Require Import certiClasses.
 Require Import Errors.
 Require Import Maps.
 Require Import Integers.
@@ -28,7 +29,7 @@ Require Import Events.
 Require Import Globalenvs.
 Require Import Ctypes.
 Require Import Cop.
- Require compcert.cfrontend.Cexec.  
+Require compcert.cfrontend.Cexec.  
 Require Import Clight.
 Require Import compcert.lib.Maps.
 
@@ -40,12 +41,6 @@ Import ListNotations.
 
 Module M := Maps.PTree.
 
-
-
-
-
-
-
 Fixpoint show_positive' (p:positive) (acc:string) : string :=
   match p with
   | xI p' =>  show_positive' p' (append "1" acc)
@@ -55,7 +50,6 @@ Fixpoint show_positive' (p:positive) (acc:string) : string :=
 
 Definition show_positive (p:positive) : string :=
     show_positive' p "". 
-
 
 (* Variables are shown using "x" as a prefix if their original name is not known*)
 Definition show_var (x:positive) nenv :=
@@ -75,8 +69,6 @@ Definition print_errcode (on: option (M.t BasicAst.name)) (e:errcode): string :=
               end
   end.
 
-
-
 (* Returns the concatenation of all error codes in errs. 
 s is passed for when I figure out how to pretty-print id from the state *)
 Fixpoint print_error (errs:errmsg) (os:option (M.t BasicAst.name)): string :=
@@ -86,7 +78,7 @@ Fixpoint print_error (errs:errmsg) (os:option (M.t BasicAst.name)): string :=
 
 (** * Events, volatile memory accesses, and external functions. *)
 
-Definition force_val (v: option val) : val :=
+Definition force_val (v: option Values.val) : val :=
  match v with Some v' => v' | None => Vundef end.
 
 Definition offset_val (ofs: Z) (v: val) : res val :=
@@ -313,11 +305,12 @@ Definition do_ef_memcpy (sz al: Z) (vargs: list val) (m: mem) : res (val * mem) 
   end.
 
 
+
 Definition do_external (ef: external_function) (vargs: list val) (m: mem): res (val * mem) :=
   match ef with
   | EF_external name sg =>
     (* gc is the AST name used by L6_to_Clight, garbage_collect the PP name added in allInstance *)
-    if UsefulTypes.string_eq_bool name "gc" then
+    if SquiggleEq.UsefulTypes.string_eq_bool name "gc" then
       do_ef_gcmalloc vargs m
     else
       if UsefulTypes.string_eq_bool name "is_ptr" then
@@ -529,45 +522,47 @@ Definition at_final_state (S: state): res int :=
 Definition is_stopped s :=
   match s with Returnstate _ Kstop _ => true | _ => false end.
 
-Function stepstar (ge: genv) (s: state) (nenv:M.t BasicAst.name) (fuel: Z)  {measure Z.to_nat fuel}: (bigStepResult state state) :=
-  if Z.leb fuel Z0 
-  then OutOfTime s
-  else match step ge s with OK s' =>
-          if is_stopped s' then Result s' else stepstar ge s' nenv (Z.pred fuel)
-                       | Error err => certiClasses.Error (print_error err (Some nenv)) (Some s)
-     end.
-Proof.
-intros.
-apply Z.leb_gt in teq.
-rewrite <- (Z.succ_pred fuel) at 2.
-rewrite Z2Nat.inj_succ; omega.
-Defined.
+(* Require Import certiClasses. *)
 
-(* stepstar with fuel in nat *)
-Fixpoint stepstar_n (ge:genv) (s:state) (nenv:M.t BasicAst.name) (fuel:nat): (bigStepResult state state) :=
-  match fuel with
-  | O => OutOfTime s
-  | S n =>match step ge s with OK s' =>
-                               if is_stopped s' then Result s' else stepstar_n ge s' (nenv:M.t BasicAst.name) n
-                          | Error err => certiClasses.Error (print_error err (Some nenv)) (Some s)
-          end
-  end.
+(* Function stepstar (ge: genv) (s: state) (nenv:M.t BasicAst.name) (fuel: Z)  {measure Z.to_nat fuel}: (bigStepResult state state) := *)
+(*   if Z.leb fuel Z0  *)
+(*   then OutOfTime s *)
+(*   else match step ge s with OK s' => *)
+(*           if is_stopped s' then Result s' else stepstar ge s' nenv (Zpred fuel) *)
+(*                        | Error err => certiClasses.Error (print_error err (Some nenv)) (Some s) *)
+(*      end. *)
+(* Proof. *)
+(* intros. *)
+(* apply Z.leb_gt in teq. *)
+(* rewrite <- (Z.succ_pred fuel) at 2. *)
+(* rewrite Z2Nat.inj_succ; omega. *)
+(* Defined. *)
+
+(* (* stepstar with fuel in nat *) *)
+(* Fixpoint stepstar_n (ge:genv) (s:state) (nenv:M.t BasicAst.name) (fuel:nat): (bigStepResult state state) := *)
+(*   match fuel with *)
+(*   | O => OutOfTime s *)
+(*   | S n =>match step ge s with OK s' => *)
+(*                                if is_stopped s' then Result s' else stepstar_n ge s' (nenv:M.t BasicAst.name) n *)
+(*                           | Error err => certiClasses.Error (print_error err (Some nenv)) (Some s) *)
+(*           end *)
+(*   end. *)
 
 
-Definition run (e: (M.t BasicAst.name)* program) (fuel: Z) : bigStepResult state int :=
-  let (nenv, p) := e in
-  match ( do_initial_state p) with
-    | OK (ge,s) =>
-      (match (stepstar ge s nenv  fuel) with
-      | Result s => (match (at_final_state s) with
-                     | OK r => certiClasses.Result r
-                     | Error err => certiClasses.Error ("Error in at_final_state: "++(print_error err (Some nenv))) (Some s)
-                     end)
-      | OutOfTime s => OutOfTime s
-      | certiClasses.Error e os => certiClasses.Error e os
-       end)
-    | Error err => certiClasses.Error ("Error while initializing state: "++(print_error err (Some nenv))) None
-  end.
+(* Definition run (e: (M.t BasicAst.name)* program) (fuel: Z) : bigStepResult state int := *)
+(*   let (nenv, p) := e in *)
+(*   match ( do_initial_state p) with *)
+(*     | OK (ge,s) => *)
+(*       (match (stepstar ge s nenv  fuel) with *)
+(*       | Result s => (match (at_final_state s) with *)
+(*                      | OK r => certiClasses.Result r *)
+(*                      | Error err => certiClasses.Error ("Error in at_final_state: "++(print_error err (Some nenv))) (Some s) *)
+(*                      end) *)
+(*       | OutOfTime s => OutOfTime s *)
+(*       | certiClasses.Error e os => certiClasses.Error e os *)
+(*        end) *)
+(*     | Error err => certiClasses.Error ("Error while initializing state: "++(print_error err (Some nenv))) None *)
+(*   end. *)
 
 Section WO_MAIN.
 (*
@@ -592,7 +587,7 @@ Definition do_initial_state_wo_main (p: program): res (genv * state * block) :=
   do m4 <- force_opt (Mem.store Mint32 m3 b (size_chunk Mint32) (Vptr b0 (Ptrofs.repr 0))) [MSG "limit ptr store failed"];
   OK (ge, Callstate f ((Vptr b (Ptrofs.repr 0))::nil) Kstop m4, b).
 
-Definition at_final_state_wo_main (S:state):res unit := 
+Definition at_final_state_wo_main (S:state):res Datatypes.unit := 
   match S with
   | Returnstate Vundef Kstop m => OK tt
   | _ => Error [MSG "main did not return an void"]
@@ -600,20 +595,20 @@ Definition at_final_state_wo_main (S:state):res unit :=
 
 
 (* run w/o main *)
-Definition run_wo_main (e: (M.t BasicAst.name)*program) (fuel: nat) : bigStepResult state int :=
-  let (nenv, p) := e in
-  match ( do_initial_state_wo_main p) with
-    | OK (ge,s, b) =>
-      (match (stepstar_n ge s nenv fuel) with
-      | Result s => (match (at_final_state_wo_main s) with
-                     | OK tt => certiClasses.Result (Int.repr 1)
-                     | Error err => certiClasses.Error ("Error in at_final_state: "++(print_error err (Some nenv))) (Some s)
-                     end)
-      | OutOfTime s => OutOfTime s
-      | certiClasses.Error e os => certiClasses.Error e os
-       end)
-    | Error err => certiClasses.Error ("Error while initializing state: "++(print_error err (Some nenv))) None
-  end.
+(* Definition run_wo_main (e: (M.t BasicAst.name)*program) (fuel: nat) : bigStepResult state int := *)
+(*   let (nenv, p) := e in *)
+(*   match ( do_initial_state_wo_main p) with *)
+(*     | OK (ge,s, b) => *)
+(*       (match (stepstar_n ge s nenv fuel) with *)
+(*       | Result s => (match (at_final_state_wo_main s) with *)
+(*                      | OK tt => certiClasses.Result (Int.repr 1) *)
+(*                      | Error err => certiClasses.Error ("Error in at_final_state: "++(print_error err (Some nenv))) (Some s) *)
+(*                      end) *)
+(*       | OutOfTime s => OutOfTime s *)
+(*       | certiClasses.Error e os => certiClasses.Error e os *)
+(*        end) *)
+(*     | Error err => certiClasses.Error ("Error while initializing state: "++(print_error err (Some nenv))) None *)
+(*   end. *)
 
 End WO_MAIN.
 

@@ -17,7 +17,11 @@ Makefile.coq
 /theories/plugin/*.mli
 /theories/Extraction/*.ml
 /theories/Extraction/*.mli
+/theories/*.ml
+/theories/*.mli
+.coqdeps.d
 
+.DS_Store
 *.bak
 Makefile.conf
 Makefile.plugin.conf

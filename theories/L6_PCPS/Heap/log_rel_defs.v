@@ -50,7 +50,7 @@ Module LogRelDefs (H : Heap).
   Definition Inj := loc -> loc.
   
   (** Tag for closure records *)
-  Parameter (clo_tag : cTag).
+  Variable (clo_tag : ctor_tag).
 
   Definition exp_rel : Type :=
     IInv -> IInv -> Inv -> Inj ->
@@ -753,47 +753,47 @@ Module LogRelDefs (H : Heap).
     Qed.
     
     (** Extend the related environments with a list *)
-    Lemma env_log_rel_P_setlist_l (S : Ensemble var) (k j : nat) b
+    Lemma env_log_rel_P_set_lists_l (S : Ensemble var) (k j : nat) b
           (rho1 rho2 rho1' rho2' : env) (H1 H2 : heap block) xs (vs1 vs2 : list value) :
       env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
       Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2 ->
-      setlist xs vs1 rho1 = Some rho1' ->
-      setlist xs vs2 rho2 = Some rho2' ->
+      set_lists xs vs1 rho1 = Some rho1' ->
+      set_lists xs vs2 rho2 = Some rho2' ->
       env_log_rel_P' S k j GP GQ b (H1, rho1') (H2, rho2').
     Proof.
       intros Hcc Hall Hset1 Hset2 x HP v Hget.
       destruct (in_dec var_dec x xs).
-      - edestruct (@setlist_Forall2_get value) as [v1 [v2 [Hget1 [Hget2 HP']]]];
+      - edestruct (@set_lists_Forall2_get value) as [v1 [v2 [Hget1 [Hget2 HP']]]];
           try eassumption. subst_exp. repeat eexists; eauto.
-      - erewrite <- setlist_not_In in Hget; eauto.
+      - erewrite <- set_lists_not_In in Hget; eauto.
         edestruct Hcc as [v2 [Hget' Hpre']]; eauto.
         repeat eexists; eauto.
-        erewrite <- setlist_not_In; eauto.
+        erewrite <- set_lists_not_In; eauto.
     Qed.
     
-    Lemma env_log_rel_P_setlist_not_in_P_l (S : Ensemble var) (k j : nat) b
+    Lemma env_log_rel_P_set_lists_not_in_P_l (S : Ensemble var) (k j : nat) b
           (rho1 rho1' rho2 : env) (H1 H2 : heap block) (xs : list var) (vs : list value) :
       env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
       Disjoint _ (FromList xs) S ->
-      setlist xs vs rho1 = Some rho1' ->
+      set_lists xs vs rho1 = Some rho1' ->
       env_log_rel_P' S k j GP GQ b (H1, rho1') (H2, rho2).
     Proof. 
       intros Hcc Hnin Hset y Py v' Hget.
       edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
-      erewrite setlist_not_In. eassumption. eassumption.
+      erewrite set_lists_not_In. eassumption. eassumption.
       intros Hc. eapply Hnin. constructor; eauto.
     Qed.
     
-    Lemma env_log_rel_P_setlist_not_in_P_r (S : Ensemble var) (k j : nat) b
+    Lemma env_log_rel_P_set_lists_not_in_P_r (S : Ensemble var) (k j : nat) b
           (rho1 rho2 rho2' : env) (H1 H2 : heap block) (xs : list var) (vs : list value) :
       env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2) ->
       Disjoint _ (FromList xs) S ->
-      setlist xs vs rho2 = Some rho2' ->
+      set_lists xs vs rho2 = Some rho2' ->
       env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2').
     Proof.
       intros Hcc Hnin Hset y Py v' Hget.
       edestruct Hcc as [v'' [Hget' Happrox]]; eauto.
-      eexists; split; eauto. erewrite <- setlist_not_In. eassumption. eassumption.
+      eexists; split; eauto. erewrite <- set_lists_not_In. eassumption. eassumption.
       intros Hc. eapply Hnin. constructor; eauto.
     Qed.
     
@@ -978,40 +978,40 @@ Module LogRelDefs (H : Heap).
     
   (** * Getlist lemmas *)
 
-    Lemma var_log_rel_getlist (k j : nat)
+    Lemma var_log_rel_get_list (k j : nat)
           (rho1 rho2 : env) (b : Inj) (H1 H2 : heap block) xs ys vs1 :
       Forall2 (var_log_rel' k j GP GQ b H1 rho1 H2 rho2) xs ys ->
-      getlist xs rho1 = Some vs1 ->
+      get_list xs rho1 = Some vs1 ->
       exists vs2,
-        getlist ys rho2 = Some vs2 /\
+        get_list ys rho2 = Some vs2 /\
         Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2.
   Proof.
     revert ys vs1. induction xs as [| x xs IHxs]; intros ys vs1 Hall Hget.
     - destruct ys; inv Hall. inv Hget. eexists. split; simpl; eauto.
     - simpl in Hget.
       destruct (M.get x rho1) eqn:Heq1; try discriminate.
-      destruct (getlist xs rho1) eqn:Heq2; try discriminate. inv Hget.
+      destruct (get_list xs rho1) eqn:Heq2; try discriminate. inv Hget.
       destruct ys as [| y ys]; inv Hall. 
       destruct (IHxs ys l H6 eq_refl) as [vs2 [Hget HAll]].
       destruct (H4 _ Heq1) as [v2 [Heq Hpre]].
       eexists. split; simpl; eauto. rewrite Hget. rewrite Heq. reflexivity.
   Qed.
   
-  Lemma env_log_rel_P_getlist_l (S : Ensemble var) (k j : nat) b
+  Lemma env_log_rel_P_get_list_l (S : Ensemble var) (k j : nat) b
         (rho1 rho2 : env) (β : Inj) (H1 H2 : heap block)
         (xs : list var) (vs1 : list value) :
     env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2)  ->
     (FromList xs) \subset S ->
-    getlist xs rho1 = Some vs1 ->
+    get_list xs rho1 = Some vs1 ->
     exists vs2,
-      getlist xs rho2 = Some vs2 /\
+      get_list xs rho2 = Some vs2 /\
       Forall2 (fun v1 v2 => val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2.
   Proof.
     intros Henv. revert vs1.
     induction xs as [| x xs IHxs]; intros ls1 Hp Hget.
     - inv Hget. eexists. split; simpl; eauto.
     - simpl in Hget. destruct (M.get x rho1) eqn:Heq1; try discriminate.
-      destruct (getlist xs rho1) eqn:Heq2; try discriminate. inv Hget.
+      destruct (get_list xs rho1) eqn:Heq2; try discriminate. inv Hget.
       edestruct (IHxs l) as  [vs2 [Hget HAll]]; eauto.
       + intros x' Hin. eapply Hp. constructor 2; eauto.
       + eapply Henv in Heq1. destruct Heq1 as [v2 [Hyp1 Hyp2]].
@@ -1019,15 +1019,15 @@ Module LogRelDefs (H : Heap).
         constructor. apply Hp. now constructor.
   Qed.
   
-  Lemma env_log_rel_P_getlist_all (k : nat) b
+  Lemma env_log_rel_P_get_list_all (k : nat) b
         (rho1 rho2 : env) (H1 H2 : heap block)
         xs ys vs1 :
     Forall2 (fun x1 x2 =>
                forall j, var_log_rel' k j GP GQ b H1 rho1 H2 rho2 x1 x2
             ) xs ys ->
-    getlist xs rho1 = Some vs1 ->
+    get_list xs rho1 = Some vs1 ->
     exists vs2,
-      getlist ys rho2 = Some vs2 /\
+      get_list ys rho2 = Some vs2 /\
       Forall2 (fun v1 v2 => forall j, val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2)))
               vs1 vs2.
   Proof.
@@ -1035,7 +1035,7 @@ Module LogRelDefs (H : Heap).
     - destruct ys; inv Hall. inv Hget. eexists. split; simpl; eauto.
     - simpl in Hget.
       destruct (M.get x rho1) eqn:Heq1; try discriminate.
-      destruct (getlist xs rho1) eqn:Heq2; try discriminate. inv Hget.
+      destruct (get_list xs rho1) eqn:Heq2; try discriminate. inv Hget.
       destruct ys as [| y ys]; inv Hall. 
       destruct (IHxs ys l H6 eq_refl) as [vs2 [Hget Hall]].
       destruct (H4 0 _ Heq1) as [v2 [Heq Hpre]].
@@ -1048,21 +1048,21 @@ Module LogRelDefs (H : Heap).
       repeat subst_exp. eassumption.
   Qed.
   
-  Lemma env_log_rel_P_getlist_l_all (S : Ensemble var) (k : nat) b
+  Lemma env_log_rel_P_get_list_l_all (S : Ensemble var) (k : nat) b
         (rho1 rho2 : env)
         (H1 H2 : heap block) (xs : list var) (vs1 : list value) :
     (forall j, env_log_rel_P' S k j GP GQ b (H1, rho1) (H2, rho2))  ->
     (FromList xs) \subset S ->
-    getlist xs rho1 = Some vs1 ->
+    get_list xs rho1 = Some vs1 ->
     exists vs2,
-      getlist xs rho2 = Some vs2 /\
+      get_list xs rho2 = Some vs2 /\
       Forall2 (fun v1 v2 => forall j, val_log_rel' k j GP GQ b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2.
   Proof.
     intros Henv. revert vs1.
     induction xs as [| x xs IHxs]; intros ls1 Hp Hget.
     - inv Hget. eexists. split; simpl; eauto.
     - simpl in Hget. destruct (M.get x rho1) eqn:Heq1; try discriminate.
-      destruct (getlist xs rho1) eqn:Heq2; try discriminate. inv Hget.
+      destruct (get_list xs rho1) eqn:Heq2; try discriminate. inv Hget.
       edestruct (IHxs l) as  [vs2 [Hget HAll]]; eauto.
       + intros x' Hin. eapply Hp. constructor 2; eauto.
       + edestruct (Henv 0) as [v2 [Hyp1 Hyp2]].

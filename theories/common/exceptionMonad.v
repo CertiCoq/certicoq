@@ -41,7 +41,7 @@ intros.
 induction a; repeat reflexivity.
 Qed.
 
-Instance exn_monad : Monad (fun A => exception A) :=
+Instance exn_monad : Monad exception :=
   { ret := @ret; bind := @bind }.
 
 Definition catch {T} (e : exception T) (f : string -> exception T) : exception T :=

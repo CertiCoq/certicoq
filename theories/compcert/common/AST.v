@@ -18,7 +18,7 @@
 
 Require Import String.
 Require Import Coqlib Maps Errors Integers Floats.
-Require Archi.
+Require x86_64.Archi.
 
 Set Implicit Arguments.
 

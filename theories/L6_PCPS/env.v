@@ -16,7 +16,7 @@ Definition env_subset (rho1 rho2 : env) :=
 Inductive well_scoped_exp : env -> exp -> Prop :=
 | WS_constr :
     forall x t ys vs e Γ,
-      getlist ys Γ = Some vs ->
+      get_list ys Γ = Some vs ->
       (forall v, well_scoped_exp (M.set x v Γ) e) ->
       well_scoped_exp Γ (Econstr x t ys e)
 | WS_case :
@@ -29,14 +29,19 @@ Inductive well_scoped_exp : env -> exp -> Prop :=
       M.get y Γ = Some v ->
       (forall v, well_scoped_exp (M.set x v Γ) e) ->
       well_scoped_exp Γ (Eproj x tau N y e)
+| WSletapp :
+    forall x tau f ys v e Γ,
+      get_list ys Γ = Some v ->
+      (forall v, well_scoped_exp (M.set x v Γ) e) ->
+      well_scoped_exp Γ (Eletapp x f tau ys e)
 | WS_app :
     forall x v ys vs ft Γ,
-      getlist ys Γ = Some vs ->
+      get_list ys Γ = Some vs ->
       M.get x Γ = Some v ->
       well_scoped_exp Γ (Eapp x ft ys)
 | WS_prim :
     forall x f ys vs e Γ,
-      getlist ys Γ = Some vs ->
+      get_list ys Γ = Some vs ->
       (forall v, well_scoped_exp (M.set x v Γ) e) ->
       well_scoped_exp Γ (Eprim x f ys e)
 | WS_halt :
@@ -47,15 +52,15 @@ Inductive well_scoped_exp : env -> exp -> Prop :=
     forall defs e Γ,
       well_scoped_fundefs Γ defs ->
       (forall vs Γ',
-         setlist (elements (fundefs_names defs)) vs Γ = Some Γ' ->
+         set_lists (elements (fundefs_names defs)) vs Γ = Some Γ' ->
          well_scoped_exp Γ' e) ->
       well_scoped_exp Γ (Efun defs e)
 with well_scoped_fundefs : env -> fundefs -> Prop :=
 | WS_fcons :
     forall f tau xs e defs Γ,
       (forall vs vs' Γ' Γ'',
-         setlist (elements (fundefs_names defs)) vs' Γ = Some Γ' ->
-         setlist xs vs Γ' = Some Γ'' ->
+         set_lists (elements (fundefs_names defs)) vs' Γ = Some Γ' ->
+         set_lists xs vs Γ' = Some Γ'' ->
          well_scoped_exp Γ'' e) ->
       (forall v, well_scoped_fundefs (M.set f v Γ) defs) ->
       well_scoped_fundefs Γ (Fcons f tau xs e defs)
@@ -78,7 +83,7 @@ Inductive well_scoped_exp_ctx : env -> exp_ctx -> env -> Prop :=
       well_scoped_exp_ctx Γ Hole_c Γ'
 | WSCtx_constr :
     forall x t ys vs c Γ Γ',
-      getlist ys Γ = Some vs ->
+      get_list ys Γ = Some vs ->
       (forall v, well_scoped_exp_ctx (M.set x v Γ) c Γ') ->
       well_scoped_exp_ctx Γ (Econstr_c x t ys c) Γ'
 | WSCtx_proj :
@@ -86,39 +91,44 @@ Inductive well_scoped_exp_ctx : env -> exp_ctx -> env -> Prop :=
       M.get y Γ = Some v ->
       (forall v, well_scoped_exp_ctx (M.set x v Γ) c Γ') ->
       well_scoped_exp_ctx Γ (Eproj_c x tau N y c) Γ'
+| WSCtx_letapp :
+    forall x tau f ys vs c Γ Γ',
+      get_list ys Γ = Some vs->
+      (forall v, well_scoped_exp_ctx (M.set x v Γ) c Γ') ->
+      well_scoped_exp_ctx Γ (Eletapp_c x f tau ys c) Γ'
 | WSCtx_prim :
     forall x f ys vs c Γ Γ',
-      getlist ys Γ = Some vs ->
+      get_list ys Γ = Some vs ->
       (forall v, well_scoped_exp_ctx (M.set x v Γ) c Γ') ->
       well_scoped_exp_ctx Γ (Eprim_c x f ys c) Γ'
 | WSCtx_fun1 :
     forall defs c Γ Γ',
       well_scoped_fundefs Γ defs ->
       (forall vs Γ'',
-         setlist (elements (fundefs_names defs)) vs Γ = Some Γ'' ->
+         set_lists (elements (fundefs_names defs)) vs Γ = Some Γ'' ->
          well_scoped_exp_ctx Γ'' c Γ') ->
       well_scoped_exp_ctx Γ (Efun1_c defs c) Γ'
 | WSCtx_fun2 :
     forall cdefs e Γ Γ',
       well_scoped_fundefs_ctx Γ cdefs Γ' ->
       (forall vs Γ'',
-         setlist (elements (fundefs_ctx_names cdefs)) vs Γ = Some Γ'' ->
+         set_lists (elements (fundefs_ctx_names cdefs)) vs Γ = Some Γ'' ->
          well_scoped_exp Γ'' e) ->
       well_scoped_exp_ctx Γ (Efun2_c cdefs e) Γ'
 with well_scoped_fundefs_ctx : env -> fundefs_ctx -> env -> Prop :=
 | WS_fcons1 :
     forall f tau xs c defs Γ Γ',
       (forall vs vs' Γ'' Γ''',
-         setlist (elements (fundefs_names defs)) vs' Γ = Some Γ''->
-         setlist xs vs Γ'' = Some Γ''' ->
+         set_lists (elements (fundefs_names defs)) vs' Γ = Some Γ''->
+         set_lists xs vs Γ'' = Some Γ''' ->
          well_scoped_exp_ctx Γ''' c Γ') ->
       (forall v, well_scoped_fundefs (M.set f v Γ) defs) ->
       well_scoped_fundefs_ctx Γ (Fcons1_c f tau xs c defs) Γ'
 | WS_fcons2 :
     forall f tau xs e cdefs Γ Γ',
       (forall vs vs' Γ'' Γ''',
-         setlist (elements (fundefs_ctx_names cdefs)) vs' Γ = Some Γ''->
-         setlist xs vs Γ'' = Some Γ''' ->
+         set_lists (elements (fundefs_ctx_names cdefs)) vs' Γ = Some Γ''->
+         set_lists xs vs Γ'' = Some Γ''' ->
          well_scoped_exp Γ''' e) ->
       (forall v, well_scoped_fundefs_ctx (M.set f v Γ) cdefs Γ') ->
       well_scoped_fundefs_ctx Γ (Fcons2_c f tau xs e cdefs) Γ'.
@@ -151,30 +161,30 @@ Proof.
   destruct (peq x' x); eauto.
 Qed.
 
-Lemma env_subset_setlist Γ1 Γ2 Γ1' xs vs :
+Lemma env_subset_set_lists Γ1 Γ2 Γ1' xs vs :
   env_subset Γ2 Γ1 ->
-  Some Γ1' = setlist xs vs Γ1 ->
-  exists Γ2', Some Γ2' = setlist xs vs Γ2 /\ env_subset Γ2' Γ1'.
+  Some Γ1' = set_lists xs vs Γ1 ->
+  exists Γ2', Some Γ2' = set_lists xs vs Γ2 /\ env_subset Γ2' Γ1'.
 Proof.
   revert vs Γ1'.
   induction xs; simpl; intros vs Γ1' Hsub Hset1;
   destruct vs; try discriminate.
   - inv Hset1; eexists; eauto.
-  - destruct (setlist xs vs Γ1) as [Γ1'' | ] eqn:Heq; try discriminate.
+  - destruct (set_lists xs vs Γ1) as [Γ1'' | ] eqn:Heq; try discriminate.
     edestruct (IHxs vs Γ1'' Hsub) as [Γ2' [Heq' Ηsub]]; eauto. inv Hset1.
     exists (M.set a v Γ2'). split. rewrite <- Heq'. eauto.
     eapply env_subset_set. eauto.
 Qed.
 
-Lemma env_subset_getlist Γ1 Γ2 xs vs :
+Lemma env_subset_get_list Γ1 Γ2 xs vs :
   env_subset Γ1 Γ2 ->
-  getlist xs Γ1 = Some vs ->
-  getlist xs Γ2 = Some vs.
+  get_list xs Γ1 = Some vs ->
+  get_list xs Γ2 = Some vs.
 Proof.
   revert vs.
   induction xs; simpl; intros vs Hsub Hget; eauto.
   destruct (M.get a Γ1) eqn:Heq; try discriminate.
-  destruct (getlist xs Γ1) eqn:Heq'; try discriminate.
+  destruct (get_list xs Γ1) eqn:Heq'; try discriminate.
   eapply Hsub in Heq. rewrite Heq. inv Hget.
   erewrite IHxs; eauto.
 Qed.
@@ -195,7 +205,7 @@ Lemma well_scoped_exp_fundefs_weakening :
      Γ ⊢* defs -> env_subset Γ Γ' -> Γ' ⊢* defs).
 Proof.
   exp_defs_induction IHc IHl IHfc; intros Γ Γ' Hws Hsub;
-  try (now inv Hws; econstructor; eauto using env_subset_getlist, env_subset_get;
+  try (now inv Hws; econstructor; eauto using env_subset_get_list, env_subset_get;
        intros; eapply IHc; eauto using env_subset_set).
   - inv Hws; econstructor; eauto.
     inv H3. constructor; eauto.
@@ -203,10 +213,10 @@ Proof.
       by (eapply IHl; eauto; econstructor; eauto).
     inv Hsuf; eauto.
   - inv Hws. constructor; eauto.
-    intros. edestruct env_subset_setlist as [Γ2 [Hset2 Hsub2]]; eauto.
+    intros. edestruct env_subset_set_lists as [Γ2 [Hset2 Hsub2]]; eauto.
   - inv Hws. constructor; eauto.
-    intros. edestruct env_subset_setlist as [Γ2 [Hset2 Hsub2]]; eauto.
-    edestruct env_subset_setlist as [Γ3 [Hset3 Hsub3]]; eauto.
+    intros. edestruct env_subset_set_lists as [Γ2 [Hset2 Hsub2]]; eauto.
+    edestruct env_subset_set_lists as [Γ3 [Hset3 Hsub3]]; eauto.
     intros. eapply IHfc; eauto using env_subset_set.
 Qed.
 

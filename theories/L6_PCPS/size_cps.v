@@ -5,7 +5,7 @@
 
 From Coq Require Import ZArith List SetoidList NArith.BinNat PArith.BinPos
      MSets.MSetRBT Sets.Ensembles Omega Sorting.Permutation.
-From CertiCoq.L6 Require Import List_util cps ctx identifiers Ensembles_util.
+From CertiCoq.L6 Require Import List_util cps ctx identifiers Ensembles_util set_util cps_util.
 
 Require Import compcert.lib.Maps.
 
@@ -27,6 +27,7 @@ Fixpoint sizeOf_exp (e : exp) : nat :=
                 | (t, e) :: l => sizeOf_exp e + sizeOf_l l
               end) l
     | Eproj x _ _ y e => 1 + sizeOf_exp e
+    | Eletapp x f _ ys e => 1 + length ys + sizeOf_exp e
     | Efun B e => 1 + sizeOf_fundefs B + sizeOf_exp e
     | Eapp x _ ys => 1 + length ys
     | Eprim x _ ys e => length ys + sizeOf_exp e
@@ -46,12 +47,13 @@ Fixpoint sizeOf_exp_ctx (c : exp_ctx) : nat :=
     | Econstr_c _ _ ys c => 1 + length ys + sizeOf_exp_ctx c
     | Eproj_c _ _ _ _ c => 1 + sizeOf_exp_ctx c
     | Eprim_c _ _ ys c => length ys + sizeOf_exp_ctx c
+    | Eletapp_c _ f _ ys c => 1 + length ys + sizeOf_exp_ctx c
     | Ecase_c _ l1 _ c l2  =>
       1 + sizeOf_exp_ctx c
       + fold_left (fun s p => s + sizeOf_exp (snd p)) l1 0
       + fold_left (fun s p => s + sizeOf_exp (snd p)) l2 0 
-    | Efun1_c B c => sizeOf_fundefs B + sizeOf_exp_ctx c
-    | Efun2_c B e => sizeOf_fundefs_ctx B + sizeOf_exp e
+    | Efun1_c B c => (1 + PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx c
+    | Efun2_c B e => 1 + sizeOf_fundefs_ctx B + sizeOf_exp e
   end
 with sizeOf_fundefs_ctx (B : fundefs_ctx) : nat :=
        match B with
@@ -188,13 +190,6 @@ Proof.
 Qed.
 
 
-(** Number of function definitions *)
-Fixpoint numOf_fundefs (B : fundefs) : nat := 
-  match B with
-    | Fcons _ _ xs e B =>
-      1 + numOf_fundefs B
-    | Fnil => 0
-  end.
 
 (** Number of function definitions in an expression *)
 Fixpoint numOf_fundefs_in_exp (e : exp) : nat :=
@@ -206,7 +201,9 @@ Fixpoint numOf_fundefs_in_exp (e : exp) : nat :=
                | [] => 0
                | (t, e) :: l => numOf_fundefs_in_exp e + num l
              end) l
+    (* Maybe 1 + should be removed?*)
     | Eproj x _ _ y e => 1 + numOf_fundefs_in_exp e
+    | Eletapp x _ _ y e => numOf_fundefs_in_exp e
     | Efun B e => numOf_fundefs_in_fundefs B + numOf_fundefs_in_exp e
     | Eapp x _ ys => 0
     | Eprim x _ ys e => numOf_fundefs_in_exp e
@@ -240,15 +237,15 @@ Proof.
   rewrite <- Max.max_assoc. eauto.
 Qed.
 
-Lemma sizeOf_env_setlist k rho rho' xs vs :
-  setlist xs vs rho = Some rho' ->
+Lemma sizeOf_env_set_lists k rho rho' xs vs :
+  set_lists xs vs rho = Some rho' ->
   sizeOf_env k rho' = max (max_list_nat_with_measure (sizeOf_val k) 0 vs) (sizeOf_env k rho).
 Proof.
   revert vs rho rho'. induction xs; intros vs rho rho' Hset.
   - destruct vs; try discriminate. inv Hset.
     reflexivity.
   - destruct vs; try discriminate.
-    simpl in Hset. destruct (setlist xs vs rho) eqn:Hset'; try discriminate.
+    simpl in Hset. destruct (set_lists xs vs rho) eqn:Hset'; try discriminate.
     inv Hset. rewrite sizeOf_env_set; simpl.
     rewrite max_list_nat_acc_spec.
     rewrite <- Max.max_assoc. eapply Nat.max_compat. reflexivity.
@@ -265,15 +262,15 @@ Proof.
   eassumption.
 Qed.
 
-Lemma sizeOf_env_getlist k rho xs vs :
-  getlist xs rho = Some vs ->
+Lemma sizeOf_env_get_list k rho xs vs :
+  get_list xs rho = Some vs ->
   max_list_nat_with_measure (sizeOf_val k) 0 vs  <= sizeOf_env k rho.
 Proof.
   revert vs. induction xs; intros vs Hgetl. 
   - destruct vs; try discriminate; simpl; omega.
   - simpl in Hgetl.
     destruct (rho ! a) eqn:Hgeta; try discriminate.
-    destruct (getlist xs rho) eqn:Hgetl'; try discriminate.
+    destruct (get_list xs rho) eqn:Hgetl'; try discriminate.
     destruct vs; try discriminate. inv Hgetl. simpl.
     eapply le_trans.
     + rewrite <- (Max.max_0_l (sizeOf_val k v0)).
@@ -287,7 +284,7 @@ Proof.
 Qed.
 
 Lemma sizeOf_env_set_constr k rho xs c vs y:
-  getlist xs rho = Some vs ->
+  get_list xs rho = Some vs ->
   sizeOf_env k (M.set y (Vconstr c vs) rho) = sizeOf_env k rho.
 Proof.
   intros Hget. rewrite sizeOf_env_set.
@@ -300,7 +297,7 @@ Proof.
     eapply fold_left_monotonic; [| now eauto ].
     intros. rewrite sizeOf_val_eq. eapply Nat.max_le_compat.
     now eauto. now eauto.
-    eapply (sizeOf_env_getlist (S k)). eassumption. }
+    eapply (sizeOf_env_get_list (S k)). eassumption. }
   omega.
 Qed.
 
@@ -353,14 +350,14 @@ Qed.
 (* Qed. *)
 
 
-Lemma sizeOf_env_getlist_setlist k rho1 rho2 rho2' xs ys vs :
-  getlist xs rho1 = Some vs ->
-  setlist ys vs rho2 = Some rho2' ->
+Lemma sizeOf_env_get_list_set_lists k rho1 rho2 rho2' xs ys vs :
+  get_list xs rho1 = Some vs ->
+  set_lists ys vs rho2 = Some rho2' ->
   sizeOf_env k rho2' <= max (sizeOf_env k rho1) (sizeOf_env k rho2).
 Proof.
-  intros Hget Hset. erewrite sizeOf_env_setlist; eauto.
+  intros Hget Hset. erewrite sizeOf_env_set_lists; eauto.
   eapply Nat.max_le_compat; eauto.
-  eapply sizeOf_env_getlist; eauto.
+  eapply sizeOf_env_get_list; eauto.
 Qed.
 
 Lemma max_list_nat_monotonic (A : Type) (f1 f2 : A -> nat) (l : list A) (n1 n2 : nat) :
@@ -376,13 +373,13 @@ Qed.
 Lemma sizeOf_env_set_app k rho rho' rho'' f xs B f' ys e vs :
   k > 0 ->
   rho ! f = Some (Vfun rho' B f') ->
-  getlist xs rho = Some vs ->
+  get_list xs rho = Some vs ->
   sizeOf_exp e <= sizeOf_fundefs B ->
-  setlist ys vs (def_funs B B rho' rho') = Some rho'' ->
+  set_lists ys vs (def_funs B B rho' rho') = Some rho'' ->
   max (sizeOf_exp e) (sizeOf_env (k - 1) rho'') <= sizeOf_env k rho.
 Proof.
   intros Hgt Hget Hget' Hf Hset.
-  erewrite sizeOf_env_setlist; eauto.
+  erewrite sizeOf_env_set_lists; eauto.
   rewrite (Max.max_comm (max_list_nat_with_measure _ _ _) _), Max.max_assoc.
   eapply Nat.max_lub.
   - eapply le_trans; [| now eapply sizeOf_env_get; eauto ].
@@ -395,7 +392,7 @@ Proof.
       Max.max_assoc, Max.max_idempotent; eauto.
   - eapply le_trans. eapply (max_list_nat_monotonic _ _ (sizeOf_val k)); eauto.
     intros. eapply sizeOf_val_monotic. omega.
-    eapply sizeOf_env_getlist; eauto.
+    eapply sizeOf_env_get_list; eauto.
 Qed.
 
 Lemma sizeOf_exp_grt_1 e :
@@ -442,6 +439,68 @@ Proof.
   - eapply le_trans. eapply IHB; eauto.
     simpl. omega.
 Qed.
+
+  (** *  Useful definitions and lemmas for the  bound. *)
+
+Definition max_exp_env (k : nat) (e : exp) rho :=
+  max (sizeOf_exp e) (sizeOf_env k rho).
+
+
+Lemma max_exp_env_grt_1 k e rho :
+  1 <= max_exp_env k e rho.
+Proof.
+  unfold max_exp_env.
+  eapply le_trans. now apply sizeOf_exp_grt_1.
+  eapply Max.le_max_l.
+Qed.
+
+(** Lemmas used to establish the upper bound given the IH *)
+
+Lemma max_exp_env_Econstr k x t ys e rho :
+  max_exp_env k e rho <= max_exp_env k (Econstr x t ys e) rho.
+Proof.
+  eapply Nat.max_le_compat_r.
+  simpl. omega.
+Qed.
+
+Lemma max_exp_env_Eproj k x t N y e rho :
+  max_exp_env k e rho <= max_exp_env k (Eproj x t N y e) rho.
+Proof.
+  eapply Nat.max_le_compat_r.
+  simpl. omega.
+Qed.
+
+Lemma max_exp_env_Ecase_cons_hd k x c e l rho :
+  max_exp_env k e rho <= max_exp_env k (Ecase x ((c, e) :: l)) rho.
+Proof.
+  eapply Nat.max_le_compat_r.
+  simpl. omega.
+Qed.
+
+Lemma max_exp_env_Ecase_cons_tl k x c e l rho :
+  max_exp_env k (Ecase x l) rho <= max_exp_env k (Ecase x ((c, e) :: l)) rho.
+Proof.
+  eapply Nat.max_le_compat_r.
+  simpl. omega.
+Qed.
+
+Lemma max_exp_env_Eprim k x f ys e rho :
+  max_exp_env k e rho <= max_exp_env k (Eprim x f ys e) rho.
+Proof.
+  eapply Nat.max_le_compat_r.
+  simpl. omega.
+Qed.
+
+Lemma max_exp_env_Efun k B e rho :
+  max_exp_env k e (def_funs B B rho rho) <= max_exp_env k (Efun B e) rho.
+Proof.
+  unfold max_exp_env. eapply le_trans.
+  - eapply Nat.max_le_compat_l.
+    now apply sizeOf_env_def_funs.
+  - rewrite (Max.max_comm (sizeOf_env _ _)), Max.max_assoc.
+    eapply Nat.max_le_compat_r.
+    eapply Nat.max_lub; simpl; omega.
+  Qed.
 
 (* Lemma about the number of free variables *)
 Lemma occurs_free_cardinality_mut :
@@ -499,6 +558,18 @@ Proof.
     rewrite <- HP in Hnd.
     eapply Permutation_length in HP. rewrite <- HP.
     rewrite app_length.
+    eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set x])) in Hin2;
+      [| now apply Setminus_Included ].
+    rewrite <- FromList_cons in Hin1.
+    eapply Same_set_FromList_length in Hin1.
+    eapply IHe in Hin2. simpl in Hin1. omega.
+    eapply NoDup_cons_r; eauto. 
+    eapply NoDup_cons_l; eauto.
+  - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
+    eassumption.
+    rewrite <- HP in Hnd.
+    eapply Permutation_length in HP. rewrite <- HP.
+    rewrite app_length.
     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) _)) in Hin2;
       [| now apply Setminus_Included ].
     eapply IHb in Hin1. eapply IHe in Hin2. omega.
@@ -526,8 +597,7 @@ Proof.
     eapply IHe in Hin2. omega.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
-  - rewrite occurs_free_Ehalt in Heq.
-    rewrite <- (Union_Empty_set_neut_r [set v]) in Heq.
+  - rewrite <- (Union_Empty_set_neut_r [set v]) in Heq.
     rewrite <- FromList_nil, <- FromList_cons in Heq.
     eapply Same_set_FromList_length in Heq; eauto.
   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].

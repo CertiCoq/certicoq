@@ -6,7 +6,8 @@ From Coq Require Import Lists.List Lists.SetoidList NArith.BinNat PArith.BinPos
      MSets.MSetRBT Sets.Ensembles Omega Sorting.Permutation Logic.Decidable.
 
 From compcert.lib Require Import Coqlib.
-From CertiCoq.L6 Require Import cps cps_util ctx set_util Ensembles_util List_util tactics.
+Require Import L6.tactics.
+From CertiCoq.L6 Require Import cps cps_util ctx set_util Ensembles_util List_util.
 
 Import ListNotations.
 
@@ -27,7 +28,7 @@ Fixpoint name_in_fundefs (B : fundefs) : Ensemble var :=
   end.
 
 (** [fun_in_fundefs B] is the set of functions defined in [B] *)
-Fixpoint fun_in_fundefs  (B : fundefs) : Ensemble (var * fTag * list var * exp) :=
+Fixpoint fun_in_fundefs  (B : fundefs) : Ensemble (var * fun_tag * list var * exp) :=
   match B with
     | Fnil => Empty_set _
     | Fcons f tau xs e B =>
@@ -86,13 +87,13 @@ Proof.
   eapply fundefs_append_split_fds; eauto.
 Qed.
 
-Lemma getlist_def_funs_Disjoint xs B B' rho  :
+Lemma get_list_def_funs_Disjoint xs B B' rho  :
   Disjoint _ (FromList xs) (name_in_fundefs B) ->
-  getlist xs (def_funs B' B rho rho) = getlist xs rho.
+  get_list xs (def_funs B' B rho rho) = get_list xs rho.
 Proof with now eauto with Ensembles_DB.
   induction B; intros Hd.
   - simpl.
-    rewrite getlist_set_neq.
+    rewrite get_list_set_neq.
     erewrite IHB...
     intros Hc; eapply Hd. constructor; eauto. now left.
   - reflexivity.
@@ -216,16 +217,16 @@ Proof.
   rewrite def_funs_neq; eauto.
 Qed.
 
-Lemma getlist_fundefs ys vs B B' rho :
-  getlist ys rho = Some vs ->
+Lemma get_list_fundefs ys vs B B' rho :
+  get_list ys rho = Some vs ->
   (forall y, List.In y ys -> ~ name_in_fundefs B y) ->
-  getlist ys (def_funs B' B rho rho) = Some vs.
+  get_list ys (def_funs B' B rho rho) = Some vs.
 Proof.
   revert rho vs. induction ys; intros rho vs Hget Hall.
   - now inv Hget.
   - simpl in Hget.
     destruct (M.get a rho) eqn:Heq1; try discriminate.
-    destruct (getlist ys rho) eqn:Heq2; try discriminate. inv Hget.
+    destruct (get_list ys rho) eqn:Heq2; try discriminate. inv Hget.
     simpl. erewrite IHys; eauto. erewrite get_fundefs; eauto.
     intros Hc. eapply Hall; eauto. left; eauto.
     intros y Hin Hc. eapply Hall; eauto. right; eauto.
@@ -286,6 +287,15 @@ Inductive occurs_free : exp -> Ensemble var :=
       x <> y ->
       occurs_free e y ->
       occurs_free (Eproj x tau n y' e) y
+| Free_Eletapp1 :
+    forall y x f ft ys e,
+      List.In y (f::ys) ->
+      occurs_free (Eletapp x f ft ys e) y
+| Free_Eletapp2 :
+    forall y x f ft ys e,
+      x <> y ->
+      occurs_free e y ->
+      occurs_free (Eletapp x f ft ys e) y
 | Free_Efun1 :
     forall y defs e,
       ~ (name_in_fundefs defs y) -> 
@@ -330,7 +340,7 @@ with occurs_free_fundefs : fundefs -> Ensemble var :=
 Hint Constructors occurs_free : core.
 Hint Constructors occurs_free_fundefs : core.
 
-(** [occurs_free_applied e] is the set of free variables of [e] that appear in applied position *)
+(** [occurs_free_applied e] is the set of free variables of [e] that appear in application position *)
 Inductive occurs_free_applied : exp -> Ensemble var :=
 | FreeApp_Econstr :
     forall y x t ys e,
@@ -350,6 +360,14 @@ Inductive occurs_free_applied : exp -> Ensemble var :=
       x <> y ->
       occurs_free_applied e y ->
       occurs_free_applied (Eproj x tau n y' e) y
+| FreeApp_Eletapp1 :
+    forall f x ft ys e,
+      occurs_free_applied (Eletapp x f ft ys e) f
+| FreeApp_Eletapp2 :
+    forall y x f ft ys e,
+      x <> y ->
+      occurs_free_applied e y ->
+      occurs_free_applied (Eletapp x f ft ys e) y
 | FreeApp_Efun1 :
     forall y defs e,
       ~ (name_in_fundefs defs y) -> 
@@ -421,6 +439,20 @@ Proof.
   inv H0. eauto.
   inv H0. constructor; eauto.
   intros Hc. subst. eauto.
+Qed.
+
+Lemma occurs_free_Eletapp x f ft ys e:
+  (occurs_free (Eletapp x f ft ys e))
+    <--> ((f |: FromList ys) :|: ((occurs_free e) \\ [set x])).
+Proof.
+  split; intros x' H; inv H.
+  + inv H6; eauto with Ensembles_DB.
+  + right. constructor; eauto. intros H. inv H; eauto.
+  + inv H0. inv H. constructor; eauto. now left.
+    constructor. now right.
+  + inv H0; eauto. eapply Free_Eletapp2 .
+    intros Hc. subst; eauto.
+    eassumption. 
 Qed.
 
 Lemma occurs_free_Ehalt x :
@@ -505,8 +537,10 @@ Ltac normalize_occurs_free :=
       rewrite occurs_free_Econstr
     | [|- context[occurs_free (Eproj _ _ _ _ _)]] =>
       rewrite occurs_free_Eproj
+    | [|- context[occurs_free (Eletapp _ _ _ _ _)]] =>
+      rewrite occurs_free_Eletapp
     | [|- context[occurs_free (Ecase _ [])]] =>
-      rewrite occurs_free_Ecase_nil
+      rewrite occurs_free_Ecase_nil              
     | [|- context[occurs_free (Ecase _ (_ :: _))]] =>
       rewrite occurs_free_Ecase_cons
     | [|- context[occurs_free (Ecase _ (_ ++ _))]] =>
@@ -517,6 +551,8 @@ Ltac normalize_occurs_free :=
       rewrite occurs_free_Eapp
     | [|- context[occurs_free (Eprim _ _ _ _)]] =>
       rewrite occurs_free_Eprim
+    | [|- context[occurs_free (Ehalt _)]] =>
+      rewrite occurs_free_Ehalt         
     | [|- context[occurs_free_fundefs (Fcons _ _ _ _ _)]] =>
        rewrite occurs_free_fundefs_Fcons
     | [|- context[occurs_free_fundefs Fnil]] =>
@@ -529,6 +565,8 @@ Ltac normalize_occurs_free_in_ctx :=
       rewrite occurs_free_Econstr in H
     | [ H : context[occurs_free (Eproj _ _ _ _ _)]  |- _ ] =>
       rewrite occurs_free_Eproj in H
+    | [ H : context[occurs_free (Eletapp _ _ _ _ _)]  |- _ ] =>
+      rewrite occurs_free_Eletapp in H
     | [ H : context[occurs_free (Ecase _ [])] |- _ ] =>
       rewrite occurs_free_Ecase_nil in H
     | [ H : context[occurs_free (Ecase _ (_ :: _))] |- _ ] =>
@@ -541,6 +579,8 @@ Ltac normalize_occurs_free_in_ctx :=
       rewrite occurs_free_Eapp in H
     | [ H : context[occurs_free (Eprim _ _ _ _)] |- _ ] =>
       rewrite occurs_free_Eprim in H
+    | [ H : context[occurs_free (Ehalt _)] |- _ ] =>
+      rewrite occurs_free_Ehalt in H
     | [ H : context[occurs_free_fundefs (Fcons _ _ _ _ _)] |- _ ] =>
        rewrite occurs_free_fundefs_Fcons in H
     | [ H : context[occurs_free_fundefs Fnil] |- _ ] =>
@@ -576,6 +616,14 @@ Qed.
 Lemma occurs_free_Eproj_Included x tau t y e :
   Included var (occurs_free e)
            (Union var (occurs_free (Eproj x tau t y e)) (Singleton var x)).
+Proof.
+  intros x' Hin.
+  destruct (var_dec x x'); subst; eauto.
+Qed.
+
+Lemma occurs_free_Eletapp_Included x f ft ys e :
+  Included var (occurs_free e)
+           (Union var (occurs_free (Eletapp x f ft ys e)) (Singleton var x)).
 Proof.
   intros x' Hin.
   destruct (var_dec x x'); subst; eauto.
@@ -698,6 +746,19 @@ Proof.
     destruct (var_dec x v); subst. right. intros Hc. inv Hc; eauto.
     destruct (Dec x); eauto.
     right. intros Hc. inv Hc; eauto.
+  + constructor; intros z.
+    destruct (in_dec var_dec z ys); eauto.
+    left. constructor; now right.
+
+    destruct (var_dec z f); subst; eauto.
+    left. constructor; now left.
+    destruct (var_dec x z); subst.
+    right. intros Hc. inv Hc; eauto.
+    eapply n. inv H6; exfalso; eauto.
+    
+    destruct (Dec z); eauto.
+    right. intros Hc. inv Hc; eauto.
+    inv H6; eauto. 
   + constructor; intros x. destruct (Decidable_name_in_fundefs f2).
     destruct (Dec x).
     * right. intros Hc. inv Hc; eauto. eapply fun_names_not_free_in_fundefs; eauto.
@@ -756,6 +817,17 @@ Proof.
     destruct (var_dec x v); subst. right. intros Hc. inv Hc; eauto.
     destruct (Dec x); eauto.
     right. intros Hc. inv Hc; eauto.
+  + constructor; intros z.
+    destruct (in_dec var_dec z ys); eauto.
+    left; constructor; eauto. now right.
+    destruct (var_dec z f); subst.
+    left; constructor; eauto. now left.    
+    destruct (var_dec z x); subst.
+    * right. intros Hc. inv Hc; eauto. eapply n. inv H6; eauto.
+      congruence. 
+    * destruct (Dec z); eauto.
+      right. intros Hc. inv Hc; eauto.
+      inv H6; eauto.
   + constructor; intros x. destruct (Decidable_name_in_fundefs f2).
     destruct (Dec x).
     * right. intros Hc. inv Hc; eauto. eapply fun_names_not_free_in_fundefs; eauto.
@@ -965,6 +1037,8 @@ Proof with eauto with Ensembles_DB.
   rewrite H2, H3...
 Qed.
 
+
+
 (** * Function blocks defined inside in expressions and function blocks *)
 
 (** [funs_in_exp B e] iff [B] is a block of functions in [e] *)
@@ -982,6 +1056,10 @@ Inductive funs_in_exp : fundefs -> exp -> Prop :=
     forall fs e x tau N ys,
       funs_in_exp fs e ->
       funs_in_exp fs (Eproj x tau N ys e)
+| In_Eletapp :
+    forall fs e x f ft ys,
+      funs_in_exp fs e ->
+      funs_in_exp fs (Eletapp x f ft ys e)
 | In_Fun1 :
     forall fs e,
       funs_in_exp fs (Efun fs e)          
@@ -1066,6 +1144,9 @@ Inductive has_true_mut : exp -> Prop :=
 | Tm_Eproj x c n y e :
     has_true_mut e ->
     has_true_mut (Eproj x c n y e)
+| Tm_Eletapp x f ft ys e :
+    has_true_mut e ->
+    has_true_mut (Eletapp x f ft ys e)
 | Tm_Efun B e :
     true_mut B ->
     has_true_mut_funs B ->
@@ -1115,6 +1196,13 @@ Inductive bound_var : exp -> Ensemble var :=
     forall y x tau n y' e,
       bound_var e y ->
       bound_var (Eproj x tau n y' e) y
+| Bound_Eletapp1 :
+    forall x f ft ys e,
+      bound_var (Eletapp x f ft ys e) x
+| Bound_Eletapp2 :
+    forall y x f ft ys e,
+      bound_var e y ->
+      bound_var (Eletapp x f ft ys e) y
 | Bound_Ecase :
     forall x y c e B,
       bound_var e y ->
@@ -1163,6 +1251,13 @@ Qed.
 
 Lemma bound_var_Eproj x tau t y e :
   Same_set _ (bound_var (Eproj x tau t y e))
+           (Union var (bound_var e) (Singleton _ x)).
+Proof.
+  split; intros x' H; inv H; eauto. inv H0; eauto.
+Qed.
+
+Lemma bound_var_Eletapp x f ft ys e :
+  Same_set _ (bound_var (Eletapp x f ft ys e))
            (Union var (bound_var e) (Singleton _ x)).
 Proof.
   split; intros x' H; inv H; eauto. inv H0; eauto.
@@ -1248,6 +1343,8 @@ Ltac normalize_bound_var :=
       rewrite bound_var_Eproj
     | [|- context[bound_var (Ecase _ [])]] =>
       rewrite bound_var_Ecase_nil
+    | [|- context[bound_var (Eletapp _ _ _ _ _)]] =>
+      rewrite bound_var_Eletapp
     | [|- context[bound_var (Ecase _ (_ :: _))]] =>
       rewrite bound_var_Ecase_cons
     | [|- context[bound_var (Ecase _ (_ ++ _))]] =>
@@ -1272,6 +1369,8 @@ Ltac normalize_bound_var_in_ctx :=
       rewrite bound_var_Econstr in H
     | [ H : context[bound_var (Eproj _ _ _ _ _)]  |- _ ] =>
       rewrite bound_var_Eproj in H
+    | [ H : context[bound_var (Eletapp _ _ _ _ _)]  |- _ ] =>
+      rewrite bound_var_Eletapp in H            
     | [ H : context[bound_var (Ecase _ [])] |- _ ] =>
       rewrite bound_var_Ecase_nil in H
     | [ H : context[bound_var (Ecase _ (_ :: _))] |- _ ] =>
@@ -1548,6 +1647,11 @@ Inductive unique_bindings : exp -> Prop :=
       ~ (bound_var e) x ->
       unique_bindings e ->
       unique_bindings (Eproj x tau n y e)
+| UBound_Eletapp :
+    forall x f ft ys e,
+      ~ (bound_var e) x ->
+      unique_bindings e ->
+      unique_bindings (Eletapp x f ft ys e)
 | UBound_Ecase1 :
     forall x,
       unique_bindings (Ecase x [])
@@ -1612,6 +1716,23 @@ Proof.
   intros H; induction H; constructor; eauto.
   intros Hin. eapply H0. now apply name_in_fundefs_bound_var_fundefs.
 Qed.
+
+
+Lemma find_def_complete (f : var) (B : fundefs) (tau : fun_tag) (xs : list var) (e : exp) :
+  unique_functions B ->
+  fun_in_fundefs B (f, tau, xs, e) ->
+  find_def f B = Some (tau, xs, e).
+Proof.
+  intros Hun HB. induction B.
+  - inv Hun. destruct (peq f v); subst.
+    + inv HB. inv H. simpl. rewrite peq_true. reflexivity.
+      exfalso. eapply H5. eapply fun_in_fundefs_name_in_fundefs.
+      eassumption.
+    + inv HB. inv H. contradiction.
+      simpl. rewrite peq_false; eauto.
+  - inv HB.
+Qed.
+
 
 Lemma unique_bindings_Ecase_l x P1 c e P2 :
   unique_bindings (Ecase x (P1 ++ ((c, e) :: P2))) ->
@@ -1844,6 +1965,20 @@ Proof with eauto with Ensembles_DB.
     + rewrite split_fds_bound_vars; [| eassumption ]...
     + eapply IHHspl...
   - constructor.
+Qed.
+
+Lemma split_fds_find_def B1 B2 B3 f:
+  unique_functions B3 ->
+  split_fds B1 B2 B3 ->
+  f \in name_in_fundefs B2 ->
+  find_def f B3 = find_def f B2.
+Proof.
+  intros Hun Hs Hin.
+  edestruct name_in_fundefs_find_def_is_Some as [ft [xs [e Hfind]]]; eauto.
+  assert (Hfun := find_def_correct _ _ _ _ _ Hfind).
+  assert (Hfun' : fun_in_fundefs B3 (f, ft, xs, e)).
+  { eapply split_fds_fun_in_fundefs. eassumption. now right. }
+  eapply find_def_complete in Hfun'. congruence. eassumption.
 Qed.
 
 Lemma fundefs_append_unique_bindings_l B1 B2 B3 :
@@ -2224,6 +2359,9 @@ Fixpoint exp_fv_aux (e : exp) (scope fvset : FVSet) : FVSet :=
     | Eproj x tau n y e =>
       let fvset' := if mem y scope then fvset else add y fvset in
       exp_fv_aux e (add x scope) fvset'
+    | Eletapp x f ft ys e =>
+      let fvset' := add_list scope fvset (f :: ys) in
+      exp_fv_aux e (add x scope) fvset'
     | Efun defs e =>
       let '(scope', fvset') := fundefs_fv_aux defs scope fvset in 
       exp_fv_aux e scope' fvset'
@@ -2286,7 +2424,7 @@ Proof.
       * inv H3; subst. eapply IHl; eauto.
         left. now apply_set_specs; eauto.
         eapply IHl; eauto.
-Qed. 
+Qed.
 
 (** correctness of exp_fv and fundefs_fv w.r.t occurs_free and
     occurs_free_fundefs *)
@@ -2298,7 +2436,7 @@ Lemma exp_fv_fundefs_fv_correct :
      (forall x, In x Scope' <-> (In x Scope \/ Ensembles.In _ (name_in_fundefs B) x)) /\
      (forall x, In x FVset' <-> ((Ensembles.In _ (occurs_free_fundefs B) x /\ ~ In x Scope) \/ In x FVset))).
 Proof.
-  exp_defs_induction IHe IHl IHdefs; simpl; intros.
+  exp_defs_induction IHe IHl IHdefs; intros.
   - split; intros H.
     + eapply IHe in H. inv H.
       * inv H0. left. split. constructor 2; eauto.
@@ -2312,7 +2450,7 @@ Proof.
         left; split; eauto.
         intros Hc. apply_set_specs_ctx; eauto.
       * eapply IHe. right. now apply add_list_spec; eauto.
-  - split; intros H.
+  - simpl; split; intros H.
     + destruct (mem v Scope) eqn:Heq; eauto.
       repeat apply_set_specs_ctx; eauto. left; split; eauto.
       intros Hc. eapply mem_spec in Hc. congruence.
@@ -2345,10 +2483,23 @@ Proof.
       * eapply IHe. right.
         destruct (mem v0 Scope) eqn:Heq; eauto.
         now apply_set_specs; eauto.
-  - destruct (fundefs_fv_aux f2 Scope FVset) as [Scope' FVset'] eqn:Heq.
+  - split; intros H.
+    + eapply IHe in H. inv H.
+      * inv H0. left. split. eapply Free_Eletapp2; eauto.
+        intros Hc. subst. apply H1. now apply_set_specs; eauto.
+        intros Hc. apply H1. now apply_set_specs; eauto.
+      * eapply add_list_spec in H0. inv H0; eauto.
+        inv H; left; eauto.
+    + inv H.
+      * inv H0. eapply IHe. inv H.
+        right. now apply add_list_spec; eauto.
+        left; split; eauto.
+        intros Hc. apply_set_specs_ctx; eauto.
+      * eapply IHe. right. now apply add_list_spec; eauto.  
+  - simpl in *; destruct (fundefs_fv_aux f2 Scope FVset) as [Scope' FVset'] eqn:Heq.
     specialize (IHdefs Scope FVset). rewrite Heq in IHdefs.
     destruct IHdefs as [H1 H2].
-    split; intros H. 
+    split; intros H.
     + eapply IHe in H. inv H.
       * inv H0. left; split. constructor; eauto.
         intros Hc. eapply H3. eapply H1; eauto.
@@ -2359,7 +2510,7 @@ Proof.
         eapply H1 in Hc. now inv Hc; eauto.
         right. eapply H2; eauto.
       * right. eapply H2; eauto.
-  - split; intros H.
+  - simpl in *; split; intros H.
     + destruct (mem v Scope) eqn:Heq; eauto.
       * eapply add_list_spec in H. inv H; eauto. inv H0; eauto.
       * repeat apply_set_specs_ctx; eauto. left; split; eauto.
@@ -2384,7 +2535,7 @@ Proof.
         left; split; eauto.
         intros Hc. apply_set_specs_ctx; eauto.
       * eapply IHe. right. now apply add_list_spec; eauto.
-  - split; intros H.
+  - simpl in *; split; intros H.
     + destruct (mem v Scope) eqn:Heq; eauto.
       repeat apply_set_specs_ctx; eauto. left; split; eauto.
       intros Hc. eapply mem_spec in Hc. congruence.
@@ -2393,7 +2544,7 @@ Proof.
         exfalso. apply H1. now apply mem_spec; eauto.
       * repeat apply_set_specs; eauto. inv H. inv H0. inv H; eauto.
         eauto.
-  - destruct (fundefs_fv_aux f5 (add v Scope) FVset) as [Scope' FVset'] eqn:Heq.
+  - simpl in *; destruct (fundefs_fv_aux f5 (add v Scope) FVset) as [Scope' FVset'] eqn:Heq.
     specialize (IHdefs (add v Scope) FVset). rewrite Heq in IHdefs.
     destruct IHdefs as [H1 H2]. split. 
     + split; intros H.
@@ -2550,6 +2701,7 @@ Fixpoint max_var e z :=
            | [] => (Pos.max z x)
          end) P z
     | Eproj x _ _ y e => max_var e (max_list (x::y::nil) z)
+    | Eletapp x f _ ys e => max_var e (max_list (x::f::ys) z)
     | Efun defs e =>
       let z' := max_var_fundefs defs z in
       max_var e z'
@@ -2610,7 +2762,7 @@ Lemma bound_var_leq_max_var_mut :
      Ensembles.In _ (bound_var_fundefs B) x ->
      (x <= max_var_fundefs B y)%positive).
 Proof.
-  exp_defs_induction IHe IHl IHb; intros x y HIn;
+  exp_defs_induction IHe IHl IHb; intros z y HIn;
   try (simpl; inv HIn; [| now eauto ];
        (eapply Pos.le_trans; [| now eapply acc_leq_max_var ];
         eapply Pos.le_trans; [| now eapply max_list_spec1 ];
@@ -2664,7 +2816,7 @@ Lemma occurs_free_leq_max_var_mut :
      Ensembles.In _ (occurs_free_fundefs B) x ->
      (x <= max_var_fundefs B y)%positive).
 Proof.
-  exp_defs_induction IHe IHl IHb; intros x y HIn.
+  exp_defs_induction IHe IHl IHb; intros z y HIn.
   try (inv HIn; [| now eauto ];
        simpl; eapply Pos.le_trans; [| now eapply acc_leq_max_var ];
        now eapply max_list_spec2).
@@ -2675,6 +2827,11 @@ Proof.
   - simpl. inv HIn; [| now eauto ].
     eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
     zify; omega.
+  - simpl. inv HIn; [| now eauto ]. inv H5; eauto. 
+    eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
+    eapply Pos.le_trans; [| now eapply max_list_spec1 ]. zify; omega.
+    eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
+    now eapply max_list_spec2.
   - inv HIn; [ now eauto |].
     simpl. eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
     now eauto.
@@ -2690,7 +2847,7 @@ Proof.
     eapply Pos.le_trans; [| now eapply acc_leq_max_var_fundefs ].
     eapply Pos.le_trans; [| now eapply max_list_spec1 ]. zify; omega.
   - inv HIn. 
-Qed. 
+Qed.
 
 Corollary occurs_free_leq_max_var e x y :
   Ensembles.In _ (occurs_free e) x ->
@@ -2757,6 +2914,11 @@ Inductive bound_var_ctx: exp_ctx -> Ensemble var  :=
 | Bound_Proj2_c: forall  t n r c v' v,
                    bound_var_ctx c v' ->
                    bound_var_ctx (Eproj_c v t n r c) v'
+| Bound_Letapp1_c: forall f ft xs c v,
+                   bound_var_ctx (Eletapp_c v f ft xs c) v
+| Bound_Letapp2_c: forall f ft xs c v' v,
+                   bound_var_ctx c v' ->
+                   bound_var_ctx (Eletapp_c v f ft xs c) v'
 | Bound_Prim1_c: forall  x f ys c,
                    bound_var_ctx (Eprim_c x f ys c) x
 | Bound_Prim2_c: forall  t r c v' v,
@@ -2829,6 +2991,12 @@ Proof.
   split; intros x' H; inv H; eauto. inv H0; eauto.
 Qed.
 
+Lemma bound_var_Eletapp_c v f ft ys c :
+  Same_set _ (bound_var_ctx (Eletapp_c v f ft ys c))
+           (Union var (bound_var_ctx c) (Singleton _ v)).
+Proof.
+  split; intros x' H; inv H; eauto. inv H0; eauto.
+Qed.
 
 Lemma bound_var_Eprim_c x tau y c :
   Same_set _ (bound_var_ctx (Eprim_c x tau y c))
@@ -2850,7 +3018,7 @@ Lemma bound_var_Case_nilnil_c :
              (bound_var_ctx c).
 Proof.
   split; intros x H; inv H; eauto. inversion H7. inversion H7.
-Qed.  
+Qed.
 
 Lemma bound_var_Case_cons1_c :
   forall v t' e lce t c lce',
@@ -2888,7 +3056,7 @@ Proof with eauto with Ensembles_DB.
     constructor 1. reflexivity.
     inversion H0; subst; eauto.
     eapply Bound_Case3_c; eauto. constructor 2. eauto.
-Qed.      
+Qed.
 
 Lemma bound_var_Case_c :
   forall v l c l0 t,
@@ -2921,7 +3089,6 @@ Lemma bound_var_Fun1_c :
 Proof.
   split; intros x H; inv H; eauto.
 Qed.
-
 
 Lemma bound_var_Fun2_c :
   forall cfds e,
@@ -2998,6 +3165,12 @@ Proof with eauto with Ensembles_DB.
     rewrite Ensembles_util.Union_commut with (s1 :=  (bound_var e)).
     rewrite <- Ensembles_util.Union_assoc. reflexivity.
   - normalize_bound_var.
+    rewrite bound_var_Eletapp_c.
+    rewrite IHc.
+    rewrite <- Ensembles_util.Union_assoc.
+    rewrite Ensembles_util.Union_commut with (s1 :=  (bound_var e)).
+    rewrite <- Ensembles_util.Union_assoc. reflexivity.
+  - normalize_bound_var.
     normalize_bound_var.      
     rewrite IHc.      
     rewrite bound_var_Case_c.
@@ -3043,6 +3216,8 @@ Ltac normalize_bound_var_ctx' :=
       rewrite bound_var_Econstr_c
     | [|- context[bound_var_ctx (Eproj_c _ _ _ _ _)]] =>
       rewrite bound_var_Eproj_c
+    | [|- context[bound_var_ctx (Eletapp_c _ _ _ _ _)]] =>
+      rewrite bound_var_Eletapp_c
     | [|- context[bound_var_ctx (Ecase_c _ _ _ _ _)]] =>
       rewrite bound_var_Case_c
     | [ |- context[bound_var_ctx (Efun1_c _ _)]] =>
@@ -3065,6 +3240,8 @@ Ltac normalize_bound_var_ctx_in_ctx' :=
       rewrite bound_var_Econstr_c in H
     | [ H : context[bound_var_ctx (Eproj_c _ _ _ _ _)]  |- _ ] =>
       rewrite bound_var_Eproj_c in H
+    | [ H : context[bound_var_ctx (Eletapp_c _ _ _ _ _)]  |- _ ] =>
+      rewrite bound_var_Eletapp_c in H
     | [H: context[bound_var_ctx (Ecase_c _ _ _ _ _)] |- _] =>
       rewrite bound_var_Case_c in H
     | [ H : context[bound_var_ctx (Efun1_c _ _)] |- _ ] =>
@@ -3123,6 +3300,11 @@ Inductive unique_bindings_c : exp_ctx -> Prop :=
       ~ (bound_var_ctx c) x ->
       unique_bindings_c c ->
       unique_bindings_c (Eproj_c x tau n y c)
+| UBc_Letapp :
+    forall x f ft ys c,
+      ~ (bound_var_ctx c) x ->
+      unique_bindings_c c ->
+      unique_bindings_c (Eletapp_c x f ft ys c)
 | UBc_Case :
     forall x t c te te',
       unique_bindings (Ecase x (te++te')) ->
@@ -3293,6 +3475,36 @@ Proof.
     assert (unique_bindings (e0 |[ e ]|)).
     apply H. split; auto. split; auto.
     rewrite bound_var_Eproj_c in H2.
+    eapply Disjoint_Included_l in H2.
+    apply H2.
+    left; auto.
+    clear H.
+    constructor; auto.
+    intro.
+    apply bound_var_app_ctx in H. inv H.
+    apply H5; auto.
+    inv H2. specialize (H v).
+    apply H. split. constructor. auto.
+  (* Eletapp *)
+  - inv H0.    apply H in H7.
+    destructAll.
+    split.
+    constructor.
+    intro. apply H3.
+    apply bound_var_app_ctx.
+    left; auto.
+    auto.
+    split; auto.
+    rewrite bound_var_Eletapp_c.
+    apply Union_Disjoint_l; auto.
+    split; intro. intro.
+    inv H4. inv H5.
+    apply H3.
+    apply bound_var_app_ctx. right; auto.
+  - destructAll. inv H0.
+    assert (unique_bindings (e0 |[ e ]|)).
+    apply H. split; auto. split; auto.
+    rewrite bound_var_Eletapp_c in H2.
     eapply Disjoint_Included_l in H2.
     apply H2.
     left; auto.
@@ -3646,48 +3858,54 @@ Lemma bound_var_dec :
   forall e, Decidable (bound_var e).
 Proof.
   eapply exp_mut with (P0 := fun B => Decidable (bound_var_fundefs B));
-  intros; constructor; intros x.
-  - inv H. specialize (Dec x).
+  intros; constructor; intros x1.
+  - inv H. specialize (Dec x1).
     inv Dec; auto.
-    destruct (var_dec v x).
+    destruct (var_dec v x1).
     subst. auto.
     right.
     intros Hc. inv Hc; auto.
   - right; intros Hc; inv Hc; eauto.
   - destruct H as [Dec1].
     destruct H0 as [Dec2].
-    destruct (Dec1 x); eauto.
+    destruct (Dec1 x1); eauto.
     left. econstructor; eauto. now constructor.
-    destruct (Dec2 x).
+    destruct (Dec2 x1).
     left. inv b. econstructor. eassumption.
     econstructor 2. eassumption.
     right. intros Hc; inv Hc; eauto. 
     inv H3. congruence. now eauto.
-  - inv H. specialize (Dec x).
+  - inv H. specialize (Dec x1).
     inv Dec; auto.
-    destruct (var_dec v x).
+    destruct (var_dec v x1).
+    subst. auto.
+    right.
+    intros Hc. inv Hc; auto.
+  - inv H. specialize (Dec x1).
+    inv Dec; auto.
+    destruct (var_dec x x1).
     subst. auto.
     right.
     intros Hc. inv Hc; auto.
   - destruct H as [Dec1].
     destruct H0 as [Dec2].
-    destruct (Dec1 x); eauto.
-    destruct (Dec2 x); eauto.
+    destruct (Dec1 x1); eauto.
+    destruct (Dec2 x1); eauto.
     right; intros Hc; inv Hc; eauto.
   - right; intros Hc; inv Hc; eauto.
-  - inv H. specialize (Dec x).
+  - inv H. specialize (Dec x1).
     inv Dec; auto.
-    destruct (var_dec v x).
+    destruct (var_dec v x1).
     subst. auto.
     right.
     intros Hc. inv Hc; auto.
   - right. intros Hc. inv Hc; auto.
   - destruct H as [Dec1].
     destruct H0 as [Dec2].
-    destruct (Dec1 x); eauto.
-    destruct (Dec2 x); eauto.
-    destruct (var_dec v x); subst; eauto.
-    destruct (in_dec var_dec x l); auto.
+    destruct (Dec1 x1); eauto.
+    destruct (Dec2 x1); eauto.
+    destruct (var_dec v x1); subst; eauto.
+    destruct (in_dec var_dec x1 l); auto.
     right; intros Hc; inv Hc; eauto.
     inv H5; eauto. inv H; eauto.
   - right. intros Hc. inv Hc; auto.
@@ -3697,48 +3915,54 @@ Lemma bound_var_fundefs_dec :
   forall B, Decidable (bound_var_fundefs B).
 Proof.
   eapply fundefs_mut with (P := fun e => Decidable (bound_var e));
-  intros; constructor; intros x.
-  - inv H. specialize (Dec x).
+  intros; constructor; intros x1.
+  - inv H. specialize (Dec x1).
     inv Dec; auto.
-    destruct (var_dec v x).
+    destruct (var_dec v x1).
     subst. auto.
     right.
     intros Hc. inv Hc; auto.
   - right; intros Hc; inv Hc; eauto.
   - destruct H as [Dec1].
     destruct H0 as [Dec2].
-    destruct (Dec1 x); eauto.
+    destruct (Dec1 x1); eauto.
     left. econstructor; eauto. now constructor.
-    destruct (Dec2 x).
+    destruct (Dec2 x1).
     left. inv b. econstructor. eassumption.
     econstructor 2. eassumption.
     right. intros Hc; inv Hc; eauto. 
     inv H3. congruence. now eauto.
-  - inv H. specialize (Dec x).
+  - inv H. specialize (Dec x1).
     inv Dec; auto.
-    destruct (var_dec v x).
+    destruct (var_dec v x1).
+    subst. auto.
+    right.
+    intros Hc. inv Hc; auto.
+  - inv H. specialize (Dec x1).
+    inv Dec; auto.
+    destruct (var_dec x x1).
     subst. auto.
     right.
     intros Hc. inv Hc; auto.
   - destruct H as [Dec1].
     destruct H0 as [Dec2].
-    destruct (Dec1 x); eauto.
-    destruct (Dec2 x); eauto.
+    destruct (Dec1 x1); eauto.
+    destruct (Dec2 x1); eauto.
     right; intros Hc; inv Hc; eauto.
   - right; intros Hc; inv Hc; eauto.
-  - inv H. specialize (Dec x).
+  - inv H. specialize (Dec x1).
     inv Dec; auto.
-    destruct (var_dec v x).
+    destruct (var_dec v x1).
     subst. auto.
     right.
     intros Hc. inv Hc; auto.
   - right. intros Hc. inv Hc; auto.
   - destruct H as [Dec1].
     destruct H0 as [Dec2].
-    destruct (Dec1 x); eauto.
-    destruct (Dec2 x); eauto.
-    destruct (var_dec v x); subst; eauto.
-    destruct (in_dec var_dec x l); auto.
+    destruct (Dec1 x1); eauto.
+    destruct (Dec2 x1); eauto.
+    destruct (var_dec v x1); subst; eauto.
+    destruct (in_dec var_dec x1 l); auto.
     right; intros Hc; inv Hc; eauto.
     inv H5; eauto. inv H; eauto.
   - right. intros Hc. inv Hc; auto.
@@ -3751,54 +3975,58 @@ Theorem bound_var_ctx_dec :
   forall c, Decidable (bound_var_ctx c).
 Proof.
   eapply ctx_exp_mut' with (P0 := fun B => Decidable (bound_var_fundefs_ctx B));
-  constructor; intros x.
+  constructor; intros x1.
   - right; intros Hc; inv Hc.
-  - destruct (var_dec v x); subst; auto.
-    destruct H as [Dec]. destruct (Dec x).
+  - destruct (var_dec v x1); subst; auto.
+    destruct H as [Dec]. destruct (Dec x1).
     now left; eauto.
     now right; intro Hbv; inv Hbv; auto.
-  - destruct (var_dec v x); subst; auto.
-    destruct H as [Dec]. destruct (Dec x).
+  - destruct (var_dec v x1); subst; auto.
+    destruct H as [Dec]. destruct (Dec x1).
     now left; eauto.
     now right; intro Hbv; inv Hbv; auto.
-  - destruct (var_dec v x); subst; auto.
-    destruct H as [Dec]. destruct (Dec x).
+  - destruct (var_dec v x1); subst; auto.
+    destruct H as [Dec]. destruct (Dec x1).
+    now left; eauto.
+    now right; intro Hbv; inv Hbv; auto.
+  - destruct (var_dec v x1); subst; auto.
+    destruct H as [Dec]. destruct (Dec x1).
     now left; eauto.
     now right; intro Hbv; inv Hbv; auto.
   - destruct (bound_var_dec (Ecase v l)) as [Decl].
-    destruct (Decl x) as [Hb | Hnb].
+    destruct (Decl x1) as [Hb | Hnb].
     left. now inv Hb; eauto.
     destruct (bound_var_dec (Ecase v l0)) as [Decl'].
-    destruct (Decl' x) as [Hb' | Hnb'].
+    destruct (Decl' x1) as [Hb' | Hnb'].
     left. now inv Hb'; eauto.
-    destruct H as [Dec]. destruct (Dec x).
+    destruct H as [Dec]. destruct (Dec x1).
     left; eauto.
     right. intros Hc. inv Hc; auto.
     now eapply Hnb; eauto.
     now eapply Hnb'; eauto.
   - destruct (bound_var_fundefs_dec f) as [Decf].
-    destruct (Decf x) as [Hb | Hnb]; eauto.
-    destruct H as [Dec]. destruct (Dec x).
+    destruct (Decf x1) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x1).
     left; eauto.
     right. intros Hc. inv Hc; auto.
   - destruct (bound_var_dec e) as [Dece].
-    destruct (Dece x) as [Hb | Hnb]; eauto.
-    destruct H as [Dec]. destruct (Dec x).
+    destruct (Dece x1) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x1).
     left; eauto.
     right. intros Hc. inv Hc; auto.    
   - destruct (bound_var_fundefs_dec f) as [Decf].
-    destruct (Decf x) as [Hb | Hnb]; eauto.
-    destruct H as [Dec]. destruct (Dec x).
+    destruct (Decf x1) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x1).
     left; eauto.
-    destruct (var_dec v x); subst; auto.
-    destruct (in_dec var_dec x l); auto. 
+    destruct (var_dec v x1); subst; auto.
+    destruct (in_dec var_dec x1 l); auto. 
     right. intros Hc. inv Hc; auto.
   - destruct (bound_var_dec e) as [Dece].
-    destruct (Dece x) as [Hb | Hnb]; eauto.
-    destruct H as [Dec]. destruct (Dec x).
+    destruct (Dece x1) as [Hb | Hnb]; eauto.
+    destruct H as [Dec]. destruct (Dec x1).
     left; eauto.
-    destruct (var_dec v x); subst; auto.
-    destruct (in_dec var_dec x l); auto. 
+    destruct (var_dec v x1); subst; auto.
+    destruct (in_dec var_dec x1 l); auto. 
     right. intros Hc. inv Hc; auto.
 Qed.
 
@@ -3808,6 +4036,10 @@ Proof.
   eapply ctx_fundefs_mut' with (P := fun e => Decidable (bound_var_ctx e));
   constructor; intros x.
   - right; intros Hc; inv Hc.
+  - destruct (var_dec v x); subst; auto.
+    destruct H as [Dec]. destruct (Dec x).
+    now left; eauto.
+    now right; intro Hbv; inv Hbv; auto.
   - destruct (var_dec v x); subst; auto.
     destruct H as [Dec]. destruct (Dec x).
     now left; eauto.
@@ -3953,6 +4185,11 @@ Proof.
       * right. rewrite bound_var_Eproj. intro. inv H0. specialize (H2 v). eauto with Ensembles_DB.
       * left. rewrite bound_var_Eproj. eauto with Ensembles_DB.
     + right. rewrite bound_var_Eproj. eauto with Ensembles_DB.
+  - inv H0.
+    + inv H. specialize (Dec x). inv Dec.
+      * right. rewrite bound_var_Eletapp. intro. inv H0. specialize (H2 x). eauto with Ensembles_DB.
+      * left. rewrite bound_var_Eletapp. eauto with Ensembles_DB.
+    + right. rewrite bound_var_Eletapp. eauto with Ensembles_DB.
   - inv H1. inv H0.
     left; rewrite bound_var_Efun. eauto with Ensembles_DB.
     right; rewrite bound_var_Efun. eauto with Ensembles_DB.
@@ -3972,7 +4209,7 @@ Proof.
         inv H1. left. rewrite bound_var_fundefs_Fcons. eauto with Ensembles_DB.
         right. rewrite bound_var_fundefs_Fcons. eauto with Ensembles_DB.
       * right. rewrite bound_var_fundefs_Fcons. eauto 25 with Ensembles_DB.
-    +         right. rewrite bound_var_fundefs_Fcons. eauto 25 with Ensembles_DB.
+    + right. rewrite bound_var_fundefs_Fcons. eauto 25 with Ensembles_DB.
   - left. rewrite bound_var_fundefs_Fnil. eauto with Ensembles_DB.
 Qed.
 
@@ -4015,6 +4252,13 @@ Proof.
     assert (H':= bound_var_dec e).
     inv H'.
     specialize (Dec v). inv Dec.
+    right; intro. inv H1; auto.
+    left. constructor; auto.
+    right. intro. inv H; auto.
+  - inv H.         
+    assert (H':= bound_var_dec e).
+    inv H'.
+    specialize (Dec x). inv Dec.
     right; intro. inv H1; auto.
     left. constructor; auto.
     right. intro. inv H; auto.
@@ -4113,6 +4357,15 @@ Inductive occurs_free_ctx : exp_ctx -> Ensemble var :=
       x <> y ->
       occurs_free_ctx e y ->
       occurs_free_ctx (Eproj_c x tau n y' e) y
+| Free_ctx_Eletapp1 :
+    forall y x f ft ys e,
+      List.In y (f :: ys) ->
+      occurs_free_ctx (Eletapp_c x f ft ys e) y
+| Free_ctx_Eletapp2 :
+    forall y x f ft ys e,
+      y <> x ->
+      occurs_free_ctx e y ->
+      occurs_free_ctx (Eletapp_c x f ft ys e) y
 | Free_ctx_Efun11 :
     forall y defs e,
       ~ (name_in_fundefs defs y) -> 
@@ -4197,6 +4450,20 @@ Proof.
   intros Hc. subst. eauto.
 Qed.
 
+Lemma occurs_free_Eletapp_c x f ft ys e :
+  (occurs_free_ctx (Eletapp_c x f ft ys e)) <--> (f |: FromList ys :|: (occurs_free_ctx e \\ [set x])).
+Proof.
+  split; intros x' H; inv H; eauto. now inv H6; eauto.
+  right. constructor; eauto. 
+  intros Hc; inv Hc; subst. congruence.
+  inv H0; eauto. inv H; eauto.
+  constructor. constructor. 
+  now eauto with Ensembles_DB.
+  constructor. right. eassumption.
+  inv H0. eapply Free_ctx_Eletapp2; eauto.
+  intros Hc. subst. eauto.
+Qed.
+
 Lemma occurs_free_Efun1_c B e :
   Same_set var (occurs_free_ctx (Efun1_c B e))
            (Union _ (occurs_free_fundefs B)
@@ -4276,24 +4543,26 @@ Qed.
 
 Ltac normalize_occurs_free_ctx :=
   match goal with
-    | [|- context[occurs_free_ctx (Econstr_c _ _ _ _)]] =>
-      rewrite occurs_free_Econstr_c
-    | [|- context[occurs_free_ctx (Eproj_c _ _ _ _ _)]] =>
-      rewrite occurs_free_Eproj_c
-    | [|- context[occurs_free_ctx (Ecase_c _ _ _ _ _ )]] =>
-      rewrite occurs_free_Ecase_c
-    | [|- context[occurs_free_ctx (Efun1_c _ _)]] =>
-      rewrite occurs_free_Efun1_c
-    | [|- context[occurs_free_ctx (Efun2_c _ _)]] =>
-      rewrite occurs_free_Efun2_c
-    | [|- context[occurs_free_ctx (Eprim_c _ _ _ _)]] =>
-      rewrite occurs_free_Eprim_c
-    | [|- context[occurs_free_fundefs_ctx (Fcons1_c _ _ _ _ _)]] =>
-      rewrite occurs_free_fundefs_Fcons1_c
-    | [|- context[occurs_free_fundefs_ctx (Fcons2_c _ _ _ _ _)]] =>
-      rewrite occurs_free_fundefs_Fcons2_c
-    | [|- context[occurs_free_ctx (Hole_c)]] =>
-      rewrite occurs_free_Hole_c
+  | [|- context[occurs_free_ctx (Econstr_c _ _ _ _)]] =>
+    rewrite occurs_free_Econstr_c
+  | [|- context[occurs_free_ctx (Eproj_c _ _ _ _ _)]] =>
+    rewrite occurs_free_Eproj_c
+  | [|- context[occurs_free_ctx (Eletapp_c _ _ _ _ _)]] =>
+    rewrite occurs_free_Eletapp_c
+  | [|- context[occurs_free_ctx (Ecase_c _ _ _ _ _ )]] =>
+    rewrite occurs_free_Ecase_c
+  | [|- context[occurs_free_ctx (Efun1_c _ _)]] =>
+    rewrite occurs_free_Efun1_c
+  | [|- context[occurs_free_ctx (Efun2_c _ _)]] =>
+    rewrite occurs_free_Efun2_c
+  | [|- context[occurs_free_ctx (Eprim_c _ _ _ _)]] =>
+    rewrite occurs_free_Eprim_c
+  | [|- context[occurs_free_fundefs_ctx (Fcons1_c _ _ _ _ _)]] =>
+    rewrite occurs_free_fundefs_Fcons1_c
+  | [|- context[occurs_free_fundefs_ctx (Fcons2_c _ _ _ _ _)]] =>
+    rewrite occurs_free_fundefs_Fcons2_c
+  | [|- context[occurs_free_ctx (Hole_c)]] =>
+    rewrite occurs_free_Hole_c
   end.
 
 Ltac normalize_occurs_free_ctx_in_ctx :=
@@ -4302,6 +4571,8 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
       rewrite occurs_free_Econstr_c
     | [ H : context[occurs_free_ctx (Eproj_c _ _ _ _ _)] |- _ ] =>
       rewrite occurs_free_Eproj_c
+    | [ H : context[occurs_free_ctx (Eletapp_c _ _ _ _ _)] |- _ ] =>
+      rewrite occurs_free_Eletapp_c
     | [ H : context[occurs_free_ctx (Ecase_c _ _ _ _ _ )] |- _ ] =>
       rewrite occurs_free_Ecase_c
     | [ H : context[occurs_free_ctx (Efun1_c _ _)] |- _ ] =>
@@ -4421,6 +4692,19 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
       now left; auto.
       right.
       intro Hc. inv Hc; auto.
+    - assert (Hl := Decidable_FromList (v0 :: l)).
+      inv Hl.
+      destruct (Dec x).
+       left; auto.
+      destruct (var_dec  v x).
+      subst.
+      right.
+      intro.
+      inv H0. auto. congruence. 
+      destruct H as [Dece]; destruct (Dece x).
+      now left; auto.
+      right.
+      intro Hc. inv Hc; auto.
     - assert (Hl := Decidable_occurs_free (Ecase v l)).
       assert (Hl0 := Decidable_occurs_free (Ecase v l0)).
       destruct Hl as [Decl].
@@ -4536,6 +4820,16 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
       now left; auto.
       right.
       intro Hc. inv Hc; auto.
+    - assert (Hl := Decidable_FromList (v0 :: l)).
+      inv Hl.
+      destruct (Dec x). 
+      now left; auto.
+      destruct (var_dec v x). subst.
+      right. intro. inv H0. auto. congruence.
+      destruct H as [Dece]; destruct (Dece x).
+      now left; auto.
+      right.
+      intro Hc. inv Hc; auto.
     - assert (Hl := Decidable_occurs_free (Ecase v l)).
       assert (Hl0 := Decidable_occurs_free (Ecase v l0)).
       destruct Hl as [Decl].
@@ -4601,4 +4895,4 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
       destruct He as [Dece].
       destruct (Dece x). now left; constructor; auto.
       now right; intros Hc; inv Hc; auto.
-  Qed. 
+  Qed.

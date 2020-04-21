@@ -22,9 +22,9 @@ Open Scope fun_scope.
 
 Section CC_correct.
 
-  Variable (clo_tag : cTag).
+  Variable (clo_tag : ctor_tag).
   Variable (pr : prims).
-  Variable (cenv : cEnv).
+  Variable (cenv : ctor_env).
 
   (** Free variable map invariant *)
   Definition FVmap_inv (FVmap : VarInfoMap) Scope Funs FVs : Prop :=
@@ -532,8 +532,8 @@ Section CC_correct.
           repeat split; eauto. apply nthN_is_Some_app. eassumption.
   Qed.
 
-  Lemma make_record_cTag_preserves_prop n P :
-    {{ fun s => P (next_var s) }} make_record_cTag n {{ fun _ _ s => P (next_var s) }}.
+  Lemma make_record_ctor_tag_preserves_prop n P :
+    {{ fun s => P (next_var s) }} make_record_ctor_tag n {{ fun _ _ s => P (next_var s) }}.
   Proof.
     eapply pre_post_mp_l. eapply bind_triple. eapply get_triple.
     intros [x1 c1 f1 e1 m1] [x2 c2 f2 e2 m2].
@@ -574,7 +574,7 @@ Section CC_correct.
     - intros [xs f] s1.
       eapply pre_existential. intros C1. eapply pre_existential. intros S'.
       eapply pre_curry_r. intros [Hvars Hctx].
-      eapply bind_triple. now eapply make_record_cTag_preserves_prop.
+      eapply bind_triple. now eapply make_record_ctor_tag_preserves_prop.
       intros tau s2. eapply return_triple.
       intros s3 Hf. do 3 eexists. 
       repeat (split; [ eassumption |]). split.
@@ -1656,7 +1656,7 @@ Section CC_correct.
         eapply Disjoint_Included_r; [| eassumption ].
         apply Included_Union_preserv_r. normalize_occurs_free...
         intros [xs f] s2. apply pre_curry_l. intros He. 
-        eapply bind_triple. apply make_record_cTag_preserves_prop.
+        eapply bind_triple. apply make_record_ctor_tag_preserves_prop.
         intros c' s3. apply return_triple. intros s4 Hf. split.
         intros e' He'.
         rewrite <- Union_Same_set with (s6 := S),
@@ -2040,7 +2040,7 @@ Section CC_correct.
     eassumption. eassumption.
     intros [xs f] s2. apply pre_curry_l. intros He.
     apply pre_curry_l. intros Heq. subst.
-    eapply bind_triple. apply make_record_cTag_preserves_prop.
+    eapply bind_triple. apply make_record_ctor_tag_preserves_prop.
     intros c' s3. apply return_triple. intros s4 Hf. split.
     intros e'.
     eapply Included_trans; [ now apply He |].
@@ -2756,7 +2756,7 @@ Section CC_correct.
       exact (conj (conj Hun1 Hin) Hf).
       apply pre_curry_l; intros [Hun1 Hin1]. inv Hun.
       setoid_rewrite assoc.
-      eapply bind_triple. now apply make_record_cTag_preserves_prop.
+      eapply bind_triple. now apply make_record_ctor_tag_preserves_prop.
       intros c1 s3.  eapply bind_triple.
       now eapply return_triple with
       (Post := fun s r s' =>

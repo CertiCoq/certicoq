@@ -18,7 +18,7 @@ Module SpaceSem (H : Heap).
   
   Module GC := GC H.
   
-  Parameter (cloTag : cTag).
+  Parameter (cloTag : ctor_tag).
 
   Import H GC.Equiv.Defs GC.Equiv.Defs.HL GC.Equiv GC.
 
@@ -62,18 +62,18 @@ Module SpaceSem (H : Heap).
         (Hsize : size_heap H = m),
         (big_step_GC H rho e OOT c m)
   | Eval_constr_gc :
-      forall (H H' : heap block) (rho : env) (x : var) (t : cTag)
+      forall (H H' : heap block) (rho : env) (x : var) (t : ctor_tag)
         (ys : list var) (e : exp) (vs : list value) (l : loc) (r : ans)
         (c m : nat)
         (Hcost :  c >= cost (Econstr x t ys e))
-        (Hget : getlist ys rho = Some vs)
+        (Hget : get_list ys rho = Some vs)
         (Halloc : alloc (Constr t vs) H = (l, H'))
         
         (Hbs : big_step_GC H' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m),
 
         big_step_GC H rho (Econstr x t ys e) r c m
   | Eval_proj_gc : (* XXX Tag annotation in projections is redundant in this semantics *)
-      forall (H : heap block) (rho : env) (x : var) (t t' : cTag) (n : N)
+      forall (H : heap block) (rho : env) (x : var) (t t' : ctor_tag) (n : N)
         (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
         (r : ans) (c m : nat)
         (Hcost : c >= cost (Eproj x t n y e))
@@ -85,8 +85,8 @@ Module SpaceSem (H : Heap).
         
         big_step_GC H rho (Eproj x t n y e) r c m
   | Eval_case_gc :
-      forall (H : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
-        (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m : nat)
+      forall (H : heap block) (rho : env) (y : var) (cl : list (ctor_tag * exp))
+        (l : loc) (t : ctor_tag) (vs : list value) (e : exp) (r : ans) (c m : nat)
         (Hcost : c >= cost (Ecase y cl))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t vs))
@@ -111,7 +111,7 @@ Module SpaceSem (H : Heap).
                     
   | Eval_app_gc :
       forall (H H' H'' : heap block) lenv (rho_clo rho rho_clo1 rho_clo2 : env) (B : fundefs)
-        (f f' : var) (t : cTag) (xs : list var) (e : exp) (l : loc) b
+        (f f' : var) (t : ctor_tag) (xs : list var) (e : exp) (l : loc) b
         (vs : list value) (ys : list var) (r : ans) (c : nat) (m m' : nat)
         (Hcost : c >= cost (Eapp f t ys))
         (Hgetf : M.get f rho = Some (Loc l))
@@ -121,10 +121,10 @@ Module SpaceSem (H : Heap).
         (Hfind : find_def f' B = Some (t, xs, e))
         (Hgetenv : get lenv H = Some (Env rho_clo))
         (* Look up the actual parameters *)
-        (Hargs : getlist ys rho = Some vs)
+        (Hargs : get_list ys rho = Some vs)
         (* Allocate mutually defined closures *)
         (Hredef : def_closures B B rho_clo H (Loc lenv) = (H', rho_clo1))
-        (Hset : setlist xs vs rho_clo1 = Some rho_clo2)
+        (Hset : set_lists xs vs rho_clo1 = Some rho_clo2)
         
         (* collect H' *)
         (Hgc : live' ((env_locs rho_clo2) (occurs_free e)) H' H'' b)
@@ -156,18 +156,18 @@ Module SpaceSem (H : Heap).
         (Hcost : c < cost e), 
         big_step H rho e OOT c (reach_size H rho e)
   | Eval_constr :
-      forall (H H' : heap block) (rho rho' : env) (x : var) (t : cTag)
+      forall (H H' : heap block) (rho rho' : env) (x : var) (t : ctor_tag)
         (ys : list var) (e : exp) (vs : list value) (l : loc) (r : ans)
         (c m : nat)
         (Hcost :  c >= cost (Econstr x t ys e))
-        (Hget : getlist ys rho = Some vs)
+        (Hget : get_list ys rho = Some vs)
         (Halloc : alloc (Constr t vs) H = (l, H'))
         
         (Hbs : big_step H' (M.set x (Loc l) rho) e r (c - cost (Econstr x t ys e)) m),
         
         big_step H rho (Econstr x t ys e) r c (max (reach_size H rho (Econstr x t ys e)) m)
   | Eval_proj : (* XXX Tag annotation in projections is redundant in this semantics *)
-      forall (H : heap block) (rho : env) (x : var) (t t' : cTag) (n : N)
+      forall (H : heap block) (rho : env) (x : var) (t t' : ctor_tag) (n : N)
         (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
         (r : ans) (c m : nat)
         (Hcost : c >= cost (Eproj x t n y e))
@@ -179,8 +179,8 @@ Module SpaceSem (H : Heap).
         
         big_step H rho (Eproj x t n y e) r c (max (reach_size H rho (Eproj x t n y e)) m)
   | Eval_case :
-      forall (H : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
-        (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m : nat)
+      forall (H : heap block) (rho : env) (y : var) (cl : list (ctor_tag * exp))
+        (l : loc) (t : ctor_tag) (vs : list value) (e : exp) (r : ans) (c m : nat)
         (Hcost : c >= cost (Ecase y cl))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t vs))
@@ -204,7 +204,7 @@ Module SpaceSem (H : Heap).
         big_step H rho (Efun B e) r c (max (reach_size H rho (Efun B e)) m)
   | Eval_app :
       forall (H H' : heap block) lenv (rho_clo rho rho_clo1 rho_clo2 : env) (B : fundefs)
-        (f f' : var) (t : cTag) (xs : list var) (e : exp) (l : loc)
+        (f f' : var) (t : ctor_tag) (xs : list var) (e : exp) (l : loc)
         (vs : list value) (ys : list var) (r : ans) (c : nat) (m : nat)
         (Hcost : c >= cost (Eapp f t ys))
         (Hgetf : M.get f rho = Some (Loc l))
@@ -214,10 +214,10 @@ Module SpaceSem (H : Heap).
         (Hfind : find_def f' B = Some (t, xs, e))
         (Hgetenv : get lenv H = Some (Env rho_clo))
         (* Look up the actual parameters *)
-        (Hargs : getlist ys rho = Some vs)
+        (Hargs : get_list ys rho = Some vs)
         (* Allocate mutually defined closures *)
         (Hredef : def_closures B B rho_clo H (Loc lenv) = (H', rho_clo1))
-        (Hset : setlist xs vs rho_clo1 = Some rho_clo2)
+        (Hset : set_lists xs vs rho_clo1 = Some rho_clo2)
         
         (Hbs : big_step H' rho_clo2
                         e r (c - cost (Eapp f t ys)) m),
@@ -265,18 +265,18 @@ Module SpaceSem (H : Heap).
         (Hsize : size_heap H = m),
         (big_step_GC_cc H rho e OOT c m)
   | Eval_constr_per_cc :
-      forall (H H' : heap block) (rho : env) (x : var) (t : cTag)
+      forall (H H' : heap block) (rho : env) (x : var) (t : ctor_tag)
         (ys :list var) (e : exp) (vs : list value) (l : loc) (r : ans)
         (c m : nat)
         (Hcost :  c >= cost_cc (Econstr x t ys e))
-        (Hget : getlist ys rho = Some vs)
+        (Hget : get_list ys rho = Some vs)
         (Halloc : alloc (Constr t vs) H = (l, H'))
         
         (Hbs : big_step_GC_cc H' (M.set x (Loc l) rho) e r (c - cost_cc (Econstr x t ys e)) m),
 
         big_step_GC_cc H rho (Econstr x t ys e) r c m
   | Eval_proj_per_cc : (* XXX Tag annotation in projections is redundant in this semantics *)
-      forall (H : heap block) (rho : env) (x : var) (t t' : cTag) (n : N)
+      forall (H : heap block) (rho : env) (x : var) (t t' : ctor_tag) (n : N)
         (y : var) (e : exp) (l : loc) (v : value) (vs : list value)
         (r : ans) (c m : nat)
         (Hcost : c >= cost_cc (Eproj x t n y e))
@@ -288,8 +288,8 @@ Module SpaceSem (H : Heap).
         
         big_step_GC_cc H rho (Eproj x t n y e) r c m
   | Eval_case_per_cc :
-      forall (H : heap block) (rho : env) (y : var) (cl : list (cTag * exp))
-        (l : loc) (t : cTag) (vs : list value) (e : exp) (r : ans) (c m : nat)
+      forall (H : heap block) (rho : env) (y : var) (cl : list (ctor_tag * exp))
+        (l : loc) (t : ctor_tag) (vs : list value) (e : exp) (r : ans) (c m : nat)
         (Hcost : c >= cost_cc (Ecase y cl))
         (Hgety : M.get y rho = Some (Loc l))
         (Hgetl : get l H = Some (Constr t vs))
@@ -311,15 +311,15 @@ Module SpaceSem (H : Heap).
         big_step_GC_cc H rho (Efun B e) r c m
   | Eval_app_per_cc :
       forall (H H' : heap block) (rho rho_clo : env) (B : fundefs)
-        (f f' : var) (ct : cTag) (xs : list var) (e : exp) b
+        (f f' : var) (ct : ctor_tag) (xs : list var) (e : exp) b
         (vs : list value) (ys : list var) (r : ans) (c : nat) (m m' : nat)
         (Hcost : c >= cost_cc (Eapp f ct ys))
         (Hgetf : M.get f rho = Some (FunPtr B f'))
         (* Find the code *)
         (Hfind : find_def f' B = Some (ct, xs, e))
         (* Look up the actual parameters *)
-        (Hargs : getlist ys rho = Some vs)
-        (Hset : setlist xs vs (def_funs B B (M.empty _)) = Some rho_clo)
+        (Hargs : get_list ys rho = Some vs)
+        (Hset : set_lists xs vs (def_funs B B (M.empty _)) = Some rho_clo)
         
         (* collect H' *)
         (Hgc : live' ((env_locs rho_clo) (occurs_free e)) H H' b)
@@ -399,7 +399,7 @@ Module SpaceSem (H : Heap).
       eassumption. eassumption. eassumption. 
       now eapply injective_subdomain_Empty_set. 
       now eapply injective_subdomain_Empty_set. 
-    - edestruct heap_env_equiv_env_getlist as [vs' [Hlst Hall]]; try eassumption.
+    - edestruct heap_env_equiv_env_get_list as [vs' [Hlst Hall]]; try eassumption.
       simpl. normalize_occurs_free...
 
       destruct (alloc (Constr t vs') H2) as [l2 H2'] eqn:Halloc'.
@@ -739,7 +739,7 @@ Module SpaceSem (H : Heap).
           econstructor; eauto.
 
     - (* case Eapp *)
-      edestruct heap_env_equiv_env_getlist as [vs' [Hlst Hall]]; try eassumption.
+      edestruct heap_env_equiv_env_get_list as [vs' [Hlst Hall]]; try eassumption.
       simpl. normalize_occurs_free... 
       
       edestruct heap_env_equiv_env_get as [lf [Hgetf' Heqf]]. eassumption.
@@ -816,8 +816,8 @@ Module SpaceSem (H : Heap).
       + rewrite Hredef in Hlet.
         
         destruct (def_closures f0 f0 rho_clo' H2 (Loc (b1 lenv))) as [H2' rho2'] eqn:Hredef'.
-        destruct (setlist_length3 rho2' xs vs') as [rho2'' Hset'']. 
-        erewrite setlist_length_eq; try eassumption. 
+        destruct (set_lists_length3 rho2' xs vs') as [rho2'' Hset'']. 
+        erewrite set_lists_length_eq; try eassumption. 
         eapply Forall2_length. eassumption.
         
         destruct Hlet as (Hfeq & Hwf1 & Hwf2 & Hl1 & Hl2 & Hinj).                  
@@ -831,7 +831,7 @@ Module SpaceSem (H : Heap).
         assert (Himeq := heap_env_equiv_image_post_n _ _ _ _ _ _ _ 0 Hequiv').
         rewrite image_id in Himeq. simpl in Himeq.
         assert (Heqset : occurs_free e |- (H', rho_clo2) ⩪_(d1, id) (H2', rho2'')). 
-        { eapply heap_env_equiv_setlist; try eassumption. 
+        { eapply heap_env_equiv_set_lists; try eassumption. 
           - eapply heap_env_equiv_antimon. eassumption.
             rewrite Union_Same_set; now eauto with Ensembles_DB. 
           - eapply Forall2_monotonic_strong; [| eassumption ]. simpl.
@@ -869,7 +869,7 @@ Module SpaceSem (H : Heap).
               eapply occurs_free_in_fun. eapply find_def_correct. eassumption.
               reflexivity.
               rewrite Union_commut.
-              eapply well_formed_reach_setlist; try eassumption.
+              eapply well_formed_reach_set_lists; try eassumption.
               
               + eapply well_formed_antimon; [| eassumption ]. eapply reach'_set_monotonic.
                 eapply env_locs_monotonic; eapply Included_Union_compat...
@@ -918,7 +918,7 @@ Module SpaceSem (H : Heap).
             - eapply Included_trans. eapply env_locs_monotonic. 
               eapply occurs_free_in_fun. eapply find_def_correct. eassumption.
               eapply Included_trans.
-              rewrite Union_commut. eapply env_locs_setlist_Included. 
+              rewrite Union_commut. eapply env_locs_set_lists_Included. 
               eassumption.
               eapply Union_Included.
               + eapply Included_trans; [| eassumption ]. eapply env_locs_monotonic.
@@ -953,7 +953,7 @@ Module SpaceSem (H : Heap).
                eapply occurs_free_in_fun; eapply find_def_correct; eassumption ].
             rewrite Union_commut. 
             eapply injective_subdomain_antimon;
-              [| eapply reach'_set_monotonic; eapply env_locs_setlist_Included; try eassumption ].
+              [| eapply reach'_set_monotonic; eapply env_locs_set_lists_Included; try eassumption ].
             rewrite reach'_Union. rewrite <- (Union_Setminus_Included (name_in_fundefs f0)); [| | reflexivity ]; tci. 
             rewrite !env_locs_Union, !reach'_Union, <- !Union_assoc. rewrite reach_unfold.
             eapply injective_subdomain_antimon; 
@@ -1105,7 +1105,7 @@ Module SpaceSem (H : Heap).
         ctx_to_heap_env Hole_c H rho H rho 0
   | Econstr_c_to_rho :
       forall H H' H'' rho rho' x t ys C vs l c,
-        getlist ys rho = Some vs ->
+        get_list ys rho = Some vs ->
         alloc (Constr t vs) H = (l, H') ->
         
         ctx_to_heap_env C H' (M.set x (Loc l) rho)  H'' rho'  c -> 
@@ -1136,7 +1136,7 @@ Module SpaceSem (H : Heap).
         ctx_to_heap_env_CC Hole_c H rho H rho 0
   | Econstr_c_to_rho_CC :
       forall H H' H'' rho rho' x t ys C vs l c,
-        getlist ys rho = Some vs ->
+        get_list ys rho = Some vs ->
         alloc (Constr t vs) H = (l, H') ->
         
         ctx_to_heap_env_CC C H' (M.set x (Loc l) rho)  H'' rho'  c -> 
@@ -1436,7 +1436,7 @@ Module SpaceSem (H : Heap).
       unfold size_heap. 
       erewrite (HL.size_with_measure_alloc _ _ _ H H');
         [| reflexivity | eassumption ]. 
-      erewrite getlist_length_eq; [| eassumption ].   
+      erewrite get_list_length_eq; [| eassumption ].   
       simpl. omega.
       eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
       normalize_occurs_free_ctx.
@@ -1479,7 +1479,7 @@ Module SpaceSem (H : Heap).
     unfold size_heap.
     erewrite (HL.size_with_measure_alloc _ _ _ H H');
       [| reflexivity | eassumption ].
-    erewrite getlist_length_eq; [| eassumption ]. 
+    erewrite get_list_length_eq; [| eassumption ]. 
     simpl. omega.
   Qed.
 
@@ -1543,7 +1543,7 @@ Module SpaceSem (H : Heap).
   Proof with (now eauto with Ensembles_DB).
     intros Hwf Hlocs Hctx. revert b H1' rho1' e Hwf Hlocs. induction Hctx; intros b H1' rho1' e Hwf Hlocs Heq Hinj.
     - do 3 eexists. repeat (split; eauto). now constructor.
-    - edestruct heap_env_equiv_env_getlist as [vs' [Hlst Hall]]; try eassumption.
+    - edestruct heap_env_equiv_env_get_list as [vs' [Hlst Hall]]; try eassumption.
       simpl. normalize_occurs_free...
       destruct (alloc (Constr t vs') H1') as [l2 H1''] eqn:Halloc.
       specialize (IHHctx (b {l ~> l2}) H1'' (M.set x (Loc l2) rho1')).
@@ -1774,7 +1774,7 @@ Module SpaceSem (H : Heap).
 
             unfold size_heap in *.
             erewrite size_with_measure_alloc in Hleq'; try eassumption; try reflexivity.
-            erewrite getlist_length_eq; try eassumption. simpl in *; omega. 
+            erewrite get_list_length_eq; try eassumption. simpl in *; omega. 
             simpl in *; omega. }
         simpl in *. omega.
     - destruct (lt_dec c1 (cost_cc (Eproj_c x t N y C |[ e ]|))). 

@@ -3,23 +3,27 @@
  *)
 
 From Coq Require Import Arith.Arith NArith.BinNat Lists.List omega.Omega.
-From CertiCoq.L6 Require Import cps tactics set_util.
+Require Import L6.tactics.
+From CertiCoq.L6 Require Import cps set_util.
+Require Import ExtLib.Structures.Monad.
 
+Import MonadNotation.
 Import ListNotations.
 
 (** Expression evaluation contexts *)
 Inductive exp_ctx : Type :=
 | Hole_c : exp_ctx
-| Econstr_c : var -> cTag -> list var -> exp_ctx -> exp_ctx
-| Eproj_c  : var -> cTag -> N -> var -> exp_ctx -> exp_ctx
-| Eprim_c : var -> prim -> list var -> exp_ctx -> exp_ctx   
-| Ecase_c : var -> list (cTag * exp) -> cTag ->
-            exp_ctx -> list (cTag * exp) -> exp_ctx  
+| Econstr_c : var -> ctor_tag -> list var -> exp_ctx -> exp_ctx
+| Eproj_c  : var -> ctor_tag -> N -> var -> exp_ctx -> exp_ctx
+| Eprim_c : var -> prim -> list var -> exp_ctx -> exp_ctx
+| Eletapp_c : var -> var -> fun_tag -> list var -> exp_ctx -> exp_ctx   
+| Ecase_c : var -> list (ctor_tag * exp) -> ctor_tag ->
+            exp_ctx -> list (ctor_tag * exp) -> exp_ctx  
 | Efun1_c : fundefs -> exp_ctx -> exp_ctx
 | Efun2_c : fundefs_ctx -> exp -> exp_ctx
 with fundefs_ctx :=
-     | Fcons1_c:  var -> cTag -> list var -> exp_ctx -> fundefs -> fundefs_ctx
-     | Fcons2_c:  var -> cTag -> list var -> exp -> fundefs_ctx -> fundefs_ctx.
+     | Fcons1_c:  var -> ctor_tag -> list var -> exp_ctx -> fundefs -> fundefs_ctx
+     | Fcons2_c:  var -> ctor_tag -> list var -> exp -> fundefs_ctx -> fundefs_ctx.
 
 (** Evaluation context application - Relational definition *)
 Inductive app_ctx: exp_ctx -> exp -> exp -> Prop :=
@@ -30,6 +34,9 @@ Inductive app_ctx: exp_ctx -> exp -> exp -> Prop :=
 | Proj_ac : forall x t n y e c ce, 
               app_ctx c e ce ->        
               app_ctx (Eproj_c x t n y c) e (Eproj x t n y ce)
+| Letapp_ac : forall x f ft ys e c ce, 
+    app_ctx c e ce ->
+    app_ctx (Eletapp_c x f ft ys c) e (Eletapp x f ft ys ce)
 | Case_ac : forall x te t e te' c ce,
               app_ctx c e ce ->
               app_ctx (Ecase_c x te t c te') e
@@ -59,6 +66,7 @@ Fixpoint app_ctx_f (c:exp_ctx) (e:exp) : exp :=
     | Hole_c => e
     | Econstr_c x t ys c => Econstr x t ys (app_ctx_f c e)
     | Eproj_c x t n y c => Eproj x t n y (app_ctx_f c e)
+    | Eletapp_c x f ft ys c => Eletapp x f ft ys (app_ctx_f c e)
     | Ecase_c x te t c te' =>
       Ecase x (te ++ (t, app_ctx_f c e) :: te')
     | Eprim_c x f ys c => Eprim x f ys (app_ctx_f c e)
@@ -80,6 +88,9 @@ Inductive  comp_ctx: exp_ctx -> exp_ctx -> exp_ctx -> Prop :=
 | Proj_cc : forall x t n y e c ce,
               comp_ctx c e ce ->
               comp_ctx (Eproj_c x t n y c) e (Eproj_c x t n y ce)
+| Letapp_cc : forall x f ft ys e c ce,
+              comp_ctx c e ce ->
+              comp_ctx (Eletapp_c x f ft ys c) e (Eletapp_c x f ft ys ce)
 | Case_cc : forall x te t c te' c' cc,
               comp_ctx c c' cc ->
               comp_ctx (Ecase_c x te t c te') c' (Ecase_c x te t cc te')
@@ -109,6 +120,7 @@ Fixpoint comp_ctx_f (c1:exp_ctx) (c2:exp_ctx) : exp_ctx :=
     | Econstr_c x t ys c => Econstr_c x t ys (comp_ctx_f c c2)
     | Eproj_c x t n y c => Eproj_c x t n y (comp_ctx_f c c2)
     | Ecase_c x te t c te' => Ecase_c x te t (comp_ctx_f c c2) te'
+    | Eletapp_c x f ft ys c => Eletapp_c x f ft ys (comp_ctx_f c c2)
     | Eprim_c x f ys c => Eprim_c x f ys (comp_ctx_f c c2)
     | Efun1_c fds c => Efun1_c fds (comp_ctx_f c c2)
     | Efun2_c cfds e' => Efun2_c (comp_f_ctx_f cfds c2) e'
@@ -136,19 +148,21 @@ with ctx_fundefs_mut' := Induction for fundefs_ctx Sort Type.
 Lemma exp_fundefs_ctx_mutual_ind :
   forall (P : exp_ctx -> Prop) (P0 : fundefs_ctx -> Prop),
     P Hole_c ->
-    (forall (v : var) (t : cTag) (l : list var) (e : exp_ctx),
+    (forall (v : var) (t : ctor_tag) (l : list var) (e : exp_ctx),
        P e -> P (Econstr_c v t l e)) ->
-    (forall (v : var) (t : cTag) (n : N) (v0 : var) (e : exp_ctx),
-       P e -> P (Eproj_c v t n v0 e)) ->
+    (forall (v : var) (t : ctor_tag) (n : N) (v0 : var) (e : exp_ctx),
+        P e -> P (Eproj_c v t n v0 e)) ->
+    (forall (v : var) (f : var) (ft : fun_tag) (ys : list var) (e : exp_ctx),
+        P e -> P (Eletapp_c v f ft ys e)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp_ctx),
        P e -> P (Eprim_c v p l e)) ->
-    (forall (v : var) (l : list (cTag * exp)) (t : cTag) (e : exp_ctx),
-       P e -> forall l0 : list (cTag * exp), P (Ecase_c v l t e l0)) ->
+    (forall (v : var) (l : list (ctor_tag * exp)) (t : ctor_tag) (e : exp_ctx),
+       P e -> forall l0 : list (ctor_tag * exp), P (Ecase_c v l t e l0)) ->
     (forall (f4 : fundefs) (e : exp_ctx), P e -> P (Efun1_c f4 e)) ->
     (forall f5 : fundefs_ctx, P0 f5 -> forall e : exp, P (Efun2_c f5 e)) ->
-    (forall (v : var) (t : fTag) (l : list var) (e : exp_ctx),
+    (forall (v : var) (t : fun_tag) (l : list var) (e : exp_ctx),
        P e -> forall f6 : fundefs, P0 (Fcons1_c v t l e f6)) ->
-    (forall (v : var) (t : fTag) (l : list var) 
+    (forall (v : var) (t : fun_tag) (l : list var) 
             (e : exp) (f7 : fundefs_ctx), P0 f7 -> P0 (Fcons2_c v t l e f7)) ->
     (forall e : exp_ctx, P e) /\ (forall f : fundefs_ctx, P0 f).
 Proof.
@@ -157,10 +171,12 @@ Proof.
   apply (ctx_fundefs_mut P P0); assumption.
 Qed.
 
+
 (** Name the induction hypotheses only *)
 Ltac exp_fundefs_ctx_induction IH1 IH2 :=
   apply exp_fundefs_ctx_mutual_ind;
   [ | intros ? ? ? ? IH1 
+    | intros ? ? ? ? ? IH1
     | intros ? ? ? ? ? IH1
     | intros ? ? ? ? IH1
     | intros ? ? ? ? IH1
@@ -347,6 +363,19 @@ Proof.
     + simpl in H0.
       left.
       destruct c4; inv H0.
+      exists (Eletapp_c v0 v1 f0 l e ),  c2; auto.
+    + apply IHc1 in H5. destruct H5.
+      * left.
+        destructAll.
+        exists x, x0.
+        auto.
+      * right. destructAll.
+        exists (Eletapp_c v0 v1 f0 l x), x0;
+          auto.        
+  - simpl in H. destruct c3; inv H.
+    + simpl in H0.
+      left.
+      destruct c4; inv H0.
       exists ( Eprim_c v0 p0 l0 e ),  c2; auto.
     + apply IHc1 in H4. destruct H4.
       * left.
@@ -444,14 +473,13 @@ Fixpoint app_fundefs_ctx (f:fundefs) (fc:fundefs_ctx): fundefs_ctx:=
       Fcons2_c x t xs e (app_fundefs_ctx f' fc)
   end.
 
-
 Lemma comp_ctx_f_Hole_c C :
   comp_ctx_f C Hole_c = C
 with comp_f_ctx_f_Hole_c f : 
        comp_f_ctx_f f Hole_c = f.
 Proof.
   - destruct C; simpl; eauto;
-    try (rewrite comp_ctx_f_Hole_c; reflexivity). 
+      try (rewrite comp_ctx_f_Hole_c; reflexivity). 
     rewrite comp_f_ctx_f_Hole_c. reflexivity.
   - destruct f; simpl; eauto.
     rewrite comp_ctx_f_Hole_c; reflexivity.

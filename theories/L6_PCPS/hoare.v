@@ -4,7 +4,7 @@
 
 From ExtLib Require Import Structures.Monads Data.Monads.StateMonad.
 From Coq Require Import Classes.Morphisms Lists.List.
-From CertiCoq.L6 Require Import functions tactics.
+From CertiCoq Require Import L6.functions L6.tactics.
 From ExtLib Require Import Structures.Monads Data.Monads.StateMonad.
 
 Import MonadNotation ListNotations.

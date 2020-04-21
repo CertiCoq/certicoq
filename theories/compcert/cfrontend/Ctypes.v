@@ -17,7 +17,7 @@
 
 Require Import Axioms Coqlib Maps Errors.
 Require Import AST Linking.
-Require Archi.
+Require x86_64.Archi.
 
 (** * Syntax of types *)
 

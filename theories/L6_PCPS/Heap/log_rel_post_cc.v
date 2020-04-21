@@ -30,13 +30,13 @@ Module LogRelPostCC (H : Heap).
     | FunPtr B1 f1, FunPtr B2 f2 =>
       forall H1 H2 rho1 ft xs1 e1 vs1 vs2 b,        
         find_def f1 B1 = Some (ft, xs1, e1) ->
-        setlist xs1 vs1 (def_funs B1 B1 (M.empty _)) = Some rho1 ->
+        set_lists xs1 vs1 (def_funs B1 B1 (M.empty _)) = Some rho1 ->
 
         List.length vs1 = List.length vs2 ->
         
         exists xs2 e2 rho2,
           find_def f2 B2 = Some (ft, xs2, e2) /\
-          setlist xs2 vs2 (def_funs B2 B2 (M.empty _)) = Some rho2 /\
+          set_lists xs2 vs2 (def_funs B2 B2 (M.empty _)) = Some rho2 /\
           let GP' c1 c2 :=
               let '(H1, rho1, c1) := c1 in
               let '(H2, rho2, c2) := c2 in              
@@ -115,13 +115,13 @@ Module LogRelPostCC (H : Heap).
       | FunPtr B1 f1, FunPtr B2 f2 =>
         forall H1 H2 rho1 ft xs1 e1 vs1 vs2 b,        
           find_def f1 B1 = Some (ft, xs1, e1) ->
-          setlist xs1 vs1 (def_funs B1 B1 (M.empty _)) = Some rho1 ->
+          set_lists xs1 vs1 (def_funs B1 B1 (M.empty _)) = Some rho1 ->
 
           List.length vs1 = List.length vs2 ->
           
           exists xs2 e2 rho2,
             find_def f2 B2 = Some (ft, xs2, e2) /\
-            setlist xs2 vs2 (def_funs B2 B2 (M.empty _)) = Some rho2 /\
+            set_lists xs2 vs2 (def_funs B2 B2 (M.empty _)) = Some rho2 /\
             forall i, (i < k)%nat ->
                  (forall j, Forall2 (fun v1 v2 => val_rel i j IP P b (Res (v1, H1)) (Res (v2, H2))) vs1 vs2) ->
                  (forall H1' H2' b1 b2,
@@ -1319,14 +1319,14 @@ Module LogRelPostCC (H : Heap).
         
         M.get f1 rho1 = Some (FunPtr B1 f1') ->
         find_def f1' B1 = Some (t, ys1, e1) ->
-        getlist xs1 rho1 = Some vs1 ->
-        setlist ys1 vs1 (def_funs B1 B1 (M.empty value)) = Some rho1' ->
+        get_list xs1 rho1 = Some vs1 ->
+        set_lists ys1 vs1 (def_funs B1 B1 (M.empty value)) = Some rho1' ->
         live' (env_locs rho1' (occurs_free e1)) H1 Hgc1 d1 ->
 
         M.get f2 rho2 = Some (FunPtr B2 f2') ->
         find_def f2' B2 = Some (t, ys2, e2) ->
-        getlist xs2 rho2 = Some vs2 ->
-        setlist ys2 vs2 (def_funs B2 B2 (M.empty value)) = Some rho2' ->
+        get_list xs2 rho2 = Some vs2 ->
+        set_lists ys2 vs2 (def_funs B2 B2 (M.empty value)) = Some rho2' ->
         live' (env_locs rho2' (occurs_free e2)) H2 Hgc2 d2 ->
 
         (* Post on result of APP *)
@@ -1369,7 +1369,7 @@ Module LogRelPostCC (H : Heap).
 
     Lemma exp_rel_constr_compat (k j : nat)
           (b : Inj) (H1 H2 : heap block) (rho1 rho2 : env)
-          (x1 x2 : var) (t : cTag) (ys1 ys2 : list var) (e1 e2 : exp)  : 
+          (x1 x2 : var) (t : ctor_tag) (ys1 ys2 : list var) (e1 e2 : exp)  : 
       InvCtxCompat IL1 IL2 (Econstr_c x1 t ys1 Hole_c) (Econstr_c x2 t ys2 Hole_c) e1 e2 ->
       IInvCtxCompat IIL1 IIL2 (Econstr_c x1 t ys1 Hole_c) (Econstr_c x2 t ys2 Hole_c) e1 e2 ->
       InvCostBase_w IL1 IIL1 (Econstr x1 t ys1 e1) (Econstr x2 t ys2 e2)  ->
@@ -1412,13 +1412,13 @@ Module LogRelPostCC (H : Heap).
             eapply var_rel_heap_env_equiv; try eassumption.
             normalize_occurs_free... normalize_occurs_free... }
           assert (Hall_eq' := Hall_eq 0). 
-          eapply var_log_rel_getlist in Hall_eq'; [| now eauto ].
+          eapply var_log_rel_get_list in Hall_eq'; [| now eauto ].
           destruct Hall_eq' as [vs2 [Hget' Hpre']].
 
-          edestruct heap_env_equiv_env_getlist as [vs1' [Hget1' Hall1]];
+          edestruct heap_env_equiv_env_get_list as [vs1' [Hget1' Hall1]];
             [| symmetry; now apply Heq1 | |]; try eassumption.
           normalize_occurs_free...
-          edestruct heap_env_equiv_env_getlist as [vs2' [Hget2' Hall2]];
+          edestruct heap_env_equiv_env_get_list as [vs2' [Hget2' Hall2]];
             [| symmetry; now apply Heq2 | |]; try eassumption.
           normalize_occurs_free...
           
@@ -1429,14 +1429,14 @@ Module LogRelPostCC (H : Heap).
           assert (Hval_rel :
                     forall j, Forall2 (fun v1 v2 => Res (v1, H1) ≺ ^ (k; j; IIG; IG; b) Res (v2, H2)) vs1' vs2').
           { intros j'. assert (Hall'' := Hall j'). 
-            eapply var_log_rel_getlist in Hall''; [| now eauto ].
+            eapply var_log_rel_get_list in Hall''; [| now eauto ].
             destruct Hall'' as [vs2'' [Hget'' Hvrel]]. repeat subst_exp. 
             eassumption. }
           assert (Hval_rel' :
                     Forall2 (fun v1 v2 => forall j, Res (v1, H1') ≺ ^ (k; j; IIG; IG; (b2 ∘ b ∘ b1))
                                                                 Res (v2, H2')) vs vs2).
           { eapply Forall2_forall. tci. intros j'. assert (Hall'' := Hall_eq j'). 
-            eapply var_log_rel_getlist in Hall''; [| now eauto ].
+            eapply var_log_rel_get_list in Hall''; [| now eauto ].
             destruct Hall'' as [vs2'' [Hget'' Hvrel]]. repeat subst_exp. 
             eassumption. }          
           
@@ -1707,7 +1707,7 @@ Module LogRelPostCC (H : Heap).
     (** Projection compatibility *)
     Lemma exp_rel_proj_compat
           (k : nat) (H1 H2 : heap block) (rho1 rho2 : env) (b : Inj)
-          (x1 x2 : var) (t : cTag) (n : N) (y1 y2 : var) (e1 e2 : exp) :
+          (x1 x2 : var) (t : ctor_tag) (n : N) (y1 y2 : var) (e1 e2 : exp) :
 
       InvCtxCompat IL1 IL2 (Eproj_c x1 t n y1 Hole_c) (Eproj_c x2 t n y2 Hole_c) e1 e2 ->
       IInvCtxCompat IIL1 IIL2 (Eproj_c x1 t n y1 Hole_c) (Eproj_c x2 t n y2 Hole_c) e1 e2 ->
@@ -1875,7 +1875,7 @@ Module LogRelPostCC (H : Heap).
 
     
     Lemma exp_rel_case_compat (k j : nat) (b : Inj)
-          (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (Pats1 Pats2 : list (cTag * exp)) :
+          (H1 H2 : heap block) (rho1 rho2 : env) (x1 x2 : var) (Pats1 Pats2 : list (ctor_tag * exp)) :
       InvCostBase_w IL1 IIL1 (Ecase x1 Pats1) (Ecase x2 Pats2) ->
       IInvCaseCompat IIL1 IIL2 x1 x2 Pats1 Pats2 ->
       InvCaseCompat IL1 IL2 x1 Pats1 ->
@@ -1995,7 +1995,7 @@ Module LogRelPostCC (H : Heap).
     
     (** Application compatibility *)
     Lemma exp_rel_app_compat (k j : nat) (b : Inj) (H1 H2 : heap block)
-          (rho1 rho2 : env) (f1 f2 : var) (xs1 xs2 : list var) (t : fTag) :
+          (rho1 rho2 : env) (f1 f2 : var) (xs1 xs2 : list var) (t : fun_tag) :
       IInvAppCompat IG IL1 IIL1 f1 t xs1 f2 xs2 ->
       InvCostBase_w IL1 IIL1 (Eapp f1 t xs1) (Eapp f2 t xs2) ->
 
@@ -2036,7 +2036,7 @@ Module LogRelPostCC (H : Heap).
                       Forall2 (fun x1 x2 : var => var_rel k j IIG IG (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' x1 x2) xs1 xs2).
             { eapply Forall2_monotonic; [| eapply Hall ]; eauto. }
 
-            eapply var_log_rel_getlist in Hall'; [| now eauto ]. 
+            eapply var_log_rel_get_list in Hall'; [| now eauto ]. 
             destruct Hall' as [vs2 [Hgetl' Hcc']]. 
             edestruct Hvar as [l2 [Hget' Hval]]; eauto.
             destruct l2; try contradiction.
@@ -2065,7 +2065,7 @@ Module LogRelPostCC (H : Heap).
                       Forall2 (fun x1 x2 : var => var_rel k j' IIG IG (b2 ∘ b ∘ b1) H1' rho1' H2' rho2' x1 x2) xs1 xs2).
             { eapply Forall2_monotonic; [| eapply Hall ]; eauto. }
             
-            eapply var_log_rel_getlist in Hall'; [| now eauto ]. 
+            eapply var_log_rel_get_list in Hall'; [| now eauto ]. 
             destruct Hall' as [vs2' [Hgetl'' Hcc'']]. repeat subst_exp. 
             eapply Forall2_monotonic_strong; [| eapply Hcc'' ]. 
             
@@ -2110,7 +2110,7 @@ Module LogRelPostCC (H : Heap).
 
         
     Lemma exp_rel_app_compat_known (k j : nat) (H1 H2 : heap block)
-          (rho1 rho2 : env) (f1 f2 : var) (xs1 xs2 : list var) (t : fTag) :
+          (rho1 rho2 : env) (f1 f2 : var) (xs1 xs2 : list var) (t : fun_tag) :
       IInvAppCompat IG IL1 IIL1 f1 t xs1 f2 xs2 ->
       InvCostBase_w IL1 IIL1 (Eapp f1 t xs1) (Eapp f2 t xs2) ->
              
@@ -2119,14 +2119,14 @@ Module LogRelPostCC (H : Heap).
           i < k ->
           M.get f1 rho1 = Some (FunPtr B1 f1') ->
           find_def f1' B1 = Some (t, ys1, e1) ->
-          getlist xs1 rho1 = Some vs1 ->
-          setlist ys1 vs1 (def_funs B1 B1 (M.empty value)) = Some rho1' ->
+          get_list xs1 rho1 = Some vs1 ->
+          set_lists ys1 vs1 (def_funs B1 B1 (M.empty value)) = Some rho1' ->
           
           exists rho2' B2 f2' ys2 e2 vs2,
             M.get f2 rho2 = Some (FunPtr B2 f2') /\
             find_def f2' B2 = Some (t, ys2, e2) /\
-            getlist xs2 rho2 = Some vs2 /\
-            setlist ys2 vs2 (def_funs B2 B2 (M.empty value)) = Some rho2' /\
+            get_list xs2 rho2 = Some vs2 /\
+            set_lists ys2 vs2 (def_funs B2 B2 (M.empty value)) = Some rho2' /\
             IInvGC IIG H1 rho1' e1 H2 rho2' e2 /\  
             (forall j, (H1, rho1', e1) ⪯ ^ (i ; j; IIG (Empty_set _) _ 0 0; IIG ; IG 0 0 ; IG) (H2, rho2', e2))) ->
         
@@ -2148,12 +2148,12 @@ Module LogRelPostCC (H : Heap).
             
             eapply Hbase; try eassumption; eauto. omega. }
       (* Termination *)
-      - { edestruct heap_env_equiv_env_getlist as [vs1' [Hget1' Hall]]. eassumption.
+      - { edestruct heap_env_equiv_env_get_list as [vs1' [Hget1' Hall]]. eassumption.
           symmetry. eassumption. normalize_occurs_free... 
-          edestruct (@setlist_length value) as [rho1'' Hset1''].  eapply Forall2_length. eassumption.
+          edestruct (@set_lists_length value) as [rho1'' Hset1''].  eapply Forall2_length. eassumption.
           eassumption.
           assert (Heq1' := Hset1'').
-          eapply heap_env_equiv_setlist with (S := occurs_free e) (rho2 := (def_funs B B (M.empty value))) in Heq1';
+          eapply heap_env_equiv_set_lists with (S := occurs_free e) (rho2 := (def_funs B B (M.empty value))) in Heq1';
             [| eapply heap_env_equiv_def_funs' | | eassumption ]; try eassumption. 
 
           edestruct heap_env_equiv_env_get as [v2 [Hgetf' Hrelf]]; try eassumption. 
@@ -2163,13 +2163,13 @@ Module LogRelPostCC (H : Heap).
           edestruct Hyp with (i := k - cost_cc (Eapp f1 t xs1)) as (rho2_s & B2 & f2' & ys2 & e2 & vs2 & Hgetf2 & Hfind2 & Hget2 & Hset2 & Hlive & Hexp);
             try eassumption.
           simpl in *; omega. 
-          edestruct heap_env_equiv_env_getlist with (rho1 := rho2)
+          edestruct heap_env_equiv_env_get_list with (rho1 := rho2)
            as [vs2' [Hget2' Hall2]]. eassumption.
           eassumption. normalize_occurs_free...
-          edestruct (@setlist_length value) as [rho2'' Hset2''].  eapply Forall2_length. exact Hall2. eassumption.
+          edestruct (@set_lists_length value) as [rho2'' Hset2''].  eapply Forall2_length. exact Hall2. eassumption.
           assert (Heq2' := Hset2'').
           
-          eapply heap_env_equiv_setlist with (S := occurs_free e2) (rho2 := (def_funs B2 B2 (M.empty value))) in Heq2';
+          eapply heap_env_equiv_set_lists with (S := occurs_free e2) (rho2 := (def_funs B2 B2 (M.empty value))) in Heq2';
             [| eapply heap_env_equiv_def_funs' | | eassumption ]; try eassumption. 
 
           edestruct heap_env_equiv_env_get as [v2 [Hgetf2' Hrelf2]]; try eassumption. 
@@ -2193,14 +2193,14 @@ Module LogRelPostCC (H : Heap).
           
           
           assert (Hincl1 : env_locs rho_clo (occurs_free e) \subset env_locs rho1' (occurs_free (Eapp f1 t xs1))). 
-          { eapply Included_trans; [| eapply Included_trans; [ eapply env_locs_setlist_Included |] ].
+          { eapply Included_trans; [| eapply Included_trans; [ eapply env_locs_set_lists_Included |] ].
             eapply env_locs_monotonic. eapply Included_Union_preserv_l. reflexivity.
             eassumption.
             eapply Union_Included.
             - rewrite env_locs_def_funs'; tci. rewrite <- env_locs_Empty...
             - normalize_occurs_free. rewrite env_locs_Union, env_locs_FromList... } 
           assert (Hincl2 : env_locs rho2_s (occurs_free e2) \subset env_locs rho2 (occurs_free (Eapp f2 t xs2))). 
-          { eapply Included_trans; [| eapply Included_trans; [ eapply env_locs_setlist_Included |] ].
+          { eapply Included_trans; [| eapply Included_trans; [ eapply env_locs_set_lists_Included |] ].
             eapply env_locs_monotonic. eapply Included_Union_preserv_l. reflexivity.
             eassumption.
             eapply Union_Included.

@@ -1,27 +1,58 @@
-COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R ../benchmarks CertiCoq.Benchmarks
+COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R ./ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
+CCOMPILER=gcc
 
-all: copy demo demo1 demo2
+# Names of the benchmarks
+TESTS=$(shell cat TESTS)
+# Names of the generated cfiles
+CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, CertiCoq.Benchmarks.tests.%.c, $(TESTS))
+# Names of the generated executables
+EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS))
+
+default: copy exec run
+all: copy lib exec run
+
+.PHONY: all default clean lib cleanlib tests run
+
+$(CFILES): tests
+exec: $(TESTS)
 
 copy:
 	cp ../theories/Runtime/gc.c ./
 	cp ../theories/Runtime/gc.h ./
+	cp ../theories/Runtime/gc_stack.c ./
+	cp ../theories/Runtime/gc_stack.h ./
 	cp ../theories/Runtime/values.h ./
 	cp ../theories/Runtime/main.c ./
 	cp ../theories/Runtime/config.h ./
-demo: demo.v
-	coqc $(COQOPTS) demo.v
 
-demo0: maindemo0.c gc.c CertiCoq.Benchmarks.demo.demo0.c
-	gcc -o demo0 -Wno-everything -O2 $+
+clean:
+	rm -f ./gc.c
+	rm -f ./gc.h
+	rm -f ./values.h
+	rm -f ./main.c
+	rm -f ./config.h
+	rm -f ./*.*.c
+	rm -f ./*.*.h
+	rm -f ./glue.*.*.c
+	rm -f ./glue.*.*.h
+	rm -f ./*.vo
+	rm -f $(EXEC)
 
-demo1: maindemo1.c gc.c CertiCoq.Benchmarks.demo.demo1.c
-	gcc -o demo1 -Wno-everything -O2 $+
+lib/Makefile:
+	cd lib; coq_makefile -f _CoqProject -o Makefile
 
-demo2: maindemo2.c gc.c CertiCoq.Benchmarks.demo.demo2.c
-	gcc -o demo2 -Wno-everything -O2 $+
+lib: lib/Makefile
+	$(MAKE) -C lib
 
-vs: CertiCoq.Benchmarks.demo.is_valid.c
-	gcc -o vs -Wno-everything -O2 mainvs.c gc.c $<
+cleanlib:
+	$(MAKE) clean -C lib
 
-%.vo: %.v
-	coqc ${COQOPTS} $<
+tests: tests.v
+	coqc $(COQOPTS) tests.v
+
+$(TESTS): $(CFILES)
+	$(CCOMPILER) -o $@_cps -Wno-everything -O2 $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@_cps.c
+	$(CCOMPILER) -o $@ -Wno-everything -O2 $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue.CertiCoq.Benchmarks.tests.$@.c
+
+run: run.sh
+	sh run.sh

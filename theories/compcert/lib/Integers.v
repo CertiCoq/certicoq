@@ -17,7 +17,7 @@
 
 Require Import Eqdep_dec Zquot Zwf.
 Require Import Coqlib.
-Require Archi.
+Require x86_64.Archi.
 
 (** * Comparisons *)
 

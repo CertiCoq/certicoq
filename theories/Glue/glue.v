@@ -1304,7 +1304,6 @@ Section FunctionCalls.
     _clo <- gensym "clo" ;;
     _f <- gensym "f" ;;
     _env <- gensym "envi" ;;
-    _ret <- gensym "ret" ;;
     _arg <- gensym "arg" ;;
     _tinfo <- gensym "tinfo";;
     let '(_halt_clo, _) := halt_clo_info toolbox in
@@ -1348,21 +1347,20 @@ Section FunctionCalls.
                      Sassign (Field(argsExpr, Z.of_nat 2)) (Etempvar _arg val) :: nil)
                  end) ;;;
       Scall None ([ret_ty] (funVar _f)) (firstn (S c_args) fargs) ;;;
-      _ret ::= Field(argsExpr, Z.of_nat 1) ;;;
-      Sreturn (Some (Etempvar _ret valPtr)) in
+      Sreturn (Some (Field(argsExpr, Z.of_nat 1))) in
 
     let params := (_tinfo, (threadInf _thread_info)) :: (_clo, val) :: (_arg, val) :: nil in
-    let vars := (_f, valPtr) :: (_env, valPtr) :: (_ret, valPtr) :: nil in
+    let vars := (_f, valPtr) :: (_env, valPtr) :: nil in
     _call <- gensym "call" ;;
     ret (_call,
          Gfun (Internal
-                 {| fn_return := Tpointer Tvoid noattr
+                 {| fn_return := val
                   ; fn_callconv := cc_default
                   ; fn_params := (_tinfo, (threadInf _thread_info)) ::
                                  (_clo, val) ::
                                  (_arg, val) :: nil
                   ; fn_vars := nil
-                  ; fn_temps := (_f, valPtr) :: (_env, valPtr) :: (_ret, valPtr) :: nil
+                  ; fn_temps := vars
                   ; fn_body := body
                   |})).
 

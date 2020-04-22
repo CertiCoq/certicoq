@@ -998,19 +998,21 @@ Fixpoint translate_funs
       let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
       body <- translate_body e fenv cenv ienv m ;;
       '(gcArrIdent , _) <- M.get mainIdent m ;;
+      let argsExpr := Efield tinfd argsIdent (Tarray uval maxArgs noattr) in
       ret ((bodyIdent, Gfun (Internal
-                              (mkfunction Tvoid
+                              (mkfunction val
                                           cc_default
                                           ((tinfIdent, threadInf)::nil)
                                           ((map (fun x => (x, val)) localVars) ++ (allocIdent, valPtr) :: (limitIdent, valPtr) :: (argsIdent, valPtr) :: nil)
                                           nil
                                           (allocIdent ::= Efield tinfd allocIdent valPtr ;;;
                                            limitIdent ::= Efield tinfd limitIdent valPtr ;;;
-                                           argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);;;
+                                           argsIdent ::= argsExpr ;;;
                                            reserve_body gcArrIdent 2%Z ;;;
                                            body ;;;
                                            Efield tinfd allocIdent valPtr :::= allocPtr ;;;
-                                           Efield tinfd limitIdent valPtr :::= limitPtr))))
+                                           Efield tinfd limitIdent valPtr :::= limitPtr ;;;
+                                           Sreturn (Some (Field(argsExpr, Z.of_nat 1)))))))
             :: funs)
   | _ => None
   end.

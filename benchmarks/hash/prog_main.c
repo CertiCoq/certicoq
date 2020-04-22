@@ -5,7 +5,7 @@
 #include <time.h>
 #include "gc.h"
 
-extern void body(struct thread_info *);
+extern value body(struct thread_info *);
 extern value args[];
 
 extern struct thread_info;
@@ -29,7 +29,7 @@ extern value alloc_make_Top_StringFFI_Build_StringFFI(struct thread_info *, valu
 extern value alloc_make_Top_Hash_Types_Build_Hash_Types(struct thread_info *, value);
 extern value alloc_make_Top_HashFFI_Build_HashFFI(struct thread_info *, value, value, value, value);
 
-extern void* call(struct thread_info *tinfo, value clos, value arg0);
+extern value call(struct thread_info *tinfo, value clos, value arg0);
 
 extern value const io_ret_clo[2];
 extern value const io_bind_clo[2];
@@ -284,10 +284,8 @@ int main(int argc, char *argv[]) {
   start = clock();
 
   // Run Coq program
-  body(tinfo);
+  clo = body(tinfo);
   end = clock();
-
-  clo = tinfo -> args[1];
 
   // Types are dummy values
   value io_types = alloc_make_Top_IO_Types_Build_IO_Types(tinfo, 1);

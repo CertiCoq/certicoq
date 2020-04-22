@@ -33,3 +33,6 @@ prog:
 
 debug:
 	$(CCOMPILER) -o prog_cps -Wno-everything prog_main.c gc.c Top.prog_cps.c glue.Top.prog_cps.c ffi.Top.IO_Impl_cps.c ffi.Top.StringFFI_cps.c -g
+
+debug_anf:
+	$(CCOMPILER) -o prog -Wno-everything prog_main.c gc.c Top.prog.c glue.Top.prog.c ffi.Top.IO_Impl.c ffi.Top.StringFFI.c -g

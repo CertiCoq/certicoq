@@ -385,15 +385,19 @@ Definition make_ffi_program
 Definition get_constructors
            (p : Ast.program)
            : ffiM (list (kername * Ast.term)) :=
+  opts <- ask ;;
+  let prefix : string := Pipeline_utils.prefix opts in
+  log ("Using the prefix '" ++ prefix ++ "' for the generated FFI functions") ;;
   let '(globs, _) := p in
 
   let fix pi_types_to_class_fields
           (e : Ast.term) : ffiM (list (kername * Ast.term)) :=
     match e with
     | Ast.tProd (nNamed field_name) t e' =>
-        (* TODO convert field_name to kername by qualifying it *)
+        (* TODO MAYBE convert field_name to kername by qualifying it *)
+        (* right now we qualify the names with the option the user provides *)
         rest <- pi_types_to_class_fields e' ;;
-        ret ((field_name, t) :: rest)
+        ret ((sanitize_qualified (append prefix field_name), t) :: rest)
     | Ast.tRel _ => ret nil
     | Ast.tApp _ _ => ret nil
     | _ =>

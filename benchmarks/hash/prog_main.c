@@ -23,11 +23,11 @@ extern value alloc_make_Coq_Strings_String_string_String(struct thread_info *, v
 extern value alloc_make_Coq_Init_Datatypes_nat_S(struct thread_info *, value);
 extern value alloc_make_Coq_Init_Datatypes_option_Some(struct thread_info *, value);
 
-extern value alloc_make_Top_IO_Types_Build_IO_Types(struct thread_info *, value);
-extern value alloc_make_Top_IO_Impl_Build_IO_Impl(struct thread_info *, value, value);
-extern value alloc_make_Top_StringFFI_Build_StringFFI(struct thread_info *, value, value);
-extern value alloc_make_Top_Hash_Types_Build_Hash_Types(struct thread_info *, value);
-extern value alloc_make_Top_HashFFI_Build_HashFFI(struct thread_info *, value, value, value, value);
+extern value alloc_make_CertiCoq_Benchmarks_hash_hash_IO_Types_Build_IO_Types(struct thread_info *, value);
+extern value alloc_make_CertiCoq_Benchmarks_hash_hash_IO_Impl_Build_IO_Impl(struct thread_info *, value, value);
+extern value alloc_make_CertiCoq_Benchmarks_hash_hash_StringFFI_Build_StringFFI(struct thread_info *, value, value);
+extern value alloc_make_CertiCoq_Benchmarks_hash_hash_Hash_Types_Build_Hash_Types(struct thread_info *, value);
+extern value alloc_make_CertiCoq_Benchmarks_hash_hash_HashFFI_Build_HashFFI(struct thread_info *, value, value, value, value);
 
 extern value call(struct thread_info *tinfo, value clos, value arg0);
 
@@ -288,21 +288,22 @@ int main(int argc, char *argv[]) {
   end = clock();
 
   // Types are dummy values
-  value io_types = alloc_make_Top_IO_Types_Build_IO_Types(tinfo, 1);
+  value io_types = alloc_make_CertiCoq_Benchmarks_hash_hash_IO_Types_Build_IO_Types(tinfo, 1);
 
-  value io_impl = alloc_make_Top_IO_Impl_Build_IO_Impl(tinfo, io_ret_clo, io_bind_clo);
+  value io_impl = alloc_make_CertiCoq_Benchmarks_hash_hash_IO_Impl_Build_IO_Impl(tinfo, io_ret_clo, io_bind_clo);
 
   value string_ffi = 
-    alloc_make_Top_StringFFI_Build_StringFFI(
+    alloc_make_CertiCoq_Benchmarks_hash_hash_StringFFI_Build_StringFFI(
         tinfo,
         print_string_clo,
         scan_string_clo);
 
   // Types are dummy values
-  value hash_types = alloc_make_Top_Hash_Types_Build_Hash_Types(tinfo, 1);
+  value hash_types = alloc_make_CertiCoq_Benchmarks_hash_hash_Hash_Types_Build_Hash_Types(tinfo, 1);
 
+  // TODO these functions don't handle garbage collection yet.
   value hash_ffi = 
-    alloc_make_Top_HashFFI_Build_HashFFI(
+    alloc_make_CertiCoq_Benchmarks_hash_hash_HashFFI_Build_HashFFI(
         tinfo,
         new_clo,
         lookup_clo,

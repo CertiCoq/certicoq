@@ -1,6 +1,9 @@
+QUAL=CertiCoq.Benchmarks.io
+QUALS=CertiCoq.Benchmarks.io.io
+COQOPTS = -R ./ $(QUAL)
 CCOMPILER=gcc
 
-default: copy prog
+default: coq copy prog
 
 copy:
 	cp ../../theories/Runtime/gc.c ./
@@ -28,8 +31,11 @@ clean:
 	rm -f ./*.vo
 	rm -f ./*.glob
 
+coq:
+	coqc $(COQOPTS) io.v
+
 prog:
-	$(CCOMPILER) -o prog -Wno-everything -O2 prog_main.c gc.c Top.prog.c glue.Top.prog.c ffi.Top.IO_Impl.c ffi.Top.StringFFI.c -g
+	$(CCOMPILER) -o prog -Wno-everything -O2 prog_main.c gc.c $(QUALS).prog.c glue.$(QUALS).prog.c ffi.$(QUALS).IO_Impl.c ffi.$(QUALS).StringFFI.c -g
 
 debug:
-	$(CCOMPILER) -o prog -Wno-everything prog_main.c gc.c Top.prog.c glue.Top.prog.c ffi.Top.IO_Impl.c ffi.Top.StringFFI.c -g
+	$(CCOMPILER) -o prog -Wno-everything prog_main.c gc.c $(QUALS).prog.c glue.$(QUALS).prog.c ffi.$(QUALS).IO_Impl.c ffi.$(QUALS).StringFFI.c -g

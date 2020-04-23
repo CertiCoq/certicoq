@@ -1,6 +1,9 @@
+QUAL=CertiCoq.Benchmarks.hash
+QUALS=CertiCoq.Benchmarks.hash.hash
+COQOPTS = -R ./ $(QUAL)
 CCOMPILER=gcc
 
-default: copy prog
+default: coq copy prog
 
 copy:
 	cp ../../theories/Runtime/gc.c ./
@@ -28,8 +31,11 @@ clean:
 	rm -f ./*.vo
 	rm -f ./*.glob
 
+coq:
+	coqc $(COQOPTS) hash.v
+
 prog:
-	$(CCOMPILER) -o prog -Wno-everything -O2 prog_main.c gc.c Top.prog.c glue.Top.prog.c ffi.Top.IO_Impl.c ffi.Top.StringFFI.c ffi.Top.HashFFI.c
+	$(CCOMPILER) -o prog -Wno-everything -O2 prog_main.c gc.c $(QUALS).prog.c glue.$(QUALS).prog.c ffi.$(QUALS).IO_Impl.c ffi.$(QUALS).StringFFI.c ffi.$(QUALS).HashFFI.c
 
 debug:
-	$(CCOMPILER) -o prog -Wno-everything prog_main.c gc.c Top.prog.c glue.Top.prog.c ffi.Top.IO_Impl.c ffi.Top.StringFFI.c ffi.Top.HashFFI.c -g
+	$(CCOMPILER) -o prog -Wno-everything prog_main.c gc.c $(QUALS).prog.c glue.$(QUALS).prog.c ffi.$(QUALS).IO_Impl.c ffi.$(QUALS).StringFFI.c ffi.$(QUALS).HashFFI.c -g

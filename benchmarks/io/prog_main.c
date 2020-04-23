@@ -18,9 +18,9 @@ extern value make_Coq_Strings_String_string_EmptyString(void);
 extern value alloc_make_Coq_Strings_Ascii_ascii_Ascii(struct thread_info *, value, value, value, value, value, value, value, value);
 extern value alloc_make_Coq_Strings_String_string_String(struct thread_info *, value, value);
 
-extern value alloc_make_Top_IO_Types_Build_IO_Types(struct thread_info *, value, value);
-extern value alloc_make_Top_IO_Impl_Build_IO_Impl(struct thread_info *, value, value);
-extern value alloc_make_Top_StringFFI_Build_StringFFI(struct thread_info *, value, value);
+extern value alloc_make_CertiCoq_Benchmarks_io_io_IO_Types_Build_IO_Types(struct thread_info *, value, value);
+extern value alloc_make_CertiCoq_Benchmarks_io_io_IO_Impl_Build_IO_Impl(struct thread_info *, value, value);
+extern value alloc_make_CertiCoq_Benchmarks_io_io_StringFFI_Build_StringFFI(struct thread_info *, value, value);
 
 extern void* call(struct thread_info *tinfo, value clos, value arg0);
 
@@ -136,12 +136,17 @@ int main(int argc, char *argv[]) {
   clo = tinfo -> args[1];
 
   // Types are dummy values
-  value io_types = alloc_make_Top_IO_Types_Build_IO_Types(tinfo, 1, 1);
+  value io_types = 
+    alloc_make_CertiCoq_Benchmarks_io_io_IO_Types_Build_IO_Types(tinfo, 1, 1);
 
-  value io_impl = alloc_make_Top_IO_Impl_Build_IO_Impl(tinfo, io_ret_clo, io_bind_clo);
+  value io_impl = 
+    alloc_make_CertiCoq_Benchmarks_io_io_IO_Impl_Build_IO_Impl(
+        tinfo, 
+        io_ret_clo, 
+        io_bind_clo);
 
   value string_ffi = 
-    alloc_make_Top_StringFFI_Build_StringFFI(
+    alloc_make_CertiCoq_Benchmarks_io_io_StringFFI_Build_StringFFI(
         tinfo,
         print_string_clo,
         scan_string_clo);

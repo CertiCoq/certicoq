@@ -249,7 +249,7 @@ let ffi_command opts gr =
     (match logs with [] -> () | _ ->
       debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
-    let suff = if opts.cps then "_cps" else "" ^ if opts.olevel <> 0 then "_opt" else "" in
+    let suff = opts.ext in
     let cstr = Quoted.string_to_list ("ffi." ^ name ^ suff ^ ".c") in
     let hstr = Quoted.string_to_list ("ffi." ^ name ^ suff ^ ".h") in
     Pipeline.printProg (nenv, prg) cstr;

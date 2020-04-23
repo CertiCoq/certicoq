@@ -77,7 +77,7 @@ Definition prog
   origin "Joomy" ;;
   origin "Andrew".
 
-CertiCoq FFI -args 2 IO_Impl.
-CertiCoq FFI -args 2 StringFFI.
-CertiCoq FFI -args 2 HashFFI.
-CertiCoq Compile -args 2 prog.
+CertiCoq FFI IO_Impl.
+CertiCoq FFI StringFFI.
+CertiCoq FFI HashFFI.
+CertiCoq Compile prog.

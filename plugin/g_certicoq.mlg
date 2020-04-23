@@ -33,18 +33,13 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
     let gr = Nametab.global gr in
     let opts = Certicoq.make_options l in
     Certicoq.show_ir opts gr
-<<<<<<< 1301658b1f73ad580ff5449476aaab43071505ad:plugin/g_certicoq.mlg
   }
-| [ "CertiCoq" "-help" ] -> {
-=======
-  ]
-| [ "CertiCoq" "FFI" cargs_list(l) global(gr) ] -> [
+| [ "CertiCoq" "FFI" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
     let opts = Certicoq.make_options l in
     Certicoq.ffi_command opts gr
-  ]
-| [ "CertiCoq" "-help" ] -> [
->>>>>>> First cut at new vernacular command for FFI function currying:plugin/g_certicoq.ml4
+  }
+| [ "CertiCoq" "-help" ] -> {
     Feedback.msg_info (str help_msg)
   }
 END

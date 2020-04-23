@@ -3,6 +3,7 @@ Require Import Common.Pipeline_utils.
 Require Import Coq.ZArith.ZArith
                Coq.Program.Basics
                Coq.Strings.String
+               Coq.Strings.Ascii
                Coq.Lists.List List_util.
 
 Require Import ExtLib.Structures.Monads

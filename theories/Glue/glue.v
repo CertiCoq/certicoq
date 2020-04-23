@@ -449,19 +449,11 @@ Section L1Types.
     let fix check_last (e : Ast.term) : bool :=
         match e with
           | Ast.tProd _ _ e' => check_last e'
-          (* | Ast.tSort (utils.NEL.sing (Universes.Level.lProp, _)) => true *)
           | Ast.tSort u =>
-              (String.eqb (Universes.string_of_sort u) ("[Prop]"%string))
-               (* hacky but there's a module issue if you try to do it right *)
+              MetaCoq.Template.Universes.Universe.is_prop u
           | _ => false
         end
-    in let check_elims (l : list Universes.sort_family) : bool :=
-        match l with
-        | _ :: nil => true (* hacky but the only case with 1 elt is Prop *)
-        | _ => false
-        end
-   in orb (check_last (Ast.ind_type (ty_body info)))
-          (check_elims [Ast.ind_kelim (ty_body info)]).
+    in check_last (Ast.ind_type (ty_body info)).
 
   (* Takes in a list of types and removes the ones that are of sort [Prop].
      [Set] and [Type] are fine. CertiCoq erases [Prop]s early on,

@@ -102,7 +102,7 @@ Fixpoint repeat_typelist (t : type) (n : nat) : typelist :=
   | S n' => Tcons t (repeat_typelist t n')
   end.
 
-Local Variant Backend := ANF | CPS.
+Variant Backend := ANF | CPS.
 
 (* A way to project arguments saved in a closure out of the env.
    e.g. if you want to get the last argument,

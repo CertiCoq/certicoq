@@ -9,6 +9,8 @@
 *.o
 *.a
 *.ml*.d
+*.vok
+*.vos
 Makefile.coq
 /libraries/Makefile
 /theories/Makefile

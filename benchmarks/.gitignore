@@ -7,7 +7,6 @@ glue.CertiCoq.Benchmarks.tests.*
 Top.*
 glue.Top.*
 
-
 gc.c
 gc.h
 gc_stack.c

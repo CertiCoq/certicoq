@@ -1683,13 +1683,13 @@ Definition make_empty_header
   ret (Some (nenv, nil)).
 
 Definition make_header
-           (cenv:ctor_env)
-           (ienv:n_ind_env)
-           (e:exp)
+           (cenv : ctor_env)
+           (ienv : n_ind_env)
+           (e : exp)
            (nenv : M.t BasicAst.name)
            : nState (option (M.t BasicAst.name  * (list (ident * globdef Clight.fundef type)))) :=
-  l <- make_interface cenv (M.elements ienv) nenv;;
-  let (nenv, inter_l) := l in
+  (* l <- make_interface cenv (M.elements ienv) nenv;; *)
+  (* let (nenv, inter_l) := l in *)
   l <- make_halt nenv ;;
   let  '(nenv, halt_f, (halt_cloIdent, halt_clo_def)) := l in
   l <- make_call_n_export_b nenv 1 false halt_cloIdent ;;
@@ -1700,7 +1700,9 @@ Definition make_header
   let  '(nenv, call_1) := l in
   l <- make_call_n_export_b nenv 3 true halt_cloIdent ;;
   let  '(nenv, call_3) := l in
-  ret (Some (nenv, (halt_f :: (halt_cloIdent, halt_clo_def) :: (tinfIdent, tinf_def) :: call_0 :: call_1 :: call_2 :: call_3 :: inter_l))).
+  ret (Some (nenv, (halt_f :: (halt_cloIdent, halt_clo_def) ::
+                   (tinfIdent, tinf_def) ::
+                   call_0 :: call_1 :: call_2 :: call_3 :: nil))).
 
 
 
@@ -1722,7 +1724,7 @@ Definition compile (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
     let '(nenv, defs) := p in
     let nenv := (add_inf_vars (ensure_unique nenv)) in
     let forward_defs := make_extern_decls nenv defs false in
-    let header_pre := make_empty_header cenv ienv e nenv in
+    let header_pre := make_header cenv ienv e nenv in
     (*     let header_p := (header_pre.(runState) m%positive) in *)
     let header_p := (header_pre.(runState) 1000000%positive) in (* should be m, but m causes collision in nenv for some reason *)
     (match fst header_p with

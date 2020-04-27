@@ -458,21 +458,21 @@ Definition stackframeT := Tstruct stackframeTIdent noattr.
 (* The type of a pointer the stack_frame struct *)
 Definition stackframeTPtr := Tpointer stackframeT noattr.
 (* The type of the root array for each frame. *)
-Definition rootT size := Tarray valPtr size noattr.
+Definition rootT size := Tarray val size noattr.
 
-Definition rootTPtr := valPtrPtr.
+Definition rootTPtr := valPtr.
 
 (* local vars declared when a function uses the stack *)
 (* struct stack_frame frame; val roots[MAX_LOCS]; val* sp; *)
 Definition stack_decl size : list (ident * type)  :=
   (frameIdent, stackframeT) :: (* local variable for local stack frame *)
   (rootIdent, rootT size) :: (* local variable for the live array *)
-  (spIdent, valPtrPtr) :: nil. (* local variable for the stack pointer *)
+  (spIdent, valPtr) :: nil. (* local variable for the stack pointer *)
 
 
 Definition init_stack : statement :=
   (* frame.next = roots; *)
-  (Efield (Evar frameIdent stackframeT) nextFld valPtrPtr :::= Evar rootIdent rootTPtr);
+  (Efield (Evar frameIdent stackframeT) nextFld valPtr :::= Evar rootIdent rootTPtr);
   (* frame.roots = roots; *)
   (Efield (Evar frameIdent stackframeT) rootFld rootTPtr :::= Evar rootIdent rootTPtr);
   (* frame.prev = tinf->fp; *)
@@ -494,19 +494,35 @@ Definition reset_stack : statement :=
 
 Definition push_var (x : positive) :=
   (* */(unsigned long long **/) next = x  ;*)  
-  Ederef (Evar spIdent valPtrPtr) valPtr :::= Eaddrof (var x) valPtr;
-  (* (Field(ptrptrVar spIdent,Z.of_nat 0) :::= Eaddrof (var x) valPtr); *)
+  Ederef (Evar spIdent valPtr) val :::= Evar x valPtr;
+  (* Ederef (Evar spIdent valPtrPtr) valPtr :::= Eaddrof (var x) valPtr; *)
   (* sp = sp + 1*)
-  (spIdent ::= Ebinop Oadd (ptrptrVar spIdent) (c_int (Z.of_N 1) valPtr) valPtrPtr).
+  (spIdent ::= Ebinop Oadd (ptrVar spIdent) (c_int (Z.of_N 1) valPtr) valPtr).
+
+  Definition pop_var (x : positive) :=
+  (* Ederef (Evar spIdent valPtrPtr) valPtr :::= Eaddrof (var x) valPtr; *)
+  (* sp = sp + 1*)
+  (spIdent ::= Ebinop Osub (ptrVar spIdent) (c_int (Z.of_N 1) valPtr) valPtr);
+  (* */(unsigned long long **/) next = x  ;*)  
+  x ::= Ederef (Evar spIdent valPtr) val.
 
 Definition push_live_vars (xs : list positive) : statement * nat :=
-  (fix aux xs no : statement * nat:=
+  (fix aux xs : statement * nat:=
      match xs with
      | nil => (Sskip, 0)
      | x :: xs =>
-       let (stmt, no') := aux xs no in
+       let (stmt, no') := aux xs in
        (push_var x; stmt, 1 + no')        
-     end) xs 0.
+     end) xs.
+
+Definition pop_live_vars (xs : list positive) : statement :=
+  (fix aux xs : statement :=
+     match xs with
+     | nil => Sskip
+     | x :: xs =>
+       let stmt := aux xs in
+       (pop_var x; stmt)
+     end) xs.
 
 (* Discard the current function frame before a function returns or calls an other function *)
 Definition discard_frame (uses_stack : bool): statement :=
@@ -711,7 +727,8 @@ Definition reserve_num (n : nat) (funInf : positive) (l : Z) (stack_vars : list 
         (!(Ebinop Ole (c_int (Z.of_nat n) val) (limitPtr -' allocPtr) type_bool))
         (make_gc_stack;
          Scall None gc (arr :: tinf :: nil) ;
-         reset_stack;
+         pop_live_vars stack_vars;
+         (* reset_stack; *)
          allocIdent ::= Efield tinfd allocIdent valPtr)
         Sskip), slots).
 
@@ -865,7 +882,8 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
            allocIdent ::= Efield tinfd allocIdent valPtr; limitIdent ::= Efield tinfd limitIdent valPtr;
            x ::= Field(args, Z.of_nat 1);
            gc_call;
-           reset_stack; (* SP point to the beginning of the current frame *)
+           pop_live_vars fvs_list;
+           (* reset_stack; (* SP points to the beginning of the current frame *) *)
            fst progn),
            snd progn)
     | None => Err "translate_body: Unknown function application in Eletapp"
@@ -1157,8 +1175,8 @@ Definition make_defs (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor_en
 
 Definition composites : list composite_definition :=
   Composite stackframeTIdent Struct
-            ((nextFld, valPtrPtr) ::
-             (rootFld, valPtrPtr) ::
+            ((nextFld, valPtr) ::
+             (rootFld, valPtr) ::
              (prevFld, (tptr stackframeT)) :: nil)
             noattr ::
   Composite threadInfIdent Struct

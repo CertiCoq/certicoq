@@ -7,10 +7,10 @@ Import MonadNotation ListNotations.
 Open Scope monad_scope.
 Open Scope string.
 
-(** * Common Interface for composing CertiCoq Transformations *) 
+(** * Common Interface for composing CertiCoq Transformations *)
 (* Author: Zoe Paraskevopoulou, 2019 *)
 
-(* Compiler options *) 
+(* Compiler options *)
 Record Options :=
   { direct   : bool;  (* direct or CPS code *)
     c_args   : nat;  (* numbers of C arguments *)
@@ -22,10 +22,11 @@ Record Options :=
     time     : bool;  (* Track timing information *)
     debug    : bool;  (* Log debug messages *)
     dev      : nat;  (* for development purposes *)
+    prefix   : string  (* prefix to generated FFI functions *)
   }.
 
 (* Compilation info, such as timing, debug and error messages *)
-Record CompInfo := 
+Record CompInfo :=
   { time_log    : list String.string;
     log         : list String.string;
     debug_log   : list String.string;
@@ -34,11 +35,11 @@ Record CompInfo :=
 (* TODO use more efficient string representation as in cps_show *)
 
 Section Translation.
-  
+
   Context (Src Dst : Type).
-  
-  Definition pipelineM := compM Options CompInfo. 
-    
+
+  Definition pipelineM := compM Options CompInfo.
+
   Definition CertiCoqTrans := Src -> pipelineM Dst.
 
   (* TODO make something like that work *)
@@ -46,22 +47,22 @@ Section Translation.
   (*   ( fun p => bind ( e1 p ) (  .. ( bind ( em p ) ( fun p => en p ) ) .. )) (at level 110, right associativity). *)
 
   Definition get_options : pipelineM Options := @compM.ask _ _.
-  
+
   Definition log_msg (s : string) : pipelineM unit :=
-    '(Build_CompInfo tm log dbg) <- get ;; 
+    '(Build_CompInfo tm log dbg) <- get ;;
     put (Build_CompInfo tm (s :: log) dbg).
-  
+
   Definition debug_msg (s : string) : pipelineM unit :=
     o <- get_options ;;
     if (debug o) then
     '(Build_CompInfo tm log dbg) <- get ;;
      @put Options CompInfo (Build_CompInfo tm log (s :: dbg))
     else ret tt.
-  
+
   Definition log_time (s : string) : pipelineM unit :=
     '(Build_CompInfo tm log dbg) <- get ;;
     put (Build_CompInfo (s :: tm) log dbg).
-  
+
   Definition chr_newline : ascii := Eval compute in ascii_of_nat 10.
   Definition newline : string := (String chr_newline EmptyString).
 
@@ -104,15 +105,15 @@ Definition LiftErrorLogCertiCoqTrans {Src Trg}
     State (fun o inf  =>
              timePhase_opt o name
                            (fun _ =>
-                              let (res, dbg) := f s in 
+                              let (res, dbg) := f s in
                               let inf' := Build_CompInfo (time_log inf) (log inf) (dbg :: debug_log inf) in
                               (res, inf'))).
 
 
-Section Lang. 
+Section Lang.
 
   (** ** CertiCoq Language properties *)
-  
+
   Class Lang (Term : Type) :=
     { Value   : Type ;
       TermWf  : Term -> Prop ;
@@ -121,10 +122,10 @@ Section Lang.
   (** ** Extensions of this Class can be defined as subclasses. *)
 
   (* Example: Deterministic semantics *)
-  
+
   Class Deterministic (Term : Type) {HL : Lang Term} :=
     { Det : forall (t : Term) (v1 v2 : Value), BigStep t v1 -> BigStep t v2 -> v1 = v2 }.
-  
+
   (* Example: a language with a notion of divergence to show divergence
      preservation *)
 
@@ -134,14 +135,14 @@ Section Lang.
 
   Definition Terminates {Term : Type} {_ : Lang Term} (t : Term) :=
     exists v, BigStep t v.
-  
+
   Class Div (Term : Type) {HL : Lang Term}  :=
     { Diverges : Term -> Prop ;
       DivSane  : forall (t : Term), xor (Diverges t) (Terminates t) }.
-        
-End Lang.                     
 
-(** ** CertiCoq Corrrectness *)  
+End Lang.
+
+(** ** CertiCoq Corrrectness *)
 Section Correctness.
 
   Context {Src Trg : Type} {Hs : Lang Src} {Hd : Lang Trg}.
@@ -154,7 +155,7 @@ Section Correctness.
      Hoare triple *)
   Definition WfPreserving (trans : CertiCoqTrans Src Trg) :=
     forall src,
-      TermWf src -> 
+      TermWf src ->
       {{ fun r w => (* No preconditions on the state *) True }}
         trans src
       {{ fun r w trg w' => TermWf trg }}.
@@ -162,30 +163,30 @@ Section Correctness.
 
   Definition obs_eq :=
     @Value Src _ -> @Value Trg _ -> Prop.
-  
+
   (* Zoe: Use a very simple notion of refinement for now. To internalize the
      transitivity of the obs relation we can use a "observation question" a la
      Abhishek's classes. However, this is not required for linking (a la
      SepCompCert) or to be able to observe functions (for this compilation
      should commute with function application, and it doesn't have to be part of
      the value refinement) *)
-  
+
   Definition ForwardSim (R : obs_eq) (src : Src) (trg : Trg) :=
     forall v_src, BigStep src v_src ->
              exists v_trg, BigStep trg v_trg /\ R v_src v_trg.
-    
-  
+
+
   Definition SemPreserving (R : obs_eq) (trans : CertiCoqTrans Src Trg) :=
     forall src,
-      TermWf src -> 
+      TermWf src ->
       {{ fun r w => (* No preconditions on the state *) True }}
         trans src
       {{ fun r w trg w' => ForwardSim R src trg }}.
 
 
   Class TransWfPreserving (trans : CertiCoqTrans Src Trg) :=
-    { trans_WfPreserving : WfPreserving trans; }. 
-          
+    { trans_WfPreserving : WfPreserving trans; }.
+
   Class TransSemPreserving (trans : CertiCoqTrans Src Trg) (R : obs_eq) :=
     { trans_SemPreserving : SemPreserving R trans }.
 
@@ -194,7 +195,7 @@ End Correctness.
 Arguments obs_eq _ _ {_ _}.
 
 Section Composition.
-  
+
   Context { Src Int Trg : Type }
           { Hs : Lang Src } { Hi : Lang Int } { Hd : Lang Trg }.
 
@@ -203,7 +204,7 @@ Section Composition.
 
   Definition inclusion {A B : Type} (R1 : A -> B -> Prop) (R2 : A -> B -> Prop) : Prop :=
     forall a b, R1 a b -> R2 a b.
-             
+
   Lemma ForwardSim_compose R1 R2 (src : Src) (int : Int) (trg : Trg):
     ForwardSim R1 src int ->
     ForwardSim R2 int trg →
@@ -222,7 +223,7 @@ Section Composition.
            {Ht2 : TransWfPreserving trans2}
     : TransWfPreserving (fun (s : Src) => bind (trans1 s) (fun (i : Int) => trans2 i)).
   Proof.
-    destruct Ht1 as [Hwf1]. destruct Ht2 as [Hwf2]. 
+    destruct Ht1 as [Hwf1]. destruct Ht2 as [Hwf2].
     constructor.
     unfold WfPreserving. intros src Hwfs.
     eapply bind_triple. eapply Hwf1. eassumption.
@@ -230,7 +231,7 @@ Section Composition.
     eapply pre_state_irrelevant. intros Hwfi.
     eauto.
   Qed.
-  
+
   Instance TransSemPreserving_compose
            (trans1 : CertiCoqTrans Src Int) (R1 : obs_eq Src Int)
            {Hwf1 : TransWfPreserving trans1} {Ht1 : TransSemPreserving trans1 R1}
@@ -238,20 +239,20 @@ Section Composition.
            {Ht2 : TransSemPreserving trans2 R2}
     : TransSemPreserving (fun (s : Src) => bind (trans1 s) (fun (i : Int) => trans2 i)) (compose R1 R2).
   Proof.
-    destruct Ht1 as [Hcor1]. destruct Ht2 as [Hcor2]. destruct Hwf1 as [Hwf1]. 
+    destruct Ht1 as [Hcor1]. destruct Ht2 as [Hcor2]. destruct Hwf1 as [Hwf1].
     constructor.
     unfold SemPreserving. intros src Hwfs.
     eapply bind_triple.
     * eapply post_conj. eapply Hwf1. eassumption.
       eapply Hcor1. eassumption.
     * intros int w.
-      simpl. 
+      simpl.
       eapply pre_state_irrelevant. intros [Hwfi Hcori].
-      eapply post_weakening; [| now eapply Hcor2; eauto ].        
+      eapply post_weakening; [| now eapply Hcor2; eauto ].
       simpl. intros r w' trg w'' _ Hf1.
       eapply ForwardSim_compose; eauto.
   Qed.
-  
+
 
   (* Zoe : With [TransSemPreserving_compose] we will get that that pipeline is
      correct w.r.t to the composition of the intermediate relations. Then we
@@ -265,7 +266,7 @@ Section Commutation.
 
   Context (Src Trg : Type) {Hs : Lang Src} {Hd : Lang Trg}
           (op_src : Src -> Src -> Src) (op_trg : Trg -> Trg -> Trg).
-  
+
   (* Translation commutes with a term operator *)
 
   (* Zoe: Only require the readable part of the state to be equal. Intuition:
@@ -276,18 +277,18 @@ Section Commutation.
       TermWf src1 -> TermWf src2 ->
       {{ fun r' w' => r = r' }} trans src1 {{ fun r w trg w' => trg = trg1 }} ->
       {{ fun r' w' => r = r' }} trans src2 {{ fun r w trg w' => trg = trg2 }} ->
-      {{ fun r' w' => r = r' }} trans (op_src src1 src2) {{ fun r w trg w' => trg = op_trg trg1 trg2 }}.   
-  
+      {{ fun r' w' => r = r' }} trans (op_src src1 src2) {{ fun r w trg w' => trg = op_trg trg1 trg2 }}.
+
   (* A relation is compositional wrt linking *)
   Definition Compositional (R : Src -> Prop) :=
     forall src1 src2,
-      R src1 -> R src2 -> R (op_src src1 src2).    
-  
+      R src1 -> R src2 -> R (op_src src1 src2).
+
   (* Level A correctness as per SepCompCert terminology, that is to link
      a program with an other program compiled with exactly the same pipeline *)
   Definition ForwardSimLink (R : obs_eq Src Trg) (src1 src2 : Src) (trg1 trg2 : Trg) :=
     ForwardSim R (op_src src1 src2) (op_trg trg1 trg2).
-  
+
   (* A CertiCoq translation has "Level A correctness"  *)
   Definition SepCompSemPreserving (R : obs_eq Src Trg) (trans : CertiCoqTrans Src Trg) :=
     forall src1 src2,
@@ -295,31 +296,31 @@ Section Commutation.
       (* This can be relaxed, not all components of the state are relevant *)
       {{{ fun s1 s2 => s1 = s2 }}}
         trans src1 | trans src2
-      {{{ fun s1' s2' trg1 trg2 => ForwardSimLink R src1 src2 trg1 trg2 }}}. 
+      {{{ fun s1' s2' trg1 trg2 => ForwardSimLink R src1 src2 trg1 trg2 }}}.
 
 
   (* If a CertiCoqTrans is [Correct] and [Commutative] for the linking operator
      then separate compilation is also correct. *)
   Lemma Commutes_implies_SepCompSemPreserving (Rel : obs_eq Src Trg) (trans : CertiCoqTrans Src Trg)
         {Hwf : TransWfPreserving trans}
-        {Hc : TransSemPreserving trans Rel} : (* If the translation is correct *) 
+        {Hc : TransSemPreserving trans Rel} : (* If the translation is correct *)
     Compositional TermWf -> (* TermWf is compositional *)
     Commutes trans ->
     SepCompSemPreserving Rel trans.
   Proof.
     destruct Hwf as [Hwf]; destruct Hc as [Hsem]. intros Hwf12 Hcom.
-    unfold WfPreserving, SemPreserving, Commutes, SepCompSemPreserving in *. 
+    unfold WfPreserving, SemPreserving, Commutes, SepCompSemPreserving in *.
     intros s1 s2 Hwf1 Hwf2. specialize (Hwf12 _ _ Hwf1 Hwf2).
     assert (Hwf' := Hwf). assert (Hsem' := Hsem).
     specialize (Hsem' (op_src s1 s2) Hwf12).
-    
+
     eapply bitriple_pre_eq_state_l. intros st1 st2 Heq; subst.
-    
+
     specialize (Hwf s1 Hwf1). specialize (Hwf' s2 Hwf2).
     destruct st2 as [r1 w1].
     edestruct (triple_concretize _ _ _ Hwf r1 w1) as [t1 [wf1 [Ht1 Hp1]]]. now intuition.
     edestruct (triple_concretize _ _ _ Hwf' r1 w1) as [t2 [wf2 [Ht2 Hp2]]]. now intuition.
-    
+
 
     (* assert (Hls : {{λ (r' : Options) (w' : CompInfo), r1 = r' }} trans (op_src s1 s2) *)
     (*               {{λ (_ : Options) (_ : CompInfo) (trg : Trg) (_ : CompInfo), trg = op_trg t1 t2}} ). *)
@@ -332,7 +333,7 @@ Section Commutation.
     (* eapply triple_consequence. exact Ht1. *)
     (* simpl. intros. inversion H; subst. split; congruence. *)
     (* simpl. intros ? ? ? ? [? ?] [? [? [? ?]]]; subst. split; reflexivity. *)
-    
+
     (* eapply triple_consequence. exact Ht2. *)
     (* simpl. intros. inversion H; subst. split; congruence. *)
     (* simpl. intros ? ? ? ? [? ?] [? [? [? ?]]]; subst. split; reflexivity. *)
@@ -342,12 +343,12 @@ Section Commutation.
     (* simpl in *. destruct Hp12 as [Hsim Heq]. *)
     (* unfold ForwardSimLink, ForwardSim in *. setoid_rewrite <- Heq. eassumption. *)
   Abort.
-  
+
 End Commutation.
 
 
-Section Linking. 
-  
+Section Linking.
+
   (*  A language with a link operator *)
   Class Linkable (Term : Type) {HL : Lang Term} :=
     { Link : Term -> Term -> Term }.
@@ -355,12 +356,12 @@ Section Linking.
   Context {Src Trg Int : Type} {Hs : Lang Src} {Hd : Lang Trg}
           {Hsl : Linkable Src} {Hdl : Linkable Trg}.
 
- 
+
   (* A Linkable language with level A correctness *)
   Class LinkableCorrectA (trans : CertiCoqTrans Src Trg) (R : obs_eq Src Trg) :=
     { trans_LinkSemPreserving : SepCompSemPreserving Src Trg Link Link R trans }.
 
-  Class LinkableCompositional (trans : CertiCoqTrans Src Trg) := 
+  Class LinkableCompositional (trans : CertiCoqTrans Src Trg) :=
     { WfCompositional : Compositional Src Link TermWf;
       TransCommutes   : Commutes Src Trg Link Link trans }.
 
@@ -377,8 +378,8 @@ Section ComposeLinking.
         we use Compositionality to derive it for each translation)
      2. prove Compositionality for each phase and compose these proofs
         to derive the linking theorem *)
-     
-     
+
+
   Instance LinkableCorrect_compose
            (trans1 : CertiCoqTrans Src Int) (R1 : obs_eq Src Int)
            {Hc1 : TransWfPreserving trans1}
@@ -391,7 +392,7 @@ Section ComposeLinking.
     (* TODO fill in if needed *)
   Abort.
 
-  
+
   Instance Compositional_compose
            (trans1 : CertiCoqTrans Src Int)
            {Hwf1 : TransWfPreserving trans1}
@@ -401,12 +402,12 @@ Section ComposeLinking.
            {Hc2 : LinkableCompositional trans2}
     : LinkableCompositional (fun (s : Src) => bind (trans1 s) (fun (i : Int) => trans2 i)).
   Proof.
-    destruct Hwf1 as [Hwf1]. destruct Hwf2 as [Hwf2].   
-    destruct Hc1 as [Hc1 Htc1]. destruct Hc2 as [Hc2 Htc2]. 
+    destruct Hwf1 as [Hwf1]. destruct Hwf2 as [Hwf2].
+    destruct Hc1 as [Hc1 Htc1]. destruct Hc2 as [Hc2 Htc2].
     constructor.
-    - eassumption. 
+    - eassumption.
     - unfold Commutes in *.
-      intros r w s1 s2 t1 t2 Hw1 Hw2 Ht1 Ht2. 
+      intros r w s1 s2 t1 t2 Hw1 Hw2 Ht1 Ht2.
       assert (Hwf1' := Hwf1). assert (Hwf2' := Hwf2).
 
       (* specialize (Hwf1 s1 Hw1). specialize (Hwf1' s2 Hw2). *)
@@ -420,27 +421,27 @@ Section ComposeLinking.
       (*   eapply post_weakening; [| eassumption ]. now intuition. *)
       (*   eapply post_weakening; [| eassumption ]. now intuition. } *)
 
-      
+
       (* eapply bind_triple. eassumption. *)
-      
+
       (* simpl.  *)
       (* intros x _. eapply pre_eq_state_l. intros r1 w1 Heq; subst. *)
-      
+
       (* specialize (Hwf2 i1 Hp1). specialize (Hwf2' i2 Hp2). *)
       (* edestruct (triple_concretize _ _ _ Hwf2 r w) as [t1' [wft1 [Ht1' Ht1'']]]. now intuition. *)
       (* edestruct (triple_concretize _ _ _ Hwf2' r w) as [t2' [wft2 [Ht2' Ht2'']]]. now intuition. *)
 
-      
+
       (* eapply Htc2; eauto.  *)
       (* specialize (Hwf1 s1 Hw1). specialize (Hwf2 s2 Hw2). *)
-            
+
       (* edestruct (triple_concretize _ _ _ Hwf1 r w) as [i1 [wf1 [Hi1 Hp1]]]. now intuition. *)
       (* edestruct (triple_concretize _ _ _ Hwf2 r w) as [i2 [wf2 [Hi2 Hp2]]]. now intuition. *)
 
       (* edestruct (triple_concretize _ _ _ Hwf' r1 w1) as [t2 [wf2 [Ht2 Hp2]]]. now intuition. *)
 
-      
+
       (* specialize (Htc1 r w s1 s2 t1 t2 Hw1 Hw2). *)
   Abort.
 
-End ComposeLinking. 
+End ComposeLinking.

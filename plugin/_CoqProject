@@ -104,12 +104,16 @@ extraction/fMapPositive.ml
 extraction/fMapPositive.mli
 extraction/fappli_IEEE_extra.ml
 extraction/fappli_IEEE_extra.mli
+extraction/ffi.ml
+extraction/ffi.mli
 extraction/floats.ml
 extraction/floats.mli
 # extraction/globalenvs.ml
 # extraction/globalenvs.mli
 extraction/glue.ml
 extraction/glue.mli
+extraction/glue_utils.ml
+extraction/glue_utils.mli
 extraction/hoisting.ml
 extraction/hoisting.mli
 extraction/identifiers.ml

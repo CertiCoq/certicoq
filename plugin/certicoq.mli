@@ -7,6 +7,7 @@ type command_args =
  | FVARGS of int (* The number of fvs passed as params and the original params shall not exceed this number *)
  | EXT of string (* Filename extension to be appended to the file name *)
  | DEV of int
+ | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
 
 type options =
   { cps       : bool;
@@ -17,6 +18,7 @@ type options =
     fv_args   : int;
     ext       : string;
     dev       : int;
+    prefix    : string;
   }
 
 val default_options : options
@@ -27,3 +29,4 @@ val compile_with_glue : options -> Names.GlobRef.t -> unit
 val compile_only : options -> Names.GlobRef.t -> unit
 val generate_glue_only : options -> Names.GlobRef.t -> unit
 val show_ir : options -> Names.GlobRef.t -> unit
+val ffi_command : options -> Names.GlobRef.t -> unit

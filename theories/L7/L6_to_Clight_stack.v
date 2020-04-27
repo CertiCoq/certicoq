@@ -349,7 +349,7 @@ Notation valPtr := (Tpointer val {| attr_volatile := false; attr_alignas := None
 Notation valPtrPtr := (Tpointer valPtr {| attr_volatile := false; attr_alignas := None |}).
 
 Notation argvTy :=
-  (Tpointer valPtr {| attr_volatile := false; attr_alignas := None |}).
+  (Tpointer val {| attr_volatile := false; attr_alignas := None |}).
 
 Notation boolTy := (Tint IBool Unsigned noattr).
 
@@ -1025,6 +1025,7 @@ Fixpoint translate_funs (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor
     let uses_stack := uses_stack e in
     bodyn <- translate_body args_opt [] (union_list PS.empty localVars) N0 [] gcArrIdent uses_stack nenv e fenv cenv ienv m None 0 ;;
     let (body, slots) := (bodyn : statement * nat) in
+    let argsExpr := Efield tinfd argsIdent (Tarray uval maxArgs noattr) in
     ret ((bodyIdent , Gfun (Internal
                               (mkfunction Tvoid
                                           cc_default
@@ -1035,7 +1036,8 @@ Fixpoint translate_funs (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor
                                            limitIdent ::= Efield tinfd limitIdent valPtr ;
                                            argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
                                            gc_call;
-                                           body))))
+                                           body ;
+                                           Sreturn (Some (Field(argsExpr, Z.of_nat 1)))))))
            :: funs)
   | _ => Err "Translate_funs: Missing toplevel function block"
   end.

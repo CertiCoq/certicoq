@@ -28,6 +28,8 @@ copy:
 clean:
 	rm -f ./gc.c
 	rm -f ./gc.h
+	rm -f ./gc_stack.c
+	rm -f ./gc_stack.h
 	rm -f ./values.h
 	rm -f ./main.c
 	rm -f ./config.h
@@ -36,6 +38,7 @@ clean:
 	rm -f ./glue.*.*.c
 	rm -f ./glue.*.*.h
 	rm -f ./*.vo
+	rm -f ./*.glob
 	rm -f $(EXEC)
 
 lib/Makefile:

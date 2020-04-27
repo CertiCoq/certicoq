@@ -23,6 +23,11 @@ VERNAC ARGUMENT EXTEND cargs
 | [ "-ext" string(s) ] -> { EXT(s) }
 END
 
+VERNAC ARGUMENT EXTEND ffiargs
+| [ "-prefix" string(s) ] -> { PREFIX(s) }
+| [ cargs(c) ] -> { c }
+END
+
 VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
 | [ "CertiCoq" "Compile" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
@@ -33,6 +38,11 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
     let gr = Nametab.global gr in
     let opts = Certicoq.make_options l in
     Certicoq.show_ir opts gr
+  }
+| [ "CertiCoq" "FFI" ffiargs_list(l) global(gr) ] -> {
+    let gr = Nametab.global gr in
+    let opts = Certicoq.make_options l in
+    Certicoq.ffi_command opts gr
   }
 | [ "CertiCoq" "-help" ] -> {
     Feedback.msg_info (str help_msg)

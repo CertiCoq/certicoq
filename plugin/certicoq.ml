@@ -21,6 +21,11 @@ let string_of_chars (chars : char list) : string =
   List.iter (Buffer.add_char buf) chars;
   Buffer.contents buf
 
+let chars_of_string (s : string) : char list =
+  let rec exp i l =
+    if i < 0 then l else exp (i - 1) (s.[i] :: l) in
+  exp (String.length s - 1) []
+
 let rec coq_nat_of_int x =
   match x with
   | 0 -> Datatypes.O
@@ -42,6 +47,7 @@ type command_args =
  | FVARGS of int (* The number of fvs passed as params and the original params shall not exceed this number *)
  | EXT of string (* Filename extension to be appended to the file name *)
  | DEV of int    (* For development purposes *)
+ | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
 
 type options =
   { cps       : bool;
@@ -52,6 +58,7 @@ type options =
     fv_args   : int;
     ext       : string;
     dev       : int;
+    prefix    : string;
   }
 
 let default_options : options =
@@ -63,6 +70,7 @@ let default_options : options =
     fv_args   = 10;
     ext       = "";
     dev       = 0;
+    prefix    = ""
   }
 
 let help_msg : string =
@@ -74,12 +82,13 @@ To show this help message type:\n\
 To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
    CertiCoq Show IR [options] <global_identifier>.\n\n\
 Valid options:\n\
--direct :  Produce direct-style code (as opposed to he default which is continuation-passing style)\n\
--time   :  Time each compilation phase\n\
--o1     :  Perform more aggressive optimizations (currently unboxing of closure environments)\n\
--bebug  :  Show debugging information\n\
--args X :  Specify how many arguments are used in the C translation (on top of the thread_info argument)\n\
--ext S  :  Specify the string s to be appended to the file name\n\
+-direct   :  Produce direct-style code (as opposed to he default which is continuation-passing style)\n\
+-time     :  Time each compilation phase\n\
+-o1       :  Perform more aggressive optimizations (currently unboxing of closure environments)\n\
+-bebug    :  Show debugging information\n\
+-args X   :  Specify how many arguments are used in the C translation (on top of the thread_info argument)\n\
+-ext S    :  Specify the string s to be appended to the file name\n\
+-prefix S :  Specify the string s to be prepended to the FFI functions (to avoid clashes with C functions)\n\
 \n\
 To show this help message type:\n\
 CertiCoq -help.\n"
@@ -97,6 +106,7 @@ let make_options (l : command_args list) : options =
     | FVARGS n :: xs -> aux {o with fv_args = n} xs
     | EXT s    :: xs -> aux {o with ext = s} xs
     | DEV n    :: xs -> aux {o with dev = n} xs
+    | PREFIX s :: xs -> aux {o with prefix = s} xs
   in aux default_options l
 
 let make_pipeline_options (opts : options) =
@@ -107,7 +117,8 @@ let make_pipeline_options (opts : options) =
   let debug  = opts.debug in
   let fv_args = coq_nat_of_int opts.fv_args in
   let dev = coq_nat_of_int opts.dev in
-  Pipeline.make_opts cps args fv_args olevel timing debug dev
+  let prefix = chars_of_string opts.prefix in
+  Pipeline.make_opts cps args fv_args olevel timing debug dev prefix
 
 (** Main Compilation Functions *)
 
@@ -215,3 +226,47 @@ let show_ir opts gr =
     debug_msg debug "Pipeline debug:";
     debug_msg debug (string_of_chars dbg);
     CErrors.user_err ~hdr:"show-ir" (str "Could not compile: " ++ (pr_char_list s) ++ str "\n")
+
+
+(* Quote Coq inductive type *)
+let quote_ind opts gr : TemplateASTQuoter.quoted_program * string =
+  let debug = opts.debug in
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let sigma, c = Evarutil.new_global sigma gr in
+  let name = match gr with
+    | Globnames.IndRef i -> 
+        let (mut, _) = i in
+        Names.KerName.to_string (Names.MutInd.canonical mut)
+    | _ -> CErrors.user_err ~hdr:"template-coq"
+       (Printer.pr_global gr ++ str " is not an inductive type") in
+  debug_msg debug "Quoting";
+  let time = Unix.gettimeofday() in
+  let term = quote_term_rec env (EConstr.to_constr sigma c) in
+  let time = (Unix.gettimeofday() -. time) in
+  debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
+  (term, name)
+
+let ffi_command opts gr =
+  let (term, name) = quote_ind opts gr in
+  let debug = opts.debug in
+  let options = make_pipeline_options opts in
+
+  let time = Unix.gettimeofday() in
+  (match Pipeline.make_ffi options term with
+  | CompM.Ret (((nenv, header), prg), logs) ->
+    let time = (Unix.gettimeofday() -. time) in
+    debug_msg debug (Printf.sprintf "Generated FFI glue code in %f s.." time);
+    (match logs with [] -> () | _ ->
+      debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
+    let time = Unix.gettimeofday() in
+    let suff = opts.ext in
+    let cstr = Quoted.string_to_list ("ffi." ^ name ^ suff ^ ".c") in
+    let hstr = Quoted.string_to_list ("ffi." ^ name ^ suff ^ ".h") in
+    Pipeline.printProg (nenv, prg) cstr;
+    Pipeline.printProg (nenv, header) hstr;
+
+    let time = (Unix.gettimeofday() -. time) in
+    debug_msg debug (Printf.sprintf "Printed FFI glue code to file in %f s.." time)
+  | CompM.Err s ->
+    CErrors.user_err ~hdr:"ffi-glue-code" (str "Could not generate FFI glue code: " ++ pr_char_list s))

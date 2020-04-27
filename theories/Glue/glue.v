@@ -25,34 +25,12 @@ Require Import L6.cps
                L6.identifiers
                L6.cps_show
                L6_to_Clight
-               compM.
+               compM
+               glue_utils.
 
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
 
-Definition main_ident : positive := 1.
-
-Notation "'var' x" := (Etempvar x val) (at level 20).
-
-Notation " p ';;;' q " := (Ssequence p q)
-                          (at level 100, format " p ';;;' '//' q ").
-
-Notation "'*' p " := (Ederef p val) (at level 40).
-
-Notation "'[' t ']' e " := (Ecast e t) (at level 34).
-
-Notation "'Field(' t ',' n ')'" :=
-  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
-
-Definition multiple (xs : list statement) : statement :=
-  fold_right Ssequence Sskip xs.
-
-Definition max_args : Z := 1024.
-
-(* aliases for Clight AST types *)
-Definition def : Type := ident * globdef fundef type.
-Definition defs : Type := list def.
-Definition composite_definitions : Type := list composite_definition.
 
 (* A record that holds L1 information about Coq types. *)
 Record ty_info : Type :=
@@ -138,40 +116,6 @@ Section Helpers.
       ; thread_info_info : thread_info_bundle ident
       ; halt_clo_info : def_info
       }.
-
-  (* Enumerate items starting from 0. *)
-  Definition enumerate_nat {a : Type} (xs : list a) : list (nat * a) :=
-    let fix aux (n : nat) (xs : list a) :=
-          match xs with
-          | nil => nil
-          | x :: xs => (n, x) :: aux (S n) xs
-          end
-    in aux O xs.
-
-  (* Enumerate items starting from 1, because that's the smallest [positive]. *)
-  Definition enumerate_pos {a : Type} (xs : list a) : list (positive * a) :=
-    let fix aux (n : positive) (xs : list a) :=
-          match xs with
-          | nil => nil
-          | x :: xs => (n, x) :: aux (Pos.succ n) xs
-          end
-    in aux 1%positive xs.
-
-  (* Lookup in a 2D dictionary. *)
-  Definition get_2d {A : Type} (k1 k2 : positive) (m : M.t (M.t A)) : option A :=
-    match M.get k1 m with
-    | None => None
-    | Some m2 => M.get k2 m2
-    end.
-
-  (* Insertion in a 2D dictionary. *)
-  Definition set_2d {A : Type}
-             (k1 k2 : positive) (v : A) (m : M.t (M.t A)) : M.t (M.t A) :=
-    let sub_map := match M.get k1 m with
-                   | None => M.empty A
-                   | Some m2 => m2
-                   end
-    in M.set k1 (M.set k2 v sub_map) m.
 
 End Helpers.
 
@@ -449,44 +393,6 @@ Section L1Types.
         max arity (get_max_ctor_arity ctors')
     end.
 
-  Fixpoint split_aux (acc : string) (sep : Ascii.ascii) (s : string) : list string :=
-    match s with
-    | EmptyString => acc :: nil
-    | String c s' =>
-      if Char.ascii_dec sep c
-          then acc :: split_aux EmptyString sep s'
-          else split_aux (acc ++ String c EmptyString) sep s'
-    end.
-
-  Definition split (c : Ascii.ascii) (s : string) : list string :=
-    split_aux EmptyString c s.
-
- Definition qualifying_prefix := string.
- Definition base_name := string.
- Definition sanitized_name := string.
-
- (* takes a fully qualified name and removes the base name,
-    leaving behind the qualifying prefix.
-    e.g. "Coq.Init.Datatypes.bool" becomes "Coq.Init.Datatypes." *)
- Require Import Coq.Strings.Ascii.
-               
- Definition find_qualifying_prefix (n : kername) : qualifying_prefix :=
-   match rev (split "." n) with
-   | nil => (* not possible *) ""%string
-   | base :: rest => String.concat "." (rev (""%string :: rest))
-   end.
-
- (* takes a fully qualified name and gives the base name *)
-  Definition find_base_name (n : kername) : base_name :=
-    match rev (split "." n) with
-    | nil => (* not possible *) ""%string
-    | base :: rest => base
-    end.
-
-  (* Takes in "M1.M2.tau" and returns "M1_M2_tau". *)
-  Definition sanitize_qualified (n : kername) : sanitized_name :=
-    String.concat "_" (split "." n).
-
   (* takes an inductive type declaration and returns
      the qualifying prefix for the name and the type definition *)
   Definition extract_mut_ind
@@ -543,19 +449,11 @@ Section L1Types.
     let fix check_last (e : Ast.term) : bool :=
         match e with
           | Ast.tProd _ _ e' => check_last e'
-          (* | Ast.tSort (utils.NEL.sing (Universes.Level.lProp, _)) => true *)
           | Ast.tSort u =>
-              (String.eqb (Universes.string_of_sort u) ("[Prop]"%string))
-               (* hacky but there's a module issue if you try to do it right *)
+              MetaCoq.Template.Universes.Universe.is_prop u
           | _ => false
         end
-    in let check_elims (l : list Universes.sort_family) : bool :=
-        match l with
-        | _ :: nil => true (* hacky but the only case with 1 elt is Prop *)
-        | _ => false
-        end
-   in orb (check_last (Ast.ind_type (ty_body info)))
-          (check_elims [Ast.ind_kelim (ty_body info)]).
+    in check_last (Ast.ind_type (ty_body info)).
 
   (* Takes in a list of types and removes the ones that are of sort [Prop].
      [Set] and [Type] are fine. CertiCoq erases [Prop]s early on,
@@ -1210,6 +1108,11 @@ Section CConstructors.
     rest <- make_arg_list' n ;;
     ret (rev rest).
 
+
+  Variable toolbox : toolbox_info.
+  Let _thread_info : ident := thread_info_type _ (thread_info_info toolbox).
+  Let _alloc : ident := alloc_info _ (thread_info_info toolbox).
+
   Fixpoint constructors_from_ctors
           (name_ty : kername) (* like bool or nat *)
           (ctors : list ctor_info) (* name, arity, ordinal *)
@@ -1234,6 +1137,11 @@ Section CConstructors.
         rest <- constructors_from_ctors name_ty ctors ;;
         ret (f :: rest)
     | (* Boxed *) {| ctor_name := cname ; ctor_arity := ar ; ctor_ordinal := ord |} :: ctors =>
+        (* We generate two different kind of constructors,
+           one that takes an address to write to,
+           and one that writes to the GC heap. *)
+
+        (* 1st kind of constructor: takes address *)
         constr_fun_id <- gensym (make_name cname) ;;
         argv_ident <- gensym "argv" ;;
         arg_list <- make_arg_list ar ;;
@@ -1253,8 +1161,41 @@ Section CConstructors.
                            ; fn_temps := nil
                            ; fn_body := body
                            |})) in
+
+        (* 2nd kind of constructor: writes to GC heap *)
+        constr_fun_id <- gensym ("alloc_" ++ make_name cname) ;;
+        _tinfo <- gensym "tinfo" ;;
+        (* tinfo->alloc *)
+        let alloc_expr :=
+            (Efield (Ederef (Evar _tinfo (threadInf _thread_info))
+                            (threadStructInf _thread_info))
+                    _alloc (tptr val)) in
+        (* e += n; *)
+        let self_incr (e : expr) (n : Z) :=
+            Sassign e (add e (c_int n val)) in
+        (* tinfo->alloc += n; *)
+        let alloc_incr (n : Z) :=
+            self_incr alloc_expr n in
+
+        let body :=
+            Sassign (Etempvar argv_ident val) ([val] alloc_expr) ;;;
+            asgn_s ;;;
+            alloc_incr (Z.of_nat (S ar)) ;;;
+            Sreturn (Some (add (Evar argv_ident argvTy) (c_int 1%Z val))) in
+
+        let g := (constr_fun_id,
+                  Gfun (Internal
+                          {| fn_return := val
+                           ; fn_callconv := cc_default
+                           ; fn_params := ((_tinfo, threadInf _thread_info) :: nil)
+                                          ++ arg_list
+                           ; fn_vars := ((argv_ident, argvTy) :: nil)
+                           ; fn_temps := nil
+                           ; fn_body := body
+                           |})) in
+
         rest <- constructors_from_ctors name_ty ctors ;;
-        ret (f :: rest)
+        ret (f :: g :: rest)
     end.
 
   Fixpoint constructors_for_tys
@@ -1355,7 +1296,6 @@ Section FunctionCalls.
     _clo <- gensym "clo" ;;
     _f <- gensym "f" ;;
     _env <- gensym "envi" ;;
-    _ret <- gensym "ret" ;;
     _arg <- gensym "arg" ;;
     _tinfo <- gensym "tinfo";;
     let '(_halt_clo, _) := halt_clo_info toolbox in
@@ -1399,39 +1339,24 @@ Section FunctionCalls.
                      Sassign (Field(argsExpr, Z.of_nat 2)) (Etempvar _arg val) :: nil)
                  end) ;;;
       Scall None ([ret_ty] (funVar _f)) (firstn (S c_args) fargs) ;;;
-      _ret ::= Field(argsExpr, Z.of_nat 1) ;;;
-      Sreturn (Some (Etempvar _ret valPtr)) in
+      Sreturn (Some (Field(argsExpr, Z.of_nat 1))) in
 
     let params := (_tinfo, (threadInf _thread_info)) :: (_clo, val) :: (_arg, val) :: nil in
-    let vars := (_f, valPtr) :: (_env, valPtr) :: (_ret, valPtr) :: nil in
+    let vars := (_f, valPtr) :: (_env, valPtr) :: nil in
     _call <- gensym "call" ;;
     ret (_call,
          Gfun (Internal
-                 {| fn_return := Tpointer Tvoid noattr
+                 {| fn_return := val
                   ; fn_callconv := cc_default
                   ; fn_params := (_tinfo, (threadInf _thread_info)) ::
                                  (_clo, val) ::
                                  (_arg, val) :: nil
                   ; fn_vars := nil
-                  ; fn_temps := (_f, valPtr) :: (_env, valPtr) :: (_ret, valPtr) :: nil
+                  ; fn_temps := vars
                   ; fn_body := body
                   |})).
 
 End FunctionCalls.
-
-(* A helper function needed to satisfy a condition about composites *)
-Definition mk_prog_opt
-           (composites : list composite_definition)
-           (ds : defs)
-           (main : ident)
-           (add_comp : bool)
-           : option Clight.program :=
-  let composites := if add_comp then composites else nil in
-  let res := Ctypes.make_program composites ds nil main in
-  match res with
-  | Error e => None
-  | OK p => Some p
-  end.
 
 (* Generates the header and the source programs *)
 Definition make_glue_program
@@ -1440,7 +1365,7 @@ Definition make_glue_program
   '(comp_tinfo, externs, toolbox) <- make_externs ;;
   singles <- (propagate_types >=> filter_prop_types) gs ;;
   name_defs <- make_name_arrays singles ;;
-  ctor_defs <- constructors_for_tys singles ;;
+  ctor_defs <- constructors_for_tys toolbox singles ;;
   structs <- args_structs_from_types singles ;;
   get_tag_defs <- get_enum_tag_from_types toolbox singles ;;
   make_printer_names singles;;

@@ -6,6 +6,7 @@ CertiCoq.Benchmarks.tests.*
 glue.CertiCoq.Benchmarks.tests.*
 Top.*
 glue.Top.*
+ffi.Top.*
 
 gc.c
 gc.h

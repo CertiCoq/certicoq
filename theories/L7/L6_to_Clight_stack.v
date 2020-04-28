@@ -516,13 +516,11 @@ Definition push_live_vars (xs : list positive) : statement * nat :=
      end) xs.
 
 Definition pop_live_vars (xs : list positive) : statement :=
-  (fix aux xs : statement :=
+  (fix aux xs stmt : statement :=
      match xs with
-     | nil => Sskip
-     | x :: xs =>
-       let stmt := aux xs in
-       (pop_var x; stmt)
-     end) xs.
+     | nil => stmt
+     | x :: xs => aux xs (pop_var x ; stmt)
+     end) xs Sskip.
 
 (* Discard the current function frame before a function returns or calls an other function *)
 Definition discard_frame (uses_stack : bool): statement :=

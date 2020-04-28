@@ -11,7 +11,11 @@ Open Scope string.
 Import ListNotations.
 Import VeriStar.
 
-CertiCoq -help.
+
+Definition demo1 := List.app (List.repeat true (500*90)) (List.repeat false (30*30)).
+
+CertiCoq Compile -anf demo1.
+CertiCoq Compile -anf -o1 -ext "_opt" demo1.
 
 Fixpoint loop_add n (f : Datatypes.unit -> nat) : nat :=
   match n with

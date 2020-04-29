@@ -12,9 +12,9 @@ Import ListNotations.
 Import VeriStar.
 
 
-Definition demo1 := List.app (List.repeat true (500*90)) (List.repeat false (30*30)).
+Definition demo1 := plus 0 0.
 
-CertiCoq Compile -anf demo1.
+CertiCoq Compile -ext "_test" demo1.
 CertiCoq Compile -anf -o1 -ext "_opt" demo1.
 
 Fixpoint loop_add n (f : Datatypes.unit -> nat) : nat :=

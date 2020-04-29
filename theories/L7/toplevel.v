@@ -8,6 +8,7 @@ Import MonadNotation.
 (* Identifiers *)
 Definition argsIdent:positive := 26.
 Definition allocIdent:positive := 28.
+Definition nallocIdent:positive := 92.
 Definition limitIdent:positive := 29.
 Definition gcIdent:positive := 80.
 Definition mainIdent:positive := 81.
@@ -58,10 +59,10 @@ Definition Clight_trans_fast (args : nat) (t : toplevel.L6_FullTerm) : error Cpr
 Definition Clight_trans_ANF (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram * string :=
   let '(_, cenv, ctag, itag, nenv, fenv, _, prog) := t in
   L6_to_Clight_stack.compile
-    argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
+    argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
     tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
     args
-    stackframeTIdent frameIdent rootIdent spIdent fpIdent nextFld rootIdent prevFld
+    stackframeTIdent frameIdent rootIdent fpIdent nextFld rootIdent prevFld
     false (* args optimization *)
     prog cenv nenv.
 

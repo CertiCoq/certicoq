@@ -17,8 +17,10 @@ Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
 Definition demo3 := andb. 
   
-CertiCoq Compile -ext "_cps" demo1.
-CertiCoq Compile -anf demo1.
+CertiCoq Compile -args 2 -ext "_cps" demo1.
+CertiCoq Compile -anf -args 2 demo1.
+CertiCoq Show IR -anf demo1.
+CertiCoq Show IR demo1.
 
 CertiCoq Compile -ext "_cps" demo2.
 CertiCoq Compile -anf demo2.

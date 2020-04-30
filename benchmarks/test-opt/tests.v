@@ -11,11 +11,18 @@ Open Scope string.
 Import ListNotations.
 Import VeriStar.
 
+Definition repeat {A} (x : A) (n : nat) : list A :=
+  (fix rep (x : A) (n : nat) acc :=
+     match n with
+     | 0 => acc
+     | S k => rep x k (x :: acc)
+     end) x n [].
 
-Definition demo1 := plus 0 0.
 
-CertiCoq Compile -ext "_test" demo1.
-CertiCoq Compile -anf -o1 -ext "_opt" demo1.
+Definition list_sum := List.fold_left plus (repeat 10 (100)) 0.
+
+CertiCoq Compile -anf list_sum.
+
 
 Fixpoint loop_add n (f : Datatypes.unit -> nat) : nat :=
   match n with
@@ -23,8 +30,6 @@ Fixpoint loop_add n (f : Datatypes.unit -> nat) : nat :=
   | S n => f tt + loop_add n f
   end.
 
-
-(* XXX lambda lifting is lifting the same argument more than once *)
 (* Problem: if function is not closed it will end up in the closure of the wrapper.
    This should not happen because its environment is a sub-environment of
    its own environment. But that means that it should be created on the spot.
@@ -96,13 +101,6 @@ CertiCoq Compile -o1 -ext "_cps_opt" rec_clos.
 CertiCoq Compile -anf rec_clos.
 CertiCoq Compile -anf -o1 -ext "_opt" rec_clos.
 
-Definition repeat {A} (x : A) (n : nat) : list A :=
-  (fix rep (x : A) (n : nat) acc :=
-     match n with
-     | 0 => acc
-     | S k => rep x k (x :: acc)
-     end) x n [].
-
 
 Definition intxy (x y w : nat) (l : list nat):= 
   let f := (fix aux l acc :=
@@ -120,7 +118,7 @@ Definition intxy' (x y w : nat) (l : list nat) :=
      end) in
   f l.
 
-Definition rec_clos2 := intxy 1 2 3 (repeat 0 (100*500)).
+Definition rec_clos2 := intxy 1 2 3 (repeat 3 (100*500)).
 
 CertiCoq Compile -ext "_cps" rec_clos2.
 CertiCoq Compile -o1 -ext "_cps_opt" rec_clos2.

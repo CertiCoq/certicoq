@@ -640,8 +640,9 @@ Definition set_nalloc (num : expr) : statement :=
   Efield tinfd nallocIdent val :::= num. 
 
 (** * GC call *)
-Definition make_GC_call (num_allocs : nat) (stack_vars : list positive) (stack_offset : N) (after_call : bool) : statement * N :=
-  let (push, slots) := push_live_vars_offset stack_offset stack_vars in
+Definition make_GC_call (num_allocs : nat) (stack_vars : list positive) (stack_offset : N) : statement * N :=
+let after_call := negb (stack_offset =? 0)%N in
+let (push, slots) := push_live_vars_offset stack_offset stack_vars in
   let make_gc_stack := push ; update_stack slots ; set_stack slots after_call in
   let discard_stack := pop_live_vars_offset stack_offset stack_vars; reset_stack slots after_call in
   let nallocs := c_int (Z.of_nat num_allocs) val in 
@@ -777,7 +778,7 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
       c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] f_var) pnum vs) ;;
       let alloc := max_allocs e' in
       (* Call GC after the call if needed *)
-      let (gc_call, slots_gc) := make_GC_call alloc fv_gc slots_call true in
+      let (gc_call, slots_gc) := make_GC_call alloc fv_gc slots_call in
       progn <- translate_body e' fenv cenv ienv map (N.max slots slots_gc);;
       Ret ((asgn ; Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
            make_stack;
@@ -849,7 +850,7 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ie
       let loc_vars := get_locals e in
       let loc_ids := union_list (union_list PS.empty vs) loc_vars  in
       let live_vars := PS.elements (PS.inter (exp_fv e) loc_ids) in 
-      let (gc, _) := make_GC_call num_allocs live_vars 0%N false in
+      let (gc, _) := make_GC_call num_allocs live_vars 0%N in
       '(body, stack_slots) <- translate_body vs loc_ids locs nenv e fenv cenv ienv map 0 ;;
       let stack_slots := N.max (N.of_nat (length live_vars)) stack_slots in
       Ret ((f , Gfun (Internal
@@ -912,7 +913,7 @@ Fixpoint translate_program (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: c
     let localVars := get_locals e in
     funs <- translate_fundefs args_opt fnd fenv cenv ienv fmap nenv ;;
     let allocs := max_allocs e in
-    let (gc_call, _) := make_GC_call allocs nil (* no live roots to push *) 0%N false in
+    let (gc_call, _) := make_GC_call allocs nil (* no live roots to push *) 0%N in
     '(body, slots) <- translate_body args_opt [] (union_list PS.empty localVars) [] nenv e fenv cenv ienv fmap 0 ;;
     let argsExpr := Efield tinfd argsIdent (Tarray uval maxArgs noattr) in
     ret ((bodyIdent , Gfun (Internal

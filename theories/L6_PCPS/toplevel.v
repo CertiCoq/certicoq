@@ -101,6 +101,12 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
   | Fnil => names
   end.
 
+  Definition log_prog (e : exp) (c_data : comp_data) : comp_data :=
+  match c_data with
+  | mkCompData nv nc ni nf cenv fenv nenv log =>
+    let msg := cps_show.show_exp nenv cenv false e in
+    mkCompData nv nc ni nf cenv fenv nenv ("term" :: msg :: log)      
+  end.
 
 (* Optimizing L6 pipeline *)
 Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_FullTerm) : error L6_FullTerm * string :=
@@ -112,11 +118,15 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_Fu
       pack_data next_var ctag itag next_fun_tag cenv fenv nenv nil
   in
   let res : error (exp * comp_data):=
+      let c_data := log_prog e0 c_data in
+      let e0 := shrink_cps.shrink_top e0 in
+      let c_data := log_prog e0 c_data in
       (* uncurring *)
-      let '(e_err1, s, c_data) := if cps then uncurry_fuel_cps 100 (shrink_cps.shrink_top e0) c_data 
-                                 else uncurry_fuel_anf 100 (shrink_cps.shrink_top e0) c_data in
+      let '(e_err1, s, c_data) := if cps then uncurry_fuel_cps 100 e0 c_data 
+                                 else uncurry_fuel_anf 100 e0 c_data in
       (* inlining *)
       e1 <- e_err1 ;;
+      let c_data := log_prog e1 c_data in
       let (e_err2, c_data) := if cps then inline_uncurry e1 s 10 10 c_data
                              else inline_uncurry_marked_anf e1 s 10 10 c_data in
       e2 <- e_err2 ;;

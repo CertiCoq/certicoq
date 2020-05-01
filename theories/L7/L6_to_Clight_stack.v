@@ -641,12 +641,12 @@ Definition set_nalloc (num : expr) : statement :=
 
 (** * GC call *)
 Definition make_GC_call (num_allocs : nat) (stack_vars : list positive) (stack_offset : N) : statement * N :=
-let after_call := negb (stack_offset =? 0)%N in
-let (push, slots) := push_live_vars_offset stack_offset stack_vars in
+  let after_call := negb (stack_offset =? 0)%N in
+  let (push, slots) := push_live_vars_offset stack_offset stack_vars in
   let make_gc_stack := push ; update_stack slots ; set_stack slots after_call in
   let discard_stack := pop_live_vars_offset stack_offset stack_vars; reset_stack slots after_call in
   let nallocs := c_int (Z.of_nat num_allocs) val in 
-  if (num_allocs =? 0)%nat then (Sskip, 0%N) else 
+  if (num_allocs =? 0)%nat then (Sskip, stack_offset) else 
     ((Sifthenelse
         (!(Ebinop Ole nallocs (limitPtr -' allocPtr) type_bool))
         (make_gc_stack;

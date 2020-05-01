@@ -11,6 +11,29 @@ Open Scope string.
 Import ListNotations.
 Import VeriStar.
 
+
+Fixpoint even (n : nat) : bool :=
+  match n with
+  | O => true
+  | S n' => odd n'
+  end
+with
+odd (n : nat) : bool :=
+  let del (x : nat) := x in 
+  match n with
+  | 0 => false
+  | S n' => even n'
+  end.
+
+
+Definition filter_odd := List.app (filter even (seq 0 2)) (filter odd (seq 0 2)).
+
+CertiCoq Show IR -anf -debug filter_odd. 
+CertiCoq Compile -ext "_cps" filter_odd.
+CertiCoq Compile -o1 -ext "_cps_opt" filter_odd.
+CertiCoq Compile -anf filter_odd.
+CertiCoq Compile -anf -o1 -ext "_opt" filter_odd.
+
 Definition repeat {A} (x : A) (n : nat) : list A :=
   (fix rep (x : A) (n : nat) acc :=
      match n with
@@ -21,8 +44,10 @@ Definition repeat {A} (x : A) (n : nat) : list A :=
 
 Definition list_sum := List.fold_left plus (repeat 10 (100)) 0.
 
+CertiCoq Compile -ext "_cps" list_sum.
+CertiCoq Compile -o1 -ext "_cps_opt" list_sum.
 CertiCoq Compile -anf list_sum.
-
+CertiCoq Compile -anf -o1 -ext "_opt" list_sum.
 
 Fixpoint loop_add n (f : Datatypes.unit -> nat) : nat :=
   match n with
@@ -68,23 +93,6 @@ CertiCoq Compile -anf -o1 -ext "_opt" clos.
 (* CertiCoq Show IR -anf -debug clos. *)
 (* CertiCoq Show IR -anf -debug -o1 -ext "_opt" clos. *)
 
-Fixpoint even (n : nat) : bool :=
-  match n with
-  | O => true
-  | S n' => odd n'
-  end
-with
-odd (n : nat) : bool :=
-  let del (x : nat) := x in 
-  match n with
-  | 0 => false
-  | S n' => even n'
-  end
-with del (n : nat) : bool := false.
-
-Definition delt := andb true (even 10).
-
-CertiCoq Show IR  -debug delt.
 
 Definition addxy (x y w : nat) (l : list nat) := 
   let f := (fix aux l :=
@@ -118,7 +126,7 @@ Definition intxy' (x y w : nat) (l : list nat) :=
      end) in
   f l.
 
-Definition rec_clos2 := intxy 1 2 3 (repeat 3 (100*500)).
+Definition rec_clos2 := intxy 1 2 3 (repeat 0 (100*500)).
 
 CertiCoq Compile -ext "_cps" rec_clos2.
 CertiCoq Compile -o1 -ext "_cps_opt" rec_clos2.

@@ -47,8 +47,12 @@ Definition vs_hard :=
   | _ => false
   end.
 
+CertiCoq Show IR -anf -o1 vs_easy.
+CertiCoq Compile -anf -o1  vs_easy.
+
+Print nat.
+
 CertiCoq Compile -ext "_cps" -time vs_easy.
-CertiCoq Compile -anf  vs_easy.
 
 (* Zoe: Compiling with the CPS pipeline takes much longer for vs_easy.
    The overhead seems to come from the C translation: (maybe has to do with dbg/error messages?)

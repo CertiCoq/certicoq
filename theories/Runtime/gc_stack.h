@@ -101,7 +101,7 @@ struct heap;     /* abstract, opaque */
 /* A frame of the shadow stack used to keep track of the live roots */
 struct stack_frame {
   value *next;
-  value *roots; /* the array of roots of the function. Allocated in the stack of the function */
+  value *root; /* the array of roots of the function. Allocated in the stack of the function */
   struct stack_frame *prev; /* pointer to the previous stack frame */
 };
 
@@ -112,11 +112,12 @@ struct thread_info {
   struct heap *heap;  /* Description of the generations in the heap */
   value args[MAX_ARGS];   /* the args array */
   struct stack_frame *fp; /* stack pointer */
+  uintnat nalloc; /* Remaining allocation until next GC call*/
 };
 
 struct thread_info *make_tinfo(void);
 
-void garbage_collect(fun_info fi, struct thread_info *ti);
+void garbage_collect(struct thread_info *ti);
 /* Performs one garbage collection; 
    or if ti->heap==NULL, initializes the heap. 
 

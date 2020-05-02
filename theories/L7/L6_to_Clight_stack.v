@@ -653,7 +653,7 @@ Definition make_GC_call (num_allocs : nat) (stack_vars : list positive) (stack_o
          set_nalloc nallocs;
          Scall None gc (tinf :: nil) ;
          discard_stack;
-         allocIdent ::= Efield tinfd allocIdent valPtr)
+         allocIdent ::= Efield tinfd allocIdent valPtr; limitIdent ::= Efield tinfd limitIdent valPtr)
         Sskip), slots).
 
 Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_statements) :=
@@ -845,11 +845,11 @@ Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ie
     | Some inf =>
       let '(l, locs) := inf in
       asgn <- asgnFunVars vs locs ;; (* project remaining params out of args array *)
-      let asgn := Sskip in
       let num_allocs := max_allocs e in
       let loc_vars := get_locals e in
-      let loc_ids := union_list (union_list PS.empty vs) loc_vars  in
-      let live_vars := PS.elements (PS.inter (exp_fv e) loc_ids) in 
+      let var_set := union_list PS.empty vs in
+      let loc_ids := union_list var_set loc_vars  in
+      let live_vars := PS.elements (PS.inter (exp_fv e) var_set) in 
       let (gc, _) := make_GC_call num_allocs live_vars 0%N in
       '(body, stack_slots) <- translate_body vs loc_ids locs nenv e fenv cenv ienv map 0 ;;
       let stack_slots := N.max (N.of_nat (length live_vars)) stack_slots in

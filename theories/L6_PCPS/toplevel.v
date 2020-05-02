@@ -118,9 +118,9 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_Fu
       pack_data next_var ctag itag next_fun_tag cenv fenv nenv nil
   in
   let res : error (exp * comp_data):=
-      let c_data := log_prog e0 c_data in
+      (* let c_data := log_prog e0 c_data in *)
       let e0 := shrink_cps.shrink_top e0 in
-      let c_data := log_prog e0 c_data in
+      (* let c_data := log_prog e0 c_data in *)
       (* uncurring *)
       let '(e_err1, s, c_data) := if cps then uncurry_fuel_cps 100 e0 c_data 
                                  else uncurry_fuel_anf 100 e0 c_data in

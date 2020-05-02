@@ -84,22 +84,23 @@ void printtree(FILE *f, struct heap *h, value v) {
   else fprintf(f,"%d",v>>1);
 }
 
-void printroots (FILE *f, struct heap *h,
-		  fun_info fi,   /* which args contain live roots? */
-		  struct thread_info *ti) /* where's the args array? */
- {
-   value *args; int n; uintnat i, *roots;
-   roots = fi+2;
-   n = fi[1];
-   args = ti->args;
+// XXX todo update for roots arrays
+/* void printroots (FILE *f, struct heap *h, */
+/* 		  fun_info fi,   /\* which args contain live roots? *\/ */
+/* 		  struct thread_info *ti) /\* where's the args array? *\/ */
+/*  { */
+/*    value *args; int n; uintnat i, *roots; */
+/*    roots = fi+2; */
+/*    n = fi[1]; */
+/*    args = ti->args; */
 
-  for(i = 0; i < n; i++) {
-    fprintf(f,"%d[%8x]:",roots[i],args[roots[i]]);
-    printtree(f, h, args[roots[i]]);
-    fprintf(f,"\n");
-  }
-  fprintf(f,"\n");
-}
+/*   for(i = 0; i < n; i++) { */
+/*     fprintf(f,"%d[%8x]:",roots[i],args[roots[i]]); */
+/*     printtree(f, h, args[roots[i]]); */
+/*     fprintf(f,"\n"); */
+/*   } */
+/*   fprintf(f,"\n"); */
+/* } */
 
 #endif
 
@@ -166,44 +167,35 @@ void forward (value *from_start,  /* beginning of from-space */
 
 void forward_roots (value *from_start,  /* beginning of from-space */
                     value *from_limit,  /* end of from-space */
-		    value **next,       /* next available spot in to-space */
-		    fun_info fi,        /* which args contain live roots? */
-		    struct thread_info *ti) /* where's the args array? */
-/* Forward each live root in the args array and the stack */
+                    value **next,       /* next available spot in to-space */
+                    struct thread_info *ti) /* where's the args array? */
+/* Forward each live root in the stack */
  {
-   value *args; int n; uintnat i;
-   const uintnat *roots = fi+2;
    struct stack_frame *frame = ti->fp;
-
-   n = fi[1];
-   args = ti->args;
-   /* First forward the arg array */
-   for(i = 0; i < n; i++) {
-     assert (roots[i] < MAX_ARGS);
-     forward(from_start, from_limit, next, args+roots[i], DEPTH);
-   };
-   /* Then scan the stack by traversing the stack pointers */
-   value **live, **curr, **limit, val;
+   value *live, *curr, *limit, val;
    header_t hd; int sz;
-   /* printf("Scaning frame \n"); */
+   /* Scan the stack by traversing the stack pointers */
+
+   /* printf("Scanning frames \n"); */
    while (frame != NULL) {
-     live = frame->roots;
+     live = frame->root;
      curr = live;
      limit = frame->next;
-     /* printf("Scanning frame \n"); */
+     /* printf("Scanning frame, curr: %lld, limit: %lld\n", curr, limit); */
      /* int cnt = 0; */
      while (curr < limit) {
        /* printf("%d \n", cnt); */
        /* cnt ++; */
        /* printf("Before \n"); */
        /* Curr has the stack address of the local */
-       val = **curr;
+       /* printf("curr: %lld\n", curr); */
+       val = *curr;
        if Is_block(val) {
            hd = Hd_val(val);
            sz = Wosize_hd(hd);
            /* printf("Moving root %lld with tag %ldd and %d fields\n", val, hd, sz); */
        }
-       forward(from_start, from_limit, next, Field(curr,0), DEPTH);
+       forward(from_start, from_limit, next, curr, DEPTH);
        /* printf("After \n"); */
        curr ++;
      }
@@ -225,6 +217,7 @@ void do_scan(value *from_start,  /* beginning of from-space */
 {
   value *s;
   s = scan;
+  /* printf("in scan \n"); */
   while(s < *next) {
     header_t hd = *s;
     mlsize_t sz = Wosize_hd(hd);
@@ -232,7 +225,6 @@ void do_scan(value *from_start,  /* beginning of from-space */
     if (!No_scan(tag)) {
       intnat j;
       for(j = 1; j <= sz; j++) {
-        /* printf("before \n"); */
         forward (from_start, from_limit, next, &Field(s, j), DEPTH);
         /* printf("after \n"); */
       }
@@ -242,15 +234,14 @@ void do_scan(value *from_start,  /* beginning of from-space */
 }
 
 void do_generation (struct space *from,  /* descriptor of from-space */
-		    struct space *to,    /* descriptor of to-space */
-		    fun_info fi,         /* which args contain live roots? */
-		    struct thread_info *ti)  /* where's the args array? */
+                    struct space *to,    /* descriptor of to-space */
+                    struct thread_info *ti)  /* where's the args array? */
 /* Copy the live objects out of the "from" space, into the "to" space,
    using fi and ti to determine the roots of liveness. */
 {
   value *p = to->next;
   assert(from->next-from->start <= to->limit-to->next);
-  forward_roots(from->start, from->limit, &to->next, fi, ti);
+  forward_roots(from->start, from->limit, &to->next, ti);
   do_scan(from->start, from->limit, p, &to->next);
   if(0)  fprintf(stderr,"%5.3f%% occupancy\n",
 	  (to->next-p)/(double)(from->next-from->start));
@@ -332,7 +323,7 @@ struct thread_info *make_tinfo(void) {
   return tinfo;
 }
 
-void resume(fun_info fi, struct thread_info *ti)
+void resume(struct thread_info *ti)
 /* When the garbage collector is all done, it does not "return"
    to the mutator; instead, it uses this function (which does not return)
    to resume the mutator by invoking the continuation, fi->fun.
@@ -342,7 +333,7 @@ void resume(fun_info fi, struct thread_info *ti)
  {
   struct heap *h = ti->heap;
   value *lo, *hi;
-  uintnat num_allocs = fi[0];
+  uintnat num_allocs = ti->nalloc;
   assert (h);
   lo = h->spaces[0].start;
   hi = h->spaces[0].limit;
@@ -353,19 +344,19 @@ void resume(fun_info fi, struct thread_info *ti)
   /* printf ("end gc\n"); */
 }
 
-void garbage_collect(fun_info fi, struct thread_info *ti)
+void garbage_collect(struct thread_info *ti)
 /* See the header file for the interface-spec of this function. */
 {
   struct heap *h = ti->heap;
+  /* printf("In GC\n"); */
   if (h==NULL) {
     /* If the heap has not yet been initialized, create it and resume */
     h = create_heap();
     ti->heap = h;
-    resume(fi,ti);
+    resume(ti);
     return;
   } else {
     int i;
-    /* printf("In GC\n"); */
     assert (h->spaces[0].limit == ti->limit);
     h->spaces[0].next = ti->alloc; /* this line is probably unnecessary */
     for (i=0; i<MAX_SPACES-1; i++) {
@@ -381,12 +372,12 @@ void garbage_collect(fun_info fi, struct thread_info *ti)
       }
       /* Copy all the objects in generation i, into generation i+1 */
       if(0) fprintf(stderr, "Generation %d:  ", i);
-      do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
+      do_generation(h->spaces+i, h->spaces+(i+1), ti);
       /* If there's enough space in gen i+1 to guarantee that the
          NEXT collection into i+1 will succeed, we can stop here */
       if (h->spaces[i].limit - h->spaces[i].start
           <= h->spaces[i+1].limit - h->spaces[i+1].next) {
-        resume(fi,ti);
+        resume(ti);
         return;
       }
     }
@@ -425,7 +416,7 @@ void free_heap (struct heap *h) {
   free (h);
 }
 
-int garbage_collect_all(fun_info fi, struct thread_info *ti) {
+int garbage_collect_all(struct thread_info *ti) {
   struct heap *h = ti->heap;
   if (h==NULL) {
     h = create_heap();
@@ -436,7 +427,7 @@ int garbage_collect_all(fun_info fi, struct thread_info *ti) {
   assert (h->spaces[0].limit == ti->limit);
   for (i=0; i < MAX_SPACES - 1 && h->spaces[i+1].start != NULL; i++) {
 
-    do_generation(h->spaces+i, h->spaces+(i+1), fi, ti);
+    do_generation(h->spaces+i, h->spaces+(i+1), ti);
   }
 
   /* If i is the nursery, its next won't be tracked, so need to be set to alloc */
@@ -445,10 +436,6 @@ int garbage_collect_all(fun_info fi, struct thread_info *ti) {
   }
   return i;
 }
-
-uintnat const fake_fi[3] = {0, 1, 1};
-
-
 
 /* export (deep copy if boxed) the first field of args */
 void* export(struct thread_info *ti) {
@@ -459,16 +446,16 @@ void* export(struct thread_info *ti) {
   }
 
   /* otherwise collect all that is reachable from it to the last generation, then compact it into value_sp */
-  int gen_level = garbage_collect_all(fake_fi, ti);
+  int gen_level = garbage_collect_all(ti);
   struct space* sp = ti->heap->spaces+gen_level;
   struct space* fake_sp = (struct space*)malloc(sizeof(struct space));
 
   create_space(fake_sp, sp->next - sp->start);
-  do_generation(sp, fake_sp, fake_fi, ti);
+  do_generation(sp, fake_sp, ti);
 
   struct space* value_sp = (struct space*)malloc(sizeof(struct space));
   create_space(value_sp, fake_sp->next - fake_sp->start);
-  do_generation(fake_sp, value_sp, fake_fi, ti);
+  do_generation(fake_sp, value_sp, ti);
 
   /* offset start by the header */
   void* result_block = (void *)(value_sp->start +1);

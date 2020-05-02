@@ -25,7 +25,6 @@ CertiCoq Show IR demo1.
 CertiCoq Compile -ext "_cps" demo2.
 CertiCoq Compile -anf demo2.
 
-(* Also works for CPS, when choosing another number of arguments, e.g. -args 1 *)
 CertiCoq Compile -ext "_cps" demo3.
 CertiCoq Compile -anf demo3.
 
@@ -47,11 +46,7 @@ Definition vs_hard :=
   | _ => false
   end.
 
-CertiCoq Show IR -anf -o1 vs_easy.
-CertiCoq Compile -anf -o1  vs_easy.
-
-Print nat.
-
+CertiCoq Compile -anf vs_easy.
 CertiCoq Compile -ext "_cps" -time vs_easy.
 
 (* Zoe: Compiling with the CPS pipeline takes much longer for vs_easy.

@@ -398,6 +398,118 @@ Section EVAL.
         M.get x rho = Some v ->
         bstep_cost rho (Ehalt x) v 1.
 
+  (** Big step semantics with cost counting as fuel. Can raise out-of-time exception. 
+      Needed to prove divergence preservation *)
+
+  Inductive res : Type := 
+  | OOT 
+  | Res : val -> res. 
+
+  Definition cost (e : exp) : nat := 
+  match e with 
+  | Econstr x t ys e => 1 + length ys
+  | Eproj x t n y e => 1
+  | Ecase y cl => 1
+  | Eapp f t ys => 1 + length ys
+  | Eletapp x f t ys e => 1 + length ys 
+  | Efun B e => 1 + PS.cardinal (fundefs_fv B)
+  | Eprim x f ys e => 1 + length ys
+  | Ehalt x => 1
+  end.
+
+  Inductive bstep :  env -> exp -> res -> nat -> Prop :=
+  | BStept_constr :
+    forall (x : var) (t : ctor_tag) (ys :list var) (e : exp) 
+      (rho rho' : env) (vs : list val) (v : res) (c : nat),
+        get_list ys rho = Some vs ->
+        M.set x (Vconstr t vs) rho = rho' ->
+        bstep_fuel rho' e v c ->
+        bstep rho (Econstr x t ys e) v c
+  | BStept_proj :
+      forall (t : ctor_tag) (vs : list val) 
+        (rho : env) (x : var) (n : N) (y : var)
+        (e : exp) (v : val) (v' : res) (c : nat),
+          M.get y rho = Some (Vconstr t vs) ->
+          nthN vs n = Some v -> 
+          bstep_fuel (M.set x v rho) e v' c ->
+          bstep rho (Eproj x t n y e) v' c
+  | BStept_case :
+      forall (y : var) (v : res) (e : exp) (t : ctor_tag) (cl : list (ctor_tag * exp))
+        (vl : list val) (rho : env) (n c : nat),
+        M.get y rho = Some (Vconstr t vl) ->
+        caseConsistent cenv cl t ->
+        find_tag_nth cl t e n ->
+        bstep_fuel rho e v c ->
+        bstep rho (Ecase y cl) v c
+  | BStept_app :
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val) 
+        (xs : list var) (e : exp) (rho'' rho : env) (f : var)
+        (t : ctor_tag) (ys : list var) (v : res) (c : nat),
+        M.get f rho = Some (Vfun rho' fl f') ->
+        get_list ys rho = Some vs ->
+        (* The number of instructions generated here should be
+         * independent of the size of B. We just need to
+         * jump to a label *)
+        find_def f' fl = Some (t,xs,e) ->
+        set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+        bstep_fuel rho'' e v c ->
+        bstep rho (Eapp f t ys) v c
+  | BStept_letapp :
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
+        (xs : list var) (e_body e : exp) (rho'' rho : env) (x f : var)
+        (t : ctor_tag) (ys : list var) (v : val) (v' : res) (c c' : nat),
+        (* evaluate application *)
+          M.get f rho = Some (Vfun rho' fl f') ->
+          get_list ys rho = Some vs ->
+          find_def f' fl = Some (t,xs,e_body) ->
+          set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+          bstep_fuel rho'' e_body (Res v) c' -> (* body evaluates to v *)
+          (* evaluate let continuation *)
+          bstep_fuel (M.set x v rho) e v' (c - c) ->
+          bstep rho (Eletapp x f t ys e) v' c 
+  | BStept_letapp_oot :
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
+        (xs : list var) (e_body e : exp) (rho'' rho : env) (x f : var)
+        (t : ctor_tag) (ys : list var) (c : nat),
+        (* evaluate application *)
+          M.get f rho = Some (Vfun rho' fl f') ->
+          get_list ys rho = Some vs ->
+          find_def f' fl = Some (t,xs,e_body) ->
+          set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
+          bstep_fuel rho'' e_body OOT c -> (* body times out*)
+          bstep rho (Eletapp x f t ys e) OOT c  
+  | BStept_fun :
+      forall (rho : env) (B : fundefs) (e : exp) (v : res) (c : nat),
+        bstep_fuel (def_funs B B rho rho) e v c ->
+        (* The definition of a function incur cost proportional to the number of FVs
+        (to make the bound of the current cc independent of the term) *)
+        bstep rho (Efun B e) v c
+  | BStept_prim :
+      forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
+        (f' : list val -> option val) (ys : list var) (e : exp)
+        (v : val) (v' : res) (c : nat),
+          get_list ys rho = Some vs ->
+          M.get f pr = Some f' ->
+          f' vs = Some v ->
+          M.set x v rho = rho' ->
+          bstep_fuel rho' e v' c ->
+          bstep rho (Eprim x f ys e) v' c
+  | BStept_halt :
+      forall x v rho c,
+        M.get x rho = Some v ->
+        bstep rho (Ehalt x) (Res v) c
+  with bstep_fuel :  env -> exp -> res -> nat -> Prop :=       
+  | BStepf_OOT : (* not enought time units to take astep *)
+    forall rho e c, 
+      (c < cost e)%nat ->
+      bstep_fuel rho e OOT c
+  | BStepf_run : (* take a step *)
+    forall rho e r c, 
+      (c >= cost e)%nat ->
+      bstep rho e r (c - cost e) ->
+      bstep_fuel rho e r c.
+  
+    
   (** * Interpretation of (certain) evaluation contexts as environments *)
 
   (* TODO move to more appropriate file *)

@@ -420,31 +420,31 @@ Section EVAL.
   Inductive bstep :  env -> exp -> res -> nat -> Prop :=
   | BStept_constr :
     forall (x : var) (t : ctor_tag) (ys :list var) (e : exp) 
-      (rho rho' : env) (vs : list val) (v : res) (c : nat),
+      (rho rho' : env) (vs : list val) (v : res) (cin : nat),
         get_list ys rho = Some vs ->
         M.set x (Vconstr t vs) rho = rho' ->
-        bstep_fuel rho' e v c ->
-        bstep rho (Econstr x t ys e) v c
+        bstep_fuel rho' e v cin ->
+        bstep rho (Econstr x t ys e) v cin
   | BStept_proj :
       forall (t : ctor_tag) (vs : list val) 
         (rho : env) (x : var) (n : N) (y : var)
-        (e : exp) (v : val) (v' : res) (c : nat),
+        (e : exp) (v : val) (v' : res) (cin : nat),
           M.get y rho = Some (Vconstr t vs) ->
           nthN vs n = Some v -> 
-          bstep_fuel (M.set x v rho) e v' c ->
-          bstep rho (Eproj x t n y e) v' c
+          bstep_fuel (M.set x v rho) e v' cin ->
+          bstep rho (Eproj x t n y e) v' cin
   | BStept_case :
       forall (y : var) (v : res) (e : exp) (t : ctor_tag) (cl : list (ctor_tag * exp))
-        (vl : list val) (rho : env) (n c : nat),
+        (vl : list val) (rho : env) (n cin : nat),
         M.get y rho = Some (Vconstr t vl) ->
         caseConsistent cenv cl t ->
         find_tag_nth cl t e n ->
-        bstep_fuel rho e v c ->
-        bstep rho (Ecase y cl) v c
+        bstep_fuel rho e v cin ->
+        bstep rho (Ecase y cl) v cin
   | BStept_app :
       forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val) 
         (xs : list var) (e : exp) (rho'' rho : env) (f : var)
-        (t : ctor_tag) (ys : list var) (v : res) (c : nat),
+        (t : ctor_tag) (ys : list var) (v : res) (cin : nat),
         M.get f rho = Some (Vfun rho' fl f') ->
         get_list ys rho = Some vs ->
         (* The number of instructions generated here should be
@@ -452,64 +452,64 @@ Section EVAL.
          * jump to a label *)
         find_def f' fl = Some (t,xs,e) ->
         set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
-        bstep_fuel rho'' e v c ->
-        bstep rho (Eapp f t ys) v c
+        bstep_fuel rho'' e v cin ->
+        bstep rho (Eapp f t ys) v cin
   | BStept_letapp :
       forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
         (xs : list var) (e_body e : exp) (rho'' rho : env) (x f : var)
-        (t : ctor_tag) (ys : list var) (v : val) (v' : res) (c c' : nat),
-        (* evaluate application *)
+        (t : ctor_tag) (ys : list var) (v : val) (v' : res) (cin1 cin2 : nat),
+         (* evaluate application *)
           M.get f rho = Some (Vfun rho' fl f') ->
           get_list ys rho = Some vs ->
           find_def f' fl = Some (t,xs,e_body) ->
           set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
-          bstep_fuel rho'' e_body (Res v) c' -> (* body evaluates to v *)
+          bstep_fuel rho'' e_body (Res v) cin1 -> (* body evaluates to v *)
           (* evaluate let continuation *)
-          bstep_fuel (M.set x v rho) e v' (c - c) ->
-          bstep rho (Eletapp x f t ys e) v' c 
+          bstep_fuel (M.set x v rho) e v' cin2 ->
+          bstep rho (Eletapp x f t ys e) v' (cin1 + cin2)
   | BStept_letapp_oot :
       forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
         (xs : list var) (e_body e : exp) (rho'' rho : env) (x f : var)
-        (t : ctor_tag) (ys : list var) (c : nat),
-        (* evaluate application *)
+        (t : ctor_tag) (ys : list var) (cin : nat),
           M.get f rho = Some (Vfun rho' fl f') ->
           get_list ys rho = Some vs ->
           find_def f' fl = Some (t,xs,e_body) ->
           set_lists xs vs (def_funs fl fl rho' rho') = Some rho'' ->
-          bstep_fuel rho'' e_body OOT c -> (* body times out*)
-          bstep rho (Eletapp x f t ys e) OOT c  
+          bstep_fuel rho'' e_body OOT cin -> (* body times out*)
+          bstep rho (Eletapp x f t ys e) OOT cin
   | BStept_fun :
-      forall (rho : env) (B : fundefs) (e : exp) (v : res) (c : nat),
-        bstep_fuel (def_funs B B rho rho) e v c ->
+      forall (rho : env) (B : fundefs) (e : exp) (v : res) (cin : nat),
+        bstep_fuel (def_funs B B rho rho) e v cin ->
         (* The definition of a function incur cost proportional to the number of FVs
         (to make the bound of the current cc independent of the term) *)
-        bstep rho (Efun B e) v c
+        bstep rho (Efun B e) v cin
   | BStept_prim :
       forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
         (f' : list val -> option val) (ys : list var) (e : exp)
-        (v : val) (v' : res) (c : nat),
+        (v : val) (v' : res) (cin : nat),
           get_list ys rho = Some vs ->
           M.get f pr = Some f' ->
           f' vs = Some v ->
           M.set x v rho = rho' ->
-          bstep_fuel rho' e v' c ->
-          bstep rho (Eprim x f ys e) v' c
+          bstep_fuel rho' e v' cin ->
+          bstep rho (Eprim x f ys e) v' cin
   | BStept_halt :
-      forall x v rho c,
+      forall x v rho,
         M.get x rho = Some v ->
-        bstep rho (Ehalt x) (Res v) c
+        bstep rho (Ehalt x) (Res v) 0
   with bstep_fuel :  env -> exp -> res -> nat -> Prop :=       
   | BStepf_OOT : (* not enought time units to take astep *)
     forall rho e c, 
       (c < cost e)%nat ->
       bstep_fuel rho e OOT c
   | BStepf_run : (* take a step *)
-    forall rho e r c, 
-      (c >= cost e)%nat ->
-      bstep rho e r (c - cost e) ->
-      bstep_fuel rho e r c.
+    forall rho e r cin, 
+      (cin >= cost e)%nat ->
+      bstep rho e r (cin - cost e) ->
+      bstep_fuel rho e r cin.
   
-    
+  (** * Lemmas about bstep_fuel *)
+                
   (** * Interpretation of (certain) evaluation contexts as environments *)
 
   (* TODO move to more appropriate file *)

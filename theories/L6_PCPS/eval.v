@@ -4,7 +4,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
 Import ListNotations.
 Require Import Coq.Strings.String.
 From CertiCoq.Common Require Import AstCommon exceptionMonad.
-From CertiCoq.L6 Require Import cps List_util size_cps ctx cps_util set_util map_util identifiers.
+From CertiCoq.L6 Require Import cps List_util size_cps ctx cps_util set_util map_util identifiers tactics.
 Require Import compcert.lib.Coqlib.
 
 
@@ -398,6 +398,18 @@ Section EVAL.
         M.get x rho = Some v ->
         bstep_cost rho (Ehalt x) v 1.
 
+  Lemma find_tag_nth_deterministic l c e n e' n' :
+    find_tag_nth l c e n ->
+    find_tag_nth l c e' n' ->
+    e = e' /\ n = n'.
+  Proof.
+    intros H1.
+    revert e' n'; induction H1; intros e1 n1 H2;
+    inv H2; try congruence; eauto. eapply IHfind_tag_nth in H8.
+    inv H8; eauto.
+  Qed.
+    
+
   (** Big step semantics with cost counting as fuel. Can raise out-of-time exception. 
       Needed to prove divergence preservation *)
 
@@ -508,8 +520,60 @@ Section EVAL.
       bstep rho e r (cin - cost e) ->
       bstep_fuel rho e r cin.
   
+  Scheme bstep_ind' := Minimality for bstep Sort Prop
+  with bstep_fuel_ind' := Minimality for bstep_fuel Sort Prop.
+
   (** * Lemmas about bstep_fuel *)
-                
+Lemma step_deterministic_aux rho e r v c r' v' c' : 
+  bstep rho e r c -> 
+  bstep rho e r' c' ->
+  r = Res v -> r' = Res v' ->
+  v = v' /\ c = c'.
+Proof.
+  set (P := fun rho e r c =>   
+              forall v r' v' c', 
+                bstep rho e r' c' ->
+                r = Res v -> r' = Res v' ->
+                v = v' /\ c = c').
+  set (P0 := fun rho e r c =>   
+              forall v r' v' c', 
+                bstep_fuel rho e r' c' ->
+                r = Res v -> r' = Res v' ->
+                v = v' /\ c = c').                
+  intros Hstep. 
+  revert v r' v' c'.
+  induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; 
+  intros v1 r2 v2 c2 Hstep2 Heq1 Heq2; subst;
+    try now (inv Hstep2; repeat subst_exp; eapply IHHstep; eauto).
+  - inv Hstep2. repeat subst_exp. 
+    eapply find_tag_nth_deterministic in H1; [| eapply H8 ]. inv H1.
+    eapply IHHstep; eauto.
+  - inv Hstep2. repeat subst_exp. eapply IHHstep in H17; eauto. inv H17.
+    eapply IHHstep0 in H18; eauto. inv H18. eauto.
+  - inv Hstep2. inv Heq1. repeat subst_exp. eauto.   
+  - inv Heq1.
+  - inv Hstep2. eapply IHHstep in H1; eauto. inv H1.
+    split; eauto. omega.
+Qed. 
+
+Lemma bstep_fuel_deterministic rho e v c v' c' : 
+    bstep_fuel rho e (Res v) c -> 
+    bstep_fuel rho e (Res v') c' ->
+    v = v' /\ c = c'. 
+Proof.
+  intros H1 H2; inv H1; inv H2; eauto. 
+  eapply step_deterministic_aux in H0; [ | eapply H3 | reflexivity | reflexivity ].
+  inv H0. split; eauto. omega.
+Qed.   
+
+Lemma bstep_deterministic rho e v c v' c' : 
+  bstep rho e (Res v) c -> 
+  bstep rho e (Res v') c' ->
+  v = v' /\ c = c'.
+Proof.
+  intros H1 H2. eapply step_deterministic_aux; eauto. 
+Qed.
+
   (** * Interpretation of (certain) evaluation contexts as environments *)
 
   (* TODO move to more appropriate file *)
@@ -588,19 +652,9 @@ Section EVAL.
     | [H1 : ?e = ?e1, H2 : ?e = ?e2 |- _ ] =>
       rewrite H1 in H2; inv H2
     end.
-
-  Lemma find_tag_nth_deterministic l c e n e' n' :
-    find_tag_nth l c e n ->
-    find_tag_nth l c e' n' ->
-    e = e' /\ n = n'.
-  Proof.
-    intros H1.
-    revert e' n'; induction H1; intros e1 n1 H2;
-    inv H2; try congruence; eauto. eapply IHfind_tag_nth in H8.
-    inv H8; eauto.
-  Qed.
   
   Unset Regular Subst Tactic.
+
   Lemma bstep_cost_deterministic e rho v1 v2 c1 c2 :
     bstep_cost rho e v1 c1 ->
     bstep_cost rho e v2 c2 ->

@@ -563,6 +563,7 @@ Section Log_rel.
         simpl in *; omega.
     Qed.
 
+    (* TODO move *)
     Lemma Forall2_Forall2_asym_included {A} R (l1 l2 : list A) :
       Forall2 R l1 l2 ->
       Forall2_asym R l1 l2.

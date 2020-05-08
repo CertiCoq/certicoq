@@ -527,16 +527,33 @@ Section LogRelCC.
     intros Hleq H. eapply cc_approx_env_P_monotonic; eauto.
   Qed.
   
+  Definition post_letapp_compat_cc (P1 P2 : PostT) (PG : PostGT) := 
+  forall e1 rho1 c1 c1' e2 rho2 c2 c2' c,
+    (* M.get f1 rho1 = Some (Vfun rho' B f') ->
+      find_def f' B = Some (t, xs, e1) ->
+      set_lists xs vs (def_funs B B rho' rho') = Some rho'' -> *)
+    PG (e1, rho1, c1) (e2, rho2, c2) ->
+    P1 c1' c2' ->
+    P2 (c1 + c1' + c) (c2 + c2' + c + 3).
+
+Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) := 
+  forall e1 rho1 c1 e2 rho2 c2 c,
+    (* M.get f1 rho1 = Some (Vfun rho' B f') ->
+     find_def f' B = Some (t, xs, e1) ->
+     set_lists xs vs (def_funs B B rho' rho') = Some rho'' -> *)
+     PG (e1, rho1, c1) (e2, rho2, c2) ->
+     P2 (c1 + c) (c2 + c + 3).
+
   Section Compat. 
    Context (P1 P2 : PostT) (* Local *)
     (PG : PostGT) (* Global *)           
     (HPost : post_compat P1 P2)
     (HPostApp : post_app_compat PG P2)
-    (HPostLetApp : post_letapp_compat PG P1 P2)
+    (HPostLetApp1 : post_letapp_compat_cc P1 P2 PG)
+    (HPostLetApp2 : post_letapp_compat_cc' P2 PG)
     (HPostRefl1 : post_refl P1)
     (HPostRefl2 : post_refl P2)
-    (HPostZero2 : post_zero P2).   
-
+    (HPostZero2 : post_zero P2).
 
     Lemma cc_approx_exp_constr_compat k 
           rho1 rho2 x t ys1 ys2 e1 e2 :
@@ -609,73 +626,125 @@ Section LogRelCC.
     Eproj_c f' clo_tag 0%N f
           (Eproj_c Γ clo_tag 1%N f Hole_c). 
 
-  
+    
   (** Let Application compatibility *)
-  Lemma cc_approx_exp_letapp_compat (P P' : relation nat) (PG : nat -> relation (exp * env * nat)) (k : nat) 
+  Lemma cc_approx_exp_letapp_compat (k : nat) 
         (rho1 rho2 rho2' : env) (x f1 : var) (xs1 : list var) 
-        (f2 f' Γ : var) (xs2 : list var) (t : fun_tag) (e1 e2 : exp)
-        (HypG : forall rho' rho'' B f' t xs vs e1 e2 rho2 c1 c2 c1' c2',
-            M.get f1 rho1 = Some (Vfun rho' B f') ->
-            find_def f' B = Some (t, xs, e1) ->
-            set_lists xs vs (def_funs B B rho' rho') = Some rho'' ->
-            PG (k - 1) (e1, rho'', c1) (e2, rho2, c2) ->
-            P' c1' c2' ->
-            P (c1 + c1' + (List.length xs1 + 1)) (c2 + c2' + (List.length xs1 + 1) + 3)) : 
+        (f2 f' Γ : var) (xs2 : list var) (t : fun_tag) (e1 e2 : exp) : 
     ~ Γ \in (f2 |: [set f'] :|: FromList xs2) ->
     ~ f' \in (f2 |: FromList xs2) ->
-
     cc_approx_var_env k PG rho1 rho2 f1 f2 ->
     Forall2 (cc_approx_var_env k PG rho1 rho2) xs1 xs2 ->
     ctx_to_rho (AppClo f2 f' Γ) rho2 rho2' ->
     (forall m v1 v2,
         m <= k ->
         cc_approx_val m PG v1 v2 -> 
-        cc_approx_exp m P' PG (e1, M.set x v1 rho1) (e2, M.set x v2 rho2')) ->
+        cc_approx_exp m P1 PG (e1, M.set x v1 rho1) (e2, M.set x v2 rho2')) ->
     
-    cc_approx_exp k P PG (Eletapp x f1 t xs1 e1, rho1)
+    cc_approx_exp k P2 PG (Eletapp x f1 t xs1 e1, rho1)
                   (AppClo f2 f' Γ |[ Eletapp x f' t (Γ :: xs2) e2 ]|, rho2).
   Proof.
-    intros Hnin1 Hnin2 Henv Hyp Hctx Hexp v1 c1 Hleq1 Hstep1. inv Hstep1.
-    inv Hctx.  inv H14. inv H17.
-    edestruct Henv as [v' [Hget Hpre]]; eauto.
-    destruct v'; rewrite cc_approx_val_eq in Hpre; simpl in Hpre; try contradiction.
-    destruct l as [| ? [|] ]; try contradiction;
-      destruct v3; try contradiction.
-    destruct v4; try contradiction. 
-    edestruct cc_approx_var_env_get_list as [vs' [Hgetl2 Hvall]]; eauto.  
-    edestruct Hpre with (j := k - 1) as [G [xs2' [e2' [rho2' [Hceq [Hfdef [Hseteq Hcc]]]]]]].
-    eapply Forall2_length. eassumption. eassumption. now eauto.
-    subst.   
-    eapply Hcc in H11;
-    [| | eapply Forall2_monotonic; [| eassumption ] | ]; try omega.
-    - destruct H11 as (v2' & c2 & Hstep2 & Hge & Hccv).       
-      edestruct (Hexp (k - (1 + c))) as [v3' [c2' [Hstep [HS Hval']]]];
-        [| | | eassumption | ]; eauto. omega.
-      eapply cc_approx_val_monotonic; eauto. omega. omega.
-      destruct (set_lists xs2' vs' (def_funs f f t0 t0)) eqn:Hgetl; try congruence.
-      repeat subst_exp. rewrite M.gso in H15. repeat subst_exp. simpl in H13. inv H13.
-      simpl in H16; inv H16. 
-      do 2 eexists. split; [| split].
-      * simpl. econstructor. eassumption. reflexivity.
-        simpl. econstructor. rewrite M.gso. eassumption.
-        intros Hc. subst; now eapply Hnin2; eauto. reflexivity.
-        inv Hseteq.
-        econstructor. rewrite M.gso. rewrite M.gss. reflexivity.
-        intros Hc. subst. eapply Hnin1. eauto.
-        simpl. rewrite M.gss.
-        rewrite get_list_set_neq. rewrite get_list_set_neq. rewrite Hgetl2. reflexivity.
-        intros Hc. eapply Hnin2; eauto.
-        intros Hc. eapply Hnin1; eauto. 
-        eassumption. simpl. rewrite Hgetl. reflexivity. eassumption.
-        eassumption.
-      * rewrite <- plus_assoc.
-        replace (c2 + c2' + 1 + Datatypes.length (Γ :: xs2) + 1 + 1) with
-            (c2 + c2' + (1 + Datatypes.length xs1) + 3).
-        rewrite (plus_comm 1). eapply HypG; eauto.
-        simpl. erewrite Forall2_length; eauto. omega. 
-      * eapply cc_approx_val_monotonic; eauto. omega.
-      * intros Hc. eapply Hnin2; subst; eauto.
-    - intros. eapply cc_approx_val_monotonic; eauto. omega.
+    intros Hnin1 Hnin2 Henv Hall Hctx Hexp v1 cin Hleq1 Hstep1.  
+    destruct (lt_dec cin (cost (Eletapp x f1 t xs1 e1))); inv Hstep1; try omega. 
+    - (* ΟΟΤ *)
+      exists OOT, cin. split; [| split ].
+      + destruct (lt_dec cin 1).
+        * constructor 1. eassumption.
+        * inv Hctx. constructor 2. simpl in *; omega.
+          econstructor; eauto. simpl.
+          destruct (lt_dec cin 2).
+          -- constructor 1. simpl; omega.
+          -- inv H9. inv H12. constructor 2. simpl in *; omega.
+             econstructor; eauto. simpl. constructor 1. 
+             simpl in *. eapply Forall2_length in Hall. rewrite <- Hall.
+             omega.
+      + eapply HPostRefl2. 
+      + simpl; eauto. 
+    - inv Hctx. inv H10. inv H13. inv H0.
+      + (* App terminates *)
+        edestruct Henv as [v' [Hget Hpre]]; eauto.
+        destruct v'; rewrite cc_approx_val_eq in Hpre; simpl in Hpre; try contradiction.
+        destruct l as [| ? [|] ]; try contradiction;
+        destruct v3; try contradiction.
+        destruct v4; try contradiction. 
+        edestruct cc_approx_var_env_get_list as [vs' [Hgetl2 Hvall]]; eauto.  
+        edestruct Hpre with (j := k - 1) as [G [xs2' [e2' [rho2' [Hceq [Hfdef [Hseteq Hcc]]]]]]].
+        eapply Forall2_length. eassumption. eassumption. now eauto.
+        subst. 
+        eapply Hcc in H17;
+          [| | eapply Forall2_monotonic; [| eassumption ] | ]; try (simpl in *; omega).
+        * destruct H17 as (v2' & c2 & Hstep2 & Hge & Hccv).
+          destruct v2' as [ | v2' ]; try contradiction. simpl in *. 
+          edestruct (Hexp (k - (1 + cin1))) as [v3' [c2' [Hstep [HS Hval']]]];
+           [| | | eassumption | ]; eauto. omega.           
+           eapply cc_approx_val_monotonic. eapply Hccv. omega. 
+           simpl in *; omega.  
+           destruct (set_lists xs2' vs' (def_funs f f t0 t0)) eqn:Hgetl; try congruence.
+           repeat subst_exp. inv Hseteq. rewrite M.gso in H11. 
+           2:{ intros Hc.  subst. eapply Hnin2. now left. } 
+           simpl in *. inv H9. repeat subst_exp. simpl in H12. inv H12.
+           exists v3', (c2 + c2' + 2 + cost (Eletapp x f' t (Γ :: xs2) e2)). split; [| split].
+           -- constructor 2. simpl; omega. 
+              econstructor; eauto. simpl. reflexivity.
+              constructor 2. simpl; omega.
+              econstructor; eauto. 
+              rewrite M.gso. eassumption. intros Hc; subst. eapply Hnin2; eauto.
+              simpl. reflexivity.
+              constructor 2. simpl in *; omega. simpl. 
+              replace (c2 + c2' + 2 + S (S (Datatypes.length xs2)) - 1 - 1 - S (S (Datatypes.length xs2))) with (c2 + c2').                 
+              econstructor; eauto. 
+              rewrite M.gso. rewrite M.gss. reflexivity.
+              intros Hc. subst; now eapply Hnin1; eauto. 
+              simpl. rewrite M.gss. rewrite get_list_set_neq. rewrite get_list_set_neq, Hgetl2.
+              reflexivity. intros Hc1. now eapply Hnin2; eauto.  
+              intros Hc2. now eapply Hnin1; eauto.
+              simpl. rewrite Hgetl. reflexivity. omega.   
+          -- simpl. 
+             replace (c2 + c2' + 2 + S (S (Datatypes.length xs2))) with (c2 + c2' + S (Datatypes.length xs2) + 3) by omega.
+             replace cin with (cin - S (Datatypes.length xs1) + S (Datatypes.length xs2)). 
+             2:{ eapply Forall2_length in Hall. rewrite Hall. omega. }
+             rewrite <- H6. eapply HPostLetApp1. eassumption.
+             eassumption.  
+          -- eapply cc_approx_res_monotonic; eauto. omega.
+        * intros. eapply cc_approx_val_monotonic; eauto. omega.  
+      + edestruct Henv as [v' [Hget Hpre]]; eauto.
+        destruct v'; rewrite cc_approx_val_eq in Hpre; simpl in Hpre; try contradiction.
+        destruct l as [| [] [|] ]; try contradiction.
+        destruct v2; try contradiction.
+        edestruct cc_approx_var_env_get_list as [vs' [Hgetl2 Hvall]]; eauto.  
+        edestruct Hpre with (j := k - 1) as [G [xs2' [e2' [rho2' [Hceq [Hfdef [Hseteq Hcc]]]]]]].
+        eapply Forall2_length. eassumption. eassumption. now eauto.
+        subst. 
+        eapply Hcc in H17;
+          [| | eapply Forall2_monotonic; [| eassumption ] | ]; try (simpl in *; omega).
+        2:{ intros; eapply cc_approx_val_monotonic; eauto. omega. }
+        destruct (set_lists xs2' vs' (def_funs f f t0 t0)) as [rho2'' | ] eqn:Hsets; inv Hseteq. 
+        repeat subst_exp. inv H9. 
+        destruct H17 as (v2' & c2 & Hstep2 & Hge & Hccv).
+        destruct v2' as [ | v2' ]; try contradiction. simpl in *.           
+        exists OOT, (c2 + 2 + cost (Eletapp x f' t (Γ :: xs2) e2)). split; [| split; eauto ].
+        * constructor 2. simpl in *; omega. 
+          econstructor; eauto. simpl; reflexivity. 
+          constructor 2. simpl in *; omega.
+          econstructor; eauto.  
+          constructor 2. simpl in *; omega. 
+          eapply BStept_letapp_oot; eauto.
+          rewrite M.gso. rewrite M.gss. reflexivity.
+          intros Hc1; subst. now eapply Hnin1; eauto.
+          simpl. rewrite M.gss. 
+          rewrite get_list_set_neq. rewrite get_list_set_neq, Hgetl2.
+          reflexivity. intros Hc1. now eapply Hnin2; eauto.  
+          intros Hc2. now eapply Hnin1; eauto.
+          simpl. rewrite Hsets. reflexivity.
+          simpl. replace (c2 + 2 + S (S (Datatypes.length xs2)) - 1 - 1 - S (S (Datatypes.length xs2))) with c2.
+          rewrite M.gso in H11. 
+          2:{ intros Hc.  subst. eapply Hnin2. now left. } 
+          repeat subst_exp. simpl in H12. inv H12. eassumption.                  
+          omega.
+        * simpl. replace (c2 + 2 + S (S (Datatypes.length xs2))) with (c2 + S (Datatypes.length xs2) + 3) by omega.
+          replace cin with (cin - S (Datatypes.length xs1) + S (Datatypes.length xs2)). 
+          2:{ eapply Forall2_length in Hall. rewrite Hall. omega. }
+          eapply HPostLetApp2. eassumption.
   Qed.
 
   (** Application compatibility *)

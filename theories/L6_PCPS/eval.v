@@ -573,10 +573,112 @@ Lemma bstep_deterministic rho e v c v' c' :
 Proof.
   intros H1 H2. eapply step_deterministic_aux; eauto. 
 Qed.
+	
+  Lemma bstep_lt_OOT_aux rho e r c v c' : 
+    bstep rho e r c -> 
+  	r = Res v -> (c' < c)%nat ->
+    bstep rho e OOT c'.
+  Proof.
+    set (P := fun rho e r c =>   
+                forall v c', 
+  								r = Res v -> (c' < c)%nat ->
+									bstep rho e OOT c').
+    set (P0 := fun rho e r c =>   
+                forall v c', 
+  								r = Res v -> (c' < c)%nat ->
+									bstep_fuel rho e OOT c').
+  intros Hstep. revert v c'.
+	induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; 
+	intros v1 c' Heq Hlt; subst; try now (econstructor; eauto).
+	- edestruct (lt_dec c' cin1).
+		+ eapply BStept_letapp_oot; eauto.
+		+ replace c' with (cin1 + (c' - cin1))%nat by omega.
+			eapply BStept_letapp; eauto. 
+			eapply IHHstep0. reflexivity. omega.
+	- omega.
+	- edestruct (lt_dec c' (cost e)).
+		+ econstructor 1; eauto.
+		+ econstructor 2; eauto. omega. eapply IHHstep; eauto. omega.
+  Qed. 
+
+	Lemma bstep_lt_OOT rho e v c c' : 
+  	bstep rho e (Res v) c -> 
+  	(c' < c)%nat ->
+  	bstep rho e OOT c'.
+	Proof.
+		intros; eapply bstep_lt_OOT_aux; eauto.
+	Qed.
+
+	Lemma bstep_fuel_lt_OOT rho e v c c' : 
+	  bstep_fuel rho e (Res v) c -> 
+	  (c' < c)%nat ->
+  	bstep_fuel rho e OOT c'.
+  Proof.
+    intros H1 Hlt; inv H1.
+    edestruct (lt_dec c' (cost e)).
+		+ econstructor 1; eauto.
+    + econstructor 2; eauto. omega. eapply bstep_lt_OOT; eauto.
+      omega.
+  Qed.
+
+  Lemma bstep_OOT_monotonic_aux rho e r c c': 
+    bstep rho e r c ->
+    r = OOT -> 
+    (c' <= c)%nat -> 
+    bstep rho e OOT c'.
+  Proof. 
+    set (P := fun rho e r c =>   
+                forall c', 
+                  r = OOT -> 
+                  (c' <= c)%nat -> 
+                  bstep rho e OOT c').
+    set (P0 := fun rho e r c =>   
+                  forall c', 
+                    r = OOT -> 
+                    (c' <= c)%nat -> 
+                    bstep_fuel rho e OOT c').
+  intros Hstep. revert c'. 
+  induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; 
+  intros c' Heq Hleq; subst; try now (econstructor; eauto).
+  - destruct (lt_dec c' cin1).
+    + eapply BStept_letapp_oot; eauto. 
+      eapply bstep_fuel_lt_OOT; eassumption.
+    + replace c' with (cin1 + (c' - cin1))%nat by omega.
+      eapply BStept_letapp; eauto. eapply IHHstep0; eauto. omega.
+  - inv Heq.
+  - econstructor 1. omega.
+  - edestruct (lt_dec c' (cost e)).
+		+ econstructor 1; eauto.
+    + econstructor 2; eauto. omega. 
+      eapply IHHstep; eauto. omega.
+  Qed. 
+
+  Lemma bstep_OOT_monotonic rho e c c': 
+    bstep rho e OOT c ->
+    (c' <= c)%nat -> 
+    bstep rho e OOT c'.
+  Proof. 
+    intros; eapply bstep_OOT_monotonic_aux; eauto.
+  Qed.
+
+  Lemma bstep_fuel_OOT_monotonic rho e c c': 
+    bstep_fuel rho e OOT c ->
+    (c' <= c)%nat -> 
+    bstep_fuel rho e OOT c'.
+  Proof. 
+    intros H1 Hlt.
+    edestruct (lt_dec c' (cost e)).
+    + econstructor 1; eauto.
+    + inv H1. omega. 
+      econstructor 2; eauto. omega. eapply bstep_OOT_monotonic; eauto.
+      omega.
+  Qed.
+
+  Definition diverge (rho : env) (e: exp) : Prop := 
+    forall c, bstep_fuel rho e OOT c. 
 
   (** * Interpretation of (certain) evaluation contexts as environments *)
 
-  (* TODO move to more appropriate file *)
 
   Inductive ctx_to_rho : exp_ctx -> env -> env -> Prop :=
   | Hole_c_to_rho :

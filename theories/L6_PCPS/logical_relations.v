@@ -768,29 +768,29 @@ Section Log_rel.
                      (e2, M.set x2 v2 rho2)) ->
       preord_exp P2 PG k (Eprim x1 f ys1 e1, rho1) (Eprim x2 f ys2 e2, rho2).
     Proof.
-    intros Hall Hpre v1 cin Hleq1 Hstep1. 
-    destruct (lt_dec cin (cost (Eprim x1 f ys1 e1))); inv Hstep1; try omega. 
-    - (* OOT *) 
-      exists OOT, cin. split. constructor. 
-      simpl in *. erewrite <- Forall2_length; [| eassumption ]. 
-      eassumption. split; [| now eauto ]. eapply HPostRefl2. 
-    - inv H0. 
-      edestruct preord_var_env_get_list as [vs2 [Hget' Hpre']]; eauto.
-      edestruct Prim_axiom as [v2 [Heq Hprev2]]; eauto.
-      edestruct (Hpre (k - 1)) as [v2' [c2 [Hstepv2' [Hpost2 Hprev2']]]]; [ | | | eassumption | ]; eauto.
-      simpl in *; omega.
-      eapply preord_val_monotonic. eassumption.
-      omega. simpl in *; omega.
-      eexists. exists (c2 + cost (Eprim x2 f ys2 e2)). split; [| split ].
-      econstructor 2; eauto. omega. 
-      econstructor; eauto.
-      replace (c2 + cost (Eprim x2 f ys2 e2) - cost (Eprim x2 f ys2 e2)) with c2 by omega.  
-      eassumption.
-      replace cin with (cin - cost (Eprim x1 f ys1 e1) + cost (Eprim x2 f ys2 e2)).
-        2:{ simpl in *. eapply Forall2_length in Hall. rewrite Hall. omega. } 
-      eapply HPost. eassumption.
-      eapply preord_res_monotonic. eassumption. 
-      simpl in *. omega.
+      intros Hall Hpre v1 cin Hleq1 Hstep1. 
+      destruct (lt_dec cin (cost (Eprim x1 f ys1 e1))); inv Hstep1; try omega. 
+      - (* OOT *) 
+        exists OOT, cin. split. constructor. 
+        simpl in *. erewrite <- Forall2_length; [| eassumption ]. 
+        eassumption. split; [| now eauto ]. eapply HPostRefl2. 
+      - inv H0. 
+        edestruct preord_var_env_get_list as [vs2 [Hget' Hpre']]; eauto.
+        edestruct Prim_axiom as [v2 [Heq Hprev2]]; eauto.
+        edestruct (Hpre (k - 1)) as [v2' [c2 [Hstepv2' [Hpost2 Hprev2']]]]; [ | | | eassumption | ]; eauto.
+        simpl in *; omega.
+        eapply preord_val_monotonic. eassumption.
+        omega. simpl in *; omega.
+        eexists. exists (c2 + cost (Eprim x2 f ys2 e2)). split; [| split ].
+        econstructor 2; eauto. omega. 
+        econstructor; eauto.
+        replace (c2 + cost (Eprim x2 f ys2 e2) - cost (Eprim x2 f ys2 e2)) with c2 by omega.  
+        eassumption.
+        replace cin with (cin - cost (Eprim x1 f ys1 e1) + cost (Eprim x2 f ys2 e2)).
+          2:{ simpl in *. eapply Forall2_length in Hall. rewrite Hall. omega. } 
+        eapply HPost. eassumption.
+        eapply preord_res_monotonic. eassumption. 
+        simpl in *. omega.
     Qed.
 
     Lemma preord_exp_fun_compat k rho1 rho2 B B' e1 e2 :
@@ -2312,3 +2312,5 @@ Section Log_rel.
   End Trans.
 
 End Log_rel.
+
+Notation preord_exp := (fun pr cenv => (preord_exp' pr cenv (preord_val pr cenv))).

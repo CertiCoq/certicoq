@@ -45,8 +45,9 @@ Section Bounds.
     assert (Hleq : c2 <= c2').
     { destruct Hp as [Hp1 Hp2]. unfold lower_boundL in Hp1.  
       eapply Nat_as_DT.mul_le_mono_pos_l in Hp1; eauto. omega. }
-    
-
+    eapply bstep_fuel_OOT_monotonic; eassumption. 
+  Qed.
+  
 End Bounds.
 
   

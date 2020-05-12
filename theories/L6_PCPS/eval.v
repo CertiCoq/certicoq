@@ -4,7 +4,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
 Import ListNotations.
 Require Import Coq.Strings.String.
 From CertiCoq.Common Require Import AstCommon exceptionMonad.
-From CertiCoq.L6 Require Import cps List_util size_cps ctx cps_util set_util map_util identifiers tactics.
+From CertiCoq Require Import L6.cps L6.List_util L6.size_cps L6.ctx L6.cps_util L6.set_util L6.map_util L6.identifiers L6.tactics.
 Require Import compcert.lib.Coqlib.
 
 
@@ -424,7 +424,7 @@ Section EVAL.
   | Ecase y cl => 1
   | Eapp f t ys => 1 + length ys
   | Eletapp x f t ys e => 1 + length ys 
-  | Efun B e => 1 + PS.cardinal (fundefs_fv B)
+  | Efun B e => 1 (* + PS.cardinal (fundefs_fv B) *)
   | Eprim x f ys e => 1 + length ys
   | Ehalt x => 1
   end.
@@ -495,7 +495,7 @@ Section EVAL.
         (* The definition of a function incur cost proportional to the number of FVs
         (to make the bound of the current cc independent of the term) *)
         bstep rho (Efun B e) v cin
-  | BStept_prim :
+  (* | BStept_prim :
       forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
         (f' : list val -> option val) (ys : list var) (e : exp)
         (v : val) (v' : res) (cin : nat),
@@ -504,7 +504,7 @@ Section EVAL.
           f' vs = Some v ->
           M.set x v rho = rho' ->
           bstep_fuel rho' e v' cin ->
-          bstep rho (Eprim x f ys e) v' cin
+          bstep rho (Eprim x f ys e) v' cin *)
   | BStept_halt :
       forall x v rho,
         M.get x rho = Some v ->

@@ -2,8 +2,8 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import L6.cps L6.cps_util L6.identifiers L6.eval L6.env L6.ctx L6.relations
-        L6.logical_relations L6.Ensembles_util L6.List_util L6.map_util L6.tactics.
+Require Import L6.cps L6.cps_util L6.identifiers L6.eval L6.env L6.ctx L6.size_cps
+        L6.logical_relations L6.Ensembles_util L6.List_util L6.map_util L6.tactics L6.bounds.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.Lists.List Coq.NArith.BinNat Coq.Relations.Relations
         Coq.omega.Omega Coq.Sets.Ensembles Coq.Classes.Morphisms.
@@ -82,7 +82,6 @@ Definition exp_hoist (e : exp) :=
     | Fnil => e
     | _ => Efun defs e
   end.
-
 
 (** [erase_fundefs e e' B] iff [e'] is [e] after erasing all the function 
   *  definition blocks and [B] is exactly the function definitions of [e] 
@@ -474,8 +473,6 @@ Proof.
   - constructor.
 Qed.
 
-
-
 Lemma Erase_nested_fundefs_name_in_fundefs :
   (forall B B' (Herase : Erase_nested_fundefs B B'),
       name_in_fundefs B \subset name_in_fundefs B').
@@ -499,7 +496,6 @@ Lemma Erase_nested_fundefs_unique_bindings :
     unique_bindings_fundefs B ->
     unique_bindings_fundefs B'.
 Proof. eapply Erase_fundefs_unique_bindings_mut. Qed.   
-
 
 
 Lemma Erase_nested_fundefs_in_name B B_hoist f tau xs e :
@@ -569,39 +565,28 @@ Section Hoisting_correct.
   
   Variable (pr : prims) (cenv : ctor_env). 
 
-  Variable (P : Post) (PG : PostG)
-           (Hcompat : post_compat P P)
-           (Happcompat : post_app_compat PG P)
-           (Hletappcompat : post_letapp_compat PG P P)
-           (Hrefl : post_refl P)
-           (Hlocalstrong : (* local implies global *)
-              forall (m : nat) (e1 e2 : exp) (rho rho' : env) (c1 c2 : nat),
-                P c1 c2 -> PG m (e1, rho, c1) (e2, rho', c2))
-           (* This means that we don't support lower bound yet *)
-           (Hadd_src : forall c1 c2 c, P c1 c2 -> P (c1 + c) c2). 
-
+  Definition boundLC U L := relation_conjunction (boundL U L 0) (boundL U L 1). 
 
   (** * Correctness of Erase_nested_fundefs *)
-  
-  Lemma Erase_nested_fundefs_correct S k B rho rho' B_hoist Bprev Ball
+  Lemma Erase_nested_fundefs_correct S k U L B rho rho' B_hoist Bprev Ball
         (* IH for expresssions *)
         (IHe :
            forall m : nat,
              m < k ->
-             forall (e e' : exp) (Bprev B Ball : fundefs) (rho rho' : env),
+             forall (e e' : exp) (Bprev B Ball : fundefs) (rho rho' : env) (U L : nat),
                unique_bindings_fundefs Ball ->
                unique_bindings e ->
-               preord_env_P pr cenv (occurs_free e) m PG rho rho' ->
+               preord_env_P pr cenv (boundG U L) (occurs_free e) m rho rho' ->
                funs_inv_env Ball rho' ->
                split_fds Bprev B Ball ->
                Disjoint var (name_in_fundefs Ball) (bound_var e) ->
                fun_fv_in e (name_in_fundefs Ball) ->
-               Erase_fundefs e e' B -> preord_exp pr cenv m P PG (e, rho) (e', rho')) :
+               Erase_fundefs e e' B -> preord_exp pr cenv (boundLC U L) (boundG U L) m (e, rho) (e', rho')) :
     unique_bindings_fundefs Ball ->
     unique_bindings_fundefs B ->
     occurs_free_fundefs B \subset S ->
     (* initial environments are related *)
-    preord_env_P pr cenv (S \\ name_in_fundefs B) k PG rho rho' ->
+    preord_env_P pr cenv (boundG U L) (S \\ name_in_fundefs B) k rho rho' ->
     (* assumptions about global funs *)     
     funs_inv_env Ball rho' ->
     split_fds Bprev B_hoist Ball ->
@@ -610,11 +595,12 @@ Section Hoisting_correct.
     (* Erase fundefs *)
     Erase_nested_fundefs B B_hoist ->
     (* Environments after defining the function bundles *)
-    preord_env_P pr cenv (name_in_fundefs B :|: S) k PG (def_funs B B rho rho) rho'.
+    preord_env_P pr cenv (boundG U L) (name_in_fundefs B :|: S) k (def_funs B B rho rho) rho'.
   Proof.
-    revert S B rho rho' B_hoist Bprev Ball IHe.
+    revert S B rho rho' B_hoist Bprev Ball U L IHe.
     induction k as [k IHk] using lt_wf_rec1.
-    intros S B rho rho' B_hoist Bprev Ball IHe Hun1 Hun2 Hsub Henv Hfuns Hsplit Hdis Hfvs Hhoist.
+    intros S B rho rho' B_hoist Bprev Ball U L IHe Hun1 Hun2 
+           Hsub Henv Hfuns Hsplit Hdis Hfvs Hhoist.
     rewrite <- (Union_Setminus_Included (name_in_fundefs B) S (name_in_fundefs B)) at 1;
       [| tci | reflexivity ]. 
     eapply preord_env_P_union.
@@ -638,8 +624,8 @@ Section Hoisting_correct.
         eapply Erase_nested_fundefs_name_in_fundefs; eassumption.
       + eauto.
       + intros Hlt Hall.
-        eapply preord_exp_post_monotonic with (P1 := P).
-        { intros x1 x2 Hp. eapply Hlocalstrong. eassumption. }
+        eapply preord_exp_post_monotonic with (P1 := boundLC U L).
+        { intros x1 x2 [Hp1 Hp2]. eapply boundL_0_implies_boundG. eassumption. } 
 
         eapply split_fds_sym in Hsplit.
         edestruct (split_fds_trans _ _ _ _ _ Hs2 Hsplit) as [Bprev' [Hs3 Hs4]].
@@ -692,11 +678,11 @@ Section Hoisting_correct.
 
   (** * Correctness of Erase_fundefs *)
   
-  Lemma hoisting_correct k e e' Bprev B Ball rho rho' :
+  Lemma hoisting_correct k e e' Bprev B Ball rho rho' U L :
     unique_bindings_fundefs Ball ->
     unique_bindings e ->
     (* environments are related *)
-    preord_env_P pr cenv (occurs_free e) k PG rho rho' ->
+    preord_env_P pr cenv (boundG U L) (occurs_free e) k rho rho' ->
     (* Hoisted functions are already defined *)
     funs_inv_env Ball rho' ->
     split_fds Bprev B Ball ->
@@ -706,7 +692,7 @@ Section Hoisting_correct.
     fun_fv_in e (name_in_fundefs Ball) ->
     (* Hoisting *)            
     Erase_fundefs e e' B ->    
-    preord_exp pr cenv k P PG (e, rho) (e', rho').
+    preord_exp pr cenv (boundLC U L) (boundG U L) k (e, rho) (e', rho').
   Proof.
     revert e e' Bprev B Ball rho rho'.
     induction k as [k IHk] using lt_wf_rec1.
@@ -714,8 +700,9 @@ Section Hoisting_correct.
     intros k IHk e' Bprev B Ball rho rho' Hun1 Hun2 Henv Hfuns Hsplit Hdis Hfvs Hhoist;
       inv Hhoist; inv Hun2.
     - (* Econstr *)
-      eapply preord_exp_const_compat.
-      + eassumption.
+      eapply preord_exp_const_compat with (P1 := boundLC U L).
+      + admit. (* ready *)
+      + admit. (* ready *)
       + eapply Forall2_same. intros x Hin. eapply Henv.
         now constructor.
       + intros m vs1 vs2 Hlt Hall. 
@@ -735,7 +722,8 @@ Section Hoisting_correct.
         * intros B' Hbin. eapply Hfvs. constructor; eauto.
         * eassumption.
     - (* Ecase nil *)
-      eapply preord_exp_case_nil_compat.
+      eapply preord_exp_case_nil_compat. 
+      admit. (* ready *) 
     - (* Ecase cons *)
       eapply split_fds_sym in H7.
       edestruct split_fds_trans as [Bnew [Hs1 Hs2]].
@@ -743,7 +731,10 @@ Section Hoisting_correct.
       eapply split_fds_sym in H7.
       edestruct split_fds_trans as [Bnew' [Hs1' Hs2']].
       now eapply H7. eapply split_fds_sym. eassumption.      
-      eapply preord_exp_case_cons_compat; eauto.
+      eapply preord_exp_case_cons_compat with (P1 := boundLC U L); eauto.
+      + admit.
+      + admit. 
+      + admit.   
       + eapply Erase_fundefs_Ecase. eassumption.
       + intros m Hlt. eapply IHk; last eassumption; eauto.
         * eapply preord_env_P_antimon.
@@ -757,15 +748,16 @@ Section Hoisting_correct.
       + eapply IHe0; last eassumption; eauto.
         * eapply preord_env_P_antimon. eassumption.
           normalize_occurs_free; sets.
-        *  apply split_fds_sym. eassumption.
+        * apply split_fds_sym. eassumption.
         * eapply Disjoint_Included_r; [| eassumption ].
           normalize_bound_var; sets.
         * intros x Hin; eapply Hfvs.
           inv Hin. econstructor. eassumption.
           right. eassumption.
     - (* Eproj *)
-      eapply preord_exp_proj_compat.
-      + eassumption.
+      eapply preord_exp_proj_compat with (P1 := boundLC U L).
+      + admit.
+      + admit.    
       + eapply Henv. eauto.
       + intros m vs1 vs2 Hlt Hall. 
         eapply IHk; [ eassumption | eassumption | | | | eassumption | | | ].
@@ -784,7 +776,9 @@ Section Hoisting_correct.
         * eassumption.
     - (* Eletapp *)
       eapply preord_exp_letapp_compat.
-      + eassumption.
+      + admit. (* XXX not ready *)
+      + admit. (* XXX not ready *)
+      + admit.
       + eapply Henv. constructor. now left.
       + eapply Forall2_same. intros z Hin. eapply Henv.
         constructor. now right.
@@ -839,13 +833,15 @@ Section Hoisting_correct.
         * intros x Hin. eapply Hfvs. constructor; eauto.
     - (* Eapp *)
       eapply preord_exp_app_compat.
-      + eassumption.
+      + admit. (* XXX not ready *)
+      + admit.
       + eapply Henv. constructor.
       + eapply Forall2_same. intros z Hin. eapply Henv.
         now constructor.
     - (* Eprim *)
-      eapply preord_exp_prim_compat.
-      + eassumption.
+      eapply preord_exp_prim_compat with (P1 := boundLC U L).
+      + admit.
+      + admit.  
       + eapply Forall2_same. intros x Hin. eapply Henv.
         now constructor.
       + intros m vs1 vs2 Hlt Hall. 
@@ -865,6 +861,7 @@ Section Hoisting_correct.
         * eassumption.
     - (* Ehalt *)
       eapply preord_exp_halt_compat; eauto.
+      admit. 
   Qed.
 
 End Hoisting_correct.

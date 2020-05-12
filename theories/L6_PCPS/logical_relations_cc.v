@@ -35,11 +35,11 @@ Section LogRelCC.
       let '(e1, rho1) := p1 in
       let '(e2, rho2) := p2 in
       forall v1 c1,
-        c1 <= k -> bstep_fuel pr cenv rho1 e1 v1 c1 ->
+        c1 <= k -> bstep_fuel cenv rho1 e1 v1 c1 ->
         exists v2 c2,
-          bstep_fuel pr cenv rho2 e2 v2 c2 /\
+          bstep_fuel cenv rho2 e2 v2 c2 /\
           (* extra invariants for cost *)
-          P1 c1 c2 /\
+          P1 (e1, rho1, c1) (e2, rho2, c2) /\
           cc_approx_res (k - c1) P2 v1 v2.
 
   End Exp_rel. 
@@ -75,7 +75,7 @@ Section LogRelCC.
                     let R := cc_approx_val (k - (k-j)) PG in
                     j < S k ->
                     Forall2 R vs1 vs2 ->
-                    cc_approx_exp' cc_approx_val (k - (k - j)) (fun cin cin' => PG (e1, rho1', cin) (e2, rho2', cin')) PG
+                    cc_approx_exp' cc_approx_val (k - (k - j)) PG PG
                       (e1, rho1') (e2, rho2')
                 end
           | Vconstr t1 vs1, Vconstr t2 vs2 =>
@@ -102,7 +102,7 @@ Section LogRelCC.
             Some rho2' = set_lists (Γ :: xs2) ((Vconstr tag' fvs) :: vs2)
                                  (def_funs defs2 defs2 rho2 rho2) /\
             (j < k -> Forall2 (cc_approx_val j P) vs1 vs2 ->
-             cc_approx_exp' cc_approx_val j (fun c1 c2 => P (e1, rho1', c1) (e2, rho2', c2)) P (e1, rho1') (e2, rho2'))
+             cc_approx_exp' cc_approx_val j P P (e1, rho1') (e2, rho2'))
       | Vconstr t1 vs1, Vconstr t2 vs2 =>
         t1 = t2 /\ Forall2_asym (cc_approx_val k P) vs1 vs2
       | Vint n1, Vint n2 => n1 = n2
@@ -218,7 +218,7 @@ Section LogRelCC.
 
   Lemma cc_approx_exp_rel_mon (P1 P1' : PostT) P2 k e1 rho1 e2 rho2 :
     cc_approx_exp k P1 P2 (e1, rho1) (e2, rho2) ->
-    inclusion nat P1 P1' ->
+    inclusion _ P1 P1' ->
     cc_approx_exp k P1' P2 (e1, rho1) (e2, rho2).
   Proof.
     intros Hcc Hin v1 c1 Hleq Hstep.
@@ -527,33 +527,67 @@ Section LogRelCC.
     intros Hleq H. eapply cc_approx_env_P_monotonic; eauto.
   Qed.
   
-  Definition post_letapp_compat_cc (P1 P2 : PostT) (PG : PostGT) := 
-  forall e1 rho1 c1 c1' e2 rho2 c2 c2' c,
-    (* M.get f1 rho1 = Some (Vfun rho' B f') ->
-      find_def f' B = Some (t, xs, e1) ->
-      set_lists xs vs (def_funs B B rho' rho') = Some rho'' -> *)
-    PG (e1, rho1, c1) (e2, rho2, c2) ->
-    P1 c1' c2' ->
-    P2 (c1 + c1' + c) (c2 + c2' + c + 3).
+  (* Closure projection before application application *)
+  Definition AppClo f f' Γ :=
+    Eproj_c f' clo_tag 0%N f
+          (Eproj_c Γ clo_tag 1%N f Hole_c). 
 
-Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) := 
-  forall e1 rho1 c1 e2 rho2 c2 c,
-    (* M.get f1 rho1 = Some (Vfun rho' B f') ->
-     find_def f' B = Some (t, xs, e1) ->
-     set_lists xs vs (def_funs B B rho' rho') = Some rho'' -> *)
-     PG (e1, rho1, c1) (e2, rho2, c2) ->
-     P2 (c1 + c) (c2 + c + 3).
+  Definition post_app_compat_cc (P : PostT) (PG : PostGT):=
+    forall x t ys xs e1 f2 Γ x' t' ys' e2 rho1 rho2 rhoc1 rhoc2 fl f vs rhoc1' c1 c2 a, 
+  
+      map_util.M.get x rho1 = Some (Vfun rhoc1 fl f) ->
+      get_list ys rho1 = Some vs ->
+      find_def f fl = Some (t, xs, e1) ->
+      set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
+        
+      (* for simplicity don't model the semantics of the target since it doesn't matter *)
+      PG (e1, rhoc1', c1)  (e2, rhoc2, c2) -> 
+      P (Eapp x t ys, rho1, c1 + a) (AppClo f2 x' Γ |[ Eapp x' t' (Γ :: ys') ]|, rho2, c2 + a + 3).
+   
+  Definition post_letapp_compat_cc (P1 P2 : PostT) (PG : PostGT):=
+    forall x f t ys e1 xs e_b1 v1
+         f2 Γ x' f' t' ys' e2 e_b2
+         rho1 rho2 rho2' rhoc1 rhoc2 fl h vs rhoc1' c1 c1' c2 c2' a, 
+  
+      map_util.M.get f rho1 = Some (Vfun rhoc1 fl h) ->
+      get_list ys rho1 = Some vs ->
+      find_def h fl = Some (t, xs, e_b1) ->
+      set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
+      bstep_fuel cenv rhoc1' e_b1 (Res v1) c1 -> 
+      (* Will need to prove that the size of the returned val is *)
+
+      (* for simplicity don't model the semantics of the target since it doesn't matter *)
+      PG (e_b1, rhoc1', c1)  (e_b2, rhoc2, c2) -> 
+      P1 (e1, M.set x v1 rho1, c1') (e2, rho2', c2') ->
+      P2 (Eletapp x f t ys e1, rho1, c1 + c1' + a) (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|, rho2, c2  + c2' + a + 3).
+
+  Definition post_letapp_compat_cc_OOT (P2 : PostT) (PG : PostGT):=
+    forall x f t ys e1 xs e_b1
+         f2 Γ x' f' t' ys' e2 e_b2 
+         rho1 rho2 rhoc1 rhoc2 fl h vs rhoc1' c1 c2 a, 
+  
+      map_util.M.get f rho1 = Some (Vfun rhoc1 fl h) ->
+      get_list ys rho1 = Some vs ->
+      find_def h fl = Some (t, xs, e_b1) ->
+      set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
+
+      (* for simplicity don't model the semantics of the target since it doesn't matter *)
+      PG (e_b1, rhoc1', c1)  (e_b2, rhoc2, c2) -> 
+      P2 (Eletapp x f t ys e1, rho1, c1 + a) (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|, rho2, c2 + a + 3).
 
   Section Compat. 
    Context (P1 P2 : PostT) (* Local *)
-    (PG : PostGT) (* Global *)           
-    (HPost : post_compat P1 P2)
-    (HPostApp : post_app_compat PG P2)
-    (HPostLetApp1 : post_letapp_compat_cc P1 P2 PG)
-    (HPostLetApp2 : post_letapp_compat_cc' P2 PG)
-    (HPostRefl1 : post_refl P1)
-    (HPostRefl2 : post_refl P2)
-    (HPostZero2 : post_zero P2).
+    (PG : PostGT) (* Global *)
+    (HPost_con : post_constr_compat P1 P2)
+    (HPost_proj : post_proj_compat P1 P2)
+    (HPost_fun : post_fun_compat P1 P2)
+    (HPost_case_hd : post_case_compat_hd P1 P2)
+    (HPost_case_tl : post_case_compat_tl P2 P2)
+    (HPost_app : post_app_compat_cc P2 PG)
+    (HPost_letapp : post_letapp_compat_cc P1 P2 PG)
+    (HPost_letapp_OOT : post_letapp_compat_cc_OOT P2 PG)
+    (HPost_OOT : post_OOT P2)
+    (Hpost_base : post_base P2).
 
     Lemma cc_approx_exp_constr_compat k 
           rho1 rho2 x t ys1 ys2 e1 e2 :
@@ -572,7 +606,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
       - (* OOT *) 
         exists OOT, c1. split. constructor. 
         simpl in *. erewrite <- Forall2_length; [| eassumption ]. 
-        eassumption. split; [| now eauto ]. eapply HPostRefl2. 
+        eassumption. split; [| now eauto ]. eapply HPost_OOT; eassumption. 
       - inv H0. 
         edestruct (cc_approx_var_env_get_list rho1 rho2) as [vs2' [Hget' Hpre']];
          [| eauto |]; eauto.
@@ -583,7 +617,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
         rewrite Nat_as_OT.add_sub. eassumption.
         replace c1 with (c1 - cost (Econstr x t ys1 e1) + cost (Econstr x t ys2 e2)).
         2:{ simpl in *. eapply Forall2_length in Hall; rewrite Hall. omega. } 
-        eapply HPost. eassumption.
+        eapply HPost_con; try eassumption.
         eapply cc_approx_res_monotonic. eassumption. 
         simpl in *. omega.
     Qed.
@@ -603,7 +637,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
     destruct (lt_dec cin (cost (Eproj x tau n y1 e1))); inv Hstep1; try omega. 
     - (* ΟΟΤ *)
       exists OOT, cin.  split. constructor. simpl in *. omega. 
-      split; [| now eauto ]. eapply HPostRefl2. 
+      split; [| now eauto ]. eapply HPost_OOT; eassumption. 
     - inv H0. edestruct Henv as [v' [Hget Hpre]]; eauto.
       destruct v'; rewrite cc_approx_val_eq in Hpre; simpl in Hpre; try contradiction.
       inv Hpre.
@@ -615,16 +649,11 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
       econstructor 2; eauto. simpl in *; omega. 
       rewrite Nat_as_OT.add_sub. now econstructor 2; eauto. 
       replace cin with (cin - cost (Eproj x c n y1 e1) + cost (Eproj x c n y2 e2)). 
-      2:{ simpl in *. omega. }
-      eapply HPost. eassumption.
+      2:{ simpl in *. omega. } eapply HPost_proj; try eassumption.
       eapply cc_approx_res_monotonic. eassumption. 
       simpl in *. omega.
   Qed.
 
-  (* Closure projection before application application *)
-  Definition AppClo f f' Γ :=
-    Eproj_c f' clo_tag 0%N f
-          (Eproj_c Γ clo_tag 1%N f Hole_c). 
 
     
   (** Let Application compatibility *)
@@ -658,7 +687,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
              econstructor; eauto. simpl. constructor 1. 
              simpl in *. eapply Forall2_length in Hall. rewrite <- Hall.
              omega.
-      + eapply HPostRefl2. 
+      + eapply HPost_OOT; eauto. 
       + simpl; eauto. 
     - inv Hctx. inv H10. inv H13. inv H0.
       + (* App terminates *)
@@ -670,11 +699,11 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
         edestruct cc_approx_var_env_get_list as [vs' [Hgetl2 Hvall]]; eauto.  
         edestruct Hpre with (j := k - 1) as [G [xs2' [e2' [rho2' [Hceq [Hfdef [Hseteq Hcc]]]]]]].
         eapply Forall2_length. eassumption. eassumption. now eauto.
-        subst. 
+        subst. assert (Hevalb := H17).
         eapply Hcc in H17;
           [| | eapply Forall2_monotonic; [| eassumption ] | ]; try (simpl in *; omega).
         * destruct H17 as (v2' & c2 & Hstep2 & Hge & Hccv).
-          destruct v2' as [ | v2' ]; try contradiction. simpl in *. 
+          destruct v2' as [ | v2' ]; try contradiction. 
           edestruct (Hexp (k - (1 + cin1))) as [v3' [c2' [Hstep [HS Hval']]]];
            [| | | eassumption | ]; eauto. omega.           
            eapply cc_approx_val_monotonic. eapply Hccv. omega. 
@@ -682,7 +711,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
            destruct (set_lists xs2' vs' (def_funs f f t0 t0)) eqn:Hgetl; try congruence.
            repeat subst_exp. inv Hseteq. rewrite M.gso in H11. 
            2:{ intros Hc.  subst. eapply Hnin2. now left. } 
-           simpl in *. inv H9. repeat subst_exp. simpl in H12. inv H12.
+           inv H9. repeat subst_exp. simpl in H12. inv H12.
            exists v3', (c2 + c2' + 2 + cost (Eletapp x f' t (Γ :: xs2) e2)). split; [| split].
            -- constructor 2. simpl; omega. 
               econstructor; eauto. simpl. reflexivity.
@@ -699,13 +728,12 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
               reflexivity. intros Hc1. now eapply Hnin2; eauto.  
               intros Hc2. now eapply Hnin1; eauto.
               simpl. rewrite Hgetl. reflexivity. omega.   
-          -- simpl. 
+          -- simpl cost.
              replace (c2 + c2' + 2 + S (S (Datatypes.length xs2))) with (c2 + c2' + S (Datatypes.length xs2) + 3) by omega.
              replace cin with (cin - S (Datatypes.length xs1) + S (Datatypes.length xs2)). 
-             2:{ eapply Forall2_length in Hall. rewrite Hall. omega. }
-             rewrite <- H6. eapply HPostLetApp1. eassumption.
-             eassumption.  
-          -- eapply cc_approx_res_monotonic; eauto. omega.
+             2:{ eapply Forall2_length in Hall. rewrite Hall. simpl in *; omega. }
+             rewrite <- H6. eapply HPost_letapp; eassumption.
+          -- eapply cc_approx_res_monotonic; eauto. simpl in *; omega.
         * intros. eapply cc_approx_val_monotonic; eauto. omega.  
       + edestruct Henv as [v' [Hget Hpre]]; eauto.
         destruct v'; rewrite cc_approx_val_eq in Hpre; simpl in Hpre; try contradiction.
@@ -744,7 +772,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
         * simpl. replace (c2 + 2 + S (S (Datatypes.length xs2))) with (c2 + S (Datatypes.length xs2) + 3) by omega.
           replace cin with (cin - S (Datatypes.length xs1) + S (Datatypes.length xs2)). 
           2:{ eapply Forall2_length in Hall. rewrite Hall. omega. }
-          eapply HPostLetApp2. eassumption.
+          eapply HPost_letapp_OOT; eassumption.
   Qed.
 
   (** Application compatibility *)
@@ -775,7 +803,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
              econstructor; eauto. simpl. constructor 1. 
              simpl in *. eapply Forall2_length in Hall. rewrite <- Hall.
              omega.
-      + eapply HPostRefl2.
+      + eapply HPost_OOT; eauto.
       + simpl; eauto. 
     - inv H0. edestruct Hvar as [v2' [Hget Hpre]]; eauto.
       destruct v2'; rewrite cc_approx_val_eq in Hpre; simpl in Hpre; try contradiction.
@@ -816,7 +844,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
         * simpl. replace (c4 + S (S (Datatypes.length xs2)) + 2) with (c4 + S (Datatypes.length xs2) + 3) by omega.
           replace cin with (cin - S (Datatypes.length xs1) + S (Datatypes.length xs2)). 
           2:{ eapply Forall2_length in Hall. rewrite Hall. simpl in *; omega. }
-          eapply HPostLetApp2. eassumption.
+          eapply HPost_app; eassumption.
         * eapply cc_approx_res_monotonic; eauto. simpl in *; omega.
       + intros. eapply cc_approx_val_monotonic; eauto. omega.
   Qed.
@@ -828,7 +856,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
     destruct (lt_dec c1 (cost (Ecase x1 []))); inv Hstep1; try omega.           
     - (* ΟΟΤ *)
       exists OOT, c1. split. constructor; eauto. simpl in *.
-      split; [| now eauto ]. eapply HPostRefl2.
+      split; [| now eauto ]. eapply HPost_OOT; eauto.
     - inv H0. inv H6. 
   Qed.
 
@@ -843,7 +871,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
     destruct (lt_dec c1 (cost (Ecase x1 ((t, e1) :: B1)))); inv Hstep1; try omega.           
     - (* ΟΟΤ *)
       exists OOT, c1. split. constructor; eauto. simpl in *.
-      split; [| now eauto ]. eapply HPostRefl2.        
+      split; [| now eauto ]. eapply HPost_OOT; eauto.    
   - inv H0. inv H4. destruct (var_dec t t0). 
     + inv H6; [| contradiction ]; subst.
       edestruct (Hexp_hd (k - 1)) as [v2 [c2 [Hstep2 [Hpost Hpre2]]]];
@@ -857,8 +885,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
       eapply caseConsistent_same_ctor_tags. eassumption. eassumption.
       now constructor. 
       replace c1 with (c1 - cost (Ecase x1 ((c, e) :: B1)) + cost (Ecase x2 ((c, e2) :: B2))). 
-      2:{ simpl in *. omega. }
-      eapply HPost. eassumption.  
+      2:{ simpl in *. omega. } now eapply HPost_case_hd; eauto.
       eapply cc_approx_res_monotonic. eassumption. 
       simpl in *; omega.
       + inv H6. contradiction.
@@ -871,7 +898,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
           inv Hstep2. 
           -- destruct v1; try contradiction. 
              exists OOT, c2. split; [| split ]. constructor 1. 
-             simpl in *; eassumption. eassumption. eauto.
+             simpl in *; eassumption. eapply HPost_case_tl; eassumption. eauto.
           -- inv H2.  repeat subst_exp.
              exists v2, c2. split; [| split ].
              constructor 2. simpl in *; omega. 
@@ -880,7 +907,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
                 rewrite H5 in H2. inv H2. congruence.
                 now econstructor; eauto.
                 now constructor; eauto. 
-             ++ eassumption.
+             ++ eapply HPost_case_tl. eassumption.
              ++ eassumption.
   Qed. 
 
@@ -892,10 +919,10 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
     destruct (lt_dec c1 (cost (Ehalt x1))); inv Hstep1; try omega. 
     - (* ΟΟΤ *)
       exists OOT, c1. split. constructor; eauto.
-      split; [| now eauto ]. eapply HPostRefl2.
+      split; [| now eauto ]. eapply HPost_OOT; eauto.
     - inv H0. edestruct Hvar as [v2' [Hget Hpre]]; eauto.
       repeat eexists. econstructor 2; eauto. simpl.
-      rewrite <- H3. econstructor; eauto. now eapply HPostRefl2.
+      rewrite <- H3. econstructor; eauto. now eapply Hpost_base; eauto.
       eapply cc_approx_val_monotonic. eassumption. omega.
   Qed.
   
@@ -911,7 +938,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
   
   Lemma cc_approx_exp_prim_compat k rho1 rho2 x1 x2 f ys1 ys2 e1 e2 :
     Forall2 (cc_approx_var_env k PG rho1 rho2) ys1 ys2 ->
-    (forall m v1 v2 vs f',
+    (* (forall m v1 v2 vs f',
        m < k ->
        (* needed by the cost proof *)
        get_list ys1 rho1 = Some vs ->
@@ -919,17 +946,17 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
        f' vs = Some v1 ->
        cc_approx_val k PG v1 v2 -> 
        cc_approx_exp k P1 PG (e1, M.set x1 v1 rho1)
-                     (e2, M.set x2 v2 rho2)) ->
+                     (e2, M.set x2 v2 rho2)) -> *)
     cc_approx_exp k P2 PG (Eprim x1 f ys1 e1, rho1) (Eprim x2 f ys2 e2, rho2).
   Proof.
-    intros Hall Hpre v1 cin Hleq1 Hstep1. 
+    intros Hall v1 cin Hleq1 Hstep1. 
     destruct (lt_dec cin (cost (Eprim x1 f ys1 e1))); inv Hstep1; try omega. 
     - (* OOT *) 
       exists OOT, cin. split. constructor. 
       simpl in *. erewrite <- Forall2_length; [| eassumption ]. 
-      eassumption. split; [| now eauto ]. eapply HPostRefl2. 
+      eassumption. split; [| now eauto ]. eapply HPost_OOT; eauto. 
    - inv H0. 
-     edestruct cc_approx_var_env_get_list as [vs2 [Hget' Hpre']]; [| eassumption | ]; eauto.
+(*   edestruct cc_approx_var_env_get_list as [vs2 [Hget' Hpre']]; [| eassumption | ]; eauto.
      edestruct Prim_axiom_cc as [v2 [Heq Hprev2]]; eauto.
      edestruct (Hpre (k - 1)) as [v2' [c2 [Hstepv2' [Hpost2 Hprev2']]]]; [ | | | | | | eassumption | ]; eauto.
      simpl in *; omega. simpl in *; omega. 
@@ -942,8 +969,8 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
      2:{ simpl in *. eapply Forall2_length in Hall. rewrite Hall. omega. } 
      eapply HPost. eassumption.
      eapply cc_approx_res_monotonic. eassumption. 
-    simpl in *. omega.
-    Qed.
+    simpl in *. omega. *)
+  Qed.
   
   End Compat.
 
@@ -1073,44 +1100,37 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
     destruct n. 
     - inv Hnth; eauto.
     - eapply IHl; eauto.  
-  Qed. 
+  Qed.
 
   Section Compose.
 
     Context (P1 P2 : PostT) (* Local *)
-            (PG  : PostGT) (* Global *)
+          (PG  : PostGT) (* Global *)
+          (HGPost : inclusion _ (comp P1 P2) PG)
+          (HPost_conG : post_constr_compat PG PG)
+          (HPost_projG : post_proj_compat PG PG)
+          (HPost_funG : post_fun_compat PG PG)
+          (HPost_case_hdG : post_case_compat_hd PG PG)
+          (HPost_case_tlG : post_case_compat_tl PG PG)
+          (HPost_appG : post_app_compat_cc PG PG)
+          (HPost_letappG : post_letapp_compat_cc PG PG PG)
+          (HPost_letapp_OOTG : post_letapp_compat_cc_OOT PG PG)
+          (HPost_appG' : post_app_compat PG PG)
+          (HPost_letappG' : post_letapp_compat cenv PG PG PG)
+          (HPost_letapp_OOTG' : post_letapp_compat_OOT PG PG)
+          (HPost_OOTG : post_OOT PG)
+          (Hpost_baseG : post_base PG)
+          (Hp1 : inclusion _ PG P1)
+          (Hp2 : inclusion _ PG P2).
 
-            (HPostApp1 : post_app_compat PG P1)
-            (HPostApp2 : post_app_compat PG P2)
-
-            (HIncl : forall e1 rho1 e2 rho2, inclusion _ (comp P1 P2) (fun c1 c2 => PG (e1, rho1, c1) (e2, rho2, c2)))
-
-            (HPostG : forall e1 rho1 rho2, post_compat
-                                          (fun c1 c2 : nat => PG (e1, rho1, c1) (e1, rho2, c2))
-                                          (fun c1 c2 : nat => PG (e1, rho1, c1) (e1, rho2, c2)))
-            (HPostAppG : forall e1 rho1 rho2, post_app_compat
-                                             PG
-                                             (fun c1 c2 : nat => PG (e1, rho1, c1) (e1, rho2, c2)))
-            (HPostLetAppG : forall e1 rho1 rho2, post_letapp_compat
-                                                PG
-                                                (fun c1 c2 : nat => PG (e1, rho1, c1) (e1, rho2, c2))
-                                                (fun c1 c2 : nat => PG (e1, rho1, c1) (e1, rho2, c2)))
-            (HPostZeroG : forall e1 rho1 rho2, post_zero (fun cin cin' : nat => PG (e1, rho1, cin) (e1, rho2, cin')))
-
-            (HPostReflG : forall e1 rho1 rho2, post_refl (fun c1 c2 : nat => PG (e1, rho1, c1) (e1, rho2, c2)))
-            (HGPost :
-               forall (e1 : exp) (rho1 : env) (e2 : exp) (rho2 : env)
-                 (e1' : exp) (rho1' : env) (e2' : exp) (rho2' : env) (c1 c2 : nat),
-                 PG (e1, rho1, c1) (e2, rho2, c2) -> PG (e1', rho1', c1) (e2', rho2', c2)).
-    
     Lemma cc_approx_res_respects_preord_exp_r_pre (k : nat) r1 r2 r3 :
       (forall j v1 v2 v3,
           j <= k ->
           cc_approx_val j PG v1 v2 ->
-          (forall k, preord_val pr cenv PG k v2 v3) ->
+          (forall k, preord_val cenv PG k v2 v3) ->
           cc_approx_val j PG v1 v3) ->
       cc_approx_res cc_approx_val k PG r1 r2 ->
-      (forall k', preord_res (preord_val pr cenv) PG k' r2 r3) ->
+      (forall k', preord_res (preord_val cenv) PG k' r2 r3) ->
       cc_approx_res cc_approx_val k PG r1 r3.
     Proof.
       intros Hyp H1 H2; 
@@ -1123,10 +1143,10 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
       (forall j v1 v2 v3,
           j <= k ->
           cc_approx_val j PG v1 v2 ->
-          (forall k, preord_val pr cenv PG k v2 v3) ->
+          (forall k, preord_val cenv PG k v2 v3) ->
           cc_approx_val j PG v1 v3) ->
       cc_approx_exp k P1 PG (e1, rho1) (e2, rho2) ->
-      (forall k', preord_exp pr cenv P2 PG k' (e2, rho2) (e3, rho3)) ->
+      (forall k', preord_exp cenv P2 PG k' (e2, rho2) (e3, rho3)) ->
       cc_approx_exp k (comp P1 P2) PG (e1, rho1) (e3, rho3).
     Proof.
       intros IH Hexp1 Hexp2 v1 c Hleq1 Hstep1. 
@@ -1157,7 +1177,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
 
   Lemma cc_approx_val_respects_preord_val_r (k : nat) (v1 v2 v3 : val) :
     cc_approx_val k PG v1 v2 ->
-    (forall k, preord_val pr cenv PG k v2 v3) ->
+    (forall k, preord_val cenv PG k v2 v3) ->
     cc_approx_val k PG v1 v3.
   Proof.
     revert v1 v2 v3. induction k using lt_wf_rec.
@@ -1205,8 +1225,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
       + intros. eapply H; [ omega | eassumption | eassumption ].
       + eapply cc_approx_exp_rel_mon.
         eapply Heval2. omega. assumption.
-        intros ? ? ?. 
-        rewrite (plus_n_O x), (plus_n_O y); eauto. 
+        intros ? ? ?. eauto. 
       + intros k'. specialize (Hpre (k'+1)). rewrite preord_val_eq in Hpre.
         inversion Hpre as [_ Hall']. clear Hpre. inv Hall'.
         rewrite preord_val_eq in H5. 
@@ -1215,8 +1234,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
         rewrite Hfind3' in Hfind3. inv Hfind3.
         rewrite <- Hset3 in Hset3'. inv Hset3'.
         eapply preord_exp_post_monotonic; [| eapply Heval3' ].
-        intros ? ? ?. 
-        rewrite (plus_n_O x), (plus_n_O y); eauto. 
+        intros ? ? ?. eauto. 
         omega. inv H8. constructor.
         eapply preord_val_monotonic. eassumption. omega. 
         eapply List_util.Forall2_refl. eapply preord_val_refl; eauto.
@@ -1229,7 +1247,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
   Corollary cc_approx_exp_respects_preord_exp_r (k : nat)
         (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) :
     cc_approx_exp k P1 PG (e1, rho1) (e2, rho2) ->
-    (forall k', preord_exp pr cenv P2 PG k' (e2, rho2) (e3, rho3)) ->
+    (forall k', preord_exp cenv P2 PG k' (e2, rho2) (e3, rho3)) ->
     cc_approx_exp k (comp P1 P2) PG (e1, rho1) (e3, rho3).
   Proof.
     eapply cc_approx_exp_respects_preord_exp_r_pre.
@@ -1240,7 +1258,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
   (* Sadly, composing with the preord relation on the left doesn't seem provable *)
 
   Lemma cc_approx_exp_respects_preord_exp_l (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) k:
-    (forall k, preord_exp pr cenv P1 PG k (e1, rho1) (e2, rho2)) ->
+    (forall k, preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)) ->
     cc_approx_exp k P2 PG (e2, rho2) (e3, rho3) ->
     cc_approx_exp k (comp P1 P2) PG (e1, rho1) (e3, rho3).
   Proof.
@@ -1249,7 +1267,7 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
   Abort.
   
   Lemma cc_approx_val_respects_preord_val_l (v1 v2 v3 : val) :
-    (forall k, preord_val pr cenv PG k v1 v2) ->
+    (forall k, preord_val cenv PG k v1 v2) ->
     (forall k, cc_approx_val k PG v2 v3) ->
     (forall k, cc_approx_val k PG v1 v3).
   Proof.
@@ -1279,7 +1297,6 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
       intros Hlt Hall. 
 
       
-      eapply cc_approx_exp_rel_mon; [| eapply HIncl ].
   Abort.
 
   
@@ -1326,8 +1343,12 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
 
   (** [(e1, ρ1) < (C [ e2 ], ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
       interpretation of [C] in [ρ2] *)
-  Lemma ctx_to_rho_cc_approx_exp k (P : nat -> relation nat) boundG rho1 rho2 rho2' C e e' m :
-    (forall c1 c2 n c , c <= sizeOf_exp_ctx C ->  P (n + c) c1 c2 -> P n c1 (c2 + c)) ->
+  Lemma ctx_to_rho_cc_approx_exp k (P : nat -> PostT) boundG rho1 rho2 rho2' C e e' m :
+    (forall n e1 rho1 c1 e2 rho2 rho2' c2 c C, 
+      c <= sizeOf_exp_ctx C -> 
+      ctx_to_rho C rho2 rho2' ->
+      P (n + c) (e1, rho1, c1) (e2, rho2', c2) -> P n (e1, rho1, c1) (C|[ e2 ]|, rho2, c2 + c)) ->
+
     ctx_to_rho C rho2 rho2' -> 
     cc_approx_exp k (P (m + sizeOf_exp_ctx C)) boundG (e, rho1) (e', rho2') ->
     cc_approx_exp k (P m) boundG (e, rho1) (C |[ e' ]|, rho2).
@@ -1338,19 +1359,16 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
       simpl in *. rewrite Nat_as_OT.add_0_r in *. firstorder.
     - intros v1 c1 Hleq1 Hstep1.
       edestruct IHHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; try eassumption.
-      intros. eapply H1; eauto. simpl; omega.
-
       simpl sizeOf_exp_ctx in Hcc.
       replace (m + S (sizeOf_exp_ctx C)) with ((m + 1) + (sizeOf_exp_ctx C)) in Hcc by omega.
       eassumption.
       eexists. eexists (c2 + cost (Eproj_c y t N Γ C |[ e' ]|)). split; [| split ].
       constructor 2; eauto. omega. simpl. 
       econstructor; eauto. replace (c2 + 1 -1) with c2 by omega. eassumption.
-      simpl. eapply H1; eauto. simpl; omega.
-      eassumption.
+      simpl. eapply H1 with (C := Eproj_c y t N Γ Hole_c); eauto. 
+      econstructor; eauto. now econstructor. simpl. eassumption.
     - intros v1' c1 Hleq1 Hstep1.
       edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
-      intros. eapply H1; eauto. simpl; omega.
 
       simpl sizeOf_exp_ctx in Hcc.
       replace (m + S (@Datatypes.length var ys + sizeOf_exp_ctx C))
@@ -1361,38 +1379,32 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
       econstructor; eauto. 
       replace (c2 + S (@Datatypes.length var ys) - S (@Datatypes.length var ys)) with c2 by omega.
       eassumption.
-      simpl. rewrite <- plus_assoc in *. eauto. eapply H1; eauto. simpl; omega.       
-      eassumption.
+      simpl. rewrite <- plus_assoc in *. eauto. eapply H1 with (C := Econstr_c x t ys Hole_c); eauto. simpl; omega.       
+      econstructor; eauto. now econstructor. simpl. eassumption.
     - intros v1' c1 Hleq1 Hstep1. 
-      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]];
-      [ | | | eassumption | ].
+      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption. 
 
-      intros. eapply H1; eauto. simpl; omega.
-      
       simpl sizeOf_exp_ctx in Hcc.
-      replace (m + S  (PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
-          (m + S (PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) in Hcc by omega. 
+      replace (m + S (sizeOf_exp_ctx C)) with (m + 1 + sizeOf_exp_ctx C) in Hcc by omega. 
       eassumption.
-      omega. 
+
       eexists. eexists (c2 + cost (Efun1_c B C |[ e' ]|)). split; [| split ].
       constructor 2; eauto. omega. simpl. 
       econstructor; eauto. 
-      replace (c2 + S (PS.cardinal (fundefs_fv B)) - S (PS.cardinal (fundefs_fv B))) with c2 by omega.
+      replace (c2 + 1 - 1) with c2 by omega.
       eassumption.
-      simpl. eapply H1; eauto. simpl.
-      omega. eassumption. 
+      simpl. eapply H1 with (C := Efun1_c B Hole_c); eauto. 
+      econstructor; eauto. now econstructor. simpl. eassumption.
   Qed.
   
-  Lemma cost_gt_0 e : 
-    0 < cost e.
-  Proof.  
-    destruct e; simpl; omega. 
-  Qed.
-
-  Lemma cc_approx_exp_ctx_to_rho k (P : nat -> relation nat) boundG rho1 rho2 rho2' C e e' m :
-    (forall c1 c2 n c , c <= sizeOf_exp_ctx C ->  P n c1 (c2 + c) -> P (n + c) c1 c2) ->
-    (forall c1 c2 m c, P m c1 c2 -> P (m + c) c1 0) -> (* XXX revise *)
-      ctx_to_rho C rho2 rho2' -> 
+  Lemma cc_approx_exp_ctx_to_rho k (P : nat -> PostT) boundG rho1 rho2 rho2' C e e' m :
+    (forall n e1 rho1 c1 e2 rho2 rho2' c2 c C, 
+      c <= sizeOf_exp_ctx C -> 
+      ctx_to_rho C rho2 rho2' ->
+      P n (e1, rho1, c1) (C|[ e2 ]|, rho2, c2 + c) -> P (n + c) (e1, rho1, c1) (e2, rho2', c2)) ->
+    (forall m e1 rho1 c1 e2 rho2 e2' rho2' c2 c,
+      P m (e1, rho1, c1) (e2, rho2, c2) -> P (m + c) (e1, rho1, c1) (e2', rho2', 0)) -> (* XXX revise *)
+    ctx_to_rho C rho2 rho2' -> 
     cc_approx_exp k (P m) boundG (e, rho1) (C |[ e' ]|, rho2) ->
     cc_approx_exp k (P (m + sizeOf_exp_ctx C)) boundG (e, rho1) (e', rho2').
   Proof.  
@@ -1403,7 +1415,6 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
     - simpl sizeOf_exp_ctx.
       replace (m + S (sizeOf_exp_ctx C)) with ((m + 1) + (sizeOf_exp_ctx C)) by omega.
       eapply IHHctx; eauto.
-      + intros c1 c2 c3 n Hleq. eapply H1. simpl; omega.
       + intros v1 c1 Hleq1 Hstep1.
         edestruct Hcc as [v2 [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
         inv Hstep2; repeat subst_exp.
@@ -1413,14 +1424,15 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
           eapply H2. eassumption.
           simpl; eauto.
         * inv H4. exists v2, (c2 - 1). simpl in *.  repeat subst_exp.
-          split. eassumption. split. eapply H1. simpl; omega. 
-          replace (c2 - 1 + 1) with c2 by (simpl in *; omega). eassumption. 
+          split. eassumption. split. eapply H1 with (C := Eproj_c y t N Γ Hole_c). simpl; omega. 
+          replace (c2 - 1 + 1) with c2 by (simpl in *; omega).
+          econstructor; eauto. now econstructor. simpl.
+          replace (c2 -1 + 1) with c2 by omega. eassumption. 
           eassumption. 
     - simpl sizeOf_exp_ctx.
       replace (m + S (@Datatypes.length var ys + sizeOf_exp_ctx C))
         with ((m + 1 + @Datatypes.length var ys) + (sizeOf_exp_ctx C)) by omega.
       eapply IHHctx; eauto.
-      intros c1 c2 c3 n Hleq. eapply H1; simpl; omega.
       intros v1' c1' Hleq1 Hstep1.
       edestruct Hcc as [v2' [c2' [Hstep2 [Hub Hcc2]]]]; try eassumption.
       inv Hstep2; simpl in *; repeat subst_exp.
@@ -1431,14 +1443,13 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
         simpl; eauto.
       + inv H3. repeat subst_exp. do 2 eexists. split. eassumption.
         split. rewrite <- !plus_assoc in *.  
-        eapply H1. omega. 
-        replace (c2' - S (@Datatypes.length var ys) + (1 + @Datatypes.length var ys)) with c2' by (simpl in *; omega).
+        eapply H1 with (C := Econstr_c x t ys Hole_c). simpl. omega.
+        econstructor; eauto. now econstructor. simpl. Set Printing All.
+        replace (c2' - S (@Datatypes.length var ys) + S (@Datatypes.length var ys)) with c2' by (simpl in *; omega).
         eassumption. eassumption.
     - simpl sizeOf_exp_ctx.
-      replace (m + S (PS.cardinal (fundefs_fv B) + sizeOf_exp_ctx C)) with
-          (m + S (PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx C) by omega. 
+      replace (m + S (sizeOf_exp_ctx C)) with (m + 1 + sizeOf_exp_ctx C) by omega. 
       eapply IHHctx; eauto. 
-      intros. eapply H1; eauto. simpl; omega.
       intros v1' c1' Hleq1 Hstep1.
       edestruct Hcc as [v2' [c2' [Hstep2 [Hub Hcc2]]]]; try eassumption.
       inv Hstep2; simpl in *; repeat subst_exp.
@@ -1449,8 +1460,9 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
         simpl; eauto. 
       + inv H0. repeat subst_exp. do 2 eexists. split. eassumption.
         split.
-        eapply H1. omega. 
-        replace (c2' - S (PS.cardinal (fundefs_fv B)) + S (PS.cardinal (fundefs_fv B))) with c2' by (simpl in *; omega).
+        eapply H1 with (C := Efun1_c B Hole_c). simpl; omega.
+        econstructor; eauto. now econstructor. simpl.
+        replace (c2' - 1 + 1) with c2' by (simpl in *; omega).
         eassumption. eassumption.
   Qed.
 
@@ -1760,4 +1772,4 @@ Definition post_letapp_compat_cc' (P2 : PostT) (PG : PostGT) :=
 
 End LogRelCC.
 
-Notation cc_approx_exp := (fun pr cenv ct => (cc_approx_exp' pr cenv (cc_approx_val pr cenv ct))).
+Notation cc_approx_exp := (fun cenv ct => (cc_approx_exp' cenv (cc_approx_val cenv ct))).

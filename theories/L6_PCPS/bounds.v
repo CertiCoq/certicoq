@@ -51,61 +51,7 @@ Section Bounds.
     eapply le_trans. eassumption. 
     eapply Nat_as_OT.mul_le_mono_l. omega.       
   Qed.
-
-  Lemma post_compat_relation_conj P1 P2 Q1 Q2 :
-    post_compat P1 Q1 ->
-    post_compat P2 Q2 ->
-    post_compat (relation_conjunction P1 P2) (relation_conjunction Q1 Q2).
-  Proof.
-    intros H1 H2 x y z [Hr1 Hr2]. split; eauto.
-  Qed.
-
-  Lemma post_refl_relation_conj P1 P2 :
-    post_refl P1 ->
-    post_refl P2 ->
-    post_refl (relation_conjunction P1 P2).
-  Proof.
-    intros H1 H2 x. split; eauto.
-  Qed. 
-
-  Context (Kpos : K > 0) (Mpos : M > 0).
-
-  Lemma boundL_post_compat l :
-    post_compat (boundL l) (boundL l). 
-  Proof.
-    unfold boundL. eapply post_compat_relation_conj.
-    - intros x y z Hl.  
-      unfold boundL, boundG, lower_boundL, lower_boundG, upper_boundL, upper_boundG  in *. 
-      eapply le_trans. eapply plus_le_compat_r. eassumption.
-      replace (y + z + 1 + l) with (y + 1 + l + z) by omega.
-      rewrite Nat_as_OT.mul_add_distr_l with (p := z).
-      eapply plus_le_compat_l. 
-      assert (Hyp := mult_O_le z K). inv Hyp; eauto. omega.
-    - intros x y z Hl.  
-      unfold boundL, boundG, lower_boundL, lower_boundG, upper_boundL, upper_boundG  in *. 
-      replace (y + z + l) with (y + l + z) by omega.
-      eapply le_trans. eapply plus_le_compat_r. eassumption.
-      replace (x + z + 1) with (x + 1 + z) by omega.
-      rewrite Nat_as_OT.mul_add_distr_l with (p := z).
-      eapply plus_le_compat_l. 
-      assert (Hyp := mult_O_le z M). inv Hyp; eauto. omega.
-  Qed. 
-  
-  Lemma boundL_post_refl l :
-    l <= M ->
-    post_refl (boundL l). 
-  Proof.
-    intros Hle. unfold boundL. 
-    eapply post_refl_relation_conj; unfold boundL, boundG, lower_boundL, lower_boundG, upper_boundL, upper_boundG  in *. 
-    - intros x. rewrite !Nat_as_OT.mul_add_distr_l.
-      assert (Hyp := mult_O_le x K). inv Hyp; eauto. omega.
-      eapply le_trans. eassumption. 
-      rewrite <- plus_assoc. eapply le_plus_l.
-    - intros x. rewrite !Nat_as_OT.mul_add_distr_l.
-      assert (Hyp := mult_O_le x M). inv Hyp; eauto. omega.
-      eapply plus_le_compat. eassumption. omega.
-  Qed.
-
+(*
   (* Divergence preservation *)
   Lemma cc_approx_exp_divergence pr cenv ct l e1 rho1 e2 rho2 :  
     (forall k, cc_approx_exp pr cenv ct k (boundL l) boundG (e1, rho1) (e2, rho2)) ->
@@ -120,7 +66,7 @@ Section Bounds.
       eapply Nat_as_DT.mul_le_mono_pos_l in Hp1; eauto. omega. }
     eapply bstep_fuel_OOT_monotonic; eassumption. 
   Qed.
-
+*)
 
 End Bounds.
 

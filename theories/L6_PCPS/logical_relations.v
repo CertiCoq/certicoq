@@ -535,6 +535,11 @@ Section Log_rel.
       P2 (Eletapp x f t ys e1, rho1, c1 + a) (Eletapp x' f' t' ys' e2, rho2, c2 + a).
 
 
+  Definition post_Efun_l (P1 P2 : PostT) :=
+    forall B e1 e2 rho1 rho2 c1 c2,
+      P1 (e1, def_funs B B rho1 rho1, c1 - cost (Efun B e1)) (e2, rho2, c2) ->
+      P2 (Efun B e1, rho1, c1) (e2, rho2, c2).
+
   Section Compat.
     Context (P1 P2 : PostT) (* Local *)
             (PG : PostGT) (* Global *)           

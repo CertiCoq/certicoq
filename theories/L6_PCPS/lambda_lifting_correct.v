@@ -2,9 +2,9 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import L6.cps L6.cps_util L6.set_util L6.hoisting L6.identifiers L6.ctx
-        L6.Ensembles_util L6.alpha_conv L6.List_util L6.functions L6.lambda_lifting
-        L6.eval L6.logical_relations L6.hoare L6.tactics.
+Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.tactics
+        L6.Ensembles_util L6.List_util L6.functions L6.lambda_lifting L6.eval
+        L6.logical_relations L6.alpha_conv.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
@@ -20,8 +20,66 @@ Section Lambda_lifting_correct.
   Variable pr : prims.
   Variable cenv : ctor_env.
 
-  Variable (P : relation nat) (PG : nat -> relation (exp * env * nat)).
-  
+  Context (P1 : nat -> PostT) (* Local *) (* the nat is the extra steps the target is allowed to take (e.g. c2 <= A*c1 + n) *)
+    (PG : PostGT) (* Global *)           
+    (HPost_con : forall n, post_constr_compat (P1 n) (P1 n))
+    (HPost_proj : forall n, post_proj_compat (P1 n) (P1 n))
+    (HPost_fun : forall n, post_fun_compat (P1 n) (P1 n))
+    (HPost_fun' : post_fun_compat (P1 1) (P1 0))
+    (HPost_case_hd : forall n, post_case_compat_hd (P1 n) (P1 n))
+    (HPost_case_tl : forall n, post_case_compat_tl (P1 n) (P1 n))
+    (HPost_app : forall n, post_app_compat (P1 n) PG) 
+    (HPost_letapp : forall n, post_letapp_compat cenv (P1 n) (P1 n) PG) 
+    (HPost_letapp_OOT : forall n, post_letapp_compat_OOT (P1 n) PG)
+    (HPost_OOT : post_OOT (P1 0))
+    (Hpost_base : post_base (P1 0))
+    (Hinc : inclusion _ (P1 0) PG)
+    (PG_P_local_steps : 
+      forall {A} e1 rho1 c1 e2 rho2 c2 fvs f B1 rhoc x t xs1 l, 
+      Datatypes.length fvs <= PS.cardinal (fundefs_fv B1) ->
+        M.get f rho1 = Some (Vfun rhoc B1 x) ->
+        find_def x B1 = Some (t, xs1, e1) ->
+        P1 l (e1, rho1, c1) (e2, rho2, c2) ->
+        l <= 1 + length xs1 + @length A fvs + 1 ->
+        PG (e1, rho1, c1) (e2, rho2, c2))
+    (PG_P_local_steps_let_app : 
+        forall e1 rho1 c1 c1' e2 rho2 e2' rho2' e2'' rho2'' c2  c2' 
+          f B1 e1' rhoc rhoc' x f' ft ys xs1 vs1 v k, 
+          k <= cost (Eletapp x f ft ys e1) + PS.cardinal (fundefs_fv B1) ->
+          M.get f rho1 = Some (Vfun rhoc B1 f') ->
+          find_def f' B1 = Some (ft, xs1, e1') ->
+          set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
+          (* maybe bstep is needed but ignore for now *)
+          P1 1 (e1', rhoc', c1) (e2', rho2', c2) ->
+          P1 0 (e1, M.set x v rho1, c1') (e2'', rho2'', c2') ->
+          P1 0 (Eletapp x f ft ys e1, rho1, c1' + c1 + cost (Eletapp x f ft ys e1))
+               (e2, rho2, c2' + c2 + k))
+    (PG_P_local_steps_app : 
+        forall e1 rho1 c1 e2 rho2 e2' rho2' c2 
+          f B1 e1' rhoc rhoc' x f' ft ys xs1 vs1 k, 
+          k <= cost (Eletapp x f ft ys e1) + PS.cardinal (fundefs_fv B1) ->
+          M.get f rho1 = Some (Vfun rhoc B1 f') ->
+          find_def f' B1 = Some (ft, xs1, e1') ->
+          set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
+          (* maybe bstep is needed but ignore for now *)
+          P1 1 (e1', rhoc', c1) (e2', rho2', c2) ->
+          P1 0 (Eapp f ft ys, rho1, c1 + cost (Eapp f ft ys))
+               (e2, rho2, c2 + k))
+        
+   (P1_mon : forall l l', l <= l' -> inclusion _ (P1 l) (P1 l'))
+   (P1_local_app : 
+     forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
+        post_Eapp_r (P1 0) (P1 (1 + Datatypes.length ys)) e1 rho1 f ft ys rho2)
+   (P1_local_app' : 
+      forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
+        post_Eapp_r (P1 1) (P1 (1 + Datatypes.length ys + 1)) e1 rho1 f ft ys rho2)
+    (P1_ctx_r : 
+      forall e1 rho1 c1 e2 e2' rho2 rho2' c2 c m m', 
+        c <= m' ->
+        P1 m (e1, rho1, c1) (e2, rho2, c2) -> 
+        P1 (m + m') (e1, rho1, c1) (e2', rho2', c2 + c)).
+
+
   
   (** The invariant that relates the original function definitions with the lifted ones *)
   Definition Funs_inv k (rho rho' : env) (σ : var -> var)
@@ -36,10 +94,11 @@ Section Lambda_lifting_correct.
         M.get (σ f') rho' = Some (Vfun rho2 B2 f2) /\
         find_def f2 B2 = Some (ft', xs2, e2) /\
         get_list (map σ fvs) rho' = Some vs2' /\
+        length vs2' <= PS.cardinal (fundefs_fv B1) /\ (* For the cost bound *)
         Some rho2' = set_lists xs2 (vs2 ++ vs2') (def_funs B2 B2 rho2 rho2) /\
-        (j < k -> Forall2 (preord_val pr cenv j PG) vs1 vs2 ->
-         preord_exp pr cenv j P PG (e1, rho1') (e2, rho2')).
-  
+        (j < k -> Forall2 (preord_val cenv PG j) vs1 vs2 ->
+         preord_exp cenv (P1 1) PG j (e1, rho1') (e2, rho2')).
+ 
   (** * Lemmas about [Funs_inv] *)  
   
   Lemma Funs_inv_set k rho rho' σ ζ v1 v2 x y :
@@ -60,7 +119,7 @@ Section Lambda_lifting_correct.
       by (intros Hc; subst; eapply Hnin2; repeat eexists; eauto).    
     rewrite M.gso in Hget2; eauto. 
     edestruct Hinv as
-        [rho2 [rho2' [B2 [f2 [xs2 [e2 [vs2' [Hget' [Hdef' [Hgetl [Hset' Hpre]]]]]]]]]]]; eauto.
+        [rho2 [rho2' [B2 [f2 [xs2 [e2 [vs2' [Hget' [Hdef' [Hgetl [Hfvs [Hset' Hpre]]]]]]]]]]]]; eauto.
     do 8 eexists; repeat split; eauto.
     - rewrite extend_gso; eauto. rewrite M.gso; eauto.
       intros Hc; subst.
@@ -68,7 +127,7 @@ Section Lambda_lifting_correct.
     - rewrite map_extend_not_In. rewrite get_list_set_neq. eassumption.
       intros Hc. eapply in_map_iff in Hc. destruct Hc as [x' [Heq' HIn]].
       eapply Hnin5. eexists; split; eauto. left. now repeat eexists; eauto.
-      intros Hc. eapply Hnin4. repeat eexists. eassumption. eassumption.
+      intros Hc. eapply Hnin4. repeat eexists. eassumption. eassumption.   
   Qed.
 
   Lemma Funs_inv_set_lists k rho rho' rho1 rho1' σ ζ vs1 vs2 xs ys :
@@ -88,7 +147,7 @@ Section Lambda_lifting_correct.
       by (intros Hc; subst; eapply HD1; constructor; eauto; eexists; eauto).
     erewrite <- set_lists_not_In in Hget2; eauto.
     edestruct Hinv as
-        [rho3 [rho3' [B2 [f2 [xs2 [e2 [vs2'' [Hget' [Hdef' [Hgetl [Hset' Hpre]]]]]]]]]]]; eauto.
+        [rho3 [rho3' [B2 [f2 [xs2 [e2 [vs2'' [Hget' [Hdef' [Hgetl [Hfvs [Hset' Hpre]]]]]]]]]]]]; eauto.
     do 8 eexists; repeat split; eauto.
     - rewrite extend_lst_gso. erewrite <- set_lists_not_In; eauto.
       intros Hc; subst. eapply HD4. constructor; eauto.
@@ -165,7 +224,7 @@ Section Lambda_lifting_correct.
     assert (Heq : lifted_name ζ f = Some f')
       by (unfold lifted_name; rewrite Hget1; simpl; eauto).
     edestruct Hinv as
-        [rho3 [rho3' [B2 [f2 [xs2 [e2 [vs2'' [Hget' [Hdef' [Hgetl' [Hset' Hpre]]]]]]]]]]]; eauto.
+        [rho3 [rho3' [B2 [f2 [xs2 [e2 [vs2'' [Hget' [Hdef' [Hgetl' [Hset' [Hfvs Hpre]]]]]]]]]]]]; eauto.
     do 8 eexists; repeat split; eauto.
     - erewrite <- get_reset_lst; eauto.
       intros Hc; subst. eapply HD1. constructor; eauto.
@@ -184,7 +243,7 @@ Section Lambda_lifting_correct.
     intros Hinv Hleq f f' ft' fvs vs1' vs2' j ft1  rho2 rho2' B1 f1
            xs1 e1 Hget1 Hget2 Hlen Hdef Hset.
     edestruct Hinv as
-        [rho3 [rho3' [B2 [f2 [xs2 [e2 [vs2'' [Hget' [Hdef' [Hgetl [Hset' Hpre]]]]]]]]]]]; eauto.
+        [rho3 [rho3' [B2 [f2 [xs2 [e2 [vs2'' [Hget' [Hdef' [Hgetl [Hfvs [Hset' Hpre]]]]]]]]]]]]; eauto.
     do 7 eexists; repeat split; try eassumption.
     intros Hlt. eapply Hpre. omega.
   Qed.
@@ -194,31 +253,13 @@ Section Lambda_lifting_correct.
     constructor; intros Hinv f f' ft' fvs vs1' vs2' j ft1  rho2 rho2' B1 f1
                         xs1 e1 Hget1 Hget2 Hlen Hdef Hset; subst;
     edestruct Hinv as
-        [rho3 [rho3' [B2 [f2 [xs2 [e2 [vs2'' [Hget' [Hdef' [Hgetl [Hset' Hpre]]]]]]]]]]]; eauto;
+        [rho3 [rho3' [B2 [f2 [xs2 [e2 [vs2'' [Hget' [Hdef' [Hgetl [Hfvs [Hset' Hpre]]]]]]]]]]]]; eauto;
     do 7 eexists; repeat split; eauto.
     rewrite <- H2. eassumption.
     rewrite <- H2. eassumption.
     rewrite H2. eassumption.
     rewrite H2. eassumption.
   Qed.      
-
-  (* TODO move *)
-  Lemma preord_exp_app_r (P1 P2 : relation nat)
-        (k : nat) (rho1 rho2 rhoc rho' : env) (f f' : var) (ft : fun_tag) (ys xs : list var) e1 e2 B vs :
-    (forall c1 c2, P2 c1 c2 -> P1 c1 (c2 + 1 + length ys)) ->
-    M.get f rho2 = Some (Vfun rhoc B f') ->
-    get_list ys rho2 = Some vs ->
-    find_def f' B = Some (ft, xs, e2) ->
-    set_lists xs vs (def_funs B B rhoc rhoc) = Some rho' ->
-    preord_exp pr cenv k P2 PG (e1, rho1) (e2, rho') ->
-    preord_exp pr cenv k P1 PG (e1, rho1) (Eapp f ft ys, rho2).
-  Proof.
-    intros Hypc Hget Hgetl Hf Hset Hexp v c1 Hleq Hstep.
-    edestruct Hexp as (v2 & c2 & Hstep' & Hpost & Hval); eauto.
-    do 2 eexists. split.
-    now econstructor; eauto. split; [| eassumption ].
-    now eauto.
-  Qed. 
 
   Lemma Fundefs_lambda_lift_correct1 k rho rho' B1 B2 σ ζ σ1 ζ1 S
         S1' S1'' S1''' fvs e:
@@ -238,10 +279,10 @@ Section Lambda_lifting_correct.
           Disjoint var (FunsFVs ζ) (Union _ S (bound_var e)) ->
           Disjoint _ (bound_var e) (occurs_free e) ->
           binding_in_map (image σ (Union _ (Union _ (occurs_free e) (FunsFVs ζ)) (LiftedFuns ζ))) rho' ->
-          preord_env_P_inj pr cenv PG (occurs_free e) m σ rho rho' ->
+          preord_env_P_inj cenv PG (occurs_free e) m σ rho rho' ->
           Funs_inv m rho rho' σ ζ ->
           Exp_lambda_lift ζ σ e S e' S' ->
-          preord_exp pr cenv m P PG (e, rho) (e', rho')) ->
+          preord_exp cenv (P1 0) PG m (e, rho) (e', rho')) ->
 
     (* Unique bindings *)
     unique_bindings_fundefs B1 ->
@@ -270,11 +311,11 @@ Section Lambda_lifting_correct.
                    rho' ->
 
     (** The invariant hold for the initial environments **)
-    preord_env_P_inj pr cenv PG (occurs_free (Efun B1 e)) k σ rho rho' ->
+    preord_env_P_inj cenv PG (occurs_free (Efun B1 e)) k σ rho rho' ->
     Funs_inv k rho rho' σ ζ ->
     
     NoDup fvs ->
-    FromList fvs \subset (occurs_free_fundefs B1 :|: (LiftedFuns ζ :|: FunsFVs ζ)) ->
+    FromList fvs \subset occurs_free_fundefs B1 (*:|: (LiftedFuns ζ :|: FunsFVs ζ))*) ->
     (* Disjoint var (FromList fvs) (Union _ S (bound_var_fundefs B1)) -> *)    
     
     Add_functions B1 fvs σ ζ S σ1 ζ1 S1' ->
@@ -283,7 +324,7 @@ Section Lambda_lifting_correct.
     
 
     (** The invariants hold for the final environments **)
-    preord_env_P_inj pr cenv PG (occurs_free (Efun B1 e) :|: name_in_fundefs B1)
+    preord_env_P_inj cenv PG (occurs_free (Efun B1 e) :|: name_in_fundefs B1)
                      k σ1 (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') /\
     Funs_inv k (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') σ1 ζ1.
   Proof with now eauto with Ensembles_DB.
@@ -294,7 +335,7 @@ Section Lambda_lifting_correct.
              S1' S1'' S1''' fvs e IHe Hun Hd1 Hd2 Hd3 Hd4 Hd5 Hd6 Hbin Henv Hfinv Hnd Hin1 Hadd Hin2 Hllfuns.
     assert 
       (HB1 : forall j, j < k ->
-                       preord_env_P_inj pr cenv PG (Union var (occurs_free (Efun B1 e)) (name_in_fundefs B1))
+                       preord_env_P_inj cenv PG (Union var (occurs_free (Efun B1 e)) (name_in_fundefs B1))
                                         j σ1 (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') /\
                        Funs_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') σ1 ζ1).
     { intros j leq. eapply IHk; last (now apply Hllfuns); eauto.
@@ -321,11 +362,8 @@ Section Lambda_lifting_correct.
     assert (HDfunsfvs : Disjoint _ (FunsFVs ζ1) (S :|: bound_var_fundefs B1)).
     { eapply Disjoint_Included_l.
       eapply Add_functions_FunsFVs_Included_r. eassumption.
-      eapply Union_Disjoint_l. eassumption.
-      eapply Disjoint_Included_l. eassumption. eapply Union_Disjoint_l.
-      eapply Union_Disjoint_r. eapply Disjoint_sym. eapply Disjoint_Included_r; [| now eapply Hd2 ].
-      normalize_occurs_free... now sets.
-      now sets. }
+      eapply Union_Disjoint_l. eassumption. 
+      eapply Disjoint_Included_l. eassumption. rewrite occurs_free_Efun in Hd2. now sets. }
     assert (Himin : image σ1 (occurs_free (Efun B1 e) :|: (LiftedFuns ζ1 :|: FunsFVs ζ1)) \subset
                     image σ (occurs_free (Efun B1 e) :|: (FunsFVs ζ :|: LiftedFuns ζ)) :|: (name_in_fundefs B1 :|: (S \\ S1'))).
     { eapply Included_trans. eapply Add_functions_image_Included. eassumption.
@@ -413,16 +451,26 @@ Section Lambda_lifting_correct.
             rewrite Setminus_Union_distr. eapply Included_Union_preserv_l.
             eapply Included_Setminus. eapply Disjoint_Included_l. eassumption. sets. reflexivity. 
             eapply image_monotonic. eapply Included_trans. eassumption. normalize_occurs_free.
-            eapply Union_Included. sets. eapply Union_Included. eapply Included_trans. eapply Add_functions_LiftedFuns_Included_l. eassumption. eassumption.
+            now sets. }
+(*          eapply Union_Included. sets. eapply Union_Included. eapply Included_trans. eapply Add_functions_LiftedFuns_Included_l. eassumption. eassumption.
             eapply Disjoint_Included_r; [| eassumption ]. now sets. now sets.
-            eapply Included_trans. eapply Add_functions_FunsFVs_Included_l. eassumption. eassumption. eapply Disjoint_Included_r; [| eassumption ]. now sets. now sets. }
+            eapply Included_trans. eapply Add_functions_FunsFVs_Included_l. eassumption. eassumption. eapply Disjoint_Included_r; [| eassumption ]. now sets. now sets. } *)
           assert (Hfset : exists rho2', set_lists (xs1' ++ ys) (vs2 ++ vsf) (def_funs B2 B2 rho' rho') = Some rho2').
           { eapply set_lists_length3. rewrite !app_length, Hleq2. 
             eapply get_list_length_eq in Hgetfvs. rewrite list_length_map in Hgetfvs.
             eapply set_lists_length_eq in Hset2. rewrite Hleq1, <- Hset2, Hgetfvs. reflexivity. }
-          destruct Hfset as [rho2' Hfset].
-          { eapply preord_exp_app_r; [| eassumption  | | eassumption | | ].
-            - admit. (* postcondition *)
+          destruct Hfset as [rho2' Hfset]. 
+          { eapply preord_exp_post_monotonic_strong. intros. 
+            eapply PG_P_local_steps with (l := 1 + length xs1' + length fvs); eauto. 
+            eapply FromList_length_cardinal'. rewrite <- fundefs_fv_correct. eassumption. eassumption. 
+            erewrite <- set_lists_not_In; [| now eauto |]. now rewrite def_funs_eq.
+            assert (Hdis : Disjoint _ (FromList xs1') (name_in_fundefs B1)).
+            { eapply unique_bindings_fun_in_fundefs; eauto. eapply find_def_correct; eauto. }
+            intros Hc. eapply Hdis; now constructor; eauto. now eapply Nat_as_OT.le_add_r.
+            
+            eapply preord_exp_app_r with (P1 := P1 0); [| eassumption  | | eassumption | | ].
+            - rewrite Hleq1. rewrite <- map_length with (l := fvs) (f := σ1). rewrite <- plus_assoc.
+              rewrite <- app_length. eapply P1_local_app. 
             - eapply get_list_app. now erewrite get_list_set_lists; eauto. eassumption.
             - eassumption.
             - assert (Hfset' := Hfset). eapply set_lists_app in Hfset'. destruct Hfset' as (rho2'' & Hsetl1 & Hsetl2).  
@@ -578,12 +626,15 @@ Section Lambda_lifting_correct.
             eapply get_list_length_eq in Hgetfvs. rewrite list_length_map in Hgetfvs.
             symmetry in Hset. eapply set_lists_length_eq in Hset. rewrite Hgetfvs, <- Hleq. f_equal. eassumption. }
           destruct Hfset as [rho2' Hsetapp].
-          do 7 eexists. split; [| split;  [| split; [| split ]]]; [| eassumption | eassumption | | ].
+          do 7 eexists. split; [| split;  [| split; [| split; [| split ]]]]; [| eassumption | eassumption | | | ].
           -- rewrite def_funs_eq. reflexivity. eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct. eassumption.
+          -- erewrite <- get_list_length_eq; [| now eauto ]. rewrite list_length_map. 
+            eapply FromList_length_cardinal'; eauto. rewrite <- fundefs_fv_correct. eassumption.
           -- now eauto.
           -- intros Hlt Hall.
              { assert (Hsetapp' := Hsetapp). eapply set_lists_app in Hsetapp. edestruct Hsetapp as (rho2'' & Hsetl1 & Hsetl2).
                2:{ rewrite <- Hleq. eapply set_lists_length_eq. now eauto. }
+               eapply preord_exp_post_monotonic. eapply P1_mon with (l := 0). omega.
                eapply IHe; [ eassumption | | | | | | | | | | | eassumption ].
                - eapply unique_bindings_fun_in_fundefs.
                  eapply find_def_correct. eassumption. eassumption.
@@ -669,13 +720,13 @@ Section Lambda_lifting_correct.
                       eapply Disjoint_Included; [| | eapply Hd2 ]. sets. eapply Included_trans; eauto. }
       + rewrite def_funs_neq in Hgetf1; [| eassumption ].
         erewrite Add_functions_eq in Hzeq; [| eassumption | eassumption ].
-        edestruct Hfinv as (rho2 & rho2' & B2' & f2' & xs2 & e2 & cs2 & Hgetf2 & Hf2 & Hgetl & Hset2 & Hyp).
+        edestruct Hfinv as (rho2 & rho2' & B2' & f2' & xs2 & e2 & cs2 & Hgetf2 & Hf2 & Hgetl & Hfvs & Hset2 & Hyp).
         * eassumption.
         * eassumption.
         * eapply Hleq.
         * eassumption.
         * eassumption.
-        * do 7 eexists. split; [| split; [| split; [| split ]]].
+        * do 7 eexists. split; [| split; [| split; [| split; [| split ]]]].
           --  assert (Hnin : ~ f2 \in name_in_fundefs B1 :|: (S \\ S1')).
               { intros Hc.
                 eapply Hd3. constructor; eauto.  
@@ -705,13 +756,14 @@ Section Lambda_lifting_correct.
                 intros z Hin. do 4 eexists. eauto.
           -- eassumption.
           -- eassumption.
-  Admitted. 
+          -- eassumption.
+  Qed. 
 
 
   Lemma Make_wrappers_correct k S f1 f2 z B S1 fds S2 rho1 rho2 :
     Make_wrappers z f1 B S1 fds S2 f2 ->
     
-    preord_env_P_inj pr cenv PG (S \\ name_in_fundefs B) k f1 rho1 rho2 ->
+    preord_env_P_inj cenv PG (S \\ name_in_fundefs B) k f1 rho1 rho2 ->
     Funs_inv k rho1 rho2 f1 z ->
 
     Disjoint _ (image f1 (S \\ name_in_fundefs B :|: FunsFVs z)) S1 ->
@@ -722,7 +774,7 @@ Section Lambda_lifting_correct.
     (forall f, f \in name_in_fundefs B -> exists rho1c, M.get f rho1 = Some (Vfun rho1c B f)) -> 
     f_eq_subdomain (image' (lifted_name z) (name_in_fundefs B)) f1 id -> 
     
-    preord_env_P_inj pr cenv PG S k f2 rho1 (def_funs fds fds rho2 rho2).
+    preord_env_P_inj cenv PG S k f2 rho1 (def_funs fds fds rho2 rho2).
   Proof.
     intros Hwr Henv Hfuns Hdis Hdis' Hun Hbin Hfeq x Hin.
     destruct (Decidable_name_in_fundefs B) as [Hdec]. destruct (Hdec x).
@@ -735,7 +787,7 @@ Section Lambda_lifting_correct.
         eexists. split. rewrite def_funs_eq. reflexivity. eapply find_def_name_in_fundefs. eassumption.
         
         rewrite preord_val_eq. intros vs1 vs2 j t xs1' e1 rho1c Hlen Hf Hset. repeat subst_exp.
-        edestruct Hfuns as (rhoc1 & rhoc1' & B2 & f3 & xs2 & e2 & vs2' & Hgetf' & Hfdef'' & Hgetl & Hset' & Hyp); try eassumption.
+        edestruct Hfuns as (rhoc1 & rhoc1' & B2 & f3 & xs2 & e2 & vs2' & Hgetf' & Hfdef'' & Hgetl & Hfvs & Hset' & Hyp); try eassumption.
         
         assert (Hlin : In var (LiftedFuns z) f').
         { eexists. split. eexists. unfold lifted_name. rewrite Hzeq. reflexivity.
@@ -746,9 +798,21 @@ Section Lambda_lifting_correct.
           
         edestruct (set_lists_length3 (def_funs fds fds rho2 rho2) xs' vs2) as [rho2c' Hset3].
         rewrite <- Hlen. erewrite <- set_lists_length_eq with (vs := vs1); [| now eauto ]. now eauto.
-        do 3 eexists. split. eassumption. split. now eauto. intros Hlt Hall. specialize (Hyp Hlt Hall). 
-        eapply preord_exp_app_r.
-        * admit. (* post *)
+        do 3 eexists. split. eassumption. split. now eauto. intros Hlt Hall. 
+        specialize (Hyp Hlt Hall). repeat subst_exp.
+        eapply preord_exp_post_monotonic_strong. intros. 
+        eapply PG_P_local_steps with (l := 1 + (length xs1' + length fvs) + 1); eauto.   
+        erewrite <- set_lists_not_In; [| now eauto |]. now rewrite def_funs_eq.
+        assert (Hdis1 : Disjoint _ (FromList xs1') (name_in_fundefs B)).
+        { eapply unique_bindings_fun_in_fundefs; eauto. eapply find_def_correct; eauto. }
+        intros Hc. eapply Hdis1; now constructor; eauto. 
+
+        erewrite <- (get_list_length_eq (map f1 fvs) vs2'); eauto. 
+        rewrite list_length_map. omega.
+
+        eapply preord_exp_app_r with (P1 := P1 1); [|  | | eassumption | | ].
+        * rewrite <- (map_length f1 fvs). rewrite Hleq. 
+          rewrite <- app_length.  eapply P1_local_app'. 
         * assert (Hfeq'' : f2 f' = f'). {
             erewrite <- Make_wrappers_f_eq_subdomain with (Q := [set f']); [| eassumption | | reflexivity ].
             2:{ eapply Disjoint_Included; [| | eapply Hdis' ]; sets. }
@@ -780,8 +844,7 @@ Section Lambda_lifting_correct.
           eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hdis ]. eassumption.
           rewrite FromList_map_image_FromList. eapply image_monotonic. eapply Included_Union_preserv_r. intros y Hiny.
           do 4 eexists. now split; eauto.
-        * eassumption.
-        * now eauto.
+        * now eauto. 
         * eassumption.
     - erewrite <- Make_wrappers_f_eq_subdomain with (Q := [set x]);
         [| eassumption | now eapply Disjoint_Singleton_l | reflexivity ].
@@ -792,7 +855,7 @@ Section Lambda_lifting_correct.
       rewrite def_funs_neq. eassumption. intros Hc. eapply Hdis.
       eapply Make_wrappers_name_in_fundefs in Hc; [| eassumption ]. inv Hc.
       constructor; [| eassumption ]. eapply In_image. left. now constructor; eauto.
-  Admitted.
+  Qed.
 
   Lemma Make_wrappers_Funs_inv k f1 f2 z B S1 fds S2 rho1 rho2 :
     Make_wrappers z f1 B S1 fds S2 f2 ->
@@ -804,8 +867,8 @@ Section Lambda_lifting_correct.
     Funs_inv k rho1 (def_funs fds fds rho2 rho2) f2 z.
   Proof.
     intros Hw Hfv Hd1 Hd2 f f' ft fvs vs1 vs2 j ft' rhoc rhoc' B1 h xs1 e1 Hzeq Hget Hlen Hf Hset.
-    edestruct Hfv as (rhoc1 & rhoc1' & B2 & f3 & xs2 & e2 & vs2' & Hgetf' & Hfdef'' & Hgetl & Hset' & Hyp); try eassumption.
-    do 7 eexists. split; [| split; [| split; [| split ]]].
+    edestruct Hfv as (rhoc1 & rhoc1' & B2 & f3 & xs2 & e2 & vs2' & Hgetf' & Hfdef'' & Hgetl & Hfvs & Hset' & Hyp); try eassumption.
+    do 7 eexists. split; [| split; [| split; [| split; [| split ]]]].
     - erewrite <- Make_wrappers_f_eq_subdomain with (Q := [set f']); [| eassumption | | reflexivity ]. 
       rewrite def_funs_neq. eassumption.
       + intros Hc. eapply Make_wrappers_name_in_fundefs in Hc; [| eassumption ].
@@ -831,6 +894,7 @@ Section Lambda_lifting_correct.
       eapply Included_Union_preserv_r.
       intros y Hiny. do 4 eexists. split; eassumption. 
     - eassumption.
+    - now eauto.  
     - eassumption.
   Qed.
 
@@ -852,10 +916,10 @@ Section Lambda_lifting_correct.
           Disjoint var (FunsFVs ζ) (Union _ S (bound_var e)) ->
           Disjoint _ (bound_var e) (occurs_free e) ->
           binding_in_map (image σ (Union _ (Union _ (occurs_free e) (FunsFVs ζ)) (LiftedFuns ζ))) rho' ->
-          preord_env_P_inj pr cenv PG (occurs_free e) m σ rho rho' ->
+          preord_env_P_inj cenv PG (occurs_free e) m σ rho rho' ->
           Funs_inv m rho rho' σ ζ ->
           Exp_lambda_lift ζ σ e S e' S' ->
-          preord_exp pr cenv m P PG (e, rho) (e', rho')) ->
+          preord_exp cenv (P1 0) PG m (e, rho) (e', rho')) ->
     
     (* Unique bindings *)
     unique_bindings_fundefs B1 ->
@@ -882,11 +946,11 @@ Section Lambda_lifting_correct.
     binding_in_map (image σ (occurs_free_fundefs B1 :|: (FunsFVs ζ :|: LiftedFuns ζ))) rho' ->
     
     (** The invariant hold for the initial environments **)
-    preord_env_P_inj pr cenv PG (occurs_free_fundefs B1) k σ rho rho' ->
+    preord_env_P_inj cenv PG (occurs_free_fundefs B1) k σ rho rho' ->
     Funs_inv k rho rho' σ ζ ->
     
     NoDup fvs ->
-    FromList fvs \subset (occurs_free_fundefs B1 :|: (LiftedFuns ζ :|: FunsFVs ζ)) ->
+    FromList fvs \subset occurs_free_fundefs B1 ->
     
     Add_functions B1 fvs σ ζ S σ1 ζ1 S1' ->
     Included _ S1'' S1' ->
@@ -1004,14 +1068,16 @@ Section Lambda_lifting_correct.
           eapply get_list_length_eq in Hgetfvs. rewrite list_length_map in Hgetfvs.
           symmetry in Hset. eapply set_lists_length_eq in Hset. rewrite Hgetfvs, <- Hleq. f_equal. eassumption. }
         destruct Hfset as [rho2' Hsetapp].
-        do 7 eexists. split; [| split;  [| split; [| split ]]]; [| eassumption | eassumption | | ].
+        do 7 eexists. split; [| split;  [| split; [| split; [| split ]]]]; [| eassumption | eassumption | | | ].
         -- rewrite def_funs_eq. reflexivity. eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct. eassumption.
+        -- erewrite <- get_list_length_eq; [| now eauto ]. rewrite map_length. 
+           eapply FromList_length_cardinal'. rewrite <- fundefs_fv_correct. eassumption. eassumption.
         -- now eauto.
-        -- intros Hlt Hall.
-           eapply preord_exp_post_monotonic. admit. (* postcondition *) 
-           eapply ctx_to_rho_preord_exp with (C := Efun1_c C Hole_c). admit. (* postcondition *)
+        -- intros Hlt Hall. replace 1 with (0 + 1).
+           eapply ctx_to_rho_preord_exp with (C := Efun1_c C Hole_c).
+           ++ intros. eapply P1_ctx_r. omega. eassumption.
            ++ constructor. constructor.
-           ++ { eapply preord_exp_post_monotonic. admit. (* postcondition *)
+           ++ { (* eapply preord_exp_post_monotonic. admit. postcondition *)
                 assert (Hsetapp' := Hsetapp). eapply set_lists_app in Hsetapp. edestruct Hsetapp as (rho2i & Hsetl1 & Hsetl2).
                 2:{ rewrite <- Hleq. eapply set_lists_length_eq. now eauto. }
 
@@ -1076,7 +1142,7 @@ Section Lambda_lifting_correct.
                  rewrite Union_commut. eapply binding_in_map_def_funs.
                  eapply binding_in_map_antimon.
                  rewrite Make_wrappers_name_in_fundefs_image; [| eassumption | eassumption ]. 
-                 eapply image_Setminus. now tci.
+                 eapply functions.image_Setminus. now tci.
                  rewrite <- Make_wrapper_image; [| eassumption | now sets ]. 
 
                  eapply binding_in_map_antimon.
@@ -1151,15 +1217,16 @@ Section Lambda_lifting_correct.
                    eapply Disjoint_Included; [| | eapply Hd2 ]. now xsets. eapply Included_trans.
                    eapply Included_trans. eapply Setminus_Included. eassumption. now xsets.                   
                    now sets. }
+          ++ omega.
     + rewrite def_funs_neq in Hgetf1; [| eassumption ].
       erewrite Add_functions_eq in Hzeq; [| eassumption | eassumption ].
-      edestruct Hfinv as (rho2 & rho2' & B2' & f2' & xs2 & e2 & cs2 & Hgetf2 & Hf2 & Hgetl & Hset2 & Hyp).
+      edestruct Hfinv as (rho2 & rho2' & B2' & f2' & xs2 & e2 & cs2 & Hgetf2 & Hf2 & Hgetl & Hset2 & Hfvs & Hyp).
       * eassumption.
       * eassumption.
       * eapply Hleq.
       * eassumption.
       * eassumption.
-      * do 7 eexists. split; [| split; [| split; [| split ]]].
+      * do 7 eexists. split; [| split; [| split; [| split; [| split ]]]].
         --  assert (Hnin : ~ f2 \in name_in_fundefs B1 :|: (S \\ S1)).
             { intros Hc. eapply Hd3. constructor; eauto.  
               eexists f1. split. eexists. unfold lifted_name. rewrite Hzeq. reflexivity.
@@ -1186,9 +1253,11 @@ Section Lambda_lifting_correct.
               intros z Hin. do 4 eexists. eauto.
         -- eassumption.
         -- eassumption.
-  Admitted.
+        -- eassumption. 
+  Qed. 
 
-    Lemma image_extend_fundefs S f B: 
+  (* TODO move *)
+  Lemma image_extend_fundefs S f B: 
     image (extend_fundefs f B B) S \subset image f (S \\ name_in_fundefs B) :|: name_in_fundefs B.
   Proof.
     revert S; induction B; intros S; simpl in *; eauto.
@@ -1279,8 +1348,7 @@ Section Lambda_lifting_correct.
   Proof.
     intros Hf. induction Hf; try reflexivity.
     simpl. eapply Same_set_Union_compat. reflexivity. eassumption.
-  Qed. 
-
+  Qed.
 
   Lemma Fundefs_lambda_lift_correct3 k rho rho' B1 B2 σ ζ S S' e:
     (* The IH for expressions *)
@@ -1299,10 +1367,10 @@ Section Lambda_lifting_correct.
           Disjoint var (FunsFVs ζ) (Union _ S (bound_var e)) ->
           Disjoint _ (bound_var e) (occurs_free e) ->
           binding_in_map (image σ (Union _ (Union _ (occurs_free e) (FunsFVs ζ)) (LiftedFuns ζ))) rho' ->
-          preord_env_P_inj pr cenv PG (occurs_free e) m σ rho rho' ->
+          preord_env_P_inj cenv PG (occurs_free e) m σ rho rho' ->
           Funs_inv m rho rho' σ ζ ->
           Exp_lambda_lift ζ σ e S e' S' ->
-          preord_exp pr cenv m P PG (e, rho) (e', rho')) ->
+          preord_exp cenv (P1 0) PG m (e, rho) (e', rho')) ->
 
     (* Unique bindings *)
     unique_bindings_fundefs B1 ->
@@ -1331,14 +1399,14 @@ Section Lambda_lifting_correct.
                    rho' ->
 
     (** The invariant holds for the initial environments **)
-    preord_env_P_inj pr cenv PG (occurs_free (Efun B1 e)) k σ rho rho' ->
+    preord_env_P_inj cenv PG (occurs_free (Efun B1 e)) k σ rho rho' ->
     Funs_inv k rho rho' σ ζ ->
         
     Fundefs_lambda_lift3 ζ σ B1 B1 S B2 S' ->
     
 
     (** The invariants hold for the final environments **)
-    preord_env_P_inj pr cenv PG (occurs_free (Efun B1 e) :|: name_in_fundefs B1)
+    preord_env_P_inj cenv PG (occurs_free (Efun B1 e) :|: name_in_fundefs B1)
                      k (extend_fundefs σ B1 B1) (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho'). (* /\ *)
     (* Funs_inv k (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (extend_fundefs σ B1 B1) ζ. *)
   Proof with now eauto with Ensembles_DB.
@@ -1347,7 +1415,7 @@ Section Lambda_lifting_correct.
       intros rho rho' B1 B2 σ ζ  S1 S2 e IHe Hun Hd1 Hd2 Hd3 Hd4 Hd5 Hd6 Hbin Henv Hfinv Hllfuns.
     assert 
       (HB1 : forall j, j < k ->
-                       preord_env_P_inj pr cenv PG (occurs_free (Efun B1 e) :|: name_in_fundefs B1)
+                       preord_env_P_inj cenv PG (occurs_free (Efun B1 e) :|: name_in_fundefs B1)
                                         j (extend_fundefs σ B1 B1) (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho')). (*  /\ *)
                        (* Funs_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (extend_fundefs σ B1 B1) ζ) *)
     { intros j leq. eapply IHk; last (now apply Hllfuns); eauto.
@@ -1391,7 +1459,7 @@ Section Lambda_lifting_correct.
       assert (Hname : name_in_fundefs B1 \subset bound_var_fundefs B1).
       { eapply name_in_fundefs_bound_var_fundefs. }
       
-      eapply preord_exp_post_monotonic. admit. (* post *)
+      eapply preord_exp_post_monotonic. eapply Hinc.
       eapply IHe; last eassumption.
       + eassumption.
       + eapply unique_bindings_fun_in_fundefs.
@@ -1456,61 +1524,117 @@ Section Lambda_lifting_correct.
       eapply Hd1. constructor. eapply In_image. left. eassumption. right.
       eapply name_in_fundefs_bound_var_fundefs. eassumption.
       eassumption. 
-  Admitted.
+  Qed.
 
   Lemma Funs_inv_Eletapp k x f ft ys e f' ft' fvs e' σ ζ rho rho' :
     (forall (m : nat) (v1 v2 : val),
         m < k ->
-        preord_val pr cenv m PG v1 v2 -> preord_exp pr cenv m P PG (e, M.set x v1 rho) (e', M.set x v2 rho')) ->
+        preord_val cenv PG m v1 v2 -> preord_exp cenv (P1 0) PG m (e, M.set x v1 rho) (e', M.set x v2 rho')) ->
     Funs_inv k rho rho' σ ζ ->
-    preord_env_P_inj pr cenv PG (occurs_free (Eletapp x f ft ys e)) k σ rho rho' ->
+    preord_env_P_inj cenv PG (occurs_free (Eletapp x f ft ys e)) k σ rho rho' ->
     
     ζ f = Some (f', ft', fvs) ->
-    preord_exp pr cenv k P PG (Eletapp x f ft ys e, rho) (Eletapp x (σ f') ft' (map σ (ys ++ fvs)) e', rho').
+    preord_exp cenv (P1 0) PG k (Eletapp x f ft ys e, rho) (Eletapp x (σ f') ft' (map σ (ys ++ fvs)) e', rho').
   Proof.
     intros Hyp Hfuns Henv Hzeq v1 c1 Hleq Hstep. inv Hstep.
-    edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
-    normalize_occurs_free. now sets.
-    assert (Hlen := Forall2_length _ _ _ Hprevs). 
+    - eexists OOT, c1. split; [| split; eauto ].
+      + econstructor. simpl in *. rewrite map_app, app_length, map_length. omega.
+      + simpl; eauto.
+    - inv H0. 
+      + edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
+        normalize_occurs_free. now sets.
+        assert (Hlen := Forall2_length _ _ _ Hprevs). 
+  
+        edestruct Hfuns with (j := k - 1) as (rhoc & rhoc' & B2 & f2 & xs2 & e2 & vs2' & Hget2 & Hf2 & Hgl2 & Hfvs & Hset2 & Hyp2);
+          [ eassumption | eassumption | eassumption | eassumption | now eauto | ]. 
+        
+        edestruct Hyp2 as (v2' & c2' & Hstep2' & Hpost' & Hval'); [  | | | eassumption | ]. simpl in *. omega.  
+        eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega. omega. 
+        destruct v2'; try (simpl in *; contradiction). 
+        edestruct Hyp as (v2 & c2 & Hstep2 & Hpost & Hval); [ | eassumption | | eassumption | ].
+        simpl in *; omega. omega.
+        exists v2, (c2 + c2' + (cost (Eletapp x (σ f') ft' (map σ (ys ++ fvs)) e'))). 
+        split; [| split ]; eauto.
+        * econstructor 2. omega. 
+          replace ((c2 + c2' + cost (Eletapp x (σ f') ft' (map σ (ys ++ fvs)) e') -
+                    cost (Eletapp x (σ f') ft' (map σ (ys ++ fvs)) e'))) with (c2' + c2) by omega.
+          econstructor; eauto. rewrite map_app. eapply get_list_app; eauto.
+        * simpl. 
+          replace c1 with (cin2 + cin1 + S (Datatypes.length ys)) by (simpl in *; omega). 
+          eapply PG_P_local_steps_let_app; [ | eassumption | eassumption | now eauto | eassumption | eassumption ].
+          simpl. rewrite map_app, app_length, (map_length σ ys).
+          eapply get_list_length_eq in Hgl2.
+          replace (@Datatypes.length var (map σ fvs)) with (@Datatypes.length M.elt (map σ fvs)) by reflexivity.
+          rewrite Hgl2. omega.
+        * eapply preord_res_monotonic. eassumption. simpl in *; omega.
+      + edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
+        normalize_occurs_free. now sets.
+        assert (Hlen := Forall2_length _ _ _ Hprevs). 
+  
+        edestruct Hfuns with (j := k - 1) as (rhoc & rhoc' & B2 & f2 & xs2 & e2 & vs2' & Hget2 & Hf2 & Hgl2 & Hfvs & Hset2 & Hyp2);
+          [ eassumption | eassumption | eassumption | eassumption | now eauto | ]. 
+        
+        edestruct Hyp2 as (v2' & c2' & Hstep2' & Hpost' & Hval'); [  | | | eassumption | ]. simpl in *. omega.  
+        eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega. 
+        simpl in *; omega. 
+        destruct v2'; try (simpl in *; contradiction). 
+        exists OOT, (c2' + (cost (Eletapp x (σ f') ft' (map σ (ys ++ fvs)) e'))). 
+        split; [| split ]; eauto.
+        * econstructor 2. omega. 
+          replace ((c2' + cost (Eletapp x (σ f') ft' (map σ (ys ++ fvs)) e') -
+                    cost (Eletapp x (σ f') ft' (map σ (ys ++ fvs)) e'))) with c2' by omega.
+          econstructor; eauto. rewrite map_app. eapply get_list_app; eauto.
+        * simpl. 
+          replace c1 with (0 + (c1 - cost (Eletapp x f ft ys e)) + S (Datatypes.length ys)) by (simpl in *; omega). 
+          replace c2' with (0 + c2') by omega.
+          eapply PG_P_local_steps_let_app; [ | eassumption | eassumption | now eauto | eassumption | ].
+          simpl. rewrite map_app, app_length, (map_length σ ys).
+          eapply get_list_length_eq in Hgl2.
+          replace (@Datatypes.length var (map σ fvs)) with (@Datatypes.length M.elt (map σ fvs)) by reflexivity.
+          rewrite Hgl2. omega.
 
-    edestruct Hfuns with (j := k - 1) as (rhoc & rhoc' & B2 & f2 & xs2 & e2 & vs2' & Hget2 & Hf2 & Hgl2 & Hset2 & Hyp2);
-      [ eassumption | eassumption | eassumption | eassumption | now eauto | ]. 
-    
-    edestruct Hyp2 as (v2' & c2' & Hstep2' & Hpost' & Hval'); [ omega | | | eassumption | ].
-    eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega. omega. 
-    
-    edestruct Hyp as (v2 & c2 & Hstep2 & Hpost & Hval); [ | eassumption | | eassumption | ].
-    omega. omega.
+          eapply HPost_OOT. eapply cost_gt_0.
 
-    do 2 eexists. split. econstructor. eassumption. rewrite list_append_map. eapply get_list_app. eassumption. eassumption.
-    eassumption. now eauto. eassumption. eassumption. split.
+          Grab Existential Variables. exact (Vconstr 1%positive []). eassumption. eassumption.
+    Qed. 
 
-    admit. (* post *) eapply preord_val_monotonic. eassumption. omega.
-  Admitted. 
 
   Lemma Funs_inv_Eapp k f ft ys f' ft' fvs σ ζ rho rho' :
     Funs_inv k rho rho' σ ζ ->
-    preord_env_P_inj pr cenv PG (occurs_free (Eapp f ft ys)) k σ rho rho' ->
+    preord_env_P_inj cenv PG (occurs_free (Eapp f ft ys)) k σ rho rho' ->
     
     ζ f = Some (f', ft', fvs) ->
-    preord_exp pr cenv k P PG (Eapp f ft ys, rho) (Eapp (σ f') ft' (map σ (ys ++ fvs)), rho').
+    preord_exp cenv (P1 0) PG k (Eapp f ft ys, rho) (Eapp (σ f') ft' (map σ (ys ++ fvs)), rho').
   Proof.
     intros Hfuns Henv Hzeq v1 c1 Hleq Hstep. inv Hstep.
-    edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
-    normalize_occurs_free. now sets.
-    assert (Hlen := Forall2_length _ _ _ Hprevs). 
+    - eexists OOT, c1. split; [| split; eauto ].
+      + econstructor. simpl in *. rewrite map_app, app_length, map_length. omega.
+      + simpl; eauto. 
+    - inv H0. edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
+      normalize_occurs_free. now sets.
+      assert (Hlen := Forall2_length _ _ _ Hprevs). 
     
-    edestruct Hfuns with (j := k - 1) as (rhoc & rhoc' & B2 & f2 & xs2 & e2 & vs2' & Hget2 & Hf2 & Hgl2 & Hset2 & Hyp2);
-      [ eassumption | eassumption | eassumption | eassumption | now eauto | ]. 
+      edestruct Hfuns with (j := k - 1) as (rhoc & rhoc' & B2 & f2 & xs2 & e2 & vs2' & Hget2 & Hf2 & Hgl2 & Hfvs & Hset2 & Hyp2);
+        [ eassumption | eassumption | eassumption | eassumption | now eauto | ]. 
     
-    edestruct Hyp2 as (v2' & c2' & Hstep2' & Hpost' & Hval'); [ omega | | | eassumption | ].
-    eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega. omega.
+     edestruct Hyp2 as (v2' & c2' & Hstep2' & Hpost' & Hval'); [ simpl in *; omega | | | eassumption | ].
+     eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega. simpl in *; omega.
 
-    do 2 eexists. split. econstructor. eassumption. rewrite list_append_map. eapply get_list_app. eassumption. eassumption.
-    eassumption. now eauto. eassumption. split.
-    
-    admit. (* post *) eapply preord_val_monotonic. eassumption. omega.
-  Admitted. 
+     exists v2', (c2' + (cost (Eapp (σ f') ft' (map σ (ys ++ fvs))))). 
+     split; [| split ]; eauto.
+     + econstructor 2. omega. econstructor; eauto. 
+       rewrite list_append_map. eapply get_list_app. eassumption. eassumption. 
+       rewrite Nat_as_OT.add_sub. eassumption.
+     + replace c1 with (c1 - cost (Eapp f ft ys) + cost (Eapp f ft ys)). 
+       eapply PG_P_local_steps_app; [ | eassumption | eassumption | now eauto | eassumption ].
+       simpl. rewrite map_app, app_length, (map_length σ ys).
+       eapply get_list_length_eq in Hgl2.
+       replace (@Datatypes.length var (map σ fvs)) with (@Datatypes.length M.elt (map σ fvs)) by reflexivity.
+       rewrite Hgl2. omega. omega.
+      + eapply preord_res_monotonic. eassumption. simpl in *; omega.
+
+      Grab Existential Variables. eassumption. eassumption.
+  Qed.
 
       
   Lemma Exp_lambda_lift_correct k rho rho' ζ σ e S e' S' :
@@ -1532,20 +1656,21 @@ Section Lambda_lifting_correct.
     (* All the free variables are in the environment *)
     binding_in_map (image σ (Union _ (Union _ (occurs_free e) (FunsFVs ζ)) (LiftedFuns ζ))) rho' ->
     (* The environments are related *)
-    preord_env_P_inj pr cenv PG (occurs_free e) k σ rho rho' ->
+    preord_env_P_inj cenv PG (occurs_free e) k σ rho rho' ->
     (* The invariant about lifted functions hold*)
     Funs_inv k rho rho' σ ζ ->
     (* e' is the translation of e*)
     Exp_lambda_lift ζ σ e S e' S' ->
     (* e and e' are related *)
-    preord_exp pr cenv k P PG (e, rho) (e', rho').
+    preord_exp cenv (P1 0) PG k (e, rho) (e', rho').
    Proof with now eauto with Ensembles_DB.
     revert e rho rho' ζ σ S e' S'; induction k as [k IHk] using lt_wf_rec1.
     induction e using exp_ind';
       intros rho rho' ζ σ S e' S' Hun Him Hf Hlf Hfun Hfvs HD Hin Henv Hinv Hll;
       inv Hll.
     - inv Hun. eapply preord_exp_const_compat.
-      + admit. (* post *)
+      + eauto. (* post *)
+      + eauto. (* post *)
       + eapply Forall2_preord_var_env_map. eassumption.
         normalize_occurs_free...
       + intros m vs1 vs2 Hall Hlt. eapply IHk; [ eassumption | eassumption | | | | | | | | | | eassumption ].
@@ -1589,11 +1714,9 @@ Section Lambda_lifting_correct.
           intros Hc. eapply Him. constructor; eauto.
           eapply image_monotonic; [| eassumption ]...
           eapply Funs_inv_monotonic. eassumption. omega.
-    - eapply preord_exp_case_nil_compat.
+    - eapply preord_exp_case_nil_compat. eauto. 
     - inv Hun. edestruct Exp_lambda_lift_Ecase as [P'' [Heq Hall]]; eauto. inv Heq.
       eapply preord_exp_case_cons_compat; eauto.
-      + admit. (* post. *)
-      + admit. (* post *)
       + intros m Hlt. eapply IHk; eauto.
         * eapply Disjoint_Included; [| | now apply Him ].
           normalize_bound_var...
@@ -1613,7 +1736,7 @@ Section Lambda_lifting_correct.
         * eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. omega.
           normalize_occurs_free...
         * eapply Funs_inv_monotonic. eassumption. omega.
-      + assert (Hinc : Included _ S'0 S).
+      + assert (Hinc' : Included _ S'0 S).
         { eapply Exp_Lambda_lift_free_set_Included; eauto. }
         eapply IHe0; eauto.
         * eapply Disjoint_Included; [| | now apply Him ].
@@ -1634,7 +1757,8 @@ Section Lambda_lifting_correct.
         * eapply preord_env_P_inj_antimon. eassumption.
           normalize_occurs_free...
     - inv Hun. eapply preord_exp_proj_compat.
-      + admit. (* post *)
+      + eauto. (* post *)
+      + eauto. (* post *)
       + eapply Henv. eauto.
       + intros m vs1 vs2 Hlt Hall. eapply IHk; [ eassumption | eassumption | | | | | | | | | | eassumption ].
         * eapply Disjoint_Included_l. now eapply image_extend_Included'.
@@ -1713,7 +1837,9 @@ Section Lambda_lifting_correct.
         eapply Funs_inv_monotonic. eassumption. omega.
     - (* Eletapp unknown *)
       inv Hun. eapply preord_exp_letapp_compat.
-      + admit. (* post *)
+      + eauto. (* post *)
+      + eauto. (* post *)
+      + eauto. (* post *)
       + eapply Henv. eapply occurs_free_Eletapp. auto.
       + eapply Forall2_preord_var_env_map. eassumption.
         normalize_occurs_free...
@@ -1755,13 +1881,12 @@ Section Lambda_lifting_correct.
           eapply image_monotonic; [| eassumption ]...
           eapply Funs_inv_monotonic. eassumption. omega.
     - (* Efun 1 *)
-      assert (Hinc : Included _ S'' S).
+      assert (Hinc' : Included _ S'' S).
       { eapply Included_trans.
         now eapply Fundefs_Lambda_lift_free_set_Included1; eauto.
         now eapply Add_functions_free_set_Included; eauto. }
       repeat normalize_bound_var_in_ctx. xsets. 
-      inv Hun. eapply preord_exp_fun_compat.
-      admit. (* post *)
+      inv Hun. eapply preord_exp_fun_compat; [ now eapply HPost_fun | eassumption | ]. 
       edestruct Fundefs_lambda_lift_correct1; eauto; eauto with Ensembles_DB.
       + eapply Disjoint_Included; [ | | now apply Him ].
         now eauto with Ensembles_DB.
@@ -1770,8 +1895,8 @@ Section Lambda_lifting_correct.
         normalize_occurs_free... now eauto with Ensembles_DB.
       + eapply binding_in_map_antimon ; [| eassumption ].
         rewrite Union_assoc...
-      + eapply Included_trans; [ eassumption |]...
-      + eapply IHe; eauto.
+      + eapply preord_exp_monotonic.
+        eapply IHe; eauto.
         * eapply Disjoint_Included_l. 
           eapply image_monotonic. eapply Included_Union_compat.
           eapply Included_Union_compat. reflexivity.
@@ -1789,11 +1914,8 @@ Section Lambda_lifting_correct.
           rewrite <- Setminus_Union. normalize_occurs_free...
           eapply Union_Included. now eauto with Ensembles_DB.
           eapply Included_trans. eapply Included_Setminus_compat.
-          eassumption. reflexivity. rewrite !Setminus_Union_distr.
-          eapply Union_Included. 
-          rewrite <- Setminus_Union. normalize_occurs_free...
-          now eauto with Ensembles_DB. now eauto with Ensembles_DB.
-          now eauto with Ensembles_DB.
+          eassumption. reflexivity. normalize_occurs_free. now sets. 
+          now sets. now sets. 
           eapply Union_Disjoint_l.
           eapply Disjoint_Included_l. now apply name_in_fundefs_bound_var_fundefs.
           apply Union_Disjoint_r.
@@ -1822,14 +1944,12 @@ Section Lambda_lifting_correct.
           eapply Add_functions_FunsFVs_Included_r. eassumption.
           apply Union_Disjoint_l. now eauto with Ensembles_DB.
           eapply Disjoint_Included_l. eassumption.
-          eapply Union_Disjoint_r. eapply Union_Disjoint_l.
+          eapply Union_Disjoint_r. 
           eapply Disjoint_sym. eapply Disjoint_Included; [ | | now apply Hf ].
-          normalize_occurs_free...  eassumption.
-          eapply Union_Disjoint_l...
-          eapply Union_Disjoint_l. eapply Disjoint_sym.
+          normalize_occurs_free...  eassumption. 
+          eapply Disjoint_sym.
           eapply Disjoint_Included; [ | | now apply HD ].
           normalize_occurs_free... now eauto with Ensembles_DB.
-          eapply Union_Disjoint_l...
         * eapply Disjoint_Included_r.
           now eapply occurs_free_Efun_Included.
           apply Union_Disjoint_r. now eauto with Ensembles_DB.
@@ -1860,25 +1980,25 @@ Section Lambda_lifting_correct.
           normalize_occurs_free. 
           rewrite Union_commut, Union_assoc, Union_Setminus_Included;
             now eauto with Ensembles_DB typeclass_instances.
+        * omega.
     - (* Efun 2 *)
-      assert (Hinc : Included _ S'' S).
+      assert (Hinc' : Included _ S'' S).
       { eapply Included_trans.
         now eapply Fundefs_Lambda_lift_free_set_Included2; eauto.
         now eapply Add_functions_free_set_Included; eauto. }
-      assert (Hinc' : Included _ S''' S).
+      assert (Hinc'' : Included _ S''' S).
       { eapply Included_trans. eapply Make_wrappers_free_set_Included; eassumption. eassumption. }
-      assert (Hinc'' : Included _ S''' S'0).
+      assert (Hinc''' : Included _ S''' S'0).
       { eapply Included_trans. eapply Make_wrappers_free_set_Included; eassumption.
         eapply Fundefs_Lambda_lift_free_set_Included2. eassumption. }
 
       repeat normalize_bound_var_in_ctx.  
-      inv Hun. eapply preord_exp_fun_compat.
-      admit. (* post *)
-      eapply ctx_to_rho_preord_exp with (C := Efun1_c fds Hole_c).
-      admit. (* post *)
-      (* ctx_to_rho *)
-      constructor. now constructor.
-
+      inv Hun. eapply preord_exp_fun_compat; [ now eapply HPost_fun' | now eauto | ].
+      replace 1 with (0 + 1) by omega. 
+      eapply ctx_to_rho_preord_exp with (C := Efun1_c fds Hole_c). 
+      intros. eapply P1_ctx_r; eauto. 
+      (* ctx_to_rho *) econstructor. now econstructor.
+      
       rewrite occurs_free_Efun in Hf, Him, HD.
       assert (Hs : S'0 \subset S).
       { eapply Add_functions_free_set_Included. eassumption. }
@@ -1897,7 +2017,7 @@ Section Lambda_lifting_correct.
         ++ eapply preord_env_P_inj_antimon. eassumption. normalize_occurs_free...
         ++ eapply Included_trans. eassumption. sets. }
       
-      eapply preord_exp_post_monotonic. admit. (* post *)
+      eapply preord_exp_monotonic. 
       eapply IHe; [ eassumption | | | | | | | | | | eassumption ]. 
       * eapply Disjoint_Included_l. 
         eapply image_monotonic. eapply Included_Union_compat.
@@ -1919,8 +2039,8 @@ Section Lambda_lifting_correct.
            eapply Union_Included. now sets.
            rewrite Setminus_Union. rewrite Setminus_Included_Empty_set. now sets. now sets.
         -- eapply Union_Disjoint_l. eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs.
-           eapply Disjoint_sym. eapply Union_Disjoint_l; [| now sets ].
-           eapply Disjoint_Included_l. eapply Hinc'. now sets.
+           eapply Disjoint_sym. eapply Union_Disjoint_l; [| now sets ]. 
+           eapply Disjoint_Included_l. eapply Hinc''. now sets.
            xsets.
       * eapply Disjoint_Included; [| | now apply Hf ].
         rewrite <- bound_var_Efun, <- occurs_free_Efun. now apply bound_var_occurs_free_Efun_Included.
@@ -1940,12 +2060,10 @@ Section Lambda_lifting_correct.
         eapply Add_functions_FunsFVs_Included_r. eassumption.
         apply Union_Disjoint_l. now eauto with Ensembles_DB.
         eapply Disjoint_Included_l. eassumption.
-        eapply Union_Disjoint_r. eapply Union_Disjoint_l.
+        eapply Union_Disjoint_r.
         eapply Disjoint_sym. eapply Disjoint_Included; [ | | now apply Hf ]. now sets. eassumption.
-        eapply Union_Disjoint_l...
-        eapply Union_Disjoint_l. eapply Disjoint_sym.
+        eapply Disjoint_sym.
         eapply Disjoint_Included; [ | | now apply HD ]. now eauto with Ensembles_DB. now sets. 
-        eapply Union_Disjoint_l...
       * eapply Disjoint_Included_r. 
         eapply occurs_free_Efun_Included with (B := f2). normalize_occurs_free.
         eapply Union_Disjoint_r. sets.
@@ -1955,7 +2073,7 @@ Section Lambda_lifting_correct.
         rewrite Union_commut. eapply binding_in_map_def_funs.
         eapply binding_in_map_antimon.
         rewrite Make_wrappers_name_in_fundefs_image; [| eassumption | eassumption ]. 
-        eapply image_Setminus. now tci.
+        eapply functions.image_Setminus. now tci.
         rewrite <- Make_wrapper_image; [| eassumption | now sets ]. 
 
         eapply binding_in_map_antimon.
@@ -1977,9 +2095,7 @@ Section Lambda_lifting_correct.
         rewrite Add_functions_image_LiftedFuns_Same_set with (S := S) (S' := S'0); [| | eassumption | eassumption ].
         eapply Union_Included; [ | now sets ]. rewrite Add_functions_image_Disjoint_Same_set with (σ' := σ'); [| | eassumption ].
         normalize_occurs_free. eapply Included_Union_preserv_l. eapply image_monotonic. rewrite !Setminus_Union_distr.
-        rewrite <- !Union_assoc. repeat (eapply Union_Included; [ now sets | ]).
-        eapply Union_Included; [| sets ]. eapply Setminus_Included_Included_Union. eapply Included_trans. eassumption.
-        now sets.
+        rewrite <- !Union_assoc. repeat (eapply Union_Included; [ now sets | ]). now sets.
         eapply Union_Disjoint_r; [| now sets ].
         rewrite !Setminus_Union_distr.
         eapply Union_Disjoint_l; [| now sets ]. eapply Union_Disjoint_l.
@@ -2019,7 +2135,7 @@ Section Lambda_lifting_correct.
            eapply Union_Disjoint_l; eapply Union_Disjoint_l. now sets. now xsets. now sets.
            eapply Disjoint_Included_l. eassumption.
 
-           eapply Union_Disjoint_l; [| now xsets ]. eapply Union_Disjoint_r. xsets.
+           eapply Union_Disjoint_r. xsets.
            eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hf ]. now xsets. eassumption.
            eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply HD ]; sets.
         -- intros f Hfin. eexists. rewrite def_funs_eq. reflexivity. eassumption.
@@ -2031,7 +2147,7 @@ Section Lambda_lifting_correct.
            now eapply Add_functions_LiftedFuns_Included_r; eauto. now eapply Add_functions_FunsFVs_Included_r; eauto.
            eapply Union_Disjoint_l; eapply Union_Disjoint_l. now sets. now sets. now sets.
            eapply Disjoint_Included_l. eassumption.
-           eapply Union_Disjoint_l; [| now xsets ]. eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply HD ]...
+           eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply HD ]...
         -- eapply Disjoint_Included_l.
            eapply image_monotonic. eapply Included_Union_compat.
            now eapply Add_functions_LiftedFuns_Included_r; eauto.
@@ -2048,11 +2164,12 @@ Section Lambda_lifting_correct.
            eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hf ].
            eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. now sets.
            eapply Add_functions_free_set_Included. eassumption.
+      * omega.
     - (* Efun 3 *)
       repeat normalize_bound_var_in_ctx.
       assert (Hsub : S'0 \subset S). { eapply Fundefs_Lambda_lift_free_set_Included3. eassumption. }
-      inv Hun. eapply preord_exp_fun_compat.
-      admit. (* post *)
+      inv Hun. eapply preord_exp_fun_compat. now eapply HPost_fun. now eauto. (* post *)
+      eapply preord_exp_monotonic. 
       eapply IHe; eauto.
       * eapply Disjoint_Included_l. eapply image_extend_fundefs.
         eapply Union_Disjoint_l.
@@ -2089,17 +2206,17 @@ Section Lambda_lifting_correct.
         -- eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs. xsets.
         -- eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs.
            eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Him ]; sets.
+      * omega.
     - (* App known *)
       eapply Funs_inv_Eapp; [ eassumption | eassumption | eassumption ].
     - (* App unknown *)
-      eapply preord_exp_app_compat. (* post *) admit. 
-      now eapply Henv.
+      eapply preord_exp_app_compat; eauto. 
       eapply Forall2_preord_var_env_map. eassumption.
       normalize_occurs_free...
-    - inv Hun. eapply preord_exp_prim_compat.
-      + admit. (* post *)
+    - inv Hun. eapply preord_exp_prim_compat; eauto.
       + eapply Forall2_preord_var_env_map. eassumption.
         normalize_occurs_free...
+(* From when prims was ot trivial:
       + intros m vs1 vs2 Hlt Hall. eapply IHk; [ eassumption | eassumption | | | | | | | | | | eassumption ].
         * eapply Disjoint_Included_l. now eapply image_extend_Included'.
           eapply Union_Disjoint_l.
@@ -2137,9 +2254,8 @@ Section Lambda_lifting_correct.
           intros Hc. eapply Hfvs. now constructor; eauto.
           intros Hc. eapply Him. constructor; eauto.
           eapply image_monotonic; [| eassumption ]...
-          eapply Funs_inv_monotonic. eassumption. omega. 
-    - eapply preord_exp_halt_compat. admit. (* post *)
-      eapply Henv; eauto.
-  Admitted.
+          eapply Funs_inv_monotonic. eassumption. omega. *)
+    - eapply preord_exp_halt_compat; eauto.
+  Qed.
 
 End Lambda_lifting_correct.

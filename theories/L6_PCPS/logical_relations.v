@@ -447,6 +447,15 @@ Section Log_rel.
     eapply preord_res_monotonic. eassumption. omega.
   Qed.
 
+  Lemma preord_exp_post_monotonic_strong k (P1 P2 : PostT) PG e1 rho1 e2 rho2 :
+    (forall c1 c2, P1 (e1, rho1, c1) (e2, rho2, c2) -> P2 (e1, rho1, c1) (e2, rho2, c2)) ->
+      preord_exp P1 PG k (e1, rho1) (e2, rho2) ->
+      preord_exp P2 PG k (e1, rho1) (e2, rho2).
+  Proof.
+     intros Hyp Hexp v1 c2 Hleq Hstep.
+     edestruct Hexp as [v2 [c2' [Hstep2 [Hp Hv]]]]; try eassumption.
+     do 2 eexists; repeat split; eauto. 
+  Qed.
 
   End PostCond.
 
@@ -540,6 +549,16 @@ Section Log_rel.
       P1 (e1, def_funs B B rho1 rho1, c1 - cost (Efun B e1)) (e2, rho2, c2) ->
       P2 (Efun B e1, rho1, c1) (e2, rho2, c2).
 
+   Definition post_Eapp_r (P1 P2 : PostT) e1 rho1 f ft ys rho2 := 
+    forall e2 rho2' c1 c2,
+       P1 (e1, rho1, c1) (e2, rho2', c2) ->
+       P2 (e1, rho1, c1) ((Eapp f ft ys), rho2, c2 + cost (Eapp f ft ys)).
+(*   forall m e1 e2 rho1 rho2 f ft ys rho2' c1 c2,
+       P (m + (cost (Eapp f ft ys))) (e1, rho1, c1) (e2, rho2', c2) ->
+       P m (e1, rho1, c1) ((Eapp f ft ys), rho2, c2 + cost (Eapp f ft ys)). *)
+        
+   
+        
   Section Compat.
     Context (P1 P2 : PostT) (* Local *)
             (PG : PostGT) (* Global *)           
@@ -908,9 +927,7 @@ Section Log_rel.
     Qed.
 
     Lemma preord_exp_Efun_l k boundG rho1 rho2 B e e' :
-      (forall c1 c2, 
-         P1 (e, def_funs B B rho1 rho1, c1 - cost (Efun B e))  (e', rho2, c2) ->
-         P2 (Efun B e, rho1, c1) (e', rho2, c2)) ->
+      post_Efun_l P1 P2 ->
       preord_exp P1 boundG (k - 1) (e, def_funs B B rho1 rho1) (e', rho2) ->
       preord_exp P2 boundG k (Efun B e, rho1) (e', rho2).
     Proof.
@@ -925,18 +942,40 @@ Section Log_rel.
         eapply preord_res_monotonic. eassumption. simpl; omega.
     Qed.
 
-    (** Context application lemma *)
-      (** [(e1, ρ1) < (C [ e2 ], ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
+    Lemma preord_exp_app_r
+      (k : nat) (rho1 rho2 rhoc rho' : env) (f f' : var) (ft : fun_tag) 
+      (ys xs : list var) e1 e2 B vs :
+      post_Eapp_r P1 P2 e1 rho1 f ft ys rho2 ->
+      M.get f rho2 = Some (Vfun rhoc B f') ->
+      get_list ys rho2 = Some vs ->
+      find_def f' B = Some (ft, xs, e2) ->
+      set_lists xs vs (def_funs B B rhoc rhoc) = Some rho' ->
+      preord_exp P1 PG k (e1, rho1) (e2, rho') ->
+      preord_exp P2 PG k (e1, rho1) (Eapp f ft ys, rho2).
+    Proof.
+      intros Hypc Hget Hgetl Hf Hset Hexp v c1 Hleq Hstep.
+      edestruct Hexp as (v2 & c2 & Hstep' & Hpost & Hval); eauto.
+      eexists. exists (c2 + cost (Eapp f ft ys)). split.
+      econstructor 2; eauto. omega. econstructor; eauto. 
+      replace (c2 + cost (Eapp f ft ys) - cost (Eapp f ft ys)) with c2 by omega.
+      eassumption.
+      split. eapply Hypc. now eauto.
+      eassumption.
+    Qed. 
+
+
+   (** Context application lemma *)
+   (** [(e1, ρ1) < (C [ e2 ], ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
       interpretation of [C] in [ρ2] *)
     Lemma ctx_to_rho_preord_exp k (P : nat -> PostT) boundG rho1 rho2 rho2' C e e' m :
-      (forall n e1 rho1 e2 rho2 rho2' C c1 c2 c , 
+      (forall n e2 rho2 rho2' C c1 c2 c , 
         c <= sizeOf_exp_ctx C -> 
         ctx_to_rho C rho2 rho2' ->
-        P (n + c) (e1, rho1, c1) (e2, rho2', c2) -> 
-        P n (e1, rho1, c1) (C |[ e2 ]|, rho2, c2 + c)) ->
+        P n (e, rho1, c1) (e2, rho2', c2) -> 
+        P (n + c) (e, rho1, c1) (C |[ e2 ]|, rho2, c2 + c)) ->
       ctx_to_rho C rho2 rho2' -> 
-      preord_exp (P (m + sizeOf_exp_ctx C)) boundG k (e, rho1) (e', rho2') ->
-      preord_exp (P m) boundG k (e, rho1) (C |[ e' ]|, rho2).
+      preord_exp (P m) boundG k (e, rho1) (e', rho2') ->
+      preord_exp (P (m + sizeOf_exp_ctx C)) boundG k (e, rho1) (C |[ e' ]|, rho2).
     Proof.
       intros H1 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
       - intros v1' c1 Hleq1 Hstep1.
@@ -944,35 +983,32 @@ Section Log_rel.
         simpl in *. rewrite Nat_as_OT.add_0_r in *. firstorder.
       - intros v1 c1 Hleq1 Hstep1. 
         edestruct IHHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; try eassumption.
-        + simpl sizeOf_exp_ctx in Hcc.
-          replace (m + S (sizeOf_exp_ctx C)) with ((m + 1) + (sizeOf_exp_ctx C)) in Hcc by omega.
-          eassumption.
-        + exists v2, (c2 + cost ((Eproj_c y t N Γ C |[ e' ]|))). repeat eexists. 
-          econstructor 2; eauto. omega. simpl; econstructor; eauto. 
-          replace (c2 + 1 - 1) with c2 by omega. eassumption.
-          eapply H1 with (C := Eproj_c y t N Γ Hole_c); eauto. 
-          econstructor; eauto. now econstructor. 
-          eassumption.
+        simpl sizeOf_exp_ctx.
+        replace (m + S (sizeOf_exp_ctx C)) with ((m + sizeOf_exp_ctx C) + 1) by omega.
+        exists v2, (c2 + cost ((Eproj_c y t N Γ C |[ e' ]|))). repeat eexists. 
+        econstructor 2; eauto. omega. simpl; econstructor; eauto. 
+        replace (c2 + 1 - 1) with c2 by omega. eassumption.
+        eapply H1 with (C := Eproj_c y t N Γ Hole_c); eauto. 
+        econstructor; eauto. now econstructor. 
+        eassumption.
       - intros v1' c1 Hleq1 Hstep1.
         edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
-        + simpl sizeOf_exp_ctx in Hcc.
-          replace (m + S (@Datatypes.length var ys + sizeOf_exp_ctx C))
-            with ((m + 1 + @Datatypes.length var ys) + (sizeOf_exp_ctx C)) in Hcc by omega.
-            eassumption. 
-        + exists v2', (c2 + cost (Econstr_c x t ys C |[ e' ]|)). repeat eexists. 
-          econstructor 2; eauto. omega. simpl; econstructor; eauto. 
-          rewrite Nat_as_OT.add_sub. eassumption.
-          simpl. eapply H1 with (C := Econstr_c x t ys Hole_c); eauto. simpl; omega.
-          econstructor; eauto. now econstructor. 
-          replace (m + S (@Datatypes.length var ys)) with (m + 1 + @Datatypes.length var ys) by omega. 
-          eassumption. eassumption.
+        simpl sizeOf_exp_ctx.
+        replace (m + S (@Datatypes.length var ys + sizeOf_exp_ctx C))
+          with ((m + sizeOf_exp_ctx C) + (1 + @Datatypes.length var ys)) by omega.
+        exists v2', (c2 + cost (Econstr_c x t ys C |[ e' ]|)). repeat eexists. 
+        econstructor 2; eauto. omega. simpl; econstructor; eauto. 
+        rewrite Nat_as_OT.add_sub. eassumption.
+        simpl. eapply H1 with (C := Econstr_c x t ys Hole_c); eauto. simpl; omega.
+        econstructor; eauto. now econstructor. 
+        replace (m + S (@Datatypes.length var ys)) with (m + 1 + @Datatypes.length var ys) by omega. 
+        eassumption. 
       - intros v1' c1 Hleq1 Hstep1.  
+        simpl sizeOf_exp_ctx. 
+        replace (m + S (sizeOf_exp_ctx C)) with (m + sizeOf_exp_ctx C + 1) by omega. 
         edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]];
-         [ | | eassumption | ].
-        + simpl sizeOf_exp_ctx in Hcc. 
-          replace (m + S (sizeOf_exp_ctx C)) with
-              (m + 1 + sizeOf_exp_ctx C) in Hcc by omega. 
-          eassumption.
+          [ | | eassumption | ].      
+        + eassumption.
         + eassumption.
         + exists v2', (c2 + cost (Efun1_c B C |[ e' ]|)). repeat eexists. 
           econstructor 2; eauto. omega. simpl; econstructor; eauto.

@@ -461,47 +461,49 @@ Section Log_rel.
 
   (** * Compatibility Properties of Post-conditions *)
 
-  Definition post_constr_compat (P1 P2 : PostT) :=
-   forall x t ys e1 x' t' ys' e2 rho1 rho2 vs vs' c1 c2 a, 
+  (** Versions of the properties where the e1 rho1 are extenralized, whhich is needed in some cases for them to be provable *)
+
+  Definition post_constr_compat' x t ys e1 rho1 (P1 P2 : PostT) :=
+   forall x' t' ys' e2 rho2 vs vs' c1 c2 a, 
      get_list ys rho1 = Some vs ->
      get_list ys' rho2 = Some vs' ->
      P1 (e1, M.set x (Vconstr t vs) rho1, c1)  (e2, M.set x' (Vconstr t' vs') rho2, c2) -> 
      P2 (Econstr x t ys e1, rho1, c1 + a) (Econstr x' t' ys' e2, rho2, c2 + a).
 
-  Definition post_proj_compat (P1 P2 : PostT) :=
-    forall x t N y e1 x' t' N' y' e2 rho1 rho2 vs v1 v2 c1 c2 a, 
+  Definition post_proj_compat' x t N y e1 rho1 (P1 P2 : PostT) :=
+    forall x' t' N' y' e2 rho2 vs v1 v2 c1 c2 a, 
       M.get y rho1 = Some (Vconstr t vs) ->
       nthN vs N = Some v1 -> 
       P1 (e1, M.set x v1 rho1, c1)  (e2, M.set x' v2 rho2, c2) -> 
       P2 (Eproj x t N y e1, rho1, c1 + a) (Eproj x' t' N' y' e2, rho2, c2 + a).
 
-  Definition post_case_compat_hd (P1 P2 : PostT) :=
-    forall x t e1 B1 x' t' e2 B2 rho1 rho2 c1 c2 a, 
+  Definition post_case_compat_hd' x t e1 B1 rho1 (P1 P2 : PostT) :=
+    forall x' t' e2 B2 rho2 c1 c2 a, 
       P1 (e1, rho1, c1)  (e2, rho2, c2) -> 
       P2 (Ecase x ((t, e1) :: B1), rho1, c1 + a) (Ecase x' ((t', e2) :: B2), rho2, c2 + a).
 
-  Definition post_case_compat_tl (P1 P2 : PostT) :=
-    forall x t e1 B1 x' t' e2 B2 rho1 rho2 c1 c2, 
+  Definition post_case_compat_tl' x t e1 B1 rho1 (P1 P2 : PostT) :=
+    forall x' t' e2 B2 rho2 c1 c2, 
       P1 (Ecase x B1, rho1, c1)  (Ecase x' B2, rho2, c2) -> 
       P2 (Ecase x ((t, e1) :: B1), rho1, c1) (Ecase x' ((t', e2) :: B2), rho2, c2).
 
-  Definition post_fun_compat (P1 P2 : PostT) :=
-    forall B1 e1 B2 e2 rho1 rho2 c1 c2 a, 
+  Definition post_fun_compat' B1 e1 rho1 (P1 P2 : PostT) :=
+    forall B2 e2 rho2 c1 c2 a, 
       P1 (e1, def_funs B1 B1 rho1 rho1, c1)  (e2, def_funs B2 B2 rho2 rho2, c2) -> 
       P2 (Efun B1 e1, rho1, c1 + a) (Efun B2 e2, rho2, c2 + a).
      
-  Definition post_OOT (P1 : PostT) :=
-    forall e1 rho1 e2 rho2 c, 
+  Definition post_OOT' e1 rho1 (P1 : PostT) :=
+    forall e2 rho2 c, 
       c < cost e1 ->
       P1 (e1, rho1, c) (e2, rho2, c).
 
-  Definition post_base (P1 : PostT) :=
-    forall e1 rho1 e2 rho2 c, 
+  Definition post_base' e1 rho1 (P1 : PostT) :=
+    forall e2 rho2 c, 
       cost e1 <= c ->
       P1 (e1, rho1, c) (e2, rho2, c).
 
-  Definition post_app_compat (P : PostT) (PG : PostGT):=
-    forall x t ys xs e1 x' t' ys' e2 rho1 rho2 rhoc1 rhoc2 fl f vs rhoc1' c1 c2 a, 
+  Definition post_app_compat' x t ys rho1 (P : PostT) (PG : PostGT):=
+    forall xs e1 x' t' ys' e2 rho2 rhoc1 rhoc2 fl f vs rhoc1' c1 c2 a, 
   
       map_util.M.get x rho1 = Some (Vfun rhoc1 fl f) ->
       get_list ys rho1 = Some vs ->
@@ -512,10 +514,9 @@ Section Log_rel.
       PG (e1, rhoc1', c1)  (e2, rhoc2, c2) -> 
       P (Eapp x t ys, rho1, c1 + a) (Eapp x' t' ys', rho2, c2 + a).
    
-  Definition post_letapp_compat (P1 P2 : PostT) (PG : PostGT):=
-    forall x f t ys e1 xs e_b1 v1
-         x' f' t' ys' e2 e_b2 v2 
-         rho1 rho2 rhoc1 rhoc2 fl h vs rhoc1' c1 c1' c2 c2' a, 
+  Definition post_letapp_compat' x f t ys e1 rho1 (P1 P2 : PostT) (PG : PostGT):=
+    forall xs e_b1 v1 x' f' t' ys' e2 e_b2 v2 
+         rho2 rhoc1 rhoc2 fl h vs rhoc1' c1 c1' c2 c2' a, 
   
       map_util.M.get f rho1 = Some (Vfun rhoc1 fl h) ->
       get_list ys rho1 = Some vs ->
@@ -529,10 +530,9 @@ Section Log_rel.
       P1 (e1, M.set x v1 rho1, c1') (e2, M.set x' v2 rho2, c2') ->
       P2 (Eletapp x f t ys e1, rho1, c1 + c1' + a) (Eletapp x' f' t' ys' e2, rho2, c2  + c2' + a).
 
-  Definition post_letapp_compat_OOT (P2 : PostT) (PG : PostGT):=
-    forall x f t ys e1 xs e_b1
-          x' f' t' ys' e2 e_b2 
-         rho1 rho2 rhoc1 rhoc2 fl h vs rhoc1' c1 c2 a, 
+  Definition post_letapp_compat_OOT' x f t ys e1 rho1 (P2 : PostT) (PG : PostGT):=
+    forall xs e_b1 x' f' t' ys' e2 e_b2 
+         rho2 rhoc1 rhoc2 fl h vs rhoc1' c1 c2 a, 
   
       map_util.M.get f rho1 = Some (Vfun rhoc1 fl h) ->
       get_list ys rho1 = Some vs ->
@@ -542,6 +542,26 @@ Section Log_rel.
       (* for simplicity don't model the semantics of the target since it doesn't matter *)
       PG (e_b1, rhoc1', c1)  (e_b2, rhoc2, c2) -> 
       P2 (Eletapp x f t ys e1, rho1, c1 + a) (Eletapp x' f' t' ys' e2, rho2, c2 + a).
+ 
+  Definition post_constr_compat (P1 P2 : PostT) := forall x t ys e1 rho1, post_constr_compat' x t ys e1 rho1 P1 P2.
+
+  Definition post_proj_compat (P1 P2 : PostT) := forall x t N y e1 rho1, post_proj_compat' x t N y e1 rho1 P1 P2. 
+
+  Definition post_case_compat_hd (P1 P2 : PostT) := forall x t e1 B1 rho1, post_case_compat_hd' x t e1 B1 rho1 P1 P2.
+
+  Definition post_case_compat_tl (P1 P2 : PostT) := forall x t e1 B1 rho1, post_case_compat_tl' x t e1 B1 rho1 P1 P2.
+
+  Definition post_fun_compat (P1 P2 : PostT) := forall B1 e1 rho1, post_fun_compat' B1 e1 rho1 P1 P2.
+     
+  Definition post_OOT (P1 : PostT) := forall e1 rho1, post_OOT' e1 rho1 P1.
+
+  Definition post_base (P1 : PostT) := forall e1 rho1, post_base' e1 rho1 P1.
+
+  Definition post_app_compat (P : PostT) (PG : PostGT) := forall x t xs rho1, post_app_compat' x t xs rho1 P PG.
+   
+  Definition post_letapp_compat (P1 P2 : PostT) (PG : PostGT) := forall x f t xs e1 rho1, post_letapp_compat' x f t xs e1 rho1 P1 P2 PG.
+
+  Definition post_letapp_compat_OOT (P2 : PostT) (PG : PostGT) := forall x f t xs e1 rho1, post_letapp_compat_OOT' x f t xs e1 rho1 P2 PG.
 
 
   Definition post_Efun_l (P1 P2 : PostT) :=

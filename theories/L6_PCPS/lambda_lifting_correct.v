@@ -1539,6 +1539,7 @@ Section Lambda_lifting_correct.
     intros Hyp Hfuns Henv Hzeq v1 c1 Hleq Hstep. inv Hstep.
     - eexists OOT, c1. split; [| split; eauto ].
       + econstructor. simpl in *. rewrite map_app, app_length, map_length. omega.
+      + eapply HPost_OOT; eauto.
       + simpl; eauto.
     - inv H0. 
       + edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
@@ -1609,7 +1610,8 @@ Section Lambda_lifting_correct.
     intros Hfuns Henv Hzeq v1 c1 Hleq Hstep. inv Hstep.
     - eexists OOT, c1. split; [| split; eauto ].
       + econstructor. simpl in *. rewrite map_app, app_length, map_length. omega.
-      + simpl; eauto. 
+      + eapply HPost_OOT; eauto.
+      + simpl; eauto.
     - inv H0. edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
       normalize_occurs_free. now sets.
       assert (Hlen := Forall2_length _ _ _ Hprevs). 

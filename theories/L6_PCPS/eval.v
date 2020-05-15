@@ -523,7 +523,11 @@ Section EVAL.
   Scheme bstep_ind' := Minimality for bstep Sort Prop
   with bstep_fuel_ind' := Minimality for bstep_fuel Sort Prop.
 
-  (** * Lemmas about bstep_fuel *)
+Definition not_stuck (rho : env) (e : exp) :=
+  (exists c v, bstep_fuel rho e (Res v) c) \/  
+  (forall c, bstep_fuel rho e OOT c).
+
+(** * Lemmas about bstep_fuel *)
 Lemma step_deterministic_aux rho e r v c r' v' c' : 
   bstep rho e r c -> 
   bstep rho e r' c' ->
@@ -573,7 +577,7 @@ Lemma bstep_deterministic rho e v c v' c' :
 Proof.
   intros H1 H2. eapply step_deterministic_aux; eauto. 
 Qed.
-	
+  
   Lemma bstep_lt_OOT_aux rho e r c v c' : 
     bstep rho e r c -> 
   	r = Res v -> (c' < c)%nat ->
@@ -620,6 +624,102 @@ Qed.
     + econstructor 2; eauto. omega. eapply bstep_lt_OOT; eauto.
       omega.
   Qed.
+
+  Lemma bstep_OOT_determistic_aux rho e r r' c c': 
+    bstep rho e r c ->
+    r = OOT -> 
+    (c' <= c)%nat ->    
+    bstep rho e r' c' -> r' = OOT.
+  Proof. 
+    set (P := fun rho e r c =>   
+                forall r' c', 
+                  r = OOT -> 
+                  (c' <= c)%nat -> 
+                  bstep rho e r' c' -> r' = OOT).
+    set (P0 := fun rho e r c =>   
+                  forall r' c', 
+                    r = OOT -> 
+                    (c' <= c)%nat -> 
+                    bstep_fuel rho e r' c' -> r' = OOT).
+    intros Hstep. revert r' c'. 
+    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; 
+    intros c' r' Heq Hleq Hs'; subst; try now (inv Hs'; repeat subst_exp; eauto).
+    - inv Hs'; repeat subst_exp. eapply find_tag_nth_deterministic in H8; [| clear H8; eauto ]. inv H8.
+      eapply IHHstep; eauto.
+    - inv Hs'; repeat subst_exp; eauto. 
+      eapply bstep_fuel_deterministic in H17; [| clear H17; eauto ]; inv H17.
+      eapply IHHstep0; [| | eassumption ]; eauto. omega.
+    - inv Hs'; repeat subst_exp; eauto. exfalso. 
+      eapply IHHstep in H16; eauto. congruence. omega.
+    - inv Hs'; eauto. omega.  
+    - inv Hs'; eauto. eapply IHHstep; [| | eassumption ]; eauto. omega.
+  Qed.
+
+  Lemma bstep_OOT_determistic rho e c r' c': 
+    bstep rho e OOT c ->
+    (c' <= c)%nat -> 
+    bstep rho e r' c' -> r' = OOT.
+  Proof. 
+    intros; eapply bstep_OOT_determistic_aux; [ | reflexivity | | ]; eauto.
+  Qed.
+
+  Lemma bstep_fuel_OOT_determistic rho e c r' c': 
+    bstep_fuel rho e OOT c ->
+    (c' <= c)%nat -> 
+    bstep_fuel rho e r' c' -> r' = OOT.
+  Proof. 
+    intros Hs Hleq Hs'; inv Hs'; inv Hs; eauto; try omega. 
+    eapply bstep_OOT_determistic; [ | | eapply H0 ]. eassumption. omega.    
+  Qed.
+
+  Lemma bstep_gt_aux rho e r c v r' c' : 
+    bstep rho e r c -> 
+  	r = Res v -> (c < c')%nat ->
+    ~ bstep rho e r' c'.
+  Proof.
+    set (P := fun rho e r c =>   
+                forall v r' c',
+                  r = Res v -> (c < c')%nat ->
+                  ~ bstep rho e r' c').
+    set (P0 := fun rho e r c =>   
+                forall v r' c', 
+                  r = Res v -> (c < c')%nat ->
+                  ~ bstep_fuel rho e r' c').             
+    intros Hstep. revert v r' c'. 
+	  induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; 
+    intros v1 r' c' Heq Hlt Hstep'; subst; (try now (inv Hstep'; repeat subst_exp; eauto));
+    try now (inv Hstep'; repeat subst_exp; eauto; eapply IHHstep; eauto).
+    - inv Hstep'; repeat subst_exp; eauto.
+      eapply find_tag_nth_deterministic in H8; [| clear H8; eauto ]. inv H8. 
+      eapply IHHstep; eauto.
+    - inv Hstep'; repeat subst_exp; eauto.
+      + destruct (lt_dec cin1 cin0).
+        * eapply IHHstep; eauto.
+        * destruct (NPeano.Nat.eq_dec cin1 cin0). subst.
+          -- eapply bstep_fuel_deterministic in H17; [| clear H17; eauto ]; inv H17; subst.
+             eapply IHHstep0; [| | eassumption ]; eauto. omega.
+          -- eapply bstep_fuel_lt_OOT with (c' := cin0) in H3; [| omega ]. 
+             eapply bstep_fuel_OOT_determistic in H17; eauto. congruence.
+      + eapply bstep_fuel_OOT_determistic in H3; eauto. congruence. omega.
+    - inv Hstep'. omega. eapply IHHstep; [ | | eassumption ]; eauto. omega.
+  Qed.
+  
+  Lemma bstep_gt rho e r c v c' : 
+    bstep rho e (Res v) c -> 
+    (c < c')%nat ->
+    ~ bstep rho e r c'.
+  Proof.
+    intros; eapply bstep_gt_aux; eauto.
+  Qed. 
+
+  Lemma bstep_fuel_gt rho e r c v c' : 
+    bstep_fuel rho e (Res v) c -> 
+    (c < c')%nat ->
+    ~ bstep_fuel rho e r c'.
+  Proof.
+    intros Hstep Hlt Hstep'.
+    inv Hstep; inv Hstep'; try omega. eapply bstep_gt; [| | eassumption ]; eauto. omega.
+  Qed. 
 
   Lemma bstep_OOT_monotonic_aux rho e r c c': 
     bstep rho e r c ->
@@ -673,6 +773,46 @@ Qed.
       econstructor 2; eauto. omega. eapply bstep_OOT_monotonic; eauto.
       omega.
   Qed.
+
+  Lemma bstep_deterministic_res rho e r c r' : 
+    bstep rho e r c -> 
+    bstep rho e r' c ->
+    r = r'.
+  Proof.
+    set (P := fun rho e r c =>   
+                forall r', 
+                  bstep rho e r' c ->
+                  r = r').
+    set (P0 := fun rho e r c =>   
+                forall r', 
+                  bstep_fuel rho e r' c ->
+                  r = r').                
+    intros Hstep. 
+    revert r'.
+    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; intros r' Hstep';
+      try now (inv Hstep'; repeat subst_exp; eapply IHHstep; eauto).
+    - inv Hstep'. repeat subst_exp. 
+      eapply find_tag_nth_deterministic in H1; [| eapply H8 ]. inv H1.
+      eapply IHHstep; eauto.
+    - inv Hstep'; repeat subst_exp. 
+      + eapply bstep_fuel_deterministic in H17; [| clear H17; eauto ]. inv H17; subst. repeat subst_exp.
+        assert (cin3 = cin2) by omega. eapply IHHstep0; eauto. subst. eassumption.
+      + eapply bstep_fuel_OOT_monotonic with (c' := cin1) in H17; [| omega ].
+        eapply IHHstep in H17. congruence.
+    - inv Hstep'; repeat subst_exp; eauto. 
+      + eapply bstep_fuel_OOT_determistic in H16. congruence. eassumption. omega.
+    - inv Hstep'. repeat subst_exp; eauto.
+    - inv Hstep'; try omega; eauto.
+    - inv Hstep'; try omega; eauto.
+  Qed. 
+
+  Lemma bstep_fuel_deterministic_res rho e r c r' : 
+    bstep_fuel rho e r c -> 
+    bstep_fuel rho e r' c ->
+    r = r'.
+  Proof.
+    intros H1 H2. inv H1; inv H2; try eauto; try omega. eapply bstep_deterministic_res; eauto.
+  Qed. 
 
   Definition diverge (rho : env) (e: exp) : Prop := 
     forall c, bstep_fuel rho e OOT c. 

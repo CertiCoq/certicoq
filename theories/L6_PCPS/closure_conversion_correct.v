@@ -23,9 +23,54 @@ Section Closure_conversion_correct.
   Variable cenv : ctor_env.
   Variable clo_tag : ctor_tag.
 
+  Context (boundL : nat -> PostT) (* Local *) (* the nat is the extra steps the target is allowed to take (e.g. c2 <= A*c1 + n) *)
+    (boundG : PostGT) (* Global *)           
+    (HPost_con : forall x t ys e rho1 n k, 
+                   k <= 4 * cost (Econstr x t ys e) -> 
+                   post_constr_compat' x t ys e rho1 (boundL n) (boundL (n + k)))
+    (HPost_proj : forall x t N y e rho1 n k, 
+                    k <= 4 * cost (Eproj x t N y e) -> 
+                    post_proj_compat' x t N y e rho1 (boundL n) (boundL (n + k)))
+    (* (HPost_fun : forall n, post_fun_compat (boundL n) (boundL n)) *)
+
+    (HPost_case_hd : forall x e1 c rho1 B1 n k, 
+                       k <= 4 * cost (Ecase x ((c, e1) :: B1)) -> 
+                       post_case_compat_hd' x c e1 B1 rho1  (boundL n) (boundL (n + k)))
+    (HPost_case_tl : forall x e1 c rho1 B1 n, 
+                       (*k <= 4 * cost (Ecase x ((c, e1) :: B1)) -> *)
+                       post_case_compat_tl' x c e1 B1 rho1  (boundL n) (boundL n))
+
+    (HPost_app : forall f t xs rho1 n k,
+                   k <= 4 * cost (Eapp f t xs) -> 
+                   post_app_compat_cc' clo_tag f t xs rho1 (boundL (k + n)) boundG)
+
+    (HPost_letapp : forall f x t xs e1 rho1 n k, 
+                      k <= 4 * cost (Eletapp x f t xs e1) ->
+                      post_letapp_compat_cc' cenv clo_tag f x t xs e1 rho1 (boundL n) (boundL (n + k)) boundG)
+    
+    (HPost_letapp_OOT : forall f x t xs e1 rho1 n k, 
+                          k <= 4 * cost (Eletapp x f t xs e1) ->
+                          post_letapp_compat_cc_OOT' clo_tag f x t xs e1 rho1 (boundL (n + k)) boundG)
+
+    (HPost_OOT : forall e rho1 k, k <= 4 * cost e -> post_OOT' e rho1 (boundL k))
+    (Hpost_base : forall e rho1 k, k <= 4 * cost e -> post_base' e rho1 (boundL k))
+
+    (Hinc : inclusion _ (boundL 0) boundG)
+    (Hpost_locals_r : forall e1 rho1 c1 e2 rho2 e2' rho2' c2 n a, boundL (n + a) (e1, rho1, c1) (e2, rho2, c2) ->  boundL n (e1, rho1, c1) (e2', rho2', c2 + a))
+    (Hpost_locals_l : forall e1 rho1 c1 e2 rho2 e2' rho2' c2 n a, boundL n (e1, rho1, c1) (e2, rho2, c2 + a) ->  boundL (n + a) (e1, rho1, c1) (e2', rho2', c2))
+      
+    (HPost_C_OOT : 
+      forall m c1 e1 rho1 e2 rho2 rho2' c2 c C,
+        c = sizeOf_exp_ctx C -> 
+        c2 < cost (C |[ e2 ]|) ->     
+        ctx_to_rho C rho2 rho2' ->
+        boundL m (e1, rho1, c1) (C |[ e2 ]|, rho2, c2) -> boundL (m + c) (e1, rho1, c1) (e2, rho2', 0)).
+
   (* Parameterize over the postconditions *)
   (* Currently assume that the bounds are independent from the size of exp and environment for simplicity *)
   (* For the current cost model and L6 transformations that should suffice *)
+(* Old bounds for reference : 
+ -----------------------------
   Context (boundL : nat (* local steps *) -> relation nat)
           (boundG : nat -> relation (exp * env * nat))
           (bound_refl : forall c n, n <= 7 * c -> boundL n c c)
@@ -55,17 +100,22 @@ Section Closure_conversion_correct.
                set_lists xs vs (def_funs B B rho' rho') = Some rho'' ->
                boundL (c + A') (c1 + A) (c2 + A + 3)).
 
-  
+  Context
+    (bound_locals_add : forall n c1 c2 c c0 , c <= 4 (* the max overhead of cc per step *) ->
+                                       1 <= c0 ->
+                                       boundL n c1 c2 -> boundL (n + c) (c1 + c0) (c2 + c0)).
+
+  *)
   (** ** Semantics preservation proof *)
 
   (** We show observational approximation of the final results as well as an
     * upper bound on the concrete execution cost of the translated program *)
   
   (* Short-hands so that we don't have to apply the parameters every time *)
-  Definition FV_inv := FV_inv pr cenv clo_tag boundG. 
-  Definition Fun_inv := Fun_inv pr cenv clo_tag boundG. 
-  Definition GFun_inv := GFun_inv pr cenv clo_tag boundG. 
-  Definition closure_env := closure_env pr cenv clo_tag boundG. 
+  Definition FV_inv := FV_inv cenv clo_tag boundG. 
+  Definition Fun_inv := Fun_inv cenv clo_tag boundG. 
+  Definition GFun_inv := GFun_inv cenv clo_tag boundG. 
+  Definition closure_env := closure_env cenv clo_tag boundG. 
   
   
   (** * Lemmas about the existance of the interpretation of an evaluation context *)
@@ -220,7 +270,7 @@ Section Closure_conversion_correct.
        forall (e : exp) (rho rho' : env) (e' : exp)
          (Scope Funs GFuns : Ensemble var) σ c genv (Γ : var) (FVs : list var)
          (C : exp_ctx),
-         cc_approx_env_P pr cenv clo_tag Scope m boundG rho rho' ->
+         cc_approx_env_P cenv clo_tag Scope m boundG rho rho' ->
          ~ In var (bound_var e) Γ ->
          binding_in_map (occurs_free e) rho ->
          fundefs_names_unique e ->
@@ -231,7 +281,7 @@ Section Closure_conversion_correct.
          GFun_inv m rho rho' Scope GFuns σ ->
          FV_inv m rho rho' Scope Funs GFuns c Γ FVs ->
          Closure_conversion clo_tag Scope Funs GFuns σ c genv Γ FVs e e' C ->
-         cc_approx_exp pr cenv clo_tag m (boundL 0) boundG (e, rho) (C |[ e' ]|, rho')) ->
+         cc_approx_exp cenv clo_tag m (boundL 0) boundG (e, rho) (C |[ e' ]|, rho')) ->
     (* FVs *)
     (occurs_free_fundefs B1 \\ GFuns) <--> (FromList FVs) ->
     (* unique functions *)
@@ -281,7 +331,7 @@ Section Closure_conversion_correct.
         * simpl. rewrite Hset'. reflexivity.
         * intros Hlt Hall1. 
           eapply cc_approx_exp_rel_mon with (P1 := boundL 0).
-          2:{ intros c3 c4. rewrite Hbounds_eq. eauto. }
+          2:{ eapply Hinc. } 
           assert (HK : Fun_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (FromList xs1) (name_in_fundefs B1) σ (extend_fundefs' id B1 Γ) /\
                        GFun_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (FromList xs1) GFuns' σ).
           { eapply IHk with (B1 := B1); try eassumption. 
@@ -439,7 +489,7 @@ Section Closure_conversion_correct.
             constructor 1. eassumption. sets.
             eapply GFun_inv_antimon. eassumption. sets. }
           eapply cc_approx_exp_rel_mon with (P1 := boundL 0).
-          2:{ intros c3 c4. rewrite Hbounds_eq. eauto. }
+          2:{ eassumption. }
           (* Apply IHe *)
           eapply IHe with (Scope := FromList xs1) (GFuns :=  (name_in_fundefs B1 :|: GFuns) \\ FromList xs1)
                           (genv := extend_fundefs' id B1 Γ''). 
@@ -480,18 +530,18 @@ Section Closure_conversion_correct.
   (** Correctness of [project_var] *)
   Lemma project_var_correct k rho1 rho2 rho2' Scope GFuns Funs σ c genv Γ FVs x x' C S S'  :
     project_var clo_tag Scope Funs GFuns σ c genv Γ FVs S x x' C S' ->
-    cc_approx_env_P pr cenv clo_tag Scope k boundG rho1 rho2 ->
+    cc_approx_env_P cenv clo_tag Scope k boundG rho1 rho2 ->
     Fun_inv k rho1 rho2 Scope Funs σ genv ->
     GFun_inv k rho1 rho2 Scope GFuns σ ->
     FV_inv k rho1 rho2 Scope Funs GFuns c Γ FVs ->
     ctx_to_rho C rho2 rho2' ->
     Disjoint _ S (Scope :|: (image σ ((Funs \\ Scope) :|: GFuns) :|: image genv (Funs \\ Scope) :|: (FromList FVs :|: [set Γ])))  ->
     ~ In _ S' x' /\
-    cc_approx_env_P pr cenv clo_tag Scope k boundG rho1 rho2' /\
+    cc_approx_env_P cenv clo_tag Scope k boundG rho1 rho2' /\
     Fun_inv k rho1 rho2' Scope Funs σ genv /\
     GFun_inv k rho1 rho2' Scope GFuns σ /\
     FV_inv k rho1 rho2' Scope Funs GFuns c Γ FVs /\
-    cc_approx_var_env pr cenv clo_tag k boundG rho1 rho2' x x'.
+    cc_approx_var_env cenv clo_tag k boundG rho1 rho2' x x'.
   Proof.
     intros Hproj Hcc Hfun Hgfun Henv Hctx Hd.
     inv Hproj.
@@ -584,20 +634,20 @@ Section Closure_conversion_correct.
   Lemma project_vars_correct k rho1 rho2 rho2'
         Scope Funs GFuns σ c genv Γ FVs xs xs' C S S' :
     project_vars clo_tag Scope Funs GFuns σ c genv Γ FVs S xs xs' C S' ->
-    cc_approx_env_P pr cenv clo_tag Scope k boundG rho1 rho2 ->
+    cc_approx_env_P cenv clo_tag Scope k boundG rho1 rho2 ->
     Fun_inv k rho1 rho2 Scope Funs σ genv ->
     GFun_inv k rho1 rho2 Scope GFuns σ ->        
     FV_inv k rho1 rho2 Scope Funs GFuns c Γ FVs ->   
     ctx_to_rho C rho2 rho2' ->
     Disjoint _ S (Scope :|: (image σ ((Funs \\ Scope) :|: GFuns) :|: image genv (Funs \\ Scope) :|: (FromList FVs :|: [set Γ]))) ->
-    cc_approx_env_P pr cenv clo_tag Scope k boundG rho1 rho2' /\
+    cc_approx_env_P cenv clo_tag Scope k boundG rho1 rho2' /\
     Fun_inv k rho1 rho2' Scope Funs σ genv /\
     GFun_inv k rho1 rho2' Scope GFuns σ /\
     FV_inv k rho1 rho2' Scope Funs GFuns c Γ FVs /\
     (forall vs,
        get_list xs rho1 = Some vs ->
        exists vs', get_list xs' rho2' = Some vs' /\
-              Forall2 (cc_approx_val pr cenv clo_tag k boundG) vs vs').
+              Forall2 (cc_approx_val cenv clo_tag k boundG) vs vs').
   Proof.
     revert k rho1 rho2 rho2' Scope Funs genv Γ FVs xs' C S.
     induction xs;
@@ -680,34 +730,32 @@ Section Closure_conversion_correct.
       rewrite mult_assoc. eapply mult_le_n. eassumption.
   Qed.
   
-  Context
-    (bound_locals_add : forall n c1 c2 c c0 , c <= 4 (* the max overhead of cc per step *) ->
-                                       1 <= c0 ->
-                                       boundL n c1 c2 -> boundL (n + c) (c1 + c0) (c2 + c0)).
   
 
   Lemma Ecase_correct k rho1 rho2 rho2' C x x' c e e' l l' :
     ctx_to_rho C rho2 rho2' ->
     sizeOf_exp_ctx C <= 4 ->
     Forall2 (fun p1 p2 : ctor_tag * exp => fst p1 = fst p2) l l' ->
-    cc_approx_var_env pr cenv clo_tag k boundG rho1 rho2' x x' ->
-    cc_approx_exp pr cenv clo_tag k (boundL 0)
+    cc_approx_var_env cenv clo_tag k boundG rho1 rho2' x x' ->
+    cc_approx_exp cenv clo_tag k (boundL 0)
                   boundG (e, rho1) (e', rho2') ->
-    cc_approx_exp pr cenv clo_tag k (boundL 0)
+    cc_approx_exp cenv clo_tag k (boundL 0)
                   boundG (Ecase x l, rho1) (C |[ Ecase x' l' ]|, rho2) ->
-    cc_approx_exp pr cenv clo_tag k (boundL 0)
-                  boundG (Ecase x ((c, e) :: l), rho1)
+    cc_approx_exp cenv clo_tag k (boundL 0) boundG (Ecase x ((c, e) :: l), rho1)
                   (C |[ Ecase x' ((c, e') :: l') ]|, rho2).
   Proof.
     intros Hctx Hleq Hall Henv Hcc1 Hcc2.
     eapply ctx_to_rho_cc_approx_exp.
-    - intros. eapply bound_locals_r. eassumption.
+    - intros. eapply Hpost_locals_r. eassumption.
     - eassumption.
     - eapply cc_approx_exp_case_cons_compat; try eassumption;
-        [ | | eapply cc_approx_exp_ctx_to_rho; try eassumption ].
-      + intros. eapply bound_locals_add; eauto.
-      + intros. rewrite plus_comm. eapply bound_add_compat; eauto. omega.
-      + intros. eapply bound_locals_l; eauto.
+        [ | | | | eapply cc_approx_exp_ctx_to_rho; try eassumption ].
+      + simpl. eapply HPost_OOT. eassumption. 
+      + eauto.
+      + simpl. eapply HPost_case_tl.
+      + intros. eapply Hcc1. (* XXX typo in rule (k instead of m) *)
+      + intros. eapply Hpost_locals_l; eauto.
+      + intros. eapply HPost_C_OOT; eauto. 
   Qed.
   
 
@@ -722,7 +770,7 @@ Section Closure_conversion_correct.
   (** Correctness of [Closure_conversion] *)
   Lemma Closure_conversion_correct k rho rho' e e' Scope Funs GFuns σ c genv Γ FVs C :
     (* [Scope] invariant *)
-    cc_approx_env_P pr cenv clo_tag Scope k boundG rho rho' ->
+    cc_approx_env_P cenv clo_tag Scope k boundG rho rho' ->
     (* [Γ] (the current environment parameter) is not bound in e *)
     ~ In _ (bound_var e) Γ ->
     (* The free variables of e are defined in the environment *)
@@ -743,7 +791,7 @@ Section Closure_conversion_correct.
     GFun_inv k rho rho' Scope GFuns σ ->
     (* [e'] is the closure conversion of [e] *)
     Closure_conversion clo_tag Scope Funs GFuns σ c genv Γ FVs e e' C ->
-    cc_approx_exp pr cenv clo_tag k (boundL 0) boundG (e, rho) (C |[ e' ]|, rho').
+    cc_approx_exp cenv clo_tag k (boundL 0) boundG (e, rho) (C |[ e' ]|, rho').
   Proof with now eauto with Ensembles_DB.
     revert k e rho rho' e' Scope Funs GFuns σ c genv Γ FVs C.
     induction k as [k IHk] using lt_wf_rec1. intros e.
@@ -752,14 +800,16 @@ Section Closure_conversion_correct.
     - (* Case Econstr *)      
       inv Hcc.
       assert(Hadm : sizeOf_exp_ctx C <= 4*length l) by (eapply project_vars_sizeOf_ctx_exp; eauto).
-      intros v1 c1 Hleq Hstep. assert (Hstep' := Hstep). inv Hstep'.
+      edestruct (@binding_in_map_get_list val) with (xs := l) as [vs Hgetvs]; eauto. normalize_occurs_free...
+
       edestruct project_vars_ctx_to_rho as [rho2' Hto_rho]; eauto.
       edestruct project_vars_correct as [Happ [Hfun' [Hgfun' [Henv' Hvar]]]]; eauto.
       edestruct Hvar as [v' [Hget' Happ']]; eauto.
       eapply ctx_to_rho_cc_approx_exp; eauto.
-      + eapply cc_approx_exp_constr_compat with (S0 := boundL 0).
+      + eapply cc_approx_exp_constr_compat with (P1 := boundL 0).
+        * eapply HPost_con. simpl. omega.
+        * eapply HPost_OOT; eauto. simpl; omega.      
         * eapply Forall2_cc_approx_var_env; eauto.
-        * intros. eapply bound_add_compat. omega. eassumption.
         * intros vs1 vs2 Hget Hall.
           { eapply IHe; [ | | | | | | | | | | | eassumption ].
             * eauto.
@@ -799,18 +849,23 @@ Section Closure_conversion_correct.
               normalize_bound_var... sets. 
               eapply GFun_inv_antimon; sets. } 
     - (* Case [Ecase x []] *)
-      inv Hcc. inv H13.
-      intros v1 c1 Hleq Hstep. inv Hstep. inv H5. 
+      inv Hcc. inv H13. 
+      edestruct HFVs with (x := v) as [v' Hgetv]. normalize_occurs_free...
+      edestruct project_var_ctx_to_rho as [rho2' Hto_rho]; eauto.       
+      rewrite image_Union in H1. now xsets.      
+      eapply ctx_to_rho_cc_approx_exp; eauto.
+      eapply cc_approx_exp_case_nil_compat; eauto.
+      assert(Hadm : sizeOf_exp_ctx C <= 4) by (eapply project_var_sizeOf_ctx_exp; eauto).
+      eapply HPost_OOT; eauto.
     - (* Case [Ecase x ((c, p) :: pats] *)
       inv Hcc.
       inversion H13 as [ | [c1 p1] [c2 p2] l1 l2 [Heq [C' [e' [Heq' Hcc]]]] Hall ];
         simpl in Heq, Heq'; subst.
       repeat normalize_bound_var_in_ctx.
       assert(Hadm : sizeOf_exp_ctx C <= 4) by (eapply project_var_sizeOf_ctx_exp; eauto).
-      intros v1 c1 Hleq Hstep. assert (Hstep' := Hstep). inv Hstep'.
+      edestruct HFVs with (x := v) as [v' Hgetv]. normalize_occurs_free...
       edestruct project_var_ctx_to_rho as [rho2' Hto_rho]; eauto.
-      eapply Disjoint_Included_r; [| eassumption ]. sets.
-      now eauto 10 with Ensembles_DB functions_BD.   
+      rewrite image_Union in H1. now xsets.
       edestruct project_var_correct as [Happ [Hfun' [Hgfun' [Henv' Hvar]]]]; eauto.
       edestruct Hvar as [Hget' Happ']; eauto. 
       eapply Ecase_correct; try eassumption.
@@ -835,16 +890,17 @@ Section Closure_conversion_correct.
         * econstructor; eauto.
     - (* Case Eproj *)
       inv Hcc.
-      assert(Hadm : sizeOf_exp_ctx C <= 4) by (eapply project_var_sizeOf_ctx_exp; eauto).
-      intros v1 c1 Hleq Hstep. assert (Hstep' := Hstep). inv Hstep'.
-      edestruct project_var_ctx_to_rho as [rho2' Hto_rho]; eauto.
-      now eauto 10 with Ensembles_DB functions_BD.   
+      assert (Hadm : sizeOf_exp_ctx C <= 4) by (eapply project_var_sizeOf_ctx_exp; eauto).
+      edestruct HFVs with (x := v0) as [v' Hgetv]. normalize_occurs_free...
+
+      edestruct project_var_ctx_to_rho as [rho2' Hto_rho]; eauto. now xsets. 
       edestruct project_var_correct as [Happ [Hfun' [Hgfun' [Henv' Hvar]]]]; eauto.
       edestruct Hvar as [Hget' Happ']; eauto.
       eapply ctx_to_rho_cc_approx_exp; eauto.
-      + eapply cc_approx_exp_proj_compat with (S0 := boundL 0).
+      + eapply cc_approx_exp_proj_compat with (P1 := boundL 0).
+        * eapply HPost_proj; eauto. 
+        * eapply HPost_OOT; eauto.
         * eassumption.
-        * intros. eapply bound_add_compat. omega. eassumption.
         * intros v1' v2' c1 vs1 Hget Hin Hv.
           { eapply IHe; [ now eauto | | | | | | | | | | | eassumption ].
             * eapply cc_approx_env_P_extend.
@@ -883,27 +939,27 @@ Section Closure_conversion_correct.
               normalize_bound_var... sets. 
               eapply GFun_inv_antimon; sets. }
     - (* Case letapp *)
-      inv Hcc. intros v1 c2 Hleq Hstep.
-      assert (Hstep' := Hstep). inv Hstep'.
-      
+      inv Hcc.
       assert (Hadm : sizeOf_exp_ctx C <= 4 + 4 * length ys).
       { eapply le_trans. eapply project_vars_sizeOf_ctx_exp; eauto. simpl; omega. }
-      
-      edestruct project_vars_ctx_to_rho as [rho2' Hto_rho]; eauto.
-      simpl. rewrite H5, H7. reflexivity. 
+      edestruct HFVs with (x0 := f) as [v' Hgetv]. normalize_occurs_free...
+      edestruct (@binding_in_map_get_list val) with (xs := ys) as [vs Hgetvs]; eauto. normalize_occurs_free...
+
+      edestruct project_vars_ctx_to_rho as [rho2' Hto_rho]; eauto. simpl. rewrite Hgetv, Hgetvs. reflexivity. 
       edestruct project_vars_correct as [Happ [Hfun' [Hgfun' [Henv' Hvar]]]]; eauto. 
-      edestruct Hvar as [v' [Hget' Happ']]; eauto.
-      simpl. rewrite H5, H7. reflexivity.
+      edestruct Hvar as [v'' [Hget' Happ']]; eauto.
+      simpl. rewrite Hgetv, Hgetvs. reflexivity.
       simpl in Hget'.
       destruct (M.get f' rho2') eqn:Hgetf';
-        destruct (get_list ys' rho2') eqn:Hgetvs; try congruence. inv Hget'. 
+        destruct (get_list ys' rho2') eqn:Hgetvs'; try congruence. inv Hget'. 
       inv Happ'.
       assert (Hv := H2). rewrite cc_approx_val_eq in H2.
-      destruct v0 as [ | | ]; try contradiction.
+   
+(*    destruct v' as [ | | ]; try contradiction.
       simpl in H2. destruct l0 as [ | ? [|]] ; try contradiction; destruct v0;  try contradiction.      
       destruct v2; try contradiction.
       edestruct H2 with (j := 0) as [Gamma [xs2 [e2' [rho2'' [Heqc [Hfdef [Hset Hlt]]]]]]]; [ | now eauto | now eauto | ].
-      eapply Forall2_length. eassumption. subst.
+      eapply Forall2_length. eassumption. subst. *)
       
       assert (Hnin' :  ~ In var (f' |: FromList ys') f'').
       { eapply Disjoint_In_l; [| eassumption ]. 
@@ -911,10 +967,10 @@ Section Closure_conversion_correct.
         sets. }
         
       eapply ctx_to_rho_cc_approx_exp; eauto.
-      eapply cc_approx_exp_letapp_compat with (P' := boundL 0) (rho1 := rho1) (f1 := f).
-      + simpl. intros. rewrite <-  (Nat.add_0_l (sizeOf_exp_ctx _)).
-        eapply bound_letapp_compat. omega. eassumption. eassumption. eassumption.
-        eassumption. eassumption. 
+      eapply cc_approx_exp_letapp_compat with (P1 := boundL 0) (rho1 := rho1) (f1 := f).
+      + eapply HPost_letapp. simpl; omega. 
+      + eapply HPost_letapp_OOT. simpl; omega.
+      + eapply HPost_OOT. simpl; omega.
       + rewrite (Union_commut [set f']), <- Union_assoc. intros Hc. inv Hc; eauto. inv H. contradiction.
         revert H. eapply Disjoint_In_l; [| eassumption ]. 
         rewrite <- FromList_cons. eapply project_vars_not_In_free_set. eassumption.

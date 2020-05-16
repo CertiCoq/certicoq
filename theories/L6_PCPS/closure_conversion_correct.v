@@ -41,11 +41,11 @@ Section Closure_conversion_correct.
                        post_case_compat_tl' x c e1 B1 rho1  (boundL n) (boundL n))
 
     (HPost_fun : forall B1 e1 rho1 k n, 
-                   k <= 5 * sizeOf_fundefs B1 + 1 -> 
-                   post_fun_compat' B1 e1 rho1 (boundL n) (boundL (n + k)))
+                   n <= 5 * (PS.cardinal (fundefs_fv B1)) + 1 -> 
+                   post_fun_compat' B1 e1 rho1 (boundL k) (boundL (k + n)))
 
     (HPost_app : forall f t xs rho1 n k,
-                   k <= 4 * cost (Eapp f t xs) -> 
+                   n <= 4 * cost (Eapp f t xs) -> 
                    post_app_compat_cc' clo_tag f t xs rho1 (boundL (k + n)) boundG)
 
     (HPost_letapp : forall f x t xs e1 rho1 n k, 
@@ -56,7 +56,7 @@ Section Closure_conversion_correct.
                           k <= 4 * cost (Eletapp x f t xs e1) ->
                           post_letapp_compat_cc_OOT' clo_tag f x t xs e1 rho1 (boundL (n + k)) boundG)
 
-    (HPost_OOT : forall e rho1 k, k <= 4 * cost e -> post_OOT' e rho1 (boundL k))
+    (HPost_OOT : forall e rho1 k, k <= 5 * cost_cc e -> post_OOT' e rho1 (boundL k))
     (Hpost_base : forall e rho1 k, k <= 4 * cost e -> post_base' e rho1 (boundL k))
 
     (Hinc : inclusion _ (boundL 0) boundG)
@@ -753,7 +753,7 @@ Section Closure_conversion_correct.
     - eassumption.
     - eapply cc_approx_exp_case_cons_compat; try eassumption;
         [ | | | | eapply cc_approx_exp_ctx_to_rho; try eassumption ].
-      + simpl. eapply HPost_OOT. eassumption. 
+      + simpl. eapply HPost_OOT. simpl; omega.
       + eauto.
       + simpl. eapply HPost_case_tl.
       + intros. eapply Hcc1. (* XXX typo in rule (k instead of m) *)
@@ -859,7 +859,7 @@ Section Closure_conversion_correct.
       eapply ctx_to_rho_cc_approx_exp; eauto.
       eapply cc_approx_exp_case_nil_compat; eauto.
       assert(Hadm : sizeOf_exp_ctx C <= 4) by (eapply project_var_sizeOf_ctx_exp; eauto).
-      eapply HPost_OOT; eauto.
+      eapply HPost_OOT; simpl; omega.
     - (* Case [Ecase x ((c, p) :: pats] *)
       inv Hcc.
       inversion H13 as [ | [c1 p1] [c2 p2] l1 l2 [Heq [C' [e' [Heq' Hcc]]]] Hall ];
@@ -902,7 +902,7 @@ Section Closure_conversion_correct.
       eapply ctx_to_rho_cc_approx_exp; eauto.
       + eapply cc_approx_exp_proj_compat with (P1 := boundL 0).
         * eapply HPost_proj; eauto. 
-        * eapply HPost_OOT; eauto.
+        * eapply HPost_OOT; simpl; omega.
         * eassumption.
         * intros v1' v2' c1 vs1 Hget Hin Hv.
           { eapply IHe; [ now eauto | | | | | | | | | | | eassumption ].
@@ -1129,12 +1129,18 @@ Section Closure_conversion_correct.
           try (now intros; eauto).
         econstructor. eassumption. now constructor. 
         simpl sizeOf_exp_ctx. simpl plus. rewrite Nat_as_OT.add_0_r.
-                 
+        assert (Hcost : sizeOf_exp_ctx C' + S (Datatypes.length FVs'') <= 5 * PS.cardinal (fundefs_fv f2) + 1).
+        { rewrite fundefs_fv_correct in Hsub. eapply FromList_length_cardinal' in Hsub; eauto.
+          simpl cost_cc. replace (5 * (PS.cardinal (fundefs_fv f2)) + 1) with (4 * PS.cardinal (fundefs_fv f2) + S (PS.cardinal (fundefs_fv f2))) by omega.
+          simpl. eapply project_vars_length in H4. rewrite <- !H4. eapply le_trans.
+          eapply plus_le_compat. eassumption. eapply Peano.le_n_S. now eapply Hsub. 
+          eapply plus_le_compat; [| reflexivity ]. eapply le_trans. eapply mult_le_compat_l. 
+          clear Hlen H4. eassumption. simpl; omega. }
+        
         eapply cc_approx_exp_fun_compat with (P1 := boundL 0).
-        + eapply project_vars_length in H4.  
-          replace (sizeOf_exp_ctx C' + S (Datatypes.length FVs'')) with (0 + (sizeOf_exp_ctx C' + S (Datatypes.length FVs''))) by omega.
-          eapply HPost_fun. simpl. omega.
-        + eapply HPost_OOT. admit.
+        + replace (sizeOf_exp_ctx C' + S (Datatypes.length FVs'')) with (0 + (sizeOf_exp_ctx C' + S (Datatypes.length FVs''))) by omega.
+          eapply HPost_fun. eassumption.
+        + eapply HPost_OOT. simpl; omega.
  (*     + { assert (Hcc := H17). eapply Closure_conversion_fundefs_numOf_fundefs in H17. 
             assert (Hlen' : Datatypes.length FVs'' = Datatypes.length FVs') by (symmetry; eapply project_vars_length; eauto).
             simpl sizeOf_exp_ctx. rewrite !Nat_as_OT.add_0_r. rewrite Hlen'. 
@@ -1292,15 +1298,14 @@ Section Closure_conversion_correct.
       { eapply Disjoint_In_l; [| eassumption ]. 
         rewrite <- FromList_cons. eapply project_vars_not_In_free_set. eassumption.
         eapply Disjoint_Included_r; [| eassumption ]. sets... }             
-      eapply cc_approx_exp_app_compat. eassumption. exact (Ehalt 1%positive). exact (Ehalt 1%positive). (* TODO remove vars *)
-      + eapply HPost_app. (* XXX change post *) admit.
+      eapply cc_approx_exp_app_compat.
+      + eapply HPost_app. simpl; omega.
       + eapply HPost_OOT. simpl; omega.
       + rewrite (Union_commut [set f']), <- Union_assoc. intros Hc. inv Hc; eauto. inv H. contradiction.
         revert H. eapply Disjoint_In_l; [| eassumption ]. 
         rewrite <- FromList_cons. eapply project_vars_not_In_free_set. eassumption.
         eapply Disjoint_Included_r; [| eassumption ]. sets...
       + eassumption.
-      + admit. (* intros x Hget. repeat subst_exp. eexists; split; eauto. *)
       + intros x Hget. repeat subst_exp. eexists; split; eauto.
       + eapply Forall2_cc_approx_var_env; eauto.
     (* Case Eprim *)

@@ -833,33 +833,42 @@ Section LogRelCC.
 
   (** Application compatibility *)
   Lemma cc_approx_exp_app_compat (k : nat) 
-        (rho1 rho2 rho2' : env) (x f1 : var) (xs1 : list var) 
-        (f2 f' Γ : var) (xs2 : list var) (t : fun_tag) (e1 e2 : exp) :
+        (rho1 rho2 : env) (f1 : var) (xs1 : list var) 
+        (f2 f' Γ : var) (xs2 : list var) (t : fun_tag) :
     post_app_compat_cc' f1 t xs1 rho1 P2 PG ->
     post_OOT' (Eapp f1 t xs1) rho1 P2 ->
     ~ Γ \in (f2 |: [set f'] :|: FromList xs2) ->
     ~ f' \in (f2 |: FromList xs2) ->
-    ctx_to_rho (AppClo f2 f' Γ) rho2 rho2' -> (* Useful for OOT -- maybe PostZero instead? *)
 
     cc_approx_var_env k PG rho1 rho2 f1 f2 ->
     Forall2 (cc_approx_var_env k PG rho1 rho2) xs1 xs2 ->    
     cc_approx_exp k P2 PG (Eapp f1 t xs1, rho1)
                   (AppClo f2 f' Γ |[ Eapp f' t (Γ :: xs2) ]|, rho2).
   Proof.
-    intros Hpost Hoot Hnin1 Hnin2 Hctx Hvar Hall v1 cin Hleq1 Hstep1 Hns. 
+    intros Hpost Hoot Hnin1 Hnin2 Hvar Hall v1 cin Hleq1 Hstep1 Hns. 
     destruct (lt_dec cin (cost (Eapp f1 t xs1))); inv Hstep1; try omega. 
     - (* ΟΟΤ *) (* Using zero *)
-      inv Hctx. inv H9. inv H12.
       exists OOT, cin. split; [| split ].
       + destruct (lt_dec cin 1).
         * constructor 1. eassumption.
-        * constructor 2. simpl in *; omega.
-          econstructor; eauto. simpl.
+        * assert (Hex : exists rho' B f, M.get f1 rho1 = Some (Vfun rho' B f)).
+          { edestruct Hns as [[c [v Hs1]] | Hs2].
+            ++ inv Hs1. inv H1. do 3 eexists; eauto. 
+            ++ specialize (Hs2 (cost (Eapp f1 t xs1))).
+               inv Hs2; try omega. inv H1; eauto. }
+          edestruct Hex as [rhoc [B [f Hget]]]. eapply Hvar in Hget.
+          destruct Hget as [v2 [Hgetv2 Hvv]]. rewrite cc_approx_val_eq in Hvv.
+          destruct v2; simpl in Hvv; try contradiction.
+          destruct l0 as [| ? [|] ]; try contradiction;
+          destruct v; try contradiction; destruct v0; try contradiction. 
+          constructor 2. simpl in *; omega. destruct Hvv as [Heq Hvv]; subst.
+          econstructor; eauto. reflexivity. 
           destruct (lt_dec cin 2).
           -- constructor 1. simpl; omega.
           -- constructor 2. simpl in *; omega.
-             econstructor; eauto. simpl. constructor 1. 
-             simpl in *. eapply Forall2_length in Hall. rewrite <- Hall.
+             econstructor; eauto. rewrite M.gso. eassumption.
+             now intros Hin; subst; eapply Hnin2; eauto. reflexivity. 
+             constructor. simpl in *. eapply Forall2_length in Hall. rewrite <- Hall.
              omega.
       + eapply Hoot; eauto.
       + simpl; eauto. 

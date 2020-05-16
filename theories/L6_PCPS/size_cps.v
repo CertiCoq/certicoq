@@ -40,6 +40,18 @@ with sizeOf_fundefs (B : fundefs) : nat :=
          | Fnil => 0
        end.
 
+Definition cost_cc (e : exp) : nat := 
+  match e with 
+  | Econstr x t ys e => 1 + length ys
+  | Eproj x t n y e => 1
+  | Ecase y cl => 1
+  | Eapp f t ys => 1 + length ys
+  | Eletapp x f t ys e => 1 + length ys 
+  | Efun B e => 1 + PS.cardinal (fundefs_fv B)
+  | Eprim x f ys e => 1 + length ys
+  | Ehalt x => 1
+  end.
+
 (** The size of evaluation contexts *)
 Fixpoint sizeOf_exp_ctx (c : exp_ctx) : nat :=
   match c with

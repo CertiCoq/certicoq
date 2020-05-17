@@ -496,6 +496,11 @@ Section Log_rel.
     forall e2 rho2 c, 
       c < cost e1 ->
       P1 (e1, rho1, c) (e2, rho2, c).
+    
+  Definition post_zero e1 rho1 (P1 : PostT) :=
+    forall e2 rho2 c, 
+      c < cost e1 ->
+      P1 (e1, rho1, c) (e2, rho2, 0).
 
   Definition post_base' e1 rho1 (P1 : PostT) :=
     forall e2 rho2 c, 
@@ -1038,54 +1043,124 @@ Section Log_rel.
           eassumption.
       Qed.
 
+      Fixpoint len_exp_ctx (c : exp_ctx) := 
+        match c with 
+        | Econstr_c _ _ _ c
+        | Eproj_c _ _ _ _ c 
+        | Eprim_c _ _ _ c
+        | Efun1_c _ c => 1 + len_exp_ctx c
+        | Efun2_c _ _
+        | Eletapp_c _ _ _ _ _
+        | Ecase_c _ _ _ _ _ => 2
+        | Hole_c => 0
+        end.
+
   (** Context application lemma, left *)
   (** [(C |[ e1 ]|, ρ1) < (e2, ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
       interpretation of [C] in [ρ2] *)
-  Lemma ctx_to_rho_preord_exp_l k (L : nat -> PostT) boundG rho1 rho1' rho2 C e e' m :
-    ctx_to_rho C rho1 rho1' -> 
-    preord_exp (L m) boundG k (e, rho1') (e', rho2) ->
-    preord_exp (L (m + sizeOf_exp_ctx C)) boundG k (C |[ e ]|, rho1) (e', rho2).
+  Lemma ctx_to_rho_preord_exp_l k boundG rho1 rho2 C e e' :
+    (forall rho1' e2 rho2 c1 c2, 
+       ctx_to_rho C rho1 rho1' ->
+       P1 (e, rho1', c1) (e2, rho2, c2) -> 
+       P2 (C |[ e ]|, rho1, c1 + (cost (C |[ e ]|))) (e2, rho2, c2)) ->
+    post_zero (C |[ e ]|) rho1 P2 ->
+    len_exp_ctx C = 1 ->
+    (forall rho1', ctx_to_rho C rho1 rho1' -> preord_exp P1 boundG k (e, rho1') (e', rho2)) ->
+    preord_exp P2 boundG k (C |[ e ]|, rho1) (e', rho2).
   Proof.
-  Abort.
-(*  intros H1 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
-    - intros v1' c1 Hleq1 Hstep1.
-      edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
-      simpl in *. repeat eexists; eauto.
-      rewrite <- plus_n_O. eassumption.
+    intros H1 Hzero Hlen Hcc. 
+    destruct C; try (simpl in Hlen; omega); try (destruct C; simpl in Hlen; try omega).
     - intros v1 c1 Hleq1 Hstep1. inv Hstep1. 
-      + simpl in *. exists OOT.
-      repeat subst_exp.
-
-      edestruct I HHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; [| eassumption | | | ]; try omega.
-      + intros. eapply H1; eauto. simpl; omega.
-      + eassumption.
-      +  
-         repeat eexists; eauto.
-      simpl.
-      replace (m + S (size_cps.sizeOf_exp_ctx C)) with (m + size_cps.sizeOf_exp_ctx C + 1) by omega.
-      eapply H1; eauto. simpl; omega.
-      eapply preord_val_monotonic. eassumption. omega.
-    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
-      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
-      intros. eapply H1; eauto. simpl; omega.
-      repeat eexists; eauto.
-      simpl.
-      rewrite <- (plus_assoc c 1 _).
-      replace (m + S (@Datatypes.length var ys + size_cps.sizeOf_exp_ctx C))
-        with ((m + (size_cps.sizeOf_exp_ctx C)) + (1 + @Datatypes.length var ys)) by omega.
-      eapply H1; eauto. simpl; omega. 
-      eapply preord_val_monotonic. eassumption. omega.
-    - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
-      edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
-      intros. eapply H1; eauto. simpl; omega.
-      repeat eexists; eauto.
-      simpl.
-      replace (m + S (set_util.PS.cardinal (fundefs_fv B) + size_cps.sizeOf_exp_ctx C))
-        with ((m + (size_cps.sizeOf_exp_ctx C)) + (1 + set_util.PS.cardinal (fundefs_fv B))) by omega.
-      eapply H1; eauto. simpl; omega. 
-      eapply preord_val_monotonic. eassumption. omega.
+      + simpl in *. exists OOT, 0. split.
+        econstructor 1. eapply cost_gt_0. split.
+        eapply Hzero. eassumption.
+        now eauto.
+      + inv H0. repeat subst_exp.
+        edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| | eassumption| ]; try omega.
+        econstructor; eauto. now econstructor. 
+        repeat eexists; eauto. simpl in *. 
+        replace c1 with (c1 - S (Datatypes.length l) + S (Datatypes.length l)) by (simpl in *; omega).
+        eapply H1; eauto. econstructor; eauto. now econstructor.
+        eapply preord_res_monotonic. eassumption. omega.
+    - intros v1 c1 Hleq1 Hstep1. inv Hstep1. 
+      + simpl in *. exists OOT, 0. split.
+        econstructor 1. eapply cost_gt_0. split.
+        eapply Hzero. eassumption.
+        now eauto.
+      + inv H0.
+        edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| | eassumption| ]; try omega.
+        econstructor; eauto. now econstructor. 
+        repeat eexists; eauto. simpl in *. 
+        replace c1 with (c1 - 1 + 1) by (simpl in *; omega).
+        eapply H1; eauto. econstructor; eauto. now econstructor.
+        eapply preord_res_monotonic. eassumption. omega.
+    - intros v' c1 Hleq1 Hstep1. inv Hstep1.
+      + simpl in *. exists OOT, 0. split.
+        econstructor 1. eapply cost_gt_0. split.
+        eapply Hzero. eassumption.
+        now eauto.
+      + inv H0.
+    - intros v' c1 Hleq1 Hstep1. inv Hstep1.
+      + simpl in *. exists OOT, 0. split.
+        econstructor 1. eapply cost_gt_0. split.
+        eapply Hzero. eassumption.
+        now eauto.
+      + inv H0. repeat subst_exp.
+        edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| | eassumption| ]; try omega.
+        econstructor; eauto. now econstructor.
+        repeat eexists; eauto. simpl in *.
+        replace c1 with (c1 - 1 + 1) by (simpl in *; omega).
+        eapply H1; eauto. econstructor; eauto. now econstructor.
+        eapply preord_res_monotonic. eassumption. omega.
   Qed.
-*)
+
+    (** Context application lemma, left *)
+    (** [(C |[ e1 ]|, ρ1) < (e2, ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
+       interpretation of [C] in [ρ2] *)
+    Lemma ctx_to_rho_preord_exp_l_old k (L : nat -> PostT) boundG rho1 rho1' rho2 C e e' m :
+      ctx_to_rho C rho1 rho1' -> 
+      preord_exp (L m) boundG k (e, rho1') (e', rho2) ->
+      preord_exp (L (m + sizeOf_exp_ctx C)) boundG k (C |[ e ]|, rho1) (e', rho2).
+    Proof.
+    Abort.
+(*      intros H1 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
+      - intros v1' c1 Hleq1 Hstep1.
+        edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
+        simpl in *. repeat eexists; eauto.
+        rewrite <- plus_n_O. eassumption.
+      - intros v1 c1 Hleq1 Hstep1. inv Hstep1. 
+        + simpl in *. exists OOT.
+        repeat subst_exp.
+    
+        edestruct I HHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; [| eassumption | | | ]; try omega.
+          + intros. eapply H1; eauto. simpl; omega.
+          + eassumption.
+          +  
+             repeat eexists; eauto.
+          simpl.
+          replace (m + S (size_cps.sizeOf_exp_ctx C)) with (m + size_cps.sizeOf_exp_ctx C + 1) by omega.
+          eapply H1; eauto. simpl; omega.
+          eapply preord_val_monotonic. eassumption. omega.
+        - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
+          edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
+          intros. eapply H1; eauto. simpl; omega.
+          repeat eexists; eauto.
+          simpl.
+          rewrite <- (plus_assoc c 1 _).
+          replace (m + S (@Datatypes.length var ys + size_cps.sizeOf_exp_ctx C))
+            with ((m + (size_cps.sizeOf_exp_ctx C)) + (1 + @Datatypes.length var ys)) by omega.
+          eapply H1; eauto. simpl; omega. 
+          eapply preord_val_monotonic. eassumption. omega.
+        - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
+          edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
+          intros. eapply H1; eauto. simpl; omega.
+          repeat eexists; eauto.
+          simpl.
+          replace (m + S (set_util.PS.cardinal (fundefs_fv B) + size_cps.sizeOf_exp_ctx C))
+            with ((m + (size_cps.sizeOf_exp_ctx C)) + (1 + set_util.PS.cardinal (fundefs_fv B))) by omega.
+          eapply H1; eauto. simpl; omega. 
+          eapply preord_val_monotonic. eassumption. omega.
+      Qed. *)
     
   End Compat.
   
@@ -2282,23 +2357,26 @@ Section Log_rel.
     - inv Hspl1. simpl. inv Hspl2. eapply preord_env_P_refl; eauto.
   Qed.
 
+
+(* Need minor updates:
+
   Lemma preord_env_P_Included_fun_in_fundefs k B1 B1' B2 B2' rho1 rho1' :
     Included _ (fun_in_fundefs B1) (fun_in_fundefs B2) ->
     Included _ (fun_in_fundefs B1') (fun_in_fundefs B2') ->
     closed_fundefs B1' ->
-    unique_bindings_fundefs B1'->
-    unique_bindings_fundefs B1 ->
-    unique_bindings_fundefs B2'->
-    unique_bindings_fundefs B2 ->
+    unique_functions B1'->
+    unique_functions B1 ->
+    unique_functions B2'->
+    unique_functions B2 ->
     preord_env_P PG (name_in_fundefs B1) k (def_funs B1' B1 rho1 rho1')
                  (def_funs B2' B2 rho1 rho1').
   Proof.
     revert B1 B1' B2 B2' rho1 rho1'. induction k using lt_wf_rec1.
     induction B1; intros B1' B2 B2' rho1 rho1' HS1 HS2 Hcl Hun1' Hun1 Hun2' Hun2.
-    - edestruct fun_in_fundefs_unique_bindings_split
+    - edestruct fun_in_fundefs_unique_functions_split
       with (B := B2) as [B [B' [Heq [Hn [HS Hun']]]]]; eauto.
       eapply HS1. left. eauto.
-      edestruct fundefs_append_unique_bindings_l as [H1 [H2 H3]]; eauto.
+      edestruct fundefs_append_unique_functions_l as [H1 [H2 H3]]; eauto.
       rewrite Heq.
       eapply preord_env_P_antimon;
         [| apply (@Included_Union_Setminus _ _ (Singleton var v) _)].
@@ -2433,7 +2511,7 @@ Section Log_rel.
       destruct HS1 as [_ H1]. exfalso. eapply not_In_Empty_set. eapply H1.
       simpl. eauto.
   Qed.
-
+*)
   End Trans.
 
 End Log_rel.

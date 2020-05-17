@@ -1699,8 +1699,8 @@ Inductive unique_functions : fundefs -> Prop :=
     unique_functions Fnil
 | Fcons_un :
     forall f tau xs e B,
-      unique_functions B ->
       ~ Ensembles.In _ (name_in_fundefs B) f ->
+      unique_functions B ->
       unique_functions (Fcons f tau xs e B).
 
 Definition fundefs_names_unique (e : exp) : Prop :=
@@ -1726,7 +1726,7 @@ Proof.
   intros Hun HB. induction B.
   - inv Hun. destruct (peq f v); subst.
     + inv HB. inv H. simpl. rewrite peq_true. reflexivity.
-      exfalso. eapply H5. eapply fun_in_fundefs_name_in_fundefs.
+      exfalso. eapply H1. eapply fun_in_fundefs_name_in_fundefs.
       eassumption.
     + inv HB. inv H. contradiction.
       simpl. rewrite peq_false; eauto.
@@ -1967,6 +1967,52 @@ Proof with eauto with Ensembles_DB.
   - constructor.
 Qed.
 
+Lemma split_fds_unique_functions_l B1 B2 B3 :
+  unique_functions B3 ->
+  split_fds B1 B2 B3 ->
+  unique_functions B1 /\ unique_functions B2 /\
+  Disjoint var (name_in_fundefs B1) (name_in_fundefs B2).
+Proof with eauto with Ensembles_DB.
+  intros Hun Hspl. induction Hspl; simpl.
+  - inv Hun. edestruct IHHspl as [Hh1 [Hh2 Hh3]]; eauto.
+    split; [| split ]. constructor; eauto. 
+    rewrite split_fds_name_in_fundefs in H1; [| eassumption ]. now eauto. 
+    eassumption. 
+    apply Union_Disjoint_l.
+    eapply Disjoint_Singleton_l. 
+    rewrite split_fds_name_in_fundefs in H1; [| eassumption ]. now eauto. 
+    eassumption. 
+  - inv Hun. edestruct IHHspl as [Hh1 [Hh2 Hh3]]; eauto.
+    split; [| split ]; eauto. constructor; eauto. 
+    rewrite split_fds_name_in_fundefs in H1; [| eassumption ]. now eauto. 
+    apply Union_Disjoint_r.
+    eapply Disjoint_Singleton_r. 
+    rewrite split_fds_name_in_fundefs in H1; [| eassumption ]. now eauto. 
+    eassumption. 
+  - split. eassumption. split. eassumption. sets.
+Qed.
+
+Lemma split_fds_unique_functions_r B1 B2 B3 :
+  unique_functions B1 -> unique_functions B2 ->
+  Disjoint var (name_in_fundefs B1) (name_in_fundefs B2) ->
+  split_fds B1 B2 B3 ->
+  unique_functions B3.
+Proof with eauto with Ensembles_DB.
+  intros Hun1 Hun2 HD Hspl. induction Hspl; simpl; repeat normalize_bound_var_in_ctx.
+  - inv Hun1. constructor; eauto.
+    + simpl in HD. intros Hc. apply H1.
+      rewrite split_fds_name_in_fundefs in Hc; [| eassumption ]. inv Hc; eauto.
+      exfalso. eapply HD; eauto.
+    + eapply IHHspl; eauto. sets.
+  - inv Hun2. constructor; eauto.
+    + simpl in HD. intros Hc. apply H1.
+      rewrite split_fds_name_in_fundefs in Hc; [| eassumption ]. inv Hc; eauto.
+      exfalso. eapply HD; eauto.
+    + eapply IHHspl; eauto. sets.
+  - constructor.
+Qed.
+
+
 Lemma split_fds_find_def B1 B2 B3 f:
   unique_functions B3 ->
   split_fds B1 B2 B3 ->
@@ -2003,6 +2049,28 @@ Proof.
   eapply split_fds_unique_bindings_fundefs_r;
     [ apply H0 | | | ]; eauto.
   apply fundefs_append_split_fds; eauto.
+Qed.
+
+Lemma fundefs_append_unique_functions_l B1 B2 B3 :
+  unique_functions B3 ->
+  fundefs_append B1 B2 = B3 ->
+  unique_functions B1 /\
+  unique_functions B2 /\
+  Disjoint var (name_in_fundefs B1) (name_in_fundefs B2).
+Proof.
+  intros. edestruct split_fds_unique_functions_l; eauto.
+  apply fundefs_append_split_fds; eauto.
+Qed.
+
+Lemma fundefs_append_unique_functions_r B1 B2 B3 :
+  fundefs_append B1 B2 = B3 ->
+  unique_functions B1 ->
+  unique_functions B2 ->
+  Disjoint var (name_in_fundefs B1) (name_in_fundefs B2) ->
+  unique_functions B3.
+Proof.
+  intros. eapply split_fds_unique_functions_r;
+            [ | | | apply fundefs_append_split_fds; eauto ]; eauto.
 Qed.
 
 Lemma unique_bindings_funs_in_exp_mut :
@@ -2110,23 +2178,73 @@ Proof with eauto with Ensembles_DB.
   - inv H.
 Qed.
 
+Lemma fun_in_fundefs_unique_functions_split f tau xs e B :
+  fun_in_fundefs B (f, tau, xs, e) ->
+  unique_functions B ->
+  exists B1 B2,
+    B = fundefs_append B1 (Fcons f tau xs e B2) /\
+    ~ name_in_fundefs B1 f /\  ~ name_in_fundefs B2 f /\
+    Same_set _ (Union _ (fun_in_fundefs B1) (fun_in_fundefs B2))
+             (Setminus _ (fun_in_fundefs B) (Singleton _ (f, tau, xs, e))) /\
+    unique_functions (fundefs_append B1 B2).
+Proof with eauto with Ensembles_DB.
+  intros H Hun. induction B.
+  - simpl in H.
+    destruct (var_dec v f); subst.
+    + inv H. inv H0.
+      * exists Fnil. eexists. split; simpl; eauto.
+        split; try (now intros Hc; inv Hc). split; try (now inv Hun; eauto).
+        rewrite Union_Empty_set_neut_l, Setminus_Union_distr,
+        Setminus_Same_set_Empty_set, Union_Empty_set_neut_l. inv Hun.
+        split; eauto.
+        symmetry. eapply Setminus_Disjoint.
+        apply Disjoint_Singleton_r. intros Hc.
+        eapply H1. eapply fun_in_fundefs_name_in_fundefs; eauto.
+      * exfalso. inv Hun. eapply H2. eapply fun_in_fundefs_name_in_fundefs; eauto.
+    + inv H. inv H0. congruence. inv Hun; eauto.
+      edestruct IHB as [B1 [B2 [Heq [Heq' [Hn [Hs Hun']]]]]]; eauto.
+      edestruct fundefs_append_unique_functions_l as [H1 [H2' H3]];
+        [ | | ]; eauto.
+      exists (Fcons v f0 l e0 B1), B2. rewrite Heq. split; eauto.
+      split; [| split; [| split ]].
+      * subst. intros H. inv H; eauto. inv H4. congruence.
+      * eassumption.
+      * simpl. rewrite Setminus_Union_distr, <- Union_assoc.
+        apply Same_set_Union_compat.
+        apply Same_set_sym. eapply Setminus_Disjoint.
+        apply Disjoint_Singleton_r. intros Hc. inv Hc. congruence.
+        apply Same_set_sym. 
+        rewrite fundefs_append_fun_in_fundefs; eauto. simpl.
+        rewrite !Setminus_Union_distr, Setminus_Same_set_Empty_set,
+        Union_Empty_set_neut_l, <- Setminus_Union_distr.
+        eapply Setminus_Disjoint. apply Union_Disjoint_l.
+        eapply Disjoint_Singleton_r. intros Hc. eapply Heq'.
+        eapply fun_in_fundefs_name_in_fundefs. eassumption.
+        eapply Disjoint_Singleton_r. intros Hc. eapply Hn.
+        eapply fun_in_fundefs_name_in_fundefs. eassumption.
+      * simpl. constructor; eauto.
+        intros H. apply H2. eapply fundefs_append_name_in_fundefs; eauto.
+        rewrite fundefs_append_name_in_fundefs in H; [| reflexivity ].
+        simpl; inv H; eauto.
+  - inv H.
+Qed.
+
 Lemma find_def_Included_fun_in_fundefs f B B' :
-  unique_bindings_fundefs B ->
-  unique_bindings_fundefs B' ->
+  unique_functions B ->
+  unique_functions B' ->
   Included _ (fun_in_fundefs B) (fun_in_fundefs B') ->
   name_in_fundefs B f ->
   find_def f B = find_def f B'.
 Proof with eauto with Ensembles_DB.
   revert B'. induction B; simpl; intros B' Hun Hun' H Hn.
-  - edestruct fun_in_fundefs_unique_bindings_split
-      as [B1 [B1' [Heq [Hn' [HS' Hun1]]]]]; eauto.
+  - edestruct fun_in_fundefs_unique_functions_split
+      as [B1 [B1' [Heq [Heq' [Hn' [HS' Hun1]]]]]]; eauto.
     eapply H. left. eauto.
     rewrite Heq. destruct (M.elt_eq f v); subst.
     + erewrite find_def_fundefs_append_r.
       simpl; destruct (M.elt_eq v v); try congruence.
       simpl; destruct (M.elt_eq v v); try congruence. eauto.
-      apply name_not_in_fundefs_find_def_None.
-      intros Hc. apply Hn'; eauto.
+      apply name_not_in_fundefs_find_def_None. eassumption.
     + rewrite find_def_fundefs_append_Fcons_neq; eauto. eapply IHB; eauto.
       inv Hun; eauto.
       rewrite (fundefs_append_fun_in_fundefs B1 B1' (fundefs_append B1 B1')); eauto.
@@ -2134,16 +2252,15 @@ Proof with eauto with Ensembles_DB.
       rewrite <- (Setminus_Disjoint (fun_in_fundefs B) (Singleton _ (v, f0, l, e))).
       eapply Included_Setminus_compat...
       eapply Included_trans; [| eassumption ]...
-      eapply Disjoint_Singleton_r. inv Hun; eauto. intros Hc. apply H6.
-      apply name_in_fundefs_bound_var_fundefs.
+      eapply Disjoint_Singleton_r. inv Hun; eauto. intros Hc. apply H2.
       now eapply fun_in_fundefs_name_in_fundefs; eauto.
-      inv Hn. inv H0; try congruence. eauto.
+      inv Hn; eauto. inv H0; eauto. contradiction.
   - destruct B'; eauto. inv Hn.
 Qed.
 
 Lemma find_def_Same_set_fun_in_fundefs f B B' :
-  unique_bindings_fundefs B ->
-  unique_bindings_fundefs B' ->
+  unique_functions B ->
+  unique_functions B' ->
   Same_set _ (fun_in_fundefs B) (fun_in_fundefs B') ->
   find_def f B = find_def f B'.
 Proof.

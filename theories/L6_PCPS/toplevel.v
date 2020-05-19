@@ -114,8 +114,7 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_Fu
   in
   let res : error (exp * comp_data):=
       (* uncurring *)
-      let '(e_err1, s, c_data) := if cps then uncurry_fuel_cps 100 (shrink_cps.shrink_top e0) c_data 
-                                 else uncurry_fuel_anf 100 (shrink_cps.shrink_top e0) c_data in
+      let '(e_err1, s, c_data) := uncurry_fuel cps 100 (shrink_cps.shrink_top e0) c_data in
       (* inlining *)
       e1 <- e_err1 ;;
       let (e_err2, c_data) := if cps then inline_uncurry e1 s 10 10 c_data

@@ -643,6 +643,40 @@ Section Log_rel.
         simpl in *. omega.
     Qed. 
 
+    Lemma preord_exp_const_compat_alt k rho1 rho2 x x' t ys1 ys2 e1 e2 :
+      Forall2 (preord_var_env PG k rho1 rho2) ys1 ys2 ->
+      (forall m (vs1 vs2 : list val),
+          m < k ->
+          get_list ys1 rho1 = Some vs1 ->
+          get_list ys2 rho2 = Some vs2 ->      
+          preord_exp P1 PG m (e1, M.set x (Vconstr t vs1) rho1)
+                     (e2, M.set x' (Vconstr t vs2) rho2)) ->
+      preord_exp P2 PG k (Econstr x t ys1 e1, rho1) (Econstr x' t ys2 e2, rho2).
+    Proof.
+      intros Hall Hpre v1 cin Hleq1 Hstep1. 
+      destruct (lt_dec cin (cost (Econstr x t ys1 e1))); inv Hstep1; try omega. 
+      - (* OOT *) 
+        exists OOT, cin. split. constructor. 
+        simpl in *. erewrite <- Forall2_length; [| eassumption ]. 
+        eassumption. split; [| now eauto ]. eapply HPost_OOT.
+        eassumption. 
+      - inv H0. edestruct (preord_var_env_get_list PG rho1 rho2) as [vs2' [Hget' Hpre']];
+          [| eauto |]; eauto. 
+        edestruct (Hpre (k - cost (Econstr x t ys1 e1))) as [v2 [cin' [Hstep [Hpost Hval]]]];
+          [| | | | eassumption | ]; eauto.   
+        simpl in *. omega. omega.  
+
+        eexists. exists (cin' + cost (Econstr x' t ys2 e2)). split; [| split ]. 
+        econstructor 2; eauto. simpl in *; omega. rewrite Nat_as_OT.add_sub.  
+        now econstructor; eauto.  
+        replace cin with (cin - cost (Econstr x t ys1 e1) + cost (Econstr x' t ys2 e2)).
+        2:{ simpl in *.  eapply Forall2_length in Hall. rewrite Hall. omega. } 
+        eapply HPost_con; try eassumption.
+        eapply preord_res_monotonic. eassumption. 
+        simpl in *. omega.
+    Qed. 
+
+
     Lemma preord_exp_proj_compat k rho1 rho2 x x' tau n y1 y2 e1 e2 :
       preord_var_env PG k rho1 rho2 y1 y2 ->
       (forall m v1 v2,
@@ -667,6 +701,41 @@ Section Log_rel.
         simpl in *; omega.
         eapply preord_val_monotonic. eassumption. omega. 
         simpl in *. omega. 
+        eexists. exists (cin' + cost (Eproj x' c n y2 e2)). split; [| split ]. 
+        econstructor 2; eauto. simpl in *; omega. 
+        rewrite Nat_as_OT.add_sub. now econstructor 2; eauto. 
+        replace cin with (cin - cost (Eproj x c n y1 e1) + cost (Eproj x' c n y2 e2)). 
+        2:{ simpl in *. omega. }
+        eapply HPost_proj; try eassumption.
+        eapply preord_res_monotonic. eassumption.
+        simpl in *; omega.
+    Qed.
+
+    Lemma preord_exp_proj_compat_alt k rho1 rho2 x x' tau n y1 y2 e1 e2 :
+      preord_var_env PG k rho1 rho2 y1 y2 ->
+      (forall m vs1 vs2 v1 v2,
+          m < k ->
+          M.get y1 rho1 = Some (Vconstr tau vs1) ->
+          M.get y2 rho2 = Some (Vconstr tau vs2) ->
+          nthN vs1 n = Some v1 ->
+          nthN vs2 n = Some v2 ->
+          preord_exp P1 PG m (e1, M.set x v1 rho1)
+                    (e2, M.set x' v2 rho2)) ->
+      preord_exp P2 PG k (Eproj x tau n y1 e1, rho1) (Eproj x' tau n y2 e2, rho2).
+    Proof.
+      intros Henv Hexp v1 cin Hleq1 Hstep1.
+      destruct (lt_dec cin (cost (Eproj x tau n y1 e1))); inv Hstep1; try omega. 
+      - (* ΟΟΤ *)
+        exists OOT, cin.  split. constructor. simpl in *. omega. 
+        split; [| now eauto ]. eapply HPost_OOT. eassumption.
+      - inv H0. edestruct Henv as [v' [Hget Hpre]]; eauto.
+        destruct v'; rewrite preord_val_eq in Hpre; simpl in Hpre; try contradiction.
+        inv Hpre.
+        edestruct (Forall2_asym_nthN (preord_val PG k) vs l) as [v2 [Hnth Hval]];
+          try eassumption.
+        edestruct (Hexp  (k - 1)) with (cin := (cin - cost (Eproj x c n y1 e1))) as [v2' [cin' [Hstep [Hpost Hval']]]];
+          [ | | | | eassumption | | | ]; eauto. 
+        simpl in *; omega. simpl in *; omega. 
         eexists. exists (cin' + cost (Eproj x' c n y2 e2)). split; [| split ]. 
         econstructor 2; eauto. simpl in *; omega. 
         rewrite Nat_as_OT.add_sub. now econstructor 2; eauto. 

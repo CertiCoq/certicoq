@@ -94,10 +94,10 @@ Inductive rw (S : Ensemble var) : relation exp :=
       rw S (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) (Efun (fundefs_append B1 B2) e)
 (* Rules about inlining/constant-folding *)
 | Constr_case:
-    forall x c cl co e ys,
-      findtag cl co = Some e ->
+    forall x c cl co n e ys,
+      find_tag_nth cl co e n ->
       (* x isn't shadowed on the way to the case statement *)
-      ~bound_stem_ctx c x ->
+      ~ bound_stem_ctx c x ->
       rw S (Econstr x co ys (c |[ Ecase x cl ]|)) (Econstr x co ys (c |[e]|))
 
 | Constr_proj:
@@ -2130,60 +2130,364 @@ Section Shrink_correct.
   Qed.
 
 
-  Lemma rw_case_local:
-    forall (k0 : nat) c0 vs e cl x (rho0 rho3 : env),
+  Context (Hless_steps'' :
+             forall x cl t e n rho1 rho2 c1 c2,
+               find_tag_nth cl t e n ->
+               P1 (e, rho1, c1) (e, rho2, c2) ->
+               P1 (Ecase x cl, rho1, c1 + 1) (e, rho2, c2)).
+
+
+
+  Lemma rw_case_local (k0 : nat) c0 vs e cl x n (rho0 rho3 : env) :
       preord_env_P cenv PG (occurs_free (Ecase x cl)) k0 rho0 rho3 ->
-      findtag cl c0 = Some e ->
+      find_tag_nth cl c0 e n ->
       M.get x rho0 = Some (Vconstr c0 vs) ->
       preord_exp cenv P1 PG k0 (Ecase x cl, rho0) (e, rho3).
   Proof.
-    intros; intro; intros.
-    inversion H3; subst.
-    rewrite H1 in H6. inversion H6; subst.
-    rewrite H9 in H0; inversion H0; subst.
-    eapply preord_exp_refl; eauto.
-    eapply preord_env_P_antimon.
-    apply H.
-    eapply occurs_free_Ecase_Included.
-    apply findtag_In_patterns. eauto.
+    intros Hcc Hf Hget v1 c1 Hleq Hs. inv Hs.
+    + exists OOT, 0. split; [| split ].
+      constructor; eauto. eapply cost_gt_0.
+      eapply Hpost_zero; eauto. now simpl; eauto.
+    + inv H0; repeat subst_exp.
+      eapply find_tag_nth_deterministic in H6; [| clear H6; eassumption ]. inv H6.
+      edestruct (preord_exp_refl cenv P1 PG)
+        with (k := k0) (e := e0) (rho := rho0) (rho' := rho3) (cin := (c1 - cost (Ecase x cl)))
+        as [v2 [c2 [Hs2 [Hp2 Hr2]]]]; eauto.
+      eapply preord_env_P_antimon. apply Hcc.
+      eapply occurs_free_Ecase_Included. eapply find_tag_nth_In_patterns; eassumption.
+      simpl; omega.
+      
+      do 2 eexists. split; [| split ]; eauto.
+      simpl in *; replace c1 with (c1 - 1 + 1) by omega. 
+      eapply Hless_steps''; eauto.
+      eapply preord_res_monotonic. eassumption. omega.
   Qed.
 
 
 
-  Lemma rw_case_equiv: forall cl c0 e x c ys rho1 rho2 k,
-      findtag cl c0 = Some e ->
-      ~bound_stem_ctx c x ->
-      preord_env_P pr cenv (occurs_free (Econstr x c0 ys (c |[ Ecase x cl ]|))) k rho1 rho2 ->
-      preord_exp pr cenv k (Econstr x c0 ys (c |[ Ecase x cl ]|), rho1) (Econstr x c0 ys (c |[ e ]|), rho2).
+  Lemma rw_case_equiv  cl c0 e n x c ys rho1 rho2 k :
+    find_tag_nth cl c0 e n ->
+    ~bound_stem_ctx c x ->
+    preord_env_P cenv PG (occurs_free (Econstr x c0 ys (c |[ Ecase x cl ]|))) k rho1 rho2 ->
+    preord_exp cenv P1 PG k (Econstr x c0 ys (c |[ Ecase x cl ]|), rho1) (Econstr x c0 ys (c |[ e ]|), rho2).
   Proof.
-    intros; intro; intros. inversion H3; subst.
-    assert (Hl : Included var (FromList ys) (occurs_free (Econstr x c0 ys (c |[ Ecase x cl ]|)))).  rewrite occurs_free_Econstr. left; auto.
-    assert (H11' := preord_env_P_get_list_l _ _ _ _ _ _ _ _ H1 Hl H11). destructAll.
-    eapply preord_exp_compat_stem_val in H13; eauto.
-    destructAll.
-    eexists. eexists.
-    split. eapply BStep_constr; eauto. auto.
-    intros. eapply rw_case_local; eauto.
-    rewrite M.gss. reflexivity.
-    apply preord_env_P_extend. eapply preord_env_P_antimon. apply H1. intro. intros. rewrite occurs_free_Econstr. right. auto.
-    rewrite preord_val_eq. simpl. split; auto.  apply Forall2_Forall2_asym_included; auto.
+    intros Hf Hb Henv. 
+    eapply preord_exp_const_compat; eauto.
+    eapply Forall2_same. intros y Hin. eapply Henv. now constructor; eauto.
+    intros m vs1 vs2 Hlt Hall.
+    eapply preord_exp_compat_stem_val; eauto.
+    2:{ rewrite M.gss; reflexivity. }
+    - intros k' rho1' rho2' Hpre Hget1. eapply rw_case_local; eassumption. 
+    - eapply preord_env_P_extend.
+      eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega.
+      normalize_occurs_free; now sets.
+      rewrite preord_val_eq. simpl. split; auto. apply Forall2_Forall2_asym_included; auto.
   Qed.
 
+
+  Require Import L6.alpha_conv L6.functions.
+
+  Lemma image_apply_r v m S :
+    image (apply_r (M.remove v m)) S \subset v |: image (apply_r m) (S \\ [set v]).
+  Proof. 
+    intros z [y [Hin Heq]]; subst.
+    destruct (peq y v); subst.
+    - left. unfold In. unfold apply_r. rewrite M.grs. reflexivity.
+    - right. eexists; split; eauto.
+      constructor; eauto. intros Hc; inv Hc; eauto.
+      unfold apply_r. rewrite M.gro; eauto.
+  Qed. 
+
+  Lemma image'_get_not_In {A} v (m : M.t A) S :
+    image' (fun x : positive => M.get x (M.remove v m)) S \subset
+    image' (fun x : positive => M.get x m) (S \\ [set v]).
+  Proof. 
+    intros z [y [Hin Heq]]; subst.
+    destruct (peq y v); subst.
+    - rewrite M.grs in Heq. congruence.
+    - rewrite M.gro in Heq; eauto. eexists; split; eauto.
+      constructor; eauto. intros Hc; inv Hc. eauto.
+  Qed.
+
+  Lemma remove_all_none: forall x l sigma,
+      M.get x sigma = None ->
+      M.get x (remove_all sigma l) = None.
+  Proof.
+    induction l.
+    - intros. simpl. auto.
+    - intros. simpl. apply gr_none. eapply IHl. eassumption.
+  Qed.
+
+  (* todo: move *)
+  Lemma in_remove_all: forall x l sigma,
+      FromList l x ->
+      M.get x (remove_all sigma l) = None.
+  Proof.
+    induction l; intros; simpl.
+    - inv H.
+    - destruct (peq x a); inv H; eauto; subst.
+      + rewrite M.grs. reflexivity.
+      + rewrite M.grs. reflexivity.
+      + rewrite M.grs. reflexivity.
+      + rewrite M.gro; eauto.
+  Qed.
+
+  Lemma not_in_remove_all: forall x l sigma,
+      ~ (FromList l x) ->
+      M.get x sigma = M.get x (remove_all sigma l).
+  Proof.
+    induction l; intros.
+    - reflexivity.
+    - simpl.
+      assert (Hin : ~ (a = x) /\ ~ (FromList l x)).
+      { split; intro. apply H. constructor; auto.
+        apply H. constructor 2; auto. }
+      destruct Hin.
+      rewrite M.gro; auto.
+  Qed.
+
+  Lemma image'_get_remove_all (m : M.t var) S l :
+    image' (fun x : positive => M.get x (remove_all m l)) S \subset
+    image' (fun x : positive => M.get x m) (S \\ FromList l).
+  Proof.
+    revert m S; induction l; intros m S.
+    - simpl. repeat normalize_sets. reflexivity. 
+    - simpl. eapply Included_trans.
+      eapply image'_get_not_In.
+      eapply Included_trans. eapply IHl.
+      repeat normalize_sets. rewrite Setminus_Union. reflexivity. 
+  Qed.
+
+
+  
+  Lemma preord_env_P_inj_remove (S : Ensemble var) (rho1 rho2 : env) 
+        (k : nat) m (x  : var) (v1 v2 : val) :
+    ~ x \in (image' (fun x => M.get x m) (S \\ [set x])) -> 
+    preord_env_P_inj cenv PG (S \\ [set x]) k (apply_r m) rho1 rho2 ->
+    preord_val cenv PG k v1 v2 ->
+    preord_env_P_inj cenv PG S k (apply_r (M.remove x m)) (M.set x v1 rho1) (M.set x v2 rho2). 
+  Proof.
+    intros Hnin Henv Hv z HP. unfold extend. 
+    destruct (peq z x) as [| Hneq].
+    - subst. intros z Hget.
+      rewrite M.gss in Hget. inv Hget. eexists. 
+      split; eauto. unfold apply_r. rewrite M.grs. rewrite M.gss; eauto. 
+    - intros z' Hget. rewrite M.gso in Hget; eauto.
+      unfold apply_r. rewrite M.gro; eauto. rewrite M.gso; eauto.
+      eapply Henv. constructor; eauto. intros Hc; inv Hc; eauto. eassumption.
+      destruct (M.get z m) eqn:Hget'; eauto.
+      intros Hc; subst. eapply Hnin. eexists. split; eauto. constructor; eauto.
+      intros Hc; inv Hc; eauto. 
+  Qed.
+
+  Lemma preord_env_P_inj_set_lists_remove_all (S : var -> Prop) (rho1 rho2 rho1' rho2' : env)
+        (k : nat) (xs1 : list var) (vs1 vs2 : list val) m :
+    Disjoint _ (image' (fun x => M.get x m) (S \\ FromList xs1)) (FromList xs1) ->
+    preord_env_P_inj cenv PG (S \\ (FromList xs1)) k (apply_r m) rho1 rho2 ->
+    Forall2 (preord_val cenv PG k) vs1 vs2 ->
+    set_lists xs1 vs1 rho1 = Some rho1' ->
+    set_lists xs1 vs2 rho2 = Some rho2' ->
+    preord_env_P_inj cenv PG S k (apply_r (remove_all m xs1))  rho1' rho2'.
+  Proof with now eauto with Ensembles_DB.
+    revert S rho1 rho2 rho1' rho2' vs1 vs2 m.
+    induction xs1; intros S rho1 rho2 rho1' rho2' vs1 vs2 m Hd Hpre Hall Hs1 Hs2.
+    - simpl in *. destruct vs1; destruct vs2; try congruence. inv Hs1; inv Hs2.
+      eapply preord_env_P_inj_antimon. eassumption. do 2 normalize_sets. now sets.
+    - simpl in *. destruct vs1; destruct vs2; try congruence.
+      destruct (set_lists xs1 vs1 rho1) eqn:Hs1'; try congruence. 
+      destruct (set_lists xs1 vs2 rho2) eqn:Hs2'; try congruence. 
+      inv Hs1; inv Hs2.
+      eapply preord_env_P_inj_remove.
+      + intros Hc. eapply Hd. constructor; [| now left ].
+        eapply image'_get_remove_all in Hc. normalize_sets. rewrite <- Setminus_Union.
+        eassumption.
+      + inv Hall. eapply IHxs1; [ | | | eassumption | eassumption ]; eauto.
+        eapply Disjoint_Included; [| | eassumption ].
+        now normalize_sets; sets.
+        normalize_sets. rewrite Setminus_Union. sets.
+
+        eapply preord_env_P_inj_antimon. eassumption.
+        normalize_sets. sets.
+      + inv Hall ; eauto.
+  Qed.
+
+  Lemma rename_all_correct k (m : M.t var) e1 rho1 rho2 :
+    Disjoint _ (image' (fun x => M.get x m) (occurs_free e1)) (bound_var e1) -> 
+    preord_env_P_inj cenv PG (occurs_free e1) k (apply_r m) rho1 rho2 ->
+    preord_exp cenv P1 PG k (e1, rho1) (rename_all m e1, rho2).
+  Proof.
+    revert e1 m rho1 rho2. induction k as [k IHk] using lt_wf_rec1. 
+    intros e1. revert k IHk; induction e1 using exp_ind'; intros k IHk m rho1 rho2 Hdis Hpre.
+    - (* Econstr *)
+      simpl; eapply preord_exp_const_compat; eauto; intros.
+      + eapply Forall2_preord_var_env_map. eassumption.
+        normalize_occurs_free. sets.      
+      + eapply IHk; [ eassumption | | ].
+        * eapply Disjoint_Included; [| | eassumption ]. 
+          normalize_bound_var. now sets.
+          normalize_occurs_free. rewrite image'_Union.
+          eapply Included_trans. eapply image'_get_not_In. now sets.
+        * eapply preord_env_P_inj_remove.
+          -- intros Hc. eapply Hdis. normalize_occurs_free.
+             constructor; eauto. rewrite image'_Union. right; eauto.
+          -- eapply preord_env_P_inj_antimon.
+             eapply preord_env_P_inj_monotonic; [| eassumption ].
+             omega. normalize_occurs_free; sets.
+          -- rewrite preord_val_eq. simpl; split; eauto.
+             eapply Forall2_Forall2_asym_included. eassumption. 
+    - (* Ecase nil *)
+      simpl; eapply preord_exp_case_nil_compat; eauto; intros.
+    - (* Ecase cons *)              
+      simpl; eapply preord_exp_case_cons_compat; eauto; intros.
+      + clear. induction l. now constructor. 
+        constructor; eauto. destruct a; reflexivity. 
+      + eapply IHk; [ eassumption | | ].
+        * eapply Disjoint_Included; [| | eassumption ]. 
+          normalize_bound_var. now sets.
+          normalize_occurs_free. rewrite !image'_Union. now sets.
+        * eapply preord_env_P_inj_antimon.
+          eapply preord_env_P_inj_monotonic; [| eassumption ].
+          omega. normalize_occurs_free; sets.
+      + eapply IHe0.
+        * eauto.
+        * eapply Disjoint_Included; [| | eassumption ]. 
+          normalize_bound_var. now sets.
+          normalize_occurs_free. rewrite !image'_Union. now sets.
+        * eapply preord_env_P_inj_antimon.
+          eapply preord_env_P_inj_monotonic; [| eassumption ].
+          omega. normalize_occurs_free; sets.
+    - (* Eproj *)
+      simpl; eapply preord_exp_proj_compat; eauto; intros.
+      eapply IHk; [ eassumption | | ].
+      * eapply Disjoint_Included; [| | eassumption ]. 
+        normalize_bound_var. now sets.
+        normalize_occurs_free. rewrite image'_Union.
+        eapply Included_trans. eapply image'_get_not_In. now sets.
+      * eapply preord_env_P_inj_remove.
+        -- intros Hc. eapply Hdis. normalize_occurs_free.
+           constructor; eauto. rewrite image'_Union. right; eauto.
+        -- eapply preord_env_P_inj_antimon.
+           eapply preord_env_P_inj_monotonic; [| eassumption ].
+           omega. normalize_occurs_free; sets.
+        -- eassumption.
+    - (* Eletapp *)
+      simpl; eapply preord_exp_letapp_compat; eauto; intros.
+      + eapply Hpre. constructor. now left.
+      + eapply Forall2_preord_var_env_map. eassumption.
+        normalize_occurs_free. sets.
+      + eapply IHk; [ eassumption | | ].
+        * eapply Disjoint_Included; [| | eassumption ]. 
+          normalize_bound_var. now sets.
+          normalize_occurs_free. rewrite image'_Union.
+          eapply Included_trans. eapply image'_get_not_In. now sets.
+        * eapply preord_env_P_inj_remove.
+          -- intros Hc. eapply Hdis. normalize_occurs_free.
+             constructor; eauto. rewrite image'_Union. right; eauto.
+          -- eapply preord_env_P_inj_antimon.
+             eapply preord_env_P_inj_monotonic; [| eassumption ].
+             omega. normalize_occurs_free; sets.
+          -- eassumption.
+    - (* Efun *)
+      simpl; eapply preord_exp_fun_compat; eauto.
+      eapply preord_exp_monotonic. 
+      eapply IHe1.
+      + eauto.
+      + eapply Disjoint_Included; [| | eassumption ]. 
+        normalize_bound_var. now sets.
+        normalize_occurs_free. rewrite image'_Union.
+        eapply Included_trans. eapply image'_get_remove_all.
+        rewrite same_name_in_fun. now sets.
+      + eapply preord_env_P_inj_antimon with (S2 := (occurs_free (Efun f2 e1)) :|: name_in_fundefs f2).
+        2:{ normalize_occurs_free; sets. rewrite <- Union_assoc, <- Union_Setminus. sets. tci. }        
+        induction k as [h IHk'] using lt_wf_rec1. 
+        intros z Hget v1 Hgetz1.
+        destruct (Decidable_name_in_fundefs f2) as [Hdec]. destruct (Hdec z).
+        * rewrite def_funs_eq in Hgetz1. inv Hgetz1.
+          eexists. split.
+          -- rewrite def_funs_eq. reflexivity.
+             eapply rename_all_fun_name. unfold apply_r. rewrite in_remove_all. 
+             eassumption. eapply same_name_in_fun. eassumption.
+          -- rewrite preord_val_eq. intros vs1 vs2 j t xs1 e rho Hlen Hf Hset.
+             edestruct (set_lists_length3 (def_funs (rename_all_fun (remove_all m (all_fun_name f2)) f2)
+                                                    (rename_all_fun (remove_all m (all_fun_name f2)) f2) rho2 rho2)
+                                          xs1 vs2).
+             rewrite <- Hlen; eapply set_lists_length_eq. now eauto. 
+             do 3 eexists; split; [| split ]. 
+             ++ eapply find_def_rename. unfold apply_r.
+                rewrite in_remove_all. eassumption. eapply same_name_in_fun. eassumption.
+             ++ now eauto.
+             ++ eapply find_def_correct in Hf.                    
+                intros Hlt Hall.
+                eapply preord_exp_post_monotonic. eassumption. eapply IHk. 
+                ** eassumption.
+                ** eapply Disjoint_Included_l. eapply Included_trans.
+                   eapply image'_get_remove_all. eapply image'_get_remove_all.
+                   eapply Disjoint_Included; [ | | eassumption ].
+                   normalize_bound_var. eapply Included_Union_preserv_l.
+                   eapply Included_trans; [| now eapply fun_in_fundefs_bound_var_fundefs; eauto ].
+
+                   now sets.
+                   normalize_occurs_free. eapply image'_monotonic. do 2 eapply Setminus_Included_Included_Union. 
+                   eapply Included_trans. eapply occurs_free_in_fun; eauto. rewrite <- same_name_in_fun. 
+                   sets. 
+                ** eapply preord_env_P_inj_set_lists_remove_all; [ | | | now eauto | now eauto ].
+                   --- eapply Disjoint_Included; [| | eassumption ].
+                       normalize_bound_var. eapply Included_Union_preserv_l.
+                       eapply Included_trans; [| now eapply fun_in_fundefs_bound_var_fundefs; eauto ].
+                       now sets.
+                       eapply Included_trans. eapply image'_get_remove_all.
+                       eapply image'_monotonic. do 2 eapply Setminus_Included_Included_Union. 
+                       eapply Included_trans. eapply occurs_free_in_fun; eauto. rewrite <- same_name_in_fun. 
+                       normalize_occurs_free. sets. 
+                   --- eapply preord_env_P_inj_antimon. eapply IHk'; [ eassumption | | ].
+                       +++ intros. eapply IHk; eauto. omega.
+                       +++ eapply preord_env_P_inj_monotonic; [| eassumption ]. omega.
+                       +++ eapply Setminus_Included_Included_Union. eapply Included_trans.
+                           eapply occurs_free_in_fun. eassumption. normalize_occurs_free. sets.
+                   --- eassumption. 
+          -- eassumption. 
+        * inv Hget; try contradiction.
+          rewrite def_funs_neq in *; eauto. unfold apply_r. rewrite <- not_in_remove_all.
+          eapply Hpre. eassumption. eassumption. 
+          intros Hc. eapply n. eapply same_name_in_fun. eassumption.
+          intros Hc. edestruct rename_all_fun_name as [Hl Hr]. eapply Hl in Hc. clear Hr Hl.
+          unfold apply_r in Hc. rewrite <- not_in_remove_all in Hc.
+          destruct (M.get z m) eqn:Heq; eauto. eapply Hdis. constructor. 
+          now eexists; split; eauto.
+          constructor; eauto. eapply name_in_fundefs_bound_var_fundefs. eassumption.
+          intros Hc'. eapply n. eapply same_name_in_fun. eassumption.
+      + omega.
+    - (* Eapp *)
+      simpl; eapply preord_exp_app_compat; eauto; intros.
+      + eapply Forall2_preord_var_env_map. eassumption.
+        normalize_occurs_free. sets.
+    - (* Eprim *)
+      simpl; eapply preord_exp_prim_compat; eauto; intros.
+      eapply Forall2_preord_var_env_map. eassumption.
+      normalize_occurs_free. sets.
+    - (* Ehalt *)
+      simpl; eapply preord_exp_halt_compat; eauto. 
+  Qed.
+      
+  
   (* rename a single applied occurence of a variable to *)
   Inductive rename_loc:  var -> var -> exp -> exp -> Prop :=
   | r_Econstr: forall x y v c l l' e, rename_loc x y (Econstr v c (l++(x::l')) e) (Econstr v c (l++(y::l')) e)
   | r_Ecase: forall x y cl, rename_loc x y (Ecase x cl) (Ecase y cl)
   | r_Eproj: forall x y v t n e, rename_loc x y (Eproj v t n x e) (Eproj v t n y e)
+  | r_Eletapp1: forall x f f' t xs e, rename_loc f f' (Eletapp x f t xs e) (Eletapp x f' t xs e)
+  | r_Eletapp2: forall v f l x y t l' e, rename_loc x y (Eletapp v f t (l++(x::l')) e) (Eletapp v f t (l++(y::l')) e)
   | r_Eprim: forall x y f v ys ys' e, rename_loc x y (Eprim v f (ys++(x::ys')) e) (Eprim v f (ys++(y::ys')) e)
   | r_Eapp1: forall x y t args, rename_loc x y (Eapp x t args) (Eapp y t args)
   | r_Eapp2: forall x y v t l l', rename_loc x y (Eapp v t (l++(x::l'))) (Eapp v t (l++(y::l')))
   | r_Ehalt: forall x y, rename_loc x y (Ehalt x) (Ehalt y).
-
+  
+  
   Inductive rename_glob: var -> var -> exp -> exp -> Prop :=
   | Ctx_r: forall x y e e' c,
       rename_loc x y e e' ->
       rename_glob x y (c|[e ]|) (c|[e']|).
-
+  
   Inductive rename_fds_glob: var -> var -> fundefs -> fundefs -> Prop :=
   | Ctx_fds_r: forall x y e e' f,
       rename_loc x y e e' ->
@@ -2226,7 +2530,7 @@ Section Shrink_correct.
       rename_loc x x e e' ->
       e = e'.
   Proof.
-    intros. inversion H; subst; reflexivity.
+    intros x e e' H. inversion H; subst; reflexivity.    
   Qed.
 
   Lemma rename_loc_refl_e:
@@ -2234,13 +2538,9 @@ Section Shrink_correct.
       rename_loc x x' e e ->
       x = x'.
   Proof.
-    intros. inv H; try reflexivity.
-    apply app_inv_head in H4. inv H4; auto.
-    apply app_inv_head in H4. inv H4; auto.
-    apply app_inv_head in H4. inv H4; auto.
+    intros. inv H; try reflexivity;
+    apply app_inv_head in H4; inv H4; auto.
   Qed.
-
-
 
   Lemma rename_loc_occurs_free:
     forall {x y} {e e'},
@@ -2255,6 +2555,11 @@ Section Shrink_correct.
     - apply Free_Ecase1.
     - apply occurs_free_Eproj. left.
       constructor.
+    - apply occurs_free_Eletapp.
+      left. now left.
+    - apply occurs_free_Eletapp.
+      left. 
+      rewrite FromList_app. normalize_sets. now sets.
     - apply occurs_free_Eprim.
       left.
       rewrite FromList_app.
@@ -2289,9 +2594,6 @@ Section Shrink_correct.
       eapply rt_trans; eauto.
   Qed.
 
-
-
-
   Lemma rename_context_fds_clos:
     forall x y e e',
       rename_clos x y e e' ->
@@ -2311,7 +2613,6 @@ Section Shrink_correct.
       specialize (IHclos_refl_trans2 cfds).
       eapply rt_trans; eauto.
   Qed.
-
 
   Lemma rename_context_clos_s:
     forall x y e e',
@@ -2336,8 +2637,6 @@ Section Shrink_correct.
       specialize (IHclos_refl_trans2 c H1).
       eapply rt_trans; eauto.
   Qed.
-
-
 
 
   Lemma rename_context_fds_clos_s:
@@ -2581,6 +2880,43 @@ Section Shrink_correct.
     intros. apply rename_clos_s_constr_l' with (l := nil).
   Qed.
 
+  Lemma rename_clos_s_letapp_l': forall x y v f t e l' l ,
+      rename_clos_s x y (Eletapp v f t (l++l') e) (Eletapp v f t (l++(apply_r_list (M.set x y (M.empty var)) l')) e).
+  Proof.
+    induction l'.
+    - simpl. intro. apply rt_refl.
+    - simpl.
+      intro.
+      unfold apply_r.
+      destruct (var_dec x a).
+      + subst.
+        rewrite M.gss.
+        eapply rt_trans.
+        constructor.
+        rewrite  inv_app_Hole at 1.
+        constructor.
+        constructor.
+        intro. inv H.
+        specialize (IHl' (l++[y])).
+        rewrite <- app_assoc in IHl'.
+        rewrite <- app_assoc in IHl'.
+        simpl in IHl'. simpl.
+        apply IHl'.
+      + rewrite M.gso by auto.
+        rewrite M.gempty.
+        specialize (IHl' (l++[a])).
+        rewrite <- app_assoc in IHl'.
+        rewrite <- app_assoc in IHl'.
+        simpl in IHl'. apply IHl'.
+  Qed.
+
+  Lemma rename_clos_s_letapp_l: forall  x y v f t e l ,
+      rename_clos_s x y (Eletapp v f t l e) (Eletapp v f t (apply_r_list (M.set x y (M.empty var)) l) e).
+  Proof.
+    intros. apply rename_clos_s_letapp_l' with (l := nil).
+  Qed.
+
+  
   Lemma rename_clos_s_prim_l': forall x y v p e l' l,
       rename_clos_s x y (Eprim v p (l++l') e) (Eprim v p (l++(apply_r_list (M.set x y (M.empty var)) l')) e).
   Proof.
@@ -2737,8 +3073,7 @@ Section Shrink_correct.
     - inv H0. apply rt_refl.
     - assert (H0' := H0).
       eapply rename_clos_is_case_l in H0'.
-      Focus 2.
-      eauto.
+      2:{ reflexivity. }
       destructAll.
       specialize (IHclos_refl_trans2 x0 v' x1 l').
       specialize (IHclos_refl_trans1 v x0 l x1).
@@ -2785,7 +3120,7 @@ Section Shrink_correct.
     - assert (H0' := H0).
       apply rename_clos_s_included in H0'.
       eapply rename_clos_is_case_l in H0'.
-      Focus 2.
+      2:{ reflexivity. }
       eauto.
       destructAll.
       specialize (IHclos_refl_trans2 x0 v' x1 l').
@@ -3036,6 +3371,7 @@ Section Shrink_correct.
       auto.
       apply apply_r_not_in_sig; auto.
   Qed.
+  
   Lemma one_rename_all_ar': forall x y v sigma,
       (M.get y sigma = None) ->
       apply_r (M.set x y sigma) v = apply_r sigma (apply_r (M.set x y (M.empty var)) v).
@@ -3091,20 +3427,19 @@ Section Shrink_correct.
       destruct (var_dec x v).
       + subst.
         erewrite Hpr1.
-        Focus 2. apply remove_set_1.
+        2:{ apply remove_set_1. }
         symmetry.
         erewrite Hpr1.
-        Focus 2. eapply smg_trans. apply remove_set_1.
-        apply remove_empty.
+        2:{ eapply smg_trans. apply remove_set_1.
+            apply remove_empty. } 
         rewrite <- (proj1 rename_all_empty).
         reflexivity.
       + erewrite Hpr1.
-        Focus 2.
-        apply remove_set_2; auto.
+        2:{ apply remove_set_2; eauto. }
         symmetry.
         erewrite Hpr1.
-        Focus 2. eapply smg_trans. apply remove_set_2; auto. apply proper_set.
-        apply remove_empty.
+        2:{ eapply smg_trans. apply remove_set_2; auto. apply proper_set. 
+            apply remove_empty. } 
         rewrite H; auto.
         apply not_in_sig_rem. auto.
         apply gr_none. auto.
@@ -3135,18 +3470,15 @@ Section Shrink_correct.
         destruct (var_dec v v0).
         subst.
         erewrite Hpr1.
-        Focus 2. apply remove_set_1.
+        2:{ apply remove_set_1. }
         symmetry.
         erewrite Hpr1.
-        Focus 2.
-        eapply smg_trans.
-        apply remove_set_1.
-        apply remove_empty.
+        2:{ eapply smg_trans. apply remove_set_1. apply remove_empty. }
         rewrite <- (proj1 rename_all_empty).
         reflexivity.
-        erewrite Hpr1. Focus 2. apply remove_set_2; auto.
+        erewrite Hpr1. 2:{ apply remove_set_2; auto. }
         symmetry.
-        erewrite Hpr1. Focus 2. eapply smg_trans. apply remove_set_2; auto. apply proper_set. apply remove_empty.
+        erewrite Hpr1. 2:{ eapply smg_trans. apply remove_set_2; auto. apply proper_set. apply remove_empty. }
         rewrite H. unfold rename. reflexivity.
         intro. apply H0. destruct H2.
         destruct (var_dec x v). subst. rewrite M.grs in H2. inversion H2.
@@ -3163,52 +3495,62 @@ Section Shrink_correct.
         rewrite apply_r_empty.
         destruct (var_dec v x).
         * subst.
-          erewrite Hpr1. Focus 2. apply remove_set_1.
+          erewrite Hpr1. 2:{ apply remove_set_1. }
           symmetry.
-          erewrite Hpr1. Focus 2. eapply smg_trans. apply remove_set_1. apply remove_empty.
+          erewrite Hpr1. 2:{ eapply smg_trans. apply remove_set_1. apply remove_empty. }
           rewrite <- (proj1 rename_all_empty). reflexivity.
-        * erewrite Hpr1. Focus 2.
-          apply remove_set_2; auto.
-          symmetry.
-          erewrite Hpr1. Focus 2. eapply smg_trans. apply remove_set_2; auto. apply proper_set. apply remove_empty.
+        * erewrite Hpr1. 2:{ apply remove_set_2; auto. }
+          symmetry. erewrite Hpr1. 2:{ eapply smg_trans. apply remove_set_2; auto. apply proper_set. apply remove_empty. }
           rewrite H. unfold rename. reflexivity.
           apply not_in_sig_rem. auto.
           apply gr_none; auto.
+    - unfold rename.
+      simpl.
+      rewrite one_rename_all_list; auto.
+      destruct (var_dec x x0).
+      + subst.
+        erewrite Hpr1.
+        2:{ apply remove_set_1. }
+        symmetry.
+        erewrite Hpr1.
+        2:{ eapply smg_trans. apply remove_set_1.
+            apply remove_empty. } 
+        rewrite <- (proj1 rename_all_empty).
+        rewrite <- one_rename_all_ar. reflexivity. eassumption. eassumption.
+      + erewrite Hpr1.
+        2:{ apply remove_set_2; eauto. }
+        symmetry.
+        erewrite Hpr1.
+        2:{ eapply smg_trans. apply remove_set_2; auto. apply proper_set. 
+            apply remove_empty. } 
+        rewrite H; auto.
+        rewrite <- one_rename_all_ar. reflexivity. eassumption. eassumption.
+        apply not_in_sig_rem. auto.
+        apply gr_none. auto.        
     - unfold rename. simpl.
       assert (Hid := in_dec).
       specialize (Hid _ var_dec x (all_fun_name f2)).
       rewrite all_fun_name_removed.
       destruct Hid.
       + erewrite Hpr2.
-        Focus 2.
-        apply remove_all_in. auto.
+        2:{ apply remove_all_in. auto. }
         erewrite Hpr1.
-        Focus 2.
-        apply remove_all_in. auto.
+        2:{ apply remove_all_in. auto. }
         symmetry.
-        erewrite Hpr2. Focus 2.
-        eapply smg_trans. apply remove_all_in; auto.
-        apply remove_all_empty.
+        erewrite Hpr2. 2:{ eapply smg_trans. apply remove_all_in; auto. apply remove_all_empty. }
         rewrite <- (proj2 rename_all_empty).
-        erewrite Hpr1. Focus 2.
-        eapply smg_trans. apply remove_all_in; auto.
-        apply remove_all_empty.
+        erewrite Hpr1. 2:{ eapply smg_trans. apply remove_all_in; auto. apply remove_all_empty. }
         rewrite <- (proj1 rename_all_empty).
         reflexivity.
       + erewrite Hpr2.
-        Focus 2.
-        apply remove_all_not_in. auto.
-        erewrite Hpr1.
-        Focus 2.
-        apply remove_all_not_in. auto.
+        2:{ apply remove_all_not_in. auto. }
+        erewrite Hpr1. 
+        2:{ apply remove_all_not_in. auto. }
         symmetry.
-        erewrite Hpr2. Focus 2.
-        eapply smg_trans. apply remove_all_not_in; auto.
-        apply proper_set. apply remove_all_empty.
-        erewrite Hpr1. Focus 2.
-        eapply smg_trans. apply remove_all_not_in; auto.
-        apply proper_set.
-        apply remove_all_empty.
+        erewrite Hpr2. 2:{ eapply smg_trans. apply remove_all_not_in; auto.
+                           apply proper_set. apply remove_all_empty. }
+        erewrite Hpr1. 2:{ eapply smg_trans. apply remove_all_not_in; auto.
+                           apply proper_set. apply remove_all_empty. }
         rewrite H; auto.
         rewrite H0; auto.
         apply not_in_sig_list_rem; auto.
@@ -3223,20 +3565,15 @@ Section Shrink_correct.
       rewrite <- one_rename_all_list; auto.
       destruct (var_dec v x).
       + subst.
-        erewrite Hpr1. Focus 2.
-        apply remove_set_1.
+        erewrite Hpr1. 2:{ apply remove_set_1. }
         symmetry.
-        erewrite Hpr1. Focus 2.
-        eapply smg_trans. apply remove_set_1.
-        apply remove_empty.
+        erewrite Hpr1. 2:{ eapply smg_trans. apply remove_set_1. apply remove_empty. }
         rewrite <- (proj1 rename_all_empty).
         reflexivity.
-      + erewrite Hpr1. Focus 2.
-        apply remove_set_2; auto.
+      + erewrite Hpr1. 2:{ apply remove_set_2; auto. }
         symmetry.
-        erewrite Hpr1. Focus 2.
-        eapply smg_trans. apply remove_set_2; auto.
-        apply proper_set. apply remove_empty.
+        erewrite Hpr1. 2:{ eapply smg_trans. apply remove_set_2; auto.
+                           apply proper_set. apply remove_empty. }
         rewrite H; auto.
         apply not_in_sig_rem; auto.
         apply gr_none; auto.
@@ -3258,24 +3595,17 @@ Section Shrink_correct.
       assert (Hid := in_dec).
       specialize (Hid _ var_dec x l).
       destruct Hid.
-      * erewrite Hpr1. Focus 2.
-        apply remove_all_in. auto.
+      * erewrite Hpr1. 2:{ apply remove_all_in. auto. }
         symmetry.
-        erewrite Hpr1. Focus 2.
-        eapply smg_trans.
-        apply remove_all_in; auto.
-        apply remove_all_empty.
+        erewrite Hpr1. 2:{ eapply smg_trans. apply remove_all_in; auto.
+                           apply remove_all_empty. }
         rewrite <- (proj1 rename_all_empty). auto.
       * erewrite Hpr1.
-        Focus 2.
-        apply remove_all_not_in; auto.
+        2:{ apply remove_all_not_in; auto. }
         symmetry.
         erewrite Hpr1.
-        Focus 2.
-        eapply smg_trans.
-        apply remove_all_not_in; auto.
-        apply proper_set.
-        apply remove_all_empty.
+        2:{ eapply smg_trans. apply remove_all_not_in; auto.
+            apply proper_set. apply remove_all_empty. }
         rewrite H; auto.
         apply not_in_sig_list_rem. auto.
         apply remove_all_none; auto.
@@ -3290,7 +3620,6 @@ Section Shrink_correct.
           (M.get y sigma = None) ->
           rename_all_fun (M.set x y sigma) f = rename_all_fun sigma (rename_all_fun (M.set x y (M.empty var)) f)).
   Proof.
-
     intros y x.
     assert (Hpr := prop_rename_all).
     destruct Hpr as (Hpr1, Hpr2).
@@ -3299,30 +3628,26 @@ Section Shrink_correct.
       destruct (var_dec x v).
       + subst.
         erewrite Hpr1.
-        Focus 2. apply remove_set_1.
+        2:{ apply remove_set_1. }
         symmetry.
         erewrite Hpr1 with (e := e).
-        Focus 2. eapply smg_trans. apply remove_set_1.
-        apply remove_empty.
+        2:{ eapply smg_trans. apply remove_set_1.
+            apply remove_empty. }
         rewrite <- (proj1 rename_all_empty).
         reflexivity.
       + erewrite Hpr1.
-        Focus 2.
-        apply remove_set_2; auto.
+        2:{ apply remove_set_2; auto. }
         symmetry.
         erewrite Hpr1 with (e := e).
-        Focus 2. eapply smg_trans. apply remove_set_2; auto. apply proper_set.
-        apply remove_empty.
+        2:{ eapply smg_trans. apply remove_set_2; auto. apply proper_set. apply remove_empty. }
         rewrite H; auto.
         rewrite <- (proj1 rename_all_empty).
-        symmetry.
-        rewrite H.
+        symmetry. rewrite H.
         reflexivity.
         apply gr_none; auto.
         apply M.gempty.
     - rewrite one_rename_all_ar'; auto.
-    -
-      unfold rename. simpl.
+    - unfold rename. simpl.
       rewrite <- one_rename_all_ar'; auto.
       rewrite <- H; auto.
       specialize (H0 sigma H1).
@@ -3332,51 +3657,67 @@ Section Shrink_correct.
     - rewrite one_rename_all_ar'; auto.
       destruct (var_dec x v).
       subst.
-      + erewrite Hpr1. Focus 2. apply remove_set_1.
+      + erewrite Hpr1. 2:{ apply remove_set_1. }
         symmetry.
-        erewrite Hpr1 with (e := e). Focus 2. eapply smg_trans. apply remove_set_1. apply remove_empty.
+        erewrite Hpr1 with (e := e). 2:{ eapply smg_trans. apply remove_set_1. apply remove_empty. }
         rewrite <- (proj1 rename_all_empty). reflexivity.
-      + erewrite Hpr1. Focus 2.
-        apply remove_set_2; auto.
+      + erewrite Hpr1.
+        2:{ apply remove_set_2; auto. }
         symmetry.
-        erewrite Hpr1 with (e := e). Focus 2. eapply smg_trans. apply remove_set_2; auto. apply proper_set. apply remove_empty.
-
+        erewrite Hpr1 with (e := e). 2:{ eapply smg_trans. apply remove_set_2; auto. apply proper_set. apply remove_empty. }
         rewrite <- H. reflexivity.
         apply gr_none; auto.
+    - rewrite one_rename_all_list'; auto.
+      destruct (var_dec x x0).
+      + subst.
+        erewrite Hpr1.
+        2:{ apply remove_set_1. }
+        symmetry.
+        erewrite Hpr1 with (e := e).
+        2:{ eapply smg_trans. apply remove_set_1.
+            apply remove_empty. }
+        rewrite <- (proj1 rename_all_empty).
+        rewrite <- one_rename_all_ar'. reflexivity. eassumption.
+      + erewrite Hpr1.
+        2:{ apply remove_set_2; auto. }
+        symmetry.
+        erewrite Hpr1 with (e := e).
+        2:{ eapply smg_trans. apply remove_set_2; auto. apply proper_set. apply remove_empty. }
+        rewrite H; auto.
+        rewrite <- (proj1 rename_all_empty).
+        symmetry. rewrite H.
+        rewrite <- one_rename_all_ar'. reflexivity. eassumption. 
+        apply gr_none; auto.
+        apply M.gempty.
     - assert (Hid := in_dec).
       specialize (Hid _ var_dec x (all_fun_name f2)).
       rewrite all_fun_name_removed.
       destruct Hid.
       + erewrite Hpr2.
-        Focus 2.
-        apply remove_all_in. auto.
+        2:{ apply remove_all_in. auto. }
         erewrite Hpr1.
-        Focus 2.
-        apply remove_all_in. auto.
+        2:{ apply remove_all_in. auto. }
         symmetry.
-        erewrite Hpr2 with (fds := f2). Focus 2.
-        eapply smg_trans. apply remove_all_in; auto.
-        apply remove_all_empty.
+        erewrite Hpr2 with (fds := f2).
+        2:{ eapply smg_trans. apply remove_all_in; auto.
+            apply remove_all_empty. }
         rewrite <- (proj2 rename_all_empty).
-        erewrite Hpr1 with (e := e). Focus 2.
-        eapply smg_trans. apply remove_all_in; auto.
-        apply remove_all_empty.
+        erewrite Hpr1 with (e := e).
+        2:{ eapply smg_trans. apply remove_all_in; auto.
+            apply remove_all_empty. }
         rewrite <- (proj1 rename_all_empty).
         reflexivity.
       + erewrite Hpr2.
-        Focus 2.
-        apply remove_all_not_in. auto.
+        2:{ apply remove_all_not_in. auto. }
         erewrite Hpr1 with (e:= e).
-        Focus 2.
-        apply remove_all_not_in. auto.
+        2:{ apply remove_all_not_in. auto. }
         symmetry.
-        erewrite Hpr2 with (fds := f2). Focus 2.
-        eapply smg_trans. apply remove_all_not_in; auto.
-        apply proper_set. apply remove_all_empty.
-        erewrite Hpr1 with (e := e). Focus 2.
-        eapply smg_trans. apply remove_all_not_in; auto.
-        apply proper_set.
-        apply remove_all_empty.
+        erewrite Hpr2 with (fds := f2).
+        2:{ eapply smg_trans. apply remove_all_not_in; auto.
+            apply proper_set. apply remove_all_empty. }
+        erewrite Hpr1 with (e := e).
+        2:{ eapply smg_trans. apply remove_all_not_in; auto.
+            apply proper_set. apply remove_all_empty. }
         rewrite <- H; auto.
         rewrite <- H0; auto.
         apply remove_all_none; auto.
@@ -3388,20 +3729,19 @@ Section Shrink_correct.
     - rewrite <- one_rename_all_list'; auto.
       destruct (var_dec v x).
       + subst.
-        erewrite Hpr1. Focus 2.
-        apply remove_set_1.
+        erewrite Hpr1. 2:{ apply remove_set_1. }
         symmetry.
-        erewrite Hpr1 with (e := e). Focus 2.
-        eapply smg_trans. apply remove_set_1.
-        apply remove_empty.
+        erewrite Hpr1 with (e := e).
+        2:{ eapply smg_trans. apply remove_set_1.
+            apply remove_empty. }
         rewrite <- (proj1 rename_all_empty).
         reflexivity.
-      + erewrite Hpr1. Focus 2.
-        apply remove_set_2; auto.
+      + erewrite Hpr1.
+        2:{ apply remove_set_2; auto. }
         symmetry.
-        erewrite Hpr1 with (e := e). Focus 2.
-        eapply smg_trans. apply remove_set_2; auto.
-        apply proper_set. apply remove_empty.
+        erewrite Hpr1 with (e := e).
+        2:{ eapply smg_trans. apply remove_set_2; auto.
+            apply proper_set. apply remove_empty. }
         rewrite <- H; auto.
         apply gr_none; auto.
     - rewrite one_rename_all_ar'; auto.
@@ -3409,30 +3749,23 @@ Section Shrink_correct.
        assert (Hid := in_dec).
        specialize (Hid _ var_dec x l).
        destruct Hid.
-       * erewrite Hpr1. Focus 2.
-         apply remove_all_in. auto.
-         symmetry.
-         erewrite Hpr1 with (e := e). Focus 2.
-         eapply smg_trans.
-         apply remove_all_in; auto.
-         apply remove_all_empty.
-         rewrite <- (proj1 rename_all_empty). auto.
        * erewrite Hpr1.
-         Focus 2.
-         apply remove_all_not_in; auto.
+         2:{ apply remove_all_in. auto. }
          symmetry.
          erewrite Hpr1 with (e := e).
-         Focus 2.
-         eapply smg_trans.
-         apply remove_all_not_in; auto.
-         apply proper_set.
-         apply remove_all_empty.
+         2:{ eapply smg_trans. apply remove_all_in; auto.
+             apply remove_all_empty. }
+         rewrite <- (proj1 rename_all_empty). auto.
+       * erewrite Hpr1.
+         2:{ apply remove_all_not_in; auto. }
+         symmetry.
+         erewrite Hpr1 with (e := e).
+         2:{ eapply smg_trans. apply remove_all_not_in; auto.
+             apply proper_set. apply remove_all_empty. }
          rewrite <- H; auto.
          apply remove_all_none; auto.
     - reflexivity.
   Qed.
-
-
 
 
   Lemma disjoint_singletons:
@@ -3529,6 +3862,27 @@ Section Shrink_correct.
         exfalso; auto.
         auto.
         rewrite M.gso by auto. apply M.gempty.
+    - rewrite bound_var_Eletapp in H0.
+      unfold rename. simpl.
+      assert (He := Disjoint_Union_l _ _ _ H0).
+      assert (Hv := Disjoint_Union_r _ _ _ H0).
+      apply H in He.
+      eapply num_occur_n.
+      apply Num_occ_letapp.
+      erewrite (proj1 prop_rename_all). apply He.
+      eapply smg_trans.
+      apply remove_set_2.
+      apply disjoint_singletons.
+      auto.
+      apply proper_set.
+      apply remove_empty.
+      unfold apply_r.
+      destruct (var_dec f x); subst.
+      + rewrite M.gss. 
+        simpl. 
+        rewrite num_occur_arl; auto. rewrite peq_false; eauto.
+      + rewrite M.gso; eauto. rewrite M.gempty.
+        simpl. rewrite num_occur_arl; auto. rewrite peq_false; eauto.
     - rewrite bound_var_Efun in H1.
       assert (Hf := Disjoint_Union_l _ _ _ H1).
       assert (He := Disjoint_Union_r _ _ _ H1).
@@ -3634,7 +3988,6 @@ Section Shrink_correct.
     - simpl. constructor.
   Qed.
 
-
   Lemma bound_var_rename_loc:
     forall x y e e',
       rename_loc x y e e' ->
@@ -3652,6 +4005,8 @@ Section Shrink_correct.
       reflexivity.
       auto.
     - do 2 (rewrite bound_var_Eproj). reflexivity.
+    - do 2 (rewrite bound_var_Eletapp). reflexivity.
+    - do 2 (rewrite bound_var_Eletapp). reflexivity.
     - do 2 (rewrite bound_var_Eprim). reflexivity.
     - do 2 (rewrite bound_var_Eapp). reflexivity.
     - do 2 (rewrite bound_var_Eapp). reflexivity.
@@ -3681,7 +4036,7 @@ Section Shrink_correct.
     - inv H.
       apply bound_var_rename_loc in H0.
       apply bound_var_fundefs_comp. auto.
-    -   reflexivity.
+    - reflexivity.
     - etransitivity; eauto.
   Qed.
 
@@ -3810,6 +4165,53 @@ Section Shrink_correct.
          apply remove_set_2; auto.
          apply proper_set.
          apply remove_empty.
+    - unfold rename.
+      simpl.
+      eapply rt_trans.
+      apply rename_clos_s_letapp_l.
+      destruct (var_dec x0 x).
+      + subst.
+        replace (rename_all (M.remove x (M.set x y (M.empty var))) e) with (rename_all (M.empty var) e).
+        rewrite <- (proj1 rename_all_empty).
+        destruct (peq  f x); subst. 
+        * unfold apply_r. rewrite M.gss.
+          constructor. eapply Ctx_rs with (c := Hole_c). constructor.
+          intros Hc. inv Hc.
+        * unfold apply_r. rewrite M.gso, M.gempty; eauto. 
+          eapply rt_refl.
+        * apply prop_rename_all.
+          eapply smg_sym.
+          eapply smg_trans.
+          apply remove_set_1; auto.
+          apply remove_empty.           
+      + destruct (peq f x); subst. 
+        * unfold apply_r. rewrite M.gss.
+          eapply rt_trans. eapply rt_step.
+          eapply Ctx_rs with (c := Hole_c). now eapply r_Eletapp1. now intros Hc; inv Hc.
+          
+          simpl.
+          replace (Eletapp x0 y ft (apply_r_list (M.set x y (M.empty var)) ys) e) with
+               (Eletapp_c x0 y ft (apply_r_list (M.set x y (M.empty var)) ys) Hole_c |[ e ]|) by reflexivity.
+           replace (Eletapp x0 y ft (apply_r_list (M.set x y (M.empty var)) ys)
+                            (rename_all (M.remove x0 (M.set x y (M.empty var))) e)) with
+               (Eletapp_c x0 y ft (apply_r_list (M.set x y (M.empty var)) ys) Hole_c |[ (rename_all (M.remove x0 (M.set x y (M.empty var))) e) ]|) by reflexivity.
+           
+           replace (rename_all (M.remove x0 (M.set x y (M.empty var))) e) with (rename_all (M.set x y (M.empty var)) e).          
+           eapply rename_context_clos_s.
+           
+           eapply H. normalize_bound_var_in_ctx. now sets.
+           simpl. intros Hc. inv Hc; eauto. now inv H7.
+           apply prop_rename_all. apply smg_sym.
+           apply remove_none.
+           rewrite M.gso; auto. apply M.gempty.
+        * unfold apply_r. rewrite M.gso, M.gempty; eauto.
+          eapply rename_context_clos_s with (c := Eletapp_c x0 f ft (apply_r_list (M.set x y (M.empty var)) ys) Hole_c).
+          replace (rename_all (M.remove x0 (M.set x y (M.empty var))) e) with (rename_all (M.set x y (M.empty var)) e).         
+          eapply H. now normalize_bound_var_in_ctx; sets.
+          apply prop_rename_all. apply smg_sym.
+          apply remove_none.
+          rewrite M.gso; auto. apply M.gempty.
+          intros Hc. inv Hc; eauto. now inv H7.
     - unfold rename. simpl.
       rewrite bound_var_Efun in H1.
       assert (Hdf := (Disjoint_Union_l _ _ _ H1)).
@@ -3938,13 +4340,12 @@ Section Shrink_correct.
 
   (* Special case of preord_env_P_get_list_l, leaving it here for now *)
   Lemma preord_env_P_get_list_app: forall rho1 rho2 x y l' l vs  k,
-      preord_var_env pr cenv k rho1 rho2 x y ->
-      preord_env_P pr cenv (FromList (l ++ (x :: l'))) k rho1
-                   rho2 ->
+      preord_var_env cenv PG k rho1 rho2 x y ->
+      preord_env_P cenv PG (FromList (l ++ (x :: l'))) k rho1 rho2 ->
       get_list (l ++ (x :: l')) rho1 = Some vs ->
       exists vs2 : list val,
         get_list (l ++ (y :: l')) rho2 = Some vs2 /\
-        Forall2 (preord_val pr cenv k) vs vs2.
+        Forall2 (preord_val cenv PG k) vs vs2.
   Proof.
     induction l; intros.
     - simpl app.
@@ -3963,7 +4364,7 @@ Section Shrink_correct.
       destruct (M.get a rho1) eqn:gar.
       destruct (get_list (l ++ x :: l') rho1) eqn:glrho1.
       rewrite <- glrho1 in IHl.
-      assert (preord_env_P pr cenv (FromList (l ++ x :: l')) k rho1 rho2).
+      assert (preord_env_P cenv PG (FromList (l ++ x :: l')) k rho1 rho2).
       eapply preord_env_P_antimon. apply H0. simpl.
       rewrite FromList_cons.
       right. auto.
@@ -3980,159 +4381,79 @@ Section Shrink_correct.
       inversion H1.
       inversion H1.
   Qed.
-
-  Lemma rename_loc_equiv: forall x y e e' k rho1 rho2,
-      preord_env_P pr cenv (occurs_free e) k  rho1 rho2 ->
-      preord_var_env pr cenv k rho1 rho2 x y ->
+  
+  Lemma rename_loc_equiv x y e e' k rho1 rho2 :
+      preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
+      preord_var_env cenv PG k rho1 rho2 x y ->
       rename_loc x y e e' ->
-      preord_exp pr cenv k (e, rho1) (e', rho2).
+      preord_exp cenv P1 PG k (e, rho1) (e', rho2).
   Proof.
-    intros.
-    inversion H1; subst.
-    - intro; intros.
-      inv H3.
-      assert (exists vs2, get_list (l++y::l') rho2 = Some vs2 /\ Forall2 (preord_val pr cenv k) vs vs2).
-      eapply preord_env_P_get_list_app; eauto.
-      rewrite occurs_free_Econstr in H.
-      eapply preord_env_P_antimon; eauto.
-      left. auto.
-      destructAll.
-      eapply preord_exp_refl in H13; eauto.
-      destructAll.
-      eexists; eexists; eauto. split.
-      eapply BStep_constr; eauto.
-      apply H6.
-      apply preord_env_P_extend.
-      eapply preord_env_P_antimon; eauto.
-      rewrite occurs_free_Econstr.
-      right. auto.
-      rewrite preord_val_eq. simpl. split; auto.
-      apply Forall2_Forall2_asym_included.
-      auto.
-    - intro; intros.
-      inv H3.
-      apply H0 in H6. destructAll.
-      apply preord_val_constr in H4. destructAll.
-      eapply preord_exp_refl in H12. destructAll.
-      eexists. eexists.
-      split.
-      eapply BStep_case; eauto.
-      apply H6.
-      eapply preord_env_P_antimon.
-      apply H.
-      eapply occurs_free_Ecase_Included.
-      apply findtag_In_patterns; eauto.
-      auto.
-    - intro; intros.
-      inv H3.
-      apply H0 in H12. destructAll.
-      apply preord_val_constr in H4.
-      destructAll.
-      assert (Hh := Forall2_asym_nthN _ _ _ _ _ H5 H13). destructAll.
-      eapply preord_exp_refl in H14. destructAll.
-      exists x2, x3.
-      split.
-      eapply BStep_proj.
-      apply H3.
-      apply H4.
-      apply H7. apply H8.
-      rewrite occurs_free_Eproj in H.
-      apply preord_env_P_extend.
-      eapply preord_env_P_antimon.
-      apply H.
-      right. auto.
-      auto.
-      auto.
-    - intro; intros.
-      inv H3.
-      assert (exists vs2, get_list (ys++y::ys') rho2 = Some vs2 /\ Forall2 (preord_val pr cenv k) vs vs2).
-      eapply preord_env_P_get_list_app; eauto.
-      rewrite occurs_free_Eprim in H.
-      eapply preord_env_P_antimon; eauto.
-      left. auto.
-      destructAll.
-      assert (Hax := Prim_axiom _ _ _ _ _ H10 _ _ _ H4 H13).
-      destructAll.
-      eapply preord_exp_refl in H15; eauto.
-      destructAll.
-      eexists; eexists; eauto. split.
-      eapply BStep_prim; eauto.
-      apply H9.
-      apply preord_env_P_extend.
-      eapply preord_env_P_antimon; eauto.
-      rewrite occurs_free_Eprim.
-      right. auto.
-      auto.
-    - intro; intros.
-      inv H3.
-      apply H0 in H7.
-      destructAll.
-      rewrite preord_val_eq in H4.
-      destruct x0.
-      inversion H4.
-      2: inversion H4.
-      simpl in H4.
-      assert (H8' := H8).
-      eapply preord_env_P_get_list_l in H8; eauto.
-      destructAll.
-      specialize (H4 vs x0 (k-1) t xs e rho'').
-      assert ( List.length vs = List.length x0).
-      eapply Forall2_length; eauto.
-      symmetry in H13.
-      specialize (H4 H7 H10 H13).
-      destructAll.
-      apply H9 in H14.
-      destructAll.
-      exists x4, (x5+1). split.
-      eapply BStep_app; eauto.
-      replace (k-(c+1)) with (k-1-c) by omega.
-      auto.
-      omega.
-      eapply Forall2_monotonic.
-      2: apply H6.
-      intros.
-      eapply preord_val_monotonic.
-      apply H11.
-      omega.
-      omega.
-      rewrite occurs_free_Eapp. left; auto.
-    - intro; intros.
-      inv H3.
-      assert (H8' := H8).
-      eapply preord_env_P_get_list_app in H8'.
-      2: apply H0.
-      destructAll.
-      apply H in H7. destructAll.
-      rewrite preord_val_eq in H6.
-      destruct x1.  inversion H6.
-      2: inversion H6.
-      simpl in H6.
-      assert (List.length vs = List.length x0).
-      eapply Forall2_length; eauto.
-      symmetry in H13.
-      specialize (H6 vs x0 (k-1) t xs e rho'' H7 H10 H13).
-      destructAll.
-      apply H11 in H14.
-      destructAll.
-      exists x4, (x5+1). split.
-      eapply BStep_app; eauto.
-      replace (k-(c+1)) with (k-1-c) by omega. auto.
-      omega.
-      eapply Forall2_monotonic.
-      2: apply H4. intros. eapply preord_val_monotonic; eauto.
-      omega.
-      omega.
-      constructor.
-      eapply preord_env_P_antimon.
-      apply H.
-      rewrite occurs_free_Eapp. left; auto.
-    - intro. intros. inversion H3; subst.
-      apply H0 in H6.
-      destructAll.
-      eexists; eexists.
-      split.
-      apply BStep_halt.
-      eauto. replace (k-0) with k by omega. apply H5.
+    intros Henv Hvar Hren. inversion Hren; subst.
+    - eapply preord_exp_const_compat; eauto.
+      + eapply Forall2_app.
+        eapply Forall2_same. intros z Hin. eapply Henv. constructor 1.
+        eapply in_or_app. now left.
+        econstructor; eauto.
+        eapply Forall2_same. intros z Hin. eapply Henv. constructor 1.
+        eapply in_or_app. right; eauto. right; eauto.
+      + intros. eapply preord_exp_refl; eauto.
+        eapply preord_env_P_extend. eapply preord_env_P_antimon; eauto.
+        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        normalize_occurs_free; sets.
+        rewrite preord_val_eq; simpl; eauto. split; eauto.
+        now apply Forall2_Forall2_asym_included.
+    - induction cl as [| [] ]. 
+      + eapply preord_exp_case_nil_compat; eauto.
+      + eapply preord_exp_case_cons_compat; eauto.
+        eapply Forall2_same. intros z Hin. reflexivity.
+        intros m Hlt. eapply preord_exp_refl; eauto.
+        eapply preord_env_P_antimon; eauto.
+        eapply preord_env_P_monotonic; [| eassumption ]. omega. normalize_occurs_free. now sets.
+        eapply IHcl.
+        eapply preord_env_P_antimon; eauto. normalize_occurs_free. now sets.
+        now constructor.
+    - eapply preord_exp_proj_compat; eauto.
+      intros. eapply preord_exp_refl; eauto.
+      eapply preord_env_P_extend. eapply preord_env_P_antimon; eauto.
+      eapply preord_env_P_monotonic; [| eassumption ]. omega.
+      normalize_occurs_free; sets. now eassumption.
+    - eapply preord_exp_letapp_compat; eauto.
+      + eapply Forall2_same. intros z Hin. eapply Henv. econstructor. now right.
+      + intros m v1 v2 Hlt Hpre. eapply preord_exp_refl; eauto.
+        eapply preord_env_P_extend. eapply preord_env_P_antimon; eauto.
+        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        normalize_occurs_free; sets. eassumption.
+    - eapply preord_exp_letapp_compat; eauto.
+      + eapply Henv. econstructor. now left.
+      + eapply Forall2_app.
+        eapply Forall2_same. intros z Hin.
+        eapply Henv. econstructor. right. eapply in_or_app. now eauto.
+        constructor. eassumption.
+        eapply Forall2_same. intros z Hin.
+        eapply Henv. econstructor. right. eapply in_or_app.
+        right. now right.
+      + intros m v1 v2 Hlt Hval. eapply preord_exp_refl; eauto.
+        eapply preord_env_P_extend. eapply preord_env_P_antimon; eauto.
+        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        normalize_occurs_free; sets. eassumption.
+    - eapply preord_exp_prim_compat; eauto.
+      + eapply Forall2_app.
+        eapply Forall2_same. intros z Hin. eapply Henv. constructor.
+        eapply in_or_app. now left.
+        econstructor; eauto.
+        eapply Forall2_same. intros z Hin. eapply Henv. constructor.
+        eapply in_or_app. right; eauto. right; eauto.
+    - eapply preord_exp_app_compat; eauto.
+      eapply Forall2_same. intros z Hin. eapply Henv. constructor. eassumption.
+    - eapply preord_exp_app_compat; eauto.
+      eapply Forall2_app.
+      eapply Forall2_same. intros z Hin.
+      eapply Henv. econstructor. eapply in_or_app. now left.
+      constructor; eauto.
+      eapply Forall2_same. intros z Hin.
+      eapply Henv. econstructor. eapply in_or_app. right.
+      now right.
+    - eapply preord_exp_halt_compat; eauto.
   Qed.
 
 
@@ -4151,116 +4472,85 @@ Section Shrink_correct.
   Qed.
 
 
-  Lemma rw_proj1_equiv : forall  x x' t t' ys  y e e'  c c' n k rho1 rho2,
+  Lemma rw_proj1_equiv x x' t t' ys  y e e'  c c' n k rho1 rho2 :
       ~ bound_stem_ctx c x ->
       ~ bound_stem_ctx c y ->
       ~ bound_stem_ctx c' x' ->
       ~ bound_var_ctx c' y  ->
       x <> y ->
       nthN ys n = Some y ->
-      preord_env_P pr cenv (occurs_free (Econstr x t ys (c |[ Eproj x' t' n x (c' |[e]|) ]|))) k rho1 rho2 ->
+      preord_env_P cenv PG (occurs_free (Econstr x t ys (c |[ Eproj x' t' n x (c' |[e]|) ]|))) k rho1 rho2 ->
       rename_loc x' y e e' ->
-      preord_exp pr cenv k (Econstr x t ys (c |[ Eproj x' t' n x (c' |[e]|) ]|) , rho1 )
+      preord_exp cenv P1 PG k (Econstr x t ys (c |[ Eproj x' t' n x (c' |[e]|) ]|) , rho1 )
                  (Econstr x t ys (c |[ Eproj x' t' n x (c' |[e']|) ]|), rho2).
   Proof.
-    intros.
-    destruct (var_dec x' y). subst.
-    apply rename_loc_refl_x in H6. subst. apply preord_exp_refl; auto.
-    intros; intro; intros.
-    inversion H8;  subst.
-    assert (Hys : Included var (FromList ys)
-                           (occurs_free (Econstr x t ys (c |[ Eproj x' t' n x (c' |[ e ]|) ]|)))). {
-      rewrite occurs_free_Econstr. left; auto.
-    }
-    assert (H11' := preord_env_P_get_list_l _ _ _ _ _ _ _  _ H5 Hys H16). destructAll.
-    assert (Hyv := get_list_nth_get _ _ _ _ _ H16 H4).
-    assert (Hyv' := get_list_nth_get _ _ _ _ _ H9 H4).
-    destructAll.
-    eapply preord_exp_compat_stem_vals with (xs := x::y::nil) in H18; eauto.
-    destructAll. eexists; eexists.
-    split. eapply BStep_constr; eauto.
-    eauto.
-    Focus 3.
-    simpl. rewrite M.gss. rewrite M.gso by auto. rewrite H14. reflexivity.
-    Focus 3.
-    simpl. rewrite M.gss. rewrite M.gso by auto. rewrite H12. reflexivity.
-    + intros.
-      intro. intros. inv H21.
-      assert (Hg := get_list_two H17).
-      assert (Hg' := get_list_two H19).
-      destructAll. rewrite H30 in H23. inv H23.
-      eapply preord_exp_compat_stem_vals with (xs := x'::y::nil) in H32; eauto.
-      destructAll. eexists; eexists. split.
-      eapply BStep_proj.
-      eauto.
-      eauto.
-      apply H23.
-      auto.
-      Focus 3.
-      simpl. rewrite M.gss. rewrite M.gso; auto. rewrite H24. reflexivity.
-      Focus 3.
-      simpl. rewrite M.gss. rewrite M.gso; auto. rewrite H22. reflexivity.
-      intros.
-      assert (Hg := get_list_two H25).
-      assert (Hg' := get_list_two H26).
-      destructAll.
-      eapply rename_loc_equiv; eauto.
-      intro. intros.
-      rewrite H34 in H29.
-      inv H29.
-      exists x1. split; auto.
-      specialize (H23 x').
-      apply H23 in H34. destructAll.
-      rewrite H29 in H27. inv H27. auto.
-      eapply rename_loc_occurs_free; eauto.
-      {
-        split. intros. intro.
-        inv H23.
-        inv H26.
-        apply H1. auto.
-        inv H23.
-        apply H2. apply bound_stem_var. auto.
-        inv H26.
-      }
-      apply preord_env_P_extend. rewrite occurs_free_Eproj in H15.
-      eapply preord_env_P_antimon. apply H15. right; auto.
-      specialize (H15 x). apply H15 in H30. destructAll.
-      rewrite H23 in H21. inv H21.
-      rewrite preord_val_eq in H25. simpl in H25. destruct H25.
-      apply (Forall2_asym_nthN _ _ _ _ _ H25) in H31. destructAll.
-      rewrite H26 in H11. inv H11; auto.
-      apply occurs_free_Eproj.
-      left; auto.
-    + split. intros.
-      intro. inv H15.
-      inv H19.
-      * apply H. apply H17.
-      * inv H15.
-        apply H0. apply H17.
-        inversion H19.
-    + apply preord_env_P_extend.
-      eapply preord_env_P_antimon.
-      apply H5. intro. intros.
-      rewrite occurs_free_Econstr. right; auto.
-      rewrite preord_val_eq. simpl. split; auto.
+    intros Hn1 Hn2 Hn3 Hn4 Hleq Hneq Henv Hren. destruct (peq x' y); subst.
+    - eapply rename_loc_refl_x in Hren. subst.
+      eapply preord_exp_refl; eauto.     
+    - eapply preord_exp_const_compat_alt; eauto.
+      + eapply Forall2_same. intros. eapply Henv. now constructor. 
+      + intros m vs1 vs2 Hlt Hg1 Hg2.
+        edestruct (@get_list_nth_get val ys vs2) as [v2 [Hnth2 Hget2]]; eauto.      
+        edestruct (@get_list_nth_get val ys vs1) as [v1 [Hnth1 Hget1]]; eauto.      
 
-      apply Forall2_Forall2_asym_included.
-      auto.
+        assert (Hval : preord_val cenv PG k v1 v2).
+        { edestruct preord_env_P_get_list_l as [vs2' [Hg2' Hvs]]; [| | eapply Hg1 |].
+
+          
+          eassumption. normalize_occurs_free; sets. subst_exp. eapply Forall2_nthN'; eassumption. }
+
+        * intros k1 rho1' rho2' Hpre Hleq1 Hgetl1 Hgetl2.
+          eapply preord_exp_proj_compat_alt; eauto.
+          intros m1 vs1' vs2' v1' v2' Hlt' Hg1' Hg2' Hn1' Hn2' Hpre'.
+          simpl in Hgetl1, Hgetl2. 
+          destruct (M.get x rho1') eqn:Hgetx1; try congruence. 
+          destruct (M.get y rho1') eqn:Hgety1; try congruence. 
+          destruct (M.get x rho2') eqn:Hgetx2; try congruence. 
+          destruct (M.get y rho2') eqn:Hgety2; try congruence. 
+          inv Hgetl1. inv Hgetl2. inv Hg1'; inv Hg2'. do 2 subst_exp.          
+          eapply preord_exp_compat_stem_vals_le with (xs := [x' ; y]);
+            [| | simpl; rewrite M.gss, M.gso, Hgety1; eauto | simpl; rewrite M.gss, M.gso, Hgety2; eauto | ].
+          -- intros k2 rho1'' rho2'' Hpre'' Hle'' Hgetl1' Hgetl2'. simpl in Hgetl1',Hgetl2'.
+             destruct (M.get x' rho1'') eqn:Hgetx1'; try congruence. 
+             destruct (M.get y rho1'') eqn:Hgety1'; try congruence. 
+             destruct (M.get x' rho2'') eqn:Hgetx2'; try congruence. 
+             destruct (M.get y rho2'') eqn:Hgety2'; try congruence. inv Hgetl1'; inv Hgetl2'. 
+             
+             eapply rename_loc_equiv; [| | eassumption ]; eauto.
+             intros v Hget1'. rewrite Hgetx1' in Hget1'. inv Hget1'.
+             eexists; split; eauto.
+             eapply preord_val_monotonic; [ eassumption | ]. omega.
+          -- repeat normalize_sets.
+             eapply Union_Disjoint_r; eapply Disjoint_Singleton_r; eauto.
+             intros Hc. eapply Hn4. eapply bound_var_stem_or_not_stem.
+             now right.
+          -- eapply preord_env_P_extend.
+             eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega.
+             normalize_occurs_free. now sets.
+             eapply preord_val_monotonic; [ eassumption | ]. omega.
+        * repeat normalize_sets.
+          eapply Union_Disjoint_r; eapply Disjoint_Singleton_r; eauto.
+        * eapply preord_env_P_extend.
+          eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          normalize_occurs_free. now sets.
+          rewrite preord_val_eq.  split; eauto.
+          edestruct preord_env_P_get_list_l as [vs2' [Hg2' Hvs]]; [| | eapply Hg1 |]. eassumption.
+          normalize_occurs_free; sets. eapply Forall2_Forall2_asym_included.
+          subst_exp. eapply Forall2_monotonic; [ | eassumption ].
+          intros. eapply preord_val_monotonic. eassumption. omega.
   Qed.
-
-
+  
 
   Lemma rw_proj_clos_equiv : forall  x x' t t' ys  y e e'  c n ,
       ~ bound_stem_ctx c x ->
       ~ bound_stem_ctx c y ->
-      (*                             ~ bound_var e x' ->  *)
       ~ bound_var e y  ->
       x <> y ->
       rename_clos_s x' y e e' ->
       nthN ys n = Some y ->
       forall k rho1 rho2,
-        preord_env_P pr cenv (occurs_free (Econstr x t ys (c |[ Eproj x' t' n x e ]|))) k rho1 rho2 ->
-        preord_exp pr cenv k (Econstr x t ys (c |[ Eproj x' t' n x e ]|) , rho1 )
+        preord_env_P cenv PG (occurs_free (Econstr x t ys (c |[ Eproj x' t' n x e ]|))) k rho1 rho2 ->
+        preord_exp cenv P1 PG k (Econstr x t ys (c |[ Eproj x' t' n x e ]|) , rho1 )
                    (Econstr x t ys (c |[ Eproj x' t' n x e' ]|), rho2).
   Proof.
     intros x x' t t' ys y e e' c n Hs_cx Hs_cy Hbv_ey Hxy Hrcs Hnth k rho1 rho2 Hpreord.
@@ -4270,7 +4560,7 @@ Section Shrink_correct.
       intros.
       eapply rw_proj1_equiv; eauto.
       intro. apply Hbv_ey. apply bound_var_app_ctx. left; auto.
-    - intros. apply preord_exp_refl. auto.
+    - intros. apply preord_exp_refl; auto.
     - intros.
       eapply preord_exp_trans.
       apply IHHrcs1.
@@ -4312,21 +4602,6 @@ Section Shrink_correct.
 
 
   (* todo: move *)
-  Lemma not_in_remove_all: forall x l sigma,
-      ~ (FromList l x) ->
-      M.get x sigma = M.get x (remove_all sigma l).
-  Proof.
-    induction l; intros.
-    reflexivity.
-    simpl.
-    assert (~ (a = x) /\ ~ (FromList l x)).
-    split; intro. apply H. constructor; auto.
-    apply H. constructor 2; auto.
-    destruct H0.
-    rewrite <- IHl; auto.
-    symmetry.
-    rewrite M.gro; auto.
-  Qed.
 
   Lemma remove_all_some:
     forall x y l sigma,

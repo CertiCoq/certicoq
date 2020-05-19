@@ -628,11 +628,9 @@ Fixpoint all_fun_name (fds:fundefs) : list var :=
 
 Fixpoint remove_all (sigma:r_map) (vs:list var) :=
   match vs with
-    | v::vs' => remove_all (M.remove v sigma) vs'
+    | v::vs' => M.remove v (remove_all sigma vs')
     | [] => sigma
   end.
-
-
 
 Fixpoint update_census_list (sig:r_map) (ys:list var) (fun_delta:var -> c_map -> nat) (count:c_map) :=
   match ys with
@@ -760,13 +758,13 @@ Section RENAME.
   Defined.
 
 
-  Theorem prop_remove_all: forall l, forall sub sub', map_get_r _ sub sub' -> map_get_r _ (remove_all sub l) (remove_all sub' l).
+  Theorem prop_remove_all: 
+  forall l sub sub', map_get_r _ sub sub' -> map_get_r _ (remove_all sub l) (remove_all sub' l).
   Proof.
-    induction l; intros.
-    auto.
-    simpl. apply IHl. apply proper_remove. auto.
+    induction l; intros.  
+    - auto.
+    - simpl. apply proper_remove. apply IHl; eauto. 
   Defined.
-
 
 
   Theorem prop_rename_all: (forall e, forall sub sub', map_get_r _ sub sub' -> rename_all sub e = rename_all sub' e) /\
@@ -796,57 +794,43 @@ Section RENAME.
   Theorem remove_all_empty: forall l, map_get_r _ (remove_all (M.empty var) l)  (M.empty var).
   Proof.
     induction l; intros; simpl; auto.
-    apply smg_refl.
-    assert (map_get_r _ (remove_all (M.remove a (M.empty var)) l) (remove_all (M.empty var) l)).
-    apply prop_remove_all.
-    apply remove_empty.
-    eapply smg_trans.
-    apply H. auto.
+    - apply smg_refl. 
+    - eapply smg_trans. eapply proper_remove. eassumption.
+      apply remove_empty.
   Defined.
 
-  Theorem remove_all_in: forall x z l rho,
-                           List.In x l ->
-                           map_get_r _ (remove_all (M.set x z rho) l) (remove_all rho l).
-  Proof.
-    induction l; intros; simpl; auto.
-    inversion H.
-    simpl in H.
-    destruct (var_dec x a).
-    subst.
-    assert (map_get_r _  (remove_all (M.remove a rho) l) (remove_all (M.remove a (M.set a z rho)) l)).
-    apply smg_sym.
-    apply prop_remove_all.
-    apply remove_set_1.
-    eapply smg_trans; eauto.
-    apply smg_sym.
-    eauto.
-    apply smg_refl.
-    destruct H.
-    exfalso; auto.
-    eapply IHl with (rho := M.remove a rho) in H.
-    eapply smg_trans; eauto.
-    apply prop_remove_all.
-    apply remove_set_2; auto.
-  Defined.
-
-
-  Theorem remove_all_not_in: forall x z l rho,
-                               ~ (List.In x l) ->
-                               map_get_r _ (remove_all (M.set x z rho) l) (M.set x z (remove_all rho l)).
+  Theorem remove_all_not_in: 
+    forall x z l rho,
+      ~ (List.In x l) ->
+      map_get_r _ (remove_all (M.set x z rho) l) (M.set x z (remove_all rho l)).
   Proof.
     induction l; intros; simpl.
-    apply smg_refl.
-    eapply smg_trans.
-    Focus 2.
-    eapply IHl.
-    intro.
-    apply H. constructor 2; auto.
-    apply prop_remove_all.
-    apply remove_set_2.
-    intro.
-    apply H.
-    constructor 1. auto.
+    - apply smg_refl.
+    - eapply smg_trans. eapply proper_remove.
+      eapply IHl. intros Hc. eapply H; now right.
+      apply remove_set_2. intros Hc; subst; eapply H; now left.
   Defined.
+
+
+  Theorem remove_all_in: 
+    forall x z l rho,
+      List.In x l ->
+      map_get_r _ (remove_all (M.set x z rho) l) (remove_all rho l).
+  Proof.
+    induction l; intros; simpl; auto.
+    - inversion H.
+    - simpl in H. 
+      destruct (var_dec x a); subst.
+      + edestruct (ListDec.In_decidable) with (l := l) (x := a) as [Hd | ]. 
+        { intros x y. destruct (DecidableTypeEx.Positive_as_DT.eq_dec x y); subst; eauto.
+          left; eauto. right; eauto. }
+        * eapply proper_remove. eapply IHl. eauto.
+        * eapply smg_trans. eapply proper_remove. 
+          eapply remove_all_not_in. eassumption.    
+          apply remove_set_1.
+      + inv H. exfalso; eauto. eapply proper_remove. eapply IHl. eauto.
+  Qed.
+
 
   Theorem rename_all_empty: (forall e,
                                e = rename_all (M.empty var) e) /\

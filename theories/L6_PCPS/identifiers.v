@@ -7,7 +7,7 @@ From Coq Require Import Lists.List Lists.SetoidList NArith.BinNat PArith.BinPos
 
 From compcert.lib Require Import Coqlib.
 Require Import L6.tactics.
-From CertiCoq.L6 Require Import cps cps_util ctx set_util Ensembles_util List_util.
+From CertiCoq.L6 Require Import cps cps_util ctx set_util Ensembles_util List_util map_util.
 
 Import ListNotations.
 
@@ -2800,8 +2800,8 @@ Lemma In_fold_left_strengthen {A} f (l : list A)
 Proof.
   revert si si'; induction l; intros si si' H; simpl in H; eauto; simpl in *.
   - apply_set_specs_ctx; eauto.
-  - rewrite Equal_fold_left in H. Focus 2.
-    rewrite union_sym. rewrite union_assoc. rewrite (union_sym si' (f a)). reflexivity.
+  - rewrite Equal_fold_left in H.
+    2:{ rewrite union_sym. rewrite union_assoc. rewrite (union_sym si' (f a)). reflexivity. }
     eapply IHl in H. inv H; eauto.
 Qed.
 

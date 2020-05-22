@@ -1232,13 +1232,6 @@ Section Log_rel.
       Qed. *)
     
 
-    Lemma inline_letapp_correct k x f t xs e1 C z z' rho1 rho2 : 
-      (forall rho1 rho2, 
-         preord_env_P 
-         preord_exp P1 PG k (e1, rho) (e2, rho'))
-
-      inline_let
-      preord_exp P1 PG k (Eletapp x f t xs e1, rho) (C |[ rename x x' e2 ]|, rho').
 
   End Compat.
   

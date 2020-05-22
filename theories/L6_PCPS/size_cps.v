@@ -5,7 +5,7 @@
 
 From Coq Require Import ZArith List SetoidList NArith.BinNat PArith.BinPos
      MSets.MSetRBT Sets.Ensembles Omega Sorting.Permutation.
-From CertiCoq.L6 Require Import List_util cps ctx identifiers Ensembles_util set_util cps_util.
+From CertiCoq.L6 Require Import List_util cps ctx identifiers Ensembles_util set_util cps_util map_util.
 
 Require Import compcert.lib.Maps.
 

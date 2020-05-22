@@ -785,6 +785,27 @@ Section Alpha_conv_correct.
         eexists. rewrite M.gso; eauto. 
   Qed.
   
+  Lemma preord_env_P_inj_set_alt (S : Ensemble var) (rho1 rho2 : env) 
+        (k : nat) f (x y : var) (v1 v2 : val) : 
+    preord_env_P_inj (S \\ [set x]) k f rho1 rho2 ->
+    preord_val cenv PG k v1 v2 ->
+    ~ In _ (image f (S \\ [set x])) y ->
+    preord_env_P_inj S k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
+  Proof.
+    intros Henv Hv Hnin z HP. unfold extend. 
+    destruct (peq z x) as [| Hneq].
+    - subst. intros z Hget.
+      rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss; eauto.
+    - intros z' Hget. rewrite M.gso in Hget; eauto. 
+      destruct (peq (f z) y).
+      + exfalso. eapply Hnin. eexists; eauto.
+        split; eauto. constructor; eauto.
+        intros Hc; inv Hc; congruence.
+      + edestruct (Henv z); eauto.
+        constructor; eauto. intros Hc. inv Hc. congruence. 
+        eexists. rewrite M.gso; eauto. 
+  Qed.
+
   Lemma preord_env_P_inj_set_l (S : Ensemble var) (rho1 rho2 : env) 
         (k : nat) f (x y : var) (v1 v2 : val) : 
     preord_env_P_inj (S \\ [set x]) k f rho1 rho2 ->

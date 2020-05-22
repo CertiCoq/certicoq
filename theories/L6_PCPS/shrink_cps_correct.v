@@ -2581,7 +2581,7 @@ Section Shrink_correct.
     eapply rename_all_refl_mut. 
   Qed.
 
-  Lemma preord_env_P_inj_set_l S k rho1 rho2 m x y v v' : 
+  Lemma preord_env_P_inj_set_l_apply_r S k rho1 rho2 m x y v v' : 
     preord_env_P_inj cenv PG (S \\ [set x]) k (apply_r m) rho1 rho2 ->
     M.get y rho2 = Some v' ->
     preord_val cenv PG k v v' ->
@@ -2661,7 +2661,7 @@ Section Shrink_correct.
               destruct (M.get x rho2') eqn:Hgetx2; try congruence. 
               destruct (M.get y rho2') eqn:Hgety2; try congruence. 
               inv Hgetl2. inv Hgetl1. inv H6.
-              eapply preord_env_P_inj_set_l; eauto. eapply preord_env_P_inj_map_id. 
+              eapply preord_env_P_inj_set_l_apply_r; eauto. eapply preord_env_P_inj_map_id. 
               eapply preord_env_P_antimon. eassumption. normalize_occurs_free; sets.
               subst_exp. eapply preord_val_monotonic; eauto. omega.
       * repeat normalize_sets.
@@ -2893,7 +2893,7 @@ Section Shrink_correct.
       destruct (get_list ys rho2) eqn:Hgetys; try congruence.
       inv Hget. simpl. 
 
-      eapply preord_env_P_inj_set_l; [| eassumption | eassumption ]. 
+      eapply preord_env_P_inj_set_l_apply_r; [| eassumption | eassumption ]. 
 
       eapply IHxs. eapply preord_env_P_antimon. eassumption.
       normalize_sets. rewrite Setminus_Union. sets.
@@ -3069,6 +3069,138 @@ Section Shrink_correct.
     eapply preord_env_P_inj_eq_r; eauto.
   Qed.  
 
+
+  Ltac destruct_bstep :=
+    match goal with
+    | [ H : bstep _ _ _ _ _ |- _ ] => inv H
+    end. 
+    
+  Lemma eval_ctx_app_OOT_Ehalt rho C e n x :
+    bstep_fuel cenv rho (C |[ Ehalt x ]|) OOT n ->
+    interprable C = true ->
+    bstep_fuel cenv rho (C |[ e ]|) OOT n.
+  Proof.       
+    revert rho e n.
+    induction C; intros rho e1 cin Hs Hi; eauto;
+      try congruence;
+      try now (inv Hs; [ constructor 1; simpl in *; omega |
+                destruct_bstep; constructor 2; [ simpl in *; omega | econstructor; eauto ] ]).
+    - inv Hs; eauto.
+      constructor 1. simpl in *.
+      eapply le_trans; [| eapply cost_gt_0 ]. omega.
+      destruct_bstep.
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+      * constructor 2; [ simpl in *; omega | ].
+        simpl. rewrite <- H6. econstructor; eauto. 
+      * constructor 2; [ simpl in *; omega | ].
+        econstructor; eauto.
+
+        Unshelve. exact 0.
+  Qed. 
+
+  Lemma eval_ctx_app_OOT_Eapp rho C e n x f t xs :
+    bstep_fuel cenv rho (C |[ Eapp f t xs ]|) OOT n ->
+    interprable C = true ->
+    bstep_fuel cenv rho (C |[ Eletapp x f t xs e ]|) OOT n.
+  Proof.       
+    revert rho e n.
+    induction C; intros rho e1 cin Hs Hi; eauto;
+      try congruence;
+      try now (inv Hs; [ constructor 1; simpl in *; omega |
+                destruct_bstep; constructor 2; [ simpl in *; omega | econstructor; eauto ] ]).
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+      * constructor 2; [ simpl in *; omega | ].
+        simpl. rewrite <- H6. econstructor; eauto. 
+      * constructor 2; [ simpl in *; omega | ].
+        econstructor; eauto.
+
+        Unshelve. exact 0.                
+  Qed. 
+
+  Lemma eval_ctx_app_OOT_Eprim rho C x p xs e1 e2 n :
+    bstep_fuel cenv rho (C |[ Eprim x p xs e1  ]|) OOT n ->
+    interprable C = true ->
+    bstep_fuel cenv rho (C |[ Eprim x p xs e2]|) OOT n.
+  Proof.       
+    revert rho n.
+    induction C; intros rho cin Hs Hi; eauto;
+      try congruence;
+      try now (inv Hs; [ constructor 1; simpl in *; omega |
+                         destruct_bstep; constructor 2; [ simpl in *; omega | econstructor; eauto ] ]).
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+      * constructor 2; [ simpl in *; omega | ].
+        simpl. rewrite <- H6. econstructor; eauto. 
+      * constructor 2; [ simpl in *; omega | ].
+        econstructor; eauto.
+
+        Unshelve. exact 0.                
+  Qed.
+
+  Context (Hless_steps_letapp :
+             forall (x f : positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp)
+                    (rho1 : map_util.M.t val)
+                    (xs : list var) (e_b1 : exp) (v1 : val) (e2 e2' e_b2: exp) (rho2 rho2' rhoc2  rhoc1 : M.t val) 
+                    (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val) (c1 c1' c2 c2' : nat),
+               rho1 ! f = Some (Vfun rhoc1 fl h) ->
+               get_list ys rho1 = Some vs ->
+               find_def h fl = Some (t, xs, e_b1) ->
+               set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
+               bstep_fuel cenv rhoc1' e_b1 (Res v1) c1 ->
+
+               P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2) ->
+               P1 (e1, M.set x v1 rho1, c1') (e2', rho2', c2') ->
+               P1 (Eletapp x f t ys e1, rho1, c1 + c1' + cost (Eletapp x f t ys e1))
+                  (e2, rho2, c2 + c2')). 
+
+  Context (Hless_steps_letapp' :
+             forall (x f : positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp)
+                    (rho1 : map_util.M.t val)
+                    (xs : list var) (e_b1 : exp) (v1 : val) (e2 e2' e_b2: exp) (rho2 rho2' rhoc2  rhoc1 : M.t val) 
+                    (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val) (c1 c1' c2 c2' : nat),
+               rho1 ! f = Some (Vfun rhoc1 fl h) ->
+               get_list ys rho1 = Some vs ->
+               find_def h fl = Some (t, xs, e_b1) ->
+               set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
+               bstep_fuel cenv rhoc1' e_b1 (Res v1) c1 ->
+
+               P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2 + 1) ->
+               P1 (e1, M.set x v1 rho1, c1') (e2', rho2', c2') ->
+               P1 (Eletapp x f t ys e1, rho1, c1 + c1' + cost (Eletapp x f t ys e1))
+                  (e2, rho2, c2 + c2')). 
+
+
+  Context (Hless_steps_letapp_OOT :
+             forall (x f : positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp) (rho1 : map_util.M.t val)
+                    (xs : list var) (e_b1 : exp) (r : res) (e2 e_b2 : exp) (rho2 rhoc1 : M.t val) (rhoc2 : env) 
+                    (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val) (c1 c2 : nat),
+               rho1 ! f = Some (Vfun rhoc1 fl h) ->
+               get_list ys rho1 = Some vs ->
+               find_def h fl = Some (t, xs, e_b1) ->
+               set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
+               bstep_fuel cenv rhoc1' e_b1 r c1 ->
+
+               P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2) ->
+               P1 (Eletapp x f t ys e1, rho1, c1 + cost (Eletapp x f t ys e1))
+                  (e2, rho2, c2 )). 
+
+  Context (Hless_steps_letapp_OOT' :
+             forall (x f : positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp) (rho1 : map_util.M.t val)
+                    (xs : list var) (e_b1 : exp) (r : res) (e2 e_b2 : exp) (rho2 rhoc1 : M.t val) (rhoc2 : env) 
+                    (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val) (c1 c2 : nat),
+               rho1 ! f = Some (Vfun rhoc1 fl h) ->
+               get_list ys rho1 = Some vs ->
+               find_def h fl = Some (t, xs, e_b1) ->
+               set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
+               bstep_fuel cenv rhoc1' e_b1 r c1 ->
+
+               P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2) ->
+               P1 (Eletapp x f t ys e1, rho1, c1 + cost (Eletapp x f t ys e1))
+                  (e2, rho2, c2 - 1)). 
+
   
   Lemma inline_letapp_correct k x sig f t ys e1 e2 e' C C' x' rho1 rho2 : 
     (forall m rhoc rhoc' B f' xs vs e,
@@ -3107,7 +3239,8 @@ Section Shrink_correct.
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * eapply Hyp2.
         * eassumption.
-        * admit.
+        * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
+          rewrite bound_var_Econstr_c, bound_var_Hole_c in *. xsets. 
         * eassumption. 
         * eapply interprable_comp_f_l; eauto.
         * eassumption.
@@ -3123,7 +3256,8 @@ Section Shrink_correct.
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * eapply Hyp2.
         * eassumption.
-        * admit.
+        * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
+          rewrite bound_var_Eproj_c, bound_var_Hole_c in *. xsets. 
         * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * eassumption.
@@ -3138,7 +3272,8 @@ Section Shrink_correct.
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * eapply Hyp2.
         * eassumption.
-        * admit.
+        * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
+          rewrite bound_var_Eletapp_c, bound_var_Hole_c in *. xsets. 
         * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * eassumption.
@@ -3153,7 +3288,8 @@ Section Shrink_correct.
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * eapply Hyp2.
         * eassumption.
-        * admit.
+        * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
+          rewrite bound_var_Fun1_c, bound_var_Hole_c in *. xsets. 
         * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * eassumption.
@@ -3164,7 +3300,7 @@ Section Shrink_correct.
       intros r1 c2 Hleq Hs1. inv Hs1.
       + exists OOT, 0. split; [| split ]; eauto. constructor. eapply cost_gt_0.
         now eapply Hpost_zero; eauto. now simpl; eauto.
-      + inv H0. 
+      + inv H0.  
 
         * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H13 | ]; eauto.
           simpl in *; omega. simpl in *; omega.
@@ -3190,17 +3326,24 @@ Section Shrink_correct.
           2:{ simpl; replace (n2 + c3 - S (Datatypes.length l))
                       with (n2 - cost (Eapp v f l) + c3) by (simpl in *; omega).
               econstructor; eauto. } simpl in *; omega.
-          split. 
-          admit. (* post *)
+          split.
+
+          assert (Heq : c2 = cin1 + cin2 + S (Datatypes.length ys)).
+          { rewrite <- (NPeano.Nat.sub_add (S (Datatypes.length ys)) c2). rewrite H6. reflexivity.
+            eassumption. } rewrite Heq. 
+          rewrite plus_assoc.
+          now eapply Hless_steps_letapp; eauto. 
           eapply preord_res_monotonic. eassumption. simpl in *; omega.
         * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H13 | ]; eauto.
           simpl in *; omega. simpl in *; omega.
           destruct r2; [ | simpl in Hv2; contradiction ].
 
           eexists OOT, c2'. split; [| split ]. 
-          
-          admit. (* lemma *)
-          admit. (* post *)
+
+          eapply eval_ctx_app_OOT_Eapp. eassumption. eassumption.
+
+          replace c2 with (c2 - cost (Eletapp x' f' t ys e1) + cost (Eletapp x' f' t ys e1)) by (simpl in *; omega). 
+          now eapply Hless_steps_letapp_OOT; eauto. 
           simpl; eauto. 
     - intros r1 c2 Hleq Hs1. inv Hs1.
       + exists OOT, 0. split; [| split ]; eauto. constructor. eapply cost_gt_0.
@@ -3219,8 +3362,10 @@ Section Shrink_correct.
 
           eexists OOT, c2'. split; [| split ]. 
 
-          admit. (* lemma *)
-          admit. (* post *)
+          eapply eval_ctx_app_OOT_Eprim. eassumption. eassumption.          
+
+          replace c2 with (c2 - cost (Eletapp x f' t ys e1) + cost (Eletapp x f' t ys e1)) by (simpl in *; omega). 
+          now eapply Hless_steps_letapp_OOT; eauto. 
           simpl; eauto. 
     - inv Hin. simpl (_ |[ _ ]|). 
       intros r1 c2 Hleq Hs1. inv Hs1.
@@ -3237,10 +3382,21 @@ Section Shrink_correct.
           edestruct (Hyp2 (k - 1 - cin1)) with (rho2 := rho2') as [r3 [c3 [Hs3 [Hp3 Hv3]]]];
             [ | | | now eapply H14 | ]; eauto.
           simpl in *; omega.
-          admit. (* with peq *)
+          
+          { eapply preord_env_P_inj_set_l; [| eassumption | eassumption ].
+            eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
+            2:{ eapply interpret_ctx_eq_env_P. eassumption. sets. }
+            eapply preord_env_P_inj_antimon.
+            eapply preord_env_P_inj_monotonic; [| eassumption ]. omega. normalize_occurs_free. sets. } 
+
           simpl in *; omega.
-          do 2 eexists. split. eapply interpret_ctx_bstep_r. eassumption. eassumption. 
-          split. admit. (* post *)
+          do 2 eexists. split. eapply interpret_ctx_bstep_r. eassumption. eassumption.
+
+          split. 
+          assert (Heq : c2 = cin1 + cin2 + S (Datatypes.length ys)).
+          { rewrite <- (NPeano.Nat.sub_add (S (Datatypes.length ys)) c2). rewrite H6. reflexivity.
+            eassumption. } rewrite Heq. 
+          now eapply Hless_steps_letapp'; eauto. 
           eapply preord_res_monotonic. eassumption. simpl in *; omega.
 
         * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H13 | ]; eauto.
@@ -3249,11 +3405,13 @@ Section Shrink_correct.
 
           eexists OOT, (c2' - 1). split; [| split ]. 
 
-          admit. (* lemma *)
-          admit. (* post *)
-          simpl; eauto. 
+          eapply bstep_fuel_OOT_monotonic. eapply eval_ctx_app_OOT_Ehalt. eassumption. eassumption. omega.
 
-        
+          replace c2 with (c2 - cost (Eletapp x f' t ys e1) + cost (Eletapp x f' t ys e1)) by (simpl in *; omega). 
+          now eapply Hless_steps_letapp_OOT'; eauto.
+          simpl; eauto. 
+  Qed.          
+  
   (* Letapp inlining *)
   Lemma rw_fun_letapp_corr x f fds t xs fb vs c rho1 rho2 k z z' C' e1 :
     find_def f fds = Some (t, xs, fb) ->

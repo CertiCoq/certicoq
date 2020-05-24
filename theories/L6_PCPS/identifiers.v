@@ -109,7 +109,6 @@ Proof.
   eassumption.
 Qed.
 
-
 (** Alternative definition of [name_in_fundefs] using set comprehension:  
    [names_in_fundefs b] = $\{ f ~|~ \exists ~xs ~tau ~e,~(f, ~xs, ~tau, ~e) \in B \}$ *)
 Lemma name_in_fundefs_big_cup_fun_in_fundefs B :
@@ -230,6 +229,17 @@ Proof.
     simpl. erewrite IHys; eauto. erewrite get_fundefs; eauto.
     intros Hc. eapply Hall; eauto. left; eauto.
     intros y Hin Hc. eapply Hall; eauto. right; eauto.
+Qed.
+
+Lemma eq_env_P_def_funs_not_in_P_r  B B' P rho rho1 rho2 :
+  eq_env_P P rho1 rho2 ->
+  Disjoint _ P (name_in_fundefs B) ->
+  eq_env_P P rho1 (def_funs B' B rho rho2).
+Proof.
+  intros Heq1 Hd x Hin.
+  specialize (Heq1 x Hin).
+  rewrite def_funs_neq.
+  auto. intro Hc. eapply Hd; eauto.
 Qed.
 
 (** Extend the environment with a block of functions and put them in the set *)
@@ -4657,6 +4667,26 @@ Proof.
   split; intros x H; inv H.
 Qed.
 
+Lemma not_occurs_not_free:
+  forall v, (forall e, num_occur e v 0 -> ~ occurs_free e v ) /\
+            (forall f, num_occur_fds f v 0 -> ~ occurs_free_fundefs f v ).
+Proof.
+  intro v.
+  exp_defs_induction IHe IHl IHB; intros Hnum Hc; try (inv Hc; inv Hnum; pi0);
+  try (match goal with 
+       | [H : context[var_dec ?X ?Y] |- _] => destruct (var_dec X Y); inv H; pi0
+       end);
+    (try now eapply not_occur_list_not_in; eauto);
+    (try now eapply IHe; eauto).
+  - inv H2; eauto. pi0. eapply IHe; eauto.
+  - inv H2. pi0. eapply IHl; eauto.
+    replace 0 with (num_occur_list [v0] v + 0).
+    now constructor.
+    simpl. destruct (cps_util.var_dec v v0). exfalso; auto. auto.
+  - inv H5; eauto. eapply not_occur_list_not_in; eauto.
+  - eapply IHB; eauto.
+  - eapply IHB; eauto.
+Qed.
 
 Ltac normalize_occurs_free_ctx :=
   match goal with

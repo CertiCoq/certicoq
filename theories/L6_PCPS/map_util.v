@@ -7,6 +7,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          Classes.Morphisms.
 From CertiCoq.L6 Require Import Ensembles_util set_util functions List_util.
 From compcert.lib Require Import Coqlib Maps.
+Require Import Libraries.maps_util.
 
 Module M := Maps.PTree. 
 
@@ -547,3 +548,27 @@ Proof with now eauto with Ensembles_DB.
     erewrite <- IHxs; eauto.
     now eauto with Ensembles_DB.
 Qed.
+
+
+Lemma proper_get_list: forall A rho rho',
+    map_get_r A rho rho' ->
+    forall vs, get_list vs rho = get_list vs rho'.
+Proof.
+  intros A rho rho' Hp.
+  induction vs; auto.
+  simpl. rewrite IHvs. rewrite Hp. reflexivity.
+Qed.
+
+
+Lemma eq_env_P_set_not_in_P_l (A : Type) (x : map_util.M.elt) (v : A)
+      (P : Ensemble map_util.M.elt) (rho1 rho2 : map_util.M.t A) : 
+  eq_env_P P rho1 rho2 ->
+  ~ x \in P ->
+          eq_env_P P (map_util.M.set x v rho1) rho2.
+Proof.
+  intros Heq Hnin z Hin.
+  rewrite M.gso; eauto.
+  intros Hc; subst; contradiction. 
+Qed.
+
+

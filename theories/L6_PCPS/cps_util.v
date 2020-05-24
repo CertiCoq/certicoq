@@ -207,6 +207,26 @@ Proof.
   - eexists; split; eauto using split_fds_nil_l.
 Qed.
 
+Theorem split_fds_nil:
+  (forall fds fds',
+      split_fds Fnil fds fds' -> fds = fds') /\
+  (forall fds fds',
+      split_fds fds Fnil fds' -> fds = fds').
+Proof.
+  split; induction fds; intros; inversion H; subst.
+  erewrite IHfds; eauto.
+  reflexivity.
+  erewrite IHfds; eauto.
+  reflexivity.
+Qed.
+
+Lemma split_fds_to_nil f1 f2:
+  split_fds f1 f2 Fnil -> f1 = Fnil /\ f2 = Fnil.
+Proof.
+  intros H; destruct f1; destruct f2; inversion H. auto.
+Qed.
+
+
 Lemma split_fds_sym B1 B2 B3 :
   split_fds B1 B2 B3 ->
   split_fds B2 B1 B3.
@@ -333,6 +353,15 @@ Proof.
   - inv Hspl.
 Qed.
 
+
+Lemma fundefs_append_assoc: forall F1 F2 F3,
+    fundefs_append F1 (fundefs_append F2 F3) =
+    fundefs_append (fundefs_append F1 F2) F3.
+Proof.
+  induction F1; intros.
+  - simpl. rewrite IHF1. auto.
+  - simpl. reflexivity.
+Qed.
 
 
 
@@ -1028,6 +1057,26 @@ Proof.
     auto.
     apply IHf.
     eexists; eexists; eauto.
+Qed.
+
+Lemma not_occur_list_not_in:
+  forall v l, num_occur_list l v = 0 <-> ~ List.In  v l.
+Proof.
+  induction l; split; intros.
+  - intro. inversion H0.
+  - auto.
+  - intro. inversion H0.
+    + subst. simpl in H.
+      unfold cps_util.var_dec in *.
+      destruct (M.elt_eq v v).
+      inversion H. apply n; auto.
+    + inversion H.
+      apply IHl. destruct (cps_util.var_dec v a).
+      inversion H3. auto. auto.
+  - simpl.
+    destruct (cps_util.var_dec v a).
+    exfalso. apply H. constructor. auto.
+    apply IHl. intro. apply H. constructor 2. auto.
 Qed.
 
 Theorem num_occur_app_ctx:

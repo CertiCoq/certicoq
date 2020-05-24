@@ -5,16 +5,16 @@ Import ListNotations.
 Require Import Coq.Strings.String.
 From CertiCoq.Common Require Import AstCommon exceptionMonad.
 From CertiCoq Require Import L6.cps L6.List_util L6.size_cps L6.ctx L6.cps_util L6.set_util L6.map_util
-     L6.identifiers L6.tactics.
+     L6.identifiers L6.tactics L6.Ensembles_util.
 Require Import compcert.lib.Coqlib.
 
 
 
 (** An [env]ironment maps [var]s to their [val]ues *)
-Definition env := M.t val. 
+Definition env := M.t val.
 
 (** A pair of an environment and an expression. The small step semantics is a transition system between this state *)
-Definition state := (env * exp)%type. 
+Definition state := (env * exp)%type.
 
 (** Primitive functions map. *)
 Definition prims := M.t (list val -> option val).
@@ -22,7 +22,7 @@ Definition prims := M.t (list val -> option val).
 Section EVAL.
 
   Variable (pr : prims).
-  
+
   Variable (cenv : ctor_env).
 
   (** Big step semantics with cost counting *)
@@ -39,7 +39,7 @@ Section EVAL.
              (rho : env) (x : var) (n : N) (y : var)
              (e : exp) (ov : val) (c : nat),
         M.get y rho = Some (Vconstr t vs) ->
-        nthN vs n = Some v -> 
+        nthN vs n = Some v ->
         bstep_e (M.set x v rho) e ov c ->
         bstep_e rho (Eproj x t n y e) ov c (* force equality on [t] *)
   | BStep_case :
@@ -51,7 +51,7 @@ Section EVAL.
         bstep_e rho e v c ->
         bstep_e rho (Ecase y cl) v c
   | BStep_app :
-      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val) 
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
              (xs : list var) (e : exp) (rho'' rho : env) (f : var)
              (t : ctor_tag) (ys : list var) (v : val) (c : nat),
         M.get f rho = Some (Vfun rho' fl f') ->
@@ -78,7 +78,7 @@ Section EVAL.
         bstep_e (def_funs fl fl rho rho) e v c ->
         bstep_e rho (Efun fl e) v c
   | BStep_prim :
-      forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
+      forall (vs : list val) (rho' rho : env) (x : var) (f : prim)
              (f' : list val -> option val) (ys : list var) (e : exp)
              (v v' : val) (c : nat),
         get_list ys rho = Some vs ->
@@ -135,7 +135,7 @@ Section EVAL.
         match M.get y rho with
           | Some (Vconstr t vs) =>
             do e <- l_opt (findtag cl t) ("Case: branch not found");
-              if caseConsistent_f cenv cl t then 
+              if caseConsistent_f cenv cl t then
                 Ret (rho, e)
                else     (exceptionMonad.Exc "Case: consistency failure")
           | Some _ =>  (exceptionMonad.Exc "Case: arg is not a constructor")
@@ -148,7 +148,7 @@ Section EVAL.
                (match  find_def f' fl with
                 | Some (t', xs ,e_body) =>
                   if (Pos.eqb t t') then
-                  do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");   
+                  do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");
                     Ret (rho'', e)
                   else (exceptionMonad.Exc "Fun: tag check failed")
               | _ => (exceptionMonad.Exc "Fun: function not found in bundle")
@@ -164,7 +164,7 @@ Section EVAL.
            (match  find_def f' fl with
               | Some (t', xs ,e) =>
                 if (Pos.eqb t t') then
-                  do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");   
+                  do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");
                   Ret (rho'', e)
                 else (exceptionMonad.Exc "Fun: tag check failed")
               | _ => (exceptionMonad.Exc "Fun: function not found in bundle")
@@ -223,7 +223,7 @@ Section EVAL.
              (match  find_def f' fl with
               | Some (t', xs ,e_body) =>
                 if (Pos.eqb t t') then
-                  do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");   
+                  do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");
                   do v <- bstep_f rho'' e_body n';
                   match v with
                   | inl st => Ret (inl st)
@@ -241,7 +241,7 @@ Section EVAL.
              (match  find_def f' fl with
               | Some (t', xs ,e) =>
                 if (Pos.eqb t t') then
-                  do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");   
+                  do rho'' <- l_opt (set_lists xs vs (def_funs fl fl rho' rho')) ("Fun: set_lists failed");
                   bstep_f rho'' e n'
                 else (exceptionMonad.Exc "Fun: tag check failed")
               | _ => (exceptionMonad.Exc "Fun: function not found in bundle")
@@ -252,7 +252,7 @@ Section EVAL.
     end.
 
   Theorem bstep_f_sound:
-    forall n rho e v, 
+    forall n rho e v,
       bstep_f rho e n = Ret (inr v) ->
       exists m, bstep_e rho e v m.
   Proof.
@@ -285,13 +285,13 @@ Section EVAL.
       apply Peqb_true_eq in ff1. subst.
       simpl in H.
       destruct (set_lists l1 l0 (def_funs f0 f0 t t)) eqn:ll0; [| inv H].
-      simpl in H. 
+      simpl in H.
       destruct (bstep_f t0 e0 n) as [ exc | [ oot | v' ] ] eqn:Heval; simpl.
       + simpl in H. congruence.
       + simpl in H. congruence.
-      + simpl in H.  
+      + simpl in H.
         apply IHn in H. inv H.
-        apply IHn in Heval. inv Heval.        
+        apply IHn in Heval. inv Heval.
         eexists. eapply BStep_letapp; try eassumption.
     - apply IHn in H. inv H.
       exists x.
@@ -303,15 +303,15 @@ Section EVAL.
       destruct (find_def v1 f0) eqn:gv1f0; [| inv H].
       destruct p. destruct p.
       destruct (f =? f1)%positive eqn:ff1; [| inv H].
-      apply Peqb_true_eq in ff1. subst. simpl in *. 
-      destruct (set_lists l1 l0 (def_funs f0 f0 t t)) eqn:ll0; [| inv H]. 
+      apply Peqb_true_eq in ff1. subst. simpl in *.
+      destruct (set_lists l1 l0 (def_funs f0 f0 t t)) eqn:ll0; [| inv H].
       simpl in H.
       apply IHn in H. inv H. exists (x+1)%nat.
       econstructor; eauto.
     - destruct (get_list l rho) eqn:glr; [| inv H].
       destruct (M.get p pr) eqn:ppr; [| inv H].
       destruct (o l0) eqn:ol0; [| inv H].
-      simpl in H. rewrite ol0 in H. simpl in H. 
+      simpl in H. rewrite ol0 in H. simpl in H.
       apply IHn in H. inv H. exists x.
       econstructor; eauto.
       rewrite ol0 in H1. simpl in H1. inv H1.
@@ -334,13 +334,13 @@ Section EVAL.
         bstep_cost rho' e v c ->
         bstep_cost rho (Econstr x t ys e) v (c + 1 + (List.length ys))
   | BStepc_proj :
-      forall (t : ctor_tag) (vs : list val) 
+      forall (t : ctor_tag) (vs : list val)
              (rho : env) (x : var) (n : N) (y : var)
              (e : exp) (v v': val) (c : nat),
         M.get y rho = Some (Vconstr t vs) ->
         (* The number of instructions generated here should be
          * independent of n. We just need to add an offset *)
-        nthN vs n = Some v -> 
+        nthN vs n = Some v ->
         bstep_cost (M.set x v rho) e v' c ->
         bstep_cost rho (Eproj x t n y e) v' (c + 1)
   | BStepc_case :
@@ -352,7 +352,7 @@ Section EVAL.
         bstep_cost rho e v c ->
         bstep_cost rho (Ecase y cl) v (c + n)
   | BStepc_app :
-      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val) 
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
              (xs : list var) (e : exp) (rho'' rho : env) (f : var)
              (t : ctor_tag) (ys : list var) (v : val) (c : nat),
         M.get f rho = Some (Vfun rho' fl f') ->
@@ -385,7 +385,7 @@ Section EVAL.
         (* TODO eventually remove the unit cost, it helps but it shouldn't be required *)
         bstep_cost rho (Efun B e) v (c + (1 + PS.cardinal (fundefs_fv B)))
   | BStepc_prim :
-      forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
+      forall (vs : list val) (rho' rho : env) (x : var) (f : prim)
              (f' : list val -> option val) (ys : list var) (e : exp)
              (v v' : val) (c : nat),
         get_list ys rho = Some vs ->
@@ -409,22 +409,22 @@ Section EVAL.
       inv H2; try congruence; eauto. eapply IHfind_tag_nth in H8.
     inv H8; eauto.
   Qed.
-  
 
-  (** Big step semantics with cost counting as fuel. Can raise out-of-time exception. 
+
+  (** Big step semantics with cost counting as fuel. Can raise out-of-time exception.
       Needed to prove divergence preservation *)
 
-  Inductive res {A} : Type := 
-  | OOT 
-  | Res : A -> res. 
+  Inductive res {A} : Type :=
+  | OOT
+  | Res : A -> res.
 
-  Definition cost (e : exp) : nat := 
-    match e with 
+  Definition cost (e : exp) : nat :=
+    match e with
     | Econstr x t ys e => 1 + length ys
     | Eproj x t n y e => 1
     | Ecase y cl => 1
     | Eapp f t ys => 1 + length ys
-    | Eletapp x f t ys e => 1 + length ys 
+    | Eletapp x f t ys e => 1 + length ys
     | Efun B e => 1 (* + PS.cardinal (fundefs_fv B) *)
     | Eprim x f ys e => 1 + length ys
     | Ehalt x => 1
@@ -432,18 +432,18 @@ Section EVAL.
 
   Inductive bstep :  env -> exp -> @res val -> nat -> Prop :=
   | BStept_constr :
-      forall (x : var) (t : ctor_tag) (ys :list var) (e : exp) 
+      forall (x : var) (t : ctor_tag) (ys :list var) (e : exp)
              (rho rho' : env) (vs : list val) (v : res) (cin : nat),
         get_list ys rho = Some vs ->
         M.set x (Vconstr t vs) rho = rho' ->
         bstep_fuel rho' e v cin ->
         bstep rho (Econstr x t ys e) v cin
   | BStept_proj :
-      forall (t : ctor_tag) (vs : list val) 
+      forall (t : ctor_tag) (vs : list val)
              (rho : env) (x : var) (n : N) (y : var)
              (e : exp) (v : val) (v' : res) (cin : nat),
         M.get y rho = Some (Vconstr t vs) ->
-        nthN vs n = Some v -> 
+        nthN vs n = Some v ->
         bstep_fuel (M.set x v rho) e v' cin ->
         bstep rho (Eproj x t n y e) v' cin
   | BStept_case :
@@ -455,7 +455,7 @@ Section EVAL.
         bstep_fuel rho e v cin ->
         bstep rho (Ecase y cl) v cin
   | BStept_app :
-      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val) 
+      forall (rho' : env) (fl : fundefs) (f' : var) (vs : list val)
              (xs : list var) (e : exp) (rho'' rho : env) (f : var)
              (t : ctor_tag) (ys : list var) (v : res) (cin : nat),
         M.get f rho = Some (Vfun rho' fl f') ->
@@ -497,7 +497,7 @@ Section EVAL.
         (to make the bound of the current cc independent of the term) *)
         bstep rho (Efun B e) v cin
   (* | BStept_prim :
-      forall (vs : list val) (rho' rho : env) (x : var) (f : prim) 
+      forall (vs : list val) (rho' rho : env) (x : var) (f : prim)
         (f' : list val -> option val) (ys : list var) (e : exp)
         (v : val) (v' : res) (cin : nat),
           get_list ys rho = Some vs ->
@@ -510,112 +510,123 @@ Section EVAL.
       forall x v rho,
         M.get x rho = Some v ->
         bstep rho (Ehalt x) (Res v) 0
-  with bstep_fuel :  env -> exp -> @res val -> nat -> Prop :=       
+  with bstep_fuel :  env -> exp -> @res val -> nat -> Prop :=
   | BStepf_OOT : (* not enought time units to take astep *)
-      forall rho e c, 
+      forall rho e c,
         (c < cost e)%nat ->
         bstep_fuel rho e OOT c
   | BStepf_run : (* take a step *)
-      forall rho e r cin, 
+      forall rho e r cin,
         (cin >= cost e)%nat ->
         bstep rho e r (cin - cost e) ->
         bstep_fuel rho e r cin.
-  
+
   Scheme bstep_ind' := Minimality for bstep Sort Prop
     with bstep_fuel_ind' := Minimality for bstep_fuel Sort Prop.
 
   Definition not_stuck (rho : env) (e : exp) :=
-    (exists c v, bstep_fuel rho e (Res v) c) \/  
+    (exists c v, bstep_fuel rho e (Res v) c) \/
     (forall c, bstep_fuel rho e OOT c).
 
+  Ltac destruct_bstep :=
+    match goal with
+    | [ H : bstep _ _ _ _ |- _ ] => inv H
+    end.
+
+  Lemma cost_gt_0 e : 
+    (0 < cost e)%nat.
+  Proof.  
+    destruct e; simpl; omega. 
+  Qed.
+
   (** * Lemmas about bstep_fuel *)
-  Lemma step_deterministic_aux rho e r v c r' v' c' : 
-    bstep rho e r c -> 
+  Lemma step_deterministic_aux rho e r v c r' v' c' :
+    bstep rho e r c ->
     bstep rho e r' c' ->
     r = Res v -> r' = Res v' ->
     v = v' /\ c = c'.
   Proof.
-    set (P := fun rho e r c =>   
-                forall v r' v' c', 
+    set (P := fun rho e r c =>
+                forall v r' v' c',
                   bstep rho e r' c' ->
                   r = Res v -> r' = Res v' ->
                   v = v' /\ c = c').
-    set (P0 := fun rho e r c =>   
-                 forall v r' v' c', 
+    set (P0 := fun rho e r c =>
+                 forall v r' v' c',
                    bstep_fuel rho e r' c' ->
                    r = Res v -> r' = Res v' ->
-                   v = v' /\ c = c').                
-    intros Hstep. 
+                   v = v' /\ c = c').
+    intros Hstep.
     revert v r' v' c'.
-    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; 
+    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *;
       intros v1 r2 v2 c2 Hstep2 Heq1 Heq2; subst;
         try now (inv Hstep2; repeat subst_exp; eapply IHHstep; eauto).
-    - inv Hstep2. repeat subst_exp. 
+    - inv Hstep2. repeat subst_exp.
       eapply find_tag_nth_deterministic in H1; [| eapply H8 ]. inv H1.
       eapply IHHstep; eauto.
     - inv Hstep2. repeat subst_exp. eapply IHHstep in H17; eauto. inv H17.
       eapply IHHstep0 in H18; eauto. inv H18. eauto.
-    - inv Hstep2. inv Heq1. repeat subst_exp. eauto.   
+    - inv Hstep2. inv Heq1. repeat subst_exp. eauto.
     - inv Heq1.
     - inv Hstep2. eapply IHHstep in H1; eauto. inv H1.
       split; eauto. omega.
-  Qed. 
+  Qed.
 
-  Lemma bstep_fuel_deterministic rho e v c v' c' : 
-    bstep_fuel rho e (Res v) c -> 
+  Lemma bstep_fuel_deterministic rho e v c v' c' :
+    bstep_fuel rho e (Res v) c ->
     bstep_fuel rho e (Res v') c' ->
-    v = v' /\ c = c'. 
+    v = v' /\ c = c'.
   Proof.
-    intros H1 H2; inv H1; inv H2; eauto. 
+    intros H1 H2; inv H1; inv H2; eauto.
     eapply step_deterministic_aux in H0; [ | eapply H3 | reflexivity | reflexivity ].
     inv H0. split; eauto. omega.
-  Qed.   
+  Qed.
 
-  Lemma bstep_deterministic rho e v c v' c' : 
-    bstep rho e (Res v) c -> 
+  Lemma bstep_deterministic rho e v c v' c' :
+    bstep rho e (Res v) c ->
     bstep rho e (Res v') c' ->
     v = v' /\ c = c'.
   Proof.
-    intros H1 H2. eapply step_deterministic_aux; eauto. 
+    intros H1 H2. eapply step_deterministic_aux; eauto.
   Qed.
-  
-  Lemma bstep_lt_OOT_aux rho e r c (v : val) c' : 
-    bstep rho e r c -> 
+
+  Lemma bstep_lt_OOT_aux rho e r c (v : val) c' :
+    bstep rho e r c ->
     r = Res v -> (c' < c)%nat ->
     bstep rho e OOT c'.
   Proof.
-    set (P := fun rho e r c =>   
-                forall (v : val) c', 
+    set (P := fun rho e r c =>
+                forall (v : val) c',
   		  r = Res v -> (c' < c)%nat ->
 		  bstep rho e OOT c').
-    set (P0 := fun rho e r c =>   
-                 forall (v : val) c', 
+    set (P0 := fun rho e r c =>
+                 forall (v : val) c',
   		   r = Res v -> (c' < c)%nat ->
 		   bstep_fuel rho e OOT c').
     intros Hstep. revert v c'.
-    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; 
+    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *;
       intros v1 c' Heq Hlt; subst; try now (econstructor; eauto).
     - edestruct (lt_dec c' cin1).
       + eapply BStept_letapp_oot; eauto.
       + replace c' with (cin1 + (c' - cin1))%nat by omega.
-        eapply BStept_letapp; eauto. 
+        eapply BStept_letapp; eauto.
         eapply IHHstep0. reflexivity. omega.
     - omega.
     - edestruct (lt_dec c' (cost e)).
       + econstructor 1; eauto.
       + econstructor 2; eauto. omega. eapply IHHstep; eauto. omega.
-  Qed. 
+  Qed.
 
-  Lemma bstep_lt_OOT rho e v c c' : 
-    bstep rho e (Res v) c -> 
+  Lemma bstep_lt_OOT rho e v c c' :
+    bstep rho e (Res v) c ->
     (c' < c)%nat ->
     bstep rho e OOT c'.
   Proof.
     intros; eapply bstep_lt_OOT_aux; eauto.
   Qed.
 
-  Lemma bstep_fuel_lt_OOT rho e v c c' : 
-    bstep_fuel rho e (Res v) c -> 
+  Lemma bstep_fuel_lt_OOT rho e v c c' :
+    bstep_fuel rho e (Res v) c ->
     (c' < c)%nat ->
     bstep_fuel rho e OOT c'.
   Proof.
@@ -626,72 +637,72 @@ Section EVAL.
       omega.
   Qed.
 
-  Lemma bstep_OOT_determistic_aux rho e (r r' : @res val) c c': 
+  Lemma bstep_OOT_determistic_aux rho e (r r' : @res val) c c':
     bstep rho e r c ->
-    r = OOT -> 
-    (c' <= c)%nat ->    
+    r = OOT ->
+    (c' <= c)%nat ->
     bstep rho e r' c' -> r' = OOT.
-  Proof. 
-    set (P := fun rho e (r : @res val) c =>   
-                forall r' c', 
-                  r = OOT -> 
-                  (c' <= c)%nat -> 
+  Proof.
+    set (P := fun rho e (r : @res val) c =>
+                forall r' c',
+                  r = OOT ->
+                  (c' <= c)%nat ->
                   bstep rho e r' c' -> r' = OOT).
-    set (P0 := fun rho e (r : @res val) c =>   
-                 forall r' c', 
-                   r = OOT -> 
-                   (c' <= c)%nat -> 
+    set (P0 := fun rho e (r : @res val) c =>
+                 forall r' c',
+                   r = OOT ->
+                   (c' <= c)%nat ->
                    bstep_fuel rho e r' c' -> r' = OOT).
-    intros Hstep. revert r' c'. 
-    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; 
+    intros Hstep. revert r' c'.
+    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *;
       intros c' r' Heq Hleq Hs'; subst; try now (inv Hs'; repeat subst_exp; eauto).
     - inv Hs'; repeat subst_exp. eapply find_tag_nth_deterministic in H8; [| clear H8; eauto ]. inv H8.
       eapply IHHstep; eauto.
-    - inv Hs'; repeat subst_exp; eauto. 
+    - inv Hs'; repeat subst_exp; eauto.
       eapply bstep_fuel_deterministic in H17; [| clear H17; eauto ]; inv H17.
       eapply IHHstep0; [| | eassumption ]; eauto. omega.
-    - inv Hs'; repeat subst_exp; eauto. exfalso. 
+    - inv Hs'; repeat subst_exp; eauto. exfalso.
       eapply IHHstep in H16; eauto. congruence. omega.
-    - inv Hs'; eauto. omega.  
+    - inv Hs'; eauto. omega.
     - inv Hs'; eauto. eapply IHHstep; [| | eassumption ]; eauto. omega.
   Qed.
 
-  Lemma bstep_OOT_determistic rho e c r' c': 
+  Lemma bstep_OOT_determistic rho e c r' c':
     bstep rho e OOT c ->
-    (c' <= c)%nat -> 
+    (c' <= c)%nat ->
     bstep rho e r' c' -> r' = OOT.
-  Proof. 
+  Proof.
     intros; eapply bstep_OOT_determistic_aux; [ | reflexivity | | ]; eauto.
   Qed.
 
-  Lemma bstep_fuel_OOT_determistic rho e c r' c': 
+  Lemma bstep_fuel_OOT_determistic rho e c r' c':
     bstep_fuel rho e OOT c ->
-    (c' <= c)%nat -> 
+    (c' <= c)%nat ->
     bstep_fuel rho e r' c' -> r' = OOT.
-  Proof. 
-    intros Hs Hleq Hs'; inv Hs'; inv Hs; eauto; try omega. 
-    eapply bstep_OOT_determistic; [ | | eapply H0 ]. eassumption. omega.    
+  Proof.
+    intros Hs Hleq Hs'; inv Hs'; inv Hs; eauto; try omega.
+    eapply bstep_OOT_determistic; [ | | eapply H0 ]. eassumption. omega.
   Qed.
 
-  Lemma bstep_gt_aux rho e r c (v : val) r' c' : 
-    bstep rho e r c -> 
+  Lemma bstep_gt_aux rho e r c (v : val) r' c' :
+    bstep rho e r c ->
     r = Res v -> (c < c')%nat ->
     ~ bstep rho e r' c'.
   Proof.
-    set (P := fun rho e r c =>   
+    set (P := fun rho e r c =>
                 forall (v : val) r' c',
                   r = Res v -> (c < c')%nat ->
                   ~ bstep rho e r' c').
-    set (P0 := fun rho e r c =>   
-                 forall (v : val) r' c', 
+    set (P0 := fun rho e r c =>
+                 forall (v : val) r' c',
                    r = Res v -> (c < c')%nat ->
-                   ~ bstep_fuel rho e r' c').             
-    intros Hstep. revert v r' c'. 
-    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; 
+                   ~ bstep_fuel rho e r' c').
+    intros Hstep. revert v r' c'.
+    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *;
       intros v1 r' c' Heq Hlt Hstep'; subst; (try now (inv Hstep'; repeat subst_exp; eauto));
         try now (inv Hstep'; repeat subst_exp; eauto; eapply IHHstep; eauto).
     - inv Hstep'; repeat subst_exp; eauto.
-      eapply find_tag_nth_deterministic in H8; [| clear H8; eauto ]. inv H8. 
+      eapply find_tag_nth_deterministic in H8; [| clear H8; eauto ]. inv H8.
       eapply IHHstep; eauto.
     - inv Hstep'; repeat subst_exp; eauto.
       + destruct (lt_dec cin1 cin0).
@@ -699,50 +710,50 @@ Section EVAL.
         * destruct (NPeano.Nat.eq_dec cin1 cin0). subst.
           -- eapply bstep_fuel_deterministic in H17; [| clear H17; eauto ]; inv H17; subst.
              eapply IHHstep0; [| | eassumption ]; eauto. omega.
-          -- eapply bstep_fuel_lt_OOT with (c' := cin0) in H3; [| omega ]. 
+          -- eapply bstep_fuel_lt_OOT with (c' := cin0) in H3; [| omega ].
              eapply bstep_fuel_OOT_determistic in H17; eauto. congruence.
       + eapply bstep_fuel_OOT_determistic in H3; eauto. congruence. omega.
     - inv Hstep'. omega. eapply IHHstep; [ | | eassumption ]; eauto. omega.
   Qed.
 
-  Lemma bstep_gt rho e r c v c' : 
-    bstep rho e (Res v) c -> 
+  Lemma bstep_gt rho e r c v c' :
+    bstep rho e (Res v) c ->
     (c < c')%nat ->
     ~ bstep rho e r c'.
   Proof.
     intros; eapply bstep_gt_aux; eauto.
-  Qed. 
+  Qed.
 
-  Lemma bstep_fuel_gt rho e r c v c' : 
-    bstep_fuel rho e (Res v) c -> 
+  Lemma bstep_fuel_gt rho e r c v c' :
+    bstep_fuel rho e (Res v) c ->
     (c < c')%nat ->
     ~ bstep_fuel rho e r c'.
   Proof.
     intros Hstep Hlt Hstep'.
     inv Hstep; inv Hstep'; try omega. eapply bstep_gt; [| | eassumption ]; eauto. omega.
-  Qed. 
+  Qed.
 
-  Lemma bstep_OOT_monotonic_aux rho e r c c': 
+  Lemma bstep_OOT_monotonic_aux rho e r c c':
     bstep rho e r c ->
-    r = OOT -> 
-    (c' <= c)%nat -> 
+    r = OOT ->
+    (c' <= c)%nat ->
     bstep rho e OOT c'.
-  Proof. 
-    set (P := fun rho e (r : @res val) c =>   
-                forall c', 
-                  r = OOT -> 
-                  (c' <= c)%nat -> 
+  Proof.
+    set (P := fun rho e (r : @res val) c =>
+                forall c',
+                  r = OOT ->
+                  (c' <= c)%nat ->
                   bstep rho e OOT c').
-    set (P0 := fun rho e (r : @res val) c =>   
-                 forall c', 
-                   r = OOT -> 
-                   (c' <= c)%nat -> 
+    set (P0 := fun rho e (r : @res val) c =>
+                 forall c',
+                   r = OOT ->
+                   (c' <= c)%nat ->
                    bstep_fuel rho e OOT c').
-    intros Hstep. revert c'. 
-    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; 
+    intros Hstep. revert c'.
+    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *;
       intros c' Heq Hleq; subst; try now (econstructor; eauto).
     - destruct (lt_dec c' cin1).
-      + eapply BStept_letapp_oot; eauto. 
+      + eapply BStept_letapp_oot; eauto.
         eapply bstep_fuel_lt_OOT; eassumption.
       + replace c' with (cin1 + (c' - cin1))%nat by omega.
         eapply BStept_letapp; eauto. eapply IHHstep0; eauto. omega.
@@ -750,73 +761,75 @@ Section EVAL.
     - econstructor 1. omega.
     - edestruct (lt_dec c' (cost e)).
       + econstructor 1; eauto.
-      + econstructor 2; eauto. omega. 
+      + econstructor 2; eauto. omega.
         eapply IHHstep; eauto. omega.
-  Qed. 
+  Qed.
 
-  Lemma bstep_OOT_monotonic rho e c c': 
+  Lemma bstep_OOT_monotonic rho e c c':
     bstep rho e OOT c ->
-    (c' <= c)%nat -> 
+    (c' <= c)%nat ->
     bstep rho e OOT c'.
-  Proof. 
+  Proof.
     intros; eapply bstep_OOT_monotonic_aux; eauto.
   Qed.
 
-  Lemma bstep_fuel_OOT_monotonic rho e c c': 
+  Lemma bstep_fuel_OOT_monotonic rho e c c':
     bstep_fuel rho e OOT c ->
-    (c' <= c)%nat -> 
+    (c' <= c)%nat ->
     bstep_fuel rho e OOT c'.
-  Proof. 
+  Proof.
     intros H1 Hlt.
     edestruct (lt_dec c' (cost e)).
     + econstructor 1; eauto.
-    + inv H1. omega. 
+    + inv H1. omega.
       econstructor 2; eauto. omega. eapply bstep_OOT_monotonic; eauto.
       omega.
   Qed.
 
-  Lemma bstep_deterministic_res rho e r c r' : 
-    bstep rho e r c -> 
+  Lemma bstep_deterministic_res rho e r c r' :
+    bstep rho e r c ->
     bstep rho e r' c ->
     r = r'.
   Proof.
-    set (P := fun rho e r c =>   
-                forall r', 
+    set (P := fun rho e r c =>
+                forall r',
                   bstep rho e r' c ->
                   r = r').
-    set (P0 := fun rho e r c =>   
-                 forall r', 
+    set (P0 := fun rho e r c =>
+                 forall r',
                    bstep_fuel rho e r' c ->
-                   r = r').                
-    intros Hstep. 
+                   r = r').
+    intros Hstep.
     revert r'.
     induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; intros r' Hstep';
       try now (inv Hstep'; repeat subst_exp; eapply IHHstep; eauto).
-    - inv Hstep'. repeat subst_exp. 
+    - inv Hstep'. repeat subst_exp.
       eapply find_tag_nth_deterministic in H1; [| eapply H8 ]. inv H1.
       eapply IHHstep; eauto.
-    - inv Hstep'; repeat subst_exp. 
+    - inv Hstep'; repeat subst_exp.
       + eapply bstep_fuel_deterministic in H17; [| clear H17; eauto ]. inv H17; subst. repeat subst_exp.
         assert (cin3 = cin2) by omega. eapply IHHstep0; eauto. subst. eassumption.
       + eapply bstep_fuel_OOT_monotonic with (c' := cin1) in H17; [| omega ].
         eapply IHHstep in H17. congruence.
-    - inv Hstep'; repeat subst_exp; eauto. 
+    - inv Hstep'; repeat subst_exp; eauto.
       + eapply bstep_fuel_OOT_determistic in H16. congruence. eassumption. omega.
     - inv Hstep'. repeat subst_exp; eauto.
     - inv Hstep'; try omega; eauto.
     - inv Hstep'; try omega; eauto.
-  Qed. 
+  Qed.
 
-  Lemma bstep_fuel_deterministic_res rho e r c r' : 
-    bstep_fuel rho e r c -> 
+  Lemma bstep_fuel_deterministic_res rho e r c r' :
+    bstep_fuel rho e r c ->
     bstep_fuel rho e r' c ->
     r = r'.
   Proof.
     intros H1 H2. inv H1; inv H2; try eauto; try omega. eapply bstep_deterministic_res; eauto.
-  Qed. 
+  Qed.
 
-  Definition diverge (rho : env) (e: exp) : Prop := 
-    forall c, bstep_fuel rho e OOT c. 
+  
+  
+  Definition diverge (rho : env) (e: exp) : Prop :=
+    forall c, bstep_fuel rho e OOT c.
 
   (** * Interpretation of (certain) evaluation contexts as environments *)
 
@@ -837,7 +850,7 @@ Section EVAL.
         ctx_to_rho (Econstr_c x t ys C) rho rho'
   | Efun_c_to_rho :
       forall rho rho' C B,
-        ctx_to_rho C (def_funs B B rho rho) rho' ->                
+        ctx_to_rho C (def_funs B B rho rho) rho' ->
         ctx_to_rho (Efun1_c B C) rho rho'.
 
 
@@ -884,7 +897,7 @@ Section EVAL.
     revert C2 rho1 rho2 rho3.
     induction C1; intros C2 rho1 rho2 rho3 Hctx1 GHctx2; inv Hctx1.
     - eassumption.
-    - simpl; econstructor; eauto. 
+    - simpl; econstructor; eauto.
     - simpl; econstructor; eauto.
     - simpl; econstructor; eauto.
   Qed.
@@ -893,30 +906,30 @@ Section EVAL.
 
   Fixpoint interprable (C : exp_ctx) : bool :=
     match C with
-    | Hole_c => true 
+    | Hole_c => true
     | Econstr_c _ _ _ C
     | Eproj_c _ _ _ _ C
     | Eprim_c _ _ _ C
     | Efun1_c _ C
     | Eletapp_c _ _ _ _ C => interprable C
-    | Ecase_c _ _ _ _ _ 
+    | Ecase_c _ _ _ _ _
     | Efun2_c _ _ => false
-    end.      
+    end.
 
 
-  Definition cost_ctx (c : exp_ctx) : nat := 
-    match c with 
+  Definition cost_ctx (c : exp_ctx) : nat :=
+    match c with
     | Econstr_c x t ys c => 1 + length ys
     | Eproj_c x t n y c => 1
     | Ecase_c _ _ _ _ _ => 1
-    | Eletapp_c x f t ys c => 1 + length ys 
+    | Eletapp_c x f t ys c => 1 + length ys
     | Efun1_c B c => 1
     | Efun2_c _ _ => 1
     | Eprim_c x f ys c => 1 + length ys
     | Ehole_c => 0
     end.
 
-  
+
   Inductive interpret_ctx : exp_ctx -> env -> @res env -> nat -> Prop :=
   | Hole_c_i :
       forall rho,
@@ -934,7 +947,7 @@ Section EVAL.
         interpret_ctx (Econstr_c x t ys C) rho r n
   | Efun_c_i :
       forall rho r C B n,
-        interpret_ctx_fuel C (def_funs B B rho rho) r n ->  
+        interpret_ctx_fuel C (def_funs B B rho rho) r n ->
         interpret_ctx (Efun1_c B C) rho r n
   | Eletapp_c_i :
       forall rho fl rhoc rhoc' f' vs xs e_body c x f t ys v r n1 n2,
@@ -943,7 +956,7 @@ Section EVAL.
         find_def f' fl = Some (t, xs, e_body) ->
         set_lists xs vs (def_funs fl fl rhoc rhoc) = Some rhoc' ->
         bstep_fuel rhoc' e_body (Res v) n1 ->
-        interpret_ctx_fuel c (M.set x v rho) r n2 ->  
+        interpret_ctx_fuel c (M.set x v rho) r n2 ->
         interpret_ctx (Eletapp_c x f t ys c) rho r (n1 + n2)
   | Eletapp_c_i_OOT :
       forall rho fl rhoc rhoc' f' vs xs e_body c x f t ys n,
@@ -962,16 +975,16 @@ Section EVAL.
       forall c rho r n,
         (cost_ctx c <= n)%nat ->
         interpret_ctx c rho r (n - cost_ctx c) ->
-        interpret_ctx_fuel c rho r n.                                                         
+        interpret_ctx_fuel c rho r n.
 
 
   (* Lemma cost_ctx_exp C e : *)
   (*   cost_ctx C <= cost (C |[ e ]|). *)
   (* Proof. *)
   (*   induction C; try reflexivity.  simpl; eauto.  *)
-  
+
   (** * Lemmas about [interpret_ctx] *)
-  
+
   Lemma interpret_ctx_bstep_l C e rho v n:
     bstep_fuel rho (C|[ e ]|) (Res v) n ->
     interprable C = true ->
@@ -982,32 +995,32 @@ Section EVAL.
   Proof.
     revert e rho v n; induction C; intros e1 rho v1 c1 Hb Hi; try now inv Hi.
     - simpl in Hb. exists rho, 0%nat, c1. split; [| split; eauto ].
-      omega. constructor. simpl. omega. constructor. 
-    - simpl in Hb, Hi. inv Hb. inv H0. 
-      edestruct IHC as (rho' & n1 & n2 & Hadd & Hi' & Hstep); [ eassumption | eassumption | ]. 
-      simpl in Hadd. 
-      eexists. exists (n1 + cost_ctx (Econstr_c v c l C))%nat. eexists. split; [| split; eauto ].  
+      omega. constructor. simpl. omega. constructor.
+    - simpl in Hb, Hi. inv Hb. inv H0.
+      edestruct IHC as (rho' & n1 & n2 & Hadd & Hi' & Hstep); [ eassumption | eassumption | ].
+      simpl in Hadd.
+      eexists. exists (n1 + cost_ctx (Econstr_c v c l C))%nat. eexists. split; [| split; eauto ].
       2:{ econstructor; eauto. omega. econstructor; eauto. rewrite Nat.add_sub. eassumption. }
-      simpl in *. omega. 
-    - simpl in Hb, Hi. inv Hb. inv H0. 
-      edestruct IHC as (rho' & n1 & n2 & Hadd & Hi' & Hstep); [ eassumption | eassumption | ]. 
-      simpl in Hadd. 
-      eexists. exists (n1 + cost_ctx (Eproj_c v c n v0 C))%nat. eexists. split; [| split; eauto ].  
+      simpl in *. omega.
+    - simpl in Hb, Hi. inv Hb. inv H0.
+      edestruct IHC as (rho' & n1 & n2 & Hadd & Hi' & Hstep); [ eassumption | eassumption | ].
+      simpl in Hadd.
+      eexists. exists (n1 + cost_ctx (Eproj_c v c n v0 C))%nat. eexists. split; [| split; eauto ].
       2:{ econstructor; eauto. omega. econstructor; eauto. rewrite Nat.add_sub. eassumption. }
-      simpl in *. omega. 
-    - simpl in Hb, Hi. inv Hb. inv H0. 
-    - simpl in Hb, Hi. inv Hb. inv H0. 
-      edestruct IHC as (rho1 & n1 & n2 & Hadd & Hi' & Hstep); [ eassumption | eassumption | ]. 
-      simpl in Hadd. 
+      simpl in *. omega.
+    - simpl in Hb, Hi. inv Hb. inv H0.
+    - simpl in Hb, Hi. inv Hb. inv H0.
+      edestruct IHC as (rho1 & n1 & n2 & Hadd & Hi' & Hstep); [ eassumption | eassumption | ].
+      simpl in Hadd.
       eexists. exists (cin1 + n1 + cost_ctx (Eletapp_c v v0 f l C))%nat.
-      eexists. split; [| split; eauto ]. simpl in *; omega. 
+      eexists. split; [| split; eauto ]. simpl in *; omega.
       econstructor; eauto. omega. rewrite Nat.add_sub. econstructor; eauto.
-    - simpl in Hb, Hi. inv Hb. inv H0. 
-      edestruct IHC as (rho' & n1 & n2 & Hadd & Hi' & Hstep); [ eassumption | eassumption | ]. 
-      simpl in Hadd. 
-      eexists. exists (n1 + cost_ctx (Efun1_c f C))%nat. eexists. split; [| split; eauto ].  
+    - simpl in Hb, Hi. inv Hb. inv H0.
+      edestruct IHC as (rho' & n1 & n2 & Hadd & Hi' & Hstep); [ eassumption | eassumption | ].
+      simpl in Hadd.
+      eexists. exists (n1 + cost_ctx (Efun1_c f C))%nat. eexists. split; [| split; eauto ].
       2:{ econstructor; eauto. omega. econstructor; eauto. rewrite Nat.add_sub. eassumption. }
-      simpl in *. omega. 
+      simpl in *. omega.
   Qed.
 
   Lemma interpret_ctx_bstep_r C e rho rho' r n1 n2:
@@ -1022,8 +1035,8 @@ Section EVAL.
              rewrite NPeano.Nat.add_sub_swap; [| simpl in *; omega ];
              eapply IHC; eauto ]).
     - inv Hi. inv H0. simpl in *.
-      replace n1 with 0%nat by omega. simpl. eassumption. 
-    - inv Hi; inv H0. econstructor. simpl in *; omega. simpl.  
+      replace n1 with 0%nat by omega. simpl. eassumption.
+    - inv Hi; inv H0. econstructor. simpl in *; omega. simpl.
       rewrite NPeano.Nat.add_sub_swap; [| simpl in *; omega ]. rewrite <- H6, <- plus_assoc.
       econstructor; eauto.
   Qed.
@@ -1035,38 +1048,38 @@ Section EVAL.
     revert e rho n; induction C; intros e1 rho n1 Hi; (try now inv Hi);
       try now (inv Hi; [ constructor 1; simpl in *; omega |
                          inv H0; simpl; constructor 2; [ simpl in *; omega | econstructor; eauto ]]).
-    
-    - inv Hi. constructor 1; simpl in *; omega. 
+
+    - inv Hi. constructor 1; simpl in *; omega.
       inv H0.
-    - inv Hi; [ constructor 1; simpl in *; omega | ]. inv H0. 
+    - inv Hi; [ constructor 1; simpl in *; omega | ]. inv H0.
       + econstructor 2; eauto. simpl. rewrite <- H6.
         econstructor; eauto.
       + econstructor 2; eauto. simpl.
-        econstructor; eauto.        
+        econstructor; eauto.
     - inv Hi. constructor 1; simpl in *; omega.
-      inv H0. 
+      inv H0.
     - inv Hi; [ constructor 1; simpl in *; omega | ].
       inv H0.
-  Qed. 
+  Qed.
 
   Lemma interprable_comp_f_l C1 C2:
-    interprable C1 = true -> interprable C2 = true -> 
-    interprable (comp_ctx_f C1 C2) = true. 
-  Proof. 
+    interprable C1 = true -> interprable C2 = true ->
+    interprable (comp_ctx_f C1 C2) = true.
+  Proof.
     induction C1; intros H1 H2; simpl in *; eauto.
   Qed.
 
   Lemma interprable_comp_f_r C1 C2:
     interprable (comp_ctx_f C1 C2) = true ->
-    interprable C1 = true /\ interprable C2 = true.      
-  Proof. 
+    interprable C1 = true /\ interprable C2 = true.
+  Proof.
     induction C1; intros H1; simpl in *; eauto.
     congruence. congruence.
   Qed.
 
   Lemma interprable_inline_letapp e x C z :
     inline_letapp e x = Some (C, z) ->
-    interprable C = true. 
+    interprable C = true.
   Proof.
     revert x C z; induction e; intros x C z Hin; simpl in *;
       try match goal with
@@ -1074,14 +1087,79 @@ Section EVAL.
             destruct (inline_letapp E X) as [ [C' z'] |] eqn:Hin'; inv Hin; simpl; eauto
           end.
     now inv Hin. inv Hin. reflexivity. inv Hin. reflexivity.
-  Qed.     
-  
+  Qed.
+
+  Lemma eval_ctx_app_OOT_Ehalt rho C e n x :
+    bstep_fuel rho (C |[ Ehalt x ]|) OOT n ->
+    interprable C = true ->
+    bstep_fuel rho (C |[ e ]|) OOT n.
+  Proof.       
+    revert rho e n.
+    induction C; intros rho e1 cin Hs Hi; eauto;
+      try congruence;
+      try now (inv Hs; [ constructor 1; simpl in *; omega |
+                         destruct_bstep; constructor 2; [ simpl in *; omega | econstructor; eauto ] ]).
+    - inv Hs; eauto.
+      constructor 1. simpl in *.
+      eapply le_trans; [| eapply cost_gt_0 ]. omega.
+      destruct_bstep.
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+      * constructor 2; [ simpl in *; omega | ].
+        simpl. rewrite <- H6. econstructor; eauto. 
+      * constructor 2; [ simpl in *; omega | ].
+        econstructor; eauto.
+
+        Unshelve. exact 0%nat.
+  Qed. 
+
+  Lemma eval_ctx_app_OOT_Eapp rho C e n x f t xs :
+    bstep_fuel rho (C |[ Eapp f t xs ]|) OOT n ->
+    interprable C = true ->
+    bstep_fuel rho (C |[ Eletapp x f t xs e ]|) OOT n.
+  Proof.       
+    revert rho e n.
+    induction C; intros rho e1 cin Hs Hi; eauto;
+      try congruence;
+      try now (inv Hs; [ constructor 1; simpl in *; omega |
+                destruct_bstep; constructor 2; [ simpl in *; omega | econstructor; eauto ] ]).
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+      * constructor 2; [ simpl in *; omega | ].
+        simpl. rewrite <- H6. econstructor; eauto. 
+      * constructor 2; [ simpl in *; omega | ].
+        econstructor; eauto.
+
+        Unshelve. exact 0%nat.                
+  Qed. 
+
+  Lemma eval_ctx_app_OOT_Eprim rho C x p xs e1 e2 n :
+    bstep_fuel rho (C |[ Eprim x p xs e1  ]|) OOT n ->
+    interprable C = true ->
+    bstep_fuel rho (C |[ Eprim x p xs e2]|) OOT n.
+  Proof.       
+    revert rho n.
+    induction C; intros rho cin Hs Hi; eauto;
+      try congruence;
+      try now (inv Hs; [ constructor 1; simpl in *; omega |
+                         destruct_bstep; constructor 2; [ simpl in *; omega | econstructor; eauto ] ]).
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+    - inv Hs; [ constructor 1; simpl in *; omega | destruct_bstep ].
+      * constructor 2; [ simpl in *; omega | ].
+        simpl. rewrite <- H6. econstructor; eauto. 
+      * constructor 2; [ simpl in *; omega | ].
+        econstructor; eauto.
+
+        Unshelve. exact 0%nat.
+  Qed.
+
   Lemma bstep_cost_deterministic e rho v1 v2 c1 c2 :
     bstep_cost rho e v1 c1 ->
     bstep_cost rho e v2 c2 ->
     v1 = v2 /\ c1 = c2.
   Proof.
-    intros Heval1 Heval2. 
+    intros Heval1 Heval2.
     revert v2 c2 Heval2; induction Heval1; intros v2 c2 Heval2;
       inv Heval2; repeat subst_exp; eauto;
         try now edestruct IHHeval1 as [Heq1 Heq2]; eauto.
@@ -1092,8 +1170,35 @@ Section EVAL.
       split; congruence.
   Qed.
 
-  
-  
+  Lemma interpret_ctx_eq_env_P S C rho rho' n :
+    interpret_ctx_fuel C rho (Res rho') n ->
+    Disjoint _ (bound_var_ctx C) S ->
+    eq_env_P S rho rho'.
+  Proof.
+    revert rho rho' n; induction C; intros rho rho' cost Hin Hd; inv Hin.
+    - inv H0. eapply eq_env_P_refl.
+    - inv H0. rewrite bound_var_Econstr_c in *.
+      eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
+      eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
+      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. sets.
+    - inv H0. rewrite bound_var_Eproj_c in *.
+      eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
+      eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
+      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. sets.
+    - inv H0.
+    - inv H0. rewrite bound_var_Eletapp_c in *.
+      eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
+      eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
+      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. sets.
+    - inv H0.
+    - inv H0. rewrite bound_var_Fun1_c in *.
+      eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
+      eapply eq_env_P_def_funs_not_in_P_r. eapply eq_env_P_refl.
+      eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs. sets.
+    - inv H0.
+  Qed.
+
+
 
   (** Small step semantics -- Relational definition *)
   (* Zoe : How to write small step for letapp? *)
@@ -1108,7 +1213,7 @@ Section EVAL.
   | Step_case: forall t vl e' rho y cl,
       M.get y rho = Some (Vconstr t vl) ->
       caseConsistent cenv cl t ->
-      findtag cl t = Some e' -> 
+      findtag cl t = Some e' ->
       step (rho, Ecase y cl) (rho, e')
   | Step_fun: forall rho fl e,
       step (rho, Efun fl e) (def_funs fl fl rho rho, e)
@@ -1138,7 +1243,7 @@ Section EVAL.
         M.get x rho = Some v ->
         halt_state (rho, Ehalt x) v.
 
-  
+
   Theorem bstep_step_corresp:
     forall n rho e v rho' e',
       step (rho, e) (rho', e') ->
@@ -1149,7 +1254,7 @@ Section EVAL.
     - inversion H0; subst. exists n.
       rewrite H2 in H9. inv H9; auto.
     - inv H0. rewrite H4 in H11. inv H11.
-      rewrite H12 in H6. inv H6. 
+      rewrite H12 in H6. inv H6.
       exists n; auto.
     - inv H0. rewrite H5 in H3. inv H3.
       rewrite H9 in H7; inv H7.
@@ -1173,7 +1278,7 @@ Section EVAL.
       exists n', bstep_e rho e v n'.
   Proof.
     intros. inversion H; subst; try solve [eexists; econstructor; eauto].
-  Qed.  
+  Qed.
 
   (** Correspondence of the two small step semantics definitions *)
   (*  Lemma sstep_f_complete:
@@ -1184,22 +1289,22 @@ Section EVAL.
     repeat match goal with
              | H: ?A = Some _ |- context [ l_opt ?A] => rewrite H; simpl; clear H
              | H: ?A= _ |- match ?A with _ => _ end = _ => rewrite H
-             | [ |- context [(?A =? ?A)%positive]] => rewrite Pos.eqb_refl 
+             | [ |- context [(?A =? ?A)%positive]] => rewrite Pos.eqb_refl
            end; auto.
     apply caseConsistent_c in H5. rewrite H5. auto.
-  Qed. 
+  Qed.
 
 
   Theorem sstep_f_sound:
-    forall (rho : env) (e : exp) (rho':env) (e':exp), sstep_f rho e = Ret (rho', e') -> step (rho,e) (rho', e').    
+    forall (rho : env) (e : exp) (rho':env) (e':exp), sstep_f rho e = Ret (rho', e') -> step (rho,e) (rho', e').
   Proof.
     intros rho e rho' e' H.
-    destruct e; simpl in H; 
-    repeat 
+    destruct e; simpl in H;
+    repeat
       match goal with
         | H: match ?A with _ => _ end = Ret _ |- _ => destruct A eqn:?; inv H
         | H: exceptionMonad.bind ?A _ = Ret _ |- _ => destruct A eqn:?; try (solve [inv H]); simpl in H
-        | H: l_opt ?A _ = Ret _ |- _ => destruct A eqn:?; try (solve [inv H]); simpl in H 
+        | H: l_opt ?A _ = Ret _ |- _ => destruct A eqn:?; try (solve [inv H]); simpl in H
         | H: Some _ = Some _ |- _ => inv H
         | H: Ret _ = Ret _ |- _ => inv H
         | H : (_ =? _)%positive = true |- _ => apply Peqb_true_eq in H; subst
@@ -1208,11 +1313,11 @@ Section EVAL.
     - apply caseConsistent_c in Heqb.
       econstructor; eauto.
     - inv H.
-  Qed. 
+  Qed.
 
-  
+
    *)
-  
+
   (** Reflexive transitive closure of the small-step relation *)
   Definition mstep : relation state := clos_refl_trans_1n state step.
 
@@ -1229,7 +1334,7 @@ Section EVAL.
 
     eapply IHHeval1_1 in H15. inv H15.
     eapply IHHeval1_2 in H16. inv H16.
-    split; congruence. 
+    split; congruence.
   Qed.
 
   Lemma step_deterministic:
@@ -1240,12 +1345,12 @@ Section EVAL.
     inversion H; inversion H0; subst;
       repeat match goal with
              | [ |- ?P = ?P] => reflexivity
-             | [H: ( Some _ = Some _ ) |- _ ] => inversion H; subst      
+             | [H: ( Some _ = Some _ ) |- _ ] => inversion H; subst
              | [H1: (?P = Some _), H2:(?P = Some _) |- _ ] => rewrite H1 in H2;
                                                                 inversion H2; subst
              | [H: ((?rho0, _) = (?rho, _)) |- _ ] => inversion H; subst
              end;
-      try now (repeat subst_exp; reflexivity). 
+      try now (repeat subst_exp; reflexivity).
   Qed.
 
   Lemma step_confluent :
@@ -1257,11 +1362,11 @@ Section EVAL.
     - intros z Hs.
       eexists. split. eassumption. now constructor.
     - intros s2 Hs2.
-      inv Hs2. 
+      inv Hs2.
       + eexists z. split; [ now constructor |].
         econstructor 2; eassumption.
       + assert (Heq : y = y0) by (eapply step_deterministic; eassumption).
-        subst. apply IHHs1.  eassumption. 
+        subst. apply IHHs1.  eassumption.
   Qed.
 
   (* proof of equivalence of small and big step semantics *)
@@ -1307,7 +1412,7 @@ Section EVAL.
     - inv H. exists 0%nat; simpl.
       constructor; auto.
     - apply IHclos_refl_trans_1n in H1.
-      destruct H1. 
+      destruct H1.
       destruct x; destruct y; simpl in *.
       eapply step_pre_bstep_corresp; eauto.
   Qed.
@@ -1323,13 +1428,20 @@ Section EVAL.
       (* apply bstep_then_mstep in H. do 3 (destruct H). *)
       (* exists (x0, Ehalt x1). split; auto. *)
       (* constructor; auto. *)
-  Abort.      
-  
+  Abort.
+
 End EVAL.
 
 
+
+Ltac destruct_bstep :=
+  match goal with
+  | [ H : bstep _ _ _ _ _ |- _ ] => inv H
+  end.
+
+
 (** The following are not used anywhere. They have to do either with "well-typedness"
- * or observable values. We need to go through them to decide if can can through them
+ * or observable values. We need to go through them to decide if can can throw them
  * away altogether. *)
 (* Inductive observable_val: val -> Prop := *)
 (* | obv_int : forall i, observable_val (Vint i) *)
@@ -1339,7 +1451,7 @@ End EVAL.
 (* Inductive obs_val: Type := *)
 (* | Obs : forall vs:list val, type -> Forall observable_val vs -> obs_val. *)
 
-(* if only consider ints and observers (i.e observable_val), syntactic 
+(* if only consider ints and observers (i.e observable_val), syntactic
      equality on val is the desired notion of equality. *)
 
 (* Definition val_proper: val -> Prop := observable_val.  *)
@@ -1412,7 +1524,7 @@ End EVAL.
 (*       end. *)
 
 
-(* small-step based equality on state *)    
+(* small-step based equality on state *)
 (* Definition valid_term_state (s:state) := *)
 (*   match s with *)
 (*     | (rho, Eapp g varl) => *)

@@ -6,7 +6,7 @@ Require Import compcert.lib.Coqlib.
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
         Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
 
-Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx
+Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.map_util
         L6.Ensembles_util L6.List_util L6.size_cps L6.tactics L6.set_util.
 
 Import ListNotations.
@@ -211,7 +211,8 @@ Section Log_rel.
     intros rho1 rho2 k x v1 v2 Hval x' Hget.
     rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss. split; eauto.
   Qed.
-  
+
+    
   Lemma preord_var_env_extend_neq :
     forall (rho1 rho2 : env) (k : nat) (x y : var) (v1 v2 : val),
       preord_var_env PostG k rho1 rho2 y y ->
@@ -368,6 +369,40 @@ Section Log_rel.
     eapply preord_env_P_antimon; eauto. intros x' H; simpl; eauto.
   Qed.
 
+
+  Lemma preord_env_P_set_not_in_P_l' (x : var) (v : val) (P : Ensemble var) (k : nat) (rho1 rho2 : env) :
+      preord_env_P PostG P k (M.set x v rho1) rho2 ->
+      Disjoint var P (Singleton var x) ->
+      preord_env_P PostG P k rho1 rho2.
+  Proof.
+    intros Henv Hdis y Hin v1 Hget. 
+    apply Henv. auto. 
+    rewrite M.gso; auto.
+    intros; subst. intros Hc; subst. eapply Hdis; constructor; eauto.
+  Qed.  
+
+  Lemma preord_env_P_set_not_in_P_r' (x : var) (v : val)
+      (P : Ensemble var) (k : nat) (rho1 rho2 : env) :
+    preord_env_P PostG P k rho1 (M.set x v rho2) ->
+    Disjoint var P (Singleton var x) ->
+    preord_env_P PostG P k rho1 rho2.
+  Proof.
+    intros Henv Hdis y Hin v1 Hget. eapply Henv in Hget; eauto. 
+    rewrite M.gso in Hget; auto.
+    intros; subst. intros Hc; subst. eapply Hdis; constructor; eauto.
+  Qed.
+
+  Lemma preord_env_P_def_funs_not_in_P_l' (B B' : fundefs)
+      (P : Ensemble var) (k : nat) (rho : M.t val) (rho1 rho2 : env) :
+      preord_env_P PostG P k (def_funs B' B rho rho1) rho2 ->
+      Disjoint var P (name_in_fundefs B) ->
+      preord_env_P PostG P k rho1 rho2.
+  Proof.
+    intros Henv Hdis y Hin v1 Hget. eapply Henv; eauto.
+    rewrite def_funs_neq; auto. intros Hc. eapply Hdis.
+    constructor; eauto.   
+  Qed.
+
   Lemma preord_env_refl k :
     Reflexive (preord_val PostG k) ->
     Reflexive (preord_env PostG k).
@@ -384,6 +419,15 @@ Section Log_rel.
     preord_env PostG k rho1' rho2'.
   Proof.
     intros. eapply preord_env_P_set_lists_l; eauto.
+  Qed.
+  
+  Lemma preord_val_constr k t vl x :
+    preord_val PostG k (cps.Vconstr t vl) x  ->
+    exists vl', x = cps.Vconstr t vl' /\ Forall2_asym (preord_val PostG k) vl vl'.
+  Proof.
+    intros H. eapply preord_val_eq in H. 
+    destruct x; try contradiction. destruct H as [Heq Hall]; eauto. subst.
+    eexists; split; eauto. 
   Qed.
 
   (** * Index Anti-Monotonicity Properties *)
@@ -408,6 +452,16 @@ Section Log_rel.
       eapply H3; eauto. omega. 
   Qed.  
 
+  Lemma preord_var_env_monotonic k rho1 rho2 j z x:
+    preord_var_env PostG k rho1 rho2 x z ->
+    j <= k ->
+    preord_var_env PostG j rho1 rho2 x z.
+  Proof.
+    intros Henv Hleq y HIn. apply Henv in HIn. destructAll.
+    eexists; split; eauto.
+    eapply preord_val_monotonic; eauto.
+  Qed.
+  
   Lemma preord_res_monotonic (k j: nat)  r1 r2 : 
     preord_res preord_val PostG k r1 r2 ->  
     j <= k ->
@@ -455,7 +509,8 @@ Section Log_rel.
      intros Hyp Hexp v1 c2 Hleq Hstep.
      edestruct Hexp as [v2 [c2' [Hstep2 [Hp Hv]]]]; try eassumption.
      do 2 eexists; repeat split; eauto. 
-  Qed.
+  Qed.  
+
 
   End PostCond.
 
@@ -1014,12 +1069,6 @@ Section Log_rel.
         eapply preord_res_monotonic. eassumption. simpl in *; omega.
     Qed.
 
-    Lemma cost_gt_0 e : 
-      0 < cost e.
-    Proof.  
-      destruct e; simpl; omega. 
-    Qed.
-
     Lemma preord_exp_Efun_l k boundG rho1 rho2 B e e' :
       post_Efun_l P1 P2 ->
       preord_exp P1 boundG (k - 1) (e, def_funs B B rho1 rho1) (e', rho2) ->
@@ -1240,7 +1289,7 @@ Section Log_rel.
            preord_env_P.
   Proof.
     intros ? ? ? s1 s2 [H1 H2]; split; intros Hpre; subst;
-    eapply preord_env_P_antimon; subst; eauto. 
+      eapply preord_env_P_antimon; subst; eauto. 
   Qed.
 
   Lemma preord_exp_post_monotonic k (P1 P2 : PostT) PG e1 rho1 e2 rho2 :
@@ -1252,6 +1301,39 @@ Section Log_rel.
     edestruct Hexp as [v2 [c2' [Hstep2 [Hp Hv]]]]; try eassumption.
     do 2 eexists; repeat split; eauto. 
   Qed.
+
+  Lemma preord_env_P_eq_r PG S S' k rho1 rho2 rho3 :
+      preord_env_P PG S k rho1 rho2 ->
+      eq_env_P S' rho2 rho3 ->
+      preord_env_P PG (S :&: S') k rho1 rho3.
+  Proof.
+    intros Henv Heqx x Hin v Hget. inv Hin.
+    rewrite <- Heqx; eauto. eapply Henv; eauto. 
+  Qed.
+
+  Lemma preord_env_P_eq_l PG S S' k rho1 rho2 rho3 :
+    preord_env_P PG S k rho1 rho2 ->
+    eq_env_P S' rho1 rho3 ->
+    preord_env_P PG (S :&: S') k rho3 rho2.
+  Proof.
+    intros Henv Heqx x Hin v Hget. inv Hin.
+    eapply Henv; eauto. 
+    rewrite Heqx; eauto.
+  Qed.
+
+  Lemma preord_env_eq_env PostG k S rho1 rho2 rho1' rho2' :
+    preord_env_P PostG S k rho1 rho2 ->
+    eq_env_P S rho1 rho1' ->
+    eq_env_P S rho2 rho2' ->
+    preord_env_P PostG S k rho1' rho2'.
+  Proof. 
+    intros Henv Heq1 Heq2.
+    rewrite <- (Intersection_idempotent S).
+    eapply preord_env_P_eq_r; eauto.
+    rewrite <- (Intersection_idempotent S).
+    eapply preord_env_P_eq_l; eauto.
+  Qed.
+
 
   Section Refl.
 
@@ -1500,6 +1582,16 @@ Section Log_rel.
     destruct r; simpl; eauto.
    eapply preord_val_refl. 
   Qed.
+
+  Lemma eq_env_P_preord_env_P  S r1 r2 :
+    eq_env_P S r1 r2 ->
+    (forall q, preord_env_P PG S q r1 r2).
+  Proof.
+    intros Heq q x Hin v Hget. rewrite <- Heq; eauto.
+    eexists; split; eauto.
+    apply preord_val_refl; eauto.
+  Qed.
+  
 
   Lemma preord_env_def_funs k f rho1 rho2 :
     preord_env PG k rho1 rho2 ->

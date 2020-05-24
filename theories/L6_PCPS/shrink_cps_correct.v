@@ -17,7 +17,7 @@ Require Import L6.Ensembles_util.
 
 Require Import L6.cps L6.ctx L6.logical_relations L6.tactics L6.cps_util L6.List_util
         L6.shrink_cps L6.eval L6.set_util L6.identifiers L6.stemctx L6.alpha_conv
-        L6.functions.
+        L6.functions L6.relations.
 
 Open Scope ctx_scope.
 
@@ -121,7 +121,7 @@ Inductive gen_rw : relation exp :=
 | Ctx_rw :
     forall c e e', rw e e' -> gen_rw (c |[ e ]|) (c |[ e' ]|).
 
-Definition gr_clos := clos_refl_trans exp gen_rw.
+Definition gr_clos n := refl_trans_closure_n gen_rw n.
 
 Section Shrink_correct.
 
@@ -2576,23 +2576,22 @@ Section Shrink_correct.
           (HGPost' : inclusion _ PG P1).  
 
   (* NOTE : works only for trivial postcondition. For meaningful ones we need to compose differently *)
-  Lemma gr_clos_correct e e' :    
-    gr_clos e e' ->
+  Lemma gr_clos_correct n e e' :    
+    gr_clos n e e' ->
     forall rho rho' k,
       preord_env_P cenv PG (occurs_free e) k rho rho'->
       preord_exp cenv P1 PG k (e, rho) (e', rho').
   Proof with now eauto.
     intros H.
     induction H; intros.
-    - eapply gen_rw_correct; eassumption.
-    - eapply preord_exp_refl; eauto.
     - eapply preord_exp_post_monotonic.
       eapply HcompP1. 
       eapply preord_exp_trans; eauto.
       revert HGPost HcompP1. clear. now firstorder.
-
-      intros m. eapply IHclos_refl_trans2.
+      eapply gen_rw_correct; try eassumption.      
+      intros m. eapply IHrefl_trans_closure_n.
       eapply preord_env_P_refl; eauto.
+    - eapply preord_exp_refl; eauto.
   Qed.
 
 End Shrink_correct.
@@ -3764,65 +3763,58 @@ End occurs_free_rw.
 
 Section Shrink_Rewrites.
 
-  (* shrink rewrites  *)
-  Inductive sr_rw: relation exp :=
+  (* shrink rewrites, with rewrite step count -- useful for cost counting *)
+  Inductive sr_rw : nat -> relation exp :=
   (* Rules about dead var elimination *)
   | Constr_dead_s: forall x t ys e,
       num_occur e x 0 ->
-      sr_rw (Econstr x t ys e) e
+      sr_rw 1 (Econstr x t ys e) e
   | Prim_dead_s: forall x p ys e,
       num_occur e x 0 ->
-      sr_rw (Eprim x p ys e) e
+      sr_rw 1 (Eprim x p ys e) e
   | Proj_dead_s: forall x t n y e,
       num_occur e x 0 ->
-      sr_rw (Eproj x t n y e) e
+      sr_rw 1 (Eproj x t n y e) e
   | Fun_dead_s: forall e fds,
       Forall (fun v => num_occur e v 0) (all_fun_name fds) ->
-      sr_rw (Efun fds e) e
+      sr_rw 1 (Efun fds e) e
   | Fun_rem_s: forall f t xs fb B1 B2 e,
       num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) f 0 ->
-      sr_rw (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) (Efun (fundefs_append B1 B2) e)
+      sr_rw 1 (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) (Efun (fundefs_append B1 B2) e)
   (* Rules about inlining/constant-folding *)
   | Constr_case_s: forall x c cl co e ys n,
       find_tag_nth cl co e n ->
-      sr_rw (Econstr x co ys (c |[ Ecase x cl ]|)) (Econstr x co ys (c |[e]|))
+      sr_rw 1 (Econstr x co ys (c |[ Ecase x cl ]|)) (Econstr x co ys (c |[e]|))
   | Constr_proj_s: forall v  t t' n x e k ys c,
       nthN ys n = Some k ->
-      sr_rw (Econstr x t ys (c |[Eproj v t' n x e]|)) (Econstr x t ys (c |[ rename_all_ns (M.set v k (M.empty var)) e]|))
-  | Fun_inline_s: forall c  vs f  t xs fb  B,
-      find_def f B = Some (t, xs, fb) -> 
+      sr_rw 1 (Econstr x t ys (c |[Eproj v t' n x e]|)) (Econstr x t ys (c |[ rename_all_ns (M.set v k (M.empty var)) e]|))  
+  | Fun_inline_s: forall c  vs f  t xs fb  B1 B2,
       List.length xs = List.length vs ->
-      sr_rw (Efun B (c |[ Eapp f t vs ]|))
-            (Efun B (c |[ (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb)]|))
-  | Fun_inline_letapp_s: forall c vs x f  t xs e1 fb B C' x',
-      find_def f B = Some (t, xs, fb) -> 
+      num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eapp f t vs ]|)) f 1 ->
+      sr_rw 2 (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eapp f t vs ]|))
+            (Efun (fundefs_append B1 B2) (c |[ (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb)]|))
+  | Fun_inline_letapp_s: forall c  vs x f  t xs e1 fb B1 B2 C' x',
       List.length xs = List.length vs ->
+      num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eletapp x f t vs e1 ]|)) f 1 ->
       inline_letapp (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb) x = Some (C', x') ->
-      sr_rw (Efun B (c |[ Eletapp x f t vs e1 ]|))
-            (Efun B (c |[ C' |[ rename_all_ns (M.set x x' (M.empty _)) e1 ]|  ]|)).
-  
-  (* All rewrite that eliminates funs in one step *)
-  (* | Fun_inline_s: forall c  vs f  t xs fb  B1 B2, *)
-  (*     List.length xs = List.length vs -> *)
-  (*     num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eapp f t vs ]|)) f 1 -> *)
-  (*     sr_rw (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eapp f t vs ]|)) *)
-  (*           (Efun (fundefs_append B1 B2) (c |[ (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb)]|)) *)
-  (* | Fun_inline_letapp_s: forall c  vs x f  t xs e1 fb B1 B2 C' x', *)
-  (*     List.length xs = List.length vs -> *)
-  (*     num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eletapp x f t vs e1 ]|)) f 1 -> *)
-  (*     inline_letapp (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb) x = Some (C', x') -> *)
-  (*     sr_rw (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eletapp x f t vs e1 ]|)) *)
-  (*           (Efun (fundefs_append B1 B2) (c |[ C' |[ rename_all_ns (M.set x x' (M.empty _)) e1 ]|  ]|)). *)
+      sr_rw 2 (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eletapp x f t vs e1 ]|))
+            (Efun (fundefs_append B1 B2) (c |[ C' |[ rename_all_ns (M.set x x' (M.empty _)) e1 ]|  ]|)).
 
-
-  Inductive gen_sr_rw : relation exp :=
+  Inductive gen_sr_rw (n : nat) : relation exp :=
   | Ctx_sr_rw : forall c e e',
-      sr_rw e e' ->
-      gen_sr_rw (c |[ e ]|) (c |[ e' ]|).
+      sr_rw n e e' ->
+      gen_sr_rw n (c |[ e ]|) (c |[ e' ]|).
+  
 
-
-  Definition gsr_clos := clos_refl_trans exp gen_sr_rw.
-
+  Inductive gsr_clos : nat -> relation exp :=
+  | Trans_srw :
+      forall n m e1 e2 e3,
+        gen_sr_rw n e1 e2 ->
+        gsr_clos m e2 e3 ->
+        gsr_clos (n + m) e1 e3
+  | Refl_srw :
+      forall e,
+        gsr_clos 0 e e.
 
   Local Hint Constructors rw : core.
 
@@ -4893,37 +4885,51 @@ substitution to a term cannot increase the occurence count for that variable. *)
       rewrite occurs_free_fundefs_Fcons2_c
   end.
 
-
-  Lemma occurs_free_ctx_app_mut : 
-    (forall C e, occurs_free (C |[ e ]|) <--> occurs_free_ctx C :|: (occurs_free e \\ bound_var_ctx C)) /\
-    (forall B e, occurs_free_fundefs (B <[ e ]>) <--> occurs_free_fundefs_ctx B :|: (occurs_free e \\ bound_var_fundefs_ctx B)).
-  Proof. 
-    exp_fundefs_ctx_induction IHC IHB.
-    - intros e. normalize_bound_var_ctx. normalize_occurs_free_ctx. sets.
-    - intros e1. normalize_bound_var_ctx. normalize_occurs_free_ctx. simpl. normalize_occurs_free.
-      rewrite IHC. rewrite Setminus_Union_distr, Setminus_Union. sets.
-    - intros e1. normalize_bound_var_ctx. normalize_occurs_free_ctx. simpl. normalize_occurs_free.
-      rewrite IHC. rewrite Setminus_Union_distr, Setminus_Union. sets.
-    - intros e1. normalize_bound_var_ctx. normalize_occurs_free_ctx. simpl. normalize_occurs_free.
-      rewrite IHC. rewrite Setminus_Union_distr, Setminus_Union. sets.
-    - intros e1. normalize_bound_var_ctx. normalize_occurs_free_ctx. simpl. normalize_occurs_free.
-      rewrite IHC. rewrite Setminus_Union_distr, Setminus_Union. sets.
-    - intros l1 e1. simpl.
-  Abort.     
-
-  Lemma sr_rw_in_rw e e' :
+  
+  Opaque num_occur_list.
+  
+  Lemma num_occur_inline_letapp e f C x x' :
+    num_occur e f 0 ->
+    inline_letapp e  x = Some (C, x') ->
+    x <> f ->
+    num_occur_ec C f 0 /\ x' <> f. 
+  Proof.
+    revert f C x x'. induction e using exp_ind'; intros g C y x' Hnum  Hin Hneq; simpl in Hin;
+    (try match goal with
+         | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
+         end); try congruence.
+    - inv Hnum. pi0. eapply IHe in H4; eauto. destructAll. split; eauto.
+      rewrite plus_comm. constructor. eassumption.
+    - inv Hnum. pi0. eapply IHe in H5; eauto. destructAll. split; eauto.
+    - inv Hnum. pi0. eapply IHe in H5; eauto. destructAll. split; eauto.
+    - inv Hnum. pi0. eapply IHe in Hin'; eauto. destructAll. split; eauto.
+    - inv Hin. inv Hnum. split; eauto.
+      replace (num_occur_list (v :: l) g) with (num_occur_list (v :: l) g + 0) by omega.
+      eauto.
+    - inv Hnum. pi0. eapply IHe in H4; eauto. destructAll. split; eauto.
+      rewrite plus_comm. constructor. eassumption.
+    - inv Hin. inv Hnum. 
+      Transparent num_occur_list.
+      simpl in *.
+      destruct (cps_util.var_dec g x'); subst; try congruence. split; eauto. 
+  Qed.
+  
+  Lemma sr_rw_in_rw n e e' :
       unique_bindings e ->
       Disjoint _ (bound_var e) (occurs_free e) ->
-      sr_rw e e' ->
-      rw e e'.
+      sr_rw n e e' ->
+      gr_clos n e e'.
   Proof.    
     intros Hun Hdis Hsr; inv Hun; inv Hsr;
-      try now (constructor; apply not_occurs_not_free). 
+      try now (econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c);
+               constructor; apply not_occurs_not_free).
     - (* Case folding *)
+      econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c).
       econstructor. eassumption.
       intros Hc. eapply H. eapply bound_var_app_ctx.
       left. eapply bound_stem_var. auto.
     - (* Constructor folding *)
+      econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c).
       eapply ub_app_ctx_f in H0. destructAll.
       rewrite <- (proj1 (Disjoint_dom_rename_all_eq _)).
       2:{ rewrite Dom_map_set. rewrite Dom_map_empty. normalize_sets.
@@ -4946,92 +4952,227 @@ substitution to a term cannot increase the occurence count for that variable. *)
         left. rewrite bound_var_app_ctx. normalize_bound_var. do 2 right. reflexivity.
         left. eapply nthN_FromList. eassumption.
     - (* Dead Funs *)
+      econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c).
       econstructor. eapply Forall_impl; [| eassumption ].
       intros. eapply not_occurs_not_free. auto.
     - (* Dead Fun *)
+      econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c).
       econstructor; eauto.
       eapply unique_bindings_fundefs_unique_functions. eassumption.
     - (* App inlining *)
-      assert (Hdefs:= H0).
-      eapply unique_bindings_fun_in_fundefs in H0; [| eapply find_def_correct; eassumption ]. 
-      destructAll.
-      rewrite <- (proj1 (Disjoint_dom_rename_all_eq _)).
-      2:{ rewrite Dom_map_set_lists_ss; [| eassumption ]. sets. }
-      econstructor; eauto.
-      + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
-        rewrite bound_var_app_ctx in Hdis.
-        repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. repeat normalize_sets. 
-        constructor. intros v Hin. inv Hin.
+      replace 2 with (1 + 1) by omega.
 
-        destruct (Decidable_name_in_fundefs defs) as [Hdf]. destruct (Hdf v).
-        * eapply H5; eauto.
-        * destruct (bound_var_ctx_dec c) as [Hdc]. destruct (Hdc v).
-          -- eapply H1. rewrite bound_var_app_ctx. constructor; eauto.
-             eapply fun_in_fundefs_bound_var_fundefs. now eapply find_def_correct; eauto. 
-             eauto.
-          -- eapply Hdis. constructor.
-             left.
-             eapply fun_in_fundefs_bound_var_fundefs. now eapply find_def_correct; eauto. now eauto.
-             right. constructor; eauto. 
-             eapply occurs_free_ctx_not_bound; eauto.
-      + eapply unique_bindings_fundefs_unique_functions. eassumption.
-      + eapply Disjoint_Included; [| | eapply Hdis ].
-        normalize_occurs_free; sets. 
-        normalize_bound_var. rewrite bound_var_app_ctx.
-        eapply Included_trans. eapply bound_stem_var. sets.
-      + eapply Disjoint_Included; [| | eapply H1 ].
-        now eapply name_in_fundefs_bound_var_fundefs.
-        rewrite bound_var_app_ctx.
-        eapply Included_trans. eapply bound_stem_var. sets.
+      assert (Hub := H0).
+        eapply split_fds_unique_bindings_fundefs_l in H0; [| eapply fundefs_append_split_fds; reflexivity ]. 
+        destructAll. inv H2.
+      assert (Hfind : find_def f (fundefs_append B1 (Fcons f t xs fb B2)) =  Some (t, xs, fb)).
+        { erewrite find_def_fundefs_append_r. simpl. rewrite peq_true. reflexivity. 
+          simpl. rewrite peq_true. reflexivity. eapply name_not_in_fundefs_find_def_None.
+          intros Hc. eapply H3. constructor. eapply name_in_fundefs_bound_var_fundefs. eassumption. constructor. now left. }
+
+      econstructor; [ eapply Ctx_rw with (c := Hole_c) |
+                      econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c)].
+      { eapply Fun_inline.
+        - eassumption.
+
+        - repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+          rewrite bound_var_app_ctx in Hdis.
+          repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. repeat normalize_sets. 
+          constructor. intros v Hin. inv Hin.
+          
+          destruct (Decidable_name_in_fundefs (fundefs_append B1 (Fcons f t xs fb B2))) as [Hdf].
+          destruct (Hdf v) as [Hn | Hn].
+          * eapply fundefs_append_name_in_fundefs in Hn; [| reflexivity ].
+            simpl in Hn; inv Hn. eapply H3; eauto. constructor.
+            eapply name_in_fundefs_bound_var_fundefs. eassumption. now eauto. 
+            inv H6. inv H8. contradiction.
+            eapply H15; eauto. constructor; eauto. eapply name_in_fundefs_bound_var_fundefs. eassumption. 
+            
+          * destruct (bound_var_ctx_dec c) as [Hdc]. destruct (Hdc v).
+            -- eapply H1. rewrite bound_var_app_ctx. constructor; eauto.
+               rewrite fundefs_append_bound_vars; [| reflexivity ]. normalize_bound_var.
+               do 3 right. now left.
+            -- eapply Hdis. constructor.
+               left.
+               eapply fun_in_fundefs_bound_var_fundefs. now eapply find_def_correct; eauto. now eauto.
+               right. constructor; eauto. 
+               eapply occurs_free_ctx_not_bound; eauto.
+        - eapply unique_bindings_fundefs_unique_functions. eassumption.
+        - eapply Disjoint_Included; [| | eapply Hdis ].
+          normalize_occurs_free; sets. 
+          normalize_bound_var. rewrite bound_var_app_ctx.
+          eapply Included_trans. eapply bound_stem_var. sets.
+        - eapply Disjoint_Included; [| | eapply H1 ].
+          now eapply name_in_fundefs_bound_var_fundefs.
+          rewrite bound_var_app_ctx.
+          eapply Included_trans. eapply bound_stem_var. sets. } 
+
+      { erewrite <- (proj1 (Disjoint_dom_rename_all_eq _)).
+        
+        2:{ rewrite Dom_map_set_lists_ss; [| eassumption ]. eapply Disjoint_sym. sets. }
+        
+        eapply Fun_rem. eapply unique_bindings_fundefs_unique_functions. eassumption.
+
+        - inv H7. eapply num_occur_app_ctx_mut in H9.
+          destructAll. inv H4. simpl in H6. rewrite peq_true in H6.
+          assert (Heq0 : num_occur_list vs f = 0) by omega.
+          assert (Heqx : x = 0) by omega.
+          assert (Heqm : m = 0) by omega. subst.
+          replace 0 with (0 + 0) by omega. constructor; [| eassumption ].
+
+          eapply num_occur_app_ctx_mut. exists 0, 0. split; [| split ]; eauto. 
+
+          erewrite (proj1 (Disjoint_dom_rename_all_eq _)).
+        
+          2:{ rewrite Dom_map_set_lists_ss; [| eassumption ]. eapply Disjoint_sym. sets. }
+
+          edestruct (e_num_occur f (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb))
+            as [m Ho].
+
+          eapply fundefs_append_num_occur' in H10. destructAll. pi0. inv H7. pi0.
+          eapply num_occur_rename_all_ns_not_range in H23; [| eassumption | ]. 
+          assert (Heq : m = 0) by omega. subst. eassumption.
+
+          intros Hc. eapply Range_map_set_list in Hc. eapply not_occur_list; eauto. }
+
     - (* Let app inlining *)
-      assert (Hdefs:= H0). assert (Hub := H). 
-      eapply unique_bindings_fun_in_fundefs in H0; [| eapply find_def_correct; eassumption ].
-      eapply ub_app_ctx_f in H. 
-      destructAll. inv H11.
-      rewrite <- (proj1 (Disjoint_dom_rename_all_eq _)).
-      2:{ rewrite Dom_map_set. rewrite Dom_map_empty. normalize_sets.
-          inv H1. sets. }
-      rewrite <- (proj1 (Disjoint_dom_rename_all_eq _)) in H7.     
-      2:{ rewrite Dom_map_set_lists_ss; [| eassumption ]. sets. }
+      assert (Hdefs:= H). assert (Hub := H0).
+      replace 2 with (1 + 1) by omega.
 
-      repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
-      rewrite bound_var_app_ctx in Hdis.
-      repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. repeat normalize_sets.
-      rewrite !bound_var_app_ctx in *. repeat normalize_bound_var_in_ctx.
-      
-      assert (HdisFV : Disjoint var (bound_var fb :|: bound_var e1)
+      eapply split_fds_unique_bindings_fundefs_l in H0; [| eapply fundefs_append_split_fds; reflexivity ]. 
+      destructAll. inv H2.
+
+      assert (Hfind : find_def f (fundefs_append B1 (Fcons f t xs fb B2)) =  Some (t, xs, fb)).
+      { erewrite find_def_fundefs_append_r. simpl. rewrite peq_true. reflexivity. 
+        simpl. rewrite peq_true. reflexivity. eapply name_not_in_fundefs_find_def_None.
+        intros Hc. eapply H3. constructor. eapply name_in_fundefs_bound_var_fundefs. eassumption. constructor. now left. }
+
+
+      assert (HdisFV : Disjoint var (bound_var fb :|: bound_var (Eletapp x f t vs e1))
                                 (occurs_free (Eletapp x f t vs e1))).
       { constructor. intros v Hin. inv Hin.
-        destruct (Decidable_name_in_fundefs defs) as [Hdf]. destruct (Hdf v).
-        * inv H11. now eapply H6; eauto.
-          eapply H1. constructor. right; left; eauto.
-          eapply name_in_fundefs_bound_var_fundefs. eassumption.
+        destruct (Decidable_name_in_fundefs (fundefs_append B1 (Fcons f t xs fb B2))) as [Hdf]. destruct (Hdf v) as [Hn | Hn ].
+        * eapply fundefs_append_name_in_fundefs in Hn; [| reflexivity ].
+          simpl in Hn; inv Hn.
+          -- inv H2. eapply H3; eauto. constructor.
+             eapply name_in_fundefs_bound_var_fundefs. eassumption. normalize_bound_var. now eauto. 
+             eapply H1. constructor. rewrite bound_var_app_ctx. now right; eauto.
+             rewrite fundefs_append_bound_vars; [| reflexivity ]. left.
+             eapply name_in_fundefs_bound_var_fundefs. eassumption. 
+          -- inv H7. 
+             ++ inv H9. inv H2; eauto.
+                eapply H1. constructor. rewrite bound_var_app_ctx. now eauto.
+                rewrite fundefs_append_bound_vars; [| reflexivity ]. right. eauto.
+             ++ inv H2. eapply H16. constructor; eauto.
+                eapply name_in_fundefs_bound_var_fundefs. eassumption. 
+                eapply H1. constructor. rewrite bound_var_app_ctx. now eauto.
+                rewrite fundefs_append_bound_vars; [| reflexivity ]. right. normalize_bound_var.
+                do 3 right. eapply name_in_fundefs_bound_var_fundefs. eassumption. 
         * destruct (bound_var_ctx_dec c) as [Hdc]. destruct (Hdc v).
-          -- inv H11.
-             eapply H1. constructor. left. eassumption. 
-             eapply fun_in_fundefs_bound_var_fundefs. now eapply find_def_correct; eauto. now eauto.
-             eapply H12; eauto. 
+          -- inv H2.
+             ++ eapply H1. constructor. rewrite bound_var_app_ctx. now left; eauto.
+                rewrite fundefs_append_bound_vars; [| reflexivity ]. right. normalize_bound_var.
+                now eauto.
+             ++ eapply ub_app_ctx_f with (c := c) in Hdefs. destructAll.
+                eapply H10. constructor; eauto.
           -- eapply Hdis. constructor.
-             ++ inv H11. left.
-                eapply fun_in_fundefs_bound_var_fundefs. now eapply find_def_correct; eauto. now eauto.
-                eauto.
-             ++ right. constructor; eauto. eapply occurs_free_ctx_not_bound; eauto. }
-      repeat normalize_occurs_free_in_ctx.
+             ++ inv H2. constructor.
+                eapply fundefs_append_bound_vars. reflexivity. right.
+                normalize_bound_var. do 2 right. left; eauto.
 
-      econstructor; eauto.
-      + eapply Disjoint_Included; [| | eapply HdisFV ]; sets. 
-      + eapply unique_bindings_fundefs_unique_functions. eassumption.
-      + eapply Disjoint_Included; [| | eapply Hdis ]. sets.
-        eapply Included_trans. eapply bound_stem_var. sets.
-      + eapply Disjoint_Included; [| | eapply H1 ].
-        now eapply name_in_fundefs_bound_var_fundefs.
-        eapply Included_trans. eapply bound_stem_var. sets.
-      + eapply Union_Disjoint_r.
-        eapply Union_Disjoint_r.
-        * eapply Disjoint_Included; [| | eapply HdisFV ]; sets.
-        * sets.
-        * eapply Disjoint_Included; [| | eapply Hdis ]; sets.
-      + eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply HdisFV ]; sets.
+                normalize_bound_var. right. rewrite bound_var_app_ctx. right. eauto.
+             ++ constructor; eauto. eapply occurs_free_ctx_not_bound; eauto. }
+
+      
+      econstructor; [ eapply Ctx_rw with (c := Hole_c) |
+                      econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c)].
+
+      { eapply Fun_inline_letapp.
+        - eassumption. 
+        - eapply Disjoint_Included; [| | eapply HdisFV ]. normalize_occurs_free; sets. 
+          sets.
+        - eapply unique_bindings_fundefs_unique_functions. eassumption. 
+        - eapply Disjoint_Included; [| | eapply Hdis ]. normalize_occurs_free. sets.
+          normalize_bound_var. rewrite bound_var_app_ctx. eapply Included_trans. eapply bound_stem_var. sets.
+        - eapply Disjoint_Included; [| | eapply H1 ].
+          now eapply name_in_fundefs_bound_var_fundefs.
+          eapply Included_trans. eapply bound_stem_var. rewrite bound_var_app_ctx. sets.
+        - eapply Union_Disjoint_r.
+          eapply Union_Disjoint_r.
+          * eapply Disjoint_Included; [| | eapply HdisFV ].  normalize_occurs_free; sets. normalize_bound_var; sets.
+          * eapply Disjoint_Included; [| | eapply H1 ]; sets.
+            rewrite bound_var_app_ctx. normalize_bound_var. sets.
+          * eapply Disjoint_Included; [| | eapply Hdis ]; sets. normalize_occurs_free; sets.
+            normalize_bound_var. rewrite bound_var_app_ctx. normalize_bound_var. sets.
+        - eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply HdisFV ]; sets.
+          normalize_occurs_free. sets.
+        - eapply ub_app_ctx_f in H. 
+          destructAll. inv H2. eassumption.
+        - rewrite (proj1 (Disjoint_dom_rename_all_eq _)). eassumption. 
+          rewrite Dom_map_set_lists_ss; [| eassumption ]. 
+          eapply Disjoint_sym. eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption.
+          eassumption. 
+      }
+
+      { eapply ub_app_ctx_f in H.  destructAll. inv H2.
+        
+        rewrite <- (proj1 (Disjoint_dom_rename_all_eq _)).
+        2:{ rewrite Dom_map_set. rewrite Dom_map_empty. normalize_sets.
+            eapply Disjoint_Singleton_l.  eassumption. }
+        
+        eapply Fun_rem. eapply unique_bindings_fundefs_unique_functions. eassumption.
+        
+        - inv H6. eapply num_occur_app_ctx_mut in H21.
+          destructAll. inv H6. simpl in H9. rewrite peq_true in H9.
+          assert (Heq0 : num_occur_list vs f = 0) by omega.
+          assert (Heqx : x0 = 0) by omega.
+          assert (Heqm : m = 0) by omega.
+          assert (Heqn : n = 0) by omega. subst.
+          
+          replace 0 with (0 + 0) by omega. constructor; [| eassumption ].
+          
+          eapply num_occur_app_ctx_mut. exists 0, 0. split; [| split ]; eauto. 
+          
+          erewrite (proj1 (Disjoint_dom_rename_all_eq _)).
+          
+          2:{ rewrite Dom_map_set. rewrite Dom_map_empty. normalize_sets.
+              eapply Disjoint_Singleton_l. eassumption. }
+          
+          eapply fundefs_append_num_occur' in H22. destructAll. pi0.
+          eapply num_occur_app_ctx_mut. exists 0, 0.
+          inv H7. pi0.
+          split; [| split ]; eauto.
+
+          { eapply num_occur_inline_letapp; [| eassumption | ].
+            edestruct (e_num_occur f (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb))
+              as [m Ho].
+
+            eapply num_occur_rename_all_ns_not_range in H27; [| eassumption | ]. 
+            assert (Heq : m = 0) by omega. subst. eassumption.            
+            intros Hc. eapply Range_map_set_list in Hc. eapply not_occur_list; eauto.
+            intros Hc; subst.
+            eapply HdisFV. constructor. right. normalize_bound_var. now right.
+            normalize_occurs_free. eauto. }
+          { edestruct (e_num_occur f (rename_all_ns (M.set x x' (M.empty var)) e1))
+              as [m Ho].
+            eapply num_occur_rename_all_ns_not_range in H28; [| eassumption | ]. 
+            assert (Heq : m = 0) by omega. subst. eassumption.
+            intros Hc. 
+            eapply Range_map_set_list with (xs := [x]) (vs := [x']) in Hc.
+            repeat normalize_sets. inv Hc. eapply inline_letapp_var_eq in H8. inv H8; subst.
+
+            eapply HdisFV. constructor. right. normalize_bound_var. now right.
+            normalize_occurs_free. eauto.
+
+            rewrite <- bound_var_rename_all_ns in H7. inv H7.
+            eapply HdisFV. constructor. left; eauto. constructor; eauto. now left.
+
+            eapply of_rename_all_ns_mut in H8. rewrite Dom_map_set_lists_ss in H8.
+            inv H8. inv H7. now eapply not_occurs_not_free in H8; eauto.
+            
+            eapply Range_map_set_list in H7. eapply not_occur_list; eassumption.
+
+            eassumption. } } 
   Qed.
 
   (* TODO move *)
@@ -5052,7 +5193,25 @@ substitution to a term cannot increase the occurence count for that variable. *)
         * inv H. 
           contradiction. eauto.
         * eexists. constructor; eauto. 
-  Qed. 
+  Qed.
+
+  Lemma ub_proj_dead: forall c x t n y e,
+      unique_bindings (c |[ Eproj x t n y e]|)  ->
+      unique_bindings (c |[e]|).
+  Proof.
+    intros.
+    apply ub_app_ctx_f in H.
+    apply ub_app_ctx_f.
+    destructAll.
+    split; auto.
+    inv H0.
+    split; auto.
+    eapply Disjoint_Included_r.
+    2: apply H1.
+    rewrite bound_var_Eproj.
+    left; auto.
+  Qed.
+
   
   Lemma rw_preserves: forall e e',
       unique_bindings e ->
@@ -5110,7 +5269,53 @@ substitution to a term cannot increase the occurence count for that variable. *)
         eapply Union_Included; sets.
         intros z Hin. left. right. econstructor. eassumption.
         eapply find_tag_nth_In_patterns. eassumption. 
-    - 
+    - assert (Hub' := Hub).
+      eapply ub_app_ctx_f with (c := Econstr_c x t ys c) in Hub. destructAll.
+      inv H1. 
+      split.
+      + apply ub_app_ctx_f with (c := Econstr_c x t ys c). split; [| split ]; eauto.
+        eapply unique_bindings_rename_all_ns; eassumption.
+        rewrite <- bound_var_rename_all_ns.
+        eapply Disjoint_Included; [ | | eapply H2 ].
+        normalize_bound_var; sets. reflexivity.
+      + eapply Disjoint_Included; [| | eapply Hdj ].
+        * eapply of_constr_proj'. eassumption.
+        * simpl. repeat normalize_bound_var.
+          rewrite !bound_var_app_ctx.
+          rewrite <- bound_var_rename_all_ns. normalize_bound_var. sets.
+    - assert (Hub' := Hub). inv Hub. 
+      eapply ub_app_ctx_f in H3. destructAll.
+      repeat normalize_bound_var_in_ctx.
+      split.
+      + constructor; eauto.        
+        eapply ub_app_ctx_f with (c := c).
+        split; [| split ]; eauto.
+        * eapply unique_bindings_rename_all_ns.
+          eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption.
+        * rewrite <- bound_var_rename_all_ns.
+          eapply Disjoint_Included; [| | eapply H5 ].
+          eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eauto ]. now sets.
+          rewrite bound_var_app_ctx. now sets.
+        * rewrite bound_var_app_ctx. rewrite <- bound_var_rename_all_ns.
+          
+          rewrite  
+        eapply ub_fun_inlining with (c' := Hole_c); apply Hub.
+
+        eapply Disjoint_Included_r.
+        apply of_fun_inline; eauto.
+        eapply Disjoint_Included_l.
+        2: apply Hdj.
+        do 2 (rewrite bound_var_app_ctx).
+        repeat (normalize_bound_var).
+        do 2 (rewrite bound_var_app_ctx).
+        rewrite <- bound_var_rename_all_ns.
+        rewrite fundefs_append_bound_vars.
+        2: reflexivity.
+        rewrite fundefs_append_bound_vars with (B3 := (fundefs_append B1 (Fcons f t xs fb B2))).
+        2: reflexivity.
+        repeat normalize_bound_var.
+        eauto 25 with Ensembles_DB.
+          eauto with Ensembles_DB.
         eappl
         repeat normalize_occurs_free_in_ctx.
         repeat normalize_occurs_free.

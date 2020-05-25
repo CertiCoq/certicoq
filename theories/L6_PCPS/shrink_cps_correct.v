@@ -5722,6 +5722,49 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - eapply of_fun_inline_app; eauto.
     - eapply of_fun_inline_letapp; eauto.
   Qed.
+
+  Lemma rw_preserves_bv e e' :
+    rw e e' ->
+    bound_var e' \subset bound_var e.
+  Proof. 
+    intros Hrw.
+    inv Hrw;
+      (try now (repeat normalize_bound_var; sets)). 
+    - repeat normalize_bound_var.
+      rewrite fundefs_append_bound_vars; [| reflexivity ].
+      rewrite fundefs_append_bound_vars with (B3 := (fundefs_append B1 (Fcons f t xs fb B2))); [| reflexivity ].
+      normalize_bound_var. sets.
+    - repeat normalize_bound_var.
+      rewrite !bound_var_app_ctx.
+      eapply Union_Included; sets.
+      eapply Union_Included; sets.
+      intros z Hin. left; right.
+      eapply Bound_Ecase. eassumption.
+      eapply find_tag_nth_In_patterns. eassumption.
+    - repeat normalize_bound_var.
+      rewrite !bound_var_app_ctx. repeat normalize_bound_var.
+      unfold rename. rewrite rename_all_bound_var. sets.
+    - repeat normalize_bound_var.
+      rewrite !bound_var_app_ctx. 
+      rewrite rename_all_bound_var.
+      eapply Union_Included; sets.
+      eapply Union_Included; sets.
+      eapply Included_Union_preserv_l.
+      eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eauto ].
+      sets.
+    - repeat normalize_bound_var.
+      rewrite !bound_var_app_ctx. 
+      unfold rename. rewrite rename_all_bound_var.
+      eapply Union_Included; sets.
+      eapply Union_Included; sets. normalize_bound_var. 
+      eapply Union_Included; sets.
+      eapply Included_trans. eapply bound_var_inline_letapp. eassumption.
+      rewrite rename_all_bound_var.
+      eapply Union_Included; sets.            
+      eapply Included_Union_preserv_l.
+      eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eauto ].
+      sets.
+  Qed.
   
   Lemma grw_preserves_fv e e' :
     gen_rw e e' ->
@@ -5735,6 +5778,18 @@ substitution to a term cannot increase the occurence count for that variable. *)
     eapply rw_preserves_fv. eassumption.
   Qed.
 
+
+  Lemma grw_preserves_bv e e' :
+    gen_rw e e' ->
+    bound_var e' \subset bound_var e.
+  Proof. 
+    intros Hc. inv Hc.
+    rewrite !bound_var_app_ctx.
+    eapply Included_Union_compat. reflexivity.
+    eapply rw_preserves_bv. eassumption.
+  Qed.
+
+
   Lemma gr_clos_preserves_fv n e e' :
     gr_clos n e e' ->
     occurs_free e' \subset occurs_free e.
@@ -5743,218 +5798,132 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - eapply Included_trans; eauto.
       eapply grw_preserves_fv. eassumption.
     - reflexivity. 
-  Qed.       
-
-  Lemma gsr_preserves_clos:
-    forall n e e',
-      unique_bindings e ->
-      closed_exp e ->
-      gsr_clos n e e' ->
-      unique_bindings e' /\
-      closed_exp e'.
-  Proof.
-    intros n e e' Hub Hdj H.
-    induction H; eauto.
-    split.
-
-    
-    - inv H. inv H0.
-      + split.
-        apply ub_app_ctx_f in Hub.
-        apply ub_app_ctx_f. destructAll.
-        inv H1.
-        split; auto.
-        split; auto.
-        rewrite bound_var_Econstr in H2.
-        eauto with Ensembles_DB.
-        apply Included_Empty_set_l.
-        eapply Proper_Included_r.
-        auto.
-        apply Hdj.
-        apply of_constr_dead. apply H.
-      + split.
-        apply ub_app_ctx_f in Hub.
-        apply ub_app_ctx_f. destructAll.
-        inv H1.
-        split; auto.
-        split; auto.
-        rewrite bound_var_Eprim in H2.
-        eauto with Ensembles_DB.
-        apply Included_Empty_set_l.
-        eapply Proper_Included_r.
-        auto.
-        apply Hdj.
-        apply of_prim_dead. apply H.
-      + split.
-        apply ub_app_ctx_f in Hub.
-        apply ub_app_ctx_f. destructAll.
-        inv H1.
-        split; auto.
-        split; auto.
-        rewrite bound_var_Eproj in H2.
-        eauto with Ensembles_DB.
-        apply Included_Empty_set_l.
-        eapply Proper_Included_r.
-        auto.
-        apply Hdj.
-        apply of_proj_dead. apply H.
-      + split.
-        apply ub_app_ctx_f in Hub.
-        apply ub_app_ctx_f. destructAll.
-        inv H1.
-        split; auto.
-        split; auto.
-        rewrite bound_var_Efun in H2.
-        eauto with Ensembles_DB.
-        apply Included_Empty_set_l.
-        eapply Proper_Included_r.
-        auto.
-        apply Hdj.
-        apply of_fun_dead. apply H.
-      + apply ub_app_ctx_f in Hub.
-        destructAll.
-        inv H1.
-        rewrite bound_var_Efun in H2.
-        rewrite fundefs_append_bound_vars in H2. 2: reflexivity.
-        rewrite bound_var_fundefs_Fcons in H2.
-        rewrite fundefs_append_bound_vars in H7. 2: reflexivity.
-        rewrite bound_var_fundefs_Fcons in H7.
-        split.
-        apply ub_app_ctx_f.
-        split; auto.
-        split.
-        constructor; auto.
-        {
-          eapply fundefs_append_unique_bindings_l in H6.
-          2: reflexivity.
-          destructAll.
-          inv H3.
-          eapply fundefs_append_unique_bindings_r; auto.
-          rewrite bound_var_fundefs_Fcons in H4.
-          eapply Disjoint_Included_r.
-          2: apply H4.
-          eauto with Ensembles_DB.
-        }
-        rewrite fundefs_append_bound_vars.
-        2: reflexivity.
-        eapply Disjoint_Included_r.
-        2: apply H7.
-        eauto with Ensembles_DB.
-        rewrite bound_var_Efun.
-        rewrite fundefs_append_bound_vars.
-        2: reflexivity.
-        eapply Disjoint_Included_r.
-        2: apply H2.
-        eauto with Ensembles_DB.
-        apply Included_Empty_set_l.
-        eapply Proper_Included_r.
-        auto.
-        apply Hdj.
-        eapply of_fun_rm.
-        auto.
-        auto.
-      + split.
-        {
-          rewrite inv_app_Econstr.
-          rewrite app_ctx_f_fuse.
-          rewrite app_ctx_f_fuse.
-          rewrite inv_app_Econstr in Hub.
-          rewrite app_ctx_f_fuse in Hub.
-          rewrite app_ctx_f_fuse in Hub.
-          eapply ub_case_inl.
-          2: apply Hub.
-          eexists; eauto.
-        }
-        apply Included_Empty_set_l.
-        eapply Proper_Included_r.
-        auto.
-        apply Hdj.
-        eapply of_case_fold. auto.
-      + split.
-        {
-          rewrite inv_app_Econstr.
-          rewrite app_ctx_f_fuse.
-          rewrite app_ctx_f_fuse.
-          rewrite inv_app_Econstr in Hub.
-          rewrite app_ctx_f_fuse in Hub.
-          rewrite app_ctx_f_fuse in Hub.
-          eapply ub_proj_dead in Hub.
-          apply ub_app_ctx_f in Hub.
-          destructAll.
-          rewrite bound_var_rename_all_ns in H2.
-          unfold rename.
-          eapply unique_bindings_rename_all_ns in H1.
-          apply ub_app_ctx_f; eauto.
-        }
-        apply Included_Empty_set_l.
-        eapply Proper_Included_r.
-        auto.
-        apply Hdj.
-        apply occurs_free_exp_ctx_included.
-        apply of_constr_proj'.
-        auto.
-      + split.
-
-        eapply ub_fun_inlining; apply Hub.
-
-        apply Included_Empty_set_l.
-        eapply Proper_Included_r.
-        auto.
-        apply Hdj.
-        apply of_fun_inline; eauto.
-    - split; auto.
-    - specialize (IHclos_refl_trans1 Hub Hdj).
-      destructAll.
-      apply IHclos_refl_trans2; auto.
   Qed.
 
-  Lemma gsr_clos_in_gr_clos e e' :
-    unique_bindings e ->
-    Disjoint _ (bound_var e) (occurs_free e) ->
-    gsr_clos e e' ->
-    gr_clos e e'. 
-  Proof.    
-    intros Hun Hdis Hrw. induction Hrw.
-    - eapply rt_step. inv H.
-      constructor. eapply sr_rw_in_rw; eauto.
-      eapply ub_app_ctx_f in Hun. destructAll. eassumption. 
-      eapply Disjoint_bv_of_ctx; eassumption.
-    - eapply rt_refl.
-    - eapply rt_trans.
-      eapply IHHrw1; eassumption.
-      eapply IHHrw2. admit. admit. 
+  Lemma gr_clos_preserves_bv n e e' :
+    gr_clos n e e' ->
+    bound_var e' \subset bound_var e.
+  Proof. 
+    intros Hc. induction Hc.
+    - eapply Included_trans; eauto.
+      eapply grw_preserves_bv. eassumption.
+    - reflexivity. 
+  Qed.
   
+  Lemma sr_rw_step n e e' :
+    sr_rw n e e' ->
+    1 <= n.
+  Proof. intros H; inv H; auto. Qed.
 
 
-  Lemma grs_in_gr: forall e e',
-      unique_bindings e ->
-      Disjoint _ (bound_var e) (occurs_free e) ->
-      gsr_clos e e' ->
-      gr_clos e e'.
-  Proof.
-    intros.
-    induction H1.
-    - apply sr_rw_in_rw; auto.
-    - apply rt_refl.
-    - eapply rt_trans; eauto.
-      apply IHclos_refl_trans1; auto.
-      apply rw_preserves in H1_ ; auto.
-      destruct H1_.
-      apply IHclos_refl_trans2; auto.
+  Lemma refl_trans_closure_n_ctx_compat (R : relation exp) :
+    (forall e e' C, R e e' -> R (C |[ e ]|) (C |[ e' ]|)) ->
+    (forall e e' C n, refl_trans_closure_n R n e e' -> refl_trans_closure_n R n (C |[ e ]|) (C |[ e' ]|)).
+  Proof. 
+    intros Hyp e e' C n Hr. induction Hr.
+    - econstructor.
+      eapply Hyp. eassumption. eassumption.
+    - eapply Refl.
+  Qed.      
+    
+  Lemma gen_sr_in_rw (n : nat) (e e' : exp) :
+    unique_bindings e ->
+    Disjoint var (bound_var e) (occurs_free e) ->
+    gen_sr_rw n e e' ->
+    gr_clos n e e'.
+  Proof.    
+    intros Hun Hdis Hsw. inv Hsw.
+    eapply refl_trans_closure_n_ctx_compat.
+    2:{ eapply sr_rw_in_rw; [ | | eassumption ].
+        - eapply ub_app_ctx_f in Hun. destructAll. eassumption. 
+        - eapply Disjoint_bv_of_ctx; eauto. }
+    
+    intros e1 e2 C Hrw. inv Hrw.
+    rewrite !app_ctx_f_fuse. constructor; eauto.
   Qed.
 
-  Corollary sr_correct e e' :
+  Lemma gen_sr_rw_preserves n e e':
     unique_bindings e ->
     Disjoint _ (bound_var e) (occurs_free e) ->
-    gsr_clos e e' ->
-    forall pr cenv rho rho' k,
-      preord_env_P pr cenv (occurs_free e) k rho rho'->
-      preord_exp pr cenv k (e, rho) (e', rho').
+    gen_sr_rw n e e' ->
+    unique_bindings e' /\
+    Disjoint _ (bound_var e') (occurs_free e').
   Proof.
-    intros.
-    apply rw_correct.
-    apply grs_in_gr; auto.
-    auto.
+    intros Hun Hdis Hrw.
+    split. 
+    + inv Hrw.
+      assert (Hun' := Hun). eapply ub_app_ctx_f in Hun.
+      destructAll.
+      assert (Hrw := H). eapply rw_preserves in H; eauto. destructAll.
+      eapply ub_app_ctx_f with (c := c). split; [| split ]; eauto.
+      eapply Disjoint_Included_r; [| eassumption ].
+      eapply gr_clos_preserves_bv. eapply sr_rw_in_rw; eauto.
+      now eapply Disjoint_bv_of_ctx; eauto.
+      now eapply Disjoint_bv_of_ctx; eauto. 
+    + eapply Disjoint_Included; [| | eassumption ].
+      eapply gr_clos_preserves_fv. eapply gen_sr_in_rw; eauto.
+      eapply gr_clos_preserves_bv. eapply gen_sr_in_rw; eauto.
   Qed.
+
+  
+  Lemma gsr_clos_in_rw (n : nat) (e e' : exp) :
+    unique_bindings e ->
+    Disjoint var (bound_var e) (occurs_free e) ->
+    gsr_clos n e e' ->
+    gr_clos n e e'.
+  Proof.    
+    intros Hun Hdis Hsw. induction Hsw.
+    - eapply refl_trans_closure_n_trans.
+      eapply gen_sr_in_rw; eauto.
+      eapply IHHsw. eapply gen_sr_rw_preserves; eauto. 
+      eapply gen_sr_rw_preserves; eauto.
+    - eapply Refl.
+  Qed.
+
+  
+  Lemma gsr_clos_preserves n e e':
+    unique_bindings e ->
+    Disjoint _ (bound_var e) (occurs_free e) ->
+    gsr_clos n e e' ->
+    unique_bindings e' /\
+    Disjoint _ (bound_var e') (occurs_free e').
+  Proof.
+    intros Hun Hdis H. induction H; eauto. 
+    eapply IHgsr_clos.
+    eapply gen_sr_rw_preserves; eauto.
+    eapply gen_sr_rw_preserves; eauto.
+  Qed.
+
+  
+  Lemma gsr_clos_preserves_clos n e e' :
+    unique_bindings e ->
+    closed_exp e ->
+    gsr_clos n e e' ->
+    unique_bindings e' /\ closed_exp e'.
+  Proof.
+    intros Hun Hc Hrw.
+    split.
+    - eapply gsr_clos_preserves; eauto.
+      unfold closed_exp in *. rewrite Hc. sets.
+    - eapply gsr_clos_in_rw in Hrw; eauto.
+      + eapply gr_clos_preserves_fv in Hrw.
+        unfold closed_exp in *. rewrite Hc in Hrw.
+        eapply Included_Empty_set_r; eauto.
+      + unfold closed_exp in *. rewrite Hc. sets.
+  Qed.      
+
+  (* Corollary sr_correct n e e' : *)
+  (*   unique_bindings e -> *)
+  (*   Disjoint _ (bound_var e) (occurs_free e) -> *)
+  (*   gsr_clos n e e' -> *)
+  (*   forall pr cenv rho rho' k, *)
+  (*     preord_env_P cenv P1 PG (occurs_free e) k rho rho'-> *)
+  (*     preord_exp cenv P1 PG k (e, rho) (e', rho'). *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   apply rw_correct. *)
+  (*   apply grs_in_gr; auto. *)
+  (*   auto. *)
+  (* Qed. *)
 
 End Shrink_Rewrites.

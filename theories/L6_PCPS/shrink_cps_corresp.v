@@ -15,44 +15,20 @@ Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.
 Require Import Libraries.CpdtTactics Coq.Sorting.Permutation.
 Require Import Libraries.HashMap.
 Require Import Libraries.maps_util.
-Require Import L6.Ensembles_util. 
-Require Import L6.cps.
-Require Import L6.ctx L6.logical_relations.
-Require Import L6.cps_util L6.List_util L6.shrink_cps L6.eval L6.set_util L6.identifiers  L6.stemctx.
+Require Import L6.Ensembles_util L6.cps L6.ctx L6.logical_relations L6.tactics L6.cps_util L6.List_util
+        L6.shrink_cps L6.eval L6.set_util L6.identifiers L6.stemctx L6.shrink_cps_correct. 
 
 
 
-Require Import L6.shrink_cps_correct.
-
-
-
-
-
-Ltac pi0 :=
+Ltac dec_vars :=
   repeat match goal with
-           | [ H: _ + _ = 0 |- _ ] =>  apply plus_is_O in H; destruct H; subst; pi0
-           | [ H: 0 = _ + _ |- _ ] => symmetry in H; pi0
-           | [ H: (if cps_util.var_dec ?X ?Y then _ else _) = 0 |- _] => destruct (cps_util.var_dec X Y); try inversion H; pi0                | [ H: ?X <> ?X |- _] => exfalso; apply H; auto
+         | [ H: (if cps_util.var_dec ?X ?Y then _ else _) = 0 |- _] =>
+           destruct (cps_util.var_dec X Y); try inversion H; pi0
          end.
+
 
 Notation "A =mgd0= B" := (map_getd_r _ 0 A B) (at level 80).
 Notation "A =mg= B" := (map_get_r _ A B) (at level 81).
-
-
-
-
-Theorem split_fds_nil:
-  (forall fds fds',
-     split_fds Fnil fds fds' -> fds = fds') /\
-  (forall fds fds',
-     split_fds fds Fnil fds' -> fds = fds').
-Proof.
-  split; induction fds; intros; inversion H; subst.
-  erewrite IHfds; eauto.
-  reflexivity.
-  erewrite IHfds; eauto.
-  reflexivity.
-Qed.
 
 Notation c_plus := (fun v c => get_c v c + 1)%nat.
 Notation c_minus := (fun v c => get_c v c - 1)%nat.
@@ -62,7 +38,6 @@ Section CENSUS.
   Definition c_count: exp -> c_map -> Prop :=
     fun e count => forall v, num_occur e v (get_c v count).
 
-
   Definition c_count_f: fundefs -> c_map -> Prop :=
     fun f count => forall v, num_occur_fds f v (get_c v count).
 
@@ -71,32 +46,32 @@ Section CENSUS.
 
   Definition c_count_fdc: fundefs_ctx -> c_map -> Prop :=
     fun fdc count => forall v, num_occur_fdc fdc v (get_c v count).
-
-
-
-  Definition init_census_f (f:fundefs) := update_census_f (M.empty var) f (fun v c =>
-                                                                             get_c v c + 1)%nat (M.empty nat).
+  
+  Definition init_census_f (f:fundefs) :=
+    update_census_f (M.empty var) f (fun v c => get_c v c + 1)%nat (M.empty nat).
 
   Fixpoint f_opt_d {A} (d:A) f on om: option A :=
     match on with
-      | Some n =>  (match om with
-                      | Some m => Some (f n m)
-                      | None => Some (f n d)
-                    end)
-      | None => match om with
-                  | Some m => Some (f d m)
-                  | None => None
-                end
+    | Some n => (match om with
+                 | Some m => Some (f n m)
+                 | None => Some (f n d)
+                 end)
+    | None => match om with
+              | Some m => Some (f d m)
+              | None => None
+              end
     end.
 
-
+  
   Lemma gccombine:
     forall (x : M.elt) (x1 x0 : c_map) (n m: nat),
       get_c x x1 = n ->
       get_c x x0 = m ->
       get_c x (M.combine (f_opt_d 0 Init.Nat.add) x1 x0) = (n + m).
   Proof.
-    unfold getd; intros. rewrite M.gcombine. destruct (M.get x x1); destruct (M.get x x0); simpl; subst; auto. reflexivity.
+    unfold getd; intros. rewrite M.gcombine.
+    destruct (M.get x x1); destruct (M.get x x0);
+      simpl; subst; auto. reflexivity.
   Qed.
 
 
@@ -104,24 +79,24 @@ Section CENSUS.
     forall (x : M.elt) (x1 x0 : c_map),
       get_c x (M.combine (f_opt_d 0 Init.Nat.add) x1 x0) = (get_c x x1 + get_c x x0).
   Proof.
-    unfold getd; intros. rewrite M.gcombine. destruct (M.get x x1); destruct (M.get x x0); simpl; subst; auto. reflexivity.
+    unfold getd; intros. rewrite M.gcombine.
+    destruct (M.get x x1); destruct (M.get x x0); simpl; subst; auto. reflexivity.
   Qed.
 
   Lemma gccombine_sub:
     forall (x : M.elt) (x1 x0 : c_map),
       get_c x (M.combine (f_opt_d 0 Init.Nat.sub) x1 x0) = (get_c x x1 - get_c x x0 ).
   Proof.
-    unfold getd; intros. rewrite M.gcombine. destruct (M.get x x1); destruct (M.get x x0); simpl; subst; auto. reflexivity.
+    unfold getd; intros. rewrite M.gcombine.
+    destruct (M.get x x1); destruct (M.get x x0); simpl; subst; auto. reflexivity.
   Qed.
 
 
-
-  Lemma proper_set_fun: forall f x y z,
-                          map_getd_r nat 0 x y ->
-                          (forall c c' : Maps.PTree.t nat,
-                             map_getd_r nat 0 c c' -> forall n0 : var, f n0 c = f n0 c') ->
-                          map_getd_r nat 0 (M.set z (f z x) x)
-                                     (M.set z (f z y) y).
+  Lemma proper_set_fun f x y z :
+    map_getd_r nat 0 x y ->
+    (forall c c' : Maps.PTree.t nat,
+        map_getd_r nat 0 c c' -> forall n0 : var, f n0 c = f n0 c') ->
+    map_getd_r nat 0 (M.set z (f z x) x) (M.set z (f z y) y).
   Proof.
     intro; intro; intros; intro.
     destruct (var_dec v z).
@@ -129,10 +104,6 @@ Section CENSUS.
     do 2 (rewrite gdss).  apply H0; auto.
     rewrite gdso. rewrite gdso. apply H. auto. auto.
   Qed.
-
-
-
-
 
   Theorem proper_update_census_d_list:
     forall {l} {f} {sig},
@@ -149,12 +120,12 @@ Section CENSUS.
   Qed.
 
 
-  Theorem proper_update_census_d: forall f,
-                                    (forall c c', map_getd_r _ 0 c c' -> forall n, f n c = f n c') ->
-                                    (forall e sig, Proper (map_getd_r _ 0 ==> map_getd_r _ 0) (update_census sig e f))
-                                    /\ (forall fds sig, Proper (map_getd_r _ 0 ==> map_getd_r _ 0) (update_census_f sig fds f)).
+  Theorem proper_update_census_d f :
+    (forall c c', map_getd_r _ 0 c c' -> forall n, f n c = f n c') ->
+    (forall e sig, Proper (map_getd_r _ 0 ==> map_getd_r _ 0) (update_census sig e f)) /\
+    (forall fds sig, Proper (map_getd_r _ 0 ==> map_getd_r _ 0) (update_census_f sig fds f)).
   Proof.
-    intros f fhs;
+    intros fhs;
     eapply exp_def_mutual_ind; intros; simpl.
     - intro. intros.
       apply H.
@@ -169,6 +140,10 @@ Section CENSUS.
       revert fhs.
       revert H0.
       apply proper_set_fun.
+    - intro. intros.
+      apply H.
+      apply proper_update_census_d_list; auto.
+      apply proper_set_fun; eauto.
     - intro. intros.
       apply H0.
       apply H. auto.
@@ -188,47 +163,46 @@ Section CENSUS.
   Qed.
 
 
-
-
-  Theorem proper_plus_census_d: forall e sig, Proper (map_getd_r _ 0 ==> map_getd_r _ 0) (update_census sig e c_plus).
+  Theorem proper_plus_census_d e sig:
+    Proper (map_getd_r _ 0 ==> map_getd_r _ 0) (update_census sig e c_plus).
   Proof.
     apply proper_update_census_d.
     intros.  rewrite H. reflexivity.
   Qed.
 
-  Theorem proper_minus_census_d: forall e sig, Proper (map_getd_r _ 0 ==> map_getd_r _ 0) (update_census sig e c_minus).
+  Theorem proper_minus_census_d e sig:
+    Proper (map_getd_r _ 0 ==> map_getd_r _ 0) (update_census sig e c_minus).
   Proof.
     apply proper_update_census_d.
     intros. rewrite H; auto.
   Qed.
 
 
-  Theorem init_census_f_ar_l: forall f l sig c,
-                                map_getd_r _ 0 (update_census_list (M.empty var) (apply_r_list sig l) f c) (update_census_list sig l f c).
+  Theorem init_census_f_ar_l f l sig c :
+    map_getd_r _ 0 (update_census_list (M.empty var) (apply_r_list sig l) f c) (update_census_list sig l f c).
   Proof.
-    induction l; intros.
+    revert f sig c; induction l; intros f sig c.
     - intro. simpl. reflexivity.
-    - simpl. rewrite apply_r_empty.
+    - simpl. rewrite !apply_r_empty.
       apply IHl.
   Qed.
-
+  
   (** update_census sig on m produces the same count as update_census (empty) on (sig m)  *)
   (* TODO: change name*)
-  Theorem init_census_f_ar:
-    forall f,       (forall c c', map_getd_r _ 0 c c' -> forall n, f n c = f n c') ->
-
-                    (forall m sig c,
-                       map_getd_r _ 0 (update_census (M.empty var) (rename_all_ns sig m) f c) (update_census sig m f c)) /\
-                    (forall m sig c,
-                       map_getd_r _ 0 (update_census_f (M.empty var) (rename_all_fun_ns sig m) f c) (update_census_f sig m f c)).
+  Theorem init_census_f_ar f :
+    (forall c c', map_getd_r _ 0 c c' -> forall n, f n c = f n c') ->    
+    (forall m sig c,
+        map_getd_r _ 0 (update_census (M.empty var) (rename_all_ns sig m) f c) (update_census sig m f c)) /\
+    (forall m sig c,
+        map_getd_r _ 0 (update_census_f (M.empty var) (rename_all_fun_ns sig m) f c) (update_census_f sig m f c)).
   Proof.
-    intros f Hf;
+    intros Hf;
     eapply exp_def_mutual_ind; intros.
-    -  simpl.
-       intro. rewrite <- H.
-       apply proper_update_census_d.
-       auto.
-       apply init_census_f_ar_l.
+    - simpl.
+      intro. rewrite <- H.
+      apply proper_update_census_d.
+      auto.
+      apply init_census_f_ar_l.
     - simpl.
       rewrite apply_r_empty.
       apply smgd_refl.
@@ -237,12 +211,18 @@ Section CENSUS.
       apply proper_update_census_d. auto.
       simpl in H0.
       apply H0.
-    -  simpl.
-       intro. rewrite <- H.
-       apply proper_update_census_d.
-       auto.
-       rewrite apply_r_empty.
-       apply smgd_refl.
+    - simpl.
+      intro. rewrite <- H.
+      apply proper_update_census_d.
+      auto.
+      rewrite apply_r_empty.
+      apply smgd_refl.
+    - simpl.
+      intro. rewrite <- H.
+      apply proper_update_census_d.
+      auto.
+      rewrite !apply_r_empty.
+      apply init_census_f_ar_l.
     - simpl.
       intro.
       rewrite <- H0.
@@ -266,11 +246,10 @@ Section CENSUS.
       auto.
     - simpl. apply smgd_refl.
   Qed.
+  
 
-
-  Theorem init_census_plus_ar:
-    (forall m sig c,
-       map_getd_r _ 0 (update_census (M.empty var) (rename_all_ns sig m) c_plus c) (update_census sig m c_plus c)).
+  Theorem init_census_plus_ar m sig c :
+       map_getd_r _ 0 (update_census (M.empty var) (rename_all_ns sig m) c_plus c) (update_census sig m c_plus c).
   Proof.
     apply init_census_f_ar.
     intros.
@@ -278,9 +257,8 @@ Section CENSUS.
   Qed.
 
 
-  Theorem init_census_plus_ar_f:
-    (forall m sig c,
-       map_getd_r _ 0 (update_census_f (M.empty var) (rename_all_fun_ns sig m) c_plus c) (update_census_f sig m c_plus c)).
+  Theorem init_census_plus_ar_f m sig c :
+    map_getd_r _ 0 (update_census_f (M.empty var) (rename_all_fun_ns sig m) c_plus c) (update_census_f sig m c_plus c).
   Proof.
     apply init_census_f_ar.
     intros.
@@ -289,17 +267,16 @@ Section CENSUS.
   Qed.
 
 
-  Theorem combine_plus_census_list: forall l count sig,
-                                      map_getd_r _ 0 (M.combine (f_opt_d 0 plus)
-                                                                count
-                                                                (update_census_list (M.empty var) (apply_r_list sig l) c_plus (M.empty nat)))
-                                                 (update_census_list sig l c_plus count).
+  Theorem combine_plus_census_list l count sig :
+    map_getd_r _ 0 (M.combine (f_opt_d 0 plus) count
+                              (update_census_list (M.empty var) (apply_r_list sig l) c_plus (M.empty nat)))
+               (update_census_list sig l c_plus count).
   Proof.
-    induction l; intros.
+    revert count sig; induction l; intros count sig.
     - simpl. intro. rewrite gccombine'. rewrite gdempty. auto.
-    - simpl. intro. rewrite gccombine'. rewrite <- IHl.
-      simpl. rewrite gccombine'. rewrite apply_r_empty.
-      rewrite gdempty. simpl.
+    - simpl. intro. rewrite !gccombine'. rewrite apply_r_empty. rewrite gdempty. simpl.
+      rewrite <- IHl.
+      simpl. rewrite gccombine'. 
       rewrite init_census_f_ar_l.
       rewrite <- IHl.
       rewrite gccombine'.
@@ -310,9 +287,9 @@ Section CENSUS.
         rewrite gdso by auto.
         rewrite gdempty. simpl. reflexivity.
   Qed.
-
-  Theorem get_c_up : forall v v0 count,
-                       get_c v0 (M.set v (get_c v count + 1) count) = get_c v0 count + get_c v0 (M.set v 1 (M.empty nat)).
+  
+  Theorem get_c_up v v0 count :
+    get_c v0 (M.set v (get_c v count + 1) count) = get_c v0 count + get_c v0 (M.set v 1 (M.empty nat)).
   Proof.
     intros. destruct (var_dec v v0).
     - subst.
@@ -325,9 +302,11 @@ Section CENSUS.
   Qed.
 
   (** update_census sig on m with c_plus adds the occurences of variables in (sig m) to their respective tally in count  *)
-  Theorem combine_plus_census_correct: (forall  m count sig,
-                                          map_getd_r _ 0 (M.combine (f_opt_d 0 plus) count (init_census (rename_all_ns sig m))) (update_census sig m c_plus count)) /\
-                                       (forall f count sig,   map_getd_r _ 0 (M.combine (f_opt_d 0 plus) count (update_census_f (M.empty var) (rename_all_fun_ns sig f) c_plus (M.empty nat))) (update_census_f sig f c_plus count)).
+  Theorem combine_plus_census_correct :
+    (forall m count sig,
+              map_getd_r _ 0 (M.combine (f_opt_d 0 plus) count (init_census (rename_all_ns sig m))) (update_census sig m c_plus count)) /\
+    (forall f count sig,
+        map_getd_r _ 0 (M.combine (f_opt_d 0 plus) count (update_census_f (M.empty var) (rename_all_fun_ns sig f) c_plus (M.empty nat))) (update_census_f sig f c_plus count)).
   Proof.
     eapply exp_def_mutual_ind; intros; simpl.
     - intro. rewrite gccombine'.
@@ -363,9 +342,8 @@ Section CENSUS.
       rewrite init_census_plus_ar.
       symmetry.
       erewrite proper_plus_census_d.
-      Focus 2. apply smgd_sym. apply H0.
-      rewrite <- H.
-      rewrite <- H.
+      2:{ apply smgd_sym. apply H0. }
+      rewrite <- H. rewrite <- H.
       do 3 (rewrite gccombine').
       omega.
     - unfold init_census.
@@ -379,6 +357,69 @@ Section CENSUS.
       rewrite get_c_up.
       rewrite gdempty.
       rewrite get_c_up. omega.
+    - intro. rewrite gccombine'. rewrite <- H.
+      rewrite gccombine'.
+      unfold init_census. simpl.  rewrite <- !combine_plus_census_list.
+      rewrite gccombine'.
+      assert (Hfr := init_census_f_ar). destruct (Hfr c_plus). intros. simpl. rewrite H0. now auto.
+      rewrite H0. rewrite <- H. rewrite gccombine'.
+      unfold init_census.
+      
+      rewrite <- combine_plus_census_list. simpl. rewrite !gccombine'.
+      rewrite !gdempty. simpl. 
+      rewrite !apply_r_empty. simpl.      
+      rewrite !get_c_up.
+
+  get_c v count +
+  (get_c v (M.set (apply_r sig f) 1 (M.empty nat)) +
+   get_c v
+     (update_census_list (M.empty var) (apply_r_list (M.empty var) (apply_r_list sig ys)) c_plus
+        (M.empty nat)) +
+   get_c v (update_census (M.empty var) (rename_all_ns sig e) c_plus (M.empty nat))) =
+  get_c v count + get_c v (M.set (apply_r sig f) 1 (M.empty nat)) +
+  get_c v (update_census_list (M.empty var) (apply_r_list sig ys) c_plus (M.empty nat)) +
+  get_c v (update_census (M.empty var) (rename_all_ns sig e) c_plus (M.empty nat))
+
+    - intro.
+      rewrite gccombine'.
+      unfold init_census.
+      simpl.
+      rewrite gdempty.
+      rewrite plus_n_O.
+      rewrite apply_r_empty.
+      simpl.
+      rewrite get_c_up.
+      omega.
+
+
+    - intro v. rewrite !gccombine'. unfold init_census. simpl. 
+      rewrite <- H.
+      rewrite !gccombine'.
+      unfold init_census.
+      rewrite <- combine_plus_census_list.
+      rewrite !gccombine'.
+      assert (Hfr := init_census_f_ar).
+      destruct (Hfr c_plus). 1:{ intros. simpl. rewrite H0. auto. }
+      rewrite !H0.
+      rewrite !H1. 
+      rewrite <- H.
+      rewrite !gccombine'. simpl.
+      
+      rewrite !init_census_plus_ar.
+      symmetry.
+      
+      erewrite proper_plus_census_d.
+      2:{ apply smgd_sym. apply H0. }
+      rewrite <- H. rewrite <- H.
+      do 3 (rewrite gccombine').
+      omega.
+
+      
+      erewrite proper_plus_census_d.
+      
+      unfold init_census.
+      omega.
+
     - intro.
       rewrite gccombine'.
       unfold init_census. simpl.
@@ -452,9 +493,9 @@ Section CENSUS.
 
 
 
-  Theorem update_census_list_correct: forall v sig l count,
-                                        getd 0 v (update_census_list sig l c_plus count) =
-                                        getd 0 v count + num_occur_list (apply_r_list sig l) v.
+  Theorem update_census_list_correct v sig l count :
+    getd 0 v (update_census_list sig l c_plus count) =
+    getd 0 v count + num_occur_list (apply_r_list sig l) v.
   Proof.
     induction l; intros.
     - simpl; omega.

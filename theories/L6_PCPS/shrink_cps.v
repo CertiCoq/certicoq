@@ -1807,7 +1807,7 @@ End CONTRACT.
 Definition shrink_top (e:exp) : exp :=
   let count := init_census e in
   match (contract (M.empty var) count e (M.empty svalue) (M.empty bool)) with
-  | existT (e', _, _) _ => e'
+  | existT (e', _, _, _) _ => e'
   end.
 
 (* Perform n passes of contract of e starting with count map c *)
@@ -1816,7 +1816,7 @@ Fixpoint shrink_n_times' (e:exp) (c:c_map) (n:nat): (exp * c_map) :=
   | 0 => (e, c)
   | (S n') =>
     match (contract (M.empty var) c e (M.empty svalue) (M.empty bool)) with
-    | existT (e', c', _) _ => shrink_n_times' e' c' n'
+    | existT (e', _, c', _) _ => shrink_n_times' e' c' n'
     end
   end.
 

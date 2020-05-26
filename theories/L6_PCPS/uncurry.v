@@ -41,19 +41,18 @@ Section UNCURRY.
 
   (* Returns true iff [k] occurs (at all) within the expression [e] *)
   (* TODO: move to identifier utils *)
+  Definition occurs_in_arms' (occurs_in_exp : var -> exp -> bool) k : list (ctor_tag * exp) -> bool :=
+    fix go arms :=
+      match arms with
+      | nil => false
+      | (_, e) :: arms1 => occurs_in_exp k e || go arms1
+      end.
   Fixpoint occurs_in_exp (k:var) (e:exp) : bool :=
     match e with
     | Econstr z _ xs e1 =>
       eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
     | Ecase x arms =>
-      eq_var k x ||
-              (fix occurs_in_arms (arms: list (ctor_tag * exp)) : bool :=
-                 match arms with
-                 | nil => false
-                 | p::arms1 => match p with
-                               | (_,e) => occurs_in_exp k e || occurs_in_arms arms1
-                               end
-                 end) arms
+      eq_var k x || occurs_in_arms' occurs_in_exp k arms
     | Eproj z _ _ x e1 =>
       eq_var z k || eq_var k x || occurs_in_exp k e1
     | Eletapp z f _ xs e1 =>
@@ -73,6 +72,7 @@ Section UNCURRY.
            eq_var z k || occurs_in_vars k zs || occurs_in_exp k e ||
                    occurs_in_fundefs k fds1
          end.
+  Definition occurs_in_arms := occurs_in_arms' occurs_in_exp.
 
 
   (* pair of 

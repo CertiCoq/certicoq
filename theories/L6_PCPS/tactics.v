@@ -34,7 +34,7 @@ Ltac pi0 :=
          | [ H: _ + _ = 0 |- _ ] =>
            apply plus_is_O in H; destruct H; subst
          | [ H: 0 = _ + _ |- _ ] =>
-           apply plus_is_O in H; destruct H; subst
+           symmetry in H; pi0
          (* | [ H: (if cps_util.var_dec ?X ?Y then _ else _) = 0 |- _] => *)
          (*   destruct (cps_util.var_dec X Y); try inversion H; pi0 *)
          | [ H: ?X <> ?X |- _] =>

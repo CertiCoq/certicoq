@@ -5043,3 +5043,533 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
       destruct (Dece x). now left; constructor; auto.
       now right; intros Hc; inv Hc; auto.
   Qed.
+
+  (** * Used variables *)
+
+  Definition eq_var := Pos.eqb.
+  
+  (** We need to determine whether variables occur free in some terms.  We
+      over-approximate by determining whether the variable occurs at all. *)
+  
+  (* Returns true iff [k] is in [xs]. *)
+  Fixpoint occurs_in_vars (k:var) (xs:list var) : bool :=
+    match xs with
+    | nil => false
+    | x::xs1 => eq_var k x || occurs_in_vars k xs1
+    end.
+
+  (* Returns true iff [k] occurs (at all) within the expression [e] *)
+  Definition occurs_in_arms' (occurs_in_exp : var -> exp -> bool) k : list (ctor_tag * exp) -> bool :=
+    fix go arms :=
+      match arms with
+      | nil => false
+      | (_, e) :: arms1 => occurs_in_exp k e || go arms1
+      end.
+  Fixpoint occurs_in_exp (k:var) (e:exp) : bool :=
+    match e with
+    | Econstr z _ xs e1 =>
+      eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
+    | Ecase x arms =>
+      eq_var k x || occurs_in_arms' occurs_in_exp k arms
+    | Eproj z _ _ x e1 =>
+      eq_var z k || eq_var k x || occurs_in_exp k e1
+    | Eletapp z f _ xs e1 =>
+      eq_var z k || eq_var f k || occurs_in_vars k xs || occurs_in_exp k e1
+    | Efun fds e =>
+      occurs_in_fundefs k fds || occurs_in_exp k e
+    | Eapp x _ xs => eq_var k x || occurs_in_vars k xs
+    | Eprim z _ xs e1 =>
+      eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
+    | Ehalt x => eq_var x k
+    end
+  (* Returns true iff [k] occurs within the function definitions [fds] *)
+  with occurs_in_fundefs (k:var) (fds:fundefs) : bool :=
+         match fds with
+         | Fnil => false
+         | Fcons z _ zs e fds1 =>
+           eq_var z k || occurs_in_vars k zs || occurs_in_exp k e ||
+                   occurs_in_fundefs k fds1
+         end.
+  Definition occurs_in_arms := occurs_in_arms' occurs_in_exp.
+
+
+  Definition used_vars (e : exp) : Ensemble var := bound_var e :|: occurs_free e.
+  Definition used_vars_fundefs (fds : fundefs) : Ensemble var
+    := bound_var_fundefs fds :|: occurs_free_fundefs fds.
+  Definition used_vars_ctx (c : exp_ctx) : Ensemble var
+    := bound_var_ctx c :|: occurs_free_ctx c.
+  Definition used_vars_fundefs_ctx (f : fundefs_ctx) : Ensemble var
+    := bound_var_fundefs_ctx f :|: occurs_free_fundefs_ctx f.
+
+  Lemma Decidable_Empty_set : forall A, Decidable (Empty_set A).
+  Proof. intros; constructor; intros; right; now inversion 1. Qed.
+
+  Lemma used_vars_dec: forall e, Decidable (used_vars e).
+  Proof.
+    intros e.
+    apply Decidable_Union.
+    apply bound_var_dec.
+    apply Decidable_occurs_free.
+  Qed.
+
+  Lemma used_vars_fundefs_dec: forall fds, Decidable (used_vars_fundefs fds).
+  Proof.
+    intros fds.
+    apply Decidable_Union.
+    apply bound_var_fundefs_dec.
+    apply Decidable_occurs_free_fundefs.
+  Qed.
+
+  Lemma used_vars_ctx_dec: forall e, Decidable (used_vars_ctx e).
+  Proof.
+    intros e.
+    apply Decidable_Union.
+    apply bound_var_ctx_dec.
+    apply Decidable_occurs_free_ctx.
+  Qed.
+
+  Lemma used_vars_fundefs_ctx_dec: forall fds, Decidable (used_vars_fundefs_ctx fds).
+  Proof.
+    intros fds.
+    apply Decidable_Union.
+    apply bound_var_fundefs_ctx_dec.
+    apply Decidable_occurs_free_fundefs_ctx.
+  Qed.
+
+  (* -------------------------------------------------------------------------------- *)
+
+  Lemma Decidable_not_not : forall {A} (S : Ensemble A),
+    Decidable S -> forall a,
+    ~ ~ Ensembles.In _ S a <-> Ensembles.In _ S a.
+  Proof.
+    intros A S HS a;
+    destruct HS as [HS];
+    specialize HS with (x := a);
+    destruct HS as [HS|HS];
+    split; easy.
+  Qed.
+
+  Lemma occurs_in_vars_correct : forall a l, occurs_in_vars a l = true <-> List.In a l.
+  Proof.
+    induction l; [firstorder|].
+    destruct (Pos.eqb_spec a a0); subst.
+    simpl; rewrite Pos.eqb_refl; simpl; split; intros; [now left|easy].
+    simpl; rewrite <- Pos.eqb_neq in n; unfold eq_var; rewrite n; simpl.
+    rewrite IHl.
+    split; [intros H; now right|intros [contra|H]]; [|assumption].
+    rewrite Pos.eqb_neq in n; congruence.
+  Qed.
+
+  Corollary occurs_in_vars_correct_neq : forall a l, occurs_in_vars a l = false <-> ~ List.In a l.
+  Proof.
+    assert (forall a, a = false <-> ~ (a = true)). {
+      split; intros Ha.
+      - intros Hcontra; congruence.
+      - destruct a; [congruence|reflexivity].
+    } 
+    intros; rewrite H.
+    apply not_iff_compat.
+    apply occurs_in_vars_correct.
+  Qed.
+
+  Lemma Union_demorgan : forall {A} (l r : Ensemble A) a,
+    ~ Ensembles.In _ (l :|: r) a <-> ~ Ensembles.In _ l a /\ ~ Ensembles.In _ r a.
+  Proof.
+    split; intros.
+    - split; intros contra; contradiction H.
+      now left. now right.
+    - destruct H. intros contra. inv contra; congruence.
+  Qed.
+
+  (*
+  Lemma Intersection_demorgan : forall {A} (l r : Ensemble A) a,
+    ~ In _ (l :&: r) a <-> ~ In _ l a \/ ~ In _ r a.
+  Proof.
+    split; intros.
+    - split; intros contra; contradiction H.
+      now left. now right.
+    - destruct H. intros contra. inv contra; congruence.
+  Qed.
+*)
+  Lemma negb_not : forall a b, a = negb b <-> a <> b.
+  Proof. destruct a; destruct b; firstorder. Qed.
+
+  Lemma Disjoint_Singleton_In : forall A S a,
+    Decidable S -> Disjoint A S [set a] <-> ~ Ensembles.In _ S a.
+  Proof.
+    split; intros H.
+    - inv H; specialize H0 with (x := a).
+      destruct X; destruct (Dec a); [|easy].
+      contradiction H0; constructor; easy.
+    - constructor.
+      intros x contra; inv contra.
+      now inv H1.
+  Qed.
+
+  Lemma not_Disjoint_Singleton_In : forall A S a,
+    Decidable S -> ~ Disjoint A S [set a] <-> Ensembles.In _ S a.
+  Proof.
+    split; [intros H|inversion 2; eapply H0; eauto].
+    destruct X; destruct (Dec a); [easy|].
+    contradiction H; constructor; intros.
+    intros contra; destruct contra.
+    inv H1.
+    contradiction.
+  Qed.
+
+  Lemma find_def_is_Some_occurs_free_fundefs : forall f fds t xs e a,
+    find_def f fds = Some (t, xs, e) ->
+    occurs_free e a ->
+    ~ List.In a xs ->
+    ~ name_in_fundefs fds a ->
+    occurs_free_fundefs fds a.
+  Proof.
+    induction fds; simpl; intros; [|now contradiction H2].
+    destruct (M.elt_eq f v); [subst; inv H|].
+    - constructor; auto; intros contra; subst; contradiction H2; [now left|now right].
+    - apply Free_Fcons2; [|intros contra; subst; contradiction H2; now left].
+      eapply IHfds; eauto.
+      intros contra; subst; contradiction H2; now right.
+  Qed.
+
+  Ltac split_var_eq a b :=
+    destruct (PS.Raw.MX.eq_dec a b).
+
+  Ltac split_var_in_list a l :=
+    destruct (in_dec PS.Raw.MX.eq_dec a l).
+
+  Ltac split_var_in_fundefs a fds Hfds :=
+    destruct (Decidable_name_in_fundefs fds) as [Hfds]; destruct (Hfds a).
+
+  Local Ltac solve_bound_cases a v l := 
+    split_var_eq a v; split_var_in_list a l;
+    [ right; now constructor
+    | left; subst a; constructor
+    | right; now constructor
+    | right].
+
+  Hint Resolve used_vars_dec : Decidable_DB.
+  Hint Resolve used_vars_fundefs_dec : Decidable_DB.
+  Hint Resolve bound_var_dec : Decidable_DB.
+  Hint Resolve bound_var_fundefs_dec : Decidable_DB.
+  Hint Resolve Decidable_occurs_free : Decidable_DB.
+  Hint Resolve Decidable_occurs_free_fundefs : Decidable_DB.
+  Hint Resolve Decidable_name_in_fundefs : Decidable_DB.
+  Hint Resolve Decidable_Empty_set : Decidable_DB.
+  Hint Resolve Decidable_Union : Decidable_DB.
+  Hint Resolve Decidable_Intersection : Decidable_DB.
+  Hint Resolve Decidable_Setminus : Decidable_DB.
+  Hint Resolve Decidable_singleton_var : Decidable_DB.
+  Hint Resolve Decidable_FromList : Decidable_DB.
+  Hint Resolve Decidable_occurs_free : Decidable_DB.
+
+  Local Ltac simplify_boolean_exprs := 
+    simpl in *;
+    repeat rewrite orb_false_r in *;
+    repeat rewrite orb_true_r in *;
+    simpl in *.
+
+  Local Ltac rewrite_trivial_iffs :=
+    repeat match goal with
+    | [ Heq : ?a <-> ?b, Ha : ?a |- _ ] => (assert b by now rewrite <- Heq); clear Heq
+    | [ Heq : ?a <-> ?b |- ?a ] => rewrite Heq
+    | [ Heq : true = false <-> ~ In var ?S ?a |- _ ] =>
+        apply not_iff_compat in Heq;
+        rewrite <- negb_not in Heq;
+        (rewrite Decidable_not_not in Heq; [|auto]);
+        (assert (In var S a) by now rewrite <- Heq); clear Heq
+    | [ Heq : false = false <-> In var ?S ?a |- _ ] =>
+        (assert (In var S a) by now rewrite <- Heq); clear Heq
+    | [ Heq : false = false <-> ~ In var ?S ?a |- _ ] => 
+        (assert (~ In var S a) by now rewrite <- Heq); clear Heq
+    end.
+
+  Local Ltac eliminate_singleton_disjoints :=
+    repeat match goal with
+    | [ Hin : _ = _ <-> Disjoint _ _ [set _] |- _ ] =>
+        rewrite Disjoint_Singleton_In in Hin; [|auto]
+    | [ Hin : _ = _ <-> ~ Disjoint _ _ [set _] |- _ ] =>
+        rewrite not_Disjoint_Singleton_In in Hin; [|auto]
+    | [ Hin : Disjoint _ _ [set _] |- _ ] =>
+        rewrite Disjoint_Singleton_In in Hin; [|auto]
+    | [ Hin : ~ Disjoint _ _ [set _] |- _ ] =>
+        rewrite not_Disjoint_Singleton_In in Hin; [|auto]
+    end;
+    try (rewrite Disjoint_Singleton_In; [|auto]);
+    try (rewrite not_Disjoint_Singleton_In; [|auto]).
+
+  Local Ltac demorgan_not_used_vars :=
+    repeat match goal with
+    | [ Hin : ~ In var (used_vars _) _ |- _ ] =>
+        unfold used_vars in Hin;
+        rewrite Union_demorgan in Hin;
+        destruct Hin
+    | [ Hin : ~ In var (used_vars_fundefs _) _ |- _ ] =>
+        unfold used_vars_fundefs in Hin;
+        rewrite Union_demorgan in Hin;
+        destruct Hin
+    end.
+
+  Local Ltac cleanup :=
+    try (rewrite occurs_in_vars_correct in *);
+    try (rewrite occurs_in_vars_correct_neq in *);
+    simplify_boolean_exprs;
+    eliminate_singleton_disjoints;
+    rewrite_trivial_iffs;
+    demorgan_not_used_vars.
+
+  Local Ltac super_destruct e Hvar :=
+    destruct e eqn:Hvar;
+    simpl in *;
+    try rewrite Hvar in *;
+    try (rewrite Pos.eqb_eq in Hvar; subst);
+    try (rewrite Pos.eqb_neq in Hvar);
+    cleanup;
+    try congruence.
+
+  Lemma Ensemble_iff_In_iff : forall {A} (S1 S2 : _ A),
+    (S1 <--> S2) <-> (forall a, Ensembles.In _ S1 a <-> Ensembles.In _ S2 a).
+  Proof.
+    split; intros.
+    now rewrite H.
+    unfold Same_set, Ensembles.Included.
+    firstorder.
+  Qed.
+
+  Lemma not_In_Setminus : forall {A} S1 S2 x,
+     (Ensembles.In _ (S1 \\ S2) x <-> Ensembles.In _ S1 x /\ ~ Ensembles.In A S2 x).
+  Proof. split; intros; [inversion H|constructor]; tauto. Qed.
+
+  Lemma In_Singleton : forall A x y, Ensembles.In A [set x] y <-> x = y.
+  Proof. split; intros; [now inversion H|now subst]. Qed.
+
+  Lemma not_In_Singleton : forall A x y, ~ Ensembles.In A [set x] y <-> x <> y.
+  Proof. split; intros; intros oops; apply H; [now subst|now inversion oops]. Qed.
+
+  Lemma In_Empty_set : forall A x, Ensembles.In A (Empty_set A) x <-> False.
+  Proof. split; intros; inversion H. Qed.
+
+  Lemma not_In_Empty_set : forall A x, ~ Ensembles.In A (Empty_set A) x <-> True.
+  Proof. split; intros; auto; inversion 1. Qed.
+
+  Lemma eq_var_iff_Singleton_l : forall b a, eq_var a b = true <-> Ensembles.In _ [set a] b.
+  Proof.
+    split; intros H; destruct (eq_var a b) eqn:Heq; try congruence.
+    rewrite Pos.eqb_eq in Heq; now subst.
+    rewrite Pos.eqb_neq in Heq; contradiction Heq; now inv H.
+  Qed.
+
+  Lemma eq_var_iff_Singleton_r : forall a b, eq_var a b = true <-> Ensembles.In _ [set b] a.
+  Proof.
+    split; intros H; destruct (eq_var a b) eqn:Heq; try congruence.
+    rewrite Pos.eqb_eq in Heq; now subst.
+    rewrite Pos.eqb_neq in Heq; contradiction Heq; now inv H.
+  Qed.
+
+  Lemma In_or_Iff_Union : forall {A} (a : A) S1 S2,
+    Ensembles.In _ (S1 :|: S2) a <-> Ensembles.In _ S1 a \/ Ensembles.In _ S2 a.
+  Proof. split; intros; destruct H; auto. Qed.
+
+  Lemma occurs_in_exp_correct_mut : forall x,
+    (forall e, (fun e => occurs_in_exp x e = false <-> Disjoint _ (used_vars e) [set x]) e) /\
+    (forall f, (fun f => occurs_in_fundefs x f = false <-> Disjoint _ (used_vars_fundefs f) [set x]) f).
+  Proof.
+    intros x.
+    apply exp_def_mutual_ind;
+    (* Rewrite by IH and translate everything to FOL *)
+    simpl; intros;
+    repeat match goal with H : ?lhs = false <-> Disjoint _ _ _ |- _ => revert H end;
+    repeat rewrite orb_false_iff;
+    repeat match goal with |- context [eq_var ?x ?y = false] => rewrite (Pos.eqb_neq x y) end;
+    repeat match goal with |- context [eq_var ?x ?y = true] => rewrite (Pos.eqb_eq x y) end;
+    repeat rewrite occurs_in_vars_correct;
+    repeat rewrite occurs_in_vars_correct_neq;
+    (* Normalize used_vars *)
+    unfold used_vars; unfold used_vars_fundefs; repeat rewrite Union_demorgan;
+    repeat normalize_bound_var; repeat normalize_occurs_free;
+    (* Normalize expressions involving Ensembles.In and solve with tauto/intuition *)
+    repeat eliminate_singleton_disjoints;
+    repeat (rewrite Union_demorgan
+     || rewrite not_In_Setminus
+     || rewrite In_Singleton
+     || rewrite not_In_Singleton
+     || rewrite In_Empty_set
+     || rewrite not_In_Empty_set);
+    (* Explain that name_in_fundefs S ⊆ bound_var_fundefs S *)
+    repeat lazymatch goal with
+    | H : Ensembles.In _ (name_in_fundefs ?S) ?x -> Ensembles.In _ (bound_var_fundefs ?S) ?x |-
+      context [Ensembles.In _ (name_in_fundefs ?S) ?x] => fail
+    | |- context [Ensembles.In _ (name_in_fundefs ?S) ?x] => 
+      assert (Ensembles.In _ (name_in_fundefs S) x -> Ensembles.In _ (bound_var_fundefs S) x)
+        by apply name_in_fundefs_bound_var_fundefs
+    end;
+    try match goal with |- Decidable _ => eauto 20 with Decidable_DB end;
+    solve [tauto|intuition congruence|firstorder|eauto with Ensembles_DB].
+  Qed.
+
+  Corollary occurs_in_exp_correct : forall x e,
+    occurs_in_exp x e = false <-> Disjoint _ (used_vars e) [set x].
+  Proof. apply occurs_in_exp_correct_mut. Qed.
+
+  Corollary occurs_in_fundefs_correct : forall x f,
+    occurs_in_fundefs x f = false <-> Disjoint _ (used_vars_fundefs f) [set x].
+  Proof. apply occurs_in_exp_correct_mut. Qed.
+
+  Corollary occurs_in_exp_iff_used_vars : forall e a,
+    occurs_in_exp a e = true <-> Ensembles.In _ (used_vars e) a.
+  Proof.
+    intros.
+    rewrite <- Decidable_not_not by auto with Decidable_DB; auto.
+    replace true with (negb false); auto.
+    rewrite negb_not.
+    apply not_iff_compat.
+    rewrite <- Disjoint_Singleton_In by auto with Decidable_DB; auto.
+    apply occurs_in_exp_correct.
+  Qed.
+
+  Corollary not_occurs_in_exp_iff_used_vars : forall e a,
+    occurs_in_exp a e = false <-> ~ Ensembles.In _ (used_vars e) a.
+  Proof. intros. rewrite <- Disjoint_Singleton_In; auto with Decidable_DB.
+         apply occurs_in_exp_correct. Qed.
+
+  Corollary occurs_in_fundefs_iff_used_vars_fundefs : forall e a,
+    occurs_in_fundefs a e = true <-> Ensembles.In _ (used_vars_fundefs e) a.
+  Proof with auto with Decidable_DB.
+    intros.
+    rewrite <- Decidable_not_not...
+    replace true with (negb false); auto.
+    rewrite negb_not.
+    apply not_iff_compat.
+    rewrite <- Disjoint_Singleton_In...
+    apply occurs_in_fundefs_correct.
+  Qed.
+
+  Corollary not_occurs_in_fundefs_iff_used_vars_fundefs : forall e a,
+    occurs_in_fundefs a e = false <-> ~ Ensembles.In _ (used_vars_fundefs e) a.
+  Proof with auto with Decidable_DB.
+    intros. rewrite <- Disjoint_Singleton_In...
+    apply occurs_in_fundefs_correct.
+  Qed.
+
+  Ltac translate_used_vars_to_firstorder a :=
+    repeat (
+      repeat rewrite <- occurs_in_exp_iff_used_vars in *; simpl in *;
+      repeat rewrite <- occurs_in_fundefs_iff_used_vars_fundefs in *; simpl in *;
+      repeat rewrite orb_true_iff in *;
+      repeat rewrite (eq_var_iff_Singleton_r a) in *;
+      repeat rewrite (eq_var_iff_Singleton_l a) in *;
+      repeat rewrite occurs_in_vars_correct in *;
+      repeat rewrite occurs_in_exp_iff_used_vars in *;
+      repeat rewrite occurs_in_fundefs_iff_used_vars_fundefs in *;
+      repeat rewrite In_or_Iff_Union in *
+    ).
+
+  Local Ltac solve_used_vars_lemma :=
+    intros;
+    rewrite Ensemble_iff_In_iff; intros a;
+    translate_used_vars_to_firstorder a;
+    firstorder.
+
+  Lemma used_vars_Econstr : forall x c args e,
+    used_vars (Econstr x c args e) <--> x |: FromList args :|: used_vars e.
+  Proof. solve_used_vars_lemma. Qed.
+
+  Lemma used_vars_Ecase_nil : forall x,
+    used_vars (Ecase x []) <--> [set x].
+  Proof. solve_used_vars_lemma. Qed.
+
+  Lemma used_vars_Ecase_cons : forall x c e arms,
+    used_vars (Ecase x ((c, e) :: arms)) <--> used_vars e :|: used_vars (Ecase x arms).
+  Proof.
+    induction arms.
+    - intros; rewrite Ensemble_iff_In_iff; intros a.
+      translate_used_vars_to_firstorder a.
+      firstorder.
+    - destruct a; rewrite Ensemble_iff_In_iff; intros a.
+      translate_used_vars_to_firstorder a.
+      clear IHarms; firstorder.
+  Qed.
+
+  Lemma used_vars_Ecase_app : forall x l r,
+    used_vars (Ecase x (l ++ r)) <--> used_vars (Ecase x l) :|: used_vars (Ecase x r).
+  Proof.
+    destruct r as [| [c e] ces]; [rewrite app_nil_r; solve_used_vars_lemma|].
+    unfold used_vars.
+    rewrite bound_var_Ecase_app, occurs_free_Ecase_app.
+    normalize_bound_var; normalize_occurs_free.
+    split; intros a Ha; repeat match goal with H : Ensembles.In _ (_ :|: _) _ |- _ => destruct H end;
+    eauto with Ensembles_DB.
+  Qed.
+
+  Lemma used_vars_Eproj : forall x c n y e,
+    used_vars (Eproj x c n y e) <--> x |: (y |: used_vars e).
+  Proof. solve_used_vars_lemma. Qed.
+
+  Lemma used_vars_Efun : forall fds e,
+    used_vars (Efun fds e) <--> used_vars_fundefs fds :|: used_vars e.
+  Proof. solve_used_vars_lemma. Qed.
+
+  Lemma used_vars_Eletapp: forall x f ft ys e,
+    used_vars (Eletapp x f ft ys e) <--> x |: (f |: FromList ys :|: used_vars e).
+  Proof. solve_used_vars_lemma. Qed.
+
+  Lemma used_vars_Eapp: forall f t args,
+    used_vars (Eapp f t args) <--> f |: FromList args.
+  Proof. solve_used_vars_lemma. Qed.
+
+  Lemma used_vars_Eprim : forall x p args e,
+    used_vars (Eprim x p args e) <--> x |: FromList args :|: used_vars e.
+  Proof. solve_used_vars_lemma. Qed.
+
+  Lemma used_vars_Ehalt : forall x, used_vars (Ehalt x) <--> [set x].
+  Proof. solve_used_vars_lemma. Qed.
+
+  Lemma used_vars_Fcons : forall f t v e fds,
+    used_vars_fundefs (Fcons f t v e fds) <-->
+    f |: FromList v :|: used_vars e :|: used_vars_fundefs fds.
+  Proof. solve_used_vars_lemma. Qed.
+
+  Lemma used_vars_Fnil : used_vars_fundefs Fnil <--> Empty_set _.
+  Proof. solve_used_vars_lemma. Qed.
+
+  Ltac normalize_used_vars := 
+    match goal with
+    | |- context [ used_vars (Econstr _ _ _ _) ] => rewrite used_vars_Econstr
+    | |- context [ used_vars (Eproj _ _ _ _ _) ] => rewrite used_vars_Eproj
+    | |- context [ used_vars (Ecase _ []) ] => rewrite used_vars_Ecase_nil
+    | |- context [ used_vars (Ecase _ (_ :: _)) ] => rewrite used_vars_Ecase_cons
+    | |- context [ used_vars (Ecase _ (_ ++ _)) ] => rewrite used_vars_Ecase_app
+    | |- context [ used_vars (Efun _ _) ] => rewrite used_vars_Efun
+    | |- context [ used_vars (Eletapp _ _ _ _ _) ] => rewrite used_vars_Eletapp
+    | |- context [ used_vars (Eapp _ _ _) ] => rewrite used_vars_Eapp
+    | |- context [ used_vars (Eprim _ _ _ _) ] => rewrite used_vars_Eprim
+    | |- context [ used_vars (Ehalt _) ] => rewrite used_vars_Ehalt
+    | |- context [ used_vars_fundefs (Fcons _ _ _ _ _) ] => rewrite used_vars_Fcons
+    | |- context [ used_vars_fundefs Fnil ] => rewrite used_vars_Fnil
+    | [ H : context [ used_vars (Econstr _ _ _ _)         ] |- _ ] => rewrite used_vars_Econstr in H
+    | [ H : context [ used_vars (Eproj _ _ _ _ _)         ] |- _ ] => rewrite used_vars_Eproj in H
+    | [ H : context [ used_vars (Ecase _ [])              ] |- _ ] => rewrite used_vars_Ecase_nil in H
+    | [ H : context [ used_vars (Ecase _ (_ :: _))        ] |- _ ] => rewrite used_vars_Ecase_cons in H
+    | [ H : context [ used_vars (Efun _ _)                ] |- _ ] => rewrite used_vars_Efun in H
+    | [ H : context [ used_vars (Eapp _ _ _)              ] |- _ ] => rewrite used_vars_Eapp in H
+    | [ H : context [ used_vars (Eprim _ _ _ _)           ] |- _ ] => rewrite used_vars_Eprim in H
+    | [ H : context [ used_vars (Ehalt _)                 ] |- _ ] => rewrite used_vars_Ehalt in H
+    | [ H : context [ used_vars_fundefs (Fcons _ _ _ _ _) ] |- _ ] => rewrite used_vars_Fcons in H
+    | [ H : context [ used_vars_fundefs Fnil              ] |- _ ] => rewrite used_vars_Fnil in H
+    end.
+
+  Lemma used_vars_subset_mut :
+    (forall c, (fun c => forall e, used_vars e \subset used_vars (c |[ e ]|)) c) /\
+    (forall f, (fun f => forall e, used_vars e \subset used_vars_fundefs (f <[ e ]>)) f).
+  Proof with eauto with Ensembles_DB.
+    exp_fundefs_ctx_induction IHe IHf; simpl; try rename e into c;
+    try solve [easy|intros; repeat normalize_used_vars; eauto with Ensembles_DB].
+  Qed.
+
+  Corollary used_vars_subset : forall c e, 
+    used_vars e \subset used_vars (c |[ e ]|).
+  Proof. apply used_vars_subset_mut. Qed.
+
+  Corollary used_vars_subset_fundefs_ctx : forall f e, 
+    used_vars e \subset used_vars_fundefs (f <[ e ]>).
+  Proof. apply used_vars_subset_mut. Qed.

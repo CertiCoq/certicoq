@@ -1811,7 +1811,7 @@ Definition shrink_top (e:exp) : exp :=
   end.
 
 (* Perform n passes of contract of e starting with count map c *)
-Fixpoint shrink_n_times' (e:exp) (c:c_map) (n:nat): (exp * c_map) :=
+Fixpoint shrink_n_times' (e:exp) (c:c_map) (n:nat) {struct n} : (exp * c_map) :=
   match n with
   | 0 => (e, c)
   | (S n') =>

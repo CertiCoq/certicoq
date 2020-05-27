@@ -22,8 +22,8 @@ Require Import L6.Ensembles_util L6.cps L6.ctx L6.logical_relations L6.tactics L
 
 Ltac dec_vars :=
   repeat match goal with
-         | [ H: (if cps_util.var_dec ?X ?Y then _ else _) = 0 |- _] =>
-           destruct (cps_util.var_dec X Y); try inversion H; pi0
+         | [ H: (if var_dec ?X ?Y then _ else _) = 0 |- _] =>
+           destruct (var_dec X Y); try inversion H; pi0
          end.
 
 
@@ -1845,33 +1845,23 @@ Section CONTRACT.
         rewrite inlined_fundefs_append
     end.
 
-
-
-
+  (* TODO move *)
   Definition closed_fundefs :=
     fun f => Empty_set var <--> occurs_free_fundefs f.
 
   Corollary closed_app_ctx:
     forall e c,
-      closed (c |[ e ]|) ->
+      closed_exp (c |[ e ]|) ->
       closed_ctx c.
   Proof.
     intros.
     assert (Hc := occurs_free_included_ctx e c).
     apply Included_Empty_set_l.
-    eapply Proper_Included_r; eauto.
+    unfold closed_exp in H. rewrite H in Hc; eauto.
   Qed.
 
-
-
-
-
-  (* End move_to_identifiers.*)
-
-
-  Theorem not_free_dead_or_bound:
-    forall e,
-      Included _ (Complement _ (occurs_free e)) (Union _ (dead_var e) (bound_var e)).
+  Theorem not_free_dead_or_bound e:
+      (Complement _ (occurs_free e)) \subset ((dead_var e) :|: (bound_var e)).
   Proof.
     intros.
     intro. intro.
@@ -1879,9 +1869,8 @@ Section CONTRACT.
     destruct H; auto.
   Qed.
 
-  Theorem not_bound_dead_or_free:
-    forall e,
-      Included _ (Complement _ (bound_var e)) (Union _ (dead_var e) (occurs_free e)).
+  Theorem not_bound_dead_or_free e :
+    (Complement _ (bound_var e)) \subset ((dead_var e) :|: (occurs_free e)).
   Proof.
     intros.
     intro; intro.
@@ -1894,8 +1883,8 @@ Section CONTRACT.
   Qed.
 
 
-  Theorem name_in_bound_var_fundefs_ctx: forall cf,
-                                           Included _ (names_in_fundefs_ctx cf) (bound_var_fundefs_ctx cf).
+  Theorem name_in_bound_var_fundefs_ctx cf :
+    names_in_fundefs_ctx cf \subset bound_var_fundefs_ctx cf.
   Proof.
     induction cf; simpl; normalize_bound_var_ctx; auto with Ensembles_DB.
     intro. intro. inv H. auto.
@@ -1903,14 +1892,12 @@ Section CONTRACT.
     auto.
   Qed.
 
-  Theorem not_free_bound_or_not_occur_ctx:
-    forall v : var,
+  Theorem not_free_bound_or_not_occur_ctx v:
       (forall c : exp_ctx, ~ occurs_free_ctx c v -> num_occur_ec c v 0 \/ bound_var_ctx c v) /\
-      (forall cf : fundefs_ctx,
-         ~ occurs_free_fundefs_ctx cf v -> num_occur_fdc cf v 0 \/ bound_var_fundefs_ctx cf v).
+      (forall cf : fundefs_ctx, ~ occurs_free_fundefs_ctx cf v -> num_occur_fdc cf v 0 \/ bound_var_fundefs_ctx cf v).
   Proof.
-    intro v; exp_fundefs_ctx_induction IHc IHf; intros; eauto with Ensembles_DB.
-    -  left. constructor.
+    exp_fundefs_ctx_induction IHc IHf; intros; eauto with Ensembles_DB.
+    - left. constructor.
     - destruct (var_dec v0 v).
       + right; subst; auto.
       + assert (~occurs_free_ctx e v).
@@ -1941,6 +1928,20 @@ Section CONTRACT.
               exfalso; apply H; auto.
             auto.
           * right; auto.
+    - destruct (var_dec v0 v).
+      + right; subst; auto.
+      + assert (~occurs_free_ctx e v).
+        intro; apply H. eapply Free_ctx_Eletapp2; eauto. 
+        apply IHc in H0.
+        inv H0.
+        * left.
+          eapply num_occur_ec_n.
+          constructor. apply H1.
+          assert (~ FromList (f :: ys) v).
+          intro; apply H.
+          auto.
+          apply not_occur_list_not_in in H0. rewrite H0; auto.
+        * right; auto.    
     -  destruct (var_dec v0 v).
        + right; subst; auto.
        +  assert (~occurs_free_ctx e v).
@@ -2093,11 +2094,7 @@ Section CONTRACT.
   Qed.
 
 
-
-
-
-  Corollary not_occurs_free_ctx_not_bound:
-    forall c e x,
+  Corollary not_occurs_free_ctx_not_bound c e x :
       ~ occurs_free (c |[ e ]|) x ->
       ~ bound_var_ctx c x ->
       ~ occurs_free e x.
@@ -2106,12 +2103,11 @@ Section CONTRACT.
     apply occurs_free_ctx_not_bound; auto.
   Qed.
 
-  Corollary not_occur_free_Efun:
-    forall f e,
-      Same_set _
-               (Complement _ (occurs_free (Efun f e)))
-               (Intersection _ (Complement _ (occurs_free_fundefs f))
-                             (Complement _ (Setminus _  (occurs_free e) (name_in_fundefs f)))).
+  Corollary not_occur_free_Efun f e :
+    Same_set _
+             (Complement _ (occurs_free (Efun f e)))
+             (Intersection _ (Complement _ (occurs_free_fundefs f))
+                           (Complement _ (Setminus _  (occurs_free e) (name_in_fundefs f)))).
   Proof.
     intros; split; intro; intro.
     -  split.
@@ -2127,11 +2123,10 @@ Section CONTRACT.
 
 
 
-  Theorem occurs_free_fundefs_append:
-    forall f1 f2,
-      Same_set _
-               (occurs_free_fundefs (fundefs_append f1 f2))
-               (Setminus _ (Union _ (occurs_free_fundefs f1) (occurs_free_fundefs f2))  (name_in_fundefs (fundefs_append f1 f2))).
+  Theorem occurs_free_fundefs_append f1 f2 :
+    Same_set _
+             (occurs_free_fundefs (fundefs_append f1 f2))
+             (Setminus _ (Union _ (occurs_free_fundefs f1) (occurs_free_fundefs f2))  (name_in_fundefs (fundefs_append f1 f2))).
   Proof.
     induction f1; intros.
     -  simpl.
@@ -2153,34 +2148,32 @@ Section CONTRACT.
            intro. inv H0; auto.
            split. right; auto.
            intro. inv H0; auto.
-       +          inv H. inv H0.
-                  inv H.
-                  inv H0.
-                  left. split; auto.
-                  intro.
-                  inv H0. apply H1. auto.
-                  inv H3. apply H2. auto.
-                  apply H1. auto.
-                  inv H0. right. split. split.
-                  left; auto.
-                  intro. apply H1; auto. auto.
-                  right. split. split.
-                  right; auto.
-                  intro; apply H1; auto.
-                  intro; apply H1; auto.
-    -          simpl. rewrite occurs_free_fundefs_Fnil.
-               assert (Hnn := name_not_free_in_fds f2).
-               rewrite Union_Empty_set_neut_l.
-               symmetry.
-               apply Setminus_Disjoint.
-               auto.
+       + inv H. inv H0.
+         inv H.
+         inv H0.
+         left. split; auto.
+         intro.
+         inv H0. apply H1. auto.
+         inv H3. apply H2. auto.
+         apply H1. auto.
+         inv H0. right. split. split.
+         left; auto.
+         intro. apply H1; auto. auto.
+         right. split. split.
+         right; auto.
+         intro; apply H1; auto.
+         intro; apply H1; auto.
+    - simpl. rewrite occurs_free_fundefs_Fnil.
+      assert (Hnn := occurs_free_fundefs_name_in_fundefs_Disjoint f2).
+      rewrite Union_Empty_set_neut_l.
+      symmetry.
+      apply Setminus_Disjoint. sets.
   Qed.
-
-  Theorem not_occurs_free_fundefs_append:
-    forall f1 f2,
-      Same_set _
-               (Complement _ (occurs_free_fundefs (fundefs_append f1 f2)))
-               (Intersection _ (Complement _ (Setminus _ (occurs_free_fundefs f1) (name_in_fundefs (fundefs_append f1 f2)))) (Complement _ (Setminus _ (occurs_free_fundefs f2) (name_in_fundefs (fundefs_append f1 f2))))).
+  
+  Theorem not_occurs_free_fundefs_append f1 f2 :
+    Same_set _
+             (Complement _ (occurs_free_fundefs (fundefs_append f1 f2)))
+             (Intersection _ (Complement _ (Setminus _ (occurs_free_fundefs f1) (name_in_fundefs (fundefs_append f1 f2)))) (Complement _ (Setminus _ (occurs_free_fundefs f2) (name_in_fundefs (fundefs_append f1 f2))))).
   Proof.
     intros. split; intro; intro.
     - split. intro. apply H.
@@ -2197,19 +2190,16 @@ Section CONTRACT.
   Qed.
 
 
-  Theorem not_free_dead_or_bound_ctx:
-    forall c,
-      Included _ (Complement _ (occurs_free_ctx c)) (Union _ (dead_var_ctx c) (bound_var_ctx c)).
+  Theorem not_free_dead_or_bound_ctx c:
+    Included _ (Complement _ (occurs_free_ctx c)) (Union _ (dead_var_ctx c) (bound_var_ctx c)).
   Proof.
-    intros.
-    intro. intro.
+    intros. intro. intro.
     apply not_free_bound_or_not_occur_ctx in H.
     destruct H; auto.
   Qed.
 
 
-  Theorem not_bound_dead_or_free_ctx:
-    forall e,
+  Theorem not_bound_dead_or_free_ctx e:
       Included _ (Complement _ (bound_var_ctx e)) (Union _ (dead_var_ctx e) (occurs_free_ctx e)).
   Proof.
     intros.
@@ -2221,11 +2211,7 @@ Section CONTRACT.
     exfalso. auto.
   Qed.
 
-
-
-
-  Theorem closed_not_occurs_in_context:
-    forall c v,
+  Theorem closed_not_occurs_in_context c v :
       closed_ctx c ->
       ~ bound_var_ctx c v ->
       num_occur_ec c v 0.
@@ -2242,139 +2228,38 @@ Section CONTRACT.
 
 
 
-  Theorem closed_implies_Disjoint:
-    forall e,
-      closed e ->
-      Disjoint _ (bound_var e) (occurs_free e).
+  Theorem closed_implies_Disjoint e :
+    closed_exp e ->
+    Disjoint _ (bound_var e) (occurs_free e).
   Proof.
     intros. split; intro. intro.
     inv H0.
     apply H in H2. inv H2.
   Qed.
 
-
-
-  Theorem gsr_preserves_sig_dom:
-    forall sig ce ce',
+  Theorem gsr_preserves_sig_dom n sig ce ce':
       unique_bindings ce ->
-      closed ce ->
-      gsr_clos ce ce' ->
+      Disjoint var (bound_var ce) (occurs_free ce) ->
+      gsr_clos n ce ce' ->
       sig_inv_dom sig ce ->
       sig_inv_dom sig ce'.
   Proof.
-    intros sig ce ce' Hub Hdj H H0.
-    induction H; auto.
-    inv H. intro.
-    intros.
-
-    apply H0 in H.
-    inv H1.
-    (* dead var *)
-    - intro;
-      apply H.
-      apply bound_var_app_ctx in H1.
-      apply bound_var_app_ctx.
-      normalize_bound_var.
-      destruct H1; auto.
-    -   intro.
-        apply H.
-        apply bound_var_app_ctx in H1.
-        apply bound_var_app_ctx.
-        normalize_bound_var.
-        destruct H1; auto.
-    - intro.
-      apply H.
-      apply bound_var_app_ctx in H1.
-      apply bound_var_app_ctx.
-      normalize_bound_var.
-      destruct H1; auto.
-    - intro.
-      apply H.
-      apply bound_var_app_ctx in H1.
-      apply bound_var_app_ctx.
-      normalize_bound_var.
-      destruct H1; auto.
-    - intro.
-      apply H.
-      apply bound_var_app_ctx in H1.
-      apply bound_var_app_ctx.
-      normalize_bound_var.
-      rewrite bound_var_Efun in H1.
-      rewrite fundefs_append_bound_vars.
-      2: reflexivity.
-      rewrite fundefs_append_bound_vars in H1.
-      2: reflexivity.
-      rewrite bound_var_fundefs_Fcons.
-      destruct H1; auto.
-      destruct H1; auto.
-      destruct H1; auto.
-      right. left. right.
-      auto.
-    (* fold *)
-    -  intro.
-       apply H.
-       apply bound_var_app_ctx.
-       apply bound_var_app_ctx in H1. destruct H1; auto.
-       right.
-       rewrite bound_var_Econstr in *.
-       destruct H1; auto.
-       left.
-       apply bound_var_app_ctx.
-       apply bound_var_app_ctx in H1. destruct H1; auto.
-       right.
-       eapply Bound_Ecase. apply H1.
-       apply findtag_In_patterns. eauto.
-    -  intro.
-       apply H.
-       apply bound_var_app_ctx.
-       apply bound_var_app_ctx in H1. destruct H1; auto.
-       right.
-       rewrite bound_var_Econstr in *.
-       destruct H1; auto.
-       left.
-       apply bound_var_app_ctx.
-       apply bound_var_app_ctx in H1. destruct H1; auto.
-       right.
-       rewrite bound_var_Eproj.
-       left.
-       unfold rename in H1.
-       apply bound_var_rename_all_ns in H1.
-       auto.
-    (* inline *)
-    -  intro.
-       apply H.
-       apply bound_var_app_ctx.
-       apply bound_var_app_ctx in H1.
-       inv H1; auto.
-       right.
-       rewrite bound_var_Efun.
-       rewrite bound_var_Efun in H4.
-       rewrite fundefs_append_bound_vars.
-       2: reflexivity.
-       rewrite fundefs_append_bound_vars in H4.
-       2: reflexivity.
-       rewrite bound_var_fundefs_Fcons.
-       inv H4; auto.
-       left.
-       inv H1; auto.
-       apply bound_var_app_ctx in H1.
-       inv H1.
-       right.
-       apply bound_var_app_ctx.
-       auto.
-       apply bound_var_rename_all_ns in H4.
-       left.
-       auto.
-    - apply gsr_preserves_clos in H; auto. destruct H.
-      apply gsr_preserves_clos in H1; auto.
+    intros Hun Hc Hrw Hsig.
+    unfold sig_inv_dom in *. intros x y Hget Hb.
+    apply Hsig in Hget. eapply Hget.
+    eapply gsr_clos_in_rw in Hrw; eauto. destructAll.
+    eapply gr_clos_preserves_bv in Hb. eassumption. eassumption.
   Qed.
 
+  Lemma eq_env_P_antimon {A} S1 S2 rho1 rho2 :
+    @eq_env_P A S1 rho1 rho2 ->
+    S2 \subset S1 ->
+    eq_env_P S2 rho1 rho2.
+  Proof.
+    firstorder. 
+  Qed.
 
-
-
-
-
-
+  
   (** rename_all_ns only affects variables which occurs in the term *)
   Theorem eq_P_rename_all_ns :
     (forall e : exp,
@@ -2388,9 +2273,8 @@ Section CONTRACT.
   Proof.
     apply exp_def_mutual_ind; intros; simpl.
     - erewrite H.
-      Focus 2.
-      intro. intro. apply H0.
-      intro. apply H1. inv H2; pi0; auto.
+      2:{ intro. intro. apply H0.
+          intro. apply H1. inv H2; pi0; auto. }
       erewrite eq_P_apply_r_list.
       reflexivity.
       intro; intro; apply H0.
@@ -2408,26 +2292,35 @@ Section CONTRACT.
       apply n0; auto.
     - erewrite H.
       assert  (eq_env_P (Complement var (dead_var (Ecase v l))) sub sub').
-      intro; intro; apply H1; intro.
-      inv H3; pi0; auto. inv H7; pi0; auto.
-      apply H2. eapply num_occur_n.
-      constructor; eauto.
-      simpl. destruct (cps_util.var_dec x v); auto.
-      exfalso; auto.
+      { intro; intro; apply H1; intro.
+        inv H3; pi0; auto. inv H7; pi0; auto.
+        apply H2. eapply num_occur_n.
+        constructor; eauto.
+        simpl. destruct (cps_util.var_dec x v); auto. }
       apply H0 in H2. simpl in H2. inv H2.
-      auto.
+      now eauto.
       intro; intro; apply H1; intro.
       inv H3. inv H7; pi0.
       auto.
     - erewrite eq_P_apply_r.
-      erewrite H.
-      reflexivity.
-      intro; intro; apply H0.
-      intro. inv H2. pi0; auto.
-      intro; intro. apply H0.
-      intro. inv H2. pi0; auto.
-      inv H1.
-      auto.
+      erewrite H. reflexivity.
+      eapply eq_env_P_antimon. eassumption.
+      intros x Hin Hd. inv Hd.
+      pi0. dec_vars. eapply Hin. eassumption.
+      eapply eq_env_P_antimon. eassumption.
+      intros x Hin Hd. inv Hin. inv Hd.
+      pi0. dec_vars.
+    - erewrite eq_P_apply_r. erewrite eq_P_apply_r_list.
+      erewrite H. reflexivity.
+      eapply eq_env_P_antimon. eassumption.
+      intros z Hin Hd. inv Hd.
+      pi0. dec_vars. eapply Hin. eassumption.
+      eapply eq_env_P_antimon. eassumption.
+      intros z Hin Hd. inv Hd.
+      pi0. dec_vars. now eapply not_occur_list; eauto.
+      eapply eq_env_P_antimon. eassumption.
+      intros z Hin Hd. inv Hd.
+      pi0. dec_vars. inv Hin; eauto.
     - erewrite H. erewrite H0.
       auto.
       intro; intro; apply H1.
@@ -2437,16 +2330,15 @@ Section CONTRACT.
     - erewrite eq_P_apply_r.
       erewrite eq_P_apply_r_list.
       reflexivity.
-      intro; intro. apply H. intro. inv H1; pi0.
+      intro; intro. apply H. intro. inv H1; pi0; dec_vars.
       apply not_occur_list in H2.
       auto.
       intro; intro. apply H. intro.
       inv H0; inv H1; auto.
-      pi0.
+      dec_vars; pi0.
     - erewrite H.
-      Focus 2.
-      intro. intro. apply H0.
-      intro. apply H1. inv H2; pi0; auto.
+      2:{ intro. intro. apply H0.
+          intro. apply H1. inv H2; pi0; auto. }
       erewrite eq_P_apply_r_list.
       reflexivity.
       intro; intro; apply H0.
@@ -2457,7 +2349,7 @@ Section CONTRACT.
     - erewrite eq_P_apply_r.
       auto.
       intro; intro; apply H; intro.
-      inv H0. inv H1; pi0.
+      inv H0. inv H1; pi0; dec_vars.
     - erewrite H.
       erewrite H0; auto.
       intro; intro; apply H1; intro.
@@ -2489,8 +2381,18 @@ Section CONTRACT.
     - erewrite IHc.
       erewrite eq_P_apply_r.
       auto.
-      intro; intro; apply H; intro; inv H1; pi0. inv H0; auto.
+      intro; intro; apply H; intro; inv H1; pi0; dec_vars. inv H0; auto.
       intro; intro; apply H; intro; inv H1; pi0; auto.
+    - erewrite IHc, eq_P_apply_r_list, eq_P_apply_r. reflexivity.
+      eapply eq_env_P_antimon. eassumption.
+      intros x Hin Hd. inv Hd.
+      pi0. dec_vars. inv Hin; eauto.
+      eapply eq_env_P_antimon. eassumption.
+      intros x Hin Hd. inv Hd.
+      pi0. dec_vars. eapply not_occur_list; eauto.
+      eapply eq_env_P_antimon. eassumption.
+      intros x Hin Hd. inv Hd.
+      pi0. dec_vars. eapply Hin. eassumption.
     - erewrite IHc.
       erewrite eq_P_apply_r_list.
       auto.
@@ -2502,17 +2404,17 @@ Section CONTRACT.
     - assert (rename_all_ns sub (Ecase v l) = rename_all_ns sub' (Ecase v l)).
       erewrite (proj1 eq_P_rename_all_ns).
       reflexivity.
-      intro; intro; apply H; intro. inv H1; pi0. apply H0.
+      intro; intro; apply H; intro. inv H1; pi0; dec_vars. apply H0.
       eapply num_occur_n.
       constructor; eauto.
-      simpl. destruct (cps_util.var_dec x v); eauto. exfalso; auto.
+      simpl. destruct (cps_util.var_dec x v); eauto. now exfalso; auto.
       assert (rename_all_ns sub (Ecase v l0) = rename_all_ns sub' (Ecase v l0)).
       erewrite (proj1 eq_P_rename_all_ns).
       reflexivity.
-      intro; intro; apply H; intro. inv H2; pi0. apply H1.
+      intro; intro; apply H; intro. inv H2; pi0; dec_vars. apply H1.
       eapply num_occur_n.
       constructor; eauto.
-      simpl. destruct (cps_util.var_dec x v); eauto. exfalso; auto.
+      simpl. destruct (cps_util.var_dec x v); eauto. now exfalso; auto.
       simpl in *. inv H0; inv H1.
       erewrite IHc. reflexivity.
       intro; intro; apply H; intro.
@@ -2553,10 +2455,6 @@ Section CONTRACT.
       intro; apply Hl; subst.
       constructor. auto.
   Qed.
-
-
-
-
 
   Theorem cmap_view_case:
     forall sub c x cl1 c0 cl2,
@@ -3095,6 +2993,13 @@ Section CONTRACT.
       destruct (var_dec v x).
       subst. constructor.
       constructor. apply H0. intro. apply H1.
+      apply occurs_free_Eletapp.
+      right.
+      split; auto.
+    + simpl in H1.
+      destruct (var_dec v x).
+      subst. constructor.
+      constructor. apply H0. intro. apply H1.
       apply occurs_free_Eprim.
       right.
       split; auto.
@@ -3190,6 +3095,24 @@ Section CONTRACT.
         apply IHc. inv H. split; auto. split; auto.
         eapply Disjoint_Included_l. 2: apply H1. auto with Ensembles_DB.
     (* Proj *)
+    - split; intros.
+      + inv H. apply IHc in H6. destructAll.
+        split; auto. constructor. intro. apply H2.
+        apply bound_var_ctx_comp_ctx.  auto.
+        auto.
+        split; auto.
+        apply Union_Disjoint_l. auto.
+        split. intro. intro. inv H3. inv H4.
+        apply H2.
+        apply bound_var_ctx_comp_ctx.  auto.
+      + destructAll.
+        constructor.  intro. apply bound_var_ctx_comp_ctx in H2. inv H2.
+        inv H. apply H5. auto.
+        inv H1. specialize (H2 v).
+        apply H2. split; auto.
+        apply IHc. inv H. split; auto. split; auto.
+        eapply Disjoint_Included_l. 2: apply H1. auto with Ensembles_DB.
+    (* Letapp *)
     - split; intros.
       + inv H. apply IHc in H6. destructAll.
         split; auto. constructor. intro. apply H2.
@@ -3416,12 +3339,22 @@ Section CONTRACT.
     apply inlined_ctx_f_staged_mut.
   Qed.
 
+  Lemma gsr_clos_trans n m e1 e2 e3 :
+    gsr_clos n e1 e2 ->
+    gsr_clos m e2 e3 ->
+    gsr_clos (n + m) e1 e3.
+  Proof.
+    intros H1 H2. induction H1.
+    + rewrite <- plus_assoc. econstructor; eauto.
+    + eassumption.
+  Qed.
+      
   (** precontractfun returns a subset of the current fundefs related to the original term by Fun_rem_s *)
   Theorem precontractfun_corresp:
     forall fds_c fds e c im sub count sig,
       let ce := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f c im)) (rename_all_ns sig (Efun (fundefs_append fds fds_c) e))) in
       unique_bindings ce ->
-      closed ce ->
+      closed_exp ce ->
       c_count ce count ->
       cmap_view_ctx sub c ->
       inl_inv im sub ce ->
@@ -3429,7 +3362,7 @@ Section CONTRACT.
       forall fds_c' count' sub',
         precontractfun sig count sub fds_c = (fds_c', count', sub') ->
         let ce' := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f c im)) (rename_all_ns sig (Efun (fundefs_append fds fds_c') e))) in
-        gsr_clos ce ce' /\ c_count ce' count' /\ inl_inv im sub' ce' /\
+        gsr_clos 0 ce ce' /\ c_count ce' count' /\ inl_inv im sub' ce' /\
         cmap_view_ctx sub' (comp_ctx_f c (Efun1_c fds_c' Hole_c)) /\
         sig_inv_full sig (rename_all_ctx_ns sig (inlined_ctx_f c im)) (rename_all_ns sig (Efun (fundefs_append fds fds_c') e)).
   Proof.
@@ -3438,16 +3371,17 @@ Section CONTRACT.
       destruct (get_c v count) eqn:gvc.
       +  assert (H1v := H1 v).
          rewrite gvc in H1v.
-         assert (gsr_clos ce
+         assert (gsr_clos 0 ce
                           (rename_all_ctx_ns sig (inlined_ctx_f c im)
                           |[ rename_all_ns sig
                                            (Efun (fundefs_append fds fds_c) e0) ]|)).
-         { constructor.
+         { replace 0 with (0 + 0) by omega. econstructor.
            constructor.
            simpl.
            rewrite rename_all_ns_fundefs_append.
-           rewrite rename_all_ns_fundefs_append.
            simpl.
+           (* rewrite rename_all_ns_fundefs_append. *)
+           (* simpl. *)
            apply Fun_rem_s.
            specialize (H1 v).
            rewrite gvc in H1.
@@ -3455,24 +3389,26 @@ Section CONTRACT.
            apply num_occur_app_ctx in H1. destructAll; pi0.
            simpl in H6.
            rewrite rename_all_ns_fundefs_append in H6.
-           simpl in H6. auto.
+           simpl in H6. now auto.
+
+           simpl. rewrite rename_all_ns_fundefs_append.
+           now econstructor. 
          }
-         assert (Hub' := gsr_preserves_clos _ _ H H0 H6).
+         assert (Hub' := gsr_clos_preserves_clos _ _ _ H H0 H6).
          destruct Hub'.
          assert (H4' := H4).
          apply sig_inv_combine in H4.
          destruct H4 as (H4dom, H4co).
-         assert (Hse := gsr_preserves_sig_dom _ _ _ H H0 H6 H4dom).
+         assert (Hse := gsr_preserves_sig_dom _ _ _ _ H (closed_implies_Disjoint _ H0) H6 H4dom).
          eapply IHfds_c with (fds := fds) (e := e0) (c := c) (im := im) in H5; eauto.
          destructAll.
          unfold ce'.
          split.
-         eapply rt_trans.
-         apply H6.
-         auto.
-         split; auto.
-         {
-           intro.
+         replace 0 with (0 + 0) by omega. eapply gsr_clos_trans.
+         * apply H6.
+         * auto.
+         * split; auto.
+         * intro.
            specialize (H1 v0).
            unfold ce in H1.
            apply num_occur_app_ctx in H1.
@@ -3506,82 +3442,79 @@ Section CONTRACT.
            assert (n0 =  get_c v0 (init_census (rename_all_ns sig e))).
            eapply (proj1 (num_occur_det v0)); eauto.
            omega.
-         }
-         {
+         * { intro.
+             intros.
+             apply H3 in H4.
+             destruct H4.
+             split; [| split].
+             - intro.
+               apply H4.
+               unfold ce.
+               apply bound_var_app_ctx in H10.
+               apply bound_var_app_ctx.
+               inv H10; auto.
+               right.
+               apply bound_var_rename_all_ns.
+               apply bound_var_rename_all_ns in H11.
+               normalize_bound_var.
+               rewrite bound_var_Efun in H11.
+               inv H11; auto.
+               left.
+               rewrite fundefs_append_bound_vars.
+               2: reflexivity.
+               rewrite fundefs_append_bound_vars in H10.
+               2: reflexivity.
+               rewrite bound_var_fundefs_Fcons.
+               inv H10; auto.
+             - apply H9 in H10.
+               unfold ce in H10.
+               intro. intro.
+               inv H10.
+               specialize (H12 x).
+               apply H12.
+               inv H11. split; auto.
+               rewrite bound_var_app_ctx in H10.
+               rewrite bound_var_app_ctx.
+               inv H10; auto.
+               right.
+               apply bound_var_rename_all_ns.
+               apply bound_var_rename_all_ns in H11.
+               normalize_bound_var.
+               rewrite bound_var_Efun in H11.
+               inv H11; auto.
+               left.
+               rewrite fundefs_append_bound_vars.
+               2: reflexivity.
+               rewrite fundefs_append_bound_vars in H10.
+               2: reflexivity.
+               rewrite bound_var_fundefs_Fcons.
+               inv H10; auto. }
+         * apply sig_inv_combine.
+           split; auto.
            intro.
            intros.
-           apply H3 in H4.
-           destruct H4.
-           split; [| split].
-           - intro.
-             apply H4.
-             unfold ce.
-             apply bound_var_app_ctx in H10.
-             apply bound_var_app_ctx.
-             inv H10; auto.
-             right.
-             apply bound_var_rename_all_ns.
-             apply bound_var_rename_all_ns in H11.
-             normalize_bound_var.
-             rewrite bound_var_Efun in H11.
-             inv H11; auto.
-             left.
-             rewrite fundefs_append_bound_vars.
-             2: reflexivity.
-             rewrite fundefs_append_bound_vars in H10.
-             2: reflexivity.
-             rewrite bound_var_fundefs_Fcons.
-             inv H10; auto.
-           - apply H9 in H10.
-             unfold ce in H10.
-             intro. intro.
-             inv H10.
-             specialize (H12 x).
-             apply H12.
-             inv H11. split; auto.
-             rewrite bound_var_app_ctx in H10.
-             rewrite bound_var_app_ctx.
-             inv H10; auto.
-             right.
-             apply bound_var_rename_all_ns.
-             apply bound_var_rename_all_ns in H11.
-             normalize_bound_var.
-             rewrite bound_var_Efun in H11.
-             inv H11; auto.
-             left.
-             rewrite fundefs_append_bound_vars.
-             2: reflexivity.
-             rewrite fundefs_append_bound_vars in H10.
-             2: reflexivity.
-             rewrite bound_var_fundefs_Fcons.
-             inv H10; auto.
-         }
-         apply sig_inv_combine.
-         split; auto.
-         intro.
-         intros.
-         apply H4' in H4.
-         inv H4. inv H10; auto.
-         left.
-         apply num_occur_app_ctx in H4.
-         destructAll; pi0.
-         simpl in H10.
-         rewrite rename_all_ns_fundefs_append in H10.
-         inv H10.
-         apply fundefs_append_num_occur' in H16; destructAll.
-         inv H11; pi0.
-         simpl.
-         apply num_occur_app_ctx.
-         exists 0, 0.
-         split; auto.
-         split; auto.
-         eapply num_occur_n.
-         constructor; eauto.
-         rewrite rename_all_ns_fundefs_append.
-         eapply fundefs_append_num_occur.
-         reflexivity.
-         eauto. eauto.
-         auto.
+           apply H4' in H4.
+           inv H4. inv H10; auto.
+           left.
+           apply num_occur_app_ctx in H4.
+           destructAll; pi0.
+           simpl in H10.
+           rewrite rename_all_ns_fundefs_append in H10.
+           inv H10.
+           apply fundefs_append_num_occur' in H16; destructAll.
+           inv H11; pi0.
+           simpl.
+           apply num_occur_app_ctx.
+           exists 0, 0.
+           split; auto.
+           split; auto.
+           eapply num_occur_n.
+           constructor; eauto.
+           rewrite rename_all_ns_fundefs_append.
+           eapply fundefs_append_num_occur.
+           reflexivity.
+           eauto. eauto.
+           auto.
       +  assert (rename_all_ctx_ns sig (inlined_ctx_f c im)
                 |[ rename_all_ns sig
                                  (Efun (fundefs_append fds (Fcons v f l e fds_c)) e0) ]| =
@@ -3643,7 +3576,7 @@ Section CONTRACT.
 
            (* due to unique binding *)
 
-           apply (gsr_preserves_clos _ _ H H0) in H7.
+           apply (gsr_clos_preserves_clos _ _ _ H H0) in H7.
            destruct H7.
            destruct (M.get v c0) eqn:gvc0.
            2: auto.
@@ -3770,9 +3703,7 @@ Section CONTRACT.
            }
            rewrite <- fundefs_append_assoc in H11.
            simpl in H11. simpl. auto.
-    - simpl in H5. inv H5.
-      split.
-      apply rt_refl.
+    - simpl in H5. inv H5. split. eapply Refl_srw.
       split; auto.
       split; auto.
       split.
@@ -3895,8 +3826,6 @@ Section CONTRACT.
     simpl; auto.
 
 
-
-
   Theorem get_set_list2:
     forall (x : M.elt) (sig : M.t Maps.PTree.elt) (l : list M.elt)
            (l' : list Maps.PTree.elt),
@@ -3922,13 +3851,13 @@ Section CONTRACT.
   Qed.
 
   (* can stage set_list *)
-  Theorem set_list_rename_all_ar: forall l0 l sig v,
-                                    (forall x, FromList l0 x -> (x <> (apply_r sig v) \/
-                                                                 ~ Range_map sig x)) ->
-                                    Disjoint _ (FromList l0) (Dom_map sig) ->
-                                    (apply_r (set_list (combine l0 (apply_r_list sig l)) (M.empty var))
-                                             (apply_r sig v)) =
-                                    (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) v).
+  Theorem set_list_rename_all_ar l0 l sig v :
+    (forall x, FromList l0 x -> (x <> (apply_r sig v) \/
+                                 ~ Range_map sig x)) ->
+    Disjoint _ (FromList l0) (Dom_map sig) ->
+    (apply_r (set_list (combine l0 (apply_r_list sig l)) (M.empty var))
+             (apply_r sig v)) =
+    (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) v).
   Proof.
     intros.
     assert (Hl0 := Decidable_FromList l0).
@@ -3976,9 +3905,7 @@ Section CONTRACT.
       + rewrite apply_r_set_list2; auto.
         rewrite apply_r_empty; auto.
   Qed.
-
-
-
+  
   Theorem set_list_rename_all_arl :
     forall l0 l  sig l1,
       Included _ (FromList l0) (Union _ (Complement _  (Range_map sig)) (Complement _ (FromList (apply_r_list sig l1)))) ->

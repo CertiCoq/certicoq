@@ -3784,7 +3784,7 @@ Section Shrink_Rewrites.
       sr_rw 1 (Efun fds e) e
   | Fun_rem_s: forall f t xs fb B1 B2 e,
       num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) f 0 ->
-      sr_rw 1 (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) (Efun (fundefs_append B1 B2) e)
+      sr_rw 0 (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) (Efun (fundefs_append B1 B2) e)
   (* Rules about inlining/constant-folding *)
   | Constr_case_s: forall x c cl co e ys n,
       find_tag_nth cl co e n ->
@@ -3795,13 +3795,13 @@ Section Shrink_Rewrites.
   | Fun_inline_s: forall c  vs f  t xs fb  B1 B2,
       List.length xs = List.length vs ->
       num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eapp f t vs ]|)) f 1 ->
-      sr_rw 2 (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eapp f t vs ]|))
+      sr_rw 1 (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eapp f t vs ]|))
             (Efun (fundefs_append B1 B2) (c |[ (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb)]|))
   | Fun_inline_letapp_s: forall c  vs x f  t xs e1 fb B1 B2 C' x',
       List.length xs = List.length vs ->
       num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eletapp x f t vs e1 ]|)) f 1 ->
       inline_letapp (rename_all_ns (set_list (combine xs vs) (M.empty var)) fb) x = Some (C', x') ->
-      sr_rw 2 (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eletapp x f t vs e1 ]|))
+      sr_rw 1 (Efun (fundefs_append B1 (Fcons f t xs fb B2)) (c |[ Eletapp x f t vs e1 ]|))
             (Efun (fundefs_append B1 B2) (c |[ C' |[ rename_all_ns (M.set x x' (M.empty _)) e1 ]|  ]|)).
 
   Inductive gen_sr_rw (n : nat) : relation exp :=
@@ -4922,17 +4922,18 @@ substitution to a term cannot increase the occurence count for that variable. *)
       unique_bindings e ->
       Disjoint _ (bound_var e) (occurs_free e) ->
       sr_rw n e e' ->
-      gr_clos n e e'.
+      (exists m, m >= n /\ gr_clos m e e').
   Proof.    
     intros Hun Hdis Hsr; inv Hun; inv Hsr;
-      try now (econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c);
+      try now (exists 1; split; eauto; econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c);
                constructor; apply not_occurs_not_free).
     - (* Case folding *)
-      econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c).
+      exists 1; split; eauto. econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c).
       econstructor. eassumption.
       intros Hc. eapply H. eapply bound_var_app_ctx.
       left. eapply bound_stem_var. auto.
     - (* Constructor folding *)
+      eexists 1; split; eauto.
       econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c).
       eapply ub_app_ctx_f in H0. destructAll.
       rewrite <- (proj1 (Disjoint_dom_rename_all_eq _)).
@@ -4956,14 +4957,17 @@ substitution to a term cannot increase the occurence count for that variable. *)
         left. rewrite bound_var_app_ctx. normalize_bound_var. do 2 right. reflexivity.
         left. eapply nthN_FromList. eassumption.
     - (* Dead Funs *)
+      exists 1; split; eauto.
       econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c).
       econstructor. eapply Forall_impl; [| eassumption ].
       intros. eapply not_occurs_not_free. auto.
     - (* Dead Fun *)
+      exists 1; split; eauto.
       econstructor; [| now eapply Refl ]; eapply Ctx_rw with (c := Hole_c).
       econstructor; eauto.
       eapply unique_bindings_fundefs_unique_functions. eassumption.
     - (* App inlining *)
+      exists 2; split; eauto.
       replace 2 with (1 + 1) by omega.
 
       assert (Hub := H0).
@@ -5040,6 +5044,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
           intros Hc. eapply Range_map_set_list in Hc. eapply not_occur_list; eauto. }
 
     - (* Let app inlining *)
+      eexists 2; split; eauto.
       assert (Hdefs:= H). assert (Hub := H0).
       replace 2 with (1 + 1) by omega.
 
@@ -5809,13 +5814,8 @@ substitution to a term cannot increase the occurence count for that variable. *)
       eapply grw_preserves_bv. eassumption.
     - reflexivity. 
   Qed.
+
   
-  Lemma sr_rw_step n e e' :
-    sr_rw n e e' ->
-    1 <= n.
-  Proof. intros H; inv H; auto. Qed.
-
-
   Lemma refl_trans_closure_n_ctx_compat (R : relation exp) :
     (forall e e' C, R e e' -> R (C |[ e ]|) (C |[ e' ]|)) ->
     (forall e e' C n, refl_trans_closure_n R n e e' -> refl_trans_closure_n R n (C |[ e ]|) (C |[ e' ]|)).
@@ -5830,18 +5830,18 @@ substitution to a term cannot increase the occurence count for that variable. *)
     unique_bindings e ->
     Disjoint var (bound_var e) (occurs_free e) ->
     gen_sr_rw n e e' ->
-    gr_clos n e e'.
+    exists m, m >= n /\ gr_clos m e e'.
   Proof.    
     intros Hun Hdis Hsw. inv Hsw.
-    eapply refl_trans_closure_n_ctx_compat.
-    2:{ eapply sr_rw_in_rw; [ | | eassumption ].
-        - eapply ub_app_ctx_f in Hun. destructAll. eassumption. 
-        - eapply Disjoint_bv_of_ctx; eauto. }
-    
-    intros e1 e2 C Hrw. inv Hrw.
-    rewrite !app_ctx_f_fuse. constructor; eauto.
+    edestruct sr_rw_in_rw; [| | eassumption | ].
+    - eapply ub_app_ctx_f in Hun. destructAll. eassumption. 
+    - eapply Disjoint_bv_of_ctx; eauto.
+    - destructAll. eexists. split; eauto.
+      eapply refl_trans_closure_n_ctx_compat; [| eassumption ].
+      intros e1 e2 C Hrw. inv Hrw.
+      rewrite !app_ctx_f_fuse. constructor; eauto.
   Qed.
-
+  
   Lemma gen_sr_rw_preserves n e e':
     unique_bindings e ->
     Disjoint _ (bound_var e) (occurs_free e) ->
@@ -5850,19 +5850,20 @@ substitution to a term cannot increase the occurence count for that variable. *)
     Disjoint _ (bound_var e') (occurs_free e').
   Proof.
     intros Hun Hdis Hrw.
+    assert (Hrw' := Hrw). eapply gen_sr_in_rw in Hrw'; eauto. destructAll.
     split. 
-    + inv Hrw.
-      assert (Hun' := Hun). eapply ub_app_ctx_f in Hun.
-      destructAll.
-      assert (Hrw := H). eapply rw_preserves in H; eauto. destructAll.
+    + inv Hrw. 
+      assert (Hun' := Hun). eapply ub_app_ctx_f in Hun. destructAll.
+      assert (H' := H1). eapply sr_rw_in_rw in H1; [| | eapply Disjoint_bv_of_ctx; eauto ]; eauto. destructAll.
       eapply ub_app_ctx_f with (c := c). split; [| split ]; eauto.
-      eapply Disjoint_Included_r; [| eassumption ].
-      eapply gr_clos_preserves_bv. eapply sr_rw_in_rw; eauto.
-      now eapply Disjoint_bv_of_ctx; eauto.
-      now eapply Disjoint_bv_of_ctx; eauto. 
+      * destructAll.
+        eapply rw_preserves; [| | eassumption ]; eauto.
+        eapply Disjoint_bv_of_ctx; eauto.
+      * eapply Disjoint_Included_r; [| eassumption ]. 
+        eapply gr_clos_preserves_bv. eassumption.
     + eapply Disjoint_Included; [| | eassumption ].
-      eapply gr_clos_preserves_fv. eapply gen_sr_in_rw; eauto.
-      eapply gr_clos_preserves_bv. eapply gen_sr_in_rw; eauto.
+      eapply gr_clos_preserves_fv; eauto.
+      eapply gr_clos_preserves_bv; eauto.
   Qed.
 
   
@@ -5870,14 +5871,17 @@ substitution to a term cannot increase the occurence count for that variable. *)
     unique_bindings e ->
     Disjoint var (bound_var e) (occurs_free e) ->
     gsr_clos n e e' ->
-    gr_clos n e e'.
+    (exists m, m >= n /\ gr_clos m e e').
   Proof.    
     intros Hun Hdis Hsw. induction Hsw.
-    - eapply refl_trans_closure_n_trans.
-      eapply gen_sr_in_rw; eauto.
-      eapply IHHsw. eapply gen_sr_rw_preserves; eauto. 
+    - edestruct IHHsw as [m1 [Hgeq Hgr]].
       eapply gen_sr_rw_preserves; eauto.
-    - eapply Refl.
+      eapply gen_sr_rw_preserves; eauto.
+      eapply gen_sr_in_rw in H; eauto. destructAll.
+      eexists (x + m1).
+      split. omega.
+      eapply refl_trans_closure_n_trans; eauto.
+    - eexists; split; [| eapply Refl ]. omega.
   Qed.
 
   
@@ -5905,9 +5909,9 @@ substitution to a term cannot increase the occurence count for that variable. *)
     split.
     - eapply gsr_clos_preserves; eauto.
       unfold closed_exp in *. rewrite Hc. sets.
-    - eapply gsr_clos_in_rw in Hrw; eauto.
-      + eapply gr_clos_preserves_fv in Hrw.
-        unfold closed_exp in *. rewrite Hc in Hrw.
+    - eapply gsr_clos_in_rw in Hrw; eauto. destructAll.
+      + eapply gr_clos_preserves_fv in H0.
+        unfold closed_exp in *. rewrite Hc in H0.
         eapply Included_Empty_set_r; eauto.
       + unfold closed_exp in *. rewrite Hc. sets.
   Qed.      

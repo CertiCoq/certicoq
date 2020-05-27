@@ -952,29 +952,29 @@ Section CONTRACT.
   Definition shrinkT A (im : b_map) : Type := {esir:(A * nat * c_map * b_map) & (b_map_le_i im (snd esir))}.
   
   
-  Fixpoint precontractfun (sig:r_map) (count:c_map) (sub:ctx_map) (fds:fundefs) (steps : nat): (fundefs * nat * c_map * ctx_map) :=
+  Fixpoint precontractfun (sig:r_map) (count:c_map) (sub:ctx_map) (fds:fundefs) : (fundefs * c_map * ctx_map) :=
     match fds with
     | Fcons f t ys e fds' =>
       match (get_c f count) with
       | 0%nat =>
         let count' := dec_census sig e count in
-        precontractfun sig count' sub fds' (steps + 1)
+        precontractfun sig count' sub fds'
       | _ =>
-        let '(fds'', steps', count', sub') := precontractfun sig count sub fds' steps in
-        (Fcons f t ys e fds'', steps', count', (M.set f (SVfun t ys e) sub'))
+        let '(fds'', count', sub') := precontractfun sig count sub fds' in
+        (Fcons f t ys e fds'', count', (M.set f (SVfun t ys e) sub'))
       end
-    | Fnil => (Fnil, steps, count, sub)
+    | Fnil => (Fnil, count, sub)
     end.
 
 
   Theorem precontractfun_size:
-    forall fds steps sig count sub fds' steps' count' sub',
-      ((fds', steps', count', sub') =  precontractfun sig count sub fds steps ->
+    forall fds sig count sub fds' count' sub',
+      ((fds', count', sub') =  precontractfun sig count sub fds ->
        (forall im, sub_inl_size sub' im <= funs_size (fds) + sub_inl_size sub im /\ funs_size fds' <= funs_size fds))%nat.
   Proof.
     induction fds; intros; simpl in H.
     - destruct (get_c v count) eqn: gcvc.
-      + specialize (IHfds _ _ _ _ _ _ _ _ H im). simpl. destruct IHfds. split.
+      + specialize (IHfds _ _ _ _ _ _ H im). simpl. destruct IHfds. split.
         rewrite <- Nat.add_assoc.
         rewrite Nat.add_comm. rewrite <- Nat.add_assoc. rewrite <- Nat.add_succ_l.
         rewrite <- Nat.add_0_r with (n :=sub_inl_size sub' im ).
@@ -984,10 +984,10 @@ Section CONTRACT.
         rewrite <- Nat.add_succ_r.
         rewrite <- Nat.add_0_r with (n := funs_size fds').
         apply Nat.add_le_mono. assumption. apply le_0_n.
-      + assert (exists fds' count' sub' steps', (fds', steps', count', sub') = precontractfun sig count sub fds steps).
-        destruct (precontractfun sig count sub fds). destruct p. destruct p.
+      + assert (exists fds' count' sub', (fds', count', sub') = precontractfun sig count sub fds).
+        destruct (precontractfun sig count sub fds). destruct p.
         eauto. destructAll. assert (H0' := H0).
-         specialize (IHfds _ _ _ _ _ _ _ _ H0 im).  rewrite <- H0' in H. inversion H; subst. simpl. split.
+         specialize (IHfds _ _ _ _ _ _ H0 im).  rewrite <- H0' in H. inversion H; subst. simpl. split.
          eapply Nat.le_trans. apply sub_set_size.  simpl.  destruct IHfds.
          constructor. rewrite Nat.add_comm with (n := funs_size fds). rewrite <- Nat.add_assoc.
          apply Nat.add_le_mono. reflexivity. assumption.
@@ -1137,12 +1137,12 @@ Section CONTRACT.
          (match (get_b f inl) with
           | true =>
             (* DEBUG: might want to verify here that the variable is actually dead *)
-            postcontractfun oes fcon sig count inl sub fds' (subfds_Fcons (eq_ind_r (fun x => subfds_e x _) pfe Heq_fds)) (steps + 1) pfsub
+            postcontractfun oes fcon sig count inl sub fds' (subfds_Fcons (eq_ind_r (fun x => subfds_e x _) pfe Heq_fds)) steps pfsub
           | false =>
             (match (get_c f count) with
              | 0%nat => (* deadF *)
                let count' := dec_census sig e count in
-               postcontractfun oes fcon sig count' inl sub fds' (subfds_Fcons (eq_ind_r (fun x => subfds_e x _) pfe Heq_fds)) (steps + 1) pfsub
+               postcontractfun oes fcon sig count' inl sub fds' (subfds_Fcons (eq_ind_r (fun x => subfds_e x _) pfe Heq_fds)) steps pfsub
              | _ =>
                match (fcon sig count (e,sub,inl) (tsis_sub_pcf pfsub (eq_ind_r (fun x => subfds_e x _) pfe Heq_fds))) with
                | existT (e', steps', count', inl') bp =>
@@ -1392,17 +1392,17 @@ Section CONTRACT.
           end)
        end )
     | Efun fl e =>
-      (match  precontractfun sig count sub fl 0 with
-       | (fl', steps', count', sub') =>
+      (match  precontractfun sig count sub fl with
+       | (fl', count', sub') =>
          (match contract sig count' e sub' im return _ with
-            existT (e', steps'', count'', im') bp =>
+            existT (e', steps', count'', im') bp =>
             match postcontractfun (Efun fl' e, sub, im')
                                   (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count''
                                   im' sub fl' (subfds_refl fl') 0 (le_n _) return _ with
-            | existT (fl'', steps''', count''', im'') bp' =>
+            | existT (fl'', steps'', count''', im'') bp' =>
               (match fl'' return _ with (* eliminate empty function defns. *)
-               | Fnil => existT _ ( e', steps' + steps'' + steps''' + 1, count''', im'') (b_map_le_i_trans _ _ bp _ bp')
-               |  _  =>  existT _ (Efun fl'' e', steps' + steps'' + steps''', count''', im'') (b_map_le_i_trans _ _ bp _ bp')
+               | Fnil => existT _ ( e', steps' + steps'' + 1, count''', im'') (b_map_le_i_trans _ _ bp _ bp')
+               |  _  =>  existT _ (Efun fl'' e', steps' + steps'', count''', im'') (b_map_le_i_trans _ _ bp _ bp')
                end)
             end
           end)
@@ -1717,20 +1717,20 @@ Section CONTRACT.
           end) (eq_refl _)
        end )
     | Efun fl e =>
-      (match  precontractfun sig count sub fl 0 as anonymous'
+      (match  precontractfun sig count sub fl as anonymous'
               return
-              (anonymous' = precontractfun sig count sub fl 0 -> contractT im) with
-       | (fl', steps1, count', sub') =>
+              (anonymous' = precontractfun sig count sub fl -> contractT im) with
+       | (fl', count', sub') =>
          fun Heq =>
            (match contract sig count' e sub' im with
-              existT (e', steps2, count'', im') bp =>
+              existT (e', steps1, count'', im') bp =>
               match postcontractfun (Efun fl' e, sub, im')
                                     (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count''
                                     im' sub fl' (subfds_refl fl') 0 (le_n _) with
-              | existT (fl'', steps3, count''', im'') bp' =>
+              | existT (fl'', steps2, count''', im'') bp' =>
                 (match fl'' return contractT im with (* eliminate empty function defns. *)
-                 | Fnil => existT _ (e', steps1 + steps2 + steps3 + 1, count''', im'') (b_map_le_i_trans _ _ bp _ bp')
-                 |  _  =>  existT _ (Efun fl'' e', steps1 + steps2 + steps3, count''', im'') (b_map_le_i_trans _ _ bp _ bp')
+                 | Fnil => existT _ (e', steps1 + steps2 + 1, count''', im'') (b_map_le_i_trans _ _ bp _ bp')
+                 |  _  =>  existT _ (Efun fl'' e', steps1 + steps2, count''', im'') (b_map_le_i_trans _ _ bp _ bp')
                  end)
               end
             end)

@@ -1301,7 +1301,7 @@ Section CONTRACT.
                               (match contract sig' count'' e sub im''
                                      as k return (k = contract sig' count'' e sub im'' -> contractT im) with
                                | existT  (e', steps2, count'', im''') bp' =>
-                                 fun Heq4 => existT _ (e', steps1 + steps2 + 1, count'', im''')
+                                 fun Heq4 => existT _ (C_inl |[ e' ]|, steps1 + steps2 + 1, count'', im''')
                                                     (b_map_le_i_trans im (M.set (apply_r sig f) true im) (ble_add im im (apply_r sig f) (ble_refl im))
                                                                       _ (b_map_le_i_trans _ _ bp _ bp'))
                                end (eq_refl _))
@@ -1614,7 +1614,7 @@ Section CONTRACT.
                               (match contract sig' count'' e sub im''
                                      as k return (k = contract sig' count'' e sub im'' -> contractT im) with
                                | existT  (e', steps2, count'', im''') bp' =>
-                                 fun Heq4 => existT _ (e', steps1 + steps2 + 1, count'', im''')
+                                 fun Heq4 => existT _ (C_inl |[ e' ]|, steps1 + steps2 + 1, count'', im''')
                                                     (b_map_le_i_trans im (M.set (apply_r sig f) true im) (ble_add im im (apply_r sig f) (ble_refl im))
                                                                       _ (b_map_le_i_trans _ _ bp _ bp'))
                                end (eq_refl _))

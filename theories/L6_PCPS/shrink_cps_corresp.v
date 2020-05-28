@@ -3954,10 +3954,9 @@ Section CONTRACT.
     destruct Hpr as (Hpr1, Hpr2).
     eapply exp_def_mutual_ind; intros; simpl.
     - rewrite set_list_rename_all_arl; auto.
-      Focus 2.
-      intro. intro. apply H0 in H2. inv H2; auto.
-      right. intro. simpl in H3. inv H3; pi0.
-      apply not_occur_list_not_in in H4. auto.
+      2:{ intro. intro. apply H0 in H2. inv H2; auto.
+          right. intro. simpl in H3. inv H3; pi0.
+          apply not_occur_list_not_in in H4. auto. }
       rewrite H; auto.
       intro. intro. apply H0 in H2.
       inv H2. auto.
@@ -3979,8 +3978,8 @@ Section CONTRACT.
       inv H4; pi0. inv H7; pi0. right.
       eapply num_occur_n.
       constructor; eauto. simpl.
-      destruct (cps_util.var_dec x (apply_r sig v)). exfalso; auto.
-      auto.
+      destruct (cps_util.var_dec x (apply_r sig v)). now  exfalso; auto.
+      omega.
       specialize (H0 H3 H2).
       simpl in H0. inv H0. auto.
       intro; intro. apply H1 in H3. inv H3; auto.
@@ -3992,7 +3991,19 @@ Section CONTRACT.
       auto.
       right. inv H3; pi0. auto.
       intros. apply H0 in H2. inv H2; auto.
+      inv H3; pi0; dec_vars. auto.
+    - rewrite set_list_rename_all_ar; auto.      
+      rewrite set_list_rename_all_arl; auto.
+      2:{ intro. intro. apply H0 in H2. inv H2; auto.
+          right. intro. simpl in H3. inv H3; pi0. dec_vars.
+          apply not_occur_list_not_in in H3. auto. }
+      rewrite H; auto.  
+      intro. intro. apply H0 in H2.
+      inv H2. auto.
+      right.
       inv H3; pi0. auto.
+      intros z Hin. apply H0 in Hin. inv Hin; auto.
+      inv H2; pi0; dec_vars; pi0; auto.      
     - rewrite H; auto.
       rewrite H0; auto.
       intro; intro. apply H1 in H3; inv H3; auto.
@@ -4003,10 +4014,10 @@ Section CONTRACT.
       rewrite set_list_rename_all_arl; auto.
       intro; intro. apply H in H1.
       inv H1; auto.
-      right. inv H2; pi0.
+      right. inv H2; pi0; dec_vars.
       apply  not_occur_list_not_in. auto.
       intros. apply H in H1. inv H1; auto.
-      inv H2; pi0; auto.
+      inv H2; pi0; dec_vars; auto.
     - rewrite set_list_rename_all_arl; auto.
       rewrite H; auto.
       intro; intro.
@@ -4018,7 +4029,7 @@ Section CONTRACT.
     - rewrite set_list_rename_all_ar; auto.
       intro; intro.
       apply H in H1. inv H1; auto.
-      inv H2; pi0; auto.
+      inv H2; pi0; dec_vars; auto.
     - rewrite H; auto.
       rewrite H0; auto.
       intro; intros. apply H1 in H3. inv H3; auto.
@@ -4236,44 +4247,11 @@ Section CONTRACT.
     (forall e, Disjoint _ (dead_var e) (occurs_free e)) /\
     (forall fds, Disjoint _ (dead_var_fundefs fds) (occurs_free_fundefs fds)).
   Proof.
-    apply exp_def_mutual_ind; intros; repeat normalize_occurs_free; simpl; split.
-    -  intro; intro Hdj; inv Hdj.
-       inv H0. inv H1; pi0.
-       revert H0. apply not_occur_list_not_in. auto.
-       inv H0. inv H.  specialize (H0 x); apply H0; auto.
-    - intro; intro Hdj; inv Hdj.
-      inv H; pi0. inv H0; auto.
-    - intro. intro.
-      inv H; inv H0. specialize (H2 x). specialize (H x).
-      inv H1. inv H3.
-      inv H1. inv H0; pi0.
-      inv H0; pi0. inv H6; pi0.
-      inv H1; auto.
-      apply H. split; auto. eapply num_occur_n.
-      constructor; auto. apply H10. simpl.
-      destruct (cps_util.var_dec x v). exfalso; auto. auto.
-    - intro; intro Hdj; inv Hdj.
-      inv H0; pi0.
-      inv H1. inv H2; auto.
-      inv H2. inv H.
-      specialize (H2 x). apply H2. split; auto.
-    - intro; intro Hdj; inv Hdj.
-      inv H1; pi0. inv H2.
-      inv H. specialize (H2 x). apply H2. auto.
-      inv H1.
-      inv H0. specialize (H1 x). apply H1; auto.
-    - intro. intro. inv H. inv H0; pi0. inv H1.
-      revert H0. apply not_occur_list_not_in. auto.
-      inv H0; auto.
-    - intro. intro. inv H0. inv H1; pi0.
-      inv H2.
-      revert H0. apply not_occur_list_not_in. auto.
-      inv H0. inv H. specialize (H0 x). apply H0; auto.
-    - intro. intro. inv H. inv H1. inv H0; pi0.
-    - intro. intro. inv H1. inv H2; pi0. inv H; inv H0.
-      specialize (H1 x). specialize (H x). inv H3; auto.
-      inv H0; auto. inv H0; auto.
-    - intro. intro. inv H. inv H1.
+    split. 
+    - intros x. constructor. intros z Hnin. inv Hnin.
+      eapply not_occurs_not_free in H. contradiction.
+    - intros x. constructor. intros z Hnin. inv Hnin.
+      eapply not_occurs_not_free in H. contradiction.
   Qed.
 
   Theorem precontractfun_sig_nbv:
@@ -4295,14 +4273,8 @@ Section CONTRACT.
     - simpl in H. inv H. intro. intro. auto.
   Qed.
 
-
-
   Hint Constructors bound_not_stem_ctx : core.
   Hint Constructors bound_not_stem_fundefs_ctx : core.
-
-
-
-
 
   Theorem Proper_Intersection:
     forall A : Type, Proper (Same_set A ==> Same_set A ==> Same_set A) (Intersection A).
@@ -4312,8 +4284,6 @@ Section CONTRACT.
     inv H1. apply H in H2.
     apply H0 in H3. auto.
   Qed.
-
-
 
   Theorem findtag_map: forall f (c0:ctor_tag) e l,
                          findtag l c0 = Some e ->
@@ -4328,8 +4298,6 @@ Section CONTRACT.
   Qed.
 
 
-
-
   Theorem contractcases_corresp:
     forall cl2 cl1 sig c im x count sub,
       (* recursive call to shrink_corresp *)
@@ -4337,45 +4305,42 @@ Section CONTRACT.
          (term_sub_inl_size (e, sub', im') < term_sub_inl_size (Ecase x cl2, sub, im)) ->
          let ce := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f c im')) (rename_all_ns sig e)) in
          unique_bindings ce ->
-         closed ce ->
+         closed_exp ce ->
          c_count ce count ->
          cmap_view_ctx sub' c ->
          inl_inv im' sub' ce ->
          sig_inv_full sig (rename_all_ctx_ns sig (inlined_ctx_f c im')) (rename_all_ns sig e) ->
-         forall e' count' im'' BP,
-           contract sig count e sub' im' = existT _ (e', count', im'') BP ->
+         forall e' count' steps im'' BP,
+           contract sig count e sub' im' = existT _ (e', steps, count', im'') BP ->
            let ce' := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f c im'')) e') in
-           gsr_clos ce ce' /\ c_count ce' count' /\ inl_inv im'' sub' ce' /\
+           gsr_clos steps ce ce' /\ c_count ce' count' /\ inl_inv im'' sub' ce' /\
            sig_inv_codom sig (rename_all_ctx_ns sig (inlined_ctx_f c im'')) e') ->
       (* actual statement of contract_case *)
       let ce := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f c im)) (Ecase x (cl1 ++ (rename_all_case sig cl2)))) in
       unique_bindings ce ->
-      closed ce ->
+      closed_exp ce ->
       c_count ce count ->
       cmap_view_ctx sub c ->
       inl_inv im sub ce ->
       sig_inv_full sig (rename_all_ctx_ns sig (inlined_ctx_f c im)) (Ecase x (cl1 ++ (rename_all_case sig cl2)))  ->
-      forall cl2' count' im' oes pfe pfsub bp,
-        contractcases oes (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub cl2 pfe pfsub = existT _ (cl2', count', im') bp ->
+      forall cl2' steps count' im' oes pfe pfsub bp,
+        contractcases oes (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub cl2 pfe pfsub = existT _ (cl2', steps, count', im') bp ->
         let ce' := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f c im')) (Ecase x (cl1 ++ cl2'))) in
-        gsr_clos ce ce' /\ c_count ce' count' /\ inl_inv im' sub ce' /\
-        sig_inv_codom sig (rename_all_ctx_ns sig (inlined_ctx_f c im')) (Ecase x (cl1 ++ cl2'))
-  .
+        gsr_clos steps ce ce' /\ c_count ce' count' /\ inl_inv im' sub ce' /\
+        sig_inv_codom sig (rename_all_ctx_ns sig (inlined_ctx_f c im')) (Ecase x (cl1 ++ cl2')).
   Proof.
     induction cl2; intros cl1 sig c im x count sub;
     intro Hcontract_corresp;
     intros; simpl in H5.
-    -
-      inv H5; unfold ce in *; unfold ce' in *; split; auto.
-      apply rt_refl.
+    - inv H5; unfold ce in *; unfold ce' in *; split; auto.
+      apply Refl_srw.
       split; auto. split; auto.
       apply sig_inv_combine in H4. inv H4. simpl in H6. auto.
-    -
-      destruct a.
+    - destruct a.
       remember (contract sig count e sub im) as con_e.
       destruct con_e.
       destruct x0.
-      destruct p.
+      destruct p. destruct p.
       simpl in ce.
       assert (Hcl1: (rename_all_ns sig (Ecase x cl1)) = Ecase x cl1 ). {
         rewrite <- (proj1 (rename_all_no_shadow _)).
@@ -4395,7 +4360,7 @@ Section CONTRACT.
         inv H7.
         apply num_occur_app_case in H12.
         destructAll.
-        pi0.
+        pi0. dec_vars.
         assert (~(occurs_free (Ecase x cl1)) x0).
         apply not_occurs_not_free.
         eapply num_occur_n.
@@ -4404,17 +4369,14 @@ Section CONTRACT.
         auto.
         (* using H4 *)
         eapply sig_inv_dom_mon.
-        Focus 2.
-        apply sig_inv_combine in H4. destruct H4.
-        eauto.
+        2:{ apply sig_inv_combine in H4. destruct H4.
+            eauto. }
         rewrite bound_var_app_ctx.
-        rewrite bound_var_Ecase_app.
-        auto with Ensembles_DB.
-      }
-                                                                       rename c0 into v.
+        rewrite bound_var_Ecase_app. sets. }
+      
+      rename c0 into v.
       assert (rename_all_ctx_ns sig (inlined_ctx_f c im)
-             |[ Ecase x  (cl1 ++ (v, rename_all_ns sig e) :: rename_all_case sig cl2) ]| =
-                                                                                         rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Ecase_c x cl1 v Hole_c cl2)) im)
+             |[ Ecase x  (cl1 ++ (v, rename_all_ns sig e) :: rename_all_case sig cl2) ]| = rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Ecase_c x cl1 v Hole_c cl2)) im)
              |[ rename_all_ns sig e]|).
       {
         assert (
@@ -4434,31 +4396,30 @@ Section CONTRACT.
         simpl.
         rewrite <- app_ctx_f_fuse.
         simpl. reflexivity.
-      }
+      } 
       symmetry in Heqcon_e.
-
+      
       eapply Hcontract_corresp with
       (c :=  (comp_ctx_f c (Ecase_c x cl1 v Hole_c cl2)))
         in Heqcon_e; try (rewrite <- H6; auto).
-      Focus 2. unfold term_sub_inl_size. simpl. omega.
-
+      2:{ unfold term_sub_inl_size. simpl. omega. }
+      
       (*
         eapply shrink_corresp with
         (c :=  (comp_ctx_f c (Ecase_c x cl1 v Hole_c cl2)))
           in Heqcon_e; try (rewrite <- H6; auto). *)
-      Focus 2.
-      apply cmap_view_case. auto.
-
+      2:{ apply cmap_view_case. auto. }
+      
       (* push Disjoint, Unique and Sub_inv through e0 *)
       destruct Heqcon_e as (H7, H8).
       destruct H8 as (H8, H9).
       destruct H9 as (H9, H_sig_r).
       rewrite <- H6 in H7.
-      assert (Hub' := gsr_preserves_clos _ _ H H0 H7).
+      assert (Hub' := gsr_clos_preserves_clos _ _ _ H H0 H7).
       destructAll.
       apply sig_inv_combine in H4.
       destruct H4 as (H4, H4c).
-      assert (Hse := gsr_preserves_sig_dom _ _ _ H H0 H7 H4).
+      assert (Hse := gsr_preserves_sig_dom _ _ _ _ H (closed_implies_Disjoint _ H0) H7 H4).
       assert (He0 : rename_all_ns sig e0 = e0). {
         rewrite <- (proj1 (rename_all_no_shadow _)).
         apply Disjoint_dom_rename_all.
@@ -4477,13 +4438,13 @@ Section CONTRACT.
         right; auto.
       }
 
-                                                assert (
-                                                  (rename_all_ctx_ns sig
-                                                                     (inlined_ctx_f (comp_ctx_f c (Ecase_c x cl1 v Hole_c cl2)) b0)
-                                                  |[ rename_all_ns sig e0 ]|) =
-                                                  (rename_all_ctx_ns sig
-                                                                     (inlined_ctx_f c b0)
-                                                  |[  (Ecase x ((cl1++[(v,e0)])++(rename_all_case sig cl2)))]|)).
+      assert (
+        (rename_all_ctx_ns sig
+                           (inlined_ctx_f (comp_ctx_f c (Ecase_c x cl1 v Hole_c cl2)) b0)
+        |[ rename_all_ns sig e0 ]|) =
+        (rename_all_ctx_ns sig
+                           (inlined_ctx_f c b0)
+        |[  (Ecase x ((cl1++[(v,e0)])++(rename_all_case sig cl2)))]|)).
       {
         assert (Ecase x ((cl1 ++ [(v, e0)]) ++ rename_all_case sig cl2)  =
                 rename_all_ns sig (Ecase x ((cl1 ++ [(v, e0)]) ++ cl2))).
@@ -4530,21 +4491,21 @@ Section CONTRACT.
                                                     (@snd exp ctx_map (@fst (prod exp ctx_map) b_map oes))
                                                     (@snd (prod exp ctx_map) b_map oes) pfsub b)) as cc_ind.
       destruct cc_ind. destruct x0.
-      destruct p.
+      destruct p. destruct p.
       symmetry in Heqcc_ind.
       rewrite He0 in H12.
       rewrite H12 in *.
 
 
-      eapply  IHcl2 in Heqcc_ind; eauto.
+      eapply IHcl2 in Heqcc_ind; eauto.
       destruct Heqcc_ind.
       destruct H14.
       destruct H15 as (H15, Hsig_r).
       clear He0.
       inv H5. unfold ce'.
       split.
-      eapply rt_trans.
-      apply H7.
+      eapply gsr_clos_trans.
+      now apply H7.
       do 2 (rewrite <- app_assoc in H13).
       simpl in H13.
       rewrite <- app_assoc.
@@ -4609,9 +4570,7 @@ Section CONTRACT.
          normalize_bound_var.
          right.
          eapply Bound_Ecase.
-         Focus 2.
-         left. eauto.
-         auto.
+         2:{ left. eauto. } auto.
       + inv H8.
         * left.
           apply num_occur_app_ctx in H9. destructAll; pi0.
@@ -4645,7 +4604,7 @@ Section CONTRACT.
           destruct (cps_util.var_dec x x). inv H20. apply n1; auto.
           apply H0 in H13. inv H13.
           destruct (cps_util.var_dec y x).
-          exfalso; auto.
+          now exfalso; auto.
           auto.
         * right.
           repeat normalize_ctx.
@@ -4654,53 +4613,40 @@ Section CONTRACT.
   Qed.
 
 
-
-
-
   (* move to shrink_cps_correct *)
   Theorem gsr_included_bv :
-    forall e e',
-      gsr_clos e e' ->
+    forall n e e',
+      gsr_clos n e e' ->
       Included _ (bound_var e') (bound_var e).
   Proof.
-    intros. induction H.
-    - inv H; inv H0; do 2 (rewrite bound_var_app_ctx); repeat normalize_bound_var; eauto with Ensembles_DB.
-      + apply Included_Union_compat.
-        auto with Ensembles_DB.
-        apply Included_Union_compat.
-        2: auto with Ensembles_DB.
-        rewrite fundefs_append_bound_vars. 2: reflexivity.
-        intro. intro.
-        rewrite fundefs_append_bound_vars. 2: reflexivity.
-        normalize_bound_var. inv H0; auto.
-      + do 2 (rewrite bound_var_app_ctx).
-        apply Included_Union_compat.
-        auto with Ensembles_DB.
-        apply Included_Union_compat.
-        apply Included_Union_compat.
-        auto with Ensembles_DB.
-        intro. intros.
-        eapply Bound_Ecase. apply H0.
-        apply findtag_In_patterns.
-        apply H.
-        auto with Ensembles_DB.
-      + rewrite bound_var_app_ctx.
+    intros n e e' Hrw.
+    induction Hrw.
+    - inv H; inv H0; rewrite !bound_var_app_ctx in *;
+        repeat normalize_bound_var; eapply Included_trans; eauto with Ensembles_DB. 
+      + apply Included_Union_compat. sets. repeat normalize_bound_var.
+        rewrite !fundefs_append_bound_vars; [| reflexivity ].
+        rewrite !fundefs_append_bound_vars with (B3 := fundefs_append B1 (Fcons f t xs fb B2)); [| reflexivity ].
+        repeat normalize_bound_var. sets.
+      + normalize_bound_var. rewrite !bound_var_app_ctx in *.
+        rewrite !Union_assoc. apply Included_Union_compat; sets.
+        apply Included_Union_compat; sets. intros x1 Hin. econstructor. eassumption.
+        eapply find_tag_nth_In_patterns. eassumption.
+      + rewrite !bound_var_app_ctx. repeat normalize_bound_var. rewrite !bound_var_app_ctx.
+        rewrite <- bound_var_rename_all_ns. sets.
+      + rewrite !bound_var_app_ctx. repeat normalize_bound_var. rewrite !bound_var_app_ctx.
         rewrite <- bound_var_rename_all_ns.
-        rewrite bound_var_app_ctx.
-        normalize_bound_var. auto with Ensembles_DB.
-      + do 2 (rewrite bound_var_app_ctx).
-        repeat normalize_bound_var.
+        rewrite !fundefs_append_bound_vars; [| reflexivity ].
+        rewrite !fundefs_append_bound_vars with (B3 := fundefs_append B1 (Fcons f t xs fb B2)); [| reflexivity ].
+        normalize_bound_var. xsets.
+      + rewrite !bound_var_app_ctx. repeat normalize_bound_var. rewrite !bound_var_app_ctx.
         rewrite <- bound_var_rename_all_ns.
-        apply Included_Union_compat.
-        auto with Ensembles_DB.
-        rewrite fundefs_append_bound_vars. 2: reflexivity.
-        intro. intros.
-        rewrite fundefs_append_bound_vars. 2: reflexivity.
-        normalize_bound_var. inv H0; auto with Ensembles_DB.
-        inv H2; auto. left. right. right. auto.
-        inv H2; auto. left. right. right. auto.
-    - auto with Ensembles_DB.
-    - etransitivity; eauto.
+        rewrite !fundefs_append_bound_vars; [| reflexivity ].
+        rewrite !fundefs_append_bound_vars with (B3 := fundefs_append B1 (Fcons f t xs fb B2)); [| reflexivity ].
+        normalize_bound_var. eapply bound_var_inline_letapp in H2.
+        rewrite !Union_assoc. eapply Union_Included; sets. eapply Union_Included. now xsets.
+        eapply Included_trans. eassumption.
+        rewrite <- bound_var_rename_all_ns. xsets.
+    - sets.
   Qed.
 
   Theorem apply_r_list_In:
@@ -4975,10 +4921,6 @@ Section CONTRACT.
         inv H; auto. right. constructor 2; auto.
   Qed.
 
-
-
-
-
   Inductive sum_range_n: list var -> list var -> exp -> var -> nat -> Prop :=
   | SRN_cons1: forall lx ly e v0 n m x,
                  sum_range_n lx ly e v0 n -> num_occur e x m -> sum_range_n (x::lx) (v0::ly) e v0 (m+n)
@@ -5061,8 +5003,6 @@ Section CONTRACT.
   Qed.
 
 
-
-
   Definition set_list_r {A:Type}  (l : list (M.elt * A)) (map: M.t A) : M.t A :=
     fold_left (fun cmap xv => M.set (fst xv) (snd xv) cmap ) l map.
 
@@ -5080,9 +5020,6 @@ Section CONTRACT.
     apply IHlx. inv H. inv H3. constructor; auto. intro; apply H2. constructor 2; auto.
     apply set_set. inv H. intro; apply H2; constructor; auto.
   Qed.
-
-
-
 
   Theorem num_occur_set_arl_s:
     forall x y sig,
@@ -5120,7 +5057,7 @@ Section CONTRACT.
          num_occur_fds (rename_all_fun_ns (M.set x y sig) fds) y (n+m)).
   Proof.
     intros x y sig Hxy Hdom.
-    apply exp_def_mutual_ind; intros; simpl in *; try (inv H0; inv H1).
+    apply exp_def_mutual_ind; intros; simpl in *; try (inv H0; inv H1). 
     - specialize (H _ _ H8 H7).
       eapply num_occur_n.
       constructor. eauto.
@@ -5148,6 +5085,11 @@ Section CONTRACT.
       assert (Hn := num_occur_set_arl_s _ _ _ Hxy Hdom [v0]).
       simpl in Hn. simpl. unfold var in *.
       omega.
+    - specialize (H _ _ H9 H8).
+      eapply num_occur_n. constructor; eauto.
+      assert (Hn := num_occur_set_arl_s _ _ _ Hxy Hdom (f :: ys)).
+      simpl in Hn. simpl. unfold var in *.
+      omega. 
     - inv H1; inv H2.
       specialize (H _ _ H8 H9).
       specialize (H0 _ _ H5 H4).
@@ -5272,7 +5214,7 @@ Section CONTRACT.
                                                      (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0))
                                       inl) |[ Eapp (apply_r sig v) f (apply_r_list sig l) ]| ) in
       c_count ce  count ->
-      closed ce ->
+      closed_exp ce ->
       unique_bindings ce ->
       get_b (apply_r sig v) inl = false ->
       sig_inv_full sig (rename_all_ctx_ns sig

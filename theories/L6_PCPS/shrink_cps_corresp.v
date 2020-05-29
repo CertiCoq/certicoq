@@ -5629,10 +5629,11 @@ Section CONTRACT.
 
   (** postcontractfun reduces or preserves the names of functions *)
   Theorem postcontractfun_name_in_fundefs:
-    forall {fds_c  im sub count sig},
-    forall {oes fds_c' count' im' pfe pfsub bp},
-      postcontractfun oes (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub fds_c pfe pfsub = existT _ (fds_c', count', im')  bp ->
-      (Included _ (name_in_fundefs fds_c') (name_in_fundefs fds_c)).
+    forall {fds_c steps im sub count sig},
+    forall {oes fds_c' steps' count' im' pfe pfsub bp},
+      postcontractfun oes (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub fds_c pfe steps pfsub =
+      existT _ (fds_c', steps', count', im')  bp ->
+      name_in_fundefs fds_c' \subset name_in_fundefs fds_c.
   Proof.
     induction fds_c; intros.
     - simpl in H.
@@ -5641,9 +5642,9 @@ Section CONTRACT.
         simpl. auto with Ensembles_DB.
       + destruct (get_c v count).
         apply IHfds_c in H.
-        simpl. auto with Ensembles_DB.
+        simpl. now sets.
         destruct (contract sig count e sub im).
-        destruct x. destruct p.
+        destruct x. destruct p. destruct p. 
         remember  (postcontractfun oes
                                    (fun (rm : r_map) (cm : c_map)
                                         (es : prod (prod exp ctx_map) b_map)
@@ -5659,109 +5660,117 @@ Section CONTRACT.
                                                                 subfds_e x
                                                                          (@fst exp ctx_map (@fst (prod exp ctx_map) b_map oes)))
                                                              pfe (Fcons v f l e fds_c)
-                                                             (@eq_refl fundefs (Fcons v f l e fds_c))))
+                                                             (@eq_refl fundefs (Fcons v f l e fds_c)))) steps
                                    (@tsis_sub_pcf' sub im
                                                    (@snd exp ctx_map (@fst (prod exp ctx_map) b_map oes))
                                                    (@snd (prod exp ctx_map) b_map oes) b0 pfsub b)).
-        destruct s. destruct x. destruct p. symmetry  in Heqs.
+        destruct s. destruct x. destruct p. destruct p. symmetry  in Heqs.
         apply IHfds_c in Heqs.
         inv H. simpl. auto with Ensembles_DB.
     - simpl in H. inv H. auto with Ensembles_DB.
   Qed.
 
+  Theorem postcontractfun_steps_ge fds_c steps im sub count sig oes fds_c' steps' count' im' pfe pfsub bp :
+    postcontractfun oes (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub fds_c pfe steps pfsub =
+    existT _ (fds_c', steps', count', im')  bp ->
+    steps' >= steps.
+  Proof.
+    revert steps im sub count sig oes fds_c' steps' count' im' pfe pfsub bp.
+    induction fds_c; intros steps im sub count sig oes fds_c' steps' count' im' pfe pfsub bp Hc. 
+    - simpl in Hc. 
+      destruct (get_b v im).
+      + apply IHfds_c in Hc. eassumption. 
+      + destruct (get_c v count).
+        * apply IHfds_c in Hc. eassumption.
+        * destruct (contract sig count e sub im) as [[[[? ?] ?] ?] ?]. 
+          remember (postcontractfun oes
+                                    (fun (rm : r_map) (cm : c_map) (es : exp * ctx_map * b_map)
+                                         (_ : term_sub_inl_size es < term_sub_inl_size oes) =>
+                                       contract rm cm
+                                                (@fst exp ctx_map (@fst (exp * ctx_map) b_map es))
+                                                (@snd exp ctx_map (@fst (exp * ctx_map) b_map es))
+                                                (@snd (exp * ctx_map) b_map es)) sig c b sub fds_c
+                                    (@subfds_Fcons v f l e fds_c
+                                                   (@fst exp ctx_map (@fst (exp * ctx_map) b_map oes))
+                                                   (@eq_ind_r fundefs (Fcons v f l e fds_c)
+                                                              (fun x : fundefs =>
+                                                                 subfds_e x
+                                                                          (@fst exp ctx_map (@fst (exp * ctx_map) b_map oes)))
+                                                              pfe (Fcons v f l e fds_c)
+                                                              (@eq_refl fundefs (Fcons v f l e fds_c)))) steps
+                                    (@tsis_sub_pcf' sub im
+                                                    (@snd exp ctx_map (@fst (exp * ctx_map) b_map oes))
+                                                    (@snd (exp * ctx_map) b_map oes) b pfsub b0)) as s.
+          destruct s as [[[[? ?] ?] ?] ?]. simpl in *. inv Hc. symmetry in Heqs. eapply IHfds_c in Heqs. omega.
+    - simpl in Hc. inv Hc. omega.
+  Qed. 
+
+  
 (** postcontractfun removes dead functions and processed the terms according to the shrink rewrite system. Also, none of the functions in fds and fds_c are ever eligible to be inlined *)
   Theorem postcontractfun_corresp:
-    forall fds_c fds e c im sub count sig,
+    forall fds_c steps fds e c im sub count sig,
       (* recursive call to shrink_corresp *)
       (forall eb sub' im' sig c count,
          (term_sub_inl_size (eb, sub', im') < funs_size fds_c + sub_inl_size sub im) ->
          let ce := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f c im')) (rename_all_ns sig eb)) in
          unique_bindings ce ->
-         closed ce ->
+         closed_exp ce ->
          c_count ce count ->
          cmap_view_ctx sub' c ->
          inl_inv im' sub' ce ->
          sig_inv_full sig (rename_all_ctx_ns sig (inlined_ctx_f c im')) (rename_all_ns sig eb) ->
-         forall e' count' im'' BP,
-           contract sig count eb sub' im' = existT _ (e', count', im'') BP ->
+         forall e' steps count' im'' BP,
+           contract sig count eb sub' im' = existT _ (e', steps, count', im'') BP ->
            let ce' := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f c im'')) e') in
-           gsr_clos ce ce' /\ c_count ce' count' /\ inl_inv im'' sub' ce' /\
+           gsr_clos steps ce ce' /\ c_count ce' count' /\ inl_inv im'' sub' ce' /\
            sig_inv_codom sig (rename_all_ctx_ns sig (inlined_ctx_f c im'')) e') ->
       (* actual statement for postcontractfun *)
       let ce := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Efun1_c (fundefs_append fds fds_c) Hole_c)) im)) (rename_all_ns sig e)) in
       (Disjoint _ (name_in_fundefs fds) (Dom_map_b im)) ->
       unique_bindings ce ->
-      closed ce ->
+      closed_exp ce ->
       c_count ce count ->
       cmap_view_ctx sub c ->
       inl_inv im sub ce ->
       sig_inv_full sig (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Efun1_c (fundefs_append fds fds_c) Hole_c)) im)) (rename_all_ns sig e) ->
-      forall oes fds_c' count' im' pfe pfsub bp,
-        postcontractfun oes (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub fds_c pfe pfsub = existT _ (fds_c', count', im')  bp ->
+      forall oes fds_c' steps' count' im' pfe pfsub bp,
+        postcontractfun oes (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub fds_c pfe steps pfsub =
+        existT _ (fds_c', steps', count', im')  bp ->
         let ce' := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Efun1_c (fundefs_append fds fds_c') Hole_c)) im')) (rename_all_ns sig e)) in
-        gsr_clos ce ce' /\ c_count ce' count' /\ inl_inv im' sub ce' /\
+        gsr_clos (steps' - steps) ce ce' /\ c_count ce' count' /\ inl_inv im' sub ce' /\
         sig_inv_codom sig (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Efun1_c (fundefs_append fds fds_c') Hole_c)) im')) (rename_all_ns sig e) /\ (rename_all_fun_ns sig (inlined_fundefs_f fds_c' im') = fds_c') /\ (Disjoint _ (name_in_fundefs fds) (Dom_map_b im')).
   Proof.
     induction fds_c;
-    intros fds e0 c im sub count sig Hcontract_corresp ce Hdjfds;
-    intros.
-    Focus 2.
-    simpl in H5. inv H5.
-    unfold ce in *; unfold ce'.
-    split; auto.
-    apply rt_refl.
-    split; auto. split; auto.
-    apply sig_inv_combine in H4. destruct H4. auto.
-
-    simpl in H5.
-    destruct (get_b v im) eqn:gbvim.
-    - (* get_b v im = true *)
-      assert (
-          (inlined_ctx_f
-             (comp_ctx_f c
-                         (Efun1_c (fundefs_append fds (Fcons v f l e fds_c)) Hole_c))
-             im) =
-          (inlined_ctx_f
-             (comp_ctx_f c (Efun1_c (fundefs_append fds fds_c) Hole_c))
-             im)).
-      { do 2 (rewrite (proj1 inlined_comp_ctx)).
-        simpl.
-        do 2 (rewrite inlined_fundefs_append).
-        simpl.
-        rewrite gbvim.
-        reflexivity.
-      }
-      unfold ce in *.
-      rewrite H6 in *.
-      eapply IHfds_c in H5; eauto.
-      intros. eapply Hcontract_corresp; eauto.
-      etransitivity. apply H7. simpl.
-      omega.
-
+      intros steps fds e0 c im sub count sig Hcontract_corresp ce Hdjfds; intros.
+    (* Fnil *)
+    2:{ simpl in H5. inv H5. unfold ce in *; unfold ce'.
+        split; auto. rewrite Nat.sub_diag. eapply Refl_srw.
+        split; auto. split; auto.
+        apply sig_inv_combine in H4. destruct H4. auto. } 
+    { (* Fcons *)
+      simpl in H5.
+      destruct (get_b v im) eqn:gbvim.
+      - (* get_b v im = true *)
+        assert (
+            (inlined_ctx_f (comp_ctx_f c (Efun1_c (fundefs_append fds (Fcons v f l e fds_c)) Hole_c)) im) =
+            (inlined_ctx_f (comp_ctx_f c (Efun1_c (fundefs_append fds fds_c) Hole_c)) im)).
+        { do 2 (rewrite (proj1 inlined_comp_ctx)). simpl.
+          do 2 (rewrite inlined_fundefs_append). simpl.
+          rewrite gbvim. reflexivity. }
+        unfold ce in *. rewrite H6 in *.
+        eapply IHfds_c in H5; eauto. intros. eapply Hcontract_corresp; eauto.
+        etransitivity. apply H7. simpl. omega.        
     - (* get_b v im = false *)
       destruct (get_c v count) eqn:gvc.
       + (* get_c v count = 0 i.e. dead fun *)
-        assert (Hgsr_dead: gsr_clos ce (rename_all_ctx_ns sig
-                                                          (inlined_ctx_f
-                                                             (comp_ctx_f c
-                                                                         (Efun1_c (fundefs_append fds fds_c) Hole_c))
-                                                             im) |[ rename_all_ns sig e0 ]|)).
-        {
-          (* by Fun_rem_s *)
-          unfold ce.
-          do 2 (rewrite (proj1 inlined_comp_ctx)).
-          simpl.
-          do 2 (rewrite inlined_fundefs_append).
-          simpl. rewrite gbvim.
-          do 2 (rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _))).
-          do 2 (rewrite <- app_ctx_f_fuse).
-          constructor. constructor.
-          simpl.
-          do 2 (rewrite rename_all_ns_fundefs_append).
-          simpl.
-          apply Fun_rem_s.
-          specialize (H1 v).
-          rewrite gvc in H1.
+        assert (Hgsr_dead: gsr_clos 0 ce (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Efun1_c (fundefs_append fds fds_c) Hole_c)) im) |[ rename_all_ns sig e0 ]|)).
+        { (* by Fun_rem_s *)
+          unfold ce. do 2 (rewrite (proj1 inlined_comp_ctx)). simpl.
+          do 2 (rewrite inlined_fundefs_append). simpl. rewrite gbvim.
+          do 2 (rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _))). do 2 (rewrite <- app_ctx_f_fuse).
+          replace 0 with (0 + 0) by omega. eapply Trans_srw; [| now constructor ]. 
+          constructor. simpl. do 2 (rewrite rename_all_ns_fundefs_append). simpl.
+          apply Fun_rem_s. specialize (H1 v). rewrite gvc in H1.
           unfold ce in H1.
           rewrite (proj1 inlined_comp_ctx) in H1.
           simpl in H1.
@@ -5776,16 +5785,17 @@ Section CONTRACT.
           simpl in H6.
           auto.
         }
-        assert (Ht := gsr_preserves_clos _ _ H H0 Hgsr_dead).
+        assert (Ht := gsr_clos_preserves_clos _ _ _ H H0 Hgsr_dead).
         destruct Ht as (Hub_dead, Hdj_dead).
         apply sig_inv_combine in H4. destruct H4 as (H4, H4c).
-        assert (Hsig_dead := gsr_preserves_sig_dom _ _ _ H H0 Hgsr_dead H4).
-
+        assert (Hsig_dead := gsr_preserves_sig_dom _ _ _ _ H (closed_implies_Disjoint _ H0) Hgsr_dead H4).
+        
         (* I.H. *)
         eapply IHfds_c in H5; eauto.
         * destructAll.
           unfold ce'; split; auto.
-          eapply rt_trans; eauto.
+          replace (steps' - steps) with (0 + (steps' - steps)) by omega.
+          eapply gsr_clos_trans. eassumption. eassumption. 
         * intros.
           eapply Hcontract_corresp; eauto.
           etransitivity. apply H6. simpl.
@@ -5956,10 +5966,8 @@ Section CONTRACT.
           inv H10.
       + (* get_c v count = (S n) *)
         (* contract on e *)
-        remember  (contract sig count e sub im).
-        destruct s.
-        destruct x.
-        destruct p.
+        remember (contract sig count e sub im) as s.
+        destruct s. destruct x. destruct p. destruct p.
         symmetry in Heqs.
         assert (
             rename_all_ctx_ns sig
@@ -5992,23 +6000,20 @@ Section CONTRACT.
                                                      (Efun2_c
                                                         (fundefs_ctx_append (inlined_fundefs_f fds im)
                                                                             (Fcons1_c v f l Hole_c (inlined_fundefs_f fds_c im))) e0))) in Heqs; eauto.
-        Focus 2. unfold term_sub_inl_size; simpl. omega. (* rewrite funs_size_append. simpl.
-          omega. *)
-        (*          eapply shrink_corresp in Heqs; eauto.  *)
-        (* can add shallow Efun2_c *)
+        2:{ unfold term_sub_inl_size; simpl. omega. }
         2: (apply cmap_view_efun2; auto).
 
 
         (* I H *)
         destruct Heqs.
         destruct H8.
-        assert (Ht := gsr_preserves_clos _ _ H H0 H7).
+        assert (Ht := gsr_clos_preserves_clos _ _ _ H H0 H7).
         destruct Ht as (Hub_post, Hdj_post).
         apply sig_inv_combine in H4.
         destruct H4 as (H4, H4c).
         rewrite H6 in H4.
-        assert (Hsig_post := gsr_preserves_sig_dom _ _ _ H H0 H7 H4).
-
+        assert (Hsig_post := gsr_preserves_sig_dom _ _ _ _ H (closed_implies_Disjoint _ H0) H7 H4).
+        
         destruct H9 as (H9, Hsig_r).
 
         assert (He1 : e1 = rename_all_ns sig e1).
@@ -6174,14 +6179,12 @@ Section CONTRACT.
                                                                 subfds_e x
                                                                          (@fst exp ctx_map (@fst (prod exp ctx_map) b_map oes)))
                                                              pfe (Fcons v f l e fds_c)
-                                                             (@eq_refl fundefs (Fcons v f l e fds_c))))
+                                                             (@eq_refl fundefs (Fcons v f l e fds_c)))) steps
                                    (@tsis_sub_pcf' sub im
                                                    (@snd exp ctx_map (@fst (prod exp ctx_map) b_map oes))
                                                    (@snd (prod exp ctx_map) b_map oes) b0 pfsub b)).
-        destruct s.
-        destruct x.
-        destruct p.
-        symmetry in Heqs.
+        destruct s. destruct x. destruct p. destruct p. 
+        symmetry in Heqs. assert (Hge := Heqs). eapply postcontractfun_steps_ge in Hge.
         eapply IHfds_c  in Heqs; eauto.
         clear He1.
         destruct Heqs as (H11, Heqs).
@@ -6190,62 +6193,59 @@ Section CONTRACT.
         inv H5.
         unfold ce'.
         split; auto.
-        eapply rt_trans.
-        apply H7.
-        rewrite <- fundefs_append_assoc in H11.
-        rewrite <- fundefs_append_assoc in H11. simpl in H11.
-        rewrite <- fundefs_append_assoc.  simpl.
-        auto.
-        split; auto.
-        rewrite <- fundefs_append_assoc in H12.
-        auto.
-        rewrite <- fundefs_append_assoc in H13.
-        split; auto.
-        rewrite <- fundefs_append_assoc in Heqs. auto.
-        destruct Heqs as (Heqs, Hf0).
-        split; auto.
-        { simpl.
-          destruct (get_b v im') eqn:gbim'.
-          -  (* v should not be eligible to be inlined *)
-            exfalso.
-            destruct Hf0.
-            inversion H14. specialize (H15 v).
-            apply H15. split.
-            eapply fundefs_append_name_in_fundefs. reflexivity.
-            right. constructor. auto.
-            auto.
-          - destruct Hf0. split.
-            + simpl. rewrite H5.
-              assert (He1 : e1 = rename_all_ns sig e1).
-              {
-                clear H5.
-                rewrite <- (proj1 (rename_all_no_shadow _)).
-                symmetry.
-                apply rename_sig_dead.
-                intro.             intros.
-                apply Hsig_post in H5.
-                apply not_bound_dead_or_free in H5.
-                inversion H5.
-                2: apply Hdj_post in H15; inversion H15.
-                rewrite <- H10 in H15.
-                apply num_occur_app_ctx in H15.
-                destructAll; pi0.
-                auto.
-                rewrite <- H10 in Hsig_post.
-                eapply sig_inv_dom_mon.
-                2: apply Hsig_post.
-                rewrite bound_var_app_ctx.
-                right;
-                  auto.
-              }
-              rewrite <- He1.
-              reflexivity.
-            + eapply Disjoint_Included_l.
-              2: apply H14.
-              intro. intro.
-              eapply fundefs_append_name_in_fundefs. reflexivity. auto.
-        }
-        { intros.
+        * replace (n0 + n1 - steps) with (n0 + (n1 - steps)) by omega. eapply gsr_clos_trans. eassumption.
+          replace (fundefs_append fds (Fcons v f l e1 f0)) with (fundefs_append (fundefs_append fds (Fcons v f l e1 Fnil)) f0).
+          2:{ rewrite <- fundefs_append_assoc. simpl. reflexivity. } 
+          eassumption.
+        * split; auto.
+          -- rewrite <- fundefs_append_assoc in H12.
+             auto.
+          -- rewrite <- fundefs_append_assoc in H13.
+             split; [ now auto |].
+             rewrite <- fundefs_append_assoc in Heqs. auto.
+             destruct Heqs as (Heqs, Hf0).
+             split; [ now auto |].
+             { simpl.
+               destruct (get_b v im') eqn:gbim'.
+               -  (* v should not be eligible to be inlined *)
+                 exfalso.
+                 destruct Hf0.
+                 inversion H14. specialize (H15 v).
+                 apply H15. split.
+                 eapply fundefs_append_name_in_fundefs. reflexivity.
+                 right. constructor. auto.
+                 auto.
+               - destruct Hf0. split.
+                 + simpl. rewrite H5.
+                   assert (He1 : e1 = rename_all_ns sig e1).
+                   {
+                     clear H5.
+                     rewrite <- (proj1 (rename_all_no_shadow _)).
+                     symmetry.
+                     apply rename_sig_dead.
+                     intro.             intros.
+                     apply Hsig_post in H5.
+                     apply not_bound_dead_or_free in H5.
+                     inversion H5.
+                     2: apply Hdj_post in H15; inversion H15.
+                     rewrite <- H10 in H15.
+                     apply num_occur_app_ctx in H15.
+                     destructAll; pi0.
+                     auto.
+                     rewrite <- H10 in Hsig_post.
+                     eapply sig_inv_dom_mon.
+                     2: apply Hsig_post.
+                     rewrite bound_var_app_ctx.
+                     right;
+                       auto.
+                   }
+                   rewrite <- He1.
+                   reflexivity.
+                 + eapply Disjoint_Included_l.
+                   2: apply H14.
+                   intro. intro.
+                   eapply fundefs_append_name_in_fundefs. reflexivity. auto. }
+        * intros.
           eapply Hcontract_corresp; eauto.
           unfold term_sub_inl_size in *.
           simpl in *.
@@ -6255,8 +6255,7 @@ Section CONTRACT.
           eapply sub_size_le.
           apply b_map_le_c; auto.
           omega.
-        }
-        { rewrite <- H10 in H9.
+        * rewrite <- H10 in H9.
           split; intro.
           intro. destruct H11. apply H9 in H12.
           inversion H12. apply H13.
@@ -6270,211 +6269,201 @@ Section CONTRACT.
           2: reflexivity.
           apply bound_var_fundefs_ctx_append.
           inversion H11.
-          - left.
-            rewrite Disjoint_inlined_fds'.
-            apply name_in_fundefs_bound_var_fundefs. auto.
-            auto.
-          - right. simpl in H15. inversion H15. inversion H17.  constructor.
-            inversion H17.
-        }
-        {
-          intro; intros.
+          -- left. rewrite Disjoint_inlined_fds.
+             apply name_in_fundefs_bound_var_fundefs; auto. eauto.
+          -- right. simpl in H15. inversion H15. inversion H17. constructor.
+             inversion H17.
+        * intro; intros.
           assert (H11' := H11).
           split.
           apply Hsig_post in H11. auto.
           apply Hsig_r in H11.
           inversion H11.
-          - left.
-            apply num_occur_app_ctx in H12.  destruct H12. destruct H12. inversion H12.
-            inversion H14. pi0.
-            destruct H14.
-            clear H14.
-            clear H16.
-            rewrite He1 in H15.
-            clear He1.
-            subst.
-            repeat normalize_ctx.
-            apply num_occur_ec_comp_ctx in H13.
-            destructAll; pi0.
-            simpl in H17. inv H17; pi0.
-            rewrite inlined_fundefs_ctx_append_shallow in H24.
-            rewrite rename_all_fundefs_ctx_append in H24.
-            apply fundefs_ctx_append_num_occur' in H24.
-            destructAll; pi0.
-            simpl in H18.  inv H18; pi0.
-            apply num_occur_app_ctx. exists 0, 0.
-            split; auto.
-            apply num_occur_ec_comp_ctx.
-            exists 0, 0.
-            split; auto. split; auto.
-            simpl.
-            eapply num_occur_ec_n. constructor.
-            eauto.
-            rewrite inlined_fundefs_append.
-            rewrite rename_all_ns_fundefs_append.
-            eapply fundefs_append_num_occur.
-            reflexivity.
-            rewrite inlined_fundefs_append.
-            rewrite rename_all_ns_fundefs_append.
-            eapply fundefs_append_num_occur.
-            reflexivity.
-            rewrite rename_all_fun_ns_inlined_fundefs in H17.
-            rewrite rename_all_fun_ns_inlined_fundefs.
-            eapply dead_occur_fds_le_antimon. simpl in b.
-            apply b_map_le_c. eauto. auto.
-            simpl. destruct (get_b v b0).
-            simpl. constructor. simpl. eapply num_occur_fds_n.
-            constructor. eauto. constructor.
-            auto.
-            rewrite rename_all_fun_ns_inlined_fundefs in H29.
-            rewrite rename_all_fun_ns_inlined_fundefs.
-            eapply dead_occur_fds_le_antimon. simpl in b.
-            apply b_map_le_c. eauto. auto.
-            auto.
-          - apply H4c in H11'.
-            inversion H11'.
-            + (* by no zombie *)
-              rewrite <- H6 in H7.
-              apply shrink_no_zombie in H7.
-              apply H7 in H13. left; auto.
-            + repeat normalize_ctx.
-              apply bound_stem_comp_ctx_mut in H12.
-              inversion H12.
-              right.
-              apply bound_stem_comp_ctx_mut.
-              left; auto.
-              simpl in H14.
-              inversion H14.
-              rewrite inlined_fundefs_ctx_append_shallow in H19.
-              (* if inlined by b0, then dead, o.w. name *)
-              destruct (get_b y b0) eqn:gbvb0.
-              * left.  apply H9 in gbvb0. destruct gbvb0.
-                apply not_bound_dead_or_free in H20.
-                inversion H20.
-                auto.
-                apply Hdj_post in H22.
-                inv H22.
-              * right. apply bound_stem_comp_ctx_mut.
-                right. simpl. constructor.
-                rewrite rename_all_fun_ns_inlined_fundefs.
-                apply name_in_fundefs_not_inlined; auto.
-                rewrite rename_all_fundefs_ctx_append in H19.
-                apply name_in_fundefs_ctx_append in H19.
-                rewrite rename_all_ns_fundefs_append.
-                eapply fundefs_append_name_in_fundefs.
-                reflexivity.
-                inversion H19.
-                left.
-                rewrite rename_all_ns_fundefs_append.
-                eapply fundefs_append_name_in_fundefs. reflexivity. left.
-                rewrite rename_all_fun_ns_inlined_fundefs in H20.
-                eapply Included_name_in_fundefs_inlined. eauto. simpl in H20.
-                inversion H20. inversion H22.
-                left.                   rewrite rename_all_ns_fundefs_append.
-                eapply fundefs_append_name_in_fundefs.
-                reflexivity. right. simpl. auto.
+          -- left.
+             apply num_occur_app_ctx in H12.  destruct H12. destruct H12. inversion H12.
+             inversion H14. pi0.
+             destruct H14.
+             clear H14.
+             clear H16.
+             rewrite He1 in H15.
+             clear He1.
+             subst.
+             repeat normalize_ctx.
+             apply num_occur_ec_comp_ctx in H13.
+             destructAll; pi0.
+             simpl in H17. inv H17; pi0.
+             rewrite inlined_fundefs_ctx_append_shallow in H24.
+             rewrite rename_all_fundefs_ctx_append in H24.
+             apply fundefs_ctx_append_num_occur' in H24.
+             destructAll; pi0.
+             simpl in H18.  inv H18; pi0.
+             apply num_occur_app_ctx. exists 0, 0.
+             split; auto.
+             apply num_occur_ec_comp_ctx.
+             exists 0, 0.
+             split; auto. split; auto.
+             simpl.
+             eapply num_occur_ec_n. constructor.
+             eauto.
+             rewrite inlined_fundefs_append.
+             rewrite rename_all_ns_fundefs_append.
+             eapply fundefs_append_num_occur.
+             reflexivity.
+             rewrite inlined_fundefs_append.
+             rewrite rename_all_ns_fundefs_append.
+             eapply fundefs_append_num_occur.
+             reflexivity.
+             rewrite rename_all_fun_ns_inlined_fundefs in H17.
+             rewrite rename_all_fun_ns_inlined_fundefs.
+             eapply dead_occur_fds_le_antimon. simpl in b.
+             apply b_map_le_c. eauto. auto.
+             simpl. destruct (get_b v b0).
+             simpl. constructor. simpl. eapply num_occur_fds_n.
+             constructor. eauto. constructor.
+             auto.
+             rewrite rename_all_fun_ns_inlined_fundefs in H29.
+             rewrite rename_all_fun_ns_inlined_fundefs.
+             eapply dead_occur_fds_le_antimon. simpl in b.
+             apply b_map_le_c. eauto. auto.
+             auto.
+          -- apply H4c in H11'.
+             inversion H11'.
+             ++ (* by no zombie *)
+               rewrite <- H6 in H7.
+               apply shrink_no_zombie in H7.
+               apply H7 in H13. left; auto.
+             ++ repeat normalize_ctx.
+                apply bound_stem_comp_ctx_mut in H12.
+                inversion H12.
                 right.
-                eapply Included_name_in_fundefs_inlined.
-                rewrite rename_all_fun_ns_inlined_fundefs in H22.
-                eauto.
-              *
+                apply bound_stem_comp_ctx_mut.
+                left; auto.
+                simpl in H14.
+                inversion H14.
                 rewrite inlined_fundefs_ctx_append_shallow in H19.
-                rewrite rename_all_fundefs_ctx_append in H19.
-                apply  bound_stem_fundefs_append in H19. simpl in H19.
-                rewrite bound_stem_Fcons1_c in H19. inversion H19.
-                inversion H20.
-                (* cannot be l because then violated unique_binding due to H13 *)
-                apply bound_stem_comp_ctx_mut in H13. inversion H13.
-                apply ub_app_ctx_f in H.
-                destruct H.
-                apply ub_comp_ctx_f in H. destruct H.
-                destruct H25.
-                inversion H26.
-                specialize (H27 y).  exfalso. apply H27.
-                split. apply bound_var_stem_or_not_stem; auto.
-                simpl. constructor.
-                rewrite inlined_fundefs_ctx_append_shallow.
-                rewrite rename_all_fundefs_ctx_append.
-                apply bound_var_fundefs_ctx_append.
-                right. simpl. constructor. auto.
+                (* if inlined by b0, then dead, o.w. name *)
+                destruct (get_b y b0) eqn:gbvb0.
+                ** left.  apply H9 in gbvb0. destruct gbvb0.
+                   apply not_bound_dead_or_free in H20.
+                   inversion H20.
+                   auto.
+                   apply Hdj_post in H22.
+                   inv H22.
+                ** right. apply bound_stem_comp_ctx_mut.
+                   right. simpl. constructor.
+                   rewrite rename_all_fun_ns_inlined_fundefs.
+                   apply name_in_fundefs_not_inlined; auto.
+                   rewrite rename_all_fundefs_ctx_append in H19.
+                   apply name_in_fundefs_ctx_append in H19.
+                   rewrite rename_all_ns_fundefs_append.
+                   eapply fundefs_append_name_in_fundefs.
+                   reflexivity.
+                   inversion H19.
+                   left.
+                   rewrite rename_all_ns_fundefs_append.
+                   eapply fundefs_append_name_in_fundefs. reflexivity. left.
+                   rewrite rename_all_fun_ns_inlined_fundefs in H20.
+                   eapply Included_name_in_fundefs_inlined. eauto. simpl in H20.
+                   inversion H20. inversion H22.
+                   left.                   rewrite rename_all_ns_fundefs_append.
+                   eapply fundefs_append_name_in_fundefs.
+                   reflexivity. right. simpl. auto.
+                   right.
+                   eapply Included_name_in_fundefs_inlined.
+                   rewrite rename_all_fun_ns_inlined_fundefs in H22.
+                   eauto.
+                ** rewrite inlined_fundefs_ctx_append_shallow in H19.
+                   rewrite rename_all_fundefs_ctx_append in H19.
+                   apply  bound_stem_fundefs_append in H19. simpl in H19.
+                   rewrite bound_stem_Fcons1_c in H19. inversion H19.
+                   inversion H20.
+                   (* cannot be l because then violated unique_binding due to H13 *)
+                   apply bound_stem_comp_ctx_mut in H13. inversion H13.
+                   apply ub_app_ctx_f in H.
+                   destruct H.
+                   apply ub_comp_ctx_f in H. destruct H.
+                   destruct H25.
+                   inversion H26.
+                   specialize (H27 y).  exfalso. apply H27.
+                   split. apply bound_var_stem_or_not_stem; auto.
+                   simpl. constructor.
+                   rewrite inlined_fundefs_ctx_append_shallow.
+                   rewrite rename_all_fundefs_ctx_append.
+                   apply bound_var_fundefs_ctx_append.
+                   right. simpl. constructor. auto.
 
-                simpl in H22. inversion H22.
-                rewrite rename_all_fun_ns_inlined_fundefs in H27.
-                {
-                  (* either y is inlined in b0 (and not in im) and then it is dead, o.w. bound stem *)
-                  destruct (get_b y b0) eqn:gbvb0.
-                  * left.  apply H9 in gbvb0. destruct gbvb0.
-                    apply not_bound_dead_or_free in H28.
-                    inversion H28.
-                    auto.
-                    apply Hdj_post in H30.
-                    inv H30.
-                  * right. apply bound_stem_comp_ctx_mut.
-                    right. simpl. constructor.
-                    rewrite rename_all_fun_ns_inlined_fundefs.
-                    apply name_in_fundefs_not_inlined; auto.
-                    apply Included_name_in_fundefs_inlined in H27.
-                    rewrite <- fundefs_append_assoc. simpl.
-                    repeat normalize_ctx.
-                    eapply fundefs_append_name_in_fundefs in H27.
-                    2: reflexivity.
-                    eapply fundefs_append_name_in_fundefs. reflexivity.
-                    inversion H27. auto. simpl in H28. inversion H28.
-                    right; auto.
-                    right. simpl. auto.
-                }
-                inversion H27.
-        }
-        {
-          intro. intros. assert (H7' := H7).
+                   simpl in H22. inversion H22.
+                   rewrite rename_all_fun_ns_inlined_fundefs in H27.
+                   { (* either y is inlined in b0 (and not in im) and then it is dead, o.w. bound stem *)
+                     destruct (get_b y b0) eqn:gbvb0.
+                     * left.  apply H9 in gbvb0. destruct gbvb0.
+                       apply not_bound_dead_or_free in H28.
+                       inversion H28.
+                       auto.
+                       apply Hdj_post in H30.
+                       inv H30.
+                     * right. apply bound_stem_comp_ctx_mut.
+                       right. simpl. constructor.
+                       rewrite rename_all_fun_ns_inlined_fundefs.
+                       apply name_in_fundefs_not_inlined; auto.
+                       apply Included_name_in_fundefs_inlined in H27.
+                       rewrite <- fundefs_append_assoc. simpl.
+                       repeat normalize_ctx.
+                       eapply fundefs_append_name_in_fundefs in H27.
+                       2: reflexivity.
+                       eapply fundefs_append_name_in_fundefs. reflexivity.
+                       inversion H27. auto. simpl in H28. inversion H28.
+                       right; auto.
+                       right. simpl. auto. }
+                   inversion H27.
+        * intro. intros. assert (H7' := H7).
           apply H4 in H7.
           destruct H7.
           split.
           rewrite <- H6.
           auto.
           inv H8.
-          - repeat normalize_ctx.
-            apply num_occur_app_ctx in H9.
-            destructAll; pi0.
-            apply num_occur_ec_comp_ctx in H8.
-            destructAll; pi0.
-            simpl in H10. inv H10; pi0. repeat normalize_ctx.
-            apply fundefs_append_num_occur' in H16. destructAll; pi0.
-            simpl in H11. rewrite gbvim in H11. simpl in H11. inv H11; pi0.
-            left.
-            apply num_occur_app_ctx. exists 0, 0.
-            split; auto.
-            apply num_occur_ec_comp_ctx. exists 0, 0.
-            split; auto.
-            split; auto.
-            simpl.
-            eapply num_occur_ec_n.
-            constructor; eauto.
-            rewrite inlined_fundefs_ctx_append_shallow.
-            rewrite rename_all_fundefs_ctx_append.
-            apply fundefs_ctx_append_num_occur; eauto.
-            simpl. constructor. constructor.
-            eauto. auto.
-          - right.
-            repeat normalize_ctx.
-            apply bound_stem_comp_ctx_mut in H9.
-            apply bound_stem_comp_ctx_mut.
-            inversion H9.
-            + left. auto.
-            + simpl in H8. inv H8.
-              right. simpl. constructor.
-              repeat normalize_ctx.
-              eapply fundefs_append_name_in_fundefs in H14.
-              2: reflexivity.
-              rewrite inlined_fundefs_ctx_append_shallow.
-              rewrite rename_all_fundefs_ctx_append.
-              apply name_in_fundefs_ctx_append.
-              inv H14.
-              auto.
-              right. simpl in H8. rewrite gbvim in H8.
-              simpl in H8. simpl. auto.
-              inv H14.
-        }
+          -- repeat normalize_ctx.
+             apply num_occur_app_ctx in H9.
+             destructAll; pi0.
+             apply num_occur_ec_comp_ctx in H8.
+             destructAll; pi0.
+             simpl in H10. inv H10; pi0. repeat normalize_ctx.
+             apply fundefs_append_num_occur' in H16. destructAll; pi0.
+             simpl in H11. rewrite gbvim in H11. simpl in H11. inv H11; pi0.
+             left.
+             apply num_occur_app_ctx. exists 0, 0.
+             split; auto.
+             apply num_occur_ec_comp_ctx. exists 0, 0.
+             split; auto.
+             split; auto.
+             simpl.
+             eapply num_occur_ec_n.
+             constructor; eauto.
+             rewrite inlined_fundefs_ctx_append_shallow.
+             rewrite rename_all_fundefs_ctx_append.
+             apply fundefs_ctx_append_num_occur; eauto.
+             simpl. constructor. constructor.
+             eauto. auto.
+          -- right.
+             repeat normalize_ctx.
+             apply bound_stem_comp_ctx_mut in H9.
+             apply bound_stem_comp_ctx_mut.
+             inversion H9.
+             ++ left. auto.
+             ++ simpl in H8. inv H8.
+                right. simpl. constructor.
+                repeat normalize_ctx.
+                eapply fundefs_append_name_in_fundefs in H14.
+                2: reflexivity.
+                rewrite inlined_fundefs_ctx_append_shallow.
+                rewrite rename_all_fundefs_ctx_append.
+                apply name_in_fundefs_ctx_append.
+                inv H14.
+                auto.
+                right. simpl in H8. rewrite gbvim in H8.
+                simpl in H8. simpl. auto.
+                inv H14. }
   Qed.
 
 (** dec_census_all_case removes all the occurences of variables in all branches from their respective tally in count *)
@@ -6501,13 +6490,13 @@ Section CONTRACT.
 
   (** dec_census_case removes all the occurences of variables in all branches EXCEPT
       for the first branch matching the given tag from their respective tally in count  *)
-  Theorem dec_census_case_count: forall sig v c0 e m count l n,
-                                   num_occur_case (rename_all_case sig l) v n ->
-                                   findtag l c0 = Some e ->
-                                   num_occur (rename_all_ns sig e) v m ->
-                                   get_c v (dec_census_case sig l c0 count) = get_c v count -  (n - m).
+  Theorem dec_census_case_count sig v c0 e m count l n :
+    num_occur_case (rename_all_case sig l) v n ->
+    findtag l c0 = Some e ->
+    num_occur (rename_all_ns sig e) v m ->
+    get_c v (dec_census_case sig l c0 count) = get_c v count -  (n - m).
   Proof.
-    induction l.
+    revert n; induction l; intros n.
     intros. inv H0.
     intros. simpl in *.
     destruct a.
@@ -6544,6 +6533,92 @@ Section CONTRACT.
       omega.
   Qed.
 
+  Instance Decidable_Dom_map {A} (m : M.t A) : Decidable (Dom_map m).
+  Proof.
+    constructor. intros x.
+    destruct (M.get x m) eqn:Heq; eauto.
+    left. eexists. eassumption.
+    right. intros [y Hget]. congruence.
+  Qed.
+
+  Lemma one_rename_all_ar: forall x y v sigma,
+      ~ (exists z, M.get z sigma = Some x) ->
+      (M.get x sigma = None) ->
+      apply_r (M.set x y sigma) v =   (apply_r (M.set x y (M.empty var)) (apply_r sigma v)).
+  Proof.
+    intros.
+    destruct (var_dec x v).
+    + subst. erewrite apply_r_some by apply M.gss.
+      rewrite apply_r_none with (v := v); auto.
+      erewrite apply_r_some by apply M.gss.
+      auto.
+    + rewrite apply_r_set2; auto.
+      rewrite apply_r_set2; auto.
+      rewrite apply_r_empty; auto.
+      apply apply_r_not_in_sig; auto.
+  Qed.
+
+  Lemma one_rename_all_list: forall y x l sigma,
+      ~ (exists z, M.get z sigma = Some x) ->
+      (M.get x sigma = None) ->
+      apply_r_list (M.set x y sigma) l =  (apply_r_list (M.set x y (M.empty var)) (apply_r_list sigma l)).
+  Proof.
+    induction l; intros.
+    reflexivity.
+    simpl.
+    rewrite IHl; auto.
+    destruct (var_dec x a).
+    - subst.
+      erewrite apply_r_some by apply M.gss.
+      erewrite apply_r_none with (v := a); auto.
+      erewrite apply_r_some by apply M.gss.
+      reflexivity.
+    - rewrite apply_r_set2; auto.
+      rewrite apply_r_set2; auto. rewrite apply_r_empty.
+      auto.
+      apply apply_r_not_in_sig; auto.
+  Qed.
+
+  Lemma one_rename_all_ns_mut: forall y x sig,
+      ~ Range_map sig x  ->
+      ~ Dom_map sig x ->
+      ( forall e,
+          rename_all_ns (M.set x y (M.empty var)) (rename_all_ns sig e) =  rename_all_ns (M.set x y sig) e  ) /\
+      ( forall f,
+          rename_all_fun_ns (M.set x y (M.empty var)) (rename_all_fun_ns sig f) =  rename_all_fun_ns (M.set x y sig) f).
+  Proof.
+    intros y x sig Hr Hd.
+    eapply exp_def_mutual_ind; intros; simpl.
+    - rewrite H.
+      rewrite <- one_rename_all_list; eauto. eapply not_Dom_map_eq; eauto.
+    - rewrite <- one_rename_all_ar; auto. eapply not_Dom_map_eq; eauto. 
+    - simpl in H0. inv H0.
+      rewrite H. auto.
+    - rewrite <- one_rename_all_ar; auto.
+      rewrite H. auto. eapply not_Dom_map_eq; eauto.
+    - rewrite H.
+      rewrite <- one_rename_all_list; eauto; [| now eapply not_Dom_map_eq; eauto ].
+      rewrite <- one_rename_all_ar; auto. eapply not_Dom_map_eq; eauto. 
+    - rewrite H. rewrite H0. reflexivity.
+    - rewrite <- one_rename_all_ar; auto.
+      rewrite <- one_rename_all_list; auto.
+      eapply not_Dom_map_eq; eauto. eapply not_Dom_map_eq; eauto. 
+    - rewrite <- one_rename_all_list; auto.
+      rewrite H. auto. eapply not_Dom_map_eq; eauto. 
+    - rewrite <- one_rename_all_ar; auto. eapply not_Dom_map_eq; eauto. 
+    - rewrite H; rewrite H0; auto.
+    - auto.
+  Qed.
+
+  Lemma one_rename_all_ns y x sig :
+    forall e,
+      ~ Range_map sig x  ->
+      ~ Dom_map sig x ->
+      rename_all_ns (M.set x y (M.empty var)) (rename_all_ns sig e) =  rename_all_ns (M.set x y sig) e.
+  Proof.
+    intros. apply one_rename_all_ns_mut; auto.
+  Qed.
+
   (** dec_census_case properly updates the count after case folding *)
   Theorem c_count_fold_case:
     forall c c0 v e sig (l:list (ctor_tag * exp)) count,
@@ -6565,8 +6640,7 @@ Section CONTRACT.
     unfold dec_census_list. simpl.
     simpl in H2.
     assert (x1 <= n).
-    {
-      eapply num_occur_case_le. 2: apply H8.
+    { eapply num_occur_case_le. 2: apply H8.
       apply findtag_In in H0.
       eapply in_map with (f := (fun (p:var*exp) => let (k, e) := p in
                                                    (k, rename_all_ns sig e))) in H0.
@@ -6582,277 +6656,184 @@ Section CONTRACT.
       omega.
   Qed.
 
-
+  Opaque contract.
+  
   (** main theorem! contract produces an output term related to the input by the shrink rewrite system.
       The output count is correct for the output state, and the returned maps respect their respective invariant *)
   Theorem shrink_corresp:
     forall e sub im sig c count,
       let ce := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f c im)) (rename_all_ns sig e)) in
       unique_bindings ce ->
-      closed ce ->
+      closed_exp ce ->
       c_count ce count ->
       cmap_view_ctx sub c ->
       inl_inv im sub ce ->
       sig_inv_full sig (rename_all_ctx_ns sig (inlined_ctx_f c im)) (rename_all_ns sig e) ->
-      forall e' count' im' BP,
-        contract sig count e sub im = existT _ (e', count', im') BP ->
+      forall e' steps count' im' BP,
+        contract sig count e sub im = existT _ (e', steps, count', im') BP ->
         let ce' := (app_ctx_f (rename_all_ctx_ns sig (inlined_ctx_f c im')) e') in
-        gsr_clos ce ce' /\ c_count ce' count' /\ inl_inv im' sub ce' /\
+        gsr_clos steps ce ce' /\ c_count ce' count' /\ inl_inv im' sub ce' /\
         sig_inv_codom sig (rename_all_ctx_ns sig (inlined_ctx_f c im')) e' .
   Proof.
-    intros e sub inl. remember (1 + term_sub_inl_size (e, sub,inl)) as n. assert (n > term_sub_inl_size (e, sub, inl)). omega. clear Heqn. revert e sub inl H. induction n; intros. inversion H. destruct e; rewrite contract_eq in H6; unfold contract_def in H6.
+    intros e sub inl. remember (1 + term_sub_inl_size (e, sub,inl)) as n.
+    assert (n > term_sub_inl_size (e, sub, inl)) by omega. clear Heqn. 
+    revert e sub inl H. induction n; intros. now inv H. rewrite contract_eq in H6. destruct e; unfold contract_def in H6.
     - (* constr *)
       destruct (get_c v count) eqn:gvc.
       + (* dead constr *)
-        simpl in ce.
-        assert (gsr_clos ce (rename_all_ctx_ns sig (inlined_ctx_f c inl) |[ (rename_all_ns sig e) ]|)).
-        { unfold ce.
+        unfold incr_steps in H6. simpl in H6.
+        remember (contract sig (dec_census_list sig l count) e sub inl) as s.  destruct s as [[[[? ?] ?] ?] ?]. inv H6.
+        symmetry in Heqs. simpl in ce.
+        assert (gsr_clos 1 ce (rename_all_ctx_ns sig (inlined_ctx_f c inl) |[ (rename_all_ns sig e) ]|)).
+        { unfold ce. replace 1 with (1 + 0) by omega. eapply Trans_srw; [| now constructor ]. 
           constructor. constructor.
-          constructor.
           specialize (H2 v). unfold ce in H2.
           apply num_occur_app_ctx in H2. rewrite gvc in H2. destructAll; pi0.
-          inv H7; pi0; auto. rewrite H8. auto.
-        }
-        assert (Hub := gsr_preserves_clos _ _ H0 H1 H7).
+          inv H6; pi0; auto. rewrite H7. auto. }
+        assert (Hub := gsr_clos_preserves_clos _ _ _ H0 H1 H6).
         destruct Hub as (Hub, Hdj).
         assert (H5' := H5).
         apply sig_inv_combine in H5.
         destruct H5 as (H5, H5cod).
-        assert (Hse := gsr_preserves_sig_dom _ _ _ H0 H1 H7 H5).
-        simpl in H6.
-        eapply IHn in H6; eauto.
-        destruct H6.
-        destruct H8.
-        unfold ce'.
-        split.
-        eapply rt_trans.
-        apply H7.
-        auto.
-        split; auto.
-        unfold term_sub_inl_size in *. simpl in *.
-        omega.
-        {
-          intro. specialize (H2 v0).
-          unfold ce in H2.
-          apply num_occur_app_ctx in H2. destructAll.
-          inv H8.
-          apply num_occur_app_ctx.
-          exists x, n0.
-          repeat split; auto.
-          unfold dec_census_list.
-          rewrite <- combine_minus_census_list.
-          rewrite gccombine_sub.
-          rewrite H9.
-          rewrite update_census_list_correct.
-          rewrite apply_r_list_empty.
+        assert (Hse := gsr_preserves_sig_dom _ _ _ _ H0 (closed_implies_Disjoint _ H1) H6 H5).
+        simpl in Heqs. eapply IHn in Heqs; eauto.
+        * destructAll. unfold ce'.
+          split.
+          -- rewrite plus_comm. eapply gsr_clos_trans. eassumption. eassumption.
+          -- now split; auto.
+        * unfold term_sub_inl_size in *. simpl in *. omega.
+        * intro. specialize (H2 v0). unfold ce in H2.
+          apply num_occur_app_ctx in H2. destructAll. inv H7.
+          apply num_occur_app_ctx. exists x, n1. repeat split; [ now auto | now auto | ].          
+          unfold dec_census_list. rewrite <- combine_minus_census_list, gccombine_sub.
+          rewrite H8. rewrite update_census_list_correct. rewrite apply_r_list_empty.
           unfold get_c. rewrite M.gempty. omega.
-        }
-        intro. intros. apply H4 in H8.
-        destructAll.
-        assert (Included _ (bound_var (rename_all_ctx_ns sig (inlined_ctx_f c inl) |[ rename_all_ns sig e ]|)) (bound_var ce)).
-        unfold ce.
-        repeat rewrite bound_var_app_ctx.
-        apply Included_Union_compat.
-        reflexivity.
-        rewrite bound_var_Econstr. left; auto.
-        split; auto.
-        intro; apply H8.
-        apply H10. auto.
-        intros. apply H9 in H11.
-        eapply Disjoint_Included_l.
-        2: apply H11. auto.
-        simpl in H5'.
-        rewrite inv_app_Econstr in H5'.
-        apply sig_inv_full_dead_l in H5'.
-        auto.
+        * intro. intros. apply H4 in H7. destructAll.
+          assert (Included _ (bound_var (rename_all_ctx_ns sig (inlined_ctx_f c inl) |[ rename_all_ns sig e ]|)) (bound_var ce)).
+          { unfold ce. repeat rewrite bound_var_app_ctx. apply Included_Union_compat. now sets.
+            rewrite bound_var_Econstr. left; auto. }          
+          split; auto.
+          -- intro; apply H7. apply H9. auto.
+          -- intros. apply H8 in H10. eapply Disjoint_Included_l.
+             2: apply H10. auto.
+        * simpl in H5'. rewrite inv_app_Econstr in H5'. apply sig_inv_full_dead_l in H5'. auto.
       + (* live constr *)
         assert (M.get v sub = None) by (eapply sub_none_from_pre; simpl; eauto; simpl; auto).
-
         assert (rename_all_ctx_ns sig (inlined_ctx_f c inl)
                |[ rename_all_ns sig (Econstr v c0 l e)]|  =
                                                           (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Econstr_c v c0 l Hole_c)) inl)
                                                           |[ rename_all_ns sig e ]|)) by ctx_inl_push.
-        remember (contract sig count e (M.set v (SVconstr c0 l) sub) inl).
-        symmetry in Heqs.
-        destruct s.
-        destruct x.
-        destruct p.
+        remember (contract sig count e (M.set v (SVconstr c0 l) sub) inl) as s. symmetry in Heqs.
+        destruct s. destruct x. destruct p. destruct p.
         eapply IHn with (c := (comp_ctx_f c (Econstr_c v c0 l Hole_c))) in Heqs; unfold ce in *; try rewrite H8 in *; eauto.
-        {
-          destruct Heqs. destruct H10. destruct H11 as (H11, Hsig).
-          assert (rename_all_ctx_ns sig (inlined_ctx_f c im')
-                 |[ Econstr v c0 (apply_r_list sig l) e0 ]| =
-                                                            (rename_all_ctx_ns sig
-                                                                               (inlined_ctx_f (comp_ctx_f c (Econstr_c v c0 l Hole_c)) im')
-                                                            |[ e0 ]|)).
-          rewrite (proj1 inlined_comp_ctx).
-          rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)).
-          rewrite <- app_ctx_f_fuse.
-          simpl. auto.
-
-          destruct (get_c v c1) eqn:gvc1.
-          - (* dead post *)
-            inv H6.
-            split.
-            2: split.
-            + eapply rt_trans.
-              apply H9.
-              rewrite <- H12.
-              unfold ce'.
-              constructor.
-              constructor.
-              constructor.
-              specialize (H10 v).
-              rewrite gvc1 in H10.
-              apply num_occur_app_ctx in H10; destructAll; pi0; auto.
-            + intro. specialize (H10 v0).
-              unfold ce'.
-              apply num_occur_app_ctx in H10. destructAll.
-              rewrite (proj1 inlined_comp_ctx) in H6.
-              rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)) in H6.
-
-              apply num_occur_ec_comp_ctx in H6; destructAll.
-              simpl in H14. inv H14. inv H21. simpl in H13.
-
-              apply num_occur_app_ctx.
-              exists x1, x0. split; auto. split; auto.
-
-              unfold dec_census_list.
-              rewrite <- combine_minus_census_list.
-              rewrite gccombine_sub.
-              rewrite H13.
-              rewrite update_census_list_correct.
-              rewrite apply_r_list_empty.
-              unfold get_c. rewrite M.gempty. omega.
-            + split.
-              split; intros.
-              assert (H6' := H6).
-              apply H11 in H6.
-              destruct H6.
-              intro; apply H6.
-              unfold ce' in H14.
-              apply bound_var_app_ctx in H14.
-              apply bound_var_app_ctx. inv H14.
-              left. rewrite (proj1 inlined_comp_ctx).
-              rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)).
-              rewrite (proj1 bound_var_ctx_comp_ctx).
-              left; auto. right; auto.
-              apply H11 in H6. destruct H6.
-              destruct (var_dec f v).
-              * exfalso.
-                apply H6; subst.
-                apply bound_var_app_ctx.
+        * { destruct Heqs. destruct H10. destruct H11 as (H11, Hsig).
+            assert (rename_all_ctx_ns sig (inlined_ctx_f c im') |[ Econstr v c0 (apply_r_list sig l) e0 ]| =
+                    (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Econstr_c v c0 l Hole_c)) im') |[ e0 ]|)).
+            rewrite (proj1 inlined_comp_ctx). rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)). rewrite <- app_ctx_f_fuse.
+            simpl. now auto.
+            destruct (get_c v c1) eqn:gvc1.
+            - (* dead post *) inv H6. split; [| split; [| split ]].
+              + eapply gsr_clos_trans. eassumption.
+                rewrite <- H12. unfold ce'. simpl. replace 1 with (1 + 0) by omega. eapply Trans_srw; [| eapply Refl_srw ]. 
+                constructor. constructor.
+                specialize (H10 v). rewrite gvc1 in H10. apply num_occur_app_ctx in H10; destructAll; pi0; auto.
+              + intro. specialize (H10 v0). unfold ce'.
+                apply num_occur_app_ctx in H10. destructAll.
+                rewrite (proj1 inlined_comp_ctx) in H6.
+                rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)) in H6.                
+                apply num_occur_ec_comp_ctx in H6; destructAll.
+                simpl in H14. inv H14. inv H21. simpl in H13.                
+                apply num_occur_app_ctx.
+                exists x1, x0. split; auto. split; auto.                
+                unfold dec_census_list.
+                rewrite <- combine_minus_census_list.
+                rewrite gccombine_sub.
+                rewrite H13.
+                rewrite update_census_list_correct.
+                rewrite apply_r_list_empty.
+                unfold get_c. rewrite M.gempty. omega.
+              + intro; intros. assert (H6' := H6).
+                apply H11 in H6. destruct H6. split.
+                intro; apply H6. unfold ce' in H14.
+                apply bound_var_app_ctx in H14.
+                apply bound_var_app_ctx. inv H14.
                 left. rewrite (proj1 inlined_comp_ctx).
-                rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)).
-                rewrite (proj1 bound_var_ctx_comp_ctx).
-                right.
-                simpl. auto.
-              *
-                assert ( M.get f (M.set v (SVconstr c0 l) sub) = Some (SVfun t xs m) ).
-                rewrite M.gso; auto.
-                apply H14 in H15.
-                eapply Disjoint_Included_l.
-                2: apply H15.
-                unfold ce'.
-                do 2 (rewrite bound_var_app_ctx).
-                rewrite (proj1 inlined_comp_ctx).
-                rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)).
-                rewrite (proj1 bound_var_ctx_comp_ctx).
-                eauto with Ensembles_DB.
-              * intro.
-                intros. apply Hsig in H6.
-                inv H6.
-                left.
+                rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)). rewrite (proj1 bound_var_ctx_comp_ctx).
+                left; auto. now right; auto.
+                intros. destruct (var_dec f v); subst.
+                * exfalso. apply H6; subst. apply bound_var_app_ctx.
+                  left. rewrite (proj1 inlined_comp_ctx).
+                  rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)).
+                  rewrite (proj1 bound_var_ctx_comp_ctx).
+                  right. simpl. auto.
+                * assert ( M.get f (M.set v (SVconstr c0 l) sub) = Some (SVfun t xs m) ).
+                  rewrite M.gso; auto. apply H13 in H15.
+                  eapply Disjoint_Included_l. 2: now apply H15.
+                  unfold ce'. do 2 (rewrite bound_var_app_ctx).
+                  rewrite (proj1 inlined_comp_ctx). rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)).
+                  rewrite (proj1 bound_var_ctx_comp_ctx). eauto with Ensembles_DB.
+              + intro. intros. apply Hsig in H6.
+                inv H6. left.
                 apply num_occur_app_ctx in H13. destructAll; pi0.
                 apply num_occur_app_ctx. exists 0, 0. repeat split; auto.
-                repeat normalize_ctx.
-                apply num_occur_ec_comp_ctx in H6.
+                repeat normalize_ctx. apply num_occur_ec_comp_ctx in H6.
                 destructAll; pi0. auto.
                 (* either y is v and it is dead OR it isn't and it is bound in c *)
                 repeat normalize_ctx.
                 apply bound_stem_comp_ctx_mut in H13. inv H13.
-                right. auto.
-                simpl in H6. inv H6.
-                left.
-                specialize (H10 y). rewrite gvc1 in H10.
+                right. auto. simpl in H6. inv H6.
+                left. specialize (H10 y). rewrite gvc1 in H10.
                 apply num_occur_app_ctx in H10.
+                destructAll; pi0. apply num_occur_ec_comp_ctx in H6.
                 destructAll; pi0.
-                apply num_occur_ec_comp_ctx in H6.
-                destructAll; pi0.
-                apply num_occur_app_ctx. eauto.
-                inv H18.
-          - (* live post *)
-            inv H6.
-            unfold ce'; rewrite H12.
-            split; auto.
-            split; auto.
-            split.
-            intro. intros.
-            assert (H6' := H6).
-            apply H11 in H6. destruct H6.
-            split; auto.
-            intros.
-            destruct (var_dec f v).
-            + (* impossible, then v is inlined but bound *)
-              exfalso.
-              subst.
-              apply H11 in H6'.
-              destruct H6'.
-              apply H15.
-              rewrite (proj1 inlined_comp_ctx).
-              rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)).
-              apply bound_var_app_ctx.
-              left.
-              apply bound_var_ctx_comp_ctx.
-              right. simpl. constructor.
-            + assert ( M.get f (M.set v (SVconstr c0 l) sub) = Some (SVfun t xs m)).
-              rewrite M.gso; auto.
-              apply H13 in H15. auto.
-            +  intro. intros.
-               assert (H6' := H6).
-               apply Hsig in H6.
-               inv H6.
-               left.
-               apply num_occur_app_ctx in H13. destructAll; pi0.
-               repeat normalize_ctx.
-               apply num_occur_ec_comp_ctx in H6. destructAll; pi0.
-               simpl in H14.
-               apply num_occur_app_ctx.
-               exists 0, 0; split; auto.
-               split; auto.
-               eapply num_occur_n.
-               constructor. eauto.
-               inv H14; pi0. rewrite H14. auto.
-
-               repeat normalize_ctx.
-               apply bound_stem_comp_ctx_mut in H13.
-               inv H13. right. auto.
-               simpl in H6. inv H6.
-               apply H5 in H6'.
-               inv H6'. inv H13.
-               specialize (H2 y). rewrite gvc in H2.
-               assert (S n0 = 0).
-               eapply (proj1 (num_occur_det _)); eauto.
-               rewrite H8 in H14. auto. inv H13.
-               exfalso.
-               rewrite <- H8 in H0.
-               apply ub_app_ctx_f in H0.
-               destructAll.
-               inv H15.
-               specialize (H16 y).
-               apply H16. split; auto.
-               apply bound_stem_var. auto.
-               simpl. constructor.
-               inv H18.
-        }
-        (* size *)
-        eapply NPeano.Nat.lt_le_trans.
-        apply constr_sub_size.
-        omega.
-        (* cmap_view *)
-        apply cmap_view_constr; eauto.
-        (* inl_inv *)
-        { intro. intros. apply H4 in H9.
+                apply num_occur_app_ctx. eauto. inv H18.
+            - (* live post *) inv H6.
+              unfold ce'; rewrite H12.
+              split; auto. split; auto. split; eauto.
+              + intro. intros. assert (H6' := H6).
+                apply H11 in H6. destruct H6.
+                split; auto. intros.
+                destruct (var_dec f v).
+                * (* impossible, then v is inlined but bound *)
+                  exfalso.
+                  subst.
+                  apply H11 in H6'.
+                  destruct H6'.
+                  apply H15.
+                  rewrite (proj1 inlined_comp_ctx).
+                  rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)).
+                  apply bound_var_app_ctx.
+                  left.
+                  apply bound_var_ctx_comp_ctx.
+                  right. simpl. constructor.
+                * assert ( M.get f (M.set v (SVconstr c0 l) sub) = Some (SVfun t xs m)).
+                  rewrite M.gso; auto.
+                  apply H13 in H15. auto.
+              + intro. intros. assert (H6' := H6). apply Hsig in H6. inv H6.
+                left. apply num_occur_app_ctx in H13. destructAll; pi0.
+                repeat normalize_ctx. apply num_occur_ec_comp_ctx in H6. destructAll; pi0.
+                simpl in H14. apply num_occur_app_ctx. exists 0, 0; split; auto.
+                split; auto. eapply num_occur_n.
+                constructor. eauto. inv H14; pi0. rewrite H14. auto.
+                repeat normalize_ctx. apply bound_stem_comp_ctx_mut in H13.
+                inv H13. right. auto. simpl in H6. inv H6.
+                apply H5 in H6'. inv H6'. inv H13.
+                specialize (H2 y). rewrite gvc in H2.
+                assert (S n0 = 0). eapply (proj1 (num_occur_det _)); eauto.
+                rewrite H8 in H14. auto. inv H13.
+                exfalso. rewrite <- H8 in H0. apply ub_app_ctx_f in H0.
+                destructAll. inv H15.
+                specialize (H16 y). apply H16. split; auto.
+                apply bound_stem_var. auto.
+                simpl. constructor. inv H18. }
+        * (* size *)
+          eapply NPeano.Nat.lt_le_trans.
+          apply constr_sub_size.
+          omega.
+          (* cmap_view *)
+        * apply cmap_view_constr; eauto.
+        * (* inl_inv *)
+          intro. intros. apply H4 in H9.
           destruct H9.
           split; auto.
           intros.
@@ -6861,103 +6842,61 @@ Section CONTRACT.
           rewrite M.gss in H11. inv H11.
           rewrite M.gso in H11; auto.
           eapply H10; eauto.
-        }
-        (* sig inv *)
-        intro; intros.
-        apply H5 in H9.
-        destruct H9.
-        split.
-        simpl in H9.
-        intro; apply H9.
-        repeat normalize_ctx.
-        rewrite <- app_ctx_f_fuse in H11.
-        simpl in H11. auto.
-        inv H10.
-        left.
-        repeat normalize_ctx.
-        rewrite <- app_ctx_f_fuse. simpl. simpl in H11.
-        auto.
-        right.
-        repeat normalize_ctx.
-        apply bound_stem_comp_ctx_mut.
-        auto.
+        * (* sig inv *)
+          intro; intros. apply H5 in H9.
+          destruct H9. split.
+          simpl in H9. intro; apply H9.
+          repeat normalize_ctx. rewrite <- app_ctx_f_fuse in H11.
+          simpl in H11. auto. inv H10.
+          left. repeat normalize_ctx.
+          rewrite <- app_ctx_f_fuse. simpl. simpl in H11.
+          auto. right. repeat normalize_ctx.
+          apply bound_stem_comp_ctx_mut. auto.
     - (* case *)
       simpl in H6.
       destruct ( M.get (apply_r sig v) sub ) eqn:garvs; [destruct s|].
-      +  destruct (findtag l c0) eqn:ftlc0.
-         * (* folded case *)
-           assert (gsr_clos
-                     ce
-                     (rename_all_ctx_ns sig (inlined_ctx_f c inl)
-                     |[ rename_all_ns sig e ]|)).
-           {
-             apply H3 in garvs.
-             destructAll.
-             unfold ce. repeat normalize_ctx.
-             do 2 (rewrite <- app_ctx_f_fuse).
-             constructor. constructor. simpl.
-             apply Constr_case_s.
-             apply findtag_map. auto.
-           }
-           assert (Hub' := gsr_preserves_clos _ _ H0 H1 H7).
-           destructAll.
-           apply sig_inv_combine in H5.
-           destruct H5 as (H5, H5c).
-           assert (Hse := gsr_preserves_sig_dom _ _ _ H0 H1 H7 H5).
-           assert (H_bv : Included _ (bound_var  (rename_all_ctx_ns sig (inlined_ctx_f c inl) |[
-                                                    rename_all_ns sig e ]|)) (bound_var ce)).
-           {
-             unfold ce. do 2 (rewrite bound_var_app_ctx).
+      + destruct (findtag l c0) eqn:ftlc0.
+        * (* folded case *)
+           assert (gsr_clos 1 ce (rename_all_ctx_ns sig (inlined_ctx_f c inl) |[ rename_all_ns sig e ]|)).
+           { apply H3 in garvs. destructAll. unfold ce. repeat normalize_ctx. do 2 (rewrite <- app_ctx_f_fuse).
+             replace 1 with (1 + 0) by omega. econstructor; [| eapply Refl_srw ]. constructor. simpl.
+             eapply findtag_map in ftlc0. eapply find_tag_nth_findtag in ftlc0. destructAll.
+             eapply Constr_case_s. eassumption. }
+           assert (Hub' := gsr_clos_preserves_clos _ _ _ H0 H1 H7). destructAll.
+           apply sig_inv_combine in H5. destruct H5 as (H5, H5c).
+           assert (Hse := gsr_preserves_sig_dom _ _ _ _ H0 (closed_implies_Disjoint _ H1) H7 H5).
+           assert (H_bv : Included _ (bound_var  (rename_all_ctx_ns sig (inlined_ctx_f c inl) |[ rename_all_ns sig e ]|)) (bound_var ce)).
+           { unfold ce. do 2 (rewrite bound_var_app_ctx).
              apply Included_Union_compat. auto with Ensembles_DB.
              simpl. intro. intros. eapply Bound_Ecase with (c := c0).
-             apply H10.
-             apply findtag_In_patterns in ftlc0.
-             eapply in_map with (f := (fun p : var * exp => let (k, e0) := p in (k, rename_all_ns sig e0)))  in ftlc0.  auto.
-           }
-
-           eapply IHn in H6; eauto.
-           destructAll.
-           split.
-           econstructor 3. apply H7. apply H6. split; auto.
-           unfold term_sub_inl_size in *.
-           simpl in *.
-           assert ( term_size e < term_size (Ecase v l)).
-           eapply case_size.
-           apply findtag_In. eauto.
-           simpl in H10. omega.
-           { (* count for folded case *)
-             apply c_count_fold_case; auto.
-           }
-           { (* inl for folded case *)
-             intro. intros.
-             apply H4 in H10.
-             destruct H10. split.
-             intro. apply H10. apply H_bv. auto.
-             intros. apply H11 in H12.
-             eapply Disjoint_Included_l. apply H_bv. auto.
-           }
-           { (* sig inv for folded case *)
+             apply H10. apply findtag_In_patterns in ftlc0.
+             eapply in_map with (f := (fun p : var * exp => let (k, e0) := p in (k, rename_all_ns sig e0))) in ftlc0. auto. } 
+           unfold incr_steps in H6. remember (contract sig (dec_census_case sig l c0 (dec_census_list sig [v] count)) e sub inl) as s.
+           symmetry in Heqs. destruct s as [[[[? ?] ?] ?] ?]. inv H6. eapply IHn in Heqs; eauto.
+           -- destructAll. split; eauto. rewrite plus_comm. eapply gsr_clos_trans. eassumption. eassumption.
+           -- unfold term_sub_inl_size in *. simpl in *.
+              assert ( term_size e < term_size (Ecase v l)).
+              { eapply case_size. apply findtag_In. eauto. } 
+              simpl in H6. omega.
+           -- (* count for folded case *) apply c_count_fold_case; auto.
+           -- (* inl for folded case *)
+             intro. intros. apply H4 in H6.
+             destruct H6. split.
+             intro. apply H6. apply H_bv. now auto.
+             intros. apply H10 in H11. eapply Disjoint_Included_l. apply H_bv. auto.
+           -- (* sig inv for folded case *)
              intro. intros. split.
-             apply H5 in H10. intro; apply H10.
-             apply H_bv; auto.
-             apply H5c in H10. inv H10; auto.
-             left. apply num_occur_app_ctx in H11.
-             destructAll; pi0.
+             apply H5 in H6. intro; apply H6.
+             apply H_bv; auto. apply H5c in H6. inv H6; auto.
+             left. apply num_occur_app_ctx in H10. destructAll; pi0.
              apply num_occur_app_ctx. exists 0, 0. split; auto. split; auto.
-             simpl in H11.
-             inv H11; pi0.
+             simpl in H10. inv H10; pi0.
              assert (exists n, num_occur (rename_all_ns sig e) y n) by apply e_num_occur.
-             destruct H12.
-             assert (x0 <= 0).
-             eapply num_occur_case_le. 2: apply H15.
+             destruct H11. assert (x0 <= 0). eapply num_occur_case_le. 2: apply H14.
              apply findtag_In in ftlc0.
              eapply in_map with (f := (fun p : var * exp => let (k, e0) := p in (k, rename_all_ns sig e0))) in ftlc0.
-             eauto.
-             auto.
-             apply le_n_0_eq in H13; subst; auto.
-           }
-         * (* case not found, same as fun.
-               contractcases_corresp with cl1 = nil and x = apply_r sig x*)
+             now eauto. now eauto. apply le_n_0_eq in H12; subst; auto. dec_vars. eassumption.
+        * (* case not found, same as fun. contractcases_corresp with cl1 = nil and x = apply_r sig x*)
            remember (contractcases
                        (@pair (prod exp ctx_map) b_map
                               (@pair exp ctx_map (Ecase v l) sub) inl)
@@ -6972,16 +6911,10 @@ Section CONTRACT.
                                    (@snd exp ctx_map (@fst (prod exp ctx_map) b_map es))
                                    (@snd (prod exp ctx_map) b_map es)) sig count inl sub l
                        (@subcl_refl v l) (le_n (sub_inl_size sub inl))) as Hcc.
-           destruct Hcc. destruct x. destruct p.
-           symmetry in HeqHcc.
+           destruct Hcc. destruct x. destruct p. destruct p. symmetry in HeqHcc.
            eapply contractcases_corresp with (x := apply_r sig v) (cl1 := nil) (c := c) in HeqHcc; eauto.
-           Focus 2. intros.
-           eapply IHn; eauto.
-           unfold term_sub_inl_size in *.
-           simpl in H7. simpl in *. omega.
-           inv H6.
-           simpl in *.
-           destructAll. split; auto.
+           2:{ intros. eapply IHn; eauto. unfold term_sub_inl_size in *. simpl in H7. simpl in *. omega. }
+           inv H6. simpl in *. destructAll. split; auto.
       + (* fun *)
         remember (contractcases
                     (@pair (prod exp ctx_map) b_map
@@ -6997,16 +6930,10 @@ Section CONTRACT.
                                 (@snd exp ctx_map (@fst (prod exp ctx_map) b_map es))
                                 (@snd (prod exp ctx_map) b_map es)) sig count inl sub l
                     (@subcl_refl v l) (le_n (sub_inl_size sub inl))) as Hcc.
-        destruct Hcc. destruct x. destruct p.
-        symmetry in HeqHcc.
-        eapply contractcases_corresp with (x := apply_r sig v) (cl1 := nil) (c := c) in HeqHcc; eauto.
-        Focus 2. intros.
-        eapply IHn; eauto.
-        unfold term_sub_inl_size in *.
-        simpl in H7. simpl in *. omega.
-        inv H6.
-        simpl in *.
-        destructAll. split; auto.
+        destruct Hcc. destruct x. destruct p. destruct p.
+        symmetry in HeqHcc. eapply contractcases_corresp with (x := apply_r sig v) (cl1 := nil) (c := c) in HeqHcc; eauto.
+        2:{ intros. eapply IHn; eauto. unfold term_sub_inl_size in *. simpl in H7. simpl in *. omega. }
+        inv H6. simpl in *. destructAll. split; auto.
       + (* None *)
         remember (contractcases
                     (@pair (prod exp ctx_map) b_map
@@ -7022,852 +6949,452 @@ Section CONTRACT.
                                 (@snd exp ctx_map (@fst (prod exp ctx_map) b_map es))
                                 (@snd (prod exp ctx_map) b_map es)) sig count inl sub l
                     (@subcl_refl v l) (le_n (sub_inl_size sub inl))) as Hcc.
-        destruct Hcc. destruct x. destruct p.
-        symmetry in HeqHcc.
+        destruct Hcc. destruct x. destruct p. destruct p. symmetry in HeqHcc.
         eapply contractcases_corresp with (x := apply_r sig v) (cl1 := nil) (c := c) in HeqHcc; eauto.
-        Focus 2. intros.
-        eapply IHn; eauto.
-        unfold term_sub_inl_size in *.
-        simpl in H7. simpl in *. omega.
-        inv H6.
-        simpl in *.
-        destructAll. split; auto.
+        2:{ intros. eapply IHn; eauto. unfold term_sub_inl_size in *. simpl in H7. simpl in *. omega. }
+        inv H6. simpl in *. destructAll. split; auto.
     - (* proj *)
-      destruct (get_c v count) eqn: gvc.
-      { (* dead v pre *)
+      destruct (get_c v count) eqn: gvc. 
+      + (* dead v pre *)
         simpl in H6.
-        assert (gsr_clos ce
-                         (rename_all_ctx_ns sig (inlined_ctx_f c inl) |[ rename_all_ns sig e ]|)).
-        constructor. constructor.
-        simpl. apply Proj_dead_s.
-        specialize (H2 v). rewrite gvc in H2.
-        apply num_occur_app_ctx in H2. destructAll; pi0.
-        inv H7; pi0. auto.
-        assert (Hub := gsr_preserves_clos _ _ H0 H1 H7).
-        destruct Hub.
-        apply sig_inv_combine in H5.
+        assert (gsr_clos 1 ce (rename_all_ctx_ns sig (inlined_ctx_f c inl) |[ rename_all_ns sig e ]|)).
+        { replace 1 with (1 + 0) by omega. eapply Trans_srw; [| now constructor ]. constructor.
+          simpl. apply Proj_dead_s. specialize (H2 v). rewrite gvc in H2.
+          apply num_occur_app_ctx in H2. destructAll; pi0. inv H7; pi0. dec_vars. auto. }
+        assert (Hub := gsr_clos_preserves_clos _ _ _ H0 H1 H7).
+        destruct Hub. apply sig_inv_combine in H5.
         destruct H5 as (H5, H5cod).
-        assert (Hse := gsr_preserves_sig_dom _ _ _ H0 H1 H7 H5).
-        apply IHn with (c := c) in H6; auto.
-        destructAll.
-        split.
-        econstructor 3. apply H7. auto.
-        split. auto. split; auto.
-        unfold term_sub_inl_size in *. simpl. simpl in H. omega.
-        intro. specialize (H2 v1). apply num_occur_app_ctx in H2.
-        destructAll. inv H10.
-        eapply num_occur_n.
-        apply num_occur_app_ctx. exists x, n1. split; auto.
-        unfold dec_census_list.
-        rewrite <- combine_minus_census_list.
-        rewrite gccombine_sub.
-        rewrite H11.
-        rewrite update_census_list_correct.
-        rewrite apply_r_list_empty.
-        unfold get_c. rewrite M.gempty.
-        simpl. omega.
+        assert (Hse := gsr_preserves_sig_dom _ _ _ _ H0 (closed_implies_Disjoint _ H1) H7 H5).
+        unfold incr_steps in H6. remember (contract sig (dec_census_list sig [v0] count) e sub inl) as s. destruct s as [[[[? ?] ?] ?] ?].
+        inv H6. symmetry in Heqs. apply IHn with (c := c) in Heqs; auto.
+        * destructAll. split; eauto. rewrite plus_comm. eapply gsr_clos_trans. eassumption. eassumption.
+        * unfold term_sub_inl_size in *. simpl. simpl in H. omega.
+        * intro. specialize (H2 v1). apply num_occur_app_ctx in H2.
+          destructAll. simpl in H6. inv H6. eapply num_occur_n.
+          apply num_occur_app_ctx. exists x, n2. split; auto.          
+          unfold dec_census_list.
+          rewrite <- combine_minus_census_list, gccombine_sub.
+          rewrite H10. rewrite update_census_list_correct.
+          rewrite apply_r_list_empty. unfold get_c. rewrite M.gempty.
+          simpl. omega.
+        * eapply inl_inv_mon. 2: now apply H4.
+          unfold ce. do 2 (rewrite bound_var_app_ctx).
+          simpl. normalize_bound_var. now sets.
+        * eapply sig_inv_full_dead_l. rewrite <- inv_app_Eproj.
+          simpl in *. apply sig_inv_combine. split; eauto.
+      + { simpl in H6.
+          (* Factoring three same subcases *)
+          assert (Hsame : (let (x, bp) := contract sig count e sub inl in
+                           (let
+                               (p, im') as x0
+                               return (b_map_le_i inl (snd x0) -> contractT inl) := x in
+                             let (p0, count') := p in
+                             let (e', steps) := p0 in
+                             fun bp0 : b_map_le_i inl im' =>
+                               match get_c v count' with
+                               | 0 =>
+                                 existT
+                                   (fun esir : exp * nat * c_map * b_map =>
+                                      b_map_le_i inl (snd esir))
+                                   (e', steps + 1, dec_census_list sig [v0] count', im') bp0
+                               | S _ =>
+                                 existT
+                                   (fun esir : exp * nat * c_map * b_map =>
+                                      b_map_le_i inl (snd esir))
+                                   (Eproj v c0 n0 (apply_r sig v0) e', steps, count', im') bp0
+                               end) bp) =
+                          existT
+                            (fun esir : exp * nat * c_map * b_map => b_map_le_i inl (snd esir))
+                            (e', steps, count', im') BP  ->
+                          gsr_clos steps ce ce' /\  c_count ce' count' /\ inl_inv im' sub ce' /\  sig_inv_codom sig (rename_all_ctx_ns sig (inlined_ctx_f c im')) e').
+          { clear H6. intros H6.
+            assert (rename_all_ctx_ns sig (inlined_ctx_f c inl) |[ rename_all_ns sig (Eproj v c0 n0 v0 e) ]| =
+                                                                                                             rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Eproj_c v c0 n0 v0 Hole_c)) inl) |[ rename_all_ns sig e ]|) by ctx_inl_push.
+            remember (contract sig count e sub inl) as s. destruct s. destruct x. destruct p. destruct p.
+            symmetry in Heqs. unfold ce in *; rewrite H7 in *. eapply IHn in Heqs; eauto. destructAll.
+            destruct (get_c v c1) eqn:gvc2.
+            { (* dead v post *)
+              inv H6. split; [| split; [| split ]].
+              - eapply gsr_clos_trans. eassumption. 
+                unfold ce'. repeat normalize_ctx. rewrite <- app_ctx_f_fuse.
+                replace 1 with (1 + 0) by omega. econstructor; [| now constructor ].
+                simpl. constructor. eapply Proj_dead_s.
+                specialize (H9 v). rewrite gvc2 in H9.
+                apply num_occur_app_ctx in H9; destructAll; pi0.
+                apply num_occur_ec_comp_ctx in H6; destructAll; pi0. eauto.
+          - intro. specialize (H9 v1). apply num_occur_app_ctx in H9. destructAll.
+                repeat normalize_ctx. apply num_occur_ec_comp_ctx in H6. destructAll. simpl in H13. inv H13.
+                eapply num_occur_n. apply num_occur_app_ctx. exists x1, x0. split; auto.
+                inv H21. unfold dec_census_list. rewrite <- combine_minus_census_list.
+                rewrite gccombine_sub. rewrite H12. rewrite update_census_list_correct.
+                rewrite apply_r_list_empty. unfold get_c. rewrite M.gempty. simpl. omega.
+              - eapply inl_inv_mon. 2: apply H10. unfold ce'.
+                do 2 (rewrite bound_var_app_ctx). repeat normalize_ctx.
+                simpl. rewrite (proj1 bound_var_ctx_comp_ctx). now sets.
+              - intro. intros. destruct (var_dec y v).
+                (* y = v *)
+                + subst. left. specialize (H9 v). rewrite gvc2 in H9.
+                  apply num_occur_app_ctx in H9. destructAll; pi0.
+                  repeat normalize_ctx. apply num_occur_ec_comp_ctx in H9; destructAll; pi0.
+                  eapply num_occur_app_ctx. exists 0, 0; split; auto.
+                + (* y <> v *)
+                  apply H11 in H6. inv H6.
+                  left. apply num_occur_app_ctx in H12; destructAll; pi0.
+                  repeat normalize_ctx.
+                  apply num_occur_ec_comp_ctx in H6; destructAll; pi0.
+                  eapply num_occur_app_ctx. exists 0, 0; split; auto.
+                  right. repeat normalize_ctx. apply bound_stem_comp_ctx_mut in H12.
+                  inv H12. auto. exfalso. inv H6. auto. inv H18. }
+            { inv H6.
+              assert ((rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Eproj_c v c0 n0 v0 Hole_c)) im') |[ e0 ]|) =
+                       rename_all_ctx_ns sig (inlined_ctx_f c im') |[ Eproj v c0 n0 (apply_r sig v0) e0 ]|) by ctx_inl_push.
+              unfold ce';  rewrite <- H6.
+              split; auto. split; auto. split; auto.
+              (* sig_inv_codom push proj *)
+              intro. intros. destruct (var_dec y v).
+              (* y = v *)
+              - subst. apply H5 in H12. inv H12. inv H14.
+                (** by no zombie *)
+                left. rewrite <- H6. eapply shrink_no_zombie. apply H8.
+                rewrite H7 in H12. auto.
+                (** imposible due to unique binding *)
+                exfalso.
+                apply ub_app_ctx_f in H0. destructAll.
+                repeat normalize_ctx. apply ub_comp_ctx_f in H0.
+                destructAll. inv H17. specialize (H18 v). apply H18.
+                split. apply bound_stem_var. auto.
+                simpl. constructor.
+              - (* y <> v *)
+                apply H11 in H12. inv H12.
+                rewrite H6 in H13. auto. repeat normalize_ctx.
+                apply bound_stem_comp_ctx_mut in H13. inv H13.
+                auto. simpl in H12. inv H12. exfalso. auto. inv H19.
+            }
+            unfold term_sub_inl_size in *. simpl. simpl in H. omega.
+            apply cmap_view_proj; auto. repeat normalize_ctx.
+            apply sig_inv_full_push. simpl. simpl in H5. auto. }
 
-        eapply inl_inv_mon. 2: apply H4.
-        unfold ce.
-        do 2 (rewrite bound_var_app_ctx).
-        simpl. normalize_bound_var.
-        auto with Ensembles_DB.
 
-        eapply sig_inv_full_dead_l.
-        rewrite <- inv_app_Eproj.
-        simpl in *.
-        apply sig_inv_combine. split; eauto.
-      }
-      simpl in H6.
-      destruct (M.get (apply_r sig v0) sub) eqn:garv0s; [destruct s|].
-      + (* constr *)
-        destruct (nthN l n0) eqn:n0thl.
-        * (* constant folding *)
-          assert (Hgvs : M.get v sig = None).
-          { destruct (M.get v sig) eqn:gvs.
-            apply H5 in gvs.
-            inv gvs.
-            exfalso.
-            apply H7.
-            apply bound_var_app_ctx.
-            right; simpl; auto.
-            auto.
-          }
-          assert (Hbv :
-                    ~ bound_var_ctx
-                      (rename_all_ctx_ns sig (inlined_ctx_f c inl)) v).
-          {
-            unfold ce in H0. apply ub_app_ctx_f in H0.
-            intro.
-            destructAll.
-            inv H9.
-            specialize (H10 v).
-            apply H10.
-            split; simpl; auto.
-          }
-          apply H3 in garv0s.
-          destructAll.
-          assert (H_rn_ctx:
-                    (rename_all_ctx_ns (M.set v (apply_r sig v1) sig)
-                                       (inlined_ctx_f (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) inl) =
-                     (rename_all_ctx_ns sig
-                                        (inlined_ctx_f (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) inl)))).
-          {
-            apply eq_P_rename_all_ctx_ns.
-            intro; intro.
-            destruct (var_dec x1 v).
-            - subst. exfalso.
-              apply H7.
-              eapply not_occur_rename_ctx_not_dom with (sig := sig).
-              intro. inv H8. rewrite Hgvs in H9; inv H9.
-              assert (~ occurs_free_ctx (rename_all_ctx_ns sig
+          destruct (M.get (apply_r sig v0) sub) eqn:garv0s; [destruct s|]. 
+          + (* constr *)
+            destruct (nthN l n0) eqn:n0thl.
+            * (* constant folding *) 
+              assert (Hgvs : M.get v sig = None).
+              { destruct (M.get v sig) eqn:gvs.
+                apply H5 in gvs. inv gvs. exfalso.
+                apply H7. apply bound_var_app_ctx. right; simpl; auto. eauto. }
+              assert (Hbv : ~ bound_var_ctx (rename_all_ctx_ns sig (inlined_ctx_f c inl)) v).
+              { unfold ce in H0. apply ub_app_ctx_f in H0. intro. destructAll. inv H9.
+                specialize (H10 v).
+                apply H10. split; simpl; auto. }
+              apply H3 in garv0s. destructAll.
+              assert (H_rn_ctx:
+                        (rename_all_ctx_ns (M.set v (apply_r sig v1) sig)
+                                           (inlined_ctx_f (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) inl) =
+                         (rename_all_ctx_ns sig
+                                            (inlined_ctx_f (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) inl)))).
+              { apply eq_P_rename_all_ctx_ns. intro; intro. destruct (var_dec x1 v).
+                - subst. exfalso. apply H7. eapply not_occur_rename_ctx_not_dom with (sig := sig).
+                  intro. inv H8. rewrite Hgvs in H9; inv H9.
+                  assert (~ occurs_free_ctx (rename_all_ctx_ns sig
                                                            (inlined_ctx_f
                                                               (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) inl)) v).
-              intro.
-              apply closed_app_ctx in H1.
-              apply H1 in H8. inv H8.
-              apply not_free_dead_or_bound_ctx in H8.
-              inv H8; auto.
-              exfalso; auto.
-            - rewrite M.gso; auto.
-          }
-          assert (Hee : rename_all_ns (M.set v (apply_r sig v1) (M.empty var)) (rename_all_ns sig e) =
+                  intro. apply closed_app_ctx in H1. apply H1 in H8. inv H8.
+                  apply not_free_dead_or_bound_ctx in H8. inv H8; auto. exfalso; auto.
+                - rewrite M.gso; auto.
+              }
+              assert (Hee : rename_all_ns (M.set v (apply_r sig v1) (M.empty var)) (rename_all_ns sig e) =
                         ( rename_all_ns (M.set v (apply_r sig v1) sig) e )).
-          {
-            assert (Decidable (Range_map sig)) by apply Decidable_Range_map.
-            assert (sig_inv_dom sig e).
-            {
-              intro.
-              intros.
-              apply H5 in H8; destructAll.
-              intro; apply H8.
-              apply bound_var_app_ctx.
-              right.
-              simpl; normalize_bound_var.
-              left.
-              eapply  bound_var_rename_all_ns in H10.
-              eauto.
-            }
-            inv H7. specialize (Dec v).
-            inv Dec.
-            + (* then v doesn't occur *)
-              inv H7. apply H5 in H9. inv H9.
-              inv H10.
-              * (* by eq_P_rename_all_ns *)
-                assert ( rename_all_ns (M.set v (apply_r sig v1) sig) e =  rename_all_ns  sig e).
-                {
-                  apply eq_P_rename_all_ns.
-                  intro. intros. destruct (var_dec x2 v).
-                  subst.
-                  exfalso. apply H10.
-                  apply num_occur_app_ctx in H9; destructAll; pi0.
-                  simpl in H11. inv H11; pi0.
-                  eapply not_occur_rename_not_dom; eauto.
-                  intro. inv H12. rewrite Hgvs in H13. inv H13.
-                  rewrite M.gso; auto.
-                }
-                rewrite H10.
+              { assert (Decidable (Range_map sig)) by apply Decidable_Range_map.
+                assert (sig_inv_dom sig e).
+                { intro. intros. apply H5 in H8; destructAll.
+                  intro; apply H8. apply bound_var_app_ctx.
+                  right. simpl; normalize_bound_var.
+                  left. eapply bound_var_rename_all_ns in H10. eauto. }
+                inv H7. specialize (Dec v). inv Dec.
+                + (* then v doesn't occur *)
+                  inv H7. apply H5 in H9. inv H9.
+                  inv H10.
+                  * (* by eq_P_rename_all_ns *)
+                    assert ( rename_all_ns (M.set v (apply_r sig v1) sig) e =  rename_all_ns  sig e).
+                    {
+                      apply eq_P_rename_all_ns.
+                      intro. intros. destruct (var_dec x2 v).
+                      subst.
+                      exfalso. apply H10.
+                      apply num_occur_app_ctx in H9; destructAll; pi0.
+                      simpl in H11. inv H11; pi0.
+                      eapply not_occur_rename_not_dom; eauto.
+                      intro. inv H12. rewrite Hgvs in H13. inv H13.
+                      rewrite M.gso; auto.
+                    }
+                    rewrite H10.
 
-                assert (rename_all_ns (M.set v (apply_r sig v1) (M.empty var)) (rename_all_ns sig e)  = rename_all_ns (M.empty var) (rename_all_ns sig e)).
-                {
-                  unfold rename.
-                  apply eq_P_rename_all_ns.
-                  intro. intros. destruct (var_dec x2 v).
-                  subst.
-                  exfalso. apply H11. apply num_occur_app_ctx in H9.
-                  destructAll; pi0.
-                  simpl in H12; inv H12; pi0; auto.
-                  rewrite M.gso; auto.
-                }
-                rewrite H11.
-                rewrite <- (proj1 rename_all_ns_empty).
-                reflexivity.
-              * (* Impossible due to unique_bindings *)
-                apply ub_app_ctx_f in H0.
-                destructAll.
-                inv H11. specialize (H12 v).
-                exfalso.
-                apply H12.
-                apply bound_stem_var in H9.
-                split; simpl; repeat normalize_ctx; auto.
-            + (* then rename v (rename_all e) = rename_all+v e *)
-              rewrite one_rename_all_ns.
-              reflexivity. auto. intro. inv H9.
-              unfold var in *. rewrite H10 in Hgvs. inv Hgvs.
-          }
-          assert (gsr_clos (rename_all_ctx_ns sig
-                                              (inlined_ctx_f (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0))
-                                                             inl) |[ rename_all_ns sig (Eproj v c0 n0 v0 e) ]|)
-                           (rename_all_ctx_ns (M.set v (apply_r sig v1) sig)
-                                              (inlined_ctx_f (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) inl)
-                           |[ rename_all_ns (M.set v (apply_r sig v1) sig) e ]|)).
-          { eapply rt_trans.
-            - simpl.
-              rewrite (proj1 inlined_comp_ctx).
-              simpl.
-              rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)).
-              rewrite <- app_ctx_f_fuse.
-              simpl. constructor.
-              constructor. apply Constr_proj_s.
-              unfold apply_r_list.
-              apply nthN_map. eauto.
-            - (* 2 parts : *)
-              destruct (M.get v sig) eqn:gvs.
-              inv Hgvs.
-              (*) context is unchanged by extra sig *)
-
-              rewrite H_rn_ctx.
-              repeat normalize_ctx. simpl.
-              rewrite <- app_ctx_f_fuse.
-              (* ) rename v (rename_all e) = rename_all+v e by  *)
-              rewrite <- Hee. apply rt_refl.
-          }
-          assert (Hub' := gsr_preserves_clos _ _ H0 H1 H7).
-
-          destructAll.
-          eapply IHn in H6; eauto.
-          assert (rename_all_ctx_ns (M.set v (apply_r sig v1) sig)
-                                    (inlined_ctx_f
-                                       (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) im')  =
-                  (rename_all_ctx_ns sig
-                                     (inlined_ctx_f
-                                        (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) im'))).
-          {
-            apply eq_P_rename_all_ctx_ns.
-            intro; intro.
-            destruct (var_dec x1 v).
-            - subst.
-              exfalso.
-              apply H10.
-              (* num occur e v <= num_occur (rename sig e) v, ~ bound occur and not occurs free so dead (also bound_var_ctx_inlined_antimon from inl to im' *)
-              assert (~ occurs_free_ctx  (rename_all_ctx_ns sig
+                    assert (rename_all_ns (M.set v (apply_r sig v1) (M.empty var)) (rename_all_ns sig e)  = rename_all_ns (M.empty var) (rename_all_ns sig e)).
+                    { unfold rename.
+                      apply eq_P_rename_all_ns.
+                      intro. intros. destruct (var_dec x2 v).
+                      subst.
+                      exfalso. apply H11. apply num_occur_app_ctx in H9.
+                      destructAll; pi0.
+                      simpl in H12; inv H12; pi0; auto.
+                      rewrite M.gso; auto.
+                    }
+                    rewrite H11.
+                    rewrite <- (proj1 rename_all_ns_empty).
+                    reflexivity.
+                  * (* Impossible due to unique_bindings *)
+                    apply ub_app_ctx_f in H0.
+                    destructAll.
+                    inv H11. specialize (H12 v).
+                    exfalso.
+                    apply H12.
+                    apply bound_stem_var in H9.
+                    split; simpl; repeat normalize_ctx; auto.
+                + (* then rename v (rename_all e) = rename_all+v e *)
+                  rewrite one_rename_all_ns. reflexivity. eassumption.
+                  intro. inv H9. unfold var in *. rewrite H10 in Hgvs. inv Hgvs.
+              }
+              assert (gsr_clos (1 + 0) (rename_all_ctx_ns sig
+                                                          (inlined_ctx_f (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0))
+                                                                         inl) |[ rename_all_ns sig (Eproj v c0 n0 v0 e) ]|)
+                               (rename_all_ctx_ns (M.set v (apply_r sig v1) sig)
+                                                  (inlined_ctx_f (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) inl)
+                               |[ rename_all_ns (M.set v (apply_r sig v1) sig) e ]|)).
+              { eapply Trans_srw.
+                - simpl. rewrite (proj1 inlined_comp_ctx). simpl.
+                  rewrite (proj1 (rename_all_ctx_ns_comp_ctx _ _)).
+                  rewrite <- app_ctx_f_fuse.
+                  simpl. econstructor. apply Constr_proj_s.
+                  unfold apply_r_list. apply nthN_map. eauto.
+                - (* 2 parts : *)
+                  destruct (M.get v sig) eqn:gvs.
+                  inv Hgvs.
+                  (*) context is unchanged by extra sig *)                  
+                  rewrite H_rn_ctx.
+                  repeat normalize_ctx. simpl.
+                  rewrite <- app_ctx_f_fuse.
+                  (* ) rename v (rename_all e) = rename_all+v e by  *)
+                  rewrite <- Hee. apply Refl_srw. }
+              assert (Hub' := gsr_clos_preserves_clos _ _ _ H0 H1 H7).              
+              destructAll. unfold incr_steps in *.
+              remember (contract (M.set v (apply_r sig v1) sig) (M.set v 0 (M.set (apply_r sig v1) (S (n1 + get_c (apply_r sig v1) count))
+                                                                                  (M.set (apply_r sig v0)
+                                                                                         (get_c (apply_r sig v0) count - 1) count))) e sub inl) as s.
+              destruct s as [[[[? ?] ?] ?] ?]. inv H6. symmetry in Heqs.
+              eapply IHn in Heqs; eauto.
+              - assert (rename_all_ctx_ns (M.set v (apply_r sig v1) sig)
+                                        (inlined_ctx_f
+                                           (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) im')  =
+                      (rename_all_ctx_ns sig
+                                         (inlined_ctx_f
+                                            (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) im'))).
+                { apply eq_P_rename_all_ctx_ns. intro; intro.
+                  destruct (var_dec x1 v).
+                  - subst. exfalso. apply H6.
+                    (* num occur e v <= num_occur (rename sig e) v, ~ bound occur and not occurs free so dead (also bound_var_ctx_inlined_antimon from inl to im' *)
+                    assert (~ occurs_free_ctx  (rename_all_ctx_ns sig
                                                             (inlined_ctx_f
                                                                (comp_ctx_f x (Econstr_c (apply_r sig v0) c1 l x0)) inl)) v).
-              apply closed_app_ctx in H1.
-              intro.
-              apply H1 in H11. inv H11.
-              apply not_free_dead_or_bound_ctx in H11.
-              inv H11.
-              + apply not_occur_rename_ctx_not_dom  in H12.
-                eapply dead_occur_ec_le_antimon; eauto.
-                apply b_map_le_c. auto.
-                intro. inv H11. apply H5 in H13.
-                inv H13. apply H11.
-                apply bound_var_app_ctx. right. simpl; auto.
-              + exfalso.
-                apply ub_app_ctx_f in H0.
-                destructAll.
-                inv H16. specialize (H17 v).
-                apply H17. split; auto. simpl. constructor.
-            - rewrite M.gso by auto; auto.
-          }
-          rewrite H10 in *.
-          destruct H6 as (H6, H11).
-          destruct H11 as (H11, H12).
-          destruct H12 as (H12, Hsigc).
-          destructAll.
-          split; auto.
-          eapply rt_trans.
-          2: apply H6.
-          apply H7.
-          split; auto.
-          split; auto.
-          { (* returned sig_inv_codom *)
-            intro. intros.
-            assert (x1 <> v).
-            intro; subst.
-            rewrite H13 in Hgvs. inv Hgvs.
-            assert (M.get x1 (M.set v (apply_r sig v1) sig) = Some y).
-            rewrite M.gso; auto.
-            apply Hsigc in H15. auto.
-          }
-          {             (* size *)
-            unfold term_sub_inl_size in *.
-            simpl in *; omega.
-          }
-          {             (* c_count for projection folding*)
-            (* TODO: redo using rename_all_set_x *)
-            rewrite H_rn_ctx.
-
-
-            rewrite <- Hee.
-            intro. assert (H2' := H2). specialize (H2 v2).
-            apply num_occur_app_ctx in H2; destructAll.
-            inv H10.
-
-            assert (Hvv1 : v <> apply_r sig v1).
-            {
-              intro. unfold apply_r in H10.
-              destruct ( @Maps.PTree.get M.elt v1 sig) eqn:gv1s.
-              subst. apply H5 in gv1s. destructAll.
-              inv H12.
-              specialize (H2' e0).
-              rewrite gvc in H2'. assert (S n1 = 0).
-              eapply (proj1 (num_occur_det _)); eauto.
-              inv H12.
-              apply ub_app_ctx_f in H0. destructAll.
-              inv H14.
-              specialize (H15 e0).
-              apply H15. split.
-              apply bound_stem_var. auto.
-              simpl. constructor.
-              subst.
-              assert (~ bound_var_ctx
-                        (rename_all_ctx_ns sig
-                                           (inlined_ctx_f x inl)) (apply_r sig v1)).
-              intro. apply Hbv. repeat normalize_ctx.
-              apply bound_var_ctx_comp_ctx. left.
-              unfold apply_r in H10. rewrite gv1s in H10. auto.
-              unfold ce in H1. repeat normalize_ctx.
-              rewrite <- app_ctx_f_fuse in H1.
-              assert (occurs_free (rename_all_ctx_ns sig
-                                                     (inlined_ctx_f (Econstr_c (apply_r sig v0) c1 l x0) inl)
-                                  |[ rename_all_ns sig (Eproj v1 c0 n0 v0 e) ]|) (apply_r sig v1)).
-              simpl. constructor.
-              apply nthN_In in n0thl.
-              apply apply_r_list_In. auto.
-              eapply occurs_free_ctx_not_bound in H12. 2: apply H10.
-              apply H1 in H12. inv H12.
-            }
-            assert (Hnv := H2' v).
-            assert (Hnv1 := H2' (apply_r sig v1)).
-            apply num_occur_app_ctx in Hnv. destruct Hnv. destruct H10.
-            destruct H10 as (Hnvc, (Hnve, Hnv_c)).
-            assert (x2 = 0).
-            eapply closed_not_occurs_in_context in Hbv.
-            eapply (num_occur_ec_det); eauto.
-            apply closed_app_ctx in H1. auto.
-            subst. inv Hnve. rename H18 into Hnve.
-
-            apply num_occur_app_ctx in Hnv1. destruct Hnv1. destruct H10.
-            destruct H10 as (Hnv1c, (Hnv1e, Hnv1_c)).
-            inv Hnv1e. rename H18 into Hnv1e.
-            assert (Hrm := num_occur_rename_mut).
-            specialize (Hrm _ _ Hvv1). inv Hrm. clear H12.
-            specialize (H10 _ _ _ Hnve Hnv1e). destruct H10 as (Hnev_post, Hnev1_post).
-
-
-
-
-            destruct (var_dec v2 v).
-            {               (* v2 = v *)
-              subst. rewrite gdss.
-
-              apply num_occur_app_ctx. exists 0, 0.
-              split; auto.
-            }
-
-
-            rewrite gdso; auto.
-            destruct (var_dec v2 (apply_r sig v1)).
-            (* v2 = (apply_r sig v1) *)
-            {
-              apply num_occur_app_ctx.
-              exists x2, (n3+n4). rewrite e0. split; auto. split; auto.
-              rewrite gdss. rewrite Hnv1_c.
-              rewrite gvc in Hnv_c.
-              assert (num_occur_list [apply_r sig v0] v = 0). (* by UB *)
-              simpl. destruct (cps_util.var_dec v (apply_r sig v0)); auto.
-              subst. exfalso. apply ub_app_ctx_f in H0; destructAll. inv H12.
-              specialize (H13 (apply_r sig v0)). apply H13. split.
-              repeat normalize_ctx. apply bound_var_ctx_comp_ctx. right. simpl. constructor; auto. constructor.
-              assert (num_occur_list [apply_r sig v0] (apply_r sig v1) = 0).
-              simpl.  destruct (cps_util.var_dec (apply_r sig v1) (apply_r sig v0)); auto.
-              subst. exfalso.
-              assert (~ bound_var_ctx (rename_all_ctx_ns sig (inlined_ctx_f x inl)) (apply_r sig v0)) (* by UB *).
-              intro. apply ub_app_ctx_f in H0; destructAll.
-              repeat normalize_ctx. apply ub_comp_ctx_f in H0; destructAll.
-              inv H16. specialize (H17 (apply_r sig v0)). apply H17. split; auto. simpl. constructor.
-              unfold ce in H1.
-              repeat normalize_ctx.
-              rewrite <- app_ctx_f_fuse in H1.
-              assert (occurs_free (rename_all_ctx_ns sig
-                                                     (inlined_ctx_f (Econstr_c (apply_r sig v0) c1 l x0) inl)
-                                  |[ rename_all_ns sig (Eproj v c0 n0 v0 e) ]|) (apply_r sig v0)).
-              simpl. constructor.
-              rewrite <- e1.
-              apply apply_r_list_In. apply nthN_In in n0thl. auto.
-              eapply occurs_free_ctx_not_bound in H13.
-              2: apply H12. apply H1 in H13. inv H13.
-
-              unfold var in *. rewrite H10 in *. rewrite H12.
-              omega.
-            }
-
-            (* v2 <> v <> (apply_r sig v1) *)
-            rewrite gdso; auto.
-            apply num_occur_app_ctx.
-            exists x1, n2.  split; auto. split.
-            assert (exists n,  num_occur
-                                 (rename_all_ns (M.set v (apply_r sig v1) (M.empty var))
-                                                (rename_all_ns sig e)) v2  n) by apply e_num_occur. destruct H10.
-            assert (n2 = x3).
-            eapply num_occur_sig_unaffected; eauto.
-            intro. inv H12. rewrite M.gso in H13 by auto.
-            rewrite M.gempty in H13. inv H13.
-            intro. inv H12. destruct (var_dec x4 v).
-            subst. rewrite M.gss in H13. inv H13; auto.
-            rewrite M.gso in H13. rewrite M.gempty in H13. inv H13. auto.
-            rewrite H12. auto.
-            rewrite get_c_minus.
-            simpl in H11.
-            destruct (cps_util.var_dec v2 (apply_r sig v0)).
-            subst. rewrite gdss. omega.
-            rewrite gdso by auto. rewrite gdempty. omega.
-          }
-          {            (* inl_inv *)
-            intro. intros.
-            apply H4 in H10. unfold ce in H10.
-            destruct H10.
-            split.
-            - intro; apply H10.
-              apply bound_var_app_ctx in H12.
-              inv H12.
-              rewrite <- (proj1 (bound_var_ctx_rename_all_ns _ )) in H13.
-              apply bound_var_app_ctx.
-              left.
-              rewrite <- (proj1 (bound_var_ctx_rename_all_ns _ )).
-              auto.
-              apply bound_var_app_ctx.
-              right.
-              apply bound_var_rename_all_ns.
-              apply bound_var_rename_all_ns in H13.
-              auto.
-            - intros. apply H11 in H12.
-              eapply Disjoint_Included_l.
-              2: apply H12.
-              do 2 rewrite bound_var_app_ctx.
-
-              do 2 (rewrite <- (proj1 (bound_var_ctx_rename_all_ns _ ))).
-              do 2 (rewrite <- (bound_var_rename_all_ns)).
-              normalize_bound_var.
-              auto with Ensembles_DB.
-          }
-          {            (* sig_inv *)
-            intro. intros.
-            destruct (var_dec x1 v).
-            -  subst. rewrite M.gss in H10.
-               inv H10.
-               split.
-               + intro.
-                 unfold ce in H0.
-                 apply ub_app_ctx_f in H0.
-                 destructAll.
-                 apply bound_var_app_ctx in H10.
-                 inv H10.
-                 apply bound_var_ctx_rename_all_ns in H13.
-                 inv H12.
-                 specialize (H10 v).
-                 apply H10.
-                 split.
-                 2: simpl; auto.
-                 apply bound_var_ctx_rename_all_ns.
-                 auto.
-                 apply bound_var_rename_all_ns in H13.
-                 simpl in H11. inv H11.
-                 apply H15.
-                 apply bound_var_rename_all_ns. auto.
-               + (* apply_r sig v1  has to be bound in x since ce is closed
-   by occurs_free_app_bound_stem
-                  *)
-                 right.
-                 repeat normalize_ctx.
-                 apply bound_stem_comp_ctx_mut.
-                 left.
-                 eapply occurs_free_app_bound_stem.
-                 Focus 2.
-                 intro.
-                 rewrite <- app_ctx_f_fuse in H9.
-                 apply H9 in H10.
-                 inv H10.
-                 simpl.
-                 constructor.
-                 apply nthN_In in n0thl.
-                 revert n0thl.
-                 apply apply_r_list_push.
-            - rewrite M.gso in H10 by auto.
-              apply H5 in H10.
-              destruct H10. split.
-              + intro; apply H10.
-                apply bound_var_app_ctx.
-                apply bound_var_app_ctx in H12.
-                inv H12.
-                apply bound_var_ctx_rename_all_ns in H13.
-                left.
-                apply bound_var_ctx_rename_all_ns. auto.
-                right. simpl. constructor.
-                apply bound_var_rename_all_ns in H13.
-                apply bound_var_rename_all_ns. auto.
-              + inv H11.
-                * (* y cannot be (apply_r sig v1) because the latter occurs in l *)
-                  rewrite H_rn_ctx.
-                  left.
-                  apply num_occur_app_ctx in H12.
-                  destructAll; pi0.
-                  eapply num_occur_app_ctx. exists 0, 0.
-                  split; auto.
-                  split; auto.
-                  inv H12; pi0.
-                  assert (y <> apply_r sig v1).
-                  {
-                    intro. subst.
-                    repeat normalize_ctx.
-                    apply num_occur_ec_comp_ctx in H11.
-                    destructAll; pi0.
-                    simpl in H13. inv H13; pi0.
-                    apply not_occur_list_not_in in H13.
-                    apply nthN_In in n0thl.
-                    apply H13.
-                    apply in_map. auto.
-                  }
-                  simpl.
-                  apply num_occur_rename_all_ns_dead_set; auto.
-                *  apply bound_stem_ctx_rename_all_ns in H12.
-                   right.
-                   apply bound_stem_ctx_rename_all_ns. auto.
-          }
-        * (* same as fun and none *)
-          assert (rename_all_ctx_ns sig (inlined_ctx_f c inl)
-                 |[ rename_all_ns sig (Eproj v c0 n0 v0 e) ]| =
-                                                              rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Eproj_c v c0 n0 v0 Hole_c)) inl)
-                 |[ rename_all_ns sig e ]|) by             ctx_inl_push.
-          remember (contract sig count e sub inl).
-          destruct s. destruct x. destruct p.
-          symmetry in Heqs.
-          unfold ce in *; rewrite H7 in *.
-          eapply IHn in Heqs; eauto.
-
-          destructAll.
-          destruct (get_c v c2) eqn:gvc2.
-          {  (* dead v post *)
-            inv H6.
-            split.
-            econstructor 3.
-            apply H8.
-            unfold ce'.
-            repeat normalize_ctx.
-            rewrite <- app_ctx_f_fuse.
-            constructor. constructor.
-            simpl. eapply Proj_dead_s.
-            specialize (H9 v). rewrite gvc2 in H9.
-            apply num_occur_app_ctx in H9; destructAll; pi0.
-            apply num_occur_ec_comp_ctx in H6; destructAll; pi0.
-            auto.
-            split.
-
-            intro. specialize (H9 v1).
-            apply num_occur_app_ctx in H9.
-            destructAll.
-            repeat normalize_ctx.
-            apply num_occur_ec_comp_ctx in H6. destructAll. simpl in H13. inv H13.
-            eapply num_occur_n.
-            apply num_occur_app_ctx. exists x1, x0. split; auto.
-            inv H21.
-            unfold dec_census_list.
-            rewrite <- combine_minus_census_list.
-            rewrite gccombine_sub.
-            rewrite H12.
-            rewrite update_census_list_correct.
-            rewrite apply_r_list_empty.
-            unfold get_c. rewrite M.gempty.
-            simpl. omega.
-
-            split. eapply inl_inv_mon.
-            2: apply H10. unfold ce'.
-            do 2 (rewrite bound_var_app_ctx).
-            repeat normalize_ctx.
-            simpl. rewrite (proj1 bound_var_ctx_comp_ctx).
-            eauto with Ensembles_DB.
-
-            intro. intros. destruct (var_dec y v).
-            (* y = v *)
-            subst. left. specialize (H9 v). rewrite gvc2 in H9.
-            apply num_occur_app_ctx in H9. destructAll; pi0.
-            repeat normalize_ctx.
-            apply num_occur_ec_comp_ctx in H9; destructAll; pi0.
-            eapply num_occur_app_ctx. exists 0, 0; split; auto.
-            (* y <> v *)
-            apply H11 in H6. inv H6.
-            left.
-            apply num_occur_app_ctx in H12; destructAll; pi0.
-            repeat normalize_ctx.
-            apply num_occur_ec_comp_ctx in H6; destructAll; pi0.
-            eapply num_occur_app_ctx. exists 0, 0; split; auto.
-            right.
-            repeat normalize_ctx.
-            apply bound_stem_comp_ctx_mut in H12.
-            inv H12. auto.
-            exfalso. inv H6. auto. inv H18.
-          }
-          inv H6.
-          assert ( (rename_all_ctx_ns sig
-                                      (inlined_ctx_f (comp_ctx_f c (Eproj_c v c0 n0 v0 Hole_c)) im')
-                   |[ e0 ]|) = rename_all_ctx_ns sig (inlined_ctx_f c im')
-                  |[ Eproj v c0 n0 (apply_r sig v0) e0 ]|) by  ctx_inl_push.
-          unfold ce';  rewrite <- H6.
-          split; auto. split; auto. split; auto.
-          { (* sig_inv_codom push proj *)
-            intro. intros. destruct (var_dec y v).
-            (* y = v *)
-            subst. apply H5 in H12. inv H12.
-            inv H14.
-            (** by no zombie *)
-            left.
-            rewrite <- H6. eapply shrink_no_zombie.
-            apply H8.
-            rewrite H7 in H12. auto.
-            (** imposible due to unique binding *)
-            exfalso.
-            apply ub_app_ctx_f in H0. destructAll.
-            repeat normalize_ctx. apply ub_comp_ctx_f in H0.
-            destructAll. inv H17.
-            specialize (H18 v). apply H18.
-            split. apply bound_stem_var. auto.
-            simpl. constructor.
-
-            (* y <> v *)
-            apply H11 in H12. inv H12.
-            rewrite H6 in H13. auto.
-            repeat normalize_ctx.
-            apply bound_stem_comp_ctx_mut in H13.
-            inv H13.
-            auto.
-            simpl in H12. inv H12.
-            exfalso. auto.
-            inv H19.
-          }
-          unfold term_sub_inl_size in *. simpl. simpl in H. omega.
-          apply cmap_view_proj; auto.
-          repeat normalize_ctx.
-          apply sig_inv_full_push. simpl. simpl in H5. auto.
-      + (* fun *)
-        assert (rename_all_ctx_ns sig (inlined_ctx_f c inl)
-               |[ rename_all_ns sig (Eproj v c0 n0 v0 e) ]| =
-                                                            rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Eproj_c v c0 n0 v0 Hole_c)) inl)
-               |[ rename_all_ns sig e ]|) by             ctx_inl_push.
-        remember (contract sig count e sub inl).
-        destruct s. destruct x. destruct p.
-        symmetry in Heqs.
-        unfold ce in *; rewrite H7 in *.
-        eapply IHn in Heqs; eauto.
-
-        destructAll.
-        destruct (get_c v c1) eqn:gvc2.
-        {  (* dead v post *)
-          inv H6.
-          split.
-          econstructor 3.
-          apply H8.
-          unfold ce'.
-          repeat normalize_ctx.
-          rewrite <- app_ctx_f_fuse.
-          constructor. constructor.
-          simpl. eapply Proj_dead_s.
-          specialize (H9 v). rewrite gvc2 in H9.
-          apply num_occur_app_ctx in H9; destructAll; pi0.
-          apply num_occur_ec_comp_ctx in H6; destructAll; pi0.
-          auto.
-          split.
-
-          intro. specialize (H9 v1).
-          apply num_occur_app_ctx in H9.
-          destructAll.
-          repeat normalize_ctx.
-          apply num_occur_ec_comp_ctx in H6. destructAll. simpl in H13. inv H13.
-          eapply num_occur_n.
-          apply num_occur_app_ctx. exists x1, x0. split; auto.
-          inv H21.
-          unfold dec_census_list.
-          rewrite <- combine_minus_census_list.
-          rewrite gccombine_sub.
-          rewrite H12.
-          rewrite update_census_list_correct.
-          rewrite apply_r_list_empty.
-          unfold get_c. rewrite M.gempty.
-          simpl. omega.
-
-          split. eapply inl_inv_mon.
-          2: apply H10. unfold ce'.
-          do 2 (rewrite bound_var_app_ctx).
-          repeat normalize_ctx.
-          simpl. rewrite (proj1 bound_var_ctx_comp_ctx).
-          eauto with Ensembles_DB.
-
-          intro. intros. destruct (var_dec y v).
-          (* y = v *)
-          subst. left. specialize (H9 v). rewrite gvc2 in H9.
-          apply num_occur_app_ctx in H9. destructAll; pi0.
-          repeat normalize_ctx.
-          apply num_occur_ec_comp_ctx in H9; destructAll; pi0.
-          eapply num_occur_app_ctx. exists 0, 0; split; auto.
-          (* y <> v *)
-          apply H11 in H6. inv H6.
-          left.
-          apply num_occur_app_ctx in H12; destructAll; pi0.
-          repeat normalize_ctx.
-          apply num_occur_ec_comp_ctx in H6; destructAll; pi0.
-          eapply num_occur_app_ctx. exists 0, 0; split; auto.
-          right.
-          repeat normalize_ctx.
-          apply bound_stem_comp_ctx_mut in H12.
-          inv H12. auto.
-          exfalso. inv H6. auto. inv H18.
-        }
-        inv H6.
-        assert ( (rename_all_ctx_ns sig
-                                    (inlined_ctx_f (comp_ctx_f c (Eproj_c v c0 n0 v0 Hole_c)) im')
-                 |[ e1 ]|) = rename_all_ctx_ns sig (inlined_ctx_f c im')
-                |[ Eproj v c0 n0 (apply_r sig v0) e1 ]|) by  ctx_inl_push.
-        unfold ce';  rewrite <- H6.
-        split; auto. split; auto. split; auto.
-        { (* sig_inv_codom push proj *)
-          intro. intros. destruct (var_dec y v).
-          (* y = v *)
-          subst. apply H5 in H12. inv H12.
-          inv H14.
-          (** by no zombie *)
-          left.
-          rewrite <- H6. eapply shrink_no_zombie.
-          apply H8.
-          rewrite H7 in H12. auto.
-          (** imposible due to unique binding *)
-          exfalso.
-          apply ub_app_ctx_f in H0. destructAll.
-          repeat normalize_ctx. apply ub_comp_ctx_f in H0.
-          destructAll. inv H17.
-          specialize (H18 v). apply H18.
-          split. apply bound_stem_var. auto.
-          simpl. constructor.
-
-          (* y <> v *)
-          apply H11 in H12. inv H12.
-          rewrite H6 in H13. auto.
-          repeat normalize_ctx.
-          apply bound_stem_comp_ctx_mut in H13.
-          inv H13.
-          auto.
-          simpl in H12. inv H12.
-          exfalso. auto.
-          inv H19.
-        }
-        unfold term_sub_inl_size in *. simpl. simpl in H. omega.
-        apply cmap_view_proj; auto.
-        repeat normalize_ctx.
-        apply sig_inv_full_push. simpl. simpl in H5. auto.
-      + (* none *)
-        assert (rename_all_ctx_ns sig (inlined_ctx_f c inl)
-               |[ rename_all_ns sig (Eproj v c0 n0 v0 e) ]| =
-                                                            rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Eproj_c v c0 n0 v0 Hole_c)) inl)
-               |[ rename_all_ns sig e ]|) by             ctx_inl_push.
-        remember (contract sig count e sub inl).
-        destruct s. destruct x. destruct p.
-        symmetry in Heqs.
-        unfold ce in *; rewrite H7 in *.
-        eapply IHn in Heqs; eauto.
-
-        destructAll.
-        destruct (get_c v c1) eqn:gvc2.
-        {  (* dead v post *)
-          inv H6.
-          split.
-          econstructor 3.
-          apply H8.
-          unfold ce'.
-          repeat normalize_ctx.
-          rewrite <- app_ctx_f_fuse.
-          constructor. constructor.
-          simpl. eapply Proj_dead_s.
-          specialize (H9 v). rewrite gvc2 in H9.
-          apply num_occur_app_ctx in H9; destructAll; pi0.
-          apply num_occur_ec_comp_ctx in H6; destructAll; pi0.
-          auto.
-          split.
-
-          intro. specialize (H9 v1).
-          apply num_occur_app_ctx in H9.
-          destructAll.
-          repeat normalize_ctx.
-          apply num_occur_ec_comp_ctx in H6. destructAll. simpl in H13. inv H13.
-          eapply num_occur_n.
-          apply num_occur_app_ctx. exists x1, x0. split; auto.
-          inv H21.
-          unfold dec_census_list.
-          rewrite <- combine_minus_census_list.
-          rewrite gccombine_sub.
-          rewrite H12.
-          rewrite update_census_list_correct.
-          rewrite apply_r_list_empty.
-          unfold get_c. rewrite M.gempty.
-          simpl. omega.
-
-          split. eapply inl_inv_mon.
-          2: apply H10. unfold ce'.
-          do 2 (rewrite bound_var_app_ctx).
-          repeat normalize_ctx.
-          simpl. rewrite (proj1 bound_var_ctx_comp_ctx).
-          eauto with Ensembles_DB.
-
-          intro. intros. destruct (var_dec y v).
-          (* y = v *)
-          subst. left. specialize (H9 v). rewrite gvc2 in H9.
-          apply num_occur_app_ctx in H9. destructAll; pi0.
-          repeat normalize_ctx.
-          apply num_occur_ec_comp_ctx in H9; destructAll; pi0.
-          eapply num_occur_app_ctx. exists 0, 0; split; auto.
-          (* y <> v *)
-          apply H11 in H6. inv H6.
-          left.
-          apply num_occur_app_ctx in H12; destructAll; pi0.
-          repeat normalize_ctx.
-          apply num_occur_ec_comp_ctx in H6; destructAll; pi0.
-          eapply num_occur_app_ctx. exists 0, 0; split; auto.
-          right.
-          repeat normalize_ctx.
-          apply bound_stem_comp_ctx_mut in H12.
-          inv H12. auto.
-          exfalso. inv H6. auto. inv H18.
-        }
-        inv H6.
-        assert ( (rename_all_ctx_ns sig
-                                    (inlined_ctx_f (comp_ctx_f c (Eproj_c v c0 n0 v0 Hole_c)) im')
-                 |[ e0 ]|) = rename_all_ctx_ns sig (inlined_ctx_f c im')
-                |[ Eproj v c0 n0 (apply_r sig v0) e0 ]|) by  ctx_inl_push.
-        unfold ce';  rewrite <- H6.
-        split; auto. split; auto. split; auto.
-        { (* sig_inv_codom push proj *)
-          intro. intros. destruct (var_dec y v).
-          (* y = v *)
-          subst. apply H5 in H12. inv H12.
-          inv H14.
-          (** by no zombie *)
-          left.
-          rewrite <- H6. eapply shrink_no_zombie.
-          apply H8.
-          rewrite H7 in H12. auto.
-          (** imposible due to unique binding *)
-          exfalso.
-          apply ub_app_ctx_f in H0. destructAll.
-          repeat normalize_ctx. apply ub_comp_ctx_f in H0.
-          destructAll. inv H17.
-          specialize (H18 v). apply H18.
-          split. apply bound_stem_var. auto.
-          simpl. constructor.
-
-          (* y <> v *)
-          apply H11 in H12. inv H12.
-          rewrite H6 in H13. auto.
-          repeat normalize_ctx.
-          apply bound_stem_comp_ctx_mut in H13.
-          inv H13.
-          auto.
-          simpl in H12. inv H12.
-          exfalso. auto.
-          inv H19.
-        }
-        unfold term_sub_inl_size in *. simpl. simpl in H. omega.
-        apply cmap_view_proj; auto.
-        repeat normalize_ctx.
-        apply sig_inv_full_push. simpl. simpl in H5. auto.
+                    { apply closed_app_ctx in H1.
+                      intro. apply H1 in H10. inv H10. }
+                    
+                    apply not_free_dead_or_bound_ctx in H10. inv H10.
+                    + apply not_occur_rename_ctx_not_dom in H11.
+                      eapply dead_occur_ec_le_antimon; eauto.
+                      apply b_map_le_c. auto.
+                      intro. inv H10. apply H5 in H12.
+                      inv H12. apply H10.
+                      apply bound_var_app_ctx. right. simpl; auto.
+                    + exfalso.
+                      apply ub_app_ctx_f in H0.
+                      destructAll.
+                      inv H16. specialize (H17 v).
+                      apply H17. split; auto. simpl. constructor.
+                  - rewrite M.gso by auto; auto. }
+                rewrite H6 in *. destruct Heqs as (H6', H11).
+                destruct H11 as (H11, H12). destruct H12 as (H12, Hsigc). destructAll.
+                split; auto.
+                -- rewrite plus_comm. eapply gsr_clos_trans. eassumption. eassumption.
+                -- split. now auto. split. now auto.
+                   (* returned sig_inv_codom *)
+                   intro. intros.
+                   assert (x1 <> v).
+                   intro; subst.
+                   rewrite H10 in Hgvs. inv Hgvs.
+                   assert (M.get x1 (M.set v (apply_r sig v1) sig) = Some y).
+                   rewrite M.gso; auto. apply Hsigc in H14. auto.
+              - unfold term_sub_inl_size in *.
+                simpl in *; omega.
+              -  (* TODO: redo using rename_all_set_x *)
+                rewrite H_rn_ctx. rewrite <- Hee.
+                intro. assert (H2' := H2). specialize (H2 v2).
+                apply num_occur_app_ctx in H2; destructAll.
+                inv H6.
+                
+                assert (Hvv1 : v <> apply_r sig v1).
+                { intro. unfold apply_r in H6.
+                  destruct ( @Maps.PTree.get M.elt v1 sig) eqn:gv1s.
+                  subst. apply H5 in gv1s. destructAll. 
+                  inv H11.
+                  specialize (H2' e0).
+                  rewrite gvc in H2'. assert (S n1 = 0).
+                  eapply (proj1 (num_occur_det _)); eauto. now inv H11. 
+                  apply ub_app_ctx_f in H0. destructAll.
+                  inv H13.
+                  specialize (H14 e0).
+                  apply H14. split.
+                  apply bound_stem_var. auto.
+                  simpl. constructor.
+                  subst.
+                  assert (~ bound_var_ctx
+                            (rename_all_ctx_ns sig
+                                               (inlined_ctx_f x inl)) (apply_r sig v1)).
+                  intro. apply Hbv. repeat normalize_ctx.
+                  apply bound_var_ctx_comp_ctx. left.
+                  unfold apply_r in H6. rewrite gv1s in H6. auto.
+                  unfold ce in H1. repeat normalize_ctx.
+                  rewrite <- app_ctx_f_fuse in H1.
+                  assert (occurs_free (rename_all_ctx_ns sig
+                                                         (inlined_ctx_f (Econstr_c (apply_r sig v0) c1 l x0) inl)
+                                      |[ rename_all_ns sig (Eproj v1 c0 n0 v0 e) ]|) (apply_r sig v1)).
+                  simpl. constructor.
+                  apply nthN_In in n0thl.
+                  apply apply_r_list_In. auto.
+                  eapply occurs_free_ctx_not_bound in H11. 2: apply H6.
+                  apply H1 in H11. inv H11. }
+                
+                assert (Hnv := H2' v). assert (Hnv1 := H2' (apply_r sig v1)).
+                apply num_occur_app_ctx in Hnv. destruct Hnv. destruct H6.
+                destruct H6 as (Hnvc, (Hnve, Hnv_c)).
+                assert (x2 = 0).
+                { eapply closed_not_occurs_in_context in Hbv.
+                  eapply (num_occur_ec_det); eauto.
+                  apply closed_app_ctx in H1. auto. }
+                subst. inv Hnve. rename H18 into Hnve.
+                apply num_occur_app_ctx in Hnv1. destruct Hnv1. destruct H6.
+                destruct H6 as (Hnv1c, (Hnv1e, Hnv1_c)).
+                inv Hnv1e. rename H18 into Hnv1e.
+                assert (Hrm := num_occur_rename_mut).
+                specialize (Hrm _ _ Hvv1). inv Hrm. clear H11.
+                specialize (H6 _ _ _ H17 Hnv1e). (* ? *) destruct H6 as (Hnev_post, Hnev1_post).              
+                destruct (var_dec v2 v).
+                { (* v2 = v *)
+                  subst. simpl. rewrite gdss.
+                  apply num_occur_app_ctx. exists 0, 0.
+                  split; auto. }
+                rewrite gdso; auto.
+                destruct (var_dec v2 (apply_r sig v1)).
+                (* v2 = (apply_r sig v1) *)
+                { apply num_occur_app_ctx.
+                  exists x2, (n4+n5). rewrite e0. split. now auto. split. now auto.
+                  rewrite gdss. rewrite Hnv1_c. rewrite gvc in Hnv_c.
+                  assert (num_occur_list [apply_r sig v0] v = 0). (* by UB *)
+                  simpl. destruct (cps_util.var_dec v (apply_r sig v0)); auto.
+                  subst. exfalso. apply ub_app_ctx_f in H0; destructAll. inv H11.
+                  specialize (H12 (apply_r sig v0)). apply H12. split.
+                  - repeat normalize_ctx. apply bound_var_ctx_comp_ctx. right. simpl. constructor; auto.
+                  - constructor.
+                  - assert (num_occur_list [apply_r sig v0] (apply_r sig v1) = 0).
+                    { simpl.  destruct (cps_util.var_dec (apply_r sig v1) (apply_r sig v0)); auto.
+                      subst. exfalso. 
+                      assert (~ bound_var_ctx (rename_all_ctx_ns sig (inlined_ctx_f x inl)) (apply_r sig v0)) (* by UB *).
+                      { intro. apply ub_app_ctx_f in H0. destructAll.
+                        repeat normalize_ctx. apply ub_comp_ctx_f in H0. destructAll. rewrite e1 in *.
+                        inv H15. specialize (H16 (apply_r sig v0)). apply H16. split; auto. simpl. constructor. }
+                      unfold ce in H1. repeat normalize_ctx.
+                      rewrite <- app_ctx_f_fuse in H1.
+                      assert (occurs_free (rename_all_ctx_ns sig
+                                                             (inlined_ctx_f (Econstr_c (apply_r sig v0) c1 l x0) inl)
+                                          |[ rename_all_ns sig (Eproj v c0 n0 v0 e) ]|) (apply_r sig v0)).
+                      { simpl. constructor. rewrite <- e1. apply apply_r_list_In. apply nthN_In in n0thl. auto. }
+                      eapply occurs_free_ctx_not_bound in H12.
+                      2: eassumption. apply H1 in H12. inv H12. }
+                    unfold var in *. rewrite H6 in *. rewrite H11. omega. }
+                
+                (* v2 <> v <> (apply_r sig v1) *)
+                rewrite gdso; auto.
+                apply num_occur_app_ctx.
+                exists x1, n3. split. now auto. split.
+                assert (exists n, num_occur
+                                    (rename_all_ns (M.set v (apply_r sig v1) (M.empty var))
+                                                   (rename_all_ns sig e)) v2  n) by apply e_num_occur. destruct H6.
+                assert (n3 = x3).
+                { eapply num_occur_sig_unaffected; eauto.
+                  intro. inv H11. rewrite M.gso in H12 by auto.
+                  rewrite M.gempty in H12. now inv H12.
+                  intro. inv H11. destruct (var_dec x4 v).
+                  - subst. rewrite M.gss in H12. inv H12; auto.
+                  - rewrite M.gso in H12. rewrite M.gempty in H12. inv H12. auto. }
+                subst. eassumption.
+                rewrite get_c_minus. simpl in H10. rewrite H10.                
+                destruct (cps_util.var_dec v2 (apply_r sig v0)).
+                subst. rewrite gdss. omega.
+                rewrite gdso by auto. rewrite gdempty. omega.
+              - (* inl_inv *)
+                intro. intros.
+                apply H4 in H6. unfold ce in H6.
+                destruct H6.
+                split.
+                ** intro; apply H6.
+                   apply bound_var_app_ctx in H11. inv H11.
+                   rewrite <- (proj1 (bound_var_ctx_rename_all_ns _ )) in H12.
+                   apply bound_var_app_ctx. left.
+                   rewrite <- (proj1 (bound_var_ctx_rename_all_ns _ )). auto.
+                   apply bound_var_app_ctx. right.
+                   apply bound_var_rename_all_ns. apply bound_var_rename_all_ns in H12. eauto.
+                ** intros. apply H10 in H11. eapply Disjoint_Included_l.
+                   2: now apply H11.
+                   do 2 rewrite bound_var_app_ctx.                   
+                  do 2 (rewrite <- (proj1 (bound_var_ctx_rename_all_ns _ ))).
+                  do 2 (rewrite <- (bound_var_rename_all_ns)).
+                  normalize_bound_var. now sets.
+              - (* sig_inv *)
+                intro. intros. destruct (var_dec x1 v).
+                -- subst. rewrite M.gss in H6. inv H6.
+                   split.
+                   ++ rewrite H_rn_ctx. intro.
+                      apply ub_app_ctx_f in H0. destructAll.
+                      apply bound_var_app_ctx in H6. inv H6. now eauto.
+                      inv H10.
+                      rewrite <- !bound_var_rename_all_ns in H12. eapply H14.
+                      eapply bound_var_rename_all_ns in H12. eassumption.
+                   ++ (* apply_r sig v1  has to be bound in x since ce is closed by occurs_free_app_bound_stem *)
+                     right. repeat normalize_ctx. apply bound_stem_comp_ctx_mut. left.
+                     eapply occurs_free_app_bound_stem.
+                     2:{ intro. rewrite <- app_ctx_f_fuse in H9. apply H9 in H6. inv H6. }
+                     simpl. constructor. apply nthN_In in n0thl.
+                     revert n0thl. apply apply_r_list_push.
+                -- rewrite M.gso in H6 by auto. apply H5 in H6. destruct H6. split.
+                   ++ intro; apply H6. apply bound_var_app_ctx.
+                      apply bound_var_app_ctx in H11. inv H11.
+                      apply bound_var_ctx_rename_all_ns in H12.
+                      left. apply bound_var_ctx_rename_all_ns. auto.
+                      right. simpl. constructor.
+                      apply bound_var_rename_all_ns in H12.
+                      apply bound_var_rename_all_ns. auto.
+                   ++ inv H10.
+                      ** (* y cannot be (apply_r sig v1) because the latter occurs in l *)
+                        rewrite H_rn_ctx. left.
+                        apply num_occur_app_ctx in H11. destructAll; pi0.
+                        eapply num_occur_app_ctx. exists 0, 0.
+                        split; auto. split; auto.
+                        inv H11; pi0. 
+                        assert (y <> apply_r sig v1).
+                        { intro. subst. repeat normalize_ctx.
+                          apply num_occur_ec_comp_ctx in H10.
+                          destructAll; pi0.
+                          simpl in H12. inv H12; pi0.
+                          apply not_occur_list_not_in in H12.
+                          apply nthN_In in n0thl.
+                          apply H12. apply in_map. auto. }
+                        dec_vars. simpl.
+                        apply num_occur_rename_all_ns_dead_set; auto.
+                      ** apply bound_stem_ctx_rename_all_ns in H11.
+                         right. apply bound_stem_ctx_rename_all_ns. auto. 
+          * eapply Hsame. eassumption.
+      + (* fun *) eapply Hsame. eassumption.
+      + (* none *) eapply Hsame. eassumption. }
     - (* fun *)
       remember (precontractfun sig count sub f).
       destruct p.

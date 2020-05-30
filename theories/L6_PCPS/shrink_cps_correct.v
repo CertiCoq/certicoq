@@ -213,7 +213,6 @@ Section Shrink_correct.
       eapply preord_env_P_set_not_in_P_l in Henv; sets.
       rewrite Setminus_Disjoint in Henv. eassumption. sets.
   Qed.
-  
 
   (* Lemmas about [all_fun_name] *)
   Lemma forall_name_fundefs: forall x P fds,

@@ -6657,7 +6657,24 @@ Section CONTRACT.
   Qed.
 
   Opaque contract.
-  
+
+  Lemma inline_letapp_grs n x e1 e2 C1 C2 x1 x2 e :
+    sr_rw n e1 e2 ->
+    inline_letapp e1 x = Some (C1, x1) ->
+    inline_letapp e2 x = Some (C2, x2) ->
+    gen_sr_rw n (C1 |[ e ]|) (C2 |[ rename x1 x2 e ]|).
+  Proof.
+    assert (Hgen := Ctx_sr_rw 1 Hole_c). simpl in Hgen.
+    intros Hrw Hl1 Hl2. inv Hrw; simpl in Hl1, Hl2.
+    8:{ destruct (inline_letapp (c |[ Eapp f t vs ]|)) as [[Cinl1 y1] |] eqn:Hin1; try congruence.
+        destruct (inline_letapp (c |[ rename_all_ns (set_list (combine xs vs) (M.empty var)) fb ]|) x)
+          as [[Cinl2 y2] |] eqn:Hin2; try congruence. inv Hin1; inv Hin2.
+        eapply Hgen. inv Hl1. inv Hl2. eapply Fun_inline_s.
+        - rewrite Hl2 in Hl1. inv Hl1. unfold rename. rewrite rename_all_refl.
+      simpl. assert (Hgen := Ctx_sr_rw 1 Hole_c). simpl in Hgen. eapply Hgen. 
+      eapply Constr_dead_s. admit. admit. 
+    7:{ 
+    
   (** main theorem! contract produces an output term related to the input by the shrink rewrite system.
       The output count is correct for the output state, and the returned maps respect their respective invariant *)
   Theorem shrink_corresp:
@@ -7395,69 +7412,94 @@ Section CONTRACT.
           * eapply Hsame. eassumption.
       + (* fun *) eapply Hsame. eassumption.
       + (* none *) eapply Hsame. eassumption. }
-    - (* fun *)
-      remember (precontractfun sig count sub f).
-      destruct p.
-      destruct p.
-      symmetry in Heqp.
-      assert (Heqp' := Heqp).
-      eapply precontractfun_corresp with (fds := Fnil) in Heqp; eauto.
-      destruct Heqp as (H7, H8).
-      destruct H8 as (H8, (H9, (H10, H_sig_pre))).
-      assert (Hub' := gsr_preserves_clos _ _ H0 H1 H7).
-      destruct Hub'.
-      assert (H5' := H5).
-      apply sig_inv_combine in H5.
-      destruct H5 as (H5, H5co).
-      assert (Hse := gsr_preserves_sig_dom _ _ _ H0 H1 H7 H5).
-      simpl in *.
-      assert ((rename_all_ctx_ns sig (inlined_ctx_f c inl)
-              |[ rename_all_ns sig (Efun f0 e) ]|) =
-              (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Efun1_c f0 Hole_c)) inl)
-              |[ rename_all_ns sig e ]|)).
-      {
-        ctx_inl_push.
-        rewrite Disjoint_inlined_fds.
-        reflexivity.
-        split. intros. intro.
-        destruct H13.
-        inv H14. apply H9 in H16.
-        destruct H16.
-        apply H14.
-        apply bound_var_app_ctx.
-        right.
-        constructor.
-        apply bound_var_rename_all_ns_fundefs.
-        auto.
-      }
-      simpl in H13.
-      rewrite H13 in *.
-      remember (contract sig c1 e c0 inl ).
-      destruct s. destruct x.
-      destruct p.
-      symmetry in Heqs.
-      eapply IHn in Heqs; eauto.
-      destructAll.
-      {
-        assert (Hube0 := gsr_preserves_clos _ _ H11 H12 H14).
-        destructAll.
-        assert (Hse0 := gsr_preserves_sig_dom _ _ _ H11 H12 H14 Hse).
+    - (* letapp *)
+      destruct (Nat.eq_dec (get_c (apply_r sig v0) count) 1) as [Hnum | Hnum].
+      + destruct (get_c (apply_r sig v0) count) as [| [|] ] eqn:Hgetc; try congruence. clear Hnum.
+        destruct (sub ! (apply_r sig v0)) as [[|] | ] eqn:Hsub. 
+        * (* f is Vconstr *) admit. (* same *)
+        * (* f in Vfun *)
+          destruct ((f0 =? f)%positive && (Datatypes.length l =? Datatypes.length l0) && negb (get_b (apply_r sig v0) inl) && straight_code e0) eqn:Hel.
+          { (* function inlining *)
+            apply andb_true_iff in Hel. destruct Hel as (Hel123, Hel4).
+            apply andb_true_iff in Hel123. destruct Hel123 as (Hel12, Hel3).
+            apply andb_true_iff in Hel12. destruct Hel12 as (Hel1, Hel2). eapply Peqb_true_eq in Hel1. apply beq_nat_true in Hel2. subst.
+            remember (contract (set_list (combine l0 (apply_r_list sig l)) sig)
+                               (update_count_inlined (apply_r_list sig l) l0 (M.set (apply_r sig v0) 0 count)) e0 sub (M.set (apply_r sig v0) true inl)) as s.
+            destruct s as [[[[? ?] ?] ?] ?].
+            assert (Hsub' := Hsub). apply H3 in Hsub'. destructAll. simpl in ce, ce'.
+            (* sig v wasn't inlined before not dead *)
+            assert (Hsvi : get_b (apply_r sig v0) inl = false).
+            { destruct (get_b (apply_r sig v0) inl) eqn:gbvi.
+              - (* impossible because not dead *)
+                clear H6. exfalso. apply H4 in gbvi. destructAll.
+                apply not_bound_dead_or_free in H6.
+                eapply H7 in Hsub. inv H6.                 
+                2:{ apply H1 in H8; inv H8. }  apply num_occur_app_ctx in H8.
+                destructAll; pi0. inv H8. rewrite peq_true in H16. inv H16.
+              - reflexivity. }
+            
+            destruct (inline_letapp e1 v) as [[Cinl x'] | ] eqn:Hinl.
+            - remember (contract (M.set v (apply_r sig x') sig) c0 e sub b) as s'. destruct s' as [[[[? ? ] ?] ? ] ?]. inv H6. 
+              symmetry in Heqs. symmetry in Heqs'.
 
+              unfold ce. 
+              assert (Hctx_rw :
+                       rename_all_ctx_ns
+                         sig (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v0) f l0 e0 x2)) x0)) inl)
+                         |[ Eletapp v (apply_r sig v0) f (apply_r_list sig l) (rename_all_ns sig e) ]| =
+                       rename_all_ctx_ns sig (inlined_ctx_f x inl) |[
+                         Efun (fundefs_append (rename_all_fun_ns sig (inlined_fundefs_f x1 inl)) (Fcons (apply_r sig v0) f l0 (rename_all_ns sig e0) (rename_all_fun_ns sig (inlined_fundefs_f x2 inl))))
+                              (rename_all_ctx_ns sig (inlined_ctx_f x0 inl) |[ Eletapp v (apply_r sig v0) f (apply_r_list sig l) (rename_all_ns sig e) ]|) ]|).
+              { ctx_inl_push. rewrite inlined_fundefs_append.
+                rewrite rename_all_ns_fundefs_append. simpl. rewrite Hsvi. auto. }
+              rewrite Hctx_rw. 
+
+              assert (H_inl_ctx: (rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
+                                                    (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0))
+                                                                   (M.set (apply_r sig v0) true inl)) =
+                                  (rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
+                                                     (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v0) f l0 e0 x2)) x0))
+                                                                    (M.set (apply_r sig v0) true inl))))).
+              { repeat normalize_ctx. simpl. do 2 (rewrite inlined_fundefs_append). simpl. unfold get_b. rewrite M.gss. reflexivity. }
+              
+              (* (* first IH *) eapply IHn in Heqs; eauto. (* second IH *) eapply IHn in Heqs'; eauto. *)
+              (* + destructAll. split; [| split; [| split ]]. *)
+              (*   (* Show goal *) *)
+              (*   * unfold ce, ce'.  *)
+                  
+              
+            (*     inv H6. admit. *)
+              admit. 
+            - (* failed to inline. Shouldn't technically happpen but handled like other cases. Same. *) admit. }
+          admit.
+        * (* f is None *) admit. (* same *)
+      + destruct (get_c (apply_r sig v0) count) as [| [|] ]; try congruence.        
+        admit. admit. (* same *)
+    - (* fun *)
+      remember (precontractfun sig count sub f). destruct p. destruct p.
+      symmetry in Heqp. assert (Heqp' := Heqp).
+      eapply precontractfun_corresp with (fds := Fnil) in Heqp; eauto.
+      destruct Heqp as (H7, H8). destruct H8 as (H8, (H9, (H10, H_sig_pre))).
+      assert (Hub' := gsr_clos_preserves_clos _ _ _ H0 H1 H7). destruct Hub'.
+      assert (H5' := H5). apply sig_inv_combine in H5. destruct H5 as (H5, H5co).
+      assert (Hse := gsr_preserves_sig_dom _ _ _ _ H0 (closed_implies_Disjoint _ H1) H7 H5).
+      simpl in *.
+      assert ((rename_all_ctx_ns sig (inlined_ctx_f c inl) |[ rename_all_ns sig (Efun f0 e) ]|) =
+              (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Efun1_c f0 Hole_c)) inl) |[ rename_all_ns sig e ]|)).
+      { ctx_inl_push. rewrite Disjoint_inlined_fds. reflexivity. split. intros. intro.
+        destruct H13. inv H14. apply H9 in H16. destruct H16. apply H14. apply bound_var_app_ctx.
+        right. constructor. apply bound_var_rename_all_ns_fundefs. eapply name_in_fundefs_bound_var_fundefs. eassumption. }
+      simpl in H13. rewrite H13 in *. remember (contract sig c1 e c0 inl ) as s. destruct s. destruct x. destruct p. destruct p.
+      symmetry in Heqs. eapply IHn in Heqs; eauto. destructAll.
+      + assert (Hube0 := gsr_clos_preserves_clos _ _ _ H11 H12 H14). destructAll.
+        assert (Hse0 := gsr_preserves_sig_dom _ _ _ _ H11 (closed_implies_Disjoint _ H12) H14 Hse).        
         (* show that e0 = rename_all_ns sig e0 *)
         assert (rename_all_ns sig e0 = e0).
-        { rewrite <- (proj1 (rename_all_no_shadow _)).
-          apply Disjoint_dom_rename_all.
-          split. intro. intro. inv H20. inv H21.
-          apply Hse0 in H20.
-          apply not_bound_dead_or_free in H20.
-          inv H20. apply num_occur_app_ctx in H21. destructAll; pi0.
-          assert (Hne := (proj1 dead_not_free) e0).
-          inv Hne. specialize (H23 x). auto.
-          apply H19 in H21. inv H21.
-          eapply sig_inv_dom_mon.
-          2: apply Hse0.
-          rewrite bound_var_app_ctx.  auto with Ensembles_DB.
-        }
+        { rewrite <- (proj1 (rename_all_no_shadow _)). apply Disjoint_dom_rename_all.
+          split. intro. intro. inv H20. inv H21. apply Hse0 in H20. apply not_bound_dead_or_free in H20.
+          inv H20. apply num_occur_app_ctx in H21. destructAll; pi0. assert (Hne := (proj1 dead_not_free) e0).
+          inv Hne. specialize (H23 x). auto. apply H19 in H21. inv H21. eapply sig_inv_dom_mon.
+          2: apply Hse0. rewrite bound_var_app_ctx. sets. }
         (* replace f0 by fundefs_append Fnil f0 *)
         (* use postcontractfun_corresp *)
         remember ( postcontractfun
@@ -7473,287 +7515,170 @@ Section CONTRACT.
                                  (@fst exp ctx_map (@fst (prod exp ctx_map) b_map es))
                                  (@snd exp ctx_map (@fst (prod exp ctx_map) b_map es))
                                  (@snd (prod exp ctx_map) b_map es)) sig c2 b0 sub f0
-                     (@subfds_refl e f0) (le_n (sub_inl_size sub b0))).
-        destruct s. destruct x. destruct p.
-        symmetry in Heqs.
-        assert (Hf0n := postcontractfun_name_in_fundefs Heqs).
+                     (@subfds_refl e f0) 0 (le_n (sub_inl_size sub b0))) as s.
+        destruct s. destruct x. destruct p. destruct p. symmetry in Heqs.
+        assert (Hf0n := postcontractfun_name_in_fundefs Heqs). 
         eapply postcontractfun_corresp with (c := c) (e := e0) (fds := Fnil) in Heqs; try (rewrite H20); eauto.
-        Focus 2. intros.
-        eapply IHn; eauto.
-        assert  (funs_size f0 + sub_inl_size sub b0 <
-                 term_sub_inl_size (Efun f e, sub, inl)).
-        unfold term_sub_inl_size; simpl.
-        assert (sub_inl_size sub b0 <= sub_inl_size sub inl).
-        apply sub_size_le. apply b_map_le_c. auto.
-        symmetry in Heqp'. apply precontractfun_size in Heqp'.
-        omega. auto.
-        assert ( S n >  funs_size f0 + sub_inl_size sub b0). omega.
-        eapply gt_trans_S. apply H30. auto.
-        - destruct Heqs as (Heqs1, (Heqs2, (Heqs3, (Heqs4, (Heqs5, Heqs6))))).
+        2:{ intros. eapply IHn; eauto.
+            assert  (funs_size f0 + sub_inl_size sub b0 < term_sub_inl_size (Efun f e, sub, inl)).
+            { unfold term_sub_inl_size; simpl. assert (sub_inl_size sub b0 <= sub_inl_size sub inl).
+              apply sub_size_le. apply b_map_le_c. auto. symmetry in Heqp'. apply precontractfun_size in Heqp'.
+              omega. auto. }
+            assert ( S n >  funs_size f0 + sub_inl_size sub b0) by omega.
+            eapply gt_trans_S. apply H30. auto. }
+        * destruct Heqs as (Heqs1, (Heqs2, (Heqs3, (Heqs4, (Heqs5, Heqs6))))).
           rewrite H20 in *. simpl in *.
-          assert (Heqs_ub := gsr_preserves_clos _ _ H18 H19 Heqs1).
+          assert (Heqs_ub := gsr_clos_preserves_clos _ _ _ H18 H19 Heqs1).
           destruct Heqs_ub as (Heqs_ub, Heqs_c).
-          assert (Heqs_dom := gsr_preserves_sig_dom _ _ _ H18 H19 Heqs1 Hse0).
-          assert (rename_all_ctx_ns sig
-                                    (inlined_ctx_f (comp_ctx_f c (Efun1_c f1 Hole_c)) b2) |[ e0
-                                                                                           ]| =
-                                                                                              rename_all_ctx_ns sig
-                                                                                                                (inlined_ctx_f c  b2) |[ Efun f1 e0
-                                                                                                                                       ]|).
-          repeat normalize_ctx. rewrite <- app_ctx_f_fuse. simpl.
-          rewrite Heqs5. reflexivity.
-          rewrite H21 in *.
-          clear H20. clear Heqs5.
+          assert (Heqs_dom := gsr_preserves_sig_dom _ _ _ _ H18 (closed_implies_Disjoint _ H19) Heqs1 Hse0).
+          assert (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Efun1_c f1 Hole_c)) b2) |[ e0 ]| =
+                  rename_all_ctx_ns sig (inlined_ctx_f c  b2) |[ Efun f1 e0 ]|).
+          { repeat normalize_ctx. rewrite <- app_ctx_f_fuse. simpl.
+            rewrite Heqs5. reflexivity. } rewrite H21 in *. clear H20. clear Heqs5.
           destruct f1.
-          + inv H6.
-            split; auto.
-            unfold ce'. unfold ce.
-            econstructor 3.
-            2: apply Heqs1.
-            econstructor 3; eauto.
-            split; auto.
-            split; auto.
-            {
-              intro. intros.
-              assert (H6' := H6).
-              apply Heqs4 in H6.
-              rewrite H21 in H6. inv H6; auto.
-              repeat normalize_ctx.
-              apply bound_stem_comp_ctx_mut in H20.
-              inv H20; auto.
-              inv H6.
-              assert (Hf2 := Decidable_name_in_fundefs f0). inv Hf2.
-              specialize (Dec y). inv Dec.
-              apply H_sig_pre in H6'.
-              destruct H6'. inv H22.
-              left.
-              eapply shrink_no_zombie.
-              econstructor 3.
-              apply H14. auto.
-              rewrite <- H13. auto.
-              (* violates unique_binding *)
-              exfalso.
-              rewrite <- H13 in H11.
-              apply ub_app_ctx_f in H11. destructAll.
-              inv H25. specialize (H26 y).
-              apply H26. split.
-              apply bound_stem_var. auto.
-              constructor. apply bound_var_rename_all_ns_fundefs.
-              apply name_in_fundefs_bound_var_fundefs. auto.
-
-              exfalso.  apply H6. apply Hf0n.
-              apply Included_name_in_fundefs_inlined with (im := im').
-              simpl.
-              apply name_in_fundefs_rename_all_ns in H24. auto.
-
-              inv H24.
-            }
-          + (* additional RW with Fun_dead_s on Fnil *)
-            inv H6.
-            split; auto.
-            econstructor 3. econstructor 3.
-            apply H7.
-            apply H14.
-            econstructor 3. apply Heqs1.
-            unfold ce'.
-            constructor. constructor. constructor.
-            apply Forall_nil.
-            split.
-            intro. specialize (Heqs2 v). apply num_occur_app_ctx in Heqs2. destructAll.
-            apply num_occur_app_ctx. exists x, x0. inv H20. inv H28. split; auto.
-            split; auto.  rewrite plus_0_r. auto.
-            split.
-            eapply inl_inv_mon. 2: apply Heqs3.
-            unfold ce'. do 2 (rewrite bound_var_app_ctx).
-            repeat normalize_bound_var.  auto with Ensembles_DB.
-            intro. intros. apply Heqs4 in H6.
-            inv H6.  rewrite H21 in H20. apply num_occur_app_ctx in H20.
-            destructAll; pi0.
-            inv H20; pi0. left.
-            apply num_occur_app_ctx. exists 0, 0; auto.
-            right.
-            apply bound_stem_ctx_rename_all_ns.
-            apply bound_stem_ctx_rename_all_ns in H20.
-            normalize_ctx. apply bound_stem_comp_ctx_mut in H20.
-            inv H20; auto.
-            inv H6. inv H24. inv H24.
-        - split. intro. intro. destruct H21. inv H21.
-        - (* inl_inv pre post *)
-          intro. intros.
-          split.
-          apply H16 in H21. destruct H21. apply H21.
-          intros.
-          assert (Hf := Decidable_name_in_fundefs f).
-          inversion Hf. specialize (Dec f2).
-          inversion Dec.
-          destruct (get_b f2 inl) eqn:gf2i.
-          + apply H4 in gf2i.
-            destruct gf2i.
-            apply H25 in H22.
-            eapply Disjoint_Included_l.
-            2: apply H22.
-            apply gsr_included_bv.
-            econstructor 3.
-            apply H7. auto.
-          + (* this violates unique_binding *)
-            exfalso. apply H3 in H22. clear H20. destructAll.
-            apply ub_app_ctx_f in H0. destructAll. inv H22.
-            specialize (H24 f2). apply H24. split.
-            repeat normalize_ctx. apply bound_var_ctx_comp_ctx.
-            right. simpl. constructor. rewrite inlined_fundefs_append.
-            apply bound_var_rename_all_ns_fundefs.
-            eapply fundefs_append_bound_vars. reflexivity.
-            right.
-            simpl. rewrite gf2i. constructor. auto.
-            constructor.
-            apply bound_var_rename_all_ns_fundefs.
-            apply name_in_fundefs_bound_var_fundefs. auto.
-          + eapply H16. apply H21.
-            erewrite <- H22.
-            symmetry.
-            eapply precontractfun_sig_nbv.
-            apply Heqp'. apply H23.
-        - (* sig_inv_full pre post *)
+          -- inv H6. split; auto. unfold ce'. unfold ce. replace (n0 + n1) with (0 + (n0 + n1)) by omega.
+             eapply gsr_clos_trans. eassumption. eapply gsr_clos_trans. eassumption.
+             replace n1 with (n1 - 0) by omega. eassumption . 
+             split. now auto. split. now auto.
+             (* sig_inv_codom *) 
+             intro. intros. assert (H6' := H6). apply Heqs4 in H6.
+             rewrite H21 in H6. inv H6. now auto. repeat normalize_ctx.                
+             apply bound_stem_comp_ctx_mut in H20. inv H20. now auto.
+             inv H6. 2:{ inv H24. }
+             assert (Hf2 := Decidable_name_in_fundefs f0). inv Hf2.
+             specialize (Dec y). inv Dec.
+             ++ apply H_sig_pre in H6'. destruct H6'. inv H22.
+                left. eapply shrink_no_zombie.
+                rewrite <- H13 in H14. eapply gsr_clos_trans. now eapply H14. eassumption.
+                eassumption. 
+                (* violates unique_binding *) 
+                exfalso. rewrite <- H13 in H11. apply ub_app_ctx_f in H11. destructAll.
+                inv H25. specialize (H26 y). apply H26. split.
+                apply bound_stem_var. auto.
+                constructor. apply bound_var_rename_all_ns_fundefs.
+                apply name_in_fundefs_bound_var_fundefs. auto.
+             ++ exfalso. apply H6. apply Hf0n.
+                apply Included_name_in_fundefs_inlined with (im := im').
+                simpl. apply name_in_fundefs_rename_all_ns in H24. auto.            
+          -- (* additional RW with Fun_dead_s on Fnil *)
+             inv H6. split; [| split; [| split ] ]; eauto.
+             ++ rewrite <- minus_n_O in Heqs1. replace (n0 + n1 + 1) with (0 + ((n0 + n1) + 1)) by omega. eapply gsr_clos_trans. eassumption.
+                eapply gsr_clos_trans. eapply gsr_clos_trans. eassumption. eassumption.
+                replace 1 with (1 + 0) by omega. eapply Trans_srw;[| now eapply Refl_srw  ]. constructor. constructor. 
+                now apply Forall_nil.
+             ++ intro. specialize (Heqs2 v). apply num_occur_app_ctx in Heqs2. destructAll.
+                apply num_occur_app_ctx. exists x, x0. inv H20. inv H28. split; auto.
+                split; auto. rewrite plus_0_r. auto.
+             ++ eapply inl_inv_mon. 2: apply Heqs3.
+                unfold ce'. do 2 (rewrite bound_var_app_ctx).
+                repeat normalize_bound_var. now sets.
+             ++ intro. intros. apply Heqs4 in H6.
+                inv H6. rewrite H21 in H20. apply num_occur_app_ctx in H20.
+                destructAll; pi0. inv H20; pi0. left.
+                apply num_occur_app_ctx. exists 0, 0; auto. right.
+                apply bound_stem_ctx_rename_all_ns.
+                apply bound_stem_ctx_rename_all_ns in H20.
+                normalize_ctx. apply bound_stem_comp_ctx_mut in H20.
+                inv H20; auto. inv H6. inv H24. inv H24.
+        * sets.
+        * (* inl_inv pre post *)
+          intro. intros. split.
+          apply H16 in H21. destruct H21. apply H21. intros.
+          assert (Hf := Decidable_name_in_fundefs f). inversion Hf. specialize (Dec f2). inversion Dec.
+          -- destruct (get_b f2 inl) eqn:gf2i.
+             ++ apply H4 in gf2i. destruct gf2i. apply H25 in H22.
+                eapply Disjoint_Included_l. 2: now apply H22. eapply gsr_included_bv.
+                eapply gsr_clos_trans. eassumption. eassumption.
+             ++ (* this violates unique_binding *)
+               exfalso. apply H3 in H22. clear H20. destructAll.
+               apply ub_app_ctx_f in H0. destructAll. inv H22.
+               specialize (H24 f2). apply H24. split.
+               repeat normalize_ctx. apply bound_var_ctx_comp_ctx.
+               right. simpl. constructor. rewrite inlined_fundefs_append.
+               apply bound_var_rename_all_ns_fundefs.
+               eapply fundefs_append_bound_vars. reflexivity.
+               right. simpl. rewrite gf2i. constructor. auto.
+               constructor. apply bound_var_rename_all_ns_fundefs.
+               apply name_in_fundefs_bound_var_fundefs. auto.
+          -- eapply H16. apply H21. erewrite <- H22.
+             symmetry. eapply precontractfun_sig_nbv. apply Heqp'. apply H23.
+        *(* sig_inv_full pre post *)
           apply sig_inv_combine. simpl. split; auto.
-      }
-      {
-        assert ((forall im, sub_inl_size c0 im <= funs_size f + sub_inl_size sub im /\ funs_size f0 <= funs_size f))%nat. eapply precontractfun_size. eauto.  unfold term_sub_inl_size. simpl. unfold term_sub_inl_size in H; simpl in H. specialize (H14 inl). omega.
-      }
-      {         (* sig_inv for rec call *)
-        apply sig_inv_combine.
-        split.
-        auto.
+      + assert ((forall im, sub_inl_size c0 im <= funs_size f + sub_inl_size sub im /\ funs_size f0 <= funs_size f))%nat.
+        { eapply precontractfun_size. eauto.  }
+        unfold term_sub_inl_size. simpl. unfold term_sub_inl_size in H; simpl in H. specialize (H14 inl). omega.
+      + (* sig_inv for rec call *)
+        apply sig_inv_combine. split. auto.
         intro. intros. apply H_sig_pre in H14. inv H14.
-        destruct H16. rewrite H13 in H14. auto.
-        right.
-        repeat normalize_ctx.
-        apply bound_stem_comp_ctx_mut.
-        auto.
-      }
+        destruct H16. rewrite H13 in H14. auto. right.
+        repeat normalize_ctx. now apply bound_stem_comp_ctx_mut; eauto.
     - (* app *)
       simpl in H6.
       destruct (get_c (apply_r sig v) count) eqn:garvc; [ | destruct n0].
-      + (* dead fun -> impossible*)
-        exfalso.
-        specialize (H2 (apply_r sig v)).
-        rewrite garvc in H2.
-        unfold ce in H2.
-        apply num_occur_app_ctx in H2.
-        destructAll; pi0.
-        simpl in H7. inv H7.
+      + (* dead fun -> impossible *)
+        exfalso. specialize (H2 (apply_r sig v)). rewrite garvc in H2.
+        unfold ce in H2. apply num_occur_app_ctx in H2.
+        destructAll; pi0. simpl in H7. inv H7.
         destruct (cps_util.var_dec (apply_r sig v) (apply_r sig v)).
-        inv H13.
-        apply n0; auto.
+        inv H13. now eauto.
       + (* only occ *)
-        destruct ( M.get (apply_r sig v) sub ) eqn:garvs; [destruct s|].
+        destruct (M.get (apply_r sig v) sub) eqn:garvs; [destruct s|].
         * (* constr, ill-typed but eh *)
-          inv H6.
-          unfold ce in *; unfold ce' in *.
-          split; auto.
-          simpl. apply rt_refl.
+          inv H6. unfold ce in *; unfold ce' in *.
+          split; auto. simpl. eapply Refl_srw.
           split; auto. split; auto.
           simpl in H5. apply sig_inv_combine in H5. destruct H5. auto.
         * (* eligible to be inlined? *)
           destruct (andb (Pos.eqb f0 f) (andb (Init.Nat.eqb (List.length l) (List.length l0)) (negb (get_b (apply_r sig v) inl)))) eqn:Hel.
-          {
-            (* function inlining *)
-            apply andb_true_iff in Hel.
-            destruct Hel as (Hel1, Hel23).
-            apply andb_true_iff in Hel23.
-            destruct Hel23 as (Hel2, Hel3).
-            apply Peqb_true_eq in Hel1.
-            apply beq_nat_true in Hel2. subst.
-
-            assert (garvs' := garvs).
-            apply H3 in garvs.
-            destructAll.
-            simpl in ce.
+          { (* function inlining *)
+            apply andb_true_iff in Hel. destruct Hel as (Hel1, Hel23).
+            apply andb_true_iff in Hel23. destruct Hel23 as (Hel2, Hel3).
+            apply Peqb_true_eq in Hel1. apply beq_nat_true in Hel2. subst.
+            assert (garvs' := garvs). apply H3 in garvs. destructAll. simpl in ce.
             (* sig v wasn't inlined before not dead *)
             assert (Hsvi : get_b (apply_r sig v) inl = false).
-            {
-              destruct (get_b (apply_r sig v) inl) eqn:gbvi.
+            { destruct (get_b (apply_r sig v) inl) eqn:gbvi.
               - (* impossible because not dead *)
-                exfalso.
-                apply H4 in gbvi.
-                destructAll.
-                apply not_bound_dead_or_free in H7.
-                inv H7.
-                2: apply H1 in H9; inv H9.
-
-                apply num_occur_app_ctx in H9.
+                exfalso. apply H4 in gbvi. destructAll.
+                apply not_bound_dead_or_free in H7. inv H7.
+                2: apply H1 in H9; inv H9. apply num_occur_app_ctx in H9.
                 destructAll; pi0.
-                inv H9.
-                destruct ( cps_util.var_dec (apply_r sig v) (apply_r sig v)).
-                inv H15.
-                apply n0; auto.
-              - auto.
-            }
-            assert (H_inl_nbv : forall y,   In var (Union var [set apply_r sig v] (FromList l0)) y ->  ~ bound_var_ctx (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0)) inl) y).
-            {
-              intros. intro.
-              apply ub_app_ctx_f in H0.
-              destructAll.
-              repeat normalize_ctx.
-              apply ub_comp_ctx_f in H0.
-              destructAll.
-              simpl in H11.
-              inv H11.
-              rewrite inlined_fundefs_append in H16.
-              rewrite rename_all_ns_fundefs_append in H16.
-              eapply fundefs_append_unique_bindings_l in H16.
-              2: reflexivity.
-              destructAll. simpl in H13.
-              rewrite Hsvi in H13.
-              simpl in H13. inv H13.
-
-              apply bound_var_ctx_comp_ctx in H8.
-
-              inv H8.
-              inv H12. specialize (H8 y).
-              apply H8. split.
+                inv H9. rewrite peq_true in H15. inv H15.
+              - reflexivity. }
+            assert (H_inl_nbv : forall y,  In var (Union var [set apply_r sig v] (FromList l0)) y ->
+                                           ~ bound_var_ctx (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0)) inl) y).
+            { intros. intro. apply ub_app_ctx_f in H0. destructAll.
+              repeat normalize_ctx. apply ub_comp_ctx_f in H0. destructAll.
+              simpl in H11. inv H11. rewrite inlined_fundefs_append in H16.
+              rewrite rename_all_ns_fundefs_append in H16. eapply fundefs_append_unique_bindings_l in H16.
+              2: reflexivity. destructAll. simpl in H13. rewrite Hsvi in H13.
+              simpl in H13. inv H13. apply bound_var_ctx_comp_ctx in H8.
+              inv H8. inv H12. specialize (H8 y). apply H8. split.
               apply bound_var_ctx_rename_all_ns. auto.
-              apply bound_var_ctx_rename_all_ns.
-              simpl. constructor.
-              rewrite inlined_fundefs_append.
-              eapply fundefs_append_bound_vars.
+              apply bound_var_ctx_rename_all_ns. simpl. constructor.
+              rewrite inlined_fundefs_append. eapply fundefs_append_bound_vars.
               reflexivity. right. simpl. rewrite Hsvi.
-              constructor. simpl. auto.
-              simpl in H13.
-              inv H13.
-
+              now constructor.
+              simpl in H13. inv H13.
               rewrite inlined_fundefs_append in H19.
               eapply fundefs_append_bound_vars in H19.
-              2: reflexivity.
-              inv H19.
+              2: reflexivity. inv H19.
               (* in x1 *)
-              inv H14.
-              specialize (H13 y). apply H13.
+              inv H14. specialize (H13 y). apply H13.
               split; auto.
-              apply bound_var_rename_all_ns_fundefs.
-              auto.
+              apply bound_var_rename_all_ns_fundefs. auto.
               simpl. rewrite Hsvi. simpl. constructor. auto.
-
               (* in x2 *)
-              inv H7.
-              apply H23. apply bound_var_rename_all_ns_fundefs. inv H13. auto.
-              inv H25. specialize (H7 y).
-              apply H7. split; auto.
-              apply bound_var_rename_all_ns_fundefs.
-              auto.
-
+              inv H7. apply H23. apply bound_var_rename_all_ns_fundefs. inv H13. auto.
+              inv H25. specialize (H7 y). apply H7. split; auto.
+              apply bound_var_rename_all_ns_fundefs. now auto.              
               (* in x0 *)
-              inv H17.
-              specialize (H8 y).
-              apply H8.
+              inv H17. specialize (H8 y). apply H8.
               split. apply bound_var_ctx_rename_all_ns.
-              auto.
-              apply bound_var_rename_all_ns_fundefs.
-              rewrite inlined_fundefs_append.
-              eapply fundefs_append_bound_vars.
-              reflexivity.
-              right. simpl; rewrite Hsvi.
-              constructor.  auto.
-            }
+              auto. apply bound_var_rename_all_ns_fundefs.
+              rewrite inlined_fundefs_append. eapply fundefs_append_bound_vars.
+              reflexivity. right. simpl; rewrite Hsvi.
+              constructor.  auto. }
 
             assert (rename_all_ctx_ns sig
                                       (inlined_ctx_f
@@ -7764,367 +7689,251 @@ Section CONTRACT.
                                                                                                 (rename_all_ctx_ns sig (inlined_ctx_f x inl)) |[
                       Efun (fundefs_append (rename_all_fun_ns sig (inlined_fundefs_f x1 inl)) (Fcons (apply_r sig v) f l0 (rename_all_ns sig e) (rename_all_fun_ns sig (inlined_fundefs_f x2 inl)))) (rename_all_ctx_ns sig (inlined_ctx_f x0 inl) |[ Eapp (apply_r sig v) f (apply_r_list sig l)  ]|)
                     ]|).
-            {
-              ctx_inl_push.
-              rewrite inlined_fundefs_append.
-              rewrite rename_all_ns_fundefs_append.
-              simpl. rewrite Hsvi. auto.
-            }
+            { ctx_inl_push. rewrite inlined_fundefs_append.
+              rewrite rename_all_ns_fundefs_append. simpl. rewrite Hsvi. auto. }
+
             assert (H_inl_ctx: (rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
                                                   (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0))
                                                                  (M.set (apply_r sig v) true inl)) =
                                 (rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
                                                    (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0))
                                                                   (M.set (apply_r sig v) true inl))))).
-            repeat normalize_ctx. simpl. do 2 (rewrite inlined_fundefs_append).
-            simpl. unfold get_b. rewrite M.gss. reflexivity.
+            { repeat normalize_ctx. simpl. do 2 (rewrite inlined_fundefs_append).
+              simpl. unfold get_b. rewrite M.gss. reflexivity. }
 
 
             assert (Hdjl0 : Disjoint _ (name_in_fundefs
                                           (rename_all_fun_ns sig
                                                              (inlined_fundefs_f
                                                                 (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) inl))) (FromList l0)).
-            {
-              apply ub_app_ctx_f in H0; destructAll.
-              repeat normalize_ctx.
-              apply ub_comp_ctx_f in H0; destructAll.
-              simpl in H10.
-              inv H10. rewrite inlined_fundefs_append in H15.
-              rewrite rename_all_ns_fundefs_append in H15.
-              eapply fundefs_append_unique_bindings_l in H15.
+            { apply ub_app_ctx_f in H0; destructAll. repeat normalize_ctx.
+              apply ub_comp_ctx_f in H0; destructAll. simpl in H10. inv H10. rewrite inlined_fundefs_append in H15.
+              rewrite rename_all_ns_fundefs_append in H15. eapply fundefs_append_unique_bindings_l in H15.
               2: reflexivity.
-              destructAll.
-              split. intro. intro. inv H15.
-              rewrite fundefs_append_name_in_fundefs in H17.
-              2: reflexivity.
-              inv H17. inv H13.
-              specialize (H17 x3).
-              apply H17.
-              split. apply name_in_fundefs_bound_var_fundefs.
-              auto.
-              simpl. rewrite Hsvi. simpl. constructor. auto.
+              destructAll. split. intro. intro. inv H15. rewrite fundefs_append_name_in_fundefs in H17.
+              2: reflexivity. inv H17. inv H13. specialize (H17 x3).
+              apply H17. split. apply name_in_fundefs_bound_var_fundefs.
+              auto. simpl. rewrite Hsvi. simpl. constructor. auto.
               simpl in H15. rewrite Hsvi in H15.
               simpl in H15. simpl in H12. rewrite Hsvi in H12.
               inv H12. inv H15. apply H28. inv H12; auto.
               inv H26. specialize (H15 x3).
               apply H15. split.
-              apply name_in_fundefs_bound_var_fundefs. auto.
-              auto.
-            }
-            assert (H8  := H_inl_nbv).
+              apply name_in_fundefs_bound_var_fundefs. auto. auto. }
 
+            assert (H8  := H_inl_nbv).
+            
             assert (H_dead_l0 :
                       forall x3, FromList l0 x3 ->
-                                 In var
-                                    (dead_var_ctx
-                                       (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0)) inl))
-                                    x3).
-            {
-              assert (H9 := true).
-
+                                 x3 \in (dead_var_ctx (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0)) inl))).
+            { assert (H9 := true).             
               (* show that x3 cannot be in the Dom of sig *)
               intros.
-              assert (~ (Dom_map sig x3)).
-
-              intro. inv H11. apply H5 in H12.
-              destructAll.
-              apply H11. apply bound_var_app_ctx. left.
-              repeat normalize_ctx.
-              apply bound_var_ctx_comp_ctx.
-              right. simpl. constructor.
-              apply bound_var_rename_all_ns_fundefs.
-              rewrite inlined_fundefs_append.
-              eapply fundefs_append_bound_vars.
-              reflexivity.
-              right.
-              simpl. rewrite Hsvi.
-              constructor. right. auto.
-
+              assert (~ (Dom_map sig x3)).              
+              { intro. inv H11. apply H5 in H12. destructAll.
+                apply H11. apply bound_var_app_ctx. left.
+                repeat normalize_ctx. apply bound_var_ctx_comp_ctx.
+                right. simpl. constructor. apply bound_var_rename_all_ns_fundefs.
+                rewrite inlined_fundefs_append. eapply fundefs_append_bound_vars. reflexivity.
+                right. simpl. rewrite Hsvi. constructor. right. auto. }
+                
               (* show that it cannot be in x, x1, x2 or x0 *)
               repeat normalize_ctx.
               assert ( ~ bound_var_ctx
                          (comp_ctx_f (inlined_ctx_f x inl)
                                      (inlined_ctx_f (Efun1_c (fundefs_append x1 x2) x0) inl)) x3) by (apply H8; auto).
               clear H8.
-              apply num_occur_ec_comp_ctx. exists 0, 0; auto.
-              split.
-
-              (* x *)
-              assert (~ bound_var_ctx (rename_all_ctx_ns sig (inlined_ctx_f x inl)) x3).
-              intro; apply H12.
-              apply bound_var_ctx_rename_all_ns in H8.
-              apply bound_var_ctx_comp_ctx. auto.
-              eapply not_occur_rename_ctx_not_dom. apply H11.
-              apply closed_not_occurs_in_context; auto.
-              unfold ce in H1.
-              simpl in H1.
-              repeat normalize_ctx.
-              rewrite <- app_ctx_f_fuse in H1.
-              apply closed_app_ctx in H1.
-              auto.
-
-              split; auto.
-              unfold ce in H1. repeat normalize_ctx.
-              rewrite <- app_ctx_f_fuse in H1.
-              assert (~ occurs_free (rename_all_ctx_ns sig
-                                                       (inlined_ctx_f
-                                                          (Efun1_c
-                                                             (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0)
-                                                          inl) |[ Eapp (apply_r sig v) f (apply_r_list sig l) ]|) x3).
-              eapply not_occurs_free_ctx_not_bound.
-              intro. apply H1 in H8. inv H8.
-              intro.
-              apply H12. apply bound_var_ctx_comp_ctx.
-              left.
-              apply bound_var_ctx_rename_all_ns in H8. auto.
-              simpl in H8.
-
-              apply not_occur_free_Efun in H8. inv H8.
-              rewrite inlined_fundefs_append in H13.
-              rewrite rename_all_ns_fundefs_append in H13.
-              apply not_occurs_free_fundefs_append in H13.
-              inv H13.
-              rewrite inlined_fundefs_append in H14.
-              rewrite rename_all_ns_fundefs_append in H14.
-              assert (H8' :
-                        In var
-                           (Complement var (occurs_free_fundefs
-                                              (rename_all_fun_ns sig (inlined_fundefs_f x1 inl)))) x3).
-              intro. apply H8. split; auto. intro. inv Hdjl0. specialize (H17 x3). apply H17; auto.
-              clear H8.
-              assert (H14' :
-                        In var
-                           (Complement var
-                                       (occurs_free
-                                          (rename_all_ctx_ns sig (inlined_ctx_f x0 inl)
-                                          |[ Eapp (apply_r sig v) f (apply_r_list sig l) ]|))) x3).
-              intro. apply H14. split; auto. intro. inv Hdjl0. specialize (H16 x3). apply H16; auto. clear H14.
-              assert (H15' :
-                        In var
-                           (Complement var
-                                       (occurs_free_fundefs
-                                          (rename_all_fun_ns sig
-                                                             (inlined_fundefs_f (Fcons (apply_r sig v) f l0 e x2)
-                                                                                inl)))) x3).
-              intro. apply H15. split; auto. intro. inv Hdjl0. specialize (H14 x3). apply H14; auto. clear H15.
-              eapply Complement_Proper in H15'.
-              Focus 2. simpl. rewrite Hsvi.
-              simpl.
-              symmetry. apply occurs_free_fundefs_Fcons.
-              assert (H15'' : In var (Complement var
+              apply num_occur_ec_comp_ctx. exists 0, 0; auto. split; [| split; [| omega ]].              
+              - (* x *)
+                assert (~ bound_var_ctx (rename_all_ctx_ns sig (inlined_ctx_f x inl)) x3).
+                intro; apply H12. apply bound_var_ctx_rename_all_ns in H8.
+                apply bound_var_ctx_comp_ctx. auto.
+                eapply not_occur_rename_ctx_not_dom. apply H11.
+                apply closed_not_occurs_in_context; auto.
+                unfold ce in H1. simpl in H1.
+                repeat normalize_ctx. rewrite <- app_ctx_f_fuse in H1.
+                apply closed_app_ctx in H1. auto.
+              - unfold ce in H1. repeat normalize_ctx.
+                rewrite <- app_ctx_f_fuse in H1.
+                assert (~ occurs_free (rename_all_ctx_ns sig
+                                                         (inlined_ctx_f
+                                                            (Efun1_c
+                                                               (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0)
+                                                            inl) |[ Eapp (apply_r sig v) f (apply_r_list sig l) ]|) x3).
+                { eapply not_occurs_free_ctx_not_bound. intro. apply H1 in H8. inv H8.
+                  intro. apply H12. apply bound_var_ctx_comp_ctx. left.
+                  apply bound_var_ctx_rename_all_ns in H8. auto. }
+                simpl in H8. apply not_occur_free_Efun in H8. inv H8.
+                rewrite inlined_fundefs_append in H13. rewrite rename_all_ns_fundefs_append in H13.
+                apply not_occurs_free_fundefs_append in H13. inv H13.
+                rewrite inlined_fundefs_append in H14. rewrite rename_all_ns_fundefs_append in H14.
+                assert (H8' :
+                          In var
+                             (Complement var (occurs_free_fundefs
+                                                (rename_all_fun_ns sig (inlined_fundefs_f x1 inl)))) x3).
+                { intro. apply H8. split; auto. intro. inv Hdjl0. specialize (H17 x3). apply H17; auto. }
+                clear H8.
+                assert (H14' :
+                          In var
+                             (Complement var
+                                         (occurs_free
+                                            (rename_all_ctx_ns sig (inlined_ctx_f x0 inl)
+                                            |[ Eapp (apply_r sig v) f (apply_r_list sig l) ]|))) x3).
+                { intro. apply H14. split; auto. intro. inv Hdjl0. specialize (H16 x3). apply H16; auto. } clear H14.
+                assert (H15' :
+                          In var
+                             (Complement var
+                                         (occurs_free_fundefs
+                                            (rename_all_fun_ns sig
+                                                               (inlined_fundefs_f (Fcons (apply_r sig v) f l0 e x2)
+                                                                                  inl)))) x3).
+                { intro. apply H15. split; auto. intro. inv Hdjl0. specialize (H14 x3). apply H14; auto. } clear H15.
+                eapply Complement_Proper in H15'.
+                2:{ simpl. rewrite Hsvi. simpl. symmetry. apply occurs_free_fundefs_Fcons. }
+                assert (H15'' : In var (Complement var
                                                  (occurs_free_fundefs
                                                     (rename_all_fun_ns sig (inlined_fundefs_f x2 inl)))) x3).
-              intro. apply H15'. right. split; auto.
-              intro. inv Hdjl0. specialize (H14 x3). apply H14. split; auto.
-              eapply fundefs_append_name_in_fundefs. reflexivity.
-              right. simpl. rewrite Hsvi. simpl. constructor. auto.
-              clear H15'.
-              apply not_free_dead_or_bound in H14'. inv H14'.
-              Focus 2. exfalso. apply H12. apply bound_var_app_ctx in H8. inv H8.
-              apply bound_var_ctx_comp_ctx. right. simpl. apply identifiers.Bound_Fun12_c.
-              apply bound_var_ctx_rename_all_ns in H13. auto. inv H13.
+                { intro. apply H15'. right. split; auto.
+                  intro. inv Hdjl0. specialize (H14 x3). apply H14. split; auto.
+                  eapply fundefs_append_name_in_fundefs. reflexivity.
+                  right. simpl. rewrite Hsvi. simpl. constructor. auto. }
+                clear H15'. apply not_free_dead_or_bound in H14'. inv H14'.
+                2:{ exfalso. apply H12. apply bound_var_app_ctx in H8. inv H8.
+                    apply bound_var_ctx_comp_ctx. right. simpl. apply identifiers.Bound_Fun12_c.
+                    apply bound_var_ctx_rename_all_ns in H13. auto. inv H13. }
 
-              apply not_free_bound_or_not_occur in H8'. inv H8'.
-              Focus 2. exfalso. apply H12. apply bound_var_ctx_comp_ctx.
-              right. constructor. rewrite inlined_fundefs_append.
-              apply bound_var_rename_all_ns_fundefs in H13.
-              eapply fundefs_append_bound_vars.
-              reflexivity. left; auto.
-
+                apply not_free_bound_or_not_occur in H8'. inv H8'.
+                2:{ exfalso. apply H12. apply bound_var_ctx_comp_ctx.
+                    right. constructor. rewrite inlined_fundefs_append.
+                    apply bound_var_rename_all_ns_fundefs in H13.
+                    eapply fundefs_append_bound_vars.
+                    reflexivity. left; auto. }
+                
               apply not_free_bound_or_not_occur in H15''. inv H15''.
-              Focus 2. exfalso. apply H12. apply bound_var_ctx_comp_ctx.
-              right. constructor. rewrite inlined_fundefs_append.
-              apply bound_var_rename_all_ns_fundefs in H14.
-              eapply fundefs_append_bound_vars.
-              reflexivity. auto.
+              2:{ exfalso. apply H12. apply bound_var_ctx_comp_ctx.
+                  right. constructor. rewrite inlined_fundefs_append.
+                  apply bound_var_rename_all_ns_fundefs in H14.
+                  eapply fundefs_append_bound_vars.
+                  reflexivity. auto. }
               simpl. apply num_occur_app_ctx in H8; destructAll; pi0.
-              apply not_occur_rename_ctx_not_dom in H8; auto.
-
+              apply not_occur_rename_ctx_not_dom in H8; auto.              
               apply not_occur_rename_fun_not_dom in H13; auto.
               apply not_occur_rename_fun_not_dom in H14; auto.
-
               eapply num_occur_ec_n. constructor. apply H8.
-              rewrite inlined_fundefs_append.
-              eapply fundefs_append_num_occur.
-              reflexivity.
-              apply H13. apply H14.
-              auto.
-
-            }
+              rewrite inlined_fundefs_append.  eapply fundefs_append_num_occur.
+              reflexivity. now apply H13. now apply H14. omega. }
+            
             assert (H_rn_ctx: rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
                                                 (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0))
                                                                inl) =
                               (rename_all_ctx_ns sig
                                                  (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0)) inl))).
-            {
-              apply eq_P_rename_all_ctx_ns. intro. intro.
-              assert (Hl0 := Decidable_FromList l0).
-              inv Hl0. specialize (Dec x3).
-              inv Dec.
-              - exfalso.
-                apply H9.
-                apply H_dead_l0; auto.
-              - apply eq_P_set_list_not_in.
-                auto.
-            }
-            clear H8.
-
+            { apply eq_P_rename_all_ctx_ns. intro. intro. assert (Hl0 := Decidable_FromList l0).
+              inv Hl0. specialize (Dec x3). inv Dec.
+              - exfalso. apply H9. apply H_dead_l0; auto.
+              - apply eq_P_set_list_not_in. auto. } clear H8.
+            
             assert (
-                gsr_clos
+                gsr_clos 1
                   (rename_all_ctx_ns sig (inlined_ctx_f x inl)
-                  |[ Efun
-                       (fundefs_append
-                          (rename_all_fun_ns sig (inlined_fundefs_f x1 inl))
-                          (Fcons (apply_r sig v) f l0 (rename_all_ns sig e)
-                                 (rename_all_fun_ns sig (inlined_fundefs_f x2 inl))))
-                       (rename_all_ctx_ns sig (inlined_ctx_f x0 inl)
-                       |[ Eapp (apply_r sig v) f (apply_r_list sig l) ]|) ]|)
+                  |[ Efun (fundefs_append (rename_all_fun_ns sig (inlined_fundefs_f x1 inl))
+                                          (Fcons (apply_r sig v) f l0 (rename_all_ns sig e)
+                                                 (rename_all_fun_ns sig (inlined_fundefs_f x2 inl))))
+                          (rename_all_ctx_ns sig (inlined_ctx_f x0 inl) |[ Eapp (apply_r sig v) f (apply_r_list sig l) ]|) ]|)
 
                   (rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
                                      (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0))
                                                     (M.set (apply_r sig v) true inl))
                   |[ rename_all_ns (set_list (combine l0 (apply_r_list sig l)) sig) e ]|)).
-            {
-
-              econstructor 3.
-              constructor. constructor.
+            { replace 1 with (1 + 0) by omega. eapply gsr_clos_trans.
+              replace 1 with (1 + 0) by omega. econstructor; [| now constructor ]. constructor. 
               apply Fun_inline_s.
-              rewrite length_apply_r_list. auto.
-              specialize (H2 (apply_r sig v)). rewrite garvc in H2.
-              unfold ce in H2. rewrite H7 in H2.
-              apply num_occur_app_ctx in H2. destructAll.
-              (* x3 = 0 *)
-              assert ( ~ bound_var_ctx (rename_all_ctx_ns sig (inlined_ctx_f x inl))
-                         (apply_r sig v)).
-
-              (** by UB *) intro.
-              unfold ce in H0. rewrite H7 in H0.
-              apply ub_app_ctx_f in H0. destructAll.
-              inv H12. specialize (H13 (apply_r sig v)).
-              apply H13. split. auto. constructor.
-              eapply fundefs_append_bound_vars.
-              reflexivity.
-              right. constructor. constructor. auto.
-              apply not_bound_dead_or_free_ctx in H10.
-              inv H10. assert (x3 = 0). eapply num_occur_ec_det; eauto.
-
-              subst. simpl in H9. rewrite H9; auto.
-              (** cannot be free since closed so dead *)
-              exfalso. eapply occurs_free_included_ctx in H11.
-              unfold ce in H1. rewrite H7 in H1. apply H1 in H11.
-              inv H11.
-
-              rewrite <- H_inl_ctx.
-              (* should that (apply_r sig v) and l0 is not bound in x, x1, x2 and x0 s.t. cannot occur *)
-              assert (H8 := H_inl_nbv). clear H_inl_nbv.
-              rewrite inlined_ctx_f_staged.
-              rewrite Disjoint_inlined_ctx with (im := (M.set (apply_r sig v) true (M.empty bool))).
-
-              Focus 2.
-              split. intro. intro. inv H9. inv H11.
-              revert H10. apply H8.
-              constructor. unfold get_b in H12.
-              destruct (var_dec x3 (apply_r sig v)).
-              subst; auto. rewrite M.gso in H12. rewrite M.gempty in H12. inv H12.
-              auto.
-
-
-              rewrite H_rn_ctx.
-
-              rewrite (proj1 (set_list_rename_all_ns _ _)).
-              repeat normalize_ctx.
-              rewrite <- app_ctx_f_fuse. simpl.
-              rewrite inlined_fundefs_append.
-              rewrite rename_all_ns_fundefs_append.
-              constructor 2.
-              { (* l0 can be staged for sig *)
-                intro. intro.
-                assert (Decidable (Range_map sig)) by apply Decidable_Range_map.
-                inv H10. specialize (Dec x3).
-                inv Dec.
-                2: left; auto.
-
-                inv H10. apply H5 in H11. inv H11.
-                inv H12.
-                - right.
-                  repeat normalize_ctx.
-                  apply num_occur_app_ctx in H11; destructAll; pi0.
-                  apply num_occur_ec_comp_ctx in H11; destructAll; pi0.
-                  simpl in H13. inv H13; pi0. rewrite inlined_fundefs_append in H19.
-                  rewrite rename_all_ns_fundefs_append in H19.
-                  apply fundefs_append_num_occur' in H19; destructAll; pi0.
-                  simpl in H14. rewrite Hsvi in H14.
-                  simpl in H14. inv H14; pi0.
-                  auto.
-                - exfalso. (* this violates unique_binding (can use H8 and fact that apply_r sig v <> x3 \in l0 *)
-                  unfold ce in H0.
-                  repeat normalize_ctx.
-                  apply ub_app_ctx_f in H0. destructAll.
-                  apply ub_comp_ctx_f in H0. destructAll.
-
-                  apply bound_stem_comp_ctx_mut in H11.
-                  inv H11.
-
-                  inv H15.
-                  specialize (H11 x3).
-                  apply H11.
-                  split.
-                  apply bound_stem_var. auto.
-                  simpl. constructor.
-                  apply bound_var_rename_all_ns_fundefs.
-                  rewrite inlined_fundefs_append.
-                  eapply fundefs_append_bound_vars.
-                  reflexivity. right.
-                  simpl. rewrite Hsvi. constructor. auto.
-
-                  simpl in H16. inv H16.
-                  apply name_in_fundefs_rename_all_ns in H19.
-                  rewrite inlined_fundefs_append in H19.
-                  eapply fundefs_append_name_in_fundefs in H19.
-                  2: reflexivity.
-                  inv H14. rewrite inlined_fundefs_append in H18.
-                  rewrite rename_all_ns_fundefs_append in H18.
-                  eapply fundefs_append_unique_bindings_l in H18.
-                  2: reflexivity. destructAll.
-                  inv H19.
-                  (* not a name of x1 *)
-                  inv H16. specialize (H19 x3).
-                  apply H19. split. apply bound_var_rename_all_ns_fundefs.
-                  apply name_in_fundefs_bound_var_fundefs. auto.
-                  simpl. rewrite Hsvi. constructor. auto.
-
-                  simpl in H14. rewrite Hsvi in H14. inv H14.
-
-                  simpl in H18. rewrite Hsvi in H18. inv H18.
-
-                  inv H14; auto.
-                  inv H28. specialize (H18 x3).
-                  apply H18. split; auto.
-                  apply name_in_fundefs_bound_var_fundefs.
-                  apply name_in_fundefs_rename_all_ns. auto.
-
-                  inv H14.
-                  inv H20. specialize (H11 x3). apply H11. split.
-                  apply bound_stem_var. auto.
-                  apply bound_var_rename_all_ns_fundefs. rewrite inlined_fundefs_append.
-                  eapply fundefs_append_bound_vars.
-                  reflexivity.
-                  right. simpl. rewrite Hsvi. constructor. auto.
-              }
-              (* by sig_inv_dom *)
-              split; intro. intro.
-              inv H9.
-              inv H11.
-              apply H5 in H9.
-              destruct H9. apply H9.
-              apply bound_var_app_ctx. left.
-              repeat normalize_ctx.
-              apply bound_var_ctx_comp_ctx. right. simpl. constructor.
-              apply bound_var_rename_all_ns_fundefs.
-              rewrite inlined_fundefs_append.
-              eapply fundefs_append_bound_vars.
-              reflexivity.
-              right. simpl. rewrite Hsvi. constructor. auto.
+              - rewrite length_apply_r_list. auto.
+              - specialize (H2 (apply_r sig v)). rewrite garvc in H2.
+                unfold ce in H2. rewrite H7 in H2.
+                apply num_occur_app_ctx in H2. destructAll.
+                (* x3 = 0 *)
+                assert ( ~ bound_var_ctx (rename_all_ctx_ns sig (inlined_ctx_f x inl)) (apply_r sig v)).
+                { (** by UB *) intro.
+                  unfold ce in H0. rewrite H7 in H0. apply ub_app_ctx_f in H0. destructAll.
+                  inv H12. specialize (H13 (apply_r sig v)). apply H13. split. auto. constructor.
+                  eapply fundefs_append_bound_vars. reflexivity.
+                  right. constructor. constructor. auto. }
+                apply not_bound_dead_or_free_ctx in H10.
+                inv H10. assert (x3 = 0). eapply num_occur_ec_det; eauto.
+                subst. simpl in H9. rewrite H9; auto.
+                (** cannot be free since closed so dead *)
+                exfalso. eapply occurs_free_included_ctx in H11.
+                unfold ce in H1. rewrite H7 in H1. apply H1 in H11.
+                inv H11.
+              - rewrite <- H_inl_ctx.
+                (* should that (apply_r sig v) and l0 is not bound in x, x1, x2 and x0 s.t. cannot occur *)
+                assert (H8 := H_inl_nbv). clear H_inl_nbv. rewrite inlined_ctx_f_staged.
+                rewrite Disjoint_inlined_ctx with (im := (M.set (apply_r sig v) true (M.empty bool))).
+                2:{ split. intro. intro. inv H9. inv H11.
+                    revert H10. apply H8. constructor. unfold get_b in H12. destruct (var_dec x3 (apply_r sig v)).
+                    subst; auto. rewrite M.gso in H12. rewrite M.gempty in H12. inv H12. auto. }
+                
+                rewrite H_rn_ctx. rewrite (proj1 (set_list_rename_all_ns _ _)).
+                repeat normalize_ctx. rewrite <- app_ctx_f_fuse. simpl.
+                rewrite inlined_fundefs_append. rewrite rename_all_ns_fundefs_append.
+                now constructor 2.
+                { (* l0 can be staged for sig *)
+                  intro. intro.
+                  assert (Decidable (Range_map sig)) by apply Decidable_Range_map.
+                  inv H10. specialize (Dec x3). inv Dec.
+                  2: now left; auto.
+                  
+                  inv H10. apply H5 in H11. inv H11. inv H12.
+                  - right. repeat normalize_ctx.
+                    apply num_occur_app_ctx in H11; destructAll; pi0.
+                    apply num_occur_ec_comp_ctx in H11; destructAll; pi0.
+                    simpl in H13. inv H13; pi0. rewrite inlined_fundefs_append in H19.
+                    rewrite rename_all_ns_fundefs_append in H19.
+                    apply fundefs_append_num_occur' in H19; destructAll; pi0.
+                    simpl in H14. rewrite Hsvi in H14.
+                    simpl in H14. inv H14; pi0. auto.
+                  - exfalso. (* this violates unique_binding (can use H8 and fact that apply_r sig v <> x3 \in l0 *)
+                    unfold ce in H0.
+                    repeat normalize_ctx.
+                    apply ub_app_ctx_f in H0. destructAll.
+                    apply ub_comp_ctx_f in H0. destructAll.
+                    
+                    apply bound_stem_comp_ctx_mut in H11. inv H11.
+                    inv H15. specialize (H11 x3). apply H11. split.
+                    apply bound_stem_var. auto. simpl. constructor.
+                    apply bound_var_rename_all_ns_fundefs.
+                    rewrite inlined_fundefs_append. eapply fundefs_append_bound_vars.
+                    reflexivity. right.
+                    simpl. rewrite Hsvi. constructor. auto. simpl in H16. inv H16.
+                    apply name_in_fundefs_rename_all_ns in H19.
+                    rewrite inlined_fundefs_append in H19. eapply fundefs_append_name_in_fundefs in H19.
+                    2: reflexivity. inv H14. rewrite inlined_fundefs_append in H18.
+                    rewrite rename_all_ns_fundefs_append in H18. eapply fundefs_append_unique_bindings_l in H18.
+                    2: reflexivity. destructAll. inv H19.
+                    (* not a name of x1 *)
+                    inv H16. specialize (H19 x3). apply H19. split. apply bound_var_rename_all_ns_fundefs.
+                    apply name_in_fundefs_bound_var_fundefs. auto. simpl. rewrite Hsvi. constructor. auto.
+                    
+                    simpl in H14. rewrite Hsvi in H14. inv H14.                    
+                    simpl in H18. rewrite Hsvi in H18. inv H18.                    
+                    inv H14; auto.
+                    inv H28. specialize (H18 x3).
+                    apply H18. split; auto. apply name_in_fundefs_bound_var_fundefs.
+                    apply name_in_fundefs_rename_all_ns. auto.                    
+                    inv H14.
+                    inv H20. specialize (H11 x3). apply H11. split.
+                    apply bound_stem_var. auto. apply bound_var_rename_all_ns_fundefs. rewrite inlined_fundefs_append.
+                    eapply fundefs_append_bound_vars. reflexivity.
+                    right. simpl. rewrite Hsvi. constructor. auto. }
+                (* by sig_inv_dom *)
+                split; intro. intro.
+                inv H9. inv H11. apply H5 in H9. destruct H9. apply H9.
+                apply bound_var_app_ctx. left. repeat normalize_ctx.
+                apply bound_var_ctx_comp_ctx. right. simpl. constructor.
+                apply bound_var_rename_all_ns_fundefs. rewrite inlined_fundefs_append.
+                eapply fundefs_append_bound_vars. reflexivity.
+                right. simpl. rewrite Hsvi. constructor. auto.
             }
             (* simplify the context for the hyp of the IH *)
             assert (H_inl_simpl:
@@ -8141,144 +7950,113 @@ Section CONTRACT.
                                                            (fundefs_append x1 x2) x0))
                                             inl)
                       )).
-            {
-              rewrite <- H_inl_ctx.
+            { rewrite <- H_inl_ctx.
               rewrite inlined_ctx_f_staged.
               rewrite Disjoint_inlined_ctx with (im := (M.set (apply_r sig v) true (M.empty bool))).
-              rewrite H_rn_ctx. reflexivity.
-              split. intro. intro. inv H9. inv H11.
-              revert H10. apply H_inl_nbv.
-              constructor. unfold get_b in H12.
+              rewrite H_rn_ctx. reflexivity. split. intro. intro. inv H9. inv H11.
+              revert H10. apply H_inl_nbv. constructor. unfold get_b in H12.
               destruct (var_dec x3 (apply_r sig v)).
               subst; auto. rewrite M.gso in H12. rewrite M.gempty in H12. inv H12.
               auto.
             }
 
-
             remember (contract (set_list (combine l0 (apply_r_list sig l)) sig)
                                (update_count_inlined (apply_r_list sig l) l0
                                                      (M.set (apply_r sig v) 0 count)) e sub
                                (M.set (apply_r sig v) true inl)) as Hc.
-            destruct Hc.
-            destruct x3. destruct p.
-            symmetry in HeqHc.
-            rewrite <- H7 in H8.
-            assert (Hinc := gsr_preserves_clos _ _ H0 H1 H8).
-            destruct Hinc as (Hin_ub, Hin_cl).
-            apply sig_inv_combine in H5.
-            destruct H5 as (H5, H5co).
-            assert (Hse := gsr_preserves_sig_dom _ _ _ H0 H1 H8 H5).
+            destruct Hc. destruct x3. destruct p. destruct p.
+            symmetry in HeqHc. rewrite <- H7 in H8.
+            assert (Hinc := gsr_clos_preserves_clos _ _ _ H0 H1 H8). destruct Hinc as (Hin_ub, Hin_cl).
+            apply sig_inv_combine in H5. destruct H5 as (H5, H5co).
+            assert (Hse := gsr_preserves_sig_dom _ _ _ _ H0 (closed_implies_Disjoint _ H1) H8 H5).
             eapply IHn with (c :=  (comp_ctx_f x
                                                (Efun1_c
                                                   (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0))) in HeqHc; auto.
-            inv H6.
-            destructAll.
-            assert (H_rn_ctx': rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
-                                                 (inlined_ctx_f
-                                                    (comp_ctx_f x
-                                                                (Efun1_c
-                                                                   (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0))
-                                                    im') =
-                               rename_all_ctx_ns  sig
-                                                  (inlined_ctx_f
-                                                     (comp_ctx_f x
-                                                                 (Efun1_c
-                                                                    (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0))
+            - inv H6.
+              destructAll.
+              assert (H_rn_ctx': rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
+                                                   (inlined_ctx_f
+                                                      (comp_ctx_f x
+                                                                  (Efun1_c
+                                                                     (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0))
+                                                      im') =
+                                 rename_all_ctx_ns  sig
+                                                    (inlined_ctx_f
+                                                       (comp_ctx_f x
+                                                                   (Efun1_c
+                                                                      (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2)) x0))
                                                      im')).
-            { apply eq_P_rename_all_ctx_ns. intro. intro.
-              assert (Hl0 := Decidable_FromList l0).
-              inv Hl0. specialize (Dec x3).
-              inv Dec.
-              exfalso. apply H12.
+              { apply eq_P_rename_all_ctx_ns. intro. intro.
+                assert (Hl0 := Decidable_FromList l0). inv Hl0. specialize (Dec x3). inv Dec.
+                exfalso. apply H12.                
+                (* show that x3 cannot be in the Dom of sig *)
+                assert (~ (Dom_map sig x3)).
+                intro. inv H14. apply H5 in H15. apply H15. apply bound_var_app_ctx. left.
+                repeat normalize_ctx. apply bound_var_ctx_comp_ctx.
+                right. simpl. constructor. apply bound_var_rename_all_ns_fundefs.
+                rewrite inlined_fundefs_append. eapply fundefs_append_bound_vars. reflexivity.
+                right. simpl. rewrite Hsvi. constructor. right. auto.
+                assert ( (inlined_ctx_f
+                            (comp_ctx_f x
+                                        (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2))
+                                                 x0)) im') =
+                         (inlined_ctx_f
+                            (comp_ctx_f x
+                                        (Efun1_c (fundefs_append x1 x2)
+                                                 x0)) im')).
+                { repeat normalize_ctx. simpl. rewrite inlined_fundefs_append. simpl.
+                  assert (get_b (apply_r sig v) im' = true).
+                  { apply b_map_le_c in b.  apply b.
+                    unfold get_b. rewrite M.gss. auto. }
+                  rewrite H15. rewrite inlined_fundefs_append. auto. }                
 
-              (* show that x3 cannot be in the Dom of sig *)
-              assert (~ (Dom_map sig x3)).
-              intro. inv H14. apply H5 in H15.
-              apply H15. apply bound_var_app_ctx. left.
-              repeat normalize_ctx.
-              apply bound_var_ctx_comp_ctx.
-              right. simpl. constructor.
-              apply bound_var_rename_all_ns_fundefs.
-              rewrite inlined_fundefs_append.
-              eapply fundefs_append_bound_vars.
-              reflexivity.
-              right.
-              simpl. rewrite Hsvi.
-              constructor. right. auto.
-              assert ( (inlined_ctx_f
-                          (comp_ctx_f x
-                                      (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v) f l0 e x2))
-                                               x0)) im') =
-                       (inlined_ctx_f
-                          (comp_ctx_f x
-                                      (Efun1_c (fundefs_append x1 x2)
-                                               x0)) im')).
-              repeat normalize_ctx. simpl.
-              rewrite inlined_fundefs_append. simpl.
-              assert (get_b (apply_r sig v) im' = true).
-              apply b_map_le_c in b.  apply b.
-              unfold get_b. rewrite M.gss. auto.
-              rewrite H15.
-              rewrite inlined_fundefs_append. auto.
+                rewrite H15. clear H15. eapply dead_occur_ec_le_antimon.
+                simpl in BP. apply b_map_le_c. apply BP. apply H_dead_l0; auto.
+                apply eq_P_set_list_not_in. auto. }
 
-              rewrite H15. clear H15.
-              eapply dead_occur_ec_le_antimon.
-              simpl in BP. apply b_map_le_c. apply BP.
-              apply H_dead_l0; auto.
-
-              apply eq_P_set_list_not_in. auto.
-            }
-
-            split; auto.
-            econstructor 3. apply H8. unfold ce'. rewrite <- H_rn_ctx'. apply H6.
-            split. unfold ce'. rewrite <- H_rn_ctx'. auto.
-            split. unfold ce'. rewrite <- H_rn_ctx'. auto.
-            { (* inl for returned app inlined case *)
-              intro. intros.
-              (* x3 in l0 is dead, not in l0 is same as H11 *)
-              assert (Hl0 := Decidable_FromList l0).
-              inv Hl0. specialize (Dec x3).
-              inv Dec.
-              - exfalso. (* impossible since bound in the original term *)
-                apply H5 in H12.
-                apply H12.
-                repeat normalize_ctx.
-                apply bound_var_app_ctx. left.
-                apply bound_var_ctx_comp_ctx. right.
-                apply bound_var_ctx_rename_all_ns.
-                simpl. constructor. rewrite inlined_fundefs_append.
-                eapply fundefs_append_bound_vars.
-                reflexivity. right. simpl. rewrite Hsvi.
-                constructor. auto.
-              - rewrite H_rn_ctx' in H11.
-                eapply H11.
-                rewrite <- H12.
-                rewrite get_set_list2. reflexivity.
-                auto.
-            }
-            unfold term_sub_inl_size in *; simpl in *.
-            apply sub_inl_fun_size with (im := inl) in garvs'.
-            omega.
-            apply negb_true_iff. auto.
-            { (* count for app inlined case*)
+              split; [| split; [| split ]].
+              + rewrite plus_comm. eapply gsr_clos_trans. eassumption.
+                unfold ce'. rewrite <- H_rn_ctx'. now apply H6.
+              + unfold ce'. rewrite <- H_rn_ctx'. auto.
+              + unfold ce'. rewrite <- H_rn_ctx'. auto.
+              + (* inl for returned app inlined case *)
+                intro. intros.
+                (* x3 in l0 is dead, not in l0 is same as H11 *)
+                assert (Hl0 := Decidable_FromList l0).
+                inv Hl0. specialize (Dec x3).
+                inv Dec.
+                * exfalso. (* impossible since bound in the original term *)
+                  apply H5 in H12.
+                  apply H12. repeat normalize_ctx.
+                  apply bound_var_app_ctx. left.
+                  apply bound_var_ctx_comp_ctx. right.
+                  apply bound_var_ctx_rename_all_ns.
+                  simpl. constructor. rewrite inlined_fundefs_append.
+                  eapply fundefs_append_bound_vars.
+                  reflexivity. right. simpl. rewrite Hsvi.
+                  constructor. auto.
+                * rewrite H_rn_ctx' in H11.
+                  eapply H11. rewrite <- H12.
+                  rewrite get_set_list2. reflexivity. auto.
+            - (* term size for IH *)
+              unfold term_sub_inl_size in *; simpl in *.
+              apply sub_inl_fun_size with (im := inl) in garvs'. omega.
+              apply negb_true_iff. auto.
+            - (* c_count for app inlined case *)
               rewrite H_inl_simpl.
               eapply count_inlining; eauto.
               apply sig_inv_combine; auto.
               specialize (H2 (apply_r sig v)). rewrite garvc in H2. auto.
-            }
-            { (* inl for app inlined case *)
+            - (* inl for app inlined case *)
               intro. intro.
               destruct (var_dec f0 (apply_r sig v)).
-              - subst.
-                split. intro.
-                +  (* this would violate unique_bindings *)
+              + subst. split. intro.
+                * (* this would violate unique_bindings *)
                   rewrite H_inl_simpl in H10.
-                  apply bound_var_app_ctx in H10.
-                  inv H10.
-                  * apply bound_var_ctx_rename_all_ns in H11.
-                    revert H11.
-                    apply H_inl_nbv. auto.
-                  * (* violates unique binding *)
+                  apply bound_var_app_ctx in H10. inv H10.
+                  ++ apply bound_var_ctx_rename_all_ns in H11.
+                     revert H11. apply H_inl_nbv. auto.
+                  ++ (* violates unique binding *)
                     apply bound_var_rename_all_ns in H11.
                     apply ub_app_ctx_f in H0; destructAll.
                     repeat normalize_ctx.
@@ -8289,15 +8067,14 @@ Section CONTRACT.
                     simpl in H15. rewrite Hsvi in H15.
                     inv H15. apply H24.
                     apply bound_var_rename_all_ns; auto.
-                + intros. rewrite H10 in garvs'. inv garvs'.
+                * intros. rewrite H10 in garvs'. inv garvs'.
                   split. intro. intro. inv H11.
                   apply bound_var_app_ctx in H12. inv H12.
-                  * rewrite H_inl_simpl in H11.
-                    apply bound_var_ctx_rename_all_ns in H11.
-                    revert H11.
-                    apply H_inl_nbv.
-                    auto.
-                  * (* violates unique binding *)
+                  -- rewrite H_inl_simpl in H11.
+                     apply bound_var_ctx_rename_all_ns in H11.
+                     revert H11.
+                     apply H_inl_nbv. auto.
+                  -- (* violates unique binding *)
                     apply bound_var_rename_all_ns in H11.
                     apply ub_app_ctx_f in H0; destructAll.
                     repeat normalize_ctx.
@@ -8310,21 +8087,18 @@ Section CONTRACT.
                     specialize (H17 x3).
                     apply H17. split.
                     apply bound_var_rename_all_ns; auto. auto.
-              - unfold get_b in H9.
-                rewrite M.gso in H9 by auto.
-                apply H4 in H9.
-                destruct H9.
-                split; intro; intros.
-                + apply H9.
-                  unfold ce.
+              + (* not bound var *)
+                unfold get_b in H9. rewrite M.gso in H9 by auto.
+                apply H4 in H9. destruct H9. split; intro; intros.
+                * apply H9. unfold ce.
                   apply bound_var_app_ctx. left.
                   apply bound_var_app_ctx in H11.
                   apply  bound_var_ctx_rename_all_ns.
                   inv H11.
-                  * apply  bound_var_ctx_rename_all_ns in H12.
-                    eapply bound_var_ctx_inlined_antimon.
-                    apply b_map_le_true. apply H12.
-                  *  apply bound_var_rename_all_ns in H12.
+                  -- apply  bound_var_ctx_rename_all_ns in H12.
+                     eapply bound_var_ctx_inlined_antimon.
+                     apply b_map_le_true. apply H12.
+                  -- apply bound_var_rename_all_ns in H12.
                      repeat normalize_ctx.
                      apply bound_var_ctx_comp_ctx.
                      right. simpl. constructor.
@@ -8332,194 +8106,143 @@ Section CONTRACT.
                      eapply fundefs_append_bound_vars.
                      reflexivity. right. simpl. rewrite Hsvi.
                      constructor 3. auto.
-                + apply H10 in H11. eapply Disjoint_Included_l.
-                  2: apply H11.
-                  unfold ce.
-                  do 2 (rewrite bound_var_app_ctx).
-                  repeat normalize_bound_var.
-                  do 2 (                  rewrite <- (proj1 (bound_var_ctx_rename_all_ns _))).
-                  rewrite Union_Empty_set_neut_r.
-                  apply Union_Included.
-                  apply bound_var_ctx_inlined_antimon.
-                  apply b_map_le_true.
-                  rewrite <- bound_var_rename_all_ns.
-                  repeat normalize_ctx.
-                  rewrite (proj1 bound_var_ctx_comp_ctx).
-                  simpl. rewrite inlined_fundefs_append. simpl.
-                  rewrite Hsvi.
-                  normalize_bound_var_ctx.
-                  intro. intro. right. left.
-                  eapply fundefs_append_bound_vars.
-                  reflexivity.
-                  right. constructor 3.
-                  auto.
-            }
-            { (* sig for app inline  case *)
-              rewrite H_inl_simpl.
-              rewrite H_inl_simpl in Hse.
-              intro; intros.
-              (* either x3 is in l0 or not *)
-              assert (Decidable (FromList l0)) by apply Decidable_FromList.
-              inv H10.
+                * apply H10 in H11. eapply Disjoint_Included_l.
+                  2: apply H11. unfold ce. do 2 (rewrite bound_var_app_ctx).
+                  repeat normalize_bound_var. do 2 (rewrite <- (proj1 (bound_var_ctx_rename_all_ns _))).
+                  rewrite Union_Empty_set_neut_r. apply Union_Included.
+                  apply bound_var_ctx_inlined_antimon. apply b_map_le_true.
+                  rewrite <- bound_var_rename_all_ns. repeat normalize_ctx.
+                  rewrite (proj1 bound_var_ctx_comp_ctx). simpl. rewrite inlined_fundefs_append. simpl.
+                  rewrite Hsvi. normalize_bound_var_ctx. intro. intro. right. left.
+                  eapply fundefs_append_bound_vars. reflexivity. right. constructor 3. eauto.
+            - (* sig for app inline  case *)
+              rewrite H_inl_simpl. rewrite H_inl_simpl in Hse.
+              intro; intros. assert (Decidable (FromList l0)) by apply Decidable_FromList. inv H10.
+              (* either x3 is in l0 or not *)              
               specialize (Dec x3). inv Dec.
-              - (* x3 is from l0 *)
+              + (* x3 is from l0 *)
                 (* then dom ->  dead OK,  *)
                 split.
-                intro. apply bound_var_app_ctx in H11.
-                inv H11. apply bound_var_ctx_rename_all_ns in H12. revert H12.
-                apply H_inl_nbv. auto.
-                (** by UB *)
-                apply bound_var_rename_all_ns in H12.
-                apply ub_app_ctx_f in H0. destructAll.
-                repeat normalize_ctx.
-                apply ub_comp_ctx_f in H0. destructAll.
-                simpl in H14. inv H14. repeat normalize_ctx.
-
-                eapply fundefs_append_unique_bindings_l in H19.
-                2: reflexivity. destructAll.
-                simpl in H16. rewrite Hsvi in H16. inv H16.
-                inv H27. specialize (H16 x3). apply H16. split; auto.
-                apply bound_var_rename_all_ns. auto.
-                (* codom has to be bound on stem due to closed and occur before *)
-                (* bound on stem due to occurs_free_app_bound_stem *)
-                assert ( List.In y (apply_r_list sig l)).
-                eapply FromList_set_list. apply H9.
-                rewrite length_apply_r_list. auto. auto.
-                assert (occurs_free (rename_all_ns sig (Eapp v f l)) y).
-                simpl. constructor. auto.
-                assert (~ occurs_free ce y).
-                intro. apply H1 in H13. inv H13.
-                eapply  occurs_free_app_bound_stem in H12.
-                inv H12. clear H15. specialize (H14 _ H13).
-                right.
-                repeat normalize_ctx.
-                apply bound_stem_comp_ctx_mut in H14.
-                apply bound_stem_comp_ctx_mut.
-                inv H14; auto.
-                simpl. simpl in H12. right. inv H12.
-                constructor. rewrite inlined_fundefs_append.
-                rewrite inlined_fundefs_append in H17.
-                apply name_in_fundefs_rename_all_ns.
-                apply name_in_fundefs_rename_all_ns in H17.
-                eapply fundefs_append_name_in_fundefs. reflexivity.
-                eapply fundefs_append_name_in_fundefs in H17. 2: reflexivity.
-                inv H17; auto.
-                simpl in H12. rewrite Hsvi in H12. inv H12.
-                (* apply_r sig l <> apply_r sig v because occ only once *)
-                exfalso. inv H14.
-                specialize (H2 (apply_r sig v)). rewrite garvc in H2.
-                apply num_occur_app_ctx in H2. destructAll.
-                inv H12.
-                simpl in H14.
-                destruct (cps_util.var_dec (apply_r sig v) (apply_r sig v)); auto.
-                assert (num_occur_list (apply_r_list sig l) (apply_r sig v) = 0) by omega.
-                apply not_occur_list in H12. auto.
-
-                auto.
-                auto.
-              - (* x3 is not from l0 *)
-                rewrite eq_P_set_list_not_in in H9 by auto.
-                split.
-                + apply Hse in H9. auto.
-                + apply H5co in H9.
+                * intro. apply bound_var_app_ctx in H11.
+                  inv H11. apply bound_var_ctx_rename_all_ns in H12. revert H12.
+                  apply H_inl_nbv. auto.
+                  (** by UB *)
+                  apply bound_var_rename_all_ns in H12.
+                  apply ub_app_ctx_f in H0. destructAll.
+                  repeat normalize_ctx.
+                  apply ub_comp_ctx_f in H0. destructAll.
+                  simpl in H14. inv H14. repeat normalize_ctx.                
+                  eapply fundefs_append_unique_bindings_l in H19.
+                  2: reflexivity. destructAll.
+                  simpl in H16. rewrite Hsvi in H16. inv H16.
+                  inv H27. specialize (H16 x3). apply H16. split; auto.
+                  apply bound_var_rename_all_ns. auto.
+                  (* codom has to be bound on stem due to closed and occur before *)
+                  (* bound on stem due to occurs_free_app_bound_stem *)
+                * assert ( List.In y (apply_r_list sig l)).
+                  eapply FromList_set_list. apply H9.
+                  rewrite length_apply_r_list. auto. auto.
+                  assert (occurs_free (rename_all_ns sig (Eapp v f l)) y).
+                  simpl. constructor. auto.
+                  assert (~ occurs_free ce y).
+                  intro. apply H1 in H13. inv H13.
+                  eapply  occurs_free_app_bound_stem in H12.
+                  inv H12. clear H15. specialize (H14 _ H13).
+                  right. repeat normalize_ctx.
+                  apply bound_stem_comp_ctx_mut in H14. apply bound_stem_comp_ctx_mut.
+                  inv H14; auto. simpl. simpl in H12. right. inv H12.
+                  constructor. rewrite inlined_fundefs_append.
+                  rewrite inlined_fundefs_append in H17. apply name_in_fundefs_rename_all_ns.
+                  apply name_in_fundefs_rename_all_ns in H17.
+                  eapply fundefs_append_name_in_fundefs. reflexivity.
+                  eapply fundefs_append_name_in_fundefs in H17. 2: reflexivity.
+                  inv H17; auto. simpl in H12. rewrite Hsvi in H12. inv H12.
+                  (* apply_r sig l <> apply_r sig v because occ only once *)
+                  exfalso. inv H14. specialize (H2 (apply_r sig v)). rewrite garvc in H2.
+                  apply num_occur_app_ctx in H2. destructAll. inv H12.
+                  simpl in H14.
+                  destruct (cps_util.var_dec (apply_r sig v) (apply_r sig v)); auto.
+                  assert (num_occur_list (apply_r_list sig l) (apply_r sig v) = 0) by omega.
+                  apply not_occur_list in H12. now auto. now auto. now auto.
+              + (* x3 is not from l0 *)
+                rewrite eq_P_set_list_not_in in H9 by auto. split.
+                * apply Hse in H9. auto.
+                * apply H5co in H9.
                   inv H9.
-                  * left.
-                    apply num_occur_app_ctx in H11; destructAll; pi0.
-                    repeat normalize_ctx.
-                    apply num_occur_ec_comp_ctx in H9; destructAll; pi0.
-                    simpl in H12. inv H12; pi0.
-                    repeat normalize_ctx.
-                    apply fundefs_append_num_occur' in H18; destructAll; pi0.
-                    simpl in H13. rewrite Hsvi in H13.
-                    simpl in H13. inv H13; pi0.
-                    simpl.
-                    apply num_occur_app_ctx. exists 0, 0; auto.
-                    split; auto.
-                    apply num_occur_ec_comp_ctx. exists 0, 0; auto. split; auto. split; auto.
-                    eapply num_occur_ec_n. constructor; eauto.
-                    repeat normalize_ctx.
-                    eapply fundefs_append_num_occur; eauto.
-                    auto.
-                    split; auto.
-                    apply dead_occur_rename_all_ns_set_list. inv H11; pi0.
-                    apply not_occur_list. auto. auto.
-                  * destruct (var_dec y (apply_r sig v)).
-                    (* then dead *)
-                    left.
-                    specialize (H2 (apply_r sig v)).
-                    rewrite garvc in H2.
-                    apply num_occur_app_ctx in H2. destructAll.
-                    inv H9. simpl in H12.
-                    destruct (cps_util.var_dec (apply_r sig v) (apply_r sig v)).
-                    2: exfalso; auto.
-                    assert (x4 = 0) by omega.
-                    assert (num_occur_list (apply_r_list sig l) (apply_r sig v) = 0) by omega.
-                    clear H12.
-                    subst.
-                    repeat normalize_ctx.
-                    apply num_occur_ec_comp_ctx in H2; destructAll; pi0.
-                    simpl in H9. inv H9; pi0.
-                    repeat normalize_ctx.
-                    apply fundefs_append_num_occur' in H18. destructAll; pi0.
-                    simpl in H12. rewrite Hsvi in H12. inv H12; destructAll; pi0.
-                    simpl.
-                    eapply num_occur_n. apply num_occur_app_ctx.
-                    exists 0, 0. split.
-                    apply num_occur_ec_comp_ctx. exists 0, 0; auto.
-                    split; auto. split.
-                    eapply num_occur_ec_n. constructor; eauto.
-                    repeat normalize_ctx.
-                    eapply fundefs_append_num_occur. reflexivity.
-                    eauto. eauto. auto. auto.
-                    split.
-                    apply dead_occur_rename_all_ns_set_list.
-                    apply not_occur_list. auto. auto.
-                    reflexivity. auto.
-
-                    right.
-                    apply bound_stem_ctx_rename_all_ns.
-                    apply bound_stem_ctx_rename_all_ns in H11.
-                    repeat normalize_ctx.
-                    apply bound_stem_comp_ctx_mut in H11.
-                    apply bound_stem_comp_ctx_mut.
-                    inv H11; auto.
-                    simpl. simpl in H9. right.  inv H9.
-                    constructor. rewrite inlined_fundefs_append.
-                    rewrite inlined_fundefs_append in H14.
-                    eapply fundefs_append_name_in_fundefs.
-                    reflexivity.
-                    eapply fundefs_append_name_in_fundefs in H14.
-                    2: reflexivity. inv H14; auto.
-                    simpl in H9. rewrite Hsvi in H9.
-                    simpl in H9. inv H9; auto.
-                    exfalso. apply n0; inv H11; auto.
-                    auto.
-            }
-
-
-
-          }
+                  -- left.
+                     apply num_occur_app_ctx in H11; destructAll; pi0.
+                     repeat normalize_ctx.
+                     apply num_occur_ec_comp_ctx in H9; destructAll; pi0.
+                     simpl in H12. inv H12; pi0.
+                     repeat normalize_ctx.
+                     apply fundefs_append_num_occur' in H18; destructAll; pi0.
+                     simpl in H13. rewrite Hsvi in H13.
+                     simpl in H13. inv H13; pi0.
+                     simpl.
+                     apply num_occur_app_ctx. exists 0, 0; auto.
+                     split; auto.
+                     ++ apply num_occur_ec_comp_ctx. exists 0, 0; auto. split; auto. split; auto.
+                        eapply num_occur_ec_n. constructor; eauto.
+                        repeat normalize_ctx.
+                        eapply fundefs_append_num_occur; eauto. omega. 
+                     ++ split; auto.
+                        apply dead_occur_rename_all_ns_set_list. inv H11; pi0; dec_vars.
+                        apply not_occur_list. auto. auto.
+                  -- destruct (var_dec y (apply_r sig v)).
+                     (* then dead *)
+                     left. specialize (H2 (apply_r sig v)).
+                     rewrite garvc in H2. apply num_occur_app_ctx in H2. destructAll.
+                     inv H9. simpl in H12. destruct (cps_util.var_dec (apply_r sig v) (apply_r sig v)).
+                     2: exfalso; auto.
+                     assert (x4 = 0) by omega.
+                     assert (num_occur_list (apply_r_list sig l) (apply_r sig v) = 0) by omega.
+                     clear H12. subst.
+                     repeat normalize_ctx.
+                     apply num_occur_ec_comp_ctx in H2; destructAll; pi0; dec_vars.
+                     simpl in H9. inv H9; pi0.
+                     repeat normalize_ctx. apply fundefs_append_num_occur' in H18. destructAll; pi0.
+                     simpl in H12. rewrite Hsvi in H12. inv H12; destructAll; pi0.
+                     simpl. eapply num_occur_n. apply num_occur_app_ctx.
+                     exists 0, 0. split.
+                     apply num_occur_ec_comp_ctx. exists 0, 0; auto.
+                     split; auto. split.
+                     eapply num_occur_ec_n. constructor; eauto.
+                     repeat normalize_ctx.
+                     eapply fundefs_append_num_occur. reflexivity.
+                     eauto. eauto. auto. auto.
+                     split.
+                     apply dead_occur_rename_all_ns_set_list.
+                     apply not_occur_list. auto. auto.
+                     reflexivity. now auto.
+                     
+                     right.
+                     apply bound_stem_ctx_rename_all_ns.
+                     apply bound_stem_ctx_rename_all_ns in H11.
+                     repeat normalize_ctx.
+                     apply bound_stem_comp_ctx_mut in H11.
+                     apply bound_stem_comp_ctx_mut.
+                     inv H11; auto. simpl. simpl in H9. right. inv H9.
+                     constructor. rewrite inlined_fundefs_append.
+                     rewrite inlined_fundefs_append in H14.
+                     eapply fundefs_append_name_in_fundefs. reflexivity.
+                     eapply fundefs_append_name_in_fundefs in H14.
+                     2: reflexivity. inv H14; auto.
+                     simpl in H9. rewrite Hsvi in H9.
+                     simpl in H9. inv H9; auto.
+                     exfalso. apply n1; inv H11; auto. auto. }
           (* not eligible to be inlined *)
           inv H6.
           unfold ce in *; unfold ce' in *.
-          split; auto.
-          simpl. apply rt_refl.
-          apply sig_inv_combine in H5. destruct H5. simpl in H6.
-          split; auto.
+          split; auto. simpl. now constructor.
+          apply sig_inv_combine in H5. destruct H5. simpl in H6. split; auto.
         * (* not a known function *)
-          inv H6.
-          unfold ce in *; unfold ce' in *.
-          split; auto.
-          simpl. apply rt_refl.
-          apply sig_inv_combine in H5. destruct H5. simpl in H6.
-          split; auto.
+          inv H6. unfold ce in *; unfold ce' in *.
+          split; auto. simpl. apply Refl_srw.
+          apply sig_inv_combine in H5. destruct H5. simpl in H6. split; auto.
       + (* multiple occ *)
-        inv H6.
-        unfold ce in *; unfold ce' in *.
-        split; auto.
-        simpl. apply rt_refl.
-        apply sig_inv_combine in H5. destruct H5. simpl in H6.
-        split; auto.
+        inv H6. unfold ce in *; unfold ce' in *.
+        split; auto. simpl. apply Refl_srw.
+        apply sig_inv_combine in H5. destruct H5. simpl in H6. split; auto.
     - (* prim *)
       destruct (get_c v count) eqn:gvc.
       { (* dead prim *)
@@ -8599,7 +8322,7 @@ Section CONTRACT.
         inv H10.
         assert (gsr_clos
                   (rename_all_ctx_ns sig
-                                     (inlined_ctx_f (comp_ctx_f c (Eprim_c v p l Hole_c)) im') |[ e'  ]|) ce').
+                                     (inlined_ctx_f (comp_fctx_f c (Eprim_c v p l Hole_c)) im') |[ e'  ]|) ce').
         { unfold ce'.
           repeat normalize_ctx.
           rewrite <- app_ctx_f_fuse.

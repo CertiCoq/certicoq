@@ -1273,34 +1273,26 @@ Section CONTRACT.
             with
             | true =>
               fun Heq2 =>                         
-                let im' := M.set f' true im in
-                (* update counts of ys' and xs after setting f' to 0 *)
-                let count' := update_count_inlined ys' xs (M.set f' 0 count) in
-                let sig' := set_list (combine xs ys') sig in                                      
-                (* first shrink the body *)
-                (match contract sig' count' e_body sub im'
-                       as k return (k = contract sig' count' e_body sub im' -> contractT im) with
-                 | existT (e_body', steps1, count'', im'') bp =>
-                   fun Heqb =>
-                     let inl := inline_letapp e_body' x in
-                     (match inl as inl' return (inl' = inl -> contractT im) with
-                      (* body can be inlined *)
-                      | Some (C_inl, x') =>
-                        fun Heq3 =>
-                          let sig' := M.set x x' sig in
-                          (match contract sig' count'' e sub im''
-                                 as k return (k = contract sig' count'' e sub im'' -> contractT im) with
-                           | existT  (e', steps2, count'', im''') bp' =>
-                             fun Heq4 => existT _ (C_inl |[ e' ]|, steps1 + steps2 + 1, count'', im''')
-                                                (b_map_le_i_trans im (M.set (apply_r sig f) true im) (ble_add im im (apply_r sig f) (ble_refl im))
-                                                                  _ (b_map_le_i_trans _ _ bp _ bp'))
-                           end (eq_refl _))
-                      | None =>
-                        (fun Heq5 =>
-                           match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
-                           | existT  (e', steps, count', im') bp =>
-                             fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-                           end (eq_refl _))
+                (* first inline the body *)
+                let inl := inline_letapp e_body x in
+                (match inl as inl' return (inl' = inl -> contractT im) with
+                 (* body can be inlined *)
+                 | Some (C_inl, x') =>
+                   fun Heqi =>
+                     let im' := M.set f' true im in
+                     (* update counts of ys' and xs after setting f' to 0 *)
+                     let count' := update_count_inlined (x' :: ys') (x :: xs) (M.set f' 0 count) in                   
+                     let sig' := set_list (combine xs ys') sig in                                      
+                     let sig'' := M.set x (apply_r sig' x') sig in
+                     (match contract sig'' count' (C_inl |[ e ]|) sub im' as k return (k =  contract sig'' count' (C_inl |[ e ]|) sub im' -> contractT im) with
+                      | existT (e', steps', c, i) bp => 
+                        fun Heql => existT _ (e', steps' + 1, c, i) (b_map_i_true _ _ _ bp)
+                      end (eq_refl _))
+                 | None =>
+                   (fun Heq5 =>
+                      match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
+                      | existT  (e', steps, count', im') bp =>
+                        fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
                       end (eq_refl _))
                  end (eq_refl _))
             | false =>
@@ -1448,28 +1440,20 @@ Section CONTRACT.
     apply Bool.andb_true_iff in H0.
     destructAll.
     apply Bool.negb_true_iff. auto.
-  Defined. 
+  Defined.
   Next Obligation.
-    unfold term_sub_inl_size; simpl in *.
-    rewrite plus_comm. erewrite <- sub_inl_fun_size; eauto. omega.   
+    unfold term_sub_inl_size; simpl.
+    symmetry in H4.
+    apply sub_inl_fun_size with (im :=  im) in H4.
+    symmetry in Heqi. eapply term_size_inline_letapp with (e' := e) in Heqi.
+    simpl. eapply Peano.le_n_S.
+    eapply le_trans. eapply plus_le_compat_r. eassumption.
+    rewrite plus_comm, plus_assoc.
+    rewrite <- H4. omega.
     symmetry in Heq2.
     apply Bool.andb_true_iff in Heq2.
     destructAll.
     apply Bool.andb_true_iff in H1.
-    destructAll.
-    apply Bool.negb_true_iff. auto.
-  Defined.
-  Next Obligation.
-    simpl in *. destruct Heqb.
-    unfold term_sub_inl_size; simpl.
-    eapply le_trans. eapply le_n_S.
-    eapply plus_le_compat_l. eapply sub_inl_size_compat; [| eapply bp  ].
-    reflexivity. eapply le_n_S.
-    eapply plus_le_compat_l. inv Heq1.
-    erewrite sub_inl_fun_size with (im := im); eauto. omega.   
-    symmetry in Heq2. apply Bool.andb_true_iff in Heq2.
-    destructAll.
-    apply Bool.andb_true_iff in H3.
     destructAll.
     apply Bool.negb_true_iff. auto.
   Defined.
@@ -1539,12 +1523,10 @@ Section CONTRACT.
          end)
       end
     | Eletapp x f t ys e =>
-      (* Zoe: I couldn't get the equality proof of the two defs to go through without expanding all the return types
-         in this definition which makes this code hard to read *)
       let f' := apply_r sig f in
       let ys' := apply_r_list sig ys in
       let f_no := get_c f' count in
-       let f_info := M.get f' sub in          
+      let f_info := M.get f' sub in          
       (match (f_no, f_info) as k return (k = (f_no, f_info) -> contractT im)  with
        | (1%nat, Some (SVfun t' xs e_body)) =>
          (fun Heq1 =>
@@ -1554,34 +1536,26 @@ Section CONTRACT.
             with
             | true =>
               fun Heq2 =>                         
-                let im' := M.set f' true im in
-                (* update counts of ys' and xs after setting f' to 0 *)
-                let count' := update_count_inlined ys' xs (M.set f' 0 count) in
-                let sig' := set_list (combine xs ys') sig in                                      
-                (* first shrink the body *)
-                (match contract sig' count' e_body sub im'
-                       as k return (k = contract sig' count' e_body sub im' -> contractT im) with
-                 | existT (e_body', steps1, count'', im'') bp =>
-                   fun Heqb =>
-                     let inl := inline_letapp e_body' x in
-                     (match inl as inl' return (inl' = inl -> contractT im) with
-                      (* body can be inlined *)
-                      | Some (C_inl, x') =>
-                        fun Heq3 =>
-                          let sig' := M.set x x' sig in
-                          (match contract sig' count'' e sub im''
-                                 as k return (k = contract sig' count'' e sub im'' -> contractT im) with
-                           | existT  (e', steps2, count'', im''') bp' =>
-                             fun Heq4 => existT _ (C_inl |[ e' ]|, steps1 + steps2 + 1, count'', im''')
-                                                (b_map_le_i_trans im (M.set (apply_r sig f) true im) (ble_add im im (apply_r sig f) (ble_refl im))
-                                                                  _ (b_map_le_i_trans _ _ bp _ bp'))
-                           end (eq_refl _))
-                      | None =>
-                        (fun Heq5 =>
-                           match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
-                           | existT  (e', steps, count', im') bp =>
-                             fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-                           end (eq_refl _))
+                (* first inline the body *)
+                let inl := inline_letapp e_body x in
+                (match inl as inl' return (inl' = inl -> contractT im) with
+                 (* body can be inlined *)
+                 | Some (C_inl, x') =>
+                   fun Heqi =>
+                     let im' := M.set f' true im in
+                     (* update counts of ys' and xs after setting f' to 0 *)
+                     let count' := update_count_inlined (x' :: ys') (x :: xs) (M.set f' 0 count) in                   
+                     let sig' := set_list (combine xs ys') sig in                                      
+                     let sig'' := M.set x (apply_r sig' x') sig in
+                     (match contract sig'' count' (C_inl |[ e ]|) sub im' as k return (k =  contract sig'' count' (C_inl |[ e ]|) sub im' -> contractT im) with
+                      | existT (e', steps', c, i) bp => 
+                        fun Heql => existT _ (e', steps' + 1, c, i) (b_map_i_true _ _ _ bp)
+                      end (eq_refl _))
+                 | None =>
+                   (fun Heq5 =>
+                      match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
+                      | existT  (e', steps, count', im') bp =>
+                        fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
                       end (eq_refl _))
                  end (eq_refl _))
             | false =>

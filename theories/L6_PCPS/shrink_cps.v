@@ -1268,8 +1268,8 @@ Section CONTRACT.
        | (1%nat, Some (SVfun t' xs e_body)) =>
          (fun Heq1 =>
             (* need t = t' and |xs| = |ys| (also that f' is not already inlined which is needed for the termination proof) *)
-            match ((Pos.eqb t' t) && (Init.Nat.eqb (length ys) (length xs)) && (negb (get_b f' im)) && (straight_code e_body))%bool as k
-                  return (k = ((t' =? t)%positive && (length ys =? length xs) && negb (get_b f' im) && (straight_code e_body))%bool -> contractT im)
+            match ((Pos.eqb t' t) && (Init.Nat.eqb (length ys) (length xs)) && (negb (get_b f' im)))%bool as k
+                  return (k = ((t' =? t)%positive && (length ys =? length xs) && negb (get_b f' im))%bool -> contractT im)
             with
             | true =>
               fun Heq2 =>                         
@@ -1280,10 +1280,10 @@ Section CONTRACT.
                  | Some (C_inl, x') =>
                    fun Heqi =>
                      let im' := M.set f' true im in
-                     (* update counts of ys' and xs after setting f' to 0 *)
-                     let count' := update_count_inlined (x' :: ys') (x :: xs) (M.set f' 0 count) in                   
-                     let sig' := set_list (combine xs ys') sig in                                      
-                     let sig'' := M.set x (apply_r sig' x') sig in
+                     let sig' := set_list (combine xs ys') sig in
+                     let x'' := apply_r sig' x' in
+                     let count' := update_count_inlined (x'' :: ys') (x :: xs) (M.set f' 0 count) in
+                     let sig'' := M.set x x'' sig' in
                      (match contract sig'' count' (C_inl |[ e ]|) sub im' as k return (k =  contract sig'' count' (C_inl |[ e ]|) sub im' -> contractT im) with
                       | existT (e', steps', c, i) bp => 
                         fun Heql => existT _ (e', steps' + 1, c, i) (b_map_i_true _ _ _ bp)
@@ -1531,8 +1531,8 @@ Section CONTRACT.
        | (1%nat, Some (SVfun t' xs e_body)) =>
          (fun Heq1 =>
             (* need t = t' and |xs| = |ys| (also that f' is not already inlined which is needed for the termination proof) *)
-            match ((Pos.eqb t' t) && (Init.Nat.eqb (length ys) (length xs)) && (negb (get_b f' im)) && (straight_code e_body))%bool as k
-                  return (k = ((t' =? t)%positive && (length ys =? length xs) && negb (get_b f' im) && (straight_code e_body))%bool -> contractT im)
+            match ((Pos.eqb t' t) && (Init.Nat.eqb (length ys) (length xs)) && (negb (get_b f' im)))%bool as k
+                  return (k = ((t' =? t)%positive && (length ys =? length xs) && negb (get_b f' im))%bool -> contractT im)
             with
             | true =>
               fun Heq2 =>                         
@@ -1544,9 +1544,10 @@ Section CONTRACT.
                    fun Heqi =>
                      let im' := M.set f' true im in
                      (* update counts of ys' and xs after setting f' to 0 *)
-                     let count' := update_count_inlined (x' :: ys') (x :: xs) (M.set f' 0 count) in                   
-                     let sig' := set_list (combine xs ys') sig in                                      
-                     let sig'' := M.set x (apply_r sig' x') sig in
+                     let sig' := set_list (combine xs ys') sig in
+                     let x'' := apply_r sig' x' in
+                     let count' := update_count_inlined (x'' :: ys') (x :: xs) (M.set f' 0 count) in
+                     let sig'' := M.set x x'' sig' in
                      (match contract sig'' count' (C_inl |[ e ]|) sub im' as k return (k =  contract sig'' count' (C_inl |[ e ]|) sub im' -> contractT im) with
                       | existT (e', steps', c, i) bp => 
                         fun Heql => existT _ (e', steps' + 1, c, i) (b_map_i_true _ _ _ bp)

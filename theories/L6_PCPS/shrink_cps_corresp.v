@@ -5006,21 +5006,6 @@ Section CONTRACT.
   Definition set_list_r {A:Type}  (l : list (M.elt * A)) (map: M.t A) : M.t A :=
     fold_left (fun cmap xv => M.set (fst xv) (snd xv) cmap ) l map.
 
-  Theorem set_list_set:
-    forall a v lx ly,
-      NoDup (a::lx) ->
-      forall (sig:M.t var),
-        M.set a v (set_list (combine lx ly) sig) =mg=
-        set_list (combine lx ly) (M.set a v sig).
-  Proof.
-    induction lx. intros. simpl. apply smg_refl.
-    intros. destruct ly. simpl. apply smg_refl.
-    simpl.  eapply smg_trans.
-    Focus 2. apply proper_set.
-    apply IHlx. inv H. inv H3. constructor; auto. intro; apply H2. constructor 2; auto.
-    apply set_set. inv H. intro; apply H2; constructor; auto.
-  Qed.
-
   Theorem num_occur_set_arl_s:
     forall x y sig,
       x <> y ->
@@ -6544,7 +6529,7 @@ Section CONTRACT.
   Lemma one_rename_all_ar: forall x y v sigma,
       ~ (exists z, M.get z sigma = Some x) ->
       (M.get x sigma = None) ->
-      apply_r (M.set x y sigma) v =   (apply_r (M.set x y (M.empty var)) (apply_r sigma v)).
+      apply_r (M.set x y sigma) v = (apply_r (M.set x y (M.empty var)) (apply_r sigma v)).
   Proof.
     intros.
     destruct (var_dec x v).
@@ -6716,6 +6701,17 @@ Section CONTRACT.
       - reflexivity.
       - simpl. rewrite !apply_r_join. rewrite IHl. reflexivity. 
     Qed.
+    
+    Lemma update_census_list_Prop sig sig' l f count :
+      map_get_r _ sig sig' ->
+      update_census_list sig l f count =
+      update_census_list sig' l f count.
+    Proof. 
+      revert count. induction l; intros Heq count.
+      - reflexivity.
+      - simpl. erewrite prop_apply_r; [| eassumption ].
+        rewrite IHl. eauto. eassumption. 
+    Qed.
 
     Lemma update_census_join_mut :
       (forall e sig f count x y,
@@ -6733,7 +6729,24 @@ Section CONTRACT.
       - rewrite IHb, IHe. reflexivity.
       - rewrite IHb, IHe. reflexivity.
     Qed. 
-      
+    
+    Lemma update_census_Prop :
+      (forall e sig sig' f count,
+          map_get_r _ sig sig' ->
+          update_census sig e f count = update_census sig' e f count) /\
+      (forall B sig sig' f count,
+          map_get_r _ sig sig' ->
+          update_census_f sig B f count = update_census_f sig' B f count).
+    Proof.
+      exp_defs_induction IHe IHl IHb; intros; simpl;
+        (try erewrite update_census_list_Prop; eauto);
+        (try erewrite prop_apply_r; eauto).
+      - simpl in IHl. erewrite <- IHl; [| eassumption ].
+        erewrite <- prop_apply_r; [| eassumption ]. erewrite IHe. reflexivity. eassumption.
+      - erewrite IHb, IHe; eauto.
+      - erewrite IHb, IHe; eauto.
+    Qed. 
+
     Lemma apply_r_list_join sig z x y : 
       apply_r_list sig (apply_r_list (M.set x y (M.empty _)) z) =
       apply_r_list (M.set x (apply_r sig y) sig) z.
@@ -6760,96 +6773,256 @@ Section CONTRACT.
       rewrite <- !dec_census_all_case_sub.
       unfold dec_census. rewrite (proj1 update_census_join_mut). reflexivity.
     Qed. 
-      
-    (* Shrink commutes with rename *)
-    Lemma contract_rename sig count e sub sub' im x y:
-      map_eq_f (rename_sval (M.set x y (M.empty _))) sub sub' ->
-      contract (M.set x (apply_r sig y) sig) count e sub im =
-      contract sig count (rename_all_ns (M.set x y (M.empty _)) e) sub' im. 
-    Proof.
-      revert sig count. remember (1 + term_sub_inl_size (e, sub, im)) as n.
-      assert (n > term_sub_inl_size (e, sub, im)) by omega. clear Heqn. 
-      revert e sub sub' im H. induction n; intros e sub sub' im Hleq sig count Hmeq. now inv Hleq. rewrite !contract_eq.
-      destruct e; simpl (rename_all_ns _ _); unfold contract_def.
-      - (* constr *)      
-        destruct (get_c v count).
-        + erewrite IHn; [| | eassumption ].
-          unfold dec_census_list. rewrite update_census_list_join. reflexivity.
-          unfold term_sub_inl_size in *. simpl in *. omega.
-        + remember (contract (M.set x (apply_r sig y) sig) count e (M.set v (SVconstr c l) sub) im) as s. 
-          symmetry in Heqs. destruct s as [[[[ ? ? ] ? ] ? ] ? ].
-          erewrite IHn in Heqs. rewrite Heqs.
-          * destruct (get_c v c0).
-            unfold dec_census_list. rewrite update_census_list_join. reflexivity.
-            rewrite apply_r_list_join. reflexivity.
-          * eapply NPeano.Nat.lt_le_trans. apply constr_sub_size. omega.
-          * replace (SVconstr c (apply_r_list (M.set x y (M.empty M.elt)) l)) with
-                (rename_sval (M.set x y (M.empty M.elt)) (SVconstr c l)) by reflexivity. 
-            eapply map_eq_f_set. eassumption.
-      - (* case *)
-        destruct (sub ! (apply_r (M.set x (apply_r sig y) sig) v)) eqn:Hcon.
-        + assert (Hcon' := Hcon). eapply map_eq_f_get in Hcon'; eauto.
-          rewrite apply_r_join. rewrite Hcon'.
-          destruct s; simpl.
-          * remember (findtag l c) as f. assert (Heqf' := Heqf). symmetry in Heqf'. eapply findtag_map_res in Heqf'.
-            rewrite Heqf'. destruct f; simpl. 
-            -- erewrite IHn.
-               ++ unfold dec_census_list. rewrite <- update_census_list_join. simpl.
-                  rewrite !apply_r_join. 
-                  reflexivity.
-                  admit. (* dec_census_case *)
-               ++ assert ( term_size e < term_size (Ecase v l)).
-                  { eapply case_size. apply findtag_In. eauto. } 
-                  unfold term_sub_inl_size in *. simpl in *. omega.
-               ++ eassumption.
-            -- simpl. admit. (* contractcases *)
-          * admit. (* constractcase *)
-        + admit. (* constractcase *)
-      - (* proj *) admit. 
-      - rewrite apply_r_join. destruct (get_c (apply_r (M.set x (apply_r sig y) sig) v0)).
-        + remember (contract (M.set x (apply_r sig y) sig) count e sub im) as s.
-          symmetry in Heqs. destruct s as [[[[ ? ? ] ? ] ? ] ? ].
-          erewrite IHn in Heqs. rewrite Heqs.
-          admit. (* apply_r_list *)
-          unfold term_sub_inl_size in *. simpl in *. omega.
-          eassumption. 
-        + destruct n0.
-          * remember (sub ! (apply_r (M.set x (apply_r sig y) sig) v0)) as g.
-            assert (Heqg' := Heqg). symmetry in Heqg'. eapply map_eq_f_get in Heqg'; [| eassumption ].
-            rewrite Heqg'. 
-            destruct g as [[ | ] | ]. 
-            -- simpl. 
-          * 
-          simpl in *. 
-          erewrite IHn; [| | eassumption ].
-          admit.
-          
-        eapply map_eq_f_set. 
-                  simpl in *; omega. simpl in H6. omega.unfold term_sub_inl_size in *. simpl. simpl in Hleq. .
-                 (map
-                 (fun p : var * exp =>
-                  let (k, e0) := p in (k, rename_all_ns (M.set x y (M.empty M.elt)) e0)) l
-          rewrite Hcon'. rewrite <- Hmeq in Hcon'. 
-          ; eassumption ]. 
-                         rewrite Heqs.
-
-  (* Lemma inline_letapp_grs n x e1 e2 C1 C2 x1 x2 e : *)
-  (*   sr_rw n e1 e2 -> *)
-  (*   inline_letapp e1 x = Some (C1, x1) -> *)
-  (*   inline_letapp e2 x = Some (C2, x2) -> *)
-  (*   gen_sr_rw n (C1 |[ e ]|) (C2 |[ rename x1 x2 e ]|). *)
-  (* Proof. *)
-  (*   assert (Hgen := Ctx_sr_rw 1 Hole_c). simpl in Hgen. *)
-  (*   intros Hrw Hl1 Hl2. inv Hrw; simpl in Hl1, Hl2. *)
-  (*   8:{ destruct (inline_letapp (c |[ Eapp f t vs ]|)) as [[Cinl1 y1] |] eqn:Hin1; try congruence. *)
-  (*       destruct (inline_letapp (c |[ rename_all_ns (set_list (combine xs vs) (M.empty var)) fb ]|) x) *)
-  (*         as [[Cinl2 y2] |] eqn:Hin2; try congruence. inv Hin1; inv Hin2. *)
-  (*       eapply Hgen. inv Hl1. inv Hl2. eapply Fun_inline_s. *)
-  (*       - rewrite Hl2 in Hl1. inv Hl1. unfold rename. rewrite rename_all_refl. *)
-  (*     simpl. assert (Hgen := Ctx_sr_rw 1 Hole_c). simpl in Hgen. eapply Hgen.  *)
-  (*     eapply Constr_dead_s. admit. admit.  *)
-  (*   7:{  *)
     
+    Lemma dec_census_all_case_Prop sig sig' l v :
+      map_get_r _ sig sig' -> 
+      dec_census_all_case sig l v = dec_census_all_case sig' l v.
+    Proof.
+      induction l. intros Hc. reflexivity.
+      intros Hc. simpl. destruct a. unfold dec_census. erewrite (proj1 update_census_Prop); [| eassumption ].
+      rewrite IHl. reflexivity. eassumption.
+    Qed. 
+
+    Lemma dec_census_case_Prop sig sig' l v c :
+      map_get_r _ sig sig' -> 
+      dec_census_case sig l v c = dec_census_case sig' l v c.
+    Proof.
+      intros Hc. induction l. reflexivity.
+      simpl. destruct a. rewrite <- !IHl; eauto.
+      (erewrite (dec_census_all_case_Prop sig sig'); eauto).
+      (erewrite <- (dec_census_all_case_Prop sig sig'); eauto).
+      unfold dec_census. erewrite (proj1 update_census_Prop). reflexivity.
+      eassumption.
+    Qed. 
+
+    Definition bv_map (sub : ctx_map) :=
+      (fun x => exists f ft xs e, sub ! f = Some (SVfun ft xs e) /\ x \in FromList xs :|: bound_var e).
+    
+    Lemma bv_map_set_Vconstr sub x c l :
+      bv_map (M.set x (SVconstr c l) sub) \subset bv_map sub.
+    Proof.
+      intros z (f & ft & xs & e & Hget & Hin).
+      do 4 eexists; split; eauto. rewrite M.gso in Hget. eassumption.
+      intros Hc; subst. rewrite M.gss in Hget. congruence.
+    Qed.
+    
+    Lemma bv_map_get_SVfun f sub ft xs e :
+      M.get f sub = Some (SVfun ft xs e) ->
+      FromList xs :|: bound_var e  \subset bv_map sub.
+    Proof.
+      intros Hget x Hin.
+      do 4 eexists; split; eauto.
+    Qed.
+    
+    Lemma bv_map_set_SVfun sub x ft xs e :
+      bv_map (M.set x (SVfun ft xs e) sub) \subset FromList xs :|: bound_var e :|: bv_map sub.
+    Proof.
+      intros z (f & ft' & xs' & e' & Hget & Hin).
+      destruct (peq x f); subst.
+      - rewrite M.gss in Hget. inv Hget. now left.
+      - right. do 4 eexists; split; eauto. rewrite M.gso in Hget; eauto.
+    Qed.
+
+    Lemma inline_letapp_rename e x C x' sig :
+      apply_r sig x = x ->
+      inline_letapp e x = Some (C, x') ->
+      inline_letapp (rename_all_ns sig e) x = Some (rename_all_ctx_ns sig C, apply_r sig x').
+    Proof.
+      revert x C x' sig; induction e; intros x C x' sig Hyp Hinl; simpl in *;
+        try match goal with
+            | [H : context[inline_letapp ?E ?X] |- _ ] => destruct (inline_letapp E X) as [[C' y] | ] eqn:Hinl'; inv Hinl
+            end;
+        try now (erewrite IHe; [| eassumption | ]).
+      - inv Hinl.
+      - inv Hinl; eauto. simpl. rewrite Hyp. reflexivity.
+      - inv Hinl. reflexivity.
+    Qed.
+
+    Lemma inline_letapp_None e x sig :
+      inline_letapp e x = None ->
+      inline_letapp (rename_all_ns sig e) x = None.
+    Proof.
+      revert x sig; induction e; intros x sig Hinl; simpl in *;
+        try match goal with
+            | [H : context[inline_letapp ?E ?X] |- _ ] => destruct (inline_letapp E X) as [[C' y] | ] eqn:Hinl'; inv Hinl
+            end;
+        try now (erewrite IHe; [| eassumption ]).
+      - reflexivity.
+      - inv Hinl.
+      - inv Hinl.
+    Qed.
+
+
+    Definition map_eq_ren {A} f (m1 m2 : M.t A) :=
+      forall v : positive, m1 ! v = m2 ! (f v).      
+
+    (* Lemma apply_rset_comm sig x v1 y v2 : *)
+    (*   x <> y -> *)
+    (*   apply_r (M.set x v1 (M.set x v2 sig)) x = apply_r (M.set x *)
+    
+    Theorem set_list_set {A} a (v : A) lx ly sig : 
+      ~ a \in FromList lx ->
+      M.set a v (set_list (combine lx ly) sig) =mg= set_list (combine lx ly) (M.set a v sig).
+    Proof.
+      revert a v ly sig. induction lx. intros. simpl. now apply smg_refl.
+      intros. destruct ly. simpl. now apply smg_refl.
+      simpl.
+      eapply smg_trans. eapply set_set. intros Hc; subst; eapply H; eauto. 
+      now left.
+      eapply proper_set. eapply IHlx.
+      intros Hc; eapply H. now right. 
+    Qed.
+
+    Lemma apply_r_permut_set_setlist a v lx ly sig y :
+      ~ a \in FromList lx ->
+      apply_r (M.set a v (set_list (combine lx ly) sig)) y =
+      apply_r (set_list (combine lx ly) (M.set a v sig)) y.
+    Proof. 
+      intros. eapply prop_apply_r. eapply set_list_set. eassumption.
+    Qed. 
+
+    Lemma set_list_map_get_d_prop {A} l (m1 m2 : M.t A) :
+      m1 =mg= m2 ->
+      set_list l m1 =mg= set_list l m2.
+    Proof.
+      intros Heq. induction l. simpl; eassumption.
+      simpl. eapply proper_set. eassumption.
+    Qed. 
+
+    Lemma nthN_None_l {A} (l l' : list A) n :
+      nthN l n = None ->
+      length l = length l' -> 
+      nthN l' n = None.  
+    Proof.
+      revert l' n. induction l; intros; simpl.
+      - destruct l'; simpl in *; eauto; congruence.
+      - destruct l'; simpl in *; eauto. destruct n; try congruence.
+        eapply IHl; eauto.
+    Qed.
+
+
+  Lemma rename_all_ns_join y x sig :
+    (forall e, rename_all_ns (M.set x (apply_r sig y) sig) e = rename_all_ns sig (rename_all_ns (M.set x y (M.empty _)) e)) /\
+    (forall f, rename_all_fun_ns (M.set x (apply_r sig y) sig) f = rename_all_fun_ns sig (rename_all_fun_ns (M.set x y (M.empty _)) f)).
+  Proof.
+    exp_defs_induction IHe IHl IHB; intros;
+      simpl; (try rewrite apply_r_list_join); (try rewrite apply_r_join); (try rewrite IHe); try reflexivity.
+    - simpl in IHl. inv IHl. rewrite H1. reflexivity.
+    - rewrite IHB. reflexivity.
+    - rewrite IHB. reflexivity.      
+  Qed.
+
+  Lemma apply_r_pull x y z sig :
+    ~ x \in Range_map sig ->
+    ~ x \in Dom_map sig ->
+    apply_r (M.set x (apply_r sig y) (M.empty _)) (apply_r sig z) = apply_r sig (apply_r (M.set x y (M.empty _)) z).
+  Proof.
+    intros. unfold apply_r.
+    destruct (@M.get M.elt z sig) eqn:Heqz.
+    + rewrite M.gso with (i := z). rewrite M.gempty. rewrite Heqz.
+      destruct (M.get y sig).
+      * rewrite M.gso, M.gempty. reflexivity.
+        intros Hc; subst. eapply H; eexists; eauto.
+      * rewrite M.gso, M.gempty. reflexivity.
+        intros Hc; subst. eapply H; eexists; eauto.
+      * intros Hc; subst. eapply H0; eexists; eauto.
+    + destruct (peq x z); subst.
+      * rewrite !M.gss. reflexivity.
+      * rewrite !M.gso, !M.gempty; eauto. rewrite Heqz. reflexivity.
+  Qed.
+
+
+  Lemma apply_r_list_pull x y zs sig :
+    ~ x \in Range_map sig ->
+    ~ x \in Dom_map sig ->
+    apply_r_list (M.set x (apply_r sig y) (M.empty _)) (apply_r_list sig zs) = apply_r_list sig (apply_r_list (M.set x y (M.empty _)) zs).
+  Proof.
+    intros. induction zs. reflexivity.
+    simpl. rewrite apply_r_pull; eauto. rewrite IHzs. reflexivity.
+  Qed.
+  
+  Lemma rename_all_ns_push y x sig :   
+    (forall e,
+         ~ x \in Range_map sig -> ~ x \in Dom_map sig ->
+        rename_all_ns (M.set x (apply_r sig y) (M.empty _)) (rename_all_ns sig e) = rename_all_ns sig (rename_all_ns (M.set x y (M.empty _)) e)) /\
+    (forall f,
+        ~ x \in Range_map sig -> ~ x \in Dom_map sig ->
+        rename_all_fun_ns (M.set x (apply_r sig y) (M.empty _)) (rename_all_fun_ns sig f) =
+        rename_all_fun_ns sig (rename_all_fun_ns (M.set x y (M.empty _)) f)).
+  Proof.
+    intros.
+    exp_defs_induction IHe IHl IHB; intros;
+      simpl; (try rewrite apply_r_list_pull; eauto); (try rewrite apply_r_pull; eauto); (try rewrite IHe; eauto); try reflexivity.
+    - simpl in IHl. specialize (IHl H H0). inv IHl. reflexivity.
+    - rewrite IHB; eauto.
+    - rewrite IHB; eauto.
+  Qed.
+
+  
+  Lemma rename_all_ns_list_join xs ys sig e :
+    Disjoint _ (FromList xs) (FromList ys) ->
+    rename_all_ns (set_list (combine xs (apply_r_list sig ys)) sig) e =
+    rename_all_ns sig (rename_all_ns (set_list (combine xs ys) (M.empty _)) e).
+  Proof.
+    revert ys sig e; induction xs; intros.
+    - simpl. rewrite <- (proj1 rename_all_ns_empty). reflexivity.
+    - simpl. destruct ys as [| y ys].
+      + simpl. rewrite <- (proj1 rename_all_ns_empty). reflexivity.
+      + simpl. repeat normalize_sets.  rewrite <- (apply_r_set_list2 y sig  xs (apply_r_list sig ys)). 
+        rewrite (proj1 (rename_all_ns_join _ _ _)). rewrite IHxs.
+        assert (Heqs: y = apply_r (set_list (combine xs ys) (M.empty positive)) y). 
+        { rewrite apply_r_set_list2. rewrite apply_r_empty . reflexivity.
+          intros Hc; eapply H; eauto. }
+        rewrite Heqs at 2. rewrite (proj1 (rename_all_ns_join _ _ _)). reflexivity.
+        eapply Disjoint_Included; [| | eassumption ]; sets.  
+        intros Hc. eapply H; constructor; eauto. 
+  Qed. 
+
+  Lemma rename_all_ns_Disjoint m e :
+    Disjoint _ (Dom_map m) (Complement _ (dead_var e)) ->
+    rename_all_ns m e = e. 
+  Proof.
+    intros. erewrite (proj1 eq_P_rename_all_ns).
+    rewrite <- (proj1 rename_all_ns_empty). reflexivity.
+    intros x Hin. inv H. rewrite M.gempty.
+    destruct (m ! x) eqn:H; eauto.
+    exfalso. eapply H0. constructor; eauto.
+    eexists; eauto.
+  Qed.
+
+
+  Theorem rename_all_ctx_ns_empty:
+    (forall C, C = rename_all_ctx_ns (M.empty var) C) /\
+    (forall fds, fds = rename_all_fun_ctx_ns (M.empty var) fds).
+  Proof.
+    exp_fundefs_ctx_induction IHe IHB; intros; simpl;
+      try rewrite apply_r_empty; try rewrite apply_r_list_empty;
+        try rewrite <- IHe; try rewrite <- IHB;
+          try rewrite <- (proj2 rename_all_ns_empty);
+          try rewrite <- (proj1 rename_all_ns_empty);
+          try reflexivity.
+    - rewrite !(proj1 All_Forall.forall_map_id_spec). reflexivity.
+      induction l0; eauto. constructor; eauto.
+      destruct a. erewrite <- (proj1 rename_all_ns_empty). reflexivity.
+
+      induction l; eauto. constructor; eauto.
+      destruct a. erewrite <- (proj1 rename_all_ns_empty). reflexivity.      
+  Qed.
+
+
+  Lemma rename_all_ctx_ns_Disjoint m e :
+    Disjoint _ (Dom_map m) (Complement _ (dead_var_ctx e)) ->
+    rename_all_ctx_ns m e = e. 
+  Proof.
+    intros. erewrite (proj1 eq_P_rename_all_ctx_ns) with (sub' := M.empty _).
+    rewrite <- (proj1 rename_all_ctx_ns_empty). reflexivity.
+    intros x Hin. inv H. rewrite M.gempty.
+    destruct (m ! x) eqn:H; eauto.
+    exfalso. eapply H0. constructor; eauto.
+    eexists; eauto.
+  Qed.
+
+
   (** main theorem! contract produces an output term related to the input by the shrink rewrite system.
       The output count is correct for the output state, and the returned maps respect their respective invariant *)
   Theorem shrink_corresp:
@@ -7588,59 +7761,148 @@ Section CONTRACT.
       + (* fun *) eapply Hsame. eassumption.
       + (* none *) eapply Hsame. eassumption. }
     - (* letapp *)
-      destruct (Nat.eq_dec (get_c (apply_r sig v0) count) 1) as [Hnum | Hnum].
-      + destruct (get_c (apply_r sig v0) count) as [| [|] ] eqn:Hgetc; try congruence. clear Hnum.
-        destruct (sub ! (apply_r sig v0)) as [[|] | ] eqn:Hsub. 
+      destruct (get_c (apply_r sig v0) count) as [| [|] ] eqn:Hgetc. 
+      + (* 0 *) admit. (* same *)
+      + destruct (sub ! (apply_r sig v0)) as [[|] | ] eqn:Hsub. 
         * (* f is Vconstr *) admit. (* same *)
         * (* f in Vfun *)
-          destruct ((f0 =? f)%positive && (Datatypes.length l =? Datatypes.length l0) && negb (get_b (apply_r sig v0) inl) && straight_code e0) eqn:Hel.
+          destruct ((f0 =? f)%positive && (Datatypes.length l =? Datatypes.length l0) && negb (get_b (apply_r sig v0) inl)) eqn:Hel.
           { (* function inlining *)
             apply andb_true_iff in Hel. destruct Hel as (Hel123, Hel4).
             apply andb_true_iff in Hel123. destruct Hel123 as (Hel12, Hel3).
-            apply andb_true_iff in Hel12. destruct Hel12 as (Hel1, Hel2). eapply Peqb_true_eq in Hel1. apply beq_nat_true in Hel2. subst.
-            remember (contract (set_list (combine l0 (apply_r_list sig l)) sig)
-                               (update_count_inlined (apply_r_list sig l) l0 (M.set (apply_r sig v0) 0 count)) e0 sub (M.set (apply_r sig v0) true inl)) as s.
-            destruct s as [[[[? ?] ?] ?] ?].
-            assert (Hsub' := Hsub). apply H3 in Hsub'. destructAll. simpl in ce, ce'.
-            (* sig v wasn't inlined before not dead *)
-            assert (Hsvi : get_b (apply_r sig v0) inl = false).
-            { destruct (get_b (apply_r sig v0) inl) eqn:gbvi.
-              - (* impossible because not dead *)
-                clear H6. exfalso. apply H4 in gbvi. destructAll.
-                apply not_bound_dead_or_free in H6.
-                eapply H7 in Hsub. inv H6.                 
-                2:{ apply H1 in H8; inv H8. }  apply num_occur_app_ctx in H8.
-                destructAll; pi0. inv H8. rewrite peq_true in H16. inv H16.
-              - reflexivity. }
+            eapply Peqb_true_eq in Hel12. apply beq_nat_true in Hel3. subst.
             
-            destruct (inline_letapp e1 v) as [[Cinl x'] | ] eqn:Hinl.
-            - remember (contract (M.set v (apply_r sig x') sig) c0 e sub b) as s'. destruct s' as [[[[? ? ] ?] ? ] ?]. inv H6. 
-              symmetry in Heqs. symmetry in Heqs'.
+            assert (Hnin : ~ v \in FromList l0 :|: FromList l). { admit. }
+            assert (Hdis : Disjoint positive (FromList l0) (FromList l)) by admit.  
 
-              unfold ce. 
-              assert (Hctx_rw :
-                       rename_all_ctx_ns
-                         sig (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v0) f l0 e0 x2)) x0)) inl)
-                         |[ Eletapp v (apply_r sig v0) f (apply_r_list sig l) (rename_all_ns sig e) ]| =
-                       rename_all_ctx_ns sig (inlined_ctx_f x inl) |[
+            destruct (inline_letapp e0 v) as [[Cinl x'] | ] eqn:Hinl. 
+            - assert (Hinl' := Hinl). eapply inline_letapp_rename with (sig := set_list (combine l0 l) (M.empty _)) in Hinl'. 
+              2:{ rewrite apply_r_set_list2. rewrite apply_r_empty. reflexivity. intros Hc. eauto. }
+              
+              assert (Hdead1 : FromList l0 \subset (dead_var (rename_all_ns sig e))).
+              { admit. (* params of function do not appear free in vars of e *) }
+              assert (Hdead2 : FromList l0 \subset dead_var_ctx (rename_all_ctx_ns sig (inlined_ctx_f c inl))).
+              { admit. }
+              assert (Hd1 : v \in dead_var_ctx Cinl).
+              { admit. }
+              
+              remember (contract
+                          (M.set v (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')
+                                 (set_list (combine l0 (apply_r_list sig l)) sig))
+                          (update_count_inlined
+                             (apply_r
+                                (set_list
+                                   (combine l0 (apply_r_list sig l)) sig)
+                                x' :: apply_r_list sig l) 
+                             (v :: l0) (M.set (apply_r sig v0) 0 count))
+                          (Cinl |[ e ]|) sub (M.set (apply_r sig v0) true inl)) as s.
+              destruct s as [[[[? ?] ?] ?] ?]. symmetry in Heqs.
+              eapply IHn with (c := c) in Heqs.
+              { destructAll. inv H6.
+                assert (Heq : rename_all_ns
+                                (M.set v (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')
+                                       (set_list (combine l0 (apply_r_list sig l)) sig))
+                                (Cinl |[ e ]|) =
+                              (rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) (M.empty _)) (rename_all_ctx_ns sig Cinl))
+                               |[ rename_all_ns (M.set v (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x') (M.empty _)) (rename_all_ns sig e) ]|).
+                { (* erewrite <- (proj1 (one_rename_all_ns_mut _ _ _ Hnin2 Hnin1)). *)
+                  assert (Hrw := proj1 (set_list_rename_all_ns [v] [x'])).
+                  simpl in Hrw. rewrite <- Hrw. 
+                  erewrite <- (proj1 (set_list_rename_all_ns _ _)).
+                  do 3 erewrite (proj1 (rename_all_ns_app_ctx _ _)). f_equal.
+                  - rewrite rename_all_ctx_ns_Disjoint. reflexivity.
+                    rewrite Dom_map_set, Dom_map_empty. normalize_sets. eapply Disjoint_sym. eapply Complement_Disjoint.
+                    eapply Singleton_Included. admit. (* dead var rename? *) 
+                  - erewrite rename_all_ns_Disjoint with (e := (rename_all_ns sig e)). reflexivity.
+                    rewrite Dom_map_set_list, Dom_map_empty. normalize_sets.
+                    eapply Disjoint_sym. eapply Complement_Disjoint. eassumption.
+                    rewrite length_apply_r_list. eauto.
+                  - admit. (* messy but ok *)
+                  - admit. (* from sig_inv *)
+                  - admit. (* messy but ok *)
+                  - rewrite Dom_map_set_list. eapply Union_Disjoint_r. repeat normalize_sets. eapply Disjoint_Singleton_l.
+                    now eauto. admit. (* from sig_inv *) rewrite length_apply_r_list. eauto. } 
+                    
+                    , Dom_map_empty. 
+                    eapply Included_Union_preserv_r. 
+                    rewrite <- (proj1 (set_list_rename_all_ns _ _)).
+                    rewrite rename_all_ns_join. eapply eq_P_rename_all_ctx_ns. eapply eq_env_P_set_not_in_P_l. eapply eq_env_P_refl.
+                    reflexivity.
+                     f_equal. erewrite (proj1 (rename_all_ns_app_ctx _ _)).                
+                  rewrite rename_all_ctx_ns_Disjoint with (m := M.set _ _ _ ).
+                  erewrite <- (proj1 (rename_all_ns_push _ _ _)).
+                  rewrite rename_all_ns_Disjoint with (e := e). reflexivity. 
+                  - rewrite Dom_map_set_list, Dom_map_empty. normalize_sets. sets.
+                    eapply Disjoint_sym. eapply Complement_Disjoint. eassumption. eauto.
+                  - intros Hc. eapply Range_map_set_list in Hc. eauto.
+                  - rewrite Dom_map_set_list, Dom_map_empty. normalize_sets. eauto. eauto.
+                  - rewrite Dom_map_set, Dom_map_empty. normalize_sets.
+                    eapply Disjoint_sym. eapply Complement_Disjoint. eapply Singleton_Included. eassumption.
+                  - eassumption. }
+                rewrite Heq in H7.
+                assert (Hsub' := Hsub). apply H3 in Hsub. destructAll. simpl in ce. eapply negb_true_iff in Hel4. 
+
+                assert (Hctx_rw :
+                          rename_all_ctx_ns
+                            sig
+                            (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v0) f l0 e0 x2))  x0)) inl)
+                       |[ Eletapp v (apply_r sig v0) f (apply_r_list sig l) (rename_all_ns sig e) ]| = 
+                                                                                                     rename_all_ctx_ns sig (inlined_ctx_f x inl) |[
                          Efun (fundefs_append (rename_all_fun_ns sig (inlined_fundefs_f x1 inl)) (Fcons (apply_r sig v0) f l0 (rename_all_ns sig e0) (rename_all_fun_ns sig (inlined_fundefs_f x2 inl))))
                               (rename_all_ctx_ns sig (inlined_ctx_f x0 inl) |[ Eletapp v (apply_r sig v0) f (apply_r_list sig l) (rename_all_ns sig e) ]|) ]|).
-              { ctx_inl_push. rewrite inlined_fundefs_append.
-                rewrite rename_all_ns_fundefs_append. simpl. rewrite Hsvi. auto. }
-              rewrite Hctx_rw. 
+                { ctx_inl_push. rewrite inlined_fundefs_append.
+                  rewrite rename_all_ns_fundefs_append. simpl. rewrite Hel4. reflexivity. }
+                assert (H_inl_ctx: (rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
+                                                      (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0))
+                                                                     (M.set (apply_r sig v0) true inl)) =
+                                    (rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
+                                                       (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v0) f l0 e0 x2)) x0))
+                                                                      (M.set (apply_r sig v0) true inl))))).
+                { repeat normalize_ctx. simpl. do 2 (rewrite inlined_fundefs_append). simpl. unfold get_b. rewrite M.gss. reflexivity. }
 
-              assert (H_inl_ctx: (rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
-                                                    (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 x2) x0))
-                                                                   (M.set (apply_r sig v0) true inl)) =
-                                  (rename_all_ctx_ns (set_list (combine l0 (apply_r_list sig l)) sig)
-                                                     (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v0) f l0 e0 x2)) x0))
-                                                                    (M.set (apply_r sig v0) true inl))))).
-              { repeat normalize_ctx. simpl. do 2 (rewrite inlined_fundefs_append). simpl. unfold get_b. rewrite M.gss. reflexivity. }
-              
-              (* (* first IH *) eapply IHn in Heqs; eauto. (* second IH *) eapply IHn in Heqs'; eauto. *)
-              (* + destructAll. split; [| split; [| split ]]. *)
-              (*   (* Show goal *) *)
-              (*   * unfold ce, ce'.  *)
+                assert (Heqp : eq_env_P
+                                 (Complement _ (dead_var_ctx
+                                                  (inlined_ctx_f
+                                                     (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v0) f l0 e0 x2)) x0)) im')))
+                                 (M.set v (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x') (set_list (combine l0 (apply_r_list sig l)) sig))
+                                 sig).
+                { eapply eq_env_P_set_not_in_P_l. eapply eq_env_P_antimon. eapply eq_P_set_list_not_in. 
+                  eapply Complement_antimon.
+                  repeat normalize_ctx. simpl. do 1 (rewrite inlined_fundefs_append). simpl.
+                  assert (Hb : get_b (apply_r sig v0) im' = true). { eapply b_map_le_c in b0. eapply b0. unfold get_b. now rewrite M.gss. }
+                  rewrite Hb. 
+                    in Hel4.
+                  runfold get_b. rewrite M.gss. reflexivity.
+                erewrite !(proj1 eq_P_rename_all_ctx_ns) with (sub := M.set v (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')
+                                                                           (set_list (combine l0 (apply_r_list sig l)) sig)) (sub' := sig) in *.
+                erewrite (proj1 eq_P_rename_all_ctx_ns) with (sub := M.set v (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')
+                                                                           (set_list (combine l0 (apply_r_list sig l)) sig)) (sub' := sig) in H7.
+                erewrite (proj1 eq_P_rename_all_ctx_ns) with (sub' := sig) in H7.
+                split; [| split; [| split ]].
+                + rewrite plus_comm. eapply gsr_clos_trans. ; [| eassumption ].
+
+                  (rename_all_ctx_ns
+                     (M.set v (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')
+                            (set_list (combine l0 (apply_r_list sig l)) sig))
+                     (inlined_ctx_f
+                        (comp_ctx_f x
+                                    (Efun1_c
+                                       (fundefs_append x1
+                                                       (Fcons (apply_r sig v0) f l0 e0
+                                                              x2)) x0)) im') |[ e' ]|)
+                    rename_all_ctx_ns sig
+                    (inlined_ctx_f
+                       (comp_ctx_f x
+                                   (Efun1_c
+                                      (fundefs_append x1
+                                                      (Fcons (apply_r sig v0) f l0 e0
+                                                             x2)) x0)) im') |[ e' ]|
+                  
+                  assert (Hclos := gs
+                                     (* (* first IH *) eapply IHn in Heqs; eauto. (* second IH *) eapply IHn in Heqs'; eauto. *)
+                                     (* + destructAll. split; [| split; [| split ]]. *)
+                                     (*   (* Show goal *) *)
+                                     (*   * unfold ce, ce'.  *)
                   
               
             (*     inv H6. admit. *)

@@ -675,6 +675,15 @@ Fixpoint update_count_inlined (ys:list var) (xs:list var) (count:c_map) :=
   | _, _ => count
   end.
 
+Definition update_count_letapp (x x' : var) (count:c_map) :=
+  if var_dec x x' then
+    count
+  else
+    let count' := M.set x 0 count in (* let-binding doesn't occur anymore *)
+    let c_x := get_c x count in
+    let c_x' := get_c x' count in
+    M.set x' (c_x + c_x' - 1) count (* all occurences of x will become x', and Halt x' is removed by inline_letapp *).
+
 
 Section RENAME.
 
@@ -944,6 +953,32 @@ Section RENAME.
     rename_all (M.set x y (M.empty var)) e.
   
   Transparent rename.
+
+  Theorem term_size_rename_all_ns sig :
+    (forall e, term_size (rename_all_ns sig e) = term_size e) /\
+    (forall B, funs_size (rename_all_fun_ns sig B) = funs_size B).
+  Proof.
+    exp_defs_induction IHe IHl IHb; simpl; try omega.    
+    rewrite IHe. f_equal. simpl in IHl. inv IHl. rewrite H0. reflexivity.
+  Qed.
+  
+  (* TODO move *)
+  Lemma inline_letapp_rename e x C x' sig :
+    apply_r sig x = x ->
+    inline_letapp e x = Some (C, x') ->
+    inline_letapp (rename_all_ns sig e) x = Some (rename_all_ctx_ns sig C, apply_r sig x').
+  Proof.
+    revert x C x' sig; induction e; intros x C x' sig Hyp Hinl; simpl in *;
+      try match goal with
+          | [H : context[inline_letapp ?E ?X] |- _ ] => destruct (inline_letapp E X) as [[C' y] | ] eqn:Hinl'; inv Hinl
+          end;
+      try now (erewrite IHe; [| eassumption | ]).
+    - inv Hinl.
+    - inv Hinl; eauto. simpl. rewrite Hyp. reflexivity.
+    - inv Hinl. reflexivity.
+  Qed.
+
+
 End RENAME.
 
 Section CONTRACT.
@@ -1256,10 +1291,7 @@ Section CONTRACT.
          end)
       end
     | Eletapp x f t ys e =>
-      (* Zoe: I couldn't get the equality proof of the two defs to go through without expanding all the return types
-         in this definition which makes this code hard to read *)
-      (* Zoe: For now don't delete the binding if it's dead code since the divergence may not be preserved (* not Coq specific *) *)
-      (* check how many times the function is used *)
+      (* Zoe: For now don't delete the binding if it's dead code since the divergence may not be preserved (* not Coq specific opt *) *)
       let f' := apply_r sig f in
       let ys' := apply_r_list sig ys in
       let f_no := get_c f' count in
@@ -1281,10 +1313,13 @@ Section CONTRACT.
                    fun Heqi =>
                      let im' := M.set f' true im in
                      let sig' := set_list (combine xs ys') sig in
-                     let x'' := apply_r sig' x' in
-                     let count' := update_count_inlined (x'' :: ys') (x :: xs) (M.set f' 0 count) in
-                     let sig'' := M.set x x'' sig' in
-                     (match contract sig'' count' (C_inl |[ e ]|) sub im' as k return (k =  contract sig'' count' (C_inl |[ e ]|) sub im' -> contractT im) with
+                     let count' := update_count_letapp (apply_r sig' x') x (update_count_inlined  ys' xs (M.set x 0 (M.set f' 0 count))) in
+                     (* IMPORTANT NOTE: There is a very sublte point with substitutions here. Ideadly we would like to avoid traversing
+                      * e to do the substitution. But we cannot put [sig'(x')/x] in the renaming for x' will not be rename with all the
+                      * shrinks happening in Cinl. Maybe to avoid it one could introduce a second rename map to be applied before the
+                      * sig renaming  *)
+                     (match contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' as k
+                            return (k =  contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' -> contractT im) with
                       | existT (e', steps', c, i) bp => 
                         fun Heql => existT _ (e', steps' + 1, c, i) (b_map_i_true _ _ _ bp)
                       end (eq_refl _))
@@ -1445,9 +1480,8 @@ Section CONTRACT.
     unfold term_sub_inl_size; simpl.
     symmetry in H4.
     apply sub_inl_fun_size with (im :=  im) in H4.
-    symmetry in Heqi. eapply term_size_inline_letapp with (e' := e) in Heqi.
-    simpl. eapply Peano.le_n_S.
-    eapply le_trans. eapply plus_le_compat_r. eassumption.
+    eapply le_lt_trans. eapply plus_le_compat_r. eapply term_size_inline_letapp.
+    now eauto. rewrite (proj1 (term_size_rename_all_ns _)).    
     rewrite plus_comm, plus_assoc.
     rewrite <- H4. omega.
     symmetry in Heq2.
@@ -1543,12 +1577,10 @@ Section CONTRACT.
                  | Some (C_inl, x') =>
                    fun Heqi =>
                      let im' := M.set f' true im in
-                     (* update counts of ys' and xs after setting f' to 0 *)
                      let sig' := set_list (combine xs ys') sig in
-                     let x'' := apply_r sig' x' in
-                     let count' := update_count_inlined (x'' :: ys') (x :: xs) (M.set f' 0 count) in
-                     let sig'' := M.set x x'' sig' in
-                     (match contract sig'' count' (C_inl |[ e ]|) sub im' as k return (k =  contract sig'' count' (C_inl |[ e ]|) sub im' -> contractT im) with
+                     let count' := update_count_letapp (apply_r sig' x') x (update_count_inlined  ys' xs (M.set x 0 (M.set f' 0 count))) in
+                     (match contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' as k
+                            return (k =  contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' -> contractT im) with
                       | existT (e', steps', c, i) bp => 
                         fun Heql => existT _ (e', steps' + 1, c, i) (b_map_i_true _ _ _ bp)
                       end (eq_refl _))

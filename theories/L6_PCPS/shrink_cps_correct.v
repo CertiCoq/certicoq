@@ -5677,7 +5677,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
 
           contradiction. 
           rewrite <- bound_var_rename_all_ns in H11. inv H11.
-          contradiction. gg
+          contradiction.
           eapply of_rename_all_ns_mut in H2. rewrite Dom_map_set_lists_ss in H2.
           inv H2. inv H11.
 

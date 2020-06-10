@@ -675,7 +675,7 @@ Fixpoint update_count_inlined (ys:list var) (xs:list var) (count:c_map) :=
   | _, _ => count
   end.
 
-Definition update_count_letapp (x x' : var) (count:c_map) :=
+Definition update_count_letapp (x' x : var) (count:c_map) :=
   if var_dec x x' then
     count
   else
@@ -1313,7 +1313,7 @@ Section CONTRACT.
                    fun Heqi =>
                      let im' := M.set f' true im in
                      let sig' := set_list (combine xs ys') sig in
-                     let count' := update_count_letapp (apply_r sig' x') x (update_count_inlined  ys' xs (M.set x 0 (M.set f' 0 count))) in
+                     let count' := update_count_letapp (apply_r sig' x') x (update_count_inlined  ys' xs (M.set f' 0 count)) in
                      (* IMPORTANT NOTE: There is a very sublte point with substitutions here. Ideadly we would like to avoid traversing
                       * e to do the substitution. But we cannot put [sig'(x')/x] in the renaming for x' will not be rename with all the
                       * shrinks happening in Cinl. Maybe to avoid it one could introduce a second rename map to be applied before the
@@ -1578,7 +1578,7 @@ Section CONTRACT.
                    fun Heqi =>
                      let im' := M.set f' true im in
                      let sig' := set_list (combine xs ys') sig in
-                     let count' := update_count_letapp (apply_r sig' x') x (update_count_inlined  ys' xs (M.set x 0 (M.set f' 0 count))) in
+                     let count' := update_count_letapp (apply_r sig' x') x (update_count_inlined  ys' xs (M.set f' 0 count)) in
                      (match contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' as k
                             return (k =  contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' -> contractT im) with
                       | existT (e', steps', c, i) bp => 

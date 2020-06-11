@@ -682,7 +682,7 @@ Definition update_count_letapp (x' x : var) (count:c_map) :=
     let count' := M.set x 0 count in (* let-binding doesn't occur anymore *)
     let c_x := get_c x count in
     let c_x' := get_c x' count in
-    M.set x' (c_x + c_x' - 1) count (* all occurences of x will become x', and Halt x' is removed by inline_letapp *).
+    M.set x' (c_x + c_x' - 1) count' (* all occurences of x will become x', and Halt x' is removed by inline_letapp *).
 
 
 Section RENAME.

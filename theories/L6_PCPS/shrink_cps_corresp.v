@@ -7512,7 +7512,38 @@ Section CONTRACT.
     - inv Hin. eapply num_occur_ec_eq. econstructor. simpl. rewrite peq_true. omega.
     - inv Hin. eapply num_occur_ec_eq. econstructor. simpl. rewrite peq_false; eauto.
   Qed. 
-      
+
+  Theorem cmap_view_letapp:
+    forall sub c v f t ys,
+      cmap_view_ctx sub c -> cmap_view_ctx sub (comp_ctx_f c (Eletapp_c v f t ys Hole_c)).
+  Proof.
+    intros; split; intros; split; intros.
+    - apply H in H0. destructAll.
+      eexists; eexists.
+      rewrite  comp_ctx_f_assoc.
+      simpl. reflexivity.
+    - apply H. destructAll.
+      apply comp_ctx_split in H0.
+      destruct H0; destructAll.
+      + destruct x2; inv H0.
+        eauto.
+      + destruct x3; inv H2.
+        destruct x3; inv H6.
+    - apply H in H0.
+      destructAll.
+      eexists; eexists; eexists; eexists.
+      rewrite  comp_ctx_f_assoc.
+      simpl. reflexivity.
+    - apply H.
+      destructAll.
+      apply comp_ctx_split in H0.
+      destruct H0; destructAll.
+      + destruct x3; inv H0.
+        eauto.
+      + destruct x4; inv H2.
+        destruct x4; inv H6.
+  Qed.
+
     
     
   (** main theorem! contract produces an output term related to the input by the shrink rewrite system.
@@ -7905,7 +7936,7 @@ Section CONTRACT.
             { inv H6.
               assert ((rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Eproj_c v c0 n0 v0 Hole_c)) im') |[ e0 ]|) =
                        rename_all_ctx_ns sig (inlined_ctx_f c im') |[ Eproj v c0 n0 (apply_r sig v0) e0 ]|) by ctx_inl_push.
-              unfold ce';  rewrite <- H6.
+              unfold ce';  rewrite <- H6. 
               split; auto. split; auto. split; auto.
               (* sig_inv_codom push proj *)
               intro. intros. destruct (var_dec y v).
@@ -8253,10 +8284,85 @@ Section CONTRACT.
       + (* fun *) eapply Hsame. eassumption.
       + (* none *) eapply Hsame. eassumption. }
     - (* letapp *)
+      (* factoring out common case *)
+      assert (Hsame : (let (x0, bp) as k return (k = contract sig count e sub inl -> contractT inl) :=
+                           contract sig count e sub inl in
+                       (let
+                           (p, im') as x1
+                           return
+                           (forall bp0 : b_map_le_i inl (snd x1),
+                               existT
+                                 (fun esir : exp * nat * c_map * b_map =>
+                                    b_map_le_i inl (snd esir)) x1 bp0 =
+                               contract sig count e sub inl -> 
+                               contractT inl) := x0 in
+                         let
+                           (p0, count') as p0
+                           return
+                           (forall bp0 : b_map_le_i inl (snd (p0, im')),
+                               existT
+                                 (fun esir : exp * nat * c_map * b_map =>
+                                    b_map_le_i inl (snd esir)) (p0, im') bp0 =
+                               contract sig count e sub inl -> 
+                               contractT inl) := p in
+                         let
+                           (e', steps) as p1
+                           return
+                           (forall bp0 : b_map_le_i inl (snd (p1, count', im')),
+                               existT
+                                 (fun esir : exp * nat * c_map * b_map =>
+                                    b_map_le_i inl (snd esir)) (p1, count', im') bp0 =
+                               contract sig count e sub inl -> 
+                               contractT inl) := p0 in
+                         fun (bp0 : b_map_le_i inl (snd (e', steps, count', im')))
+                             (_ : existT
+                                    (fun esir : exp * nat * c_map * b_map =>
+                                       b_map_le_i inl (snd esir)) (e', steps, count', im')
+                                    bp0 = contract sig count e sub inl) =>
+                           existT
+                             (fun esir : exp * nat * c_map * b_map =>
+                                b_map_le_i inl (snd esir))
+                             (Eletapp v (apply_r sig v0) f (apply_r_list sig l) e',
+                              steps, count', im') bp0) bp) eq_refl =
+                      existT
+                        (fun esir : exp * nat * c_map * b_map =>
+                           b_map_le_i inl (snd esir)) (e', steps, count', im') BP ->
+                      gsr_clos steps ce ce' /\  c_count ce' count' /\ inl_inv im' sub ce' /\  sig_inv_codom sig (rename_all_ctx_ns sig (inlined_ctx_f c im')) e').
+      { clear H6; intros H6. 
+        assert (Heqc1 : rename_all_ctx_ns sig (inlined_ctx_f c inl) |[ rename_all_ns sig (Eletapp v v0 f l e) ]| =
+                                                                                                                 rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Eletapp_c v v0 f l Hole_c)) inl) |[ rename_all_ns sig e ]|) by ctx_inl_push.
+        unfold ce in *. rewrite Heqc1 in *.
+        remember (contract sig count e sub inl) as s. destruct s as [[[[ ? ? ] ? ] ? ] ? ]. 
+        symmetry in Heqs. eapply IHn in Heqs; eauto. destructAll. inv H6.
+        assert (Heqc2 : (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f c (Eletapp_c v v0 f l Hole_c)) im') |[ e0 ]|) =
+                        rename_all_ctx_ns sig (inlined_ctx_f c im') |[ Eletapp v (apply_r sig v0) f (apply_r_list sig l) e0 ]|) by ctx_inl_push.
+        unfold ce'. rewrite <- Heqc2.
+        split; auto. split; auto. split; auto.
+        (* sig_inv_codom push proj *)
+        - intro. intros. destruct (var_dec y v).
+          (* y = v *)
+          +  subst. apply H5 in H6. inv H6. inv H12.
+             (** by no zombie *)
+             left. rewrite <- Heqc2. eapply shrink_no_zombie. eassumption.
+             rewrite Heqc1 in H6. now auto.
+             (** imposible due to unique binding *)
+             exfalso. 
+             apply ub_app_ctx_f in H0. destructAll.
+             repeat normalize_ctx. apply ub_comp_ctx_f in H0.
+             destructAll. eapply H15. constructor. eapply bound_stem_var. eassumption.
+             rewrite <- (proj1 (bound_var_ctx_rename_all_ns _ )). simpl. normalize_bound_var_ctx. eauto.
+          + apply H10 in H6. inv H6.
+            rewrite Heqc2 in H11. auto. repeat normalize_ctx.
+            apply bound_stem_comp_ctx_mut in H11. inv H11.
+            auto. simpl in H6. inv H6. exfalso. now auto. inv H17.
+        - unfold term_sub_inl_size in *. simpl. simpl in H. omega.
+        - apply cmap_view_letapp; auto.
+        - repeat normalize_ctx. apply sig_inv_full_push. simpl. simpl in H5. auto. }
+      
       destruct (get_c (apply_r sig v0) count) as [| [|] ] eqn:Hgetc. 
-      + (* 0 *) admit. (* same *)
+      + (* 0 *) eapply Hsame. eassumption.         
       + destruct (sub ! (apply_r sig v0)) as [[|] | ] eqn:Hsub. 
-        * (* f is Vconstr *) admit. (* same *)
+        * (* f is Vconstr *) eapply Hsame; eassumption. 
         * (* f in Vfun *)
           destruct ((f0 =? f)%positive && (Datatypes.length l =? Datatypes.length l0) && negb (get_b (apply_r sig v0) inl)) eqn:Hel.
           { (* function inlining *)   
@@ -8285,15 +8391,20 @@ Section CONTRACT.
             { eapply ub_app_ctx_f in H0. destructAll. constructor. intros z Hc. inv Hc. inv H9. 
               - eapply H8. constructor. eapply bound_stem_var. eapply Hinbv.
                 simpl. normalize_occurs_free. inv H10; eauto. normalize_bound_var. sets. }
+            
+            (* assert (Hnin' : Disjoint _ [set (apply_r sig v0)] (FromList (apply_r_list sig l))). *)
+            (* { eapply ub_app_ctx_f in H0. destructAll. constructor. intros z Hc. inv Hc. inv H9.  *)
+            (*   eapply H8. constructor. eapply bound_stem_var. eapply Hinbv. *)
+            (*   simpl. normalize_occurs_free. do 2 left. reflexivity. normalize_bound_var. inv H10; eauto. normalize_bound_var. sets. } *)
 
-            assert (Hdis' :  Disjoint _ (v |: FromList l0)
+            assert (Hdisu :  Disjoint _ (v |: FromList l0)
                                       ((apply_r sig v0) |: bound_var_fundefs (inlined_fundefs_f x1 inl) :|: bound_var_fundefs (inlined_fundefs_f x2 inl) :|:
-                                       bound_var_ctx (inlined_ctx_f x inl) :|: bound_var_ctx (inlined_ctx_f x0 inl) :|: bound_var e0)).
+                                       bound_var_ctx (inlined_ctx_f x inl) :|: bound_var_ctx (inlined_ctx_f x0 inl) :|: bound_var e0)  /\ NoDup l0).
             { eapply ub_app_ctx_f in H0. destructAll. repeat normalize_ctx. 
               simpl in *. rewrite inlined_fundefs_append in *. simpl in *. rewrite Hel4 in *.
               eapply ub_comp_ctx_f in H0. destructAll. inv H9. rewrite rename_all_ns_fundefs_append in *.
               simpl in H14. eapply fundefs_append_unique_bindings_l in H14; [| reflexivity ]. destructAll.
-              repeat normalize_bound_var_in_ctx. inv H11. rewrite <- !Union_assoc. eapply Union_Disjoint_r. 
+              repeat normalize_bound_var_in_ctx. inv H11. rewrite <- !Union_assoc. split; [| eassumption ]. eapply Union_Disjoint_r. 
               - eapply Disjoint_Singleton_r. intros Hc. eapply H25. inv Hc; [| now eauto ].
                 exfalso. eapply Hnin. now constructor; eauto. 
               - rewrite <- bound_var_rename_all_ns_fundefs in *. eapply Union_Disjoint_l.
@@ -8313,7 +8424,7 @@ Section CONTRACT.
                        rewrite fundefs_append_bound_vars; [| reflexivity ]. rewrite <- bound_var_rename_all_ns_fundefs.
                        rewrite <- bound_var_rename_all_ns_fundefs. normalize_bound_var. sets.
                        rewrite <- (proj1 (bound_var_ctx_rename_all_ns _)). sets.
-                    -- rewrite <- bound_var_rename_all_ns in H22. sets. }
+                    -- rewrite <- bound_var_rename_all_ns in H22. sets. } destruct Hdisu as [Hdis' Hnd].
             
             assert (Hdisv0 :  ~ (apply_r sig v0) \in  (bound_var_fundefs (inlined_fundefs_f x1 inl) :|: bound_var_fundefs (inlined_fundefs_f x2 inl) :|:
                                                     bound_var_ctx (inlined_ctx_f x inl) :|: bound_var_ctx (inlined_ctx_f x0 inl) :|: bound_var e0 :|: bound_var e)).
@@ -8345,7 +8456,7 @@ Section CONTRACT.
               inv H10; revert H9; eapply not_occurs_not_free_ctx; eauto. }
    
             assert (Hdis : Disjoint _ (FromList l0) (bound_var (rename_all_ns sig (Eletapp v v0 f l e)) :|:
-                                                               occurs_free (rename_all_ns sig (Eletapp v v0 f l e)))).
+                                                                occurs_free (rename_all_ns sig (Eletapp v v0 f l e)))).
             { eapply ub_app_ctx_f in H0. destructAll. eapply Union_Disjoint_r.
               + eapply Disjoint_Included; [| | eapply H8 ]. simpl. sets.
                 rewrite <- (proj1 (bound_var_ctx_rename_all_ns _)). 
@@ -8533,7 +8644,7 @@ Section CONTRACT.
                   intros Hc. eapply Hfv. rewrite <- Hc in H10. right; eauto.
                 - eapply Disjoint_apply_r. eapply Disjoint_Singleton_r. intros Hc.
                   eapply Hd_bv'. constructor; eauto. }
-              
+              clear Hsame.
               match goal with
               | [ H : context[contract ?SIG ?CNT ?E ?SUB ?IM] |- _ ] =>
                 (* remember (app_ctx_f (rename_all_ctx_ns SIG (inlined_ctx_f c IM)) (rename_all_ns SIG E)) as ce''; *)
@@ -8596,10 +8707,86 @@ Section CONTRACT.
               + (* unique bindings *)
                 rewrite Heq1, Heq2. eassumption.
               + (* closed *)
-                rewrite Heq1, Heq2. eassumption.
+                rewrite Heq1, Heq2. eassumption. 
               + { rewrite Heq1, Heq2. intros z.
                   assert (Hc := H2). specialize (H2 z). unfold ce in H2. 
                   repeat destruct_num_occur. rewrite Hel4 in H10. simpl in H10. inv H10.
+
+                  assert (Hdisl : Disjoint _ (FromList l0) (FromList (apply_r_list sig l))).
+                  { eapply Disjoint_Included_r; [ | eapply Hdis ]. simpl. normalize_occurs_free. sets. }
+                  
+                  assert (Hinl0 : FromList l0 \subset Complement var (Range_map sig) :|: dead_var (rename_all_ns sig e0)).
+                  { intros r Hinr. destruct (Decidable_Range_map sig) as [D]. destruct (D r); [| now left; eauto ].
+                    destruct r0 as [i Hgetr]. eapply H5 in Hgetr. destructAll. inv H11.
+                    - repeat destruct_num_occur. simpl in H14. repeat destruct_num_occur. rewrite Hel4 in H15. simpl in H15.
+                      repeat destruct_num_occur. now right.
+                    - exfalso. eapply Hdis'. constructor. now right; eauto. eapply bound_stem_comp_ctx_mut in H13.
+                      inv H13; repeat normalize_bound_var_lemmas. now eapply bound_stem_var in H11; eauto.
+                      simpl in H11. repeat normalize_ctx. simpl in H11. rewrite Hel4 in H11. inv H11. repeat normalize_bound_var_lemmas.
+                      eapply fundefs_append_name_in_fundefs in H16; [| reflexivity ]. simpl in H16. inv H16.
+                      eapply name_in_fundefs_bound_var_fundefs in H11. left; now eauto. inv H11. now left; eauto.
+                      eapply name_in_fundefs_bound_var_fundefs in H13. left; now eauto. eapply bound_stem_var in H16. now left; eauto. }
+                  
+                  assert (Hneqv : ~ FromList (apply_r_list sig l) (apply_r sig v0)).
+                  { specialize (Hc (apply_r sig v0)). rewrite Hgetc in Hc. SearchAbout (apply_r sig v0). unfold ce in Hc.
+                    repeat normalize_ctx. repeat destruct_num_occur. simpl in H14. repeat destruct_num_occur.
+                    rewrite Hel4 in H14. repeat destruct_num_occur. simpl in H13. rewrite peq_true in H13.
+                    assert (x7 = 0) by omega. assert (n5 = 0) by omega. assert (x4 = 0) by omega. assert (n6 = 0) by omega. assert (m0 = 0) by omega.
+                    assert (n4 = 0) by omega. subst. assert (Hl : num_occur_list (apply_r_list sig l) (apply_r sig v0) = 0) by omega.
+                    eapply not_occur_list. eassumption. }
+                  
+                  assert (Hneqv0 : apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x' <> apply_r sig v0).
+                  { destruct (Decidable_FromList l0). destruct (Dec x').
+                    intros Hc1. eapply Hneqv. rewrite <- Hc1. eapply apply_r_set_list_In. eassumption. rewrite length_apply_r_list. now eauto.
+                    rewrite apply_r_set_list2. eauto. eassumption. }
+
+                  assert (Hoc : forall (x7 : var) (n1 : nat), FromList l0 x7 -> num_occur (rename_all_ns sig e0) x7 n1 ->
+                                                              get_c x7 (M.set (apply_r sig v0) 0 count) = n1).
+                  { intros. specialize (Hc x7). unfold ce in Hc. repeat normalize_ctx. repeat destruct_num_occur.
+                    simpl in H16. repeat normalize_ctx. repeat destruct_num_occur. rewrite Hel4 in H16. repeat destruct_num_occur.
+                    assert (Hl0d : num_occur (rename_all_ns sig (Eletapp v v0 f l e)) x7 0).
+                    { eapply Disjoint_dead_var; eassumption. }
+                    assert (n4 = get_c x7 count).
+                    { simpl in *. inv Hl0d. pi0. dec_vars. rewrite H22. simpl. 
+                      eapply Hdead in H10. unfold dead_var_ctx, In in H10. repeat normalize_ctx. repeat destruct_num_occur. simpl in *.
+                      repeat match goal with
+                             | [H1 : num_occur ?e ?x ?n1, H2 : num_occur ?e ?x ?n2 |- _ ] => eapply num_occur_det in H1; [| eapply H2 ]; subst
+                             | [H1 : num_occur_fds ?e ?x ?n1, H2 : num_occur_fds ?e ?x ?n2 |- _ ] => eapply num_occur_det in H1; [| eapply H2 ]; subst
+                             | [H1 : num_occur_ec ?e ?x ?n1, H2 : num_occur_ec ?e ?x ?n2 |- _ ] => eapply num_occur_ec_det in H1; [| eapply H2 ]; subst
+                             end.
+                      omega. } 
+                    unfold get_c. rewrite !M.gso. rewrite H16. reflexivity.
+                    intros hc. eapply Hdis'. subst. constructor. now right; eauto. left; eauto. }
+
+                  assert (Hvd : ~ v \in bound_var_ctx (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v0) f l0 e0 x2)) x0)) inl)) :|:
+                                                      occurs_free_ctx (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v0) f l0 e0 x2)) x0)) inl))).
+                  { intros Hc1. inv Hc1.
+                    - eapply Hdis'. constructor. now left.
+                      repeat normalize_bound_var_lemmas. repeat normalize_ctx. repeat normalize_bound_var_lemmas.
+                      inv H10. now left; eauto. simpl in H11. repeat normalize_bound_var_ctx_in_ctx. inv H11; [| now eauto ].
+                      repeat normalize_ctx. repeat normalize_bound_var_lemmas. inv H10. now left; eauto.
+                      simpl in H11. rewrite Hel4 in H11. repeat normalize_bound_var_in_ctx. inv H11; eauto. inv H10. do 5 left. reflexivity.
+                      inv H10. exfalso. contradiction. inv H11; eauto.
+                    - eapply closed_app_ctx in H10. inv H10. eassumption. }
+                  assert (Hdeadv : num_occur_ec (rename_all_ctx_ns sig (inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v0) f l0 e0 x2)) x0)) inl)) v 0).
+                  { eapply Disjoint_dead_var_ctx. eapply Disjoint_Singleton_l. eassumption. reflexivity. } clear Hvd. 
+
+                  assert (Hocv : num_occur (rename_all_ns sig e) v (get_c v count)).
+                  { repeat normalize_ctx. repeat destruct_num_occur. simpl in H11. repeat destruct_num_occur. rewrite Hel4 in H13.
+                    simpl in H13. repeat destruct_num_occur.
+                    specialize (Hc v). unfold ce in Hc. repeat normalize_ctx. repeat destruct_num_occur. simpl in *.
+                    repeat destruct_num_occur. rewrite Hel4 in H16. simpl in H16. repeat destruct_num_occur.
+                    repeat match goal with
+                           | [H1 : num_occur ?e ?x ?n1, H2 : num_occur ?e ?x ?n2 |- _ ] => eapply num_occur_det in H1; [| eapply H2 ]; subst
+                           | [H1 : num_occur_fds ?e ?x ?n1, H2 : num_occur_fds ?e ?x ?n2 |- _ ] => eapply num_occur_det in H1; [| eapply H2 ]; subst
+                           | [H1 : num_occur_ec ?e ?x ?n1, H2 : num_occur_ec ?e ?x ?n2 |- _ ] => eapply num_occur_ec_det in H1; [| eapply H2 ]; subst
+                           end.
+                    rewrite peq_false in H15.
+                    assert (Hnin' : ~ v \in FromList (apply_r_list sig l)).
+                    { intros Hc. eapply Hnin. constructor; sets. }
+                    eapply not_occur_list in Hnin'. rewrite Hnin' in *. simpl in H15. rewrite H15. eassumption.
+                    intros Hc. subst. eapply Hdis'. constructor; eauto. left; eauto. }
+                      
                   destruct (var_dec v z).
                   - subst.
                     match goal with
@@ -8607,43 +8794,58 @@ Section CONTRACT.
                     end.
                     assert (Hceq : cnt = if var_dec z (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x') then get_c z count else 0).
                     { unfold cnt, update_count_letapp. destruct (var_dec _ _).
-                      - subst. assert (Heqz : apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x' = apply_r sig x').
+                      - subst.
+                        assert (Heqz : apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x' = apply_r sig x').
                         { destruct (Decidable_FromList l0). destruct (Dec x').
                           exfalso. eapply Hnin. constructor. reflexivity. right. eapply apply_r_set_list_In. eassumption.
                           rewrite length_apply_r_list. now eauto.
-                          rewrite apply_r_set_list2. reflexivity. eassumption. }
+                          rewrite apply_r_set_list2. reflexivity. eassumption. }                        
                         rewrite Heqz in *. rewrite update_count_inlined_unaffected. unfold get_c. rewrite M.gso. reflexivity.
                         now eauto. eassumption. intros Hc1. eapply Hnin. constructor; eauto. 
-                      - unfold get_c. rewrite M.gso. 
-                    subst. eapply num_occur_app_ctx. exists 0. eexists. split; [| split ].
-                    + admit. (* dead var *)
-                    + rewrite <- (proj1 (rename_all_ns_app_ctx _ _)).
-                      eapply dead_occur_rename_all_ns_set_list.
-                      intros Hc1. eapply Hnin. constructor; now eauto. repeat normalize_ctx. 
-                      eapply num_occur_app_ctx. exists 0. eexists. split; [| split ].
-                      * assert (Hinl'' := Hinl). eapply inline_letapp_rename with (sig := sig) in Hinl''.
-                        eapply num_occur_inline_letapp'; [| eassumption ].
-                        admit. (* v dead_var e0 *) eapply Disjoint_apply_r.
-                        eapply Disjoint_sym. eapply Disjoint_Included_l; [| eapply Hd_bv' ]. xsets.
-                      * 
-                        
-                        eassumption.
-                        rewrite eapply Domrewrite 
-                      SearchAbout z. 
-                    (* cases v = sig x' *) admit. (* should be zero everywhere *)
+                      - unfold get_c. rewrite M.gso; eauto. rewrite M.gss. reflexivity. }
+                         
+                    subst. eapply num_occur_app_ctx. exists 0, cnt. split; [| split; [| reflexivity ] ].
+                    + repeat normalize_ctx. repeat destruct_num_occur. simpl in H11. repeat destruct_num_occur. rewrite Hel4 in H13.
+                      simpl in H13. repeat destruct_num_occur. eapply num_occur_ec_comp_ctx. eexists 0, 0. split; [| split ]; eauto.
+                      simpl. eapply num_occur_ec_eq. econstructor; eauto. repeat normalize_ctx.
+                      eapply fundefs_append_num_occur. reflexivity. eassumption. eassumption. reflexivity. 
+                    + rewrite Heq.
+                      eapply num_occur_app_ctx. exists 0, cnt. split; [| split; [| reflexivity ] ].
+                      * eapply num_occur_inline_letapp'; [| eassumption ].
+                        eapply dead_occur_rename_all_ns_set_list.
+                        intros Hc1. eapply Hnin. constructor. reflexivity. now eauto.
+                        rewrite <- (proj1 (rename_all_ns_empty)).
+                        repeat normalize_ctx. repeat destruct_num_occur. simpl in H11. repeat destruct_num_occur. rewrite Hel4 in H13.
+                        simpl in H13. repeat destruct_num_occur. eassumption.
+                      * rewrite Hceq. destruct (var_dec _ _).
+                        -- rewrite e1. rewrite rename_all_ns_same_set.
+                           rewrite <- e1 in *. eassumption.
+                        -- eapply num_occur_rename_all_ns. eassumption.
                   - edestruct (e_sum_range_n (rename_all_ns sig e0) z l0 (apply_r_list sig l)).
                     rewrite length_apply_r_list. now eauto.
                     destruct (Decidable_FromList l0) as [Dec]. destruct (Dec z).
-                    + assert (Heql : get_c z (update_count_letapp (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')  v
+                    + assert (Hneqz : z <> apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x').
+                      { rewrite set_list_rename_all_ar in Hinl'; [| eassumption | now sets ].                               
+                        eapply inline_letapp_var_eq_alt' in Hinl'. inv Hinl'.
+                        - destructAll. eauto.
+                        - inv H11. 
+                          + repeat normalize_bound_var_lemmas. intros Hc1. eapply Hdis'.
+                            constructor. now right; eauto. now subst; eauto.
+                          + eapply of_rename_all_ns_mut in H13. inv H13. 
+                            intros Hc1. rewrite <- Hc1 in *. inv H11. rewrite Dom_map_set_list, Dom_map_empty in H14.
+                            repeat normalize_sets. contradiction. rewrite length_apply_r_list. now eauto.
+                            eapply Range_map_set_list in H11. intros Hc1.
+                            eapply Hdis. constructor. eassumption. simpl. normalize_occurs_free. subst. eauto. }
+                      assert (Heql : get_c z (update_count_letapp (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')  v
                                                                   (update_count_inlined (apply_r_list sig l) l0 (M.set (apply_r sig v0) 0 count))) =
                                      0). 
                       { unfold update_count_letapp. destruct (var_dec v (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')); subst.
                         - rewrite update_count_inlined_dom. reflexivity. rewrite length_apply_r_list. now eauto. eassumption.
                           eapply Disjoint_sym. eapply Disjoint_Included_r; [| eapply Hdis ]. simpl. normalize_occurs_free. sets.
-                        - unfold get_c. rewrite M.gso.
+                        - unfold get_c. rewrite M.gso. rewrite M.gso; eauto.
                           eapply update_count_inlined_dom. rewrite length_apply_r_list. now eauto. eassumption.
                           eapply Disjoint_sym. eapply Disjoint_Included_r; [| eapply Hdis ]. simpl. normalize_occurs_free. sets.
-                          admit. (* z <> apply_r ... *) } rewrite Heql. 
+                          SearchAbout x'. eassumption. } rewrite Heql. 
                       eapply num_occur_app_ctx. exists 0, 0. split; [| split; [| reflexivity ] ].
                       * eapply Hdead. eassumption.
                       * assert (Hinl1 := f0). eapply Included_Union_preserv_r with (s2 := [set v]) in Hinl1; [| reflexivity ].
@@ -8661,35 +8863,29 @@ Section CONTRACT.
                               simpl. normalize_occurs_free. now eauto.
                               eapply Dom_map_set_list; [| now eauto ]. rewrite length_apply_r_list. now eauto.
                            ++ eapply num_occur_rename_all_ns_dead_set; [| rewrite <- (proj1 (rename_all_ns_empty)); eassumption ].
-                              rewrite set_list_rename_all_ar in Hinl'; [| eassumption | now sets ]. 
-                              eapply inline_letapp_var_eq_alt' in Hinl'. inv Hinl'.
-                              ** destructAll. eauto.
-                              ** inv H14. 
-                                 --- repeat normalize_bound_var_lemmas. intros Hc1. eapply Hdis'.
-                                     constructor. now right; eauto. now subst; eauto.
-                                 --- eapply of_rename_all_ns_mut in H15. inv H15. 
-                                     intros Hc1. rewrite <- Hc1 in *. inv H14. rewrite Dom_map_set_list, Dom_map_empty in H16.
-                                     repeat normalize_sets. contradiction. rewrite length_apply_r_list. now eauto.
-                                     eapply Range_map_set_list in H14. intros Hc1.
-                                     eapply Hdis. constructor. eassumption. simpl. normalize_occurs_free.
-                                     subst. eauto.
-                    + destruct (peq z (apply_r sig v0)).
+                              rewrite set_list_rename_all_ar in Hinl'; [| eassumption | now sets ]. eassumption.
+                    + destruct (peq z (apply_r sig v0)). 
                       * assert (Heqc : get_c z (update_count_letapp
                                                   (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')
                                                   v (update_count_inlined (apply_r_list sig l) l0 (M.set (apply_r sig v0) 0 count))) = 0).
                         { subst. unfold update_count_letapp. destruct (var_dec v _).
                           - rewrite update_count_inlined_unaffected. unfold get_c. rewrite M.gss. reflexivity.
-                            intros Hc1. eapply Hdis'. constructor; eauto. now left; eauto. admit. (* because apply_r sig v0 <> FromList sig l *)
+                            intros Hc1. eapply Hdis'. constructor; eauto. now left; eauto. eassumption.
                           - replace (get_c _ _) with
                                 (get_c (apply_r sig v0) (update_count_inlined (apply_r_list sig l) l0 (M.set (apply_r sig v0) 0 count))).
-                            2:{ unfold get_c. rewrite M.gso. reflexivity.
-                                destruct (Decidable_FromList l0). destruct (Dec x'). intros Hc1. admit. (* because apply_r sig v0 <> FromList sig l *)
+                            2:{ unfold get_c. rewrite M.gso. rewrite M.gso. reflexivity.
+                                intros Hc1. eapply Hdis'. constructor. now left. subst; now eauto.
+                                destruct (Decidable_FromList l0). destruct (Dec x').
+                                intros Hc1. eapply Hneqv. rewrite Hc1. eapply apply_r_set_list_In. eassumption. rewrite length_apply_r_list. now eauto.
                                 rewrite apply_r_set_list2. eassumption. eassumption. }
                             erewrite update_count_inlined_unaffected. unfold get_c. rewrite M.gss. reflexivity.
-                            intros Hc1. eapply Hdis'. constructor; eauto. now left; eauto. admit. (* because apply_r sig v0 <> FromList sig l *) }
+                            intros Hc1. eapply Hdis'. constructor; eauto. now left; eauto. eassumption. }
+                        clear Hdeadv.
                         rewrite Heqc. clear Heqc. subst. specialize (Hc (apply_r sig v0)). rewrite Hgetc in Hc. unfold ce in Hc.
-                        repeat normalize_ctx. repeat destruct_num_occur. simpl in H15. repeat destruct_num_occur.
-                        rewrite Hel4 in H15. repeat destruct_num_occur. simpl in H14. rewrite peq_true in H14.
+                        repeat normalize_ctx. repeat destruct_num_occur. simpl in *. repeat destruct_num_occur. 
+                        rewrite Hel4 in H15. repeat destruct_num_occur. simpl in *. rewrite peq_true in H14.
+                        simpl in *. repeat normalize_ctx. repeat destruct_num_occur.
+                        
                         assert (x8 = 0) by omega. assert (n7 = 0) by omega. assert (x6 = 0) by omega. assert (n8 = 0) by omega. assert (m0 = 0) by omega.
                         assert (n6 = 0) by omega. subst. assert (Hl : num_occur_list (apply_r_list sig l) (apply_r sig v0) = 0) by omega.
                         rewrite Heq.
@@ -8698,7 +8894,7 @@ Section CONTRACT.
                            eassumption. simpl. eapply num_occur_ec_eq. constructor. eassumption. repeat normalize_ctx.
                            eapply fundefs_append_num_occur. reflexivity. eassumption. eassumption. reflexivity.
                         -- rewrite <- Heq. rewrite <- (proj1 (rename_all_ns_app_ctx _ _)).
-                           eapply dead_occur_rename_all_ns_set_list. admit. (* because apply_r sig v0 <> FromList sig l *)
+                           eapply dead_occur_rename_all_ns_set_list. eassumption.
                            assert (Hinl'' := Hinl). eapply inline_letapp_rename with (sig := sig) in Hinl''.
                            normalize_ctx. eapply num_occur_app_ctx. exists 0, 0. split; [| split; [| reflexivity ]].
                            eapply num_occur_inline_letapp'; [| eassumption ]. eassumption.
@@ -8706,20 +8902,18 @@ Section CONTRACT.
                            eapply num_occur_rename_all_ns_dead_set. eassumption. eassumption.
                            eapply Disjoint_apply_r. sets.                            
                       * destruct (peq z (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')).
-                        -- specialize (Hc v). unfold ce in Hc. repeat normalize_ctx. repeat destruct_num_occur.
-                           assert (n7 = get_c v count) by admit. (* because all the rest 0 *)
-                           assert (Hinl'' := Hinl').
+                        -- assert (Hinl'' := Hinl').
                            eapply inline_letapp_gt_zero in Hinl''.
-                           2:{ rewrite set_list_rename_all_ar; [| eassumption | now sets ]. eauto. } destructAll.
-                           rewrite set_list_rename_all_ar in H17; [| eassumption | now sets ].                              
+                           2:{ rewrite set_list_rename_all_ar; [| eassumption | now sets ]. subst. eauto. } destructAll.
+                           rewrite set_list_rename_all_ar in H13; [| eassumption | now sets ].                              
                            rewrite set_list_rename_all_ar in Hinl'; [| eassumption | now sets ]. 
                            eapply inline_letapp_num_occur in Hinl'; [| eassumption | eassumption ].
                            rewrite peq_true in Hinl'. destruct x6; [ omega | ].
                            eapply num_occur_set_list_r in H20; [ | | | | | eassumption | ].
-                           assert (H17' := H17). rewrite (proj1 (set_list_rename_all_ns _ _)) in H17.
-                           eapply num_occur_det in H17; [| clear H17; clear H17'; eassumption ].
-                           rewrite H17 in *.
-                            
+                           assert (H13' := H13). rewrite (proj1 (set_list_rename_all_ns _ _)) in H13.
+                           eapply num_occur_det in H13; [| clear H13; clear H13'; eassumption ].
+                           rewrite H13 in *.
+                           
                            apply num_occur_app_ctx.  do 2 eexists. split; [| split ].
                            ++ apply num_occur_ec_comp_ctx. do 2 eexists.  split; [| split ].
                               eassumption. simpl. constructor. eassumption. repeat normalize_ctx. eapply fundefs_append_num_occur.
@@ -8729,7 +8923,7 @@ Section CONTRACT.
                               split; [| split ].
                               ** eassumption.
                               ** eapply num_occur_rename_all_set_x. eassumption.
-                                 intros Hc. eapply Dom_map_empty in Hc. now inv Hc. eassumption.
+                                 intros Hc1. eapply Dom_map_empty in Hc1. now inv Hc1. eassumption.
                                  rewrite <- (proj1 (rename_all_ns_empty)). eassumption.
                               ** subst. reflexivity.
                            ++ unfold update_count_letapp.
@@ -8737,26 +8931,23 @@ Section CONTRACT.
                               ** contradiction.
                               ** unfold get_c at 1. rewrite M.gss.
                                  rewrite update_count_inlined_unaffected.
-                                 replace (get_c v (M.set (apply_r sig v0) 0 count)) with (get_c v count) by admit. 
+                                 replace (get_c v (M.set (apply_r sig v0) 0 count)) with (get_c v count).
+                                 2:{ unfold get_c. rewrite M.gso. reflexivity. intros Hc1. eapply Hnin.
+                                     subst. constructor; eauto. }
                                  erewrite update_count_sum_range; [ | | | | | | ]; try eassumption.
                                  replace (get_c _ (M.set (apply_r sig v0) 0 count)) with
                                      (get_c (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x') count).
-                                 
                                  2:{ unfold get_c. rewrite !M.gso; eauto. }
-                                 rewrite H9. simpl. rewrite peq_false; [| now eauto ]. 
-                                 omega. 
+                                 rewrite H9. simpl. rewrite peq_false; [| now eauto ]. omega. 
                                  unfold get_c in *. rewrite !M.gso. rewrite H9. simpl. rewrite peq_false. omega.
-                                 admit. (* bcause disj *) admit. (* because disj *)
-                                 admit. 
-                                 admit. (* prove globaly *)
-                                 admit. (* NoDup *)
-                                 eassumption. admit.
-                           ++ admit. (* proved before *)
+                                 eassumption. eassumption. sets. eassumption.
+                                 intros hc. eapply Hnin. constructor; eauto.
+                           ++ eassumption. 
                            ++ sets.
                            ++ sets.
-                           ++ admit.
-                           ++ admit. (* no dup *)
-                           ++ admit.
+                           ++ eassumption.
+                           ++ eassumption.
+                           ++ eassumption. 
                            ++ eassumption. 
                         -- destruct (e_num_occur z (rename_all_ns (M.set v (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')
                                                                          (M.empty M.elt)) (rename_all_ns sig e))).
@@ -8769,11 +8960,8 @@ Section CONTRACT.
                            ++ eapply inline_letapp_num_occur with (z := z) in Hinl'; [| eassumption |].
                               rewrite set_list_rename_all_ar in Hinl'; [| eassumption | now sets ]. 
                               rewrite peq_false in Hinl'. eassumption. eassumption.
-                              (* rewrite (proj1 (set_list_rename_all_ctx_ns _ _)) in Hinl'. eassumption. *)
-                              (* eassumption. *)
-                              eapply num_occur_set_list_r. rewrite Dom_map_empty. now sets. admit. admit. admit.
-                              rewrite <- (proj1 (rename_all_ns_empty)). eassumption. 
-                              rewrite <- (proj1 (rename_all_ns_empty)). eassumption. eassumption.
+                              rewrite (proj1 (set_list_rename_all_ns _ _)); try eassumption.
+                              eapply num_occur_set_list_r; try eassumption. now sets. now sets.
                            ++ eassumption.
                            ++ reflexivity.
                            ++ assert (get_c z (update_count_letapp
@@ -8781,25 +8969,19 @@ Section CONTRACT.
                                                  (update_count_inlined (apply_r_list sig l) l0 (M.set (apply_r sig v0) 0 count))) =
                                       get_c z (update_count_inlined (apply_r_list sig l) l0 (M.set (apply_r sig v0) 0 count))).
                               { unfold update_count_letapp. destruct (var_dec v (apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x')).
-                                reflexivity. unfold get_c. rewrite M.gso; eauto. }
+                                reflexivity. unfold get_c. rewrite M.gso; eauto. rewrite M.gso; eauto. }
                               rewrite H11. 
-                              erewrite update_count_sum_range; [ | | | | | | admit (* NODup *) ]; try eassumption.
+                              erewrite update_count_sum_range; [ | | | | | | eassumption ]; try eassumption.
                               replace (get_c z (M.set (apply_r sig v0) 0 count)) with (get_c z count).
                               2:{ unfold get_c. rewrite !M.gso; eauto. }
                               rewrite H9. simpl. rewrite peq_false; [| now eauto ]. omega. 
                               replace (get_c z (M.set (apply_r sig v0) 0 count)) with (get_c z count).
                               2:{ unfold get_c. rewrite !M.gso; eauto. }
-                              rewrite H9. simpl. rewrite peq_false. omega. eassumption. 
-                              admit. (* disjoint *)
-                              
-                              intros. specialize (Hc x7). repeat normalize_ctx. repeat destruct_num_occur.
-                              assert (n1 = get_c x7 count) by admit. (* because dead_elsewhere *)
-                              unfold get_c. rewrite !M.gso. rewrite H15. reflexivity.
-                              admit. (* bcause disj *)
+                              rewrite H9. simpl. rewrite peq_false. omega. eassumption. now sets.
                            ++ intros Hc1. eapply Dom_map_set in Hc1. rewrite Dom_map_empty in Hc1. repeat normalize_sets.
                               inv Hc1; contradiction.
                            ++ intros Hc1. eapply Range_map_set_list with (xs := [v]) (vs := [apply_r (set_list (combine l0 (apply_r_list sig l)) sig) x']) in Hc1.
-                              repeat normalize_sets. inv Hc1; contradiction. }                    
+                              repeat normalize_sets. inv Hc1; contradiction. } 
               + eassumption.
               + rewrite Heq1, Heq2.
                 intros f1 Hget. destruct (peq f1 (apply_r sig v0)).
@@ -8938,6 +9120,10 @@ Section CONTRACT.
                        inv H10; eauto. right. left. rewrite fundefs_append_name_in_fundefs in *; [| reflexivity | reflexivity ].
                        inv H6; eauto. simpl in H10. rewrite Hel4 in H10. simpl in H10.
                        inv H10; eauto. inv H6; now exfalso. }
+            - eapply Hsame; eassumption. }
+          eapply Hsame; eassumption.
+        * eapply Hsame; eassumption.
+      + eapply Hsame; eassumption.  
     - (* fun *)
       remember (precontractfun sig count sub f). destruct p. destruct p.
       symmetry in Heqp. assert (Heqp' := Heqp).

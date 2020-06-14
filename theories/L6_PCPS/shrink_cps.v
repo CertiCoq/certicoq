@@ -16,7 +16,7 @@ Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.
 Require Import Coq.Sorting.Permutation.
 Require Import Libraries.maps_util.
 Require Import L6.cps.
-Require Import L6.ctx.
+Require Import L6.ctx L6.rename.
 Require Import L6.cps_util L6.List_util L6.identifiers.
 
 
@@ -541,58 +541,10 @@ Definition f_pair {A B C D} (f: A -> A -> B) (g: C -> C -> D)
                end.
 
 
-Definition apply_r sigma y :=
-  match (@M.get M.elt y sigma) with
-  | Some v => v
-  | None => y
-  end.
-
-Definition apply_r_list sigma ys :=
-  map (apply_r sigma) ys.
 
 Definition tag := positive.
 
-Theorem prop_apply_r: (forall v, forall sub sub', map_get_r _ sub sub' -> apply_r sub v = apply_r sub' v).
-Proof.
-  intros.
-  unfold apply_r.
-  destruct (M.get v sub) eqn:gvs.
-  rewrite H in gvs. rewrite gvs. auto.
-  rewrite H in gvs. rewrite gvs; auto.
-Defined.
 
-Theorem prop_apply_r_list: (forall l, forall sub sub', map_get_r _ sub sub' -> apply_r_list sub l = apply_r_list sub' l).
-Proof.
-  induction l; intros.
-  reflexivity.
-  simpl. erewrite IHl; eauto.
-  erewrite prop_apply_r; eauto.
-Defined.
-
-
-Theorem apply_r_empty: forall v, apply_r (M.empty var) v = v.
-Proof.
-  intro. unfold apply_r.
-  rewrite M.gempty. auto.
-Defined.
-
-Theorem apply_r_list_empty: forall l, apply_r_list (M.empty var) l = l.
-Proof.
-  induction l; auto.
-  simpl. rewrite IHl. rewrite apply_r_empty. reflexivity.
-Defined.
-
-Fixpoint all_fun_name (fds:fundefs) : list var :=
-  match fds with
-  | Fcons f t ys e fds' => f::(all_fun_name fds')
-  | Fnil => []
-  end.
-
-Fixpoint remove_all (sigma:r_map) (vs:list var) :=
-  match vs with
-  | v::vs' => M.remove v (remove_all sigma vs')
-  | [] => sigma
-  end.
 
 Fixpoint update_census_list (sig:r_map) (ys:list var) (fun_delta:var -> c_map -> nat) (count:c_map) :=
   match ys with
@@ -601,7 +553,6 @@ Fixpoint update_census_list (sig:r_map) (ys:list var) (fun_delta:var -> c_map ->
     let y' := apply_r sig y in
     update_census_list sig ys' fun_delta (M.set y' (fun_delta y' count) count)
   end.
-
 
 
 (* assumes Disjoint (Dom sig) (BV e) *)
@@ -685,301 +636,14 @@ Definition update_count_letapp (x' x : var) (count:c_map) :=
     M.set x' (c_x + c_x' - 1) count' (* all occurences of x will become x', and Halt x' is removed by inline_letapp *).
 
 
-Section RENAME.
-
-
-  Fixpoint rename_all (sigma:r_map) (e:exp) : exp :=
-    match e with
-    | Econstr x t ys e' => Econstr x t (apply_r_list sigma ys) (rename_all (M.remove x sigma) e')
-    | Eprim x f ys e' => Eprim x f (apply_r_list sigma ys) (rename_all (M.remove x sigma) e')
-    | Eletapp x f ft ys e' => Eletapp x (apply_r sigma f) ft (apply_r_list sigma ys)
-                                      (rename_all (M.remove x sigma) e')
-    | Eproj v t n y e' => Eproj v t n (apply_r sigma y) (rename_all (M.remove v sigma) e')
-    | Ecase v cl =>
-      Ecase (apply_r sigma v) (List.map (fun (p:var*exp) => let (k, e) := p in
-                                                            (k, rename_all sigma e)) cl)
-    | Efun fl e' =>
-      let fs := all_fun_name fl in
-      let fl' := rename_all_fun (remove_all sigma fs) fl in
-
-      Efun fl' (rename_all (remove_all sigma fs) e')
-    | Eapp f t ys =>
-      Eapp (apply_r sigma f) t (apply_r_list sigma ys)
-    | Ehalt v => Ehalt (apply_r sigma v)
-    end
-  with rename_all_fun (sigma:r_map) (fds:fundefs): fundefs :=
-         match fds with
-         | Fnil => Fnil
-         | Fcons v' t ys e fds' => Fcons v' t ys (rename_all (remove_all sigma ys) e) (rename_all_fun sigma fds')
-         end.
-
-  Theorem rename_all_fun_name: forall rho fds,
-      Same_set _ (name_in_fundefs (rename_all_fun rho fds)) (name_in_fundefs fds).
-  Proof.
-    induction fds.
-    - simpl. eauto with Ensembles_DB.
-    - reflexivity.
-  Defined.
-
-
-  Theorem prop_remove_all: 
-    forall l sub sub', map_get_r _ sub sub' -> map_get_r _ (remove_all sub l) (remove_all sub' l).
-  Proof.
-    induction l; intros.  
-    - auto.
-    - simpl. apply proper_remove. apply IHl; eauto. 
-  Defined.
-
-
-  Theorem prop_rename_all: (forall e, forall sub sub', map_get_r _ sub sub' -> rename_all sub e = rename_all sub' e) /\
-                           (forall fds, forall sub sub', map_get_r _ sub sub' -> rename_all_fun sub fds = rename_all_fun sub' fds) .
-  Proof.
-    apply exp_def_mutual_ind; intros; simpl.
-    - erewrite prop_apply_r_list; eauto. erewrite H; eauto. apply proper_remove; auto.
-    - erewrite prop_apply_r; eauto.
-    - erewrite H; eauto.
-      erewrite prop_apply_r; eauto.
-      apply H0 in H1. simpl in H1. inversion H1; subst. reflexivity.
-    - erewrite prop_apply_r; eauto. erewrite H; eauto. apply proper_remove; auto.
-    - erewrite prop_apply_r; eauto. erewrite prop_apply_r_list; eauto. erewrite H; eauto. apply proper_remove; auto.
-    - erewrite H0; eauto. erewrite H; eauto.
-      apply prop_remove_all; auto.
-      apply prop_remove_all; auto.
-    - erewrite prop_apply_r; eauto. erewrite prop_apply_r_list; eauto.
-    - erewrite prop_apply_r_list; eauto. erewrite H; eauto. apply proper_remove; auto.
-    - erewrite prop_apply_r; eauto.
-    - erewrite H; eauto. erewrite H0; eauto. apply prop_remove_all; auto.
-    - reflexivity.
-  Defined.
-
-
-
-
-  Theorem remove_all_empty: forall l, map_get_r _ (remove_all (M.empty var) l)  (M.empty var).
-  Proof.
-    induction l; intros; simpl; auto.
-    - apply smg_refl. 
-    - eapply smg_trans. eapply proper_remove. eassumption.
-      apply remove_empty.
-  Defined.
-
-  Theorem remove_all_not_in: 
-    forall x z l rho,
-      ~ (List.In x l) ->
-      map_get_r _ (remove_all (M.set x z rho) l) (M.set x z (remove_all rho l)).
-  Proof.
-    induction l; intros; simpl.
-    - apply smg_refl.
-    - eapply smg_trans. eapply proper_remove.
-      eapply IHl. intros Hc. eapply H; now right.
-      apply remove_set_2. intros Hc; subst; eapply H; now left.
-  Defined.
-
-
-  Theorem remove_all_in: 
-    forall x z l rho,
-      List.In x l ->
-      map_get_r _ (remove_all (M.set x z rho) l) (remove_all rho l).
-  Proof.
-    induction l; intros; simpl; auto.
-    - inversion H.
-    - simpl in H. 
-      destruct (var_dec x a); subst.
-      + edestruct (ListDec.In_decidable) with (l := l) (x := a) as [Hd | ]. 
-        { intros x y. destruct (DecidableTypeEx.Positive_as_DT.eq_dec x y); subst; eauto.
-          left; eauto. right; eauto. }
-        * eapply proper_remove. eapply IHl. eauto.
-        * eapply smg_trans. eapply proper_remove. 
-          eapply remove_all_not_in. eassumption.    
-          apply remove_set_1.
-      + inv H. exfalso; eauto. eapply proper_remove. eapply IHl. eauto.
-  Qed.
-
-
-  Theorem rename_all_empty: (forall e,
-                                e = rename_all (M.empty var) e) /\
-                            (forall fds, fds = rename_all_fun (M.empty var) fds).
-  Proof.
-    apply exp_def_mutual_ind; intros; simpl.
-    - rewrite apply_r_list_empty.
-      replace (rename_all (M.remove v (M.empty var)) e) with e. reflexivity.
-      rewrite H at 1.
-      apply prop_rename_all.
-      apply smg_sym.
-      apply remove_empty.
-    - rewrite apply_r_empty.  reflexivity.
-    - rewrite apply_r_empty. rewrite <- H. simpl in H0. inversion H0.
-      rewrite <- H3. rewrite <- H3. reflexivity.
-    - rewrite apply_r_empty.
-      replace (rename_all (M.remove v (M.empty var)) e) with e. reflexivity.
-      rewrite H at 1.
-      apply prop_rename_all.
-      apply smg_sym.
-      apply remove_empty.
-    - rewrite apply_r_empty, apply_r_list_empty.
-      replace (rename_all (M.remove x (M.empty var)) e) with e. reflexivity.
-      rewrite H at 1.
-      apply prop_rename_all.
-      apply smg_sym.
-      apply remove_empty.
-    - replace (rename_all (remove_all (M.empty var) (all_fun_name f2)) e) with e.
-      replace (rename_all_fun (remove_all (M.empty var) (all_fun_name f2)) f2) with f2; auto.
-      rewrite H at 1.
-      eapply prop_rename_all.
-      apply smg_sym.
-      apply remove_all_empty.
-      rewrite H0 at 1.
-      eapply prop_rename_all.
-      apply smg_sym.
-      apply remove_all_empty.
-    - rewrite apply_r_empty.
-      rewrite apply_r_list_empty. auto.
-    - rewrite apply_r_list_empty.
-      replace (rename_all (M.remove v (M.empty var)) e) with e. reflexivity.
-      rewrite H at 1.
-      apply prop_rename_all.
-      apply smg_sym.
-      apply remove_empty.
-    -     rewrite apply_r_empty. auto.
-    - rewrite <- H0.
-      replace (rename_all (remove_all (M.empty var) l) e) with e.
-      reflexivity.
-      rewrite H at 1.
-      eapply prop_rename_all.
-      apply smg_sym.
-      apply remove_all_empty.
-    - auto.
-  Defined.
-
-
-  Fixpoint all_fun_name_ctx (cfds:fundefs_ctx) : list var :=
-    match cfds with
-    | Fcons1_c f t ys c fds' => f::(all_fun_name fds')
-    | Fcons2_c f t ys e cfds' => f::(all_fun_name_ctx cfds')
-    end.
-
-  Theorem all_fun_name_ctx_same:
-    forall e f,
-      all_fun_name_ctx f = all_fun_name (f <[ e ]>).
-  Proof.
-    induction f; auto.
-    simpl.
-    rewrite IHf. auto.
-  Defined.
-
-
-  Fixpoint rename_all_ctx (sigma:r_map) (c:exp_ctx): exp_ctx :=
-    match c with
-    | Hole_c => Hole_c
-    | Econstr_c x t ys c' =>
-      Econstr_c x t (apply_r_list sigma ys) (rename_all_ctx (M.remove x sigma) c')
-    | Eprim_c x f ys c' =>
-      Eprim_c x f (apply_r_list sigma ys) (rename_all_ctx (M.remove x sigma) c')
-    | Eproj_c v t n y c' => Eproj_c v t n (apply_r sigma y) (rename_all_ctx (M.remove v sigma) c')
-    | Eletapp_c v f ft ys c' => Eletapp_c v (apply_r sigma f) ft (apply_r_list sigma ys)
-                                          (rename_all_ctx (M.remove v sigma) c')
-    | Ecase_c v l t c' l' =>
-      let f cl := (List.map (fun (p:var*exp) => let (k, e) := p in
-                                                (k, rename_all sigma e)) cl) in
-      Ecase_c (apply_r sigma v) (f l) t (rename_all_ctx sigma c') (f l')
-    | Efun1_c fl c' =>
-      let fs := all_fun_name fl in
-      let fl' := rename_all_fun (remove_all sigma fs) fl in
-      Efun1_c fl' (rename_all_ctx (remove_all sigma fs) c')
-    | Efun2_c cf e =>
-      let fs := all_fun_name_ctx cf in
-      let cf' := rename_all_fun_ctx (remove_all sigma fs) cf in
-      Efun2_c cf' (rename_all (remove_all sigma fs) e)
-    end
-  with rename_all_fun_ctx (sigma:r_map) (fc: fundefs_ctx): fundefs_ctx :=
-         match fc with
-         | Fcons1_c f t ys c fds' =>  Fcons1_c f t ys (rename_all_ctx (remove_all sigma ys) c) (rename_all_fun sigma fds')
-         | Fcons2_c f t ys e cfds' =>  Fcons2_c f t ys (rename_all (remove_all sigma ys) e) (rename_all_fun_ctx sigma cfds')
-         end.
-
-
-  (* no-shadow version of rename_all. *)
-  Fixpoint rename_all_ns (sigma:r_map) (e:exp) : exp :=
-    match e with
-    | Econstr x t ys e' => Econstr x t (apply_r_list sigma ys) (rename_all_ns sigma e')
-    | Eprim x f ys e' => Eprim x f (apply_r_list sigma ys) (rename_all_ns sigma e')
-    | Eproj v t n y e' => Eproj v t n (apply_r sigma y) (rename_all_ns sigma e')
-    | Eletapp v f t ys e' => Eletapp v (apply_r sigma f) t (apply_r_list sigma ys) (rename_all_ns sigma e')
-    | Ecase v cl =>
-      Ecase (apply_r sigma v) (List.map (fun (p:var*exp) => let (k, e) := p in
-                                                            (k, rename_all_ns sigma e)) cl)
-    | Efun fl e' =>
-      let fl' := rename_all_fun_ns sigma fl in
-      Efun fl' (rename_all_ns sigma e')
-    | Eapp f t ys =>
-      Eapp (apply_r sigma f) t (apply_r_list sigma ys)
-    | Ehalt v => Ehalt (apply_r sigma v)
-    end
-  with rename_all_fun_ns (sigma:r_map) (fds:fundefs): fundefs :=
-         match fds with
-         | Fnil => Fnil
-         | Fcons v' t ys e fds' => Fcons v' t ys (rename_all_ns sigma e) (rename_all_fun_ns sigma fds')
-         end.
-
-
-  Fixpoint rename_all_ctx_ns (sigma:r_map) (c:exp_ctx): exp_ctx :=
-    match c with
-    | Hole_c => Hole_c
-    | Econstr_c x t ys c' =>
-      Econstr_c x t (apply_r_list sigma ys) (rename_all_ctx_ns sigma c')
-    | Eprim_c x f ys c' =>
-      Eprim_c x f (apply_r_list sigma ys) (rename_all_ctx_ns sigma c')
-    | Eproj_c v t n y c' => Eproj_c v t n (apply_r sigma y) (rename_all_ctx_ns sigma c')
-    | Eletapp_c v f ft ys c' => Eletapp_c v (apply_r sigma f) ft (apply_r_list sigma ys)
-                                          (rename_all_ctx_ns sigma c')
-    | Ecase_c v l t c' l' =>
-      let f cl := (List.map (fun (p:var*exp) => let (k, e) := p in
-                                                (k, rename_all_ns sigma e)) cl) in
-      Ecase_c (apply_r sigma v) (f l) t (rename_all_ctx_ns sigma c') (f l')
-    | Efun1_c fl c' =>
-      let fl' := rename_all_fun_ns sigma fl in
-      Efun1_c fl' (rename_all_ctx_ns sigma c')
-    | Efun2_c cf e =>
-      let cf' := rename_all_fun_ctx_ns sigma cf in
-      Efun2_c cf' (rename_all_ns sigma e)
-    end
-  with rename_all_fun_ctx_ns (sigma:r_map) (fc: fundefs_ctx): fundefs_ctx :=
-         match fc with
-         | Fcons1_c f t ys c fds' =>  Fcons1_c f t ys (rename_all_ctx_ns sigma c) (rename_all_fun_ns sigma fds')
-         | Fcons2_c f t ys e cfds' =>  Fcons2_c f t ys (rename_all_ns sigma e) (rename_all_fun_ctx_ns sigma cfds')
-         end.
-
-  Definition rename y x e :=
-    rename_all (M.set x y (M.empty var)) e.
+Theorem term_size_rename_all_ns sig :
+  (forall e, term_size (rename_all_ns sig e) = term_size e) /\
+  (forall B, funs_size (rename_all_fun_ns sig B) = funs_size B).
+Proof.
+  exp_defs_induction IHe IHl IHb; simpl; try omega.    
+  rewrite IHe. f_equal. simpl in IHl. inv IHl. rewrite H0. reflexivity.
+Qed.
   
-  Transparent rename.
-
-  Theorem term_size_rename_all_ns sig :
-    (forall e, term_size (rename_all_ns sig e) = term_size e) /\
-    (forall B, funs_size (rename_all_fun_ns sig B) = funs_size B).
-  Proof.
-    exp_defs_induction IHe IHl IHb; simpl; try omega.    
-    rewrite IHe. f_equal. simpl in IHl. inv IHl. rewrite H0. reflexivity.
-  Qed.
-  
-  (* TODO move *)
-  Lemma inline_letapp_rename e x C x' sig :
-    apply_r sig x = x ->
-    inline_letapp e x = Some (C, x') ->
-    inline_letapp (rename_all_ns sig e) x = Some (rename_all_ctx_ns sig C, apply_r sig x').
-  Proof.
-    revert x C x' sig; induction e; intros x C x' sig Hyp Hinl; simpl in *;
-      try match goal with
-          | [H : context[inline_letapp ?E ?X] |- _ ] => destruct (inline_letapp E X) as [[C' y] | ] eqn:Hinl'; inv Hinl
-          end;
-      try now (erewrite IHe; [| eassumption | ]).
-    - inv Hinl.
-    - inv Hinl; eauto. simpl. rewrite Hyp. reflexivity.
-    - inv Hinl. reflexivity.
-  Qed.
-
-
-End RENAME.
 
 Section CONTRACT.
 
@@ -1206,20 +870,6 @@ Section CONTRACT.
 
   (* The return type of contractT *)
   Definition contractT im := shrinkT exp im.
-
-
-  (* TODO move *)
-  Fixpoint straight_code (e : exp) : bool :=
-    match e with
-    | Econstr _ _ _ e 
-    | Eproj _ _ _ _ e
-    | Eletapp _ _ _ _ e
-    | Eprim _ _ _ e
-    | Efun _ e => straight_code e
-    | Eapp _ _ _
-    | Ehalt _ => true
-    | Ecase _ _ => false
-    end.
 
   Definition incr_steps {im} (res : contractT im) : contractT im :=
     match res as k return (k = res -> contractT im) with
@@ -1747,10 +1397,10 @@ Section CONTRACT.
 End CONTRACT.
 
 (* Perform 1 pass of contract of e *)
-Definition shrink_top (e:exp) : exp :=
+Definition shrink_top (e:exp) : exp * nat :=
   let count := init_census e in
   match (contract (M.empty var) count e (M.empty svalue) (M.empty bool)) with
-  | existT (e', _, _, _) _ => e'
+  | existT (e', steps, _, _) _ => (e', steps)
   end.
 
 (* Perform n passes of contract of e starting with count map c *)

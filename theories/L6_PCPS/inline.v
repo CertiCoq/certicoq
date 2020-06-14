@@ -58,13 +58,27 @@ Section Beta.
     log_msg (pp_St s nenv);;
     log_msg Pipeline_utils.newline.
 
+  Fixpoint straight_code (e : exp) : bool :=
+    match e with
+    | Econstr _ _ _ e
+    | Eprim _ _ _ e
+    | Eproj _ _ _ _ e
+    | Eletapp _ _ _ _ e
+    | Efun _ e => straight_code e
+    | Ecase _ _ => false 
+    | Eapp _ _ _ => true
+    | Ehalt _ => true
+    end.      
+
+    
   Fixpoint beta_contract (d : nat) {struct d} :=
     let fix beta_contract_aux (e : exp) (sig : r_map) (fm:fun_map) (s:St) {struct e} : freshM exp :=
         match e with
         | Econstr x t ys e =>
           let ys' := apply_r_list sig ys in
-          e' <- beta_contract_aux e sig fm s;;
-          ret (Econstr x t ys' e')
+          x' <- get_name x "" ;;
+          e' <- beta_contract_aux e (M.set x x' sig) fm s;;
+          ret (Econstr x' t ys' e')
         | Ecase v cl =>
           let v' := apply_r sig v in
           cl' <- (fix beta_list (br: list (ctor_tag*exp)) : freshM (list (ctor_tag*exp)) :=
@@ -78,38 +92,46 @@ Section Beta.
           ret (Ecase v' cl')
        | Eproj x t n y e =>
          let y' := apply_r sig y in
-         e' <- beta_contract_aux e sig fm s;;
-         ret (Eproj x t n y' e')
+         x' <- get_name x "" ;;
+         e' <- beta_contract_aux e (M.set x x' sig) fm s;;
+         ret (Eproj x' t n y' e')
        | Eletapp x f t ys ec =>
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
          let (s' , inl) := update_letApp _ IH f' t ys' s in
          (match (inl, M.get f' fm, d) with
           | (true, Some (t, xs, e), S d') =>
-            e' <- freshen_exp e;;
+            let sig' := set_list (combine xs ys') sig  in            
+            e' <- beta_contract d' e sig' fm s' ;;
             match inline_letapp e' x with
             | Some (C, x') =>
-              let sig' := set_list (combine xs ys') sig  in
-              beta_contract d' (C |[ ec ]|) (M.set x (apply_r sig' x') sig') fm s'
+              ec' <- beta_contract d' ec (M.set x x' sig) fm s' ;;
+              ret (C |[ ec' ]|)
             | None =>
-              ec' <- beta_contract_aux ec sig fm s' ;;
+              x' <- get_name x "" ;;
+              ec' <- beta_contract_aux ec (M.set x x' sig) fm s' ;;
               ret (Eletapp x f' t ys' ec')
             end
-          | _ =>
-            ec' <- beta_contract_aux ec sig fm s' ;;
-            ret (Eletapp x f' t ys' ec')
+         | _ =>
+           x' <- get_name x "" ;;
+           ec' <- beta_contract_aux ec (M.set x x' sig) fm s' ;;
+           ret (Eletapp x' f' t ys' ec')
           end)
        | Efun fds e =>
          let fm' := add_fundefs fds fm in
          let (s1, s2) := update_funDef _ IH fds sig s in
-         (* debug_st s1;; *)
+         let names := all_fun_name fds in
+         names' <- get_names_lst names "" ;;
+         let sig' := set_list (combine names names') sig in
          fds' <- (fix beta_contract_fds (fds:fundefs) (s:St) : freshM fundefs :=
                    match fds with
                    | Fcons f t xs e fds' =>
                      let s' := update_inFun _ IH f t xs e sig s in
-                     e' <- beta_contract_aux e sig fm' s' ;;
+                     let f' := apply_r sig' f in
+                     xs' <- get_names_lst xs "" ;;
+                     e' <- beta_contract_aux e (set_list (combine xs xs') sig') fm' s' ;;
                      fds'' <- beta_contract_fds fds' s ;;
-                     ret (Fcons f t xs e' fds'')
+                     ret (Fcons f' t xs e' fds'')
                    | Fnil => ret Fnil
                    end) fds s2 ;;
          e' <- beta_contract_aux e sig fm' s1;;
@@ -129,27 +151,16 @@ Section Beta.
           end)
        | Eprim x t ys e =>
          let ys' := apply_r_list sig ys in
-         e' <- beta_contract_aux e sig fm s;;
-         ret (Eprim x t ys' e')
+         x' <- get_name x "" ;;
+         e' <- beta_contract_aux e (M.set x x' sig) fm s;;
+         ret (Eprim x' t ys' e')
        | Ehalt x =>
          let x' := apply_r sig x in
          ret (Ehalt x')
         end
     in beta_contract_aux.
 
-
-  (* Old fds for reference *)
-  (* Function beta_contract_fds (fds:fundefs) (fcon: St -> forall e:exp, (term_size e < funs_size fds)%nat -> freshM exp)  (fdc:fundefs) (sig:r_map) (s:St) (p:  cps_util.subfds_or_eq fdc fds): freshM fundefs := *)
-  (*   (match fdc as x return x = fdc -> _ with *)
-  (*    | Fcons f t xs e fdc' => *)
-  (*      fun Heq_fdc => *)
-  (*        let s' := update_inFun _ IH f t xs e sig s in *)
-  (*       e' <- fcon s' e (beta_contract_fds_1 (eq_ind_r (fun a => cps_util.subfds_or_eq a fds) p Heq_fdc));; *)
-  (*       fds' <- beta_contract_fds fds fcon fdc' sig s (beta_contract_fds_2 (eq_ind_r (fun a => cps_util.subfds_or_eq a fds) p Heq_fdc));; *)
-  (*        ret (Fcons f t xs e' fds') *)
-  (*   | Fnil => fun _ => ret Fnil *)
-  (*   end) (eq_refl fdc). *)
-
+  
   Definition beta_contract_top (e:exp) (d:nat) (s:St) (c:comp_data) : error exp * comp_data :=
     let '(e', (st', _)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s) c tt in
     (e', st').

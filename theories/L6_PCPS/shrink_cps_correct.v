@@ -17,21 +17,9 @@ Require Import L6.Ensembles_util.
 
 Require Import L6.cps L6.ctx L6.logical_relations L6.tactics L6.cps_util L6.List_util
         L6.shrink_cps L6.eval L6.set_util L6.identifiers L6.stemctx L6.alpha_conv
-        L6.functions L6.relations.
+        L6.functions L6.relations L6.rename.
 
 Open Scope ctx_scope.
-
-Theorem find_def_rename: forall f t xs e sigma fds,
-    find_def f fds = Some (t, xs, e) ->
-    find_def f (rename_all_fun sigma fds) = Some (t, xs, rename_all (remove_all sigma xs) e).
-Proof.
-  induction fds; intros.
-  - simpl in *. destruct (M.elt_eq f v).
-    + subst; inversion H; reflexivity.
-    + apply IHfds; auto.
-  -   inversion H.
-Qed.
-
 
 (** general rewrite rules that preserves semantics
     - Fun_inline replaces one occurence on f by its definition
@@ -214,62 +202,6 @@ Section Shrink_correct.
       rewrite Setminus_Disjoint in Henv. eassumption. sets.
   Qed.
 
-  (* Lemmas about [all_fun_name] *)
-  Lemma forall_name_fundefs: forall x P fds,
-      Forall P (all_fun_name fds) ->
-      name_in_fundefs fds x ->
-      P x.
-  Proof.
-    induction fds; intros.
-    - inversion H0; inversion H; subst.
-      + inversion H1; subst. auto.
-      + apply IHfds; auto.
-    - inversion H0.
-  Qed.
-
-  Lemma all_name_fundefs: forall fds x,
-      List.In x (all_fun_name fds) <-> name_in_fundefs fds x.
-  Proof.
-    induction fds; simpl; intros; split; intros.
-    - destruct H. subst. left; auto.
-      right. apply IHfds; auto.
-    - inversion H; subst. inversion H0; auto.
-      right. apply IHfds; auto.
-    - inversion H.
-    - inversion H.
-  Qed.
-
-  Lemma disjoint_not_occurs_fun: forall e fds,
-      Forall (fun v => num_occur e v 0) (all_fun_name fds) ->
-      Disjoint var (occurs_free e) (name_in_fundefs fds).
-  Proof.
-    intros.
-    apply Disjoint_intro; intros.
-    intro.
-    inversion H0; subst.
-    assert (Hof := (not_occurs_not_free x)).
-    destruct Hof.
-    specialize (H3 e).
-    apply H3; auto.
-    rewrite Forall_forall in H.
-    apply H.
-    apply all_name_fundefs; auto.
-  Qed.
-
-
-  Lemma disjoint_occurs_free_fun: forall e fds,
-      Forall (fun v => ~occurs_free e v) (all_fun_name fds) ->
-      Disjoint var (occurs_free e) (name_in_fundefs fds).
-  Proof.
-    intros.
-    apply Disjoint_intro; intros.
-    intro.
-    inversion H0; subst.
-    rewrite Forall_forall in H.
-    specialize (H x).
-    apply H.
-    apply all_name_fundefs; auto. auto.
-  Qed.
 
   Lemma split_fds_unique_name_l: forall fds,
       unique_functions fds ->
@@ -303,6 +235,7 @@ Section Shrink_correct.
       split; constructor; eauto. sets.
   Qed.
 
+  (* TODO move *)
   Lemma split_fds_unique_functions_r B1 B2 B3 :
     unique_functions B1 -> unique_functions B2 ->
     Disjoint var (name_in_fundefs B1) (name_in_fundefs B2) ->
@@ -326,8 +259,6 @@ Section Shrink_correct.
       + eapply IHHspl...
     - constructor.
   Qed.
-
-
 
   Lemma fundefs_append_unique_name_l B1 B2 B3 :
     unique_functions B3 ->
@@ -354,7 +285,7 @@ Section Shrink_correct.
     apply fundefs_append_split_fds; eauto.
   Qed.
 
-  Lemma  find_def_fundefs_append_none:
+  Lemma find_def_fundefs_append_none:
     forall (f : var) (B1 B2 : fundefs) (v : fun_tag * list var * exp),
       find_def f B1 = None -> find_def f (fundefs_append B1 B2) = find_def f B2.
   Proof.
@@ -376,7 +307,7 @@ Section Shrink_correct.
     - reflexivity.
     - intros rho1 Henv. inv Henv. inv H3.
       eapply preord_exp_refl; eauto.
-      eapply disjoint_occurs_free_fun in Hall.
+      eapply Disjoint_occurs_free_name_in_fundefs_cor in Hall.
       eapply preord_env_P_def_funs_not_in_P_l; eauto.
       rewrite Setminus_Disjoint in Hpre; eauto.
   Qed.
@@ -1157,32 +1088,6 @@ Section Shrink_correct.
     apply bound_stem_var. auto.
   Qed.
 
-  Lemma name_fds_same: forall x fds,
-      name_in_fundefs fds x <->
-      List.In x (all_fun_name fds).
-  Proof.
-    induction fds; split; intros.
-    - simpl in H. inversion H; subst.
-      inversion H0; subst.
-      constructor; auto.
-      rewrite IHfds in H0.
-      constructor 2. auto.
-    - simpl.
-      simpl in H.
-      inversion H.
-      subst; left; auto.
-      right.
-      apply IHfds. auto.
-    - inversion H.
-    - inversion H.
-  Qed.
-
-  Lemma same_name_in_fun: forall f,
-      name_in_fundefs f <--> FromList (all_fun_name f).
-  Proof.
-    intro.
-    split; intro; intro; apply name_fds_same; auto.
-  Qed.
 
   Context (Hless_steps'' :
              forall x cl t e n rho1 rho2 c1 c2,
@@ -1239,78 +1144,6 @@ Section Shrink_correct.
   Qed.
 
 
-  Lemma image_apply_r v m S :
-    image (apply_r (M.remove v m)) S \subset v |: image (apply_r m) (S \\ [set v]).
-  Proof.
-    intros z [y [Hin Heq]]; subst.
-    destruct (peq y v); subst.
-    - left. unfold In. unfold apply_r. rewrite M.grs. reflexivity.
-    - right. eexists; split; eauto.
-      constructor; eauto. intros Hc; inv Hc; eauto.
-      unfold apply_r. rewrite M.gro; eauto.
-  Qed.
-
-  Lemma image'_get_not_In {A} v (m : M.t A) S :
-    image' (fun x : positive => M.get x (M.remove v m)) S \subset
-    image' (fun x : positive => M.get x m) (S \\ [set v]).
-  Proof.
-    intros z [y [Hin Heq]]; subst.
-    destruct (peq y v); subst.
-    - rewrite M.grs in Heq. congruence.
-    - rewrite M.gro in Heq; eauto. eexists; split; eauto.
-      constructor; eauto. intros Hc; inv Hc. eauto.
-  Qed.
-
-  Lemma remove_all_none: forall x l sigma,
-      M.get x sigma = None ->
-      M.get x (remove_all sigma l) = None.
-  Proof.
-    induction l.
-    - intros. simpl. auto.
-    - intros. simpl. apply gr_none. eapply IHl. eassumption.
-  Qed.
-
-  (* todo: move *)
-  Lemma in_remove_all: forall x l sigma,
-      FromList l x ->
-      M.get x (remove_all sigma l) = None.
-  Proof.
-    induction l; intros; simpl.
-    - inv H.
-    - destruct (peq x a); inv H; eauto; subst.
-      + rewrite M.grs. reflexivity.
-      + rewrite M.grs. reflexivity.
-      + rewrite M.grs. reflexivity.
-      + rewrite M.gro; eauto.
-  Qed.
-
-  Lemma not_in_remove_all: forall x l sigma,
-      ~ (FromList l x) ->
-      M.get x sigma = M.get x (remove_all sigma l).
-  Proof.
-    induction l; intros.
-    - reflexivity.
-    - simpl.
-      assert (Hin : ~ (a = x) /\ ~ (FromList l x)).
-      { split; intro. apply H. constructor; auto.
-        apply H. constructor 2; auto. }
-      destruct Hin.
-      rewrite M.gro; auto.
-  Qed.
-
-  Lemma image'_get_remove_all (m : M.t var) S l :
-    image' (fun x : positive => M.get x (remove_all m l)) S \subset
-    image' (fun x : positive => M.get x m) (S \\ FromList l).
-  Proof.
-    revert m S; induction l; intros m S.
-    - simpl. repeat normalize_sets. reflexivity.
-    - simpl. eapply Included_trans.
-      eapply image'_get_not_In.
-      eapply Included_trans. eapply IHl.
-      repeat normalize_sets. rewrite Setminus_Union. reflexivity.
-  Qed.
-
-
   Lemma preord_env_P_inj_remove (S : Ensemble var) (rho1 rho2 : env)
         (k : nat) m (x  : var) (v1 v2 : val) :
     ~ x \in (image' (fun x => M.get x m) (S \\ [set x])) ->
@@ -1360,20 +1193,6 @@ Section Shrink_correct.
         eapply preord_env_P_inj_antimon. eassumption.
         normalize_sets. sets.
       + inv Hall ; eauto.
-  Qed.
-
-  Lemma apply_r_remove_eq m v :
-    apply_r (M.remove v m) v = v.
-  Proof.
-    unfold apply_r. rewrite M.grs. reflexivity. 
-  Qed.
-
-  Lemma apply_r_remove_neq m x v :
-    x <> v ->
-    apply_r (M.remove v m) x = apply_r m x.
-  Proof.
-    intros Hneq.
-    unfold apply_r. rewrite M.gro; eauto.
   Qed.
 
   Lemma rename_all_correct k (m : M.t var) e1 rho1 rho2 :
@@ -1461,7 +1280,7 @@ Section Shrink_correct.
         normalize_bound_var. now sets.
         normalize_occurs_free. rewrite image'_Union.
         eapply Included_trans. eapply image'_get_remove_all.
-        rewrite same_name_in_fun. now sets.
+        rewrite Same_set_all_fun_name. now sets.
       + eapply preord_env_P_inj_antimon with (S2 := (occurs_free (Efun f2 e1)) :|: name_in_fundefs f2).
         2:{ normalize_occurs_free; sets. rewrite <- Union_assoc, <- Union_Setminus. sets. tci. }
         induction k as [h IHk'] using lt_wf_rec1.
@@ -1471,7 +1290,7 @@ Section Shrink_correct.
           eexists. split.
           -- rewrite def_funs_eq. reflexivity.
              eapply rename_all_fun_name. unfold apply_r. rewrite in_remove_all.
-             eassumption. eapply same_name_in_fun. eassumption.
+             eassumption. eapply Same_set_all_fun_name. eassumption.
           -- rewrite preord_val_eq. intros vs1 vs2 j t xs1 e rho Hlen Hf Hset.
              edestruct (set_lists_length3 (def_funs (rename_all_fun (remove_all m (all_fun_name f2)) f2)
                                                     (rename_all_fun (remove_all m (all_fun_name f2)) f2) rho2 rho2)
@@ -1479,7 +1298,7 @@ Section Shrink_correct.
              rewrite <- Hlen; eapply set_lists_length_eq. now eauto.
              do 3 eexists; split; [| split ].
              ++ eapply find_def_rename. unfold apply_r.
-                rewrite in_remove_all. eassumption. eapply same_name_in_fun. eassumption.
+                rewrite in_remove_all. eassumption. eapply Same_set_all_fun_name. eassumption.
              ++ now eauto.
              ++ eapply find_def_correct in Hf.
                 intros Hlt Hall.
@@ -1493,7 +1312,7 @@ Section Shrink_correct.
 
                    now sets.
                    normalize_occurs_free. eapply image'_monotonic. do 2 eapply Setminus_Included_Included_Union.
-                   eapply Included_trans. eapply occurs_free_in_fun; eauto. rewrite <- same_name_in_fun.
+                   eapply Included_trans. eapply occurs_free_in_fun; eauto. rewrite <- Same_set_all_fun_name.
                    sets.
                 ** eapply preord_env_P_inj_set_lists_remove_all; [ | | | now eauto | now eauto ].
                    --- eapply Disjoint_Included; [| | eassumption ].
@@ -1502,7 +1321,7 @@ Section Shrink_correct.
                        now sets.
                        eapply Included_trans. eapply image'_get_remove_all.
                        eapply image'_monotonic. do 2 eapply Setminus_Included_Included_Union.
-                       eapply Included_trans. eapply occurs_free_in_fun; eauto. rewrite <- same_name_in_fun.
+                       eapply Included_trans. eapply occurs_free_in_fun; eauto. rewrite <- Same_set_all_fun_name.
                        normalize_occurs_free. sets.
                    --- eapply preord_env_P_inj_antimon. eapply IHk'; [ eassumption | | ].
                        +++ intros. eapply IHk; eauto. omega.
@@ -1514,13 +1333,13 @@ Section Shrink_correct.
         * inv Hget; try contradiction.
           rewrite def_funs_neq in *; eauto. unfold apply_r. rewrite <- not_in_remove_all.
           eapply Hpre. eassumption. eassumption.
-          intros Hc. eapply n. eapply same_name_in_fun. eassumption.
+          intros Hc. eapply n. eapply Same_set_all_fun_name. eassumption.
           intros Hc. edestruct rename_all_fun_name as [Hl Hr]. eapply Hl in Hc. clear Hr Hl.
           unfold apply_r in Hc. rewrite <- not_in_remove_all in Hc.
           destruct (M.get z m) eqn:Heq; eauto. eapply Hdis. constructor.
           now eexists; split; eauto.
           constructor; eauto. eapply name_in_fundefs_bound_var_fundefs. eassumption.
-          intros Hc'. eapply n. eapply same_name_in_fun. eassumption.
+          intros Hc'. eapply n. eapply Same_set_all_fun_name. eassumption.
       + omega.
     - (* Eapp *)
       simpl; eapply preord_exp_app_compat; eauto; intros.
@@ -1532,31 +1351,6 @@ Section Shrink_correct.
       normalize_occurs_free. sets.
     - (* Ehalt *)
       simpl; eapply preord_exp_halt_compat; eauto.
-  Qed.
-
-  Lemma apply_r_none:
-    forall v sigma,
-      M.get v sigma = None ->
-      apply_r sigma v = v.
-  Proof.
-    intros. unfold apply_r.
-    unfold M.get in H. unfold M.get. rewrite H.
-    reflexivity.
-  Qed.
-
-  Lemma apply_r_some: forall v y sigma,
-      M.get v sigma = Some y ->
-      apply_r sigma v = y.
-  Proof.
-    intros. unfold apply_r.
-    unfold M.get in *. rewrite H. reflexivity.
-  Qed.
-
-  Lemma apply_r_set2: forall x v y sigma,
-      x <> v ->
-      apply_r (M.set x y sigma) v = apply_r sigma v.
-  Proof.
-    intros. unfold apply_r. rewrite M.gso by auto. auto.
   Qed.
 
   Lemma num_occur_arl:
@@ -1575,15 +1369,6 @@ Section Shrink_correct.
       rewrite M.gso by auto. apply M.gempty.
   Qed.
 
-  Lemma apply_r_not_in_sig: forall x v sigma,
-      ~ (exists z : M.elt, M.get z sigma = Some x) ->
-      x <> v -> x <> apply_r sigma v.
-  Proof.
-    intros. unfold apply_r.
-    destruct (M.get v sigma) eqn:gvs.
-    intro; subst. apply H. exists v; auto.
-    auto.
-  Qed.
 
   Lemma Disjoint_Singletons:
     forall v x,
@@ -1595,68 +1380,6 @@ Section Shrink_correct.
     apply H0. split; auto.
   Qed.
 
-  Lemma apply_r_list_refl m xs :
-    (forall x, x \in FromList xs -> apply_r m x = x) ->
-    apply_r_list m xs = xs.
-  Proof.
-    induction xs; eauto.
-    - simpl; intros Hyp. f_equal. eapply Hyp.
-      now left. eapply IHxs. 
-      intros. eapply Hyp. now right.
-  Qed.
-
-  Lemma remove_apply_r_eq m v :
-    (forall x, apply_r m x = x) ->
-    (forall x, apply_r (M.remove v m) x =x).
-  Proof.
-    intros Hyp x. unfold apply_r. destruct (peq x v); subst.
-    - rewrite M.grs. reflexivity.  
-    - rewrite M.gro; eauto.
-  Qed.
-
-  Lemma remove_all_apply_r_eq m l :
-    (forall x, apply_r m x = x) ->
-    (forall x, apply_r (remove_all m l) x =x).
-  Proof.
-    induction l; intros Hyp x; eauto.
-    simpl. rewrite remove_apply_r_eq; eauto.
-  Qed.
-
-  Lemma rename_all_refl_mut :
-    (forall e m (Hyp : forall x, apply_r m x = x),
-        rename_all m e = e) /\
-    (forall B m (Hyp : forall x, apply_r m x = x),
-        rename_all_fun m B = B).
-  Proof.
-    exp_defs_induction IHe IHl IHB; intros. 
-    - simpl. rewrite apply_r_list_refl; eauto. rewrite IHe. reflexivity.
-      eapply remove_apply_r_eq. eassumption.
-    - simpl. rewrite Hyp; eauto.
-    - simpl. rewrite Hyp; eauto.
-      rewrite IHe; eauto. eapply IHl in Hyp. simpl in Hyp.
-      do 2 f_equal. inversion Hyp. rewrite H1. eassumption. 
-    - simpl. rewrite Hyp, IHe; eauto.
-      eapply remove_apply_r_eq. eassumption.
-    - simpl. rewrite Hyp, apply_r_list_refl, IHe; eauto.
-      eapply remove_apply_r_eq. eassumption.
-    - simpl. rewrite IHe, IHB; eauto.
-      eapply remove_all_apply_r_eq; eauto.
-      eapply remove_all_apply_r_eq; eauto.
-    - simpl. rewrite Hyp, apply_r_list_refl; auto.
-    - simpl. rewrite apply_r_list_refl; eauto. rewrite IHe. reflexivity.
-      eapply remove_apply_r_eq. eassumption.
-    - simpl. rewrite Hyp; eauto.
-    - simpl. rewrite IHe, IHB; eauto. 
-      eapply remove_all_apply_r_eq; eauto.
-    - reflexivity. 
-  Qed.
-
-  Corollary rename_all_refl :
-    forall e m (Hyp : forall x, apply_r m x = x),
-      rename_all m e = e.
-  Proof.
-    eapply rename_all_refl_mut. 
-  Qed.
 
   Lemma preord_env_P_inj_set_l_apply_r S k rho1 rho2 m x y v v' : 
     preord_env_P_inj cenv PG (S \\ [set x]) k (apply_r m) rho1 rho2 ->
@@ -1688,7 +1411,7 @@ Section Shrink_correct.
   Qed.
   
   
-  
+  (* TODO move *)
   Lemma image'_get_Singleton {A} S x (y : A) :  
     image' (fun z : positive => M.get z (M.set x y (M.empty _))) S \subset [set y].
   Proof.
@@ -1994,7 +1717,8 @@ Section Shrink_correct.
     normalize_occurs_free...
   Qed.
 
-  
+
+  (* TODO move *)
   Lemma bound_var_inline_letapp x e C x' :
     inline_letapp e x = Some (C, x') ->
     bound_var_ctx C \subset x |: bound_var e.
@@ -2038,52 +1762,8 @@ Section Shrink_correct.
     - inv Hin. normalize_occurs_free. sets.
   Qed.
 
-  Lemma rename_all_bound_var_mut :
-    (forall e m, bound_var (rename_all m e) <--> bound_var e) /\
-    (forall B m, bound_var_fundefs (rename_all_fun m B) <--> bound_var_fundefs B).
-  Proof.
-    exp_defs_induction IHe IHl IHB; intros m;
-      simpl; repeat normalize_bound_var;
-        (try (rewrite IHe; reflexivity)); try reflexivity.
-    - rewrite IHe.
-      specialize (IHl m). simpl in IHl. rewrite IHl. reflexivity. 
-    - rewrite IHe, IHB. reflexivity. 
-    - rewrite IHe, IHB. reflexivity.
-  Qed. 
-
-  Lemma rename_all_bound_var :
-    forall e m, bound_var (rename_all m e) <--> bound_var e.
-  Proof.
-    eapply rename_all_bound_var_mut. 
-  Qed. 
-
-  Lemma rename_all_bound_var_fundefs :
-    (forall B m, bound_var_fundefs (rename_all_fun m B) <--> bound_var_fundefs B).
-  Proof.
-    eapply rename_all_bound_var_mut. 
-  Qed. 
   
-  Lemma FromList_apply_list m l :
-    FromList (apply_r_list m l) <--> image (apply_r m) (FromList l).
-  Proof.
-    induction l; simpl; repeat normalize_sets.
-    - rewrite image_Empty_set. reflexivity.
-    - rewrite image_Union. rewrite IHl. eapply Same_set_Union_compat; [| reflexivity ].
-      rewrite image_Singleton. reflexivity. 
-  Qed.
-
-  Lemma image_apply_r_remove_not_In m v S :
-    ~ v \in S ->
-    image (apply_r (M.remove v m)) S <--> image (apply_r m) S.
-  Proof.
-    intros Hc.
-    split; intros x [z [HIn Heq]]; subst.
-    eexists; split; eauto. unfold apply_r.
-    rewrite M.gro; eauto. now intros Hc'; subst; eauto.
-    eexists; split; eauto. unfold apply_r.
-    rewrite M.gro; eauto. intros Hi; subst; eauto.
-  Qed.
-
+  (* TODO move *)
   Lemma image_Setminus_Disjoint {A B} (f : A -> B) s1 s2 :
     Disjoint _ (image f (s1 \\ s2)) (image f s2)  ->
     image f (s1 \\ s2) <--> image f s1 \\ image f s2.
@@ -2098,112 +1778,6 @@ Section Shrink_correct.
       intros Hc. eapply H0. eapply In_image. eassumption. 
   Qed.
 
-  Lemma image_apply_r_remove_Singleton v m :
-    image (apply_r (M.remove v m)) [set v] <--> [set v].
-  Proof.
-    rewrite image_Singleton. unfold apply_r. rewrite M.grs. reflexivity.
-  Qed.
-
-  Lemma image_apply_r_remove_all_Singleton l v m :
-    v \in FromList l ->
-    image (apply_r (remove_all m l)) [set v] <--> [set v].
-  Proof.
-    intros Hin.
-    rewrite image_Singleton. unfold apply_r. rewrite in_remove_all. reflexivity.
-    eassumption. 
-  Qed.
-
-  Lemma image_remove_all_Disjoint  S m l :
-    Disjoint _ S (FromList l) ->
-    image (apply_r (remove_all m l)) S <--> image (apply_r m) S.
-  Proof.
-    revert S. induction l; intros S Hc.
-    - reflexivity.
-    - simpl. normalize_sets. rewrite image_apply_r_remove_not_In.
-      eapply IHl. sets.
-      intros Hc'. eapply Hc. constructor; eauto.
-  Qed.
-  
-  Lemma image_remove_all S m l :
-    image (apply_r (remove_all m l)) S \subset image (apply_r m) (S \\ FromList l) :|: FromList l.
-  Proof.
-    revert S. induction l; intros S.
-    - simpl. rewrite !FromList_nil at 1. repeat normalize_sets. sets.
-    - simpl. rewrite !FromList_cons at 1. repeat normalize_sets.
-      eapply Included_trans. eapply image_apply_r. 
-      eapply Union_Included. sets.
-      eapply Included_trans. eapply IHl. rewrite Setminus_Union. sets.
-  Qed. 
-  
-  Lemma rename_all_occurs_free_mut :
-    (forall e m,
-        occurs_free (rename_all m e) \subset (image (apply_r m) (occurs_free e))) /\
-    (forall B L m,
-        name_in_fundefs B \subset FromList L ->
-        occurs_free_fundefs (rename_all_fun (remove_all m L) B) \\ FromList L  \subset
-        image (apply_r m) (occurs_free_fundefs B \\ FromList L)).
-  Proof.
-    exp_defs_induction IHe IHl IHB; intros m; simpl;
-      repeat normalize_occurs_free; repeat normalize_bound_var.
-    - rewrite FromList_apply_list, image_Union in *.
-      eapply Included_Union_compat. reflexivity.
-      eapply Setminus_Included_Included_Union.
-      eapply Included_trans. eapply IHe. eapply Included_trans.
-      eapply image_apply_r. sets.
-    - rewrite image_Singleton. reflexivity. 
-    - rewrite !image_Union, image_Singleton.
-      eapply Union_Included; sets.
-    - rewrite !image_Union, image_Singleton.
-      eapply Union_Included; sets.
-      eapply Setminus_Included_Included_Union.
-      eapply Included_trans. eapply IHe. eapply Included_trans.
-      eapply image_apply_r. sets.
-    - rewrite !image_Union, image_Singleton.
-      eapply Union_Included; sets. eapply Union_Included; sets.
-      rewrite FromList_apply_list. now sets.
-      eapply Setminus_Included_Included_Union.
-      eapply Included_trans. eapply IHe. eapply Included_trans.
-      eapply image_apply_r. sets.
-    - specialize (IHB (all_fun_name f2) m).
-      rewrite <- !same_name_in_fun in IHB at 1.
-      rewrite Setminus_Disjoint in IHB.
-      2:{ rewrite <- rename_all_fun_name. eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint. }      
-      
-      rewrite !image_Union. eapply Union_Included.      
-      eapply Included_trans. eapply IHB. reflexivity. now sets.
-      eapply Setminus_Included_Included_Union.
-      eapply Included_trans. eapply IHe. rewrite rename_all_fun_name.
-      eapply Included_trans. eapply image_remove_all.
-      rewrite <- !same_name_in_fun at 1. sets.
-    - rewrite FromList_apply_list, image_Union, image_Singleton in *. sets.
-    - rewrite FromList_apply_list, image_Union.
-      eapply Included_Union_compat. sets. eapply Setminus_Included_Included_Union.
-      eapply Included_trans. eapply IHe. eapply Included_trans.
-      eapply image_apply_r. sets.
-    - rewrite image_Singleton. sets.
-    - intros M Hsub (* Hdis *). repeat normalize_occurs_free; repeat normalize_bound_var.
-      erewrite !Setminus_Union_distr, !Setminus_Union. apply Union_Included; sets.
-      + eapply Setminus_Included_Included_Union. 
-        eapply Included_trans. eapply IHe. eapply Included_trans.
-        eapply image_remove_all. eapply Union_Included; [| now sets ]. 
-        eapply Included_trans. eapply image_remove_all.
-        eapply Union_Included; [| now sets ].
-        rewrite !image_Union. do 2 eapply Included_Union_preserv_l.
-        rewrite !Setminus_Union. eapply image_monotonic. eapply Included_Setminus_compat.
-        now sets. rewrite (Union_commut (FromList l)), Union_assoc. rewrite <- Union_assoc. 
-        eapply Union_Included. eapply Included_trans. eassumption. now sets. now sets.
-      + rewrite (Union_commut [set v]) at 1. rewrite <- Setminus_Union.
-        eapply Included_trans. eapply Included_Setminus_compat. eapply IHB.
-        eapply Included_trans; [| eassumption ]. now sets. reflexivity. 
-        rewrite <- image_remove_all_Disjoint; [| eapply Disjoint_Setminus_l; reflexivity ]. 
-        rewrite <- (image_apply_r_remove_all_Singleton m v) at 1.       
-        eapply Included_trans. eapply image_Setminus. now tci.
-        rewrite image_remove_all_Disjoint.
-        rewrite image_Union, Setminus_Union, !(Union_commut [set v]). now sets.
-        now sets. eapply Hsub. sets. 
-    - intros M Hsub. rewrite !occurs_free_fundefs_Fnil at 1.
-      sets. 
-  Qed.
 
   Lemma image_apply_r_set x v m S:
     image (apply_r (M.set x v m)) S \subset v |: image (apply_r m) (S \\ [set x]). 
@@ -2229,22 +1803,7 @@ Section Shrink_correct.
       normalize_sets. rewrite Setminus_Union. sets. 
   Qed.
 
-  Lemma image_apply_r_empty S :
-    image (apply_r (M.empty var)) S <--> S. 
-  Proof.
-    split; intros x.
-    - intros [z [Hin Heq]]; subst. unfold apply_r.
-      rewrite M.gempty. eassumption.
-    - intros Hin. eexists; split; eauto.
-      unfold apply_r.
-      rewrite M.gempty. reflexivity.
-  Qed.
 
-  Lemma rename_all_occurs_free :
-    forall e m,
-      occurs_free (rename_all m e) \subset (image (apply_r m) (occurs_free e)). 
-  Proof. eapply rename_all_occurs_free_mut. Qed. 
-    
   (* Letapp inlining *)
   Lemma rw_fun_letapp_corr x f fds t xs fb vs c rho1 rho2 k x' C' e1 :
     find_def f fds = Some (t, xs, fb) ->
@@ -2598,95 +2157,6 @@ Section Shrink_correct.
 End Shrink_correct.
 
 
-Lemma bound_var_rename_all_ns_mut:
-  forall sigma,
-    (forall (e : exp),
-        bound_var e <--> bound_var (rename_all_ns sigma e)) /\
-    (forall (fds : fundefs),
-        bound_var_fundefs fds <--> bound_var_fundefs (rename_all_fun_ns sigma fds)).
-Proof.
-  intro sig.
-  apply exp_def_mutual_ind; intros; simpl;
-    repeat (normalize_bound_var); split; try (rewrite H); try (rewrite H0); auto with Ensembles_DB.
-Qed.
-
-Lemma bound_var_rename_all_ns:
-  (forall (e : exp) sigma,
-      bound_var e <--> bound_var (rename_all_ns sigma e)).
-Proof.
-  intros. apply bound_var_rename_all_ns_mut.
-Qed.
-
-Lemma bound_var_rename_all_ns_fundefs:
-  (forall (fds : fundefs) sigma,
-      bound_var_fundefs fds <--> bound_var_fundefs (rename_all_fun_ns sigma fds)).
-Proof.
-  intros. apply bound_var_rename_all_ns_mut.
-Qed.
-
-Lemma unique_bindings_rename_all_ns:
-  (forall e sigma,
-      unique_bindings e -> unique_bindings (rename_all_ns sigma e)) /\
-  (forall fds sigma,
-      unique_bindings_fundefs fds -> unique_bindings_fundefs (rename_all_fun_ns sigma fds)).
-Proof.
-  apply exp_def_mutual_ind; intros; simpl.
-  - inv H0. eapply H in H6.
-    constructor; eauto.
-    intro. apply H3.
-    eapply (bound_var_rename_all_ns).
-    apply H0.
-  - constructor.
-  - inv H1.
-    constructor.
-    eapply H0 in H5.
-    simpl in H5. apply H5.
-    apply H. auto.
-    rewrite <- (bound_var_rename_all_ns).
-    rewrite (bound_var_rename_all_ns) with (e := (Ecase v l)) in H8.
-    simpl in H8.
-    apply H8.
-  - inv H0.
-    constructor; auto.
-    intro; apply H3.
-    eapply (bound_var_rename_all_ns).
-    eauto.
-  - inv H0. eapply H in H7.
-    constructor; eauto.
-    intro. apply H3.
-    eapply (bound_var_rename_all_ns).
-    apply H0.
-  - inv H1.
-    constructor.
-    apply H0. auto.
-    apply H; auto.
-    rewrite <- (bound_var_rename_all_ns).
-    rewrite <- (bound_var_rename_all_ns_fundefs).
-    auto.
-  - constructor.
-  - inv H0; constructor.
-    intro; apply H3.
-    eapply (bound_var_rename_all_ns).
-    apply H0.
-    apply H.
-    auto.
-  - constructor.
-  - inv H1.
-    constructor; auto.
-    intro; apply H7.
-    eapply (bound_var_rename_all_ns).
-    eauto.
-    intro; apply H8.
-    eapply (bound_var_rename_all_ns_fundefs).
-    eauto.
-    rewrite <- (bound_var_rename_all_ns). auto.
-    rewrite <- (bound_var_rename_all_ns_fundefs). auto.
-    rewrite <- (bound_var_rename_all_ns).
-    rewrite <- (bound_var_rename_all_ns_fundefs).
-    auto.
-  - constructor.
-Qed.
-
 
 
 Section inv_app_ctx.
@@ -2747,7 +2217,6 @@ Section inv_app_ctx.
 
 
 End inv_app_ctx.
-
 
 
 Lemma ub_fun_inlining: forall B1 xs fb B2 c f t vs c',
@@ -2943,7 +2412,7 @@ Section occurs_free_rw.
     intros.
     apply occurs_free_exp_ctx_included.
     rewrite occurs_free_Efun.
-    apply disjoint_not_occurs_fun in H.
+    apply Disjoint_occurs_free_name_in_fundefs in H.
     eauto with Ensembles_DB.
   Qed.
   
@@ -3208,13 +2677,12 @@ Section occurs_free_rw.
       In _ (Union _ (Setminus _ (Singleton _ a) (Dom_map sigma)) (Range_map sigma)) (apply_r sigma a).
   Proof.
     unfold apply_r.
-    intros.
-    destruct (Maps.PTree.get a sigma) eqn:gas.
-    right. exists a. auto.
-    left.
-    split.
+    intros. 
+    destruct (@PTree.get var a sigma) eqn:gas.
+    right. exists a. auto. 
+    left. split.
     constructor.
-    intro. inv H. rewrite gas in H0. inv H0.
+    intro. inv H. unfold var, M.elt in *. rewrite gas in H0. inv H0.
   Qed.
 
   Lemma FromList_apply_r_list:
@@ -3901,9 +3369,9 @@ Section Shrink_Rewrites.
       erewrite (proj1 prop_rename_all).
       erewrite (proj2 prop_rename_all).
       reflexivity.
-      apply Disjoint_dom_remove_all. rewrite <- same_name_in_fun. eapply Disjoint_Included_r.
+      apply Disjoint_dom_remove_all. rewrite <- Same_set_all_fun_name. eapply Disjoint_Included_r.
       apply name_in_fundefs_bound_var_fundefs. auto...
-      apply Disjoint_dom_remove_all. rewrite <- same_name_in_fun. eapply Disjoint_Included_r.
+      apply Disjoint_dom_remove_all. rewrite <- Same_set_all_fun_name. eapply Disjoint_Included_r.
       apply name_in_fundefs_bound_var_fundefs. auto...
     - reflexivity.
     - rewrite <- H...
@@ -3982,7 +3450,7 @@ Section Shrink_Rewrites.
     subst.
     destruct (M.get a sigma) eqn:gas.
     exfalso.
-    apply H. exists e; auto.
+    apply H. exists v; auto.
     destruct (cps_util.var_dec a a). omega.
     exfalso; apply n. auto.
     destruct (cps_util.var_dec f (apply_r sigma a)); omega.
@@ -4045,9 +3513,8 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - simpl in H2. inv H1. inv H2. inv H8. inv H7.
       replace (num_occur_list [v] f + (n + m)) with
           (n + (num_occur_list [v] f + m)) by omega.
-      unfold var.
-      replace (num_occur_list [apply_r sigma v] f + (n0 + m0)) with
-          (n0 + (num_occur_list [apply_r sigma v] f + m0)) by omega.
+      replace ((num_occur_list (@cons var (apply_r sigma v) (@nil var)) f) + (n0 + m0)) with
+          (n0 + (num_occur_list (@cons var (apply_r sigma v) (@nil var)) f + m0)) by omega.
       apply plus_le_compat.
       eapply H; eauto.
       eapply H0; eauto.
@@ -4111,7 +3578,6 @@ substitution to a term cannot increase the occurence count for that variable. *)
   Proof.
     apply num_occur_rename_all_not_range_mut.
   Qed.
-
 
 
   Lemma num_occur_rename_all_ns_not_range_mut:
@@ -4224,9 +3690,8 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - simpl in H2. inv H1. inv H2. inv H8. inv H7.
       replace (num_occur_list [v] f + (n + m)) with
           (n + (num_occur_list [v] f + m)) by omega.
-      unfold var.
-      replace (num_occur_list [apply_r sigma v] f + (n0 + m0)) with
-          (n0 + (num_occur_list [apply_r sigma v] f + m0)) by omega.
+      replace (Init.Nat.add (num_occur_list (@cons var (apply_r sigma v) (@nil var)) f) (Init.Nat.add n0 m0)) with
+          (n0 + (num_occur_list (@cons var (apply_r sigma v) (@nil var)) f + m0)) by omega.
       apply plus_le_compat.
       eapply H; eauto.
       eapply H0; eauto.
@@ -4272,17 +3737,6 @@ substitution to a term cannot increase the occurence count for that variable. *)
   Qed.
 
 
-
-
-  Lemma apply_r_set1:
-    forall x y sig,
-      apply_r (M.set x y sig) x = y.
-  Proof.
-    intros.
-    unfold apply_r.
-    rewrite M.gss. auto.
-  Qed.
-
   Lemma num_occur_list_set:
     forall f y x sigma,
       f <> y ->
@@ -4319,7 +3773,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       destruct (cps_util.var_dec f (apply_r sigma a)).
       exfalso. unfold apply_r  in e.
       destruct (Maps.PTree.get a sigma) eqn:gas.
-      apply H. exists e0; auto.
+      apply H. exists v; auto.
       auto.
       auto.
     - rewrite apply_r_set2; auto.
@@ -4529,11 +3983,11 @@ substitution to a term cannot increase the occurence count for that variable. *)
     auto.
     simpl. destruct (cps_util.var_dec x (apply_r sig a)).
     - exfalso. unfold apply_r in e.
-      destruct (Maps.PTree.get a sig) eqn:gas.
+      destruct (@M.get var a sig) eqn:gas.
       subst.
-      apply H. exists a; auto.
+      apply H. exists a; auto. 
       subst.
-      inv H0. rewrite H1 in gas. inv gas.
+      inv H0. unfold var, M.elt in *. rewrite H1 in gas. inv gas.
     - auto.
   Qed.
 
@@ -4861,33 +4315,6 @@ substitution to a term cannot increase the occurence count for that variable. *)
       constructor; auto.
     }
   Qed.
-
-
-  (* TODO move *)
-  Ltac normalize_occurs_free_ctx :=
-  match goal with
-    | [|- context[occurs_free_ctx (Econstr_c _ _ _ _)]] =>
-      rewrite occurs_free_Econstr_c
-    | [|- context[occurs_free_ctx (Eproj_c _ _ _ _ _)]] =>
-      rewrite occurs_free_Eproj_c
-    | [|- context[occurs_free_ctx (Ecase_c _ _ _ _ _)]] =>
-      rewrite occurs_free_Ecase_c
-    | [|- context[occurs_free_ctx (Eletapp_c _ _ _ _ _)]] =>
-      rewrite occurs_free_Eletapp_c
-    | [|- context[occurs_free_ctx (Efun1_c _ _)]] =>
-      rewrite occurs_free_Efun1_c
-    | [|- context[occurs_free_ctx (Efun2_c _ _)]] =>
-      rewrite occurs_free_Efun2_c
-    | [|- context[occurs_free_ctx (Eprim_c _ _ _ _)]] =>
-      rewrite occurs_free_Eprim_c
-    | [|- context[occurs_free_ctx Hole_c]] =>
-      rewrite occurs_free_Hole_c
-    | [|- context[occurs_free_fundefs_ctx (Fcons1_c _ _ _ _ _)]] =>
-      rewrite occurs_free_fundefs_Fcons1_c
-    | [|- context[occurs_free_fundefs_ctx (Fcons2_c _ _ _ _ _)]] =>
-      rewrite occurs_free_fundefs_Fcons2_c
-  end.
-
   
   Opaque num_occur_list.
   
@@ -5259,31 +4686,6 @@ substitution to a term cannot increase the occurence count for that variable. *)
       eapply IHe; eauto.
     - inv Hin. constructor.
   Qed.
-
-
-  Ltac normalize_bound_stem_ctx :=
-    match goal with
-    | [|- context[bound_stem_ctx (Econstr_c _ _ _ _)]] =>
-      rewrite bound_stem_Econstr_c
-    | [|- context[bound_stem_ctx (Eproj_c _ _ _ _ _)]] =>
-      rewrite bound_stem_Eproj_c
-    | [|- context[bound_stem_ctx (Ecase_c _ _ _ _ _)]] =>
-      rewrite bound_stem_Case_c
-    | [|- context[bound_stem_ctx (Eletapp_c _ _ _ _ _)]] =>
-      rewrite bound_stem_Eletapp_c
-    | [|- context[bound_stem_ctx (Efun1_c _ _)]] =>
-      rewrite bound_stem_Fun1_c
-    | [|- context[bound_stem_ctx (Efun2_c _ _)]] =>
-      rewrite bound_stem_Fun2_c
-    | [|- context[bound_stem_ctx (Eprim_c _ _ _ _)]] =>
-      rewrite bound_stem_Eprim_c
-    | [|- context[bound_stem_ctx Hole_c]] =>
-      rewrite bound_stem_Hole_c
-    | [|- context[bound_stem_fundefs_ctx (Fcons1_c _ _ _ _ _)]] =>
-      rewrite bound_stem_Fcons1_c
-    | [|- context[bound_stem_fundefs_ctx (Fcons2_c _ _ _ _ _)]] =>
-      rewrite bound_stem_Fcons2_c
-  end.
 
 
   Lemma occurs_fee_inline_letapp C e x x' e' :
@@ -5702,7 +5104,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     inv Hrw;
       (try now (normalize_occurs_free; rewrite Setminus_Disjoint; sets)). 
     - normalize_occurs_free; rewrite Setminus_Disjoint; sets. 
-      eapply disjoint_occurs_free_fun. eassumption.
+      eapply Disjoint_occurs_free_name_in_fundefs_cor. eassumption.
     - eapply of_fun_rm'; eauto. 
     - eapply of_case_fold with (c' := Hole_c).
       eapply find_tag_nth_findtag; eauto.
@@ -5913,7 +5315,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
         unfold closed_exp in *. rewrite Hc in H0.
         eapply Included_Empty_set_r; eauto.
       + unfold closed_exp in *. rewrite Hc. sets.
-  Qed.      
+  Qed.
 
   (* Corollary sr_correct n e e' : *)
   (*   unique_bindings e -> *)

@@ -116,10 +116,10 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_Fu
       (* uncurring *)
       let '(e_err1, s, c_data) := uncurry_fuel cps 100 (fst (shrink_cps.shrink_top e0)) c_data in
       (* inlining *)
-      e1 <- e_err1 ;;
-      let (e_err2, c_data) := if cps then inline_uncurry e1 s 10 10 c_data
-                             else inline_uncurry_marked_anf e1 s 10 10 c_data in
-      e2 <- e_err2 ;;
+      (* e1 <- e_err1 ;; *)
+      (* let (e_err2, c_data) := if cps then inline_uncurry e1 s 10 10 c_data *)
+      (*                        else inline_uncurry_marked_anf e1 s 10 10 c_data in *)
+      e2 <- e_err1 ;;
       (* Shrink reduction *)
       let (e3, _) := shrink_cps.shrink_top e2 in
       (* lambda lifting *)

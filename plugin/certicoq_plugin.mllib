@@ -114,6 +114,7 @@ AstCommon
 Round
 MSetRBT
 Maps
+Maps_util
 Map_util
 Compile0
 Compile1
@@ -129,6 +130,7 @@ Term0
 Pipeline_utils
 Set_util
 Identifiers
+Rename
 Uncurry
 Color
 Shrink_cps
@@ -157,8 +159,7 @@ Camlcoq
 AST
 Ctypes
 Cop
-Alpha_fresh
-Beta_contraction
+Inline
 Dead_param_elim
 Csyntax
 Clightdefs

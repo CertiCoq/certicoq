@@ -4,7 +4,7 @@ Require Import Common.compM Common.Pipeline_utils L6.cps.
 Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
 Import ListNotations.
 Require Import identifiers.
-Require Import L6.state L6.freshen L6.cps_util L6.cps_show L6.ctx L6.uncurry L6.shrink_cps.
+Require Import L6.state L6.cps_util L6.cps_show L6.ctx L6.uncurry L6.shrink_cps L6.rename.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
@@ -28,8 +28,7 @@ Record InlineHeuristic (St:Type) :=
 
 Definition fun_map := M.t (fun_tag * list var * exp).
 
-Definition freshen_exp (e:exp) : freshM exp  :=
-  freshen_term e (M.empty _).
+Definition inlineM : Type -> Type := @compM' unit.
 
 Section Beta.
 
@@ -53,26 +52,14 @@ Section Beta.
       exact None.
   Defined.
 
-  Definition debug_st (s : St) : freshM unit :=
+  Definition debug_st (s : St) : inlineM unit :=
     nenv <- get_name_env () ;;
     log_msg (pp_St s nenv);;
     log_msg Pipeline_utils.newline.
 
-  Fixpoint straight_code (e : exp) : bool :=
-    match e with
-    | Econstr _ _ _ e
-    | Eprim _ _ _ e
-    | Eproj _ _ _ _ e
-    | Eletapp _ _ _ _ e
-    | Efun _ e => straight_code e
-    | Ecase _ _ => false 
-    | Eapp _ _ _ => true
-    | Ehalt _ => true
-    end.      
-
     
   Fixpoint beta_contract (d : nat) {struct d} :=
-    let fix beta_contract_aux (e : exp) (sig : r_map) (fm:fun_map) (s:St) {struct e} : freshM exp :=
+    let fix beta_contract_aux (e : exp) (sig : r_map) (fm:fun_map) (s:St) {struct e} : inlineM exp :=
         match e with
         | Econstr x t ys e =>
           let ys' := apply_r_list sig ys in
@@ -81,7 +68,7 @@ Section Beta.
           ret (Econstr x' t ys' e')
         | Ecase v cl =>
           let v' := apply_r sig v in
-          cl' <- (fix beta_list (br: list (ctor_tag*exp)) : freshM (list (ctor_tag*exp)) :=
+          cl' <- (fix beta_list (br: list (ctor_tag*exp)) : inlineM (list (ctor_tag*exp)) :=
                    match br with
                    | nil => ret ( nil)
                    | (t, e)::br' =>
@@ -123,7 +110,7 @@ Section Beta.
          let names := all_fun_name fds in
          names' <- get_names_lst names "" ;;
          let sig' := set_list (combine names names') sig in
-         fds' <- (fix beta_contract_fds (fds:fundefs) (s:St) : freshM fundefs :=
+         fds' <- (fix beta_contract_fds (fds:fundefs) (s:St) : inlineM fundefs :=
                    match fds with
                    | Fcons f t xs e fds' =>
                      let s' := update_inFun _ IH f t xs e sig s in
@@ -145,8 +132,7 @@ Section Beta.
          (match (inl, M.get f' fm, d) with
           | (true, Some (t, xs, e), S d') =>
             let sig' := set_list (combine xs ys') sig  in
-            e' <- freshen_exp e;;
-            beta_contract d' e' sig' fm  s'
+            beta_contract d' e sig' fm  s'
           | _ => ret (Eapp f' t ys')
           end)
        | Eprim x t ys e =>

@@ -19,8 +19,8 @@ exec: $(TESTS)
 copy:
 	cp ../theories/Runtime/gc.c ./
 	cp ../theories/Runtime/gc.h ./
-	cp ../theories/Runtime/gc_stack.c ./
-	cp ../theories/Runtime/gc_stack.h ./
+	# cp ../theories/Runtime/gc_stack.c ./
+	# cp ../theories/Runtime/gc_stack.h ./
 	cp ../theories/Runtime/values.h ./
 	cp ../theories/Runtime/main.c ./
 	cp ../theories/Runtime/config.h ./

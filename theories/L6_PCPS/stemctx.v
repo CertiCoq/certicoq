@@ -151,7 +151,7 @@ Import ListNotations.
   Qed.
 
 
-  Ltac normalize_bound_stem_ctx' :=
+  Ltac normalize_bound_stem_ctx :=
     match goal with
       | [ |- context[bound_stem_ctx Hole_c]] =>
         rewrite bound_stem_Hole_c
@@ -175,7 +175,31 @@ Import ListNotations.
         rewrite bound_stem_Fcons2_c
     end.
 
-  Ltac normalize_bound_stem_ctx_in_ctx' :=
+  (*   Ltac normalize_bound_stem_ctx := *)
+  (*   match goal with *)
+  (*   | [|- context[bound_stem_ctx (Econstr_c _ _ _ _)]] => *)
+  (*     rewrite bound_stem_Econstr_c *)
+  (*   | [|- context[bound_stem_ctx (Eproj_c _ _ _ _ _)]] => *)
+  (*     rewrite bound_stem_Eproj_c *)
+  (*   | [|- context[bound_stem_ctx (Ecase_c _ _ _ _ _)]] => *)
+  (*     rewrite bound_stem_Case_c *)
+  (*   | [|- context[bound_stem_ctx (Eletapp_c _ _ _ _ _)]] => *)
+  (*     rewrite bound_stem_Eletapp_c *)
+  (*   | [|- context[bound_stem_ctx (Efun1_c _ _)]] => *)
+  (*     rewrite bound_stem_Fun1_c *)
+  (*   | [|- context[bound_stem_ctx (Efun2_c _ _)]] => *)
+  (*     rewrite bound_stem_Fun2_c *)
+  (*   | [|- context[bound_stem_ctx (Eprim_c _ _ _ _)]] => *)
+  (*     rewrite bound_stem_Eprim_c *)
+  (*   | [|- context[bound_stem_ctx Hole_c]] => *)
+  (*     rewrite bound_stem_Hole_c *)
+  (*   | [|- context[bound_stem_fundefs_ctx (Fcons1_c _ _ _ _ _)]] => *)
+  (*     rewrite bound_stem_Fcons1_c *)
+  (*   | [|- context[bound_stem_fundefs_ctx (Fcons2_c _ _ _ _ _)]] => *)
+  (*     rewrite bound_stem_Fcons2_c *)
+  (* end. *)
+
+  Ltac normalize_bound_stem_ctx_in_ctx :=
     match goal with
       | [ H: context[bound_stem_ctx Hole_c] |- _] =>
         rewrite bound_stem_Hole_c in H
@@ -350,7 +374,7 @@ Import ListNotations.
     inv H0; auto.
   Qed.
 
-  Ltac normalize_bound_not_stem_ctx' :=
+  Ltac normalize_bound_not_stem_ctx :=
     match goal with
     | [ |- context[bound_not_stem_ctx Hole_c]] =>
       rewrite bound_not_stem_Hole_c
@@ -374,7 +398,7 @@ Import ListNotations.
       rewrite bound_not_stem_Fcons2_c
     end.
 
-  Ltac normalize_bound_not_stem_ctx_in_ctx' :=
+  Ltac normalize_bound_not_stem_ctx_in_ctx :=
     match goal with
     | [ H: context[bound_not_stem_ctx Hole_c] |- _] =>
       rewrite bound_not_stem_Hole_c in H
@@ -402,8 +426,8 @@ Import ListNotations.
     (forall f,bound_var_fundefs_ctx f <--> names_in_fundefs_ctx f :|: (bound_not_stem_fundefs_ctx f :|: bound_stem_fundefs_ctx f)).
   Proof.
     apply exp_fundefs_ctx_mutual_ind;
-      intros; try normalize_bound_var_ctx; try normalize_bound_stem_ctx';
-        try normalize_bound_not_stem_ctx'; try rewrite H; eauto 25 with Ensembles_DB.
+      intros; try normalize_bound_var_ctx; try normalize_bound_stem_ctx;
+        try normalize_bound_not_stem_ctx; try rewrite H; eauto 25 with Ensembles_DB.
     - split; eauto 25 with Ensembles_DB.
     - assert (Hn := Decidable_name_in_fundefs f4).
       split; intro; intros. inv H0; eauto 25 with Ensembles_DB.
@@ -437,7 +461,7 @@ Import ListNotations.
     (forall c, bound_stem_ctx c \subset bound_var_ctx c) /\
     (forall fc, bound_stem_fundefs_ctx fc \subset bound_var_fundefs_ctx fc).
   Proof.
-    apply exp_fundefs_ctx_mutual_ind; intros; normalize_bound_var_ctx'; normalize_bound_stem_ctx'; eauto with Ensembles_DB.
+    apply exp_fundefs_ctx_mutual_ind; intros; normalize_bound_var_ctx'; normalize_bound_stem_ctx; eauto with Ensembles_DB.
     assert (Hf4 := name_in_fundefs_bound_var_fundefs f4).
     eauto with Ensembles_DB.
 
@@ -545,7 +569,7 @@ Import ListNotations.
     forall c', (forall c, (bound_stem_ctx c :|: bound_stem_ctx c') <--> (bound_stem_ctx (comp_ctx_f c c'))) /\
           (forall fc, (bound_stem_fundefs_ctx fc :|: bound_stem_ctx c') <--> (bound_stem_fundefs_ctx (comp_f_ctx_f fc c'))).
   Proof.
-    intro c'; apply exp_fundefs_ctx_mutual_ind; intros; simpl; repeat normalize_bound_stem_ctx'; eauto 25 with Ensembles_DB.
+    intro c'; apply exp_fundefs_ctx_mutual_ind; intros; simpl; repeat normalize_bound_stem_ctx; eauto 25 with Ensembles_DB.
     -  rewrite <- H.
        rewrite <- Union_assoc.
        rewrite Union_commut with (s1 := [set v]).

@@ -14,14 +14,14 @@ certicoq_debug.ml
 # extraction/fappli_IEEE_bits.mli
 extraction/aST.ml
 extraction/aST.mli
-extraction/alpha_fresh.ml
-extraction/alpha_fresh.mli
+# extraction/freshen.ml
+# extraction/freshen.mli
 extraction/archi.ml
 extraction/archi.mli
 extraction/astCommon.ml
 extraction/astCommon.mli
-extraction/beta_contraction.ml
-extraction/beta_contraction.mli
+extraction/inline.ml
+extraction/inline.mli
 extraction/binary.ml
 extraction/binary.mli
 extraction/bits.ml
@@ -170,6 +170,8 @@ extraction/mSetWeakList.ml
 extraction/mSetWeakList.mli
 extraction/map_util.ml
 extraction/map_util.mli
+extraction/maps_util.ml
+extraction/maps_util.mli
 extraction/maps.ml
 extraction/maps.mli
 # extraction/memdata.ml
@@ -242,6 +244,8 @@ extraction/printCsyntax.ml
 extraction/printCsyntax.mli
 extraction/randyPrelude.ml
 extraction/randyPrelude.mli
+extraction/rename.ml
+extraction/rename.mli
 extraction/round.ml
 extraction/round.mli
 extraction/safeErasureFunction.ml

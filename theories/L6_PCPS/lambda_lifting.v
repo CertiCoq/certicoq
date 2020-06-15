@@ -16,7 +16,7 @@ Require Import compcert.lib.Maps.
 
 Close Scope Z_scope.
 Open Scope monad_scope.
-
+ 
 
 (** * Lambda lifting *)
 
@@ -604,8 +604,10 @@ Inductive Exp_lambda_lift :
       Exp_lambda_lift ζ σ (Eproj x t N y e) S (Eproj x t N (σ y) e') S'
 | LL_Efun1 : (* wrappers are mutually defined *)
     forall B B' e e' σ σ' ζ ζ' fvs S S' S'' S''',
-      Included _ (FromList fvs) (Union _ (occurs_free_fundefs B)
-                                       (Union _ (FunsFVs ζ) (LiftedFuns ζ))) ->
+      Included _ (FromList fvs) (occurs_free_fundefs B) ->
+(* Previous less restrictive version *)
+(*   Included _ (FromList fvs) (Union _ (occurs_free_fundefs B)
+                                       (Union _ (FunsFVs ζ) (LiftedFuns ζ))) *)
       NoDup fvs ->
       Add_functions B fvs σ ζ S σ' ζ' S' ->
       Fundefs_lambda_lift1 ζ' σ' B S' B' S'' ->
@@ -613,8 +615,7 @@ Inductive Exp_lambda_lift :
       Exp_lambda_lift ζ σ (Efun B e) S (Efun B' e') S'''
 | LL_Efun2 : (* wrappers are defined afterwards *)
     forall B B' e e' fds σ σ' σ'' ζ ζ' fvs S S' S'' S''' S'''',
-      Included _ (FromList fvs) (Union _ (occurs_free_fundefs B)
-                                       (Union _ (FunsFVs ζ) (LiftedFuns ζ))) ->
+      Included _ (FromList fvs) (occurs_free_fundefs B) ->
       NoDup fvs ->
       Add_functions B fvs σ ζ S σ' ζ' S' ->
       Fundefs_lambda_lift2 ζ' σ' B B S' B' S'' ->

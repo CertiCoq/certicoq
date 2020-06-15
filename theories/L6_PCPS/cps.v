@@ -2,8 +2,9 @@
  *   Initial design, Andrew W. Appel, June 2014
  *)
 From Coq Require Import ZArith.ZArith Lists.List.
-From CertiCoq.L6 Require Import List_util.
-From compcert.lib Require Import Maps.
+From CertiCoq.L6 Require Import List_util map_util.
+From compcert.lib Require Export  Maps.
+From CertiCoq.L6 Require Export map_util.
 From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
 
 Import ListNotations.
@@ -15,27 +16,6 @@ Import ListNotations.
 
 Module M := Maps.PTree.
 
-Fixpoint get_list {A} (xs: list M.elt) (rho: M.t A) : option (list A) :=
-  match xs with
-  | x :: xs' => match M.get x rho, get_list xs' rho with
-               | Some v, Some vs => Some (v::vs)
-               | _, _ => None
-               end
-  | nil => Some nil
-  end.
-
-Fixpoint set_lists {A} (xs: list M.elt) (vs: list A) (rho: M.t A) : option (M.t A) :=
-  match xs, vs with
-  | x::xs', v::vs' => match set_lists xs' vs' rho with
-                     | Some rho' => Some (M.set x v rho')
-                     | None => None
-                     end
-  | nil, nil => Some rho
-  | _, _ => None
-  end.
-
-Definition set_list {A:Type}  (l : list (M.elt * A)) (map: M.t A) : M.t A :=
-  fold_right (fun xv cmap => M.set (fst xv) (snd xv) cmap ) map l.
 
 
 Definition var      := M.elt. (* value variables *)

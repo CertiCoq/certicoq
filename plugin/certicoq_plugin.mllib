@@ -159,8 +159,8 @@ Camlcoq
 AST
 Ctypes
 Cop
-Inline
 Dead_param_elim
+Inline
 Csyntax
 Clightdefs
 Globalenvs

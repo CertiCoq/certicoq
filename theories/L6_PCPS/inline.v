@@ -97,7 +97,7 @@ Section Beta.
             | None =>
               x' <- get_name x "" ;;
               ec' <- beta_contract_aux ec (M.set x x' sig) fm s' ;;
-              ret (Eletapp x f' t ys' ec')
+              ret (Eletapp x' f' t ys' ec')
             end
          | _ =>
            x' <- get_name x "" ;;
@@ -118,10 +118,10 @@ Section Beta.
                      xs' <- get_names_lst xs "" ;;
                      e' <- beta_contract_aux e (set_list (combine xs xs') sig') fm' s' ;;
                      fds'' <- beta_contract_fds fds' s ;;
-                     ret (Fcons f' t xs e' fds'')
+                     ret (Fcons f' t xs' e' fds'')
                    | Fnil => ret Fnil
                    end) fds s2 ;;
-         e' <- beta_contract_aux e sig fm' s1;;
+         e' <- beta_contract_aux e sig' fm' s1;;
          ret (Efun fds' e')
        | Eapp f t ys =>
          let f' := apply_r sig f in

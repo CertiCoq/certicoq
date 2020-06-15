@@ -35,6 +35,9 @@ Qed.
 (* Definition of env *)
 Definition env := list value.
 
+
+
+(* make_rec_env definitions and lemmas *)
 Definition make_rec_env (fnlst : efnlst) (rho : env) : env :=
   let fix make_env_aux funcs n :=
       match funcs with
@@ -222,7 +225,9 @@ Proof.
   rewrite make_rec_env_aux_nil_eq. rewrite make_rec_env_to_zero_rewrite.
   eapply make_env_aux_to_zero_eq.
 Qed. 
-    
+
+
+(** Helper functions for going between exps and lists *)
 Fixpoint exps_to_list (es : expression.exps) : list exp :=
   match es with
   | enil => nil
@@ -248,7 +253,9 @@ Fixpoint efnlst_to_list (fnlst: efnlst) :=
     (e::l)
   end.
 
-(* TODOO move to expression *)
+
+
+(* TODO move to expression *)
 Fixpoint parallel_sbst (e : exp) (depth : N) (esubst : list exp) :=
   match e with
   | Var_e i =>
@@ -336,8 +343,7 @@ Definition sbst_env (e: expression.exp) (rho: env) (n : N) : expression.exp :=
   parallel_sbst e n es.
 
 
-(** * Environment-based semantics for L4 *)
-                                      
+(** * Environment-based semantics for L4 *)                                      
 Inductive eval_env: env -> exp -> value -> Prop :=
 | eval_Var:
     forall (x: N) (rho: env) (n: value),
@@ -460,17 +466,6 @@ with eval_env_exps_f (n : nat) (rho : env) (es : exps) : option (list value) :=
          end
        end.       
 
-(* not being used for semantics *)
-Inductive evals_env: env -> exps -> list value -> Prop :=
-| evals_nil: forall (rho: env),
-    evals_env rho enil nil
-| evals_cons: forall (e: expression.exp) (es': expression.exps) (rho: env)
-  (v: value) (vs': list value),
-    eval_env rho e v ->
-    evals_env rho es' vs' ->
-    evals_env rho (econs e es') (cons v vs').
-
-
 Lemma eval_env_ind_strong :
   forall P : env -> exp -> value -> Prop,
     (forall (x : N) (rho : env) (n : value),
@@ -544,27 +539,10 @@ Proof.
   - eapply H10. 
     eassumption. eapply IH. eassumption.
     eassumption. eapply IH. eassumption.
-Qed.        
-    
-(* not required for now *)
-Lemma eval_env_single_valued:
-  (forall e rho d, eval_env rho e d -> forall f, eval_env rho e f -> d = f).
-Proof.
-  intros e rho d Hd f Hf.
-  induction e.
-  - inv Hd. inv Hf. reflexivity.
-  - inv Hd. inv Hf. reflexivity.
-  - admit.
-  - inv Hd. inv Hf.
-    assert (Heq: vs = vs0).
-    { induction vs.
-      + destruct vs0. reflexivity.
-        inv H3. inv H4. rewrite <- H0 in H. now inv H.
-      + destruct vs0.
-        inv H3. inv H4. rewrite <- H in H1. now inv H1.
-        inv H3. inv H4. 
-Admitted. 
+Qed.
 
+
+(** Well-formedness definitions *)
 Definition well_formed_in_env (e : exp) (rho : list value) :=
   exp_wf (list.NLength rho) e.
 
@@ -598,6 +576,22 @@ Definition well_formed_env (rho : list value) : Prop :=
   Forall well_formed_val rho.
 
 Opaque N.add.
+
+Lemma app_length_N:
+  forall (T : Type) (l1 l2 : list T),
+    list.NLength (l1 ++ l2) = list.NLength l1 + list.NLength l2.
+Proof.
+  intros T l1 l2.
+  induction l1.
+  - simpl. unfold list.NLength. simpl. reflexivity.
+  - unfold list.NLength in *. simpl.
+    rewrite !Pos.of_nat_succ.
+    rewrite <- !positive_nat_N.
+    rewrite !Nat2Pos.id; try (intros; discriminate).
+    rewrite !Nnat.Nat2N.inj_succ. 
+    rewrite IHl1. rewrite <- N.add_succ_r.
+    rewrite N.add_succ_comm. reflexivity.
+Qed.
 
 Lemma well_formed_in_env_App:
   forall e1 e2 rho,
@@ -647,22 +641,6 @@ Proof.
   eassumption.
 Qed.
 
-Lemma app_length_N:
-  forall (T : Type) (l1 l2 : list T),
-    list.NLength (l1 ++ l2) = list.NLength l1 + list.NLength l2.
-Proof.
-  intros T l1 l2.
-  induction l1.
-  - simpl. unfold list.NLength. simpl. reflexivity.
-  - unfold list.NLength in *. simpl.
-    rewrite !Pos.of_nat_succ.
-    rewrite <- !positive_nat_N.
-    rewrite !Nat2Pos.id; try (intros; discriminate).
-    rewrite !Nnat.Nat2N.inj_succ. 
-    rewrite IHl1. rewrite <- N.add_succ_r.
-    rewrite N.add_succ_comm. reflexivity.
-Qed.
-
 Lemma well_formed_in_env_Match_branches:
   forall e e' bs rho i dc vs,
     eval_env rho e (Con_v dc vs) ->
@@ -676,16 +654,6 @@ Proof.
   rewrite app_length_N. unfold list.NLength.
   eapply find_branch_preserves_wf; eassumption.
 Qed. 
-
-(* e2 should also evaluate to value *)
-Lemma eval_env_app_subterm:
-      forall e1 e2 rho v,
-        eval_env rho (e1 $ e2) v ->
-        exists v1, eval_env rho e1 v1.
-Proof.
-  intros e1 e2 rho v H.
-  inv H; try (eexists; eassumption).
-Qed.
 
 Lemma nth_inlist_Forall A (P : A -> Prop) :
   forall l n default,
@@ -1586,12 +1554,6 @@ Proof.
     reflexivity. 
 Qed.
 
-Lemma n_sub_0 n :
-  n - 0 = n.
-Proof.
-  destruct n. reflexivity. reflexivity.
-Qed.
-
 Lemma exps_length_is_Datatypes_length:
   forall es, exps_length es = N.of_nat (Datatypes.length (exps_to_list es)).
 Proof.
@@ -1658,8 +1620,6 @@ Proof.
     rewrite (list.cons_as_app exp a l) in Hn.
     eapply len_cons_lt in Hn. eassumption.
 Qed. 
-
-Opaque N.add.
 
 Lemma efnlst_length_commut flst :
    N.to_nat (efnlst_length flst) = List.length (efnlst_as_list flst).
@@ -1927,51 +1887,6 @@ Proof.
     inv Hge. rewrite Nat.sub_succ.
     eapply IHl; try omega.
 Qed. 
-    
-
-(* Statements of Lemmas *)
-Definition equiv_semantics_stmt_exp e := 
-  forall rho e',
-    eval (parallel_sbst e N0 (List.map val_to_exp rho)) e' ->
-    exists v, eval_env rho e v /\ rel_value e' v.
-
-Definition equiv_semantics_stmt_exps es :=
-  forall rho es',
-    evals (parallel_sbsts es N0 (List.map val_to_exp rho)) es' ->
-    Forall2 (fun e' e => exists v, eval_env rho e v /\ rel_value e' v)
-            (exps_to_list es') (exps_to_list es).
-
-Definition equiv_semantics_stmt_efnlst efns := 
-  forall rho n,
-    rel_value (parallel_sbst (Fix_e efns n) N0 (List.map val_to_exp rho))
-              (ClosFix_v rho efns n).
-
-Definition equiv_semantics_stmt_branches bs :=
-  Forall (fun e => equiv_semantics_stmt_exp (snd e)) (branches_as_list bs).
-
-(*
-Lemma sbst_list_inv_Lam_e na n e es :
-  exists e', sbst_list_n (Lam_e na e) es n = Lam_e na e'
-             /\ sbst_list_n e es (n+1) = e'.
-Proof.
-  induction es.
-  - simpl. eexists. split; reflexivity.
-  - simpl. destruct IHes as [e' Hlst].
-    destruct Hlst.
-    destruct n.
-    + simpl in *. rewrite H0.
-      rewrite H.
-      eexists; split; reflexivity.
-    + simpl in *.
-      rewrite H. rewrite H0.
-      eexists. split.
-      reflexivity.
-      fold sbst.
-      assert (Hpos: N.pos (BinPos.Pos.add p 1) = 1 + N.pos p).
-      -- destruct p; simpl; reflexivity.
-      -- rewrite Hpos. reflexivity.
-Qed.
-*)
 
 Lemma parallel_sbst_inv_Lam_e na n e es :
   exists e', parallel_sbst (Lam_e na e) n es = Lam_e na e'
@@ -1981,27 +1896,6 @@ Proof.
   split.
   - simpl. reflexivity.
   - reflexivity.
-Qed.
-
-Lemma sbst_list_inv_Con_e n d es esubst:
-  exists es', sbst_list_n (Con_e d es) esubst n = Con_e d es'
-              /\ Forall2 (fun e e' => sbst_list_n e esubst n = e')
-                         (exps_to_list es) (exps_to_list es'). 
-Proof.
-  generalize dependent n. induction esubst.
-  - intros n. exists es. simpl. split. reflexivity.
-    eapply Forall2_refl. eauto with typeclass_instances.
-  - intros n. simpl.
-    destruct (IHesubst n) as [es' [Hsbst Hall]].
-    eexists.
-    rewrite Hsbst. simpl. split.
-    + reflexivity.
-    + revert Hall. clear.
-      revert es'. induction es; intros es' Hall; destruct es'; try (now inv Hall).
-      * simpl. constructor.
-      * simpl in *. inv Hall. constructor.
-        -- reflexivity.
-        -- eauto.
 Qed.
 
 Lemma parallel_sbst_inv_Con_e n d es esubst:
@@ -2057,33 +1951,6 @@ Proof.
     + simpl. eapply Forall2_cons. reflexivity.
       eapply IHefns.
 Qed.
-    
-    
-(*
-Lemma equiv_semantics_fwd_exp: forall e, equiv_semantics_stmt_exp e
-with equiv_semantics_fwd_exps: forall es, equiv_semantics_stmt_exps es
-with equiv_semantics_fwd_efnlst: forall efns, equiv_semantics_stmt_efnlst efns
-with equiv_semantics_fwd_branches: forall bs, equiv_semantics_stmt_branches bs.
-Proof.
-  - clear equiv_semantics_fwd_exp.
-    induction e. 
- *)
-
-
-Definition equiv_semantics_stmt_exp' (e1 e' : exp) (P :  eval e1 e') :=
-  forall rho e2,
-    well_formed_in_env e2 rho ->
-    well_formed_env rho ->
-    e1 = parallel_sbst e2 N0 (List.map val_to_exp rho) ->
-  exists v, eval_env rho e2 v /\ rel_value e' v.
-
-Definition equiv_semantics_stmt_exps' (es1 es' : exps) (P : evals es1 es') :=
-  (forall rho es2,
-      well_formed_exps_in_env es2 rho ->
-      well_formed_env rho ->
-      es1 = (parallel_sbsts es2 N0 (List.map val_to_exp rho)) ->
-      Forall2 (fun e' e => exists v, eval_env rho e v /\ rel_value e' v)
-              (exps_to_list es') (exps_to_list es2)).
 
 Lemma is_value_env_not_Var :
   forall e n, is_value_env e -> e <> Var_e n.
@@ -3007,55 +2874,6 @@ Proof.
     + eapply IH2; eassumption.
 Qed.
 
-Lemma rel_value_make_rec_env :
-  forall efns1 efns2 rho,
-    Forall2
-      (fun s t : name * exp =>
-         let (n_s, e_s) := s in
-         let (n_t, e_t) := t in
-         n_s = n_t /\ sbst_env e_t rho (efnlst_length efns1) = e_s)
-      (efnlst_as_list efns1) (efnlst_as_list efns2) ->
-    Forall2 (fun n v => rel_value (Fix_e efns1 (N.of_nat n)) v)
-            (list_to_zero (efnlength efns1)) (rev (make_rec_env_nil efns2 rho)).
-Proof.
-  intros efns1 efns2 rho Hall.
-  rewrite <- make_rec_env_to_zero_eq.
-  unfold make_rec_env_to_zero.
-  assert (Hl : efnlength efns1 = efnlength efns2).
-  { eapply Forall2_length in Hall.
-    generalize dependent efns2.
-    induction efns1; intros efns2 Hlen; destruct efns2.
-    - reflexivity.
-    - inv Hlen.
-    - inv Hlen.
-    - simpl. eauto. }
-  rewrite <- Hl.
-  induction (list_to_zero (efnlength efns1)).
-  - constructor.
-  - constructor.
-    + constructor. reflexivity. eassumption.
-    + eapply IHl.
-Qed.
-
-Lemma rel_value_sbst_fix :
-  forall efns1 efns2 e rho,
-    Forall2 (fun n v => rel_value (Fix_e efns1 (N.of_nat n)) v)
-          (list_to_zero (efnlength efns1)) (rev (make_rec_env_nil efns2 rho)) ->
-    sbst_fix_n efns1 e 0 =
-    sbst_list_n e
-                (list_to_exps (map val_to_exp (rev (make_rec_env_nil efns2 rho)))) 0.
-Proof. 
-  intros efns1 efns2 e rho Hall.
-  rewrite <- make_rec_env_to_zero_eq in *.
-  unfold make_rec_env_to_zero.
-  rewrite sbst_fix_n_sbst_fix_eq. rewrite <- sbst_fix_n_rec_eq.
-  assert (Hl : efnlength efns1 = efnlength efns2) by admit.
-  rewrite <- Hl.
-  induction (list_to_zero (efnlength efns1)).
-  - simpl. reflexivity.
-  - simpl. inv Hall. 
-Abort.
-
 Lemma rel_value_efns_eq:
         forall efns1 efns2 rho,
           Forall2
@@ -3361,7 +3179,23 @@ Proof.
       rewrite Hlen in H4. eassumption.
     + eassumption.
     + specialize (IHefns n1 rhof H3 Hlen). eassumption. 
-Qed. 
+Qed.
+
+(* Statements of Lemmas *)
+Definition equiv_semantics_stmt_exp' (e1 e' : exp) (P :  eval e1 e') :=
+  forall rho e2,
+    well_formed_in_env e2 rho ->
+    well_formed_env rho ->
+    e1 = parallel_sbst e2 N0 (List.map val_to_exp rho) ->
+  exists v, eval_env rho e2 v /\ rel_value e' v.
+
+Definition equiv_semantics_stmt_exps' (es1 es' : exps) (P : evals es1 es') :=
+  (forall rho es2,
+      well_formed_exps_in_env es2 rho ->
+      well_formed_env rho ->
+      es1 = (parallel_sbsts es2 N0 (List.map val_to_exp rho)) ->
+      Forall2 (fun e' e => exists v, eval_env rho e v /\ rel_value e' v)
+              (exps_to_list es') (exps_to_list es2)).
   
 Lemma equiv_semantics_fwd_version2 :
   (forall e e' P, equiv_semantics_stmt_exp' e e' P) /\
@@ -3375,7 +3209,7 @@ Proof.
     symmetry in H1.
     destruct e2; try inv H1.
     + destruct (n <? 0) eqn:Heq.
-      inv H3. rewrite n_sub_0 in *.
+      inv H3. rewrite N.sub_0_r in *.
       eexists. split. econstructor. reflexivity.
       eapply rel_value_nth_inlist.
       eapply N2Nat_inj_lt.
@@ -3437,7 +3271,7 @@ Proof.
   - (* Con_e *)
     destruct e2; try inv H2.
     + destruct (n <? 0).
-      now inv H4. rewrite n_sub_0 in *.
+      now inv H4. rewrite N.sub_0_r in *.
       eexists. split.
       econstructor. reflexivity.
       eapply evals_are_value_env in e. subst.
@@ -3513,7 +3347,7 @@ Proof.
     destruct e3; try inv H3.
     + destruct (n <? 0).
       now inv H5.
-      rewrite n_sub_0 in *.
+      rewrite N.sub_0_r in *.
       eexists. split.
       econstructor. reflexivity.
       assert (Hnotval: ~(is_value_env (Match_e e p bs))).
@@ -3563,7 +3397,7 @@ Proof.
   - (* Fix_e *)
     destruct e2; try inv H1.
     + destruct (n <? 0).
-      inv H3. rewrite n_sub_0 in *.
+      inv H3. rewrite N.sub_0_r in *.
       eexists. split. econstructor. reflexivity.
       rewrite H3.
       eapply rel_value_nth_inlist.
@@ -3689,7 +3523,7 @@ Proof.
     + destruct (n <? 0).
       inv H3.
       eexists. split. econstructor. reflexivity.
-      rewrite H3. rewrite n_sub_0 in *. 
+      rewrite H3. rewrite N.sub_0_r in *. 
       eapply rel_value_nth_inlist.
       eapply N2Nat_inj_lt.
       rewrite (Nnat.Nat2N.id (Datatypes.length (map val_to_exp rho))).
@@ -3717,147 +3551,3 @@ Proof.
         eassumption.
         inv H3. reflexivity.
 Qed. 
-
-(*
-Lemma equiv_semantics_fwd_version1:
-  (forall e, equiv_semantics_stmt_exp e) /\
-  (forall es,  equiv_semantics_stmt_exps es) /\
-  (forall efns, equiv_semantics_stmt_efnlst efns) /\
-  (forall bs, equiv_semantics_stmt_branches bs).
-Proof. 
-  eapply my_exp_ind; unfold equiv_semantics_stmt_exp.
-  - intros n rho e' IH.
-    simpl in IH.
-    edestruct (OrdersEx.N_as_OT.ltb_spec n 0).
-    exfalso. eapply N.nlt_0_r. eassumption.
-    rewrite N.sub_0_r in IH.
-    eexists. split. constructor. reflexivity.
-    assert (Hval : is_value_env (nth (N.to_nat n) (map val_to_exp rho) Prf_e)).
-    eapply nth_inlist_is_value.
-    eapply sbst_all_values.
-    reflexivity.
-    now constructor.
-    destruct (value_self_eval).
-    eapply H0 in Hval.
-    assert (He : e' = (nth (N.to_nat n) (map val_to_exp rho) Prf_e)).
-    eapply eval_single_valued.
-    eassumption.
-    eassumption.
-    rewrite He.
-    generalize dependent (N.to_nat n). 
-    induction rho.
-    + intros n0 H2 H3 H4. simpl. destruct n0.
-      now constructor.
-      now constructor.
-    + intros n0 H2 H3 H4. simpl. destruct n0.
-      eapply rel_value_val_to_exp.
-      eapply IHrho; simpl in *; eassumption. 
-  - intros n e IH rho e' Heval.
-    edestruct (parallel_sbst_inv_Lam_e n 0 e (map val_to_exp rho)) as [e1 Heq].
-    destruct Heq as [Heq1 Heq2]. simpl in *. 
-    rewrite Heq1 in Heval. inversion Heval.
-    eexists. split. constructor.
-    constructor. unfold sbst_env.
-    eassumption. 
-  - intros e1 IH1 e2 IH2 rho e' H.
-    admit. 
-  - intros d e IH rho e' Heval.
-    edestruct (parallel_sbst_inv_Con_e 0 d e (map val_to_exp rho)) as [e1 Heq].
-    destruct Heq as [Heq1 Heq2]. subst. 
-    rewrite Heq1 in Heval. inv Heval. 
-    unfold equiv_semantics_stmt_exps in IH.
-    pose proof (parallel_sbsts_map_exps_equiv e 0 (map val_to_exp rho)) as Hmap.
-    rewrite <- Hmap in H2.
-    apply IH in H2.
-    eapply Con_e_exists_list in H2.
-    destruct H2. destruct H. 
-    exists (Con_v d x).
-    split.
-    + constructor. eapply H.
-    + constructor. reflexivity. eapply H0.
-  - admit.
-  - admit.
-  - intros e IHefns n rho e' Heval.
-    edestruct (parallel_sbst_inv_Fix_e e n 0 (map val_to_exp rho)) as [e1 Heq].
-    destruct Heq as [Heq1 Heq2]. rewrite Heq1 in Heval.
-    unfold equiv_semantics_stmt_efnlst in IHefns. 
-    specialize IHefns with rho n. rewrite Heq1 in IHefns.
-    exists (ClosFix_v rho e n). split.
-    + constructor.
-    + inv Heval. eassumption.
-  - exists Prf_v.
-    split.
-    constructor.
-    inv H. constructor.
-  - unfold equiv_semantics_stmt_exps.
-    intros rho es' IHevals.
-    simpl in *. inv IHevals. simpl.
-    eapply List.Forall2_nil.
-  - intros e IH es IHes.
-    unfold equiv_semantics_stmt_exps in *.
-    intros rho es' H. simpl.
-    inv H. simpl. constructor.
-    + eapply IH in H2. eassumption.
-    + eapply IHes in H4. eassumption.
-  - unfold equiv_semantics_stmt_efnlst.
-    intros rho n. simpl. constructor.
-    reflexivity.
-    simpl. now constructor.
-  - intros n e IHe efns IHefns.
-    unfold equiv_semantics_stmt_efnlst in *.
-    intros rho N.
-    edestruct (parallel_sbst_inv_Fix_e (eflcons n e efns) N
-                                       0 (map val_to_exp rho)) as [e1 Heq].
-    destruct Heq as [Heq1 Heq2]. rewrite Heq1.
-    constructor. reflexivity.
-    unfold sbst_env. Opaque parallel_sbst. simpl in *.
-    simpl in Heq2.
-      in Heval.
-    unfold equiv_semantics_stmt_efnlst in IHefns. 
-    specialize IHefns with rho n. rewrite Heq1 in IHefns.
-    exists (ClosFix_v rho e n). split.
-    + constructor.
-    + inv Heval. eassumption.
-
-    intros rho i. (* generalize efnlst_length in equiv_semantics_stmt_efnlst? *)
-    simpl.
-
-    admit.
-  - unfold equiv_semantics_stmt_branches.
-    simpl. now constructor.
-  - intros d p e IHe bs IHbs.
-    unfold equiv_semantics_stmt_branches in *.
-    constructor.
-    + simpl. unfold equiv_semantics_stmt_exp. eassumption.
-    + 
-    Abort.
-
-Lemma equiv_semantics_fwd:
-  forall rho es e e',
-    rel_subst_env es rho /\ eval (sbst_list e es) e' ->
-    exists v, eval_env rho e v /\ rel_value e' v. 
-Proof.
-  intros rho es e e' [Hsubst Heval]. 
-  assert (Heq: sbst_list e es = sbst_list e es) by reflexivity.
-  revert Heq. generalize (sbst_list e es) at 1. intros e1 Heq.
-  rewrite <- Heq in Heval. revert es e Hsubst Heq.
-  
-  induction Heval; intros subst e0 Hsubst Heq; subst.
-  - 
-    exists (Clos_v rho e0). split. 
-    destruct e0; try (simpl in *; discriminate). 
-    simpl in Heq.
-  ; revert rho es.
-  induction e.
-  eexists.
-  split.
-  inversion H.
-  inversion H1; try simpl; try discriminate.
-Abort.
-
-
-assert (Hb: forall l,
-                 find_branch dc2 l
-                             (parallel_sbst_branches b 0 (map val_to_exp rho))
-                 = Some e' ->
-                 exists e'', find_branch dc2 l b = Some e''). *)

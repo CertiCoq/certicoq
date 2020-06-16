@@ -1495,6 +1495,7 @@ Fixpoint sbst_list_n_exps (es es_sbst : exps) (n : N)  :=
   map_exps (fun e => sbst_list_n e es_sbst n) es.
 
 
+(** Alternative notion of values that co-incides with substitution semantics *)
 Inductive is_value_env : exp -> Prop :=
   | lam_is_value_env : forall (na : name) (e : exp), is_value_env (Lam_e na e)
   | con_is_value_env :
@@ -1554,6 +1555,33 @@ Proof.
     reflexivity. 
 Qed.
 
+Lemma is_value_env_not_Var :
+  forall e n, is_value_env e -> e <> Var_e n.
+Proof.
+  intros e n H.
+  inv H; unfold not; intros; try inv H.
+Qed.
+
+Lemma sbst_all_values_not_Var es :
+  Forall (fun e => is_value_env e) es ->
+  Forall (fun e => forall n, e <> Var_e n) es.
+Proof.
+  intros. induction es.
+  - econstructor.
+  - econstructor.
+    intros n. eapply is_value_env_not_Var. inv H. eassumption.
+    eapply IHes. inv H. eassumption.
+Qed.
+
+Lemma app_not_value :
+  forall e1 e2,
+    ~(is_value_env (App_e e1 e2)).
+Proof.
+  intros e1 e2. unfold not. intros H.
+  inv H.
+Qed. 
+
+(** Various length lemmas *)
 Lemma exps_length_is_Datatypes_length:
   forall es, exps_length es = N.of_nat (Datatypes.length (exps_to_list es)).
 Proof.
@@ -1563,12 +1591,48 @@ Proof.
 Qed.
 
 Lemma efnlst_length_is_Datatypes_length:
-  forall efns, efnlst_length efns = N.of_nat (Datatypes.length (efnlst_as_list efns)).
+  forall efns, efnlst_length efns =
+               N.of_nat (Datatypes.length (efnlst_as_list efns)).
 Proof.
   induction efns.
   - reflexivity.
   - simpl. zify. omega.
+Qed.
+
+Lemma exps_to_list_list_to_exps_inv :
+  forall l, list_to_exps (exps_to_list l) = l.
+Proof.
+  induction l.
+  - simpl. reflexivity.
+  - simpl. rewrite IHl. reflexivity.
+Qed.
+
+Lemma list_to_exps_exps_to_list_inv :
+  forall l, exps_to_list (list_to_exps l) = l.
+Proof.
+  induction l.
+  - reflexivity.
+  - simpl. f_equal. eapply IHl.
 Qed. 
+
+Lemma exps_to_list_cons_commut :
+        forall hd tl es,
+        (hd :: tl) = exps_to_list es ->
+        es = (econs hd (list_to_exps tl)).
+Proof.
+  intros hd tl es H.
+  destruct es.
+  - inv H.
+  - inversion H. rewrite (exps_to_list_list_to_exps_inv es). reflexivity.
+Qed.
+
+Lemma efnlst_length_commut flst :
+   N.to_nat (efnlst_length flst) = List.length (efnlst_as_list flst).
+Proof.
+  simpl. induction flst; eauto.
+  - simpl. rewrite Nnat.N2Nat.inj_add.
+    rewrite <- IHflst. simpl. reflexivity.
+Qed.
     
 Lemma nth_inlist_is_value' :
   forall l default n, 
@@ -1621,14 +1685,8 @@ Proof.
     eapply len_cons_lt in Hn. eassumption.
 Qed. 
 
-Lemma efnlst_length_commut flst :
-   N.to_nat (efnlst_length flst) = List.length (efnlst_as_list flst).
-Proof.
-  simpl. induction flst; eauto.
-  - simpl. rewrite Nnat.N2Nat.inj_add.
-    rewrite <- IHflst. simpl. reflexivity.
-Qed.
-    
+
+(** Lemmas relating rel_value and val_to_exp *)   
 Lemma rel_value_val_to_exp :
   forall v, rel_value (val_to_exp v) v.
 Proof.
@@ -1688,34 +1746,6 @@ Proof.
     rewrite H3. reflexivity.
     eapply IHl. eassumption.
 Qed.
-
-
-Lemma exps_to_list_list_to_exps_inv :
-  forall l, list_to_exps (exps_to_list l) = l.
-Proof.
-  induction l.
-  - simpl. reflexivity.
-  - simpl. rewrite IHl. reflexivity.
-Qed.
-
-Lemma list_to_exps_exps_to_list_inv :
-  forall l, exps_to_list (list_to_exps l) = l.
-Proof.
-  induction l.
-  - reflexivity.
-  - simpl. f_equal. eapply IHl.
-Qed. 
-
-Lemma exps_to_list_cons_commut :
-        forall hd tl es,
-        (hd :: tl) = exps_to_list es ->
-        es = (econs hd (list_to_exps tl)).
-Proof.
-  intros hd tl es H.
-  destruct es.
-  - inv H.
-  - inversion H. rewrite (exps_to_list_list_to_exps_inv es). reflexivity.
-Qed. 
 
 Lemma rel_value_then_val_to_exp:
   forall v v', rel_value v v' -> v = val_to_exp v'.
@@ -1886,28 +1916,6 @@ Proof.
   - simpl in *. destruct n eqn: Hn.
     inv Hge. rewrite Nat.sub_succ.
     eapply IHl; try omega.
-Qed. 
-
-Lemma parallel_sbst_inv_Lam_e na n e es :
-  exists e', parallel_sbst (Lam_e na e) n es = Lam_e na e'
-             /\ parallel_sbst e (n+1) es = e'.
-Proof.
-  eexists.
-  split.
-  - simpl. reflexivity.
-  - reflexivity.
-Qed.
-
-Lemma parallel_sbst_inv_Con_e n d es esubst:
-  exists es', parallel_sbst (Con_e d es) n esubst = Con_e d es'
-              /\ map_exps (fun e => parallel_sbst e n esubst) es = es'.
-Proof.
-  exists (parallel_sbsts es n esubst).
-  split.
-  reflexivity.
-  induction es.
-  - simpl. reflexivity.
-  - simpl. rewrite IHes. reflexivity.
 Qed.
 
 
@@ -1935,50 +1943,7 @@ Proof.
     + eapply Forall2_cons; eassumption.
 Qed.
 
-Lemma parallel_sbst_inv_Fix_e efns i n esubst:
-  exists efns', parallel_sbst (Fix_e efns i) n esubst = Fix_e efns' i
-                /\ let l := efnlst_length efns in
-                   Forall2 (fun e e' => parallel_sbst e (n + l) esubst = e')
-                           (efnlst_to_list efns) (efnlst_to_list efns'). 
-Proof.
-  exists (parallel_sbst_efnlst efns (n + (efnlst_length efns)) esubst).
-  split.
-  - simpl. reflexivity.
-  - simpl.
-    generalize dependent (n + efnlst_length efns). 
-    induction efns; intros n1.
-    + simpl. eapply List.Forall2_nil.
-    + simpl. eapply Forall2_cons. reflexivity.
-      eapply IHefns.
-Qed.
-
-Lemma is_value_env_not_Var :
-  forall e n, is_value_env e -> e <> Var_e n.
-Proof.
-  intros e n H.
-  inv H; unfold not; intros; try inv H.
-Qed.
-
-Lemma sbst_all_values_not_Var es :
-  Forall (fun e => is_value_env e) es ->
-  Forall (fun e => forall n, e <> Var_e n) es.
-Proof.
-  intros. induction es.
-  - econstructor.
-  - econstructor.
-    intros n. eapply is_value_env_not_Var. inv H. eassumption.
-    eapply IHes. inv H. eassumption.
-Qed.
-
-Lemma app_not_value :
-  forall e1 e2,
-    ~(is_value_env (App_e e1 e2)).
-Proof.
-  intros e1 e2. unfold not. intros H.
-  inv H.
-Qed. 
-
-Lemma parallel_sbst_inv_App_e' :
+Lemma parallel_sbst_inv_App_e :
   forall (n : N) (e1 e2 e : exp) (es : list exp),
     Forall (fun e => is_value_env e) es ->
     parallel_sbst e n es = (e1 $ e2) ->
@@ -2004,7 +1969,7 @@ Proof.
     reflexivity. split; reflexivity.
 Qed.
 
-Lemma parallel_sbst_inv_Let_e' :
+Lemma parallel_sbst_inv_Let_e :
   forall (n : N) (na : name) (e1 e2 e : exp) (es : list exp),
     Forall (fun e => is_value_env e) es ->
     parallel_sbst e n es = (Let_e na e1 e2) ->
@@ -2030,20 +1995,6 @@ Proof.
   - repeat eexists.
 Qed. 
 
-Lemma parallel_sbst_inv_Con_e' :
-  forall (es es': exps) (n : N) (esubst : list exp),
-    parallel_sbsts es n esubst = es'->
-    map_exps (fun e => parallel_sbst e n esubst) es = es'.
-Proof.
-  intros es es' n esubst H.
-  generalize dependent es'.
-  induction es; intros es' H.
-  - simpl in *. rewrite H. reflexivity.
-  - simpl in *.
-    specialize IHes with (parallel_sbsts es n esubst).
-    rewrite IHes. eassumption. reflexivity.
-Qed.
-
 Lemma nth_cons {A : Type} n (x : A) l :
   (n > 0)%nat ->
   nth n (x :: l) = nth (n - 1)%nat l.
@@ -2057,6 +2008,7 @@ Proof.
     + simpl. reflexivity.
 Qed.
 
+(** Substitution Lemmas *)
 Definition parallel_sbst_inv_wf_exp e :=
   forall n rho,
     exp_wf n e ->
@@ -3225,7 +3177,7 @@ Proof.
   - (* App_e (of Lam_e) *)
     simpl in *.
     symmetry in H4.
-    eapply parallel_sbst_inv_App_e' in H4.
+    eapply parallel_sbst_inv_App_e in H4.
     + destruct H4 as [e1'' [e2'' [Heqapp [Hs1 Hs2]]]]. subst.
       assert (Hwf1 : well_formed_in_env e1'' rho).
       { eapply well_formed_in_env_App in H2.
@@ -3302,7 +3254,7 @@ Proof.
   - (* Let_e *)
     simpl in *.
     symmetry in H3.
-    eapply parallel_sbst_inv_Let_e' in H3.
+    eapply parallel_sbst_inv_Let_e in H3.
     + destruct H3 as [e1'' [e2'' [Heqlet [Hs1 Hs2]]]]. subst.
       assert (Hwf1: well_formed_in_env e1'' rho).
       { eapply well_formed_in_env_Let in H1.
@@ -3428,7 +3380,7 @@ Proof.
          
   - (* Fix_app *)
     symmetry in H4. 
-    eapply parallel_sbst_inv_App_e' in H4.
+    eapply parallel_sbst_inv_App_e in H4.
     + destruct H4 as [e1'' [e2'' [Heqapp [Hs1 Hs2]]]]. subst.
 
       assert (Hwf1 : well_formed_in_env e1'' rho).
@@ -3504,7 +3456,7 @@ Proof.
 
   - (* Prf_app *)
     symmetry in H3. 
-    eapply parallel_sbst_inv_App_e' in H3.
+    eapply parallel_sbst_inv_App_e in H3.
     + destruct H3 as [e1'' [e2'' [Heqlet [Hs1 Hs2]]]]. subst.
       assert (Hwf1 : well_formed_in_env e1'' rho).
       { inv H1. eapply H6. }      

@@ -122,7 +122,6 @@ State
 Ctx
 Eval
 Hoisting
-Term0
 Pipeline_utils
 Set_util
 Identifiers

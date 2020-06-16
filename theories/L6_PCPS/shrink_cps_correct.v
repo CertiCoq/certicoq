@@ -617,36 +617,6 @@ Section Shrink_correct.
   Qed.
 
 
-  Lemma eq_P_apply_r:
-    forall x sub sub',
-      eq_env_P (Singleton _ x) sub sub' ->
-      apply_r sub x = apply_r sub' x.
-  Proof.
-    intros.
-    unfold apply_r.
-    rewrite H.
-    auto.
-    constructor.
-  Qed.
-
-  Lemma eq_P_apply_r_list:
-    forall sub sub' l,
-      eq_env_P (FromList l) sub sub' ->
-      apply_r_list sub l = apply_r_list sub' l.
-  Proof.
-    induction l.
-    auto.
-    simpl.
-    intros.
-    erewrite eq_P_apply_r.
-    erewrite IHl. auto.
-    intro. intro. apply H.
-    constructor 2; auto.
-    intro. intro; apply H.
-    constructor.
-    inv H0. auto.
-  Qed.
-
   Lemma eq_env_P_def_funs:
     forall fl rho,
       eq_env_P (name_in_fundefs fl) (def_funs fl fl rho rho) rho ->
@@ -1763,46 +1733,6 @@ Section Shrink_correct.
   Qed.
 
   
-  (* TODO move *)
-  Lemma image_Setminus_Disjoint {A B} (f : A -> B) s1 s2 :
-    Disjoint _ (image f (s1 \\ s2)) (image f s2)  ->
-    image f (s1 \\ s2) <--> image f s1 \\ image f s2.
-  Proof.
-    intros Hd; split; intros x Him.
-    - destruct Him as [z [Hin Heq]]; subst.
-      inv Hin. constructor. eexists; split; eauto. intros Hc.
-      eapply Hd. constructor; eauto. eapply In_image. constructor; eauto.
-    - inv Him. 
-      assert (Hs' := H). edestruct H as [z [Hin Heq]]; subst.
-      eapply In_image. constructor; eauto. 
-      intros Hc. eapply H0. eapply In_image. eassumption. 
-  Qed.
-
-
-  Lemma image_apply_r_set x v m S:
-    image (apply_r (M.set x v m)) S \subset v |: image (apply_r m) (S \\ [set x]). 
-  Proof.
-    intros z [h [Hin Heq]]. subst.
-    unfold In, apply_r. simpl. destruct (peq h x); subst.
-    - rewrite M.gss. now left.
-    - rewrite M.gso. right. eexists. split; eauto. constructor; eauto.
-      intros Hc; inv Hc; eauto. eassumption. 
-  Qed.
-
-  Lemma image_apply_r_set_list xs vs (m : M.t var) S :
-    length xs = length vs ->
-    image (apply_r (set_list (combine xs vs) m)) S \subset FromList vs :|: (image (apply_r m) (S \\ FromList xs)).
-  Proof.
-    revert vs m S; induction xs; intros vs m S.
-    - simpl. normalize_sets; sets.
-    - intros Hlen. destruct vs. now inv Hlen.
-      simpl. eapply Included_trans.
-      eapply image_apply_r_set. normalize_sets.
-      eapply Union_Included. now sets.
-      eapply Included_trans. eapply (IHxs vs). inv Hlen. reflexivity.
-      normalize_sets. rewrite Setminus_Union. sets. 
-  Qed.
-
 
   (* Letapp inlining *)
   Lemma rw_fun_letapp_corr x f fds t xs fb vs c rho1 rho2 k x' C' e1 :
@@ -2536,69 +2466,6 @@ Section occurs_free_rw.
     induction f; simpl; eauto with Ensembles_DB.
   Qed.
 
-  Definition Range_map {A:Type} sig:  Ensemble A:=
-    (fun x => exists y, M.get y sig = Some x).
-
-  Definition Dom_map {A:Type} sig : Ensemble (M.elt):=
-    (fun x => exists (y:A), M.get x sig = Some y).
-
-  Lemma Dom_map_remove {A:Type} : forall sigma v,
-      Same_set _ (Dom_map (@M.remove A v sigma))
-               (Setminus _ (Dom_map sigma) (Singleton _ v)).
-  Proof.
-    split; intros; intro; intros.
-    inv H.
-    split.
-    exists x0.
-    eapply gr_some.
-    apply H0.
-    intro. inv H.
-    rewrite M.grs in H0; auto. inv H0.
-    inv H.
-    inv H0.
-    exists x0.
-    rewrite M.gro; auto.
-    intro; apply H1. subst.
-    constructor.
-  Qed.
-
-  Lemma Dom_map_empty {A}:
-    Same_set _ (Dom_map (M.empty A)) (Empty_set _).
-  Proof.
-    split; intro. intro. inv H. rewrite M.gempty in H0. inv H0.
-    intro. inv H.
-  Qed.
-
-  Lemma Dom_map_set:
-    forall (sig:M.t var) x y,
-      Same_set _ (Dom_map (M.set x y sig)) (Union _ [set x] (Dom_map sig)).
-  Proof.
-    intros. split. intro. intro. inv H. destruct (var_dec x0 x).
-    subst; auto.
-    rewrite M.gso in H0 by auto.
-    right. exists x1; auto.
-    intro. intro. inv H. exists y. inv H0. rewrite M.gss.
-    auto.
-    destruct (var_dec x x0). subst. exists y.
-    rewrite M.gss. auto.
-    inv H0. exists x1. rewrite M.gso; auto.
-  Qed.
-
-  Lemma Dom_map_set_list:
-    forall (sig: M.t var) lx ly,
-      List.length lx = List.length ly ->
-      Same_set _ (Dom_map (set_list (combine lx ly) sig)) (Union _ (FromList lx) (Dom_map sig)).
-  Proof.
-    induction lx.
-    - intros. destruct ly.
-      simpl. rewrite FromList_nil. auto with Ensembles_DB.
-      inv H.
-    - intros. destruct ly; inv H.
-      simpl. rewrite FromList_cons.
-      rewrite Dom_map_set.
-      apply IHlx in H1. rewrite H1.  auto 25 with Ensembles_DB.
-  Qed.
-
   Lemma remove_all_some:
     forall x y l sigma,
       M.get x (remove_all sigma l) = Some y ->
@@ -2629,17 +2496,6 @@ Section occurs_free_rw.
     rewrite <- not_in_remove_all; auto.
   Qed.
 
-
-  Lemma Range_map_remove {A:Type}: forall sigma v,
-      Included _ (Range_map (@M.remove A v sigma))
-               (Range_map sigma).
-  Proof.
-    intros. intro. intros. inv H.
-    exists x0.
-    eapply gr_some.
-    apply H0.
-  Qed.
-  
   Lemma Range_map_remove_all : forall l sigma ,
       Included _ (Range_map (remove_all sigma l))
                (Range_map sigma).
@@ -2651,66 +2507,6 @@ Section occurs_free_rw.
     apply IHl.
   Qed.
   
-  Lemma not_Range_map_eq {A}:
-    forall sig (x:A),
-      ~ Range_map sig x ->
-      ~ (exists z, M.get z sig = Some x).
-  Proof.
-    intros. intro. apply H. inv H0. exists x0; auto.
-  Qed.
-
-  Lemma not_Dom_map_eq {A}:
-    forall (sig:M.t A) x,
-      ~ Dom_map sig x ->
-      M.get x sig = None.
-  Proof.
-    intro. intros.
-    destruct (M.get x sig) eqn:gxs.
-    exfalso; apply H. exists a; auto.
-    auto.
-  Qed.
-
-  Hint Resolve not_Range_map_eq not_Dom_map_eq : core.
-
-  Lemma apply_r_sigma_in:
-    forall sigma a,
-      In _ (Union _ (Setminus _ (Singleton _ a) (Dom_map sigma)) (Range_map sigma)) (apply_r sigma a).
-  Proof.
-    unfold apply_r.
-    intros. 
-    destruct (@PTree.get var a sigma) eqn:gas.
-    right. exists a. auto. 
-    left. split.
-    constructor.
-    intro. inv H. unfold var, M.elt in *. rewrite gas in H0. inv H0.
-  Qed.
-
-  Lemma FromList_apply_r_list:
-    forall sigma l,
-      Included _ (FromList (apply_r_list sigma l))
-               (Union _ (Setminus var (FromList l) (Dom_map sigma)) (Range_map sigma)).
-  Proof.
-    induction l.
-    - simpl. intro. intro.
-      inv H.
-    - simpl.
-      rewrite FromList_cons.
-      rewrite FromList_cons.
-      apply Union_Included.
-      intro. intros.
-      inv H.
-      assert (Hrs := apply_r_sigma_in sigma a).
-      inv Hrs. left.
-      inv H.
-      split; auto.
-      right; auto.
-      intro; intro.
-      apply IHl in H.
-      inv H.
-      left. inv H0.
-      split; auto.
-      right; auto.
-  Qed.
 
 
   Lemma of_rename_all_ns_mut:
@@ -2921,28 +2717,6 @@ Section occurs_free_rw.
       exists x0. rewrite M.gso; auto.
   Qed.
 
-  Lemma Range_map_set_list: forall xs vs,
-      Included _  (Range_map (set_list (combine xs vs) (M.empty var)))
-               (FromList vs).
-  Proof.
-    induction xs; intros.
-    - simpl. intro.
-      intro. inv H. rewrite M.gempty in H0. inv H0.
-    - simpl. specialize IHxs. destruct vs. simpl.
-      intro; intro; inv H. rewrite M.gempty in H0. inv H0.
-      simpl.
-      rewrite FromList_cons.
-      intro. intro.
-      inv H. destruct (var_dec x0 a).
-      subst.
-      rewrite M.gss in H0.
-      left. inv H0.
-      constructor.
-      right.
-      apply IHxs.
-      rewrite M.gso in H0 by auto.
-      exists x0. auto.
-  Qed.
 
   Lemma of_fun_inline':
     forall f fds t xs fb vs,
@@ -4594,7 +4368,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
             eapply num_occur_rename_all_ns_not_range in H28; [| eassumption | ]. 
             assert (Heq : m = 0) by omega. subst. eassumption.
             intros Hc. 
-            eapply Range_map_set_list with (xs := [x]) (vs := [x']) in Hc.
+            eapply Range_map_set_list with (xs0 := [x]) (vs0 := [x']) in Hc.
             repeat normalize_sets. inv Hc. eapply inline_letapp_var_eq in H8. inv H8; subst.
 
             eapply HdisFV. constructor. right. normalize_bound_var. now right.
@@ -5074,7 +4848,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
           eapply num_occur_rename_all_ns_not_range with (e := e1) in H27; [| eassumption | ]. 
           assert (Heq : m = 0) by omega. subst. eassumption.
           intros Hc. 
-          eapply Range_map_set_list with (xs := [x]) (vs := [x']) in Hc.
+          eapply Range_map_set_list with (xs0 := [x]) (vs0 := [x']) in Hc.
           repeat normalize_sets. inv Hc. eapply inline_letapp_var_eq in H2. inv H2; subst.
 
           contradiction. 

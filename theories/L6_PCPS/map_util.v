@@ -7,7 +7,7 @@ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          Classes.Morphisms.
 From CertiCoq.L6 Require Import Ensembles_util set_util functions List_util.
 From compcert.lib Require Import Coqlib Maps.
-Require Import Libraries.maps_util.
+Require Import Libraries.maps_util L6.tactics.
 
 Module M := Maps.PTree. 
 
@@ -572,3 +572,202 @@ Proof.
 Qed.
 
 
+(* [Dom_map] and [Range_map] *)
+
+Definition Range_map {A:Type} sig:  Ensemble A:=
+  (fun x => exists y, M.get y sig = Some x).
+
+Definition Dom_map {A:Type} sig : Ensemble (M.elt):=
+  (fun x => exists (y:A), M.get x sig = Some y).
+
+Lemma Dom_map_remove {A:Type} sigma v :
+  (Dom_map (@M.remove A v sigma)) <--> (Dom_map sigma \\ [set v]).
+Proof.
+  split; intros; intro; intros.
+  inv H.
+  split.
+  exists x0.
+  eapply gr_some.
+  apply H0.
+  intro. inv H.
+  rewrite M.grs in H0; auto. inv H0.
+  inv H.
+  inv H0.
+  exists x0.
+  rewrite M.gro; auto.
+  intro; apply H1. subst.
+  constructor.
+Qed.
+
+Lemma Dom_map_empty {A}:
+  (Dom_map (M.empty A)) <--> (Empty_set _).
+Proof.
+  split; intro. intro. inv H. rewrite M.gempty in H0. inv H0.
+  intro. inv H.
+Qed.
+
+Lemma Dom_map_set A (sig: M.t A) x y :
+    (Dom_map (M.set x y sig)) <--> (x |: Dom_map sig).
+Proof.
+  intros. split. intro. intro. inv H. destruct (var_dec x0 x).
+  subst; auto.
+  rewrite M.gso in H0 by auto.
+  right. exists x1; auto.
+  intro. intro. inv H. exists y. inv H0. rewrite M.gss.
+  auto.
+  destruct (var_dec x x0). subst. exists y.
+  rewrite M.gss. auto.
+  inv H0. exists x1. rewrite M.gso; auto.
+Qed.
+
+Lemma Dom_map_set_list {A} (sig: M.t A) lx ly :
+  List.length lx = List.length ly ->
+  (Dom_map (set_list (combine lx ly) sig)) <--> (FromList lx :|: Dom_map sig).
+Proof.
+  revert ly; induction lx; intros ly.
+  - intros. destruct ly.
+    simpl. rewrite FromList_nil. auto with Ensembles_DB.
+    inv H.
+  - intros. destruct ly; inv H.
+    simpl. rewrite FromList_cons.
+    rewrite Dom_map_set.
+    apply IHlx in H1. rewrite H1. auto 25 with Ensembles_DB.
+Qed.
+
+Lemma Range_map_remove {A:Type} sigma v :
+  Range_map (@M.remove A v sigma) \subset Range_map sigma.
+Proof.
+  intros. intro. intros. inv H.
+  exists x0.
+  eapply gr_some.
+  apply H0.
+Qed.
+
+Lemma not_Range_map_eq {A} sig (x:A) :
+  ~ Range_map sig x ->
+  ~ (exists z, M.get z sig = Some x).
+Proof.
+  intros. intro. apply H. inv H0. exists x0; auto.
+Qed.
+
+Lemma not_Dom_map_eq {A} (sig:M.t A) x :
+    ~ Dom_map sig x ->
+    M.get x sig = None.
+Proof.
+  intro. intros.
+  destruct (M.get x sig) eqn:gxs.
+  exfalso; apply H. exists a; auto.
+  auto.
+Qed.
+
+Hint Resolve not_Range_map_eq not_Dom_map_eq : core.
+
+Lemma Range_map_set_list {A} xs (vs : list A) :
+    Range_map (set_list (combine xs vs) (M.empty _)) \subset FromList vs.
+Proof.
+  revert vs; induction xs; intros.
+  - simpl. intro.
+    intro. inv H. rewrite M.gempty in H0. inv H0.
+  - simpl. specialize IHxs. destruct vs. simpl.
+    intro; intro; inv H. rewrite M.gempty in H0. inv H0.
+    simpl.
+    rewrite FromList_cons.
+    intro. intro.
+    inv H. destruct (var_dec x0 a).
+    subst.
+    rewrite M.gss in H0.
+    left. inv H0.
+    constructor.
+    right.
+    apply IHxs.
+    rewrite M.gso in H0 by auto.
+    exists x0. auto.
+Qed.
+
+Instance Decidable_Dom_map {A} (m : M.t A) : Decidable (Dom_map m).
+Proof.
+  constructor. intros x.
+  destruct (M.get x m) eqn:Heq; eauto.
+  left. eexists. eassumption.
+  right. intros [y Hget]. congruence.
+Qed.
+
+(* TODO move *)
+Lemma InList_snd:
+  forall {A B} (x:A) (l:list (B*A)),
+    List.In x (map snd l) <-> exists v, List.In (v, x) l.
+Proof.
+  induction l; intros.
+  - split; intro H; inv H.
+    inv H0.
+  - split.
+    + intro. destruct a.
+      simpl in H. inv H.
+      exists b; constructor; auto.
+      apply IHl in H0. inv H0. exists x0.
+      constructor 2. auto.
+    + intro. inv H.
+      destruct a. simpl.
+      inv H0.
+      inv H; auto.
+      right.
+      apply IHl; eauto.
+Qed.
+
+Lemma Decidable_Range_map :
+  forall sig, @Decidable positive (Range_map sig).
+Proof.
+  intros. constructor.
+  intro.
+  assert (Decidable (FromList (map snd (M.elements sig)))).
+  apply Decidable_FromList.
+  inv H.
+  specialize (Dec x).
+  inv Dec.
+  unfold FromList in H.
+  left. rewrite InList_snd in H.
+  destruct H.
+  apply M.elements_complete in H.
+  exists x0; auto.
+  right. intro. inv H0.
+  apply H.
+  apply InList_snd.
+  exists x0. apply M.elements_correct. auto.
+Qed.
+
+Lemma Range_set_Included {A} (sig : M.t A) a b :
+  ~ a \in Dom_map sig ->
+          Range_map sig \subset Range_map (M.set a b sig).
+Proof.
+  intros Hc x [y Hget]. exists y. rewrite M.gso. eassumption.
+  intros Hc'; subst. eapply Hc; eexists; eauto.
+Qed.
+
+Lemma Range_set_list_Included {A} (sig : M.t A) l1 l2 :
+  Disjoint _ (FromList l1) (Dom_map sig) ->
+  NoDup l1 ->
+  length l1 = length l2 ->
+  Range_map sig \subset Range_map (set_list (combine l1 l2) sig).
+Proof.
+  revert l2; induction l1; intros; simpl. reflexivity.
+  destruct l2; simpl. now sets. normalize_sets.
+  eapply Included_trans; [| eapply Range_set_Included; sets ]. simpl.
+  eapply IHl1. now sets. inv H0; eassumption.
+  inv H1. reflexivity. inv H1. inv H0. rewrite (Dom_map_set_list sig l1 l2); eauto.
+  intros Hc; inv Hc; eauto. eapply H. constructor; eauto.
+Qed.    
+
+Lemma range_map_set_list {A} (ly : list A) sig lx :
+  Range_map (set_list (combine lx ly) sig) \subset (Range_map sig :|: FromList ly).
+Proof.
+  revert lx; induction ly.
+  - intros. intro. intro. destruct lx; simpl in H; auto.
+  - intros. destruct lx. simpl. auto with Ensembles_DB.
+    simpl. intro. intro.
+    inv H. destruct (var_dec x0 e).
+    + subst. rewrite M.gss in H0. inv H0. right; constructor; auto.
+    + rewrite M.gso in H0 by auto.
+      assert ( Range_map (set_list (combine lx ly) sig) x). exists x0; auto.
+      apply IHly in H.
+      inv H; auto. right. constructor 2; auto.
+Qed.

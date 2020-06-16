@@ -3,7 +3,7 @@ Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String Coq.Sets.Ense
 Import ListNotations.
 Require Import identifiers.
 Require Import L6.state L6.freshen L6.cps_util L6.cps_show L6.ctx L6.hoare L6.inline L6.rename
-        L6.Ensembles_util L6.alpha_conv L6.functions L6.logical_relations L6.tactics.
+        L6.Ensembles_util L6.alpha_conv L6.functions L6.logical_relations L6.tactics L6.eval.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
@@ -16,6 +16,7 @@ Require Import Common.compM Libraries.CpdtTactics Libraries.maps_util.
 Import MonadNotation.
 Open Scope monad_scope.
 Open Scope ctx_scope.
+Open Scope fun_scope.
 
 Section Inline_Eq.
   
@@ -119,10 +120,10 @@ Opaque bind ret.
  
 (** Spec for [get_name] *)
 Lemma get_name_fresh A S y str :
-  {{ fun _ '((s, _) : comp_data * A) => fresh S (next_var s) }}
+  {{ fun _ (s : comp_data * A) => fresh S (next_var (fst s)) }}
     get_name y str
-  {{ fun (r: unit) _ x '(s', _) =>
-       x \in S /\ fresh (S \\ [set x]) (next_var s') }}.  
+  {{ fun (r: unit) _ x s' =>
+       x \in S /\ fresh (S \\ [set x]) (next_var (fst s')) }}.  
 Proof. 
   eapply pre_post_mp_l.
   eapply bind_triple. now eapply get_triple.  
@@ -142,55 +143,37 @@ Section Inline_correct.
 
   Context (St : Type) (IH : InlineHeuristic St) (cenv : ctor_env) (P1 : PostT) (PG : PostGT).
 
-  (* TODO move *)
-  Lemma image_Setminus_Disjoint {A B} (f : A -> B) s1 s2 :
-    Disjoint _ (image f (s1 \\ s2)) (image f s2)  ->
-    image f (s1 \\ s2) <--> image f s1 \\ image f s2.
-  Proof.
-    intros Hd; split; intros x Him.
-    - destruct Him as [z [Hin Heq]]; subst.
-      inv Hin. constructor. eexists; split; eauto. intros Hc.
-      eapply Hd. constructor; eauto. eapply In_image. constructor; eauto.
-    - inv Him. 
-      assert (Hs' := H). edestruct H as [z [Hin Heq]]; subst.
-      eapply In_image. constructor; eauto. 
-      intros Hc. eapply H0. eapply In_image. eassumption. 
-  Qed.
+  Definition fun_map_inv (fm : fun_map) (rho : env) :=
+    forall f ft xs e,
+      fm ! f = Some (ft, xs, e) ->
+      exists rhoc B g, rho ! f = Some (Vfun rhoc B g) /\
+                       find_def g B = Some (ft, xs, e).
 
+  
+  Lemma fun_map_inv_set fm rho x v :
+    fun_map_inv fm rho ->
+    ~ x \in Dom_map fm ->
+    fun_map_inv fm (M.set x v rho).           
 
-  Lemma image_apply_r_set x v m S:
-    image (apply_r (M.set x v m)) S \subset v |: image (apply_r m) (S \\ [set x]). 
-  Proof.
-    intros z [h [Hin Heq]]. subst.
-    unfold In, apply_r. simpl. destruct (var_dec h x); subst.
-    - rewrite M.gss. now left.
-    - rewrite M.gso. right. eexists. split; eauto. constructor; eauto.
-      intros Hc; inv Hc; eauto. eassumption. 
-  Qed.
+  Lemma fun_map_inv_set_lists fm rho xs vs :
+    fun_map_inv fm rho ->
+    Disjoint _ (FromList xs) (Dom_map fm) ->
+    set_lists xs vs rho = Some rho' ->
+    fun_map_inv fm rho'.
 
-  Lemma image_apply_r_set_list xs vs (m : M.t var) S :
-    List.length xs = List.length vs ->
-    image (apply_r (set_list (combine xs vs) m)) S \subset FromList vs :|: (image (apply_r m) (S \\ FromList xs)).
-  Proof.
-    revert vs m S; induction xs; intros vs m S.
-    - simpl. normalize_sets; sets.
-    - intros Hlen. destruct vs. now inv Hlen.
-      simpl. eapply Included_trans.
-      eapply image_apply_r_set. normalize_sets.
-      eapply Union_Included. now sets.
-      eapply Included_trans. eapply (IHxs vs). inv Hlen. reflexivity.
-      normalize_sets. rewrite Setminus_Union. sets. 
-  Qed.
-
-
+  Lemma fun_map_inv_def_funs fm rho B :
+    fun_map_inv fm rho -
+    fun_map_inv (add_fundefs B fm) (def_funs B B rho rho).
+    
   Lemma inline_correct d e sig fm st S :
     unique_bindings e ->
     Disjoint _ (bound_var e) (occurs_free e) ->
     Disjoint _ S (bound_var e :|: image (apply_r sig) (occurs_free e)) ->
-    {{ fun _ '(s, _) => fresh S (next_var s) }}
+    Disjoint _ (Dom_map fm) (bound_var e) ->
+    {{ fun _ s => fresh S (next_var (fst s)) }}
       beta_contract St IH d e sig fm st
-    {{ fun _ _ e' '(s', _) =>
-         fresh S (next_var s') /\
+    {{ fun _ _ e' s' =>
+         fresh S (next_var (fst s')) /\
          (* unique bindings is preserved *)
          unique_bindings e' /\
          occurs_free e' \subset image (apply_r sig) (occurs_free e) /\
@@ -209,8 +192,8 @@ Section Inline_correct.
     induction e using exp_ind'; intros sig fm st S Hun Hdis1 Hdis2; inv Hun; rewrite beta_contract_eq.
     - (* constr *)
       eapply bind_triple. now eapply get_name_fresh. 
-      intros x w1. simpl. eapply pre_curry_l. frame_rule. ; [| eapply bind_triple; [ eapply IHe with (S := S \\ [set x]) | ]].
-      + clear. intros ? [? ?]. now firstorder. 
+      intros x w1. eapply pre_curry_l. intros Hinx.
+      eapply bind_triple. eapply IHe with (S := S \\ [set x]).
       + eassumption. 
       + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
         eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := [set v]). tci.
@@ -224,7 +207,8 @@ Section Inline_correct.
         eapply Union_Disjoint_r. now sets.
         eapply Disjoint_Included; [| | eapply Hdis2 ]. rewrite image_Union. now sets.
         now sets.
-      + intros e' w2. eapply return_triple. intros _ [s3 _ ]. intros [Hf [Hun [Hsub [Hsub' Hsem]]]].
+      + intros e' w2. eapply return_triple.
+        intros _ st'. intros [Hf [Hun [Hsub [Hsub' Hsem]]]].
         split; [| split; [| split; [| split ]]].
         * eapply fresh_monotonic;[| eassumption ]. sets.
         * constructor.
@@ -235,11 +219,19 @@ Section Inline_correct.
           eapply Included_trans. eassumption. now eapply image_apply_r_set. reflexivity.
           rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. normalize_sets. sets.
         * normalize_bound_var. eapply Union_Included. eapply Included_trans. eassumption. now sets.
-          eapply Singleton_Included. SearchAbout x. sets. 
+          eapply Singleton_Included. eassumption.
         * intros r1 r2 k Henv. eapply preord_exp_const_compat.
           admit. admit. admit.
           intros. eapply Hsem. 
-          
+          rewrite apply_r_set_f_eq. eapply preord_env_P_inj_set_alt.
+          -- eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ].
+             omega. normalize_occurs_free. sets.
+          -- rewrite preord_val_eq. split. reflexivity.
+             eapply Forall2_Forall2_asym_included. eassumption. 
+          -- intros Hc. eapply Hdis2. constructor. eassumption.
+             right. normalize_occurs_free. rewrite image_Union. right. eassumption.
+    - 
+          pre
           reflexivity. 
         rewrite Union_Setminus with (S1 := occurs_free e) (S2 := [set v]).
         2:{ 

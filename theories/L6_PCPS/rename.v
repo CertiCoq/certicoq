@@ -310,6 +310,134 @@ Proof.
   rewrite M.gro; eauto. intros Hi; subst; eauto.
 Qed.
 
+Lemma image_apply_r_set x v m S:
+  image (apply_r (M.set x v m)) S \subset v |: image (apply_r m) (S \\ [set x]). 
+Proof.
+  intros z [h [Hin Heq]]. subst.
+  unfold In, apply_r. simpl. destruct (var_dec h x); subst.
+  - rewrite M.gss. now left.
+  - rewrite M.gso. right. eexists. split; eauto. constructor; eauto.
+    intros Hc; inv Hc; eauto. eassumption. 
+Qed.
+
+Lemma image_apply_r_set_list xs vs (m : M.t var) S :
+  List.length xs = List.length vs ->
+  image (apply_r (set_list (combine xs vs) m)) S \subset FromList vs :|: (image (apply_r m) (S \\ FromList xs)).
+Proof.
+  revert vs m S; induction xs; intros vs m S.
+  - simpl. normalize_sets; sets.
+  - intros Hlen. destruct vs. now inv Hlen.
+    simpl. eapply Included_trans.
+    eapply image_apply_r_set. normalize_sets.
+    eapply Union_Included. now sets.
+    eapply Included_trans. eapply (IHxs vs). inv Hlen. reflexivity.
+    normalize_sets. rewrite Setminus_Union. sets. 
+Qed.
+
+Lemma apply_r_set_f_eq v x sig :
+  f_eq (apply_r (M.set v x sig)) (extend (apply_r sig) v x).
+Proof.
+  intros z. destruct (var_dec v z); subst.
+  - unfold apply_r. rewrite M.gss, extend_gss. reflexivity. 
+  - unfold apply_r. rewrite M.gso, extend_gso; eauto.
+Qed.
+
+Lemma eq_P_apply_r:
+  forall x sub sub',
+    eq_env_P (Singleton _ x) sub sub' ->
+    apply_r sub x = apply_r sub' x.
+Proof.
+  intros.
+  unfold apply_r.
+  rewrite H.
+  auto.
+  constructor.
+Qed.
+
+Lemma eq_P_apply_r_list:
+  forall sub sub' l,
+    eq_env_P (FromList l) sub sub' ->
+    apply_r_list sub l = apply_r_list sub' l.
+Proof.
+  induction l.
+  auto.
+  simpl.
+  intros.
+  erewrite eq_P_apply_r.
+  erewrite IHl. auto.
+  intro. intro. apply H.
+  constructor 2; auto.
+  intro. intro; apply H.
+  constructor.
+  inv H0. auto.
+Qed.
+
+Lemma apply_r_sigma_in sigma a :
+    apply_r sigma a \in  ([set a] \\ (Dom_map sigma) :|: Range_map sigma).
+Proof.
+  unfold apply_r.
+  intros. 
+  destruct (@PTree.get var a sigma) eqn:gas.
+  right. exists a. auto. 
+  left. split.
+  constructor.
+  intro. inv H. unfold var, M.elt in *. rewrite gas in H0. inv H0.
+Qed.
+
+Lemma FromList_apply_r_list sigma l:
+  FromList (apply_r_list sigma l) \subset
+  (FromList l \\ (Dom_map sigma) :|: Range_map sigma).
+Proof.
+  induction l.
+  - simpl. intro. intro.
+    inv H.
+  - simpl.
+    rewrite FromList_cons.
+    rewrite FromList_cons.
+    apply Union_Included.
+    intro. intros.
+    inv H.
+    assert (Hrs := apply_r_sigma_in sigma a).
+    inv Hrs. left.
+    inv H.
+    split; auto.
+    right; auto.
+    intro; intro.
+    apply IHl in H.
+    inv H.
+    left. inv H0.
+    split; auto.
+    right; auto.
+Qed.
+
+Lemma Disjoint_apply_r sig x :
+  Disjoint _ (Dom_map sig) (Singleton _ x) ->
+  apply_r sig x = x.
+Proof.
+  intros. unfold apply_r.
+  destruct (M.get x sig) eqn:gxs.
+  exfalso; inv H. specialize (H0 x).
+  apply H0.
+  split; auto. exists v. auto.
+  auto.
+Qed.
+
+Lemma Disjoint_apply_r_FromList sig l :
+  Disjoint _ (Dom_map sig) (FromList l) ->
+  apply_r_list sig l = l.
+Proof.
+  induction l; intros.
+  - auto.
+  - simpl. rewrite IHl.
+    rewrite Disjoint_apply_r.
+    auto.
+    eapply Disjoint_Included_r.
+    2: apply H. rewrite FromList_cons; auto with Ensembles_DB.
+    eapply Disjoint_Included_r.
+    2: apply H. rewrite FromList_cons; auto with Ensembles_DB.
+Qed.
+
+
 
 (** * Lemmas about [all_fun_name] *)
 
@@ -502,7 +630,6 @@ Proof.
   induction l; intros; simpl.
   - inv H.
   - destruct (peq x a); inv H; eauto; subst.
-    + rewrite M.grs. reflexivity.
     + rewrite M.grs. reflexivity.
     + rewrite M.grs. reflexivity.
     + rewrite M.gro; eauto.

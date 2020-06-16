@@ -505,7 +505,22 @@ Proof.
   now apply Included_Union_r.
 Qed.
 
+Lemma image_Setminus_Disjoint {A B} (f : A -> B) s1 s2 :
+  Disjoint _ (image f (s1 \\ s2)) (image f s2)  ->
+  image f (s1 \\ s2) <--> image f s1 \\ image f s2.
+Proof.
+  intros Hd; split; intros x Him.
+  - destruct Him as [z [Hin Heq]]; subst.
+    inv Hin. constructor. eexists; split; eauto. intros Hc.
+    eapply Hd. constructor; eauto. eapply In_image. constructor; eauto.
+  - inv Him. 
+    assert (Hs' := H). edestruct H as [z [Hin Heq]]; subst.
+    eapply In_image. constructor; eauto. 
+    intros Hc. eapply H0. eapply In_image. eassumption. 
+Qed.
+
 Hint Resolve In_image Included_image_extend : functions_BD.
+
 
 (** * Lemmas about [extend_lst]  *) 
 

@@ -1143,33 +1143,6 @@ Section CONTRACT.
     - left; constructor.
   Qed.
 
-  Theorem Disjoint_apply_r sig x :
-    Disjoint _ (Dom_map sig) (Singleton _ x) ->
-    apply_r sig x = x.
-  Proof.
-    intros. unfold apply_r.
-    destruct (M.get x sig) eqn:gxs.
-    exfalso; inv H. specialize (H0 x).
-    apply H0.
-    split; auto. exists v. auto.
-    auto.
-  Qed.
-
-  Theorem Disjoint_apply_r_FromList sig l :
-    Disjoint _ (Dom_map sig) (FromList l) ->
-    apply_r_list sig l = l.
-  Proof.
-    induction l; intros.
-    - auto.
-    - simpl. rewrite IHl.
-      rewrite Disjoint_apply_r.
-      auto.
-      eapply Disjoint_Included_r.
-      2: apply H. rewrite FromList_cons; auto with Ensembles_DB.
-      eapply Disjoint_Included_r.
-      2: apply H. rewrite FromList_cons; auto with Ensembles_DB.
-  Qed.
-
   Theorem Disjoint_Setminus_swap:
     forall {A} s1 s2 s3,
       Disjoint A (Setminus _ s1 s2) s3 <-> Disjoint A s1 (Setminus _ s3 s2).
@@ -2918,48 +2891,6 @@ Section CONTRACT.
       eapply fundefs_append_bound_vars.
       reflexivity.
       right; auto.
-  Qed.
-
-  Theorem InList_snd:
-    forall {A B} (x:A) (l:list (B*A)),
-      List.In x (map snd l) <-> exists v, List.In (v, x) l.
-  Proof.
-    induction l; intros.
-    - split; intro H; inv H.
-      inv H0.
-    - split.
-      + intro. destruct a.
-        simpl in H. inv H.
-        exists b; constructor; auto.
-        apply IHl in H0. inv H0. exists x0.
-        constructor 2. auto.
-      + intro. inv H.
-        destruct a. simpl.
-        inv H0.
-        inv H; auto.
-        right.
-        apply IHl; eauto.
-  Qed.
-
-  Theorem Decidable_Range_map:
-    forall sig, @Decidable var (Range_map sig).
-  Proof.
-    intros. constructor.
-    intro.
-    assert (Decidable (FromList (map snd (M.elements sig)))).
-    apply Decidable_FromList.
-    inv H.
-    specialize (Dec x).
-    inv Dec.
-    unfold FromList in H.
-    left. rewrite InList_snd in H.
-    destruct H.
-    apply M.elements_complete in H.
-    exists x0; auto.
-    right. intro. inv H0.
-    apply H.
-    apply InList_snd.
-    exists x0. apply M.elements_correct. auto.
   Qed.
 
   (* Variables are bound by (1) binding on the stem (2) mutually rec. functions *)
@@ -4905,22 +4836,6 @@ Section CONTRACT.
     apply le_n_0_eq in H2. subst; auto.
   Qed.
 
-
-  Theorem range_map_set_list: forall {A} ly sig lx,
-                                Included A (Range_map (set_list (combine lx ly) sig)) (Union _ (Range_map sig) (FromList ly)).
-  Proof.
-    induction ly.
-    - intros. intro. intro. destruct lx; simpl in H; auto.
-    - intros. destruct lx. simpl. auto with Ensembles_DB.
-      simpl. intro. intro.
-      inv H. destruct (var_dec x0 e).
-      + subst. rewrite M.gss in H0. inv H0. right; constructor; auto.
-      + rewrite M.gso in H0 by auto.
-        assert ( Range_map (set_list (combine lx ly) sig) x). exists x0; auto.
-        apply IHly in H.
-        inv H; auto. right. constructor 2; auto.
-  Qed.
-
   Inductive sum_range_n: list var -> list var -> exp -> var -> nat -> Prop :=
   | SRN_cons1: forall lx ly e v0 n m x,
                  sum_range_n lx ly e v0 n -> num_occur e x m -> sum_range_n (x::lx) (v0::ly) e v0 (m+n)
@@ -6518,14 +6433,6 @@ Section CONTRACT.
       omega.
   Qed.
 
-  Instance Decidable_Dom_map {A} (m : M.t A) : Decidable (Dom_map m).
-  Proof.
-    constructor. intros x.
-    destruct (M.get x m) eqn:Heq; eauto.
-    left. eexists. eassumption.
-    right. intros [y Hget]. congruence.
-  Qed.
-
   Lemma one_rename_all_ar: forall x y v sigma,
       ~ (exists z, M.get z sigma = Some x) ->
       (M.get x sigma = None) ->
@@ -7347,27 +7254,6 @@ Section CONTRACT.
     - inv Hin. inv Hnum. dec_vars. constructor. 
   Qed.
 
-  Lemma Range_set_Included {A} (sig : M.t A) a b :
-    ~ a \in Dom_map sig ->
-    Range_map sig \subset Range_map (M.set a b sig).
-  Proof.
-    intros Hc x [y Hget]. exists y. rewrite M.gso. eassumption.
-    intros Hc'; subst. eapply Hc; eexists; eauto.
-  Qed.
-  
-  Lemma Range_set_list_Included (sig : M.t var) l1 l2 :
-    Disjoint _ (FromList l1) (Dom_map sig) ->
-    NoDup l1 ->
-    length l1 = length l2 ->
-    Range_map sig \subset Range_map (set_list (combine l1 l2) sig).
-  Proof.
-    revert l2; induction l1; intros; simpl. now sets.
-    destruct l2; simpl. now sets. normalize_sets.
-    eapply Included_trans; [| eapply Range_set_Included; sets ]. simpl.
-    eapply IHl1. now sets. inv H0; eassumption.
-    inv H1. reflexivity. inv H1. inv H0. rewrite (Dom_map_set_list sig l1 l2); eauto.
-    intros Hc; inv Hc; eauto. eapply H. constructor; eauto.
-  Qed.    
 
   (* TODO move *)
   Lemma not_occurs_not_free_ctx :

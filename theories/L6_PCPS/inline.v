@@ -86,7 +86,7 @@ Section Beta.
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
          let (s' , inl) := update_letApp _ IH f' t ys' s in
-         (match (inl, M.get f' fm, d) with
+         (match (inl, M.get f fm, d) with
           | (true, Some (t, xs, e), S d') =>
             let sig' := set_list (combine xs ys') sig  in            
             e' <- beta_contract d' e sig' fm s' ;;
@@ -129,7 +129,7 @@ Section Beta.
          let (s', inl) := update_App _ IH f' t ys' s in
          (* fstr <- get_pp_name f' ;; *)
          (* log_msg ("Application of " ++ fstr ++ " is " ++ if inl then "" else "not " ++ "inlined") ;; *)
-         (match (inl, M.get f' fm, d) with
+         (match (inl, M.get f fm, d) with
           | (true, Some (t, xs, e), S d') =>
             let sig' := set_list (combine xs ys') sig  in
             beta_contract d' e sig' fm  s'

@@ -141,7 +141,8 @@ Section Shrink_correct.
            (HPost_letapp_OOTG : post_letapp_compat_OOT PG PG)
            (HPost_OOTG : post_OOT PG)
            (Hpost_baseG : post_base PG)
-           (Hless_steps_letapp : remove_steps_letapp cenv P1 P1 P1)
+           (Hless_steps_app : forall f ft ys rho1 e2 rho2, post_Eapp_l P1 P1 f ft ys rho1 e2 rho2)                      
+           (Hless_steps_letapp : remove_steps_letapp cenv P1 P1 P1)                     
            (Hless_steps_letapp' : remove_steps_letapp' cenv P1 P1 P1)
            (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv P1 P1)
            (Hless_steps_letapp_OOT' : remove_steps_letapp_OOT' cenv P1 P1)
@@ -1493,49 +1494,6 @@ Section Shrink_correct.
         apply H3. left. auto.
     -   intros. inv H.
   Qed.
-
-
-
-  Context (Hless_steps_app :
-             forall (rho1 rho2 rhoc rho' : env) (f f' : var) (ft : fun_tag) 
-                    (ys xs : list var) e1 e2 B vs c1 c2,
-               M.get f rho1 = Some (Vfun rhoc B f') ->
-               get_list ys rho1 = Some vs ->
-               find_def f' B = Some (ft, xs, e1) ->
-               set_lists xs vs (def_funs B B rhoc rhoc) = Some rho' ->       
-               P1 (e1, rho', c1) (e2, rho2, c2) ->
-               P1 (Eapp f ft ys, rho1, c1 + cost (Eapp f ft ys)) (e2, rho2, c2)).
-
-
-  (* TODO move *)
-  Lemma preord_exp_app_l
-        (k : nat) (rho1 rho2 : env) (f : var) (ft : fun_tag)
-        (ys : list var) e2 :
-    (* post_Eapp_r P1 P2 e1 rho1 f ft ys rho2 -> *)
-    (forall rhoc rho' e1 vs f' xs B,
-        get_list ys rho1 = Some vs ->
-        M.get f rho1 = Some (Vfun rhoc B f') ->
-        find_def f' B = Some (ft, xs, e1) ->
-        set_lists xs vs (def_funs B B rhoc rhoc) = Some rho' ->
-        preord_exp cenv P1 PG k (e1, rho') (e2, rho2)) ->
-    preord_exp cenv P1 PG k (Eapp f ft ys, rho1) (e2, rho2).
-  Proof.
-    intros Hyp v c1 Hleq Hstep.
-    inv Hstep.
-    - eexists OOT, 0. split; [| split ].
-      econstructor; eauto. eapply cost_gt_0.
-      + eapply Hpost_zero. eassumption.
-      + simpl; eauto.
-    - inv H0. repeat subst_exp. 
-      edestruct Hyp as (v2 & c2 & Hstep' & Hpost & Hval); [ | | | | | eassumption |]; eauto.
-      omega.
-      eexists. exists c2. split; [ eassumption | split ].
-      replace c1 with (c1 - cost (Eapp f ft ys) + cost (Eapp f ft ys)) by omega.
-      eapply Hless_steps_app; eauto.
-      
-      eapply preord_res_monotonic. eassumption. omega.
-  Qed. 
-
   
   Lemma preord_env_P_inj_set_lists_l S k rho1 rho1' rho2 xs ys vs1 vs2 : 
     preord_env_P cenv PG (S \\ FromList xs) k rho1 rho2 ->
@@ -1611,10 +1569,10 @@ Section Shrink_correct.
     eapply preord_exp_compat_vals_stem_set with (S1 := name_in_fundefs fds :|: occurs_free_fundefs fds) (S :=  name_in_fundefs fds :|: occurs_free_fundefs fds). 
     
     * intros k1 rho1' rho2' Hleq1 Hpre' Heq1 Heq2. 
-      
+       
       assert (Hf1' := Hf1).
       eapply find_def_correct in Hf1; eapply fun_in_fundefs_name_in_fundefs in Hf1.      
-      eapply preord_exp_app_l. intros rhoc rho' e1 vs1 f' xs1 B Hgetl Hget Hf Hset.
+      eapply preord_exp_app_l. now eauto. now eauto. intros rhoc rho' e1 vs1 f' xs1 B Hgetl Hget Hf Hset.
       rewrite def_funs_eq in Hget1, Hget2; eauto.
       inv Hget1; inv Hget2.
        

@@ -637,7 +637,16 @@ Section Log_rel.
        P (m + (cost (Eapp f ft ys))) (e1, rho1, c1) (e2, rho2', c2) ->
        P m (e1, rho1, c1) ((Eapp f ft ys), rho2, c2 + cost (Eapp f ft ys)). *)
         
-   
+
+   Definition post_Eapp_l (P1 P2 : PostT) f ft ys rho1 e2 rho2 :=
+     forall (rhoc rho' : env) (f' : var) (xs : list var) e1 B vs c1 c2,
+       M.get f rho1 = Some (Vfun rhoc B f') ->
+       get_list ys rho1 = Some vs ->
+       find_def f' B = Some (ft, xs, e1) ->
+       set_lists xs vs (def_funs B B rhoc rhoc) = Some rho' ->       
+       P1 (e1, rho', c1) (e2, rho2, c2) ->
+       P2 (Eapp f ft ys, rho1, (c1 + cost (Eapp f ft ys))%nat) (e2, rho2, c2).
+
         
   Section Compat.
     Context (P1 P2 : PostT) (* Local *)
@@ -1104,11 +1113,41 @@ Section Log_rel.
       eassumption.
       split. eapply Hypc. now eauto.
       eassumption.
+    Qed.
+
+    Lemma preord_exp_app_l
+          (k : nat) (rho1 rho2 : env) (f : var) (ft : fun_tag)
+          (ys : list var) e2 
+      (Hls : post_Eapp_l P1 P2 f ft ys rho1 e2 rho2) 
+      (Hpost_zero : post_zero (Eapp f ft ys) rho1 P2) :
+      (forall rhoc rho' e1 vs f' xs B,
+          get_list ys rho1 = Some vs ->
+          M.get f rho1 = Some (Vfun rhoc B f') ->
+          find_def f' B = Some (ft, xs, e1) ->
+          set_lists xs vs (def_funs B B rhoc rhoc) = Some rho' ->
+          preord_exp P1 PG k (e1, rho') (e2, rho2)) ->
+      preord_exp P2 PG k (Eapp f ft ys, rho1) (e2, rho2).
+    Proof.
+      intros Hyp v c1 Hleq Hstep.
+      inv Hstep.
+      - eexists OOT, 0%nat. split; [| split ].
+        econstructor; eauto. eapply cost_gt_0.
+        + eapply Hpost_zero. eassumption.
+        + simpl; eauto.
+      - inv H0. repeat subst_exp. 
+        edestruct Hyp as (v2 & c2 & Hstep' & Hpost & Hval); [ | | | | | eassumption |]; eauto.
+        omega.
+        eexists. exists c2. split; [ eassumption | split ].
+        replace c1 with (c1 - cost (Eapp f ft ys) + cost (Eapp f ft ys))%nat by omega.
+        eapply Hls; eauto.
+        
+        eapply preord_res_monotonic. eassumption. omega.
     Qed. 
 
 
-   (** Context application lemma *)
-   (** [(e1, ρ1) < (C [ e2 ], ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
+
+    (** Context application lemma *)
+    (** [(e1, ρ1) < (C [ e2 ], ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
       interpretation of [C] in [ρ2] *)
     Lemma ctx_to_rho_preord_exp k (P : nat -> PostT) boundG rho1 rho2 rho2' C e e' m :
       (forall n e2 rho2 rho2' C c1 c2 c , 

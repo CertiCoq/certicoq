@@ -3,11 +3,13 @@ Require Import L6.cps L6.size_cps L6.cps_util L6.eval L6.logical_relations L6.se
         L6.shrink_cps_correct.
 Require Import FunInd.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
+Require Import Coq.Strings.String.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
 Require Import Common.compM.
+Require Import Lia.
 
 Import ListNotations MonadNotation.
 
@@ -197,54 +199,6 @@ Section list_lemmas.
 End list_lemmas.
 
 Section uncurry_correct.
-  Lemma Fcons_eq_v_eq : forall {f t v e fds f1 t1 v1 e1 fds1},
-    Fcons f t v e fds = Fcons f1 t1 v1 e1 fds1 -> v = v1.
-  Proof. now inversion 1. Qed.
-  Lemma Fcons_eq_e_eq : forall {f t v e fds f1 t1 v1 e1 fds1},
-    Fcons f t v e fds = Fcons f1 t1 v1 e1 fds1 -> e = e1.
-  Proof. now inversion 1. Qed.
-  Lemma Fcons_eq_fds_eq : forall {f t v e fds f1 t1 v1 e1 fds1},
-    Fcons f t v e fds = Fcons f1 t1 v1 e1 fds1 -> fds = fds1.
-  Proof. now inversion 1. Qed.
-  Lemma Efun_eq_fds_eq : forall {fds e fds1 e1}, Efun fds e = Efun fds1 e1 -> fds = fds1.
-  Proof. now inversion 1. Qed.
-  Lemma Efun_eq_e_eq : forall {fds e fds1 e1}, Efun fds e = Efun fds1 e1 -> e = e1.
-  Proof. now inversion 1. Qed.
-  Lemma Eapp_eq_xs_eq : forall {x f xs x1 f1 xs1}, Eapp x f xs = Eapp x1 f1 xs1 -> xs = xs1.
-  Proof. now inversion 1. Qed.
-  Lemma Fcons_neq_Fnil : forall {f t v e fds}, Fcons f t v e fds <> Fnil.
-  Proof. now inversion 1. Qed.
-  Lemma Econstr_neq_Efun : forall {x c vs e e1 fds1}, Econstr x c vs e <> Efun fds1 e1.
-  Proof. now inversion 1. Qed.
-  Lemma Ecase_neq_Efun : forall {v l e1 fds1}, Ecase v l <> Efun fds1 e1.
-  Proof. now inversion 1. Qed.
-  Lemma Eproj_neq_Efun : forall {x c n y e e1 fds1}, Eproj x c n y e <> Efun fds1 e1.
-  Proof. now inversion 1. Qed.
-  Lemma Eletapp_neq_Efun : forall {x f ft ys e e1 fds1}, Eletapp x f ft ys e<> Efun fds1 e1.
-  Proof. now inversion 1. Qed.
-  Lemma Eapp_neq_Efun : forall {x f xs e1 fds1}, Eapp x f xs <> Efun fds1 e1.
-  Proof. now inversion 1. Qed.
-  Lemma Eprim_neq_Efun : forall {x p xs e e1 fds1}, Eprim x p xs e <> Efun fds1 e1.
-  Proof. now inversion 1. Qed.
-  Lemma Ehalt_neq_Efun : forall {x e1 fds1}, Ehalt x <> Efun fds1 e1.
-  Proof. now inversion 1. Qed.
-  Lemma Econstr_neq_Eapp : forall {x c vs e x1 f1 xs1}, Econstr x c vs e <> Eapp x1 f1 xs1.
-  Proof. now inversion 1. Qed.
-  Lemma Ecase_neq_Eapp : forall {v l x1 f1 xs1}, Ecase v l <> Eapp x1 f1 xs1.
-  Proof. now inversion 1. Qed.
-  Lemma Eletapp_neq_Eapp : forall {x f ft ys e x1 f1 xs1}, Eletapp x f ft ys e <> Eapp x1 f1 xs1.
-  Proof. now inversion 1. Qed.
-  Lemma Eproj_neq_Eapp : forall {x c n y e x1 f1 xs1}, Eproj x c n y e <> Eapp x1 f1 xs1.
-  Proof. now inversion 1. Qed.
-  Lemma Eprim_neq_Eapp : forall {x p xs e x1 f1 xs1}, Eprim x p xs e <> Eapp x1 f1 xs1.
-  Proof. now inversion 1. Qed.
-  Lemma Efun_neq_Eapp : forall {fds e x1 f1 xs1}, Efun fds e <> Eapp x1 f1 xs1.
-  Proof. now inversion 1. Qed.
-  Lemma Ehalt_neq_Eapp : forall {x x1 f1 xs1}, Ehalt x <> Eapp x1 f1 xs1.
-  Proof. now inversion 1. Qed.
-  Lemma cons_cons_neq_cons : forall {A : Type} {a b c : A} {t}, a :: b :: t <> [c].
-  Proof. now inversion 1. Qed.
-
   (* need a stronger definition of size to prove that the functional
      induction scheme is well-founded *)
   Print exp.
@@ -278,292 +232,6 @@ Section uncurry_correct.
       ReflectT yes => inl yes
     | ReflectF no => inr no
     end.
-
-  (* functional induction scheme for uncurry_exp, uncurry_fundefs *)
-  Function uncurry_wf_ind
-    (cps : bool) (a : exp + fundefs) (P : _ -> _ ->  Prop) (Q : _ -> _ -> Prop)
-    (Hconstr : forall x c vs e,
-        P e (uncurry_exp cps e) ->
-        P (Econstr x c vs e) (uncurry_exp cps (Econstr x c vs e)))
-    (Hnil : forall x, P (Ecase x []) (uncurry_exp cps (Ecase x [])))
-    (Hcons : forall x c e t,
-        P e (uncurry_exp cps e) ->
-        P (Ecase x t) (uncurry_exp cps (Ecase x t)) ->
-        P (Ecase x ((c, e) :: t)) (uncurry_exp cps (Ecase x ((c, e) :: t))))
-    (Hproj : forall x c n y e,
-        P e (uncurry_exp cps e) ->
-        P (Eproj x c n y e) (uncurry_exp cps (Eproj x c n y e)))
-    (Hletapp : forall x f ft ys e,
-        P e (uncurry_exp cps e) ->
-        P (Eletapp x f ft ys e) (uncurry_exp cps (Eletapp x f ft ys e)))
-    (Happ : forall x f xs,
-        P (Eapp x f xs) (uncurry_exp cps (Eapp x f xs)))
-    (Hprim : forall x p xs e,
-        P e (uncurry_exp cps e) ->
-        P (Eprim x p xs e) (uncurry_exp cps (Eprim x p xs e)))
-    (Hfun : forall e fds,
-        P e (uncurry_exp cps e) ->
-        Q fds (uncurry_fundefs cps fds) ->
-        P (Efun fds e) (uncurry_exp cps (Efun fds e)))
-    (Hhalt : forall x,
-        P (Ehalt x) (uncurry_exp cps (Ehalt x)))
-    (HFnil : Q Fnil (uncurry_fundefs cps Fnil))
-    (HFcons : forall f ft k fv g gt gv ge kt fds,
-        Q fds (uncurry_fundefs cps fds) ->
-        P ge (uncurry_exp cps ge) ->
-        Q (Fcons f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k kt [g])) fds)
-          (uncurry_fundefs cps
-             (Fcons f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k kt [g])) fds)))
-    (HFcons1 : forall f ft k k' fv g g' gt gv ge kt fds,
-        Q fds (uncurry_fundefs cps fds) ->
-        P ge (uncurry_exp cps ge) ->
-        k <> k' \/ g <> g' ->
-        Q (Fcons f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k' kt [g'])) fds)
-          (uncurry_fundefs cps
-             (Fcons f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k' kt [g'])) fds)))
-    (HFcons2 : forall f ft v e fds,
-        Q fds (uncurry_fundefs cps fds) ->
-        P e (uncurry_exp cps e) ->
-        (~ exists k k' fv g g' gt gv ge kt, 
-          Fcons f ft v e fds =
-          Fcons f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k' kt [g'])) fds) ->
-        Q (Fcons f ft v e fds) (uncurry_fundefs cps (Fcons f ft v e fds)))
-    {measure sizeof a} :
-    match a with
-      inl e => P e (uncurry_exp cps e)
-    | inr f => Q f (uncurry_fundefs cps f)
-    end :=
-    let go (b : exp + fundefs) :
-      match b with
-      | inl e => P e (uncurry_exp cps e)
-      | inr f => Q f (uncurry_fundefs cps f)
-      end
-    :=
-      uncurry_wf_ind cps b
-        P Q Hconstr Hnil Hcons Hproj Hletapp Happ Hprim Hfun Hhalt
-        HFnil HFcons HFcons1 HFcons2 in
-    match a with
-    | inl (Econstr x c vs e) => Hconstr x c vs e (go (inl e))
-    | inl (Ecase x []) => Hnil x
-    | inl (Ecase x ((c, e) :: t)) => Hcons x c e t (go (inl e)) (go (inl (Ecase x t)))
-    | inl (Eproj x c n y e) => Hproj x c n y e (go (inl e))
-    | inl (Eletapp x f ft ys e) => Hletapp x f ft ys e (go (inl e))
-    | inl (Eapp x f xs) => Happ x f xs
-    | inl (Eprim x p xs e) => Hprim x p xs e (go (inl e))
-    | inl (Efun fds e) => Hfun e fds (go (inl e)) (go (inr fds))
-    | inl (Ehalt x) => Hhalt x
-    | inr Fnil => HFnil
-    | inr (Fcons f ft fl fe fds) => 
-      match fl with
-      | k :: fv => 
-        match fe with
-          Efun fds1 e =>
-          match fds1 with
-            Fnil =>
-              HFcons2 f ft (k :: fv) (Efun Fnil e) fds
-              (go (inr fds)) (go (inl (Efun Fnil e)))
-              (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-                (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-                (Fcons_neq_Fnil (eq_sym (Efun_eq_fds_eq (Fcons_eq_e_eq Heq)))))
-          | Fcons g gt gv ge Fnil =>
-            match e with
-              Eapp k' kt l =>
-              match l with
-                [] =>
-                  HFcons2 f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k' kt [])) fds
-                  (go (inr fds)) (go (inl (Efun (Fcons g gt gv ge Fnil) (Eapp k' kt []))))
-                  (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-                    (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-                    (nil_cons (Eapp_eq_xs_eq (Efun_eq_e_eq (Fcons_eq_e_eq Heq)))))
-              | [g'] =>
-                match reflect_eq_var k k' with
-                  inl yes =>
-                  match yes, reflect_eq_var g g' with
-                    eq_refl, inl yes => match yes with eq_refl =>
-                      HFcons f ft k fv g gt gv ge kt fds (go (inr fds)) (go (inl ge))
-                    end
-                  | eq_refl, inr no =>
-                      HFcons1 f ft k k fv g g' gt gv ge kt fds (go (inr fds)) (go (inl ge))
-                      (or_intror no)
-                  end
-                | inr no =>
-                    HFcons1 f ft k k' fv g g' gt gv ge kt fds (go (inr fds)) (go (inl ge))
-                    (or_introl no)
-                end
-              | g' :: g1 :: l1 =>
-                  HFcons2 f ft (k :: fv)
-                  (Efun (Fcons g gt gv ge Fnil) (Eapp k' kt (g' :: g1 :: l1))) fds
-                  (go (inr fds))
-                  (go (inl (Efun (Fcons g gt gv ge Fnil) (Eapp k' kt (g' :: g1 :: l1)))))
-                  (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-                    (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-                    (cons_cons_neq_cons (Eapp_eq_xs_eq (Efun_eq_e_eq (Fcons_eq_e_eq Heq)))))
-              end (* match l *)
-            | Eletapp x1 f1 ft1 ys1 e1 =>
-                HFcons2 f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eletapp x1 f1 ft1 ys1 e1)) fds
-                (go (inr fds)) (go (inl (Efun (Fcons g gt gv ge Fnil) (Eletapp x1 f1 ft1 ys1 e1))))
-                (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-                  (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-                  (Eletapp_neq_Eapp (Efun_eq_e_eq (Fcons_eq_e_eq Heq))))
-            | Econstr x1 c1 vs1 e1 =>
-                HFcons2 f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Econstr x1 c1 vs1 e1)) fds
-                (go (inr fds)) (go (inl (Efun (Fcons g gt gv ge Fnil) (Econstr x1 c1 vs1 e1))))
-                (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-                  (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-                  (Econstr_neq_Eapp (Efun_eq_e_eq (Fcons_eq_e_eq Heq))))
-            | Ecase v1 l1 =>
-                HFcons2 f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Ecase v1 l1)) fds
-                (go (inr fds)) (go (inl (Efun (Fcons g gt gv ge Fnil) (Ecase v1 l1))))
-                (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-                  (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-                  (Ecase_neq_Eapp (Efun_eq_e_eq (Fcons_eq_e_eq Heq))))
-            | Eproj x1 c1 n1 y1 e1 =>
-                HFcons2 f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eproj x1 c1 n1 y1 e1)) fds
-                (go (inr fds)) (go (inl (Efun (Fcons g gt gv ge Fnil) (Eproj x1 c1 n1 y1 e1))))
-                (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-                  (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-                  (Eproj_neq_Eapp (Efun_eq_e_eq (Fcons_eq_e_eq Heq))))
-            | Efun fds2 e1 =>
-                HFcons2 f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Efun fds2 e1)) fds
-                (go (inr fds)) (go (inl (Efun (Fcons g gt gv ge Fnil) (Efun fds2 e1))))
-                (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-                  (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-                  (Efun_neq_Eapp (Efun_eq_e_eq (Fcons_eq_e_eq Heq))))
-            | Eprim x1 p1 xs1 e1 =>
-                HFcons2 f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eprim x1 p1 xs1 e1)) fds
-                (go (inr fds)) (go (inl (Efun (Fcons g gt gv ge Fnil) (Eprim x1 p1 xs1 e1))))
-                (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-                  (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-                  (Eprim_neq_Eapp (Efun_eq_e_eq (Fcons_eq_e_eq Heq))))
-            | Ehalt x1 =>
-                HFcons2 f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Ehalt x1)) fds
-                (go (inr fds)) (go (inl (Efun (Fcons g gt gv ge Fnil) (Ehalt x1))))
-                (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-                  (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-                  (Ehalt_neq_Eapp (Efun_eq_e_eq (Fcons_eq_e_eq Heq))))
-            end (* match e *)
-          | Fcons g gt gv ge (Fcons f1 t1 v1 e1 fds2) =>
-              HFcons2 f ft (k :: fv) (Efun (Fcons g gt gv ge (Fcons f1 t1 v1 e1 fds2)) e) fds
-              (go (inr fds)) (go (inl (Efun (Fcons g gt gv ge (Fcons f1 t1 v1 e1 fds2)) e)))
-              (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-                (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-                (Fcons_neq_Fnil (Fcons_eq_fds_eq (Efun_eq_fds_eq (Fcons_eq_e_eq Heq)))))
-          end (* match fds1 *)
-        | Econstr x c vs e => HFcons2 f ft (k :: fv) (Econstr x c vs e) fds
-            (go (inr fds)) (go (inl (Econstr x c vs e)))
-            (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-              (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-              (Econstr_neq_Efun (Fcons_eq_e_eq Heq)))
-        | Ecase x l => HFcons2 f ft (k :: fv) (Ecase x l) fds
-            (go (inr fds)) (go (inl (Ecase x l))) 
-            (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-              (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-              (Ecase_neq_Efun (Fcons_eq_e_eq Heq)))
-        | Eproj x c n y e => HFcons2 f ft (k :: fv) (Eproj x c n y e) fds
-            (go (inr fds)) (go (inl (Eproj x c n y e)))
-            (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-              (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-              (Eproj_neq_Efun (Fcons_eq_e_eq Heq)))
-        | Eletapp x1 f1 ft1 ys1 e1 => HFcons2 f ft (k :: fv) (Eletapp x1 f1 ft1 ys1 e1) fds
-            (go (inr fds)) (go (inl (Eletapp x1 f1 ft1 ys1 e1)))
-            (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-              (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-              (Eletapp_neq_Efun (Fcons_eq_e_eq Heq)))
-        | Eapp x f1 xs => HFcons2 f ft (k :: fv) (Eapp x f1 xs) fds
-            (go (inr fds)) (go (inl (Eapp x f1 xs)))
-            (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-              (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-              (Eapp_neq_Efun (Fcons_eq_e_eq Heq)))
-        | Eprim x p xs e => HFcons2 f ft (k :: fv) (Eprim x p xs e) fds
-            (go (inr fds)) (go (inl (Eprim x p xs e)))
-            (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-              (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-              (Eprim_neq_Efun (Fcons_eq_e_eq Heq)))
-        | Ehalt x => HFcons2 f ft (k :: fv) (Ehalt x) fds
-            (go (inr fds)) (go (inl (Ehalt x)))
-            (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-              (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-              (Ehalt_neq_Efun (Fcons_eq_e_eq Heq)))
-        end (* match fe *)
-      | [] => HFcons2 f ft [] fe fds (go (inr fds)) (go (inl fe))
-        (fun '(ex_intro k (ex_intro k' (ex_intro fv (ex_intro g (ex_intro g' (ex_intro gt
-           (ex_intro gv (ex_intro ge (ex_intro kt Heq))))))))) =>
-           nil_cons (Fcons_eq_v_eq Heq))
-      end (* match fl *)
-    end (* match a *).
-  Proof.
-    all: intros; simpl; omega.
-  Qed.
-
-  Corollary uncurry_mut : forall (cps : bool) (P : _ -> _ -> Prop) (Q : _ -> _ -> Prop),
-    (forall x c vs e,
-        P e (uncurry_exp cps e) ->
-        P (Econstr x c vs e) (uncurry_exp cps (Econstr x c vs e))) ->
-    (forall x, P (Ecase x []) (uncurry_exp cps (Ecase x []))) ->
-    (forall x c e t,
-        P e (uncurry_exp cps e) ->
-        P (Ecase x t) (uncurry_exp cps (Ecase x t)) ->
-        P (Ecase x ((c, e) :: t)) (uncurry_exp cps (Ecase x ((c, e) :: t)))) ->
-    (forall x c n y e,
-        P e (uncurry_exp cps e) ->
-        P (Eproj x c n y e) (uncurry_exp cps (Eproj x c n y e))) ->
-    (forall x f ft ys e,
-        P (Eletapp x f ft ys e) (uncurry_exp cps (Eletapp x f ft ys e))) ->
-    (forall x f xs,
-        P (Eapp x f xs) (uncurry_exp cps (Eapp x f xs))) ->
-    (forall x p xs e,
-        P e (uncurry_exp cps e) ->
-        P (Eprim x p xs e) (uncurry_exp cps (Eprim x p xs e))) ->
-    (forall e fds,
-        P e (uncurry_exp cps e) ->
-        Q fds (uncurry_fundefs cps fds) ->
-        P (Efun fds e) (uncurry_exp cps (Efun fds e))) ->
-    (forall x,
-        P (Ehalt x) (uncurry_exp cps (Ehalt x))) ->
-    (Q Fnil (uncurry_fundefs cps Fnil)) ->
-    (forall f ft k fv g gt gv ge kt fds,
-        Q fds (uncurry_fundefs cps fds) ->
-        P ge (uncurry_exp cps ge) ->
-        Q (Fcons f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k kt [g])) fds)
-          (uncurry_fundefs cps
-             (Fcons f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k kt [g])) fds))) ->
-    (forall f ft k k' fv g g' gt gv ge kt fds,
-        Q fds (uncurry_fundefs cps fds) ->
-        P ge (uncurry_exp cps ge) ->
-        k <> k' \/ g <> g' ->
-        Q (Fcons f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k' kt [g'])) fds)
-          (uncurry_fundefs cps
-             (Fcons f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k' kt [g'])) fds))) ->
-    (forall f ft v e fds,
-        Q fds (uncurry_fundefs cps fds) ->
-        P e (uncurry_exp cps e) ->
-        (~ exists k k' fv g g' gt gv ge kt, 
-          Fcons f ft v e fds =
-          Fcons f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k' kt [g'])) fds) ->
-        Q (Fcons f ft v e fds) (uncurry_fundefs cps (Fcons f ft v e fds))) ->
-    (forall e, P e (uncurry_exp cps e)) /\ (forall f, Q f (uncurry_fundefs cps f)).
-  Proof.
-    split; intros.
-    - eapply (uncurry_wf_ind cps (inl e)); eauto.
-    - eapply (uncurry_wf_ind cps (inr f)); eauto.
-  Qed.
-
-  Ltac uncurry_induction_mut P Q IHe IHf IHeq :=
-    apply uncurry_mut with (P := P) (Q := Q);
-    [ intros ? ? ? ? IHe
-    | intros ?
-    | intros ? ? ? ? IHe IHf
-    | intros ? ? ? ? ? IHe
-    | intros ? ? ? ? ? IHe
-    | intros ? ? ?
-    | intros ? ? ? ? IHe
-    | intros ? ? IHe IHf
-    | intros ?
-    | intros
-    | intros ? ? ? ? ? ? ? ? ? ? IHf IHe
-    | intros ? ? ? ? ? ? ? ? ? ? ? ? IHf IHe IHeq
-    | intros ? ? ? ? ? IHf IHe IHeq
-    ].
 
   (* all variables in a list are distinct and disjoint from some set of used vars *)
   Definition fresh_copies (s : Ensemble var) (l : list var) : Prop
@@ -613,6 +281,7 @@ Section uncurry_correct.
   | uncurry_fundefs_e : forall f t args e e1 fds s s1 m m1,
       uncurry_step e s m e1 s1 m1 ->
       uncurry_fundefs_step (Fcons f t args e fds) s m (Fcons f t args e1 fds) s1 m1
+  (* todo: delete this *)
   | uncurry_fundefs_g : forall e e1 f ft k kt fv g gt gv fds s s1 m m1,
       uncurry_step e s m e1 s1 m1 ->
       uncurry_fundefs_step
@@ -3883,35 +3552,104 @@ Section uncurry_correct.
     total (bind m f).
   Proof. intros Hm Hf P; eapply bind_triple; [apply Hm|intros; apply Hf]. Qed.
   
-  Lemma already_uncurried_total x : total (uncurry.already_uncurried x).
-  Proof. Admitted.
+  Hint Resolve ret_total : TotalDB.
+  Hint Extern 1 (total (_ <- _ ;; _)) => (apply bind_total; [|let x := fresh "arbitrary" in intros x]) : TotalDB.
   
-  Lemma get_names_lst_total {S} xs s : total (@state.get_names_lst S xs s).
-  Proof. Admitted.
+  Lemma get_triple' {R W} P :
+    {{ P }} compM.get {{ fun (r : R) (w : W) (x : W) (w' : W) => x = w /\ w = w' }}.
+  Proof. unfold triple; intros. simpl. eauto. Qed.
+
+  Lemma put_triple' {R W} P x :
+    {{ P }} compM.put x {{ fun (r : R) (w : W) (_ : unit) (w' : W) => x = w' }}.
+  Proof. unfold triple; intros. simpl. eauto. Qed.
+
+  Lemma get_total {R W} : total (get : compM R W W).
+  Proof.
+    unfold total; intros; eapply post_weakening; [|apply get_triple']; auto.
+  Qed.
+
+  Lemma put_total {R W} x : total (put x : compM R W unit).
+  Proof.
+    unfold total; intros; eapply post_weakening; [|apply put_triple']; auto.
+  Qed.
+
+  Hint Resolve get_total put_total : TotalDB.
+
+  Lemma get_state_total {S} : total (state.get_state tt : state.compM' S).
+  Proof. unfold state.get_state; auto with TotalDB. Qed.
+
+  Lemma put_state_total {S} (s : S) : total (state.put_state s).
+  Proof. unfold state.put_state; auto with TotalDB. Qed.
+
+  Hint Resolve get_state_total put_state_total : TotalDB.
+  
+  Lemma already_uncurried_total x : total (uncurry.already_uncurried x).
+  Proof.
+    unfold uncurry.already_uncurried.
+    apply bind_total; [auto with TotalDB|intros x'].
+    destruct x' as [[[b aenv] lm] s].
+    destruct (lm ! x) as [[] |]; apply ret_total.
+  Qed.
   
   Lemma get_name_total {S} x s : total (@state.get_name S x s).
-  Proof. Admitted.
+  Proof.
+    unfold state.get_name.
+    apply bind_total; [apply get_total|].
+    destruct x0 as [[] st].
+    apply bind_total; [apply put_total|apply ret_total].
+  Qed.
+  
+  Lemma get_names_lst_total {S} xs s : total (@state.get_names_lst S xs s).
+  Proof.
+    induction xs; unfold state.get_names_lst, mapM; [apply ret_total|].
+    apply bind_total; [apply get_name_total|intros x].
+    apply bind_total; [apply IHxs|intros x0; apply ret_total].
+  Qed.
   
   Lemma mark_as_uncurried_total x : total (mark_as_uncurried x).
-  Proof. Admitted.
+  Proof.
+    unfold mark_as_uncurried.
+    apply bind_total; [apply get_state_total|intros [[[b aenv] lm] s]].
+    apply put_state_total.
+  Qed.
   
   Lemma click_total : total click.
-  Proof. Admitted.
+  Proof.
+    unfold click; apply bind_total; [apply get_state_total|intros [[[b aenv] lm] s]].
+    apply put_state_total.
+  Qed.
   
   Lemma markToInline_total xs v1 v2 : total (markToInline xs v1 v2).
-  Proof. Admitted.
+  Proof.
+    unfold markToInline.
+    apply bind_total; [apply get_state_total|].
+    intros [[[b aenv] lm] s]; apply put_state_total.
+  Qed.
+
+  Lemma get_ftag_total {S} n : total (@state.get_ftag S n).
+  Proof.
+    unfold state.get_ftag.
+    apply bind_total; [apply get_total|].
+    intros [[] s]; apply bind_total; [apply put_total|intros []; apply ret_total].
+  Qed.
   
   Lemma get_fun_tag_total n : total (get_fun_tag n).
-  Proof. Admitted.
+  Proof.
+    unfold get_fun_tag; apply bind_total; [apply get_state_total|].
+    intros [[[b aenv] lm] s].
+    destruct (aenv ! (N.succ_pos n)); [apply ret_total|].
+    apply bind_total; [apply get_ftag_total|intros x].
+    apply bind_total; [apply put_state_total|intros x'].
+    apply ret_total.
+  Qed.
 
-  Hint Resolve ret_total : TotalDB.
-  Hint Resolve bind_total : TotalDB.
   Hint Resolve already_uncurried_total : TotalDB.
   Hint Resolve get_names_lst_total : TotalDB.
   Hint Resolve get_name_total : TotalDB.
   Hint Resolve mark_as_uncurried_total : TotalDB.
   Hint Resolve click_total : TotalDB.
   Hint Resolve markToInline_total : TotalDB.
+  Hint Resolve get_ftag_total : TotalDB.
   Hint Resolve get_fun_tag_total : TotalDB.
 
   Definition l6_stmt (P : exp -> Prop) (Q : fundefs -> Prop) a :=
@@ -3919,8 +3657,6 @@ Section uncurry_correct.
     | inl e => P e
     | inr fds => Q fds
     end.
-  
-  Require Import Coq.Strings.String.
   
   (* uncurry_exp is total *)
   Lemma uncurry_total b a :
@@ -4069,14 +3805,6 @@ Section uncurry_correct.
   Qed.
 
   
-  
-  Lemma get_triple' {R W} P :
-    {{ P }} compM.get {{ fun (r : R) (w : W) (x : W) (w' : W) => x = w /\ w = w' }}.
-  Proof. unfold triple; intros. simpl. eauto. Qed.
-
-  Lemma put_triple' {R W} P x :
-    {{ P }} compM.put x {{ fun (r : R) (w : W) (_ : unit) (w' : W) => x = w' }}.
-  Proof. unfold triple; intros. simpl. eauto. Qed.
 
   Lemma already_uncurried_triple : forall s f,
     {{fun _ s' => s = s'}} uncurry.already_uncurried f
@@ -4143,7 +3871,6 @@ Section uncurry_correct.
   Abort.
   End RwExperiment.
 
-  Require Import Lia. (* TODO move to top *)
   Lemma get_name_triple : forall s f str,
     {{fun _ s' => s = s'}} state.get_name f str
     {{fun _ s a s1 =>
@@ -4538,356 +4265,220 @@ Section uncurry_correct.
     - (* fundefs *)
       destruct f; unfold Q; intros b.
       + (* Fcons *)
-        eapply pre_eq_state_lr; intros [] st [Huniq Hused].
+        eapply pre_eq_state_l; intros [] st [Huniq Hused].
         unfold uncurry_fundefs; fold uncurry_fundefs; fold uncurry_exp.
-        destruct b; [|admit].
-        * eapply bind_triple; [apply pre_post_copy; eapply pre_strenghtening; [|use_IH IHn] |].
-        intros [] st0 [_ Hst0]; subst st0; split; [now inv Huniq|].
-        eapply Included_trans; eauto.
-        rewrite used_vars_Fcons...
-        intros fds' st'.
-        eapply pre_eq_state_lr.
-        intros [] st0 [[_ Hst] [n_fds Hfds]]; subst st'.
-        admit. (*
-        eapply bind_triple'.
-        rewrite pre_post_copy.
-        eapply pre_strenghtening; [|apply IHe]; auto.
-        intros st0' Hst0'; subst; split; auto.
-        inv Huniq; inv H11; now inv H2.
-        apply Included_trans with (s2 := from_fresh st').
-        eapply Included_trans; eauto.
-        repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun + rewrite used_vars_Eapp)...
-        eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-        intros e0' st0'; apply pre_eq_state_lr.
-        intros st1 [Hst1 [n_e0 He0]]; subst.
-        eapply bind_triple'.
-        rewrite pre_post_copy.
-        apply already_uncurried_triple.
-        intros getb st1'; simpl.
-        apply pre_eq_state_lr; intros st1'' [Hst1 [Hst1' Hget]]; subst st1'; subst st1''.
-        destruct (eq_var k k &&
-                  eq_var g g &&
-                  negb (occurs_in_exp g ge) &&
-                  negb (occurs_in_exp k ge) &&
-                  negb getb) eqn:Hpred.
-        + eapply bind_triple'.
-          rewrite pre_post_copy. apply get_names_lst_triple.
-          intros l0' st1'. apply pre_eq_state_lr.
-          intros st2 [Hst1 [Hst2 [Hst2_m [Hl0' Hlen_l0']]]]; subst st1'.
-          eapply bind_triple'.
-          rewrite pre_post_copy. apply get_names_lst_triple.
-          intros l' st2'. apply pre_eq_state_lr.
-          intros st3 [Hst2' [Hst3 [Hst3_m [Hl' Hlen_l']]]]; subst st2'.
-          eapply bind_triple'. rewrite pre_post_copy.
-          apply get_name_triple.
-          intros v' st3'. apply pre_eq_state_lr.
-          intros st4 [Hst3' [Hst4 [Hst4_m Hv]]]; subst st3'.
-          
-          eapply bind_triple'. rewrite pre_post_copy.
-  
-          eapply pre_strenghtening with (P := fun _ => True). now firstorder. 
-          eapply register_name_triple.
-  
-          intros [] st5. eapply pre_curry_l. intros Heq; subst.
-  
-          eapply bind_triple'. rewrite pre_post_copy.
-  
-          eapply pre_strenghtening with (P := fun _ => True). now firstorder. 
-          eapply register_names_triple.
-  
-          intros [] st6. eapply pre_curry_l. intros Heq; subst.
-  
-          eapply bind_triple'. rewrite pre_post_copy.
-  
-          eapply pre_strenghtening with (P := fun _ => True). now firstorder. 
-          eapply register_names_triple.
-  
-          intros [] st7. eapply pre_curry_l. intros Heq'; subst.
-  
-          eapply bind_triple'. rewrite pre_post_copy.
-          
-          eapply pre_strenghtening with (P := fun _ => True). now firstorder. 
-          apply mark_as_uncurried_triple.
-          intros [] st4'. apply pre_eq_state_lr.
-          intros st5' [Hst4' [Hst5 Hst5_m]]. subst.
-          eapply bind_triple'. rewrite pre_post_copy.
-          apply click_triple.
-          intros [] st5''. apply pre_eq_state_lr.
-          intros st6' [Hst5' [Hst6 Hst6_m]]; subst st5''.
-          eapply bind_triple'. rewrite pre_post_copy.
-          apply markToInline_triple.
-          intros [] st6''. apply pre_eq_state_lr.
-          intros st7' [Hst6' [Hst7 Hst7_m]]; subst st6''.
-          eapply bind_triple'. rewrite pre_post_copy.
-          apply get_fun_tag_triple.
-          intros ft' st7''. apply pre_eq_state_lr.
-          intros st8 [Hst7' [Hst8 Hst8_m]]; subst st7''.
-          apply return_triple.
-          intros st8' Hst8' _ _ _ _ _ _ _ _ _ _ _; subst st8'.
-          assert (Hfds_ctx :
-            uncurry_rel_fundefs n_fds
-              (Fcons f ft (k :: fv)
-                     (Efun (Fcons g gt gv ge Fnil) (Eapp k kt [g]))
-                     fds)
-              (from_fresh st')
-              (already_uncurried st')
-              (Fcons f ft (k :: fv)
-                     (Efun (Fcons g gt gv ge Fnil) (Eapp k kt [g]))
-                     fds')
-              (from_fresh st0')
-              (already_uncurried st0')) by now apply uncurry_rel_fundefs_Fcons.
-          exists (1 + n_e0 + n_fds).
-          eapply uncurry_rel_fundefs_compose; eauto.
-          eapply uncurry_rel_fundefs_compose.
-          eapply app_ctx_uncurry_rel_fundefs
-            with (f :=
-                    Fcons1_c f ft (k :: fv)
-                             (Efun2_c (Fcons1_c g gt gv Hole_c Fnil)
-                                      (Eapp k kt [g])) fds'); eauto.
-          simpl; eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-          econstructor; [|constructor].
-          repeat match goal with
-            [ H : ?a && ?b = true |- _ ] => apply andb_prop in H; destruct H
-          | [ H : negb ?a = true |- _ ] => rewrite negb_true_iff in H
-          | [ H : eq_var ?a ?b = true |- _ ] => rewrite Pos.eqb_eq in H; subst a
-          | [ H : occurs_in_exp ?a ?e = false |- _ ] =>
-            rewrite not_occurs_in_exp_iff_used_vars in H
-          end.
-          eapply uncurry_fundefs_step_subst.
-          apply uncurry_fundefs_curried with (s' := from_fresh st8).
-          13: reflexivity.
-          all:
-            unfold fresh_copies in *;
-            try rewrite <- Hst2 in *;
-            try rewrite <- Hst3 in *;
-            try setoid_rewrite <- Hst3;
-            eauto with Ensembles_DB;
-            try match goal with
-              [ _ : _ |- occurs_in_exp ?a ?e = false ] =>
-                apply not_occurs_in_exp_iff_used_vars; intros contra
-            | [ _ : ?a = next_free ?s |- ~ In _ (from_fresh ?s) ?a ] =>
-                subst a; apply next_free_not_In_from_fresh
-          end. 
-          * contradiction H2.
-            eapply uncurry_rel_maintains_used_vars_fn; eauto.
-            eapply uncurry_rel_preserves_used_vars; eauto.
-            apply Included_trans with (s2 := from_fresh st').
-            eapply Included_trans; eauto.
-            repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun)...
-            eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-            apply Singleton_Included_r.
-            apply Included_trans with (s2 := from_fresh st').
-            eapply Included_trans; eauto.
-            repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun +
-                    rewrite used_vars_Eapp + rewrite FromList_cons)...
-            eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          * contradiction H1.
-            eapply uncurry_rel_maintains_used_vars_fn; eauto.
-            eapply uncurry_rel_preserves_used_vars; eauto.
-            apply Included_trans with (s2 := from_fresh st').
-            eapply Included_trans; eauto.
-            repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun)...
-            eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-            apply Singleton_Included_r.
-            apply Included_trans with (s2 := from_fresh st').
-            eapply Included_trans; eauto.
-            repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun +
-                    rewrite used_vars_Eapp + rewrite FromList_cons)...
-            eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          * eapply next_free_not_In_from_fresh.
-          * rewrite Union_commut. rewrite <- Hst4.
-            rewrite Hst8, Hst7, Hst6, Hst5.
-  
-            eapply from_fresh_fst_eq. congruence. 
-          * rewrite <- Hst2_m, <- Hst3_m, <- Hst4_m, Hst8_m, Hst7_m, Hst6_m, Hst5_m.
-            eapply f_equal. eapply already_uncurried_fst_eq.
-            congruence.
-        + apply return_triple.
-          intros st1' Hst1 _ _ _ _; subst st1'.
-          exists (n_e0 + n_fds).
-          eapply uncurry_rel_fundefs_compose.
-          apply uncurry_rel_fundefs_Fcons; eauto.
-          apply app_ctx_uncurry_rel_fundefs
-            with (f := Fcons1_c f ft (k :: fv)
-                                (Efun2_c (Fcons1_c g gt gv Hole_c Fnil) (Eapp k kt [g])) fds'); auto.
-          simpl; repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun + rewrite used_vars_Eapp).
-          intros a Ha; inv Ha.
-          revert H; apply Included_trans with (s2 := from_fresh st').
+        destruct b.
+        * (* cps uncurrying *)
+          eapply bind_triple; [apply pre_post_copy; eapply pre_strenghtening; [|use_IH IHn] |].
+          intros [] st0 [_ Hst0]; subst st0; split; [now inv Huniq|].
           eapply Included_trans; eauto.
-          simpl; repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun + rewrite used_vars_Eapp)...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-          eapply Included_trans; eauto.
-          repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun + rewrite used_vars_Eapp)...
-      - (* Fcons2 *)
-        eapply pre_eq_state_lr; intros st [Huniq Hused].
-        eapply bind_triple'. rewrite pre_post_copy.
-        eapply pre_strenghtening; [|apply IHf].
-        intros st0 Hst0; subst; split; [now inv Huniq|].
-        eapply Included_trans; eauto.
-        rewrite used_vars_Fcons...
-        intros fds' st'.
-        eapply pre_eq_state_lr.
-        intros st0 [Hst [n_fds Hfds]]; subst.
-        eapply bind_triple'.
-        rewrite pre_post_copy.
-        eapply pre_strenghtening; [|apply IHe]; auto.
-        intros st0' Hst0'; subst; split; auto.
-        inv Huniq; inv H11; now inv H2.
-        apply Included_trans with (s2 := from_fresh st').
-        eapply Included_trans; eauto.
-        repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun + rewrite used_vars_Eapp)...
-        eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-        intros e0' st0'; apply pre_eq_state_lr.
-        intros st1 [Hst1 [n_e0 He0]]; subst.
-        eapply bind_triple'.
-        rewrite pre_post_copy.
-        apply already_uncurried_triple.
-        intros getb st1'; simpl.
-        apply pre_eq_state_lr; intros st1'' [Hst1 [Hst1' Hget]]; subst st1'; subst st1''.
-        assert (Hpred : eq_var k k' &&
-                  eq_var g g' &&
-                  negb (occurs_in_exp g ge) &&
-                  negb (occurs_in_exp k ge) &&
-                  negb getb = false). {
-          destruct IHeq as [Heq|Heq].
-          rewrite <- Pos.eqb_neq in Heq.
-          unfold eq_var; rewrite Heq; auto.
-          rewrite <- Pos.eqb_neq in Heq.
-          unfold eq_var; rewrite Heq; repeat rewrite <- andb_assoc; simpl; now rewrite andb_comm.
-        }
-        rewrite Hpred.
-        apply return_triple.
-        intros st1' Hst1' _ _ _ _; subst st1'.
-        exists (n_e0 + n_fds).
-        eapply uncurry_rel_fundefs_compose.
-        apply uncurry_rel_fundefs_Fcons; eauto.
-        apply app_ctx_uncurry_rel_fundefs
-          with (f := Fcons1_c f ft (k :: fv)
-                              (Efun2_c (Fcons1_c g gt gv Hole_c Fnil) (Eapp k' kt [g'])) fds'); auto.
-        simpl; repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun + rewrite used_vars_Eapp).
-        intros a Ha; inv Ha.
-        revert H; apply Included_trans with (s2 := from_fresh st').
-        eapply Included_trans; eauto.
-        simpl; repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun + rewrite used_vars_Eapp)...
-        eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-        eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-        eapply Included_trans; eauto.
-        repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun + rewrite used_vars_Eapp)...
-      - (* Fcons3 *)
-        destruct v; simpl.
-        + apply pre_eq_state_lr; intros st [Huniq Hused].
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHf].
-          intros st' Hst'; split; subst st'; [now inv Huniq|].
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          intros fds' st'; apply pre_eq_state_lr.
-          intros st0 [Hst' [n_fds Hfds]]; subst st'.
-          eapply bind_triple'. rewrite pre_post_copy.
-          eapply pre_strenghtening; [|apply IHe].
-          intros st0' Hst0; subst st0'; split; [now inv Huniq|].
-          apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          intros e' st0'; apply return_triple.
-          intros st1 [Hst0' [n_e He]] _ _; subst st0'.
-          exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose.
-          apply uncurry_rel_fundefs_Fcons; eauto.
-          apply app_ctx_uncurry_rel_fundefs with (f := Fcons1_c f ft [] Hole_c fds'); auto.
-          simpl; rewrite used_vars_Fcons.
-          intros a Ha; inv Ha.
-          revert H; apply Included_trans with (s2 := from_fresh st).
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-          eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
-          eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
-          eapply Included_trans; eauto; rewrite used_vars_Fcons...
-        + destruct e.
-          4: destruct f0; try destruct f1; try destruct e; try destruct l0; try destruct l0.
-          all: try solve [
-            apply pre_eq_state_lr; intros st [Huniq Hused];
-            eapply bind_triple';
-              [rewrite pre_post_copy;
-               eapply pre_strenghtening; [|apply IHf];
-               intros st' Hst'; split; subst st'; [now inv Huniq|];
-               eapply Included_trans; eauto; rewrite used_vars_Fcons;
-               eauto with Ensembles_DB
-              |];
-            intros fds' st'; apply pre_eq_state_lr;
-            intros st0 [Hst' [n_fds Hfds]]; subst st';
-            eapply bind_triple';
-              [rewrite pre_post_copy;
-               eapply pre_strenghtening; [|apply IHe];
-               intros st0' Hst0; subst st0'; split; [now inv Huniq|];
-               apply Included_trans with (s2 := from_fresh st);
-               [eapply Included_trans; eauto; rewrite used_vars_Fcons; eauto with Ensembles_DB
-               |eapply uncurry_fundefs_rel_s_nondecreasing; eauto]
-              |];
-            intros e' st0'; apply return_triple;
-            intros st1 [Hst0' [n_e He]] _ _; subst st0';
-            exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose;
-              [apply uncurry_rel_fundefs_Fcons; eauto|];
-            apply app_ctx_uncurry_rel_fundefs
-              with (f := Fcons1_c f ft (v :: v0) Hole_c fds'); auto;
-            simpl; rewrite used_vars_Fcons;
-            intros a Ha; inv Ha;
-            [revert H; apply Included_trans with (s2 := from_fresh st);
-             [eapply Included_trans; eauto; rewrite used_vars_Fcons; eauto with Ensembles_DB
-             |eapply uncurry_fundefs_rel_s_nondecreasing; eauto]
-            |eapply uncurry_fundefs_rel_preserves_used_vars; eauto;
-             eapply Included_trans; eauto; rewrite used_vars_Fcons; eauto with Ensembles_DB]].
-          contradiction IHeq; do 9 eexists; eauto.
-          Grab Existential Variables.
-          exact M.Leaf.
-          exact M.Leaf. *)
+          rewrite used_vars_Fcons...
+          intros fds' st'.
+          eapply pre_eq_state_l.
+          intros [] st0 [[_ Hst] [n_fds Hfds]]; subst st'.
+          destruct l.
+          -- eapply bind_triple; [eapply pre_post_copy; eapply pre_strenghtening; [|use_IH IHn] |].
+             intros [] st0' [_ Hst0']; subst; cbn; split; [now inv Huniq|].
+             eapply Included_trans; eauto.
+             2: eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
+             eapply Included_trans; eauto.
+             normalize_used_vars...
+             cbn; intros e0' st0'; apply pre_eq_state_l.
+             intros [] st1 [[_ Hst1] [n_e0 He0]]; subst.
+             apply return_triple. intros [] w [_ Hw]; subst w.
+             exists (n_e0 + n_fds); eapply uncurry_rel_fundefs_compose.
+             apply uncurry_rel_fundefs_Fcons; eauto.
+             apply app_ctx_uncurry_rel_fundefs with (f := Fcons1_c v f [] Hole_c fds'); auto.
+             simpl; rewrite used_vars_Fcons.
+             intros a Ha; inv Ha.
+             revert H; apply Included_trans with (s2 := from_fresh st).
+             eapply Included_trans; eauto; rewrite used_vars_Fcons...
+             eapply uncurry_fundefs_rel_s_nondecreasing; eauto.
+             eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
+             eapply Included_trans; eauto; rewrite used_vars_Fcons...
+           Ltac solve_wildcard IHn Huniq n_fds fds' st H v f v0 l := solve[
+             eapply bind_triple; [eapply pre_post_copy; eapply pre_strenghtening; [|use_IH IHn] |];
+              [intros [] st0' [_ Hst0']; subst; cbn; split; [now inv Huniq|];
+               eapply Included_trans; eauto; [|eapply uncurry_fundefs_rel_s_nondecreasing; eauto];
+               eapply Included_trans; eauto; rewrite used_vars_Fcons; eauto with Ensembles_DB
+              |cbn; intros e' st'; apply pre_eq_state_l;
+               intros [] st1 [[_ Hst'] [n_e He]]; subst st';
+               apply return_triple; intros [] w [_ Hw]; subst w;
+               exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose;
+                [apply uncurry_rel_fundefs_Fcons; eauto|];
+               apply app_ctx_uncurry_rel_fundefs
+                 with (f := Fcons1_c v f (v0 :: l) Hole_c fds'); auto;
+               cbn; rewrite used_vars_Fcons;
+               intros a Ha; inv Ha;
+               [revert H; apply Included_trans with (s2 := from_fresh st);
+                [eapply Included_trans; eauto; rewrite used_vars_Fcons; eauto with Ensembles_DB
+                |eapply uncurry_fundefs_rel_s_nondecreasing; eauto]
+               |eapply uncurry_fundefs_rel_preserves_used_vars; eauto;
+                eapply Included_trans; eauto; rewrite used_vars_Fcons; eauto with Ensembles_DB]]].
+          -- destruct e; try solve_wildcard IHn Huniq n_fds fds' st H v f v0 l.
+             destruct f1; try solve_wildcard IHn Huniq n_fds fds' st H v f v0 l.
+             destruct f2; try solve_wildcard IHn Huniq n_fds fds' st H v f v0 l.
+             destruct e; try solve_wildcard IHn Huniq n_fds fds' st H v f v0 l.
+             destruct l1; try solve_wildcard IHn Huniq n_fds fds' st H v f v0 l.
+             destruct l1; try solve_wildcard IHn Huniq n_fds fds' st H v f v0 l.
+             eapply bind_triple; [apply pre_post_copy; eapply pre_strenghtening;
+                                  [|apply already_uncurried_triple] |].
+             { cbn; intros [] s [_ Hs]; now subst. }
+             intros getb st1'; apply pre_eq_state_l.
+             intros [] st1'' [[_ Hst1] [Hst1' Hget]]; subst st1' st1''.
+             destruct (eq_var v0 v2 &&
+                       eq_var v1 v3 &&
+                       negb (occurs_in_exp v1 e0) &&
+                       negb (occurs_in_exp v0 e0) &&
+                       negb getb) eqn:Hpred.
+             ++ eapply bind_triple.
+                rewrite pre_post_copy; eapply pre_strenghtening; [|apply get_names_lst_triple].
+                { cbn; intros [] s [_ Hs]; now subst. }
+                intros l0' st1'. apply pre_eq_state_l.
+                intros [] st2 [[_ Hst1] [Hst2 [Hst2_m [Hl0' Hlen_l0']]]]; subst st1'.
+                eapply bind_triple.
+                apply pre_post_copy; eapply pre_strenghtening; [|apply get_names_lst_triple].
+                { cbn; intros [] s [_ Hs]; now subst. }
+                intros l' st2'. apply pre_eq_state_l.
+                intros [] st3 [[_ Hst2'] [Hst3 [Hst3_m [Hl' Hlen_l']]]]; subst st2'.
+                eapply bind_triple.
+                rewrite pre_post_copy; eapply pre_strenghtening; [|apply get_name_triple].
+                { cbn; intros [] s [_ Hs]; now subst. }
+                intros v' st3'. apply pre_eq_state_l.
+                intros [] st4 [[_ Hst3'] [Hst4 [Hst4_m Hv]]]; subst st3'.
+                eapply bind_triple'. rewrite pre_post_copy.
+                eapply pre_strenghtening; [|apply mark_as_uncurried_triple].
+                { cbn; intros [] s [_ Hs]; now subst. }
+                intros [] st4'. apply pre_eq_state_l.
+                intros [] st5' [[_ Hst4'] [Hst5 Hst5_m]]. subst.
+                eapply bind_triple. apply pre_post_copy; eapply pre_strenghtening; [|apply click_triple].
+                { cbn; intros [] s [_ Hs]; now subst. }
+                intros [] st5''. apply pre_eq_state_lr.
+                intros [] st6' [[_ Hst5'] [Hst6 Hst6_m]]; subst st5''.
+                eapply bind_triple. apply pre_post_copy.
+                eapply pre_strenghtening; [|apply markToInline_triple].
+                { cbn; intros [] s [_ Hs]; now subst. }
+                intros [] st6''. apply pre_eq_state_lr.
+                intros [] st7' [[_ Hst6'] [Hst7 Hst7_m]]; subst st6''.
+                eapply bind_triple'. rewrite pre_post_copy.
+                eapply pre_strenghtening; [|apply get_fun_tag_triple].
+                { cbn; intros [] s [_ Hs]; now subst. }
+                intros ft' st7''. apply pre_eq_state_lr.
+                intros [] st8 [[_ Hst7'] [Hst8 Hst8_m]]; subst st7''.
+                apply return_triple.
+                intros [] st8' [_ Hst8'] _ _ _; subst st8'.
+                assert (Hfds_ctx :
+                  uncurry_rel_fundefs n_fds
+                    (Fcons v f (v0 :: l)
+                           (Efun (Fcons v1 f1 l0 e0 Fnil) (Eapp v2 f2 [v3]))
+                           f0)
+                    (from_fresh st)
+                    (already_uncurried st)
+                    (Fcons v f (v0 :: l)
+                           (Efun (Fcons v1 f1 l0 e0 Fnil) (Eapp v2 f2 [v3]))
+                           fds')
+                    (from_fresh st0)
+                    (already_uncurried st0)) by now apply uncurry_rel_fundefs_Fcons.
+                exists (1 + n_fds).
+                eapply uncurry_rel_fundefs_compose; eauto.
+                econstructor; [|constructor].
+                repeat match goal with
+                  [ H : ?a && ?b = true |- _ ] => apply andb_prop in H; destruct H
+                | [ H : negb ?a = true |- _ ] => rewrite negb_true_iff in H
+                | [ H : eq_var ?a ?b = true |- _ ] => rewrite Pos.eqb_eq in H; subst a
+                | [ H : occurs_in_exp ?a ?e = false |- _ ] =>
+                  rewrite not_occurs_in_exp_iff_used_vars in H
+                end.
+                eapply uncurry_fundefs_step_subst.
+                apply uncurry_fundefs_curried with (s' := from_fresh st8).
+                13: reflexivity.
+                all:
+                  unfold fresh_copies in *;
+                  try rewrite <- Hst2 in *;
+                  try rewrite <- Hst3 in *;
+                  try setoid_rewrite <- Hst3;
+                  eauto with Ensembles_DB;
+                  try match goal with
+                    [ _ : _ |- occurs_in_exp ?a ?e = false ] =>
+                      apply not_occurs_in_exp_iff_used_vars; intros contra
+                  | [ _ : ?a = next_free ?s |- ~ In _ (from_fresh ?s) ?a ] =>
+                      subst a; apply next_free_not_In_from_fresh
+                end. 
+                ** contradiction H2.
+                ** contradiction H1.
+                ** eapply next_free_not_In_from_fresh.
+                ** rewrite Union_commut. rewrite <- Hst4.
+                   rewrite Hst8, Hst7, Hst6, Hst5.
+                   eapply from_fresh_fst_eq. congruence. 
+                ** now rewrite <- Hst2_m, <- Hst3_m, <- Hst4_m, Hst8_m, Hst7_m, Hst6_m, Hst5_m.
+             ++ eapply bind_triple; [eapply pre_post_copy; eapply pre_strenghtening; [|use_IH IHn] |].
+                 { intros [] st0' [_ Hst0']; subst; cbn; split; [now inv Huniq|];
+                  eapply Included_trans; eauto; [|eapply uncurry_fundefs_rel_s_nondecreasing; eauto];
+                    eapply Included_trans; eauto; rewrite used_vars_Fcons; eauto with Ensembles_DB. }
+                 cbn; intros e' st'; apply pre_eq_state_l;
+                  intros [] st1 [[_ Hst'] [n_e He]]; subst st';
+                  apply return_triple; intros [] w [_ Hw]; subst w;
+                  exists (n_e + n_fds); eapply uncurry_rel_fundefs_compose;
+                   [apply uncurry_rel_fundefs_Fcons; eauto|];
+                  apply app_ctx_uncurry_rel_fundefs
+                    with (f := Fcons1_c v f (v0 :: l) Hole_c fds'); auto;
+                    cbn; rewrite used_vars_Fcons.
+                 apply Union_Included.
+                 ** eapply Included_trans; [|eapply uncurry_fundefs_rel_s_nondecreasing; eassumption].
+                    eapply Included_trans; [|eassumption].
+                    rewrite used_vars_Fcons...
+                 ** eapply uncurry_fundefs_rel_preserves_used_vars; eauto.
+                    eapply Included_trans; eauto; rewrite used_vars_Fcons...
+        * (* anf uncurrying *) admit.
       + (* Fnil *)
         apply return_triple; intros.
         exists 0; constructor.
   Admitted.
 
-  Corollary uncurry_exp_corresp : forall e,
-    {{ fun st => unique_bindings e /\ used_vars e \subset from_fresh st }}
-      uncurry_exp e
-    {{ fun st e1 st1 => exists n,
+  Corollary uncurry_exp_corresp : forall b e,
+    {{ fun _ st => unique_bindings e /\ used_vars e \subset from_fresh st }}
+      uncurry_exp b e
+    {{ fun _ st e1 st1 => exists n,
          uncurry_rel n
                      e (from_fresh st) (already_uncurried st)
                      e1 (from_fresh st1) (already_uncurried st1)
     }}.
-  Proof. intros; eapply uncurry_corresp_mut; eauto. Qed.
+  Proof. intros; eapply (uncurry_corresp_mut (inl e)); eauto. Qed.
   
-  Corollary uncurry_fundefs_corresp : forall f,
-    {{ fun st => unique_bindings_fundefs f /\ used_vars_fundefs f \subset from_fresh st }}
-      uncurry_fundefs f
-    {{ fun st f1 st1 => exists n,
+  Corollary uncurry_fundefs_corresp : forall b f,
+    {{ fun _ st => unique_bindings_fundefs f /\ used_vars_fundefs f \subset from_fresh st }}
+      uncurry_fundefs b f
+    {{ fun _ st f1 st1 => exists n,
          uncurry_rel_fundefs n
                              f (from_fresh st) (already_uncurried st)
                              f1 (from_fresh st1) (already_uncurried st1)
     }}.
-  Proof. intros; eapply uncurry_corresp_mut; eauto. Qed.
+  Proof. intros; eapply (uncurry_corresp_mut (inr f)); eauto. Qed.
 
-  Definition uncurry_triple e P Q :=
-    {{ fun st => unique_bindings e /\ used_vars e \subset from_fresh st /\ P st }}
-      uncurry_exp e
-    {{ Q e }}.
+  Definition uncurry_triple b e P Q :=
+    {{ fun _ st => unique_bindings e /\ used_vars e \subset from_fresh st /\ P st }}
+      uncurry_exp b e
+    {{ fun _ => Q e }}.
 
-  Lemma uncurry_rel_to_triple : forall e (P : _ -> Prop) (Q : _ -> _ -> _ -> _ -> Prop),
+  Lemma uncurry_rel_to_triple : forall b e (P : _ -> Prop) (Q : _ -> _ -> _ -> _ -> Prop),
     (forall n e1 st st1,
         uncurry_rel n e (from_fresh st) (already_uncurried st)
                     e1 (from_fresh st1) (already_uncurried st1) ->
         unique_bindings e -> used_vars e \subset from_fresh st ->
         P st ->
-        Q e st e1 st1) -> uncurry_triple e P Q.
+        Q e st e1 st1) -> uncurry_triple b e P Q.
   Proof.
     intros.
-    apply pre_eq_state_lr; intros s [Huniq [Hused He]].
+    apply pre_eq_state_lr; intros [] s [Huniq [Hused He]].
     eapply triple_consequence.
     apply uncurry_exp_corresp.
-    - intros; subst; auto.
-    - simpl; intros; subst; destruct H1.
+    - intros [] w [_ Hw]; subst w; auto.
+    - cbn. intros [] w x w' H' [n Hrel] [_ Hw]; subst w.
       eapply H; eauto.
   Qed.
   
-  Lemma uncurry_exp_correct : forall e,
-    uncurry_triple e (fun _ => True) (fun e _ e1 _ => forall k, ctx_preord_exp k e e1).
+  Lemma uncurry_exp_correct : forall b e,
+    uncurry_triple b e (fun _ => True) (fun e _ e1 _ => forall k, ctx_preord_exp k e e1).
   Proof.
     intros.
     apply uncurry_rel_to_triple; simpl; intros.
@@ -4896,14 +4487,15 @@ Section uncurry_correct.
     eapply uncurry_rel_preserves_used_vars; eauto.
   Qed.
 
-  Lemma uncurry_exp_good_preserving : forall e,
-    uncurry_triple e (fun _ => closed_exp e) (fun _ _ e1 _ => closed_exp e1).
+  Lemma uncurry_exp_good_preserving : forall b e,
+    uncurry_triple b e (fun _ => closed_exp e) (fun _ _ e1 _ => closed_exp e1).
   Proof.
     intros; apply uncurry_rel_to_triple; simpl; intros.
     eapply uncurry_rel_preserves_closed; eauto.
   Qed.
 
-  Lemma uncurry_corresp : forall e aenv fenv ft lm maxvar s nenv,
+  (*
+  Lemma uncurry_corresp : forall b e aenv fenv ft lm maxvar s nenv,
     unique_bindings e ->
     used_vars e \subset from_maxvar maxvar ->
     match uncurry e aenv fenv ft lm maxvar s nenv with
@@ -5017,11 +4609,6 @@ Section uncurry_correct.
     split.
     eapply uncurry_rel_preserves_unique_bindings; eauto.
     eapply uncurry_rel_preserves_closed; eauto.
-  Qed.
+  Qed.*)
 
 End uncurry_correct.
-
-
-
-
-

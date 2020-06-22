@@ -246,6 +246,9 @@ Section uncurry_correct.
     Ensemble var -> (* new used variables *)
     localMap -> (* new uncurried functions *)
     Prop :=
+  | uncurry_letapp : forall x f ft ys e e1 s s1 m m1,
+      uncurry_step e s m e1 s1 m1 ->
+      uncurry_step (Eletapp x f ft ys e) s m (Eletapp x f ft ys e1) s1 m1
   | uncurry_constr : forall x c args e e1 s s1 m m1,
       uncurry_step e s m e1 s1 m1 ->
       uncurry_step (Econstr x c args e) s m (Econstr x c args e1) s1 m1
@@ -281,12 +284,6 @@ Section uncurry_correct.
   | uncurry_fundefs_e : forall f t args e e1 fds s s1 m m1,
       uncurry_step e s m e1 s1 m1 ->
       uncurry_fundefs_step (Fcons f t args e fds) s m (Fcons f t args e1 fds) s1 m1
-  (* todo: delete this *)
-  | uncurry_fundefs_g : forall e e1 f ft k kt fv g gt gv fds s s1 m m1,
-      uncurry_step e s m e1 s1 m1 ->
-      uncurry_fundefs_step
-        (Fcons f ft (k :: fv) (Efun (Fcons g gt gv e  Fnil) (Eapp k kt [g])) fds) s m
-        (Fcons f ft (k :: fv) (Efun (Fcons g gt gv e1 Fnil) (Eapp k kt [g])) fds) s1 m1
   | uncurry_fundefs_curried :
       forall f f1 ft ft1 k kt fv fv1
              g gt gv gv1 ge fds s m s',
@@ -314,9 +311,11 @@ Section uncurry_correct.
   Scheme uncurry_step_mut := Minimality for uncurry_step Sort Prop
   with uncurry_step_fundefs_mut := Minimality for uncurry_fundefs_step Sort Prop.
 
+  Check uncurry_step_mut.
   Ltac uncurry_step_induction P Q IHuncurry IH :=
     apply uncurry_step_mut with (P := P) (P0 := Q);
-    [ intros ? ? ? ? ? ? ? ? ? IHuncurry IH
+    [ intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
+    | intros ? ? ? ? ? ? ? ? ? IHuncurry IH
     | intros ? ? ? ? ? ? ? ? ? IHuncurry IH
     | intros ? ? ? ? ? ? ? ? IHuncurry IH
     | intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
@@ -325,28 +324,14 @@ Section uncurry_correct.
     | intros ? ? ? ? ? ? ? IHuncurry IH
     | intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
     | intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
-    | intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IHuncurry IH
-    | intros
-    ].
-
-  Ltac uncurry_fundefs_step_induction P Q IHuncurry IH :=
-    apply uncurry_step_mut with (P := P) (P0 := Q);
-    [ intros ? ? ? ? ? ? ? ? ? IHuncurry IH
-    | intros ? ? ? ? ? ? ? ? ? IHuncurry IH
-    | intros ? ? ? ? ? ? ? ? IHuncurry IH
-    | intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
-    | intros ? ? ? ? ? ? ? ? ? IHuncurry IH
-    | intros ? ? ? ? ? ? ? IHuncurry IH
-    | intros ? ? ? ? ? ? ? IHuncurry IH
-    | intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
-    | intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
-    | intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IHuncurry IH
     | intros
     ].
 
   Lemma uncurry_step_mutual_ind : 
   forall (P : exp -> Ensemble var -> localMap -> exp -> Ensemble var -> localMap -> Prop)
     (P0 : fundefs -> Ensemble var -> localMap -> fundefs -> Ensemble var -> localMap -> Prop),
+  (forall (x f : var) (ft : fun_tag) (ys : list var) (e e1 : exp) (s s1 : Ensemble var) (m m1 : localMap),
+   uncurry_step e s m e1 s1 m1 -> P e s m e1 s1 m1 -> P (Eletapp x f ft ys e) s m (Eletapp x f ft ys e1) s1 m1) ->
   (forall (x : var) (c : ctor_tag) (args : list var) (e e1 : exp) (s s1 : Ensemble var) (m m1 : localMap),
    uncurry_step e s m e1 s1 m1 ->
    P e s m e1 s1 m1 -> P (Econstr x c args e) s m (Econstr x c args e1) s1 m1) ->
@@ -377,13 +362,6 @@ Section uncurry_correct.
      (s s1 : Ensemble var) (m m1 : localMap),
    uncurry_step e s m e1 s1 m1 ->
    P e s m e1 s1 m1 -> P0 (Fcons f7 t args e fds) s m (Fcons f7 t args e1 fds) s1 m1) ->
-  (forall (e e1 : exp) (f8 : var) (ft : fun_tag) (k : var) (kt : fun_tag) (fv : list var) 
-     (g : var) (gt : fun_tag) (gv : list var) (fds : fundefs) (s s1 : Ensemble var) 
-     (m m1 : localMap),
-   uncurry_step e s m e1 s1 m1 ->
-   P e s m e1 s1 m1 ->
-   P0 (Fcons f8 ft (k :: fv) (Efun (Fcons g gt gv e Fnil) (Eapp k kt [g])) fds) s m
-     (Fcons f8 ft (k :: fv) (Efun (Fcons g gt gv e1 Fnil) (Eapp k kt [g])) fds) s1 m1) ->
   (forall (f9 f10 : var) (ft ft1 : fun_tag) (k : var) (kt : fun_tag) (fv fv1 : list var) 
      (g : positive) (gt : fun_tag) (gv gv1 : list var) (ge : exp) (fds : fundefs) 
      (s : Ensemble var) (m : M.t bool) (s' : Ensemble var),
@@ -419,7 +397,8 @@ Section uncurry_correct.
   (* to do proofs simultaneously *) 
   Ltac uncurry_step_induction_mut P Q IHuncurry IH :=
     apply uncurry_step_mutual_ind with (P := P) (P0 := Q);
-    [ intros ? ? ? ? ? ? ? ? ? IHuncurry IH
+    [ intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
+    | intros ? ? ? ? ? ? ? ? ? IHuncurry IH
     | intros ? ? ? ? ? ? ? ? ? IHuncurry IH
     | intros ? ? ? ? ? ? ? ? IHuncurry IH
     | intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
@@ -428,7 +407,6 @@ Section uncurry_correct.
     | intros ? ? ? ? ? ? ? IHuncurry IH
     | intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
     | intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
-    | intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? IHuncurry IH
     | intros
     ].
 
@@ -1790,6 +1768,14 @@ Section uncurry_correct.
       try solve [eapply Included_trans; [|eauto]; eauto with Ensembles_DB];
       apply Union_Included; eauto with Ensembles_DB;
       eapply Included_trans; [|eauto]; eauto with Ensembles_DB].
+    - (* Eletapp *)
+      apply uncurry_step_s_nondecreasing in IHstep.
+      rewrite used_vars_Eletapp in *.
+      destruct_Union_Included.
+      apply Union_Included...
+      apply Union_Included...
+      apply Union_Included...
+      eapply Included_trans...
     - (* Eproj *)
       apply uncurry_step_s_nondecreasing in IHstep.
       rewrite used_vars_Eproj in *.
@@ -1801,18 +1787,6 @@ Section uncurry_correct.
       destruct_Union_Included.
       apply Union_Included; [apply Union_Included|]...
       all: eapply Included_trans; [|eassumption]...
-    - (* Fcons ge *)
-      apply uncurry_step_s_nondecreasing in IHstep.
-      repeat (rewrite used_vars_Fcons in * + rewrite used_vars_Efun in *).
-      destruct_Union_Included.
-      repeat rewrite Union_assoc.
-      do 7 (
-        match goal with
-          [ _ : _ |- used_vars _ \subset _ ] => idtac
-        | _ => try apply Union_Included
-        end;
-        try solve [eapply Included_trans; [|eassumption]; eauto with Ensembles_DB]).
-      now apply IH.
     - (* Fcons curried *)
       rewrite H7.
       repeat (rewrite used_vars_Fcons in * + rewrite used_vars_Efun in *).
@@ -1875,6 +1849,9 @@ Section uncurry_correct.
       rewrite Intersection_Union_distr;
       rewrite IH; [rewrite Intersection_Same_set; [reflexivity| ] |];
       eapply Included_trans; [|eauto| |eauto]; eauto with Ensembles_DB).
+    - (* Eletapp *)
+      rewrite used_vars_Eletapp in *.
+      eauto with Ensembles_DB.
     - (* Fcons fds *)
       repeat rewrite bound_var_fundefs_Fcons.
       repeat rewrite Intersection_Union_distr.
@@ -1899,24 +1876,6 @@ Section uncurry_correct.
       do 2 eapply Union_Included_l...
       do 3 eapply Union_Included_l...
       eapply Included_trans; [|eassumption]...
-    - (* Fcons ge *)
-      repeat rewrite bound_var_fundefs_Fcons.
-      repeat rewrite bound_var_Efun.
-      repeat rewrite bound_var_fundefs_Fcons.
-      repeat rewrite Intersection_Union_distr.
-      rewrite IH.
-      repeat rewrite Intersection_Same_set.
-      reflexivity.
-      all: repeat (rewrite used_vars_Fcons in H + rewrite used_vars_Efun in H);
-           repeat rewrite Union_assoc in H.
-      eapply Included_trans; [|eassumption]...
-      rewrite bound_var_Eapp...
-      rewrite bound_var_fundefs_Fnil...
-      eapply Union_Included_r; do 5 eapply Union_Included_l...
-      eapply Union_Included_r; do 5 eapply Union_Included_l...
-      eapply Union_Included_r; do 6 eapply Union_Included_l...
-      do 7 eapply Union_Included_l...
-      eapply Union_Included_r; do 3 eapply Union_Included_l...
     - (* Fcons curried *)
       assert (Hsubst :
               bound_var_fundefs
@@ -2003,6 +1962,14 @@ Section uncurry_correct.
       rewrite Intersection_Union_distr;
       rewrite IH; [rewrite Intersection_Same_set; eauto with Ensembles_DB|];
       eapply Included_trans; [|eauto| |eauto]; eauto with Ensembles_DB).
+    - (* Eletapp *)
+      repeat rewrite used_vars_Eletapp in *.
+      do 2 rewrite Intersection_Union_distr.
+      rewrite IH.
+      rewrite Intersection_Same_set...
+      rewrite Intersection_Same_set...
+      eapply Included_trans; [|eassumption]... 
+      eapply Included_trans; [|eassumption]... 
     - (* Eproj *)
       repeat rewrite used_vars_Eproj.
       do 2 rewrite Intersection_Union_distr.
@@ -2022,23 +1989,6 @@ Section uncurry_correct.
       do 2 eapply Union_Included_l...
       do 3 eapply Union_Included_l...
       eapply Included_trans; [|eassumption]...
-    - (* Fcons ge *)
-      repeat rewrite used_vars_Fcons.
-      repeat rewrite used_vars_Efun.
-      repeat rewrite used_vars_Fcons.
-      repeat rewrite Intersection_Union_distr.
-      rewrite IH.
-      repeat rewrite Intersection_Same_set...
-      all: repeat (rewrite used_vars_Fcons in H + rewrite used_vars_Efun in H);
-           repeat rewrite Union_assoc in H.
-      eapply Included_trans; [|eassumption]...
-      rewrite used_vars_Eapp in *; eapply Included_trans; eauto...
-      rewrite used_vars_Fnil...
-      eapply Union_Included_r; do 5 eapply Union_Included_l...
-      eapply Union_Included_r; do 5 eapply Union_Included_l...
-      eapply Union_Included_r; do 6 eapply Union_Included_l...
-      do 7 eapply Union_Included_l...
-      eapply Union_Included_r; do 3 eapply Union_Included_l...
     - (* Fcons curried *)
       assert (Hsubst :
               used_vars_fundefs
@@ -2122,6 +2072,15 @@ Section uncurry_correct.
   Proof with eauto with Ensembles_DB.
     intros P Q.
     uncurry_step_induction_mut P Q IHstep IH; subst P; subst Q; simpl in *; intros.
+    - (* Eletapp *)
+      rewrite used_vars_Eletapp in H; inv H0.
+      assert (used_vars e \subset s).
+      eapply Included_trans; [|eassumption]...
+      assert (unique_bindings e)...
+      constructor; auto.
+      intros contra.
+      contradiction H3.
+      eapply uncurry_step_maintains_bindings_fn; eauto.
     - (* Econstr *)
       rewrite used_vars_Econstr in H; inv H0.
       assert (used_vars e \subset s).
@@ -2215,49 +2174,6 @@ Section uncurry_correct.
       inv H10; contradiction (H3 x); split; auto.
       eapply uncurry_step_maintains_bindings_fn; eauto.
       apply H; right; now left.
-    - (* Fcons ge *)
-      repeat (rewrite used_vars_Fcons in H + rewrite used_vars_Efun in H); inv H0.
-      repeat rewrite Union_assoc in H.
-      assert (used_vars e \subset s).
-      eapply Union_Included_r; do 3 eapply Union_Included_l...
-      constructor; auto.
-      + intros contra.
-        contradiction H6.
-        inv contra.
-        inv H4.
-        constructor. constructor. auto.
-        inv H17.
-        constructor. apply Bound_Fcons3.
-        eapply uncurry_step_maintains_bindings_fn; eauto.
-        apply H; now do 7 left.
-        now apply Bound_Efun2.
-      + constructor; intros a contra; destruct contra.
-        inv H8. contradiction (H3 x); split; auto.
-        inv H1; [constructor|now apply Bound_Efun2].
-        inv H15; [now apply Bound_Fcons1|now apply Bound_Fcons2|apply Bound_Fcons3].
-        eapply uncurry_step_maintains_bindings_fn; eauto.
-        apply H; do 6 left; now right.
-      + constructor; intros a contra; destruct contra.
-        inv H10; contradiction (H3 x); split; auto.
-        inv H1; [constructor|now apply Bound_Efun2].
-        inv H15; [now apply Bound_Fcons1|now apply Bound_Fcons2|apply Bound_Fcons3].
-        eapply uncurry_step_maintains_bindings_fn; eauto.
-        apply H; right; now left.
-      + constructor; [constructor|constructor|].
-        intros contra. inv H13. inv H4.
-        contradiction H17; eapply uncurry_step_maintains_bindings_fn; eauto.
-        apply H; do 5 left; now right.
-        inversion 1.
-        constructor; intros a contra; destruct contra.
-        inv H13. inv H15.
-        inv H21. contradiction (H3 x).
-        split; auto.
-        eapply uncurry_step_maintains_bindings_fn; eauto.
-        apply H; do 4 left; now right.
-        rewrite bound_var_fundefs_Fnil...
-        rewrite bound_var_fundefs_Fnil...
-        all: inv H13; inv H4; auto.
-        rewrite bound_var_Eapp...
     - (* Fcons curried *)
       repeat (rewrite used_vars_Fcons in H8 + rewrite used_vars_Efun in H8).
       repeat rewrite Union_assoc in H8.
@@ -2630,6 +2546,30 @@ Section uncurry_correct.
       subst P; subst Q; simpl in *;
       [ intros k .. | intros f' k' e' | intros f' k' e' | intros f' k' e' | intros f' k' e' ];
       intros Hunique Hunique1 Hused Hused1 rho rho1 Henv.
+    - (* uncurry_letapp *)
+      eapply preord_exp_letapp_compat; try eassumption; try easy_post.
+      + unfold preord_env_P in Henv.
+        intros a Hin.
+        apply Henv; [|easy].
+        constructor; now left.
+      + unfold preord_env_P in Henv.
+        apply Forall2_same.
+        intros a Hin.
+        apply Henv.
+        apply Free_Eletapp1; now right.
+      + intros k' args1 args2 Hargs Hk'.
+        apply IH; inv Hunique; inv Hunique1; auto.
+        rewrite used_vars_Eletapp in Hused.
+        eapply Included_trans; [|eassumption]...
+        rewrite used_vars_Eletapp in Hused1.
+        eapply Included_trans; [|eassumption]...
+        apply preord_env_P_extend.
+        * intros x1 Hx1.
+          apply preord_var_env_monotonic with (k := k); [|omega].
+          apply Henv.
+          inversion Hx1. apply Free_Eletapp2; [|assumption].
+          intros contra. subst. intuition.
+        * assumption.
     - (* uncurry_constr *)
       eapply preord_exp_const_compat; try eassumption; try easy_post.
       + unfold preord_env_P in Henv.
@@ -2773,29 +2713,6 @@ Section uncurry_correct.
       rewrite fundefs_append_used_vars.
       rewrite used_vars_Fcons...
       all: simpl; now rewrite Hc.
-    - (* uncurry_fundefs_g *)
-      edestruct fundefs_append_ctx_exists
-        with (f' := f')
-             (c' := Fcons1_c f ft (k :: fv)
-                             (Efun2_c (Fcons1_c g gt gv Hole_c Fnil) (Eapp k kt [g])) fds) as [c Hc].
-      eapply preord_exp_eq_compat with (c := Efun2_c c e') (e1 := e) (e2 := e1); eauto.
-      unfold ctx_preord_exp in IH.
-      inv Hunique; inv Hunique1.
-      apply fundefs_append_unique_and in H2; destruct H2.
-      apply fundefs_append_unique_and in H5; destruct H5.
-      inv H0; inv H5.
-      inv H19; inv H27.
-      inv H8; inv H19.
-      intros k0 rho0 rho2 Hk0; eapply IH; auto.
-      eapply Included_trans; eauto.
-      rewrite used_vars_Efun.
-      rewrite fundefs_append_used_vars.
-      repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun)...
-      eapply Included_trans; eauto.
-      rewrite used_vars_Efun.
-      rewrite fundefs_append_used_vars.
-      repeat (rewrite used_vars_Fcons + rewrite used_vars_Efun)...
-      all: simpl; now rewrite Hc.
     - (* uncurry_fundefs_curried *)
       eapply uncurry_step_correct_fundefs_curried; eauto...
       eapply Included_trans; [|apply Hused].
@@ -2929,14 +2846,12 @@ Section uncurry_correct.
       step_isnt_reflexive.
       now apply IHe.
       apply IHe.
-      rewrite <- H3; rewrite <- H7.
-      inv H3; inv H7.
+      rewrite <- H2; rewrite <- H5.
       apply uncurry_fun_fds; auto.
       circular_fds.
     - (* Fcons3_c *)
       inv Hstep.
       now apply IHf.
-      step_isnt_reflexive.
       step_isnt_reflexive.
       pose circular_app_f_ctx.
       exfalso; eapply n; eauto.
@@ -2972,7 +2887,7 @@ Section uncurry_correct.
         repeat normalize_used_vars;
         ((apply IHe; auto) || (apply IHf; auto));
         eapply Included_trans; [|eauto]; eauto with Ensembles_DB).
-    - admit.
+    - rewrite used_vars_Eletapp...
     - induction l; simpl in *.
       + constructor; rewrite used_vars_Ecase_cons in Hused.
         apply IHe; auto.
@@ -2982,7 +2897,7 @@ Section uncurry_correct.
         rewrite used_vars_Ecase_cons in Hused.
         apply IHl; auto.
         eapply Included_trans...
-  Admitted.
+  Qed.
 
   Corollary app_ctx_uncurry_step : forall c e s m e1 s1 m1,
       used_vars (c |[ e ]|) \subset s ->
@@ -3096,12 +3011,6 @@ Section uncurry_correct.
         }
         contradiction H0; apply Hused; left; right; now right.
       + repeat ensemble_compat_simpl; intros a Ha; eapply uncurry_fundefs_step_preserves_names; eauto.
-    - (* Fcons ge *)
-      intros Hused Huniq.
-      repeat normalize_occurs_free; simpl.
-      repeat ensemble_compat_simpl; apply IH.
-      eapply Included_trans; [|eauto]; repeat normalize_used_vars...
-      inv Huniq; inv H11; now inv H2. (* admit: automate something like this? basically keep inverting stuff until you find unique_bindings e *)
     - (* Fcons ge *)
       intros Hused Huniq.
       do 2 rewrite occurs_free_fundefs_Fcons.
@@ -4083,14 +3992,6 @@ Section uncurry_correct.
     fst s = fst s' ->
     from_fresh s <--> from_fresh s'.
   Proof. destruct s, s'; cbn; now inversion 1. Qed.
-
-  Lemma already_uncurried_fst_eq s s' :
-    fst s = fst s' ->
-    already_uncurried s = already_uncurried s'.
-  Proof.
-    destruct s as [? [[[b aenv] lm] s]].
-    destruct s' as [? [[[b' aenv'] lm'] s']].
-  Abort.
   
   Lemma uncurry_corresp_mut a :
     let P e := forall b,
@@ -4197,7 +4098,22 @@ Section uncurry_correct.
         eapply uncurry_step_preserves_used_vars; eauto.
         apply app_ctx_uncurry_step with (c := Eproj_c v c n v0 Hole_c). all: eauto.
       + (* Eletapp *)
-        admit.
+        unfold uncurry_exp; fold uncurry_exp.
+        eapply pre_eq_state_lr; intros [] st [Huniq Hused].
+        eapply bind_triple. eapply pre_strenghtening; [|use_IH IHn].
+        cbn; intros [] s [_ Hs]; subst s.
+        { split; [now inv Huniq|].
+          eapply Included_trans; [|apply Hused]; rewrite used_vars_Eletapp... }
+        cbn; intros e' st0; apply return_triple.
+        intros [] st1 [n1 Hrel] [_ Hst]; subst st0.
+        assert (from_fresh st \subset from_fresh st1) by (eapply uncurry_rel_s_nondecreasing; eauto).
+        destruct n1; inv Hrel.
+        exists 0; constructor.
+        exists (S n1); econstructor.
+        constructor; eauto.
+        apply app_ctx_uncurry_rel with (c := Eletapp_c v v0 f l Hole_c).
+        eapply uncurry_step_preserves_used_vars; eauto.
+        apply app_ctx_uncurry_step with (c := Eletapp_c v v0 f l Hole_c). all: eauto.
       + (* Efun *)
         eapply pre_eq_state_lr; intros [] st [Huniq Hused].
         unfold uncurry_exp; fold uncurry_exp; fold uncurry_fundefs.

@@ -166,13 +166,11 @@ Section UNCURRY.
    *)
 
   Section Uncurry_prog.
-
-    Context (cps : bool).
     
-    Fixpoint uncurry_exp (e:exp) : uncurryM exp :=
+    Fixpoint uncurry_exp (cps : bool) (e:exp) : uncurryM exp :=
       match e with
       | Econstr x ct vs e1 =>
-        e1' <- uncurry_exp e1 ;; 
+        e1' <- uncurry_exp cps e1 ;; 
         ret (Econstr x ct vs e1')
       | Ecase x arms =>
         (* annoyingly, I can't seem to use a separate mapM definition here, but
@@ -184,37 +182,37 @@ Section UNCURRY.
                   | h::t =>
                     match h with
                     | (s,e) => 
-                      e' <- uncurry_exp e ;; t' <- uncurry_list t ;;
+                      e' <- uncurry_exp cps e ;; t' <- uncurry_list t ;;
                          ret ((s,e')::t')
                     end
                   end) arms ;;
       ret (Ecase x arms')
     | Eproj x ct n y e1 =>
-      e1' <- uncurry_exp e1 ;;
+      e1' <- uncurry_exp cps e1 ;;
       ret (Eproj x ct n y e1')
     | Eletapp x f ft ys e1 =>
-      e1' <- uncurry_exp e1 ;;
+      e1' <- uncurry_exp cps e1 ;;
       ret (Eletapp x f ft ys e1')
     | Eapp x ft xs => ret (Eapp x ft xs)
     | Eprim x p xs e1 =>
-      e1' <- uncurry_exp e1 ;;
+      e1' <- uncurry_exp cps e1 ;;
       ret (Eprim x p xs e1')
     | Efun fds e1 =>
-      fds' <- uncurry_fundefs fds ;;
-      e1' <- uncurry_exp e1 ;;
+      fds' <- uncurry_fundefs cps fds ;;
+      e1' <- uncurry_exp cps e1 ;;
       ret (Efun fds' e1')
     | Ehalt x => ret (Ehalt x)
       end
-    with uncurry_fundefs (fds : fundefs) : uncurryM fundefs :=
+    with uncurry_fundefs cps (fds : fundefs) : uncurryM fundefs :=
            match fds with
            | Fnil => ret Fnil
            | Fcons f f_ft fvs fe fds1 =>
              if cps then            
-               fds1' <- uncurry_fundefs fds1 ;;
+               fds1' <- uncurry_fundefs cps fds1 ;;
                match fvs, fe with
                | fk::fvs, Efun (Fcons g gt gvs ge Fnil)
                                (Eapp fk' fk_ft (g'::nil)) =>
-                 (* XXX CHANGED *) (* ge' <- uncurry_exp ge ;; *)
+                 (* XXX CHANGED *) (* ge' <- uncurry_exp cps ge ;; *)
                  (* Zoe : Nested carried arguments should be handled one-at-a-time,
                         so that functions with > 2 arguments get uncurried properly.
                         Therefore the body of g will be uncurried at the next iteration
@@ -245,15 +243,15 @@ Section UNCURRY.
                               (Fcons f' fp_ft (gvs ++ fvs) ge fds1'))
                  else
                    (* log_msg (f_str ++ " is not uncurried (candidate)" ) ;; *)
-                   fe' <- uncurry_exp fe ;;
+                   fe' <- uncurry_exp cps fe ;;
                    ret (Fcons f f_ft (fk::fvs) fe' fds1')
                | _, _ =>
                  (* log_msg (f_str ++ " is not uncurried" ) ;; *)
-                 fe' <- uncurry_exp fe ;;
+                 fe' <- uncurry_exp cps fe ;;
                  ret (Fcons f f_ft fvs fe' fds1')
                end
              else
-               fds1' <- uncurry_fundefs fds1 ;;
+               fds1' <- uncurry_fundefs cps fds1 ;;
                match fe with
                | Efun (Fcons g gt gvs ge Fnil)
                       (Ehalt g') =>
@@ -274,10 +272,10 @@ Section UNCURRY.
                                     (Ehalt g))
                               (Fcons f' fp_ft (gvs ++ fvs) ge fds1'))
                  else
-                   fe' <- uncurry_exp fe ;;
+                   fe' <- uncurry_exp cps fe ;;
                    ret (Fcons f f_ft fvs fe' fds1')
                | _ =>
-                 fe' <- uncurry_exp fe ;;
+                 fe' <- uncurry_exp cps fe ;;
                  ret (Fcons f f_ft fvs fe' fds1')
                end
            end.

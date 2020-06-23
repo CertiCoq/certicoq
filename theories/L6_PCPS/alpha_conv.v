@@ -4,7 +4,7 @@
 
 
 Require Import L6.cps L6.ctx L6.cps_util L6.set_util L6.identifiers L6.Ensembles_util L6.List_util
-        L6.eval L6.logical_relations L6.functions L6.tactics L6.map_util.
+        L6.eval L6.logical_relations L6.functions L6.tactics L6.map_util L6.rename.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
@@ -851,6 +851,19 @@ Section Alpha_conv_correct.
     intros Hc. subst. contradiction.
   Qed.
 
+  Lemma preord_env_P_inj_extend_lst_not_In_P_r k S σ rho1 rho2 xs ys:
+    preord_env_P_inj S k σ rho1 rho2 -> 
+    Disjoint _ (FromList xs) S ->
+    preord_env_P_inj S k (σ <{xs ~> ys}>) rho1 rho2.
+  Proof.
+    revert k S σ rho1 rho2 ys. induction xs; intros.
+    - simpl. eassumption.
+    - destruct ys. eassumption.
+      repeat normalize_sets. simpl. eapply preord_env_P_inj_extend_not_In_P_r.
+      eapply IHxs. eassumption. now sets.
+      intros Hc. eapply H0. constructor; eauto.
+  Qed.
+
   Lemma preord_env_P_inj_set_extend_not_In_P_r S k f rho1 rho2 x y v :
     preord_env_P_inj S k f rho1 rho2 ->
     ~ x \in S ->
@@ -1119,6 +1132,84 @@ Section Alpha_conv_correct.
       eexists. rewrite Hgetx', Hgetl'. split.
       reflexivity.
       now constructor; eauto.
+  Qed.
+
+  Lemma preord_env_P_inj_set_l_apply_r S k rho1 rho2 m x y v v' : 
+    preord_env_P_inj (S \\ [set x]) k (apply_r m) rho1 rho2 ->
+    M.get y rho2 = Some v' ->
+    preord_val cenv PG k v v' ->
+    preord_env_P_inj S k (apply_r (M.set x y m)) (map_util.M.set x v rho1) rho2.
+  Proof.
+    intros Henv Hg1 Hval z Hin v1 Hgetz.
+    destruct (peq z x); subst.
+    - eexists. unfold apply_r. rewrite M.gss in *. inv Hgetz. split; eauto.
+    - unfold apply_r. rewrite M.gso in *; eauto.
+      eapply Henv; eauto. constructor; eauto.
+      intros Hc; inv Hc; eauto.
+  Qed.
+
+  Lemma preord_env_P_inj_set_lists_l S k rho1 rho1' rho2 xs ys vs1 vs2 : 
+    preord_env_P cenv PG (S \\ FromList xs) k rho1 rho2 ->
+
+    set_lists xs vs1 rho1 = Some rho1'  ->
+    get_list ys rho2 = Some vs2 ->
+    Forall2 (preord_val cenv PG k) vs1 vs2 ->      
+
+    preord_env_P_inj S k (apply_r (set_list (combine xs ys) (M.empty var))) rho1' rho2.
+  Proof.
+    revert S k rho1 rho1' rho2 ys vs1 vs2; induction xs;
+      intros S k rho1 rho1' rho2 ys vs1 vs2 Henv Hset Hget Hvall.
+    - simpl in Hset. destruct vs1; try congruence. inv Hset.
+      inv Hvall. destruct ys; simpl in Hget; try congruence.
+      intros z Hin v1 Hgetz. unfold apply_r. rewrite M.gempty. eapply Henv.
+      constructor; eauto. eassumption.
+
+      destruct (M.get e rho2); try congruence.
+      destruct (get_list ys rho2); try congruence.
+    - simpl in Hset. destruct vs1; try congruence.
+      destruct vs2 as [|v' vs2]; inv Hvall.
+      destruct (set_lists xs vs1 rho1) eqn:Hset1'; try congruence. inv Hset.
+      destruct ys as [| y ys]; simpl in Hget; try congruence. 
+      destruct (M.get y rho2) eqn:Hgety; try congruence.
+      destruct (get_list ys rho2) eqn:Hgetys; try congruence.
+      inv Hget. simpl. 
+
+      eapply preord_env_P_inj_set_l_apply_r; [| eassumption | eassumption ]. 
+
+      eapply IHxs. eapply preord_env_P_antimon. eassumption.
+      normalize_sets. rewrite Setminus_Union. sets.
+      eassumption. eassumption. eassumption. 
+  Qed.
+
+  Lemma preord_env_P_inj_set_lists_l' S k sig rho1 rho1' rho2 xs ys vs1 vs2 : 
+    preord_env_P_inj (S \\ FromList xs) k (apply_r sig) rho1 rho2 ->
+
+    set_lists xs vs1 rho1 = Some rho1'  ->
+    get_list ys rho2 = Some vs2 ->
+    Forall2 (preord_val cenv PG k) vs1 vs2 ->      
+
+    preord_env_P_inj S k (apply_r (set_list (combine xs ys) sig)) rho1' rho2.
+  Proof.
+    revert S k rho1 rho1' rho2 ys vs1 vs2; induction xs;
+      intros S k rho1 rho1' rho2 ys vs1 vs2 Henv Hset Hget Hvall.
+    - simpl in Hset. destruct vs1; try congruence. inv Hset.
+      inv Hvall. destruct ys; simpl in Hget; try congruence.
+      simpl. repeat normalize_sets. eassumption. 
+      destruct (M.get e rho2); try congruence.
+      destruct (get_list ys rho2); try congruence.
+    - simpl in Hset. destruct vs1; try congruence.
+      destruct vs2 as [|v' vs2]; inv Hvall.
+      destruct (set_lists xs vs1 rho1) eqn:Hset1'; try congruence. inv Hset.
+      destruct ys as [| y ys]; simpl in Hget; try congruence. 
+      destruct (M.get y rho2) eqn:Hgety; try congruence.
+      destruct (get_list ys rho2) eqn:Hgetys; try congruence.
+      inv Hget. simpl. 
+      
+      eapply preord_env_P_inj_set_l_apply_r; [| eassumption | eassumption ]. 
+
+      eapply IHxs. eapply preord_env_P_inj_antimon. eassumption.
+      normalize_sets. rewrite Setminus_Union. sets.
+      eassumption. eassumption. eassumption. 
   Qed.
 
   Global Instance preord_env_P_inj_f_proper :

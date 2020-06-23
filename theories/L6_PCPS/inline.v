@@ -90,11 +90,11 @@ Section Beta.
           | (true, Some (t, xs, e), S d') =>
             let sig' := set_list (combine xs ys') sig  in            
             e' <- beta_contract d' e sig' fm s' ;;
-            match inline_letapp e' x with
-            | Some (C, x') =>
+            match inline_letapp e' x, Nat.eqb (List.length xs) (List.length ys) with
+            | Some (C, x'), true =>
               ec' <- beta_contract d' ec (M.set x x' sig) fm s' ;;
               ret (C |[ ec' ]|)
-            | None =>
+            | _, _ =>
               x' <- get_name x "" ;;
               ec' <- beta_contract_aux ec (M.set x x' sig) fm s' ;;
               ret (Eletapp x' f' t ys' ec')
@@ -130,9 +130,12 @@ Section Beta.
          (* fstr <- get_pp_name f' ;; *)
          (* log_msg ("Application of " ++ fstr ++ " is " ++ if inl then "" else "not " ++ "inlined") ;; *)
          (match (inl, M.get f fm, d) with
-          | (true, Some (t, xs, e), S d') =>
-            let sig' := set_list (combine xs ys') sig  in
-            beta_contract d' e sig' fm  s'
+          | (true, Some (ft, xs, e), S d') =>
+            if Nat.eqb (List.length xs) (List.length ys) then
+              let sig' := set_list (combine xs ys') sig  in
+              beta_contract d' e sig' fm  s'
+            else 
+              ret (Eapp f' t ys')
           | _ => ret (Eapp f' t ys')
           end)
        | Eprim x t ys e =>

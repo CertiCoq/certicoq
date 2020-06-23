@@ -21,7 +21,7 @@ Definition key_set {A : Type} (map : M.t A) :=
   
 Definition sub_map {A : Type} (map1 map2 : M.t A) :=
   forall x v, M.get x map1 = Some v ->
-         M.get x map2 = Some v.
+              M.get x map2 = Some v.
 
 Fixpoint xfilter {A : Type} (pred : positive -> A -> bool) (m : M.t A) 
          (i : positive) {struct m} : M.t A :=

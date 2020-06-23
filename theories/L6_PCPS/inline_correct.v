@@ -753,6 +753,7 @@ Section Inline_correct.
          (forall k rho1 rho2,
              preord_env_P_inj cenv PG (occurs_free e) k (apply_r sig) rho1 rho2 ->
              Disjoint _ (bound_var e) (occurs_free_in_env rho1 :|: Dom_map rho1) ->
+             Disjoint _ S (image (apply_r sig) (occurs_free_in_env rho1)) ->
              fun_map_inv d (occurs_free e :|: occurs_free_in_env rho1) fm rho1 rho2 k sig ->
              preord_exp cenv P1 PG k (e, rho1) (e', rho2))
 
@@ -776,8 +777,8 @@ Section Inline_correct.
         repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
         eapply Union_Disjoint_r. now sets.
         eapply Union_Disjoint_r. now sets.
-        eapply Disjoint_Included; [| | eapply Hdis2 ]. rewrite image_Union. now sets.
-        now sets.
+        eapply Disjoint_Included; [| | eapply Hdis2 ].
+        rewrite !image_Union. now xsets. now sets.
       + eapply fun_map_vars_set. eassumption.
       + intros e' w2. eapply return_triple.
         intros _ st'. intros [Hf [Hun [Hsub [Hsub' Hsem]]]].
@@ -793,7 +794,7 @@ Section Inline_correct.
           rewrite image_Union. sets.
         * normalize_bound_var. eapply Union_Included. eapply Included_trans. eassumption. now sets.
           eapply Singleton_Included. eassumption.
-        * intros r1 r2 k Henv Hdis Hfm'. eapply preord_exp_const_compat.
+        * intros r1 r2 k Henv Hdis Hdis' Hfm'. eapply preord_exp_const_compat.
           eassumption. eassumption.
           eapply Forall2_preord_var_env_map. eassumption. normalize_occurs_free. now sets.          
           intros. eapply Hsem. 
@@ -811,12 +812,16 @@ Section Inline_correct.
              ++ eapply Union_Disjoint_r.
                 ** eapply Disjoint_Singleton_r. eassumption.
                 ** eapply Disjoint_Included; [| | eapply Hdis]; sets.
+          -- eapply Disjoint_Included_r.
+             eapply Included_trans. eapply image_monotonic. eapply occurs_free_in_env_set. simpl. repeat normalize_sets.
+             now eapply image_apply_r_set.
+             eapply Union_Disjoint_r. now sets. sets. 
           -- eapply fun_map_inv_antimon. eapply fun_map_inv_set. eapply fun_map_inv_i_mon. eassumption. omega.
              intros Hc. inv Hc. inv H2.
              ++ eapply Hdis. normalize_bound_var. constructor. now right. now right; eauto.
              ++ eapply Hdis1. constructor. normalize_bound_var. now right. now right; eauto.
              ++ eapply Hdis. normalize_bound_var. constructor. now right. now left; eauto.
-             ++ admit. (* change assumptions *)
+             ++ intros Hc. eapply Hdis'. constructor; eassumption.
              ++ simpl. sets.
              ++ normalize_occurs_free. rewrite !Union_assoc. rewrite Union_Setminus_Included; sets; tci.
                 eapply Union_Included. now sets. eapply Included_trans. eapply occurs_free_in_env_set.
@@ -863,7 +868,7 @@ Section Inline_correct.
                   ** intros. eapply preord_exp_app_l.
                    --- admit. (* post *)
                    --- admit. (* post *)
-                   --- intros. assert (Hf := H11). assert (Heqf' := Heqf). edestruct H11; eauto. destructAll.
+                   --- intros. assert (Hf := H12). assert (Heqf' := Heqf). edestruct H12; eauto. destructAll.
                        do 2 subst_exp. eapply H8.
                        +++ edestruct preord_env_P_inj_get_list_l. now eapply H9. normalize_occurs_free. now sets.
                            eassumption. destructAll.                           
@@ -875,24 +880,37 @@ Section Inline_correct.
                            eapply Disjoint_Included_r. eapply occurs_free_in_env_set_lists_not_In. eassumption.
                            eapply Disjoint_Included_r. eapply Included_Union_compat. reflexivity.
                            eapply sub_map_occurs_free_in_env. eassumption.
-                           rewrite Union_Same_set. now sets. eapply occurs_free_in_env_get_list. eassumption. 
-                       +++  eapply fun_map_inv_antimon. eapply fun_map_inv_set_lists; [ | | | | | | | eassumption ].
-                            *** rewrite <- fun_map_inv_eq in *. eapply H22.
-                            *** eapply fun_map_inv_mon. eapply Hf. omega.
-                            *** sets.
-                            *** eapply occurs_free_in_env_get_list. eassumption.
-                            *** eassumption.
-                            *** eassumption. 
-                            *** rewrite Dom_map_def_funs. xsets.
-                            *** eapply Included_trans. eapply Included_Union_compat. reflexivity.
-                                eapply occurs_free_in_env_set_lists_not_In. eassumption.
-                                eapply Union_Included; [| eapply Union_Included ]. 
-                                ++++ eapply Included_trans.
-                                     2:{ eapply Included_Union_compat. reflexivity. eapply occurs_free_in_env_get. eapply H13. }
-                                     eapply Included_trans. eapply occurs_free_in_fun. eapply find_def_correct. eassumption.
-                                     sets.
-                                ++++ eapply Included_trans. eapply occurs_free_in_env_get_list. eassumption. sets.
-                                ++++ eapply Included_trans. eapply sub_map_occurs_free_in_env. eassumption. sets.
+                           rewrite Union_Same_set. now sets. eapply occurs_free_in_env_get_list. eassumption.
+                       +++ eapply Disjoint_Included_r. eapply image_apply_r_set_list.
+                           unfold apply_r_list. rewrite list_length_map. eassumption.
+                           eapply Union_Disjoint_r.
+                           eapply Disjoint_Included_r; [|  eapply Hdis2 ]. normalize_occurs_free. rewrite image_Union.
+                           rewrite FromList_apply_list. now sets.
+                           eapply Disjoint_Included_r. eapply image_monotonic. eapply Setminus_Included.
+                           eapply Disjoint_Included_r. eapply image_monotonic.
+                           eapply occurs_free_in_env_set_lists_not_In. eassumption.
+                           rewrite image_Union. eapply Union_Disjoint_r.
+                           eapply Disjoint_Included_r; [|  eapply H11 ]. eapply image_monotonic.
+                           eapply occurs_free_in_env_get_list. eassumption.
+                           eapply Disjoint_Included_r; [| eapply H11 ]. eapply image_monotonic.
+                           eapply sub_map_occurs_free_in_env. eassumption. 
+                       +++ eapply fun_map_inv_antimon. eapply fun_map_inv_set_lists; [ | | | | | | | eassumption ].
+                           *** rewrite <- fun_map_inv_eq in *. eapply H23.
+                           *** eapply fun_map_inv_mon. eapply Hf. omega.
+                           *** sets.
+                           *** eapply occurs_free_in_env_get_list. eassumption.
+                           *** eassumption.
+                           *** eassumption. 
+                           *** rewrite Dom_map_def_funs. xsets.
+                           *** eapply Included_trans. eapply Included_Union_compat. reflexivity.
+                               eapply occurs_free_in_env_set_lists_not_In. eassumption.
+                               eapply Union_Included; [| eapply Union_Included ]. 
+                               ++++ eapply Included_trans.
+                                    2:{ eapply Included_Union_compat. reflexivity. eapply occurs_free_in_env_get. eapply H14. }
+                                    eapply Included_trans. eapply occurs_free_in_fun. eapply find_def_correct. eassumption.
+                                    sets.
+                               ++++ eapply Included_trans. eapply occurs_free_in_env_get_list. eassumption. sets.
+                               ++++ eapply Included_trans. eapply sub_map_occurs_free_in_env. eassumption. sets.
                ++ omega.
                ++ eassumption.
                ++ eassumption.
@@ -945,4 +963,6 @@ Section Inline_correct.
               now constructor.
     - (* Eprim *)
       admit.
-      
+    - (* Ehalt *)
+      admit.
+  Qed.

@@ -2,8 +2,9 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From Coq Require Import Classes.Morphisms Arith NArith.BinNat Lists.List Sets.Ensembles Sorting.Permutation.
+From Coq Require Import Classes.Morphisms Arith NArith.BinNat Lists.List Sorting.Permutation.
 From compcert.lib Require Import Coqlib.
+From Coq Require Import Sets.Ensembles.
 
 Import ListNotations.
 
@@ -11,14 +12,16 @@ Close Scope Z_scope.
 
 Ltac inv H := inversion H; clear H;  subst.
 
-Hint Constructors Singleton.
-Hint Constructors Union.
-Hint Constructors Intersection.
-Hint Unfold In.
+Hint Constructors Singleton : core.
+Hint Constructors Union : core.
+Hint Constructors Intersection : core.
+Hint Unfold In : core.
 
 Create HintDb Ensembles_DB.
 
 (** * Usefull notations. Inspired from https://github.com/QuickChick/QuickChick/blob/master/src/Sets.v *)
+
+Declare Scope Ensembles_scope.
 
 Notation "x \in A" := (Ensembles.In _ A x) (at level 70, only parsing) : Ensembles_scope.
 
@@ -227,7 +230,7 @@ Proof.
 Qed.
 
 Instance Proper_In {A} :
-  Proper (Same_set A ==> Logic.eq ==> iff) (In A).
+  Proper (Same_set A ==> Logic.eq ==> iff) (Ensembles.In A).
 Proof.
   constructor; intros H'; subst; destruct H as [H1 H2]; eauto.
 Qed.
@@ -1636,16 +1639,16 @@ Hint Extern 1 (Included _
 rewrite (Union_commut C A) : Ensembles_DB.
 
 Hint Extern 1 (Same_set _ (Union _ ?A (Union _ _ _)) (Union _ (Union _ ?A ?B) ?C)) =>
-rewrite <- (Union_assoc A B C).
+rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
 Hint Extern 1 (Same_set _ (Union _ (Union _ ?A ?B) ?C) (Union _ ?A (Union _ _ _))) =>
-rewrite <- (Union_assoc A B C).
+rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
 Hint Extern 1 (Included _ (Union _ ?A (Union _ _ _)) (Union _ (Union _ ?A ?B) ?C)) =>
-rewrite <- (Union_assoc A B C).
+rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
 Hint Extern 1 (Included _ (Union _ (Union _ ?A ?B) ?C) (Union _ ?A (Union _ _ _))) =>
-rewrite <- (Union_assoc A B C).
+rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
 Hint Extern 5 (Disjoint _ ?A ?B) =>
 eapply Disjoint_Included_r; [| eassumption ] : Ensembles_DB.
@@ -1802,6 +1805,24 @@ Proof.
   left; constructor; eauto.
   intros Hc; eapply H0; constructor; eauto.
 Qed.
+
+
+Lemma Setminus_Setminus_Same_set A (S1 S2 S3 : Ensemble A) :
+  Decidable S3 ->
+  S3 \subset S1 ->
+  (S1 \\ (S2 \\ S3)) <--> ((S1 \\ S2) :|: S3).
+Proof.
+  intros Hd Hin. split.
+  now apply Setminus_Setminus_Included.
+  destruct Hd as [D]. intros x H. destruct (D x) as [Hin' | Hnin].
+  - constructor. now eapply Hin.
+    intros Hc; inv Hc; eauto.
+  - inv H.
+    + inv H0. constructor; eauto. intros Hc.
+      inv Hc; eauto.
+    + exfalso; eauto.
+Qed.
+
 
 Lemma Same_set_Intersection_Setminus {A: Type} (S1 S2 S3 : Ensemble A)
       {_ : Decidable S3}:

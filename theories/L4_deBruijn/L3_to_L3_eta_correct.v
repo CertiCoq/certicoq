@@ -5,7 +5,8 @@
 
 Require Import FunInd.
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
-        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz
+        Coq.Bool.Bool.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
@@ -15,6 +16,10 @@ Require Import L3_to_L3_eta L3_eta_crct.
 Require Import L2k.term L2k.program L2k.compile L2k.wcbvEval.
 Require Import L3_eta_crct.
 Module L3C := L3_eta_crct.
+
+Set Keyed Unification.
+
+Coercion Is_true : bool >-> Sortclass.
 
 Lemma Lookup_trans_env e nm t :
   LookupDfn nm e t -> LookupDfn nm (transEnv e) (trans t).
@@ -144,7 +149,7 @@ Lemma wcbvEval_no_step e s t : WcbvEval e s t -> WcbvEval e t t.
 Proof.
   apply WcbvEval_no_further.
 Qed.
-Hint Resolve wcbvEval_no_step.
+Hint Resolve wcbvEval_no_step : core.
 
 
 Function mkApp' (fn : Term) (ts : Terms) :=
@@ -247,7 +252,7 @@ Proof.
   simpl. now apply IHn.
 Qed.
 
-Lemma isLambda_trans n : ~ isLambda n -> ~ isLambda (trans n).
+Lemma isLambda_trans n : ~ L2k.term.isLambda n -> ~ term.isLambda (trans n).
 Proof.
   intros nlam Htr. dstrctn Htr. apply nlam.
   destruct n; try discriminate; repeat eexists.
@@ -336,7 +341,7 @@ Proof.
   - cbn. destruct (lt_eq_lt_dec n0 n); cbn.
     + destruct s.
       * rewrite (proj1 (nat_compare_lt n0 n)); try omega. reflexivity.
-      * subst. rewrite (proj2 (nat_compare_eq_iff _ _)); trivial. 
+      * subst. rewrite (proj2 (Nat.compare_eq_iff _ _)); trivial. 
     + rewrite (proj1 (nat_compare_gt n0 n)); try intro; trivial.
   - cbn. now rewrite H, H0.
   - cbn. now rewrite H, H0.
@@ -467,7 +472,7 @@ Proof.
 Qed.
 
 
-Lemma mkApp_mkApp' fn args x : mkApp fn args = Some x ->
+Lemma mkApp_mkApp' fn args x : L2k.term.mkApp fn args = Some x ->
                               mkApp' fn args = x.
 Proof.
   induction args in fn, x |- *. simpl. now intros [= ->].
@@ -497,16 +502,16 @@ Proof.
 Qed.
 
 Lemma mkApp_mkApp'_notc fn args : ~ isConstruct_discr fn ->
-                                  mkApp fn args = Some (mkApp' fn args).
+                                  L2k.term.mkApp fn args = Some (mkApp' fn args).
 Proof.
   induction args in fn |- *. simpl. trivial.
   simpl. intros Hfn.
   destruct fn; simpl; intros; eauto. intuition.
 Qed.
 
-Lemma mkApp_mkApp'_etac fn args : mkApp fn args = Some (mkApp' fn args) ->
+Lemma mkApp_mkApp'_etac fn args : L2k.term.mkApp fn args = Some (mkApp' fn args) ->
                                   forall k,
-                                    mkApp (eta_expand k (trans fn)) (trans_terms args) =
+                                    L2k.term.mkApp (eta_expand k (trans fn)) (trans_terms args) =
                                     Some (mkApp' (eta_expand k (trans fn)) (trans_terms args)).
 Proof.
   induction args in fn |- *. simpl. trivial.

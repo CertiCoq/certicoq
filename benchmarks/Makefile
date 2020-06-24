@@ -1,9 +1,20 @@
 COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R ./ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
 CCOMPILER=gcc
-CFILES= demo1 demo2 list_sum vs_easy vs_hard Binom.main Color.main
 
-cfiles: $(CFILES)
-all: copy lib tests cfiles
+# Names of the benchmarks
+TESTS=$(shell cat TESTS)
+# Names of the generated cfiles
+CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, CertiCoq.Benchmarks.tests.%.c, $(TESTS))
+# Names of the generated executables
+EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS))
+
+default: copy exec run
+all: copy lib exec run
+
+.PHONY: all default clean lib cleanlib tests run
+
+$(CFILES): tests
+exec: $(TESTS)
 
 copy:
 	cp ../theories/Runtime/gc.c ./
@@ -15,9 +26,10 @@ copy:
 	cp ../theories/Runtime/config.h ./
 
 clean:
-	$(MAKE) clean -C lib
 	rm -f ./gc.c
 	rm -f ./gc.h
+	rm -f ./gc_stack.c
+	rm -f ./gc_stack.h
 	rm -f ./values.h
 	rm -f ./main.c
 	rm -f ./config.h
@@ -26,6 +38,8 @@ clean:
 	rm -f ./glue.*.*.c
 	rm -f ./glue.*.*.h
 	rm -f ./*.vo
+	rm -f ./*.glob
+	rm -f $(EXEC)
 
 lib/Makefile:
 	cd lib; coq_makefile -f _CoqProject -o Makefile
@@ -33,9 +47,15 @@ lib/Makefile:
 lib: lib/Makefile
 	$(MAKE) -C lib
 
+cleanlib:
+	$(MAKE) clean -C lib
+
 tests: tests.v
 	coqc $(COQOPTS) tests.v
 
-$(CFILES): 
-	$(CCOMPILER) -o $@_cps -Wno-everything -O2 $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@.c
+$(TESTS): $(CFILES)
+	$(CCOMPILER) -o $@_cps -Wno-everything -O2 $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@_cps.c
 	$(CCOMPILER) -o $@ -Wno-everything -O2 $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue.CertiCoq.Benchmarks.tests.$@.c
+
+run: run.sh
+	sh run.sh

@@ -3638,8 +3638,8 @@ Definition traceless_step2:  genv -> state -> state -> Prop := fun ge s s' => st
 
 Definition m_tstep2 (ge:genv):=  clos_trans state (traceless_step2 ge).
 
-Hint Unfold Ptrofs.modulus Ptrofs.max_unsigned uint_range.
-Hint Transparent Ptrofs.max_unsigned Ptrofs.modulus uint_range.
+Hint Unfold Ptrofs.modulus Ptrofs.max_unsigned uint_range : core.
+Hint Transparent Ptrofs.max_unsigned Ptrofs.modulus uint_range : core.
  
 Inductive mem_after_n_proj_store_rev: block -> Z -> (list Values.val) -> mem -> mem -> Prop :=
 | Mem_last_ind: forall m b ofs v m', 

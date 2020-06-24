@@ -45,7 +45,7 @@ with Brs : Type :=
 with Defs : Type :=
 | dnil : Defs
 | dcons : name -> Term -> nat -> Defs -> Defs.
-Hint Constructors Term Terms Brs Defs.
+Hint Constructors Term Terms Brs Defs : core.
 Scheme Trm_ind' := Induction for Term Sort Prop
   with Trms_ind' := Induction for Terms Sort Prop
   with Brs_ind' := Induction for Brs Sort Prop

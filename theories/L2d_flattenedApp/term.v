@@ -120,7 +120,7 @@ Definition isLambda (t:Term) : Prop :=
 Lemma IsLambda: forall nm bod, isLambda (TLambda nm bod).
 intros. exists nm, bod. reflexivity.
 Qed.
-Hint Resolve IsLambda.
+Hint Resolve IsLambda : core.
 
 Lemma isLambda_dec: forall t, {isLambda t}+{~ isLambda t}.
 induction t;
@@ -147,7 +147,7 @@ Definition isApp (t:Term) : Prop :=
 Lemma IsApp: forall fn arg, isApp (TApp fn arg).
 intros. exists fn, arg. reflexivity.
 Qed.
-Hint Resolve IsApp.
+Hint Resolve IsApp : core.
 Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
 Proof.
   destruct t; try (right; not_isn).
@@ -159,7 +159,7 @@ Definition isFix (t:Term) : Prop :=
 Lemma IsFix: forall ds n, isFix (TFix ds n).
 intros. exists ds, n. reflexivity.
 Qed.
-Hint Resolve IsFix.
+Hint Resolve IsFix : core.
 Lemma isFix_dec: forall t, {isFix t}+{~ isFix t}.
 Proof.
   induction t;
@@ -172,7 +172,7 @@ Definition isProof (t:Term) : Prop := t = TProof.
 Lemma IsProof: isProof TProof.
 intros. reflexivity.
 Qed.
-Hint Resolve IsProof.
+Hint Resolve IsProof : core.
 Lemma isProof_dec: forall t, {isProof t}+{~ isProof t}.
 Proof.
   destruct t;
@@ -200,7 +200,7 @@ Inductive isCanonical : Term -> Prop :=
 | canC: forall (i:inductive) (n np na:nat),
     isCanonical (TConstruct i n np na)
 | canA: forall fn t, isCanonical fn -> isCanonical (TApp fn t).
-Hint Constructors isCanonical.
+Hint Constructors isCanonical : core.
 
 Lemma isCanonical_dec: forall t, isCanonical t \/ ~ isCanonical t.
 Proof.
@@ -814,7 +814,7 @@ Inductive MkApp :Term -> Terms -> Term -> Prop :=
            MkApp (TApp fn b bs) cs (TApp fn b (tappend bs cs))
 | maNil: forall fn, ~ isApp fn -> MkApp fn tnil fn
 | maCons: forall fn c cs, ~ isApp fn -> MkApp fn (tcons c cs) (TApp fn c cs).
-Hint Constructors MkApp.
+Hint Constructors MkApp : core.
 
 Lemma MkApp_tcons_isApp:
   forall fn bs res, MkApp fn bs res ->
@@ -1156,7 +1156,7 @@ with WFappDs: Defs -> Prop :=
 | wfadcons: forall nm bod arg ds,
              WFapp bod -> WFappDs ds ->
              WFappDs (dcons nm bod arg ds).
-Hint Constructors WFapp WFappBs WFappDs.
+Hint Constructors WFapp WFappBs WFappDs : core.
 Scheme WFapp_ind' := Minimality for WFapp Sort Prop
   with WFappBs_ind' := Minimality for WFappBs Sort Prop
   with WFappDs_ind' := Minimality for WFappDs Sort Prop.
@@ -1300,7 +1300,7 @@ with WFTrmDs: Defs -> nat -> Prop :=
      | wfdcons: forall n nm bod arg ds,
          WFTrm bod n -> WFTrmDs ds n ->
          WFTrmDs (dcons nm bod arg ds) n.
-Hint Constructors WFTrm WFTrmBs WFTrmDs.
+Hint Constructors WFTrm WFTrmBs WFTrmDs : core.
 Scheme WFTrm_ind' := Minimality for WFTrm Sort Prop
   with WFTrmBs_ind' := Minimality for WFTrmBs Sort Prop
   with WFTrmDs_ind' := Minimality for WFTrmDs Sort Prop.
@@ -1399,7 +1399,7 @@ with PoccDefs : Defs -> Prop :=
            PoccTrm db -> PoccDefs (dcons dn db dra ds)
 | PoDtl: forall dn db dra ds,
            PoccDefs ds -> PoccDefs (dcons dn db dra ds).
-Hint Constructors PoccTrm PoccTrms PoccBrs PoccDefs.
+Hint Constructors PoccTrm PoccTrms PoccBrs PoccDefs : core.
 Scheme poTrm_ind' := Minimality for PoccTrm Sort Prop
   with poTrms_ind' := Minimality for PoccTrms Sort Prop
   with poBrs_ind' := Minimality for PoccBrs Sort Prop
@@ -1632,7 +1632,7 @@ with InstantiateDefs: nat -> Defs -> Defs -> Prop :=
          InstantiateDefs n ds ids ->
          InstantiateDefs n (dcons nm bod rarg ds)
                          (dcons nm ibod rarg ids).
-Hint Constructors Instantiate Instantiates InstantiateBrs InstantiateDefs.
+Hint Constructors Instantiate Instantiates InstantiateBrs InstantiateDefs : core.
 Scheme Instantiate_ind' := Induction for Instantiate Sort Prop
   with Instantiates_ind' := Induction for Instantiates Sort Prop
   with InstantiateBrs_ind' := Induction for InstantiateBrs Sort Prop

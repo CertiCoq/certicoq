@@ -23,11 +23,12 @@ Open Scope monad_scope.
    3 - name environment mapping variables to their original name if it exists
    4 - a map from function tags to information about that class of function
 *)
-Let L6env : Type := prims * ctor_env *  cps_util.name_env * fun_env.
 
-Let L6term: Type := env * cps.exp.
+Local Definition L6env : Type := prims * ctor_env *  cps_util.name_env * fun_env.
 
-Let L6val: Type := cps.val.
+Local Definition L6term: Type := env * cps.exp.
+
+Local Definition L6val: Type := cps.val.
 
 (* A: Should pr cenv env be particular values? The translation from L5a doesn't produce
   these values. If it did, we could make the terms contain this information, as in L3 *)
@@ -83,6 +84,40 @@ Definition bogus_closure_tag := 15%positive.
 Definition bogus_cloind_tag := 16%positive.
 
 (* tags for functions and continuations *)
+<<<<<<< HEAD
+Definition fun_fTag := 3%positive.
+Definition kon_fTag := 2%positive.
+
+(* Let bindings for function and enviroment.
+ * Thee function and the argument should be closed terms
+ * so we do not care about capturing *)
+Definition f' := 1%positive.
+Definition Γ := 2%positive.
+
+(* This is application of closure converted functions.
+   We will need regural application as well. It's likely that
+   only this one will be exposed. *)
+(* Instance CloApp : MkApply L6term := *)
+(*   mkApp (fun f xs =>  *)
+(*            Eproj f' bogus_clo_tag 0%N f *)
+(*                  (Eproj Γ bogus_clo_tag 1%N f *)
+(*                         (Eapp f' t (Γ :: xs)))). *)
+  
+
+Instance certiL5_t0_L6: 
+  CerticoqTranslation (cTerm certiL5) (cTerm certiL6) := 
+  fun v =>
+    match v with
+    | pair venv vt =>
+      (match convert_top default_cTag default_iTag fun_fTag kon_fTag (venv, vt) with
+      | Some r =>         
+        let '(cenv, nenv, fenv, next_cTag, next_iTag, e) :=  r in
+        let '(e, (d, s), fenv) := uncurry_fuel 100 (shrink_cps.shrink_top e) fenv in   
+        (* let e := postuncurry_contract e s d in            *)
+        (* let e := shrink_cps.shrink_top e in  *)
+        (* let e :=  inlinesmall_contract e 10 10 in *)
+        let e := inline_uncurry_contract e s 10 10 in  
+=======
 Definition fun_fun_tag := 3%positive.
 Definition kon_fun_tag := 2%positive.
 
@@ -250,6 +285,7 @@ Definition L6_pipeline  (opt : bool) (e : cTerm certiL5) : exceptionMonad.except
         let (e_err, c_data) := inline_uncurry e s 10 10 c_data in
         e <- e_err ;;
         (* Shrink reduction *)
+>>>>>>> 7822872cef2ae52868945e60a30fb5cbc00b5589
         let e := shrink_cps.shrink_top e in
         (* lambda lifting *)
         let (e_rr, c_data) := if opt then lambda_lift e c_data else (Ret e, c_data)in

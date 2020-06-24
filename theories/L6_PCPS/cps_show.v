@@ -5,6 +5,7 @@
 *)
 Require Import Common.AstCommon.
 Require Import List.
+Require Import Ascii.
 Require Import String.
 Require Import L6.cps.
 Require Import ExtLib.Data.String.
@@ -17,8 +18,6 @@ From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
 Import MonadNotation.
 
 Open Scope monad_scope.
-
-Require Import Common.AstCommon.
 
 Definition name_env := M.t Template.BasicAst.name.
 
@@ -110,15 +109,15 @@ Definition newline : M unit := emit (String chr_newline EmptyString).
 
 (* We assume each expression starts on a fresh newline, and that it
    should be indented by [indent] characters. *)
-Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
+Fixpoint emit_exp (indent:nat) (e:exp) {struct e} : M unit :=
   tab indent ;;
   match e with
   | Econstr x tg xs e =>
     emit "let " ;; emit (show_var x) ;;
          (* emit " := con_" ;; emit (show_pos tg) ;; *)
-    emit " := ";;emit (show_con tg);;
-    emit (show_vars xs) ;; emit " in " ;; newline ;;
-    emit_exp indent e
+    emit " := " ;; emit (show_con tg) ;;
+    emit (show_vars xs) ;; emit " in " ;; newline ;; 
+    emit_exp indent e 
   | Eproj x tg n y e =>
     emit "let " ;; emit (show_var x) ;;
     emit " := proj_" ;; emit (show_binnat n) ;; emit " " ;;
@@ -166,7 +165,7 @@ Fixpoint emit_exp (indent:nat) (e:exp) : M unit :=
   | Ehalt x  => emit "halt " ;; emit (show_var x) ;; newline
   end%string.
 
-Fixpoint emit_val (indent:nat) (v:val) : M unit :=
+Fixpoint emit_val (indent:nat) (v:val) {struct v}: M unit :=
   tab indent ;;
       match v with
         | Vconstr tg l =>
@@ -196,7 +195,7 @@ Definition show_val (v:val) : string :=
           (show_tree (snd (runState (emit_val 0 v) Emp))).
 
 
-Fixpoint emit_env' (indent:nat) (rhol:list (positive* val)):M unit :=
+Fixpoint emit_env' (indent:nat) (rhol:list (positive* val)) {struct rhol}:M unit :=
   match rhol with
     | cons (p, v)  rhol' =>
       emit "| "%string;;emit (show_var p);;emit " |->"%string;; newline;;
@@ -205,39 +204,35 @@ Fixpoint emit_env' (indent:nat) (rhol:list (positive* val)):M unit :=
     | nil => newline
   end.
 
-Fixpoint emit_cenv' (indent:nat) (cenvl:list (positive*ctor_ty_info)):M unit :=
+
+Fixpoint emit_cenv' (indent:nat) (cenvl:list (positive*ctor_ty_info)) {struct cenvl} : M unit :=
   match cenvl with
-    | cons (p, info) cenvl' =>
-      emit "| "%string;;
-           emit (show_pos p);;
-           emit " |-> ("%string;;
-           emit (show_name (ctor_name info) ("cons_"++(show_pos p)));;
-           emit " "%string;;
-           emit (show_pos (ctor_ind_tag info));;
-           emit " "%string;; emit (show_binnat (ctor_arity info));;
-           emit " "%string;; emit (show_binnat (ctor_ordinal info));;
-           emit " )"%string ;;
-           newline ;;
-           emit_cenv' indent cenvl'
+  | cons (p, info) cenvl' =>
+    emit "| "%string;;
+         emit (show_pos p) ;;
+         emit " |-> ("%string ;;
+         emit (show_name (ctor_name info) ("cons_"++(show_pos p))) ;;
+         emit " "%string ;;
+         emit (show_pos (ctor_ind_tag info)) ;;
+         emit " "%string ;; emit (show_binnat (ctor_arity info)) ;;
+         emit " "%string ;; emit (show_binnat (ctor_ordinal info)) ;;
+         emit " )"%string ;;
+         newline ;;
+         emit_cenv' indent cenvl'
     | nil => newline
   end.
+
 
 Definition emit_env (indent:nat) (rho:M.t val): M unit :=
   emit "rho:{"%string;;newline;;emit_env' indent (M.elements rho);;emit "}"%string.
 
+
 Definition emit_cenv (indent:nat) (cenv:M.t ctor_ty_info):M unit :=
   emit "cenv:{"%string;;newline;;emit_cenv' indent (M.elements cenv);;emit "}"%string.
-
 
 Definition show_env (rho:M.t val) : string :=
   String chr_newline
          (show_tree (snd (runState (emit_env 0 rho) Emp))).
-
-
-Definition show_cenv (cenv:M.t ctor_ty_info): string :=
-  String chr_newline
-         (show_tree (snd (runState (emit_cenv 0 cenv) Emp))).
-
 
 (* We add an extra newline at the front so that Coq will display the
    whole program correctly when we evaluate. *)

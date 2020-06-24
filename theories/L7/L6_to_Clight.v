@@ -1,7 +1,8 @@
 Require Import Coq.ZArith.ZArith
-               Coq.Program.Basics
-               Coq.Strings.String
-               Coq.Lists.List List_util.
+        Coq.Program.Basics
+        Coq.Strings.Ascii
+        Coq.Strings.String
+        Coq.Lists.List List_util.
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
@@ -22,6 +23,8 @@ Require Import compcert.common.AST
                compcert.common.Values.
 
 
+Require Import Clightdefs.
+
 Require Import L6.cps
                L6.identifiers.
 
@@ -29,10 +32,10 @@ Require Import Clightdefs.
 Require Import L6.cps_show.
 
 (* Axioms that are only realized in ocaml *)
-Variable (print_Clight : Clight.program -> unit).
-Variable (print_Clight_dest : Clight.program -> String.string -> unit).
-Variable (print_Clight_dest_names' : Clight.program -> list (positive * name) -> String.string -> unit).
-Variable (print : String.string -> unit).
+Parameter (print_Clight : Clight.program -> unit).
+Parameter (print_Clight_dest : Clight.program -> String.string -> unit).
+Parameter (print_Clight_dest_names' : Clight.program -> list (positive * name) -> String.string -> unit).
+Parameter (print : String.string -> unit).
 
 
 Section TRANSLATION.
@@ -293,7 +296,7 @@ Definition valPtr : type :=
   Tpointer val {| attr_volatile := false; attr_alignas := None |}.
 
 Definition argvTy : type :=
-  Tpointer valPtr {| attr_volatile := false; attr_alignas := None |}.
+  Tpointer val {| attr_volatile := false; attr_alignas := None |}.
 
 Definition boolTy : type :=
   Tint IBool Unsigned noattr.
@@ -995,17 +998,21 @@ Fixpoint translate_funs
       let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
       body <- translate_body e fenv cenv ienv m ;;
       '(gcArrIdent , _) <- M.get mainIdent m ;;
+      let argsExpr := Efield tinfd argsIdent (Tarray uval maxArgs noattr) in
       ret ((bodyIdent, Gfun (Internal
-                              (mkfunction Tvoid
+                              (mkfunction val
                                           cc_default
                                           ((tinfIdent, threadInf)::nil)
                                           ((map (fun x => (x, val)) localVars) ++ (allocIdent, valPtr) :: (limitIdent, valPtr) :: (argsIdent, valPtr) :: nil)
                                           nil
                                           (allocIdent ::= Efield tinfd allocIdent valPtr ;;;
                                            limitIdent ::= Efield tinfd limitIdent valPtr ;;;
-                                           argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);;;
+                                           argsIdent ::= argsExpr ;;;
                                            reserve_body gcArrIdent 2%Z ;;;
-                                           body))))
+                                           body ;;;
+                                           Efield tinfd allocIdent valPtr :::= allocPtr ;;;
+                                           Efield tinfd limitIdent valPtr :::= limitPtr ;;;
+                                           Sreturn (Some (Field(argsExpr, Z.of_nat 1)))))))
             :: funs)
   | _ => None
   end.
@@ -1033,7 +1040,9 @@ Fixpoint translate_funs_fast
                                            limitIdent ::= Efield tinfd limitIdent valPtr ;;;
                                            argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);;;
                                            reserve_body gcArrIdent 2%Z ;;;
-                                           body))))
+                                           body ;;;
+                                           Efield tinfd allocIdent valPtr :::= allocPtr ;;;
+                                           Efield tinfd limitIdent valPtr :::= limitPtr))))
              :: funs)
   | _ => None
   end.
@@ -1051,10 +1060,7 @@ Fixpoint make_ind_array (l : list N) : list init_data :=
   | n :: l' => (Init_int (Z.of_N n)) :: (make_ind_array l')
   end.
 
-
-
-
-(* representation of pos as string *)
+  (* representation of pos as string *)
 Fixpoint pos2string' p s :=
   match p with
   | xI p' => pos2string' p' (String "1" s)
@@ -1198,7 +1204,7 @@ Definition make_defs
     | Some fun_defs' =>
       let fun_defs := rev fun_defs' in
       ret (exceptionMonad.Ret (nenv',
-                ((((global_defs e) ++ fun_inf ++ fun_defs)))))
+                               ((((global_defs e) ++ fun_inf ++ fun_defs)))))
     end
   | None => ret (exceptionMonad.Exc "make_funinfo")
   end.
@@ -1264,7 +1270,8 @@ Definition add_inf_vars (nenv : name_env) : name_env :=
                                                M.set threadInfIdent (nNamed "thread_info"%string) (
                                                        M.set tinfIdent (nNamed "tinfo"%string) (
                                                                M.set heapInfIdent (nNamed "heap"%string) (
-                                                                     M.set numArgsIdent (nNamed "num_args"%string) nenv)))))))))).
+                                                                     M.set caseIdent (nNamed "arg"%string) (
+                                                                           M.set numArgsIdent (nNamed "num_args"%string) nenv))))))))))).
 
 
 
@@ -1678,13 +1685,13 @@ Definition make_empty_header
   ret (Some (nenv, nil)).
 
 Definition make_header
-           (cenv:ctor_env)
-           (ienv:n_ind_env)
-           (e:exp)
+           (cenv : ctor_env)
+           (ienv : n_ind_env)
+           (e : exp)
            (nenv : M.t BasicAst.name)
            : nState (option (M.t BasicAst.name  * (list (ident * globdef Clight.fundef type)))) :=
-  l <- make_interface cenv (M.elements ienv) nenv;;
-  let (nenv, inter_l) := l in
+  (* l <- make_interface cenv (M.elements ienv) nenv;; *)
+  (* let (nenv, inter_l) := l in *)
   l <- make_halt nenv ;;
   let  '(nenv, halt_f, (halt_cloIdent, halt_clo_def)) := l in
   l <- make_call_n_export_b nenv 1 false halt_cloIdent ;;
@@ -1695,7 +1702,9 @@ Definition make_header
   let  '(nenv, call_1) := l in
   l <- make_call_n_export_b nenv 3 true halt_cloIdent ;;
   let  '(nenv, call_3) := l in
-  ret (Some (nenv, (halt_f :: (halt_cloIdent, halt_clo_def) :: (tinfIdent, tinf_def) :: call_0 :: call_1 :: call_2 :: call_3 :: inter_l))).
+  ret (Some (nenv, (halt_f :: (halt_cloIdent, halt_clo_def) ::
+                   (tinfIdent, tinf_def) ::
+                   call_0 :: call_1 :: call_2 :: call_3 :: nil))).
 
 
 

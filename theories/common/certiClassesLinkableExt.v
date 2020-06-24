@@ -8,6 +8,8 @@ Require Import Common.certiClasses2.
 Require Import Common.certiClasses3.
 Require Import Common.certiClassesLinkable.
 Require Import Coq.Unicode.Utf8.
+Require Import SquiggleEq.tactics.
+Require Import SquiggleEq.LibTactics.
 
 
 
@@ -32,7 +34,7 @@ Fixpoint compObsLeLinkExtN `{GoodTerm Dst} (m:nat) (s:Src) (d:Dst) {struct m} : 
   | S m =>
     (forall (sv:Src),
         s ⇓ sv
-        -> (exists dv:Dst,
+        -> (exists (dv:Dst),
               d ⇓ dv /\
               yesPreserved sv dv
               /\ (forall n:nat, liftLe  (compObsLeLinkExtN m) (observeNthSubterm n sv) (observeNthSubterm n dv))
@@ -46,9 +48,6 @@ Fixpoint compObsLeLinkExtN `{GoodTerm Dst} (m:nat) (s:Src) (d:Dst) {struct m} : 
 
 Definition compObsLeLinkExt `{GoodTerm Dst} (s:Src) (d:Dst) : Prop :=
   forall m, compObsLeLinkExtN m s d.
-
-Require Import SquiggleEq.tactics.
-Require Import SquiggleEq.LibTactics.
 
 Context `{CerticoqTranslation Src Dst}.
 Definition compObsPreservingLinkableExt `{GoodTerm Dst}:=

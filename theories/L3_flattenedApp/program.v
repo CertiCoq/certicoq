@@ -115,7 +115,7 @@ with crctDs: environ Term -> nat -> Defs -> Prop :=
 | cdsCons: forall p n nm bod ix ds,
     crctTerm p n bod -> isLambda bod -> crctDs p n ds ->
     crctDs p n (dcons nm bod ix ds).
-Hint Constructors crctTerm crctTerms crctBs crctDs crctEnv.
+Hint Constructors crctTerm crctTerms crctBs crctDs crctEnv : core.
 Scheme crct_ind' := Minimality for crctTerm Sort Prop
   with crcts_ind' := Minimality for crctTerms Sort Prop
   with crctBs_ind' := Minimality for crctBs Sort Prop
@@ -182,7 +182,7 @@ Lemma Crct_Up:
 Proof.
   intros. eapply Crct_UP. eassumption. omega.
 Qed.
-Hint Resolve Crct_Up Crct_UP.
+Hint Resolve Crct_Up Crct_UP : core.
 
 Lemma Crct_fresh_Pocc:
   (forall p n t, crctTerm p n t -> forall nm, fresh nm p -> ~ PoccTrm nm t) /\
@@ -796,7 +796,7 @@ with CrctTyp: environ Term -> nat -> itypPack -> Prop :=
            fresh nm p -> CrctTyp ((nm,ecTrm s)::p) n t
 | CrctTypWk2: forall n p t s nm, CrctTyp p n t -> CrctTyp p n s ->
            fresh nm p -> forall m, CrctTyp ((nm,ecTyp _ m s)::p) n t.
-Hint Constructors Crct Crcts CrctDs CrctTyp.
+Hint Constructors Crct Crcts CrctDs CrctTyp : core.
 Scheme Crct_ind' := Minimality for Crct Sort Prop
   with Crcts_ind' := Minimality for Crcts Sort Prop
   with CrctDs_ind' := Minimality for CrctDs Sort Prop
@@ -1456,7 +1456,7 @@ Inductive envOk : environ Term -> Prop :=
 | envOk_cons : forall nm t p,
       fresh nm p -> envOk p -> weaklyClosed t p ->
          envOk ((nm, ecConstr t) :: p).
-Hint Constructors envOk.
+Hint Constructors envOk : core.
 
 Lemma envOk_nPocc_hd:
   forall nmtp, envOk nmtp ->

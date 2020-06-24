@@ -24,7 +24,7 @@ Definition compile_L1g : CertiCoqTrans Ast.program (Program Term) :=
 Instance L1g_Lang : Lang (Program Term) :=
   { Value := Term;
     TermWf := fun P => match P with
-                      mkPgm trm env => WFapp trm /\ WFaEnv env
+                      mkPgm trm env => WFapp trm /\ program.WFaEnv env
                     end;
     BigStep := fun s sv => WcbvEval (env s) (main s) sv
   }.

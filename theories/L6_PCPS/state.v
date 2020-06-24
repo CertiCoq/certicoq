@@ -1,4 +1,4 @@
-Require Import Common.compM.
+Require Import Common.compM Common.Pipeline_utils.
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx
         L6.List_util L6.functions L6.cps_show.
 Require Import Coq.ZArith.Znumtheory.
@@ -108,12 +108,6 @@ Section CompM.
     s <- compM.get ;;
     let '(mkCompData x c i f e fenv names log, st) := s in
     compM.put (mkCompData x c i f e fenv names (msg :: log)%string, st).
-
-  Definition chr_newline : ascii := Eval compute in ascii_of_nat 10.
-  Definition newline : string := (String chr_newline EmptyString).
-
-  Definition log_to_string (log : list string) : string :=
-    (concat newline ("Debug messages" :: (List.rev log)))%string.
 
   (* Access the transformation specific state *)
   Definition get_state (_ : unit) : compM' S :=

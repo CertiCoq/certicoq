@@ -207,6 +207,26 @@ Proof.
   - eexists; split; eauto using split_fds_nil_l.
 Qed.
 
+Theorem split_fds_nil:
+  (forall fds fds',
+      split_fds Fnil fds fds' -> fds = fds') /\
+  (forall fds fds',
+      split_fds fds Fnil fds' -> fds = fds').
+Proof.
+  split; induction fds; intros; inversion H; subst.
+  erewrite IHfds; eauto.
+  reflexivity.
+  erewrite IHfds; eauto.
+  reflexivity.
+Qed.
+
+Lemma split_fds_to_nil f1 f2:
+  split_fds f1 f2 Fnil -> f1 = Fnil /\ f2 = Fnil.
+Proof.
+  intros H; destruct f1; destruct f2; inversion H. auto.
+Qed.
+
+
 Lemma split_fds_sym B1 B2 B3 :
   split_fds B1 B2 B3 ->
   split_fds B2 B1 B3.
@@ -333,407 +353,17 @@ Proof.
   - inv Hspl.
 Qed.
 
-(** Lemmas about [get_list] *)
-Lemma get_list_In {A} (rho : M.t A) ys x vs :
-  get_list ys rho = Some vs ->
-  List.In x ys ->
-  exists v, M.get x rho = Some v.
+
+Lemma fundefs_append_assoc: forall F1 F2 F3,
+    fundefs_append F1 (fundefs_append F2 F3) =
+    fundefs_append (fundefs_append F1 F2) F3.
 Proof.
-  revert x vs. induction ys; intros x vs Hget H. inv H.
-  inv H; simpl in Hget.
-  - destruct (M.get x rho) eqn:Heq; try discriminate; eauto.
-  - destruct (M.get a rho) eqn:Heq; try discriminate; eauto.
-    destruct (get_list ys rho) eqn:Heq'; try discriminate; eauto.
-Qed.
-
-Lemma In_get_list {A} (xs : list var) (rho : M.t A) :
-  (forall x, List.In x xs -> exists v, M.get x rho = Some v) ->
-  exists vs, get_list xs rho = Some vs.
-Proof.
-  intros H. induction xs.
-  - eexists; simpl; eauto.
-  - edestruct IHxs.
-    + intros x Hin. eapply H. now constructor 2.
-    + edestruct H. now constructor.
-      eexists. simpl. erewrite H1, H0.
-      reflexivity.
-Qed.
-
-Lemma get_list_nth_get {A} (xs : list var) (vs : list A) rho (x : var) N :
-  get_list xs rho = Some vs ->
-  nthN xs N = Some x ->
-  exists v, nthN vs N = Some v /\ M.get x rho = Some v.
-Proof.
-  revert vs N; induction xs; intros vs N Hget Hnth.
-  - inv Hnth.
-  - simpl in Hget.
-    destruct (M.get a rho) eqn:Hget'; try discriminate.
-    destruct (get_list xs rho) eqn:Hget_list'; try discriminate.
-    inv Hget. destruct N.
-    + inv Hnth. eexists; simpl; eauto.
-    + edestruct IHxs as [v' [Hnth1 Hget1]]; eauto.
-Qed.
-
-Lemma get_list_set_neq {A} xs x (v : A) rho :
-  ~ List.In x xs ->
-  get_list xs (M.set x v rho) = get_list xs rho.
-Proof.
-  intros Hin.
-  revert rho. induction xs; intros rho.
-  - reflexivity.
-  - simpl. rewrite M.gso.
-    + rewrite IHxs. reflexivity.
-      intros Hin'. eapply Hin. now constructor 2.
-    + intros Heq; subst. eapply Hin. now constructor.
-Qed.
-
-Lemma get_list_set_lists {A} xs (vs : list A) rho rho' :
-  NoDup xs ->
-  set_lists xs vs rho = Some rho' ->
-  get_list xs rho' = Some vs.
-Proof.
-  revert rho' vs; induction xs; intros rho' vs Hnd Hset.
-  - inv Hset. destruct vs; try discriminate. reflexivity.
-  - inv Hnd. simpl in *.
-    destruct vs; try discriminate.
-    destruct (set_lists xs vs rho) eqn:Hset'; try discriminate. inv Hset.
-    rewrite M.gss. rewrite get_list_set_neq.
-    now erewrite IHxs; eauto. eassumption.
-Qed.
-
-Lemma get_list_set_lists_Disjoint {A} xs xs' (vs : list A) rho rho' :
-  Disjoint _ (FromList xs) (FromList xs') ->
-  set_lists xs vs rho = Some rho' ->
-  get_list xs' rho' = get_list xs' rho.
-Proof with now eauto with Ensembles_DB.
-  revert rho' vs; induction xs; intros rho' vs Hd Hset.
-  - inv Hset. destruct vs; try discriminate. inv H0; reflexivity.
-  - simpl in *.
-    destruct vs; try discriminate.
-    destruct (set_lists xs vs rho) eqn:Hset'; try discriminate. inv Hset.
-    rewrite FromList_cons in Hd.
-    rewrite get_list_set_neq.
-    erewrite IHxs...
-    intros Hc; eapply Hd. constructor; eauto.
-Qed.
-
-Lemma get_list_reset {A} σ x y (v : A) rho l :
-  M.get (σ x) rho = Some v ->
-  ~ In _ (image σ (Setminus _ (FromList l) (Singleton _ x))) y ->
-  get_list (map σ l) rho = get_list (map (σ { x ~> y }) l) (M.set y v rho).
-Proof with now eauto with Ensembles_DB.
-  intros Hget Hnin. induction l; eauto.
-  simpl. destruct (peq x a); subst.
-  - rewrite extend_gss, M.gss, Hget.
-    rewrite IHl. reflexivity.
-    intros Hc. eapply Hnin.
-    rewrite FromList_cons.
-    eapply image_monotonic; try eassumption...
-  - rewrite extend_gso; eauto.
-    rewrite M.gso.
-    rewrite IHl. reflexivity.
-    intros Hc. eapply Hnin.
-    rewrite FromList_cons.
-    eapply image_monotonic; try eassumption...
-    intros Hc. eapply Hnin.
-    subst. rewrite FromList_cons. eexists; split; eauto.
-    constructor; eauto.
-    intros Hc; inv Hc. congruence.
-Qed.
-
-Lemma get_list_reset_neq {A} σ x y (v : A) rho l :
-  ~ In _ (image σ (Setminus _ (FromList l) (Singleton _ x))) y ->
-  ~ List.In x l ->
-  get_list (map σ l) rho = get_list (map (σ { x ~> y }) l) (M.set y v rho).
-Proof with now eauto with Ensembles_DB.
-  intros  Hnin. induction l; intros Hnin'; eauto.
-  simpl. destruct (peq x a); subst.
-  - exfalso. eapply Hnin'. now constructor.
-  - rewrite extend_gso; eauto.
-    rewrite M.gso.
-    rewrite IHl. reflexivity.
-    intros Hc. eapply Hnin.
-    rewrite FromList_cons.
-    eapply image_monotonic; try eassumption...
-    intros Hc. eapply Hnin'. now constructor 2.
-    intros Hc. subst. eapply Hnin.
-    rewrite FromList_cons. eexists; split; eauto.
-    constructor; eauto.
-    intros Hc; inv Hc. congruence.
-Qed.
-
-Lemma get_eq_get_list_eq {A} (rho rho' : M.t A) xs :
-  (forall z, M.get z rho = M.get z rho') ->
-  get_list xs rho = get_list xs rho'.
-Proof.
-  induction xs; intros H; eauto.
-  simpl; f_equal.
-  rewrite IHxs; eauto.
-  rewrite H. reflexivity.
-Qed.
-
-Lemma get_list_app {A} m l1 l2 (v1 v2 : list A) :
-  get_list l1 m = Some v1 ->
-  get_list l2 m = Some v2 ->
-  get_list (l1 ++ l2) m = Some (v1 ++ v2).
-Proof.
-  revert v1. induction l1; intros v1 Hget1 Hget2; simpl in *.
-  - inv Hget1. eauto.
-  - destruct (M.get a m) eqn:Hgeta; try discriminate.
-    destruct (get_list l1 m) eqn:Hget; try discriminate.
-    inv Hget1. simpl. erewrite IHl1; eauto.
-Qed.
-
-Lemma get_list_length_eq {A} l (vs : list A) rho :
-  get_list l rho = Some vs ->
-  length l = length vs.
-Proof.
-  revert vs; induction l; intros vs Hget.
-  - inv Hget. eauto.
-  - simpl in Hget. destruct (M.get a rho); try discriminate.
-    destruct (get_list l rho); try discriminate.
-    inv Hget. simpl. f_equal; eauto.
-Qed.
-
-Lemma app_get_list {A} l1 l2 (vs : list A) rho :
-  get_list (l1 ++ l2) rho = Some vs ->
-  exists vs1 vs2,
-    get_list l1 rho = Some vs1 /\
-    get_list l2 rho = Some vs2 /\
-    vs = vs1 ++ vs2.
-Proof.
-  revert vs. induction l1; intros vs Hget.
-  - simpl in Hget. repeat eexists; eauto.
-  - simpl in Hget.
-    destruct (M.get a rho) eqn:Hgeta; try discriminate.
-    destruct (get_list (l1 ++ l2) rho) eqn:Hgetl; try discriminate.
-    inv Hget.
-    edestruct IHl1 as [vs1 [vs2 [Hget1 [Hget2 Heq]]]].
-    reflexivity.
-    repeat eexists; eauto. simpl.
-    rewrite Hgeta, Hget1. reflexivity.
-    simpl. congruence.
-Qed.
-
-Lemma get_list_In_val {A} (rho : M.t A) ys v vs :
-  get_list ys rho = Some vs ->
-  List.In v vs ->
-  exists x, List.In x ys /\ M.get x rho = Some v.
-Proof.
-  revert v vs. induction ys; intros x vs Hget H.
-  - inv Hget. now inv H.
-  - simpl in *.
-    destruct (M.get a rho) eqn:Heq; try discriminate; eauto.
-    destruct (get_list ys rho) eqn:Heq'; try discriminate; eauto.
-    inv Hget. inv H; eauto.
-    edestruct IHys as [y [Hin Hget]]; eauto.
+  induction F1; intros.
+  - simpl. rewrite IHF1. auto.
+  - simpl. reflexivity.
 Qed.
 
 
-(** Lemmas about [set_lists]  *)
-
-Lemma set_lists_Forall2_get {A} (P : A -> A -> Prop)
-      xs vs1 vs2 rho1 rho2 rho1' rho2' x :
-  Forall2 P vs1 vs2 ->
-  set_lists xs vs1 rho1 = Some rho1' ->
-  set_lists xs vs2 rho2 = Some rho2' ->
-  List.In x xs ->
-  exists v1 v2,
-    M.get x rho1' = Some v1 /\
-    M.get x rho2' = Some v2 /\ P v1 v2.
-Proof.
-  revert rho1' rho2' vs1 vs2.
-  induction xs; simpl; intros rho1' rho2' vs1 vs2 Hall Hset1 Hset2 Hin.
-  - inv Hin.
-  - destruct (Coqlib.peq a x); subst.
-    + destruct vs1; destruct vs2; try discriminate.
-      destruct (set_lists xs vs1 rho1) eqn:Heq1;
-        destruct (set_lists xs vs2 rho2) eqn:Heq2; try discriminate.
-      inv Hset1; inv Hset2. inv Hall.
-      repeat eexists; try rewrite M.gss; eauto.
-    + destruct vs1; destruct vs2; try discriminate.
-      destruct (set_lists xs vs1 rho1) eqn:Heq1;
-        destruct (set_lists xs vs2 rho2) eqn:Heq2; try discriminate.
-      inv Hset1; inv Hset2. inv Hall. inv Hin; try congruence.
-      edestruct IHxs as [v1 [v2 [Hget1 [Hget2 HP]]]]; eauto.
-      repeat eexists; eauto; rewrite M.gso; eauto.
-Qed.
-
-Lemma get_set_lists_In_xs {A} x xs vs rho rho' :
-  In var (FromList xs) x ->
-  set_lists xs vs rho = Some rho' ->
-  exists v : A, M.get x rho' = Some v.
-Proof.
-  revert rho rho' vs. induction xs; intros rho rho' vs Hin Hset.
-  - rewrite FromList_nil in Hin. exfalso.
-    eapply not_In_Empty_set. eassumption.
-  - rewrite FromList_cons in Hin.
-    destruct vs; try discriminate.
-    simpl in Hset. destruct (set_lists xs vs rho) eqn:Hset_lists; try discriminate.
-    inv Hset. inv Hin.
-    + inv H. eexists. rewrite M.gss. reflexivity.
-    + destruct (Coqlib.peq x a); subst.
-      * eexists. now rewrite M.gss.
-      * edestruct IHxs; eauto.
-        eexists. simpl. rewrite M.gso; eauto.
-Qed.
-
-Lemma set_lists_not_In {A} (xs : list var) (vs : list A)
-      (rho rho' : M.t A) (x : var) :
-  set_lists xs vs rho = Some rho' ->
-  ~ List.In x xs ->
-  M.get x rho = M.get x rho'.
-Proof.
-  revert vs rho'.
-  induction xs; simpl; intros vs rho' Hset Hin.
-  - destruct vs; congruence.
-  - destruct vs; try discriminate.
-    destruct (set_lists xs vs rho) eqn:Heq1; try discriminate. inv Hset.
-    rewrite M.gso; eauto.
-Qed.
-
-Lemma set_lists_length {A} (rho rho' rho1 : M.t A)
-      (xs : list var) (vs1 vs2 : list A) :
-  length vs1 = length vs2 ->
-  set_lists xs vs1 rho = Some rho1 ->
-  exists rho2, set_lists xs vs2 rho' = Some rho2.
-Proof.
-  revert vs1 vs2 rho1.
-  induction xs as [| x xs IHxs ]; intros vs1 vs2 rho1 Hlen Hset.
-  - inv Hset. destruct vs1; try discriminate. inv H0.
-    destruct vs2; try discriminate. eexists; simpl; eauto.
-  - destruct vs1; try discriminate. destruct vs2; try discriminate.
-    inv Hlen. simpl in Hset.
-    destruct (set_lists xs vs1 rho) eqn:Heq2; try discriminate.
-    edestruct (IHxs _ _ _ H0 Heq2) as  [vs2' Hset2].
-    eexists. simpl; rewrite Hset2; eauto.
-Qed.
-
-Lemma set_permut {A} rho x y (v1 v2 : A) z :
-  x <> y ->
-  M.get z (M.set x v1 (M.set y v2 rho)) =
-  M.get z (M.set y v2 (M.set x v1 rho)).
-Proof.
-  intros Hnin. destruct (peq z x); subst.
-  - rewrite M.gss, M.gso, M.gss; eauto.
-  - rewrite (@M.gso _ z x); eauto.
-    destruct (peq z y); subst.
-    + rewrite !M.gss; eauto.
-    + rewrite !M.gso; eauto.
-Qed.
-
-Lemma set_set_lists_permut {A} rho rho' y ys (v : A) vs :
-  set_lists ys vs rho = Some rho' ->
-  ~ List.In y ys ->
-  exists rho'',
-    set_lists ys vs (M.set y v rho) = Some rho'' /\
-    (forall z, M.get z (M.set y v rho') = M.get z rho'').
-Proof.
-  revert vs rho'.
-  induction ys; intros vs rho' Hset Hin;
-  destruct vs; try discriminate.
-  - inv Hset. eexists; split; simpl; eauto.
-  - simpl in Hset.
-    destruct (set_lists ys vs rho) eqn:Heq; try discriminate.
-    inv Hset. edestruct IHys as [rho'' [Hset Hget]]; eauto.
-    intros Hc; eapply Hin; now constructor 2.
-    eexists; split.
-    simpl. rewrite Hset. reflexivity.
-    intros z. rewrite set_permut.
-    destruct (peq z a); subst.
-    + rewrite !M.gss; eauto.
-    + rewrite !(@M.gso _ z a); eauto.
-    + intros Hc. eapply Hin.
-      constructor; eauto.
-Qed.
-
-Lemma set_lists_length3 {A} (rho : M.t A) xs vs :
-  length xs = length vs ->
-  exists rho', set_lists xs vs rho = Some rho'.
-Proof.
-  revert vs; induction xs; intros vs Hlen; destruct vs; try discriminate.
-  - eexists; simpl; eauto.
-  - inv Hlen.
-    edestruct IHxs as [rho' Hset]. eassumption.
-    eexists. simpl. rewrite Hset. reflexivity.
-Qed.
-
-Lemma set_lists_app {A} xs1 xs2 (vs1 vs2 : list A) rho rho' :
-  set_lists (xs1 ++ xs2) (vs1 ++ vs2) rho = Some rho' ->
-  length xs1 = length vs1 ->
-  exists rho'',
-    set_lists xs2 vs2 rho = Some rho'' /\
-    set_lists xs1 vs1 rho'' = Some rho'.
-Proof.
-  revert vs1 rho'. induction xs1; intros vs1 rho' Hset Hlen.
-  - destruct vs1; try discriminate.
-    eexists; split; eauto.
-  - destruct vs1; try discriminate.
-    inv Hlen. simpl in Hset.
-    destruct (set_lists (xs1 ++ xs2) (vs1 ++ vs2) rho) eqn:Heq; try discriminate.
-    inv Hset. edestruct IHxs1 as [rho'' [Hset1 Hset2]].
-    eassumption. eassumption.
-    eexists. split. eassumption. simpl; rewrite Hset2; reflexivity.
-Qed.
-
-
-Lemma set_lists_length_eq {A} rho rho' xs (vs : list A) :
-  set_lists xs vs rho = Some rho' ->
-  length xs = length vs.
-Proof.
-  revert rho' vs; induction xs; intros rho' vs Hset.
-  - destruct vs; try discriminate. reflexivity.
-  - destruct vs; try discriminate.
-    simpl in Hset.
-    destruct (set_lists xs vs rho) eqn:Heq; try discriminate.
-    simpl. f_equal. inv Hset. eauto.
-Qed.
-
-Lemma get_list_reset_lst {A} σ xs ys (vs : list A) rho rho' l  :
-  set_lists ys vs rho = Some rho' ->
-  get_list (map σ xs) rho = Some vs ->
-  Disjoint _ (image σ (FromList l)) (FromList ys) ->
-  length xs = length ys ->
-  NoDup xs -> NoDup ys ->
-  get_list (map σ l) rho = get_list (map (σ <{ xs ~> ys }>) l) rho'.
-Proof with now eauto with Ensembles_DB.
-  revert σ ys vs rho' rho. induction xs as [| x xs IHxs ];
-    intros σ ys vs rho' rho Hset Hget HD Hlen Hnd1 Hnd2.
-  - destruct ys; try discriminate.
-    inv Hget. inv Hset. reflexivity.
-  - destruct ys; try discriminate. simpl in *.
-    inv Hlen. destruct vs as [| v vs]; try discriminate.
-    destruct (set_lists ys vs rho) eqn:Hset'; try discriminate.
-    destruct (M.get (σ x) rho) eqn:Hget'; try discriminate.
-    destruct (get_list (map σ xs) rho) eqn:Hgetl; try discriminate.
-    inv Hget. inv Hset. inv Hnd1. inv Hnd2. rewrite !FromList_cons in HD.
-    assert (H : get_list (map ((σ <{ xs ~> ys }>) {x ~> e}) l) (M.set e v t) =
-                get_list (map ((σ <{ xs ~> ys }>)) l) t).
-    { destruct (in_dec peq x l).
-      - rewrite <- get_list_reset; try reflexivity.
-        rewrite extend_lst_gso; eauto.
-        erewrite <- set_lists_not_In. eassumption. eassumption.
-        intros Hc. eapply HD. constructor; eauto.
-        eexists; split; eauto.
-        intros Hc.
-        apply image_extend_lst_Included in Hc; eauto.
-        inv Hc; eauto. eapply HD. constructor; eauto.
-        eapply image_monotonic; [| eassumption ]...
-      - rewrite map_extend_not_In; eauto.
-        erewrite get_list_set_neq. reflexivity.
-        intros Hc. eapply in_map_iff in Hc.
-        destruct Hc as [x' [Heq Hin]].
-        destruct (in_dec peq x' xs).
-        + edestruct (extend_lst_gss σ) as [y' [Hin' Heq']]; eauto.
-          rewrite Heq in Hin'. subst.
-          subst. eauto.
-        + rewrite extend_lst_gso in Heq; eauto.
-          eapply HD. constructor; eauto.
-          eexists; eauto. }
-    rewrite H.
-    erewrite <- IHxs; eauto.
-    now eauto with Ensembles_DB.
-Qed.
 
 
 (** A case statement only pattern matches constructors from the same inductive type *)
@@ -818,6 +448,12 @@ Definition binding_in_map {A} (S : Ensemble M.elt) (map : M.t A) : Prop :=
 (** The variables in S are not defined in the map. *)
 Definition binding_not_in_map {A} (S : Ensemble M.elt) (map : M.t A) :=
   forall x : M.elt, In M.elt S x -> M.get x map = None.
+
+Lemma binding_in_map_Empty_set A (rho : M.t A) :
+  binding_in_map (Empty_set _) rho.
+Proof.
+  intros x Hin. inv Hin.
+Qed.
 
 
 (** * Lemmas about [binding_in_map] *)
@@ -1280,7 +916,7 @@ Proof.
 Qed.
 
 
-Local Hint Constructors num_occur num_occur_fds num_occur_case num_occur_ec num_occur_fdc.
+Local Hint Constructors num_occur num_occur_fds num_occur_case num_occur_ec num_occur_fdc : core.
 
 Theorem num_occur_app_ctx_mut:
   forall e x,
@@ -1421,6 +1057,26 @@ Proof.
     auto.
     apply IHf.
     eexists; eexists; eauto.
+Qed.
+
+Lemma not_occur_list_not_in:
+  forall v l, num_occur_list l v = 0 <-> ~ List.In  v l.
+Proof.
+  induction l; split; intros.
+  - intro. inversion H0.
+  - auto.
+  - intro. inversion H0.
+    + subst. simpl in H.
+      unfold cps_util.var_dec in *.
+      destruct (M.elt_eq v v).
+      inversion H. apply n; auto.
+    + inversion H.
+      apply IHl. destruct (cps_util.var_dec v a).
+      inversion H3. auto. auto.
+  - simpl.
+    destruct (cps_util.var_dec v a).
+    exfalso. apply H. constructor. auto.
+    apply IHl. intro. apply H. constructor 2. auto.
 Qed.
 
 Theorem num_occur_app_ctx:
@@ -1658,7 +1314,7 @@ Proof.
 Qed.
 
 
-(* Instance for option monad. Maybe move to more general file *)  Instance OptMonad : Monad option.
+(* Instance for option monad. Maybe move to more general file *)
 Instance OptMonad : Monad option.
 Proof. 
   constructor.

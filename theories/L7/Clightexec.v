@@ -256,7 +256,6 @@ First argument is a pointer to the number of blocks to allocate (unsigned int32)
 second arg is pointer to tinfo
 
 Mem_alloc n blocks , updates alloc and limit in tinfo, returns void *)
-SearchAbout (ptrofs -> Z).
 
 Definition do_ef_gcmalloc
        (vargs: list val) (m: mem) : res (val * mem) :=

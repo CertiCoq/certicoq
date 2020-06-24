@@ -54,10 +54,6 @@ Proof.
   apply Bool.bool_dec. apply level_dec.
 Defined.
 
-Lemma universe_dec: forall x y : universe, {x = y} + {x <> y}.
-  decide equality; apply level_bool_dec.
-Defined.
-
 Lemma cast_kind_dec: forall (c1 c2:cast_kind), {c1 = c2}+{c1 <> c2}.
 induction c1; induction c2;
 try (solve [right; intros; discriminate]);
@@ -105,15 +101,6 @@ Proof.
 Defined.
 
 Instance InductiveEq: Eq inductive := { eq_dec := inductive_dec }.
-
-(** certiCoq representation of sorts **)
-Inductive Srt := SProp | SSet | SType.
-
-Lemma Srt_dec: forall (s1 s2:Srt), {s1 = s2}+{s1 <> s2}.
-induction s1; induction s2;
-try (solve [right; intros h; discriminate]);
-try (solve [left; reflexivity]).
-Defined.
 
 
 (** certiCoq representation of inductive types **)
@@ -219,7 +206,7 @@ Inductive WFaEc: envClass -> Prop :=
 | wfaecTrm: forall t, WFapp t -> WFaEc (ecTrm t)
 | wfaecTyp: forall n i, WFaEc (ecTyp n i)
 | wfaecAx: WFaEc (ecAx).
-Hint Constructors WFaEc.
+Hint Constructors WFaEc : core.
 
 (** An environ is an association list of envClass. **)
 Definition environ := list (string * envClass).
@@ -253,7 +240,7 @@ Inductive fresh (nm:string) : environ -> Prop :=
 | fcons: forall s p ec,
          fresh nm p -> nm <> s -> fresh nm ((s,ec)::p)
 | fnil: fresh nm nil.
-Hint Constructors fresh.
+Hint Constructors fresh : core.
 
 Lemma fresh_dec: forall nm p, (fresh nm p) \/ ~(fresh nm p).
 induction p.
@@ -289,7 +276,7 @@ Inductive WFaEnv: environ -> Prop :=
 | wfaenil: WFaEnv nil
 | wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p -> 
                    forall nm, fresh nm p -> WFaEnv ((nm, ec) :: p).
-Hint Constructors WFaEnv.
+Hint Constructors WFaEnv : core.
 
 (** looking a name up in an environment **)
 (** Hack: we code axioms in the environment as ecTyp with itypPack = nil **)
@@ -297,7 +284,7 @@ Inductive Lookup: string -> environ -> envClass -> Prop :=
 | LHit: forall s p t, Lookup s ((s,t)::p) t
 | LMiss: forall s1 s2 p t ec,
            s2 <> s1 -> Lookup s2 p ec -> Lookup s2 ((s1,t)::p) ec.
-Hint Constructors Lookup.
+Hint Constructors Lookup : core.
 Definition LookupDfn s p t := Lookup s p (ecTrm t).
 Definition LookupTyp s p n i := Lookup s p (ecTyp n i) /\ i <> nil.
 Definition LookupAx s p := Lookup s p ecAx.

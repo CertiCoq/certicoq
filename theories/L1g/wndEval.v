@@ -60,7 +60,7 @@ Inductive wndEval : Term -> Term -> Prop :=
     wndEval mch can -> wndEval (TCase nl mch brs) (TCase nl can brs)
 | sProjBod: forall prj bod Bod,
     wndEval bod Bod -> wndEval (TProj prj bod) (TProj prj Bod).
-Hint Constructors wndEval.
+Hint Constructors wndEval : core.
 
 (**********
 with wndEvals : Terms -> Terms -> Prop :=
@@ -70,7 +70,7 @@ with wndEvals : Terms -> Terms -> Prop :=
      | saTl: forall (t:Term) (ts ss:Terms),
          wndEvals ts ss ->
          wndEvals (tcons t ts) (tcons t ss).
-Hint Constructors wndEval wndEvals.
+Hint Constructors wndEval wndEvals : core.
 Scheme wndEval1_ind := Induction for wndEval Sort Prop
   with wndEvals1_ind := Induction for wndEvals Sort Prop.
 Combined Scheme wndEvalEvals_ind from wndEval1_ind, wndEvals1_ind.
@@ -528,7 +528,7 @@ Inductive wndEvalRTC: Term -> Term -> Prop :=
 | wERTCstep: forall t s, wndEval t s -> wndEvalRTC t s
 | wERTCtrn: forall t s u, wndEvalRTC t s -> wndEvalRTC s u ->
                           wndEvalRTC t u.
-Hint Constructors wndEvalRTC.
+Hint Constructors wndEvalRTC : core.
 (***********
 Inductive wndEvalsRTC: Terms -> Terms -> Prop :=
 (** | wEsRTCrfl: forall ts, WNorms ts -> wndEvalsRTC p ts ts ??? **)
@@ -536,7 +536,7 @@ Inductive wndEvalsRTC: Terms -> Terms -> Prop :=
 | wEsRTCstep: forall ts ss, wndEvals ts ss -> wndEvalsRTC ts ss
 | wEsRTCtrn: forall ts ss us, wndEvalsRTC ts ss -> wndEvalsRTC ss us ->
                           wndEvalsRTC ts us.
-Hint Constructors wndEvalRTC wndEvalsRTC.
+Hint Constructors wndEvalRTC wndEvalsRTC : core.
 *******************)
 
 Lemma wndEvalRTC_pres_WFapp:
@@ -675,13 +675,13 @@ Inductive wndEvalTCl: Term -> Term -> Prop :=
 | wETClstep: forall t s, wndEval t s -> wndEvalTCl t s
 | wETCltrn: forall t s, wndEvalTCl t s ->
                         forall u, wndEval s u -> wndEvalTCl t u.
-Hint Constructors wndEvalTCl.
+Hint Constructors wndEvalTCl : core.
 (*********************
 Inductive wndEvalsTCl: Terms -> Terms -> Prop :=
 | wEsTClstep: forall ts ss, wndEvals ts ss -> wndEvalsTCl ts ss
 | wEsTCltrn: forall ts ss, wndEvalsTCl ts ss -> 
          forall us, wndEvals ss us -> wndEvalsTCl ts us.
-Hint Constructors wndEvalsTCl.
+Hint Constructors wndEvalsTCl : core.
 *********************)
 
 (** transitive congruence rules **)
@@ -798,7 +798,7 @@ Qed.
  *****************)
  
 End Env.
-Hint Constructors wndEval wndEvalRTC.
+Hint Constructors wndEval wndEvalRTC : core.
 
 
 Lemma wndEval_weaken:

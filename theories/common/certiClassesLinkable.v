@@ -4,6 +4,9 @@ Require Import Common.certiClasses.
 Require Import Common.certiClasses2.
 Require Import Common.certiClasses3.
 Require Import Coq.Unicode.Utf8.
+Require Import SquiggleEq.tactics.
+Require Import SquiggleEq.LibTactics.
+Require Import Morphisms.
 
 Class MkApply (Term:Type) := mkApp : Term -> Term -> Term.
 
@@ -37,7 +40,7 @@ CoInductive compObsLeLink : Src -> Dst -> Prop :=
 | sameObsLink : forall (s : Src) (d : Dst),
     (forall (o:Opt) (sv:Src),
         s ⇓ sv
-        -> (exists dv:Dst,
+        -> (exists (dv : Dst),
               d ⇓ dv /\
               yesPreserved sv dv
               /\ (forall n:nat, liftLe compObsLeLink (observeNthSubterm n sv) (observeNthSubterm n dv))
@@ -52,7 +55,7 @@ Inductive compObsLeLinkN : nat -> Src -> Dst -> Prop :=
 | sameObsLinkS : forall m (s : Src) (d : Dst),
     (forall (o:Opt) (sv:Src),
         s ⇓ sv
-        -> (exists dv:Dst,
+        -> (exists (dv:Dst),
               d ⇓ dv /\
               yesPreserved sv dv
               /\ (forall n:nat, liftLe (compObsLeLinkN m) (observeNthSubterm n sv) (observeNthSubterm n dv))
@@ -65,8 +68,6 @@ Inductive compObsLeLinkN : nat -> Src -> Dst -> Prop :=
 | sameObsLinkO : forall (s : Src) (d : Dst), compObsLeLinkN 0 s d.
 
 
-Require Import SquiggleEq.tactics.
-Require Import SquiggleEq.LibTactics.
 (** this part is generally easy and unconditional *)
 Lemma fromCoInd s d:
   compObsLeLink s d -> forall m, compObsLeLinkN m s d.
@@ -306,8 +307,6 @@ Proof.
   eapply compObsLeLinkTransitive; eauto.
   Unshelve. eauto. eauto.
 Qed.
-
-Require Import Morphisms.
 
 (* Outside this section, this definition should not depend at all on Src and Dst.*)
 Definition leObsId : Inter -> Inter -> Prop :=  ((@compObsLeLink Inter Inter _ _ _ _ _ _ _ (fun o x => Ret x) _ _ )).

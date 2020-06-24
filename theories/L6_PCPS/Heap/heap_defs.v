@@ -2,13 +2,13 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
+ From compcert.lib Require Import Coqlib.
+ From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
          Classes.Morphisms.
 From CertiCoq.L6 Require Import cps cps_util List_util Ensembles_util functions
         identifiers tactics set_util map_util.
 From CertiCoq.L6.Heap Require Import heap.
-From compcert.lib Require Import Coqlib.
 
 Import ListNotations.
 
@@ -2441,11 +2441,11 @@ Module HeapDefs (H : Heap) .
     rewrite FromSet_empty, Union_Empty_set_neut_r...
   Qed.
   
-  Instance ToMSet_env_locs (S : Ensemble var) (rho : env) (HS : ToMSet S) : ToMSet (env_locs rho S) :=
-    {
-      mset := env_locs_set rho mset
-    }.
+  Instance ToMSet_env_locs (S : Ensemble var) (rho : env) (HS : ToMSet S) : ToMSet (env_locs rho S).
   Proof.
+    refine {|
+      mset := env_locs_set rho mset
+    |}.
     eapply env_locs_set_correct. eapply mset_eq.
   Qed.
 

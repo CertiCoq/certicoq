@@ -3,8 +3,8 @@
  *)
 
 From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx hoare Ensembles_util
-               List_util closure_conversion closure_conversion_util
-               functions logical_relations eval.
+               List_util functions logical_relations eval.
+Require Import CertiCoq.L6.closure_conversion CertiCoq.L6.closure_conversion_util.
 Require Import CertiCoq.L6.closure_conversion_correct.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.

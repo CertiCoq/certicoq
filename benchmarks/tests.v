@@ -2,32 +2,37 @@ Require Import Arith List String.
 Require Import CertiCoq.Benchmarks.lib.vs.
 Require Import CertiCoq.Benchmarks.lib.Binom.
 Require Import CertiCoq.Benchmarks.lib.Color.
-Require Import CertiCoq.Benchmarks.lib.sha256.
+(* Require Import CertiCoq.Benchmarks.lib.sha256. *)
 
 From CertiCoq.Plugin Require Import CertiCoq.
 
 Open Scope string.
 
 Import ListNotations.
+Import VeriStar.
+
+CertiCoq -help.
 
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
-
-CertiCoq Compile "time" demo1.
-(* With dead_param_elim:
- L6_to_Clight: Failure in make_defs:translate_funs *)
-CertiCoq Compile "anf" "time" demo1.
-
 Definition demo2 := List.map negb [true; false; true].
+Definition demo3 := andb. 
+  
+CertiCoq Compile -ext "_cps" demo1.
+CertiCoq Compile -anf demo1.
 
-CertiCoq Compile demo2.
-CertiCoq Compile "anf" demo2.
+CertiCoq Compile -ext "_cps" demo2.
+CertiCoq Compile -anf demo2.
+
+(* Also works for CPS, when choosing another number of arguments, e.g. -args 1 *)
+CertiCoq Compile -ext "_cps" demo3.
+CertiCoq Compile -anf demo3.
+
 
 Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
 
-CertiCoq Compile list_sum.
-CertiCoq Compile "anf" list_sum.
+CertiCoq Compile -ext "_cps" list_sum.
+CertiCoq Compile -anf list_sum.
 
-Import VeriStar.
 
 Definition vs_easy :=
   match vs.main with
@@ -41,8 +46,8 @@ Definition vs_hard :=
   | _ => false
   end.
 
-CertiCoq Compile "time" vs_easy. 
-CertiCoq Compile "time" "anf"  vs_easy.
+CertiCoq Compile -ext "_cps" -time vs_easy.
+CertiCoq Compile -anf  vs_easy.
 
 (* Zoe: Compiling with the CPS pipeline takes much longer for vs_easy.
    The overhead seems to come from the C translation: (maybe has to do with dbg/error messages?)
@@ -68,13 +73,15 @@ Debug: Time elapsed in L6 ANF:  0.020384
 Debug: Time elapsed in L6 Pipeline:  0.148308
 Debug: Time elapsed in L7:  2.394216 *)
 
-CertiCoq Compile vs_hard.
-CertiCoq Compile "anf" vs_hard.
+CertiCoq Compile -ext "_cps" vs_hard.
+CertiCoq Compile -anf vs_hard.
 
-CertiCoq Compile Binom.main. (* returns nat *)
-CertiCoq Compile "anf" Binom.main.  (* returns nat *)
+Definition binom := Binom.main.
 
-CertiCoq Compile Color.main.
-CertiCoq Compile "anf" Color.main.
+CertiCoq Compile -ext "_cps" binom. (* returns nat *)
+CertiCoq Compile -anf binom.  (* returns nat *)
 
+Definition color := Color.main.
 
+CertiCoq Compile -ext "_cps" color.
+CertiCoq Compile -anf color.

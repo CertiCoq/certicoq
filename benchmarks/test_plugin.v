@@ -1,11 +1,13 @@
 Require Import Arith.
+From MetaCoq.SafeChecker Require Import Loader.
+From MetaCoq.Erasure Require Import Loader.
 From CertiCoq.Plugin Require Import CertiCoq.
 Unset Template Cast Propositions.
 Require Import List.
 Import ListNotations.
 Definition foo := 3 + 4.
 
-MetaCoq Check foo.
+MetaCoq SafeCheck foo.
 MetaCoq Erase foo.
 CertiCoq Compile foo.
 

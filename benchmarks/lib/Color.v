@@ -113,6 +113,8 @@ Module Import WP := WProperties_fun E M.  (* More useful stuff about maps *)
 Definition Mdomain {A} (m: M.t A) : S.t := 
    M.fold (fun n _ s => S.add n s) m S.empty.
 
+Hint Resolve E.eq_refl E.eq_sym E.eq_trans.
+
 Lemma StrictOrder_lt: StrictOrder E.lt.
 (* This lemma useful when using the lemma SortA_equivlistA_eqlistA *)
 Proof.
@@ -120,21 +122,21 @@ constructor.
 unfold Irreflexive, Reflexive, complement.
 intros; eapply E.lt_not_eq; eauto.
 unfold Transitive.
-intros; eapply E.lt_trans; eauto.
+intros; eapply M.E.lt_trans; eauto.
 Qed.
 
 Lemma lt_eq_trans: forall {x y z}, E.lt x y -> E.eq y z -> E.lt x z.
 Proof.
 intros. destruct (E.compare x z); auto.
 apply E.lt_not_eq in H. contradiction H. transitivity z; auto.
-contradiction (E.lt_not_eq (E.lt_trans l H)). auto.
+contradiction (E.lt_not_eq (E.lt_trans l H)); auto.
 Qed.
 
 Lemma eq_lt_trans: forall {x y z}, E.eq x y -> E.lt y z -> E.lt x z.
 Proof.
 intros. destruct (E.compare x z); auto.
 apply E.lt_not_eq in H0. contradiction H0. transitivity x; auto.
-contradiction (E.lt_not_eq (E.lt_trans H0 l)). auto.
+contradiction (E.lt_not_eq (E.lt_trans H0 l)); auto.
 Qed.
 
 Lemma Proper_lt: Proper (E.eq ==> E.eq ==> iff) E.lt.
@@ -317,7 +319,7 @@ assert (PR': Proper (@M.eq_key_elt A ==> eq)
   (fun x : E.t * A => if F.eq_dec (fst x) i then false else true)).
 clear. repeat intro.
 destruct H. change M.key with E.t in *.
-  destruct (F.eq_dec (fst x) i); destruct (F.eq_dec (fst y) i); auto; contradiction n; eauto.
+  destruct (F.eq_dec (fst x) i); destruct (F.eq_dec (fst y) i); auto; contradiction n; eauto. 
 
 apply SortA_equivlistA_eqlistA with (fun x y => E.lt (fst x) (fst y)); auto.
 apply eqv_eq_key_elt.
@@ -1442,5 +1444,4 @@ Definition main := run G16.
  On my machine, vm_compute takes 2.171 seconds, ocaml takes 1.453 seconds.
   -- Andrew Appel, September 16, 2016.
 *)
-
 

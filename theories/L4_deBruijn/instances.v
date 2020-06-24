@@ -7,6 +7,7 @@ Require Import L4.L3_to_L3_eta.
 Require Import L4.L3_eta_crct.
 Require Import L4.L3_to_L3_eta_correct.
 Require Import L4.L3_to_L4_correct.
+
 Require L2k.
 Require Import L2k.instances.
 
@@ -44,7 +45,7 @@ Lemma L3_crctEnv_inv d e : L2k.program.crctEnv (d :: e) -> L2k.program.crctEnv e
 Proof.
   intros. inv H. apply L2k.program.Crct_CrctEnv in H4. easy. auto.
 Qed.
-Hint Resolve L3_crctEnv_inv.
+Hint Resolve L3_crctEnv_inv : core.
 
 Lemma leb_refl b : Bool.leb b b.
 Proof.
@@ -133,7 +134,7 @@ Existing Instance dummyEnvBigStep | 1000000.
 (* very low priority *)
 Existing Instance dummyEnvWf | 1000000.
 
-Let L4Term := prod ienv L4.expression.exp.
+Local Definition L4Term := prod ienv L4.expression.exp.
 
 Instance certiL4eval: BigStepOpSem L4.expression.exp L4.expression.exp := eval.
 Global Instance L4_evaln : BigStepOpSemExec (ienv * L4.expression.exp)
@@ -192,8 +193,6 @@ Global  Instance certiL3_eta_to_L4:
   fun o p =>
     (AstCommon.timePhase "L3 to L4")  (fun (_:Datatypes.unit) => (Ret (L4.L3_to_L4.inductive_env (AstCommon.env p),
                                                                     (L3_to_L4.translate_program (AstCommon.env p) (main p))))).
-
-Require Import L4.L3_to_L4_correct.
 
 Lemma same_args_same_obs n t e t' :
   same_args same_obs t e = true -> L2k.term.tnth n t = Some t' ->
@@ -731,7 +730,7 @@ Closed under the global context
 (* this proof, which was developed later, uses lemmas in the certiclasses library *)
 Module SimplerProof.
 
-Let certiL4_5_to_L5Val:
+  Local Definition certiL4_5_to_L5Val:
   CerticoqTranslation (cTerm certiL4_5) (cTerm certiL5):=
   @liftTotal _ _ (fun o x => (fst x, (cps_cvt_val (snd x)))).
 
@@ -796,7 +795,6 @@ Let certiL4_5_to_L5Val:
    Qed.
 End SimplerProof.
 
-SearchAbout isprogram (bterm []).
 Ltac isprogd :=
 unfold apply_bterm in *;
 unfold subst in *;
@@ -823,23 +821,10 @@ auto.
 Qed. *)
 
 (* Move to L4_5_to_L5 *)
-Lemma eval_preserves_isprog :
-  forall (e v : L4_5_Term),  eval e v ->  isprogram e -> isprogram v.
-Proof using.
-  unfold isprogram. split.  repnd. eauto with eval.
-
-  (* Move to L4_5_to_L5 *)
-Set Nested Proofs Allowed.
-  
-Lemma eval_preserves_isprog :
-  forall (e v : L4_5_Term),  eval e v ->  isprogram e -> isprogram v.
-Proof using.
-  unfold isprogram. split.  repnd. eauto with eval.
-Abort.
 
 Global Instance evalPreservesGood :
   Proper (eval ==> Basics.impl) (@goodTerm L4_5_Term _).
-Proof using.
+Proof.
   intros e v Hev Hg.
   hnf. autounfold with certiclasses eval in *. repnd.
   dands; eauto with eval typeclass_instances.

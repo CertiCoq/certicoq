@@ -2,7 +2,7 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-From CertiCoq.L6 Require Import Ensembles_util.
+From CertiCoq Require Import L6.Ensembles_util L6.tactics.
 From compcert.lib Require Import Coqlib.
 From Coq Require Import Numbers.BinNums NArith.BinNat PArith.BinPos Relations.Relations
      Classes.Morphisms Lists.List Sets.Ensembles Program.Basics.
@@ -173,6 +173,13 @@ Proof.
 Qed.
 
 
+Lemma f_eq_subdomain_trans {A} S (f g h : positive -> A) :
+  f_eq_subdomain S f g -> f_eq_subdomain S g h -> f_eq_subdomain S f h.
+Proof.
+  eapply equivalence_f_eq_subdomain.
+Qed.
+  
+
 Lemma compose_extend_l S (C : Type) f (g : positive -> positive) (x : positive) (y : C) :
   injective_subdomain S g ->
   x \in S -> 
@@ -184,6 +191,17 @@ Proof.
   - rewrite peq_true. reflexivity.
   - rewrite peq_false. reflexivity.  intros Hc.
     eapply n. eapply Hinj; eassumption.
+Qed. 
+
+Lemma map_f_eq_subdomain {A B} (f g : A -> B) l :
+  f_eq_subdomain (FromList l) f g -> 
+  map f l = map g l.
+Proof.
+  intros Hf. induction l.
+  - reflexivity.
+  - simpl. rewrite IHl. rewrite Hf. reflexivity.
+    now left. eapply f_eq_subdomain_antimon; [| eassumption ].
+    normalize_sets; now eauto with Ensembles_DB.
 Qed. 
 
 (** * Lemmas about [image] *)
@@ -371,6 +389,19 @@ Proof.
   intros Hc. subst. contradiction.
 Qed.
 
+Lemma f_eq_subdomain_extend_lst_Disjoint {A} S xs vs (f : positive -> A) :
+  Disjoint _ (FromList xs) S ->
+  f_eq_subdomain S (f <{ xs ~> vs }>) f.
+Proof.
+  intros Hd. revert vs; induction xs; simpl; intros vs.
+  - reflexivity.
+  - destruct vs. reflexivity. normalize_sets. 
+    eapply f_eq_subdomain_extend_not_In_S_l.
+    + intros Hc. eapply Hd. constructor; eauto.
+    + eapply IHxs. now eauto with Ensembles_DB.
+Qed.
+
+
 Lemma map_extend_not_In {A} f l x (x' : A) :
   ~ In _ (FromList l) x ->
   map (f{x~>x'}) l = map f l.
@@ -453,6 +484,16 @@ Proof.
   intros; repeat eexists; eauto.
 Qed.
 
+Lemma image_Setminus {A B} S1 S2 {Hd: Decidable S2} (f : A -> B) :
+  image f S1 \\ image f S2 \subset image f (S1 \\ S2). 
+Proof.
+  intros x Hin. inv Hin. destruct Hd as [D]. 
+  destruct H as [y [Hin' Heq]]. subst. destruct (D y).
+  - exfalso. eapply H0. eapply In_image. eassumption.
+  - eapply In_image. constructor; eauto.
+Qed.
+
+
 Lemma Included_image_extend g S x (x' : positive) :
   ~ In _ S x ->
   Included _ (image g S)
@@ -464,7 +505,22 @@ Proof.
   now apply Included_Union_r.
 Qed.
 
+Lemma image_Setminus_Disjoint {A B} (f : A -> B) s1 s2 :
+  Disjoint _ (image f (s1 \\ s2)) (image f s2)  ->
+  image f (s1 \\ s2) <--> image f s1 \\ image f s2.
+Proof.
+  intros Hd; split; intros x Him.
+  - destruct Him as [z [Hin Heq]]; subst.
+    inv Hin. constructor. eexists; split; eauto. intros Hc.
+    eapply Hd. constructor; eauto. eapply In_image. constructor; eauto.
+  - inv Him. 
+    assert (Hs' := H). edestruct H as [z [Hin Heq]]; subst.
+    eapply In_image. constructor; eauto. 
+    intros Hc. eapply H0. eapply In_image. eassumption. 
+Qed.
+
 Hint Resolve In_image Included_image_extend : functions_BD.
+
 
 (** * Lemmas about [extend_lst]  *) 
 
@@ -866,6 +922,20 @@ Proof.
     repeat eexists; eauto.
 Qed.
 
+Lemma domain_extend_is_Some_Same_set {A} f x (y : A) :
+  domain (f {x ~> Some y}) <--> (domain f :|: [set x]).
+Proof. 
+  split; intros z H.
+  - destruct H as [w H'].
+    destruct (peq x z); subst; eauto.
+    rewrite extend_gso in H'; eauto. left.
+    eexists; eauto.
+  - destruct (peq x z); subst; eauto.
+    + eexists. rewrite extend_gss; eauto.
+    + inv H. destruct H0.
+      eexists. rewrite extend_gso; eauto.
+      inv H0; congruence.
+Qed.
 
 (** * Lemmas about [image'] *)
 
@@ -973,11 +1043,77 @@ Proof.
       rewrite extend_gss. reflexivity.
 Qed.
 
+Lemma image'_Singleton_is_Some {A B} (f : A -> option B) x y :
+  f x = Some y ->
+  (image' f ([set x])) <--> [set y].
+Proof.
+  split; intros z H'.
+  - destruct H' as [w [Hin Heq ]].
+    inv Hin. rewrite Heq in H; inv H. eauto.
+  - inv H'. eexists; split; eauto.
+Qed.
+
+Lemma image'_extend_is_Some {B} f x y S :
+  Included B (image' (f {x ~> Some y}) S)
+           (Union _ (image' f (Setminus _ S (Singleton _ x))) (Singleton _ y)).
+Proof.
+  intros z H'. 
+  destruct H' as [w [Hin Heq ]].
+  destruct (peq x w); subst.
+  - rewrite extend_gss in Heq. inv Heq.
+    eauto.
+  - rewrite extend_gso in Heq; eauto.
+    left. eexists; split; eauto.
+    constructor; eauto. intros Hc; inv Hc; congruence.
+Qed.
+
+Lemma image'_extend_is_Some_In_P {B} f x y S :
+  In _ S x ->
+  Same_set B (image' (f {x ~> Some y}) S)
+           (Union _ (image' f (Setminus _ S (Singleton _ x))) (Singleton _ y)).
+Proof.
+  intros Hin. split.
+  - now apply image'_extend_is_Some; eauto.
+  - intros z H'. inv H'.
+    + destruct H as [w [Hin' Heq]].
+      destruct (peq x w); subst.
+      * inv Hin'. exfalso; eauto.
+      * inv Hin'. eexists; split; eauto.
+        rewrite extend_gso; eauto.
+    + inv H. eexists; split; eauto.
+      rewrite extend_gss; eauto.
+Qed.
+
+Lemma image'_extend_is_Some_not_In_P {B} f x y S :
+  ~ In _ S x ->
+  Same_set B (image' (f {x ~> Some y}) S) (image' f S).
+Proof.
+  intros Hnin. split.
+  - intros z H'. 
+    destruct H' as [w [Hin Heq ]].
+    destruct (peq x w); subst.
+    + rewrite extend_gss in Heq. inv Heq. exfalso; eauto.
+    + rewrite extend_gso in Heq; eauto.
+      eexists; split; eauto.
+  - intros z [w [Hin Heq]]. 
+    destruct (peq x w); subst.
+    + exfalso; eauto.
+    + eexists; split; eauto. rewrite extend_gso; eauto.
+Qed.
+
 Instance Proper_image'_Same_set {A B} :
   Proper (eq ==> Same_set A ==> Same_set B) image'.
 Proof.
   intros f1 f2 Hfeq s1 s2 Hseq; split; intros x [y [Hin Heq]];
-  subst; eexists; split; eauto; eapply Hseq; eauto.
+    subst; eexists; split; eauto; eapply Hseq; eauto.
+Qed.
+
+Lemma image'_feq_subdomain {A B} (f1 f2 : A -> option B) S :
+  f_eq_subdomain S f1 f2 ->
+  image' f1 S <--> image' f2 S.
+Proof.
+  intros Heq; split; intros x [y [Hin Heq']]; eexists; split; eauto.
+  now rewrite <- Heq; eauto. now rewrite Heq; eauto.
 Qed.
 
 
@@ -1128,4 +1264,28 @@ Lemma injective_subdomain_f_eq_subdomain {A B} S (f1 f2 : A -> B ) :
 Proof.
   intros Hin1 Hsub x1 x2 H1 H2 Heq. eapply Hin1; eauto.
   rewrite !Hsub; eassumption.
+Qed.
+
+
+(** * left inverse properties *)
+
+Definition left_inverse {A B} (f : A -> B) (h : B -> A) :=
+  f_eq  (f ∘ h) id.
+
+
+Parameter (M : nat).
+
+
+Definition f (c : nat) := (c + M*c)%nat.
+
+Definition h (x : nat) := (x/(1 + M))%nat.
+
+Lemma left_inverse_f : left_inverse h f.
+Proof.
+  unfold left_inverse, f_eq, h, f, compose. intros x. 
+  replace x with (1 * x)%nat at 1 by omega.
+  rewrite <- Nat.mul_add_distr_r.
+  rewrite Nat.mul_comm.                       
+  rewrite Nat.div_mul; try omega.
+  reflexivity.
 Qed.

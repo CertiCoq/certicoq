@@ -13,6 +13,8 @@ Require Import Coq.Bool.Bool.
 Require Import Coq.Bool.DecBool.
 Require Import Coq.omega.Omega.
 Require Import Common.exceptionMonad.
+Require Import FunInd.
+Require Import Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -21,7 +23,6 @@ Set Implicit Arguments.
 
 (** named cases from Software Foundations **)
 Section PP.
-Require Import Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
 Local Open Scope string_scope.
 
 Definition digit_to_string (n:nat): string :=
@@ -526,10 +527,10 @@ Lemma append_nil_1:
   - simpl in h. discriminate h.
 Qed.
 
-Lemma nat_compare_EQ: forall n, nat_compare n n = Eq.
-  intro n. apply (proj2 (nat_compare_eq_iff n n)). reflexivity.
+Lemma nat_compare_EQ: forall n, Nat.compare n n = Eq.
+  intro n. apply (proj2 (Nat.compare_eq_iff n n)). reflexivity.
 Qed.
-Hint Rewrite nat_compare_EQ.
+Hint Rewrite nat_compare_EQ : core.
 
 Lemma notNone_Some:
   forall (A:Type) (o:option A), o <> None -> exists a, o = Some a.
@@ -610,8 +611,6 @@ Proof.
   assumption.
 Qed.
 
-Require Import FunInd.
-
 Function string_eq_bool (a1 a2:string) : bool :=
   match a1, a2 with
     | String b1 (String b2 bs), String c1 (String c2 cs) =>
@@ -635,7 +634,7 @@ Proof.
     - destruct _x. elim y. destruct _x; elim y. }
   intros. apply j. reflexivity.  
 Qed.
-Hint Resolve string_eq_bool_rfl.
+Hint Resolve string_eq_bool_rfl : core.
 
 Lemma string_eq_bool_eq:
   forall (s1 s2:string), string_eq_bool s1 s2 = true -> s1 = s2.

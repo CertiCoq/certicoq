@@ -4,6 +4,7 @@
 
 From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
 Require Import Common.AstCommon.
+From compcert.lib Require Import Coqlib Maps. 
 
 From CertiCoq.L6 Require Import cps cps_util set_util relations hoisting identifiers ctx
                          Ensembles_util List_util alpha_conv functions.

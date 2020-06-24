@@ -2,13 +2,13 @@
  * Part of the CertiCoq project.
  * Author: Zoe Paraskevopoulou, 2019
  *)
-
+ 
+From compcert Require Import lib.Coqlib.
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
                         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles.
 From CertiCoq.L6 Require Import functions cps eval cps_util identifiers ctx Ensembles_util set_util
                                 List_util tactics map_util.
 From CertiCoq.L6.Heap Require Import heap heap_defs space_sem GC log_rel_defs.
-From compcert Require Import lib.Coqlib.
 
 
 

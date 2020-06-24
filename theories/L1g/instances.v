@@ -6,6 +6,10 @@ Require Import certiClasses.
 Require Import Common.Common.
 Require Import Common.classes.
 Require Import certiClasses2.
+Require Import SquiggleEq.UsefulTypes.
+Require Import DecidableClass.
+Require Import String.
+Require Import certiClasses.
 
 Instance bigStepOpSemL1gTerm: BigStepOpSem (Program Term) (Program Term).
 Proof.
@@ -17,11 +21,8 @@ Defined.
 Instance WfL1gTerm: GoodTerm (Program L1g.compile.Term) :=
   fun P:Program Term =>
     match P with
-      mkPgm trm env => WFapp trm /\ WFaEnv env
+      mkPgm trm env => WFapp trm /\ WFaEnv WFapp env
     end.
-
-Require Import SquiggleEq.UsefulTypes.
-Require Import DecidableClass.
 
 Lemma nth_pres_WFapp:
   forall (us:list Term),
@@ -49,7 +50,7 @@ Proof.
   induction 1; cbn; intros; repeat econstructor; try assumption.
   - destruct (flattenApp fn). intuition.
   - destruct (flattenApp fn); simpl in *.
-    apply append_pres_WFapps; intuition.
+    apply append_pres_WFapps; intuition. constructor; auto. constructor.
 Qed.
 
 Global Instance QuestionHeadL1gTerm: QuestionHead (Program L1g.compile.Term) :=
@@ -79,7 +80,7 @@ Local Generalizable Variable Lj.
 
 Axiom debug : forall {A}, String.string -> A -> A.
 Extract Constant debug => "(fun msg x -> Certicoq_debug.certicoq_msg_debug msg; x)".
-Require Import String.
+
 (** When defining [Show] instance for your own datatypes, you sometimes need to
     start a new line for better printing. [nl] is a shorthand for it. *)
 Definition nl : string := String (Ascii.ascii_of_nat 10) EmptyString.
@@ -92,8 +93,6 @@ Definition translateTo `{CerticoqTranslation (Program L1g.compile.Term) Lj}
   db (translate (Program L1g.compile.Term) Lj o l1g).
 
 Arguments translateTo Lj {H} o p.
-
-Require Import certiClasses.
 
 Definition ctranslateTo {Term Value BigStep WF QH ObsS }
   (Lj: @CerticoqLanguage Term Value BigStep WF QH ObsS)

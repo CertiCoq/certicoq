@@ -22,6 +22,9 @@ Require Cstrategy.
 
 Local Open Scope string_scope.
 Local Open Scope list_scope.
+Declare Scope option_monad_scope.
+Declare Scope list_monad_scope.
+Declare Scope reducts_monad_scope.
 
 (** Error monad with options or lists *)
 
@@ -1129,8 +1132,8 @@ Proof.
   induction 1; intros; constructor; eauto.
 Qed.
 
-Hint Constructors context contextlist.
-Hint Resolve context_compose contextlist_compose.
+Hint Constructors context contextlist : core.
+Hint Resolve context_compose contextlist_compose : core.
 
 Definition reduction_ok (k: kind) (a: expr) (m: mem) (rd: reduction) : Prop :=
   match k, rd with
@@ -1697,7 +1700,7 @@ Proof.
 Qed.
 
 Hint Resolve reducts_incl_val reducts_incl_loc reducts_incl_listval
-             reducts_incl_incontext reducts_incl_incontext2_left reducts_incl_incontext2_right.
+             reducts_incl_incontext reducts_incl_incontext2_left reducts_incl_incontext2_right : core.
 
 Lemma step_expr_context:
   forall from to C, context from to C ->
@@ -2082,7 +2085,7 @@ Ltac myinv :=
   | _ => idtac
   end.
 
-Hint Extern 3 => exact I.
+Hint Extern 3 => exact I : core.
 
 Theorem do_step_sound:
   forall w S rule t S',

@@ -92,7 +92,7 @@ with CrctTyp: nat -> environ term -> itypPack -> Prop :=
            fresh nm p -> CrctTyp n ((nm,ecTrm s):::p) t
 | CrctTypWk2: forall n p t s nm, CrctTyp n p t -> CrctTyp n p s ->
            fresh nm p -> forall m, CrctTyp n ((nm,ecTyp term m s):::p) t.
-Hint Constructors Crct CrctTyp.
+Hint Constructors Crct CrctTyp : core.
 Scheme Crct_ind' := Minimality for Crct Sort Prop
   with CrctTyp_ind' := Minimality for CrctTyp Sort Prop.
 Combined Scheme CrctCrctTyp_ind' from

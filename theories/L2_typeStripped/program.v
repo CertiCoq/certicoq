@@ -50,7 +50,7 @@ Inductive Canonical : Term -> nat -> Terms -> Prop :=
           Canonical (TConstruct i n) n tnil
 | canA: forall (i:inductive) (n:nat) (t:Term) (ts:Terms),
           Canonical (TApp (TConstruct i n) t ts) n (tcons t ts).
-Hint Constructors Canonical.
+Hint Constructors Canonical : core.
 
 
 Lemma Canonical_dec:
@@ -123,7 +123,7 @@ with crctDs: environ Term -> nat -> Defs -> Prop :=
 | cdsCons: forall p n nm bod ix ds,
              isLambda bod -> crctTerm p n bod -> crctDs p n ds ->
              crctDs p n (dcons nm bod ix ds).
-Hint Constructors crctTerm crctTerms crctBs crctDs crctEnv.
+Hint Constructors crctTerm crctTerms crctBs crctDs crctEnv : core.
 Scheme crct_ind' := Minimality for crctTerm Sort Prop
   with crcts_ind' := Minimality for crctTerms Sort Prop
   with crctBs_ind' := Minimality for crctBs Sort Prop
@@ -183,7 +183,7 @@ Lemma Crct_Up:
 Proof.
   intros. eapply Crct_UP. eassumption. omega.
 Qed.
-Hint Resolve Crct_Up Crct_UP.
+Hint Resolve Crct_Up Crct_UP : core.
   
 Lemma Crct_fresh_Pocc:
   (forall p n t, crctTerm p n t -> forall nm, fresh nm p -> ~ PoccTrm nm t) /\
@@ -578,7 +578,7 @@ with CrctDs: environ Term -> nat -> Defs -> Prop :=
      | CrctDsCons: forall n p dn db dra ds,
          isLambda db ->  Crct p n db -> CrctDs p n ds ->
          CrctDs p n (dcons dn db dra ds).
-Hint Constructors Crct Crcts CrctBs CrctDs.
+Hint Constructors Crct Crcts CrctBs CrctDs : core.
 Scheme Crct_ind' := Minimality for Crct Sort Prop
   with Crcts_ind' := Minimality for Crcts Sort Prop
   with CrctBs_ind' := Minimality for CrctBs Sort Prop
@@ -1280,7 +1280,7 @@ Inductive envOk : environ -> Prop :=
 | envOk_cons : forall nm t p,
       fresh nm p -> envOk p -> weaklyClosed t p ->
          envOk ((nm, ecConstr t) :: p).
-Hint Constructors envOk.
+Hint Constructors envOk : core.
 
 Lemma envOk_nPocc_hd:
   forall nmtp, envOk nmtp ->

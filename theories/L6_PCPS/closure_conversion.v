@@ -6,6 +6,7 @@ Require Import Common.AstCommon Common.compM.
 Require Import L6.cps L6.cps_util L6.set_util L6.hoisting L6.identifiers L6.ctx
         L6.Ensembles_util L6.List_util L6.functions L6.cps_show L6.state.
 Require Import Coq.ZArith.Znumtheory.
+Require Import compcert.lib.Maps.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Coq.Strings.String Coq.Strings.Ascii.
 Require Import Common.AstCommon.
@@ -13,7 +14,6 @@ Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
 Import ListNotations Nnat MonadNotation.
 
-Require Import compcert.lib.Maps.
 
 Open Scope ctx_scope.
 Open Scope monad_scope.
@@ -521,7 +521,7 @@ Section CC.
     end.
     
 
-  Definition populate_map (l : list (var * val)) map  :=
+  Definition populate_map (l : list (var * cps.val)) map  :=
     fold_left (fun map x => M.set (fst x) BoundVar map) l map.
 
   (* Definition closure_conversion_hoist_open (rho : eval.env) (e : exp) ctag itag cenv nmap : exp := *)

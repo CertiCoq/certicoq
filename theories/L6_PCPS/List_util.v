@@ -61,7 +61,7 @@ Inductive Sublist {A : Type} : list A -> list A -> Prop :=
 Definition Subperm {A : Type} (l1 l2 : list A) :=
   exists l2', Sublist l1 l2' /\ Permutation l2' l2. 
 
-Hint Constructors Forall2_asym.
+Hint Constructors Forall2_asym : core.
 
 (** Lemmas about [Forall2] and [Forall2_asym] *)
 Lemma Forall2_length {A B} (R : A -> B -> Prop) l1 l2 :

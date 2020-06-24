@@ -12,7 +12,7 @@ Require Recdef.
 Import Nnat.
 
 Require Import L4.expression L4.exp_eval.
-
+Require Import Coq.Relations.Relation_Definitions.
 Require Import cps.
 Require Import cps_show.
 Require Import eval.
@@ -635,24 +635,37 @@ Fixpoint cps_cvt_env (vs : list exp_eval.value) (next : symgen)
   end.
 
 
-Context (P1 : Post) (PG : PostG).   
+Context (P1 : PostT) (PG : PostGT)
+        (pr : prims) (cenv : ctor_env)
+        (HPost_con : post_constr_compat P1 P1)
+        (HPost_proj : post_proj_compat P1 P1)
+        (HPost_fun : post_fun_compat P1 P1)
+        (HPost_case_hd : post_case_compat_hd P1 P1)
+        (HPost_case_tl : post_case_compat_tl P1 P1)
+        (HPost_app : post_app_compat P1 PG)
+        (HPost_letapp : post_letapp_compat cenv P1 P1 PG)
+        (HPost_letapp_OOT : post_letapp_compat_OOT P1 PG)
+        (HPost_OOT : post_OOT P1)
+        (Hpost_base : post_base P1)
+        (* (HGPost : inclusion P1 PG)  *)
+        (Hpost_zero : forall e rho, post_zero e rho P1).   
 
 Definition cps_cvt_correct_e c :=
   forall e e' rho rho' rho_m v v' x k vk vars cnstrs
-         next1 next2 next3 next4 next5 penv cenv,
+         next1 next2 next3 next4 next5 cenv,
     eval_env rho e v ->
     cps_cvt_env rho next1 cnstrs = Some (rho', next2) ->
     gensym_n_nAnon next2 (List.length rho') = (vars, next3) ->
     set_lists vars rho' (M.empty val) = Some rho_m ->
     cps_cvt e vars k next3 cnstrs = Some (e', next4) ->
     cps_cvt_val v next1 cnstrs = Some (v', next5) ->
-    preord_exp penv cenv c P1 PG
+    preord_exp cenv P1 PG c
                ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty val))))
                (e', (M.set k vk rho_m)).
 
 Definition cps_cvt_correct_es c :=
     forall es es' rho rho' rho_m vs vs' x k vk vars cnstrs
-           next1 next2 next3 next4 next5 penv cenv,
+           next1 next2 next3 next4 next5 cenv,
     Forall2 (fun e v => eval_env rho e v) (exps_to_list es) vs ->
     cps_cvt_env rho next1 cnstrs = Some (rho', next2) ->
     gensym_n_nAnon next2 (List.length rho') = (vars, next3) ->
@@ -661,7 +674,7 @@ Definition cps_cvt_correct_es c :=
     Forall2 (fun v v' => cps_cvt_val v next1 cnstrs = Some (v', next5)) vs vs' ->
     Forall2
       (fun e' v' =>
-         preord_exp penv cenv c P1 PG
+         preord_exp cenv P1 PG c
                     ((Eapp k kon_tag (x::nil)),
                      (M.set x v' (M.set k vk (M.empty val))))
                     (e', (M.set k vk rho_m)))
@@ -669,7 +682,7 @@ Definition cps_cvt_correct_es c :=
 
 Definition cps_cvt_correct_efnlst c :=
   forall efns efns' rho rho' rho_m vfns vfns' x k vk vars cnstrs
-         next1 next2 next3 next4 next5 penv cenv,
+         next1 next2 next3 next4 next5 cenv,
     Forall2 (fun p v => let (na, e) := p : (name * expression.exp) in
                         eval_env rho e v) (efnlst_as_list efns) vfns ->
     cps_cvt_env rho next1 cnstrs = Some (rho', next2) ->
@@ -679,7 +692,7 @@ Definition cps_cvt_correct_efnlst c :=
     Forall2 (fun v v' => cps_cvt_val v next1 cnstrs = Some (v', next5)) vfns vfns' ->
     Forall2
       (fun e' v' =>
-         preord_exp penv cenv c P1 PG
+         preord_exp cenv P1 PG c
                     (e', (M.set k vk rho_m))
                     ((Eapp k kon_tag (x::nil)),
                      (M.set x v' (M.set k vk (M.empty val)))))
@@ -688,7 +701,7 @@ Definition cps_cvt_correct_efnlst c :=
 
 Definition cps_cvt_correct_branches c :=
   forall bs bs' rho rho' rho_m vs vs' x k vk vars cnstrs
-         next1 next2 next3 next4 next5 penv cenv,
+         next1 next2 next3 next4 next5 cenv,
     Forall2 (fun p v => let '(dc, (n, l), e) := p in
                         eval_env rho e v) (branches_as_list bs) vs ->
     cps_cvt_env rho next1 cnstrs = Some (rho', next2) ->
@@ -698,7 +711,7 @@ Definition cps_cvt_correct_branches c :=
     Forall2 (fun v v' => cps_cvt_val v next1 cnstrs = Some (v', next5)) vs vs' ->
     Forall2
       (fun e' v' =>
-         preord_exp penv cenv c P1 PG
+         preord_exp cenv P1 PG c
                     (e', (M.set k vk rho_m))
                     ((Eapp k kon_tag (x::nil)),
                      (M.set x v' (M.set k vk (M.empty val)))))
@@ -715,13 +728,14 @@ Proof.
   - intros. inv H.
     simpl in H3. inv H3.
     eapply preord_exp_app_compat.
-    + admit.
+    + eapply HPost_app. 
+    + eapply HPost_OOT.
     + unfold preord_var_env.
-      intros v1 getv1. rewrite M.gso in getv1.
-      rewrite M.gss in getv1. inv getv1.
+      intros v1 Hgetv1. rewrite M.gso in Hgetv1.
+      rewrite M.gss in Hgetv1. inv Hgetv1.
       eexists. rewrite M.gss. split.
       reflexivity.
-      eapply preord_val_refl; admit. admit.
+      eapply preord_val_refl; admit. admit. 
 
 Abort. 
 

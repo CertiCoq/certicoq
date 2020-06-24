@@ -1,7 +1,7 @@
 Require Import Coq.Arith.Arith Coq.NArith.BinNat omega.Omega Coq.Strings.String
-        Coq.Lists.List.
+        Coq.Lists.List Structures.OrdersEx.
 Require Import Common.Common.
-Require Import L4.expression L6.List_util.
+Require Import L4.expression.
 
 (* Environment semantics values *)
 Inductive value :=
@@ -914,20 +914,6 @@ Proof.
     + eapply IHefns. eassumption.
 Qed. 
 
-(* not required for now *)
-Lemma make_rec_env_wf:
-  forall rho fnlst n,
-    well_formed_val (ClosFix_v rho fnlst n) ->
-    well_formed_env (make_rec_env fnlst rho).
-Proof.
-  intros rho fnlst n Hwf.
-  inv Hwf. induction fnlst.
-  - simpl in *. unfold make_rec_env. eapply H1.
-  - simpl in *. unfold well_formed_env.
-    unfold make_rec_env. constructor.
-    + constructor. eassumption. 
-Admitted.
-
 
 Lemma enthopt_inlist_Forall (P : exp -> Prop) :
   forall efnl n e,
@@ -1701,6 +1687,15 @@ Proof.
     eapply IHl. eassumption.
 Qed.
 
+(* copied from List_util for now *)
+Lemma Forall2_length {A B} (R : A -> B -> Prop) l1 l2 :
+  Forall2 R l1 l2 -> List.length l1 = List.length l2. 
+Proof.
+  revert l2. induction l1; intros l2 H.
+  - inv H; eauto.
+  - inv H. simpl. f_equal. eauto.
+Qed.
+
 Lemma rel_value_then_val_to_exp:
   forall v v', rel_value v v' -> v = val_to_exp v'.
 Proof.
@@ -1715,7 +1710,7 @@ Proof.
                            (aux_efnlst fnlst' len0)
                  end)).
     subst. f_equal.
-    assert (Hleq : length lst_s = length lst_t).
+    assert (Hleq : List.length lst_s = List.length lst_t).
     { eapply Forall2_length. eassumption. }
     unfold lst_s , lst_t in Hleq. rewrite <- !efnlst_length_commut in Hleq.
     eapply Nnat.N2Nat.inj in Hleq. rewrite <- Hleq. clear Hleq.
@@ -2884,7 +2879,7 @@ Proof.
   - constructor.
   - eapply Forall_rev. eapply make_rec_env_to_zero_wf. eassumption.
   - rewrite list_to_exps_exps_to_list_inv.
-    eapply utils.Forall2_rev.
+    eapply All_Forall.Forall2_rev.
     induction (make_rec_env_to_zero efns2 rho).
     + econstructor.
     + simpl. econstructor.
@@ -3279,7 +3274,7 @@ Proof.
          eapply Forall2_length in H10. rewrite H10 in H3.
          eassumption. 
       -- unfold well_formed_env.
-         eapply utils.app_Forall.
+         eapply All_Forall.app_Forall.
          ++ eapply Forall_rev.
             assert (Hwf: well_formed_val (Con_v dc2 vs_t)).
             { eapply eval_env_preserves_well_formed; eassumption. }
@@ -3390,7 +3385,7 @@ Proof.
             eassumption.
             eapply enthopt_inlist_Forall.
             specialize (H9 rhof Hlenf).
-            eapply utils.Forall_impl.
+            eapply All_Forall.Forall_impl.
             eapply H9.
             { intros x Hcon. destruct x.
               destruct Hcon. unfold well_formed_in_env in H5.

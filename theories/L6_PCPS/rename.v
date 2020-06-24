@@ -438,6 +438,18 @@ Proof.
 Qed.
 
 
+Lemma apply_r_list_In:
+  forall v1 sig l,
+    List.In v1 l ->
+    List.In (apply_r sig v1) (apply_r_list sig l).
+Proof.
+  induction l.
+  intro. inv H.
+  intros. inv H.
+  simpl. auto.
+  apply IHl in H0. simpl. auto.
+Qed.
+
 
 (** * Lemmas about [all_fun_name] *)
 

@@ -12,7 +12,7 @@ Require Import L2k.compile.
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
-Set Implicit Arguments.
+Set Implicit Arguments. 
 
  
 (** well-formedness of environs **)
@@ -267,14 +267,14 @@ Proof.
     unfold LookupTyp in H. destruct H.
     econstructor; try eassumption.
     econstructor; try eassumption. unfold LookupTyp. intuition.
-    destruct (string_dec (inductive_mind ind) nm).
+    destruct (kername_eq_dec (inductive_mind ind) nm).
     + subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
     + apply LMiss; assumption.
   - inversion_Clear H. inversion_Clear H6.
     unfold LookupTyp in H. destruct H.
     econstructor; try eassumption. econstructor; try eassumption.
     unfold LookupTyp. split; try assumption.
-    case_eq (string_dec (inductive_mind ind) nm); intros.
+    case_eq (kername_eq_dec (inductive_mind ind) nm); intros.
     + rewrite e in H. elim (Lookup_fresh_neq H H4). reflexivity.
     + apply LMiss; assumption.
 Qed.
@@ -302,14 +302,14 @@ Proof.
   - inversion_Clear H. inversion_Clear H3.
     econstructor; try eassumption. econstructor; try eassumption.
     + unfold LookupTyp in *. destruct H. split; try eassumption.
-      destruct (string_dec (inductive_mind ind) nm).
+      destruct (kername_eq_dec (inductive_mind ind) nm).
       * subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
       * apply LMiss; assumption.
   - inversion_Clear H. inversion_Clear H5.
     unfold LookupTyp in H. destruct H. econstructor; try eassumption.
     econstructor; try eassumption.
     unfold LookupTyp. split; try assumption.
-    destruct (string_dec (inductive_mind ind) nm).
+    destruct (kername_eq_dec (inductive_mind ind) nm).
     + subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
     + apply LMiss; assumption.
 Qed.
@@ -347,7 +347,7 @@ Proof.
     + inversion_Clear H. inversion_Clear H2.
       unfold LookupTyp in H. destruct H. econstructor; try eassumption.
       econstructor; try eassumption. unfold LookupTyp. split; intuition.
-      destruct (string_dec (inductive_mind ind) nm).
+      destruct (kername_eq_dec (inductive_mind ind) nm).
       * subst. elim H3. destruct ind. cbn. apply PoCnstri.
       * inversion_Clear H.
         -- elim n0. reflexivity.
@@ -355,7 +355,7 @@ Proof.
     + eapply H1. reflexivity. intros j. elim H3.
       apply PoCnstrargs. assumption.
   - inversion_Clear H. inversion_Clear H4. unfold LookupTyp in H. destruct H.
-    case_eq (string_dec (inductive_mind ind) nm); intros.
+    case_eq (kername_eq_dec (inductive_mind ind) nm); intros.
     + subst. inversion_Clear H.
       * elim H5. destruct ind. cbn. apply PoCaseAnn.
       * elim H15. reflexivity.

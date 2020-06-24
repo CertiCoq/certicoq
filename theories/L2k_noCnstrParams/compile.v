@@ -37,7 +37,7 @@ Inductive Term : Type :=
 | TLambda    : name -> Term -> Term
 | TLetIn     : name -> Term -> Term -> Term
 | TApp       : Term -> Term -> Term
-| TConst     : string -> Term
+| TConst     : kername -> Term
 (* constructors fully applied: eta expand *)
 | TConstruct : inductive -> nat (* cnstr no *) -> Terms (* args *) -> Term
 | TCase      : inductive ->
@@ -516,7 +516,7 @@ Function stripEC (ec:L1gEC) : AstCommon.envClass Term :=
   end.
 
 Definition  stripEnv : L1gEnv -> AstCommon.environ Term :=
-  List.map (fun nmec : string * L1gEC => (fst nmec, stripEC (snd nmec))).
+  List.map (fun nmec : _ * L1gEC => (fst nmec, stripEC (snd nmec))).
 
 Lemma stripEcTrm_hom:
   forall t, stripEC (ecTrm t) = ecTrm (strip t).

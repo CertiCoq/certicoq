@@ -23,8 +23,8 @@ Section Env.
 Variable p: environ Term.
 Inductive wndEval : Term -> Term -> Prop :=
 (*** contraction steps ***)
-| sConst: forall (s:string) (t:Term),
-    LookupDfn s p t -> wndEval (TConst s) t
+| sConst: forall (kn:kername) (t:Term),
+    LookupDfn kn p t -> wndEval (TConst kn) t
 | sBeta: forall (nm:name) (bod arg:Term),
     wndEval (TApp (TLambda nm bod) arg) (whBetaStep bod arg)
 (* note: [instantiate] is total *)
@@ -87,8 +87,8 @@ Lemma Lookup_Lkup_index_pos:
   forall nm ec, Lookup nm p ec -> Lkup_index nm p > 0.
 Proof.
   induction 1; intros.
-  - cbn. rewrite string_eq_bool_rfl. omega.
-  -  cbn. rewrite (string_eq_bool_neq H).
+  - cbn. rewrite eq_kername_refl. omega.
+  -  cbn. rewrite (eq_kername_bool_neq H).
      destruct (Lkup_index s2 p); omega.
 Qed.
 
@@ -817,7 +817,7 @@ Lemma wndEval_strengthen:
         ~ PoccTrm nm t -> wndEval p t s.
 Proof.
   induction 1; intros; auto.
-  - apply sConst; subst. unfold LookupDfn in *. destruct (string_dec s nm).
+  - apply sConst; subst. unfold LookupDfn in *. destruct (kername_eq_dec kn nm).
     + subst. elim H1. constructor.
     + refine (Lookup_strengthen H _ _). reflexivity. assumption.
   - eapply sCase; eassumption.

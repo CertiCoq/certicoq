@@ -16,7 +16,7 @@ Require Import Coq.Arith.Arith
 Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program 
 Coq.micromega.Psatz.
 
-Definition dummyind := BasicAst.mkInd "" 0%nat.
+Definition dummyind := BasicAst.mkInd (AstCommon.kername_of_string "") 0%nat.
 
 Require Import Common.RandyPrelude.
 Open Scope N_scope.

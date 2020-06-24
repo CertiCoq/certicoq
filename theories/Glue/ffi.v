@@ -80,7 +80,7 @@ Fixpoint type_to_args
   match e with
   | Ast.tProd _ _ e' =>
       let (n, b) := type_to_args e' in (S n, b)
-  | Ast.tApp (Ast.tConst "Top.IO"%string _) _ => (0, true)
+  | Ast.tApp (Ast.tConst ((MPfile (cons "Top" nil), "IO")%string) _) _ => (0, true)
   | _ => (0, false)
   end.
 
@@ -134,8 +134,8 @@ Definition make_curried_fn
   let c_args : nat := c_args opts in
   let backend := if direct opts then ANF else CPS in
   _curried <- gensym (match num with
-                      | S _ => kn ++ "_" ++ show_nat num
-                      | _ => kn ++ "_world"
+                      | S _ => sanitize_qualified kn ++ "_" ++ show_nat num
+                      | _ => sanitize_qualified kn ++ "_world"
                       end) ;;
 
   (* FIXME some of these names should be kept in a toolbox,
@@ -322,11 +322,11 @@ Definition make_one_field
            : ffiM defs :=
   let (kn, t) := field in
   let (arity, is_io) := type_to_args t in
-  _extern_fn <- gensym kn ;;
+  _extern_fn <- gensym (sanitize_qualified kn) ;;
   _thread_info <- gensym "thread_info" ;;
   let extern_def :=
     (_extern_fn,
-     Gfun (External (EF_external kn
+     Gfun (External (EF_external (sanitize_qualified kn)
                  (mksignature (val_typ :: nil) None cc_default))
                (Tcons (threadInf _thread_info) (repeat_typelist val arity))
                val cc_default)) in
@@ -334,7 +334,7 @@ Definition make_one_field
   match rest with
   | nil => failwith "No curried functions!"
   | (_entry, _) :: _ =>
-    _clo <- gensym (kn ++ "_clo") ;;
+    _clo <- gensym (sanitize_qualified kn ++ "_clo") ;;
     let clo_ty := tarray val 2 in
     let clo_data := Init_addrof _entry Ptrofs.zero :: Init_int8 (Int.repr 1) :: nil in
     let clo_def := (_clo, Gvar (mkglobvar clo_ty clo_data true false)) in
@@ -397,7 +397,7 @@ Definition get_constructors
         (* TODO MAYBE convert field_name to kername by qualifying it *)
         (* right now we qualify the names with the option the user provides *)
         rest <- pi_types_to_class_fields e' ;;
-        ret ((sanitize_qualified (append prefix field_name), t) :: rest)
+        ret ((((MPfile (cons (sanitize_string prefix) nil)), field_name), t) :: rest)
     | Ast.tRel _ => ret nil
     | Ast.tApp _ _ => ret nil
     | _ =>

@@ -150,8 +150,8 @@ let compile opts term const =
     debug_msg debug "Finished compiling, printing to file.";
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-    let cstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
-    let hstr = Quoted.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
+    let cstr = Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
+    let hstr = Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
     Pipeline.printProg (nenv,prg) cstr;
     Pipeline.printProg (nenv,header) hstr;
     let time = (Unix.gettimeofday() -. time) in
@@ -177,8 +177,8 @@ let generate_glue opts term const =
       debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-    let cstr = Quoted.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
-    let hstr = Quoted.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
+    let cstr = Tm_util.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
+    let hstr = Tm_util.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
     Pipeline.printProg (nenv, prg) cstr;
     Pipeline.printProg (nenv, header) hstr;
 
@@ -229,7 +229,7 @@ let show_ir opts gr =
 
 
 (* Quote Coq inductive type *)
-let quote_ind opts gr : TemplateASTQuoter.quoted_program * string =
+let quote_ind opts gr : Ast_quoter.quoted_program * string =
   let debug = opts.debug in
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -261,8 +261,8 @@ let ffi_command opts gr =
       debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-    let cstr = Quoted.string_to_list ("ffi." ^ name ^ suff ^ ".c") in
-    let hstr = Quoted.string_to_list ("ffi." ^ name ^ suff ^ ".h") in
+    let cstr = Tm_util.string_to_list ("ffi." ^ name ^ suff ^ ".c") in
+    let hstr = Tm_util.string_to_list ("ffi." ^ name ^ suff ^ ".h") in
     Pipeline.printProg (nenv, prg) cstr;
     Pipeline.printProg (nenv, header) hstr;
 

@@ -121,26 +121,6 @@ Fixpoint range (n : N) (len : nat) : list nat :=
   | S len' => (N.to_nat n) :: range (n + 1) len' 
   end.
 
-Lemma rev_range_is_list_to_zero :
-  forall len,
-    rev (range 0 len) = list_to_zero len.
-Proof.
-  intros len.
-  induction len.
-  - reflexivity.
-  - simpl. 
-    remember (range 1 len).
-    induction l using @rev_ind.
-    + simpl. destruct len.
-      simpl. reflexivity.
-      simpl in Heql. inv Heql.
-    + rewrite rev_app_distr.
-      destruct len.
-      simpl in Heql. symmetry in Heql.
-      eapply app_cons_not_nil in Heql. destruct Heql.
-      admit.
-Admitted. 
-
 Lemma make_rec_env_aux_eq :
   forall fnlst rho, 
     make_rec_env fnlst rho = make_env_aux fnlst 0 fnlst rho.
@@ -198,32 +178,6 @@ Proof.
   - simpl. reflexivity.
   - simpl. rewrite make_env_aux_to_zero_app_distr.
     rewrite IHl. simpl. reflexivity.
-Qed. 
-  
-Lemma make_env_aux_to_zero_eq :
-  forall fnlst rho,
-    make_env_aux_to_zero fnlst rho (list_to_zero (efnlength fnlst)) =
-    rev (make_env_aux_nil fnlst 0 fnlst rho).
-Proof.
-  intros fnlst rho.
-  rewrite <- rev_range_is_list_to_zero.
-  rewrite rev_make_env_aux_to_zero.
-  f_equal. generalize 0 at 1 2. 
-  generalize fnlst at 1 4.
-  induction fnlst; intros fnlst1 n1.
-  - simpl. reflexivity.
-  - simpl. f_equal.
-    + rewrite Nnat.N2Nat.id. reflexivity.
-    + eapply IHfnlst. 
-Qed. 
-
-Lemma make_rec_env_to_zero_eq :
-  forall fnlst rho,
-    make_rec_env_to_zero fnlst rho = rev (make_rec_env_nil fnlst rho).
-Proof.
-  intros fnlst rho.
-  rewrite make_rec_env_aux_nil_eq. rewrite make_rec_env_to_zero_rewrite.
-  eapply make_env_aux_to_zero_eq.
 Qed. 
 
 

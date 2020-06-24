@@ -63,7 +63,110 @@ Quote Recursively Definition demo1 := (List.app (List.repeat true 5) (List.repea
 (* Definition demo1_CPS := Eval native_compute in (compile_L6_show demo1). *)
 Definition demo1_ANF := Eval native_compute in (compile_L6_ANF_show demo1).
 Definition demo1_CPS := Eval native_compute in (compile_L6_show demo1).
-Definition demo1_L4 := Eval native_compute in (compile_L4_AST demo1). 
+Definition demo1_L4 := Eval native_compute in (compile_L4_AST demo1).
+
+(* (* experimenting -- take out later *) *)
+(* Require Import L6.L4_to_L6 L6.cps L6.eval L4.exp_eval. *)
+
+(* Definition demo2_L4 := Eval native_compute in (compile_L4_show demo2). *)
+(* Definition demo4_L4 := Eval native_compute in (compile_L4_show demo4).  *)
+
+(* Definition test_eval := demo4_L4. *)
+
+(* Definition test := *)
+(*   match test_eval with *)
+(*   | compM.Ret (ienv, p) => (ienv, p) *)
+(*   | compM.Err s => (nil, L4.expression.Prf_e) *)
+(*   end. *)
+
+(* Definition test_result := *)
+(*   let (ienv, e) := test in *)
+(*   let '(_, cenv, ctag, itag,  dcm) := convert_env ienv in *)
+(*   let f := (100%positive) in *)
+(*   let k := (101%positive) in *)
+(*   let x := (102%positive) in *)
+(*   match (cps_cvt e nil k (SG (103%positive, n_empty)) dcm) with *)
+(*   | Some (e', sg) => *)
+(*     match sg with *)
+(*       SG (next, nenv) => *)
+(*       let fenv : fun_env := M.set func_tag (2%N, (0%N::1%N::nil)) *)
+(*                                (M.set kon_tag (1%N, (0%N::nil)) (M.empty _) ) in *)
+(*       let pr := cps.M.empty (list val -> option val) in *)
+(*       (* let fenv := cps.M.empty fun_ty_info in  *) *)
+(*       (* let cont := (cps.Efun *) *)
+(*       (*               (Fcons f kon_tag (k::nil) e' *) *)
+(*       (*                      (Fcons k kon_tag (x::nil) (Ehalt x) Fnil)) *) *)
+(*       (*               (cps.Eapp f kon_tag (k::nil))) in *) *)
+(*       let cont := (Fcons k kon_tag (x::nil) (Ehalt x) Fnil) in *)
+(*       let env := cps.M.empty val in *)
+(*       let env' := def_funs cont cont env env in *)
+(*       print_BigStepResult_L6 ((pr, cenv, nenv, fenv), (env', e')) 60%nat *)
+(*     end *)
+(*   | None => *)
+(*     L7.L6_to_Clight.print ("Failed during comp_L6") *)
+(*   end. *)
+
+(* Definition test_eval_res (L4term : L3_to_L4.ienv * expression.exp) := *)
+(*   let (ienv, e) := L4term in *)
+(*   match eval_env_f 100 nil e with *)
+(*   | Some v => v *)
+(*   | None => Prf_v *)
+(*   end.  *)
+
+(* Definition L4_eval := Eval native_compute in (test_eval_res test). *)
+
+(* Definition test_result_val := *)
+(*   let (ienv, e) := test in *)
+(*   let '(_, cenv, ctag, itag,  dcm) := convert_env ienv in *)
+(*   let f := (100%positive) in *)
+(*   let k := (101%positive) in *)
+(*   let x := (102%positive) in *)
+(*   match eval_env_f 20 nil e with *)
+(*   | Some v => *)
+(*     match cps_cvt_val v (SG (103%positive, n_empty)) dcm with *)
+(*     | Some (v', sg) => *)
+(*       match sg with *)
+(*         SG (next, nenv) => *)
+(*         let fenv : fun_env := M.set func_tag (2%N, (0%N::1%N::nil)) *)
+(*                                (M.set kon_tag (1%N, (0%N::nil)) (M.empty _) ) in *)
+(*         let pr := cps.M.empty (list val -> option val) in *)
+(*         let cont := (Fcons k kon_tag (x::nil) (Ehalt x) Fnil) in *)
+(*         match v' with *)
+(*         | Vfun env _ _ => *)
+(*           let env' := def_funs cont cont env env in *)
+(*           print_BigStepResult_L6Val ((pr, cenv, nenv, fenv), (env', v')) *)
+(*         | _ =>  *)
+(*           let env := cps.M.empty val in *)
+(*           let env' := def_funs cont cont env env in *)
+(*           print_BigStepResult_L6Val ((pr, cenv, nenv, fenv), (env', v')) *)
+(*         end *)
+(*       end *)
+(*     | None => *)
+(*       L7.L6_to_Clight.print ("Failed during cps_cvt_val_L6") *)
+(*     end *)
+(*   | None => *)
+(*     L7.L6_to_Clight.print ("Failed during eval_env") *)
+(*   end. *)
+
+(* Require Import ExtrOcamlBasic. *)
+(* Require Import ExtrOcamlString. *)
+(* Require Import ExtrOcamlZInt. *)
+(* Require Import ExtrOcamlNatInt. *)
+
+(* Extract Inductive Decimal.int => *)
+(* unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)". *)
+
+(* Extract Constant L6_to_Clight.print => *)
+(* "(fun s-> print_string (String.concat """" (List.map (String.make 1) s)))". *)
+
+
+(* Extract Constant   varImplDummyPair.varClassNVar => *)
+(* " (fun f (p:int*bool) -> varClass0 (f (fst p)))". *)
+
+(* Extraction "test1.ml" test_result. *)
+(* Extraction "testval.ml" test_result_val. *) 
+
+(* -- *)
 
 Definition demo1_L6_anf := Eval native_compute in (compile_L6_anf_show false demo1).
 Definition demo1_L6_init := Eval native_compute in (compile_anf_show false demo1).

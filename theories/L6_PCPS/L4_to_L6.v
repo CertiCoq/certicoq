@@ -17,6 +17,7 @@ Require Import cps.
 Require Import cps_show.
 Require Import eval.
 Require Import ctx.
+Require Import logical_relations.
 Require Import alpha_conv.
 
 Require Import ExtLib.Data.Monads.OptionMonad.
@@ -280,13 +281,13 @@ Definition convert_env (g:ienv): (ind_env * ctor_env*  ctor_tag * ind_tag * conI
 
 
 (* vx is list of variables to which exps are bound in cvt_triples *)
-Fixpoint cps_cvt_exps (ts : list (cps.exp * var * var)) (vx : list var) (k : var)
+Fixpoint cps_exps (ts : list (cps.exp * var * var)) (vx : list var) (k : var)
   : option (cps.exp) :=
   match ts with
   | nil => ret (cps.Eapp k kon_tag vx)
   | t::ts' =>
     let '(e1, k1, x1) := t in
-    r <- cps_cvt_exps ts' vx k;;
+    r <- cps_exps ts' vx k;;
       let e_exp := r in
       ret (cps.Efun
              (Fcons k1 kon_tag (x1::nil) e_exp Fnil)
@@ -353,7 +354,7 @@ Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
                    (fun x => let '(_, _, v) := x : (cps.exp * var * var) in v)
                    cvt_ts
        in
-       r2 <- cps_cvt_exps cvt_ts vx k';;
+       r2 <- cps_exps cvt_ts vx k';;
           let e' := r2 in
           ret (cps.Efun
                  (Fcons k' kon_tag vx
@@ -444,6 +445,43 @@ with cps_cvt_branches (bl : expression.branches_e) (vn : list var) (k : var)
                let '(ce, next) := re : (exp * symgen) in
                ret ((tg, app_ctx_f ctx_p ce)::cbl, next)
        end.
+
+Fixpoint cps_cvt_exps' (es : expression.exps) (vn : list var) (k : var)
+         (next : symgen) (tgm : constr_env) :=
+  match es with
+  | enil => ret (nil, next)
+  | econs e es' =>
+    r1 <- cps_cvt e vn k next tgm;;
+       let '(e', next) := r1 in
+       r2 <- cps_cvt_exps' es' vn k next tgm;;
+          let (es'', next) := r2 in
+          ret (cons e' es'', next)
+  end.
+
+Fixpoint cps_cvt_efnlst' (efns : expression.efnlst) (vn : list var) (k : var)
+         (next : symgen) (tgm : constr_env) :=
+  match efns with
+  | eflnil => ret (nil, next)
+  | eflcons na e efns' =>
+    r1 <- cps_cvt e vn k next tgm;;
+       let (e', next) := r1 : (cps.exp * symgen) in
+       r2 <- cps_cvt_efnlst' efns' vn k next tgm;;
+          let (efns'', next) := r2 in
+          ret (cons e' efns'', next)
+  end.
+
+Fixpoint cps_cvt_branches' (bs : expression.branches_e) (vn : list var) (k : var)
+         (next : symgen) (tgm : constr_env) :=
+  match bs with
+  | brnil_e => ret (nil, next)
+  | brcons_e dc (n, l) e bs' =>
+    r1 <- cps_cvt e vn k next tgm;;
+       let (e', next) := r1 : (cps.exp * symgen) in
+       r2 <- cps_cvt_branches' bs' vn k next tgm;;
+          let (bs'', next) := r2 in
+          ret (cons e' bs'', next)
+  end. 
+    
 
 Inductive fresh_var : var -> symgen -> Prop :=
 | is_fresh :
@@ -596,15 +634,100 @@ Fixpoint cps_cvt_env (vs : list exp_eval.value) (next : symgen)
           ret (cons v' vs'', next)
   end.
 
-(* scratch *)
-(* Inductive cps_cvt_val_rel : exp_eval.value -> cps.val -> Prop := *)
-(* | v_Clos : *)
-(*     cps_cvt_env_rel rho rho' -> *)
-    
-    
 
-(* cenv needs to related to dcon? *)
+Context (P1 : Post) (PG : PostG).   
+
+Definition cps_cvt_correct_e c :=
+  forall e e' rho rho' rho_m v v' x k vk vars cnstrs
+         next1 next2 next3 next4 next5 penv cenv,
+    eval_env rho e v ->
+    cps_cvt_env rho next1 cnstrs = Some (rho', next2) ->
+    gensym_n_nAnon next2 (List.length rho') = (vars, next3) ->
+    set_lists vars rho' (M.empty val) = Some rho_m ->
+    cps_cvt e vars k next3 cnstrs = Some (e', next4) ->
+    cps_cvt_val v next1 cnstrs = Some (v', next5) ->
+    preord_exp penv cenv c P1 PG
+               ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty val))))
+               (e', (M.set k vk rho_m)).
+
+Definition cps_cvt_correct_es c :=
+    forall es es' rho rho' rho_m vs vs' x k vk vars cnstrs
+           next1 next2 next3 next4 next5 penv cenv,
+    Forall2 (fun e v => eval_env rho e v) (exps_to_list es) vs ->
+    cps_cvt_env rho next1 cnstrs = Some (rho', next2) ->
+    gensym_n_nAnon next2 (List.length rho') = (vars, next3) ->
+    set_lists vars rho' (M.empty val) = Some rho_m ->
+    cps_cvt_exps' es vars k next3 cnstrs = Some (es', next4) ->
+    Forall2 (fun v v' => cps_cvt_val v next1 cnstrs = Some (v', next5)) vs vs' ->
+    Forall2
+      (fun e' v' =>
+         preord_exp penv cenv c P1 PG
+                    ((Eapp k kon_tag (x::nil)),
+                     (M.set x v' (M.set k vk (M.empty val))))
+                    (e', (M.set k vk rho_m)))
+      es' vs'.
+
+Definition cps_cvt_correct_efnlst c :=
+  forall efns efns' rho rho' rho_m vfns vfns' x k vk vars cnstrs
+         next1 next2 next3 next4 next5 penv cenv,
+    Forall2 (fun p v => let (na, e) := p : (name * expression.exp) in
+                        eval_env rho e v) (efnlst_as_list efns) vfns ->
+    cps_cvt_env rho next1 cnstrs = Some (rho', next2) ->
+    gensym_n_nAnon next2 (List.length rho') = (vars, next3) ->
+    set_lists vars rho' (M.empty val) = Some rho_m ->
+    cps_cvt_efnlst' efns vars k next3 cnstrs = Some (efns', next4) ->
+    Forall2 (fun v v' => cps_cvt_val v next1 cnstrs = Some (v', next5)) vfns vfns' ->
+    Forall2
+      (fun e' v' =>
+         preord_exp penv cenv c P1 PG
+                    (e', (M.set k vk rho_m))
+                    ((Eapp k kon_tag (x::nil)),
+                     (M.set x v' (M.set k vk (M.empty val)))))
+      efns' vfns'.
+
+
+Definition cps_cvt_correct_branches c :=
+  forall bs bs' rho rho' rho_m vs vs' x k vk vars cnstrs
+         next1 next2 next3 next4 next5 penv cenv,
+    Forall2 (fun p v => let '(dc, (n, l), e) := p in
+                        eval_env rho e v) (branches_as_list bs) vs ->
+    cps_cvt_env rho next1 cnstrs = Some (rho', next2) ->
+    gensym_n_nAnon next2 (List.length rho') = (vars, next3) ->
+    set_lists vars rho' (M.empty val) = Some rho_m ->
+    cps_cvt_branches' bs vars k next3 cnstrs = Some (bs', next4) ->
+    Forall2 (fun v v' => cps_cvt_val v next1 cnstrs = Some (v', next5)) vs vs' ->
+    Forall2
+      (fun e' v' =>
+         preord_exp penv cenv c P1 PG
+                    (e', (M.set k vk rho_m))
+                    ((Eapp k kon_tag (x::nil)),
+                     (M.set x v' (M.set k vk (M.empty val)))))
+      bs' vs'.
+
 Lemma cps_cvt_correct:
+  forall k,
+    (cps_cvt_correct_e k) /\
+    (cps_cvt_correct_es k) /\
+    (cps_cvt_correct_efnlst k) /\
+    (cps_cvt_correct_branches k).
+Proof.
+  intros k. eapply my_exp_ind.
+  - intros. inv H.
+    simpl in H3. inv H3.
+    eapply preord_exp_app_compat.
+    + admit.
+    + unfold preord_var_env.
+      intros v1 getv1. rewrite M.gso in getv1.
+      rewrite M.gss in getv1. inv getv1.
+      eexists. rewrite M.gss. split.
+      reflexivity.
+      eapply preord_val_refl; admit. admit.
+
+Abort. 
+
+  
+(* cenv needs to related to dcon? *)
+Lemma cps_cvt_correct':
   forall e m rho rho' rhomap x k vk e' v v' v'' v''' penv cenv
          vars cnstrs next1 next2 next3 next4 next5,
     eval_env rho e v ->
@@ -617,7 +740,9 @@ Lemma cps_cvt_correct:
     exists n, bstep_e penv cenv (M.set k vk rhomap) e' v''' n /\
     exists f, (Alpha_conv_val v'' v''' f).
 Proof.
-  intros e. eapply my_exp_ind. 
+  intros e. 
+  eapply my_exp_ind.
+  
 Abort. 
   
 (* testing code *)

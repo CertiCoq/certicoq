@@ -17,6 +17,19 @@ Open Scope fun_scope.
 Section Inline_Eq.
   
   Context (St : Type) (IH : InlineHeuristic St).
+
+  Definition beta_contract_fundefs (d : nat) (sig sig' : subst) (fm' : fun_map) :=
+    (fix beta_contract_fds (fds:fundefs) (s:St) : inlineM fundefs :=
+       match fds with
+       | Fcons f t xs e fds' =>
+         let s' := update_inFun _ IH f t xs e sig s in
+         let f' := apply_r sig' f in
+         xs' <- get_names_lst xs "" ;;
+         e' <- beta_contract _ IH d e (set_list (combine xs xs') sig') fm' s' ;;
+         fds'' <- beta_contract_fds fds' s ;;
+         ret (Fcons f' t xs' e' fds'')
+       | Fnil => ret Fnil
+       end).
   
   Definition beta_contract' (d : nat) (e : exp) (sig : r_map) (fm:fun_map) (s:St) : inlineM exp :=
     match e with
@@ -69,17 +82,7 @@ Section Inline_Eq.
       let names := all_fun_name fds in
       names' <- get_names_lst names "" ;;
       let sig' := set_list (combine names names') sig in
-      fds' <- (fix beta_contract_fds (fds:fundefs) (s:St) : inlineM fundefs :=
-                 match fds with
-                 | Fcons f t xs e fds' =>
-                   let s' := update_inFun _ IH f t xs e sig s in
-                   let f' := apply_r sig' f in
-                   xs' <- get_names_lst xs "" ;;
-                   e' <- beta_contract _ IH d e (set_list (combine xs xs') sig') fm' s' ;;
-                   fds'' <- beta_contract_fds fds' s ;;
-                   ret (Fcons f' t xs' e' fds'')
-                 | Fnil => ret Fnil
-                 end) fds s2 ;;
+      fds' <-  beta_contract_fundefs d sig sig' fm' fds s2 ;;
       e' <- beta_contract _ IH d e sig' fm' s1;;
       ret (Efun fds' e')
     | Eapp f t ys =>
@@ -136,7 +139,26 @@ Proof.
   intros Hc. inv Hc. zify; omega.
 Qed.
 
-
+Lemma get_names_lst_fresh A S ns str :
+  {{ fun _ (s : comp_data * A) => fresh S (next_var (fst s)) }}
+     get_names_lst ns str
+  {{ fun (r: unit) _ xs s' =>
+       FromList xs \subset S /\ NoDup xs /\ fresh (S \\ FromList xs) (next_var (fst s')) }}.  
+Proof.
+  unfold get_names_lst. revert S; induction ns; intros S.
+  - simpl. eapply return_triple.
+    intros. repeat normalize_sets. split; eauto. sets. split; eauto.
+    now constructor.
+  - simpl. eapply bind_triple. eapply get_name_fresh.
+    intros x w. eapply pre_curry_l. intros Hin.
+    eapply bind_triple. eapply IHns.
+    intros xs w'. eapply return_triple. intros. destructAll.
+    repeat normalize_sets. split; [| split ].
+    + eapply Union_Included. now sets. eapply Included_trans. eassumption. sets.
+    + constructor; eauto. intros hc. eapply H. eassumption. sets.
+    + rewrite <- Setminus_Union. eassumption.
+Qed.
+  
 Section Inline_correct.
 
   Context (St : Type) (IH : InlineHeuristic St) (cenv : ctor_env) (P1 : PostT) (PG : PostGT).
@@ -623,30 +645,7 @@ Section Inline_correct.
     rewrite Dom_map_set. rewrite IHB. sets.
   Qed.
 
-(* 
-    
-  Lemma fun_map_inv_add_fundefs_Disjoint k S fm rho1 rho2 i sig B :
-    fun_map_inv k S fm rho1 rho2 i sig ->
-    Disjoint _ (name_in_fundefs B) (S :|: occurs_free_in_env rho1) ->
-    fun_map_inv k S (add_fundefs B fm) rho1 rho2 i sig.
-  Proof.
-    revert S fm rho1 rho2 i sig  B; induction k using lt_wf_rec1; intros.
-    intro; intros. rewrite add_fundefs_not_in in H3.
-    edestruct H0; eauto. destructAll.
-    repeat (split; [ now eauto |]). split.
-    - rewrite Dom_map_add_fundefs. sets. 
-      reflexivity. split. eassumption. split. eassumption.
-    destruct k; eauto. rewrite <- fun_map_inv_eq in *. eapply H.
-    + omega.
-    + eassumption.
-    + eapply Disjoint_Included_r; [| eassumption ].
-      eapply Included_Union_preserv_r. eapply Union_Included.
-      * eapply Included_trans; [| eapply occurs_free_in_env_get ]; eauto.
-        simpl; sets.
-      * eapply sub_map_occurs_free_in_env. eassumption.
-    + intros Hc. eapply H1. constructor. eassumption. now left.
-  Qed.
-
+  
   Lemma sub_map_def_funs rho B :
     Disjoint _ (name_in_fundefs B) (Dom_map rho) ->            
     sub_map rho (def_funs B B rho rho).
@@ -658,40 +657,77 @@ Section Inline_correct.
 
   Lemma fun_map_inv_def_funs k S fm rho1 rho2 i sig B1 B2 :
     fun_map_inv k S fm rho1 rho2 i sig ->
+    
     preord_env_P_inj cenv PG (name_in_fundefs B1 :|: occurs_free_fundefs B1) i
                      (apply_r (set_list (combine (all_fun_name B1) (all_fun_name B2)) sig))
                      (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2) ->
-    occurs_free_fundefs B1 \subset S ->
+
+    unique_bindings_fundefs B1 ->
+    occurs_free_fundefs B1 :|: occurs_free_in_env rho1 \subset S ->
+    
     Disjoint _ (name_in_fundefs B1) (S :|: Dom_map rho1 :|: occurs_free_in_env rho1) ->
 
     fun_map_inv k (name_in_fundefs B1 :|: S) (add_fundefs B1 fm) (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2) i
                 (set_list (combine (all_fun_name B1) (all_fun_name B2)) sig).
   Proof.
-    revert S fm rho1 rho2 i sig B1 B2. induction k as [k IHk] using lt_wf_rec1. intros S fm rho1 rho2 i sig B1 B2 Hf Hrel Hsub Hdis.
+    revert S fm rho1 rho2 i sig B1 B2. induction k as [k IHk] using lt_wf_rec1.
+    intros S fm rho1 rho2 i sig B1 B2 Hf Hrel Hun Hsub Hdis.
     intros f ft xs e rhoc B' f' HSin Heq1 Heq2.   
     destruct (Decidable_name_in_fundefs B1) as [Dec]. destruct (Dec f).
     - rewrite def_funs_eq in Heq2; eauto. inv Heq2.
       edestruct name_in_fundefs_find_def_is_Some. eassumption. destructAll.
       erewrite add_fundefs_in in Heq1; [| eassumption ]. inv Heq1. split; eauto.
-      split; eauto. split; [| split ].
+      split; eauto. split; [| split; [| split; [| split ]]].
       + eassumption.
       + eapply sub_map_refl.
-      + destruct k; eauto. rewrite <- fun_map_inv_eq. eapply IHk. omega.
-        eapply fun_map_inv_antimon. eapply fun_map_inv_mon. eassumption. omega.
-        eassumption. eassumption. reflexivity. eapply Disjoint_Included_r; [| eassumption ].
-        eapply Union_Included; sets.
+      + admit. (* seems OK *)
+      + rewrite Dom_map_add_fundefs.
+        admit. (* seems OK, add assump *)
+      + destruct k; eauto. rewrite <- fun_map_inv_eq. eapply fun_map_inv_antimon. eapply IHk.
+        omega. eapply fun_map_inv_mon. eassumption. omega. eassumption. eassumption.
+        eassumption. now sets. 
+        eapply Included_trans. eapply occurs_free_in_env_def_funs.
+        rewrite (Union_commut (occurs_free_fundefs _)). rewrite <- Union_assoc.
+        eapply Union_Included. now sets. eapply Included_trans. eassumption. sets.
     - rewrite def_funs_neq in Heq2; eauto.
       rewrite add_fundefs_not_in in Heq1; [| eassumption ]. inv HSin. contradiction. 
       edestruct Hf. eassumption. eassumption. eassumption. destructAll. split; eauto. split; eauto. 
-      split; [| split ].
-      + admit.
-        (* eapply eq_env_P_def_funs_not_in_P_r. eassumption. *)
-        (* eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ]. *)
-        (* eapply Included_Union_preserv_r. *)
-        (* eapply Included_trans; [| eapply occurs_free_in_env_get ]; eauto. simpl. sets. *)
+      split; [| split; [| split; [| split ]]].
+      + eapply preord_env_P_inj_def_funs_neq_r.
+
+        rewrite apply_r_set_list_f_eq. eapply preord_env_P_inj_extend_lst_not_In_P_r.
+        eassumption. admit. admit. (* I think OK *)
       + eapply sub_map_trans. eassumption. eapply sub_map_def_funs. sets.
+      + admit. (* I think OK *)
+      + admit.
       + destruct k; eauto. rewrite <- fun_map_inv_eq in *.
-        eapply fun_map_inv_add_fundefs_Disjoint. admit.
+ 
+        Set Nested Proofs Allowed.
+
+ 
+  Lemma fun_map_inv_add_fundefs_Disjoint k S fm rho1 rho2 i sig B1 B2 :
+    fun_map_inv k S fm rho1 rho2 i sig ->
+    Disjoint _ (name_in_fundefs B1) (S :|: occurs_free_in_env rho1) ->
+    fun_map_inv k S (add_fundefs B1 fm) rho1 (def_funs B2 B2 rho2 rho2) i
+                (set_list (combine (all_fun_name B1) (all_fun_name B2)) sig).
+  Proof.
+    revert S fm rho1 rho2 i sig B1 B2; induction k using lt_wf_rec1; intros.
+    intro; intros. rewrite add_fundefs_not_in in H3.
+    edestruct H0; eauto. destructAll.
+    repeat (split; [ now eauto |]). split; [| split; [| split; [| split ]]].
+    - admit.
+    - eassumption.
+    - sets.
+    - 
+  (*   - destruct k; eauto. rewrite <- fun_map_inv_eq in *. eapply H. *)
+  (*     + omega. *)
+  (*     + eassumption. *)
+  (*     + eapply Disjoint_Included_r; [| eassumption ]. *)
+  (*       eapply Included_Union_preserv_r. eapply Union_Included. reflexivity.  *)
+  (*       eapply sub_map_occurs_free_in_env. eassumption. *)
+  (*   - intros Hc. eapply H1. constructor. eassumption. now left. *)
+  (* Qed. *)
+        
         (* eassumption. *)
   (*       eapply Disjoint_Included_r; [| eassumption ]. eapply Included_Union_preserv_r. *)
   (*       eapply Union_Included. *)
@@ -699,7 +735,7 @@ Section Inline_correct.
   (*       eapply sub_map_occurs_free_in_env. eassumption. *)
   (* Qed. *)
   Abort.
- *)
+  Abort.
   
   Definition fun_map_vars (fm : fun_map) (F : Ensemble var) (sig : subst) :=
     forall f ft xs e,
@@ -731,33 +767,50 @@ Section Inline_correct.
     
   Opaque preord_exp'.
   
-  Lemma inline_correct d e sig fm st S :
-    unique_bindings e ->
-    Disjoint _ (bound_var e) (occurs_free e :|: Dom_map fm) ->    
-    Disjoint _ S (bound_var e :|: image (apply_r sig) (occurs_free e)) ->
+  Lemma inline_correct_mut d : 
+    (forall e sig fm st S,
+        unique_bindings e ->
+        Disjoint _ (bound_var e) (occurs_free e :|: Dom_map fm) ->    
+        Disjoint _ S (bound_var e :|: image (apply_r sig) (occurs_free e)) ->        
+        fun_map_vars fm S sig ->        
+        {{ fun _ s => fresh S (next_var (fst s)) }}
+          beta_contract St IH d e sig fm st
+        {{ fun _ _ e' s' =>
+             fresh S (next_var (fst s')) /\
+             unique_bindings e' /\
+             occurs_free e' \subset image (apply_r sig) (occurs_free e :|: occurs_free_fun_map fm) /\
+             bound_var e' \subset S /\
+             (forall k rho1 rho2,
+                 preord_env_P_inj cenv PG (occurs_free e) k (apply_r sig) rho1 rho2 ->
+                 Disjoint _ (bound_var e) (occurs_free_in_env rho1 :|: Dom_map rho1) ->
+                 Disjoint _ S (image (apply_r sig) (occurs_free_in_env rho1)) ->
+                 fun_map_inv d (occurs_free e :|: occurs_free_in_env rho1) fm rho1 rho2 k sig ->
+                 preord_exp cenv P1 PG k (e, rho1) (e', rho2)) }} ) /\ 
 
-    fun_map_vars fm S sig ->
-    
-    {{ fun _ s => fresh S (next_var (fst s)) }}
-      beta_contract St IH d e sig fm st
-    {{ fun _ _ e' s' =>
-         fresh S (next_var (fst s')) /\
-         (* unique bindings is preserved *)
-         unique_bindings e' /\
-         occurs_free e' \subset image (apply_r sig) (occurs_free e :|: occurs_free_fun_map fm) /\
-         bound_var e' \subset S /\
-         (* Disjointedness is preserved *)
-         (* Disjoint _ (bound_var e') (occurs_free e') /\ *)
-         (* FV are preserved *)
-         (* semantics are preserved *)
-         (forall k rho1 rho2,
-             preord_env_P_inj cenv PG (occurs_free e) k (apply_r sig) rho1 rho2 ->
-             Disjoint _ (bound_var e) (occurs_free_in_env rho1 :|: Dom_map rho1) ->
-             Disjoint _ S (image (apply_r sig) (occurs_free_in_env rho1)) ->
-             fun_map_inv d (occurs_free e :|: occurs_free_in_env rho1) fm rho1 rho2 k sig ->
-             preord_exp cenv P1 PG k (e, rho1) (e', rho2))
+    (forall B sig sig0 fm st S,
+        unique_bindings_fundefs B ->
+        Disjoint _ (bound_var_fundefs B) (occurs_free_fundefs B :|: Dom_map fm) ->    
+        Disjoint _ S (bound_var_fundefs B :|: image (apply_r sig) (occurs_free_fundefs B)) ->
+        fun_map_vars fm S sig ->        
+        {{ fun _ s => fresh S (next_var (fst s)) }}
+          beta_contract_fundefs St IH d sig sig0 fm B st
+        {{ fun _ _ B' s' =>
+             fresh S (next_var (fst s')) /\
+             unique_bindings_fundefs B' /\
+             occurs_free_fundefs B' \subset image (apply_r sig) (occurs_free_fundefs B :|: occurs_free_fun_map fm) /\
+             bound_var_fundefs B' \subset S /\
+             all_fun_name B' = apply_r_list sig (all_fun_name B) /\
+             (forall f xs ft e1,
+                 find_def f B = Some (xs, ft, e1) ->
+                 exists xs' e2,
+                   find_def (apply_r sig f) B = Some (xs', ft, e2) /\
+                   (forall rho1 rho2 k,
+                       preord_env_P_inj cenv PG (occurs_free_fundefs B) k (apply_r sig) rho1 rho2 ->
+                       Disjoint _ (bound_var e1) (occurs_free_in_env rho1 :|: Dom_map rho1) ->
+                       Disjoint _ S (image (apply_r sig) (occurs_free_in_env rho1)) ->
+                       fun_map_inv d (occurs_free_fundefs B :|: occurs_free_in_env rho1) fm rho1 rho2 k sig ->
+                       preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)))}}).
 
-    }}.
   Proof.
     revert e sig fm st S. induction d as [d IHd] using lt_wf_rec1.
     induction e using exp_ind'; intros sig fm st S Hun Hdis1 Hdis2 Hfm; inv Hun; rewrite beta_contract_eq.
@@ -835,6 +888,35 @@ Section Inline_correct.
     - (* Eletapp *)
       admit.
     - (* Efun *)
+      simpl. destruct (update_funDef St IH f2 sig st). 
+      eapply bind_triple. now eapply get_names_lst_fresh. intros xs w.
+      eapply pre_curry_l. intros Hinx.
+      eapply pre_curry_l. intros Hnd. eapply bind_triple. admit.
+      intros fds' w'. eapply bind_triple. eapply IHe.
+      + eassumption.
+      + rewrite Dom_map_add_fundefs.
+        rewrite Union_Included_Union_Setminus with (s3 := name_in_fundefs f2); [| now tci | now sets ]. 
+        rewrite (Union_commut (name_in_fundefs f2)). rewrite Union_assoc.
+        eapply Union_Disjoint_r.
+        * repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+          eapply Disjoint_Included; [| | eapply Hdis1 ]; now sets.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          eapply name_in_fundefs_bound_var_fundefs.
+      + admit.
+      + admit.
+      + intros e' w''. eapply return_triple. intros _ w''' Hyp. destructAll.
+        split; [| split; [| split; [| split ]]].
+        * admit.
+        * admit.
+        * admit.
+        * admit.
+        * intros k rho1 rho2 Henv Hdis Hdis' Hfm'. eapply preord_exp_fun_compat.
+          eassumption. eassumption.
+          eapply H6.
+          -- admit.
+          -- admit.
+          -- admit.
+          -- admit. 
       admit.
     - (* Eapp *)
       simpl. destruct (update_App St IH (apply_r sig v) t (apply_r_list sig l) st) as [s b] eqn:Hup. 

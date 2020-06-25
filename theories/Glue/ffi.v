@@ -75,6 +75,8 @@ End FState.
 
 (* Takes a MetaCoq type for an FFI function,
    returns its arity and whether it's in IO. *)
+(* TODO currently the IO name is hardcoded
+   but we should change that at some point *)
 Fixpoint type_to_args
          (e : Ast.term) : nat * bool :=
   match e with
@@ -127,6 +129,8 @@ Definition make_curried_fn
            (num : nat)
          (* constant argument, always the arity *)
            (arity : nat)
+         (* whether the function is in the IO monad or not *)
+           (is_io : bool)
          (* the next function to put in the closure or in the 0 arity case, to call *)
            (_next_fn : ident)
            : ffiM def :=
@@ -193,10 +197,14 @@ Definition make_curried_fn
      One for currying (if arity > 0) and
      one for calling linked C function from the extern. (if arity = 0) *)
   '(_ret, vars' , rest) <-
-      match num with
-      | 0 => (* We should project the content of the env
+      match num , is_io with
+      | 0 , _ (* world function for IO *)
+      | 1 , false (* pure FFI function *)=>
+           (* We should project the content of the env
               and call the extern function here *)
-        let l := RandyPrelude.list_to_zero arity in
+        let args_to_extract : nat :=
+            if is_io then arity else pred arity in
+        let l := RandyPrelude.list_to_zero args_to_extract in
 
         let make_arg (n : nat) : ffiM ((ident * type) * statement) :=
             _n <- gensym ("arg" ++ show_nat n) ;;
@@ -205,6 +213,8 @@ Definition make_curried_fn
 
         res <- mapM make_arg l ;;
         let '(args, ss) := List.split res in
+        let all_args := if is_io then args
+                        else args ++ ((_arg, val) :: nil) in
         _res <- gensym "result" ;;
         let call := Scall (Some _res)
                           (Evar _next_fn
@@ -212,21 +222,26 @@ Definition make_curried_fn
                                                   (repeat_typelist val arity))
                                            val cc_default))
                           (Evar _tinfo (threadInf _thread_info) ::
-                           map (fun '(_n, t) => Etempvar _n t) args) in
-        (* Put the result in a pair of [A * World]
-           because that's how [IO] is defined *)
-        _pair <- gensym "pair" ;;
-        let s :=
-            Sassign (Etempvar _pair val) ([val] alloc_expr) ;;;
-            Sassign (Field(var _pair, 0%Z)) (c_int 2048 val) ;;;
-            Sassign (Field(var _pair, 1%Z)) (Evar _res val) ;;;
-            Sassign (Field(var _pair, 2%Z)) (Evar _arg val) ;;;
-            alloc_incr 3%Z ;;;
-            ptr_self_incr (Etempvar _pair val) 1%Z in
-        ret (_pair,
-             (_res, val) :: (_pair, val) :: args,
-             multiple ss ;;; call ;;; s)
-      | S _ => (* We should create an env and a closure *)
+                           map (fun '(_n, t) => Etempvar _n t) all_args) in
+        if is_io
+          then (* Put the result in a pair of [A * World]
+                  because that's how [IO] is defined *)
+            _pair <- gensym "pair" ;;
+            let s :=
+                Sassign (Etempvar _pair val) ([val] alloc_expr) ;;;
+                Sassign (Field(var _pair, 0%Z)) (c_int 2048 val) ;;;
+                Sassign (Field(var _pair, 1%Z)) (Evar _res val) ;;;
+                Sassign (Field(var _pair, 2%Z)) (Evar _arg val) ;;;
+                alloc_incr 3%Z ;;;
+                ptr_self_incr (Etempvar _pair val) 1%Z in
+            ret (_pair,
+                (_res, val) :: (_pair, val) :: args,
+                multiple ss ;;; call ;;; s)
+          else (* Just return the result *)
+            ret (_res,
+                (_res, val) :: args,
+                multiple ss ;;; call)
+      | S _ , _ => (* We should create an env and a closure *)
         _new_env <- gensym "new_env" ;;
         _new_clo <- gensym "new_clo" ;;
         let create_env :=
@@ -293,22 +308,25 @@ Fixpoint make_curried_fns
            (num : nat)
          (* constant argument, always the arity *)
            (arity : nat)
+         (* whether the function is in the IO monad or not *)
+           (is_io : bool)
          (* the extern function to call in the 0 arity case *)
            (_final_fn : ident)
          : ffiM defs :=
-  match num with
-  | 0 =>
+  match num , is_io with
+  | 0 , _ (* world function for IO *)
+  | 1 , false (* pure FFI function *) =>
       (* generate a function that takes in the world *)
-      x <- make_curried_fn kn num arity _final_fn ;;
+      x <- make_curried_fn kn num arity is_io _final_fn ;;
       ret (x :: nil)
-  | S num'  =>
-      rest <- make_curried_fns kn num' arity _final_fn ;;
+  | S num' , _ =>
+      rest <- make_curried_fns kn num' arity is_io _final_fn ;;
       match rest with
       | nil =>
           (* There will always be a world function for 0 arity *)
           failwith "Impossible: no world function"
       | (_prev_fn, _) :: _ =>
-          d <- make_curried_fn kn num arity _prev_fn ;;
+          d <- make_curried_fn kn num arity is_io _prev_fn ;;
           ret (d :: rest)
       end
   end.
@@ -330,7 +348,7 @@ Definition make_one_field
                  (mksignature (val_typ :: nil) None cc_default))
                (Tcons (threadInf _thread_info) (repeat_typelist val arity))
                val cc_default)) in
-  rest <- make_curried_fns kn arity arity _extern_fn ;;
+  rest <- make_curried_fns kn arity arity is_io _extern_fn ;;
   match rest with
   | nil => failwith "No curried functions!"
   | (_entry, _) :: _ =>

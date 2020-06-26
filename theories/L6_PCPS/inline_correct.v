@@ -639,8 +639,8 @@ Section Inline_correct.
         eapply occurs_free_fun_map_get; eauto.
     - destruct k; eauto. rewrite <- fun_map_inv_eq in *.
       eapply H. omega. eassumption. eassumption. eassumption.
-  Qed.                
-
+  Qed.
+  
   Lemma fun_map_inv_set k S fm rho1 rho2 i sig x v x' v' :
     fun_map_inv k S fm rho1 rho2 i sig ->
     ~ x \in Dom_map rho1 :|: Dom_map fm :|: occurs_free_fun_map fm ->
@@ -995,7 +995,7 @@ Section Inline_correct.
       Disjoint _ (bound_var e) (FromList xs :|: occurs_free e) /\
       Disjoint _ (bound_var e \\ funname_in_exp e) (occurs_free_fun_map fm :|: Dom_map fm) /\
       Disjoint _ (FromList xs) (Dom_map fm :|: occurs_free_fun_map fm) /\
-      Disjoint _ (funname_in_exp e :|: funfv_in_exp e) (bound_var_fun_map fm) /\
+      (* Disjoint _ (funname_in_exp e :|: funfv_in_exp e) (bound_var_fun_map fm) /\ *)
 
       Disjoint _ F (bound_var e :|: image (apply_r sig) (occurs_free e \\ FromList xs :|: occurs_free_fun_map fm)).
 
@@ -1042,13 +1042,13 @@ Section Inline_correct.
     Disjoint _ (name_in_fundefs B) (bound_var_fun_map fm) ->
     Disjoint _ (occurs_free_fundefs B) (bound_var_fun_map fm) ->
     Disjoint _ (S \\ FromList xs) (bound_var_fundefs B :|: image (apply_r sig) (occurs_free_fundefs B :|: occurs_free_fun_map fm)) ->
-    Disjoint _ (funname_in_fundefs B :|: funfv_in_fundefs B) (bound_var_fun_map fm) ->
+    (* Disjoint _ (funname_in_fundefs B :|: funfv_in_fundefs B) (bound_var_fun_map fm) -> *)
     
     Datatypes.length (all_fun_name B) = Datatypes.length xs ->
     
     fun_map_vars (add_fundefs B fm) (S \\ FromList xs) (set_list (combine (all_fun_name B) xs) sig).
   Proof.
-    intros Hfm Hun Hdis1 Hdis Hdis' Hdis'' Hdis''' Hdis2 Hlen x ft ys e Hget. destruct (Decidable_name_in_fundefs B). destruct (Dec x).
+    intros Hfm Hun Hdis1 Hdis (* Hdis' Hdis'' *) _ _ Hdis''' (* Hdis2 *) Hlen x ft ys e Hget. destruct (Decidable_name_in_fundefs B). destruct (Dec x).
     - edestruct name_in_fundefs_find_def_is_Some; eauto. destructAll. erewrite add_fundefs_in in Hget; eauto.
       inv Hget. edestruct unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption. destructAll.
       assert (Hin1 : bound_var e \subset bound_var_fundefs B).
@@ -1084,13 +1084,13 @@ Section Inline_correct.
           eapply Disjoint_Included_l. eapply Included_Setminus. eassumption. 
           eapply fun_in_fundefs_FromList_subset. eapply find_def_correct. eassumption. eassumption.
           sets.
-      + eapply Disjoint_Included_r. eapply bound_var_fun_map_add_fundefs_un. eassumption.
-        eapply Union_Disjoint_r.
-        * eapply Disjoint_Included_l. admit. admit.
-          (* eapply fun_in_fundefs_bound_var_Setminus. *)
-          (* (* now sets. admit. *)           *)
-        * eapply Disjoint_Included; [| | eapply Hdis2 ]. now sets. admit.
-      (* eapply fun_in_fundefs_bound_var_Setminus. funname_in_fundefs_subset.  *)
+      (* + eapply Disjoint_Included_r. eapply bound_var_fun_map_add_fundefs_un. eassumption. *)
+      (*   eapply Union_Disjoint_r. *)
+      (*   * eapply Disjoint_Included_l. admit. admit. *)
+      (*     (* eapply fun_in_fundefs_bound_var_Setminus. *) *)
+      (*     (* (* now sets. admit. *)           *) *)
+      (*   * eapply Disjoint_Included; [| | eapply Hdis2 ]. now sets. admit. *)
+      (* (* eapply fun_in_fundefs_bound_var_Setminus. funname_in_fundefs_subset.  *) *)
       + eapply Union_Disjoint_r. now sets. eapply Disjoint_Included_r.
         eapply image_apply_r_set_list. now eauto. eapply Union_Disjoint_r. now sets.
         rewrite <- Same_set_all_fun_name. rewrite Setminus_Union_distr.
@@ -1109,18 +1109,21 @@ Section Inline_correct.
       + now sets.        
       + rewrite Dom_map_add_fundefs. eapply Union_Disjoint_r.
         * eapply Disjoint_Included_r. eapply occurs_free_fun_map_add_fundefs. eapply Union_Disjoint_r; [| now sets ].
-          eapply Union_Disjoint_r.
-          eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ].
-          eapply Included_trans; [| eapply bound_var_fun_map_get; eauto ]. now sets.
-          eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ].
-          eapply Included_trans; [| eapply bound_var_fun_map_get; eauto ]. now sets.
+          (* eapply Union_Disjoint_r. *)
+          (* eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ]. *)
+          (* eapply Included_trans; [| eapply bound_var_fun_map_get; eauto ]. now sets. *)
+          (* eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ]. *)
+        (* eapply Included_trans; [| eapply bound_var_fun_map_get; eauto ]. now sets. *) 
+          eapply Union_Disjoint_r.  admit. admit.
         * eapply Union_Disjoint_r. sets.
-          eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ].
-          eapply Included_trans; [| eapply bound_var_fun_map_get; eauto ]. now sets.
+          admit.
+          (* eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ]. *)
+          (* eapply Included_trans; [| eapply bound_var_fun_map_get; eauto ]. now sets. *)
           now sets.
       + rewrite Dom_map_add_fundefs. eapply Union_Disjoint_r. eapply Union_Disjoint_r.
-        eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ].
-        eapply Included_trans; [| eapply bound_var_fun_map_get; eauto ]. now sets.
+        admit. 
+        (* eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ]. *)
+        (* eapply Included_trans; [| eapply bound_var_fun_map_get; eauto ]. now sets. *)
         now sets.
         eapply Disjoint_Included_r. eapply occurs_free_fun_map_add_fundefs. 
         eapply Union_Disjoint_r; [| now sets ]. eapply Union_Disjoint_r.
@@ -1128,8 +1131,8 @@ Section Inline_correct.
         eapply Included_trans; [| eapply bound_var_fun_map_get; eauto ]. now sets.
         eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ].
         eapply Included_trans; [| eapply bound_var_fun_map_get; eauto ]. now sets.
-      + eapply Disjoint_Included_r. eapply bound_var_fun_map_add_fundefs_un. eassumption.
-        eapply Union_Disjoint_r; [| eassumption ]. admit.
+      (* + eapply Disjoint_Included_r. eapply bound_var_fun_map_add_fundefs_un. eassumption. *)
+      (*   eapply Union_Disjoint_r; [| eassumption ]. admit. *)
       + eapply Union_Disjoint_r. now sets. 
         eapply Disjoint_Included_r. eapply image_apply_r_set_list. eassumption.
         eapply Union_Disjoint_r. now sets. eapply Disjoint_Included_r.
@@ -1149,7 +1152,7 @@ Section Inline_correct.
             (Hdis1 : Disjoint _ (bound_var e) (occurs_free e))
             (Hdis2 : Disjoint _ S (bound_var e :|: image (apply_r sig) (occurs_free e :|: occurs_free_fun_map fm)))
             (Hdis3 : Disjoint _ (bound_var e \\ funname_in_exp e) (Dom_map fm :|: occurs_free_fun_map fm))
-            (Hdis4 : Disjoint _ (funname_in_exp e :|: funfv_in_exp e) (bound_var_fun_map fm))
+            (* (Hdis4 : Disjoint _ (funname_in_exp e :|: funfv_in_exp e) (bound_var_fun_map fm)) *)
             
             (Hfm : fun_map_vars fm S sig),
         {{ fun _ s => fresh S (next_var (fst s)) }}
@@ -1170,7 +1173,7 @@ Section Inline_correct.
             (Hdis1 : Disjoint _ (bound_var_fundefs B) (occurs_free_fundefs B))
             (Hdis2 : Disjoint _ S (bound_var_fundefs B :|: image (apply_r sig) (occurs_free_fundefs B :|: occurs_free_fun_map fm)))
             (Hdis3 : Disjoint _ (bound_var_fundefs B \\ name_in_fundefs B \\ funname_in_fundefs B) (Dom_map fm :|: occurs_free_fun_map fm))
-            (Hdis4 : Disjoint _ (funname_in_fundefs B :|: funfv_in_fundefs B) (bound_var_fun_map fm))
+            (* (Hdis4 : Disjoint _ (funname_in_fundefs B :|: funfv_in_fundefs B) (bound_var_fun_map fm)) *)
             
             (Hfm : fun_map_vars fm S sig), 
         {{ fun _ s => fresh S (next_var (fst s)) }}
@@ -1213,7 +1216,7 @@ Section Inline_correct.
         eapply Disjoint_Included; [| | eapply Hdis2 ].
         rewrite Setminus_Union_distr. rewrite !image_Union. now xsets. now sets.
       + eapply Disjoint_Included_l; [| eassumption ]. normalize_bound_var. sets.
-      + eassumption.
+      (* + eassumption. *)
       + eapply fun_map_vars_set. eassumption.
       + intros e' w2. eapply return_triple.
         intros _ st'. intros [Hf1 [Hf2 [Hf3 [Hf4 [Hun [Hsub [Hsub' Hsem]]]]]]].
@@ -1261,9 +1264,10 @@ Section Inline_correct.
              intros Hc. inv Hc. inv H2.
              ++ eapply Hdis. normalize_bound_var. constructor. now right. eassumption.
              ++ eapply Hdis3. constructor. normalize_bound_var. simpl. constructor. now right.
-                (* now right. now right; eauto. *) admit.
+                intros Hc. eapply H1. eapply funname_in_exp_subset. eassumption.
                 now left; eauto.
-             ++ eapply Hdis3. normalize_bound_var. constructor. constructor. now right. simpl. admit.
+             ++ eapply Hdis3. normalize_bound_var. constructor. constructor. now right. simpl.
+                intros Hc. eapply H1. eapply funname_in_exp_subset. eassumption.
                 now right; eauto.
              ++ intros Hc. eapply Hdis2. constructor; try eassumption.
                 eapply fresh_Range; [| eassumption ]. eassumption. rewrite image_Union. eauto.
@@ -1286,8 +1290,9 @@ Section Inline_correct.
         + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
           eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
         + eapply Disjoint_Included_l; [| eapply Hdis3 ]. simpl. admit.
-        + sets.
-        + eapply Disjoint_Included_l; [| eassumption ]. simpl. sets.
+        + admit. (* Disjoint var (name_in_fundefs f2) (bound_var_fun_map fm) *)
+        + admit.
+        (* + eapply Disjoint_Included_l; [| eassumption ]. simpl. sets. *)
         + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
           eapply Disjoint_Included; [| | eapply Hdis2 ]; sets. }      
       

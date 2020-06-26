@@ -534,18 +534,22 @@ Section L1Constructors.
     | _, _ => (nil, dissect_type ctx ty)
     end.
 
-  (*
+  
   Import Template.Ast.
-
+  (*
+  Definition datatypes_kn na : kername := (MPfile (cons "Datatypes" (cons "Init" (cons "Coq" nil))), na)%string.
+  Definition top_kn na : kername := (MPfile (cons "Top" nil), na)%string.
+  Arguments top_kn na%string.
   Definition change := tProd nAnon
                           (tProd nAnon
                             (tInd
                                 {|
-                                inductive_mind := "Coq.Init.Datatypes.nat";
+                                inductive_mind := datatypes_kn "nat"%string;
                                 inductive_ind := 0 |} nil)
                             (tRel 1))
                           (tRel 1).
-  Eval compute in (dissect_types 0 (dInd "Top.color" :: nil) change).
+  
+  Eval compute in (dissect_types [] (dInd (top_kn "color") :: nil) change).
 
   Definition c := tProd (nNamed "a"%string)
                     (tSort ((Level.Level "Top.43", false) :: nil))
@@ -1402,7 +1406,7 @@ Definition generate_glue
        ; gstate_penv   := M.empty _
        ; gstate_log    := nil
        |} in
-  let '(err, st) := runState (make_glue_program globs) opts init in
+  let '(err, st) := runState (make_glue_program (rev globs)) opts init in
   let nenv := gstate_nenv st in
   match err with
   | Ret (header, source) =>

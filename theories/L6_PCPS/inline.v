@@ -87,18 +87,23 @@ Section Beta.
          let ys' := apply_r_list sig ys in
          let (s' , inl) := update_letApp _ IH f' t ys' s in
          (match (inl, M.get f fm, d) with
-          | (true, Some (t, xs, e), S d') =>
-            let sig' := set_list (combine xs ys') sig  in            
-            e' <- beta_contract d' e sig' fm s' ;;
-            match inline_letapp e' x, Nat.eqb (List.length xs) (List.length ys) with
-            | Some (C, x'), true =>
-              ec' <- beta_contract d' ec (M.set x x' sig) fm s' ;;
-              ret (C |[ ec' ]|)
-            | _, _ =>
+          | (true, Some (ft, xs, e), S d') =>
+            if (Nat.eqb (List.length xs) (List.length ys)) then 
+              let sig' := set_list (combine xs ys') sig  in            
+              e' <- beta_contract d' e sig' fm s' ;;
+              match inline_letapp e' x, Nat.eqb (List.length xs) (List.length ys) with
+              | Some (C, x'), true =>
+                ec' <- beta_contract d' ec (M.set x x' sig) fm s' ;;
+                ret (C |[ ec' ]|)
+              | _, _ =>
+                x' <- get_name x "" ;;
+                ec' <- beta_contract_aux ec (M.set x x' sig) fm s' ;;
+                ret (Eletapp x' f' t ys' ec')
+              end
+            else              
               x' <- get_name x "" ;;
               ec' <- beta_contract_aux ec (M.set x x' sig) fm s' ;;
               ret (Eletapp x' f' t ys' ec')
-            end
          | _ =>
            x' <- get_name x "" ;;
            ec' <- beta_contract_aux ec (M.set x x' sig) fm s' ;;

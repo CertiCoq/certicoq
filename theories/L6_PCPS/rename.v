@@ -342,6 +342,15 @@ Proof.
   - unfold apply_r. rewrite M.gso, extend_gso; eauto.
 Qed.
 
+Lemma apply_r_set_list_f_eq xs ys sig : 
+  f_eq (apply_r (set_list (combine xs ys) sig)) (apply_r sig <{ xs ~> ys }>). 
+Proof.
+  revert ys sig. induction xs; intros; simpl. reflexivity.
+  destruct ys. reflexivity.
+  simpl. eapply Equivalence_Transitive.
+  eapply apply_r_set_f_eq. eapply f_eq_extend. eauto.
+Qed.
+
 Lemma eq_P_apply_r:
   forall x sub sub',
     eq_env_P (Singleton _ x) sub sub' ->

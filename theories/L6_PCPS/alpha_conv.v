@@ -864,6 +864,58 @@ Section Alpha_conv_correct.
       intros Hc. eapply H0. constructor; eauto.
   Qed.
 
+  Lemma preord_env_P_inj_extend_not_In_P_r_alt k S σ rho1 rho2 x y :
+    preord_env_P_inj S k σ rho1 rho2 -> 
+    ~ x \in Dom_map rho1 ->
+    preord_env_P_inj S k (σ {x ~> y}) rho1 rho2.
+  Proof.
+    intros Hpre Hnin z Hp v1 Hget.
+    edestruct Hpre as [v2 [Hget2 Hpre2]]; eauto.
+    repeat eexists; eauto. rewrite extend_gso; eauto.
+    intros Hc. subst. apply Hnin. eexists; eauto.
+  Qed.
+
+  Lemma preord_env_P_inj_def_funs_neq_r_alt S k σ rho1 rho2 B0 B :
+    preord_env_P_inj S k σ rho1 rho2->
+    Disjoint _ (image σ (Dom_map rho1)) (name_in_fundefs B) ->
+    preord_env_P_inj S k σ rho1 (def_funs B0 B rho2 rho2).
+  Proof. 
+    intros Henv Hd x Hin v Hget.
+    rewrite def_funs_neq. now eapply Henv.
+    intros Hc. eapply Hd. constructor; eauto. eapply In_image.
+    eexists; eauto.
+  Qed.
+
+
+
+  Lemma preord_env_P_inj_set_lists_not_In_P_r S k f rho1 rho2 rho2' xs vs :
+    preord_env_P_inj S k f rho1 rho2 ->
+    set_lists xs vs rho2 = Some rho2' ->
+    Disjoint _(FromList xs) (image f (Dom_map rho1)) ->
+    preord_env_P_inj S k f rho1 rho2'.
+  Proof.
+    intros Henv Hnin Hnin' z Hy v' Hget.
+    edestruct Henv as [v'' [Hget' Hv]]; eauto.
+    eexists; split; eauto. erewrite <- set_lists_not_In. eassumption.
+    eassumption. intros Hc. eapply Hnin'. constructor. eassumption.
+    eapply In_image. eexists; eauto.
+  Qed.
+
+
+  Lemma preord_env_P_inj_extend_lst_not_In_P_r_alt k S σ rho1 rho2 xs ys:
+    preord_env_P_inj S k σ rho1 rho2 -> 
+    Disjoint _ (FromList xs) (Dom_map rho1) ->
+    preord_env_P_inj S k (σ <{xs ~> ys}>) rho1 rho2.
+  Proof.
+    revert k S σ rho1 rho2 ys. induction xs; intros.
+    - simpl. eassumption.
+    - destruct ys. eassumption.
+      repeat normalize_sets. simpl. eapply preord_env_P_inj_extend_not_In_P_r_alt.
+      eapply IHxs. eassumption. now sets.
+      intros Hc. eapply H0. constructor; eauto.
+  Qed.
+
+  
   Lemma preord_env_P_inj_set_extend_not_In_P_r S k f rho1 rho2 x y v :
     preord_env_P_inj S k f rho1 rho2 ->
     ~ x \in S ->

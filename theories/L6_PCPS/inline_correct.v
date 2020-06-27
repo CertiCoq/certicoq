@@ -1712,7 +1712,12 @@ Section Inline_correct.
           eapply Setminus_Included_Included_Union. eapply Included_trans. eapply occurs_free_in_fun.
           2:{ now sets. } now left.
         - eapply Disjoint_Included_l; [| eassumption ].
-          normalize_bound_var. simpl. admit. (* same ? *)
+          normalize_bound_var. simpl. rewrite !Setminus_Union_distr. do 2 eapply Included_Union_preserv_r.
+          eapply Included_Union_preserv_l. rewrite !Setminus_Union. rewrite Union_commut.
+          rewrite <- Union_assoc. rewrite <- Setminus_Union. eapply Included_Setminus; [| now sets ].
+          eapply Union_Disjoint_r; [| eapply Union_Disjoint_r ]; sets.
+          + eapply Disjoint_Included_r. eapply funname_in_fundefs_subset. sets.
+          + eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs. sets.
         - repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx. 
           sets.
         - repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
@@ -1759,10 +1764,13 @@ Section Inline_correct.
              admit. (* NODUP *)
              
         * eapply Disjoint_Included. eassumption. eassumption. eapply Disjoint_sym. eapply Disjoint_Range. reflexivity.
-        * admit.
-          (* eapply Disjoint_Included. eassumption. eassumption. eapply Disjoint_sym. eapply Disjoint_Range. zify. omega. *)
-        * admit. 
-          (* eapply Disjoint_Included. eassumption. eassumption. eapply Disjoint_Range. reflexivity. *)
+        * eapply Disjoint_Included_l. eapply Included_Union_Setminus with (s2 := name_in_fundefs B'); tci. eapply Union_Disjoint_l.
+          -- eapply Disjoint_Included. eassumption. eassumption. eapply Disjoint_sym. eapply Disjoint_Range. zify. omega.
+          -- (* rewrite Same_set_all_fun_name in H20. rewrite H14 in H20. rewrite FromList_apply_list in H20.  *)
+             admit. (* Disjoint var (name_in_fundefs B') (FromList xs) *)
+        * eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := name_in_fundefs B'); tci. eapply Union_Disjoint_r.
+          -- eapply Disjoint_Included. eassumption. eassumption. eapply Disjoint_Range. zify. omega.
+          -- admit. (* rewrite Same_set_all_fun_name in H20. rewrite H14 in H20. rewrite FromList_apply_list in H20.  *)
         * intros Hc. eapply Hdis2. constructor. 2:{ right. eapply In_image. right. now left. }
           eapply Hf. eapply Hxs in Hc. unfold Ensembles.In, Range in Hc. zify; omega.
       + normalize_occurs_free. eapply Included_trans. eapply Included_Union_compat.

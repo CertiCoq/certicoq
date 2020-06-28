@@ -109,6 +109,14 @@ Proof.
   rewrite H. auto.
 Qed.
 
+Lemma eq_env_P_antimon {A} S S' (rho1 rho2 : M.t A) :
+  eq_env_P S rho1 rho2 ->
+  S' \subset S ->
+  eq_env_P S' rho1 rho2.
+Proof.
+  intros. intro; intros. eapply H. eapply H0; eauto.
+Qed.
+
 Lemma eq_env_P_set_not_in_P_l':
   forall  {A} (x : M.elt) (v : A)
           (P : Ensemble M.elt) (rho1 rho2 : M.t A),

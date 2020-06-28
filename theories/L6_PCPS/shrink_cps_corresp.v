@@ -16,7 +16,7 @@ Require Import Libraries.CpdtTactics Coq.Sorting.Permutation.
 Require Import Libraries.HashMap.
 Require Import Libraries.maps_util.
 Require Import L6.Ensembles_util L6.cps L6.rename L6.ctx L6.logical_relations L6.tactics L6.cps_util
-        L6.List_util L6.shrink_cps L6.eval L6.set_util L6.identifiers L6.stemctx L6.shrink_cps_correct. 
+        L6.List_util L6.shrink_cps L6.eval L6.set_util L6.identifiers L6.stemctx L6.shrink_cps_correct L6.inline_letapp. 
 
 
 
@@ -702,49 +702,6 @@ Section CONTRACT.
            exfalso; apply H; auto
          end.
 
-  Lemma num_occur_inline_letapp_leq e f C x x' m :
-    num_occur e f m ->
-    inline_letapp e  x = Some (C, x') ->
-    exists n, num_occur_ec C f n /\ n <= m.
-  Proof.
-    revert m f C x x'. induction e using exp_ind'; intros m g C y x' Hnum  Hin; simpl in Hin;
-                       (try match goal with
-                            | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
-                            end); try congruence.
-    - inv Hnum. eapply IHe in Hin'; eauto. destructAll.
-      eexists; split. econstructor. eassumption. omega.
-    - inv Hnum. eapply IHe in Hin'; eauto. destructAll.
-      eexists; split. econstructor. eassumption. omega.
-    - inv Hnum. eapply IHe in Hin'; eauto. destructAll.
-      eexists; split. econstructor. eassumption. omega.
-    - inv Hnum. eapply IHe in Hin'; eauto. destructAll.
-      eexists; split. econstructor. eassumption. eassumption. omega.
-    - inv Hnum. inv Hin. eexists; split. econstructor. now constructor. omega.
-    - inv Hnum. eapply IHe in Hin'; eauto. destructAll.
-      eexists; split. econstructor. eassumption. omega.
-    - inv Hin. eexists. split. constructor. omega.
-  Qed.
-
-  Lemma inline_letapp_var_num_occur x e C x' :
-    inline_letapp e x = Some (C, x') ->
-    x' = x \/ (exists m, m > 0 /\ num_occur e x' m).
-  Proof.
-    revert C. induction e using exp_ind'; simpl; intros C Hin;
-    (try match goal with
-         | [ _ : context[inline_letapp ?E ?X] |- _ ] =>
-           destruct (inline_letapp E X) as [[C' z] | ] eqn:Hin'; inv Hin
-         end);
-    try now (destruct (IHe C' eq_refl); eauto; destructAll; right;
-             eauto; eexists; split; [| econstructor; eassumption ]; omega).
-    - congruence.
-    - destruct (IHe C' eq_refl); eauto. right. destructAll.
-      edestruct (proj2 (e_num_occur_mut x')). 
-      eexists. constructor. 2:{ econstructor; eauto. }
-      omega.
-    - inv Hin. now left.
-    - inv Hin. right. eauto. eexists. split. 2:{ econstructor. }
-      simpl. rewrite peq_true. omega.
-  Qed.
 
   Lemma rename_all_ns_same_mut m (Hyp : forall x, apply_r m x = x) : 
     (forall e, rename_all_ns m e = e) /\
@@ -6772,21 +6729,6 @@ Section CONTRACT.
       - right. do 4 eexists; split; eauto. rewrite M.gso in Hget; eauto.
     Qed.
 
-    Lemma inline_letapp_None e x sig :
-      inline_letapp e x = None ->
-      inline_letapp (rename_all_ns sig e) x = None.
-    Proof.
-      revert x sig; induction e; intros x sig Hinl; simpl in *;
-        try match goal with
-            | [H : context[inline_letapp ?E ?X] |- _ ] => destruct (inline_letapp E X) as [[C' y] | ] eqn:Hinl'; inv Hinl
-            end;
-        try now (erewrite IHe; [| eassumption ]).
-      - reflexivity.
-      - inv Hinl.
-      - inv Hinl.
-    Qed.
-
-
     Definition map_eq_ren {A} f (m1 m2 : M.t A) :=
       forall v : positive, m1 ! v = m2 ! (f v).      
 
@@ -7176,40 +7118,6 @@ Section CONTRACT.
     congruence.
   Qed.
 
-  Lemma inline_letapp_var_eq_alt' x e C x' :
-    inline_letapp e x = Some (C, x') ->
-    (x' = x /\ x \in bound_stem_ctx C) \/ x' \in bound_var e :|: occurs_free e.
-  Proof.
-    revert C. induction e using exp_ind'; simpl; intros C Hin;
-                (try match goal with
-                     | [ _ : context[inline_letapp ?E ?X] |- _ ] =>
-                       destruct (inline_letapp E X) as [[C' z] | ] eqn:Hin'; inv Hin
-                     end).
-    - destruct (IHe C' eq_refl); eauto. now inv H; eauto.
-      normalize_occurs_free. normalize_bound_var.
-      rewrite !Union_assoc, Union_Setminus_Included; tci; sets. inv H; eauto. 
-    - congruence.
-    - destruct (IHe C' eq_refl); eauto.
-      inv H. now left; eauto.
-      normalize_occurs_free. normalize_bound_var. inv H; eauto.
-      rewrite !Union_assoc. rewrite Union_Setminus_Included with (s3 := [set v]); tci. sets.
-    - destruct (IHe C' eq_refl); eauto.
-      inv H. now left; eauto.
-      normalize_occurs_free. normalize_bound_var.
-      rewrite !Union_assoc, Union_Setminus_Included; tci; sets. inv H; eauto 20.
-    - destruct (IHe C' eq_refl); eauto. 
-      inv H. now left; eauto.
-      normalize_occurs_free. normalize_bound_var.
-      rewrite !Union_assoc, Union_Setminus_Included; tci; sets. inv H; eauto.
-      eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. sets.
-    - inv Hin. eauto.
-    - destruct (IHe C' eq_refl); eauto.
-      inv H. now left; eauto.
-      normalize_occurs_free. normalize_bound_var.
-      rewrite !Union_assoc, Union_Setminus_Included; tci; sets. inv H; eauto.
-    - inv Hin. normalize_occurs_free; sets.
-  Qed.
-
   Lemma apply_r_set_list_In sig l1 l2 x :
     x \in FromList l1 ->
     length l1 = length l2 ->
@@ -7277,19 +7185,6 @@ Section CONTRACT.
     eapply not_bound_dead_or_free_ctx  in n. inv n; eauto.
     exfalso; eauto.
   Qed.
-
-  Lemma num_occur_ec_eq C x m n :
-    num_occur_ec C x m ->
-    n = m ->
-    num_occur_ec C x n.
-  Proof. intros; subst; eauto. Qed.
-
-  Lemma num_occur_eq C x m n :
-    num_occur C x m ->
-    n = m ->
-    num_occur C x n.
-  Proof. intros; subst; eauto. Qed.
-
     
   Lemma Disjoint_dead_var_ctx S e :
     Disjoint _ S (bound_var_ctx e :|: occurs_free_ctx e) ->
@@ -7302,55 +7197,6 @@ Section CONTRACT.
     intros Hc. unfold dead_var, In in *. eapply num_occur_ec_det in H; [| clear H; eassumption ].    
     congruence.
   Qed.
-
-  Lemma inline_letapp_gt_zero e v C x :
-    inline_letapp e v = Some (C, x) ->
-    v <> x ->
-    exists m, m > 0 /\ num_occur e x m.
-  Proof. 
-    revert C.
-    induction e using exp_ind'; intros C Hin Hneq; simpl in Hin;
-      (try match goal with
-           | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
-           end); try congruence; try (edestruct IHe; eauto; destructAll);
-        (try now eexists; split; [| eapply num_occur_eq; econstructor; eauto ]; omega).
-    - edestruct e_num_occur_fds. eexists. split. 2:{ eapply num_occur_eq. constructor; eassumption. reflexivity. }
-      omega.
-    - eexists. split. 2:{ constructor. }
-      inv Hin. simpl. rewrite peq_true. omega.
-  Qed.
-    
-  Lemma inline_letapp_num_occur e v C x z n :
-    inline_letapp e v = Some (C, x) ->
-    v <> z ->
-    num_occur e z n ->    
-    if (var_dec z x) then num_occur_ec C z (n - 1) else num_occur_ec C z n.
-  Proof.
-    (* destruct n. *)
-    (* { intros. destruct (var_dec z x); eapply num_occur_inline_letapp'; eauto. } *)
-    (* assert (Hleq : S n >= 1) by omega. revert Hleq. generalize (S n) as m. *)
-    revert C n.
-    induction e using exp_ind'; intros C (* m Hleq *) m Hin Hneq Hnum; simpl in Hin;
-      (try match goal with
-           | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
-           end); try congruence; inv Hnum; destruct (var_dec z x); subst;
-        (try now eapply num_occur_ec_eq; [ constructor; eapply IHe; eauto | omega ]);
-        (try now edestruct inline_letapp_gt_zero; [ eassumption | eassumption | ]; destructAll;
-     match goal with
-     | [H1 : num_occur _ _ _, H2 : num_occur _ _ _ |- _ ] => eapply num_occur_det in H1; [| eapply H2 ]; subst
-     end;
-     eapply num_occur_ec_eq; [ constructor; eapply IHe; eauto | omega ]).
-    - edestruct inline_letapp_gt_zero; [ eassumption | eassumption | ]; destructAll.
-      match goal with
-      | [H1 : num_occur _ _ _, H2 : num_occur _ _ _ |- _ ] => eapply num_occur_det in H1; [| eapply H2 ]; subst
-      end.
-      eapply num_occur_ec_eq. constructor. eapply IHe; eauto. eassumption. omega .
-    - eapply num_occur_ec_eq. constructor. eapply IHe; eauto. eassumption. omega .
-    - inv Hin. contradiction.
-    - inv Hin. eapply num_occur_ec_eq. econstructor. now constructor. omega.
-    - inv Hin. eapply num_occur_ec_eq. econstructor. simpl. rewrite peq_true. omega.
-    - inv Hin. eapply num_occur_ec_eq. econstructor. simpl. rewrite peq_false; eauto.
-  Qed. 
 
   Theorem cmap_view_letapp:
     forall sub c v f t ys,

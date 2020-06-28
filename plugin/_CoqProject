@@ -20,8 +20,6 @@ extraction/archi.ml
 extraction/archi.mli
 extraction/astCommon.ml
 extraction/astCommon.mli
-extraction/inline.ml
-extraction/inline.mli
 extraction/binary.ml
 extraction/binary.mli
 extraction/bits.ml
@@ -120,6 +118,10 @@ extraction/identifiers.ml
 extraction/identifiers.mli
 extraction/init.ml
 extraction/init.mli
+extraction/inline.ml
+extraction/inline.mli
+extraction/inline_letapp.ml
+extraction/inline_letapp.mli
 extraction/integers.ml
 extraction/integers.mli
 extraction/l3_to_L3_eta.ml

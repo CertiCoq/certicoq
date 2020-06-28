@@ -4,7 +4,7 @@ Require Import Common.compM Common.Pipeline_utils L6.cps.
 Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
 Import ListNotations.
 Require Import identifiers.
-Require Import L6.state L6.cps_util L6.cps_show L6.ctx L6.uncurry L6.shrink_cps L6.rename.
+Require Import L6.state L6.cps_util L6.cps_show L6.ctx L6.uncurry L6.shrink_cps L6.rename L6.inline_letapp.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
@@ -87,11 +87,12 @@ Section Beta.
          let ys' := apply_r_list sig ys in
          let (s' , inl) := update_letApp _ IH f' t ys' s in
          (match (inl, M.get f fm, d) with
-          | (true, Some (ft, xs, e), S d') =>
+          | (true, Some  (ft, xs, e), S d') =>
             if (Nat.eqb (List.length xs) (List.length ys)) then 
-              let sig' := set_list (combine xs ys') sig  in            
+              let sig' := set_list (combine xs ys') sig  in
+              x' <- get_name x "" ;;         
               e' <- beta_contract d' e sig' fm s' ;;
-              match inline_letapp e' x, Nat.eqb (List.length xs) (List.length ys) with
+              match inline_letapp e' x', Nat.eqb (List.length xs) (List.length ys) with
               | Some (C, x'), true =>
                 ec' <- beta_contract d' ec (M.set x x' sig) fm s' ;;
                 ret (C |[ ec' ]|)

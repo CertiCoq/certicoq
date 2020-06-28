@@ -17,7 +17,7 @@ Require Import L6.Ensembles_util.
 
 Require Import L6.cps L6.ctx L6.logical_relations L6.tactics L6.cps_util L6.List_util
         L6.shrink_cps L6.eval L6.set_util L6.identifiers L6.stemctx L6.alpha_conv
-        L6.functions L6.relations L6.rename.
+        L6.functions L6.relations L6.rename L6.inline_letapp.
 
 Open Scope ctx_scope.
 
@@ -1585,65 +1585,6 @@ Section Shrink_correct.
     | [|- context[bound_var_fundefs_ctx (Fcons2_c _ _ _ _ _)]] =>
        rewrite bound_var_Fcons2_c
   end.
-
-  Lemma bound_var_occurs_free_Eletapp_Included x f t ys e :
-    Included _ (Union _ (bound_var e) (occurs_free e))
-             (Union _ (bound_var (Eletapp x f t ys e))
-                    (occurs_free (Eletapp x f t ys e))).
-  Proof with eauto with Ensembles_DB.
-    repeat normalize_bound_var. repeat normalize_occurs_free.
-    rewrite <- Union_assoc.
-    apply Included_Union_compat...
-    eapply Included_trans. now apply occurs_free_Eletapp_Included with (ft := t).
-    normalize_occurs_free...
-  Qed.
-
-
-  (* TODO move *)
-  Lemma bound_var_inline_letapp x e C x' :
-    inline_letapp e x = Some (C, x') ->
-    bound_var_ctx C \subset x |: bound_var e.
-  Proof. 
-    revert C. induction e using exp_ind'; simpl; intros C Hin;
-    (try match goal with
-         | [ _ : context[inline_letapp ?E ?X] |- _ ] =>
-           destruct (inline_letapp E X) as [[C' z] | ] eqn:Hin'; inv Hin
-         end);
-    (try now (normalize_bound_var; normalize_bound_var_ctx;
-              eapply Union_Included; sets; eapply Included_trans;
-              [ eapply IHe; reflexivity | ]; sets)).
-    congruence.
-    
-    inv Hin. normalize_bound_var. repeat normalize_bound_var_ctx. sets.
-    inv Hin. normalize_bound_var. repeat normalize_bound_var_ctx. sets.
-  Qed.
-
-
-  Lemma inline_letapp_var_eq x e C x' :
-    inline_letapp e x = Some (C, x') ->
-    x' = x \/ x' \in bound_var e :|: occurs_free e.
-  Proof.
-    revert C. induction e using exp_ind'; simpl; intros C Hin;
-    (try match goal with
-         | [ _ : context[inline_letapp ?E ?X] |- _ ] =>
-           destruct (inline_letapp E X) as [[C' z] | ] eqn:Hin'; inv Hin
-         end).
-    - destruct (IHe C' eq_refl); eauto. right. 
-      eapply bound_var_occurs_free_Econstr_Included; eauto.
-    - congruence.
-    - destruct (IHe C' eq_refl); eauto. right. 
-      eapply bound_var_occurs_free_Eproj_Included; eauto.
-    - destruct (IHe C' eq_refl); eauto. right. 
-      eapply bound_var_occurs_free_Eletapp_Included; eauto.
-    - destruct (IHe C' eq_refl); eauto. right. 
-      eapply bound_var_occurs_free_Efun_Included; eauto.
-    - inv Hin. eauto.
-    - destruct (IHe C' eq_refl); eauto. right. 
-      eapply bound_var_occurs_free_Eprim_Included; eauto.
-    - inv Hin. normalize_occurs_free. sets.
-  Qed.
-
-  
 
   (* Letapp inlining *)
   Lemma rw_fun_letapp_corr x f fds t xs fb vs c rho1 rho2 k x' C' e1 :
@@ -4003,31 +3944,6 @@ substitution to a term cannot increase the occurence count for that variable. *)
   
   Opaque num_occur_list.
   
-  Lemma num_occur_inline_letapp e f C x x' :
-    num_occur e f 0 ->
-    inline_letapp e  x = Some (C, x') ->
-    x <> f ->
-    num_occur_ec C f 0 /\ x' <> f. 
-  Proof.
-    revert f C x x'. induction e using exp_ind'; intros g C y x' Hnum  Hin Hneq; simpl in Hin;
-    (try match goal with
-         | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
-         end); try congruence.
-    - inv Hnum. pi0. eapply IHe in H4; eauto. destructAll. split; eauto.
-      rewrite plus_comm. constructor. eassumption.
-    - inv Hnum. pi0. eapply IHe in H5; eauto. destructAll. split; eauto.
-    - inv Hnum. pi0. eapply IHe in H5; eauto. destructAll. split; eauto.
-    - inv Hnum. pi0. eapply IHe in Hin'; eauto. destructAll. split; eauto.
-    - inv Hin. inv Hnum. split; eauto.
-      replace (num_occur_list (v :: l) g) with (num_occur_list (v :: l) g + 0) by omega.
-      eauto.
-    - inv Hnum. pi0. eapply IHe in H4; eauto. destructAll. split; eauto.
-      rewrite plus_comm. constructor. eassumption.
-    - inv Hin. inv Hnum. 
-      Transparent num_occur_list.
-      simpl in *.
-      destruct (cps_util.var_dec g x'); subst; try congruence. split; eauto. 
-  Qed.
   
   Lemma sr_rw_in_rw n e e' :
       unique_bindings e ->
@@ -4131,7 +4047,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
         2:{ rewrite Dom_map_set_lists_ss; [| eassumption ]. eapply Disjoint_sym. sets. }
         
         eapply Fun_rem. eapply unique_bindings_fundefs_unique_functions. eassumption.
-
+        Transparent num_occur_list.
         - inv H7. eapply num_occur_app_ctx_mut in H9.
           destructAll. inv H4. simpl in H6. rewrite peq_true in H6.
           assert (Heq0 : num_occur_list vs f = 0) by omega.
@@ -4334,89 +4250,8 @@ substitution to a term cannot increase the occurence count for that variable. *)
   Qed.
 
 
-  Lemma unique_bindings_inline_letapp C e x x' : 
-    inline_letapp e x = Some (C, x') ->
-    ~ x \in bound_var e ->
-    unique_bindings e ->
-    unique_bindings_c C.
-  Proof.
-    revert C x x'; induction e; intros C x x' Hin Hbv Hub; simpl in Hin;
-      (try match goal with
-           | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
-           end); try congruence.
-    - inv Hub. constructor; eauto. intros Hc; eapply H1.
-      eapply bound_var_inline_letapp in Hc; eauto. inv Hc; eauto. inv H.
-      exfalso. eapply Hbv; eauto.
-      eapply IHe; eauto.
-    - inv Hub. constructor; eauto. intros Hc; eapply H1.
-      eapply bound_var_inline_letapp in Hc; eauto. inv Hc; eauto. inv H.
-      exfalso. eapply Hbv; eauto.
-      eapply IHe; eauto.
-    - inv Hub. constructor; eauto. intros Hc; eapply H1.
-      eapply bound_var_inline_letapp in Hc; eauto. inv Hc; eauto. inv H.
-      exfalso. eapply Hbv; eauto.
-      eapply IHe; eauto.
-    - inv Hub. constructor; eauto.
-      eapply IHe; eauto.
-      eapply Disjoint_Included_l.
-      eapply bound_var_inline_letapp. eassumption.
-      eapply Union_Disjoint_l; sets. eapply Disjoint_Singleton_l.
-      intros Hc. eapply Hbv; eauto.
-    - inv Hin. constructor; eauto.
-      intros Hc; inv Hc.
-      constructor. 
-    - inv Hub. constructor; eauto. intros Hc; eapply H1.
-      eapply bound_var_inline_letapp in Hc; eauto. inv Hc; eauto. inv H.
-      exfalso. eapply Hbv; eauto.
-      eapply IHe; eauto.
-    - inv Hin. constructor.
-  Qed.
 
 
-  Lemma occurs_fee_inline_letapp C e x x' e' :
-    inline_letapp e x = Some (C, x') ->
-    occurs_free (C |[ e' ]|)  \subset occurs_free e :|: (occurs_free e' \\ bound_stem_ctx C).
-  Proof.
-    revert C x x' e'; induction e; intros C x x' e' Hin; simpl in Hin;
-      (try match goal with
-           | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
-           end); try congruence.
-    - simpl. repeat normalize_occurs_free.
-      eapply Union_Included; sets.
-      eapply Setminus_Included_Included_Union. eapply Included_trans.
-      eapply IHe; eauto. normalize_bound_stem_ctx. rewrite <- Setminus_Union.
-      rewrite <- !Union_assoc. rewrite <- Union_Setminus; tci.
-      rewrite <- Union_Included_Union_Setminus with (s3 := [set v]); tci; sets. 
-    - simpl. repeat normalize_occurs_free.
-      eapply Union_Included; sets.
-      eapply Setminus_Included_Included_Union. eapply Included_trans.
-      eapply IHe; eauto. normalize_bound_stem_ctx. rewrite <- Setminus_Union.
-      rewrite <- !Union_assoc. rewrite <- Union_Setminus; tci.
-      rewrite <- Union_Included_Union_Setminus with (s3 := [set v]); tci; sets. 
-    - simpl. repeat normalize_occurs_free.
-      eapply Union_Included; sets.
-      eapply Setminus_Included_Included_Union. eapply Included_trans.
-      eapply IHe; eauto. normalize_bound_stem_ctx. rewrite <- Setminus_Union.
-      rewrite <- !Union_assoc. rewrite <- Union_Setminus; tci.
-      rewrite <- Union_Included_Union_Setminus with (s3 := [set v]); tci; sets. 
-    - simpl. repeat normalize_occurs_free.
-      eapply Union_Included; sets.
-      eapply Setminus_Included_Included_Union. eapply Included_trans.
-      eapply IHe; eauto. normalize_bound_stem_ctx. rewrite (Union_commut (name_in_fundefs f)).      
-      rewrite <- Setminus_Union.
-      rewrite <- !Union_assoc. rewrite <- Union_Setminus; tci.
-      rewrite <- Union_Included_Union_Setminus with (s3 := name_in_fundefs f); tci; sets. 
-    - inv Hin. simpl. repeat normalize_occurs_free. repeat normalize_bound_stem_ctx.
-      xsets.
-    - simpl. repeat normalize_occurs_free.
-      eapply Union_Included; sets.
-      eapply Setminus_Included_Included_Union. eapply Included_trans.
-      eapply IHe; eauto. normalize_bound_stem_ctx. rewrite <- Setminus_Union.
-      rewrite <- !Union_assoc. rewrite <- Union_Setminus; tci.
-      rewrite <- Union_Included_Union_Setminus with (s3 := [set v]); tci; sets.
-    - inv Hin. repeat normalize_occurs_free. repeat normalize_bound_stem_ctx.
-      simpl. sets. 
-  Qed.
 
   Lemma image_apply_r_set_list_alt xs vs (m : M.t var) S :
     image (apply_r (set_list (combine xs vs) m)) S \subset FromList vs :|: (image (apply_r m) S).
@@ -4431,63 +4266,6 @@ substitution to a term cannot increase the occurence count for that variable. *)
         eapply Included_trans. eapply (IHxs vs). xsets.
   Qed.
 
-  Lemma bound_stem_inline_letapp x e C x' :
-    inline_letapp e x = Some (C, x') ->
-    bound_stem_ctx C \subset x |: bound_var e.
-  Proof. 
-    revert C. induction e using exp_ind'; simpl; intros C Hin;
-    (try match goal with
-         | [ _ : context[inline_letapp ?E ?X] |- _ ] =>
-           destruct (inline_letapp E X) as [[C' z] | ] eqn:Hin'; inv Hin
-         end);
-    (try now (normalize_bound_var; normalize_bound_stem_ctx;
-              eapply Union_Included; sets; eapply Included_trans;
-              [ eapply IHe; reflexivity | ]; sets)).
-    congruence.
-
-    normalize_bound_var; normalize_bound_stem_ctx. eapply Union_Included.
-    eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. now sets.
-    eapply Included_trans. eapply IHe. reflexivity. sets.
-
-    inv Hin. normalize_bound_var. repeat normalize_bound_stem_ctx. sets.
-    inv Hin. normalize_bound_var. repeat normalize_bound_stem_ctx. sets.
-  Qed.
-  
-
-  Lemma inline_letapp_var_eq_alt x e C x' :
-    inline_letapp e x = Some (C, x') ->
-    (x' = x /\ x \in bound_stem_ctx C) \/ x' \in bound_stem_ctx C :|: occurs_free e.
-  Proof.
-    revert C. induction e using exp_ind'; simpl; intros C Hin;
-    (try match goal with
-         | [ _ : context[inline_letapp ?E ?X] |- _ ] =>
-           destruct (inline_letapp E X) as [[C' z] | ] eqn:Hin'; inv Hin
-         end).
-    - destruct (IHe C' eq_refl); eauto. right.
-      inv H. now left; eauto.
-      normalize_occurs_free. normalize_bound_stem_ctx.
-      rewrite !Union_assoc, Union_Setminus_Included; tci; sets. inv H; eauto. 
-    - congruence.
-    - destruct (IHe C' eq_refl); eauto. right.
-      inv H. now left; eauto.
-      normalize_occurs_free. normalize_bound_stem_ctx. inv H; eauto.
-      rewrite !Union_assoc. rewrite Union_Setminus_Included with (s3 := [set v]); tci. sets.
-    - destruct (IHe C' eq_refl); eauto. right.
-      inv H. now left; eauto.
-      normalize_occurs_free. normalize_bound_stem_ctx.
-      rewrite !Union_assoc, Union_Setminus_Included; tci; sets. inv H; eauto 20.
-    - destruct (IHe C' eq_refl); eauto. right.
-      inv H. now left; eauto.
-      normalize_occurs_free. normalize_bound_stem_ctx.
-      rewrite !Union_assoc, Union_Setminus_Included; tci; sets. inv H; eauto. 
-    - inv Hin. eauto.
-    - destruct (IHe C' eq_refl); eauto. right.
-      inv H. now left; eauto.
-      normalize_occurs_free. normalize_bound_stem_ctx.
-      rewrite !Union_assoc, Union_Setminus_Included; tci; sets. inv H; eauto.
-    - inv Hin. normalize_occurs_free; sets.
-  Qed.
-  
   
   Lemma of_fun_inline_letapp x e1 xs vs fb t c f fds C' x' :
       length xs = length vs ->

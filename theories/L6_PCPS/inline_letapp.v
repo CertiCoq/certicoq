@@ -799,7 +799,7 @@ Section Inline_correct.
         M.get f rho1 = Some (Vfun rhoc B f') ->
         find_def f' B = Some (t, xs, e) -> length xs = length ys ->
         eq_env_P (Complement _ [set x]) rho1 rho1' ->
-        eq_env_P (Complement _ (bound_var e' :|: bound_var_ctx C') \\ [set x']) rho2 rho2' ->
+        eq_env_P (Complement _ (bound_var_ctx C :|: bound_var_ctx C')) rho2 rho2' ->
         Dom_map rho1' <--> x |: Dom_map rho1 ->
         preord_env_P_inj cenv PG (occurs_free e1) m (sig {x ~> x'}) rho1' rho2' ->
         preord_exp cenv P1 PG m (e1, rho1') (e2, rho2')) ->
@@ -827,9 +827,7 @@ Section Inline_correct.
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
-          eapply Included_Setminus_compat. eapply Complement_antimon. normalize_bound_var; sets.
-          rewrite (proj1 bound_var_ctx_comp_ctx). repeat normalize_bound_var_ctx. sets.
-          reflexivity.
+          eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
           rewrite bound_var_Econstr_c, bound_var_Hole_c in *. normalize_sets.
@@ -848,9 +846,7 @@ Section Inline_correct.
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
-          eapply Included_Setminus_compat. eapply Complement_antimon. normalize_bound_var; sets.
-          rewrite (proj1 bound_var_ctx_comp_ctx). repeat normalize_bound_var_ctx. sets.
-          reflexivity.
+          eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
           rewrite bound_var_Eproj_c, bound_var_Hole_c in *.
@@ -868,9 +864,7 @@ Section Inline_correct.
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
-          eapply Included_Setminus_compat. eapply Complement_antimon. normalize_bound_var; sets.
-          rewrite (proj1 bound_var_ctx_comp_ctx). repeat normalize_bound_var_ctx. sets.
-          reflexivity.
+          eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
           rewrite bound_var_Eletapp_c, bound_var_Hole_c in *. xsets.
@@ -887,9 +881,7 @@ Section Inline_correct.
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
-          eapply Included_Setminus_compat. eapply Complement_antimon. normalize_bound_var; sets.
-          rewrite (proj1 bound_var_ctx_comp_ctx). repeat normalize_bound_var_ctx. sets.
-          reflexivity.          
+          eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
           rewrite bound_var_Fun1_c, bound_var_Hole_c in *. xsets.
@@ -915,13 +907,12 @@ Section Inline_correct.
             [ | | | | | | | | | now eapply H14 | ]; eauto. 
           simpl in *; omega.  
           rewrite (get_list_length_eq _ _ _ H10). eapply set_lists_length_eq. now eauto. 
-
+          
           eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l. eapply eq_env_P_refl. now eauto.
           eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l. eapply eq_env_P_sym.
           eapply interpret_ctx_fuel_env_eq_P. eassumption.
-          eapply Disjoint_Included_r. eapply Setminus_Included.
           eapply Disjoint_sym. eapply Complement_Disjoint. now sets.
-          intros Hc. inv Hc. now eauto.
+          intros Hc. eapply Hc. now eauto.
           
           rewrite Dom_map_set. reflexivity.
           
@@ -1000,11 +991,9 @@ Section Inline_correct.
 
           eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l. eapply eq_env_P_refl. now eauto.
 
-          eapply interpret_ctx_fuel_env_eq_P. eassumption. normalize_bound_var. sets. simpl.
-
-          eapply Disjoint_Included_r. eapply Setminus_Included.
-          eapply Disjoint_sym. eapply Complement_Disjoint. now sets.
-
+          eapply interpret_ctx_fuel_env_eq_P. eassumption. normalize_bound_var_ctx.
+          normalize_sets. eapply Disjoint_sym. eapply Complement_Disjoint. now sets.
+          
           rewrite Dom_map_set. reflexivity.
 
           

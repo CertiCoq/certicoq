@@ -660,6 +660,68 @@ Section Inline_correct.
       eapply Dom_map_sub_map. eassumption.
   Qed.
 
+  Lemma fun_map_inv_sig_extend_one_Disjoint k S fm rho1 rho1' rho2 i sig x x' :
+    fun_map_inv k S fm rho1 rho2 i sig ->
+
+    sub_map rho1 rho1' ->
+    eq_env_P (Complement _ [set x]) rho1 rho1' ->
+    ~ x \in (Dom_map fm) ->
+    ~ x \in (Dom_map rho1) ->
+    ~ x \in S ->
+                    
+    fun_map_inv k (x |: S) fm rho1' rho2 i (M.set x x' sig).
+  Proof.
+    intros Hfm Hsub HeqP Hdis1 Hdis2 Hdis3. 
+    intro; intros. inv H. exfalso. inv H2. eapply Hdis1. eexists; eauto.
+    rewrite <- HeqP in H1. 2:{ intros Hc; inv Hc; subst; eauto. }
+    edestruct Hfm; eauto. destructAll.
+    split; eauto. split; eauto. split; [| split; [| split; [| split ]]].
+    - rewrite apply_r_set_f_eq. 
+      eapply preord_env_P_inj_extend_not_In_P_r_alt. eassumption.
+      intros Hc. eapply Hdis2. eapply Dom_map_sub_map. eassumption. eassumption.
+    - eapply sub_map_trans; eassumption.
+    - eassumption.
+    - eassumption.
+    - destruct k; eauto. rewrite <- fun_map_inv_eq in *.
+      eapply fun_map_inv_sig_extend_Disjoint with (xs := [x]) (xs' := [x']). eassumption.
+      repeat normalize_sets. eapply Disjoint_Singleton_l.
+      intros Hc. eapply Hdis2. eapply Dom_map_sub_map. eassumption. eassumption.
+  Qed.
+
+  Lemma fun_map_inv_env_eq_P S k fm rho1 rho2 i sig rho1' rho2' :
+    fun_map_inv k S fm rho1 rho2 i sig ->
+    eq_env_P S rho1 rho1' ->
+    sub_map rho1 rho1' ->
+    eq_env_P (image (apply_r sig) (occurs_free_fun_map fm)) rho2 rho2' ->    
+    fun_map_inv k S fm rho1' rho2' i sig.
+  Proof.
+    revert S fm rho1 rho2 i sig rho1' rho2'.
+    induction k using lt_wf_rec1; intros S fm rho1 rho2 i sig rho1' rho2' Hfm Heq1 Hsub Heq2.
+    intro; intros. rewrite <- Heq1 in H2; eauto. edestruct Hfm; eauto. destructAll.
+    split; eauto. split; eauto. split; [| split; [| split; [| split ]]].
+    - eapply preord_env_P_inj_eq_env_P.
+      eassumption.
+      now eapply eq_env_P_refl.
+      eapply eq_env_P_antimon. eassumption.
+      eapply image_monotonic. eapply occurs_free_fun_map_get; eauto.
+    - eapply sub_map_trans; eauto.
+    - eassumption.
+    - eassumption.
+    - destruct k; eauto. rewrite <- fun_map_inv_eq in *. eapply H. omega.
+      eassumption. now eapply eq_env_P_antimon. eapply sub_map_refl. eassumption.
+  Qed.
+
+
+  Lemma eq_env_P_sub_map {A} (rho1 rho2 : M.t A) x:
+    eq_env_P (Complement _ [set x]) rho1 rho2 ->
+    ~ x \in Dom_map rho1 ->
+    sub_map rho1 rho2.
+  Proof.
+    intros Henv Hnin z v Hget.
+    rewrite <- Henv. eassumption. intros Hc. inv Hc.
+    eapply Hnin. eexists; eauto.
+  Qed.
+  
   Lemma fun_map_inv_set_lists k S fm rho1 rho1' rho2 i sig xs vs :
     fun_map_inv k S fm rho1 rho2 i sig ->
 
@@ -1116,11 +1178,6 @@ Section Inline_correct.
              eapply Union_Disjoint_r.
              ++ eapply Disjoint_Singleton_r. eassumption.
              ++ eapply Disjoint_Included; [| | eapply Hdis ]; xsets.
-             (* ++ eapply Disjoint_Included_r. eapply image_apply_r_set. *)
-             (*    eapply Union_Disjoint_r. eapply Disjoint_Singleton_r. *)
-             (*    ** intros Hc. eapply Hdis2. constructor. 2:{ left. left. now left; eauto. } *)
-             (*       eapply Hf.  unfold Ensembles.In, Range in *. zify; omega. *)
-             (*    ** rewrite Setminus_Union_distr. eapply Disjoint_Included; [| | eapply Hdis ]; xsets. *)
           -- eapply Disjoint_Included_r. rewrite Dom_map_set. eapply image_apply_r_set.
              rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. normalize_sets.
              eapply Union_Disjoint_r. now sets. now sets. 
@@ -1380,16 +1437,31 @@ Section Inline_correct.
                         eapply image_apply_r_set. rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set. normalize_sets. 
                         eapply Union_Disjoint_r. eassumption.
                         eapply Disjoint_Included; [ | | eapply H19 ]; sets.
-                     ++ SearchAbout S. admit.
-                        (* eapply fun_map_inv_antimon. eapply fun_map_inv_set_lists; [ | | | eassumption ]. *)
-                        (* ** eapply fun_map_inv_sig_extend_Disjoint. rewrite <- fun_map_inv_eq in *. *)
-                        (*    eapply fun_map_inv_i_mon. eassumption. omega.  *)
-                        (*    rewrite Dom_map_def_funs. sets. *)
-                        (* ** eassumption. *)
-                        (* ** rewrite Dom_map_def_funs. eapply Union_Disjoint_r. now sets.  *)
-                        (*    clear H32. xsets. *)
-                        (* ** rewrite Union_Setminus_Included. sets. tci. sets. *)
-                        (*    sets.  *)
+                     ++ eapply fun_map_inv_antimon.
+                        2:{ eapply Included_trans. eapply Included_Union_Setminus with (s2 := [set x]); tci.
+                            rewrite Union_commut. reflexivity. }
+                        eapply fun_map_inv_sig_extend_one_Disjoint.
+                        ** eapply fun_map_inv_env_eq_P.
+                           eapply fun_map_inv_antimon. eapply fun_map_inv_mon.
+                           eapply fun_map_inv_i_mon. eassumption. omega. omega. normalize_occurs_free. now sets.
+
+                           eapply eq_env_P_refl. eapply sub_map_refl. 
+                           
+                           eapply eq_env_P_antimon. eassumption.
+                           normalize_bound_var_ctx. normalize_sets. intros y Hin Hin'.
+                           eapply bound_var_inline_letapp in Hin'; [| eassumption ]. eapply Hdis2.
+                           constructor. 2:{ right. rewrite image_Union. right. eassumption. }
+                           inv Hin'. inv H29.
+                           eapply Hfx. unfold Ensembles.In, Range in *. zify; omega.
+                           eapply H10 in H29. eapply Hfx. unfold Ensembles.In, Range in *. zify; omega.
+                        ** eapply eq_env_P_sub_map. eassumption. intros Hc. eapply H18. constructor. now constructor.
+                           eassumption.
+                        ** eassumption.
+                        ** intros Hc. eapply Hdis3. constructor. 2:{ now left; eauto. }
+                           normalize_bound_var. simpl. rewrite Setminus_Union_distr. right.
+                           constructor. reflexivity. intros Hc1. eapply H1. eapply funname_in_exp_subset. eassumption.
+                        ** intros Hc. eapply H18; eauto.
+                        ** intros Hc. inv Hc; eauto.
                   -- eassumption.
                   -- normalize_bound_var_ctx. normalize_sets.
                      eapply Disjoint_Included_l. eapply bound_var_inline_letapp. eassumption.

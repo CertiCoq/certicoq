@@ -753,7 +753,9 @@ Fixpoint translate_body
   | Eprim x p vs e => None
   | Ehalt x =>
     (* set args[1] to x and return *)
-    ret (args[ Z.of_nat 1 ] :::= (makeVar x fenv map))
+    ret (Efield tinfd allocIdent valPtr :::= allocPtr ;;;
+         Efield tinfd limitIdent valPtr :::= limitPtr ;;;
+         args[ Z.of_nat 1 ] :::= (makeVar x fenv map))
   end.
 
 Fixpoint translate_body_fast
@@ -833,7 +835,9 @@ Fixpoint translate_body_fast
   | Eprim x p vs e => None
   | Ehalt x =>
     (* set args[1] to x and return *)
-    ret (args[ Z.of_nat 1 ] :::= (makeVar x fenv map))
+    ret (Efield tinfd allocIdent valPtr :::= allocPtr ;;;
+         Efield tinfd limitIdent valPtr :::= limitPtr ;;;
+         args[ Z.of_nat 1 ] :::= (makeVar x fenv map))
   end.
 
 Definition mkFun
@@ -1010,8 +1014,6 @@ Fixpoint translate_funs
                                            argsIdent ::= argsExpr ;;;
                                            reserve_body gcArrIdent 2%Z ;;;
                                            body ;;;
-                                           Efield tinfd allocIdent valPtr :::= allocPtr ;;;
-                                           Efield tinfd limitIdent valPtr :::= limitPtr ;;;
                                            Sreturn (Some (Field(argsExpr, Z.of_nat 1)))))))
             :: funs)
   | _ => None
@@ -1040,9 +1042,7 @@ Fixpoint translate_funs_fast
                                            limitIdent ::= Efield tinfd limitIdent valPtr ;;;
                                            argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);;;
                                            reserve_body gcArrIdent 2%Z ;;;
-                                           body ;;;
-                                           Efield tinfd allocIdent valPtr :::= allocPtr ;;;
-                                           Efield tinfd limitIdent valPtr :::= limitPtr))))
+                                           body))))
              :: funs)
   | _ => None
   end.

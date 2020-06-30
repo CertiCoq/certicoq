@@ -1,5 +1,5 @@
-QUAL=CertiCoq.Benchmarks.pure
-QUALS=CertiCoq.Benchmarks.pure.pure
+QUAL=CertiCoq.Benchmarks.regex
+QUALS=CertiCoq.Benchmarks.regex.regex
 COQOPTS = -R ./ $(QUAL)
 CCOMPILER=gcc
 
@@ -32,7 +32,7 @@ clean:
 	rm -f ./*.glob
 
 coq:
-	coqc $(COQOPTS) io.v
+	coqc $(COQOPTS) regex.v
 
 prog:
 	$(CCOMPILER) -o prog -Wno-everything -lpcre -O2 prog_main.c gc.c $(QUALS).prog.c glue.$(QUALS).prog.c ffi.$(QUALS).RegexFFI.c -g

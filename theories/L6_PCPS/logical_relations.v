@@ -720,7 +720,7 @@ Section Log_rel.
     Qed. 
 
     (* TODO check if can be avoided *)
-    Lemma preord_exp_const_compat_alt k rho1 rho2 x x' t ys1 ys2 e1 e2
+    Lemma preord_exp_constr_compat_alt k rho1 rho2 x x' t ys1 ys2 e1 e2
           (Hcompat : post_constr_compat' x t ys1 e1 rho1 x' t ys2 e2 rho2 P1 P2)
           (HOOT : post_OOT' (Econstr x t ys1 e1) rho1 (Econstr x' t ys2 e2) rho2 P2):
       Forall2 (preord_var_env PG k rho1 rho2) ys1 ys2 ->
@@ -1721,11 +1721,11 @@ Section Log_rel.
     preord_env_P PG (occurs_free (c |[ e1 ]|)) k rho1 rho2 ->
     preord_exp P1 PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
-    unfold exp_fv.
+    unfold exp_fv. assert (Hp := Hprops). inv Hp.
     revert c rho1 rho2 e1 e2. induction k as [ k IH' ] using lt_wf_rec1.
     intros c. revert k IH'.
     induction c; intros k IH' rho1 rho2 e1 e2 Hyp Hpre; eauto.
-    - simpl. eapply preord_exp_constr_compat; eauto.
+    - simpl. eapply preord_exp_constr_compat; eauto. 
       + eapply Forall2_same. intros x Hin. eapply Hpre. constructor; eauto.
       + intros m vs1 vs2 Hlt Hall. eapply IHc; eauto.
 
@@ -1777,19 +1777,18 @@ Section Log_rel.
       intros x' H'. inv H'.
       + inv H. simpl. constructor; eauto.
       + simpl. eapply Free_Efun2; eauto.
-    - simpl app_ctx_f.
-      eapply preord_exp_fun_compat. now eauto.
-      2:{ eapply preord_exp_refl; eauto.      
-          eapply preord_env_P_antimon.
-          eapply preord_env_P_def_funs_compat_pre.
-          * intros. eapply IH'. omega.
-            intros. eapply Hyp; eauto. omega.
-            eassumption.
-          * eapply preord_env_P_antimon.
-            eapply preord_env_P_monotonic; [| eassumption ]. omega.
-            simpl. rewrite occurs_free_Efun. reflexivity.
-          * rewrite <- Union_Included_Union_Setminus. now sets. tci. sets. }
-      eassumption.
+    - simpl app_ctx_f. 
+      eapply preord_exp_fun_compat; [| now eauto |]. now eauto.
+       eapply preord_exp_refl; eauto.      
+       eapply preord_env_P_antimon.
+       eapply preord_env_P_def_funs_compat_pre.
+      * intros. eapply IH'. omega.
+        intros. eapply Hyp; eauto. omega.
+        eassumption.
+      * eapply preord_env_P_antimon.
+        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        simpl. rewrite occurs_free_Efun. reflexivity.
+      * rewrite <- Union_Included_Union_Setminus. now sets. tci. sets. 
   Qed.
 
   End Rel.
@@ -1801,21 +1800,12 @@ Section Log_rel.
 
   Context (P1 P2 : PostT) (* Local *)
           (PG  : PostGT) (* Global *)
+          (HpropG: Post_properties PG PG PG)
           (HGPost : inclusion _ (comp P1 P2) PG)
-          (HPost_conG : post_constr_compat PG PG)
-          (HPost_projG : post_proj_compat PG PG)
-          (HPost_funG : post_fun_compat PG PG)
-          (HPost_case_hdG : post_case_compat_hd PG PG)
-          (HPost_case_tlG : post_case_compat_tl PG PG)
-          (HPost_appG : post_app_compat PG PG)
-          (HPost_letappG : post_letapp_compat PG PG PG)
-          (HPost_letapp_OOTG : post_letapp_compat_OOT PG PG)
-          (HPost_OOTG : post_OOT PG)
-          (Hpost_baseG : post_base PG)
           (Hp1 : inclusion _ PG P1)
           (Hp2 : inclusion _ PG P2).
 
-  (* NOTE : the above are satusfiable only for trivial postconditons. 
+  (* NOTE : the above are satisfiable only for trivial postconditons. 
    * It seems that transitivity cannot be obtained for any relation 
      that is not idempotent (ie R <--> R ∘ R) 
    *)
@@ -1947,17 +1937,7 @@ Section Log_rel.
     intros. eapply preord_val_trans; eauto.
   Qed.
 
-  Context  (Hp1' : inclusion _ P1 PG)
-           (HPost_con : post_constr_compat P1 P1)
-           (HPost_proj : post_proj_compat P1 P1)
-           (HPost_fun : post_fun_compat P1 P1)
-           (HPost_case_hd : post_case_compat_hd P1 P1)
-           (HPost_case_tl : post_case_compat_tl P1 P1)
-           (HPost_app : post_app_compat P1 PG)
-           (HPost_letapp : post_letapp_compat P1 P1 PG)
-           (HPost_letapp_OOT : post_letapp_compat_OOT P1 PG)
-           (HPost_OOT : post_OOT P1)
-           (Hpost_base : post_base P1).
+  Context  (Hprops : Post_properties P1 P1 PG).
 
 
   Lemma preord_env_P_def_funs_pre' k (S1 : var -> Prop) B B' rho1 rho2 :
@@ -1987,7 +1967,9 @@ Section Log_rel.
         exists xs1. exists e1. exists rho2'. split; eauto.
         split. eauto. intros Hleq Hpre.
         
-        eapply preord_exp_post_monotonic; [| eapply Hyp1 ]. eassumption. eassumption.
+        eapply preord_exp_post_monotonic; [| eapply Hyp1 ].
+        inv Hprops. eassumption. 
+        eassumption.
         eapply preord_env_P_set_lists_l with (P1 := occurs_free e1 \\ FromList xs1); try eassumption; try now eauto.
         eapply preord_env_P_antimon with (P2 := occurs_free_fundefs B' :|: name_in_fundefs B'). 
         eapply IH'. eassumption. rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
@@ -2225,7 +2207,7 @@ Section Log_rel.
         eapply name_not_in_fundefs_find_def_None in Hnin.
         erewrite find_def_fundefs_append_r; eauto.
         split. eauto. intros Hleq Hpre'.
-        eapply preord_exp_refl; eauto. clear; now firstorder.
+        eapply preord_exp_refl; eauto.
         eapply preord_env_P_set_lists_l; [| | now eauto | now eauto | now eauto].
         rewrite def_funs_append.
         apply preord_env_P_def_funs_not_in_P_r; eauto. 
@@ -2466,7 +2448,7 @@ Section Log_rel.
             edestruct (@set_lists_length val) as [rho2'' Hs']; [eauto | | ]. eauto.
             exists xs1, e1, rho2''. repeat split; eauto.
             erewrite <- find_def_split_fds; eauto.
-            intros Hleq Hpre'. eapply preord_exp_refl; eauto. (clear; now firstorder).
+            intros Hleq Hpre'. eapply preord_exp_refl; eauto.
             eapply preord_env_P_set_lists_l; [| | | eauto | eauto ]; eauto. }
           symmetry in Heq. eapply fundefs_append_split_fds in Heq.
           edestruct split_fds_unique_bindings_fundefs_l as [H5 [H6 H8]]. apply H4.  eauto.
@@ -2507,7 +2489,6 @@ Section Log_rel.
             exists xs1, e1, rho2''. repeat split; eauto.
             erewrite <- find_def_split_fds; eauto.
             intros Hleq Hpre'. eapply preord_exp_refl; eauto.
-            clear; now firstorder.
             eapply preord_env_P_set_lists_l; [| | | eauto | eauto ]; eauto. }
           symmetry in Heq. eapply fundefs_append_split_fds in Heq.
           edestruct split_fds_unique_bindings_fundefs_l as [H5 [H6 H8]].

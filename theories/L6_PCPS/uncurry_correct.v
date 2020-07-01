@@ -3570,7 +3570,7 @@ Section uncurry_correct.
           intros contra. subst. intuition.
         * assumption.
     - (* uncurry_constr *)
-      eapply preord_exp_const_compat; try eassumption; try easy_post.
+      eapply preord_exp_constr_compat; try eassumption; try easy_post.
       + unfold preord_env_P in Henv.
         apply Forall2_same.
         intros a Hin.

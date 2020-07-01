@@ -1195,7 +1195,7 @@ Section Inline_correct.
           eapply Included_trans. eapply Singleton_Included. eassumption. eapply Range_Subset. reflexivity.
           zify; omega.
         * eauto.
-        * intros r1 r2 k Henv Hdis Hdis' Hfm'. eapply preord_exp_const_compat.
+        * intros r1 r2 k Henv Hdis Hdis' Hfm'. eapply preord_exp_constr_compat.
           eassumption. eassumption.
           eapply Forall2_preord_var_env_map. eassumption. normalize_occurs_free. now sets.          
           intros. eapply Hsem. 

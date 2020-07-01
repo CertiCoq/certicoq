@@ -1074,7 +1074,7 @@ Section Lambda_lifting_correct.
            eapply FromList_length_cardinal'. rewrite <- fundefs_fv_correct. eassumption. eassumption.
         -- now eauto.
         -- intros Hlt Hall. replace 1 with (0 + 1).
-           eapply ctx_to_rho_preord_exp with (C := Efun1_c C Hole_c).
+           eapply ctx_to_rho_preord_exp with (C := Efun1_c C Hole_c). eassumption. eassumption. eassumption. (* TODO remove extra args ? *)
            ++ intros. eapply P1_ctx_r. omega. eassumption.
            ++ constructor. constructor.
            ++ { (* eapply preord_exp_post_monotonic. admit. postcondition *)
@@ -1670,8 +1670,8 @@ Section Lambda_lifting_correct.
     induction e using exp_ind';
       intros rho rho' ζ σ S e' S' Hun Him Hf Hlf Hfun Hfvs HD Hin Henv Hinv Hll;
       inv Hll.
-    - inv Hun. eapply preord_exp_const_compat.
-      + eauto. (* post *)
+    - inv Hun. eapply preord_exp_constr_compat.
+      + eapply HPost_con.
       + eauto. (* post *)
       + eapply Forall2_preord_var_env_map. eassumption.
         normalize_occurs_free...
@@ -1719,6 +1719,8 @@ Section Lambda_lifting_correct.
     - eapply preord_exp_case_nil_compat. eauto. 
     - inv Hun. edestruct Exp_lambda_lift_Ecase as [P'' [Heq Hall]]; eauto. inv Heq.
       eapply preord_exp_case_cons_compat; eauto.
+      + eapply HPost_case_hd.
+      + eapply HPost_case_tl.
       + intros m Hlt. eapply IHk; eauto.
         * eapply Disjoint_Included; [| | now apply Him ].
           normalize_bound_var...
@@ -1759,7 +1761,7 @@ Section Lambda_lifting_correct.
         * eapply preord_env_P_inj_antimon. eassumption.
           normalize_occurs_free...
     - inv Hun. eapply preord_exp_proj_compat.
-      + eauto. (* post *)
+      + eapply HPost_proj.
       + eauto. (* post *)
       + eapply Henv. eauto.
       + intros m vs1 vs2 Hlt Hall. eapply IHk; [ eassumption | eassumption | | | | | | | | | | eassumption ].
@@ -1839,8 +1841,8 @@ Section Lambda_lifting_correct.
         eapply Funs_inv_monotonic. eassumption. omega.
     - (* Eletapp unknown *)
       inv Hun. eapply preord_exp_letapp_compat.
-      + eauto. (* post *)
-      + eauto. (* post *)
+      + eapply HPost_letapp. (* post *)
+      + eapply HPost_letapp_OOT. (* post *)
       + eauto. (* post *)
       + eapply Henv. eapply occurs_free_Eletapp. auto.
       + eapply Forall2_preord_var_env_map. eassumption.
@@ -1888,7 +1890,7 @@ Section Lambda_lifting_correct.
         now eapply Fundefs_Lambda_lift_free_set_Included1; eauto.
         now eapply Add_functions_free_set_Included; eauto. }
       repeat normalize_bound_var_in_ctx. xsets. 
-      inv Hun. eapply preord_exp_fun_compat; [ now eapply HPost_fun | eassumption | ]. 
+      inv Hun. eapply preord_exp_fun_compat. now eauto. now eapply HPost_fun.
       edestruct Fundefs_lambda_lift_correct1; eauto; eauto with Ensembles_DB.
       + eapply Disjoint_Included; [ | | now apply Him ].
         now eauto with Ensembles_DB.
@@ -1995,9 +1997,10 @@ Section Lambda_lifting_correct.
         eapply Fundefs_Lambda_lift_free_set_Included2. eassumption. }
 
       repeat normalize_bound_var_in_ctx.  
-      inv Hun. eapply preord_exp_fun_compat; [ now eapply HPost_fun' | now eauto | ].
+      inv Hun. eapply preord_exp_fun_compat; [  now eauto | now eapply HPost_fun' | ].
       replace 1 with (0 + 1) by omega. 
       eapply ctx_to_rho_preord_exp with (C := Efun1_c fds Hole_c). 
+      eassumption. eassumption. eassumption. 
       intros. eapply P1_ctx_r; eauto. 
       (* ctx_to_rho *) econstructor. now econstructor.
       
@@ -2170,7 +2173,7 @@ Section Lambda_lifting_correct.
     - (* Efun 3 *)
       repeat normalize_bound_var_in_ctx.
       assert (Hsub : S'0 \subset S). { eapply Fundefs_Lambda_lift_free_set_Included3. eassumption. }
-      inv Hun. eapply preord_exp_fun_compat. now eapply HPost_fun. now eauto. (* post *)
+      inv Hun. eapply preord_exp_fun_compat. now eauto. now eapply HPost_fun. (* post *)
       eapply preord_exp_monotonic. 
       eapply IHe; eauto.
       * eapply Disjoint_Included_l. eapply image_extend_fundefs.
@@ -2212,7 +2215,7 @@ Section Lambda_lifting_correct.
     - (* App known *)
       eapply Funs_inv_Eapp; [ eassumption | eassumption | eassumption ].
     - (* App unknown *)
-      eapply preord_exp_app_compat; eauto. 
+      eapply preord_exp_app_compat; eauto. eapply HPost_app.
       eapply Forall2_preord_var_env_map. eassumption.
       normalize_occurs_free...
     - inv Hun. eapply preord_exp_prim_compat; eauto.

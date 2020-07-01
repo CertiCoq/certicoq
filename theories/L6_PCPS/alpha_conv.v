@@ -1492,7 +1492,7 @@ Section Alpha_conv_correct.
     induction k as [ k IH ] using lt_wf_rec1.
     induction e1 using exp_ind'; intros e2 rho1 rho2 g Hinj (* Hdis *) Ha Henv; inv Ha.
     - (* Econstr *)
-      eapply preord_exp_const_compat; eauto; intros.
+      eapply preord_exp_constr_compat; eauto; intros.
       + eapply Forall2_monotonic_strong; [ | eassumption ].
         intros x y Hin1 Hin2 Heq. specialize (Henv x).
         rewrite Heq in Henv. eapply Henv.
@@ -1575,17 +1575,8 @@ Section Alpha_conv_correct.
           eapply construct_fundefs_injection_injective_pres. eassumption.
           eapply injective_subdomain_antimon. eassumption. normalize_occurs_free. sets.
           eapply Disjoint_Included_r; [| eassumption ]. normalize_occurs_free. sets. }
-        eassumption. 
-(*       + rewrite Heq.
-        rewrite PS_cardinal_map_eq.  
-        rewrite Proper_carinal. eapply Hcompat. eassumption.
-        eapply Same_set_From_set. rewrite <- mset_eq. reflexivity.
-        rewrite <- FromSet_elements, <- fundefs_fv_correct. 
-        eapply injective_subdomain_f_eq_subdomain.
-        eapply injective_subdomain_antimon. eassumption. normalize_occurs_free. sets.
-        eapply construct_fundefs_injection_f_eq_subdomain. eassumption.
-        eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint. 
- *)   + eassumption.  
+        now eauto. 
+      + now eauto.
       + eapply preord_exp_monotonic. eapply IHe1; [| eassumption |]. 3:{ omega. }
         * eapply injective_subdomain_antimon.
           eapply construct_fundefs_injection_injective_pres.

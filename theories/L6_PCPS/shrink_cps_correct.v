@@ -146,7 +146,7 @@ Section Shrink_correct.
            (Hless_steps_letapp' : remove_steps_letapp' cenv P1 P1 P1)
            (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv P1 P1)
            (Hless_steps_letapp_OOT' : remove_steps_letapp_OOT' cenv P1 P1)
-           (Hpost_zero : forall e rho, post_zero e rho P1).
+           (Hpost_zero : forall e rho e' rho', post_zero e rho e' rho' P1).
   
   Context (Hless_steps :
              forall C e1 rho1 (rho1' : env) (e2 : exp) (rho2 : env) (c1 c2 : nat),
@@ -168,7 +168,7 @@ Section Shrink_correct.
     - simpl. eapply Hpost_zero.
     - reflexivity.
     - intros. inv H. inv H7.
-      eapply preord_exp_refl; eauto.
+      eapply preord_exp_refl; eauto. constructor; eauto.
       eapply preord_env_P_set_not_in_P_l in Henv; eauto with Ensembles_DB.
       rewrite Setminus_Disjoint in Henv. eassumption. eauto with Ensembles_DB.
   Qed.
@@ -199,6 +199,7 @@ Section Shrink_correct.
     - reflexivity.
     - intros. inv H. inv H9.
       eapply preord_exp_refl; eauto.
+      constructor; eauto.
       eapply preord_env_P_set_not_in_P_l in Henv; sets.
       rewrite Setminus_Disjoint in Henv. eassumption. sets.
   Qed.
@@ -307,7 +308,7 @@ Section Shrink_correct.
     - intros; eapply Hpost_zero.
     - reflexivity.
     - intros rho1 Henv. inv Henv. inv H3.
-      eapply preord_exp_refl; eauto.
+      eapply preord_exp_refl; eauto. constructor; eauto.
       eapply Disjoint_occurs_free_name_in_fundefs_cor in Hall.
       eapply preord_env_P_def_funs_not_in_P_l; eauto.
       rewrite Setminus_Disjoint in Hpre; eauto.
@@ -394,7 +395,7 @@ Section Shrink_correct.
   Proof.
     intros k rho1 rho2 fb e B1 B2 xs t f Hnin Hub H H0.
     eapply preord_exp_fun_compat; eauto.
-    simpl. eapply preord_exp_refl; eauto.
+    simpl. eapply preord_exp_refl; eauto. constructor; now eauto.
     assert (Hin : ~ f \in (occurs_free (Efun (fundefs_append B1 B2) e))).
     { intros Hin. eapply not_occurs_not_free in Hin; eauto. } repeat normalize_occurs_free_in_ctx.
     revert Hin H. generalize (occurs_free e) as S.
@@ -418,7 +419,7 @@ Section Shrink_correct.
            do 3 eexists. split; [| split ]; eauto.
            erewrite <- find_def_fundefs_append_Fcons_neq; eassumption.
            intros Hlt Hall.
-           eapply preord_exp_refl; eauto. clear; now firstorder.
+           eapply preord_exp_refl; eauto. now constructor; eauto.
            eapply preord_env_P_set_lists_l with (P1 := occurs_free e1 \\ FromList xs1); eauto.
            replace i with (i + 1 - 1) by omega.
            erewrite find_def_fundefs_append_Fcons_neq in Hf1; try eassumption.
@@ -744,7 +745,7 @@ Section Shrink_correct.
       + edestruct (@set_lists_length cps.val) as [rho2' Hs']; eauto.
         do 4 eexists; eauto. split; eauto.
         intros Hleq Hall.
-        eapply preord_exp_refl; eauto. clear; now firstorder.
+        eapply preord_exp_refl; eauto. now constructor; eauto.
         eapply preord_env_P_set_lists_l; [| | now eauto | now eauto | now eauto ].
         eapply IH'; eauto.
         intros. eapply Hpre; eauto. omega.
@@ -842,7 +843,7 @@ Section Shrink_correct.
       apply eq_env_P_refl.
       apply eq_env_P_refl.
     - rewrite bound_stem_Econstr_c in Hbv. simpl.
-      eapply preord_exp_const_compat; eauto; intros.
+      eapply preord_exp_constr_compat; eauto; intros.
       * eapply Forall2_same. intros x0 HIn. apply Hpre. left. constructor. auto.
       * assert (Disjoint _ S (Singleton _ v)).
          { eauto 10 with Ensembles_DB. }
@@ -924,7 +925,7 @@ Section Shrink_correct.
         simpl.
         rewrite occurs_free_Eletapp. rewrite Setminus_Union_distr. 
         eauto 10 with Ensembles_DB. eassumption. omega.
-    - simpl; eapply preord_exp_case_compat; eauto.
+    - simpl; eapply preord_exp_case_compat; eauto. now constructor; eauto.
       eapply preord_env_P_antimon. eassumption. simpl. now sets.
       intros m Hlt.
       eapply IH'; auto.
@@ -958,12 +959,12 @@ Section Shrink_correct.
         eapply eq_env_P_def_funs_not_in_P_l'; eauto.
       }
       eauto with Ensembles_DB.
-      eapply preord_env_P_def_funs_cor; eauto.
+      eapply preord_env_P_def_funs_cor; eauto. constructor; eauto. clear; now firstorder. 
       eapply preord_env_P_antimon; [ eassumption |].
       simpl. rewrite occurs_free_Efun.
       rewrite Setminus_Union_distr. eauto with Ensembles_DB. omega.
     - simpl. eapply preord_exp_fun_compat; eauto.
-      eapply preord_exp_refl; eauto.
+      eapply preord_exp_refl; eauto. now constructor; eauto.
       eapply preord_env_P_antimon.
       simpl in Hpre.
       erewrite occurs_free_Efun in Hpre. 
@@ -1081,7 +1082,7 @@ Section Shrink_correct.
       eapply find_tag_nth_deterministic in H6; [| clear H6; eassumption ]. inv H6.
       edestruct (preord_exp_refl cenv P1 PG)
         with (k := k0) (e := e0) (rho := rho0) (rho' := rho3) (cin := (c1 - cost (Ecase x cl)))
-        as [v2 [c2 [Hs2 [Hp2 Hr2]]]]; eauto.
+        as [v2 [c2 [Hs2 [Hp2 Hr2]]]]; eauto. now constructor; eauto.
       eapply preord_env_P_antimon. apply Hcc.
       eapply occurs_free_Ecase_Included. eapply find_tag_nth_In_patterns; eassumption.
       simpl; omega.
@@ -1101,7 +1102,7 @@ Section Shrink_correct.
     preord_exp cenv P1 PG k (Econstr x c0 ys (c |[ Ecase x cl ]|), rho1) (Econstr x c0 ys (c |[ e ]|), rho2).
   Proof.
     intros Hf Hb Henv.
-    eapply preord_exp_const_compat; eauto.
+    eapply preord_exp_constr_compat; eauto.
     eapply Forall2_same. intros y Hin. eapply Henv. now constructor; eauto.
     intros m vs1 vs2 Hlt Hall.
     eapply preord_exp_compat_stem_val with (S1 := Empty_set _); eauto.
@@ -1174,7 +1175,7 @@ Section Shrink_correct.
     revert e1 m rho1 rho2. induction k as [k IHk] using lt_wf_rec1.
     intros e1. revert k IHk; induction e1 using exp_ind'; intros k IHk m rho1 rho2 Hdis Hpre.
     - (* Econstr *)
-      simpl; eapply preord_exp_const_compat; eauto; intros.
+      simpl; eapply preord_exp_constr_compat; eauto; intros.
       + eapply Forall2_preord_var_env_map. eassumption.
         normalize_occurs_free. sets.
       + eapply IHk; [ eassumption | | ].
@@ -1390,7 +1391,7 @@ Section Shrink_correct.
                  (Econstr x t ys (c |[ rename y x' e ]|), rho2).
   Proof.
     intros Hn1 Hn2 Hn3 Hleq Hneq Hnth Henv.
-    eapply preord_exp_const_compat_alt; eauto.
+    eapply preord_exp_constr_compat_alt; eauto.
     + eapply Forall2_same. intros. eapply Henv. now constructor.
     + intros m vs1 vs2 Hlt Hg1 Hg2.
       edestruct (@get_list_nth_get val ys vs2) as [v2 [Hnth2 Hget2]]; eauto.
@@ -1544,7 +1545,7 @@ Section Shrink_correct.
          eapply preord_env_eq_env.
          ** eapply preord_env_P_antimon. 
             eapply preord_env_P_def_funs_pre. eassumption.
-            { intros. eapply preord_exp_refl; eauto. }
+            { intros. eapply preord_exp_refl; eauto. now constructor; eauto. }
             eapply preord_env_P_monotonic; [| eassumption ]. omega.
             eapply Setminus_Included_Included_Union.
             eapply Included_trans. eapply occurs_free_in_fun. eapply find_def_correct; eauto.
@@ -1556,7 +1557,7 @@ Section Shrink_correct.
     * sets.
     * eapply preord_env_P_antimon.
       eapply preord_env_P_def_funs_pre with (e := c |[ Eapp f t vs ]|); eauto.
-      { intros. eapply preord_exp_refl; eauto. }
+      { intros. eapply preord_exp_refl; eauto. now constructor; eauto. }
       eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega. reflexivity.
       normalize_occurs_free. rewrite <- Union_assoc, <- Union_Setminus; tci. sets.
   Qed.
@@ -1643,7 +1644,7 @@ Section Shrink_correct.
           -- eapply preord_env_eq_env.
              ** eapply preord_env_P_antimon.
                 eapply preord_env_P_def_funs_pre. eassumption.
-                { intros. eapply preord_exp_refl; eauto. }
+                { intros. eapply preord_exp_refl; eauto. now constructor; eauto. }
                 eapply preord_env_P_monotonic; [| eassumption ]. omega.
                 eapply Setminus_Included_Included_Union.
                 eapply Included_trans. eapply occurs_free_in_fun. eapply find_def_correct; eauto.
@@ -1698,7 +1699,7 @@ Section Shrink_correct.
     - sets.
     - eapply preord_env_P_antimon.
       eapply preord_env_P_def_funs_pre with (e := c |[ Eletapp x f t vs e1 ]|); eauto.
-      { intros. eapply preord_exp_refl; eauto. }
+      { intros. eapply preord_exp_refl; eauto. now constructor; eauto. }
       eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega. reflexivity.
       normalize_occurs_free. rewrite <- Union_assoc, <- Union_Setminus; tci. sets.
   Qed.
@@ -1910,7 +1911,7 @@ Section Shrink_correct.
       preord_exp cenv P1 PG k (e, rho) (e', rho').
   Proof.
     intros H; inv H. intros. 
-    apply preord_exp_compat; auto.
+    apply preord_exp_compat; auto. now constructor; eauto. now constructor; eauto.
     intros; eapply rw_correct; eauto. 
   Qed.
 
@@ -1928,12 +1929,12 @@ Section Shrink_correct.
     induction H; intros.
     - eapply preord_exp_post_monotonic.
       eapply HcompP1. 
-      eapply preord_exp_trans; eauto.
+      eapply preord_exp_trans; eauto. now constructor; eauto.
       revert HGPost HcompP1. clear. now firstorder.
       eapply gen_rw_correct; try eassumption.      
       intros m. eapply IHrefl_trans_closure_n.
-      eapply preord_env_P_refl; eauto.
-    - eapply preord_exp_refl; eauto.
+      eapply preord_env_P_refl; eauto. now constructor; eauto.
+    - eapply preord_exp_refl; eauto. now constructor; eauto.
   Qed.
 
 End Shrink_correct.

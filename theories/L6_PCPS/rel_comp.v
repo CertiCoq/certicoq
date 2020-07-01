@@ -468,7 +468,7 @@ Section Linking.
     intros e. revert k IH.
     induction e using exp_ind'; intros k IH rho rho' Henv. 
     (* Each case follows from the corresponding compat lemma *)
-    - eapply preord_exp_const_compat with (P1 := Post_id); eauto; intros.
+    - eapply preord_exp_constr_compat with (P1 := Post_id); eauto; intros.
       * clear. intro; intros. intro; intros. unfold Post_id in *.
         inv H1. firstorder. eapply Forall2_same. intros x HIn. apply Henv. now constructor.
       * eapply IHe. intros. eapply IH; eauto. omega.

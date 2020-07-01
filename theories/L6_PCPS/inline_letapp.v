@@ -506,7 +506,7 @@ Section Inline_correct.
           (Hless_steps_letapp' : remove_steps_letapp' cenv P1 P1 P1)
           (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv P1 P1)
           (Hless_steps_letapp_OOT' : remove_steps_letapp_OOT' cenv P1 P1)
-          (Hpost_zero : forall e rho, post_zero e rho P1).
+          (Hpost_zero : forall e rho e' rho', post_zero e rho e' rho' P1).
   
   Lemma inline_letapp_correct k x sig f t ys e1 e2 e' C C' x' rho1 rho2 : 
     (forall m rhoc rhoc' B f' xs vs e,
@@ -1481,7 +1481,7 @@ Section Inline_correct.
     
     preord_exp cenv P3 PG k (C1 |[ e ]|, rho1) (C2 |[ e' ]|, rho2).
   Proof.
-    intros Hexp (* Hc1 *) _ (* Hc2 *) Hinl1 Hinl2 Hrel Henv v cin Hleq Hstep.
+    intros Hexp Hc1  (* Hc2 *) Hinl1 Hinl2 Hrel Henv v cin Hleq Hstep.
     destruct v.
     - edestruct bstep_fuel_ctx_OOT. eassumption. eapply interprable_inline_letapp. eassumption.
       + eassert (H' := H). eapply inline_letapp_eval_OOT_l in H'; [| eassumption ].
@@ -1535,7 +1535,7 @@ Section Inline_correct.
       + eapply Hposti; try eassumption. omega. omega.
       + eapply preord_res_monotonic. eassumption. omega.
   Qed.
-        
+
   
 End Inline_correct.
 

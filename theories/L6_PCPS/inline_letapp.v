@@ -1440,34 +1440,32 @@ Section Inline_correct.
   Qed.
 
   Definition post_inline :=
-    forall e1 e2 e e' C1 C2 x x' y y' rho1 rho2 c1 c2 c3 c4 c1' c3',
+    forall e1 e2 e e' C1 C2 x x' y y' rho1 rho2 rho1' rho2' c1 c2 c3 c4 c1' c3',
       inline_letapp e1 x = Some (C1, x') ->
       inline_letapp e2 y = Some (C2, y') ->
       
-      interpret_ctx_fuel cenv C1 (M.empty _) (Res rho1) c1' ->
-      interpret_ctx_fuel cenv C2 (M.empty _) (Res rho2) c3' ->
+      interpret_ctx_fuel cenv C1 rho1 (Res rho1') c1' ->
+      interpret_ctx_fuel cenv C2 rho2 (Res rho2') c3' ->
       c1' <= c1 <= c1' + 1 ->
       c3' <= c3 <= c3' + 1 ->
       
-      P1 (e1, M.empty _, c1) (e2, M.empty _, c3) ->
-      P2 (e, rho1, c2) (e', rho2, c4) ->
-      P3 (C1 |[ e ]|, M.empty _, c1' + c2) (C2 |[ e' ]|, M.empty _, c3' + c4).
+      P1 (e1, rho1, c1) (e2, rho2, c3) ->
+      P2 (e, rho1', c2) (e', rho2', c4) ->
+      P3 (C1 |[ e ]|, rho1, c1' + c2) (C2 |[ e' ]|, rho2, c3' + c4).
   
   Definition post_inline_OOT :=
-    forall e1 e2  C1 C2 x x' y y' c1 c3 c3' e e',
+    forall e1 e2  C1 C2 x x' y y' c1 c3 c3' e e' rho1 rho2,
       inline_letapp e1 x = Some (C1, x') ->
       inline_letapp e2 y = Some (C2, y') ->            
-      P1 (e1, M.empty _, c1) (e2, M.empty _, c3) ->
+      P1 (e1, rho1, c1) (e2, rho2, c3) ->
       c3' <= c3 <= c3' + 1 ->
-      P3 (C1 |[ e ]|, M.empty _, c1) (C2 |[ e' ]|, M.empty _, c3').
+      P3 (C1 |[ e ]|, rho1, c1) (C2 |[ e' ]|, rho2, c3').
 
   Context (Hposti : post_inline) (Hposti_OOT : post_inline_OOT). 
-
-
-
+  
     
   Lemma inline_letapp_compat k e1 e2 x y x' y' C1 C2 e e' sig rho1 rho2 :
-    (forall k, preord_exp cenv P1 PG k (e1, M.empty _) (e2, M.empty _)) ->
+    (forall k rho1 rho2, preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)) ->
     closed_exp e1 ->
     (* closed_exp e2 -> *)
 
@@ -1481,9 +1479,9 @@ Section Inline_correct.
 
     preord_env_P_inj cenv PG (occurs_free e) k sig rho1 rho2 ->
     
-    preord_exp cenv P3 PG k (C1 |[ e ]|, M.empty _) (C2 |[ e' ]|, M.empty _).
+    preord_exp cenv P3 PG k (C1 |[ e ]|, rho1) (C2 |[ e' ]|, rho2).
   Proof.
-    intros Hexp Hc1 (* Hc2 *) Hinl1 Hinl2 Hrel Henv v cin Hleq Hstep.
+    intros Hexp (* Hc1 *) _ (* Hc2 *) Hinl1 Hinl2 Hrel Henv v cin Hleq Hstep.
     destruct v.
     - edestruct bstep_fuel_ctx_OOT. eassumption. eapply interprable_inline_letapp. eassumption.
       + eassert (H' := H). eapply inline_letapp_eval_OOT_l in H'; [| eassumption ].

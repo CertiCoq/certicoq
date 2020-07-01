@@ -49,22 +49,30 @@ unsigned char ascii_to_char(value x) {
   return c;
 }
 
+
+typedef enum { EMPTYSTRING, STRING } coq_string;
+
+size_t string_value_length(value s) {
+  value temp = s;
+  size_t i = 0;
+  while(get_Coq_Strings_String_string_tag(temp) == STRING) {
+    temp = *((value *) temp + 1ULL);
+    i++;
+  }
+  return i;
+}
+
 char *value_to_string(value s) {
   value temp = s;
   char * result;
-  result = (char*) malloc(100 * sizeof(char)); //FIXME
-  int i = 0;
+  size_t result_length = string_value_length(s) + 1;
+  result = (char*) malloc(result_length * sizeof(char));
+  memset(result, 0, result_length);
 
-  while(1) {
-    unsigned int tag = get_Coq_Strings_String_string_tag(temp);
-    if(tag == 1) {
-      sprintf(result + i, "%c", ascii_to_char(temp));
-      temp = *((value *) temp + 1ULL);
-      i++;
-    } else {
-      break;
-    }
-  } 
+  for(int i = 0; get_Coq_Strings_String_string_tag(temp) == STRING; i++) {
+    sprintf(result + i, "%c", ascii_to_char(temp));
+    temp = *((value *) temp + 1ULL);
+  }
 
   return result;
 }

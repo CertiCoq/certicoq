@@ -18,6 +18,7 @@ Section Compose.
   Definition post_property := PostT -> Prop.
   
   Context (wf_pres : A -> A -> Prop)
+          (wf : A -> Prop)
           (post_prop : post_property).
   
   
@@ -37,7 +38,7 @@ Section Compose.
         R P1 P1 c1 c' ->
         R_n R n P2 c' c2 ->
         wf_pres c1 c' -> (* well-formedness is preserved *)
-        post_prop P -> (* the indermediate post has some desired property *)
+        post_prop P1 -> (* the indermediate post has some desired property *)
         same_relation _ (compose P1 P2) P ->
         R_n R (S n) P c1 c2.
 
@@ -47,9 +48,7 @@ Section Compose.
       exists c',
         R1 P1 c1 c' /\
         R2 P2 c' c2 /\
-        Pr1 P1 /\ Pr2 P2 /\
-        wf_pres c1 c'.
-
+        Pr1 P1 /\ Pr2 P2.     
 
 End Compose.
 
@@ -78,7 +77,7 @@ Section RelComp.
 
   Context (cenv : ctor_env) (ctag : ctor_tag).
 
-  Context (wf_pres : exp -> exp -> Prop) (post_prop : post_property).
+  Context (wf_pres : exp -> exp -> Prop) (wf : exp -> Prop) (post_prop : post_property).
    
   Definition preord_exp_n n := R_n wf_pres post_prop
                                    (fun P PG e1 e2 =>
@@ -132,6 +131,9 @@ Section RelComp.
     eapply Hwf. eassumption. eapply Hc1.
   Qed.
   
+  Context (Hwf_c : forall e1 e2, wf_pres e1 e2 -> closed_exp e1 -> closed_exp e2).
+  
+  
   Lemma preord_exp_n_impl (n : nat) (P : PostT) (e1 : exp) (e2: exp) :
     closed_exp e1 ->
     preord_exp_n n P e1 e2 ->
@@ -162,7 +164,8 @@ Section RelComp.
       * clear; now firstorder.
     + intros. edestruct H; eauto. 
       eapply preord_env_P_antimon with (rho2 := rho2); [| eapply Hwfe ]. now intros z Hin; inv Hin. destructAll.
-      edestruct IHHrel. eapply closed_preserved; eassumption. eassumption. destructAll. 
+      edestruct IHHrel. eapply Hwf_c. eassumption. eassumption. eassumption.
+      destructAll. 
       do 2 eexists. split; eauto. split.
       eapply H2. do 2 eexists. eassumption. eassumption. 
       eapply More; [| eassumption | | eapply R_true_idempotent | eassumption ].
@@ -231,10 +234,11 @@ Section RelComp.
   
   (* Top-level relation for L6 pipeline *)
   Definition R_n_exp P1 P2 P3 Pr1 Pr2 Pr3 Pr4 n m : relation exp :=
-    compose_rel wf_pres P1 P2 Pr1 Pr2
+    compose_rel P1 P2 Pr1 Pr2
                 (preord_exp_n n)
-                (fun P2 => compose_rel wf_pres P2 P3 Pr3 Pr4
+                (fun P2 => compose_rel P2 P3 Pr3 Pr4
                                        (fun P e1 e2 =>
+                                          wf_pres e1 e2 /\ 
                                           forall k rho1 rho2 ,
                                             cc_approx_env_P cenv ctag (occurs_free e1) k P rho1 rho2 ->
                                             cc_approx_exp cenv ctag k P P (e1, rho1) (e2, rho2)) (preord_exp_n m)).
@@ -242,13 +246,13 @@ Section RelComp.
   Definition post_trivial : PostT := fun c1 c2 => True.
   
   Definition R_n_res P1 P2 P3 n m : relation res :=
-    compose_rel wf_trivial P1 P2 pr_trivial pr_trivial (preord_res_n n)
-                (fun P2 => compose_rel wf_trivial P2 P3 pr_trivial pr_trivial 
+    compose_rel P1 P2 pr_trivial pr_trivial (preord_res_n n)
+                (fun P2 => compose_rel P2 P3 pr_trivial pr_trivial 
                                        (fun P c1 c2 => forall k, cc_approx_res (cc_approx_val cenv ctag) k P c1 c2) (preord_res_n m)).
   
-  Definition R_n_val P1 P2 P3 n m : relation val :=
-    compose_rel wf_trivial P1 P2 pr_trivial pr_trivial (preord_val_n n)
-                (fun P2 => compose_rel wf_trivial P2 P3 pr_trivial pr_trivial
+  Definition R_n_val P1 P2 P3 n m : relation val :=    
+    compose_rel P1 P2 pr_trivial pr_trivial (preord_val_n n)
+                (fun P2 => compose_rel P2 P3 pr_trivial pr_trivial
                                        (fun P (c1 : val) (c2 : val) => forall k, cc_approx_val cenv ctag k P c1 c2) (preord_val_n m)).
 
   Definition Pr_in_P_implies_u_bound (Pr1 : post_property) :=
@@ -257,7 +261,14 @@ Section RelComp.
   Context (P1 P2 P3 : PostT)
           (Pr1 Pr2 Pr3 Pr4 : post_property)
           (wf_pres_trans : Transitive wf_pres).
-  
+
+  Lemma preord_exp_n_wf_pres n P e1 e2 : 
+    preord_exp_n n P e1 e2 ->
+    wf_pres e1 e2.
+  Proof.
+    intros Hn. induction Hn; eauto.
+  Qed.
+                 
   Lemma R_n_exp_impl (n m : nat) e1 e2 :    
     closed_exp e1 ->
     Pr_in_P_implies_u_bound Pr1 ->
@@ -275,42 +286,44 @@ Section RelComp.
     intros Hwfe Himpl Hrel. inv Hrel. destructAll. inv H0. destructAll. 
     assert (Hexp1 := H). assert (Hexp2 := H4). intros.
     eapply preord_exp_n_impl in H; [| eassumption | eassumption ]. destructAll.
-    edestruct (H0 x2 (M.empty _) (M.empty _)); eauto.
-    eapply cc_approx_env_P_antimon; [| now eapply Hwf; eauto ].
-    intros z Hin. eapply Hwfe in Hin. now inv Hin. 
+    edestruct (H6 x2 (M.empty _) (M.empty _)); eauto.
+    eapply cc_approx_env_P_antimon. 2:{ eapply Hwf_c. eapply preord_exp_n_wf_pres. eassumption. eassumption. }
+    intros z Hin. inv Hin.
     
     eapply preord_exp_n_preserves_not_stuck. eapply Himpl; eassumption. eassumption. eassumption. eassumption.
     
     destructAll.
-    eapply preord_exp_n_impl in H4; [| eapply closed_preserved; eauto | eassumption ]. destructAll.
-    
-    do 2 eexists. split; eauto. split; eauto.
+    eapply preord_exp_n_impl in H3; [| | eassumption ].
+    2:{ eapply Hwf_c. eapply wf_pres_trans; [| eassumption ]. eapply preord_exp_n_wf_pres. eassumption. eassumption. }
+    destructAll. 
+    do 2 eexists. split; eauto. split.
     
     eexists. split. eassumption. eexists. split; eassumption.
     
     eexists. split. eassumption. split.
-    2:{ split. clear. now firstorder. split. now firstorder. now firstorder. }
+    2:{ clear. now firstorder. }
     eexists. split.
-    2:{ split. eassumption. split. now firstorder. now firstorder. }
+    2:{ split. eassumption. clear. now firstorder. }
     
     intros k. 
     destruct v1.
     - destruct x1.
       * destruct x3; eauto. 
-      * eapply preord_res_n_OOT_l in H11. contradiction.
+      * eapply preord_res_n_OOT_l in H10. contradiction.
     - destruct x1.
-      + eapply preord_res_n_OOT_r in H11. contradiction.
+      + eapply preord_res_n_OOT_r in H10. contradiction.
       + destruct x3; eauto.
-        edestruct (H0 (k + x2)) with (rho2 := (M.empty val)); [| | eassumption | | ].
-        eapply cc_approx_env_P_antimon; [| now eapply Hwf; eauto ].
-        intros z Hin. eapply Hwfe in Hin. now inv Hin.
+        edestruct (H6 (k + x2)) with (rho2 := (M.empty val)); [| | eassumption | | ].
+        eapply cc_approx_env_P_antimon; [| eapply Hwf_c; eauto ].
+        intros z Hin. now inv Hin.
+        eapply preord_exp_n_wf_pres. eassumption.
         omega.
         
         eapply preord_exp_n_preserves_not_stuck. eapply Himpl. eassumption. eassumption. eassumption. eassumption.
         
         destructAll.
         destruct x1. contradiction.
-        eapply bstep_fuel_deterministic in H17; [| clear H17; eassumption ]. inv H17.
+        eapply bstep_fuel_deterministic in H16; [| clear H16; eassumption ]. inv H16.
         eapply cc_approx_res_monotonic. eassumption. omega.
   Qed.
 
@@ -349,9 +362,13 @@ Section RelComp.
   Proof.
     intros Hwfe Hp1 Hp2 Hp3 Hrel Hdiv. inv Hrel. destructAll. inv H0. destructAll. 
     eapply preord_exp_n_preserves_divergence; [| | eassumption | ].
-    eapply Hp3. eassumption. eapply closed_preserved. eassumption. eapply wf_pres_trans; eassumption.
-    eapply cc_approx_exp_rreserves_divergence. eapply Hp2. eassumption. intros. eapply H0.
-    eapply cc_approx_env_P_antimon; [| now eapply Hwf; eauto ]. intros z Hin. eapply Hwfe in Hin. now inv Hin.
+    eapply Hp3. eassumption. eapply Hwf_c. eapply wf_pres_trans. eapply preord_exp_n_wf_pres. eapply H. eassumption.
+    eassumption. 
+    
+    eapply cc_approx_exp_rreserves_divergence. eapply Hp2. eassumption.
+    intros. eapply H6.
+    eapply cc_approx_env_P_antimon; [| eapply Hwf_c; eauto ]. intros z Hin. now inv Hin.
+    eapply preord_exp_n_wf_pres. eapply H.
     eapply preord_exp_n_preserves_divergence. eapply Hp1. eassumption. eassumption. eassumption. eassumption.
   Qed.
 
@@ -395,6 +412,26 @@ Section Linking.
            | [ _ : context[inline_letapp ?E ?X] |- _ ] => 
              destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
            end); (try now inv Hin); try (now eauto).
+  Qed.
+
+  
+  Lemma link_straight_code_r x (e1 e2 e : exp) :
+    link x e1 e2 = Some e ->
+    straight_code e1 = true.
+  Proof.
+    unfold link in *. intros H.
+    match goal with
+    | [ Hin : context[inline_letapp ?E ?X] |- _ ] => 
+      destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
+    end. eapply inline_straight_code_r. eassumption.
+  Qed.
+  
+  Lemma link_straight_code_l (e1 e2 : exp) x :
+    straight_code e1 = true ->
+    exists e, link x e1 e2 = Some e.
+  Proof.
+    intros. eapply inline_straight_code_l in H. destructAll.
+    eexists. unfold link. rewrite H. reflexivity.
   Qed.
 
 
@@ -503,13 +540,25 @@ Section Linking.
     intros H. inv H. now eauto. intros. inv H2.
   Qed.
 
+  (* Lemma preord_exp_n_wf_monotonic (wf1 wf2 : exp -> Prop) P1 Pr e1 e2 : *)
+  (*   (forall e, wf1 e -> wf2 e) -> *)
+  (*   preord_exp_n cenv wf1 Pr 1 P1 e1 e2 -> *)
+  (*   preord_exp_n cenv wf2 Pr 1 P1 e1 e2. *)
+  (* Proof. *)
+  (*   intros. induction H0. *)
+  (*   - constructor; eauto. *)
+  (*   - econstructor; eauto. *)
+  (* Qed. *)
+  
+
 End Linking.
 
 Section LinkingComp.
       
   Context (P P1 P2 P3 : PostT)
           (Pr Pr1 Pr2 Pr3 Pr4 : post_property)
-          (wf_pres : exp -> exp -> Prop)          
+          (wf_pres : exp -> exp -> Prop)
+          (wf1 wf2 : exp -> Prop)          
           (cenv : ctor_env) (lf : var).
   
   Context (Hwf : forall e e', wf_pres e e' -> preserves_fv e e')
@@ -518,14 +567,26 @@ Section LinkingComp.
           (Hpr1 : forall P, Pr P -> post_inline cenv P P P)
           (Hpr2 : forall P, Pr P -> post_inline_OOT P P).
 
+  Context (Hlinkwf :
+             forall x e1 e2 e1' e2' e e',
+               wf_pres e1 e2 -> wf_pres e1' e2' ->
+               link lf x e1 e2 = Some e ->
+               link lf x e1' e2' = Some e' ->
+               wf_pres e e').
+  
   
   Definition andp {A} (P1 P2 : A -> Prop) : A -> Prop := fun x => P1 x /\ P2 x.
 
   Lemma inclusion_refl {A} (Q : relation A) : inclusion _ Q Q.
   Proof. clear. now firstorder. Qed.
-  
+
+  Definition is_straightP := fun e => straight_code e = true.
+
+
+  Definition preserves_closed (e1 e2 : exp) := closed_exp e1 -> closed_exp e2.
+
   Lemma preord_exp_n_preserves_linking_src_l x n e1 e2 e1' :
-    preord_exp_n cenv wf_pres Pr n P e1 e2 ->
+    preord_exp_n cenv (relation_conjunction preserves_closed preserves_straight_code) Pr n P e1 e2 ->
     
     closed_exp e1 ->
     straight_code e1 = true ->
@@ -533,7 +594,7 @@ Section LinkingComp.
     
     match link lf x e1 e1', link lf x e2 e1' with
     | Some e, Some e' =>
-      preord_exp_n cenv wf_pres Pr n P e e'
+      preord_exp_n cenv preserves_closed Pr n P e e'
     | _ , _ => True
     end.
   Proof.
@@ -543,7 +604,7 @@ Section LinkingComp.
                   preord_env_P cenv P [set x] k rho1 rho2 ->
                   preord_exp cenv P P k (e1', rho1) (e1', rho2)).
       { intros. eapply preord_exp_refl. eapply Hpr. eassumption.
-        intros z Hin. eapply Hfv in Hin . eauto. }
+        intros z Hin. eapply Hfv in Hin . eauto. } 
       assert (Hexp1 :
                 forall (k : nat) (rho1 rho2 : env),
                   preord_exp' cenv (preord_val cenv) P P k (c1, rho1) (c2, rho2)).
@@ -555,30 +616,35 @@ Section LinkingComp.
       intros Hc. destruct (link lf x c1 e1') eqn:Hl1; eauto. destruct (link lf x c2 e1') eqn:Hl2; eauto.
       constructor. 
       * intros. eapply Hc.
-      * admit.
+      * intros Hc1. eapply link_src_closed; [| | eassumption ]. eapply H0. eassumption. eassumption.
       * eassumption.
-    - specialize (IHHrel ltac:(admit) e1').
-      destruct (link_src lf c1 e1') eqn:Hl1; eauto. 
-      destruct (link_src lf c2 e1') eqn:Hl2; eauto.
-      
-      destruct (link_src lf c' e1') eqn:Hl1'; eauto ; [| admit ]. 
+    - assert (Hc' : closed_exp c'). { eapply H0. eassumption. }
+      assert (Hs' : straight_code c' = true). { eapply H0; eauto. }
+      specialize (IHHrel e1' Hc' Hs' Hfv).
+                                              
+      destruct (link lf x c1 e1') eqn:Hl1; eauto. 
+      destruct (link lf x c2 e1') eqn:Hl2; eauto.
+      edestruct (link_straight_code_l lf c' e1'). eassumption. rewrite H3 in IHHrel.  
       
       assert (Hexp1 :
                   forall (k : nat) (rho1 rho2 : env),
-                    preord_exp' cenv (preord_val cenv) P0 PG0 k (c1, rho1) (c', rho2)).
-      { intros. eapply H. intros x Hin. eapply Hwf in Hin; eauto. inv Hin. }
-      
-        assert (Hexp2 : forall k rho1 rho2, preord_exp cenv P PG k (e1', rho1) (e1', rho2)).
-        { intros. eapply preord_exp_refl. eapply Hpr. eassumption.
-          intros x Hin. eapply Hwf in Hin; eauto. inv Hin. }
-        econstructor; [| |  | | eassumption | eassumption ].
-      + admit. (* as above *)
+                    preord_exp' cenv (preord_val cenv) P0 P0 k (c1, rho1) (c', rho2)).
+      { intros. eapply H. intros z Hin. eapply Hw1 in Hin; eauto. inv Hin. } 
+      assert (Hexp2 :
+                forall k rho1 rho2,
+                  preord_env_P cenv P0 [set x] k rho1 rho2 ->
+                  preord_exp cenv P0 P0 k (e1', rho1) (e1', rho2)).
+      { intros. eapply preord_exp_refl. eapply Hpr. eassumption.
+        intros z Hin. eapply Hfv in Hin . eauto. }
+
+      econstructor; [| | | eassumption | eassumption ].
+      + specialize (preord_exp_preserves_linking_src
+                      lf cenv P0 P0 (Hpr _ H1) (Hpr1 _ H1) (Hpr2 _ H1) (inclusion_refl _) _ _ _ _ _ Hexp1 Hexp2 Hw1).
+        intros Hc. rewrite Hl1, H3 in Hc.
+        intros. eapply Hc.
       + eapply IHHrel; eauto.
-      + admit. (* linking wf *)
-      + eassumption.
-    
-    
-    
+      + intros Hc1. eapply link_src_closed; [| | eassumption ]. eapply H0. eassumption. eassumption.
+  Qed.    
 
   Lemma preord_exp_n_preserves_linking_src n m e1 e2 e1' e2' Pr :
     

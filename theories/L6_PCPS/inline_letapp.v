@@ -1465,7 +1465,8 @@ Section Inline_correct.
   
     
   Lemma inline_letapp_compat k e1 e2 x y x' y' C1 C2 e e' sig rho1 rho2 :
-    (forall k rho1 rho2, preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)) ->
+    (forall k rho1 rho2,
+        preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)) ->
     closed_exp e1 ->
     (* closed_exp e2 -> *)
 
@@ -1476,12 +1477,10 @@ Section Inline_correct.
         m <= k ->
         preord_env_P_inj cenv PG [set x'] m (sig {x' ~> y'}) rho1 rho2 ->
         preord_exp cenv P2 PG m (e, rho1) (e', rho2)) ->
-
-    preord_env_P_inj cenv PG (occurs_free e) k sig rho1 rho2 ->
     
     preord_exp cenv P3 PG k (C1 |[ e ]|, rho1) (C2 |[ e' ]|, rho2).
   Proof.
-    intros Hexp Hc1  (* Hc2 *) Hinl1 Hinl2 Hrel Henv v cin Hleq Hstep.
+    intros Hexp Hc1  (* Hc2 *) Hinl1 Hinl2 Hrel (* Henv *) v cin Hleq Hstep.
     destruct v.
     - edestruct bstep_fuel_ctx_OOT. eassumption. eapply interprable_inline_letapp. eassumption.
       + eassert (H' := H). eapply inline_letapp_eval_OOT_l in H'; [| eassumption ].

@@ -157,6 +157,7 @@ Lemma get_name_fresh A S y str :
   {{ fun _ (s : comp_data * A) => fresh S (next_var (fst s)) }}
     get_name y str
   {{ fun (r: unit) s x s' =>
+       x \in S /\
        x \in Range (next_var (fst s)) (next_var (fst s')) /\
        (next_var (fst s) < next_var (fst s')) /\
        fresh (S \\ [set x]) (next_var (fst s'))      
@@ -170,7 +171,7 @@ Proof.
   intros x [r3 w3].
   eapply return_triple. 
   intros ? [r4 w4] H2. inv H2. intros [H1 H2]. inv H1; inv H2. intros.
-  split. simpl. unfold Range, Ensembles.In. zify. omega.
+  split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. omega.
   simpl. split. zify; omega.
   intros z Hin. constructor. eapply H; eauto. zify. omega.
   intros Hc. inv Hc. zify; omega.
@@ -181,6 +182,7 @@ Lemma get_names_lst_fresh A S ns str :
     get_names_lst ns str
   {{ fun (r: unit) s xs s' =>
        NoDup xs /\ List.length xs = List.length ns /\
+       FromList xs \subset S /\
        FromList xs \subset Range (next_var (fst s)) (next_var (fst s')) /\
        (next_var (fst s) <= next_var (fst s')) /\
        fresh (S \\ FromList xs) (next_var (fst s')) }}.  
@@ -188,15 +190,15 @@ Proof.
   unfold get_names_lst. revert S; induction ns; intros S.
   - simpl. eapply return_triple.
     intros. repeat normalize_sets. split; eauto. sets. now constructor. split; eauto.
-    split. now sets. split. reflexivity. eassumption.
+    split. now sets. split. sets. split. reflexivity. eassumption.
   - simpl. eapply bind_triple. eapply get_name_fresh.
     intros x w.
-    eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHns.
+    eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply frame_rule. eapply IHns.
     intros xs w'. eapply return_triple. intros. destructAll.
-    repeat normalize_sets. split; [| split; [| split; [| split ]]].
-    + constructor; eauto. intros Hc. eapply H3 in Hc. 
-      eapply Disjoint_Range; [| constructor; [ eapply H | eapply Hc ] ]. reflexivity.
-    + simpl. omega.
+    repeat normalize_sets. split; [| split; [| split; [| split; [| split ]]]].
+    + constructor; eauto. intros Hc. eapply H4 in Hc. inv Hc. now eauto.
+    + simpl. congruence.
+    + eapply Union_Included. sets. eapply Included_trans. eapply H4. sets.
     + eapply Union_Included. eapply Singleton_Included.
       eapply Range_Subset; [| | eassumption ]. reflexivity. zify. omega.
       eapply Included_trans. eassumption. eapply Range_Subset. zify; omega. reflexivity.
@@ -267,9 +269,10 @@ Section Inline_correct.
       rho1 ! f = Some (Vfun rhoc B f') ->
       find_def f B = Some (ft, xs, e) /\ f = f' /\
       preord_env_P_inj cenv PG (occurs_free e \\ FromList xs) i (apply_r sig) (def_funs B B rhoc rhoc) rho2 /\
-      sub_map (def_funs B B rhoc rhoc) rho1 /\
-      Disjoint _ (bound_var e) ((* Dom_map rhoc :|: *) name_in_fundefs B) /\
-      Disjoint _ (FromList xs) ((* Dom_map rhoc :|: *) name_in_fundefs B) /\
+      (* sub_map (def_funs B B rhoc rhoc) rho1 /\ *)
+      Disjoint _ (bound_var e) (name_in_fundefs B) /\
+      Disjoint _ (FromList xs) (name_in_fundefs B) /\
+      (* Disjoint _ S (occurs_free e \\ FromList xs) /\ *)
       match k with
       | 0%nat => True
       | S k => fun_map_inv' k (occurs_free e \\ FromList xs) fm (def_funs B B rhoc rhoc) rho2 i sig
@@ -282,9 +285,10 @@ Section Inline_correct.
       rho1 ! f = Some (Vfun rhoc B f') ->
       find_def f B = Some (ft, xs, e) /\ f = f' /\
       preord_env_P_inj cenv PG (occurs_free e \\ FromList xs) i (apply_r sig) (def_funs B B rhoc rhoc) rho2 /\
-      sub_map (def_funs B B rhoc rhoc) rho1 /\
-      Disjoint _ (bound_var e) ((* Dom_map rhoc :|: *) name_in_fundefs B) /\
-      Disjoint _ (FromList xs) ((* Dom_map rhoc :|: *) name_in_fundefs B) /\
+      (* sub_map (def_funs B B rhoc rhoc) rho1 /\ *)
+      Disjoint _ (bound_var e) (name_in_fundefs B) /\
+      Disjoint _ (FromList xs) (name_in_fundefs B) /\
+      (* Disjoint _ S (occurs_free e \\ FromList xs) /\ *)
       match k with
       | 0%nat => True
       | S k => fun_map_inv' k (occurs_free e \\ FromList xs) fm (def_funs B B rhoc rhoc) rho2 i sig
@@ -307,7 +311,7 @@ Section Inline_correct.
       repeat (split; eauto).
     - destruct k; [ omega | ].
       intro; intros. edestruct H; eauto. destructAll. 
-      split; eauto. split; eauto. split; eauto. split; eauto. split; eauto. split; eauto.
+      split; eauto. split; eauto. split; eauto. split; eauto. split; eauto.
       rewrite <- fun_map_inv_eq. eapply IHk. 
       omega. rewrite fun_map_inv_eq. eassumption. omega. 
   Qed.
@@ -318,9 +322,9 @@ Section Inline_correct.
     fun_map_inv k S fm rho1 rho2 i' sig.
   Proof.
     revert k S fm rho1 rho2 i i' sig. induction k as [k' IHk] using lt_wf_rec1; intros.
-    intros. intro; intros. edestruct H; eauto. destructAll. split; eauto. split; eauto. split; eauto. 
+    intros. intro; intros. edestruct H; eauto. destructAll. split; eauto. split; eauto. split; eauto.
     eapply preord_env_P_inj_monotonic; eassumption.
-    split; eauto. split; eauto. split; eauto.
+    split; eauto. split; eauto.
     destruct k'; eauto. rewrite <- fun_map_inv_eq in *. eapply IHk; eauto.
   Qed.
 
@@ -525,7 +529,7 @@ Section Inline_correct.
   (* TODO move *)
   Lemma preord_env_P_inj_set_extend_not_In_P_r_alt S k f rho1 rho2 x y v :
     preord_env_P_inj cenv PG S k f rho1 rho2 ->
-    ~ x \in Dom_map rho1 ->
+    ~ x \in S ->
     ~ y \in (image f (Dom_map rho1)) ->
     preord_env_P_inj cenv PG S k (f {x ~> y}) rho1 (M.set y v rho2).
   Proof.
@@ -534,7 +538,7 @@ Section Inline_correct.
     eexists; split; eauto.
     rewrite extend_gso, M.gso. eassumption.
     intros Hc; subst. eapply Hnin'. eexists; eauto. split. eexists; eauto. reflexivity.
-    intros Hc. subst. eapply Hnin. eexists. eassumption.
+    intros Hc. subst. contradiction.
   Qed.  
 
   Lemma Dom_map_add_fundefs fm B :
@@ -572,47 +576,47 @@ Section Inline_correct.
 
   Lemma fun_map_inv_set_not_In_r k S fm rho1 rho2 i sig x x' v' : 
     fun_map_inv k S fm rho1 rho2 i sig ->
-    ~ x \in (Dom_map rho1) ->
-    ~ x' \in image (apply_r sig) (Dom_map rho1) ->
+    ~ x \in occurs_free_fun_map fm ->
+    ~ x' \in image (apply_r sig) (occurs_free_fun_map fm) ->
     fun_map_inv k S fm rho1 (M.set x' v' rho2) i (M.set x x' sig).
   Proof.
     revert S fm rho1 rho2 i sig x x' v'. induction k using lt_wf_rec1; intros. intro; intros.
     edestruct H0; eauto. 
-    destructAll. split; [| split; [| split; [| split; [| split; [| split ]]]]]; eauto.
-    - rewrite apply_r_set_f_eq. eapply preord_env_P_inj_set_extend_not_In_P_r_alt. eassumption.
-      + intros Hc. eapply H1. eapply Dom_map_sub_map. eassumption. eassumption.
+    destructAll. split; [| split; [| split; [| split; [| split ]]]]; eauto.
+    - rewrite apply_r_set_f_eq. eapply preord_env_P_inj_set_extend_not_In_P_r. eassumption.
+      + intros Hc. eapply H1. eapply occurs_free_fun_map_get. eassumption. eassumption.
       + intros Hc. eapply H2. eapply image_monotonic; [| eassumption ].
-        eapply Dom_map_sub_map; eassumption.
+        eapply occurs_free_fun_map_get. eassumption.
     - destruct k; eauto. rewrite <- fun_map_inv_eq in *.
       eapply H. omega. eassumption.
-      intros hc. eapply H1. eapply Dom_map_sub_map. eassumption. eassumption.
-      intros hc. eapply H2. eapply image_monotonic; [| eassumption ]. eapply Dom_map_sub_map. eassumption.
+      intros hc. eapply H1. eassumption.
+      intros hc. eapply H2. eapply image_monotonic; [| eassumption ]. reflexivity.
   Qed.
   
   Lemma fun_map_inv_set k S fm rho1 rho2 i sig x v x' v' :
     fun_map_inv k S fm rho1 rho2 i sig ->
-    ~ x \in Dom_map rho1 :|: Dom_map fm ->
-    ~ x' \in image (apply_r sig) (Dom_map rho1) ->
+    ~ x \in occurs_free_fun_map fm :|: Dom_map fm ->
+    ~ x' \in image (apply_r sig) (occurs_free_fun_map fm) ->
     fun_map_inv k (x |: S) fm (M.set x v rho1) (M.set x' v' rho2) i (M.set x x' sig).
   Proof.
     intros Hinv Hnin Hnin'. intro; intros.
     rewrite M.gso in *. 
     2:{ intros Heq; subst. eapply Hnin. right. eexists; eauto. }
     inv H.
-    - inv H2. exfalso. eapply Hnin. left. eexists; eauto.
+    - inv H2. exfalso. eapply Hnin. right. eexists; eauto.
     - edestruct Hinv; eauto.
-      destructAll. split; [| split; [| split; [| split; [| split; [| split ]]]]]; eauto.
-      + rewrite apply_r_set_f_eq. eapply preord_env_P_inj_set_extend_not_In_P_r_alt. eassumption.
-        intros Hc. eapply Hnin. left. eapply Dom_map_sub_map. eassumption. eassumption.
-        intros Hc. eapply Hnin'. eapply image_monotonic; [| eassumption ]. eapply Dom_map_sub_map. eassumption.
-      + eapply sub_map_trans. eassumption. eapply sub_map_set.
-        intros Hc. eapply Hnin. left. eassumption.
+      destructAll. split; [| split; [| split; [| split; [| split ]]]]; eauto.
+      + rewrite apply_r_set_f_eq. eapply preord_env_P_inj_set_extend_not_In_P_r. eassumption.
+        intros Hc. eapply Hnin. left. eapply occurs_free_fun_map_get; eauto.
+        intros Hc. eapply Hnin'. eapply image_monotonic; [| eassumption ].
+        eapply occurs_free_fun_map_get; eauto.
+      (* + eapply sub_map_trans. eassumption. eapply sub_map_set. *)
+      (*   intros Hc. eapply Hnin. left. eassumption. *)
       + destruct k; eauto. rewrite <- fun_map_inv_eq in *.
         eapply fun_map_inv_set_not_In_r. eapply fun_map_inv_antimon. eassumption.
         * reflexivity.
-        * intros Hc. eapply Hnin. left. eapply Dom_map_sub_map. eassumption. eassumption.
-        * intros Hc. eapply Hnin'. eapply image_monotonic; [| eassumption ].
-          eapply Dom_map_sub_map. eassumption.
+        * sets.
+        * sets.
   Qed.
   
   Lemma Dom_map_set_lists {A} xs (vs : list A) rho rho' :
@@ -644,76 +648,72 @@ Section Inline_correct.
   Lemma fun_map_inv_sig_extend_Disjoint k S fm rho1 rho2 i sig xs xs' :
     fun_map_inv k S fm rho1 rho2 i sig ->
 
-    Disjoint _ (FromList xs) (Dom_map rho1) ->    
+    Disjoint _ (FromList xs) (occurs_free_fun_map fm) ->    
     
     fun_map_inv k S fm rho1 rho2 i (set_list (combine xs xs') sig).
   Proof.
     revert S fm rho1 rho2 i sig xs xs'.
     induction k using lt_wf_rec1; intros S fm rho1 rho2 i sig xs xs' Hfm Hdis1.
     intro; intros. edestruct Hfm; eauto. destructAll.
-    split; eauto. split; eauto. split; [| split; [| split; [| split ]]].
+    split; eauto. split; eauto. split; [| split; [| split ]].
     - rewrite apply_r_set_list_f_eq. 
-      eapply preord_env_P_inj_extend_lst_not_In_P_r_alt. eassumption.
+      eapply preord_env_P_inj_extend_lst_not_In_P_r. eassumption.
       eapply Disjoint_Included_r; [| eapply Hdis1 ]. 
-      eapply Dom_map_sub_map. eassumption.
-    - eassumption.
+      eapply occurs_free_fun_map_get. eassumption.
     - eassumption.
     - eassumption.
     - destruct k; eauto. rewrite <- fun_map_inv_eq in *. eapply H. omega.
       eassumption.
-      eapply Disjoint_Included_r; [| eapply Hdis1 ]. 
-      eapply Dom_map_sub_map. eassumption.
+      sets.
   Qed.
-
+  
   Lemma fun_map_inv_sig_extend_one_Disjoint k S fm rho1 rho1' rho2 i sig x x' :
     fun_map_inv k S fm rho1 rho2 i sig ->
 
-    sub_map rho1 rho1' ->
     eq_env_P (Complement _ [set x]) rho1 rho1' ->
     ~ x \in (Dom_map fm) ->
-    ~ x \in (Dom_map rho1) ->
+    ~ x \in (occurs_free_fun_map fm) ->
     ~ x \in S ->
                     
     fun_map_inv k (x |: S) fm rho1' rho2 i (M.set x x' sig).
   Proof.
-    intros Hfm Hsub HeqP Hdis1 Hdis2 Hdis3. 
+    intros Hfm HeqP Hdis1 Hdis2 Hdis3. 
     intro; intros. inv H. exfalso. inv H2. eapply Hdis1. eexists; eauto.
     rewrite <- HeqP in H1. 2:{ intros Hc; inv Hc; subst; eauto. }
     edestruct Hfm; eauto. destructAll.
-    split; eauto. split; eauto. split; [| split; [| split; [| split ]]].
+    split; eauto. split; eauto. split; [| split; [| split ]].
     - rewrite apply_r_set_f_eq. 
-      eapply preord_env_P_inj_extend_not_In_P_r_alt. eassumption.
-      intros Hc. eapply Hdis2. eapply Dom_map_sub_map. eassumption. eassumption.
-    - eapply sub_map_trans; eassumption.
+      eapply preord_env_P_inj_extend_not_In_P_r. eassumption.
+      intros Hc. eapply Hdis2. eapply occurs_free_fun_map_get. eassumption.
+      eassumption.
     - eassumption.
     - eassumption.
     - destruct k; eauto. rewrite <- fun_map_inv_eq in *.
       eapply fun_map_inv_sig_extend_Disjoint with (xs := [x]) (xs' := [x']). eassumption.
       repeat normalize_sets. eapply Disjoint_Singleton_l.
-      intros Hc. eapply Hdis2. eapply Dom_map_sub_map. eassumption. eassumption.
+      sets.
   Qed.
-
+  
   Lemma fun_map_inv_env_eq_P S k fm rho1 rho2 i sig rho1' rho2' :
     fun_map_inv k S fm rho1 rho2 i sig ->
     eq_env_P S rho1 rho1' ->
-    sub_map rho1 rho1' ->
     eq_env_P (image (apply_r sig) (occurs_free_fun_map fm)) rho2 rho2' ->    
     fun_map_inv k S fm rho1' rho2' i sig.
   Proof.
     revert S fm rho1 rho2 i sig rho1' rho2'.
     induction k using lt_wf_rec1; intros S fm rho1 rho2 i sig rho1' rho2' Hfm Heq1 Hsub Heq2.
     intro; intros. rewrite <- Heq1 in H2; eauto. edestruct Hfm; eauto. destructAll.
-    split; eauto. split; eauto. split; [| split; [| split; [| split ]]].
+    split; eauto. split; eauto. split; [| split; [| split ]].
     - eapply preord_env_P_inj_eq_env_P.
       eassumption.
       now eapply eq_env_P_refl.
       eapply eq_env_P_antimon. eassumption.
       eapply image_monotonic. eapply occurs_free_fun_map_get; eauto.
-    - eapply sub_map_trans; eauto.
+    (* - eapply sub_map_trans; eauto. *)
     - eassumption.
     - eassumption.
     - destruct k; eauto. rewrite <- fun_map_inv_eq in *. eapply H. omega.
-      eassumption. now eapply eq_env_P_antimon. eapply sub_map_refl. eassumption.
+      eassumption. eapply eq_env_P_refl. eassumption.
   Qed.
 
 
@@ -731,7 +731,7 @@ Section Inline_correct.
     fun_map_inv k S fm rho1 rho2 i sig ->
 
     NoDup xs ->
-    Disjoint _ (FromList xs) (Dom_map rho1 :|: Dom_map fm) ->    
+    Disjoint _ (FromList xs) (occurs_free_fun_map fm :|: Dom_map fm) ->
     set_lists xs vs rho1 = Some rho1' ->
     
     fun_map_inv k (FromList xs :|: S) fm rho1' rho2 i sig.
@@ -743,19 +743,26 @@ Section Inline_correct.
     destruct (Decidable_FromList xs). destruct (Dec f).
     - exfalso. eapply Hdis1. constructor. eassumption. right. eexists; eauto.
     - inv H0; try contradiction. erewrite <- set_lists_not_In in H2; [| eassumption | eassumption ].
-      edestruct Hfm; eauto. destructAll. split; eauto. split; eauto. split; [| split; [| split; [| split ]]].
-      + assumption.
-      + eapply sub_map_trans. eassumption. eapply sub_map_set_lists. eassumption. eassumption.
-        eapply Disjoint_Included_r; [| eapply Hdis1 ]. sets.
-      + eassumption.
-      + eassumption.
-      + destruct k; eauto.
+      edestruct Hfm; eauto.
   Qed.
 
 
+  Lemma preord_env_P_inj_set_lists_not_In_P_r' S k f rho1 rho2 rho2' xs vs :
+    preord_env_P_inj cenv PG S k f rho1 rho2 ->
+    set_lists xs vs rho2 = Some rho2' ->
+    Disjoint _(FromList xs) (image f S) ->
+    preord_env_P_inj cenv PG S k f rho1 rho2'.
+  Proof.
+    intros Henv Hnin Hnin' z Hy v' Hget.
+    edestruct Henv as [v'' [Hget' Hv]]; eauto.
+    eexists; split; eauto. erewrite <- set_lists_not_In. eassumption.
+    eassumption. intros Hc. eapply Hnin'. constructor. eassumption.
+    eapply In_image. eassumption.
+  Qed.
+
   Lemma fun_map_inv_set_lists_r k S fm rho1 rho2' rho2 i sig xs vs :
     fun_map_inv k S fm rho1 rho2 i sig ->
-    Disjoint _ (FromList xs) (image (apply_r sig) (Dom_map rho1)) ->    
+    Disjoint _ (FromList xs) (image (apply_r sig) (occurs_free_fun_map fm)) ->
 
     set_lists xs vs rho2 = Some rho2' ->
     
@@ -765,21 +772,22 @@ Section Inline_correct.
     induction k using lt_wf_rec1;
       intros S fm rho1 rho1' rho2 i sig xs vs Hfm Hdis1 Hset.
     intro f; intros.
-    edestruct Hfm; eauto. destructAll. split; eauto. split; eauto. split; [| split; [| split; [| split ]]]; try eassumption.
-    + eapply preord_env_P_inj_set_lists_not_In_P_r. eassumption. eassumption.
-      eapply Disjoint_Included_r; [| eassumption ]. eapply image_monotonic. eapply Dom_map_sub_map. eassumption.
+    edestruct Hfm; eauto. destructAll. split; eauto. split; eauto.
+    split; [| split; [| split ]]; try eassumption.
+    + eapply preord_env_P_inj_set_lists_not_In_P_r'. eassumption. eassumption.
+      eapply Disjoint_Included_r; [| eassumption ]. eapply image_monotonic. eapply occurs_free_fun_map_get.
+      eassumption.
     + destruct k; eauto. rewrite <- fun_map_inv_eq in *.
       eapply H. omega. eassumption.
-      eapply Disjoint_Included_r; [| eapply Hdis1 ]. eapply image_monotonic. eapply Dom_map_sub_map. eassumption.
-      eassumption.
+      eapply Disjoint_Included_r; [| eapply Hdis1 ]. reflexivity. eassumption.
   Qed.  
 
 
   Lemma fun_map_inv_add_fundefs_Disjoint k S fm rho1 rho2 i sig B1 B2 :
     fun_map_inv k S fm rho1 rho2 i sig ->
     
-    Disjoint _ (name_in_fundefs B1) (Dom_map rho1) ->
-    Disjoint _ (name_in_fundefs B2) (image (apply_r sig) (Dom_map rho1)) ->
+    Disjoint _ (name_in_fundefs B1) (S :|: occurs_free_fun_map fm) ->
+    Disjoint _ (name_in_fundefs B2) (image (apply_r sig) (occurs_free_fun_map fm)) ->
 
     fun_map_inv k S (add_fundefs B1 fm) rho1 (def_funs B2 B2 rho2 rho2) i
                 (set_list (combine (all_fun_name B1) (all_fun_name B2)) sig).
@@ -787,30 +795,32 @@ Section Inline_correct.
     revert S fm rho1 rho2 i sig B1 B2; induction k using lt_wf_rec1; intros.
     intro; intros. rewrite add_fundefs_not_in in H4.
     edestruct H0; eauto. destructAll.
-    repeat (split; [ now eauto |]). split; [| split; [| split; [| split ]]].
-    - eapply preord_env_P_inj_def_funs_neq_r_alt.
-      rewrite apply_r_set_list_f_eq. eapply preord_env_P_inj_extend_lst_not_In_P_r_alt.
+    repeat (split; [ now eauto |]). split; [| split; [| split ]].
+    - eapply preord_env_P_inj_def_funs_neq_r.
+      rewrite apply_r_set_list_f_eq. eapply preord_env_P_inj_extend_lst_not_In_P_r.
       eassumption. rewrite <- Same_set_all_fun_name.
-      eapply Disjoint_Included_r. eapply Dom_map_sub_map. eassumption. now sets. 
+      eapply Disjoint_Included_r; [| eapply H1 ]. eapply Included_Union_preserv_r.
+      eapply occurs_free_fun_map_get. eassumption.
+      
       rewrite apply_r_set_list_f_eq. eapply Disjoint_Included_l.
       intros x Hc. destruct Hc. destructAll.
       rewrite extend_lst_gso. eapply In_image. eassumption.
-      rewrite <- Same_set_all_fun_name. intros Hc. eapply H1. constructor. eassumption.
-      eapply Dom_map_sub_map; eassumption.
+      rewrite <- Same_set_all_fun_name. intros Hc. eapply H1. constructor. eassumption. right.
+      eapply occurs_free_fun_map_get. eassumption. eassumption.
       eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ]. eapply image_monotonic.
-      eapply Dom_map_sub_map. eassumption.
+      eapply occurs_free_fun_map_get. eassumption.
     - eassumption.
     - eassumption.
-    - sets.
-    - destruct k; eauto. rewrite <- fun_map_inv_eq in *. eapply H. 
+    - destruct k; eauto. rewrite <- fun_map_inv_eq in *. eapply H.
       + omega.
       + eassumption.
-      + eapply Disjoint_Included_r; [| eassumption ]. eapply Dom_map_sub_map. eassumption.
-      + eapply Disjoint_Included_r; [| eassumption ]. eapply image_monotonic.
-        eapply Dom_map_sub_map. eassumption.
-    - intros Hc. eapply H1. constructor. eassumption. eexists; eauto.  
+      + eapply Union_Disjoint_r; [| sets ].
+        eapply Disjoint_Included_r; [| eassumption ]. eapply Included_Union_preserv_r.
+      eapply occurs_free_fun_map_get. eassumption.
+      + sets.
+    - intros Hc. eapply H1. constructor. eassumption. now left ; eauto.
   Qed.
-
+  
   Lemma name_in_fundefs_funname_in_fundefs_Disjoint B1 : 
     unique_bindings_fundefs B1 ->
     Disjoint _ (name_in_fundefs B1) (funname_in_fundefs B1).
@@ -835,8 +845,8 @@ Section Inline_correct.
     unique_bindings_fundefs B1 ->
     occurs_free_fundefs B1 \subset S ->
     
-    Disjoint _ (bound_var_fundefs B1) (Dom_map rho1) ->
-    Disjoint _ (name_in_fundefs B2) (image (apply_r sig) (Dom_map rho1)) ->        
+    Disjoint _ (name_in_fundefs B1) (S :|: occurs_free_fun_map fm) ->
+    Disjoint _ (name_in_fundefs B2) (image (apply_r sig) (occurs_free_fun_map fm)) ->        
     
     fun_map_inv k (name_in_fundefs B1 :|: S) (add_fundefs B1 fm) (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2) i
                 (set_list (combine (all_fun_name B1) (all_fun_name B2)) sig).
@@ -848,17 +858,13 @@ Section Inline_correct.
     - rewrite def_funs_eq in Heq2; eauto. inv Heq2.
       edestruct name_in_fundefs_find_def_is_Some. eassumption. destructAll.
       erewrite add_fundefs_in in Heq1; [| eassumption ]. inv Heq1. split; eauto.
-      split; eauto. split; [| split; [| split; [| split ]]].
+      split; eauto. split; [| split; [| split ]].
       + eapply preord_env_P_inj_antimon. eassumption. eapply Setminus_Included_Included_Union.
         eapply Included_trans. eapply occurs_free_in_fun. eapply find_def_correct. eassumption. sets.
-      + eapply sub_map_refl.
       + eapply find_def_correct in H. assert (H' := H). eapply unique_bindings_fun_in_fundefs in H; eauto. destructAll.
-        eapply Union_Disjoint_r; [| now sets ]. eapply Disjoint_Included; [| | eapply Hdis ]. now sets.
-        eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs; eauto ]. now sets.
+        eassumption.
       + eapply find_def_correct in H. assert (H' := H). eapply unique_bindings_fun_in_fundefs in H; eauto. destructAll.
-        eapply Union_Disjoint_r; [| now sets ]. 
-        eapply Disjoint_Included; [| | eapply Hdis ]. now sets.
-        eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs; eauto ]. now sets.         
+        eassumption.
       + destruct k; eauto. rewrite <- fun_map_inv_eq. eapply fun_map_inv_antimon. eapply IHk.
         omega. eapply fun_map_inv_mon. eassumption. omega. eassumption. eassumption.
         eassumption. now sets. now sets. eapply Setminus_Included_Included_Union. 
@@ -867,28 +873,26 @@ Section Inline_correct.
     - rewrite def_funs_neq in Heq2; eauto.
       rewrite add_fundefs_not_in in Heq1; [| eassumption ]. inv HSin. contradiction.
       edestruct Hf. eassumption. eassumption. eassumption. destructAll. split; eauto. split; eauto.
-      split; [| split; [| split; [| split ]]]; eauto.
-      + eapply preord_env_P_inj_def_funs_neq_r_alt.
-        rewrite apply_r_set_list_f_eq. eapply preord_env_P_inj_extend_lst_not_In_P_r_alt.
+      split; [| split; [| split ]]; eauto.
+      + eapply preord_env_P_inj_def_funs_neq_r.
+        rewrite apply_r_set_list_f_eq. eapply preord_env_P_inj_extend_lst_not_In_P_r.
         eassumption.
         * rewrite <- Same_set_all_fun_name.
-          eapply Disjoint_Included; [| | eapply Hdis ]. eapply Dom_map_sub_map. eassumption.
-          eapply name_in_fundefs_bound_var_fundefs.           
+          eapply Disjoint_Included; [| | eapply Hdis ]. eapply Included_Union_preserv_r.
+          eapply occurs_free_fun_map_get. eassumption. reflexivity. 
         * rewrite apply_r_set_list_f_eq. eapply Disjoint_Included_l. 
           intros x Hc. destruct Hc. destructAll.
           rewrite extend_lst_gso. eapply In_image. eassumption.
           rewrite <- Same_set_all_fun_name. intros Hc. eapply Hdis. constructor.
-          eapply name_in_fundefs_bound_var_fundefs. eassumption. eapply Dom_map_sub_map; eassumption.
-          eapply Disjoint_Included_l. apply image_monotonic. eapply Dom_map_sub_map. eassumption.
-          sets.
-      + eapply sub_map_trans. eassumption. eapply sub_map_def_funs.
-        eapply Disjoint_Included; [| | eapply Hdis ]; sets. eapply name_in_fundefs_bound_var_fundefs. 
+          eassumption. right.
+          eapply occurs_free_fun_map_get. eassumption. eassumption.
+          eapply Disjoint_sym. eapply Disjoint_Included_r; [| eassumption ]. apply image_monotonic.
+          eapply occurs_free_fun_map_get. eassumption.
       + destruct k; eauto. rewrite <- fun_map_inv_eq in *.
         eapply fun_map_inv_add_fundefs_Disjoint; try eassumption.
-        * eapply Disjoint_Included; [| | eapply Hdis ]. eapply Dom_map_sub_map. eassumption.
-          eapply name_in_fundefs_bound_var_fundefs.
-        * eapply Disjoint_Included; [| | eapply Hdis' ]. eapply image_monotonic. eapply Dom_map_sub_map. eassumption.
-          reflexivity.
+        * eapply Union_Disjoint_r; [| sets ].
+          eapply Disjoint_Included_r; [| eassumption ]. eapply Included_Union_preserv_r.
+          eapply occurs_free_fun_map_get. eassumption. 
   Qed.
 
   Lemma fun_in_fundefs_funname_in_exp f ft xs e B :
@@ -1103,8 +1107,9 @@ Section Inline_correct.
   Lemma inline_correct_mut d : 
     (forall e sig fm st S
             (Hun : unique_bindings e)
-            (Hdis1 : Disjoint _ (bound_var e) (occurs_free e))
-            (Hdis2 : Disjoint _ S ((bound_var e) :|: image (apply_r sig) (occurs_free e :|: occurs_free_fun_map fm)))
+            (Hdis1 : Disjoint _ (bound_var e) (occurs_free e :|: occurs_free_fun_map fm))
+            (Hdis1' : Disjoint _ (bound_var e :|: bound_var_fun_map' fm) (image (apply_r sig) (occurs_free e :|: occurs_free_fun_map fm)))
+            (Hdis2 : Disjoint _ S ((bound_var e :|: bound_var_fun_map' fm) :|: image (apply_r sig) (occurs_free e :|: occurs_free_fun_map fm)))
             (Hdis3 : Disjoint _ (bound_var e \\ funname_in_exp e) (Dom_map fm :|: funname_fun_map fm))
             (Hdis4 : Disjoint _ (funname_in_exp e) (bound_var_fun_map fm))
             
@@ -1118,20 +1123,20 @@ Section Inline_correct.
              bound_var e' \subset (Range (next_var (fst s)) (next_var (fst s')))  /\ Ecase_shape sig e e' /\
              (forall k rho1 rho2,
                  preord_env_P_inj cenv PG (occurs_free e) k (apply_r sig) rho1 rho2 ->
-                 Disjoint _ (bound_var e) (Dom_map rho1) ->
-                 Disjoint _ S (image (apply_r sig) (Dom_map rho1)) ->
                  fun_map_inv d (occurs_free e) fm rho1 rho2 k sig ->
                  preord_exp cenv P1 PG k (e, rho1) (e', rho2)) }} ) /\ 
 
     (forall B sig sig0 fm st S
             (Hun : unique_bindings_fundefs B)
-            (Hdis1 : Disjoint _ (bound_var_fundefs B) (occurs_free_fundefs B))
-            (Hdis2 : Disjoint _ S ((bound_var_fundefs B):|: image (apply_r sig) ( occurs_free_fundefs B :|: name_in_fundefs B :|: occurs_free_fun_map fm)))
+            (Hdis1 : Disjoint _ (bound_var_fundefs B) (occurs_free_fundefs B :|: (occurs_free_fun_map fm \\ name_in_fundefs B)))
+            (Hdis1' : Disjoint _ (bound_var_fundefs B :|: bound_var_fun_map' fm) (image (apply_r sig) (occurs_free_fundefs B :|: occurs_free_fun_map fm)))
+
+            (Hdis2 : Disjoint _ S ((bound_var_fundefs B :|: bound_var_fun_map' fm):|: image (apply_r sig) (occurs_free_fundefs B :|: occurs_free_fun_map fm)))
             (Hdis3 : Disjoint _ (bound_var_fundefs B \\ name_in_fundefs B \\ funname_in_fundefs B) (Dom_map fm :|: funname_fun_map fm))
             (Hdis4 : Disjoint _ (funname_in_fundefs B) (bound_var_fun_map fm))            
             (Hfm : fun_map_vars fm S sig)
             (Hnames1 : NoDup (apply_r_list sig (all_fun_name B)))
-            (Hnames2 : Disjoint _ S (FromList (apply_r_list sig (all_fun_name B)))), 
+            (Hnames2 : Disjoint _ (S :|: (bound_var_fundefs B :|: bound_var_fun_map' fm)) (FromList (apply_r_list sig (all_fun_name B)))), 
         {{ fun _ s => fresh S (next_var (fst s)) }}
           beta_contract_fundefs St IH d sig0 sig fm B st
         {{ fun _ s B' s' =>
@@ -1148,23 +1153,26 @@ Section Inline_correct.
                    (forall rho1 rho2 k,
                        preord_env_P_inj cenv PG (occurs_free_fundefs B :|: name_in_fundefs B :|: FromList xs)
                                         k (apply_r sig <{ xs ~> xs' }>) rho1 rho2 ->
-                       Disjoint _ (bound_var e1) (Dom_map rho1) ->
-                       Disjoint _ (S \\ FromList xs') (image (apply_r sig <{ xs ~> xs' }>) (Dom_map rho1)) ->
                        fun_map_inv d (occurs_free_fundefs B :|: name_in_fundefs B :|: FromList xs) fm rho1 rho2 k (set_list (combine xs xs') sig) ->
                        preord_exp cenv P1 PG k (e1, rho1) (e2, rho2))) }}).
-
+  
   Proof.
     induction d as [d IHd] using lt_wf_rec1.
     exp_defs_induction IHe IHl IHB; intros; inv Hun; try rewrite beta_contract_eq.
     - (* constr *)
       eapply bind_triple. eapply pre_transfer_r. now eapply get_name_fresh. 
-      intros x w1. simpl. eapply pre_curry_l. intros Hf. 
+      intros x w1. simpl. eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros HinS. 
       eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHe with (S := S \\ [set x]).
       + eassumption.
       + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
         eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := [set v]). tci.
         eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
+        rewrite Setminus_Union_distr. now sets.
         eapply Disjoint_Singleton_r. eassumption.
+      + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+        eapply Disjoint_Included_r. eapply image_apply_r_set. eapply Union_Disjoint_r.
+        eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hdis2 ]. now sets. now sets.
+        rewrite Setminus_Union_distr. eapply Disjoint_Included; [| | eapply Hdis1' ]. now sets. now sets.
       + eapply Disjoint_Included_r.
         eapply Included_Union_compat. reflexivity.
         eapply image_apply_r_set. 
@@ -1195,7 +1203,7 @@ Section Inline_correct.
           eapply Included_trans. eapply Singleton_Included. eassumption. eapply Range_Subset. reflexivity.
           zify; omega.
         * eauto.
-        * intros r1 r2 k Henv Hdis Hdis' Hfm'. eapply preord_exp_constr_compat.
+        * intros r1 r2 k Henv Hfm'. eapply preord_exp_constr_compat.
           now eauto. now eauto.
           eapply Forall2_preord_var_env_map. eassumption. normalize_occurs_free. now sets.          
           intros. eapply Hsem. 
@@ -1206,21 +1214,13 @@ Section Inline_correct.
              eapply Forall2_Forall2_asym_included. eassumption.
           -- intros Hc. eapply Hdis2. constructor. eapply Hf. eapply Hf1. 
              right. normalize_occurs_free. rewrite !image_Union. left. right. eassumption.
-          -- repeat normalize_bound_var_in_ctx. rewrite !Dom_map_set at 1. 
-             eapply Union_Disjoint_r.
-             ++ eapply Disjoint_Singleton_r. eassumption.
-             ++ eapply Disjoint_Included; [| | eapply Hdis ]; xsets.
-          -- eapply Disjoint_Included_r. rewrite Dom_map_set. eapply image_apply_r_set.
-             rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. normalize_sets.
-             eapply Union_Disjoint_r. now sets. now sets. 
           -- eapply fun_map_inv_antimon. eapply fun_map_inv_set. eapply fun_map_inv_i_mon. eassumption. omega.
-             intros Hc. inv Hc. inv H2.
-             ++ eapply Hdis. normalize_bound_var. constructor. now right. eexists; eauto.
+             intros Hc. inv Hc.
+             ++ eapply Hdis1. normalize_bound_var. normalize_occurs_free. constructor. now right. eauto.
              ++ eapply Hdis3. constructor. normalize_bound_var. simpl. constructor. now right.
                 intros Hc. eapply H1. eapply funname_in_exp_subset. eassumption.
                 now left; eauto.
-             ++ intros Hc. eapply Hdis'. constructor; try eassumption.
-                eapply fresh_Range; [| eassumption ]. eassumption.
+             ++ intros Hc. eapply Hdis2. constructor; try eassumption. rewrite image_Union. do 2 right. eassumption.
              ++ normalize_occurs_free. rewrite !Union_assoc. rewrite Union_Setminus_Included; sets; tci.
     - (* Ecase [] *)
       simpl. eapply bind_triple.
@@ -1238,11 +1238,12 @@ Section Inline_correct.
         * repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
           eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
         * repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+          eapply Disjoint_Included; [| | eapply Hdis1' ]; sets.
+        * repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
           xsets.
         * repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
           eapply Disjoint_Included_l; [| eassumption ]. simpl. rewrite Setminus_Union_distr.
-          eapply Included_Union_preserv_l. rewrite <- Setminus_Union. eapply Included_Setminus; [| sets ].
-
+          eapply Included_Union_preserv_l. rewrite <- Setminus_Union. eapply Included_Setminus; [| sets ].          
           eapply Disjoint_Included; [| | eapply H5 ].
           eapply Included_trans; [| eapply funname_in_exp_subset ]. now sets. now sets.
         * sets.
@@ -1260,6 +1261,8 @@ Section Inline_correct.
           -- eassumption.
           -- repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
              eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
+          -- repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+             eapply Disjoint_Included; [| | eapply Hdis1' ]; sets.
           -- repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
              xsets.
           -- repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
@@ -1297,26 +1300,26 @@ Section Inline_correct.
              ** intros. eapply Hrel.
                 --- eapply preord_env_P_inj_monotonic; [| eapply preord_env_P_inj_antimon; [ eassumption | ]].
                     omega. normalize_occurs_free. sets.
-                --- repeat normalize_bound_var_in_ctx. sets.
-                --- sets.
                 --- eapply fun_map_inv_antimon. eapply fun_map_inv_mon. eapply fun_map_inv_i_mon. eassumption.
                     omega. omega. normalize_occurs_free. sets.
-             ** eapply H8.                
+             ** eapply H8.
                 --- eapply preord_env_P_inj_monotonic; [| eapply preord_env_P_inj_antimon; [ eassumption | ]].
                     omega. normalize_occurs_free. sets.
-                --- repeat normalize_bound_var_in_ctx. sets.
-                --- sets.
                 --- eapply fun_map_inv_antimon. eapply fun_map_inv_mon. eapply fun_map_inv_i_mon. eassumption.
                     omega. omega. normalize_occurs_free. sets.
     - (* Eproj *)
       eapply bind_triple. eapply pre_transfer_r. now eapply get_name_fresh. 
-      intros x w1. simpl. eapply pre_curry_l. intros Hf. 
+      intros x w1. simpl. eapply pre_curry_l. intros Hf.  eapply pre_curry_l. intros Hsin.
       eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHe with (S := S \\ [set x]).
       + eassumption.
       + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
         eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := [set v]). tci.
-        eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
+        eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; sets. rewrite Setminus_Union_distr. sets.
         eapply Disjoint_Singleton_r. eassumption.
+      + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+        eapply Disjoint_Included_r. eapply image_apply_r_set. eapply Union_Disjoint_r.
+        eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hdis2 ]. now sets. now sets.
+        rewrite Setminus_Union_distr. eapply Disjoint_Included; [| | eapply Hdis1' ]. now sets. now sets.  
       + eapply Disjoint_Included_r.
         eapply Included_Union_compat. reflexivity.
         eapply image_apply_r_set. 
@@ -1346,7 +1349,7 @@ Section Inline_correct.
           eapply Included_trans. eapply Singleton_Included. eassumption. eapply Range_Subset. reflexivity.
           zify; omega.
         * eauto.
-        * intros r1 r2 k Henv Hdis Hdis' Hfm'. eapply preord_exp_proj_compat.
+        * intros r1 r2 k Henv Hfm'. eapply preord_exp_proj_compat.
           now eauto. now eauto. eapply Henv. now constructor.
           intros. eapply Hsem. 
           rewrite apply_r_set_f_eq. eapply preord_env_P_inj_set_alt.
@@ -1355,21 +1358,13 @@ Section Inline_correct.
           -- eassumption.
           -- intros Hc. eapply Hdis2. constructor. eapply Hf. eapply Hf1. 
              right. normalize_occurs_free. rewrite !image_Union. left. right. eassumption.
-          -- repeat normalize_bound_var_in_ctx. rewrite !Dom_map_set at 1. 
-             eapply Union_Disjoint_r.
-             ++ eapply Disjoint_Singleton_r. eassumption.
-             ++ eapply Disjoint_Included; [| | eapply Hdis ]; xsets.
-          -- eapply Disjoint_Included_r. rewrite Dom_map_set. eapply image_apply_r_set.
-             rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. normalize_sets.
-             eapply Union_Disjoint_r. now sets. now sets. 
           -- eapply fun_map_inv_antimon. eapply fun_map_inv_set. eapply fun_map_inv_i_mon. eassumption. omega.
-             intros Hc. inv Hc. inv H2.
-             ++ eapply Hdis. normalize_bound_var. constructor. now right. eexists; eauto.
+             intros Hc. inv Hc. 
+             ++ eapply Hdis1. normalize_bound_var. constructor. now right. now right; eauto.
              ++ eapply Hdis3. constructor. normalize_bound_var. simpl. constructor. now right.
                 intros Hc. eapply H1. eapply funname_in_exp_subset. eassumption.
                 now left; eauto.
-             ++ intros Hc. eapply Hdis'. constructor; try eassumption.
-                eapply fresh_Range; [| eassumption ]. eassumption.
+             ++ intros Hc. eapply Hdis2. constructor. eassumption. rewrite image_Union. do 2 right. eassumption.
              ++ normalize_occurs_free. rewrite !Union_assoc. rewrite Union_Setminus_Included; sets; tci.
     - (* Eletapp *)
       simpl. Opaque beta_contract.  destruct (update_letApp St IH (apply_r sig f) ft (apply_r_list sig ys) st).
@@ -1378,13 +1373,17 @@ Section Inline_correct.
       end.
       assert (Hsame : Lemm).
       { unfold Lemm. eapply bind_triple. eapply pre_transfer_r. eapply get_name_fresh. intros x' w1.
-        simpl. eapply pre_curry_l. intros Hf. 
+        simpl. eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros HSin.
         eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHe with (S := S \\ [set x']).
         - eassumption.
         - repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
           eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := [set x]). tci.
           eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
-          eapply Disjoint_Singleton_r. eassumption.
+          rewrite Setminus_Union_distr. now sets. eapply Disjoint_Singleton_r. eassumption.
+        - repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+          eapply Disjoint_Included_r. eapply image_apply_r_set. eapply Union_Disjoint_r.
+          eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hdis2 ]. now sets. now sets.
+          rewrite Setminus_Union_distr. eapply Disjoint_Included; [| | eapply Hdis1' ]. now sets. now sets.
         - repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
           eapply Disjoint_Included_r.
           eapply Included_Union_compat. reflexivity.
@@ -1415,7 +1414,7 @@ Section Inline_correct.
             eapply Included_trans. eapply Singleton_Included. eassumption. eapply Range_Subset. reflexivity.
             zify; omega.
           * simpl; eauto.
-          * intros r1 r2 k Henv Hdis Hdis' Hfm'. eapply preord_exp_letapp_compat.
+          * intros r1 r2 k Henv Hfm'. eapply preord_exp_letapp_compat.
             now eauto. now eauto. now eauto.
             eapply Henv. econstructor. now left.
             eapply Forall2_preord_var_env_map. eassumption. normalize_occurs_free. now sets.          
@@ -1426,21 +1425,14 @@ Section Inline_correct.
             -- eassumption.
             -- intros Hc. eapply Hdis2. constructor. eapply Hf. eapply Hf1. 
                right. normalize_occurs_free. rewrite !image_Union. left. right. eassumption.
-            -- repeat normalize_bound_var_in_ctx. rewrite !Dom_map_set at 1. 
-               eapply Union_Disjoint_r.
-               ++ eapply Disjoint_Singleton_r. eassumption.
-               ++ eapply Disjoint_Included; [| | eapply Hdis ]; xsets.
-          -- eapply Disjoint_Included_r. rewrite Dom_map_set. eapply image_apply_r_set.
-             rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. normalize_sets.
-             eapply Union_Disjoint_r. now sets. now sets. 
           -- eapply fun_map_inv_antimon. eapply fun_map_inv_set. eapply fun_map_inv_i_mon. eassumption. omega.
-             intros Hc. inv Hc. inv H2.
-             ++ eapply Hdis. normalize_bound_var. constructor. now right. eexists; eauto.
+             intros Hc. inv Hc.
+             ++ eapply Hdis1. constructor. normalize_bound_var. now right. right; eassumption.
              ++ eapply Hdis3. constructor. normalize_bound_var. simpl. constructor. now right.
                 intros Hc. eapply H1. eapply funname_in_exp_subset. eassumption.
                 now left; eauto.
-             ++ intros Hc. eapply Hdis'. constructor; try eassumption.
-                eapply fresh_Range; [| eassumption ]. eassumption.
+             ++ intros Hc. eapply Hdis2. constructor. eassumption. rewrite image_Union.
+                do 2 right. eassumption.
              ++ normalize_occurs_free. rewrite !Union_assoc. rewrite Union_Setminus_Included; sets; tci. }
         
       destruct b. 
@@ -1449,18 +1441,30 @@ Section Inline_correct.
           destruct (Datatypes.length l =? Datatypes.length ys)%nat eqn:Hlen; [| eassumption ]. 
           eapply beq_nat_true in Hlen.
           eapply bind_triple. eapply pre_transfer_r. now eapply get_name_fresh. 
-          intros z w. simpl. eapply pre_curry_l. intros Hfx. 
+          intros z w. simpl. eapply pre_curry_l. intros Hfx. eapply pre_curry_l. intros HSin. 
           { edestruct Hfm. eassumption. destructAll. eapply bind_triple.
             - do 2 eapply frame_rule. eapply pre_transfer_r. eapply IHd.
               + omega.
               + eassumption.
-              + sets.
-              + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+              + eapply Union_Disjoint_r. sets. admit.
+              + eapply Disjoint_Included_r. eapply image_apply_r_set_list. unfold apply_r_list. rewrite map_length. eassumption.
+                eapply Union_Disjoint_r.
+                * eapply Disjoint_Included; [ | | eapply Hdis1' ].
+                  rewrite FromList_apply_list. normalize_occurs_free. rewrite !image_Union. now sets.
+                  eapply Union_Included; [| now sets ].
+                  eapply Included_Union_preserv_r.
+                  eapply Included_trans; [| eapply bound_var_fun_map_get'; eauto ]. sets.
+                * eapply Disjoint_Included; [| | eapply Hdis1' ]. rewrite image_Union.
+                  eapply Included_Union_preserv_r. eapply image_monotonic. rewrite Setminus_Union_distr. 
+                  eapply Union_Included; [| now sets ]. eapply occurs_free_fun_map_get; eauto.
+                  eapply Union_Included; [| now sets ]. eapply Included_Union_preserv_r.
+                  eapply Included_trans; [| eapply bound_var_fun_map_get'; eauto ]. now sets.
+              + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. eapply Union_Disjoint_r.
+                eapply Union_Disjoint_r. now sets. clear H7. now sets.
                 eapply Disjoint_Included_r.
-                eapply Included_Union_compat. reflexivity.
                 eapply image_apply_r_set_list. unfold apply_r_list. rewrite map_length. eassumption. 
-                eapply Union_Disjoint_r. now sets.
-                eapply Union_Disjoint_r. rewrite FromList_apply_list.
+                eapply Union_Disjoint_r.
+                rewrite FromList_apply_list.
                 eapply Disjoint_Included; [| | eapply Hdis2 ]; [| now sets ]. rewrite !image_Union. now sets.
                 
                 rewrite !Setminus_Union_distr. rewrite image_Union. eapply Union_Disjoint_r.
@@ -1484,24 +1488,41 @@ Section Inline_correct.
               { intros. destructAll.
                 assert (Hfr' : fresh (S \\ [set z] \\ bound_var ei) (next_var (fst s0))).
                 { intros u Hleq'. constructor. eapply H8; eauto.
-                  intros Hnin. eapply H12 in Hnin. unfold Ensembles.In, Range in Hnin. zify. omega. }  
-                eapply (conj H14 (conj H13 (conj H11 (conj H10 (conj H8 (conj H9 (conj H12 Hfr'))))))). }
+                  intros Hnin. eapply H12 in Hnin. unfold Ensembles.In, Range in Hnin. zify. omega. }
+                assert (Hbv : bound_var ei \subset S \\ [set z]).
+                { eapply Included_trans. eassumption. intros y Hin. unfold Ensembles.In, Range in *. inv Hin.
+                  eapply Hfz. eassumption. }
+                
+                eapply (conj Hbv (conj H14 (conj H13 (conj H11 (conj H10 (conj H8 (conj H9 (conj H12 Hfr')))))))). }
 
+              eapply pre_curry_l. intros Hbv. 
               eapply pre_curry_l. intros Hrel. eapply pre_curry_l. intros Hcase. eapply pre_curry_l. intros Hfv. eapply pre_curry_l. intros Hun.
               
-              assert (Hdisr : Disjoint var (S \\ [set z] \\ bound_var ei) [set r]).
+              assert (Hdisr : Disjoint var (S \\ [set z] \\ bound_var ei :|: (bound_var e :|: bound_var_fun_map' fm)) [set r]).
               { edestruct inline_letapp_var_eq. eassumption.
-                * subst. sets.
-                * repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
-                  inv H8. eapply Disjoint_Included_r. eapply Singleton_Included. eassumption. sets.
-                  eapply Disjoint_Included_r. eapply Included_trans. eapply Singleton_Included. eassumption.
-                  eassumption.
-                  eapply Disjoint_Included_r. eapply image_apply_r_set_list. unfold apply_r_list. rewrite map_length. now eauto.
-                  rewrite !Setminus_Union_distr, image_Union.
-                  eapply Union_Disjoint_r; [| eapply Union_Disjoint_r ].
-                  rewrite FromList_apply_list.
-                  eapply Disjoint_Included; [| | eapply Hdis2 ]; sets. now sets.
-                  eapply Disjoint_Included; [| | eapply Hdis2 ]; sets. }
+                - subst. eapply Union_Disjoint_l. now sets. eapply Disjoint_sym.
+                  eapply Disjoint_Included_l. eapply Singleton_Included. eapply HSin.
+                  repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+                  eapply Disjoint_Included_r; [ | eapply Hdis2 ]. now sets. 
+                - repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+                  inv H8.
+                  + eapply Disjoint_Included_r. eapply Singleton_Included. eassumption. eapply Union_Disjoint_l.
+                    * sets.
+                    * eapply Disjoint_Included_r. eassumption. eapply Disjoint_sym.
+                      eapply Disjoint_Included; [ | | eapply Hdis2 ]. now sets. now sets.
+                  + eapply Disjoint_Included_r. eapply Included_trans. eapply Singleton_Included. eassumption.
+                    eassumption.
+                    eapply Disjoint_Included_r. eapply image_apply_r_set_list. unfold apply_r_list. rewrite map_length. now eauto.
+                    rewrite !Setminus_Union_distr, image_Union.
+                    eapply Union_Disjoint_r; [| eapply Union_Disjoint_r ].
+                    rewrite FromList_apply_list.
+                    eapply Union_Disjoint_l. eapply Disjoint_Included; [| | eapply Hdis2 ]; now sets.
+                    eapply Disjoint_Included; [| | eapply Hdis1' ]; now sets.
+                    eapply Union_Disjoint_l. now sets.
+                    eapply Disjoint_Included; [| | eapply Hdis1' ]. rewrite image_Union. eapply Included_Union_preserv_r.
+                    eapply image_monotonic. eapply occurs_free_fun_map_get; eauto. now sets. 
+                    eapply Union_Disjoint_l.  eapply Disjoint_Included; [| | eapply Hdis2 ]; now sets.
+                     eapply Disjoint_Included; [| | eapply Hdis1' ]; now sets. }
               
               eapply bind_triple.
               + do 3 eapply frame_rule.
@@ -1510,15 +1531,17 @@ Section Inline_correct.
                   + eassumption.
                   + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
                     eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := [set x]). tci.
-                    eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
+                    eapply Union_Disjoint_r. rewrite Setminus_Union_distr. now eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
                     eapply Disjoint_Singleton_r. eassumption.
                   + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
                     eapply Disjoint_Included_r.
-                    eapply Included_Union_compat. reflexivity.
-                    eapply image_apply_r_set. rewrite !Union_assoc. rewrite (Union_commut _ [set r]).
-                    rewrite <- !Union_assoc. eapply Union_Disjoint_r. now sets. 
-                    rewrite Setminus_Union_distr. eapply Disjoint_Included; [| | eapply Hdis2 ]; sets.
-                    (* rewrite !image_Union. now eapply Union_Included; sets. *)
+                    eapply image_apply_r_set. eapply Union_Disjoint_r. now sets.
+                    eapply Disjoint_Included; [| | eapply Hdis1' ]. rewrite Setminus_Union_distr. now sets. now sets.
+                  + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+                    eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis2 ]; now sets.
+                    eapply Disjoint_Included_r.
+                    eapply image_apply_r_set. eapply Union_Disjoint_r. now sets.
+                    eapply Disjoint_Included; [| | eapply Hdis2 ]. rewrite Setminus_Union_distr. now sets. now sets.
                   + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
                     eapply Disjoint_Included_l; [| eapply Hdis3 ]. simpl. rewrite Setminus_Union_distr. xsets.
                   + sets.
@@ -1552,7 +1575,7 @@ Section Inline_correct.
                      eapply image_apply_r_set_list. unfold apply_r_list. rewrite map_length. eassumption.
                      normalize_occurs_free. rewrite Setminus_Union_distr, !image_Union. eapply Union_Included.
                      rewrite FromList_apply_list. now sets.
-                     eapply Union_Included; [| now sets ]. SearchAbout e0. eapply Included_trans.
+                     eapply Union_Included; [| now sets ]. eapply Included_trans.
                      eapply image_monotonic. eapply occurs_free_fun_map_get. eassumption. sets.
                   -- eapply Included_trans. eapply Included_Setminus_compat.
                      eapply Included_trans. eassumption. eapply image_apply_r_set. reflexivity.
@@ -1572,7 +1595,7 @@ Section Inline_correct.
                   -- eassumption.
                   -- eassumption.
                   -- eauto.
-                  -- simpl. intros. edestruct H21 with (f0 := f). constructor. now left. eassumption. eassumption.
+                  -- simpl. intros. edestruct H19 with (f0 := f). constructor. now left. eassumption. eassumption.
                      destructAll. do 2 subst_exp. eapply Hrel.
                      ++ edestruct preord_env_P_inj_get_list_l. now eapply H18. normalize_occurs_free. now sets.
                         eassumption. destructAll.                           
@@ -1580,34 +1603,18 @@ Section Inline_correct.
                         eapply preord_env_P_inj_monotonic; [| eassumption ]. omega.
                         eapply List_util.Forall2_monotonic; [| eassumption ].
                         intros. eapply preord_val_monotonic. eassumption. omega.
-                     ++ erewrite Dom_map_set_lists with (rho' := rhoc') at 1; [| eassumption ].
-                        rewrite Dom_map_def_funs.
-                        eapply Union_Disjoint_r.
-                        now eapply Disjoint_Included; [| | eapply H2 ]; sets. xsets.
-                     ++ rewrite Dom_map_set_lists; eauto. eapply Disjoint_Included_r.
-                        eapply image_apply_r_set_list. unfold apply_r_list. rewrite map_length. now eauto.
-                        rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. repeat normalize_sets.
-                        eapply Union_Disjoint_r.
-                        ** eapply Disjoint_Included; [| | eapply Hdis2 ].
-                           normalize_occurs_free. rewrite image_Union. rewrite FromList_apply_list. now sets. now sets.
-                        ** eapply Disjoint_Included_r. eapply image_monotonic. eapply Included_Setminus_compat.
-                           eapply Dom_map_sub_map. eassumption. reflexivity. sets.
                      ++ eapply fun_map_inv_antimon. eapply fun_map_inv_set_lists; [ | | | eassumption ].
                         ** eapply fun_map_inv_sig_extend_Disjoint. rewrite <- fun_map_inv_eq in *.
-                           eapply fun_map_inv_i_mon. eassumption. omega. 
-                           rewrite Dom_map_def_funs. sets.
+                           eapply fun_map_inv_i_mon. eassumption. omega. admit.
+                           (* SearchAbout l. eapply Disjoint_Included; [| | eapply Hdis1 ]. sets.  *)
+                           (* sets. rewrite Dom_map_def_funs. sets. *)
                         ** eassumption.
-                        ** rewrite Dom_map_def_funs. eapply Union_Disjoint_r. now sets. 
-                           clear H32. xsets.
+                        ** eapply Union_Disjoint_r. admit.
+                           clear H29. xsets.
                         ** rewrite Union_Setminus_Included. sets. tci. sets.
-                  -- intros. edestruct H21 with (f0 := f). constructor. now left. eassumption. eassumption.
+                  -- intros. edestruct H19 with (f0 := f). constructor. now left. eassumption. eassumption.
                      destructAll. subst_exp. eapply H17.
                      ++ rewrite apply_r_set_f_eq. eassumption.
-                     ++ rewrite H28. eapply Union_Disjoint_r. sets. repeat normalize_bound_var_in_ctx. sets. 
-                     ++ rewrite H28. eapply Disjoint_Included_r.
-                        eapply image_apply_r_set. rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set. normalize_sets. 
-                        eapply Union_Disjoint_r. eassumption.
-                        eapply Disjoint_Included; [ | | eapply H20 ]; sets.
                      ++ eapply fun_map_inv_antimon.
                         2:{ eapply Included_trans. eapply Included_Union_Setminus with (s2 := [set x]); tci.
                             rewrite Union_commut. reflexivity. }
@@ -1615,23 +1622,20 @@ Section Inline_correct.
                         ** eapply fun_map_inv_env_eq_P.
                            eapply fun_map_inv_antimon. eapply fun_map_inv_mon.
                            eapply fun_map_inv_i_mon. eassumption. omega. omega. normalize_occurs_free. now sets.
-
-                           eapply eq_env_P_refl. eapply sub_map_refl. 
                            
+                           eapply eq_env_P_refl. 
                            eapply eq_env_P_antimon. eassumption.
                            normalize_bound_var_ctx. normalize_sets. intros y Hin Hin'.
                            eapply bound_var_inline_letapp in Hin'; [| eassumption ]. eapply Hdis2.
                            constructor. 2:{ right. rewrite image_Union. right. eassumption. }
-                           inv Hin'. inv H30.
+                           inv Hin'. inv H28.
                            eapply Hfx. unfold Ensembles.In, Range in *. zify; omega.
-                           eapply H10 in H30. eapply Hfx. unfold Ensembles.In, Range in *. zify; omega.
-                        ** eapply eq_env_P_sub_map. eassumption. intros Hc. eapply H19. constructor. now constructor.
-                           eassumption.
+                           eapply H10 in H28. eapply Hfx. unfold Ensembles.In, Range in *. zify; omega.
                         ** eassumption.
                         ** intros Hc. eapply Hdis3. constructor. 2:{ now left; eauto. }
                            normalize_bound_var. simpl. rewrite Setminus_Union_distr. right.
                            constructor. reflexivity. intros Hc1. eapply H1. eapply funname_in_exp_subset. eassumption.
-                        ** intros Hc. eapply H19; eauto.
+                        ** intros Hc. eapply Hdis1. constructor. now constructor. now eauto.
                         ** intros Hc. inv Hc; eauto.
                   -- eassumption.
                   -- normalize_bound_var_ctx. normalize_sets.
@@ -1639,8 +1643,8 @@ Section Inline_correct.
                      eapply Disjoint_Included; [| | eapply Hdis2 ]. normalize_occurs_free. rewrite image_Union. now sets.
                      eapply Union_Included. intros u Hc. inv Hc. eapply Hfx. unfold Ensembles.In, Range in *. zify; omega.
                      intros u Hc. eapply H10 in Hc. unfold Ensembles.In, Range in *. eapply Hfx. zify; omega.
-                  -- intros Hc. eapply H20. constructor; [| eassumption ].
-                     eapply Hfx. unfold Ensembles.In, Range in *. zify; omega.
+                  -- intros Hc. eapply Hdis1'. normalize_occurs_free. normalize_bound_var.
+                     constructor. now eauto. rewrite !image_Union. now eauto.
              + eapply post_weakening. 
                 2:{ eapply pre_transfer_r. eapply pre_strenghtening. 2:{
                       eapply post_weakening; [| eassumption ]. simpl. intros.
@@ -1682,22 +1686,33 @@ Section Inline_correct.
       assert (Hnd' := NoDup_all_fun_name _ H2).
       assert (Hseq :  apply_r_list (set_list (combine (all_fun_name f2) xs) sig) (all_fun_name f2) = xs).
       { rewrite apply_r_list_eq. reflexivity. now eauto. now eauto. }
-
+      eapply pre_curry_l. intros Hin. 
       eapply bind_triple. 
       { do 2 eapply frame_rule. eapply IHB with (S := S \\ FromList xs).
         - eassumption.
-        - repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
-          eapply Disjoint_Included; [| | eapply Hdis1 ]; try now sets.
-        - repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx. 
-          rewrite image_Union in Hdis2. eapply Union_Disjoint_r. now sets.
-          eapply Disjoint_Included_r. eapply image_apply_r_set_list. now eauto.
-          rewrite <- Same_set_all_fun_name. rewrite !Setminus_Union_distr. rewrite !image_Union. 
-          repeat (eapply Union_Disjoint_r; sets).
-          now xsets. now xsets.
-          eapply Disjoint_Included_r. eapply image_monotonic.
-          eapply Included_Setminus_compat. eapply occurs_free_fun_map_add_fundefs. reflexivity.
-          rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. repeat normalize_sets.
-          rewrite image_Union. xsets.
+        - repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx. eapply Union_Disjoint_r.
+          eapply Disjoint_Included; [| | eapply Hdis1 ]; now sets.
+          eapply Disjoint_Included_r. eapply Included_Setminus_compat. eapply occurs_free_fun_map_add_fundefs. reflexivity.
+          rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. normalize_sets. 
+          eapply Disjoint_Included; [| | eapply Hdis1 ]; now sets.
+        - eapply Disjoint_Included.
+          + eapply Included_trans. eapply image_apply_r_set_list. now eauto.
+            rewrite <- Same_set_all_fun_name. rewrite !Setminus_Union_distr. eapply Included_Union_compat. reflexivity.
+            eapply image_monotonic. eapply Included_Union_compat. reflexivity. eapply Included_Setminus_compat.
+            eapply occurs_free_fun_map_add_fundefs. reflexivity.
+          + eapply Included_Union_compat. reflexivity. eapply bound_var_fun_map_add_fundefs_un'. eassumption.
+          + rewrite !Setminus_Union_distr. rewrite !Setminus_Same_set_Empty_set. repeat normalize_sets. eapply Union_Disjoint_r.
+            * eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hdis2 ]. normalize_bound_var. now sets. eassumption.
+            * eapply Disjoint_Included; [| | eapply Hdis1' ]. normalize_occurs_free. eapply image_monotonic. now sets.
+              normalize_bound_var. now sets.
+        - repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx. eapply Union_Disjoint_r.
+          + eapply Union_Disjoint_r. sets. eapply Disjoint_Included_r. eapply bound_var_fun_map_add_fundefs_un'. eassumption. xsets.
+          + eapply Disjoint_Included_r. eapply image_apply_r_set_list. now eauto.
+            rewrite <- Same_set_all_fun_name. rewrite !Setminus_Union_distr. rewrite !image_Union. 
+            repeat (eapply Union_Disjoint_r; sets).
+            now xsets.
+            eapply Disjoint_Included_r. eapply image_monotonic. eapply Included_Setminus_compat. eapply occurs_free_fun_map_add_fundefs. reflexivity.
+            rewrite !Setminus_Union_distr.  rewrite !Setminus_Same_set_Empty_set. repeat normalize_sets. now xsets.
         - repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
           rewrite Dom_map_add_fundefs. eapply Union_Disjoint_r.
           + eapply Union_Disjoint_r. now sets.
@@ -1711,7 +1726,9 @@ Section Inline_correct.
           + now sets.
         - eassumption.
         - rewrite Hseq. eassumption.
-        - rewrite Hseq. sets. }
+        - rewrite Hseq. eapply Union_Disjoint_l. now sets.
+          eapply Disjoint_Included_r. eassumption. eapply Disjoint_sym. eapply Disjoint_Included_r; [| eapply Hdis2 ]. normalize_bound_var.
+          eapply Union_Included. now sets. eapply Included_trans. eapply bound_var_fun_map_add_fundefs_un'. eassumption. sets. }
 
       intros fds' w'. simpl.
       eapply pre_curry_l. intros Hsub. eapply pre_curry_l. intros Hr. 
@@ -1721,18 +1738,36 @@ Section Inline_correct.
             + eassumption.
             + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
               * eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := name_in_fundefs f2). now tci.
-                eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; now sets.
+                eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; try now sets.
+                rewrite Setminus_Union_distr. eapply Union_Included. now sets.  eapply Included_trans.
+                eapply Included_Setminus_compat. eapply occurs_free_fun_map_add_fundefs. reflexivity.
+                rewrite !Setminus_Union_distr. rewrite !Setminus_Same_set_Empty_set. repeat normalize_sets. now sets.
                 eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs. now sets.
             + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
-              eapply Union_Disjoint_r. now sets. eapply Disjoint_Included_r.
-              eapply image_apply_r_set_list. now eauto.
-              rewrite image_Union in Hdis2. eapply Union_Disjoint_r. now xsets.
-              rewrite <- Same_set_all_fun_name.
-              rewrite !Setminus_Union_distr. rewrite image_Union. eapply Union_Disjoint_r. now xsets.
-              eapply Disjoint_Included_r. eapply image_monotonic.
-              eapply Included_Setminus_compat. eapply occurs_free_fun_map_add_fundefs. reflexivity.
-              rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. repeat normalize_sets.
-              rewrite image_Union. xsets.
+              eapply Disjoint_Included_l. eapply Included_Union_compat. reflexivity. eapply bound_var_fun_map_add_fundefs_un'. eassumption. 
+              eapply Disjoint_Included_r. 
+              eapply image_apply_r_set_list. now eauto. eapply Union_Disjoint_r.
+              * eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hdis2 ]. now sets. eassumption.
+              * rewrite <- Same_set_all_fun_name. rewrite Setminus_Union_distr.
+                rewrite image_Union. eapply Union_Disjoint_r.
+                eapply Disjoint_Included; [| | eapply Hdis1' ]. now sets. now sets.
+                eapply Disjoint_Included_r. eapply image_monotonic. eapply Included_Setminus_compat.
+                eapply occurs_free_fun_map_add_fundefs. reflexivity.
+                rewrite !Setminus_Union_distr. rewrite !Setminus_Same_set_Empty_set. repeat normalize_sets.
+                eapply Disjoint_Included; [| | eapply Hdis1' ]. now sets. now sets.
+            + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. eapply Union_Disjoint_r. eapply Union_Disjoint_r. 
+              now sets.
+              eapply Disjoint_Included_r. eapply bound_var_fun_map_add_fundefs_un'. eassumption. now xsets.
+              eapply Disjoint_Included_r. 
+              eapply image_apply_r_set_list. now eauto. eapply Union_Disjoint_r.
+              * now sets.
+              * rewrite <- Same_set_all_fun_name. rewrite Setminus_Union_distr.
+                rewrite image_Union. eapply Union_Disjoint_r.
+                eapply Disjoint_Included; [| | eapply Hdis2 ]. now sets. now sets.
+                eapply Disjoint_Included_r. eapply image_monotonic. eapply Included_Setminus_compat.
+                eapply occurs_free_fun_map_add_fundefs. reflexivity.
+                rewrite !Setminus_Union_distr. rewrite !Setminus_Same_set_Empty_set. repeat normalize_sets.
+                eapply Disjoint_Included; [| | eapply Hdis2 ]. now sets. now sets.
             + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
               rewrite Dom_map_add_fundefs. eapply Union_Disjoint_r.
               * eapply Union_Disjoint_r.
@@ -1792,7 +1827,7 @@ Section Inline_correct.
               eapply Included_trans. eassumption. eapply Range_Subset; zify; omega. 
         -- eapply Included_trans. eassumption. eapply Range_Subset. zify; omega. reflexivity.
       * eauto.
-      * intros k rho1 rho2 Henv Hdis Hdis' Hfm''. eapply preord_exp_fun_compat.
+      * intros k rho1 rho2 Henv Hfm''. eapply preord_exp_fun_compat.
         now eauto. now eauto.
         assert (Hrel : preord_env_P_inj cenv PG
                                         (name_in_fundefs f2 :|: occurs_free (Efun f2 e)) 
@@ -1822,62 +1857,44 @@ Section Inline_correct.
                    eapply Union_Disjoint_l. now sets. rewrite <- Same_set_all_fun_name.
                    eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hdis2 ].
                    normalize_occurs_free. now xsets. now sets.
-              * rewrite Dom_map_set_lists; [| now eauto ]. rewrite Dom_map_def_funs.
-                eapply Union_Disjoint_r. eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption.
-                eapply Union_Disjoint_r. eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption.
-                eapply Disjoint_Included_l; [| eapply Hdis ]. normalize_bound_var. eapply Included_Union_preserv_l.
-                eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs ]; [| eapply find_def_correct; eassumption ]. sets.
-              * eapply Disjoint_Included_r. rewrite Dom_map_set_lists; eauto. rewrite Dom_map_def_funs.
-                eapply image_extend_lst_Included. eassumption. eapply Union_Disjoint_r; [| now sets ].
-                eapply Disjoint_Included_r. eapply image_apply_r_set_list. now auto. rewrite <- Same_set_all_fun_name.
-                rewrite !Setminus_Union_distr, Setminus_Same_set_Empty_set. repeat normalize_sets.
-                eapply Union_Disjoint_r. now sets.
-                rewrite (Setminus_Union _ (FromList ys1)). rewrite (Union_commut (FromList ys1)). rewrite <- Setminus_Union. 
-                rewrite Setminus_Same_set_Empty_set. repeat normalize_sets. xsets.
-              * eapply fun_map_inv_antimon. eapply fun_map_inv_set_lists; [ | | | now eauto ].
+              * assert (Hdisys : Disjoint positive (FromList ys1)
+                                          (occurs_free_fundefs f2 :|: name_in_fundefs f2
+                                                               :|: occurs_free_fun_map fm)).
+                { rewrite Union_commut. rewrite Union_assoc. eapply Union_Disjoint_r.
+                  - eapply Disjoint_Included_l.                          
+                    eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eapply Hfind ]. now sets.
+                    eapply Disjoint_Included; [| | eapply Hdis1 ]. normalize_occurs_free. now sets. normalize_bound_var. now sets.
+                  - eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption. }
+                eapply fun_map_inv_antimon. eapply fun_map_inv_set_lists; [ | | | now eauto ].
                 eapply fun_map_inv_set_lists_r; [| | now eauto ]. 
                 -- rewrite <- Hseq. rewrite <- H13. eapply fun_map_inv_sig_extend_Disjoint.
                    eapply fun_map_inv_def_funs.
                    eapply fun_map_inv_i_mon. eassumption. omega. eapply preord_env_P_inj_antimon.
-                   rewrite H13. rewrite Hseq. eapply IHi. eassumption. omega. normalize_occurs_free. sets.
+                   rewrite H13. rewrite Hseq. eapply IHi. eassumption. omega. normalize_occurs_free. now sets.
                    eassumption. normalize_occurs_free. now sets.
-                   repeat normalize_bound_var_in_ctx. now sets.
-                   eapply Disjoint_Included; [ | | eapply Hdis' ]. now sets.
-                   rewrite Same_set_all_fun_name, H13, Hseq. 
-                   eapply Included_trans. eassumption. 
-                   intros z Hin. eapply Hf. unfold Range, Ensembles.In in Hin. zify. omega.
-
-                   rewrite Dom_map_def_funs. eapply Union_Disjoint_r.
-                   eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption.
-                   eapply Disjoint_Included_l; [| eassumption ].
-                   normalize_bound_var. eapply Included_Union_preserv_l.
-                   eapply Included_trans; [|  eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eassumption ].
-                   now sets.
+                   eapply Disjoint_Included; [| | eapply Hdis1 ]. now sets. normalize_bound_var.
+                   eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. now sets. 
+                   
+                   rewrite Same_set_all_fun_name, H13, Hseq. eapply Disjoint_Included ; [| | eapply Hdis2 ]. now sets. eassumption.
+                   admit. 
                 -- rewrite image_f_eq_subdomain.
                    2:{ rewrite apply_r_set_list_f_eq. eapply f_eq_subdomain_extend_lst_Disjoint.
-                       rewrite Dom_map_def_funs. eapply Union_Disjoint_r.
-                       eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption.
-                       eapply Disjoint_Included_l; [| eassumption ]. normalize_bound_var. eapply Included_Union_preserv_l.
-                       eapply Included_trans; [|  eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eassumption ].
-                       now sets. }
-                   eapply Disjoint_Included_l. eassumption.
+                       eapply Disjoint_Included_r. eapply occurs_free_fun_map_add_fundefs. eassumption. }
                    eapply Disjoint_Included_r. 
                    eapply image_apply_r_set_list. now eauto. eapply Union_Disjoint_r. 
-                   now sets.
-                   eapply Disjoint_Included; [| | eapply Hdis' ]. rewrite <- Same_set_all_fun_name.
-                   rewrite Dom_map_def_funs. rewrite !Setminus_Union_distr. rewrite image_Union. eapply Union_Included.
-                   now sets. now sets. now sets.
+                   eapply Disjoint_Included_l. eassumption. now sets.
+                   rewrite <- Same_set_all_fun_name. eapply Disjoint_Included_l. eassumption. eapply Disjoint_Included_r.
+                   eapply image_monotonic. eapply Included_Setminus_compat. eapply occurs_free_fun_map_add_fundefs. reflexivity.
+                   rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. repeat normalize_sets.
+                   eapply Disjoint_Included; [| | eapply Hdis2 ]. normalize_occurs_free. now sets. now sets.
                 -- eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption.
-                -- eapply Disjoint_Included_r. eapply Included_Union_compat.
-                   eapply Dom_map_def_funs. eapply Dom_map_add_fundefs.
-                   edestruct unique_bindings_fun_in_fundefs. eapply find_def_correct. eapply Hfind. eassumption. destructAll. 
-                   eapply Union_Disjoint_r. eapply Union_Disjoint_r. now sets. 
-                   eapply Disjoint_Included_l; [| eassumption ]. normalize_bound_var. eapply Included_Union_preserv_l. 
-                   eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eapply Hfind ]. now sets.                   
-                   eapply Union_Disjoint_r. now sets.
+                -- eapply Disjoint_Included_r. eapply Included_Union_compat. eapply occurs_free_fun_map_add_fundefs. 
+                   eapply Dom_map_add_fundefs. rewrite !Union_assoc. eapply Union_Disjoint_r. now sets.
                    eapply Disjoint_Included; [| | eapply Hdis3 ]. now sets.
                    eapply Included_trans. eapply fun_in_fundefs_FromList_subset. eapply find_def_correct. eassumption. eassumption.
-                   eassumption. 
+                   normalize_bound_var. simpl. rewrite Setminus_Union_distr. eapply Included_Union_preserv_l.
+                   rewrite <- !Setminus_Union. eapply Included_Setminus; [| now sets ]. eapply Disjoint_Included_r.
+                   eapply funname_in_exp_subset. now sets.
                 -- normalize_occurs_free. sets.
           - inv HIn. contradiction. rewrite def_funs_neq in Hgetx; [| eassumption ]. eapply Henv in Hgetx; [| eassumption ]. destructAll. 
             eexists. rewrite apply_r_set_list_f_eq. rewrite extend_lst_gso. rewrite def_funs_neq. 
@@ -1891,22 +1908,13 @@ Section Inline_correct.
         eapply H9.
         -- eapply preord_env_P_inj_antimon. eassumption. normalize_occurs_free.
            rewrite !Union_assoc. rewrite Union_Setminus_Included; sets. tci.
-        -- repeat normalize_bound_var_in_ctx.
-           rewrite Dom_map_def_funs. eapply Union_Disjoint_r.
-           ++ eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs. sets.
-           ++ sets.
-        -- eapply Disjoint_Included_r. eapply image_apply_r_set_list; eauto. eapply Union_Disjoint_r. now sets.
-           rewrite Dom_map_def_funs. rewrite <- Same_set_all_fun_name. rewrite Setminus_Union_distr.
-           rewrite Setminus_Same_set_Empty_set. repeat normalize_sets. now sets.
         -- eapply fun_map_inv_antimon. rewrite <- Hseq. rewrite <- H13. eapply fun_map_inv_def_funs.
            eapply fun_map_inv_i_mon. eassumption. omega. rewrite H13, Hseq. eapply preord_env_P_inj_antimon.
            eassumption. normalize_occurs_free. now sets. eassumption. normalize_occurs_free. sets.
-           repeat normalize_bound_var_in_ctx. now sets. 
-           
-           eapply Disjoint_Included_l; [ | eapply Hdis' ].
-           eapply Included_trans. rewrite Same_set_all_fun_name, H13, Hseq. eassumption.
-           intros z Hin. eapply Hf. unfold Range, Ensembles.In in Hin. zify. omega. 
+           eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs.
+           eapply Disjoint_Included; [| | eapply Hdis1 ]. now sets. normalize_bound_var. now sets.
 
+           rewrite Same_set_all_fun_name, H13, Hseq. eapply Disjoint_Included; [| | eapply Hdis2 ]. now sets. eassumption.
            normalize_occurs_free. rewrite !Union_assoc. rewrite Union_Setminus_Included. now sets. tci. now sets.
     - (* Eapp *)
       simpl. destruct (update_App St IH (apply_r sig v) t (apply_r_list sig l) st) as [s b] eqn:Hup. 
@@ -1943,39 +1951,49 @@ Section Inline_correct.
                   ** intros. eapply preord_exp_app_l.
                      --- eauto.
                      --- eauto.
-                     --- intros. assert (Hf := H17). assert (Heqf' := Heqf). edestruct H17; eauto. destructAll.
+                     --- intros. assert (Hf := H15). assert (Heqf' := Heqf). edestruct H15; eauto. destructAll.
                          do 2 subst_exp. eapply H13.
                          +++ edestruct preord_env_P_inj_get_list_l. now eapply H14. normalize_occurs_free. now sets.
                              eassumption. destructAll.                           
                              eapply preord_env_P_inj_set_lists_l'; try eassumption.
-                         +++ erewrite Dom_map_set_lists; [| eassumption ]. rewrite Dom_map_def_funs. xsets.
-                             eapply Union_Disjoint_r; xsets. eapply Disjoint_Included_r; [| eapply H1 ]. sets.
-                         +++ rewrite Dom_map_set_lists; eauto. eapply Disjoint_Included_r.
-                             eapply image_apply_r_set_list. unfold apply_r_list. rewrite map_length. now eauto.
-                             rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. repeat normalize_sets.
-                             eapply Union_Disjoint_r.
-                             *** eapply Disjoint_Included_r; [| eapply Hdis2 ].
-                                 normalize_occurs_free. rewrite image_Union. rewrite FromList_apply_list. sets.
-                             *** eapply Disjoint_Included_r. eapply image_monotonic. eapply Included_Setminus_compat.
-                                 eapply Dom_map_sub_map. eassumption. reflexivity. sets.
                          +++ eapply fun_map_inv_antimon. eapply fun_map_inv_set_lists; [ | | | eassumption ].
                              *** eapply fun_map_inv_sig_extend_Disjoint. rewrite <- fun_map_inv_eq in *. eassumption.
-                                 rewrite Dom_map_def_funs. sets.
+                                 eapply Disjoint_Included_l. eapply Included_trans; [| eapply bound_var_fun_map_get'; eauto ]. now sets.
+                                 admit.
                              *** eassumption.
-                             *** rewrite Dom_map_def_funs. eapply Union_Disjoint_r. now sets. 
+                             *** eapply Union_Disjoint_r.
+                                 eapply Disjoint_Included_l. eapply Included_trans; [| eapply bound_var_fun_map_get'; eauto ]. now sets.
+                                 admit. 
                                  clear H25. xsets.
                              *** rewrite Union_Setminus_Included. sets. tci. sets.
                ++ omega.
                ++ eassumption.
-               ++ xsets.
-               ++ eapply Union_Disjoint_r. now sets.
-                  eapply Disjoint_Included_r. eapply image_apply_r_set_list.
+               ++ eapply Union_Disjoint_r. now sets. admit.
+               ++ eapply Disjoint_Included_r. eapply image_apply_r_set_list.
                   unfold apply_r_list. rewrite list_length_map. eassumption.
                   eapply Union_Disjoint_r.
-                  eapply Disjoint_Included_r; [| eapply Hdis2 ]. normalize_occurs_free.
+                  eapply Disjoint_Included; [ | | eapply Hdis1' ]. normalize_occurs_free.
                   rewrite !image_Union. rewrite FromList_apply_list. now sets.
-                  rewrite Setminus_Union_distr. rewrite !image_Union. eapply Union_Disjoint_r. now sets.
-                  clear H5. xsets.
+                  eapply Union_Included; [| now sets ].
+                  eapply Included_Union_preserv_r. eapply Included_trans; [| eapply bound_var_fun_map_get'; eauto ]. now sets.
+                  rewrite Setminus_Union_distr. rewrite !image_Union. eapply Union_Disjoint_r.
+                  eapply Disjoint_Included; [| | eapply Hdis1' ]. eapply image_monotonic. eapply Included_Union_preserv_r.
+                  eapply occurs_free_fun_map_get. eassumption.
+                  eapply Included_Union_preserv_r. eapply Union_Included; [| now sets ].
+                  eapply Included_trans; [| eapply bound_var_fun_map_get'; eauto ]. now sets.
+                  eapply Disjoint_Included; [| | eapply Hdis1' ]. eapply image_monotonic. eapply Included_Union_preserv_r. now sets.
+                  eapply Included_Union_preserv_r. eapply Union_Included; [| now sets ].
+                  eapply Included_trans; [| eapply bound_var_fun_map_get'; eauto ]. now sets.
+               ++ eapply Union_Disjoint_r. eapply Union_Disjoint_r. now sets.
+                  clear H5. now sets.
+                  eapply Disjoint_Included_r. eapply image_apply_r_set_list.
+                  unfold apply_r_list. rewrite list_length_map. eassumption.
+                  eapply Disjoint_Included; [ | | eapply Hdis2 ]. normalize_occurs_free.
+                  rewrite !image_Union. rewrite FromList_apply_list.
+                  eapply Union_Included; [ now sets  | ]. rewrite Setminus_Union_distr, !Union_assoc. eapply Included_Union_preserv_r.
+                  rewrite !image_Union. eapply Union_Included; [| now sets ].
+                  eapply image_monotonic.
+                  eapply occurs_free_fun_map_get. eassumption. now sets.
                ++ sets.
                ++ sets.
                ++ (* Make lemma if needed about fun_map_vars fm S (set_list (combine xs (apply_r_list sig l)) sig) *)
@@ -2027,13 +2045,17 @@ Section Inline_correct.
               now constructor.
     - (* Eprim *)
       eapply bind_triple. eapply pre_transfer_r. now eapply get_name_fresh. 
-      intros x w1. simpl. eapply pre_curry_l. intros Hf. 
+      intros x w1. simpl. eapply pre_curry_l. intros HSin. eapply pre_curry_l. intros Hf. 
       eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHe with (S := S \\ [set x]).
       + eassumption.
       + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
         eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := [set v]). tci.
-        eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
+        eapply Union_Disjoint_r. rewrite Setminus_Union_distr. eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
         eapply Disjoint_Singleton_r. eassumption.
+      + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+        eapply Disjoint_Included_r. eapply image_apply_r_set. eapply Union_Disjoint_r.
+        eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hdis2 ]. now sets. now sets.
+        rewrite Setminus_Union_distr. eapply Disjoint_Included; [| | eapply Hdis1' ]. now sets. now sets.
       + eapply Disjoint_Included_r.
         eapply Included_Union_compat. reflexivity.
         eapply image_apply_r_set. 
@@ -2064,9 +2086,9 @@ Section Inline_correct.
           eapply Included_trans. eapply Singleton_Included. eassumption. eapply Range_Subset. reflexivity.
           zify; omega.
         * eauto.
-        * intros r1 r2 k Henv Hdis Hdis' Hfm'. eapply preord_exp_prim_compat.
+        * intros r1 r2 k Henv Hfm'. eapply preord_exp_prim_compat.
           now eauto.
-          eapply Forall2_preord_var_env_map. eassumption. normalize_occurs_free. now sets.          
+          eapply Forall2_preord_var_env_map. eassumption. normalize_occurs_free. now sets.
     - (* Ehalt *)
       eapply return_triple.
       intros. split; [| split; [| split; [| split; [| split; [| split ]]]]]; eauto.
@@ -2080,20 +2102,37 @@ Section Inline_correct.
     - (* Fcons *)
       simpl. 
       eapply bind_triple. eapply pre_transfer_r. now eapply get_names_lst_fresh. intros xs w. simpl.
-      eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros Hnd.  eapply pre_curry_l. intros Hlen.
+      eapply pre_curry_l. intros HSin. eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros Hnd.  eapply pre_curry_l. intros Hlen.
       eapply bind_triple. 
       { do 2 eapply frame_rule. eapply IHe with (S := S \\ FromList xs).
         - eassumption.
-        - eapply fun_in_fundefs_Disjoint_bound_Var_occurs_free; [| | eassumption ]. now left.
-          constructor; eauto.
-        - eapply Union_Disjoint_r. repeat normalize_bound_var_in_ctx.
-          eapply Disjoint_Included; [| | eapply Hdis2 ]; now sets.
+        - eapply Union_Disjoint_r. 
+          + eapply fun_in_fundefs_Disjoint_bound_Var_occurs_free with (B := (Fcons v t l e f5)).
+            now left. constructor; eauto. eapply Disjoint_Included; [| | eapply Hdis1 ]. now sets. now sets.
+          + eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := name_in_fundefs (Fcons v t l e f5)). now tci.
+            eapply Union_Disjoint_r.
+            eapply Disjoint_Included; [| | eapply Hdis1 ]. now sets. normalize_bound_var. now sets.
+            eapply unique_bindings_fun_in_fundefs. now left. constructor; eauto.
+        - repeat normalize_bound_var_in_ctx.
+          (* eapply Disjoint_Included; [| | eapply Hdis2 ]; now sets. *)
+          eapply Disjoint_Included_r. eapply image_apply_r_set_list. now eauto.
+          eapply Union_Disjoint_r.
+          eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hdis2 ]; now sets.
+          rewrite FromList_apply_list in Hnames2. rewrite <- Same_set_all_fun_name in Hnames2.
+          eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := image (apply_r sig) (name_in_fundefs (Fcons v t l e f5))).
+          now tci. eapply Union_Disjoint_r. eapply Disjoint_Included_r. eapply image_Setminus. now tci. rewrite Setminus_Union_distr. 
+          eapply Disjoint_Included; [| | eapply Hdis1' ]. rewrite !Setminus_Union_distr. normalize_occurs_free.
+          rewrite !Setminus_Union. eapply image_monotonic. eapply Union_Included. simpl. now sets. now sets. now sets. 
+          now xsets.
+        - eapply Union_Disjoint_r. repeat normalize_bound_var_in_ctx. now xsets.
           eapply Disjoint_Included_r. eapply image_apply_r_set_list. now eauto.
           eapply Union_Disjoint_r. now sets.
-          eapply Disjoint_Included; [| | eapply Hdis2 ]; [| now sets ].
-          eapply Included_Union_preserv_r. eapply image_monotonic. rewrite Setminus_Union_distr. eapply Union_Included; [| now sets ]. 
-          eapply Setminus_Included_Included_Union. eapply Included_trans. eapply occurs_free_in_fun.
-          2:{ now sets. } now left.
+          eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := image (apply_r sig) (name_in_fundefs (Fcons v t l e f5))).
+          now tci. eapply Union_Disjoint_r. eapply Disjoint_Included_r. eapply image_Setminus. now tci. rewrite Setminus_Union_distr. 
+          eapply Disjoint_Included; [| | eapply Hdis2 ]. rewrite !Setminus_Union_distr. normalize_occurs_free.
+          rewrite !Setminus_Union. eapply Included_Union_preserv_r. eapply image_monotonic. eapply Union_Included. simpl.
+          now sets. now sets. now sets. eapply Disjoint_Included; [| | eapply Hnames2 ]. rewrite FromList_apply_list. rewrite Same_set_all_fun_name.
+          reflexivity. now sets.
         - eapply Disjoint_Included_l; [| eassumption ].
           normalize_bound_var. simpl. rewrite !Setminus_Union_distr. do 2 eapply Included_Union_preserv_r.
           eapply Included_Union_preserv_l. rewrite !Setminus_Union. rewrite Union_commut.
@@ -2114,15 +2153,22 @@ Section Inline_correct.
             + eassumption.
             + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
               eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := [set v]). now tci.
-              eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; now sets.
-              sets.
-            + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
-              eapply Union_Disjoint_r.
+              rewrite Setminus_Union_distr. eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ].
+              simpl. rewrite Setminus_Union. now sets. now sets. now sets. 
+            + eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := image (apply_r sig) [set v]). now tci.
+              eapply Union_Disjoint_r. eapply Disjoint_Included_r. eapply image_Setminus. now tci. rewrite !Setminus_Union_distr.
+              eapply Disjoint_Included; [| | eapply Hdis1' ]. normalize_occurs_free. now sets. normalize_bound_var. now sets.
+              eapply Disjoint_Included; [| | eapply Hnames2 ]. rewrite FromList_apply_list, <- Same_set_all_fun_name. simpl. now sets.
+              normalize_bound_var. now sets.
+            + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. 
+              eapply Union_Disjoint_r. 
               eapply Disjoint_Included; [| | eapply Hdis2 ]; now sets.
+              eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := image (apply_r sig) [set v]). now tci.
+              eapply Union_Disjoint_r. 
+              eapply Disjoint_Included_r. eapply image_Setminus. now tci.
               eapply Disjoint_Included; [| | eapply Hdis2 ]. eapply Included_Union_preserv_r.
-              eapply image_monotonic. rewrite <- !Union_assoc.
-              rewrite <- Union_Included_Union_Setminus with (s3 := [set v]) at 1.
-              sets. tci. sets. sets.
+              eapply image_monotonic. rewrite !Setminus_Union_distr. now sets. now sets.
+              eapply Disjoint_Included; [| | eapply Hnames2 ]. rewrite FromList_apply_list, <- Same_set_all_fun_name. simpl. now sets. now sets.
             + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
               eapply Disjoint_Included_l; [| eapply Hdis3 ]. simpl. rewrite !Setminus_Union_distr.
               do 3 eapply Included_Union_preserv_r. rewrite !Setminus_Union.
@@ -2134,7 +2180,8 @@ Section Inline_correct.
             + sets.
             + eapply fun_map_vars_antimon; eauto. sets.
             + simpl in Hnames1. inv Hnames1. eassumption.
-            + eapply Disjoint_Included; [ | | eapply Hnames2 ]; simpl; sets. normalize_sets. sets. }
+            + eapply Disjoint_Included; [ | | eapply Hnames2 ]; simpl; sets. normalize_sets. sets. normalize_bound_var. now sets. } 
+
         simpl. intros u w1 [Hyp Hyp']. split. eapply Hyp'. eassumption. }
 
 
@@ -2142,12 +2189,12 @@ Section Inline_correct.
       + eapply fresh_monotonic; [|  eassumption ]. sets.
       + zify; omega.
       + constructor; eauto.
-        * intros Hc. eapply Hdis2. constructor. 2:{ right. eapply In_image. left. right. now left. }
-          eapply Hf. eapply H18 in Hc. unfold Ensembles.In, Range in Hc. zify; omega.
+        * intros Hc. eapply Hnames2. constructor. 2:{ left. reflexivity. }
+          left. eapply H18 in Hc. unfold Ensembles.In, Range in Hc. eapply HSin. zify; omega.
         * intros Hc. eapply Included_Union_Setminus with (s2 := name_in_fundefs B') in Hc; [| tci ].
           inv Hc. 
-          -- eapply Hdis2. constructor. 2:{ right. eapply In_image. left. right. now left. }
-             eapply Hf. eapply H13 in H21. unfold Ensembles.In, Range in H21. zify; omega.
+          -- eapply Hnames2. constructor. 2:{ left. reflexivity. } left. 
+             eapply HSin. eapply H13 in H21. unfold Ensembles.In, Range in H21. zify; omega.
           -- rewrite Same_set_all_fun_name in H21. rewrite H14 in H21. rewrite FromList_apply_list in H21.
              inv Hnames1. eapply H24; eauto. eapply FromList_apply_list. eassumption.
              
@@ -2156,14 +2203,14 @@ Section Inline_correct.
           -- eapply Disjoint_Included. eassumption. eassumption. eapply Disjoint_sym. eapply Disjoint_Range. zify. omega.
           -- apply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hnames2 ].
              simpl. normalize_sets. rewrite Same_set_all_fun_name. rewrite H14. now sets.
-             eapply Included_trans. eassumption. intros z Hc. eapply Hf. unfold Ensembles.In, Range in Hc. zify; omega.
+             eapply Included_trans. eassumption. intros z Hc. left. eapply HSin. unfold Ensembles.In, Range in Hc. zify; omega.
         * eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := name_in_fundefs B'); tci. eapply Union_Disjoint_r.
           -- eapply Disjoint_Included. eassumption. eassumption. eapply Disjoint_Range. zify. omega.
           -- rewrite Same_set_all_fun_name.  rewrite H14. eapply Disjoint_Included; [ | | eapply Hnames2 ].
              simpl. normalize_sets. now sets.
-             intros z Hin. eapply H18 in Hin. eapply Hf. unfold Ensembles.In, Range in Hin. zify; omega.
-        * intros Hc. eapply Hdis2. constructor. 2:{ right. eapply In_image. left. right. now left. }
-          eapply Hf. eapply Hxs in Hc. unfold Ensembles.In, Range in Hc. zify; omega.
+             intros z Hin. eapply H18 in Hin. left. eapply HSin. unfold Ensembles.In, Range in Hin. zify; omega.
+        * intros Hc. eapply Hnames2. constructor. 2:{ left. reflexivity. }
+          left. eapply HSin. eapply Hxs in Hc. unfold Ensembles.In, Range in Hc. zify; omega.
       + normalize_occurs_free. eapply Included_trans. eapply Included_Union_compat.
         * eapply Included_Setminus_compat. eassumption. reflexivity.
         * eapply Included_Setminus_compat. eassumption. reflexivity.
@@ -2193,14 +2240,12 @@ Section Inline_correct.
           -- simpl. rewrite peq_true. reflexivity.
           -- now eauto.
           -- eassumption.
-          -- intros z HIn. eapply Hf. eapply Hxs in HIn. unfold Ensembles.In, Range in HIn. zify; omega.
+          -- intros z HIn. eapply HSin. eapply Hxs in HIn. unfold Ensembles.In, Range in HIn. zify; omega.
           -- intros. eapply H20.
              ++ rewrite apply_r_set_list_f_eq.
                 eapply preord_env_P_inj_antimon. eassumption. eapply Included_trans.
                 eapply occurs_free_in_fun with (B := (Fcons v ft xs0 e1 f5)). now left.
                 sets.
-             ++ sets.
-             ++ rewrite apply_r_set_list_f_eq. eassumption.
              ++ eapply fun_map_inv_antimon. eassumption.
                 eapply Included_trans. eapply occurs_free_in_fun with (B := (Fcons v ft xs0 e1 f5)). now left.
                 sets.
@@ -2216,9 +2261,7 @@ Section Inline_correct.
                 rewrite <- !Union_assoc.
                 rewrite <- Union_Included_Union_Setminus with (s1 := occurs_free_fundefs _) (s3 := [set v]).
                 now sets. tci. now sets.
-             ++ sets.
-             ++ eapply
-                  fun_map_inv_antimon. eassumption. normalize_occurs_free. 
+             ++ eapply fun_map_inv_antimon. eassumption. normalize_occurs_free. 
                 rewrite <- !Union_assoc.
                 rewrite <- Union_Included_Union_Setminus with (s1 := occurs_free_fundefs _) (s3 := [set v]).
                 now sets. tci. now sets.

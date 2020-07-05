@@ -790,7 +790,7 @@ Section Inline_correct.
     preord_env_P_inj cenv PG (occurs_free (Eletapp x f t ys e1)) k sig rho1 rho2 ->
     
     Disjoint _ (bound_var_ctx C' :|: bound_var_ctx C) (image sig (occurs_free e1 \\ [set x])) ->
-    ~ z \in (image sig (Dom_map rho1)) ->
+    ~ x \in (image sig (occurs_free e1 \\ [set x])) ->
             
     interprable C' = true ->
     inline_letapp e' z = Some (C, x') ->
@@ -900,11 +900,12 @@ Section Inline_correct.
           
           rewrite Dom_map_set. reflexivity.
           
-          { eapply preord_env_P_inj_set_alt'; [| eassumption | eassumption ].
+          { eapply preord_env_P_inj_set_alt; [| eassumption |  ].
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
             2:{ eapply interpret_ctx_eq_env_P. eassumption. sets. }
             eapply preord_env_P_inj_antimon.
-            eapply preord_env_P_inj_monotonic; [| eassumption ]. omega. normalize_occurs_free. sets.  }
+            eapply preord_env_P_inj_monotonic; [| eassumption ]. omega. normalize_occurs_free. sets.
+            intros Hc. eapply Hdis. constructor; [| eassumption ]. normalize_bound_var_ctx. eauto. }
             
           simpl in *; omega.
           inv H1. 

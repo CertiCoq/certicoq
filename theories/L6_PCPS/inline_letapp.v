@@ -498,16 +498,20 @@ Definition remove_steps_letapp_OOT' cenv (P1 P2 : PostT) :=
     P2 (Eletapp x f t ys e1, rho1, c1 + cost (Eletapp x f t ys e1)) (e2, rho2, c2 - 1). 
 
 
+Require Import L6.logical_relations_cc.
+Require Import Coq.Logic.Classical_Prop Coq.Logic.Classical_Pred_Type.
+
 Section Inline_correct.
 
-  Context (cenv : ctor_env) (P1  : PostT) (PG : PostGT). 
+  Context (cenv : ctor_env) (P1  : PostT) (PG : PostGT) (ctag : ctor_tag). 
 
   Context (Hless_steps_letapp : remove_steps_letapp cenv P1 P1 P1)
           (Hless_steps_letapp' : remove_steps_letapp' cenv P1 P1 P1)
           (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv P1 P1)
           (Hless_steps_letapp_OOT' : remove_steps_letapp_OOT' cenv P1 P1)
           (Hpost_zero : forall e rho e' rho', post_zero e rho e' rho' P1).
-  
+
+
   Lemma inline_letapp_correct k x sig f t ys e1 e2 e' C C' x' rho1 rho2 : 
     (forall m rhoc rhoc' B f' xs vs e,
         m < k -> 
@@ -762,28 +766,6 @@ Section Inline_correct.
       sets.
     - inv Hi. inv H0.
   Qed.
-
-
-  (* Lemma preord_env_P_inj_set_alt' (S : Ensemble var) (rho1 rho2 : env)  *)
-  (*       (k : nat) f (x y : var) (v1 v2 : val) :  *)
-  (*   preord_env_P_inj cenv PG (S \\ [set x]) k f rho1 rho2 -> *)
-  (*   preord_val cenv PG k v1 v2 -> *)
-  (*   f x = y -> *)
-  (*   (* ~ In _ (image f (Dom_map rho1)) y -> *) *)
-  (*   preord_env_P_inj cenv PG S k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2). *)
-  (* Proof. *)
-  (*   intros Henv Hv Heq z HP. unfold extend.  *)
-  (*   destruct (peq z x) as [| Hneq]. *)
-  (*   - subst. intros z Hget. *)
-  (*     rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss; eauto. *)
-  (*   - intros z' Hget. rewrite M.gso in Hget; eauto.  *)
-  (*     destruct (peq (f z) y). *)
-  (*     + exfalso. eapply Hnin. eexists; eauto. *)
-  (*       split; eauto. eexists; eauto. *)
-  (*     + edestruct (Henv z); eauto. *)
-  (*       constructor; eauto. intros Hc. inv Hc. congruence.  *)
-  (*       eexists. rewrite M.gso; eauto.  *)
-  (* Qed. *)
 
 
   Lemma inline_letapp_correct_alt k x z sig f t ys e1 e2 e' C C' x' rho1 rho2 : 
@@ -1484,7 +1466,7 @@ Section Inline_correct.
     destruct v.
     - edestruct bstep_fuel_ctx_OOT. eassumption. eapply interprable_inline_letapp. eassumption.
       + eassert (H' := H). eapply inline_letapp_eval_OOT_l in H'; [| eassumption ].
-        edestruct (Hexp (k + cin)); [| eassumption | ]. omega. destructAll.
+        edestruct (Hexp (k + cin)); [| eassumption | ]. omega. destructAll. 
         destruct x0; [| contradiction ]. 
         destruct x1.
         * eexists OOT, 0. split. constructor. eapply le_lt_trans; [| eapply cost_gt_0 ]. omega.
@@ -1533,6 +1515,116 @@ Section Inline_correct.
       + eapply interpret_ctx_bstep_r. eassumption. eassumption.
       + eapply Hposti; try eassumption. omega. omega.
       + eapply preord_res_monotonic. eassumption. omega.
+  Qed.
+
+  
+  Definition cc_approx_env_P_inj (S : Ensemble var) k P f rho1 rho2 :=
+    forall x : var, S x -> cc_approx_var_env cenv ctag k P rho1 rho2 x (f x).
+
+  Lemma inline_letapp_compat_cc k e1 e2 x y x' y' C1 C2 e e' sig rho1 rho2 :
+    (forall k rho1 rho2,
+        cc_approx_exp cenv ctag k P1 PG (e1, rho1) (e2, rho2)) ->
+    closed_exp e1 ->
+
+    inline_letapp e1 x = Some (C1, x') ->
+    inline_letapp e2 y = Some (C2, y') ->
+
+    (forall m rho1 rho2,
+        m <= k ->
+        cc_approx_env_P_inj [set x'] m PG (sig {x' ~> y'}) rho1 rho2 ->
+        cc_approx_exp cenv ctag m P2 PG (e, rho1) (e', rho2)) ->
+    
+     cc_approx_exp cenv ctag k P3 PG (C1 |[ e ]|, rho1) (C2 |[ e' ]|, rho2).
+  Proof.
+    intros Hexp Hc1 Hinl1 Hinl2 Hrel v cin Hleq Hstep Hns.
+    destruct v.
+    - edestruct bstep_fuel_ctx_OOT. eassumption. eapply interprable_inline_letapp. eassumption.
+      + eassert (H' := H). eapply inline_letapp_eval_OOT_l in H'; [| eassumption ].
+        edestruct (Hexp (k + cin)); [| eassumption | | ]. omega.
+        * inv Hns.
+          -- destructAll. edestruct interpret_ctx_bstep_l. eassumption.
+             eapply interprable_inline_letapp. eassumption. destructAll.
+             edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
+             left. edestruct inline_letapp_eval_l; [| eassumption | |]. eassumption. eassumption.
+             destructAll. do 2 eexists. eassumption.
+          -- assert (Hem := classic (not_stuck cenv rho1 e1)). inv Hem. eassumption.  
+             eapply not_or_and in H1. destruct H1 as [Hres Ho]. 
+             eapply not_all_ex_not in Ho. destruct Ho as [c Hnstep].
+             specialize (H0 c). edestruct bstep_fuel_ctx_OOT. eassumption.
+             eapply interprable_inline_letapp. eassumption.
+             ++ eapply inline_letapp_eval_OOT_l in H1; [| eassumption ]. contradiction.
+             ++ destructAll. left.
+                edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
+                edestruct inline_letapp_eval_l; [| eassumption | |]. eassumption. eassumption.
+                inv H5. do 2 eexists. eassumption.
+        * destructAll. destruct x0; [| contradiction ]. 
+          destruct x1.
+          -- eexists OOT, 0. split. constructor. eapply le_lt_trans; [| eapply cost_gt_0 ]. omega.
+             split; [| eauto ]. eapply Hposti_OOT; eauto. omega.
+          -- eapply inline_letapp_eval_OOT_r with (n := x1) in H0; [| eassumption | omega ].
+             do 2 eexists. split; [| split ].
+             eapply interpret_ctx_OOT_bstep. eassumption. eapply Hposti_OOT; eauto. omega.
+             eauto.
+      + assert (Hstep' := Hstep). destructAll.
+        edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
+        edestruct inline_letapp_eval_l with (C := C1). eassumption. eassumption. eassumption.
+        destructAll. 
+        edestruct (Hexp (k + x3)); [ | eassumption | | ]. omega.
+        { left. eauto. }
+        destructAll.
+        destruct x4. contradiction. 
+        edestruct inline_letapp_eval_r with (C := C2). eassumption. eassumption.
+        destructAll. 
+        
+        edestruct Hrel with (m := k); [ omega | | | eassumption | | ]; [| omega | | ]. 
+        intros z Hin v1 Hget. inv Hin. eexists. rewrite extend_gss. split. eassumption.
+        repeat subst_exp. 
+        simpl in H8. eapply cc_approx_val_monotonic. eassumption. omega.
+
+        { inv Hns.
+          -- destructAll. edestruct interpret_ctx_bstep_l. eassumption.
+             eapply interprable_inline_letapp. eassumption. destructAll.
+             eapply interpret_ctx_fuel_deterministic in H15; [| clear H15;  eassumption ]. destructAll.
+             left. eauto.
+          -- right. intros c1. specialize (H13 (x3 + c1)).
+             edestruct bstep_fuel_ctx_OOT. eassumption. 
+             eapply interprable_inline_letapp. eassumption. 
+             ++ eapply inline_letapp_eval_OOT_l in H14; [| eassumption ].
+                eapply bstep_fuel_OOT_monotonic with (c' := x3) in H14; [| omega ].
+                eapply bstep_fuel_OOT_determistic in H3; [| eassumption | ]. congruence. omega.
+             ++ destructAll. eapply interpret_ctx_fuel_deterministic in H14; [| clear H14; eassumption ]. destructAll.
+                eapply bstep_fuel_OOT_monotonic. eassumption. omega. }
+        
+        destructAll.
+        do 2 eexists. split; [| split ].
+        * eapply interpret_ctx_bstep_r. eassumption. eassumption.
+        * replace cin with (x1 + (cin - x1)) by omega.
+          eapply Hposti; try eassumption. omega. omega.
+        * eapply cc_approx_res_monotonic. eassumption. omega.
+    - assert (Hstep' := Hstep). eapply interpret_ctx_bstep_l in Hstep'. destructAll.
+      2:{ eapply interprable_inline_letapp. eassumption. }
+      edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
+      edestruct inline_letapp_eval_l with (C := C1); try eassumption.
+      destructAll. 
+      edestruct (Hexp (k + x4)); [| eassumption | | ]. omega.
+
+      { left. eauto. }
+      destructAll.
+      destruct x5. contradiction. 
+      edestruct inline_letapp_eval_r with (C := C2). eassumption. eassumption.
+      destructAll.
+      
+      edestruct Hrel with (m := k); [ omega | | | eassumption | | ].
+
+      intros z Hin v1 Hget. inv Hin. eexists. rewrite extend_gss. split. eassumption.
+      repeat subst_exp. 
+      simpl in H7. eapply cc_approx_val_monotonic. eassumption. omega. omega.
+      { left. eauto. } 
+      destructAll.      
+      do 2 eexists. split; [| split ].
+      + eapply interpret_ctx_bstep_r. eassumption. eassumption.
+      + eapply Hposti; try eassumption. omega. omega.
+      + eapply cc_approx_res_monotonic. eassumption. omega.
   Qed.
 
   

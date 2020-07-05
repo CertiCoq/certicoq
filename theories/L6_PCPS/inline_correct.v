@@ -241,7 +241,7 @@ Section Inline_correct.
            (HPost_OOT : post_OOT P1)
            (Hpost_base : post_base P1)
            (HGPost : inclusion P1 PG)
-           (Hpost_zero : forall e rho, post_zero e rho P1)
+           (Hpost_zero : forall e1 rho1 e2 rho2, post_zero e1 rho1 e2 rho2 P1)
            (HEapp_l : forall v t l rho1 x rho2, post_Eapp_l P1 P1 v t l rho1 x rho2)
            (HEletapp : remove_steps_letapp cenv P1 P1 P1)
            (Eletapp' : remove_steps_letapp' cenv P1 P1 P1)
@@ -268,8 +268,8 @@ Section Inline_correct.
       find_def f B = Some (ft, xs, e) /\ f = f' /\
       preord_env_P_inj cenv PG (occurs_free e \\ FromList xs) i (apply_r sig) (def_funs B B rhoc rhoc) rho2 /\
       sub_map (def_funs B B rhoc rhoc) rho1 /\
-      Disjoint _ (bound_var e) (Dom_map rhoc :|: name_in_fundefs B) /\
-      Disjoint _ (FromList xs) (Dom_map rhoc :|: name_in_fundefs B) /\
+      Disjoint _ (bound_var e) ((* Dom_map rhoc :|: *) name_in_fundefs B) /\
+      Disjoint _ (FromList xs) ((* Dom_map rhoc :|: *) name_in_fundefs B) /\
       match k with
       | 0%nat => True
       | S k => fun_map_inv' k (occurs_free e \\ FromList xs) fm (def_funs B B rhoc rhoc) rho2 i sig
@@ -283,8 +283,8 @@ Section Inline_correct.
       find_def f B = Some (ft, xs, e) /\ f = f' /\
       preord_env_P_inj cenv PG (occurs_free e \\ FromList xs) i (apply_r sig) (def_funs B B rhoc rhoc) rho2 /\
       sub_map (def_funs B B rhoc rhoc) rho1 /\
-      Disjoint _ (bound_var e) (Dom_map rhoc :|: name_in_fundefs B) /\
-      Disjoint _ (FromList xs) (Dom_map rhoc :|: name_in_fundefs B) /\
+      Disjoint _ (bound_var e) ((* Dom_map rhoc :|: *) name_in_fundefs B) /\
+      Disjoint _ (FromList xs) ((* Dom_map rhoc :|: *) name_in_fundefs B) /\
       match k with
       | 0%nat => True
       | S k => fun_map_inv' k (occurs_free e \\ FromList xs) fm (def_funs B B rhoc rhoc) rho2 i sig
@@ -1196,7 +1196,7 @@ Section Inline_correct.
           zify; omega.
         * eauto.
         * intros r1 r2 k Henv Hdis Hdis' Hfm'. eapply preord_exp_constr_compat.
-          eassumption. eassumption.
+          now eauto. now eauto.
           eapply Forall2_preord_var_env_map. eassumption. normalize_occurs_free. now sets.          
           intros. eapply Hsem. 
           rewrite apply_r_set_f_eq. eapply preord_env_P_inj_set_alt.
@@ -1230,7 +1230,7 @@ Section Inline_correct.
       + constructor.
       + simpl. normalize_occurs_free. sets.
       + normalize_bound_var. sets.
-      + intros. eapply preord_exp_case_nil_compat. eassumption.
+      + intros. eapply preord_exp_case_nil_compat. now eauto.
     - (* Ecase (_ :: _) *)
       simpl. setoid_rewrite assoc. eapply bind_triple.
       + eapply pre_transfer_r. eapply IHe.
@@ -1289,10 +1289,10 @@ Section Inline_correct.
              ** eapply Included_trans. eassumption. eapply Range_Subset. reflexivity. eassumption.
              ** eapply Included_trans. eassumption. eapply Range_Subset. eassumption. reflexivity.
           ++ intros. eapply preord_exp_case_cons_compat.
-             ** eassumption.
-             ** eassumption.
-             ** eassumption.
-             ** eassumption.
+             ** now eauto.
+             ** now eauto.
+             ** now eauto.
+             ** now eauto.
              ** eapply H9. now constructor.
              ** intros. eapply Hrel.
                 --- eapply preord_env_P_inj_monotonic; [| eapply preord_env_P_inj_antimon; [ eassumption | ]].
@@ -1347,7 +1347,7 @@ Section Inline_correct.
           zify; omega.
         * eauto.
         * intros r1 r2 k Henv Hdis Hdis' Hfm'. eapply preord_exp_proj_compat.
-          eassumption. eassumption. eapply Henv. now constructor.
+          now eauto. now eauto. eapply Henv. now constructor.
           intros. eapply Hsem. 
           rewrite apply_r_set_f_eq. eapply preord_env_P_inj_set_alt.
           -- eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ].
@@ -1416,7 +1416,7 @@ Section Inline_correct.
             zify; omega.
           * simpl; eauto.
           * intros r1 r2 k Henv Hdis Hdis' Hfm'. eapply preord_exp_letapp_compat.
-            eassumption. eassumption. eassumption.
+            now eauto. now eauto. now eauto.
             eapply Henv. econstructor. now left.
             eapply Forall2_preord_var_env_map. eassumption. normalize_occurs_free. now sets.          
             intros. eapply Hsem. 
@@ -1793,7 +1793,7 @@ Section Inline_correct.
         -- eapply Included_trans. eassumption. eapply Range_Subset. zify; omega. reflexivity.
       * eauto.
       * intros k rho1 rho2 Henv Hdis Hdis' Hfm''. eapply preord_exp_fun_compat.
-        eassumption. eassumption.
+        now eauto. now eauto.
         assert (Hrel : preord_env_P_inj cenv PG
                                         (name_in_fundefs f2 :|: occurs_free (Efun f2 e)) 
                                         (k - 1) (apply_r (set_list (combine (all_fun_name f2) xs) sig))
@@ -1922,7 +1922,7 @@ Section Inline_correct.
              ++ normalize_bound_var. sets.
              ++ eauto.
              ++ intros. eapply preord_exp_app_compat.
-                assumption. assumption.
+                now eauto. now eauto.
                 eapply H0. now constructor.
                 eapply Forall2_preord_var_env_map. eassumption.
                 now constructor.              
@@ -1995,7 +1995,7 @@ Section Inline_correct.
                ++ normalize_bound_var. sets.
                ++ eauto.
                ++ intros. eapply preord_exp_app_compat.
-                  assumption. assumption.
+                  now eauto. now eauto.
                   eapply H0. now constructor.
                   eapply Forall2_preord_var_env_map. eassumption.
                   now constructor. }
@@ -2008,7 +2008,7 @@ Section Inline_correct.
              ++ normalize_bound_var. sets.
              ++ eauto.
              ++ intros. eapply preord_exp_app_compat.
-                assumption. assumption.
+                now eauto. now eauto.
                 eapply H0. now constructor.
                 eapply Forall2_preord_var_env_map. eassumption.
                 now constructor.
@@ -2021,7 +2021,7 @@ Section Inline_correct.
            ++ normalize_bound_var. sets.
            ++ eauto.                              
            ++ intros. eapply preord_exp_app_compat.
-              assumption. assumption.
+              now eauto. now eauto.
               eapply H0. now constructor.
               eapply Forall2_preord_var_env_map. eassumption.
               now constructor.
@@ -2065,7 +2065,7 @@ Section Inline_correct.
           zify; omega.
         * eauto.
         * intros r1 r2 k Henv Hdis Hdis' Hfm'. eapply preord_exp_prim_compat.
-          eassumption.
+          now eauto.
           eapply Forall2_preord_var_env_map. eassumption. normalize_occurs_free. now sets.          
     - (* Ehalt *)
       eapply return_triple.
@@ -2075,7 +2075,7 @@ Section Inline_correct.
       + repeat normalize_occurs_free. rewrite image_Union, image_Singleton. sets.
       + normalize_bound_var. sets.
       + simpl; eauto.
-      + intros. eapply preord_exp_halt_compat. eassumption. eassumption.
+      + intros. eapply preord_exp_halt_compat. now eauto. now eauto.
         eapply H0. now constructor.
     - (* Fcons *)
       simpl. 

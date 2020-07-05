@@ -477,18 +477,20 @@ Section uncurry_correct.
     eapply length_exists_set_lists in H0. destruct H0 as [rho1' Hrho1'].
     do 3 eexists. split; [eassumption|split]; [eassumption|].
 
-    intros Hj Hvs. apply preord_exp_refl; try easy_post.
+    intros Hj Hvs. apply preord_exp_refl. now constructor; easy_post.
+
     assert (preord_env_P cenv Post' (occurs_free_fundefs fds :|: name_in_fundefs fds) j
                          (def_funs fds fds rho rho)
                          (def_funs fds fds rho1 rho1)). {
       apply preord_env_P_monotonic with (k := k). omega.
-      apply preord_env_P_def_funs_cor; try easy_post.
+      apply preord_env_P_def_funs_cor. now constructor; try easy_post. 
       eapply preord_env_P_antimon; [eassumption|].
       auto with Ensembles_DB.
     }
     clear H.
     eapply preord_env_P_set_lists_l; [eassumption| |eassumption|eauto|eauto].
-
+    
+    
     apply find_def_correct in H1.
     assert (occurs_free e1 \\ FromList xs1 \subset occurs_free_fundefs fds :|: name_in_fundefs fds). {
       apply occurs_free_in_fun in H1.
@@ -1056,8 +1058,8 @@ Section uncurry_correct.
            Hcurried_used Huncurried_used Halready_uncurried
            Hg_nonrec Hk0_nonrec Hcurried_unique_fundefs Hcurried_used_fundefs
            Huncurried_unique_fundefs Hgv1_fresh Hgv_gv1 Hfv1_fresh Hfv_fv1 Hf1_fresh Henv.
-    eapply preord_exp_fun_compat; [eassumption|..]; try easy_post.
-    apply preord_exp_refl; try easy_post.
+    eapply preord_exp_fun_compat. now eapply Hpost_refl_OOT. now eapply Hpost_refl_fun. 
+    apply preord_exp_refl. now constructor;  try easy_post.
     intros h Hh; unfold preord_var_env.
 
     (* useful facts for later *)
@@ -1242,15 +1244,15 @@ Section uncurry_correct.
         eapply length_exists_set_lists in Hrho1'.
         destruct Hrho1' as [rho1' Hrho1'].
         do 3 eexists; split; [reflexivity|split]; [eassumption|intros Hk1 Hvs1_vs2].
-        eapply preord_exp_fun_compat.
+        eapply preord_exp_fun_compat. 
         assert (post_fun_compat Post PostG). (* --- *)
         { unfold post_fun_compat, post_fun_compat'; intros; apply Hpost_inclusion;
           apply Hpost_refl_fun; eassumption. }
-        eassumption.
+        now eauto.
         assert (post_OOT PostG). (* --- *)
         { unfold post_OOT, post_OOT'; intros; apply Hpost_inclusion; now apply Hpost_refl_OOT. }
-        assumption.
-        apply preord_exp_refl; try easy_post.
+        now eauto.
+        apply preord_exp_refl. now constructor; try easy_post.
         (* wrt k0 and g, the environments
              rho'' = g + [k0 :: fv -> vs1] + curried f + fds + rho
              rho1'' = uncurried g + [k0 :: fv1 -> vs2] + uncurried f + f1 + fds + rho1
@@ -1298,7 +1300,7 @@ Section uncurry_correct.
             (rho0 := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
           destruct Hrho''' as [rho''' Hrho'''].
           assert (Hgoal : preord_exp cenv Post PostG k2 (ge, rho'') (ge, rho''')). {
-            apply preord_exp_refl; try assumption.
+            apply preord_exp_refl. constructor; now easy_post.
             (* wrt free variables of ge, the environments
                  rho'' = [gv -> vs3] + g + [k0 :: fv -> vs1] + curried f + fds + rho
                  rho''' = [gv ++ fv -> vs4 ++ tvs2] + uncurried f + f1 + fds + rho1
@@ -1514,7 +1516,7 @@ Section uncurry_correct.
         simpl; simpl in Hfind_def.
         destruct (M.elt_eq h f); try contradiction.
         destruct (M.elt_eq h f1); try contradiction; auto.
-        apply preord_exp_refl; try easy_post.
+        apply preord_exp_refl. now constructor; try easy_post.
 
         (* wrt free variables of e1, the environments
              rho' = [xs1 -> vs1] + f + fds + rho
@@ -1904,8 +1906,8 @@ Section uncurry_correct.
            Hcurried_used Huncurried_used Halready_uncurried
            Hg_nonrec Hcurried_unique_fundefs Hcurried_used_fundefs
            Huncurried_unique_fundefs Hgv1_fresh Hgv_gv1 Hfv1_fresh Hfv_fv1 Hf1_fresh Henv.
-    eapply preord_exp_fun_compat; [eassumption|..]; try easy_post.
-    apply preord_exp_refl; try easy_post.
+    eapply preord_exp_fun_compat. now eauto. now eauto.
+    apply preord_exp_refl. now constructor; try easy_post.
     intros h Hh; unfold preord_var_env.
 
     (* useful facts for later *)
@@ -2073,11 +2075,11 @@ Section uncurry_correct.
         assert (post_fun_compat Post PostG). (* --- *)
         { unfold post_fun_compat, post_fun_compat'; intros; apply Hpost_inclusion;
           apply Hpost_refl_fun; eassumption. }
-        eassumption.
+        now eauto.
         assert (post_OOT PostG). (* --- *)
         { unfold post_OOT, post_OOT'; intros; apply Hpost_inclusion; now apply Hpost_refl_OOT. }
-        assumption.
-        apply preord_exp_refl; try easy_post.
+        now eauto.
+        apply preord_exp_refl. now constructor; try easy_post.
         (* wrt g, the environments
              rho'' = g + [fv -> vs1] + curried f + fds + rho
              rho1'' = uncurried g + [fv1 -> vs2] + uncurried f + f1 + fds + rho1
@@ -2118,7 +2120,7 @@ Section uncurry_correct.
           (rho0 := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
         destruct Hrho''' as [rho''' Hrho'''].
         assert (Hgoal : preord_exp cenv Post PostG k2 (ge, rho'') (ge, rho''')). {
-          apply preord_exp_refl; try assumption.
+          apply preord_exp_refl. constructor; now easy_post.
           (* wrt free variables of ge, the environments
                rho'' = [gv -> vs3] + g + [k0 :: fv -> vs1] + curried f + fds + rho
                rho''' = [gv ++ fv -> vs4 ++ tvs2] + uncurried f + f1 + fds + rho1
@@ -2340,7 +2342,7 @@ Section uncurry_correct.
         simpl; simpl in Hfind_def.
         destruct (M.elt_eq h f); try contradiction.
         destruct (M.elt_eq h f1); try contradiction; auto.
-        apply preord_exp_refl; try easy_post.
+        apply preord_exp_refl. now constructor; try easy_post.
 
         (* wrt free variables of e1, the environments
              rho' = [xs1 -> vs1] + f + fds + rho
@@ -3516,7 +3518,8 @@ Section uncurry_correct.
     preord_exp' cenv (preord_val cenv) P1 PG k (e1', rho1) (e2', rho2).
   Proof.
     intros.
-    rewrite <- H21, <- H22; apply preord_exp_compat; auto.
+    rewrite <- H21, <- H22; apply preord_exp_compat; auto. constructor; now eauto.
+    constructor; now eauto.
     now rewrite H21.
   Qed.
 
@@ -3547,6 +3550,9 @@ Section uncurry_correct.
       intros Hunique Hunique1 Hused Hused1 rho rho1 Henv.
     - (* uncurry_letapp *)
       eapply preord_exp_letapp_compat; try eassumption; try easy_post.
+      + now eauto.
+      + now eauto.
+      + now eauto.
       + unfold preord_env_P in Henv.
         intros a Hin.
         apply Henv; [|easy].
@@ -3569,8 +3575,10 @@ Section uncurry_correct.
           inversion Hx1. apply Free_Eletapp2; [|assumption].
           intros contra. subst. intuition.
         * assumption.
-    - (* uncurry_constr *)
+    - (* uncurry_constr *)      
       eapply preord_exp_constr_compat; try eassumption; try easy_post.
+      + now eauto.
+      + now eauto.
       + unfold preord_env_P in Henv.
         apply Forall2_same.
         intros a Hin.
@@ -3592,6 +3600,9 @@ Section uncurry_correct.
           now apply Forall2_Forall2_asym_included.
     - (* uncurry_case_expr *)
       eapply preord_exp_case_cons_compat; try eassumption; try easy_post.
+      + now eauto.
+      + now eauto.
+      + now eauto.
       + now apply List_util.Forall2_refl.
       + now apply Henv.
       + intros k' Hk'; apply IH; inv Hunique; inv Hunique1; auto.
@@ -3602,15 +3613,18 @@ Section uncurry_correct.
         apply preord_env_P_monotonic with (k := k); [omega|].
         eapply preord_env_P_antimon; [eassumption|].
         eapply occurs_free_Ecase_Included; simpl; eauto.
-      + apply preord_exp_refl; try easy_post.
+      + apply preord_exp_refl. now constructor;  try easy_post.
         eapply preord_env_P_antimon; [eassumption|].
         rewrite occurs_free_Ecase_cons...
     - (* uncurry_case_arms *)
       destruct arm.
       eapply preord_exp_case_cons_compat; try eassumption; try easy_post.
+      + now eauto.
+      + now eauto.
+      + now eauto.
       + eapply uncurry_step_preserves_ctag; eauto.
       + now apply Henv.
-      + intros k' Hk'; apply preord_exp_refl; try easy_post.
+      + intros k' Hk'; apply preord_exp_refl. now constructor; try easy_post.
         apply preord_env_P_monotonic with (k := k); [omega|].
         eapply preord_env_P_antimon; [eassumption|].
         rewrite occurs_free_Ecase_cons...
@@ -3624,6 +3638,7 @@ Section uncurry_correct.
         rewrite occurs_free_Ecase_cons...
     - (* uncurry_proj *)
       eapply preord_exp_proj_compat; try eassumption; try easy_post.
+      now eauto. now eauto. 
       now apply Henv.
       intros k' v1 v2 Hk' Hv1_v2.
       apply IH; inv Hunique; inv Hunique1; auto.
@@ -3638,7 +3653,7 @@ Section uncurry_correct.
         apply preord_env_P_monotonic with (j := k') in Henv; [|omega].
         apply Henv; auto.
     - (* uncurry_prim *)
-      apply preord_exp_prim_compat; try easy_post.
+      apply preord_exp_prim_compat; try easy_post. now eauto.
       + induction args; constructor.
         apply Henv; constructor; now left.
         inv Hunique; inv Hunique1.
@@ -3666,7 +3681,7 @@ Section uncurry_correct.
         * do 2 (rewrite M.gso; [|assumption]).
           apply Henv; auto.*)
     - (* uncurry_fun_expr *)
-      eapply preord_exp_fun_compat; try eassumption; try easy_post.
+      eapply preord_exp_fun_compat; try eassumption; try easy_post. now eauto. now eauto.
       apply IH; inv Hunique; inv Hunique1; auto.
       rewrite used_vars_Efun in Hused.
       eapply Included_trans; [|eassumption]...
@@ -4222,6 +4237,14 @@ Section uncurry_correct.
     rewrite <- H3; eauto.
   Qed.
 
+  Lemma uncurry_step_preserves_occurs_free : forall e s m e1 s1 m1,
+    used_vars e \subset s ->
+    unique_bindings e ->
+    uncurry_step e s m e1 s1 m1 -> occurs_free e <--> occurs_free e1.
+  Proof with eauto with Ensembles_DB.
+    destruct uncurry_step_preserves_occurs_free_mut. now eauto.
+  Qed.
+
   Inductive uncurry_rel :
     nat ->
     exp -> Ensemble var -> localMap ->
@@ -4347,6 +4370,22 @@ Section uncurry_correct.
     eapply uncurry_step_preserves_used_vars; eauto.
     eapply uncurry_step_preserves_unique_bindings; eauto.
     eapply uncurry_step_preserves_closed; eauto.
+  Qed.
+
+  Lemma uncurry_rel_preserves_occurs_free : forall n e s m e1 s1 m1,
+    used_vars e \subset s ->
+    unique_bindings e ->
+    uncurry_rel n e s m e1 s1 m1 ->
+    occurs_free e <--> occurs_free e1.
+  Proof.
+    induction n; [inversion 3; subst; auto|].
+    intros.
+    inv H1. subst. reflexivity.
+    intros. inv H1. eapply Same_set_trans.
+    now eapply uncurry_step_preserves_occurs_free; eauto.
+    eapply IHn; [| |eassumption].
+    eapply uncurry_step_preserves_used_vars; eauto.
+    eapply uncurry_step_preserves_unique_bindings; eauto.
   Qed.
 
   Lemma uncurry_rel_preserves_used_vars : forall n e s m e1 s1 m1,
@@ -4500,10 +4539,13 @@ Section uncurry_correct.
     assert (unique_bindings e2) by (eapply uncurry_step_preserves_unique_bindings; eauto).
     assert (used_vars e2 \subset s2) by (eapply uncurry_step_preserves_used_vars; eauto).
     eapply preord_exp_post_monotonic; [apply Hpost_idemp|..].
-    eapply preord_exp_trans; try easy_post.
+    eapply preord_exp_trans. now constructor; try easy_post. 
     - unfold inclusion; intros; now apply Hpost_inclusion, Hpost_idemp.
+    - now eauto.
+    - now eauto. 
     - eapply uncurry_step_correct; [| | | |apply H5|apply Henv]; auto.
     - intros; eapply IHn; [| | | |apply H6|apply preord_env_P_refl]; auto.
+      constructor; eauto. clear; now firstorder. 
   Qed.
     
   Transparent bind ret.
@@ -4860,7 +4902,8 @@ Section uncurry_correct.
     preord_exp cenv Post PostG k (e1, rho1) (e2, rho2).
   Proof.
     inversion 1; intros Henv.
-    apply preord_exp_compat; try easy_post.
+    apply preord_exp_compat. constructor; now try easy_post.
+    constructor; now try easy_post.
     clear dependent rho1; clear dependent rho2; subst e1 e2.
     intros k' rho1 rho2 Hk' Henv.
     apply (uncurry_step_correct_fundefs_curried
@@ -5637,6 +5680,13 @@ Section uncurry_correct.
   Proof.
     intros; apply uncurry_rel_to_triple; simpl; intros.
     eapply uncurry_rel_preserves_closed; eauto.
+  Qed.
+  
+  Lemma uncurry_exp_fv_preserving : forall b e,
+    uncurry_triple b e (fun _ => True) (fun _ _ e1 _ => occurs_free e <--> occurs_free e1).
+  Proof.
+    intros; apply uncurry_rel_to_triple; simpl; intros.
+    eapply uncurry_rel_preserves_occurs_free; eauto.
   Qed.
 
   (*

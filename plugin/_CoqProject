@@ -321,7 +321,6 @@ extraction/zbool.mli
 extraction/zpower.ml
 extraction/zpower.mli
 
->>>>>>> f1de3e7a317cdf5b24451a083f4ef1b90bbb9e71
 
 # plugin
 certicoq.mli

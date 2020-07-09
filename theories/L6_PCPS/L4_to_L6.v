@@ -878,6 +878,7 @@ Proof.
         destruct (cps_cvt_env l1 s1 cnstrs) eqn:Henv2; inv H3.
         destruct p0 eqn:Hp0.
         simpl. inv H.
+        inv H1. inv H2. 
         admit. }
   - simpl in *. inv Hv1. inv Hv2.
     eapply preord_val_refl; admit.
@@ -1003,32 +1004,55 @@ Proof.
       destruct (cps_cvt_env rho s cnstrs) eqn: Hcps_env.
       2: { inv Henv. }
       destruct p0 eqn: Hp0.
+      inv Henv.
+      destruct vars eqn: Hvars.
+      simpl in Hset. inv Hset.
+      simpl in Hset.
+      destruct (set_lists l0 l (M.Node M.Leaf (Some (Vint 0)) M.Leaf)) eqn: Hset2.
+      inv Hset. 
       destruct n eqn: Hn.
-      * destruct vars eqn: Hvars. 
-        simpl in Hset. inv Hset.
-        simpl in Hset.
-        destruct (set_lists l1 l (M.Node M.Leaf (Some (Vint 0)) M.Leaf)) eqn: Hset2.
-        inv Hset. unfold nth in Hget. unfold nth_default in Hget.
-        simpl in Hget. inv Henv. rewrite M.gss in Hget.
-        inv Hget.
+      * unfold nth in Hget. unfold nth_default in Hget.
+        simpl in Hget. rewrite M.gss in Hget.
+        inv Hget. 
         (* use cps_cvt_val lemma here *) admit.
-        inv Hset.
-      * destruct vars eqn: Hvars.
-        simpl in Hset. inv Hset.
-        simpl in Hset.
-        destruct (set_lists l1 l (M.Node M.Leaf (Some (Vint 0)) M.Leaf)) eqn: Hset2.
-        inv Hset. 
-        simpl in Hget. inv Henv. rewrite M.gso in Hget. 
+      * unfold nth in Hget. unfold nth_default in Hget.
+        simpl in Hget. rewrite M.gso in Hget. 
         eapply IHrho.
         eapply Hcps_env.
         eapply Hset2.
         eapply Hget.
         eapply Hval.
-        unfold nth. unfold nth_default. 
         (* add condition of vars *) admit.
-        inv Hset. 
-Admitted. 
+      * inv Hset. 
+Admitted.
 
+Definition cps_env_rel rho vs :=
+  forall v n,
+    nth_error rho n = Some v ->
+    exists v',
+      nth_error vs n = Some v' ->
+      forall v'' k next1 next2 cnstrs,
+        cps_cvt_val v next1 cnstrs = Some (v'', next2) ->
+        preord_val cenv PG k v'' v'.
+
+Inductive cps_val_rel : value -> val -> Prop :=
+| rel_Con :
+    forall vs vs' dc c_tag cnstrs,
+      cps_env_rel vs vs' -> 
+      dcon_to_tag dc cnstrs = c_tag ->
+      cps_val_rel (Con_v dc vs) (Vconstr c_tag vs')
+| rel_Prf :
+    cps_val_rel Prf_v (Vint 0)
+| rel_Clos :
+    forall rho vs rho_m names na k x f n nenv next e e' cnstrs,
+      cps_env_rel rho vs ->
+      StrictlyIncreasing names ->
+      set_lists names vs (M.empty val) = Some rho_m ->
+      (k > List.last names (1%positive))%positive /\ (x > k)%positive
+      /\ (f > x)%positive /\ (n > f)%positive ->
+      cps_cvt e names k (SG (n, nenv)) cnstrs = Some (e', next) ->
+      cps_val_rel (Clos_v rho na e)
+                  (Vfun rho_m (Fcons f func_tag (x::k::nil) e' Fnil) f).
 
 Definition cps_cvt_correct_e c :=
   forall e e' rho rho' rho_m v v' x k vk vars cnstrs
@@ -1154,7 +1178,23 @@ Proof.
     intros v1 c Hleq Hstep.
     inv Hstep. 
     admit. admit.
-  - intros e1 IH1 e2 IH2 e' rho rho' rho_m v v' x k0 vk vars cnstrs
+  - admit.
+  - admit.
+  - admit.
+  - intros.
+    simpl in H7.
+    destruct (gensym next3 n) eqn: Hgen_x.
+    destruct (gensym s (nNamed "k")) eqn: Hgen_k.
+    destruct (cps_cvt e0 (v0 :: vars) k0 s0 cnstrs) eqn: Hcvt_e0.
+    2 : { congruence. } 
+    destruct p eqn: Hp.
+    destruct (cps_cvt e vars v1 s1 cnstrs) eqn: Hcvt_e.
+    2 : { congruence. } 
+    destruct p0 eqn: Hp0.
+    inv H7.
+    inv H1. 
+    
+    intros e1 IH1 e2 IH2 e' rho rho' rho_m v v' x k0 vk vars cnstrs
            next1 next2 next3 next4 next5 H H0 H1 H2 H3 H4 H5 H6.
     inv H.
     + simpl in H5. 

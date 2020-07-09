@@ -1441,7 +1441,7 @@ Proof.
   - (* Econstr *)
     spark_evaluation. bind_next. ret.
     (* We need to figure out what Q is. *)
-    eapply preord_exp_const_compat; cleanup; cleanup.
+    eapply preord_exp_constr_compat; cleanup; cleanup.
     (* We've found Q. *)
     gen k; gen rho; gen rho'.
     choose_post H.

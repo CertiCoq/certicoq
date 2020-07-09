@@ -713,9 +713,9 @@ Section Hoisting_correct.
     intros k IHk e' Bprev B Ball rho rho' Hun1 Hun2 Henv Hfuns Hsplit Hdis Hfvs Hhoist;
       inv Hhoist; inv Hun2.
     - (* Econstr *)
-      eapply preord_exp_const_compat.
-      + eassumption.
-      + eassumption.
+      eapply preord_exp_constr_compat.
+      + now eauto.
+      + now eauto.
       + eapply Forall2_same. intros x Hin. eapply Henv.
         now constructor.
       + intros m vs1 vs2 Hlt Hall. 
@@ -735,7 +735,7 @@ Section Hoisting_correct.
         * intros B' Hbin. eapply Hfvs. constructor; eauto.
         * eassumption.
     - (* Ecase nil *)
-      eapply preord_exp_case_nil_compat. eassumption.
+      eapply preord_exp_case_nil_compat. now eauto.
     - (* Ecase cons *)
       eapply split_fds_sym in H7.
       edestruct split_fds_trans as [Bnew [Hs1 Hs2]].
@@ -765,8 +765,8 @@ Section Hoisting_correct.
           right. eassumption.
     - (* Eproj *)
       eapply preord_exp_proj_compat.
-      + eassumption.
-      + eassumption.
+      + now eauto.
+      + now eauto. 
       + eapply Henv. eauto.
       + intros m vs1 vs2 Hlt Hall. 
         eapply IHk; [ eassumption | eassumption | | | | eassumption | | | ].
@@ -785,9 +785,9 @@ Section Hoisting_correct.
         * eassumption.
     - (* Eletapp *)
       eapply preord_exp_letapp_compat.
-      + eassumption.
-      + eassumption.
-      + eassumption.
+      + now eauto.
+      + now eauto. 
+      + now eauto.
       + eapply Henv. constructor. now left.
       + eapply Forall2_same. intros z Hin. eapply Henv.
         constructor. now right.
@@ -808,7 +808,7 @@ Section Hoisting_correct.
         * eassumption.
     - (* Efun -- the only non trivial case *)
       eapply preord_exp_Efun_l.
-      + eassumption.
+      + now eauto.
       + eapply Hpost_Efun_l.
       + eapply split_fds_sym in Hsplit.
         eapply split_fds_sym in H5.
@@ -842,31 +842,16 @@ Section Hoisting_correct.
         * intros x Hin. eapply Hfvs. constructor; eauto.
     - (* Eapp *)
       eapply preord_exp_app_compat.
-      + eassumption.
-      + eassumption.
+      + now eauto.
+      + now eauto.
       + eapply Henv. constructor.
       + eapply Forall2_same. intros z Hin. eapply Henv.
         now constructor.
     - (* Eprim *)
       eapply preord_exp_prim_compat.
-      + eassumption.
+      + now eauto.
       + eapply Forall2_same. intros x Hin. eapply Henv.
         now constructor.
-(*    + intros m vs1 vs2 Hlt Hall. 
-        eapply IHk; [ eassumption | eassumption | | | | eassumption | | | ].
-        * eassumption.
-        * eapply preord_env_P_extend.
-          -- eapply preord_env_P_antimon.
-             eapply preord_env_P_monotonic; [| eassumption ]. omega.
-             normalize_occurs_free. sets.
-          -- eassumption.
-        * eapply funs_inv_env_set. eassumption.
-          eapply Disjoint_In_l. eapply Disjoint_sym. eassumption.
-          normalize_bound_var; sets.
-        * eapply Disjoint_Included_r; [| eassumption ].
-          normalize_bound_var; sets.
-        * intros B' Hbin. eapply Hfvs. constructor; eauto.
-        * eassumption. *)
     - (* Ehalt *)
       eapply preord_exp_halt_compat; eauto. 
   Qed.

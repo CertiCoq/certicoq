@@ -589,8 +589,8 @@ Section LogRelCC.
 
     Lemma cc_approx_exp_constr_compat k 
           rho1 rho2 x t ys1 ys2 e1 e2 :
-      post_constr_compat' x t ys1 e1 rho1 P1 P2 ->
-      post_OOT' (Econstr x t ys1 e1) rho1 P2 ->
+      post_constr_compat' x t ys1 e1 rho1  x t ys2 e2 rho2 P1 P2 ->
+      post_OOT' (Econstr x t ys1 e1) rho1 (Econstr x t ys2 e2) rho2 P2 ->
       (* For application *)
       Forall2 (cc_approx_var_env k PG rho1 rho2) ys1 ys2 ->
       (forall vs1 vs2 : list val,
@@ -630,8 +630,8 @@ Section LogRelCC.
     Qed.
   
   Lemma cc_approx_exp_proj_compat k rho1 rho2 x tau n y1 y2 e1 e2 :
-    post_proj_compat' x tau n y1 e1 rho1 P1 P2 ->
-    post_OOT' (Eproj x tau n y1 e1) rho1 P2 ->
+    post_proj_compat' x tau n y1 e1 rho1  x tau n y2 e2 rho2 P1 P2 ->
+    post_OOT' (Eproj x tau n y1 e1) rho1 (Eproj x tau n y2 e2) rho2 P2 ->
     cc_approx_var_env k PG rho1 rho2 y1 y2 ->
     (forall v1 v2 c vs,
        (* needed for cost proof *)
@@ -679,7 +679,7 @@ Section LogRelCC.
         (f2 f' Γ : var) (xs2 : list var) (t : fun_tag) (e1 e2 : exp) : 
     post_letapp_compat_cc' x f1 t xs1 e1 rho1 P1 P2 PG ->
     post_letapp_compat_cc_OOT' x f1 t xs1 e1 rho1 P2 PG ->
-    post_OOT' (Eletapp x f1 t xs1 e1) rho1 P2 ->  
+    post_OOT' (Eletapp x f1 t xs1 e1) rho1 (AppClo f2 f' Γ |[ Eletapp x f' t (Γ :: xs2) e2 ]|) rho2 P2 ->  
     ~ Γ \in (f2 |: [set f'] :|: FromList xs2) ->
     ~ f' \in (f2 |: FromList xs2) ->
     cc_approx_var_env k PG rho1 rho2 f1 f2 ->
@@ -836,7 +836,7 @@ Section LogRelCC.
         (rho1 rho2 : env) (f1 : var) (xs1 : list var) 
         (f2 f' Γ : var) (xs2 : list var) (t : fun_tag) :
     post_app_compat_cc' f1 t xs1 rho1 P2 PG ->
-    post_OOT' (Eapp f1 t xs1) rho1 P2 ->
+    post_OOT' (Eapp f1 t xs1) rho1 (AppClo f2 f' Γ |[ Eapp f' t (Γ :: xs2) ]|) rho2 P2 ->
     ~ Γ \in (f2 |: [set f'] :|: FromList xs2) ->
     ~ f' \in (f2 |: FromList xs2) ->
 
@@ -931,8 +931,8 @@ Section LogRelCC.
   Qed.
 
   Lemma cc_approx_exp_fun_compat k rho1 rho2 B B' e1 e2 :
-    post_fun_compat' B e1 rho1 P1 P2 ->
-    post_OOT' (Efun B e1) rho1 P2 ->
+    post_fun_compat' B e1 rho1 B' e2 rho2 P1 P2 ->
+    post_OOT' (Efun B e1) rho1 (Efun B' e2) rho2 P2 ->
     cc_approx_exp (k - 1) P1 PG (e1, def_funs B B rho1 rho1)
                (e2, def_funs B' B' rho2 rho2) ->
     cc_approx_exp k P2 PG (Efun B e1, rho1) (Efun B' e2, rho2).
@@ -963,7 +963,7 @@ Section LogRelCC.
   Qed.
 
   Lemma cc_approx_exp_case_nil_compat k rho1 rho2 x1 x2 :
-    post_OOT' (Ecase x1 []) rho1 P2 ->
+    post_OOT' (Ecase x1 []) rho1 (Ecase x2 []) rho2 P2 ->
     cc_approx_exp k P2 PG (Ecase x1 [], rho1) (Ecase x2 [], rho2).
   Proof.
     intros Hoot v1 c1 Hleq1 Hstep1.      
@@ -975,9 +975,9 @@ Section LogRelCC.
   Qed.
 
   Lemma cc_approx_exp_case_cons_compat k rho1 rho2 x1 x2 t e1 e2 B1 B2 :
-    post_OOT' (Ecase x1 ((t, e1) :: B1)) rho1 P2 ->
-    post_case_compat_hd' x1 t e1 B1 rho1 P1 P2 ->
-    post_case_compat_tl' x1 t e1 B1 rho1 P2 P2 ->
+    post_OOT' (Ecase x1 ((t, e1) :: B1)) rho1 (Ecase x2 ((t, e2) :: B2)) rho2 P2 ->
+    post_case_compat_hd' x1 t e1 B1 rho1 x2 t e2 B2 rho2 P1 P2 ->
+    post_case_compat_tl' x1 t e1 B1 rho1 x2 t e2 B2 rho2 P2 P2 ->
 
     Forall2 (fun p1 p2 => fst p1 = fst p2) B1 B2 ->
     cc_approx_var_env k PG rho1 rho2 x1 x2 ->
@@ -1046,8 +1046,8 @@ Section LogRelCC.
   Qed. 
 
   Lemma cc_approx_exp_halt_compat k rho1 rho2 x1 x2 :
-    post_OOT' (Ehalt x1) rho1 P2 ->
-    post_base' (Ehalt x1) rho1 P2 ->
+    post_OOT' (Ehalt x1) rho1 (Ehalt x2) rho2 P2 ->
+    post_base' (Ehalt x1) rho1 (Ehalt x2) rho2 P2 ->
     cc_approx_var_env k PG rho1 rho2 x1 x2 ->
     cc_approx_exp k P2 PG (Ehalt x1, rho1) (Ehalt x2, rho2).
   Proof.
@@ -1073,7 +1073,7 @@ Section LogRelCC.
           cc_approx_val k S v1 v2.
   
   Lemma cc_approx_exp_prim_compat k rho1 rho2 x1 x2 f ys1 ys2 e1 e2 :
-    post_OOT' (Eprim x1 f ys1 e1) rho1 P2 ->
+    post_OOT' (Eprim x1 f ys1 e1) rho1 (Eprim x2 f ys2 e2) rho2 P2 ->
     Forall2 (cc_approx_var_env k PG rho1 rho2) ys1 ys2 ->
     (* (forall m v1 v2 vs f',
        m < k ->
@@ -1242,23 +1242,11 @@ Section LogRelCC.
   Section Compose.
 
     Context (P1 P2 : PostT) (* Local *)
-          (PG  : PostGT) (* Global *)
-          (HGPost : inclusion _ (comp P1 P2) PG)
-          (HPost_conG : post_constr_compat PG PG)
-          (HPost_projG : post_proj_compat PG PG)
-          (HPost_funG : post_fun_compat PG PG)
-          (HPost_case_hdG : post_case_compat_hd PG PG)
-          (HPost_case_tlG : post_case_compat_tl PG PG)
-          (HPost_appG : post_app_compat_cc PG PG)
-          (HPost_letappG : post_letapp_compat_cc PG PG PG)
-          (HPost_letapp_OOTG : post_letapp_compat_cc_OOT PG PG)
-          (HPost_appG' : post_app_compat PG PG)
-          (HPost_letappG' : post_letapp_compat cenv PG PG PG)
-          (HPost_letapp_OOTG' : post_letapp_compat_OOT PG PG)
-          (HPost_OOTG : post_OOT PG)
-          (Hpost_baseG : post_base PG)
-          (Hp1 : inclusion _ PG P1)
-          (Hp2 : inclusion _ PG P2).
+            (PG  : PostGT) (* Global *)
+            (Hprops : Post_properties cenv PG PG PG)
+            (HGPost : inclusion _ (comp P1 P2) PG)
+            (Hp1 : inclusion _ PG P1)
+            (Hp2 : inclusion _ PG P2).
 
     Lemma cc_approx_res_respects_preord_exp_r_pre (k : nat) r1 r2 r3 :
       (forall j v1 v2 v3,

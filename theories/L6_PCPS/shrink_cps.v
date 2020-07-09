@@ -17,7 +17,7 @@ Require Import Coq.Sorting.Permutation.
 Require Import Libraries.maps_util.
 Require Import L6.cps.
 Require Import L6.ctx L6.rename.
-Require Import L6.cps_util L6.List_util L6.identifiers.
+Require Import L6.cps_util L6.List_util L6.identifiers L6.inline_letapp.
 
 
 (* Shallow val for constr and function *)

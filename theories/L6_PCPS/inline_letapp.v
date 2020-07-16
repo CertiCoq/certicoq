@@ -11,8 +11,9 @@ Import MonadNotation.
 Open Scope monad_scope.
 Open Scope ctx_scope.
 
+
 Fixpoint inline_letapp
-         (e : exp) (* function body to be inlined *)
+         (e : exp) (* expression to be inlined *)
          (z : var) (* the binding used for the app *)
   : option (exp_ctx * var) := (* Returns an evaluation context that computes the result of the function and puts it in the variable that's returned *)
   match e with

@@ -385,7 +385,7 @@ Section Linking.
     | None => None
     end.
 
-
+  
   Lemma inline_straight_code_l (e : exp) x :
     straight_code e = true ->
     exists C x', inline_letapp e x = Some (C, x').

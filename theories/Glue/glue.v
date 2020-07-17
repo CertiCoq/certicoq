@@ -303,6 +303,8 @@ Section Externs.
                       (Sreturn (Some (Ebinop Oand (Field(var _v, -1)) (make_cint 255 val) val)))
                   |})).
 
+
+  
   Definition make_externs : glueM (composite_definitions * defs * toolbox_info) :=
     '(_lparen, ty_lparen, def_lparen) <- string_literal "lparen_lit" "(" ;;
     '(_rparen, ty_rparen, def_rparen) <- string_literal "rparen_lit" ")" ;;
@@ -368,12 +370,12 @@ Section Externs.
        (_printf,
         Gfun (External (EF_external "printf"
                           (mksignature (AST.Tint :: nil)
-                                       (Some AST.Tint)
+                                       (Tret AST.Tint)
                                        cc_default))
                         (Tcons (tptr tschar) Tnil) tint cc_default)) ::
        (_is_ptr,
          Gfun (External (EF_external "is_ptr"
-                          (mksignature (val_typ :: nil) None cc_default))
+                          (mksignature (val_typ :: nil) retVoid cc_default))
                         (Tcons val Tnil)
                         (Tint IBool Unsigned noattr) cc_default)) ::
        (_guo, def_guo) ::

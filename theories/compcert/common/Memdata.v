@@ -17,7 +17,8 @@
 (** In-memory representation of values. *)
 
 Require Import Coqlib.
-Require x86_64.Archi.
+Require Import Zbits.
+Require Archi.
 Require Import AST.
 Require Import Integers.
 Require Import Floats.
@@ -50,7 +51,7 @@ Proof.
 Qed.
 
 Definition size_chunk_nat (chunk: memory_chunk) : nat :=
-  nat_of_Z(size_chunk chunk).
+  Z.to_nat(size_chunk chunk).
 
 Lemma size_chunk_conv:
   forall chunk, size_chunk chunk = Z.of_nat (size_chunk_nat chunk).
@@ -258,21 +259,21 @@ Lemma decode_encode_int_4:
   forall x, Int.repr (decode_int (encode_int 4 (Int.unsigned x))) = x.
 Proof.
   intros. rewrite decode_encode_int. transitivity (Int.repr (Int.unsigned x)).
-  decEq. apply Zmod_small. apply Int.unsigned_range. apply Int.repr_unsigned.
+  decEq. apply Z.mod_small. apply Int.unsigned_range. apply Int.repr_unsigned.
 Qed.
 
 Lemma decode_encode_int_8:
   forall x, Int64.repr (decode_int (encode_int 8 (Int64.unsigned x))) = x.
 Proof.
   intros. rewrite decode_encode_int. transitivity (Int64.repr (Int64.unsigned x)).
-  decEq. apply Zmod_small. apply Int64.unsigned_range. apply Int64.repr_unsigned.
+  decEq. apply Z.mod_small. apply Int64.unsigned_range. apply Int64.repr_unsigned.
 Qed.
 
 (** A length-[n] encoding depends only on the low [8*n] bits of the integer. *)
 
 Lemma bytes_of_int_mod:
   forall n x y,
-  Int.eqmod (two_p (Z.of_nat n * 8)) x y ->
+  eqmod (two_p (Z.of_nat n * 8)) x y ->
   bytes_of_int n x = bytes_of_int n y.
 Proof.
   induction n.
@@ -284,7 +285,7 @@ Proof.
   intro EQM.
   simpl; decEq.
   apply Byte.eqm_samerepr. red.
-  eapply Int.eqmod_divides; eauto. apply Z.divide_factor_r.
+  eapply eqmod_divides; eauto. apply Z.divide_factor_r.
   apply IHn.
   destruct EQM as [k EQ]. exists k. rewrite EQ.
   rewrite <- Z_div_plus_full_l. decEq. change (two_p 8) with 256. ring. omega.
@@ -292,7 +293,7 @@ Qed.
 
 Lemma encode_int_8_mod:
   forall x y,
-  Int.eqmod (two_p 8) x y ->
+  eqmod (two_p 8) x y ->
   encode_int 1%nat x = encode_int 1%nat y.
 Proof.
   intros. unfold encode_int. decEq. apply bytes_of_int_mod. auto.
@@ -300,7 +301,7 @@ Qed.
 
 Lemma encode_int_16_mod:
   forall x y,
-  Int.eqmod (two_p 16) x y ->
+  eqmod (two_p 16) x y ->
   encode_int 2%nat x = encode_int 2%nat y.
 Proof.
   intros. unfold encode_int. decEq. apply bytes_of_int_mod. auto.
@@ -546,16 +547,24 @@ Proof.
   destruct v1; auto.
 Qed.
 
+Lemma decode_val_rettype:
+  forall chunk cl,
+  Val.has_rettype (decode_val chunk cl) (rettype_of_chunk chunk).
+Proof.
+  intros. unfold decode_val.
+  destruct (proj_bytes cl).
+- destruct chunk; simpl; rewrite ? Int.sign_ext_idem, ? Int.zero_ext_idem by omega; auto.
+- Local Opaque Val.load_result.
+  destruct chunk; simpl;
+  (exact I || apply Val.load_result_type || destruct Archi.ptr64; (exact I || apply Val.load_result_type)).
+Qed.
+
 Lemma decode_val_type:
   forall chunk cl,
   Val.has_type (decode_val chunk cl) (type_of_chunk chunk).
 Proof.
-  intros. unfold decode_val.
-  destruct (proj_bytes cl).
-  destruct chunk; simpl; auto.
-Local Opaque Val.load_result.
-  destruct chunk; simpl;
-  (exact I || apply Val.load_result_type || destruct Archi.ptr64; (exact I || apply Val.load_result_type)).
+  intros. rewrite <- proj_rettype_of_chunk.
+  apply Val.has_proj_rettype. apply decode_val_rettype.
 Qed.
 
 Lemma encode_val_int8_signed_unsigned:
@@ -606,11 +615,9 @@ Lemma decode_val_cast:
   | _ => True
   end.
 Proof.
-  unfold decode_val; intros; destruct chunk; auto; destruct (proj_bytes l); auto.
-  unfold Val.sign_ext. rewrite Int.sign_ext_idem; auto. omega.
-  unfold Val.zero_ext. rewrite Int.zero_ext_idem; auto. omega.
-  unfold Val.sign_ext. rewrite Int.sign_ext_idem; auto. omega.
-  unfold Val.zero_ext. rewrite Int.zero_ext_idem; auto. omega.
+  intros. 
+  assert (A: Val.has_rettype v (rettype_of_chunk chunk)) by apply decode_val_rettype.
+  destruct chunk; auto; simpl in A; destruct v; try contradiction; simpl; congruence.
 Qed.
 
 (** Pointers cannot be forged. *)

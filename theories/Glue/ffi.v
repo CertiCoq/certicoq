@@ -327,7 +327,7 @@ Definition make_one_field
   let extern_def :=
     (_extern_fn,
      Gfun (External (EF_external kn
-                 (mksignature (val_typ :: nil) None cc_default))
+                 (mksignature (val_typ :: nil) retVoid cc_default))
                (Tcons (threadInf _thread_info) (repeat_typelist val arity))
                val cc_default)) in
   rest <- make_curried_fns kn arity arity _extern_fn ;;

@@ -15,10 +15,19 @@
 
 (** A big-step semantics for the Clight language. *)
 
-From compcert.lib Require Import Coqlib Maps Integers Floats.
-From compcert.common Require Import Values AST Memory Events Globalenvs Smallstep.
-From compcert.cfrontend Require Import Ctypes Cop Clight.
-
+Require Import Coqlib.
+Require Import Maps.
+Require Import Integers.
+Require Import Floats.
+Require Import Values.
+Require Import AST.
+Require Import Memory.
+Require Import Events.
+Require Import Globalenvs.
+Require Import Smallstep.
+Require Import Ctypes.
+Require Import Cop.
+Require Import Clight.
 
 Section BIGSTEP.
 

@@ -207,16 +207,18 @@ compcert/flocq/Prop/Relative.v
 compcert/flocq/IEEE754/Binary.v
 compcert/flocq/IEEE754/Bits.v
 compcert/x86_64/Archi.v
+compcert/lib/Zbits.v
 compcert/lib/Integers.v
 compcert/flocq/Prop/Sterbenz.v
 compcert/flocq/Prop/Round_odd.v
 compcert/lib/Fappli_IEEE_extra.v
+compcert/lib/IEEE754_extra.v
 compcert/lib/Floats.v
 compcert/lib/Maps.v
 compcert/lib/Axioms.v
 compcert/lib/Intv.v
 compcert/lib/Decidableplus.v
-# compcert/flocq/Core/Fcore_Zaux.v
+#compcert/flocq/Core/Fcore_Zaux.v
 #compcert/flocq/Core/Fcore_Raux.v
 #compcert/flocq/Core/Fcore_defs.v
 #compcert/flocq/Core/Fcore_float_prop.v
@@ -249,6 +251,9 @@ compcert/common/Memdata.v
 compcert/common/Memtype.v
 compcert/common/Memory.v
 compcert/common/Globalenvs.v
+compcert/common/Builtins0.v
+compcert/x86/Builtins1.v
+compcert/common/Builtins.v
 compcert/common/Events.v
 compcert/common/Smallstep.v
 compcert/common/Behaviors.v
@@ -266,7 +271,7 @@ compcert/exportclight/Clightdefs.v
 L7/tactics.v
 L7/L6_to_Clight.v
 L7/L6_to_Clight_stack.v
-L7/Clightexec.v
+#L7/Clightexec.v
 L7/toplevel.v
 
 # Glue

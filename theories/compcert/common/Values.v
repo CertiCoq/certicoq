@@ -132,6 +132,40 @@ Proof.
   simpl in *. InvBooleans. destruct H0. split; auto. eapply has_subtype; eauto.
 Qed.
 
+Definition has_type_dec (v: val) (t: typ) : { has_type v t } + { ~ has_type v t }.
+Proof.
+  unfold has_type; destruct v.
+- auto.
+- destruct t; auto.
+- destruct t; auto.
+- destruct t; auto.
+- destruct t; auto.
+- destruct t. 
+  apply bool_dec.
+  auto.
+  apply bool_dec.
+  auto.
+  apply bool_dec.
+  auto.
+Defined.
+
+Definition has_rettype (v: val) (r: rettype) : Prop :=
+  match r, v with
+  | Tret t, _ => has_type v t
+  | Tint8signed, Vint n => n = Int.sign_ext 8 n
+  | Tint8unsigned, Vint n => n = Int.zero_ext 8 n
+  | Tint16signed, Vint n => n = Int.sign_ext 16 n
+  | Tint16unsigned, Vint n => n = Int.zero_ext 16 n
+  | _, Vundef => True
+  | _, _ => False
+  end.
+
+Lemma has_proj_rettype: forall v r,
+  has_rettype v r -> has_type v (proj_rettype r).
+Proof.
+  destruct r; simpl; intros; auto; destruct v; try contradiction; exact I.
+Qed.
+
 (** Truth values.  Non-zero integers are treated as [True].
   The integer 0 (also used to represent the null pointer) is [False].
   Other values are neither true nor false. *)
@@ -766,6 +800,18 @@ Definition rolml (v: val) (amount: int) (mask: int64): val :=
   | _ => Vundef
   end.
 
+Definition zero_ext_l (nbits: Z) (v: val) : val :=
+  match v with
+  | Vlong n => Vlong(Int64.zero_ext nbits n)
+  | _ => Vundef
+  end.
+
+Definition sign_ext_l (nbits: Z) (v: val) : val :=
+  match v with
+  | Vlong n => Vlong(Int64.sign_ext nbits n)
+  | _ => Vundef
+  end.
+
 (** Comparisons *)
 
 Section COMPARISONS.
@@ -898,6 +944,55 @@ Definition offset_ptr (v: val) (delta: ptrofs) : val :=
   | _ => Vundef
   end.
 
+(** Normalize a value to the given type, turning it into Vundef if it does not
+    match the type. *)
+
+Definition normalize (v: val) (ty: typ) : val :=
+  match v, ty with
+  | Vundef, _ => Vundef
+  | Vint _, Tint => v
+  | Vlong _, Tlong => v
+  | Vfloat _, Tfloat => v
+  | Vsingle _, Tsingle => v
+  | Vptr _ _, (Tint | Tany32) => if Archi.ptr64 then Vundef else v
+  | Vptr _ _, Tlong => if Archi.ptr64 then v else Vundef
+  | (Vint _ | Vsingle _), Tany32 => v
+  | _, Tany64 => v
+  | _, _ => Vundef
+  end.
+
+Lemma normalize_type:
+  forall v ty, has_type (normalize v ty) ty.
+Proof.
+  intros; destruct v; simpl.
+- auto.
+- destruct ty; exact I.
+- destruct ty; exact I.
+- destruct ty; exact I.
+- destruct ty; exact I.
+- unfold has_type; destruct ty, Archi.ptr64; auto.
+Qed.
+
+Lemma normalize_idem:
+  forall v ty, has_type v ty -> normalize v ty = v.
+Proof.
+  unfold has_type, normalize; intros. destruct v.
+- auto.
+- destruct ty; intuition auto.
+- destruct ty; intuition auto.
+- destruct ty; intuition auto.
+- destruct ty; intuition auto.
+- destruct ty, Archi.ptr64; intuition congruence.
+Qed.
+
+(** Select between two values based on the result of a comparison. *)
+
+Definition select (cmp: option bool) (v1 v2: val) (ty: typ) :=
+  match cmp with
+  | Some b => normalize (if b then v1 else v2) ty
+  | None => Vundef
+  end.
+
 (** [load_result] reflects the effect of storing a value with a given
   memory chunk, then reading it back with the same chunk.  Depending
   on the chunk and the type of the value, some normalization occurs.
@@ -925,10 +1020,24 @@ Definition load_result (chunk: memory_chunk) (v: val) :=
   | _, _ => Vundef
   end.
 
+Lemma load_result_rettype:
+  forall chunk v, has_rettype (load_result chunk v) (rettype_of_chunk chunk).
+Proof.
+  intros. unfold has_rettype; destruct chunk; destruct v; simpl; auto.
+- rewrite Int.sign_ext_idem by omega; auto.
+- rewrite Int.zero_ext_idem by omega; auto.
+- rewrite Int.sign_ext_idem by omega; auto.
+- rewrite Int.zero_ext_idem by omega; auto.
+- destruct Archi.ptr64 eqn:SF; simpl; auto.
+- destruct Archi.ptr64 eqn:SF; simpl; auto.
+- destruct Archi.ptr64 eqn:SF; simpl; auto.
+Qed.
+
 Lemma load_result_type:
   forall chunk v, has_type (load_result chunk v) (type_of_chunk chunk).
 Proof.
-  intros. unfold has_type; destruct chunk; destruct v; simpl; auto; destruct Archi.ptr64 eqn:SF; simpl; auto.
+  intros. rewrite <- proj_rettype_of_chunk. apply has_proj_rettype.
+  apply load_result_rettype.
 Qed.
 
 Lemma load_result_same:
@@ -1832,10 +1941,18 @@ Qed.
 
 Lemma zero_ext_and:
   forall n v,
-  0 < n < Int.zwordsize ->
+  0 <= n ->
   Val.zero_ext n v = Val.and v (Vint (Int.repr (two_p n - 1))).
 Proof.
-  intros. destruct v; simpl; auto. decEq. apply Int.zero_ext_and; auto. omega.
+  intros. destruct v; simpl; auto. decEq. apply Int.zero_ext_and; auto.
+Qed.
+
+Lemma zero_ext_andl:
+  forall n v,
+  0 <= n ->
+  Val.zero_ext_l n v = Val.andl v (Vlong (Int64.repr (two_p n - 1))).
+Proof.
+  intros. destruct v; simpl; auto. decEq. apply Int64.zero_ext_and; auto.
 Qed.
 
 Lemma rolm_lt_zero:
@@ -2042,6 +2159,36 @@ Lemma offset_ptr_assoc:
   forall v d1 d2, offset_ptr (offset_ptr v d1) d2 = offset_ptr v (Ptrofs.add d1 d2).
 Proof.
   intros. destruct v; simpl; auto. f_equal. apply Ptrofs.add_assoc.
+Qed.
+
+Lemma lessdef_normalize:
+  forall v ty, lessdef (normalize v ty) v.
+Proof.
+  intros. destruct v; simpl.
+  - auto.
+  - destruct ty; auto.
+  - destruct ty; auto.
+  - destruct ty; auto.
+  - destruct ty; auto.
+  - destruct ty, Archi.ptr64; auto.
+Qed.
+
+Lemma normalize_lessdef:
+  forall v v' ty, lessdef v v' -> lessdef (normalize v ty) (normalize v' ty).
+Proof.
+  intros. inv H; auto.
+Qed.
+
+Lemma select_lessdef:
+  forall ob ob' v1 v1' v2 v2' ty,
+  ob = None \/ ob = ob' ->
+  lessdef v1 v1' -> lessdef v2 v2' ->
+  lessdef (select ob v1 v2 ty) (select ob' v1' v2' ty).
+Proof.
+  intros; unfold select. destruct H.
+- subst ob; auto.
+- subst ob'; destruct ob as [b|]; auto.
+  apply normalize_lessdef. destruct b; auto.
 Qed.
 
 (** * Values and memory injections *)
@@ -2326,6 +2473,36 @@ Lemma hiword_inject:
   forall v v', inject f v v' -> inject f (Val.hiword v) (Val.hiword v').
 Proof.
   intros. unfold Val.hiword; inv H; auto.
+Qed.
+
+Lemma normalize_inject:
+  forall v v' ty, inject f v v' -> inject f (normalize v ty) (normalize v' ty).
+Proof.
+  intros. inv H.
+- destruct ty; constructor.
+- destruct ty; constructor.
+- destruct ty; constructor.
+- destruct ty; constructor.
+- simpl. destruct ty.
++ destruct Archi.ptr64; econstructor; eauto.
++ auto.
++ destruct Archi.ptr64; econstructor; eauto.
++ auto.
++ destruct Archi.ptr64; econstructor; eauto.
++ econstructor; eauto.
+- constructor.
+Qed.
+
+Lemma select_inject:
+  forall ob ob' v1 v1' v2 v2' ty,
+  ob = None \/ ob = ob' ->
+  inject f v1 v1' -> inject f v2 v2' ->
+  inject f (select ob v1 v2 ty) (select ob' v1' v2' ty).
+Proof.
+  intros; unfold select. destruct H.
+- subst ob; auto.
+- subst ob'; destruct ob as [b|]; auto.
+  apply normalize_inject. destruct b; auto.
 Qed.
 
 End VAL_INJ_OPS.

@@ -91,7 +91,7 @@ Section Beta.
             if (Nat.eqb (List.length xs) (List.length ys)) then 
               let sig' := set_list (combine xs ys') sig  in
               x' <- get_name x "" ;;         
-              e' <- beta_contract d' e sig' fm s' ;;
+              e' <- beta_contract d' e sig' (M.remove f fm) s' ;;
               match inline_letapp e' x', Nat.eqb (List.length xs) (List.length ys) with
               | Some (C, x'), true =>
                 ec' <- beta_contract d' ec (M.set x x' sig) fm s' ;;
@@ -139,7 +139,7 @@ Section Beta.
           | (true, Some (ft, xs, e), S d') =>
             if Nat.eqb (List.length xs) (List.length ys) then
               let sig' := set_list (combine xs ys') sig  in
-              beta_contract d' e sig' fm  s'
+              beta_contract d' e sig' (M.remove f fm) s'
             else 
               ret (Eapp f' t ys')
           | _ => ret (Eapp f' t ys')

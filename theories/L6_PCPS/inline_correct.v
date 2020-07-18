@@ -1882,7 +1882,8 @@ Section Inline_correct.
       { eapply fun_map_vars_def_funs; (try now eauto).
         + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
           eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
-        + eapply Disjoint_Included_l; [| eapply Hdis3 ]. eassumption.
+        + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. sets.
+        + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. sets.
         + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. xsets.
         + sets.
         + sets. }
@@ -1925,7 +1926,7 @@ Section Inline_correct.
             eapply Disjoint_Included; [| | eapply Hdis3 ]. now sets.
             rewrite Setminus_Union. rewrite Union_commut. rewrite <- Setminus_Union. eassumption.
         - sets.
-        - eassumption.
+        - repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx. sets.
         - eapply fun_map_vars_set_list. eassumption.
         - rewrite Hseq. eassumption.
         - rewrite Hseq. eapply Union_Disjoint_l. now sets.
@@ -1982,15 +1983,18 @@ Section Inline_correct.
               * eapply Disjoint_Included_l. eapply funname_in_exp_subset. sets.
               * sets.
             + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
-              eapply Disjoint_Included.
+              eapply Disjoint_Included_l.
               * eapply bound_var_fun_map_add_fundefs_un'. eassumption.
-              * eapply occurs_free_fun_map_add_fundefs.
-              * admit.
-                (* eapply Union_Disjoint_r; eapply Union_Disjoint_l. *)
-                (* -- eapply Union_Disjoint_l. admit. (* easy *) sets. *)
-                (* -- admit. (* easy *) *)
-                (* -- admi t. *)
-                (* -- sets.  *)
+              * eapply Union_Disjoint_l.
+                -- eapply Union_Disjoint_r. now sets.
+                   eapply Disjoint_Included_r.
+                   eapply Included_Union_Setminus with (s2 := name_in_fundefs f2). tci.
+                   eapply Union_Disjoint_r; [| now sets ].
+                   eapply Disjoint_Included; [| | eapply Hdis1 ]; now sets.
+                -- eapply Union_Disjoint_r. now sets.
+                   eapply Disjoint_Included; [| | eapply Hdis5 ]; [| now sets ].
+                   rewrite !Union_assoc. rewrite Union_commut. rewrite <- Union_Included_Union_Setminus.
+                   now sets. now tci.  eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. now sets.
             + eassumption. }
         
         simpl. intros u w1 [Hyp Hyp']. split. eapply Hyp'. eassumption. }
@@ -2081,14 +2085,13 @@ Section Inline_correct.
                   - eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption. }
                 eapply fun_map_inv_antimon. eapply fun_map_inv_set_lists; [ | | | now eauto ].
                 eapply fun_map_inv_set_lists_r; [| | now eauto ]. 
-                -- rewrite <- Hseq. rewrite <- H13. eapply fun_map_inv_sig_extend_Disjoint. 
-                   admit.
+                -- rewrite <- Hseq. rewrite <- H13. eapply fun_map_inv_sig_extend_Disjoint. admit. 
                    (* eapply fun_map_inv_def_funs. *)
                    (* eapply fun_map_inv_i_mon. eassumption. omega. eapply preord_env_P_inj_antimon. *)
                    (* rewrite H13. rewrite Hseq. eapply IHi. eassumption. omega. normalize_occurs_free. now sets. *)
                    (* eassumption. normalize_occurs_free. now sets. *)
                    (* eapply Disjoint_Included; [| | eapply Hdis1 ]. now sets. normalize_bound_var. *)
-                   (* eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. now sets.  *)
+                   (* eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. now sets. *)
                    
                    (* rewrite Same_set_all_fun_name, H13, Hseq. eapply Disjoint_Included ; [| | eapply Hdis2 ]. now sets. eassumption. *)
                 (* eapply Disjoint_Included_r. eapply occurs_free_fun_map_add_fundefs. eassumption. *)

@@ -28,6 +28,7 @@ CertiCoq Compile -anf demo2.
 CertiCoq Compile -ext "_cps" demo3.
 CertiCoq Compile -anf demo3.
 
+
 Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
 
 CertiCoq Compile -ext "_cps" list_sum.
@@ -85,4 +86,3 @@ Definition color := Color.main.
 
 CertiCoq Compile -ext "_cps" color.
 CertiCoq Compile -anf color.
-

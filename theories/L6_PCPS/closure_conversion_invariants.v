@@ -54,8 +54,8 @@ Section Closure_conversion_invariants.
   Variable clo_tag : ctor_tag.
 
   (* Parameterize over the postconditions *)
-  Context (boundL : nat -> exp -> env -> relation nat)
-          (boundG : nat -> relation (exp * env * nat)).
+  Context (boundL : nat -> PostT)
+          (boundG : PostGT).
   
   (** ** Semantics preservation proof *)
 
@@ -69,7 +69,7 @@ Section Closure_conversion_invariants.
                       ~ In _ Funs x ->
                       ~ In _ GFuns x ->
                       M.get x rho = Some v ->
-                      cc_approx_val pr cenv clo_tag k boundG v v') FVs vs.
+                      cc_approx_val cenv clo_tag k boundG v v') FVs vs.
   
   (** Invariant about the free variables *) 
   Definition FV_inv k rho rho' Scope Funs GFuns c Γ FVs : Prop :=
@@ -81,7 +81,7 @@ Section Closure_conversion_invariants.
                       ~ In _ Funs x ->
                       ~ In _ GFuns x ->
                       M.get x rho = Some v ->
-                      cc_approx_val pr cenv clo_tag k boundG v v') FVs vs.
+                      cc_approx_val cenv clo_tag k boundG v v') FVs vs.
   
   (** Invariant about the functions in the current function definition *)
   Definition Fun_inv k (rho rho' : env) Scope Funs σ genv : Prop :=
@@ -94,7 +94,7 @@ Section Closure_conversion_invariants.
         v = (Vfun rho1 B1 f1) /\
         ~ In _ Scope (σ f) /\
         M.get (σ f) rho' = Some (Vfun rho2 B2 f2) /\
-        cc_approx_val pr cenv clo_tag k boundG
+        cc_approx_val cenv clo_tag k boundG
                       (Vfun rho1 B1 f1)
                       (Vconstr clo_tag [(Vfun rho2 B2 f2) ; env]).
 
@@ -107,7 +107,7 @@ Section Closure_conversion_invariants.
         v = (Vfun rho1 B1 f1) /\
         ~ In _ Scope (σ f) /\ (* Check if needed *)
         M.get (σ f) rho' = Some (Vfun rho2 B2 f2) /\
-        cc_approx_val pr cenv clo_tag k boundG
+        cc_approx_val cenv clo_tag k boundG
                       (Vfun rho1 B1 f1)
                       (Vconstr clo_tag [(Vfun rho2 B2 f2) ; (Vconstr c [])]).
 
@@ -139,7 +139,7 @@ Section Closure_conversion_invariants.
     ~ In _ (image σ (Funs \\ Scope)) (σ f) ->
 
     M.get (genv f) rho' = Some env ->
-    (cc_approx_val pr cenv clo_tag k boundG (Vfun rho1 B1 f1)
+    (cc_approx_val cenv clo_tag k boundG (Vfun rho1 B1 f1)
                    (Vconstr clo_tag [(Vfun rho2 B2 f2) ; env])) ->
     Fun_inv k (M.set f (Vfun rho1 B1 f1) rho)
             (M.set (σ f) (Vfun rho2 B2 f2) rho')
@@ -558,7 +558,7 @@ Section Closure_conversion_invariants.
   Lemma FV_inv_Forall2 k rho rho' Scope GFuns Funs c Γ FVs vs1 vs2 :
     get_list FVs rho = Some vs1 ->
     M.get Γ rho' = Some (Vconstr c vs2) ->
-    Forall2 (cc_approx_val pr cenv clo_tag k boundG) vs1 vs2 ->
+    Forall2 (cc_approx_val cenv clo_tag k boundG) vs1 vs2 ->
     FV_inv k rho rho' Scope Funs GFuns c Γ FVs.
   Proof.
     intros Hget1 Hget2 Hall. do 2 eexists; split; eauto. 
@@ -615,7 +615,7 @@ Section Closure_conversion_invariants.
     ~ In _ Scope (σ f) ->
     ~ In _ (image σ (GFuns \\ [set f])) (σ f) ->
     (forall c, f \in GFuns ->
-          cc_approx_val pr cenv clo_tag k boundG (Vfun rho1 B1 f1) (Vconstr clo_tag [(Vfun rho2 B2 f2) ; Vconstr c []])) ->
+          cc_approx_val cenv clo_tag k boundG (Vfun rho1 B1 f1) (Vconstr clo_tag [(Vfun rho2 B2 f2) ; Vconstr c []])) ->
     GFun_inv k (M.set f (Vfun rho1 B1 f1) rho) (M.set (σ f) (Vfun rho2 B2 f2) rho') Scope GFuns σ.
   Proof.
     intros Hinv Hnin Hnin' Hv f'' v Hnin'' Hin Hget'.

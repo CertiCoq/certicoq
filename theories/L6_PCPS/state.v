@@ -1,9 +1,10 @@
 Require Import Common.compM Common.Pipeline_utils.
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx
-        L6.List_util L6.functions L6.cps_show.
-Require Import Coq.ZArith.Znumtheory.
+        L6.List_util L6.functions L6.cps_show L6.Ensembles_util L6.tactics.
+Require Import Coq.ZArith.ZArith.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Strings.String Coq.Strings.Ascii.
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Strings.String Coq.Strings.Ascii
+        Coq.Sets.Ensembles.
 Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads.
 
@@ -135,3 +136,88 @@ Section CompM.
   Definition get_result (d : comp_data) : name_env * string := (nenv d, log_to_string (log d)).
   
 End CompM.
+
+(* Lemmas about [get_name] and [get_names_lst] *)
+
+Definition Range (x1 x2 : positive) : Ensemble var := fun z => (x1 <= z < x2)%positive.
+
+Lemma Disjoint_Range (x1 x2 x1' x2' : positive) :
+  (x2 <= x1')%positive ->
+  Disjoint _ (Range x1 x2) (Range x1' x2').
+Proof.
+  intros Hleq. constructor. intros x Hin. inv Hin.
+  unfold Range, Ensembles.In in *. simpl in *. zify. omega.
+Qed.    
+
+Lemma Range_Subset (x1 x2 x1' x2' : positive) :
+  (x1 <= x1')%positive ->
+  (x2' <= x2)%positive ->
+  Range x1' x2' \subset Range x1 x2.
+Proof.
+  intros H1 H2. intros z Hin. unfold Range, Ensembles.In in *.
+  inv Hin. zify. omega.
+Qed.
+          
+Lemma fresh_Range S (x1 x2 : positive) :
+  identifiers.fresh S x1 ->
+  Range x1 x2 \subset S.
+Proof.
+  intros Hin z Hin'. inv Hin'. eapply Hin. eassumption.
+Qed.
+
+Opaque bind ret. 
+
+(** Spec for [get_name] *)
+Lemma get_name_fresh A S y str :
+  {{ fun _ (s : comp_data * A) => identifiers.fresh S (next_var (fst s)) }}
+    get_name y str
+  {{ fun (r: unit) s x s' =>
+       x \in S /\
+       x \in Range (next_var (fst s)) (next_var (fst s')) /\
+       (next_var (fst s) < next_var (fst s'))%positive /\
+       identifiers.fresh (S \\ [set x]) (next_var (fst s'))      
+  }}.  
+Proof. 
+  eapply pre_post_mp_l.
+  eapply bind_triple. now eapply get_triple.  
+  intros [[] w1] [[] w2].
+  eapply pre_post_mp_l. simpl.
+  eapply bind_triple. now eapply put_triple.
+  intros x [r3 w3].
+  eapply return_triple. 
+  intros ? [r4 w4] H2. inv H2. intros [H1 H2]. inv H1; inv H2. intros.
+  split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. omega.
+  simpl. split. zify; omega.
+  intros z Hin. constructor. eapply H; eauto. zify. omega.
+  intros Hc. inv Hc. zify; omega.
+Qed.
+
+Lemma get_names_lst_fresh A S ns str :
+  {{ fun _ (s : comp_data * A) => identifiers.fresh S (next_var (fst s)) }}
+    get_names_lst ns str
+  {{ fun (r: unit) s xs s' =>
+       NoDup xs /\ List.length xs = List.length ns /\
+       FromList xs \subset S /\
+       FromList xs \subset Range (next_var (fst s)) (next_var (fst s')) /\
+       (next_var (fst s) <= next_var (fst s'))%positive /\
+       identifiers.fresh (S \\ FromList xs) (next_var (fst s')) }}.  
+Proof.
+  unfold get_names_lst. revert S; induction ns; intros S.
+  - simpl. eapply return_triple.
+    intros. repeat normalize_sets. split; eauto.
+    sets. now constructor. split; eauto.
+    split. now sets. split. sets. split. reflexivity. eassumption.
+  - simpl. eapply bind_triple. eapply get_name_fresh.
+    intros x w.
+    eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply frame_rule. eapply IHns.
+    intros xs w'. eapply return_triple. intros. destructAll.
+    repeat normalize_sets. split; [| split; [| split; [| split; [| split ]]]].
+    + constructor; eauto. intros Hc. eapply H4 in Hc. inv Hc. now eauto.
+    + simpl. congruence.
+    + eapply Union_Included. sets. eapply Included_trans. eapply H4. sets.
+    + eapply Union_Included. eapply Singleton_Included.
+      eapply Range_Subset; [| | eassumption ]. reflexivity. zify. omega.
+      eapply Included_trans. eassumption. eapply Range_Subset. zify; omega. reflexivity.
+    + zify; omega.
+    + rewrite <- Setminus_Union. eassumption.
+Qed.

@@ -4,7 +4,7 @@
 
 
 Require Import L6.cps L6.ctx L6.cps_util L6.set_util L6.identifiers L6.Ensembles_util L6.List_util
-        L6.eval L6.logical_relations L6.functions L6.tactics.
+        L6.eval L6.logical_relations L6.functions L6.tactics L6.map_util L6.rename.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
@@ -742,29 +742,31 @@ Section Alpha_conv_correct.
 
   Variable pr : prims.
   Variable cenv : ctor_env.
-  Variable P : Post.
-  Variable PG : PostG.
-  Variable (Hcompat : post_compat P P)
-           (Happcompat : post_app_compat PG P)
-           (Hletappcompat : post_letapp_compat PG P P)
-           (Hrefl : post_refl P)
-           (Hlocalstrong : (* local implies global *)
-              forall (m : nat) (e1 e2 : exp) (rho rho' : env) (c1 c2 : nat),
-                P c1 c2 -> PG m (e1, rho, c1) (e2, rho', c2))
-           (* This means that we don't support lower bound yet *)
-           (Hadd_src : forall c1 c2 c, P c1 c2 -> P (c1 + c) c2). 
+  Context (P1 : PostT) (* Local *)
+    (PG : PostGT) (* Global *)           
+    (HPost_con : post_constr_compat P1 P1)
+    (HPost_proj : post_proj_compat P1 P1)
+    (HPost_fun : post_fun_compat P1 P1)
+    (HPost_case_hd : post_case_compat_hd P1 P1)
+    (HPost_case_tl : post_case_compat_tl P1 P1)
+    (HPost_app : post_app_compat P1 PG)
+    (HPost_letapp : post_letapp_compat cenv P1 P1 PG)
+    (HPost_letapp_OOT : post_letapp_compat_OOT P1 PG)
+    (HPost_OOT : post_OOT P1)
+    (Hpost_base : post_base P1)
+    (Hinv : inclusion _ P1 PG).
 
 
   (** ** Environment relation up to renaming *)
   (* TODO move to log rel *)
 
   Definition preord_env_P_inj (S : Ensemble var) k f rho1 rho2 :=
-    forall x : var, S x -> preord_var_env pr cenv k PG rho1 rho2 x (f x).
+    forall x : var, S x -> preord_var_env cenv PG k rho1 rho2 x (f x).
 
   Lemma preord_env_P_inj_set (S : Ensemble var) (rho1 rho2 : env) 
         (k : nat) f (x y : var) (v1 v2 : val) : 
     preord_env_P_inj  (S \\ [set x]) k f rho1 rho2 ->
-    preord_val pr cenv k PG v1 v2 ->
+    preord_val cenv PG k v1 v2 ->
     injective_subdomain (x |: S) (f {x ~> y}) ->
     preord_env_P_inj S k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
   Proof.
@@ -786,7 +788,7 @@ Section Alpha_conv_correct.
   Lemma preord_env_P_inj_set_alt (S : Ensemble var) (rho1 rho2 : env) 
         (k : nat) f (x y : var) (v1 v2 : val) : 
     preord_env_P_inj (S \\ [set x]) k f rho1 rho2 ->
-    preord_val pr cenv k PG v1 v2 ->
+    preord_val cenv PG k v1 v2 ->
     ~ In _ (image f (S \\ [set x])) y ->
     preord_env_P_inj S k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
   Proof.
@@ -794,7 +796,7 @@ Section Alpha_conv_correct.
     destruct (peq z x) as [| Hneq].
     - subst. intros z Hget.
       rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss; eauto.
-    - intros z' Hget. rewrite M.gso in Hget; eauto.
+    - intros z' Hget. rewrite M.gso in Hget; eauto. 
       destruct (peq (f z) y).
       + exfalso. eapply Hnin. eexists; eauto.
         split; eauto. constructor; eauto.
@@ -804,10 +806,47 @@ Section Alpha_conv_correct.
         eexists. rewrite M.gso; eauto. 
   Qed.
 
-  Lemma preord_env_P_inj_antimon (P1 P2 : var -> Prop) (k : nat) (rho1 rho2 : env) f :
-    preord_env_P_inj P2 k f rho1 rho2 ->
-    P1 \subset P2 ->
-    preord_env_P_inj P1 k f rho1 rho2.
+  Lemma preord_env_P_inj_set_alt' (S : Ensemble var) (rho1 rho2 : env) 
+        (k : nat) f (x y : var) (v1 v2 : val) : 
+    preord_env_P_inj (S \\ [set x]) k f rho1 rho2 ->
+    preord_val cenv PG k v1 v2 ->
+    ~ In _ (image f (Dom_map rho1)) y ->
+    preord_env_P_inj S k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
+  Proof.
+    intros Henv Hv Hnin z HP. unfold extend. 
+    destruct (peq z x) as [| Hneq].
+    - subst. intros z Hget.
+      rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss; eauto.
+    - intros z' Hget. rewrite M.gso in Hget; eauto. 
+      destruct (peq (f z) y).
+      + exfalso. eapply Hnin. eexists; eauto.
+        split; eauto. eexists; eauto.
+      + edestruct (Henv z); eauto.
+        constructor; eauto. intros Hc. inv Hc. congruence. 
+        eexists. rewrite M.gso; eauto. 
+  Qed.
+
+
+  Lemma preord_env_P_inj_set_l (S : Ensemble var) (rho1 rho2 : env) 
+        (k : nat) f (x y : var) (v1 v2 : val) : 
+    preord_env_P_inj (S \\ [set x]) k f rho1 rho2 ->
+    preord_val cenv PG k v1 v2 ->
+    M.get y rho2 = Some v2 ->
+    preord_env_P_inj S k (f {x ~> y}) (M.set x v1 rho1) rho2.
+  Proof.
+    intros Henv Hv Hnin z HP. unfold extend. 
+    destruct (peq z x) as [| Hneq].
+    - subst. intros z Hget.
+      rewrite M.gss in Hget. inv Hget. eexists. split; eauto.
+    - intros z' Hget. rewrite M.gso in Hget; eauto.
+      eapply Henv. constructor; eauto. intros Hc; inv Hc; eauto.
+      eassumption.  
+  Qed.
+
+  Lemma preord_env_P_inj_antimon (S1 S2 : var -> Prop) (k : nat) (rho1 rho2 : env) f :
+    preord_env_P_inj S2 k f rho1 rho2 ->
+    S1 \subset S2 ->
+    preord_env_P_inj S1 k f rho1 rho2.
   Proof.
     intros Henv Hi x HP. eapply Henv. now apply Hi.
   Qed.
@@ -833,6 +872,71 @@ Section Alpha_conv_correct.
     intros Hc. subst. contradiction.
   Qed.
 
+  Lemma preord_env_P_inj_extend_lst_not_In_P_r k S σ rho1 rho2 xs ys:
+    preord_env_P_inj S k σ rho1 rho2 -> 
+    Disjoint _ (FromList xs) S ->
+    preord_env_P_inj S k (σ <{xs ~> ys}>) rho1 rho2.
+  Proof.
+    revert k S σ rho1 rho2 ys. induction xs; intros.
+    - simpl. eassumption.
+    - destruct ys. eassumption.
+      repeat normalize_sets. simpl. eapply preord_env_P_inj_extend_not_In_P_r.
+      eapply IHxs. eassumption. now sets.
+      intros Hc. eapply H0. constructor; eauto.
+  Qed.
+
+  Lemma preord_env_P_inj_extend_not_In_P_r_alt k S σ rho1 rho2 x y :
+    preord_env_P_inj S k σ rho1 rho2 -> 
+    ~ x \in Dom_map rho1 ->
+    preord_env_P_inj S k (σ {x ~> y}) rho1 rho2.
+  Proof.
+    intros Hpre Hnin z Hp v1 Hget.
+    edestruct Hpre as [v2 [Hget2 Hpre2]]; eauto.
+    repeat eexists; eauto. rewrite extend_gso; eauto.
+    intros Hc. subst. apply Hnin. eexists; eauto.
+  Qed.
+
+  Lemma preord_env_P_inj_def_funs_neq_r_alt S k σ rho1 rho2 B0 B :
+    preord_env_P_inj S k σ rho1 rho2->
+    Disjoint _ (image σ (Dom_map rho1)) (name_in_fundefs B) ->
+    preord_env_P_inj S k σ rho1 (def_funs B0 B rho2 rho2).
+  Proof. 
+    intros Henv Hd x Hin v Hget.
+    rewrite def_funs_neq. now eapply Henv.
+    intros Hc. eapply Hd. constructor; eauto. eapply In_image.
+    eexists; eauto.
+  Qed.
+
+
+
+  Lemma preord_env_P_inj_set_lists_not_In_P_r S k f rho1 rho2 rho2' xs vs :
+    preord_env_P_inj S k f rho1 rho2 ->
+    set_lists xs vs rho2 = Some rho2' ->
+    Disjoint _(FromList xs) (image f (Dom_map rho1)) ->
+    preord_env_P_inj S k f rho1 rho2'.
+  Proof.
+    intros Henv Hnin Hnin' z Hy v' Hget.
+    edestruct Henv as [v'' [Hget' Hv]]; eauto.
+    eexists; split; eauto. erewrite <- set_lists_not_In. eassumption.
+    eassumption. intros Hc. eapply Hnin'. constructor. eassumption.
+    eapply In_image. eexists; eauto.
+  Qed.
+
+
+  Lemma preord_env_P_inj_extend_lst_not_In_P_r_alt k S σ rho1 rho2 xs ys:
+    preord_env_P_inj S k σ rho1 rho2 -> 
+    Disjoint _ (FromList xs) (Dom_map rho1) ->
+    preord_env_P_inj S k (σ <{xs ~> ys}>) rho1 rho2.
+  Proof.
+    revert k S σ rho1 rho2 ys. induction xs; intros.
+    - simpl. eassumption.
+    - destruct ys. eassumption.
+      repeat normalize_sets. simpl. eapply preord_env_P_inj_extend_not_In_P_r_alt.
+      eapply IHxs. eassumption. now sets.
+      intros Hc. eapply H0. constructor; eauto.
+  Qed.
+
+  
   Lemma preord_env_P_inj_set_extend_not_In_P_r S k f rho1 rho2 x y v :
     preord_env_P_inj S k f rho1 rho2 ->
     ~ x \in S ->
@@ -875,7 +979,25 @@ Section Alpha_conv_correct.
     intros Henv Hfeq y Hin. rewrite <- Hfeq; eauto.
   Qed.
 
+    Lemma preord_env_P_inj_eq_r S S' sig k rho1 rho2 rho3 :
+      preord_env_P_inj S k sig rho1 rho2 ->
+      eq_env_P (image sig S') rho2 rho3 ->
+      preord_env_P_inj (Intersection _ S  S') k sig rho1 rho3.
+  Proof.
+    intros Henv Heq x Hin v Hget. inv Hin.
+    rewrite <- Heq; eauto. eapply Henv; eauto.
+    eapply In_image. eassumption.
+  Qed.
 
+  Lemma preord_env_P_inj_eq_l S S' sig k rho1 rho2 rho3 :
+      preord_env_P_inj S k sig rho1 rho2 ->
+      eq_env_P S' rho1 rho3 ->
+      preord_env_P_inj (Intersection _ S  S') k sig rho3 rho2.
+  Proof.
+    intros Henv Heq x Hin v Hget. inv Hin.
+    rewrite <- Heq in Hget; eauto. eapply Henv; eauto.
+  Qed.
+  
   Global Instance preord_env_P_inj_proper  :
     Proper (Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
            preord_env_P_inj.
@@ -883,6 +1005,19 @@ Section Alpha_conv_correct.
     intros s1 s2 [H1 H2]; split; intros Hpre;
     eapply preord_env_P_inj_antimon; subst; eauto.
   Qed.
+
+  Lemma preord_env_P_inj_eq_env_P S sig k rho1 rho2 rho3 rho4 :
+    preord_env_P_inj S k sig rho1 rho2 ->
+    eq_env_P S rho1 rho3 ->
+    eq_env_P (image sig S) rho2 rho4 ->
+    preord_env_P_inj S k sig rho3 rho4.
+  Proof.
+    intros Henv Heq1 Heq2.
+    rewrite <- (Intersection_idempotent S). 
+    eapply preord_env_P_inj_eq_l; eauto.
+    rewrite <- (Intersection_idempotent S). 
+    eapply preord_env_P_inj_eq_r; eauto.
+  Qed.  
   
   Lemma Alpha_conv_fundefs_find_def B1 B2 f g t xs1 e1 :
     Alpha_conv_fundefs B1 B2 f ->
@@ -929,23 +1064,23 @@ Section Alpha_conv_correct.
       eexists. simpl; rewrite Hset2; eauto.
   Qed.
   
-  Lemma preord_env_P_inj_set_lists (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
+  Lemma preord_env_P_inj_set_lists (S1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
         (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list val) f f':
-    preord_env_P_inj (Setminus _ P1 (FromList xs1)) k f rho1 rho2 ->
-    Forall2 (preord_val pr cenv k PG) vs1 vs2 ->
+    preord_env_P_inj (Setminus _ S1 (FromList xs1)) k f rho1 rho2 ->
+    Forall2 (preord_val cenv PG k) vs1 vs2 ->
     
-    injective_subdomain (P1 \\ FromList xs1) f ->
-    Disjoint _ (FromList xs2) (image f (P1 \\ FromList xs1)) ->
+    injective_subdomain (S1 \\ FromList xs1) f ->
+    Disjoint _ (FromList xs2) (image f (S1 \\ FromList xs1)) ->
     construct_lst_injection f xs1 xs2 f' ->
     
     set_lists xs1 vs1 rho1 = Some rho1' ->
     set_lists xs2 vs2 rho2 = Some rho2' ->
 
-    preord_env_P_inj P1 k f' rho1' rho2'.
+    preord_env_P_inj S1 k f' rho1' rho2'.
   Proof.
-    revert P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f f'.
+    revert S1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f f'.
     induction xs1;
-      intros P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2  f f'
+      intros S1 rho1 rho2 rho1' rho2' xs2 vs1 vs2  f f'
              Hpre Hall Hinj Hdis Hlst Hset1 Hset2 x HP v Hget.
     - inv Hlst. destruct vs1; try discriminate.
       simpl in Hset1. inv Hset1.
@@ -961,7 +1096,7 @@ Section Alpha_conv_correct.
       + inv Hget. eexists. 
         simpl. unfold extend. rewrite peq_true.
         rewrite M.gss. eauto.
-      + edestruct IHxs1 with (P1 := Setminus var P1 (Singleton _ a)) as [v2 [Het' Hpre']];
+      + edestruct IHxs1 with (S1 := Setminus var S1 (Singleton _ a)) as [v2 [Het' Hpre']];
           eauto.
         * rewrite Setminus_Union.
           rewrite FromList_cons in Hpre. eassumption.
@@ -975,7 +1110,7 @@ Section Alpha_conv_correct.
           
           intros Heq. eapply n.
           
-          eapply construct_lst_injection_injective_pres with (S := P1) in Hlst'; eauto.
+          eapply construct_lst_injection_injective_pres with (S := S1) in Hlst'; eauto.
           eapply Hlst'; eauto.
           normalize_sets. sets.
           rewrite extend_gss.
@@ -983,20 +1118,20 @@ Section Alpha_conv_correct.
   Qed.
   
   
-  Lemma preord_env_P_inj_set_lists_alt (P1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
+  Lemma preord_env_P_inj_set_lists_alt (S1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
         (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list val) f :
-    preord_env_P_inj (Setminus _ P1 (FromList xs1)) k f rho1 rho2 ->
-    Forall2 (preord_val pr cenv k PG) vs1 vs2 ->
+    preord_env_P_inj (Setminus _ S1 (FromList xs1)) k f rho1 rho2 ->
+    Forall2 (preord_val cenv PG k) vs1 vs2 ->
     NoDup xs1 -> NoDup xs2 ->
     length xs1 = length xs2 ->
-    Disjoint _ (image f (Setminus _ P1 (FromList xs1))) (FromList xs2) ->
+    Disjoint _ (image f (Setminus _ S1 (FromList xs1))) (FromList xs2) ->
     set_lists xs1 vs1 rho1 = Some rho1' ->
     set_lists xs2 vs2 rho2 = Some rho2' ->
-    preord_env_P_inj P1 k (f <{ xs1 ~> xs2 }>)  rho1' rho2'.
+    preord_env_P_inj S1 k (f <{ xs1 ~> xs2 }>)  rho1' rho2'.
   Proof with now eauto with Ensembles_DB.
-    revert P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f.
+    revert S1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f.
     induction xs1;
-      intros P1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f Hpre Hall
+      intros S1 rho1 rho2 rho1' rho2' xs2 vs1 vs2 f Hpre Hall
              Hnd1 Hnd2 Hlen HD Hset1 Hset2 x HP v Hget;
       destruct xs2; try discriminate;
       destruct vs1; try discriminate;
@@ -1012,7 +1147,7 @@ Section Alpha_conv_correct.
       + inv Hget. eexists. 
         simpl. rewrite extend_gss.
         rewrite M.gss. eauto.
-      + edestruct IHxs1 with (P1 := Setminus var P1 (Singleton _ a))
+      + edestruct IHxs1 with (S1 := Setminus var S1 (Singleton _ a))
           as [v2' [Hget' Hpre']]; eauto.
         * rewrite Setminus_Union.
           rewrite FromList_cons in Hpre. eassumption.
@@ -1039,7 +1174,7 @@ Section Alpha_conv_correct.
   Lemma Forall2_preord_var_env_map k S σ rho rho' l :
     preord_env_P_inj S k σ rho rho' ->
     Included _ (FromList l) S ->
-    Forall2 (preord_var_env pr cenv k PG rho rho') l (map σ l).
+    Forall2 (preord_var_env cenv PG k rho rho') l (map σ l).
   Proof with now eauto with Ensembles_DB.
     induction l; intros Henv Hin; simpl; constructor.
     - eapply Henv. eapply Hin. rewrite FromList_cons...
@@ -1053,7 +1188,7 @@ Section Alpha_conv_correct.
     Included var (FromList xs) S ->
     get_list xs rho1 = Some vs1 ->
     exists vs2 : list val,
-      get_list (map f xs) rho2 = Some vs2 /\ Forall2 (preord_val pr cenv k PG) vs1 vs2.
+      get_list (map f xs) rho2 = Some vs2 /\ Forall2 (preord_val cenv PG k) vs1 vs2.
   Proof with now eauto with Ensembles_DB.
     revert vs1. induction xs; intros vs1 Henv Hinc Hget.
     - eexists; split; eauto. inv Hget. constructor.
@@ -1070,6 +1205,84 @@ Section Alpha_conv_correct.
       eexists. rewrite Hgetx', Hgetl'. split.
       reflexivity.
       now constructor; eauto.
+  Qed.
+
+  Lemma preord_env_P_inj_set_l_apply_r S k rho1 rho2 m x y v v' : 
+    preord_env_P_inj (S \\ [set x]) k (apply_r m) rho1 rho2 ->
+    M.get y rho2 = Some v' ->
+    preord_val cenv PG k v v' ->
+    preord_env_P_inj S k (apply_r (M.set x y m)) (map_util.M.set x v rho1) rho2.
+  Proof.
+    intros Henv Hg1 Hval z Hin v1 Hgetz.
+    destruct (peq z x); subst.
+    - eexists. unfold apply_r. rewrite M.gss in *. inv Hgetz. split; eauto.
+    - unfold apply_r. rewrite M.gso in *; eauto.
+      eapply Henv; eauto. constructor; eauto.
+      intros Hc; inv Hc; eauto.
+  Qed.
+
+  Lemma preord_env_P_inj_set_lists_l S k rho1 rho1' rho2 xs ys vs1 vs2 : 
+    preord_env_P cenv PG (S \\ FromList xs) k rho1 rho2 ->
+
+    set_lists xs vs1 rho1 = Some rho1'  ->
+    get_list ys rho2 = Some vs2 ->
+    Forall2 (preord_val cenv PG k) vs1 vs2 ->      
+
+    preord_env_P_inj S k (apply_r (set_list (combine xs ys) (M.empty var))) rho1' rho2.
+  Proof.
+    revert S k rho1 rho1' rho2 ys vs1 vs2; induction xs;
+      intros S k rho1 rho1' rho2 ys vs1 vs2 Henv Hset Hget Hvall.
+    - simpl in Hset. destruct vs1; try congruence. inv Hset.
+      inv Hvall. destruct ys; simpl in Hget; try congruence.
+      intros z Hin v1 Hgetz. unfold apply_r. rewrite M.gempty. eapply Henv.
+      constructor; eauto. eassumption.
+
+      destruct (M.get e rho2); try congruence.
+      destruct (get_list ys rho2); try congruence.
+    - simpl in Hset. destruct vs1; try congruence.
+      destruct vs2 as [|v' vs2]; inv Hvall.
+      destruct (set_lists xs vs1 rho1) eqn:Hset1'; try congruence. inv Hset.
+      destruct ys as [| y ys]; simpl in Hget; try congruence. 
+      destruct (M.get y rho2) eqn:Hgety; try congruence.
+      destruct (get_list ys rho2) eqn:Hgetys; try congruence.
+      inv Hget. simpl. 
+
+      eapply preord_env_P_inj_set_l_apply_r; [| eassumption | eassumption ]. 
+
+      eapply IHxs. eapply preord_env_P_antimon. eassumption.
+      normalize_sets. rewrite Setminus_Union. sets.
+      eassumption. eassumption. eassumption. 
+  Qed.
+
+  Lemma preord_env_P_inj_set_lists_l' S k sig rho1 rho1' rho2 xs ys vs1 vs2 : 
+    preord_env_P_inj (S \\ FromList xs) k (apply_r sig) rho1 rho2 ->
+
+    set_lists xs vs1 rho1 = Some rho1'  ->
+    get_list ys rho2 = Some vs2 ->
+    Forall2 (preord_val cenv PG k) vs1 vs2 ->      
+
+    preord_env_P_inj S k (apply_r (set_list (combine xs ys) sig)) rho1' rho2.
+  Proof.
+    revert S k rho1 rho1' rho2 ys vs1 vs2; induction xs;
+      intros S k rho1 rho1' rho2 ys vs1 vs2 Henv Hset Hget Hvall.
+    - simpl in Hset. destruct vs1; try congruence. inv Hset.
+      inv Hvall. destruct ys; simpl in Hget; try congruence.
+      simpl. repeat normalize_sets. eassumption. 
+      destruct (M.get e rho2); try congruence.
+      destruct (get_list ys rho2); try congruence.
+    - simpl in Hset. destruct vs1; try congruence.
+      destruct vs2 as [|v' vs2]; inv Hvall.
+      destruct (set_lists xs vs1 rho1) eqn:Hset1'; try congruence. inv Hset.
+      destruct ys as [| y ys]; simpl in Hget; try congruence. 
+      destruct (M.get y rho2) eqn:Hgety; try congruence.
+      destruct (get_list ys rho2) eqn:Hgetys; try congruence.
+      inv Hget. simpl. 
+      
+      eapply preord_env_P_inj_set_l_apply_r; [| eassumption | eassumption ]. 
+
+      eapply IHxs. eapply preord_env_P_inj_antimon. eassumption.
+      normalize_sets. rewrite Setminus_Union. sets.
+      eassumption. eassumption. eassumption. 
   Qed.
 
   Global Instance preord_env_P_inj_f_proper :
@@ -1179,7 +1392,7 @@ Section Alpha_conv_correct.
          injective_subdomain (occurs_free e1) f ->
          Alpha_conv e1 e2 f ->
          preord_env_P_inj (occurs_free e1) m f rho1 rho2 ->
-         preord_exp pr cenv m P PG (e1, rho1) (e2, rho2)) ->
+         preord_exp cenv P1 PG m (e1, rho1) (e2, rho2)) ->
     construct_fundefs_injection f B1 B2 h ->
     Disjoint _ (image f S) (name_in_fundefs B2) ->
     injective_subdomain S f ->
@@ -1214,8 +1427,7 @@ Section Alpha_conv_correct.
           edestruct set_lists_length2 as [rho2' Hs']; eauto.
           exists xs2. exists e2. exists rho2'. split; eauto.
           split; [ now eauto |]. intros Hleq Hpre'.
-          eapply preord_exp_post_monotonic;
-            first (intros ? ? ?; eapply Hlocalstrong; eassumption).
+          eapply preord_exp_post_monotonic. eassumption.
           
           assert (Hinjh : injective_subdomain (occurs_free e1 \\ FromList xs1) h).
           { eapply injective_subdomain_antimon   
@@ -1274,13 +1486,13 @@ Section Alpha_conv_correct.
     (* Disjoint _ (image g (occurs_free e1)) (bound_var e1) ->     *)
     Alpha_conv e1 e2 g ->
     preord_env_P_inj (occurs_free e1) k g rho1 rho2 ->
-    preord_exp pr cenv k P PG (e1, rho1) (e2, rho2).
+    preord_exp cenv P1 PG k (e1, rho1) (e2, rho2).
   Proof with now sets. 
     revert e1 e2 rho1 rho2 g.
     induction k as [ k IH ] using lt_wf_rec1.
     induction e1 using exp_ind'; intros e2 rho1 rho2 g Hinj (* Hdis *) Ha Henv; inv Ha.
     - (* Econstr *)
-      eapply preord_exp_const_compat; eauto; intros.
+      eapply preord_exp_constr_compat; eauto; intros.
       + eapply Forall2_monotonic_strong; [ | eassumption ].
         intros x y Hin1 Hin2 Heq. specialize (Henv x).
         rewrite Heq in Henv. eapply Henv.
@@ -1300,7 +1512,7 @@ Section Alpha_conv_correct.
           rewrite preord_val_eq. constructor; eauto using Forall2_Forall2_asym_included.
           eassumption.
     - (* Ecase nil *)
-      inv H1. eapply preord_exp_case_nil_compat.
+      inv H1. eapply preord_exp_case_nil_compat. eauto.
     - (* Ecase cons *)
       inv H1. destruct H2 as [Heq Ha]. destruct y as [c' e2]. simpl in Heq; subst.
       eapply preord_exp_case_cons_compat; eauto.
@@ -1363,16 +1575,9 @@ Section Alpha_conv_correct.
           eapply construct_fundefs_injection_injective_pres. eassumption.
           eapply injective_subdomain_antimon. eassumption. normalize_occurs_free. sets.
           eapply Disjoint_Included_r; [| eassumption ]. normalize_occurs_free. sets. }
-        rewrite Heq.
-        rewrite PS_cardinal_map_eq.  
-        rewrite Proper_carinal. eapply Hcompat. eassumption.
-        eapply Same_set_From_set. rewrite <- mset_eq. reflexivity.
-        rewrite <- FromSet_elements, <- fundefs_fv_correct. 
-        eapply injective_subdomain_f_eq_subdomain.
-        eapply injective_subdomain_antimon. eassumption. normalize_occurs_free. sets.
-        eapply construct_fundefs_injection_f_eq_subdomain. eassumption.
-        eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint. 
-      + eapply IHe1; [| eassumption |].
+        now eauto. 
+      + now eauto.
+      + eapply preord_exp_monotonic. eapply IHe1; [| eassumption |]. 3:{ omega. }
         * eapply injective_subdomain_antimon.
           eapply construct_fundefs_injection_injective_pres.
           eassumption.
@@ -1382,7 +1587,7 @@ Section Alpha_conv_correct.
           normalize_occurs_free...
           now sets.
         * eapply preord_env_P_inj_antimon
-            with (P2 := name_in_fundefs f2 :|: occurs_free (Efun f2 e1)).
+            with (S2 := name_in_fundefs f2 :|: occurs_free (Efun f2 e1)).
           eapply preord_env_P_inj_def_funs_pre; eauto.
           ** eapply Disjoint_sym. eapply Disjoint_Included_r;[| eassumption ]...
           ** normalize_occurs_free...
@@ -1398,7 +1603,7 @@ Section Alpha_conv_correct.
         intros x y Hin1 Hin2 Heq. specialize (Henv x).
         rewrite Heq in Henv. eapply Henv.
         now constructor.
-      + assert (Hinj' : injective_subdomain (v |: occurs_free e1) (g {v ~> x'})).
+  (* + assert (Hinj' : injective_subdomain (v |: occurs_free e1) (g {v ~> x'})).
         { eapply injective_subdomain_extend'.
           - rewrite Setminus_Union_distr.
             rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_l.  
@@ -1410,11 +1615,11 @@ Section Alpha_conv_correct.
         * eapply preord_env_P_inj_set.
           eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. 
           omega. normalize_occurs_free...
-          eassumption. eassumption.
+          eassumption. eassumption. *)
     - eapply preord_exp_halt_compat; eauto.
   Qed.
   
 End Alpha_conv_correct.
 
-Close Scope fun_scope.
-Close Scope ctx_scope.
+(* Close Scope fun_scope. *)
+(* Close Scope ctx_scope. *)

@@ -952,7 +952,7 @@ Section ArgsStructs.
     match j with
     | O => ret nil
     | S j' =>
-        arg_name <- gensym (sanitize_qualified (qp ++ name)%string ++ "_args_" ++ show_nat i) ;;
+        arg_name <- gensym (sanitize_qualified (qp ++ name)%string ++ "_arg_" ++ show_nat i) ;;
         rest <- members_from_ctor qp name (i + 1) j' ;;
         ret ((arg_name, val) :: rest)
     end.
@@ -1178,7 +1178,8 @@ Section CConstructors.
             self_incr alloc_expr n in
 
         let body :=
-            Sassign (Etempvar argv_ident val) ([val] alloc_expr) ;;;
+            Sassign (Etempvar argv_ident argvTy) alloc_expr ;;;
+            Sassign (Field(var argv_ident, 0%Z)) header ;;;
             asgn_s ;;;
             alloc_incr (Z.of_nat (S ar)) ;;;
             Sreturn (Some (add (Evar argv_ident argvTy) (c_int 1%Z val))) in

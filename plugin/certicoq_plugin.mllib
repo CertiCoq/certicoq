@@ -14,7 +14,6 @@ List0
 List_util
 Monad0
 MonadState
-OptionMonad
 Orders
 OrdersEx
 OrdersTac
@@ -49,7 +48,6 @@ PCUICNormal
 PCUICPosition
 PCUICChecker
 PCUICPretty
-PCUICRetyping
 PCUICAstUtils
 PCUICInduction
 PCUICUnivSubst
@@ -64,8 +62,6 @@ PCUICNormal
 PCUICPosition
 PCUICChecker
 PCUICPretty
-PCUICRetyping
-PCUICMetaTheory
 TemplateToPCUIC
 PCUICSafeLemmata
 PCUICCumulativity
@@ -114,6 +110,7 @@ AstCommon
 Round
 MSetRBT
 Maps
+Maps_util
 Map_util
 Compile0
 Compile1
@@ -129,6 +126,7 @@ Term0
 Pipeline_utils
 Set_util
 Identifiers
+Rename
 Uncurry
 Color
 Shrink_cps
@@ -148,21 +146,16 @@ Archi
 Integers
 Floats
 Values
-Memtype
-Memdata
-Memory
 L3_to_L3_eta
 L3_to_L4
 Camlcoq
 AST
 Ctypes
 Cop
-Alpha_fresh
-Beta_contraction
 Dead_param_elim
+Inline
 Csyntax
 Clightdefs
-Globalenvs
 Clight
 PrintAST
 PrintCsyntax
@@ -178,8 +171,6 @@ Glue_utils
 Glue
 Ffi
 Pipeline
-Cexec
-Clightexec
 Certicoq
 G_certicoq
 Certicoq_plugin_mod

@@ -1162,3 +1162,22 @@ Proof.
   eapply PS_union_list_eq_corr. 
 Qed. 
 
+Lemma FromList_length_cardinal l S {Hs : ToMSet S} : 
+  FromList l \subset S -> 
+  NoDup l ->
+  length l <= PS.cardinal mset.
+Proof.
+  intros Hyp1 Hyp2. rewrite (@mset_eq S) in Hyp1.
+  rewrite FromSet_elements in Hyp1. rewrite PS.cardinal_spec.
+  eapply Same_set_FromList_length; eauto.
+Qed. 
+
+Lemma FromList_length_cardinal' l m :
+  FromList l \subset (FromSet m) -> 
+  NoDup l ->
+  length l <= PS.cardinal m.
+Proof.
+  intros Hyp1 Hyp2.
+  rewrite FromSet_elements in Hyp1. rewrite PS.cardinal_spec.
+  eapply Same_set_FromList_length; eauto.
+Qed. 

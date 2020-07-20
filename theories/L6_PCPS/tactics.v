@@ -1,5 +1,7 @@
 (* General purpose tactics *)
 
+Require Import Coq.Arith.Arith. 
+
 Ltac inv H := inversion H; clear H; subst.
 
 Ltac subst_exp :=
@@ -26,3 +28,15 @@ Ltac destructAll :=
     | [ H : exists E, _ |- _ ] => destruct H; destructAll
     | _ => subst
   end.
+
+Ltac pi0 :=
+  repeat match goal with
+         | [ H: _ + _ = 0 |- _ ] =>
+           apply plus_is_O in H; destruct H; subst
+         | [ H: 0 = _ + _ |- _ ] =>
+           symmetry in H; pi0
+         (* | [ H: (if cps_util.var_dec ?X ?Y then _ else _) = 0 |- _] => *)
+         (*   destruct (cps_util.var_dec X Y); try inversion H; pi0 *)
+         | [ H: ?X <> ?X |- _] =>
+           exfalso; apply H; auto
+         end.

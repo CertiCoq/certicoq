@@ -5,7 +5,7 @@
 
 From Coq Require Import ZArith List SetoidList NArith.BinNat PArith.BinPos
      MSets.MSetRBT Sets.Ensembles Omega Sorting.Permutation.
-From CertiCoq.L6 Require Import List_util cps ctx identifiers Ensembles_util set_util cps_util.
+From CertiCoq.L6 Require Import List_util cps ctx identifiers Ensembles_util set_util cps_util map_util.
 
 Require Import compcert.lib.Maps.
 
@@ -40,6 +40,18 @@ with sizeOf_fundefs (B : fundefs) : nat :=
          | Fnil => 0
        end.
 
+Definition cost_cc (e : exp) : nat := 
+  match e with 
+  | Econstr x t ys e => 1 + length ys
+  | Eproj x t n y e => 1
+  | Ecase y cl => 1
+  | Eapp f t ys => 1 + length ys
+  | Eletapp x f t ys e => 1 + length ys 
+  | Efun B e => 1 + PS.cardinal (fundefs_fv B)
+  | Eprim x f ys e => 1 + length ys
+  | Ehalt x => 1
+  end.
+
 (** The size of evaluation contexts *)
 Fixpoint sizeOf_exp_ctx (c : exp_ctx) : nat :=
   match c with
@@ -52,7 +64,7 @@ Fixpoint sizeOf_exp_ctx (c : exp_ctx) : nat :=
       1 + sizeOf_exp_ctx c
       + fold_left (fun s p => s + sizeOf_exp (snd p)) l1 0
       + fold_left (fun s p => s + sizeOf_exp (snd p)) l2 0 
-    | Efun1_c B c => (1 + PS.cardinal (fundefs_fv B)) + sizeOf_exp_ctx c
+    | Efun1_c B c => 1 + sizeOf_exp_ctx c
     | Efun2_c B e => 1 + sizeOf_fundefs_ctx B + sizeOf_exp e
   end
 with sizeOf_fundefs_ctx (B : fundefs_ctx) : nat :=
@@ -189,32 +201,47 @@ Proof.
   induction l; eauto.
 Qed.
 
-
-
 (** Number of function definitions in an expression *)
-Fixpoint numOf_fundefs_in_exp (e : exp) : nat :=
+Fixpoint num_fundefs_in_exp (e : exp) : nat :=
   match e with
-    | Econstr x _ ys e => numOf_fundefs_in_exp e
+    | Econstr x _ ys e => num_fundefs_in_exp e
     | Ecase x l =>
       1 + (fix num l :=
              match l with
                | [] => 0
-               | (t, e) :: l => numOf_fundefs_in_exp e + num l
+               | (t, e) :: l => num_fundefs_in_exp e + num l
              end) l
     (* Maybe 1 + should be removed?*)
-    | Eproj x _ _ y e => 1 + numOf_fundefs_in_exp e
-    | Eletapp x _ _ y e => numOf_fundefs_in_exp e
-    | Efun B e => numOf_fundefs_in_fundefs B + numOf_fundefs_in_exp e
+    | Eproj x _ _ y e => 1 + num_fundefs_in_exp e
+    | Eletapp x _ _ y e => num_fundefs_in_exp e
+    | Efun B e => 1 + num_fundefs_in_fundefs B + num_fundefs_in_exp e
     | Eapp x _ ys => 0
-    | Eprim x _ ys e => numOf_fundefs_in_exp e
+    | Eprim x _ ys e => num_fundefs_in_exp e
     | Ehalt x => 0
   end
-with numOf_fundefs_in_fundefs (B : fundefs) : nat :=
+with num_fundefs_in_fundefs (B : fundefs) : nat :=
   match B with
-    | Fcons _ _ xs e B =>
-      1 + numOf_fundefs_in_exp e + numOf_fundefs_in_fundefs B
+    | Fcons _ _ xs e B => num_fundefs_in_exp e + num_fundefs_in_fundefs B
     | Fnil => 0
   end.
+
+Fixpoint num_fundefs_val (i : nat) (v : val) := 
+  match i with
+  | 0 => 0
+  | S i' =>
+    (fix aux v : nat :=
+     let num_fundefs_in_env rho := max_ptree_with_measure (num_fundefs_val i') 0 rho in
+     match v with
+       | Vconstr _ vs => max_list_nat_with_measure aux 0 vs
+       | Vfun rho B f =>
+         max (num_fundefs_in_fundefs B) (num_fundefs_in_env rho)
+       | Vint x => 0
+     end) v
+  end.
+
+Definition num_fundefs_in_env i rho := max_ptree_with_measure (num_fundefs_val i) 0 rho.
+
+Definition num_fundefs_in_exp_env i e rho := max (num_fundefs_in_exp e) (num_fundefs_in_env i rho).
 
 Lemma numOf_fundefs_le_sizeOf_fundefs B :
   numOf_fundefs B <= sizeOf_fundefs B.

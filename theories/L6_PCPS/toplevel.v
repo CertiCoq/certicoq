@@ -108,8 +108,8 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
     mkCompData nv nc ni nf cenv fenv nenv ("term" :: msg :: log)      
   end.
 
-(* Optimizing L6 pipeline *)
-Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_FullTerm) : error L6_FullTerm * string :=
+  (* Optimizing L6 pipeline *)
+  Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_FullTerm) : error L6_FullTerm * string :=
   let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
   (* make compilation state *)
   let c_data :=
@@ -119,14 +119,10 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_Fu
       pack_data next_var ctag itag next_fun_tag cenv fenv nenv nil
   in
   let res : error (exp * comp_data):=
-      (* let c_data := log_prog e0 c_data in *)
-      let e0 := shrink_cps.shrink_top e0 in
-      (* let c_data := log_prog e0 c_data in *)
       (* uncurring *)
       let '(e_err1, s, c_data) := uncurry_fuel cps 100 (fst (shrink_cps.shrink_top e0)) c_data in
       (* inlining *)
       e1 <- e_err1 ;;
-      let c_data := log_prog e1 c_data in
       let (e_err2, c_data) := if cps then inline_uncurry e1 s 10 10 c_data
                               else inline_uncurry_marked_anf e1 s 10 10 c_data in
       e2 <- e_err2 ;;
@@ -161,6 +157,7 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_Fu
     let (_, ctag, itag, ftag, cenv, fenv, nenv, log) := c_data in
     (Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e), log_to_string log)
   end.
+
 
 Definition L6_trans : CertiCoqTrans L6_FullTerm L6_FullTerm :=
   fun src => 

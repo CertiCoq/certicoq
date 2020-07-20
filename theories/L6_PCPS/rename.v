@@ -381,6 +381,19 @@ Proof.
   inv H0. auto.
 Qed.
 
+Lemma apply_r_list_eq xs ys sig :
+  NoDup xs ->
+  length xs = length ys ->
+  apply_r_list (set_list (combine xs ys) sig) xs = ys.
+Proof.
+  revert ys sig; induction xs; intros ys sig Hnd Hlen.
+  - simpl. destruct ys; eauto. inv Hlen.
+  - destruct ys; inv Hlen. inv Hnd.
+    simpl. unfold apply_r. rewrite M.gss. f_equal.
+    erewrite eq_P_apply_r_list. eapply IHxs. eassumption. eassumption.
+    eapply eq_env_P_set_not_in_P_l. eapply eq_env_P_refl. eassumption.
+Qed.
+
 Lemma apply_r_sigma_in sigma a :
     apply_r sigma a \in  ([set a] \\ (Dom_map sigma) :|: Range_map sigma).
 Proof.

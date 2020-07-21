@@ -349,5 +349,5 @@ Fixpoint eliminate (e : exp) (c_data : comp_data) : error exp * comp_data :=
       end
     | None => (Err "Dead param elim: find_live failed", c_data)
     end
-  | _ => (Err "Dead param elim: find_live failed", c_data)
+  | e => (Ret e, c_data)
   end.

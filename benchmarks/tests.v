@@ -13,6 +13,9 @@ Import VeriStar.
 
 CertiCoq -help.
 
+Definition test := true. 
+
+
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
 Definition demo3 := andb. 

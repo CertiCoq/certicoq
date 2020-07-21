@@ -127,6 +127,7 @@ Pipeline_utils
 Set_util
 Identifiers
 Rename
+Inline_letapp
 Uncurry
 Color
 Shrink_cps

@@ -4160,23 +4160,25 @@ Inductive correct_cenv_of_val: L6.cps.ctor_env -> (L6.cps.val) -> Prop :=
 | CCV_int: forall cenv z,
     correct_cenv_of_val cenv (cps.Vint z).
                           
-  
 
 (* everything in cenv is in ienv, AND there is a unique entry for it, AND its ord is not reused 
     Doesn't check that name of the i will be consistent (namei could be different from name') *)
 
-(* TODO MATT: Things start not lining up with CertiCoq changes here! *)
+(* TODO MATT: Things start not lining up with CertiCoq changes here! inductive environment is now records, not tuples. *)
   Definition correct_ienv_of_cenv: L6.cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall x, forall i a ord name name', M.get x cenv = Some (Build_ctor_ty_info name name' i a ord) ->
-                                   exists  namei cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
+      exists  namei cl, M.get i ienv = Some (namei, cl)
+                        /\ List.In (Build_ctor_ty_info name name' i a ord) cl
+                        /\ ~ (exists bname bname' a', (bname, bname', a') <> (name, name', a)
+                                                         /\ List.In  (Build_ctor_ty_info bname bname' i a' ord) cl).
 
   (* all constructors found in ienv are in cenv *) 
   Definition domain_ienv_cenv:  L6.cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall i namei cl, M.get i ienv = Some (namei, cl)  ->
-                         forall name x a ord, List.In (name, x, a, ord) cl ->
-                                              exists namei', M.get x cenv = Some (Build_ctor_ty_info name namei' i a ord).              
+                         forall name name' i' a ord, List.In (Build_ctor_ty_info name name' i' a ord) cl ->
+                                              exists x namei', M.get x cenv = Some (Build_ctor_ty_info name namei' i' a ord).              
 
                                    
 
@@ -4184,10 +4186,8 @@ Inductive correct_cenv_of_val: L6.cps.ctor_env -> (L6.cps.val) -> Prop :=
     Definition correct_ienv_of_cenv_strong: L6.cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall x, forall i a ord name namei, M.get x cenv = Some (Build_ctor_ty_info name namei i a ord) ->
-                                   exists   cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
+                                   exists   cl, M.get i ienv = Some (namei, cl) /\ List.In (Build_ctor_ty_info name namei i a ord) cl /\ ~ (exists name' namei' i' a', (name', namei', i', a') <> (name, namei, i, a) /\ List.In (Build_ctor_ty_info name' namei' i' a' ord) cl).
  
-  
-  
 
   (* OS 04/24: added in bound on n includes in this *) 
   Inductive correct_crep (cenv:ctor_env): ctor_tag -> ctor_rep -> Prop :=
@@ -4889,7 +4889,7 @@ Proof.
     archi_red; unfold classify_shift; simpl.
   {   (* unfold Int64.ltu. rewrite Coqlib.zlt_true. *)
       rewrite Int64.shru_div_two_p.
-      rewrite Int64.Zshiftr_div_two_p by omega.
+      rewrite Zbits.Zshiftr_div_two_p by omega.
       rewrite Int64.unsigned_repr by (archi_red; solve_uint_range; omega).
       unfold Int64.iwordsize. unfold Int64.zwordsize. simpl.
       unfold Int64.ltu.
@@ -4899,7 +4899,7 @@ Proof.
 }
 {   
   rewrite Int.shru_div_two_p.
-  rewrite Int.Zshiftr_div_two_p by omega.
+  rewrite Zbits.Zshiftr_div_two_p by omega.
   rewrite Int.unsigned_repr by (archi_red; solve_uint_range; omega).
   unfold Int.iwordsize. unfold Int.zwordsize. simpl.
   unfold Int.ltu.
@@ -4960,7 +4960,7 @@ Proof.
     archi_red; unfold classify_shift; simpl.
   {   (* unfold Int64.ltu. rewrite Coqlib.zlt_true. *)
     rewrite Int64.shru_div_two_p.
-    rewrite Int64.Zshiftr_div_two_p by omega.
+    rewrite Zbits.Zshiftr_div_two_p by omega.
       rewrite Int64.unsigned_repr with (z := n) by (archi_red; solve_uint_range; omega).
       rewrite Int64.unsigned_repr with (z := 1%Z) by (archi_red; solve_uint_range; omega).
       rewrite Int64.unsigned_repr. reflexivity.
@@ -4972,7 +4972,7 @@ Proof.
 }
   {
         rewrite Int.shru_div_two_p.
-    rewrite Int.Zshiftr_div_two_p by omega.
+    rewrite Zbits.Zshiftr_div_two_p by omega.
       rewrite Int.unsigned_repr with (z := n) by (archi_red; solve_uint_range; omega).
       rewrite Int.unsigned_repr with (z := 1%Z) by (archi_red; solve_uint_range; omega).
       rewrite Int.unsigned_repr. reflexivity.
@@ -4996,13 +4996,15 @@ Proof.
   intros.
   apply H in H0. apply H in H1. destructAll.
   rewrite H1 in H0. inv H0.
+Admitted.
+(*
   split; intro; intro; subst.
   - (* c -> ord *)
     apply H7. exists namec', c', a'.  split. intro. inv H8. apply H0; auto. auto.
   - (* ord -> c *)
     apply H6. exists ord', namec', a'. split. intro. inv H8. apply H0; auto. auto.
 Qed.
-
+*)
 
 
 Theorem pos_iter_injective:
@@ -5748,7 +5750,8 @@ Proof.
     rewrite H2 in H5. inv H5. rewrite H in Hgar. inv Hgar. auto.
     rewrite H2 in H5; inv H5. rewrite H2 in H7; inv H7.
     rewrite H5 in H8; inv H8. rewrite H in Hgar. inv Hgar. auto.
-Qed. 
+Qed.
+
 
 (* invariant for GC, needs to be shown to be provable from GC proof *)
 (* OS: Changed returned vs7 into vs7' s.t. the pointers can have changed (but represent the same values in L6) *)

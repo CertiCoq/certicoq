@@ -1567,6 +1567,18 @@ Proof with eauto with Ensembles_DB.
   normalize_occurs_free...
 Qed.
 
+Lemma bound_var_occurs_free_Eletapp_Included x f t ys e :
+  Included _ (Union _ (bound_var e) (occurs_free e))
+           (Union _ (bound_var (Eletapp x f t ys e))
+                  (occurs_free (Eletapp x f t ys e))).
+Proof with eauto with Ensembles_DB.
+  repeat normalize_bound_var. repeat normalize_occurs_free.
+  rewrite <- Union_assoc.
+  apply Included_Union_compat...
+  eapply Included_trans. now apply occurs_free_Eletapp_Included with (ft := t).
+  normalize_occurs_free...
+Qed.
+
 Lemma bound_var_occurs_free_Efun_Included B e :
   Included _ (Union _ (bound_var e) (occurs_free e))
            (Union _ (bound_var (Efun B e))
@@ -2989,6 +3001,151 @@ Corollary occurs_free_leq_max_fundefs B x y :
 Proof.
   now apply occurs_free_leq_max_var_mut.
 Qed.
+
+
+Lemma max_var_acc_commutes :
+  (forall e z y, max_var e (Pos.max y z) = Pos.max (max_var e y%positive) z) /\
+  (forall B z y, max_var_fundefs B (Pos.max y z) = Pos.max (max_var_fundefs B y%positive) z).
+Proof.
+  exp_defs_induction IHe IHl IHB; intros;
+    try (simpl; rewrite Pos.max_assoc, Pos.max_comm, max_list_acc_commutes, Pos.max_comm, IHe; reflexivity).
+  - simpl. rewrite <- !Pos.max_assoc. rewrite <- (Pos.max_comm z v). reflexivity.
+  - simpl in *. rewrite IHe, IHl. reflexivity.
+  - simpl.
+    assert (Heq : Pos.max v0 (Pos.max v (Pos.max y z)) = Pos.max (Pos.max v0 (Pos.max v y)) z).
+    { zify. omega. }
+    rewrite Heq. rewrite IHe. reflexivity.
+  - simpl.
+    assert (Heq : Pos.max f (Pos.max x (Pos.max y z)) = Pos.max (Pos.max f (Pos.max x y)) z).
+    { zify. omega. }
+    rewrite Heq, Pos.max_comm. rewrite max_list_acc_commutes, Pos.max_comm, IHe. reflexivity.
+  - simpl. rewrite IHB. rewrite IHe. reflexivity.
+  - simpl. rewrite Pos.max_assoc, Pos.max_comm. rewrite max_list_acc_commutes. zify; omega.
+  - simpl. zify; omega.
+  - simpl. rewrite IHe.
+    assert (Heq : Pos.max v (Pos.max (max_var e y) z) = Pos.max z (Pos.max v (max_var e y))) by (zify; omega).
+    rewrite Heq. rewrite max_list_acc_commutes. rewrite Pos.max_comm. rewrite IHB. reflexivity.
+  - reflexivity.
+Qed.
+
+Lemma max_var_acc e z :
+  max_var e z = Pos.max (max_var e 1%positive) z.
+Proof.
+  rewrite <- (proj1 max_var_acc_commutes). f_equal. zify; omega.
+Qed. 
+
+Lemma max_var_fundefs_acc B z :
+  max_var_fundefs B z = Pos.max (max_var_fundefs B 1%positive) z.
+Proof.
+  rewrite <- (proj2 max_var_acc_commutes). f_equal. zify; omega.
+Qed. 
+
+
+Lemma aux_acc l v z :
+  (fix
+     aux (P : list (ctor_tag * exp)) (z : positive) {struct P} :
+     positive :=
+     match P with
+     | [] => Pos.max z v
+     | (_, e0) :: P0 => aux P0 (max_var e0 z)
+     end) l z =
+  Pos.max z ((fix
+                aux (P : list (ctor_tag * exp)) (z : positive) {struct P} :
+                positive :=
+                match P with
+                | [] => Pos.max z v
+                | (_, e0) :: P0 => aux P0 (max_var e0 z)
+                end)l 1%positive). 
+Proof.
+  revert z. induction l; intros.
+  - zify; omega.
+  - simpl. destruct a. simpl. rewrite IHl.
+    rewrite max_var_acc. rewrite (Pos.max_comm _ z).  rewrite <- Pos.max_assoc. rewrite <- IHl.
+    reflexivity.
+Qed. 
+
+
+Lemma max_var_subset_mut :
+  (forall e, max_var e 1%positive \in bound_var e :|: occurs_free e) /\
+  (forall B z, max_var_fundefs B z%positive \in z |: bound_var_fundefs B :|: occurs_free_fundefs B).  
+Proof.
+  exp_defs_induction IHe IHl IHB; intros.
+  - simpl. replace (Pos.max v 1%positive) with v by (zify; omega). rewrite max_var_acc. 
+    destruct (Pos.max_spec (max_var e 1%positive) (List_util.max_list l v)).
+    + inv H. rewrite H1.
+      eapply Included_trans. 3:{ eapply max_list_in_list. } reflexivity.
+      normalize_bound_var. normalize_occurs_free. sets.
+    + inv H. rewrite H1. eapply bound_var_occurs_free_Econstr_Included. eauto.
+  - simpl. normalize_occurs_free. replace (Pos.max 1%positive v) with v by (zify; omega). sets.
+  - simpl. rewrite aux_acc.
+    match goal with
+    | [_ : _ |- context[Pos.max ?A ?B] ] => 
+      destruct (Pos.max_spec A B)
+    end.
+    + inv H. rewrite H1. eapply bound_var_occurs_free_Ecase_cons_Included. eassumption.
+    + inv H. rewrite H1. eapply bound_var_occurs_free_Ecase_Included. now left. eassumption.
+  - simpl. replace (Pos.max v 1%positive) with v by (zify; omega). rewrite max_var_acc. 
+    destruct (Pos.max_spec (max_var e 1%positive) (Pos.max v0 v)).
+    + inv H. rewrite H1.
+      destruct (Pos.max_spec v0 v).
+      * inv H. rewrite H3. now eauto.
+      * inv H. rewrite H3. now eauto.
+    + inv H. rewrite H1. eapply bound_var_occurs_free_Eproj_Included. eauto.
+  - simpl. replace (Pos.max x 1%positive) with x by (zify; omega). rewrite max_var_acc. 
+    destruct (Pos.max_spec (max_var e 1%positive) (List_util.max_list ys (Pos.max f x))).
+    + inv H. rewrite H1.
+      eapply Included_trans. 3:{ eapply max_list_in_list. } reflexivity.
+      eapply Union_Included.
+      * eapply Singleton_Included.
+        destruct (Pos.max_spec f x).
+        -- inv H. rewrite H3. now eauto.
+        -- inv H. rewrite H3. normalize_occurs_free. now eauto.
+      * normalize_occurs_free. sets.
+    + inv H. rewrite H1. eapply bound_var_occurs_free_Eletapp_Included. eauto.
+  - destruct f2. 
+    { simpl in *. specialize (IHB v). rewrite (Pos.max_comm v), <- max_var_acc.
+      rewrite (Pos.max_comm v) in IHB.  rewrite <- (proj1 max_var_acc_commutes) in IHB.
+      rewrite Pos.max_idempotent in IHB. rewrite max_var_acc. 
+      edestruct (Pos.max_spec (max_var e 1%positive) (max_var_fundefs f2 (List_util.max_list l (max_var e0 v)))).
+      - inv H. rewrite H1. eapply Included_trans. 3:{ eapply IHB. } reflexivity.
+        normalize_bound_var. eapply Union_Included. eapply Union_Included.  normalize_bound_var. sets.
+        sets. normalize_occurs_free. sets.
+      - inv H. rewrite H1. eapply bound_var_occurs_free_Efun_Included. eauto. }
+    { simpl. repeat normalize_bound_var. repeat normalize_occurs_free. simpl. repeat normalize_sets.
+      eauto. } 
+  - simpl. eapply Included_trans. 3:{ eapply max_list_in_list. } reflexivity.
+    replace (Pos.max v 1%positive) with v by (zify; omega).
+    normalize_bound_var. normalize_occurs_free. sets.
+  - simpl. replace (Pos.max v 1) with v by (zify; omega). rewrite max_var_acc. 
+    destruct (Pos.max_spec (max_var e 1%positive) (List_util.max_list l v)).
+    + inv H. rewrite H1.
+      eapply Included_trans. 3:{ eapply max_list_in_list. } reflexivity.
+      normalize_bound_var. normalize_occurs_free. sets.
+    + inv H. rewrite H1. eapply bound_var_occurs_free_Eprim_Included. eauto.
+  - simpl. replace (Pos.max 1%positive v) with v by (zify; omega). normalize_occurs_free. eauto.
+  - simpl. rewrite max_var_acc. eapply Included_trans. 3:{ eapply IHB. } reflexivity. eapply Union_Included. eapply Union_Included.
+    + eapply Singleton_Included.
+      eapply Included_trans. 3:{ eapply max_list_in_list. } reflexivity.
+      eapply Union_Included.
+      * eapply Singleton_Included.
+        destruct (Pos.max_spec v (Pos.max (max_var e 1%positive) z)).
+        -- inv H. rewrite H1.
+           destruct (Pos.max_spec (max_var e 1%positive) z). 
+           ++ inv H. rewrite H3. eauto.
+           ++ inv H. rewrite H3. eapply Included_trans. eapply bound_var_occurs_free_Fcons_Included. now sets.
+              now eauto.
+        -- inv H. rewrite H1. normalize_bound_var. now eauto.
+      * normalize_bound_var. now sets.
+    + normalize_bound_var. now sets.
+    + eapply Included_trans. eapply Included_Union_Setminus with (s2 := [set v]). tci.
+      normalize_occurs_free. normalize_bound_var. sets.
+  - simpl. now sets.
+Qed.                                 
+
+
+Lemma max_var_subset :
+  (forall e, max_var e 1%positive \in bound_var e :|: occurs_free e).
+Proof. eapply max_var_subset_mut. Qed.
 
 (** * A set that contains all the identifiers above a certain value *)
 

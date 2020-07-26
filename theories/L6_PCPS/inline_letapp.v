@@ -66,18 +66,6 @@ Proof.
 Qed.
 
 
-(* TODO move *)
-Lemma bound_var_occurs_free_Eletapp_Included x f t ys e :
-  Included _ (Union _ (bound_var e) (occurs_free e))
-           (Union _ (bound_var (Eletapp x f t ys e))
-                  (occurs_free (Eletapp x f t ys e))).
-Proof with eauto with Ensembles_DB.
-  repeat normalize_bound_var. repeat normalize_occurs_free.
-  rewrite <- Union_assoc.
-  apply Included_Union_compat...
-  eapply Included_trans. now apply occurs_free_Eletapp_Included with (ft := t).
-  normalize_occurs_free...
-Qed.
 
 Lemma inline_letapp_var_eq x e C x' :
   inline_letapp e x = Some (C, x') ->

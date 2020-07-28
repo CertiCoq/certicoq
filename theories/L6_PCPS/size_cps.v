@@ -35,7 +35,7 @@ Fixpoint sizeOf_exp (e : exp) : nat :=
   end
 with sizeOf_fundefs (B : fundefs) : nat := 
        match B with
-         | Fcons _ _ xs e B =>
+       | Fcons _ _ xs e B =>
            1 + sizeOf_exp e + sizeOf_fundefs B
          | Fnil => 0
        end.
@@ -108,6 +108,14 @@ Proof.
     now apply Max.le_max_l.
 Qed.
 
+
+
+Inductive val_rec : val -> Type :=
+| Val_rec_constr :
+    
+| 
+
+with env_rec : env -> Type := 
 
 (** Stratified size for values *)
 Fixpoint sizeOf_val' (i : nat) (v : val) : nat :=
@@ -202,7 +210,7 @@ Proof.
 Qed.
 
 (** Number of function definitions in an expression *)
-Fixpoint num_fundefs_in_exp (e : exp) : nat :=
+Fixpoint num_fundefs_in_expnum_fundefs_in_exp (e : exp) : nat :=
   match e with
     | Econstr x _ ys e => num_fundefs_in_exp e
     | Ecase x l =>

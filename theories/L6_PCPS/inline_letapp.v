@@ -65,8 +65,6 @@ Proof.
   inv Hin. normalize_bound_var. repeat normalize_bound_var_ctx. sets.
 Qed.
 
-
-
 Lemma inline_letapp_var_eq x e C x' :
   inline_letapp e x = Some (C, x') ->
   x' = x \/ x' \in bound_var e :|: occurs_free e.

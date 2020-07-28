@@ -583,8 +583,7 @@ Section Log_rel.
       find_def h fl = Some (t, xs, e_b1) ->
       set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
       bstep_fuel cenv rhoc1' e_b1 (Res v1) c1 -> 
-      (* Will need to prove that the size of the returned val is *)
-
+      
       (* for simplicity don't model the semantics of the target since it doesn't matter *)
       PG (e_b1, rhoc1', c1)  (e_b2, rhoc2, c2) -> 
       P1 (e1, M.set x v1 rho1, c1') (e2, M.set x' v2 rho2, c2') ->

@@ -241,6 +241,9 @@ Section RelComp.
                 (fun P2 => compose_rel P2 P3 pr_trivial pr_trivial
                                        (fun P (c1 : val) (c2 : val) => forall k, cc_approx_val cenv ctag k P c1 c2) (preord_val_n m)).
 
+  
+
+  
   Context (P1 P2 P3 : PostT)
           (Pr1 Pr2 Pr3 Pr4 : post_property)
           (wf_pres_trans : Transitive wf_pres).
@@ -839,17 +842,21 @@ Section LinkingCompTop.
   Lemma Rel_exp_n_preserves_linking P1 P2 Q1 Q2 P x n1 n2 m1 m2 e1 e2 e1' e2' :    
     R_n_exp cenv ctag (relation_conjunction preserves_closed preserves_straight_code) Pr P1 P P2 Pr1 Pr Pr3 n1 n2 e1 e2 ->
     R_n_exp cenv ctag preserves_fv Pr Q1 P Q2 Pr1 Pr Pr3 m1 m2 e1' e2' ->
+
+    (* e1: source library, e2: compiled library *)
+    (* e1': source client, e2': compiled client *)    
     
     closed_exp e1 ->
     straight_code e1 = true ->
     occurs_free e1' \subset [set x] ->
     
     match link lf x e1 e1', link lf x e2 e2' with
-    | Some e, Some e' =>
-      R_n_exp cenv ctag preserves_closed Pr' (comp P1 Q1) P (comp P2 Q2) Pr' Pr' Pr' (n1 + m1) (n2 + m2)  e e'
+    | Some e_src, Some e_trg =>
+      R_n_exp cenv ctag preserves_closed Pr' (comp P1 Q1) P (comp P2 Q2) Pr' Pr' Pr' (n1 + m1) (n2 + m2)  e_src e_trg
     | _ , _ => True
     end.
   Proof.
+    
     intros Hrel1 Hrel2 Hc1 Hs1 Hfv.
     destruct (link lf x e1 e1') eqn:Hl1; eauto.
     destruct (link lf x e2 e2') eqn:Hl2; eauto. inv Hrel1. inv Hrel2. destructAll. 

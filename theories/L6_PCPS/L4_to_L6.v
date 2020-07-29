@@ -291,10 +291,10 @@ Fixpoint cps_exps (ts : list (cps.exp * var * var)) (vx : list var) (k : var)
   | t::ts' =>
     let '(e1, k1, x1) := t in
     r <- cps_exps ts' vx k;;
-      let e_exp := r in
-      ret (cps.Efun
-             (Fcons k1 kon_tag (x1::nil) e_exp Fnil)
-             e1)
+    let e_exp := r in
+    ret (cps.Efun
+           (Fcons k1 kon_tag (x1::nil) e_exp Fnil)
+           e1)
   end.
 
 (* returns cps exp, var and next fresh var *)
@@ -309,18 +309,18 @@ Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
     let (k1, next) := gensym next (nNamed "k1"%string) in
     let (x1, next) := gensym next (nNamed "x1"%string) in
     r1 <- cps_cvt e1 vn k1 (next) tgm;;
-       let '(e1', next) := r1 : (cps.exp * symgen) in
-       let (k2, next) := gensym next (nNamed "k2"%string) in
-       let (x2, next) := gensym next (nNamed "x2"%string) in
-       r2 <- cps_cvt e2 vn k2 (next) tgm;;
-          let '(e2', next) := r2 : (cps.exp * symgen) in
-          ret (cps.Efun
-                 (Fcons k1 kon_tag (x1::nil)
-                        (cps.Efun
-                           (Fcons k2 kon_tag (x2::nil)
-                                  (cps.Eapp x1 func_tag (x2::k::nil)) Fnil)
-                           e2') Fnil)
-                 e1', next)
+    let '(e1', next) := r1 : (cps.exp * symgen) in
+    let (k2, next) := gensym next (nNamed "k2"%string) in
+    let (x2, next) := gensym next (nNamed "x2"%string) in
+    r2 <- cps_cvt e2 vn k2 (next) tgm;;
+    let '(e2', next) := r2 : (cps.exp * symgen) in
+    ret (cps.Efun
+           (Fcons k1 kon_tag (x1::nil)
+                  (cps.Efun
+                     (Fcons k2 kon_tag (x2::nil)
+                            (cps.Eapp x1 func_tag (x2::k::nil)) Fnil)
+                     e2') Fnil)
+           e1', next)
 
   | Lam_e n e1 =>
     let (k1, next) := gensym next (nNamed "k_lam"%string) in
@@ -328,10 +328,10 @@ Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
     let (f, next) := gensym next n in
     (* let tgm := set_n f n tgm in *)
     r <- cps_cvt e1 (x1::vn) k1 (next) tgm;;
-      let '(e1', next) := r : (cps.exp * symgen) in
-      ret ((cps.Efun
-              (Fcons f func_tag (x1::k1::nil) e1' Fnil)
-              (cps.Eapp k kon_tag (f::nil))), next)
+    let '(e1', next) := r : (cps.exp * symgen) in
+    ret ((cps.Efun
+            (Fcons f func_tag (x1::k1::nil) e1' Fnil)
+            (cps.Eapp k kon_tag (f::nil))), next)
 
   | Let_e n e1 e2 =>
     (* let e' = L4.App_e (L4.Lam_e n e1) e2 in
@@ -339,74 +339,96 @@ Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
     let (x, next) := gensym next n in
     let (k1, next) := gensym next (nNamed "k"%string) in
     r2 <- cps_cvt e2 (x::vn) k (next) tgm;;
-       let '(e2', next) := r2 : (cps.exp * symgen) in
-       r1 <- cps_cvt e1 vn k1 next tgm;;
-          let '(e1', next) := r1 : (cps.exp * symgen) in
-          (* let tgm := set_n x n tgm in *)
-          ret (cps.Efun
-                 (Fcons k1 kon_tag (x::nil) e2' Fnil)
-                 e1', next)
+    let '(e2', next) := r2 : (cps.exp * symgen) in
+    r1 <- cps_cvt e1 vn k1 next tgm;;
+    let '(e1', next) := r1 : (cps.exp * symgen) in
+    (* let tgm := set_n x n tgm in *)
+    ret (cps.Efun
+           (Fcons k1 kon_tag (x::nil) e2' Fnil)
+           e1', next)
 
   | Con_e dci es =>
     let c_tag := dcon_to_tag dci tgm in
     let (k', next) := gensym next (nNamed "k'"%string) in
     let (x', next) := gensym next (nNamed "x'"%string) in
-    r1 <- cvt_triples_exps es vn next tgm;;
-       let '(cvt_ts, next) := r1 in
-       let vx := List.map
-                   (fun x => let '(_, _, v) := x : (cps.exp * var * var) in v)
-                   cvt_ts
-       in
-       r2 <- cps_exps cvt_ts vx k';;
-          let e' := r2 in
-          ret (cps.Efun
-                 (Fcons k' kon_tag vx
-                        (Econstr x' c_tag vx
-                                 (Eapp k kon_tag (x'::nil))) Fnil)
-                 e', next)
+    (* r1 <- cvt_triples_exps es vn next tgm;; *)
+    (* let '(cvt_ts, next) := r1 in *)
+    (* let vx := List.map *)
+    (*             (fun x => let '(_, _, v) := x : (cps.exp * var * var) in v) *)
+    (*             cvt_ts *)
+    (* in *)
+    (* r2 <- cps_exps cvt_ts vx k';; *)
+    (* let e' := r2 in *)
+    let (vx, next) := gensym_n_nAnon next (N.to_nat (exps_length es)) in
+    r <- cps_cvt_exps es vn k nil next tgm;;
+    let (e', next) := r : cps.exp * symgen in
+    ret (cps.Efun
+           (Fcons k' kon_tag vx
+                  (Econstr x' c_tag vx
+                           (Eapp k kon_tag (x'::nil))) Fnil)
+           e', next)
 
   | Fix_e fnlst i =>
     let (fnlst_length, names_lst) := efnlst_names fnlst in
     let (nlst, next) := gensym_n next names_lst in
     r <- cps_cvt_efnlst fnlst (nlst ++ vn) nlst next tgm;;
-      let '(fdefs, next) := r : (fundefs * symgen) in
-      let i' := (nth nlst (N.to_nat i)) in
-      ret (cps.Efun fdefs
-                    (cps.Eapp k kon_tag (i'::nil)),
-           next)
+    let '(fdefs, next) := r : (fundefs * symgen) in
+    let i' := (nth nlst (N.to_nat i)) in
+    ret (cps.Efun fdefs
+                  (cps.Eapp k kon_tag (i'::nil)),
+         next)
 
   | Match_e e1 n bl =>
     let (k1, next) := gensym next (nNamed "k1"%string) in
     let (x1, next) := gensym next (nNamed "x1"%string) in
     r1 <- cps_cvt e1 vn k1 next tgm;;
-       let '(e1', next) := r1 in
-       r2 <- cps_cvt_branches bl vn k x1 next tgm;;
-          let '(cbl, next) := r2 : (list (ctor_tag * exp) * symgen) in
-          ret (cps.Efun
-                 (Fcons k1 kon_tag (x1::nil)
-                        (Ecase x1 cbl) Fnil)
-                 e1', next)
+    let '(e1', next) := r1 in
+    r2 <- cps_cvt_branches bl vn k x1 next tgm;;
+    let '(cbl, next) := r2 : (list (ctor_tag * exp) * symgen) in
+    ret (cps.Efun
+           (Fcons k1 kon_tag (x1::nil)
+                  (Ecase x1 cbl) Fnil)
+           e1', next)
 
   | Prf_e =>
     let (x, next) := gensym next (nNamed ""%string) in
     ret (cps.Econstr x default_tag nil (cps.Eapp k kon_tag (x::nil)), next)
   end
 
-with cvt_triples_exps (es : expression.exps) (vn : list var) (next : symgen)
-                      (tgm : constr_env)
-     : option ((list (cps.exp * var * var)) * symgen) :=
+(* with cvt_triples_exps (es : expression.exps) (vn : list var) (next : symgen) *)
+(*                       (tgm : constr_env) *)
+(*      : option ((list (cps.exp * var * var)) * symgen) := *)
+(*        match es with *)
+(*        | enil => ret (nil, next) *)
+(*        | econs e es' => *)
+(*          let (k, next) := gensym next (nNamed ""%string) in *)
+(*          let (x, next) := gensym next (nNamed ""%string) in *)
+(*          r1 <- cps_cvt e vn k next tgm;; *)
+(*          let '(e', next) := r1 in *)
+(*          r2 <- cvt_triples_exps es' vn next tgm;; *)
+(*          let '(cvt_ts', next) := *)
+(*              r2 : (list (cps.exp * var * var)) * symgen in *)
+(*          ret ((e', k, x) :: cvt_ts', next) *)
+(*        end *)
+
+(* merge cvt_triples_exps and cps_exps *)
+with cps_cvt_exps (es : expression.exps) (vn : list var) (k : var) (vx : list var)
+                  (next : symgen) (tgm : constr_env) 
+       : option (cps.exp * symgen) :=
        match es with
-       | enil => ret (nil, next)
+       | enil => ret (cps.Eapp k kon_tag (List.rev vx), next)
        | econs e es' =>
-         let (k, next) := gensym next (nNamed ""%string) in
-         let (x, next) := gensym next (nNamed ""%string) in
-         r1 <- cps_cvt e vn k next tgm;;
-            let '(e', next) := r1 in
-            r2 <- cvt_triples_exps es' vn next tgm;;
-               let '(cvt_ts', next) :=
-                   r2 : (list (cps.exp * var * var)) * symgen in
-               ret ((e', k, x) :: cvt_ts', next)
+         let (k1, next) := gensym next (nNamed ""%string) in
+         let (x1, next) := gensym next (nNamed ""%string) in
+         r1 <- cps_cvt e vn k1 next tgm;;
+         let (e', next) := r1 : (cps.exp * symgen) in
+         r2 <- cps_cvt_exps es' vn k (x1 :: vx) next tgm;;
+         let (e_exp, next) := r2 : (cps.exp * symgen) in
+         ret (cps.Efun
+                (Fcons k1 kon_tag (x1::nil) e_exp Fnil)
+                e', next)
        end
+       
 
 (* nlst must be of the same length as fdefs *)
 with cps_cvt_efnlst (fdefs : expression.efnlst) (vn : list var)
@@ -800,6 +822,36 @@ Definition cps_val_rel (v : value) (v': val) : Prop :=
   | _, _ => False
   end.
 
+Fixpoint obs_rel' (v : value) (v': val) : Prop :=
+  let fix Forall2_aux vs1 vs2 :=
+      match vs1, vs2 with
+      | [], [] => True
+      | v1 :: vs1, v2 :: vs2 =>
+        obs_rel' v1 v2 /\ Forall2_aux vs1 vs2
+      | _, _ => False
+      end
+  in
+  match v, v' with
+  | Con_v dc vs, Vconstr c_tag vs' =>
+    dcon_to_tag dc cnstrs = c_tag /\ Forall2_aux vs vs'
+  | Prf_v, Vint 0 => True
+  | Clos_v rho na e, Vfun rho_m (Fcons f func_tag (x::k::nil) e' Fnil) f' =>
+    True
+  | _, _ => False
+  end.
+
+Fixpoint env_obs_rel rho rho' :=
+  match rho, rho' with
+  | [], [] => True
+  | v1 :: rho, v2 :: vs =>
+    (forall v'' k,
+        obs_rel' v1 v'' ->
+        preord_val cenv PG k v'' v2) /\
+    env_obs_rel rho vs
+  | _, _ => False
+  end.
+
+
 Lemma Forall2_aux_is_Forall2 :
   forall vs l, 
     (fix Forall2_aux (vs1 : list value) (vs2 : list val) {struct vs1} : Prop :=
@@ -821,7 +873,9 @@ Proof.
   - destruct l. destruct Haux.
     destruct Haux. econstructor.
     eassumption. eapply IHvs. eassumption.
-Qed. 
+Qed.
+
+(* Lemma cps_env_rel_eq :  *)
 
 Lemma cps_val_rel_eq :
   forall v v',
@@ -845,7 +899,9 @@ Proof.
       admit.
     + admit.
   - admit.
-Admitted. 
+Admitted.
+
+
 
 (* informal *)
 (* add StrictlyInc constraint on names, and greater than constraint on next1 *)
@@ -980,16 +1036,44 @@ Proof.
       inv Hgen2. inv H2. eassumption. 
 Admitted. 
 
-Lemma Forall2_asym_app:
-  forall (A : Type) (R : relation A) (l1 l2 : list A) (l1' l2' : list A),
-    Forall2_asym R l1 l1' ->
-    Forall2_asym R l2 l2' ->
-    Forall2_asym R (l1 ++ l2) (l1' ++ l2').
+Require Import functions.
+Require Import Ensembles.
+Require Import Ensembles_util.
+
+Definition cps_cvt_exp_alpha_equiv :=
+   forall k e e1 e2 k1 k2 vars1 vars2 rho1 rho2 next1 next2 next3 next4,
+    cps_cvt e vars1 k1 next1 cnstrs = Some (e1, next2) ->
+    cps_cvt e vars2 k2 next3 cnstrs = Some (e2, next4) ->
+    ~(k1 \in (FromList vars1)) ->
+    preord_env_P_inj cenv PG (k1 |: FromList vars1) k (id { k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
+    preord_exp cenv P1 PG k (e1, rho1) (e2, rho2).
+
+Definition cps_cvt_exps_alpha_equiv :=
+  forall k es es1 es2 k1 k2 vars1 vars2 rho1 rho2 next1 next2 next3 next4,
+    
+
+
 Proof.
-  intros A R l1 l2 l1' l2' H1 H2.
-  induction H1.
-  - 
-Abort. 
+  induction k using lt_wf_rec.
+  induction e; intros e1' e2' k1 k2 vars1 vars2 rho1 rho2
+                      next1 next2 next3 next4 He1 He2 Hnot Henv.
+  - simpl in He1, He2.
+    inv He1. inv He2.
+    eapply preord_exp_app_compat.
+    + admit.
+    + admit.
+    + assert (Heq: k2 = ((id {k1 ~> k2}) <{ vars1 ~> vars2 }>) k1).
+      { rewrite extend_lst_gso.
+        rewrite extend_gss. reflexivity.
+        eassumption. }
+      rewrite Heq.
+      eapply Henv. left. reflexivity.
+    + admit.
+  - admit.
+  - admit.
+  - simpl in He1, He2.
+    
+    
 
 Lemma cps_cvt_val_diff_symgen :
   forall v v' v'' k next1 next2 next3 next4,
@@ -1125,7 +1209,7 @@ Proof.
     + simpl. eapply IHl.
 Qed.
 
-Lemma cps_val_rel_is_env_rel :
+Lemma cps_val_rel_is_env_rel' :
   forall vs,
     Forall
       (fun v : value =>
@@ -1153,12 +1237,36 @@ Proof.
   - inv Hall. eapply IHvs in H2.
     edestruct H2.
     eexists.
-Abort. 
+Abort.
+
+Lemma cps_val_rel_is_env_rel :
+  forall vs l next1 next2,
+     Forall
+      (fun v : value =>
+         forall (v' : val) (next1 next2 : symgen),
+           cps_cvt_val v next1 cnstrs = Some (v', next2) -> cps_val_rel' v v') vs ->
+     cps_cvt_env vs next1 cnstrs = Some (l, next2) ->
+     cps_env_rel vs l.
+Proof. 
+  induction vs; intros l next1 next2 Hall Henv.
+  - simpl in Henv. inv Henv. econstructor.
+  - inv Hall.
+    simpl in Henv.
+    destruct (cps_cvt_val a next1 cnstrs) eqn:Hcvt_val. 2: { inv Henv. }
+    destruct p eqn:Hp.
+    destruct (cps_cvt_env vs s cnstrs) eqn:Hcvt_env. 2: { inv Henv. } 
+    destruct p0 eqn:Hp0.
+    inv Henv. simpl. split.
+    + intros. 
+    admit.
+Admitted. 
+
 
 Lemma cps_cvt_val_impl_rel :
   forall v v' next1 next2,
     cps_cvt_val v next1 cnstrs = Some (v', next2) ->
     cps_val_rel' v v'.
+Proof. 
   intros v.
   induction v using value_ind'; intros v' next1 next2 Hval;
     rewrite cps_cvt_val_eq in Hval.
@@ -1192,9 +1300,8 @@ Lemma cps_cvt_val_impl_rel :
     destruct (cps_cvt e (v0 :: l0) v s3 cnstrs) eqn:Hcvt_e. 2: { inv Hval. }
     destruct p0 eqn:Hp0.
     inv Hval.
-    simpl. repeat eexists.
-    
-        
+    simpl.
+Abort.        
     
 Lemma cps_val_rel_preord :
   forall rho rho' next1 next2 v n k,        
@@ -1214,7 +1321,53 @@ Proof.
     + simpl. eapply H.
       simpl in Hval.
       admit.
-    + 
+    +
+Abort.
+
+Lemma env_obs_rel_preord :
+  forall rho rho' n v1 v2 k,
+    env_obs_rel rho rho' ->
+    obs_rel' (List.nth n rho Prf_v) v1 ->
+    List.nth n rho' (Vint 0) = v2 ->
+    preord_val cenv PG k v1 v2.
+Proof.
+  induction rho; intros rho' n v1 v2 k Henv Hrel Hv2.
+  - simpl in Henv. destruct rho'.
+    admit.
+    destruct Henv.
+  - simpl in Henv. destruct rho' eqn:Hrho'.
+    destruct Henv.
+    destruct Henv.
+    simpl in Hrel. destruct n eqn:Hn.
+    + simpl in Hv2. rewrite <- Hv2.
+      eapply H. eassumption.
+    + simpl in Hv2. eapply IHrho; try eassumption.
+Admitted.
+
+Lemma nth_post_set_lists :
+  forall rho rho_m k0 next1 next2 n vk vars v,
+    lt_symgen k0 next1 ->
+    gensym_n_nAnon next1 (List.length rho) = (vars, next2) ->
+    set_lists vars rho (M.empty val) = Some rho_m ->
+    M.get (nth vars n) (M.set k0 vk rho_m) = Some v ->
+    v = List.nth n rho (Vint 0).
+Proof.
+  induction rho; intros rho_m k0 next1 next2 n vk vars v Hlt Hgen Hset Hget.
+  - simpl in *. admit.
+  - simpl in *. destruct n eqn:Hn.
+    + unfold gensym_n_nAnon in Hgen.
+      destruct next1 eqn:Hnext1.
+      destruct p eqn:Hp.
+      destruct (gensym_n_nAnon' v0 n0 (S (Datatypes.length rho))) eqn:Hgen2.
+      destruct p0 eqn:Hp0.
+Abort. 
+  
+
+(* Lemma cps_val_rel_preord_2 : *)
+(*   forall rho rho' n k , *)
+(*     cps_env_rel rho rho' -> *)
+(*     cps_val_rel (List.nth n rho Prf_v) (List.nth n rho' (Vint 0)) -> *)
+(*     preord_val cenv PG k (List.nth n rho Prf_v) (List.nth n rho' (Vint 0)).  *)
 
 Lemma cps_cvt_env_and_val_nth :
   forall rho rho' rho_m vars v' v'' n k next next1 next2 next3,
@@ -1279,15 +1432,17 @@ Admitted.
 
 Definition cps_cvt_correct_e c :=
   forall e e' rho rho' rho_m v v' x k vk vars
-         next1 next2 next3 next4 next5,
+         next1 next2 next3,
     eval_env rho e v ->
     ~(x = k) ->
-    (lt_symgen k next1) /\ (lt_symgen x next4) /\ (lt_symgen k next4) ->
+    (lt_symgen k next1) /\ (lt_symgen x next1) ->
+    (* (lt_symgen x next4) /\ (lt_symgen k next4) -> *)
     cps_env_rel rho rho' -> 
     gensym_n_nAnon next1 (List.length rho') = (vars, next2) ->
     set_lists vars rho' (M.empty val) = Some rho_m ->
     cps_cvt e vars k next2 cnstrs = Some (e', next3) ->
-    cps_cvt_val v next4 cnstrs = Some (v', next5) ->
+    (* cps_cvt_val v next4 cnstrs = Some (v', next5) -> *)
+    obs_rel' v v' ->
     preord_exp cenv P1 PG c
                ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty val))))
                (e', (M.set k vk rho_m)).
@@ -1297,7 +1452,8 @@ Definition cps_cvt_correct_es c :=
          next1 next2 next3 next4 next5,
     Forall2 (fun e v => eval_env rho e v) (exps_to_list es) vs ->
     ~(x = k) ->
-    (lt_symgen x next1) /\ (lt_symgen x next4) /\ (lt_symgen k next4) ->
+    (lt_symgen x next1) /\ (lt_symgen x next1) /\
+    (lt_symgen x next4) /\ (lt_symgen k next4) ->
     cps_env_rel rho rho' ->
     gensym_n_nAnon next1 (List.length rho') = (vars, next2) ->
     set_lists vars rho' (M.empty val) = Some rho_m ->
@@ -1317,7 +1473,8 @@ Definition cps_cvt_correct_efnlst c :=
     Forall2 (fun p v => let (na, e) := p : (name * expression.exp) in
                         eval_env rho e v) (efnlst_as_list efns) vfns ->
     ~(x = k) ->
-    (lt_symgen x next1) /\ (lt_symgen x next4) /\ (lt_symgen k next4) ->
+    (lt_symgen x next1) /\ (lt_symgen x next1) /\
+    (lt_symgen x next4) /\ (lt_symgen k next4) ->
     cps_env_rel rho rho' ->
     gensym_n_nAnon next1 (List.length rho') = (vars, next2) ->
     set_lists vars rho' (M.empty val) = Some rho_m ->
@@ -1338,7 +1495,8 @@ Definition cps_cvt_correct_branches c :=
     Forall2 (fun p v => let '(dc, (n, l), e) := p in
                         eval_env rho e v) (branches_as_list bs) vs ->
     ~(x = k) ->
-    (lt_symgen x next1) /\ (lt_symgen x next4) /\ (lt_symgen k next4) ->
+    (lt_symgen x next1) /\ (lt_symgen x next1) /\
+    (lt_symgen x next4) /\ (lt_symgen k next4) ->
     cps_env_rel rho rho' ->
     gensym_n_nAnon next1 (List.length rho') = (vars, next2) ->
     set_lists vars rho' (M.empty val) = Some rho_m ->
@@ -1362,7 +1520,7 @@ Lemma cps_cvt_correct:
 Proof.
   intros k. induction k as [k IHk] using lt_wf_rec1. eapply my_exp_ind.
   - intros n e' rho rho' rho_m v v' x k0 vk vars 
-           next1 next2 next3 next4 next5 H H0 H1 H2 H3 H4 H5 H6.
+           next1 next2 next3 H H0 H1 H2 H3 H4 H5 H6.
     inv H. simpl in H5. inv H5.
     eapply preord_exp_app_compat.
     + eapply HPost_app. eapply Hprops. 
@@ -1381,7 +1539,7 @@ Proof.
          intros v1 Hgetv1. rewrite M.gss in Hgetv1.
          inv Hgetv1. eexists. admit.
       -- econstructor.
-  - intros na e IH e' rho rho' rho_m v v' x k0 vk vars cnstrs
+  - intros na e IH e' rho rho' rho_m v v' x k0 vk vars
            next1 next2 next3 next4 next5 Heval Hneq Hlt Hrel Hgen Hset Hcvt Hcvt_val.
     inv Heval. simpl in Hcvt.
     destruct (gensym next2 (nNamed "k_lam")) eqn: Hgen_k.
@@ -1419,7 +1577,7 @@ Proof.
   - admit.
   - admit.
   - admit.
-  - intros na e IH1 e0 IH2 e' rho rho' rho_m v v' x k0 vk vars cnstrs
+  - intros na e IH1 e0 IH2 e' rho rho' rho_m v v' x k0 vk vars
            next1 next2 next3 next4 next5 Heval Hneq Hlt Hrel Hgen Hset Hcvt Hcvt_val.
     simpl in Hcvt.
     destruct (gensym next2 na) eqn: Hgen_x.
@@ -1503,7 +1661,16 @@ Proof.
                                         (M.set k0 vk rho_m))) by admit.
       eapply Hpre. clear Hpre. 
       eapply preord_exp_monotonic.
-      eapply IH1. 
+      eapply IH1.
+      - eassumption.
+      - (* x < next1 < next2 < s < v1 *) admit.
+      - admit.
+      - eassumption.
+      - eassumption.
+      - (* use some other rho? *) admit.
+      - admit.
+      - eassumption.
+      - (* ? *)
 Abort. 
 
   

@@ -361,7 +361,7 @@ Fixpoint find_def (f: var) (fl:  fundefs) :=
 (** * Information associated with identifiers **)
 
 (* The info of a constructor. *)
-Record ctor_ty_info : Type :=
+Record ctor_ty_info : Set :=
   Build_ctor_ty_info
     { ctor_name     : name    (* the name of the constructor *)
     ; ctor_ind_name : name    (* the name of its inductive type *)
@@ -371,7 +371,7 @@ Record ctor_ty_info : Type :=
     }.
 
 (* The info of an inductive type is list of the ctags of its constructors *)
-Definition ind_ty_info : Type := list (ctor_tag * N).
+Definition ind_ty_info : Set := list (ctor_tag * N).
 
 Definition unknown_ctor_ty_info : ctor_ty_info :=
   {| ctor_name     := nAnon
@@ -384,16 +384,16 @@ Definition unknown_ctor_ty_info : ctor_ty_info :=
 Definition unknown_ind_ty_info : ind_ty_info := nil.
 
 (* An constructor environment maps [ctor_tag]s to their information *)
-Definition ctor_env := M.t ctor_ty_info.
+Definition ctor_env : Set := M.tree ctor_ty_info.
 
 (* An inductive type environment maps [ind_tag]s to their constructors with their arities *)
-Definition ind_env := M.t ind_ty_info.
+Definition ind_env : Set := M.tree ind_ty_info.
 
 (* Every calling convention requires knowing
    how many arguments in which slots of the arg array *)
-Definition fun_ty_info : Type := N * list N.
+Definition fun_ty_info : Set := N * list N.
 
-Definition fun_env : Type := M.t fun_ty_info.
+Definition fun_env : Set := M.tree fun_ty_info.
 
 (** Register the tag used for closures **)
 Definition add_closure_tag (c i : positive) (cenv : ctor_env) : ctor_env :=

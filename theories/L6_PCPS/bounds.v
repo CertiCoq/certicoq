@@ -32,18 +32,18 @@ Section Bounds.
     end.
 
     
-  Fixpoint size_value' (v : val) {struct v} :=
+  Fixpoint size_value' (G : nat) (v : val) {struct v} :=
     match v with
-    | Vconstr _ vs => fold_left (fun m v => max m (size_value' v)) vs 0
+    | Vconstr _ vs => fold_left (fun m v => max m (size_value' G v)) vs 0
     | Vfun rho B _ =>
       let senv :=
           (fix max_env m :=
              match m with
              | M.Leaf => 0
-             | M.Node l (Some v) r => max (size_value' v) (max (max_env l) (max_env r))
+             | M.Node l (Some v) r => max (size_value' G v) (max (max_env l) (max_env r))
              | M.Node l None r => (max (max_env l) (max_env r))
              end) rho in
-      max (size_fundefs B) senv
+      G * max (size_fundefs B) senv
     | Vint x => 0
     end.
 
@@ -54,20 +54,20 @@ Section Bounds.
     | M.Node l None r => (max (max_env f l) (max_env f r))
     end.
 
-  Definition size_value (v : val) :=
+  Definition size_value (G : nat) (v : val) :=
     match v with
-    | Vconstr _ vs => fold_left (fun m v => max m (size_value' v)) vs 0
+    | Vconstr _ vs => fold_left (fun m v => max m (size_value' G v)) vs 0
     | Vfun rho B _ =>
-      max (size_fundefs B) (max_env size_value' rho)
+      G * max (size_fundefs B) (max_env (size_value' G) rho)
     | Vint x => 0
     end.
 
-  Lemma size_value_eq v :
-    size_value v = size_value' v.
+  Lemma size_value_eq G v :
+    size_value G v = size_value' G v.
   Proof.
     destruct v.
     - reflexivity.
-    - simpl. f_equal. induction t.
+    - simpl. do 2 f_equal. induction t.
       + reflexivity.
       + simpl. destruct o; eauto.
     - reflexivity.
@@ -81,14 +81,14 @@ Section Bounds.
     simpl. rewrite IHrho1, IHrho2; eauto. destruct o; eauto.
   Qed.
 
-  Lemma max_env_max_value_eq rho :
-    max_env size_value' rho = max_env size_value rho.
+  Lemma max_env_max_value_eq G rho :
+    max_env (size_value' G) rho = max_env (size_value G) rho.
   Proof.
     erewrite max_env_f_eq. reflexivity.
     intros. rewrite size_value_eq. reflexivity. 
   Qed.
   
-  Definition cost_exp_env e rho := max (size_exp e) (max_env size_value rho). 
+  Definition cost_exp_env G e rho := max (size_exp e) (max_env (size_value G) rho). 
 
   Require Import micromega.Lia.
 
@@ -151,9 +151,9 @@ Section Bounds.
     - eapply le_trans. eapply IHB. eassumption. simpl. lia.
   Qed.
     
-  Lemma max_env_def_funs rho B B0 :
-    max_env size_value (def_funs B0 B rho rho) <=
-    max (max (size_fundefs B0) (max_env size_value rho)) (max_env size_value rho).
+  Lemma max_env_def_funs G rho B B0 :
+    max_env (size_value G) (def_funs B0 B rho rho) <=
+    max (G * max (size_fundefs B0) (max_env (size_value G) rho)) (max_env (size_value G) rho).
   Proof.
     induction B; simpl; [| lia ].
     
@@ -193,19 +193,25 @@ Section Bounds.
 
   
   (* (possible) bound for inlining *)
-  Definition inline_bound : relation (exp * env *  nat) := 
+  Definition inline_bound (i G : nat) : relation (exp * env *  nat) := 
     fun '(e1, rho1, c1) '(e2, rho2, c2) =>
-      c1 <= c2 * (1 + cost_exp_env e1 rho1) + cost_exp_env e1 rho1.
+      c1 <= c2 * (1 + i * cost_exp_env G e1 rho1) + cost_exp_env G e1 rho1.
 
   Context (cenv : ctor_env).
   
-  Instance inline_bound_compat : Post_properties cenv inline_bound inline_bound inline_bound. 
+  Instance inline_bound_compat i G (Hi : i <= G) :
+    Post_properties cenv (inline_bound i G) (inline_bound i G) (inline_bound G G). 
   Proof.
-    constructor. 11:{ clear. firstorder. }
+    constructor.
+    11:{ intro; intros. unfold inline_bound in *.
+         destruct x as [[? ? ] ?]. destruct y as [[? ? ] ?]. eapply le_trans. eassumption.
+         eapply plus_le_compat_r. eapply mult_le_compat_l. eapply plus_le_compat_l.
+         eapply mult_le_compat_r. eassumption. }
+    
     - (* constr *) intro; intros. intro; intros.
       unfold inline_bound in *.
       eapply le_trans. eapply plus_le_compat_r. eassumption.
-      assert (Hleq : cost_exp_env e1 (map_util.M.set x (Vconstr t vs) rho1) <= cost_exp_env (Econstr x t ys e1) rho1).
+      assert (Hleq : cost_exp_env G e1 (map_util.M.set x (Vconstr t vs) rho1) <= cost_exp_env G (Econstr x t ys e1) rho1).
       { unfold cost_exp_env. eapply Max.max_lub.
         -- eapply le_trans; [| eapply Max.le_max_l ]. simpl. lia.
         -- eapply le_trans. eapply max_env_set.
@@ -216,12 +222,12 @@ Section Bounds.
       rewrite (plus_comm _ a), plus_assoc. eapply plus_le_compat.
       * rewrite (NPeano.Nat.mul_add_distr_r _ a). rewrite (plus_comm (_ * _) (_ * _)).
         eapply plus_le_compat. lia. 
-        eapply mult_le_compat_l. eapply plus_le_compat_l. eassumption.
+        eapply mult_le_compat_l. eapply plus_le_compat_l. eapply mult_le_compat_l. eassumption.
       * eassumption.
     - (* proj *) intro; intros. intro; intros.
       unfold inline_bound in *. 
       eapply le_trans. eapply plus_le_compat_r. eassumption.
-      assert (Hleq : cost_exp_env e1 (map_util.M.set x v1 rho1) <= cost_exp_env (Eproj x t N y e1) rho1).
+      assert (Hleq : cost_exp_env G e1 (map_util.M.set x v1 rho1) <= cost_exp_env G (Eproj x t N y e1) rho1).
       { unfold cost_exp_env. eapply Max.max_lub.
         -- eapply le_trans; [| eapply Max.le_max_l ]. simpl. lia.
         -- eapply le_trans. eapply max_env_set.
@@ -231,12 +237,12 @@ Section Bounds.
       rewrite (plus_comm _ a), plus_assoc. eapply plus_le_compat.
       * rewrite (NPeano.Nat.mul_add_distr_r _ a). rewrite (plus_comm (_ * _) (_ * _)).
         eapply plus_le_compat. lia. 
-        eapply mult_le_compat_l. eapply plus_le_compat_l. eassumption.
+        eapply mult_le_compat_l. eapply plus_le_compat_l. eapply mult_le_compat_l. eassumption.
       * eassumption.
     - (* fun *) intro; intros. intro; intros.
       unfold inline_bound in *.
       eapply le_trans. eapply plus_le_compat_r. eassumption.
-      assert (Hleq : cost_exp_env e1 (def_funs B1 B1 rho1 rho1) <= cost_exp_env (Efun B1 e1) rho1). 
+      assert (Hleq : cost_exp_env G e1 (def_funs B1 B1 rho1 rho1) <= cost_exp_env G (Efun B1 e1) rho1). 
       { unfold cost_exp_env. eapply Max.max_lub.
         -- eapply le_trans; [| eapply Max.le_max_l ]. simpl. lia.
         -- eapply le_trans. eapply max_env_def_funs. simpl. lia. }

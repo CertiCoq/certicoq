@@ -546,7 +546,7 @@ Section LogRelCC.
         
       (* for simplicity don't model the semantics of the target since it doesn't matter *)
       PG (e1, rhoc1', c1)  (e2, rhoc2, c2) -> 
-      P (Eapp x t ys, rho1, c1 + a) (AppClo f2 x' Γ |[ Eapp x' t' (Γ :: ys') ]|, rho2, c2 + a + 3).
+      P (Eapp x t ys, rho1, c1 + a) (AppClo f2 x' Γ |[ Eapp x' t' (Γ :: ys') ]|, rho2, c2 + a + 2).
    
   Definition post_letapp_compat_cc' x f t ys e1 rho1 (P1 P2 : PostT) (PG : PostGT):=
     forall xs e_b1 v1 f2 Γ x' f' t' ys' e2 e_b2
@@ -562,7 +562,7 @@ Section LogRelCC.
       (* for simplicity don't model the semantics of the target since it doesn't matter *)
       PG (e_b1, rhoc1', c1)  (e_b2, rhoc2, c2) -> 
       P1 (e1, M.set x v1 rho1, c1') (e2, rho2', c2') ->
-      P2 (Eletapp x f t ys e1, rho1, c1 + c1' + a) (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|, rho2, c2  + c2' + a + 3).
+      P2 (Eletapp x f t ys e1, rho1, c1 + c1' + a) (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|, rho2, c2  + c2' + a + 2).
 
   Definition post_letapp_compat_cc_OOT' x f t ys e1 rho1 (P2 : PostT) (PG : PostGT):=
     forall xs e_b1 f2 Γ x' f' t' ys' e2 e_b2 
@@ -575,7 +575,7 @@ Section LogRelCC.
 
       (* for simplicity don't model the semantics of the target since it doesn't matter *)
       PG (e_b1, rhoc1', c1)  (e_b2, rhoc2, c2) -> 
-      P2 (Eletapp x f t ys e1, rho1, c1 + a) (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|, rho2, c2 + a + 3).
+      P2 (Eletapp x f t ys e1, rho1, c1 + a) (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|, rho2, c2 + a + 2).
 
   Definition post_app_compat_cc P PG := forall x t xs rho1, post_app_compat_cc' x t xs rho1 P PG.
 
@@ -605,8 +605,8 @@ Section LogRelCC.
       destruct (lt_dec c1 (cost (Econstr x t ys1 e1))); inv Hstep1; try omega. 
       - (* OOT *) 
         exists OOT, c1. split. constructor. 
-        simpl in *. erewrite <- Forall2_length; [| eassumption ]. 
-        eassumption. split; [| now eauto ]. eapply Hoot; eassumption. 
+        simpl in *. omega.
+        split; [| now eauto ]. eapply Hoot; eassumption. 
       - inv H0. 
         edestruct (cc_approx_var_env_get_list rho1 rho2) as [vs2' [Hget' Hpre']];
          [| eauto |]; eauto.
@@ -623,7 +623,7 @@ Section LogRelCC.
         econstructor 2; eauto. omega. econstructor; eauto.
         rewrite Nat_as_OT.add_sub. eassumption.
         replace c1 with (c1 - cost (Econstr x t ys1 e1) + cost (Econstr x t ys2 e2)).
-        2:{ simpl in *. eapply Forall2_length in Hall; rewrite Hall. omega. } 
+        2:{ simpl in *. omega. }
         eapply Hpost; try eassumption.
         eapply cc_approx_res_monotonic. eassumption. 
         simpl in *. omega.
@@ -707,18 +707,18 @@ Section LogRelCC.
             edestruct Hex as [rhoc [B [f Hget]]]. eapply Henv in Hget.
             destruct Hget as [v2 [Hgetv2 Hvv]]. rewrite cc_approx_val_eq in Hvv.
             destruct v2; simpl in Hvv; try contradiction.
-            destruct l0 as [| ? [|] ]; try contradiction;
-            destruct v; try contradiction; destruct v0; try contradiction. 
-            constructor 2. simpl in *; omega. destruct Hvv as [Heq Hvv]; subst.
-            econstructor; eauto. simpl. reflexivity. 
-            destruct (lt_dec cin 2).
-             -- constructor 1. simpl; omega.
-             -- constructor 2. simpl in *; omega.
-                econstructor; eauto. simpl. rewrite M.gso. eassumption.
-                intros Hc; eapply Hnin2; subst; eauto. reflexivity. 
-                constructor 1. 
-                simpl in *. eapply Forall2_length in Hall. rewrite <- Hall.
-                omega.
+            (* destruct l0 as [| ? [|] ]; try contradiction; *)
+            (* destruct v; try contradiction; destruct v0; try contradiction.  *)
+            (* constructor 2. simpl in *; omega. destruct Hvv as [Heq Hvv]; subst. *)
+            (* econstructor; eauto. simpl. reflexivity.  *)
+            (* destruct (lt_dec cin 2). *)
+            (*  -- constructor 1. simpl; omega. *)
+            (*  -- constructor 2. simpl in *; omega. *)
+            (*     econstructor; eauto. simpl. rewrite M.gso. eassumption. *)
+            (*     intros Hc; eapply Hnin2; subst; eauto. reflexivity.  *)
+            (*     constructor 1.  *)
+            (*     simpl in *. eapply Forall2_length in Hall. rewrite <- Hall. *)
+            (*     omega. *)
       + eapply Hoot; eauto. 
       + simpl; eauto. 
     - inv H0.
@@ -768,7 +768,7 @@ Section LogRelCC.
               rewrite M.gso. eassumption. intros Hc; subst. eapply Hnin2; eauto.
               simpl. reflexivity.
               constructor 2. simpl in *; omega. simpl. 
-              replace (c2 + c2' + 2 + S (S (Datatypes.length xs2)) - 1 - 1 - S (S (Datatypes.length xs2))) with (c2 + c2').                 
+              replace (c2 + c2' + 2 + 1 - 1 - 1 - 1) with (c2 + c2').                 
               econstructor; eauto. 
               rewrite M.gso. rewrite M.gss. reflexivity.
               intros Hc. subst; now eapply Hnin1; eauto. 
@@ -776,11 +776,9 @@ Section LogRelCC.
               reflexivity. intros Hc1. now eapply Hnin2; eauto.  
               intros Hc2. now eapply Hnin1; eauto.
               simpl. rewrite Hgetl. reflexivity. omega.   
-          -- simpl cost.
-             replace (c2 + c2' + 2 + S (S (Datatypes.length xs2))) with (c2 + c2' + S (Datatypes.length xs2) + 3) by omega.
-             replace cin with (cin - S (Datatypes.length xs1) + S (Datatypes.length xs2)). 
-             2:{ eapply Forall2_length in Hall. rewrite Hall. simpl in *; omega. }
-             rewrite <- H6. eapply Hpost; eassumption.
+           -- simpl cost. replace cin with (cin - 1 + 1) by (simpl in *; omega).
+              rewrite <- H6. replace (c2 + c2' + 2 + 1) with (c2 + c2' + 1 + 2) by omega.
+              eapply Hpost; eassumption.
           -- eapply cc_approx_res_monotonic; eauto. simpl in *; omega.
         * intros. eapply cc_approx_val_monotonic; eauto. omega.  
         * left; eauto. 
@@ -814,11 +812,10 @@ Section LogRelCC.
           reflexivity. intros Hc1. now eapply Hnin2; eauto.  
           intros Hc2. now eapply Hnin1; eauto.
           simpl. rewrite Hsets. reflexivity.
-          simpl. replace (c2 + 2 + S (S (Datatypes.length xs2)) - 1 - 1 - S (S (Datatypes.length xs2))) with c2.
+          simpl. replace (c2 + 2 + 1 - 1 - 1 - 1) with c2.
           eassumption. omega. 
-        * simpl. replace (c2 + 2 + S (S (Datatypes.length xs2))) with (c2 + S (Datatypes.length xs2) + 3) by omega.
-          replace cin with (cin - S (Datatypes.length xs1) + S (Datatypes.length xs2)). 
-          2:{ eapply Forall2_length in Hall. rewrite Hall. omega. }
+        * simpl. replace (c2 + 2 + 1) with (c2 + 1 + 2) by omega.
+          replace cin with (cin - 1 + 1) by (simpl in *; omega). 
           eapply Hpostoot; eassumption.
         * edestruct Hns as [ [c' [v' Hstep]] | Hoot' ].  
           -- left. inv Hstep. inv H1. repeat subst_exp. eauto. 
@@ -859,17 +856,17 @@ Section LogRelCC.
           edestruct Hex as [rhoc [B [f Hget]]]. eapply Hvar in Hget.
           destruct Hget as [v2 [Hgetv2 Hvv]]. rewrite cc_approx_val_eq in Hvv.
           destruct v2; simpl in Hvv; try contradiction.
-          destruct l0 as [| ? [|] ]; try contradiction;
-          destruct v; try contradiction; destruct v0; try contradiction. 
-          constructor 2. simpl in *; omega. destruct Hvv as [Heq Hvv]; subst.
-          econstructor; eauto. reflexivity. 
-          destruct (lt_dec cin 2).
-          -- constructor 1. simpl; omega.
-          -- constructor 2. simpl in *; omega.
-             econstructor; eauto. rewrite M.gso. eassumption.
-             now intros Hin; subst; eapply Hnin2; eauto. reflexivity. 
-             constructor. simpl in *. eapply Forall2_length in Hall. rewrite <- Hall.
-             omega.
+          (* destruct l0 as [| ? [|] ]; try contradiction; *)
+          (* destruct v; try contradiction; destruct v0; try contradiction.  *)
+          (* constructor 2. simpl in *; omega. destruct Hvv as [Heq Hvv]; subst. *)
+          (* econstructor; eauto. reflexivity.  *)
+          (* destruct (lt_dec cin 2). *)
+          (* -- constructor 1. simpl; omega. *)
+          (* -- constructor 2. simpl in *; omega. *)
+          (*    econstructor; eauto. rewrite M.gso. eassumption. *)
+          (*    now intros Hin; subst; eapply Hnin2; eauto. reflexivity.  *)
+          (*    constructor. simpl in *. eapply Forall2_length in Hall. rewrite <- Hall. *)
+          (*    omega. *)
       + eapply Hoot; eauto.
       + simpl; eauto. 
     - inv H0. edestruct Hvar as [v2' [Hget Hpre]]; eauto.
@@ -915,11 +912,10 @@ Section LogRelCC.
           intros Hc. now eapply Hnin2; eauto.
           intros Hc. now eapply Hnin1; eauto. 
           simpl. rewrite Hgetl. reflexivity. simpl. 
-          replace  (c4 + S (S (Datatypes.length xs2)) + 2 - 1 - 1 - S (S (Datatypes.length xs2))) with c4 by omega. 
+          replace  (c4 + 1 + 2 - 1 - 1 - 1) with c4 by omega. 
           eassumption.
-        * simpl. replace (c4 + S (S (Datatypes.length xs2)) + 2) with (c4 + S (Datatypes.length xs2) + 3) by omega.
-          replace cin with (cin - S (Datatypes.length xs1) + S (Datatypes.length xs2)). 
-          2:{ eapply Forall2_length in Hall. rewrite Hall. simpl in *; omega. }
+        * simpl.
+          replace cin with (cin - 1 + 1) by (simpl in *; omega).  
           repeat subst_exp.
           eapply Hpost; eassumption.
         * eapply cc_approx_res_monotonic; eauto. simpl in *; omega.
@@ -1090,8 +1086,8 @@ Section LogRelCC.
     destruct (lt_dec cin (cost (Eprim x1 f ys1 e1))); inv Hstep1; try omega. 
     - (* OOT *) 
       exists OOT, cin. split. constructor. 
-      simpl in *. erewrite <- Forall2_length; [| eassumption ]. 
-      eassumption. split; [| now eauto ]. eapply Hoot; eauto. 
+      simpl in *. omega.
+      split; [| now eauto ]. eapply Hoot; eauto. 
    - inv H0. 
 (*   edestruct cc_approx_var_env_get_list as [vs2 [Hget' Hpre']]; [| eassumption | ]; eauto.
      edestruct Prim_axiom_cc as [v2 [Heq Hprev2]]; eauto.
@@ -1475,7 +1471,7 @@ Section LogRelCC.
       P (n + c) (e1, rho1, c1) (e2, rho2', c2) -> P n (e1, rho1, c1) (C|[ e2 ]|, rho2, c2 + c)) ->
 
     ctx_to_rho C rho2 rho2' -> 
-    cc_approx_exp k (P (m + sizeOf_exp_ctx C)) boundG (e, rho1) (e', rho2') ->
+    cc_approx_exp k (P (m + exp_ctx_len C)) boundG (e, rho1) (e', rho2') ->
     cc_approx_exp k (P m) boundG (e, rho1) (C |[ e' ]|, rho2).
   Proof.  
     intros H1 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
@@ -1484,8 +1480,8 @@ Section LogRelCC.
       simpl in *. rewrite Nat_as_OT.add_0_r in *. firstorder. 
     - intros v1 c1 Hleq1 Hstep1 Hns.
       edestruct IHHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; try eassumption.
-      simpl sizeOf_exp_ctx in Hcc.
-      replace (m + S (sizeOf_exp_ctx C)) with ((m + 1) + (sizeOf_exp_ctx C)) in Hcc by omega.
+      simpl exp_ctx_len in Hcc.
+      replace (m + S (exp_ctx_len C)) with ((m + 1) + (exp_ctx_len C)) in Hcc by omega.
       eassumption.
       eexists. eexists (c2 + cost (Eproj_c y t N Γ C |[ e' ]|)). split; [| split ].
       constructor 2; eauto. omega. simpl. 
@@ -1495,22 +1491,21 @@ Section LogRelCC.
     - intros v1' c1 Hleq1 Hstep1 Hns.
       edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
 
-      simpl sizeOf_exp_ctx in Hcc.
-      replace (m + S (@Datatypes.length var ys + sizeOf_exp_ctx C))
-        with ((m + 1 + @Datatypes.length var ys) + (sizeOf_exp_ctx C)) in Hcc by omega.
+      simpl exp_ctx_len in Hcc.
+      replace (m + S (exp_ctx_len C)) with ((m + 1 + exp_ctx_len C)) in Hcc by omega.
       eassumption. 
       eexists. eexists (c2 + cost (Econstr_c x t ys C |[ e' ]|)). split; [| split ].
       constructor 2; eauto. omega. simpl. 
       econstructor; eauto. 
-      replace (c2 + S (@Datatypes.length var ys) - S (@Datatypes.length var ys)) with c2 by omega.
+      replace (c2 + 1 - 1) with c2 by omega.
       eassumption.
-      simpl. rewrite <- plus_assoc in *. eauto. eapply H1 with (C := Econstr_c x t ys Hole_c); eauto. simpl; omega.       
+      simpl. eapply H1 with (C := Econstr_c x t ys Hole_c); eauto. simpl; omega.       
       econstructor; eauto. now econstructor. simpl. eassumption.
     - intros v1' c1 Hleq1 Hstep1 Hns. 
       edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption. 
 
-      simpl sizeOf_exp_ctx in Hcc.
-      replace (m + S (sizeOf_exp_ctx C)) with (m + 1 + sizeOf_exp_ctx C) in Hcc by omega. 
+      simpl exp_ctx_len in Hcc.
+      replace (m + S (exp_ctx_len C)) with (m + 1 + exp_ctx_len C) in Hcc by omega. 
       eassumption.
 
       eexists. eexists (c2 + cost (Efun1_c B C |[ e' ]|)). split; [| split ].
@@ -1524,24 +1519,24 @@ Section LogRelCC.
   
   Lemma cc_approx_exp_ctx_to_rho k (P : nat -> PostT) boundG rho1 rho2 rho2' C e e' m :
     (forall n e1 rho1 c1 e2 rho2 rho2' c2 c C, 
-      c <= sizeOf_exp_ctx C -> 
+      c <= exp_ctx_len C -> 
       ctx_to_rho C rho2 rho2' ->
       P n (e1, rho1, c1) (C|[ e2 ]|, rho2, c2 + c) -> P (n + c) (e1, rho1, c1) (e2, rho2', c2)) ->
     (forall m c1 e2 rho2 rho2' c2 c C,
-      c = sizeOf_exp_ctx C -> 
+      c = exp_ctx_len C -> 
       c2 < cost (C |[ e2 ]|) ->     
       ctx_to_rho C rho2 rho2' ->
       P m (e, rho1, c1) (C |[ e2 ]|, rho2, c2) -> P (m + c) (e, rho1, c1) (e2, rho2', 0)) -> (* XXX revise *)
     ctx_to_rho C rho2 rho2' -> 
     cc_approx_exp k (P m) boundG (e, rho1) (C |[ e' ]|, rho2) ->
-    cc_approx_exp k (P (m + sizeOf_exp_ctx C)) boundG (e, rho1) (e', rho2').
+    cc_approx_exp k (P (m + exp_ctx_len C)) boundG (e, rho1) (e', rho2').
   Proof.
     intros H1 H2 Hctx Hcc. revert m Hcc; induction Hctx; intros m Hcc.
     - intros v1' c1 Hleq1 Hstep1 Hns.
       edestruct Hcc as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
       simpl in *. rewrite Nat_as_OT.add_0_r in *. firstorder.
-    - simpl sizeOf_exp_ctx.
-      replace (m + S (sizeOf_exp_ctx C)) with ((m + 1) + (sizeOf_exp_ctx C)) by omega.
+    - simpl exp_ctx_len.
+      replace (m + S (exp_ctx_len C)) with ((m + 1) + (exp_ctx_len C)) by omega.
       eapply IHHctx; eauto.
       + intros v1 c1 Hleq1 Hstep1 Hns.
         edestruct Hcc as [v2 [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
@@ -1558,27 +1553,25 @@ Section LogRelCC.
           econstructor; eauto. now econstructor. simpl.
           replace (c2 -1 + 1) with c2 by omega. eassumption. 
           eassumption. 
-    - simpl sizeOf_exp_ctx.
-      replace (m + S (@Datatypes.length var ys + sizeOf_exp_ctx C))
-        with ((m + 1 + @Datatypes.length var ys) + (sizeOf_exp_ctx C)) by omega.
+    - simpl . 
+      replace (m + S (exp_ctx_len C)) with ((m + 1) + (exp_ctx_len C)) by omega.
       eapply IHHctx; eauto.
       intros v1' c1' Hleq1 Hstep1 Hns.
       edestruct Hcc as [v2' [c2' [Hstep2 [Hub Hcc2]]]]; try eassumption.
       inv Hstep2; simpl in *; repeat subst_exp.
       + destruct v1'; try contradiction. 
         eexists OOT, 0. split. econstructor; eauto. 
-        eapply cost_gt_0. split. rewrite <- !plus_assoc.
+        eapply cost_gt_0. split.
         eapply H2 with (C := Econstr_c x t ys Hole_c). simpl; omega.
         eassumption. econstructor; eauto. now econstructor.
         simpl. eassumption. eassumption. 
       + inv H3. repeat subst_exp. do 2 eexists. split. eassumption.
-        split. rewrite <- !plus_assoc in *.  
-        eapply H1 with (C := Econstr_c x t ys Hole_c). simpl. omega.
-        econstructor; eauto. now econstructor. simpl. Set Printing All.
-        replace (c2' - S (@Datatypes.length var ys) + S (@Datatypes.length var ys)) with c2' by (simpl in *; omega).
+        split. eapply H1 with (C := Econstr_c x t ys Hole_c). simpl. omega.
+        econstructor; eauto. now econstructor. simpl.
+        replace (c2' - 1 + 1) with c2' by (simpl in *; omega).
         eassumption. eassumption.
-    - simpl sizeOf_exp_ctx.
-      replace (m + S (sizeOf_exp_ctx C)) with (m + 1 + sizeOf_exp_ctx C) by omega. 
+    - simpl exp_ctx_len.
+      replace (m + S (exp_ctx_len C)) with (m + 1 + exp_ctx_len C) by omega. 
       eapply IHHctx; eauto. 
       intros v1' c1' Hleq1 Hstep1 Hns.
       edestruct Hcc as [v2' [c2' [Hstep2 [Hub Hcc2]]]]; try eassumption.
@@ -1637,15 +1630,15 @@ Section LogRelCC.
       + assert (Hc1 : c1 = 0) by (simpl in *; omega); subst. 
         eexists OOT, 0. split. constructor; eauto. eapply cost_gt_0.
         split. eapply  
-        assert (Heq' : exists B D, A = B + D /\ B <= 7 * sizeOf_exp_ctx C /\ D <= 7).
+        assert (Heq' : exists B D, A = B + D /\ B <= 7 * exp_ctx_len C /\ D <= 7).
         { revert Hleq. clear. intros Hleq.
           destruct A. eexists 0, 0. split; eauto. split; omega.
-        assert (Heq : A <= 7 * (sizeOf_exp_ctx C) + 6) by (simpl in *; omega).
-        destruct (Nat_as_DT.le_decidable A (7 * (sizeOf_exp_ctx C))). 
+        assert (Heq : A <= 7 * (exp_ctx_len C) + 6) by (simpl in *; omega).
+        destruct (Nat_as_DT.le_decidable A (7 * (exp_ctx_len C))). 
         + eexists A, 1. split; eauto. omega. split; eauto.
           omega.
-        + eexists (7 * sizeOf_exp_ctx C).
-          eexists (S A - 7 * sizeOf_exp_ctx C).
+        + eexists (7 * exp_ctx_len C).
+          eexists (S A - 7 * exp_ctx_len C).
           split. omega. split. omega. omega. }
       edestruct Heq' as [B [D [Heq [HeqB HleqD]]]]. subst.
       edestruct IHHctx with (A := B) as [v2 [c2 [Hstep2 [HP Hcc2]]]];
@@ -1658,7 +1651,7 @@ Section LogRelCC.
       replace (m + (B + D)) with (m + B + D) by omega. eapply H1; eauto.
       eapply cc_approx_val_monotonic. eassumption. omega. 
     - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
-      assert (Heq'' : exists B D, A = B + D /\ B <= 7 * sizeOf_exp_ctx C /\ D <= 7 + 7 * @List.length var ys).
+      assert (Heq'' : exists B D, A = B + D /\ B <= 7 * exp_ctx_len C /\ D <= 7 + 7 * @List.length var ys).
       { eapply leq_sum_exists. simpl in *; omega. }      
       destruct Heq'' as [B [D [Heq [Hleqb Hleqd]]]]. subst.
       
@@ -1672,7 +1665,7 @@ Section LogRelCC.
     - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
       simpl in Hleq.
       pose (cost := 1 + PS.cardinal (fundefs_fv B)).
-      assert (Heq'' : exists B D, A = B + D /\ B <= 7 * sizeOf_exp_ctx C /\ D <= 7*cost).
+      assert (Heq'' : exists B D, A = B + D /\ B <= 7 * exp_ctx_len C /\ D <= 7*cost).
       { eapply leq_sum_exists. simpl in *; omega. }
       destruct Heq'' as [B' [D [Heq [Hleqb Hleqd]]]]. subst.
       
@@ -1689,7 +1682,7 @@ Section LogRelCC.
     (* This is very specific to what holds currently for CC *)
     (forall c1 c2 m a b, a <= b <= 7 * a -> P m c1 c2 -> P (m + b) (c1 + a) c2) ->
     ctx_to_rho C rho1 rho1' ->
-    sizeOf_exp_ctx C <= A <= 7 * sizeOf_exp_ctx C ->
+    exp_ctx_len C <= A <= 7 * exp_ctx_len C ->
     cc_approx_exp k (P m) boundG (e, rho1') (e', rho2) ->
     cc_approx_exp k (P (m + A)) boundG (C|[ e ]|, rho1) (e', rho2).
   Proof. 
@@ -1700,16 +1693,16 @@ Section LogRelCC.
       simpl in *. do 2 eexists; split; eauto. split; eauto.
       rewrite (plus_n_O c1). eapply H1; eauto.
     - intros v1 c1 Hleq1 Hstep1. simpl in Hstep1. inv Hstep1. repeat subst_exp.
-      assert (Heq' : exists B D, A = B + D /\ sizeOf_exp_ctx C <= B <= 7 * sizeOf_exp_ctx C /\ 1 <= D <= 7).
+      assert (Heq' : exists B D, A = B + D /\ exp_ctx_len C <= B <= 7 * exp_ctx_len C /\ 1 <= D <= 7).
       { revert Hleq. clear. intros Hleq.
         destruct A; try (simpl in *; omega). simpl in Hleq. 
-        assert (Heq : sizeOf_exp_ctx C <= A <= 7 * (sizeOf_exp_ctx C) + 6) by omega.
+        assert (Heq : exp_ctx_len C <= A <= 7 * (exp_ctx_len C) + 6) by omega.
         clear Hleq.
-        destruct (Nat_as_DT.le_decidable A (7 * (sizeOf_exp_ctx C))). 
+        destruct (Nat_as_DT.le_decidable A (7 * (exp_ctx_len C))). 
         + eexists A, 1. split; eauto. omega. split; eauto.
           omega. omega.
-        + eexists (7 * sizeOf_exp_ctx C).
-          eexists (S A - 7 * sizeOf_exp_ctx C).
+        + eexists (7 * exp_ctx_len C).
+          eexists (S A - 7 * exp_ctx_len C).
           split. omega. split. omega. omega. }
       edestruct Heq' as [B [D [Heq [HeqB HleqD]]]]. subst.
       edestruct IHHctx with (A := B) as [v2 [c2 [Hstep2 [HP Hcc2]]]];
@@ -1726,16 +1719,16 @@ Section LogRelCC.
       { simpl in *. eexists (A - S (Datatypes.length ys)).
         rewrite NPeano.Nat.sub_add. omega. simpl in *. omega. }
       destruct Heq' as [B' Hbeq].
-      assert (Heq'' : exists B D, A = B + D /\ sizeOf_exp_ctx C <= B <= 7 * sizeOf_exp_ctx C /\
+      assert (Heq'' : exists B D, A = B + D /\ exp_ctx_len C <= B <= 7 * exp_ctx_len C /\
                              1 + @List.length var ys <= D <= 7 + 7 * @List.length var ys).
       { revert Hbeq Hleq. clear. intros Hbeq Hleq. subst.
-        assert (Heq : sizeOf_exp_ctx C <= B' <= 7 * (sizeOf_exp_ctx C) + (6 + 6 * @List.length var ys))
+        assert (Heq : exp_ctx_len C <= B' <= 7 * (exp_ctx_len C) + (6 + 6 * @List.length var ys))
           by (simpl in *; omega).
         clear Hleq.
-        destruct (Nat_as_DT.le_decidable B' (7 * (sizeOf_exp_ctx C))). 
+        destruct (Nat_as_DT.le_decidable B' (7 * (exp_ctx_len C))). 
         + eexists B'. eexists. split; eauto. split. omega. omega.
-        + eexists (7 * sizeOf_exp_ctx C).
-          eexists (1 + @List.length var ys + B' - 7 * sizeOf_exp_ctx C).
+        + eexists (7 * exp_ctx_len C).
+          eexists (1 + @List.length var ys + B' - 7 * exp_ctx_len C).
           split. omega. split. omega. omega. }
       clear Hbeq.
       destruct Heq'' as [B [D [Heq [Hleqb Hleqd]]]]. subst.
@@ -1753,17 +1746,17 @@ Section LogRelCC.
        assert (Heq' : exists B, A = B + cost). 
        { simpl in *. eexists (A - cost).
          rewrite NPeano.Nat.sub_add. omega. omega. }
-      assert (Heq'' : exists B D, A = B + D /\ sizeOf_exp_ctx C <= B <= 7 * sizeOf_exp_ctx C /\
+      assert (Heq'' : exists B D, A = B + D /\ exp_ctx_len C <= B <= 7 * exp_ctx_len C /\
                              cost <= D <= 7*cost).
        { destruct Heq' as [B' Hbeq].
          revert Hbeq Hleq. clear. intros Hbeq Hleq. subst.
-         assert (Heq : sizeOf_exp_ctx C <= B' <= 7 * (sizeOf_exp_ctx C) + 6*cost)
+         assert (Heq : exp_ctx_len C <= B' <= 7 * (exp_ctx_len C) + 6*cost)
            by (simpl in *; omega).
         clear Hleq.
-        destruct (Nat_as_DT.le_decidable B' (7 * (sizeOf_exp_ctx C))). 
+        destruct (Nat_as_DT.le_decidable B' (7 * (exp_ctx_len C))). 
         + eexists B'. eexists. split; eauto. split. omega. omega.
-        + eexists (7 * sizeOf_exp_ctx C).
-          eexists (cost + B' - 7 * sizeOf_exp_ctx C).
+        + eexists (7 * exp_ctx_len C).
+          eexists (cost + B' - 7 * exp_ctx_len C).
           split. omega. split. omega. omega. }
        clear Heq'.
        destruct Heq'' as [B' [D [Heq [Hleqb Hleqd]]]]. subst.
@@ -1856,7 +1849,7 @@ Section LogRelCC.
           eapply Included_Union_r.
         * eapply Forall_nthN; [| eassumption ].
           eapply lift_P_env_get in H; [| eassumption |].
-          now inv H. 
+          now inv H.          
           rewrite occurs_free_Eproj. eapply Included_Union_l.
       + intros B Hin. eauto.
     - eapply IHHstep.

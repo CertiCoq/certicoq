@@ -2,7 +2,7 @@
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
         Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
 Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.set_util
-        L6.Ensembles_util L6.List_util L6.size_cps L6.tactics L6.relations. 
+        L6.Ensembles_util L6.List_util L6.tactics L6.relations. 
 Require Export L6.logical_relations L6.logical_relations_cc L6.alpha_conv L6.inline_letapp.
 Require Import compcert.lib.Coqlib.
 
@@ -564,7 +564,7 @@ Section Linking.
              zify. omega.
              simpl. rewrite peq_true. reflexivity. simpl. reflexivity.
              rewrite NPeano.Nat.add_sub. eassumption.
-          -- simpl. replace c1 with ((c1 -2) + 2) by omega. eapply HPost_app.
+          -- simpl. replace c1 with ((c1 - 1) + 1) by omega. eapply HPost_app.
              rewrite M.gss. reflexivity. simpl. rewrite M.gso. rewrite Hgetz. reflexivity.
              intros Hc. zify; omega.
              simpl. rewrite peq_true. reflexivity. simpl. reflexivity.

@@ -420,13 +420,13 @@ Section EVAL.
 
   Definition cost (e : exp) : nat :=
     match e with
-    | Econstr x t ys e => 1 + length ys
+    | Econstr x t ys e => 1 (* + length ys *)
     | Eproj x t n y e => 1
     | Ecase y cl => 1
-    | Eapp f t ys => 1 + length ys
-    | Eletapp x f t ys e => 1 + length ys
+    | Eapp f t ys => 1 (* + length ys *)
+    | Eletapp x f t ys e => 1 (* + length ys *)
     | Efun B e => 1 (* + PS.cardinal (fundefs_fv B) *)
-    | Eprim x f ys e => 1 + length ys
+    | Eprim x f ys e => 1 (* + length ys *)
     | Ehalt x => 1
     end.
 
@@ -919,13 +919,13 @@ Section EVAL.
 
   Definition cost_ctx (c : exp_ctx) : nat :=
     match c with
-    | Econstr_c x t ys c => 1 + length ys
+    | Econstr_c x t ys c => 1 (* + length ys *)
     | Eproj_c x t n y c => 1
     | Ecase_c _ _ _ _ _ => 1
-    | Eletapp_c x f t ys c => 1 + length ys
+    | Eletapp_c x f t ys c => 1 (* + length ys *)
     | Efun1_c B c => 1
     | Efun2_c _ _ => 1
-    | Eprim_c x f ys c => 1 + length ys
+    | Eprim_c x f ys c => 1 (* + length ys *)
     | Ehole_c => 0
     end.
 
@@ -1199,7 +1199,130 @@ Section EVAL.
   Qed.
 
 
+  Scheme interpret_ctx_ind' := Minimality for interpret_ctx Sort Prop
+    with interpret_ctx_fuel_ind' := Minimality for interpret_ctx_fuel Sort Prop.
 
+  Lemma interpret_ctx_deterministic_aux rho C r v c r' v' c' :
+    interpret_ctx C rho r c ->
+    interpret_ctx C rho r' c' ->
+    r = Res v -> r' = Res v' ->
+    v = v' /\ c = c'.
+  Proof.
+    set (R := fun C rho r c =>
+                forall v r' v' c',
+                  interpret_ctx C rho r' c' ->
+                  r = Res v -> r' = Res v' ->
+                  v = v' /\ c = c').
+    set (R0 := fun C rho r c =>
+                 forall v r' v' c',
+                   interpret_ctx_fuel C rho r' c' ->
+                   r = Res v -> r' = Res v' ->
+                   v = v' /\ c = c').
+    intros Hint.
+    revert v r' v' c'.
+    induction Hint using interpret_ctx_ind' with (P := R) (P0 := R0); unfold R, R0 in *;
+      intros v1 r2 v2 c2 Hint2 Heq1 Heq2; subst.
+    - inv Heq1. inv Hint2. split; eauto.
+    - inv Hint2. repeat subst_exp. eapply IHHint. eassumption. reflexivity. reflexivity.
+    - inv Hint2. repeat subst_exp. eapply IHHint. eassumption. reflexivity. reflexivity.
+    - inv Hint2. repeat subst_exp. eapply IHHint. eassumption. reflexivity. reflexivity.
+    - inv Hint2. repeat subst_exp.
+      eapply bstep_fuel_deterministic in H17; [| clear H17; eassumption ]. destructAll.
+      eapply IHHint in H18; eauto. destructAll. split; eauto.
+    - inv Heq1.
+    - inv Heq1.
+    - inv Hint2. eapply IHHint in H1; eauto. destructAll. split; eauto. omega. 
+  Qed.
+
+  Lemma interpret_ctx_fuel_deterministic C rho v c v' c' :
+    interpret_ctx_fuel C rho (Res v) c ->
+    interpret_ctx_fuel C rho (Res v') c' ->
+    v = v' /\ c = c'.
+  Proof.
+    intros H1 H2; inv H1; inv H2; eauto.
+    eapply interpret_ctx_deterministic_aux in H0; [ | clear H0; eassumption | reflexivity | reflexivity ].
+    destructAll. split; eauto. omega.
+  Qed.
+
+  Lemma interpret_ctx_deterministic C rho v c v' c' :
+    interpret_ctx C rho (Res v) c ->
+    interpret_ctx C rho (Res v') c' ->
+    v = v' /\ c = c'.
+  Proof.
+    intros H1 H2.
+    eapply interpret_ctx_deterministic_aux; eauto.
+  Qed.
+
+  Lemma bstep_fuel_ctx_OOT rho C e c :
+    bstep_fuel rho (C |[ e ]|) OOT c ->
+    interprable C = true ->
+    interpret_ctx_fuel C rho OOT c \/
+    exists rho' c', interpret_ctx_fuel C rho (Res rho') c' /\
+                    bstep_fuel rho' e OOT (c - c') /\
+                    (c >= c')%nat.
+  Proof.
+    revert rho e c. induction C; intros rho e1 c1 Hstep Hi; (try now inv Hi); simpl in Hi.
+    - simpl in Hstep. right. eexists. exists 0%nat.
+      replace (c1 - 0)%nat with c1 by omega. 
+      split; [| split ]; [| eassumption |]. constructor. simpl; omega.
+      simpl. econstructor. omega.
+    - inv Hstep.
+      + left. econstructor. simpl in *; omega.
+      + inv H0. eapply IHC in H10. inv H10.
+        * left. econstructor 2. simpl in *; omega.
+          econstructor; eauto.
+        * destructAll. right. do 2 eexists.
+          rewrite <- Nat.sub_add_distr in H1. 
+          split; [| split ]; [| eassumption |]. econstructor. simpl. omega.
+          econstructor. eassumption. 
+          replace (cost (Econstr_c v c l C |[ e1 ]|) + x0 - cost_ctx (Econstr_c v c l C))%nat with x0 by (simpl; omega).
+          eassumption. simpl in *; omega. 
+        * eassumption.
+    - inv Hstep.
+      + left. econstructor. simpl in *; omega.
+      + inv H0. eapply IHC in H11. inv H11.
+        * left. econstructor 2. simpl in *; omega.
+          econstructor; eauto.
+        * destructAll. right. do 2 eexists.
+          rewrite <- Nat.sub_add_distr in H1. 
+          split; [| split ]; [| eassumption| ]. econstructor. simpl. omega.
+          econstructor. eassumption. eassumption.
+          replace (cost (Eproj_c v c n v0 C |[ e1 ]|) + x0 - cost_ctx (Eproj_c v c n v0 C))%nat with x0 by (simpl; omega).
+          eassumption. simpl in *; omega.
+        * eassumption.
+    - inv Hstep.
+      + left. econstructor. simpl in *; omega.
+      + inv H0.
+    - inv Hstep.
+      + left. econstructor. simpl in *; omega.
+      + inv H0.
+        * eapply IHC in H14. inv H14.
+          -- left. econstructor 2. simpl in *; omega. simpl. rewrite <- H6.
+             econstructor; eauto.
+          -- destructAll. right. eexists. exists (cin1 + x0 + cost_ctx (Eletapp_c v v0 f l C))%nat. 
+             split; [| split ].
+             econstructor. omega. 
+             simpl. rewrite Nat.add_sub. now econstructor; eauto.
+             simpl. rewrite plus_comm. rewrite NPeano.Nat.sub_add_distr.
+             rewrite <- H6. replace (cin1 + cin2 - (cin1 + x0))%nat with (cin2 - x0)%nat by omega. eassumption.
+             simpl in *; omega.
+          -- eassumption.
+        * left. econstructor 2. simpl in *; omega. econstructor; eauto.
+    - inv Hstep.
+      + left. econstructor. simpl in *; omega.
+      + inv H0. eapply IHC in H6. inv H6.
+        * left. econstructor 2. simpl in *; omega.
+          econstructor; eauto.
+        * destructAll. right. do 2 eexists.
+          rewrite <- Nat.sub_add_distr in H1. 
+          split; [| split]; [| eassumption |]. econstructor. simpl. omega.
+          econstructor.
+          replace (cost (Efun1_c f C |[ e1 ]|) + x0 - cost_ctx (Efun1_c f C))%nat with x0 by (simpl; omega).
+          eassumption. simpl in *; omega.
+        * eassumption.
+  Qed.
+
+  
   (** Small step semantics -- Relational definition *)
   (* Zoe : How to write small step for letapp? *)
   Inductive step: state -> state -> Prop :=

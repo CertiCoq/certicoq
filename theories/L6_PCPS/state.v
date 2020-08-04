@@ -22,7 +22,7 @@ Open Scope string.
 Section CompM.
   Context {S : Type}. (* Transformation-specific state *)
 
-  Record comp_data : Type :=  mkCompData { next_var : var;
+  Record comp_data : Set  :=  mkCompData { next_var : var;
                                            nect_ctor_tag : ctor_tag;
                                            next_ind_tag : ind_tag;
                                            next_fun_tag : fun_tag;

@@ -65,20 +65,6 @@ Proof.
   inv Hin. normalize_bound_var. repeat normalize_bound_var_ctx. sets.
 Qed.
 
-
-(* TODO move *)
-Lemma bound_var_occurs_free_Eletapp_Included x f t ys e :
-  Included _ (Union _ (bound_var e) (occurs_free e))
-           (Union _ (bound_var (Eletapp x f t ys e))
-                  (occurs_free (Eletapp x f t ys e))).
-Proof with eauto with Ensembles_DB.
-  repeat normalize_bound_var. repeat normalize_occurs_free.
-  rewrite <- Union_assoc.
-  apply Included_Union_compat...
-  eapply Included_trans. now apply occurs_free_Eletapp_Included with (ft := t).
-  normalize_occurs_free...
-Qed.
-
 Lemma inline_letapp_var_eq x e C x' :
   inline_letapp e x = Some (C, x') ->
   x' = x \/ x' \in bound_var e :|: occurs_free e.
@@ -636,15 +622,13 @@ Section Inline_correct.
           inv H1. 
           exists r3, (n1 + (n2 + c3)).
           split. eapply interpret_ctx_bstep_r. eassumption.
-          constructor 2.
-          2:{ simpl; replace (n2 + c3 - S (Datatypes.length l))
-                      with (n2 - cost (Eapp v f l) + c3) by (simpl in *; omega).
-              econstructor; eauto. } simpl in *; omega.
+          constructor 2. simpl in *; omega. simpl.
+          replace (n2 + c3 - 1) with (n2 - 1 + c3) by (simpl in *; omega).
+          now econstructor; eauto.
           split.
-
-          assert (Heq : c2 = cin1 + cin2 + S (Datatypes.length ys)).
-          { rewrite <- (NPeano.Nat.sub_add (S (Datatypes.length ys)) c2). rewrite H6. reflexivity.
-            eassumption. } rewrite Heq. 
+          
+          assert (Heq : c2 = cin1 + cin2 + 1).
+          { rewrite <- (NPeano.Nat.sub_add 1 c2). rewrite H6. reflexivity. eassumption. } rewrite Heq. 
           rewrite plus_assoc.
           now eapply Hless_steps_letapp; eauto. 
           eapply preord_res_monotonic. eassumption. simpl in *; omega.
@@ -709,8 +693,8 @@ Section Inline_correct.
           do 2 eexists. split. eapply interpret_ctx_bstep_r. eassumption. eassumption.
 
           split. 
-          assert (Heq : c2 = cin1 + cin2 + S (Datatypes.length ys)).
-          { rewrite <- (NPeano.Nat.sub_add (S (Datatypes.length ys)) c2). rewrite H6. reflexivity.
+          assert (Heq : c2 = cin1 + cin2 + 1).
+          { rewrite <- (NPeano.Nat.sub_add 1 c2). rewrite H6. reflexivity.
             eassumption. } rewrite Heq. 
           now eapply Hless_steps_letapp'; eauto. 
           eapply preord_res_monotonic. eassumption. simpl in *; omega.
@@ -913,13 +897,12 @@ Section Inline_correct.
           exists r3, (n1 + (n2 + c3)).
           split. eapply interpret_ctx_bstep_r. eassumption.
           constructor 2.
-          2:{ simpl; replace (n2 + c3 - S (Datatypes.length l))
-                      with (n2 - cost (Eapp v f l) + c3) by (simpl in *; omega).
+          2:{ simpl; replace (n2 + c3 - 1) with (n2 - 1 + c3) by (simpl in *; omega).
               econstructor; eauto. } simpl in *; omega.
           split.
 
-          assert (Heq : c2 = cin1 + cin2 + S (Datatypes.length ys)).
-          { rewrite <- (NPeano.Nat.sub_add (S (Datatypes.length ys)) c2). rewrite H6. reflexivity.
+          assert (Heq : c2 = cin1 + cin2 + 1).
+          { rewrite <- (NPeano.Nat.sub_add 1 c2). rewrite H6. reflexivity.
             eassumption. } rewrite Heq. 
           rewrite plus_assoc.
           now eapply Hless_steps_letapp; eauto. 
@@ -994,8 +977,8 @@ Section Inline_correct.
           do 2 eexists. split. eapply interpret_ctx_bstep_r. eassumption. eassumption.
 
           split. 
-          assert (Heq : c2 = cin1 + cin2 + S (Datatypes.length ys)).
-          { rewrite <- (NPeano.Nat.sub_add (S (Datatypes.length ys)) c2). rewrite H6. reflexivity.
+          assert (Heq : c2 = cin1 + cin2 + 1).
+          { rewrite <- (NPeano.Nat.sub_add 1 c2). rewrite H6. reflexivity.
             eassumption. } rewrite Heq. 
           now eapply Hless_steps_letapp'; eauto. 
           eapply preord_res_monotonic. eassumption. simpl in *; omega.
@@ -1092,7 +1075,7 @@ Section Inline_correct.
     - inv Hin. inv Hstep. inv H0. eexists. eexists m.
       (* (m + cost (Eapp v t l)). *)
       split. econstructor. simpl in *; omega.
-      simpl. replace (m - S (Datatypes.length l)) with ((m - S (Datatypes.length l)) + 0) by omega.
+      simpl. replace (m - 1) with (m - 1 + 0) by omega.
       econstructor; eauto. econstructor. simpl; omega. econstructor.
       split. rewrite M.gss. reflexivity. omega.
     - inv Hstep. inv H0.
@@ -1100,59 +1083,6 @@ Section Inline_correct.
       simpl; omega. split. eassumption. omega.
   Qed.
 
-  Scheme interpret_ctx_ind' := Minimality for interpret_ctx Sort Prop
-    with interpret_ctx_fuel_ind' := Minimality for interpret_ctx_fuel Sort Prop.
-
-  Lemma interpret_ctx_deterministic_aux rho C r v c r' v' c' :
-    interpret_ctx cenv C rho r c ->
-    interpret_ctx cenv C rho r' c' ->
-    r = Res v -> r' = Res v' ->
-    v = v' /\ c = c'.
-  Proof.
-    set (R := fun C rho r c =>
-                forall v r' v' c',
-                  interpret_ctx cenv C rho r' c' ->
-                  r = Res v -> r' = Res v' ->
-                  v = v' /\ c = c').
-    set (R0 := fun C rho r c =>
-                 forall v r' v' c',
-                   interpret_ctx_fuel cenv C rho r' c' ->
-                   r = Res v -> r' = Res v' ->
-                   v = v' /\ c = c').
-    intros Hint.
-    revert v r' v' c'.
-    induction Hint using interpret_ctx_ind' with (P := R) (P0 := R0); unfold R, R0 in *;
-      intros v1 r2 v2 c2 Hint2 Heq1 Heq2; subst.
-    - inv Heq1. inv Hint2. split; eauto.
-    - inv Hint2. repeat subst_exp. eapply IHHint. eassumption. reflexivity. reflexivity.
-    - inv Hint2. repeat subst_exp. eapply IHHint. eassumption. reflexivity. reflexivity.
-    - inv Hint2. repeat subst_exp. eapply IHHint. eassumption. reflexivity. reflexivity.
-    - inv Hint2. repeat subst_exp.
-      eapply bstep_fuel_deterministic in H17; [| clear H17; eassumption ]. destructAll.
-      eapply IHHint in H18; eauto. destructAll. split; eauto.
-    - inv Heq1.
-    - inv Heq1.
-    - inv Hint2. eapply IHHint in H1; eauto. destructAll. split; eauto. omega. 
-  Qed.
-
-  Lemma interpret_ctx_fuel_deterministic C rho v c v' c' :
-    interpret_ctx_fuel cenv C rho (Res v) c ->
-    interpret_ctx_fuel cenv C rho (Res v') c' ->
-    v = v' /\ c = c'.
-  Proof.
-    intros H1 H2; inv H1; inv H2; eauto.
-    eapply interpret_ctx_deterministic_aux in H0; [ | clear H0; eassumption | reflexivity | reflexivity ].
-    destructAll. split; eauto. omega.
-  Qed.
-
-  Lemma interpret_ctx_deterministic C rho v c v' c' :
-    interpret_ctx cenv C rho (Res v) c ->
-    interpret_ctx cenv C rho (Res v') c' ->
-    v = v' /\ c = c'.
-  Proof.
-    intros H1 H2.
-    eapply interpret_ctx_deterministic_aux; eauto.
-  Qed.
   
   Lemma inline_letapp_preord_env_P_inj k S e1 e2 x y x' y' C1 C2 sig rho1 rho2 rho1' rho2' n1 n2:
     (forall k, preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)) ->
@@ -1297,8 +1227,6 @@ Section Inline_correct.
           eassumption. simpl in *; omega.
         * eassumption.
   Qed.
-
-
 
 
   Lemma inline_letapp_eval_OOT_l C e x x' rho n :    

@@ -4,7 +4,9 @@ From ExtLib Require Import Monads.
 
 Import MonadNotation ListNotations.
 
-Open Scope monad. 
+Open Scope monad.
+
+Unset Universe Polymorphism.
 
 Fixpoint mapM {M : Type -> Type} {A B : Type} `{Monad M} (f : A -> M B)
          (l : list A)  : M (list B) :=

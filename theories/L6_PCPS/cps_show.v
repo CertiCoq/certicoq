@@ -19,7 +19,7 @@ Import MonadNotation.
 
 Open Scope monad_scope.
 
-Definition name_env := M.t Template.BasicAst.name.
+Definition name_env : Set := M.tree Template.BasicAst.name.
 
 Section PP.
 

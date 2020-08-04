@@ -376,32 +376,31 @@ Section CC.
     c_new <- make_record_ctor_tag n ;;
     ret (c_new, map_new', fun e => g' (Econstr Γ_new c_new fv' e)).
   
-  (** Construct closures after a function definition block *)
-  Fixpoint make_full_closure (defs : fundefs) (mapfv_new mapfv_old : VarInfoMap) (gfuns : GFunMap) 
-           (Γ : var) (is_closed : bool)
-  : ccstate (VarInfoMap * VarInfoMap * GFunMap * (exp -> exp)) :=
+  (** Add closures to maps *)
+  Fixpoint add_closures (defs : fundefs) (mapfv_new mapfv_old : VarInfoMap) (gfuns : GFunMap) 
+           (is_closed : bool)
+  : ccstate (VarInfoMap * VarInfoMap * GFunMap) :=
     match defs with
-      | Fcons f typ xs e defs' =>
-        (* The new name of the function *)
-        code_ptr <- get_name f "" ;;
-        t <- make_full_closure defs' mapfv_new mapfv_old gfuns Γ is_closed ;;
-        let '(mapfv_new', mapfv_old', gfuns', g') := t in
-        (* update the new map *)
-        let mapfv_new'' :=
-            Maps.PTree.set f (MRFun code_ptr) mapfv_new'
-        in
-        (* update the old map *)
-        let mapfv_old'' :=
-            Maps.PTree.set f BoundVar mapfv_old'
-        in
-        gfuns'' <- (if is_closed then
-                     (* f_str <- get_pp_name f ;; *)
-                     (* log_msg ("Adding " ++ f_str) ;; *)
-                     ret (M.set f (GFun code_ptr) gfuns')
-                   else ret gfuns') ;;
-        ret (mapfv_new'', mapfv_old'', gfuns'',
-             (fun e => Econstr f clo_tag [code_ptr; Γ] (g' e)))
-      | Fnil => ret (mapfv_new, mapfv_old, gfuns, id)
+    | Fcons f typ xs e defs' =>
+      (* The new name of the function *)
+      code_ptr <- get_name f "" ;;
+      t <- add_closures defs' mapfv_new mapfv_old gfuns is_closed ;;
+      let '(mapfv_new', mapfv_old', gfuns') := t in
+      (* update the new map *)
+      let mapfv_new'' :=
+          Maps.PTree.set f (MRFun code_ptr) mapfv_new'
+      in
+      (* update the old map *)
+      let mapfv_old'' :=
+          Maps.PTree.set f (MRFun code_ptr) mapfv_old'
+      in
+      gfuns'' <- (if is_closed then
+                    (* f_str <- get_pp_name f ;; *)
+                    (* log_msg ("Adding " ++ f_str) ;; *)
+                    ret (M.set f (GFun code_ptr) gfuns')
+                  else ret gfuns') ;;
+      ret (mapfv_new'', mapfv_old'', gfuns'')
+    | Fnil => ret (mapfv_new, mapfv_old, gfuns)
     end.
 
   Definition bool_to_string (b : bool) : string :=
@@ -460,11 +459,11 @@ Section CC.
         (* fv_names <- get_pp_names_list fvs ;; *)
         (* log_msg (concat " " ("Closed" :: bool_to_string is_closed :: "Block has fvs :" :: fv_names)) ;; *)
         
-        t2 <- make_full_closure defs mapfv_new mapfv gfuns Γ' is_closed ;;
-        let '(mapfv_new', mapfv_old', gfuns', g2) := t2 in
+        t2 <- add_closures defs mapfv_new mapfv gfuns is_closed ;;
+        let '(mapfv_new', mapfv_old', gfuns') := t2 in
         ef <- exp_closure_conv e mapfv_old' gfuns' c Γ ;;
         defs' <- fundefs_closure_conv defs mapfv_new' gfuns' c' ;;
-        ret (Efun defs' (g2 ((snd ef) (fst ef))), g1)
+        ret (Efun defs' ((snd ef) (fst ef)), g1)
       | Eapp f ft xs =>
         t1 <- get_var f mapfv gfuns c Γ ;;
         let '(f', g1) := t1 in     

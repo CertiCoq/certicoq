@@ -2,7 +2,7 @@
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
         Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
 Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.set_util
-        L6.Ensembles_util L6.List_util L6.size_cps L6.tactics L6.relations. 
+        L6.Ensembles_util L6.List_util L6.tactics L6.relations. 
 Require Export L6.logical_relations L6.logical_relations_cc L6.alpha_conv L6.inline_letapp.
 Require Import compcert.lib.Coqlib.
 
@@ -57,20 +57,6 @@ Definition pr_trivial : post_property := fun _ => True.
 Definition wf_trivial {A} : A -> A -> Prop := fun _ _ => True.
 
 Definition preserves_fv (e1 e2 : exp) := occurs_free e2 \subset occurs_free e1.
-
-Fixpoint straight_code (e : exp) :=
-  match e with
-  | Econstr _ _ _ e
-  | Eprim _ _ _ e
-  | Eproj _ _ _ _ e
-  | Eletapp _ _ _ _ e 
-  | Efun _ e => straight_code e    
-  | Ecase _ _ => false 
-  | Eapp _ _ _ => true
-  | Ehalt _ => true
-  end.
-
-Definition preserves_straight_code (e1 e2 : exp) := straight_code e1 = true -> straight_code e2 = true.
 
 
 Section RelComp.
@@ -255,6 +241,9 @@ Section RelComp.
                 (fun P2 => compose_rel P2 P3 pr_trivial pr_trivial
                                        (fun P (c1 : val) (c2 : val) => forall k, cc_approx_val cenv ctag k P c1 c2) (preord_val_n m)).
 
+  
+
+  
   Context (P1 P2 P3 : PostT)
           (Pr1 Pr2 Pr3 Pr4 : post_property)
           (wf_pres_trans : Transitive wf_pres).
@@ -385,32 +374,7 @@ Section Linking.
     | None => None
     end.
 
-  
-  Lemma inline_straight_code_l (e : exp) x :
-    straight_code e = true ->
-    exists C x', inline_letapp e x = Some (C, x').
-  Proof.
-    intros.
-    induction e; simpl in *;
-      try (eapply IHe in H; destructAll; do 2 eexists; rewrite H; reflexivity).
-    - inv H.
-    - do 2 eexists. reflexivity.
-    - do 2 eexists. reflexivity.
-  Qed.
-
-  Lemma inline_straight_code_r (e : exp) x C x' :
-    inline_letapp e x = Some (C, x') ->
-    straight_code e = true.
-  Proof.
-    revert C x'.
-    induction e; intros C x' Hin; simpl in *;
-      try (match goal with
-           | [ _ : context[inline_letapp ?E ?X] |- _ ] => 
-             destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
-           end); (try now inv Hin); try (now eauto).
-  Qed.
-
-  
+    
   Lemma link_straight_code_r x (e1 e2 e : exp) :
     link x e1 e2 = Some e ->
     straight_code e1 = true.
@@ -600,7 +564,7 @@ Section Linking.
              zify. omega.
              simpl. rewrite peq_true. reflexivity. simpl. reflexivity.
              rewrite NPeano.Nat.add_sub. eassumption.
-          -- simpl. replace c1 with ((c1 -2) + 2) by omega. eapply HPost_app.
+          -- simpl. replace c1 with ((c1 - 1) + 1) by omega. eapply HPost_app.
              rewrite M.gss. reflexivity. simpl. rewrite M.gso. rewrite Hgetz. reflexivity.
              intros Hc. zify; omega.
              simpl. rewrite peq_true. reflexivity. simpl. reflexivity.
@@ -878,17 +842,21 @@ Section LinkingCompTop.
   Lemma Rel_exp_n_preserves_linking P1 P2 Q1 Q2 P x n1 n2 m1 m2 e1 e2 e1' e2' :    
     R_n_exp cenv ctag (relation_conjunction preserves_closed preserves_straight_code) Pr P1 P P2 Pr1 Pr Pr3 n1 n2 e1 e2 ->
     R_n_exp cenv ctag preserves_fv Pr Q1 P Q2 Pr1 Pr Pr3 m1 m2 e1' e2' ->
+
+    (* e1: source library, e2: compiled library *)
+    (* e1': source client, e2': compiled client *)    
     
     closed_exp e1 ->
     straight_code e1 = true ->
     occurs_free e1' \subset [set x] ->
     
     match link lf x e1 e1', link lf x e2 e2' with
-    | Some e, Some e' =>
-      R_n_exp cenv ctag preserves_closed Pr' (comp P1 Q1) P (comp P2 Q2) Pr' Pr' Pr' (n1 + m1) (n2 + m2)  e e'
+    | Some e_src, Some e_trg =>
+      R_n_exp cenv ctag preserves_closed Pr' (comp P1 Q1) P (comp P2 Q2) Pr' Pr' Pr' (n1 + m1) (n2 + m2)  e_src e_trg
     | _ , _ => True
     end.
   Proof.
+    
     intros Hrel1 Hrel2 Hc1 Hs1 Hfv.
     destruct (link lf x e1 e1') eqn:Hl1; eauto.
     destruct (link lf x e2 e2') eqn:Hl2; eauto. inv Hrel1. inv Hrel2. destructAll. 

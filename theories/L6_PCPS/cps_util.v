@@ -1357,3 +1357,57 @@ Fixpoint inline_letapp
     ret (Eprim_c x p ys C, v)
   | Ehalt x => ret (Hole_c, x)
   end.
+
+Fixpoint straight_code (e : exp) :=
+  match e with
+  | Econstr _ _ _ e
+  | Eprim _ _ _ e
+  | Eproj _ _ _ _ e
+  | Eletapp _ _ _ _ e 
+  | Efun _ e => straight_code e    
+  | Ecase _ _ => false 
+  | Eapp _ _ _ => true
+  | Ehalt _ => true
+  end.
+
+Definition preserves_straight_code (e1 e2 : exp) := straight_code e1 = true -> straight_code e2 = true.
+
+Lemma inline_straight_code_l (e : exp) x :
+    straight_code e = true ->
+    exists C x', inline_letapp e x = Some (C, x').
+Proof.
+  intros.
+    induction e; simpl in *;
+      try (eapply IHe in H; destructAll; do 2 eexists; rewrite H; reflexivity).
+  - inv H.
+  - do 2 eexists. reflexivity.
+  - do 2 eexists. reflexivity.
+Qed.
+
+Lemma inline_straight_code_r (e : exp) x C x' :
+  inline_letapp e x = Some (C, x') ->
+  straight_code e = true.
+Proof.
+  revert C x'.
+  induction e; intros C x' Hin; simpl in *;
+    try (match goal with
+         | [ _ : context[inline_letapp ?E ?X] |- _ ] => 
+           destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
+         end); (try now inv Hin); try (now eauto).
+Qed.
+
+
+Lemma straight_code_ctx_app e x C x' e' :
+  inline_letapp e x = Some (C, x') ->
+  straight_code e' = true ->
+  straight_code (C |[ e' ]|) = true.
+Proof.                                  
+  revert C x'.
+  induction e; intros C x' Hin Hs; simpl in *;
+    try (match goal with
+         | [ _ : context[inline_letapp ?E ?X] |- _ ] => 
+           destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
+         end); (try now inv Hin);
+      try (now simpl; eapply IHe; eauto).
+Qed.
+

@@ -29,55 +29,26 @@ Section Closure_conversion_util.
     intros Hp; induction Hp; eauto. simpl; congruence.
   Qed.
     
-  (* TODO : do this with autorewrites *)
-  Ltac normalize_sets :=
-    match goal with
-      | [|- context[FromList []]] => rewrite FromList_nil
-      | [|- context[FromList(_ :: _)]] => rewrite FromList_cons
-      | [|- context[FromList(_ ++ _)]] => rewrite FromList_app
-      | [|- context[FromList [_ ; _]]] => rewrite FromList_cons
-      | [|- context[Union _ _ (Empty_set _)]] =>
-        rewrite Union_Empty_set_neut_r
-      | [|- context[Union _ (Empty_set _) _]] =>
-        rewrite Union_Empty_set_neut_l
-      | [|- context[Setminus _ (Empty_set _) _]] =>
-        rewrite Setminus_Empty_set_abs_r
-      | [|- context[Setminus _ _ (Empty_set _)]] =>
-        rewrite Setminus_Empty_set_neut_r
-      | [ H : context[FromList []] |- _] => rewrite FromList_nil in H
-      | [ H : context[FromList(_ :: _)] |- _] => rewrite FromList_cons in H
-      | [ H : context[FromList(_ ++ _)] |- _] => rewrite FromList_app in H
-      | [ H : context[FromList [_ ; _]] |- _] => rewrite FromList_cons in H
-      | [ H : context[Union _ _ (Empty_set _)] |- _ ] =>
-        rewrite Union_Empty_set_neut_r in H
-      | [ H : context[Union _ (Empty_set _) _] |- _] =>
-        rewrite Union_Empty_set_neut_l in H
-      | [ H : context[Setminus _ (Empty_set _) _] |- _] =>
-        rewrite Setminus_Empty_set_abs_r in H
-      | [ H : context[Setminus _ _ (Empty_set _)] |- _] =>
-        rewrite Setminus_Empty_set_neut_r in H
-    end.
-
   Lemma project_var_occurs_free_ctx_Included Scope Funs GFuns c genv Γ FVs S x y C Q F e:
     project_var clo_tag Scope Funs GFuns c genv Γ FVs S x y C Q ->
     (occurs_free e) \subset (F :|: [set y]) ->
-    (Scope :|: (((Funs \\ Scope) :|: GFuns) :|: image genv (Funs \\ Scope)) :|: [set Γ]) \subset F ->
+    (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: [set Γ]) \subset F ->
     (occurs_free (C |[ e ]|)) \subset F. 
   Proof with now eauto with Ensembles_DB functions_BD. 
     intros Hproj Hinc1 Hinc2. inv Hproj.
     - simpl. eapply Included_trans. eassumption. 
       apply Union_Included. now apply Included_refl.
-      eapply Included_trans; [| eassumption ].
-      eauto with Ensembles_DB.
+      eapply Included_trans; [| eapply Hinc2 ]. eapply Singleton_Included. sets.
     - simpl.
       rewrite occurs_free_Econstr, !FromList_cons, FromList_nil,
       Union_Empty_set_neut_r.
       eapply Union_Included.
       + eapply Included_trans; [| now apply Hinc2 ].
         eapply Union_Included.
-        eapply Included_Union_preserv_l. eapply Included_Union_preserv_r. do 2 eapply Included_Union_preserv_l.
+        do 3 eapply Included_Union_preserv_l. eapply Included_Union_preserv_r.
         eapply Singleton_Included. constructor; eauto.
-        eapply Included_Union_preserv_l. do 2 eapply Included_Union_preserv_r. 
+        
+        eapply Included_Union_preserv_l. eapply Included_Union_preserv_r. 
         eapply Singleton_Included. eapply In_image. constructor; eauto.
       + eauto with Ensembles_DB.
     - simpl. 
@@ -87,7 +58,7 @@ Section Closure_conversion_util.
       rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
       eapply Union_Included.
       + eapply Included_trans; [| now apply Hinc2 ].
-        eauto 10 with Ensembles_DB functions_BD.        
+        xsets.
       + eauto with Ensembles_DB.
     - simpl. rewrite occurs_free_Eproj.
       eapply Union_Included.
@@ -100,7 +71,7 @@ Section Closure_conversion_util.
     FVs S xs xs' C S' F e:
     project_vars clo_tag Scope Funs GFuns c genv Γ FVs S xs xs' C S' ->
     (occurs_free e) \subset (F :|: (FromList xs')) ->
-    (Scope :|: ((Funs \\ Scope :|: GFuns) :|: image genv (Funs \\ Scope)) :|: [set  Γ]) \subset F ->
+    (Scope :|:  (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: [set  Γ]) \subset F ->
     occurs_free (C |[ e ]|) \subset F. 
   Proof. 
     intros Hproj. revert F.
@@ -115,7 +86,7 @@ Section Closure_conversion_util.
   Lemma project_var_occurs_free_ctx_alt_Included Scope Funs GFuns c genv Γ FVs S x y C Q F e:
     project_var clo_tag Scope Funs GFuns c genv Γ FVs S x y C Q ->
     (occurs_free e) \subset (F :|: [set y]) ->
-    (Scope :|: ((([set x] :&: (Funs \\ Scope :|: GFuns)) :|: image genv (Funs \\ Scope))) :|: [set Γ]) \subset F ->
+    (Scope :|: ([set x] :&: (Funs \\ Scope :|: GFuns)) :|: image genv (Funs \\ Scope) :|: [set Γ]) \subset F ->
     (occurs_free (C |[ e ]|)) \subset F. 
   Proof with now eauto with Ensembles_DB functions_BD. 
     intros Hproj Hinc1 Hinc2. inv Hproj.
@@ -128,9 +99,9 @@ Section Closure_conversion_util.
       Union_Empty_set_neut_r. 
       eapply Union_Included.
       + eapply Included_trans; [| now apply Hinc2 ].
-        eapply Union_Included; sets. eapply Singleton_Included. left. right. left.
+        eapply Union_Included; sets. eapply Singleton_Included. do 2 left. right.
         constructor; eauto. left; constructor; eauto.
-        eapply Singleton_Included. left. right. right. 
+        eapply Singleton_Included. left. right.
         eapply In_image. constructor; eauto.        
       + eauto with Ensembles_DB.
     - simpl. 
@@ -141,7 +112,7 @@ Section Closure_conversion_util.
       eapply Union_Included.
       + eapply Included_trans; [| now apply Hinc2 ].
         eapply Setminus_Included_Included_Union.
-        eapply Singleton_Included. left. left. right. left.
+        eapply Singleton_Included. left. left. left. right.
         econstructor; eauto.
       + eauto with Ensembles_DB.
     - simpl. rewrite occurs_free_Eproj.
@@ -155,7 +126,7 @@ Section Closure_conversion_util.
         FVs S xs xs' C S' F e:
     project_vars clo_tag Scope Funs GFuns c genv Γ FVs S xs xs' C S' ->
     Included _ (occurs_free e) (Union _ F (FromList xs')) ->
-    Included _ (Scope :|: (Union _ ((FromList xs :&: (Funs \\ Scope :|: GFuns)) :|: image genv (Funs \\ Scope)) (Singleton _ Γ))) F ->
+    Included _ (Scope :|: (FromList xs :&: (Funs \\ Scope :|: GFuns)) :|: image genv (Funs \\ Scope) :|: (Singleton _ Γ)) F ->
     Included _ (occurs_free (C |[ e ]|)) F. 
   Proof. 
     intros Hproj. revert F.
@@ -170,7 +141,7 @@ Section Closure_conversion_util.
       eapply Included_Union_compat; sets.
       eapply Included_Intersection_compat; sets. sets.
       eapply Included_trans; [| eassumption ].
-      rewrite !Union_assoc.  eapply Included_Union_compat; sets.
+      eapply Included_Union_compat; sets.
       eapply Included_Union_compat; sets.
       eapply Included_Union_compat; sets.
       eapply Included_Intersection_compat; sets.
@@ -262,7 +233,7 @@ Section Closure_conversion_util.
   
   Lemma extend_fundefs'_get_s f B x z :
     z \in name_in_fundefs B ->
-          extend_fundefs' f B x z = x.
+    extend_fundefs' f B x z = x.
   Proof.
     intros Heq. unfold extend_fundefs'.
     destruct (Dec z); eauto.
@@ -271,7 +242,7 @@ Section Closure_conversion_util.
 
   Lemma extend_fundefs'_get_o f B x z :
     ~ z \in name_in_fundefs B ->
-            extend_fundefs' f B x z = f z.
+    extend_fundefs' f B x z = f z.
   Proof.
     intros Heq. unfold extend_fundefs'.
     destruct (Dec z); eauto.
@@ -340,12 +311,11 @@ Section Closure_conversion_util.
 
   Lemma closure_conversion_fundefs_Same_set_image c Funs GFuns FVs B1 B2  :
     Closure_conversion_fundefs clo_tag Funs GFuns c FVs B1 B2 ->
-    Same_set _ ((name_in_fundefs B1)) (name_in_fundefs B2).
+    Same_set _ (name_in_fundefs B1) (name_in_fundefs B2).
   Proof. 
     intros Hcc. induction Hcc.  
-    - simpl. rewrite  IHHcc.
-      apply Same_set_refl.
-    - simpl. apply Same_set_refl.
+    - simpl. rewrite IHHcc. sets.
+    - simpl. sets.
   Qed.
 
 
@@ -414,15 +384,15 @@ Section Closure_conversion_util.
     (forall e Scope Funs GFuns c genv Γ FVs e' C 
        (Hcc : Closure_conversion clo_tag Scope Funs GFuns c genv Γ FVs e e' C)
        (Hun: fundefs_names_unique e),
-        occurs_free (C |[ e' ]|) \subset (Scope :|: ((Funs \\ Scope :|: GFuns) :|: image genv (Funs \\ Scope)) :|: [set Γ])) /\
+        occurs_free (C |[ e' ]|) \subset (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: [set Γ])) /\
     (forall B Bg GFuns c FVs B'
        (Hcc: Closure_conversion_fundefs clo_tag Bg GFuns c FVs B B')
        (Hun: fundefs_names_unique_fundefs B),
-       occurs_free_fundefs B' \subset ((name_in_fundefs Bg :|: GFuns) \\ (name_in_fundefs B'))).
+       occurs_free_fundefs B' \subset (name_in_fundefs Bg :|: GFuns) \\ (name_in_fundefs B')).
   Proof with now eauto with Ensembles_DB functions_BD.
     exp_defs_induction IHe IHl IHB; intros; inv Hcc.
     - eapply project_vars_occurs_free_ctx_Included;
-      [ eassumption | | now apply Included_refl ].
+      [ eassumption | | reflexivity ].
       rewrite occurs_free_Econstr.
       apply Union_Included. now eauto with Ensembles_DB.
       apply Setminus_Included_Included_Union.
@@ -453,11 +423,11 @@ Section Closure_conversion_util.
       apply Included_Union_compat; [| now apply Included_refl ].
       apply Setminus_Included_Included_Union.
       eapply Included_trans. eapply IHe. eassumption.
-      intros f Hunf. eapply Hun. now constructor.      
-      eapply Union_Included; [| sets ].
-      eapply Union_Included; [| sets ].
-      eapply Union_Included; sets.
-      eauto 10 with Ensembles_DB functions_BD.
+      intros f Hunf. eapply Hun. now constructor.
+      eapply Union_Included; [| now sets ].
+      eapply Union_Included; [| now xsets ].
+      eapply Union_Included; [| now sets ].
+      xsets.
     - eapply project_vars_occurs_free_ctx_Included; [ eassumption | | now apply Included_refl ].
       repeat normalize_occurs_free. repeat normalize_sets. 
       eapply Union_Included.
@@ -474,8 +444,7 @@ Section Closure_conversion_util.
       eapply Union_Included; sets.
       eapply Union_Included; eauto 10 with Ensembles_DB functions_BD.
       eapply Union_Included; sets.
-      do 5 eapply Included_Union_preserv_l.  eapply Included_Union_preserv_r. eapply Included_Union_preserv_l. sets.
-      do 5 eapply Included_Union_preserv_l.  do 2 eapply Included_Union_preserv_r. sets.
+      now xsets. now xsets.
     - rewrite <- app_ctx_f_fuse.
       eapply project_vars_occurs_free_ctx_Included;
         [ eassumption | | now apply Included_refl ].
@@ -489,25 +458,18 @@ Section Closure_conversion_util.
         rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ].
         eapply Union_Included; sets.
         eapply Included_trans. eapply add_global_funs_included_r; eauto.
-        rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ].
-        eauto 20 with Ensembles_DB. 
+        rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ]. now xsets.
       + eapply Setminus_Included_Included_Union.
         eapply Included_trans. eapply IHe. eassumption.
         intros f Hunf. eapply Hun. now constructor.
-        eapply Union_Included; sets.
-        eapply Union_Included. xsets.
-        eapply Union_Included; sets.
-        * eapply Included_trans. eapply Included_Union_compat; [| reflexivity ].
-          eapply Setminus_Setminus_Included. tci.
-          rewrite Setminus_Union_distr.
-          rewrite <- !Union_assoc.
-          rewrite (Union_Same_set (name_in_fundefs _ \\ Scope)); sets.
-          eapply Union_Included; eauto 10 with Ensembles_DB.
-          eapply Union_Included; eauto 10 with Ensembles_DB.
-          rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ]. xsets.
-          eapply Included_trans. eapply add_global_funs_included_r; eauto.
-          rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ].
-          eauto 20 with Ensembles_DB.
+        eapply Union_Included; [| now sets ].
+        eapply Union_Included.
+        * rewrite <- closure_conversion_fundefs_Same_set_image with (B1 := f2) (B2 := B') at 1; [| eassumption ].
+          eapply Union_Included. eapply Union_Included. now xsets.
+          -- eapply Included_trans. eapply Setminus_Setminus_Included. tci.
+             eapply Union_Included. rewrite Setminus_Union_distr. now xsets. now sets.
+          -- eapply Included_trans. eapply add_global_funs_included_r; eauto.
+             now xsets.
         * eapply Included_trans. eapply extend_fundefs'_image_Included'.
           eapply Union_Included; sets.
           rewrite !Setminus_Union_distr. rewrite Setminus_Included_Empty_set; sets.
@@ -530,13 +492,11 @@ Section Closure_conversion_util.
       apply Union_Included; [ now eauto with Ensembles_DB |]. 
       apply Setminus_Included_Included_Union.
       eapply Included_trans. eapply IHe. eassumption.
-      intros f Hunf. eapply Hun. now constructor.      
-      eapply Union_Included; [| sets ].
-      eapply Union_Included; [| sets ].
-      eapply Union_Included; sets.
-      eapply Union_Included; sets.
-      eauto 10 with Ensembles_DB functions_BD.
-      eauto 10 with Ensembles_DB functions_BD.
+      intros f Hunf. eapply Hun. now constructor.
+      eapply Union_Included; [| now sets ].
+      eapply Union_Included; [| now xsets ].
+      eapply Union_Included; [| now xsets ].
+      eapply Union_Included; [| now xsets ]. xsets. 
     - eapply project_var_occurs_free_ctx_Included; eauto.
       normalize_occurs_free... reflexivity. 
     - rewrite occurs_free_fundefs_Fcons.
@@ -548,10 +508,10 @@ Section Closure_conversion_util.
         eapply Union_Included; sets.
         eapply Union_Included; sets.
         eapply Union_Included; sets.
-        * rewrite <- (Union_Included_Union_Setminus _ _ (_ |: _)); tci; sets. 
-        * eapply Included_trans.
-          eapply Included_trans. eapply image_monotonic. eapply Setminus_Included.
-          eapply extend_fundefs'_image. sets.          
+        * rewrite <- (Union_Included_Union_Setminus _ _ (_ |: _)); tci; xsets. 
+        * rewrite <- (Union_Included_Union_Setminus _ _ (_ |: _)); tci; xsets.
+        * eapply Included_trans. eapply image_monotonic. eapply Setminus_Included.
+          eapply Included_trans. eapply extend_fundefs'_image. sets.          
       + apply Setminus_Included_Included_Union.
         eapply Included_trans. eapply IHB. eassumption.
         intros f Hunf. inv Hunf; eauto.
@@ -577,26 +537,25 @@ Section Closure_conversion_util.
        (Hcc : Closure_conversion clo_tag Scope Funs GFuns c genv Γ FVs e e' C)
        (Hun: fundefs_names_unique e),
         occurs_free (C |[ e' ]|) \subset
-        Scope :|: ((occurs_free e :&: (Funs \\ Scope :|: GFuns)) :|: image genv (Funs \\ Scope)) :|: [set Γ]) /\
+        Scope :|: (occurs_free e :&: (Funs \\ Scope :|: GFuns) :|: image genv (Funs \\ Scope)) :|: [set Γ]) /\
     (forall B Bg GFuns c FVs B'
        (Hcc: Closure_conversion_fundefs clo_tag Bg GFuns c FVs B B')
        (Hun: fundefs_names_unique_fundefs B),
-        occurs_free_fundefs B' \subset (occurs_free_fundefs B :&: (name_in_fundefs Bg :|: GFuns))).
+        occurs_free_fundefs B' \subset occurs_free_fundefs B :&: (name_in_fundefs Bg :|: GFuns)).
   Proof with now eauto with Ensembles_DB functions_BD.
     exp_defs_induction IHe IHl IHB; intros; inv Hcc.
     - eapply project_vars_occurs_free_ctx_alt_Included; [ eassumption | | sets ].
       repeat normalize_occurs_free.
       apply Union_Included. now eauto with Ensembles_DB. eapply Setminus_Included_Included_Union.
       eapply Included_trans. eapply IHe. eassumption. intros f Hfin. eapply Hun. now constructor.  
-      eapply Union_Included; [| sets ].
-      eapply Union_Included; [| sets ].
-      now eapply Union_Included; sets.
-      eapply Union_Included; xsets.
+      eapply Union_Included; [| now xsets ].
+      eapply Union_Included. now sets.
+      eapply Union_Included; [| now xsets ].
       
       do 3 eapply Included_Union_preserv_l. eapply Included_Union_preserv_r. eapply Included_Union_preserv_l.
-      rewrite <- Intersection_Setmius_Disjoint with (S2 := [set v]). eapply Included_Intersection_compat; sets.
-      sets.
-
+      rewrite <- Intersection_Setmius_Disjoint with (S2 := [set v]).
+      eapply Included_Intersection_compat; sets. now sets.
+      
       eapply Union_Included; sets.
       eapply Union_Included; sets.
       normalize_occurs_free.  eapply Union_Included; sets. 
@@ -681,7 +640,7 @@ Section Closure_conversion_util.
           eapply Union_Included; [| eapply add_global_funs_included_r; eassumption]. sets.
           do 3 eapply Included_Union_preserv_l. eapply Included_Union_preserv_r. eapply Included_Union_preserv_l. 
           rewrite Intersection_commut. rewrite Intersection_Union_Disjoint. 
-          rewrite Intersection_commut. 
+          rewrite Intersection_commut.
           eapply Included_Intersection_compat; sets. eapply occurs_free_fundefs_name_in_fundefs_Disjoint; eauto.
         * { do 2 eapply Setminus_Included_Included_Union. eapply Included_trans. eapply IHe. eassumption.
             intros f Hfin. eapply Hun. now constructor.
@@ -714,7 +673,7 @@ Section Closure_conversion_util.
       + rewrite <- H1, !Union_assoc.
         normalize_occurs_free. eapply Included_Union_compat; sets.
         eapply Included_Union_compat; sets.
-        eapply Included_Union_compat; sets. 
+        eapply Included_Union_compat; sets.
         eapply Included_Intersection_compat; sets. 
     - eapply project_vars_occurs_free_ctx_alt_Included; [ eassumption | | normalize_sets; normalize_occurs_free; sets ].
       repeat normalize_occurs_free. repeat normalize_sets. 
@@ -759,10 +718,10 @@ Section Closure_conversion_util.
         eapply Union_Included; sets.  
 
         eapply Included_trans with (s2 := ((occurs_free e \\ (v |: (FromList l :|: name_in_fundefs f5))
-                                                                :|: (occurs_free_fundefs f5 \\ [set v])) :&: (name_in_fundefs Bg :|: GFuns)) :|: [set (v)]
+                                                                :|: (occurs_free_fundefs f5 \\ [set v])) :&: (name_in_fundefs Bg :|: GFuns)) :|: [set v]
                                                 :|: name_in_fundefs defs'); [| sets ].
         rewrite <- (closure_conversion_fundefs_Same_set_image) with (B2 := defs'); [| eassumption ].
-        rewrite !Union_Intersection_distr. 
+        rewrite !Union_Intersection_distr.
         rewrite <- Intersection_Setmius_Disjoint with (S2 := FromList l); sets.
         eapply Included_Intersection_compat; sets. eapply Setminus_Included_Included_Union.
         rewrite <- !Union_assoc. rewrite <- Union_Included_Union_Setminus. sets. tci. sets. sets.
@@ -784,7 +743,7 @@ Section Closure_conversion_util.
     (forall B GFuns {Hd : Decidable GFuns} c FVs B'
        (Hcc: Closure_conversion_fundefs clo_tag B GFuns c FVs B B')
        (Hun: fundefs_names_unique_fundefs B),
-        occurs_free_fundefs B' \subset (occurs_free_fundefs B :&: GFuns)).
+        occurs_free_fundefs B' \subset occurs_free_fundefs B :&: GFuns).
   Proof.
     intros. eapply Closure_conversion_occurs_free_Included_alt_mut in Hcc; eauto. 
     eapply Included_trans. eassumption.
@@ -803,71 +762,312 @@ Section Closure_conversion_util.
   Qed. 
     
 
+  Definition funnames_in_exp (e : exp) :=
+    fun f => exists B, funs_in_exp B e /\ f \in name_in_fundefs B.
 
-  (* TODO FIX this does not hold quite like that anymore *)
-  (* Lemma Closure_conversion_closed_fundefs_mut : *)
-  (*   (forall e Scope Funs GFuns σ c Γ FVs e' C  *)
-  (*      (Hcc : Closure_conversion clo_tag Scope Funs GFuns σ c Γ FVs e e' C) *)
-  (*      (Hun: fundefs_names_unique e), *)
-  (*      closed_fundefs_in_exp (C |[ e' ]|)) /\ *)
-  (*   (forall B Funs GFuns σ c FVs B' *)
-  (*      (Hcc: Closure_conversion_fundefs clo_tag Funs GFuns σ c FVs B B') *)
-  (*      (Hun: fundefs_names_unique_fundefs B), *)
-  (*      closed_fundefs_in_fundefs B'). *)
-  (* Proof. *)
-  (* Abort.  *)
-  (*   exp_defs_induction IHe IHl IHB; intros; inv Hcc. *)
-  (*   - intros B HB. rewrite project_vars_free_funs_in_exp in HB; [| eassumption ]. *)
-  (*     inv HB. eapply IHe; [ eassumption | | eassumption ].  *)
-  (*     intros B' H. eapply Hun. now constructor.  *)
-  (*   - inv H11.  *)
-  (*     intros B HB. rewrite project_var_free_funs_in_exp in HB; [| eassumption ]. *)
-  (*     inv HB. inv H4. *)
-  (*   - inv H11. destruct H2 as [Heq [C' [e' [Heq' Hcc']]]]. destruct y as [t e'']. *)
-  (*     simpl in *; subst. *)
-  (*     intros B HB. rewrite project_var_free_funs_in_exp in HB; [| eassumption ]. *)
-  (*     inv HB. inv H5. *)
-  (*     + inv H. eapply IHe; [ eassumption | | eassumption ]. *)
-  (*       intros B' H. eapply Hun. econstructor. eassumption. now constructor.  *)
-  (*     + eapply IHl. now econstructor; eauto. *)
-  (*       intros B' HB'. eapply Hun. inv HB'. econstructor. eassumption. *)
-  (*       constructor 2. eassumption.  *)
-  (*       rewrite project_var_free_funs_in_exp. *)
-  (*       econstructor; eassumption. eassumption. *)
-  (*   - intros B HB. rewrite project_var_free_funs_in_exp in HB; [| eassumption ]. *)
-  (*     inv HB. eapply IHe; [ eassumption | | eassumption ].  *)
-  (*     intros B' H. eapply Hun. now constructor.  *)
-  (*   - rewrite <- app_ctx_f_fuse. intros B HB. *)
-  (*     rewrite project_vars_free_funs_in_exp in HB; [| eassumption ]. *)
-  (*     inv HB. inv H9. *)
-  (*     + split; [| now apply Included_Empty_set ]. *)
-  (*       eapply Included_trans. *)
-  (*       eapply Closure_conversion_occurs_free_Included_mut. eassumption. *)
-  (*       intros B HB. eapply Hun. inv HB; eauto. *)
-  (*       rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ]. *)
-  (*       rewrite Setminus_Same_set_Empty_set. now apply Included_Empty_set. *)
-  (*     + rewrite make_closures_funs_in_exp in H10; [| eassumption ]. *)
-  (*       eapply IHe; [ eassumption | | eassumption ]. *)
-  (*       intros B1 HB1. eapply Hun. now constructor. *)
-  (*     + eapply IHB; [ eassumption | | eassumption ]. *)
-  (*       intros B1 HB1. now inv HB1; eauto. *)
-  (*   - intros B HB.  rewrite project_vars_free_funs_in_exp in HB; [| eassumption ]. *)
-  (*     inv HB. inv H1. inv H4. *)
-  (*   - intros B HB. rewrite project_vars_free_funs_in_exp in HB; [| eassumption ]. *)
-  (*     inv HB. eapply IHe; [ eassumption | | eassumption ].  *)
-  (*     intros B' H. eapply Hun. now constructor. *)
-  (*   - intros B HB. rewrite project_var_free_funs_in_exp in HB; [| eassumption ]. *)
-  (*     inv HB. *)
-  (*   - intros B HB. inv HB. *)
-  (*     + eapply IHe; [ eassumption | | eassumption ].   *)
-  (*       intros B' H. eapply Hun. left. now constructor.  *)
-  (*     + eapply IHB; [ eassumption | | eassumption ]. *)
-  (*       intros B' H. inv H; eauto. *)
-  (*       specialize (Hun (Fcons v t l e f5) (or_intror eq_refl)). now inv Hun; eauto. *)
-  (*   - intros B HB. inv HB. *)
-  (* Qed. *)
+  Definition funnames_in_fundefs (fds : fundefs) :=
+    fun f => exists B, funs_in_fundef B fds /\ f \in name_in_fundefs B.
 
 
+  Lemma Closure_conversion_closed_fundefs_mut :
+    (forall e Scope Funs GFuns genv c Γ FVs e' C B
+            (Hcc : Closure_conversion clo_tag Scope Funs GFuns c genv Γ FVs e e' C)
+            (Hun: fundefs_names_unique e)            
+            (Hin : funs_in_exp B (C |[ e' ]|)),
+        occurs_free_fundefs B \subset GFuns :|: funnames_in_exp e) /\
+    (forall B Funs GFuns c FVs B' B''
+            (Hcc: Closure_conversion_fundefs clo_tag Funs GFuns c FVs B B')
+            (Hun: fundefs_names_unique_fundefs B)
+            (Hin : funs_in_fundef B'' B'),
+       occurs_free_fundefs B'' \subset GFuns :|: funnames_in_fundefs B).
+  Proof.
+    exp_defs_induction IHe IHl IHB; intros; inv Hcc.
+    - rewrite project_vars_free_funs_in_exp in Hin; [| eassumption ]. inv Hin.
+      eapply IHe in H14; [| | eassumption ].
+      eapply Included_trans. eassumption.
+      eapply Included_Union_compat. now sets.
+      intros x Hin. inv Hin. inv H. eexists. split; eauto. 
+      intros B' H. eapply Hun. now constructor.
+    - inv H12.
+      rewrite project_var_free_funs_in_exp in Hin; [| eassumption ].
+      inv Hin. inv H4.
+    - inv H12. destruct H2 as [Heq [C' [e' [Heq' Hcc']]]]. destruct y as [t e''].
+      simpl in *; subst.
+      rewrite project_var_free_funs_in_exp in Hin; [| eassumption ].
+      inv Hin. inv H5.
+      + inv H. eapply IHe in Hcc'; [ | | eassumption ].
+        eapply Included_trans. eassumption.
+        eapply Included_Union_compat. now sets.
+        intros x Hin. inv Hin. inv H. eexists. split; eauto. econstructor; eauto. now left. 
+        intros B' H. eapply Hun. econstructor. eassumption. now constructor.
+      + eapply Included_trans. eapply IHl. now econstructor; eauto.
+        intros B' HB'. eapply Hun. inv HB'. econstructor. eassumption.  
+        constructor 2. eassumption.
+        rewrite project_var_free_funs_in_exp.
+        econstructor; eassumption. eassumption.
+        eapply Included_Union_compat. now sets.
+        intros x Hin. inv Hin. inv H0. eexists. split; eauto. inv H2. eapply In_Case. eassumption. now right; eauto.
+    - rewrite project_var_free_funs_in_exp in Hin; [| eassumption ]. inv Hin.
+      eapply IHe in H15; [| | eassumption ].
+      eapply Included_trans. eassumption.
+      eapply Included_Union_compat. now sets.
+      intros x Hin. inv Hin. inv H. eexists. split; eauto. 
+      intros B' H. eapply Hun. now constructor.
+    - rewrite project_vars_free_funs_in_exp in Hin; [| eassumption ].
+      inv Hin. inv H1. inv H2.
+      eapply IHe in H18; [| | eassumption ].
+      eapply Included_trans. eassumption.
+      eapply Included_Union_compat. now sets.
+      intros z Hin. inv Hin. inv H. eexists. split; eauto. 
+      intros B' H. eapply Hun. now constructor.
+    - rewrite <- app_ctx_f_fuse in *.
+      rewrite project_vars_free_funs_in_exp in Hin; [| eassumption ].
+      inv Hin. inv H8.
+      + assert (HB := H15). eapply Closure_conversion_occurs_free_Included_mut in H15.
+        eapply Included_trans. eassumption. rewrite Setminus_Union_distr. 
+        rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ].
+        rewrite Setminus_Same_set_Empty_set. repeat normalize_sets.
+        eapply Included_trans. eapply Included_Setminus_compat. eapply add_global_funs_included_r.
+        eassumption. reflexivity.
+        rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ].
+        rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set. repeat normalize_sets. now sets.
+        
+        intros x Hin. eapply Hun. inv Hin; eauto.
+      + eapply IHe in H18; [ | | eassumption ].
+        eapply Included_trans. eassumption.
+        eapply Included_trans. eapply Included_Union_compat. eapply add_global_funs_included_r.
+        eassumption. reflexivity. rewrite <- Union_assoc. 
+        eapply Included_Union_compat. now sets. 
+        intros x Hin. inv Hin.
+
+        eexists. split. eapply In_Fun1. eassumption.
+        inv H. inv H0. eexists. split. eapply In_Fun2. eassumption. eassumption.
+
+        intros B'' H. eapply Hun. now constructor.
+      + eapply Included_trans. eapply IHB; [ eassumption | | eassumption ].
+        intros B1 HB1. now inv HB1; eauto.
+        
+        eapply Included_trans. eapply Included_Union_compat. eapply add_global_funs_included_r.
+        eassumption. reflexivity. rewrite <- Union_assoc. 
+        eapply Included_Union_compat. now sets. 
+        intros x Hin. inv Hin.
+        
+        eexists. split. eapply In_Fun1. eassumption.
+        inv H. inv H0. eexists. split. eapply In_Fun3. eassumption. eassumption.
+
+    - rewrite project_vars_free_funs_in_exp in Hin; [| eassumption ]. inv Hin. inv H1. inv H4.
+    - rewrite project_vars_free_funs_in_exp in Hin; [| eassumption ]. inv Hin.
+      eapply IHe in H14; [| | eassumption ].
+      eapply Included_trans. eassumption.
+      eapply Included_Union_compat. now sets.
+      intros x Hin. inv Hin. inv H. eexists. split; eauto. 
+      intros B' H. eapply Hun. now constructor.
+    - rewrite project_var_free_funs_in_exp in Hin; [| eassumption ]. inv Hin.
+    - inv Hin.
+      + eapply IHe in H12; [ | | eassumption ].
+        eapply Included_trans. eassumption.
+        eapply Included_Union_compat. now sets.
+        intros z Hin. inv Hin. inv H. eexists. split; eauto. 
+
+        intros B' H. eapply Hun. left. now constructor.
+      + eapply IHB in H11; [| | eassumption ].
+
+        eapply Included_trans. eassumption.
+        eapply Included_Union_compat. now sets.
+        intros z Hin. inv Hin. inv H. eexists. split; eauto. 
+        intros B' H. inv H; eauto.
+        specialize (Hun (Fcons v t l e f5) (or_intror eq_refl)). now inv Hun; eauto.
+    - inv Hin.
+  Qed.
+
+
+
+  Lemma project_var_occurs_free_ctx_Included_no_env Scope Funs GFuns c genv Γ S x y C Q F e:
+    project_var clo_tag Scope Funs GFuns c genv Γ [] S x y C Q ->
+    (occurs_free e) \subset (F :|: [set y]) ->
+    (Scope :|: ([set x] :&: (Funs \\ Scope :|: GFuns)) :|: image genv (Funs \\ Scope)) \subset F ->
+    (occurs_free (C |[ e ]|)) \subset F. 
+  Proof with now eauto with Ensembles_DB functions_BD. 
+    intros Hproj Hinc1 Hinc2. inv Hproj.
+    - simpl. eapply Included_trans. eassumption. 
+      apply Union_Included. now apply Included_refl.
+      eapply Included_trans; [| eassumption ].
+      eauto with Ensembles_DB.
+    - simpl.
+      rewrite occurs_free_Econstr, !FromList_cons, FromList_nil,
+      Union_Empty_set_neut_r. 
+      eapply Union_Included.
+      + eapply Included_trans; [| now apply Hinc2 ].
+        eapply Union_Included; sets. eapply Singleton_Included. left. right.
+        constructor; eauto. left; constructor; eauto.
+        eapply Singleton_Included. right.
+        eapply In_image. constructor; eauto.        
+      + eauto with Ensembles_DB.
+    - simpl. 
+      repeat normalize_occurs_free.
+      rewrite FromList_cons, FromList_nil, Union_Empty_set_neut_l.
+      rewrite FromList_singleton. rewrite !Setminus_Union_distr.
+      rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
+      eapply Union_Included.
+      + eapply Included_trans; [| now apply Hinc2 ].
+        eapply Setminus_Included_Included_Union.
+        eapply Singleton_Included. left. left. right.
+        econstructor; eauto.
+      + eauto with Ensembles_DB.
+    - simpl. inv H2.
+  Qed.
+
+  
+  Lemma project_vars_occurs_free_ctx_Included_no_env Scope Funs GFuns c genv Γ
+        S xs xs' C S' F e:
+    project_vars clo_tag Scope Funs GFuns c genv Γ [] S xs xs' C S' ->
+    Included _ (occurs_free e) (Union _ F (FromList xs')) ->
+    Included _ (Scope :|: (FromList xs :&: (Funs \\ Scope :|: GFuns)) :|: image genv (Funs \\ Scope)) F ->
+    Included _ (occurs_free (C |[ e ]|)) F. 
+  Proof.
+    revert C F xs' S S'. induction xs; intros C F xs' S S' Hproj Hinc1 Hinc2; inv Hproj; simpl in *; repeat normalize_sets.
+    - eassumption.
+    -
+      rewrite <- app_ctx_f_fuse.
+      eapply project_var_occurs_free_ctx_Included_no_env; [ eassumption | | ].
+      eapply IHxs. eassumption. rewrite <- Union_assoc. eassumption.
+      eapply Included_trans. eapply Included_trans; [| eapply Hinc2 ]; sets.
+      eapply Included_Union_compat; sets.
+      eapply Included_Union_compat; sets.
+      eapply Included_Intersection_compat; sets. sets.
+      eapply Included_trans; [| eassumption ].
+      eapply Included_Union_compat; sets.
+      eapply Included_Union_compat; sets.
+      eapply Included_Intersection_compat; sets.
+  Qed.
+
+  Hint Resolve Included_Intersection_l Included_Intersection_r : Ensembles_DB.
+
+  
+  Lemma Closure_conversion_occurs_free_toplevel_aux :
+    (forall e Scope Funs GFuns c genv Γ e' C
+            (Hcc : Closure_conversion clo_tag Scope Funs GFuns c genv Γ [] e e' C)
+        (Hun : fundefs_names_unique e),
+        occurs_free (C |[ e' ]|) \subset Scope :|: (Funs \\ Scope :|: GFuns) :|: image genv (Funs \\ Scope)).
+  Proof.    
+    induction e using exp_ind'; intros; inv Hcc.
+    - eapply project_vars_occurs_free_ctx_Included_no_env; [ eassumption | | now sets ].
+      rewrite occurs_free_Econstr.
+      apply Union_Included. now eauto with Ensembles_DB.
+      apply Setminus_Included_Included_Union.
+      eapply Included_trans. eapply IHe. eassumption.
+      intros f Hunf. eapply Hun. now constructor.
+      rewrite Union_commut with (s2 := Singleton var v), !Union_assoc.      
+      eapply Union_Included; sets.
+      eapply Union_Included; eauto 10 with Ensembles_DB functions_BD.      
+    - eapply project_var_occurs_free_ctx_Included_no_env;
+        [ eassumption | | now sets ]. inv H12.
+      rewrite occurs_free_Ecase_nil. now apply Included_Union_r.
+    - inv H12. destruct y as [c' e'].
+      inv H2. simpl in H; subst. destruct H0 as [C' [e'' [Heq Hcce]]]. simpl in Heq; subst. 
+      eapply Included_trans. now eapply occurs_free_Ecase_ctx_app.
+      apply Union_Included. 
+      + eapply project_var_occurs_free_ctx_Included_no_env; [ eassumption | | now sets ].
+        eapply Included_trans. eapply IHe. eassumption.
+        intros f Hunf. eapply Hun. econstructor. eassumption. now constructor. now sets.
+      + eapply IHe0. econstructor; eauto.
+        intros f Hunf. eapply Hun. inv Hunf. econstructor 2. eassumption.
+        econstructor 2. eassumption. 
+    - eapply project_var_occurs_free_ctx_Included_no_env; [ eassumption | | now sets ].
+      rewrite occurs_free_Eproj.
+      rewrite Union_commut.
+      apply Included_Union_compat; [| now apply Included_refl ].
+      apply Setminus_Included_Included_Union.
+      eapply Included_trans. eapply IHe. eassumption.
+      intros f Hunf. eapply Hun. now constructor.
+      eapply Union_Included; [| now sets ].
+      eapply Union_Included; [| now xsets ].
+      eapply Union_Included; [| now sets ].
+      xsets.
+    - eapply project_vars_occurs_free_ctx_Included_no_env; [ eassumption | | now sets ].
+      repeat normalize_occurs_free. repeat normalize_sets. 
+      eapply Union_Included.
+      now eauto with Ensembles_DB.
+      eapply Setminus_Included_Included_Union.
+      eapply Union_Included.
+      now eauto with Ensembles_DB.
+      eapply Setminus_Included_Included_Union.
+      eapply Union_Included.      
+      eapply Union_Included; now eauto with Ensembles_DB.
+      eapply Setminus_Included_Included_Union.
+      eapply Included_trans. eapply IHe. eassumption.
+      intros h Hunf. eapply Hun. now constructor.
+      eapply Union_Included; sets.
+      eapply Union_Included; eauto 10 with Ensembles_DB functions_BD.
+      eapply Union_Included; sets.
+      now xsets.
+    - rewrite <- app_ctx_f_fuse.
+      eapply project_vars_occurs_free_ctx_Included_no_env;
+        [ eassumption | | now sets ].
+      simpl. rewrite occurs_free_Econstr.
+      apply Union_Included. now apply Included_Union_r.
+      rewrite occurs_free_Efun. apply Setminus_Included_Included_Union.
+      eapply Union_Included.  
+      + eapply Included_trans. eapply Closure_conversion_occurs_free_Included_mut. eassumption.
+
+        intros f Hunf. eapply Hun. now inv Hunf; eauto.
+        rewrite Setminus_Union_distr.
+        rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ]. rewrite Setminus_Same_set_Empty_set.
+        normalize_sets. eapply Setminus_Included_Included_Union. 
+        eapply Included_trans. eapply add_global_funs_included_r; eauto.
+        rewrite closure_conversion_fundefs_Same_set_image; [| eassumption ]. now xsets.
+      + eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply IHe. eassumption.
+        intros f Hunf. eapply Hun. now constructor.
+        eapply Union_Included.
+        * rewrite <- closure_conversion_fundefs_Same_set_image with (B1 := f2) (B2 := B') at 1; [| eassumption ].
+          eapply Union_Included. now xsets. eapply Union_Included. 
+          -- eapply Included_trans. eapply Setminus_Setminus_Included. tci.
+             eapply Union_Included. rewrite Setminus_Union_distr. now xsets. now sets.
+          -- eapply Included_trans. eapply add_global_funs_included_r; eauto.
+             now xsets.
+        * eapply Included_trans. eapply extend_fundefs'_image_Included'.
+          eapply Union_Included; sets.
+          rewrite !Setminus_Union_distr. rewrite Setminus_Included_Empty_set; sets.
+          rewrite Union_Empty_set_neut_l.
+          eapply Included_trans. eapply image_monotonic. eapply Included_Setminus_compat; [| reflexivity ].
+          eapply Setminus_Setminus_Included. tci.
+          rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
+          xsets.
+    - eapply project_vars_occurs_free_ctx_Included_no_env;
+      [ eassumption | | now sets ].
+      repeat normalize_occurs_free. repeat normalize_sets.
+      apply Union_Included. eauto with Ensembles_DB.
+      apply Setminus_Included_Included_Union.
+      apply Union_Included. eauto with Ensembles_DB.
+      apply Setminus_Included_Included_Union.
+      eauto 7 with Ensembles_DB.
+    - eapply project_vars_occurs_free_ctx_Included_no_env; [ eassumption | | now sets ].
+      rewrite occurs_free_Eprim.
+      apply Union_Included; [ now eauto with Ensembles_DB |]. 
+      apply Setminus_Included_Included_Union.
+      eapply Included_trans. eapply IHe. eassumption.
+      intros f Hunf. eapply Hun. now constructor.
+      eapply Union_Included; [| now xsets ].
+      eapply Union_Included; [| now xsets ].
+      eapply Union_Included; [| now xsets ]. xsets. 
+    - eapply project_var_occurs_free_ctx_Included_no_env; eauto.
+      normalize_occurs_free... now sets. now sets.
+
+      Grab Existential Variables. exact (Empty_set _).
+  Qed.
+
+
+  Lemma Closure_conversion_occurs_free_toplevel e Scope c genv Γ e' C
+    (Hcc : Closure_conversion clo_tag Scope (Empty_set _) (Empty_set _) c genv Γ [] e e' C)
+    (Hun : fundefs_names_unique e) :
+    occurs_free (C |[ e' ]|) \subset Scope.
+  Proof.
+    eapply Included_trans. eapply Closure_conversion_occurs_free_toplevel_aux. eassumption.
+    eassumption. repeat normalize_sets. do 2 rewrite Setminus_Empty_set_abs_r at 1. rewrite image_Empty_set.
+    now sets. 
+  Qed.
+    
   (* TODO : move *)
   Lemma inclusion_trans {A} P1 P2 P3 :
     inclusion A P1 P2 ->
@@ -883,8 +1083,8 @@ Section Closure_conversion_util.
     Closure_conversion_fundefs clo_tag Bg GFuns c FVs B1 B2 ->
     find_def f B1 = Some (t1, xs, e1) ->
     exists Γ' C e2,
-      ~ In var (Union var ((name_in_fundefs Bg :|: GFuns)) (Union _ (FromList xs) (bound_var e1))) Γ' /\
-      find_def (f) B2 = Some (t1, Γ' :: xs, (C |[ e2 ]|)) /\
+      ~ In var (Union var (name_in_fundefs Bg :|: GFuns) (Union _ (FromList xs) (bound_var e1))) Γ' /\
+      find_def f B2 = Some (t1, Γ' :: xs, (C |[ e2 ]|)) /\
       Closure_conversion clo_tag (FromList xs) (name_in_fundefs Bg) (GFuns \\ (FromList xs)) c
                          (extend_fundefs' id Bg Γ')  Γ' FVs e1 e2 C.
   Proof.
@@ -896,10 +1096,9 @@ Section Closure_conversion_util.
         simpl. rewrite peq_true. reflexivity.
       + edestruct IHHcc as [Γ'' [C' [e2 [Hnin [Hfind Hcc']]]]]; eauto.
         repeat eexists; eauto. simpl. rewrite peq_false. eassumption.
-        intros Hc. now eapply n. 
+        intros Hc. eapply n. eassumption.
     - inv Hdef.
   Qed.
-
 
   (** * Lemmas about [project_var] and [project_vars] *)
 
@@ -922,12 +1121,11 @@ Section Closure_conversion_util.
 
   Lemma project_var_not_In_free_set Scope Funs GFuns c genv Γ FVs x x' C S S'  :
     project_var clo_tag Scope Funs GFuns c genv Γ FVs S x x' C S' ->
-    Disjoint _ S (Scope :|: (((Funs \\ Scope) :|: GFuns) :|:
-                                   ((FromList FVs) :|: ([set Γ])))) ->
+    Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: FromList FVs :|: [set Γ]) ->
     ~ In _ S' x'.
   Proof.
     intros Hproj Hd. inv Hproj; intros Hc.
-    - eapply Hd. eauto.
+    - eapply Hd. constructor; eauto.
     - inv Hc. exfalso. eauto.
     - inv Hc. inv H4; eauto. 
     - inv Hc; eauto.
@@ -935,8 +1133,7 @@ Section Closure_conversion_util.
 
   Lemma project_vars_not_In_free_set Scope Funs GFuns c genv Γ FVs xs xs' C S S'  :
     project_vars clo_tag Scope Funs GFuns c genv Γ FVs S xs xs' C S' ->
-    Disjoint _ S (Scope :|: (((Funs \\ Scope) :|: GFuns) :|:
-                                   ((FromList FVs) :|: ([set Γ]))))  ->
+    Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: FromList FVs :|: [set Γ])  ->
     Disjoint _ S' (FromList xs').
   Proof.
     intros Hproj Hd. induction Hproj.
@@ -947,7 +1144,7 @@ Section Closure_conversion_util.
       + eapply Disjoint_Included_r_sym.
         eapply project_vars_free_set_Included; eassumption.
         eapply Disjoint_Singleton_r.
-        eapply project_var_not_In_free_set; eassumption.        
+        eapply project_var_not_In_free_set; eassumption.
       + eapply Disjoint_sym. eapply IHHproj.
         eapply Disjoint_Included_l.
         eapply project_var_free_set_Included. eassumption.
@@ -1075,7 +1272,7 @@ Section Closure_conversion_util.
         eauto 10 with Ensembles_DB.
   Qed.
 
-  (** Properties about context sizes *)
+  (** Properties for context sizes *)
 
   Lemma project_var_sizeOf_ctx_exp (Scope Funs GFuns : Ensemble var)
         (c : ctor_tag) genv (Γ : var) (FVs : list var) (S : Ensemble var) 
@@ -1098,7 +1295,7 @@ Section Closure_conversion_util.
     omega.
   Qed.
 
-  Lemma Closure_conversion_fundefs_numOf_fundefs Funs (GFuns : Ensemble var) (c : ctor_tag) 
+  Lemma Closure_conversion_fundefs_numOf_fundefs Funs (GFuns : Ensemble var) (σ : var -> var) (c : ctor_tag) 
         (FVs : list var) (B1 B2 : fundefs) :
     Closure_conversion_fundefs clo_tag Funs GFuns c FVs B1 B2 ->
     numOf_fundefs B1 = numOf_fundefs B2.

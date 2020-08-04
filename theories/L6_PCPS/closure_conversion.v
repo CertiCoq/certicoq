@@ -174,7 +174,7 @@ Section CC.
         Closure_conversion Scope Funs GFuns c genv Γ FVs (Efun B e) (Efun B' (Ce |[ e' ]|)) (comp_ctx_f C' (Econstr_c Γ' c' FVs'' Hole_c))
   | CC_Eletapp :
       forall Scope Funs GFuns c genv Γ FVs x f f' f'' ft e env' ys ys' C C' e' S S',
-        Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: (FromList FVs :|: [set Γ]))) ->
+        Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: (FromList FVs :|: [set Γ])) ->
         (* Project the function name and the actual parameter *)
         project_vars Scope Funs GFuns c genv Γ FVs S (f :: ys) (f' :: ys') C S' ->
         (* The name of the function pointer and the name of the environment

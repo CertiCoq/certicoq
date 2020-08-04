@@ -5308,7 +5308,7 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
 
   Lemma occurs_in_vars_correct : forall a l, occurs_in_vars a l = true <-> List.In a l.
   Proof.
-    induction l; [firstorder|].
+    induction l; [firstorder auto with *|].
     destruct (Pos.eqb_spec a a0); subst.
     simpl; rewrite Pos.eqb_refl; simpl; split; intros; [now left|easy].
     simpl; rewrite <- Pos.eqb_neq in n; unfold eq_var; rewrite n; simpl.
@@ -5349,7 +5349,7 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
   Qed.
 *)
   Lemma negb_not : forall a b, a = negb b <-> a <> b.
-  Proof. destruct a; destruct b; firstorder. Qed.
+  Proof. destruct a; destruct b; firstorder auto with *. Qed.
 
   Lemma Disjoint_Singleton_In : forall A S a,
     Decidable S -> Disjoint A S [set a] <-> ~ Ensembles.In _ S a.
@@ -5625,7 +5625,7 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
     intros;
     rewrite Ensemble_iff_In_iff; intros a;
     translate_used_vars_to_firstorder a;
-    firstorder.
+    firstorder auto with *.
 
   Lemma used_vars_Econstr : forall x c args e,
     used_vars (Econstr x c args e) <--> x |: FromList args :|: used_vars e.

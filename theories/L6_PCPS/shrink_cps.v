@@ -19,6 +19,7 @@ Require Import L6.cps.
 Require Import L6.ctx L6.rename.
 Require Import L6.cps_util L6.List_util L6.identifiers L6.inline_letapp.
 
+Export ListNotations.
 
 (* Shallow val for constr and function *)
 Inductive svalue : Type :=
@@ -543,8 +544,6 @@ Definition f_pair {A B C D} (f: A -> A -> B) (g: C -> C -> D)
 
 
 Definition tag := positive.
-
-
 
 Fixpoint update_census_list (sig:r_map) (ys:list var) (fun_delta:var -> c_map -> nat) (count:c_map) :=
   match ys with

@@ -663,8 +663,8 @@ Lemma NoDup_cons_l {A} (l1 l2 : list A):
   NoDup l1.
 Proof.
   induction l1; simpl; intros H; constructor; eauto.
-  - inv H. firstorder.
-  - inv H; firstorder.
+  - inv H. firstorder auto with *.
+  - inv H; firstorder auto with *.
 Qed.
 
 Lemma NoDup_cons_r {A} (l1 l2 : list A):

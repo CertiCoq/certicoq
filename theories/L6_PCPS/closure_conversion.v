@@ -336,34 +336,33 @@ Section CC.
     c_new <- make_record_ctor_tag n ;;
     ret (c_new, map_new', fun e => g' (Econstr Γ_new c_new fv' e)).
   
-  (** Add closures to maps *)
-  Fixpoint add_closures (defs : fundefs) (mapfv_new mapfv_old : VarInfoMap) (gfuns : GFunMap)
-           (env : var) (* the enviroment of defs *)
-           (is_closed : bool)
-  : ccstate (VarInfoMap * VarInfoMap * GFunMap) :=
+  (** Add closures to VarInfoMap *)
+  Fixpoint add_closures (defs : fundefs) (mapfv : VarInfoMap)
+           (env : var) (* the enviroment of defs *) : ccstate VarInfoMap :=
     match defs with
     | Fcons f typ xs e defs' =>
       (* The new name of the function *)
       code_ptr <- get_name f "" ;;
-      t <- add_closures defs' mapfv_new mapfv_old gfuns env is_closed ;;
-      let '(mapfv_new', mapfv_old', gfuns') := t in
-      (* update the new map *)
-      let mapfv_new'' :=
-          Maps.PTree.set f (MRFun env) mapfv_new'
-      in
-      (* update the old map *)
-      let mapfv_old'' :=
-          Maps.PTree.set f (MRFun env) mapfv_old'
-      in
-      gfuns'' <- (if is_closed then
-                    (* f_str <- get_pp_name f ;; *)
-                    (* log_msg ("Adding " ++ f_str) ;; *)
-                    ret (M.set f GFun gfuns')
-                  else ret gfuns') ;;
-      ret (mapfv_new'', mapfv_old'', gfuns'')
-    | Fnil => ret (mapfv_new, mapfv_old, gfuns)
+      mapfv' <- add_closures defs' mapfv env ;;
+      let mapfv'' := Maps.PTree.set f (MRFun env) mapfv' in
+      ret mapfv''
+    | Fnil => ret mapfv
     end.
 
+  (** Add closures to GFunMap *)
+  Fixpoint add_closures_gfuns (defs : fundefs) (gfuns : GFunMap) (is_closed : bool) : ccstate GFunMap :=
+    match defs with
+    | Fcons f typ xs e defs' =>
+      gfuns' <- add_closures_gfuns defs' gfuns is_closed;;
+      if is_closed then
+        (* f_str <- get_pp_name f ;; *)
+        (* log_msg ("Adding " ++ f_str) ;; *)
+        ret (M.set f GFun gfuns')
+      else ret gfuns
+    | Fnil => ret gfuns
+    end.
+  
+  
   Definition bool_to_string (b : bool) : string :=
     if b then "true" else "false".
 
@@ -420,10 +419,11 @@ Section CC.
         (* fv_names <- get_pp_names_list fvs ;; *)
         (* log_msg (concat " " ("Closed" :: bool_to_string is_closed :: "Block has fvs :" :: fv_names)) ;; *)
         
-        t2 <- add_closures defs mapfv_new mapfv gfuns Γ' is_closed ;;
-        let '(mapfv_new', mapfv_old', gfuns') := t2 in
-        ef <- exp_closure_conv e mapfv_old' gfuns' c Γ ;;
-        defs' <- fundefs_closure_conv defs mapfv_new' gfuns' c' ;;
+        mapfv' <- add_closures defs mapfv Γ' ;;
+        gfuns' <- add_closures_gfuns defs gfuns is_closed ;;
+
+        ef <- exp_closure_conv e mapfv' gfuns' c Γ ;;
+        defs' <- fundefs_closure_conv defs mapfv_new gfuns' c' ;;
         ret (Efun defs' ((snd ef) (fst ef)), g1)
       | Eapp f ft xs =>
         t1 <- get_var f mapfv gfuns c Γ ;;
@@ -448,11 +448,13 @@ Section CC.
   with fundefs_closure_conv (defs : fundefs) (mapfv : VarInfoMap) (gfuns : GFunMap) (c : ctor_tag)
        : ccstate fundefs  :=
          match defs with
-           | Fcons f tag ys e defs' =>
-             (* Add arguments to the map *)
-             let mapfv' := add_params ys mapfv in
-             (* formal parameter for the environment pointer *)
+         | Fcons f tag ys e defs' =>
+           (* formal parameter for the environment pointer *)
              Γ <- get_name_no_suff "env" ;;
+             (* Add mut rec functions to map *) 
+             mapfv' <- add_closures defs mapfv Γ ;;
+             (* Add arguments to the map *)       
+             let mapfv' := add_params ys mapfv in
              ef <- exp_closure_conv e mapfv' gfuns c Γ ;;
              defs'' <- fundefs_closure_conv defs' mapfv gfuns c ;;
              ret (Fcons f tag (Γ :: ys) ((snd ef) (fst ef)) defs'')

@@ -18,47 +18,6 @@ Open Scope fun_scope.
 
 (** * Correspondence of the relational and the computational definitions of closure conversion *)
 
-
-(* Sketch of what we want to show: *)
-
-Lemma exp_closure_conv_Closure_conv_sound :
-  (forall e Scope Funs c Γ FVs FVmap S
-          (* The invariant that relates [FVmap] and [Scope], [Funs], [FV] *)
-          (Minv : FVmap_inv FVmap Scope Funs FVs)
-          (* [FVmap] contains all the free variables *)
-          (Hbin1 : binding_in_map (occurs_free e) FVmap)
-          (* [FVmap] does not contain the variables in [S] or [Γ] *)
-          (Hbin2 : binding_not_in_map (Union _ S (Singleton _ Γ)) FVmap)
-          (* [S] is disjoint with the free and bound variables of [e] and [Γ] *)
-          (HD1 : Disjoint _ S (Union _ (image (subst FVmap) (Setminus _ Funs Scope))
-                                     (Union _ (bound_var e)
-                                            (Union _ (occurs_free e) (Singleton _ Γ)))))
-          (* The current environment argument is fresh *)
-          (HD2 : ~ In _ (Union _ (bound_var e) (occurs_free e)) Γ),
-      {{ fun s => fresh S (next_var s) }}
-        exp_closure_conv clo_tag e FVmap Gmap c Γ
-        {{ fun s ef s' =>
-             exists C, is_exp_ctx (snd ef) C /\
-                       Closure_conversion clo_tag Scope Funs GFuns (subst FVmap) c Γ FVs e (fst ef) C /\
-                       fresh S (next_var s')
-  }}) /\
-  (forall B FVmap Funs FVs S c
-          (Minv : FVmap_inv FVmap (Empty_set _) Funs FVs)
-          (Hbin1 : binding_in_map (Union _ (occurs_free_fundefs B) (name_in_fundefs B)) FVmap)
-          (Hbin2 : binding_not_in_map S FVmap)
-          (HD1 : Disjoint _ S (Union _ (image (subst FVmap) Funs)
-                                     (Union _ (bound_var_fundefs B) (occurs_free_fundefs B))))
-          (Hinc : Included _ (name_in_fundefs B) Funs),
-      {{ fun s => fresh S (next_var s) }}
-        fundefs_closure_conv clo_tag B FVmap c
-        {{ fun s B' s' =>     
-             Closure_conversion_fundefs clo_tag Funs (subst FVmap) c FVs B B' /\
-             fresh S (next_var s')
-  }}).
-Proof with now eauto with Ensembles_DB functions_BD.
-
-
-
 Section CC_correct.
 
   Variable (clo_tag : ctor_tag).
@@ -872,6 +831,7 @@ Section CC_correct.
     (forall e Scope Funs c Γ FVs FVmap S
        (* The invariant that relates [FVmap] and [Scope], [Funs], [FV] *)
        (Minv : FVmap_inv FVmap Scope Funs FVs)
+       
        (* [FVmap] contains all the free variables *)
        (Hbin1 : binding_in_map (occurs_free e) FVmap)
        (* [FVmap] does not contain the variables in [S] or [Γ] *)
@@ -886,7 +846,7 @@ Section CC_correct.
          exp_closure_conv clo_tag e FVmap c Γ
        {{ fun s ef s' =>
             exists C, is_exp_ctx (snd ef) C /\
-                 Closure_conversion clo_tag Scope Funs (subst FVmap) c Γ FVs e (fst ef) C /\
+                 Closure_conversion clo_tag Scope Funs GFuns (subst FVmap) c Γ FVs e (fst ef) C /\
                  fresh S (next_var s')
        }}) /\
     (forall B FVmap Funs FVs S c

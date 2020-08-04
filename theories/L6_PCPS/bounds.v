@@ -1,13 +1,212 @@
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
-        Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
+        Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles Coq.micromega.Lia.
 
 Require Import L6.cps L6.eval L6.Ensembles_util L6.List_util L6.tactics L6.set_util
-        L6.logical_relations L6.logical_relations_cc.
+        L6.logical_relations L6.logical_relations_cc L6.algebra.
+Require Import micromega.Lia.
 
 Import ListNotations.
 
 
 Section Bounds.
+  
+  
+  Program Instance resource_tup : @resource fin (nat * nat) :=
+    { zero := (0, 0);
+      one_i fin :=
+        match fin with
+        | Four | Six => (0, 1)
+        | _ => (1, 0)
+        end;
+      plus x y  := (fst x + fst y, snd x + snd y);
+      mult x y  := (fst x * fst y, snd x * snd y); (* change to innner product *)
+
+      lt_i fin x y :=
+        match fin with
+        | Four | Six => snd x < snd y
+        | _ => fst x < fst y
+        end;
+
+      to_nat x := fst x + snd x;
+      
+    }.
+  Solve Obligations with (simpl; f_equal; lia).
+  Solve Obligations with (split; congruence).
+  Next Obligation. simpl; f_equal; lia. Qed.
+  Next Obligation. simpl; f_equal; lia. Qed.
+  Next Obligation. simpl; f_equal; lia. Qed.
+  Next Obligation. simpl; f_equal; lia. Qed.
+  Next Obligation. simpl; f_equal; lia. Qed.
+  Next Obligation. intro; intros. destruct x; destruct y; destruct z; destruct i; simpl in *; lia. Qed.
+  Next Obligation. intro; intros. destruct x; destruct i; intro; intros; simpl in *; lia. Qed.
+  Next Obligation.
+    destruct i; simpl; eauto.
+    
+                   
+                   lia. . intro; intros. destruct x; destruct i; intro; intros; simpl in *; lia. Qed.
+  
+  eauto. econstructor. simpl; f_equal; lia. Qed.
+  
+  Solve Obligations with (simpl; f_equal; lia).
+  Next Obligation. simpl; f_equal; lia. Qed.
+  Next Obligation. simpl. f_equal; lia. Qed.
+  
+  omega. constructor. congruence. simpl; f_equal; lia. Qed.  Next Obligation. simpl; f_equal; lia. Qed.
+  split; congruence. Qed. 
+                   Proof.
+    econstructor.
+    
+    
+  (* (possible) bound for inlining *)
+  Definition inline_bound (i G : nat) : relation (exp * env *  nat) := 
+    fun '(e1, rho1, c1) '(e2, rho2, c2) => c1 <= c2 * (1 + G) + i + G.
+
+  Context (cenv : ctor_env).
+
+  
+  Instance inline_bound_compat i G (Hi : i <= G) :
+    Post_properties cenv (inline_bound i G) (inline_bound i G) (inline_bound G G). 
+  Proof.
+    constructor; try (intro; intros; intro; intros; unfold inline_bound in *; lia). 
+    - intro; intros; intro; intros; unfold inline_bound in *.
+      rewrite NPeano.Nat.mul_add_distr_r. rewrite (NPeano.Nat.mul_add_distr_l a). 
+      admit. (* a > 1 *)
+    - intro; intros; intro; intros; unfold inline_bound in *. 
+      admit. (* a > 1 *)
+    - intro; intros; intro; intros; unfold inline_bound in *.
+      admit. (* a > 1 *)
+    - intro; intros; unfold inline_bound in *. destruct x as [[? ?] ?]; destruct y as [[? ?] ?].
+      lia.
+  Admitted.
+
+
+  Lemma cost_exp_size_exp e :
+    1 = cost e.
+  Proof.
+    destruct e; simpl; lia.
+  Qed.
+  
+
+  Lemma inline_bound_Hpost_zero i G e1 rho1 e2 rho2 (Hleq : 1 <= i):
+    post_zero e1 rho1 e2 rho2 (inline_bound i G).
+  Proof.
+    intro; intros. unfold inline_bound. simpl. rewrite <- cost_exp_size_exp in H.
+    lia.
+  Qed.
+
+  Lemma inline_bound_post_Eapp_l i G v t l rho1 x rho2 :
+    post_Eapp_l (inline_bound i G) (inline_bound (S i) G) v t l rho1 x rho2.
+  Proof.
+    intro; intros. unfold inline_bound in *. simpl. lia.
+  Qed.
+
+  Require Import L6.inline_letapp.
+  
+  Lemma inline_bound_remove_steps_letapp i j G : 
+    remove_steps_letapp cenv (inline_bound i G) (inline_bound j G) (inline_bound (S (i + j)) G).
+  Proof.
+    intro; intros. unfold inline_bound in *. simpl. admit. (* lia. *)
+  Admitted.
+
+  Lemma inline_bound_remove_steps_letapp_OOT i j G : 
+    remove_steps_letapp_OOT cenv (inline_bound j G) (inline_bound (S (i + j)) G).
+  Proof.
+    intro; intros. unfold inline_bound in *. simpl. lia.
+  Qed.
+  
+  Lemma inline_bound_remove_steps_letapp_OOT' i j G : 
+    remove_steps_letapp' cenv (inline_bound i G) (inline_bound j G) (inline_bound (S (i + j)) G).
+  Proof.
+    intro; intros. unfold inline_bound in *. simpl. lia.
+  Qed.
+
+  (+ (1 + G) * letapp_nodes)
+
+    Require Import inline_letapp.
+           (HEletapp : remove_steps_letapp cenv P1 P1 P1)
+           (Eletapp' : remove_steps_letapp' cenv P1 P1 P1)
+           (Eletapp_OOT : remove_steps_letapp_OOT cenv P1 P1)
+           (Eletapp_OOT' : remove_steps_letapp_OOT' cenv P1 P1).
+
+      
+
+    
+    post_constr_compat'; post_proj_compat' .
+
+      11:{ intro; intros. unfold inline_bound in *.
+         destruct x as [[? ? ] ?]. destruct y as [[? ? ] ?]. eapply le_trans. eassumption.
+         eapply plus_le_compat_r. eapply mult_le_compat_l. eapply plus_le_compat_l.
+         eapply mult_le_compat_r. eassumption. }
+    
+    - (* constr *) intro; intros. intro; intros.
+      unfold inline_bound in *.
+      eapply le_trans. eapply plus_le_compat_r. eassumption.
+      assert (Hleq : cost_exp_env G e1 (map_util.M.set x (Vconstr t vs) rho1) <= cost_exp_env G (Econstr x t ys e1) rho1).
+      { unfold cost_exp_env. eapply Max.max_lub.
+        -- eapply le_trans; [| eapply Max.le_max_l ]. simpl. lia.
+        -- eapply le_trans. eapply max_env_set.
+           eapply Max.max_lub; [| lia ]. eapply le_trans.
+           simpl. eapply max_env_getlist. eassumption.
+           rewrite max_env_max_value_eq. lia. }      
+        
+      rewrite (plus_comm _ a), plus_assoc. eapply plus_le_compat.
+      * rewrite (NPeano.Nat.mul_add_distr_r _ a). rewrite (plus_comm (_ * _) (_ * _)).
+        eapply plus_le_compat. lia. 
+        eapply mult_le_compat_l. eapply plus_le_compat_l. eapply mult_le_compat_l. eassumption.
+      * eassumption.
+    - (* proj *) intro; intros. intro; intros.
+      unfold inline_bound in *. 
+      eapply le_trans. eapply plus_le_compat_r. eassumption.
+      assert (Hleq : cost_exp_env G e1 (map_util.M.set x v1 rho1) <= cost_exp_env G (Eproj x t N y e1) rho1).
+      { unfold cost_exp_env. eapply Max.max_lub.
+        -- eapply le_trans; [| eapply Max.le_max_l ]. simpl. lia.
+        -- eapply le_trans. eapply max_env_set.
+           eapply Max.max_lub; [| lia ]. eapply le_trans; [| eapply Max.le_max_r ].
+           eapply le_trans; [| eapply max_env_get; eauto ]. simpl.
+           rewrite size_value_eq. eapply fold_left_max_in. eapply nthN_In. eassumption. }            
+      rewrite (plus_comm _ a), plus_assoc. eapply plus_le_compat.
+      * rewrite (NPeano.Nat.mul_add_distr_r _ a). rewrite (plus_comm (_ * _) (_ * _)).
+        eapply plus_le_compat. lia. 
+        eapply mult_le_compat_l. eapply plus_le_compat_l. eapply mult_le_compat_l. eassumption.
+      * eassumption.
+    - (* fun *) intro; intros. intro; intros.
+      unfold inline_bound in *.
+      eapply le_trans. eapply plus_le_compat_r. eassumption.
+      assert (Hleq : cost_exp_env G e1 (def_funs B1 B1 rho1 rho1) <= cost_exp_env G (Efun B1 e1) rho1). 
+      { unfold cost_exp_env. eapply Max.max_lub.
+        -- eapply le_trans; [| eapply Max.le_max_l ]. simpl. lia.
+        -- eapply le_trans. eapply max_env_def_funs. simpl. lia. }
+      rewrite (plus_comm _ a), plus_assoc. eapply plus_le_compat.
+      * rewrite (NPeano.Nat.mul_add_distr_r _ a). rewrite (plus_comm (_ * _) (_ * _)).
+        eapply plus_le_compat. lia. 
+        eapply mult_le_compat_l. eapply plus_le_compat_l. eassumption.
+      * eassumption.
+    - (* case hd *) intro; intros. intro; intros.
+      unfold inline_bound in *.
+      eapply le_trans. eapply plus_le_compat_r. eassumption.
+      assert (Hleq : cost_exp_env e1 rho1 <= cost_exp_env (Ecase x ((t, e1) :: B1)) rho1).
+      { unfold cost_exp_env. eapply Nat.max_le_compat_r.
+        simpl. lia. }
+      rewrite (plus_comm _ a), plus_assoc. eapply plus_le_compat.
+      * rewrite (NPeano.Nat.mul_add_distr_r _ a). rewrite (plus_comm (_ * _) (_ * _)).
+        eapply plus_le_compat. lia. 
+        eapply mult_le_compat_l. eapply plus_le_compat_l.
+        simpl. eassumption.
+      * eassumption.
+    - (* case tl *) intro; intros. intro; intros.
+      unfold inline_bound in *.
+      eapply le_trans. eassumption.
+      assert (Hleq : cost_exp_env (Ecase x B1) rho1 <= cost_exp_env (Ecase x ((t, e1) :: B1)) rho1).
+      { unfold cost_exp_env. eapply Nat.max_le_compat_r. simpl. lia. }
+      eapply plus_le_compat.
+      * eapply mult_le_compat_l. eapply plus_le_compat_l. eassumption.
+      * eassumption.
+    - (* app *) intro; intros. intro; intros.  
+      unfold inline_bound in *.
+      eapply le_trans. eapply plus_le_compat_r. eassumption.
+      assert (Hleq : cost_exp_env e1 rhoc1' <= cost_exp_env (Eapp x t xs) rho1).
+      { unfold cost_exp_env at 2. eapply le_trans; [| eapply Max.le_max_r ].
+        unfold cost_exp_env. eapply Nat.max_lub.
 
   Fixpoint size_exp (e : exp) : nat :=
     match e with
@@ -90,7 +289,6 @@ Section Bounds.
   
   Definition cost_exp_env G e rho := max (size_exp e) (max_env (size_value G) rho). 
 
-  Require Import micromega.Lia.
 
   Lemma fold_left_max_acc {A} l acc (f : A -> nat) :
     fold_left (fun m v => max m (f v)) l acc = 

@@ -191,7 +191,7 @@ Section RelComp.
     intros c2. specialize (Hdiv ((M + 1)*c2 + K)).
     eapply preord_exp_n_impl in Hexp; [| eassumption | eassumption ].
     edestruct Hexp as [v2 [c2' [Hs2 [Hp Hval]]]].
-    eapply Himpl in Hp. 
+    eapply Himpl in Hp.  
     assert (Hleq : c2 <= c2').
     { eapply NPeano.Nat.add_le_mono_r in Hp.
       eapply Nat_as_DT.mul_le_mono_pos_l in Hp. eassumption. omega. }

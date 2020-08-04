@@ -738,23 +738,16 @@ Proof.
   eapply Alpha_conv_occurs_free_mut.
 Qed.
 
+Require Import L6.algebra.
+
 Section Alpha_conv_correct.
 
+  Context {steps : Type} {Hr : @resource_exp steps}.
   Variable pr : prims.
   Variable cenv : ctor_env.
   Context (P1 : PostT) (* Local *)
-    (PG : PostGT) (* Global *)           
-    (HPost_con : post_constr_compat P1 P1)
-    (HPost_proj : post_proj_compat P1 P1)
-    (HPost_fun : post_fun_compat P1 P1)
-    (HPost_case_hd : post_case_compat_hd P1 P1)
-    (HPost_case_tl : post_case_compat_tl P1 P1)
-    (HPost_app : post_app_compat P1 PG)
-    (HPost_letapp : post_letapp_compat cenv P1 P1 PG)
-    (HPost_letapp_OOT : post_letapp_compat_OOT P1 PG)
-    (HPost_OOT : post_OOT P1)
-    (Hpost_base : post_base P1)
-    (Hinv : inclusion _ P1 PG).
+          (PG : PostGT) (* Global *)
+          (Hcompat : Post_properties cenv P1 P1 PG).
 
 
   (** ** Environment relation up to renaming *)
@@ -1402,9 +1395,9 @@ Section Alpha_conv_correct.
     preord_env_P_inj (name_in_fundefs B1 :|: S) k h
                      (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2).
   Proof with now eauto with Ensembles_DB.
-    revert S rho1 rho2 B1 B2 f h.
+    revert S rho1 rho2 B1 B2 f h. 
     induction k as [ k IH' ] using lt_wf_rec1.
-    intros S rho1 rho2 B1 B2 f h IHe Hlst Hdis Hinj Hsub Ha Hpre.
+    intros S rho1 rho2 B1 B2 f h IHe Hlst Hdis Hinj Hsub Ha Hpre; assert (Hc := Hcompat); destruct Hc.
     - intros x Hin v Hget.
       destruct (Decidable_name_in_fundefs B1) as [Dec].
       destruct (Dec x).
@@ -1490,7 +1483,7 @@ Section Alpha_conv_correct.
   Proof with now sets. 
     revert e1 e2 rho1 rho2 g.
     induction k as [ k IH ] using lt_wf_rec1.
-    induction e1 using exp_ind'; intros e2 rho1 rho2 g Hinj (* Hdis *) Ha Henv; inv Ha.
+    induction e1 using exp_ind'; intros e2 rho1 rho2 g Hinj (* Hdis *) Ha Henv; assert (Hc := Hcompat); inv Hc; inv Ha.
     - (* Econstr *)
       eapply preord_exp_constr_compat; eauto; intros.
       + eapply Forall2_monotonic_strong; [ | eassumption ].

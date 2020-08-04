@@ -129,7 +129,7 @@ Section CC.
       forall Scope Funs GFuns c genv Γ FVs S' S x ys ys' C C' t e e',
         (* Variables for projected vars should not shadow the variables in
          scope, i.e. Scope U FV U { Γ } *)
-        Disjoint _ S (Scope :|: Funs \\ Scope :|: GFuns :|: image genv (Funs \\ Scope) :|: (FromList FVs :|: [set Γ])) ->
+        Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: (FromList FVs :|: [set Γ])) ->
         project_vars Scope Funs GFuns c genv Γ FVs S ys ys' C S' ->
         (* We do not care about ys'. Should never be accessed again so do not
          add them aτ the current scope *)
@@ -166,7 +166,7 @@ Section CC.
         (* Γ' is the variable that will hold the record of the environment *)
         Disjoint _ S3 (bound_var (Efun B e) :|: (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: (FromList FVs :|: [set Γ]))) ->
         In _ S3 Γ' ->
-        Disjoint _ S2 (bound_var (Efun B e) :|: (Γ' |: (Scope :|: Funs \\ Scope :|: GFuns :|: image genv (Funs \\ Scope)) :|: (FromList FVs :|: [set Γ]))) ->
+        Disjoint _ S2 (bound_var (Efun B e) :|: (Γ' |: (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope)) :|: (FromList FVs :|: [set Γ]))) ->
         add_global_funs GFuns (name_in_fundefs B) (FromList FVs') GFuns' ->
         Closure_conversion_fundefs B GFuns' c' FVs' B B' ->
         (* Add B in Funs if its only fvs are names are in GFuns *)
@@ -174,7 +174,7 @@ Section CC.
         Closure_conversion Scope Funs GFuns c genv Γ FVs (Efun B e) (Efun B' (Ce |[ e' ]|)) (comp_ctx_f C' (Econstr_c Γ' c' FVs'' Hole_c))
   | CC_Eletapp :
       forall Scope Funs GFuns c genv Γ FVs x f f' f'' ft e env' ys ys' C C' e' S S',
-        Disjoint _ S (Scope :|: ((Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: (FromList FVs :|: [set Γ]))) ->
+        Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: (FromList FVs :|: [set Γ]))) ->
         (* Project the function name and the actual parameter *)
         project_vars Scope Funs GFuns c genv Γ FVs S (f :: ys) (f' :: ys') C S' ->
         (* The name of the function pointer and the name of the environment

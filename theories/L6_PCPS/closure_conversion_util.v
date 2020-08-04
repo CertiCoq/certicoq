@@ -22,52 +22,24 @@ Section Closure_conversion_util.
 
   Variable clo_tag : ctor_tag.
 
-  Lemma project_vars_length Scope Funs GFuns σ c genv Γ FVs S x y C Q :
-    project_vars clo_tag Scope Funs GFuns σ c genv Γ FVs S x y C Q ->
+  Lemma project_vars_length Scope Funs GFuns c genv Γ FVs S x y C Q :
+    project_vars clo_tag Scope Funs GFuns c genv Γ FVs S x y C Q ->
     @List.length var x = @List.length var y.
   Proof.
     intros Hp; induction Hp; eauto. simpl; congruence.
   Qed.
     
-  (* TODO : do this with autorewrites *)
-  Ltac normalize_sets :=
-    match goal with
-      | [|- context[FromList []]] => rewrite FromList_nil
-      | [|- context[FromList(_ :: _)]] => rewrite FromList_cons
-      | [|- context[FromList(_ ++ _)]] => rewrite FromList_app
-      | [|- context[FromList [_ ; _]]] => rewrite FromList_cons
-      | [|- context[Union _ _ (Empty_set _)]] =>
-        rewrite Union_Empty_set_neut_r
-      | [|- context[Union _ (Empty_set _) _]] =>
-        rewrite Union_Empty_set_neut_l
-      | [|- context[Setminus _ (Empty_set _) _]] =>
-        rewrite Setminus_Empty_set_abs_r
-      | [|- context[Setminus _ _ (Empty_set _)]] =>
-        rewrite Setminus_Empty_set_neut_r
-      | [ H : context[FromList []] |- _] => rewrite FromList_nil in H
-      | [ H : context[FromList(_ :: _)] |- _] => rewrite FromList_cons in H
-      | [ H : context[FromList(_ ++ _)] |- _] => rewrite FromList_app in H
-      | [ H : context[FromList [_ ; _]] |- _] => rewrite FromList_cons in H
-      | [ H : context[Union _ _ (Empty_set _)] |- _ ] =>
-        rewrite Union_Empty_set_neut_r in H
-      | [ H : context[Union _ (Empty_set _) _] |- _] =>
-        rewrite Union_Empty_set_neut_l in H
-      | [ H : context[Setminus _ (Empty_set _) _] |- _] =>
-        rewrite Setminus_Empty_set_abs_r in H
-      | [ H : context[Setminus _ _ (Empty_set _)] |- _] =>
-        rewrite Setminus_Empty_set_neut_r in H
-    end.
-
-  Lemma project_var_occurs_free_ctx_Included Scope Funs GFuns σ c genv Γ FVs S x y C Q F e:
-    project_var clo_tag Scope Funs GFuns σ c genv Γ FVs S x y C Q ->
+  Lemma project_var_occurs_free_ctx_Included Scope Funs GFuns c genv Γ FVs S x y C Q F e:
+    project_var clo_tag Scope Funs GFuns c genv Γ FVs S x y C Q ->
     (occurs_free e) \subset (F :|: [set y]) ->
-    (Scope :|: (image σ ((Funs \\ Scope) :|: GFuns) :|: image genv (Funs \\ Scope)) :|: [set Γ]) \subset F ->
+    (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: [set Γ]) \subset F ->
     (occurs_free (C |[ e ]|)) \subset F. 
   Proof with now eauto with Ensembles_DB functions_BD. 
     intros Hproj Hinc1 Hinc2. inv Hproj.
     - simpl. eapply Included_trans. eassumption. 
       apply Union_Included. now apply Included_refl.
-      eapply Included_trans; [| eassumption ].
+      eapply Included_trans; [| eapply Hinc2 ]. eapply Singleton_Included.
+      repeat left; eauto. left. 
       eauto with Ensembles_DB.
     - simpl.
       rewrite occurs_free_Econstr, !FromList_cons, FromList_nil,

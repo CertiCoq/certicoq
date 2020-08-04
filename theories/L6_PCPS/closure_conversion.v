@@ -90,9 +90,9 @@ Section CC.
         project_vars Scope Funs GFuns c gmap Γ FVs S [] [] Hole_c S
   | VarsCons :
       forall Scope Funs GFuns c gmap Γ FVs y y' ys ys' C1 C2 S1 S2 S3,
-        project_var Scope GFuns Funs c gmap Γ FVs S1 y y' C1 S2 ->
-        project_vars Scope GFuns Funs c gmap Γ FVs S2 ys ys' C2 S3 ->
-        project_vars Scope GFuns Funs c gmap Γ FVs S1 (y :: ys) (y' :: ys') (comp_ctx_f C1 C2) S3.
+        project_var Scope Funs GFuns c gmap Γ FVs S1 y y' C1 S2 ->
+        project_vars Scope Funs GFuns c gmap Γ FVs S2 ys ys' C2 S3 ->
+        project_vars Scope Funs GFuns c gmap Γ FVs S1 (y :: ys) (y' :: ys') (comp_ctx_f C1 C2) S3.
 
   Definition extend_fundefs' (f : var -> var) (B : fundefs) (x : var) : var -> var :=
     fun y => if (@Dec _ (name_in_fundefs B) _) y then x else f y.

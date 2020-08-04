@@ -681,28 +681,33 @@ Section CC_correct.
           by (intros x H1 H2; inv H2).
         replace fv with ([] ++ fv) at 1 3 6 by reflexivity.
         revert Hlen He Hb Hb' Hnin Hdis Hdup. generalize (Maps.PTree.empty VarInfo) as FVmap_i.
-        generalize (@nil map_util.M.elt). generalize 0%N. 
-        induction fv; intros n vars FVmap_i Hlen Hinv Hb Hb' Hnin Hdis Hdup.
-        * simpl. rewrite app_nil_r. simpl. split. eauto.
-        * simpl. replace (vars ++ a :: l) with ((vars ++ [a]) ++ l). simpl.
-          eapply IHl. rewrite app_length. simpl. zify. omega.
+        unfold PS.elt, map_util.M.elt in *.
+        generalize (@nil positive). generalize 0%N. 
+        induction fv as [|v fv IHfv]; intros n vars FVmap_i Hlen Hinv Hb Hb' Hnin Hdis Hdup.
+        * simpl. rewrite app_nil_r. eauto.
+        * simpl. replace (vars ++ v :: fv) with ((vars ++ [v]) ++ fv). simpl.
+          eapply IHfv. rewrite app_length. simpl. zify. omega.
           eapply FVmap_inv_set_free_var. now eauto. eassumption. 
           now intros Hc; inv Hc. now intros Hc; inv Hc. 
-          eapply Hnin. constructor. reflexivity.
-          intros x H. eapply binding_in_map_set. eassumption.
-          rewrite FromList_app, FromList_cons, FromList_nil, Union_Empty_set_neut_r in H.
-          eassumption.
-          eapply binding_not_in_map_set_not_In_S.
-          eapply binding_not_in_map_antimon; [| eassumption ].  
-          eapply Complement_antimon. rewrite FromList_app. now apply Included_Union_l.
-          intros Hc. eapply Hc.
-          rewrite FromList_app, FromList_cons, FromList_nil. now eauto.
-          intros x Hin Hc. eapply Hnin.
-          now constructor 2; eauto. inv Hdup.
-          apply Coqlib.in_app in Hc. inv Hc; eauto. inv H. 
-          exfalso. eapply H1. eapply In_InA. eauto. now eapply Pos.eq_equiv. 
-          eassumption. now inv H0. now inv Hdup.
-          rewrite <- app_assoc. reflexivity.
+          { normalize_sets. apply Disjoint_sym, Disjoint_Union_l in Hdis.
+            intros Hc; destruct Hdis as [Hdis]; now contradiction (Hdis v). }
+          { eapply Hnin. constructor. reflexivity. }
+          { intros x H. eapply binding_in_map_set. eassumption.
+            rewrite FromList_app, FromList_cons, FromList_nil, Union_Empty_set_neut_r in H.
+            eassumption. }
+          { eapply binding_not_in_map_set_not_In_S.
+            eapply binding_not_in_map_antimon; [| eassumption ].  
+            eapply Complement_antimon. rewrite FromList_app. now apply Included_Union_l.
+            intros Hc. eapply Hc.
+            rewrite FromList_app, FromList_cons, FromList_nil. now eauto. }
+          { intros x Hin Hc. eapply Hnin.
+            - now constructor 2; eauto.
+            - inv Hdup. apply Coqlib.in_app in Hc. inv Hc; eauto. inv H. 
+              exfalso. eapply H1. eauto. now inv H0. }
+          { normalize_sets.
+            now apply Disjoint_sym, Disjoint_Union_r, Disjoint_sym in Hdis. }
+          { now inv Hdup. }
+          { now rewrite <- app_assoc. }
   Qed.
 
   Lemma subst_MRFun_f_eq (FVmap : VarInfoMap) (x x' : var) :
@@ -712,7 +717,7 @@ Section CC_correct.
     rewrite M.gsspec. destruct (peq y x); eauto.
   Qed.
 
-
+  (*
   Lemma make_full_closure_spec B FVmap_n FVmap_o Γ Scope Funs FVs FVs' S S1 S2 S1' S2' :
     binding_in_map S1 FVmap_o -> 
     binding_in_map S2 FVmap_n ->
@@ -783,7 +788,9 @@ Section CC_correct.
       split. rewrite Union_Empty_set_neut_l. eassumption.
       eassumption. 
   Qed.
+  *)
 
+  (*
   (* Rewrite does not exactly works for these two, but they are still useful as lemmas *)
   Global Instance project_var_Proper Scope Funs :
     Proper
@@ -887,7 +894,6 @@ Section CC_correct.
   Proof. 
     now apply Closure_conversion_f_eq_subdomain_mut.
   Qed.
-  
 
   Lemma subst_add_params_f_eq_subdomain S l FVmap :
     Disjoint _ (FromList l) S ->
@@ -905,40 +911,41 @@ Section CC_correct.
   Qed.
     
   Hint Resolve image_Setminus_extend : functions_BD.
+*)
 
+  Print Closure_conversion_fundefs.
   Lemma exp_closure_conv_Closure_conv_sound :
-    (forall e Scope Funs c Γ FVs FVmap S
+    (forall e Scope Funs GFuns gfuns genv c Γ FVs FVmap S
        (* The invariant that relates [FVmap] and [Scope], [Funs], [FV] *)
-       (Minv : FVmap_inv FVmap Scope Funs FVs)
+       (Minv : FVmap_inv FVmap Scope Funs GFuns FVs)
        (* [FVmap] contains all the free variables *)
        (Hbin1 : binding_in_map (occurs_free e) FVmap)
        (* [FVmap] does not contain the variables in [S] or [Γ] *)
        (Hbin2 : binding_not_in_map (Union _ S (Singleton _ Γ)) FVmap)
        (* [S] is disjoint with the free and bound variables of [e] and [Γ] *)
-       (HD1 : Disjoint _ S (Union _ (image (subst FVmap) (Setminus _ Funs Scope))
+       (HD1 : Disjoint _ S (Union _ (Setminus _ Funs Scope)
                                   (Union _ (bound_var e)
                                          (Union _ (occurs_free e) (Singleton _ Γ)))))
        (* The current environment argument is fresh *)
        (HD2 : ~ In _ (Union _ (bound_var e) (occurs_free e)) Γ),
-       {{ fun s => fresh S (next_var s) }}
-         exp_closure_conv clo_tag e FVmap c Γ
-       {{ fun s ef s' =>
+       {{ fun _ s => fresh S (next_var (fst s)) }}
+         exp_closure_conv clo_tag e FVmap gfuns c Γ
+       {{ fun _ s ef s' =>
             exists C, is_exp_ctx (snd ef) C /\
-                 Closure_conversion clo_tag Scope Funs (subst FVmap) c Γ FVs e (fst ef) C /\
-                 fresh S (next_var s')
+                 Closure_conversion clo_tag Scope Funs GFuns c genv Γ FVs e (fst ef) C /\
+                 fresh S (next_var (fst s'))
        }}) /\
-    (forall B FVmap Funs FVs S c
-       (Minv : FVmap_inv FVmap (Empty_set _) Funs FVs)
+    (forall Bg B FVmap Funs GFuns gfuns FVs S c
+       (Minv : FVmap_inv FVmap (Empty_set _) Funs GFuns FVs)
        (Hbin1 : binding_in_map (Union _ (occurs_free_fundefs B) (name_in_fundefs B)) FVmap)
        (Hbin2 : binding_not_in_map S FVmap)
-       (HD1 : Disjoint _ S (Union _ (image (subst FVmap) Funs)
-                                  (Union _ (bound_var_fundefs B) (occurs_free_fundefs B))))
+       (HD1 : Disjoint _ S (Union _ Funs (Union _ (bound_var_fundefs B) (occurs_free_fundefs B))))
        (Hinc : Included _ (name_in_fundefs B) Funs),
-       {{ fun s => fresh S (next_var s) }}
-         fundefs_closure_conv clo_tag B FVmap c
-       {{ fun s B' s' =>     
-            Closure_conversion_fundefs clo_tag Funs (subst FVmap) c FVs B B' /\
-            fresh S (next_var s')
+       {{ fun _ s => fresh S (next_var (fst s)) }}
+         fundefs_closure_conv clo_tag B FVmap gfuns c
+       {{ fun _ s B' s' =>     
+            Closure_conversion_fundefs clo_tag Funs GFuns c FVs B B' /\
+            fresh S (next_var (fst s'))
        }}).
   Proof with now eauto with Ensembles_DB functions_BD.
     eapply exp_def_mutual_ind; intros; simpl. Opaque exp_closure_conv.

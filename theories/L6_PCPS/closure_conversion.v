@@ -341,8 +341,6 @@ Section CC.
            (env : var) (* the enviroment of defs *) : ccstate VarInfoMap :=
     match defs with
     | Fcons f typ xs e defs' =>
-      (* The new name of the function *)
-      code_ptr <- get_name f "" ;;
       mapfv' <- add_closures defs' mapfv env ;;
       let mapfv'' := Maps.PTree.set f (MRFun env) mapfv' in
       ret mapfv''

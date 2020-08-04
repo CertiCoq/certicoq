@@ -302,8 +302,10 @@ Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
          (tgm : constr_env) : option (cps.exp * symgen) :=
   match e with
   | Var_e x =>
-    let v := (nth vn (N.to_nat x)) in
-    ret (cps.Eapp k kon_tag (v::nil), next)
+    match nth_error vn (N.to_nat x) with
+    | Some v => ret (cps.Eapp k kon_tag (v::nil), next)
+    | None => None
+    end
 
   | App_e e1 e2 =>
     let (k1, next) := gensym next (nNamed "k1"%string) in
@@ -360,7 +362,7 @@ Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
     (* r2 <- cps_exps cvt_ts vx k';; *)
     (* let e' := r2 in *)
     let (vx, next) := gensym_n_nAnon next (N.to_nat (exps_length es)) in
-    r <- cps_cvt_exps es vn k nil next tgm;;
+    r <- cps_cvt_exps es vn k' nil next tgm;;
     let (e', next) := r : cps.exp * symgen in
     ret (cps.Efun
            (Fcons k' kon_tag vx
@@ -514,11 +516,18 @@ Inductive fresh_var : var -> symgen -> Prop :=
       (v1 >= v2)%positive ->
       fresh_var v1 (SG (v2, nenv)).
 
-Inductive lt_symgen : var -> symgen -> Prop :=
-| is_lt :
-    forall v1 v2 nenv,
-      (v1 < v2)%positive ->
-      lt_symgen v1 (SG (v2, nenv)). 
+Definition lt_symgen (v1 : var) (next : symgen) : Prop :=
+  match next with
+  | SG (v2, nenv) => (v1 < v2)%positive
+  end.
+
+Definition geq_symgen (v1 : var) (next : symgen) : Prop :=
+  match next with
+  | SG (v2, nenv) => (v1 >= v2)%positive
+  end. 
+
+Definition lt_lst_symgen (vars : list var) (next : symgen) : Prop :=
+  Forall (fun v => lt_symgen v next) vars. 
 
 (* scratch *)
 (* how to ensure fresh variables? *)
@@ -739,7 +748,6 @@ Definition cps_env_rel'' (R : value -> val -> Prop) rho vs :=
       forall v'' k,
         R v v'' ->
         preord_val cenv PG k v'' v'.
-
 
 Fixpoint cps_val_rel' (v : value) (v': val) {struct v} : Prop :=
   let fix Forall2_aux vs1 vs2 :=
@@ -1039,25 +1047,273 @@ Admitted.
 Require Import functions.
 Require Import Ensembles.
 Require Import Ensembles_util.
+Require Import L6.tactics. 
 
-Definition cps_cvt_exp_alpha_equiv :=
-   forall k e e1 e2 k1 k2 vars1 vars2 rho1 rho2 next1 next2 next3 next4,
+Definition cps_cvt_exp_alpha_equiv k :=
+  forall e e1 e2 k1 k2 vars1 vars2 rho1 rho2 next1 next2 next3 next4,
     cps_cvt e vars1 k1 next1 cnstrs = Some (e1, next2) ->
     cps_cvt e vars2 k2 next3 cnstrs = Some (e2, next4) ->
+    NoDup vars1 ->
     ~(k1 \in (FromList vars1)) ->
-    preord_env_P_inj cenv PG (k1 |: FromList vars1) k (id { k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
+    List.length vars1 = List.length vars2 ->
+    Forall (fun v => lt_symgen v next1) vars1 ->
+    preord_env_P_inj cenv PG (k1 |: FromList vars1) k
+                     (id { k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
     preord_exp cenv P1 PG k (e1, rho1) (e2, rho2).
 
-Definition cps_cvt_exps_alpha_equiv :=
-  forall k es es1 es2 k1 k2 vars1 vars2 rho1 rho2 next1 next2 next3 next4,
-    
+Definition cps_cvt_exps_alpha_equiv k :=
+  forall es es1 es2 k1 k2 vars1 vars2 rho1 rho2 next1 next2 next3 next4,
+    cps_cvt_exps es vars1 k1 nil next1 cnstrs = Some (es1, next2) ->
+    cps_cvt_exps es vars2 k2 nil next3 cnstrs = Some (es2, next4) ->
+    NoDup vars1 ->
+    ~(k1 \in (FromList vars1)) ->
+    List.length vars1 = List.length vars2 ->
+     Forall (fun v => lt_symgen v next1) vars1 ->
+    preord_env_P_inj cenv PG (k1 |: FromList vars1) k
+                     (id { k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
+    preord_exp cenv P1 PG k (es1, rho1) (es2, rho2). 
 
+Definition cps_cvt_efnlst_alpha_equiv k :=
+  forall efns fdefs1 fdefs2 k1 k2 vars1 vars2 nlst1 nlst2 rho1 rho2
+         next1 next2 next3 next4,
+    cps_cvt_efnlst efns vars1 nlst1 next1 cnstrs = Some (fdefs1, next2) ->
+    cps_cvt_efnlst efns vars2 nlst2 next3 cnstrs = Some (fdefs2, next4) ->
+    NoDup vars1 ->
+    ~(k1 \in (FromList vars1)) ->
+    List.length vars1 = List.length vars2 ->
+    Forall (fun v => lt_symgen v next1) vars1 ->
+    preord_env_P_inj cenv PG (k1 |: FromList vars1) k
+                     (id {k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
+    preord_env_P_inj cenv PG (k1 |: (FromList vars1 :|: FromList nlst1)) k
+                     (id {k1 ~> k2 } <{ vars1 ~> vars2 }> <{ nlst1 ~> nlst2}>)
+                     (def_funs fdefs1 fdefs1 rho1 rho1)
+                     (def_funs fdefs2 fdefs2 rho2 rho2).
 
+Definition cps_cvt_branches_alpha_equiv k :=
+  forall bs bs1 bs2 k1 k2 r1 r2 vars1 vars2 rho1 rho2 next1 next2 next3 next4,
+    cps_cvt_branches bs vars1 k1 r1 next1 cnstrs = Some (bs1, next2) ->
+    cps_cvt_branches bs vars1 k2 r2 next3 cnstrs = Some (bs2, next4) ->
+    NoDup vars1 ->
+    ~(k1 \in (FromList vars1)) ->
+    List.length vars1 = List.length vars2 ->
+    Forall (fun v => lt_symgen v next1) vars1 ->
+    preord_env_P_inj cenv PG (k1 |: FromList vars1) k
+                     (id {k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
+    Forall2 (fun '(c1, e1) '(c2, e2) =>
+               c1 = c2 /\ preord_exp cenv P1 PG k (e1, rho1) (e2, rho2))
+            bs1 bs2.
+
+Lemma id_vars_nth_error :
+  forall A vars1 vars2 n (f: var -> A) v1 v2,
+    List.length vars1 = List.length vars2 ->
+    NoDup vars1 ->
+    nth_error vars1 n = Some v1 ->
+    nth_error vars2 n = Some v2 ->
+    (f <{ vars1 ~> vars2 }>) v1 = v2.
+Proof.
+  intros A vars1. induction vars1; intros vars2 n f v1 v2 Hlen Hdup Hv1 Hv2.
+  - destruct vars2 eqn:Hvars2.
+    destruct n eqn:Hn; simpl in Hv1; inv Hv1.
+    inv Hlen. 
+  - destruct vars2 eqn:Hvars2.
+    inv Hlen.
+    destruct n eqn:Hn.
+    + simpl in Hv1, Hv2.
+      inv Hv1. inv Hv2.
+      simpl. rewrite extend_gss. reflexivity.
+    + simpl in *.
+      rewrite extend_gso.
+      eapply IHvars1. omega.
+      inv Hdup. eassumption.
+      eassumption.
+      eassumption.
+      intros Heq.
+      eapply nth_error_In in Hv1.
+      inv Hdup. contradiction.
+Qed. 
+
+Lemma nth_FromList :
+  forall A l n x,
+    nth_error l n = Some x ->
+    In A (FromList l) x.
+Proof.
+  intros A l n x Hx.
+  generalize dependent n. induction l; intros n Hx.
+  - destruct n eqn:Hn; inv Hx. 
+  - destruct n eqn:Hn.
+    + simpl in Hx. inv Hx.
+      unfold FromList. simpl. 
+      left. reflexivity.
+    + simpl in Hx. 
+      unfold FromList in *. unfold In in *.
+      simpl. right. eapply IHl.
+      eassumption.
+Qed.
+
+Lemma gt_gensym :
+  forall next1 next2 na v,
+    gensym next1 na = (v, next2) ->
+    geq_symgen v next1.
+Proof.
+  intros next1 next2 na v Hgen.
+  destruct next1. simpl in Hgen.
+  destruct p. inv Hgen.
+  simpl. zify. omega.
+Qed. 
+
+Lemma lt_symgen_In_lst :
+  forall vars next1 next2 na v',
+    Forall (fun v => lt_symgen v next1) vars ->
+    gensym next1 na = (v', next2) ->
+    ~ In var (FromList vars) v'.
+Proof.
+  induction vars; intros next1 next2 na v' Hall Hgen.
+  - intros Hin. inv Hin.
+  - intros Hin.
+    inv Hall. 
+    unfold lt_symgen in H1.
+    destruct next1. destruct p eqn:Hp.
+    inv Hin.
+    + assert (Hgt: (v' >= v)%positive).
+      { eapply gt_gensym in Hgen. simpl in Hgen. eassumption. } 
+      zify. omega.
+    + eapply IHvars in H. destruct H.
+      eassumption. eassumption.
+Qed.
+
+Lemma lt_symgen_gensym :
+  forall n nenv na v next,
+    gensym (SG (n, nenv)) na = (v, next) ->
+    lt_symgen n next.
+Proof.
+  intros n nenv na v next H.
+  simpl in H.
+  unfold lt_symgen. destruct next. destruct p.
+  inv H. zify. omega.
+Qed.
+
+Lemma lt_lst_symgen_gensym_n' :
+  forall n v1 v2 nenv nenv' vars,
+    gensym_n_nAnon' v1 nenv n = (vars, nenv', v2) ->
+    (v1 <= v2)%positive.
+Proof.
+  induction n; intros v1 v2 nenv nenv' vars Hgen.
+  - simpl in Hgen. inv Hgen. zify. omega.
+  - simpl in Hgen.
+    destruct (gensym_n_nAnon' (Pos.succ v1) (M.set v1 nAnon nenv) n) eqn:Hgen2.
+    destruct p eqn:Hp. inv Hgen.
+    eapply IHn in Hgen2. zify. omega. 
+Qed. 
+
+Lemma lt_lst_symgen_gensym_n :
+  forall n vars next1 next2,
+    gensym_n_nAnon next1 n = (vars, next2) ->
+    Forall (fun v => lt_symgen v next2) vars.
+Proof.
+  induction n; intros vars next1 next2 Hgen; unfold gensym_n_nAnon in Hgen.
+  - destruct next1. destruct p.
+    destruct (gensym_n_nAnon' v n 0) eqn:Hgen2.
+    destruct p. simpl in Hgen2. inv Hgen2. inv Hgen.
+    econstructor.
+  - destruct next1. destruct p.
+    destruct (gensym_n_nAnon' v n0 (S n)) eqn:Hgen2.
+    destruct p. simpl in Hgen2.
+    destruct (gensym_n_nAnon' (Pos.succ v) (M.set v nAnon n0) n) eqn:Hgen3.
+    destruct p. inv Hgen2. inv Hgen.
+    econstructor.
+    + unfold lt_symgen. eapply lt_lst_symgen_gensym_n' in Hgen3.
+      zify. omega. 
+    + specialize IHn with (next1 := (SG (Pos.succ v, (M.set v nAnon n0)))).
+      eapply IHn. unfold gensym_n_nAnon.
+      destruct (gensym_n_nAnon' (Pos.succ v) (M.set v nAnon n0) n).
+      destruct p. inv Hgen3. reflexivity.
+Qed.
+
+Lemma Forall_lt_symgen_gensym :
+  forall vars next1 next2 na v,
+    Forall (fun v => lt_symgen v next1) vars ->
+    gensym next1 na = (v, next2) ->
+    Forall (fun v => lt_symgen v next2) vars.
+Proof.
+  induction vars; intros next1 next2 na v Hall Hgen.
+  - econstructor.
+  - inv Hall. econstructor.
+    pose proof lt_symgen_gensym as Hgen2.
+    destruct next1. destruct p. eapply Hgen2 in Hgen.  
+    unfold lt_symgen in *. destruct next2. destruct p.
+    zify. omega.
+    eapply IHvars. eassumption. eassumption.
+Qed.
+
+Lemma Forall_lt_symgen_gensym_n :
+  forall vars1 n vars2 next1 next2,
+    Forall (fun v => lt_symgen v next1) vars1 ->
+    gensym_n_nAnon next1 n = (vars2, next2) ->
+    Forall (fun v => lt_symgen v next2) vars1.
+Proof.
+  induction vars1; intros n vars2 next1 next2 Hall Hgen.
+  - econstructor.
+  - econstructor.
+    + pose proof lt_lst_symgen_gensym_n as Hgen2.
+      inv Hall.
+      destruct next1. destruct p. simpl in Hgen.
+      destruct (gensym_n_nAnon' v n0 n) eqn:Hgen'. destruct p.
+      eapply lt_lst_symgen_gensym_n' in Hgen'.
+      inv Hgen. unfold lt_symgen in *. zify. omega. 
+    + inv Hall.
+      eapply IHvars1. eassumption. eassumption.
+Qed. 
+
+Lemma gensym_n_length_eq :
+  forall n next1 next2 next3 next4 l1 l2,
+    gensym_n_nAnon next1 n = (l1, next2) ->
+    gensym_n_nAnon next3 n = (l2, next4) ->
+    Datatypes.length l1 = Datatypes.length l2.
+Proof.
+  induction n; intros next1 next2 next3 next4 l1 l2 Hgen1 Hgen2;
+    unfold gensym_n_nAnon in *.
+  - destruct next1. destruct p.
+    destruct (gensym_n_nAnon' v n 0) eqn:H1. destruct p.
+    destruct next3. destruct p.
+    destruct (gensym_n_nAnon' v1 n1 0) eqn:H2. destruct p.
+    simpl in H1, H2. inv H1. inv Hgen1. inv H2. inv Hgen2.
+    reflexivity.
+  - destruct next1. destruct p.
+    destruct (gensym_n_nAnon' v n0 (S n)) eqn:H1. destruct p.
+    destruct next3. destruct p.
+    destruct (gensym_n_nAnon' v1 n2 (S n)) eqn:H2. destruct p.
+    simpl in H1, H2.
+    destruct (gensym_n_nAnon' (Pos.succ v) (M.set v nAnon n0) n) eqn:H1'.
+    destruct p.
+    destruct (gensym_n_nAnon' (Pos.succ v1) (M.set v1 nAnon n2) n) eqn:H2'.
+    destruct p.
+    inv H1. inv Hgen1.
+    inv H2. inv Hgen2.
+    simpl. f_equal.
+    specialize IHn with (next1 := SG (Pos.succ v, (M.set v nAnon n0)))
+                        (next3 := SG (Pos.succ v1, (M.set v1 nAnon n2))).
+    eapply IHn.
+    destruct (gensym_n_nAnon' (Pos.succ v) (M.set v nAnon n0) n) eqn:H1. destruct p.
+    inv H1'. reflexivity.
+    destruct (gensym_n_nAnon' (Pos.succ v1) (M.set v1 nAnon n2) n) eqn:H2. destruct p.
+    inv H2'. reflexivity.
+Qed.   
+  
+
+Lemma cps_cvt_alpha_equiv :
+  forall k,
+    cps_cvt_exp_alpha_equiv k /\
+    cps_cvt_exps_alpha_equiv k /\
+    cps_cvt_efnlst_alpha_equiv k /\
+    cps_cvt_branches_alpha_equiv k. 
 Proof.
   induction k using lt_wf_rec.
-  induction e; intros e1' e2' k1 k2 vars1 vars2 rho1 rho2
-                      next1 next2 next3 next4 He1 He2 Hnot Henv.
-  - simpl in He1, He2.
+  eapply my_exp_ind. 
+  - intros n e1 e2 k1 k2 vars1 vars2 rho1 rho2
+           next1 next2 next3 next4 He1 He2 Hdup Hnot Hlen Hlt Henv.
+    simpl in He1, He2.
+    destruct (nth_error vars1 (N.to_nat n)) eqn:Hnth1. 2: { inv He1. }
+    destruct (nth_error vars2 (N.to_nat n)) eqn:Hnth2. 2: { inv He2. } 
     inv He1. inv He2.
     eapply preord_exp_app_compat.
     + admit.
@@ -1068,12 +1324,145 @@ Proof.
         eassumption. }
       rewrite Heq.
       eapply Henv. left. reflexivity.
+    + econstructor.
+      * assert (Heq: ((id {k1 ~> k2}) <{ vars1 ~> vars2 }>) v = v0). 
+        { eapply id_vars_nth_error; eassumption. }
+        rewrite <- Heq.
+        eapply Henv. right.
+        eapply nth_FromList. eassumption. 
+      * econstructor. 
+  - intros na e IH e1 e2 k1 k2 vars1 vars2 rho1 rho2 next1 next2 next3 next4
+            He1 He2 Hdup Hnot Hlen Hlt Henv.
+    simpl in He1, He2.
+    destruct (gensym next1 (nNamed "k_lam")) eqn:Hgen_k1.
+    destruct (gensym s (nNamed "x_lam")) eqn:Hgen_x1.
+    destruct (gensym s0 na) eqn:Hgen_f1.
+    destruct (cps_cvt e (v0 :: vars1) v s1 cnstrs) eqn:Hcvt_e1.
+    2: { inv He1. } 
+    destruct p eqn:Hp. inv He1.
+    destruct (gensym next3 (nNamed "k_lam")) eqn:Hgen_k2.
+    destruct (gensym s2 (nNamed "x_lam")) eqn:Hgen_x2.
+    destruct (gensym s3 na) eqn:Hgen_f2.
+    destruct (cps_cvt e (v3 :: vars2) v2 s4 cnstrs) eqn:Hcvt_e2.
+    2: { inv He2. } 
+    destruct p eqn:Hp. inv He2.
+    eapply preord_exp_fun_compat.
     + admit.
+    + admit.
+    + { eapply preord_exp_app_compat.
+        - admit.
+        - admit.
+        - simpl. admit.
+        - econstructor. 2: { econstructor. }
+          simpl. unfold preord_var_env.
+          intros v5 Hset.
+          rewrite M.gss in Hset. inv Hset.
+          eexists. split.
+          rewrite M.gss. reflexivity. 
+          rewrite preord_val_eq. unfold preord_val'.
+          { intros vs1 vs2 j tg xs1 e2 rho1' Hlen_eq Hfind Hset.
+            simpl in Hfind.
+            destruct (M.elt_eq v1 v1). 2: { congruence. }
+            inv Hfind.
+            pose proof (set_lists_length2) as Hset2.
+            edestruct Hset2 with (rho := (def_funs (Fcons v1 func_tag [v0; v] e2 Fnil)
+                                                   (Fcons v1 func_tag [v0; v] e2 Fnil) rho1 rho1))
+                                 (xs1 := [v0; v]) (vs1 := vs1)
+                                 (xs2 := [v3; v2]) (vs2 := vs2); clear Hset2.
+            econstructor. 
+            eassumption.
+            symmetry. eassumption. 
+            simpl in Hset.
+            destruct vs1 eqn:Hvs1. inv Hset.
+            destruct l eqn:Hl. inv Hset.
+            destruct l0 eqn:Hl0; inv Hset.
+            simpl.
+            destruct (M.elt_eq v4 v4). 2: { congruence. }
+            eexists. eexists. eexists. split.
+            reflexivity. split.
+            symmetry. eassumption.
+            simpl in H0.
+            destruct vs2 eqn:Hvs2. inv H0.
+            destruct l eqn:Hl. inv H0.
+            destruct l0 eqn:Hl0; inv H0.
+            intros Hjk Hall v9 cin Hleq Hstep.
+            inv Hstep. admit.
+            admit. 
+          } 
+      } 
   - admit.
-  - admit.
-  - simpl in He1, He2.
-    
-    
+  - intros dc es IH e1 e2 k1 k2 vars1 vars2 rho1 rho2
+           next1 next2 next3 next4 He1 He2 Hdup Hnot Hlen Hlt Henv.
+    simpl in He1, He2.
+    destruct (gensym next1 (nNamed "k'")) eqn:Hgen_k1.
+    destruct (gensym s (nNamed "x'")) eqn:Hgen_x1.
+    destruct (gensym_n_nAnon s0 (N.to_nat (exps_length es))) eqn:Hgen_n_es1.
+    destruct (cps_cvt_exps es vars1 v [] s1 cnstrs) eqn:Hcvt_exps1.
+    2: { inv He1. } 
+    destruct p eqn:Hp. inv He1.
+    destruct (gensym next3 (nNamed "k'")) eqn:Hgen_k2.
+    destruct (gensym s2 (nNamed "x'")) eqn:Hgen_x2.
+    destruct (gensym_n_nAnon s3 (N.to_nat (exps_length es))) eqn:Hgen_n_es2.
+    destruct (cps_cvt_exps es vars2 v1 [] s4 cnstrs) eqn:Hcvt_exps2.
+    2: { inv He2. } 
+    destruct p eqn:Hp. inv He2.
+    eapply preord_exp_fun_compat.
+    + admit.
+    + admit.
+    + eapply preord_exp_monotonic.
+      { eapply IH.
+        - eassumption.
+        - eassumption.
+        - eassumption.
+        - eapply lt_symgen_In_lst. eassumption. eassumption.
+        - eassumption.
+        - eapply Forall_lt_symgen_gensym_n.
+          eapply Forall_lt_symgen_gensym.
+          eapply Forall_lt_symgen_gensym.
+          eassumption. eassumption. eassumption. eassumption. 
+        - simpl.
+          rewrite extend_extend_lst_commut. 
+          eapply preord_env_P_inj_set_alt.
+          rewrite Setminus_Union_distr at 1.
+          eapply preord_env_P_inj_f_eq_subdomain.
+          eapply preord_env_P_inj_antimon.
+          eassumption. sets.
+          admit.
+          rewrite preord_val_eq. unfold preord_val'.
+          { intros vs1 vs2 j tg xs1 e1 rho1' Hlen_eq Hfind Hset.
+            simpl in Hfind.
+            destruct (M.elt_eq v v). 2: { congruence. }
+            inv Hfind.
+            simpl.
+            destruct (M.elt_eq v1 v1). 2: { congruence. }
+            pose proof (set_lists_length2) as Hset2.
+            simpl in Hset.
+            edestruct Hset2 with (rho := (M.set v
+                                                (Vfun rho1
+                                                      (Fcons v kon_tag xs1
+                                                             (Econstr v0 (dcon_to_tag dc cnstrs) xs1 (Eapp k1 kon_tag [v0]))
+                                                             Fnil) v) rho1))
+                                 (xs1 := xs1) (vs1 := vs1) (xs2 := l0) (vs2 := vs2). 
+            eapply gensym_n_length_eq. eassumption. eassumption. 
+            eassumption.
+            symmetry. eassumption.
+            eexists. eexists. eexists. split.
+            reflexivity. split.
+            symmetry. eassumption.
+            intros Hlt2 Hall v3 cin Hleq Hstep.
+            inv Hstep. simpl in H1.
+            eexists. eexists. split.
+            econstructor. simpl.
+            assert (Heq: Datatypes.length xs1 = Datatypes.length l0).
+            { eapply gensym_n_length_eq. eassumption. eassumption. } 
+            rewrite <- Heq. eassumption.
+            admit.
+            inv H2. simpl in H12.
+            inv H12. admit.
+            
+            admit.
+            
+Abort.
 
 Lemma cps_cvt_val_diff_symgen :
   forall v v' v'' k next1 next2 next3 next4,

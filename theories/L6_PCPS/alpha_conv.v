@@ -908,7 +908,6 @@ Section Alpha_conv_correct.
   Qed.
 
 
-
   Lemma preord_env_P_inj_set_lists_not_In_P_r S k f rho1 rho2 rho2' xs vs :
     preord_env_P_inj S k f rho1 rho2 ->
     set_lists xs vs rho2 = Some rho2' ->
@@ -920,6 +919,32 @@ Section Alpha_conv_correct.
     eexists; split; eauto. erewrite <- set_lists_not_In. eassumption.
     eassumption. intros Hc. eapply Hnin'. constructor. eassumption.
     eapply In_image. eexists; eauto.
+  Qed.
+  
+  Lemma preord_env_P_inj_set_lists_l_Disjoint S k f rho1 rho2 rho1' xs vs :
+    preord_env_P_inj S k f rho1 rho2 ->
+    set_lists xs vs rho1 = Some rho1' ->
+    Disjoint _(FromList xs) S ->
+    preord_env_P_inj S k f rho1' rho2.
+  Proof.
+    intros Henv Hnin Hnin' z Hy v' Hget.
+    edestruct Henv as [v'' [Hget' Hv]]; eauto.
+    erewrite <- set_lists_not_In in Hget. eassumption.
+    eassumption. intros Hc. eapply Hnin'. constructor; eauto.
+  Qed.
+
+  Lemma preord_env_P_inj_set_lists_r_Disjoint S k f rho1 rho2 rho2' xs vs :
+    preord_env_P_inj S k f rho1 rho2 ->
+    set_lists xs vs rho2 = Some rho2' ->
+    Disjoint _ (FromList xs) (image f S) ->
+    preord_env_P_inj S k f rho1 rho2'.
+  Proof.
+    intros Henv Hnin Hnin' z Hy v' Hget.
+    edestruct Henv as [v'' [Hget' Hv]]; eauto. eexists.
+    split. 
+    erewrite <- set_lists_not_In. eassumption.
+    eassumption. intros Hc. eapply Hnin'. constructor; eauto.
+    eapply In_image. eassumption. eassumption.
   Qed.
 
 

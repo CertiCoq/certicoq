@@ -6780,22 +6780,30 @@ Qed.
 
 (* Main Theorem *)
 Theorem repr_bs_L6_L7_related:
-  forall p rep_env cenv fenv finfo_env ienv,
-    program_inv p ->
-    find_symbol_domain p finfo_env ->
-    finfo_env_correct fenv finfo_env ->
-  forall rho v e n, bstep_e (M.empty _) cenv rho e v n ->                    
-                    correct_envs cenv ienv rep_env rho e ->
-                    protected_id_not_bound_id rho e ->
-                    unique_bindings_env rho e ->
-                    functions_not_bound p rho e ->
-                    forall stm lenv m k max_alloc fu, repr_expr_L6_L7_id fenv finfo_env p rep_env e stm ->
-                                              rel_mem_L6_L7_id fenv finfo_env p rep_env e  rho m lenv ->
-                                              correct_alloc e max_alloc -> 
-                                              correct_tinfo p max_alloc lenv m ->
-                                              exists m' lenv',  m_tstep2 (globalenv p) (State fu stm k empty_env lenv m) (State fu Sskip k empty_env lenv' m') /\
-                                                                same_args_ptr lenv lenv' /\
-                                                                arg_val_L6_L7 fenv finfo_env p rep_env v m' lenv'.
+  forall (p : program) (rep_env : M.t ctor_rep) (cenv : ctor_env)
+         (fenv : fun_env) (finfo_env : M.t (positive * fun_tag)) (ienv : n_ind_env),
+    program_inv p -> (* isPtr function is defined/correct /\ thread info is correct /\ gc invariant *)
+    find_symbol_domain p finfo_env -> (* finfo_env [L6] contains precisely the same things as global env [Clight] *)
+    finfo_env_correct fenv finfo_env -> (* everything in finfo_env is in the function environment *)
+    forall (rho : eval.env) (v : cps.val) (e : exp) (n : nat), (* rho is environment containing outer fundefs. e is body of L6 program *)
+      bstep_e (M.empty _) cenv rho e v n ->  (* e n-steps to v *) (* for linking: environment won't be empty *)
+      correct_envs cenv ienv rep_env rho e -> (* inductive type/constructor environments are correct/pertain to e*)
+      protected_id_not_bound_id rho e ->
+      unique_bindings_env rho e ->
+      functions_not_bound p rho e -> (* function names in p/rho not bound in e *)
+      forall (stm : statement) (lenv : temp_env) (m : mem) (k : cont) (max_alloc : Z) (fu : function),
+        repr_expr_L6_L7_id fenv finfo_env p rep_env e stm -> (* translate_body e returns stm *)
+        rel_mem_L6_L7_id fenv finfo_env p rep_env e rho m lenv ->
+        (* " relates a L6 evaluation environment [rho] to a Clight memory [m/lenv] up to the free variables in e " *)
+        (* also says fundefs in e are correct in m *)
+        (* NOTE: this is only place pertaining to outside of the body, and can likely incorporate free variables here *)
+        correct_alloc e max_alloc ->  (* max_alloc correct *)
+        correct_tinfo p max_alloc lenv m -> (* thread_info correct *)
+        exists (m' : mem) (lenv' : temp_env),
+          m_tstep2 (globalenv p) (State fu stm k empty_env lenv m) (State fu Sskip k empty_env lenv' m') /\
+          (* memory m/lenv becomes m'/lenv' after executing stm *)
+          same_args_ptr lenv lenv' /\
+          arg_val_L6_L7 fenv finfo_env p rep_env v m' lenv'. (* value v is related to memory m'/lenv' *)
 Proof.
   intros p rep_env cenv fenv finfo_env ienv Hpinv Hsym HfinfoCorrect rho v e n Hev.
   induction Hev; intros Hc_env Hp_id Hrho_id Hf_id stm lenv m k max_alloc fu Hrepr_e Hrel_m Hc_alloc Hc_tinfo; inv Hrepr_e.

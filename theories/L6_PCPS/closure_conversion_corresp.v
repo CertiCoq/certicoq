@@ -79,12 +79,8 @@ Section CC_correct.
   Definition gfuns_inv (gfuns : GFunMap) GFuns : Prop :=
     GFuns <--> (fun x => M.get x gfuns = Some GFun).
 
-  (** Invariant on genv *)
-  Definition genv_inv (genv : var -> var) Funs Scope FVmap : Prop :=
-    Funs \\ Scope <--> (fun x => M.get x FVmap = Some (MRFun (genv x))).
-
-  (** Function names substitution *)
-  Definition subst (FVmap : VarInfoMap) x : var :=
+  (** Map function name to environment *)
+  Definition to_env (FVmap : VarInfoMap) x : var :=
     match M.get x FVmap with
       | Some (MRFun x') => x'
       | _ => x
@@ -294,22 +290,21 @@ Section CC_correct.
   Qed.
 
   (** Spec for [get_var] *)
-  Lemma get_var_project_var_sound Scope Funs GFuns gfuns c genv Γ FVs FVmap S x :
+  Lemma get_var_project_var_sound Scope Funs GFuns gfuns c Γ FVs FVmap S x :
     binding_in_map (Singleton _ x) FVmap ->
     (* binding_not_in_map (Union _ S (Singleton _ Γ)) FVmap -> *)
     FVmap_inv FVmap Scope Funs GFuns FVs ->
     gfuns_inv gfuns GFuns ->
-    genv_inv genv Funs Scope FVmap ->
     {{ fun _ s => fresh S (next_var (fst s)) }}
       get_var clo_tag x FVmap gfuns c Γ
     {{ fun _ _ t s' =>
          exists C S', 
            fresh S' (next_var (fst s')) /\
            let '(x', f) := t in
-           project_var clo_tag Scope Funs GFuns c genv Γ FVs S x x' C S' /\
+           project_var clo_tag Scope Funs GFuns c (to_env FVmap) Γ FVs S x x' C S' /\
            is_exp_ctx f C }}.
   Proof.
-    intros Hin Minv Hgfuns Hgenv. destruct Minv as [Minv1 [Minv2 Minv3]]. 
+    intros Hin Minv Hgfuns. destruct Minv as [Minv1 [Minv2 Minv3]]. 
     unfold get_var. edestruct (Hin x) as [inf Hget]; eauto. 
     destruct inf; rewrite Hget. 
     - eapply bind_triple.
@@ -325,11 +320,7 @@ Section CC_correct.
         edestruct Minv2 as [H1 H2]; eauto. 
         exists (Econstr_c x' clo_tag [x; v] Hole_c). repeat eexists.
         * eassumption.
-        * replace v with (genv x). 2: {
-            unfold genv_inv in Hgenv.
-            destruct Hgenv as [Hgenv1 Hgenv2]; specialize (Hgenv1 x); unfold In in Hgenv1.
-            rewrite Hgenv1 in Hget; [inv Hget;auto|].
-            apply H2; now exists v. }
+        * replace v with (to_env FVmap x) by (unfold to_env; now rewrite Hget).
           specialize (H2 x); unfold In, Setminus in H2; destruct H2 as [HFuns HScope]; [now exists v|].
           econstructor 2; eauto.
     - eapply return_triple. intros _ [s d] Hin'.      
@@ -339,22 +330,21 @@ Section CC_correct.
   Qed.
   
   (** Spec for [get_vars] *)
-  Lemma get_vars_project_vars_sound Scope Funs GFuns gfuns c genv Γ FVs FVmap S xs :
+  Lemma get_vars_project_vars_sound Scope Funs GFuns gfuns c Γ FVs FVmap S xs :
     binding_in_map (FromList xs) FVmap ->
     FVmap_inv FVmap Scope Funs GFuns FVs ->
     gfuns_inv gfuns GFuns ->
-    genv_inv genv Funs Scope FVmap ->
     {{ fun _ s => fresh S (next_var (fst s)) }}
       get_vars clo_tag xs FVmap gfuns c Γ
     {{ fun _ _ t s' =>
          exists C S', 
            fresh S' (next_var (fst s')) /\
            let '(xs', f) := t in
-           project_vars clo_tag Scope Funs GFuns c genv Γ FVs S xs xs' C S' /\
+           project_vars clo_tag Scope Funs GFuns c (to_env FVmap) Γ FVs S xs xs' C S' /\
            is_exp_ctx f C }}.
   Proof.
-    intros Hb Hfv Hgfuns Hgenv.
-    revert S Hb Hfv Hgfuns Hgenv. induction xs; intros S Hb Hfv Hgfuns Hgenv.
+    intros Hb Hfv Hgfuns.
+    revert S Hb Hfv Hgfuns. induction xs; intros S Hb Hfv Hgfuns.
     - eapply return_triple. intros s Hf.
       eexists Hole_c. repeat eexists; eauto.
       constructor.
@@ -377,17 +367,17 @@ Section CC_correct.
         intros e. rewrite <- app_ctx_f_fuse. congruence.
   Qed.
   
-  Lemma subst_BoundVar_f_eq_subdomain FVmap x S :
-    f_eq_subdomain S ((subst FVmap) {x ~> x}) (subst (M.set x BoundVar FVmap)).
+  Lemma to_env_BoundVar_f_eq_subdomain FVmap x S :
+    f_eq_subdomain S ((to_env FVmap) {x ~> x}) (to_env (M.set x BoundVar FVmap)).
   Proof.  
-    intros x'. unfold subst, extend. rewrite M.gsspec.
+    intros x'. unfold to_env, extend. rewrite M.gsspec.
     destruct (peq x' x). now eauto. reflexivity. 
   Qed.
 
-  Lemma subst_BoundVar_f_eq FVmap x :
-    f_eq ((subst FVmap) {x ~> x}) (subst (M.set x BoundVar FVmap)).
+  Lemma to_env_BoundVar_f_eq FVmap x :
+    f_eq ((to_env FVmap) {x ~> x}) (to_env (M.set x BoundVar FVmap)).
   Proof.  
-    intros x'. unfold subst, extend. rewrite M.gsspec.
+    intros x'. unfold to_env, extend. rewrite M.gsspec.
     destruct (peq x' x). now eauto. reflexivity. 
   Qed.
 
@@ -617,12 +607,11 @@ Section CC_correct.
     eassumption.
   Qed.
 
-  Lemma make_env_spec fv FVmap_o c Γ_n Γ_o Scope Funs GFuns gfuns genv FVs S :
+  Lemma make_env_spec fv FVmap_o c Γ_n Γ_o Scope Funs GFuns gfuns FVs S :
     binding_in_map (FromList fv) FVmap_o ->
     binding_not_in_map (Union M.elt S (Singleton M.elt Γ_o)) FVmap_o ->
     FVmap_inv FVmap_o Scope Funs GFuns FVs ->
     gfuns_inv gfuns GFuns ->
-    genv_inv genv Funs Scope FVmap_o ->
     Disjoint _ GFuns (FromList fv) ->
     NoDup fv ->
     {{ fun _ s => fresh S (next_var (fst s)) }}
@@ -631,14 +620,14 @@ Section CC_correct.
          let '(c', FVmap_n, f) := t in
          exists C S' FVs',
            fresh S' (next_var (fst s')) /\
-           project_vars clo_tag Scope Funs GFuns c genv Γ_o FVs S fv FVs' C S' /\
+           project_vars clo_tag Scope Funs GFuns c (to_env FVmap_o) Γ_o FVs S fv FVs' C S' /\
            is_exp_ctx f (comp_ctx_f C (Econstr_c Γ_n c' FVs' Hole_c)) /\
            binding_in_map (FromList fv) FVmap_n /\
            binding_not_in_map (Complement _ (FromList fv)) FVmap_n /\
            FVmap_inv FVmap_n (Empty_set _) (Empty_set _) GFuns fv
      }}.
   Proof. 
-    intros Hb1 Hb2 Minv Hgfuns Hgenv Hdis Hdup. unfold make_env.
+    intros Hb1 Hb2 Minv Hgfuns Hdis Hdup. unfold make_env.
     destruct ((fix
                  add_fvs (l : list M.elt) (n : N) (map : Maps.PTree.t VarInfo)
                  {struct l} : Maps.PTree.t VarInfo * N :=
@@ -710,10 +699,10 @@ Section CC_correct.
           { now rewrite <- app_assoc. }
   Qed.
 
-  Lemma subst_MRFun_f_eq (FVmap : VarInfoMap) (x x' : var) :
-    f_eq ((subst FVmap) {x ~> x'}) (subst (M.set x (MRFun x') FVmap)).
+  Lemma to_env_MRFun_f_eq (FVmap : VarInfoMap) (x x' : var) :
+    f_eq ((to_env FVmap) {x ~> x'}) (to_env (M.set x (MRFun x') FVmap)).
   Proof.
-    unfold subst. intros y. unfold extend.
+    unfold to_env. intros y. unfold extend.
     rewrite M.gsspec. destruct (peq y x); eauto.
   Qed.
 
@@ -913,44 +902,47 @@ Section CC_correct.
   Hint Resolve image_Setminus_extend : functions_BD.
 *)
 
-  Print Closure_conversion_fundefs.
+  (* Misc invariants:
+     - Funs # Scope as long as UB(term) (so Funs \\ Scope = Funs) *)
   Lemma exp_closure_conv_Closure_conv_sound :
-    (forall e Scope Funs GFuns gfuns genv c Γ FVs FVmap S
-       (* The invariant that relates [FVmap] and [Scope], [Funs], [FV] *)
+    (forall e Scope Funs GFuns gfuns c Γ FVs FVmap S
+       (* The invariant that relates [FVmap] and [Scope], [Funs], [GFuns], [FV] *)
        (Minv : FVmap_inv FVmap Scope Funs GFuns FVs)
        (* [FVmap] contains all the free variables *)
        (Hbin1 : binding_in_map (occurs_free e) FVmap)
        (* [FVmap] does not contain the variables in [S] or [Γ] *)
-       (Hbin2 : binding_not_in_map (Union _ S (Singleton _ Γ)) FVmap)
-       (* [S] is disjoint with the free and bound variables of [e] and [Γ] *)
-       (HD1 : Disjoint _ S (Union _ (Setminus _ Funs Scope)
-                                  (Union _ (bound_var e)
-                                         (Union _ (occurs_free e) (Singleton _ Γ)))))
+       (Hbin2 : binding_not_in_map (S :|: [set Γ]) FVmap)
+       (* [gfuns] relates to [GFuns] *)
+       (Hgfuns : gfuns_inv gfuns GFuns)
+       (* [S] is disjoint with the free and bound variables of [e] and [Γ] and ran(to_env FVmap) *)
+       (HD1 : Disjoint _ S ((Funs \\ Scope) :|: GFuns :|: used_vars e :|: [set Γ]
+                                            :|: image (to_env FVmap) (Funs \\ Scope)))
        (* The current environment argument is fresh *)
-       (HD2 : ~ In _ (Union _ (bound_var e) (occurs_free e)) Γ),
+       (HD2 : ~ In _ (used_vars e) Γ),
        {{ fun _ s => fresh S (next_var (fst s)) }}
          exp_closure_conv clo_tag e FVmap gfuns c Γ
        {{ fun _ s ef s' =>
             exists C, is_exp_ctx (snd ef) C /\
-                 Closure_conversion clo_tag Scope Funs GFuns c genv Γ FVs e (fst ef) C /\
-                 fresh S (next_var (fst s'))
+                 Closure_conversion clo_tag Scope Funs GFuns c (to_env FVmap) Γ FVs e (fst ef) C /\
+                 fresh (S \\ bound_var (C |[ fst ef ]|)) (next_var (fst s'))
        }}) /\
     (forall Bg B FVmap Funs GFuns gfuns FVs S c
        (Minv : FVmap_inv FVmap (Empty_set _) Funs GFuns FVs)
-       (Hbin1 : binding_in_map (Union _ (occurs_free_fundefs B) (name_in_fundefs B)) FVmap)
+       (Hbin1 : binding_in_map (occurs_free_fundefs B :|: name_in_fundefs B) FVmap)
        (Hbin2 : binding_not_in_map S FVmap)
-       (HD1 : Disjoint _ S (Union _ Funs (Union _ (bound_var_fundefs B) (occurs_free_fundefs B))))
+       (Hgfuns : gfuns_inv gfuns GFuns)
+       (HD1 : Disjoint _ S (Funs :|: used_vars_fundefs B :|: image (to_env FVmap) Funs))
        (Hinc : Included _ (name_in_fundefs B) Funs),
        {{ fun _ s => fresh S (next_var (fst s)) }}
          fundefs_closure_conv clo_tag B FVmap gfuns c
        {{ fun _ s B' s' =>     
-            Closure_conversion_fundefs clo_tag Funs GFuns c FVs B B' /\
-            fresh S (next_var (fst s'))
+            Closure_conversion_fundefs clo_tag Bg GFuns c FVs B B' /\
+            fresh (S \\ bound_var_fundefs B') (next_var (fst s'))
        }}).
   Proof with now eauto with Ensembles_DB functions_BD.
     eapply exp_def_mutual_ind; intros; simpl. Opaque exp_closure_conv.
     - eapply bind_triple.
-      + eapply get_vars_project_vars_sound; [ | eassumption ].
+      + eapply get_vars_project_vars_sound; try eassumption.
         intros x Hx. eapply Hbin1. eauto.
       + intros [xs f] s. eapply pre_existential. intros C.
         eapply pre_existential. intros S'.
@@ -967,40 +959,53 @@ Section CC_correct.
           eapply project_vars_free_set_Included; now eauto.
           now apply Included_refl.
           eapply binding_not_in_map_set_not_In_S. eassumption.
-          intros Hc; inv Hc. now eapply HD1; eauto. inv H0; eapply HD2; eauto.
+          intros Hc; inv Hc.
+          { unfold used_vars in HD1. eapply HD1; constructor; [eassumption|].
+            left; left; right; left; eauto. }
+          { inv H0; eapply HD2; unfold used_vars; eauto. }
+        * assumption.
         * eapply Disjoint_Included_l.
           eapply project_vars_free_set_Included; now eauto.
           eapply Disjoint_Included_r; [| eassumption ].
-          rewrite <- subst_BoundVar_f_eq, (Union_commut (Singleton _ _)), <- Setminus_Union.
-          apply Included_Union_compat. now eapply image_Setminus_extend.
-          rewrite !Union_assoc. apply Included_Union_compat; [| now apply Included_refl ].
-          now apply bound_var_occurs_free_Econstr_Included.
-        * intros Hc. inv Hc; eapply HD2; eauto.
-          rewrite bound_var_Econstr, occurs_free_Econstr. 
-          destruct (peq Γ v); subst. now eauto.
-          right. right. constructor; eauto. intros Hc; inv Hc. congruence.
+          apply Included_Union_compat.
+          -- apply Included_Union_compat; [|now apply Included_refl].
+             normalize_used_vars; rewrite Union_assoc.
+             apply Included_Union_compat; [|now apply Included_refl].
+             eauto with Ensembles_DB.
+          -- admit.
+        * intros Hc. inv Hc; eapply HD2; eauto; normalize_used_vars.
+          right; now left.
+          right; now right.
         * intros e' s'.
-          eapply return_triple. intros s'' [C' [Hctx' [Hcc Hf'']]]; eauto.
-          eexists. split. now eapply Hctx. split.
-          simpl. rewrite Hctx'. econstructor; [| eassumption |].
-          eapply Disjoint_free_set  with (S := S) in  Minv.
-          apply Disjoint_sym in Minv. (* hackish way to make hint externs search work *)
-          now eauto 15 with Ensembles_DB. 
-          eapply binding_not_in_map_antimon; [| eassumption ].
-          now apply Included_Union_l.
-          eapply Closure_conversion_f_eq_subdomain. eassumption.
-          rewrite <- subst_BoundVar_f_eq. apply f_eq_subdomain_extend_not_In_S_l.
-          intros Hc. inv Hc. now eauto. reflexivity.
-          eapply fresh_monotonic. now eapply project_vars_free_set_Included; eauto.
-          eassumption.
-    - eapply bind_triple with (post' := fun _ l i => l = [] /\ fresh S (next_var i)).
+          eapply return_triple. intros _ s'' [C' [Hctx' [Hcc Hf'']]]; eauto.
+          exists C. split; [assumption|]. split.
+          -- rewrite Hctx'; simpl. econstructor; [|eassumption|].
+             ++ (* - Scope # S because Scope ⊆ dom(FVmap) and dom(FVmap) # S 
+                   - Funs \ Scope # S by HD1
+                   - GFuns # S by HD1
+                   - Because of the above, it's sufficient to show
+                       FVs\Scope\Funs\GFuns ∪ FVmap(Funs\Scope) ∪ {Γ} # S
+                     - By Hinv, x ∈ FVs\Scope\Funs\GFuns <-> FVmap(x) = FVar _
+                       ==> x ∈ dom(FVmap) ==> x ∉ S 
+                     - FVmap(Funs\Scope) # S by HD1
+                     - Γ ∉ S by HD1 *)
+                admit.
+             ++ admit.
+                (* eapply Closure_conversion_f_eq_subdomain. eassumption. *)
+                (* rewrite <- subst_BoundVar_f_eq. apply f_eq_subdomain_extend_not_In_S_l. *)
+                (* intros Hc. inv Hc. now eauto. reflexivity. *)
+          -- admit.
+             (* eapply fresh_monotonic; [|eassumption]. eapply project_vars_free_set_Included; eauto. *)
+             (* simpl. *)
+             (* eassumption. *)
+    - eapply bind_triple with (Q' := fun _ _ l i => l = [] /\ fresh S (next_var (fst i))).
       + eapply return_triple; eauto. 
       + intros pats' s2.
         eapply bind_triple.
         * eapply frame_rule. eapply get_var_project_var_sound; eauto.
           intros x Hx. eapply Hbin1. rewrite occurs_free_Ecase_nil. eassumption.
         * intros [x f] s. eapply return_triple.
-          intros s' [Heq [C [S' [Hf [Hproj Hctx]]]]]. rewrite Heq.
+          intros _ s' [Heq [C [S' [Hf [Hproj Hctx]]]]]. rewrite Heq.
           eexists. split; eauto. split. econstructor; [| eassumption |].
           eapply Disjoint_free_set in Minv. apply Disjoint_sym in Minv.
           now eauto 15 with Ensembles_DB. 

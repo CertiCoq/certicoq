@@ -23,11 +23,12 @@ Section LogRelCC.
   (* Tag for closure records *)
   Variable (clo_tag : ctor_tag). 
 
-  Context {steps: Type} {Hs : @resource_exp steps}.
+  Context {fuel: Type} {Hf : @resource_exp fuel} {trace: Type} {Ht : @resource_exp trace}.
+  Context (Hro : @resource_ones fin fuel (@HRes _ Hf)).
   
   Section Exp_rel. 
 
-    Variable (cc_approx_val : nat -> @PostGT steps -> val -> val -> Prop).
+    Variable (cc_approx_val : nat -> @PostGT fuel trace -> val -> val -> Prop).
     
     Definition cc_approx_res (k : nat) (P2 : PostGT) (r1 r2 : res) := 
     match r1, r2 with 
@@ -36,17 +37,17 @@ Section LogRelCC.
     | _, _ => False
     end.
 
-    Definition cc_approx_exp' (k : nat) (P1 : PostT) (P2 : PostGT) (p1 p2 : exp * env) : Prop :=
+    Definition cc_approx_exp' (k : nat) (P1 : @PostGT fuel trace) (P2 : @PostGT fuel trace) (p1 p2 : exp * env) : Prop :=
       let '(e1, rho1) := p1 in
       let '(e2, rho2) := p2 in
-      forall v1 c1,
-        to_nat c1 <= k -> bstep_fuel cenv rho1 e1 v1 c1 -> 
-        not_stuck cenv rho1 e1 ->
-        exists v2 c2,
-          bstep_fuel cenv rho2 e2 v2 c2 /\
+      forall v1 cin1 cout1,
+        to_nat cin1 <= k -> bstep_fuel cenv rho1 e1 cin1 v1 cout1 -> 
+        (* @not_stuck cenv fuel _ trace _ rho1 e1 -> *)
+        exists v2 cin2 cout2,
+          bstep_fuel cenv rho2 e2 cin2 v2 cout2 /\
           (* extra invariants for cost *)
-          P1 (e1, rho1, c1) (e2, rho2, c2) /\
-          cc_approx_res (k - to_nat c1) P2 v1 v2.
+          P1 (e1, rho1, cin1, cout1) (e2, rho2, cin2, cout2) /\
+          cc_approx_res (k - to_nat cin1) P2 v1 v2.
 
   End Exp_rel. 
 
@@ -155,7 +156,7 @@ Section LogRelCC.
       destruct Hpre as [Heq Hpre]; subst;
       split; eauto; intros;
       edestruct (Hpre vs1 vs2 j) as [Γ [xs2 [e2 [rho' [H1' [H2' H3']]]]]];
-      eauto; do 4 eexists; repeat split; eauto; intros Hleq Hf v1 c1 Hleq' Hstep;
+      eauto; do 4 eexists; repeat split; eauto; intros Hleq Hf' v1 c1 Hleq' Hstep;
       (assert (Heq' : k - (k - j) = j) by omega);
       rewrite Heq' in *;  eapply H3'; eauto.
   Qed.
@@ -229,8 +230,8 @@ Section LogRelCC.
     inclusion _ P1 P1' ->
     cc_approx_exp k P1' P2 (e1, rho1) (e2, rho2).
   Proof.
-    intros Hcc Hin v1 c1 Hleq Hstep Hns.
-    edestruct Hcc as [v2 [c2 [Hstep2 [HP Hval]]]]; eauto.
+    intros Hcc Hin v1 c1 cout1 Hleq Hstep.
+    edestruct Hcc as [v2 [c2 [cout2 [Hstep2 [HP Hval]]]]]; eauto.
     repeat eexists; eauto.
   Qed.
 
@@ -243,8 +244,8 @@ Section LogRelCC.
     same_relation _ P2 P2' ->
     cc_approx_exp k P1 P2' (e1, rho1) (e2, rho2).
   Proof.
-    intros IH Hcc Hin v1 c1 Hleq Hstep Hns.
-    edestruct Hcc as [v2 [c2 [Hstep2 [HP Hval]]]]; eauto.
+    intros IH Hcc Hin v1 c1 cout1 Hleq Hstep.
+    edestruct Hcc as [v2 [c2 [cout2 [Hstep2 [HP Hval]]]]]; eauto.
     repeat eexists; eauto. 
     destruct v1; destruct v2; try contradiction; eauto.
     eapply IH; eauto. omega.
@@ -289,8 +290,8 @@ Section LogRelCC.
     same_relation _ P1 P2 ->
     cc_approx_exp k P P2 (e1, rho1) (e2, rho2).
   Proof.
-    intros Hcc Hin v1 c1 Hleq Hstep Hns.
-    edestruct Hcc as [v2 [c2 [Hstep2 [HP Hval]]]]; eauto.
+    intros Hcc Hin v1 c1 c2 Hleq Hstep.
+    edestruct Hcc as [v2 [c2' [cout2 [Hstep2 [HP Hval]]]]]; eauto.
     repeat eexists; eauto. 
     destruct v1; destruct v2; try contradiction; eauto. simpl in *.
     eapply cc_approx_val_same_rel; eauto.
@@ -493,7 +494,7 @@ Section LogRelCC.
     - destruct l; try contradiction. destruct v0; try contradiction. 
       destruct l; try contradiction. destruct v1; try contradiction. 
       destruct Hpre as [Heq1 Hpre]; subst; split; eauto.
-      intros vs1 vs2 j t1' xs e1 rho1' Hlen Hf Heq.
+      intros vs1 vs2 j t1' xs e1 rho1' Hlen Hf' Heq.
       edestruct Hpre as [Γ [xs2 [e2 [rho2' [H1 [H2 H3]]]]]]; eauto.
       subst. do 4 eexists; repeat split; eauto. intros Hleq' Hall.
       eapply H3; eauto. omega.
@@ -513,9 +514,9 @@ Section LogRelCC.
     j <= k ->
     cc_approx_exp j P1 P2 (rho1, e1) (rho2, e2).
   Proof.
-    intros Hpre Hleq v1 c1 Hlt Hstep Hns.
-    edestruct (Hpre v1 c1) as [v2 [c2 [H1 [H2 H3]]]]; eauto. omega.
-    do 2 eexists; repeat split; eauto.
+    intros Hpre Hleq v1 c1 cout1 Hlt Hstep.
+    edestruct (Hpre v1 c1) as [v2 [c2 [cout2 [H1 [H2 H3]]]]]; eauto. omega.
+    do 3 eexists; repeat split; eauto.
     eapply cc_approx_res_monotonic; eauto. omega.
   Qed.
   
@@ -542,8 +543,8 @@ Section LogRelCC.
 
   Open Scope alg_scope.
   
-  Definition post_app_compat_cc' x t ys rho1 (P : PostT) (PG : PostGT):=
-    forall e1 xs f2 Γ x' t' ys' e2 rho2 rhoc1 rhoc2 fl f vs rhoc1' c1 c2, 
+  Definition post_app_compat_cc' x t ys rho1 (P : @PostT fuel trace) (PG : @PostGT fuel trace):=
+    forall e1 xs f2 Γ x' t' ys' e2 rho2 rhoc1 rhoc2 fl f vs rhoc1' cin1 cin2 cout1 cout2, 
   
       map_util.M.get x rho1 = Some (Vfun rhoc1 fl f) ->
       get_list ys rho1 = Some vs ->
@@ -551,34 +552,43 @@ Section LogRelCC.
       set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
         
       (* for simplicity don't model the semantics of the target since it doesn't matter *)
-      PG (e1, rhoc1', c1)  (e2, rhoc2, c2) -> 
-      P (Eapp x t ys, rho1, c1 <+> one (Eapp x t ys)) (AppClo f2 x' Γ |[ Eapp x' t' (Γ :: ys') ]|, rho2, c2 <+> one (Eapp x' t' (Γ :: ys)) <+>
-                                                                                                                one (Eproj Γ clo_tag 1%N f2 (Eapp x' t' (Γ :: ys))) <+>
-                                                                                                                one (AppClo f2 x' Γ |[ Eapp x' t' (Γ :: ys') ]|)).
+      PG (e1, rhoc1', cin1, cout1)  (e2, rhoc2, cin2, cout2) -> 
+      P (Eapp x t ys, rho1, cin1 <+> one (Eapp x t ys), cout1 <+> one (Eapp x t ys))
+        (AppClo f2 x' Γ |[ Eapp x' t' (Γ :: ys') ]|, rho2,
+                         cin2 <+> one (Eapp x' t' (Γ :: ys)) <+>
+                              one (Eproj Γ clo_tag 1%N f2 (Eapp x' t' (Γ :: ys))) <+>
+                              one (AppClo f2 x' Γ |[ Eapp x' t' (Γ :: ys') ]|),
+                         cout2 <+> one (Eapp x' t' (Γ :: ys)) <+>
+                              one (Eproj Γ clo_tag 1%N f2 (Eapp x' t' (Γ :: ys))) <+>
+                              one (AppClo f2 x' Γ |[ Eapp x' t' (Γ :: ys') ]|)).
 
   
-  Definition post_letapp_compat_cc' x f t ys e1 rho1 (P1 P2 : PostT) (PG : PostGT):=
+  Definition post_letapp_compat_cc' x f t ys e1 rho1 (P1 P2 : @PostT fuel trace) (PG : @PostGT fuel trace) :=
     forall xs e_b1 v1 f2 Γ x' f' t' ys' e2 e_b2
-         rho2 rho2' rhoc1 rhoc2 fl h vs rhoc1' c1 c1' c2 c2', 
+         rho2 rho2' rhoc1 rhoc2 fl h vs rhoc1' cin1 cin1' cin2 cin2' cout1 cout2 cout1' cout2', 
   
       map_util.M.get f rho1 = Some (Vfun rhoc1 fl h) ->
       get_list ys rho1 = Some vs ->
       find_def h fl = Some (t, xs, e_b1) ->
       set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
-      bstep_fuel cenv rhoc1' e_b1 (Res v1) c1 -> 
+      bstep_fuel cenv rhoc1' e_b1 cin1 (Res v1) cout1 -> 
       (* Will need to prove that the size of the returned val is *)
 
       (* for simplicity don't model the semantics of the target since it doesn't matter *)
-      PG (e_b1, rhoc1', c1)  (e_b2, rhoc2, c2) -> 
-      P1 (e1, M.set x v1 rho1, c1') (e2, rho2', c2') ->
-      P2 (Eletapp x f t ys e1, rho1, c1 <+> c1' <+> one (Eletapp x f t ys e1))
-         (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|, rho2, c2 <+> c2' <+> one (Eletapp x' f' t' (Γ :: ys') e2) <+>
-                                                                                    one (Eproj Γ clo_tag 1%N f2 (Eletapp x' f' t' (Γ :: ys') e2)) <+>
-                                                                                    one (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|)).
+      PG (e_b1, rhoc1', cin1, cout1)  (e_b2, rhoc2, cin2, cout2) -> 
+      P1 (e1, M.set x v1 rho1, cin1', cout1') (e2, rho2', cin2', cout2') ->
+      P2 (Eletapp x f t ys e1, rho1, cin1 <+> cin1' <+> one (Eletapp x f t ys e1), cout1 <+> cout1' <+> one (Eletapp x f t ys e1))
+         (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|, rho2,
+                          cin2 <+> cin2' <+> one (Eletapp x' f' t' (Γ :: ys') e2) <+>
+                               one (Eproj Γ clo_tag 1%N f2 (Eletapp x' f' t' (Γ :: ys') e2)) <+>
+                               one (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|),
+                          cout2 <+> cout2' <+> one (Eletapp x' f' t' (Γ :: ys') e2) <+>
+                                one (Eproj Γ clo_tag 1%N f2 (Eletapp x' f' t' (Γ :: ys') e2)) <+>
+                                one (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|) ).
 
-  Definition post_letapp_compat_cc_OOT' x f t ys e1 rho1 (P2 : PostT) (PG : PostGT):=
+  Definition post_letapp_compat_cc_OOT' x f t ys e1 rho1 (P2 : @PostT fuel trace) (PG :  @PostGT fuel trace):=
     forall xs e_b1 f2 Γ x' f' t' ys' e2 e_b2 
-           rho2 rhoc1 rhoc2 fl h vs rhoc1' c1 c2, 
+           rho2 rhoc1 rhoc2 fl h vs rhoc1' cin1 cout1 cin2 cout2, 
   
       map_util.M.get f rho1 = Some (Vfun rhoc1 fl h) ->
       get_list ys rho1 = Some vs ->
@@ -586,10 +596,15 @@ Section LogRelCC.
       set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
 
       (* for simplicity don't model the semantics of the target since it doesn't matter *)
-      PG (e_b1, rhoc1', c1)  (e_b2, rhoc2, c2) -> 
-      P2 (Eletapp x f t ys e1, rho1, c1 <+> one (Eletapp x f t ys e1)) (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|, rho2, c2 <+> one (Eletapp x' f' t' (Γ :: ys') e2) <+>
-                                                                                                                                          one (Eproj Γ clo_tag 1%N f2 (Eletapp x' f' t' (Γ :: ys') e2)) <+>
-                                                                                                                                          one (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|)).
+      PG (e_b1, rhoc1', cin1, cout1)  (e_b2, rhoc2, cin2, cout2) -> 
+      P2 (Eletapp x f t ys e1, rho1, cin1 <+> one (Eletapp x f t ys e1), cout1 <+> one (Eletapp x f t ys e1))
+         (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|, rho2,
+                          cin2 <+> one (Eletapp x' f' t' (Γ :: ys') e2) <+>
+                             one (Eproj Γ clo_tag 1%N f2 (Eletapp x' f' t' (Γ :: ys') e2)) <+>
+                             one (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|),
+                          cout2 <+> one (Eletapp x' f' t' (Γ :: ys') e2) <+>
+                             one (Eproj Γ clo_tag 1%N f2 (Eletapp x' f' t' (Γ :: ys') e2)) <+>
+                             one (AppClo f2 f' Γ |[ Eletapp x' f' t' (Γ :: ys') e2 ]|)).
 
   Definition post_app_compat_cc P PG := forall x t xs rho1, post_app_compat_cc' x t xs rho1 P PG.
 
@@ -599,16 +614,9 @@ Section LogRelCC.
 
   Section Compat.
     
-   Context (P1 P2 : @PostT steps) (* Local *)
-           (PG : @PostGT steps). (* Global *)
-   
-   Lemma not_lt_add I A (Hr : @resource I A) i x y :
-     ~ lt_i i (y <+> x) x.
-   Proof.
-     intro. rewrite algebra.plus_comm in H. eapply plus_lt in H. 
-     eapply lt_antisym. eassumption.
-   Qed.
-   
+   Context (P1 P2 : @PostT fuel trace) (* Local *)
+           (PG : @PostGT fuel trace). (* Global *)
+      
      
    Lemma cc_approx_exp_constr_compat k 
          rho1 rho2 x t ys1 ys2 e1 e2 :
@@ -624,9 +632,9 @@ Section LogRelCC.
                        (e2, M.set x (Vconstr t vs2) rho2)) ->
      cc_approx_exp k P2 PG (Econstr x t ys1 e1, rho1) (Econstr x t ys2 e2, rho2).
    Proof.
-     intros Hpost Hoot Hall Hpre v1 c1 Hleq1 Hstep1 Hns. inv Hstep1. 
+     intros Hpost Hoot Hall Hpre v1 c1 cout Hleq1 Hstep1. inv Hstep1. 
      - (* OOT *) 
-       exists OOT, c1. split. constructor; eauto. 
+       exists OOT, c1, <0>. split. constructor; eauto. 
        split; [| now eauto ]. eapply Hoot; eassumption. 
      - inv H. 
        edestruct (cc_approx_var_env_get_list rho1 rho2) as [vs2' [Hget' Hpre']];
@@ -634,19 +642,19 @@ Section LogRelCC.
        rewrite to_nat_add in *.
        assert (Hg := to_nat_one (exp_to_fin (Econstr x t ys1 e1))). unfold one in *.
        
-       edestruct Hpre as [v2 [c2 [Hstep [HS Hval]]]]; [| | | eassumption | | ]; eauto.
+       edestruct Hpre as [v2 [c2 [cout' [Hstep [HS Hval]]]]]; [| | | eassumption | ]; eauto.
        omega. 
 
        (* not stuck *)
-       { edestruct Hns as [ [c' [v' Hstep]] | Hoot' ].  
-         - left. inv Hstep. inv H. repeat subst_exp. do 2 eexists; eauto.
-         - right. intros c'. specialize (Hoot' (c' <+> one (Econstr x t ys1 e1))). inv Hoot'.
-           + exfalso. eapply not_lt_add. eassumption.
-           + eapply plus_inv in H. subst. inv H3. repeat subst_exp. eassumption. }
+       { edestruct Hns as [ [c' [v' [c'' Hstep]]] | Hoot' ].  
+         - left. inv Hstep. inv H. repeat subst_exp. do 3 eexists; eauto.
+         - right. intros c'. specialize (Hoot' (c' <+> one (Econstr x t ys1 e1))). destructAll. inv H.
+           + exfalso. eapply (@not_lt_add _ fuel). eassumption.
+           + eapply plus_inv in H0. subst. inv H3. repeat subst_exp. eexists. eassumption. }
        
-       eexists. exists (c2 <+> one (Econstr x t ys2 e2)); repeat eexists; eauto. 
+       eexists. exists (c2 <+> one (Econstr x t ys2 e2)); repeat eexists. 
        econstructor 2; eauto. econstructor; eauto.
-
+       eapply Hpost; eauto.
        eapply cc_approx_res_monotonic. eassumption. 
        simpl in *. omega.
    Qed.
@@ -664,31 +672,31 @@ Section LogRelCC.
                      (e2, M.set x v2 rho2)) ->
     cc_approx_exp k P2 PG (Eproj x tau n y1 e1, rho1) (Eproj x tau n y2 e2, rho2).
   Proof.
-    intros Hpost Hoot Henv Hexp v1 cin Hleq1 Hstep1 Hns. inv Hstep1.
+    intros Hpost Hoot Henv Hexp v1 cin cout Hleq1 Hstep1 Hns. inv Hstep1.
     - (* ΟΟΤ *)
-      exists OOT, cin.  split. constructor; eassumption.
+      exists OOT, cin, <0>. split. constructor; eassumption.
       split; [| now eauto ]. eapply Hoot; eassumption. 
     - inv H. edestruct Henv as [v' [Hget Hpre]]; eauto.
       destruct v'; rewrite cc_approx_val_eq in Hpre; simpl in Hpre; try contradiction.
       inv Hpre.
 
-      rewrite to_nat_add in *. assert (Hg := to_nat_one (exp_to_fin (Eproj x c0 n y1 e1))). unfold one in *.
+      rewrite to_nat_add in *. assert (Hg := to_nat_one (exp_to_fin (Eproj x c n y1 e1))). unfold one in *.
       
       edestruct (Forall2_asym_nthN (cc_approx_val k PG) vs l) as [v2 [Hnth Hval]]; eauto.
-      edestruct Hexp as [v2' [cin' [Hstep [HS Hval']]]];
+      edestruct Hexp as [v2' [cin' [cout' [Hstep [HS Hval']]]]];
         [| | | | eassumption | | ]; eauto.
       now eapply nthN_In; eauto. omega.
 
       (* not stuck *)
       { edestruct Hns as [ [c' [v' Hstep]] | Hoot' ].  
-        - left. inv Hstep. inv H. repeat subst_exp. do 2 eexists; eauto.
-        - right. intros c'. specialize (Hoot' (c' <+> one (Eproj x c0 n y1 e1))). inv Hoot'.
-          + exfalso. eapply not_lt_add. eassumption.
-          + eapply plus_inv in H. subst. inv H4. repeat subst_exp. eassumption. }
+        - left. inv Hstep. inv H. inv H1. repeat subst_exp. do 3 eexists; eauto.
+        - right. intros c'. specialize (Hoot' (c' <+> one (Eproj x c n y1 e1))). inv Hoot'. inv H.
+          + exfalso. eapply (@not_lt_add _ fuel). eassumption.
+          + eapply plus_inv in H1. subst. inv H4. repeat subst_exp. eexists. eassumption. }
 
-      do 2 eexists. split; [| split ]. 
+      do 3 eexists. split; [| split ]. 
       econstructor 2; eauto. econstructor; eauto.
-
+      
       eapply Hpost; try eassumption.
       eapply cc_approx_res_monotonic. eassumption. 
       simpl in *. omega.
@@ -714,34 +722,10 @@ Section LogRelCC.
     cc_approx_exp k P2 PG (Eletapp x f1 t xs1 e1, rho1)
                   (AppClo f2 f' Γ |[ Eletapp x f' t (Γ :: xs2) e2 ]|, rho2).
   Proof.
-    intros Hpost Hpostoot Hoot Hnin1 Hnin2 Henv Hall Hexp v1 cin Hleq1 Hstep1 Hns. inv Hstep1.
+    intros Hpost Hpostoot Hoot Hnin1 Hnin2 Henv Hall Hexp v1 cin cout Hleq1 Hstep1 Hns. inv Hstep1.
     - (* ΟΟΤ *)
-      exists OOT, cin. split; [| split ].
-      + destruct (lt_dec_i cin (exp_to_fin (AppClo f2 f' Γ |[ Eletapp x f' t (Γ :: xs2) e2 ]|))).
-        * constructor 1. eassumption.
-        * assert (Hex : exists rho' B f, M.get f1 rho1 = Some (Vfun rho' B f)).
-          { edestruct Hns as [[c [v Hs1]] | Hs2].
-            ++ inv Hs1. inv H1. do 3 eexists; eauto. 
-            ++ specialize (Hs2 (one (Eletapp x f1 t xs1 e1))). inv Hs2.
-               eapply lt_antisym in H1. contradiction.
-               inv H5; eauto. } inv H0.
-          econstructor 2.
-          
-          edestruct Hex as [rhoc [B [f Hget]]]. eapply Henv in Hget.
-          destruct Hget as [v2 [Hgetv2 Hvv]]. rewrite cc_approx_val_eq in Hvv.
-          destruct v2; simpl in Hvv; try contradiction.
-          destruct l as [| ? [|] ]; try contradiction;
-            destruct v; try contradiction; destruct v0; try contradiction.
-          destruct Hvv as [Heq Hvv]; subst.
-          econstructor; eauto. simpl. reflexivity.
-
-          destruct (lt_dec_i x0 (exp_to_fin (Eproj Γ clo_tag 1 f2 (Eletapp x f' t (Γ :: xs2) e2)))).
-          -- constructor 1. eassumption.
-          -- destructAll. constructor 2.
-             econstructor; eauto. simpl. rewrite M.gso. eassumption.
-             intros Hc; eapply Hnin2; subst; eauto. reflexivity.
-             constructor 1.
-             eapply plus_lt in H. eapply plus_lt in H. eassumption. 
+      exists OOT, cin, <0>. split; [| split ].
+      + econstructor. unfold one. erewrite one_eq. eassumption.
       + eapply Hoot; eauto. 
       + simpl; eauto. 
     - inv H.
@@ -753,19 +737,19 @@ Section LogRelCC.
         destruct v2; try contradiction. destruct Hpre as [Heq Hpre]; subst.
         edestruct cc_approx_var_env_get_list as [vs' [Hgetl2 Hvall]]; eauto.
 
-        rewrite !to_nat_add in *. assert (Hg := to_nat_one (exp_to_fin (Eletapp x f1 t xs1 e1))). unfold one in *.        
+        rewrite !to_nat_add in *. assert (Hg := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x f1 t xs1 e1))). unfold one in *.        
         
         edestruct Hpre with (j := k - 1) as [G [xs2' [e2' [rho2'' [Hfdef [Hseteq Hcc]]]]]].
         eapply Forall2_length. eassumption. eassumption. now eauto.
-        subst. assert (Hevalb := H12).
-        eapply Hcc in H12;
+        subst. assert (Hevalb := H13).
+        eapply Hcc in H13;
           [| | eapply Forall2_monotonic; [| eassumption ] | | ]; try (unfold one in *; simpl in *; omega).
-        * destruct H12 as (v2' & c2 & Hstep2 & Hge & Hccv).
+        * destruct H13 as (v2' & c2 & c2' & Hstep2 & Hge & Hccv).
           destruct v2' as [ | v2' ]; try contradiction. 
-          edestruct (Hexp (k - to_nat (cin1 <+> (one_i (exp_to_fin (Eletapp x f1 t xs1 e1)))))) as [v3' [c2' [Hstep [HS Hval']]]];
+          edestruct (Hexp (k - @to_nat _ fuel _ (cin1 <+> (one_i (exp_to_fin (Eletapp x f1 t xs1 e1)))))) as [v3' [cin2' [cout2' [Hstep [HS Hval']]]]];
             [| | | | eassumption | | ]; eauto. simpl in *; omega.
           
-           eapply cc_approx_val_monotonic. eapply Hccv. rewrite to_nat_add. unfold one in *; simpl in *. omega.
+          eapply cc_approx_val_monotonic. eapply Hccv. rewrite to_nat_add. unfold one in *; simpl in *. omega.
            
            econstructor. eassumption. reflexivity. econstructor. rewrite M.gso. eassumption.
            intros Hc; eapply Hnin2; subst; eauto. reflexivity. now econstructor. 
@@ -1251,45 +1235,47 @@ Section LogRelCC.
             (Hp1 : inclusion _ PG P1)
             (Hp2 : inclusion _ PG P2).
 
-    Lemma cc_approx_res_respects_preord_exp_r_pre (k : nat) r1 r2 r3 :
-      (forall j v1 v2 v3,
-          j <= k ->
-          cc_approx_val j PG v1 v2 ->
-          (forall k, preord_val cenv PG k v2 v3) ->
-          cc_approx_val j PG v1 v3) ->
-      cc_approx_res cc_approx_val k PG r1 r2 ->
-      (forall k', preord_res (preord_val cenv) PG k' r2 r3) ->
-      cc_approx_res cc_approx_val k PG r1 r3.
-    Proof.
-      intros Hyp H1 H2; 
-      assert (H2' := H2 0); destruct r1; destruct r2; destruct r3; try contradiction; eauto.
-      simpl. eapply Hyp; eauto.
-    Qed. 
+    (* We lose compositionality when we add not_stuck to the preord_exp relation *)
+    
+    (* Lemma cc_approx_res_respects_preord_exp_r_pre (k : nat) r1 r2 r3 : *)
+    (*   (forall j v1 v2 v3, *)
+    (*       j <= k -> *)
+    (*       cc_approx_val j PG v1 v2 -> *)
+    (*       (forall k, preord_val cenv PG k v2 v3) -> *)
+    (*       cc_approx_val j PG v1 v3) -> *)
+    (*   cc_approx_res cc_approx_val k PG r1 r2 -> *)
+    (*   (forall k', preord_res (preord_val cenv) PG k' r2 r3) -> *)
+    (*   cc_approx_res cc_approx_val k PG r1 r3. *)
+    (* Proof. *)
+    (*   intros Hyp H1 H2;  *)
+    (*   assert (H2' := H2 0); destruct r1; destruct r2; destruct r3; try contradiction; eauto. *)
+    (*   simpl. eapply Hyp; eauto. *)
+    (* Qed.  *)
 
-    Lemma cc_approx_exp_respects_preord_exp_r_pre (k : nat) 
-          (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) :
-      (forall j v1 v2 v3,
-          j <= k ->
-          cc_approx_val j PG v1 v2 ->
-          (forall k, preord_val cenv PG k v2 v3) ->
-          cc_approx_val j PG v1 v3) ->
-      cc_approx_exp k P1 PG (e1, rho1) (e2, rho2) ->
-      (forall k', preord_exp cenv P2 PG k' (e2, rho2) (e3, rho3)) ->
-      cc_approx_exp k (comp P1 P2) PG (e1, rho1) (e3, rho3).
-    Proof.
-      intros IH Hexp1 Hexp2 v1 c Hleq1 Hstep1 Hns. 
-      edestruct Hexp1 as [v2 [c2 [Hstep2 [HS Hpre2]]]]; eauto. 
-      edestruct (Hexp2 (to_nat c2)) as [v3 [c3 [Hstep3 [HS' Hpre3]]]]; [| eassumption | ].
-      omega. do 2 eexists; repeat split; eauto. now eexists; split; eauto.
-      eapply cc_approx_res_respects_preord_exp_r_pre.
-      intros. eapply IH; eauto. omega. eassumption. 
-      intros m.
-      edestruct (Hexp2 (m + to_nat c2)) with (cin := c2) 
-        as [v3' [c3' [Hstep3' [Hpost3 Hpre3']]]]; [| eauto |]. omega.
-      destruct v1; destruct v2; destruct v3; destruct v3'; try contradiction; eauto.
-      eapply bstep_fuel_deterministic in Hstep3; [| eapply Hstep3' ]. inv Hstep3.
-      eapply preord_val_monotonic. eauto. omega.
-    Qed.
+    (* Lemma cc_approx_exp_respects_preord_exp_r_pre (k : nat)  *)
+    (*       (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) : *)
+    (*   (forall j v1 v2 v3, *)
+    (*       j <= k -> *)
+    (*       cc_approx_val j PG v1 v2 -> *)
+    (*       (forall k, preord_val cenv PG k v2 v3) -> *)
+    (*       cc_approx_val j PG v1 v3) -> *)
+    (*   cc_approx_exp k P1 PG (e1, rho1) (e2, rho2) -> *)
+    (*   (forall k', preord_exp cenv P2 PG k' (e2, rho2) (e3, rho3)) -> *)
+    (*   cc_approx_exp k (comp P1 P2) PG (e1, rho1) (e3, rho3). *)
+    (* Proof. *)
+    (*   intros IH Hexp1 Hexp2 v1 c Hleq1 Hstep1 Hns.  *)
+    (*   edestruct Hexp1 as [v2 [c2 [Hstep2 [HS Hpre2]]]]; eauto.  *)
+    (*   edestruct (Hexp2 (to_nat c2)) as [v3 [c3 [Hstep3 [HS' Hpre3]]]]; [| eassumption | | ]. *)
+    (*   omega. do 2 eexists; repeat split; eauto. now eexists; split; eauto. *)
+    (*   eapply cc_approx_res_respects_preord_exp_r_pre. *)
+    (*   intros. eapply IH; eauto. omega. eassumption.  *)
+    (*   intros m. *)
+    (*   edestruct (Hexp2 (m + to_nat c2)) with (cin := c2)  *)
+    (*     as [v3' [c3' [Hstep3' [Hpost3 Hpre3']]]]; [| eauto |]. omega. *)
+    (*   destruct v1; destruct v2; destruct v3; destruct v3'; try contradiction; eauto. *)
+    (*   eapply bstep_fuel_deterministic in Hstep3; [| eapply Hstep3' ]. inv Hstep3. *)
+    (*   eapply preord_val_monotonic. eauto. omega. *)
+    (* Qed. *)
 
   (* TODO move *)
   Lemma occurs_free_closed_fundefs f tau xs e B :
@@ -1303,84 +1289,84 @@ Section LogRelCC.
     eapply Included_refl.
   Qed.
 
-  Lemma cc_approx_val_respects_preord_val_r (k : nat) (v1 v2 v3 : val) :
-    cc_approx_val k PG v1 v2 ->
-    (forall k, preord_val cenv PG k v2 v3) ->
-    cc_approx_val k PG v1 v3.
-  Proof.
-    revert v1 v2 v3. induction k using lt_wf_rec.
-    induction v1 using val_ind'; intros v2 v3 Happrox Hpre;
-    assert (Hpre' := Hpre k);
-    rewrite cc_approx_val_eq, preord_val_eq in *.
-    - destruct v2; try contradiction.
-      destruct v3; try contradiction.
-      inv Hpre'; inv Happrox. split; eauto.
-    - destruct v2; try contradiction.
-      destruct v3; try contradiction.
-      destruct l0; [now inv Happrox; inv H1 |].
-      destruct l1; [now inv Hpre'; inv H1 |].
-      inv Hpre'; inv Happrox. inv H1; inv H2; split; eauto.
-      constructor; eauto.
-      + eapply IHv1; [ now eauto |].
-        intros k'. specialize (Hpre k').
-        rewrite preord_val_eq in Hpre. inv Hpre. now inv H1.
-      + assert (Hsuf : cc_approx_val' k PG (Vconstr c0 l) (Vconstr c0 l1)).
-        { rewrite <- cc_approx_val_eq.
-          eapply IHv0 with (v2 := Vconstr c0 l0).
-          - rewrite cc_approx_val_eq. now split; eauto.
-          - intros k'. specialize (Hpre k'). rewrite preord_val_eq in Hpre.
-            inv Hpre. inv H1. rewrite preord_val_eq. now split; eauto. }
-        now inv Hsuf.
-    - destruct v2, v3; try contradiction. 
-      destruct l; try contradiction.
-      destruct v0, l; try contradiction.
-      destruct v1; try contradiction. 
-      inversion Hpre' as [Hleq Hall]. clear Hpre'. inv Hall.
-      rewrite preord_val_eq in H2. inv H4.
-      rewrite preord_val_eq in H3.
-      destruct y, y0; try contradiction. simpl. destruct Happrox as [Heq1 Happrox]; subst. split; eauto.
-      intros vs1 vs2 j t1' xs1 e1 rho1 Heq1 Hfind1 Hset1.
-      edestruct (Happrox vs1 vs2) as [Γ [xs2 [e2 [rho2' [Hfind2 [Hset2 Heval2]]]]]]; eauto.
-      subst.
-      edestruct (H2 (Vconstr c1 l1 :: vs2) (Vconstr c l0 :: vs2)) with (j := 0) as
-          [xs3' [e3 [rho3 [Hfind3 [Hset3 _]]]]]; eauto.
-      edestruct xs3' as [| Γ' xs3]; try discriminate. 
-      do 4 eexists. repeat split; eauto.
-      intros Hlt Hall.  
-      eapply cc_approx_exp_rel_mon.
-      eapply cc_approx_exp_respects_preord_exp_r_pre
-        with (e2 := e2) (rho2 := rho2').
-      + intros. eapply H; [ omega | eassumption | eassumption ].
-      + eapply cc_approx_exp_rel_mon.
-        eapply Heval2. omega. assumption.
-        intros ? ? ?. eauto. 
-      + intros k'. specialize (Hpre (k'+1)). rewrite preord_val_eq in Hpre.
-        inversion Hpre as [_ Hall']. clear Hpre. inv Hall'.
-        rewrite preord_val_eq in H5. 
-        edestruct (H5 (Vconstr c1 l1 :: vs2) (Vconstr c l0 :: vs2)) as
-            [xs3'' [e3' [rho4 [Hfind3' [Hset3' Heval3']]]]]; eauto. 
-        rewrite Hfind3' in Hfind3. inv Hfind3.
-        rewrite <- Hset3 in Hset3'. inv Hset3'.
-        eapply preord_exp_post_monotonic; [| eapply Heval3' ].
-        intros ? ? ?. eauto. 
-        omega. inv H8. constructor.
-        eapply preord_val_monotonic. eassumption. omega. 
-        eapply List_util.Forall2_refl. eapply preord_val_refl; eauto.
-      + eauto.
-    - destruct v2; try contradiction.
-      destruct v3; try contradiction. inv Happrox.
-      inv Hpre'. reflexivity.
-  Qed.
+  (* Lemma cc_approx_val_respects_preord_val_r (k : nat) (v1 v2 v3 : val) : *)
+  (*   cc_approx_val k PG v1 v2 -> *)
+  (*   (forall k, preord_val cenv PG k v2 v3) -> *)
+  (*   cc_approx_val k PG v1 v3. *)
+  (* Proof. *)
+  (*   revert v1 v2 v3. induction k using lt_wf_rec. *)
+  (*   induction v1 using val_ind'; intros v2 v3 Happrox Hpre; *)
+  (*   assert (Hpre' := Hpre k); *)
+  (*   rewrite cc_approx_val_eq, preord_val_eq in *. *)
+  (*   - destruct v2; try contradiction. *)
+  (*     destruct v3; try contradiction. *)
+  (*     inv Hpre'; inv Happrox. split; eauto. *)
+  (*   - destruct v2; try contradiction. *)
+  (*     destruct v3; try contradiction. *)
+  (*     destruct l0; [now inv Happrox; inv H1 |]. *)
+  (*     destruct l1; [now inv Hpre'; inv H1 |]. *)
+  (*     inv Hpre'; inv Happrox. inv H1; inv H2; split; eauto. *)
+  (*     constructor; eauto. *)
+  (*     + eapply IHv1; [ now eauto |]. *)
+  (*       intros k'. specialize (Hpre k'). *)
+  (*       rewrite preord_val_eq in Hpre. inv Hpre. now inv H1. *)
+  (*     + assert (Hsuf : cc_approx_val' k PG (Vconstr c0 l) (Vconstr c0 l1)). *)
+  (*       { rewrite <- cc_approx_val_eq. *)
+  (*         eapply IHv0 with (v2 := Vconstr c0 l0). *)
+  (*         - rewrite cc_approx_val_eq. now split; eauto. *)
+  (*         - intros k'. specialize (Hpre k'). rewrite preord_val_eq in Hpre. *)
+  (*           inv Hpre. inv H1. rewrite preord_val_eq. now split; eauto. } *)
+  (*       now inv Hsuf. *)
+  (*   - destruct v2, v3; try contradiction.  *)
+  (*     destruct l; try contradiction. *)
+  (*     destruct v0, l; try contradiction. *)
+  (*     destruct v1; try contradiction.  *)
+  (*     inversion Hpre' as [Hleq Hall]. clear Hpre'. inv Hall. *)
+  (*     rewrite preord_val_eq in H2. inv H4. *)
+  (*     rewrite preord_val_eq in H3. *)
+  (*     destruct y, y0; try contradiction. simpl. destruct Happrox as [Heq1 Happrox]; subst. split; eauto. *)
+  (*     intros vs1 vs2 j t1' xs1 e1 rho1 Heq1 Hfind1 Hset1. *)
+  (*     edestruct (Happrox vs1 vs2) as [Γ [xs2 [e2 [rho2' [Hfind2 [Hset2 Heval2]]]]]]; eauto. *)
+  (*     subst. *)
+  (*     edestruct (H2 (Vconstr c1 l1 :: vs2) (Vconstr c l0 :: vs2)) with (j := 0) as *)
+  (*         [xs3' [e3 [rho3 [Hfind3 [Hset3 _]]]]]; eauto. *)
+  (*     edestruct xs3' as [| Γ' xs3]; try discriminate.  *)
+  (*     do 4 eexists. repeat split; eauto. *)
+  (*     intros Hlt Hall.   *)
+  (*     eapply cc_approx_exp_rel_mon. *)
+  (*     eapply cc_approx_exp_respects_preord_exp_r_pre *)
+  (*       with (e2 := e2) (rho2 := rho2'). *)
+  (*     + intros. eapply H; [ omega | eassumption | eassumption ]. *)
+  (*     + eapply cc_approx_exp_rel_mon. *)
+  (*       eapply Heval2. omega. assumption. *)
+  (*       intros ? ? ?. eauto.  *)
+  (*     + intros k'. specialize (Hpre (k'+1)). rewrite preord_val_eq in Hpre. *)
+  (*       inversion Hpre as [_ Hall']. clear Hpre. inv Hall'. *)
+  (*       rewrite preord_val_eq in H5.  *)
+  (*       edestruct (H5 (Vconstr c1 l1 :: vs2) (Vconstr c l0 :: vs2)) as *)
+  (*           [xs3'' [e3' [rho4 [Hfind3' [Hset3' Heval3']]]]]; eauto.  *)
+  (*       rewrite Hfind3' in Hfind3. inv Hfind3. *)
+  (*       rewrite <- Hset3 in Hset3'. inv Hset3'. *)
+  (*       eapply preord_exp_post_monotonic; [| eapply Heval3' ]. *)
+  (*       intros ? ? ?. eauto.  *)
+  (*       omega. inv H8. constructor. *)
+  (*       eapply preord_val_monotonic. eassumption. omega.  *)
+  (*       eapply List_util.Forall2_refl. eapply preord_val_refl; eauto. *)
+  (*     + eauto. *)
+  (*   - destruct v2; try contradiction. *)
+  (*     destruct v3; try contradiction. inv Happrox. *)
+  (*     inv Hpre'. reflexivity. *)
+  (* Qed. *)
 
-  Corollary cc_approx_exp_respects_preord_exp_r (k : nat)
-        (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) :
-    cc_approx_exp k P1 PG (e1, rho1) (e2, rho2) ->
-    (forall k', preord_exp cenv P2 PG k' (e2, rho2) (e3, rho3)) ->
-    cc_approx_exp k (comp P1 P2) PG (e1, rho1) (e3, rho3).
-  Proof.
-    eapply cc_approx_exp_respects_preord_exp_r_pre.
-    now intros; eapply cc_approx_val_respects_preord_val_r; eauto.
-  Qed.
+  (* Corollary cc_approx_exp_respects_preord_exp_r (k : nat) *)
+  (*       (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) : *)
+  (*   cc_approx_exp k P1 PG (e1, rho1) (e2, rho2) -> *)
+  (*   (forall k', preord_exp cenv P2 PG k' (e2, rho2) (e3, rho3)) -> *)
+  (*   cc_approx_exp k (comp P1 P2) PG (e1, rho1) (e3, rho3). *)
+  (* Proof. *)
+  (*   eapply cc_approx_exp_respects_preord_exp_r_pre. *)
+  (*   now intros; eapply cc_approx_val_respects_preord_val_r; eauto. *)
+  (* Qed. *)
 
 
   (* Sadly, composing with the preord relation on the left doesn't seem provable *)
@@ -1531,7 +1517,6 @@ Section LogRelCC.
         P n (e1, rho1, c1) (C|[ e2 ]|, rho2, c2 <+> c) -> P (n + to_nat c) (e1, rho1, c1) (e2, rho2', c2)) ->
     (forall m e2 rho2 rho2' (c1 c2 c : steps) C,
         to_nat c = exp_ctx_len C -> 
-        (* c2 <<_{ } cost (C |[ e2 ]|) ->      *)
         ctx_to_rho C rho2 rho2' ->
         P m (e, rho1, c1) (C |[ e2 ]|, rho2, c2) -> P (m + to_nat c) (e, rho1, c1) (e2, rho2', <0>)) -> (* XXX revise *)
     ctx_to_rho C rho2 rho2' -> 
@@ -1548,7 +1533,8 @@ Section LogRelCC.
       + intros v1 c1 Hleq1 Hstep1 Hns.
         edestruct Hcc as [v2 [c2 [Hstep2 [Hub Hcc2]]]]; try eassumption.
         inv Hstep2; repeat subst_exp.
-        * destruct v1; try contradiction. eapply lt_zero_one in H3. subst.
+        * destruct v1; try contradiction.
+          (* eapply lt_zero_one in H3. subst. *)
           eexists OOT, <0>. split. econstructor; eauto. eapply zero_one_lt_i. 
           split.
           -- erewrite <- to_nat_one. eapply H2 with (C := Eproj_c y t N Γ Hole_c); try eassumption.

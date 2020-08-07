@@ -7,79 +7,154 @@ Require Import micromega.Lia.
 
 Import ListNotations.
 
+Open Scope alg_scope. 
+Section Temp.
+
+    Context {steps: Type} {Hr : @resource_exp steps}.
+
+    Definition remove_steps_letapp cenv (P1 P2 P3 : PostT) :=
+    forall (x f z : positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp)
+           (rho1 : map_util.M.t val)
+           (xs : list var) (e_b1 : exp) (v1 : val) (e2 e2' e_b2: exp) (rho2 rho2' rhoc2  rhoc1 : M.t val) 
+           (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val) (c1 c1' c2 c2' : steps),
+      rho1 ! f = Some (Vfun rhoc1 fl h) ->
+      get_list ys rho1 = Some vs ->
+      find_def h fl = Some (t, xs, e_b1) ->
+      set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
+      bstep_fuel cenv rhoc1' e_b1 (Res v1) c1 ->
+
+      P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2) (* when inlined body makes a tail call *) \/
+      P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2 <+> one (Ehalt z)) (* when inlined body returns *) ->
+      P2 (e1, M.set x v1 rho1, c1') (e2', rho2', c2') ->
+      P3 (Eletapp x f t ys e1, rho1, c1 <+> c1' <+> one (Eletapp x f t ys e1))
+         (e2, rho2, c2 <+> c2').
+
+
+  Definition remove_steps_letapp_OOT cenv (P1 P2 : PostT) :=
+    forall (x f z: positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp) (rho1 : map_util.M.t val)
+           (xs : list var) (e_b1 : exp) (r : res) (e2 e_b2 : exp) (rho2 rhoc1 : M.t val) (rhoc2 : env) 
+           (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val) (c1 c2 : steps),
+      rho1 ! f = Some (Vfun rhoc1 fl h) ->
+      get_list ys rho1 = Some vs ->
+      find_def h fl = Some (t, xs, e_b1) ->
+      set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
+      bstep_fuel cenv rhoc1' e_b1 r c1 ->
+      
+      P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2) \/
+      P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2 <+> one (Ehalt z)) ->
+      P2 (Eletapp x f t ys e1, rho1, c1 <+> one (Eletapp x f t ys e1)) (e2, rho2, c2). 
+
+
+End Temp.
 
 Section Bounds.
   
   
   Program Instance resource_tup : @resource fin (nat * nat) :=
-    { zero := (0, 0);
+    { zero := (0, 0)%type;
       one_i fin :=
         match fin with
-        | Four | Six => (0, 1)
+        | Four => (1, 1)
+        | Six => (1, 1)
         | _ => (1, 0)
         end;
-      plus x y  := (fst x + fst y, snd x + snd y);
-      mult x y  := (fst x * fst y, snd x * snd y); (* change to innner product *)
-
+      plus x y  :=
+        let '(x1, x2) := x in
+        let '(y1, y2) := y in
+        (x1 + y1, x2 + y2);
+      
       lt_i fin x y :=
+        let '(x1, x2) := x in
+        let '(y1, y2) := y in
         match fin with
-        | Four | Six => snd x < snd y
-        | _ => fst x < fst y
+        | Four => x1 < y1 
+        | Six => x1 < y1
+        | _ => x1 < y1
         end;
 
-      to_nat x := fst x + snd x;
+      to_nat x := fst x;
       
     }.
-  Solve Obligations with (simpl; f_equal; lia).
-  Solve Obligations with (split; congruence).
-  Next Obligation. simpl; f_equal; lia. Qed.
-  Next Obligation. simpl; f_equal; lia. Qed.
-  Next Obligation. simpl; f_equal; lia. Qed.
-  Next Obligation. simpl; f_equal; lia. Qed.
-  Next Obligation. simpl; f_equal; lia. Qed.
-  Next Obligation. intro; intros. destruct x; destruct y; destruct z; destruct i; simpl in *; lia. Qed.
-  Next Obligation. intro; intros. destruct x; destruct i; intro; intros; simpl in *; lia. Qed.
+  Solve Obligations with (try (split; congruence)).
+  Solve Obligations with (simpl; f_equal; try lia).
+  Next Obligation. simpl; f_equal; try lia. Qed.
+  Next Obligation. simpl; f_equal; try lia. Qed.
+  Next Obligation. simpl; f_equal; try lia. Qed.
+  Next Obligation.  
+    intro; intros.
+    destruct x as [? ?]. destruct y as [? ?]. destruct z as [? ?].
+    destruct i; try (simpl in *; lia).
+  Qed.
+  Next Obligation. intro; intros. destruct x as [? ?]. intro. destruct i; simpl in *; lia. Qed.
+  Next Obligation. destruct i; simpl; try eapply Compare_dec.lt_dec. Qed.
+  Next Obligation. intros H. destruct i; simpl; lia. Qed.
+  Next Obligation. destruct i; simpl; lia. Qed.
+  Next Obligation. destruct i; simpl in *; lia. Qed.
+  Next Obligation. 
+    (* simpl in *. *)
+    (* edestruct (Compare_dec.le_dec n0 n3); edestruct (Compare_dec.le_dec n1 n4); *)
+    (*   edestruct (Compare_dec.le_dec n n2). *)
+    (* - right. eexists (n3 - n0, n4 - n1, n2 - n). simpl. f_equal; [ f_equal | ]; lia. *)
+    (* - left. exists Four. lia. *)
+    (* - left. exists Six. lia. *)
+    (* - left. exists Six. lia. *)
+    (* - left. exists One. lia. *)
+    (* - left. exists One. lia. *)
+    (* - left. exists One. lia. *)
+    (* - left. exists One. lia. *)
+  Admitted. 
   Next Obligation.
-    destruct i; simpl; eauto.
+    destruct i; simpl;
     
-                   
-                   lia. . intro; intros. destruct x; destruct i; intro; intros; simpl in *; lia. Qed.
-  
-  eauto. econstructor. simpl; f_equal; lia. Qed.
-  
-  Solve Obligations with (simpl; f_equal; lia).
-  Next Obligation. simpl; f_equal; lia. Qed.
-  Next Obligation. simpl. f_equal; lia. Qed.
-  
-  omega. constructor. congruence. simpl; f_equal; lia. Qed.  Next Obligation. simpl; f_equal; lia. Qed.
-  split; congruence. Qed. 
-                   Proof.
-    econstructor.
+      try (edestruct (Compare_dec.lt_dec n0 1); [ now eauto  | right; eexists (n0 -1, n1, n); simpl; f_equal; [ f_equal | ]; lia]);
+      try (edestruct (Compare_dec.lt_dec n1 1); [ now eauto  | right; eexists (n0, n1 -1, n); simpl; f_equal; [ f_equal | ]; lia]).
     
-    
+  Admitted.
+  Next Obligation.
+    destruct i; simpl; try f_equal; lia.
+  Qed. 
+  Next Obligation.
+    intros Heq. destruct i; simpl in *; try lia.
+    (* inv H; inv Heq; try lia. *)
+  Qed.
+  Next Obligation.
+    destruct i; simpl; reflexivity.
+  Qed.
+
+  Program Instance resource_tup_e : @resource_exp (nat * nat).
+
   (* (possible) bound for inlining *)
-  Definition inline_bound (i G : nat) : relation (exp * env *  nat) := 
-    fun '(e1, rho1, c1) '(e2, rho2, c2) => c1 <= c2 * (1 + G) + i + G.
+  Definition inline_bound (L G : nat) : relation (exp * env * (nat * nat)) := 
+    fun '(e1, rho1, (c1, c2)) '(e2, rho2, (c1', c2')) =>
+      c1 <= c1' + 2 * G * c2' + 2 * L /\
+      c2 <= c2' + 2 * G * c2' + 2 * L.
 
   Context (cenv : ctor_env).
 
+
+  Close Scope alg_scope.
   
-  Instance inline_bound_compat i G (Hi : i <= G) :
-    Post_properties cenv (inline_bound i G) (inline_bound i G) (inline_bound G G). 
+  Instance inline_bound_compat L G (Hi : L <= G) :
+    Post_properties cenv (inline_bound L G) (inline_bound L G) (inline_bound G G). 
   Proof.
-    constructor; try (intro; intros; intro; intros; unfold inline_bound in *; lia). 
+    constructor; try (intro; intros; intro; intros; unfold inline_bound in *; lia);
+    try now (intro; intros; intro; intros; unfold inline_bound in *;
+         destruct c1 as [? ?]; destruct c2 as [? ?]; destructAll; simpl;
+         split; lia). 
     - intro; intros; intro; intros; unfold inline_bound in *.
-      rewrite NPeano.Nat.mul_add_distr_r. rewrite (NPeano.Nat.mul_add_distr_l a). 
-      admit. (* a > 1 *)
+      destruct c1 as [? ?]. destruct c2 as [? ?].
+      destruct c1' as [? ?]. destruct c2' as [? ?].
+      destructAll. simpl. split; lia.
     - intro; intros; intro; intros; unfold inline_bound in *. 
-      admit. (* a > 1 *)
-    - intro; intros; intro; intros; unfold inline_bound in *.
-      admit. (* a > 1 *)
-    - intro; intros; unfold inline_bound in *. destruct x as [[? ?] ?]; destruct y as [[? ?] ?].
-      lia.
-  Admitted.
+      destruct c as [? ?]. simpl in *. split; lia.      
+    - intro; intros; intro; intros; unfold inline_bound in *. 
+      destruct c as [? ?]. simpl in *. split; lia.      
+    - intro; intros; unfold inline_bound in *.
+      destruct x as [[? ?] [? ?]]; destruct y as [[? ?] [? ?]].
+      destructAll. split; lia.
+  Qed. 
 
-
+  
   Lemma cost_exp_size_exp e :
     1 = cost e.
   Proof.
@@ -87,47 +162,45 @@ Section Bounds.
   Qed.
   
 
-  Lemma inline_bound_Hpost_zero i G e1 rho1 e2 rho2 (Hleq : 1 <= i):
-    post_zero e1 rho1 e2 rho2 (inline_bound i G).
-  Proof.
-    intro; intros. unfold inline_bound. simpl. rewrite <- cost_exp_size_exp in H.
-    lia.
-  Qed.
+  (* Lemma inline_bound_Hpost_zero i G f ft ys rho1 e2 rho2 (Hleq : 1 <= i): *)
+  (*   post_zero (Eapp f ft ys) rho1 e2 rho2 (inline_bound i G). *)
+  (* Proof. *)
+  (*   intro; intros; unfold inline_bound in *.  *)
+  (*   destruct c as [? ?]. *)
+  (*   simpl. unfold lt_e in H. simpl in H. split; try lia. *)
+  (* Qed. *)
 
+  
   Lemma inline_bound_post_Eapp_l i G v t l rho1 x rho2 :
     post_Eapp_l (inline_bound i G) (inline_bound (S i) G) v t l rho1 x rho2.
   Proof.
-    intro; intros. unfold inline_bound in *. simpl. lia.
+    intro; intros. unfold inline_bound in *.
+    destruct c1 as [? ?].
+    destruct c2 as [? ?]. simpl. split; lia.
   Qed.
-
-  Require Import L6.inline_letapp.
   
   Lemma inline_bound_remove_steps_letapp i j G : 
     remove_steps_letapp cenv (inline_bound i G) (inline_bound j G) (inline_bound (S (i + j)) G).
   Proof.
-    intro; intros. unfold inline_bound in *. simpl. admit. (* lia. *)
-  Admitted.
+    intro; intros. unfold inline_bound in *.
+    destruct c1 as [? ?].
+    destruct c2 as [? ?].
+    destruct c1' as [? ?].
+    destruct c2' as [? ?].
+    simpl. inv H4. lia. simpl in *.
+    rewrite !NPeano.Nat.mul_add_distr_l, !Nat.mul_0_r in *. simpl in *.
+    lia. 
+  Qed.    
 
   Lemma inline_bound_remove_steps_letapp_OOT i j G : 
     remove_steps_letapp_OOT cenv (inline_bound j G) (inline_bound (S (i + j)) G).
   Proof.
-    intro; intros. unfold inline_bound in *. simpl. lia.
+    intro; intros. unfold inline_bound in *.
+    destruct c1 as [? ?].
+    destruct c2 as [? ?].
+    simpl. inv H4. lia. simpl in *.
+    rewrite !NPeano.Nat.mul_add_distr_l, !Nat.mul_0_r in *. simpl in *. lia.
   Qed.
-  
-  Lemma inline_bound_remove_steps_letapp_OOT' i j G : 
-    remove_steps_letapp' cenv (inline_bound i G) (inline_bound j G) (inline_bound (S (i + j)) G).
-  Proof.
-    intro; intros. unfold inline_bound in *. simpl. lia.
-  Qed.
-
-  (+ (1 + G) * letapp_nodes)
-
-    Require Import inline_letapp.
-           (HEletapp : remove_steps_letapp cenv P1 P1 P1)
-           (Eletapp' : remove_steps_letapp' cenv P1 P1 P1)
-           (Eletapp_OOT : remove_steps_letapp_OOT cenv P1 P1)
-           (Eletapp_OOT' : remove_steps_letapp_OOT' cenv P1 P1).
-
       
 
     

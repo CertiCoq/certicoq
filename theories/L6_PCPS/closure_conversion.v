@@ -338,26 +338,26 @@ Section CC.
   
   (** Add closures to VarInfoMap *)
   Fixpoint add_closures (defs : fundefs) (mapfv : VarInfoMap)
-           (env : var) (* the enviroment of defs *) : ccstate VarInfoMap :=
+           (env : var) (* the enviroment of defs *) : VarInfoMap :=
     match defs with
     | Fcons f typ xs e defs' =>
-      mapfv' <- add_closures defs' mapfv env ;;
+      let mapfv' := add_closures defs' mapfv env in
       let mapfv'' := Maps.PTree.set f (MRFun env) mapfv' in
-      ret mapfv''
-    | Fnil => ret mapfv
+      mapfv''
+    | Fnil => mapfv
     end.
 
   (** Add closures to GFunMap *)
-  Fixpoint add_closures_gfuns (defs : fundefs) (gfuns : GFunMap) (is_closed : bool) : ccstate GFunMap :=
+  Fixpoint add_closures_gfuns (defs : fundefs) (gfuns : GFunMap) (is_closed : bool) : GFunMap :=
     match defs with
     | Fcons f typ xs e defs' =>
-      gfuns' <- add_closures_gfuns defs' gfuns is_closed;;
+      let gfuns' := add_closures_gfuns defs' gfuns is_closed in
       if is_closed then
         (* f_str <- get_pp_name f ;; *)
         (* log_msg ("Adding " ++ f_str) ;; *)
-        ret (M.set f GFun gfuns')
-      else ret gfuns
-    | Fnil => ret gfuns
+        M.set f GFun gfuns'
+      else gfuns
+    | Fnil => gfuns
     end.
   
   
@@ -396,12 +396,12 @@ Section CC.
         let '(f', g1) := t1 in
         t2 <- get_vars xs mapfv gfuns c Γ ;;
         let '(xs', g2) := t2 in
-        ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) gfuns c Γ ;;
         ptr <- get_name f code_suffix ;;
-        Γ <- get_name f clo_env_suffix ;;
+        Γ' <- get_name f clo_env_suffix ;;
+        ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) gfuns c Γ ;;
         ret (Eproj ptr clo_tag 0 f'
-                   (Eproj Γ clo_tag 1 f'
-                          (Eletapp x ptr ft (Γ :: xs')
+                   (Eproj Γ' clo_tag 1 f'
+                          (Eletapp x ptr ft (Γ' :: xs')
                                    ((snd ef) (fst ef)))),
              fun e => g1 (g2 e))
       | Efun defs e =>
@@ -417,11 +417,11 @@ Section CC.
         (* fv_names <- get_pp_names_list fvs ;; *)
         (* log_msg (concat " " ("Closed" :: bool_to_string is_closed :: "Block has fvs :" :: fv_names)) ;; *)
         
-        mapfv' <- add_closures defs mapfv Γ' ;;
-        gfuns' <- add_closures_gfuns defs gfuns is_closed ;;
+        let mapfv' := add_closures defs mapfv Γ' in
+        let gfuns' := add_closures_gfuns defs gfuns is_closed in
 
-        ef <- exp_closure_conv e mapfv' gfuns' c Γ ;;
         defs' <- fundefs_closure_conv defs mapfv_new gfuns' c' ;;
+        ef <- exp_closure_conv e mapfv' gfuns' c Γ ;;
         ret (Efun defs' ((snd ef) (fst ef)), g1)
       | Eapp f ft xs =>
         t1 <- get_var f mapfv gfuns c Γ ;;
@@ -450,7 +450,7 @@ Section CC.
            (* formal parameter for the environment pointer *)
              Γ <- get_name_no_suff "env" ;;
              (* Add mut rec functions to map *) 
-             mapfv' <- add_closures defs mapfv Γ ;;
+             let mapfv' := add_closures defs mapfv Γ in
              (* Add arguments to the map *)       
              let mapfv' := add_params ys mapfv in
              ef <- exp_closure_conv e mapfv' gfuns c Γ ;;

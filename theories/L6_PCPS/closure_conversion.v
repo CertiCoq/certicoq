@@ -420,7 +420,7 @@ Section CC.
         let mapfv' := add_closures defs mapfv Γ' in
         let gfuns' := add_closures_gfuns defs gfuns is_closed in
 
-        defs' <- fundefs_closure_conv defs mapfv_new gfuns' c' ;;
+        defs' <- fundefs_closure_conv defs defs mapfv_new gfuns' c' ;;
         ef <- exp_closure_conv e mapfv' gfuns' c Γ ;;
         ret (Efun defs' ((snd ef) (fst ef)), g1)
       | Eapp f ft xs =>
@@ -443,18 +443,18 @@ Section CC.
       let '(x', f) := t1 in
       ret (Ehalt x', f)
     end
-  with fundefs_closure_conv (defs : fundefs) (mapfv : VarInfoMap) (gfuns : GFunMap) (c : ctor_tag)
+  with fundefs_closure_conv (all_defs defs : fundefs) (mapfv : VarInfoMap) (gfuns : GFunMap) (c : ctor_tag)
        : ccstate fundefs  :=
          match defs with
          | Fcons f tag ys e defs' =>
            (* formal parameter for the environment pointer *)
              Γ <- get_name_no_suff "env" ;;
              (* Add mut rec functions to map *) 
-             let mapfv' := add_closures defs mapfv Γ in
+             let mapfv' := add_closures all_defs mapfv Γ in
              (* Add arguments to the map *)       
-             let mapfv' := add_params ys mapfv in
+             let mapfv' := add_params ys mapfv' in
              ef <- exp_closure_conv e mapfv' gfuns c Γ ;;
-             defs'' <- fundefs_closure_conv defs' mapfv gfuns c ;;
+             defs'' <- fundefs_closure_conv all_defs defs' mapfv gfuns c ;;
              ret (Fcons f tag (Γ :: ys) ((snd ef) (fst ef)) defs'')
            | Fnil => ret Fnil
          end.

@@ -1188,28 +1188,11 @@ Section EVAL.
 
   Lemma interpret_ctx_OOT_bstep C e rho cin cout:
     interpret_ctx_fuel C rho cin OOT cout ->
-    exists cout' c, bstep_fuel rho (C|[ e ]|) cin OOT cout' /\ cout = (c <+> cout').
+    bstep_fuel rho (C|[ e ]|) cin OOT cout.
   Proof.
-    revert e rho cin cout; induction C; intros e1 rho cin cout' Hi; (try now inv Hi);    
-      try now (inv Hi; [ do 2 eexists; split; [ econstructor 1; eauto | rewrite plus_zero; reflexivity ] 
-                       | inv H0; edestruct IHC; eauto; destructAll; do 2 eexists; split;
-                       [ econstructor 2; eauto; econstructor; eauto | rewrite plus_assoc; reflexivity ] ]).
-    - inv Hi; [ do 2 eexists; split; [ econstructor 1; eauto | rewrite plus_zero; reflexivity ] 
-              | inv H0 ].
-    - inv Hi.
-      + do 2 eexists; split; [ econstructor 1; eauto | rewrite plus_zero; reflexivity ].
-      + inv H0.
-        * edestruct IHC; eauto; destructAll; do 2 eexists; split.
-          econstructor 2; eauto; econstructor; eauto.
-          rewrite <- plus_assoc. rewrite (plus_comm cout1).
-          do 2 rewrite plus_assoc.
-          rewrite (plus_assoc cout1 x (one _)). reflexivity.
-        * do 2 eexists. split. econstructor 2; eauto. econstructor; eauto.
-          rewrite plus_zero. reflexivity.
-    - inv Hi; [ do 2 eexists; split; [ econstructor 1; eauto | rewrite plus_zero; reflexivity ] 
-              | inv H0; edestruct IHC; eauto ].
-    - inv Hi; [ do 2 eexists; split; [ econstructor 1; eauto | rewrite plus_zero; reflexivity ] 
-              | inv H0; edestruct IHC; eauto ].
+    revert e rho cin cout; induction C; intros e1 rho cin cout' Hi; (try now inv Hi);
+      try now (inv Hi; [ econstructor; eauto
+                       | inv H0; econstructor 2; eauto;  simpl; econstructor; eauto ]).
   Qed.
 
   Lemma interprable_comp_f_l C1 C2:

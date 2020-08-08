@@ -742,8 +742,12 @@ Require Import L6.algebra.
 
 Section Alpha_conv_correct.
 
-  Context {steps : Type} {Hr : @resource_exp steps}.
-  Variable pr : prims.
+  Context {fuel: Type} {Hf : @resource_exp fuel} {trace: Type} {Ht : @resource_exp trace}.
+  Context (Hro : @resource_ones fin fuel (@HRes _ Hf)).
+  
+  Definition PostT  : Type := @PostT fuel trace.
+  Definition PostGT : Type := @PostGT fuel trace.
+
   Variable cenv : ctor_env.
   Context (P1 : PostT) (* Local *)
           (PG : PostGT) (* Global *)
@@ -1435,7 +1439,7 @@ Section Alpha_conv_correct.
         eapply def_funs_eq. eassumption.
 
         { rewrite preord_val_eq.
-          intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
+          intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf1 Hs.
           edestruct Alpha_conv_fundefs_find_def
             as [xs2 [e2 [f'' [Hf' [Hinj''' [Hdis' Ha'' ] ] ] ] ] ]; eauto.
           now eapply construct_fundefs_injection_injective; eauto.

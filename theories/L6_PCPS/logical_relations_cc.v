@@ -9,8 +9,6 @@ Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.set_util
 Require Export L6.logical_relations.
 Require Import compcert.lib.Coqlib.
 
-Require Import Coq.Logic.Classical_Prop Coq.Logic.Classical_Pred_Type.
-
 Import ListNotations.
 
 Close Scope Z_scope.

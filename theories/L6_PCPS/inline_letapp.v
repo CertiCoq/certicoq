@@ -429,70 +429,59 @@ Open Scope alg_scope.
 
 Section Post. 
 
-  Context {steps: Type} {Hr : @resource_exp steps}.
+  Context {fuel: Type} {Hf : @resource_exp fuel} {trace: Type} {Ht : @resource_exp trace}.
+  Context (Hro : @resource_ones fin fuel (@HRes _ Hf)).
 
-
-  Definition remove_steps_letapp cenv (P1 P2 P3 : PostT) :=
+  Definition remove_steps_letapp cenv (P1 P2 P3 : @PostT fuel trace) :=
     forall (x f z : positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp)
            (rho1 : map_util.M.t val)
            (xs : list var) (e_b1 : exp) (v1 : val) (e2 e2' e_b2: exp) (rho2 rho2' rhoc2  rhoc1 : M.t val) 
-           (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val) (c1 c1' c2 c2' : steps),
+           (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val)
+           (cin1 cin1' cin2 cin2' : fuel) (cout1 cout1' cout2 cout2' : trace),
       rho1 ! f = Some (Vfun rhoc1 fl h) ->
       get_list ys rho1 = Some vs ->
       find_def h fl = Some (t, xs, e_b1) ->
       set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
-      bstep_fuel cenv rhoc1' e_b1 (Res v1) c1 ->
+      bstep_fuel cenv rhoc1' e_b1 cin1 (Res v1) cout1 ->
 
-      P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2) (* when inlined body makes a tail call *) \/
-      P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2 <+> one (Ehalt z)) (* when inlined body returns *) ->
-      P2 (e1, M.set x v1 rho1, c1') (e2', rho2', c2') ->
-      P3 (Eletapp x f t ys e1, rho1, c1 <+> c1' <+> one (Eletapp x f t ys e1))
-         (e2, rho2, c2 <+> c2').
+      P1 (e_b1, rhoc1', cin1, cout1) (e_b2, rhoc2, cin2, cout2) (* when inlined body makes a tail call *) \/
+      P1 (e_b1, rhoc1', cin1, cout1) (e_b2, rhoc2, cin2 <+> one (Ehalt z), cout2 <+> one (Ehalt z)) (* when inlined body returns *) ->
+      P2 (e1, M.set x v1 rho1, cin1', cout1') (e2', rho2', cin2', cout2') ->
+      P3 (Eletapp x f t ys e1, rho1, cin1 <+> cin1' <+> one (Eletapp x f t ys e1), cout1 <+> cout1' <+> one (Eletapp x f t ys e1))
+         (e2, rho2, cin2 <+> cin2', cout2 <+> cout2').
 
 
-  Definition remove_steps_letapp_OOT cenv (P1 P2 : PostT) :=
+  Definition remove_steps_letapp_OOT cenv (P1 P2 : @PostT fuel trace) :=
     forall (x f z: positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp) (rho1 : map_util.M.t val)
            (xs : list var) (e_b1 : exp) (r : res) (e2 e_b2 : exp) (rho2 rhoc1 : M.t val) (rhoc2 : env) 
-           (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val) (c1 c2 : steps),
+           (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val)
+           (cin1 cin2  : fuel) (cout1 cout2 : trace),
+
       rho1 ! f = Some (Vfun rhoc1 fl h) ->
       get_list ys rho1 = Some vs ->
       find_def h fl = Some (t, xs, e_b1) ->
       set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
-      bstep_fuel cenv rhoc1' e_b1 r c1 ->
+      bstep_fuel cenv rhoc1' e_b1 cin1 r cout1 ->
       
-      P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2) \/
-      P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2 <+> one (Ehalt z)) ->
-      P2 (Eletapp x f t ys e1, rho1, c1 <+> one (Eletapp x f t ys e1)) (e2, rho2, c2). 
-
-  (* Definition remove_steps_letapp_OOT' cenv (P1 P2 : PostT) := *)
-
-  (*   forall (x f z : positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp) (rho1 : map_util.M.t val) *)
-  (*          (xs : list var) (e_b1 : exp) (r : res) (e2 e_b2 : exp) (rho2 rhoc1 : M.t val) (rhoc2 : env)  *)
-  (*          (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val) (c1 c2 : nat), *)
-  (*     rho1 ! f = Some (Vfun rhoc1 fl h) -> *)
-  (*     get_list ys rho1 = Some vs -> *)
-  (*     find_def h fl = Some (t, xs, e_b1) -> *)
-  (*     set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' -> *)
-  (*     bstep_fuel cenv rhoc1' e_b1 r c1 -> *)
-      
-  (*     P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2) \/ *)
-  (*     P1 (e_b1, rhoc1', c1) (e_b2, rhoc2, c2 <+> one (Ehalt z)) -> *)
-  (*     P2 (Eletapp x f t ys e1, rho1, c1 + cost (Eletapp x f t ys e1)) (e2, rho2, c2 - 1).  *)
-
+      P1 (e_b1, rhoc1', cin1, cout1) (e_b2, rhoc2, cin2, cout2) (* when inlined body makes a tail call *) \/
+      P1 (e_b1, rhoc1', cin1, cout1) (e_b2, rhoc2, cin2 <+> one (Ehalt z), cout2 <+> one (Ehalt z)) (* when inlined body returns *) ->
+      P2 (Eletapp x f t ys e1, rho1, cin1 <+> one (Eletapp x f t ys e1), cout1 <+> one (Eletapp x f t ys e1)) (e2, rho2, cin2, cout2). 
 
 End Post.
 
 Section Inline_correct.
 
-  Context {steps: Type} {Hr : @resource_exp steps}.
-
-  Context (cenv : ctor_env) (P1  : @PostT steps) (PG : @PostGT steps) (ctag : ctor_tag). 
+  Context {fuel: Type} {Hf : @resource_exp fuel} {trace: Type} {Ht : @resource_exp trace}.
+  Context (Hro : @resource_ones fin fuel (@HRes _ Hf)).
+  
+  Definition PostT  : Type := @PostT fuel trace.
+  Definition PostGT : Type := @PostGT fuel trace.
+  
+  Context (cenv : ctor_env) (ctag : ctor_tag) (P1  : PostT) (PG : PostGT). 
 
   Context (Hless_steps_letapp : remove_steps_letapp cenv P1 P1 P1)
-          (* (Hless_steps_letapp' : remove_steps_letapp' cenv P1 P1 P1) *)
           (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv P1 P1)
-          (* (Hless_steps_letapp_OOT' : remove_steps_letapp_OOT' cenv P1 P1) *)
-          (Hpost_zero : forall e rho e' rho', post_zero e rho e' rho' P1).
+          (HOOT: post_OOT P1).
 
 
   Lemma inline_letapp_correct k x sig f t ys e1 e2 e' C C' x' rho1 rho2 : 
@@ -526,10 +515,12 @@ Section Inline_correct.
         | [ _ : context [inline_letapp ?E ?X] |- _ ] =>
           (destruct (inline_letapp E X) as [ [C'' u] | ] eqn:Hin'; simpl in Hin; inv Hin)
         end.
-    - intros r1 c2 Hleq Hs1 Hns. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        eapply Hpost_zero; eauto. now simpl; eauto.
-      + edestruct (IHe' (comp_ctx_f C' (Econstr_c v c l Hole_c)) k) with (C := C'') as [r2 [c2' [Hs2 [Hp2 Hv2]]]].
+    - intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + edestruct (IHe' (comp_ctx_f C' (Econstr_c v c l Hole_c)) k) with (C := C'')
+          as [r2 [cout2 [cout2' [Hs2 [Hp2 Hv2]]]]].
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * eapply Hyp2.
@@ -540,14 +531,14 @@ Section Inline_correct.
         * eapply interprable_comp_f_l; eauto.
         * eassumption.
         * eassumption.
-        * eassumption.
-        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 2 eexists. 
+        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 3 eexists. 
           split; [| split ]. eassumption. eassumption. eassumption.
     - inv Hin.
-    - intros r1 c2 Hleq Hs1 Hns. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + edestruct (IHe' (comp_ctx_f C' (Eproj_c v c n v0 Hole_c)) k) with (C := C'') as [r2 [c2' [Hs2 [Hp2 Hv2]]]].
+    - intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + edestruct (IHe' (comp_ctx_f C' (Eproj_c v c n v0 Hole_c)) k) with (C := C'') as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]].
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * eapply Hyp2.
@@ -558,13 +549,13 @@ Section Inline_correct.
         * eapply interprable_comp_f_l; eauto.
         * eassumption.
         * eassumption.
-        * eassumption.
-        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 2 eexists.
+        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 3 eexists.
           split; [| split ]. eassumption. eassumption. eassumption. 
-    - intros r1 c2 Hleq Hs1 Hns. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + edestruct (IHe' (comp_ctx_f C' (Eletapp_c v v0 f l Hole_c)) k) with (C := C'') as [r2 [c2' [Hs2 [Hp2 Hv2]]]].
+    - intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + edestruct (IHe' (comp_ctx_f C' (Eletapp_c v v0 f l Hole_c)) k) with (C := C'') as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]].
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * eapply Hyp2.
@@ -575,13 +566,13 @@ Section Inline_correct.
         * eapply interprable_comp_f_l; eauto.
         * eassumption.
         * eassumption.
-        * eassumption.
-        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 2 eexists.
+        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 3 eexists.
           split; [| split ]. eassumption. eassumption. eassumption.
-    - intros r1 c2 Hleq Hs1 Hns. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + edestruct (IHe' (comp_ctx_f C' (Efun1_c f  Hole_c)) k) with (C := C'') as [r2 [c2' [Hs2 [Hp2 Hv2]]]].
+    - intros r1 cin2 cout2  Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + edestruct (IHe' (comp_ctx_f C' (Efun1_c f  Hole_c)) k) with (C := C'') as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]].
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * eapply Hyp2. 
@@ -592,213 +583,135 @@ Section Inline_correct.
         * eapply interprable_comp_f_l; eauto.
         * eassumption.
         * eassumption.
-        * eassumption.                     
-        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 2 eexists.
+        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 3 eexists.
           split; [| split ]. eassumption. eassumption. eassumption.
     - inv Hin. simpl (_ |[ _ ]|).
-      intros r1 c2 Hleq Hs1 Hns. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x' f' t ys e1))).
+      intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x' f' t ys e1))).
         
         inv H.  
         
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | | ]; eauto; rewrite !to_nat_add in Hleq.
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite !to_nat_add in Hleq.
           
           unfold one in *; simpl in *; omega.
           unfold one in *; simpl in *; omega.
 
-          (* not stuck *) left; now eauto.
-          
           destruct r2; [ simpl in Hv2; contradiction | ].
-          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ].
-          destruct Hs2 as (rho2' & n1 & n2 & Hadd & Hctx & Heval); subst.
-          inv Heval.
-          edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [c3 [Hs3 [Hp3 Hv3]]]];
-            [ | |  | | | | now eapply H13 | | ]; eauto. 
+          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll. 
+          inv H2.
+          
+          edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [cin3 [cout3 [Hs3 [Hp3 Hv3]]]]];
+            [ | |  | | | | now eapply H14 | ]; eauto. 
           unfold one in *; simpl in *; omega.
           
           rewrite (get_list_length_eq _ _ _ H7). eapply set_lists_length_eq. now eauto. 
-          
+
           { eapply preord_env_P_inj_set_alt; [| eassumption | eassumption ].
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
-            2:{ eapply interpret_ctx_eq_env_P. eassumption. sets. }
+            2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
             eapply preord_env_P_inj_antimon.
             eapply preord_env_P_inj_monotonic; [| eassumption ]. omega. normalize_occurs_free. sets.  } 
             
-          unfold one in *; simpl in *; omega.
-
-          (* not stuck *)
-          { edestruct Hns as [ [c' [v' Hstep]] | Hoot' ].  
-            - left. inv Hstep. inv H0. repeat subst_exp.
-              eapply bstep_fuel_deterministic in H19; [| eapply H12 ]. inv H19. 
-              subst. do 2 eexists; eauto.
-            - right. intros c'. specialize (Hoot' (cin1 <+> c' <+> one (Eletapp x' f' t ys e1))).
-              inv Hoot'.
-              + exfalso. eapply not_lt_add. eassumption.
-              + inv H4. repeat subst_exp.
-                * eapply bstep_fuel_deterministic in H20; [| eapply H12 ]. inv H20.
-                  eapply plus_inv in H0. rewrite !(algebra.plus_comm cin0) in H0. eapply plus_inv in H0.
-                  subst. eassumption.
-                * eapply plus_inv in H0. subst. repeat subst_exp.
-                  eapply bstep_fuel_OOT_determistic in H12; [ | eassumption ].
-                  congruence. }
-
-          
+          unfold one in *; simpl in *; omega.          
           inv H.
 
-
-          do 2 eexists. split; [| split ].
+          do 3 eexists. split; [| split ].
 
           -- eapply interpret_ctx_bstep_r. eassumption.
              constructor 2. econstructor; eauto.
              
-          -- rewrite !plus_assoc. rewrite (plus_comm c3). rewrite  <- (algebra.plus_assoc c). rewrite  <- (algebra.plus_assoc _ _ c3).
-             rewrite <- algebra.plus_assoc. 
-             eapply Hless_steps_letapp; eauto.
+          -- rewrite !plus_assoc. rewrite (plus_comm cin3). rewrite (plus_comm cout3).
+             rewrite  <- (algebra.plus_assoc cin). rewrite  <- (algebra.plus_assoc _ _ cin3).
+             rewrite  <- (algebra.plus_assoc cout). rewrite  <- (algebra.plus_assoc _ _ cout3).
+             do 2 rewrite <- algebra.plus_assoc. eapply Hless_steps_letapp; eauto.
+             
           -- eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *. simpl in *; omega.
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | | ]; eauto.
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
           
           unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
-
-          (* not stuck *)
-          { edestruct Hns as [ [c' [v' Hstep]] | Hoot' ].  
-            -- left. inv Hstep. inv H. repeat subst_exp. eauto. 
-            -- assert (Hem := classic (not_stuck cenv rho'' e_body)).
-               inv Hem; eauto. eapply not_or_and in H. destruct H as [Hres Ho]. 
-               eapply not_all_ex_not in Ho. destruct Ho as [c' Hnstep].
-               specialize (Hoot' (c' <+> one (Eletapp x' f' t ys e1))). inv Hoot'.
-               eapply not_lt_add in H. contradiction. eapply plus_inv in H. subst.
-               inv H3.
-               ++ repeat subst_exp. now left; do 2 eexists; eauto.
-               ++ exfalso. repeat subst_exp. eauto. }
           
           destruct r2; [ | simpl in Hv2; contradiction ].
 
-          eexists OOT, c2'. split; [| split ]. 
+          eexists OOT, cin2', cout2'. split; [| split ]. 
           now eapply eval_ctx_app_OOT_Eapp; eauto.
           now eapply Hless_steps_letapp_OOT; eauto. 
           simpl; eauto. 
-    - intros r1 c2 Hleq Hs1 Hns. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
+    - intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.        
+      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x f' t ys e1))). inv H.
         
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | | ]; eauto; rewrite to_nat_add in Hleq.
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
           unfold one in *. simpl in *; omega. unfold one in *; simpl in *; omega.
-
-          now left; eauto.
+          
           
           destruct r2; [ simpl in Hv2; contradiction | ].
-          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ].
-          destruct Hs2 as (rho2' & n1 & n2 & Hadd & Hctx & Heval); subst.
-          inv Heval. inv H.
+          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll. 
+          inv H2. inv H.
           
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | | ]; eauto.
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
           unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
-
-          (* not stuck *)
-          { edestruct Hns as [ [c' [v' Hstep]] | Hoot' ].  
-            -- left. inv Hstep. inv H. repeat subst_exp. eauto. 
-            -- assert (Hem := classic (not_stuck cenv rho'' e_body)).
-               inv Hem; eauto. eapply not_or_and in H. destruct H as [Hres Ho]. 
-               eapply not_all_ex_not in Ho. destruct Ho as [c' Hnstep].
-               specialize (Hoot' (c' <+> one (Eletapp x' f' t ys e1))). inv Hoot'.
-               eapply not_lt_add in H. contradiction. eapply plus_inv in H. subst.
-               inv H3.
-               ++ repeat subst_exp. now left; do 2 eexists; eauto.
-               ++ exfalso. repeat subst_exp. eauto. }
 
           destruct r2; [ | simpl in Hv2; contradiction ].
 
-          eexists OOT, c2'. split; [| split ]. 
+          eexists OOT, cin2', cout2'. split; [| split ]. 
           
           now eapply eval_ctx_app_OOT_Eprim; eassumption.
 
           now eapply Hless_steps_letapp_OOT; eauto. 
           simpl; eauto. 
     - inv Hin. simpl (_ |[ _ ]|). 
-      intros r1 c2 Hleq Hs1 Hns. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
+      intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x f' t ys e1))). inv H.
          
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | | ]; eauto; rewrite to_nat_add in Hleq.
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
           unfold one in *; simpl in *; omega.
           unfold one in *; simpl in *; omega.
-
-          now left; eauto.
           
           destruct r2; [ simpl in Hv2; contradiction | ].
-          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ].
-          destruct Hs2 as (rho2' & n1 & n2 & Hadd & Hctx & Heval); subst.
-          inv Heval. inv H.
-          (* assert (Heq : n2 = 1) by (simpl in *; omega). subst.  *)
-          edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [c3 [Hs3 [Hp3 Hv3]]]];
-            [ | | | | | | now eapply H13 | | ]; eauto.
+          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll. 
+          inv H2. inv H.
+
+          edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [cin3 [cout3 [Hs3 [Hp3 Hv3]]]]];
+            [ | | | | | | now eapply H14 | ]; eauto.
           unfold one in *; simpl in *; omega.
           
           rewrite (get_list_length_eq _ _ _ H7). eapply set_lists_length_eq. now eauto. 
           
           { eapply preord_env_P_inj_set_l; [| eassumption | eassumption ].
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
-            2:{ eapply interpret_ctx_eq_env_P. eassumption. sets. }
+            2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
             eapply preord_env_P_inj_antimon.
             eapply preord_env_P_inj_monotonic; [| eassumption ]. omega. normalize_occurs_free. sets. } 
           
           unfold one in *; simpl in *; omega.
-
-          (* not stuck *)
-          { edestruct Hns as [ [c' [v' Hstep]] | Hoot' ].  
-            - left. inv Hstep. inv H. repeat subst_exp.
-              eapply bstep_fuel_deterministic in H19; [| eapply H12]. inv H19. 
-              do 2 eexists; eauto.
-            - right. intros c'. specialize (Hoot' (cin1 <+> c' <+> one (Eletapp x f' t ys e1))).
-              inv Hoot'.
-              + exfalso. eapply not_lt_add. eassumption.
-              + inv H4. repeat subst_exp.
-                * eapply bstep_fuel_deterministic in H20; [| eapply H12]. inv H20.
-                  eapply plus_inv in H. rewrite !(algebra.plus_comm cin0) in H. eapply plus_inv in H.
-                  subst. eassumption.
-                * eapply plus_inv in H. subst. repeat subst_exp.
-                  eapply bstep_fuel_OOT_determistic in H12; [ | eassumption ].
-                  congruence. }
           
-          do 2 eexists. split. eapply interpret_ctx_bstep_r. eassumption. eassumption.
+          do 3 eexists. split. eapply interpret_ctx_bstep_r. eassumption. eassumption.
           
           split. 
-          eapply Hless_steps_letapp; eauto. rewrite plus_zero in Hp2. now right; eauto.
+          eapply Hless_steps_letapp; eauto. rewrite !plus_zero in Hp2. now right; eauto.
           
           eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *; simpl in *; omega.
           
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | | ]; eauto.
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
           
           unfold one in *. simpl in *; omega. unfold one in *; simpl in *; omega.
 
-          (* not stuck *)
-          { edestruct Hns as [ [c' [v' Hstep]] | Hoot' ].  
-            -- left. inv Hstep. inv H. repeat subst_exp. eauto. 
-            -- assert (Hem := classic (not_stuck cenv rho'' e_body)).
-               inv Hem; eauto. eapply not_or_and in H. destruct H as [Hres Ho]. 
-               eapply not_all_ex_not in Ho. destruct Ho as [c' Hnstep].
-               specialize (Hoot' (c' <+> one (Eletapp x' f' t ys e1))). inv Hoot'.
-               eapply not_lt_add in H. contradiction. eapply plus_inv in H. subst.
-               inv H3.
-               ++ repeat subst_exp. now left; do 2 eexists; eauto.
-               ++ exfalso. repeat subst_exp. eauto. }
-
           destruct r2; [ | simpl in Hv2; contradiction ].
           
-          exists OOT. eexists c2'. split; [| split ]; [| now eapply Hless_steps_letapp_OOT; eauto | now eauto ]. 
+          exists OOT. eexists cin2', cout2'. split; [| split ]; [| now eapply Hless_steps_letapp_OOT; eauto | now eauto ]. 
           
-          admit.
-          (* 45 eapply eval_ctx_app_OOT_Ehalt. eassumption. eassumption. *)
-          
-          now eapply Hless_steps_letapp_OOT; eauto. 
-          simpl; eauto.
+          eapply eval_ctx_app_Ehalt_div. eassumption. eassumption. eassumption.
 
-          (* Grab Existential Variables. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive. *)
-  Admitted.
+          Grab Existential Variables. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive.
+  Qed.
 
 
   Lemma eq_env_P_def_funs_not_in_P_r' (B B' : fundefs) (P : Ensemble M.elt) 
@@ -814,27 +727,27 @@ Section Inline_correct.
   Qed.
 
   (* TOPO move to eval.v *)
-  Lemma interpret_ctx_fuel_env_eq_P S C rho rho' n :    
-    interpret_ctx_fuel cenv C rho (Res rho') n ->
+  Lemma interpret_ctx_fuel_env_eq_P S C rho rho' (cin : fuel) (cout : trace) :    
+    interpret_ctx_fuel cenv C rho cin (Res rho') cout ->
     Disjoint _ (bound_stem_ctx C) S ->
     eq_env_P S rho rho'.
   Proof.
-    revert rho rho' n. induction C; intros rho rho' i Hi Hd.
+    revert rho rho' cin cout. induction C; intros rho rho' cin cout Hi Hd.
     - inv Hi. eapply eq_env_P_refl. inv H0. 
     - inv Hi. inv H0.
-      normalize_bound_stem_ctx_in_ctx. eapply IHC in H9; [| now sets ].
+      normalize_bound_stem_ctx_in_ctx. eapply IHC in H10; [| now sets ].
       eapply eq_env_P_set_not_in_P_l'. eassumption. sets.
     - inv Hi. inv H0.
-      normalize_bound_stem_ctx_in_ctx. eapply IHC in H11; [| now sets ].
-      eapply eq_env_P_set_not_in_P_l'. eassumption. sets.
-    - inv Hi. inv H0.
-    - inv Hi. inv H0.
-      normalize_bound_stem_ctx_in_ctx. eapply IHC in H14; [| now sets ].
+      normalize_bound_stem_ctx_in_ctx. eapply IHC in H12; [| now sets ].
       eapply eq_env_P_set_not_in_P_l'. eassumption. sets.
     - inv Hi. inv H0.
     - inv Hi. inv H0.
-      normalize_bound_stem_ctx_in_ctx. eapply IHC in H6; [| now sets ].
-      eapply eq_env_P_sym in H6. eapply eq_env_P_def_funs_not_in_P_r' in H6.
+      normalize_bound_stem_ctx_in_ctx. eapply IHC in H15; [| now sets ].
+      eapply eq_env_P_set_not_in_P_l'. eassumption. sets.
+    - inv Hi. inv H0.
+    - inv Hi. inv H0.
+      normalize_bound_stem_ctx_in_ctx. eapply IHC in H7; [| now sets ].
+      eapply eq_env_P_sym in H7. eapply eq_env_P_def_funs_not_in_P_r' in H7.
       eapply eq_env_P_sym. eassumption.
       sets.
     - inv Hi. inv H0.
@@ -870,105 +783,114 @@ Section Inline_correct.
     
     preord_exp cenv P1 PG k (Eletapp x f t ys e1, rho1) (C' |[ C |[ e2 ]| ]|, rho2).
   Proof.
-    revert C' k x sig f t ys e1 e2 C x' rho1 rho2; induction e';
-      intros C' k x sig f' t ys e1 e2 C x' rho1 rho2 Hyp1 Hyp2 Hpre Hdis Hnin Hint Hin; simpl in Hin;
+   revert C' k x sig f t ys e1 e2 C x' rho1 rho2; induction e';
+      intros C' k x sig f' t ys e1 e2 C x' rho1 rho2 Hyp1 Hyp2 Hpre Hdis Him Hint Hin; simpl in Hin;
         try match goal with
         | [ _ : context [inline_letapp ?E ?X] |- _ ] =>
           (destruct (inline_letapp E X) as [ [C'' u] | ] eqn:Hin'; simpl in Hin; inv Hin)
         end.
-    - intros r1 c2 Hleq Hs1. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        eapply Hpost_zero; eauto. now simpl; eauto.
-      + edestruct (IHe' (comp_ctx_f C' (Econstr_c v c l Hole_c)) k) with (C := C'') as [r2 [c2' [Hs2 [Hp2 Hv2]]]].
+    - intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + edestruct (IHe' (comp_ctx_f C' (Econstr_c v c l Hole_c)) k) with (C := C'')
+          as [r2 [cout2 [cout2' [Hs2 [Hp2 Hv2]]]]].
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
           eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
-          rewrite bound_var_Econstr_c, bound_var_Hole_c in *. normalize_sets.
-           eapply Disjoint_Included; [| | eapply Hdis]; sets.
+          rewrite bound_var_Econstr_c, bound_var_Hole_c in *. xsets. 
         * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * reflexivity.
-        * eassumption. 
-        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 2 eexists. 
+        * eassumption.
+        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 3 eexists. 
           split; [| split ]. eassumption. eassumption. eassumption.
     - inv Hin.
-    - intros r1 c2 Hleq Hs1. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + edestruct (IHe' (comp_ctx_f C' (Eproj_c v c n v0 Hole_c)) k) with (C := C'') as [r2 [c2' [Hs2 [Hp2 Hv2]]]].
+    - intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + edestruct (IHe' (comp_ctx_f C' (Eproj_c v c n v0 Hole_c)) k) with (C := C'') as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]].
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
           eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
-          rewrite bound_var_Eproj_c, bound_var_Hole_c in *.
-          eapply Disjoint_Included; [| | eapply Hdis]; sets.
+          rewrite bound_var_Eproj_c, bound_var_Hole_c in *. xsets. 
         * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * reflexivity.
-        * eassumption. 
-        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 2 eexists.
+        * eassumption.
+        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 3 eexists.
           split; [| split ]. eassumption. eassumption. eassumption. 
-    - intros r1 c2 Hleq Hs1. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + edestruct (IHe' (comp_ctx_f C' (Eletapp_c v v0 f l Hole_c)) k) with (C := C'') as [r2 [c2' [Hs2 [Hp2 Hv2]]]].
+    - intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + edestruct (IHe' (comp_ctx_f C' (Eletapp_c v v0 f l Hole_c)) k) with (C := C'') as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]].
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
           eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
-          rewrite bound_var_Eletapp_c, bound_var_Hole_c in *. xsets.
+          rewrite bound_var_Eletapp_c, bound_var_Hole_c in *. xsets. 
         * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * reflexivity.
-        * eassumption. 
-        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 2 eexists.
+        * eassumption.
+        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 3 eexists.
           split; [| split ]. eassumption. eassumption. eassumption.
-    - intros r1 c2 Hleq Hs1. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + edestruct (IHe' (comp_ctx_f C' (Efun1_c f  Hole_c)) k) with (C := C'') as [r2 [c2' [Hs2 [Hp2 Hv2]]]].
+    - intros r1 cin2 cout2  Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + edestruct (IHe' (comp_ctx_f C' (Efun1_c f  Hole_c)) k) with (C := C'') as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]].
         9:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
           eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
-          rewrite bound_var_Fun1_c, bound_var_Hole_c in *. xsets.
+          rewrite bound_var_Fun1_c, bound_var_Hole_c in *. xsets. 
         * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * reflexivity.
-        * eassumption. 
-        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 2 eexists.
+        * eassumption.
+        * rewrite <- app_ctx_f_fuse in *. simpl in *. do 3 eexists.
           split; [| split ]. eassumption. eassumption. eassumption.
-    - inv Hin. simpl (_ |[ _ ]|). 
-      intros r1 c2 Hleq Hs1. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x' f' t ys e1))).
+    - inv Hin. simpl (_ |[ _ ]|).
+      intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x' f' t ys e1))).
+        
         inv H.  
         
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | ]; eauto; rewrite to_nat_add in Hleq.
-          unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite !to_nat_add in Hleq.
+          
+          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; omega.
 
           destruct r2; [ simpl in Hv2; contradiction | ].
-          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ].
-          destruct Hs2 as (rho2' & n1 & n2 & Hadd & Hctx & Heval); subst.
-          inv Heval.
-          edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [c3 [Hs3 [Hp3 Hv3]]]];
-            [ | | | | | | | | | now eapply H13 | ]; eauto. 
-          unfold one in *; simpl in *; omega.  
-          rewrite (get_list_length_eq _ _ _ H7). eapply set_lists_length_eq. now eauto. 
+          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll. 
+          inv H2. inv H.
+         
+          edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [cin3 [cout3 [Hs3 [Hp3 Hv3]]]]];
+            [ | | | | | | | | |now eapply H14 | ]; eauto. 
+
+          unfold one in *; simpl in *; omega.
           
+          rewrite (get_list_length_eq _ _ _ H7). eapply set_lists_length_eq. now eauto.
+
           eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l. eapply eq_env_P_refl. now eauto.
           eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l. eapply eq_env_P_sym.
-          eapply interpret_ctx_fuel_env_eq_P. eassumption.
+          eapply interpret_ctx_fuel_env_eq_P (* with (fuel := fuel) *). eassumption.
           eapply Disjoint_sym. eapply Complement_Disjoint.
           eapply Included_trans. eapply bound_stem_var. now sets.
           intros Hc. eapply Hc. now eauto.
@@ -977,68 +899,76 @@ Section Inline_correct.
           
           { eapply preord_env_P_inj_set_alt; [| eassumption |  ].
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
-            2:{ eapply interpret_ctx_eq_env_P. eassumption. sets. }
+            2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
             eapply preord_env_P_inj_antimon.
             eapply preord_env_P_inj_monotonic; [| eassumption ]. omega. normalize_occurs_free. sets.
             intros Hc. eapply Hdis. constructor; [| eassumption ]. normalize_bound_var_ctx. eauto. }
             
-          unfold one in *; simpl in *; omega.
-          do 2 eexists.  split; [| split ].
+          unfold one in *; simpl in *; omega.          
 
-          -- eapply interpret_ctx_bstep_r. eassumption. inv H. repeat subst_exp. 
-             econstructor 2. econstructor; eauto.
-          -- rewrite !plus_assoc. rewrite (plus_comm c3). rewrite  <- (algebra.plus_assoc c). rewrite  <- (algebra.plus_assoc _ _ c3).
-             rewrite <- algebra.plus_assoc. 
-             eapply Hless_steps_letapp; eauto. erewrite one_letapp. left. eauto.
+          do 3 eexists. split; [| split ].
+
+          -- eapply interpret_ctx_bstep_r. eassumption.
+             constructor 2. econstructor; eauto.
+             
+          -- rewrite !plus_assoc. rewrite (plus_comm cin3). rewrite (plus_comm cout3).
+             rewrite  <- (algebra.plus_assoc cin). rewrite  <- (algebra.plus_assoc _ _ cin3).
+             rewrite  <- (algebra.plus_assoc cout). rewrite  <- (algebra.plus_assoc _ _ cout3).
+             do 2 rewrite <- algebra.plus_assoc. eapply Hless_steps_letapp; eauto.
+             
           -- eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *. simpl in *; omega.
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | ]; eauto.
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
+          
           unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
+          
           destruct r2; [ | simpl in Hv2; contradiction ].
 
-          eexists OOT, c2'. split; [| split ]. 
-
-          eapply eval_ctx_app_OOT_Eapp. eassumption. eassumption.
-
+          eexists OOT, cin2', cout2'. split; [| split ]. 
+          now eapply eval_ctx_app_OOT_Eapp; eauto.
           now eapply Hless_steps_letapp_OOT; eauto. 
           simpl; eauto. 
-    - intros r1 c2 Hleq Hs1. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))).
-        inv H.
+    - intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.        
+      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x f' t ys e1))). inv H.
         
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | ]; eauto; rewrite to_nat_add in Hleq.
-          unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
+          unfold one in *. simpl in *; omega. unfold one in *; simpl in *; omega.
+          
+          
           destruct r2; [ simpl in Hv2; contradiction | ].
-          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ].
-          destruct Hs2 as (rho2' & n1 & n2 & Hadd & Hctx & Heval); subst.
-          inv Heval. inv H.
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | ]; eauto.
+          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll. 
+          inv H2. inv H.
+          
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
           unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
+
           destruct r2; [ | simpl in Hv2; contradiction ].
 
-          eexists OOT, c2'. split; [| split ]. 
-
-          eapply eval_ctx_app_OOT_Eprim. eassumption. eassumption.          
+          eexists OOT, cin2', cout2'. split; [| split ]. 
+          
+          now eapply eval_ctx_app_OOT_Eprim; eassumption.
 
           now eapply Hless_steps_letapp_OOT; eauto. 
           simpl; eauto. 
     - inv Hin. simpl (_ |[ _ ]|). 
-      intros r1 c2 Hleq Hs1. inv Hs1.
-      + exists OOT, <0>. split; [| split ]; eauto. constructor. eapply zero_one_lt_i.
-        now eapply Hpost_zero; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))).
-        inv H.
-        
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | ]; eauto; rewrite to_nat_add in Hleq.
-          unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
+      intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
+      + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
+        unfold one. erewrite one_eq. eassumption.
+        eapply HOOT; eauto. now simpl; eauto.
+      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x f' t ys e1))). inv H.
+         
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
+          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; omega.
           
           destruct r2; [ simpl in Hv2; contradiction | ].
-          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ].
-          destruct Hs2 as (rho2' & n1 & n2 & Hadd & Hctx & Heval); subst.
-          inv Heval. inv H.
-          edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [c3 [Hs3 [Hp3 Hv3]]]];
-            [ | | | | | | | | | now eapply H13 | ]; eauto.
+          eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll. 
+          inv H2. inv H.
+
+          edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [cin3 [cout3 [Hs3 [Hp3 Hv3]]]]];
+            [ | | | | | | | | | now eapply H14 | ]; eauto.
           unfold one in *; simpl in *; omega.
           
           rewrite (get_list_length_eq _ _ _ H7). eapply set_lists_length_eq. now eauto. 
@@ -1052,155 +982,182 @@ Section Inline_correct.
           rewrite Dom_map_set. reflexivity.
 
           
-          { eapply preord_env_P_inj_set_l; [| eassumption | eassumption ]. SearchAbout rho2'.
+          { eapply preord_env_P_inj_set_l; [| eassumption | eassumption ].
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
-            2:{ eapply interpret_ctx_eq_env_P. eassumption. sets. }
+            2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
             eapply preord_env_P_inj_antimon.
             eapply preord_env_P_inj_monotonic; [| eassumption ]. omega. normalize_occurs_free. sets. } 
 
           unfold one in *; simpl in *; omega.
-          do 2 eexists. split. eapply interpret_ctx_bstep_r. eassumption. eassumption.
+          do 3 eexists. split. eapply interpret_ctx_bstep_r. eassumption. eassumption.
 
           split. 
-          eapply Hless_steps_letapp; eauto. rewrite plus_zero in Hp2. now eauto.
+          eapply Hless_steps_letapp; eauto. rewrite !plus_zero in Hp2. now eauto.
           
           eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *; simpl in *; omega.
           
-        * edestruct (Hyp1 (k -1)) as [r2 [c2' [Hs2 [Hp2 Hv2]]]]; [ | | | | | | now eapply H12 | ]; eauto.
-          unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
+        * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
+          
+          unfold one in *. simpl in *; omega. unfold one in *; simpl in *; omega.
 
           destruct r2; [ | simpl in Hv2; contradiction ].
-
-          do 2 eexists. split; [| split ]. 
-
-          eapply eval_ctx_app_OOT_Ehalt. eassumption. eassumption. 
-          now eapply Hless_steps_letapp_OOT; eauto.
-          simpl; eauto.
+          
+          exists OOT. eexists cin2', cout2'. split; [| split ]; [| now eapply Hless_steps_letapp_OOT; eauto | now eauto ]. 
+          
+          eapply eval_ctx_app_Ehalt_div. eassumption. eassumption. eassumption.
 
           Grab Existential Variables. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive.
-        
   Qed.
 
+  Context (P2 P3 : PostT).
 
-  Context (P2 P3 : @PostT steps).
-
-  Lemma inline_letapp_eval_l C e x x' v rho rho' (n : steps) :
+  Lemma inline_letapp_eval_l C e x x' v rho rho' (cin : fuel) (cout : trace):
     inline_letapp e x = Some (C, x') ->
-    interpret_ctx_fuel cenv C rho (Res rho') n ->
+    interpret_ctx_fuel cenv C rho cin (Res rho') cout ->
     M.get x' rho' = Some v ->
-    exists (m : steps), bstep_fuel cenv rho e (Res v) m /\ (m = n \/ m = plus n (one (Ehalt 1%positive))).
+    exists cin' cout', bstep_fuel cenv rho e cin' (Res v) cout' /\
+                       (cin' = cin \/ cin' = plus cin (one (Ehalt 1%positive))) /\
+                       (cout' = cout \/ cout' = plus cout (one (Ehalt 1%positive))).
   Proof.
-    revert C x x' v rho rho' n.
-    induction e using exp_ind'; simpl; intros C z z' v1 rho rho' c1 Hin Hinp Hget;
+    revert C x x' v rho rho' cin cout.
+    induction e using exp_ind'; simpl; intros C z z' v1 rho rho' cin cout Hin Hinp Hget;
       try (match goal with
            | [ _ : context[inline_letapp ?E ?X] |- _ ] => 
              destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
            end); (try now inv Hin).
-    - inv Hinp. inv H0. eapply IHe in H9; eauto. destructAll.
-      eexists. 
-      split. econstructor. econstructor; eauto.
-      inv H1.
-      + left. reflexivity.
-      + right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-    - inv Hinp. inv H0. eapply IHe in H11; eauto. destructAll.
-      eexists.
-      split. econstructor. econstructor; eauto.
-      inv H1.
-      + left. reflexivity.
-      + right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-    - inv Hinp. inv H0. eapply IHe in H14; eauto. destructAll.
-      eexists.
-      split. econstructor. econstructor; eauto.
-      inv H1.
-      + left. reflexivity.
-      + right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-    - inv Hinp. inv H0. eapply IHe in H6; eauto. destructAll.
-      eexists.
-      split. econstructor. econstructor; eauto.
-      inv H1.
-      + left. reflexivity.
-      + right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-    - inv Hin. inv Hinp. inv H0. inv H14; [| congruence ].
-      rewrite M.gss in *. inv Hget. eexists.
-      split. econstructor. econstructor; eauto.
-      left. rewrite !plus_assoc. rewrite plus_zero. simpl. erewrite <- one_letapp. 
-      reflexivity.
+    - inv Hinp. inv H0. eapply IHe in H10; eauto. destructAll.
+      do 2 eexists. 
+      split; [| split ].
+      + econstructor. econstructor; eauto.
+      + inv H1.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+      + inv H2.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+    - inv Hinp. inv H0. eapply IHe in H12; eauto. destructAll.
+      do 2 eexists.
+      split; [| split ].
+      + econstructor. econstructor; eauto.
+      + inv H1.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+      + inv H2.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+    - inv Hinp. inv H0. eapply IHe in H15; eauto. destructAll.
+      do 2 eexists. split; [| split ]. 
+      + econstructor. econstructor; eauto.
+      + inv H1.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+      + inv H2.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+    - inv Hinp. inv H0. eapply IHe in H7; eauto. destructAll.
+      do 2 eexists. split; [| split ]. 
+      + econstructor. econstructor; eauto.
+      + inv H1.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+      + inv H2.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+    - inv Hin. inv Hinp. inv H0. inv H15; [| congruence ].
+      rewrite M.gss in *. inv Hget. do 2 eexists. split; [| split ].
+      + econstructor. econstructor; eauto.
+      + left. rewrite !plus_assoc. rewrite plus_zero. simpl. reflexivity.
+      + left. rewrite !plus_assoc. rewrite plus_zero. simpl. reflexivity.
     - inv Hinp. inv H0.
     - inv Hin. inv Hinp.
-      eexists. split. 
+      do 2 eexists. split; [| split ]. 
       econstructor. econstructor. eassumption.
       right. reflexivity.
+      right. reflexivity.
       congruence.
-
-      Grab Existential Variables. exact 1%positive. exact (Ehalt 1%positive). exact nil. exact 1%positive. exact 1%positive.
-
   Qed.
 
 
-  Lemma inline_letapp_eval_r e x C x' v m rho :
-    bstep_fuel cenv rho e (Res v) m ->
+  Lemma inline_letapp_eval_r e x C x' v (cin : fuel) (cout : trace) rho :
+    bstep_fuel cenv rho e cin (Res v) cout ->
     inline_letapp e x = Some (C, x') ->
-    exists rho' n, 
-      interpret_ctx_fuel cenv C rho (Res rho') n /\
-      M.get x' rho' = Some v  /\ (m = n \/ m = plus n (one (Ehalt 1%positive))).
+    exists rho' cin' cout', 
+      interpret_ctx_fuel cenv C rho cin' (Res rho') cout' /\
+      M.get x' rho' = Some v  /\
+      (cin = cin' \/ cin = plus cin' (one (Ehalt 1%positive))) /\ (cout = cout' \/ cout = plus cout' (one (Ehalt 1%positive))).
   Proof.
-    revert x C x' v m rho.
-    induction e using exp_ind'; simpl; intros z C z' v1 m rho Hstep Hin;
+    revert x C x' v cin cout rho.
+    induction e using exp_ind'; simpl; intros z C z' v1 cin cout rho Hstep Hin;
       try (match goal with
            | [ _ : context[inline_letapp ?E ?X] |- _ ] => 
              destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
            end); (try now inv Hin).
-    - inv Hstep. inv H. eapply IHe in H9; eauto. destructAll.
-      do 2 eexists.
-      split. econstructor; [ congruence | econstructor; eauto ].
-      split. eassumption.
-      inv H1.
-      + left. reflexivity.
-      + right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
     - inv Hstep. inv H. eapply IHe in H10; eauto. destructAll.
-      eexists. eexists (x0 <+> one (Eproj v t n v0 e)). 
-      split. econstructor; [| econstructor; eauto ]. congruence.
-      split. eassumption.
-      inv H1.
-      + left. reflexivity.
-      + right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-    - inv Hstep. inv H. eapply IHe in H13; eauto. destructAll.
-      do 2 eexists.
-      split. econstructor. congruence. econstructor; eauto. split. eassumption.
-      inv H1.
-      + left. reflexivity.
-      + right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-    - inv Hstep. inv H. eapply IHe in H5; eauto. destructAll.
-      do 2 eexists.
-      split. econstructor. congruence.
-      econstructor; eauto.
-      split. eassumption.
-      inv H1.
-      + left. reflexivity.
-      + right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-    - inv Hin. inv Hstep. inv H. do 2 eexists.
-      split. econstructor. congruence.
-      econstructor; eauto. econstructor.
-      split. rewrite M.gss. reflexivity.
-      left. rewrite !plus_assoc. rewrite plus_zero. simpl. erewrite <- one_letapp. 
-      reflexivity.
+      do 3 eexists.
+      split; [| split; [| split ]].
+      + econstructor; [ congruence | econstructor; eauto ].
+      + eassumption.
+      + inv H1.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+      + inv H2.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.          
+    - inv Hstep. inv H. eapply IHe in H11; eauto. destructAll.
+      do 3 eexists.
+      split; [| split; [| split ]].
+      + econstructor; [ congruence | econstructor; eauto ].
+      + eassumption.
+      + inv H1.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+      + inv H2.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.          
+    - inv Hstep. inv H. eapply IHe in H14; eauto. destructAll.
+      do 3 eexists.
+      split; [| split; [| split ]].
+      + econstructor; [ congruence | econstructor; eauto ].
+      + eassumption.
+      + inv H1.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+      + inv H2.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+    - inv Hstep. inv H. eapply IHe in H6; eauto. destructAll.
+            do 3 eexists.
+      split; [| split; [| split ]].
+      + econstructor; [ congruence | econstructor; eauto ].
+      + eassumption.
+      + inv H1.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+      + inv H2.
+        * left. reflexivity.
+        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+    - inv Hin. inv Hstep. inv H.
+      do 3 eexists.
+      split; [| split; [| split ]].
+      + econstructor. congruence.
+        econstructor; eauto. econstructor.
+      + rewrite M.gss. reflexivity.
+      + left. rewrite !plus_assoc. rewrite plus_zero. simpl. reflexivity.
+      + left. rewrite !plus_assoc. rewrite plus_zero. simpl. reflexivity.
     - inv Hstep. inv H.
-    - inv Hstep. inv H. inv Hin. do 2 eexists. split. econstructor.
-      split. eassumption. right. reflexivity.
-
-      Grab Existential Variables. exact 1%positive. exact (Ehalt 1%positive). exact nil. exact 1%positive. exact 1%positive.
-
+    - inv Hstep. inv H. inv Hin. do 3 eexists. split. econstructor.
+      split. eassumption. split. right. reflexivity. right. reflexivity. 
   Qed.
 
   
-  Lemma inline_letapp_preord_env_P_inj k S e1 e2 x y x' y' C1 C2 sig rho1 rho2 rho1' rho2' n1 n2:
+  Lemma inline_letapp_preord_env_P_inj k S e1 e2 x y x' y' C1 C2 sig rho1 rho2 rho1' rho2' (cin1 cin2 : fuel) (cout1 cout2 : trace) :
     (forall k, preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)) ->
 
     inline_letapp e1 x = Some (C1, x') ->
     inline_letapp e2 y = Some (C2, y') ->
 
-    interpret_ctx_fuel cenv C1 rho1 (Res rho1') n1 ->
-    interpret_ctx_fuel cenv C2 rho2 (Res rho2') n2 ->
+    interpret_ctx_fuel cenv C1 rho1 cin1 (Res rho1') cout1 ->
+    interpret_ctx_fuel cenv C2 rho2 cin2 (Res rho2') cout2 ->
 
     preord_env_P_inj cenv PG S k sig rho1 rho2 ->
     
@@ -1212,9 +1169,9 @@ Section Inline_correct.
     - rewrite extend_gss.
       edestruct inline_letapp_eval_l with (C := C1); eauto. destructAll.
       eapply (Hexp (k + to_nat x0)) in H; [| omega ]. destructAll. 
-      destruct x1; eauto. now inv H2. 
+      destruct x2; eauto. now inv H3. 
       edestruct inline_letapp_eval_r with (C := C2); eauto. destructAll.
-      eapply interpret_ctx_fuel_deterministic in H3; [| clear H3; eauto ]. destructAll.
+      eapply interpret_ctx_fuel_deterministic in H4; [| clear H4; eauto ]. destructAll.
       eexists. split. eassumption. simpl in H2. eapply preord_val_monotonic. eassumption. omega.
     - inv Hin. inv H. contradiction. inv H.
       erewrite <- interpret_ctx_fuel_env_eq_P in Hget; [| eassumption | | ].
@@ -1227,12 +1184,12 @@ Section Inline_correct.
       eexists. split; eauto.
   Qed.
 
-  Lemma interpret_ctx_bound C rho c rho' x :
-    interpret_ctx_fuel cenv C rho (Res rho') c ->
+  Lemma interpret_ctx_bound C rho (cin : fuel) (cout : trace) rho' x :
+    interpret_ctx_fuel cenv C rho cin (Res rho') cout ->
     x \in bound_stem_ctx C ->
     exists v, M.get x rho' = Some v. 
   Proof.
-    revert rho c rho' x. induction C; intros rho cin rho' x Hint Hin; inv Hint; try inv H0.
+    revert rho cin cout rho' x. induction C; intros rho cin cout rho' x Hint Hin; inv Hint; try inv H0.
     - inv Hin.
     - destruct (bound_stem_ctx_dec C) as [Dec]; destruct (Dec x).
       + eapply IHC; eassumption.
@@ -1256,10 +1213,10 @@ Section Inline_correct.
         eapply Disjoint_Singleton_r. eassumption. reflexivity.
   Qed.
     
-  Lemma inline_letapp_get C e x x' rho rho' n :
+  Lemma inline_letapp_get C e x x' rho rho' (cin : fuel) (cout : trace) :
     closed_exp e ->
     inline_letapp e x = Some (C, x') ->
-    interpret_ctx_fuel cenv C rho (Res rho') n ->
+    interpret_ctx_fuel cenv C rho cin (Res rho') cout ->
     exists v, M.get x' rho' = Some v.
   Proof.
     intros Hc Hinl Hin. edestruct inline_letapp_var_eq_alt. eassumption.
@@ -1269,39 +1226,36 @@ Section Inline_correct.
   Qed.
 
 
-  Lemma inline_letapp_eval_OOT_l C e x x' rho n :    
+  Lemma inline_letapp_eval_OOT_l C e x x' rho (cin : fuel) (cout : trace) :    
     inline_letapp e x = Some (C, x') ->
-    interpret_ctx_fuel cenv C rho OOT n ->
-    bstep_fuel cenv rho e OOT n.
+    interpret_ctx_fuel cenv C rho cin OOT cout ->
+    bstep_fuel cenv rho e cin OOT cout.
   Proof.
-    revert C x x' rho n.
-    induction e using exp_ind'; simpl; intros C z z' rho c1 Hin Hinp;
+    revert C x x' rho cin cout.
+    induction e using exp_ind'; simpl; intros C z z' rho cin cout Hin Hinp;
       try (match goal with
            | [ _ : context[inline_letapp ?E ?X] |- _ ] => 
              destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
-           end); (try now inv Hin).
+           end); (try now inv Hin). 
     - inv Hinp. constructor 1. eassumption.
-      inv H0. eapply IHe in H9; eauto. destructAll.  
+      inv H0. eapply IHe in H10; eauto. destructAll.  
       econstructor 2. econstructor; eauto.
     - inv Hinp. constructor 1; eassumption.
-      inv H0. eapply IHe in H11; eauto. destructAll. 
+      inv H0. eapply IHe in H12; eauto. destructAll. 
       econstructor 2. simpl. econstructor; eauto.
     - inv Hinp. constructor 1; eassumption.
       inv H0.
       + econstructor 2. econstructor; eauto.
       + econstructor 2. eapply BStept_letapp_oot; eauto.
     - inv Hinp. constructor 1. eassumption.
-      inv H0. eapply IHe in H6; eauto. destructAll. 
+      inv H0. eapply IHe in H7; eauto. destructAll. 
       econstructor 2. econstructor; eauto.
-    - inv Hin. inv Hinp. constructor 1. eapply lt_zero_one in H. subst. eapply zero_one_lt_i.
+    - inv Hin. inv Hinp. constructor 1. eassumption.
       inv H0.
-      + unfold eval.one_ctx. simpl. erewrite one_letapp.
-        econstructor 2. inv H14. congruence. inv H1.
-      + unfold eval.one_ctx. simpl. erewrite one_letapp.
-        econstructor 2. econstructor; eauto.
-    - inv Hinp. econstructor 1.
-       eapply lt_zero_one in H. subst. eapply zero_one_lt_i.
-       inv H0.
+      + econstructor 2. inv H15. congruence. inv H1.
+      + econstructor 2. econstructor; eauto.
+    - inv Hinp. econstructor 1. eassumption.
+      inv H0.
     - inv Hin. inv Hinp. congruence. inv H0.
   Qed.
 
@@ -1332,85 +1286,96 @@ Section Inline_correct.
            end); (try now inv Hin).
   Qed.
     
-  Lemma inline_letapp_eval_OOT_r e x C x' (m : steps) rho :
-    bstep_fuel cenv rho e OOT m ->
+  Lemma inline_letapp_eval_OOT_r e x C x' (cin : fuel) (cout : trace) rho :
+    bstep_fuel cenv rho e cin OOT cout ->
     inline_letapp e x = Some (C, x') ->
-    (exists n r, interpret_ctx_fuel cenv C rho r n /\ (m = n \/ m = plus n (one (Ehalt 1%positive)))).
+    (exists cin' cout' r, interpret_ctx_fuel cenv C rho cin' r cout' /\
+                          (cin' = cin \/ cin' = plus cin (one (Ehalt 1%positive))) /\
+                          (cout' = cout \/ cout' = plus cout (one (Ehalt 1%positive)))).
   Proof.
-    revert x C x' m rho.
-    induction e using exp_ind'; simpl; intros z C z' m rho Hstep Hin;
+    revert x C x' cin cout rho.
+    induction e using exp_ind'; simpl; intros z C z' cin cout rho Hstep Hin;
       try (match goal with
            | [ _ : context[inline_letapp ?E ?X] |- _ ] =>
              destruct (inline_letapp E X) as [[C' u] | ] eqn:Hin'; inv Hin
            end); (try now inv Hin).
     - inv Hstep.
-      + do 2 eexists; split. econstructor. eassumption. congruence. eapply lt_zero_one in H.
-        eauto.
-      + inv H. eapply IHe in H9; [| eassumption ]. destructAll.
-        do 2 eexists. split. econstructor 3. congruence. econstructor; eauto.
-        inv H0; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
-    - inv Hstep.
-      + do 2 eexists; split. econstructor. eassumption. congruence. eapply lt_zero_one in H.
-        eauto.
+      + do 3 eexists; split; [| split ]. econstructor. eassumption. congruence.
+        eauto. eauto.
       + inv H. eapply IHe in H10; [| eassumption ]. destructAll.
-        do 2 eexists. split. econstructor 3. congruence. econstructor; eauto.
+        do 3 eexists. split; [| split ]. econstructor 3. congruence. econstructor; eauto.
         inv H0; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
+        inv H1; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
     - inv Hstep.
-      + do 2 eexists; split. econstructor. eassumption. congruence. eapply lt_zero_one in H.
-        eauto.
+      + do 3 eexists; split; [| split ]. econstructor. eassumption. congruence.
+        eauto. eauto.
+      + inv H. eapply IHe in H11; [| eassumption ]. destructAll.
+        do 3 eexists. split; [| split ]. econstructor 3. congruence. econstructor; eauto.
+        inv H0; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
+        inv H1; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
+    - inv Hstep.
+      + do 3 eexists; split; [| split ]. econstructor. eassumption. congruence.
+        eauto. eauto.
       + inv H.
-        * eapply IHe in H13; [| eassumption ]. destructAll.
-          do 2 eexists. split. econstructor 3. congruence. econstructor; eauto.
+        * eapply IHe in H14; [| eassumption ]. destructAll.
+          do 3 eexists. split; [| split ]. econstructor 3. congruence. econstructor; eauto.
           inv H0; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
-        * do 2 eexists. split. econstructor 3. congruence. eapply Eletapp_c_i_OOT; eauto.
-          left. reflexivity.
+          inv H1; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
+        * do 3 eexists. split; [| split ]. econstructor 3. congruence. eapply Eletapp_c_i_OOT; eauto.
+          now eauto. now eauto.
     - inv Hstep.
-      + do 2 eexists; split. econstructor. eassumption. congruence. eapply lt_zero_one in H.
-        eauto.
-      + inv H. eapply IHe in H5; [| eassumption ]. destructAll.
-        do 2 eexists. split. econstructor 3. congruence. econstructor; eauto.
+      + do 3 eexists; split; [| split ]. econstructor. eassumption. congruence.
+        eauto. eauto.
+      + inv H. eapply IHe in H6; [| eassumption ]. destructAll.
+        do 3 eexists. split; [| split ]. econstructor 3. congruence. econstructor; eauto.
         inv H0; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
+        inv H1; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
     - inv Hin. inv Hstep.
-      + do 2 eexists; split. econstructor. eapply lt_zero_one in H. subst. eapply zero_one_lt_i.
-        congruence. eapply lt_zero_one in H; eauto.
+      + do 3 eexists; split. econstructor. eassumption.
+        congruence. eauto.
       + inv H.
-        do 2 eexists. split. econstructor 3. congruence. eapply Eletapp_c_i_OOT; eauto.
-
-        left. unfold eval.one_ctx. erewrite <- one_letapp. reflexivity.
-    - inv Hstep.
-      + do 2 eexists; split. econstructor. eassumption. congruence. eapply lt_zero_one in H.
+        do 3 eexists. split. econstructor 3. congruence. eapply Eletapp_c_i_OOT; eauto.
         eauto.
+    - inv Hstep.
+      + do 3 eexists; split. econstructor. eassumption. congruence. eauto.
       + inv H.
     - inv Hin. inv Hstep.
-      + do 2 eexists; split. eapply ctx_hole. eapply lt_zero_one in H. subst. eauto.
+      + do 3 eexists; split. eapply ctx_hole. eauto. eapply lt_one in H. subst. eauto.
       + inv H.
-  Qed.
+  Qed. 
+
   
 
   Definition post_inline :=
-    forall e1 e2 e e' C1 C2 x x' y y' z z' rho1 rho2 rho1' rho2' (c1 c2 c3 c4 c1' c3' : steps),
+    forall e1 e2 e e' C1 C2 x x' y y' z z' rho1 rho2 rho1' rho2'
+           (cin1 cin2 cin3 cin4 cin1' cin3' : fuel)
+           (cout1 cout2 cout3 cout4 cout1' cout3' : trace),
       inline_letapp e1 x = Some (C1, x') ->
       inline_letapp e2 y = Some (C2, y') ->
       
-      interpret_ctx_fuel cenv C1 rho1 (Res rho1') c1' ->
-      interpret_ctx_fuel cenv C2 rho2 (Res rho2') c3' ->
-      c1 = c1' \/ c1 = plus c1' (one (Ehalt z)) ->
-      c3 = c3' \/ c3 = plus c3' (one (Ehalt z')) ->
+      interpret_ctx_fuel cenv C1 rho1 cin1' (Res rho1') cout1' ->
+      interpret_ctx_fuel cenv C2 rho2 cin3' (Res rho2') cout3' ->
+      cin1 = cin1' \/ cin1 = plus cin1' (one (Ehalt z)) ->
+      cin3 = cin3' \/ cin3 = plus cin3' (one (Ehalt z')) ->
+      cout1 = cout1' \/ cout1 = plus cout1' (one (Ehalt z)) ->
+      cout3 = cout3' \/ cout3 = plus cout3' (one (Ehalt z')) ->
       
-      P1 (e1, rho1, c1) (e2, rho2, c3) ->
-      P2 (e, rho1', c2) (e', rho2', c4) ->
-      P3 (C1 |[ e ]|, rho1, c1' <+> c2) (C2 |[ e' ]|, rho2, c3' <+> c4).
+      P1 (e1, rho1, cin1, cout1) (e2, rho2, cin3, cout3) ->
+      P2 (e, rho1', cin2, cout2) (e', rho2', cin4, cout4) ->
+      P3 (C1 |[ e ]|, rho1, cin1' <+> cin2, cout1' <+> cout2) (C2 |[ e' ]|, rho2, cin3' <+> cin4, cout3' <+> cout4).
   
   Definition post_inline_OOT :=
-    forall e1 e2  C1 C2 x x' y y' z c1 c3 c3' e e' rho1 rho2,
+    forall e1 e2  C1 C2 x x' y y' z (cin1 cin3 cin3' : fuel) (cout1 cout3 cout3' : trace) e e' rho1 rho2,
       inline_letapp e1 x = Some (C1, x') ->
       inline_letapp e2 y = Some (C2, y') ->            
 
-      c3 = c3' \/ c3 = plus c3' (one (Ehalt z)) ->
+      cin3' = cin3 \/ cin3' = plus cin3 (one (Ehalt z)) ->
+      cout3' = cout3 \/ cout3' = plus cout3 (one (Ehalt z)) ->
 
-      P1 (e1, rho1, c1) (e2, rho2, c3) ->
 
-      P3 (C1 |[ e ]|, rho1, c1) (C2 |[ e' ]|, rho2, c3').
+      P1 (e1, rho1, cin1, cout1) (e2, rho2, cin3, cout3) ->
+
+      P3 (C1 |[ e ]|, rho1, cin1, cout1) (C2 |[ e' ]|, rho2, cin3', cout3').
 
   Context (Hposti : post_inline) (Hposti_OOT : post_inline_OOT). 
   
@@ -1431,38 +1396,37 @@ Section Inline_correct.
     
     preord_exp cenv P3 PG k (C1 |[ e ]|, rho1) (C2 |[ e' ]|, rho2).
   Proof.
-    intros Hexp Hc1  (* Hc2 *) Hinl1 Hinl2 Hrel v cin Hleq Hstep.
+    intros Hexp Hc1  (* Hc2 *) Hinl1 Hinl2 Hrel v cin cout Hleq Hstep.
     destruct v.
     - edestruct bstep_fuel_ctx_OOT. eassumption. eapply interprable_inline_letapp. eassumption.
       + eassert (H' := H). eapply inline_letapp_eval_OOT_l in H'; [| eassumption ].
         edestruct (Hexp (k + to_nat cin)); [| eassumption | ]. omega. destructAll. 
         destruct x0; [| contradiction ].        
         eapply inline_letapp_eval_OOT_r in H0; [| eassumption ]. destructAll.
-        destruct x2. 
-        * do 2 eexists. split; [| split ]. 
+        destruct x4. 
+        * do 3 eexists. split; [| split ]. 
           eapply interpret_ctx_OOT_bstep; eassumption. eapply Hposti_OOT; eassumption.
           eauto.
-        * do 2 eexists. split; [| split ].
-          -- eapply interpret_ctx_bstep_r. eassumption. econstructor 1.
-             eapply zero_one_lt_i.
-          -- rewrite plus_comm. rewrite plus_zero. eapply Hposti_OOT; eassumption.
+        * do 3 eexists. split; [| split ].
+          -- eapply interpret_ctx_bstep_r. eassumption. econstructor 1. eapply zero_one_lt.
+          -- rewrite !(plus_comm _ <0>). rewrite !plus_zero. eapply Hposti_OOT; eauto.
           -- eauto. 
       + assert (Hstep' := Hstep). destructAll.
         edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
         edestruct inline_letapp_eval_l with (C := C1). eassumption. eassumption. eassumption.
-        destructAll. 
-        edestruct (Hexp (k + to_nat x4)); [| eassumption | ]. omega. destructAll.
-        destruct x5. contradiction. 
+        destructAll. rewrite to_nat_add in *.
+        edestruct (Hexp (k + to_nat x6)); [| eassumption | ].
+        omega. destructAll.
+        destruct x8. contradiction. 
         edestruct inline_letapp_eval_r with (C := C2). eassumption. eassumption.
         destructAll. 
-        rewrite to_nat_add in *. 
         
         edestruct Hrel with (m := k); [ omega | | | eassumption | ]; [| omega |].
         
         intros z Hin v1 Hget. inv Hin. eexists. rewrite extend_gss. split. eassumption.
         repeat subst_exp. 
         simpl in H7. eapply preord_val_monotonic. eassumption. omega. destructAll.
-        do 2 eexists. split; [| split ].
+        do 3 eexists. split; [| split ].
         * eapply interpret_ctx_bstep_r. eassumption. eassumption.
         * eapply Hposti; eassumption.
         * eapply preord_res_monotonic. eassumption. omega.
@@ -1471,8 +1435,8 @@ Section Inline_correct.
       edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
       edestruct inline_letapp_eval_l with (C := C1); try eassumption.
       destructAll. 
-      edestruct (Hexp (k + to_nat x4)); [| eassumption | ]. omega. destructAll.
-      destruct x5. contradiction. 
+      edestruct (Hexp (k + to_nat x6)); [| eassumption | ]. omega. destructAll.
+      destruct x8. contradiction. 
       edestruct inline_letapp_eval_r with (C := C2). eassumption. eassumption.
       destructAll.
 
@@ -1484,7 +1448,7 @@ Section Inline_correct.
       simpl in H7. eapply preord_val_monotonic. eassumption. omega. omega.
       destructAll.
       
-      do 2 eexists. split; [| split ].
+      do 3 eexists. split; [| split ].
       + eapply interpret_ctx_bstep_r. eassumption. eassumption.
       + eapply Hposti; eassumption.
       + eapply preord_res_monotonic. eassumption. rewrite to_nat_add. omega.
@@ -1492,7 +1456,7 @@ Section Inline_correct.
 
   
   Definition cc_approx_env_P_inj (S : Ensemble var) k P f rho1 rho2 :=
-    forall x : var, S x -> cc_approx_var_env cenv ctag k P rho1 rho2 x (f x).
+    forall x : var, S x -> cc_approx_var_env (fuel := fuel) (trace := trace) cenv ctag k P rho1 rho2 x (f x).
 
   Lemma inline_letapp_compat_cc k e1 e2 x y x' y' C1 C2 e e' sig rho1 rho2 :
     (forall k rho1 rho2,
@@ -1509,81 +1473,39 @@ Section Inline_correct.
     
      cc_approx_exp cenv ctag k P3 PG (C1 |[ e ]|, rho1) (C2 |[ e' ]|, rho2).
   Proof.
-    intros Hexp Hc1 Hinl1 Hinl2 Hrel v cin Hleq Hstep Hns.
+    intros Hexp Hc1 Hinl1 Hinl2 Hrel v cin cout Hleq Hstep.
     destruct v.
     - edestruct bstep_fuel_ctx_OOT. eassumption. eapply interprable_inline_letapp. eassumption.
       + eassert (H' := H). eapply inline_letapp_eval_OOT_l in H'; [| eassumption ].
-        edestruct (Hexp (k + to_nat cin)); [| eassumption | | ]. omega.
-        * inv Hns.
-          -- destructAll. edestruct interpret_ctx_bstep_l. eassumption.
-             eapply interprable_inline_letapp. eassumption. destructAll.
-             edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
-             left. edestruct inline_letapp_eval_l; [| eassumption | |]. eassumption. eassumption.
-             destructAll. do 2 eexists. eassumption.
-          -- assert (Hem := classic (not_stuck cenv rho1 e1)). inv Hem. eassumption.  
-             eapply not_or_and in H1. destruct H1 as [Hres Ho]. 
-             eapply not_all_ex_not in Ho. destruct Ho as [c Hnstep].
-             specialize (H0 c). edestruct bstep_fuel_ctx_OOT. eassumption.
-             eapply interprable_inline_letapp. eassumption.
-             ++ eapply inline_letapp_eval_OOT_l in H1; [| eassumption ]. contradiction.
-             ++ destructAll. left.
-                edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
-                edestruct inline_letapp_eval_l; [| eassumption | |]. eassumption. eassumption.
-                inv H4. do 2 eexists. eassumption.
-        * destructAll. destruct x0; [| contradiction ].
-          eapply inline_letapp_eval_OOT_r in H0; [| eassumption ]. destructAll. 
-          destruct x2.
-          -- do 2 eexists. split; [| split ].
-             eapply interpret_ctx_OOT_bstep. eassumption. eapply Hposti_OOT; eauto.
-             eauto.
-          -- do 2 eexists. split; [| split ]. 
-             --- eapply interpret_ctx_bstep_r. eassumption. econstructor 1.
-                 eapply zero_one_lt_i.
-             --- rewrite plus_comm. rewrite plus_zero. eapply Hposti_OOT; eassumption.
-             --- eauto.
+        edestruct (Hexp (k + to_nat cin)); [| eassumption | ]. omega.
+        destructAll. destruct x0; [| contradiction ].
+        eapply inline_letapp_eval_OOT_r in H0; [| eassumption ]. destructAll. 
+        destruct x4.
+        -- do 3 eexists. split; [| split ].
+           eapply interpret_ctx_OOT_bstep. eassumption. eapply Hposti_OOT; eauto.
+           eauto.
+        -- do 3 eexists. split; [| split ]. 
+           --- eapply interpret_ctx_bstep_r. eassumption. econstructor 1. eapply zero_one_lt.
+           --- rewrite !(plus_comm _ <0>). rewrite !plus_zero. eapply Hposti_OOT; eassumption.
+           --- eauto.
       + assert (Hstep' := Hstep). destructAll.
         edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
         edestruct inline_letapp_eval_l with (C := C1). eassumption. eassumption. eassumption.
         destructAll. 
-        edestruct (Hexp (k + to_nat x4)); [ | eassumption | | ]. omega.
-        { left. eauto. }
+        edestruct (Hexp (k + to_nat x6)); [ | eassumption | ]. omega.
+
         destructAll.
-        destruct x5. contradiction. 
+        destruct x8. contradiction. 
         edestruct inline_letapp_eval_r with (C := C2). eassumption. eassumption.
         destructAll. 
         rewrite to_nat_add in *.
 
-        edestruct Hrel with (m := k); [ omega | | | eassumption | | ]; [| omega | | ]. 
+        edestruct Hrel with (m := k); [ omega | | | eassumption | ]; [| omega | ]. 
         intros z Hin v1 Hget. inv Hin. eexists. rewrite extend_gss. split. eassumption.
         repeat subst_exp. 
-        simpl in H8. eapply cc_approx_val_monotonic. eassumption. omega.
-
-        { inv Hns.
-          -- destructAll. edestruct interpret_ctx_bstep_l. eassumption.
-             eapply interprable_inline_letapp. eassumption. destructAll.
-             eapply interpret_ctx_fuel_deterministic in H12; [| clear H12;  eassumption ]. destructAll.
-             left. eauto.
-          -- right. intros c1. specialize (H10 (x4 <+> c1)).
-             edestruct bstep_fuel_ctx_OOT. eassumption. 
-             eapply interprable_inline_letapp. eassumption. 
-             ++ destruct (lt_tri (exp_to_fin e) zero c1). 
-                ** eapply inline_letapp_eval_OOT_l in H11; [| eassumption ].
-                   exfalso. eapply bstep_fuel_gt; [ eapply H2 | | eapply H11 ].
-                   erewrite <- (plus_zero x4) at 1. rewrite (plus_comm x4).
-                   eapply plus_stable in H12. eapply H12.
-                ** inv H12. constructor. eapply zero_one_lt_i.
-                   eapply lt_zero in H13. contradiction. 
-             ++ destructAll. eapply interpret_ctx_fuel_deterministic in H11; [| clear H11; eassumption ]. destructAll.
-                inv H3.
-                ** rewrite !(plus_comm x9) in H13. eapply plus_inv in H13. subst. eassumption.
-                ** rewrite plus_assoc in H13.
-                   rewrite !(plus_comm x9) in H13. eapply plus_inv in H13. subst.
-                   eapply bstep_fuel_OOT_monotonic. eassumption.
-                   rewrite <- (plus_zero c1) at 1. edestruct plus_stable. eapply H3.
-                   eapply zero_one_lt_i. }
-        
+        simpl in H8. eapply cc_approx_val_monotonic. eassumption. omega.        
         destructAll.
-        do 2 eexists. split; [| split ].
+        do 3 eexists. split; [| split ].
         * eapply interpret_ctx_bstep_r. eassumption. eassumption.
         * eapply Hposti; eassumption.
         * eapply cc_approx_res_monotonic. eassumption. omega.
@@ -1592,28 +1514,25 @@ Section Inline_correct.
       edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
       edestruct inline_letapp_eval_l with (C := C1); try eassumption.
       destructAll. 
-      edestruct (Hexp (k + to_nat x4)); [| eassumption | | ]. omega.
+      edestruct (Hexp (k + to_nat x6)); [| eassumption | ]. omega.
 
-      { left. eauto. }
       destructAll.
-      destruct x5. contradiction. 
+      destruct x8. contradiction. 
       edestruct inline_letapp_eval_r with (C := C2). eassumption. eassumption.
       destructAll.
       
-      edestruct Hrel with (m := k); [ omega | | | eassumption | | ].
+      edestruct Hrel with (m := k); [ omega | | | eassumption | ].
 
       intros z Hin v1 Hget. inv Hin. eexists. rewrite extend_gss. split. eassumption.
       repeat subst_exp. 
       simpl in H7. eapply cc_approx_val_monotonic. eassumption. omega. rewrite to_nat_add in Hleq. omega.
-      { left. eauto. } 
       destructAll.      
-      do 2 eexists. split; [| split ].
+      do 3 eexists. split; [| split ].
       + eapply interpret_ctx_bstep_r. eassumption. eassumption.
       + eapply Hposti; eassumption.
       + eapply cc_approx_res_monotonic. eassumption.
         rewrite to_nat_add. omega.
   Qed.
-
   
 End Inline_correct.
 

@@ -742,8 +742,7 @@ Require Import L6.algebra.
 
 Section Alpha_conv_correct.
 
-  Context {fuel: Type} {Hf : @resource_exp fuel} {trace: Type} {Ht : @resource_exp trace}.
-  Context (Hro : @resource_ones fin fuel (@HRes _ Hf)).
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
   
   Definition PostT  : Type := @PostT fuel trace.
   Definition PostGT : Type := @PostGT fuel trace.

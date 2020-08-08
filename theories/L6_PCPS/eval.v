@@ -440,8 +440,7 @@ Section EVAL.
   | Res : A -> res.
 
   
-  Context {fuel: Type} {Hf : @resource_exp fuel} {trace: Type} {Ht : @resource_exp trace}.
-  Context (Hro : @resource_ones fin fuel (@HRes _ Hf)).
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
 
   Open Scope alg_scope.
   

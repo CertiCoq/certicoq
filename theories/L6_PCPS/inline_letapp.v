@@ -429,9 +429,9 @@ Open Scope alg_scope.
 
 Section Post. 
 
-  Context {fuel: Type} {Hf : @resource_exp fuel} {trace: Type} {Ht : @resource_exp trace}.
-  Context (Hro : @resource_ones fin fuel (@HRes _ Hf)).
-
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
+    
+  
   Definition remove_steps_letapp cenv (P1 P2 P3 : @PostT fuel trace) :=
     forall (x f z : positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp)
            (rho1 : map_util.M.t val)
@@ -471,8 +471,7 @@ End Post.
 
 Section Inline_correct.
 
-  Context {fuel: Type} {Hf : @resource_exp fuel} {trace: Type} {Ht : @resource_exp trace}.
-  Context (Hro : @resource_ones fin fuel (@HRes _ Hf)).
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
   
   Definition PostT  : Type := @PostT fuel trace.
   Definition PostGT : Type := @PostGT fuel trace.
@@ -590,7 +589,7 @@ Section Inline_correct.
       + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
         unfold one. erewrite one_eq. eassumption.
         eapply HOOT; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x' f' t ys e1))).
+      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x' f' t ys e1))).
         
         inv H.  
         
@@ -626,7 +625,9 @@ Section Inline_correct.
           -- rewrite !plus_assoc. rewrite (plus_comm cin3). rewrite (plus_comm cout3).
              rewrite  <- (algebra.plus_assoc cin). rewrite  <- (algebra.plus_assoc _ _ cin3).
              rewrite  <- (algebra.plus_assoc cout). rewrite  <- (algebra.plus_assoc _ _ cout3).
-             do 2 rewrite <- algebra.plus_assoc. eapply Hless_steps_letapp; eauto.
+             do 2 rewrite <- algebra.plus_assoc.
+             
+             eapply Hless_steps_letapp; try eassumption. left. eassumption.
              
           -- eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *. simpl in *; omega.
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
@@ -643,7 +644,7 @@ Section Inline_correct.
       + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
         unfold one. erewrite one_eq. eassumption.
         eapply HOOT; eauto. now simpl; eauto.        
-      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x f' t ys e1))). inv H.
+      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
         
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
           unfold one in *. simpl in *; omega. unfold one in *; simpl in *; omega.
@@ -662,23 +663,23 @@ Section Inline_correct.
           
           now eapply eval_ctx_app_OOT_Eprim; eassumption.
 
-          now eapply Hless_steps_letapp_OOT; eauto. 
+          eapply Hless_steps_letapp_OOT; try eassumption. left. eassumption.
           simpl; eauto. 
     - inv Hin. simpl (_ |[ _ ]|). 
       intros r1 cin2 cout2 Hleq Hs1. inv Hs1.
       + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
         unfold one. erewrite one_eq. eassumption.
         eapply HOOT; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x f' t ys e1))). inv H.
+      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
          
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
           unfold one in *; simpl in *; omega.
           unfold one in *; simpl in *; omega.
           
-          destruct r2; [ simpl in Hv2; contradiction | ].
+          destruct r2; [ simpl in Hv2; contradiction | ]. 
           eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll. 
           inv H2. inv H.
-
+          
           edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [cin3 [cout3 [Hs3 [Hp3 Hv3]]]]];
             [ | | | | | | now eapply H14 | ]; eauto.
           unfold one in *; simpl in *; omega.
@@ -696,7 +697,9 @@ Section Inline_correct.
           do 3 eexists. split. eapply interpret_ctx_bstep_r. eassumption. eassumption.
           
           split. 
-          eapply Hless_steps_letapp; eauto. rewrite !plus_zero in Hp2. now right; eauto.
+          eapply Hless_steps_letapp; try eassumption. rewrite !plus_zero in Hp2.
+          
+          now right; eauto.
           
           eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *; simpl in *; omega.
           
@@ -708,7 +711,7 @@ Section Inline_correct.
           
           exists OOT. eexists cin2', cout2'. split; [| split ]; [| now eapply Hless_steps_letapp_OOT; eauto | now eauto ]. 
           
-          eapply eval_ctx_app_Ehalt_div. eassumption. eassumption. eassumption.
+          eapply eval_ctx_app_Ehalt_div. eassumption. eassumption.
 
           Grab Existential Variables. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive.
   Qed.
@@ -868,7 +871,7 @@ Section Inline_correct.
       + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
         unfold one. erewrite one_eq. eassumption.
         eapply HOOT; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x' f' t ys e1))).
+      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x' f' t ys e1))).
         
         inv H.  
         
@@ -931,7 +934,7 @@ Section Inline_correct.
       + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
         unfold one. erewrite one_eq. eassumption.
         eapply HOOT; eauto. now simpl; eauto.        
-      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x f' t ys e1))). inv H.
+      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
         
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
           unfold one in *. simpl in *; omega. unfold one in *; simpl in *; omega.
@@ -957,7 +960,7 @@ Section Inline_correct.
       + exists OOT, cin2, <0>. split; [| split ]; eauto. constructor.
         unfold one. erewrite one_eq. eassumption.
         eapply HOOT; eauto. now simpl; eauto.
-      + rewrite !to_nat_add in Hleq. assert (Hone := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x f' t ys e1))). inv H.
+      + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
          
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
           unfold one in *; simpl in *; omega.
@@ -1004,8 +1007,8 @@ Section Inline_correct.
           
           exists OOT. eexists cin2', cout2'. split; [| split ]; [| now eapply Hless_steps_letapp_OOT; eauto | now eauto ]. 
           
-          eapply eval_ctx_app_Ehalt_div. eassumption. eassumption. eassumption.
-
+          eapply eval_ctx_app_Ehalt_div. eassumption. eassumption.
+          
           Grab Existential Variables. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive.
   Qed.
 
@@ -1535,5 +1538,3 @@ Section Inline_correct.
   Qed.
   
 End Inline_correct.
-
-      

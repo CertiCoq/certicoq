@@ -38,9 +38,8 @@ Section Log_rel.
   Variable (pr : prims).
   Variable (cenv : ctor_env).
 
-  Context {fuel: Type} {Hf : @resource_exp fuel} {trace: Type} {Ht : @resource_exp trace}.
-  Context (Hro : @resource_ones fin fuel (@HRes _ Hf)).
-  
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
+
   Definition PostT  : Type := relation (exp * env * fuel * trace). 
   Definition PostGT : Type := relation (exp * env * fuel * trace).
   
@@ -560,17 +559,16 @@ Section Log_rel.
          (Efun B2 e2, rho2, c2 <+> one (Efun B2 e2), cout2 <+> one (Efun B1 e1)).
      
   Definition post_OOT' e1 rho1 e2 rho2 (P1 : PostT) :=
-    forall c cout, 
-      c << one e1 -> P1 (e1, rho1, c, cout) (e2, rho2, c, cout).
-    
+    forall c, 
+      c << one e1 -> P1 (e1, rho1, c, <0>) (e2, rho2, c, <0>).
+  
   (* Definition post_zero e1 rho1 e2 rho2 (P1 : PostT) := *)
   (*   forall c,  *)
   (*     c <<_{ e1 } one e1 -> *)
   (*     P1 (e1, rho1, c) (e2, rho2, <0>). *)
 
   Definition post_base' x rho1 y rho2 (P1 : PostT) :=
-    forall c cout, 
-      P1 (Ehalt x, rho1, c <+> one (Ehalt x), cout <+> one (Ehalt x)) (Ehalt y, rho2, c <+> one (Ehalt y), cout <+> one (Ehalt y)).
+    P1 (Ehalt x, rho1, one (Ehalt x), one (Ehalt x)) (Ehalt y, rho2, one (Ehalt y), one (Ehalt y)).
 
   Definition post_app_compat' x t ys rho1 x' t' ys' rho2 (P : PostT) (PG : PostGT):=
     forall xs e1 e2 rhoc1 rhoc2 fl f vs rhoc1' c1 c2 cout1 cout2, 
@@ -711,11 +709,11 @@ Section Log_rel.
         split; [| now eauto ]. eapply HOOT. eassumption. 
       - inv H.
         rewrite to_nat_add in Hleq1.
-        assert (Hg := @to_nat_one _ fuel _ (exp_to_fin (Econstr x t ys1 e1))). unfold one in *.
+        assert (Hg := to_nat_one (exp_to_fin (Econstr x t ys1 e1))). unfold one in *.
         edestruct (preord_var_env_get_list PG rho1 rho2) as [vs2' [Hget' Hpre']];
           [| eauto |]; eauto.
         
-        edestruct (Hpre (k - @to_nat _ fuel _ (one (Econstr x t ys1 e1)))) as [v2 [cin' [cout' [Hstep [Hpost Hval]]]]];
+        edestruct (Hpre (k - to_nat (one (Econstr x t ys1 e1)))) as [v2 [cin' [cout' [Hstep [Hpost Hval]]]]];
           [| | | eassumption | ]; eauto. 
         unfold one. simpl in *. omega.
         
@@ -750,9 +748,9 @@ Section Log_rel.
                  [| eauto |]; eauto.
 
         rewrite to_nat_add in Hleq1.
-        assert (Hg := @to_nat_one _ fuel _ (exp_to_fin (Econstr x t ys1 e1))). 
+        assert (Hg := to_nat_one (exp_to_fin (Econstr x t ys1 e1))). 
         
-        edestruct (Hpre (k - @to_nat _ fuel _ (one (Econstr x t ys1 e1)))) as [v2 [cin' [cout' [Hstep [Hpost Hval]]]]];
+        edestruct (Hpre (k - to_nat (one (Econstr x t ys1 e1)))) as [v2 [cin' [cout' [Hstep [Hpost Hval]]]]];
           [| | | | eassumption | ]; eauto.   
         unfold one in *; simpl in *. omega. omega.  
         
@@ -783,7 +781,7 @@ Section Log_rel.
         destruct v'; rewrite preord_val_eq in Hpre; simpl in Hpre; try contradiction.
         inv Hpre.
         rewrite to_nat_add in Hleq1.
-        assert (Hg := @to_nat_one _ fuel _ (exp_to_fin (Eproj x c n y1 e1))). 
+        assert (Hg := to_nat_one (exp_to_fin (Eproj x c n y1 e1))). 
         
         edestruct (Forall2_asym_nthN (preord_val PG k) vs l) as [v2 [Hnth Hval]];
           try eassumption.
@@ -823,10 +821,10 @@ Section Log_rel.
         rewrite preord_val_eq in Hpre.
         destruct v2'; try (now simpl in Hpre; contradiction).
         edestruct preord_var_env_get_list as [vs2 [Hget' Hpre']]; eauto.
-        edestruct (Hpre vs vs2 (k - @to_nat _ fuel _ (one (Eapp x1 ft ys1)))) as [xs2 [e2 [rho2' [Hf' [Hset H']]]]]; eauto.
+        edestruct (Hpre vs vs2 (k - to_nat (one (Eapp x1 ft ys1)))) as [xs2 [e2 [rho2' [Hf' [Hset H']]]]]; eauto.
         now eapply Forall2_length; eauto.
         rewrite to_nat_add in Hleq1.
-        assert (Hg := @to_nat_one _ fuel _ (exp_to_fin (Eapp x1 ft ys1))).         
+        assert (Hg := to_nat_one (exp_to_fin (Eapp x1 ft ys1))).         
 
         edestruct H' as [v2 [cin' [cout' [Hstep' [Hpost' Hpre'']]]]];
           eauto; try (unfold one in *; simpl in *; omega).   
@@ -863,10 +861,10 @@ Section Log_rel.
           rewrite preord_val_eq in Hpre.  
           destruct v'; try (now simpl in Hpre; contradiction).
           rewrite !to_nat_add in Hleq1.
-          assert (Hg := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x f1 ft ys1 e1))).
+          assert (Hg := to_nat_one (exp_to_fin (Eletapp x f1 ft ys1 e1))).
           
           edestruct preord_var_env_get_list as [vs2 [Hget' Hpre']]; eauto.
-          edestruct (Hpre vs vs2 (k - @to_nat _ fuel _ (one (Eletapp x f1 ft ys1 e1)))) as [xs2 [e2' [rho2' [Hf' [Hset H']]]]]; eauto.
+          edestruct (Hpre vs vs2 (k - to_nat (one (Eletapp x f1 ft ys1 e1)))) as [xs2 [e2' [rho2' [Hf' [Hset H']]]]]; eauto.
           now eapply Forall2_length; eauto.   
 
           edestruct H' with (cin := cin1) as [v2 [cin' [cout' [Hstep' [Hpost' Hpre'']]]]]. 
@@ -890,10 +888,10 @@ Section Log_rel.
           rewrite preord_val_eq in Hpre.
           destruct v'; try (now simpl in Hpre; contradiction).
           edestruct preord_var_env_get_list as [vs2 [Hget' Hpre']]; eauto.
-          edestruct (Hpre vs vs2 (k - @to_nat _ fuel _ (one (Eletapp x f1 ft ys1 e1)))) as [xs2 [e2' [rho2' [Hf' [Hset H']]]]]; eauto.
+          edestruct (Hpre vs vs2 (k - to_nat (one (Eletapp x f1 ft ys1 e1)))) as [xs2 [e2' [rho2' [Hf' [Hset H']]]]]; eauto.
           now eapply Forall2_length; eauto.
           rewrite !to_nat_add in Hleq1.
-          assert (Hg := @to_nat_one _ fuel _ (exp_to_fin (Eletapp x f1 ft ys1 e1))).
+          assert (Hg := to_nat_one (exp_to_fin (Eletapp x f1 ft ys1 e1))).
           
           edestruct H'; try eassumption. unfold one in *; simpl in *; omega. 
           eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic.
@@ -921,7 +919,8 @@ Section Log_rel.
         assert (Hg := to_nat_one (exp_to_fin (Ehalt x1))).
         
         repeat eexists. econstructor 2; eauto. econstructor; eauto.
-        
+
+        rewrite !plus_zero. 
         eapply Hbase.
         eapply preord_val_monotonic. eassumption. omega.
     Qed.
@@ -955,7 +954,7 @@ Section Log_rel.
         split; [| now eauto ]. eapply HOOT; eassumption.        
       - inv H. inv H3.
         rewrite !to_nat_add in Hleq1.
-        assert (Hg := @to_nat_one _ fuel _ (exp_to_fin (Ecase x1 ((c, e1) :: D1)))).
+        assert (Hg := to_nat_one (exp_to_fin (Ecase x1 ((c, e1) :: D1)))).
         destruct (var_dec c t). 
         + inv H5; [| contradiction ]; subst.
           edestruct (Hexp_hd (k - 1)) as [v2 [c2 [cout' [Hstep2 [Hpost Hpre2]]]]];
@@ -1070,7 +1069,7 @@ Section Log_rel.
         simpl; eauto.
       - inv H.
         rewrite !to_nat_add in Hleq1.
-        assert (Hg := @to_nat_one _ fuel _ (exp_to_fin (Efun B e1))).
+        assert (Hg := to_nat_one (exp_to_fin (Efun B e1))).
 
         edestruct Hexp as [v2' [c2 [cout' [Hstepv2' [Hprev2' Hpost]]]]];
           [ | eassumption | ]; eauto.
@@ -1095,7 +1094,7 @@ Section Log_rel.
         simpl; eauto.
       - inv H.
         rewrite !to_nat_add in Hleq1.
-        assert (Hg := @to_nat_one _ fuel _ (exp_to_fin (Efun B e))).
+        assert (Hg := to_nat_one (exp_to_fin (Efun B e))).
         
         edestruct Hexp as [v2' [c2 [cout' [Hstep2 [Hub Hcc2]]]]]; [| eassumption | ]; try (unfold one in *; simpl in *; omega).
         
@@ -1172,12 +1171,10 @@ Section Log_rel.
     (** [(e1, ρ1) < (C [ e2 ], ρ2)] if [(e1, ρ1) < (e2, ρ2')], where [ρ2'] is the
       interpretation of [C] in [ρ2] *)
     Lemma ctx_to_rho_preord_exp k (P : nat -> PostT) boundG rho1 rho2 rho2' C e e' m :
-      (forall n e2 rho2 rho2' C c1 c2 c c' cout1 cout2, 
-          to_nat c <= exp_ctx_len C ->
-          to_nat c' <= exp_ctx_len C -> 
+      (forall n e2 rho2 rho2' C c1 c2 cout1 cout2, 
           ctx_to_rho C rho2 rho2' ->
           P n (e, rho1, c1, cout1) (e2, rho2', c2, cout2) -> 
-          P (n + @to_nat _ fuel _ c) (e, rho1, c1, cout1) (C |[ e2 ]|, rho2, c2 <+> c, cout2 <+> c')) ->
+          P (n + to_nat (one_ctx C)) (e, rho1, c1, cout1) (C |[ e2 ]|, rho2, c2 <+> one_ctx C, cout2 <+> one_ctx C)) ->
       ctx_to_rho C rho2 rho2' -> 
       preord_exp (P m) boundG k (e, rho1) (e', rho2') ->
       preord_exp (P (m + exp_ctx_len C)) boundG k (e, rho1) (C |[ e' ]|, rho2).
@@ -1193,9 +1190,7 @@ Section Log_rel.
         exists v2, (c2 <+> one ((Eproj_c y t N Γ C |[ e' ]|))). repeat eexists.
         econstructor 2; eauto. econstructor; eauto.
 
-        erewrite <- !(@to_nat_one _ fuel). unfold one. eapply H1 with (C := Eproj_c y t N Γ Hole_c); eauto.
-        rewrite to_nat_one. simpl. omega.
-        rewrite to_nat_one. simpl. omega.
+        erewrite <- !to_nat_one. unfold one. eapply H1 with (C := Eproj_c y t N Γ Hole_c); eauto.
         econstructor; eauto. now econstructor. 
         eassumption.
       - intros v1' c1 Hleq1 Hstep1 Hns.
@@ -1208,8 +1203,7 @@ Section Log_rel.
         simpl. replace (m + S (exp_ctx_len C)) with ((m + exp_ctx_len C) + 1).
                 
         erewrite <- !(@to_nat_one _ fuel). unfold one. eapply H1 with (C := Econstr_c x t ys Hole_c); eauto.
-        rewrite to_nat_one. simpl; omega.
-        rewrite to_nat_one. simpl; omega. econstructor; eauto. econstructor; eauto. 
+        econstructor; eauto. econstructor; eauto. 
         replace (m + S (@Datatypes.length var ys)) with (m + 1 + @Datatypes.length var ys) by omega. simpl; omega. 
         eassumption. 
       - intros v1' c1 cout2 Hleq1 Hstep1.  
@@ -1222,13 +1216,12 @@ Section Log_rel.
         + exists v2', (c2 <+> one (Efun1_c B C |[ e' ]|)). repeat eexists. 
           econstructor 2; eauto. econstructor; eauto.
           simpl.
-          erewrite <- (@to_nat_one _ fuel). unfold one. eapply H1 with (C := Efun1_c B Hole_c); eauto.
-          rewrite to_nat_one. simpl. omega.
-          rewrite to_nat_one. simpl. omega. 
+          erewrite <- to_nat_one. unfold one. eapply H1 with (C := Efun1_c B Hole_c); eauto.
           econstructor; eauto. econstructor; eauto.
           eassumption.
     Qed.
 
+    
     Fixpoint len_exp_ctx (c : exp_ctx) := 
       match c with 
       | Econstr_c _ _ _ c
@@ -1827,14 +1820,14 @@ Section Log_rel.
   Definition compG (P1 P2 : PostGT) : PostGT := fun c1 c2 => exists c3, P1 c1 c3 /\ P2 c3 c2.
 
   Section Divergence.
-    
 
     Definition post_upper_bound (P : PostT) :=
-      forall e1 rho1 e2 rho2,
-      exists f,
-      forall cin1 cout1 cin2 cout2,
+      forall e1 rho1 e2 rho2, 
+      exists (f : fuel -> fuel),
+      forall cin1 cin2 cout1 cout2,
         P (e1, rho1, f cin1, cout1) (e2, rho2, cin2, cout2) ->
         exists (c : fuel), cin2 = (c <+> cin1).
+                                              
 
     Lemma preord_exp_preserves_divergence P PG e1 rho1 e2 rho2
           (Hrel : post_upper_bound P) :
@@ -1922,7 +1915,7 @@ Section Log_rel.
     Proof.
       intros Htrans rho1 rho2 rho3 e1 e2 e3 H1 H2 v1 c1 cout1 Hleq1 Hstep1.
       edestruct H1 as [v2 [c2 [cout2 [Hstep2 [Hpost2 Hpre2]]]]]; eauto. 
-      edestruct (H2 (@to_nat _ fuel _ c2)) as [v3 [c3 [cout3 [Hstep3 [Hpost3 Hpre3]]]]]; [| eauto |]. omega.
+      edestruct (H2 (to_nat c2)) as [v3 [c3 [cout3 [Hstep3 [Hpost3 Hpre3]]]]]; [| eauto |]. omega.
       exists v3, c3, cout3. split; eauto. 
       split.
       
@@ -1930,7 +1923,7 @@ Section Log_rel.
       eapply preord_res_trans_pre; eauto.
       {intros. eapply Htrans; eauto. omega. }
       intros m.
-      edestruct (H2 (m + @to_nat _ fuel _ c2)) as [v3' [c3' [cout3' [Hstep3' [Hpost3' Hpre3']]]]]; [| eauto |]. omega.
+      edestruct (H2 (m + to_nat c2)) as [v3' [c3' [cout3' [Hstep3' [Hpost3' Hpre3']]]]]; [| eauto |]. omega.
       destruct v1; destruct v2; destruct v3; destruct v3'; try contradiction; eauto. 
       eapply bstep_fuel_deterministic in Hstep3; [| eapply Hstep3' ]. inv Hstep3. 
       eapply preord_val_monotonic; eauto. omega.

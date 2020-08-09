@@ -116,7 +116,7 @@ Section Bounds.
     Proof.
       intro; intros. unfold inline_bound in *. unfold_all. simpl in *.
       destruct cout1; destruct cout2. simpl in *. destructAll. 
-      split; [| split ]; lia.
+      split; [| split ]; try lia.
     Qed.
 
     Lemma inline_bound_remove_steps_letapp_OOT i j G : 
@@ -159,6 +159,43 @@ Section Bounds.
 
       eexists (cin2 - cin1). simpl. lia.
     Qed.
+
+    (* bound for inlining, toplevel *)
+    Definition inline_bound_top (L G : nat) : @PostT nat (nat * nat) := 
+      fun '(e1, rho1, c1, (t1, tapp1)) '(e2, rho2, c2, (t2, tapp2)) =>
+        c1 <= G * c2 + L.
+
+    Lemma inline_bound_top_impl (G L : nat) :
+      inclusion _ (inline_bound L G)
+                (inline_bound_top (2 * L * 2 * G + 2 * L) (1 + 2 * G + 2 * G * 2 * G)).
+    Proof.
+      intros [[[? ?] ?] [? ?]] [[[? ?] ?] [? ?]]. unfold inline_bound, inline_bound_top in *. unfold_all.
+      intros. destructAll.
+      rewrite !NPeano.Nat.mul_add_distr_l in *. 
+      rewrite !NPeano.Nat.mul_add_distr_r in *. 
+      eapply le_trans. eassumption.
+      eapply le_trans. eapply plus_le_compat_r. eapply plus_le_compat_l. eapply mult_le_compat_l. eassumption.
+      lia.
+    Qed.
+    
+    (* Lemma inline_bound_post_inline G : *)
+    (*   post_inline cenv (inline_bound_top G) (inline_bound_top G) (inline_bound_top (3 * G)). *)
+    (* Proof. *)
+    (*   intro; intros. unfold inline_bound in *. unfold_all; simpl in *. *)
+    (*   destruct cout1; destruct cout2. destruct cout3; destruct cout4. *)
+    (*   destruct cout1'; destruct cout3'. *)
+    (*   simpl in *. *)
+    (*   inv H3; inv H4; destructAll; inv H8; inv H4; *)
+    (*     try (simpl in *; lia). *)
+    (* Qed. *)
+
+    (* Lemma inline_bound_post_inline_OOT G : *)
+    (*   post_inline_OOT (inline_bound_top G) (inline_bound_top G). *)
+    (* Proof. *)
+    (*   intro; intros. unfold inline_bound in *. unfold_all; simpl in *. *)
+    (*   destruct cout1; destruct cout3; destruct cout3'. *)
+    (*   inv H1; destructAll; inv H3; lia. *)
+    (* Qed. *)
 
   
 End Bounds.

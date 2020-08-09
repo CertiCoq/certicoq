@@ -1323,7 +1323,7 @@ Section LogRelCC.
   Section Divergence.
     
     
-    Lemma preord_exp_preserves_divergence
+    Lemma cc_approx_exp_preserves_divergence
           (P : @PostT fuel trace)
           (PG : @PostGT fuel trace) e1 rho1 e2 rho2
           (Hrel : post_upper_bound P) :
@@ -1342,7 +1342,7 @@ Section LogRelCC.
       eapply bstep_fuel_OOT_monotonic in Hs2. destructAll. eexists. eassumption.
     Qed.
     
-    Lemma preord_exp_preserves_not_stuck
+    Lemma cc_approx_exp_preserves_not_stuck
           (P : @PostT fuel trace)
           (PG : @PostGT fuel trace) e1 rho1 e2 rho2
           (Hrel : post_upper_bound P) :
@@ -1357,7 +1357,7 @@ Section LogRelCC.
 
         destruct v2; try contradiction.
         left. now eauto.
-      - right. eapply preord_exp_preserves_divergence; eassumption.
+      - right. eapply cc_approx_exp_preserves_divergence; eassumption.
     Qed.
 
   End Divergence.

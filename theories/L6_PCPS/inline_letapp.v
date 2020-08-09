@@ -1019,64 +1019,31 @@ Section Inline_correct.
     interpret_ctx_fuel cenv C rho cin (Res rho') cout ->
     M.get x' rho' = Some v ->
     exists cin' cout', bstep_fuel cenv rho e cin' (Res v) cout' /\
-                       (cin' = cin \/ cin' = plus cin (one (Ehalt 1%positive))) /\
-                       (cout' = cout \/ cout' = plus cout (one (Ehalt 1%positive))).
+                       ((cin' = cin /\ cout' = cout ) \/
+                        (cin' = plus cin (one (Ehalt 1%positive)) /\ cout' = plus cout (one (Ehalt 1%positive)))).
   Proof.
     revert C x x' v rho rho' cin cout.
     induction e using exp_ind'; simpl; intros C z z' v1 rho rho' cin cout Hin Hinp Hget;
       try (match goal with
            | [ _ : context[inline_letapp ?E ?X] |- _ ] => 
              destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
-           end); (try now inv Hin).
-    - inv Hinp. inv H0. eapply IHe in H10; eauto. destructAll.
-      do 2 eexists. 
-      split; [| split ].
-      + econstructor. econstructor; eauto.
-      + inv H1.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-      + inv H2.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-    - inv Hinp. inv H0. eapply IHe in H12; eauto. destructAll.
-      do 2 eexists.
-      split; [| split ].
-      + econstructor. econstructor; eauto.
-      + inv H1.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-      + inv H2.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-    - inv Hinp. inv H0. eapply IHe in H15; eauto. destructAll.
-      do 2 eexists. split; [| split ]. 
-      + econstructor. econstructor; eauto.
-      + inv H1.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-      + inv H2.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-    - inv Hinp. inv H0. eapply IHe in H7; eauto. destructAll.
-      do 2 eexists. split; [| split ]. 
-      + econstructor. econstructor; eauto.
-      + inv H1.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-      + inv H2.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+           end); (try now inv Hin); try (now inv Hinp; inv H0; eapply IHe; eauto);
+        try (now inv Hinp; inv H0;
+             match goal with
+             | [ H : interpret_ctx_fuel _ _ _ _ _ _ |- _ ] => eapply IHe in H; eauto; destructAll
+             end;
+             do 2 eexists; split;
+             [ econstructor; econstructor; eauto |
+               inv H1;
+               [ destructAll; left; now split; eauto | destructAll; right; rewrite !plus_assoc; split; rewrite (plus_comm (one _ )); eauto ]]).
     - inv Hin. inv Hinp. inv H0. inv H15; [| congruence ].
-      rewrite M.gss in *. inv Hget. do 2 eexists. split; [| split ].
+      rewrite M.gss in *. inv Hget. do 2 eexists. split.
       + econstructor. econstructor; eauto.
-      + left. rewrite !plus_assoc. rewrite plus_zero. simpl. reflexivity.
-      + left. rewrite !plus_assoc. rewrite plus_zero. simpl. reflexivity.
-    - inv Hinp. inv H0.
+      + left. rewrite !plus_assoc. rewrite !plus_zero. simpl. split; eauto.
     - inv Hin. inv Hinp.
-      do 2 eexists. split; [| split ]. 
+      do 2 eexists. split.
       econstructor. econstructor. eassumption.
-      right. reflexivity.
-      right. reflexivity.
+      right. split; reflexivity.
       congruence.
   Qed.
 
@@ -1087,69 +1054,32 @@ Section Inline_correct.
     exists rho' cin' cout', 
       interpret_ctx_fuel cenv C rho cin' (Res rho') cout' /\
       M.get x' rho' = Some v  /\
-      (cin = cin' \/ cin = plus cin' (one (Ehalt 1%positive))) /\ (cout = cout' \/ cout = plus cout' (one (Ehalt 1%positive))).
+      ((cin = cin' /\ cout = cout') \/ (cin = plus cin' (one (Ehalt 1%positive)) /\ cout = plus cout' (one (Ehalt 1%positive)))).
   Proof.
     revert x C x' v cin cout rho.
     induction e using exp_ind'; simpl; intros z C z' v1 cin cout rho Hstep Hin;
       try (match goal with
            | [ _ : context[inline_letapp ?E ?X] |- _ ] => 
              destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
-           end); (try now inv Hin).
-    - inv Hstep. inv H. eapply IHe in H10; eauto. destructAll.
-      do 3 eexists.
-      split; [| split; [| split ]].
-      + econstructor; [ congruence | econstructor; eauto ].
-      + eassumption.
-      + inv H1.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-      + inv H2.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.          
-    - inv Hstep. inv H. eapply IHe in H11; eauto. destructAll.
-      do 3 eexists.
-      split; [| split; [| split ]].
-      + econstructor; [ congruence | econstructor; eauto ].
-      + eassumption.
-      + inv H1.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-      + inv H2.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.          
-    - inv Hstep. inv H. eapply IHe in H14; eauto. destructAll.
-      do 3 eexists.
-      split; [| split; [| split ]].
-      + econstructor; [ congruence | econstructor; eauto ].
-      + eassumption.
-      + inv H1.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-      + inv H2.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-    - inv Hstep. inv H. eapply IHe in H6; eauto. destructAll.
-            do 3 eexists.
-      split; [| split; [| split ]].
-      + econstructor; [ congruence | econstructor; eauto ].
-      + eassumption.
-      + inv H1.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
-      + inv H2.
-        * left. reflexivity.
-        * right. rewrite !plus_assoc. rewrite (plus_comm (one _ )). reflexivity.
+           end); (try now inv Hin);
+        (try now inv Hstep; inv H;
+         match goal with
+         | [ H : bstep_fuel _ _ _ _ _ _ |- _ ] => eapply IHe in H; eauto; destructAll
+         end;
+         do 3 eexists; split; [| split ];
+         [ econstructor; [ congruence | econstructor; eauto ] | congruence
+           | inv H1;
+             [ destructAll; left; now split; eauto | destructAll; right; rewrite !plus_assoc; split; rewrite (plus_comm (one _ )); eauto ]]).
     - inv Hin. inv Hstep. inv H.
       do 3 eexists.
-      split; [| split; [| split ]].
+      split; [| split ].
       + econstructor. congruence.
         econstructor; eauto. econstructor.
       + rewrite M.gss. reflexivity.
-      + left. rewrite !plus_assoc. rewrite plus_zero. simpl. reflexivity.
-      + left. rewrite !plus_assoc. rewrite plus_zero. simpl. reflexivity.
+      + left. rewrite !plus_assoc. rewrite !plus_zero. simpl. split; reflexivity.
     - inv Hstep. inv H.
     - inv Hstep. inv H. inv Hin. do 3 eexists. split. econstructor.
-      split. eassumption. split. right. reflexivity. right. reflexivity. 
+      split. eassumption. right. split; reflexivity.
   Qed.
 
   
@@ -1172,9 +1102,9 @@ Section Inline_correct.
     - rewrite extend_gss.
       edestruct inline_letapp_eval_l with (C := C1); eauto. destructAll.
       eapply (Hexp (k + to_nat x0)) in H; [| omega ]. destructAll. 
-      destruct x2; eauto. now inv H3. 
+      destruct x2; eauto. now inv H0. 
       edestruct inline_letapp_eval_r with (C := C2); eauto. destructAll.
-      eapply interpret_ctx_fuel_deterministic in H4; [| clear H4; eauto ]. destructAll.
+      eapply interpret_ctx_fuel_deterministic in H3; [| clear H3; eauto ]. destructAll.
       eexists. split. eassumption. simpl in H2. eapply preord_val_monotonic. eassumption. omega.
     - inv Hin. inv H. contradiction. inv H.
       erewrite <- interpret_ctx_fuel_env_eq_P in Hget; [| eassumption | | ].
@@ -1293,46 +1223,33 @@ Section Inline_correct.
     bstep_fuel cenv rho e cin OOT cout ->
     inline_letapp e x = Some (C, x') ->
     (exists cin' cout' r, interpret_ctx_fuel cenv C rho cin' r cout' /\
-                          (cin' = cin \/ cin' = plus cin (one (Ehalt 1%positive))) /\
-                          (cout' = cout \/ cout' = plus cout (one (Ehalt 1%positive)))).
+                          ((cin' = cin /\ cout' = cout) \/ cin' = plus cin (one (Ehalt 1%positive)) /\ cout' = plus cout (one (Ehalt 1%positive)))).
   Proof.
     revert x C x' cin cout rho.
     induction e using exp_ind'; simpl; intros z C z' cin cout rho Hstep Hin;
       try (match goal with
            | [ _ : context[inline_letapp ?E ?X] |- _ ] =>
              destruct (inline_letapp E X) as [[C' u] | ] eqn:Hin'; inv Hin
-           end); (try now inv Hin).
+           end); (try now inv Hin);
+        (try now inv Hstep;
+         [ do 3 eexists; split; [ econstructor; [ eassumption | congruence ] | now eauto ] | ];    
+         inv H;
+         match goal with
+         | [ H : bstep_fuel _ _ _ _ _ _ |- _ ] => eapply IHe in H; eauto; destructAll
+         end;
+         do 3 eexists; split; [ econstructor 3; [ congruence |  econstructor; eauto ] | ];
+         inv H0; destructAll; [ now eauto | right; split; do 2 rewrite plus_assoc; rewrite (plus_comm (one _ )); reflexivity ]). 
     - inv Hstep.
-      + do 3 eexists; split; [| split ]. econstructor. eassumption. congruence.
-        eauto. eauto.
-      + inv H. eapply IHe in H10; [| eassumption ]. destructAll.
-        do 3 eexists. split; [| split ]. econstructor 3. congruence. econstructor; eauto.
-        inv H0; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
-        inv H1; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
-    - inv Hstep.
-      + do 3 eexists; split; [| split ]. econstructor. eassumption. congruence.
-        eauto. eauto.
-      + inv H. eapply IHe in H11; [| eassumption ]. destructAll.
-        do 3 eexists. split; [| split ]. econstructor 3. congruence. econstructor; eauto.
-        inv H0; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
-        inv H1; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
-    - inv Hstep.
-      + do 3 eexists; split; [| split ]. econstructor. eassumption. congruence.
-        eauto. eauto.
+      + do 3 eexists; split. econstructor. eassumption. congruence. eauto.
       + inv H.
         * eapply IHe in H14; [| eassumption ]. destructAll.
-          do 3 eexists. split; [| split ]. econstructor 3. congruence. econstructor; eauto.
-          inv H0; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
-          inv H1; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
-        * do 3 eexists. split; [| split ]. econstructor 3. congruence. eapply Eletapp_c_i_OOT; eauto.
-          now eauto. now eauto.
-    - inv Hstep.
-      + do 3 eexists; split; [| split ]. econstructor. eassumption. congruence.
-        eauto. eauto.
-      + inv H. eapply IHe in H6; [| eassumption ]. destructAll.
-        do 3 eexists. split; [| split ]. econstructor 3. congruence. econstructor; eauto.
-        inv H0; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
-        inv H1; eauto. right. rewrite !plus_assoc. rewrite (plus_comm (one _)). reflexivity.
+          do 3 eexists. split. econstructor 3. congruence. econstructor; eauto.
+          inv H0; eauto.
+          destructAll. left. eauto.
+          destructAll. 
+          right. split; rewrite !plus_assoc; rewrite (plus_comm (one _)); reflexivity.
+        * do 3 eexists. split. econstructor 3. congruence. eapply Eletapp_c_i_OOT; eauto.
+          now eauto.
     - inv Hin. inv Hstep.
       + do 3 eexists; split. econstructor. eassumption.
         congruence. eauto.
@@ -1347,7 +1264,6 @@ Section Inline_correct.
       + inv H.
   Qed. 
 
-  
 
   Definition post_inline :=
     forall e1 e2 e e' C1 C2 x x' y y' z z' rho1 rho2 rho1' rho2'
@@ -1358,11 +1274,9 @@ Section Inline_correct.
       
       interpret_ctx_fuel cenv C1 rho1 cin1' (Res rho1') cout1' ->
       interpret_ctx_fuel cenv C2 rho2 cin3' (Res rho2') cout3' ->
-      cin1 = cin1' \/ cin1 = plus cin1' (one (Ehalt z)) ->
-      cin3 = cin3' \/ cin3 = plus cin3' (one (Ehalt z')) ->
-      cout1 = cout1' \/ cout1 = plus cout1' (one (Ehalt z)) ->
-      cout3 = cout3' \/ cout3 = plus cout3' (one (Ehalt z')) ->
-      
+      cin1 = cin1' /\ cout1 = cout1' \/ cin1 = plus cin1' (one (Ehalt z)) /\ cout1 = plus cout1' (one (Ehalt z)) ->
+      cin3 = cin3' /\ cout3 = cout3' \/ cin3 = plus cin3' (one (Ehalt z')) /\ cout3 = plus cout3' (one (Ehalt z')) ->
+
       P1 (e1, rho1, cin1, cout1) (e2, rho2, cin3, cout3) ->
       P2 (e, rho1', cin2, cout2) (e', rho2', cin4, cout4) ->
       P3 (C1 |[ e ]|, rho1, cin1' <+> cin2, cout1' <+> cout2) (C2 |[ e' ]|, rho2, cin3' <+> cin4, cout3' <+> cout4).
@@ -1372,9 +1286,7 @@ Section Inline_correct.
       inline_letapp e1 x = Some (C1, x') ->
       inline_letapp e2 y = Some (C2, y') ->            
 
-      cin3' = cin3 \/ cin3' = plus cin3 (one (Ehalt z)) ->
-      cout3' = cout3 \/ cout3' = plus cout3 (one (Ehalt z)) ->
-
+      cin3' = cin3 /\  cout3' = cout3  \/ cin3' = plus cin3 (one (Ehalt z)) /\ cout3' = plus cout3 (one (Ehalt z)) ->
 
       P1 (e1, rho1, cin1, cout1) (e2, rho2, cin3, cout3) ->
 
@@ -1408,7 +1320,7 @@ Section Inline_correct.
         eapply inline_letapp_eval_OOT_r in H0; [| eassumption ]. destructAll.
         destruct x4. 
         * do 3 eexists. split; [| split ]. 
-          eapply interpret_ctx_OOT_bstep; eassumption. eapply Hposti_OOT; eassumption.
+          eapply interpret_ctx_OOT_bstep; eassumption. eapply Hposti_OOT; eassumption.          
           eauto.
         * do 3 eexists. split; [| split ].
           -- eapply interpret_ctx_bstep_r. eassumption. econstructor 1. eapply zero_one_lt.

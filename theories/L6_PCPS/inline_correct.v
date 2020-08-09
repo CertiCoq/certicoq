@@ -1,7 +1,8 @@
 Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String Coq.Sets.Ensembles Coq.Classes.Morphisms.
 Require Import compcert.lib.Maps compcert.lib.Coqlib.
 Require Import L6.cps L6.state L6.freshen L6.cps_util L6.cps_show L6.ctx L6.hoare L6.inline L6.rename L6.identifiers
-        L6.Ensembles_util L6.alpha_conv L6.functions L6.logical_relations L6.tactics L6.eval L6.map_util L6.inline_letapp L6.List_util.
+        L6.Ensembles_util L6.alpha_conv L6.functions L6.logical_relations L6.tactics L6.eval L6.map_util L6.inline_letapp
+        L6.List_util L6.algebra.
 Require Import Common.compM Common.Pipeline_utils Libraries.CpdtTactics Libraries.maps_util.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
@@ -62,11 +63,12 @@ Section Inline_Eq.
        | (true, Some (ft, xs, e), S d') =>
          if (Nat.eqb (List.length xs) (List.length ys)) then 
            let sig' := set_list (combine xs ys') sig in
-           x' <- get_name x "" ;;         
-           e' <- beta_contract _ IH d' e sig' (M.remove f fm) s' str_flag ;;
+           x' <- get_name x "" ;;
+           let (d1, d2) := split_fuel d' in 
+           e' <- beta_contract _ IH d1 e sig' (M.remove f fm) s' str_flag ;;
            match inline_letapp e' x', Nat.eqb (List.length xs) (List.length ys) with
            | Some (C, x'), true =>
-             ec' <- beta_contract _ IH d' ec (M.set x x' sig) fm s' str_flag ;;
+             ec' <- beta_contract _ IH d2 ec (M.set x x' sig) fm s' str_flag ;;
              ret (C |[ ec' ]|)
            | _, _ =>
              x' <- get_name x "" ;;
@@ -117,8 +119,9 @@ Section Inline_Eq.
   Lemma beta_contract_eq (d : nat) (e : exp) (sig : r_map) (fm:fun_map) (s:St) (str_flag : bool) : 
     beta_contract _ IH d e sig fm s str_flag = beta_contract' d e sig fm s str_flag.
   Proof.
-    destruct d; destruct e; try reflexivity.
-  Qed.
+    unfold beta_contract.
+    (* XXX ask *)
+  Admitted.
     
 End Inline_Eq. 
 
@@ -126,29 +129,21 @@ Opaque bind ret.
 
   
 Section Inline_correct.
+  
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
 
-  Context (St : Type) (IH : InlineHeuristic St) (cenv : ctor_env) (P1 : PostT) (PG : PostGT).
 
-  Variable (HPost_con : post_constr_compat P1 P1)
-           (HPost_proj : post_proj_compat P1 P1)
-           (HPost_fun : post_fun_compat P1 P1)
-           (HPost_case_hd : post_case_compat_hd P1 P1)
-           (HPost_case_tl : post_case_compat_tl P1 P1)
-           (HPost_app : post_app_compat P1 PG)
-           (HPost_letapp : post_letapp_compat cenv P1 P1 PG)
-           (HPost_letapp_OOT : post_letapp_compat_OOT P1 PG)
-           (HPost_OOT : post_OOT P1)
-           (Hpost_base : post_base P1)
-           (HGPost : inclusion P1 PG)
-           (Hpost_zero : forall e1 rho1 e2 rho2, post_zero e1 rho1 e2 rho2 P1)
-           (HEapp_l : forall v t l rho1 x rho2, post_Eapp_l P1 P1 v t l rho1 x rho2)
-           (HEletapp : remove_steps_letapp cenv P1 P1 P1)
-           (Eletapp' : remove_steps_letapp' cenv P1 P1 P1)
-           (Eletapp_OOT : remove_steps_letapp_OOT cenv P1 P1)
-           (Eletapp_OOT' : remove_steps_letapp_OOT' cenv P1 P1).
+  Context (St : Type) (IH : InlineHeuristic St) (cenv : ctor_env)
+          (P1 : nat -> @PostT fuel trace) (PG : @PostGT fuel trace)
+          (G : nat).
+  
+  Variable (HProp : forall L, (L <= G)%nat -> Post_properties cenv (P1 L) (P1 L) PG)
+           (HEapp_l : forall L v t l rho1 x rho2, post_Eapp_l (P1 L) (P1 (S L)) v t l rho1 x rho2)
+           (HEletapp : forall L1 L2, remove_steps_letapp cenv (P1 L1) (P1 L2) (P1 (S (L1 + L2))))
+           (Eletapp_OOT : forall L1 L2, remove_steps_letapp_OOT cenv (P1 L1) (P1 (S (L1 + L2)))).
 
   
-    (* [add_fundefs] *)
+  (* [add_fundefs] *)
 
   Lemma add_fundefs_in fm f B ft xs e:
     find_def f B = Some (ft, xs, e) -> 
@@ -310,7 +305,7 @@ Section Inline_correct.
                 inv H0; eauto. eassumption.
           -- rewrite add_fundefs_not_in in H; eauto. right. do 4 eexists. split. rewrite M.gro. eassumption. now eauto.
              eassumption.
-      + simpl in Hfind. rewrite peq_false in Hfind; eauto. assert (Hf := Hfind). eapply IHB in Hfind; eauto.
+      + simpl in Hfind. rewrite peq_false in Hfind; eauto. assert (Hf' := Hfind). eapply IHB in Hfind; eauto.
         simpl. intros x Hin. destruct Hin. destructAll. normalize_bound_var. simpl.
         destruct (peq f x0); subst.
         * rewrite M.grs in H. inv H.
@@ -696,7 +691,7 @@ Section Inline_correct.
                 (set_list (combine (all_fun_name B1) (all_fun_name B2)) sig).
   Proof.
     revert S fm rho1 rho2 i sig B1 B2. induction k as [k IHk] using lt_wf_rec1.
-    intros S fm rho1 rho2 i sig B1 B2 Hf Hrel Hun Hsub Hdis Hdis'.
+    intros S fm rho1 rho2 i sig B1 B2 Hf' Hrel Hun Hsub Hdis Hdis'.
     intros f ft xs e rhoc B' f' HSin Heq1 Heq2.
     destruct (Decidable_name_in_fundefs B1) as [Dec]. destruct (Dec f).
     - rewrite def_funs_eq in Heq2; eauto. inv Heq2.
@@ -712,7 +707,7 @@ Section Inline_correct.
         sets.
     - rewrite def_funs_neq in Heq2; eauto.
       rewrite add_fundefs_not_in in Heq1; [| eassumption ]. inv HSin. contradiction.
-      edestruct Hf. eassumption. eassumption. eassumption. destructAll. split; eauto. split; eauto. split.
+      edestruct Hf'. eassumption. eassumption. eassumption. destructAll. split; eauto. split; eauto. split.
       + eapply preord_env_P_inj_def_funs_neq_r.
         rewrite apply_r_set_list_f_eq. eapply preord_env_P_inj_extend_lst_not_In_P_r.
         eassumption.
@@ -748,13 +743,13 @@ Section Inline_correct.
                 (set_list (combine (all_fun_name B1) (all_fun_name B2)) sig).
   Proof.
     revert S fm rho1 rho2 i sig B1 B2. induction k as [k IHk] using lt_wf_rec1.
-    intros S fm rho1 rho2 i sig B1 B2 Hf (* Hrel *) (* Hun Hsub *) Hdis Hdis' Hdis''.
+    intros S fm rho1 rho2 i sig B1 B2 Hf' (* Hrel *) (* Hun Hsub *) Hdis Hdis' Hdis''.
     intros f ft xs e rhoc B' f' HSin Heq1 Heq2.
     destruct (Decidable_name_in_fundefs B1) as [Dec]. destruct (Dec f).
     - exfalso.
       eapply Hdis''. constructor. eassumption. eexists; eauto.
     - rewrite def_funs_neq in Heq2; eauto. inv HSin. contradiction.
-      edestruct Hf. eassumption. eassumption. eassumption. destructAll. split; eauto. split; eauto. split.
+      edestruct Hf'. eassumption. eassumption. eassumption. destructAll. split; eauto. split; eauto. split.
       + eapply preord_env_P_inj_def_funs_neq_r.
         rewrite apply_r_set_list_f_eq. eapply preord_env_P_inj_extend_lst_not_In_P_r.
         eassumption.
@@ -849,7 +844,7 @@ Section Inline_correct.
     - simpl. intros Hin. eapply fun_map_vars_antimon. eassumption.
       now sets.
     - destruct vs; simpl.
-      + intros Hf. eapply fun_map_vars_antimon. eassumption. sets.
+      + intros Hf'. eapply fun_map_vars_antimon. eassumption. sets.
       + intros Hfm. simpl. repeat normalize_sets. rewrite Union_commut.
         rewrite <- Setminus_Union. eapply fun_map_vars_set. 
         simpl. eapply IHxs; eauto.
@@ -993,7 +988,7 @@ Section Inline_correct.
     end.
              
    
-  Lemma inline_correct_mut d : 
+  Lemma inline_correct_mut d (Hleq : (d <= G)%nat) : 
     (forall e sig fm st S str_flag 
             (Hun : unique_bindings e)
             (Hdis1 : Disjoint _ (bound_var e) (occurs_free e :|: occurs_free_fun_map fm))
@@ -1014,7 +1009,7 @@ Section Inline_correct.
              (forall k rho1 rho2,
                  preord_env_P_inj cenv PG (occurs_free e) k (apply_r sig) rho1 rho2 ->
                  fun_map_inv d (occurs_free e) fm rho1 rho2 k sig ->
-                 preord_exp cenv P1 PG k (e, rho1) (e', rho2)) }} ) /\ 
+                 preord_exp cenv (P1 d) PG k (e, rho1) (e', rho2)) }} ) /\ 
 
     (forall B sig sig0 fm st S
             (Hun : unique_bindings_fundefs B)
@@ -1044,14 +1039,14 @@ Section Inline_correct.
                        preord_env_P_inj cenv PG (occurs_free_fundefs B :|: name_in_fundefs B :|: FromList xs )
                                         k (apply_r sig <{ xs ~> xs' }>) rho1 rho2 ->
                        fun_map_inv d (occurs_free_fundefs B :|: name_in_fundefs B :|: FromList xs) fm rho1 rho2 k (set_list (combine xs xs') sig) ->
-                       preord_exp cenv P1 PG k (e1, rho1) (e2, rho2))) }}).
+                       preord_exp cenv (P1 d) PG k (e1, rho1) (e2, rho2))) }}).
   
   Proof.
     induction d as [d IHd] using lt_wf_rec1.
-    exp_defs_induction IHe IHl IHB; intros; inv Hun; try rewrite beta_contract_eq.
+    exp_defs_induction IHe IHl IHB; intros; inv Hun; try rewrite beta_contract_eq; (destruct (HProp d); [ eassumption | ]).
     - (* constr *)
       eapply bind_triple. eapply pre_transfer_r. now eapply get_name_fresh. 
-      intros x w1. simpl. eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros HinS. 
+      intros x w1. simpl. eapply pre_curry_l. intros Hf'. eapply pre_curry_l. intros HinS. 
       eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHe with (S := S \\ [set x]).
       + eassumption.
       + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
@@ -1103,7 +1098,7 @@ Section Inline_correct.
              omega. normalize_occurs_free. sets.
           -- rewrite preord_val_eq. split. reflexivity.
              eapply Forall2_Forall2_asym_included. eassumption.
-          -- intros Hc. eapply Hdis2. constructor. eapply Hf. eapply Hf1. 
+          -- intros Hc. eapply Hdis2. constructor. eapply Hf'. eapply Hf1. 
              right. normalize_occurs_free. eapply image_monotonic; [| eassumption ]. sets.
           -- eapply fun_map_inv_antimon. eapply fun_map_inv_set. eapply fun_map_inv_i_mon. eassumption. omega.
              intros Hc. inv Hc.
@@ -1134,16 +1129,11 @@ Section Inline_correct.
         * repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
           xsets.
         * repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. now sets.
-          (* eapply Disjoint_Included_l; [| eassumption ]. simpl. now sets. rewrite Setminus_Union_distr. *)
-          (* eapply Included_Union_preserv_l. rewrite <- Setminus_Union. eapply Included_Setminus; [| sets ].           *)
-          (* eapply Disjoint_Included; [| | eapply H5 ]. *)
-          (* eapply Included_trans; [| eapply funname_in_exp_subset ]. now sets. now sets. *)
-        (* * sets. *)
         * eapply Disjoint_Included_r. eapply bound_var_occurs_free_Ecase_Included. 2:{ eassumption. }
           now left.
         * eassumption.
       + intros e' w. simpl.
-        eapply pre_curry_l. intros Hf. eapply pre_strenghtening.
+        eapply pre_curry_l. intros Hf'. eapply pre_strenghtening.
         { intros. destructAll. 
           eapply (conj H9 (conj H8 (conj H7 (conj H3 (conj H1 (conj H6 (conj H0 H))))))). }
         
@@ -1163,8 +1153,8 @@ Section Inline_correct.
           -- repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. now sets.
           -- eapply Disjoint_Included_r. eapply bound_var_occurs_free_Ecase_cons_Included. eassumption.
           -- eassumption.
-        * intros ce w'. simpl. eapply pre_curry_l. intros Hbv. eapply pre_curry_l. intros Hleq.
-          eapply pre_curry_l. intros Hf'.
+        * intros ce w'. simpl. eapply pre_curry_l. intros Hbv. eapply pre_curry_l. intros Hleq1.
+          eapply pre_curry_l. intros Hf''.
           eapply pre_strenghtening.
           { intros. destruct H as (H1 & H2' & H3 & H4' & H5' & H6 & H7).
             eapply (conj H6 (conj H1 (conj H2' (conj H3 (conj H4' (conj H5' H7)))))). }
@@ -1199,7 +1189,7 @@ Section Inline_correct.
                     normalize_occurs_free. sets.
     - (* Eproj *)
       eapply bind_triple. eapply pre_transfer_r. now eapply get_name_fresh. 
-      intros x w1. simpl. eapply pre_curry_l. intros Hf.  eapply pre_curry_l. intros Hsin.
+      intros x w1. simpl. eapply pre_curry_l. intros Hf'.  eapply pre_curry_l. intros Hsin.
       eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHe with (S := S \\ [set x]).
       + eassumption.
       + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
@@ -1247,7 +1237,7 @@ Section Inline_correct.
           -- eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ].
              omega. normalize_occurs_free. sets.
           -- eassumption.
-          -- intros Hc. eapply Hdis2. constructor. eapply Hf. eapply Hf1. 
+          -- intros Hc. eapply Hdis2. constructor. eapply Hf'. eapply Hf1. 
              right. normalize_occurs_free. eapply image_monotonic; [| eassumption ]. sets.
           -- eapply fun_map_inv_antimon. eapply fun_map_inv_set. eapply fun_map_inv_i_mon. eassumption. omega.
              intros Hc. inv Hc. 
@@ -1262,7 +1252,7 @@ Section Inline_correct.
       end.
       assert (Hsame : Lemm).
       { unfold Lemm. eapply bind_triple. eapply pre_transfer_r. eapply get_name_fresh. intros x' w1.
-        simpl. eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros HSin.
+        simpl. eapply pre_curry_l. intros Hf'. eapply pre_curry_l. intros HSin.
         eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHe with (S := S \\ [set x']).
         - eassumption.
         - repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
@@ -1313,7 +1303,7 @@ Section Inline_correct.
             -- eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ].
                omega. normalize_occurs_free. sets.
             -- eassumption.
-            -- intros Hc. eapply Hdis2. constructor. eapply Hf. eapply Hf1. 
+            -- intros Hc. eapply Hdis2. constructor. eapply Hf'. eapply Hf1. 
                right. normalize_occurs_free. rewrite !image_Union. left. right. eassumption.
             -- eapply fun_map_inv_antimon. eapply fun_map_inv_set. eapply fun_map_inv_i_mon. eassumption. omega.
                intros Hc. inv Hc.
@@ -1323,7 +1313,7 @@ Section Inline_correct.
                   do 2 right. eassumption.
                ++ normalize_occurs_free. rewrite !Union_assoc. rewrite Union_Setminus_Included; sets; tci. }        
       destruct b. 
-      + destruct (fm ! f) as [ [[? ?] ?] | ] eqn:Hf.
+      + destruct (fm ! f) as [ [[? ?] ?] | ] eqn:Hf'.
         * destruct d. eassumption.
           destruct (Datatypes.length l =? Datatypes.length ys)%nat eqn:Hlen; [| eassumption ]. 
           eapply beq_nat_true in Hlen.
@@ -1331,7 +1321,10 @@ Section Inline_correct.
           intros z w. simpl. eapply pre_curry_l. intros Hfx. eapply pre_curry_l. intros HSin. 
           { edestruct Hfm. eassumption. destructAll. eapply bind_triple.
             - do 2 eapply frame_rule. eapply pre_transfer_r. eapply IHd.
-              + omega.
+              + eapply le_trans. reflexivity. eapply le_n_S. 
+                eapply NPeano.Nat.div2_decr. omega.
+              + eapply le_trans. reflexivity.
+                eapply NPeano.Nat.div2_decr. omega.
               + eassumption.
               + eapply Union_Disjoint_r. clear H3. now sets. now sets.
               + eapply Disjoint_Included_r. eapply image_apply_r_set_list. unfold apply_r_list. rewrite map_length. eassumption.
@@ -1376,7 +1369,7 @@ Section Inline_correct.
                 eapply Union_Disjoint_r.
                 eapply Disjoint_Included; [| | eapply Hdis2 ]. normalize_occurs_free.
                 rewrite !image_Union. rewrite FromList_apply_list. now sets. now sets. now xsets.
-            - intros ei w'. simpl. eapply pre_curry_l; intros Hfr. eapply pre_curry_l; intros Hleq. 
+            - intros ei w'. simpl. eapply pre_curry_l; intros Hfr. eapply pre_curry_l; intros Hleq1. 
               eapply pre_curry_l; intros Hfz.
               destruct (inline_letapp ei z) as [ [C r] | ] eqn:Hinl.
               eapply pre_strenghtening.
@@ -1427,7 +1420,13 @@ Section Inline_correct.
               eapply bind_triple.
               + do 3 eapply frame_rule.
                 { eapply IHd.
-                  + omega.
+                  + destruct d. simpl. omega.
+                    replace (Datatypes.S (Datatypes.S d)) with (Datatypes.S d + 1)%nat by omega. 
+                    eapply plus_lt_le_compat.
+                    eapply NPeano.Nat.lt_div2. omega.     
+                    destruct ((Nat.odd (Datatypes.S d))); simpl; omega.
+                  + eapply le_trans; [| eassumption ].
+                    assert (Heq := split_fuel_add d). rewrite Heq at 3. unfold split_fuel. simpl. omega.
                   + eassumption.
                   + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
                     eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := [set x]). tci.
@@ -1491,13 +1490,14 @@ Section Inline_correct.
                   -- eapply Included_trans. eassumption. eapply Range_Subset. zify; omega. zify; omega.
                 * eauto.
                 * intros Heq Hs; eauto. eapply straight_code_ctx_app. eassumption. eapply H18; eauto.
-                * intros. eapply inline_letapp_correct_alt with (C' := Hole_c);
-                            [ | | | | | | | | | | now eauto | eassumption ]. 
-                  -- eassumption.
-                  -- eassumption.
-                  -- eassumption.
-                  -- eassumption.
-                  -- eauto.
+                * intros. assert (Hadd := split_fuel_add d).
+                  unfold split_fuel in *. simpl in Hadd. rewrite Hadd.
+                  eapply inline_letapp_correct_alt with (C' := Hole_c);
+                            [ | | | | | | | |  now eauto | eassumption ]. 
+                  -- eapply HEletapp.
+                  -- eapply Eletapp_OOT.
+                  -- eapply HProp.
+                     eapply le_trans; [| eassumption ]. rewrite Hadd at 4. simpl. omega. 
                   -- simpl. intros. edestruct H21 with (f0 := f). constructor. now left. eassumption. eassumption.
                      destructAll. do 2 subst_exp. eapply Hrel.
                      ++ edestruct preord_env_P_inj_get_list_l. now eapply H20. normalize_occurs_free. now sets.
@@ -1508,7 +1508,8 @@ Section Inline_correct.
                         intros. eapply preord_val_monotonic. eassumption. omega.
                      ++ eapply fun_map_inv_antimon. eapply fun_map_inv_set_lists; [ | | | eassumption ].
                         ** eapply fun_map_inv_sig_extend_Disjoint. rewrite <- fun_map_inv_eq in *.
-                           eapply fun_map_inv_i_mon. eapply fun_map_inv_remove. eassumption. omega. sets.
+                           eapply fun_map_inv_i_mon. eapply fun_map_inv_remove.
+                           eapply fun_map_inv_mon. eassumption. omega. omega. sets.
                         ** eassumption.
                         ** eapply Union_Disjoint_r. now sets. rewrite Dom_map_remove. sets. 
                         ** rewrite Union_Setminus_Included. sets. tci. sets. 
@@ -1558,7 +1559,7 @@ Section Inline_correct.
     - (* Efun *) 
       simpl. destruct (update_funDef St IH f2 sig st). 
       eapply bind_triple. eapply pre_transfer_r. now eapply get_names_lst_fresh. intros xs w. simpl.
-      eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros Hnd.  eapply pre_curry_l. intros Hlen.
+      eapply pre_curry_l. intros Hf'. eapply pre_curry_l. intros Hnd.  eapply pre_curry_l. intros Hlen.
       
       assert (Hfm' : fun_map_vars (add_fundefs f2 fm) (S \\ FromList xs) (set_list (combine (all_fun_name f2) xs) sig)).
       { eapply fun_map_vars_def_funs; (try now eauto).
@@ -1827,7 +1828,7 @@ Section Inline_correct.
                   ** intros. eapply preord_exp_app_l.
                      --- eauto.
                      --- eauto.
-                     --- intros. assert (Hf := H19). assert (Heqf' := Heqf).
+                     --- intros. assert (Hf' := H19). assert (Heqf' := Heqf).
                          edestruct H19; eauto. destructAll.
                          do 2 subst_exp. eapply H17.
                          +++ edestruct preord_env_P_inj_get_list_l. now eapply H18. normalize_occurs_free. now sets.
@@ -1842,6 +1843,7 @@ Section Inline_correct.
                                  rewrite Dom_map_remove. sets.
                              *** rewrite Union_Setminus_Included. sets. tci. sets.
                ++ omega.
+               ++ omega. 
                ++ eassumption.
                ++ eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply H3 ]; now sets.
                   sets. 
@@ -1932,7 +1934,7 @@ Section Inline_correct.
               now constructor.
     - (* Eprim *)
       eapply bind_triple. eapply pre_transfer_r. now eapply get_name_fresh. 
-      intros x w1. simpl. eapply pre_curry_l. intros HSin. eapply pre_curry_l. intros Hf. 
+      intros x w1. simpl. eapply pre_curry_l. intros HSin. eapply pre_curry_l. intros Hf'. 
       eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHe with (S := S \\ [set x]).
       + eassumption.
       + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
@@ -1991,7 +1993,7 @@ Section Inline_correct.
     - (* Fcons *)
       simpl. 
       eapply bind_triple. eapply pre_transfer_r. now eapply get_names_lst_fresh. intros xs w. simpl.
-      eapply pre_curry_l. intros HSin. eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros Hnd.  eapply pre_curry_l. intros Hlen.
+      eapply pre_curry_l. intros HSin. eapply pre_curry_l. intros Hf'. eapply pre_curry_l. intros Hnd.  eapply pre_curry_l. intros Hlen.
       eapply bind_triple. 
       { do 2 eapply frame_rule. eapply IHe with (S := S \\ FromList xs).
         - eassumption.
@@ -2028,7 +2030,7 @@ Section Inline_correct.
         - repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
           eapply fun_map_vars_set_list. eassumption. }
 
-      intros e' w'. simpl. eapply pre_curry_l. intros Hxs. eapply pre_curry_l; intros Hleq.     
+      intros e' w'. simpl. eapply pre_curry_l. intros Hxs. eapply pre_curry_l; intros Hleq1.     
       eapply bind_triple.
 
       { eapply pre_strenghtening.
@@ -2175,7 +2177,7 @@ Section Inline_correct.
   Qed.
   
 
-  Lemma inline_correct_top d (e : exp) (st : St) (c:comp_data) :
+  Lemma inline_correct_top d (Hleq : (d <= G)%nat) P (e : exp) (st : St) (c:comp_data) (Hi : inclusion (P1 d) P):
     unique_bindings e ->
     Disjoint _ (bound_var e) (occurs_free e) ->
     (max_var e 1%positive) < (next_var c) ->
@@ -2183,14 +2185,15 @@ Section Inline_correct.
       beta_contract_top St IH e d st c true  = (Ret e', c') /\
       unique_bindings e' /\
       occurs_free e' \subset occurs_free e /\
+      Disjoint _ (bound_var e') (occurs_free e') /\
       preserves_straight_code e e' /\
       (max_var e' 1%positive) < (next_var c') /\     
       (forall k rho1 rho2,
           preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
-          preord_exp cenv P1 PG k (e, rho1) (e', rho2)).
+          preord_exp cenv P PG k (e, rho1) (e', rho2)).
   Proof.
     intros. edestruct (inline_correct_mut d) as [He _].
-    unfold beta_contract_top, triple in *.
+    unfold beta_contract_top, triple in *. eassumption.
     
     specialize (He e (M.empty _) (M.empty _) st (fun x => max_var e 1%positive < x) true H).
 
@@ -2223,23 +2226,31 @@ Section Inline_correct.
                                  (M.empty var)).
     { unfold fun_map_vars. intros. rewrite M.gempty in H2. inv H2. }
     
-    assert (Hf : fresh (fun x : var => max_var e 1 < x) (next_var (fst (c, tt)))).
+    assert (Hf' : fresh (fun x : var => max_var e 1 < x) (next_var (fst (c, tt)))).
     { unfold fresh. intros. unfold Ensembles.In in *. simpl in *. zify; omega. }
 
-    specialize (He Hdis Hdis1 Hdis2 Hdis3 Hfinv tt (c, tt) Hf).
+    specialize (He Hdis Hdis1 Hdis2 Hdis3 Hfinv tt (c, tt) Hf').
     
     unfold runState, run_compM. simpl in *. 
     
     destruct (compM.runState
-                (beta_contract St IH d e (cps.M.empty var) (cps.M.empty (fun_tag * list var * exp)) st true) tt (c, tt)) eqn:Heq.   
+                (beta_contract St IH d e (cps.M.empty var)
+                               (cps.M.empty (fun_tag * list var * exp)) st
+                               true) tt (c, tt)) eqn:Heq.   
     
     destruct e0. contradiction. destructAll.
     
-    destruct p. do 2 eexists. split; [| split; [| split; [| split; [| split ]]]].
-    - reflexivity.
+    destruct p. do 2 eexists. split; [| split; [| split; [| split; [| split; [| split ]]]]]. 
+    - unfold beta_contract_top. simpl. unfold run_compM. 
+      rewrite Heq. reflexivity.
     - eassumption.
     - eapply Included_trans. eassumption. rewrite apply_r_empty_f_eq. rewrite image_id, occurs_free_fun_map_empty.
       sets.
+    - eapply Disjoint_Included. eassumption. eassumption.
+      rewrite apply_r_empty_f_eq. rewrite image_id, occurs_free_fun_map_empty. normalize_sets.
+      eapply Disjoint_Included_l. eapply fresh_Range. eassumption.
+      constructor. intros x Hnin. inv Hnin. eapply occurs_free_leq_max_var in H11.
+      unfold Ensembles.In in H10. eapply Pos.le_nlt in H11. eapply H11. eassumption.
     - eapply H8; eauto.
     - assert (Hin := max_var_subset e0). assert (Hin' := max_var_subset e).      
       inv Hin.
@@ -2248,7 +2259,9 @@ Section Inline_correct.
         rewrite apply_r_empty_f_eq in H10. rewrite image_id in H10. repeat normalize_sets.
         eapply occurs_free_leq_max_var in H10. eapply Pos.le_lt_trans. eassumption.
         eapply H2. reflexivity.
-    - intros. eapply H9; eauto. rewrite apply_r_empty_f_eq.
+    - intros.
+      eapply preord_exp_post_monotonic. eassumption.
+      eapply H9; eauto. rewrite apply_r_empty_f_eq.
       intros x Hin. unfold id. now eauto.
       intro; intros. rewrite M.gempty in H12; inv H12.
   Qed. 

@@ -57,8 +57,19 @@ Section Beta.
     log_msg (pp_St s nenv);;
     log_msg Pipeline_utils.newline.
 
+  Definition split_fuel d : nat * nat :=
+    let d2 := Nat.div2 d in
+    (d2, d2 + Nat.b2n (Nat.odd d)).
+
+  Lemma split_fuel_add d :
+    d = fst (split_fuel d) + snd (split_fuel d). 
+  Proof.
+    unfold split_fuel. simpl. rewrite (NPeano.Nat.div2_odd d) at 1. simpl.    
+    omega.
+  Qed.
     
-  Fixpoint beta_contract (d : nat) {struct d} :=
+  
+  Program Fixpoint beta_contract (d : nat) {measure d} :=
     let fix beta_contract_aux (e : exp) (sig : r_map) (fm:fun_map) (s:St) (str_flag : bool) {struct e} : inlineM exp :=
         match e with
         | Econstr x t ys e =>
@@ -82,7 +93,7 @@ Section Beta.
          x' <- get_name x "" ;;
          e' <- beta_contract_aux e (M.set x x' sig) fm s str_flag ;;
          ret (Eproj x' t n y' e')
-       | Eletapp x f t ys ec =>
+       | Eletapp x f t ys ec =>         
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
          let (s' , inl) := update_letApp _ IH f' t ys' s in
@@ -90,11 +101,12 @@ Section Beta.
           | (true, Some  (ft, xs, e), S d') =>
             if (Nat.eqb (List.length xs) (List.length ys)) then 
               let sig' := set_list (combine xs ys') sig  in
-              x' <- get_name x "" ;;         
-              e' <- beta_contract d' e sig' (M.remove f fm) s' str_flag ;;
+              x' <- get_name x "" ;;
+              let '(d1, d2) := split_fuel d' in 
+              e' <- beta_contract d1 e sig' (M.remove f fm) s' str_flag ;;
               match inline_letapp e' x', Nat.eqb (List.length xs) (List.length ys) with
               | Some (C, x'), true =>
-                ec' <- beta_contract d' ec (M.set x x' sig) fm s' str_flag ;;
+                ec' <- beta_contract d2 ec (M.set x x' sig) fm s' str_flag ;;
                 ret (C |[ ec' ]|)
               | _, _ =>
                 x' <- get_name x "" ;;
@@ -155,6 +167,18 @@ Section Beta.
         end
     in beta_contract_aux.
 
+  Next Obligation.
+    eapply le_trans. reflexivity. eapply le_n_S. 
+    eapply NPeano.Nat.div2_decr. omega.
+  Qed.
+  Next Obligation.
+    destruct d'. simpl. omega.
+    replace (S (S d')) with (S d' + 1) by omega. 
+    eapply plus_lt_le_compat.
+    eapply NPeano.Nat.lt_div2. omega. 
+    
+    destruct ((Nat.odd (S d'))); simpl; omega.
+  Qed.
   
   Definition beta_contract_top (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
     let '(e', (st', _)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c tt in

@@ -476,11 +476,11 @@ Section Inline_correct.
   Definition PostT  : Type := @PostT fuel trace.
   Definition PostGT : Type := @PostGT fuel trace.
   
-  Context (cenv : ctor_env) (ctag : ctor_tag) (P1  : PostT) (PG : PostGT). 
+  Context (cenv : ctor_env) (ctag : ctor_tag) (P1 P2 P3 : PostT) (PG : PostGT). 
 
-  Context (Hless_steps_letapp : remove_steps_letapp cenv P1 P1 P1)
-          (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv P1 P1)
-          (HOOT: post_OOT P1).
+  Context (Hless_steps_letapp : remove_steps_letapp cenv P1 P2 P3)
+          (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv P1 P3)
+          (HOOT: post_OOT P3).
 
 
   Lemma inline_letapp_correct k x sig f t ys e1 e2 e' C C' x' rho1 rho2 : 
@@ -497,7 +497,7 @@ Section Inline_correct.
         M.get f rho1 = Some (Vfun rhoc B f') ->
         find_def f' B = Some (t, xs, e) -> length xs = length ys ->
         preord_env_P_inj cenv PG (occurs_free e1) m (sig {x ~> x'}) rho1' rho2' ->
-        preord_exp cenv P1 PG m (e1, rho1') (e2, rho2')) ->
+        preord_exp cenv P2 PG m (e1, rho1') (e2, rho2')) ->
 
     preord_env_P_inj cenv PG (occurs_free (Eletapp x f t ys e1)) k sig rho1 rho2 ->
     
@@ -506,7 +506,7 @@ Section Inline_correct.
     interprable C' = true ->
     inline_letapp e' x = Some (C, x') ->
     
-    preord_exp cenv P1 PG k (Eletapp x f t ys e1, rho1) (C' |[ C |[ e2 ]| ]|, rho2).
+    preord_exp cenv P3 PG k (Eletapp x f t ys e1, rho1) (C' |[ C |[ e2 ]| ]|, rho2).
   Proof. 
     revert C' k x sig f t ys e1 e2 C x' rho1 rho2; induction e';
       intros C' k x sig f' t ys e1 e2 C x' rho1 rho2 Hyp1 Hyp2 Hpre Hdis Him Hint Hin; simpl in Hin;
@@ -774,7 +774,7 @@ Section Inline_correct.
         eq_env_P (Complement _ (bound_var_ctx C :|: bound_var_ctx C')) rho2 rho2' ->
         Dom_map rho1' <--> x |: Dom_map rho1 ->
         preord_env_P_inj cenv PG (occurs_free e1) m (sig {x ~> x'}) rho1' rho2' ->
-        preord_exp cenv P1 PG m (e1, rho1') (e2, rho2')) ->
+        preord_exp cenv P2 PG m (e1, rho1') (e2, rho2')) ->
 
     preord_env_P_inj cenv PG (occurs_free (Eletapp x f t ys e1)) k sig rho1 rho2 ->
     
@@ -784,7 +784,7 @@ Section Inline_correct.
     interprable C' = true ->
     inline_letapp e' z = Some (C, x') ->
     
-    preord_exp cenv P1 PG k (Eletapp x f t ys e1, rho1) (C' |[ C |[ e2 ]| ]|, rho2).
+    preord_exp cenv P3 PG k (Eletapp x f t ys e1, rho1) (C' |[ C |[ e2 ]| ]|, rho2).
   Proof.
    revert C' k x sig f t ys e1 e2 C x' rho1 rho2; induction e';
       intros C' k x sig f' t ys e1 e2 C x' rho1 rho2 Hyp1 Hyp2 Hpre Hdis Him Hint Hin; simpl in Hin;
@@ -1011,8 +1011,6 @@ Section Inline_correct.
           
           Grab Existential Variables. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive.
   Qed.
-
-  Context (P2 P3 : PostT).
 
   Lemma inline_letapp_eval_l C e x x' v rho rho' (cin : fuel) (cout : trace):
     inline_letapp e x = Some (C, x') ->

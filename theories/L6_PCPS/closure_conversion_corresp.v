@@ -482,6 +482,137 @@ Section CC_correct.
         now apply Disjoint_sym.
       + apply unique_bindings_fundefs_c_comp; try assumption. now apply Disjoint_sym.
   Qed.
+
+  Fixpoint unique_bindings_c_comp_inv C D {struct C} :
+    unique_bindings_c (ctx.comp_ctx_f C D) ->
+    unique_bindings_c C /\
+    unique_bindings_c D /\
+    Disjoint _ (bound_var_ctx C) (bound_var_ctx D)
+  with unique_bindings_fundefs_c_comp_inv C D {struct C} :
+    unique_bindings_fundefs_c (ctx.comp_f_ctx_f C D) ->
+    unique_bindings_fundefs_c C /\
+    unique_bindings_c D /\
+    Disjoint _ (bound_var_fundefs_ctx C) (bound_var_ctx D).
+  Proof.
+    all: destruct C; simpl; intros Huniq.
+    - splits; try solve [constructor|assumption]. constructor; intros x Hx; now inv Hx.
+    - inv Huniq; splits.
+      + constructor; change (~ ?S ?x) with (~ x \in S) in *.
+        * intros Hc; contradiction H1; normalize_bound_var_ctx; now left.
+        * clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H4); intuition.
+      + clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H4); intuition.
+      + clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H4).
+        destruct unique_bindings_c_comp_inv as [HuniqC [HuniqD Hdis]].
+        normalize_bound_var_ctx; apply Union_Disjoint_l; auto.
+        constructor; intros x Hx; inv Hx. inv H.
+        contradiction H1. change (?S ?x) with (x \in S). normalize_bound_var_ctx.
+        now right.
+    - inv Huniq; splits.
+      + constructor; change (~ ?S ?x) with (~ x \in S) in *.
+        * intros Hc; contradiction H1; normalize_bound_var_ctx; now left.
+        * clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H5); intuition.
+      + clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H5); intuition.
+      + clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H5).
+        destruct unique_bindings_c_comp_inv as [HuniqC [HuniqD Hdis]].
+        normalize_bound_var_ctx; apply Union_Disjoint_l; auto.
+        constructor; intros x Hx; inv Hx. inv H.
+        contradiction H1. change (?S ?x) with (x \in S). normalize_bound_var_ctx.
+        now right.
+    - inv Huniq; splits.
+      + constructor; change (~ ?S ?x) with (~ x \in S) in *.
+        * intros Hc; contradiction H1; normalize_bound_var_ctx; now left.
+        * clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H4); intuition.
+      + clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H4); intuition.
+      + clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H4).
+        destruct unique_bindings_c_comp_inv as [HuniqC [HuniqD Hdis]].
+        normalize_bound_var_ctx; apply Union_Disjoint_l; auto.
+        constructor; intros x Hx; inv Hx. inv H.
+        contradiction H1. change (?S ?x) with (x \in S). normalize_bound_var_ctx.
+        now right.
+    - inv Huniq; splits.
+      + constructor; change (~ ?S ?x) with (~ x \in S) in *.
+        * intros Hc; contradiction H1; normalize_bound_var_ctx; now left.
+        * clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H5); intuition.
+      + clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H5); intuition.
+      + clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H5).
+        destruct unique_bindings_c_comp_inv as [HuniqC [HuniqD Hdis]].
+        normalize_bound_var_ctx; apply Union_Disjoint_l; auto.
+        constructor; intros x Hx; inv Hx. inv H.
+        contradiction H1. change (?S ?x) with (x \in S). normalize_bound_var_ctx.
+        now right.
+    - inv Huniq; splits.
+      + constructor; change (~ ?S ?x) with (~ x \in S) in *.
+        * assumption.
+        * clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H5); intuition.
+        * eapply Disjoint_Included_l; [|eassumption]. normalize_bound_var_ctx; eauto with Ensembles_DB.
+      + clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H5); intuition.
+      + normalize_bound_var_ctx. eapply Union_Disjoint_l; [|apply Union_Disjoint_l].
+        * apply Disjoint_sym; eapply Disjoint_Included_l; [|eapply Disjoint_Included_r; [|eassumption]].
+          -- normalize_bound_var_ctx; now right.
+          -- rewrite bound_var_Ecase_app; now left.
+        * clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H5); intuition.
+        * apply Disjoint_sym; eapply Disjoint_Included_l; [|eapply Disjoint_Included_r; [|eassumption]].
+          -- normalize_bound_var_ctx; now right.
+          -- rewrite bound_var_Ecase_app; now right.
+    - inv Huniq; splits.
+      + constructor; change (~ ?S ?x) with (~ x \in S) in *.
+        * clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H1); intuition.
+        * assumption.
+        * eapply Disjoint_Included_l; [|eassumption]. normalize_bound_var_ctx; eauto with Ensembles_DB.
+      + clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H1); intuition.
+      + normalize_bound_var_ctx. eapply Union_Disjoint_l.
+        * apply Disjoint_sym; eapply Disjoint_Included_l; [|eassumption].
+          normalize_bound_var_ctx; eauto with Ensembles_DB.
+        * clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H1); intuition.
+    - inv Huniq; splits.
+      + constructor; change (~ ?S ?x) with (~ x \in S) in *.
+        * clear unique_bindings_c_comp_inv; specialize (unique_bindings_fundefs_c_comp_inv _ _ H2); intuition.
+        * clear unique_bindings_c_comp_inv; specialize (unique_bindings_fundefs_c_comp_inv _ _ H2); intuition.
+        * eapply Disjoint_Included_r; [|eassumption].
+          rewrite (proj2 bound_var_ctx_comp_ctx); eauto with Ensembles_DB.
+      + clear unique_bindings_c_comp_inv; specialize (unique_bindings_fundefs_c_comp_inv _ _ H2); intuition.
+      + normalize_bound_var_ctx. eapply Union_Disjoint_l.
+        * clear unique_bindings_c_comp_inv; specialize (unique_bindings_fundefs_c_comp_inv _ _ H2); intuition.
+        * eapply Disjoint_Included_r; [|eassumption].
+          rewrite (proj2 bound_var_ctx_comp_ctx); eauto with Ensembles_DB.
+    - inv Huniq; splits.
+      + constructor; change (~ ?S ?x) with (~ x \in S) in *; auto.
+        * intros Hc; contradiction H4; normalize_bound_var_ctx. now left.
+        * eapply Disjoint_Included_l; [|apply H6].
+          normalize_bound_var_ctx; eauto with Ensembles_DB.
+        * eapply Disjoint_Included_l; [|apply H8].
+          normalize_bound_var_ctx; eauto with Ensembles_DB.
+        * clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H11); intuition.
+      + clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H11); intuition.
+      + normalize_bound_var_ctx. apply Union_Disjoint_l; [|apply Union_Disjoint_l; [|apply Union_Disjoint_l]].
+        * constructor; intros x Hx; inv Hx. inv H.
+          change (~ ?S ?x) with (~ x \in S) in *; contradiction H4.
+          normalize_bound_var_ctx; now right.
+        * apply Disjoint_sym. eapply Disjoint_Included_l; [|apply H6].
+          normalize_bound_var_ctx; eauto with Ensembles_DB.
+        * clear unique_bindings_fundefs_c_comp_inv; specialize (unique_bindings_c_comp_inv _ _ H11); intuition.
+        * apply Disjoint_sym. eapply Disjoint_Included_l; [|apply H8].
+          normalize_bound_var_ctx; eauto with Ensembles_DB.
+    - inv Huniq; splits.
+      + constructor; change (~ ?S ?x) with (~ x \in S) in *; auto.
+        * intros Hc; contradiction H5.
+          rewrite (proj2 bound_var_ctx_comp_ctx); eauto with Ensembles_DB.
+        * eapply Disjoint_Included_l; [|apply H7].
+          rewrite (proj2 bound_var_ctx_comp_ctx); eauto with Ensembles_DB.
+        * eapply Disjoint_Included_r; [|apply H8].
+          rewrite (proj2 bound_var_ctx_comp_ctx); eauto with Ensembles_DB.
+        * clear unique_bindings_c_comp_inv; specialize (unique_bindings_fundefs_c_comp_inv _ _ H12); intuition.
+      + clear unique_bindings_c_comp_inv; specialize (unique_bindings_fundefs_c_comp_inv _ _ H12); intuition.
+      + normalize_bound_var_ctx. apply Union_Disjoint_l; [|apply Union_Disjoint_l; [|apply Union_Disjoint_l]].
+        * constructor; intros x Hx; inv Hx. inv H.
+          change (~ ?S ?x) with (~ x \in S) in *; contradiction H5.
+          rewrite (proj2 bound_var_ctx_comp_ctx); now right.
+        * apply Disjoint_sym. eapply Disjoint_Included_l; [|apply H7].
+          rewrite (proj2 bound_var_ctx_comp_ctx); now right.
+        * eapply Disjoint_Included_r; [|apply H8].
+          rewrite (proj2 bound_var_ctx_comp_ctx); now right.
+        * clear unique_bindings_c_comp_inv; specialize (unique_bindings_fundefs_c_comp_inv _ _ H12); intuition.
+  Qed.
   
   (** Spec for [get_vars] *)
   Lemma get_vars_project_vars_sound' Scope Funs GFuns gfuns c Γ FVs FVmap S xs S_pre s_pre :
@@ -693,6 +824,16 @@ Section CC_correct.
       intros H. rewrite Heq3. eapply H3. eassumption. 
   Qed.
 
+  Global Instance FVmap_inv_GFuns_Proper :
+    Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> Same_set var ==> Logic.eq ==> iff) FVmap_inv.
+  Proof. 
+    intros M1 M2 Heq1 S1 S2 Heq2 S3 S4 Heq3 S5 S6 Heq6 l1 l2 Heq4; subst; split; intros [H1 [H2 H3]].
+    - unfold FVmap_inv; splits; auto.
+      intros; rewrite <- Heq6; auto.
+    - unfold FVmap_inv; splits; auto.
+      intros; rewrite Heq6; auto.
+  Qed.
+
   Lemma FVmapInv_add_params FVmap xs Scope Funs GFuns FVs :
     FVmap_inv FVmap Scope Funs GFuns FVs ->
     FVmap_inv (add_params xs FVmap) (Union _ Scope (FromList xs)) Funs GFuns FVs. 
@@ -817,6 +958,7 @@ Section CC_correct.
            (project_vars clo_tag Scope Funs GFuns c (to_env FVmap_o) Γ_o FVs S fv FVs' C S' /\
            is_exp_ctx f (comp_ctx_f C (Econstr_c Γ_n c' FVs' Hole_c)) /\
            unique_bindings_c (comp_ctx_f C (Econstr_c Γ_n c' FVs' Hole_c))) /\
+           (* TODO: bound var in range *)
            fresh S' (next_var (fst s')) /\
            (next_var (fst s') >= next_var (fst s))%positive /\
            binding_in_map (FromList fv) FVmap_n /\
@@ -1022,7 +1164,7 @@ Section CC_correct.
       destruct (@Dec _ (name_in_fundefs Fnil) _ x) as [Hin|]; [inv Hin|]; auto.
   Qed.
 
-  Lemma FVmap_inv_add_closures B :
+  Lemma FVmap_inv_add_closures_open B :
     forall FVmap FVmap' Scope Funs GFuns FVs Γ
     (Hmap : FVmap_inv FVmap Scope Funs GFuns FVs)
     (Heq : FVmap' = add_closures B FVmap Γ),
@@ -1081,6 +1223,87 @@ Section CC_correct.
       now repeat normalize_sets.
   Qed.
 
+  Lemma add_closures_not_in B FVmap Γ x :
+    ~ x \in name_in_fundefs B ->
+    (add_closures B FVmap Γ) ! x = FVmap ! x.
+  Proof.
+    induction B as [f ft xs e B IHB|]; intros.
+    - simpl in *.
+      destruct (peq f x); [subst|]; [rewrite M.gss|rewrite M.gso by auto; auto].
+      contradiction H; now left.
+    - reflexivity.
+  Qed.
+
+  Lemma FVmap_inv_add_closures_closed B :
+    forall FVmap FVmap' Scope Funs GFuns GFuns' FVs Γ
+    (Hmap : FVmap_inv FVmap Scope Funs GFuns FVs)
+    (Heq : FVmap' = add_closures B FVmap Γ)
+    (Hclos : GFuns' <--> GFuns :|: name_in_fundefs B),
+    FVmap_inv (add_closures B FVmap Γ)
+              (Scope \\ name_in_fundefs B)
+              (name_in_fundefs B :|: Funs) GFuns' FVs.
+  Proof.
+    induction B as [f ft xs e B IHB|]; intros.
+    - simpl in *.
+      specialize (IHB FVmap _ _ _ _ (GFuns :|: name_in_fundefs B) _ Γ Hmap eq_refl (Same_set_refl _ _)).
+      destruct Hmap as [HFuns [HScope Hfree]].
+      destruct IHB as [IHFuns [IHScope IHfree]].
+      unfold FVmap_inv; splits.
+      + rewrite Union_commut.
+        rewrite <- Setminus_Union.
+        rewrite IHFuns.
+        rewrite Ensemble_iff_In_iff; intros arb.
+        rewrite not_In_Setminus.
+        unfold In; split; intros Harb.
+        * destruct Harb as [Hget Hne'].
+          assert (Hne : f <> arb) by (intros Hc; subst; now apply Hne').
+          now rewrite M.gso by auto.
+        * destruct (Pos.eq_dec f arb); [subst|]; [rewrite M.gss in Harb|rewrite M.gso in Harb by auto].
+          1: now inv Harb.
+          split; [auto|now intros Hc; inv Hc].
+      + split; intros arb Harb.
+        * unfold In. inv Harb.
+          rewrite <- Union_assoc in H.
+          destruct (Pos.eq_dec f arb); [subst; rewrite M.gss; now eexists|rewrite M.gso by auto].
+          apply IHScope; constructor.
+          -- inv H; auto. now inv H1.
+          -- intros Hc; inv Hc. contradiction H0; constructor; auto.
+             intros Hc; inv Hc; auto. now inv H3.
+        * unfold In in Harb.
+          destruct (Pos.eq_dec f arb); [subst; rewrite M.gss in Harb|rewrite M.gso in Harb by auto].
+          -- destruct Harb as [? Harb]; inv Harb. constructor; [now do 2 left|].
+             intros Hc; inv Hc; contradiction H0; now left.
+          -- apply IHScope in Harb. inv Harb.
+             constructor. rewrite <- Union_assoc. now right.
+             intros Hc; inv Hc. contradiction H0. constructor; auto.
+      + intros N x; split.
+        * intros [Hnth [HnScope [HnFuns HnGFuns]]].
+          assert (Hne : f <> x) by (intros Hc; subst; contradiction HnFuns; now do 2 left).
+          rewrite M.gso by auto.
+          destruct (Decidable_name_in_fundefs B) as [Hdec], (Hdec x) as [Hin|Hnin].
+          -- contradiction HnFuns; left; now right.
+          -- rewrite add_closures_not_in by auto.
+             apply Hfree; splits; auto.
+             ++ intros Hc. contradiction HnScope; constructor; auto.
+             ++ rewrite Hclos in HnGFuns; intros Hc; contradiction HnGFuns; now left.
+        * destruct (Pos.eq_dec f x); [subst; now rewrite M.gss|rewrite M.gso by auto].
+          intros Hget. apply IHfree in Hget. destruct Hget as [Hnth [HnScope [HnFuns HnGFuns]]].
+          splits; auto.
+          -- intros Hc; inv Hc. contradiction HnScope; constructor; auto.
+          -- rewrite <- Union_assoc. intros Hc; inv Hc.
+             ++ now inv H.
+             ++ contradiction HnFuns; auto.
+          -- rewrite Hclos; intros Hc; apply HnGFuns; inv Hc.
+             { now left. }
+             inv H.
+             { now inv H0. }
+             now right.
+    - simpl in *; subst.
+      repeat normalize_sets.
+      unfold FVmap_inv in *; destruct Hmap as [H1 [H2 H3]]; splits; auto.
+      intros N x; rewrite Hclos; auto.
+  Qed.
+
   Lemma add_closures_gfuns_open B gfuns :
     add_closures_gfuns B gfuns false = gfuns.
   Proof. induction B as [f ft xs e B IHB|]; simpl in *; congruence. Qed.
@@ -1108,15 +1331,16 @@ Section CC_correct.
     Funs <--> name_in_fundefs B ->
     Disjoint _ Funs GFuns ->
     gfuns_inv gfuns GFuns -> exists GFuns',
+    (if is_closed then GFuns' <--> Funs :|: GFuns else GFuns' <--> GFuns \\ Funs) /\
     gfuns_inv (add_closures_gfuns B gfuns is_closed) GFuns' /\
     squash (add_global_funs GFuns Funs FVs GFuns').
   Proof.
     destruct is_closed.
     - intros Hclos HFuns Hdis Hgfuns.
-      exists (Funs :|: GFuns); split.
+      exists (Funs :|: GFuns); splits; eauto with Ensembles_DB.
       + now apply add_closures_gfuns_closed.
       + constructor; constructor. now inv Hclos.
-    - intros Hclos HFuns Hdis Hgfuns; inv Hclos; exists (GFuns \\ Funs); split.
+    - intros Hclos HFuns Hdis Hgfuns; inv Hclos; exists (GFuns \\ Funs); splits; eauto with Ensembles_DB.
       + rewrite add_closures_gfuns_open.
         apply Disjoint_sym, Setminus_Disjoint in Hdis.
         unfold gfuns_inv. rewrite Hdis. apply Hgfuns.
@@ -1902,7 +2126,7 @@ Section CC_correct.
       eapply pre_existential; intros FVs'.
       eapply pre_curry_l. intros [Hproj_env [Hctx_env Huniq_env]].
       destruct (add_closures_gfuns_spec f2 gfuns is_closed (name_in_fundefs f2) (FromList FVs_pre) GFuns)
-        as [GFuns' [HGFuns' [Hsquash]]]; eauto with Ensembles_DB.
+        as [GFuns' [HGFuns'_eq [HGFuns' [Hsquash]]]]; eauto with Ensembles_DB.
       { destruct is_closed, FVs_pre; inv Hclos; constructor; normalize_sets; eauto with Ensembles_DB.
         intros [Hc _]. specialize (Hc p); destruct Hc; now left. }
       { clear - Hdis2. normalize_bound_var_in_ctx. decomp_Disjoint.
@@ -1944,8 +2168,17 @@ Section CC_correct.
         [|apply H0 with (Funs := name_in_fundefs f2 :|: Funs) (GFuns := GFuns')
             (Scope := Scope \\ name_in_fundefs f2) (FVs := FVs)] |].
       { intros ? ? [Hres ?]; exact Hres. }
-      { subst FVmap_n. eapply FVmap_inv_add_closures; [|reflexivity].
-        admit. (* TODO: need adjust invariant slightly for GFuns' *) }
+      { subst FVmap_n.
+        destruct is_closed.
+        - rewrite HGFuns'_eq. eapply FVmap_inv_add_closures_closed; eauto with Ensembles_DB.
+        - rewrite HGFuns'_eq. eapply FVmap_inv_add_closures_open; eauto with Ensembles_DB.
+          assert (HGFuns_eq : GFuns \\ name_in_fundefs f2 <--> GFuns). {
+            split.
+            - intros x Hx; now inv Hx.
+            - intros x Hx; constructor; auto.
+              intros Hc; destruct Hdis2 as [Hdis2]; contradiction (Hdis2 x); constructor; auto.
+              normalize_bound_var; left; apply name_in_fundefs_bound_var_fundefs; auto. }
+          rewrite HGFuns_eq; auto. }
       { admit. (* dom(FVmap_n) = dom(FVmap) ∪ names(f2) ⊇ FV(e) *) }
       { admit. (* S_env ∪ {Γ} ⊆ S ∪ {Γ} # dom(FVmap) by Hbin2
                   S ∪ {Γ} # names(f2) by HD1, HD2 *) }
@@ -1967,7 +2200,7 @@ Section CC_correct.
            names(f2) ∪ Funs\(Scope\names(f2)) ∪ GFuns' ∪ vars(e) ∪ {Γ} ∪ FVmap(Funs\Scope) # S by HD1 
            Γ' ∉ S_env by Hran_Γ', Hfresh_B', Hinc_B' *)
         admit. }
-      { admit. (* HD2 *) }
+      { (* HD2 *) intros Hc; apply HD2; normalize_used_vars; now right. }
       intros e' s_e'; apply return_triple.
       intros _ s_final [[Hfresh_e' [HbvB' [Hinc_e' Huniq_B']]]
                        [Hfresh_final [C_e' [Hctx_e' [Hcc_e' [HbvC_e' [Hinc_final [Hbv_e' Huniq_e']]]]]]]].
@@ -2014,7 +2247,8 @@ Section CC_correct.
       + simpl; unfold is_exp_ctx in Hctx_e'; rewrite Hctx_e'.
         rewrite <- app_ctx_f_fuse; simpl.
         rewrite (proj1 (ub_app_ctx_f _)); splits; auto.
-        * admit. (* needs lemma from Hproj_env *)
+        * apply unique_bindings_c_comp_inv in Huniq_env.
+          destruct Huniq_env as [HuniqC_env [HuniqC_constr Hdis_env]]; auto.
         * constructor; auto.
           2: constructor; auto.
           1: change (~ ?S ?x) with (~ x \in S).
@@ -2156,15 +2390,18 @@ Section CC_correct.
           { inv H0; contradiction HD2; normalize_used_vars; now do 2 left. }
         * assumption.
         * now inv Huniq.
-        * admit. (* Follows from Hdis1, Hdis2 *)
-        * admit. (* Follows from Hdis2 *)
+        * splits_Disjoint; auto.
+          constructor; intros x Hx; inv Hx. inv H1.
+          destruct Hdis2 as [Hdis2]; contradiction (Hdis2 x); constructor; auto.
+        * eapply Disjoint_Included_r; [|apply Hdis2]; normalize_bound_var; eauto with Ensembles_DB.
         * eapply Disjoint_Included_l. eapply project_vars_free_set_Included; now eauto.
           eapply Disjoint_Included_r; [| eassumption ].
           apply Included_Union_compat.
           -- normalize_used_vars. solve_Union_Inc.
           -- rewrite <- to_env_BoundVar_f_eq, Union_commut, <- Setminus_Union.
              now eapply image_Setminus_extend.
-        * (* Follows from HD2 *) admit.
+        * (* Follows from HD2 *)
+          intros Hc; contradiction HD2; normalize_used_vars; now right.
         * intros e' s'. eapply return_triple.
           intros _ s'' [[Hfresh' [HbvC Hinc]] [Hfresh'' [C' [Hctx' [Hcc [HbvC' [Hinc' [Hbve' Huniq'']]]]]]]]; eauto.
           split; [eapply fresh_inc; [|eassumption]; zify; omega|].
@@ -2175,10 +2412,14 @@ Section CC_correct.
             - eapply Closure_conversion_f_eq_subdomain. eassumption.
               rewrite <- to_env_BoundVar_f_eq. apply f_eq_subdomain_extend_not_In_S_l.
               intros Hc. inv Hc. now eauto. reflexivity. }
-          { admit. (* HbvC and s'' > s' *) }
+          { (* HbvC and s'' > s' *)
+            eapply Included_trans; [apply HbvC|]; intros x Hx; unfold Range, In in *; zify; omega.}
           { zify; omega. }
           { simpl; normalize_bound_var. unfold is_exp_ctx in Hctx'; rewrite Hctx'.
-            rewrite bound_var_app_ctx. (* ranges and HbvC, Hf'' *) admit. }
+            rewrite bound_var_app_ctx. solve_Union_Inc.
+            - eapply Included_trans; [apply HbvC'|]. right; unfold Range, In in *; zify; omega.
+            - eapply Included_trans; [apply Hbve'|]; normalize_bound_var; solve_Union_Inc.
+              right; unfold Range, In in *; zify; omega. }
           { simpl. rewrite Hctx'.
              rewrite (proj1 (ub_app_ctx_f _)); splits; auto.
              ++ constructor; auto.
@@ -2237,7 +2478,7 @@ Section CC_correct.
       { rewrite <- (FVmap_inv_Scope_Proper _ _ eq_refl _ _ (Union_Empty_set_neut_l _ _)
                                           _ _ eq_refl _ _ eq_refl _ _ eq_refl).
         apply FVmapInv_add_params.
-        eapply FVmap_inv_add_closures with (Γ := Γ) (B := Bg) in Minv; [|reflexivity].
+        eapply FVmap_inv_add_closures_open with (Γ := Γ) (B := Bg) in Minv; [|reflexivity].
         repeat normalize_sets. apply Minv. }
       { admit. (* Follows from Hbin1. useful lemma: occurs_free_in_fun *) }
       { (* S\{Γ} ∪ {Γ} ⊆ S ∪ {Γ} ⊆ S by HS_Γ
@@ -2245,7 +2486,7 @@ Section CC_correct.
         admit. }
       { eassumption. }
       { now inv Huniq. }
-      { admit. (* Huniq *) }
+      { admit. (* TODO: strengthen invariant *) }
       { admit. (* HD2, Huniq *) }
       { (* S # names(Bg), S # GFuns, S # vars(e) by HD1
            S\{Γ] # {Γ} by some setminus lemma

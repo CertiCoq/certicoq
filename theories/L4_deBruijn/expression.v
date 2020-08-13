@@ -889,14 +889,13 @@ Proof.
   exists x. apply H0.
 Qed.
 
-
 (** some concrete examples **)
 Open Scope N_scope.
 Example Ke: exp := Lam_e "x" (Lam_e "y" (Var_e 1)).
 Example Se: exp := Lam_e "x" (Lam_e "y" (Lam_e "z"
             (App_e (App_e (Var_e 2) (Var_e 0)) (App_e (Var_e 1) (Var_e 0))))).
 Example SKKe: exp := App_e (App_e Se Ke) Ke.
-Definition index := mkInd "someind" 0.
+Definition index := mkInd (kername_of_string "someind") 0.
 Definition conex := (index, 10).
 
 Eval vm_compute in (eval_n 1000 (App_e SKKe (Con_e conex enil))).
@@ -951,7 +950,7 @@ Definition unsome (x:option exp) : exp :=
 (* End ChurchNaturals. *)
 
 (** booleans using native data constructors (with no arguments) **)
-Notation boolind := (mkInd "bool" 0).
+Notation boolind := (mkInd (kername_of_string "bool") 0).
 
 Notation TT := ((boolind, 0):dcon).
 Notation TTT := (Con_e TT enil).
@@ -968,7 +967,7 @@ repeat econstructor. Qed.
 
 
 (** lists using native data constructors: Cons takes 2 arguments **)
-Notation listind := (mkInd "list" 0).
+Notation listind := (mkInd (kername_of_string "list") 0).
 Notation dNil := ((listind,0):dcon).
 Notation Nil := (Con_e dNil enil).
 Notation dCons := ((listind,1):dcon).
@@ -1003,7 +1002,7 @@ Qed.
 
 
 (** Natural numbers using native data constructors **)
-Notation natind := (mkInd "nat" 0).
+Notation natind := (mkInd (kername_of_string "nat") 0).
 Notation ZZ := ((natind,0):dcon).
 Notation ZZZ := (Con_e ZZ enil).
 Notation SS := ((natind,1):dcon).

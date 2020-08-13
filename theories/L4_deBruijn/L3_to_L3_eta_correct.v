@@ -381,7 +381,7 @@ Proof.
 Qed.
 
 Lemma Lookup_hom:
-  forall p (s:string) ec,
+  forall p (s:kername) ec,
     Lookup s p ec -> Lookup s (transEnv p) (transEC ec).
 Proof.
   induction 1; destruct t.

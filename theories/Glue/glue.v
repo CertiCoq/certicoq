@@ -235,7 +235,7 @@ Section GState.
              (tag : ind_L1_tag)
              (info : ty_info) : option ind_L1_tag :=
       match prev with
-      | None => if string_dec s (ty_name info) then Some tag else None
+      | None => if kername_eq_dec s (ty_name info) then Some tag else None
       | _ => prev
       end in
     ienv <- gets gstate_ienv ;;
@@ -398,9 +398,9 @@ Section L1Types.
   Definition extract_mut_ind
             (name : kername)
             (g : Ast.global_decl)
-            : option (qualifying_prefix * Ast.mutual_inductive_body) :=
+            : option (modpath * Ast.mutual_inductive_body) :=
     match g with
-    | Ast.InductiveDecl body => Some (find_qualifying_prefix name, body)
+    | Ast.InductiveDecl body => Some (fst name, body)
     | _ => None
     end.
 
@@ -425,7 +425,7 @@ Section L1Types.
              Type names in one_inductive_body are NOT qualified,
              which makes them globally nonunique. *)
         let tys := map (fun o =>
-                          {| ty_name := (qual_pre ++ Ast.ind_name o)%string
+                          {| ty_name := (qual_pre, Ast.ind_name o)%string
                            ; ty_body := o
                            ; ty_params := context_names (rev (Ast.ind_params b))
                            |}) (Ast.ind_bodies b) in
@@ -465,10 +465,10 @@ Section L1Types.
     | (itag, info) :: xs =>
       if is_prop_type info
       then
-        log ("Skipping type of sort Prop: " ++ ty_name info) ;;
+        log ("Skipping type of sort Prop: " ++ string_of_kername (ty_name info)) ;;
         filter_prop_types xs
       else
-        log ("Including type: " ++ ty_name info) ;;
+        log ("Including type: " ++ string_of_kername (ty_name info)) ;;
         rest <- filter_prop_types xs ;;
         ret ((itag, info) :: rest)
     end.
@@ -478,7 +478,7 @@ End L1Types.
 Section L1Constructors.
 
   Inductive dissected_type :=
-  | dInd : string -> dissected_type
+  | dInd : kername -> dissected_type
   | dApp : dissected_type -> list dissected_type -> dissected_type
   | dFun : dissected_type (* for higher-order arguments to constructor *)
   | dParam : string -> dissected_type (* for argument of the parametrized types *)
@@ -534,18 +534,22 @@ Section L1Constructors.
     | _, _ => (nil, dissect_type ctx ty)
     end.
 
-  (*
+  
   Import Template.Ast.
-
+  (*
+  Definition datatypes_kn na : kername := (MPfile (cons "Datatypes" (cons "Init" (cons "Coq" nil))), na)%string.
+  Definition top_kn na : kername := (MPfile (cons "Top" nil), na)%string.
+  Arguments top_kn na%string.
   Definition change := tProd nAnon
                           (tProd nAnon
                             (tInd
                                 {|
-                                inductive_mind := "Coq.Init.Datatypes.nat";
+                                inductive_mind := datatypes_kn "nat"%string;
                                 inductive_ind := 0 |} nil)
                             (tRel 1))
                           (tRel 1).
-  Eval compute in (dissect_types 0 (dInd "Top.color" :: nil) change).
+  
+  Eval compute in (dissect_types [] (dInd (top_kn "color") :: nil) change).
 
   Definition c := tProd (nNamed "a"%string)
                     (tSort ((Level.Level "Top.43", false) :: nil))
@@ -633,7 +637,7 @@ Section Printers.
             printerM <- get_print_env tag ;;
             match printerM with
             | None =>
-                log ("Can't find printer for the spine type " ++ arg_type_name) ;;
+                log ("Can't find printer for the spine type " ++ string_of_kername arg_type_name) ;;
                 ret None
             | Some printer => (* success! *)
                 rest <- spine_to_args spine' params ;;
@@ -726,7 +730,7 @@ Section Printers.
           | (i, dParam p) =>
               match find_param_fun_name p param_table with
               | None =>
-                  log ("Found an unexpected param " ++ p ++ " for type " ++ name) ;;
+                  log ("Found an unexpected param " ++ p ++ " for type " ++ string_of_kername name) ;;
                   ret print_unk
               | Some fn_name =>
                   ret (Scall None (Evar fn_name ty_printer)
@@ -749,15 +753,15 @@ Section Printers.
               tagM <- get_tag_from_type_name arg_type_name ;;
               match tagM with
               | None =>
-                  log ("No L1 tag for the type " ++ name ++
+                  log ("No L1 tag for the type " ++ string_of_kername name ++
                        " for the #" ++ show_nat i ++
-                       " constructor that takes " ++ arg_type_name) ;;
+                       " constructor that takes " ++ string_of_kername arg_type_name) ;;
                   ret Sskip (* ideally shouldn't happen *)
               | Some tag =>
                   infoM <- get_ind_L1_env tag ;;
                   match infoM with
                   | None =>
-                      log ("Can't find info for the type " ++ name ++
+                      log ("Can't find info for the type " ++ string_of_kername name ++
                            " in recursive call") ;;
                       ret Sskip
                   | Some info =>
@@ -768,12 +772,12 @@ Section Printers.
                         printerM <- get_print_env tag ;;
                         match spineM, printerM with
                         | None , _ =>
-                            log ("Couldn't create spine application for the type " ++ name ++
+                            log ("Couldn't create spine application for the type " ++ string_of_kername name ++
                                 " for the #" ++ show_nat i ++
-                                " constructor that takes " ++ arg_type_name) ;;
+                                " constructor that takes " ++ string_of_kername arg_type_name) ;;
                             ret Sskip (* ideally shouldn't happen *)
                         | _ , None =>
-                            log ("Can't find printer for the type " ++ name) ;;
+                            log ("Can't find printer for the type " ++ string_of_kername name) ;;
                             ret Sskip
                         | Some spine_args , Some printer =>
                             let spine_args := (* taking in only the parameters *)
@@ -790,7 +794,7 @@ Section Printers.
                   end
              end
           | _ => (* TODO expand this for other cases *)
-              log ("Found a non-inductive constructor argument for " ++ name) ;;
+              log ("Found a non-inductive constructor argument for " ++ string_of_kername name) ;;
               ret print_unk
           end in
 
@@ -871,13 +875,13 @@ Section Printers.
 
     (* pnameM, gtnameM, cnnameM, iM *)
     | None, _, _, _ =>
-        log ("No print function name for " ++ name ++ ".") ;; ret None
+        log ("No print function name for " ++ string_of_kername name ++ ".") ;; ret None
     | _, None, _, _ =>
-        log ("No get_tag_... function name for " ++ name ++ ".") ;; ret None
+        log ("No get_tag_... function name for " ++ string_of_kername name ++ ".") ;; ret None
     | _, _, None, _ =>
-        log ("No constructor names array name for " ++ name ++ ".") ;; ret None
+        log ("No constructor names array name for " ++ string_of_kername name ++ ".") ;; ret None
     | _, _, _, None =>
-        log ("No L1 info for the inductive type  " ++ name ++ ".") ;; ret None
+        log ("No L1 info for the inductive type  " ++ string_of_kername name ++ ".") ;; ret None
     end.
 
   Fixpoint generate_printers
@@ -952,7 +956,7 @@ Section ArgsStructs.
     match j with
     | O => ret nil
     | S j' =>
-        arg_name <- gensym (sanitize_qualified (qp ++ name)%string ++ "_arg_" ++ show_nat i) ;;
+        arg_name <- gensym (sanitize_qualified (qp, name ++ "_arg_" ++ show_nat i)%string) ;;
         rest <- members_from_ctor qp name (i + 1) j' ;;
         ret ((arg_name, val) :: rest)
     end.
@@ -966,7 +970,7 @@ Section ArgsStructs.
     | nil => ret nil
     | (ctag, ctor) :: ctors' =>
         let '(name, ty, arity) := ctor in
-        let sn := sanitize_qualified (qp ++ name)%string in
+        let sn := sanitize_qualified (qp, name) in
         _struct <- gensym (sn ++ "_args") ;;
         mems <- members_from_ctor qp name 0 arity ;;
         let comp := Composite _struct Struct mems noattr in
@@ -1402,7 +1406,7 @@ Definition generate_glue
        ; gstate_penv   := M.empty _
        ; gstate_log    := nil
        |} in
-  let '(err, st) := runState (make_glue_program globs) opts init in
+  let '(err, st) := runState (make_glue_program (rev globs)) opts init in
   let nenv := gstate_nenv st in
   match err with
   | Ret (header, source) =>

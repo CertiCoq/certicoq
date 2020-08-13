@@ -120,10 +120,10 @@ Lemma lookup_hom_None:
 Proof.
   induction p; intros.
   - cbn. reflexivity.
-  - destruct a. destruct (string_dec nm s).
-    + subst. cbn in H. rewrite string_eq_bool_rfl in H. discriminate.
-    + cbn. rewrite (string_eq_bool_neq n).
-      cbn in H. rewrite (string_eq_bool_neq n) in H.
+  - destruct a. destruct (kername_eq_dec nm k).
+    + subst. cbn in H. rewrite eq_kername_refl in H. discriminate.
+    + cbn. rewrite (eq_kername_bool_neq n).
+      cbn in H. rewrite (eq_kername_bool_neq n) in H.
       apply IHp. assumption.
 Qed.
   
@@ -141,12 +141,12 @@ Proof.
   induction p; intros.
   - cbn in *. discriminate.
   - destruct a. unfold lookupDfn. cbn. unfold lookupDfn in H. cbn in H.
-    destruct (string_dec nm s).
+    destruct (kername_eq_dec nm k).
     + subst. cbn. cbn in H.
-      rewrite string_eq_bool_rfl. rewrite string_eq_bool_rfl in H.
+      rewrite eq_kername_refl. rewrite eq_kername_refl in H.
       destruct e; try discriminate.
       * myInjection H. cbn. reflexivity.
-    + rewrite (string_eq_bool_neq n). rewrite (string_eq_bool_neq n) in H.
+    + rewrite (eq_kername_bool_neq n). rewrite (eq_kername_bool_neq n) in H.
       case_eq (lookup nm p); intros; rewrite H0 in H; try discriminate.
       * rewrite (lookup_hom _ _ H0). destruct e0; try discriminate.
         cbn. myInjection H. reflexivity.

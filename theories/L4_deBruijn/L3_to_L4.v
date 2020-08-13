@@ -22,17 +22,17 @@ Ltac forward H :=
 Definition dcon_of_con (i : inductive) (n : nat) := (i, N.of_nat n).
 
 (** Definition environment *)
-Definition env := list (string * exp).
+Definition env := list (kername * exp).
 
-Fixpoint cst_offset (e : env) (s : string) : N :=
+Fixpoint cst_offset (e : env) (s : kername) : N :=
   match e with
   | [] => 0%N
-  | (c, e) :: tl => if string_eq_bool s c then 0 else 1 + cst_offset tl s
+  | (c, e) :: tl => if eq_kername s c then 0 else 1 + cst_offset tl s
   end.
 
 (** Inductive environment, kept to record arities of constructors.
     No more parameters by this stage. *)
-Definition ienv := list (string * itypPack).
+Definition ienv := list (kername * itypPack).
 
 Definition map_terms (f : L3t.Term -> exp) :=
   fix map_terms (l : L3t.Terms) : exps :=
@@ -130,7 +130,7 @@ Definition translate_env_aux (e : environ L2k.compile.Term) (k : env) : env :=
 Definition translate_env (e : environ L2k.compile.Term) : env :=
   translate_env_aux e [].
 
-Definition inductive_entry_aux {A} (x : string * envClass A) acc : ienv :=
+Definition inductive_entry_aux {A} (x : kername * envClass A) acc : ienv :=
   match x with
   | (s, ecTrm t) => acc
   | (s, ecTyp pars pack) =>
@@ -142,7 +142,7 @@ Definition inductive_env (e : environ L2k.compile.Term) : ienv :=
   fold_right inductive_entry_aux [] e.
 
 Definition mkLets (e : env) (t : exp) :=
-  fold_left (fun acc (x : string * exp) => Let_e (fst x) (snd x) acc) e t.
+  fold_left (fun acc (x : _ * exp) => Let_e (string_of_kername (fst x)) (snd x) acc) e t.
 
 Require Import L3_to_L3_eta.
 

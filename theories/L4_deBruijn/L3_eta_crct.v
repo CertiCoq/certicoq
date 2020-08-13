@@ -334,7 +334,7 @@ Proof.
     + destruct i. destruct H3 as (pack&ityp&Hlook&Hget&Hann).
       exists pack, ityp. split; auto. unfold LookupTyp in *.
       destruct Hlook as [Hlook Hnil]. split; auto.
-      destruct (string_dec inductive_mind nm).
+      destruct (kername_eq_dec inductive_mind nm).
       * subst inductive_mind. inversion_Clear Hlook.
         elim H5. apply PoCaseAnn. assumption.
       * inversion_Clear Hlook.

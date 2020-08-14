@@ -103,11 +103,12 @@ Section Closure_conversion_invariants.
   (** Invariant about the functions in the current function definition *)
   Definition GFun_inv k (rho rho' : env) Scope GFuns : Prop :=
     forall f v c,
+      ~ In _ Scope f ->
+      ~ In var Funs f ->
       In var GFuns f ->
       M.get f rho = Some v  ->
       exists rho1 B1 f1 rho2 B2 f2,
         v = (Vfun rho1 B1 f1) /\
-        ~ In _ Scope f /\ (* Check if needed *)
         M.get f rho' = Some (Vfun rho2 B2 f2) /\
         cc_approx_val cenv clo_tag k boundG
                       (Vfun rho1 B1 f1)

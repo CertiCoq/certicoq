@@ -1462,7 +1462,7 @@ Section LogRelCC.
         to_nat c = exp_ctx_len C ->
         ctx_to_rho C rho2 rho2' ->
         P m (e, rho1, cin1, cout1) (C |[ e2 ]|, rho2, cin2, cout2) ->
-        P (m + to_nat c) (e, rho1, cin1, cout1) (e2, rho2', cin2, cout2)) -> (* XXX revise *)
+        P (m + to_nat c) (e, rho1, cin1, cout1) (e2, rho2', cin2, cout2)) ->
     ctx_to_rho C rho2 rho2' -> 
     cc_approx_exp k (P m) boundG (e, rho1) (C |[ e' ]|, rho2) ->
     cc_approx_exp k (P (m + exp_ctx_len C)) boundG (e, rho1) (e', rho2').

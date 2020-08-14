@@ -3,10 +3,9 @@
   for a vernacular command that takes an FFI type class:
 
   Class StringFFI : Type :=
-    Build_StringFFI
-      { print_string : string -> IO unit
-      ; scan_string : IO string
-      }.
+    { print_string : string -> IO unit
+    ; scan_string : IO string
+    }.
   CertiCoq FFI StringFFI.
 *)
 Require Import Common.Pipeline_utils.
@@ -82,7 +81,7 @@ Fixpoint type_to_args
   match e with
   | Ast.tProd _ _ e' =>
       let (n, b) := type_to_args e' in (S n, b)
-  | Ast.tApp (Ast.tConst ((MPfile (cons "Top" nil), "IO")%string) _) _ => (0, true)
+  | Ast.tApp (Ast.tConst ((_, "IO")%string) _) _ => (0, true)
   | _ => (0, false)
   end.
 
@@ -123,8 +122,8 @@ Fixpoint env_proj
   end.
 
 Definition make_curried_fn
-         (* The Coq [kername] of the FFI function we're dealing with *)
-           (kn : kername)
+         (* The sanitized unqual. name of the FFI function we're dealing with *)
+           (kn : sanitized_name)
          (* initially the arity but it gets smaller with every call *)
            (num : nat)
          (* constant argument, always the arity *)
@@ -138,8 +137,8 @@ Definition make_curried_fn
   let c_args : nat := c_args opts in
   let backend := if direct opts then ANF else CPS in
   _curried <- gensym (match num with
-                      | S _ => sanitize_qualified kn ++ "_" ++ show_nat num
-                      | _ => sanitize_qualified kn ++ "_world"
+                      | S _ => kn ++ "_" ++ show_nat num
+                      | _ => kn ++ "_world"
                       end) ;;
 
   (* FIXME some of these names should be kept in a toolbox,
@@ -302,8 +301,8 @@ Definition make_curried_fn
                 |})).
 
 Fixpoint make_curried_fns
-         (* The Coq [kername] of the FFI function we're dealing with *)
-           (kn : kername)
+         (* The sanitized unqual. name of the FFI function we're dealing with *)
+           (kn : sanitized_name)
          (* initially the arity but it gets smaller with every call *)
            (num : nat)
          (* constant argument, always the arity *)
@@ -336,15 +335,15 @@ Fixpoint make_curried_fns
    and its Coq type as a MetaCoq type.
    Generate the necessary Clight functions and closures from that. *)
 Definition make_one_field
-           (field : kername * Ast.term)
+           (field : sanitized_name * Ast.term)
            : ffiM defs :=
   let (kn, t) := field in
   let (arity, is_io) := type_to_args t in
-  _extern_fn <- gensym (sanitize_qualified kn) ;;
+  _extern_fn <- gensym kn ;;
   _thread_info <- gensym "thread_info" ;;
   let extern_def :=
     (_extern_fn,
-     Gfun (External (EF_external (sanitize_qualified kn)
+     Gfun (External (EF_external kn
                  (mksignature (val_typ :: nil) None cc_default))
                (Tcons (threadInf _thread_info) (repeat_typelist val arity))
                val cc_default)) in
@@ -352,7 +351,7 @@ Definition make_one_field
   match rest with
   | nil => failwith "No curried functions!"
   | (_entry, _) :: _ =>
-    _clo <- gensym (sanitize_qualified kn ++ "_clo") ;;
+    _clo <- gensym (kn ++ "_clo") ;;
     let clo_ty := tarray val 2 in
     let clo_data := Init_addrof _entry Ptrofs.zero :: Init_int8 (Int.repr 1) :: nil in
     let clo_def := (_clo, Gvar (mkglobvar clo_ty clo_data true false)) in
@@ -361,7 +360,7 @@ Definition make_one_field
   end.
 
 Fixpoint make_all_fields
-         (fields : list (kername * Ast.term))
+         (fields : list (sanitized_name * Ast.term))
          : ffiM defs :=
   match fields with
   | nil => ret nil
@@ -380,13 +379,13 @@ Definition make_toolbox : ffiM composite_definitions :=
   let comp :=
     Composite _thread_info Struct
       ((_alloc, valPtr) ::
-      (_limit, valPtr) ::
-      (_heap, tptr (Tstruct _heap noattr)) ::
-      (_args, Tarray uval max_args noattr) :: nil) noattr :: nil in
+       (_limit, valPtr) ::
+       (_heap, tptr (Tstruct _heap noattr)) ::
+       (_args, Tarray uval max_args noattr) :: nil) noattr :: nil in
   ret comp.
 
 Definition make_ffi_program
-           (fields : list (kername * Ast.term))
+           (fields : list (sanitized_name * Ast.term))
            : ffiM (option Clight.program * option Clight.program) :=
   composites <- make_toolbox ;;
   field_defs <- make_all_fields fields ;;
@@ -402,27 +401,28 @@ Definition make_ffi_program
    Returns the fields in that type class. *)
 Definition get_constructors
            (p : Ast.program)
-           : ffiM (list (kername * Ast.term)) :=
+           : ffiM (list (sanitized_name * Ast.term)) :=
   opts <- ask ;;
   let prefix : string := Pipeline_utils.prefix opts in
   log ("Using the prefix '" ++ prefix ++ "' for the generated FFI functions") ;;
   let '(globs, _) := p in
 
   let fix pi_types_to_class_fields
-          (e : Ast.term) : ffiM (list (kername * Ast.term)) :=
+          (e : Ast.term) : ffiM (list (sanitized_name * Ast.term)) :=
     match e with
     | Ast.tProd (nNamed field_name) t e' =>
+        log ("Handing the field " ++ field_name) ;;
         (* TODO MAYBE convert field_name to kername by qualifying it *)
         (* right now we qualify the names with the option the user provides *)
         rest <- pi_types_to_class_fields e' ;;
-        ret ((((MPfile (cons (sanitize_string prefix) nil)), field_name), t) :: rest)
+        ret ((sanitize_string (append prefix field_name), t) :: rest)
     | Ast.tRel _ => ret nil
     | Ast.tApp _ _ => ret nil
     | _ =>
       failwith "Unrecognized pattern in converting pi types to class fields."
     end in
 
-  match last_error globs with
+  match last_error (rev globs) with
   | Some (ind_name, Ast.InductiveDecl mut) =>
       (* Assuming we don't have mutually recursive type classes *)
       match Ast.ind_bodies mut with

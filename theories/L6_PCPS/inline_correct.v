@@ -1,6 +1,6 @@
 Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String Coq.Sets.Ensembles Coq.Classes.Morphisms.
 Require Import compcert.lib.Maps compcert.lib.Coqlib.
-Require Import L6.cps L6.state L6.freshen L6.cps_util L6.cps_show L6.ctx L6.hoare L6.inline L6.rename L6.identifiers
+Require Import L6.cps L6.state L6.freshen L6.cps_util L6.cps_show L6.ctx L6.inline L6.rename L6.identifiers
         L6.Ensembles_util L6.alpha_conv L6.functions L6.logical_relations L6.tactics L6.eval L6.map_util L6.inline_letapp
         L6.List_util L6.algebra.
 Require Import Common.compM Common.Pipeline_utils Libraries.CpdtTactics Libraries.maps_util.

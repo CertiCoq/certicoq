@@ -506,7 +506,7 @@ Section Closure_conversion_invariants.
   (** Extend the [Scope] and remove from [GFuns] **)
   Lemma FV_inv_extend_Scope_GFuns k rho rho' Scope GFuns Funs c Γ FVs x :
     FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
-    FV_inv k rho rho' (x |: Scope) Funs (GFuns \\ [set x]) c Γ FVs.
+    FV_inv k rho rho' (x |: Scope) Funs GFuns c Γ FVs.
   Proof.
     intros [c' [g [Hget [Hc HInv]]]]. do 2 eexists; split; eauto.
     split; eauto.
@@ -611,7 +611,7 @@ Section Closure_conversion_invariants.
   (** Extend the two environments with a variable that is not the current environment
     argument (i.e. [Γ]) *)
   Lemma GFun_inv_set k rho rho' Scope GFuns σ f rho1 B1 f1 rho2 B2 f2:
-    GFun_inv k rho rho' Scope (GFuns \\ [set f]) σ ->
+    GFun_inv k rho rho' Scope GFuns σ ->
     ~ In _ Scope (σ f) ->
     ~ In _ (image σ (GFuns \\ [set f])) (σ f) ->
     (forall c, f \in GFuns ->

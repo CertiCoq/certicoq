@@ -2,8 +2,10 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
+Require Import Common.AstCommon Common.compM.
 Require Import L6.cps L6.cps_util L6.identifiers L6.eval L6.env L6.ctx L6.size_cps
-        L6.logical_relations L6.Ensembles_util L6.List_util L6.map_util L6.tactics.
+        L6.logical_relations L6.Ensembles_util L6.List_util L6.map_util L6.tactics
+        L6.algebra L6.closure_conversion L6.closure_conversion_util L6.state.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.Lists.List Coq.NArith.BinNat Coq.Relations.Relations
         Coq.omega.Omega Coq.Sets.Ensembles Coq.Classes.Morphisms.
@@ -82,6 +84,22 @@ Definition exp_hoist (e : exp) :=
     | Fnil => e
     | _ => Efun defs e
   end.
+
+
+Section CC.
+  Context (clo_tag : ctor_tag). (* Tag for closure records *)
+  
+  Definition closure_conversion_hoist (e : exp) (c: comp_data) : error exp * comp_data :=
+    let Γ := 1%positive in
+    let '(ef'_err, (c', _)) :=
+        run_compM (exp_closure_conv clo_tag e (Maps.PTree.empty VarInfo) (Maps.PTree.empty GFunInfo) 1%positive Γ)
+                  c tt in
+    match ef'_err with
+    | Ret (e', f') => (Ret (exp_hoist (f' e')), c')
+    | Err str => (Err str, c')
+    end.
+
+End CC.
 
 (** [erase_fundefs e e' B] iff [e'] is [e] after erasing all the function 
   *  definition blocks and [B] is exactly the function definitions of [e] 
@@ -252,7 +270,7 @@ Qed.
 
 Definition funs_inv_env B rho :=
   forall f, f \in name_in_fundefs B ->
-             M.get f rho = Some (Vfun (M.empty _) B f).
+            M.get f rho = Some (Vfun (M.empty _) B f).
 
 
 Lemma funs_inv_env_set B rho x v :
@@ -483,6 +501,62 @@ Proof.
 Qed.
 
 
+Lemma Erase_fundefs_funnames_in_exp : 
+      (forall e e' B (Herase : Erase_fundefs e e' B),
+          funnames_in_exp e \subset name_in_fundefs B) /\
+      (forall B B' (Herase : Erase_nested_fundefs B B'),
+          funnames_in_fundefs B \subset name_in_fundefs B').
+Proof.
+  exp_defs_induction IHe IHc IHB; intros; simpl; inv Herase;
+    try now (intros z Hin; inv Hin; destructAll; inv H; eapply IHe; eauto;
+             econstructor; split; eauto).
+  - intros x Hin; inv Hin; destructAll. inv H. inv H5.
+  - eapply IHc in H5. intros z Hin; inv Hin; destructAll. inv H. inv H8.
+    + inv H. eapply IHe in H6. erewrite split_fds_name_in_fundefs; [| eassumption ].
+      right; eauto. eapply H6. econstructor. split; eauto.
+    + erewrite split_fds_name_in_fundefs; [| eassumption ]. left.
+      eapply H5. econstructor. split; [| eassumption ].
+      econstructor. eassumption. eassumption.
+  - intros z Hin; inv Hin; destructAll. erewrite split_fds_name_in_fundefs; [| eassumption ]. inv H.
+    + right. eapply Erase_nested_fundefs_name_in_fundefs. eassumption. eassumption.
+    + left. eapply IHe. eassumption. econstructor. split; eauto.
+    + right. eapply IHB. eassumption. econstructor. split; eauto.
+  - intros z Hin; inv Hin; destructAll. erewrite split_fds_name_in_fundefs; [| eassumption ]. inv H.
+    + left. eapply IHe. eassumption. econstructor. split; eauto.
+    + right. simpl. right. eapply IHB. eassumption. econstructor. split; eauto.
+Qed.      
+
+(* Lemma Erase_fundefs_occurs_free_mut : *)
+(*   (forall e e' B (Herase : Erase_fundefs e e' B) *)
+(*           (Hfv : fun_fv_in e (funnames_in_exp)), *)
+(*       occurs_free e <--> occurs_free e') /\ *)
+(*   (forall B B' (Herase : Erase_nested_fundefs B B'), *)
+(*       bound_var_fundefs B <--> bound_var_fundefs B'). *)
+(* Proof. *)
+(*   exp_defs_induction IHe IHc IHB; *)
+(*     try (intros e' B Hr); try (intros B' Hr); inv Hr; *)
+(*       try (now repeat normalize_bound_var; rewrite IHe; [| eassumption ]; *)
+(*            split; xsets). *)
+(*   - repeat normalize_bound_var. sets. *)
+(*   - repeat normalize_bound_var. *)
+(*     rewrite IHe; [| eassumption ]. *)
+(*     rewrite IHc; [| eassumption ]. *)
+(*     erewrite (split_fds_bound_vars B0 B' B); eauto. *)
+(*     split; xsets. *)
+(*   - normalize_bound_var. *)
+(*     rewrite IHe; [| eassumption ]. *)
+(*     rewrite IHB; [| eassumption ]. *)
+(*     erewrite (split_fds_bound_vars Be Bdefs B); eauto.             *)
+(*     sets. *)
+(*   - repeat normalize_bound_var. sets. *)
+(*   - repeat normalize_bound_var. sets. *)
+(*   - erewrite (split_fds_bound_vars B (Fcons v t l e' B'0) B'); eauto.    *)
+(*     repeat normalize_bound_var. *)
+(*     rewrite IHe; [| eassumption ]. *)
+(*     rewrite IHB; [| eassumption ]. xsets. *)
+(*   - normalize_bound_var. xsets. *)
+(* Qed.  *)
+
 Lemma Erase_fundefs_unique_bindings :
   forall e e' B (Herase : Erase_fundefs e e' B),
     unique_bindings e ->
@@ -565,20 +639,12 @@ Section Hoisting_correct.
   
   Variable (pr : prims) (cenv : ctor_env). 
 
+  Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
+
   Context (P1 : PostT) (* Local *)
-    (PG : PostGT) (* Global *)           
-    (HPost_con : post_constr_compat P1 P1)
-    (HPost_proj : post_proj_compat P1 P1)
-    (HPost_fun : post_fun_compat P1 P1)
-    (HPost_case_hd : post_case_compat_hd P1 P1)
-    (HPost_case_tl : post_case_compat_tl P1 P1)
-    (HPost_app : post_app_compat P1 PG)
-    (HPost_letapp : post_letapp_compat cenv P1 P1 PG)
-    (HPost_letapp_OOT : post_letapp_compat_OOT P1 PG)
-    (HPost_OOT : post_OOT P1)
-    (Hpost_base : post_base P1)
-    (Hpost_Efun_l : post_Efun_l P1 P1)
-    (Hinv : inclusion _ P1 PG).
+          (PG : PostGT) (* Global *)
+          (HP : Post_properties cenv P1 P1 PG)
+          (Hpost_Efun_l : post_Efun_l P1 P1).
 
 
   (** * Correctness of Erase_nested_fundefs *)
@@ -614,7 +680,7 @@ Section Hoisting_correct.
     revert S B rho rho' B_hoist Bprev Ball IHe.
     induction k as [k IHk] using lt_wf_rec1.
     intros S B rho rho' B_hoist Bprev Ball IHe Hun1 Hun2 
-           Hsub Henv Hfuns Hsplit Hdis Hfvs Hhoist.
+           Hsub Henv Hfuns Hsplit Hdis Hfvs Hhoist. assert (Hd' := HP). destruct Hd'. 
     rewrite <- (Union_Setminus_Included (name_in_fundefs B) S (name_in_fundefs B)) at 1;
       [| tci | reflexivity ]. 
     eapply preord_env_P_union.
@@ -711,7 +777,7 @@ Section Hoisting_correct.
     induction k as [k IHk] using lt_wf_rec1.
     intros e; revert k IHk; induction e using exp_ind';
     intros k IHk e' Bprev B Ball rho rho' Hun1 Hun2 Henv Hfuns Hsplit Hdis Hfvs Hhoist;
-      inv Hhoist; inv Hun2.
+      inv Hhoist; inv Hun2; assert (Hd' := HP); destruct Hd'.
     - (* Econstr *)
       eapply preord_exp_constr_compat.
       + now eauto.

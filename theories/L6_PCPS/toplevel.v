@@ -128,7 +128,7 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_Fu
       (* Shrink reduction *)
       let (e5, _) := shrink_cps.shrink_top e4 in
       (* Closure conversion *)
-      let (e_err5, c_data) := closure_conversion.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e5 c_data in
+      let (e_err5, c_data) := hoisting.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e5 c_data in
       let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
       e5 <- e_err5 ;;
       let c_data :=

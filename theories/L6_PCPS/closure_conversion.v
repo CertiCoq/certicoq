@@ -3,7 +3,7 @@
  *)
 Require Import Common.AstCommon Common.compM.
 
-Require Import L6.cps L6.cps_util L6.set_util L6.hoisting L6.identifiers L6.ctx
+Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx
         L6.Ensembles_util L6.List_util L6.functions L6.cps_show L6.state.
 Require Import Coq.ZArith.Znumtheory.
 Require Import compcert.lib.Maps.
@@ -133,7 +133,7 @@ Section CC.
         project_vars Scope Funs GFuns c genv Γ FVs S ys ys' C S' ->
         (* We do not care about ys'. Should never be accessed again so do not
          add them aτ the current scope *)
-        Closure_conversion (x |: Scope) Funs (GFuns \\ [set x]) c genv Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) Funs GFuns c genv Γ FVs e e' C' ->
         Closure_conversion Scope Funs GFuns c genv Γ FVs (Econstr x t ys e)
                            (Econstr x t ys' (C' |[ e' ]|)) C
   | CC_Ecase :
@@ -151,7 +151,7 @@ Section CC.
       forall Scope Funs GFuns c genv Γ FVs S S' x y y' C C' t N e e',
         Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: (FromList FVs :|: [set Γ])) ->
         project_var Scope Funs GFuns c genv Γ FVs S y y' C S' ->
-        Closure_conversion (x |: Scope) Funs (GFuns \\ [set x]) c genv Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) Funs GFuns c genv Γ FVs e e' C' ->
         Closure_conversion Scope Funs GFuns c genv Γ FVs (Eproj x t N y e)
                            (Eproj x t N y' (C' |[ e' ]|)) C
   | CC_Efun :
@@ -181,7 +181,7 @@ Section CC.
          should not shadow the variables in the current scope and the
          variables that where used in the projections *)
         In _ S' f'' -> In _ S' env' -> f'' <> env' ->
-        Closure_conversion (x |: Scope) Funs (GFuns \\ [set x]) c genv Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) Funs GFuns c genv Γ FVs e e' C' ->
         Closure_conversion Scope Funs GFuns c genv Γ FVs (Eletapp x f ft ys e)
                            (Eproj f'' clo_tag 0%N f'
                                   (Eproj env' clo_tag 1%N f'
@@ -203,7 +203,7 @@ Section CC.
       forall Scope Funs GFuns c genv Γ FVs S S' x ys ys' C C' f e e',
         Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope)  :|: (FromList FVs :|: [set Γ])) ->
         project_vars Scope Funs GFuns c genv Γ FVs S ys ys' C S' ->
-        Closure_conversion (x |: Scope) Funs (GFuns \\ [set x]) c genv Γ FVs e e' C' ->
+        Closure_conversion (x |: Scope) Funs GFuns c genv Γ FVs e e' C' ->
         Closure_conversion Scope Funs GFuns c genv Γ FVs (Eprim x f ys e) (Eprim x f ys' (C' |[ e' ]|)) C
   | CC_Ehalt :
       forall Scope Funs GFuns c genv Γ FVs x x' C S S',
@@ -226,8 +226,7 @@ Section CC.
              Disjoint _ S (name_in_fundefs Bg :|: GFuns :|: (FromList ys :|: bound_var e)) ->
              In _ S  Γ' ->
              Closure_conversion_fundefs Bg GFuns c FVs defs defs' ->
-             Closure_conversion (FromList ys) (name_in_fundefs Bg)
-                                (GFuns \\ FromList ys) c (extend_fundefs' id Bg Γ') Γ' FVs e e' C ->
+             Closure_conversion (FromList ys) (name_in_fundefs Bg) GFuns c (extend_fundefs' id Bg Γ') Γ' FVs e e' C ->
              Closure_conversion_fundefs Bg GFuns c FVs (Fcons f t ys e defs )
                                         (Fcons f t (Γ' :: ys) (C |[ e' ]|) defs')
        | CC_Fnil :
@@ -460,16 +459,6 @@ Section CC.
              ret (Fcons f tag (Γ :: ys) ((snd ef) (fst ef)) defs'')
            | Fnil => ret Fnil
          end.
-
-  Definition closure_conversion_hoist (e : exp) (c: comp_data) : error exp * comp_data :=
-    let Γ := 1%positive in
-    let '(ef'_err, (c', _)) :=
-        run_compM (exp_closure_conv e (Maps.PTree.empty VarInfo) (Maps.PTree.empty GFunInfo) 1%positive Γ)
-                                        c tt in
-    match ef'_err with
-    | Ret (e', f') => (Ret (exp_hoist (f' e')), c')
-    | Err str => (Err str, c')
-    end.
     
 
   Definition populate_map (l : list (var * cps.val)) map  :=

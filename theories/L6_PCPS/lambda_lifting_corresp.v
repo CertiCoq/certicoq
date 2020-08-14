@@ -2,7 +2,7 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.hoare L6.Ensembles_util
+Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.Ensembles_util
         L6.List_util L6.lambda_lifting L6.functions
         L6.logical_relations L6.eval L6.lambda_lifting_correct.
 Require Import compcert.lib.Coqlib.

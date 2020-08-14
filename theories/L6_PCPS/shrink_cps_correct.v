@@ -17,7 +17,7 @@ Require Import L6.Ensembles_util.
 
 Require Import L6.cps L6.ctx L6.logical_relations L6.tactics L6.cps_util L6.List_util
         L6.shrink_cps L6.eval L6.set_util L6.identifiers L6.stemctx L6.alpha_conv
-        L6.functions L6.relations L6.rename L6.inline_letapp.
+        L6.functions L6.relations L6.rename L6.inline_letapp L6.algebra.
 
 Open Scope ctx_scope.
 
@@ -117,71 +117,61 @@ Section Shrink_correct.
 
   Variable pr : prims.
   Variable cenv : ctor_env.
-
-  Variable (P1 :  PostT) (PG : PostGT)
-           (HPost_con : post_constr_compat P1 P1)
-           (HPost_proj : post_proj_compat P1 P1)
-           (HPost_fun : post_fun_compat P1 P1)
-           (HPost_case_hd : post_case_compat_hd P1 P1)
-           (HPost_case_tl : post_case_compat_tl P1 P1)
-           (HPost_app : post_app_compat P1 PG)
-           (HPost_letapp : post_letapp_compat cenv P1 P1 PG)
-           (HPost_letapp_OOT : post_letapp_compat_OOT P1 PG)
-           (HPost_OOT : post_OOT P1)
-           (Hpost_base : post_base P1)
-           (HGPost : inclusion _ P1 PG)
-
-           (HPost_conG : post_constr_compat PG PG)
-           (HPost_projG : post_proj_compat PG PG)
-           (HPost_funG : post_fun_compat PG PG)
-           (HPost_case_hdG : post_case_compat_hd PG PG)
-           (HPost_case_tlG : post_case_compat_tl PG PG)
-           (HPost_appG : post_app_compat PG PG)
-           (HPost_letappG : post_letapp_compat cenv PG PG PG)
-           (HPost_letapp_OOTG : post_letapp_compat_OOT PG PG)
-           (HPost_OOTG : post_OOT PG)
-           (Hpost_baseG : post_base PG)
-           (Hless_steps_app : forall f ft ys rho1 e2 rho2, post_Eapp_l P1 P1 f ft ys rho1 e2 rho2)                      
-           (Hless_steps_letapp : remove_steps_letapp cenv P1 P1 P1)                     
-           (Hless_steps_letapp' : remove_steps_letapp' cenv P1 P1 P1)
-           (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv P1 P1)
-           (Hless_steps_letapp_OOT' : remove_steps_letapp_OOT' cenv P1 P1)
-           (Hpost_zero : forall e rho e' rho', post_zero e rho e' rho' P1).
   
-  Context (Hless_steps :
-             forall C e1 rho1 (rho1' : env) (e2 : exp) (rho2 : env) (c1 c2 : nat),
+  Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
+
+  Variable (P1 : nat ->  @PostT fuel trace) (PG : @PostGT fuel trace)
+           (HPost : forall n, n <= 1 -> Post_properties cenv (P1 n) (P1 n) PG)
+           (HPost' : Post_properties cenv PG PG PG) 
+
+           (Hless_steps_app : forall f ft ys rho1 e2 rho2, post_Eapp_l (P1 0) (P1 1) f ft ys rho1 e2 rho2)
+           (Hless_steps_letapp : remove_steps_letapp cenv (P1 0) (P1 0) (P1 1))                     
+           (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv (P1 0) (P1 1)).
+   
+  Context (Hless_steps_ctx :
+             forall C e1 rho1 (rho1' : env) (e2 : exp) (rho2 : env) (cin1 cin2 : fuel)
+                    (cout1 cout2 : trace),
                ctx_to_rho C rho1 rho1' ->
                len_exp_ctx C = 1 ->
-               P1 (e1, rho1', c1) (e2, rho2, c2) ->
-               P1 (C |[ e1 ]|, rho1, c1 + cost (C |[ e1 ]|)) (e2, rho2, c2)).
+               P1 0 (e1, rho1', cin1, cout1) (e2, rho2, cin2, cout2) ->
+               P1 1 (C |[ e1 ]|, rho1, cin1 <+> one (C |[ e1 ]|), cout1 <+> one (C |[ e1 ]|)) (e2, rho2, cin2, cout2)).
+
+  Context (Hless_steps_case :
+             forall x cl t e n rho1 rho2 cin1 cout1 cin2 cout2,
+               find_tag_nth cl t e n ->
+               P1 0 (e, rho1, cin1, cout1) (e, rho2, cin2, cout2) ->
+               P1 1 (Ecase x cl, rho1, cin1 <+> one (Ecase x cl), cout1 <+> one (Ecase x cl)) (e, rho2, cin2, cout2)).
+
+  Lemma HPost_OOT : post_OOT (P1 1).
+  Proof. eapply HPost; eauto. Qed.
 
   (* Removing unused bindings *)
 
   Lemma rm_constr k rho rho' e' v t l :
     ~ occurs_free e' v ->
     preord_env_P cenv PG (occurs_free e' \\ [set v]) k rho rho' ->
-    preord_exp cenv P1 PG k (Econstr v t l e', rho) (e', rho').
+    preord_exp cenv (P1 1) PG k (Econstr v t l e', rho) (e', rho').
   Proof.
     intros Hnin Henv.
-    eapply ctx_to_rho_preord_exp_l with (C := Econstr_c v t l Hole_c) (P1 := P1).
-    - intros; eapply Hless_steps; eauto.
-    - simpl. eapply Hpost_zero.
+    eapply ctx_to_rho_preord_exp_l with (C := Econstr_c v t l Hole_c) (P1 := P1 0).
+    - intros; eapply Hless_steps_ctx; eauto.
+    - simpl. eapply HPost_OOT.
     - reflexivity.
     - intros. inv H. inv H7.
-      eapply preord_exp_refl; eauto. constructor; eauto.
+      eapply preord_exp_refl; eauto.
       eapply preord_env_P_set_not_in_P_l in Henv; eauto with Ensembles_DB.
-      rewrite Setminus_Disjoint in Henv. eassumption. eauto with Ensembles_DB.
+      rewrite Setminus_Disjoint in Henv. eauto. eauto with Ensembles_DB.
   Qed.
-
+  
   Lemma rm_prim k rho rho' e x p l :
     ~occurs_free e x ->
     preord_env_P cenv PG (occurs_free e \\ [set x]) k rho rho' ->
-    preord_exp cenv P1 PG k (Eprim x p l e, rho) (e, rho').
+    preord_exp cenv (P1 1) PG k (Eprim x p l e, rho) (e, rho').
   Proof.
     intros Hnin Henv.
-    eapply ctx_to_rho_preord_exp_l with (C := Eprim_c x p l Hole_c) (P1 := P1).
-    - intros; eapply Hless_steps; eauto.
-    - simpl. eapply Hpost_zero.
+    eapply ctx_to_rho_preord_exp_l with (C := Eprim_c x p l Hole_c) (P1 := P1 0).
+    - intros; eapply Hless_steps_ctx; eauto.
+    - simpl. eapply HPost_OOT.
     - reflexivity.
     - intros. inv H.
   Qed.
@@ -190,16 +180,15 @@ Section Shrink_correct.
   Lemma rm_proj k rho rho' e x t n y :
     ~occurs_free e x ->
     preord_env_P cenv PG (occurs_free e \\ [set x]) k rho rho' ->
-    preord_exp cenv P1 PG k (Eproj x t n y e, rho) (e, rho').
+    preord_exp cenv (P1 1) PG k (Eproj x t n y e, rho) (e, rho').
   Proof.
     intros Hnin Henv.
-    eapply ctx_to_rho_preord_exp_l with (C := Eproj_c x t n y Hole_c) (P1 := P1).
-    - intros; eapply Hless_steps; eauto.
-    - simpl. eapply Hpost_zero.
+    eapply ctx_to_rho_preord_exp_l with (C := Eproj_c x t n y Hole_c) (P1 := P1 0).
+    - intros; eapply Hless_steps_ctx; eauto.
+    - simpl. eapply HPost_OOT.
     - reflexivity.
     - intros. inv H. inv H9.
       eapply preord_exp_refl; eauto.
-      constructor; eauto.
       eapply preord_env_P_set_not_in_P_l in Henv; sets.
       rewrite Setminus_Disjoint in Henv. eassumption. sets.
   Qed.
@@ -301,14 +290,14 @@ Section Shrink_correct.
   Lemma rm_fundefs_of k rho rho' e fds :
       Forall (fun v => ~ occurs_free e v) (all_fun_name fds) ->
       preord_env_P cenv PG (occurs_free e \\ name_in_fundefs fds)  k rho rho' ->
-      preord_exp cenv P1 PG k (Efun fds e, rho) (e, rho').
+      preord_exp cenv (P1 1) PG k (Efun fds e, rho) (e, rho').
   Proof.
-    intros Hall Hpre. eapply ctx_to_rho_preord_exp_l with (C := Efun1_c fds Hole_c) (P1 := P1).
-    - intros; eapply Hless_steps; eauto.
-    - intros; eapply Hpost_zero.
+    intros Hall Hpre. eapply ctx_to_rho_preord_exp_l with (C := Efun1_c fds Hole_c) (P1 := P1 0).
+    - intros; eapply Hless_steps_ctx; eauto.
+    - intros; eapply HPost_OOT.
     - reflexivity.
     - intros rho1 Henv. inv Henv. inv H3.
-      eapply preord_exp_refl; eauto. constructor; eauto.
+      eapply preord_exp_refl; eauto.
       eapply Disjoint_occurs_free_name_in_fundefs_cor in Hall.
       eapply preord_env_P_def_funs_not_in_P_l; eauto.
       rewrite Setminus_Disjoint in Hpre; eauto.
@@ -319,7 +308,7 @@ Section Shrink_correct.
   Lemma rm_fundefs: forall k rho rho' e fds,
       Forall (fun v => num_occur e v 0) (all_fun_name fds) ->
       preord_env_P cenv PG (occurs_free e \\ name_in_fundefs fds)  k rho rho' ->
-      preord_exp cenv P1 PG k (Efun fds e, rho) (e, rho').
+      preord_exp cenv (P1 1) PG k (Efun fds e, rho) (e, rho').
   Proof.
     intros. eapply rm_fundefs_of; eauto.
     eapply Forall_impl; [| eassumption ]. intros.
@@ -390,12 +379,13 @@ Section Shrink_correct.
       unique_functions (fundefs_append B1 (Fcons f t xs fb B2)) ->
       num_occur (Efun (fundefs_append B1 B2) e) f 0 ->
       preord_env_P cenv PG (occurs_free (Efun (fundefs_append B1 B2) e)) k rho1 rho2 ->
-      preord_exp cenv P1 PG k (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e, rho1)
+      preord_exp cenv (P1 1) PG k (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e, rho1)
                  ((Efun (fundefs_append B1 B2) e), rho2).
   Proof.
-    intros k rho1 rho2 fb e B1 B2 xs t f Hnin Hub H H0.
+    intros k rho1 rho2 fb e B1 B2 xs t f Hnin Hub H H0. destruct (HPost 1). omega.
+    
     eapply preord_exp_fun_compat; eauto.
-    simpl. eapply preord_exp_refl; eauto. constructor; now eauto.
+    simpl. eapply preord_exp_refl; eauto.
     assert (Hin : ~ f \in (occurs_free (Efun (fundefs_append B1 B2) e))).
     { intros Hin. eapply not_occurs_not_free in Hin; eauto. } repeat normalize_occurs_free_in_ctx.
     revert Hin H. generalize (occurs_free e) as S.
@@ -419,7 +409,7 @@ Section Shrink_correct.
            do 3 eexists. split; [| split ]; eauto.
            erewrite <- find_def_fundefs_append_Fcons_neq; eassumption.
            intros Hlt Hall.
-           eapply preord_exp_refl; eauto. now constructor; eauto.
+           eapply preord_exp_refl; eauto.
            eapply preord_env_P_set_lists_l with (P1 := occurs_free e1 \\ FromList xs1); eauto.
            replace i with (i + 1 - 1) by omega.
            erewrite find_def_fundefs_append_Fcons_neq in Hf1; try eassumption.
@@ -445,12 +435,6 @@ Section Shrink_correct.
          inv H2; eauto. contradiction.
   Qed.
 
-
-
-  Context (Hless_steps' :
-             forall x cl t e n rho1 c1,
-               find_tag_nth cl t e n ->
-               P1 (Ecase x cl, rho1, c1 + 1) (e, rho1, c1)).
 
   (* XXX unused *)
   Lemma caseConsistent_app: forall cenv t0 l0 l,
@@ -725,7 +709,7 @@ Section Shrink_correct.
         eq_env_P S rho1 rho1' ->
         eq_env_P S rho2 rho2' ->
         preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) m rho1' rho2' ->
-        preord_exp cenv P1 PG m (c |[ e1 ]|, rho1') (c |[ e2 ]|, rho2')) ->
+        preord_exp cenv (P1 1) PG m (c |[ e1 ]|, rho1') (c |[ e2 ]|, rho2')) ->
     preord_env_P cenv PG (occurs_free_fundefs (B' <[ e1 ]>) :|: S1) k rho1 rho2 ->
     Disjoint var (Union var (names_in_fundefs_ctx B) (bound_stem_fundefs_ctx B)) S ->
     Disjoint var (Union var (names_in_fundefs_ctx B') (bound_stem_fundefs_ctx B')) S ->
@@ -745,7 +729,7 @@ Section Shrink_correct.
       + edestruct (@set_lists_length cps.val) as [rho2' Hs']; eauto.
         do 4 eexists; eauto. split; eauto.
         intros Hleq Hall.
-        eapply preord_exp_refl; eauto. now constructor; eauto.
+        eapply preord_exp_refl; eauto.
         eapply preord_env_P_set_lists_l; [| | now eauto | now eauto | now eauto ].
         eapply IH'; eauto.
         intros. eapply Hpre; eauto. omega.
@@ -759,7 +743,7 @@ Section Shrink_correct.
         do 4 eexists; eauto.
         split; eauto.
         intros Hleq Hall.
-        eapply preord_exp_post_monotonic. eassumption.
+        eapply preord_exp_post_monotonic. now eapply HPost.
         eapply Hpre; eauto.
         {
           split; intro; intro. rewrite bound_stem_app_fundefs_ctx in Hbv'.
@@ -831,19 +815,19 @@ Section Shrink_correct.
 
                        eq_env_P S rho1 rho1' ->
                        eq_env_P S rho2 rho2' ->
-                       preord_exp cenv P1 PG k' (e1, rho1') (e2, rho2')) ->
+                       preord_exp cenv (P1 1) PG k' (e1, rho1') (e2, rho2')) ->
     Disjoint var (bound_stem_ctx c) S ->
     preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
-    preord_exp cenv P1 PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
+    preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     revert c S1 S rho1 rho2 e1 e2. induction k as [ k IH' ] using lt_wf_rec1.
-    induction c; intros S1 S rho1 rho2 e1 e2 Hyp Hbv Hpre; eauto.
+    induction c; intros S1 S rho1 rho2 e1 e2 Hyp Hbv Hpre; eauto; (destruct (HPost 1); [ omega | ]).
     - simpl. apply Hyp. auto.
       simpl in Hpre. apply Hpre.
       apply eq_env_P_refl.
       apply eq_env_P_refl.
     - rewrite bound_stem_Econstr_c in Hbv. simpl.
-      eapply preord_exp_constr_compat; eauto; intros.
+      eapply preord_exp_constr_compat; eauto; intros.      
       * eapply Forall2_same. intros x0 HIn. apply Hpre. left. constructor. auto.
       * assert (Disjoint _ S (Singleton _ v)).
          { eauto 10 with Ensembles_DB. }
@@ -925,7 +909,7 @@ Section Shrink_correct.
         simpl.
         rewrite occurs_free_Eletapp. rewrite Setminus_Union_distr. 
         eauto 10 with Ensembles_DB. eassumption. omega.
-    - simpl; eapply preord_exp_case_compat; eauto. now constructor; eauto.
+    - simpl; eapply preord_exp_case_compat; eauto.
       eapply preord_env_P_antimon. eassumption. simpl. now sets.
       intros m Hlt.
       eapply IH'; auto.
@@ -959,12 +943,12 @@ Section Shrink_correct.
         eapply eq_env_P_def_funs_not_in_P_l'; eauto.
       }
       eauto with Ensembles_DB.
-      eapply preord_env_P_def_funs_cor; eauto. constructor; eauto. clear; now firstorder. 
+      eapply preord_env_P_def_funs_cor; eauto.
       eapply preord_env_P_antimon; [ eassumption |].
       simpl. rewrite occurs_free_Efun.
       rewrite Setminus_Union_distr. eauto with Ensembles_DB. omega.
     - simpl. eapply preord_exp_fun_compat; eauto.
-      eapply preord_exp_refl; eauto. now constructor; eauto.
+      eapply preord_exp_refl; eauto.
       eapply preord_env_P_antimon.
       simpl in Hpre.
       erewrite occurs_free_Efun in Hpre. 
@@ -991,15 +975,15 @@ Section Shrink_correct.
                      k' <= k ->
                      get_list xs rho1 = Some vs ->
                      get_list xs rho2 = Some vs' ->
-                     preord_exp cenv P1 PG k' (e1, rho1) (e2, rho2)) ->
+                     preord_exp cenv (P1 1) PG k' (e1, rho1) (e2, rho2)) ->
     Disjoint var (bound_stem_ctx c) (FromList xs) ->
     get_list xs rho1 = Some vs ->
     get_list xs rho2 = Some vs' ->
     preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
-    preord_exp cenv P1 PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
+    preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     intros.
-    eapply preord_exp_compat_vals_stem_set with (S := FromList xs); eauto.
+    eapply preord_exp_compat_vals_stem_set with (S0 := FromList xs); eauto.
     intros. apply H; eauto.
     erewrite <- eq_env_P_get_list.
     eauto.
@@ -1014,12 +998,12 @@ Section Shrink_correct.
                      k' <= k ->
                      get_list xs rho1 = Some vs ->
                      get_list xs rho2 = Some vs' ->
-                     preord_exp cenv P1 PG k' (e1, rho1) (e2, rho2)) ->
+                     preord_exp cenv (P1 1) PG k' (e1, rho1) (e2, rho2)) ->
     Disjoint var (bound_var_ctx c) (FromList xs) ->
     get_list xs rho1 = Some vs ->
     get_list xs rho2 = Some vs' ->
     preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
-    preord_exp cenv P1 PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
+    preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     intros.
     eapply preord_exp_compat_stem_vals_le; eauto.
@@ -1030,14 +1014,14 @@ Section Shrink_correct.
   Corollary preord_exp_compat_stem_val S1 x k val rho1 rho2 c e1 e2 :
     (forall k rho1 rho2, preord_env_P cenv PG (occurs_free e1 :|: S1) k rho1 rho2 ->
                          M.get x rho1 = Some val ->
-                         preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)) ->
+                         preord_exp cenv (P1 1) PG k (e1, rho1) (e2, rho2)) ->
     ~ bound_stem_ctx c x ->
     M.get x rho1 = Some val ->
     preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
-    preord_exp cenv P1 PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
+    preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     intros.
-    eapply preord_exp_compat_vals_stem_set with (S := Singleton _ x); auto.
+    eapply preord_exp_compat_vals_stem_set with (S0 := Singleton _ x); auto.
     intros.
     apply H. eauto. specialize (H5 x). rewrite <- H1.
     symmetry. apply H5.
@@ -1049,11 +1033,11 @@ Section Shrink_correct.
   Corollary preord_exp_compat_val S1 x k val rho1 rho2 c e1 e2 :
     (forall k rho1 rho2, preord_env_P cenv PG (occurs_free e1 :|: S1) k rho1 rho2 ->
                          M.get x rho1 = Some val ->
-                         preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)) ->
+                         preord_exp cenv (P1 1) PG k (e1, rho1) (e2, rho2)) ->
     ~ bound_var_ctx c x ->
     M.get x rho1 = Some val ->
     preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
-    preord_exp cenv P1 PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
+    preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     intros. eapply preord_exp_compat_stem_val; eauto.
     intro; apply H0.
@@ -1061,36 +1045,27 @@ Section Shrink_correct.
   Qed.
 
 
-  Context (Hless_steps'' :
-             forall x cl t e n rho1 rho2 c1 c2,
-               find_tag_nth cl t e n ->
-               P1 (e, rho1, c1) (e, rho2, c2) ->
-               P1 (Ecase x cl, rho1, c1 + 1) (e, rho2, c2)).
-
 
   Lemma rw_case_local (k0 : nat) c0 vs e cl x n (rho0 rho3 : env) :
       preord_env_P cenv PG (occurs_free (Ecase x cl)) k0 rho0 rho3 ->
       find_tag_nth cl c0 e n ->
       M.get x rho0 = Some (Vconstr c0 vs) ->
-      preord_exp cenv P1 PG k0 (Ecase x cl, rho0) (e, rho3).
+      preord_exp cenv (P1 1) PG k0 (Ecase x cl, rho0) (e, rho3).
   Proof.
-    intros Hcc Hf Hget v1 c1 Hleq Hs. inv Hs.
-    + exists OOT, 0. split; [| split ].
-      constructor; eauto. eapply cost_gt_0.
-      eapply Hpost_zero; eauto. now simpl; eauto.
-    + inv H0; repeat subst_exp.
-      eapply find_tag_nth_deterministic in H6; [| clear H6; eassumption ]. inv H6.
-      edestruct (preord_exp_refl cenv P1 PG)
-        with (k := k0) (e := e0) (rho := rho0) (rho' := rho3) (cin := (c1 - cost (Ecase x cl)))
-        as [v2 [c2 [Hs2 [Hp2 Hr2]]]]; eauto. now constructor; eauto.
-      eapply preord_env_P_antimon. apply Hcc.
+    intros Hcc Hf Hget v1 c1 c2 Hleq Hs. inv Hs.
+    + do 3 eexists. split; [| split ]. eapply bstep_fuel_zero_OOT. eapply lt_one in H. subst.
+      eapply HPost_OOT. eapply zero_one_lt.
+      now simpl; eauto.
+    + inv H; repeat subst_exp.
+      eapply find_tag_nth_deterministic in H5; [| clear H5; eassumption ]. inv H5.
+      edestruct (preord_exp_refl cenv (P1 0) PG). now eauto.
+      eapply preord_env_P_antimon. apply Hcc. 3:{ eassumption. }
       eapply occurs_free_Ecase_Included. eapply find_tag_nth_In_patterns; eassumption.
-      simpl; omega.
-
-      do 2 eexists. split; [| split ]; eauto.
-      simpl in *; replace c1 with (c1 - 1 + 1) by omega.
-      eapply Hless_steps''; eauto.
-      eapply preord_res_monotonic. eassumption. omega.
+      rewrite to_nat_add in Hleq. simpl; omega.
+      destructAll.
+      do 3 eexists. split; [| split ]. eassumption. 
+      now eapply Hless_steps_case; eauto.
+      eapply preord_res_monotonic. eassumption. rewrite to_nat_add. omega.
   Qed.
 
 
@@ -1099,9 +1074,9 @@ Section Shrink_correct.
     find_tag_nth cl c0 e n ->
     ~bound_stem_ctx c x ->
     preord_env_P cenv PG (occurs_free (Econstr x c0 ys (c |[ Ecase x cl ]|))) k rho1 rho2 ->
-    preord_exp cenv P1 PG k (Econstr x c0 ys (c |[ Ecase x cl ]|), rho1) (Econstr x c0 ys (c |[ e ]|), rho2).
+    preord_exp cenv (P1 1) PG k (Econstr x c0 ys (c |[ Ecase x cl ]|), rho1) (Econstr x c0 ys (c |[ e ]|), rho2).
   Proof.
-    intros Hf Hb Henv.
+    intros Hf Hb Henv. assert (HP := HPost). destruct (HP 1). omega.
     eapply preord_exp_constr_compat; eauto.
     eapply Forall2_same. intros y Hin. eapply Henv. now constructor; eauto.
     intros m vs1 vs2 Hlt Hall.
@@ -1167,13 +1142,15 @@ Section Shrink_correct.
       + inv Hall ; eauto.
   Qed.
 
-  Lemma rename_all_correct k (m : M.t var) e1 rho1 rho2 :
+  Lemma rename_all_correct k (m : M.t var) e1 rho1 rho2 n (Hleq : n <= 1):
     Disjoint _ (image' (fun x => M.get x m) (occurs_free e1)) (bound_var e1) ->
     preord_env_P_inj cenv PG (occurs_free e1) k (apply_r m) rho1 rho2 ->
-    preord_exp cenv P1 PG k (e1, rho1) (rename_all m e1, rho2).
+    preord_exp cenv (P1 n) PG k (e1, rho1) (rename_all m e1, rho2).
   Proof.
     revert e1 m rho1 rho2. induction k as [k IHk] using lt_wf_rec1.
-    intros e1. revert k IHk; induction e1 using exp_ind'; intros k IHk m rho1 rho2 Hdis Hpre.
+    intros e1.
+    revert k IHk; induction e1 using exp_ind'; intros k IHk m rho1 rho2 Hdis Hpre;
+      (assert (HP := HPost n); destruct HP; [ omega | ]).
     - (* Econstr *)
       simpl; eapply preord_exp_constr_compat; eauto; intros.
       + eapply Forall2_preord_var_env_map. eassumption.
@@ -1305,13 +1282,13 @@ Section Shrink_correct.
         * inv Hget; try contradiction.
           rewrite def_funs_neq in *; eauto. unfold apply_r. rewrite <- not_in_remove_all.
           eapply Hpre. eassumption. eassumption.
-          intros Hc. eapply n. eapply Same_set_all_fun_name. eassumption.
+          intros Hc. eapply n0. eapply Same_set_all_fun_name. eassumption.
           intros Hc. edestruct rename_all_fun_name as [Hl Hr]. eapply Hl in Hc. clear Hr Hl.
           unfold apply_r in Hc. rewrite <- not_in_remove_all in Hc.
           destruct (M.get z m) eqn:Heq; eauto. eapply Hdis. constructor.
           now eexists; split; eauto.
           constructor; eauto. eapply name_in_fundefs_bound_var_fundefs. eassumption.
-          intros Hc'. eapply n. eapply Same_set_all_fun_name. eassumption.
+          intros Hc'. eapply n0. eapply Same_set_all_fun_name. eassumption.
       + omega.
     - (* Eapp *)
       simpl; eapply preord_exp_app_compat; eauto; intros.
@@ -1387,10 +1364,10 @@ Section Shrink_correct.
       x' <> y ->
       nthN ys n = Some y ->
       preord_env_P cenv PG (occurs_free (Econstr x t ys (c |[ Eproj x' t' n x e ]|))) k rho1 rho2 ->
-      preord_exp cenv P1 PG k (Econstr x t ys (c |[ Eproj x' t' n x e ]|) , rho1 )
+      preord_exp cenv (P1 1) PG k (Econstr x t ys (c |[ Eproj x' t' n x e ]|) , rho1 )
                  (Econstr x t ys (c |[ rename y x' e ]|), rho2).
   Proof.
-    intros Hn1 Hn2 Hn3 Hleq Hneq Hnth Henv.
+    intros Hn1 Hn2 Hn3 Hleq Hneq Hnth Henv. assert (HP := HPost 1). destruct HP. omega.
     eapply preord_exp_constr_compat_alt; eauto.
     + eapply Forall2_same. intros. eapply Henv. now constructor.
     + intros m vs1 vs2 Hlt Hg1 Hg2.
@@ -1404,13 +1381,14 @@ Section Shrink_correct.
       eapply preord_exp_compat_stem_vals_le with (xs := [x ; y]) (S1 := Empty_set _);
         [ | | simpl; rewrite M.gss, M.gso, Hget1; eauto | simpl; rewrite M.gss, M.gso, Hget2; eauto | ].
       * intros k1 rho1' rho2' Hpre Hleq1 Hgetl1 Hgetl2.
-        eapply ctx_to_rho_preord_exp_l with (C := Eproj_c x' t' n x Hole_c) (P1 := P1).
+        eapply ctx_to_rho_preord_exp_l with (C := Eproj_c x' t' n x Hole_c) (P1 := P1 0).
         
-        -- intros; eapply Hless_steps; eauto.
-        -- eapply Hpost_zero.
+        -- intros; eapply Hless_steps_ctx; eauto.
+        -- eassumption.
         -- reflexivity.
         -- intros rho1'' Hrho1'; inv Hrho1'. inv H8.
            eapply rename_all_correct.
+           ++ omega.
            ++ eapply Disjoint_Included_l.
               eapply image'_get_Singleton. eapply Disjoint_Singleton_l. eassumption.
            ++ simpl in Hgetl1, Hgetl2.
@@ -1507,11 +1485,11 @@ Section Shrink_correct.
     Disjoint var (bound_stem_ctx c) (name_in_fundefs fds)  ->
     
     preord_env_P cenv PG (occurs_free (Efun fds (c |[ Eapp f t vs ]|))) k rho1 rho2 ->
-    preord_exp cenv P1 PG k
+    preord_exp cenv (P1 1) PG k
                (Efun fds (c |[ Eapp f t vs ]|), rho1)
                (Efun fds (c |[ (rename_all (set_list (combine xs vs) (M.empty var)) fb)]|), rho2).
   Proof.
-    intros Hf1 Hd1 Hun1 Hd2 Hd3 Hpre.
+    intros Hf1 Hd1 Hun1 Hd2 Hd3 Hpre. assert (HP := HPost 1). destruct HP. omega.
     eapply preord_exp_fun_compat; eauto.
     assert (Hget1 : M.get f (def_funs fds fds rho1 rho1) = Some (Vfun rho1 fds f)). 
     { rewrite def_funs_eq. reflexivity. eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct.
@@ -1519,8 +1497,9 @@ Section Shrink_correct.
     assert (Hget2 : M.get f (def_funs fds fds rho2 rho2) = Some (Vfun rho2 fds f)). 
     { rewrite def_funs_eq. reflexivity. eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct.
       eassumption. }
-
-    eapply preord_exp_compat_vals_stem_set with (S1 := name_in_fundefs fds :|: occurs_free_fundefs fds) (S :=  name_in_fundefs fds :|: occurs_free_fundefs fds). 
+    
+    eapply preord_exp_compat_vals_stem_set with
+        (S1 := name_in_fundefs fds :|: occurs_free_fundefs fds) (S0 :=  name_in_fundefs fds :|: occurs_free_fundefs fds). 
     
     * intros k1 rho1' rho2' Hleq1 Hpre' Heq1 Heq2. 
        
@@ -1533,6 +1512,7 @@ Section Shrink_correct.
       rewrite <- Heq1 in Hget. rewrite def_funs_eq in Hget; eauto. inv Hget. repeat subst_exp.
        
       eapply rename_all_correct.
+      ++ omega.
       ++ eapply Disjoint_Included_l. eapply image'_get_set_list. 
          eapply Disjoint_sym. eapply Disjoint_Included_l; [| eassumption ].
          now sets.
@@ -1545,7 +1525,7 @@ Section Shrink_correct.
          eapply preord_env_eq_env.
          ** eapply preord_env_P_antimon. 
             eapply preord_env_P_def_funs_pre. eassumption.
-            { intros. eapply preord_exp_refl; eauto. now constructor; eauto. }
+            { intros. eapply preord_exp_refl; eauto. }
             eapply preord_env_P_monotonic; [| eassumption ]. omega.
             eapply Setminus_Included_Included_Union.
             eapply Included_trans. eapply occurs_free_in_fun. eapply find_def_correct; eauto.
@@ -1557,7 +1537,7 @@ Section Shrink_correct.
     * sets.
     * eapply preord_env_P_antimon.
       eapply preord_env_P_def_funs_pre with (e := c |[ Eapp f t vs ]|); eauto.
-      { intros. eapply preord_exp_refl; eauto. now constructor; eauto. }
+      { intros. eapply preord_exp_refl; eauto. } 
       eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega. reflexivity.
       normalize_occurs_free. rewrite <- Union_assoc, <- Union_Setminus; tci. sets.
   Qed.
@@ -1607,11 +1587,11 @@ Section Shrink_correct.
          (set_list (combine xs vs) (M.empty var)) fb) x = Some (C', x') ->
 
     preord_env_P cenv PG (occurs_free (Efun fds (c |[ Eletapp x f t vs e1 ]|))) k rho1 rho2 ->
-    preord_exp cenv P1 PG k
+    preord_exp cenv (P1 1) PG k
                (Efun fds (c |[ Eletapp x f t vs e1 ]|), rho1)
                (Efun fds (c |[ C' |[ rename x' x e1 ]| ]|), rho2).
   Proof.
-    intros Hf1 Hd1 Hun1 Hd2 Hd3  Hd4 Hd5 Hnin Hnd Hpre.
+    intros Hf1 Hd1 Hun1 Hd2 Hd3  Hd4 Hd5 Hnin Hnd Hpre. assert (HP := HPost 1). destruct HP. omega.
     eapply preord_exp_fun_compat; eauto.
     assert (Hget1 : M.get f (def_funs fds fds rho1 rho1) = Some (Vfun rho1 fds f)). 
     { rewrite def_funs_eq. reflexivity. eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct.
@@ -1620,15 +1600,14 @@ Section Shrink_correct.
     { rewrite def_funs_eq. reflexivity. eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct.
       eassumption. } 
 
-    eapply preord_exp_compat_vals_stem_set with (S1 := name_in_fundefs fds :|: occurs_free_fundefs fds) (S :=  name_in_fundefs fds :|: occurs_free_fundefs fds). 
+    eapply preord_exp_compat_vals_stem_set with (S1 := name_in_fundefs fds :|: occurs_free_fundefs fds)
+                                                (S0 :=  name_in_fundefs fds :|: occurs_free_fundefs fds). 
     - intros k1 rho1' rho2' Hleq1 Hpre' Heq1 Heq2. 
 
       assert (Hf1' := Hf1).
       eapply find_def_correct in Hf1; eapply fun_in_fundefs_name_in_fundefs in Hf1.      
       
-      eapply inline_letapp_correct with (C' := Hole_c) (sig := id); [ | | | | | | | | | | | eassumption ]. 
-      + eassumption.
-      + eassumption.
+      eapply inline_letapp_correct with (C'0 := Hole_c) (sig := id); [ | | | | | | | | | eassumption ]. 
       + eassumption.
       + eassumption.
       + eassumption.
@@ -1637,6 +1616,7 @@ Section Shrink_correct.
         2:{ left; eauto. } simpl (_ |[ _ ]|).
 
         eapply rename_all_correct.
+        * omega.
         * eapply Disjoint_Included_l. eapply image'_get_set_list. sets.
         * edestruct preord_env_P_get_list_l as [vs2 [Hget' Hvall]]; [ | | eassumption | ]. eassumption. 
           normalize_occurs_free. now sets. 
@@ -1644,7 +1624,7 @@ Section Shrink_correct.
           -- eapply preord_env_eq_env.
              ** eapply preord_env_P_antimon.
                 eapply preord_env_P_def_funs_pre. eassumption.
-                { intros. eapply preord_exp_refl; eauto. now constructor; eauto. }
+                { intros. eapply preord_exp_refl; eauto. }
                 eapply preord_env_P_monotonic; [| eassumption ]. omega.
                 eapply Setminus_Included_Included_Union.
                 eapply Included_trans. eapply occurs_free_in_fun. eapply find_def_correct; eauto.
@@ -1658,6 +1638,7 @@ Section Shrink_correct.
       + intros m rho3 rho4 rhoc B' f' t' xs1' e' Hlt Hgetf Hfind Hlen Henv.
         rewrite <- Heq1 in Hgetf; [| now left; eauto ]. rewrite def_funs_eq in Hgetf. inv Hgetf. repeat subst_exp. 
         eapply rename_all_correct.
+        * omega.
         * eapply Disjoint_Included_l. 
           eapply image'_get_Singleton.
           destruct (inline_letapp_var_eq _ _ _ _ Hnd).
@@ -1699,7 +1680,7 @@ Section Shrink_correct.
     - sets.
     - eapply preord_env_P_antimon.
       eapply preord_env_P_def_funs_pre with (e := c |[ Eletapp x f t vs e1 ]|); eauto.
-      { intros. eapply preord_exp_refl; eauto. now constructor; eauto. }
+      { intros. eapply preord_exp_refl; eauto. }
       eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega. reflexivity.
       normalize_occurs_free. rewrite <- Union_assoc, <- Union_Setminus; tci. sets.
   Qed.
@@ -1847,7 +1828,7 @@ Section Shrink_correct.
     rw e e' ->
     forall rho rho' k,
       preord_env_P cenv PG (occurs_free e) k rho rho'->
-      preord_exp cenv P1 PG k (e, rho) (e', rho').
+      preord_exp cenv (P1 1) PG k (e, rho) (e', rho').
   Proof.
     intros Hrw. inv Hrw.
     - intros; apply rm_constr; auto.
@@ -1908,37 +1889,36 @@ Section Shrink_correct.
     gen_rw e e' ->
     forall rho rho' k,
       preord_env_P cenv PG (occurs_free e) k rho rho'->
-      preord_exp cenv P1 PG k (e, rho) (e', rho').
+      preord_exp cenv (P1 1) PG k (e, rho) (e', rho').
   Proof.
     intros H; inv H. intros. 
-    apply preord_exp_compat; auto. now constructor; eauto. now constructor; eauto.
+    apply preord_exp_compat; auto.
     intros; eapply rw_correct; eauto. 
   Qed.
 
-  Context (HcompP1 : inclusion _ (comp P1 P1) P1)
-          (HGPost' : inclusion _ PG P1).  
+  Context (HcompP1 : inclusion _ (comp (P1 1) (P1 1)) (P1 1))
+          (HGPost' : inclusion _ PG (P1 1)).  
 
   (* NOTE : works only for trivial postcondition. For meaningful ones we need to compose differently *)
   Lemma gr_clos_correct n e e' :    
     gr_clos n e e' ->
     forall rho rho' k,
       preord_env_P cenv PG (occurs_free e) k rho rho'->
-      preord_exp cenv P1 PG k (e, rho) (e', rho').
+      preord_exp cenv (P1 1) PG k (e, rho) (e', rho').
   Proof with now eauto.
     intros H.
     induction H; intros.
     - eapply preord_exp_post_monotonic.
       eapply HcompP1. 
-      eapply preord_exp_trans; eauto. now constructor; eauto.
+      eapply preord_exp_trans; eauto. destruct (HPost 1). omega.
       revert HGPost HcompP1. clear. now firstorder.
       eapply gen_rw_correct; try eassumption.      
       intros m. eapply IHrefl_trans_closure_n.
-      eapply preord_env_P_refl; eauto. now constructor; eauto.
-    - eapply preord_exp_refl; eauto. now constructor; eauto.
+      eapply preord_env_P_refl; eauto.
+    - eapply preord_exp_refl; eauto.
   Qed.
 
 End Shrink_correct.
-
 
 
 
@@ -3690,7 +3670,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       simpl in Hn. simpl.  rewrite plus_0_r. auto.
       eapply num_occur_n. constructor. auto.
       assert (Hnn := num_occur_set_arl _ _ Hxy [v]).
-      simpl. simpl in Hnn. do 3 (rewrite plus_0_r). rewrite plus_comm. auto.
+      simpl. simpl in Hnn. do 3 (rewrite plus_0_r). rewrite Plus.plus_comm. auto.
     - inv H1; inv H2. inv H7; inv H6.
       specialize (H _ _ H8 H7).
       assert (num_occur (Ecase v l) x ( num_occur_list [v] x + m)).
@@ -3877,31 +3857,30 @@ substitution to a term cannot increase the occurence count for that variable. *)
   Proof.
     intros xs vs fb t c f B1 B2 c' H Hnoc H0.
     eapply Included_trans.
-    Focus 2.
-    apply occurs_free_exp_ctx_included.
-    apply of_fun_inline''' with (f := f) (fds := (fundefs_append B1 (Fcons f t xs fb B2))).
-    2: apply H0.
-    erewrite find_def_fundefs_append_r.
-    simpl. destruct (M.elt_eq f f).
-    reflexivity.
-    exfalso. apply n. auto.
-    simpl. destruct (M.elt_eq f f).
-    reflexivity.
-    exfalso. apply n. auto.
-    apply ub_app_ctx_f in H.
-    destructAll.
-    inv H1.
-    apply name_not_in_fundefs_find_def_None.
-    eapply fundefs_append_unique_bindings_l in H6.
-    2: reflexivity.
-    destructAll.
-    rewrite bound_var_fundefs_Fcons in H4.
-    intro.
-    apply name_in_fundefs_bound_var_fundefs in H6.
-    inv H4.
-    specialize (H8 f).
-    apply H8.
-    split; eauto.
+    2:{ apply occurs_free_exp_ctx_included.
+        apply of_fun_inline''' with (f := f) (fds := (fundefs_append B1 (Fcons f t xs fb B2))).
+        2: apply H0.
+        erewrite find_def_fundefs_append_r.
+        simpl. destruct (M.elt_eq f f).
+        reflexivity.
+        exfalso. apply n. auto.
+        simpl. destruct (M.elt_eq f f).
+        reflexivity.
+        exfalso. apply n. auto.
+        apply ub_app_ctx_f in H.
+        destructAll.
+        inv H1.
+        apply name_not_in_fundefs_find_def_None.
+        eapply fundefs_append_unique_bindings_l in H6.
+        2: reflexivity.
+        destructAll.
+        rewrite bound_var_fundefs_Fcons in H4.
+        intro.
+        apply name_in_fundefs_bound_var_fundefs in H6.
+        inv H4.
+        specialize (H8 f).
+        apply H8.
+        split; eauto. } 
     apply of_fun_rm.
     apply ub_app_ctx_f in H.
     destructAll.

@@ -291,9 +291,9 @@ Section CC.
         | Some GFun =>
           (* if so, construct an empty env *)
           c_env <- make_record_ctor_tag 0 ;;
-          g_env <- get_name x "bogus_env" ;;
           y <- get_name x clo_suffix ;;
-          ret (y, fun e => Econstr g_env c_env [] (Econstr y clo_tag [x; Γ] e))
+          g_env <- get_name x "bogus_env" ;;
+          ret (y, fun e => Econstr g_env c_env [] (Econstr y clo_tag [x; g_env] e))
         | None => ret (x, id) (* should never reach here *)
         end
     end.

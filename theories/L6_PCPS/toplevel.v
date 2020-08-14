@@ -1,7 +1,7 @@
 Require Import ZArith.
 Require Import Common.compM.
 From CertiCoq Require Import
-     L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6_anf L6.L5_to_L6
+     L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6_anf L6.L4_to_L6 L6.L5_to_L6
      L6.inline L6.uncurry L6.closure_conversion
      L6.closure_conversion L6.hoisting L6.dead_param_elim L6.lambda_lifting.
 From CertiCoq Require Import L4.toplevel.
@@ -42,17 +42,24 @@ Definition bogus_cloind_tag := 16%positive.
 Definition fun_fun_tag := 3%positive.
 Definition kon_fun_tag := 2%positive.
 
-Definition compile_L6_CPS : CertiCoqTrans L5_FullTerm L6_FullTerm :=
+Definition compile_L6_CPS : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
   fun src => 
       debug_msg "Translating from L5 to L6 (CPS)" ;;
       LiftErrorCertiCoqTrans "L6 CPS"
-        (fun (p : L5_FullTerm) =>
-           match convert_top default_ctor_tag default_ind_tag fun_fun_tag kon_fun_tag p with
-           | Some (cenv, nenv, fenv, ctag, itag, e) =>
+        (fun (p : toplevel.L4Term) =>
+           match L4_to_L6.convert_top (* fun_fun_tag default_ctor_tag default_ind_tag *) p with
+           | Some (cenv, nenv, fenv, ctag, itag, e) => 
              Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e)
-
-           | None => Err "Failed translating from L5 to L6"
+           | None => Err "Failed while compiling from L4 to L6 (CPS)"
            end) src.
+
+        (* (fun (p : L5_FullTerm) => *)
+        (*    match convert_top default_ctor_tag default_ind_tag fun_fun_tag kon_fun_tag p with *)
+        (*    | Some (cenv, nenv, fenv, ctag, itag, e) => *)
+        (*      Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e) *)
+
+        (*    | None => Err "Failed translating from L5 to L6" *)
+        (*    end) src. *)
 
 Definition compile_L6_ANF : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
   fun src => 

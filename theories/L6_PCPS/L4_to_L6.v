@@ -21,7 +21,7 @@ Require Import eval.
 Require Import ctx.
 Require Import logical_relations.
 Require Import alpha_conv.
-Require Import L6.List_util. 
+Require Import L6.List_util L6.algebra. 
 
 Require Import ExtLib.Data.Monads.OptionMonad.
 Require Import ExtLib.Structures.Monads.
@@ -721,13 +721,17 @@ Proof.
   - simpl. unfold cps_cvt_env. reflexivity.
 Qed. 
 
-Context (P1 : PostT) (* Local *)
-        (PG : PostGT) (* Global *)
-        (cnstrs : conId_map)
-        (cenv : ctor_env)
-        (Hprops : Post_properties cenv P1 P1 PG)
-        (HpropsG : Post_properties cenv PG PG PG)
-        (Hincl : inclusion _ (comp P1 P1) P1).
+Section Post.
+  
+    Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
+
+    Context (P1 : PostT) (* Local *)
+            (PG : PostGT) (* Global *)
+            (cnstrs : conId_map)
+            (cenv : ctor_env)
+            (Hprops : Post_properties cenv P1 P1 PG)
+            (HpropsG : Post_properties cenv PG PG PG)
+            (Hincl : inclusion _ (comp P1 P1) P1).
 
 Inductive StrictlyIncreasing' : list positive -> Prop :=
   | SInc_nil : StrictlyIncreasing' []
@@ -1450,17 +1454,19 @@ Proof.
             reflexivity. split.
             symmetry. eassumption.
             intros Hlt2 Hall v3 cin Hleq Hstep.
-            inv Hstep. simpl in H1.
-            eexists. eexists. split.
-            econstructor. simpl.
-            assert (Heq: Datatypes.length xs1 = Datatypes.length l0).
-            { eapply gensym_n_length_eq. eassumption. eassumption. } 
-            rewrite <- Heq. eassumption.
-            admit.
-            inv H2. simpl in H12.
-            inv H12. admit.
+            inv Hstep.
+            (* Zoe : commenting out because H1 is not in the context *)
+            (* simpl in H1. *)
+            (* eexists. eexists. split. *)
+            (* econstructor. simpl. *)
+            (* assert (Heq: Datatypes.length xs1 = Datatypes.length l0). *)
+            (* { eapply gensym_n_length_eq. eassumption. eassumption. }  *)
+            (* rewrite <- Heq. eassumption. *)
+            (* admit. *)
+            (* inv H2. simpl in H12. *)
+            (* inv H12. admit. *)
             
-            admit.
+            (* admit. *)
             
 Abort.
 
@@ -1910,7 +1916,9 @@ Proof.
   intros k. induction k as [k IHk] using lt_wf_rec1. eapply my_exp_ind.
   - intros n e' rho rho' rho_m v v' x k0 vk vars 
            next1 next2 next3 H H0 H1 H2 H3 H4 H5 H6.
-    inv H. simpl in H5. inv H5.
+    inv H. simpl in H5.
+    destruct (nth_error vars (N.to_nat n)) eqn:Heqn. 2:{ congruence. }
+    inv H5.
     eapply preord_exp_app_compat.
     + eapply HPost_app. eapply Hprops. 
     + eapply HPost_OOT. eapply Hprops. 
@@ -1929,14 +1937,16 @@ Proof.
          inv Hgetv1. eexists. admit.
       -- econstructor.
   - intros na e IH e' rho rho' rho_m v v' x k0 vk vars
-           next1 next2 next3 next4 next5 Heval Hneq Hlt Hrel Hgen Hset Hcvt Hcvt_val.
-    inv Heval. simpl in Hcvt.
+           next1 next2 next3 Heval Hneq Hlt Hrel Hgen Hset Hcvt Hcvt_val.
+    inv Heval. simpl in Hcvt. 
     destruct (gensym next2 (nNamed "k_lam")) eqn: Hgen_k.
     destruct (gensym s (nNamed "x_lam")) eqn: Hgen_x.
     destruct (gensym s0 na) eqn:Hgen_f.
     destruct (cps_cvt e (v0 :: vars) v s1 cnstrs) eqn:Hcvt_e.
     destruct p eqn:Hp. inv Hcvt.
     2 : { inv Hcvt. }
+(* Zoe: commneting out because some stuff have changed *) 
+(* 
     rewrite cps_cvt_val_eq in Hcvt_val. simpl in Hcvt_val.
     destruct (cps_cvt_env rho next4 cnstrs) eqn:Hcps_env.
     2: { inv Hcvt_val. } 
@@ -1949,7 +1959,7 @@ Proof.
     destruct (gensym s5 na) eqn:Hgen_f2.
     destruct (cps_cvt e (v3 :: l0) v2 s6 cnstrs) eqn:Hcvt_e_2.
     destruct p0 eqn:Hp0. inv Hcvt_val.
-    2: { inv Hcvt_val. }
+    2: { inv Hcvt_val. } *)
     (* 
        RHS:
        (Efun v1 [v0; v] e0 (Eapp k0 [v1]), [k0 -> vk]rho_m) ==>
@@ -1967,7 +1977,7 @@ Proof.
   - admit.
   - admit.
   - intros na e IH1 e0 IH2 e' rho rho' rho_m v v' x k0 vk vars
-           next1 next2 next3 next4 next5 Heval Hneq Hlt Hrel Hgen Hset Hcvt Hcvt_val.
+           next1 next2 next3 Heval Hneq Hlt Hrel Hgen Hset Hcvt Hcvt_val.
     simpl in Hcvt.
     destruct (gensym next2 na) eqn: Hgen_x.
     destruct (gensym s (nNamed "k")) eqn: Hgen_k.
@@ -1979,6 +1989,9 @@ Proof.
     destruct p0 eqn: Hp0.
     inv Hcvt.
     inv Heval.
+    (* Zoe: commneting out because some stuff have changed *) 
+(* 
+
     assert (Hex: exists v2' next6,
                  cps_cvt_val v2 next5 cnstrs = Some (v2', next6)) by admit.
     destruct Hex as (v2' & next6 & Hval). 
@@ -2059,7 +2072,7 @@ Proof.
       - (* use some other rho? *) admit.
       - admit.
       - eassumption.
-      - (* ? *)
+      - (* ? *) *)
 Abort. 
 
   
@@ -2103,27 +2116,28 @@ Definition L6_evaln_fun n p : @bigStepResult (env * exp) cps.val :=
   | Ret (inr v) => Result v
   end.
 
-Definition print_BigStepResult_L6 p n :=
-  let '((penv, cenv, nenv, fenv), (rho, e)) :=
-      p : ((M.t (list cps.val -> option cps.val) * ctor_env * name_env * fun_env) *
-           (M.t cps.val * cps.exp)) in
-  L7.L6_to_Clight.print (
-      match (bstep_f penv cenv rho e n) with
-      | exceptionMonad.Exc s => s
-      | Ret (inl t) =>
-        let (rho', e') := t : (env * cps.exp) in
-        "Out of time:" ++ (show_cenv cenv) ++ (show_env nenv cenv false rho') ++
-                       (show_exp nenv cenv false e')
-      | Ret (inr v) => show_val nenv cenv false v
-      end).
+(* Definition print_BigStepResult_L6 p n := *)
+(*   let '((penv, cenv, nenv, fenv), (rho, e)) := *)
+(*       p : ((M.t (list cps.val -> option cps.val) * ctor_env * name_env * fun_env) * *)
+(*            (M.t cps.val * cps.exp)) in *)
+(*   L7.L6_to_Clight.print ( *)
+(*       match (bstep_f penv cenv rho e n) with *)
+(*       | exceptionMonad.Exc s => s *)
+(*       | Ret (inl t) => *)
+(*         let (rho', e') := t : (env * cps.exp) in *)
+(*         "Out of time:" ++ (show_cenv cenv) ++ (show_env nenv cenv false rho') ++ *)
+(*                        (show_exp nenv cenv false e') *)
+(*       | Ret (inr v) => show_val nenv cenv false v *)
+(*       end). *)
 
-Definition print_BigStepResult_L6Val p :=
-  let '((penv, cenv, nenv, fenv), (rho, v)) :=
-      p : ((M.t (list cps.val -> option cps.val) * ctor_env * name_env * fun_env) *
-           (M.t cps.val * cps.val)) in
-  L7.L6_to_Clight.print ((show_cenv cenv) ++ (show_env nenv cenv false rho) ++
-                                          (show_val nenv cenv false v)).
+(* Definition print_BigStepResult_L6Val p := *)
+(*   let '((penv, cenv, nenv, fenv), (rho, v)) := *)
+(*       p : ((M.t (list cps.val -> option cps.val) * ctor_env * name_env * fun_env) * *)
+(*            (M.t cps.val * cps.val)) in *)
+(*   L7.L6_to_Clight.print ((show_cenv cenv) ++ (show_env nenv cenv false rho) ++ *)
+(*                                           (show_val nenv cenv false v)). *)
 
+End Post.
 (*
 Quote Recursively Definition test1_program :=
   ((fun x =>

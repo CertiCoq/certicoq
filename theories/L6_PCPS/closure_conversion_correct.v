@@ -2,7 +2,8 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import L6.tactics L6.closure_conversion_invariants L6.closure_conversion L6.closure_conversion_util.
+Require Import L6.tactics L6.closure_conversion_invariants L6.closure_conversion L6.closure_conversion_util
+        L6.algebra.
 From CertiCoq.L6 Require Import cps size_cps cps_util set_util hoisting identifiers ctx
                        Ensembles_util List_util functions eval logical_relations_cc.
 Require Import compcert.lib.Coqlib.
@@ -18,14 +19,18 @@ Close Scope Z_scope.
 
 
 Section Closure_conversion_correct.
-
+  
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
+  
   Variable pr : prims.
   Variable cenv : ctor_env.
   Variable clo_tag : ctor_tag.
 
-  Context (boundL : nat -> PostT) (* Local *) (* the nat is the extra steps the target is allowed to take (e.g. c2 <= A*c1 + n) *)
-    (boundG : PostGT) (* Global *)           
-    (HPost_con : forall x t ys e rho1 n k, 
+  Context (boundL : nat -> @PostT fuel trace) (* Local *) (* the nat is the extra steps the target is allowed to take (e.g. c2 <= A*c1 + n) *)
+          (boundG : @PostGT fuel trace).  (* Global *)           
+
+  Context (HPost : forall k e, Post_properties cenv (boundL k) (boundL (k + 4 * to_nat (e))) boundG).
+  (HPost_con : forall x t ys e rho1 n k, 
                    k <= 4 * cost (Econstr x t ys e) -> 
                    post_constr_compat' x t ys e rho1 (boundL n) (boundL (n + k)))
     (HPost_proj : forall x t N y e rho1 n k, 

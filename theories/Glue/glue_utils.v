@@ -114,7 +114,7 @@ Section Names.
   Definition split (c : ascii) (s : string) : list string :=
     split_aux EmptyString c s.
 
- Definition qualifying_prefix := string.
+ Definition qualifying_prefix := modpath.
  Definition base_name := string.
  Definition sanitized_name := string.
 
@@ -122,21 +122,37 @@ Section Names.
     leaving behind the qualifying prefix.
     e.g. "Coq.Init.Datatypes.bool" becomes "Coq.Init.Datatypes." *)
   Definition find_qualifying_prefix (n : kername) : qualifying_prefix :=
-    match rev (split "." n) with
+    fst n.
+  (* match rev (split "." n) with
     | nil => (* not possible *) ""%string
     | base :: rest => String.concat "." (rev (""%string :: rest))
-    end.
+    end. *)
 
  (* takes a fully qualified name and gives the base name *)
   Definition find_base_name (n : kername) : base_name :=
-    match rev (split "." n) with
+    snd n.
+  (* match rev (split "." n) with
     | nil => (* not possible *) ""%string
     | base :: rest => base
+    end. *)
+
+  Definition sanitize_dirpath (dp : dirpath) : string :=
+    String.concat "_" (List.rev dp).
+      
+  Fixpoint sanitize_modpath (mp : modpath) : string :=
+    match mp with
+    | MPfile dp => sanitize_dirpath dp
+    | MPbound dp id _ => (sanitize_dirpath dp ++ "_" ++ id)%string
+    | MPdot mp0 id => (sanitize_modpath mp0 ++ "_" ++ id)%string
     end.
 
   (* Takes in "M1.M2.tau" and returns "M1_M2_tau". *)
   Definition sanitize_qualified (n : kername) : sanitized_name :=
-    String.concat "_" (split "." n).
+    let (mp, id) := n in 
+    (sanitize_modpath mp ++ "_" ++ id)%string.
+
+  Definition sanitize_string (s : string) : sanitized_name :=
+    String.concat "_" (split "." s).
 
 End Names.
 

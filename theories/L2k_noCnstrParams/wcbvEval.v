@@ -225,7 +225,7 @@ Lemma WcbvEval_weaken:
 Proof.
   intros p. apply WcbvEvalEvals_ind; intros; auto.
   - econstructor; intuition.
-  - destruct (string_dec nm nm0).
+  - destruct (kername_eq_dec nm nm0).
     + subst. inversion_Clear H0; unfold lookupDfn in e.
       * rewrite (proj1 (fresh_lookup_None (trm:=Term) _ _)) in e.
         discriminate. assumption.
@@ -311,7 +311,7 @@ Function wcbvEval
       match (lookup nm p) with
       | Some (ecTrm t) => wcbvEval n t
       (** note hack coding of axioms in environment **)
-      | Some (ecTyp _ _) => raise ("wcbvEval;TConst;ecTyp: " ++ nm)
+      | Some (ecTyp _ _) => raise ("wcbvEval;TConst;ecTyp: " ++ string_of_kername nm)
       | _ => raise "wcbvEval: TConst environment miss"
       end
     | TApp fn a1 =>

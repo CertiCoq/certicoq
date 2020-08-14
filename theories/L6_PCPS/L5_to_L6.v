@@ -364,7 +364,7 @@ arguments are:
          end.
 
 
-  Definition ienv := list (string * AstCommon.itypPack).
+  Definition ienv := list (BasicAst.kername * AstCommon.itypPack).
 
 
   (** process a list of constructors from inductive type ind with ind_tag niT.
@@ -399,7 +399,7 @@ arguments are:
     - process each of the constructor, indicating they are the ith constructor of the nth type of idBundle
    np: number of type parameters for this bundle
    *)
-  Fixpoint convert_typack typ (idBundle:string) (n:nat) (ice:(ind_env * ctor_env*  ctor_tag * ind_tag * conId_map)) : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
+  Fixpoint convert_typack typ (idBundle:BasicAst.kername) (n:nat) (ice:(ind_env * ctor_env*  ctor_tag * ind_tag * conId_map)) : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
     let '(ie, ce, ncT, niT, dcm) := ice in
     match typ with
       | nil => ice

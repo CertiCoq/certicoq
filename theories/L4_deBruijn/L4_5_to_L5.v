@@ -55,7 +55,7 @@ Require Import  ExtLib.Data.String.
 Definition dconString (d: dcon) : string :=
 match fst d with
 | mkInd s n => terms.flatten [nat2string10 (N.to_nat (snd d))
-    ; ":"; nat2string10 n; ":"; s]
+    ; ":"; nat2string10 n; ":"; string_of_kername s]
 end.
 
 Inductive L4_5Opid : Set :=
@@ -2715,7 +2715,7 @@ ball (map (is_valueb ∘ get_nt) (map (bterm []) es)) = true
 -> es=vs.
 Proof using.
 intros ? ? ? ? Hb.
-eapply eval_Con_e with (d:=((mkInd "" 0), 0%N)) in H0; eauto.
+eapply eval_Con_e with (d:=((mkInd (kername_of_string "") 0), 0%N)) in H0; eauto.
 apply eval_valueb_noop in H0;[| assumption].
 inverts H0.
 apply map_eq_injective in H3; auto.

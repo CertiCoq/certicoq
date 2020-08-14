@@ -126,6 +126,28 @@ with Alpha_conv_fundefs : fundefs -> fundefs -> (var -> var) -> Prop :=
       Alpha_conv_fundefs (Fcons g t xs e B) (Fcons g' t xs' e' B') f.
 
 
+Inductive Alpha_conv_val :
+  val -> val -> (* the two related values *)
+  (var -> var) -> (* the current renaming of fvs *)
+  Prop :=
+| Alpha_Vconstr :
+    forall t vs vs' f,
+      Forall2 (fun v v' => Alpha_conv_val v v' f) vs vs' ->
+      Alpha_conv_val (Vconstr t vs) (Vconstr t vs') f
+| Alpha_Vfun :
+    forall rho rho' fdefs fdefs' x x' f,
+      f x = x' ->
+      Alpha_conv_fundefs fdefs fdefs' f ->
+      (forall x v, x \in occurs_free_fundefs fdefs ->
+                         M.get x rho = Some v ->
+                         exists v', M.get (f x) rho' =
+                                    Some v' /\ Alpha_conv_val v v' f) ->
+      Alpha_conv_val (Vfun rho fdefs x) (Vfun rho' fdefs' x') f
+| Alpha_Vint :
+    forall n f,
+      Alpha_conv_val (Vint n) (Vint n) f.
+
+
 Lemma construct_fundefs_injection_f_eq f f' B B' g :
   construct_fundefs_injection f B B' f' ->
   f_eq f g ->

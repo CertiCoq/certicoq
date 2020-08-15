@@ -47,10 +47,11 @@ Definition compile_L6_CPS : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
       debug_msg "Translating from L5 to L6 (CPS)" ;;
       LiftErrorCertiCoqTrans "L6 CPS"
         (fun (p : toplevel.L4Term) =>
-           match L4_to_L6.convert_top (* fun_fun_tag default_ctor_tag default_ind_tag *) p with
+           match L4_to_L6.convert_top fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag p with
            | Some (cenv, nenv, fenv, ctag, itag, e) => 
+             (* (compM.Ret e, data) => *)
              Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e)
-           | None => Err "Failed while compiling from L4 to L6 (CPS)"
+           | None => Err "Error when compiling from L5 to L6"
            end) src.
 
         (* (fun (p : L5_FullTerm) => *)

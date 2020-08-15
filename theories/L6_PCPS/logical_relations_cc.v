@@ -1454,15 +1454,14 @@ Section LogRelCC.
   Qed.
   
   Lemma cc_approx_exp_ctx_to_rho k (P : nat -> @PostT fuel trace) boundG rho1 rho2 rho2' C e e' m :
-    (forall n e1 rho1 e2 rho2 rho2' (cin1 cin2 c : fuel) (cout1 cout2 c' : trace) C, 
+    (forall n e1 rho1 e2 rho2 rho2' (cin1 cin2 : fuel) (cout1 cout2 : trace) C, 
         ctx_to_rho C rho2 rho2' ->
         P n (e1, rho1, cin1, cout1) (C|[ e2 ]|, rho2, cin2 <+> one_ctx C, cout2 <+> one_ctx C) ->
-        P (n + to_nat c) (e1, rho1, cin1, cout1) (e2, rho2', cin2, cout2)) ->
-    (forall m e2 rho2 rho2' (cin1 cin2 c: fuel) (cout1 cout2 : trace) C,
-        to_nat c = exp_ctx_len C ->
+        P (n + to_nat (one_ctx C)) (e1, rho1, cin1, cout1) (e2, rho2', cin2, cout2)) ->
+    (forall m e2 rho2 rho2' (cin1 cin2 : fuel) (cout1 cout2 : trace) C,
         ctx_to_rho C rho2 rho2' ->
         P m (e, rho1, cin1, cout1) (C |[ e2 ]|, rho2, cin2, cout2) ->
-        P (m + to_nat c) (e, rho1, cin1, cout1) (e2, rho2', cin2, cout2)) ->
+        P (m + to_nat (one_ctx C)) (e, rho1, cin1, cout1) (e2, rho2', cin2, cout2)) ->
     ctx_to_rho C rho2 rho2' -> 
     cc_approx_exp k (P m) boundG (e, rho1) (C |[ e' ]|, rho2) ->
     cc_approx_exp k (P (m + exp_ctx_len C)) boundG (e, rho1) (e', rho2').
@@ -1483,7 +1482,7 @@ Section LogRelCC.
           unfold one; erewrite one_eq. eassumption.
           split.
           -- erewrite <- (@to_nat_one _ fuel _). eapply H2 with (C := Eproj_c y t N Γ Hole_c); try eassumption.
-             rewrite to_nat_one. simpl. simpl; omega. econstructor; eauto. now econstructor.
+             econstructor; eauto. now econstructor.
           -- simpl. eassumption. 
         * inv H3. do 3 eexists. repeat subst_exp.
           split. eassumption. split.
@@ -1499,7 +1498,7 @@ Section LogRelCC.
       + destruct v1'; try contradiction. 
         eexists OOT, c2', <0>. split. econstructor; eauto. unfold one. erewrite one_eq. eassumption.
         split.
-        erewrite <- (@to_nat_one _ fuel _). eapply H2 with (C := Econstr_c x t ys Hole_c). rewrite to_nat_one. simpl; omega.
+        erewrite <- (@to_nat_one _ fuel _). eapply H2 with (C := Econstr_c x t ys Hole_c).
         econstructor; eauto. now econstructor.
         simpl. eassumption. eassumption. 
       + inv H0. repeat subst_exp. do 3 eexists. split. eassumption.
@@ -1517,7 +1516,7 @@ Section LogRelCC.
         eexists OOT, c3, <0>. split. econstructor; eauto. unfold one. erewrite one_eq. eassumption.
 
         split.
-        erewrite <- to_nat_one. eapply H2 with (C := Efun1_c B Hole_c). rewrite to_nat_one. simpl; omega.
+        erewrite <- to_nat_one. eapply H2 with (C := Efun1_c B Hole_c).
         econstructor; eauto. now econstructor.
         simpl. eassumption.  
         simpl; eauto. 
@@ -1527,7 +1526,6 @@ Section LogRelCC.
         econstructor; eauto. now econstructor. simpl.
         eassumption.
         
-        Grab Existential Variables. exact One. exact One. exact One. exact One. exact One. exact One. 
   Qed.
 
   Lemma leq_sum_exists A B C:

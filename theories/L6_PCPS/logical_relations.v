@@ -648,7 +648,7 @@ Section Log_rel.
       HPost_proj : post_proj_compat P1 P2;
       HPost_fun : post_fun_compat P1 P2;
       HPost_case_hd : post_case_compat_hd P1 P2;
-      HPost_case_tl : post_case_compat_tl P1 P2;
+      HPost_case_tl : post_case_compat_tl P2 P2;
       HPost_app : post_app_compat P1 PG;
       HPost_letapp : post_letapp_compat P1 P2 PG;
       HPost_letapp_OOT : post_letapp_compat_OOT P1 PG;

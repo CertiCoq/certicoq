@@ -609,6 +609,8 @@ Section LogRelCC.
 
   Definition post_letapp_compat_cc_OOT P2 PG := forall x f t xs e1 rho1, post_letapp_compat_cc_OOT' x f t xs e1 rho1 P2 PG.
 
+
+  
   Section Compat.
     
    Context (P1 P2 : @PostT fuel trace) (* Local *)

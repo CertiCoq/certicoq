@@ -30,7 +30,7 @@ Fixpoint sizeOf_exp (e : exp) : nat :=
     | Eletapp x f _ ys e => 1 + length ys + sizeOf_exp e
     | Efun B e => 1 + sizeOf_fundefs B + sizeOf_exp e
     | Eapp x _ ys => 1 + length ys
-    | Eprim x _ ys e => length ys + sizeOf_exp e
+    | Eprim x _ ys e => 1 + length ys + sizeOf_exp e
     | Ehalt x => 1
   end
 with sizeOf_fundefs (B : fundefs) : nat := 
@@ -58,7 +58,7 @@ Fixpoint sizeOf_exp_ctx (c : exp_ctx) : nat :=
     | Hole_c => 0
     | Econstr_c _ _ ys c => 1 + length ys + sizeOf_exp_ctx c
     | Eproj_c _ _ _ _ c => 1 + sizeOf_exp_ctx c
-    | Eprim_c _ _ ys c => length ys + sizeOf_exp_ctx c
+    | Eprim_c _ _ ys c => 1 + length ys + sizeOf_exp_ctx c
     | Eletapp_c _ f _ ys c => 1 + length ys + sizeOf_exp_ctx c
     | Ecase_c _ l1 _ c l2  =>
       1 + sizeOf_exp_ctx c

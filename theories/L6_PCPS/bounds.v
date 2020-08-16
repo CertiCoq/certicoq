@@ -73,6 +73,15 @@ Section Bounds.
     econstructor. eapply trace_res_exp.
   Defined.
 
+  Ltac unfold_all :=
+    try unfold zero in *;
+    try unfold one_ctx in *;
+    try unfold one in *;
+    try unfold one_i in *;
+    try unfold HRes in *;
+    try unfold HRexp_f in *; try unfold fuel_res in *; try unfold fuel_res_exp in *; try unfold fuel_res_pre in *;
+    try unfold HRexp_t in *; try unfold trace_res in *; try unfold trace_res_exp in *; try unfold trace_res_pre in *.
+
 
   Section Inline_bound. 
 
@@ -84,15 +93,6 @@ Section Bounds.
         t2 + tapp2 = c2. 
 
     Context (cenv : ctor_env).
-
-    Ltac unfold_all :=
-      try unfold zero in *;
-      try unfold one_ctx in *;
-      try unfold one in *;
-      try unfold one_i in *;
-      try unfold HRes in *;
-      try unfold HRexp_f in *; try unfold fuel_res in *; try unfold fuel_res_exp in *; try unfold fuel_res_pre in *;
-      try unfold HRexp_t in *; try unfold trace_res in *; try unfold trace_res_exp in *; try unfold trace_res_pre in *.
 
     Instance inline_bound_compat L G (Hi : L <= G) :
       Post_properties cenv (inline_bound L G) (inline_bound L G) (inline_bound G G). 
@@ -179,5 +179,123 @@ Section Bounds.
   
   End Inline_bound.
 
+
+  Require Import closure_conversion_correct ctx.
+  
+  Section SimpleBound.
+
+    Context (cenv : ctor_env).
+    
+    (* Simple bound for transformations that don't decrease steps *)
+    Definition simple_bound (L : nat) : @PostT nat (nat * nat) :=
+      fun '(e1, rho1, c1, (t1, tapp1)) '(e2, rho2, c2, (t2, tapp2)) =>
+        c1 <= c2 + L.
+
+
+    Instance simple_bound_compat k :
+      Post_properties cenv (simple_bound 0) (simple_bound k) (simple_bound 0). 
+    Proof.
+      constructor; (try (intro; intros; intro; intros; destruct cout1; destruct cout2;
+                         unfold simple_bound  in *; unfold_all; simpl; lia)).
+      - intro; intros. intro; intros. destruct cout1; destruct cout2. destruct cout1'; destruct cout2'.
+        unfold simple_bound in *; unfold_all; simpl. destructAll. lia.
+      - intro; intros. intro; intros. 
+        unfold simple_bound in *; unfold_all; simpl. lia.
+      - intro; intros. unfold post_base'. 
+        unfold simple_bound in *; unfold_all; simpl. lia.
+      - intro; intros; unfold simple_bound in *.
+        destruct x as [[[? ?] ?] [? ?]]; destruct y as [[[? ?] ?] [? ?]]. lia.
+    Qed. 
+    
+
+    (* CC bound properties *)
+
+    Lemma Hpost_locals_r :
+      forall (n : nat) (rho1 rho2  rho2' : env)(e1 : exp) (e2 : exp)
+             (cin1 : nat) (cout1 : nat * nat)
+             (cin2 : nat) (cout2 : nat * nat) (C : exp_ctx),
+        ctx_to_rho C rho2 rho2' ->
+        simple_bound (n + to_nat (one_ctx C)) (e1, rho1, cin1, cout1)
+                     (e2, rho2', cin2, cout2) ->
+        simple_bound n (e1, rho1, cin1, cout1)
+                     (C |[ e2 ]|, rho2, cin2 <+> (one_ctx C), cout2 <+> (one_ctx C)).
+    Proof.
+      intros. destruct cout1; destruct cout2. unfold simple_bound in *. unfold_all. simpl in *.
+      lia.
+    Qed.
+    
+      
+    Lemma Hpost_locals_l :
+      forall (n : nat) (rho1 rho2  rho2' : env)(e1 : exp) (e2 : exp)
+             (cin1 : nat) (cout1 : nat * nat)
+             (cin2 : nat) (cout2 : nat * nat) (C : exp_ctx),
+        ctx_to_rho C rho2 rho2' ->
+        simple_bound n (e1, rho1, cin1, cout1)
+                     (C |[ e2 ]|, rho2, cin2 <+> (one_ctx C), cout2 <+> (one_ctx C)) ->
+        simple_bound (n + to_nat (one_ctx C)) (e1, rho1, cin1, cout1)
+                     (e2, rho2', cin2, cout2).
+    Proof.
+      intros. destruct cout1; destruct cout2. unfold simple_bound in *. unfold_all. simpl in *.
+      lia.
+    Qed.
+    
+    Lemma Hpost_locals_l0 :
+      forall (n : nat) (rho1 rho2  rho2' : env)(e1 : exp) (e2 : exp)
+             (cin1 : nat) (cout1 : nat * nat)
+             (cin2 : nat) (cout2 : nat * nat) (C : exp_ctx),
+        ctx_to_rho C rho2 rho2' ->
+        simple_bound n (e1, rho1, cin1, cout1)
+                     (C |[ e2 ]|, rho2, cin2, cout2) ->
+        simple_bound (n + to_nat (one_ctx C)) (e1, rho1, cin1, cout1)
+                     (e2, rho2', cin2, cout2).
+    Proof.
+      intros. destruct cout1; destruct cout2. unfold simple_bound in *. unfold_all. simpl in *.
+      lia.
+    Qed.
+
+    Lemma HOOT : forall j, post_OOT (simple_bound j).
+    Proof.
+      intros. intro; intros. intro; intros.
+      unfold simple_bound in *. unfold_all. simpl in *.
+      omega.
+    Qed.
+
+    Lemma Hbase : forall j, post_base (simple_bound j).
+    Proof.
+      intros. intro; intros. unfold post_base'.
+      unfold simple_bound in *. unfold_all. simpl in *.
+      omega.
+    Qed.
+
+    Context (clo_tag : ctor_tag).
+
+    Lemma HPost_letapp_cc :
+      forall f x t xs e1 rho1 n k, 
+        k <= 4 + 4 * length xs  ->
+        post_letapp_compat_cc' cenv clo_tag f x t xs e1 rho1 (simple_bound n) (simple_bound (n + k)) (simple_bound 0).
+    Proof.
+      intro; intros. intro; intros. destruct cout1; destruct cout2. destruct cout1'; destruct cout2'.
+      unfold simple_bound in *; unfold_all; simpl. destructAll. lia.
+    Qed.
+    
+    
+    Lemma HPost_letapp_OOT_cc :
+      forall f x t xs e1 rho1 n k, 
+        k <= 4 + 4 * length xs ->
+        post_letapp_compat_cc_OOT' clo_tag f x t xs e1 rho1 (simple_bound (n + k)) (simple_bound 0).
+    Proof.
+      intro; intros. intro; intros. destruct cout1; destruct cout2.
+      unfold simple_bound in *; unfold_all; simpl. destructAll. lia.
+    Qed.
+    
+
+    Lemma HPost_app :
+      forall k v t l rho1,
+        k <= 4 + 4 * length l -> post_app_compat_cc' clo_tag v t l rho1 (simple_bound k) (simple_bound 0).
+    Proof.
+      intro; intros. intro; intros. destruct cout1; destruct cout2.
+      unfold simple_bound in *; unfold_all; simpl. destructAll. lia.
+    Qed.
+  
 End Bounds.
   

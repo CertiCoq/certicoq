@@ -652,8 +652,8 @@ Section Log_rel.
       HPost_app : post_app_compat P1 PG;
       HPost_letapp : post_letapp_compat P1 P2 PG;
       HPost_letapp_OOT : post_letapp_compat_OOT P1 PG;
-      HPost_OOT : post_OOT P1;
-      Hpost_base : post_base P1;
+      HPost_OOT : post_OOT P2;
+      Hpost_base : post_base P2;
       HGPost : inclusion _ P1 PG }.
 
 

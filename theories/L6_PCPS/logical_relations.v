@@ -663,20 +663,26 @@ Section Log_rel.
       P1 (e1, def_funs B B rho1 rho1, c1, cout1) (e2, rho2, c2, cout2) ->
       P2 (Efun B e1, rho1, c1 <+> one (Efun B e1), cout1 <+> one (Efun B e1)) (e2, rho2, c2, cout2).
 
-   Definition post_Eapp_r (P1 P2 : PostT) e1 rho1 f ft ys rho2 := 
+  Definition post_Efun_r (P1 P2 : PostT) :=
+    forall B e1 e2 rho1 rho2 c1 c2 cout1 cout2,
+      P1 (e1, rho1, c1, cout1) (e2, def_funs B B rho2 rho2, c2, cout2) ->
+      P2 (e1, rho1, c1, cout1)
+         (Efun B e2, rho2, c2 <+> one (Efun B e2), cout2 <+> one (Efun B e2)).
+
+  Definition post_Eapp_r (P1 P2 : PostT) e1 rho1 f ft ys rho2 := 
     forall e2 rho2' c1 c2 cout1 cout2,
-       P1 (e1, rho1, c1, cout1) (e2, rho2', c2, cout2) ->
-       P2 (e1, rho1, c1, cout1) ((Eapp f ft ys), rho2, c2 <+> one (Eapp f ft ys), cout2 <+> one (Eapp f ft ys)).
-        
-   Definition post_Eapp_l (P1 P2 : PostT) f ft ys rho1 e2 rho2 :=
-     forall (rhoc rho' : env) (f' : var) (xs : list var) e1 B vs c1 c2 cout1 cout2,
-       M.get f rho1 = Some (Vfun rhoc B f') ->
-       get_list ys rho1 = Some vs ->
-       find_def f' B = Some (ft, xs, e1) ->
-       set_lists xs vs (def_funs B B rhoc rhoc) = Some rho' ->       
-       P1 (e1, rho', c1, cout1) (e2, rho2, c2, cout2) ->
-       P2 (Eapp f ft ys, rho1, c1 <+> one (Eapp f ft ys), cout1 <+> one (Eapp f ft ys)) (e2, rho2, c2, cout2).
-    
+      P1 (e1, rho1, c1, cout1) (e2, rho2', c2, cout2) ->
+      P2 (e1, rho1, c1, cout1) ((Eapp f ft ys), rho2, c2 <+> one (Eapp f ft ys), cout2 <+> one (Eapp f ft ys)).
+  
+  Definition post_Eapp_l (P1 P2 : PostT) f ft ys rho1 e2 rho2 :=
+    forall (rhoc rho' : env) (f' : var) (xs : list var) e1 B vs c1 c2 cout1 cout2,
+      M.get f rho1 = Some (Vfun rhoc B f') ->
+      get_list ys rho1 = Some vs ->
+      find_def f' B = Some (ft, xs, e1) ->
+      set_lists xs vs (def_funs B B rhoc rhoc) = Some rho' ->       
+      P1 (e1, rho', c1, cout1) (e2, rho2, c2, cout2) ->
+      P2 (Eapp f ft ys, rho1, c1 <+> one (Eapp f ft ys), cout1 <+> one (Eapp f ft ys)) (e2, rho2, c2, cout2).
+  
   Section Compat.
     Context (P1 P2 : PostT) (* Local *)
             (PG : PostGT). (* Global *)           
@@ -1101,7 +1107,23 @@ Section Log_rel.
         repeat eexists; eauto.
         eapply preord_res_monotonic. eassumption. rewrite to_nat_add. unfold one in *; simpl in *; omega.
     Qed.
-    
+
+    Lemma preord_exp_Efun_r k boundG rho1 rho2 B e e' (HOOT : post_OOT P2) :
+      post_Efun_r P1 P2 ->
+      preord_exp P1 boundG k (e, rho1) (e', def_funs B B rho2 rho2) ->
+      preord_exp P2 boundG k (e, rho1) (Efun B e', rho2).
+    Proof.
+      intros Hyp Hexp. intros v1' c1 cout Hleq1 Hstep1. inv Hstep1; repeat subst_exp.
+      - exists OOT, c1, <0>. split. econstructor; eauto.
+        unfold one. erewrite one_eq. eassumption. split.
+        eapply HOOT. eassumption.
+        simpl; eauto.
+      - edestruct Hexp as [v2' [c2 [cout' [Hstep2 [Hub Hcc2]]]]]; [| constructor 2; eassumption | ].
+        unfold one in *; simpl in *; omega.
+        
+        repeat eexists; eauto. econstructor 2. econstructor. eassumption.
+    Qed.
+
     Lemma preord_exp_app_r
       (k : nat) (rho1 rho2 rhoc rho' : env) (f f' : var) (ft : fun_tag) 
       (ys xs : list var) e1 e2 B vs :

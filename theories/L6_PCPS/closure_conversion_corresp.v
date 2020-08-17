@@ -1,6 +1,5 @@
-(* Correspondence of the computational definition and the declarative spec for closure conversion. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
- *)
+(* Correspondence of the computational definition and the declarative
+   spec for closure conversion. Part of the CertiCoq project.  *)
 
 Require Import L6.closure_conversion L6.closure_conversion_util.
 From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx Ensembles_util
@@ -52,88 +51,6 @@ Section CC_correct.
   Definition binding_not_in_map {A} (S : Ensemble M.elt) (map : M.t A) := 
     forall x : M.elt, In M.elt S x -> M.get x map = None.
 
-  (*
-  (** Spec for [get_name_entry] *)
-  Lemma get_name_entry_preserves_prop x P :
-    {{ fun s => P (next_var s) }} get_name_entry x {{ fun _ _ s => P (next_var s) }}.
-  Proof.
-    eapply pre_post_mp_l. eapply bind_triple. eapply get_triple.
-    intros [x1 c1 f1 e1 m1] [x2 c2 f2 e2 m2].
-    destruct (Maps.PTree.get x m1);
-      eapply return_triple; intros ? H ?; inv H; eauto.
-  Qed.
-
-  (** Spec for [set_name_entry] *)
-  Lemma set_name_entry_preserves_prop x s P :
-    {{ fun s => P (next_var s) }} set_name_entry x s {{ fun _ _ s => P (next_var s) }}.
-  Proof.
-    eapply pre_post_mp_l. eapply bind_triple. eapply get_triple.
-    intros [x1 c1 f1 e1 m1] [x2 c2 f2 e2 m2].
-    eapply pre_post_mp_l. eapply bind_triple. 
-    eapply put_triple. intros.
-    eapply return_triple. intros ? ? [H1 H2]. inv H1; eauto.
-  Qed.
-  
-  (** Specs for adding names *)
-  Lemma add_name_preserves_prop x y P :
-    {{ fun s => P (next_var s) }} add_name x y {{ fun _ _ s => P (next_var s) }}.
-  Proof.
-    eapply set_name_entry_preserves_prop.
-  Qed.
-
-  Lemma add_name_suff_preserves_prop x y s P :
-    {{ fun s => P (next_var s) }} add_name_suff x y s {{ fun _ _ s => P (next_var s) }}.
-  Proof.
-    eapply bind_triple. now apply get_name_entry_preserves_prop.
-    intros n s1. destruct n; now apply set_name_entry_preserves_prop.
-  Qed.
-
-  (** Spec for [get_name] *)
-  Lemma get_name_fresh S y str :
-    {{ fun s => fresh S (next_var s) }}
-      get_name y str
-    {{ fun _ x s' => fresh S x /\ fresh (Setminus var S (Singleton var x)) (next_var s') }}.  
-  Proof.
-    eapply pre_strenghtening with (P := fun s => fresh S (next_var s) /\ True); intros; eauto.
-    eapply bind_triple.
-    eapply frame_rule with (Pre := fun _ => True). now eapply get_triple.
-    intros [x c i e m] [x' c' i' e' m'].
-    eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros H. inv H.
-    eapply bind_triple
-    with (post' :=  fun _ _ s' => fresh (Setminus var S (Singleton var x')) (next_var s')).
-    eapply pre_post_mp_l. eapply post_weakening; [| now eapply put_triple ].
-    intros; subst; simpl in *. subst; simpl.
-    constructor.
-    - eapply Hf. simpl in *. zify. omega.
-    - intros Hin. inv Hin. simpl in *. zify. omega.
-    - intros _ _. eapply bind_triple. 
-      now eapply add_name_suff_preserves_prop.
-      intros. eapply return_triple. intros; eauto.
-  Qed.
-
-  (** Spec for [get_name_no_suff] *)
-  Lemma get_name_no_suff_fresh S str :
-    {{ fun s => fresh S (next_var s) }}
-      get_name_no_suff str
-    {{ fun _ x s' => fresh S x /\ fresh (Setminus var S (Singleton var x)) (next_var s') }}.  
-  Proof.
-    eapply pre_strenghtening with (P := fun s => fresh S (next_var s) /\ True); intros; eauto.
-    eapply bind_triple.
-    eapply frame_rule with (Pre := fun _ => True). now eapply get_triple.
-    intros [x c i e m] [x' c' i' e' m'].
-    eapply pre_curry_l. intros Hf. eapply pre_curry_l. intros H. inv H.
-    eapply bind_triple
-    with (post' :=  fun _ _ s' => fresh (Setminus var S (Singleton var x')) (next_var s')).
-    eapply pre_post_mp_l. eapply post_weakening; [| now eapply put_triple ].
-    intros; subst; simpl in *. subst; simpl.
-    constructor.
-    - eapply Hf. simpl in *. zify. omega.
-    - intros Hin. inv Hin. simpl in *. zify. omega.
-    - intros _ _. eapply bind_triple. 
-      now eapply add_name_preserves_prop.
-      intros. eapply return_triple. intros; eauto.
-  Qed.
-   *)
 
   (* TODO move to state *)
   Lemma get_name_no_suff_fresh 
@@ -1097,79 +1014,6 @@ Section CC_correct.
     unfold to_env. intros y. unfold extend.
     rewrite M.gsspec. destruct (peq y x); eauto.
   Qed.
-
-  (*
-  Lemma make_full_closure_spec B FVmap_n FVmap_o Γ Scope Funs FVs FVs' S S1 S2 S1' S2' :
-    binding_in_map S1 FVmap_o -> 
-    binding_in_map S2 FVmap_n ->
-    binding_not_in_map S1' FVmap_o -> 
-    binding_not_in_map S2' FVmap_n ->
-    FVmap_inv FVmap_o Scope Funs FVs ->
-    FVmap_inv FVmap_n (Empty_set _) (Empty_set _) FVs' ->
-    {{ fun s => fresh S (next_var s) }}
-      make_full_closure clo_tag B FVmap_n FVmap_o Γ
-    {{ fun s t s' =>
-         let '(FVmap_n', FVmap_o', f) := t in
-         exists C S',
-           fresh S' (next_var s') /\
-           make_closures clo_tag B S Γ C (subst FVmap_n') S' /\
-           is_exp_ctx f C /\
-           f_eq_subdomain (Setminus _ Funs (Union _ Scope (name_in_fundefs B)))
-                          (subst FVmap_o) (subst FVmap_o') /\
-           binding_in_map (Union _ S1 (name_in_fundefs B)) FVmap_o' /\
-           binding_in_map (Union _ S2 (name_in_fundefs B)) FVmap_n' /\
-           binding_not_in_map (Setminus _ S1' (name_in_fundefs B)) FVmap_o' /\
-           binding_not_in_map (Setminus _ S2' (name_in_fundefs B)) FVmap_n' /\
-           FVmap_inv FVmap_o' (Union _ (name_in_fundefs B) Scope) Funs FVs /\
-           FVmap_inv FVmap_n' (Empty_set _) (name_in_fundefs B) FVs'
-     }}.
-  Proof with now eauto with Ensembles_DB.
-    revert FVmap_n FVmap_o Γ Scope Funs FVs FVs' S S1 S2 S1' S2'.
-    induction B;
-      intros FVmap_n FVmap_o Γ Scope Funs FVs FVs' S
-             S1 S2 S1' S2' Hb1 Hb2 Hb1' Hb2'  Minv_o Minv_n. 
-    - eapply bind_triple; [ now apply get_name_fresh |].
-      intros x s1. eapply pre_curry_l. intros Hx.
-      eapply bind_triple; [ eapply IHB; eassumption |].
-      intros [[FVmap_n' FVmap_o'] f'] _.
-      eapply pre_existential. intros C. eapply pre_existential. intros S'.
-      eapply pre_curry_r.
-      intros [Hclo [Hctx [Hfeq [Hbn [Hbo [Hbn' [Hbo' [Minv_o' Minv_n']]]]]]]].
-      apply return_triple. 
-      intros s3 Hf. do 2 eexists. split. eassumption. 
-      split. econstructor. eassumption. eapply Hx. zify; omega.
-      rewrite <- subst_MRFun_f_eq. reflexivity.
-      split. intros e'. simpl. rewrite Hctx. reflexivity.
-      split. rewrite <- subst_BoundVar_f_eq.
-      apply f_eq_subdomain_extend_not_In_S_r.
-      intros Hc. inv Hc. eapply H0. right. left. now eauto.
-      eapply f_eq_subdomain_antimon; [| eassumption ]...
-      split.
-      eapply binding_in_map_antimon;[| eapply binding_in_map_set; eassumption ]...
-      split. simpl.
-      eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ]...
-      split. eapply binding_not_in_map_set_not_In_S.
-      eapply binding_not_in_map_antimon; [| eassumption ]...
-      intros Hc. inv Hc. eapply H0. left. now eauto.
-      split. eapply binding_not_in_map_set_not_In_S.
-      eapply binding_not_in_map_antimon; [| eassumption ]...
-      intros Hc. inv Hc. eapply H0. left. now eauto.
-      split. simpl. rewrite <- Union_assoc. eapply FVmap_inv_set_bound.
-      eassumption.
-      simpl. apply FVmap_inv_set_funs. now apply not_In_Empty_set.
-      eassumption. 
-    - eapply return_triple. intros s Hs. do 2 eexists.
-      split. eassumption. split. now constructor.
-      split. intros e. reflexivity.
-      split. intros x H. reflexivity.
-      split. intros x H. eapply Hb1. now rewrite Union_Empty_set_neut_r in H.
-      split. intros x H. eapply Hb2. now rewrite Union_Empty_set_neut_r in H.
-      split. eapply binding_not_in_map_antimon; [| eassumption ]...
-      split. eapply binding_not_in_map_antimon; [| eassumption ]...
-      split. rewrite Union_Empty_set_neut_l. eassumption.
-      eassumption. 
-  Qed.
-  *)
 
   Global Instance extend_fundefs'_Proper S :
     Proper (f_eq_subdomain S ==> eq ==> eq ==> f_eq_subdomain S) extend_fundefs'.
@@ -3325,7 +3169,7 @@ Section CC_correct.
   Qed.
 
   Transparent exp_closure_conv.
-
+(* 
   (** Correctness of [exp_closure_conv] *)
   Corollary exp_closure_conv_correct k rho rho' S e c Γ FVmap Scope Funs FVs :
     (* [Scope], [Funs] and [FVs] are uniquely identified by [FVmap] *)
@@ -5327,5 +5171,6 @@ Section CC_correct.
       rewrite FromList_cons in HD. now eauto with Ensembles_DB.
       eassumption.
   Qed.
-    
+ *)
+  
 End CC_correct.

@@ -296,6 +296,9 @@ Section Bounds.
       intro; intros. intro; intros. destruct cout1; destruct cout2.
       unfold simple_bound in *; unfold_all; simpl. destructAll. lia.
     Qed.
+
+
+  End SimpleBound.
   
 End Bounds.
   

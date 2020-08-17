@@ -460,18 +460,24 @@ Section CC.
            | Fnil => ret Fnil
          end.
     
+  Definition populate_map (s : FVSet) (map : VarInfoMap) : VarInfoMap :=
+    PS.fold (fun x map => M.set x BoundVar map) s map.
 
-  Definition populate_map (l : list (var * cps.val)) map  :=
-    fold_left (fun map x => M.set (fst x) BoundVar map) l map.
 
-  (* Definition closure_conversion_hoist_open (rho : eval.env) (e : exp) ctag itag cenv nmap : exp := *)
-  (*   let Γ := ((max_list (map fst (M.elements rho)) (max_var e 1%positive)) + 1)%positive in *)
-  (*   let map := populate_map (M.elements rho) (Maps.PTree.empty VarInfo) in *)
-  (*   let next := (Γ + 1)%positive in *)
-  (*   let state := mkCont next ctag itag cenv nmap in *)
-  (*   let '(e, f, s) := runState *)
-  (*                       (exp_closure_conv e map (Maps.PTree.empty GFunInfo) 1%positive Γ) *)
-  (*                       state in *)
-  (*   exp_hoist (f e). *)
+  Definition get_name (c : comp_data) : (var * comp_data) :=
+    let 'mkCompData n c i f e fenv names log := c in
+    let c' := mkCompData (n + 1)%positive c i f e fenv names log in
+    (n, c'). 
+                         
+  Definition closure_conversion_top (e : exp) (c: comp_data) :=
+    let '(Γ, c) := get_name c in
+    let map := populate_map (exp_fv e) (Maps.PTree.empty VarInfo) in
+    let '(ef'_err, (c', _)) :=
+        run_compM (exp_closure_conv e map (Maps.PTree.empty GFunInfo) 1%positive Γ)
+                  c tt in
+    match ef'_err with
+    | Ret (e', f') => (Ret (f' e'), c')
+    | Err str => (Err str, c')
+    end.
   
 End CC.

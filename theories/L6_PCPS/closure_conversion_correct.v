@@ -4,6 +4,7 @@
 
 Require Import L6.tactics L6.closure_conversion_invariants L6.closure_conversion L6.closure_conversion_util
         L6.algebra.
+Require Import L6.closure_conversion_corresp L6.state compM.
 From CertiCoq.L6 Require Import cps size_cps cps_util set_util hoisting identifiers ctx
                        Ensembles_util List_util functions eval logical_relations_cc.
 Require Import compcert.lib.Coqlib.
@@ -1149,4 +1150,209 @@ Section Closure_conversion_correct.
     - intro; intros. inv H4.
   Qed.
   
-End Closure_conversion_correct. 
+
+  (* Correctness of the CC program *)
+
+  Lemma populate_map_FVmap_inv s map Scope Funs GFuns FVs:
+    FVmap_inv map Scope Funs GFuns FVs ->
+    FVmap_inv (populate_map s map) (Union _ (FromSet s) Scope) Funs GFuns FVs.
+  Proof.
+    unfold populate_map. rewrite PS.fold_spec. 
+    unfold FromSet. generalize (PS.elements s). intros l.    
+    revert Scope map. induction l as [| x l IHl ]; intros Scope map Hinv.
+    - simpl. rewrite FromList_nil, Union_Empty_set_neut_l. eassumption.
+    - simpl in *. rewrite FromList_cons, (Union_commut (Singleton _ _) _), <- Union_assoc.
+      eapply IHl. apply FVmap_inv_set_bound. eassumption.
+  Qed.
+
+  Corollary populate_map_FVmap_inv_init e :
+    FVmap_inv (populate_map (exp_fv e) (Maps.PTree.empty VarInfo))
+              (occurs_free e) (Empty_set positive) (Empty_set positive) [].
+  Proof.
+    rewrite <- (Union_Empty_set_neut_r (occurs_free e)). rewrite exp_fv_correct.
+    eapply populate_map_FVmap_inv.
+    split; [| split; [| split; [| split ]]].
+    + split; sets.
+      intros x Hin. unfold In in Hin. rewrite M.gempty in Hin. inv Hin.
+    + split; sets.
+      intros x Hin. unfold In in Hin. rewrite M.gempty in Hin. inv Hin. inv H.
+    + intros. destructAll. inv H.
+    + rewrite M.gempty in H. inv H.
+    + rewrite M.gempty in H. inv H.
+  Qed.
+
+  Lemma populate_map_binding_in_not_in_map S s m:
+    Disjoint _ (FromSet s) S ->
+    binding_not_in_map S m ->
+    binding_not_in_map S (populate_map s m).
+  Proof.
+     unfold populate_map. rewrite PS.fold_spec. 
+     unfold FromSet. generalize (PS.elements s). intros l.
+     revert S m. induction l; intros S m.
+     - simpl. eauto.
+     - repeat normalize_sets.
+       intros Hd Hnin x Hin. simpl. eapply IHl with (S := S); [| | eassumption ].
+       now sets.
+       eapply binding_not_in_map_set_not_In_S. eassumption. 
+       intros Hc. eapply Hd. constructor; eauto.
+  Qed.
+
+  Corollary populate_map_binding_in_not_in_map_init S s:
+    Disjoint _ (FromSet s) S ->
+    binding_not_in_map S (populate_map s (M.empty _)).
+  Proof.
+    intros. eapply populate_map_binding_in_not_in_map. eassumption.
+    intros x Hin. rewrite M.gempty. reflexivity.
+  Qed.
+
+  Opaque preord_exp'. 
+
+  Lemma unique_bindings_fundef_names_unique_mut :
+    (forall e, unique_bindings e -> fundefs_names_unique e) /\
+    (forall B, unique_bindings_fundefs B -> fundefs_names_unique_fundefs B).
+  Proof.
+    exp_defs_induction IHe IHl IHB; intros Hun; inv Hun;
+    try now (intros B Hin; inv Hin; eapply IHe; eauto).
+    - intros B Hin. inv Hin. inv H3.
+    - intros B Hin. inv Hin. inv H6.
+      + inv H. eapply IHe; eauto.
+      + eapply IHl. eassumption.
+        econstructor. eassumption. eassumption.
+    - intros B Hin. inv Hin.
+      + eapply unique_bindings_fundefs_unique_functions. eassumption.
+      + eapply IHe. eassumption. eassumption.
+      + eapply IHB. eassumption. left. eassumption.
+    - intros B Hin. inv Hin. inv H.  
+      + eapply IHe. eassumption. eassumption.
+      + eapply IHB. eassumption. left. eassumption.
+      + constructor. intros Hc. eapply H5. eapply name_in_fundefs_bound_var_fundefs.
+        eassumption.
+        eapply IHB. eassumption. eauto.
+    - intros B HIn. inv HIn. inv H. constructor. 
+  Qed.
+  
+  Lemma exp_closure_conv_correct e c :
+    unique_bindings e ->
+    Disjoint _ (bound_var e) (occurs_free e) ->
+    (max_var e 1%positive < next_var c)%positive ->
+    exists e' c',      
+      closure_conversion_top clo_tag e c = (Ret e', c') /\
+      unique_bindings e' /\
+      occurs_free e' \subset occurs_free e /\
+      Disjoint _ (bound_var e') (occurs_free e') /\
+      (max_var e' 1%positive < next_var c')%positive /\     
+      (forall k rho1 rho2,
+          cc_approx_env_P cenv clo_tag (occurs_free e) k boundG rho1 rho2 ->
+          binding_in_map (occurs_free e) rho1 ->
+          cc_approx_exp cenv clo_tag k (boundL 0) boundG (e, rho1) (e', rho2)).
+  Proof.
+    intros Hun Hdis Hlt. unfold closure_conversion_top.
+    set (fvmap := populate_map (exp_fv e) (Maps.PTree.empty VarInfo)).
+    destruct (closure_conversion.get_name c) as [G c1] eqn:Hg. 
+    assert (Hlt' : (max_var e 1 < next_var c1)%positive).
+    { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; omega. }
+
+    assert (Hlt'' : (max_var e 1 < G)%positive).
+    { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; omega. }
+
+    assert (Hlt''' : (G < next_var c1)%positive).
+    { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; omega. }
+    
+    
+    set (S := (fun x : var => G < x)%positive).
+    
+    assert (Hsound := (proj1 (exp_closure_conv_Closure_conv_sound clo_tag)
+                             e (occurs_free e) (Empty_set _) (Empty_set _)
+                             (Maps.PTree.empty GFunInfo) 1%positive G [] fvmap S)).
+
+    assert (Hfvmap : FVmap_inv fvmap (occurs_free e) (Empty_set positive) (Empty_set positive) []).
+    { eapply populate_map_FVmap_inv_init. }
+    
+    assert (Hsub : occurs_free e \subset occurs_free e :|: Empty_set positive :|: Empty_set positive :|: FromList []).
+    { sets. }
+    
+    assert (Hbnin: binding_not_in_map (S :|: [set G]) fvmap).
+    { eapply populate_map_binding_in_not_in_map_init. rewrite <- exp_fv_correct.
+      unfold S. eapply Union_Disjoint_r.
+      - constructor. intros x Hnin. inv Hnin.
+        eapply occurs_free_leq_max_var with (y := 1%positive) in H. unfold Ensembles.In in *.
+        zify. omega.
+      - constructor. intros x Hnin. inv Hnin. inv H0. 
+        eapply occurs_free_leq_max_var with (y := 1%positive) in H. unfold Ensembles.In in *.
+        zify. omega. }
+      
+    assert (Hgmap: gfuns_inv (PTree.empty GFunInfo) (Empty_set positive)).
+    { unfold gfuns_inv.
+      split; sets.
+      intros x Hin. unfold In in Hin. rewrite M.gempty in Hin. inv Hin. }
+
+    assert (Hdis1 : Disjoint positive (Empty_set positive) (occurs_free e)).
+    { sets. }
+
+    assert (Hdis2 : Disjoint positive (Empty_set positive :|: Empty_set positive) (bound_var e)).
+    { sets. }
+
+    assert (Hdis3 : Disjoint M.elt S
+                             (Empty_set positive \\ occurs_free e :|: Empty_set positive :|: used_vars e :|: [set G]
+                                        :|: image (to_env fvmap) (Empty_set positive \\ occurs_free e))).
+    { rewrite !Setminus_Empty_set_abs_r at 1. rewrite image_Empty_set. 
+      rewrite !Union_Empty_set_neut_r. rewrite Union_Empty_set_neut_l.
+      
+      unfold S. eapply Union_Disjoint_r.
+      - constructor. intros x Hnin. inv Hnin. inv H0.
+        + eapply bound_var_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. omega.
+        + eapply occurs_free_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. omega.
+      - constructor. intros x Hnin. inv Hnin. inv H0.
+        unfold Ensembles.In in *. zify. omega. } 
+
+    assert (Hnin : ~ In var (used_vars e) G).
+    { intros Hc. inv Hc.
+      - eapply bound_var_leq_max_var with (y := 1%positive) in H. unfold Ensembles.In in *. zify. omega.
+      - eapply occurs_free_leq_max_var with (y := 1%positive) in H. unfold Ensembles.In in *. zify. omega. }
+    
+    unfold triple in *.
+    assert (Hf' : fresh S (next_var (fst (c1, tt)))).
+    { unfold S, fresh. intros. unfold Ensembles.In in *. simpl in *. zify; omega. }
+
+    specialize (Hsound Hfvmap Hsub Hbnin Hgmap Hun Hdis1 Hdis2 Hdis3 Hnin tt (c1, tt) Hf').
+
+    unfold run_compM.
+    destruct (runState (exp_closure_conv clo_tag e fvmap (PTree.empty GFunInfo) 1%positive G) tt (c1, tt))
+      as [ p [c2 w2]] eqn:Hcc.
+    destruct p as [ | [e' f]]. contradiction. simpl in *. destructAll.
+
+    assert (Hs : occurs_free (x |[ e' ]|) \subset occurs_free e). 
+    { eapply Closure_conversion_occurs_free_toplevel; try eassumption.
+      tci. eapply unique_bindings_fundef_names_unique_mut. eassumption. }
+    
+    do 2 eexists. split; [| split; [| split; [| split; [| split ]]]].
+    - reflexivity.
+    - rewrite H0. eassumption.
+    - rewrite (H0 e'). eassumption.
+    - rewrite H0.
+      eapply Disjoint_Included.
+      + eassumption.
+      + eapply Included_trans. eapply bound_var_app_ctx.
+        eapply Included_Union_compat. eassumption. eassumption.
+      + rewrite Union_Same_set; [| now sets ].
+        eapply Union_Disjoint_l. now sets.
+        constructor. intros z Hninz. inv Hninz.
+        eapply occurs_free_leq_max_var with (y := 1%positive) in H7.
+        unfold Ensembles.In, Range in *. simpl in *. zify; omega.
+    - rewrite (H0 e').
+      assert (Hin := max_var_subset (x |[ e' ]|)). 
+      inv Hin. 
+      + eapply bound_var_app_ctx in H6. inv H6.
+        * eapply H2 in H7. unfold Ensembles.In, Range in *. simpl in *. zify; omega.
+        * eapply H4 in H7. inv H7.
+          ++ eapply bound_var_leq_max_var with (y := 1%positive) in H6. unfold Ensembles.In in *. zify. omega.
+          ++ unfold Ensembles.In, Range in *. simpl in *. zify; omega.
+      + eapply Hs in H6. eapply occurs_free_leq_max_var with (y := 1%positive) in H6. unfold Ensembles.In in *. zify. omega.
+    - intros.
+      rewrite (H0 e').
+      eapply Closure_conversion_correct_top; try eassumption.
+      intros Hn.
+      eapply bound_var_leq_max_var with (y := 1%positive) in Hn. unfold Ensembles.In in *. zify. omega.
+  Qed.     
+
+End Closure_conversion_correct.

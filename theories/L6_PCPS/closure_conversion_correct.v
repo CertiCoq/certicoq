@@ -1240,7 +1240,8 @@ Section Closure_conversion_correct.
       unique_bindings e' /\
       occurs_free e' \subset occurs_free e /\
       Disjoint _ (bound_var e') (occurs_free e') /\
-      (max_var e' 1%positive < next_var c')%positive /\     
+      (max_var e' 1%positive < next_var c')%positive /\
+      fun_fv_in e' (funnames_in_exp e') /\
       (forall k rho1 rho2,
           cc_approx_env_P cenv clo_tag (occurs_free e) k boundG rho1 rho2 ->
           binding_in_map (occurs_free e) rho1 ->
@@ -1325,7 +1326,7 @@ Section Closure_conversion_correct.
     { eapply Closure_conversion_occurs_free_toplevel; try eassumption.
       tci. eapply unique_bindings_fundef_names_unique_mut. eassumption. }
     
-    do 2 eexists. split; [| split; [| split; [| split; [| split ]]]].
+    do 2 eexists. split; [| split; [| split; [| split; [| split; [| split ]]]]].
     - reflexivity.
     - rewrite H0. eassumption.
     - rewrite (H0 e'). eassumption.
@@ -1348,6 +1349,10 @@ Section Closure_conversion_correct.
           ++ eapply bound_var_leq_max_var with (y := 1%positive) in H6. unfold Ensembles.In in *. zify. omega.
           ++ unfold Ensembles.In, Range in *. simpl in *. zify; omega.
       + eapply Hs in H6. eapply occurs_free_leq_max_var with (y := 1%positive) in H6. unfold Ensembles.In in *. zify. omega.
+    - rewrite (H0 e'). intros z Hin. 
+      rewrite <- (Union_Empty_set_neut_l _ (funnames_in_exp (x |[ e' ]|))).
+      eapply Closure_conversion_closed_fundefs. eassumption.
+      eapply unique_bindings_fundef_names_unique_mut. eassumption. eassumption. 
     - intros.
       rewrite (H0 e').
       eapply Closure_conversion_correct_top; try eassumption.

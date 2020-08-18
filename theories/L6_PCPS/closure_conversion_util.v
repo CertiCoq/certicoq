@@ -780,6 +780,13 @@ Section Closure_conversion_util.
   Definition funnames_in_fundefs (fds : fundefs) :=
     fun f => exists B, funs_in_fundef B fds /\ f \in name_in_fundefs B.
 
+  (* FVs of function definitions are in G *)
+  Definition fun_fv_in e G :=
+    forall B, funs_in_exp B e -> occurs_free_fundefs B \subset G.
+
+  Definition fun_fv_in_fundefs B G :=
+    forall B', B = B' \/ funs_in_fundef B' B -> occurs_free_fundefs B' \subset G.
+
 
   Lemma Closure_conversion_closed_fundefs_mut :
     (forall e Scope Funs GFuns genv c Γ FVs e' C B
@@ -893,6 +900,157 @@ Section Closure_conversion_util.
   Qed.
 
 
+  Lemma funnames_in_exp_Econstr x c ys e :
+    funnames_in_exp (Econstr x c ys e) <-->  funnames_in_exp e.
+  Proof.
+    split.
+    - intros z [B Hin]. destructAll. inv H. eexists; split; eauto.
+    - intros z [B Hin]. destructAll. eexists; split; eauto.
+  Qed. 
+
+  Lemma funnames_in_exp_Eproj x c n y e :
+    funnames_in_exp (Eproj x c n y e) <--> funnames_in_exp e.
+  Proof.
+    split.
+    - intros z [B Hin]. destructAll. inv H. eexists; split; eauto.
+    - intros z [B Hin]. destructAll. eexists; split; eauto.
+  Qed. 
+
+  Lemma funnames_in_exp_Ecase_nil x :
+    funnames_in_exp (Ecase x []) <--> Empty_set _.
+  Proof.
+    split; sets.
+    - intros z [B Hin]. destructAll. inv H. inv H5.
+  Qed. 
+
+  Lemma funnames_in_exp_Ecase_cons x c e P :
+    funnames_in_exp (Ecase x ((c, e) :: P)) <--> funnames_in_exp e :|: funnames_in_exp (Ecase x P).
+  Proof.
+    split.
+    - intros z [B Hin]. destructAll. inv H. inv H5.
+      + inv H. left. eexists; split; eauto.
+      + right. eexists; split; eauto.        
+    - intros z Hin. inv Hin; destruct H; destructAll.
+      + eexists. split. econstructor. eassumption. now left. eassumption.
+      + eexists. split. inv H. econstructor. eassumption. now right; eauto. eassumption.
+  Qed.
+
+
+  Lemma funnames_in_exp_Eletapp x f c ys e :
+    funnames_in_exp (Eletapp x f c ys e) <--> funnames_in_exp e.
+  Proof.
+    split.
+    - intros z [B Hin]. destructAll. inv H. eexists; split; eauto.
+    - intros z [B Hin]. destructAll. eexists; split; eauto.
+  Qed. 
+
+  Lemma funnames_in_exp_Eapp f c xs :
+    funnames_in_exp (Eapp f c xs) <--> Empty_set _.
+  Proof.
+    split; sets.
+    - intros z [B Hin]. destructAll. inv H.
+  Qed.
+
+  Lemma funnames_in_exp_Ehalt x :
+    funnames_in_exp (Ehalt x) <--> Empty_set _.
+  Proof.
+    split; sets.
+    - intros z [B Hin]. destructAll. inv H.
+  Qed.
+
+  Lemma funnames_in_exp_Eprim x c ys e :
+    funnames_in_exp (Eprim x c ys e) <-->  funnames_in_exp e.
+  Proof.
+    split.
+    - intros z [B Hin]. destructAll. inv H. eexists; split; eauto.
+    - intros z [B Hin]. destructAll. eexists; split; eauto.
+  Qed. 
+
+  Lemma funnames_in_exp_Efun B e :
+    funnames_in_exp (Efun B e) <-->  name_in_fundefs B :|: funnames_in_fundefs B :|: funnames_in_exp e.
+  Proof.
+    split.
+    - intros z [B' Hin]. destructAll. inv H; eauto.
+      + right. eexists; split; eauto.
+      + left. right. eexists; split; eauto.        
+    - intros z Hin. inv Hin. inv H.
+      + eexists. split. econstructor. eassumption.
+      + inv H0. destructAll. eexists. split. eapply In_Fun3. eassumption. eassumption.
+      + inv H. destructAll. eexists. split. eapply In_Fun2. eassumption. eassumption.
+  Qed. 
+
+
+  Lemma funnames_in_fundefs_Fcons f t xs e B :
+    funnames_in_fundefs (Fcons f t xs e B) <-->  funnames_in_exp e :|: funnames_in_fundefs B.
+  Proof.
+    split.
+    - intros z [B' Hin]. destructAll. inv H; eauto.
+      + left. eexists; split; eauto.
+      + right. eexists; split; eauto.
+    - intros z Hin. inv Hin. inv H.
+      + inv H0. eexists. split. econstructor; eassumption. eassumption.
+      + inv H. inv H0. eexists. split. eapply In_Fcons2. eassumption. eassumption.
+  Qed.
+  
+  Lemma funnames_in_exp_Fnil :
+    funnames_in_fundefs Fnil <--> Empty_set _.
+  Proof.
+    split; sets.
+    - intros z [B Hin]. destructAll. inv H.
+  Qed.
+
+
+  Lemma project_var_funnnames_in_exp Scope Funs GFuns c genv Γ FVs S x y C Q e :
+    project_var clo_tag Scope Funs GFuns c genv Γ FVs S x y C Q ->    
+    funnames_in_exp (C |[ e ]|) <-->  funnames_in_exp e.
+  Proof.
+    intros Hvars. inv Hvars.
+    - reflexivity.
+    - simpl. rewrite funnames_in_exp_Econstr. reflexivity.
+    - simpl. do 2 rewrite funnames_in_exp_Econstr. reflexivity.
+    - simpl. rewrite funnames_in_exp_Eproj. reflexivity.
+  Qed. 
+
+  Lemma project_vars_funnnames_in_exp Scope Funs GFuns c genv Γ FVs S x y C Q e :
+    project_vars clo_tag Scope Funs GFuns c genv Γ FVs S x y C Q ->    
+    funnames_in_exp (C |[ e ]|) <-->  funnames_in_exp e.
+  Proof.
+    intros Hvars. induction Hvars.
+    - reflexivity.
+    - simpl. rewrite <- app_ctx_f_fuse. rewrite project_var_funnnames_in_exp; [| eassumption ].
+      eassumption. 
+  Qed.
+
+  Lemma funnames_in_exp_Closure_Conversion :
+    (forall e Scope Funs GFuns genv c Γ FVs e' C
+            (Hcc : Closure_conversion clo_tag Scope Funs GFuns c genv Γ FVs e e' C),
+            funnames_in_exp (C |[ e' ]|) <--> funnames_in_exp  e) /\
+    (forall B Funs GFuns c FVs B'
+            (Hcc: Closure_conversion_fundefs clo_tag Funs GFuns c FVs B B'),
+       funnames_in_fundefs B' <--> funnames_in_fundefs B).
+  Proof.
+    exp_defs_induction IHe IHl IHB; intros; inv Hcc;
+      (try (rewrite project_vars_funnnames_in_exp; [| eassumption ]));
+      (try (rewrite project_var_funnnames_in_exp; [| eassumption ])).
+    - rewrite !funnames_in_exp_Econstr. eauto.
+    - inv H12. rewrite !funnames_in_exp_Ecase_nil. sets.
+    - inv H12. destruct y. destructAll. simpl in *. subst. rewrite !funnames_in_exp_Ecase_cons.      
+      rewrite IHe; eauto.
+      rewrite <- IHl. 2:{ econstructor; try eassumption. }
+      rewrite project_var_funnnames_in_exp; [| eassumption ]. reflexivity.
+    - rewrite !funnames_in_exp_Eproj. eauto.
+    - rewrite !funnames_in_exp_Eproj. rewrite !funnames_in_exp_Eletapp. eauto.
+    - rewrite <- app_ctx_f_fuse.
+      rewrite project_vars_funnnames_in_exp; [| eassumption ].
+      simpl. rewrite !funnames_in_exp_Econstr. rewrite !funnames_in_exp_Efun.
+      rewrite IHe; [| eassumption ]. rewrite IHB; [| eassumption ].
+      rewrite <- closure_conversion_fundefs_Same_set_image. reflexivity. eassumption.
+    - rewrite !funnames_in_exp_Eproj. rewrite !funnames_in_exp_Eapp. sets.
+    - rewrite !funnames_in_exp_Eprim. eauto.
+    - rewrite !funnames_in_exp_Ehalt. sets.
+    - rewrite !funnames_in_fundefs_Fcons. rewrite IHe; eauto. erewrite IHB; eauto. reflexivity.
+    - rewrite !funnames_in_exp_Fnil. reflexivity.
+  Qed.  
 
   Lemma project_var_occurs_free_ctx_Included_no_env Scope Funs GFuns c genv Γ S x y C Q F e:
     project_var clo_tag Scope Funs GFuns c genv Γ [] S x y C Q ->
@@ -928,7 +1086,7 @@ Section Closure_conversion_util.
       + eauto with Ensembles_DB.
     - simpl. inv H2.
   Qed.
-
+  
   
   Lemma project_vars_occurs_free_ctx_Included_no_env Scope Funs GFuns c genv Γ
         S xs xs' C S' F e:
@@ -939,8 +1097,7 @@ Section Closure_conversion_util.
   Proof.
     revert C F xs' S S'. induction xs; intros C F xs' S S' Hproj Hinc1 Hinc2; inv Hproj; simpl in *; repeat normalize_sets.
     - eassumption.
-    -
-      rewrite <- app_ctx_f_fuse.
+    - rewrite <- app_ctx_f_fuse.
       eapply project_var_occurs_free_ctx_Included_no_env; [ eassumption | | ].
       eapply IHxs. eassumption. rewrite <- Union_assoc. eassumption.
       eapply Included_trans. eapply Included_trans; [| eapply Hinc2 ]; sets.
@@ -1075,6 +1232,14 @@ Section Closure_conversion_util.
       Grab Existential Variables. exact (Empty_set _).
   Qed.
 
+  Corollary Closure_conversion_closed_fundefs e Scope Funs GFuns genv c Γ FVs e' C
+        (Hcc : Closure_conversion clo_tag Scope Funs GFuns c genv Γ FVs e e' C)
+        (Hun: fundefs_names_unique e) :
+    fun_fv_in (C |[ e' ]|) (GFuns :|: funnames_in_exp (C |[ e' ]|)).
+  Proof.
+    intros B Hin. rewrite (proj1 funnames_in_exp_Closure_Conversion); [| eassumption ].
+    eapply Closure_conversion_closed_fundefs_mut; eassumption.
+  Qed. 
 
   Lemma Closure_conversion_occurs_free_toplevel e Scope {_ : Decidable Scope} c genv Γ e' C
     (Hcc : Closure_conversion clo_tag Scope (Empty_set _) (Empty_set _) c genv Γ [] e e' C)

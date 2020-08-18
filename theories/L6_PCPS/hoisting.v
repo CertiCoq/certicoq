@@ -283,13 +283,6 @@ Proof.
   intros Hc; subst; eauto.
 Qed.
 
-(* FVs of function definitions are in G *)
-Definition fun_fv_in e G :=
-  forall B, funs_in_exp B e -> occurs_free_fundefs B \subset G.
-
-Definition fun_fv_in_fundefs B G :=
-  forall B', B = B' \/ funs_in_fundef B' B -> occurs_free_fundefs B' \subset G.
-
 
 Lemma Erase_fundefs_bound_var_mut :
   (forall e e' B (Herase : Erase_fundefs e e' B),       
@@ -1046,33 +1039,120 @@ Section Hoisting_correct.
 
   Context (Hp2 : post_Efun_r P1 P2) (Hoot2 : post_OOT P2). 
   
-  Lemma hoisting_correct_top k e e' B rho rho' :
+  Lemma Erase_fundefs_correct_top k e e' B :
     unique_bindings e ->
     Disjoint _ (occurs_free e) (bound_var e) ->
     fun_fv_in e (funnames_in_exp e) ->
     (* Hoisting *)            
     Erase_fundefs e e' B ->
 
-    (* environments are related *)
-    preord_env_P cenv PG (occurs_free e) k rho rho' ->
-    preord_exp cenv P2 PG k (e, rho) (Efun B e', rho').
+    (forall rho rho',
+        preord_env_P cenv PG (occurs_free e) k rho rho' ->
+        preord_exp cenv P2 PG k (e, rho) (Efun B e', rho')) /\
+    unique_bindings (Efun B e') /\
+    Disjoint _ (occurs_free (Efun B e')) (bound_var (Efun B e')).
   Proof.
-    intros Hub Hdis Hin Her Henv. eapply preord_exp_Efun_r.
-    - eassumption.
-    - eassumption.
-    - edestruct Erase_fundefs_unique_bindings. eassumption. eassumption. destructAll.
-      eapply hoisting_correct with (Bprev := Fnil) (B := B) (Ball := B).
-      + eassumption.
-      + eassumption.
-      + eapply preord_env_P_def_funs_not_in_P_r. eassumption. 
-        eapply Disjoint_Included_r; [| eassumption ].
-        rewrite Erase_fundefs_bound_var; [| eassumption ].
-        eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. sets.
-      + eexists rho'. intros f Hfin. rewrite def_funs_eq. reflexivity. eassumption.
-      + eapply split_fds_nil_r.
-      + eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs. eassumption.
-      + eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.
-      + eassumption.
+    intros Hub Hdis Hin Her. split; [| split ].
+    { intros rho rho' Henv. 
+      eapply preord_exp_Efun_r.
+      - eassumption.
+      - eassumption.
+      - edestruct Erase_fundefs_unique_bindings. eassumption. eassumption. destructAll.
+        eapply hoisting_correct with (Bprev := Fnil) (B := B) (Ball := B).
+        + eassumption.
+        + eassumption.
+        + eapply preord_env_P_def_funs_not_in_P_r. eassumption. 
+          eapply Disjoint_Included_r; [| eassumption ].
+          rewrite Erase_fundefs_bound_var; [| eassumption ].
+          eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. sets.
+        + eexists rho'. intros f Hfin. rewrite def_funs_eq. reflexivity. eassumption.
+        + eapply split_fds_nil_r.
+        + eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs. eassumption.
+        + eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.
+        + eassumption. }
+    { edestruct Erase_fundefs_unique_bindings. eassumption. eassumption. destructAll.
+      constructor; eauto. sets. }
+    { normalize_occurs_free.
+      eapply Disjoint_Included_r.
+      eapply Included_Union_Setminus with (s2 := name_in_fundefs B). tci. 
+
+      eapply Union_Disjoint_l.
+      - eapply Union_Disjoint_r. 2:{ eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint. }
+        eapply Disjoint_Included_l. eapply (proj1 Erase_fundefs_occurs_free_fundefs). eassumption.
+        eapply split_fds_nil_r. eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.        
+        sets.
+      - eapply Union_Disjoint_r; [| sets ].
+        eapply Disjoint_Included_l. eapply Included_Setminus_compat. 
+        eapply Erase_fundefs_occurs_free. eassumption.
+        eapply split_fds_nil_r. eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.        
+        reflexivity. rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set.
+        repeat normalize_sets.
+        normalize_bound_var. rewrite Union_commut. rewrite <- Erase_fundefs_bound_var; [| eassumption ].
+        sets. }
+  Qed.
+
+  Context (Hinc : inclusion (exp * env * fuel * trace) P1 P2).
+  
+  Lemma Erase_fundefs_correct_top_Fnil k e e' :
+    unique_bindings e ->
+    Disjoint _ (occurs_free e) (bound_var e) ->
+    fun_fv_in e (funnames_in_exp e) ->
+    (* Hoisting *)            
+    Erase_fundefs e e' Fnil ->
+
+    (forall rho rho',
+        preord_env_P cenv PG (occurs_free e) k rho rho' ->
+        preord_exp cenv P2 PG k (e, rho) (e', rho')) /\
+    unique_bindings e' /\
+    Disjoint _ (occurs_free e') (bound_var e').
+  Proof.
+    intros Hub Hdis Hin Her.
+    edestruct Erase_fundefs_correct_top; try eassumption. destructAll. clear H.
+    inv H0.
+    rewrite occurs_free_Efun, occurs_free_fundefs_Fnil in H1.
+    rewrite bound_var_Efun, bound_var_fundefs_Fnil in H1.
+    simpl in H1. repeat normalize_sets.
+
+    split; [| split ]; try eassumption.
+    intros rho rho' Henv. 
+
+    edestruct Erase_fundefs_unique_bindings. eassumption. eassumption. destructAll.
+    eapply preord_exp_post_monotonic. eapply Hinc.
+    eapply hoisting_correct with (Bprev := Fnil) (B := Fnil) (Ball := Fnil).
+    + eassumption.
+    + eassumption.
+    + eassumption.
+    + eexists rho'. intros f Hfin. inv Hfin.
+    + eapply split_fds_nil_r.
+    + now sets.
+    + eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.
+    + eassumption.
+    
+      Grab Existential Variables. exact 1.
+  Qed.
+
+  Lemma exp_hoist_correct_top k e e' :
+    unique_bindings e ->
+    Disjoint _ (occurs_free e) (bound_var e) ->
+    fun_fv_in e (funnames_in_exp e) ->
+    
+    exp_hoist e = e' -> 
+
+    (forall rho rho',
+        preord_env_P cenv PG (occurs_free e) k rho rho' ->
+        preord_exp cenv P2 PG k (e, rho) (e', rho')) /\
+    unique_bindings e' /\
+    Disjoint _ (occurs_free e') (bound_var e').
+  Proof.
+    intros Hun Hdis Hfv Hh.
+    unfold exp_hoist in Hh.
+
+    edestruct (proj1 erase_fundefs_in_Erase_fundefs) as [e1 [B1 [B2 [H1 [Hs H2]]]]].
+    rewrite H1 in Hh. unfold id in *. clear H1.
+    eapply split_fds_Fnil_eq_l in Hs. rewrite Hs in *. clear Hs. 
+    destruct B1.
+    - subst. eapply Erase_fundefs_correct_top; eauto.
+    - subst. eapply Erase_fundefs_correct_top_Fnil; eauto.
   Qed.
     
 End Hoisting_correct.

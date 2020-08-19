@@ -760,23 +760,19 @@ Proof.
   eapply Alpha_conv_occurs_free_mut.
 Qed.
 
+Require Import L6.algebra.
+
 Section Alpha_conv_correct.
 
-  Variable pr : prims.
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
+  
+  Definition PostT  : Type := @PostT fuel trace.
+  Definition PostGT : Type := @PostGT fuel trace.
+
   Variable cenv : ctor_env.
   Context (P1 : PostT) (* Local *)
-    (PG : PostGT) (* Global *)           
-    (HPost_con : post_constr_compat P1 P1)
-    (HPost_proj : post_proj_compat P1 P1)
-    (HPost_fun : post_fun_compat P1 P1)
-    (HPost_case_hd : post_case_compat_hd P1 P1)
-    (HPost_case_tl : post_case_compat_tl P1 P1)
-    (HPost_app : post_app_compat P1 PG)
-    (HPost_letapp : post_letapp_compat cenv P1 P1 PG)
-    (HPost_letapp_OOT : post_letapp_compat_OOT P1 PG)
-    (HPost_OOT : post_OOT P1)
-    (Hpost_base : post_base P1)
-    (Hinv : inclusion _ P1 PG).
+          (PG : PostGT) (* Global *)
+          (Hcompat : Post_properties cenv P1 P1 PG).
 
 
   (** ** Environment relation up to renaming *)
@@ -930,7 +926,6 @@ Section Alpha_conv_correct.
   Qed.
 
 
-
   Lemma preord_env_P_inj_set_lists_not_In_P_r S k f rho1 rho2 rho2' xs vs :
     preord_env_P_inj S k f rho1 rho2 ->
     set_lists xs vs rho2 = Some rho2' ->
@@ -942,6 +937,32 @@ Section Alpha_conv_correct.
     eexists; split; eauto. erewrite <- set_lists_not_In. eassumption.
     eassumption. intros Hc. eapply Hnin'. constructor. eassumption.
     eapply In_image. eexists; eauto.
+  Qed.
+  
+  Lemma preord_env_P_inj_set_lists_l_Disjoint S k f rho1 rho2 rho1' xs vs :
+    preord_env_P_inj S k f rho1 rho2 ->
+    set_lists xs vs rho1 = Some rho1' ->
+    Disjoint _(FromList xs) S ->
+    preord_env_P_inj S k f rho1' rho2.
+  Proof.
+    intros Henv Hnin Hnin' z Hy v' Hget.
+    edestruct Henv as [v'' [Hget' Hv]]; eauto.
+    erewrite <- set_lists_not_In in Hget. eassumption.
+    eassumption. intros Hc. eapply Hnin'. constructor; eauto.
+  Qed.
+
+  Lemma preord_env_P_inj_set_lists_r_Disjoint S k f rho1 rho2 rho2' xs vs :
+    preord_env_P_inj S k f rho1 rho2 ->
+    set_lists xs vs rho2 = Some rho2' ->
+    Disjoint _ (FromList xs) (image f S) ->
+    preord_env_P_inj S k f rho1 rho2'.
+  Proof.
+    intros Henv Hnin Hnin' z Hy v' Hget.
+    edestruct Henv as [v'' [Hget' Hv]]; eauto. eexists.
+    split. 
+    erewrite <- set_lists_not_In. eassumption.
+    eassumption. intros Hc. eapply Hnin'. constructor; eauto.
+    eapply In_image. eassumption. eassumption.
   Qed.
 
 
@@ -1424,9 +1445,9 @@ Section Alpha_conv_correct.
     preord_env_P_inj (name_in_fundefs B1 :|: S) k h
                      (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2).
   Proof with now eauto with Ensembles_DB.
-    revert S rho1 rho2 B1 B2 f h.
+    revert S rho1 rho2 B1 B2 f h. 
     induction k as [ k IH' ] using lt_wf_rec1.
-    intros S rho1 rho2 B1 B2 f h IHe Hlst Hdis Hinj Hsub Ha Hpre.
+    intros S rho1 rho2 B1 B2 f h IHe Hlst Hdis Hinj Hsub Ha Hpre; assert (Hc := Hcompat); destruct Hc.
     - intros x Hin v Hget.
       destruct (Decidable_name_in_fundefs B1) as [Dec].
       destruct (Dec x).
@@ -1439,7 +1460,7 @@ Section Alpha_conv_correct.
         eapply def_funs_eq. eassumption.
 
         { rewrite preord_val_eq.
-          intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf Hs.
+          intros vs1 vs2 j t1 xs1 e1 rho1' Hlen Hf1 Hs.
           edestruct Alpha_conv_fundefs_find_def
             as [xs2 [e2 [f'' [Hf' [Hinj''' [Hdis' Ha'' ] ] ] ] ] ]; eauto.
           now eapply construct_fundefs_injection_injective; eauto.
@@ -1512,7 +1533,7 @@ Section Alpha_conv_correct.
   Proof with now sets. 
     revert e1 e2 rho1 rho2 g.
     induction k as [ k IH ] using lt_wf_rec1.
-    induction e1 using exp_ind'; intros e2 rho1 rho2 g Hinj (* Hdis *) Ha Henv; inv Ha.
+    induction e1 using exp_ind'; intros e2 rho1 rho2 g Hinj (* Hdis *) Ha Henv; assert (Hc := Hcompat); inv Hc; inv Ha.
     - (* Econstr *)
       eapply preord_exp_constr_compat; eauto; intros.
       + eapply Forall2_monotonic_strong; [ | eassumption ].

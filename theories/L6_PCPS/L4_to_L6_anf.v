@@ -254,7 +254,7 @@ Section Convert.
 End Convert.
 
 (* Conversion from ienv from L5_to_L6 *)
-Definition ienv := list (string * AstCommon.itypPack).
+Definition ienv := list (kername * AstCommon.itypPack).
 
 (* returns list of numbers [n, n+m[  and the positive n+m (next available pos) *)
 Fixpoint fromN (n:positive) (m:nat) : list positive * positive :=
@@ -296,7 +296,7 @@ Fixpoint convert_cnstrs (tyname:string) (cct:list ctor_tag) (itC:list AstCommon.
     - process each of the constructor, indicating they are the ith constructor of the nth type of idBundle
    np: number of type parameters for this bundle
  *)
-Fixpoint convert_typack typ (idBundle:string) (n:nat) (ice:(ind_env * ctor_env*  ctor_tag * ind_tag * conId_map)) : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
+Fixpoint convert_typack typ (idBundle:kername) (n:nat) (ice:(ind_env * ctor_env*  ctor_tag * ind_tag * conId_map)) : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
     let '(ie, ce, ncT, niT, dcm) := ice in
     match typ with
       | nil => ice

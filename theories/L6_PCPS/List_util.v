@@ -609,6 +609,32 @@ Proof.
   - simpl. eapply IHl. zify; omega.
 Qed.
 
+Lemma max_list_acc_commutes l y z :
+  List_util.max_list l (Pos.max y z) = (Pos.max y (List_util.max_list l z)).
+Proof.
+  revert y z. induction l; intros y z.
+  - simpl. reflexivity.
+  - simpl. rewrite (Pos.max_comm y z), Pos.max_assoc, Pos.max_comm.
+    rewrite IHl. reflexivity.
+Qed. 
+
+Lemma max_list_in_list v l :
+  List_util.max_list l v \in v |: FromList l.
+Proof.
+  induction l; simpl. now left.
+  normalize_sets. rewrite max_list_acc_commutes.
+  destruct (Pos.max_spec a (List_util.max_list l v)).
+  - inv H. rewrite H1. inv IHl; eauto.
+  - inv H. rewrite H1. eauto.
+Qed.
+
+Lemma max_list_one l y :
+  List_util.max_list l y = Pos.max (List_util.max_list l 1) y.
+Proof.
+  rewrite Pos.max_comm, <- max_list_acc_commutes. f_equal. zify; omega.
+Qed.
+
+
 (** * Lemmas about [NoDup] *)
 
 Lemma NoDup_app {A} xs ys :

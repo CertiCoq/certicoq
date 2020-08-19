@@ -74,8 +74,8 @@ extraction/ctypes.ml
 extraction/ctypes.mli
 extraction/dead_param_elim.ml
 extraction/dead_param_elim.mli
-extraction/decidableClass.ml
-extraction/decidableClass.mli
+# extraction/decidableClass.ml
+# extraction/decidableClass.mli
 extraction/digits.ml
 extraction/digits.mli
 extraction/eAst.ml
@@ -98,8 +98,8 @@ extraction/extract.ml
 extraction/extract.mli
 extraction/fLT.ml
 extraction/fLT.mli
-extraction/fMapPositive.ml
-extraction/fMapPositive.mli
+# extraction/fMapPositive.ml
+# extraction/fMapPositive.mli
 extraction/fappli_IEEE_extra.ml
 extraction/fappli_IEEE_extra.mli
 extraction/ffi.ml
@@ -128,24 +128,26 @@ extraction/l3_to_L3_eta.ml
 extraction/l3_to_L3_eta.mli
 extraction/l3_to_L4.ml
 extraction/l3_to_L4.mli
-extraction/l4_2_to_L4_5.ml
-extraction/l4_2_to_L4_5.mli
-extraction/l4_5_to_L5.ml
-extraction/l4_5_to_L5.mli
-extraction/l4_to_L4_1_to_L4_2.ml
-extraction/l4_to_L4_1_to_L4_2.mli
+# extraction/l4_2_to_L4_5.ml
+# extraction/l4_2_to_L4_5.mli
+# extraction/l4_5_to_L5.ml
+# extraction/l4_5_to_L5.mli
+# extraction/l4_to_L4_1_to_L4_2.ml
+# extraction/l4_to_L4_1_to_L4_2.mli
+extraction/l4_to_L6.ml
+extraction/l4_to_L6.mli
 extraction/l4_to_L6_anf.ml
 extraction/l4_to_L6_anf.mli
-extraction/l5_to_L6.ml
-extraction/l5_to_L6.mli
+# extraction/l5_to_L6.ml
+# extraction/l5_to_L6.mli
 extraction/l6_to_Clight.ml
 extraction/l6_to_Clight.mli
 extraction/l6_to_Clight_stack.ml
 extraction/l6_to_Clight_stack.mli
 extraction/lambda_lifting.ml
 extraction/lambda_lifting.mli
-extraction/list1.ml
-extraction/list1.mli
+# extraction/list1.ml
+# extraction/list1.mli
 extraction/list_util.ml
 extraction/list_util.mli
 extraction/mCCompare.ml
@@ -236,8 +238,8 @@ extraction/pipeline.ml
 extraction/pipeline.mli
 extraction/pipeline_utils.ml
 extraction/pipeline_utils.mli
-extraction/polyEval.ml
-extraction/polyEval.mli
+# extraction/polyEval.ml
+# extraction/polyEval.mli
 extraction/printAST.ml
 extraction/printAST.mli
 extraction/printClight.ml
@@ -272,12 +274,12 @@ extraction/templateToPCUIC.ml
 extraction/templateToPCUIC.mli
 # extraction/term0.ml
 # extraction/term0.mli
-extraction/termAbs.ml
-extraction/termAbs.mli
-extraction/terms.ml
-extraction/terms.mli
-extraction/termsDB.ml
-extraction/termsDB.mli
+# extraction/termAbs.ml
+# extraction/termAbs.mli
+# extraction/terms.ml
+# extraction/terms.mli
+# extraction/termsDB.ml
+# extraction/termsDB.mli
 extraction/toplevel.ml
 extraction/toplevel.mli
 extraction/toplevel0.ml
@@ -296,22 +298,22 @@ extraction/uncurry.ml
 extraction/uncurry.mli
 extraction/universes0.ml
 extraction/universes0.mli
-extraction/usefulTypes.ml
-extraction/usefulTypes.mli
+# extraction/usefulTypes.ml
+# extraction/usefulTypes.mli
 extraction/utils.ml
 extraction/utils.mli
 extraction/values.ml
 extraction/values.mli
-extraction/varImplDummyPair.ml
-extraction/varImplDummyPair.mli
-extraction/varImplZ.ml
-extraction/varImplZ.mli
-extraction/varInterface.ml
-extraction/varInterface.mli
-extraction/varInterface0.ml
-extraction/varInterface0.mli
-extraction/variables.ml
-extraction/variables.mli
+# extraction/varImplDummyPair.ml
+# extraction/varImplDummyPair.mli
+# extraction/varImplZ.ml
+# extraction/varImplZ.mli
+# extraction/varInterface.ml
+# extraction/varInterface.mli
+# extraction/varInterface0.ml
+# extraction/varInterface0.mli
+# extraction/variables.ml
+# extraction/variables.mli
 extraction/wGraph.ml
 extraction/wGraph.mli
 extraction/zArith_dec.ml

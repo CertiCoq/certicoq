@@ -617,13 +617,13 @@ Qed.
 Lemma Dom_map_set A (sig: M.t A) x y :
     (Dom_map (M.set x y sig)) <--> (x |: Dom_map sig).
 Proof.
-  intros. split. intro. intro. inv H. destruct (var_dec x0 x).
+  intros. split. intro. intro. inv H. destruct (peq x0 x).
   subst; auto.
   rewrite M.gso in H0 by auto.
   right. exists x1; auto.
   intro. intro. inv H. exists y. inv H0. rewrite M.gss.
   auto.
-  destruct (var_dec x x0). subst. exists y.
+  destruct (peq x x0). subst. exists y.
   rewrite M.gss. auto.
   inv H0. exists x1. rewrite M.gso; auto.
 Qed.
@@ -640,6 +640,18 @@ Proof.
     simpl. rewrite FromList_cons.
     rewrite Dom_map_set.
     apply IHlx in H1. rewrite H1. auto 25 with Ensembles_DB.
+Qed.
+
+Lemma Dom_map_set_lists {A} xs (vs : list A) rho rho' :
+  set_lists xs vs rho = Some rho' ->
+  Dom_map rho' <--> FromList xs :|: Dom_map rho.
+Proof.
+  revert vs rho'. induction xs; intros vs rho' Hset.
+  - destruct vs; inv Hset. repeat normalize_sets. reflexivity.
+  - destruct vs; try now inv Hset.
+    simpl in Hset. destruct (set_lists xs vs rho) eqn:Hset1; inv Hset.
+    repeat normalize_sets. rewrite Dom_map_set. rewrite IHxs. now sets.
+    eassumption.
 Qed.
 
 Lemma Range_map_remove {A:Type} sigma v :
@@ -681,7 +693,7 @@ Proof.
     simpl.
     rewrite FromList_cons.
     intro. intro.
-    inv H. destruct (var_dec x0 a).
+    inv H. destruct (peq x0 a).
     subst.
     rewrite M.gss in H0.
     left. inv H0.
@@ -772,10 +784,81 @@ Proof.
   - intros. intro. intro. destruct lx; simpl in H; auto.
   - intros. destruct lx. simpl. auto with Ensembles_DB.
     simpl. intro. intro.
-    inv H. destruct (var_dec x0 e).
+    inv H. destruct (peq x0 e).
     + subst. rewrite M.gss in H0. inv H0. right; constructor; auto.
     + rewrite M.gso in H0 by auto.
       assert ( Range_map (set_list (combine lx ly) sig) x). exists x0; auto.
       apply IHly in H.
       inv H; auto. right. constructor 2; auto.
+Qed.
+
+
+(* [sub_map] lemmas *) 
+
+Lemma sub_map_set {A} rho x (v : A) :
+  ~ x \in Dom_map rho ->
+          sub_map rho (M.set x v rho).
+Proof.
+  intros Hnin z1 v1 Hget1. rewrite M.gso; eauto.
+  intros hc. subst. eapply Hnin. eexists; eauto.
+Qed.
+
+Lemma sub_map_trans {A} (rho1 rho2 rho3 : M.t A) :
+  sub_map rho1 rho2 ->
+  sub_map rho2 rho3 ->
+  sub_map rho1 rho3.
+Proof.
+  intros H1 H2 x v Hget. eauto.
+Qed.
+
+Lemma sub_map_refl {A} (rho : M.t A) :
+  sub_map rho rho.
+Proof.
+  intro; intros; eauto.
+Qed.
+
+
+Lemma sub_map_set_lists {A} rho rho' xs (vs : list A) :
+  set_lists xs vs rho = Some rho' ->
+  NoDup xs ->
+  Disjoint _ (FromList xs) (Dom_map rho) ->
+  sub_map rho rho'.
+Proof.
+  revert rho rho' vs; induction xs; intros rho rho' vs Hset; destruct vs; try now inv Hset.
+  simpl in Hset. destruct (set_lists xs vs rho) eqn:Hset'; inv Hset.
+  intros Hnd Hdis. inv Hnd. repeat normalize_sets. eapply sub_map_trans. eapply IHxs. eassumption. eassumption.
+  now sets. eapply sub_map_set. intros Hc. eapply Hdis. constructor. now left.
+  eapply Dom_map_set_lists in Hc; eauto. inv Hc; eauto. exfalso. contradiction.
+Qed.
+
+Lemma eq_env_P_sub_map {A} (rho1 rho2 : M.t A) x:
+  eq_env_P (Complement _ [set x]) rho1 rho2 ->
+  ~ x \in Dom_map rho1 ->
+          sub_map rho1 rho2.
+Proof.
+  intros Henv Hnin z v Hget.
+  rewrite <- Henv. eassumption. intros Hc. inv Hc.
+  eapply Hnin. eexists; eauto.
+Qed.
+
+Lemma eq_env_P_set_lists_not_in_P_l  (A : Type) (xs : list positive) (vs : list A)
+      (P : Ensemble map_util.M.elt) (rho1 rho1' rho2 : map_util.M.t A) :
+  eq_env_P P rho1 rho2 ->    
+  Disjoint _ P (FromList xs) ->
+  set_lists xs vs rho1 = Some rho1' -> 
+  eq_env_P P rho1' rho2.
+Proof.
+  intros Heq Hdis Hset x Hin.
+  destruct (Decidable_FromList xs). destruct (Dec x).
+  - exfalso. eapply Hdis. constructor; eauto.
+  - erewrite <- set_lists_not_In; [| eassumption | eassumption ]. eauto.
+Qed.
+
+
+Lemma Dom_map_sub_map {A : Type} (rho1 rho2 : M.t A) :
+  sub_map rho1 rho2 ->
+  Dom_map rho1 \subset Dom_map rho2.
+Proof.
+  intros H1 x [y Hin]. eapply H1 in Hin.
+  eexists; eauto.
 Qed.

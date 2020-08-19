@@ -1,7 +1,7 @@
 Require Import ZArith.
 Require Import Common.compM.
 From CertiCoq Require Import
-     L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6_anf L6.L5_to_L6
+     L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6_anf L6.L4_to_L6 L6.L5_to_L6
      L6.inline L6.uncurry L6.closure_conversion
      L6.closure_conversion L6.hoisting L6.dead_param_elim L6.lambda_lifting.
 From CertiCoq Require Import L4.toplevel.
@@ -42,17 +42,25 @@ Definition bogus_cloind_tag := 16%positive.
 Definition fun_fun_tag := 3%positive.
 Definition kon_fun_tag := 2%positive.
 
-Definition compile_L6_CPS : CertiCoqTrans L5_FullTerm L6_FullTerm :=
+Definition compile_L6_CPS : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
   fun src => 
       debug_msg "Translating from L5 to L6 (CPS)" ;;
       LiftErrorCertiCoqTrans "L6 CPS"
-        (fun (p : L5_FullTerm) =>
-           match convert_top default_ctor_tag default_ind_tag fun_fun_tag kon_fun_tag p with
-           | Some (cenv, nenv, fenv, ctag, itag, e) =>
+        (fun (p : toplevel.L4Term) =>
+           match L4_to_L6.convert_top fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag p with
+           | Some (cenv, nenv, fenv, ctag, itag, e) => 
+             (* (compM.Ret e, data) => *)
              Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e)
-
-           | None => Err "Failed translating from L5 to L6"
+           | None => Err "Error when compiling from L5 to L6"
            end) src.
+
+        (* (fun (p : L5_FullTerm) => *)
+        (*    match convert_top default_ctor_tag default_ind_tag fun_fun_tag kon_fun_tag p with *)
+        (*    | Some (cenv, nenv, fenv, ctag, itag, e) => *)
+        (*      Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e) *)
+
+        (*    | None => Err "Failed translating from L5 to L6" *)
+        (*    end) src. *)
 
 Definition compile_L6_ANF : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
   fun src => 
@@ -117,8 +125,8 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_Fu
       let '(e_err1, s, c_data) := uncurry_fuel cps 100 (fst (shrink_cps.shrink_top e0)) c_data in
       (* inlining *)
       e1 <- e_err1 ;;
-      let (e_err2, c_data) := if cps then inline_uncurry e1 s 10 10 c_data
-                              else inline_uncurry_marked_anf e1 s 10 10 c_data in
+      let (e_err2, c_data) := if cps then inline_uncurry e1 s 10 10 c_data true 
+                              else inline_uncurry_marked_anf e1 s 10 10 c_data true in
       e2 <- e_err2 ;;
       (* Shrink reduction *)
       let (e3, _) := shrink_cps.shrink_top e2 in
@@ -128,7 +136,7 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_Fu
       (* Shrink reduction *)
       let (e5, _) := shrink_cps.shrink_top e4 in
       (* Closure conversion *)
-      let (e_err5, c_data) := closure_conversion.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e5 c_data in
+      let (e_err5, c_data) := hoisting.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e5 c_data in
       let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
       e5 <- e_err5 ;;
       let c_data :=

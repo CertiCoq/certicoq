@@ -1,4 +1,4 @@
--R ./ CertiCoq.Benchmarks.lib
+-R ../../theories/compcert compcert -R ./ CertiCoq.Benchmarks.lib
 Binom.v
 Color.v
 vs.v

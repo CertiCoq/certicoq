@@ -176,7 +176,7 @@ Proof.
   induction 1; intros; auto.
   - specialize (IHWcbvEval1 _ ec H1). specialize (IHWcbvEval2 _ ec H1).
     econstructor; eassumption.
-  - destruct (string_dec nm nm0).
+  - destruct (kername_eq_dec nm nm0).
     + subst. unfold lookupDfn in H.
       rewrite (proj1 (fresh_lookup_None (trm:=Term) _ _) H1) in H.
       discriminate.
@@ -283,7 +283,7 @@ Function wcbvEval
       match (lookup nm p) with
       | Some (AstCommon.ecTrm t) => wcbvEval n t
       (** note hack coding of axioms in environment **)
-      | Some (AstCommon.ecTyp _ _) => raise ("wcbvEval, TConst ecTyp " ++ nm)
+      | Some (AstCommon.ecTyp _ _) => raise ("wcbvEval, TConst ecTyp " ++ string_of_kername nm)
       | _ => raise "wcbvEval: TConst environment miss"
       end
     | TProof => Ret TProof

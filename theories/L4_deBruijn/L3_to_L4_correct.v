@@ -164,10 +164,10 @@ Proof.
   apply Crct_CrctEnv in H. apply Crct_LookupDfn_Crct in H0; auto.
 Qed.
 
-Inductive LookupEnv : string -> env -> exp -> Prop :=
-  LHit : forall (s : string) (p : list (string * exp)) (t : exp),
+Inductive LookupEnv : kername -> env -> exp -> Prop :=
+  LHit : forall (s : kername) (p : list (kername * exp)) (t : exp),
     LookupEnv s ((s, t) :: p) t
-| LMiss : forall (s1 s2 : string) (p : env) (t t' : exp),
+| LMiss : forall (s1 s2 : kername) (p : env) (t t' : exp),
     s2 <> s1 -> LookupEnv s2 p t' -> LookupEnv s2 ((s1, t) :: p) t'.
 
 Lemma crctEnv_lookup (e : environ Term) (t : Term) nm :
@@ -180,7 +180,7 @@ Proof.
   now apply Crct_CrctEnv in H1.
 Qed.
 
-Inductive wf_tr_pre_environ : list (string * exp) -> Prop :=
+Inductive wf_tr_pre_environ : list (kername * exp) -> Prop :=
 | wf_tr_pre_nil : wf_tr_pre_environ []
 | wf_tr_pre_cons s t e :
     wf_tr_pre_environ e ->
@@ -188,7 +188,7 @@ Inductive wf_tr_pre_environ : list (string * exp) -> Prop :=
     not (exists t', LookupEnv s e t') -> (* No other binding to s in the environment *)
     wf_tr_pre_environ (cons (s, t) e).
 
-Inductive wf_tr_environ : list (string * exp) -> Prop :=
+Inductive wf_tr_environ : list (kername * exp) -> Prop :=
 | wf_tr_nil : wf_tr_environ []
 | wf_tr_cons s t e :
     wf_tr_environ e ->
@@ -197,9 +197,9 @@ Inductive wf_tr_environ : list (string * exp) -> Prop :=
     not (exists t', LookupEnv s e t') -> (* No other binding to s in the environment *)
     wf_tr_environ (cons (s, t) e).
 
-Definition subst_env_aux e n (t : exp) :=
+Definition subst_env_aux (e : env) n (t : exp) :=
   fold_left
-    (fun t (x : string * exp) => t{n := snd x})
+    (fun t (x : _ * exp) => t{n := snd x})
     e t.
 
 Definition subst_env e (t : exp) := subst_env_aux e 0 t.
@@ -231,10 +231,10 @@ Proof.
   revert nm.
   induction e; simpl; intros; try lia.
   destruct H. inversion H.
-  destruct a as [s trm]. case_eq (string_eq_bool nm s). lia.
+  destruct a as [s trm]. case_eq (eq_kername nm s). lia.
   intros. 
   destruct H. inversion H. subst.
-  rewrite string_eq_bool_rfl in H0. discriminate.
+  rewrite eq_kername_refl in H0. discriminate.
   subst. specialize (IHe nm). forward IHe. lia.
   eexists; eauto.
 Qed.
@@ -243,7 +243,7 @@ Qed.
 Lemma lookup_eval_env:
   forall e : environ L2k.compile.Term,
     crctEnv e ->
-    forall (nm : string) t, LookupDfn nm e t ->
+    forall (nm : kername) t, LookupDfn nm e t ->
     forall (e'' : env),
       eval_env (translate_env e) e'' ->
       wf_tr_environ e'' ->
@@ -439,7 +439,7 @@ Qed.
 (** Simplification lemmas for [subst_env] *)
 
 Lemma subst_env_aux_closed:
-  forall (e : list (string * exp)) (t : exp) (k : N),
+  forall (e : env) (t : exp) (k : N),
     wf_tr_environ e -> exp_wf 0 t -> is_value t -> subst_env_aux e k t = t.
 Proof.
   induction e; crush.
@@ -464,15 +464,15 @@ Proof with crush.
   - destruct a as [s a]; simpl in *.
     inv H0.
     + (* Hit *)
-      rewrite string_eq_bool_rfl. 
+      rewrite eq_kername_refl.
       destruct lt_dec... 
       destruct N.eq_dec...
       clear e0. inv H.
       rewrite (proj1 exp_wf_shift); eauto.
       now split; try apply subst_env_aux_closed.
     + (* Miss *)
-      case_eq (string_eq_bool nm s); intros Hnms. 
-      apply string_eq_bool_eq in Hnms; contradiction.
+      case_eq (eq_kername nm s); intros Hnms. 
+      apply eq_kername_bool_eq in Hnms; contradiction.
       inv H.
       specialize (IHe _ k H3 H7); simpl in IHe.
       destruct lt_dec... 
@@ -840,11 +840,11 @@ Proof. intros. eapply (proj1 crctTerm_exp_wf_ind); eauto. Qed.
 
 Lemma crctEnv_ind : forall P : forall e : environ Term, crctEnv e -> Prop,
     P [] ceNil ->
-    (forall (nm : string) (s : Term) (p : environ Term) (f0 : fresh nm p) (c : crctTerm p 0 s),
+    (forall nm (s : Term) (p : environ Term) (f0 : fresh nm p) (c : crctTerm p 0 s),
         let wf := proj1 Crct_CrctEnv p 0%nat s c in
         P p wf ->
         P ((nm, ecTrm s) :: p) (ceTrmCons f0 c)) ->
-    (forall (nm : string) (m : nat) (s : itypPack) (p : environ Term) (c : crctEnv p),
+    (forall nm (m : nat) (s : itypPack) (p : environ Term) (c : crctEnv p),
         P p c -> forall f1 : fresh nm p, P ((nm, ecTyp Term m s) :: p) (ceTypCons m s c f1)) ->
     forall (e : environ Term) (c : crctEnv e), P e c.
 Proof.
@@ -1794,9 +1794,9 @@ Proof.
   simpl. exists t. auto.
 
   intros. simpl. destruct a.
-  case_eq (string_eq_bool s s0).
-  intros. apply string_eq_bool_eq in H0. subst. exists e0. constructor.
-  intros. apply string_neq_bool_neq in H0.
+  case_eq (eq_kername s k).
+  intros. apply eq_kername_bool_eq in H0. subst. exists e0. constructor.
+  intros. apply eq_kername_bool_neq_inv in H0.
   destruct (IHe' H). eexists; eauto. constructor; eauto.
 Qed.
 
@@ -1881,16 +1881,16 @@ Proof.
     (* rewrite IH1, IH2; eauto. *)
   + intros. f_equal.
     eapply Crct_invrt_Const in H as [H [pd H']]; eauto.
-    rewrite (N.add_comm k), N.add_assoc. f_equal.
+    rewrite (N.add_comm k0), N.add_assoc. f_equal.
     pose proof (crctEnv_pres_dfn _ _ Hwfbef Hbef' _ _ pd).
     clear -H' H0 Hwf. induction after. simpl. lia.
     simpl.
-    destruct a. case_eq (string_eq_bool s s0).
-    intros Hss0. apply string_eq_bool_eq in Hss0. subst s0.
+    destruct a. case_eq (eq_kername k k0).
+    intros Hss0. apply eq_kername_bool_eq in Hss0. subst k0.
     inv Hwf. elim H7.
     destruct H0 as [ts Hts]. 
     eapply lookup_env_extend; eauto.
-    intros. apply string_neq_bool_neq in H1.
+    intros. apply eq_kername_bool_neq_inv in H1.
     simpl in Hwf. inv Hwf. specialize (IHafter H5).
     rewrite IHafter. lia.
   + intros. rewrite H; auto. destruct i.

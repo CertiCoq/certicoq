@@ -18,7 +18,7 @@ extern value make_Coq_Strings_String_string_EmptyString(void);
 extern value alloc_make_Coq_Strings_Ascii_ascii_Ascii(struct thread_info *, value, value, value, value, value, value, value, value);
 extern value alloc_make_Coq_Strings_String_string_String(struct thread_info *, value, value);
 
-extern value alloc_make_CertiCoq_Benchmarks_io_io_IO_Types_Build_IO_Types(struct thread_info *, value, value);
+extern value alloc_make_CertiCoq_Benchmarks_io_io_IO_Types_Build_IO_Types(struct thread_info *, value);
 extern value alloc_make_CertiCoq_Benchmarks_io_io_IO_Impl_Build_IO_Impl(struct thread_info *, value, value);
 extern value alloc_make_CertiCoq_Benchmarks_io_io_StringFFI_Build_StringFFI(struct thread_info *, value, value);
 
@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
 
   // Types are dummy values
   value io_types = 
-    alloc_make_CertiCoq_Benchmarks_io_io_IO_Types_Build_IO_Types(tinfo, 1, 1);
+    alloc_make_CertiCoq_Benchmarks_io_io_IO_Types_Build_IO_Types(tinfo, 1);
 
   value io_impl = 
     alloc_make_CertiCoq_Benchmarks_io_io_IO_Impl_Build_IO_Impl(

@@ -57,14 +57,25 @@ Section Beta.
     log_msg (pp_St s nenv);;
     log_msg Pipeline_utils.newline.
 
+  Definition split_fuel d : nat * nat :=
+    let d2 := Nat.div2 d in
+    (d2, d2 + Nat.b2n (Nat.odd d)).
+
+  Lemma split_fuel_add d :
+    d = fst (split_fuel d) + snd (split_fuel d). 
+  Proof.
+    unfold split_fuel. simpl. rewrite (NPeano.Nat.div2_odd d) at 1. simpl.    
+    omega.
+  Qed.
     
-  Fixpoint beta_contract (d : nat) {struct d} :=
-    let fix beta_contract_aux (e : exp) (sig : r_map) (fm:fun_map) (s:St) {struct e} : inlineM exp :=
+  
+  Program Fixpoint beta_contract (d : nat) {measure d} :=
+    let fix beta_contract_aux (e : exp) (sig : r_map) (fm:fun_map) (s:St) (str_flag : bool) {struct e} : inlineM exp :=
         match e with
         | Econstr x t ys e =>
           let ys' := apply_r_list sig ys in
           x' <- get_name x "" ;;
-          e' <- beta_contract_aux e (M.set x x' sig) fm s;;
+          e' <- beta_contract_aux e (M.set x x' sig) fm s str_flag ;;
           ret (Econstr x' t ys' e')
         | Ecase v cl =>
           let v' := apply_r sig v in
@@ -72,7 +83,7 @@ Section Beta.
                    match br with
                    | nil => ret ( nil)
                    | (t, e)::br' =>
-                     e' <- beta_contract_aux e sig fm s;;
+                     e' <- beta_contract_aux e sig fm s str_flag ;;
                      br'' <- beta_list br';;
                      ret ((t, e')::br'')
                    end) cl;;
@@ -80,9 +91,9 @@ Section Beta.
        | Eproj x t n y e =>
          let y' := apply_r sig y in
          x' <- get_name x "" ;;
-         e' <- beta_contract_aux e (M.set x x' sig) fm s;;
+         e' <- beta_contract_aux e (M.set x x' sig) fm s str_flag ;;
          ret (Eproj x' t n y' e')
-       | Eletapp x f t ys ec =>
+       | Eletapp x f t ys ec =>         
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
          let (s' , inl) := update_letApp _ IH f' t ys' s in
@@ -90,24 +101,25 @@ Section Beta.
           | (true, Some  (ft, xs, e), S d') =>
             if (Nat.eqb (List.length xs) (List.length ys)) then 
               let sig' := set_list (combine xs ys') sig  in
-              x' <- get_name x "" ;;         
-              e' <- beta_contract d' e sig' fm s' ;;
+              x' <- get_name x "" ;;
+              let '(d1, d2) := split_fuel d' in 
+              e' <- beta_contract d1 e sig' (M.remove f fm) s' str_flag ;;
               match inline_letapp e' x', Nat.eqb (List.length xs) (List.length ys) with
               | Some (C, x'), true =>
-                ec' <- beta_contract d' ec (M.set x x' sig) fm s' ;;
+                ec' <- beta_contract d2 ec (M.set x x' sig) fm s' str_flag ;;
                 ret (C |[ ec' ]|)
               | _, _ =>
                 x' <- get_name x "" ;;
-                ec' <- beta_contract_aux ec (M.set x x' sig) fm s' ;;
+                ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag ;;
                 ret (Eletapp x' f' t ys' ec')
               end
             else              
               x' <- get_name x "" ;;
-              ec' <- beta_contract_aux ec (M.set x x' sig) fm s' ;;
+              ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag ;;
               ret (Eletapp x' f' t ys' ec')
          | _ =>
            x' <- get_name x "" ;;
-           ec' <- beta_contract_aux ec (M.set x x' sig) fm s' ;;
+           ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag;;
            ret (Eletapp x' f' t ys' ec')
           end)
        | Efun fds e =>
@@ -122,12 +134,12 @@ Section Beta.
                      let s' := update_inFun _ IH f t xs e sig s in
                      let f' := apply_r sig' f in
                      xs' <- get_names_lst xs "" ;;
-                     e' <- beta_contract_aux e (set_list (combine xs xs') sig') fm' s' ;;
+                     e' <- beta_contract_aux e (set_list (combine xs xs') sig') fm s' false ;;
                      fds'' <- beta_contract_fds fds' s ;;
                      ret (Fcons f' t xs' e' fds'')
                    | Fnil => ret Fnil
                    end) fds s2 ;;
-         e' <- beta_contract_aux e sig' fm' s1;;
+         e' <- beta_contract_aux e sig' fm' s1 str_flag;;
          ret (Efun fds' e')
        | Eapp f t ys =>
          let f' := apply_r sig f in
@@ -137,9 +149,9 @@ Section Beta.
          (* log_msg ("Application of " ++ fstr ++ " is " ++ if inl then "" else "not " ++ "inlined") ;; *)
          (match (inl, M.get f fm, d) with
           | (true, Some (ft, xs, e), S d') =>
-            if Nat.eqb (List.length xs) (List.length ys) then
+            if (Nat.eqb (List.length xs) (List.length ys) && (negb str_flag || straight_code e))%bool then
               let sig' := set_list (combine xs ys') sig  in
-              beta_contract d' e sig' fm  s'
+              beta_contract d' e sig' (M.remove f fm) s' str_flag
             else 
               ret (Eapp f' t ys')
           | _ => ret (Eapp f' t ys')
@@ -147,7 +159,7 @@ Section Beta.
        | Eprim x t ys e =>
          let ys' := apply_r_list sig ys in
          x' <- get_name x "" ;;
-         e' <- beta_contract_aux e (M.set x x' sig) fm s;;
+         e' <- beta_contract_aux e (M.set x x' sig) fm s str_flag ;;
          ret (Eprim x' t ys' e')
        | Ehalt x =>
          let x' := apply_r sig x in
@@ -155,9 +167,21 @@ Section Beta.
         end
     in beta_contract_aux.
 
+  Next Obligation.
+    eapply le_trans. reflexivity. eapply le_n_S. 
+    eapply NPeano.Nat.div2_decr. omega.
+  Qed.
+  Next Obligation.
+    destruct d'. simpl. omega.
+    replace (S (S d')) with (S d' + 1) by omega. 
+    eapply plus_lt_le_compat.
+    eapply NPeano.Nat.lt_div2. omega. 
+    
+    destruct ((Nat.odd (S d'))); simpl; omega.
+  Qed.
   
-  Definition beta_contract_top (e:exp) (d:nat) (s:St) (c:comp_data) : error exp * comp_data :=
-    let '(e', (st', _)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s) c tt in
+  Definition beta_contract_top (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
+    let '(e', (st', _)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c tt in
     (e', st').
 
 End Beta.

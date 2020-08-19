@@ -34,13 +34,14 @@ Arguments rarg {term} _.
 *** there are no nested applicatione and every application has an argument
 *** every Fixpoint has at least one function
 **)
+
 Inductive Term : Type :=
 | TRel       : nat -> Term
 | TProof     : Term
 | TLambda    : name -> Term -> Term
 | TLetIn     : name -> Term (* dfn *) -> Term (* body *) -> Term
 | TApp       : Term -> Term -> Term
-| TConst     : string -> Term
+| TConst     : kername -> Term
 | TConstruct : inductive (* inductive type *) -> nat (* constructor # *) ->
                nat (* # pars *) -> nat (* # args *) -> Term
 | TCase      : (inductive * nat) (* # of pars *) ->
@@ -75,7 +76,7 @@ Fixpoint print_template_term (t:term) : string :=
     | tLetIn _ _ _ => " LET "
     | tApp fn args =>
       " (APP" ++ (print_template_term fn) ++ " _ " ++ ") "
-    | tConst s => "[" ++ s ++ "]"
+    | tConst s => "[" ++ string_of_kername s ++ "]"
     | tConstruct i n =>
       "(CSTR:" ++ print_inductive i ++ ":" ++ (nat_to_string n) ++ ") "
     | tCase n mch _ =>
@@ -217,13 +218,13 @@ End term_Term_sec.
 (** for debuggung **)
 Fixpoint print_global_declarations (g:global_declarations) : string :=
   match g with
-  | cons (knm, _) p => knm ++ print_global_declarations p
+  | cons (knm, _) p => string_of_kername knm ++ print_global_declarations p
   | nil => "!"
   end.
 
 (** can compile terms using global_declarations from EAst.v **)
 Definition Cstr_npars_nargs
-  (g:global_declarations) (ind:inductive) (ncst:nat): exception (nat * nat) :=
+  (g:global_declarations) (ind:BasicAst.inductive) (ncst:nat): exception (nat * nat) :=
   match ind with
   | {| inductive_mind:= knm;  inductive_ind:= nbod |} =>
     match lookup_env g knm with
@@ -231,7 +232,7 @@ Definition Cstr_npars_nargs
       raise ("Cstr_npars_nargs:lookup_env ConstantDecl")
     | None =>
       raise ("Cstr_npars_nargs:lookup_env; "
-               ++ knm ++ "," ++ (nat_to_string nbod) ++
+               ++ string_of_kername knm ++ "," ++ (nat_to_string nbod) ++
                "," ++ (nat_to_string ncst) ++
                "/" ++ print_global_declarations g)
     | Some (InductiveDecl {| ind_npars:= npars; ind_bodies:= bodies |}) =>
@@ -256,7 +257,7 @@ Function term_Term (g:global_declarations) (t:term) : Term :=
     | tConst pth =>
       match lookup_env g pth with
       | Some (ConstantDecl _) => TConst pth
-      | _ => TWrong ("term_Term:Const inductive or axiom: " ++ pth)
+      | _ => TWrong ("term_Term:Const inductive or axiom: " ++ string_of_kername pth)
       end
     | tConstruct ind ncst =>
       match Cstr_npars_nargs g ind ncst with
@@ -289,7 +290,7 @@ Definition trans_global_decl (g:global_declarations) (dcl:global_decl) :
 Fixpoint program_Pgm_aux (g:global_declarations) : environ Term :=
   match g with
   | nil => nil
-  | gd :: g => cons (on_snd (trans_global_decl g) gd) (program_Pgm_aux g)
+  | d :: g => cons (on_snd (trans_global_decl g) d) (program_Pgm_aux g)
   end.
 
 From MetaCoq Require Import SafeChecker.SafeTemplateChecker.

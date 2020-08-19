@@ -1,5 +1,5 @@
 From MetaCoq.Template Require Import Universes.
-From MetaCoq Require Export Template.BasicAst.
+From MetaCoq Require Export Template.BasicAst Template.Ast.
 From MetaCoq Require Export Erasure.EAst.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Peano_dec.
@@ -17,6 +17,9 @@ Set Implicit Arguments.
 (** Fix arguments scope for [mkInd]. *)
 Arguments mkInd _%string _%nat.
 
+(** Use with caution, valid kernames from Coq cannot have an empty MPFile component. *)
+Definition kername_of_string (s : string) := (MPfile nil, s).
+
 (** Printing terms in exceptions for debugging purposes **)
 Definition print_name nm : string :=
   match nm with
@@ -25,7 +28,7 @@ Definition print_name nm : string :=
   end.
 Definition print_inductive (i:inductive) : string :=
   match i with
-  | mkInd str n => ("(inductive:" ++ str ++ ":" ++ nat_to_string n ++ ")")
+  | mkInd str n => ("(inductive:" ++ string_of_kername str ++ ":" ++ nat_to_string n ++ ")")
   end.
 Definition print_projection (p:projection) : string :=
   match p with
@@ -63,7 +66,7 @@ Defined.
 Lemma inductive_dec: forall (s1 s2:inductive), {s1 = s2}+{s1 <> s2}.
 Proof.
   intros [mind i] [mind' i'].
-  destruct (string_dec mind mind');
+  destruct (kername_eq_dec mind mind');
     destruct (eq_nat_dec i i'); subst;
       try (solve [left; reflexivity]); 
       right; intros h; elim n; injection h; intuition.
@@ -209,7 +212,7 @@ Inductive WFaEc: envClass -> Prop :=
 Hint Constructors WFaEc : core.
 
 (** An environ is an association list of envClass. **)
-Definition environ := list (string * envClass).
+Definition environ := list (kername * envClass).
 
 (** compute an [environ] of just the inductive types and axioms from a
 *** template-coq [program].  Independent of term structure
@@ -231,12 +234,12 @@ Record Program : Type := mkPgm { main:trm; env:environ }.
 Fixpoint print_environ (e:environ) : string :=
   match e with
     | nil => "(envnil)"
-    | cons (str, ec) ecs => "(envcons " ++ str ++ (print_ec ec) ++ ")" ++
+    | cons (str, ec) ecs => "(envcons " ++ string_of_kername str ++ (print_ec ec) ++ ")" ++
                                         (print_environ ecs)
   end.
 
 (** environments are finite functions **)
-Inductive fresh (nm:string) : environ -> Prop :=
+Inductive fresh (nm:kername) : environ -> Prop :=
 | fcons: forall s p ec,
          fresh nm p -> nm <> s -> fresh nm ((s,ec)::p)
 | fnil: fresh nm nil.
@@ -245,7 +248,7 @@ Hint Constructors fresh : core.
 Lemma fresh_dec: forall nm p, (fresh nm p) \/ ~(fresh nm p).
 induction p.
 - left. auto.
-- destruct a. destruct IHp. destruct (string_dec nm s).
+- destruct a. destruct IHp. destruct (kername_eq_dec nm k).
  + subst. right. intros h. inversion_Clear h. nreflexivity H4.
  + left. constructor; auto.
  + right. intros h. elim H. inversion_Clear h. assumption.
@@ -280,7 +283,7 @@ Hint Constructors WFaEnv : core.
 
 (** looking a name up in an environment **)
 (** Hack: we code axioms in the environment as ecTyp with itypPack = nil **)
-Inductive Lookup: string -> environ -> envClass -> Prop :=
+Inductive Lookup: kername -> environ -> envClass -> Prop :=
 | LHit: forall s p t, Lookup s ((s,t)::p) t
 | LMiss: forall s1 s2 p t ec,
            s2 <> s1 -> Lookup s2 p ec -> Lookup s2 ((s1,t)::p) ec.
@@ -290,44 +293,54 @@ Definition LookupTyp s p n i := Lookup s p (ecTyp n i) /\ i <> nil.
 Definition LookupAx s p := Lookup s p ecAx.
 
 (** equivalent lookup functions **)
-Function lookup (nm:string) (p:environ) : option envClass :=
+Function lookup (nm:kername) (p:environ) : option envClass :=
   match p with
    | nil => None
-   | cons (s,ec) p => if (string_eq_bool nm s) then Some ec
+   | cons (s,ec) p => if (eq_kername nm s) then Some ec
                       else lookup nm p
   end.
 
-Definition lookupDfn (nm:string) (p:environ) : exception trm :=
+Definition lookupDfn (nm:kername) (p:environ) : exception trm :=
   match lookup nm p with
     | Some (ecTrm t) => ret t
-    | _ => raise ("lookupDfn; fails on " ++ nm)
+    | _ => raise ("lookupDfn; fails on " ++ string_of_kername nm)
   end.
 
-Definition lookupTyp (nm:string) (p:environ) : exception (nat * itypPack) :=
+Definition lookupTyp (nm:kername) (p:environ) : exception (nat * itypPack) :=
   match lookup nm p with
     | Some (ecTyp n ((cons _ _) as t)) => Ret (n, t)
-    | _ => raise ("lookupTyp; fails on " ++ nm)
+    | _ => raise ("lookupTyp; fails on " ++ string_of_kername nm)
   end.
+
+Lemma eq_kername_bool_neq {x y} : x <> y -> eq_kername x y = false.
+Proof.
+  unfold eq_kername. destruct kername_eq_dec; congruence.
+Qed.
+
+Lemma eq_kername_bool_neq_inv {x y} : eq_kername x y = false -> x <> y.
+Proof.
+  unfold eq_kername. destruct kername_eq_dec; congruence.
+Qed.
 
 Lemma Lookup_lookup:
   forall nm p t, Lookup nm p t -> lookup nm p = Some t.
 induction 1; intros; subst.
-- simpl. rewrite (string_eq_bool_rfl s). reflexivity.
-- simpl. rewrite (string_eq_bool_neq H). destruct t; assumption.
+- simpl. rewrite (eq_kername_refl s). reflexivity.
+- simpl. rewrite (eq_kername_bool_neq H). destruct t; assumption.
 Qed.
 
 Lemma lookup_Lookup:
   forall nm p t, lookup nm p = Some t -> Lookup nm p t.
 induction p; intros t h. inversion h.
-destruct a. destruct (string_dec nm s); simpl in h.
-- subst. rewrite (string_eq_bool_rfl s) in h. 
+destruct a. destruct (kername_eq_dec nm k); simpl in h.
+- subst. rewrite (eq_kername_refl k) in h. 
   injection h. intros; subst. apply LHit.
 - apply LMiss. assumption. apply IHp. 
-  rewrite (string_eq_bool_neq n) in h. assumption.
+  rewrite (eq_kername_bool_neq n) in h. assumption.
 Qed.
 
 Lemma not_lookup_not_Lookup:
- forall (nm:string) (p:environ) (ec:envClass),
+ forall (nm:kername) (p:environ) (ec:envClass),
    ~(lookup nm p = Some ec) <-> ~(Lookup nm p ec).
 split; eapply deMorgan_impl.
 - apply (Lookup_lookup).
@@ -338,8 +351,8 @@ Lemma LookupDfn_lookupDfn:
   forall nm p t, Lookup nm p t ->
                  forall te, t = (ecTrm te) -> lookupDfn nm p = Ret te.
   induction 1; intros; subst; unfold lookupDfn, lookup.
-- rewrite (string_eq_bool_rfl s). reflexivity.
-- rewrite (string_eq_bool_neq H). 
+- rewrite (eq_kername_refl s). reflexivity.
+- rewrite (eq_kername_bool_neq H). 
   destruct t; apply IHLookup; reflexivity.
 Qed.
 
@@ -360,7 +373,7 @@ Lemma Lookup_dec:
 Proof.
   induction p; intros.
   - right. intros t h. inversion h.
-  - destruct IHp; destruct a; destruct (string_dec s s0); subst.
+  - destruct IHp; destruct a; destruct (kername_eq_dec s k); subst.
     + left. destruct H. exists e. apply LHit.
     + left. destruct H. exists x. apply LMiss; assumption.
     + destruct e.
@@ -386,16 +399,16 @@ Qed.
 Lemma fresh_lookup_None: forall nm p, fresh nm p <-> lookup nm p = None.
 split. 
 - induction 1; simpl; try reflexivity.
-  + rewrite string_eq_bool_neq; assumption.
+  + rewrite eq_kername_bool_neq; assumption.
 - induction p; auto.
-  + destruct a. destruct (string_dec nm s). 
-    * subst. simpl. rewrite string_eq_bool_rfl. discriminate.
-    * simpl. rewrite string_eq_bool_neq; try assumption. intros h.
+  + destruct a. destruct (kername_eq_dec nm k). 
+    * subst. simpl. rewrite eq_kername_refl. discriminate.
+    * simpl. rewrite eq_kername_bool_neq; try assumption. intros h.
       apply fcons; intuition.
 Qed.
 
 Lemma Lookup_single_valued:
-  forall (nm:string) (p:environ) (t r:envClass),
+  forall (nm:kername) (p:environ) (t r:envClass),
     Lookup nm p t -> Lookup nm p r -> t = r.
 Proof.
   intros nm p t r h1 h2. 
@@ -405,11 +418,16 @@ Proof.
 Qed.
 
 Lemma LookupDfn_single_valued:
-  forall (nm:string) (p:environ) (t r:trm),
+  forall (nm:kername) (p:environ) (t r:trm),
     LookupDfn nm p t -> LookupDfn nm p r -> t = r.
 Proof.
   unfold LookupDfn. intros nm p t r h1 h2.
   injection (Lookup_single_valued h1 h2); intros. assumption.
+Qed.
+
+Lemma eq_kername_bool_eq {k k'} : eq_kername k k' = true -> k = k'.
+Proof.
+  unfold eq_kername. destruct kername_eq_dec; congruence.
 Qed.
 
 Lemma lookup_fresh_neq:
@@ -418,7 +436,7 @@ Lemma lookup_fresh_neq:
 Proof.
   intros nm2 p ec. functional induction (lookup nm2 p); intros.
   - discriminate.
-  - inversion_Clear H0. rewrite (string_eq_bool_eq _ _ e0). assumption.
+  - inversion_Clear H0. rewrite (eq_kername_bool_eq e0). assumption.
   - inversion_Clear H0. specialize (IHo H _ H3). assumption.
 Qed.
 
@@ -440,9 +458,9 @@ Lemma lookup_weaken':
   forall s nm, s <> nm -> forall p ec, lookup s p = lookup s ((nm, ec) :: p).
 Proof.
   intros s nm h1 p ec.
-  change (lookup s p = if (string_eq_bool s nm) then Some ec
+  change (lookup s p = if eq_kername s nm then Some ec
                        else lookup s p).
-  rewrite string_eq_bool_neq. reflexivity. assumption.
+  rewrite eq_kername_bool_neq. reflexivity. assumption.
 Qed.
 
 Lemma lookupDfn_weaken':
@@ -454,20 +472,20 @@ Proof.
 Qed.
 
 Lemma Lookup_strengthen:
-  forall (nm1:string) pp t,
+  forall (nm1:kername) pp t,
     Lookup nm1 pp t -> 
     forall nm2 ec p, pp = (nm2,ec)::p -> nm1 <> nm2 -> Lookup nm1 p t.
 Proof.
   intros nm1 pp t h nm2 ecx px j1 j2. subst. assert (k:= Lookup_lookup h).
-  simpl in k. rewrite (string_eq_bool_neq j2) in k.
+  simpl in k. rewrite (eq_kername_bool_neq j2) in k.
   apply lookup_Lookup. assumption.
 Qed.
 
 Lemma lookup_strengthen:
-  forall (nm1 nm2:string) ec p,
+  forall (nm1 nm2:kername) ec p,
     nm1 <> nm2 -> lookup nm1 ((nm2,ec)::p) = lookup nm1 p.
 Proof.
-  intros. cbn. rewrite (string_eq_bool_neq H). reflexivity.
+  intros. cbn. rewrite (eq_kername_bool_neq H). reflexivity.
 Qed.
 
 Lemma Lookup_pres_WFapp:
@@ -483,7 +501,7 @@ Lemma lookup_pres_WFapp:
 Proof.
   induction 1; intros nn ed h.
   - inversion_Clear h.
-  - case_eq (string_eq_bool nn nm); intros j.
+  - case_eq (eq_kername nn nm); intros j.
     + cbn in h. rewrite j in h. myInjection h. assumption.
     + cbn in h. rewrite j in h. eapply IHWFaEnv. eassumption.
 Qed.
@@ -501,10 +519,10 @@ Proof.
 Qed.
 
 (* index of a name in an environ *)
-Function Lkup_index (nm:string) (env:environ) : nat :=
+Function Lkup_index (nm:kername) (env:environ) : nat :=
   match env with
   | nil => 0
-  | ((s,t)::p) => match string_eq_bool nm s with
+  | ((s,t)::p) => match eq_kername nm s with
                   | true => 1
                   | false => match Lkup_index nm p with
                              | 0 => 0

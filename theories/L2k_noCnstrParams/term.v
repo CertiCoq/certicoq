@@ -138,7 +138,7 @@ Fixpoint print_term (t:Term) : string :=
     | TLetIn nm _ _ => "(LET " ++ (print_name nm) ++ ")"
     | TApp fn arg =>
       "(" ++ (print_term fn) ++ " @ " ++ (print_term arg) ++ ")"
-    | TConst s => "[" ++ s ++ "]"
+    | TConst s => "[" ++ string_of_kername s ++ "]"
     | TConstruct i n _ =>
       "(CSTR " ++ (print_inductive i) ++ " " ++ (nat_to_string n) ++ ")"
     | TCase i mch _ =>
@@ -171,7 +171,7 @@ Proof.
     [lft | rght ..]. 
   - destruct t1; cross.
     destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..].
-  - destruct t; cross. destruct (string_dec s s0); [lft | rght].
+  - destruct t; cross. destruct (kername_eq_dec k k0); [lft | rght].
   - destruct t0; cross.
     destruct (inductive_dec i i0), (eq_nat_dec n n0), (H t0);
       [lft | rght .. ].
@@ -3119,7 +3119,7 @@ Qed.
     
 (** occurrances of a constant in a term (ignoring type components) **)
 Section PoccTrm_sec.
-Variable nm: string.
+Variable nm: kername.
 
 Definition PoccInd (i:inductive) := nm = inductive_mind i.
   

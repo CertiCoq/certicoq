@@ -298,7 +298,95 @@ Section Bounds.
     Qed.
 
 
+    (* This allows us to prove divergence preservation *)  
+    Lemma simple_bound_post_upper_bound L :
+      post_upper_bound (simple_bound L).
+    Proof.
+      intro; intros. unfold simple_bound in *. unfold_all.
+      eexists (fun x => x +  L).
+      intros. 
+      destruct cout1 as [t1 tapp1]; destruct cout2 as [t2 tapp2].
+      eapply Nat.add_le_mono_r in H.
+
+      eexists (cin2 - cin1). simpl. lia.
+    Qed.
+
   End SimpleBound.
-  
+
+  Section HoistingBound.
+
+    Context (cenv : ctor_env). 
+
+    Definition hoisting_bound (L G : nat) : @PostT nat (nat * nat) := 
+      fun '(e1, rho1, c1, (t1, tapp1)) '(e2, rho2, c2, (t2, tapp2)) =>
+        c1 <= c2 + G * c2 + L.
+    
+    Instance hoisting_bound_compat L G (Hi : L <= G) :
+      Post_properties cenv (hoisting_bound L G) (hoisting_bound L G) (hoisting_bound G G).
+    Proof.
+      constructor; (try (intro; intros; intro; intros; destruct cout1; destruct cout2;
+                         unfold hoisting_bound in *; unfold_all; simpl; lia)).
+      - intro; intros. intro; intros. destruct cout1; destruct cout2. destruct cout1'; destruct cout2'.
+        unfold hoisting_bound in *; unfold_all; simpl. destructAll. lia.
+      - intro; intros. intro; intros. 
+        unfold hoisting_bound in *; unfold_all; simpl. lia. 
+      - intro; intros. unfold post_base'. 
+        unfold hoisting_bound in *; unfold_all; simpl. lia.
+      - intro; intros; unfold hoisting_bound in *.
+        destruct x as [[[? ?] ?] [? ?]]; destruct y as [[[? ?] ?] [? ?]]. lia.
+    Qed. 
+
+    Lemma hoisting_bound_mon n m G :
+      n <= m -> inclusion _ (hoisting_bound n G) (hoisting_bound m G).
+    Proof.
+      intros Hleq.
+      intro; intros; unfold hoisting_bound in *.
+      destruct x as [[[? ?] ?] [? ?]]; destruct y as [[[? ?] ?] [? ?]]. lia.
+    Qed. 
+
+    
+    Lemma hoisting_bound_post_Efun_l n G :
+      post_Efun_l (hoisting_bound n G) (hoisting_bound (S n) G).
+    Proof.
+      intro; intros. unfold hoisting_bound in *. unfold_all. simpl in *.
+      destruct cout1; destruct cout2. lia.
+    Qed.
+
+    Definition hoisting_bound_top G := hoisting_bound (G + 1) G. 
+
+    Lemma hoisting_bound_post_Efun_r n G :
+      n <= G -> 
+      post_Efun_r (hoisting_bound n G) (hoisting_bound_top G).
+    Proof.
+      intros Hleq. 
+      intro; intros. unfold hoisting_bound, hoisting_bound_top in *. unfold_all. simpl in *.      
+      destruct cout1; destruct cout2. lia.
+    Qed.
+
+    Lemma hoisting_boound_top_incl n G :
+      n <= G -> inclusion _ (hoisting_bound n G) (hoisting_bound_top G).
+    Proof.
+      intros Hleq.
+      intro; intros. unfold hoisting_bound_top, hoisting_bound in *.
+      destruct x as [[[? ?] ?] [? ?]]; destruct y as [[[? ?] ?] [? ?]]. lia.
+    Qed.
+
+    Lemma hoisting_bound_post_upper_bound G :
+      post_upper_bound (hoisting_bound_top G).
+    Proof.
+      intro; intros. unfold hoisting_bound_top, hoisting_bound in *. unfold_all.
+      eexists (fun x => (1 + G) * x + (G + 1)).
+      intros. 
+      destruct cout1 as [t1 tapp1]; destruct cout2 as [t2 tapp2].
+      eapply Nat.add_le_mono_r in H.
+
+      replace (cin2 + G * cin2) with ((1 + G) * cin2) in H by lia.
+      eapply NPeano.Nat.mul_le_mono_pos_l in H. 
+      eexists (cin2 - cin1). simpl. lia.
+      lia. 
+    Qed.
+
+  End HoistingBound.
+    
 End Bounds.
   

@@ -72,6 +72,9 @@ Section RelComp.
                                    (fun P PG e1 e2 =>
                                       forall k rho1 rho2,
                                         preord_env_P cenv PG (occurs_free e1) k rho1 rho2 ->
+                                        (* For certain proof rho1 needs to be a closing substitution, to ensure
+                                           that programs "get stuck in the same way" *)
+                                        binding_in_map (occurs_free e1) rho1 ->
                                         preord_exp cenv P PG k (e1, rho1) (e2, rho2)) n.  
 
   Definition preord_env_n n S := R_n wf_trivial pr_trivial (fun P PG c1 c2 => forall k, preord_env_P cenv P S k c1 c2) n.  
@@ -143,11 +146,14 @@ Section RelComp.
     + (* base case *)
       intros. edestruct (H (to_nat cin)); eauto.
       eapply preord_env_P_antimon; [| eapply Hwfe ]. now intros z Hin; inv Hin.  
+      intros x Hc1. eapply Hwfe in Hc1. now inv Hc1.
       destructAll.
       do 3 eexists. split; eauto. eapply One. intros k.
-      edestruct (H (k + to_nat cin) rho1 rho2); [| | eassumption | ].
+      edestruct (H (k + to_nat cin) rho1 rho2); [| | | eassumption | ].
       eapply preord_env_P_antimon; [| eapply Hwfe ].
-      now intros z Hin; inv Hin. omega. destructAll.
+      now intros z Hin; inv Hin.
+      intros z Hc1. eapply Hwfe in Hc1. now inv Hc1.
+      omega. destructAll.
       destruct v1.
       * destruct x; eauto.
       * destruct x; eauto. destruct x2. contradiction.
@@ -156,7 +162,9 @@ Section RelComp.
       * clear. firstorder.
       * clear; now firstorder.
     + intros. edestruct H; eauto. 
-      eapply preord_env_P_antimon with (rho2 := rho2); [| eapply Hwfe ]. now intros z Hin; inv Hin. destructAll.
+      eapply preord_env_P_antimon with (rho2 := rho2); [| eapply Hwfe ]. now intros z Hin; inv Hin.
+      intros x Hc1. eapply Hwfe in Hc1. now inv Hc1.
+      destructAll.
       edestruct IHHrel. eapply Hwf_c. eassumption. eassumption. eassumption.
       destructAll. 
       do 3 eexists. split; eauto.
@@ -165,8 +173,10 @@ Section RelComp.
       * destruct x; eauto.
       * destruct x; eauto. destruct x2. eapply preord_res_n_OOT_r in H7. contradiction.
         intros k.
-        edestruct (H (k + to_nat cin)); [| | eassumption | ].
-        eapply preord_env_P_antimon; [| eapply Hwfe ]. now intros z Hin; inv Hin. omega. destructAll.
+        edestruct (H (k + to_nat cin)); [| | | eassumption | ]. 
+        eapply preord_env_P_antimon; [| eapply Hwfe ]. now intros z Hin; inv Hin.
+        intros x Hc1. eapply Hwfe in Hc1. now inv Hc1.
+        omega. destructAll.
         destruct x; eauto. simpl in H10. contradiction.
         eapply bstep_fuel_deterministic in H3; [| clear H3; eassumption ]. destructAll.
         eapply preord_res_monotonic. eassumption. omega.
@@ -190,11 +200,13 @@ Section RelComp.
     - eapply logical_relations.preord_exp_preserves_divergence. eapply Hrel. eassumption.
       intros k. eapply H.
       unfold closed_exp in Hef. rewrite Hef. now intros z Hin; inv Hin.
+      intros x Hc1. eapply Hef in Hc1. now inv Hc1.
       eassumption.
     - eapply IHHexp. eapply Hwf_c. eassumption. eassumption.
       eapply logical_relations.preord_exp_preserves_divergence. eapply Hrel. eassumption.
       intros k. eapply H.
       unfold closed_exp in Hef. rewrite Hef. now intros z Hin; inv Hin.
+      intros x Hc1. eapply Hef in Hc1. now inv Hc1.
       eassumption.
   Qed.
 
@@ -223,6 +235,7 @@ Section RelComp.
                                 wf_pres e1 e2 /\ 
                                 forall k rho1 rho2 ,
                                   cc_approx_env_P cenv ctag (occurs_free e1) k PG rho1 rho2 ->
+                                  binding_in_map (occurs_free e1) rho1 ->
                                   cc_approx_exp cenv ctag k P PG (e1, rho1) (e2, rho2))
                              (preord_exp_n m)).
 
@@ -264,8 +277,10 @@ Section RelComp.
     intros Hwfe Himpl Hrel. inv Hrel. destructAll. inv H0. destructAll. 
     assert (Hexp1 := H). assert (Hexp2 := H2). intros.
     eapply preord_exp_n_impl in H; [| eassumption | eassumption ]. destructAll. 
-    edestruct (H2 (to_nat x2) rho1 rho2); [ | | eassumption | ].
+    edestruct (H2 (to_nat x2) rho1 rho2); [ | | | eassumption | ].
     intros z Hin. eapply Hwf_c in Hin. now inv Hin. eapply preord_exp_n_wf_pres. eassumption. eassumption. eassumption.
+    intros z Hin. eapply Hwf_c in Hin. now inv Hin. eapply preord_exp_n_wf_pres. eassumption. eassumption. eassumption.
+    
     omega.
     
     destructAll.
@@ -289,11 +304,16 @@ Section RelComp.
         destruct x7. eapply preord_res_n_OOT_r in H8.
         contradiction.
         
-        edestruct (H2 (k + to_nat x2)); [| | eassumption | ]. 
+        edestruct (H2 (k + to_nat x2)); [| | | eassumption | ]. 
          
         eapply cc_approx_env_P_antimon; [| eapply Hwf_c; eauto ].
+
         intros z Hin. now inv Hin.
-        eapply preord_exp_n_wf_pres. eassumption. eassumption. omega. 
+        eapply preord_exp_n_wf_pres. eassumption. eassumption.
+
+        intros z Hin. eapply Hwf_c in Hin. now inv Hin. eapply preord_exp_n_wf_pres; eauto. eassumption. 
+
+        omega. 
         destructAll.
         
         destruct x1. contradiction.
@@ -323,7 +343,9 @@ Section RelComp.
     eapply cc_approx_exp_preserves_divergence.
     2:{ intros. eapply H2.
         eapply cc_approx_env_P_antimon; [| eapply Hwf_c; eauto ]. intros z Hin. now inv Hin.
-        eapply preord_exp_n_wf_pres. eassumption. eassumption. }
+        eapply preord_exp_n_wf_pres. eassumption. eassumption.
+
+        intros z Hin. eapply Hwf_c in Hin. now inv Hin. eapply preord_exp_n_wf_pres; eassumption. eassumption. }
     eassumption.
     
     eapply preord_exp_n_preserves_divergence. eapply Hpr. eassumption. eassumption. eassumption.
@@ -368,7 +390,8 @@ Section Linking.
         preord_exp cenv P PG k (e1, rho1) (e2, rho2)) ->
     
     (forall k rho1 rho2,
-        preord_env_P cenv PG [set x] k rho1 rho2 ->                
+        preord_env_P cenv PG [set x] k rho1 rho2 ->
+        binding_in_map [set x] rho1 ->
         preord_exp cenv P PG k (e1', rho1) (e2', rho2)) ->
     
     closed_exp e1 ->
@@ -400,6 +423,9 @@ Section Linking.
       + intros. eapply Hexp2.
         simpl. intros w1 Hget. inv Hget. intros v3 Hget1. rewrite M.gss in *. inv Hget1.
         eauto.
+
+        rewrite <- (Union_Empty_set_neut_l _ [set x]). eapply binding_in_map_set.
+        intros z Hin. inv Hin.
   Qed. 
 
 
@@ -410,7 +436,8 @@ Section Linking.
         cc_approx_exp cenv ctag k P PG (e1, rho1) (e2, rho2)) ->
     
     (forall k rho1 rho2,
-        cc_approx_env_P cenv ctag [set x] k PG rho1 rho2 ->                
+        cc_approx_env_P cenv ctag [set x] k PG rho1 rho2 ->
+        binding_in_map [set x] rho1 ->
         cc_approx_exp cenv ctag k P PG (e1', rho1) (e2', rho2)) ->
     
     closed_exp e1 ->
@@ -439,7 +466,12 @@ Section Linking.
           destructAll. destruct x0. contradiction. 
           
           edestruct (Hexp2 (k + to_nat cin2)); try eassumption.
+
+          2:{ rewrite <- (Union_Empty_set_neut_l _ [set x]). eapply binding_in_map_set.
+              intros z Hin. inv Hin. }
+
           2:{ omega. }
+
           
           2:{ destructAll.
               do 3 eexists. split. econstructor 2. econstructor.
@@ -483,6 +515,7 @@ Section Linking.
       wf_pres e1 e2 /\
       (forall k rho1 rho2,
           preord_env_P cenv PG (occurs_free e1) k rho1 rho2 ->
+          binding_in_map (occurs_free e1) rho1 -> 
           preord_exp cenv P PG k (e1, rho1) (e2, rho2)).
   Proof.
     intros H. inv H. do 2 eexists. now split; eauto.
@@ -530,13 +563,15 @@ Section LinkingComp.
     - assert (Hexp2 :
                 forall k rho1 rho2,
                   preord_env_P cenv P2 [set x] k rho1 rho2 ->
+                  binding_in_map [set x] rho1 ->
                   preord_exp cenv P1 P2 k (e1', rho1) (e1', rho2)).
       { intros. eapply preord_exp_refl. eapply Hpr. eassumption.
         intros z Hin. eapply Hfv in Hin . eauto. } 
       assert (Hexp1 :
-                forall (k : nat) (rho1 rho2 : env),
+                forall (k : nat) (rho1 rho2 : env),                  
                   preord_exp' cenv (preord_val cenv) P1 P2 k (c1, rho1) (c2, rho2)).
-      { intros. eapply H. intros z Hin. eapply Hw1 in Hin; eauto. inv Hin. }
+      { intros. eapply H. intros z Hin. eapply Hw1 in Hin; eauto. inv Hin.
+        intros z Hin. eapply Hw1 in Hin. inv Hin. } 
       
       
       specialize (preord_exp_preserves_linking
@@ -552,10 +587,12 @@ Section LinkingComp.
       assert (Hexp1 :
                 forall (k : nat) (rho1 rho2 : env),
                   preord_exp' cenv (preord_val cenv) P1 P2 k (c1, rho1) (c', rho2)).
-      { intros. eapply H. intros z Hin. eapply Hw1 in Hin; eauto. inv Hin. } 
+      { intros. eapply H. intros z Hin. eapply Hw1 in Hin; eauto. inv Hin.
+        intros z Hin. eapply Hw1 in Hin. inv Hin. }
       assert (Hexp2 :
                 forall k rho1 rho2,
                   preord_env_P cenv P2 [set x] k rho1 rho2 ->
+                  binding_in_map [set x] rho1 ->                                    
                   preord_exp cenv P1 P2 k (e1', rho1) (e1', rho2)).
       { intros. eapply preord_exp_refl. eapply Hpr. eassumption.
         intros z Hin. eapply Hfv in Hin . eauto. }
@@ -581,8 +618,10 @@ Section LinkingComp.
     - assert (Hexp2 :
                 forall k rho1 rho2,
                   preord_env_P cenv P2 [set x] k rho1 rho2 ->
+                  binding_in_map [set x] rho1 ->                                    
                   preord_exp cenv P1 P2 k (c1, rho1) (c2, rho2)).
-      { intros. eapply H. intros z Hin. eapply Hfv in Hin; eauto. }
+      { intros. eapply H. intros z Hin. eapply Hfv in Hin; eauto.
+        eapply binding_in_map_antimon. eassumption. eassumption. }
       
       assert (Hexp1 :
                 forall (k : nat) (rho1 rho2 : env),
@@ -604,8 +643,10 @@ Section LinkingComp.
       assert (Hexp2 :
                 forall k rho1 rho2,
                   preord_env_P cenv P2 [set x] k rho1 rho2 ->
+                  binding_in_map [set x] rho1 ->                                    
                   preord_exp cenv P1 P2 k (c1, rho1) (c', rho2)).
-      { intros. eapply H. intros z Hin. eapply Hfv in Hin; eauto. }
+      { intros. eapply H. intros z Hin. eapply Hfv in Hin; eauto.
+        eapply binding_in_map_antimon. eassumption. eassumption. }
       
       assert (Hexp1 :
                 forall (k : nat) (rho1 rho2 : env),
@@ -717,10 +758,14 @@ Section LinkingCompTop.
     eexists. split. split.
     2:{ intros. eapply cc_approx_exp_preserves_linking.
         2:{ intros. eapply H4. intros z Hin. eapply preord_exp_n_wf_pres in H. eapply H in Hin. inv Hin.
-            eassumption. clear; now firstorder. }
+            eassumption. clear; now firstorder.
+            intros z Hin. eapply Hc2 in Hin. inv Hin. }
+
         eassumption.
 
-        intros. eapply H6. intros z Hin. eapply H8. eapply Hfv2. eassumption. eassumption. }
+        intros. eapply H6. intros z Hin. eapply H9. eapply Hfv2. eassumption.
+        eapply binding_in_map_antimon. eassumption. eassumption.
+        eassumption. }
 
     intros Hc. eapply link_closed. eassumption.
     eapply Included_trans. eapply H3. eassumption.
@@ -805,7 +850,8 @@ Section LinkingFast.
         preord_exp cenv P PG k (e1, rho1) (e2, rho2)) ->
     
     (forall k rho1 rho2,
-        preord_env_P cenv PG [set x] k rho1 rho2 ->                
+        preord_env_P cenv PG [set x] k rho1 rho2 ->
+        binding_in_map [set x] rho1 ->
         preord_exp cenv P PG k (e1', rho1) (e2', rho2)) ->
     
     closed_exp e1 ->
@@ -865,7 +911,8 @@ Section LinkingFast.
         cc_approx_exp cenv ctag k P PG (e1, rho1) (e2, rho2)) ->
     
     (forall k rho1 rho2,
-        cc_approx_env_P cenv ctag [set x] k PG rho1 rho2 ->                
+        cc_approx_env_P cenv ctag [set x] k PG rho1 rho2 ->
+        binding_in_map [set x] rho1 ->
         cc_approx_exp cenv ctag k P PG (e1', rho1) (e2', rho2)) ->
     
     closed_exp e1 ->

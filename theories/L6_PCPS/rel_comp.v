@@ -10,7 +10,9 @@ Import ListNotations.
 
 Close Scope Z_scope.
 
-Context (fuel trace : Type).
+Section Types.
+  
+Context {fuel trace : Type}.
 
 Definition PostT := @PostT fuel trace.
 Definition PostGT := @PostGT fuel trace.
@@ -975,3 +977,5 @@ Section LinkingFast.
   Qed.
   
 End LinkingFast.
+
+End Types.

@@ -2,19 +2,21 @@
 
 Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
 Require Import Coq.Sorting.Sorted.
-Require Import Program Arith.
+Require Import Arith.
 Require Import ExtLib.Data.String.
 Require Import Common.AstCommon.
 Require Import Znumtheory.
 Require Import Bool.
 (* ask about this import *)
 Require compcert.lib.Maps.
-Require Recdef.
+(* Require Recdef. *)
 Import Nnat.
+Import ListNotations.
 
 Require Import L4.expression L4.exp_eval.
 Require Import Coq.Relations.Relation_Definitions.
-Require Import Coq.Classes.RelationClasses.
+Require Import Coq.Classes.Morphisms.
+(* Require Import Coq.Classes.RelationClasses. *)
 Require Import cps.
 Require Import cps_show.
 Require Import eval.
@@ -31,6 +33,7 @@ Open Scope monad_scope.
 
 
 Require Import functions.
+Require Import compcert.lib.Coqlib.
 Require Import Ensembles.
 Require Import Ensembles_util.
 Require Import L6.tactics. 
@@ -44,106 +47,106 @@ Section CPS.
 
   Context (func_tag kon_tag default_tag default_itag : positive).
 
-Definition conId_map:= list (dcon * ctor_tag).
+  Definition conId_map:= list (dcon * ctor_tag).
 
-Theorem conId_dec: forall x y:dcon, {x = y} + {x <> y}.
-Proof.
-  intros. destruct x,y.
-  assert (H:= AstCommon.inductive_dec i i0).
-  destruct H.
-  - destruct (classes.eq_dec n n0).
-    + subst. left. auto.
-    + right. intro. apply n1. inversion H. auto.
-  - right; intro; apply n1. inversion H; auto.
-Defined.
+  Theorem conId_dec: forall x y:dcon, {x = y} + {x <> y}.
+  Proof.
+    intros. destruct x,y.
+    assert (H:= AstCommon.inductive_dec i i0).
+    destruct H.
+    - destruct (classes.eq_dec n n0).
+      + subst. left. auto.
+      + right. intro. apply n1. inversion H. auto.
+    - right; intro; apply n1. inversion H; auto.
+  Defined.
 
-Fixpoint dcon_to_info (a:dcon) (sig:conId_map) :=
-  match sig with
-  | nil => default_tag
-  | ((cId, inf)::sig') => match conId_dec a cId with
-                          | left _ => inf
-                          | right _ => dcon_to_info a sig'
-                          end
-  end.
+  Fixpoint dcon_to_info (a:dcon) (sig:conId_map) :=
+    match sig with
+    | nil => default_tag
+    | ((cId, inf)::sig') => match conId_dec a cId with
+                            | left _ => inf
+                            | right _ => dcon_to_info a sig'
+                            end
+    end.
 
-Definition dcon_to_tag (a:dcon) (sig:conId_map) :=
-  dcon_to_info a sig.
-
-
-Definition name_env := M.t BasicAst.name.
-Definition n_empty:name_env := M.empty _.
-
-Definition t_info:Type := fun_tag.
-Definition t_map := M.t t_info.
-Definition t_empty:t_map := M.empty _.
-
-(* get the fun_tag of a variable, func_tag if not found *)
-Fixpoint get_f (n:var) (sig:t_map): fun_tag :=
-  match M.get n sig with
-  | None => func_tag
-  | Some v => v
-  end.
+  Definition dcon_to_tag (a:dcon) (sig:conId_map) :=
+    dcon_to_info a sig.
 
 
-Definition s_map := M.t var.
-Definition s_empty := M.empty var.
+  Definition name_env := M.t BasicAst.name.
+  Definition n_empty:name_env := M.empty _.
+
+  Definition t_info:Type := fun_tag.
+  Definition t_map := M.t t_info.
+  Definition t_empty:t_map := M.empty _.
+
+  (* get the fun_tag of a variable, func_tag if not found *)
+  Fixpoint get_f (n:var) (sig:t_map): fun_tag :=
+    match M.get n sig with
+    | None => func_tag
+    | Some v => v
+    end.
 
 
-Definition constr_env:Type := conId_map.
+  Definition s_map := M.t var.
+  Definition s_empty := M.empty var.
 
-Definition ienv := list (BasicAst.kername * AstCommon.itypPack).
+
+  Definition constr_env:Type := conId_map.
+
+  Definition ienv := list (BasicAst.kername * AstCommon.itypPack).
 
 
-Inductive symgen := SG : (var * name_env) -> symgen.
+  Inductive symgen := SG : (var * name_env) -> symgen.
 
-Definition gensym : symgen -> name -> (var * symgen) :=
-  fun s n => match s with
-           | SG (i, nenv) =>
-             let env' := M.set i n nenv in
-             (i, SG (Pos.succ i, env'))
-             end.
+  Definition gensym : symgen -> name -> (var * symgen) :=
+    fun s n => match s with
+               | SG (i, nenv) =>
+                 let env' := M.set i n nenv in
+                 (i, SG (Pos.succ i, env'))
+               end.
 
-Fixpoint gensym_n' (i : var) (env : name_env) (nlst : list name) :=
-  match nlst with
-  | nil => (nil, env, i)
-  | cons n nlst' =>
-    let env' := M.set i n env in
-    let '(vlst, env'', next) := gensym_n' (Pos.succ i) env' nlst' in
-    (i::vlst, env'', next)
-  end.
+  Fixpoint gensym_n' (i : var) (env : name_env) (nlst : list name) :=
+    match nlst with
+    | nil => (nil, env, i)
+    | cons n nlst' =>
+      let env' := M.set i n env in
+      let '(vlst, env'', next) := gensym_n' (Pos.succ i) env' nlst' in
+      (i::vlst, env'', next)
+    end.
 
-Definition gensym_n : symgen -> list name -> (list var * symgen) :=
-  fun s nlst => match s with
-                | SG (i, nenv) =>
-                  let '(ilst, nenv', next) := gensym_n' i nenv nlst in
-                  (ilst, SG (next, nenv'))
-                end.
+  Definition gensym_n : symgen -> list name -> (list var * symgen) :=
+    fun s nlst => match s with
+                  | SG (i, nenv) =>
+                    let '(ilst, nenv', next) := gensym_n' i nenv nlst in
+                    (ilst, SG (next, nenv'))
+                  end.
 
-Fixpoint gensym_n_nAnon' (i : var) (env : name_env )
-         (n : nat) : (list var * name_env * var) :=
-  match n with
-  | O => (nil, env, i)
-  | S n' =>
-    let env' := M.set i nAnon env in
-    let '(vlst, env'', next_var) := gensym_n_nAnon' (Pos.succ i) env' n' in
-    (i::vlst, env'', next_var)
-  end.
+  Fixpoint gensym_n_nAnon' (i : var) (env : name_env )
+           (n : nat) : (list var * name_env * var) :=
+    match n with
+    | O => (nil, env, i)
+    | S n' =>
+      let env' := M.set i nAnon env in
+      let '(vlst, env'', next_var) := gensym_n_nAnon' (Pos.succ i) env' n' in
+      (i::vlst, env'', next_var)
+    end.
 
-Definition gensym_n_nAnon (s : symgen) (n : nat) : (list var * symgen) :=
-  match s with
-    SG (i, nenv) =>
-    let '(ilist, nenv', next_var) := gensym_n_nAnon' i nenv n in
-    (ilist, SG (next_var, nenv'))
-  end.
+  Definition gensym_n_nAnon (s : symgen) (n : nat) : (list var * symgen) :=
+    match s with
+      SG (i, nenv) =>
+      let '(ilist, nenv', next_var) := gensym_n_nAnon' i nenv n in
+      (ilist, SG (next_var, nenv'))
+    end.
 
-Fixpoint gen_nlst (n : nat) : list name :=
-  match n with
-  | O => nil
-  | S n' => (nNamed "f"%string) :: (gen_nlst n')
-  end.
+  Fixpoint gen_nlst (n : nat) : list name :=
+    match n with
+    | O => nil
+    | S n' => (nNamed "f"%string) :: (gen_nlst n')
+    end.
 
-(* helper function for building name_env *)
-(*
+  (* helper function for building name_env *)
+  (*
 Definition set_n (x:var) (n:BasicAst.name) (tgm:conv_env) : conv_env :=
   let '(t1,t2,t3) := tgm in
   (t1, t2, M.set x n t3).
@@ -156,84 +159,84 @@ Fixpoint add_names lnames vars tgm : conv_env :=
     add_names lnames' vars' tgm
   | _, _ => tgm
   end.
-*)
+   *)
 
-(* returns list of numbers [n, n+m[  and the positive n+m (next available pos) *)
-Fixpoint fromN (n:positive) (m:nat) : list positive * positive :=
-  match m with
-  | O => (nil, n)
-  | S m' =>
-    let (l, nm ) := (fromN (n+1) (m')) in
-    (n::l, nm)
-  end.
-
-
-(* Bind m projections (starting from the (p+1)th) of var r to
-   variables [n, n+m[, returns the generated context and n+m *)
-Fixpoint ctx_bind_proj (tg:ctor_tag) (r:positive) (m:nat) (n:var) (p:nat)
-  : (exp_ctx * var) :=
+  (* returns list of numbers [n, n+m[  and the positive n+m (next available pos) *)
+  Fixpoint fromN (n:positive) (m:nat) : list positive * positive :=
     match m with
-      | O => (Hole_c, n)
-      | S m' =>
-        let (ctx_p', n') := ctx_bind_proj tg r m' n p in
-        (Eproj_c  n' tg (N.of_nat (m'+p)) r ctx_p', Pos.succ n')
+    | O => (nil, n)
+    | S m' =>
+      let (l, nm ) := (fromN (n+1) (m')) in
+      (n::l, nm)
     end.
 
-(* returns length of given expression.efnlst *)
-Fixpoint efnlst_names (vs:efnlst) : nat * list name :=
-  match vs with
+
+  (* Bind m projections (starting from the (p+1)th) of var r to
+   variables [n, n+m[, returns the generated context and n+m *)
+  Fixpoint ctx_bind_proj (tg:ctor_tag) (r:positive) (m:nat) (n:var) (p:nat)
+    : (exp_ctx * var) :=
+    match m with
+    | O => (Hole_c, n)
+    | S m' =>
+      let (ctx_p', n') := ctx_bind_proj tg r m' n p in
+      (Eproj_c  n' tg (N.of_nat (m'+p)) r ctx_p', Pos.succ n')
+    end.
+
+  (* returns length of given expression.efnlst *)
+  Fixpoint efnlst_names (vs:efnlst) : nat * list name :=
+    match vs with
     | eflnil => (O, nil)
     | eflcons n e fds' =>
       let (i, l) := efnlst_names fds' in
       ((S i), n::l)
-  end.
+    end.
 
-(* definition of nth for the purposes of the cps_cvt function *)
-Definition nth := nth_default (1%positive).
+  (* definition of nth for the purposes of the cps_cvt function *)
+  Definition nth := nth_default (1%positive).
 
 
-(** process a list of constructors from inductive type ind with ind_tag niT.
+  (** process a list of constructors from inductive type ind with ind_tag niT.
     - update the ctor_env with a mapping from the current ctor_tag to the cTypInfo
     - update the conId_map with a pair relating the nCon'th constructor of
       ind to the ctor_tag of the current constructor
    *)
-Fixpoint convert_cnstrs (tyname:string) (cct:list ctor_tag) (itC:list AstCommon.Cnstr)
-         (ind:BasicAst.inductive) (nCon:N) (unboxed : N) (boxed : N)
-         (niT:ind_tag) (ce:ctor_env) (dcm:conId_map) :=
+  Fixpoint convert_cnstrs (tyname:string) (cct:list ctor_tag) (itC:list AstCommon.Cnstr)
+           (ind:BasicAst.inductive) (nCon:N) (unboxed : N) (boxed : N)
+           (niT:ind_tag) (ce:ctor_env) (dcm:conId_map) :=
     match (cct, itC) with
-      | (cn::cct', cst::icT') =>
-        let (cname, ccn) := cst in
-        let is_unboxed := Nat.eqb ccn 0 in
-        let info := {| ctor_name := BasicAst.nNamed cname
+    | (cn::cct', cst::icT') =>
+      let (cname, ccn) := cst in
+      let is_unboxed := Nat.eqb ccn 0 in
+      let info := {| ctor_name := BasicAst.nNamed cname
                      ; ctor_ind_name := BasicAst.nNamed tyname
                      ; ctor_ind_tag := niT
                      ; ctor_arity := N.of_nat ccn
                      ; ctor_ordinal := if is_unboxed then unboxed else boxed
-                     |} in
-        convert_cnstrs tyname cct' icT' ind (nCon+1)%N
-                       (if is_unboxed then unboxed + 1 else unboxed)
-                       (if is_unboxed then boxed else boxed + 1)
-                       niT
-                       (M.set cn info ce)
-                       (((ind,nCon), cn)::dcm (** Remove this now that params are always 0? *))
-      | (_, _) => (ce, dcm)
+                  |} in
+      convert_cnstrs tyname cct' icT' ind (nCon+1)%N
+                     (if is_unboxed then unboxed + 1 else unboxed)
+                     (if is_unboxed then boxed else boxed + 1)
+                     niT
+                     (M.set cn info ce)
+                     (((ind,nCon), cn)::dcm (** Remove this now that params are always 0? *))
+    | (_, _) => (ce, dcm)
     end.
 
 
-(** For each inductive type defined in the mutually recursive bundle,
+  (** For each inductive type defined in the mutually recursive bundle,
     - use tag niT for this inductive datatype
     - reserve constructor tags for each constructors of the type
     - process each of the constructor, indicating they are the ith constructor
       of the nth type of idBundle
     np: number of type parameters for this bundle
    *)
-Fixpoint convert_typack typ (idBundle:BasicAst.kername) (n:nat)
-         (ice : (ind_env * ctor_env*  ctor_tag * ind_tag * conId_map))
-  : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
+  Fixpoint convert_typack typ (idBundle:BasicAst.kername) (n:nat)
+           (ice : (ind_env * ctor_env*  ctor_tag * ind_tag * conId_map))
+    : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
     let '(ie, ce, ncT, niT, dcm) := ice in
     match typ with
     | nil => ice
-      (* let cct := (ncT::nil) in
+    (* let cct := (ncT::nil) in
       let ncT' := Pos.succ ncT in
       let itN := "Unit"%string in
       let itC := ((mkCnstr "prf"%string 0%nat) :: nil) in
@@ -256,20 +259,20 @@ Fixpoint convert_typack typ (idBundle:BasicAst.kername) (n:nat)
     end.
 
 
-Fixpoint convert_env' (g:ienv) (ice:ind_env * ctor_env * ctor_tag * ind_tag * conId_map)
-  : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
-  let '(ie, ce, ncT, niT, dcm) := ice in
-  match g with
-  | nil => ice
-  | (id, ty)::g' =>
-    (* id is name of mutual pack ty is mutual pack *)
-    (* constructors are indexed with : name (string) of the mutual pack
+  Fixpoint convert_env' (g:ienv) (ice:ind_env * ctor_env * ctor_tag * ind_tag * conId_map)
+    : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
+    let '(ie, ce, ncT, niT, dcm) := ice in
+    match g with
+    | nil => ice
+    | (id, ty)::g' =>
+      (* id is name of mutual pack ty is mutual pack *)
+      (* constructors are indexed with : name (string) of the mutual pack
        with which projection of the ty, and indice of the constructor *)
-    convert_env' g' (convert_typack ty id 0 (ie, ce, ncT, niT, dcm))
-  end.
+      convert_env' g' (convert_typack ty id 0 (ie, ce, ncT, niT, dcm))
+    end.
 
 
- (** As we process the L4 inductive environment (ienv), we build:
+  (** As we process the L4 inductive environment (ienv), we build:
     - an L6 inductive environment (ind_env) mapping tags (ind_tag) to constructors
 
       and their arities
@@ -280,334 +283,334 @@ Fixpoint convert_env' (g:ienv) (ice:ind_env * ctor_env * ctor_tag * ind_tag * co
       next available inductive datatype tag, and inductive and constructor
       environment containing only the default "box" constructor/type
    *)
-Definition convert_env (g:ienv): (ind_env * ctor_env*  ctor_tag * ind_tag * conId_map) :=
-  let default_ind_env := M.set default_itag (cons (default_tag, 0%N) nil) (M.empty ind_ty_info) in
-  let info := {| ctor_name := BasicAst.nAnon
-                ; ctor_ind_name := BasicAst.nAnon
-                ; ctor_ind_tag := default_itag
-                ; ctor_arity := 0%N
-                ; ctor_ordinal := 0%N
+  Definition convert_env (g:ienv): (ind_env * ctor_env*  ctor_tag * ind_tag * conId_map) :=
+    let default_ind_env := M.set default_itag (cons (default_tag, 0%N) nil) (M.empty ind_ty_info) in
+    let info := {| ctor_name := BasicAst.nAnon
+                   ; ctor_ind_name := BasicAst.nAnon
+                   ; ctor_ind_tag := default_itag
+                   ; ctor_arity := 0%N
+                   ; ctor_ordinal := 0%N
                 |} in
-  let default_ctor_env := M.set default_tag info (M.empty ctor_ty_info) in
-  convert_env' g (default_ind_env, default_ctor_env, (Pos.succ default_tag:ctor_tag), (Pos.succ default_itag:ind_tag), nil).
+    let default_ctor_env := M.set default_tag info (M.empty ctor_ty_info) in
+    convert_env' g (default_ind_env, default_ctor_env, (Pos.succ default_tag:ctor_tag), (Pos.succ default_itag:ind_tag), nil).
 
 
-(* vx is list of variables to which exps are bound in cvt_triples *)
-Fixpoint cps_exps (ts : list (cps.exp * var * var)) (vx : list var) (k : var)
-  : option (cps.exp) :=
-  match ts with
-  | nil => ret (cps.Eapp k kon_tag vx)
-  | t::ts' =>
-    let '(e1, k1, x1) := t in
-    r <- cps_exps ts' vx k;;
-    let e_exp := r in
-    ret (cps.Efun
-           (Fcons k1 kon_tag (x1::nil) e_exp Fnil)
-           e1)
-  end.
+  (* vx is list of variables to which exps are bound in cvt_triples *)
+  Fixpoint cps_exps (ts : list (cps.exp * var * var)) (vx : list var) (k : var)
+    : option (cps.exp) :=
+    match ts with
+    | nil => ret (cps.Eapp k kon_tag vx)
+    | t::ts' =>
+      let '(e1, k1, x1) := t in
+      r <- cps_exps ts' vx k;;
+      let e_exp := r in
+      ret (cps.Efun
+             (Fcons k1 kon_tag (x1::nil) e_exp Fnil)
+             e1)
+    end.
 
-(* returns cps exp, var and next fresh var *)
-Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
-         (tgm : constr_env) : option (cps.exp * symgen) :=
-  match e with
-  | Var_e x =>
-    match nth_error vn (N.to_nat x) with
-    | Some v => ret (cps.Eapp k kon_tag (v::nil), next)
-    | None => None
+  (* returns cps exp, var and next fresh var *)
+  Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
+           (tgm : constr_env) : option (cps.exp * symgen) :=
+    match e with
+    | Var_e x =>
+      match nth_error vn (N.to_nat x) with
+      | Some v => ret (cps.Eapp k kon_tag (v::nil), next)
+      | None => None
+      end
+
+    | App_e e1 e2 =>
+      let (k1, next) := gensym next (nNamed "k1"%string) in
+      let (x1, next) := gensym next (nNamed "x1"%string) in
+      r1 <- cps_cvt e1 vn k1 (next) tgm;;
+      let '(e1', next) := r1 : (cps.exp * symgen) in
+      let (k2, next) := gensym next (nNamed "k2"%string) in
+      let (x2, next) := gensym next (nNamed "x2"%string) in
+      r2 <- cps_cvt e2 vn k2 (next) tgm;;
+      let '(e2', next) := r2 : (cps.exp * symgen) in
+      ret (cps.Efun
+             (Fcons k1 kon_tag (x1::nil)
+                    (cps.Efun
+                       (Fcons k2 kon_tag (x2::nil)
+                              (cps.Eapp x1 func_tag (x2::k::nil)) Fnil)
+                       e2') Fnil)
+             e1', next)
+
+    | Lam_e n e1 =>
+      let (k1, next) := gensym next (nNamed "k_lam"%string) in
+      let (x1, next) := gensym next (nNamed "x_lam"%string) in
+      let (f, next) := gensym next n in
+      (* let tgm := set_n f n tgm in *)
+      r <- cps_cvt e1 (x1::vn) k1 (next) tgm;;
+      let '(e1', next) := r : (cps.exp * symgen) in
+      ret ((cps.Efun
+              (Fcons f func_tag (x1::k1::nil) e1' Fnil)
+              (cps.Eapp k kon_tag (f::nil))), next)
+
+    | Let_e n e1 e2 =>
+      (* let e' = L4.App_e (L4.Lam_e n e1) e2 in
+    cps_cvt e' vn k next *)
+      let (x, next) := gensym next n in
+      let (k1, next) := gensym next (nNamed "k"%string) in
+      r2 <- cps_cvt e2 (x::vn) k (next) tgm;;
+      let '(e2', next) := r2 : (cps.exp * symgen) in
+      r1 <- cps_cvt e1 vn k1 next tgm;;
+      let '(e1', next) := r1 : (cps.exp * symgen) in
+      (* let tgm := set_n x n tgm in *)
+      ret (cps.Efun
+             (Fcons k1 kon_tag (x::nil) e2' Fnil)
+             e1', next)
+
+    | Con_e dci es =>
+      let c_tag := dcon_to_tag dci tgm in
+      let (k', next) := gensym next (nNamed "k'"%string) in
+      let (x', next) := gensym next (nNamed "x'"%string) in
+      (* r1 <- cvt_triples_exps es vn next tgm;; *)
+      (* let '(cvt_ts, next) := r1 in *)
+      (* let vx := List.map *)
+      (*             (fun x => let '(_, _, v) := x : (cps.exp * var * var) in v) *)
+      (*             cvt_ts *)
+      (* in *)
+      (* r2 <- cps_exps cvt_ts vx k';; *)
+      (* let e' := r2 in *)
+      let (vx, next) := gensym_n_nAnon next (N.to_nat (exps_length es)) in
+      r <- cps_cvt_exps es vn k' nil next tgm;;
+      let (e', next) := r : cps.exp * symgen in
+      ret (cps.Efun
+             (Fcons k' kon_tag vx
+                    (Econstr x' c_tag vx
+                             (Eapp k kon_tag (x'::nil))) Fnil)
+             e', next)
+
+    | Fix_e fnlst i =>
+      let (fnlst_length, names_lst) := efnlst_names fnlst in
+      let (nlst, next) := gensym_n next names_lst in
+      r <- cps_cvt_efnlst fnlst (nlst ++ vn) nlst next tgm;;
+      let '(fdefs, next) := r : (fundefs * symgen) in
+      let i' := (nth nlst (N.to_nat i)) in
+      ret (cps.Efun fdefs
+                    (cps.Eapp k kon_tag (i'::nil)),
+           next)
+
+    | Match_e e1 n bl =>
+      let (k1, next) := gensym next (nNamed "k1"%string) in
+      let (x1, next) := gensym next (nNamed "x1"%string) in
+      r1 <- cps_cvt e1 vn k1 next tgm;;
+      let '(e1', next) := r1 in
+      r2 <- cps_cvt_branches bl vn k x1 next tgm;;
+      let '(cbl, next) := r2 : (list (ctor_tag * exp) * symgen) in
+      ret (cps.Efun
+             (Fcons k1 kon_tag (x1::nil)
+                    (Ecase x1 cbl) Fnil)
+             e1', next)
+
+    | Prf_e =>
+      let (x, next) := gensym next (nNamed ""%string) in
+      ret (cps.Econstr x default_tag nil (cps.Eapp k kon_tag (x::nil)), next)
     end
 
-  | App_e e1 e2 =>
-    let (k1, next) := gensym next (nNamed "k1"%string) in
-    let (x1, next) := gensym next (nNamed "x1"%string) in
-    r1 <- cps_cvt e1 vn k1 (next) tgm;;
-    let '(e1', next) := r1 : (cps.exp * symgen) in
-    let (k2, next) := gensym next (nNamed "k2"%string) in
-    let (x2, next) := gensym next (nNamed "x2"%string) in
-    r2 <- cps_cvt e2 vn k2 (next) tgm;;
-    let '(e2', next) := r2 : (cps.exp * symgen) in
-    ret (cps.Efun
-           (Fcons k1 kon_tag (x1::nil)
-                  (cps.Efun
-                     (Fcons k2 kon_tag (x2::nil)
-                            (cps.Eapp x1 func_tag (x2::k::nil)) Fnil)
-                     e2') Fnil)
-           e1', next)
+  (* with cvt_triples_exps (es : expression.exps) (vn : list var) (next : symgen) *)
+  (*                       (tgm : constr_env) *)
+  (*      : option ((list (cps.exp * var * var)) * symgen) := *)
+  (*        match es with *)
+  (*        | enil => ret (nil, next) *)
+  (*        | econs e es' => *)
+  (*          let (k, next) := gensym next (nNamed ""%string) in *)
+  (*          let (x, next) := gensym next (nNamed ""%string) in *)
+  (*          r1 <- cps_cvt e vn k next tgm;; *)
+  (*          let '(e', next) := r1 in *)
+  (*          r2 <- cvt_triples_exps es' vn next tgm;; *)
+  (*          let '(cvt_ts', next) := *)
+  (*              r2 : (list (cps.exp * var * var)) * symgen in *)
+  (*          ret ((e', k, x) :: cvt_ts', next) *)
+  (*        end *)
 
-  | Lam_e n e1 =>
-    let (k1, next) := gensym next (nNamed "k_lam"%string) in
-    let (x1, next) := gensym next (nNamed "x_lam"%string) in
-    let (f, next) := gensym next n in
-    (* let tgm := set_n f n tgm in *)
-    r <- cps_cvt e1 (x1::vn) k1 (next) tgm;;
-    let '(e1', next) := r : (cps.exp * symgen) in
-    ret ((cps.Efun
-            (Fcons f func_tag (x1::k1::nil) e1' Fnil)
-            (cps.Eapp k kon_tag (f::nil))), next)
-
-  | Let_e n e1 e2 =>
-    (* let e' = L4.App_e (L4.Lam_e n e1) e2 in
-    cps_cvt e' vn k next *)
-    let (x, next) := gensym next n in
-    let (k1, next) := gensym next (nNamed "k"%string) in
-    r2 <- cps_cvt e2 (x::vn) k (next) tgm;;
-    let '(e2', next) := r2 : (cps.exp * symgen) in
-    r1 <- cps_cvt e1 vn k1 next tgm;;
-    let '(e1', next) := r1 : (cps.exp * symgen) in
-    (* let tgm := set_n x n tgm in *)
-    ret (cps.Efun
-           (Fcons k1 kon_tag (x::nil) e2' Fnil)
-           e1', next)
-
-  | Con_e dci es =>
-    let c_tag := dcon_to_tag dci tgm in
-    let (k', next) := gensym next (nNamed "k'"%string) in
-    let (x', next) := gensym next (nNamed "x'"%string) in
-    (* r1 <- cvt_triples_exps es vn next tgm;; *)
-    (* let '(cvt_ts, next) := r1 in *)
-    (* let vx := List.map *)
-    (*             (fun x => let '(_, _, v) := x : (cps.exp * var * var) in v) *)
-    (*             cvt_ts *)
-    (* in *)
-    (* r2 <- cps_exps cvt_ts vx k';; *)
-    (* let e' := r2 in *)
-    let (vx, next) := gensym_n_nAnon next (N.to_nat (exps_length es)) in
-    r <- cps_cvt_exps es vn k' nil next tgm;;
-    let (e', next) := r : cps.exp * symgen in
-    ret (cps.Efun
-           (Fcons k' kon_tag vx
-                  (Econstr x' c_tag vx
-                           (Eapp k kon_tag (x'::nil))) Fnil)
-           e', next)
-
-  | Fix_e fnlst i =>
-    let (fnlst_length, names_lst) := efnlst_names fnlst in
-    let (nlst, next) := gensym_n next names_lst in
-    r <- cps_cvt_efnlst fnlst (nlst ++ vn) nlst next tgm;;
-    let '(fdefs, next) := r : (fundefs * symgen) in
-    let i' := (nth nlst (N.to_nat i)) in
-    ret (cps.Efun fdefs
-                  (cps.Eapp k kon_tag (i'::nil)),
-         next)
-
-  | Match_e e1 n bl =>
-    let (k1, next) := gensym next (nNamed "k1"%string) in
-    let (x1, next) := gensym next (nNamed "x1"%string) in
-    r1 <- cps_cvt e1 vn k1 next tgm;;
-    let '(e1', next) := r1 in
-    r2 <- cps_cvt_branches bl vn k x1 next tgm;;
-    let '(cbl, next) := r2 : (list (ctor_tag * exp) * symgen) in
-    ret (cps.Efun
-           (Fcons k1 kon_tag (x1::nil)
-                  (Ecase x1 cbl) Fnil)
-           e1', next)
-
-  | Prf_e =>
-    let (x, next) := gensym next (nNamed ""%string) in
-    ret (cps.Econstr x default_tag nil (cps.Eapp k kon_tag (x::nil)), next)
-  end
-
-(* with cvt_triples_exps (es : expression.exps) (vn : list var) (next : symgen) *)
-(*                       (tgm : constr_env) *)
-(*      : option ((list (cps.exp * var * var)) * symgen) := *)
-(*        match es with *)
-(*        | enil => ret (nil, next) *)
-(*        | econs e es' => *)
-(*          let (k, next) := gensym next (nNamed ""%string) in *)
-(*          let (x, next) := gensym next (nNamed ""%string) in *)
-(*          r1 <- cps_cvt e vn k next tgm;; *)
-(*          let '(e', next) := r1 in *)
-(*          r2 <- cvt_triples_exps es' vn next tgm;; *)
-(*          let '(cvt_ts', next) := *)
-(*              r2 : (list (cps.exp * var * var)) * symgen in *)
-(*          ret ((e', k, x) :: cvt_ts', next) *)
-(*        end *)
-
-(* merge cvt_triples_exps and cps_exps *)
-with cps_cvt_exps (es : expression.exps) (vn : list var) (k : var) (vx : list var)
-                  (next : symgen) (tgm : constr_env) 
+  (* merge cvt_triples_exps and cps_exps *)
+  with cps_cvt_exps (es : expression.exps) (vn : list var) (k : var) (vx : list var)
+                    (next : symgen) (tgm : constr_env) 
        : option (cps.exp * symgen) :=
-       match es with
-       | enil => ret (cps.Eapp k kon_tag (List.rev vx), next)
-       | econs e es' =>
-         let (k1, next) := gensym next (nNamed ""%string) in
-         let (x1, next) := gensym next (nNamed ""%string) in
-         r1 <- cps_cvt e vn k1 next tgm;;
-         let (e', next) := r1 : (cps.exp * symgen) in
-         r2 <- cps_cvt_exps es' vn k (x1 :: vx) next tgm;;
-         let (e_exp, next) := r2 : (cps.exp * symgen) in
-         ret (cps.Efun
-                (Fcons k1 kon_tag (x1::nil) e_exp Fnil)
-                e', next)
-       end      
+         match es with
+         | enil => ret (cps.Eapp k kon_tag (List.rev vx), next)
+         | econs e es' =>
+           let (k1, next) := gensym next (nNamed ""%string) in
+           let (x1, next) := gensym next (nNamed ""%string) in
+           r1 <- cps_cvt e vn k1 next tgm;;
+           let (e', next) := r1 : (cps.exp * symgen) in
+           r2 <- cps_cvt_exps es' vn k (x1 :: vx) next tgm;;
+           let (e_exp, next) := r2 : (cps.exp * symgen) in
+           ret (cps.Efun
+                  (Fcons k1 kon_tag (x1::nil) e_exp Fnil)
+                  e', next)
+         end      
 
-(* nlst must be of the same length as fdefs *)
-with cps_cvt_efnlst (fdefs : expression.efnlst) (vn : list var)
-                    (nlst : list var) (next : symgen) (tgm : constr_env)
-     : option (fundefs * symgen) :=
-       match fdefs with
-       | eflnil => ret (Fnil, next)
-       | eflcons n1 e1 fdefs' =>
-         let (x, next) := gensym next (nNamed "fix_x"%string) in
-         let (k', next) := gensym next (nNamed "fix_k"%string) in
-         let curr_var := List.hd (1%positive) nlst in
-         match e1 with
-         | Lam_e n2 e2 =>
-           r1 <- cps_cvt e2 (x::vn) k' (next) tgm;;
-              let '(ce, next) := r1 : (cps.exp * symgen) in
-              r2 <- cps_cvt_efnlst fdefs' vn (List.tl nlst) next tgm;;
-                 let '(cfdefs, next) := r2 : (fundefs * symgen) in
-                 ret (Fcons curr_var func_tag (x::k'::nil) ce cfdefs, next)
-         | _ => None
+  (* nlst must be of the same length as fdefs *)
+  with cps_cvt_efnlst (fdefs : expression.efnlst) (vn : list var)
+                      (nlst : list var) (next : symgen) (tgm : constr_env)
+       : option (fundefs * symgen) :=
+         match fdefs with
+         | eflnil => ret (Fnil, next)
+         | eflcons n1 e1 fdefs' =>
+           let (x, next) := gensym next (nNamed "fix_x"%string) in
+           let (k', next) := gensym next (nNamed "fix_k"%string) in
+           let curr_var := List.hd (1%positive) nlst in
+           match e1 with
+           | Lam_e n2 e2 =>
+             r1 <- cps_cvt e2 (x::vn) k' (next) tgm;;
+             let '(ce, next) := r1 : (cps.exp * symgen) in
+             r2 <- cps_cvt_efnlst fdefs' vn (List.tl nlst) next tgm;;
+             let '(cfdefs, next) := r2 : (fundefs * symgen) in
+             ret (Fcons curr_var func_tag (x::k'::nil) ce cfdefs, next)
+           | _ => None
+           end
          end
-       end
 
-with cps_cvt_branches (bl : expression.branches_e) (vn : list var) (k : var)
-                      (r : var) (next : symgen) (tgm : constr_env)
-     : option (list (ctor_tag * exp) * symgen) :=
-       match bl with
-       | brnil_e => ret (nil, next)
-       | brcons_e dc (i, lnames) e bl' =>
-         let tg := dcon_to_tag dc tgm in
-         let l := List.length lnames in
-         rb <- cps_cvt_branches bl' vn k r next tgm;;
-            let (cbl, next) := rb : (list (ctor_tag * exp) * symgen) in
-            let (vars, next) := gensym_n next (List.rev lnames) in
-            let (ctx_p, _) :=
-                ctx_bind_proj tg r l (List.hd (1%positive) vars) 0
-            in
-            let vars_rev := List.rev vars in
-            re <- cps_cvt e (vars_rev ++ vn) k next tgm;;
-               let '(ce, next) := re : (exp * symgen) in
-               ret ((tg, app_ctx_f ctx_p ce)::cbl, next)
-       end.
+  with cps_cvt_branches (bl : expression.branches_e) (vn : list var) (k : var)
+                        (r : var) (next : symgen) (tgm : constr_env)
+       : option (list (ctor_tag * exp) * symgen) :=
+         match bl with
+         | brnil_e => ret (nil, next)
+         | brcons_e dc (i, lnames) e bl' =>
+           let tg := dcon_to_tag dc tgm in
+           let l := List.length lnames in
+           rb <- cps_cvt_branches bl' vn k r next tgm;;
+           let (cbl, next) := rb : (list (ctor_tag * exp) * symgen) in
+           let (vars, next) := gensym_n next (List.rev lnames) in
+           let (ctx_p, _) :=
+               ctx_bind_proj tg r l (List.hd (1%positive) vars) 0
+           in
+           let vars_rev := List.rev vars in
+           re <- cps_cvt e (vars_rev ++ vn) k next tgm;;
+           let '(ce, next) := re : (exp * symgen) in
+           ret ((tg, app_ctx_f ctx_p ce)::cbl, next)
+         end.
 
-Fixpoint cps_cvt_exps' (es : expression.exps) (vn : list var) (k : var)
-         (next : symgen) (tgm : constr_env) :=
-  match es with
-  | enil => ret (nil, next)
-  | econs e es' =>
-    r1 <- cps_cvt e vn k next tgm;;
-       let '(e', next) := r1 in
-       r2 <- cps_cvt_exps' es' vn k next tgm;;
-          let (es'', next) := r2 in
-          ret (cons e' es'', next)
-  end.
+  Fixpoint cps_cvt_exps' (es : expression.exps) (vn : list var) (k : var)
+           (next : symgen) (tgm : constr_env) :=
+    match es with
+    | enil => ret (nil, next)
+    | econs e es' =>
+      r1 <- cps_cvt e vn k next tgm;;
+      let '(e', next) := r1 in
+      r2 <- cps_cvt_exps' es' vn k next tgm;;
+      let (es'', next) := r2 in
+      ret (cons e' es'', next)
+    end.
 
-Fixpoint cps_cvt_efnlst' (efns : expression.efnlst) (vn : list var) (k : var)
-         (next : symgen) (tgm : constr_env) :=
-  match efns with
-  | eflnil => ret (nil, next)
-  | eflcons na e efns' =>
-    r1 <- cps_cvt e vn k next tgm;;
-       let (e', next) := r1 : (cps.exp * symgen) in
-       r2 <- cps_cvt_efnlst' efns' vn k next tgm;;
-          let (efns'', next) := r2 in
-          ret (cons e' efns'', next)
-  end.
+  Fixpoint cps_cvt_efnlst' (efns : expression.efnlst) (vn : list var) (k : var)
+           (next : symgen) (tgm : constr_env) :=
+    match efns with
+    | eflnil => ret (nil, next)
+    | eflcons na e efns' =>
+      r1 <- cps_cvt e vn k next tgm;;
+      let (e', next) := r1 : (cps.exp * symgen) in
+      r2 <- cps_cvt_efnlst' efns' vn k next tgm;;
+      let (efns'', next) := r2 in
+      ret (cons e' efns'', next)
+    end.
 
-Fixpoint cps_cvt_branches' (bs : expression.branches_e) (vn : list var) (k : var)
-         (next : symgen) (tgm : constr_env) :=
-  match bs with
-  | brnil_e => ret (nil, next)
-  | brcons_e dc (n, l) e bs' =>
-    r1 <- cps_cvt e vn k next tgm;;
-       let (e', next) := r1 : (cps.exp * symgen) in
-       r2 <- cps_cvt_branches' bs' vn k next tgm;;
-          let (bs'', next) := r2 in
-          ret (cons e' bs'', next)
-  end. 
-    
+  Fixpoint cps_cvt_branches' (bs : expression.branches_e) (vn : list var) (k : var)
+           (next : symgen) (tgm : constr_env) :=
+    match bs with
+    | brnil_e => ret (nil, next)
+    | brcons_e dc (n, l) e bs' =>
+      r1 <- cps_cvt e vn k next tgm;;
+      let (e', next) := r1 : (cps.exp * symgen) in
+      r2 <- cps_cvt_branches' bs' vn k next tgm;;
+      let (bs'', next) := r2 in
+      ret (cons e' bs'', next)
+    end. 
+  
 
-Inductive fresh_var : var -> symgen -> Prop :=
-| is_gt :
-    forall v1 v2 nenv,
-      (v1 >= v2)%positive ->
-      fresh_var v1 (SG (v2, nenv)).
+  Inductive fresh_var : var -> symgen -> Prop :=
+  | is_gt :
+      forall v1 v2 nenv,
+        (v1 >= v2)%positive ->
+        fresh_var v1 (SG (v2, nenv)).
 
-Definition lt_symgen (v1 : var) (next : symgen) : Prop :=
-  match next with
-  | SG (v2, nenv) => (v1 < v2)%positive
-  end.
+  Definition lt_symgen (v1 : var) (next : symgen) : Prop :=
+    match next with
+    | SG (v2, nenv) => (v1 < v2)%positive
+    end.
 
-Definition geq_symgen (v1 : var) (next : symgen) : Prop :=
-  match next with
-  | SG (v2, nenv) => (v1 >= v2)%positive
-  end. 
+  Definition geq_symgen (v1 : var) (next : symgen) : Prop :=
+    match next with
+    | SG (v2, nenv) => (v1 >= v2)%positive
+    end. 
 
-Definition lt_lst_symgen (vars : list var) (next : symgen) : Prop :=
-  Forall (fun v => lt_symgen v next) vars. 
+  Definition lt_lst_symgen (vars : list var) (next : symgen) : Prop :=
+    Forall (fun v => lt_symgen v next) vars. 
 
-(* scratch *)
-(* how to ensure fresh variables? *)
-Inductive cps_cvt_rel : expression.exp -> list var -> var -> cps.exp -> Prop :=
-| e_Var :
-    forall v vn x k,
-      v = (nth vn (N.to_nat x)) ->
-      cps_cvt_rel (Var_e x) vn k (cps.Eapp k kon_tag (v::nil))
-| e_Lam :
-    forall na e1 e1' x1 vn k k1 f,
-      cps_cvt_rel e1 (x1::vn) k1 e1' ->
-      cps_cvt_rel (Lam_e na e1) vn k (cps.Efun
-                                        (Fcons f func_tag (x1::k1::nil) e1' Fnil)
-                                        (cps.Eapp k kon_tag (f::nil)))
-| e_App :
-    forall e1 e1' e2 e2' k k1 k2 x1 x2 vn,
-      cps_cvt_rel e1 vn k1 e1' ->
-      cps_cvt_rel e2 vn k2 e2' ->
-      cps_cvt_rel (App_e e1 e2)
-                  vn
-                  k
-                  (cps.Efun
-                     (Fcons k1 kon_tag (x1::nil)
-                            (cps.Efun
-                               (Fcons k2 kon_tag (x2::nil)
-                                      (cps.Eapp x1 func_tag
-                                                (x2::k::nil)) Fnil)
-                               e2') Fnil)
-                     e1')
-| e_Let :
-    forall na e1 e1' e2 e2' x vn k k1,
-      cps_cvt_rel e2 (x::vn) k e2' ->
-      cps_cvt_rel e1 vn k1 e1' ->
-      cps_cvt_rel (Let_e na e1 e2) vn k (cps.Efun
-                                           (Fcons k1 kon_tag (x::nil) e2' Fnil)
-                                           e1')
-| e_Fix :
-    forall fnlst i i' nlst vn k fdefs,
-      List.length nlst = efnlength fnlst ->
-      cps_cvt_rel_efnlst fnlst (nlst ++ vn) nlst fdefs ->
-      i' = (nth nlst (N.to_nat i)) ->
-      cps_cvt_rel (Fix_e fnlst i) vn k (cps.Efun fdefs
-                                                 (cps.Eapp k kon_tag (i'::nil)))
-with cps_cvt_rel_efnlst :
-       expression.efnlst -> list var -> list var -> fundefs -> Prop :=
-     | e_Eflnil :
-         forall vn nlst,
-           cps_cvt_rel_efnlst eflnil vn nlst Fnil
-     | e_Eflcons :
-         forall vn nlst e1 e1' fnlst' fdefs' cvar n1 na x k',
-           cps_cvt_rel e1 (x::vn) k' e1' ->
-           cps_cvt_rel_efnlst fnlst' vn (List.tl nlst) fdefs' ->
-           List.hd_error nlst = Some cvar ->
-           cps_cvt_rel_efnlst
-             (eflcons n1 (Lam_e na e1) fnlst')
-             vn
-             nlst
-             (Fcons cvar func_tag (x::k'::nil) e1' fdefs').                       
+  (* scratch *)
+  (* how to ensure fresh variables? *)
+  Inductive cps_cvt_rel : expression.exp -> list var -> var -> cps.exp -> Prop :=
+  | e_Var :
+      forall v vn x k,
+        v = (nth vn (N.to_nat x)) ->
+        cps_cvt_rel (Var_e x) vn k (cps.Eapp k kon_tag (v::nil))
+  | e_Lam :
+      forall na e1 e1' x1 vn k k1 f,
+        cps_cvt_rel e1 (x1::vn) k1 e1' ->
+        cps_cvt_rel (Lam_e na e1) vn k (cps.Efun
+                                          (Fcons f func_tag (x1::k1::nil) e1' Fnil)
+                                          (cps.Eapp k kon_tag (f::nil)))
+  | e_App :
+      forall e1 e1' e2 e2' k k1 k2 x1 x2 vn,
+        cps_cvt_rel e1 vn k1 e1' ->
+        cps_cvt_rel e2 vn k2 e2' ->
+        cps_cvt_rel (App_e e1 e2)
+                    vn
+                    k
+                    (cps.Efun
+                       (Fcons k1 kon_tag (x1::nil)
+                              (cps.Efun
+                                 (Fcons k2 kon_tag (x2::nil)
+                                        (cps.Eapp x1 func_tag
+                                                  (x2::k::nil)) Fnil)
+                                 e2') Fnil)
+                       e1')
+  | e_Let :
+      forall na e1 e1' e2 e2' x vn k k1,
+        cps_cvt_rel e2 (x::vn) k e2' ->
+        cps_cvt_rel e1 vn k1 e1' ->
+        cps_cvt_rel (Let_e na e1 e2) vn k (cps.Efun
+                                             (Fcons k1 kon_tag (x::nil) e2' Fnil)
+                                             e1')
+  | e_Fix :
+      forall fnlst i i' nlst vn k fdefs,
+        List.length nlst = efnlength fnlst ->
+        cps_cvt_rel_efnlst fnlst (nlst ++ vn) nlst fdefs ->
+        i' = (nth nlst (N.to_nat i)) ->
+        cps_cvt_rel (Fix_e fnlst i) vn k (cps.Efun fdefs
+                                                   (cps.Eapp k kon_tag (i'::nil)))
+  with cps_cvt_rel_efnlst :
+         expression.efnlst -> list var -> list var -> fundefs -> Prop :=
+  | e_Eflnil :
+      forall vn nlst,
+        cps_cvt_rel_efnlst eflnil vn nlst Fnil
+  | e_Eflcons :
+      forall vn nlst e1 e1' fnlst' fdefs' cvar n1 na x k',
+        cps_cvt_rel e1 (x::vn) k' e1' ->
+        cps_cvt_rel_efnlst fnlst' vn (List.tl nlst) fdefs' ->
+        List.hd_error nlst = Some cvar ->
+        cps_cvt_rel_efnlst
+          (eflcons n1 (Lam_e na e1) fnlst')
+          vn
+          nlst
+          (Fcons cvar func_tag (x::k'::nil) e1' fdefs').                       
 
 
-Definition convert_top (ee:ienv * expression.exp) :
-  option (ctor_env * name_env * fun_env * ctor_tag * ind_tag * cps.exp) :=
-  let '(_, cG, ctag, itag,  dcm) := convert_env (fst ee) in
-  let f := (100%positive) in
-  let k := (101%positive) in
-  let x := (102%positive) in
-  r <- cps_cvt (snd ee) nil k (SG (103%positive, n_empty)) dcm;;
+  Definition convert_top (ee:ienv * expression.exp) :
+    option (ctor_env * name_env * fun_env * ctor_tag * ind_tag * cps.exp) :=
+    let '(_, cG, ctag, itag,  dcm) := convert_env (fst ee) in
+    let f := (100%positive) in
+    let k := (101%positive) in
+    let x := (102%positive) in
+    r <- cps_cvt (snd ee) nil k (SG (103%positive, n_empty)) dcm;;
     let (e', sg) := r : (cps.exp * symgen) in
     match sg with
       SG (next, nM) =>
       let fenv : fun_env := M.set func_tag (2%N, (0%N::1%N::nil))
-                               (M.set kon_tag (1%N, (0%N::nil)) (M.empty _) ) in
+                                  (M.set kon_tag (1%N, (0%N::nil)) (M.empty _) ) in
       ret (cG, nM, fenv, ctag, itag,
            (cps.Efun
               (Fcons f kon_tag (k::nil) e'
@@ -615,124 +618,124 @@ Definition convert_top (ee:ienv * expression.exp) :
               (cps.Eapp f kon_tag (k::nil))))
     end.
 
-Fixpoint rho_names (rho : exp_eval.env) : list name :=
-  match rho with
-  | nil => nil
-  | cons v rho' =>
-    let na := nNamed "rho_elt"%string in
-    (na :: (rho_names rho'))
-  end.
+  Fixpoint rho_names (rho : exp_eval.env) : list name :=
+    match rho with
+    | nil => nil
+    | cons v rho' =>
+      let na := nNamed "rho_elt"%string in
+      (na :: (rho_names rho'))
+    end.
 
-Fixpoint cps_cvt_val (v : exp_eval.value) (next : symgen)
-         (tgm : constr_env) {struct v} : option (cps.val * symgen) :=
-  let fix cps_cvt_env vs next tgm :=
-       match vs with
-       | nil => ret (nil, next)
-       | cons v vs' =>
-         r1 <- cps_cvt_val v next tgm;;
-         let (v', next) := r1 : (cps.val * symgen) in
-         r2 <- cps_cvt_env vs' next tgm;;
-         let (vs'', next) := r2 : (list cps.val * symgen) in
-         ret (cons v' vs'', next)
-       end
-  in
-  match v with
-  | Con_v dc vs =>
-    let c_tag := dcon_to_tag dc tgm in
-    r <- cps_cvt_env vs next tgm;;
-      let (vs', next) := r : (list cps.val * symgen) in
-      ret (Vconstr c_tag vs', next)
-  | Clos_v rho na e =>
-    r1 <- cps_cvt_env rho next tgm;;
-      let (rho', next) := r1 : (list cps.val * symgen) in
-      let lnames := rho_names rho in
-      let (vars, next) := gensym_n next lnames in
-      m <- set_lists vars rho' (M.empty cps.val);;
-        let (k1, next) := gensym next (nNamed "k_lam"%string) in
-        let (x1, next) := gensym next (nNamed "x_lam"%string) in
-        let (f, next) := gensym next na in
-        r2 <- cps_cvt e (x1::vars) k1 (next) tgm;;
-           let (e', next) := r2 : (cps.exp * symgen) in
-           ret (Vfun m (Fcons f func_tag (x1::k1::nil) e' Fnil) f, next)
-  | ClosFix_v rho efns n =>
-    r1 <- cps_cvt_env rho next tgm;;
-      let (rho', next) := r1 : (list cps.val * symgen) in
-      let lnames := rho_names rho in
-      let (vars, next) := gensym_n next lnames in
-      m <- set_lists vars rho' (M.empty cps.val);;
-        let (fnlst_length, names_lst) := efnlst_names efns in
-        let (nlst, next) := gensym_n next names_lst in
-        r2 <- cps_cvt_efnlst efns (nlst ++ vars) nlst next tgm;;
-           let (fdefs, next) := r2 : (fundefs * symgen) in
-           let i := (nth nlst (N.to_nat n)) in
-           ret (Vfun m fdefs i, next)
-  | _ => (* TODO *)
-    ret (Vint 0, next)
-  end.
-
-Fixpoint cps_cvt_env (vs : list exp_eval.value) (next : symgen)
-         (tgm : constr_env) : option (list cps.val * symgen) :=
-  match vs with
-  | nil => ret (nil, next)
-  | cons v vs' =>
-    r1 <- cps_cvt_val v next tgm;;
-       let (v', next) := r1 : (cps.val * symgen) in
-       r2 <- cps_cvt_env vs' next tgm;;
+  Fixpoint cps_cvt_val (v : exp_eval.value) (next : symgen)
+           (tgm : constr_env) {struct v} : option (cps.val * symgen) :=
+    let fix cps_cvt_env vs next tgm :=
+        match vs with
+        | nil => ret (nil, next)
+        | cons v vs' =>
+          r1 <- cps_cvt_val v next tgm;;
+          let (v', next) := r1 : (cps.val * symgen) in
+          r2 <- cps_cvt_env vs' next tgm;;
           let (vs'', next) := r2 : (list cps.val * symgen) in
           ret (cons v' vs'', next)
-  end.
-
-Definition cps_cvt_val' (v : exp_eval.value) (next : symgen) (tgm : constr_env) :=
-  match v with
-  | Con_v dc vs =>
-    let c_tag := dcon_to_tag dc tgm in
-    r <- cps_cvt_env vs next tgm;;
+        end
+    in
+    match v with
+    | Con_v dc vs =>
+      let c_tag := dcon_to_tag dc tgm in
+      r <- cps_cvt_env vs next tgm;;
       let (vs', next) := r : (list cps.val * symgen) in
       ret (Vconstr c_tag vs', next)
-  | Clos_v rho na e =>
-    r1 <- cps_cvt_env rho next tgm;;
+    | Clos_v rho na e =>
+      r1 <- cps_cvt_env rho next tgm;;
       let (rho', next) := r1 : (list cps.val * symgen) in
       let lnames := rho_names rho in
       let (vars, next) := gensym_n next lnames in
       m <- set_lists vars rho' (M.empty cps.val);;
-        let (k1, next) := gensym next (nNamed "k_lam"%string) in
-        let (x1, next) := gensym next (nNamed "x_lam"%string) in
-        let (f, next) := gensym next na in
-        r2 <- cps_cvt e (x1::vars) k1 (next) tgm;;
-           let (e', next) := r2 : (cps.exp * symgen) in
-           ret (Vfun m (Fcons f func_tag (x1::k1::nil) e' Fnil) f, next)
-  | ClosFix_v rho efns n =>
-    r1 <- cps_cvt_env rho next tgm;;
+      let (k1, next) := gensym next (nNamed "k_lam"%string) in
+      let (x1, next) := gensym next (nNamed "x_lam"%string) in
+      let (f, next) := gensym next na in
+      r2 <- cps_cvt e (x1::vars) k1 (next) tgm;;
+      let (e', next) := r2 : (cps.exp * symgen) in
+      ret (Vfun m (Fcons f func_tag (x1::k1::nil) e' Fnil) f, next)
+    | ClosFix_v rho efns n =>
+      r1 <- cps_cvt_env rho next tgm;;
       let (rho', next) := r1 : (list cps.val * symgen) in
       let lnames := rho_names rho in
       let (vars, next) := gensym_n next lnames in
       m <- set_lists vars rho' (M.empty cps.val);;
-        let (fnlst_length, names_lst) := efnlst_names efns in
-        let (nlst, next) := gensym_n next names_lst in
-        r2 <- cps_cvt_efnlst efns (nlst ++ vars) nlst next tgm;;
-           let (fdefs, next) := r2 : (fundefs * symgen) in
-           let i := (nth nlst (N.to_nat n)) in
-           ret (Vfun m fdefs i, next)
-  | _ => (* TODO *)
-    ret (Vint 0, next)
-  end.
+      let (fnlst_length, names_lst) := efnlst_names efns in
+      let (nlst, next) := gensym_n next names_lst in
+      r2 <- cps_cvt_efnlst efns (nlst ++ vars) nlst next tgm;;
+      let (fdefs, next) := r2 : (fundefs * symgen) in
+      let i := (nth nlst (N.to_nat n)) in
+      ret (Vfun m fdefs i, next)
+    | _ => (* TODO *)
+      ret (Vint 0, next)
+    end.
 
-Lemma cps_cvt_val_eq :
-  forall v next cnstrs,
-    cps_cvt_val v next cnstrs = cps_cvt_val' v next cnstrs.
-Proof.
-  intros v next cnstrs.
-  induction v using value_ind'.
-  - simpl. unfold cps_cvt_env. reflexivity.
-  - simpl. reflexivity.
-  - simpl. unfold cps_cvt_env. reflexivity.
-  - simpl. unfold cps_cvt_env. reflexivity.
-Qed. 
+  Fixpoint cps_cvt_env (vs : list exp_eval.value) (next : symgen)
+           (tgm : constr_env) : option (list cps.val * symgen) :=
+    match vs with
+    | nil => ret (nil, next)
+    | cons v vs' =>
+      r1 <- cps_cvt_val v next tgm;;
+      let (v', next) := r1 : (cps.val * symgen) in
+      r2 <- cps_cvt_env vs' next tgm;;
+      let (vs'', next) := r2 : (list cps.val * symgen) in
+      ret (cons v' vs'', next)
+    end.
 
+  Definition cps_cvt_val' (v : exp_eval.value) (next : symgen) (tgm : constr_env) :=
+    match v with
+    | Con_v dc vs =>
+      let c_tag := dcon_to_tag dc tgm in
+      r <- cps_cvt_env vs next tgm;;
+      let (vs', next) := r : (list cps.val * symgen) in
+      ret (Vconstr c_tag vs', next)
+    | Clos_v rho na e =>
+      r1 <- cps_cvt_env rho next tgm;;
+      let (rho', next) := r1 : (list cps.val * symgen) in
+      let lnames := rho_names rho in
+      let (vars, next) := gensym_n next lnames in
+      m <- set_lists vars rho' (M.empty cps.val);;
+      let (k1, next) := gensym next (nNamed "k_lam"%string) in
+      let (x1, next) := gensym next (nNamed "x_lam"%string) in
+      let (f, next) := gensym next na in
+      r2 <- cps_cvt e (x1::vars) k1 (next) tgm;;
+      let (e', next) := r2 : (cps.exp * symgen) in
+      ret (Vfun m (Fcons f func_tag (x1::k1::nil) e' Fnil) f, next)
+    | ClosFix_v rho efns n =>
+      r1 <- cps_cvt_env rho next tgm;;
+      let (rho', next) := r1 : (list cps.val * symgen) in
+      let lnames := rho_names rho in
+      let (vars, next) := gensym_n next lnames in
+      m <- set_lists vars rho' (M.empty cps.val);;
+      let (fnlst_length, names_lst) := efnlst_names efns in
+      let (nlst, next) := gensym_n next names_lst in
+      r2 <- cps_cvt_efnlst efns (nlst ++ vars) nlst next tgm;;
+      let (fdefs, next) := r2 : (fundefs * symgen) in
+      let i := (nth nlst (N.to_nat n)) in
+      ret (Vfun m fdefs i, next)
+    | _ => (* TODO *)
+      ret (Vint 0, next)
+    end.
+
+  Lemma cps_cvt_val_eq :
+    forall v next cnstrs,
+      cps_cvt_val v next cnstrs = cps_cvt_val' v next cnstrs.
+  Proof.
+    intros v next cnstrs.
+    induction v using value_ind'.
+    - simpl. unfold cps_cvt_env. reflexivity.
+    - simpl. reflexivity.
+    - simpl. unfold cps_cvt_env. reflexivity.
+    - simpl. unfold cps_cvt_env. reflexivity.
+  Qed. 
 
 Section Post.
   
-    Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
+  Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type}
+          {Htrace : @trace_resource trace}.
 
     Context (P1 : PostT) (* Local *)
             (PG : PostGT) (* Global *)
@@ -742,6 +745,15 @@ Section Post.
             (HpropsG : Post_properties cenv PG PG PG)
             (Hincl : inclusion _ (comp P1 P1) P1)
             (HinclG : inclusion _ P1 PG).
+
+    Global Instance preord_env_P_inj_proper  :
+      Proper (Logic.eq ==> Logic.eq ==> Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
+             (@preord_env_P_inj fuel Hfuel trace Htrace).
+    Proof.
+      repeat (intro; intros); subst.
+      split; intros Hpre;
+        eapply preord_env_P_inj_antimon; subst; eauto; eapply H1.
+    Qed.
 
     Inductive StrictlyIncreasing' : list positive -> Prop :=
     | SInc_nil : StrictlyIncreasing' []
@@ -876,7 +888,8 @@ Section Post.
 
     Lemma Forall2_aux_is_Forall2 :
       forall vs l, 
-        (fix Forall2_aux (vs1 : list value) (vs2 : list cps.val) {struct vs1} : Prop :=
+        (fix Forall2_aux (vs1 : list value) (vs2 : list cps.val) {struct vs1} :
+           Prop :=
            match vs1 with
            | [] => match vs2 with
                    | [] => True
@@ -896,33 +909,6 @@ Section Post.
         destruct Haux. econstructor.
         eassumption. eapply IHvs. eassumption.
     Qed.
-
-    (* Lemma cps_env_rel_eq :  *)
-
-    Lemma cps_val_rel_eq :
-      forall v v',
-        cps_val_rel' v v' <-> cps_val_rel v v'.
-    Proof.
-      intros v v'. split.
-      - intros Hrel'. induction v using value_ind'.
-        + simpl in *.
-          destruct v' eqn:Hv'; try contradiction.
-          destruct Hrel'. split.
-          eassumption.
-          eapply Forall2_aux_is_Forall2. eassumption.
-        + simpl in *. destruct v'; try contradiction.
-          destruct z; try contradiction. reflexivity.
-        + simpl in *. destruct v'; try contradiction.
-          destruct f; try contradiction.
-          destruct l; try contradiction.
-          destruct l; try contradiction.
-          destruct l; try contradiction.
-          destruct f0; try contradiction.
-          admit.
-        + admit.
-      - admit.
-    Admitted.
-
 
     Lemma gensym_n_nAnon'_strictlyInc :
       forall n v nenv vars nenv' v',
@@ -1028,13 +1014,6 @@ Section Post.
           unfold StrictlyIncreasing in Hgen2.
           inv Hgen2. inv H2. eassumption. 
     Admitted. 
-
-
-    Require Import functions.
-    Require Import compcert.lib.Coqlib.
-    Require Import Ensembles.
-    Require Import Ensembles_util.
-    Require Import L6.tactics.
 
     Lemma id_vars_nth_error :
       forall A vars1 vars2 n (f: var -> A) v1 v2,
@@ -1197,7 +1176,7 @@ Section Post.
           eapply IHvars1. eassumption. eassumption.
     Qed. 
 
-    Lemma gensym_n_length_eq :
+    Lemma gensym_n_nAnon_length_eq :
       forall n next1 next2 next3 next4 l1 l2,
         gensym_n_nAnon next1 n = (l1, next2) ->
         gensym_n_nAnon next3 n = (l2, next4) ->
@@ -1231,6 +1210,45 @@ Section Post.
         destruct (gensym_n_nAnon' (Pos.succ v1) (M.set v1 nAnon n2) n) eqn:H2. destruct p.
         inv H2'. reflexivity.
     Qed.
+
+    Lemma gensym_n'_length_eq :
+      forall names v1 v2 v3 v4 nenv1 nenv2 nenv3 nenv4 l1 l2,
+        gensym_n' v1 nenv1 names = (l1, nenv2, v2) ->
+        gensym_n' v3 nenv3 names = (l2, nenv4, v4) ->
+        Datatypes.length l1 = Datatypes.length l2.
+    Proof.
+      induction names; intros v1 v2 v3 v4 nenv1 nenv2 nenv3 nenv4 l1 l2 Hgen1 Hgen2.
+      - simpl in Hgen1, Hgen2. inv Hgen1. inv Hgen2. econstructor.
+      - simpl in Hgen1, Hgen2.
+        destruct (gensym_n' (Pos.succ v1) (M.set v1 a nenv1) names) eqn:H1.
+        destruct p.
+        destruct (gensym_n' (Pos.succ v3) (M.set v3 a nenv3) names) eqn:H2.
+        destruct p.
+        inv H1. inv Hgen1. inv H2. inv Hgen2.
+        simpl. f_equal.
+        eapply IHnames. eassumption. eassumption.
+    Qed. 
+
+    Lemma gensym_n_length_eq :
+      forall names next1 next2 next3 next4 vars1 vars2,
+        gensym_n next1 names = (vars1, next2) ->
+        gensym_n next3 names = (vars2, next4) ->
+        Datatypes.length vars1 = Datatypes.length vars2.
+    Proof.
+      destruct names; intros next1 next2 next3 next4 vars1 vars2 Hgen1 Hgen2.
+      - destruct next1. destruct p.
+        destruct next3. destruct p.
+        simpl in Hgen1, Hgen2. inv Hgen1. inv Hgen2.
+        econstructor.
+      - destruct next1. destruct p. simpl in Hgen1.
+        destruct (gensym_n' (Pos.succ v) (M.set v n n0) names) eqn:H1. destruct p.
+        destruct next3. destruct p. simpl in Hgen2.
+        destruct (gensym_n' (Pos.succ v1) (M.set v1 n n2) names) eqn:H2. destruct p.
+        inv H1. inv Hgen1.
+        inv H2. inv Hgen2.
+        simpl. f_equal.
+        eapply gensym_n'_length_eq. eassumption. eassumption.
+    Qed. 
 
     Lemma StrictlyInc_impl_NoDup :
       forall l,
@@ -1383,6 +1401,40 @@ Section Post.
         cps_cvt_val v next3 cnstrs = Some (v2, next4) ->
         preord_val cenv PG k v1 v2.
 
+    Opaque preord_exp'.
+
+    Global Instance preord_env_P_inj_f_proper :
+    Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> f_eq ==> Logic.eq ==> Logic.eq ==> iff)
+           (@preord_env_P_inj fuel Hfuel trace Htrace).
+  Proof.
+    repeat (intro; intros); subst.
+    split; intros Hpre.
+    intro; intros. rewrite <- H3. eauto.
+    intro; intros. rewrite H3. eauto.
+  Qed.
+
+    Lemma cps_cvt_env_alpha_equiv :
+      forall vs k vs1 vs2 next1 next2 next3 next4,
+        cps_cvt_val_alpha_equiv_statement k ->
+        cps_cvt_env vs next1 cnstrs = Some (vs1, next2) ->
+        cps_cvt_env vs next3 cnstrs = Some (vs2, next4) ->
+        Forall2 (preord_val cenv PG k) vs1 vs2.
+    Proof.
+      induction vs; intros k vs1 vs2 next1 next2 next3 next4 IH Hcvt1 Hcvt2.
+      - simpl in Hcvt1, Hcvt2. inv Hcvt1. inv Hcvt2. econstructor.
+      - simpl in Hcvt1.
+        destruct (cps_cvt_val a next1 cnstrs) eqn:Hval1. 2: { inv Hcvt1. } 
+        destruct p. destruct (cps_cvt_env vs s cnstrs) eqn:Henv1. 2: { inv Hcvt1. } 
+        destruct p. inv Hcvt1.
+        simpl in Hcvt2.
+        destruct (cps_cvt_val a next3 cnstrs) eqn:Hval2. 2: { inv Hcvt2. }
+        destruct p. destruct (cps_cvt_env vs s0 cnstrs) eqn:Henv2. 2: { inv Hcvt2. }
+        destruct p. inv Hcvt2.
+        econstructor.
+        + eapply IH. eassumption. eassumption.
+        + eapply IHvs. eassumption. eassumption. eassumption.
+    Qed. 
+
     Lemma cps_val_alpha_equiv :
       forall k,
         (forall m, (m < k)%nat -> cps_cvt_alpha_equiv_statement m) ->
@@ -1400,28 +1452,98 @@ Section Post.
         simpl in Henv1, Henv2.
         admit. admit. admit.
       - admit.
-      - (* simpl in Hv1, Hv2. *)
-        (* destruct (cps_cvt_env vs next1 cnstrs) eqn:Henv1; inv Hv1. *)
-        (* destruct p eqn:Hp. *)
-        (* destruct (gensym_n s (rho_names vs)) eqn:Hgen_n1. *)
-        (* destruct (set_lists l0 l (M.empty val)) eqn:Hset. 2: { inv H2. }  *)
-        (* destruct (gensym s0 (nNamed "k_lam")) eqn:Hgen_k1. *)
-        (* destruct (gensym s1 (nNamed "x_lam")) eqn:Hgen_x1. *)
-        (* destruct (gensym s2 na) eqn:Hen_f1. *)
-        (* destruct (cps_cvt e (v0 :: l0) v s3 cnstrs) eqn:Hcvt1. *)
-        (* destruct p0. inv H2.  *)
-        (* destruct (cps_cvt_env vs next3 cnstrs) eqn:Henv2; inv Hv2. *)
-        (* destruct p eqn:Hp. *)
-        (* destruct (gensym_n s4 (rho_names vs)) eqn:Hgen_n2. *)
-        (* destruct (set_lists l2 l1 (M.empty val)) eqn:Hset2. 2: { inv H2. }  *)
-        (* destruct (gensym s5 (nNamed "k_lam")) eqn:Hgen_k2. *)
-        (* destruct (gensym s6 (nNamed "x_lam")) eqn:Hgen_x2. *)
-        (* destruct (gensym s7 na) eqn:Hen_f2. *)
-        (* destruct (cps_cvt e (v4 :: l2) v1 s8 cnstrs) eqn:Hcvt2. *)
-        (* destruct p0. inv H2.  *)
-    Abort. 
-
-    Opaque preord_exp'.  
+      - simpl in Hv1, Hv2.
+        destruct (cps_cvt_env vs next1 cnstrs) eqn:Henv1; inv Hv1.
+        destruct p eqn:Hp.
+        destruct (gensym_n s (rho_names vs)) eqn:Hgen_n1.
+        destruct (set_lists l0 l (M.empty cps.val)) eqn:Hset. 2: { inv H2. }
+        destruct (gensym s0 (nNamed "k_lam")) eqn:Hgen_k1.
+        destruct (gensym s1 (nNamed "x_lam")) eqn:Hgen_x1.
+        destruct (gensym s2 na) eqn:Hen_f1.
+        destruct (cps_cvt e (v0 :: l0) v s3 cnstrs) eqn:Hcvt1. 2: { inv H2. }
+        destruct p0. inv H2.
+        destruct (cps_cvt_env vs next3 cnstrs) eqn:Henv2; inv Hv2.
+        destruct p eqn:Hp.
+        destruct (gensym_n s4 (rho_names vs)) eqn:Hgen_n2.
+        destruct (set_lists l2 l1 (M.empty cps.val)) eqn:Hset2. 2: { inv H2. }
+        destruct (gensym s5 (nNamed "k_lam")) eqn:Hgen_k2.
+        destruct (gensym s6 (nNamed "x_lam")) eqn:Hgen_x2.
+        destruct (gensym s7 na) eqn:Hen_f2.
+        destruct (cps_cvt e (v4 :: l2) v1 s8 cnstrs) eqn:Hcvt2. 2: { inv H2. } 
+        destruct p0. inv H2.
+        rewrite preord_val_eq. unfold preord_val'.
+        { intros vs1 vs2 j tg xs1 e2 rho1' Hlen_eq Hfind Hsetl.
+          simpl in Hfind. simpl.
+          rewrite peq_true in *.
+          inv Hfind.
+          pose proof (set_lists_length2) as Hsetl2.
+          edestruct Hsetl2 with (rho := (def_funs (Fcons v3 func_tag [v0; v] e2 Fnil)
+                                                       (Fcons v3 func_tag [v0; v] e2 Fnil) t t))
+                                     (xs1 := [v0; v]) (vs1 := vs1)
+                                     (xs2 := [v5; v5]) (vs2 := vs2); clear Hsetl2.
+          econstructor.
+          eassumption.
+          symmetry. rewrite H2. eassumption. 
+          simpl in Hsetl.
+          destruct vs1. inv Hsetl.
+          destruct vs1. inv Hsetl.
+          destruct vs1; inv Hsetl.
+          simpl in H1.
+          destruct vs2. inv H1.
+          destruct vs2. inv H1.
+          destruct vs2. 2: { inv H1. } rewrite <- H2. inv H1. 
+          eexists. eexists. eexists. split.
+          reflexivity. split.
+          reflexivity.
+          intros Hlt2 Hall.
+          eapply preord_exp_post_monotonic.
+          eapply HinclG.
+          eapply preord_exp_monotonic.
+          unfold cps_cvt_alpha_equiv_statement in IH.
+          edestruct IH with (m := j) as (IHstep & _). eassumption.
+          eapply IHstep. 
+          eassumption.
+          eassumption.
+          admit. admit.
+          simpl. f_equal. (* similar to gensym_n_length_eq *) admit.  
+          admit.
+          simpl.
+          eapply preord_env_P_inj_set_alt.
+          rewrite Setminus_Union_distr.
+          rewrite FromList_cons. (* normalize_sets *)
+          assert (Hsets: ([set v] \\ [set v0] :|: (v0 |: FromList l0 \\ [set v0]))
+                           <--> ([set v] :|: (FromList l0))).
+          { rewrite Setminus_Union_distr.
+            rewrite Setminus_Same_set_Empty_set. normalize_sets.
+            rewrite Setminus_Disjoint. rewrite Setminus_Disjoint.
+            reflexivity. admit. admit. }
+          rewrite Hsets. clear Hsets.
+          rewrite extend_extend_lst_commut.
+          eapply preord_env_P_inj_set_alt.
+          rewrite Setminus_Union_distr at 1.
+          rewrite Setminus_Same_set_Empty_set.
+          rewrite Setminus_Disjoint. normalize_sets.
+          eapply preord_env_P_inj_set_not_In_P_l.
+          eapply preord_env_P_inj_set_not_In_P_r.
+          eapply preord_env_P_inj_set_lists_alt.
+          7: { eassumption. } 7: { eassumption. }
+          econstructor. rewrite M.gempty in H3. inv H3.
+          eapply cps_cvt_env_alpha_equiv.
+          eapply H. eassumption. intros m Hlt3.
+          eapply IH. omega. eassumption. eassumption. 
+          admit. admit. admit.
+          rewrite Setminus_Same_set_Empty_set. rewrite image_Empty_set.
+          eapply Disjoint_Empty_set_l.
+          admit.
+          admit. admit. 
+          inversion Hall. inversion H7. eassumption.
+          admit.
+          admit. admit. admit.
+          inversion Hall. eassumption.
+          admit. 
+          omega. }
+      - admit.
+    Admitted. 
 
     Lemma cps_cvt_alpha_equiv :
       forall k, cps_cvt_alpha_equiv_statement k.
@@ -1486,7 +1608,7 @@ Section Post.
               intros v5 Hset.
               rewrite M.gss in Hset. inv Hset.
               eexists. split.
-              rewrite M.gss. reflexivity. 
+              rewrite M.gss. reflexivity.              
               rewrite preord_val_eq. unfold preord_val'.
               { intros vs1 vs2 j tg xs1 e2 rho1' Hlen_eq Hfind Hset.
                 simpl in Hfind. simpl.
@@ -1510,36 +1632,46 @@ Section Post.
                 destruct vs2. 2: { inv H0. } rewrite <- H1. inv H0. 
                 eexists. eexists. eexists. split.
                 reflexivity. split.
-
-                (* Anvay changes *)
-                 reflexivity.
-                      intros Hlt2 Hall.
-                      eapply preord_exp_post_monotonic.
-                      eapply HinclG.
-                      eapply preord_exp_monotonic.
-                      edestruct H with (m := j) as (IHstep & _). eassumption.
-                      eapply IHstep.
-                      eassumption.
-                      eassumption.
-                      admit. admit.
-                      simpl. f_equal. eassumption.
-                      admit. simpl.
-                      eapply preord_env_P_inj_set_alt.
-                      rewrite Setminus_Union_distr at 1.
-                      rewrite FromList_cons. (* normalize_sets *)
-                      assert (Hsets:
-                                ([set v] \\ [set v0] :|: (v0 |: FromList vars1 \\ [set v0])) <--> ([set v] :|: (FromList vars1))).
-                      { rewrite Setminus_Union_distr.
-                        rewrite Setminus_Same_set_Empty_set. normalize_sets.
-                        rewrite Setminus_Disjoint. rewrite Setminus_Disjoint.
-                        reflexivity. admit. admit. }
-                      rewrite Hsets. clear Hsets.
-                      (* apply set lemma again *) admit.
-                      inversion Hall. eassumption.
-                      admit.
-                      omega.
-                    }
-                - omega. }
+                reflexivity.
+                intros Hlt2 Hall.
+                eapply preord_exp_post_monotonic.
+                eapply HinclG.
+                eapply preord_exp_monotonic.
+                edestruct H with (m := j) as (IHstep & _). eassumption.
+                eapply IHstep.
+                eassumption.
+                eassumption.
+                admit. admit.
+                simpl. f_equal. eassumption.
+                admit. simpl.
+                eapply preord_env_P_inj_set_alt.
+                rewrite Setminus_Union_distr at 1.
+                rewrite FromList_cons. (* normalize_sets *)
+                assert (Hsets: ([set v] \\ [set v0] :|:
+                                        (v0 |: FromList vars1 \\ [set v0]))
+                                 <--> ([set v] :|: (FromList vars1))).
+                { rewrite Setminus_Union_distr.
+                  rewrite Setminus_Same_set_Empty_set. normalize_sets.
+                  rewrite Setminus_Disjoint. rewrite Setminus_Disjoint.
+                  reflexivity. admit. admit. }
+                rewrite Hsets. clear Hsets.
+                rewrite extend_extend_lst_commut.
+                eapply preord_env_P_inj_set_alt.
+                rewrite Setminus_Union_distr at 1.
+                rewrite Setminus_Same_set_Empty_set.
+                rewrite Setminus_Disjoint. normalize_sets.
+                eapply preord_env_P_inj_set_not_In_P_l.
+                eapply preord_env_P_inj_set_not_In_P_r.
+                (* follows from Henv? *)
+                admit.
+                admit. admit. admit. 
+                inversion Hall. inversion H6. eassumption.
+                admit. admit. admit. eassumption.
+                inversion Hall. eassumption.
+                admit. 
+                omega.
+              }
+            - omega. }
       - admit.
       - intros dc es IH e1 e2 k1 k2 vars1 vars2 rho1 rho2
                next1 next2 next3 next4 He1 He2 Hdup Hnot Hlen Hlt Henv.
@@ -1592,68 +1724,130 @@ Section Post.
                                                                  Fnil) v) rho1))
                                      (xs1 := xs1) (vs1 := vs1) (xs2 := l0) (vs2 := vs2);
                   clear Hset2. 
-                eapply gensym_n_length_eq. eassumption. eassumption. 
+                eapply gensym_n_nAnon_length_eq. eassumption. eassumption. 
                 eassumption.
                 symmetry. rewrite H1. eassumption.
                 eexists. eexists. eexists. split.
                 reflexivity. split.
                 symmetry. eassumption.
-                (* Anvay changes *)
                 intros Hlt2 Hall.
-                      eapply preord_exp_constr_compat.
-                      admit.
-                      admit.
-                      rewrite <- map_extend_lst_same with (xs := xs1) (xs' := l0) (f := id).
-                      eapply Forall2_preord_var_env_map.
-                      2: { reflexivity. }
-                      eapply preord_env_P_inj_set_lists_alt.
-                      rewrite Setminus_Same_set_Empty_set.
-                      intros x' Hin. inv Hin.
-                      eassumption.
-                      eapply gensym_n_NoDup. eassumption.
-                      eapply gensym_n_NoDup. eassumption.
-                      eapply gensym_n_length_eq. eassumption. eassumption.
-                      rewrite image_id.  rewrite Setminus_Same_set_Empty_set. now sets.
-                      now eauto.
-                      eassumption.
-                      eapply gensym_n_NoDup. eassumption.
-                      eapply gensym_n_length_eq. eassumption. eassumption.
-                      intros m vs0 vs3 Hlt3 Hall2.
-                      eapply preord_exp_app_compat.
-                      admit.
-                      admit.
-                      assert (Heq: k2 = ((id {k1 ~> k2}) <{ vars1 ~> vars2 }>) k1).
-                      { rewrite extend_lst_gso.
-                        rewrite extend_gss. reflexivity.
-                        eassumption. }
-                      rewrite Heq.
-                      eapply preord_env_P_inj_set_not_In_P_l.
-                      eapply preord_env_P_inj_set_not_In_P_r.
-                      eapply preord_env_P_inj_set_lists_l_Disjoint.
-                      2: { now eauto. }
-                      eapply preord_env_P_inj_set_lists_r_Disjoint.
-                      2: { eassumption. }
-                      eapply preord_env_P_inj_set_not_In_P_l.
-                      eapply preord_env_P_inj_set_not_In_P_r.
-                      eapply preord_env_P_inj_monotonic.
-                      2 : { eassumption. }
-                      omega.
-                      admit. admit. admit. admit. admit. admit.
-                      admit.
-                      econstructor.
-                      unfold preord_var_env.
-                      intros v3 Hv3.
-                      rewrite M.gss in Hv3. inversion Hv3. rewrite M.gss.
-                      eexists. split. reflexivity.
-                      rewrite preord_val_eq. econstructor.
-                      reflexivity.
-                      eapply Forall2_Forall2_asym_included. eassumption.
-                      econstructor. }
-                    admit.
-                    admit.
-                    admit.
-                    eassumption. }
-                omega.              
+                eapply preord_exp_constr_compat.
+                admit.
+                admit.
+                rewrite <- map_extend_lst_same with (xs := xs1) (xs' := l0)
+                                                    (f := id).
+                eapply Forall2_preord_var_env_map.
+                2: { reflexivity. }
+                eapply preord_env_P_inj_set_lists_alt.
+                rewrite Setminus_Same_set_Empty_set.
+                intros x' Hin. inv Hin.
+                eassumption.
+                eapply gensym_n_NoDup. eassumption.
+                eapply gensym_n_NoDup. eassumption.
+                eapply gensym_n_nAnon_length_eq. eassumption. eassumption.
+                rewrite image_id.  rewrite Setminus_Same_set_Empty_set.
+                now sets.
+                now eauto.
+                eassumption.
+                eapply gensym_n_NoDup. eassumption.
+                eapply gensym_n_nAnon_length_eq. eassumption. eassumption.
+                intros m vs0 vs3 Hlt3 Hall2.
+                eapply preord_exp_app_compat.
+                admit.
+                admit.
+                assert (Heq: k2 = ((id {k1 ~> k2}) <{ vars1 ~> vars2 }>) k1).
+                { rewrite extend_lst_gso.
+                  rewrite extend_gss. reflexivity.
+                  eassumption. }
+                rewrite Heq.
+                eapply preord_env_P_inj_set_not_In_P_l.
+                eapply preord_env_P_inj_set_not_In_P_r.
+                eapply preord_env_P_inj_set_lists_l_Disjoint.
+                2: { now eauto. }
+                eapply preord_env_P_inj_set_lists_r_Disjoint.
+                2: { eassumption. }
+                eapply preord_env_P_inj_set_not_In_P_l.
+                eapply preord_env_P_inj_set_not_In_P_r.
+                eapply preord_env_P_inj_monotonic.
+                2 : { eassumption. }
+                omega.
+                admit. admit. admit. admit. admit. admit.
+                admit.
+                econstructor.
+                unfold preord_var_env.
+                intros v3 Hv3.
+                rewrite M.gss in Hv3. inversion Hv3. rewrite M.gss.
+                eexists. split. reflexivity.
+                rewrite preord_val_eq. econstructor.
+                reflexivity.
+                eapply Forall2_Forall2_asym_included. eassumption.
+                econstructor. }
+              admit.
+              admit.
+              admit.
+              eassumption. }
+          omega.
+      - admit.
+      - intros na e1 IHe1 e2 IHe2 e1' e2' k1 k2 vars1 vars2 rho1 rho2
+               next1 next2 next3 next4 He1 He2 Hdup Hnot Hlen Hlt Henv.
+        simpl in He1, He2.
+        destruct (gensym next1 na) eqn:Hgen_na1.
+        destruct (gensym s (nNamed "k")) eqn:Hgen_k1.
+        destruct (cps_cvt e2 (v :: vars1) k1 s0 cnstrs) eqn:Hcvt1_e2. 2: { inv He1. }
+        destruct p. destruct (cps_cvt e1 vars1 v0 s1 cnstrs) eqn:Hcvt1_e1.
+        2: { inv He1. } destruct p. inv He1.
+        destruct (gensym next3 na) eqn:Hgen_na2.
+        destruct (gensym s2 (nNamed "k")) eqn:Hgen_k2.
+        destruct (cps_cvt e2 (v1 :: vars2) k2 s3 cnstrs) eqn:Hcvt2_e2. 2: { inv He2. }
+        destruct p. destruct (cps_cvt e1 vars2 v2 s4 cnstrs) eqn:Hcvt2_e1.
+        2: { inv He2. } destruct p. inv He2. 
+        eapply preord_exp_fun_compat.
+        + admit.
+        + admit.
+        + simpl. eapply preord_exp_monotonic.
+          eapply IHe1.
+          eassumption. eassumption. eassumption.
+          admit.
+          eassumption.
+          admit.
+          rewrite extend_extend_lst_commut. 
+          eapply preord_env_P_inj_set_alt.
+          rewrite Setminus_Union_distr at 1. rewrite Setminus_Same_set_Empty_set.
+          rewrite Setminus_Disjoint. normalize_sets.
+          (* from Henv -- how to show? *) admit.
+          admit.
+          rewrite preord_val_eq. unfold preord_val'.
+          { intros vs1 vs2 j tg xs1 e5 rho1' Hlen_eq Hfind Hset.
+            simpl in Hfind. simpl.
+            rewrite peq_true in *. 
+            inv Hfind.
+            pose proof (set_lists_length2) as Hset2.
+            edestruct Hset2 with (rho := (M.set v0
+                                                (Vfun rho1
+                                                      (Fcons v0 tg [v] e5 Fnil) v0)
+                                                rho1))
+                                 (xs1 := [v]) (vs1 := vs1)
+                                 (xs2 := [v1]) (vs2 := vs2);
+              clear Hset2.
+            simpl. reflexivity.
+            eassumption.
+            simpl in Hset. destruct vs1. inv Hset.
+            destruct vs1. simpl. symmetry. eassumption. 
+            inv Hset.
+            eexists. eexists. eexists. split.
+            reflexivity. split.
+            symmetry. eassumption.
+            intros Hlt2 Hall.
+            eapply preord_exp_post_monotonic. eapply Hprops.
+            eapply preord_exp_monotonic. eapply IHe2. 
+            eassumption. eassumption.
+            admit. admit.
+            simpl. f_equal. eassumption.
+            admit.
+            simpl. admit.
+            omega. }
+          admit. admit. admit.
+          eassumption. omega. 
     Abort.
 
     Lemma cps_cvt_val_diff_symgen :
@@ -1773,19 +1967,6 @@ Section Post.
           * inv H0.
           * inv H0. 
     Admitted.
-
-    (* Lemma nth_default_List_nth : *)
-    (*   forall (l : list positive) (n : nat), *)
-    (*     nth l n = List.nth n l 1%positive. *)
-    (* Proof. *)
-    (*   unfold nth. unfold nth_default. induction l; intros n. *)
-    (*   - simpl. destruct n eqn: Hn. *)
-    (*     + simpl. reflexivity. *)
-    (*     + simpl. reflexivity. *)
-    (*   - simpl. destruct n eqn: Hn. *)
-    (*     + simpl. reflexivity. *)
-    (*     + simpl. eapply IHl. *)
-    (* Qed. *)
 
     Lemma cps_val_rel_is_env_rel' :
       forall vs,

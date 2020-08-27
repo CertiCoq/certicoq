@@ -17,7 +17,8 @@
 
   Currently our generator works on:
   [x] simple types like [bool]
-  [ ] recursive types like [nat]
+  [x] recursive types like [nat]
+  [ ] mutually recursive types like [even] and [odd]
   [ ] polymorphic types like [option]
   [ ] multi-polymorphic types like [pair]
   [ ] recursive and polymorphic types like [list]
@@ -27,7 +28,8 @@
 Require Import Coq.ZArith.ZArith
                Coq.Program.Basics
                Coq.Strings.String
-               Coq.Lists.List.
+               Coq.Lists.List
+               Coq.Lists.ListSet.
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
@@ -45,35 +47,7 @@ Import monad_utils.MonadNotation
 
 Notation "f >=> g" := (fun x => (f x) >>= g)
                       (at level 51, right associativity) : monad_scope.
-
-Section MetaCoqNotations.
-  (* Recursive quoting *)
-  Notation "<%% x %%>" :=
-    ((ltac:(let p y := exact y in run_template_program (tmQuoteRec x) p)))
-    (only parsing).
-  (* Check <%% nat %%>. *)
-
-  (* Splicing / top level antiquotation *)
-  Notation "~( x )" :=
-    (ltac:(let p y :=
-              let e := eval unfold my_projT2 in (my_projT2 y) in
-              exact e in
-          run_template_program (tmUnquote x) p))
-    (only parsing).
-  (* Check (~( <% fun (x : bool) => if x then false else true  %>)). *)
-  (* Compute (~(<% fun (x : bool) => if x then false else true %>) false). *)
-
-  (* Data type name resolution *)
-  Notation "<? x ?>" :=
-    (ltac:(let p y :=
-              match y with
-              | tInd {| inductive_mind := ?name |} _ =>
-                exact name
-              | _ => fail "not a type constructor" end in
-          run_template_program (tmQuote x) p))
-    (only parsing).
-  (* Compute <? option ?>. *)
-End MetaCoqNotations.
+Import MetaCoqNotations.
 
 Variables (graph : Type) (mtype : Type).
 
@@ -92,12 +66,21 @@ Definition lookup {A : Type} (x : kername) (xs : list (kername * A)) : option A 
   | Some (_, a) => Some a
   end.
 
-Print mutual_inductive_body.
-Definition has_recursive_type (m : mutual_inductive_body) : bool :=
-  (* TODO *)
-  (* dissect type with a context created from ind_bodies *)
-  (* then check if the types in question appear in an argument position in the dissected types *)
-  false.
+(* Look in [global_env] for the types mutually recursively
+   defined with the type with the given [kername]. *)
+Fixpoint find_mutuals
+         (kn : kername)
+         (env : global_env) : list kername :=
+  match env with
+  | (kn', InductiveDecl mut) :: env' =>
+    if eq_kername kn kn'
+    then map (fun b => (fst kn, ind_name b))
+             (filter (fun b => negb (eq_string (ind_name b) (snd kn)))
+                     (ind_bodies mut))
+    else find_mutuals kn env'
+  | _ :: env' => find_mutuals kn env'
+  | nil => nil
+  end.
 
 (* Take in a [global_env], which is a list of declarations,
    and find the inductive declarations in that list
@@ -137,12 +120,16 @@ Definition get_one_inductive_body
     | one :: _ => ret one
     end.
 
-(* the name for the *)
 Record arg_info : Type :=
   { arg_name : BasicAst.ident
+    (* the bound name used in the constructor, inside the pattern *)
   ; p_name : BasicAst.ident
+    (* the bound name used in the exists *)
   ; arg_type : term
+    (* the term for the main inductive type used *)
+    (* TODO think about the fully applied type for polymorphic/dependent types *)
   ; arg_ind_name : kername
+    (* the name of the type constructor used in the argument, like [nat], [list], [option] *)
   }.
 
 Fixpoint handle_dissected_args
@@ -294,13 +281,14 @@ Definition make_fix (tau : term) (body : term) :=
                                      <% mtype %>
                                      <% Prop %>))
       ; dbody := body
-      ; rarg := 0 |}] 0.
+      ; rarg := 1 |}] 0.
 
 Definition add_instance (ind : inductive) : TemplateMonad unit :=
   t_graph <- tmQuote graph ;;
   t_mtype <- tmQuote mtype ;;
   let ind_name : kername := inductive_mind ind in
   let tau : term := tInd ind nil in
+  (* TODO untyped unquote to avoid kind issues *)
   Tau <- tmUnquoteTyped Type tau ;;
 
   mut <- get_mutual_inductive_body ind ;;
@@ -308,14 +296,14 @@ Definition add_instance (ind : inductive) : TemplateMonad unit :=
   prop <- matchmaker ind_name ind tau (process_ctors (ind_ctors one)) ;;
 
   let prog : term :=
-      tLambda (nNamed "g"%string) t_graph
+    make_fix tau
+      (tLambda (nNamed "g"%string) t_graph
         (tLambda (nNamed "x"%string) tau
-          (tLambda (nNamed "p"%string) t_mtype prop)) in
+          (tLambda (nNamed "p"%string) t_mtype prop))) in
 
-  let prog' : term :=
-      if has_recursive_type mut then make_fix tau prog else prog in
-
-  fn <- tmUnquoteTyped (graph -> Tau -> mtype -> Prop) prog' ;;
+  fn <- tmUnquoteTyped (graph -> Tau -> mtype -> Prop) prog ;;
+  (* Remove [tmEval] when MetaCoq issue 455 is fixed:
+     https://github.com/MetaCoq/metacoq/issues/455 *)
   name <- tmFreshName =<< tmEval all ("Rep_" ++ snd ind_name)%string ;;
   (* FIXME no types are parametrized for now *)
   _ <- tmDefinition name {| rep := fn |} ;;
@@ -325,41 +313,80 @@ Definition add_instance (ind : inductive) : TemplateMonad unit :=
   tmExistingInstance (ConstRef (mp, name)) ;;
   tmMsg ("Added Rep instance for " ++ string_of_kername ind_name).
 
-(* Derives a [Rep] instance for the type [Tau] and the types it depends on. *)
-Definition rep_gen (Tau : Type) : TemplateMonad unit :=
+(* Derives a [Rep] instance for the type constructor [Tau]
+   and the types its definition depends on. *)
+Definition rep_gen {kind : Type} (Tau : kind) : TemplateMonad unit :=
   '(env, tau) <- tmQuoteRec Tau ;;
+  (* let mutuals := find_mutuals _ env in *)
   missing <- find_missing_instances env ;;
   monad_iter add_instance (rev missing).
 
-
+(* Let's see it in action: *)
 MetaCoq Run (rep_gen bool).
-(* MetaCoq Run (rep_gen nat). *)
+MetaCoq Run (rep_gen nat).
 
-Inductive color :=
-| red : color
-| green : color
-| blue : color
-| dark : color -> color.
-(* MetaCoq Run (rep_gen color). *)
+Inductive rgx : Type :=
+| empty   : rgx
+| epsilon : rgx
+| literal : string -> rgx
+| or      : rgx -> rgx -> rgx
+| and     : rgx -> rgx -> rgx
+| star    : rgx -> rgx.
 
-Inductive T :=
-| A : bool -> T
-| B : T
-| C : nat -> nat -> T
-| D : T.
-(* MetaCoq Run (rep_gen T). *)
+MetaCoq Run (rep_gen rgx).
+Print Rep_rgx.
 
 Inductive T1 :=
 | c1 : T2 -> T1
 with T2 :=
 | c2 : T1 -> T2.
+Check <% T2 %>.
+Check ~(tInd {| inductive_mind := (MPfile ["rep"; "Glue"; "CertiCoq"], "T1");
+                inductive_ind := 0 |} []).
+Check tFix.
+Print BasicAst.def.
+Search _ (BasicAst.def).
+
+Inductive V :=
+| v1 : T1 -> V
+| v2 : T2 -> V.
+Check <%% V %%>.
+
+Inductive U1 :=
+| u1 : U2 -> U1
+with U2 :=
+| u2 : U3 -> U2
+with U3 :=
+| u3 : U1 -> U3.
+Check <%% U1 %%>.
+
+
+Fixpoint rep_t1 (g : graph) (x : T1) (p : mtype) : Prop :=
+  match x with
+  | c1 y => rep_t2 g y p
+  end
+with rep_t2 (g : graph) (x : T2) (p : mtype) : Prop :=
+  match x with
+  | c2 y => rep_t1 g y p
+  end.
+Check (<% fix rep_t1 (x : T1) : Prop := match x with c1 y => rep_t2 y end
+        with rep_t2 (x : T2) : Prop := match x with c2 y => rep_t1 y end
+        for rep_t1 %>).
+
 (* MetaCoq Run (rep_gen T1). *)
 (* MetaCoq Run (rep_gen T2). *)
 
 (* Set Printing All. *)
-Print Rep_bool.
+(* Print Rep_bool. *)
 (* Print Rep_color. *)
 (* Print Rep_nat. *)
 (* Print Rep_T. *)
 (* Print Rep_T1. *)
 (* Print Rep_T2. *)
+
+(* Inductive nat_list := *)
+(* | my_nil : nat_list *)
+(* | my_cons : nat -> nat_list -> nat_list. *)
+
+(* MetaCoq Run (rep_gen nat_list). *)
+(* Print Rep_nat_list. *)

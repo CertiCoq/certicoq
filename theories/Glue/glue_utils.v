@@ -329,3 +329,34 @@ Section Ctor_Info.
     in aux O O ctors.
 
 End Ctor_Info.
+
+Module MetaCoqNotations.
+  Import MetaCoq.Template.All.
+
+  (* Recursive quoting *)
+  Notation "<%% x %%>" :=
+    ((ltac:(let p y := exact y in run_template_program (tmQuoteRec x) p)))
+    (only parsing).
+  (* Check <%% nat %%>. *)
+
+  (* Splicing / top level antiquotation *)
+  Notation "~( x )" :=
+    (ltac:(let p y :=
+              let e := eval unfold my_projT2 in (my_projT2 y) in
+              exact e in
+          run_template_program (tmUnquote x) p))
+    (only parsing).
+  (* Check (~( <% fun (x : bool) => if x then false else true  %>)). *)
+  (* Compute (~(<% fun (x : bool) => if x then false else true %>) false). *)
+
+  (* Data type name resolution *)
+  Notation "<? x ?>" :=
+    (ltac:(let p y :=
+              match y with
+              | tInd {| inductive_mind := ?name |} _ =>
+                exact name
+              | _ => fail "not a type constructor" end in
+          run_template_program (tmQuote x) p))
+    (only parsing).
+  (* Compute <? option ?>. *)
+End MetaCoqNotations.

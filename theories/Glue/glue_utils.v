@@ -177,9 +177,10 @@ End Clight_Helpers.
 (* A record that holds L1 information about Coq types. *)
 Record ty_info : Type :=
   Build_ty_info
-    { ty_name   : kername
-    ; ty_body   : Ast.one_inductive_body
-    ; ty_params : list string
+    { ty_name      : kername
+    ; ty_body      : Ast.one_inductive_body
+    ; ty_inductive : inductive
+    ; ty_params    : list string
     }.
 
 (* A record that holds information about Coq constructors.
@@ -195,7 +196,7 @@ Record ctor_info : Type :=
 Section L1Constructors.
 
   Inductive dissected_type :=
-  | dInd : kername -> dissected_type
+  | dInd : inductive -> dissected_type
   | dApp : dissected_type -> list dissected_type -> dissected_type
   | dFun : dissected_type (* for higher-order arguments to constructor *)
   | dParam : string -> dissected_type (* for argument of the parametrized types *)
@@ -216,7 +217,7 @@ Section L1Constructors.
            : dissected_type :=
     match ty with
     | Ast.tRel n => get_from_ctx ctx n
-    | Ast.tInd kn _ => dInd (inductive_mind kn)
+    | Ast.tInd ind _ => dInd ind
     | Ast.tProd _ e1 e2 => dFun
     | Ast.tSort _ => dSort
     | Ast.tApp hd args =>

@@ -185,6 +185,19 @@ Section GState.
     ienv <- gets gstate_ienv ;;
     ret (M.fold find ienv None).
 
+  (* A hacky way to get the [ind_L1_tag] of a type from its [inductive] value.
+     This is necessary because of a shortcoming of Template Coq. *)
+  Definition get_tag_from_inductive (i : inductive) : glueM (option ind_L1_tag) :=
+    let find (prev : option ind_L1_tag)
+             (tag : ind_L1_tag)
+             (info : ty_info) : option ind_L1_tag :=
+      match prev with
+      | None => if eq_inductive i (ty_inductive info) then Some tag else None
+      | _ => prev
+      end in
+    ienv <- gets gstate_ienv ;;
+    ret (M.fold find ienv None).
+
   Definition put_ind_L1_env (ienv : ind_L1_env) : glueM unit :=
     '(Build_gstate_data n _ nenv gtenv cnenv caaenv penv log) <- get ;;
     put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
@@ -368,11 +381,13 @@ Section L1Types.
              the other types in the mut rec type declaration.
              Type names in one_inductive_body are NOT qualified,
              which makes them globally nonunique. *)
-        let tys := map (fun o =>
+        let tys := map (fun '(i, o) =>
                           {| ty_name := (qual_pre, Ast.ind_name o)%string
                            ; ty_body := o
+                           ; ty_inductive :=
+                               {| inductive_mind := name ; inductive_ind := i |}
                            ; ty_params := context_names (rev (Ast.ind_params b))
-                           |}) (Ast.ind_bodies b) in
+                           |}) (enumerate_nat (Ast.ind_bodies b)) in
           tys ++ get_single_types gs'
       | None => get_single_types gs'
       end
@@ -457,6 +472,10 @@ Section Printers.
      Print functions for parametrized types take > 1 arguments. *)
   Definition ty_printer : type := Tfunction (Tcons val Tnil) tvoid cc_default.
 
+  Definition report_inductive (i : inductive) : string :=
+    "type #" ++ show_nat (inductive_ind i) ++ " in the "
+             ++ string_of_kername (inductive_mind i) ++ " block".
+
   (* Takes a spine of the type that is about to be printed,
      and returns the correct list of printer functions for it,
      some of which may be the parameters of the type *)
@@ -475,18 +494,21 @@ Section Printers.
             | Some rest' => ret (Some ((Evar i ty_printer) :: rest'))
             end
         end
-    | dInd arg_type_name :: spine' =>
-        (* We check [arg_type_name] against fully qualified [kername]s
-           like "Coq.Init.Datatypes.nat". We should only use [kername]s
-           since they're globally unique. *)
-        tagM <- get_tag_from_type_name arg_type_name ;;
+    | dInd arg_ind :: spine' =>
+        (* We check [arg_ind] against the collection of [inductive]s
+           in the L1 env. This is a bit hacky but there is no other way
+           for a [dissected_type] to contain the precise [kername]
+           of a type from a mutually inductive block, since we fake [kernames]
+           for non-primary mutually inductive types. *)
+        tagM <- get_tag_from_inductive arg_ind ;;
         match tagM with
         | None => ret None
         | Some tag =>
             printerM <- get_print_env tag ;;
             match printerM with
             | None =>
-                log ("Can't find printer for the spine type " ++ string_of_kername arg_type_name) ;;
+                log ("Can't find printer for the spine type "
+                      ++ report_inductive arg_ind) ;;
                 ret None
             | Some printer => (* success! *)
                 rest <- spine_to_args spine' params ;;
@@ -504,7 +526,10 @@ Section Printers.
   Definition generate_printer
              (info : ind_L1_tag * ty_info)
             : glueM (option def) :=
-    let '(itag, {| ty_name := name ; ty_body := b ; ty_params := params |}) := info in
+    let '(itag, {| ty_name := name
+                 ; ty_body := b
+                 ; ty_inductive := ind
+                 ; ty_params := params |}) := info in
     let basename := Ast.ind_name b in
     let ctors := Ast.ind_ctors b in
     pnameM <- get_print_env itag ;;
@@ -591,20 +616,22 @@ Section Printers.
                                       (Econst_int (Int.repr (Z.of_nat i)) val)
                                       (tptr val)) val :: nil))
               end
-          | (i, dApp (dInd arg_type_name) _ as dt) (* for indexed/polymorphic types *)
-          | (i, dInd arg_type_name as dt) (* for monomorphic types *) =>
+          | (i, dApp (dInd arg_ind) _ as dt) (* for indexed/polymorphic types *)
+          | (i, dInd arg_ind as dt) (* for monomorphic types *) =>
               (* in order to get the disjunctive pattern work
                  we need a separate match to get the spine *)
               let spine := match dt with dApp _ s => s | _ => nil end in
-              (* We check [arg_type_name] against fully qualified [kername]s
-                 like "Coq.Init.Datatypes.nat". We should only use [kername]s
-                 since they're globally unique. *)
-              tagM <- get_tag_from_type_name arg_type_name ;;
+              (* We check [arg_ind] against the collection of [inductive]s
+                 in the L1 env. This is a bit hacky but there is no other way
+                 for a [dissected_type] to contain the precise [kername]
+                 of a type from a mutually inductive block, since we fake [kernames]
+                 for non-primary mutually inductive types. *)
+              tagM <- get_tag_from_inductive arg_ind ;;
               match tagM with
               | None =>
                   log ("No L1 tag for the type " ++ string_of_kername name ++
                        " for the #" ++ show_nat i ++
-                       " constructor that takes " ++ string_of_kername arg_type_name) ;;
+                       " constructor that takes " ++ report_inductive arg_ind) ;;
                   ret Sskip (* ideally shouldn't happen *)
               | Some tag =>
                   infoM <- get_ind_L1_env tag ;;
@@ -623,7 +650,7 @@ Section Printers.
                         | None , _ =>
                             log ("Couldn't create spine application for the type " ++ string_of_kername name ++
                                 " for the #" ++ show_nat i ++
-                                " constructor that takes " ++ string_of_kername arg_type_name) ;;
+                                " constructor that takes " ++ report_inductive arg_ind) ;;
                             ret Sskip (* ideally shouldn't happen *)
                         | _ , None =>
                             log ("Can't find printer for the type " ++ string_of_kername name) ;;
@@ -668,7 +695,7 @@ Section Printers.
           match ctors with
           | nil => ret LSnil
           | (ctag, (_, ty, arity)) :: ctors' =>
-            let (args, rt) := dissect_types params (dInd name :: nil) ty in
+            let (args, rt) := dissect_types params (dInd ind :: nil) ty in
             calls <- rec_print_calls (enumerate_nat args) ;;
             rest <- switch_cases ctors' ;;
             accM <- get_ctor_arg_accessor_env itag ctag ;;

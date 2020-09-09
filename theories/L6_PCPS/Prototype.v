@@ -35,7 +35,7 @@ Require Export CertiCoq.L6.PrototypeGenFrame.
    Before unquoting, all internally generated names will be replaced by the proper
    indices. *)
 
-Fail Run TemplateProgram (tmUnquote (tLambda (nNamed "$oof") <%nat%> (tRel 0))).
+Fail MetaCoq Run (tmUnquote (tLambda (nNamed "$oof") <%nat%> (tRel 0))).
 
 Definition gensym (suffix : string) : GM string :=
   let! n := get in
@@ -319,7 +319,7 @@ Fixpoint quote_string (s : string) : term :=
   | String c s => tApp <%String%> [quote_char c; quote_string s]
   end.
 
-Run TemplateProgram (tmPrint =<< tmUnquote (quote_string "abc")).
+MetaCoq Run (tmPrint =<< tmUnquote (quote_string "abc")).
 
 (* abbreviate = map head . splitOn "_" *)
 Fixpoint abbreviate s :=
@@ -418,7 +418,7 @@ Compute <%@Rec%>.
 Definition prefix := ltac:(
    let e := constr:(<%@Rec%>) in
    match e with
-   | tConst ?s [] => let s' := eval cbv in (qualifier s) in exact s'
+   | tConst ?s [] => let s' := eval cbv in (fst s) in exact s'
    end).
 Print prefix.
 Definition rec_rhs_vars_of : term -> Map string (option term).
@@ -427,7 +427,7 @@ Definition rec_rhs_vars_of : term -> Map string (option term).
     match tm with
     | tApp (tConstruct _ _ _) args => union_all (map go args)
     | tApp (tConst func []) args =>
-      if func ==? (prefix +++ "Rec") then
+      if func ==? (prefix, "Rec") then
         match args with
         | [_A; x] =>
           match is_var x with
@@ -806,6 +806,7 @@ Section GoalGeneration.
 
 Context
   (aux_data : aux_data_t)
+  (qual := aux_data.(aQual))
   (decls := aux_data.(aEnv))
   (typename := aux_data.(aTypename)) (g := aux_data.(aGraph))
   (univ_of_tyname := aux_data.(aUnivOfTyname)).
@@ -826,7 +827,7 @@ Definition gen_constr_delay_ty (c : string) : GM term. ltac1:(refine(
   let! rty := findM rtyname g.(mgTypes) in
   let! '(ind, pars) := decompose_ind decls rty in
   let ctr := mkApps (tConstruct ind (N.to_nat n) []) pars in
-  let univ_name := typename +++ "_univ" in
+  let univ_name := (qual, snd typename +++ "_univ") in
   let! univ_n := findM rtyname univ_of_tyname in
   let univ := tConstruct (mkInd univ_name 0) (N.to_nat univ_n) [] in
   let! children :=
@@ -891,6 +892,7 @@ Section GoalGeneration.
 
 Context
   (aux_data : aux_data_t)
+  (qual := aux_data.(aQual))
   (decls := aux_data.(aEnv))
   (typename := aux_data.(aTypename)) (graph := aux_data.(aGraph))
   (univ_of_tyname := aux_data.(aUnivOfTyname))
@@ -915,10 +917,10 @@ Context
   (univD := mkApps <%@univD%> [rw_univ; HFrame]) 
   (* specialize to Fuel fueled -> forall A, erased (frames_t A root) -> univD A -> Set *)
   (rw_for := mkApps <%@rw_for%> [rw_univ; HFrame; root; fueled; metric; rw_rel; R; I_R; S; I_S])
-  (frame_ind := mkInd (typename +++ "_frame_t") 0)
+  (frame_ind := mkInd (qual, snd typename +++ "_frame_t") 0)
   (frame_t := tInd frame_ind [])
   (frame_cons := fun n => tConstruct frame_ind n [])
-  (univ_ind := mkInd (typename +++ "_univ") 0)
+  (univ_ind := mkInd (qual, snd typename +++ "_univ") 0)
   (univ_cons := fun n => tConstruct univ_ind n [])
   (* Specialized to forall A B C, frame_t A B -> frames_t B C -> frames_t A C *)
   (frames_cons := mkApps <%@frames_cons%> [rw_univ; frame_t]).
@@ -1512,9 +1514,9 @@ Ltac mk_smart_constr :=
    end.
 
 Definition tm_get_constr (s : string) : TemplateMonad typed_term :=
-  ref <- tmAbout s ;;
+  ref <- tmLocate s ;;
   match ref with
-  | Some (ConstructRef ind n) => tmUnquote (tConstruct ind n [])
+  | [ConstructRef ind n] => tmUnquote (tConstruct ind n [])
   | _ => tmFail ("tm_get_constr: not a constructor: " +++ s)
   end.
 

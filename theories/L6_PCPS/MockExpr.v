@@ -20,7 +20,9 @@ Inductive exp :=
 | eFuns (fds : list fundef) (e : exp)
 with fundef := fFun (f : var) (xs : list var) (e : exp).
 
-Run TemplateProgram (mk_Frame_ops "exp" exp [var; constr; nat; list var]).
+MetaCoq Run (mk_Frame_ops (MPfile ["MockExpr"; "L6"; "CertiCoq"])
+                          (MPfile ["MockExpr"; "L6"; "CertiCoq"], "exp") exp
+                          [var; constr; nat; list var]).
 
 Print exp_univ.
 Print exp_univD.

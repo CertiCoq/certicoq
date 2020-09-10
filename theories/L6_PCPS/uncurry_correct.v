@@ -1,6 +1,6 @@
 Require Import L6.cps L6.size_cps L6.cps_util L6.eval L6.logical_relations L6.set_util L6.identifiers L6.ctx
         L6.Ensembles_util L6.List_util L6.alpha_conv L6.functions L6.uncurry L6.uncurry_rel
-        L6.shrink_cps_correct.
+        L6.shrink_cps_correct L6.algebra.
 Require Import FunInd.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Strings.String.
@@ -11,12 +11,24 @@ Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Require Import Common.compM.
 Require Import Lia.
 
+Require L6.Prototype L6.cps_proto L6.proto_util L6.uncurry_proto.
+
+Import ListNotations MonadNotation.
+
 Section uncurry_correct.
 
   Variable (pr : prims).
   Variable (cenv : ctor_env).
-  Variable (Post : PostT).
-  Variable (PostG : PostGT).
+  Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
+  (* Context (P1 : nat -> @PostT fuel trace) (PG : @PostGT fuel trace). *)
+  Variable (Post : @PostT fuel trace).
+  Variable (PostG : @PostGT fuel trace).
+
+  Ltac easy_post :=
+    assumption ||
+    match goal with
+    | |- inclusion _ ?R ?R => now unfold inclusion
+    end.
 
   Lemma preord_val_fundefs Post' k rho rho1 fds f
     (Hpost_refl_constr : post_constr_compat Post' Post')
@@ -210,7 +222,7 @@ Section uncurry_correct.
     (Hpost_app : post_app_compat Post PostG)
     (Hpost_letapp : post_letapp_compat cenv Post Post PostG)
     (Hpost_letapp_OOT : post_letapp_compat_OOT Post PostG)
-    (Hpost_inclusion : inclusion (exp * env * nat) Post PostG).
+    (Hpost_inclusion : inclusion _ Post PostG).
 
   Variable
     (HpostG_refl_constr : post_constr_compat PostG PostG)
@@ -224,190 +236,225 @@ Section uncurry_correct.
     (HpostG_refl_OOT : post_OOT PostG)
     (HpostG_refl_base : post_base PostG).
 
-  Variable
-    (Hpost_Eapp :
-      forall (f k0 : var)
-      (kt : fun_tag)
-      (fv : list var)
-      (gt : fun_tag)
-      (gv : list var)
-      (ge : exp)
-      (pre_fds fds : fundefs)
-      (f1 : var)
-      (ft1 : fun_tag)
-      (fv1 gv1 : list var)
-      (s : Ensemble var)
-      (rho rho1 : env)
-      (already_uncurried : M.t bool)
-      (g : var)
-      (Hg_nonrec : occurs_in_exp g ge = false)
-      (Halready_uncurried : match already_uncurried ! g with
-                           | Some true => true
-                           | _ => false
-                           end = false)
-      (Hk0_nonrec : occurs_in_exp k0 ge = false)
-      (t : fun_tag)
-      (Hcurried_unique_fundefs : unique_bindings_fundefs
-                                  (fundefs_append pre_fds
-                                     (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)))
-      (Hcurried_used_fundefs : used_vars_fundefs
+  Variable (Hpost_curried : forall
+    (pr : prims)
+    (cenv : ctor_env)
+    (fuel : Type)
+    (Hf : fuel_resource)
+    (trace : Type)
+    (Ht : trace_resource)
+    (Post : PostT)
+    (PostG : PostGT)
+    (Hpost_refl_constr : post_constr_compat Post Post)
+    (Hpost_refl_proj : post_proj_compat Post Post)
+    (Hpost_refl_fun : post_fun_compat Post Post)
+    (Hpost_refl_case_hd : post_case_compat_hd Post Post)
+    (Hpost_refl_case_tl : post_case_compat_tl Post Post)
+    (Hpost_refl_app : post_app_compat Post Post)
+    (Hpost_refl_letapp : post_letapp_compat cenv Post Post Post)
+    (Hpost_refl_letapp_OOT : post_letapp_compat_OOT Post Post)
+    (Hpost_refl_OOT : post_OOT Post)
+    (Hpost_refl_base : post_base Post)
+    (Hpost_app : post_app_compat Post PostG)
+    (Hpost_letapp : post_letapp_compat cenv Post Post PostG)
+    (Hpost_letapp_OOT : post_letapp_compat_OOT Post PostG)
+    (Hpost_inclusion : inclusion (exp * env * fuel * trace) Post PostG)
+    (HpostG_refl_constr : post_constr_compat PostG PostG)
+    (HpostG_refl_proj : post_proj_compat PostG PostG)
+    (HpostG_refl_fun : post_fun_compat PostG PostG)
+    (HpostG_refl_case_hd : post_case_compat_hd PostG PostG)
+    (HpostG_refl_case_tl : post_case_compat_tl PostG PostG)
+    (HpostG_refl_app : post_app_compat PostG PostG)
+    (HpostG_refl_letapp : post_letapp_compat cenv PostG PostG PostG)
+    (HpostG_refl_letapp_OOT : post_letapp_compat_OOT PostG PostG)
+    (HpostG_refl_OOT : post_OOT PostG)
+    (HpostG_refl_base : post_base PostG)
+    (f k0 : var)
+    (kt : fun_tag)
+    (fv : list var)
+    (gt : fun_tag)
+    (gv : list var)
+    (ge : exp)
+    (pre_fds fds : fundefs)
+    (f1 : var)
+    (ft1 : fun_tag)
+    (fv1 gv1 : list var)
+    (s : Ensemble var)
+    (rho rho1 : env)
+    (already_uncurried : M.t bool)
+    (g : var)
+    (Hg_nonrec : occurs_in_exp g ge = false)
+    (Halready_uncurried : match already_uncurried ! g with
+                         | Some true => true
+                         | _ => false
+                         end = false)
+    (Hk0_nonrec : occurs_in_exp k0 ge = false)
+    (t : fun_tag)
+    (Hcurried_unique_fundefs : unique_bindings_fundefs
                                 (fundefs_append pre_fds
-                                   (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) \subset s)
-      (Huncurried_unique_fundefs : unique_bindings_fundefs
-                                    (fundefs_append pre_fds
-                                       (Fcons f t (k0 :: fv1)
-                                          (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
-                                          (Fcons f1 ft1 (gv ++ fv) ge fds))))
-      (Hgv1_fresh : fresh_copies s gv1)
-      (Hgv_gv1 : length gv1 = length gv)
-      (Hfv1_fresh : fresh_copies (s :|: FromList gv1) fv1)
-      (Hfv_fv1 : length fv1 = length fv)
-      (Hf1_fresh : ~ In var (s :|: FromList gv1 :|: FromList fv1) f1)
-      (Hf1_gv1 : ~ List.In f1 gv1)
-      (Hf1_k0fv1 : ~ List.In f1 (k0 :: fv1))
-      (Hg_f1 : g <> f1)
-      (f_f1 : f <> f1)
-      (Hk0_fv1 : ~ List.In k0 fv1)
-      (Hk0_g : k0 <> g)
-      (Hg_fv1 : ~ List.In g fv1)
-      (Hf1_pre_fds : ~ name_in_fundefs pre_fds f1)
-      (Hf_pre_fds : ~ name_in_fundefs pre_fds f)
-      (Hpre_fds_curried : name_in_fundefs pre_fds \subset
+                                   (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)))
+    (Hcurried_used_fundefs : used_vars_fundefs
+                              (fundefs_append pre_fds
+                                 (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) \subset s)
+    (Huncurried_unique_fundefs : unique_bindings_fundefs
+                                  (fundefs_append pre_fds
+                                     (Fcons f t (k0 :: fv1)
+                                        (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
+                                        (Fcons f1 ft1 (gv ++ fv) ge fds))))
+    (Hgv1_fresh : fresh_copies s gv1)
+    (Hgv_gv1 : Datatypes.length gv1 = Datatypes.length gv)
+    (Hfv1_fresh : fresh_copies (s :|: FromList gv1) fv1)
+    (Hfv_fv1 : Datatypes.length fv1 = Datatypes.length fv)
+    (Hf1_fresh : ~ In var (s :|: FromList gv1 :|: FromList fv1) f1)
+    (Hf1_gv1 : ~ List.In f1 gv1)
+    (Hf1_k0fv1 : ~ List.In f1 (k0 :: fv1))
+    (Hg_f1 : g <> f1)
+    (f_f1 : f <> f1)
+    (Hk0_fv1 : ~ List.In k0 fv1)
+    (Hk0_g : k0 <> g)
+    (Hg_fv1 : ~ List.In g fv1)
+    (Hf1_pre_fds : ~ name_in_fundefs pre_fds f1)
+    (Hf_pre_fds : ~ name_in_fundefs pre_fds f)
+    (Hpre_fds_curried : name_in_fundefs pre_fds \subset
+                       name_in_fundefs
+                         (fundefs_append pre_fds
+                            (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)))
+    (Hpre_fds_uncurried : name_in_fundefs pre_fds \subset
                          name_in_fundefs
                            (fundefs_append pre_fds
-                              (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)))
-      (Hpre_fds_uncurried : name_in_fundefs pre_fds \subset
-                           name_in_fundefs
-                             (fundefs_append pre_fds
-                                (Fcons f t (k0 :: fv1)
-                                   (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
-                                   (Fcons f1 ft1 (gv ++ fv) ge fds))))
-      (Hgv_g : ~ List.In g gv)
-      (Hcurried_uncurried : name_in_fundefs
-                             (fundefs_append pre_fds
-                                (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) \subset
-                           name_in_fundefs
-                             (fundefs_append pre_fds
-                                (Fcons f t (k0 :: fv1)
-                                   (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
-                                   (Fcons f1 ft1 (gv ++ fv) ge fds))))
-      (Hf1_ge : ~ In var (occurs_free ge) f1)
-      (Hf1_curried : ~
-                    In var
-                      (name_in_fundefs
-                         (fundefs_append pre_fds
-                            (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))) f1)
-      (Hf_curried : In var
+                              (Fcons f t (k0 :: fv1)
+                                 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
+                                 (Fcons f1 ft1 (gv ++ fv) ge fds))))
+    (Hgv_g : ~ List.In g gv)
+    (Hcurried_uncurried : name_in_fundefs
+                           (fundefs_append pre_fds
+                              (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) \subset
+                         name_in_fundefs
+                           (fundefs_append pre_fds
+                              (Fcons f t (k0 :: fv1)
+                                 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
+                                 (Fcons f1 ft1 (gv ++ fv) ge fds))))
+    (Hf1_ge : ~ In var (occurs_free ge) f1)
+    (Hf1_curried : ~
+                  In var
+                    (name_in_fundefs
+                       (fundefs_append pre_fds
+                          (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))) f1)
+    (Hf_curried : In var
+                   (name_in_fundefs
+                      (fundefs_append pre_fds
+                         (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))) f)
+    (Hf_uncurried : In var
                      (name_in_fundefs
                         (fundefs_append pre_fds
-                           (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))) f)
-      (Hf_uncurried : In var
-                       (name_in_fundefs
+                           (Fcons f t (k0 :: fv1)
+                              (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
+                              (Fcons f1 ft1 (gv ++ fv) ge fds)))) f)
+    (k : nat)
+    (IHk : forall m : nat,
+          m < k ->
+          forall e : exp,
+          used_vars e
+          :|: used_vars_fundefs
+                (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) \subset
+          s ->
+          used_vars e
+          :|: used_vars_fundefs
+                (fundefs_append pre_fds
+                   (Fcons f t (k0 :: fv1) (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
+                      (Fcons f1 ft1 (gv ++ fv) ge fds))) \subset s :|: FromList gv1 :|: FromList fv1 :|: [set f1] ->
+          preord_env_P cenv PostG
+            (occurs_free
+               (Efun
+                  (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))
+                  e)) m rho rho1 ->
+          forall h : var,
+          occurs_free e h ->
+          name_in_fundefs
+            (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) h ->
+          preord_val cenv PostG (m - 1)
+            (Vfun rho
+               (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) h)
+            (Vfun rho1
+               (fundefs_append pre_fds
+                  (Fcons f t (k0 :: fv1) (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
+                     (Fcons f1 ft1 (gv ++ fv) ge fds))) h))
+    (e : exp)
+    (Hcurried_used : used_vars e
+                    :|: used_vars_fundefs
                           (fundefs_append pre_fds
-                             (Fcons f t (k0 :: fv1)
-                                (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
-                                (Fcons f1 ft1 (gv ++ fv) ge fds)))) f)
-      (k : nat)
-      (IHk : forall m : nat,
-            m < k ->
-            forall e : exp,
-            used_vars e
-            :|: used_vars_fundefs
-                  (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) \subset
-            s ->
-            used_vars e
-            :|: used_vars_fundefs
-                  (fundefs_append pre_fds
-                     (Fcons f t (k0 :: fv1) (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
-                        (Fcons f1 ft1 (gv ++ fv) ge fds))) \subset s :|: FromList gv1 :|: FromList fv1 :|: [set f1] ->
-            preord_env_P cenv PostG
-              (occurs_free
-                 (Efun
-                    (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))
-                    e)) m rho rho1 ->
-            forall h : var,
-            occurs_free e h ->
-            name_in_fundefs
-              (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) h ->
-            preord_val cenv PostG (m - 1)
-              (Vfun rho
-                 (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) h)
-              (Vfun rho1
-                 (fundefs_append pre_fds
-                    (Fcons f t (k0 :: fv1) (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
-                       (Fcons f1 ft1 (gv ++ fv) ge fds))) h))
-      (e : exp)
-      (Hcurried_used : used_vars e
+                             (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) \subset s)
+    (Huncurried_used : used_vars e
                       :|: used_vars_fundefs
                             (fundefs_append pre_fds
-                               (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) \subset s)
-      (Huncurried_used : used_vars e
-                        :|: used_vars_fundefs
-                              (fundefs_append pre_fds
-                                 (Fcons f t (k0 :: fv1)
-                                    (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
-                                    (Fcons f1 ft1 (gv ++ fv) ge fds))) \subset
-                        s :|: FromList gv1 :|: FromList fv1 :|: [set f1])
-      (Henv : preord_env_P cenv PostG
-               (occurs_free
-                  (Efun
-                     (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))
-                     e)) k rho rho1)
-      (Hfds : name_in_fundefs
-               (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) f)
-      (Hh : occurs_free e f)
-      (curried := fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)
-       : fundefs)
-      (uncurried := fundefs_append pre_fds
+                               (Fcons f t (k0 :: fv1)
+                                  (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
+                                  (Fcons f1 ft1 (gv ++ fv) ge fds))) \subset
+                      s :|: FromList gv1 :|: FromList fv1 :|: [set f1])
+    (Henv : preord_env_P cenv PostG
+             (occurs_free
+                (Efun
+                   (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))
+                   e)) k rho rho1)
+    (Hfds : name_in_fundefs
+             (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)) f)
+    (Hh : occurs_free e f)
+    (curried := fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds)
+     : fundefs)
+    (uncurried := fundefs_append pre_fds
+                   (Fcons f t (k0 :: fv1) (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
+                      (Fcons f1 ft1 (gv ++ fv) ge fds)) : fundefs)
+    (hvs1 : val)
+    (tvs1 : list val)
+    (hvs2 : val)
+    (tvs2 : list val)
+    (k1 : nat)
+    (rho' : env)
+    (Hlen_vs1_vs2 : Datatypes.length (hvs1 :: tvs1) = Datatypes.length (hvs2 :: tvs2))
+    (Hrho' : Some rho' =
+            set_lists (k0 :: fv) (hvs1 :: tvs1)
+              (def_funs
+                 (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))
+                 (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))
+                 rho rho))
+    (rho1' : map_util.M.t val)
+    (Hrho1' : Some rho1' =
+             set_lists (k0 :: fv1) (hvs2 :: tvs2)
+               (def_funs
+                  (fundefs_append pre_fds
                      (Fcons f t (k0 :: fv1) (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
-                        (Fcons f1 ft1 (gv ++ fv) ge fds)) : fundefs)
-      (hvs1 : val)
-      (tvs1 : list val)
-      (hvs2 : val)
-      (tvs2 : list val)
-      (k1 : nat)
-      (rho' : env)
-      (Hlen_vs1_vs2 : length (hvs1 :: tvs1) = length (hvs2 :: tvs2))
-      (Hrho' : Some rho' =
-              set_lists (k0 :: fv) (hvs1 :: tvs1)
-                (def_funs
-                   (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))
-                   (fundefs_append pre_fds (Fcons f t (k0 :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k0 kt [g])) fds))
-                   rho rho))
-      (rho1' : map_util.M.t val)
-      (Hrho1' : Some rho1' =
-               set_lists (k0 :: fv1) (hvs2 :: tvs2)
-                 (def_funs
-                    (fundefs_append pre_fds
-                       (Fcons f t (k0 :: fv1) (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
-                          (Fcons f1 ft1 (gv ++ fv) ge fds)))
-                    (fundefs_append pre_fds
-                       (Fcons f t (k0 :: fv1) (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
-                          (Fcons f1 ft1 (gv ++ fv) ge fds))) rho1 rho1))
-      (Hk1 : k1 < k - 1)
-      (Hvs1_vs2 : Forall2 (preord_val cenv PostG k1) (hvs1 :: tvs1) (hvs2 :: tvs2))
-      (vs3 vs4 : list val)
-      (k2 : nat)
-      (rho'' : env)
-      (Hlen_vs3_vs4 : length vs3 = length vs4)
-      (Hrho'' : Some rho'' = set_lists gv vs3 (M.set g (Vfun rho' (Fcons g gt gv ge Fnil) g) rho'))
-      (rho1'' : map_util.M.t val)
-      (Hrho1'' : Some rho1'' =
-                set_lists gv1 vs4 (M.set g (Vfun rho1' (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) g) rho1'))
-      (Hk2 : k2 < k1 - 1)
-      (Hvs3_vs4 : Forall2 (preord_val cenv PostG k2) vs3 vs4)
-      (rho''' : map_util.M.t val)
-      (Hrho''' : Some rho''' = set_lists (gv ++ fv) (vs4 ++ tvs2) (def_funs uncurried uncurried rho1 rho1))
-      (v1 : res)
-      (c1 : nat)
-      (Hc1 : c1 <= k2)
-      (Hv1 : bstep_fuel cenv rho'' ge v1 c1)
-      (v2 : res)
-      (c2 : nat)
-      (Hv2 : bstep_fuel cenv rho''' ge v2 c2)
-      (Hvpost : Post (ge, rho'', c1) (ge, rho''', c2))
-      (Hv1_v2 : preord_res (preord_val cenv) PostG (k2 - c1) v1 v2),
-      PostG (ge, rho'', c1) (Eapp f1 ft1 (gv1 ++ fv1), rho1'', c2 + cost (Eapp f1 ft1 (gv1 ++ fv1)))).
+                        (Fcons f1 ft1 (gv ++ fv) ge fds)))
+                  (fundefs_append pre_fds
+                     (Fcons f t (k0 :: fv1) (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k0 kt [g]))
+                        (Fcons f1 ft1 (gv ++ fv) ge fds))) rho1 rho1))
+    (Hk1 : k1 < k - 1)
+    (Hvs1_vs2 : Forall2 (preord_val cenv PostG k1) (hvs1 :: tvs1) (hvs2 :: tvs2))
+    (vs3 vs4 : list val)
+    (k2 : nat)
+    (rho'' : env)
+    (Hlen_vs3_vs4 : Datatypes.length vs3 = Datatypes.length vs4)
+    (Hrho'' : Some rho'' = set_lists gv vs3 (M.set g (Vfun rho' (Fcons g gt gv ge Fnil) g) rho'))
+    (rho1'' : map_util.M.t val)
+    (Hrho1'' : Some rho1'' =
+              set_lists gv1 vs4 (M.set g (Vfun rho1' (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) g) rho1'))
+    (Hk2 : k2 < k1 - 1)
+    (Hvs3_vs4 : Forall2 (preord_val cenv PostG k2) vs3 vs4)
+    (rho''' : map_util.M.t val)
+    (Hrho''' : Some rho''' = set_lists (gv ++ fv) (vs4 ++ tvs2) (def_funs uncurried uncurried rho1 rho1))
+    (v1 : res)
+    (c1 : fuel)
+    (cout : trace)
+    (Hc1 : to_nat c1 <= k2)
+    (Hv1 : bstep_fuel cenv rho'' ge c1 v1 cout)
+    (v2 : res)
+    (c2 : fuel)
+    (cout' : trace)
+    (Hv2 : bstep_fuel cenv rho''' ge c2 v2 cout')
+    (Hvpost : Post (ge, rho'', c1, cout) (ge, rho''', c2, cout'))
+    (Hv1_v2 : preord_res (preord_val cenv) PostG (k2 - to_nat c1) v1 v2),
+    PostG (ge, rho'', c1, cout)
+      (Eapp f1 ft1 (gv1 ++ fv1), rho1'', plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1))),
+      plus cout' (one (Eapp f1 ft1 (gv1 ++ fv1))))).
 
   (* unnesting fundefs_curried case of uncurry_step_correct *)
   Lemma uncurry_step_correct_fundefs_curried :
@@ -679,7 +726,7 @@ Section uncurry_correct.
             rewrite <- Hfv_fv1.
             reflexivity.
           }
-          (* Transparent preord_exp. *) intros v1 c1 Hc1 Hv1. 
+          (* Transparent preord_exp. *) intros v1 c1 cout Hc1 Hv1. 
           apply length_exists_set_lists with
             (rho0 := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
           destruct Hrho''' as [rho''' Hrho'''].
@@ -842,13 +889,21 @@ Section uncurry_correct.
             }
           }
           unfold preord_exp' in Hgoal.
-          specialize Hgoal with (v1 := v1) (cin := c1); destruct Hgoal; [apply Hc1|apply Hv1|].
-          rename x into v2; destruct H as [c2 [Hv2 [Hvpost Hv1_v2]]].
-          eexists; exists (c2 + cost (Eapp f1 ft1 (gv1 ++ fv1))); split; [|split; [|eassumption]].
-          2: eapply (Hpost_Eapp f k0 kt fv gt gv ge pre_fds fds f1 ft1 fv1 gv1 s
-                                rho rho1 already_uncurried g); eassumption.
-          apply BStepf_run; [omega|].
-          replace (_ + _ - _) with c2 by omega.
+          specialize Hgoal with (v1 := v1) (cin := c1) (cout := cout); destruct Hgoal; [apply Hc1|apply Hv1|].
+          rename x into v2; destruct H as [c2 [cout' [Hv2 [Hvpost Hv1_v2]]]].
+          eexists; exists (plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1) : exp))),
+                   (plus cout' (one (Eapp f1 ft1 (gv1 ++ fv1) : exp))); split; [|split; [|eassumption]].
+          2: {
+            let t := type of Hpost_curried in
+            repeat lazymatch goal with
+            | H:t |- _ => 
+              repeat lazymatch goal with
+              | _:t, H:_ |- _ => revert H
+              end
+            | H:_ |- _ => revert H
+            end.
+            apply Hpost_curried. }
+          apply BStepf_run.
           eapply BStept_app; eauto.
           { erewrite <- set_lists_not_In; [|symmetry; eassumption|assumption].
             rewrite M.gso; [|auto].
@@ -871,7 +926,7 @@ Section uncurry_correct.
             destruct (M.elt_eq f1 f1) as [Heq|]; [clear Heq|contradiction].
             reflexivity. }
       + (* h \in pre_fds ++ fds *)
-        assert (Hf : h <> f). {
+        assert (Hf' : h <> f). {
           intros contra; subst; inv Hcurried_unique_fundefs.
           now apply name_in_fundefs_bound_var_fundefs in Hfds.
           contradiction. }
@@ -1092,7 +1147,6 @@ Section uncurry_correct.
       do 2 (rewrite def_funs_get_neq; auto).
       simpl; do 3 (rewrite M.gso; auto).
       do 2 (rewrite def_funs_neq; [|assumption]).
-      Print preord_var_env.
       unfold preord_env_P, preord_var_env in Henv.
       intros v1 Hv1.
       edestruct Henv as [v2 [Hv2 Hv12]]; try eassumption.
@@ -1100,163 +1154,198 @@ Section uncurry_correct.
       + eexists; split; eapply preord_val_monotonic in Hv12; eauto; omega.
   Qed.
 
-  Variable
-    (Hpost_Eapp_anf : forall
-       (f : var)
-       (gt : fun_tag)
-       (gv : list var)
-       (ge : exp)
-       (pre_fds fds : fundefs)
-       (f1 : var)
-       (ft1 : fun_tag)
-       (fv1 gv1 : list var)
-       (s : Ensemble var)
-       (rho rho1 : env)
-       (already_uncurried : M.t bool)
-       (g : var)
-       (Hg_nonrec : occurs_in_exp g ge = false)
-       (Halready_uncurried : match already_uncurried ! g with
-                            | Some true => true
-                            | _ => false
-                            end = false)
-       (t : fun_tag)
-       (fv : list var)
-       (Huncurried_unique_fundefs : unique_bindings_fundefs
-                                     (fundefs_append pre_fds
-                                        (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
-                                           (Fcons f1 ft1 (gv ++ fv) ge fds))))
-       (Hcurried_used_fundefs : used_vars_fundefs
-                                 (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) \subset
-                               s)
-       (Hcurried_unique_fundefs : unique_bindings_fundefs
-                                   (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)))
-       (Hgv1_fresh : fresh_copies s gv1)
-       (Hgv_gv1 : Datatypes.length gv1 = Datatypes.length gv)
-       (Hfv1_fresh : fresh_copies (s :|: FromList gv1) fv1)
-       (Hfv_fv1 : Datatypes.length fv1 = Datatypes.length fv)
-       (Hf1_fresh : ~ In var (s :|: FromList gv1 :|: FromList fv1) f1)
-       (Hf1_gv1 : ~ List.In f1 gv1)
-       (Hf1_k0fv1 : ~ List.In f1 fv1)
-       (Hg_f1 : g <> f1)
-       (f_f1 : f <> f1)
-       (Hg_fv1 : ~ List.In g fv1)
-       (Hf1_pre_fds : ~ name_in_fundefs pre_fds f1)
-       (Hf_pre_fds : ~ name_in_fundefs pre_fds f)
-       (Hpre_fds_uncurried : name_in_fundefs pre_fds \subset
-                            name_in_fundefs
-                              (fundefs_append pre_fds
-                                 (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
-                                    (Fcons f1 ft1 (gv ++ fv) ge fds))))
-       (Hpre_fds_curried : name_in_fundefs pre_fds \subset
-                          name_in_fundefs
-                            (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)))
-       (Hgv_g : ~ List.In g gv)
-       (Hcurried_uncurried : name_in_fundefs
-                              (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) \subset
-                            name_in_fundefs
-                              (fundefs_append pre_fds
-                                 (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
-                                    (Fcons f1 ft1 (gv ++ fv) ge fds))))
-       (Hf1_ge : ~ In var (occurs_free ge) f1)
-       (Hf_uncurried : In var
-                        (name_in_fundefs
-                           (fundefs_append pre_fds
-                              (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
-                                 (Fcons f1 ft1 (gv ++ fv) ge fds)))) f)
-       (Hf_curried : In var
-                      (name_in_fundefs
-                         (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds))) f)
-       (Hf1_curried : ~
-                     In var
-                       (name_in_fundefs
-                          (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds))) f1)
-       (k : nat)
-       (IHk : forall m : nat,
-             m < k ->
-             forall e : exp,
-             used_vars e
-             :|: used_vars_fundefs (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) \subset
-             s ->
-             used_vars e
-             :|: used_vars_fundefs
-                   (fundefs_append pre_fds
-                      (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
-                         (Fcons f1 ft1 (gv ++ fv) ge fds))) \subset s :|: FromList gv1 :|: FromList fv1 :|: [set f1] ->
-             preord_env_P cenv PostG
-               (occurs_free (Efun (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) e))
-               m rho rho1 ->
-             forall h : var,
-             occurs_free e h ->
-             name_in_fundefs (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) h ->
-             preord_val cenv PostG (m - 1)
-               (Vfun rho (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) h)
-               (Vfun rho1
-                  (fundefs_append pre_fds
-                     (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
-                        (Fcons f1 ft1 (gv ++ fv) ge fds))) h))
-       (e : exp)
-       (Hfds : name_in_fundefs (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) f)
-       (Henv : preord_env_P cenv PostG
-                (occurs_free
-                   (Efun (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) e)) k rho
-                rho1)
-       (Huncurried_used : used_vars e
-                         :|: used_vars_fundefs
-                               (fundefs_append pre_fds
-                                  (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
-                                     (Fcons f1 ft1 (gv ++ fv) ge fds))) \subset
-                         s :|: FromList gv1 :|: FromList fv1 :|: [set f1])
-       (Hcurried_used : used_vars e
-                       :|: used_vars_fundefs
-                             (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) \subset
-                       s)
-       (Hh : occurs_free e f)
-       (uncurried := fundefs_append pre_fds
-                      (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
-                         (Fcons f1 ft1 (gv ++ fv) ge fds)) : fundefs)
-       (curried := fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds) : fundefs)
-       (tvs1 tvs2 : list val)
-       (k1 : nat)
-       (rho' : env)
-       (Hlen_vs1_vs2 : Datatypes.length tvs1 = Datatypes.length tvs2)
-       (Hrho' : Some rho' =
-               set_lists fv tvs1
-                 (def_funs (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds))
-                    (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) rho rho))
-       (rho1' : map_util.M.t val)
-       (Hrho1' : Some rho1' =
-                set_lists fv1 tvs2
-                  (def_funs
-                     (fundefs_append pre_fds
-                        (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
-                           (Fcons f1 ft1 (gv ++ fv) ge fds)))
-                     (fundefs_append pre_fds
-                        (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
-                           (Fcons f1 ft1 (gv ++ fv) ge fds))) rho1 rho1))
-       (Hk1 : k1 < k - 1)
-       (Hvs1_vs2 : Forall2 (preord_val cenv PostG k1) tvs1 tvs2)
-       (vs3 vs4 : list val)
-       (k2 : nat)
-       (rho'' : env)
-       (Hlen_vs3_vs4 : Datatypes.length vs3 = Datatypes.length vs4)
-       (Hrho'' : Some rho'' = set_lists gv vs3 (M.set g (Vfun rho' (Fcons g gt gv ge Fnil) g) rho'))
-       (rho1'' : map_util.M.t val)
-       (Hrho1'' : Some rho1'' =
-                 set_lists gv1 vs4 (M.set g (Vfun rho1' (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) g) rho1'))
-       (Hk2 : k2 < k1 - 1)
-       (Hvs3_vs4 : Forall2 (preord_val cenv PostG k2) vs3 vs4)
-       (rho''' : map_util.M.t val)
-       (Hrho''' : Some rho''' = set_lists (gv ++ fv) (vs4 ++ tvs2) (def_funs uncurried uncurried rho1 rho1))
-       (v1 : res)
-       (c1 : nat)
-       (Hc1 : c1 <= k2)
-       (Hv1 : bstep_fuel cenv rho'' ge v1 c1)
-       (v2 : res)
-       (c2 : nat)
-       (Hv2 : bstep_fuel cenv rho''' ge v2 c2)
-       (Hvpost : Post (ge, rho'', c1) (ge, rho''', c2))
-       (Hv1_v2 : preord_res (preord_val cenv) PostG (k2 - c1) v1 v2),
-       PostG (ge, rho'', c1) (Eapp f1 ft1 (gv1 ++ fv1), rho1'', c2 + cost (Eapp f1 ft1 (gv1 ++ fv1)))).
+  Variable (Hpost_curried_anf : forall
+  (pr : prims)
+  (cenv : ctor_env)
+  (fuel : Type)
+  (Hf : fuel_resource)
+  (trace : Type)
+  (Ht : trace_resource)
+  (Post : PostT)
+  (PostG : PostGT)
+  (Hpost_refl_constr : post_constr_compat Post Post)
+  (Hpost_refl_proj : post_proj_compat Post Post)
+  (Hpost_refl_fun : post_fun_compat Post Post)
+  (Hpost_refl_case_hd : post_case_compat_hd Post Post)
+  (Hpost_refl_case_tl : post_case_compat_tl Post Post)
+  (Hpost_refl_app : post_app_compat Post Post)
+  (Hpost_refl_letapp : post_letapp_compat cenv Post Post Post)
+  (Hpost_refl_letapp_OOT : post_letapp_compat_OOT Post Post)
+  (Hpost_refl_OOT : post_OOT Post)
+  (Hpost_refl_base : post_base Post)
+  (Hpost_app : post_app_compat Post PostG)
+  (Hpost_letapp : post_letapp_compat cenv Post Post PostG)
+  (Hpost_letapp_OOT : post_letapp_compat_OOT Post PostG)
+  (Hpost_inclusion : inclusion (exp * env * fuel * trace) Post PostG)
+  (HpostG_refl_constr : post_constr_compat PostG PostG)
+  (HpostG_refl_proj : post_proj_compat PostG PostG)
+  (HpostG_refl_fun : post_fun_compat PostG PostG)
+  (HpostG_refl_case_hd : post_case_compat_hd PostG PostG)
+  (HpostG_refl_case_tl : post_case_compat_tl PostG PostG)
+  (HpostG_refl_app : post_app_compat PostG PostG)
+  (HpostG_refl_letapp : post_letapp_compat cenv PostG PostG PostG)
+  (HpostG_refl_letapp_OOT : post_letapp_compat_OOT PostG PostG)
+  (HpostG_refl_OOT : post_OOT PostG)
+  (HpostG_refl_base : post_base PostG)
+  (f : var)
+  (gt : fun_tag)
+  (gv : list var)
+  (ge : exp)
+  (pre_fds fds : fundefs)
+  (f1 : var)
+  (ft1 : fun_tag)
+  (fv1 gv1 : list var)
+  (s : Ensemble var)
+  (rho rho1 : env)
+  (already_uncurried : M.t bool)
+  (g : var)
+  (Hg_nonrec : occurs_in_exp g ge = false)
+  (Halready_uncurried : match already_uncurried ! g with
+                       | Some true => true
+                       | _ => false
+                       end = false)
+  (t : fun_tag)
+  (fv : list var)
+  (Huncurried_unique_fundefs : unique_bindings_fundefs
+                                (fundefs_append pre_fds
+                                   (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
+                                      (Fcons f1 ft1 (gv ++ fv) ge fds))))
+  (Hcurried_used_fundefs : used_vars_fundefs
+                            (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) \subset
+                          s)
+  (Hcurried_unique_fundefs : unique_bindings_fundefs
+                              (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)))
+  (Hgv1_fresh : fresh_copies s gv1)
+  (Hgv_gv1 : Datatypes.length gv1 = Datatypes.length gv)
+  (Hfv1_fresh : fresh_copies (s :|: FromList gv1) fv1)
+  (Hfv_fv1 : Datatypes.length fv1 = Datatypes.length fv)
+  (Hf1_fresh : ~ In var (s :|: FromList gv1 :|: FromList fv1) f1)
+  (Hf1_gv1 : ~ List.In f1 gv1)
+  (Hf1_k0fv1 : ~ List.In f1 fv1)
+  (Hg_f1 : g <> f1)
+  (f_f1 : f <> f1)
+  (Hg_fv1 : ~ List.In g fv1)
+  (Hf1_pre_fds : ~ name_in_fundefs pre_fds f1)
+  (Hf_pre_fds : ~ name_in_fundefs pre_fds f)
+  (Hpre_fds_uncurried : name_in_fundefs pre_fds \subset
+                       name_in_fundefs
+                         (fundefs_append pre_fds
+                            (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
+                               (Fcons f1 ft1 (gv ++ fv) ge fds))))
+  (Hpre_fds_curried : name_in_fundefs pre_fds \subset
+                     name_in_fundefs
+                       (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)))
+  (Hgv_g : ~ List.In g gv)
+  (Hcurried_uncurried : name_in_fundefs
+                         (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) \subset
+                       name_in_fundefs
+                         (fundefs_append pre_fds
+                            (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
+                               (Fcons f1 ft1 (gv ++ fv) ge fds))))
+  (Hf1_ge : ~ In var (occurs_free ge) f1)
+  (Hf_uncurried : In var
+                   (name_in_fundefs
+                      (fundefs_append pre_fds
+                         (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
+                            (Fcons f1 ft1 (gv ++ fv) ge fds)))) f)
+  (Hf_curried : In var
+                 (name_in_fundefs
+                    (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds))) f)
+  (Hf1_curried : ~
+                In var
+                  (name_in_fundefs
+                     (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds))) f1)
+  (k : nat)
+  (IHk : forall m : nat,
+        m < k ->
+        forall e : exp,
+        used_vars e
+        :|: used_vars_fundefs (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) \subset
+        s ->
+        used_vars e
+        :|: used_vars_fundefs
+              (fundefs_append pre_fds
+                 (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
+                    (Fcons f1 ft1 (gv ++ fv) ge fds))) \subset s :|: FromList gv1 :|: FromList fv1 :|: [set f1] ->
+        preord_env_P cenv PostG
+          (occurs_free (Efun (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) e))
+          m rho rho1 ->
+        forall h : var,
+        occurs_free e h ->
+        name_in_fundefs (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) h ->
+        preord_val cenv PostG (m - 1)
+          (Vfun rho (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) h)
+          (Vfun rho1
+             (fundefs_append pre_fds
+                (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
+                   (Fcons f1 ft1 (gv ++ fv) ge fds))) h))
+  (e : exp)
+  (Hfds : name_in_fundefs (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) f)
+  (Henv : preord_env_P cenv PostG
+           (occurs_free
+              (Efun (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) e)) k rho
+           rho1)
+  (Huncurried_used : used_vars e
+                    :|: used_vars_fundefs
+                          (fundefs_append pre_fds
+                             (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
+                                (Fcons f1 ft1 (gv ++ fv) ge fds))) \subset
+                    s :|: FromList gv1 :|: FromList fv1 :|: [set f1])
+  (Hcurried_used : used_vars e
+                  :|: used_vars_fundefs
+                        (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) \subset
+                  s)
+  (Hh : occurs_free e f)
+  (uncurried := fundefs_append pre_fds
+                 (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
+                    (Fcons f1 ft1 (gv ++ fv) ge fds)) : fundefs)
+  (curried := fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds) : fundefs)
+  (tvs1 tvs2 : list val)
+  (k1 : nat)
+  (rho' : env)
+  (Hlen_vs1_vs2 : Datatypes.length tvs1 = Datatypes.length tvs2)
+  (Hrho' : Some rho' =
+          set_lists fv tvs1
+            (def_funs (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds))
+               (fundefs_append pre_fds (Fcons f t fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds)) rho rho))
+  (rho1' : map_util.M.t val)
+  (Hrho1' : Some rho1' =
+           set_lists fv1 tvs2
+             (def_funs
+                (fundefs_append pre_fds
+                   (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
+                      (Fcons f1 ft1 (gv ++ fv) ge fds)))
+                (fundefs_append pre_fds
+                   (Fcons f t fv1 (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
+                      (Fcons f1 ft1 (gv ++ fv) ge fds))) rho1 rho1))
+  (Hk1 : k1 < k - 1)
+  (Hvs1_vs2 : Forall2 (preord_val cenv PostG k1) tvs1 tvs2)
+  (vs3 vs4 : list val)
+  (k2 : nat)
+  (rho'' : env)
+  (Hlen_vs3_vs4 : Datatypes.length vs3 = Datatypes.length vs4)
+  (Hrho'' : Some rho'' = set_lists gv vs3 (M.set g (Vfun rho' (Fcons g gt gv ge Fnil) g) rho'))
+  (rho1'' : map_util.M.t val)
+  (Hrho1'' : Some rho1'' =
+            set_lists gv1 vs4 (M.set g (Vfun rho1' (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) g) rho1'))
+  (Hk2 : k2 < k1 - 1)
+  (Hvs3_vs4 : Forall2 (preord_val cenv PostG k2) vs3 vs4)
+  (rho''' : map_util.M.t val)
+  (Hrho''' : Some rho''' = set_lists (gv ++ fv) (vs4 ++ tvs2) (def_funs uncurried uncurried rho1 rho1))
+  (v1 : res)
+  (c1 : fuel)
+  (cout : trace)
+  (Hc1 : to_nat c1 <= k2)
+  (Hv1 : bstep_fuel cenv rho'' ge c1 v1 cout)
+  (v2 : res)
+  (c2 : fuel)
+  (cout' : trace)
+  (Hv2 : bstep_fuel cenv rho''' ge c2 v2 cout')
+  (Hvpost : Post (ge, rho'', c1, cout) (ge, rho''', c2, cout'))
+  (Hv1_v2 : preord_res (preord_val cenv) PostG (k2 - to_nat c1) v1 v2),
+  PostG (ge, rho'', c1, cout)
+    (Eapp f1 ft1 (gv1 ++ fv1), rho1'', plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1))),
+    plus cout' (one (Eapp f1 ft1 (gv1 ++ fv1))))).
 
   (* the same thing, but for anf uncurrying *)
   Lemma uncurry_step_correct_fundefs_curried_anf :
@@ -1499,7 +1588,7 @@ Section uncurry_correct.
           rewrite <- Hfv_fv1.
           reflexivity.
         }
-        (* Transparent preord_exp. *) intros v1 c1 Hc1 Hv1. 
+        (* Transparent preord_exp. *) intros v1 c1 cout Hc1 Hv1. 
         apply length_exists_set_lists with
           (rho0 := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
         destruct Hrho''' as [rho''' Hrho'''].
@@ -1662,21 +1751,22 @@ Section uncurry_correct.
           }
         }
         unfold preord_exp' in Hgoal.
-        specialize Hgoal with (v1 := v1) (cin := c1); destruct Hgoal; [apply Hc1|apply Hv1|].
-        rename x into v2; destruct H as [c2 [Hv2 [Hvpost Hv1_v2]]].
-        eexists; exists (c2 + cost (Eapp f1 ft1 (gv1 ++ fv1))); split; [|split; [|eassumption]].
-        2: eapply (Hpost_Eapp_anf f gt gv ge pre_fds fds f1 ft1 fv1 gv1 s rho rho1
-                                  already_uncurried g Hg_nonrec Halready_uncurried t fv
-                                  Huncurried_unique_fundefs Hcurried_used_fundefs Hcurried_unique_fundefs
-                                  Hgv1_fresh Hgv_gv1 Hfv1_fresh Hfv_fv1 Hf1_fresh Hf1_gv1 Hf1_k0fv1
-                                  Hg_f1 f_f1 Hg_fv1 Hf1_pre_fds Hf_pre_fds Hpre_fds_uncurried
-                                  Hpre_fds_curried Hgv_g Hcurried_uncurried Hf1_ge Hf_uncurried
-                                  Hf_curried Hf1_curried k IHk e Hfds Henv Huncurried_used Hcurried_used
-                                  Hh tvs1 tvs2 k1 rho' Hlen_vs1_vs2 Hrho' rho1' Hrho1' Hk1 Hvs1_vs2 vs3 vs4 k2
-                                  rho'' Hlen_vs3_vs4 Hrho'' rho1'' Hrho1'' Hk2 Hvs3_vs4 rho''' Hrho''' v1 c1
-                                  Hc1 Hv1 v2 c2 Hv2 Hvpost Hv1_v2).
-        apply BStepf_run; [omega|].
-        replace (_ + _ - _) with c2 by omega.
+        specialize Hgoal with (v1 := v1) (cin := c1) (cout := cout); destruct Hgoal; [apply Hc1|apply Hv1|].
+        rename x into v2; destruct H as [c2 [cout' [Hv2 [Hvpost Hv1_v2]]]].
+        eexists; exists (plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1) : exp))),
+                 (plus cout' (one (Eapp f1 ft1 (gv1 ++ fv1) : exp))); split; [|split; [|eassumption]].
+        2: {
+          clear Hpost_curried.
+          let t := type of Hpost_curried_anf in
+          repeat lazymatch goal with
+          | H:t |- _ => 
+            repeat lazymatch goal with
+            | _:t, H:_ |- _ => revert H
+            end
+          | H:_ |- _ => revert H
+          end.
+          apply Hpost_curried_anf. }
+        apply BStepf_run.
         eapply BStept_app; eauto.
         { erewrite <- set_lists_not_In; [|symmetry; eassumption|assumption].
           rewrite M.gso; [|auto].
@@ -1697,7 +1787,7 @@ Section uncurry_correct.
           destruct (M.elt_eq f1 f1) as [Heq|]; [clear Heq|contradiction].
           reflexivity. }
       + (* h \in pre_fds ++ fds *)
-        assert (Hf : h <> f). {
+        assert (Hf' : h <> f). {
           intros contra; subst; inv Hcurried_unique_fundefs.
           now apply name_in_fundefs_bound_var_fundefs in Hfds.
           contradiction. }
@@ -1918,7 +2008,6 @@ Section uncurry_correct.
       do 2 (rewrite def_funs_get_neq; auto).
       simpl; do 3 (rewrite M.gso; auto).
       do 2 (rewrite def_funs_neq; [|assumption]).
-      Print preord_var_env.
       unfold preord_env_P, preord_var_env in Henv.
       intros v1 Hv1.
       edestruct Henv as [v2 [Hv2 Hv12]]; try eassumption.
@@ -1948,7 +2037,7 @@ Section uncurry_correct.
     post_letapp_compat_OOT PG PG ->
     post_OOT PG ->
     post_base PG ->
-    inclusion (exp * env * nat) P1 PG ->
+    inclusion _ P1 PG ->
     forall (k : nat) (rho1 rho2 : env) (c : exp_ctx) (e1 e2 e1' e2' : exp),
     (forall (m : nat) (rho3 rho4 : env),
      m <= k ->
@@ -2266,7 +2355,7 @@ Section uncurry_correct.
     total m ->
     (forall x, total (f x)) ->
     total (bind m f).
-  Proof. intros Hm Hf P; eapply bind_triple; [apply Hm|intros; apply Hf]. Qed.
+  Proof. intros Hm Hf' P; eapply bind_triple; [apply Hm|intros; apply Hf']. Qed.
   
   Hint Resolve ret_total : TotalDB.
   Hint Extern 1 (total (_ <- _ ;; _)) => (apply bind_total; [|let x := fresh "arbitrary" in intros x]) : TotalDB.
@@ -3268,121 +3357,95 @@ Section uncurry_correct.
     eapply uncurry_rel_preserves_occurs_free; eauto.
   Qed.
 
-  (*
-  Lemma uncurry_corresp : forall b e aenv fenv ft lm maxvar s nenv,
-    unique_bindings e ->
-    used_vars e \subset from_maxvar maxvar ->
-    match uncurry e aenv fenv ft lm maxvar s nenv with
-      Some (e1, aenv1, fenv1, ft1, lm1, maxvar1, s1, nenv) =>
-      exists n, uncurry_rel n e (from_maxvar maxvar) lm e1 (from_maxvar maxvar1) lm1
-    | _ => True
-    end.
-  Proof.
-    intros; unfold uncurry.
-    destruct (runState _ _) eqn:HrunState.
-    destruct s0, p, p, p, p, p, p; destruct b; auto.
-    assert (
-      {{ fun st => next_free st = maxvar /\ already_uncurried st = lm }}
-        uncurry_exp e
-      {{ fun st e1 st1 => exists n, uncurry_rel n e (from_fresh st) (already_uncurried st)
-                                         e1 (from_fresh st1) (already_uncurried st1)
-      }}). {
-      apply pre_eq_state_lr; intros.
-      eapply triple_consequence.
-      apply uncurry_exp_corresp.
-      - intros; destruct H1; subst; auto.
-      - auto.
-    }
-    unfold triple in H1.
-    specialize H1 with (i := (maxvar, false, aenv, fenv, ft, lm, s, nenv)).
-    unfold from_fresh, next_free, already_uncurried in H1; simpl in H1; rewrite HrunState in H1.
-    auto.
-  Qed.
+(* uncurry_proto corresp *)
 
-  Lemma uncurry_fuel'_corresp : forall fuel e aenv fenv ft lm maxvar s nenv,
-    unique_bindings e ->
-    used_vars e \subset from_maxvar maxvar ->
-    let '(e1, _, _, _) := uncurry_fuel' fuel e aenv fenv ft lm maxvar s nenv in
-    exists n s1 m1, uncurry_rel n e (from_maxvar maxvar) lm e1 s1 m1.
-  Proof.
-    induction fuel; intros; simpl.
-    - exists 0; do 2 eexists; constructor.
-    - destruct (uncurry _ _ _ _ _ _ _) eqn:Huncurry; [|exists 0; do 2 eexists; constructor].
-      destruct p as [[[[[[[]]]]]]].
-      assert (
-        match uncurry e aenv fenv ft lm maxvar s nenv with
-          Some (e0, _, _, _, l, v, _, _) =>
-            exists n, uncurry_rel n e (from_maxvar maxvar) lm e0 (from_maxvar v) l
-        | _ => True
-        end) by (apply uncurry_corresp; auto).
-      rewrite Huncurry in H1; simpl in H1; destruct H1.
+Import L6.Prototype L6.cps_proto L6.proto_util L6.uncurry_proto.
 
-      specialize IHfuel with
-          (e := e0) (lm := l) (maxvar := v) (aenv := a) (fenv := f) (ft := f0) (s := s0) (nenv := n).
-      destruct (uncurry_fuel' _ _ _ _ _ _ _ _ _) as [[[]]] eqn:Hfuel.
-      edestruct IHfuel as [x1 [s' [m1 Hrel1]]].
-      eapply uncurry_rel_preserves_unique_bindings; eauto.
-      eapply uncurry_rel_preserves_used_vars; eauto.
-      exists (x1 + x); do 2 eexists; eapply uncurry_rel_compose; eauto.
-  Qed.
+Lemma uncurry_fundefs_step_app pre f1 s1 m1 f2 s2 m2 :
+  uncurry_fundefs_step f1 s1 m1 f2 s2 m2 ->
+  uncurry_fundefs_step (fundefs_append pre f1) s1 m1 (fundefs_append pre f2) s2 m2.
+Proof. induction pre; auto; intros Hstep; simpl; now constructor. Qed.
 
-  Lemma succ_max_var_Included : forall e, used_vars e \subset from_maxvar (max_var e 1 + 1).
-  Proof.
-    intros e a Ha; inv Ha;
-    unfold from_maxvar; unfold In; simpl;
-    rewrite Pos.add_1_r;
-    rewrite Pos.lt_succ_r;
-    [now apply bound_var_leq_max_var
-    |now apply occurs_free_leq_max_var].
-  Qed.
-      
-  Lemma uncurry_fuel_corresp : forall n e fenv nenv,
-    unique_bindings e ->
-    let '(e1, _, _, _) := uncurry_fuel n e fenv nenv in
-    exists n' s m s1 m1, used_vars e \subset s /\ uncurry_rel n' e s m e1 s1 m1.
-  Proof.
-    intros.
-    pose uncurry_fuel'_corresp as Hfuel.
-    unfold uncurry_fuel.
-    specialize Hfuel with
-        (fuel := n) (e := e) (aenv := M.empty _) (fenv := fenv)
-        (ft := Pos.succ (M.fold (fun cm ft _ => Pos.max cm ft) fenv 1%positive))
-        (lm := M.empty _) (maxvar := (max_var e 1 + 1) % positive)
-        (s := (0, M.empty _)) (nenv := nenv).
-    destruct (uncurry_fuel' _ _ _ _ _ _ _ _ _) eqn:Huncurry; destruct p; destruct p.
-    assert (used_vars e \subset from_maxvar (max_var e 1 + 1))
-      by apply succ_max_var_Included. 
-    destruct Hfuel as [n1 [s1 [m1 Hrel]]]; auto.
-    do 5 eexists; eauto.
-  Qed.
-      
-  Lemma uncurry_fuel_obs_preserving : forall n e fenv nenv,
-    unique_bindings e ->
-    let '(e1, _, _, _) := uncurry_fuel n e fenv nenv in
-    forall k, ctx_preord_exp k e e1.
-  Proof.
-    intros.
-    destruct (uncurry_fuel n e fenv) eqn:Hfuel; destruct p, p.
-    pose (uncurry_fuel_corresp n e fenv nenv H) as Hcorresp; rewrite Hfuel in Hcorresp.
-    destruct Hcorresp as [n' [s' [m [s1 [m1 [Hused Hrel]]]]]].
-    intros k.
-    eapply uncurry_rel_correct; [auto| |eauto| |eauto].
-    eapply uncurry_rel_preserves_unique_bindings; eauto.
-    eapply uncurry_rel_preserves_used_vars; eauto.
-  Qed.
+Lemma uncurry_proto_corresp_step e1 s1 e2 :
+  s1 <--> used_vars e1 ->
+  uncurry_proto.uncurry_step e1 e2 -> exists m1 s2 m2,
+  uncurry_rel.uncurry_step e1 s1 m1 e2 s2 m2.
+Proof.
+  intros Hused Hstep; destruct Hstep.
+  - (* CPS uncurrying *)
+    destruct (decompose_fd_c C) as [[[D pre] e] HC]; subst C.
+    rewrite !frames_compose_law, !framesD_cons, !ctx_of_fds_app, !app_exp_c_eq in *.
+    unfold Rec; decompose [and] H; clear H; subst.
+    exists (M.empty _); do 2 eexists. apply app_ctx_uncurry_step; [destruct Hused; auto|].
+    simpl; constructor.
+    unfold fresh_copies, proto_util.fresh_copies in *.
+    rewrite <- !Hused in *.
+    apply uncurry_fundefs_step_app, uncurry_fundefs_curried; auto.
+    + now rewrite M.gempty.
+    + now apply occurs_in_exp_correct, Disjoint_Singleton_r.
+    + now apply occurs_in_exp_correct, Disjoint_Singleton_r.
+    + reflexivity.
+  - (* ANF uncurrying *)
+    destruct (decompose_fd_c C) as [[[D pre] e] HC]; subst C.
+    rewrite !frames_compose_law, !framesD_cons, !ctx_of_fds_app, !app_exp_c_eq in *.
+    unfold Rec; decompose [and] H; clear H; subst.
+    exists (M.empty _); do 2 eexists. apply app_ctx_uncurry_step; [destruct Hused; auto|].
+    simpl; constructor.
+    unfold fresh_copies, proto_util.fresh_copies in *.
+    rewrite <- !Hused in *.
+    apply uncurry_fundefs_step_app, uncurry_fundefs_curried_anf; auto.
+    + now rewrite M.gempty.
+    + now apply occurs_in_exp_correct, Disjoint_Singleton_r.
+    + reflexivity.
+Qed.
 
-  Lemma uncurry_fuel_good_preserving : forall n e fenv nenv,
-    unique_bindings e ->
-    closed_exp e ->
-    let '(e1, _, _, _) := uncurry_fuel n e fenv nenv in
-    unique_bindings e1 /\ closed_exp e1.
-  Proof.
-    intros; destruct (uncurry_fuel n e fenv) eqn:Hfuel; destruct p, p.
-    pose (uncurry_fuel_corresp n e fenv nenv H) as Hcorresp; rewrite Hfuel in Hcorresp.
-    destruct Hcorresp as [n' [s' [m [s1 [m1 [Hused Hrel]]]]]].
-    split.
-    eapply uncurry_rel_preserves_unique_bindings; eauto.
-    eapply uncurry_rel_preserves_closed; eauto.
-  Qed.*)
+Lemma uncurry_step_proto_correct e1 e2 k :
+  unique_bindings e1 ->
+  uncurry_step e1 e2 ->
+  ctx_preord_exp k e1 e2.
+Proof.
+  intros Hbind Hstep.
+  edestruct (uncurry_proto_corresp_step e1 (used_vars e1)) as [m1 [s2 [m2 Hrel]]]; eauto with Ensembles_DB.
+  eapply uncurry_step_correct with (s := used_vars e1); eauto; eauto with Ensembles_DB.
+  - eapply uncurry_step_preserves_unique_bindings; eauto with Ensembles_DB.
+  - eapply uncurry_step_preserves_used_vars; eauto with Ensembles_DB.
+Qed.
+
+Lemma uncurry_step_star_proto_correct e1 e2 k :
+  unique_bindings e1 ->
+  clos_refl_trans _ uncurry_step e1 e2 ->
+  ctx_preord_exp k e1 e2.
+Proof.
+  intros Huniq Hsteps; revert k.
+  apply clos_rt_rt1n in Hsteps.
+  induction Hsteps; intros k.
+  - unfold ctx_preord_exp; intros; apply preord_exp_refl; auto.
+    constructor; auto.
+  - unfold ctx_preord_exp.
+    intros rho rho1 Hrho.
+    edestruct (uncurry_proto_corresp_step x (used_vars x)) as [m1 [s2 [m2 Hrel]]]; eauto with Ensembles_DB.
+    assert (unique_bindings y) by (eapply uncurry_step_preserves_unique_bindings; eauto; eauto with Ensembles_DB).
+    assert (used_vars y \subset s2) by (eapply uncurry_step_preserves_used_vars; eauto; eauto with Ensembles_DB).
+    eapply preord_exp_post_monotonic; [apply Hpost_idemp|..].
+    eapply preord_exp_trans; auto.
+    + constructor; auto. unfold inclusion; auto.
+    + unfold inclusion; intros.
+      now apply Hpost_inclusion, Hpost_idemp.
+    + apply uncurry_step_proto_correct; eauto.
+    + intros m; apply IHHsteps; auto.
+      apply preord_env_P_refl.
+      constructor; auto; unfold inclusion; auto.
+Qed.
+
+Lemma uncurry_proto_correct e1 r s k :
+  unique_bindings e1 ->
+  ctx_preord_exp k e1 (run_rewriter rw_uncurry e1 r s).
+Proof.
+  intros Huniq.
+  unfold run_rewriter.
+  destruct (run_rewriter' rw_uncurry e1 r s) as [e2 s' He12].
+  unerase; cbn in He12.
+  apply uncurry_step_star_proto_correct; auto.
+Qed.
 
 End uncurry_correct.

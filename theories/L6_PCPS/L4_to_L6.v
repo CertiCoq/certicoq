@@ -1596,19 +1596,39 @@ Section Post.
           admit. admit. 
     Admitted.
 
+
     Lemma cps_cvt_efnlst_nth_error :
       forall fnl l1 l2 n v f next1 next2,
+        N.to_nat (efnlst_length fnl) = Datatypes.length l1 ->
         cps_cvt_efnlst fnl l2 l1 next1 cnstrs = Some (f, next2) ->
         nth_error l1 n = Some v ->
         exists na e,
           nth_error (efnlst_as_list fnl) n = Some (na, e).
     Proof.
-      induction fnl; intros l1 l2 n' v f next1 next2 Hcvt Hnth.
+      induction fnl; intros l1 l2 n' v f next1 next2 Hlen Hcvt Hnth.
       - simpl in *. inv Hcvt.
         destruct n'.
-        simpl in *. destruct l1. inv Hnth. admit.
-        simpl in *. destruct l1. inv Hnth. admit.
-    Abort. 
+        simpl in *. destruct l1. inv Hnth. inv Hlen.
+        simpl in *. destruct l1. inv Hnth. inv Hlen.
+      - destruct l1. destruct n'.
+        inv Hnth. inv Hnth. 
+        simpl in Hcvt.
+        destruct (gensym next1 (nNamed "fix_x")) eqn:Hgen_x.
+        destruct (gensym s (nNamed "fix_k")) eqn:Hgen_k.
+        destruct e eqn:He; inv Hcvt.
+        destruct (cps_cvt e0 (v1 :: l2) v2 s0 cnstrs) eqn:Hcvt. 2: { inv H0. } 
+        destruct p.
+        destruct (cps_cvt_efnlst fnl l2 l1 s1 cnstrs) eqn:Hcvt2. 2: { inv H0. }
+        destruct p. inv H0.
+        simpl. destruct n'.
+        + simpl in *. repeat eexists.
+        + simpl in *. eapply IHfnl.
+          destruct (efnlst_length fnl). simpl in Hlen.
+          rewrite Pos2Nat.inj_1 in Hlen.
+          inv Hlen. simpl. eassumption. 
+          simpl in *. destruct p; try (zify; omega). 
+          eassumption. eassumption.
+    Qed. 
 
     Lemma cps_val_alpha_equiv :
       forall k,
@@ -1735,23 +1755,25 @@ Section Post.
         destruct (nth_error l5 (N.to_nat n)) eqn:Herr2; inv Hv2.
         rewrite preord_val_eq. unfold preord_val'.
         { intros vs1 vs2 j tg xs1 e2 rho1' Hlen_eq Hfind Hsetl.
+          edestruct (cps_cvt_efnlst_nth_error).
+          admit. eapply Hcvt_efns1. eassumption.
+          edestruct H1.  
           pose proof (cps_cvt_efnlst_find_def) as Hexists.
-          edestruct Hexists.
+          edestruct Hexists; clear Hexists.
           4: { eapply Hcvt_efns1. } 4: { eapply Hcvt_efns2. } 
           eapply gensym_n_NoDup. eassumption.
           eapply gensym_n_NoDup. eassumption.
           admit.
           2: { eassumption. } 
-          admit.
+          eassumption.
           eassumption. 
-          clear Hexists.
           destructAll. 
           pose proof (set_lists_length2) as Hsetl2.
-          edestruct Hsetl2 with (xs1 := [x1; x2]) (vs1 := vs1)
+          edestruct Hsetl2 with (xs1 := [x3; x4]) (vs1 := vs1)
                                 (vs2 := vs2); clear Hsetl2. admit. eassumption.
           symmetry. eassumption.
           eexists. eexists. eexists. split.
-          rewrite Herr2 in H7. inv H7. eassumption. split. 
+          rewrite Herr2 in H9. inv H9. eassumption. split. 
           symmetry. eassumption.
           intros Hlt Hall.
           unfold cps_cvt_alpha_equiv_statement in IH.

@@ -850,7 +850,7 @@ Section CONTRACT.
           * eapply num_occur_sig_unaffected in H16; eauto.  subst. eassumption.
             intros Hc. eapply Dom_map_set in Hc. rewrite Dom_map_empty in Hc. normalize_sets.
             now inv Hc; eauto. intros Hc.
-            eapply Range_map_set_list with (xs := [x]) (vs := [x']) in Hc. inv Hc; eauto. }
+            eapply (Range_map_set_list [x] [x']) in Hc. inv Hc; eauto. }
       reflexivity. reflexivity.
       eapply fundefs_append_num_occur. reflexivity. eassumption. eassumption. omega. 
   Qed.
@@ -6428,22 +6428,21 @@ Section CONTRACT.
     intros y x sig Hr Hd.
     eapply exp_def_mutual_ind; intros; simpl.
     - rewrite H.
-      rewrite <- one_rename_all_list; eauto. eapply not_Dom_map_eq; eauto.
-    - rewrite <- one_rename_all_ar; auto. eapply not_Dom_map_eq; eauto. 
+      rewrite <- one_rename_all_list; eauto.
+    - rewrite <- one_rename_all_ar; auto.
     - simpl in H0. inv H0.
       rewrite H. auto.
     - rewrite <- one_rename_all_ar; auto.
-      rewrite H. auto. eapply not_Dom_map_eq; eauto.
+      rewrite H. auto.
     - rewrite H.
-      rewrite <- one_rename_all_list; eauto; [| now eapply not_Dom_map_eq; eauto ].
-      rewrite <- one_rename_all_ar; auto. eapply not_Dom_map_eq; eauto. 
+      rewrite <- one_rename_all_list; eauto.
+      rewrite <- one_rename_all_ar; auto.
     - rewrite H. rewrite H0. reflexivity.
     - rewrite <- one_rename_all_ar; auto.
       rewrite <- one_rename_all_list; auto.
-      eapply not_Dom_map_eq; eauto. eapply not_Dom_map_eq; eauto. 
     - rewrite <- one_rename_all_list; auto.
-      rewrite H. auto. eapply not_Dom_map_eq; eauto. 
-    - rewrite <- one_rename_all_ar; auto. eapply not_Dom_map_eq; eauto. 
+      rewrite H. auto.
+    - rewrite <- one_rename_all_ar; auto.
     - rewrite H; rewrite H0; auto.
     - auto.
   Qed.
@@ -6908,15 +6907,15 @@ Section CONTRACT.
           rename_all_fun_ctx_ns (M.set x y (M.empty var)) (rename_all_fun_ctx_ns sig f) =  rename_all_fun_ctx_ns (M.set x y sig) f).
   Proof.
     intros; exp_fundefs_ctx_induction IHe IHB; intros; simpl; eauto;
-      (try (rewrite <- one_rename_all_list; eauto; [| eapply not_Dom_map_eq; eauto ]));
-      (try (rewrite <- one_rename_all_ar; eauto; [| eapply not_Dom_map_eq; eauto ]));
+      (try (rewrite <- one_rename_all_list; eauto));
+      (try (rewrite <- one_rename_all_ar; eauto));
       (try (rewrite (proj2 (one_rename_all_ns_mut _ _ _ H H0))));
       (try (rewrite (proj1 (one_rename_all_ns_mut _ _ _ H H0))));
       (try rewrite IHe; eauto);
       (try rewrite IHB; eauto).
     - simpl. f_equal; eauto.
-      + induction l; eauto. simpl; rewrite IHl. f_equal.
-        destruct a. rewrite one_rename_all_ns; eauto.
+      + induction l; eauto. destruct a. simpl; rewrite IHl. f_equal.
+        rewrite one_rename_all_ns; eauto.
       + induction l0; eauto. simpl; rewrite IHl0. f_equal.
         destruct a. rewrite one_rename_all_ns; eauto.
   Qed.
@@ -9824,5 +9823,5 @@ Section CONTRACT.
     }
   Qed.
 
-
+  End Contract_rename.
 End CONTRACT.

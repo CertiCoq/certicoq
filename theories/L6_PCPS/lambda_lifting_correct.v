@@ -4,7 +4,7 @@
 
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.tactics
         L6.Ensembles_util L6.List_util L6.functions L6.lambda_lifting L6.eval
-        L6.logical_relations L6.alpha_conv.
+        L6.logical_relations L6.alpha_conv L6.algebra.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
@@ -15,7 +15,12 @@ Open Scope ctx_scope.
 Open Scope fun_scope.
 Close Scope Z_scope.
 
+Open Scope alg_scope.
+
 Section Lambda_lifting_correct.
+  
+  Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
+
 
   Variable pr : prims.
   Variable cenv : ctor_env.
@@ -35,37 +40,13 @@ Section Lambda_lifting_correct.
     (Hpost_base : post_base (P1 0))
     (Hinc : inclusion _ (P1 0) PG)
     (PG_P_local_steps : 
-      forall {A} e1 rho1 c1 e2 rho2 c2 fvs f B1 rhoc x t xs1 l, 
+      forall {A} e1 rho1 c1 t1 e2 rho2 c2 t2 fvs f B1 rhoc x t xs1 l, 
       Datatypes.length fvs <= PS.cardinal (fundefs_fv B1) ->
         M.get f rho1 = Some (Vfun rhoc B1 x) ->
         find_def x B1 = Some (t, xs1, e1) ->
-        P1 l (e1, rho1, c1) (e2, rho2, c2) ->
+        P1 l (e1, rho1, c1, t1) (e2, rho2, c2, t2) ->
         l <= 1 + length xs1 + @length A fvs + 1 ->
-        PG (e1, rho1, c1) (e2, rho2, c2))
-    (PG_P_local_steps_let_app : 
-        forall e1 rho1 c1 c1' e2 rho2 e2' rho2' e2'' rho2'' c2  c2' 
-          f B1 e1' rhoc rhoc' x f' ft ys xs1 vs1 v k, 
-          k <= cost (Eletapp x f ft ys e1) + PS.cardinal (fundefs_fv B1) ->
-          M.get f rho1 = Some (Vfun rhoc B1 f') ->
-          find_def f' B1 = Some (ft, xs1, e1') ->
-          set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
-          (* maybe bstep is needed but ignore for now *)
-          P1 1 (e1', rhoc', c1) (e2', rho2', c2) ->
-          P1 0 (e1, M.set x v rho1, c1') (e2'', rho2'', c2') ->
-          P1 0 (Eletapp x f ft ys e1, rho1, c1' + c1 + cost (Eletapp x f ft ys e1))
-               (e2, rho2, c2' + c2 + k))
-    (PG_P_local_steps_app : 
-        forall e1 rho1 c1 e2 rho2 e2' rho2' c2 
-          f B1 e1' rhoc rhoc' x f' ft ys xs1 vs1 k, 
-          k <= cost (Eletapp x f ft ys e1) + PS.cardinal (fundefs_fv B1) ->
-          M.get f rho1 = Some (Vfun rhoc B1 f') ->
-          find_def f' B1 = Some (ft, xs1, e1') ->
-          set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
-          (* maybe bstep is needed but ignore for now *)
-          P1 1 (e1', rhoc', c1) (e2', rho2', c2) ->
-          P1 0 (Eapp f ft ys, rho1, c1 + cost (Eapp f ft ys))
-               (e2, rho2, c2 + k))
-        
+        PG (e1, rho1, c1, t1) (e2, rho2, c2, t2))        
    (P1_mon : forall l l', l <= l' -> inclusion _ (P1 l) (P1 l'))
    (P1_local_app : 
      forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
@@ -73,11 +54,39 @@ Section Lambda_lifting_correct.
    (P1_local_app' : 
       forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
         post_Eapp_r (P1 1) (P1 (1 + Datatypes.length ys + 1)) e1 rho1 f ft ys rho2)
-    (P1_ctx_r : 
-      forall e1 rho1 c1 e2 e2' rho2 rho2' c2 c m m', 
-        c <= m' ->
-        P1 m (e1, rho1, c1) (e2, rho2, c2) -> 
-        P1 (m + m') (e1, rho1, c1) (e2', rho2', c2 + c)).
+   (PG_P_local_steps_let_app :
+      forall e1 rho1 c1 t1 c1' t1' e2 rho2 e2' rho2' e2'' rho2'' c2  t2 c2' t2'
+             f B1 e1' rhoc rhoc' x ft ys ys' xs1 vs1 v fvs ft' f',
+        M.get f rho1 = Some (Vfun rhoc B1 f') ->
+        find_def f' B1 = Some (ft, xs1, e1') ->
+        set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
+        (* maybe bstep is needed but ignore for now *)
+        P1 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
+        P1 0 (e1, M.set x v rho1, c1', t1') (e2'', rho2'', c2', t2') ->
+        P1 0 (Eletapp x f ft ys e1, rho1, c1 <+> c1' <+> one (Eletapp x f ft ys e1), t1 <+> t1' <+> one (Eletapp x f ft ys e1))
+           (e2, rho2, c2 <+> c2' <+> one (Eletapp x f' ft' (ys' ++ fvs) e2''),
+            t2 <+> t2' <+> one (Eletapp x f' ft' (ys' ++ fvs) e2'')))
+   (PG_P_local_steps_let_app_OOT :
+      forall e1 rho1 c1 t1  e2 rho2 e2' rho2' e2'' c2  t2 
+             f B1 e1' rhoc rhoc' x ft ys ys' xs1 vs1 fvs ft' f' f'',
+        M.get f rho1 = Some (Vfun rhoc B1 f'') ->
+        find_def f'' B1 = Some (ft, xs1, e1') ->
+        set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
+        (* maybe bstep is needed but ignore for now *)
+        P1 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
+        P1 0 (Eletapp x f ft ys e1, rho1, c1 <+> one (Eletapp x f ft ys e1), t1 <+> one (Eletapp x f ft ys e1))
+           (e2, rho2, c2 <+> one (Eletapp x f' ft' (ys' ++ fvs) e2''),
+            t2 <+> one (Eletapp x f' ft' (ys' ++ fvs) e2'')))
+   (PG_P_local_steps_app : 
+      forall rho1 c1 t1 e2 rho2 e2' rho2' c2 t2 
+             f B1 e1' rhoc rhoc' f' ft ys xs1 vs1 f'' ft' ys' fvs, 
+        M.get f rho1 = Some (Vfun rhoc B1 f') ->
+        find_def f' B1 = Some (ft, xs1, e1') ->
+        set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
+        (* maybe bstep is needed but ignore for now *)
+        P1 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
+        P1 0 (Eapp f ft ys, rho1, c1 <+> one (Eapp f ft ys), t1 <+> one (Eapp f ft ys))
+           (e2, rho2, c2 <+> one (Eapp f'' ft' (ys' ++ fvs)), t2 <+> one (Eapp f' ft' (ys' ++ fvs)))).
 
 
   
@@ -898,7 +907,16 @@ Section Lambda_lifting_correct.
     - eassumption.
   Qed.
 
+  Context
+    (P1_ctx_r :
+       forall (n : nat) (e1 e2 : exp) (C : exp_ctx) (rho1 rho2 rho2' : env) 
+              (C0 : exp_ctx) (c1 c2 : fuel) (cout1 cout2 : trace),
+         ctx_to_rho C rho2 rho2' ->
+         P1 n (e1, rho1, c1, cout1) (e2, rho2', c2, cout2) ->
+         P1 (n + to_nat (one_ctx C0)) (e1, rho1, c1, cout1)
+            (C |[ e2 ]|, rho2, plus c2 (one_ctx C), plus cout2 (one_ctx C))).
 
+  
   Lemma Fundefs_lambda_lift_correct2 k rho rho' B1 B2 sig zeta sig1 zeta1 S S1' S1'' S1''' fvs :
     (* The IH for expressions *)
     (forall m : nat,
@@ -1075,7 +1093,7 @@ Section Lambda_lifting_correct.
         -- now eauto.
         -- intros Hlt Hall. replace 1 with (0 + 1).
            eapply ctx_to_rho_preord_exp with (C := Efun1_c C Hole_c). eassumption. eassumption. eassumption. (* TODO remove extra args ? *)
-           ++ intros. eapply P1_ctx_r. omega. eassumption.
+           ++ intros. eapply P1_ctx_r. eassumption. eassumption.
            ++ constructor. constructor.
            ++ { (* eapply preord_exp_post_monotonic. admit. postcondition *)
                 assert (Hsetapp' := Hsetapp). eapply set_lists_app in Hsetapp. edestruct Hsetapp as (rho2i & Hsetl1 & Hsetl2).
@@ -1117,7 +1135,7 @@ Section Lambda_lifting_correct.
                      rewrite !Setminus_Union_distr. eapply image_monotonic. xsets. 
                    * eapply Union_Disjoint_r; eapply Union_Disjoint_l.
                      -- eapply Disjoint_Included_r. eassumption. sets.
-                     -- eapply Disjoint_Included_r. eapply Make_wrappers_free_set_Included.  eassumption.
+                     -- eapply Disjoint_Included_r. eapply Make_wrappers_free_set_Included. eassumption.
                         sets.
                      -- eapply Disjoint_sym. eapply unique_bindings_fun_in_fundefs.
                         eapply find_def_correct. eassumption. eassumption.
@@ -1526,6 +1544,7 @@ Section Lambda_lifting_correct.
       eassumption. 
   Qed.
 
+
   Lemma Funs_inv_Eletapp k x f ft ys e f' ft' fvs e' sig zeta rho rho' :
     (forall (m : nat) (v1 v2 : val),
         m < k ->
@@ -1536,60 +1555,66 @@ Section Lambda_lifting_correct.
     zeta f = Some (f', ft', fvs) ->
     preord_exp cenv (P1 0) PG k (Eletapp x f ft ys e, rho) (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e', rho').
   Proof.
-    intros Hyp Hfuns Henv Hzeq v1 c1 Hleq Hstep. inv Hstep.
-    - eexists OOT, c1. split; [| split; eauto ].
+    intros Hyp Hfuns Henv Hzeq v1 c1 t1 Hleq Hstep. inv Hstep.
+    - eexists OOT, c1, zero. split; [| split; eauto ].
       + econstructor. eassumption.
-      + eapply HPost_OOT; eauto.
+      + eapply lt_one in H. 
+        eapply HPost_OOT; eauto. subst. eapply zero_one_lt. 
       + simpl; eauto.
-    - inv H0. 
+    - inv H. 
       + edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
         normalize_occurs_free. now sets.
         assert (Hlen := Forall2_length _ _ _ Hprevs). 
   
         edestruct Hfuns with (j := k - 1) as (rhoc & rhoc' & B2 & f2 & xs2 & e2 & vs2' & Hget2 & Hf2 & Hgl2 & Hfvs & Hset2 & Hyp2);
           [ eassumption | eassumption | eassumption | eassumption | now eauto | ]. 
+
+        rewrite !to_nat_add in Hleq. unfold one in Hleq. erewrite to_nat_one in Hleq.
         
-        edestruct Hyp2 as (v2' & c2' & Hstep2' & Hpost' & Hval'); [  | | | eassumption | ]. simpl in *. omega.  
-        eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega. omega. 
+        edestruct Hyp2 as (v2' & c2' & t2' & Hstep2' & Hpost' & Hval'); [  | | | eassumption | ]. simpl in *.
+        omega.
+         
+        eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega.
+        
+        omega. 
         destruct v2'; try (simpl in *; contradiction). 
-        edestruct Hyp as (v2 & c2 & Hstep2 & Hpost & Hval); [ | eassumption | | eassumption | ].
+
+        edestruct Hyp as (v2 & c2 & t2 & Hstep2 & Hpost & Hval); [ | eassumption | | eassumption | ].
         simpl in *; omega. omega.
-        exists v2, (c2 + c2' + (cost (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e'))). 
+        exists v2, (c2' <+> c2 <+> (one (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e'))),
+        (t2' <+> t2 <+> (one (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e'))). 
         split; [| split ]; eauto.
-        * econstructor 2. omega. 
-          replace ((c2 + c2' + cost (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e') -
-                    cost (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e'))) with (c2' + c2) by omega.
-          econstructor; eauto. rewrite map_app. eapply get_list_app; eauto.
-        * simpl. 
-          replace c1 with (cin2 + cin1 +1) by (simpl in *; omega). 
-          eapply PG_P_local_steps_let_app; [ | eassumption | eassumption | now eauto | eassumption | eassumption ].
-          simpl. omega.
-        * eapply preord_res_monotonic. eassumption. simpl in *; omega.
+        * econstructor 2.
+          econstructor; try eassumption. rewrite map_app. eapply get_list_app; eauto.
+          now eauto.
+        * simpl. eapply PG_P_local_steps_let_app. eassumption. eassumption. eassumption.
+          eassumption. eassumption.
+        * eapply preord_res_monotonic. eassumption.
+          rewrite !to_nat_add. unfold one. rewrite to_nat_one. omega. 
       + edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
         normalize_occurs_free. now sets.
         assert (Hlen := Forall2_length _ _ _ Hprevs). 
   
         edestruct Hfuns with (j := k - 1) as (rhoc & rhoc' & B2 & f2 & xs2 & e2 & vs2' & Hget2 & Hf2 & Hgl2 & Hfvs & Hset2 & Hyp2);
           [ eassumption | eassumption | eassumption | eassumption | now eauto | ]. 
-        
-        edestruct Hyp2 as (v2' & c2' & Hstep2' & Hpost' & Hval'); [  | | | eassumption | ]. simpl in *. omega.  
+
+        rewrite !to_nat_add in Hleq. unfold one in Hleq. erewrite to_nat_one in Hleq.        
+        edestruct Hyp2 as (v2' & c2' & t2' & Hstep2' & Hpost' & Hval'); [  | | | eassumption | ]. simpl in *.
+
+        omega.  
         eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega. 
         simpl in *; omega. 
-        destruct v2'; try (simpl in *; contradiction). 
-        exists OOT, (c2' + (cost (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e'))). 
-        split; [| split ]; eauto.
-        * econstructor 2. omega. 
-          replace ((c2' + cost (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e') -
-                    cost (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e'))) with c2' by omega.
-          econstructor; eauto. rewrite map_app. eapply get_list_app; eauto.
-        * simpl. 
-          replace c1 with (0 + (c1 - cost (Eletapp x f ft ys e)) + 1) by (simpl in *; omega). 
-          replace c2' with (0 + c2') by omega.
-          eapply PG_P_local_steps_let_app; [ | eassumption | eassumption | now eauto | eassumption | ].
-          simpl. omega.
-          eapply HPost_OOT. eapply cost_gt_0.
+        destruct v2'; try (simpl in *; contradiction).
+        exists OOT. do 2 eexists. 
+        split; [| split ].
+        * eapply BStepf_run. eapply BStept_letapp_oot.
+          eassumption. rewrite map_app. eapply get_list_app; eauto. eassumption.
+          now eauto. eassumption. 
+        * repeat subst_exp. simpl. rewrite !map_app. eapply PG_P_local_steps_let_app_OOT. eassumption.
+          eassumption. eassumption. eassumption.
+        * eassumption.
 
-          Grab Existential Variables. exact (Vconstr 1%positive []). eassumption. eassumption.
+          Grab Existential Variables. eauto. exact []. exact [].
     Qed. 
 
 
@@ -1600,33 +1625,34 @@ Section Lambda_lifting_correct.
     zeta f = Some (f', ft', fvs) ->
     preord_exp cenv (P1 0) PG k (Eapp f ft ys, rho) (Eapp (sig f') ft' (map sig (ys ++ fvs)), rho').
   Proof.
-    intros Hfuns Henv Hzeq v1 c1 Hleq Hstep. inv Hstep.
-    - eexists OOT, c1. split; [| split; eauto ].
+    intros Hfuns Henv Hzeq v1 c1 t1 Hleq Hstep. inv Hstep.
+    - eexists OOT, c1, <0>. split; [| split; eauto ].
       + econstructor. eassumption.
-      + eapply HPost_OOT; eauto.
+      + eapply lt_one in H. 
+        eapply HPost_OOT; eauto. subst. eapply zero_one_lt. 
       + simpl; eauto.
-    - inv H0. edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
+    - inv H. edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
       normalize_occurs_free. now sets.
       assert (Hlen := Forall2_length _ _ _ Hprevs). 
     
       edestruct Hfuns with (j := k - 1) as (rhoc & rhoc' & B2 & f2 & xs2 & e2 & vs2' & Hget2 & Hf2 & Hgl2 & Hfvs & Hset2 & Hyp2);
         [ eassumption | eassumption | eassumption | eassumption | now eauto | ]. 
-    
-     edestruct Hyp2 as (v2' & c2' & Hstep2' & Hpost' & Hval'); [ simpl in *; omega | | | eassumption | ].
+
+      rewrite !to_nat_add in Hleq. unfold one in Hleq. erewrite to_nat_one in Hleq.
+
+     edestruct Hyp2 as (v2' & c2' & t2' & Hstep2' & Hpost' & Hval'); [ simpl in *; omega | | | eassumption | ].
      eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega. simpl in *; omega.
-
-     exists v2', (c2' + (cost (Eapp (sig f') ft' (map sig (ys ++ fvs))))). 
-     split; [| split ]; eauto.
-     + econstructor 2. omega. econstructor; eauto. 
+     repeat subst_exp.
+     
+     exists v2'. do 2 eexists.
+     split; [| split ].
+     + econstructor 2. econstructor; eauto. 
        rewrite list_append_map. eapply get_list_app. eassumption. eassumption. 
-       rewrite Nat_as_OT.add_sub. eassumption.
-     + replace c1 with (c1 - cost (Eapp f ft ys) + cost (Eapp f ft ys)). 
-       eapply PG_P_local_steps_app; [ | eassumption | eassumption | now eauto | eassumption ].
-       simpl. omega.
+     + eapply PG_P_local_steps_app. eassumption. eassumption. eassumption. eassumption.
+     + eapply preord_res_monotonic. eassumption. rewrite to_nat_add. unfold one. rewrite to_nat_one.
        simpl in *; omega.
-      + eapply preord_res_monotonic. eassumption. simpl in *; omega.
 
-      Grab Existential Variables. eassumption. eassumption.
+      Grab Existential Variables. eassumption. eassumption. eassumption. eassumption.
   Qed.
 
       

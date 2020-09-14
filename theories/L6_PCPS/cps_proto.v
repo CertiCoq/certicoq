@@ -13,8 +13,10 @@ From MetaCoq Require Import Template.All.
 
 From CertiCoq.L6 Require Import PrototypeGenFrame cps.
 
-Run TemplateProgram (mk_Frame_ops
-  "exp" exp [var; fun_tag; ctor_tag; prim; N; list var]).
+MetaCoq Run (mk_Frame_ops
+               (MPfile ["cps_proto"; "L6"; "CertiCoq"])
+               (MPfile ["cps"; "L6"; "CertiCoq"], "exp")
+               exp [var; fun_tag; ctor_tag; prim; N; list var]).
 Print exp_univ.
 Print exp_univD.
 

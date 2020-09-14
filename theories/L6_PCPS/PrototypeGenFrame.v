@@ -143,6 +143,7 @@ Notation "'Eq' A" := (RelDec (@eq A)) (at level 1, no associativity).
 Infix "==?" := eq_dec (at level 40, no associativity).
 
 Instance Eq_N : Eq N := {rel_dec := N.eqb}.
+Instance Eq_kername : Eq kername := {rel_dec := eq_kername}.
 
 Definition Map A B := list (A * B).
 Definition Set' A := Map A unit.
@@ -337,16 +338,21 @@ Definition runGM {A} (m : GM A) : TemplateMonad A :=
 Definition runGM' {A} (n : N) (m : GM A) : string + (A × N) :=
   runStateT m n.
 
-Definition findM {A} (k : string) (m : Map string A) : GM A :=
+Class Show A := show : A -> string.
+Instance Show_string : Show string := fun x => x.
+Instance Show_kername : Show kername := string_of_kername.
+
+(* TODO: impl Show typeclass *)
+Definition findM {K A} `{Eq K} `{Show K} (k : K) (m : Map K A) : GM A :=
   match find k m with
   | Some v => ret v
-  | None => raise ("findM: " +++ k)
+  | None => raise ("findM: " +++ show k)
   end.
 
-Definition findM' {A} (k : string) (m : Map string A) (s : string) : GM A :=
+Definition findM' {K A} `{Eq K} `{Show K} (k : K) (m : Map K A) (s : string) : GM A :=
   match find k m with
   | Some v => ret v
-  | None => raise ("findM': " +++ s +++ ": " +++ k)
+  | None => raise ("findM': " +++ s +++ ": " +++ show k)
   end.
 
 Definition findM'' {A B} `{Eq A} (k : A) (m : Map A B) (s : string) : GM B :=
@@ -378,7 +384,7 @@ Definition nthM_nat {A} (n : nat) (xs : list A) : GM A :=
 
 (* Parse a mutual inductive definition into constructor names + argument types *)
 
-Definition ind_info := Map string ((mutual_inductive_body × list inductive) × nat).
+Definition ind_info := Map kername ((mutual_inductive_body × list inductive) × nat).
 
 Record mind_graph_t := mk_mg {
   mgAtoms : Map string term; (* name -> AST e.g. "list_nat" -> tApp {| .. |} {| .. |} *)
@@ -420,8 +426,9 @@ Definition inductives_of_env (decls : global_env) : ind_info :=
       match decl with
       | ConstantDecl _ => m
       | InductiveDecl mbody =>
-        let qual := qualifier kername in
-        let kernames := mapi (fun i body => (i, qual +++ body.(ind_name))) mbody.(ind_bodies) in
+        (* let '(qual, _) := kername in *)
+        (* let kernames := mapi (fun i body => (i, (qual, body.(ind_name)))) mbody.(ind_bodies) in *)
+        let kernames := mapi (fun i body => (i, kername)) mbody.(ind_bodies) in
         let inds := map (fun '(i, kername) => mkInd kername i) kernames in
         fold_right
           (fun '(i, kername) m =>
@@ -450,7 +457,7 @@ Fixpoint mangle (inds : ind_info) (e : term) : GM string :=
     let! body := nthM_nat ind.(inductive_ind) mbody.(ind_bodies) in
     let! '(c, _, _) := nthM_nat n body.(ind_ctors) in
     ret c
-  | tConst kername _ => ret (unqualified kername)
+  | tConst (_, name) _ => ret name
   | e => raise ("mangle: Unrecognized type: " +++ string_of_term e)
   end.
 
@@ -491,8 +498,8 @@ Definition decompose_ind (decls : global_env) (ty : term) : GM (inductive × lis
       match decl with
       | ConstantDecl {| cst_body := Some body |} => go n body
       | ConstantDecl {| cst_body := None |} =>
-        raise ("decompose_ind: empty ConstantDecl body: " +++ c)
-      | InductiveDecl _ => raise ("decompose_ind: got InductiveDecl: " +++ c)
+        raise ("decompose_ind: empty ConstantDecl body: " +++ string_of_kername c)
+      | InductiveDecl _ => raise ("decompose_ind: got InductiveDecl: " +++ string_of_kername c)
       end
     in
     match n with O => raise "decompose_ind: OOF" | S n =>
@@ -561,9 +568,9 @@ Definition type0 := tSort Universe.type0.
 Definition func x t e := tLambda (nNamed x) t e.
 Definition lam t e := tLambda nAnon t e.
 
-Definition gen_univ_univD (typename : string) (g : mind_graph_t)
-  : ((mutual_inductive_entry × Map string N) × string) × term :=
-  let ty_u := typename +++ "_univ" in
+Definition gen_univ_univD (qual : modpath) (typename : kername) (g : mind_graph_t)
+  : ((mutual_inductive_entry × Map string N) × kername) × term :=
+  let ty_u := snd typename +++ "_univ" in
   let mgTypes := list_of_map g.(mgTypes) in
   let tys := map (fun '(ty, _) => (ty, ty_u +++ "_" +++ ty)) mgTypes in
   let ty_ns := foldri (fun n '(ty, _) m => insert ty n m) (fun _ => empty) tys in
@@ -575,7 +582,7 @@ Definition gen_univ_univD (typename : string) (g : mind_graph_t)
     mind_entry_consnames := tys;
     mind_entry_lc := repeat (tRel 0) #|tys| |}
   in
-  let univ_ind := mkInd (typename +++ "_univ") 0 in
+  let univ_ind := mkInd (qual, snd typename +++ "_univ") 0 in
   let univ := tInd univ_ind [] in
   let body :=
     func "u" univ
@@ -589,7 +596,7 @@ Definition gen_univ_univD (typename : string) (g : mind_graph_t)
     mind_entry_inds := [ind_entry];
     mind_entry_universes := Monomorphic_entry (LevelSet.empty, ConstraintSet.empty);
     mind_entry_variance := None;
-    mind_entry_private := None |}, ty_ns, typename +++ "_univD", body).
+    mind_entry_private := None |}, ty_ns, (qual, snd typename +++ "_univD"), body).
 
 Definition holes_of {A} (xs : list A) : list ((list A × A) × list A) :=
   let fix go l xs :=
@@ -635,13 +642,13 @@ Definition index_of {A} (f : A -> bool) (xs : list A) : GM nat :=
     end
   in go O xs.
 
-Definition gen_frame_t (typename : string) (inds : ind_info) (g : mind_graph_t) (fs : list frame)
+Definition gen_frame_t (qual : modpath) (typename : kername) (inds : ind_info) (g : mind_graph_t) (fs : list frame)
   : GM mutual_inductive_entry :=
-  let univ := tInd (mkInd (typename +++ "_univ") 0) [] in
+  let univ := tInd (mkInd (qual, snd typename +++ "_univ") 0) [] in
   let to_univ ty :=
     let! mangled := mangle inds ty in
     let! n := index_of (fun '(s, _) => eq_string s mangled) (list_of_map g.(mgTypes)) in
-    ret (tConstruct (mkInd (typename +++ "_univ") 0) n [])
+    ret (tConstruct (mkInd (qual, snd typename +++ "_univ") 0) n [])
   in
   let! ctr_types :=
     mapM
@@ -652,7 +659,7 @@ Definition gen_frame_t (typename : string) (inds : ind_info) (g : mind_graph_t) 
       fs
   in
   let ind_entry : one_inductive_entry := {|
-    mind_entry_typename := typename +++ "_frame_t";
+    mind_entry_typename := snd typename +++ "_frame_t";
     mind_entry_arity := fn univ (fn univ type0);
     mind_entry_template := false;
     mind_entry_consnames := map (fun h => h.(hName)) fs;
@@ -667,11 +674,11 @@ Definition gen_frame_t (typename : string) (inds : ind_info) (g : mind_graph_t) 
     mind_entry_variance := None;
     mind_entry_private := None |}.
 
-Definition gen_frameD (typename : string) (univD_kername : string) (fs : list frame)
-  : string × term :=
-  let univ_ty := tInd (mkInd (typename +++ "_univ") O) [] in
+Definition gen_frameD (qual : modpath) (typename : kername) (univD_kername : kername) (fs : list frame)
+  : kername × term :=
+  let univ_ty := tInd (mkInd (qual, snd typename +++ "_univ") O) [] in
   let univD ty := mkApps (tConst univD_kername []) [ty] in
-  let frame_ind := mkInd (typename +++ "_frame_t") O in
+  let frame_ind := mkInd (qual, snd typename +++ "_frame_t") O in
   let frame_ty := mkApps (tInd frame_ind []) [tRel 1; tRel O] in
   let mk_arm h :=
     let 'mk_frame _ name constr lefts frame rights root := h in
@@ -687,50 +694,58 @@ Definition gen_frameD (typename : string) (univD_kername : string) (fs : list fr
           (fn (univD (tRel 2)) (univD (tRel 2))))))
         (tRel O) (map mk_arm fs))))
   in
-  (typename +++ "_frameD", body).
+  ((qual, snd typename +++ "_frameD"), body).
 
-Definition kername_of_const (s : string) : TemplateMonad string :=
-  ref <- tmAbout s ;;
-  match ref with
-  | Some (ConstRef kername) => TM.ret kername
-  | Some _ => tmFail ("kername_of_const: Not a constant: " +++ s)
-  | None => tmFail ("kername_of_const: Not in scope: " +++ s)
+Definition kername_of_const (s : string) : TemplateMonad kername :=
+  refs <- tmLocate s ;;
+  match refs with
+  | ConstRef kername :: _ => TM.ret kername
+  | _ :: _ => tmFail ("kername_of_const: Not a constant: " +++ s)
+  | [] => tmFail ("kername_of_const: Not in scope: " +++ s)
   end.
 
-Definition gen_Frame_ops (typename : string) (T : program) (atoms : list term) : GM _ :=
+Definition gen_Frame_ops (qual : modpath) (typename : kername) (T : program) (atoms : list term) : GM _ :=
   let! '(inds, g) := build_graph atoms T in
   let! '(fs, cfs) := gen_frames (fst T) g in
-  let '(univ, univ_of_tyname, univD, univD_body) := gen_univ_univD typename g in
-  let! frame_t := gen_frame_t typename inds g fs in
+  let '(univ, univ_of_tyname, univD, univD_body) := gen_univ_univD qual typename g in
+  let! frame_t := gen_frame_t qual typename inds g fs in
   ret (inds, g, fs, cfs, univ, univ_of_tyname, univD, univD_body, frame_t).
 
 Record aux_data_t := mk_aux_data {
+  aQual : modpath;
   aEnv : global_env;
   aIndInfo : ind_info;
-  aTypename : string;
+  aTypename : kername;
   aGraph : mind_graph_t;
   aUnivOfTyname : Map string N;
   aFramesOfConstr : Map string (list frame) }.
 
 Class AuxData (U : Set) := aux_data : aux_data_t.
 
-Definition mk_Frame_ops (typename : string) (T : Type) (atoms : list Set) : TemplateMonad unit :=
+Definition mk_Frame_ops (qual : modpath) (typename : kername) (T : Type) (atoms : list Set) : TemplateMonad unit :=
   p <- tmQuoteRec T ;;
   atoms <- monad_map tmQuote atoms ;;
   mlet (inds, g, fs, cfs, univ, univ_of_tyname, univD, univD_body, frame_t) <-
-    runGM (gen_Frame_ops typename p atoms) ;;
+    runGM (gen_Frame_ops qual typename p atoms) ;;
   tmMkInductive univ ;;
-  tmMkDefinition univD univD_body ;;
+  (* tmPrint univD ;; *)
+  (* tmPrint univD_body ;; *)
+  (* tmPrint =<< tmUnquote univD_body ;; *)
+  tmMkDefinition (snd univD) univD_body ;;
   tmMkInductive frame_t ;;
-  univD_kername <- kername_of_const univD ;;
-  let '(frameD, frameD_body) := gen_frameD typename univD_kername fs in
-  tmMkDefinition frameD frameD_body ;;
-  tmMkDefinition (typename +++ "_Frame_ops") (
-    mkApps (tConstruct (mkInd "Frame" 0) 0 []) [
-      tInd (mkInd (typename +++ "_univ") 0) [];
-      tConst (typename +++ "_univD") [];
-      tInd (mkInd (typename +++ "_frame_t") 0) [];
-         tConst (typename +++ "_frameD") []]) ;;
-  tmDefinition (typename +++ "_aux_data")
-               (mk_aux_data (fst p) inds typename g univ_of_tyname cfs) ;;
-  ret tt.
+  let univD_kername := univD in
+  let '(frameD, frameD_body) := gen_frameD qual typename univD_kername fs in
+  tmMkDefinition (snd frameD) frameD_body ;;
+  match <%@Frame%> with
+  | tInd Frame_ind [] =>
+    tmMkDefinition (snd typename +++ "_Frame_ops") (
+      mkApps (tConstruct Frame_ind 0 []) [
+        tInd (mkInd (qual, snd typename +++ "_univ") 0) [];
+        tConst (qual, snd typename +++ "_univD") [];
+        tInd (mkInd (qual, snd typename +++ "_frame_t") 0) [];
+           tConst (qual, snd typename +++ "_frameD") []]) ;;
+    tmDefinition (snd typename +++ "_aux_data")
+                 (mk_aux_data qual (fst p) inds typename g univ_of_tyname cfs) ;;
+    ret tt
+  | _ => tmPrint "Error: Frame was not as expected"
+  end.

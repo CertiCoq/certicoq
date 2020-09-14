@@ -180,7 +180,7 @@ Section Bounds.
   End Inline_bound.
 
 
-  Require Import closure_conversion_correct ctx.
+  Require Import L6.closure_conversion_correct ctx.
   
   Section SimpleBound.
 

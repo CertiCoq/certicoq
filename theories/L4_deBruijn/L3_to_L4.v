@@ -146,27 +146,7 @@ Definition mkLets (e : env) (t : exp) :=
 
 Require Import L3_to_L3_eta.
 
-(** start-to-L4 translations **)
-Definition myprogram_Program `{F:utils.Fuel}: Ast.program -> Program Term :=
-  program_L3_eta.
-(*************
-  do pgm0 <- malecha_L1.program_Program pgm (Ret nil);
-    let e' := stripEvalCommute.stripEnv (program.env pgm0) in
-    match L3U.stripEnv e' with
-    | Ret senv => 
-      match L3U.strip e' (stripEvalCommute.strip (program.main pgm0)) with
-      | Ret smain => Ret {| main := smain; L2k.program.env := senv |}
-      | Exc s => Exc ("Error in stripping: " ++ s)
-      end
-    | Exc s => Exc ("Error while stripping environ L2k.compile.Termment: " ++ s)
-    end.
- *************)
-
 Definition translate_program
            (e: environ L2k.compile.Term) (t: L3t.Term) : exp :=
   let e' := translate_env e in
   mkLets e' (translate e' t).
-
-Definition program_exp `{F:utils.Fuel} (pgm:Ast.program) : exp :=
-  let (main, env) := myprogram_Program pgm in
-  translate_program env main.

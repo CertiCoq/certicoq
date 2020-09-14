@@ -7,13 +7,16 @@ From ExtLib Require Import Monads.
 
 Import MonadNotation.
 
+Definition erase_PCUIC : CertiCoqTrans Ast.program (global_context * term) :=
+  fun src =>
+    debug_msg "Translating from Template to Lbox" ;;
+    (LiftErrorCertiCoqTrans "Lbox" L1g.compile.erase src).
 
 (* Expose the top-level transformation function *)
-Definition compile_L1g : CertiCoqTrans Ast.program (Program Term) :=
+Definition compile_L1g : CertiCoqTrans (global_context * term) (Program Term) :=
   fun src =>
-    debug_msg "Translating from Template to L1" ;;
+    debug_msg "Translating from Lbox to L1" ;;
     (LiftCertiCoqTrans "L1g" L1g.compile.program_Program src).
-
 
 (* Zoe: AFAICT we don't have these definitions *)
 (* Instance Template_Lang : Lang Ast.program := *)

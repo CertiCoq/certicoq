@@ -297,18 +297,16 @@ From MetaCoq Require Import SafeChecker.SafeTemplateChecker.
 From MetaCoq.SafeChecker Require Import PCUICSafeChecker.
 From MetaCoq.PCUIC Require Import TemplateToPCUIC.
 From MetaCoq.Erasure Require Import ErasureFunction SafeTemplateErasure.
+Require Import Common.classes Common.Pipeline_utils Common.compM.
 
 Existing Instance envcheck_monad.
-Import MonadNotation.
 
 Open Scope string_scope.
-
-Definition program_Program (p:Template.Ast.program) : Program Term :=
+     
+Definition erase (p:Template.Ast.program) : error (global_context × term) :=
   let p := fix_program_universes p in
   match erase_template_program p with
-  | CorrectDecl (gc, t) =>
-    {| main := term_Term gc t;
-       env := program_Pgm_aux gc |}
+    | CorrectDecl (gc, t) => Ret (gc, t)
   | EnvError Σ err => 
     let str :=
       match err with
@@ -316,5 +314,10 @@ Definition program_Program (p:Template.Ast.program) : Program Term :=
       | IllFormedDecl id e => "Type error: " ++ PCUICSafeChecker.string_of_type_error Σ e ++ ", while checking " ++ id
       end
     in
-    {| main := TWrong ("L1g.program_Program: erase_template_program failed with error:" ++ str); env := nil |}
+    Err ("L1g.program_Program: erase_template_program failed with error:" ++ str)
   end.
+
+Definition program_Program (p:global_context × term) : (Program Term) :=
+  let '(gc, t) := p in 
+  {| main := term_Term gc t;
+     env := program_Pgm_aux gc |}.

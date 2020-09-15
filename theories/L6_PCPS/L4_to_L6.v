@@ -44,39 +44,42 @@ Section CPS.
 
   Context (func_tag kon_tag default_tag default_itag : positive).
 
-Definition conId_map:= list (dcon * ctor_tag).
+  Definition consume_fun (f x : var) : exp_ctx :=
+    Efun1_c (Fcons f func_tag [x] (Ehalt f) Fnil) Hole_c. 
 
-Theorem conId_dec: forall x y:dcon, {x = y} + {x <> y}.
-Proof.
-  intros. destruct x,y.
-  assert (H:= AstCommon.inductive_dec i i0).
-  destruct H.
-  - destruct (classes.eq_dec n n0).
-    + subst. left. auto.
-    + right. intro. apply n1. inversion H. auto.
-  - right; intro; apply n1. inversion H; auto.
-Defined.
-
-Fixpoint dcon_to_info (a:dcon) (sig:conId_map) :=
-  match sig with
-  | nil => default_tag
-  | ((cId, inf)::sig') => match conId_dec a cId with
-                          | left _ => inf
-                          | right _ => dcon_to_info a sig'
-                          end
-  end.
-
-Definition dcon_to_tag (a:dcon) (sig:conId_map) :=
-  dcon_to_info a sig.
-
-
-Definition name_env := M.t BasicAst.name.
-Definition n_empty:name_env := M.empty _.
-
-Definition t_info:Type := fun_tag.
-Definition t_map := M.t t_info.
-Definition t_empty:t_map := M.empty _.
-
+  Definition conId_map:= list (dcon * ctor_tag).
+  
+  Theorem conId_dec: forall x y:dcon, {x = y} + {x <> y}.
+  Proof.
+    intros. destruct x,y.
+    assert (H:= AstCommon.inductive_dec i i0).
+    destruct H.
+    - destruct (classes.eq_dec n n0).
+      + subst. left. auto.
+      + right. intro. apply n1. inversion H. auto.
+    - right; intro; apply n1. inversion H; auto.
+  Defined.
+  
+  Fixpoint dcon_to_info (a:dcon) (sig:conId_map) :=
+    match sig with
+    | nil => default_tag
+    | ((cId, inf)::sig') => match conId_dec a cId with
+                            | left _ => inf
+                            | right _ => dcon_to_info a sig'
+                            end
+    end.
+  
+  Definition dcon_to_tag (a:dcon) (sig:conId_map) :=
+    dcon_to_info a sig.
+  
+  
+  Definition name_env := M.t BasicAst.name.
+  Definition n_empty:name_env := M.empty _.
+  
+  Definition t_info:Type := fun_tag.
+  Definition t_map := M.t t_info.
+  Definition t_empty:t_map := M.empty _.
+  
 (* get the fun_tag of a variable, func_tag if not found *)
 Fixpoint get_f (n:var) (sig:t_map): fun_tag :=
   match M.get n sig with
@@ -402,8 +405,10 @@ Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
            e1', next)
 
   | Prf_e =>
-    let (x, next) := gensym next (nNamed ""%string) in
-    ret (cps.Econstr x default_tag nil (cps.Eapp k kon_tag (x::nil)), next)
+    let (f, next) := gensym next (nNamed "f_proof"%string) in
+    let (x, next) := gensym next (nNamed "x"%string) in
+    let c := consume_fun f x in
+    ret (c |[ cps.Eapp k kon_tag (f::nil) ]|, next)
   end
 
 (* with cvt_triples_exps (es : expression.exps) (vn : list var) (next : symgen) *)

@@ -54,14 +54,6 @@ Definition compile_L6_CPS : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
            | None => Err "Error when compiling from L5 to L6"
            end) src.
 
-        (* (fun (p : L5_FullTerm) => *)
-        (*    match convert_top default_ctor_tag default_ind_tag fun_fun_tag kon_fun_tag p with *)
-        (*    | Some (cenv, nenv, fenv, ctag, itag, e) => *)
-        (*      Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e) *)
-
-        (*    | None => Err "Failed translating from L5 to L6" *)
-        (*    end) src. *)
-
 Definition compile_L6_ANF : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
   fun src => 
       debug_msg "Translating from L4 to L6 (ANF)" ;;
@@ -167,7 +159,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
   end.
 
 
-Definition L6_trans : CertiCoqTrans L6_FullTerm L6_FullTerm :=
+Definition compile_L6 : CertiCoqTrans L6_FullTerm L6_FullTerm :=
   fun src => 
     debug_msg "Compiling L6" ;;
     opts <- get_options ;;
@@ -176,58 +168,3 @@ Definition L6_trans : CertiCoqTrans L6_FullTerm L6_FullTerm :=
     let no_push := dev opts in (* temporarily use dev for the number of times a var can be pushed on the shadow stack *)
     let o := (0 <? (o_level opts))%nat in
     LiftErrorLogCertiCoqTrans "L6 Pipeline" (L6_pipeline o cps args no_push) src.
-
-(* 
-Require Import Common.Pipeline_utils Common.compM Common.
-Require Import L1g.toplevel.
-Require Import L2k.toplevel.
-Require Import L4.toplevel.
-Require Import L6.toplevel L6.cps_show L6.state Compiler.pipeline maps_util.
-Require Import ExtLib.Structures.Monad Strings.String.
-
-Import MonadNotation.
-Open Scope monad_scope.
-
-Open Scope Z_scope.
-Require Import ZArith.
-
-
-Definition debug_ANF (p : Template.Ast.program) :=
-  p <- compile_L1g p ;;
-  p <- compile_L2k p ;;
-  p <- compile_L2k_eta p ;;
-  p <- compile_L4 p ;;
-  p <- compile_L6_ANF p ;;
-  L6_trans p.
-
-Definition compile_L6_ANF_show (e: Template.Ast.program) : string  :=
-  match run_pipeline _ _ default_opts e debug_ANF with
-  | (compM.Ret (pr, cenv, vtag, itag, nenv, fenv, rho, term), _) =>
-    cps_show.show_exp nenv cenv false term
-  | (compM.Err s, _) => s
-  end.
-
-Fixpoint loop_add n (f : Datatypes.unit -> nat) : nat :=
-  match n with
-  | 0%nat => f tt
-  | S n => f tt + loop_add n f
-  end.
-
-
-Require Import List.
-Import ListNotations.
-
-Definition clos_loop (u : Datatypes.unit) : nat :=
-  ((fix list_add k1 k2 k3 l : nat :=
-      match l with
-      | [] => 0%nat
-      | x::xs =>
-       let clos z := (k1 + k2 + k3 + z)%nat in
-       ((clos x) + list_add k1 k2 k3 xs)%nat
-      end) 0 0 0 (List.repeat 0 (100*10)))%nat.
-
-(* Quote Recursively Definition clos := (loop_add (1%nat) clos_loop). *)
-
-(* Definition demo1_ANF := Eval native_compute in (compile_L6_ANF_show clos). *)
-
-*) 

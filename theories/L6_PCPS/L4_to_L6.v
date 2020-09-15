@@ -405,10 +405,12 @@ Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
            e1', next)
 
   | Prf_e =>
-    let (f, next) := gensym next (nNamed "f_proof"%string) in
-    let (x, next) := gensym next (nNamed "x"%string) in
-    let c := consume_fun f x in
-    ret (c |[ cps.Eapp k kon_tag (f::nil) ]|, next)
+    let (x, next) := gensym next (nNamed ""%string) in
+    ret (cps.Econstr x default_tag nil (cps.Eapp k kon_tag (x::nil)), next)
+    (* let (f, next) := gensym next (nNamed "f_proof"%string) in *)
+    (* let (x, next) := gensym next (nNamed "x"%string) in *)
+    (* let c := consume_fun f x in *)
+    (* ret (c |[ cps.Eapp k kon_tag (f::nil) ]|, next) *)
   end
 
 (* with cvt_triples_exps (es : expression.exps) (vn : list var) (next : symgen) *)

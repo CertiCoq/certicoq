@@ -331,16 +331,8 @@ Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : elimM fundefs :=
     end
   | Fnil => ret Fnil
   end. 
-
-Definition log_prog (e : exp) (c_data : comp_data) : comp_data :=
-  match c_data with
-  | mkCompData nv nc ni nf cenv fenv nenv log =>
-    let msg := cps_show.show_exp nenv cenv false e in
-    mkCompData nv nc ni nf cenv fenv nenv ("term" :: msg :: log)      
-  end.
            
 Fixpoint eliminate (e : exp) (c_data : comp_data) : error exp * comp_data := 
-  let c_data := log_prog e c_data in
   match e with 
   | Efun B e' =>
     match find_live e with
@@ -350,7 +342,6 @@ Fixpoint eliminate (e : exp) (c_data : comp_data) : error exp * comp_data :=
       | (Ret B', (c_data, m)) => 
         match run_compM (eliminate_expr L e') c_data m with
         | (Ret e'', (c_data, m)) =>
-          let c_data := log_prog (Efun B' e'') c_data in
           (Ret (Efun B' e''), c_data)
         | (Err s, (c_data, m)) => (Err s, c_data)
         end

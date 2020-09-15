@@ -109,9 +109,15 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
   | Fnil => names
   end.
 
+  Definition log_prog (e : exp) (c_data : comp_data) : comp_data :=
+  match c_data with
+  | mkCompData nv nc ni nf cenv fenv nenv log =>
+    let msg := cps_show.show_exp nenv cenv false e in
+    mkCompData nv nc ni nf cenv fenv nenv ("term" :: msg :: log)      
+  end.
 
-(* Optimizing L6 pipeline *)
-Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_FullTerm) : error L6_FullTerm * string :=
+  (* Optimizing L6 pipeline *)
+  Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_FullTerm) : error L6_FullTerm * string :=
   let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
   (* make compilation state *)
   let c_data :=
@@ -159,6 +165,7 @@ Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_Fu
     let (_, ctag, itag, ftag, cenv, fenv, nenv, log) := c_data in
     (Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e), log_to_string log)
   end.
+
 
 Definition L6_trans : CertiCoqTrans L6_FullTerm L6_FullTerm :=
   fun src => 

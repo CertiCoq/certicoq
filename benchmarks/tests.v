@@ -13,27 +13,30 @@ Import VeriStar.
 
 CertiCoq -help.
 
+
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
 Definition demo3 := andb. 
   
-CertiCoq Compile -args 2 -ext "_cps" demo1.
-CertiCoq Compile -direct -args 2 demo1.
-CertiCoq Show IR -direct demo1.
-CertiCoq Show IR demo1.
+CertiCoq Compile -ext "_cps" demo1.
+CertiCoq Compile -direct demo1.
+CertiCoq Compile -o1 -ext "_cps_opt" demo1.
+CertiCoq Compile -direct -o1 -ext "_opt" demo1.
 
 CertiCoq Compile -ext "_cps" demo2.
 CertiCoq Compile -direct demo2.
+CertiCoq Compile -o1 -ext "_cps_opt" demo2.
+CertiCoq Compile -direct -o1 -ext "_opt" demo2.
 
 CertiCoq Compile -ext "_cps" demo3.
 CertiCoq Compile -direct demo3.
-
 
 Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
 
 CertiCoq Compile -ext "_cps" list_sum.
 CertiCoq Compile -direct list_sum.
-
+CertiCoq Compile -o1 -ext "_cps_opt" list_sum.
+CertiCoq Compile -direct -o1 -ext "_opt" list_sum.
 
 Definition vs_easy :=
   match vs.main with
@@ -49,6 +52,9 @@ Definition vs_hard :=
 
 CertiCoq Compile -direct -time vs_easy.
 CertiCoq Compile -ext "_cps" -time vs_easy.
+CertiCoq Compile -o1 -ext "_cps_opt" vs_easy.
+CertiCoq Compile -direct -o1 -ext "_opt" vs_easy.
+
 
 (* Zoe: Compiling with the CPS pipeline takes much longer for vs_easy.
    The overhead seems to come from the C translation: (maybe has to do with dbg/error messages?)
@@ -76,13 +82,20 @@ Debug: Time elapsed in L7:  2.394216 *)
 
 CertiCoq Compile -ext "_cps" vs_hard.
 CertiCoq Compile -direct vs_hard.
+CertiCoq Compile -o1 -ext "_cps_opt" vs_hard.
+CertiCoq Compile -direct -o1 -ext "_opt" vs_hard.
 
 Definition binom := Binom.main.
 
 CertiCoq Compile -ext "_cps" binom. (* returns nat *)
 CertiCoq Compile -direct binom.  (* returns nat *)
+CertiCoq Compile -o1 -ext "_cps_opt" binom.
+CertiCoq Compile -direct -o1 -ext "_opt" binom.
 
 Definition color := Color.main.
 
 CertiCoq Compile -ext "_cps" color.
 CertiCoq Compile -direct color.
+CertiCoq Compile -o1 -ext "_cps_opt" color.
+CertiCoq Compile -direct -o1 -ext "_opt" color.
+

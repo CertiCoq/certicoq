@@ -33,7 +33,8 @@ Definition inlineM : Type -> Type := @compM' unit.
 Section Beta.
 
   Variable St:Type.
-  Variable (pp_St : St -> name_env -> string).
+  (* Pretty print the state for debugging purposes *)
+  Variable (pp_St : St -> name_env -> string). 
   Variable IH : InlineHeuristic St.
 
   (* Construct known-functions map *)
@@ -96,13 +97,15 @@ Section Beta.
        | Eletapp x f t ys ec =>         
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
-         let (s' , inl) := update_letApp _ IH f' t ys' s in
+         let (s' , inl) := update_letApp _ IH f t ys' s in
+         fstr <- get_pp_name f' ;;
+         (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl then "" else "not ") ++ "inlined") ;; *)
          (match (inl, M.get f fm, d) with
           | (true, Some  (ft, xs, e), S d') =>
             if (Nat.eqb (List.length xs) (List.length ys)) then 
               let sig' := set_list (combine xs ys') sig  in
               x' <- get_name x "" ;;
-              let '(d1, d2) := split_fuel d' in 
+              let '(d1, d2) := split_fuel d' in
               e' <- beta_contract d1 e sig' (M.remove f fm) s' str_flag ;;
               match inline_letapp e' x', Nat.eqb (List.length xs) (List.length ys) with
               | Some (C, x'), true =>
@@ -113,14 +116,14 @@ Section Beta.
                 ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag ;;
                 ret (Eletapp x' f' t ys' ec')
               end
-            else              
+            else
               x' <- get_name x "" ;;
               ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag ;;
               ret (Eletapp x' f' t ys' ec')
-         | _ =>
-           x' <- get_name x "" ;;
-           ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag;;
-           ret (Eletapp x' f' t ys' ec')
+          | _ =>
+            x' <- get_name x "" ;;
+            ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag;;
+            ret (Eletapp x' f' t ys' ec')
           end)
        | Efun fds e =>
          let fm' := add_fundefs fds fm in
@@ -134,7 +137,7 @@ Section Beta.
                      let s' := update_inFun _ IH f t xs e sig s in
                      let f' := apply_r sig' f in
                      xs' <- get_names_lst xs "" ;;
-                     e' <- beta_contract_aux e (set_list (combine xs xs') sig') fm s' false ;;
+                     e' <- beta_contract_aux e (set_list (combine xs xs') sig') fm' s' false ;;
                      fds'' <- beta_contract_fds fds' s ;;
                      ret (Fcons f' t xs' e' fds'')
                    | Fnil => ret Fnil
@@ -144,17 +147,18 @@ Section Beta.
        | Eapp f t ys =>
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
-         let (s', inl) := update_App _ IH f' t ys' s in
-         (* fstr <- get_pp_name f' ;; *)
-         (* log_msg ("Application of " ++ fstr ++ " is " ++ if inl then "" else "not " ++ "inlined") ;; *)
+         let (s', inl) := update_App _ IH f t ys' s in
+         fstr <- get_pp_name f' ;;
+         (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl then "" else "not ") ++ "inlined") ;; *)
          (match (inl, M.get f fm, d) with
           | (true, Some (ft, xs, e), S d') =>
             if (Nat.eqb (List.length xs) (List.length ys) && (negb str_flag || straight_code e))%bool then
               let sig' := set_list (combine xs ys') sig  in
               beta_contract d' e sig' (M.remove f fm) s' str_flag
-            else 
+            else
               ret (Eapp f' t ys')
-          | _ => ret (Eapp f' t ys')
+          | _ =>
+            ret (Eapp f' t ys')
           end)
        | Eprim x t ys e =>
          let ys' := apply_r_list sig ys in
@@ -179,15 +183,24 @@ Section Beta.
     
     destruct ((Nat.odd (S d'))); simpl; omega.
   Qed.
-  
+    
   Definition beta_contract_top (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
     let '(e', (st', _)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c tt in
     (e', st').
 
 End Beta.
 
+(** * Encoding of inline heauristics *)
+(* Currently supported heuristics:
+   1. Inline uncurry shells
+      - By inlinning marked functions from uncurry, OR
+      - By looking for the pattern of uncurry shell
+   2. Inline small functions
+ *)
 
-Definition CombineInlineHeuristic {St1 St2:Type} (deci:bool -> bool -> bool) (IH1:InlineHeuristic St1) (IH2:InlineHeuristic St2) : InlineHeuristic (prod St1 St2) :=
+
+Definition CombineInlineHeuristic {St1 St2:Type} (deci:bool -> bool -> bool)
+           (IH1:InlineHeuristic St1) (IH2:InlineHeuristic St2) : InlineHeuristic (prod St1 St2) :=
   {| update_funDef :=
        fun fds sigma (s:(prod St1 St2)) =>
          let (s1, s2) := s in
@@ -214,26 +227,8 @@ Definition CombineInlineHeuristic {St1 St2:Type} (deci:bool -> bool -> bool) (IH
          ((s1', s2'), deci b1 b2 )|}.
 
 
-
-Definition PostUncurryIH : InlineHeuristic (M.t nat) :=
-  (* at the start, uncurry shell (i.e. not the outermost) all maps to 1 *)
-  (* 0 -> Do not inline, 1 -> uncurried function, 2 -> continuation of uncurried function *)
-  {| update_funDef := fun (fds:fundefs) (sigma:r_map) (s:_) => (s, s);
-     update_inFun := fun (f:var) (t:fun_tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => s;
-     update_App := fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
-                    match (M.get f s, ys) with
-                    | (Some 1, k::ys') =>
-                      (M.set f 0 (M.set k 2 s), true)
-                    | (Some 2, _ ) =>
-                      (s, true)
-                    | _ => (s, false)
-                    end;
-     update_letApp := fun (f:var) (t:fun_tag) (ys:list var) (s:_) => (s, false)
-
-  |}.
-
 Definition InlineSmallIH (bound:nat): InlineHeuristic (M.t bool) :=
-  {| (* Add small, [todo: non-recursive] functions to s *)
+  {| (* Inline small functions, but not inside their body (alternatively, check if they are recursive) *)
     update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) =>
                          let s' :=
                              (fix upd (fds:fundefs) (sigma:r_map) (s:_) :=
@@ -249,12 +244,33 @@ Definition InlineSmallIH (bound:nat): InlineHeuristic (M.t bool) :=
                     | Some true => (M.remove f s, true)
                     | _ => (s, false)
                     end;
-    update_letApp := fun (f:var) (t:fun_tag) (ys:list var) (s:_) => (s, false)
-
+    update_letApp := fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
+                       match M.get f s with
+                       | Some true => (M.remove f s, true)
+                       | _ => (s, false)
+                       end;
   |}.
 
 Open Scope positive.
 
+Definition InlinedUncurriedMarked : InlineHeuristic (M.t nat) :=  
+  {| update_funDef := fun (fds:fundefs) (sigma:r_map) (s:_) => (s, s);
+     update_inFun := fun (f:var) (t:fun_tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => s;
+     update_App := fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
+                    match M.get f s with
+                    | Some 1%nat => (s, true)
+                    | Some 2%nat => (s, true)
+                    | _ => (s, false)
+                    end;
+     update_letApp :=
+       fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
+         match M.get f s with
+         | Some 1%nat => (s, true)
+         | Some 2%nat => (s, true)
+         | _ => (s, false)
+         end;
+
+  |}.
 
 
 Fixpoint find_uncurried (fds : fundefs) (s:M.t bool) : M.t bool :=
@@ -266,7 +282,7 @@ Fixpoint find_uncurried (fds : fundefs) (s:M.t bool) : M.t bool :=
   | _ => s
   end.
 
-Definition InineUncurried: InlineHeuristic (M.t bool) :=
+Definition InineUncurriedPats: InlineHeuristic (M.t bool) :=
   {| update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) =>
                           let s' := find_uncurried fds s in
                           (s', s'));
@@ -295,7 +311,7 @@ Fixpoint find_uncurried_pats_anf (fds : fundefs) (s:M.t bool) : M.t bool :=
 (* Inlines functions based on patterns found in the code *)
 Definition InineUncurriedPatsAnf : InlineHeuristic (M.t bool) :=
   {| update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) =>
-                          let s' := find_uncurried fds s in
+                          let s' := find_uncurried_pats_anf fds s in
                           (s', s'));
      update_inFun := fun (f:var) (t:fun_tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => (M.remove f s);
      update_App := fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
@@ -311,28 +327,6 @@ Definition InineUncurriedPatsAnf : InlineHeuristic (M.t bool) :=
   |}.
 
 
-Definition InlinedUncurriedMarkedAnf : InlineHeuristic (M.t nat) :=
-  (* at the start, uncurry shell (i.e. not the outermost) all maps to 1 *)
-  (* 0 -> Do not inline, 1 -> uncurried function, 2 -> continuation of uncurried function *)
-  {| update_funDef := fun (fds:fundefs) (sigma:r_map) (s:_) => (s, s);
-     update_inFun := fun (f:var) (t:fun_tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => s;
-     update_App := fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
-                    match M.get f s with
-                    | Some 1%nat => (M.set f 0%nat s, true)
-                    | Some 2%nat => (M.set f 0%nat s, true)
-                    | _ => (s, false)
-                    end;
-     update_letApp :=
-       fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
-         match M.get f s with
-         | Some 1%nat => (s, true)
-         | Some 2%nat => (s, true)
-         | _ => (s, false)
-         end;
-
-  |}.
-
-
 (* DEBUGGING *)
 Definition show_map {A} (m : M.t A) (nenv : name_env) (str : A -> string) :=
   (let fix show_lst (lst : list (var * A)) :=
@@ -345,28 +339,14 @@ Definition show_map {A} (m : M.t A) (nenv : name_env) (str : A -> string) :=
    "S{" ++ show_lst (M.elements m) ++ "}")%string.
 
 Definition show_map_bool m nenv := show_map m nenv (fun (b : bool) => if b then "true" else "false")%string.
-Definition show_map_bogus {A} (m : A) (nenv : name_env) := ""%string.
+Definition show_map_nat m nenv := show_map m nenv show_nat.
 
 
 Definition InlineSmallOrUncurried (bound:nat): InlineHeuristic (prod (M.t bool) (M.t nat)) :=
-  CombineInlineHeuristic orb (InlineSmallIH bound) (PostUncurryIH).
+  CombineInlineHeuristic orb (InlineSmallIH bound) InlinedUncurriedMarked.
 
-(* d should be max argument size, perhaps passed through by uncurry *)
-Definition postuncurry_contract (e:exp) (s:M.t nat) (d:nat) :=
-  beta_contract_top _ PostUncurryIH e d s.
-
-Definition inlinesmall_contract (e:exp) (bound:nat)  (d:nat) :=
-  beta_contract_top _ (InlineSmallIH bound) e d (M.empty _).
-
-Definition inline_uncurry_contract (e:exp) (s:M.t nat) (bound:nat)  (d:nat) :=
-  beta_contract_top _ (InlineSmallOrUncurried bound) e d (M.empty bool, s).
-
-Definition inline_uncurry (e:exp) (s:M.t nat) (bound:nat)  (d:nat) :=
-  beta_contract_top _ InineUncurried e d (M.empty bool).
-
-Definition inline_uncurry_marked_anf (e:exp) (s:M.t nat) (bound:nat)  (d:nat) :=
-  beta_contract_top _ InlinedUncurriedMarkedAnf e d s.
-
+Definition inline_uncurry (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
+    beta_contract_top _ (InlineSmallOrUncurried bound) e d (M.empty _, s) c false.
 
 (* Fixpoint find_lambda_lifted (fds : fundefs) (s:M.t bool) : M.t bool :=  *)
 (*   match fds with *)

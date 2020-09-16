@@ -78,7 +78,7 @@ Section UNCURRY.
   (* pair of 
      1- max number of arguments 
      2- encoding of inlining decision for beta-contraction phase *)
-  Definition St := (nat * (M.t nat))%type. (* 0 -> Do not inline, 1 -> uncurried function, 2 -> continuation of uncurried function *)
+  Definition St := (nat * (M.t nat))%type. (* 0 -> Do not inline, 1 -> outermost function, 2 -> inner function *)
 
   (* Maps (arity+1) to the right fun_tag *)
   Definition arityMap:Type := M.t fun_tag.

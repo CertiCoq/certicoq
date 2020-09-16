@@ -123,8 +123,9 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       let '(e_err1, s, c_data) := uncurry_fuel cps 100 (fst (shrink_cps.shrink_top e0)) c_data in
       (* inlining *)
       e1 <- e_err1 ;;
-      let (e_err2, c_data) := if cps then inline_uncurry e1 s 10 10 c_data true 
-                              else inline_uncurry_marked_anf e1 s 10 10 c_data true in
+      let (e_err2, c_data) := inline_uncurry e1 s 10 10 c_data in
+      (* let (e_err2, c_data) := if cps then inline_uncurry e1 s 10 10 c_data true  *)
+      (*                         else inline_uncurry e1 s 10 10 c_data true in *)
       e2 <- e_err2 ;;
       (* Shrink reduction *)
       let (e3, _) := shrink_cps.shrink_top e2 in

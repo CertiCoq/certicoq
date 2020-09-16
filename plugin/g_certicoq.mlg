@@ -11,7 +11,7 @@ open Pcoq.Prim
 }
 
 VERNAC ARGUMENT EXTEND cargs 
-| [ "-anf" ] -> { ANF }
+| [ "-direct" ] -> { ANF }
 | [ "-time" ] -> { TIME }
 | [ "-o1" ] -> { OPT(1) }
 | [ "-debug" ] -> { DEBUG }

@@ -215,7 +215,7 @@ let show_ir opts gr =
   | (CompM.Ret prg, dbg) ->
     debug_msg debug "Finished compiling, printing to file.";
     let time = Unix.gettimeofday() in
-    let suff = if opts.cps then "_cps" else "" ^ if opts.olevel <> 0 then "_opt" else "" in
+    let suff = opts.ext in
     let file = (Names.KerName.to_string (Names.Constant.canonical const)) ^ suff ^ ".ir" in
     print_to_file (string_of_chars prg) file;
     let time = (Unix.gettimeofday() -. time) in

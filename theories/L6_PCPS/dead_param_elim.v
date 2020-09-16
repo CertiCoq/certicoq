@@ -269,11 +269,11 @@ match e with
   ret (Eproj x t m y e'')
 | Eletapp x f ft ys e' =>
   f_str <- get_pp_name f ;;
-  state.log_msg (String.concat " " ["Letapp" ; f_str ]) ;;
+  (* state.log_msg (String.concat " " ["Letapp" ; f_str ]) ;; *)
   match get_fun_vars L f with
   | Some bs =>
     ys_or <- get_pp_names_list ys ;;    
-    state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;; 
+    (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;;  *)
     let ys' := live_args ys bs in
     e'' <- eliminate_expr L e';;
     ft <- get_fun_tag (length ys') ;;
@@ -320,9 +320,9 @@ Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : elimM fundefs :=
       f_str <- get_pp_name f ;;
       ys_names <- get_pp_names_list ys' ;;
       ys_or <- get_pp_names_list ys ;;
-      state.log_msg (String.concat " " ["Def Function entry" ; f_str ; "found" ; "id"; cps_show.show_pos f]) ;;
-      state.log_msg (String.concat " " ("Def New params" :: ys_names)) ;;
-      state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;;
+      (* state.log_msg (String.concat " " ["Def Function entry" ; f_str ; "found" ; "id"; cps_show.show_pos f]) ;; *)
+      (* state.log_msg (String.concat " " ("Def New params" :: ys_names)) ;; *)
+      (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;; *)
       e' <- eliminate_expr L e ;;
       B'' <- eliminate_fundefs B' L ;;
       ft <- get_fun_tag (length ys') ;;

@@ -58,4 +58,4 @@ $(TESTS): $(CFILES)
 	$(CCOMPILER) -o $@ -Wno-everything -O2 $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue.CertiCoq.Benchmarks.tests.$@.c
 
 run: run.sh
-	sh run.sh
+	sh run.sh 10

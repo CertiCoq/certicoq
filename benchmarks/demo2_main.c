@@ -22,10 +22,16 @@ int main(int argc, char *argv[]) {
   clock_t start, end;
   double msec, sec;
 
-  tinfo = make_tinfo();
+  // Specify number of runs
+  int n = 1;
+  if (argc > 0) n = atoi(argv[1]);
+
   start = clock();
   // Run Coq program
-  body(tinfo);
+  for (int i = 0; i < n; i ++) {
+    tinfo = make_tinfo();
+    body(tinfo);
+  }
   end = clock();
 
   val = tinfo -> args[1];

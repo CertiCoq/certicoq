@@ -209,10 +209,12 @@ Section Tags.
         let C_fun := Efun1_c (Fcons f fun_tag [y] (Ecase y pats) Fnil) C in
         ret (Anf_App f x, C_fun)
       | Prf_e =>
-        f <- get_name_no_suff "f_proof" ;;
-        y <- get_name_no_suff "x" ;;
-        let c := consume_fun f y in             
-        ret (Anf_Var f, c)
+        (* Zoe: Because a lot of dead code is *not* being eliminated *)
+        ret (Constr default_tag [], Hole_c)            
+        (* f <- get_name_no_suff "f_proof" ;; *)
+        (* y <- get_name_no_suff "x" ;; *)
+        (* let c := consume_fun f y in              *)
+        (* ret (Anf_Var f, c) *)
       end    
     with convert_anf_exps (es : expression.exps) (vm : var_map) : anfM (list var * exp_ctx) :=
            match es with

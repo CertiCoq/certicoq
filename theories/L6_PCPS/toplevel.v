@@ -109,7 +109,8 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
   end.
 
   (* Optimizing L6 pipeline *)
-  Definition L6_pipeline  (opt cps : bool) (args : nat) (no_push : nat) (t : L6_FullTerm) : error L6_FullTerm * string :=
+  Definition L6_pipeline  (opt : nat) (* if opt = 1 do lambda lifting, if opt = 2 do lambda lifting AND inline lambda-lifting shells *)
+             (cps : bool) (args : nat) (no_push : nat) (t : L6_FullTerm) : error L6_FullTerm * string :=
   let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
   (* make compilation state *)
   let c_data :=
@@ -130,10 +131,15 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       (* Shrink reduction *)
       let (e3, _) := shrink_cps.shrink_top e2 in
       (* lambda lifting *)
-      let (e_rr4, c_data) := if opt then lambda_lift e3 args no_push c_data else (compM.Ret e3, c_data) in
+      let (e_rr4, c_data) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then lambda_lift e3 args no_push c_data else (compM.Ret e3, c_data) in
       e4 <- e_rr4 ;;
       (* Shrink reduction *)
-      let (e5, _) := shrink_cps.shrink_top e4 in
+      let (e5, _) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then shrink_cps.shrink_top e4 else (e4, 0%nat)  in
+      (* Inline lambda-lifting shells *)
+      let (e_err5, c_data) := if (opt =? 2)%nat then inline_lambda_lifted  e1 s 10 10 c_data else (compM.Ret e5, c_data) in
+      e5 <- e_err5 ;;
+      (* Shrink reduction *)
+      let (e5, _) := if (opt =? 2)%nat then shrink_cps.shrink_top e5 else (e5, 0%nat)  in
       (* Closure conversion *)
       let (e_err5, c_data) := hoisting.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e5 c_data in
       let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
@@ -166,6 +172,5 @@ Definition compile_L6 : CertiCoqTrans L6_FullTerm L6_FullTerm :=
     opts <- get_options ;;
     let cps := negb (direct opts) in
     let args := fv_args opts in
-    let no_push := dev opts in (* temporarily use dev for the number of times a var can be pushed on the shadow stack *)
-    let o := (0 <? (o_level opts))%nat in
-    LiftErrorLogCertiCoqTrans "L6 Pipeline" (L6_pipeline o cps args no_push) src.
+    let no_push := dev opts in (* temporarily use dev for the number of times a var can be pushed on the shadow stack *)    
+    LiftErrorLogCertiCoqTrans "L6 Pipeline" (L6_pipeline (o_level opts) cps args no_push) src.

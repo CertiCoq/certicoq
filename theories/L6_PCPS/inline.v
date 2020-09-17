@@ -345,30 +345,37 @@ Definition show_map_nat m nenv := show_map m nenv show_nat.
 Definition InlineSmallOrUncurried (bound:nat): InlineHeuristic (prod (M.t bool) (M.t nat)) :=
   CombineInlineHeuristic orb (InlineSmallIH bound) InlinedUncurriedMarked.
 
-Definition inline_uncurry (e:exp) (s:M.t nat) (bound:nat) (d:nat) :=
-  fun (c : comp_data) =>    
+Definition inline_uncurry (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
     beta_contract_top _ InlinedUncurriedMarked e d s c false.
 
 
-(* Fixpoint find_lambda_lifted (fds : fundefs) (s:M.t bool) : M.t bool :=  *)
-(*   match fds with *)
-(*   | Fcons f _ _ (Eapp g _ _) fds' => *)
-(*     let s' := if (f =? g) then s else  M.set f true s in *)
-(*     find_lambda_lifted fds' s' *)
-(*   | _ => s *)
-(*   end. *)
+(* Inline the calls to known functions from the escaping  wrappers *)
+Fixpoint find_wrappers (fds : fundefs) (s:M.t bool) : M.t bool :=
+  match fds with
+  | Fcons f _ _ (Eapp g _ _) fds' =>
+    (* f immediately calls g -- inline g *) 
+    let s' := if (f =? g) then s else  M.set f true s in
+    find_wrappers fds' s'
+  | _ => s
+  end.
 
 
-(* Definition InineLambdaLifted: InlineHeuristic (M.t bool) := *)
-(*   {| update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) => *)
-(*                           let s' := find_lambda_lifted fds s in *)
-(*                           (s', s')); *)
-(*      update_inFun := fun (f:var) (t:tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => (M.remove f s); *)
-(*      update_App := fun (f:var) (t:tag) (ys:list var) (s:_) => *)
-(*                      match M.get f s with *)
-(*                      | Some true => (s, true) *)
-(*                      | _ => (s, false) *)
-(*                      end *)
-(*   |}. *)
-(* Definition inline_lambda_lifted (e:exp) (s:M.t nat) (bound:nat)  (d:nat) := *)
-(*   beta_contract_top_debug _ show_map_bool InineLambdaLifted e d (M.empty bool). *)
+Definition InineLambdaLifted: InlineHeuristic (M.t bool) :=
+  {| update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) =>
+                          let s' := find_wrappers fds s in
+                          (s', s'));
+     update_inFun := fun (f:var) (t:tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => (M.remove f s);
+     update_App := fun (f:var) (t:tag) (ys:list var) (s:_) =>
+                     match M.get f s with
+                     | Some true => (s, true)
+                     | _ => (s, false)
+                     end;
+     update_letApp := fun (f:var) (t:tag) (ys:list var) (s:_) =>
+                        match M.get f s with
+                        | Some true => (s, true)
+                        | _ => (s, false)
+                        end;                       
+  |}.
+
+Definition inline_lambda_lifted (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
+  beta_contract_top _ InineLambdaLifted e d (M.empty bool) c false.

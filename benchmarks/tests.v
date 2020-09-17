@@ -29,7 +29,7 @@ CertiCoq Compile -direct -o1 -ext "_opt" demo2.
 
 CertiCoq Compile -ext "_cps" demo3.
 CertiCoq Compile -direct demo3.
-CertiCoq Compile -o1 -ext -ext "_cps_opt" demo3.
+CertiCoq Compile -o1 -ext "_cps_opt" demo3.
 CertiCoq Compile -direct -o1 -ext "_opt" demo3.
 
 Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.

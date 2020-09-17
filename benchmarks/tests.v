@@ -13,7 +13,6 @@ Import VeriStar.
 
 CertiCoq -help.
 
-
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
 Definition demo3 := andb. 
@@ -30,8 +29,12 @@ CertiCoq Compile -direct -o1 -ext "_opt" demo2.
 
 CertiCoq Compile -ext "_cps" demo3.
 CertiCoq Compile -direct demo3.
+CertiCoq Compile -o1 -ext -ext "_cps_opt" demo3.
+CertiCoq Compile -direct -o1 -ext "_opt" demo3.
 
 Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
+
+(* CertiCoq Show IR -debug -direct list_sum. *)
 
 CertiCoq Compile -ext "_cps" list_sum.
 CertiCoq Compile -direct list_sum.

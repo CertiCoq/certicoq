@@ -332,7 +332,7 @@ Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
            (Fcons k1 kon_tag (x1::nil)
                   (cps.Efun
                      (Fcons k2 kon_tag (x2::nil)
-                            (cps.Eapp x1 func_tag (x2::k::nil)) Fnil)
+                            (cps.Eapp x1 func_tag (k::x2::nil)) Fnil)
                      e2') Fnil)
            e1', next)
 
@@ -344,7 +344,7 @@ Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
     r <- cps_cvt e1 (x1::vn) k1 (next) tgm;;
     let '(e1', next) := r : (cps.exp * symgen) in
     ret ((cps.Efun
-            (Fcons f func_tag (x1::k1::nil) e1' Fnil)
+            (Fcons f func_tag (k1::x1::nil) e1' Fnil)
             (cps.Eapp k kon_tag (f::nil))), next)
 
   | Let_e n e1 e2 =>
@@ -464,7 +464,7 @@ with cps_cvt_efnlst (fdefs : expression.efnlst) (vn : list var)
               let '(ce, next) := r1 : (cps.exp * symgen) in
               r2 <- cps_cvt_efnlst fdefs' vn (List.tl nlst) next tgm;;
                  let '(cfdefs, next) := r2 : (fundefs * symgen) in
-                 ret (Fcons curr_var func_tag (x::k'::nil) ce cfdefs, next)
+                 ret (Fcons curr_var func_tag (k'::x::nil) ce cfdefs, next)
          | _ => None
          end
        end
@@ -556,7 +556,7 @@ Inductive cps_cvt_rel : expression.exp -> list var -> var -> cps.exp -> Prop :=
     forall na e1 e1' x1 vn k k1 f,
       cps_cvt_rel e1 (x1::vn) k1 e1' ->
       cps_cvt_rel (Lam_e na e1) vn k (cps.Efun
-                                        (Fcons f func_tag (x1::k1::nil) e1' Fnil)
+                                        (Fcons f func_tag (k1::x1::nil) e1' Fnil)
                                         (cps.Eapp k kon_tag (f::nil)))
 | e_App :
     forall e1 e1' e2 e2' k k1 k2 x1 x2 vn,
@@ -570,7 +570,7 @@ Inductive cps_cvt_rel : expression.exp -> list var -> var -> cps.exp -> Prop :=
                             (cps.Efun
                                (Fcons k2 kon_tag (x2::nil)
                                       (cps.Eapp x1 func_tag
-                                                (x2::k::nil)) Fnil)
+                                                (k::x2::nil)) Fnil)
                                e2') Fnil)
                      e1')
 | e_Let :
@@ -601,7 +601,7 @@ with cps_cvt_rel_efnlst :
              (eflcons n1 (Lam_e na e1) fnlst')
              vn
              nlst
-             (Fcons cvar func_tag (x::k'::nil) e1' fdefs').                       
+             (Fcons cvar func_tag (k'::x::nil) e1' fdefs').                       
 
 
 Definition convert_top (ee:ienv * expression.exp) :
@@ -661,7 +661,7 @@ Fixpoint cps_cvt_val (v : exp_eval.value) (next : symgen)
         let (f, next) := gensym next na in
         r2 <- cps_cvt e (x1::vars) k1 (next) tgm;;
            let (e', next) := r2 : (cps.exp * symgen) in
-           ret (Vfun m (Fcons f func_tag (x1::k1::nil) e' Fnil) f, next)
+           ret (Vfun m (Fcons f func_tag (k1::x1::nil) e' Fnil) f, next)
   | ClosFix_v rho efns n =>
     r1 <- cps_cvt_env rho next tgm;;
       let (rho', next) := r1 : (list cps.val * symgen) in
@@ -708,7 +708,7 @@ Definition cps_cvt_val' (v : exp_eval.value) (next : symgen) (tgm : constr_env) 
         let (f, next) := gensym next na in
         r2 <- cps_cvt e (x1::vars) k1 (next) tgm;;
            let (e', next) := r2 : (cps.exp * symgen) in
-           ret (Vfun m (Fcons f func_tag (x1::k1::nil) e' Fnil) f, next)
+           ret (Vfun m (Fcons f func_tag (k1::x1::nil) e' Fnil) f, next)
   | ClosFix_v rho efns n =>
     r1 <- cps_cvt_env rho next tgm;;
       let (rho', next) := r1 : (list cps.val * symgen) in
@@ -793,7 +793,7 @@ Fixpoint cps_val_rel' (v : value) (v': cps.val) {struct v} : Prop :=
   | Con_v dc vs, Vconstr c_tag vs' =>
     dcon_to_tag dc cnstrs = c_tag /\ Forall2_aux vs vs'
   | Prf_v, Vint 0 => True
-  | Clos_v rho na e, Vfun rho_m (Fcons f func_tag (x::k::nil) e' Fnil) f' =>
+  | Clos_v rho na e, Vfun rho_m (Fcons f func_tag (k::x::nil) e' Fnil) f' =>
     exists vs names n nenv next,
     cps_env_rel' rho vs /\ 
     StrictlyIncreasing names /\
@@ -1383,7 +1383,7 @@ Proof.
             edestruct Hset2 with (rho := (def_funs (Fcons v1 func_tag [v0; v] e2 Fnil)
                                                    (Fcons v1 func_tag [v0; v] e2 Fnil) rho1 rho1))
                                  (xs1 := [v0; v]) (vs1 := vs1)
-                                 (xs2 := [v3; v2]) (vs2 := vs2); clear Hset2.
+                                 (xs2 := [v2; v3]) (vs2 := vs2); clear Hset2.
             econstructor. 
             eassumption.
             symmetry. admit. (* used to be : eassumption. *)

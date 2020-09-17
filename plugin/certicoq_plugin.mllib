@@ -94,7 +94,6 @@ Monad_utils
 ExceptionMonad
 Expression
 List1
-PolyEval
 VarInterface
 VarInterface0
 VarImplZ
@@ -103,7 +102,6 @@ Terms
 RandyPrelude
 OrdersFacts
 MSetInterface
-L4_5_to_L5
 Bracket
 ExtLibMisc
 AstCommon
@@ -135,12 +133,8 @@ Variables
 Closure_conversion
 Hoisting
 Lambda_lifting
-L5a
-L5_to_L6
 L4_to_L6
 L4_to_L6_anf
-L4_to_L4_1_to_L4_2
-L4_2_to_L4_5
 Binary
 Bits
 Fappli_IEEE_extra

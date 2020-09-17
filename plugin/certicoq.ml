@@ -84,7 +84,8 @@ To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
 Valid options:\n\
 -direct   :  Produce direct-style code (as opposed to he default which is continuation-passing style)\n\
 -time     :  Time each compilation phase\n\
--o1       :  Perform more aggressive optimizations (currently unboxing of closure environments)\n\
+-O n      :  Perform more aggressive optimizations\n\
+             Currently 1: lambda lifting for closure environment unboxing, 2: lambda lifting and inling for lambda lifting shells\n\                       
 -bebug    :  Show debugging information\n\
 -args X   :  Specify how many arguments are used in the C translation (on top of the thread_info argument)\n\
 -ext S    :  Specify the string s to be appended to the file name\n\

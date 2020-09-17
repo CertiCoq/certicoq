@@ -13,7 +13,7 @@ open Pcoq.Prim
 VERNAC ARGUMENT EXTEND cargs 
 | [ "-direct" ] -> { ANF }
 | [ "-time" ] -> { TIME }
-| [ "-o1" ] -> { OPT(1) }
+| [ "-O" natural(n) ] -> { OPT(n) }
 | [ "-debug" ] -> { DEBUG }
 | [ "-args" natural(n) ] -> { ARGS(n) }
 | [ "-fvargs" natural(n) ] -> { FVARGS(n) }

@@ -183,7 +183,7 @@ Section Beta.
     
     destruct ((Nat.odd (S d'))); simpl; omega.
   Qed.
-    
+  
   Definition beta_contract_top (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
     let '(e', (st', _)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c tt in
     (e', st').
@@ -345,8 +345,10 @@ Definition show_map_nat m nenv := show_map m nenv show_nat.
 Definition InlineSmallOrUncurried (bound:nat): InlineHeuristic (prod (M.t bool) (M.t nat)) :=
   CombineInlineHeuristic orb (InlineSmallIH bound) InlinedUncurriedMarked.
 
-Definition inline_uncurry (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
-    beta_contract_top _ (InlineSmallOrUncurried bound) e d (M.empty _, s) c false.
+Definition inline_uncurry (e:exp) (s:M.t nat) (bound:nat) (d:nat) :=
+  fun (c : comp_data) =>    
+    beta_contract_top _ InlinedUncurriedMarked e d s c false.
+
 
 (* Fixpoint find_lambda_lifted (fds : fundefs) (s:M.t bool) : M.t bool :=  *)
 (*   match fds with *)

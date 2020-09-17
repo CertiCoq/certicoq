@@ -1041,7 +1041,7 @@ Section Alpha_conv_correct.
     rewrite <- Heq in Hget; eauto. eapply Henv; eauto.
   Qed.
   
-  Global Instance preord_env_P_inj_proper  :
+  Instance preord_env_P_inj_proper  :
     Proper (Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
            preord_env_P_inj.
   Proof.
@@ -1328,7 +1328,7 @@ Section Alpha_conv_correct.
       eassumption. eassumption. eassumption. 
   Qed.
 
-  Global Instance preord_env_P_inj_f_proper :
+  Instance preord_env_P_inj_f_proper :
     Proper (eq ==> eq ==> f_eq ==> eq ==> eq ==> iff) preord_env_P_inj.
   Proof.
     constructor; subst; intros Hp.
@@ -1663,6 +1663,28 @@ Section Alpha_conv_correct.
   Qed.
   
 End Alpha_conv_correct.
+
+Instance preord_env_P_inj_proper' fuel (Hfuel : fuel_resource) trace (Htrace : trace_resource) :
+  Proper (Logic.eq ==> Logic.eq ==> Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
+         (@preord_env_P_inj fuel Hfuel trace Htrace).
+Proof.
+  repeat (intro; intros); subst.
+  split; intros Hpre;
+    eapply preord_env_P_inj_antimon; subst; eauto; eapply H1.
+Qed.
+
+
+Instance preord_env_P_inj_f_proper' fuel (Hfuel : fuel_resource) trace (Htrace : trace_resource) :
+  Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> f_eq ==> Logic.eq ==> Logic.eq ==> iff)
+         (@preord_env_P_inj fuel Hfuel trace Htrace).
+Proof.
+  repeat (intro; intros); subst.
+  split; intros Hpre.
+  intro; intros. rewrite <- H3. eauto.
+  intro; intros. rewrite H3. eauto.
+Qed.
+
+
 
 (* Close Scope fun_scope. *)
 (* Close Scope ctx_scope. *)

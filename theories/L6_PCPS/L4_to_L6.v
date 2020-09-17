@@ -752,15 +752,6 @@ Section Post.
             (Hincl : inclusion _ (comp P1 P1) P1)
             (HinclG : inclusion _ P1 PG).
 
-    Global Instance preord_env_P_inj_proper  :
-      Proper (Logic.eq ==> Logic.eq ==> Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
-             (@preord_env_P_inj fuel Hfuel trace Htrace).
-    Proof.
-      repeat (intro; intros); subst.
-      split; intros Hpre;
-        eapply preord_env_P_inj_antimon; subst; eauto; eapply H1.
-    Qed.
-
     Inductive StrictlyIncreasing' : list positive -> Prop :=
     | SInc_nil : StrictlyIncreasing' []
     | SInc_cons1 a : StrictlyIncreasing' [a]
@@ -1459,16 +1450,6 @@ Section Post.
         preord_val cenv PG k v1 v2.
 
     Opaque preord_exp'.
-
-    Global Instance preord_env_P_inj_f_proper :
-    Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> f_eq ==> Logic.eq ==> Logic.eq ==> iff)
-           (@preord_env_P_inj fuel Hfuel trace Htrace).
-  Proof.
-    repeat (intro; intros); subst.
-    split; intros Hpre.
-    intro; intros. rewrite <- H3. eauto.
-    intro; intros. rewrite H3. eauto.
-  Qed.
 
     Lemma cps_cvt_env_alpha_equiv :
       forall vs k vs1 vs2 next1 next2 next3 next4,

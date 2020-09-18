@@ -166,7 +166,6 @@ Section Inline_correct.
       intros Hc. eapply Hnin. simpl. subst; eauto.
     - reflexivity.
   Qed.
-
   
   Lemma Dom_map_add_fundefs fm B :
     Dom_map (add_fundefs B fm) <--> name_in_fundefs B :|: Dom_map fm.

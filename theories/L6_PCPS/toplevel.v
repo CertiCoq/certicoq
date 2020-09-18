@@ -136,7 +136,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       (* Shrink reduction *)
       let (e5, _) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then shrink_cps.shrink_top e4 else (e4, 0%nat)  in
       (* Inline lambda-lifting shells *)
-      let (e_err5, c_data) := if (opt =? 2)%nat then inline_lambda_lifted  e1 s 10 10 c_data else (compM.Ret e5, c_data) in
+      let (e_err5, c_data) := if (opt =? 2)%nat then inline_lambda_lifted e5 s 10 10 c_data else (compM.Ret e5, c_data) in
       e5 <- e_err5 ;;
       (* Shrink reduction *)
       let (e5, _) := if (opt =? 2)%nat then shrink_cps.shrink_top e5 else (e5, 0%nat)  in

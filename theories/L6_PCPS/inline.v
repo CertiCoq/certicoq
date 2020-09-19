@@ -28,7 +28,11 @@ Record InlineHeuristic (St:Type) :=
 
 Definition fun_map := M.t (fun_tag * list var * exp).
 
-Definition inlineM : Type -> Type := @compM' bool. (* Keep a boolean state to "click" when a function is inlined *) 
+Definition inline_state := (bool * name_env)%type. 
+(* We keep a state consisting of the old name map and a boolean state to "click"
+   when a function is inlined (so that we stop iterating) *)
+
+Definition inlineM : Type -> Type := @compM' inline_state.  
 
 Section Beta.
 
@@ -36,13 +40,21 @@ Section Beta.
   (* Pretty print the state for debugging purposes *)
   Variable (pp_St : St -> name_env -> string). 
   Variable IH : InlineHeuristic St.
-
+  
   Variable (max_var : var). (* The maximum reserved variable *)
-  Variable (nenv : name_env).
-  Variable (cenv : ctor_env).
 
   Definition click : inlineM unit :=
-    put_state true.
+    '(b, s) <- get_state () ;;
+    put_state (true, s).
+
+  Definition get_fresh_name (x : var) :inlineM var :=
+    '(_, nenv_old) <- get_state () ;;
+    get_name' x "" nenv_old.
+
+  Definition get_fresh_names (xs : list var) :inlineM (list var) :=
+    '(_, nenv_old) <- get_state () ;;
+    mapM (fun x => get_name' x "" nenv_old) xs.
+
   
   (* Construct known-functions map *)
   Fixpoint add_fundefs (fds:fundefs) (fm: fun_map) : fun_map :=
@@ -81,7 +93,7 @@ Section Beta.
         match e with
         | Econstr x t ys e =>
           let ys' := apply_r_list sig ys in
-          x' <- get_name_delete x "" ;;
+          x' <- get_fresh_name x ;;
           e' <- beta_contract_aux e (M.set x x' sig) fm s str_flag ;;
           ret (Econstr x' t ys' e')
         | Ecase v cl =>
@@ -97,7 +109,7 @@ Section Beta.
           ret (Ecase v' cl')
        | Eproj x t n y e =>
          let y' := apply_r sig y in
-         x' <- get_name_delete x "" ;;
+         x' <- get_fresh_name x ;;
          e' <- beta_contract_aux e (M.set x x' sig) fm s str_flag ;;
          ret (Eproj x' t n y' e')
        | Eletapp x f t ys ec =>         
@@ -105,12 +117,12 @@ Section Beta.
          let ys' := apply_r_list sig ys in
          let '(s', s'' , inl_dec) := update_letApp _ IH f t ys' s in
          fstr <- get_pp_name f' ;;
-         (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl_dec then "" else "not ") ++ "inlined") ;; *)
+         (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl_dec then else "not ") ++ "inlined") ;; *)
          (match (inl_dec, M.get f fm, d) with
           | (true, Some  (ft, xs, e), S d') =>
             if (Nat.eqb (List.length xs) (List.length ys)) then 
               let sig' := set_list (combine xs ys') sig  in
-              x' <- get_name_delete x "" ;;
+              x' <- get_fresh_name x ;;
               let '(d1, d2) := split_fuel d' in
               e' <- beta_contract d1 e sig' (M.remove f fm) s' str_flag ;;
               match inline_letapp e' x' with
@@ -119,16 +131,16 @@ Section Beta.
                 ec' <- beta_contract d2 ec (M.set x x' sig) fm s'' str_flag ;;
                 ret (C |[ ec' ]|)
               | _ =>
-                x' <- get_name_delete x "" ;;
+                x' <- get_fresh_name x ;;
                 ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag ;;
                 ret (Eletapp x' f' t ys' ec')
               end
             else
-              x' <- get_name_delete x "" ;;
+              x' <- get_fresh_name x ;;
               ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag ;;
               ret (Eletapp x' f' t ys' ec')
           | _ =>
-            x' <- get_name_delete x "" ;;
+            x' <- get_fresh_name x ;;
             ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag;;
             ret (Eletapp x' f' t ys' ec')
           end)
@@ -136,14 +148,14 @@ Section Beta.
          let fm' := add_fundefs fds fm in         
          let (s1, s2) := update_funDef _ IH fds sig s in
          let names := all_fun_name fds in
-         names' <- get_names_lst names "" ;;
+         names' <- get_fresh_names names ;;
          let sig' := set_list (combine names names') sig in
          fds' <- (fix beta_contract_fds (fds:fundefs) (s:St) : inlineM fundefs :=
                    match fds with
                    | Fcons f t xs e fds' =>
                      let s' := update_inFun _ IH f t xs e sig s in
                      let f' := apply_r sig' f in
-                     xs' <- get_names_lst xs "" ;;
+                     xs' <- get_fresh_names xs ;;
                      e' <- beta_contract_aux e (set_list (combine xs xs') sig') fm' s' false ;;
                      fds'' <- beta_contract_fds fds' s ;;
                      ret (Fcons f' t xs' e' fds'')
@@ -170,7 +182,7 @@ Section Beta.
           end)
        | Eprim x t ys e =>
          let ys' := apply_r_list sig ys in
-         x' <- get_name_delete x "" ;;
+         x' <- get_fresh_name x ;;
          e' <- beta_contract_aux e (M.set x x' sig) fm s str_flag ;;
          ret (Eprim x' t ys' e')
        | Ehalt x =>
@@ -197,9 +209,12 @@ Section Beta.
   (* Since inlining will rename *all* bound variables, we can restart the name count, so we dont generate
    * really large positive numbers resulting in performance bugs *)
 
+  (* We will also create a new name environment, (tha maps vars to their string names in the source program)
+     and we will discard the old one. But we should keep it around to copy the names to the new name map *)
+
   (* To restart the pool counter, take the max of the max free var and the max reserved var *)
 
-  Definition restart_names (e : exp) (c : comp_data) : comp_data :=
+  Definition restart_names (e : exp) (c : comp_data) : comp_data * name_env :=
     let fvs := exp_fv e in
     let new_var :=
         match set_util.PS.max_elt fvs with
@@ -207,14 +222,15 @@ Section Beta.
         | None => (max_var + 1)%positive
         end
     in
-    let (_, ct, it, ft, c, f, n, l) := c in
-    mkCompData new_var ct it ft c f n l. 
+    let (_, ct, it, ft, c, f, names, l) := c in
+    
+    (mkCompData new_var ct it ft c f (M.empty _) l, names). 
  
-  
+
   
   Definition inline_top (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
-    let c := restart_names e c in     
-    let '(e', (st', click)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c false in
+    let (c, nenv) := restart_names e c in     
+    let '(e', (st', click)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c (false, nenv) in
     (e', st').
 
   (* Run until nothing changes and call shrink reducer after each pass *)
@@ -222,8 +238,8 @@ Section Beta.
     match fuel with
     | 0 => (Ret e, c)
     | S fuel =>
-      let c := restart_names e c in
-      let '(e', (c', click)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c false in
+      let (c, nenv) := restart_names e c in
+      let '(e', (c', (click, _old_map))) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c (false, nenv) in
       match e' with
       | Ret e' => 
         if click then

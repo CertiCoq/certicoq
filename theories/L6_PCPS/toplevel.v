@@ -163,7 +163,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       (* Shrink reduction *)
       let (e, _) := shrink_cps.shrink_top e in
       (* Inline small functions *) 
-      let (e_err, c_data) := if (opt =? 3)%nat then inline_small next_var e s 10 100 c_data else (compM.Ret e, c_data) in
+      let (e_err, c_data) := inline_small next_var e s 10 100 c_data in
       e <- e_err ;;
       ret (e, c_data)
   in

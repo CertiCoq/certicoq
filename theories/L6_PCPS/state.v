@@ -48,15 +48,27 @@ Section CompM.
     compM.put (mkCompData ((n+1)%positive) c i f e fenv names' log, st) ;;
     ret n.
 
+
+  Definition add_entry_from_map (nenv nenv_old:name_env)
+             (x : var) (x_origin : var) (suff : String.string) : name_env :=
+    match M.get x_origin nenv_old  with
+  | Some (BasicAst.nNamed s) => M.set x (BasicAst.nNamed (String.append s suff)) nenv
+  | Some BasicAst.nAnon => M.set x (BasicAst.nNamed (String.append "anon" suff)) nenv
+  | None => M.set x (BasicAst.nNamed (String.append "anon" suff)) nenv
+  end.
+
+
   (** Get a fresh name, and register a pretty name by appending a suffix to the pretty name of the old var.
-      Delete the old entry from the map *)
-  Definition get_name_delete (old_var : var) (suff : string) : compM' var :=
+      The old name is found in the old name environment, passed as argument.  *)
+  (* This is useful when we are alpha-renaming all variables of the program so we want to
+     constuct a new name environment. *)
+  Definition get_name' (old_var : var) (suff : string) (nenv_old : name_env) : compM' var :=
     p <- compM.get ;;
-    let '(mkCompData n c i f e fenv names log, st) := p in
-    let names' := add_entry names n old_var suff in
-    let names'' := M.remove old_var names' in
-    compM.put (mkCompData ((n+1)%positive) c i f e fenv names'' log, st) ;;
+    let '(mkCompData n c i f e fenv nenv log, st) := p in
+    let nenv' := add_entry_from_map nenv nenv_old n old_var suff in
+    compM.put (mkCompData ((n+1)%positive) c i f e fenv nenv' log, st) ;;
     ret n.
+
 
   Definition get_names_lst (old : list var) (suff : string) : compM' (list var) :=
     mapM (fun o => get_name o suff) old.

@@ -1640,13 +1640,30 @@ Section Post.
                   intros v1 v2 next1 next2 next3 next4 Hv1 Hv2;
                   rewrite cps_cvt_val_eq in *.
       - simpl in Hv1, Hv2.
-        destruct (cps_cvt_env vs next1 cnstrs) eqn:Henv1. destruct p. inv Hv1.
-        destruct (cps_cvt_env vs next3 cnstrs) eqn:Henv2. destruct p. inv Hv2.
+        destruct (cps_cvt_env vs next1 cnstrs) eqn:Henv1.
+        2: { inv Hv1. } destruct p. inv Hv1.
+        destruct (cps_cvt_env vs next3 cnstrs) eqn:Henv2.
+        2: { inv Hv2. } destruct p. inv Hv2.
         rewrite preord_val_eq. simpl. split. reflexivity.
-        induction H0. admit.
-        simpl in Henv1, Henv2.
-        admit. admit. admit.
-      - admit.
+        eapply Forall2_Forall2_asym_included.
+        generalize dependent l0. generalize dependent l.
+        generalize dependent next1. generalize dependent next3.
+        induction H0; intros next3 next1 l1 Henv1 l2 Henv2.
+        + simpl in Henv1, Henv2. inv Henv1. inv Henv2. econstructor. 
+        + simpl in Henv1, Henv2.
+          destruct (cps_cvt_val x next1 cnstrs) eqn:Hval1.
+          2: { inv Henv1. } destruct p.
+          destruct (cps_cvt_env l s cnstrs) eqn:Hcvt1.
+          2: { inv Henv1. } destruct p. inv Henv1.
+          destruct (cps_cvt_val x next3 cnstrs) eqn:Hval2.
+          2: { inv Henv2. } destruct p.
+          destruct (cps_cvt_env l s0 cnstrs) eqn:Hcvt2.
+          2: { inv Henv2. } destruct p. inv Henv2.
+          econstructor.
+          eapply H0. eassumption. eassumption.
+          eapply IHForall. eassumption. eassumption. 
+      - simpl in Hv1, Hv2. inv Hv1. inv Hv2.
+        eapply preord_val_refl. eassumption.
       - simpl in Hv1, Hv2.
         destruct (cps_cvt_env vs next1 cnstrs) eqn:Henv1; inv Hv1.
         destruct p eqn:Hp.
@@ -1700,7 +1717,8 @@ Section Post.
           eassumption.
           eassumption.
           admit. admit.
-          simpl. f_equal. (* similar to gensym_n_length_eq *) admit.  
+          simpl. f_equal. eapply gensym_n_length_eq.
+          eassumption. eassumption. 
           admit.
           simpl.
           eapply preord_env_P_inj_set_alt.
@@ -1726,7 +1744,9 @@ Section Post.
           eapply cps_cvt_env_alpha_equiv.
           eapply H. eassumption. intros m Hlt3.
           eapply IH. omega. eassumption. eassumption. 
-          admit. admit. admit.
+          eapply gensym_n_NoDup. eassumption.
+          eapply gensym_n_NoDup. eassumption.
+          eapply gensym_n_length_eq. eassumption. eassumption.
           rewrite Setminus_Same_set_Empty_set. rewrite image_Empty_set.
           eapply Disjoint_Empty_set_l.
           admit.
@@ -1763,14 +1783,15 @@ Section Post.
           4: { eapply Hcvt_efns1. } 4: { eapply Hcvt_efns2. } 
           eapply gensym_n_NoDup. eassumption.
           eapply gensym_n_NoDup. eassumption.
-          admit.
+          eapply gensym_n_length_eq. eassumption. eassumption. 
           2: { eassumption. } 
           eassumption.
           eassumption. 
           destructAll. 
           pose proof (set_lists_length2) as Hsetl2.
           edestruct Hsetl2 with (xs1 := [x3; x4]) (vs1 := vs1)
-                                (vs2 := vs2); clear Hsetl2. admit. eassumption.
+                                (vs2 := vs2); clear Hsetl2.
+          admit. eassumption.
           symmetry. eassumption.
           eexists. eexists. eexists. split.
           rewrite Herr2 in H9. inv H9. eassumption. split. 
@@ -1782,7 +1803,7 @@ Section Post.
           eapply preord_exp_post_monotonic. eapply HinclG. eapply IHstep.
           eassumption.
           eassumption.
-    Abort.
+    Admitted.
 
     Lemma f_eq_subdomain_extend_lst
           (A : Type) (S : Ensemble positive) (f f' : positive -> A)
@@ -1797,12 +1818,32 @@ Section Post.
       - destruct ys; simpl. inv H. inv H. simpl.
         normalize_sets. rewrite <- Union_assoc. eapply f_eq_subdomain_extend. 
         eapply IHxs; eauto.
-    Qed. 
+    Qed.
+
+    Lemma preord_var_env_extend_eq PostG :
+      forall (rho1 rho2 : env) (k : nat) (x1 x2 : var) (v1 v2 : cps.val),
+        preord_val cenv PostG k v1 v2 ->
+        preord_var_env cenv PostG k (M.set x1 v1 rho1) (M.set x2 v2 rho2) x1 x2.
+    Proof.
+      intros rho1 rho2 k x1 x2 v1 v2 Hval x' Hget.
+      rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss. split; eauto.
+    Qed.
+    
+    Lemma preord_var_env_extend_neq PostG :
+      forall (rho1 rho2 : env) (k : nat) (x1 x2 y1 y2 : var) (v1 v2 : cps.val),
+        preord_var_env cenv PostG k rho1 rho2 y1 y2 ->
+        y1 <> x1 ->
+        y2 <> x2 ->      
+        preord_var_env cenv PostG k (M.set x1 v1 rho1) (M.set x2 v2 rho2) y1 y2.
+    Proof.
+      intros rho1 rho2 k x1 x2 y1 y2 v1 v2 Hval Hneq Hneq' x' Hget.
+      rewrite M.gso in *; eauto.
+    Qed.
 
     Lemma cps_cvt_alpha_equiv :
       forall k, cps_cvt_alpha_equiv_statement k.
     Proof.
-      induction k using lt_wf_rec.
+      induction k using lt_wf_rec. 
       eapply my_exp_ind. 
       - intros n e1 e2 k1 k2 vars1 vars2 rho1 rho2
                next1 next2 next3 next4 He1 He2 Hdup Hnot Hlen Hlt Henv.
@@ -2000,7 +2041,7 @@ Section Post.
             - admit.
             - admit.
             - simpl. eapply preord_exp_monotonic.
-              eapply IHe2.
+              edestruct (H j). eassumption. eapply H0.
               eassumption. eassumption. eassumption.
               admit.
               eassumption. admit.
@@ -2027,11 +2068,33 @@ Section Post.
                 reflexivity. split.
                 symmetry. eassumption.
                 intros Hlt3 Hall2.
+                destruct vs2. simpl in H3. inv H3.
+                simpl in H3. destruct vs2. 2: { inv H3. }
+                destruct vs1. simpl in Hset. inv Hset.
+                simpl in Hset. destruct vs1. 2: { inv Hset. }
+                inversion Hset. inversion H3. subst rho1' x. clear Hset H3. 
+                inversion Hall2. subst x l0 y l'. clear H8 Hall2. 
                 eapply preord_exp_app_compat.
                 - admit.
                 - admit.
-                - admit.
-                - econstructor. admit. admit.
+                - eapply preord_var_env_extend_neq.
+                  eapply preord_var_env_extend_neq.
+                  eapply preord_var_env_extend_eq. inversion Hall.
+                  eapply preord_val_monotonic. eassumption. omega.
+                  admit. admit. admit. admit.
+                - econstructor.
+                  eapply preord_var_env_extend_eq. eassumption.
+                  econstructor.
+                  eapply preord_var_env_extend_neq.
+                  eapply preord_var_env_extend_neq.
+                  eapply preord_var_env_extend_neq.
+                  eapply preord_var_env_extend_neq.
+                  replace k2 with ((id {k1 ~> k2} <{ vars1 ~> vars2}>) k1).
+                  eapply preord_var_env_monotonic. eapply Henv.
+                  now left. omega. rewrite extend_lst_gso. 
+                  rewrite extend_gss. reflexivity. 
+                  admit. admit. admit. admit. admit. admit. admit. admit. admit.
+                  econstructor. 
                 - admit.
                 - admit.
                 - admit.

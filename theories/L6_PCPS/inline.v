@@ -18,17 +18,17 @@ Open Scope monad_scope.
 
 Definition r_map := M.t var.
 
-(* St is the type of the [scoped] state used by the  heuristic *)
+(* St is the type of the state used by the heuristic *)
 Record InlineHeuristic (St:Type) :=
   { update_funDef:(fundefs -> r_map -> St -> (St * St)); (* update inlining decision at functions declaraction. First state is used for the body of the program, second for the function definitions *)
     update_inFun:(var -> fun_tag -> list var -> exp -> r_map -> St -> St); (* update inlining decisions when converting a function within a bundle *)
-    update_App:(var -> fun_tag -> list var -> St -> (St*bool)); (* update and return inlining decision for f on function application *)
-    update_letApp:(var -> fun_tag -> list var -> St -> (St * bool)) (* update and return inlining decision for f on let bound function application *)
+    update_App:(var -> fun_tag -> list var -> St -> (St * bool)); (* update and return inlining decision for f on function application *)
+    update_letApp:(var -> fun_tag -> list var -> St -> (St * St * bool)) (* update and return inlining decision for f on let bound function application *)
   }.
 
 Definition fun_map := M.t (fun_tag * list var * exp).
 
-Definition inlineM : Type -> Type := @compM' unit.
+Definition inlineM : Type -> Type := @compM' bool. (* Keep a boolean state to "click" when a function is inlined *) 
 
 Section Beta.
 
@@ -37,6 +37,12 @@ Section Beta.
   Variable (pp_St : St -> name_env -> string). 
   Variable IH : InlineHeuristic St.
 
+  Variable (nenv : name_env).
+  Variable (cenv : ctor_env).
+
+  Definition click : inlineM unit :=
+    put_state true.
+  
   (* Construct known-functions map *)
   Fixpoint add_fundefs (fds:fundefs) (fm: fun_map) : fun_map :=
     match fds with
@@ -67,8 +73,7 @@ Section Beta.
   Proof.
     unfold split_fuel. simpl. rewrite (NPeano.Nat.div2_odd d) at 1. simpl.    
     omega.
-  Qed.
-    
+  Qed.    
   
   Program Fixpoint beta_contract (d : nat) {measure d} :=
     let fix beta_contract_aux (e : exp) (sig : r_map) (fm:fun_map) (s:St) (str_flag : bool) {struct e} : inlineM exp :=
@@ -97,21 +102,22 @@ Section Beta.
        | Eletapp x f t ys ec =>         
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
-         let (s' , inl) := update_letApp _ IH f t ys' s in
+         let '(s', s'' , inl_dec) := update_letApp _ IH f t ys' s in
          fstr <- get_pp_name f' ;;
-         (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl then "" else "not ") ++ "inlined") ;; *)
-         (match (inl, M.get f fm, d) with
+         (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl_dec then "" else "not ") ++ "inlined") ;; *)
+         (match (inl_dec, M.get f fm, d) with
           | (true, Some  (ft, xs, e), S d') =>
             if (Nat.eqb (List.length xs) (List.length ys)) then 
               let sig' := set_list (combine xs ys') sig  in
               x' <- get_name x "" ;;
               let '(d1, d2) := split_fuel d' in
               e' <- beta_contract d1 e sig' (M.remove f fm) s' str_flag ;;
-              match inline_letapp e' x', Nat.eqb (List.length xs) (List.length ys) with
-              | Some (C, x'), true =>
-                ec' <- beta_contract d2 ec (M.set x x' sig) fm s' str_flag ;;
+              match inline_letapp e' x' with
+              | Some (C, x') =>
+                click ;; 
+                ec' <- beta_contract d2 ec (M.set x x' sig) fm s'' str_flag ;;
                 ret (C |[ ec' ]|)
-              | _, _ =>
+              | _ =>
                 x' <- get_name x "" ;;
                 ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag ;;
                 ret (Eletapp x' f' t ys' ec')
@@ -126,7 +132,7 @@ Section Beta.
             ret (Eletapp x' f' t ys' ec')
           end)
        | Efun fds e =>
-         let fm' := add_fundefs fds fm in
+         let fm' := add_fundefs fds fm in         
          let (s1, s2) := update_funDef _ IH fds sig s in
          let names := all_fun_name fds in
          names' <- get_names_lst names "" ;;
@@ -154,6 +160,7 @@ Section Beta.
           | (true, Some (ft, xs, e), S d') =>
             if (Nat.eqb (List.length xs) (List.length ys) && (negb str_flag || straight_code e))%bool then
               let sig' := set_list (combine xs ys') sig  in
+              click ;;
               beta_contract d' e sig' (M.remove f fm) s' str_flag
             else
               ret (Eapp f' t ys')
@@ -184,9 +191,26 @@ Section Beta.
     destruct ((Nat.odd (S d'))); simpl; omega.
   Qed.
   
-  Definition beta_contract_top (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
-    let '(e', (st', _)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c tt in
+  Definition inline_top (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
+    let '(e', (st', click)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c false in
     (e', st').
+
+  (* Run until nothing changes and call shrink reducer after each pass *)
+  Fixpoint inline_loop_aux (fuel : nat) (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
+    match fuel with
+    | 0 => (Ret e, c)
+    | S fuel => 
+      let '(e', (c', click)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c false in
+      match e' with
+      | Ret e' => 
+        if click then
+          inline_loop_aux fuel (fst (shrink_cps.shrink_top e')) d s c' str_flag
+        else (Ret (fst (shrink_cps.shrink_top e')) , c')
+      | Err s => (Err s, c')
+      end
+    end.
+
+  Definition inline_loop := inline_loop_aux 1000. 
 
 End Beta.
 
@@ -222,18 +246,35 @@ Definition CombineInlineHeuristic {St1 St2:Type} (deci:bool -> bool -> bool)
      update_letApp  :=
        fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
          let (s1, s2) := s in
-         let (s1', b1) := update_letApp _ IH1 f t ys s1 in
-         let (s2', b2) := update_letApp _ IH2 f t ys s2 in
-         ((s1', s2'), deci b1 b2 )|}.
+         let '(s1', s1'', b1) := update_letApp _ IH1 f t ys s1 in
+         let '(s2', s2'', b2) := update_letApp _ IH2 f t ys s2 in
+         ((s1', s2'), (s1'', s2''), deci b1 b2 )|}.
 
 
-Definition InlineSmallIH (bound:nat): InlineHeuristic (M.t bool) :=
+
+(* Don't inline functions with nested function definitions (code duplication)
+   and functions with case analysis (to avoid inlining uncurried functions) *)
+
+Fixpoint do_inline (e : exp) :=
+  match e with
+  | Econstr _ _ _  e 
+  | Eproj _ _ _ _ e
+  | Eletapp _ _ _ _ e
+  | Eprim _ _ _ e => do_inline e
+  | Ecase _ _ => false
+  | Efun _ _ => false
+  | Eapp _ _ _ => true
+  | Ehalt _ => true
+  end.
+    
+
+Definition InlineSmall (bound:nat): InlineHeuristic (M.t bool) :=
   {| (* Inline small functions, but not inside their body (alternatively, check if they are recursive) *)
     update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) =>
                          let s' :=
                              (fix upd (fds:fundefs) (sigma:r_map) (s:_) :=
                                 match fds with
-                                | Fcons f t xs e fdc' => if (Init.Nat.ltb (term_size e) bound) then
+                                | Fcons f t xs e fdc' => if ((term_size e <? bound) && do_inline e)%bool then
                                                           upd fdc' sigma (M.set f true s)
                                                         else  upd fdc' sigma s
                                 | Fnil => s
@@ -246,8 +287,8 @@ Definition InlineSmallIH (bound:nat): InlineHeuristic (M.t bool) :=
                     end;
     update_letApp := fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
                        match M.get f s with
-                       | Some true => (M.remove f s, true)
-                       | _ => (s, false)
+                       | Some true => (M.remove f s, s, true)
+                       | _ => (s, s, false)
                        end;
   |}.
 
@@ -265,11 +306,10 @@ Definition InlinedUncurriedMarked : InlineHeuristic (M.t nat) :=
      update_letApp :=
        fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
          match M.get f s with
-         | Some 1%nat => (s, true)
-         | Some 2%nat => (s, true)
-         | _ => (s, false)
+         | Some 1%nat => (s, s, true)
+         | Some 2%nat => (s, s, true)
+         | _ => (s, s, false)
          end;
-
   |}.
 
 
@@ -292,7 +332,7 @@ Definition InineUncurriedPats: InlineHeuristic (M.t bool) :=
                      | Some true => (s, true)
                      | _ => (s, false)
                      end;
-     update_letApp := fun (f:var) (t:fun_tag) (ys:list var) (s:_) => (s, false)
+     update_letApp := fun (f:var) (t:fun_tag) (ys:list var) (s:_) => (s, s, false)
   |}.
 
 
@@ -321,8 +361,8 @@ Definition InineUncurriedPatsAnf : InlineHeuristic (M.t bool) :=
                      end;
      update_letApp := fun (f:var) (t:fun_tag) (ys:list var) (s:_) =>
                         match M.get f s with
-                        | Some true => (s, true)
-                        | _ => (s, false)
+                        | Some true => (s, s, true)
+                        | _ => (s, s, false)
                         end;
   |}.
 
@@ -343,10 +383,14 @@ Definition show_map_nat m nenv := show_map m nenv show_nat.
 
 
 Definition InlineSmallOrUncurried (bound:nat): InlineHeuristic (prod (M.t bool) (M.t nat)) :=
-  CombineInlineHeuristic orb (InlineSmallIH bound) InlinedUncurriedMarked.
+  CombineInlineHeuristic orb (InlineSmall bound) InlinedUncurriedMarked.
 
 Definition inline_uncurry (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
-    beta_contract_top _ InlinedUncurriedMarked e d s c false.
+  inline_top _ (InlineSmallOrUncurried bound) e d (M.empty _, s) c false.
+
+(* Run after hoisting to eliminate outemost lambdas (like in e.g, repeat) *) 
+Definition inline_small (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
+  inline_loop _ (InlineSmall bound) e d (M.empty _) c false.
 
 
 (* Inline the calls to known functions from the escaping  wrappers *)
@@ -372,10 +416,10 @@ Definition InineLambdaLifted: InlineHeuristic (M.t bool) :=
                      end;
      update_letApp := fun (f:var) (t:tag) (ys:list var) (s:_) =>
                         match M.get f s with
-                        | Some true => (s, true)
-                        | _ => (s, false)
+                        | Some true => (s, s, true)
+                        | _ => (s, s, false)
                         end;                       
   |}.
 
 Definition inline_lambda_lifted (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
-  beta_contract_top _ InineLambdaLifted e d (M.empty bool) c false.
+  inline_top _ InineLambdaLifted e d (M.empty bool) c false.

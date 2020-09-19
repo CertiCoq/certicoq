@@ -120,42 +120,43 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       pack_data next_var ctag itag next_fun_tag cenv fenv nenv nil
   in
   let res : error (exp * comp_data):=
-      (* uncurring *)
-      let '(e_err1, s, c_data) := uncurry_fuel cps 100 (fst (shrink_cps.shrink_top e0)) c_data in
-      (* inlining *)
-      e1 <- e_err1 ;;
-      let (e_err2, c_data) := inline_uncurry e1 s 10 10 c_data in
-      (* let (e_err2, c_data) := if cps then inline_uncurry e1 s 10 10 c_data true  *)
-      (*                         else inline_uncurry e1 s 10 10 c_data true in *)
-      e2 <- e_err2 ;;
+      (* Uncurring *)
+      let '(e_err, s, c_data) := uncurry_fuel cps 100 (fst (shrink_cps.shrink_top e0)) c_data in
+      (* Inlining *)
+      e <- e_err ;;
+      let (e_err, c_data) := inline_uncurry e s 10 100 c_data in
+      e <- e_err ;;
       (* Shrink reduction *)
-      let (e3, _) := shrink_cps.shrink_top e2 in
+      let (e, _) := shrink_cps.shrink_top e in
       (* lambda lifting *)
-      let (e_rr4, c_data) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then lambda_lift e3 args no_push c_data else (compM.Ret e3, c_data) in
-      e4 <- e_rr4 ;;
+      let (e_rr, c_data) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then lambda_lift e args no_push c_data else (compM.Ret e, c_data) in
+      e <- e_rr ;;
       (* Shrink reduction *)
-      let (e5, _) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then shrink_cps.shrink_top e4 else (e4, 0%nat)  in
+      let (e, _) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then shrink_cps.shrink_top e else (e, 0%nat)  in
       (* Inline lambda-lifting shells *)
-      let (e_err5, c_data) := if (opt =? 2)%nat then inline_lambda_lifted e5 s 10 10 c_data else (compM.Ret e5, c_data) in
-      e5 <- e_err5 ;;
+      let (e_err, c_data) := if (opt =? 2)%nat then inline_lambda_lifted e s 10 10 c_data else (compM.Ret e, c_data) in
+      e <- e_err ;;
       (* Shrink reduction *)
-      let (e5, _) := if (opt =? 2)%nat then shrink_cps.shrink_top e5 else (e5, 0%nat)  in
+      let (e, _) := if (opt =? 2)%nat then shrink_cps.shrink_top e else (e, 0%nat)  in
       (* Closure conversion *)
-      let (e_err5, c_data) := hoisting.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e5 c_data in
+      let (e_err, c_data) := hoisting.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e c_data in
       let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
-      e5 <- e_err5 ;;
+      e <- e_err ;;
       let c_data :=
-          let next_var := ((identifiers.max_var e5 1) + 1)%positive in (* ΧΧΧ check why this is needed *)
-          pack_data next_var ctag itag ftag (add_closure_tag bogus_closure_tag bogus_cloind_tag cenv) fenv (add_binders_exp names e5) log
+          let next_var := ((identifiers.max_var e 1) + 1)%positive in (* ΧΧΧ check why this is needed *)
+          pack_data next_var ctag itag ftag (add_closure_tag bogus_closure_tag bogus_cloind_tag cenv) fenv (add_binders_exp names e) log
       in
       (* Shrink reduction *)
-      let (e6, _) := shrink_cps.shrink_top e5 in
+      let (e, _) := shrink_cps.shrink_top e in
       (* Dead parameter elimination *)
-      let (e_err7, c_data) := dead_param_elim.eliminate e6 c_data in
-      e7 <- e_err7 ;;
+      let (e_err, c_data) := dead_param_elim.eliminate e c_data in
+      e <- e_err ;;
       (* Shrink reduction *)
-      let (e8, _) := shrink_cps.shrink_top e7 in
-      ret (e8, c_data)
+      let (e, _) := shrink_cps.shrink_top e in
+      (* Inline small functions *) 
+      let (e_err, c_data) := if (opt =? 3)%nat then inline_small e s 10 100 c_data else (compM.Ret e, c_data) in
+      e <- e_err ;;
+      ret (e, c_data)
   in
   match res with
   | compM.Err s =>

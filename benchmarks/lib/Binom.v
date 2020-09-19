@@ -50,7 +50,7 @@ Fixpoint join (p q: priqueue) (c: tree) : priqueue :=
 
 Fixpoint unzip (t: tree) (cont: priqueue -> priqueue) : priqueue :=
   match t with
-  |  Node x t1 t2   => unzip t2 (fun q => Node x t1 Leaf  :: cont q)
+  | Node x t1 t2   => unzip t2 (fun q => Node x t1 Leaf  :: cont q)
   | Leaf => cont nil
   end.
 

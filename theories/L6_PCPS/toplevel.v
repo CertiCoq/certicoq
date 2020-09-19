@@ -42,6 +42,10 @@ Definition bogus_cloind_tag := 16%positive.
 Definition fun_fun_tag := 3%positive.
 Definition kon_fun_tag := 2%positive.
 
+(* First available variable to use *)
+(* TODO make param in ANF/CPS translations *)
+Definition next_var := 103%positive.
+
 Definition compile_L6_CPS : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
   fun src => 
       debug_msg "Translating from L5 to L6 (CPS)" ;;
@@ -108,6 +112,11 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
     mkCompData nv nc ni nf cenv fenv nenv ("term" :: msg :: log)      
   end.
 
+  (* Note : To keep the name map small the inliner (which does alpha conversion) will delete mappings of old variables.
+   * To print the ANF term before inlining, the corresponding name environment must be used
+   *)
+
+  
   (* Optimizing L6 pipeline *)
   Definition L6_pipeline  (opt : nat) (* if opt = 1 do lambda lifting, if opt = 2 do lambda lifting AND inline lambda-lifting shells *)
              (cps : bool) (args : nat) (no_push : nat) (t : L6_FullTerm) : error L6_FullTerm * string :=
@@ -124,7 +133,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       let '(e_err, s, c_data) := uncurry_fuel cps 100 (fst (shrink_cps.shrink_top e0)) c_data in
       (* Inlining *)
       e <- e_err ;;
-      let (e_err, c_data) := inline_uncurry e s 10 100 c_data in
+      let (e_err, c_data) := inline_uncurry next_var e s 10 100 c_data in
       e <- e_err ;;
       (* Shrink reduction *)
       let (e, _) := shrink_cps.shrink_top e in
@@ -134,7 +143,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       (* Shrink reduction *)
       let (e, _) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then shrink_cps.shrink_top e else (e, 0%nat)  in
       (* Inline lambda-lifting shells *)
-      let (e_err, c_data) := if (opt =? 2)%nat then inline_lambda_lifted e s 10 10 c_data else (compM.Ret e, c_data) in
+      let (e_err, c_data) := if (opt =? 2)%nat then inline_lambda_lifted next_var e s 10 10 c_data else (compM.Ret e, c_data) in
       e <- e_err ;;
       (* Shrink reduction *)
       let (e, _) := if (opt =? 2)%nat then shrink_cps.shrink_top e else (e, 0%nat)  in
@@ -154,7 +163,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       (* Shrink reduction *)
       let (e, _) := shrink_cps.shrink_top e in
       (* Inline small functions *) 
-      let (e_err, c_data) := if (opt =? 3)%nat then inline_small e s 10 100 c_data else (compM.Ret e, c_data) in
+      let (e_err, c_data) := if (opt =? 3)%nat then inline_small next_var e s 10 100 c_data else (compM.Ret e, c_data) in
       e <- e_err ;;
       ret (e, c_data)
   in

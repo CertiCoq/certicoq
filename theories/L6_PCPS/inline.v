@@ -37,6 +37,7 @@ Section Beta.
   Variable (pp_St : St -> name_env -> string). 
   Variable IH : InlineHeuristic St.
 
+  Variable (max_var : var). (* The maximum reserved variable *)
   Variable (nenv : name_env).
   Variable (cenv : ctor_env).
 
@@ -80,7 +81,7 @@ Section Beta.
         match e with
         | Econstr x t ys e =>
           let ys' := apply_r_list sig ys in
-          x' <- get_name x "" ;;
+          x' <- get_name_delete x "" ;;
           e' <- beta_contract_aux e (M.set x x' sig) fm s str_flag ;;
           ret (Econstr x' t ys' e')
         | Ecase v cl =>
@@ -96,7 +97,7 @@ Section Beta.
           ret (Ecase v' cl')
        | Eproj x t n y e =>
          let y' := apply_r sig y in
-         x' <- get_name x "" ;;
+         x' <- get_name_delete x "" ;;
          e' <- beta_contract_aux e (M.set x x' sig) fm s str_flag ;;
          ret (Eproj x' t n y' e')
        | Eletapp x f t ys ec =>         
@@ -109,7 +110,7 @@ Section Beta.
           | (true, Some  (ft, xs, e), S d') =>
             if (Nat.eqb (List.length xs) (List.length ys)) then 
               let sig' := set_list (combine xs ys') sig  in
-              x' <- get_name x "" ;;
+              x' <- get_name_delete x "" ;;
               let '(d1, d2) := split_fuel d' in
               e' <- beta_contract d1 e sig' (M.remove f fm) s' str_flag ;;
               match inline_letapp e' x' with
@@ -118,16 +119,16 @@ Section Beta.
                 ec' <- beta_contract d2 ec (M.set x x' sig) fm s'' str_flag ;;
                 ret (C |[ ec' ]|)
               | _ =>
-                x' <- get_name x "" ;;
+                x' <- get_name_delete x "" ;;
                 ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag ;;
                 ret (Eletapp x' f' t ys' ec')
               end
             else
-              x' <- get_name x "" ;;
+              x' <- get_name_delete x "" ;;
               ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag ;;
               ret (Eletapp x' f' t ys' ec')
           | _ =>
-            x' <- get_name x "" ;;
+            x' <- get_name_delete x "" ;;
             ec' <- beta_contract_aux ec (M.set x x' sig) fm s' str_flag;;
             ret (Eletapp x' f' t ys' ec')
           end)
@@ -169,7 +170,7 @@ Section Beta.
           end)
        | Eprim x t ys e =>
          let ys' := apply_r_list sig ys in
-         x' <- get_name x "" ;;
+         x' <- get_name_delete x "" ;;
          e' <- beta_contract_aux e (M.set x x' sig) fm s str_flag ;;
          ret (Eprim x' t ys' e')
        | Ehalt x =>
@@ -190,8 +191,29 @@ Section Beta.
     
     destruct ((Nat.odd (S d'))); simpl; omega.
   Qed.
+
+
+
+  (* Since inlining will rename *all* bound variables, we can restart the name count, so we dont generate
+   * really large positive numbers resulting in performance bugs *)
+
+  (* To restart the pool counter, take the max of the max free var and the max reserved var *)
+
+  Definition restart_names (e : exp) (c : comp_data) : comp_data :=
+    let fvs := exp_fv e in
+    let new_var :=
+        match set_util.PS.max_elt fvs with
+        | Some v => (Pos.max v max_var + 1)%positive
+        | None => (max_var + 1)%positive
+        end
+    in
+    let (_, ct, it, ft, c, f, n, l) := c in
+    mkCompData new_var ct it ft c f n l. 
+ 
+  
   
   Definition inline_top (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
+    let c := restart_names e c in     
     let '(e', (st', click)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c false in
     (e', st').
 
@@ -199,7 +221,8 @@ Section Beta.
   Fixpoint inline_loop_aux (fuel : nat) (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
     match fuel with
     | 0 => (Ret e, c)
-    | S fuel => 
+    | S fuel =>
+      let c := restart_names e c in
       let '(e', (c', click)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c false in
       match e' with
       | Ret e' => 
@@ -385,12 +408,12 @@ Definition show_map_nat m nenv := show_map m nenv show_nat.
 Definition InlineSmallOrUncurried (bound:nat): InlineHeuristic (prod (M.t bool) (M.t nat)) :=
   CombineInlineHeuristic orb (InlineSmall bound) InlinedUncurriedMarked.
 
-Definition inline_uncurry (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
-  inline_top _ (InlineSmallOrUncurried bound) e d (M.empty _, s) c false.
+Definition inline_uncurry (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
+  inline_top _ (InlineSmallOrUncurried bound) max_var e d (M.empty _, s) c false.
 
 (* Run after hoisting to eliminate outemost lambdas (like in e.g, repeat) *) 
-Definition inline_small (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
-  inline_loop _ (InlineSmall bound) e d (M.empty _) c false.
+Definition inline_small (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
+  inline_loop _ (InlineSmall bound) max_var e d (M.empty _) c false.
 
 
 (* Inline the calls to known functions from the escaping  wrappers *)
@@ -421,5 +444,5 @@ Definition InineLambdaLifted: InlineHeuristic (M.t bool) :=
                         end;                       
   |}.
 
-Definition inline_lambda_lifted (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
-  inline_top _ InineLambdaLifted e d (M.empty bool) c false.
+Definition inline_lambda_lifted (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
+  inline_top _ InineLambdaLifted max_var e d (M.empty bool) c false.

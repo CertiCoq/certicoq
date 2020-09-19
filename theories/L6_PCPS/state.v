@@ -48,6 +48,16 @@ Section CompM.
     compM.put (mkCompData ((n+1)%positive) c i f e fenv names' log, st) ;;
     ret n.
 
+  (** Get a fresh name, and register a pretty name by appending a suffix to the pretty name of the old var.
+      Delete the old entry from the map *)
+  Definition get_name_delete (old_var : var) (suff : string) : compM' var :=
+    p <- compM.get ;;
+    let '(mkCompData n c i f e fenv names log, st) := p in
+    let names' := add_entry names n old_var suff in
+    let names'' := M.remove old_var names' in
+    compM.put (mkCompData ((n+1)%positive) c i f e fenv names'' log, st) ;;
+    ret n.
+
   Definition get_names_lst (old : list var) (suff : string) : compM' (list var) :=
     mapM (fun o => get_name o suff) old.
 

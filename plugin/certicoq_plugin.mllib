@@ -4,7 +4,6 @@ AstUtils
 Basics
 BinInt
 Char0
-DecidableClass
 Errors0
 FMapPositive
 FLT

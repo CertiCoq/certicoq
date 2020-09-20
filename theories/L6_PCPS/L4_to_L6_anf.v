@@ -241,7 +241,7 @@ Section Tags.
                           | Npos _ => fi
                           end in
                ret (fi', Fcons f_name fun_tag [arg] e_body defs')
-             | (_, _) => failwith "Unexpected body of fix"
+             | (_, _) => failwith ("Unexpected body of fix in function " ++  print_name n)
              end
            |_, _ => failwith "Wrong number of names for mut. rec. functions"
            end

@@ -8412,7 +8412,7 @@ Section CONTRACT.
                       eapply name_in_fundefs_bound_var_fundefs in H13. left; now eauto. eapply bound_stem_var in H16. now left; eauto. }
                   
                   assert (Hneqv : ~ FromList (apply_r_list sig l) (apply_r sig v0)).
-                  { specialize (Hc (apply_r sig v0)). rewrite Hgetc in Hc. SearchAbout (apply_r sig v0). unfold ce in Hc.
+                  { specialize (Hc (apply_r sig v0)). rewrite Hgetc in Hc. unfold ce in Hc.
                     repeat normalize_ctx. repeat destruct_num_occur. simpl in H14. repeat destruct_num_occur.
                     rewrite Hel4 in H14. repeat destruct_num_occur. simpl in H13. rewrite peq_true in H13.
                     assert (x7 = 0) by omega. assert (n5 = 0) by omega. assert (x4 = 0) by omega. assert (n6 = 0) by omega. assert (m0 = 0) by omega.
@@ -8529,7 +8529,7 @@ Section CONTRACT.
                         - unfold get_c. rewrite M.gso. rewrite M.gso; eauto.
                           eapply update_count_inlined_dom. rewrite length_apply_r_list. now eauto. eassumption.
                           eapply Disjoint_sym. eapply Disjoint_Included_r; [| eapply Hdis ]. simpl. normalize_occurs_free. sets.
-                          SearchAbout x'. eassumption. } rewrite Heql. 
+                          eassumption. } rewrite Heql. 
                       eapply num_occur_app_ctx. exists 0, 0. split; [| split; [| reflexivity ] ].
                       * eapply Hdead. eassumption.
                       * assert (Hinl1 := f0). eapply Included_Union_preserv_r with (s2 := [set v]) in Hinl1; [| reflexivity ].
@@ -8762,7 +8762,7 @@ Section CONTRACT.
                           +++ split; [| omega ]. replace 0 with (0 + 0) by omega.
                               eapply dead_occur_rename_all_ns_set_list.
                               eapply not_occur_list. omega. 
-                              SearchAbout x'. rewrite <- (proj1 (rename_all_ns_join _ _ _)).
+                              rewrite <- (proj1 (rename_all_ns_join _ _ _)).
                               destruct (e_num_occur (apply_r sig v0) (rename_all_ns (M.set v (apply_r sig x') sig) e)).
                               assert (Hren := H11).
                               eapply num_occur_rename_all_ns_set in H11; [| | eassumption ]. assert (x5 = 0) by omega; subst.

@@ -6,15 +6,16 @@ TESTS=$(shell cat TESTS)
 # Names of the generated cfiles
 CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, CertiCoq.Benchmarks.tests.%.c, $(TESTS))
 # Names of the generated executables
-EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS))
+EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS)) $(patsubst %, %_cps_opt, $(TESTS)) $(patsubst %, %_opt, $(TESTS))
 
 default: copy exec run
 all: copy lib exec run
+llvm: $(LLTESTS)
 
-.PHONY: all default clean lib cleanlib tests run
+.PHONY: all default clean lib cleanlib tests run llvm
 
-$(CFILES): tests
-exec: $(TESTS)
+# $(CFILES): tests
+exec: $(LLTESTS)
 
 copy:
 	cp ../theories/Runtime/gc.c ./
@@ -24,6 +25,7 @@ copy:
 	cp ../theories/Runtime/values.h ./
 	cp ../theories/Runtime/main.c ./
 	cp ../theories/Runtime/config.h ./
+	cp ../theories/Runtime/mod.py ./
 
 clean:
 	rm -f ./gc.c
@@ -33,12 +35,14 @@ clean:
 	rm -f ./values.h
 	rm -f ./main.c
 	rm -f ./config.h
-	rm -f ./*.*.c
-	rm -f ./*.*.h
-	rm -f ./glue.*.*.c
-	rm -f ./glue.*.*.h
+	# rm -f ./*.*.c
+	# rm -f ./*.*.h
+	# rm -f ./glue.*.*.c
+	# rm -f ./glue.*.*.h
 	rm -f ./*.vo
 	rm -f ./*.glob
+
+cleanexec:
 	rm -f $(EXEC)
 
 lib/Makefile:
@@ -54,10 +58,35 @@ tests: tests.v
 	coqc $(COQOPTS) tests.v
 
 $(TESTS): $(CFILES)
-	$(CCOMPILER) -o $@_cps -Wno-everything -O2 $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@_cps.c
-	$(CCOMPILER) -o $@ -Wno-everything -O2 $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue.CertiCoq.Benchmarks.tests.$@.c
-	$(CCOMPILER) -o $@_cps_opt -Wno-everything -O2 $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt.c glue.CertiCoq.Benchmarks.tests.$@_cps_opt.c
-	$(CCOMPILER) -o $@_opt -Wno-everything -O2 $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt.c glue.CertiCoq.Benchmarks.tests.$@_opt.c
+	$(CCOMPILER) -o $@_cps -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@_cps.c
+	$(CCOMPILER) -o $@ -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue.CertiCoq.Benchmarks.tests.$@.c
+	$(CCOMPILER) -o $@_cps_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt.c glue.CertiCoq.Benchmarks.tests.$@_cps_opt.c
+	$(CCOMPILER) -o $@_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt.c glue.CertiCoq.Benchmarks.tests.$@_opt.c
+
+# $(TESTS): $(CFILES)
+#         # From Matthew's scripts
+#         # Compile to LLVM
+# 	clang -Wno-everything -S -O2 -fomit-frame-pointer CertiCoq.Benchmarks.tests.$@.c -emit-llvm
+#         # Run script to modify the calling convention
+# 	python mod.py CertiCoq.Benchmarks.tests.$@.ll CertiCoq.Benchmarks.tests.$@CC.ll
+# 	rm CertiCoq.Benchmarks.tests.$@.ll
+#         # Compile to machine code		
+# 	clang -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c glue.CertiCoq.Benchmarks.tests.$@.c CertiCoq.Benchmarks.tests.$@CC.ll -o $@
+#         # Same for CPS	
+# 	clang -Wno-everything -S -O2 -fomit-frame-pointer CertiCoq.Benchmarks.tests.$@_cps.c -emit-llvm
+# 	python mod.py CertiCoq.Benchmarks.tests.$@_cps.ll CertiCoq.Benchmarks.tests.$@_cpsCC.ll
+# 	rm CertiCoq.Benchmarks.tests.$@_cps.ll
+# 	clang -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c glue.CertiCoq.Benchmarks.tests.$@.c CertiCoq.Benchmarks.tests.$@_cpsCC.ll -o $@_cps
+#         # Same for -direct -O 1 	
+# 	clang -Wno-everything -S -O2 -fomit-frame-pointer CertiCoq.Benchmarks.tests.$@_opt.c -emit-llvm
+# 	python mod.py CertiCoq.Benchmarks.tests.$@_opt.ll CertiCoq.Benchmarks.tests.$@_optCC.ll
+# 	rm CertiCoq.Benchmarks.tests.$@_opt.ll
+# 	clang -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c glue.CertiCoq.Benchmarks.tests.$@.c CertiCoq.Benchmarks.tests.$@_optCC.ll -o $@_opt
+#         # Same for CPS -O 1 	
+# 	clang -Wno-everything -S -O2 -fomit-frame-pointer CertiCoq.Benchmarks.tests.$@_cps_opt.c -emit-llvm
+# 	python mod.py CertiCoq.Benchmarks.tests.$@_cps_opt.ll CertiCoq.Benchmarks.tests.$@_cps_optCC.ll
+# 	rm CertiCoq.Benchmarks.tests.$@_cps_opt.ll
+# 	clang -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c glue.CertiCoq.Benchmarks.tests.$@.c CertiCoq.Benchmarks.tests.$@_cps_optCC.ll -o $@_cps_opt
 
 run: run.sh
 	sh run.sh 10

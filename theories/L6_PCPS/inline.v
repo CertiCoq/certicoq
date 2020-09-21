@@ -253,7 +253,7 @@ Section Beta.
 
 End Beta.
 
-(** * Encoding of inline heauristics *)
+(** * Encoding of inline heuristics *)
 (* Currently supported heuristics:
    1. Inline uncurry shells
       - By inlinning marked functions from uncurry, OR
@@ -435,15 +435,27 @@ Definition inline_small (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) 
 (* Inline the calls to known functions from the escaping  wrappers *)
 Fixpoint find_wrappers (fds : fundefs) (s:M.t bool) : M.t bool :=
   match fds with
-  | Fcons f _ _ (Eapp g _ _) fds' =>
-    (* f immediately calls g -- inline g *) 
-    let s' := if (f =? g) then s else  M.set f true s in
+  | Fcons f _ _ e fds' =>
+    (* f is a wrapper function if it calls some other function
+       after some projections/constructions *)
+    let b := (fix is_wrapper e :=
+                match e with
+                | Econstr _ _ _  e 
+                | Eproj _ _ _ _ e
+                | Eprim _ _ _ e => is_wrapper e
+                | Eletapp _ _ _ _ e => false
+                | Ecase _ _
+                | Ehalt _
+                | Efun _ _ => false
+                | Eapp g _ _ => negb (f =? g)
+                end) e in                     
+    let s' := if b then s else  M.set f true s in
     find_wrappers fds' s'
   | _ => s
   end.
 
 
-Definition InineLambdaLifted: InlineHeuristic (M.t bool) :=
+Definition InineWrappers: InlineHeuristic (M.t bool) :=
   {| update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) =>
                           let s' := find_wrappers fds s in
                           (s', s'));
@@ -460,5 +472,5 @@ Definition InineLambdaLifted: InlineHeuristic (M.t bool) :=
                         end;                       
   |}.
 
-Definition inline_lambda_lifted (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
-  inline_top _ InineLambdaLifted max_var e d (M.empty bool) c false.
+Definition inline_wrappers (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
+  inline_top _ InineWrappers max_var e d (M.empty bool) c false.

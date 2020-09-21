@@ -1,6 +1,7 @@
 type command_args =
  | ANF
  | TIME
+ | TIMEANF
  | OPT of int
  | DEBUG
  | ARGS of int 
@@ -12,6 +13,7 @@ type command_args =
 type options =
   { cps       : bool;
     time      : bool;
+    time_anf  : bool;
     olevel    : int;
     debug     : bool;
     args      : int;

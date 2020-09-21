@@ -41,6 +41,7 @@ let debug_msg (flag : bool) (s : string) =
 type command_args =
  | ANF
  | TIME
+ | TIMEANF
  | OPT of int
  | DEBUG
  | ARGS of int
@@ -52,6 +53,7 @@ type command_args =
 type options =
   { cps       : bool;
     time      : bool;
+    time_anf  : bool;
     olevel    : int;
     debug     : bool;
     args      : int;
@@ -64,6 +66,7 @@ type options =
 let default_options : options =
   { cps       = true;
     time      = false;
+    time_anf  = true;
     olevel    = 0;
     debug     = false;
     args      = 5;
@@ -84,6 +87,7 @@ To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
 Valid options:\n\
 -direct   :  Produce direct-style code (as opposed to he default which is continuation-passing style)\n\
 -time     :  Time each compilation phase\n\
+-time_anf :  Time λanf optimizations\n\
 -O n      :  Perform more aggressive optimizations. 1: lambda lifting for closure environment unboxing, 2: lambda lifting and inling for lambda lifting shells\n\
 -debug    :  Show debugging information\n\
 -args X   :  Specify how many arguments are used in the C translation (on top of the thread_info argument)\n\
@@ -100,6 +104,7 @@ let make_options (l : command_args list) : options =
     | [] -> o
     | ANF      :: xs -> aux {o with cps = false} xs
     | TIME     :: xs -> aux {o with time = true} xs
+    | TIMEANF  :: xs -> aux {o with time_anf = true} xs
     | OPT n    :: xs -> aux {o with olevel = n} xs
     | DEBUG    :: xs -> aux {o with debug = true} xs
     | ARGS n   :: xs -> aux {o with args = n} xs
@@ -114,11 +119,12 @@ let make_pipeline_options (opts : options) =
   let args = coq_nat_of_int opts.args in
   let olevel = coq_nat_of_int opts.olevel in
   let timing = opts.time in
+  let timing_anf = opts.time in
   let debug  = opts.debug in
   let fv_args = coq_nat_of_int opts.fv_args in
   let dev = coq_nat_of_int opts.dev in
   let prefix = chars_of_string opts.prefix in
-  Pipeline.make_opts cps args fv_args olevel timing debug dev prefix
+  Pipeline.make_opts cps args fv_args olevel timing timing_anf debug dev prefix
 
 (** Main Compilation Functions *)
 

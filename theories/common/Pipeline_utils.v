@@ -13,16 +13,17 @@ Open Scope string.
 (* Compiler options *)
 Record Options :=
   { direct   : bool;  (* direct or CPS code *)
-    c_args   : nat;  (* numbers of C arguments *)
-    fv_args  : nat;  (* numbers of C arguments *)
+    c_args   : nat;   (* numbers of C arguments *)
+    fv_args  : nat;   (* numbers of C arguments *)
 
     show_anf : bool;  (* show ANF IR. TODO generalize for other IR's of the compiler,
-                    * by perhaps adding Show lang instances *)
-    o_level  : nat;  (* optimization level *)
+                       * (perhaps add Show lang instances ?) *)
+    o_level  : nat;   (* optimization level *)
     time     : bool;  (* Track timing information *)
+    time_anf : bool;  (* Track timing for the ANF pipeline *)
     debug    : bool;  (* Log debug messages *)
-    dev      : nat;  (* for development purposes *)
-    prefix   : string  (* prefix to generated FFI functions *)
+    dev      : nat;   (* for development purposes *)
+    prefix   : string (* prefix to generated FFI functions *)
   }.
 
 (* Compilation info, such as timing, debug and error messages *)

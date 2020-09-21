@@ -417,9 +417,9 @@ Section LambdaLifting.
       (* Filter out arguments that is expensive to lift *)
       let lfvs := List.filter (fun x => let n := stack_push_fundefs x B in Nat.leb n max_push) fvs in
       (* DEBUG *)
-      b_name <- get_pp_name (name_block B) ;;
-      fv_names <- get_pp_names_list (PS.elements sfvsi) ;;
-      log_msg (String.concat " " ("Block" :: b_name :: "has fvs :" :: fv_names)) ;;
+      (* b_name <- get_pp_name (name_block B) ;; *)
+      (* fv_names <- get_pp_names_list (PS.elements sfvsi) ;; *)
+      (* log_msg (String.concat " " ("Block" :: b_name :: "has fvs :" :: fv_names)) ;; *)
       (* END DEBUG *)
       (* Number of argument slots available. By convention lift exactly the same no of args in each mut. rec. function *)
       let lifted_args := max_args - (fundefs_max_params B) in
@@ -458,11 +458,11 @@ Section LambdaLifting.
            | Some inf =>
              match inf with
              | Fun f' ft' fvs sfvs args =>
-               (* Debug *)
-               f_str <- get_pp_name f ;;
-               fv_names <- get_pp_names_list fvs ;;
-               log_msg (String.concat " " (f_str :: "has fvs :" :: fv_names)) ;;
-               (* *)
+               (* DEBUG *)
+               (* f_str <- get_pp_name f ;; *)
+               (* fv_names <- get_pp_names_list fvs ;; *)
+               (* log_msg (String.concat " " (f_str :: "has fvs :" :: fv_names)) ;; *)
+               (* END DEBUG *)
                p <- add_free_vars args fvm ;;
                let (ys, fvm') := p in
                cm <- make_wrappers Bfull fvm' fm ;;

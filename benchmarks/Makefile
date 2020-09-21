@@ -8,8 +8,8 @@ CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, 
 # Names of the generated executables
 EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS)) $(patsubst %, %_cps_opt, $(TESTS)) $(patsubst %, %_opt, $(TESTS))
 
-default: copy exec run
-all: copy lib exec run
+default: copy tests exec run
+all: copy lib tests exec run
 llvm: $(LLTESTS)
 
 .PHONY: all default clean lib cleanlib tests run llvm
@@ -35,10 +35,10 @@ clean:
 	rm -f ./values.h
 	rm -f ./main.c
 	rm -f ./config.h
-	# rm -f ./*.*.c
-	# rm -f ./*.*.h
-	# rm -f ./glue.*.*.c
-	# rm -f ./glue.*.*.h
+	rm -f ./*.*.c
+	rm -f ./*.*.h
+	rm -f ./glue.*.*.c
+	rm -f ./glue.*.*.h
 	rm -f ./*.vo
 	rm -f ./*.glob
 

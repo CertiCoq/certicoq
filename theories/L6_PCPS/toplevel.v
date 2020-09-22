@@ -135,7 +135,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
           
                                       
 
-  (* TODO some way of sequencing ANF transformations so that we don't bind e_err all the time *)
+    (* TODO some way of sequencing ANF transformations so that we don't bind e_err all the time *)
   
     (* Optimizing L6 pipeline *)
     Definition L6_pipeline
@@ -159,6 +159,9 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
           e <- e_err ;;
           let (e_err, c_data) := time_anf "Inline uncurry wrappers" (fun _ => inline_uncurry next_var e s 10 100 c_data) c_data in
           e <- e_err ;;
+          (* Inline small functions *) 
+          let (e_err, c_data) := time_anf "Inline/shrink loop" (fun _ => inline_small next_var e s 10 100 c_data) c_data in
+          e <- e_err ;;
           (* Shrink reduction *)
           let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) c_data in
           (* lambda lifting *)
@@ -166,15 +169,11 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
                                   time_anf "Lambda lift" (fun _ => lambda_lift e args no_push c_data) c_data 
                                 else (compM.Ret e, c_data) in
           e <- e_rr ;;
-          (* Shrink reduction *)
-          let (e, _) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) c_data else (e, 0%nat)  in
-          (* Inline wrapper functions *)
-          let (e_err, c_data) := if (opt =? 2)%nat then
-                                   time_anf "Inline wrappers" (fun _ => inline_wrappers next_var e s 10 10 c_data) c_data
-                                 else (compM.Ret e, c_data) in
+          (* Inlining *)           
+          let (e_err, c_data) := time_anf "Inline lambda lifting wrappers" (fun _ => inline_lambda_lifted next_var e s 10 100 c_data) c_data in
           e <- e_err ;;
           (* Shrink reduction *)
-          let (e, _) := if (opt =? 2)%nat then  time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) c_data else (e, 0%nat) in
+          let (e, _) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) c_data else (e, 0%nat)  in
           (* Closure conversion *)
           let (e_err, c_data) := time_anf "Closure conversion and hoisting"
                                           (fun _ => hoisting.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e c_data) c_data in
@@ -186,6 +185,13 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
           in
           (* Shrink reduction *)
           let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) c_data in
+          (* Inline wrapper functions *)
+          let (e_err, c_data) := if (opt =? 2)%nat then
+                                   time_anf "Inline wrappers" (fun _ => inline_wrappers next_var e s 10 10 c_data) c_data
+                                 else (compM.Ret e, c_data) in
+          e <- e_err ;;
+          (* Shrink reduction *)
+          let (e, _) := if (opt =? 2)%nat then  time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) c_data else (e, 0%nat) in
           (* Dead parameter elimination *)
           let (e_err, c_data) := time_anf "Dead param elim" (fun _ => dead_param_elim.eliminate e c_data) c_data in
           e <- e_err ;;
@@ -204,6 +210,53 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
         (Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e), log_to_string log)
       end.
 
+
+    (* Just for debugging *)
+    Definition L6_pipeline_print (t : L6_FullTerm) : error L6_FullTerm * string :=
+      let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
+      (* make compilation state *)
+      let c_data :=
+          let next_var :=
+              ((identifiers.max_var e0 1) + 1)%positive in
+          let next_fun_tag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) fenv 1 + 1 in
+          pack_data next_var ctag itag next_fun_tag cenv fenv nenv nil
+      in
+      let res : error (exp * comp_data):=
+          (* Apply ANF transformations *)
+          (* Shrink reduction *)
+          let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e0) c_data in
+          (* Uncurring *)
+          let '(e_err, s, c_data) := time_anf "Uncurry" (fun _ => uncurry_fuel cps 100 e c_data) c_data in
+          (* Inlining *)
+          e <- e_err ;;
+          let (e_err, c_data) := time_anf "Inline uncurry wrappers" (fun _ => inline_uncurry next_var e s 10 100 c_data) c_data in
+          e <- e_err ;;
+          (* Inline small functions *) 
+          let (e_err, c_data) := time_anf "Inline/shrink loop" (fun _ => inline_small next_var e s 10 100 c_data) c_data in
+          e <- e_err ;;
+          (* Shrink reduction *)
+          let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) c_data in
+          (* lambda lifting *)
+          let (e_rr, c_data) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then
+                                  time_anf "Lambda lift" (fun _ => lambda_lift e args no_push c_data) c_data 
+                                else (compM.Ret e, c_data) in
+          e <- e_rr ;;
+          (* (* Inlining *)            *)
+          (* let (e_err, c_data) := time_anf "Inline lambda lifting wrappers" (fun _ => inline_lambda_lifted next_var e s 10 100 c_data) c_data in *)
+          (* e <- e_err ;; *)
+          (* (* Shrink reduction *) *)
+          (* let (e, _) := if ((opt =? 1)%nat || (opt =? 2)%nat)%bool then time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) c_data else (e, 0%nat)  in *)
+          ret (e, c_data)
+      in
+      match res with
+      | compM.Err s =>
+        (Err ("Failed compiling L6 program: " ++ s)%string, "")
+      | compM.Ret (e, c_data) =>
+        let (_, ctag, itag, ftag, cenv, fenv, nenv, log) := c_data in
+        (Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e), log_to_string log)
+      end.
+
+    
 End Pipeline.
    
 Definition compile_L6 : CertiCoqTrans L6_FullTerm L6_FullTerm :=
@@ -215,3 +268,14 @@ Definition compile_L6 : CertiCoqTrans L6_FullTerm L6_FullTerm :=
     let no_push := dev opts in (* temporarily use dev for the number of times a var can be pushed on the shadow stack *)
     let time := Pipeline_utils.time_anf opts in
     LiftErrorLogCertiCoqTrans "L6 Pipeline" (L6_pipeline (o_level opts) cps args no_push time) src.
+
+
+Definition compile_L6_debug : CertiCoqTrans L6_FullTerm L6_FullTerm :=
+  fun src => 
+    debug_msg "Compiling L6" ;;
+    opts <- get_options ;;
+    let cps := negb (direct opts) in
+    let args := fv_args opts in
+    let no_push := dev opts in (* temporarily use dev for the number of times a var can be pushed on the shadow stack *)
+    let time := Pipeline_utils.time_anf opts in
+    LiftErrorLogCertiCoqTrans "L6 Pipeline" (L6_pipeline_print (o_level opts) cps args no_push time) src.

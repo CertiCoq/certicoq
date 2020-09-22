@@ -11,13 +11,31 @@ Open Scope string.
 Import ListNotations.
 Import VeriStar.
 
-CertiCoq -help.
+
+(* Definition vs_easy := *)
+(*   match vs.main with *)
+(*   | Valid => true *)
+(*   | _ => false *)
+(*   end. *)
+
+(* CertiCoq Show IR -debug -O 2 -ext "_cps_opt" vs_easy. *)
+
+(* CertiCoq Show IR -debug -ext "_cps" vs_easy. *)
+
+(* CertiCoq Show IR -debug -direct vs_easy. *)
+
+(* CertiCoq Show IR -debug -direct -O 2 -ext "_opt" vs_easy. *)
 
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
 Definition demo3 := andb. 
 
 (* CertiCoq Show IR -debug -direct demo1. *)
+
+Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
+
+(* CertiCoq Show IR -debug -direct list_sum. *)
+(* CertiCoq Show IR -debug -direct -O 2 -ext "_opt" list_sum. *)
 
 Eval compute in "Compiling demo1".
 
@@ -42,11 +60,6 @@ CertiCoq Compile -direct -O 2 -ext "_opt" demo3.
 
 Eval compute in "Compiling list_sum".
 
-Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
-
-(* CertiCoq Show IR -debug -direct list_sum. *)
-(* CertiCoq Show IR -debug -O 2 -ext "_cps_opt" list_sum. *)
-
 CertiCoq Compile -ext "_cps" list_sum.
 CertiCoq Compile -direct list_sum.
 CertiCoq Compile -O 2 -ext "_cps_opt" list_sum.
@@ -66,8 +79,8 @@ Definition vs_hard :=
 
 Eval compute in "Compiling vs_easy".
 
-CertiCoq Compile -direct -time vs_easy.
-CertiCoq Compile -ext "_cps" -time vs_easy.
+CertiCoq Compile -direct -time_anf vs_easy.
+CertiCoq Compile -ext "_cps" -time_anf vs_easy.
 CertiCoq Compile -O 2 -ext "_cps_opt" vs_easy.
 CertiCoq Compile -direct -O 2 -ext "_opt" vs_easy.
 

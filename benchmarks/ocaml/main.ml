@@ -69,3 +69,22 @@ let binom_main =
  *   done;
  *   let t' = Unix.gettimeofday () -. t in
  *   Printf.printf "Execution time: %f seconds\n" t' *)
+
+let sha_main =  
+  let n = int_of_string Sys.argv.(1) in
+  let t = Unix.gettimeofday () in
+  for i = 1 to n do
+    Sha.sha Tt
+  done;
+  let t' = Unix.gettimeofday () -. t in
+  Printf.printf "Sha execution time: %f seconds\n" t'
+
+
+let sha_fast_main =  
+  let n = int_of_string Sys.argv.(1) in
+  let t = Unix.gettimeofday () in
+  for i = 1 to n do
+    Sha_fast.sha_fast Tt
+  done;
+  let t' = Unix.gettimeofday () -. t in
+  Printf.printf "Sha_fast execution time: %f seconds\n" t'

@@ -41,10 +41,23 @@ Definition vs_hard (_ : unit) :=
 (* Extraction "vs_easy" vs_easy. *)
 (* Extraction "vs_hard" vs_hard. *)
 
-Definition binom (_ : unit) := Binom.main.
-
-Extraction "binom" binom.
+(* Modified by hand *)
+(* Definition binom (_ : unit) := Binom.main. *)
+(* Extraction "binom" binom. *)
 
 Definition color (_ : unit) := Color.main.
 
 Extraction "color" color.
+
+(* From the Coq website *)
+Definition test (_ : unit) := "Coq is a formal proof management system. It provides a formal language to write mathematical definitions, executable algorithms and theorems together with an environment for semi-interactive development of machine-checked proofs. Typical applications include the certification of properties of programming languages (e.g. the CompCert compiler certification project, the Verified Software Toolchain for verification of C programs, or the Iris framework for concurrent separation logic), the formalization of mathematics (e.g. the full formalization of the Feit-Thompson theorem, or homotopy type theory), and teaching.".
+
+(* Definition test (_ : unit) := "The message". *)
+                                
+Definition sha (_ : unit) := sha256.SHA_256 (sha256.str_to_bytes (test tt)).
+
+Definition sha_fast (_ : unit) := sha256.SHA_256' (sha256.str_to_bytes (test tt)).
+
+Extraction "sha" sha.
+
+Extraction "sha_fast" sha_fast.

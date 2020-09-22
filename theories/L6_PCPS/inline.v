@@ -160,8 +160,8 @@ Section Beta.
                      fds'' <- beta_contract_fds fds' s ;;
                      ret (Fcons f' t xs' e' fds'')
                    | Fnil => ret Fnil
-                   end) fds s2 ;;
-         e' <- beta_contract_aux e sig' fm' s1 str_flag;;
+                   end) fds s1 ;;
+         e' <- beta_contract_aux e sig' fm' s2 str_flag;;
          ret (Efun fds' e')
        | Eapp f t ys =>
          let f' := apply_r sig f in
@@ -301,7 +301,7 @@ Fixpoint do_inline (e : exp) :=
   | Eletapp _ _ _ _ e
   | Eprim _ _ _ e => do_inline e
   | Ecase _ _ => false
-  | Efun _ _ => false
+  | Efun _ _ => (* false *) true
   | Eapp _ _ _ => true
   | Ehalt _ => true
   end.
@@ -427,35 +427,61 @@ Definition InlineSmallOrUncurried (bound:nat): InlineHeuristic (prod (M.t bool) 
 Definition inline_uncurry (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
   inline_top _ (InlineSmallOrUncurried bound) max_var e d (M.empty _, s) c false.
 
-(* Run after hoisting to eliminate outemost lambdas (like in e.g, repeat) *) 
+(* Run after hoisting to eliminate outermost lambdas (like in e.g, repeat) *) 
 Definition inline_small (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
   inline_loop _ (InlineSmall bound) max_var e d (M.empty _) c false.
 
 
 (* Inline the calls to known functions from the escaping  wrappers *)
+Fixpoint find_indirect_call (f : var) (e : exp) (s:M.t bool) : M.t bool :=
+  let b := (fix is_wrapper e :=
+              match e with
+              | Econstr _ _ _  e 
+              | Eproj _ _ _ _ e
+              | Eprim _ _ _ e => is_wrapper e
+              | Eletapp _ _ _ _ e => None
+              | Ecase _ _
+              | Ehalt _
+              | Efun _ _ => None
+              | Eapp g _ _ => Some g
+                end) e in
+  match b with
+  | None => s
+  | Some g =>  M.set g true s
+  end.
+
+
+Definition InineLifted: InlineHeuristic (M.t bool) :=
+  {| update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) => (s, s));
+     update_inFun := fun (f:var) (t:tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => (M.remove f (find_indirect_call f e s));
+     update_App := fun (f:var) (t:tag) (ys:list var) (s:_) =>
+                     match M.get f s with
+                     | Some true => (s, true)
+                     | _ => (s, false)
+                     end;
+     update_letApp := fun (f:var) (t:tag) (ys:list var) (s:_) =>
+                        match M.get f s with
+                        | Some true => (s, s, true)
+                        | _ => (s, s, false)
+                        end;                       
+  |}.
+
+Definition inline_wrappers (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
+  inline_top _ InineLifted max_var e d (M.empty bool) c false.
+
+
+(* Inline the calls to known functions from the escaping  wrappers *)
 Fixpoint find_wrappers (fds : fundefs) (s:M.t bool) : M.t bool :=
   match fds with
-  | Fcons f _ _ e fds' =>
-    (* f is a wrapper function if it calls some other function
-       after some projections/constructions *)
-    let b := (fix is_wrapper e :=
-                match e with
-                | Econstr _ _ _  e 
-                | Eproj _ _ _ _ e
-                | Eprim _ _ _ e => is_wrapper e
-                | Eletapp _ _ _ _ e => false
-                | Ecase _ _
-                | Ehalt _
-                | Efun _ _ => false
-                | Eapp g _ _ => negb (f =? g)
-                end) e in                     
-    let s' := if b then s else  M.set f true s in
+  | Fcons f _ _ (Eapp g _ _) fds' =>
+    (* f immediately calls g -- inline g *) 
+    let s' := if (f =? g) then s else  M.set f true s in
     find_wrappers fds' s'
   | _ => s
   end.
 
 
-Definition InineWrappers: InlineHeuristic (M.t bool) :=
+Definition InineLambdaLifted: InlineHeuristic (M.t bool) :=
   {| update_funDef  := (fun (fds:fundefs) (sigma:r_map) (s:_) =>
                           let s' := find_wrappers fds s in
                           (s', s'));
@@ -472,5 +498,5 @@ Definition InineWrappers: InlineHeuristic (M.t bool) :=
                         end;                       
   |}.
 
-Definition inline_wrappers (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
-  inline_top _ InineWrappers max_var e d (M.empty bool) c false.
+Definition inline_lambda_lifted (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
+  inline_top _ InineLambdaLifted max_var e d (M.empty bool) c false.

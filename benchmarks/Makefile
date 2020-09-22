@@ -14,8 +14,8 @@ llvm: $(LLTESTS)
 
 .PHONY: all default clean lib cleanlib tests run llvm
 
-# $(CFILES): tests
-exec: $(LLTESTS)
+$(CFILES): tests
+exec: $(TESTS)
 
 copy:
 	cp ../theories/Runtime/gc.c ./

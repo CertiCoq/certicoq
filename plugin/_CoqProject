@@ -138,8 +138,8 @@ extraction/l6_to_Clight_stack.ml
 extraction/l6_to_Clight_stack.mli
 extraction/lambda_lifting.ml
 extraction/lambda_lifting.mli
-# extraction/list1.ml
-# extraction/list1.mli
+extraction/list1.ml
+extraction/list1.mli
 extraction/list_util.ml
 extraction/list_util.mli
 extraction/mCCompare.ml

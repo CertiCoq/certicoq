@@ -94,7 +94,8 @@ Definition delete_max (q: priqueue) : option (key * priqueue) :=
 
 Definition merge (p q: priqueue) := join p q Leaf.
 
-Definition main :=
+
+Definition main_easy :=
  let a := insert 5 (insert 3 (insert 7 empty)) in
  let b := insert 3 (insert 6 (insert 9 empty)) in
  let c := merge a b in
@@ -102,4 +103,28 @@ Definition main :=
  | Some (k, _) => k
  | None => 0
  end.
+
+
+Fixpoint insert_list (l : list nat) (q : priqueue) :=
+    match l with
+    | [] => q
+    | x :: l => insert_list l (insert x q)
+    end.
+
+
+Fixpoint make_list (n : nat) (l : list nat) :=
+  match n with
+  | 0 => 0 :: l
+  | S 0 => 1 :: l
+  | S (S n) => make_list n (S (S n) :: l)
+  end.   
+  
+Definition main :=
+  let a := insert_list (make_list 1000 []) empty in
+  let b := insert_list (make_list 1001 []) empty in
+  let c := merge a b in
+  match delete_max c with
+  | Some (k, _) => k
+  | None => 0
+  end.
 

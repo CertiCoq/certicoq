@@ -8,8 +8,8 @@ let demo1_main =
     Demo1.demo1 Tt
   done;
   let t' = Unix.gettimeofday () -. t in
-  Printf.printf "Demo1 execution time: %f seconds\n" t'
-    
+  Printf.printf "Demo1 execution time: %f miliseconds\n" (t'*.1000.0)
+  
   
 let demo2_main =
   let n = int_of_string Sys.argv.(1) in
@@ -18,7 +18,7 @@ let demo2_main =
     Demo2.demo2 Tt
   done;
   let t' = Unix.gettimeofday () -. t in
-  Printf.printf "Demo2 execution time: %f seconds\n" t'
+  Printf.printf "Demo2 execution time: %f miliseconds\n" (t'*.1000.0)
     
 
 let list_sum_main =
@@ -28,7 +28,7 @@ let list_sum_main =
     List_sum.list_sum Tt
   done;
   let t' = Unix.gettimeofday () -. t in
-  Printf.printf "List_sum xecution time: %f seconds\n" t'
+  Printf.printf "List_sum execution time: %f miliseconds\n" (t'*.1000.0)
 
 
 let vs_easy_main =
@@ -38,7 +38,7 @@ let vs_easy_main =
     Vs_easy.vs_easy Tt
   done;
   let t' = Unix.gettimeofday () -. t in
-  Printf.printf "Vs_easy execution time: %f seconds\n" t'
+  Printf.printf "Vs_easy execution time: %f miliseconds\n" (t'*.1000.0)
 
 let vs_hard_main =
   let n = int_of_string Sys.argv.(1) in
@@ -47,7 +47,7 @@ let vs_hard_main =
     Vs_hard.vs_hard Tt
   done;
   let t' = Unix.gettimeofday () -. t in
-  Printf.printf "Vs_hard execution time: %f seconds\n" t'
+  Printf.printf "Vs_hard execution time: %f miliseconds\n" (t'*.1000.0)
 
 
 let binom_main =  
@@ -57,7 +57,7 @@ let binom_main =
     Binom.binom Tt
   done;
   let t' = Unix.gettimeofday () -. t in
-  Printf.printf "Binom execution time: %f seconds\n" t'
+  Printf.printf "Binom execution time: %f miliseconds\n" (t'*.1000.0)
 
 
 (* Color does not typecheck in OCaml *)
@@ -70,14 +70,14 @@ let binom_main =
  *   let t' = Unix.gettimeofday () -. t in
  *   Printf.printf "Execution time: %f seconds\n" t' *)
 
-let sha_main =  
-  let n = int_of_string Sys.argv.(1) in
-  let t = Unix.gettimeofday () in
-  for i = 1 to n do
-    Sha.sha Tt
-  done;
-  let t' = Unix.gettimeofday () -. t in
-  Printf.printf "Sha execution time: %f seconds\n" t'
+(* let sha_main =  
+ *   let n = int_of_string Sys.argv.(1) in
+ *   let t = Unix.gettimeofday () in
+ *   for i = 1 to n do
+ *     Sha.sha Tt
+ *   done;
+ *   let t' = Unix.gettimeofday () -. t in
+ *   Printf.printf "Sha execution time: %f seconds\n" t' *)
 
 
 let sha_fast_main =  
@@ -87,4 +87,4 @@ let sha_fast_main =
     Sha_fast.sha_fast Tt
   done;
   let t' = Unix.gettimeofday () -. t in
-  Printf.printf "Sha_fast execution time: %f seconds\n" t'
+  Printf.printf "Sha execution time: %f miliseconds\n" (t'*.1000.0)

@@ -117,4 +117,5 @@ Separate Extraction
          Compiler.pipeline.make_ffi
          Compiler.pipeline.show_IR.
 Recursive Extraction Library BinPos.
+Recursive Extraction Library OrdersTac.
 Cd "..".

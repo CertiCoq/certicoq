@@ -50,6 +50,14 @@ extraction/logic0.mli
 extraction/logic0.ml
 extraction/binNums.ml
 extraction/binNums.mli
+extraction/orderedType0.mli
+extraction/orderedType0.ml
+extraction/cRelationClasses.ml
+extraction/cRelationClasses.mli
+extraction/mCRelations.ml
+extraction/mCRelations.mli
+extraction/mCOption.mli
+extraction/mCOption.ml
 
 # extraction/fappli_IEEE.ml
 # extraction/fappli_IEEE.mli

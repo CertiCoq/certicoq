@@ -27,7 +27,7 @@ cd plugin/extraction
 # rm -f checker0.* typing.* retyping.* univSubst.* stringMap.*
 # rm -f astUtils.* universes.* pretty.* char.*
 # rm -f classes0*
-rm -f numeral.*
+# rm -f numeral.*
 # Work around a compiler bug in module name resolution
 sed -f ../extraction.sed -i bak compile0.ml
 cd ../..

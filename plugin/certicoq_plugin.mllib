@@ -17,6 +17,8 @@ List0
 List_util
 Monad0
 MonadState
+Hexadecimal0
+Numeral0
 Orders
 OrdersEx
 OrdersTac

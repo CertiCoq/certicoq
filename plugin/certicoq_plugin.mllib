@@ -20,7 +20,6 @@ Orders
 OrdersTac
 OrdersFacts
 OrdersLists
-OrderedType0
 MSetInterface
 MSetFacts
 MSetDecide
@@ -47,11 +46,7 @@ Logic0
 
 Char0
 Errors0
-OrderedTypeEx
-OrderedTypeAlt
-OrderedType0
 
-FMapPositive
 FLT
 Zaux
 Digits
@@ -81,7 +76,6 @@ PCUICAstUtils
 PCUICUnivSubst
 PCUICLiftSubst
 EqDecInstances
-PCUICReflect
 PCUICEquality
 PCUICTyping
 PCUICInduction
@@ -125,8 +119,6 @@ ErasureFunction
 SafeErasureFunction
 SafeTemplateErasure
 
-TermAbs
-UsefulTypes
 ZArith_dec
 Coqlib0
 Zbool
@@ -135,12 +127,6 @@ Classes1
 Monad_utils
 ExceptionMonad
 Expression
-List1
-VarInterface
-VarInterface0
-VarImplZ
-VarImplDummyPair
-Terms
 RandyPrelude
 OrdersFacts
 MSetInterface
@@ -170,8 +156,6 @@ Inline_letapp
 Uncurry
 Color
 Shrink_cps
-TermsDB
-Variables
 Closure_conversion
 Hoisting
 Lambda_lifting

@@ -156,8 +156,6 @@ extraction/extract.ml
 extraction/extract.mli
 extraction/FLT.ml
 extraction/FLT.mli
-extraction/fMapPositive.ml
-extraction/fMapPositive.mli
 extraction/fappli_IEEE_extra.ml
 extraction/fappli_IEEE_extra.mli
 extraction/ffi.ml
@@ -198,8 +196,6 @@ extraction/l6_to_Clight_stack.ml
 extraction/l6_to_Clight_stack.mli
 extraction/lambda_lifting.ml
 extraction/lambda_lifting.mli
-extraction/list1.ml
-extraction/list1.mli
 extraction/list_util.ml
 extraction/list_util.mli
 extraction/mCCompare.ml
@@ -258,19 +254,10 @@ extraction/ordersLists.ml
 extraction/ordersLists.mli
 extraction/ordersTac.ml
 extraction/ordersTac.mli
-extraction/orderedTypeEx.mli
-extraction/orderedTypeEx.ml
-extraction/orderedTypeAlt.mli
-extraction/orderedTypeAlt.ml
-extraction/orderedType0.mli
-extraction/orderedType0.ml
-
 extraction/pCUICAst.ml
 extraction/pCUICAst.mli
 extraction/pCUICAstUtils.ml
 extraction/pCUICAstUtils.mli
-extraction/pCUICReflect.mli
-extraction/pCUICReflect.ml
 
 extraction/pCUICChecker.ml
 extraction/pCUICChecker.mli

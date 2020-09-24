@@ -120,8 +120,8 @@ Fixpoint make_list (n : nat) (l : list nat) :=
   end.   
   
 Definition main :=
-  let a := insert_list (make_list 1000 []) empty in
-  let b := insert_list (make_list 1001 []) empty in
+  let a := insert_list (make_list 2000 []) empty in
+  let b := insert_list (make_list 2001 []) empty in
   let c := merge a b in
   match delete_max c with
   | Some (k, _) => k

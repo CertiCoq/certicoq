@@ -1,11 +1,11 @@
 Certicoq_debug
 
-AST
-
 Datatypes
 Bool
 Equalities
 Decimal
+Hexadecimal
+Numeral0
 Nat0
 List0
 PeanoNat
@@ -63,9 +63,6 @@ Digits
 List_util
 Monad0
 MonadState
-Hexadecimal
-Hexadecimal0
-Numeral0
 Orders
 OrdersEx
 OrdersTac
@@ -192,6 +189,7 @@ Fappli_IEEE_extra
 Archi
 Integers
 Floats
+AST
 Values
 L3_to_L3_eta
 L3_to_L4

@@ -14,7 +14,7 @@ Open Scope string.
 Record Options :=
   { direct   : bool;  (* direct or CPS code *)
     c_args   : nat;   (* numbers of C arguments *)
-    fv_args  : nat;   (* numbers of C arguments *)
+    anf_conf  : nat;  (* for different ANF pipeline configs. For development purposes *)
 
     show_anf : bool;  (* show ANF IR. TODO generalize for other IR's of the compiler,
                        * (perhaps add Show lang instances ?) *)

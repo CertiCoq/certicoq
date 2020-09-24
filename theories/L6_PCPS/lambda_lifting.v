@@ -502,8 +502,8 @@ Definition lift_all (fvs : list var) (scope : FVSet) := true.
 (* Never increase fvs *)
 Definition lift_conservative (fvs : list var) (scope : FVSet) := PS.subset (union_list PS.empty fvs) scope.
 
-Definition lambda_lift (e : exp) (args : nat) (no_push : nat) (c : comp_data) : error exp * comp_data :=
-  let '(e', (c', _)) := run_compM (exp_lambda_lift args no_push lift_all
+Definition lambda_lift (e : exp) (args : nat) (no_push : nat) (inl : bool) (c : comp_data) : error exp * comp_data :=
+  let '(e', (c', _)) := run_compM (exp_lambda_lift args no_push (if inl then lift_all else lift_conservative)
                                                    e PS.empty PS.empty (Maps.PTree.empty VarInfo)
                                                    (Maps.PTree.empty FunInfo) (M.empty GFunInfo))
                                   c tt in  

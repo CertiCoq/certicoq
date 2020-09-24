@@ -436,7 +436,7 @@ Definition inline_small (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) 
 Fixpoint find_indirect_call (f : var) (e : exp) (s:M.t bool) : M.t bool :=
   let b := (fix is_wrapper e :=
               match e with
-              | Econstr _ _ _  e 
+              | Econstr _ _ _  e
               | Eproj _ _ _ _ e
               | Eprim _ _ _ e => is_wrapper e
               | Eletapp _ _ _ _ e => None
@@ -444,10 +444,11 @@ Fixpoint find_indirect_call (f : var) (e : exp) (s:M.t bool) : M.t bool :=
               | Ehalt _
               | Efun _ _ => None
               | Eapp g _ _ => Some g
+              (* | _ => None *)
                 end) e in
   match b with
   | None => s
-  | Some g =>  M.set g true s
+  | Some g => M.set g true s
   end.
 
 
@@ -466,15 +467,28 @@ Definition InineLifted: InlineHeuristic (M.t bool) :=
                         end;                       
   |}.
 
-Definition inline_wrappers (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
+Definition inline_lifted (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
   inline_top _ InineLifted max_var e d (M.empty bool) c false.
 
+(* "Bogus" inlining. Renames all variables with fresh names but does not inline any function. *)
 
+(* Inlines functions based on patterns found in the code *)
+Definition InlineNone: InlineHeuristic unit :=
+  {| update_funDef  := fun (fds:fundefs) (sigma:r_map) (s:_) => (tt, tt);
+     update_inFun := fun (f:var) (t:fun_tag) (xs:list var) (e:exp) (sigma:r_map) (s:_) => tt;
+     update_App := fun (f:var) (t:fun_tag) (ys:list var) (s:_) => (tt, false);
+     update_letApp := fun (f:var) (t:fun_tag) (ys:list var) (s:_) => (tt, tt, false);
+  |}.
+
+Definition inline_none (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
+  inline_top _ InlineNone max_var e d tt c false.
+
+(*
 (* Inline the calls to known functions from the escaping  wrappers *)
 Fixpoint find_wrappers (fds : fundefs) (s:M.t bool) : M.t bool :=
   match fds with
   | Fcons f _ _ (Eapp g _ _) fds' =>
-    (* f immediately calls g -- inline g *) 
+    (* f immediately calls g -- inline f *) 
     let s' := if (f =? g) then s else  M.set f true s in
     find_wrappers fds' s'
   | _ => s
@@ -500,3 +514,4 @@ Definition InineLambdaLifted: InlineHeuristic (M.t bool) :=
 
 Definition inline_lambda_lifted (max_var : var) (e:exp) (s:M.t nat) (bound:nat) (d:nat) (c : comp_data) :=
   inline_top _ InineLambdaLifted max_var e d (M.empty bool) c false.
+*)

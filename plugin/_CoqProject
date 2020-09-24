@@ -2,8 +2,14 @@
 -I .
 -R . CertiCoq.Plugin
 
-# extracted compiler
-# extraction/ast0.mli
+
+# plugin
+certicoq.mli
+certicoq.ml
+g_certicoq.mlg
+certicoq_plugin_mod.ml
+certicoq_plugin.mllib
+CertiCoq.v
 
 certicoq_debug.mli
 certicoq_debug.ml
@@ -38,33 +44,31 @@ extraction/binPosDef.mli
 extraction/binPosDef.ml
 extraction/binInt.mli
 extraction/binInt.ml
-extraction/numeral.mli
-extraction/numeral.ml
+# extraction/numeral.mli
+# extraction/numeral.ml
 extraction/basicAst.mli
 extraction/basicAst.ml
-extraction/all_Forall.mli
-extraction/all_Forall.ml
+# extraction/all_Forall.mli
+# extraction/all_Forall.ml
 extraction/specif.mli
 extraction/specif.ml
 extraction/logic0.mli
 extraction/logic0.ml
 extraction/binNums.ml
 extraction/binNums.mli
-extraction/orderedType0.mli
-extraction/orderedType0.ml
-extraction/cRelationClasses.ml
-extraction/cRelationClasses.mli
-extraction/mCRelations.ml
-extraction/mCRelations.mli
-extraction/mCOption.mli
-extraction/mCOption.ml
+# extraction/orderedType0.mli
+# extraction/orderedType0.ml
+# extraction/cRelationClasses.ml
+# extraction/cRelationClasses.mli
+# extraction/mCRelations.ml
+# extraction/mCRelations.mli
+# extraction/mCOption.mli
+# extraction/mCOption.ml
 
 # extraction/fappli_IEEE.ml
 # extraction/fappli_IEEE.mli
 # extraction/fappli_IEEE_bits.ml
 # extraction/fappli_IEEE_bits.mli
-extraction/aST.ml
-extraction/aST.mli
 # extraction/freshen.ml
 # extraction/freshen.mli
 extraction/archi.ml
@@ -111,6 +115,9 @@ extraction/cop.ml
 extraction/cop.mli
 extraction/coqlib0.ml
 extraction/coqlib0.mli
+extraction/AST.ml
+extraction/AST.mli
+
 extraction/cps.ml
 extraction/cps.mli
 extraction/cps_show.ml
@@ -147,10 +154,10 @@ extraction/expression.ml
 extraction/expression.mli
 extraction/extract.ml
 extraction/extract.mli
-extraction/fLT.ml
-extraction/fLT.mli
-# extraction/fMapPositive.ml
-# extraction/fMapPositive.mli
+extraction/FLT.ml
+extraction/FLT.mli
+extraction/fMapPositive.ml
+extraction/fMapPositive.mli
 extraction/fappli_IEEE_extra.ml
 extraction/fappli_IEEE_extra.mli
 extraction/ffi.ml
@@ -163,8 +170,8 @@ extraction/glue.ml
 extraction/glue.mli
 extraction/glue_utils.ml
 extraction/glue_utils.mli
-extraction/hexadecimal0.ml
-extraction/hexadecimal0.mli
+# extraction/hexadecimal0.ml
+# extraction/hexadecimal0.mli
 extraction/hoisting.ml
 extraction/hoisting.mli
 extraction/identifiers.ml
@@ -271,8 +278,8 @@ extraction/pCUICCumulativity.ml
 extraction/pCUICCumulativity.mli
 extraction/pCUICLiftSubst.ml
 extraction/pCUICLiftSubst.mli
-extraction/pCUICInduction.ml
-extraction/pCUICInduction.mli
+# extraction/pCUICInduction.ml
+# extraction/pCUICInduction.mli
 extraction/pCUICNormal.ml
 extraction/pCUICNormal.mli
 extraction/pCUICPosition.ml
@@ -383,12 +390,3 @@ extraction/zbool.ml
 extraction/zbool.mli
 extraction/zpower.ml
 extraction/zpower.mli
-
-
-# plugin
-certicoq.mli
-certicoq.ml
-g_certicoq.mlg
-certicoq_plugin_mod.ml
-certicoq_plugin.mllib
-CertiCoq.v

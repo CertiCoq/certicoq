@@ -1,5 +1,5 @@
-From MetaCoq.Template Require Import monad_utils utils.
-
+From MetaCoq.Template Require Import utils.
+From ExtLib Require Import Monads.
 Import MonadNotation.
 
 Require Import Coq.Lists.List.

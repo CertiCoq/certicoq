@@ -1,6 +1,6 @@
 Require Import Coq.Strings.String.
 Set Implicit Arguments.
-From MetaCoq.Template Require Import monad_utils.
+From ExtLib Require Import Monads.
 Import MonadNotation.
 
 Inductive exception (A:Type) := Exc (_:string) | Ret (_:A).

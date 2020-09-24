@@ -5,7 +5,6 @@ Bool
 Equalities
 Decimal
 Hexadecimal
-Numeral0
 Nat0
 List0
 PeanoNat
@@ -28,15 +27,11 @@ MSetDecide
 MSetList
 MSetProperties
 BinNums
-CRelationClasses
 Compare_dec
 MCList
-MCRelations
-MCOption
 MCProd
 MCCompare
 MCString
-All_Forall
 Config0
 Universes0
 BasicAst
@@ -83,7 +78,6 @@ UGraph0
 Typing0
 PCUICAst
 PCUICAstUtils
-PCUICInduction
 PCUICUnivSubst
 PCUICLiftSubst
 EqDecInstances

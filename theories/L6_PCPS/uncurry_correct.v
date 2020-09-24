@@ -2520,7 +2520,7 @@ Section uncurry_correct.
           auto.
   Qed.
 
-  Opaque pbind bind ret.
+  Opaque bind ret.
 
   Lemma app_l_injective : forall {A} (l : list A) r1 r2, l ++ r1 = l ++ r2 -> r1 = r2.
   Proof.
@@ -2859,7 +2859,7 @@ Section uncurry_correct.
         * (* Ecase :: *)
           eapply pre_eq_state_lr; intros [] st [Huniq Hused].
           unfold uncurry_exp; fold uncurry_exp.
-          Transparent pbind. setoid_rewrite assoc. Opaque pbind.
+          Transparent bind. setoid_rewrite assoc. Opaque bind.
           eapply bind_triple'.
           rewrite pre_post_copy.
           eapply pre_strenghtening; [|use_IH IHn].

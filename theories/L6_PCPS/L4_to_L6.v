@@ -1665,7 +1665,7 @@ Section Post.
                                      (xs2 := [v5; v5]) (vs2 := vs2); clear Hsetl2.
           econstructor.
           eassumption.
-          symmetry. rewrite H2. eassumption. 
+          symmetry. eapply Hsetl.
           simpl in Hsetl.
           destruct vs1. inv Hsetl.
           destruct vs1. inv Hsetl.
@@ -1673,7 +1673,7 @@ Section Post.
           simpl in H1.
           destruct vs2. inv H1.
           destruct vs2. inv H1.
-          destruct vs2. 2: { inv H1. } rewrite <- H2. inv H1. 
+          destruct vs2. 2: { inv H1. } 
           eexists. eexists. eexists. split.
           reflexivity. split.
           reflexivity.
@@ -1865,7 +1865,7 @@ Section Post.
                                      (xs2 := [v3; v2]) (vs2 := vs2); clear Hset2.
                 econstructor. 
                 eassumption.
-                symmetry. rewrite H1. eassumption. 
+                symmetry. eapply Hset.
                 simpl in Hset.
                 destruct vs1. inv Hset.
                 destruct vs1. inv Hset.
@@ -1873,7 +1873,7 @@ Section Post.
                 simpl in H0.
                 destruct vs2. inv H0.
                 destruct vs2. inv H0.
-                destruct vs2. 2: { inv H0. } rewrite <- H1. inv H0. 
+                destruct vs2. 2: { inv H0. } inv H0. 
                 eexists. eexists. eexists. split.
                 reflexivity. split.
                 reflexivity.
@@ -1963,6 +1963,7 @@ Section Post.
             rewrite peq_true in *.
             inv Hfind.
             pose proof (set_lists_length2) as Hset2.
+            set(tg:= kon_tag).
             edestruct Hset2 with (rho := (def_funs
                                             (Fcons v tg [v0]
                                                    (Efun (Fcons v1 tg [v2]
@@ -1985,7 +1986,7 @@ Section Post.
             reflexivity. split.
             symmetry. eassumption.
             simpl in H0. destruct vs2. inv H0.
-            destruct vs2. 2: { inv H0. } rewrite <- H1. inv H0. 
+            destruct vs2. 2: { inv H0. } inv H0. 
             intros Hlt2 Hall.  
             eapply preord_exp_fun_compat.
             - admit.
@@ -2008,7 +2009,7 @@ Section Post.
                 rewrite preord_val_eq. unfold preord_val'.
                 intros vs1 vs2 l tg' xs1 e5 rho1' Hlen_eq2 Hfind Hset.
                 simpl in *.
-                rewrite peq_true in *. rewrite <- H1. inv Hfind.
+                rewrite peq_true in *. inv Hfind.
                 pose proof (set_lists_length2) as Hset2.
                 edestruct Hset2 with (xs1 := [v2]) (vs1 := vs1)
                                      (xs2 := [v6]) (vs2 := vs2); clear Hset2.
@@ -2084,7 +2085,7 @@ Section Post.
                   clear Hset2. 
                 eapply gensym_n_nAnon_length_eq. eassumption. eassumption. 
                 eassumption.
-                symmetry. rewrite H1. eassumption.
+                symmetry. eapply Hset.
                 eexists. eexists. eexists. split.
                 reflexivity. split.
                 symmetry. eassumption.
@@ -2180,6 +2181,7 @@ Section Post.
             rewrite peq_true in *. 
             inv Hfind.
             pose proof (set_lists_length2) as Hset2.
+            set(tg := kon_tag).
             edestruct Hset2 with (rho := (M.set v0
                                                 (Vfun rho1
                                                       (Fcons v0 tg [v] e5 Fnil) v0)

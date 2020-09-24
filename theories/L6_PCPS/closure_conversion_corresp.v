@@ -742,7 +742,7 @@ Section CC_correct.
          | _ => ret fe
        end).
   Proof.
-    unfold pbind, ret.
+    unfold bind, ret.
     intros r s. simpl. destruct (runState m1 r s).
     destruct e; simpl; auto.
     destruct (runState m2 r p).

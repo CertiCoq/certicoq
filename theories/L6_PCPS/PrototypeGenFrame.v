@@ -578,7 +578,6 @@ Definition gen_univ_univD (qual : modpath) (typename : kername) (g : mind_graph_
   let ind_entry : one_inductive_entry := {|
     mind_entry_typename := ty_u;
     mind_entry_arity := type0;
-    mind_entry_template := false;
     mind_entry_consnames := tys;
     mind_entry_lc := repeat (tRel 0) #|tys| |}
   in
@@ -595,7 +594,8 @@ Definition gen_univ_univD (qual : modpath) (typename : kername) (g : mind_graph_
     mind_entry_params := [];
     mind_entry_inds := [ind_entry];
     mind_entry_universes := Monomorphic_entry (LevelSet.empty, ConstraintSet.empty);
-    mind_entry_variance := None;
+    mind_entry_template := false;
+    mind_entry_cumulative := false;
     mind_entry_private := None |}, ty_ns, (qual, snd typename +++ "_univD"), body).
 
 Definition holes_of {A} (xs : list A) : list ((list A × A) × list A) :=
@@ -661,7 +661,6 @@ Definition gen_frame_t (qual : modpath) (typename : kername) (inds : ind_info) (
   let ind_entry : one_inductive_entry := {|
     mind_entry_typename := snd typename +++ "_frame_t";
     mind_entry_arity := fn univ (fn univ type0);
-    mind_entry_template := false;
     mind_entry_consnames := map (fun h => h.(hName)) fs;
     mind_entry_lc := ctr_types |}
   in
@@ -671,7 +670,8 @@ Definition gen_frame_t (qual : modpath) (typename : kername) (inds : ind_info) (
     mind_entry_params := [];
     mind_entry_inds := [ind_entry];
     mind_entry_universes := Monomorphic_entry (LevelSet.empty, ConstraintSet.empty);
-    mind_entry_variance := None;
+    mind_entry_template := false;
+    mind_entry_cumulative := false;
     mind_entry_private := None |}.
 
 Definition gen_frameD (qual : modpath) (typename : kername) (univD_kername : kername) (fs : list frame)

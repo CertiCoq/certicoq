@@ -5,7 +5,7 @@ type command_args =
  | OPT of int
  | DEBUG
  | ARGS of int 
- | FVARGS of int (* The number of fvs passed as params and the original params shall not exceed this number *)
+ | ANFCONFIG of int (* The number of fvs passed as params and the original params shall not exceed this number *)
  | EXT of string (* Filename extension to be appended to the file name *)
  | DEV of int
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
@@ -17,7 +17,7 @@ type options =
     olevel    : int;
     debug     : bool;
     args      : int;
-    fv_args   : int;
+    anf_conf  : int;
     ext       : string;
     dev       : int;
     prefix    : string;

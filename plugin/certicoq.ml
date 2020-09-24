@@ -45,7 +45,7 @@ type command_args =
  | OPT of int
  | DEBUG
  | ARGS of int
- | FVARGS of int (* The number of fvs passed as params and the original params shall not exceed this number *)
+ | ANFCONFIG of int (* To measure different ANF configurations *)
  | EXT of string (* Filename extension to be appended to the file name *)
  | DEV of int    (* For development purposes *)
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
@@ -57,7 +57,7 @@ type options =
     olevel    : int;
     debug     : bool;
     args      : int;
-    fv_args   : int;
+    anf_conf  : int;
     ext       : string;
     dev       : int;
     prefix    : string;
@@ -66,11 +66,11 @@ type options =
 let default_options : options =
   { cps       = true;
     time      = false;
-    time_anf  = true;
+    time_anf  = false;
     olevel    = 0;
     debug     = false;
     args      = 5;
-    fv_args   = 10;
+    anf_conf  = 0;
     ext       = "";
     dev       = 0;
     prefix    = ""
@@ -108,7 +108,7 @@ let make_options (l : command_args list) : options =
     | OPT n    :: xs -> aux {o with olevel = n} xs
     | DEBUG    :: xs -> aux {o with debug = true} xs
     | ARGS n   :: xs -> aux {o with args = n} xs
-    | FVARGS n :: xs -> aux {o with fv_args = n} xs
+    | ANFCONFIG n :: xs -> aux {o with anf_conf = n} xs
     | EXT s    :: xs -> aux {o with ext = s} xs
     | DEV n    :: xs -> aux {o with dev = n} xs
     | PREFIX s :: xs -> aux {o with prefix = s} xs
@@ -119,12 +119,12 @@ let make_pipeline_options (opts : options) =
   let args = coq_nat_of_int opts.args in
   let olevel = coq_nat_of_int opts.olevel in
   let timing = opts.time in
-  let timing_anf = opts.time in
+  let timing_anf = opts.time_anf in
   let debug  = opts.debug in
-  let fv_args = coq_nat_of_int opts.fv_args in
+  let anfc = coq_nat_of_int opts.anf_conf in
   let dev = coq_nat_of_int opts.dev in
   let prefix = chars_of_string opts.prefix in
-  Pipeline.make_opts cps args fv_args olevel timing timing_anf debug dev prefix
+  Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix
 
 (** Main Compilation Functions *)
 

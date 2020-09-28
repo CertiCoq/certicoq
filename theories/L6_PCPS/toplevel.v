@@ -124,8 +124,10 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
             (no_push : nat)       (* How many times we allow free variables to be pushed and popped from the stuck after lambda lifting  *)
             (inl_wrappers : bool) (* If true, lambda lifting inlines calls cites agressively *)
             (inl_known : bool)    (* If true, lambda lifting inlines known calls inside wrappers *)
-            (time : bool).        (* time ANF phases *)
-  
+            (time : bool)         (* time ANF phases *)
+            (inl_before : bool)   (* Perform shrink/inline loop before closure conversion *)
+            (inl_after : bool).   (* Perform shrink/inline loop after closure conversion *)
+            
     (* Wrap the shrink reducer so that it has the same type as other ANF transformations *)
     Definition shrink_err (e : exp) (c : comp_data) := (Ret (shrink_cps.shrink_top e), c). 
     
@@ -161,7 +163,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
           let (e_err, c_data) := time_anf "Inline uncurry wrappers" (fun _ => inline_uncurry next_var e s 10 100 c_data) in
           e <- e_err ;;
           (* Inline small functions *) 
-          let (e_err, c_data) := time_anf "Inline/shrink loop" (fun _ => inline_small next_var e s 10 100 c_data) in
+          let (e_err, c_data) := if inl_before then time_anf "Inline/shrink loop" (fun _ => inline_small next_var e s 10 100 c_data) else (compM.Ret e, c_data) in
           e <- e_err ;;
           (* Shrink reduction *)
           let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) in
@@ -183,11 +185,6 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
           in
           (* Shrink reduction *)
           let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) in
-          (* Inline wrapper functions *)
-          let (e_err, c_data) := if inl_known then
-                                   time_anf "Inline known functions inside wrappers" (fun _ => inline_lifted next_var e s 10 1000 c_data)
-                                 else (compM.Ret e, c_data) in
-          e <- e_err ;;
           (* Shrink reduction *)
           let (e, _) := if (opt =? 2)%nat then time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) else (e, 0%nat) in
           (* Dead parameter elimination *)
@@ -196,12 +193,13 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
           (* Shrink reduction *)
           let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) in
           (* Inline small functions *) 
-          let (e_err, c_data) := time_anf "Inline/shrink loop" (fun _ => inline_small next_var e s 10 100 c_data) in
+          let (e_err, c_data) := if inl_after then time_anf "Inline/shrink loop" (fun _ => inline_small next_var e s 10 100 c_data) else (compM.Ret e, c_data) in
           e <- e_err ;;
-          (* (* Inline wrapper functions *) *)
-          (* let (e_err, c_data) := if (opt =? 2)%nat then *)
-          (*                          time_anf "Inline known functions inside wrappers" (fun _ => inline_lifted next_var e s 10 1000 c_data) *)
-          (*                        else (compM.Ret e, c_data) in *)
+          (* Inline in wrapper functions *)
+          let (e_err, c_data) := if inl_known then
+                                   let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) in
+                                   time_anf "Inline known functions inside wrappers" (fun _ => inline_lifted next_var e s 10 1000 c_data)
+                                 else (compM.Ret e, c_data) in
           e <- e_err ;;
 
           ret (e, c_data)
@@ -267,22 +265,28 @@ End Pipeline.
    - fvs live across 0 calls
 1: Like 0, but conservative inlining
 2: Like 0, but inline known calls inside wrappers
-3: Like 0, but like across 1 call
+3: Like 0, but like across 0 call
 4: Like 0, but like across 2 calls
 5: Like 0, but like across 10 calls
+6: Like 0, but do not perform inline/shrink loop before CC
+7: Like 0, but do not perform inline/shrink loop after CC
+8: Like 0, but do not perform inline/shrink at all
  *)
 
 Open Scope nat.
   
-Definition config_anf (config : nat) : (bool * bool * nat) :=
-  let default := (true, false, 0) in 
+Definition config_anf (config : nat) : (bool * bool * nat * bool * bool) :=
+  let default := (true, false, 1, true, true) in 
   match config with
   | 0 => default
-  | 1 => (false, false, 0)
-  | 2 => (true, true, 0)
-  | 3 => (true, false, 1)
-  | 4 => (true, false, 2)
-  | 5 => (true, false, 10)
+  | 1 => (false, false, 1, true, true)
+  | 2 => (true, true, 1, true, true)
+  | 3 => (true, false, 0, true, true)
+  | 4 => (true, false, 2, true, true)
+  | 5 => (true, false, 10, true, true)
+  | 6 => (true, false, 1, false, true)
+  | 7 => (true, false, 1, true, false)
+  | 8 => (true, false, 1, false, false)
   | _ => default
   end.
 
@@ -292,9 +296,9 @@ Definition compile_L6 : CertiCoqTrans L6_FullTerm L6_FullTerm :=
     opts <- get_options ;;
     let cps := negb (direct opts) in
     let args := c_args opts in
-    let '(inl_wrappers, inl_known, no_push) := config_anf (anf_conf opts) in
+    let '(inl_wrappers, inl_known, no_push, inl_before, inl_after) := config_anf (anf_conf opts) in
     let time := Pipeline_utils.time_anf opts in
-    LiftErrorLogCertiCoqTrans "L6 Pipeline" (L6_pipeline (o_level opts) cps args no_push inl_wrappers inl_known time) src.
+    LiftErrorLogCertiCoqTrans "L6 Pipeline" (L6_pipeline (o_level opts) cps args no_push inl_wrappers inl_known time inl_before inl_after) src.
 
 
 Definition compile_L6_debug : CertiCoqTrans L6_FullTerm L6_FullTerm :=
@@ -303,6 +307,6 @@ Definition compile_L6_debug : CertiCoqTrans L6_FullTerm L6_FullTerm :=
     opts <- get_options ;;
     let cps := negb (direct opts) in
     let args := c_args opts in
-    let '(inl_wrappers, inl_known, no_push) := config_anf (anf_conf opts) in
+    let '(inl_wrappers, inl_known, no_push, inl_before, inl_after) := config_anf (anf_conf opts) in
     let time := Pipeline_utils.time_anf opts in
     LiftErrorLogCertiCoqTrans "L6 Pipeline" (L6_pipeline_print (o_level opts) cps args no_push inl_wrappers time) src.

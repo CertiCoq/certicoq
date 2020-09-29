@@ -138,8 +138,6 @@ extraction/l6_to_Clight_stack.ml
 extraction/l6_to_Clight_stack.mli
 extraction/lambda_lifting.ml
 extraction/lambda_lifting.mli
-extraction/list1.ml
-extraction/list1.mli
 extraction/list_util.ml
 extraction/list_util.mli
 extraction/mCCompare.ml
@@ -196,8 +194,6 @@ extraction/ordersLists.ml
 extraction/ordersLists.mli
 extraction/ordersTac.ml
 extraction/ordersTac.mli
-extraction/orderedTypeEx.mli
-extraction/orderedTypeEx.ml
 extraction/orderedTypeAlt.mli
 extraction/orderedTypeAlt.ml
 extraction/orderedType0.mli

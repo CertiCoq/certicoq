@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
 
   // Specify number of runs
   int n = 1;
-  if (argc > 0) n = atoi(argv[1]);
+  if (argc > 1) n = atoi(argv[1]);
 
   start = clock();
   // Run Coq program

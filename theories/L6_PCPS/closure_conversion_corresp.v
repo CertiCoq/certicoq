@@ -53,9 +53,9 @@ Section CC_correct.
 
 
   (* TODO move to state *)
-  Lemma get_name_no_suff_fresh 
+  Lemma get_named_str_fresh 
      : forall (A : Type) (S : Ensemble var) (str : string),
-       {{fun (_ : unit) (s : comp_data * A) => fresh S (next_var (fst s))}} get_name_no_suff str
+       {{fun (_ : unit) (s : comp_data * A) => fresh S (next_var (fst s))}} get_named_str str
        {{fun (_ : unit) (s : comp_data * A) (x : var) (s' : comp_data * A) =>
          In var S x /\
          In var (Range (next_var (fst s)) (next_var (fst s'))) x /\
@@ -246,7 +246,7 @@ Section CC_correct.
     unfold get_var.
     destruct (FVmap ! x) as [[] |] eqn:Hx.
     - eapply bind_triple.
-      + eapply get_name_fresh.     
+      + eapply get_name_spec.     
       + intros x' s. eapply return_triple. intros _ s' [Hx' [Hrange [Hf Hf']]].
         eexists (Eproj_c x' _ n Γ Hole_c).
         edestruct Minv3 as [H1 [H2 [H3 [H4 H5]]]]. now repeat eexists; eauto.
@@ -258,7 +258,7 @@ Section CC_correct.
           intros Harb; inv Harb. unfold In, Range in *; zify; omega. }
         { zify; omega. }
     - eapply bind_triple.
-      + eapply get_name_fresh.  
+      + eapply get_name_spec.  
       + intros x' s. eapply return_triple. intros _ s' [Hx' [Hrange [Hf Hf']]].
         edestruct Minv2 as [H1 H2]; eauto. 
         exists (Econstr_c x' clo_tag [x; v] Hole_c). eexists; splits.
@@ -297,14 +297,14 @@ Section CC_correct.
         eapply bind_triple'.
         { eapply pre_strenghtening.
           { intros st s H; rewrite <- H in HS_c_env. exact (conj H HS_c_env). }
-          apply frame_rule, get_name_fresh. }
+          apply frame_rule, get_name_spec. }
         intros y s_y.
         apply pre_curry_l; intros HS_s_y.
         apply pre_curry_l; intros HS_y.
         eapply bind_triple'.
         { eapply pre_strenghtening.
           { intros st s H; pose (H' := H); clearbody H'; destruct H' as [? [? Hres]]; exact (conj H Hres). }
-          apply frame_rule, get_name_fresh. }
+          apply frame_rule, get_name_spec. }
         intros g_env s_g_env.
         apply return_triple.
         intros _ s_final [[Hran_y [Hinc_y Hfresh_y]] [HS_g_env [Hran_g_env [Hinc_g_env Hfresh_g_env]]]].
@@ -2063,10 +2063,10 @@ Section CC_correct.
       apply pre_curry_l; intros [Hfresh_f [HbvC_f Hinc_f]].
       apply pre_existential; intros C_ys; apply pre_existential; intros S_ys.
       apply pre_curry_l; intros [Hprojs [Hctx_ys Huniq_ys]].
-      eapply bind_triple'; [eapply pre_strenghtening; [|apply get_name_fresh] |].
+      eapply bind_triple'; [eapply pre_strenghtening; [|apply get_name_spec] |].
       { intros ? ? [Hres ?]; exact Hres. }
       intros ptr s_ptr; apply pre_curry_l; intros [Hfresh_ys [HbvC_ys Hinc_ys]].
-      eapply bind_triple'; [eapply pre_strenghtening; [|apply get_name_fresh] |].
+      eapply bind_triple'; [eapply pre_strenghtening; [|apply get_name_spec] |].
       { intros ? ? [? [? [? Hres]]]; exact Hres. }
       intros Γ' s_Γ'; apply pre_curry_l; intros [HS_ptr [Hptr_ran [Hs_ptr Hfresh_ptr]]].
       apply pre_curry_l; intros HS_Γ'.
@@ -2285,7 +2285,7 @@ Section CC_correct.
         - intros x Hx; constructor; auto.
           intros Hc; destruct Hdis2 as [Hdis2]; contradiction (Hdis2 x); constructor; auto.
           normalize_bound_var; left; apply name_in_fundefs_bound_var_fundefs; auto. }
-      eapply bind_triple'; [ eapply get_name_no_suff_fresh |].
+      eapply bind_triple'; [ eapply get_named_str_fresh |].
       intros Γ' s_Γ'. eapply pre_curry_l. intros HS_Γ'.
       eapply bind_triple'.
       { eapply pre_strenghtening; [|eapply make_env_spec].
@@ -2697,10 +2697,10 @@ Section CC_correct.
           eapply pre_existential. intros S''.
           eapply pre_curry_l. intros [Hvars [Hctx2 Huniq2]].
           eapply bind_triple'.
-          eapply pre_strenghtening; [|eapply get_name_fresh].
+          eapply pre_strenghtening; [|eapply get_name_spec].
           { intros ? ? [Hres ?]; exact Hres. }
           intros x' i. eapply pre_curry_l. intros [Hfresh'' Hf1].
-          eapply bind_triple'; [eapply pre_strenghtening; [|eapply get_name_fresh] |].
+          eapply bind_triple'; [eapply pre_strenghtening; [|eapply get_name_spec] |].
           { intros ? ? [? [? [? Hres]]]; exact Hres. }
           intros x'' s3. eapply pre_curry_l. intros Hf2. 
           eapply return_triple.
@@ -2865,7 +2865,7 @@ Section CC_correct.
       + simpl. rewrite (proj1 (ub_app_ctx_f _)); splits; auto.
         * constructor.
         * normalize_bound_var; eauto with Ensembles_DB.
-    - eapply bind_triple'; [apply get_name_no_suff_fresh|].
+    - eapply bind_triple'; [apply get_named_str_fresh|].
       intros Γ s_Γ. apply pre_curry_l; intros Hfresh_Γ.
       apply pre_curry_l; intros HS_Γ.
       pose (Huniq_whole := Huniq); clearbody Huniq_whole.
@@ -3360,13 +3360,13 @@ Section CC_correct.
     intros Hnin.
     unfold get_var. destruct (Maps.PTree.get x FVmap) eqn:Heq.
     - destruct v.
-      + eapply bind_triple. apply get_name_fresh.
+      + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e Hin. rewrite bound_var_Eproj.
         apply Union_Included. eapply Included_trans; [ eassumption |]...
         apply Singleton_Included. right. eapply Hf. zify; omega.
-      + eapply bind_triple. apply get_name_fresh.
+      + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e Hin'. rewrite bound_var_Econstr.
@@ -3428,7 +3428,7 @@ Section CC_correct.
      }}.
   Proof with now eauto with Ensembles_DB.
     revert S; induction B; intros S. 
-    - eapply bind_triple. now apply get_name_fresh.
+    - eapply bind_triple. now apply get_name_spec.
       intros x s1. apply pre_curry_l. intros Hf1.
       eapply bind_triple. now eapply IHB.
       intros [[m1' m2'] f1] _. apply return_triple.
@@ -3538,7 +3538,7 @@ Section CC_correct.
         simpl in *. eapply Hf. rewrite !bound_var_Eproj.
         rewrite <- Union_assoc, Union_commut with (s2 := Setminus _ _ _), Union_assoc... 
         eapply fresh_monotonic; [| eassumption ]...
-    - eapply bind_triple. now apply get_name_no_suff_fresh.
+    - eapply bind_triple. now apply get_named_str_fresh.
       intros Γ' s1. eapply pre_curry_l. intros Hf1.
       eapply bind_triple with
       (post' :=
@@ -3620,9 +3620,9 @@ Section CC_correct.
       eapply Disjoint_Included_r; [| eassumption ].
       rewrite occurs_free_Eapp...
       intros [xs f'] s2. apply pre_curry_l. intros He'.
-      eapply bind_triple. now apply get_name_fresh.
+      eapply bind_triple. now apply get_name_spec.
       intros ptr s3. apply pre_curry_l. intros Hf.
-      eapply bind_triple. now apply get_name_fresh.
+      eapply bind_triple. now apply get_name_spec.
       intros env s4. apply pre_curry_l. intros Hf'.
       apply return_triple. intros s5. intros Hf''.
       simpl in *. split.
@@ -3656,7 +3656,7 @@ Section CC_correct.
       eapply Included_trans. now eapply Hin. reflexivity.
       eapply fresh_monotonic; [| eassumption ]...
     - eapply bind_triple.
-      now apply get_name_fresh.
+      now apply get_name_spec.
       intros env s1. apply pre_curry_l; intros Hf.
       eapply bind_triple. eapply IHe.
       eapply Disjoint_Included_l. now apply Setminus_Included.
@@ -3706,11 +3706,11 @@ Section CC_correct.
     intros Hnin.
     unfold get_var. destruct (Maps.PTree.get x FVmap) eqn:Heq.
     - destruct v.
-      + eapply bind_triple. apply get_name_fresh.
+      + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e. rewrite bound_var_Eproj...
-      + eapply bind_triple. apply get_name_fresh.
+      + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e. rewrite bound_var_Econstr...
@@ -3777,11 +3777,11 @@ Section CC_correct.
     intros Hinv Hnin.
     unfold get_var. destruct (Maps.PTree.get x FVmap) eqn:Heq.
     - destruct v.
-      + eapply bind_triple. apply get_name_fresh.
+      + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e. normalize_occurs_free...
-      + eapply bind_triple. apply get_name_fresh.
+      + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e. normalize_occurs_free. rewrite FromList_cons, FromList_singleton.
@@ -3820,11 +3820,11 @@ Section CC_correct.
     intros Hinv Hnin.
     unfold get_var. destruct (Maps.PTree.get x FVmap) eqn:Heq.
     - destruct v.
-      + eapply bind_triple. apply get_name_fresh.
+      + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf'].
         eapply Hinv in Heq. inv Heq. inv H.
-      + eapply bind_triple. apply get_name_fresh.
+      + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf'].
         assert (Hc : In _ (Setminus _ (Empty_set var) Scope) x)
@@ -3894,7 +3894,7 @@ Section CC_correct.
      }}.
   Proof with now eauto with Ensembles_DB.
     revert S; induction B; intros S Hun. 
-    - inv Hun. eapply bind_triple. now apply get_name_fresh.
+    - inv Hun. eapply bind_triple. now apply get_name_spec.
       intros x s1. apply pre_curry_l. intros Hf1.
       eapply bind_triple. now eapply IHB.
       intros [[m1' m2'] f1] _. apply return_triple.
@@ -4169,7 +4169,7 @@ Section CC_correct.
         eapply fresh_monotonic; [| eassumption ]...
     - eapply post_mp. 
       eapply exp_closure_conv_closed_fundefs with (e := Efun f2 e); eassumption.
-      eapply bind_triple. now eapply get_name_no_suff_fresh.
+      eapply bind_triple. now eapply get_named_str_fresh.
       intros Γ' s1. eapply pre_curry_l. intros Hf1.
       eapply bind_triple.
       + eapply post_conj.
@@ -4281,9 +4281,9 @@ Section CC_correct.
         repeat normalize_occurs_free_in_ctx...
         intros [xs f'] s2. 
         apply pre_curry_l. intros He'. apply pre_curry_l; intros Heq; subst.
-        eapply bind_triple. now apply get_name_fresh.
+        eapply bind_triple. now apply get_name_spec.
         intros y s3. apply pre_curry_l. intros Hfy.
-        eapply bind_triple. now apply get_name_fresh.
+        eapply bind_triple. now apply get_name_spec.
         intros z s4. apply pre_curry_l. intros Hfz.
         apply return_triple. intros s5 Hf.
         split.
@@ -4351,14 +4351,14 @@ Section CC_correct.
   Proof with now eauto with Ensembles_DB.
     intros Hnin. unfold get_var. destruct (Maps.PTree.get x FVmap) eqn:Heq.
     - destruct v.
-      + eapply bind_triple. apply get_name_fresh.
+      + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e Hin Hd Hun. constructor; [| eassumption ].
         intros Hc. eapply Hd.
         eapply Hin in Hc. inv Hc. constructor. eauto. 
         eapply Hf. zify; omega. inv H. exfalso; eauto.
-      + eapply bind_triple. apply get_name_fresh.
+      + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e Hin Hd Hun. constructor; [| eassumption ].
@@ -4432,7 +4432,7 @@ Section CC_correct.
      }}.
   Proof with now eauto with Ensembles_DB.
     revert S; induction B; intros S Hun. 
-    - eapply bind_triple. now apply get_name_fresh.
+    - eapply bind_triple. now apply get_name_spec.
       intros x s1. apply pre_curry_l. intros Hf1. inv Hun.
       eapply bind_triple. eapply post_conj. now eapply IHB.
       now apply make_full_closure_bound_var_Included.
@@ -4469,7 +4469,7 @@ Section CC_correct.
      }}.
   Proof with now eauto with Ensembles_DB.
     revert S. induction B; intros S HD Hun.
-    - eapply bind_triple. now apply get_name_fresh.
+    - eapply bind_triple. now apply get_name_spec.
       intros v' s1. apply pre_curry_l. intros Hfv'.
       eapply bind_triple.
       + eapply post_conj.
@@ -4645,7 +4645,7 @@ Section CC_correct.
         apply Included_Setminus_compat. now eauto with Ensembles_DB.
         eapply Included_trans. eapply Hin'. rewrite bound_var_Eproj...
         eapply Setminus_Disjoint_preserv_l... 
-    - eapply bind_triple. now apply get_name_no_suff_fresh.
+    - eapply bind_triple. now apply get_named_str_fresh.
       intros Γ' s1. eapply pre_curry_l. intros Hf1. unfold make_env.
       assert (Heqel : (@FromList var (PS.elements (fundefs_fv f2))) = FromSet (fundefs_fv f2)) by reflexivity.
       destruct
@@ -4811,9 +4811,9 @@ Section CC_correct.
         intros ? [[Hun2 _] [[Hin2 Hf2] [Hin2' _]]].
         exact (conj (conj Hun2 (conj Hin2 Hin2')) Hf2).
         eapply pre_curry_l; intros [Hun2 [Hin2 Hin2']].
-        eapply bind_triple. now apply get_name_fresh.
+        eapply bind_triple. now apply get_name_spec.
         intros g' s3. eapply pre_curry_l. intros Hg'.
-        eapply bind_triple. now apply get_name_fresh.
+        eapply bind_triple. now apply get_name_spec.
         intros Γ' s4. eapply pre_curry_l. intros HΓ'.
         apply return_triple. intros s5. intros Hfs5. simpl. split.
         eapply Hun1.
@@ -4889,7 +4889,7 @@ Section CC_correct.
         eapply Included_Setminus_compat. reflexivity.
         eapply Included_trans. now apply Hin'.
         normalize_bound_var...
-    - eapply bind_triple. now apply get_name_fresh.
+    - eapply bind_triple. now apply get_name_spec.
       intros x s1. eapply pre_curry_l. intros Hfx. inv Hun. eapply bind_triple.
       + eapply post_conj;
         [ eapply IHe; eauto | eapply exp_closure_conv_bound_var_Included_mut ];

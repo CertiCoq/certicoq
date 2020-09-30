@@ -409,7 +409,7 @@ Section CC.
         let fv := fundefs_fv defs in
         let fvs :=  List.filter (fun x => match M.get x gfuns with Some _ => false | None => true end) (PS.elements fv) in
         (* let fvs := PS.elements fv in *)
-         Γ' <- get_name_no_suff "env";;
+         Γ' <- get_named_str "env";;
         (* register its pretty name *)
         t1 <- make_env fvs (Maps.PTree.empty VarInfo) mapfv c Γ' Γ gfuns ;;
         let '(c', mapfv_new, g1) := t1 in
@@ -449,7 +449,7 @@ Section CC.
          match defs with
          | Fcons f tag ys e defs' =>
            (* formal parameter for the environment pointer *)
-             Γ <- get_name_no_suff "env" ;;
+             Γ <- get_named_str "env" ;;
              (* Add mut rec functions to map *) 
              let mapfv' := add_closures all_defs mapfv Γ in
              (* Add arguments to the map *)       

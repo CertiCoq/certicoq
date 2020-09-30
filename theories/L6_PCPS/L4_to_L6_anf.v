@@ -69,13 +69,13 @@ Section Tags.
     | Anf_Var x => ret (C |[ Ehalt x ]|)
     | Anf_App f x => ret (C |[ Eapp f fun_tag [x] ]|)
     | Constr c xs =>
-      x' <- get_name_no_suff "y" ;; (* Get variable for interim result *)
+      x' <- get_named_str "y" ;; (* Get variable for interim result *)
       ret (C |[ Econstr x' c xs (Ehalt x') ]|)
     | Proj c n y =>
-      x' <- get_name_no_suff "y" ;; (* Get variable for interim result *)
+      x' <- get_named_str "y" ;; (* Get variable for interim result *)
       ret (C |[ Eproj x' c n y (Ehalt x') ]|)
     | Fun ft x e =>
-      x' <- get_name_no_suff" y" ;; (* Get variable for interim result *)
+      x' <- get_named_str" y" ;; (* Get variable for interim result *)
       ret (C |[ Efun (Fcons x' ft [x] e Fnil) (Ehalt x') ]|)
     end.
 
@@ -197,12 +197,12 @@ Section Tags.
          * pattern matches it, and returns the result of the pattern match. For those that are in tail position
          * these functions will be inlined by shrink reduction yielding the expected compilation result.
          * However, for those that are intermediate results these functions will appear in the C code.
-         * Another approach would be to use some form of local continuations to capture the continuation of
-         * the pattern-match
+         * Another approach would be to use some form of local continuations (join points) to capture the continuation
+         * of the pattern-match. This might be preferable because the join point will always be a tail call. 
          *)
         a <- convert_anf e1 vm ;;
-        f <- get_name_no_suff "f_case" ;; (* Case-analysis function *)
-        y <- get_name_no_suff "s" ;; (* Scrutinee argument *)
+        f <- get_named_str "f_case" ;; (* Case-analysis function *)
+        y <- get_named_str "s" ;; (* Scrutinee argument *)
         pats <- convert_anf_branches bl y vm ;;
         xc <- anf_term_to_ctx a def_name ;;
         let (x, C) := xc in
@@ -211,8 +211,8 @@ Section Tags.
       | Prf_e =>
         (* Zoe: Because a lot of dead code is *not* being eliminated *)
         ret (Constr default_tag [], Hole_c)            
-        (* f <- get_name_no_suff "f_proof" ;; *)
-        (* y <- get_name_no_suff "x" ;; *)
+        (* f <- get_named_str "f_proof" ;; *)
+        (* y <- get_named_str "x" ;; *)
         (* let c := consume_fun f y in              *)
         (* ret (Anf_Var f, c) *)
       end    

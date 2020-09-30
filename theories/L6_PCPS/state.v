@@ -69,10 +69,14 @@ Section CompM.
     compM.put (mkCompData ((n+1)%positive) c i f e fenv nenv' log, st) ;;
     ret n.
 
-
+  
   Definition get_names_lst (old : list var) (suff : string) : compM' (list var) :=
     mapM (fun o => get_name o suff) old.
 
+  Definition get_names_lst' (old : list var) (suff : string) (nenv_old : name_env) : compM' (list var) :=
+    mapM (fun o => get_name' o suff nenv_old) old.
+
+  
   (** Get a fresh name, and register a pretty name by appending a suffix to the pretty name of the old var *)
   Definition get_named (s : name) : compM' var :=
     p <- compM.get ;;
@@ -83,8 +87,9 @@ Section CompM.
 
   Definition get_named_lst (s : list name) : compM' (list var) := mapM get_named s.
 
+  
   (** Get a fresh name, and create a new pretty name *)
-  Definition get_name_no_suff (name : string) : compM' var :=
+  Definition get_named_str (name : string) : compM' var :=
     p <- compM.get ;;
     let '(mkCompData n c i f e fenv names log, st) := p in
     let names' := add_entry_str names n name in
@@ -190,7 +195,7 @@ Qed.
 Opaque bind ret. 
 
 (** Spec for [get_name] *)
-Lemma get_name_fresh A S y str :
+Lemma get_name_spec A S y str :
   {{ fun _ (s : comp_data * A) => identifiers.fresh S (next_var (fst s)) }}
     get_name y str
   {{ fun (r: unit) s x s' =>
@@ -214,7 +219,7 @@ Proof.
   intros Hc. inv Hc. zify; omega.
 Qed.
 
-Lemma get_names_lst_fresh A S ns str :
+Lemma get_names_lst_spec A S ns str :
   {{ fun _ (s : comp_data * A) => identifiers.fresh S (next_var (fst s)) }}
     get_names_lst ns str
   {{ fun (r: unit) s xs s' =>
@@ -229,7 +234,7 @@ Proof.
     intros. repeat normalize_sets. split; eauto.
     sets. now constructor. split; eauto.
     split. now sets. split. sets. split. reflexivity. eassumption.
-  - simpl. eapply bind_triple. eapply get_name_fresh.
+  - simpl. eapply bind_triple. eapply get_name_spec.
     intros x w.
     eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply frame_rule. eapply IHns.
     intros xs w'. eapply return_triple. intros. destructAll.
@@ -242,4 +247,84 @@ Proof.
       eapply Included_trans. eassumption. eapply Range_Subset. zify; omega. reflexivity.
     + zify; omega.
     + rewrite <- Setminus_Union. eassumption.
+Qed.
+
+(** Spec for [get_name] *)
+Lemma get_name'_spec A S y str old_m :
+  {{ fun _ (s : comp_data * A) => identifiers.fresh S (next_var (fst s)) }}
+    get_name' y str old_m
+  {{ fun (r: unit) s x s' =>
+       x \in S /\
+       x \in Range (next_var (fst s)) (next_var (fst s')) /\
+       (next_var (fst s) < next_var (fst s'))%positive /\
+       identifiers.fresh (S \\ [set x]) (next_var (fst s'))      
+  }}.  
+Proof. 
+  eapply pre_post_mp_l.
+  eapply bind_triple. now eapply get_triple.  
+  intros [[] w1] [[] w2].
+  eapply pre_post_mp_l. simpl.
+  eapply bind_triple. now eapply put_triple.
+  intros x [r3 w3].
+  eapply return_triple. 
+  intros ? [r4 w4] H2. inv H2. intros [H1 H2]. inv H1; inv H2. intros.
+  split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. omega.
+  simpl. split. zify; omega.
+  intros z Hin. constructor. eapply H; eauto. zify. omega.
+  intros Hc. inv Hc. zify; omega.
+Qed.
+
+Lemma get_names_lst'_spec A S ns str old_m :
+  {{ fun _ (s : comp_data * A) => identifiers.fresh S (next_var (fst s)) }}
+    get_names_lst' ns str old_m
+  {{ fun (r: unit) s xs s' =>
+       NoDup xs /\ List.length xs = List.length ns /\
+       FromList xs \subset S /\
+       FromList xs \subset Range (next_var (fst s)) (next_var (fst s')) /\
+       (next_var (fst s) <= next_var (fst s'))%positive /\
+       identifiers.fresh (S \\ FromList xs) (next_var (fst s')) }}.  
+Proof.
+  unfold get_names_lst. revert S; induction ns; intros S.
+  - simpl. eapply return_triple.
+    intros. repeat normalize_sets. split; eauto.
+    sets. now constructor. split; eauto.
+    split. now sets. split. sets. split. reflexivity. eassumption.
+  - simpl. eapply bind_triple. eapply get_name'_spec.
+    intros x w.
+    eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply frame_rule. eapply IHns.
+    intros xs w'. eapply return_triple. intros. destructAll.
+    repeat normalize_sets. split; [| split; [| split; [| split; [| split ]]]].
+    + constructor; eauto. intros Hc. eapply H4 in Hc. inv Hc. now eauto.
+    + simpl. congruence.
+    + eapply Union_Included. sets. eapply Included_trans. eapply H4. sets.
+    + eapply Union_Included. eapply Singleton_Included.
+      eapply Range_Subset; [| | eassumption ]. reflexivity. zify. omega.
+      eapply Included_trans. eassumption. eapply Range_Subset. zify; omega. reflexivity.
+    + zify; omega.
+    + rewrite <- Setminus_Union. eassumption.
+Qed.
+
+
+Lemma get_state_spec A :
+  {{ fun _ (s : comp_data * A) => True }}
+    get_state tt
+  {{ fun (r: unit) s x s' => x = snd s /\ s = s' }}.
+Proof.
+  unfold get_state. eapply bind_triple.
+  - eapply get_triple.
+  - intros x w. eapply return_triple. firstorder.
+    subst. reflexivity.
+Qed.
+
+Lemma put_state_spec A st :
+  {{ fun _ (s : comp_data * A) => True }}
+    put_state st
+  {{ fun (r: unit) s _ s' => fst s' = fst s /\ snd s' = st }}.
+Proof.
+  unfold get_state. eapply bind_triple.
+  - eapply get_triple.
+  - intros x w. simpl. eapply pre_curry_l. intros Heq; subst. 
+    eapply pre_post_mp_l. eapply post_weakening.
+    2:{ eapply put_triple. } firstorder. simpl in *. subst. reflexivity.
+    simpl in *. subst. reflexivity.
 Qed.

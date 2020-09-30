@@ -98,7 +98,7 @@ Section Lambda_lifting_corresp.
   Qed.
   
   (** Spec for [get_name] *)
-  Lemma get_name_fresh S :
+  Lemma get_name_spec S :
     {{ fun s => fresh S (next_var s) }}
       get_name
     {{ fun _ x s' => fresh S x /\ fresh (Setminus var S (Singleton var x)) (next_var s') }}.  
@@ -138,7 +138,7 @@ Section Lambda_lifting_corresp.
       split; eauto. split; eauto.
       split. now constructor.
       now rewrite FromList_nil, Setminus_Empty_set_neut_r.
-    - eapply bind_triple. now apply get_name_fresh.
+    - eapply bind_triple. now apply get_name_spec.
       intros x s1. eapply pre_curry_l. intros Hf.
       eapply bind_triple. now eapply IHn.
       intros xs s2. apply return_triple.
@@ -194,7 +194,7 @@ Section Lambda_lifting_corresp.
         eapply pre_curry_l. intros Hadd.
         eapply pre_curry_l. intros Hfeq1.
         eapply pre_curry_l. intros Hfeq2.
-        eapply bind_triple. now apply get_name_fresh.
+        eapply bind_triple. now apply get_name_spec.
         intros x s2. eapply pre_curry_l. intros Hf'.       
         eapply bind_triple. now apply get_tag_preserv.
         intros ft s3. apply return_triple. intros s4 Hf.
@@ -243,7 +243,7 @@ Section Lambda_lifting_corresp.
         apply pre_curry_l. intros Hnd.
         apply pre_curry_l. intros Hall.
         apply pre_curry_l. intros Hlen.
-        eapply bind_triple. now apply get_name_fresh.
+        eapply bind_triple. now apply get_name_spec.
         intros y s1. apply return_triple. 
         intros s2 [Hf1 Hf2]. split; [| split; [| split; [| split; [| split ]]]].
         * simpl. rewrite rename_set_FreeVar_f_eq, Hfeq1.

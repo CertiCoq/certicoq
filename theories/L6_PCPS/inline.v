@@ -53,7 +53,7 @@ Section Beta.
 
   Definition get_fresh_names (xs : list var) :inlineM (list var) :=
     '(_, nenv_old) <- get_state () ;;
-    mapM (fun x => get_name' x "" nenv_old) xs.
+    get_names_lst' xs "" nenv_old.
 
   
   (* Construct known-functions map *)
@@ -116,7 +116,7 @@ Section Beta.
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
          let '(s', s'' , inl_dec) := update_letApp _ IH f t ys' s in
-         fstr <- get_pp_name f' ;;
+         (* fstr <- get_pp_name f' ;; *)
          (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl_dec then else "not ") ++ "inlined") ;; *)
          (match (inl_dec, M.get f fm, d) with
           | (true, Some  (ft, xs, e), S d') =>
@@ -167,7 +167,7 @@ Section Beta.
          let f' := apply_r sig f in
          let ys' := apply_r_list sig ys in
          let (s', inl) := update_App _ IH f t ys' s in
-         fstr <- get_pp_name f' ;;
+         (* fstr <- get_pp_name f' ;; *)
          (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl then "" else "not ") ++ "inlined") ;; *)
          (match (inl, M.get f fm, d) with
           | (true, Some (ft, xs, e), S d') =>

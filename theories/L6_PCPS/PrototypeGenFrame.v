@@ -1,4 +1,6 @@
 Require Import Coq.Strings.Ascii Coq.Strings.String.
+Open Scope string_scope.
+
 Infix "+++" := append (at level 60, right associativity).
 
 Require Import Coq.Lists.List.

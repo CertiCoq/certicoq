@@ -545,5 +545,5 @@ Definition stripProgram (p:L1gPgm) : Program Term :=
      main:= strip (main p) |}.
 
 (*** from L2 to L2k ***)
-Definition program_Program `{F:utils.Fuel} (p:global_context * term) : Program Term :=
+Definition program_Program `{F:MCUtils.Fuel} (p:global_context * term) : Program Term :=
   stripProgram (L1g.compile.program_Program p).

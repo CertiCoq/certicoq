@@ -140,7 +140,7 @@ let quote opts gr =
        (Printer.pr_global gr ++ str" is not a constant definition") in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = quote_term_rec env (EConstr.to_constr sigma c) in
+  let term = quote_term_rec false env (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   (term, const)
@@ -248,7 +248,7 @@ let quote_ind opts gr : Ast_quoter.quoted_program * string =
        (Printer.pr_global gr ++ str " is not an inductive type") in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = quote_term_rec env (EConstr.to_constr sigma c) in
+  let term = quote_term_rec false env (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
   (term, name)

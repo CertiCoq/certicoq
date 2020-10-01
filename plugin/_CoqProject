@@ -254,10 +254,10 @@ extraction/ordersLists.ml
 extraction/ordersLists.mli
 extraction/ordersTac.ml
 extraction/ordersTac.mli
-# extraction/orderedTypeAlt.mli
-# extraction/orderedTypeAlt.ml
-# extraction/orderedType0.mli
-# extraction/orderedType0.ml
+extraction/orderedTypeAlt.mli
+extraction/orderedTypeAlt.ml
+extraction/orderedType0.mli
+extraction/orderedType0.ml
 
 extraction/pCUICAst.ml
 extraction/pCUICAst.mli
@@ -280,6 +280,8 @@ extraction/pCUICPosition.ml
 extraction/pCUICPosition.mli
 extraction/pCUICPretty.ml
 extraction/pCUICPretty.mli
+extraction/pCUICReflect.ml
+extraction/pCUICReflect.mli
 extraction/pCUICSafeChecker.ml
 extraction/pCUICSafeChecker.mli
 extraction/pCUICSafeConversion.ml

@@ -20,6 +20,7 @@ Orders
 OrdersTac
 OrdersFacts
 OrdersLists
+OrderedTypeAlt
 MSetInterface
 MSetFacts
 MSetDecide

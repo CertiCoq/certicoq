@@ -1,4 +1,3 @@
-From MetaCoq.Template Require Import utils.
 From ExtLib Require Import Monads.
 Import MonadNotation.
 
@@ -9,7 +8,7 @@ Require Import Coq.Bool.Bool.
 Require Import FunInd.
 Require Import Common.Common.
 
-From MetaCoq.Template Require Import utils.
+From MetaCoq.Template Require utils. 
 From MetaCoq.Erasure Require Import EAst ETyping.
 
 Local Open Scope string_scope.
@@ -292,10 +291,10 @@ Definition trans_global_decl (g:global_declarations) (dcl:global_decl) :
 Fixpoint program_Pgm_aux (g:global_declarations) : environ Term :=
   match g with
   | nil => nil
-  | d :: g => cons (on_snd (trans_global_decl g) d) (program_Pgm_aux g)
+  | d :: g => cons (MCProd.on_snd (trans_global_decl g) d) (program_Pgm_aux g)
   end.
 
-From MetaCoq Require Import SafeChecker.SafeTemplateChecker.
+From MetaCoq Require Import SafeChecker.SafeTemplateChecker MCProd.
 From MetaCoq.SafeChecker Require Import PCUICSafeChecker.
 From MetaCoq.PCUIC Require Import TemplateToPCUIC.
 From MetaCoq.Erasure Require Import ErasureFunction SafeTemplateErasure.

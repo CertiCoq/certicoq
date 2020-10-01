@@ -1,4 +1,5 @@
 Require Import Coq.Strings.Ascii Coq.Strings.String.
+Open Scope string_scope.
 Infix "+++" := append (at level 60, right associativity).
 
 Require Import Coq.Lists.List.
@@ -26,6 +27,8 @@ Set Universe Polymorphism.
 
 Require Export CertiCoq.L6.Rewriting.
 Require Export CertiCoq.L6.PrototypeGenFrame.
+
+Open Scope list_scope.
 
 (* -------------------- Converting between named and indices --------------------
    Indices are a real pain for some of the things we want to do.

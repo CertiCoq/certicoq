@@ -2,7 +2,7 @@ Require Import Arith List String.
 Require Import CertiCoq.Benchmarks.lib.vs.
 Require Import CertiCoq.Benchmarks.lib.Binom.
 Require Import CertiCoq.Benchmarks.lib.Color.
-(* Require Import CertiCoq.Benchmarks.lib.sha256. *)
+Require Import CertiCoq.Benchmarks.lib.sha256.
 
 From CertiCoq.Plugin Require Import CertiCoq.
 
@@ -11,6 +11,229 @@ Open Scope string.
 Import ListNotations.
 Import VeriStar.
 
+
+(* Demo 1 *)
+
+Definition demo1 := List.app (List.repeat true 500) (List.repeat false 300).
+
+(* Demo 2 *)
+
+Fixpoint repeat2 {A : Type} (x y : A) (n : nat) :=
+  match n with
+  | 0 => []
+  | S n => x :: y :: repeat2 x y n
+  end.
+
+Definition demo2 := List.map negb (repeat2 true false 100).
+
+(* Demo 3 *)
+
+Definition demo3 := andb.
+
+(* List sum *)
+
+Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
+
+(* Veristar *)
+
+Definition vs_easy :=
+  match vs.main with
+  | Valid => true
+  | _ => false
+  end.
+
+Definition vs_hard :=
+  match vs.main_h with
+  | Valid => true
+  | _ => false
+  end.
+
+(* Binom *)
+
+Definition binom := Binom.main.
+
+(* Color *)
+Definition color := Color.main.
+
+(* Sha *)
+
+(* From the Coq website *)
+Definition test := "Coq is a formal proof management system. It provides a formal language to write mathematical definitions, executable algorithms and theorems together with an environment for semi-interactive development of machine-checked proofs. Typical applications include the certification of properties of programming languages (e.g. the CompCert compiler certification project, the Verified Software Toolchain for verification of C programs, or the Iris framework for concurrent separation logic), the formalization of mathematics (e.g. the full formalization of the Feit-Thompson theorem, or homotopy type theory), and teaching.".
+
+Definition sha := sha256.SHA_256 (sha256.str_to_bytes test).
+
+Definition sha_fast := sha256.SHA_256' (sha256.str_to_bytes test).
+
+
+(* CertiCoq Show IR -direct -time_anf vs_easy. *)
+(* CertiCoq Show IR -direct -time_anf -O 1 -ext "_optc0" vs_easy. *)
+(* CertiCoq Show IR -config 2 -direct -time_anf -ext "_inl" vs_easy. *)
+(* CertiCoq Show IR -config 2 -direct -O 1 -time_anf -ext "_opt_no_inl" vs_easy. *)
+
+Eval compute in "Compiling demo1".
+
+CertiCoq Compile -O 1 -ext "_cps_opt" demo1.
+CertiCoq Compile -direct -O 1 -ext "_opt" demo1.
+
+CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" demo1.
+CertiCoq Compile -config 1 -direct -O 1 -ext "_opt1" demo1.
+
+CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" demo1.
+CertiCoq Compile -config 2 -direct -O 1 -ext "_opt2" demo1.
+
+CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" demo1.
+CertiCoq Compile -config 3 -direct -O 1 -ext "_opt3" demo1.
+
+CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" demo1.
+CertiCoq Compile -config 4 -direct -O 1 -ext "_opt4" demo1.
+
+CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" demo1.
+CertiCoq Compile -config 5 -direct -O 1 -ext "_opt5" demo1.
+
+Eval compute in "Compiling demo2".
+
+CertiCoq Compile -O 1 -ext "_cps_opt" demo2.
+CertiCoq Compile -direct -O 1 -ext "_opt" demo2.
+
+CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" demo2.
+CertiCoq Compile -config 1 -direct -O 1 -ext "_opt1" demo2.
+
+CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" demo2.
+CertiCoq Compile -config 2 -direct -O 1 -ext "_opt2" demo2.
+
+CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" demo2.
+CertiCoq Compile -config 3 -direct -O 1 -ext "_opt3" demo2.
+
+CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" demo2.
+CertiCoq Compile -config 4 -direct -O 1 -ext "_opt4" demo2.
+
+CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" demo2.
+CertiCoq Compile -config 5 -direct -O 1 -ext "_opt5" demo2.
+
+Eval compute in "Compiling list_sum".
+
+CertiCoq Compile -O 1 -ext "_cps_opt" list_sum.
+CertiCoq Compile -direct -O 1 -ext "_opt" list_sum.
+
+CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" list_sum.
+CertiCoq Compile -config 1 -direct -O 1 -ext "_opt1" list_sum.
+
+CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" list_sum.
+CertiCoq Compile -config 2 -direct -O 1 -ext "_opt2" list_sum.
+
+CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" list_sum.
+CertiCoq Compile -config 3 -direct -O 1 -ext "_opt3" list_sum.
+
+CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" list_sum.
+CertiCoq Compile -config 4 -direct -O 1 -ext "_opt4" list_sum.
+
+CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" list_sum.
+CertiCoq Compile -config 5 -direct -O 1 -ext "_opt5" list_sum.
+
+
+Eval compute in "Compiling vs_easy".
+
+CertiCoq Compile -O 1 -ext "_cps_opt" vs_easy.
+CertiCoq Compile -direct -O 1 -ext "_opt" vs_easy.
+
+CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" vs_easy.
+CertiCoq Compile -config 1 -direct -O 1 -ext "_opt1" vs_easy.
+
+CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" vs_easy.
+CertiCoq Compile -config 2 -direct -O 1 -ext "_opt2" vs_easy.
+
+CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" vs_easy.
+CertiCoq Compile -config 3 -direct -O 1 -ext "_opt3" vs_easy.
+
+CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" vs_easy.
+CertiCoq Compile -config 4 -direct -O 1 -ext "_opt4" vs_easy.
+
+CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" vs_easy.
+CertiCoq Compile -config 5 -direct -O 1 -ext "_opt5" vs_easy.
+
+Eval compute in "Compiling vs_hard".
+
+CertiCoq Compile -O 1 -ext "_cps_opt" vs_hard.
+CertiCoq Compile -direct -O 1 -ext "_opt" vs_hard.
+
+CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" vs_hard.
+CertiCoq Compile -config 1 -direct -O 1 -ext "_opt1" vs_hard.
+
+CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" vs_hard.
+CertiCoq Compile -config 2 -direct -O 1 -ext "_opt2" vs_hard.
+
+CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" vs_hard.
+CertiCoq Compile -config 3 -direct -O 1 -ext "_opt3" vs_hard.
+
+CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" vs_hard.
+CertiCoq Compile -config 4 -direct -O 1 -ext "_opt4" vs_hard.
+
+CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" vs_hard.
+CertiCoq Compile -config 5 -direct -O 1 -ext "_opt5" vs_hard.
+
+
+Eval compute in "Compiling binom".
+
+CertiCoq Compile -O 1 -ext "_cps_opt" binom.
+CertiCoq Compile -direct -O 1 -ext "_opt" binom.
+
+CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" binom.
+CertiCoq Compile -config 1 -direct -O 1 -ext "_opt1" binom.
+
+CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" binom.
+CertiCoq Compile -config 2 -direct -O 1 -ext "_opt2" binom.
+
+CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" binom.
+CertiCoq Compile -config 3 -direct -O 1 -ext "_opt3" binom.
+
+CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" binom.
+CertiCoq Compile -config 4 -direct -O 1 -ext "_opt4" binom.
+
+CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" binom.
+CertiCoq Compile -config 5 -direct -O 1 -ext "_opt5" binom.
+
+Eval compute in "Compiling color".
+
+CertiCoq Compile -O 1 -ext "_cps_opt" color.
+CertiCoq Compile -direct -O 1 -ext "_opt" color.
+
+CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" color.
+CertiCoq Compile -config 1 -direct -O 1 -ext "_opt1" color.
+
+CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" color.
+CertiCoq Compile -config 2 -direct -O 1 -ext "_opt2" color.
+
+CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" color.
+CertiCoq Compile -config 3 -direct -O 1 -ext "_opt3" color.
+
+CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" color.
+CertiCoq Compile -config 4 -direct -O 1 -ext "_opt4" color.
+
+CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" color.
+CertiCoq Compile -config 5 -direct -O 1 -ext "_opt5" color.
+
+Eval compute in "Compiling sha_fast".
+
+CertiCoq Compile -O 1 -ext "_cps_opt" sha_fast.
+CertiCoq Compile -direct -O 1 -ext "_opt" sha_fast.
+
+CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" sha_fast.
+CertiCoq Compile -config 1 -direct -O 1 -ext "_opt1" sha_fast.
+
+CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" sha_fast.
+CertiCoq Compile -config 2 -direct -O 1 -ext "_opt2" sha_fast.
+
+CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" sha_fast.
+CertiCoq Compile -config 3 -direct -O 1 -ext "_opt3" sha_fast.
+
+CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" sha_fast.
+CertiCoq Compile -config 4 -direct -O 1 -ext "_opt4" sha_fast.
+
+CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" sha_fast.
+CertiCoq Compile -config 5 -direct -O 1 -ext "_opt5" sha_fast.
+
+
+(* OLD 
 
 Fixpoint even (n : nat) : bool :=
   match n with
@@ -259,4 +482,5 @@ Definition color := Color.main.
 CertiCoq Compile -ext "_cps" color.
 CertiCoq Compile -anf color.
 CertiCoq Compile -anf -o1 -ext "_opt" color.
+*)
 *)

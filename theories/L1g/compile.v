@@ -223,6 +223,8 @@ Fixpoint print_global_declarations (g:global_declarations) : string :=
   end.
 
 (** can compile terms using global_declarations from EAst.v **)
+Instance fix_bug : MonadExc string exception := exn_monad_exc.
+
 Definition Cstr_npars_nargs
   (g:global_declarations) (ind:BasicAst.inductive) (ncst:nat): exception (nat * nat) :=
   match ind with
@@ -245,7 +247,7 @@ Definition Cstr_npars_nargs
         end
       end
     end
-  end.
+  end % string.
 
 Function term_Term (g:global_declarations) (t:term) : Term :=
   match t with

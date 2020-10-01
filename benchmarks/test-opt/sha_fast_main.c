@@ -6,10 +6,6 @@
 
 extern void body(struct thread_info *);
 
-extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
-
-extern void print_Coq_Init_Datatypes_nat(unsigned long long);
-
 extern value args[];
 
 _Bool is_ptr(value s) {
@@ -21,7 +17,8 @@ int main(int argc, char *argv[]) {
   struct thread_info* tinfo;
   clock_t start, end;
   double msec, sec;
-  // Specify number of runs to be executed
+
+  // Specify number of runs
   int n = 1;
   if (argc > 1) n = atoi(argv[1]);
 
@@ -33,8 +30,9 @@ int main(int argc, char *argv[]) {
   }
   end = clock();
 
-  val = tinfo -> args[1];
-  /* print_Coq_Init_Datatypes_list(val, print_Coq_Init_Datatypes_nat); */
+  /* TODO write string printers */
+  /* val = tinfo -> args[1]; */
+  /* print_Coq_Init_Datatypes_list(val, print_Coq_Init_Datatypes_bool); */
   /* printf("\n"); */
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;

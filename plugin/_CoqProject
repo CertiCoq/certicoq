@@ -206,6 +206,8 @@ extraction/mCProd.ml
 extraction/mCProd.mli
 extraction/mCString.ml
 extraction/mCString.mli
+extraction/mCUtils.ml
+extraction/mCUtils.mli
 extraction/mSetDecide.ml
 extraction/mSetDecide.mli
 extraction/mSetFacts.ml
@@ -218,8 +220,6 @@ extraction/mSetProperties.ml
 extraction/mSetProperties.mli
 extraction/mSetRBT.ml
 extraction/mSetRBT.mli
-extraction/mSetWeakList.ml
-extraction/mSetWeakList.mli
 extraction/map_util.ml
 extraction/map_util.mli
 extraction/maps_util.ml
@@ -254,6 +254,11 @@ extraction/ordersLists.ml
 extraction/ordersLists.mli
 extraction/ordersTac.ml
 extraction/ordersTac.mli
+# extraction/orderedTypeAlt.mli
+# extraction/orderedTypeAlt.ml
+# extraction/orderedType0.mli
+# extraction/orderedType0.ml
+
 extraction/pCUICAst.ml
 extraction/pCUICAst.mli
 extraction/pCUICAstUtils.ml
@@ -267,6 +272,8 @@ extraction/pCUICLiftSubst.ml
 extraction/pCUICLiftSubst.mli
 # extraction/pCUICInduction.ml
 # extraction/pCUICInduction.mli
+extraction/pCUICReduction.ml
+extraction/pCUICReduction.mli
 extraction/pCUICNormal.ml
 extraction/pCUICNormal.mli
 extraction/pCUICPosition.ml
@@ -353,8 +360,6 @@ extraction/universes0.ml
 extraction/universes0.mli
 # extraction/usefulTypes.ml
 # extraction/usefulTypes.mli
-extraction/utils.ml
-extraction/utils.mli
 extraction/values.ml
 extraction/values.mli
 # extraction/varImplDummyPair.ml

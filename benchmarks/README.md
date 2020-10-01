@@ -17,6 +17,13 @@ To clean and recompile the library run
 Some of these benchmarks are featured in Olivier Savary Belanger's thesis [1],
 for an old version of the compiler.
 
+To run the compiled benchmarks:
+
+   # sh run.sh X
+
+where X is the number of times each test runs. Runnin `make` will invoke `sh run.sh 10`.
+
+
 How to add new benchmarks
 -------------------------
 To add a new benchmark

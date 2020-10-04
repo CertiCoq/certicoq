@@ -756,7 +756,7 @@ Section Inline_correct.
     - inv Hi. inv H0.
   Qed.
 
-
+  
   Lemma inline_letapp_correct_alt k x z sig f t ys e1 e2 e' C C' x' rho1 rho2 : 
     (forall m rhoc rhoc' B f' xs vs e,
         m < k -> 
@@ -779,15 +779,14 @@ Section Inline_correct.
     preord_env_P_inj cenv PG (occurs_free (Eletapp x f t ys e1)) k sig rho1 rho2 ->
     
     Disjoint _ (bound_var_ctx C' :|: bound_var_ctx C) (image sig (occurs_free e1 \\ [set x])) ->
-    ~ x \in (image sig (occurs_free e1 \\ [set x])) ->
-            
+
     interprable C' = true ->
     inline_letapp e' z = Some (C, x') ->
     
     preord_exp cenv P3 PG k (Eletapp x f t ys e1, rho1) (C' |[ C |[ e2 ]| ]|, rho2).
   Proof.
    revert C' k x sig f t ys e1 e2 C x' rho1 rho2; induction e';
-      intros C' k x sig f' t ys e1 e2 C x' rho1 rho2 Hyp1 Hyp2 Hpre Hdis Him Hint Hin; simpl in Hin;
+      intros C' k x sig f' t ys e1 e2 C x' rho1 rho2 Hyp1 Hyp2 Hpre Hdis Hint Hin; simpl in Hin;
         try match goal with
         | [ _ : context [inline_letapp ?E ?X] |- _ ] =>
           (destruct (inline_letapp E X) as [ [C'' u] | ] eqn:Hin'; simpl in Hin; inv Hin)
@@ -798,14 +797,13 @@ Section Inline_correct.
         eapply HOOT; eauto. now simpl; eauto.
       + edestruct (IHe' (comp_ctx_f C' (Econstr_c v c l Hole_c)) k) with (C := C'')
           as [r2 [cout2 [cout2' [Hs2 [Hp2 Hv2]]]]].
-        9:{ econstructor 2; eauto. }
+        8:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
           eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
           rewrite bound_var_Econstr_c, bound_var_Hole_c in *. xsets. 
-        * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * reflexivity.
         * eassumption.
@@ -817,14 +815,13 @@ Section Inline_correct.
         unfold one. erewrite one_eq. eassumption.
         eapply HOOT; eauto. now simpl; eauto.
       + edestruct (IHe' (comp_ctx_f C' (Eproj_c v c n v0 Hole_c)) k) with (C := C'') as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]].
-        9:{ econstructor 2; eauto. }
+        8:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
           eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
           rewrite bound_var_Eproj_c, bound_var_Hole_c in *. xsets. 
-        * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * reflexivity.
         * eassumption.
@@ -835,14 +832,13 @@ Section Inline_correct.
         unfold one. erewrite one_eq. eassumption.
         eapply HOOT; eauto. now simpl; eauto.
       + edestruct (IHe' (comp_ctx_f C' (Eletapp_c v v0 f l Hole_c)) k) with (C := C'') as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]].
-        9:{ econstructor 2; eauto. }
+        8:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
           eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
           rewrite bound_var_Eletapp_c, bound_var_Hole_c in *. xsets. 
-        * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * reflexivity.
         * eassumption.
@@ -853,14 +849,13 @@ Section Inline_correct.
         unfold one. erewrite one_eq. eassumption.
         eapply HOOT; eauto. now simpl; eauto.
       + edestruct (IHe' (comp_ctx_f C' (Efun1_c f  Hole_c)) k) with (C := C'') as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]].
-        9:{ econstructor 2; eauto. }
+        8:{ econstructor 2; eauto. }
         * rewrite <- app_ctx_f_fuse. simpl ( _ |[ _ ]|). eapply Hyp1.
         * intros. eapply Hyp2; eauto. eapply eq_env_P_antimon. eassumption.
           eapply Complement_antimon. repeat normalize_bound_var_ctx; sets.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
           rewrite bound_var_Fun1_c, bound_var_Hole_c in *. xsets. 
-        * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * reflexivity.
         * eassumption.

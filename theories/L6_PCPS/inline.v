@@ -156,7 +156,7 @@ Section Beta.
                      let s' := update_inFun _ IH f t xs e sig s in
                      let f' := apply_r sig' f in
                      xs' <- get_fresh_names xs ;;
-                     e' <- beta_contract_aux e (set_list (combine xs xs') sig') fm' s' false ;;
+                     e' <- beta_contract_aux e (set_list (combine xs xs') sig') (M.remove f fm') s' false ;;
                      fds'' <- beta_contract_fds fds' s ;;
                      ret (Fcons f' t xs' e' fds'')
                    | Fnil => ret Fnil

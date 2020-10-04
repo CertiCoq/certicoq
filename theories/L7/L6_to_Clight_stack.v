@@ -917,7 +917,7 @@ Fixpoint translate_program (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: c
     '(body, slots) <- translate_body args_opt [] (union_list PS.empty localVars) [] nenv e fenv cenv ienv fmap 0 ;;
     let argsExpr := Efield tinfd argsIdent (Tarray uval maxArgs noattr) in
     ret ((bodyIdent , Gfun (Internal
-                              (mkfunction Tvoid
+                              (mkfunction val
                                           cc_default
                                           ((tinfIdent, threadInf)::nil)
                                           ((map (fun x => (x , val)) localVars) ++ (stack_decl (Z.of_N slots)) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)

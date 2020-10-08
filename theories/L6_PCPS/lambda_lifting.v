@@ -20,7 +20,7 @@ Open Scope monad_scope.
 
 (** * Lambda lifting *)
 
-(* XXX TODO Comments are not uptodate with the implementation *)
+(* XXX TODO Comments are not up-to-date with the implementation *)
 
 (** This transformation assumes that all bindings are unique and disjoint from
     the free variables of an expression.

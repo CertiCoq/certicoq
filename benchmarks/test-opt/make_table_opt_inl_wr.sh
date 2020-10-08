@@ -11,7 +11,7 @@ N=$1
 # Compare inlining all known calls vs. inline defensively (to not increase closure environments)
 
 echo "Running CertiCoq programs..."
-printf "      & ANF OPT & ANF OPT DEF & SPEEDUP & CPS OPT & CPS OPT DEF & SPEEDUP \n"
+printf "      & ANF OPT DEF & ANF OPT AGR & SPEEDUP & CPS OPT DEF & CPS OPT AGR & SPEEDUP \n"
 
 for f in $FILES
 do
@@ -25,10 +25,10 @@ do
     timecpsodef=$(./${f}_cps_opt1 ${N} | awk -v N=${N} '/Time taken/ {print ($5 / N) }')
 
     #Find anf/ocamlopt ratio
-    speedupanf=$(awk -v ANF=${timeanfo} -v OPT=${timeanfodef} 'BEGIN { print  ( (ANF - OPT) / ANF ) }')
-    speedupcps=$(awk -v CPS=${timecpso} -v OPT=${timecpsodef} 'BEGIN { print ( (CPS - OPT) / CPS ) }')
+    speedupanf=$(awk -v AGR=${timeanfo} -v DEF=${timeanfodef} 'BEGIN { print  ( (DEF - AGR) / DEF ) }')
+    speedupcps=$(awk -v AGR=${timecpso} -v DEF=${timecpsodef} 'BEGIN { print ( (DEF - AGR) / DEF ) }')
     
     ESC='\\'
     # output latex table
-    printf "{${ESC}tt ${f}} &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  \n" "$timeanfo" "$timeanfodef" "$speedupanf" "$timecpso" "$timecpsodef" "$speedupcps"
+    printf "{${ESC}tt ${f}} &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  \n" "$timeanfodef" "$timeanfo" "$speedupanf" "$timecpsodef" "$timecpso" "$speedupcps"
 done

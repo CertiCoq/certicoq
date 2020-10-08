@@ -1,10 +1,12 @@
-(* Correspondence of the computational definition and the declarative spec for lambda lifting. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
- *)
+(* Correspondence of the computational definition and the declarative
+  spec for lambda lifting. Part of the CertiCoq project.
+ * Author: Zoe Paraskevopoulou, 2016 *)
 
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.Ensembles_util
-        L6.List_util L6.lambda_lifting L6.functions
-        L6.logical_relations L6.eval L6.lambda_lifting_correct.
+        L6.List_util L6.lambda_lifting L6.functions L6.state L6.tactics
+        L6.logical_relations L6.eval L6.lambda_lifting_correct L6.uncurry_correct.
+From CertiCoq.Common Require Import compM.
+Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad ExtLib.Data.Monads.OptionMonad.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
@@ -15,25 +17,26 @@ Import ListNotations MonadNotation.
 
 Open Scope ctx_scope.
 Open Scope fun_scope.
-
+Open Scope monad_scope.
 
 (** * Correspondence of the relational and the computational definitions of  lambda lifting *)
  
 Section Lambda_lifting_corresp.
 
-  (** Construct a function map similar to the one that is used in the relational spec from as [FunInfoMap]  *)
+  (** Construct a function map from [FunInfoMap] similar to the one that is used in the relational spec   *)
   Definition fun_map (m : FunInfoMap) : var -> option (var * fun_tag * list var) :=
     fun f =>
       match M.get f m with
         | Some inf =>
           match inf with
-            | Fun f' ft fvs => Some (f', ft, fvs)
-              end
+          | Fun f' ft _ _ fvs => Some (f', ft, fvs)
+          | NoLiftFun _ _ => None
+          end
         | None => None
       end.
 
   (** Useful equality to use the IH for [Ecase]  *)
-  Lemma st_eq_Ecase {S} (m1 : state S (list (ctor_tag * exp))) (x : var) y :
+  Lemma st_eq_Ecase (m1 :  lambdaM (list (ctor_tag * exp))) (x : var) y :
     st_eq
       (bind (bind m1 (fun ys => ret (y :: ys))) (fun ys' => ret (Ecase x ys')))
       (e <- (ys <- m1 ;;
@@ -43,13 +46,13 @@ Section Lambda_lifting_corresp.
            ret (Ecase x (y :: ys))
          | _ => ret e
        end).
-  Proof.
-    unfold pbind, ret.
-    intros s. simpl. destruct (runState m1 s). reflexivity.
+  Proof.    
+    unfold bind, ret. simpl.
+    intros s [w u]. simpl. destruct (compM.runState m1 s (w, u)).
+    simpl. destruct e; reflexivity. 
   Qed.
 
   Global Opaque bind ret.
-
 
   (** * Lemmas about [rename] *)
 
@@ -64,31 +67,32 @@ Section Lambda_lifting_corresp.
   Qed.
   
   Lemma rename_not_in_domain_f_eq m x :
-    binding_not_in_map (Singleton _ x) m ->
+    ~ x \in Dom_map m ->
     f_eq (rename m) ((rename m) {x ~> x}).
   Proof with now eauto with Ensembles_DB.
     intros H y. unfold rename.
     destruct (peq y x); subst; simpl.
     - rewrite extend_gss. destruct (M.get x m) eqn:Heq; eauto.
-      rewrite H in Heq; try congruence. eauto.
+      exfalso. eapply H; eexists; eauto. 
     - rewrite extend_gso; eauto.
   Qed.
 
   Lemma rename_not_in_domain_lst_f_eq m xs :
-    binding_not_in_map (FromList xs) m ->
+    Disjoint _ (FromList xs) (Dom_map m) ->
     f_eq (rename m) ((rename m) <{xs ~> xs}>).
   Proof with now eauto with Ensembles_DB.
     induction xs; intros Hnin; simpl; eauto.
     - reflexivity.
     - rewrite <- IHxs. rewrite <- rename_not_in_domain_f_eq. reflexivity.
-      eapply binding_not_in_map_antimon; [| eassumption ]; rewrite FromList_cons...
-      eapply binding_not_in_map_antimon; [| eassumption ]; rewrite FromList_cons...
+      normalize_sets. intros Hc. eapply Hnin. constructor; eauto.
+      normalize_sets. sets. 
   Qed.
   
   (** * Lemmas about [fun_map] *)
   
-  Lemma fun_map_set_Fun_f_eq m f f' ft fvs :
-    f_eq (fun_map (M.set f (Fun f' ft fvs) m))
+
+  Lemma fun_map_set_Fun_f_eq m f f' ft vs s fvs :
+    f_eq (fun_map (M.set f (Fun f' ft vs s fvs) m))
          ((fun_map m) {f ~> Some (f', ft, fvs)}).
   Proof.
     intros z. unfold fun_map.
@@ -96,122 +100,118 @@ Section Lambda_lifting_corresp.
     - now rewrite M.gss, extend_gss.
     - now rewrite M.gso, extend_gso.
   Qed.
-  
-  (** Spec for [get_name] *)
-  Lemma get_name_spec S :
-    {{ fun s => fresh S (next_var s) }}
-      get_name
-    {{ fun _ x s' => fresh S x /\ fresh (Setminus var S (Singleton var x)) (next_var s') }}.  
-  Proof.   
-    eapply pre_post_mp_l.
-    eapply bind_triple. eapply get_triple.
-    intros [x1 ft1] [x2 ft2].
-    eapply pre_post_mp_l. eapply bind_triple.
-    eapply put_triple. intros u [x3 ft3]. eapply return_triple. 
-    intros [x4 ft4] Heq1 [Heq2 Heq3] H; subst. inv Heq1. inv Heq2. inv Heq3. 
-    split; eauto. intros y Hleq.
-    constructor.
-    - eapply H. simpl in *. zify. omega.
-    - intros Hin. inv Hin. simpl in *. eapply Pos.le_nlt in Hleq.
-      eapply Hleq. zify. omega.
-  Qed.
 
-  Lemma Forall_monotonic {A} (P P' : A -> Prop) l :
-    (forall x, P x -> P' x) ->
-    Forall P l ->
-    Forall P' l.
+  Lemma fun_map_set_NoListFun_f_eq m f f' fvs :
+    ~ f \in (Dom_map m) ->    
+    f_eq (fun_map (M.set f (NoLiftFun f' fvs) m))
+         (fun_map m).
   Proof.
-    intros H Hall. induction Hall; eauto.
-  Qed.    
-
-  (** Spec for [get_names] *)
-  Lemma get_names_fresh n S :
-    {{ fun s => fresh S (next_var s) }}
-      get_names n
-    {{ fun _ xs s' => Forall (fresh S) xs /\
-                   length xs = n /\
-                   NoDup xs /\
-                   fresh (Setminus var S (FromList xs)) (next_var s') }}.  
-  Proof with now eauto with Ensembles_DB. 
-    revert S. induction n; intros S.
-    - eapply return_triple. intros.
-      split; eauto. split; eauto.
-      split. now constructor.
-      now rewrite FromList_nil, Setminus_Empty_set_neut_r.
-    - eapply bind_triple. now apply get_name_spec.
-      intros x s1. eapply pre_curry_l. intros Hf.
-      eapply bind_triple. now eapply IHn.
-      intros xs s2. apply return_triple.
-      intros s3 [Hall [Hlen [Hnd Hf']]].
-      simpl. split; [| split; [| split ]].
-      + constructor; eauto.
-        eapply Forall_monotonic; [| eassumption ].
-        intros y Hd. eapply fresh_monotonic; [| eassumption ]...
-      + congruence.
-      + constructor; [| assumption ].
-        intros Hc. eapply Forall_forall in Hall; eauto.
-        specialize (Hall x (Pos.le_refl x)). inv Hall.
-        eauto.
-      + rewrite FromList_cons.
-        eapply fresh_monotonic; [| eassumption ]...
+    intros Hnin z. unfold fun_map.
+    destruct (peq z f); subst; simpl.
+    - rewrite M.gss.
+      destruct (m ! f) eqn:Hget; eauto.
+      exfalso. eapply Hnin. eexists; eauto.
+    - rewrite M.gso; eauto.
   Qed.
-  
+
   (** Spec for [get_tag] *)
-  Lemma get_tag_preserv P :
-    {{ fun s => P (next_var s)}}
-      get_tag
-    {{ fun _ x s' => P (next_var s') }}.  
+  Lemma get_tag_spec A P N :
+    {{ fun r (s : comp_data * A) => P (next_var (fst s))}}
+      get_ftag N
+    {{ fun r s x s' => P (next_var (fst s')) }}.  
   Proof.
     eapply pre_post_mp_l.
     eapply bind_triple. now eapply get_triple.
     intros [x1 t1] [x2 t2].
-    eapply pre_post_mp_l.
-    eapply bind_triple. now eapply put_triple.
+    eapply pre_curry_l. intros H; inv H. destruct x2. simpl.
+    eapply bind_triple. eapply pre_strenghtening. 2:{ now eapply put_triple. }
+    now clear; firstorder. 
     intros x [x3 t3]. apply return_triple.
-    intros [s4 x4] H1 [H2 H3] Hp.
-    inv H1; inv H2; inv H3. eauto.
+    intros. inv H. eassumption.
   Qed.
 
   (** [add_functions] is sound w.r.t. its relational spec *)
-  Lemma add_functions_sound B fvs fvm fm S :
-    binding_not_in_map (Union _ S (bound_var_fundefs B)) fvm ->
-    {{ fun s => fresh S (next_var s) }}
-      add_functions B fvs fm
-    {{ fun s m' s' => 
+  Lemma add_functions_true_sound B fvs sfvs args fm gfuns fvm S :
+    Disjoint _ (S :|: bound_var_fundefs B) (Dom_map fvm) ->
+    (Datatypes.length fvs =? Datatypes.length args)%nat = true ->
+    {{ fun r s => fresh S (next_var (fst s)) }}
+      add_functions B fvs sfvs args fm gfuns
+    {{ fun r s m s' =>
+         let '(fm', gfuns') := m in
          exists σ ζ S',
-           Add_functions B fvs (rename fvm) (fun_map fm) S σ ζ S' /\
+           Add_functions B args (rename fvm) (fun_map fm) S σ ζ S' /\
            f_eq σ (rename fvm) /\
-           f_eq ζ (fun_map m') /\
-           fresh S' (next_var s') }}.
-  Proof with now eauto with Ensembles_DB.
-    revert fm S. induction B; intros m S Hnin.
+           f_eq ζ (fun_map fm') /\
+           fresh S' (next_var (fst s')) }}.
+  Proof with now eauto with Ensembles_DB. 
+    revert fm S. induction B; intros m S Hnin Hbeq.
     - eapply bind_triple.
-      + eapply IHB. eapply binding_not_in_map_antimon; [| eassumption ].
-        normalize_bound_var...
-      + intros m' s1. eapply pre_existential; intros g1.
+      + eapply IHB.
+        normalize_bound_var_in_ctx... eassumption.
+      + intros [fm' gfuns'] s1. simpl. eapply pre_existential; intros g1.
         eapply pre_existential; intros g2.
         eapply pre_existential; intros S'.
         eapply pre_curry_l. intros Hadd.
         eapply pre_curry_l. intros Hfeq1.
         eapply pre_curry_l. intros Hfeq2.
+        rewrite Hbeq. 
+        simpl. 
         eapply bind_triple. now apply get_name_spec.
         intros x s2. eapply pre_curry_l. intros Hf'.       
-        eapply bind_triple. now apply get_tag_preserv.
-        intros ft s3. apply return_triple. intros s4 Hf.
+        eapply bind_triple.
+        apply get_tag_spec with (P := fun s => x \in (Range (next_var (fst s2)) s) /\
+                                                     (next_var (fst s2) < s)%positive /\
+                                                     fresh (S' \\ [set x]) s).
+        intros ft s3. apply return_triple. intros _ s4 Hf. destructAll.
         do 3 eexists. split ; [| split; [| split ]].
-        * econstructor. eassumption. eapply Hf' with (y := x).
-          zify; omega.
-        * symmetry. rewrite Hfeq1, <- !rename_not_in_domain_f_eq. reflexivity.
-          eapply binding_not_in_map_antimon; [| eassumption ].
-          eapply Singleton_Included. left.
-          eapply Add_functions_free_set_Included; eauto.
-          eapply Hf'. zify; omega.
-          eapply binding_not_in_map_antimon; [| eassumption ].
-          normalize_bound_var...
-        * symmetry. rewrite Hfeq2. apply fun_map_set_Fun_f_eq.
-        * eassumption.
+        
+        -- econstructor. eassumption. eassumption.
+        -- symmetry. rewrite Hfeq1, <- !rename_not_in_domain_f_eq. reflexivity.
+           intros Hc. eapply Hnin. constructor; [| eassumption ]. left.
+           eapply Add_functions_free_set_Included; eauto.
+           intros Hc. eapply Hnin. constructor; [| eassumption ]. right.
+           now constructor.
+        -- symmetry. rewrite Hfeq2. apply fun_map_set_Fun_f_eq.
+        -- eassumption. 
     - apply return_triple. intros s Hf.
       repeat eexists; eauto. constructor; reflexivity.
+  Qed.
+  
+  Lemma add_functions_false_sound B fvs sfvs args fm gfuns S :
+    Disjoint _ (bound_var_fundefs B) (Dom_map fm) ->
+    unique_bindings_fundefs B ->
+    (Datatypes.length fvs =? Datatypes.length args)%nat = false ->
+    {{ fun r s => fresh S (next_var (fst s)) }}
+      add_functions B fvs sfvs args fm gfuns
+    {{ fun r s m s' =>
+         let '(fm', gfuns') := m in
+         exists S',
+           Dom_map fm' <--> Dom_map fm :|: name_in_fundefs B /\
+           (* gfuns' = gfuns /\ *)
+           f_eq (fun_map fm) (fun_map fm') /\
+           fresh S' (next_var (fst s')) }}.
+  Proof with now eauto with Ensembles_DB.
+    revert fm S. induction B; intros fm S Hdis Hun Hbeq.
+    - eapply bind_triple.
+      + eapply IHB.
+        normalize_bound_var_in_ctx. now sets. inv Hun. eassumption.
+        eassumption. 
+      + intros [fm' gfuns'] s1. simpl. eapply pre_existential; intros S'.
+        eapply pre_curry_l. intros Heq.
+        (* eapply pre_curry_l. intros Hfeq1. *)
+        rewrite Hbeq.  
+        simpl. apply return_triple. intros _ s4 Hf. destructAll.
+        eexists. split; [| split ].
+        * rewrite Dom_map_set, Heq. now sets.
+        * symmetry. rewrite H; eauto. eapply fun_map_set_NoListFun_f_eq.
+          intros Hnin. eapply Heq in Hnin. inv Hnin.
+          -- eapply Hdis. constructor; eauto.
+          -- inv Hun; eauto. eapply H8. eapply name_in_fundefs_bound_var_fundefs.
+             eassumption.
+        * eassumption.
+    - apply return_triple. intros s Hf Hs.
+      eexists; eauto. split. simpl; now sets. split. reflexivity.
+      eassumption.
   Qed.
 
   (** [add_free_var] spec *)

@@ -8,11 +8,10 @@ CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, 
 # Names of the generated executables
 EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS)) $(patsubst %, %_cps_opt, $(TESTS)) $(patsubst %, %_opt, $(TESTS))
 
-default: copy tests exec run
+default: copy exec run
 all: copy lib tests exec run
-llvm: $(LLTESTS)
 
-.PHONY: all default clean lib cleanlib tests run llvm
+.PHONY: all default clean lib cleanlib tests run copy $(TESTS)
 
 $(CFILES): tests
 exec: $(TESTS)
@@ -54,14 +53,20 @@ lib: lib/Makefile
 cleanlib:
 	$(MAKE) clean -C lib
 
-tests: tests.v
-	coqc $(COQOPTS) tests.v
+# tests: tests.v
+# 	coqc $(COQOPTS) tests.v
 
+# $(TESTS): $(CFILES)
+# 	$(CCOMPILER) -o $@_cps -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@_cps.c
+# 	$(CCOMPILER) -o $@ -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue.CertiCoq.Benchmarks.tests.$@.c
+# 	$(CCOMPILER) -o $@_cps_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt.c glue.CertiCoq.Benchmarks.tests.$@_cps_opt.c
+# 	$(CCOMPILER) -o $@_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt.c glue.CertiCoq.Benchmarks.tests.$@_opt.c
+
+# Compile with compcert
 $(TESTS): $(CFILES)
-	$(CCOMPILER) -o $@_cps -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@_cps.c
-	$(CCOMPILER) -o $@ -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue.CertiCoq.Benchmarks.tests.$@.c
-	$(CCOMPILER) -o $@_cps_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt.c glue.CertiCoq.Benchmarks.tests.$@_cps_opt.c
-	$(CCOMPILER) -o $@_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt.c glue.CertiCoq.Benchmarks.tests.$@_opt.c
+	ccomp -o $@_cps_ccomp -O2 $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@_cps.c
+	ccomp -o $@_ccomp -O2 $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue.CertiCoq.Benchmarks.tests.$@.c
+
 
 # $(TESTS): $(CFILES)
 #         # From Matthew's scripts

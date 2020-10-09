@@ -197,7 +197,7 @@ Section LambdaLifting.
   Definition FVMap := Maps.PTree.t PS.t.
 
   (* Used when wrappers are defined separately from the mut. def. function bundle *)
-  Fixpoint make_wrappers (B: fundefs) (fvm : VarInfoMap) (fm: FunInfoMap) : lambdaM (exp_ctx * VarInfoMap):=
+  Fixpoint make_wrappers (B: fundefs) (fvm : VarInfoMap) (fm: FunInfoMap) : lambdaM (option fundefs * VarInfoMap):=
     match B with
     | Fcons f ft xs e B =>
       match M.get f fm with
@@ -207,16 +207,19 @@ Section LambdaLifting.
           g <- get_name f "_wrapper" ;;
           xs' <- get_names_lst xs "" ;;
           cm <- make_wrappers B fvm fm ;;
-          let (c, fvm') := cm in
+          let (mb, fvm') := cm in
           let fvm'' := M.set f (WrapperFun g) fvm' in
-          ret (Efun1_c (Fcons g ft xs' (Eapp f' ft' (xs' ++ (rename_lst fvm args))) Fnil) c, fvm'')
-        | NoLiftFun _ _ => make_wrappers B fvm fm
+          match mb with
+          | Some Bw => ret (Some (Fcons g ft xs' (Eapp f' ft' (xs' ++ (rename_lst fvm args))) Bw), fvm'')
+          | None => ret (Some (Fcons g ft xs' (Eapp f' ft' (xs' ++ (rename_lst fvm args))) Fnil), fvm'')
+          end 
+        | NoLiftFun _ _ => ret (None, fvm) (* That's OK because the hole bundle is either all Fun or all NoLiftFun *)
         end
       | None =>
         f_str <- get_pp_name f ;;
         failwith ("Internal error in make_wrappers: All known functions should be in map. Could not find " ++ f_str)
       end
-    | Fnil => ret (Hole_c, fvm) 
+    | Fnil => ret (Some Fnil, fvm) 
     end.
   
   Definition fundefs_max_params (B: fundefs) : nat :=
@@ -430,9 +433,12 @@ Section LambdaLifting.
       let scope' := PS.union names scope in
       let max_params := fundefs_max_params B in
       B' <- fundefs_lambda_lift B B names (PS.union names active_funs) fvm fm' gfuns' lifted_args ;;
-      '(C, fvm') <- make_wrappers B fvm fm' ;;
+      '(ob, fvm') <- make_wrappers B fvm fm' ;;
       e' <- exp_lambda_lift e (PS.union names scope) active_funs fvm' fm' gfuns' ;;
-      ret (Efun B' (C |[ e' ]|))
+      match ob with
+      | Some Bw => ret (Efun B' (Efun Bw e'))
+      | None => ret (Efun B' e')
+      end
     | Eapp f ft xs =>
       match fm ! f with
       | Some (Fun f' ft' fvs sfvs args) =>
@@ -461,13 +467,18 @@ Section LambdaLifting.
              (* log_msg (String.concat " " (f_str :: "has fvs :" :: fv_names)) ;; *)
              (* END DEBUG *)
              '(ys, fvm') <- add_free_vars args fvm ;;
-             '(C, fvm'') <- make_wrappers Bfull fvm' fm ;;
+             '(ob, fvm'') <- make_wrappers Bfull fvm' fm ;;
              (* Variables in scope are :
                 1. Whatever variables are locally bound (current functions, arguments, local defs), and
                 2. The FVs of the current function *)
              e' <- exp_lambda_lift e (PS.union fnames (union_list sfvs xs)) active_funs fvm'' fm gfuns ;;
              B' <- fundefs_lambda_lift B Bfull fnames active_funs fvm fm gfuns fv_no ;;
-             ret (Fcons f' ft' (xs ++ ys) (C |[ e' ]|)  B')
+             match ob with
+             | Some Bw => ret (Fcons f' ft' (xs ++ ys) (Efun Bw e')  B')
+             | None =>
+               f_str <- get_pp_name f ;;
+               failwith ("Internal error in fundefs_lambda_lift: Wrappers cannot be empty in lambda lifted function " ++ f_str)
+             end
            | Some (NoLiftFun fvs sfvs) =>
              e' <- exp_lambda_lift e (PS.union fnames (union_list sfvs xs)) active_funs fvm fm gfuns ;;
              B' <- fundefs_lambda_lift B Bfull fnames active_funs fvm fm gfuns fv_no ;;
@@ -605,10 +616,7 @@ Inductive Exp_lambda_lift :
       Exp_lambda_lift ζ σ (Eproj x t N y e) S (Eproj x t N (σ y) e') S'
 | LL_Efun1 : (* wrappers are mutually defined *)
     forall B B' e e' σ σ' ζ ζ' fvs S S' S'' S''',
-      Included _ (FromList fvs) (occurs_free_fundefs B) ->
-(* Previous less restrictive version *)
-(*   Included _ (FromList fvs) (Union _ (occurs_free_fundefs B)
-                                       (Union _ (FunsFVs ζ) (LiftedFuns ζ))) *)
+      FromList fvs \subset occurs_free_fundefs B :|: (FunsFVs ζ :|: LiftedFuns ζ) ->
       NoDup fvs ->
       Add_functions B fvs σ ζ S σ' ζ' S' ->
       Fundefs_lambda_lift1 ζ' σ' B S' B' S'' ->
@@ -616,7 +624,7 @@ Inductive Exp_lambda_lift :
       Exp_lambda_lift ζ σ (Efun B e) S (Efun B' e') S'''
 | LL_Efun2 : (* wrappers are defined afterwards *)
     forall B B' e e' fds σ σ' σ'' ζ ζ' fvs S S' S'' S''' S'''',
-      Included _ (FromList fvs) (occurs_free_fundefs B) ->
+      FromList fvs \subset occurs_free_fundefs B :|: (FunsFVs ζ :|: LiftedFuns ζ) ->
       NoDup fvs ->
       Add_functions B fvs σ ζ S σ' ζ' S' ->
       Fundefs_lambda_lift2 ζ' σ' B B S' B' S'' ->

@@ -282,15 +282,16 @@ Definition t_conses (xs : list term) : term :=
 Definition t_and (t : term) (t' : term) : term :=
   tApp <% @and %> [t ; t'].
 
+Print one_inductive_body.
+Compute (seq 0 4).
 Fixpoint make_prop
          (ind : inductive)
-           (* name of the type we're generating for *)
+         (one : one_inductive_body)
          (ctor : ctor_info)
          (args : list arg_info)
          : TemplateMonad term :=
-  let twice := ctor_arity ctor * 2 in
-  let t_g := tRel (twice + 2) in
-  let t_p := tRel (twice) in
+  let t_g := tVar "$g" in
+  let t_p := tVar "$p" in
 
   let make_prop_base : TemplateMonad term :=
     (* Create the [cRep] for this constructor and evaluate *)
@@ -301,7 +302,8 @@ Fixpoint make_prop
                 end) ;;
     t_crep <- tmQuote crep ;;
     (* Create list of [[p0;p1;p2;...]] to pass to [fitting_index] *)
-    let l := t_conses (map tRel (rev (seq 0 (ctor_arity ctor)))) in
+    let l := t_conses (map (fun n => tVar ("$p" ++ string_of_nat n))
+                           (seq 0 (ctor_arity ctor))) in
     ret (tApp <% fitting_index %>
               [ t_g ; t_p ; t_crep ; l])
   in
@@ -310,13 +312,13 @@ Fixpoint make_prop
 (*      generates the call to [rep] for that argument *)
   let make_arg_prop (arg' : nat * arg_info) : TemplateMonad term :=
     let '(i, arg) := arg' in
-    let t_arg := tRel (twice - 1 - i) in
-    let t_p := tRel (ctor_arity ctor - 1 - i) in
+    let t_arg := tVar ("$arg" ++ string_of_nat i) in
+    let t_p := tVar ("$p" ++ string_of_nat i) in
 
     (* Check if this is a recursive call to the [rep] we're defining *)
     if eq_inductive ind (arg_inductive arg)
     then
-      let t_rep := tRel (twice + 3) in
+      let t_rep := tVar ("$rep_" ++ ind_name one) in
       ret (tApp t_rep [ t_g ; t_arg; t_p ])
     else
       (* not a recursive call, find the right [Rep] instance *)
@@ -337,7 +339,9 @@ Fixpoint make_prop
 
 Definition ctor_to_branch
     (ind : inductive)
-      (* name of the type we're generating for *)
+      (* the type we're generating for *)
+    (one : one_inductive_body)
+      (* the single type we're generating for *)
     (tau : term)
       (* reified term of the type we're generating for *)
     (ctor : ctor_info)
@@ -347,7 +351,7 @@ Definition ctor_to_branch
       (* FIXME params *)
       dissect_types nil (dInd ind :: nil) (ctor_type ctor) in
   args <- handle_dissected_args dissected_args O ;;
-  prop <- make_prop ind ctor args ;;
+  prop <- make_prop ind one ctor args ;;
   let t := make_lambdas args (make_exists args prop) in
   ret (ctor_arity ctor, t).
 
@@ -355,15 +359,17 @@ Definition ctor_to_branch
 Definition matchmaker
     (ind : inductive)
       (* description of the type we're generating for *)
+    (one : one_inductive_body)
+      (* the single type we're generating for *)
     (tau : term)
       (* reified term of the type we're generating for *)
     (ctors : list ctor_info)
       (* constructors we're generating match branches for *)
     : TemplateMonad term :=
-  branches <- monad_map (ctor_to_branch ind tau) ctors ;;
+  branches <- monad_map (ctor_to_branch ind one tau) ctors ;;
   ret (tCase (ind, 0)
              (tLambda (nNamed "$y"%string) tau <% Prop %>)
-             (tRel 1)
+             (tVar "$x")
              branches).
 
 
@@ -375,7 +381,7 @@ Definition make_fix_single
            (ind : inductive)
            (one : one_inductive_body) : TemplateMonad (BasicAst.def term) :=
   let this_name := nNamed ("$rep_" ++ ind_name one)%string in
-  prop <- matchmaker ind tau (process_ctors (ind_ctors one)) ;;
+  prop <- matchmaker ind one tau (process_ctors (ind_ctors one)) ;;
   let body :=
       (tLambda (nNamed "$g"%string) <% graph %>
         (tLambda (nNamed "$x"%string) tau
@@ -462,9 +468,7 @@ Definition add_instances (kn : kername) : TemplateMonad unit :=
        (* Convert generated program from named to de Bruijn representation *)
        prog <- DB.deBruijn prog_named ;;
 
-
        (* If need be, here's the reified type of our [Rep] instance: *)
-
        (*    instance_ty <-
                tmUnquoteTyped Type
                  (build_quantifiers tProd quantifiers
@@ -475,11 +479,26 @@ Definition add_instances (kn : kername) : TemplateMonad unit :=
        (* Remove [tmEval] when MetaCoq issue 455 is fixed: *)
        (* https://github.com/MetaCoq/metacoq/issues/455 *)
        name <- tmFreshName =<< tmEval all ("Rep_" ++ ind_name one)%string ;;
-       _ <- tmEval all (my_projT2 instance) >>= tmDefinitionRed_ false name (Some all) ;;
+
+       (* This is sort of a hack. I couldn't use [tmUnquoteTyped] above
+          because of a mysterious type error. (Coq's type errors in monadic
+          contexts are just wild.) Therefore I had to [tmUnquote] it to get
+          a Σ-type. But when you project the second field out of that,
+          the type doesn't get evaluated to [Rep _], it stays as
+          [my_projT2 {| ... |}]. The same thing goes for the first projection,
+          which is the type of the second projection. When the user prints
+          their [Rep] instance, Coq shows the unevaluated version.
+          But we don't want to evaluate it [all] the way, that would unfold
+          the references to other instances of [Rep]. We only want to get
+          the head normal form with [hnf].
+          We have to do this both for the instance body and its type. *)
+       tmEval hnf (my_projT2 instance) >>=
+         tmDefinitionRed_ false name (Some hnf) ;;
 
        (* Declare the new definition a type class instance *)
        mp <- tmCurrentModPath tt ;;
        tmExistingInstance (ConstRef (mp, name)) ;;
+
        let fake_kn := (fst kn, ind_name one) in
        tmMsg ("Added Rep instance for " ++ string_of_kername fake_kn) ;;
        ret tt) (ind_bodies mut) ;;

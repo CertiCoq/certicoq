@@ -516,6 +516,28 @@ Section Bounds.
    Qed. 
 
   End LambdaLiftingBound.
+
+
+  Section UncurryBound.
+
+
+    Lemma Hpost_curry :
+      forall e rho rho' rho'' c1 c2 cout1 cout2 f1 ft1 fv1 gv1, 
+        simple_bound 0 (e, rho, c1, cout1) (e, rho'', c2, cout2) ->
+        simple_bound 0 (e, rho, c1, cout1) (Eapp f1 ft1 (gv1 ++ fv1), rho', plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1))), plus cout2 (one (Eapp f1 ft1 (gv1 ++ fv1)))). 
+    Proof. 
+      intros. destruct cout1; destruct cout2. unfold simple_bound in *. unfold_all. simpl in *.
+      omega.
+    Qed.
+
+    Lemma Hpost_idemp : inclusion _ (comp (simple_bound 0) (simple_bound 0)) (simple_bound 0).
+    Proof.
+      intro; intros.
+      destruct x as [[[? ?] ?] [? ?]]; destruct y as [[[? ?] ?] [? ?]].
+      unfold comp, simple_bound in *. unfold_all. destructAll.
+      destruct x as [[[? ?] ?] [? ?]]. simpl in *. omega.
+    Qed.
+
   
 End Bounds.
   

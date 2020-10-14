@@ -772,16 +772,6 @@ Section Lambda_lifting_correct.
   Qed. 
 
   
-  Lemma Exp_lambda_lift_Ecase zeta sig x Pats S e S' :
-    Exp_lambda_lift zeta sig (Ecase x Pats) S e S' ->
-    exists Pats', e = Ecase (sig x) Pats' /\ Forall2 (fun p p' : ctor_tag * exp => fst p = fst p') Pats Pats'.
-  Proof.
-    revert S S' e; induction Pats; intros S S' e Hexp; inv Hexp.
-    - eexists; eauto.
-    - eapply IHPats in H8. edestruct H8 as [P'' [Heq Hall]]. inv Heq.
-      eexists; eauto.
-  Qed.
-
   
   Lemma bound_var_occurs_free_Eletapp_Included x f t ys e :
     (bound_var e :|: occurs_free e) \subset
@@ -1707,6 +1697,121 @@ Section Lambda_lifting_correct.
           eapply image_monotonic; [| eassumption ]...
           eapply Funs_inv_monotonic. eassumption. omega. *)
     - eapply preord_exp_halt_compat; eauto.
-  Qed.
+   Qed.
+
+   Require Import Common.compM L6.state L6.lambda_lifting_corresp Lia. 
+    
+
+   Opaque preord_exp'.
+
+
+   Lemma lambda_lift_correct_top  (e : exp) (c : comp_data) k l b :
+     unique_bindings e ->
+     (max_var e 1%positive < next_var c)%positive ->
+     Disjoint _ (bound_var e) (occurs_free e) ->
+     exists e' c',
+       lambda_lift e k l b c = (Ret e', c') /\
+       unique_bindings e' /\
+       occurs_free e' \subset occurs_free e /\
+       Disjoint _ (bound_var e') (occurs_free e') /\
+       (max_var e' 1%positive < next_var c')%positive /\     
+       (forall k rho1 rho2,
+           preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
+           binding_in_map (occurs_free e) rho1 ->
+           preord_exp cenv (P1 0) PG k (e, rho1) (e', rho2)).
+   Proof.
+     intros Hun Hleq Hdis.
+     set (lift_dec := if b then lift_all else lift_conservative).
+     assert (Hs := lambda_lifting_sound). destruct (Hs k l lift_dec) as [Hsound _]. clear Hs.
+     specialize (Hsound e (M.empty _) (M.empty _) (M.empty _) PS.empty PS.empty (fun x => (max_var e 1%positive < x))%positive). 
+
+     rewrite !Dom_map_empty in Hsound.
+
+     assert (Heq : LiftedFuns (fun_map (M.empty FunInfo)) <--> Empty_set _).
+     { clear. split; sets. intros x Hin. inv Hin. destructAll.
+       inv H. inv H0. unfold fun_map, lifted_name in *. simpl in H1. rewrite M.gempty in H1. congruence. }
+
+     assert (Heq' : FunsFVs (fun_map (M.empty FunInfo)) <--> Empty_set _).
+     { clear. split; sets. intros x Hin. inv Hin. destructAll.
+       unfold fun_map, lifted_name in *. rewrite M.gempty in H. congruence. }
+
+     assert (Heq'' : Funs (fun_map (M.empty FunInfo)) <--> Empty_set _).
+     { clear. split; sets. intros x Hin. inv Hin. destructAll.
+       unfold fun_map, lifted_name in *. simpl in *. rewrite M.gempty in H. congruence. }
+     
+     rewrite !Heq, !Heq' in *.
+
+     assert (Hfresh : Disjoint var (fun x : var => (max_var e 1 < x)%positive) (bound_var e :|: occurs_free e)).
+     { constructor. intros x Hnin. inv Hnin. inv H0.
+       - eapply bound_var_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. omega.
+       - eapply occurs_free_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. omega. }
+     
+     specialize (Hsound ltac:(sets) ltac:(sets) ltac:(eassumption) ltac:(eassumption) ltac:(sets) ltac:(sets) ltac:(eassumption)).
+     
+     unfold lambda_lift, triple in *.
+     unfold run_compM, compM.runState in *. simpl in *. 
+     
+     destruct (exp_lambda_lift k l (if b then lift_all else lift_conservative) e PS.empty PS.empty
+                               (PTree.empty VarInfo) (PTree.empty FunInfo) (M.empty GFunInfo)) eqn:Heqe.
+     unfold lift_dec in *. rewrite Heqe in Hsound. 
+     destruct (runState tt (c, tt)) as [e' [c' u]] eqn:Hstate. simpl in *.
+     
+     assert (Hf : fresh (fun x : var => (max_var e 1 < x)%positive) (next_var (fst (c, tt)))).
+     { unfold fresh. intros. unfold Ensembles.In in *. simpl in *. zify; omega. }
+
+     assert (Hren_empty : f_eq (rename (M.empty _)) id).
+     { intros x. unfold rename. rewrite M.gempty. reflexivity. }
+     
+     specialize (Hsound tt _ Hf). rewrite Hstate in Hsound.
+     destruct e'. contradiction. destructAll.
+
+     do 2 eexists. split. reflexivity.
+
+     assert (Hsub : occurs_free e0 \subset occurs_free e).
+     { eapply Included_trans.
+       eapply Exp_lambda_lift_occurs_free; try eassumption.
+       + rewrite Heq, Heq'. rewrite Hren_empty. rewrite image_id. repeat normalize_sets.
+         now sets.
+       + rewrite Heq, Heq'. sets.
+       + rewrite Heq, Heq'. sets.
+       + rewrite !Heq, !Heq' at 1. rewrite Hren_empty. rewrite image_id. repeat normalize_sets. sets. }
+     assert (Hsub' : bound_var e0 \subset bound_var e :|: ((fun x0 : var => (max_var e 1 < x0)%positive) \\ x)).
+     { eapply Included_trans. eapply Exp_lambda_lift_bound_var. eassumption. sets. }
+
+       
+     split; [| split; [| split; [| split ] ] ]; try eassumption.
+     - eapply Exp_lambda_lift_unique_bindings; try eassumption.
+       sets.
+       rewrite Heq. sets.
+     - eapply Disjoint_Included. eassumption. eassumption. sets.
+     - assert (Hin := max_var_subset e0). assert (Hin' := max_var_subset e).      
+       inv Hin.
+       + eapply Hsub' in H1. inv H1.
+         * simpl in *. find_subsets. eapply bound_var_leq_max_var in H2. 
+           assert (Hin : x (next_var c')). eapply H0. zify; omega.
+           eapply H in Hin. unfold In in *. 
+           eapply Pos.le_lt_trans. eassumption. eassumption.
+         * inv H2. simpl in *.
+           eapply Pos.lt_nle. intros Hc. eapply H3. eapply H0. eassumption.
+       + eapply Hsub in H1. simpl in *. find_subsets. 
+         eapply occurs_free_leq_max_var in H1.
+         eapply Pos.le_lt_trans. eassumption. 
+         assert (Hin : x (next_var c')). eapply H0. simpl; zify; omega.
+         eapply H in Hin. unfold In in *. eassumption.
+     - intros. eapply Exp_lambda_lift_correct; try eassumption.
+       + rewrite !Heq, !Heq', Hren_empty. rewrite image_id.
+         normalize_sets. sets.
+       + rewrite !Heq. sets.
+       + rewrite !Heq''. sets.
+       + rewrite !Heq'. sets.
+       + rewrite !Heq, !Heq', Hren_empty. rewrite image_id.
+         repeat normalize_sets.
+         rewrite exp_fv_correct in *. intros z Hin. 
+         edestruct H2. eassumption.
+         edestruct H1. eassumption. eassumption. destructAll. eauto.
+       + rewrite Hren_empty. eassumption.
+       + intro. intros. unfold fun_map in *. rewrite M.gempty in H3. congruence. 
+  Qed. 
+
 
 End Lambda_lifting_correct.

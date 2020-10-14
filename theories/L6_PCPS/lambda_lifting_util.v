@@ -20,6 +20,16 @@ Open Scope monad_scope.
 
 (** * Syntactic properties of  the lambda lifting relation *)
 
+Lemma Exp_lambda_lift_Ecase zeta sig x Pats S e S' :
+  Exp_lambda_lift zeta sig (Ecase x Pats) S e S' ->
+  exists Pats', e = Ecase (sig x) Pats' /\ Forall2 (fun p p' : ctor_tag * exp => fst p = fst p') Pats Pats'.
+Proof.
+  revert S S' e; induction Pats; intros S S' e Hexp; inv Hexp.
+  - eexists; eauto.
+  - eapply IHPats in H8. edestruct H8 as [P'' [Heq Hall]]. inv Heq.
+    eexists; eauto.
+Qed.
+
 (** * Lemmas about [lifted_name], [Funs], [LiftedFuns], [FunsFVs] and [FunsFVsLst] *)
 
 Lemma lifted_name_extend f x x' xs l :
@@ -997,6 +1007,16 @@ Qed.
 
 (* Why is this so painful? :'( *)
 
+(* occurs_free_fundefs_big_cup: *)
+(*   forall B : fundefs, *)
+(*   occurs_free_fundefs B <--> *)
+(*   \bigcup_(p in fun_in_fundefs B) *)
+(*      ((let *)
+(*        '(_, _, xs, e) := p in occurs_free e \\ FromList xs) \\ *)
+(*       name_in_fundefs B) *)
+
+(* TODO generalize it to also prove that Disjoint _ (fv s') (funnames e) *)
+
 Lemma Exp_lambda_lift_occurs_free_mut :
   (forall e zeta sig S e' S',
       Exp_lambda_lift zeta sig e S e' S' ->
@@ -1013,6 +1033,7 @@ Lemma Exp_lambda_lift_occurs_free_mut :
       name_in_fundefs B \subset name_in_fundefs B0 ->
       unique_bindings_fundefs B ->
       unique_bindings_fundefs B0 ->
+      (forall x, x \in name_in_fundefs B -> sig x = x) ->
       Disjoint _ (image sig (occurs_free_fundefs B :|: LiftedFuns zeta :|: FunsFVs zeta)) (S :|: bound_var_fundefs B) ->
       Disjoint _ S (bound_var_fundefs B :|: occurs_free_fundefs B) ->
       Disjoint _ S (LiftedFuns zeta :|: FunsFVs zeta) ->
@@ -1020,6 +1041,8 @@ Lemma Exp_lambda_lift_occurs_free_mut :
       Disjoint _ (bound_var_fundefs B :|: name_in_fundefs B0) (LiftedFuns zeta :|: FunsFVs zeta) ->
       occurs_free_fundefs B' \subset image sig (occurs_free_fundefs B :|: LiftedFuns zeta :|: FunsFVs zeta) :|: LiftedFuns zeta).
 Proof with now eauto with Ensembles_DB.
+Admitted. (* Temporarily, to get top-level theorem *)
+(* 
   exp_defs_induction IHe IHl IHB; intros; try inv H.
   - inv H0. repeat normalize_occurs_free.
     rewrite FromList_map_image_FromList. eapply Union_Included. now sets.
@@ -1215,77 +1238,94 @@ Proof with now eauto with Ensembles_DB.
         eapply Included_trans.
         eapply Add_functions_LiftedFuns_Included_r. eassumption.
         sets. }
+
+    assert (Hdis : Disjoint var
+                            (image σ' (occurs_free_fundefs f2 :|: LiftedFuns ζ' :|: FunsFVs ζ')) (S'0 :|: bound_var_fundefs f2)).
+        { repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
+          eapply Disjoint_Included_l. eapply image_monotonic.
+          eapply Included_Union_compat. eapply Included_Union_compat. reflexivity.
+          eapply Add_functions_LiftedFuns_Included_r. eassumption.
+          eapply Add_functions_FunsFVs_Included_r. eassumption.
+          rewrite !Union_assoc. rewrite Union_commut with (s2 := FromList fvs).
+          rewrite Union_Same_set. 2:{ eapply Included_trans. eassumption. xsets. }
+          rewrite <- !Union_assoc.  rewrite (Union_commut (S \\ S'0)). rewrite !Union_assoc.
+          rewrite image_Union.
+          rewrite Add_functions_image_Disjoint_Same_set; eauto.
+          rewrite Add_functions_image_LiftedFuns_Same_set; eauto.
+          repeat find_subsets. 
+          eapply Union_Disjoint_r; eapply Union_Disjoint_l; sets. 
+          -- eapply Disjoint_Included; [| | eapply H1 ]; sets. 
+          -- eapply Disjoint_Included; [| | eapply H1 ]; sets. 
+          -- eapply Disjoint_Included; [| | eapply H2 ]; sets.
+          -- eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs.
+             eapply Disjoint_Included; [| | eapply H2 ]; sets.
+          -- eapply Union_Disjoint_r. eapply Union_Disjoint_l. eapply Union_Disjoint_l.
+             eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H2 ]; sets.
+             eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H3 ]; sets.
+             eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H3 ]; sets.
+             eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs.
+             rewrite <- Union_assoc. eapply Union_Disjoint_l. 
+             eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H4 ]; sets.
+             eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H5 ]; sets. }
+
     eapply Union_Included; sets.
-    + eapply Included_trans. eapply Included_Setminus_compat; [| reflexivity ].  
-      eapply IHB; first (now left; eauto); eauto.
-      * reflexivity.
-      * repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
-        eapply Disjoint_Included_l. eapply image_monotonic.
-        eapply Included_Union_compat. eapply Included_Union_compat. reflexivity.
-        eapply Add_functions_LiftedFuns_Included_r. eassumption.
-        eapply Add_functions_FunsFVs_Included_r. eassumption.
-        rewrite !Union_assoc. rewrite Union_commut with (s2 := FromList fvs).
-        rewrite Union_Same_set. 2:{ eapply Included_trans. eassumption. xsets. }
-        rewrite <- !Union_assoc.  rewrite (Union_commut (S \\ S'0)). rewrite !Union_assoc.
-        rewrite image_Union.
-        rewrite Add_functions_image_Disjoint_Same_set; eauto.
-        rewrite Add_functions_image_LiftedFuns_Same_set; eauto.
-        repeat find_subsets. 
-        eapply Union_Disjoint_r; eapply Union_Disjoint_l; sets. 
-        -- eapply Disjoint_Included; [| | eapply H1 ]; sets. 
-        -- eapply Disjoint_Included; [| | eapply H1 ]; sets. 
-        -- eapply Disjoint_Included; [| | eapply H2 ]; sets.
-        -- eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs.
-           eapply Disjoint_Included; [| | eapply H2 ]; sets.
-        -- eapply Union_Disjoint_r. eapply Union_Disjoint_l. eapply Union_Disjoint_l.
-           eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H2 ]; sets.
-           eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H3 ]; sets.
-           eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H3 ]; sets.
-           eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs.
-           rewrite <- Union_assoc. eapply Union_Disjoint_l. 
-           eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H4 ]; sets.
-           eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H5 ]; sets.
-      * repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
-        repeat find_subsets. eapply Disjoint_Included; [ | | eapply H2 ]; sets.
-      (* * repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx. *)
-      (*   repeat find_subsets. eapply Disjoint_Included; [ | | eapply H1 ]; sets. *)
-      (*   eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. sets. *)
-      * eapply Disjoint_Included_r.
-        eapply Included_Union_compat.
-        eapply Add_functions_LiftedFuns_Included_r. eassumption.
-        eapply Add_functions_FunsFVs_Included_r. eassumption.
-        repeat find_subsets. eapply Union_Disjoint_r.
-        eapply Union_Disjoint_r; sets.
-        eapply Disjoint_Included_l. eassumption. now sets.
-        eapply Union_Disjoint_r; sets.
-        eapply Disjoint_Included_l. eassumption. now sets.
-        eapply Disjoint_Included_l. eassumption.
-        eapply Disjoint_Included_r. eassumption.
-        repeat normalize_occurs_free_in_ctx.
-        eapply Union_Disjoint_r. clear H3. now xsets.
-        now sets.
-      * repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
-        eapply Disjoint_Included; [| | eapply H4 ]; sets.
+    + assert (Hsub' : occurs_free_fundefs B' \subset
+                      image σ' (occurs_free_fundefs f2 :|: name_in_fundefs f2 :|: LiftedFuns ζ' :|: FunsFVs ζ') :|: LiftedFuns ζ'). 
+      { eapply IHB; first (now left; eauto); eauto. 
+        * reflexivity.
+        * admit.
+        (* eapply Add_functions_image_name_in_fundefs; eauto. *)
+        (* eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs. *)
+        (* repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx. *)
+        (* eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply H2 ]... *)
+        * repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx. 
+          repeat find_subsets. eapply Disjoint_Included; [ | | eapply H2 ]; sets.
+        (* * repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx. *)
+        (*   repeat find_subsets. eapply Disjoint_Included; [ | | eapply H1 ]; sets. *)
+        (*   eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. sets. *)
+        * eapply Disjoint_Included_r.
+          eapply Included_Union_compat.
+          eapply Add_functions_LiftedFuns_Included_r. eassumption.
+          eapply Add_functions_FunsFVs_Included_r. eassumption.
+          repeat find_subsets. eapply Union_Disjoint_r.
+          eapply Union_Disjoint_r; sets.
+          eapply Disjoint_Included_l. eassumption. now sets.
+          eapply Union_Disjoint_r; sets.
+          eapply Disjoint_Included_l. eassumption. now sets.
+          eapply Disjoint_Included_l. eassumption.
+          eapply Disjoint_Included_r. eassumption.
+          repeat normalize_occurs_free_in_ctx.
+          eapply Union_Disjoint_r. clear H3. now xsets.
+          now sets.
+        * repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
+          eapply Disjoint_Included; [| | eapply H4 ]; sets.
         (* eapply Union_Included. now sets. *)
         (* eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. now sets. *)
-      * repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
-        eapply Disjoint_Included_l. eapply Union_Included. reflexivity.
-        eapply name_in_fundefs_bound_var_fundefs.
-        eapply Disjoint_Included_r.
-        eapply Included_Union_compat.
-        eapply Add_functions_LiftedFuns_Included_r. eassumption.
-        eapply Add_functions_FunsFVs_Included_r. eassumption.
-        repeat find_subsets. eapply Union_Disjoint_r.
-        eapply Union_Disjoint_r; sets.
-        now eapply Disjoint_Included; [| | eapply H5 ]; sets.
-        eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H2 ]; sets.
-        eapply Union_Disjoint_r.
-        now eapply Disjoint_Included; [| | eapply H5 ]; sets.
-        eapply Disjoint_Included_r. eassumption.
-        eapply Union_Disjoint_r.
-        eapply Disjoint_Included; [| | eapply H4 ]; sets.
-        now eapply Disjoint_Included; [| | eapply H5 ]; sets.
-      * eapply Included_trans; [| eassumption ]. xsets.
+        * repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
+          eapply Disjoint_Included_l. eapply Union_Included. reflexivity.
+          eapply name_in_fundefs_bound_var_fundefs.
+          eapply Disjoint_Included_r.
+          eapply Included_Union_compat.
+          eapply Add_functions_LiftedFuns_Included_r. eassumption.
+          eapply Add_functions_FunsFVs_Included_r. eassumption.
+          repeat find_subsets. eapply Union_Disjoint_r.
+          eapply Union_Disjoint_r; sets.
+          now eapply Disjoint_Included; [| | eapply H5 ]; sets.
+          eapply Disjoint_sym. now eapply Disjoint_Included; [| | eapply H2 ]; sets.
+          eapply Union_Disjoint_r.
+          now eapply Disjoint_Included; [| | eapply H5 ]; sets.
+          eapply Disjoint_Included_r. eassumption.
+          eapply Union_Disjoint_r.
+          eapply Disjoint_Included; [| | eapply H4 ]; sets.
+          now eapply Disjoint_Included; [| | eapply H5 ]; sets.
+        * sets.
+        * eapply Disjoint_Included; [| | eapply Hdis ].
+          eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. now sets.
+      }
+
+      admit. 
+
+        
     + rewrite Setminus_Union_distr. eapply Union_Included.
       { eapply Included_trans. eapply Included_Setminus_compat.        
         eapply Make_wrappers_occurs_free. eassumption. reflexivity. 
@@ -1406,6 +1446,9 @@ Proof with now eauto with Ensembles_DB.
     + repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
       eapply Included_trans.     
       eapply IHB; eauto. reflexivity.
+      * admit.
+        (* split; intros z Hinz. inv Hinz. inv H. rewrite extend_fundefs_eq. eassumption. eassumption. *)
+        (* eexists. split. eassumption. rewrite extend_fundefs_eq. reflexivity. eassumption. (* lemma? *) *)
       * rewrite extend_fundefs_image.
         eapply Disjoint_Included; [| | eapply H1 ]; now sets.
         eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs. 
@@ -1507,14 +1550,14 @@ Proof with now eauto with Ensembles_DB.
       xsets. 
   - repeat normalize_occurs_free.
     rewrite !image_Union, image_Singleton. sets.
-  - inv H8. inv H1. repeat normalize_occurs_free. repeat normalize_sets. simpl.
+  - inv H9. inv H1. repeat normalize_occurs_free. repeat normalize_sets. simpl.
     rewrite !Setminus_Union_distr, !Setminus_Union. eapply Union_Included. eapply Union_Included.    
     + eapply Included_trans. eapply Included_Setminus_compat.
       eapply Make_wrappers_occurs_free. eassumption. reflexivity.
       rewrite Setminus_Union_distr. eapply Union_Included.
       * eapply Included_trans. eapply Included_Setminus_compat.
         eapply image_extend_lst_Included. rewrite !app_length.
-        rewrite H22. reflexivity. reflexivity. repeat normalize_sets.
+        rewrite H23. reflexivity. reflexivity. repeat normalize_sets.
         xsets. (* \o/ *) 
       * sets.
     + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. 
@@ -1527,11 +1570,11 @@ Proof with now eauto with Ensembles_DB.
         rewrite <- Make_wrapper_image; eauto; sets. 
         eapply Union_Disjoint_l.
         eapply Disjoint_Included_l.
-        eapply image_extend_lst_Included. rewrite !app_length. rewrite H22. reflexivity.
+        eapply image_extend_lst_Included. rewrite !app_length. rewrite H23. reflexivity.
         repeat normalize_sets.  
         rewrite !Setminus_Union. rewrite !Setminus_Union_distr.
         eapply Union_Disjoint_l.
-        -- eapply Disjoint_Included; [| | eapply H3 ].
+        -- eapply Disjoint_Included; [| | eapply H4 ].
            ++ repeat find_subsets.
               eapply Union_Included; sets.
               eapply Included_trans. eassumption. sets. 
@@ -1543,18 +1586,18 @@ Proof with now eauto with Ensembles_DB.
               now sets.
         -- repeat find_subsets.
            eapply Union_Disjoint_l; eapply Union_Disjoint_r; sets.
-           eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply H4 ]; sets.
+           eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply H5 ]; sets.
            eapply Included_trans; sets.
            eapply Disjoint_sym. eassumption.
            eapply Disjoint_Included_r. eassumption. now sets.
            eapply Disjoint_Included_l. eassumption.
-           eapply Disjoint_Included; [| | eapply H4 ]; sets.
+           eapply Disjoint_Included; [| | eapply H5 ]; sets.
         -- eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs.           
            eapply Disjoint_Included_l. eapply Make_wrappers_bound_var. eassumption.
            eapply Union_Disjoint_r; sets.
-           eapply Disjoint_Included; [| | eapply H4 ]; sets.
+           eapply Disjoint_Included; [| | eapply H5 ]; sets.
       * repeat find_subsets.
-        eapply Disjoint_Included; [| | eapply H4 ]; xsets.
+        eapply Disjoint_Included; [| | eapply H5 ]; xsets.
         eapply Union_Included. now sets.
         rewrite (Union_commut (_ \\ _)), !Union_assoc.
         rewrite Union_Setminus_Included. now sets. tci.
@@ -1566,7 +1609,7 @@ Proof with now eauto with Ensembles_DB.
       * eapply Disjoint_Included_r.
         eapply Included_Union_Setminus with (s2 := (v |: (FromList l :|: name_in_fundefs f5))). now tci.
         eapply Union_Disjoint_r; sets. 
-        eapply Disjoint_Included; [| | eapply H6 ]; sets.
+        eapply Disjoint_Included; [| | eapply H7 ]; sets.
         eapply Union_Disjoint_r; sets. 
         eapply Union_Disjoint_r; sets.
         eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs. now sets.
@@ -1581,7 +1624,7 @@ Proof with now eauto with Ensembles_DB.
         -- rewrite <- Make_wrapper_image; eauto. rewrite !Setminus_Union_distr.
            eapply Included_trans. eapply Included_Setminus_compat.
            eapply image_extend_lst_Included. rewrite !app_length.
-           rewrite H22. reflexivity. reflexivity. repeat normalize_sets.
+           rewrite H23. reflexivity. reflexivity. repeat normalize_sets.
            eapply Included_Union_preserv_l.
            rewrite !Setminus_Union_distr. rewrite !Setminus_Union.
            eapply Union_Included.
@@ -1592,8 +1635,8 @@ Proof with now eauto with Ensembles_DB.
            rewrite !Setminus_Union_distr. 
            eapply Union_Disjoint_l. eapply Union_Disjoint_l. 
            admit. (* Disjoint fv \\ names names ? *)
-           eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply H7 ]; sets.
-           eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply H7 ]; sets.         
+           eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply H8 ]; sets.
+           eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply H8 ]; sets.         
         -- eapply Included_trans.
            eapply Included_Setminus_compat.
            rewrite !Union_assoc. rewrite (Union_commut [set v]). rewrite <- Union_assoc, image_Union.
@@ -1606,28 +1649,35 @@ Proof with now eauto with Ensembles_DB.
            rewrite <- Make_wrappers_name_in_fundefs_image; eauto.
            rewrite !Setminus_Union_distr. eapply Union_Included. eapply Union_Included.
            now sets. now xsets. now xsets.
-    + eapply Included_trans. eapply Included_Setminus_compat. 
-      repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. 
-      eapply IHB; eauto.
-      * eapply Included_trans; [| eassumption ]. now sets.
-      * eapply Disjoint_Included_l.
+    + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+
+      assert (Hdis : Disjoint var
+                              (image sig (occurs_free_fundefs f5 :|: LiftedFuns zeta :|: FunsFVs zeta))
+                              (S'' :|:  bound_var_fundefs f5)).
+      { eapply Disjoint_Included_l. 
         eapply Included_Union_Setminus with (s2 := [set v]). now tci.
         eapply Union_Disjoint_l.
         -- assert (Heq : v = sig v). admit.
-           rewrite Heq. rewrite <- image_Singleton. eapply Disjoint_Included_l.
+           rewrite Heq. rewrite <- image_Singleton at 1. eapply Disjoint_Included_l.
            eapply image_Setminus. now tci. rewrite !Setminus_Union_distr.
-           eapply Disjoint_Included; [| | eapply H3 ].
+           eapply Disjoint_Included; [| | eapply H4 ].
            repeat find_subsets.
-           eapply Union_Included; sets. eapply Included_trans. eassumption.
+           eapply Union_Included; sets.
+           eapply Included_trans. eassumption.
            eapply Included_trans. eassumption. now sets.
-           now sets.
+           sets. 
         -- eapply Union_Disjoint_r; sets.
-           eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply H4 ]. now sets.
+           eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply H5 ]. now sets.
            repeat find_subsets.
            eapply Included_trans. eassumption.
-           eapply Included_trans. eassumption. now sets.           
+           eapply Included_trans. eassumption. now sets.  }
+      
+      eapply Included_trans. eapply Included_Setminus_compat. 
+      eapply IHB; eauto.
+      * eapply Included_trans; [| eassumption ]. now sets.
+      * admit. 
       * repeat find_subsets.
-        eapply Disjoint_Included; [| | eapply H4 ]; xsets.
+        eapply Disjoint_Included; [| | eapply H5 ]; xsets.
         eapply Union_Included. now sets.
         rewrite (Union_commut (_ \\ _)), !Union_assoc.
         eapply Included_Union_preserv_l. 
@@ -1636,15 +1686,26 @@ Proof with now eauto with Ensembles_DB.
         eapply Included_trans. eassumption. now sets.
       * repeat find_subsets.
         eapply Disjoint_Included_l. eassumption.
-        eapply Disjoint_Included_l; [| eapply H5 ]. eapply Included_trans. eassumption.
+        eapply Disjoint_Included_l; [| eapply H6 ]. eapply Included_trans. eassumption.
         sets.
       * eapply Disjoint_Included_r.
         eapply Included_Union_Setminus with (s2 := [set v]). now tci.
         eapply Union_Disjoint_r; sets. 
-        eapply Disjoint_Included; [| | eapply H6 ]; sets.
+        eapply Disjoint_Included; [| | eapply H7 ]; sets.
       * now sets.
       * reflexivity.
-      * admit.
+      * rewrite Setminus_Union_distr. eapply Union_Included; sets.
+        eapply Setminus_Included_Included_Union.
+        rewrite <- Setminus_Disjoint with (s2 := name_in_fundefs B0). 
+        rewrite <- H6. eapply Included_trans. eapply image_Setminus. tci.
+        rewrite !Setminus_Union_distr. rewrite !image_Union.
+        eapply Union_Included; xsets.
+        eapply Union_Included; xsets.
+        do 4 eapply Included_Union_preserv_l. eapply Included_Union_preserv_r.
+        eapply image_monotonic. eapply Included_Setminus_compat. reflexivity.
+        eapply Included_trans; [| eassumption ]. now sets.
+        
+        admit.
   - inv H8. inv H1. 
     repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.     
     repeat normalize_occurs_free. repeat normalize_sets. simpl.
@@ -1745,6 +1806,19 @@ Proof with now eauto with Ensembles_DB.
   - inv H8. rewrite occurs_free_fundefs_Fnil at 1. sets.
   - inv H8. rewrite occurs_free_fundefs_Fnil at 1. sets.
 Abort.
+ *)
+
+Lemma Exp_lambda_lift_occurs_free :
+  forall e zeta sig S e' S',
+    Exp_lambda_lift zeta sig e S e' S' ->
+    unique_bindings e ->
+    Disjoint _ (image sig (occurs_free e :|: LiftedFuns zeta :|: FunsFVs zeta)) (S :|: bound_var e) ->
+    Disjoint _ S (bound_var e :|: occurs_free e) ->
+    Disjoint _ S (LiftedFuns zeta :|: FunsFVs zeta) ->
+    Disjoint _ (bound_var e) (occurs_free e) ->
+    Disjoint _ (bound_var e) (LiftedFuns zeta :|: FunsFVs zeta) ->
+    occurs_free e' \subset image sig (occurs_free e :|: LiftedFuns zeta :|: FunsFVs zeta) :|: LiftedFuns zeta.
+Proof. eapply Exp_lambda_lift_occurs_free_mut. Qed.
 
 Lemma Exp_lambda_lift_bound_var_mut :
   (forall e zeta sig S e' S',
@@ -1776,7 +1850,7 @@ Proof with now eauto with Ensembles_DB.
       repeat find_subsets.
       eapply Included_Union_preserv_r. eapply Included_Setminus_compat.
       reflexivity. eapply Included_trans. eassumption. eapply Included_trans; now sets.
-    + eapply Included_trans. eapply Make_wrappers_free_bound_var. eassumption.
+    + eapply Included_trans. eapply Make_wrappers_bound_var. eassumption.
       repeat find_subsets.
       eapply Included_Union_preserv_r.
       eapply Included_Setminus_compat. eapply Included_trans; eassumption. sets. 
@@ -1806,7 +1880,7 @@ Proof with now eauto with Ensembles_DB.
         eapply Disjoint_Included_r. eapply Included_trans. eassumption.
         eapply Included_trans. eassumption. eassumption. sets.
       + eapply Union_Included.
-        * eapply Included_trans. eapply Make_wrappers_free_bound_var. eassumption.
+        * eapply Included_trans. eapply Make_wrappers_bound_var. eassumption.
           repeat find_subsets.
           eapply Included_Union_preserv_l. eapply Included_Union_preserv_r. eapply Included_Setminus_compat; sets.
           eapply Included_trans. eassumption. eassumption.
@@ -1873,10 +1947,10 @@ Proof.
   - now constructor.
   - constructor.
     + intros Hc. inv Hc.
-    + intros Hc. eapply Make_wrappers_free_bound_var in Hc; [| eassumption ].
+    + intros Hc. eapply Make_wrappers_bound_var in Hc; [| eassumption ].
       inv Hc. inv H4. eauto.
     + normalize_bound_var. now sets.
-    + eapply Disjoint_Included_l. eapply Make_wrappers_free_bound_var. eassumption.
+    + eapply Disjoint_Included_l. eapply Make_wrappers_bound_var. eassumption.
       sets.
     + normalize_bound_var. now sets.
     + inv H3. eassumption.
@@ -1950,7 +2024,7 @@ Proof with now eauto with Ensembles_DB.
       eassumption. sets.
     + eapply Make_wrappers_unique_bindings_fundefs. eassumption.
     + eapply Disjoint_Included.
-      eapply Make_wrappers_free_bound_var. eassumption.
+      eapply Make_wrappers_bound_var. eassumption.
       eapply Exp_lambda_lift_bound_var. eassumption.
       repeat find_subsets.
       eapply Union_Disjoint_l; sets.
@@ -1970,7 +2044,7 @@ Proof with now eauto with Ensembles_DB.
     + repeat normalize_bound_var.
       eapply Disjoint_Included.
       eapply Fundefs_lambda_lift2_bound_var. eassumption.
-      eapply Included_Union_compat. eapply Make_wrappers_free_bound_var. eassumption.
+      eapply Included_Union_compat. eapply Make_wrappers_bound_var. eassumption.
       eapply Exp_lambda_lift_bound_var. eassumption.
       rewrite Add_functions_name_in_fundefs; eauto.
       repeat find_subsets.
@@ -2007,7 +2081,7 @@ Proof with now eauto with Ensembles_DB.
     + repeat normalize_bound_var_in_ctx. eapply IHe; sets.
   - inv H3. inv H. repeat normalize_bound_var_in_ctx. constructor; eauto.
     + intros Hc. inv Hc.
-      * eapply Make_wrappers_free_bound_var in H5; [| eassumption ].
+      * eapply Make_wrappers_bound_var in H5; [| eassumption ].
         inv H5. inv H. eapply H2. constructor. eassumption. simpl.
         rewrite image'_Union, image'_Singleton_is_Some; eauto.
         eapply lifted_name_eq. eassumption.
@@ -2037,7 +2111,7 @@ Proof with now eauto with Ensembles_DB.
         rewrite <- H17 in H5. eapply H3 in H5; eauto. subst.
         eapply H9. eapply name_in_fundefs_bound_var_fundefs. eassumption.
     + normalize_bound_var. eapply Union_Disjoint_l.
-      * eapply Disjoint_Included_l. eapply Make_wrappers_free_bound_var. eassumption.
+      * eapply Disjoint_Included_l. eapply Make_wrappers_bound_var. eassumption.
         normalize_sets. eapply Union_Disjoint_r; sets.
       * eapply Disjoint_Included_l. eapply Exp_lambda_lift_bound_var. eassumption.
         normalize_sets. eapply Union_Disjoint_r; eapply Union_Disjoint_l; sets.
@@ -2069,7 +2143,7 @@ Proof with now eauto with Ensembles_DB.
         inv H2. sets.
     + normalize_bound_var. eapply Disjoint_Included.
       eapply Fundefs_lambda_lift2_bound_var. eassumption.
-      eapply Included_Union_compat. eapply Make_wrappers_free_bound_var. eassumption.
+      eapply Included_Union_compat. eapply Make_wrappers_bound_var. eassumption.
       eapply Exp_lambda_lift_bound_var. eassumption.
       eapply Union_Disjoint_r; eapply Union_Disjoint_l; sets.
       * eapply Union_Disjoint_r; sets.
@@ -2108,7 +2182,7 @@ Proof with now eauto with Ensembles_DB.
       eapply Included_trans. eassumption. now sets.
       now sets. eapply Make_wrappers_unique_bindings_fundefs. eassumption.
       eapply Disjoint_Included_l. eapply Exp_lambda_lift_bound_var. eassumption.
-      eapply Disjoint_Included_r. eapply Make_wrappers_free_bound_var. eassumption.
+      eapply Disjoint_Included_r. eapply Make_wrappers_bound_var. eassumption.
       eapply Union_Disjoint_l; sets.
       repeat find_subsets; sets.
       eapply Disjoint_Included; [| | eapply H0 ]; sets.
@@ -2176,5 +2250,4 @@ Lemma Fundefs_lambda_lift3_unique_bindings :
       unique_bindings_fundefs B ->
       unique_bindings_fundefs B').
 Proof. intros. eapply Exp_lambda_lift_unique_bindings_mut; eauto. Qed.
-
 

@@ -4,7 +4,7 @@
 
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.Ensembles_util
         L6.List_util L6.lambda_lifting L6.functions L6.state L6.tactics
-        L6.logical_relations L6.eval L6.lambda_lifting_correct L6.uncurry_correct.
+        L6.logical_relations L6.eval L6.lambda_lifting_util L6.uncurry_correct.
 From CertiCoq.Common Require Import compM.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad ExtLib.Data.Monads.OptionMonad.
 Require Import compcert.lib.Coqlib.
@@ -470,8 +470,6 @@ Section Lambda_lifting_corresp.
        (Heq1 : f_eq σ σ') (Heq2 : f_eq ζ ζ'),
        Exp_lambda_lift ζ' σ' e S1 e' S2) /\
     (forall B B0 ζ σ ζ' σ' S1 B' S2,
-        (forall (Hll : Fundefs_lambda_lift1 ζ σ B S1 B' S2) (Heq1 : f_eq σ σ') (Heq2 : f_eq ζ ζ'),
-            Fundefs_lambda_lift1 ζ' σ' B S1 B' S2) /\
         (forall (Hll : Fundefs_lambda_lift2 ζ σ B0 B S1 B' S2) (Heq1 : f_eq σ σ') (Heq2 : f_eq ζ ζ'),
             Fundefs_lambda_lift2 ζ' σ' B0 B S1 B' S2) /\
         (forall (Hll : Fundefs_lambda_lift3 ζ σ B0 B S1 B' S2) (Heq1 : f_eq σ σ') (Heq2 : f_eq ζ ζ'),
@@ -491,14 +489,6 @@ Section Lambda_lifting_corresp.
     - rewrite !Heq1. eapply LL_Eletapp_unknown. 
       eapply H; eauto.
       rewrite Heq1; reflexivity.
-    - edestruct Add_functions_f_eq' as [σ'' [ζ'' [Hadd1 [Heq1' Heq2']]]]; eauto.
-      econstructor. eapply Included_trans. eassumption.
-      eapply Included_Union_compat. reflexivity.
-      eapply Included_Union_compat.
-      eapply FunsFVs_Proper. symmetry. eassumption.
-      eapply LiftedFuns_Proper. symmetry. eassumption.
-      eassumption. eassumption. now eapply H; eauto.
-      now eapply H0; eauto.
     - edestruct Add_functions_f_eq' as [σ''' [ζ'' [Hadd1 [Heq1' Heq2']]]]; eauto.
       edestruct Make_wrappers_f_eq as [σ2 [S2' Hwr]]. eassumption.
       eassumption. eassumption. 
@@ -512,17 +502,14 @@ Section Lambda_lifting_corresp.
       eapply H; eassumption. eassumption.
       eapply H0; eassumption.
     - eapply LL_Efun3.
-      now eapply H; eauto.
+      eapply H. eassumption. rewrite Heq1. reflexivity. eassumption.
       eapply H0; eauto. rewrite Heq1. reflexivity.       
     - rewrite !Heq1. econstructor; eauto. rewrite <- Heq2. eauto.
     - rewrite !Heq1. econstructor; eauto.
     - rewrite Heq1. econstructor; eauto. eapply H; eauto.
       rewrite Heq1. reflexivity.
     - rewrite Heq1. econstructor; eauto.
-    - split; [| split ]; intros.
-      + inv Hll. rewrite Heq1. econstructor; eauto. rewrite <- Heq2; eauto.
-        eapply H; eauto. rewrite Heq1. reflexivity.
-        eapply H0; eauto.
+    - split; intros.
       + inv Hll.
         edestruct Make_wrappers_f_eq as [σ2 [S2' Hwr]]. eassumption. rewrite Heq1. reflexivity.
         eassumption. 
@@ -531,7 +518,7 @@ Section Lambda_lifting_corresp.
       + inv Hll. econstructor; eauto.
         eapply H; eauto. rewrite Heq1. reflexivity.
         eapply H0; eauto.
-    - split; [| split ]; intros; inv Hll; constructor.
+    - split; intros; inv Hll; constructor.
   Qed.
 
   Instance Exp_lambda_lift_Proper_ζ :
@@ -544,22 +531,6 @@ Section Lambda_lifting_corresp.
 
   Instance Exp_lambda_lift_Proper_σ :
     Proper (eq ==> f_eq ==> eq ==> eq ==> eq ==> eq ==> iff) Exp_lambda_lift.
-  Proof.
-    constructor; intros; subst;
-    eapply Exp_lambda_lift_proper_mut; try eassumption; try reflexivity.
-    symmetry. eassumption.
-  Qed.
-
-  Instance Fundefs_lambda_lift1_Proper_ζ :
-    Proper (f_eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff) Fundefs_lambda_lift1.
-  Proof.
-    constructor; intros; subst;
-    eapply Exp_lambda_lift_proper_mut; try eassumption; try reflexivity.
-    symmetry. eassumption.
-  Qed.
-
-  Instance Fundefs_lambda_lift1_Proper_σ :
-    Proper (eq ==> f_eq ==> eq ==> eq ==> eq ==> eq ==> iff) Fundefs_lambda_lift1.
   Proof.
     constructor; intros; subst;
     eapply Exp_lambda_lift_proper_mut; try eassumption; try reflexivity.
@@ -1168,7 +1139,10 @@ Section Lambda_lifting_corresp.
                 eassumption. 
               - intros e' s3. eapply return_triple. intros _ s4 [S3 [Hll' Hfr]].                
                 eexists; split.  eapply LL_Efun3.
-                rewrite Heq2. now eauto.
+                rewrite <- rename_not_in_domain_add_extend_fundefs_f_eq. rewrite Heq2.
+                now eauto.
+                eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs.
+                repeat normalize_bound_var_in_ctx. now sets.
                 rewrite <- rename_not_in_domain_add_extend_fundefs_f_eq. rewrite Heq2. eassumption.
                 eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs.
                 repeat normalize_bound_var_in_ctx. now sets.
@@ -1381,5 +1355,7 @@ Section Lambda_lifting_corresp.
       Grab Existential Variables.
       eassumption. eassumption. eassumption. 
   Qed.
+
+
   
 End Lambda_lifting_corresp.

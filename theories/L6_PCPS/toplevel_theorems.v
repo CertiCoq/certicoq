@@ -4,7 +4,7 @@ Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSe
 
 Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.set_util
         L6.Ensembles_util L6.List_util L6.size_cps L6.tactics L6.relations L6.rel_comp
-        L6.uncurry L6.bounds
+        L6.uncurry L6.bounds L6.shrink_cps L6.shrink_cps_toplevel
         L6.closure_conversion L6.closure_conversion_util L6.hoisting
         L6.lambda_lifting L6.lambda_lifting_correct.
 Require Export L6.logical_relations L6.logical_relations_cc L6.alpha_conv L6.inline_letapp L6.inline L6.inline_correct.
@@ -212,6 +212,47 @@ Section CCHoist.
 
 End CCHoist.
   
+Section Shrink.
+
+  Lemma shrink_top_correct e e' m :
+    well_scoped e ->
+    shrink_top e = (e', m) ->
+    exists m,
+      preord_exp_n cenv wf_pres post_prop m e e'.
+  Proof.
+    intros.
+    intros. intros.
+    assert (Hs := shrink_corresp_top (M.empty _) cenv (fun L => inline_bound L 1) (inline_bound 1 1)).
+    inv H. 
+
+    assert (Ha : let (e', n) := shrink_top e in
+                 (exists m : nat,
+                     (m >= n)%nat /\
+                     preord_exp_n cenv shrink_cps_toplevel.wf_pres (shrink_cps_toplevel.post_prop cenv) m e e') /\
+                 unique_bindings e' /\
+                 Disjoint var (occurs_free e') (bound_var e') /\
+                 occurs_free e' \subset occurs_free e /\ bound_var e' \subset bound_var e).
+    { eapply Hs.
+      
+      - intros. eapply inline_bound_compat. eassumption.
+      - intros. eapply inline_bound_compat. omega.
+      - intros. eapply inline_bound_post_Eapp_l.
+      - eapply inline_bound_remove_steps_letapp.
+      - assert (Hs' := inline_bound_remove_steps_letapp_OOT cenv 0 0 1).
+        eassumption.
+      - eapply inline_bound_ctx1.
+      - eapply inline_bound_Ecase.
+      - eapply inline_bound_post_upper_bound.
+      - eapply inline_bound_post_upper_bound.
+      - eassumption.
+      - eassumption. }
+
+    rewrite H0 in Ha. destructAll. eexists. eassumption. 
+  Qed.
+
+End Shrink.
+
+
 (* Section Uncurry. *)
 
 (*   boun *)

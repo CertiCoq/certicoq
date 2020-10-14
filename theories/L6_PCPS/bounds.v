@@ -1,7 +1,7 @@
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
         Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles Coq.micromega.Lia.
 
-Require Import L6.cps L6.eval L6.Ensembles_util L6.List_util L6.tactics L6.set_util
+Require Import L6.cps L6.eval L6.Ensembles_util L6.List_util L6.tactics L6.set_util L6.ctx
         L6.logical_relations L6.logical_relations_cc L6.algebra L6.inline_letapp L6.lambda_lifting_correct.
 Require Import micromega.Lia.
 
@@ -176,6 +176,35 @@ Section Bounds.
       lia.
     Qed.
 
+    (* For shrink reduction *)
+    Open Scope ctx_scope.
+    
+    Lemma inline_bound_ctx1 :      
+      forall (C : exp_ctx) (e1 : exp) (rho1 rho1' : env) (e2 : exp) (rho2 : env) (cin1 cin2 : nat)
+             (cout1 cout2 : nat * nat),
+        ctx_to_rho C rho1 rho1' ->
+        len_exp_ctx C = 1%nat ->
+        inline_bound 0 1 (e1, rho1', cin1, cout1) (e2, rho2, cin2, cout2) ->
+        inline_bound 1 1 (C |[ e1 ]|, rho1, cin1 <+> one (C |[ e1 ]|), cout1 <+> one (C |[ e1 ]|))
+                     (e2, rho2, cin2, cout2).
+    Proof.
+      intro; intros. unfold inline_bound in *. unfold_all; simpl in *.
+      destruct cout1; destruct cout2. simpl in *. destructAll.
+      destruct (C |[ e1 ]|); simpl; try lia.
+    Qed.    
+
+
+    Lemma inline_bound_Ecase :
+      forall x cl t e n rho1 rho2 cin1 cout1 cin2 cout2,
+        cps_util.find_tag_nth cl t e n ->
+        inline_bound 0 1 (e, rho1, cin1, cout1) (e, rho2, cin2, cout2) ->
+        inline_bound 1 1 (Ecase x cl, rho1, cin1 <+> one (Ecase x cl), cout1 <+> one (Ecase x cl)) (e, rho2, cin2, cout2).
+    Proof. 
+      intro; intros. unfold inline_bound in *. unfold_all; simpl in *.
+      destruct cout1; destruct cout2. simpl in *. destructAll. lia.
+    Qed.    
+
+      
   
   End Inline_bound.
 

@@ -36,9 +36,7 @@ Section Srink_top_correct.
                P1 0 (e, rho1, cin1, cout1) (e, rho2, cin2, cout2) ->
                P1 1 (Ecase x cl, rho1, cin1 <+> one (Ecase x cl), cout1 <+> one (Ecase x cl)) (e, rho2, cin2, cout2)).
 
-  Context (HcompP1 : inclusion _ (comp (P1 1) (P1 1)) (P1 1))
-          (HGPost' : inclusion _ PG (P1 1))
-          (Hubound1 : post_upper_bound (P1 1))
+  Context (Hubound1 : post_upper_bound (P1 1))
           (Hubound2 : post_upper_bound PG).  
 
 

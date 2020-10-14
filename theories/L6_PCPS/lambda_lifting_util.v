@@ -1017,6 +1017,17 @@ Qed.
 
 (* TODO generalize it to also prove that Disjoint _ (fv s') (funnames e) *)
 
+(* Thing to try:
+ 
+
+Consider that Disjoint (names B') (sig (names B))
+
+where names B' = lifted_names zeta (names B)
+
+
+and then take occurs_free e' \\ name_in_fundefs B0
+*)  
+
 Lemma Exp_lambda_lift_occurs_free_mut :
   (forall e zeta sig S e' S',
       Exp_lambda_lift zeta sig e S e' S' ->

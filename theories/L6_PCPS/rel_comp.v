@@ -149,6 +149,18 @@ Section RelComp.
     intros Hn. induction Hn; eauto.
   Qed.
 
+  Lemma preord_exp_n_trans n m e1 e2 e3 :         
+    preord_exp_n n e1 e2 ->
+    preord_exp_n m e2 e3 ->
+    preord_exp_n (n + m) e1 e3.
+  Proof.
+    intros H1. revert m e3. induction H1; intros k e3 H2. 
+    - econstructor. econstructor. eassumption. eassumption. eassumption.
+      eassumption.
+    - rewrite <- plus_assoc. simpl.
+      eapply IHR_n1.
+      eapply IHR_n2. eassumption.
+  Qed.
   
   (* Adequacy, termination *)
   
@@ -517,41 +529,8 @@ Section Linking.
     - eapply R_n_not_zero in H1. omega.
     - inv H. eapply R_n_not_zero in H2. omega.      
   Qed.
-
-  (* Lemma preord_exp_n_wf_monotonic (wf1 wf2 : exp -> Prop) P1 Pr e1 e2 : *)
-  (*   (forall e, wf1 e -> wf2 e) -> *)
-  (*   preord_exp_n cenv wf1 Pr 1 P1 e1 e2 -> *)
-  (*   preord_exp_n cenv wf2 Pr 1 P1 e1 e2. *)
-  (* Proof. *)
-  (*   intros. induction H0. *)
-  (*   - constructor; eauto. *)
-  (*   - econstructor; eauto. *)
-  (* Qed. *)
   
 End Linking.
-
-Section Refl.
-  
-  Context (Pr : post_property)
-          (wf_pres : exp -> exp -> Prop)
-          (wf_pres_refl : forall e, wf_pres e e)
-          (cenv : ctor_env) (lf : var).
-  
-  Context {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
-
-  Context (Hpr : forall P PG, Pr P PG -> Post_properties cenv P P PG).
-
-  Lemma preord_exp_n_refl n e :         
-    preord_exp_n cenv wf_pres Pr n e e.
-  Proof.
-    intros H1. revert m e3. induction H1; intros k e3 H2. 
-    - econstructor. econstructor. eassumption. eassumption. eassumption.
-      eassumption.
-    - rewrite <- plus_assoc. simpl.
-      eapply IHR_n1.
-      eapply IHR_n2. eassumption.
-  Qed.
-
   
 Section LinkingComp.
       
@@ -643,19 +622,6 @@ Section LinkingComp.
       eapply preord_exp_n_wf_pres in Hrel1.
       eapply Included_trans. eapply Hrel1. eassumption.  
       clear. now firstorder.
-  Qed.
-
-  Lemma preord_exp_n_trans n m e1 e2 e3 :         
-    preord_exp_n cenv preserves_closed Pr n e1 e2 ->
-    preord_exp_n cenv preserves_closed Pr m e2 e3 ->
-    preord_exp_n cenv preserves_closed Pr (n + m) e1 e3.
-  Proof.
-    intros H1. revert m e3. induction H1; intros k e3 H2. 
-    - econstructor. econstructor. eassumption. eassumption. eassumption.
-      eassumption.
-    - rewrite <- plus_assoc. simpl.
-      eapply IHR_n1.
-      eapply IHR_n2. eassumption.
   Qed.
   
   Lemma preord_exp_n_preserves_linking x n m e1 e2 e1' e2' :

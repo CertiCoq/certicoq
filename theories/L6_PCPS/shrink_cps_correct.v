@@ -1900,7 +1900,7 @@ Section Shrink_correct.
           (HGPost' : inclusion _ PG (P1 1)).  
 
   (* NOTE : works only for trivial postcondition. For meaningful ones we need to compose differently *)
-  Lemma gr_clos_correct n e e' :    
+  Lemma gr_clos_correct n e e' :  
     gr_clos n e e' ->
     forall rho rho' k,
       preord_env_P cenv PG (occurs_free e) k rho rho'->

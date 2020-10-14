@@ -1398,9 +1398,20 @@ End CONTRACT.
 
 (* Perform 1 pass of contract of e *)
 Definition shrink_top (e:exp) : exp * nat :=
-  let count := init_census e in
+  let fvs := set_util.PS.elements (exp_fv e) in
+  let f := (max_var e 1 + 1)%positive in
+  let t := 1%positive in
+  (* To hanlde open terms, wrapp e in a function with fvs as arguments *)
+  (* This is only needed because the correspondence theorem assumes
+     that e is closes, which is too strong (TODO adjust the proof to weaker assumption) )*)
+  let e := Efun (Fcons f t fvs e Fnil) (Ehalt f) in
+  let count := init_census e in  
   match (contract (M.empty var) count e (M.empty svalue) (M.empty bool)) with
-  | existT (e', steps, _, _) _ => (e', steps)
+  | existT (e', steps, _, _) _ =>
+    match e' with
+    | Efun (Fcons _ _ _ e' Fnil) _ => (e', steps)
+    | _ => (e', steps) (* should never happen *)
+    end
   end.
 
 (* Perform n passes of contract of e starting with count map c *)

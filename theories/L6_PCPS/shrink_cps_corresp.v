@@ -9792,36 +9792,6 @@ Section CONTRACT.
         destruct f0; inv H6.
   Qed.
 
-  (** Top-level theorem
-      see sr_unwrap_halt to strengthen it to terms that are not closed *)
-  Theorem shrink_corresp_top:
-    forall e,
-      unique_bindings e ->
-      closed_exp e ->
-      let (e', n) := shrink_top e in 
-      gsr_clos n e e'.
-  Proof.
-    intros.
-    unfold shrink_top.
-    remember (contract (M.empty var) (init_census e) e (M.empty svalue)
-                       (M.empty bool)) as s.
-    destruct s as [[[[ ? ? ] ? ] ? ] ?]. symmetry in Heqs.
-    eapply shrink_corresp with (c:= Hole_c) in Heqs; simpl; destructAll;
-      try (rewrite <- (proj1 rename_all_ns_empty) in *); auto.
-    apply init_census_correct.
-    apply empty_view_hole.
-    {
-      intro.
-      intro.
-      unfold get_b in H1.
-      rewrite M.gempty in H1. inv H1.
-    }
-    {
-      intro. intros.
-      rewrite M.gempty in H1.
-      inv H1.
-    }
-  Qed.
-
   End Contract_rename.
+  
 End CONTRACT.

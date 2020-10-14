@@ -4,13 +4,14 @@
 
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.tactics
         L6.Ensembles_util L6.List_util L6.functions L6.lambda_lifting L6.lambda_lifting_util L6.eval
-        L6.logical_relations L6.alpha_conv L6.algebra.
+        L6.logical_relations L6.alpha_conv L6.algebra L6.state L6.lambda_lifting_corresp .
 Require Import compcert.lib.Coqlib.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat MonadNotation.
-
+Require Import Common.compM. 
+   
 Open Scope ctx_scope.
 Open Scope fun_scope.
 Close Scope Z_scope.
@@ -25,68 +26,69 @@ Section Lambda_lifting_correct.
   Variable pr : prims.
   Variable cenv : ctor_env.
 
-  Context (P1 : nat -> PostT) (* Local *) (* the nat is the extra steps the target is allowed to take (e.g. c2 <= A*c1 + n) *)
-    (PG : PostGT) (* Global *)           
-    (HPost_con : forall n, post_constr_compat (P1 n) (P1 n))
-    (HPost_proj : forall n, post_proj_compat (P1 n) (P1 n))
-    (HPost_fun : forall n, post_fun_compat (P1 n) (P1 n))
-    (HPost_fun' : post_fun_compat (P1 1) (P1 0))
-    (HPost_case_hd : forall n, post_case_compat_hd (P1 n) (P1 n))
-    (HPost_case_tl : forall n, post_case_compat_tl (P1 n) (P1 n))
-    (HPost_app : forall n, post_app_compat (P1 n) PG) 
-    (HPost_letapp : forall n, post_letapp_compat cenv (P1 n) (P1 n) PG) 
-    (HPost_letapp_OOT : forall n, post_letapp_compat_OOT (P1 n) PG)
-    (HPost_OOT : post_OOT (P1 0))
-    (Hpost_base : post_base (P1 0))
-    (Hinc : inclusion _ (P1 0) PG)
-    (PG_P_local_steps : 
-      forall {A} e1 rho1 c1 t1 e2 rho2 c2 t2 fvs f B1 rhoc x t xs1 l, 
-      (* Datatypes.length fvs <= PS.cardinal (fundefs_fv B1) -> *)
-        M.get f rho1 = Some (Vfun rhoc B1 x) ->
-        find_def x B1 = Some (t, xs1, e1) ->
-        P1 l (e1, rho1, c1, t1) (e2, rho2, c2, t2) ->
-        l <= 1 + length xs1 + @length A fvs + 1 ->
-        PG (e1, rho1, c1, t1) (e2, rho2, c2, t2))        
-   (P1_mon : forall l l', l <= l' -> inclusion _ (P1 l) (P1 l'))
-   (P1_local_app : 
-     forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
-        post_Eapp_r (P1 0) (P1 (1 + Datatypes.length ys)) e1 rho1 f ft ys rho2)
-   (P1_local_app' : 
-      forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
-        post_Eapp_r (P1 1) (P1 (1 + Datatypes.length ys + 1)) e1 rho1 f ft ys rho2)
-   (PG_P_local_steps_let_app :
-      forall e1 rho1 c1 t1 c1' t1' e2 rho2 e2' rho2' e2'' rho2'' c2  t2 c2' t2'
-             f B1 e1' rhoc rhoc' x ft ys ys' xs1 vs1 v fvs ft' f',
-        M.get f rho1 = Some (Vfun rhoc B1 f') ->
-        find_def f' B1 = Some (ft, xs1, e1') ->
-        set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
-        (* maybe bstep is needed but ignore for now *)
-        P1 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
-        P1 0 (e1, M.set x v rho1, c1', t1') (e2'', rho2'', c2', t2') ->
-        P1 0 (Eletapp x f ft ys e1, rho1, c1 <+> c1' <+> one (Eletapp x f ft ys e1), t1 <+> t1' <+> one (Eletapp x f ft ys e1))
-           (e2, rho2, c2 <+> c2' <+> one (Eletapp x f' ft' (ys' ++ fvs) e2''),
-            t2 <+> t2' <+> one (Eletapp x f' ft' (ys' ++ fvs) e2'')))
-   (PG_P_local_steps_let_app_OOT :
-      forall e1 rho1 c1 t1  e2 rho2 e2' rho2' e2'' c2  t2 
-             f B1 e1' rhoc rhoc' x ft ys ys' xs1 vs1 fvs ft' f' f'',
-        M.get f rho1 = Some (Vfun rhoc B1 f'') ->
-        find_def f'' B1 = Some (ft, xs1, e1') ->
-        set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
-        (* maybe bstep is needed but ignore for now *)
-        P1 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
-        P1 0 (Eletapp x f ft ys e1, rho1, c1 <+> one (Eletapp x f ft ys e1), t1 <+> one (Eletapp x f ft ys e1))
-           (e2, rho2, c2 <+> one (Eletapp x f' ft' (ys' ++ fvs) e2''),
-            t2 <+> one (Eletapp x f' ft' (ys' ++ fvs) e2'')))
-   (PG_P_local_steps_app : 
-      forall rho1 c1 t1 e2 rho2 e2' rho2' c2 t2 
-             f B1 e1' rhoc rhoc' f' ft ys xs1 vs1 f'' ft' ys' fvs, 
-        M.get f rho1 = Some (Vfun rhoc B1 f') ->
-        find_def f' B1 = Some (ft, xs1, e1') ->
-        set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
-        (* maybe bstep is needed but ignore for now *)
-        P1 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
-        P1 0 (Eapp f ft ys, rho1, c1 <+> one (Eapp f ft ys), t1 <+> one (Eapp f ft ys))
-           (e2, rho2, c2 <+> one (Eapp f'' ft' (ys' ++ fvs)), t2 <+> one (Eapp f' ft' (ys' ++ fvs)))).
+  Context (P1 : nat -> PostT) (* Local *) (* the nat parameter is the extra steps the target is allowed to take (e.g. c2 <= A*c1 + n) *)
+          (PG : PostGT) (* Global *)
+          (Hcompat : forall n, Post_properties cenv (P1 n) (P1 n) PG) (* can be specialized to 0 *)
+
+          (HPost_fun' : post_fun_compat (P1 1) (P1 0))         
+          (Hinc : inclusion _ (P1 0) PG)
+
+          (PG_P_local_steps : 
+             forall {A} e1 rho1 c1 t1 e2 rho2 c2 t2 fvs f B1 rhoc x t xs1 l, 
+               (* Datatypes.length fvs <= PS.cardinal (fundefs_fv B1) -> *)
+               M.get f rho1 = Some (Vfun rhoc B1 x) ->
+               find_def x B1 = Some (t, xs1, e1) ->
+               P1 l (e1, rho1, c1, t1) (e2, rho2, c2, t2) ->
+               l <= 1 + length xs1 + @length A fvs + 1 ->
+               PG (e1, rho1, c1, t1) (e2, rho2, c2, t2))        
+          (P1_mon : forall l l', l <= l' -> inclusion _ (P1 l) (P1 l'))
+          (P1_local_app : 
+             forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
+               post_Eapp_r (P1 0) (P1 (1 + Datatypes.length ys)) e1 rho1 f ft ys rho2)
+          (P1_local_app' : 
+             forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
+               post_Eapp_r (P1 1) (P1 (1 + Datatypes.length ys + 1)) e1 rho1 f ft ys rho2)
+          (PG_P_local_steps_let_app :
+             forall e1 rho1 c1 t1 c1' t1' e2 rho2 e2' rho2' e2'' rho2'' c2  t2 c2' t2'
+                    f B1 e1' rhoc rhoc' x ft ys ys' xs1 vs1 v fvs ft' f',
+               M.get f rho1 = Some (Vfun rhoc B1 f') ->
+               find_def f' B1 = Some (ft, xs1, e1') ->
+               set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
+               (* maybe bstep is needed but ignore for now *)
+               P1 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
+               P1 0 (e1, M.set x v rho1, c1', t1') (e2'', rho2'', c2', t2') ->
+               P1 0 (Eletapp x f ft ys e1, rho1, c1 <+> c1' <+> one (Eletapp x f ft ys e1), t1 <+> t1' <+> one (Eletapp x f ft ys e1))
+                  (e2, rho2, c2 <+> c2' <+> one (Eletapp x f' ft' (ys' ++ fvs) e2''),
+                   t2 <+> t2' <+> one (Eletapp x f' ft' (ys' ++ fvs) e2'')))
+          (PG_P_local_steps_let_app_OOT :
+             forall e1 rho1 c1 t1  e2 rho2 e2' rho2' e2'' c2  t2 
+                    f B1 e1' rhoc rhoc' x ft ys ys' xs1 vs1 fvs ft' f' f'',
+               M.get f rho1 = Some (Vfun rhoc B1 f'') ->
+               find_def f'' B1 = Some (ft, xs1, e1') ->
+               set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
+               (* maybe bstep is needed but ignore for now *)
+               P1 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
+               P1 0 (Eletapp x f ft ys e1, rho1, c1 <+> one (Eletapp x f ft ys e1), t1 <+> one (Eletapp x f ft ys e1))
+                  (e2, rho2, c2 <+> one (Eletapp x f' ft' (ys' ++ fvs) e2''),
+                   t2 <+> one (Eletapp x f' ft' (ys' ++ fvs) e2'')))
+          (PG_P_local_steps_app : 
+             forall rho1 c1 t1 e2 rho2 e2' rho2' c2 t2 
+                    f B1 e1' rhoc rhoc' f' ft ys xs1 vs1 f'' ft' ys' fvs, 
+               M.get f rho1 = Some (Vfun rhoc B1 f') ->
+               find_def f' B1 = Some (ft, xs1, e1') ->
+               set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
+               (* maybe bstep is needed but ignore for now *)
+               P1 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
+               P1 0 (Eapp f ft ys, rho1, c1 <+> one (Eapp f ft ys), t1 <+> one (Eapp f ft ys))
+                  (e2, rho2, c2 <+> one (Eapp f'' ft' (ys' ++ fvs)), t2 <+> one (Eapp f' ft' (ys' ++ fvs))))
+          (P1_ctx_r :
+         forall (n : nat) (e1 e2 : exp) (C : exp_ctx) (rho1 rho2 rho2' : env) 
+                (C0 : exp_ctx) (c1 c2 : fuel) (cout1 cout2 : trace),
+           ctx_to_rho C rho2 rho2' ->
+           P1 n (e1, rho1, c1, cout1) (e2, rho2', c2, cout2) ->
+           P1 (n + to_nat (one_ctx C0)) (e1, rho1, c1, cout1)
+              (C |[ e2 ]|, rho2, plus c2 (one_ctx C), plus cout2 (one_ctx C))).
+
 
 
   
@@ -299,9 +301,8 @@ Section Lambda_lifting_correct.
         rewrite preord_val_eq. intros vs1 vs2 j t xs1' e1 rho1c Hlen Hf Hset. repeat subst_exp.
         edestruct Hfuns as (rhoc1 & rhoc1' & B2 & f3 & xs2 & e2 & vs2' & Hgetf' & Hfdef'' & Hgetl  & Hset' & Hyp); try eassumption.
         
-        assert (Hlin : In var (LiftedFuns z) f').
-        { eexists. split. eexists. unfold lifted_name. rewrite Hzeq. reflexivity.
-          unfold lifted_name. rewrite Hzeq. reflexivity. }
+        assert (Hlin : In var (LiftedFuns z) f'). 
+        { eexists. split. eexists. eapply lifted_name_eq. eassumption. eapply lifted_name_eq. eassumption. }
         assert (Hfvin : FromList fvs \subset FunsFVs z).
         { intros y Hiny. do 4 eexists. now split; eauto. }
 
@@ -384,11 +385,12 @@ Section Lambda_lifting_correct.
       + intros Hc. eapply Make_wrappers_name_in_fundefs in Hc; [| eassumption ].
         eapply Hd2. constructor; [| eassumption ].
         eapply In_image. 
-        left. eexists. split. eexists. unfold lifted_name. rewrite Hzeq. reflexivity.
-        unfold lifted_name. rewrite Hzeq. reflexivity.
+        left. eexists. split. eexists. eapply lifted_name_eq. eassumption.
+        eapply lifted_name_eq. eassumption.
       + eapply Disjoint_Included_l; [| eassumption ].
-        eapply Singleton_Included. left. eexists. split. eexists. unfold lifted_name. rewrite Hzeq. reflexivity.
-        unfold lifted_name. rewrite Hzeq. reflexivity.
+        eapply Singleton_Included. left. eexists. split. eexists.
+        eapply lifted_name_eq. eassumption.
+        eapply lifted_name_eq. eassumption.
     - eassumption.
     - erewrite map_f_eq_subdomain.
       rewrite get_list_def_funs_Disjoint. eassumption.
@@ -406,16 +408,6 @@ Section Lambda_lifting_correct.
     - eassumption.
     - now eauto.  
   Qed.
-
-  Context
-    (P1_ctx_r :
-       forall (n : nat) (e1 e2 : exp) (C : exp_ctx) (rho1 rho2 rho2' : env) 
-              (C0 : exp_ctx) (c1 c2 : fuel) (cout1 cout2 : trace),
-         ctx_to_rho C rho2 rho2' ->
-         P1 n (e1, rho1, c1, cout1) (e2, rho2', c2, cout2) ->
-         P1 (n + to_nat (one_ctx C0)) (e1, rho1, c1, cout1)
-            (C |[ e2 ]|, rho2, plus c2 (one_ctx C), plus cout2 (one_ctx C))).
-
   
   Lemma Fundefs_lambda_lift_correct2 k rho rho' B1 B2 sig zeta sig1 zeta1 S S1' S1'' S1''' fvs :
     (* The IH for expressions *)
@@ -570,8 +562,8 @@ Section Lambda_lifting_correct.
             eapply Disjoint_Included; [| | eapply Hd1 ]. now sets. now sets. now xsets. }
 
           erewrite Add_functions_same_name; [ | | eassumption ].
-        2:{ right. eapply Add_functions_image_LiftedFuns_Included. eassumption. unfold lifted_name, liftM, bind.
-            rewrite Hzeq. reflexivity. eassumption. }
+          2:{ right. eapply Add_functions_image_LiftedFuns_Included. eassumption.
+              eapply lifted_name_eq. eassumption. eassumption. }
         edestruct Add_functions_is_Some as (f1'' & ft'' & Hzeq' & Hin). eassumption. eassumption.
         rewrite Hzeq in Hzeq'. inv Hzeq'. 
         assert (Ha : exists vsfv, get_list (map sig1 fvs) (def_funs B2 B2 rho' rho') = Some vsfv).
@@ -745,8 +737,10 @@ Section Lambda_lifting_correct.
       * do 7 eexists. split; [| split; [| split; [| split ]]].
         --  assert (Hnin : ~ f2 \in name_in_fundefs B1 :|: (S \\ S1)).
             { intros Hc. eapply Hd3. constructor; eauto.  
-              eexists f1. split. eexists. unfold lifted_name. rewrite Hzeq. reflexivity.
-              unfold lifted_name. rewrite Hzeq. reflexivity. simpl. 
+              eexists f1. split. eexists.
+              eapply lifted_name_eq. eassumption.
+              eapply lifted_name_eq. eassumption.
+              simpl. 
               eapply Included_trans; [| reflexivity | eassumption ]. xsets. }
             erewrite <- Add_functions_sig_eq; [ | eassumption | ].
             rewrite def_funs_neq. eassumption.
@@ -754,8 +748,10 @@ Section Lambda_lifting_correct.
                eapply Fundefs_lambda_lift_name_in_fundefs2 in Hc; [| eassumption ].
                eapply Add_functions_name_in_fundefs in Hc; [| eassumption | eassumption ].
                eapply Hd1. constructor. eexists f2. split; [| reflexivity ]. do 2 right.
-               eexists. split. eexists. unfold lifted_name. rewrite Hzeq. reflexivity.
-               unfold lifted_name. rewrite Hzeq. reflexivity. inv Hc; eauto.
+               eexists. split. eexists.
+               eapply lifted_name_eq. eassumption.
+               eapply lifted_name_eq. eassumption.
+               inv Hc; eauto.
             ++ eassumption.
         -- eassumption.
         -- erewrite <- Add_functions_map_eq; [| eassumption |]. eapply get_list_fundefs. eassumption.
@@ -1173,7 +1169,7 @@ Section Lambda_lifting_correct.
     (* e and e' are related *)
     preord_exp cenv (P1 0) PG k (e, rho) (e', rho').
    Proof with now eauto with Ensembles_DB.
-    revert e rho rho' zeta sig S e' S'; induction k as [k IHk] using lt_wf_rec1.
+    revert e rho rho' zeta sig S e' S'; induction k as [k IHk] using lt_wf_rec1; edestruct (Hcompat 0).
     induction e using exp_ind';
       intros rho rho' zeta sig S e' S' Hun Him Hf Hlf Hfun Hfvs HD Hin Henv Hinv Hll;
       inv Hll.
@@ -1226,8 +1222,6 @@ Section Lambda_lifting_correct.
     - eapply preord_exp_case_nil_compat. eauto. 
     - inv Hun. edestruct Exp_lambda_lift_Ecase as [P'' [Heq Hall]]; eauto. inv Heq.
       eapply preord_exp_case_cons_compat; eauto.
-      + eapply HPost_case_hd.
-      + eapply HPost_case_tl.
       + intros m Hlt. eapply IHk; eauto.
         * eapply Disjoint_Included; [| | now apply Him ].
           normalize_bound_var...
@@ -1651,7 +1645,7 @@ Section Lambda_lifting_correct.
     - (* App known *)
       eapply Funs_inv_Eapp; [ eassumption | eassumption | eassumption ].
     - (* App unknown *)
-      eapply preord_exp_app_compat; eauto. eapply HPost_app.
+      eapply preord_exp_app_compat; eauto. 
       eapply Forall2_preord_var_env_map. eassumption.
       normalize_occurs_free...
     - inv Hun. eapply preord_exp_prim_compat; eauto.
@@ -1699,7 +1693,6 @@ Section Lambda_lifting_correct.
     - eapply preord_exp_halt_compat; eauto.
    Qed.
 
-   Require Import Common.compM L6.state L6.lambda_lifting_corresp Lia. 
     
 
    Opaque preord_exp'.

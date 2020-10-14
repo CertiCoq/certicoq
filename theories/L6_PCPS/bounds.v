@@ -2,7 +2,7 @@ Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSe
         Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles Coq.micromega.Lia.
 
 Require Import L6.cps L6.eval L6.Ensembles_util L6.List_util L6.tactics L6.set_util
-        L6.logical_relations L6.logical_relations_cc L6.algebra L6.inline_letapp.
+        L6.logical_relations L6.logical_relations_cc L6.algebra L6.inline_letapp L6.lambda_lifting_correct.
 Require Import micromega.Lia.
 
 Import ListNotations.
@@ -387,6 +387,117 @@ Section Bounds.
     Qed.
 
   End HoistingBound.
+
+  Section LambdaLiftingBound.
+
+    Definition ll_bound (l : nat) := simple_bound 0.
+
+    Context (cenv : ctor_env).
+
+    Instance ll_bound_compat k m n :
+      Post_properties cenv (ll_bound k) (ll_bound m) (ll_bound n). 
+    Proof. unfold ll_bound in *. eapply simple_bound_compat. Qed.
     
+    Lemma ll_bound_local_steps : 
+      forall {A} e1 rho1 c1 t1 e2 rho2 c2 t2 fvs f B1 rhoc x t xs1 l, 
+        M.get f rho1 = Some (Vfun rhoc B1 x) ->
+        find_def x B1 = Some (t, xs1, e1) ->
+        ll_bound l (e1, rho1, c1, t1) (e2, rho2, c2, t2) ->
+        l <= 1 + length xs1 + @length A fvs + 1 ->
+        ll_bound 0 (e1, rho1, c1, t1) (e2, rho2, c2, t2).
+    Proof.
+      intros. destruct t1, t2.
+      unfold simple_bound  in *; unfold_all; simpl in *. lia.
+    Qed. 
+
+    Lemma ll_bound_mon :
+      forall l l', l <= l' -> inclusion _ (ll_bound l) (ll_bound l').
+    Proof.
+      intros. intro; intros. eassumption.
+    Qed.
+      
+   Lemma ll_bound_local_app : 
+     forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
+       post_Eapp_r (ll_bound 0) (ll_bound (1 + Datatypes.length ys)) e1 rho1 f ft ys rho2.
+   Proof.
+     intros. intro; intros. destruct cout1, cout2.
+     unfold simple_bound  in *; unfold_all; simpl in *. lia.
+   Qed. 
+
+     
+   Lemma ll_bound_local_app' : 
+     forall (e1 : exp) (rho1 : env) (f : var) (ft : fun_tag) (ys : list var) (rho2 : env),
+       post_Eapp_r (ll_bound 1) (ll_bound (1 + Datatypes.length ys + 1)) e1 rho1 f ft ys rho2.
+   Proof.
+     intros. intro; intros. destruct cout1, cout2.
+     unfold simple_bound  in *; unfold_all; simpl in *. lia.
+   Qed. 
+
+     
+   Lemma ll_bound_local_steps_let_app :
+      forall e1 rho1 c1 t1 c1' t1' e2 rho2 e2' rho2' e2'' rho2'' c2  t2 c2' t2'
+             f B1 e1' rhoc rhoc' x ft ys ys' xs1 vs1 v fvs ft' f',
+        M.get f rho1 = Some (Vfun rhoc B1 f') ->
+        find_def f' B1 = Some (ft, xs1, e1') ->
+        set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
+        (* maybe bstep is needed but ignore for now *)
+        ll_bound 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
+        ll_bound 0 (e1, M.set x v rho1, c1', t1') (e2'', rho2'', c2', t2') ->
+        ll_bound 0 (Eletapp x f ft ys e1, rho1, c1 <+> c1' <+> one (Eletapp x f ft ys e1), t1 <+> t1' <+> one (Eletapp x f ft ys e1))
+                 (e2, rho2, c2 <+> c2' <+> one (Eletapp x f' ft' (ys' ++ fvs) e2''),
+                  t2 <+> t2' <+> one (Eletapp x f' ft' (ys' ++ fvs) e2'')).
+   Proof.
+     intros. destruct t1, t2, t1', t2'.
+     unfold simple_bound  in *; unfold_all; simpl in *. lia.
+   Qed. 
+
+   Lemma ll_bound_local_steps_let_app_OOT :
+     forall e1 rho1 c1 t1  e2 rho2 e2' rho2' e2'' c2  t2 
+            f B1 e1' rhoc rhoc' x ft ys ys' xs1 vs1 fvs ft' f' f'',
+       M.get f rho1 = Some (Vfun rhoc B1 f'') ->
+       find_def f'' B1 = Some (ft, xs1, e1') ->
+       set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
+       (* maybe bstep is needed but ignore for now *)
+       ll_bound 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
+       ll_bound 0 (Eletapp x f ft ys e1, rho1, c1 <+> one (Eletapp x f ft ys e1), t1 <+> one (Eletapp x f ft ys e1))
+                (e2, rho2, c2 <+> one (Eletapp x f' ft' (ys' ++ fvs) e2''),
+                 t2 <+> one (Eletapp x f' ft' (ys' ++ fvs) e2'')).
+   Proof.
+     intros. destruct t1, t2.
+     unfold simple_bound  in *; unfold_all; simpl in *. lia.
+   Qed. 
+
+
+   
+   Lemma ll_bound_local_steps_app : 
+     forall rho1 c1 t1 e2 rho2 e2' rho2' c2 t2 
+            f B1 e1' rhoc rhoc' f' ft ys xs1 vs1 f'' ft' ys' fvs, 
+       M.get f rho1 = Some (Vfun rhoc B1 f') ->
+       find_def f' B1 = Some (ft, xs1, e1') ->
+       set_lists xs1 vs1 (def_funs B1 B1 rhoc rhoc) = Some rhoc' ->
+       (* maybe bstep is needed but ignore for now *)
+       ll_bound 1 (e1', rhoc', c1, t1) (e2', rho2', c2, t2) ->
+       ll_bound 0 (Eapp f ft ys, rho1, c1 <+> one (Eapp f ft ys), t1 <+> one (Eapp f ft ys))
+                (e2, rho2, c2 <+> one (Eapp f'' ft' (ys' ++ fvs)), t2 <+> one (Eapp f' ft' (ys' ++ fvs))).
+   Proof.
+     intros. destruct t1, t2.
+     unfold simple_bound  in *; unfold_all; simpl in *. lia.
+   Qed. 
+
+   
+   Lemma ll_bound_ctx_r :
+     forall (n : nat) (e1 e2 : exp) (C : exp_ctx) (rho1 rho2 rho2' : env) 
+            (C0 : exp_ctx) c1 c2 cout1 cout2,
+       ctx_to_rho C rho2 rho2' ->
+       ll_bound n (e1, rho1, c1, cout1) (e2, rho2', c2, cout2) ->
+       ll_bound (n + to_nat (one_ctx C0)) (e1, rho1, c1, cout1)
+                (C |[ e2 ]|, rho2, plus c2 (one_ctx C), plus cout2 (one_ctx C)).
+   Proof.
+     intros. destruct cout1, cout2.
+     unfold simple_bound  in *; unfold_all; simpl in *. lia.
+   Qed. 
+
+  End LambdaLiftingBound.
+  
 End Bounds.
   

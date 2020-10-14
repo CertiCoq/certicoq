@@ -530,6 +530,29 @@ Section Linking.
   
 End Linking.
 
+Section Refl.
+  
+  Context (Pr : post_property)
+          (wf_pres : exp -> exp -> Prop)
+          (wf_pres_refl : forall e, wf_pres e e)
+          (cenv : ctor_env) (lf : var).
+  
+  Context {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
+
+  Context (Hpr : forall P PG, Pr P PG -> Post_properties cenv P P PG).
+
+  Lemma preord_exp_n_refl n e :         
+    preord_exp_n cenv wf_pres Pr n e e.
+  Proof.
+    intros H1. revert m e3. induction H1; intros k e3 H2. 
+    - econstructor. econstructor. eassumption. eassumption. eassumption.
+      eassumption.
+    - rewrite <- plus_assoc. simpl.
+      eapply IHR_n1.
+      eapply IHR_n2. eassumption.
+  Qed.
+
+  
 Section LinkingComp.
       
   Context (Pr : post_property)

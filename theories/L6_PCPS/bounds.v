@@ -352,38 +352,27 @@ Section Bounds.
       destruct cout1; destruct cout2. lia.
     Qed.
 
-    Definition hoisting_bound_top G := hoisting_bound (G + 1) G. 
-
-    Lemma hoisting_bound_post_Efun_r n G :
-      n <= G -> 
-      post_Efun_r (hoisting_bound n G) (hoisting_bound_top G).
+    Lemma hoisting_bound_post_Efun_r n m :
+      (n <= m)%nat -> post_Efun_r (hoisting_bound n m) (hoisting_bound m m).
     Proof.
       intros Hleq. 
-      intro; intros. unfold hoisting_bound, hoisting_bound_top in *. unfold_all. simpl in *.      
+      intro; intros. unfold hoisting_bound in *. unfold_all. simpl in *.      
       destruct cout1; destruct cout2. lia.
     Qed.
-
-    Lemma hoisting_boound_top_incl n G :
-      n <= G -> inclusion _ (hoisting_bound n G) (hoisting_bound_top G).
+    
+    Lemma hoisting_bound_post_upper_bound n G :
+      post_upper_bound (hoisting_bound n G).
     Proof.
-      intros Hleq.
-      intro; intros. unfold hoisting_bound_top, hoisting_bound in *.
-      destruct x as [[[? ?] ?] [? ?]]; destruct y as [[[? ?] ?] [? ?]]. lia.
-    Qed.
-
-    Lemma hoisting_bound_post_upper_bound G :
-      post_upper_bound (hoisting_bound_top G).
-    Proof.
-      intro; intros. unfold hoisting_bound_top, hoisting_bound in *. unfold_all.
-      eexists (fun x => (1 + G) * x + (G + 1)).
+      intro; intros. unfold hoisting_bound in *. unfold_all.
+      eexists (fun x => G * x + x + n).
       intros. 
       destruct cout1 as [t1 tapp1]; destruct cout2 as [t2 tapp2].
       eapply Nat.add_le_mono_r in H.
-
       replace (cin2 + G * cin2) with ((1 + G) * cin2) in H by lia.
-      eapply NPeano.Nat.mul_le_mono_pos_l in H. 
+      replace (G * cin1 + cin1) with ((1 + G) * cin1) in H by lia.      
+      eapply NPeano.Nat.mul_le_mono_pos_l in H.
       eexists (cin2 - cin1). simpl. lia.
-      lia. 
+      lia.
     Qed.
 
   End HoistingBound.

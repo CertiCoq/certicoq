@@ -1087,9 +1087,10 @@ Section Hoisting_correct.
         preord_exp cenv P2 PG k (e, rho) (Efun B e', rho')) /\
     unique_bindings (Efun B e') /\
     Disjoint _ (occurs_free (Efun B e')) (bound_var (Efun B e')) /\
-    occurs_free (Efun B e') \subset occurs_free e.
+    occurs_free (Efun B e') \subset occurs_free e /\
+    bound_var (Efun B e') \subset bound_var e.
   Proof.
-    intros Hub Hdis Hin Her. split; [| split; [| split ] ].
+    intros Hub Hdis Hin Her. split; [| split; [| split; [| split ] ] ].
     { intros k rho rho' Henv. 
       eapply preord_exp_Efun_r.
       - eassumption.
@@ -1134,6 +1135,8 @@ Section Hoisting_correct.
       eapply Erase_fundefs_occurs_free. eassumption.
       eapply split_fds_nil_r. eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.        
       sets. }
+    { normalize_bound_var. rewrite Union_commut. rewrite <- Erase_fundefs_bound_var.
+      reflexivity. eassumption. }
   Qed.
 
   Context (Hinc : forall n, n <= G -> inclusion (exp * env * fuel * trace) (P1 n) P2).
@@ -1150,7 +1153,8 @@ Section Hoisting_correct.
         preord_exp cenv P2 PG k (e, rho) (e', rho')) /\
     unique_bindings e' /\
     Disjoint _ (occurs_free e') (bound_var e') /\
-    occurs_free e' \subset occurs_free e.
+    occurs_free e' \subset occurs_free e /\
+    bound_var e' \subset bound_var e.
   Proof.
     intros Hub Hdis Hin Her.
     edestruct Erase_fundefs_correct_top; try eassumption. destructAll. clear H.
@@ -1159,7 +1163,7 @@ Section Hoisting_correct.
     rewrite bound_var_Efun, bound_var_fundefs_Fnil in H1.
     simpl in H1. repeat normalize_sets.
 
-    split; [| split; [| split ] ]; try eassumption.
+    split; [| split; [| split; [| split ]]]; try eassumption.
     intros k rho rho' Henv. 
 
     edestruct Erase_fundefs_unique_bindings. eassumption. eassumption. destructAll.
@@ -1178,6 +1182,8 @@ Section Hoisting_correct.
       eapply Erase_fundefs_occurs_free. eassumption.
       eapply split_fds_nil_r. eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.        
       sets.
+    + eapply Erase_fundefs_bound_var in Her. repeat normalize_bound_var_in_ctx.
+      rewrite Her. sets. 
   Qed.
 
   Lemma exp_hoist_correct_top e e' n (Hleq : n <= G) :
@@ -1192,7 +1198,8 @@ Section Hoisting_correct.
         preord_exp cenv P2 PG k (e, rho) (e', rho')) /\
     unique_bindings e' /\
     Disjoint _ (occurs_free e') (bound_var e') /\
-    occurs_free e' \subset occurs_free e.
+    occurs_free e' \subset occurs_free e /\
+    bound_var e' \subset bound_var e.
   Proof.
     intros Hun Hdis Hfv Hh.
     unfold exp_hoist in Hh.

@@ -107,17 +107,51 @@ Section LambdaLift.
 End LambdaLift.
   
 
+Lemma max_var_le e e' :
+  bound_var e :|: occurs_free e \subset bound_var e' :|: occurs_free e' ->
+  max_var e 1 <= max_var e' 1. 
+Proof.
+  intros Hin.
+  assert (Hin' := max_var_subset e).
+  eapply Hin in Hin'.
+  inv Hin'.
+  eapply bound_var_leq_max_var. eassumption.
+  eapply occurs_free_leq_max_var. eassumption.
+Qed.
+
+Require Import L6.algebra.
+
+Section Refl.
+  
+  Context (wf_pres : exp -> exp -> Prop)
+          (wf_pres_refl : forall e, wf_pres e e)
+          (cenv : ctor_env) (lf : var).
+  
+  Context (fuel trace : Type)  {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
+
+  Lemma preord_exp_n_refl e :
+    preord_exp_n cenv wf_pres post_prop 1 e e.
+  Proof.
+    econstructor; eauto.
+    2:{ split. eapply simple_bound_compat. eapply simple_bound_post_upper_bound. }
+    intros.
+    eapply preord_exp_refl; eauto.
+    eapply simple_bound_compat.
+  Qed.
+
+End Refl.
+  
 Section CCHoist.
 
   Context (clo_tag : ctor_tag).
-  
+
   Lemma closure_conversion_hoist_correct e c :
    well_scoped e ->
    max_var e 1 < state.next_var c ->
    exists (e' : exp) (c' : state.comp_data),
      closure_conversion_hoist clo_tag e c = (compM.Ret e', c') /\
-     R_n_exp cenv clo_tag wf_pres post_prop (simple_bound 0) (simple_bound 0) 0%nat 1%nat e e' /\
-     max_var e' 1 < state.next_var c'.
+     max_var e' 1 < state.next_var c' /\
+     R_n_exp cenv clo_tag wf_pres post_prop (simple_bound 0) (simple_bound 0) 1%nat 1%nat e e'.
   Proof.
     intros Hws Hmvar.
     edestruct closure_conversion_correct.exp_closure_conv_correct
@@ -137,13 +171,13 @@ Section CCHoist.
     - eapply Hws.
     - eassumption.
     - destructAll.
-
+      
       edestruct (exp_hoist x) as [e' m] eqn:Hhoist. 
       
       edestruct exp_hoist_correct_top with
           (e := x)
           (P1 := fun n =>  hoisting_bound n m)
-          (P2 := hoisting_bound_top m)
+          (P2 := hoisting_bound m m)
           (PG := hoisting_bound m m).
 
       (* Hoisting bounds *)
@@ -151,8 +185,8 @@ Section CCHoist.
       + intros. eapply hoisting_bound_mon. eassumption.
       + intros. eapply hoisting_bound_post_Efun_l.
       + intros. eapply hoisting_bound_post_Efun_r. eassumption.
-      + admit. (* easy *)
-      + intros. eapply hoisting_boound_top_incl. easy.
+      + eapply hoisting_bound_compat; eauto. exact (M.empty _).
+      + intros. eapply hoisting_bound_mon. eassumption.
       + reflexivity.
       (* scoping *)
       + easy.
@@ -161,17 +195,23 @@ Section CCHoist.
       + eassumption.
       + destructAll. do 2 eexists. split; [| split ].
         * unfold closure_conversion_hoist. rewrite H. rewrite Hhoist. simpl. reflexivity.
+        * eapply Pos.le_lt_trans; [| eassumption ].
+          eapply max_var_le. eapply Included_Union_compat. eassumption. eassumption.
         * eexists. split.
-          
+          ++ eapply preord_exp_n_refl.
+             clear; firstorder.
+          ++ eexists. split. split.
+             2:{ eassumption. }
+             2:{ econstructor. intros. eapply H6. eassumption.
+                 constructor; eauto.
+                 intros. split; eauto. now sets. split.
+                 eapply hoisting_bound_compat. omega.
+                 eapply hoisting_bound_post_upper_bound. }
+             intros. split; eauto. now sets.
+  Qed.
 
-          admit.
-        * eapply Pos.lt_trans; [| eassumption ]. 
-
-        e
-  forall n G : nat,
-  (n <= G)%nat -> inclusion
-    
-
+End CCHoist.
+  
 (* Section Uncurry. *)
 
 (*   boun *)

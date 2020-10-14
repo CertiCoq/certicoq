@@ -651,6 +651,21 @@ Qed.
 
 
 
+Lemma Erase_fundefs_occurs_free_fundefs_Empty_set :
+  forall e e' B m
+         (Herase : Erase_fundefs e e' B m)
+         (Hfv : fun_fv_in e (name_in_fundefs B)),
+    occurs_free_fundefs B <--> Empty_set _.
+Proof.
+  intros. split; sets. 
+  rewrite <- Setminus_Disjoint with (s2 := name_in_fundefs B).
+  2:{ eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint. }
+  eapply Included_trans. eapply Included_Setminus_compat; [| reflexivity ].
+  eapply (proj1 Erase_fundefs_occurs_free_fundefs). eassumption.
+  eapply split_fds_nil_r. eassumption.
+  sets. 
+Qed.
+
 Lemma Erase_fundefs_unique_bindings :
   forall e e' B m (Herase : Erase_fundefs e e' B m),
     unique_bindings e ->
@@ -1060,21 +1075,22 @@ Section Hoisting_correct.
 
   Context (Hp2 : forall n, n <= G -> post_Efun_r (P1 n) P2) (Hoot2 : post_OOT P2). 
   
-  Lemma Erase_fundefs_correct_top k e e' B n (Hleq : n <= G) :
+  Lemma Erase_fundefs_correct_top e e' B n (Hleq : n <= G) :
     unique_bindings e ->
     Disjoint _ (occurs_free e) (bound_var e) ->
     fun_fv_in e (funnames_in_exp e) ->
     (* Hoisting *)            
     Erase_fundefs e e' B n ->
 
-    (forall rho rho',
+    (forall k rho rho',
         preord_env_P cenv PG (occurs_free e) k rho rho' ->
         preord_exp cenv P2 PG k (e, rho) (Efun B e', rho')) /\
     unique_bindings (Efun B e') /\
-    Disjoint _ (occurs_free (Efun B e')) (bound_var (Efun B e')).
+    Disjoint _ (occurs_free (Efun B e')) (bound_var (Efun B e')) /\
+    occurs_free (Efun B e') \subset occurs_free e.
   Proof.
-    intros Hub Hdis Hin Her. split; [| split ].
-    { intros rho rho' Henv. 
+    intros Hub Hdis Hin Her. split; [| split; [| split ] ].
+    { intros k rho rho' Henv. 
       eapply preord_exp_Efun_r.
       - eassumption.
       - eauto.
@@ -1099,10 +1115,8 @@ Section Hoisting_correct.
       eapply Included_Union_Setminus with (s2 := name_in_fundefs B). tci. 
 
       eapply Union_Disjoint_l.
-      - eapply Union_Disjoint_r. 2:{ eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint. }
-        eapply Disjoint_Included_l. eapply (proj1 Erase_fundefs_occurs_free_fundefs). eassumption.
-        eapply split_fds_nil_r. eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.        
-        sets.
+      - rewrite Erase_fundefs_occurs_free_fundefs_Empty_set. sets. eassumption.
+        eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.        
       - eapply Union_Disjoint_r; [| sets ].
         eapply Disjoint_Included_l. eapply Included_Setminus_compat. 
         eapply Erase_fundefs_occurs_free. eassumption.
@@ -1111,22 +1125,32 @@ Section Hoisting_correct.
         repeat normalize_sets.
         normalize_bound_var. rewrite Union_commut. rewrite <- Erase_fundefs_bound_var; [| eassumption ].
         sets. }
+    { repeat normalize_occurs_free.
+      rewrite Erase_fundefs_occurs_free_fundefs_Empty_set; try eassumption.
+      2:{ eapply Erase_fundefs_fun_fv_in. eassumption. eassumption. }
+      normalize_sets. 
+      
+      eapply Included_trans. eapply Included_Setminus_compat; [| reflexivity ].
+      eapply Erase_fundefs_occurs_free. eassumption.
+      eapply split_fds_nil_r. eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.        
+      sets. }
   Qed.
 
   Context (Hinc : forall n, n <= G -> inclusion (exp * env * fuel * trace) (P1 n) P2).
   
-  Lemma Erase_fundefs_correct_top_Fnil k e e' n (Hleq : n <= G) :
+  Lemma Erase_fundefs_correct_top_Fnil e e' n (Hleq : n <= G) :
     unique_bindings e ->
     Disjoint _ (occurs_free e) (bound_var e) ->
     fun_fv_in e (funnames_in_exp e) ->
     (* Hoisting *)            
     Erase_fundefs e e' Fnil n ->
 
-    (forall rho rho',
+    (forall k rho rho',
         preord_env_P cenv PG (occurs_free e) k rho rho' ->
         preord_exp cenv P2 PG k (e, rho) (e', rho')) /\
     unique_bindings e' /\
-    Disjoint _ (occurs_free e') (bound_var e').
+    Disjoint _ (occurs_free e') (bound_var e') /\
+    occurs_free e' \subset occurs_free e.
   Proof.
     intros Hub Hdis Hin Her.
     edestruct Erase_fundefs_correct_top; try eassumption. destructAll. clear H.
@@ -1135,8 +1159,8 @@ Section Hoisting_correct.
     rewrite bound_var_Efun, bound_var_fundefs_Fnil in H1.
     simpl in H1. repeat normalize_sets.
 
-    split; [| split ]; try eassumption.
-    intros rho rho' Henv. 
+    split; [| split; [| split ] ]; try eassumption.
+    intros k rho rho' Henv. 
 
     edestruct Erase_fundefs_unique_bindings. eassumption. eassumption. destructAll.
     eapply preord_exp_post_monotonic. eapply Hinc. eassumption. 
@@ -1150,22 +1174,25 @@ Section Hoisting_correct.
     + now sets.
     + eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.
     + eassumption.
-    
-      Grab Existential Variables. exact 1.
+    + eapply Included_trans.
+      eapply Erase_fundefs_occurs_free. eassumption.
+      eapply split_fds_nil_r. eapply Erase_fundefs_fun_fv_in. eassumption. eassumption.        
+      sets.
   Qed.
 
-  Lemma exp_hoist_correct_top k e e' n (Hleq : n <= G) :
+  Lemma exp_hoist_correct_top e e' n (Hleq : n <= G) :
     unique_bindings e ->
     Disjoint _ (occurs_free e) (bound_var e) ->
     fun_fv_in e (funnames_in_exp e) ->
     
     exp_hoist e = (e', n) -> 
 
-    (forall rho rho',
+    (forall k rho rho',
         preord_env_P cenv PG (occurs_free e) k rho rho' ->
         preord_exp cenv P2 PG k (e, rho) (e', rho')) /\
     unique_bindings e' /\
-    Disjoint _ (occurs_free e') (bound_var e').
+    Disjoint _ (occurs_free e') (bound_var e') /\
+    occurs_free e' \subset occurs_free e.
   Proof.
     intros Hun Hdis Hfv Hh.
     unfold exp_hoist in Hh.

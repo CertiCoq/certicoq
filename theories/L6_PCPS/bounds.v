@@ -538,6 +538,6 @@ Section Bounds.
       destruct x as [[[? ?] ?] [? ?]]. simpl in *. omega.
     Qed.
 
-  
+  End UncurryBound. 
 End Bounds.
   

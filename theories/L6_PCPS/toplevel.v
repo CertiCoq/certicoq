@@ -2,7 +2,7 @@ Require Import ZArith.
 Require Import Common.compM.
 From CertiCoq Require Import
      L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6_anf L6.L4_to_L6
-     L6.inline L6.uncurry L6.closure_conversion
+     L6.inline L6.uncurry_proto L6.closure_conversion
      L6.closure_conversion L6.hoisting L6.dead_param_elim L6.lambda_lifting.
 From CertiCoq Require Import L4.toplevel.
 (* From CertiCoq.L7 Require Import L6_to_Clight. *)
@@ -156,8 +156,8 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
           (* Shrink reduction *)
           let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e0) in
           (* Uncurring *)
-          (* let '(e_err, (_, s), c_data) := time_anf "Uncurry" (fun _ => uncurry_top cps c_data e) in *)
-          let '(e_err, s, c_data) := time_anf "Uncurry" (fun _ => uncurry_fuel cps 100 e c_data) in
+          let '(e_err, (_, s), c_data) := time_anf "Uncurry" (fun _ => uncurry_top cps c_data e) in
+          (* let '(e_err, s, c_data) := time_anf "Uncurry" (fun _ => uncurry_fuel cps 100 e c_data) in *)
           e <- e_err ;;
           (* Inlining *)
           let (e_err, c_data) := time_anf "Inline uncurry wrappers" (fun _ => inline_uncurry next_var e s 10 100 c_data) in
@@ -228,8 +228,8 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
           (* Shrink reduction *)
           let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e0) in
           (* Uncurring *)
-          (* let '(e_err, (_, s), c_data) := time_anf "Uncurry" (fun _ => uncurry_top cps c_data e) in *)
-          let '(e_err, s, c_data) := time_anf "Uncurry" (fun _ => uncurry_fuel cps 100 e c_data) in
+          let '(e_err, (_, s), c_data) := time_anf "Uncurry" (fun _ => uncurry_top cps c_data e) in
+          (* let '(e_err, s, c_data) := time_anf "Uncurry" (fun _ => uncurry_fuel cps 100 e c_data) in *)
           e <- e_err ;;
           (* Inlining *)
           let (e_err, c_data) := time_anf "Inline uncurry wrappers" (fun _ => inline_uncurry next_var e s 10 100 c_data) in

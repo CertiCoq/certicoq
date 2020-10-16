@@ -7,7 +7,8 @@ Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.set_util
         L6.uncurry L6.bounds L6.shrink_cps L6.shrink_cps_toplevel
         L6.closure_conversion L6.closure_conversion_util L6.hoisting
         L6.lambda_lifting L6.lambda_lifting_correct.
-Require Export L6.logical_relations L6.logical_relations_cc L6.alpha_conv L6.inline_letapp L6.inline L6.inline_correct.
+Require Export L6.logical_relations L6.logical_relations_cc L6.alpha_conv
+        L6.inline_letapp L6.inline L6.inline_correct L6.algebra.
 Require Import Common.compM.
 Require Import compcert.lib.Coqlib.
 
@@ -18,11 +19,14 @@ Close Scope Z_scope.
 
 (* TODO use John's definition once merged *)
 
+(* TODO Make tranformations take all parameters first and exp and comp_data last.
+        then write correctness theorem as defintion. 
+ *) 
+
 Definition well_scoped e :=
   unique_bindings e /\ Disjoint _ (bound_var e) (occurs_free e).
 
 Definition wf_pres e1 e2 :=
-  (well_scoped e1 -> well_scoped e2) /\
   occurs_free e2 \subset occurs_free e1.
 
 Definition PostT := @PostT nat (nat * nat).
@@ -39,15 +43,16 @@ Section Inline.
 
  Lemma inline_correct St IH e d st c z :
    well_scoped e ->
-   exists (e' : exp) (c' : state.comp_data),
-     inline_top St IH z e d st c true = (Ret e', c') /\
+   exists (e' : exp) (c' : state.comp_data) click,
+     inline_top' St IH z e d st c true = (Ret e', c', click) /\
      wf_pres e e' /\
+     well_scoped e' /\
      max_var e' 1 < state.next_var c' /\
      (forall (k : nat) (rho1 rho2 : env),
          preord_env_P cenv (inline_bound d d) (occurs_free e) k rho1 rho2 ->
-         preord_exp cenv (inline_bound_top d) (inline_bound d d) k (e, rho1) (e', rho2)).
+         preord_exp cenv (inline_bound d d) (inline_bound d d) k (e, rho1) (e', rho2)).
  Proof.
-   intros.
+   intros H.
    edestruct inline_correct_top with (P1 := fun L => inline_bound L d)
                                      (PG := inline_bound d d).   
    - intros. eapply inline_bound_compat. eassumption.
@@ -55,15 +60,38 @@ Section Inline.
    - intros. eapply inline_bound_remove_steps_letapp.
    - intros. rewrite plus_comm. eapply inline_bound_remove_steps_letapp_OOT. 
    - reflexivity.
-   - eapply inline_bound_top_impl.
+   - intro; intros. exact H0.
    - eapply H.
    - eapply H.
-   - destructAll. do 2 eexists. split. eassumption.
-     split.
-     split. intros. split. eassumption. eassumption. eassumption.
-     split. eassumption. eassumption.
+   - destructAll. do 3 eexists. split. eassumption.
+     split. eassumption. split.
+     split; eassumption. split. eassumption.
+     eassumption.
  Qed.
 
+
+ Corollary inline_correct_cor St IH e d st c z :
+   well_scoped e ->
+   max_var e 1 < state.next_var c ->
+   exists (e' : exp) (c' : state.comp_data),
+     inline_top St IH z e d st c true = (Ret e', c') /\
+     well_scoped e' /\
+     max_var e' 1 < state.next_var c' /\
+     preord_exp_n cenv wf_pres post_prop 1 e e'.
+ Proof.
+   intros.
+   edestruct inline_correct; eauto. destructAll.
+   do 2 eexists. split.
+   
+   unfold inline_top. rewrite H1. reflexivity.
+   repeat (split; [ eassumption | ]).
+   econstructor. now eauto. eassumption. split.
+   unfold inline_bound_top. eapply inline_bound_compat. omega.
+   eapply inline_bound_post_upper_bound.
+ Qed.
+
+
+ 
 End Inline.
 
 
@@ -76,14 +104,15 @@ Section LambdaLift.
      lambda_lift e k l b c = (Ret e', c') /\
      max_var e' 1 < state.next_var c' /\
      wf_pres e e' /\
+     well_scoped e'  /\
      (forall (k : nat) (rho1 rho2 : env),
          preord_env_P cenv (ll_bound 0) (occurs_free e) k rho1 rho2 ->
          binding_in_map (occurs_free e) rho1 ->
          preord_exp cenv (ll_bound 0) (ll_bound 0) k (e, rho1) (e', rho2)).
   Proof.
     intros.
-   edestruct lambda_lift_correct_top with (P1 := ll_bound)
-                                          (PG := ll_bound 0).   
+    edestruct lambda_lift_correct_top with (P1 := ll_bound)
+                                           (PG := ll_bound 0).   
     - intros. eapply ll_bound_compat.
     - intros. eapply ll_bound_compat.
       exact (M.empty _). exact 0%nat.
@@ -99,11 +128,29 @@ Section LambdaLift.
     - eapply H. 
     - destructAll. do 2 eexists. split. eassumption.
       split. eassumption.
-      split. intros. split.
-      intros. inv H7. split. eassumption. eassumption. eassumption.
+      split. eassumption. split.
+      split; eassumption.
       eassumption.
+  Qed.
+
+  Corollary lambda_lift_correct_corr e c k l b :
+   well_scoped e ->
+   max_var e 1 < state.next_var c ->
+   exists (e' : exp) (c' : state.comp_data),
+     lambda_lift e k l b c = (Ret e', c') /\
+     max_var e' 1 < state.next_var c' /\
+     well_scoped e'  /\
+     preord_exp_n cenv wf_pres post_prop 1 e e'.
+  Proof.
+    intros.
+   edestruct lambda_lift_correct; eauto. destructAll.
+   do 2 eexists. repeat (split; [ eassumption | ]).
+   econstructor. now eauto. eassumption. split.
+   eapply ll_bound_compat. eapply simple_bound_post_upper_bound.
  Qed.
-   
+
+
+  
 End LambdaLift.
   
 
@@ -119,8 +166,8 @@ Proof.
   eapply occurs_free_leq_max_var. eassumption.
 Qed.
 
-Require Import L6.algebra.
 
+(* TODO move *)
 Section Refl.
   
   Context (wf_pres : exp -> exp -> Prop)
@@ -150,6 +197,7 @@ Section CCHoist.
    max_var e 1 < state.next_var c ->
    exists (e' : exp) (c' : state.comp_data),
      closure_conversion_hoist clo_tag e c = (compM.Ret e', c') /\
+     well_scoped e' /\
      max_var e' 1 < state.next_var c' /\
      R_n_exp cenv clo_tag wf_pres post_prop (simple_bound 0) (simple_bound 0) 1%nat 1%nat e e'.
   Proof.
@@ -193,8 +241,9 @@ Section CCHoist.
       + eapply Disjoint_sym. eassumption. 
       + eassumption.
       + eassumption.
-      + destructAll. do 2 eexists. split; [| split ].
+      + destructAll. do 2 eexists. split; [| split; [| split ] ].
         * unfold closure_conversion_hoist. rewrite H. rewrite Hhoist. simpl. reflexivity.
+        * split. eassumption. sets.
         * eapply Pos.le_lt_trans; [| eassumption ].
           eapply max_var_le. eapply Included_Union_compat. eassumption. eassumption.
         * eexists. split.
@@ -203,11 +252,10 @@ Section CCHoist.
           ++ eexists. split. split.
              2:{ eassumption. }
              2:{ econstructor. intros. eapply H6. eassumption.
-                 constructor; eauto.
-                 intros. split; eauto. now sets. split.
-                 eapply hoisting_bound_compat. omega.
+                 eassumption.
+                 split. eapply hoisting_bound_compat. omega.
                  eapply hoisting_bound_post_upper_bound. }
-             intros. split; eauto. now sets.
+             intros. eassumption.
   Qed.
 
 End CCHoist.
@@ -218,11 +266,14 @@ Section Shrink.
     well_scoped e ->
     shrink_top e = (e', m) ->
     exists m,
+      well_scoped e' /\
+      occurs_free e' \subset occurs_free e /\
+      bound_var e' \subset bound_var e /\
       preord_exp_n cenv wf_pres post_prop m e e'.
   Proof.
     intros.
     intros. intros.
-    assert (Hs := shrink_corresp_top (M.empty _) cenv (fun L => inline_bound L 1) (inline_bound 1 1)).
+    assert (Hs := shrink_corresp_top cenv (fun L => inline_bound L 1) (inline_bound 1 1)).
     inv H. 
 
     assert (Ha : let (e', n) := shrink_top e in
@@ -247,11 +298,90 @@ Section Shrink.
       - eassumption.
       - eassumption. }
 
-    rewrite H0 in Ha. destructAll. eexists. eassumption. 
+    rewrite H0 in Ha. destructAll. eexists. split.
+    split. eassumption. sets.
+    eauto.
   Qed.
 
+
+  Corollary shrink_err_correct e c :
+   well_scoped e ->
+   max_var e 1 < state.next_var c ->
+   exists (e' : exp) (c' : state.comp_data) (n m : nat),
+     shrink_err e c = (exceptionMonad.Ret (e', n), c') /\ (* TODO change Ret, remove existentials *)
+     max_var e' 1 < state.next_var c' /\
+     well_scoped e' /\
+     preord_exp_n cenv wf_pres post_prop m e e'.
+  Proof.
+    intros.
+    destruct (shrink_top e) eqn:Hres. 
+    exists e0, c, n.
+    edestruct shrink_top_correct; eauto. destructAll.
+    eexists. split.
+    unfold shrink_err. rewrite Hres. reflexivity.
+    
+    split; [| split ]; eauto.
+
+    eapply Pos.le_lt_trans. eapply max_var_le. 2: eassumption.
+    
+    sets. 
+  Qed.     
+
+  
 End Shrink.
 
+Section InlineLoop.
+
+
+  Lemma inline_loop_correct St IH e d st c z :
+    well_scoped e ->
+    max_var e 1 < state.next_var c ->
+    exists (e' : exp) (c' : state.comp_data),
+      inline_loop St IH z e d st c true = (Ret e', c') /\
+      well_scoped e' /\
+      max_var e' 1 < state.next_var c' /\
+      exists m, preord_exp_n cenv wf_pres post_prop m e e'.
+  Proof.
+    unfold inline_loop.
+    revert e c. generalize 1000%nat.
+    induction n; intros.
+   - simpl. do 2 eexists.
+     split. reflexivity.
+     split. eassumption. split. eassumption.
+     eexists. eapply preord_exp_n_refl.
+     intros. unfold wf_pres. sets.
+   - destructAll. simpl. 
+     edestruct inline_correct with (e := e). eassumption.
+     destructAll.
+     destruct (shrink_top x) eqn:Hshrink.
+     edestruct shrink_top_correct; [| eassumption | ]. eassumption.
+     destructAll. 
+     destruct x1. 
+     + edestruct (IHn e0). eassumption.
+       eapply Pos.le_lt_trans. eapply max_var_le. 2: eassumption. sets.
+       destructAll.
+       do 2 eexists. erewrite H1. split; [| split ].
+       rewrite Hshrink. simpl. eassumption. eassumption.
+       split. eassumption. eexists. 
+       econstructor 2.
+       * econstructor 1. now eauto. eassumption.
+         split. eapply inline_bound_compat. omega.
+         eapply inline_bound_post_upper_bound.
+       * econstructor 2. eassumption. eassumption.
+     + do 2 eexists. rewrite H1.
+       split. reflexivity. 
+       split. rewrite Hshrink. eassumption.
+       split. rewrite Hshrink.
+       eapply Pos.le_lt_trans. eapply max_var_le. 2: eassumption. sets.
+       rewrite Hshrink. eexists. simpl.
+       econstructor 2.
+       * econstructor 1. now eauto. eassumption.
+         split. eapply inline_bound_compat. omega.
+         eapply inline_bound_post_upper_bound.
+       * eassumption.
+  Qed.
+
+End InlineLoop.
 
 (* Section Uncurry. *)
 

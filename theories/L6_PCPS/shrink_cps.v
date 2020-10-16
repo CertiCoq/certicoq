@@ -16,9 +16,9 @@ Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.
 Require Import Coq.Sorting.Permutation.
 Require Import Libraries.maps_util.
 Require Import L6.cps.
-Require Import L6.ctx L6.rename.
+Require Import L6.ctx L6.rename L6.state.
 Require Import L6.cps_util L6.List_util L6.identifiers L6.inline_letapp.
-
+Require Import Common.exceptionMonad. 
 
 (* Shallow val for constr and function *)
 Inductive svalue : Type :=
@@ -1429,3 +1429,7 @@ Definition shrink_n_times (e:exp) (n:nat): exp :=
   let count := init_census e in
   let (e, _) := shrink_n_times' e count n in
   e.
+
+
+(* Wrap the shrink reducer so that it has the same type as other ANF transformations *)
+Definition shrink_err (e : exp) (c : comp_data) := (Ret (shrink_cps.shrink_top e), c). 

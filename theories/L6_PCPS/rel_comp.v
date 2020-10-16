@@ -24,9 +24,8 @@ Section Compose.
   (* Properties that the intermediate post conditions have *)
   Definition post_property := PostT -> PostGT -> Prop.
   
-  Context (wf_pres : A -> A -> Prop)
-          (wf : A -> Prop)
-          (post_prop : post_property).
+  Context (wf_pres : A -> A -> Prop)   (* well-formedness conditions that are preserved by the relation *)
+          (post_prop : post_property). (* predicates over postconditons. Usefull to show *) 
   
   
   Definition rel := PostT -> PostGT -> A -> A -> Prop.  
@@ -35,7 +34,7 @@ Section Compose.
   | One :
       forall (P1 P2 : PostT) (c1 : A) (c2: A),
         R P1 P2 c1 c2 ->
-        wf_pres c1 c2 -> (* TODO does not need to be here I think *)
+        wf_pres c1 c2 ->
         post_prop P1 P2 ->
         R_n R 1%nat c1 c2
   | More :
@@ -79,14 +78,6 @@ Section RelComp.
   Definition preord_val_n n := R_n wf_trivial pr_trivial (fun P PG c1 c2 => forall k, preord_val cenv PG k c1 c2) n.
 
   Definition preord_res_n n := R_n wf_trivial pr_trivial (fun P PG c1 c2 => forall k, preord_res (preord_val cenv) PG k c1 c2) n.
-
-  Definition R_true : PostT := fun _ _ => True. 
-  
-  Lemma R_true_idempotent :
-    same_relation _ (compose R_true R_true) R_true.
-  Proof.
-    firstorder.
-  Qed.
 
   Lemma R_n_not_zero A (R : A -> A -> Prop) P Pr k a b :
     R_n R P Pr k a b -> 0 < k.
@@ -137,7 +128,6 @@ Section RelComp.
   Qed.
   
   Context (Hwf_c : forall e1 e2, wf_pres e1 e2 -> closed_exp e1 -> closed_exp e2).
-
 
   Definition Pr_implies_post_upper_bound (Pr : PostT -> PostGT -> Prop) :=
     forall P PG, Pr P PG -> @post_upper_bound fuel _ trace P.  
@@ -243,8 +233,8 @@ Section RelComp.
       left. eauto.
     - right. eapply preord_exp_n_preserves_divergence; eassumption.
   Qed.
-  
-  
+
+
   (* Top-level relation for L6 pipeline *)
   Definition R_n_exp P PG n m : relation exp :=
     compose_rel (preord_exp_n n)

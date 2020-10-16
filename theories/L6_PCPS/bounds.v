@@ -204,7 +204,6 @@ Section Bounds.
       destruct cout1; destruct cout2. simpl in *. destructAll. lia.
     Qed.    
 
-      
   
   End Inline_bound.
 

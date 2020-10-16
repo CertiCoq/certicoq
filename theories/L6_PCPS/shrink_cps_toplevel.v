@@ -45,9 +45,7 @@ Section Srink_top_correct.
     unique_bindings e /\ Disjoint _ (bound_var e) (occurs_free e).
 
   Definition wf_pres e1 e2 :=
-    (well_scoped e1 -> well_scoped e2) /\
-    occurs_free e2 \subset occurs_free e1.
-  
+    occurs_free e2 \subset occurs_free e1.  
 
   Definition post_prop P1 PG :=
     Post_properties cenv P1 P1 PG /\
@@ -75,43 +73,7 @@ Section Srink_top_correct.
       econstructor; eassumption.
     + intros. subst. eexists. split; eauto.
       constructor.       
-  Qed.
-    
-
-  Lemma rw_preserves_unique_bindings e e' : 
-    rw e e' ->
-    unique_bindings e ->
-    unique_bindings e'.
-  Proof. 
-    (* intros Hrw Hun. *)
-    (* inv Hrw; inv Hun; eauto; simpl in *; repeat normalize_bound_var_in_ctx.  *)
-    (* - constructor. *)
-    (*   + eassumption. *)
-    (*   + eapply fundefs_append_unique_bindings_l in H4; [| reflexivity ]. *)
-    (*     destructAll. *)
-    (*     eapply fundefs_append_unique_bindings_r; try reflexivity; eauto. *)
-    (*     inv H2. eassumption. *)
-    (*     repeat normalize_bound_var_in_ctx. sets. *)
-    (*   + eapply Disjoint_Included_r; [| eassumption ]. *)
-    (*     rewrite fundefs_append_bound_vars; [| reflexivity ].  *)
-    (*     erewrite fundefs_append_bound_vars with (B3 := fundefs_append _ (Fcons _ _ _ _ _)); [| reflexivity ]. *)
-    (*     normalize_bound_var. sets. *)
-    (* - econstructor.  *)
-    (*   admit. *)
-    (*   eapply ub_case_inl; eauto. *)
-    (*   eexists. eapply find_tag_nth_findtag. eexists. eassumption. *)
-    (* - Disjoint_bv_of_ctx *)
-  Admitted.
-
-  Lemma gen_rw_preserves_unique_bindings e e' : 
-    gen_rw e e' ->
-    unique_bindings e ->
-    unique_bindings e'.
-  Proof.
-    intros.
-  Admitted.
-
-  
+  Qed.   
 
   Theorem shrink_corresp_top e:
     unique_bindings e ->
@@ -140,28 +102,15 @@ Section Srink_top_correct.
         
     { destructAll.      
       split; [| split; [| split; [| split ]]].
-      + clear H2 H1 H0. revert n H3. induction H5; intros.
+      + clear H2 H1 H0 Hun Hdis. revert n H3. induction H5; intros.
         { edestruct IHrefl_trans_closure_n with (n0 := n).
-          eapply gen_rw_preserves_unique_bindings. eassumption. eassumption.
-          eapply Disjoint_Included.
-          eapply grw_preserves_fv. eassumption.
-          eapply grw_preserves_bv. eassumption.
-          eassumption. eassumption. eassumption.
-          2:{ destructAll. eexists. split.
-              2:{ eapply preord_exp_n_trans; [| eassumption ].
-                  econstructor. intros. eapply gen_rw_correct; eauto.                  
-                  split. 
-                  intros. split.
-                  eapply gen_rw_preserves_unique_bindings. eassumption. eassumption.
-                  eapply Disjoint_Included.
-                  eapply grw_preserves_fv. eassumption.
-                  eapply grw_preserves_bv. eassumption.
-                  eassumption.
-                  eapply grw_preserves_fv. eassumption.
-                  split. now eauto.
-                  eassumption. }
-              omega. }
-          ++ omega. }
+          eassumption. eassumption. omega. destructAll. 
+          eexists. split.
+          2:{ eapply preord_exp_n_trans; [| eassumption ].
+              econstructor. intros. eapply gen_rw_correct; eauto.                  
+              eapply grw_preserves_fv. eassumption.
+              split. now eauto. eassumption. }
+          omega. }
         
         exists 1. split. omega.
         econstructor. intros. eapply preord_exp_refl.

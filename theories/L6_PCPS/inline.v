@@ -228,18 +228,22 @@ Section Beta.
  
 
   
-  Definition inline_top (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
+  Definition inline_top' (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data * bool :=
     let (c, nenv) := restart_names e c in     
-    let '(e', (st', click)) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c (false, nenv) in
-    (e', st').
+    let '(e', (st', (click, _old_map))) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c (false, nenv) in
+    (e', st', click).
 
+  Definition inline_top (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
+    let '(e', st', _click) := inline_top' e d s c str_flag in
+    (e', st').
+  
+  
   (* Run until nothing changes and call shrink reducer after each pass *)
   Fixpoint inline_loop_aux (fuel : nat) (e:exp) (d:nat) (s:St) (c:comp_data) (str_flag: bool) : error exp * comp_data :=
     match fuel with
     | 0 => (Ret e, c)
     | S fuel =>
-      let (c, nenv) := restart_names e c in
-      let '(e', (c', (click, _old_map))) := run_compM (beta_contract d e (M.empty var) (M.empty _) s str_flag) c (false, nenv) in
+      let '(e', c', click) := inline_top' e d s c str_flag in
       match e' with
       | Ret e' => 
         if click then

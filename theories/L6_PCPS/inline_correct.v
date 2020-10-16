@@ -2354,8 +2354,8 @@ Section Inline_correct.
   Lemma inline_correct_top d (Hleq : (d <= G)%nat) P (e : exp) (st : St) (c:comp_data) (Hi : inclusion (P1 d) P) z :
     unique_bindings e ->
     Disjoint _ (bound_var e) (occurs_free e) ->
-    exists e' c',
-      inline_top St IH z e d st c true  = (Ret e', c') /\
+    exists e' c' click,
+      inline_top' St IH z e d st c true  = (Ret e', c', click) /\
       unique_bindings e' /\
       occurs_free e' \subset occurs_free e /\
       Disjoint _ (bound_var e') (occurs_free e') /\
@@ -2366,7 +2366,7 @@ Section Inline_correct.
           preord_exp cenv P PG k (e, rho1) (e', rho2)).
   Proof.
     intros Hun Hdis. edestruct (inline_correct_mut d) as [He _]. eassumption.
-    unfold inline_top, triple in *.
+    unfold inline_top', triple in *.
 
     destruct (restart_names z e c) as [c_data nenv] eqn:Hnames.
     unfold restart_names in Hnames. destruct c.
@@ -2424,7 +2424,7 @@ Section Inline_correct.
     destruct (runState tt (c_data, (false, nenv))) eqn:Hstate.
     destruct e0. contradiction. destructAll.
     
-    destruct p. do 2 eexists.
+    destruct p. destruct i. do 3 eexists.
     split; [| split; [| split; [| split; [| split; [| split ]]]]]. 
     - setoid_rewrite Hstate. (* why? *) reflexivity.
     - eassumption.

@@ -116,6 +116,8 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
    * To print the ANF term before inlining, the corresponding name environment must be used
    *)
 
+
+  
   Section Pipeline.
 
     Context (opt : nat)           (* if opt = 1 do lambda lifting, if opt = 2 do lambda lifting AND inline lambda-lifting shells *)
@@ -128,8 +130,6 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
             (inl_before : bool)   (* Perform shrink/inline loop before closure conversion *)
             (inl_after : bool).   (* Perform shrink/inline loop after closure conversion *)
             
-    (* Wrap the shrink reducer so that it has the same type as other ANF transformations *)
-    Definition shrink_err (e : exp) (c : comp_data) := (Ret (shrink_cps.shrink_top e), c). 
     
     Definition time_anf {A} (s : string) (f : Datatypes.unit -> A) : A :=
       if time then

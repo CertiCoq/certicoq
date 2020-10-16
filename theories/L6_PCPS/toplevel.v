@@ -137,7 +137,6 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       else
         f tt.
 
-
     (* TODO some way of sequencing ANF transformations so that we don't bind e_err all the time *)
     (* The way it's threaded now is *very* error prone *)
   
@@ -157,6 +156,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
           (* Shrink reduction *)
           let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e0) in
           (* Uncurring *)
+          (* let '(e_err, (_, s), c_data) := time_anf "Uncurry" (fun _ => uncurry_top cps c_data e) in *)
           let '(e_err, s, c_data) := time_anf "Uncurry" (fun _ => uncurry_fuel cps 100 e c_data) in
           e <- e_err ;;
           (* Inlining *)
@@ -228,6 +228,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
           (* Shrink reduction *)
           let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e0) in
           (* Uncurring *)
+          (* let '(e_err, (_, s), c_data) := time_anf "Uncurry" (fun _ => uncurry_top cps c_data e) in *)
           let '(e_err, s, c_data) := time_anf "Uncurry" (fun _ => uncurry_fuel cps 100 e c_data) in
           e <- e_err ;;
           (* Inlining *)

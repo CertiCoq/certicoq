@@ -311,41 +311,19 @@ Defined.
 Set Extraction Flag 2031. (* default + linear let + linear beta *)
 Recursive Extraction rw_uncurry.
 
-Lemma uncurry_one (cps : bool) (ms : S_misc) (e : exp) (s : State (@I_S_fresh) (erase <[]>) e)
-  : option (result (Root:=exp_univ_exp) uncurry_step (@I_S) (erase <[]>) e).
-Proof.
-  Print run_rewriter'.
-  pose (res := run_rewriter' rw_uncurry e (exist _ cps I) (exist _ (ms, proj1_sig s) (conj I (proj2_sig s))));
-               destruct res eqn:Hres.
-  exact (let 'exist ((b, _, _, _, _), _) _ := resState in if b then Some res else None).
-Defined.
-
-Fixpoint uncurry_fuel (cps : bool) (n : nat) (ms : S_misc) (e : exp)
-         (s : State (@I_S_fresh) (erase <[]>) e) {struct n}
-  : result (Root:=exp_univ_exp) uncurry_step (@I_S) (erase <[]>) e.
-Proof.
-  destruct n as [|n].
-  - unshelve econstructor; [exact e|exact (exist _ (ms, proj1_sig s) (conj I (proj2_sig s)))|do 2 constructor].
-  - pose (res := uncurry_one cps ms e s).
-    refine (match res with Some res' => _ | None => _ end).
-    + destruct res'.
-      destruct resState as [[[[[[? aenv] lm] st] cdata] resState] Hstate].
-      unfold I_S, I_S_prod in Hstate.
-      destruct (uncurry_fuel cps n (false, aenv, lm, st, cdata) resTree)
-        as [resTree' resState' resProof'].
-      * exists resState; unerase; now destruct Hstate.
-      * unshelve econstructor; [exact resTree'|auto|].
-        eapply Relation_Operators.rt_trans; eauto.
-    + unshelve econstructor; [exact e|exact (exist _ (ms, proj1_sig s) (conj I (proj2_sig s)))
-                              |apply Relation_Operators.rt_refl].
-Defined.
-
-Definition uncurry_top (cps : bool) (n : nat) (cdata : comp_data) (e : exp) : exp * M.t nat * comp_data.
-Proof.
-  refine (
-    let '{| resTree := e'; resState := exist (ms, _) (conj I _) |} := uncurry_fuel cps n _ e (initial_fresh e) in
-    _).
-  - exact (false, M.empty _, M.empty _, (0%nat, (M.empty _)), cdata).
-  - destruct ms as [[[[? ?] ?] [? st]] cdata'].
-    exact (e', st, cdata').
+Definition uncurry_top (cps : bool) (c : state.comp_data) (e : exp) : compM.error exp * St * state.comp_data.
+  destruct (Pos.ltb_spec0 (max_var e 1) (state.next_var c))%positive as [Hlt|Hge].
+  2: { exact (compM.Err "uncurry_top: max_var computation failed", (0, M.empty _), c). }
+  unshelve refine (let res := run_rewriter' rw_uncurry e _ _ in _).
+  - unshelve econstructor; [exact cps|unerase; exact I].
+  - unshelve econstructor; [refine ((false, M.empty _, M.empty _, (0, M.empty _), c), state.next_var c)|].
+    unerase; unfold I_S, I_S_prod; split; [exact I|]; unfold I_S_fresh.
+    unfold fresher_than; simpl.
+    intros _ [y' Hbv|y' Hfv].
+    + abstract (apply bound_var_leq_max_var with (y := 1%positive) in Hbv; lia).
+    + abstract (apply occurs_free_leq_max_var with (y := 1%positive) in Hfv; lia).
+  - destruct res as [e' [[[[_ s] c'] fresh] _] _].
+    exact (compM.Ret e', s,
+           mkCompData fresh c'.(nect_ctor_tag) c'.(next_ind_tag)
+                      c'.(next_fun_tag) c'.(cenv) c'.(fenv) c'.(nenv) c'.(log)).
 Defined.

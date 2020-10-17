@@ -129,7 +129,12 @@ Identifiers
 Rename
 Inline_letapp
 Uncurry
-Rewritting
+BinNatDef
+Cps_proto
+Prototype
+Proto_util
+Frame
+Rewriting
 Uncurry_proto
 Color
 Shrink_cps

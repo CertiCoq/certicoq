@@ -22,6 +22,8 @@ extraction/astCommon.ml
 extraction/astCommon.mli
 extraction/binary.ml
 extraction/binary.mli
+extraction/binNatDef.ml
+extraction/binNatDef.mli
 extraction/bits.ml
 extraction/bits.mli
 extraction/bracket.ml
@@ -248,7 +250,15 @@ extraction/randyPrelude.ml
 extraction/randyPrelude.mli
 extraction/rename.ml
 extraction/rename.mli
-extraction/rewitting.ml
+extraction/prototype.ml
+extraction/prototype.mli
+extraction/cps_proto.ml
+extraction/cps_proto.mli
+extraction/proto_util.ml
+extraction/proto_util.mli
+extraction/frame.ml
+extraction/frame.mli
+extraction/rewriting.ml
 extraction/rewriting.mli
 extraction/round.ml
 extraction/round.mli

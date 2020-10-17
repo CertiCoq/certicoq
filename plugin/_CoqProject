@@ -248,6 +248,8 @@ extraction/randyPrelude.ml
 extraction/randyPrelude.mli
 extraction/rename.ml
 extraction/rename.mli
+extraction/rewitting.ml
+extraction/rewriting.mli
 extraction/round.ml
 extraction/round.mli
 extraction/safeErasureFunction.ml
@@ -294,6 +296,8 @@ extraction/uGraph0.ml
 extraction/uGraph0.mli
 extraction/uncurry.ml
 extraction/uncurry.mli
+extraction/uncurry_proto.ml
+extraction/uncurry_proto.mli
 extraction/universes0.ml
 extraction/universes0.mli
 # extraction/usefulTypes.ml

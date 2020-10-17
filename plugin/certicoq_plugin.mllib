@@ -129,6 +129,8 @@ Identifiers
 Rename
 Inline_letapp
 Uncurry
+Rewritting
+Uncurry_proto
 Color
 Shrink_cps
 TermsDB

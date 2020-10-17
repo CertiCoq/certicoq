@@ -29,6 +29,7 @@ Section CompM.
                                            cenv : ctor_env;
                                            fenv : fun_env; (* Maps fun_tag's to (number of args,  list (arg no)) *)
                                            nenv : name_env;
+                                           inline_map : M.tree nat; (* marks functions for inlining *)
                                            log : list string;
                                          }.
   
@@ -43,9 +44,9 @@ Section CompM.
   (** Get a fresh name, and register a pretty name by appending a suffix to the pretty name of the old var *)
   Definition get_name (old_var : var) (suff : string) : compM' var :=
     p <- compM.get ;;
-    let '(mkCompData n c i f e fenv names log, st) := p in
+    let '(mkCompData n c i f e fenv names imap log, st) := p in
     let names' := add_entry names n old_var suff in
-    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' log, st) ;;
+    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' imap log, st) ;;
     ret n.
 
 
@@ -64,9 +65,9 @@ Section CompM.
      constuct a new name environment. *)
   Definition get_name' (old_var : var) (suff : string) (nenv_old : name_env) : compM' var :=
     p <- compM.get ;;
-    let '(mkCompData n c i f e fenv nenv log, st) := p in
+    let '(mkCompData n c i f e fenv nenv imap log, st) := p in
     let nenv' := add_entry_from_map nenv nenv_old n old_var suff in
-    compM.put (mkCompData ((n+1)%positive) c i f e fenv nenv' log, st) ;;
+    compM.put (mkCompData ((n+1)%positive) c i f e fenv nenv' imap log, st) ;;
     ret n.
 
   
@@ -80,9 +81,9 @@ Section CompM.
   (** Get a fresh name, and register a pretty name by appending a suffix to the pretty name of the old var *)
   Definition get_named (s : name) : compM' var :=
     p <- compM.get ;;
-    let '(mkCompData n c i f e fenv names log, st) := p in
+    let '(mkCompData n c i f e fenv names imap log, st) := p in
     let names' := M.set n s names in
-    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' log, st) ;;
+    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' imap log, st) ;;
     ret n.
 
   Definition get_named_lst (s : list name) : compM' (list var) := mapM get_named s.
@@ -91,15 +92,15 @@ Section CompM.
   (** Get a fresh name, and create a new pretty name *)
   Definition get_named_str (name : string) : compM' var :=
     p <- compM.get ;;
-    let '(mkCompData n c i f e fenv names log, st) := p in
+    let '(mkCompData n c i f e fenv names imap log, st) := p in
     let names' := add_entry_str names n name in
-    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' log, st) ;;
+    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' imap log, st) ;;
     ret n.
 
   (* Get the next fresh record tag of a fresh type *)
   Definition make_record_ctor_tag (n : N) : compM' ctor_tag :=
     p <- compM.get ;;
-    let '(mkCompData x c i f e fenv names log, st) := p  in
+    let '(mkCompData x c i f e fenv names imap log, st) := p  in
     let inf := {| ctor_name := nAnon
                 ; ctor_ind_name := nAnon
                 ; ctor_ind_tag := i
@@ -107,13 +108,13 @@ Section CompM.
                 ; ctor_ordinal := 0%N
                 |} : ctor_ty_info in
     let e' := ((M.set c inf e) : ctor_env) in
-    compM.put (mkCompData x (c+1)%positive (i+1)%positive f e' fenv names log, st) ;;
+    compM.put (mkCompData x (c+1)%positive (i+1)%positive f e' fenv names imap log, st) ;;
     ret c.
 
   (* Register a constructor tag of some type i *)
   Definition register_record_ctor_tag (c : ctor_tag) (i : ind_tag) (n : N) : compM' unit :=
     p <- compM.get ;;
-    let '(mkCompData x c i f e fenv names log, st) := p  in
+    let '(mkCompData x c i f e fenv names imap log, st) := p  in
     let inf := {| ctor_name := nAnon
                 ; ctor_ind_name := nAnon
                 ; ctor_ind_tag := i
@@ -121,7 +122,7 @@ Section CompM.
                 ; ctor_ordinal := 0%N
                 |} : ctor_ty_info in
     let e' := ((M.set c inf e) : ctor_env) in
-    compM.put (mkCompData x c i f e' fenv names log, st).
+    compM.put (mkCompData x c i f e' fenv names imap log, st).
 
   (* Get the pretty name of a binder *)
   Definition get_pp_name (x : var) : compM' string :=
@@ -134,8 +135,8 @@ Section CompM.
   (* Log a new message *)
   Definition log_msg (msg : string) : compM' unit :=
     s <- compM.get ;;
-    let '(mkCompData x c i f e fenv names log, st) := s in
-    compM.put (mkCompData x c i f e fenv names (msg :: log)%string, st).
+    let '(mkCompData x c i f e fenv names imap log, st) := s in
+    compM.put (mkCompData x c i f e fenv names imap (msg :: log)%string, st).
 
   (* Access the transformation specific state *)
   Definition get_state (_ : unit) : compM' S :=
@@ -150,8 +151,20 @@ Section CompM.
   (** Get a fresh function tag and register it in fun_env *)
   Definition get_ftag (arity : N) : compM' fun_tag :=
     p <- compM.get ;;
-    let '(mkCompData x c i f e fenv names log, st) := p in
-    compM.put (mkCompData x c i (f + 1)%positive e (M.set f (arity, (fromN (0%N) (BinNat.N.to_nat arity))) fenv) names log, st) ;;
+    let '(mkCompData x c i f e fenv names imap log, st) := p in
+    compM.put (mkCompData x c i (f + 1)%positive e (M.set f (arity, (fromN (0%N) (BinNat.N.to_nat arity))) fenv) names imap log, st) ;;
+    ret f.
+
+  
+  Definition get_inline_map (_ : unit) : compM' (M.tree nat) :=
+    p <- compM.get ;;
+    let '(mkCompData x c i f e fenv names imap log, st) := p in
+    ret imap.
+
+  Definition put_inline_map (imap : M.tree nat) : compM' fun_tag :=
+    p <- compM.get ;;
+    let '(mkCompData x c i f e fenv names _ log, st) := p in
+    compM.put (mkCompData x c i f e fenv names imap log, st) ;;
     ret f.
 
   Definition run_compM {A} (m: compM' A) (st : comp_data) (s : S)

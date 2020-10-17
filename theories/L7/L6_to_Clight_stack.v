@@ -1240,7 +1240,7 @@ Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_e
   let p'' := make_defs args_opt e fenv cenv ienv nenv0 in
   (* state *)
   let n := ((max_var e 100) + 1)%positive in
-  let comp_d := pack_data 1%positive 1%positive  1%positive 1%positive cenv fenv nenv0 [] in (* XXX dummy *)
+  let comp_d := pack_data 1%positive 1%positive  1%positive 1%positive cenv fenv nenv0 (M.empty nat) [] in (* XXX dummy *)
   (* run compM *)
   let err : error (M.t BasicAst.name * Clight.program * Clight.program) :=
       let '(res, (p, m)) := run_compM p'' comp_d n in

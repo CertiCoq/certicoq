@@ -2044,7 +2044,7 @@ Lemma uncurry_correct_top cps c e :
   unique_bindings e ->
   Disjoint _ (bound_var e) (occurs_free e) ->
   (max_var e 1 < state.next_var c)%positive ->
-  exists e' s c', uncurry_top cps c e = (Ret e', s, c') /\
+  exists e' c', uncurry_top cps e c = (Ret e', c') /\
   (max_var e' 1 < state.next_var c')%positive /\
   unique_bindings e' /\
   occurs_free e' \subset occurs_free e /\
@@ -2061,7 +2061,7 @@ Proof.
     destruct (run_rewriter' rw_uncurry e r s) as [e' s' Hrel]
   end.
   destruct s' as [[[[misc s] c'] fresh] Hfresh].
-  do 3 eexists; split; [reflexivity|]; split; [|split; [|split; [|split]]].
+  do 2 eexists; split; [reflexivity|]; split; [|split; [|split; [|split]]].
   - clear - Hfresh; simpl; unerase; destruct Hfresh as [[] Hfresh]; unfold I_S_fresh in Hfresh.
     unfold fresher_than in Hfresh.
     enough (fresh > max_var e' 1)%positive by lia.

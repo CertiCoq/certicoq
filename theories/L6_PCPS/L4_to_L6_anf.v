@@ -352,7 +352,7 @@ convert_env' is called with the next available constructor tag and the next avai
     let '(_, cenv, ctag, itag, dcm) := convert_env (fst ee) in
     let ftag := (fun_tag + 1)%positive in
     let fenv : fun_env := M.set fun_tag (1%N, (0%N::nil)) (M.empty _) in
-    let comp_d := pack_data next_id ctag itag ftag cenv fenv (M.empty _) [] in
+    let comp_d := pack_data next_id ctag itag ftag cenv fenv (M.empty _) (M.empty nat) [] in
     let '(res_err, (comp_d', _)) := run_compM (convert_anf_exp dcm (snd ee)) comp_d tt in
     (res_err, comp_d').
 

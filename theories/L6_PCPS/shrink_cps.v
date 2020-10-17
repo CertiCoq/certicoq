@@ -1393,7 +1393,6 @@ Section CONTRACT.
            lazy [projT1 projT2 fst snd]; reflexivity).
   Qed.
 
-
 End CONTRACT.
 
 (* Perform 1 pass of contract of e *)
@@ -1432,4 +1431,4 @@ Definition shrink_n_times (e:exp) (n:nat): exp :=
 
 
 (* Wrap the shrink reducer so that it has the same type as other ANF transformations *)
-Definition shrink_err (e : exp) (c : comp_data) := (Ret (shrink_cps.shrink_top e), c). 
+Definition shrink_err (e : exp) (c : comp_data) := (compM.Ret (fst (shrink_cps.shrink_top e)), c). 

@@ -464,9 +464,10 @@ Section CC.
     PS.fold (fun x map => M.set x BoundVar map) s map.
 
 
+  (* TODO move *)
   Definition get_name (c : comp_data) : (var * comp_data) :=
-    let 'mkCompData n c i f e fenv names log := c in
-    let c' := mkCompData (n + 1)%positive c i f e fenv names log in
+    let 'mkCompData n c i f e fenv names imap log := c in
+    let c' := mkCompData (n + 1)%positive c i f e fenv names imap log in
     (n, c'). 
                          
   Definition closure_conversion_top (e : exp) (c: comp_data) :=

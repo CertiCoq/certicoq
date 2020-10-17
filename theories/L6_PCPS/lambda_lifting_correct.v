@@ -1703,7 +1703,7 @@ Section Lambda_lifting_correct.
      (max_var e 1%positive < next_var c)%positive ->
      Disjoint _ (bound_var e) (occurs_free e) ->
      exists e' c',
-       lambda_lift e k l b c = (Ret e', c') /\
+       lambda_lift k l b e c = (Ret e', c') /\
        unique_bindings e' /\
        occurs_free e' \subset occurs_free e /\
        Disjoint _ (bound_var e') (occurs_free e') /\

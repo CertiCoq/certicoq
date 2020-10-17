@@ -23,12 +23,12 @@ Unset Strict Unquote Universe Mode.
 
 Definition set_name old_var new_var suff cdata :=
   let '{| next_var := n; nect_ctor_tag := c; next_ind_tag := i; next_fun_tag := f;
-          cenv := e; fenv := fenv; nenv := names; log := log |} := cdata
+          cenv := e; fenv := fenv; nenv := names; inline_map := imap; log := log |} := cdata
   in
   let names' := add_entry names new_var old_var suff in
   {| next_var := (1 + Pos.max old_var new_var)%positive; nect_ctor_tag := c;
      next_ind_tag := i; next_fun_tag := f; cenv := e; fenv := fenv;
-     nenv := names'; log := log |}.
+     nenv := names'; inline_map := imap; log := log |}.
 
 Definition set_names_lst olds news suff cdata :=
   fold_right (fun '(old, new) cdata => set_name old new suff cdata) cdata (combine olds news).
@@ -311,9 +311,9 @@ Defined.
 Set Extraction Flag 2031. (* default + linear let + linear beta *)
 Recursive Extraction rw_uncurry.
 
-Definition uncurry_top (cps : bool) (c : state.comp_data) (e : exp) : compM.error exp * St * state.comp_data.
+Definition uncurry_top (cps : bool) (e : exp) (c : state.comp_data) : compM.error exp * state.comp_data.
   destruct (Pos.ltb_spec0 (max_var e 1) (state.next_var c))%positive as [Hlt|Hge].
-  2: { exact (compM.Err "uncurry_top: max_var computation failed", (0, M.empty _), c). }
+  2: { exact (compM.Err "uncurry_top: max_var computation failed", c). }
   unshelve refine (let res := run_rewriter' rw_uncurry e _ _ in _).
   - unshelve econstructor; [exact cps|unerase; exact I].
   - unshelve econstructor; [refine ((false, M.empty _, M.empty _, (0, M.empty _), c), state.next_var c)|].
@@ -323,7 +323,7 @@ Definition uncurry_top (cps : bool) (c : state.comp_data) (e : exp) : compM.erro
     + abstract (apply bound_var_leq_max_var with (y := 1%positive) in Hbv; lia).
     + abstract (apply occurs_free_leq_max_var with (y := 1%positive) in Hfv; lia).
   - destruct res as [e' [[[[_ s] c'] fresh] _] _].
-    exact (compM.Ret e', s,
+    exact (compM.Ret e',
            mkCompData fresh c'.(nect_ctor_tag) c'.(next_ind_tag)
-                      c'.(next_fun_tag) c'.(cenv) c'.(fenv) c'.(nenv) c'.(log)).
+                                                    c'.(next_fun_tag) c'.(cenv) c'.(fenv) c'.(nenv) (snd s) c'.(log)).
 Defined.

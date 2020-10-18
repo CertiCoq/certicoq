@@ -115,7 +115,22 @@ Section Inline.
  Qed.
 
 
- 
+ Corollary inline_uncurry_cor x n m :
+   correct (inline_uncurry x n m).
+ Proof.
+   intro; intros.
+   edestruct inline_correct; eauto. destructAll.
+   do 2 eexists. split.
+   
+   unfold inline_uncurry, inline_top. rewrite H1. reflexivity.
+   repeat (split; [ eassumption | ]).
+   eexists. econstructor. now eauto. eassumption.
+   split.
+   unfold inline_bound_top. eapply inline_bound_compat. omega.
+   eapply inline_bound_post_upper_bound.
+ Qed.
+
+
 End Inline.
 
 
@@ -433,3 +448,136 @@ Section Uncurry.
 
 
 End Uncurry.
+
+End ToplevelTheorems.
+
+Require Import ExtLib.Structures.Monad L6.toplevel.
+Import MonadNotation.
+
+
+Section Compose.
+
+  Context (cenv : ctor_env).
+
+  Definition clo_tag := bogus_closure_tag.
+  
+  Lemma correct_compose (t1 t2 : anf_trans) :
+    correct cenv t1 ->
+    correct cenv t2 ->   
+    correct cenv (fun e => e <- t1 e;; t2 e).
+  Proof.
+  Admitted.
+
+
+  Lemma correct_cc_compose_l (t1 t2 : anf_trans) :
+    correct cenv t1 ->
+    correct_cc cenv clo_tag t2 ->   
+    correct_cc cenv clo_tag (fun e => e <- t1 e;; t2 e).
+  Proof.
+  Admitted.
+
+  Lemma correct_cc_compose_r (t1 t2 : anf_trans) :
+    correct_cc cenv clo_tag t1 ->
+    correct cenv t2 ->   
+    correct_cc cenv clo_tag (fun e => e <- t1 e;; t2 e).
+  Proof.
+  Admitted.
+
+
+  Lemma correct_time (t : anf_trans) o s :
+    correct cenv t ->
+    correct cenv (time_anf o s t).
+  Proof.
+    unfold time_anf.
+    intros.
+    destruct (time o); eauto.
+  Qed. 
+
+  Lemma correct_cc_time (t : anf_trans) o s :
+    correct_cc cenv clo_tag t ->
+    correct_cc cenv clo_tag (time_anf o s t).
+  Proof.
+    unfold time_anf.
+    intros.
+    destruct (time o); eauto.
+  Qed. 
+
+  Opaque uncurry_top.
+    
+  Lemma correct_id_trans :
+    correct cenv id_trans.
+  Proof.
+  Admitted.
+    
+  Theorem and_pipeline_correct opts :
+    correct_cc cenv clo_tag (anf_pipeline opts).
+  Proof.
+    unfold anf_pipeline.
+    eapply correct_cc_compose_l.
+
+    eapply correct_time. 
+    now eapply shrink_err_correct.
+    
+    eapply correct_cc_compose_l.
+
+    eapply correct_time. 
+    (* eapply uncurry_top_correct_corr. *)
+    admit. (* same kind of admit again ... *)
+
+    eapply correct_cc_compose_l.
+
+    eapply correct_time.
+    now eapply inline_uncurry_cor.
+
+    eapply correct_cc_compose_l.
+    
+    destruct (inl_before opts).
+    eapply correct_time. now eapply inline_loop_correct.
+    now eapply correct_id_trans.
+    
+    eapply correct_cc_compose_l.
+
+    destruct (do_lambda_lift opts).
+    eapply correct_time. now eapply lambda_lift_correct_corr.
+    now eapply correct_id_trans.
+    
+    eapply correct_cc_compose_l.
+    
+    eapply correct_time. now eapply shrink_err_correct.
+    
+    eapply correct_cc_compose_r.
+      
+    eapply correct_cc_time. now eapply closure_conversion_hoist_correct. 
+
+    eapply correct_compose.
+    admit. (* TODO show or remove *)
+
+    eapply correct_compose.
+
+    eapply correct_time. now eapply shrink_err_correct.
+    
+    eapply correct_compose.
+
+    destruct (inl_after opts).
+    eapply correct_time. now eapply inline_loop_correct.
+    now eapply correct_id_trans.
+
+    eapply correct_compose.
+    admit. (* not yet dead param elim *)
+
+    eapply correct_compose.
+
+    eapply correct_time. now eapply shrink_err_correct.
+
+    eapply correct_compose.
+
+    destruct (inl_known opts).
+    eapply correct_time.
+    unfold inline_lifted. now eapply inline_correct_cor.
+    now eapply correct_id_trans.
+
+    now eapply correct_id_trans.
+  Admitted.    
+
+
+End Compose.

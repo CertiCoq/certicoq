@@ -475,7 +475,7 @@ Definition InineLifted: InlineHeuristic (M.t bool) :=
                         end;                       
   |}.
 
-Definition inline_lifted (max_var : var) (e:exp) (bound:nat) (d:nat) (c : comp_data) :=
+Definition inline_lifted (max_var : var) (bound:nat) (d:nat) (e:exp) (c : comp_data) :=
   inline_top _ InineLifted max_var d (M.empty bool) e c.
 
 (* "Bogus" inlining. Renames all variables with fresh names but does not inline any function. *)

@@ -79,7 +79,7 @@ End Translation.
 
 Definition timePhase_opt {A} (o : Options) (s : string) (f : unit -> A) : A :=
   if time o then
-    timePhase s f
+    timePhase s f tt
   else f tt.
 
 Definition BuildCertiCoqTrans {Src Trg}

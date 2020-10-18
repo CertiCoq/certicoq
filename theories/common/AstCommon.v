@@ -568,9 +568,7 @@ End trm_Sec.
 
 (* Timing facilities, instanciated by extraction in extraction.v *)
 
+Definition timePhase: forall A B, string -> (A -> B) -> A -> B := fun A B s f a => f a.
 
-
-Definition timePhase: forall A, string -> (Datatypes.unit -> A) -> A := fun a s f => f tt.
-
-Lemma timePhase_id: forall {A:Type} s (x:Datatypes.unit -> A), timePhase s x = x tt.
+Lemma timePhase_id: forall {A B:Type} s (x : A -> B) (a : A), timePhase s x a = x a.
 Proof. reflexivity. Qed.

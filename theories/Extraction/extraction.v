@@ -29,36 +29,14 @@ Extract Constant L6_to_Clight.print_Clight_dest_names' => "PrintClight.print_des
 Extract Constant L6_to_Clight.print => "print_string".
 
 
-(* Timing *)
-(* T0 : No timing *)
-(*
-Extract Constant AstCommon.timePhase => "(fun c x -> x ())".
-*)
-
-(* T1 : Time each phase, print to debug *)
+(* Time each phase, print to debug channel *)
 
 Extract Constant AstCommon.timePhase =>
-"(fun c x -> let time = Unix.gettimeofday() in
-                            let temp = x () in
-                            let time = (Unix.gettimeofday() -. time) in
-              Feedback.msg_debug (Pp.str (Printf.sprintf ""Time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time));
-              temp)".
-
-(* T2 : Time each phase 10 times, print average to debug
-debug: Feedback.msg_debug (Pp.str (Printf.sprintf ""%f""  (Unix.gettimeofday() -. time)));   *)
-
-(** **  Zoe : I'm commenting timing out for now because it blocks computation inside Coq when we want to test
-              comp passes. TODO add compiler opt *)
-
-(* Extract Constant AstCommon.timePhase => *)
-(* "(fun c x -> let time = Unix.gettimeofday() in *)
-(*              let temp = ref (x ()) in *)
-(*              for i = 2 to 10 do *)
-(*               temp := x () *)
-(*              done; *)
-(*              let time = ((Unix.gettimeofday() -. time) /. 10.) in *)
-(*               Feedback.msg_debug (Pp.str (Printf.sprintf ""Average time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time)); *)
-(*               !temp)". *)
+"(fun c x a -> let time = Unix.gettimeofday() in
+               let temp = x a in
+               let time = (Unix.gettimeofday() -. time) in
+               Feedback.msg_debug (Pp.str (Printf.sprintf ""Time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time));
+               temp)".
 
 
 (* Int31 *)

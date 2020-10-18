@@ -1381,16 +1381,24 @@ Section CONTRACT.
       contract_def sig count e sub im.
   Proof.
     intros.
-    unfold contract. unfold contract_func.
+    unfold contract. unfold contract_func. 
     match goal with
-      |- context C [@Fix_sub ?A ?R ?wf ?P ?f ?a] =>
+    | |- context C [@Fix_sub ?A ?R ?wf ?P ?f ?a] =>
       set (body := hide_body (a:=f)) in |-;
-                                          let newg := context C [ @Fix_sub A R wf P body a ] in convert_concl_no_check newg
+      let newg := context C [ @Fix_sub A R wf P body a ] in change_no_check newg
     end.
     WfExtensionality.unfold_sub contract (contract sig count e sub im).
-    destruct e; lazy [projT1 projT2 fst snd];
-      try (unfold contract_def; unfold contract; unfold contract_func;
-           lazy [projT1 projT2 fst snd]; reflexivity).
+    destruct e; lazy [projT1 projT2 fst snd]; unfold contract_def; unfold contract; lazy [projT1 projT2 fst snd].
+    { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
+    { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
+    { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
+    optimize_heap.
+    { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
+    optimize_heap.
+    { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
+    { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
+    { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
+    { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
   Qed.
 
 End CONTRACT.

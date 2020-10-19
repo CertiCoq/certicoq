@@ -11,7 +11,7 @@ Require Import L6.Ensembles_util L6.List_util L6.cps_util L6.state.
 Require Import Coq.Lists.List.
 Import ListNotations.
 
-Set Universe Polymorphism.
+(* Set Universe Polymorphism. *)
 Unset Strict Unquote Universe Mode.
 
 (** * Uncurrying as a guarded rewrite rule *)
@@ -134,7 +134,7 @@ Definition I_S : forall {A}, frames_t A exp_univ_exp -> univD A -> _ -> Prop :=
 
 (** * Uncurrying as a recursive function *)
 
-Set Printing Universes.
+(* Set Printing Universes. *)
 
 Lemma bool_true_false b : b = false -> b <> true. Proof. now destruct b. Qed.
 

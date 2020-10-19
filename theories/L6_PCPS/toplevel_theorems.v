@@ -398,6 +398,9 @@ Section InlineLoop.
 End InlineLoop.
 
 Section Uncurry.
+
+  Lemma test : (forall b e c r, uncurry_top b e c = r -> uncurry_top b e c = r).
+  Proof. intros. Abort.
   
   Lemma uncurry_top_correct e c b :
    well_scoped e ->
@@ -424,12 +427,12 @@ Section Uncurry.
     - inv H. eassumption.
     - eassumption.
     - destructAll. exists x, x0.
-      split. admit. (* ?? *)
+      split. assumption.
       split. eassumption.
       split. eassumption.
       split. split; eassumption. 
       now eauto.
-  Admitted.
+  Qed.
 
   Corollary uncurry_top_correct_corr b :
     correct (uncurry_top b).
@@ -438,13 +441,11 @@ Section Uncurry.
     edestruct uncurry_top_correct. eassumption. eassumption.
     destructAll.
     do 2 eexists. split.
-    admit. (* ?? *)
+    eassumption. 
     repeat (split; [ eassumption | ]).
     eexists. econstructor. now eauto. eassumption. split.
     eapply simple_bound_compat. eapply simple_bound_post_upper_bound.
-
-    Unshelve. eassumption.
-  Admitted.
+  Qed.
 
 
 End Uncurry.

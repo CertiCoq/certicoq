@@ -25,7 +25,7 @@ Open Scope string.
 Section CC.
   Variable (clo_tag : ctor_tag). (* Tag for closure records *)
 
-  Variable (clo_itag : ind_tag). (* Dummy ind_tag for closure records *)
+  Variable (clo_itag : ind_tag). (* Inductive tag for closure records *)
 
   Inductive project_var :
     Ensemble var -> (* Variables in the current scope *)
@@ -477,8 +477,12 @@ Section CC.
         run_compM (exp_closure_conv e map (Maps.PTree.empty GFunInfo) 1%positive Γ)
                   c tt in
     match ef'_err with
-    | Ret (e', f') => (Ret (f' e'), c')
-    | Err str => (Err str, c')
+    | Ret (e', f') =>
+      let cenv' := add_closure_tag clo_tag clo_itag (cenv c')  in
+      let c'' := put_ctor_env cenv' c' in
+      (Ret (f' e'), c'')
+    | Err str =>
+      (Err str, c')
     end.
   
 End CC.

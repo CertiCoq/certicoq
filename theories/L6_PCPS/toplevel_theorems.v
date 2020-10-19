@@ -26,6 +26,7 @@ Section ToplevelTheorems.
 
   Context (cenv : ctor_env).
   Context (clo_tag : ctor_tag).
+  Context (clo_itag : ind_tag).
   
   (* TODO use John's definition  *)
   Definition well_scoped e :=
@@ -225,7 +226,7 @@ Section CCHoist.
 
 
   Lemma closure_conversion_hoist_correct :
-    correct_cc (closure_conversion_hoist clo_tag).
+    correct_cc (closure_conversion_hoist clo_tag clo_itag).
   Proof. 
     intros e c Hws Hmvar.
     edestruct closure_conversion_correct.exp_closure_conv_correct
@@ -398,6 +399,9 @@ Section InlineLoop.
 End InlineLoop.
 
 Section Uncurry.
+
+  Lemma test : (forall b e c r, uncurry_top b e c = r -> uncurry_top b e c = r).
+  Proof. intros. Abort.
   
   Lemma uncurry_top_correct e c b :
    well_scoped e ->
@@ -424,12 +428,12 @@ Section Uncurry.
     - inv H. eassumption.
     - eassumption.
     - destructAll. exists x, x0.
-      split. unfold uncurry_top in *. admit. (* uncurry admit *)
+      split. assumption.
       split. eassumption.
       split. eassumption.
       split. split; eassumption. 
       now eauto.
-  Admitted.
+  Qed.
 
   Corollary uncurry_top_correct_corr b :
     correct (uncurry_top b).
@@ -438,13 +442,11 @@ Section Uncurry.
     edestruct uncurry_top_correct. eassumption. eassumption.
     destructAll.
     do 2 eexists. split.
-    admit. (* uncurry admit *)
+    eassumption. 
     repeat (split; [ eassumption | ]).
     eexists. econstructor. now eauto. eassumption. split.
     eapply simple_bound_compat. eapply simple_bound_post_upper_bound.
-
-    Unshelve. eassumption.
-  Admitted.
+  Qed.
 
 
 End Uncurry.
@@ -459,29 +461,64 @@ Section Compose.
 
   Context (cenv : ctor_env).
 
-  Definition clo_tag := bogus_closure_tag.
+  Transparent bind.
   
   Lemma correct_compose (t1 t2 : anf_trans) :
     correct cenv t1 ->
     correct cenv t2 ->   
     correct cenv (fun e => e <- t1 e;; t2 e).
   Proof.
-  Admitted.
+    intros Ht1 Ht2. intro; intros.
+    edestruct Ht1; eauto. destructAll.
+    edestruct Ht2. eapply H2. eassumption. destructAll.
+    do 2 eexists. split; [| split; [| split ]].
+    - simpl. unfold bind.
+      rewrite H1. rewrite H5. reflexivity.
+    - eassumption.
+    - assumption.
+    - eexists. econstructor 2; eauto.
+  Qed.
 
-
+  
   Lemma correct_cc_compose_l (t1 t2 : anf_trans) :
     correct cenv t1 ->
     correct_cc cenv clo_tag t2 ->   
     correct_cc cenv clo_tag (fun e => e <- t1 e;; t2 e).
   Proof.
-  Admitted.
+    intros Ht1 Ht2. intro; intros.
+    edestruct Ht1; eauto. destructAll.
+    edestruct Ht2. eapply H2. eassumption. destructAll.
+    do 2 eexists. split; [| split; [| split ]].
+    - simpl. unfold bind.
+      rewrite H1. rewrite H5. reflexivity.
+    - eassumption.
+    - assumption.
+    - inv H8. destructAll. inv H9. destructAll.
+      do 3 eexists. split.
+      econstructor 2. eassumption. eassumption.
+      eexists. split. split; [| eassumption ]. eassumption.
+      eassumption.
+  Qed.
 
+  
   Lemma correct_cc_compose_r (t1 t2 : anf_trans) :
     correct_cc cenv clo_tag t1 ->
     correct cenv t2 ->   
     correct_cc cenv clo_tag (fun e => e <- t1 e;; t2 e).
   Proof.
-  Admitted.
+    intros Ht1 Ht2. intro; intros.
+    edestruct Ht1; eauto. destructAll.
+    edestruct Ht2. eapply H2. eassumption. destructAll.
+    do 2 eexists. split; [| split; [| split ]].
+    - simpl. unfold bind.
+      rewrite H1. rewrite H5. reflexivity.
+    - eassumption.
+    - assumption.
+    - inv H4. destructAll. inv H9. destructAll.
+      do 3 eexists. split. eassumption.
+      eexists. split. split; [| eassumption ]. eassumption.
+      econstructor 2; eassumption.
+  Qed.
 
 
   Lemma correct_time (t : anf_trans) o s :
@@ -507,11 +544,22 @@ Section Compose.
   Lemma correct_id_trans :
     correct cenv id_trans.
   Proof.
-  Admitted.
-    
+    intro; intros.
+    do 2 eexists. split. reflexivity.
+    split. eassumption.
+    split. eassumption.
+    eexists. econstructor 1.
+    3:{ split. eapply simple_bound_compat. eapply simple_bound_post_upper_bound. }
+    intros. eapply preord_exp_refl.
+    eapply simple_bound_compat. eassumption.
+    clear. firstorder.
+  Qed.
+  
   Theorem and_pipeline_correct opts :
+    dead_param_elim opts = false -> (* We don't yet have a proof for dead param elim phase, so turn off *)
     correct_cc cenv clo_tag (anf_pipeline opts).
   Proof.
+    intros Heq.
     unfold anf_pipeline.
     eapply correct_cc_compose_l.
 
@@ -520,9 +568,7 @@ Section Compose.
     
     eapply correct_cc_compose_l.
 
-    eapply correct_time.
-    (* eapply uncurry_top_correct_corr. *)
-    admit. (* uncurry admit *)
+    eapply correct_time. now eapply uncurry_top_correct_corr.
 
     eapply correct_cc_compose_l.
 
@@ -549,10 +595,7 @@ Section Compose.
       
     eapply correct_cc_time. now eapply closure_conversion_hoist_correct. 
 
-    eapply correct_compose.
-    admit. (* TODO show or remove *)
-
-    eapply correct_compose.
+    eapply correct_compose. 
 
     eapply correct_time. now eapply shrink_err_correct.
     
@@ -563,7 +606,8 @@ Section Compose.
     now eapply correct_id_trans.
 
     eapply correct_compose.
-    admit. (* not yet dead param elim *)
+
+    rewrite Heq. now eapply correct_id_trans.
 
     eapply correct_compose.
 
@@ -577,7 +621,6 @@ Section Compose.
     now eapply correct_id_trans.
 
     now eapply correct_id_trans.
-  Admitted.    
-
+  Qed.
 
 End Compose.

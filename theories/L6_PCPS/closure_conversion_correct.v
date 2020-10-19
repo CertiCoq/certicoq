@@ -28,6 +28,7 @@ Section Closure_conversion_correct.
   Variable pr : prims.
   Variable cenv : ctor_env.
   Variable clo_tag : ctor_tag.
+  Variable clo_itag : ind_tag.
 
   Context (boundL : nat -> @PostT fuel trace) (* Local *)
           (* the nat parameter is usefull when we want to give an upper bound to the steps, but for now its a dummy paramater *)
@@ -1236,7 +1237,7 @@ Section Closure_conversion_correct.
     Disjoint _ (bound_var e) (occurs_free e) ->
     (max_var e 1%positive < next_var c)%positive ->
     exists e' c',      
-      closure_conversion_top clo_tag e c = (Ret e', c') /\
+      closure_conversion_top clo_tag clo_itag e c = (Ret e', c') /\
       unique_bindings e' /\
       occurs_free e' \subset occurs_free e /\
       Disjoint _ (bound_var e') (occurs_free e') /\
@@ -1316,7 +1317,7 @@ Section Closure_conversion_correct.
     { unfold S, fresh. intros. unfold Ensembles.In in *. simpl in *. zify; omega. }
 
     specialize (Hsound Hfvmap Hsub Hbnin Hgmap Hun Hdis1 Hdis2 Hdis3 Hnin tt (c1, tt) Hf').
-
+    
     unfold run_compM.
     destruct (runState (exp_closure_conv clo_tag e fvmap (PTree.empty GFunInfo) 1%positive G) tt (c1, tt))
       as [ p [c2 w2]] eqn:Hcc.
@@ -1344,11 +1345,17 @@ Section Closure_conversion_correct.
       assert (Hin := max_var_subset (x |[ e' ]|)). 
       inv Hin. 
       + eapply bound_var_app_ctx in H6. inv H6.
-        * eapply H2 in H7. unfold Ensembles.In, Range in *. simpl in *. zify; omega.
+        * eapply H2 in H7.
+          destruct c2. simpl in *.
+          unfold Ensembles.In, Range in *. simpl in *. zify; omega.
         * eapply H4 in H7. inv H7.
-          ++ eapply bound_var_leq_max_var with (y := 1%positive) in H6. unfold Ensembles.In in *. zify. omega.
-          ++ unfold Ensembles.In, Range in *. simpl in *. zify; omega.
-      + eapply Hs in H6. eapply occurs_free_leq_max_var with (y := 1%positive) in H6. unfold Ensembles.In in *. zify. omega.
+          ++ eapply bound_var_leq_max_var with (y := 1%positive) in H6.
+             destruct c2. simpl in *.
+             unfold Ensembles.In in *. zify. omega.
+          ++ destruct c2. simpl in *.
+             unfold Ensembles.In, Range in *. simpl in *. zify; omega.
+      + destruct c2. simpl in *.
+        eapply Hs in H6. eapply occurs_free_leq_max_var with (y := 1%positive) in H6. unfold Ensembles.In in *. zify. omega.
     - rewrite (H0 e'). intros z Hin. 
       rewrite <- (Union_Empty_set_neut_l _ (funnames_in_exp (x |[ e' ]|))).
       eapply Closure_conversion_closed_fundefs. eassumption.

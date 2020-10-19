@@ -88,9 +88,10 @@ Definition exp_hoist (e : exp) :=
 
 Section CC.
   Context (clo_tag : ctor_tag). (* Tag for closure records *)
+  Context (clo_itag : ind_tag). (* Inductive tag for closure records *)
   
   Definition closure_conversion_hoist (e : exp) (c: comp_data) : error exp * comp_data :=    
-    let '(e'_err, c') := closure_conversion_top clo_tag e c in
+    let '(e'_err, c') := closure_conversion_top clo_tag clo_itag e c in
     match e'_err with 
     | Ret e' => (Ret (fst (exp_hoist e')), c')
     | Err str => (Err str, c')

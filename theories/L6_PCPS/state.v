@@ -164,6 +164,14 @@ Section CompM.
   Definition put_inline_map (imap : M.tree nat) (c : comp_data) : comp_data :=
     let 'mkCompData x c i f cenv fenv names _ log := c in
     mkCompData x c i f cenv fenv names imap log.
+
+  Definition put_ctor_env (cenv : ctor_env) (c : comp_data) : comp_data :=
+    let '(mkCompData next ctag itag ftag _ fenv names imap log) := c in
+    pack_data next ctag itag ftag cenv fenv names imap log.
+
+  Definition get_ctor_env (cenv : ctor_env) (c : comp_data) : ctor_env :=
+    let '(mkCompData next ctag itag ftag cenv fenv names imap log) := c in
+    cenv.
   
 End CompM.
 

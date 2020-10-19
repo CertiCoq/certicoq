@@ -36,8 +36,8 @@ Instance L6_Lang : Lang L6_FullTerm :=
 Definition default_ctor_tag := 99%positive.
 Definition default_ind_tag := 99%positive.
 (* assigned for the constructor and the type of closures *)
-Definition bogus_closure_tag := 15%positive.
-Definition bogus_cloind_tag := 16%positive.
+Definition clo_tag := 15%positive.
+Definition clo_ind_tag := 16%positive.
 (* tags for functions and continuations *)
 Definition fun_fun_tag := 3%positive.
 Definition kon_fun_tag := 2%positive.
@@ -123,6 +123,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       inl_known       : bool;    (* If true, lambda lifting inlines known calls inside wrappers *)
       inl_before      : bool;    (* Perform shrink/inline loop before closure conversion *)
       inl_after       : bool;    (* Perform shrink/inline loop after closure conversion *)
+      dead_param_elim : bool;    (* Turn it off for the top-level theorm because it does not have a proof yet *)
     }.
 
 
@@ -162,7 +163,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
         let c_data :=
             let '(mkCompData next ctag itag ftag cenv fenv names imap log) := c in
             let cc_var := ((identifiers.max_var e 1) + 1)%positive in (* ΧΧΧ check why this is needed *)
-            pack_data cc_var ctag itag ftag (add_closure_tag bogus_closure_tag bogus_cloind_tag cenv) fenv (add_binders_exp names e) imap log
+            pack_data cc_var ctag itag ftag (add_closure_tag clo_tag clo_ind_tag cenv) fenv (add_binders_exp names e) imap log
         in
         (Ret e, c_data). 
     
@@ -179,14 +180,16 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
               time_anf "Lambda lift" (lambda_lift (args anf_opts) (no_push anf_opts) (inl_wrappers anf_opts)) e
             else id_trans e) ;;
       e <- time_anf "Shrink" shrink_err e;;
-      e <- time_anf "Closure conversion and hoisting" (closure_conversion_hoist bogus_closure_tag) e ;;
+      e <- time_anf "Closure conversion and hoisting" (closure_conversion_hoist clo_tag clo_ind_tag) e ;;
       (* Update the names map. TODO find which transformation does not register all names and remove that. *)
-      e <- update_c_data e ;; 
+      (* e <- update_c_data e ;;  *)
       e <- time_anf "Shrink" shrink_err e;;
       e <- (if inl_after anf_opts then
               time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100) e
             else id_trans e) ;;
-      e <- time_anf "Dead param elim" dead_param_elim.eliminate e ;;
+      e <- (if dead_param_elim anf_opts then
+              time_anf "Dead param elim" dead_param_elim.eliminate e
+            else id_trans e) ;;
       e <- time_anf "Shrink" shrink_err e;;
       e <- (if inl_known anf_opts then
               time_anf "Inline known functions inside wrappers" (inline_lifted next_var 10 1000) e
@@ -212,7 +215,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
         (Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e), log_to_string log)
       end.
     
-(*
+(* The old L6 pipeline. Don't delete yet.
 
     (* Optimizing L6 pipeline *)
     Definition L6_pipeline               
@@ -375,6 +378,7 @@ Definition make_anf_options (opts : Options) : anf_options :=
      inl_known    := inl_known;
      inl_before   := inl_before;
      inl_after    := inl_after;
+     dead_param_elim := true;
   |}.
 
 

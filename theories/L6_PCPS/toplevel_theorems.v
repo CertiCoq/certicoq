@@ -424,7 +424,7 @@ Section Uncurry.
     - inv H. eassumption.
     - eassumption.
     - destructAll. exists x, x0.
-      split. admit. (* ?? *)
+      split. unfold uncurry_top in *. admit. (* uncurry admit *)
       split. eassumption.
       split. eassumption.
       split. split; eassumption. 
@@ -438,7 +438,7 @@ Section Uncurry.
     edestruct uncurry_top_correct. eassumption. eassumption.
     destructAll.
     do 2 eexists. split.
-    admit. (* ?? *)
+    admit. (* uncurry admit *)
     repeat (split; [ eassumption | ]).
     eexists. econstructor. now eauto. eassumption. split.
     eapply simple_bound_compat. eapply simple_bound_post_upper_bound.
@@ -520,9 +520,9 @@ Section Compose.
     
     eapply correct_cc_compose_l.
 
-    eapply correct_time. 
+    eapply correct_time.
     (* eapply uncurry_top_correct_corr. *)
-    admit. (* same kind of admit again ... *)
+    admit. (* uncurry admit *)
 
     eapply correct_cc_compose_l.
 

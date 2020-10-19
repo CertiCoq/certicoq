@@ -100,15 +100,15 @@ Section CompM.
   (* Get the next fresh record tag of a fresh type *)
   Definition make_record_ctor_tag (n : N) : compM' ctor_tag :=
     p <- compM.get ;;
-    let '(mkCompData x c i f e fenv names imap log, st) := p  in
+    let '(mkCompData x c i f cenv fenv names imap log, st) := p  in
     let inf := {| ctor_name := nAnon
                 ; ctor_ind_name := nAnon
                 ; ctor_ind_tag := i
                 ; ctor_arity := n
                 ; ctor_ordinal := 0%N
                 |} : ctor_ty_info in
-    let e' := ((M.set c inf e) : ctor_env) in
-    compM.put (mkCompData x (c+1)%positive (i+1)%positive f e' fenv names imap log, st) ;;
+    let cenv' := ((M.set c inf cenv) : ctor_env) in
+    compM.put (mkCompData x (c+1)%positive (i+1)%positive f cenv' fenv names imap log, st) ;;
     ret c.
 
   (* Register a constructor tag of some type i *)
@@ -156,24 +156,14 @@ Section CompM.
     ret f.
 
   
-  Definition get_inline_map (_ : unit) : compM' (M.tree nat) :=
-    p <- compM.get ;;
-    let '(mkCompData x c i f e fenv names imap log, st) := p in
-    ret imap.
-
-  Definition put_inline_map (imap : M.tree nat) : compM' fun_tag :=
-    p <- compM.get ;;
-    let '(mkCompData x c i f e fenv names _ log, st) := p in
-    compM.put (mkCompData x c i f e fenv names imap log, st) ;;
-    ret f.
-
   Definition run_compM {A} (m: compM' A) (st : comp_data) (s : S)
     : error A * (comp_data * S) := runState m tt (st, s).
 
   Definition pack_data := mkCompData.
-
-  (* Returns the name environment and the log *)
-  Definition get_result (d : comp_data) : name_env * string := (nenv d, log_to_string (log d)).
+  
+  Definition put_inline_map (imap : M.tree nat) (c : comp_data) : comp_data :=
+    let 'mkCompData x c i f cenv fenv names _ log := c in
+    mkCompData x c i f cenv fenv names imap log.
   
 End CompM.
 

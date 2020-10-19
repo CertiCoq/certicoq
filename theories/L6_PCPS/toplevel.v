@@ -203,12 +203,12 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
           let next_fun_tag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) fenv 1 + 1 in
           pack_data next_var ctag itag next_fun_tag cenv fenv nenv (M.empty nat) nil
       in
-      let (res, c'_data) := anf_pipeline e0 c_data in
+      let (res, c_data') := anf_pipeline e0 c_data in
       match res with
       | compM.Err s =>
         (Err ("Failed compiling L6 program: " ++ s)%string, "")
       | compM.Ret e =>
-        let (_, ctag, itag, ftag, cenv, fenv, nenv, _, log) := c_data in
+        let (_, ctag, itag, ftag, cenv, fenv, nenv, _, log) := c_data' in
         (Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e), log_to_string log)
       end.
     

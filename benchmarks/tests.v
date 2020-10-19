@@ -65,13 +65,14 @@ Definition sha := sha256.SHA_256 (sha256.str_to_bytes test).
 
 Definition sha_fast := sha256.SHA_256' (sha256.str_to_bytes test).
 
-
 (* CertiCoq Show IR -time_anf binom. *)
 (* CertiCoq Show IR -time_anf -O 1 -ext "_opt" binom. *)
 (* CertiCoq Show IR -config 2 -direct -time_anf -ext "_inl" vs_easy. *)
 (* CertiCoq Show IR -config 2 -direct -O 1 -time_anf -ext "_opt_no_inl" vs_easy. *)
 
 Eval compute in "Compiling demo1".
+
+CertiCoq Compile -direct -time_anf vs_easy.
 
 CertiCoq Compile -ext "_cps" demo1.
 CertiCoq Compile -direct demo1.

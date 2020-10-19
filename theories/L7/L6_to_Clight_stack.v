@@ -254,7 +254,7 @@ Definition make_ctor_rep (cenv : ctor_env) (ct : ctor_tag) : error ctor_rep :=
     if ((ctor_arity p) =? 0)%N
     then ret (enum (ctor_ordinal p))
     else ret (boxed (ctor_ordinal p) (ctor_arity p))
-  | None => Err "make_ctor_rep: unknown constructor"
+  | None => Err ("make_ctor_rep: unknown constructor with tag " ++ show_pos ct)
   end.
 
 Notation threadStructInf := (Tstruct threadInfIdent noattr).

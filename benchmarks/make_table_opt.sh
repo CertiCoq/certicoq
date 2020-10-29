@@ -10,7 +10,7 @@ N=$1
 
 
 echo "Running CertiCoq programs..."
-printf "      &   ANF   & ANF OPT & SPEEDUP &   CPS   & CPS OPT & SPEEDUP \n"
+printf "      &   ANF   & ANF OPT & SPEEDUP &   CPS   & CPS OPT & SPEEDUP %s \n" "\\\\"
 for f in $FILES
 do
     # Find ANF time    

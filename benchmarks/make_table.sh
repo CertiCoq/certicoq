@@ -34,6 +34,6 @@ do
 
 	ESC='\\'
 	# output latex table
-	printf "{${ESC}tt ${f}} &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  \n" "$timeanf" "$timecps" "$timeocamlopt" "$timeocamlc" "$ratio"
+	printf "{${ESC}tt ${f}} &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  %s \n" "$timeanf" "$timecps" "$timeocamlopt" "$timeocamlc" "$ratio" "\\\\"
     fi
 done

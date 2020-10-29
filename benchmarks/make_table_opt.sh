@@ -28,5 +28,5 @@ do
     
     ESC='\\'
     # output latex table
-    printf "{${ESC}tt ${f}} &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  \n" "$timeanf" "$timeanfopt" "$speedupanf" "$timecps" "$timecpsopt" "$speedupcps"
+    printf "{${ESC}tt ${f}} &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  %s \n" "$timeanf" "$timeanfopt" "$speedupanf" "$timecps" "$timecpsopt" "$speedupcps" "\\\\"
 done

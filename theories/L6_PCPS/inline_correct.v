@@ -1353,7 +1353,7 @@ Section Inline_correct.
           -- eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ].
              omega. normalize_occurs_free. sets.
           -- rewrite preord_val_eq. split. reflexivity.
-             eapply Forall2_Forall2_asym_included. eassumption.
+             eassumption.
           -- intros Hc. eapply Hdis3. constructor. eapply Hf'. eapply Hf1. 
              normalize_occurs_free. eapply image_monotonic; [| eassumption ]. sets.
           -- eapply fun_map_inv_antimon. eapply fun_map_inv_set. eapply fun_map_inv_i_mon. eassumption. omega.

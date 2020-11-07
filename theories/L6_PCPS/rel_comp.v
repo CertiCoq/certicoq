@@ -13,6 +13,7 @@ Close Scope Z_scope.
 Section Types.
   
 Context {fuel trace : Type}.
+Context {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
 
 Definition PostT := @PostT fuel trace.
 Definition PostGT := @PostGT fuel trace.
@@ -61,7 +62,6 @@ Section RelComp.
 
   Context (wf_pres : exp -> exp -> Prop) (post_prop : post_property).
 
-  Context {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
     
   
   Definition preord_exp_n n := R_n wf_pres post_prop
@@ -380,7 +380,6 @@ Section Linking.
     sets. 
   Qed.
 
-  Context {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
 
   Context (P : PostT) (PG : PostGT) (Hpr : Post_properties cenv P P PG).
 
@@ -528,8 +527,6 @@ Section LinkingComp.
           (wf_pres : exp -> exp -> Prop)
           (cenv : ctor_env) (lf : var).
 
-  Context {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
-
   Context (Hpr : forall P PG, Pr P PG -> Post_properties cenv P P PG).
   
    
@@ -643,8 +640,7 @@ Section LinkingCompTop.
           (wf1 wf2 : exp -> Prop)          
           (cenv : ctor_env) (ctag : ctor_tag) (lf : var) (P : PostT) (PG : PostGT).
 
-  Context {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
-    
+   
   Context (* (Hwf : forall e e', wf_pres e e' -> preserves_fv e e') *)
           (Hpr : forall P PG, Pr P PG -> Post_properties cenv P P PG)
           (Hp : Post_properties cenv P P PG).
@@ -771,8 +767,6 @@ Section LinkingFast.
         * eapply Hc1 in H0. inv H0.
   Qed.
   
-
-  Context {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
 
   Context (P : PostT) (PG : PostGT) (Hpr : Post_properties cenv P P PG)
           (Hinl : post_inline cenv P P P)
@@ -911,5 +905,200 @@ Section LinkingFast.
   Qed.
   
 End LinkingFast.
+
+
+(* Formalization of the top-level behavioral refinement *)
+Section Refinement.
+
+  Context (cenv : ctor_env) (ctag : ctor_tag).
+  
+  Fixpoint value_ref' (v1 v2 : val) : Prop:=
+    let fix Forall2_aux vs1 vs2 :=
+        match vs1, vs2 with
+        | [], [] => True
+        | v1 :: vs1, v2 :: vs2 =>
+          value_ref' v1 v2 /\ Forall2_aux vs1 vs2
+        | _, _ => False
+        end 
+    in
+    match v1, v2 with 
+    | Vconstr c1 vs1, Vconstr c2 vs2 =>
+      c1 = c2 /\ Forall2_aux vs1 vs2
+    | Vfun _ _ _, Vfun _ _ _ => True
+    | Vint i1, Vint i2 => i1 = i2
+    | _, _ => False
+    end.
+
+
+  Definition value_ref (v1 v2 : val) : Prop:=
+    match v1, v2 with 
+    | Vconstr c1 vs1, Vconstr c2 vs2 =>
+      c1 = c2 /\ Forall2 value_ref' vs1 vs2
+    | Vfun _ _ _, Vfun _ _ _ => True
+    | Vint i1, Vint i2 => i1 = i2
+    | _, _ => False
+    end.
+
+
+  Fixpoint value_ref_cc' (v1 v2 : val) : Prop:=
+    let fix Forall2_aux vs1 vs2 :=
+        match vs1, vs2 with
+        | [], [] => True
+        | v1 :: vs1, v2 :: vs2 =>
+          value_ref_cc' v1 v2 /\ Forall2_aux vs1 vs2
+        | _, _ => False
+        end 
+    in
+    match v1, v2 with 
+    | Vconstr c1 vs1, Vconstr c2 vs2 =>
+      c1 = c2 /\ Forall2_aux vs1 vs2
+    | Vfun _ _ _, Vconstr c [Vfun _ _ _; env] => True
+    | Vint i1, Vint i2 => i1 = i2
+    | _, _ => False
+    end.
+
+
+  Definition value_ref_cc (v1 v2 : val) : Prop:=
+    match v1, v2 with 
+    | Vconstr c1 vs1, Vconstr c2 vs2 =>
+      c1 = c2 /\ Forall2 value_ref_cc' vs1 vs2
+    | Vfun _ _ _, Vconstr c [Vfun _ _ _; env] => True
+    | Vint i1, Vint i2 => i1 = i2
+    | _, _ => False
+    end.
+
+    
+  Lemma value_ref_eq v1 v2 :
+    value_ref' v1 v2 <-> value_ref v1 v2. 
+  Proof.
+    destruct v1; destruct v2; simpl; try easy.
+    split; intros [H1 H2]; split; eauto.
+    + revert l0 H2. induction l; intros l0 H2; destruct l0; intros; eauto.  
+      now exfalso; eauto.
+      now exfalso; eauto.
+      inv H2. constructor. easy. eauto. 
+    + induction H2; eauto.
+  Qed.
+
+  Lemma value_ref_cc_eq v1 v2 :
+    value_ref_cc' v1 v2 <-> value_ref_cc v1 v2. 
+  Proof.
+    destruct v1; destruct v2; simpl; try easy. 
+    split; intros [H1 H2]; split; eauto. 
+    + revert l0 H2. induction l; intros l0 H2; destruct l0; intros; eauto.  
+      now exfalso; eauto.
+      now exfalso; eauto.
+      inv H2. constructor. easy. eauto. 
+    + induction H2; eauto.
+  Qed.
+
+  (* e2 refines the behavior of e1 *)
+
+  Definition emp := M.empty val. 
+  
+  Definition refines (vref : val -> val -> Prop) (e1 e2 : exp) := 
+    (* Termination *)
+    (forall (v1 : val) (c1 : fuel) (t1 : trace),
+        bstep_fuel cenv emp e1 c1 (Res v1) t1 ->
+        exists (v2 : val) (c2 : fuel) (t2 : trace),
+          bstep_fuel cenv emp e2 c2 (Res v2) t2 /\
+          vref v1 v2) /\
+    (* Divergence *)    
+    diverge cenv emp e1 -> diverge cenv emp e2.
+
+  (* Properties of the value refinement *)
+  Instance value_ref_transitive : Transitive value_ref.
+  Proof.
+    intro x; induction x using val_ind';
+      intros y1 z1; destruct y1; destruct z1; intros; simpl in *; eauto; try contradiction.     
+    - simpl in *. destructAll. inv H2. inv H1. eauto.
+    - destructAll. split; eauto.
+      destruct l0. now inv H2.
+      destruct l1. now inv H1. inv H2; inv H1. constructor; eauto.
+      rewrite value_ref_eq in *. now eapply IHx; eauto.
+
+      specialize (IHx0 (Vconstr c0 l0) (Vconstr c0 l1)). simpl in IHx0.
+      eapply IHx0; eauto.
+    - congruence.
+  Qed.
+
+  Lemma preord_val_in_value_ref PG k v1 v2 :
+    preord_val cenv PG k v1 v2 -> value_ref v1 v2.
+  Proof.
+    rewrite preord_val_eq. 
+    revert v2. induction v1 using val_ind'; intros v2.
+    - intros H. simpl in H. destruct v2; try contradiction. inv H.
+      inv H1. simpl. split; eauto.
+    - intros H. simpl in H. destruct v2; try contradiction. inv H.
+      inv H1. simpl. split; eauto. constructor.
+      rewrite value_ref_eq. eapply IHv1. rewrite <- preord_val_eq. easy.
+      specialize (IHv0 (Vconstr c l')). eapply IHv0.
+      split; eauto.
+    - intros H. destruct v2; eauto.
+      easy.
+    - intros H. destruct v2; eauto.  
+  Qed.   
+
+
+  Lemma cc_approx_val_in_value_ref PG k v1 v2 :
+    cc_approx_val cenv ctag  PG k v1 v2 -> value_ref_cc v1 v2.
+  Proof.
+    rewrite cc_approx_val_eq. 
+    revert v2. induction v1 using val_ind'; intros v2.
+    - intros H. simpl in H. destruct v2; try contradiction. inv H.
+      inv H1. simpl. split; eauto.
+    - intros H. simpl in H. destruct v2; try contradiction. inv H. 
+      inv H1. simpl. split; eauto. constructor.
+      rewrite value_ref_cc_eq. eapply IHv1. rewrite <- cc_approx_val_eq. easy.
+      specialize (IHv0 (Vconstr c l')). eapply IHv0.
+      split; eauto.
+    - intros H. destruct v2; try contradiction.
+      simpl in H. destruct l; try contradiction. destruct v0; try contradiction.
+      destruct l; try contradiction. destruct v1; simpl; try contradiction.
+      destruct l; eauto.
+    - intros H. destruct v2; eauto. 
+  Qed.
+
+  Lemma value_ref_compose_l :
+    forall v1 v2 v3,
+      value_ref v1 v2 -> value_ref_cc v2 v3 -> value_ref_cc v1 v3.
+  Proof.
+    intros v1.
+    induction v1 using val_ind';
+      intros v2 v3; destruct v2; destruct v3; intros; simpl in *; eauto; try contradiction. 
+    - simpl in *. destructAll. inv H2. inv H1. eauto.
+    - destructAll. inv H2. inv H1. split; eauto.
+      constructor. rewrite value_ref_cc_eq in *. rewrite value_ref_eq in *. eapply IHv1.
+      eassumption. eassumption.
+
+      specialize (IHv0 (Vconstr c0 l') (Vconstr c0 l'0)). simpl in IHv0.
+      eapply IHv0; eauto.
+    - congruence. 
+  Qed.
+  
+  Lemma value_ref_compose_r :
+    forall v1 v2 v3,
+      value_ref_cc v1 v2 -> value_ref v2 v3 -> value_ref_cc v1 v3.
+  Proof.
+    intros v1.
+    induction v1 using val_ind';
+      intros v2 v3; destruct v2; destruct v3; intros; simpl in *; eauto; try contradiction. 
+    - simpl in *. destructAll. inv H2. inv H1. eauto.
+    - destructAll. inv H2. inv H1. split; eauto.
+      constructor. rewrite value_ref_cc_eq in *. rewrite value_ref_eq in *. eapply IHv1.
+      eassumption. eassumption.
+
+      specialize (IHv0 (Vconstr c0 l') (Vconstr c0 l'0)). simpl in IHv0.
+      eapply IHv0; eauto.
+    - destruct l. contradiction.
+      destruct v0. contradiction.
+      destruct l. contradiction.
+      destruct l. inv H0. inv H2. inv H5. inv H6.
+      simpl in H3. destruct y. contradiction. easy.
+      contradiction. contradiction. contradiction.
+    - congruence. 
+  Qed.
+
+End Refinement. 
 
 End Types.

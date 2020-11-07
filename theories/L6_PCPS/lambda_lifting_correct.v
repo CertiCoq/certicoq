@@ -1208,7 +1208,7 @@ Section Lambda_lifting_correct.
           eapply preord_env_P_inj_monotonic; [| eassumption]. omega.
           normalize_occurs_free...
           rewrite preord_val_eq. constructor. reflexivity.
-          now apply Forall2_Forall2_asym_included.
+          eassumption. 
           intros Hc. eapply Him. constructor; eauto.
           eapply image_monotonic; [| eassumption ].
           normalize_occurs_free...

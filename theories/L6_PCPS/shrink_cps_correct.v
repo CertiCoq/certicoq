@@ -845,8 +845,7 @@ Section Shrink_correct.
          simpl.
          rewrite occurs_free_Econstr.
          rewrite Setminus_Union_distr. now sets.
-         rewrite preord_val_eq. constructor. reflexivity.
-         apply Forall2_Forall2_asym_included; auto. omega.
+         rewrite preord_val_eq. constructor. reflexivity. eassumption. omega.
     - simpl app_ctx_f.
       rewrite bound_stem_Eproj_c in Hbv.
       eapply preord_exp_proj_compat; eauto.
@@ -1087,7 +1086,7 @@ Section Shrink_correct.
     - eapply preord_env_P_extend.
       eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega.
       normalize_occurs_free; now sets.
-      rewrite preord_val_eq. simpl. split; auto. apply Forall2_Forall2_asym_included; auto.
+      rewrite preord_val_eq. simpl. split; auto.
   Qed.
 
 
@@ -1167,7 +1166,6 @@ Section Shrink_correct.
              eapply preord_env_P_inj_monotonic; [| eassumption ].
              omega. normalize_occurs_free; sets.
           -- rewrite preord_val_eq. simpl; split; eauto.
-             eapply Forall2_Forall2_asym_included. eassumption.
     - (* Ecase nil *)
       simpl; eapply preord_exp_case_nil_compat; eauto; intros.
     - (* Ecase cons *)
@@ -1407,7 +1405,7 @@ Section Shrink_correct.
         normalize_occurs_free. now sets.
         rewrite preord_val_eq.  split; eauto.
         edestruct preord_env_P_get_list_l as [vs2' [Hg2' Hvs]]; [| | eapply Hg1 |]. eassumption.
-        normalize_occurs_free; sets. eapply Forall2_Forall2_asym_included.
+        normalize_occurs_free; sets.
         subst_exp. eapply Forall2_monotonic; [ | eassumption ].
         intros. eapply preord_val_monotonic. eassumption. omega.
   Qed.

@@ -697,7 +697,6 @@ Section Closure_conversion_correct.
             * eapply cc_approx_env_P_extend with (v2 := Vconstr t vs2).
               eapply cc_approx_env_P_antimon; [ eassumption |]...
               rewrite cc_approx_val_eq. constructor; eauto.
-              eapply logical_relations.Forall2_Forall2_asym_included; eauto. (* TODO fix dependency *)
             * now eauto.
             * eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
               eapply occurs_free_Econstr_Included. 

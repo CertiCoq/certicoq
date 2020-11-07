@@ -1641,8 +1641,7 @@ Section uncurry_correct.
           apply Henv.
           inversion Hx1. apply Free_Econstr2; [|assumption].
           intros contra. subst. intuition.
-        * rewrite preord_val_eq. split; [trivial|].
-          now apply Forall2_Forall2_asym_included.
+        * rewrite preord_val_eq. split; [trivial|]. eassumption.
     - (* uncurry_case_expr *)
       eapply preord_exp_case_cons_compat; try eassumption; try easy_post.
       + eapply Hpost_prop.

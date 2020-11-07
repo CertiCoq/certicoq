@@ -40,7 +40,7 @@ Section ToplevelTheorems.
     Post_properties cenv P1 P1 PG /\
     post_upper_bound P1.  
 
-  (** Correctness spec for (composition of) "identity transformations" *)
+  (** Correctness spec for (composition of) "identity" transformations *)
 
   Definition correct (trans :  exp -> comp_data -> error exp * comp_data) := 
     forall e c,
@@ -555,7 +555,7 @@ Section Compose.
     clear. firstorder.
   Qed.
   
-  Theorem and_pipeline_correct opts :
+  Theorem anf_pipeline_correct opts :
     dead_param_elim opts = false -> (* We don't yet have a proof for dead param elim phase, so turn off *)
     correct_cc cenv clo_tag (anf_pipeline opts).
   Proof.

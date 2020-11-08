@@ -266,7 +266,6 @@ Section RelComp.
   
   Lemma R_n_exp_impl P PG (n m : nat) e1 rho1 e2 rho2 :    
     closed_exp e1 ->
-    Pr_implies_post_upper_bound post_prop ->    
     R_n_exp P PG n m e1 e2 ->
       
     forall (v1 : res) cin cout,
@@ -275,7 +274,7 @@ Section RelComp.
         bstep_fuel cenv rho2 e2 cin' v2 cout' /\
         R_n_res PG n m v1 v2.
   Proof.
-    intros Hwfe Himpl Hrel. inv Hrel. destructAll. inv H0. destructAll. 
+    intros Hwfe Hrel. inv Hrel. destructAll. inv H0. destructAll. 
     assert (Hexp1 := H). assert (Hexp2 := H2). intros.
     eapply preord_exp_n_impl in H; [| eassumption | eassumption ]. destructAll. 
     edestruct (H2 (to_nat x2) rho1 rho2); [ | | | eassumption | ].
@@ -536,12 +535,12 @@ Section LinkingComp.
   Definition preserves_closed (e1 e2 : exp) := closed_exp e1 -> closed_exp e2.
 
   Lemma preord_exp_n_preserves_linking_src_l x n e1 e2 e1' :
-    preord_exp_n cenv preserves_closed Pr n e1 e2 ->
+    preord_exp_n cenv preserves_fv Pr n e1 e2 ->
     
     closed_exp e1 ->
     occurs_free e1' \subset [set x] ->
     
-    preord_exp_n cenv preserves_closed Pr n (link lf x e1 e1') (link lf x e2 e1').
+    preord_exp_n cenv preserves_fv Pr n (link lf x e1 e1') (link lf x e2 e1').
   Proof.
     intros Hrel. revert e1'. induction Hrel; intros e1' Hw1 Hfv.
     - assert (Hexp2 :
@@ -563,12 +562,14 @@ Section LinkingComp.
       intros Hc. 
       econstructor. 
       * intros. eapply Hc.
-      * intros Hc1. eapply link_closed; [| eassumption ]. eapply H0. eassumption.
+      * intros x1 Hfv1. eapply link_closed in Hfv1; eauto.
+        inv Hfv1.
+        eapply closed_preserved; eauto.
       * eassumption.
     - econstructor. eapply IHHrel1. eassumption. eassumption.
       eapply IHHrel2.
-      
-      eapply preord_exp_n_wf_pres in Hrel1. eapply Hrel1. eassumption.
+      eapply preord_exp_n_wf_pres in Hrel1.
+      eapply closed_preserved; eauto.
       clear. now firstorder. eassumption.
   Qed.    
 
@@ -578,7 +579,7 @@ Section LinkingComp.
     closed_exp e1 ->
     occurs_free e1' \subset [set x] ->
     
-    preord_exp_n cenv preserves_closed Pr n (link lf x e1 e1') (link lf x e1 e2').
+    preord_exp_n cenv preserves_fv Pr n (link lf x e1 e1') (link lf x e1 e2').
   Proof.
     intros Hrel. revert e1. induction Hrel; intros e1 Hw1 Hfv.
     - assert (Hexp2 :
@@ -600,7 +601,8 @@ Section LinkingComp.
       intros Hc.
       econstructor. 
       * intros. eapply Hc.
-      * intros Hc1. eapply link_closed. eassumption.
+      * intros x1 Hfv1. eapply link_closed in Hfv1; eauto.
+        inv Hfv1.
         eapply Included_trans. eapply H0. eassumption. 
       * eassumption.
     - econstructor. eapply IHHrel1. eassumption. eassumption.
@@ -612,20 +614,20 @@ Section LinkingComp.
   Qed.
   
   Lemma preord_exp_n_preserves_linking x n m e1 e2 e1' e2' :
-    preord_exp_n cenv preserves_closed Pr n e1 e2 ->
+    preord_exp_n cenv preserves_fv Pr n e1 e2 ->
     preord_exp_n cenv preserves_fv Pr m e1' e2' ->
     
     closed_exp e1 ->
     occurs_free e1' \subset [set x] ->
     
-    preord_exp_n cenv preserves_closed Pr (n + m) (link lf x e1 e1') (link lf x e2 e2').
+    preord_exp_n cenv preserves_fv Pr (n + m) (link lf x e1 e1') (link lf x e2 e2').
   Proof.
     intros (* Hp1 Hp2 *) Hrel1 Hrel2 Hc1 Hfv.
     specialize (preord_exp_n_preserves_linking_src_l x n _ _ _ Hrel1 Hc1 Hfv). intros Hr1.
     eapply preord_exp_n_trans. eassumption.
     
     assert (Hc2 : closed_exp e2). {
-      eapply preord_exp_n_wf_pres in Hrel1. eapply Hrel1. eassumption.
+      eapply preord_exp_n_wf_pres in Hrel1. eapply closed_preserved; eauto.
       clear. firstorder. }
 
     eapply preord_exp_n_preserves_linking_src_r. eassumption. eassumption. eassumption.
@@ -657,7 +659,7 @@ Section LinkingCompTop.
   Qed.
   
   Lemma Rel_exp_n_preserves_linking x n1 n2 m1 m2 e1 e2 e1' e2' :    
-    R_n_exp cenv ctag preserves_closed Pr P PG n1 n2 e1 e2 ->
+    R_n_exp cenv ctag preserves_fv Pr P PG n1 n2 e1 e2 ->
     R_n_exp cenv ctag preserves_fv Pr P PG m1 m2 e1' e2' ->
 
     (* e1: source library, e2: compiled library *)
@@ -666,20 +668,21 @@ Section LinkingCompTop.
     closed_exp e1 ->
     occurs_free e1' \subset [set x] ->
     
-    R_n_exp cenv ctag preserves_closed Pr P PG (n1 + m1) (n2 + m2) (link lf x e1 e1') (link lf x e2 e2').
+    R_n_exp cenv ctag preserves_fv Pr P PG (n1 + m1) (n2 + m2) (link lf x e1 e1') (link lf x e2 e2').
   Proof.
     
     intros Hrel1 Hrel2 Hc1 Hfv. inv Hrel1. inv Hrel2. destructAll. inv H1. inv H2. destructAll.  
     
     assert (Hc2 : closed_exp x0). {
-      eapply preord_exp_n_wf_pres in H. eapply H in Hc1. eassumption. clear. now firstorder. }
+      eapply preord_exp_n_wf_pres in H.
+      eapply closed_preserved; eauto. clear. now firstorder. }
     assert (Hfv2 : occurs_free x1 \subset [set x]).
     { eapply preord_exp_n_wf_pres in H0. eapply Included_trans. eapply H0; eauto. eassumption.
       clear. now firstorder. }
     assert (Hc3 : closed_exp x3).
-    { eapply H1. eassumption. }
+    { eapply closed_preserved; eauto. }
     assert (Hfv3 : occurs_free x3 \subset [set x]).
-    { eapply Included_trans. eapply H1. eassumption. sets. }
+    { eapply Included_trans. eapply Hc3. sets. }
     assert (Hfv3' : occurs_free x2 \subset [set x]).
     { eapply Included_trans. eapply H3. eassumption. }
 
@@ -690,8 +693,9 @@ Section LinkingCompTop.
     
     eexists. split. split.
     2:{ intros. eapply cc_approx_exp_preserves_linking.
-        2:{ intros. eapply H4. intros z Hin. eapply preord_exp_n_wf_pres in H. eapply H in Hin. inv Hin.
-            eassumption. clear; now firstorder.
+        2:{ intros. eapply H4. intros z Hin. eapply preord_exp_n_wf_pres in H. eapply H in Hin.
+            eapply Hc1 in Hin. now inv Hc1.
+            clear; now firstorder.
             intros z Hin. eapply Hc2 in Hin. inv Hin. }
 
         eassumption.
@@ -699,9 +703,11 @@ Section LinkingCompTop.
         intros. eapply H6. intros z Hin. eapply H9. eapply Hfv2. eassumption.
         eapply binding_in_map_antimon. eassumption. eassumption. }
 
-    intros Hc. eapply link_closed. eassumption.
-    eapply Included_trans. eapply H3. eassumption.
 
+    intros z1 Hfv1. eapply link_closed in Hfv1; eauto.
+    inv Hfv1.
+
+    
     eapply preord_exp_n_preserves_linking; eassumption.
   Qed.
 
@@ -1004,9 +1010,10 @@ Section Refinement.
           bstep_fuel cenv emp e2 c2 (Res v2) t2 /\
           vref v1 v2) /\
     (* Divergence *)    
-    diverge cenv emp e1 -> diverge cenv emp e2.
+    (diverge cenv emp e1 -> diverge cenv emp e2).
 
   (* Properties of the value refinement *)
+  
   Instance value_ref_transitive : Transitive value_ref.
   Proof.
     intro x; induction x using val_ind';
@@ -1099,6 +1106,132 @@ Section Refinement.
     - congruence. 
   Qed.
 
+  Lemma preord_res_n_in_value_ref n v1 v2 :
+    preord_res_n cenv n (Res v1) (Res v2) ->
+    value_ref v1 v2.
+  Proof.
+    assert (Heq1 : Res v1 = Res v1) by reflexivity.
+    assert (Heq2 : Res v2 = Res v2) by reflexivity.
+    revert Heq1 Heq2. generalize (Res v1) at 1 3 as r1. generalize (Res v2) at 1 3 as r2. 
+    intros. revert v1 v2 Heq1 Heq2. induction H.
+    - intros; subst. eapply preord_val_in_value_ref with (k := 0). eapply H.
+    - intros. subst. destruct c'.
+
+      + exfalso. eapply preord_res_n_OOT_r. eassumption.
+
+      + eapply value_ref_transitive. now eapply IHR_n1; eauto. now eapply IHR_n2; eauto.
+  Qed.
+
+  
+  Lemma R_n_res_in_value_ref PG n m v1 v2 :
+    R_n_res cenv ctag PG n m (Res v1) (Res v2) ->
+    value_ref_cc v1 v2.
+  Proof.
+    assert (Heq1 : Res v1 = Res v1) by reflexivity.
+    assert (Heq2 : Res v2 = Res v2) by reflexivity.
+    revert Heq1 Heq2. generalize (Res v1) at 1 3 as r1. generalize (Res v2) at 1 3 as r2. 
+    intros. revert v1 v2 Heq1 Heq2. induction H.
+    - intros; subst. destructAll. inv H0. destructAll.
+      destruct x.
+      + exfalso. eapply preord_res_n_OOT_r. eassumption.
+      + destruct x0.
+        * exfalso. eapply preord_res_n_OOT_l. eassumption.
+        * eapply value_ref_compose_l. eapply preord_res_n_in_value_ref. eassumption.
+          eapply value_ref_compose_r.
+          eapply cc_approx_val_in_value_ref. eapply (H0 0).
+          eapply preord_res_n_in_value_ref. eassumption.
+  Qed.
+
+  
+  (* Composition for value refinement *)
+  
+  Lemma refines_compose (r1 r2 r3 : val -> val -> Prop) e1 e2 e3 :
+    (forall v1 v2 v3, r1 v1 v2 -> r2 v2 v3 -> r3 v1 v3) ->
+    refines r1 e1 e2 ->
+    refines r2 e2 e3 ->
+    refines r3 e1 e3.
+  Proof.
+    intros Hv [Hterm Hdiv] [Hterm' Hdiv'].
+    split; [| now eauto ].
+    intros v1 c1 t1 Hstep. 
+    edestruct Hterm. eassumption. destructAll.
+    edestruct Hterm'. eassumption. destructAll.
+    do 3 eexists. split. eassumption. eauto. 
+  Qed.
+  
+  Instance refines_transitive (rel : val -> val -> Prop) { _ : Transitive rel } : Transitive (refines rel).
+  Proof.
+    intros x y z H1 H2. eapply refines_compose; eauto.
+  Qed.
+
+
+  Lemma refines_compose_l e1 e2 e3 :
+    refines value_ref e1 e2 ->
+    refines value_ref_cc e2 e3 ->
+    refines value_ref_cc e1 e3.
+  Proof.
+    intros. eapply refines_compose; eauto.
+    eapply value_ref_compose_l.
+  Qed.
+
+  Lemma refines_compose_r e1 e2 e3 :
+    refines value_ref_cc e1 e2 ->
+    refines value_ref e2 e3 ->
+    refines value_ref_cc e1 e3.
+  Proof.
+    intros. eapply refines_compose; eauto.
+    eapply value_ref_compose_r.
+  Qed.
+
+
+
+  Lemma R_n_res_OOT_r PG n m v :
+    ~ R_n_res cenv ctag PG n m (Res v) OOT.
+  Proof.
+    intros Hc. inv Hc. destructAll. inv H0. destructAll.
+    destruct x. eapply preord_res_n_OOT_r in H; eauto.
+    specialize (H0 0). destruct x0; try contradiction.
+    eapply preord_res_n_OOT_r; eauto.
+  Qed.
+  
+
+  Lemma R_n_res_OOT_l PG n m v :
+    ~ R_n_res cenv ctag PG n m OOT (Res v).
+  Proof.
+    intros Hc. inv Hc. destructAll. inv H0. destructAll.
+    destruct x0. now eapply preord_res_n_OOT_l; eauto.
+    specialize (H0 0). destruct x; try contradiction.
+    eapply preord_res_n_OOT_l; eauto.
+  Qed.
+  
+  
+  (* Transitive logical relations imply behavioral refinement *)
+
+  Context (wf_pres : exp -> exp -> Prop)
+          (PostProp : post_property)
+
+          (Hwf : forall e1 e2, wf_pres e1 e2 -> preserves_fv e1 e2)
+          (Hwf_trans : Transitive wf_pres)
+          (Hub : Pr_implies_post_upper_bound PostProp).
+
+  
+  Lemma R_n_exp_in_refines P PG (HP : post_upper_bound P) n m e1 e2 :
+    closed_exp e1 ->
+    R_n_exp cenv ctag wf_pres PostProp P PG n m e1 e2 ->
+    refines value_ref_cc e1 e2.
+  Proof.
+    intros Hc1 Hexp. split.
+    - intros. edestruct R_n_exp_impl; try eassumption.
+      intros. now eapply closed_preserved; eauto.
+
+      destructAll. destruct x. exfalso. eapply R_n_res_OOT_r. eassumption.
+      do 3 eexists. split. eassumption. eapply R_n_res_in_value_ref. eassumption.
+
+    - intros.
+      eapply R_n_exp_preserves_divergence; try eassumption.
+      intros. now eapply closed_preserved; eauto.
+  Qed.
+  
 End Refinement. 
 
 End Types.

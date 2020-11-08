@@ -195,8 +195,8 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
               time_anf "Inline known functions inside wrappers" (inline_lifted next_var 10 1000) e
             else id_trans e) ;;
       ret e. 
-    
-    
+
+
     Definition run_anf_pipeline (t : L6_FullTerm) : error L6_FullTerm * string :=
       let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
       (* make compilation state *)

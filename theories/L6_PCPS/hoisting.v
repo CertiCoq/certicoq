@@ -918,7 +918,6 @@ Section Hoisting_correct.
              eapply preord_env_P_monotonic; [| eassumption ]. omega. 
              normalize_occurs_free. sets.
           -- rewrite preord_val_eq. constructor; eauto.
-             eapply Forall2_Forall2_asym_included. eassumption.
         * eapply funs_inv_env_set. eassumption.
           eapply Disjoint_In_l. eapply Disjoint_sym. eassumption.
           normalize_bound_var; sets.

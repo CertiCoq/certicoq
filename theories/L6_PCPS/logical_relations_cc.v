@@ -54,7 +54,7 @@ Section LogRelCC.
     let fix cc_approx_val_aux (v1 v2 : val) {struct v1} : Prop :=
         let fix Forall2_aux vs1 vs2 :=
             match vs1, vs2 with
-              | [], _ => True
+              | [], [] => True
               | v1 :: vs1, v2 :: vs2 =>
                 cc_approx_val_aux v1 v2 /\ Forall2_aux vs1 vs2
               | _, _ => False
@@ -62,7 +62,7 @@ Section LogRelCC.
         in
         match v1, v2 with
           | Vfun rho1 defs1 f1,
-            Vconstr tag ((Vfun rho2 defs2 f2) ::  (Vconstr tag' fvs) :: l)  =>
+            Vconstr tag ((Vfun rho2 defs2 f2) ::  (Vconstr tag' fvs) :: [])  =>
             tag = clo_tag /\
             forall (vs1 vs2 : list val) (j : nat) (t : fun_tag) 
               (xs1 : list var) (e1 : exp) (rho1' : env),
@@ -94,7 +94,7 @@ Section LogRelCC.
   Definition cc_approx_val' (k : nat) (P : PostGT) (v1 v2 : val) : Prop :=
     match v1, v2 with
       | Vfun rho1 defs1 f1,
-        Vconstr tag ((Vfun rho2 defs2 f2) ::  (Vconstr tag' fvs) :: l) =>
+        Vconstr tag ((Vfun rho2 defs2 f2) ::  (Vconstr tag' fvs) :: []) =>
         tag = clo_tag /\
         forall (vs1 vs2 : list val) (j : nat) (t : fun_tag) 
           (xs1 : list var) (e1 : exp) (rho1' : env),
@@ -108,7 +108,7 @@ Section LogRelCC.
             (j < k -> Forall2 (cc_approx_val j P) vs1 vs2 ->
              cc_approx_exp' cc_approx_val j P P (e1, rho1') (e2, rho2'))
       | Vconstr t1 vs1, Vconstr t2 vs2 =>
-        t1 = t2 /\ Forall2_asym (cc_approx_val k P) vs1 vs2
+        t1 = t2 /\ Forall2 (cc_approx_val k P) vs1 vs2
       | Vint n1, Vint n2 => n1 = n2
       | _, _ => False
     end.
@@ -259,6 +259,7 @@ Section LogRelCC.
     intros v2 P1 P2 Hval Hin; rewrite cc_approx_val_eq in *;
     destruct v2; try contradiction. 
     - destruct Hval as [Heq Hall]; subst; simpl; eauto.
+      inv Hall. split; eauto.
     - destruct Hval as [Heq Hall]; subst; simpl; eauto.
       inv Hall. split; eauto. constructor; eauto.
       assert
@@ -270,7 +271,9 @@ Section LogRelCC.
     - destruct l; try contradiction.
       destruct v0; try contradiction.
       destruct l; try contradiction.
-      destruct v1; try contradiction. destruct Hval as [Heq Hval]; subst; split; eauto.
+      destruct v1; try contradiction.
+      destruct l; try contradiction.
+      destruct Hval as [Heq Hval]; subst; split; eauto.
       intros vs1 vs2 i t1 xs1 e1 rho1' Hlen Hdef Hset.
       edestruct Hval as [Gamma [xs2 [e2 [rho2' [Hdef' [Hset' Hi]]]]]]; eauto.
       do 4 eexists; repeat split; eauto. intros Hlt Hall.
@@ -490,6 +493,7 @@ Section LogRelCC.
       now split; eauto.
     - destruct l; try contradiction. destruct v0; try contradiction. 
       destruct l; try contradiction. destruct v1; try contradiction. 
+      destruct l; try contradiction.
       destruct Hpre as [Heq1 Hpre]; subst; split; eauto.
       intros vs1 vs2 j t1' xs e1 rho1' Hlen Hf' Heq.
       edestruct Hpre as [Γ [xs2 [e2 [rho2' [H1 [H2 H3]]]]]]; eauto.
@@ -674,7 +678,7 @@ Section LogRelCC.
 
       rewrite to_nat_add in *. assert (Hg := to_nat_one (exp_to_fin (Eproj x c n y1 e1))). unfold one in *.
       
-      edestruct (Forall2_asym_nthN (cc_approx_val k PG) vs l) as [v2 [Hnth Hval]]; eauto.
+      edestruct (Forall2_nthN (cc_approx_val k PG) vs l) as [v2 [Hnth Hval]]; eauto.
       edestruct Hexp as [v2' [cin' [cout' [Hstep [HS Hval']]]]];
         [| | | | eassumption | ]; eauto.
       now eapply nthN_In; eauto. omega.
@@ -719,7 +723,10 @@ Section LogRelCC.
         destruct v'; rewrite cc_approx_val_eq in Hpre; simpl in Hpre; try contradiction.
         destruct l as [| ? [|] ]; try contradiction;
         destruct v0; try contradiction;
-        destruct v2; try contradiction. destruct Hpre as [Heq Hpre]; subst.
+          destruct v2; try contradiction.
+        destruct l; try contradiction;
+        
+        destruct Hpre as [Heq Hpre]; subst.
         edestruct cc_approx_var_env_get_list as [vs' [Hgetl2 Hvall]]; eauto.
 
         rewrite !to_nat_add in *. assert (Hg := to_nat_one (exp_to_fin (Eletapp x f1 t xs1 e1))). unfold one in *.        
@@ -761,7 +768,7 @@ Section LogRelCC.
       + edestruct Henv as [v' [Hget Hpre]]; eauto.
         destruct v'; rewrite cc_approx_val_eq in Hpre; simpl in Hpre; try contradiction.
         destruct l as [| [] [|] ]; try contradiction.
-        destruct v0; try contradiction. destruct Hpre as [HEq Hpre].
+        destruct v0; try contradiction. destruct l; try contradiction. destruct Hpre as [HEq Hpre].
         edestruct cc_approx_var_env_get_list as [vs' [Hgetl2 Hvall]]; eauto.  
         edestruct Hpre with (j := k - 1) as [G [xs2' [e2' [rho2' [Hfdef [Hseteq Hcc]]]]]].
         eapply Forall2_length. eassumption. eassumption. now eauto.
@@ -819,6 +826,7 @@ Section LogRelCC.
         destruct v; try contradiction.
         destruct v0; try contradiction. 
       edestruct cc_approx_var_env_get_list as [vs' [Hgetl2 Hvall]]; eauto. 
+      destruct l; try contradiction.
       destruct Hpre as [Heq Hpre]; subst. 
       edestruct Hpre with (j := k - 1) as [G [xs2' [e2' [rho2'' [Hfdef [Hseteq Hcc]]]]]]; try eassumption.
       eapply Forall2_length. eassumption. now eauto. 
@@ -1206,7 +1214,7 @@ Section LogRelCC.
     rewrite cc_approx_val_eq, preord_val_eq in *.
     - destruct v2; try contradiction.
       destruct v3; try contradiction.
-      inv Hpre'; inv Happrox. split; eauto.
+      inv Happrox; inv Hpre'. inv H1; inv H2. split; eauto.
     - destruct v2; try contradiction.
       destruct v3; try contradiction.
       destruct l0; [now inv Happrox; inv H1 |].
@@ -1230,7 +1238,9 @@ Section LogRelCC.
       inversion Hpre' as [Hleq Hall]. clear Hpre'. inv Hall.
       rewrite preord_val_eq in H2. inv H4.
       rewrite preord_val_eq in H3.
-      destruct y, y0; try contradiction. simpl. destruct Happrox as [Heq1 Happrox]; subst. split; eauto.
+      destruct y, y0; try contradiction. simpl.
+      destruct l; try contradiction. 
+      destruct Happrox as [Heq1 Happrox]; subst. inv H6. split; eauto.
       intros vs1 vs2 j t1' xs1 e1 rho1 Heq1 Hfind1 Hset1.
       edestruct (Happrox vs1 vs2) as [Γ [xs2 [e2 [rho2' [Hfind2 [Hset2 Heval2]]]]]]; eauto.
       subst.
@@ -1255,7 +1265,7 @@ Section LogRelCC.
         rewrite <- Hset3 in Hset3'. inv Hset3'.
         eapply preord_exp_post_monotonic; [| eapply Heval3' ].
         intros ? ? ?. eauto.
-        omega. inv H8. constructor.
+        omega. inv H7. constructor.
         eapply preord_val_monotonic. eassumption. omega.
         eapply List_util.Forall2_refl. eapply preord_val_refl; eauto.
       + eauto.
@@ -1305,7 +1315,7 @@ Section LogRelCC.
       simpl in Happrox'.
       destruct v1; try contradiction.
       destruct l. now inv Happrox'.
-      destruct v2; try contradiction. destruct Happrox' as [Heq Happrox']. subst.
+      destruct v2; try contradiction.
 (*        
       intros vs1 vs2 i t2 xs1 e1 rho1 Hleneq Hfdef Hset. 
       simpl in Hpre'. 

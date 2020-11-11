@@ -79,7 +79,7 @@ Section Log_rel.
       let fix preord_val_aux (v1 v2 : val) {struct v1} : Prop :=
           let fix Forall2_aux vs1 vs2 :=
               match vs1, vs2 with
-                | [], _ => True
+                | [], [] => True
                 | v1 :: vs1, v2 :: vs2 =>
                   preord_val_aux v1 v2 /\ Forall2_aux vs1 vs2
                 | _, _ => False
@@ -125,7 +125,7 @@ Section Log_rel.
               (j < k -> Forall2 (preord_val PostG j) vs1 vs2 ->
                preord_exp' preord_val PostG PostG j (e1, rho1') (e2, rho2'))
       | Vconstr t1 vs1, Vconstr t2 vs2 =>
-        t1 = t2 /\ Forall2_asym (preord_val PostG k) vs1 vs2
+        t1 = t2 /\ Forall2 (preord_val PostG k) vs1 vs2
       | Vint n1, Vint n2 => n1 = n2
       | _, _ => False
     end.
@@ -427,7 +427,7 @@ Section Log_rel.
   
   Lemma preord_val_constr k t vl x :
     preord_val PostG k (cps.Vconstr t vl) x  ->
-    exists vl', x = cps.Vconstr t vl' /\ Forall2_asym (preord_val PostG k) vl vl'.
+    exists vl', x = cps.Vconstr t vl' /\ Forall2 (preord_val PostG k) vl vl'.
   Proof.
     intros H. eapply preord_val_eq in H. 
     destruct x; try contradiction. destruct H as [Heq Hall]; eauto. subst.
@@ -789,7 +789,7 @@ Section Log_rel.
         rewrite to_nat_add in Hleq1.
         assert (Hg := to_nat_one (exp_to_fin (Eproj x c n y1 e1))). 
         
-        edestruct (Forall2_asym_nthN (preord_val PG k) vs l) as [v2 [Hnth Hval]];
+        edestruct (Forall2_nthN (preord_val PG k) vs l) as [v2 [Hnth Hval]];
           try eassumption.
         edestruct (Hexp  (k - 1)) as [v2' [cin' [cout' [Hstep [Hpost Hval']]]]];
           [ | | | eassumption | ]; eauto.
@@ -1482,7 +1482,7 @@ Section Log_rel.
           eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ].
           omega.
           now (normalize_occurs_free; eauto with Ensembles_DB). 
-          rewrite preord_val_eq. constructor; eauto using Forall2_Forall2_asym_included.
+          rewrite preord_val_eq. constructor; eauto.
       - eapply preord_exp_case_nil_compat. now eauto.
       - eapply preord_exp_case_cons_compat; eauto.
         now apply Forall2_refl.
@@ -1781,7 +1781,7 @@ Section Log_rel.
           eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]. omega.
           simpl. normalize_occurs_free.  sets.
 
-          rewrite preord_val_eq. simpl; split; eauto using Forall2_Forall2_asym_included.
+          rewrite preord_val_eq. simpl; split; eauto.
           
     - simpl. eapply preord_exp_proj_compat; eauto.
       + eapply Hpre. constructor; eauto.
@@ -1958,12 +1958,12 @@ Section Log_rel.
     Proof.
       revert v1 v2 v3.
       induction k using lt_wf_rec1.
-      intros x; induction x using val_ind'; simpl; eauto;
-        intros v1 v2;
-        try (now  intros H1 H2; specialize (H2 k); rewrite !preord_val_eq in *;
-             destruct v1; destruct v2; 
-             try (now simpl in *; contradiction); inv H1; inv H2; simpl; eauto).
-      - intros H1 H2. assert (H2' := H2 k); rewrite !preord_val_eq in *.
+      intros x; induction x using val_ind'; simpl; eauto.
+      - intros v1 v2 H1 H2; specialize (H2 k); rewrite !preord_val_eq in *.
+        destruct v1; destruct v2; 
+          try (now simpl in *; contradiction); inv H1; inv H2; simpl; eauto.
+        inv H3; inv H1. eauto.
+      - intros v1 v2 H1 H2. assert (H2' := H2 k); rewrite !preord_val_eq in *.
         destruct v1; destruct v2; try (now simpl in *; contradiction).
         destruct H1 as [H1 H1']. destruct H2' as [H3 H3']. subst.
         destruct l0; try inv H1'; try inv H3'. split; eauto. 
@@ -1979,7 +1979,7 @@ Section Log_rel.
             specialize (H2 m). rewrite !preord_val_eq in H2.
             split; eauto. inv H2. now inv H1. }
           rewrite !preord_val_eq in Hsuf. now inv Hsuf.
-      - intros H1 H2. assert (H2' := H2 k); rewrite !preord_val_eq in *.
+      - intros v1 v2 H1 H2. assert (H2' := H2 k); rewrite !preord_val_eq in *.
         destruct v1; destruct v2; try (now simpl in *; contradiction).
         intros vs1 vs3 j t1' xs1 e1 rho1' Hlen Hf' Hs. 
         edestruct (H1 vs1 vs3) as [xs2 [e2 [rho2 [Hf2 [Hs2 Hpre2]]]]]; eauto.
@@ -1999,7 +1999,10 @@ Section Log_rel.
         rewrite Hf3 in Hf3'. inv Hf3'. rewrite <- Hs3 in Hs3'. inv Hs3'.
         eapply preord_exp_post_monotonic; [| eapply Hpre3'; eauto ].
         intros c1 c2 HG. eapply Hp2; now eauto. omega. 
-        eapply Forall2_refl. eapply preord_val_refl; eauto. 
+        eapply Forall2_refl. eapply preord_val_refl; eauto.
+      - intros v1 v2 H1 H2; specialize (H2 k); rewrite !preord_val_eq in *.
+        destruct v1; destruct v2; 
+          try (now simpl in *; contradiction); inv H1; inv H2; simpl; eauto.
     Qed.
 
 

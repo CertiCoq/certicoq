@@ -40,7 +40,7 @@ Section ToplevelTheorems.
     Post_properties cenv P1 P1 PG /\
     post_upper_bound P1.  
 
-  (** Correctness spec for (composition of) "identity transformations" *)
+  (** Correctness spec for (composition of) "identity" transformations *)
 
   Definition correct (trans :  exp -> comp_data -> error exp * comp_data) := 
     forall e c,
@@ -555,7 +555,7 @@ Section Compose.
     clear. firstorder.
   Qed.
   
-  Theorem and_pipeline_correct opts :
+  Theorem anf_pipeline_correct opts :
     dead_param_elim opts = false -> (* We don't yet have a proof for dead param elim phase, so turn off *)
     correct_cc cenv clo_tag (anf_pipeline opts).
   Proof.
@@ -623,4 +623,97 @@ Section Compose.
     now eapply correct_id_trans.
   Qed.
 
+
+
+  (* Top-level correctness for whole programs *)
+  Corollary anf_pipeline_whole_program_correct opts e c :
+    dead_param_elim opts = false -> (* We don't yet have a proof for dead param elim phase, so turn off *)
+
+    closed_exp e ->
+    
+    well_scoped e ->
+    (max_var e 1 < state.next_var c)%positive ->
+    
+    exists (e' : exp) (c' : state.comp_data),     
+      anf_pipeline opts e c = (Ret e', c') /\
+
+      refines cenv value_ref_cc e e'. 
+  Proof.
+    intros.
+    edestruct anf_pipeline_correct; eauto. destructAll.
+    do 2 eexists.
+
+    split. eassumption.
+
+    eapply R_n_exp_in_refines; eauto.
+
+    clear; now firstorder.
+    clear; now firstorder.
+    eapply simple_bound_post_upper_bound.
+  Qed. 
+
+
+  Lemma preord_exp_n_wf_mon wf1 wf2 p k e1 e2 :
+    inclusion _ wf1 wf2 ->
+    preord_exp_n cenv wf1 p k e1 e2 ->
+    preord_exp_n cenv wf2 p k e1 e2. 
+  Proof.
+    intros H1 H2. induction H2; eauto.
+    now econstructor 1; eauto.
+    now econstructor 2; eauto.
+  Qed.
+
+  Lemma R_n_exp_wf_mon ctag wf1 wf2 p P PG k m e1 e2 :
+    inclusion _ wf1 wf2 ->
+    R_n_exp cenv ctag wf1 p P PG k m e1 e2 ->
+    R_n_exp cenv ctag wf2 p P PG k m e1 e2. 
+  Proof.
+    intros H1 H2. inv H2. inv H. inv H2. destructAll.
+    eexists. split. now eapply preord_exp_n_wf_mon.
+    eexists. split; eauto. now eapply preord_exp_n_wf_mon.
+  Qed.
+  
+
+  (* Top-level correctness for linking *)
+  Corollary anf_pipeline_linking_correct lf x o1 o2 e1 e2 c1 c2 :
+    dead_param_elim o1 = false -> dead_param_elim o2 = false -> (* We don't yet have a proof for dead param elim phase, so turn off *)
+
+    closed_exp e1 ->
+    well_scoped e1 ->
+    (max_var e1 1 < state.next_var c1)%positive ->
+
+    occurs_free e2 \subset [set x] ->
+    well_scoped e2 ->
+    (max_var e2 1 < state.next_var c2)%positive ->
+    
+    exists (e1' e2' : exp) (c1' c2' : state.comp_data),     
+      anf_pipeline o1 e1 c1 = (Ret e1', c1') /\
+      anf_pipeline o2 e2 c2 = (Ret e2', c2') /\
+
+      refines cenv value_ref_cc (link lf x e1 e2) (link lf x e1' e2'). 
+  Proof.
+    intros.
+    edestruct anf_pipeline_correct with (e := e1) (opts := o1); eauto. destructAll.
+    edestruct anf_pipeline_correct with (e := e2) (opts := o2); eauto. destructAll.
+    
+    do 4 eexists.
+    
+    split. eassumption.
+    split. eassumption.
+
+    eapply R_n_exp_in_refines.
+    
+    6:{ eapply Rel_exp_n_preserves_linking; eauto.
+        - intros. eapply H15.
+        - eapply simple_bound_compat. }
+
+    now eauto.
+    clear; now firstorder.
+    clear; now firstorder.
+    eapply simple_bound_post_upper_bound.
+
+    eapply link_closed; eauto.
+  Qed. 
+
+  
 End Compose.

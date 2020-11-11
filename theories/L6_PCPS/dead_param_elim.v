@@ -22,7 +22,21 @@ Definition live_fun : Type :=  M.t (list bool).
 
 Definition get_fun_vars (m : live_fun) (f : var) := M.get f m. 
 
-Definition set_fun_vars (m : live_fun) (f : var) (b : list bool) := M.set f b m. 
+Definition set_fun_vars (m : live_fun) (f : var) (b : list bool) :=
+  match b with
+  | [] => m
+  | _ => M.set f b m
+  end. 
+
+(* Apply bit mask to argument list*)
+Fixpoint live_args (ys : list var) (bs : list bool) : list var := 
+  match ys, bs with 
+  | [], [] => ys
+  | y :: ys', b :: bs' => 
+    if b then y :: (live_args ys' bs')
+    else live_args ys' bs'
+  | _, _ => ys
+  end. 
 
 (* Get list of list of bools corresponding to fundefs *)
 Fixpoint get_bool_false {A} (ys : list A) : list bool := 
@@ -58,19 +72,15 @@ Fixpoint add_escapings (L : live_fun) (fs : list var) : live_fun :=
 
 
 (* IDENTIFYING ESCAPING FUNCTIONS *)
+
 Fixpoint escaping_fun_exp (e : exp) (L : live_fun) := 
 match e with 
 | Eapp f t ys => add_escapings L ys
 | Econstr x t ys e' => escaping_fun_exp e' (add_escapings L ys)
 | Eproj x t n y e' => escaping_fun_exp e' (add_escaping L y)
 | Eletapp x f ft ys e' => escaping_fun_exp e' (add_escapings L ys)
-| Ecase x P => 
-  (fix mapM_LD (l : list (ctor_tag * exp)) (L : live_fun) := 
-     match l with 
-     | [] => L
-     | (c', e') :: l' =>
-       let L' := escaping_fun_exp e' L in mapM_LD l' L'
-     end) P L
+| Ecase x P =>
+  fold_left (fun L '(c', e') => escaping_fun_exp e' L) P L
 | Ehalt x => add_escaping L x
 | Efun fl e' => escaping_fun_exp e' (escaping_fun_fundefs fl L)
 | Eprim x fs ys e' => escaping_fun_exp e' (add_escapings L ys)
@@ -85,26 +95,19 @@ with escaping_fun_fundefs (B : fundefs) (L : live_fun) :=
 
 (* LIVE PARAMETER ANALYSIS *)
 
-Definition add_list (xs : list var) (s : PS.t)  :=
-  fold_left (fun s x => PS.add x s) xs s.
-
 Definition add_fun_vars (L : live_fun) (f : var) (xs : list var) (S : PS.t) : PS.t :=
-  let fix aux xs (bs : list bool) S :=
-      match xs, bs with
-      | [], _ | _, [] => S
-      | x :: xs, b :: bs =>
-        if b then aux xs bs (PS.add x S) else aux xs bs S
-      end in
   match get_fun_vars L f with
-  | Some bs => aux xs bs S
-  | None => add_list xs S
+  | Some bs =>
+    let xs' := live_args xs bs in
+    union_list S xs'
+  | None => union_list S xs
   end.
 
 (* Returns a set that's an underapproximation of the live vars in e *) 
 Fixpoint live_expr (L : live_fun) (e : exp) (S : PS.t) : PS.t := 
 match e with 
 | Econstr x t ys e' => 
-  live_expr L e' (add_list ys S)
+  live_expr L e' (union_list S ys)
 | Eproj x t m y e' =>
   live_expr L e' (PS.add y S)
 | Eletapp x f ft ys e' =>
@@ -112,20 +115,13 @@ match e with
   let S'' := add_fun_vars L f ys S' in
   live_expr L e' S''
 | Ecase x P =>
-  let S' := PS.add x S in
-  (fix mapM_LD  (S: PS.t) (l : list (ctor_tag * exp)) : PS.t := 
-     match l with 
-     | [] => S
-     | (c', e') :: l'=>
-       let S' := live_expr L e' S in
-       mapM_LD S' l'
-     end) S' P
+  PS.add x (fold_left (fun S '(c', e') => live_expr L e' S) P S)
 | Ehalt x => PS.add x S 
 | Eapp f t ys =>  
   let S' := PS.add f S in
-  add_fun_vars L f ys S
+  add_fun_vars L f ys S'
 | Efun fl e' => S (* Should not happen, assuming hoisted program *)
-| Eprim x f ys e' => live_expr L e' (add_list ys S)
+| Eprim x f ys e' => live_expr L e' (union_list S ys)
 end.
 
 Definition update_live_fun (L : live_fun) (f : var) (xs : list var) (S : PS.t) : option (live_fun * bool):=
@@ -140,7 +136,8 @@ Definition update_live_fun (L : live_fun) (f : var) (xs : list var) (S : PS.t) :
           ((b' || b) :: bs', (negb (eqb b b') || d))
         end in
     let (bs, diff) := update_bs xs bs in
-    Some (set_fun_vars L f bs, diff)
+    if diff then Some (set_fun_vars L f bs, diff)
+    else  Some (L, diff)
   | None => None
   end.
 
@@ -189,15 +186,6 @@ Fixpoint find_live (e : exp) : option live_fun :=
   end. 
 
 (* ELIMINATING VARIABLES *)
-
-Fixpoint live_args (ys : list var) (bs : list bool) : list var := 
-match ys, bs with 
-| [], [] => ys
-| y :: ys', b :: bs' => 
-  if (eqb b true) then y :: (live_args ys' bs')
-  else live_args ys' bs'
-| _, _ => ys
-end. 
 
 Definition is_nil {A} (l : list A) : bool :=
   match l with

@@ -124,18 +124,21 @@ match e with
 | Eprim x f ys e' => live_expr L e' (union_list S ys)
 end.
 
+Fixpoint update_bs (S : PS.t) xs (bs : list bool) : (list bool * bool) :=
+  match xs, bs with
+  | [], _ | _, [] => (bs, false)
+  | x :: xs, b :: bs =>
+    let (bs', d) := update_bs S xs bs in
+    if b then (b :: bs', d) (* if the bit is on don't change it *)
+    else
+      let b' := PS.mem x S in
+      (b' :: bs', (negb (eqb b b') || d))
+  end.
+
 Definition update_live_fun (L : live_fun) (f : var) (xs : list var) (S : PS.t) : option (live_fun * bool):=
   match get_fun_vars L f with
   | Some bs =>
-    let fix update_bs xs bs : (list bool * bool) :=
-        match xs, bs with
-        | [], _ | _, [] => ([], false)
-        | x :: xs, b :: bs =>
-          let (bs', d) := update_bs xs bs in
-          let b' := PS.mem x S in
-          ((b' || b) :: bs', (negb (eqb b b') || d))
-        end in
-    let (bs, diff) := update_bs xs bs in
+    let (bs, diff) := update_bs S xs bs in
     if diff then Some (set_fun_vars L f bs, diff)
     else  Some (L, diff)
   | None => None

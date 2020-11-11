@@ -36,7 +36,7 @@ Fixpoint dead_args (ys : list var) (bs : list bool) : list var :=
   | y :: ys', b :: bs' => 
     if b then (dead_args ys' bs')
     else y :: dead_args ys' bs'
-| _, _ => ys
+| _, _ => []
 end. 
 
 Inductive Dead (S : Ensemble var) (L : live_fun) : exp -> Prop :=
@@ -118,70 +118,45 @@ Proof.
 Qed.
 
 Lemma update_live_fun_false L L' f xs S :
-  live_fun_args L f xs ->
   update_live_fun L f xs S = Some (L', false) ->
   exists bs,
     get_fun_vars L f = Some bs /\
     L = L' /\ Disjoint _ (FromSet S) (FromList (dead_args xs bs)).
 Proof.
-  intros Hlive Hl.
+  intros Hl.
   unfold update_live_fun in Hl.
   destruct (get_fun_vars L f) eqn:Hf; try congruence.
   eexists.
   split. reflexivity. 
-  destruct Hlive. destructAll.
-  unfold get_fun_vars in *. subst_exp.
-  destruct ((fix update_bs (xs : list PS.elt) (bs : list bool) {struct xs} :
-               list bool * bool :=
-               match xs with
-               | [] => ([], false)
-               | x :: xs0 =>
-                 match bs with
-                 | [] => ([], false)
-                 | b :: bs0 =>
-                   let (bs', d) := update_bs xs0 bs0 in
-                   (PS.mem x S || b :: bs', negb (eqb b (PS.mem x S)) || d)
-                 end
-               end) xs l) as [bs diff] eqn:Hupd.
+  unfold get_fun_vars in *.
+  destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
   inv Hl.
-  destruct diff. congruence. inv H2.
-  assert (Hsuff : bs = l /\ Disjoint positive (FromSet S) (FromList (dead_args xs l))).
-  { clear H. revert l bs Hupd H0.
-    induction xs; intros l bs Hupd Heq.
-    - inv Hupd.
-      destruct l; inv Heq; eauto.
-      split; eauto. simpl. normalize_sets. sets.
-    - destruct l. now inv Heq. 
-      simpl in *.
-      destruct ((fix update_bs (xs : list PS.elt) (bs : list bool) {struct xs} :
-                   list bool * bool :=
-                   match xs with
-                   | [] => ([], false)
-                   | x :: xs0 =>
-                     match bs with
-                   | [] => ([], false)
-                   | b :: bs0 =>
-                     let (bs', d) := update_bs xs0 bs0 in
-                     (PS.mem x S || b :: bs',
-                      negb (eqb b (PS.mem x S)) || d)
-                     end
-                   end) xs l) as [bs' diff] eqn:Hrec.
+  destruct diff. congruence. inv H0. 
+  assert (Hsuff : Disjoint positive (FromSet S) (FromList (dead_args xs l))).
+  { clear Hf. revert l bs Hupd.
+    induction xs; intros l bs Hupd.
+    - inv Hupd. 
+      destruct bs; eauto; simpl; normalize_sets; sets.
+    - destruct l.
+      { simpl. normalize_sets; sets. } 
+      simpl in *. 
+      destruct (update_bs S xs l) as [bs' diff] eqn:Hrec.
       inv Hupd.
-      eapply orb_false_iff in H1. inv H1. 
-      eapply negb_false_iff in H. 
-      eapply (eqb_true_iff b) in H. subst.
-      inv Heq. specialize (IHxs l bs' Hrec H0). 
-      destructAll.
-      rewrite orb_diag. split. reflexivity.
-      
-      destruct (PS.mem a S) eqn:Hmem. eassumption.
-      normalize_sets. eapply Union_Disjoint_r; [| eassumption ].  
-      eapply Disjoint_Singleton_r. 
-      intros Hc. eapply FromSet_sound in Hc; [| reflexivity ].
-      eapply PS.mem_spec in Hc. congruence. }
+      destruct b.
+      + inv H0. eauto.
+      + inv H0.
+        eapply orb_false_iff in H2. inv H2.
+        destruct (PS.mem a S) eqn:Hmem. now inv H. clear H.
+        specialize (IHxs l bs' Hrec). 
+        normalize_sets. eapply Union_Disjoint_r; [| eassumption ].  
+        eapply Disjoint_Singleton_r. 
+        intros Hc. eapply FromSet_sound in Hc; [| reflexivity ].
+        eapply PS.mem_spec in Hc. congruence. }
   split. reflexivity.
-  inv Hsuff. eassumption.
+  eassumption.
 Qed.
+
+
 
 
 (* Lemma live_expr_monotonic L e Q1 Q2 : *)
@@ -334,18 +309,16 @@ Qed.
       
 Lemma live_correct L L' B :
   no_fun_defs B -> (* no nested functions in B *)
-  live_fun_fundefs L B -> (* arity in map is consistent *)
   live B L false = Some (L', false) -> 
   L = L' /\ live_map_sound B L.
 Proof.
-  revert L L'; induction B; simpl; intros L L' Hnf Hlive Hl.
+  revert L L'; induction B; simpl; intros L L' Hnf Hl.
   - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [[L'' b] | ] eqn:Heq.
     2:{ congruence. }
     
     assert (Hd := live_diff _ _ _ _ Hl). destruct b; inv Hd.
     simpl in *. 
     edestruct update_live_fun_false; try eassumption.
-    eapply Hlive.  now left. 
     destructAll.
     eapply IHB in Hl. inv Hl.
     split. reflexivity.
@@ -355,8 +328,166 @@ Proof.
         eassumption. 
       - eapply H2. eassumption. eassumption. } 
     inv Hnf. eassumption.
-    intro; intros. 
-    eapply Hlive. now right; eauto. 
   - inv Hl. split; eauto.
     intro; intros. inv H.
 Qed. 
+
+
+(* Proof that a fixpoint is reached in n steps *)
+
+Fixpoint bitsize (bs : list bool) :=
+  match bs with
+  | [] => 0
+  | b :: bs => if b then 1 + bitsize bs else bitsize bs
+  end.
+  
+Definition map_size (L : live_fun) :=
+  fold_left (fun s '(_, bs) => s + bitsize bs) (M.elements L) 0.
+
+
+Lemma update_bs_bitsize_leq S xs bs bs' diff :
+  update_bs S xs bs = (bs', diff) ->
+  bitsize bs <= bitsize bs'.
+Proof.
+  revert S bs bs' diff. induction xs; simpl; intros S bs bs' diff Hupd.
+  - inv Hupd. reflexivity.
+  - destruct bs.
+    + inv Hupd. reflexivity.
+    + destruct (update_bs S xs bs) as [bs'' d] eqn:Hupd'.
+      destruct b.
+      * inv Hupd. simpl. eapply IHxs in Hupd'. omega.
+      * inv Hupd. eapply IHxs in Hupd'. simpl. 
+        destruct (PS.mem a S); omega.
+Qed.       
+
+Lemma update_bs_bitsize S xs bs bs' :
+  update_bs S xs bs = (bs', true) ->
+  bitsize bs < bitsize bs'.
+Proof.
+  revert S bs bs'. induction xs; simpl; intros S bs bs' Hupd.
+  - inv Hupd.
+  - destruct bs.
+    + inv Hupd.
+    + destruct (update_bs S xs bs) as [bs'' d] eqn:Hupd'.
+      destruct b.
+      * inv Hupd. simpl. eapply IHxs in Hupd'. omega.
+      * inv Hupd. simpl. 
+        destruct (PS.mem a S).
+        -- eapply update_bs_bitsize_leq in Hupd'. omega.
+        -- simpl in H1. subst. eapply IHxs. eassumption.
+Qed.
+
+Lemma update_bs_length S xs bs bs' diff :
+  update_bs S xs bs = (bs', diff) ->
+  length bs = length bs'.
+Proof.
+  revert S bs bs' diff. induction xs; simpl; intros S bs bs' diff Hupd.
+  - inv Hupd. reflexivity.
+  - destruct bs.
+    + inv Hupd. reflexivity.
+    + destruct (update_bs S xs bs) as [bs'' d] eqn:Hupd'.
+      destruct b.
+      * inv Hupd. simpl. eapply IHxs in Hupd'. omega.
+      * inv Hupd. simpl.
+        eapply IHxs in Hupd'. congruence.
+Qed.
+
+
+Lemma set_fun_vars_map_size L f l bs :
+  L ! f = Some l ->
+  length l = length bs ->
+  map_size L + bitsize bs =  map_size (set_fun_vars L f bs) + bitsize l.
+Proof.
+  intros Heq Hlen. unfold set_fun_vars.
+  destruct bs.
+  { destruct l; inv Hlen. reflexivity. }
+
+  revert Hlen. generalize (b :: bs). clear b bs. intros bs Hlen.
+  unfold map_size.
+  edestruct elements_set_some. eassumption.
+  destructAll.
+  rewrite H, H0.
+  rewrite !fold_left_app. simpl.
+  rewrite <- (plus_O_n (fold_left _ _ _ + bitsize l)).
+  rewrite <- (plus_O_n (fold_left _ x 0 + bitsize bs)).
+  erewrite !List_util.fold_left_acc_plus. simpl. omega.
+
+  intros ? ? [? ? ]. omega.
+  intros ? ? [? ? ]. omega.
+Qed.
+
+  
+Lemma update_live_fun_size_leq L L' b f xs S :
+  update_live_fun L f xs S = Some (L', b) ->
+  map_size L <= map_size L'.
+Proof.
+  intros Hl.
+  unfold update_live_fun in Hl.
+  destruct (get_fun_vars L f) eqn:Hf; try congruence.
+  unfold get_fun_vars in *.
+  destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
+  destruct diff.
+  
+  - inv Hl. assert (Hupd' := Hupd). eapply update_bs_bitsize in Hupd.
+    eapply set_fun_vars_map_size with (bs := bs) in Hf. omega.
+    eapply update_bs_length. eassumption.
+  - inv Hl. reflexivity.
+Qed.
+
+Lemma update_live_fun_size L L' f xs S :
+  update_live_fun L f xs S = Some (L', true) ->
+  map_size L < map_size L'.
+Proof.
+  intros Hl.
+  unfold update_live_fun in Hl.
+  destruct (get_fun_vars L f) eqn:Hf; try congruence.
+  unfold get_fun_vars in *.
+  destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
+  destruct diff.
+  
+  - inv Hl. assert (Hupd' := Hupd). eapply update_bs_bitsize in Hupd.
+    eapply set_fun_vars_map_size with (bs := bs) in Hf. omega.
+    eapply update_bs_length. eassumption.
+  - inv Hl.
+Qed.
+
+
+Lemma live_size_leq L L' d d' B :
+  live B L d = Some (L', d') ->
+  map_size L <= map_size L'.
+Proof.
+  revert L L' d d'; induction B; simpl; intros L L' d d' Hl; subst.
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [[L'' b] | ] eqn:Heq.
+    2:{ congruence. }
+    destruct b; simpl in *.
+    + eapply le_trans.
+      eapply update_live_fun_size_leq. 
+      eassumption.
+      eapply IHB. eassumption.
+    + edestruct update_live_fun_false. 
+      eassumption. destructAll. 
+      eapply IHB. eassumption.
+  - inv Hl. reflexivity.
+Qed. 
+
+
+Lemma live_size L L' B :
+  live B L false = Some (L', true) ->
+  map_size L < map_size L'.
+Proof.
+  assert (Heq : false = false) by reflexivity. revert Heq. generalize false at 1 3. 
+  revert L L'; induction B; simpl; intros L L' d Heq Hl; subst.
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [[L'' b] | ] eqn:Heq.
+    2:{ congruence. }
+    destruct b; simpl in *.
+    + eapply lt_le_trans.
+      eapply update_live_fun_size. eassumption.
+      eapply live_size_leq. 
+      eassumption.
+    + edestruct update_live_fun_false. 
+      eassumption. destructAll. 
+      eapply IHB. reflexivity. eassumption.
+  - inv Hl. 
+Qed. 
+
+

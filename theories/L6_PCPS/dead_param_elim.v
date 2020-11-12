@@ -59,7 +59,7 @@ Fixpoint init_live_fun_aux (m : live_fun) (B : fundefs) : live_fun :=
 end. 
 
 
-Definition get_live_initial (B : fundefs) : live_fun := init_live_fun_aux (M.empty _) B.
+Definition init_live_fun (B : fundefs) : live_fun := init_live_fun_aux (M.empty _) B.
 
 Definition add_escaping (L : live_fun) (f : var) : live_fun :=
   match get_fun_vars L f with
@@ -67,7 +67,7 @@ Definition add_escaping (L : live_fun) (f : var) : live_fun :=
   | None => L
   end.
 
-Fixpoint add_escapings (L : live_fun) (fs : list var) : live_fun :=
+Definition add_escapings (L : live_fun) (fs : list var) : live_fun :=
   fold_left add_escaping fs L.
 
 
@@ -181,9 +181,10 @@ end.
 Fixpoint find_live (e : exp) : option live_fun := 
   match e with 
   | Efun B e' =>
-    let initial_L := get_live_initial B in
+    let initial_L := init_live_fun B in
+    (* Mark all variables of escaping function as live *)
     let L' := escaping_fun_exp e' (escaping_fun_fundefs B initial_L) in
-    let n := num_vars B 0 in
+    let n := num_vars B 0 + 1 in
     find_live_helper B L' n
   | _ => Some (M.empty _)
   end. 

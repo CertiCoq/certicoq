@@ -99,7 +99,7 @@ Definition live_map_sound (B : fundefs) (L : live_fun) :=
 Definition live_fun_args (L : live_fun) (f : var) (xs : list var) :=
   exists bs, L ! f = Some bs /\ length xs = length bs. 
 
-Definition live_fun_fundefs (L : live_fun) (B : fundefs) :=
+Definition live_fun_consistent (L : live_fun) (B : fundefs) :=
   forall f ft xs e,
     fun_in_fundefs B (f, ft, xs, e) ->
     live_fun_args L f xs.
@@ -344,6 +344,9 @@ Fixpoint bitsize (bs : list bool) :=
 Definition map_size (L : live_fun) :=
   fold_left (fun s '(_, bs) => s + bitsize bs) (M.elements L) 0.
 
+Definition max_map_size (L : live_fun) :=
+  fold_left (fun s '(_, bs) => s + length bs) (M.elements L) 0.
+
 
 Lemma update_bs_bitsize_leq S xs bs bs' diff :
   update_bs S xs bs = (bs', diff) ->
@@ -491,3 +494,279 @@ Proof.
 Qed. 
 
 
+Lemma find_live_helper_size B L n L' :
+  no_fun_defs B -> 
+  find_live_helper B L n = Some L' ->
+  (* either a fixpoint is reached *)
+  live_map_sound B L' \/ 
+  (* or the distance between L and L' is at least n *)
+  map_size L + n <= map_size L'.
+Proof.
+  revert B L L'. induction n; intros.
+  - inv H0. right. omega.
+  - simpl in H0.
+    destruct (live B L false) as [[L1 diff] | ]  eqn:Hlive; [| congruence ].
+    
+    destruct diff.
+
+    + eapply IHn in H0; eauto. inv H0. now left.
+      right.
+
+      eapply live_size in Hlive. omega.
+
+    + inv H0. eapply live_correct in Hlive; eauto.
+      destructAll. now left.
+Qed. 
+
+
+(* Lemmas about max_size *)
+
+Lemma bitsize_leq bs :
+  bitsize bs <= Datatypes.length bs.
+Proof.
+  induction bs; simpl; eauto. destruct a; omega.
+Qed.
+  
+Lemma max_map_size_leq L :
+  map_size L <= max_map_size L.
+Proof.
+  unfold map_size, max_map_size.
+  eapply List_util.fold_left_monotonic; eauto.
+  intros. destruct x2. simpl.
+  assert (Hleq := bitsize_leq l). 
+  omega.
+Qed.
+
+
+      
+Lemma max_map_size_empty :
+  max_map_size (M.empty (list bool)) = 0.
+Proof. reflexivity. Qed.
+
+(* Proofs that max_max_size is preserved during liveness analysis *)
+
+Lemma set_fun_vars_max_size L f l bs :
+  L ! f = Some l ->
+  length l = length bs ->
+  max_map_size (set_fun_vars L f bs) = max_map_size L.
+Proof.
+  intros Heq Hlen. unfold set_fun_vars.
+  destruct bs.
+  { destruct l; inv Hlen. reflexivity. }
+  
+  revert Hlen. generalize (b :: bs). clear b bs. intros bs Hlen.
+  unfold map_size, max_map_size.
+  edestruct elements_set_some. eassumption.
+  destructAll.
+  rewrite H, H0.
+  rewrite !fold_left_app. simpl.
+  
+  rewrite <- (plus_O_n (fold_left _ _ _ + length bs)).
+  rewrite <- (plus_O_n (fold_left _ _ _  + length l)).
+  erewrite !List_util.fold_left_acc_plus. simpl. congruence.
+
+  intros ? ? [? ? ]. omega.
+  intros ? ? [? ? ]. omega.
+Qed.
+
+
+Lemma update_live_fun_max_size L L' b f xs S :
+  update_live_fun L f xs S = Some (L', b) ->
+  max_map_size L' = max_map_size L.
+Proof.
+  intros Hl.
+  unfold update_live_fun in Hl.
+  destruct (get_fun_vars L f) eqn:Hf; try congruence.
+  unfold get_fun_vars in *.
+  destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
+  destruct diff.
+  
+  - inv Hl.  eapply update_bs_length in Hupd.
+    assert (Hupd' := Hupd).
+    eapply set_fun_vars_max_size. eassumption. eassumption.
+
+  - inv Hl. reflexivity.
+Qed.
+
+
+Lemma live_max_size L L' d d' B :
+  live B L d = Some (L', d') ->
+  max_map_size L' = max_map_size L.
+Proof.
+  revert L L' d d'; induction B; simpl; intros L L' d d' Hl; subst.
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [[L'' b] | ] eqn:Heq.
+    2:{ congruence. }
+    
+    eapply IHB in Hl. eapply update_live_fun_max_size in Heq. congruence.
+  - inv Hl. reflexivity. 
+Qed. 
+
+
+Lemma find_live_helper_max_size B L n L' :
+  no_fun_defs B -> 
+  find_live_helper B L n = Some L' ->
+  max_map_size L' = max_map_size L.
+Proof.
+  revert B L L'. induction n; intros.
+  - inv H0. reflexivity.
+  - simpl in H0.
+    destruct (live B L false) as [[L1 diff] | ]  eqn:Hlive; [| congruence ].
+    
+    destruct diff.
+
+    + eapply IHn in H0; eauto. eapply live_max_size in Hlive.
+      congruence.
+
+    + inv H0.
+      eapply live_max_size in Hlive. omega.
+Qed. 
+
+Lemma set_fun_vars_max_size_None L f bs :
+  L ! f = None ->
+  max_map_size (set_fun_vars L f bs) = max_map_size L + length bs.
+Proof.
+  intros Heq. unfold set_fun_vars.
+  destruct bs.
+  { simpl. omega. }
+  
+  generalize (b :: bs). clear b bs. intros bs.
+  unfold map_size, max_map_size.
+  edestruct elements_set_none. eassumption.
+  destructAll.
+  rewrite H, H0.
+  rewrite !fold_left_app. simpl.
+  
+  rewrite <- (plus_O_n (fold_left _ _ _ + length bs)).
+  rewrite <- (plus_O_n (fold_left _ x 0)).
+  erewrite !List_util.fold_left_acc_plus. simpl. omega.
+  intros ? ? [? ? ]. omega.
+  intros ? ? [? ? ]. omega.
+Qed.
+
+Lemma get_bool_false_length {A} (l : list A) :
+  length (get_bool_false l) = length l. 
+Proof.
+  induction l; simpl; eauto.
+Qed.
+
+Lemma get_bool_true_length {A} (l : list A) :
+  length (get_bool_true l) = length l. 
+Proof.
+  induction l; simpl; eauto.
+Qed.
+
+Lemma num_vars_acc B m n :
+  num_vars B (n + m) = num_vars B n + m.
+Proof.
+  revert m n. induction B; intros; simpl; eauto.
+
+  rewrite <- plus_assoc. rewrite (plus_comm m). rewrite plus_assoc.
+  rewrite IHB. omega.
+Qed. 
+  
+
+Lemma init_live_fun_aux_max_size L B L' m :
+  Disjoint _ (Dom_map L) (name_in_fundefs B) ->
+  unique_functions B ->
+  init_live_fun_aux L B = L' ->  
+  max_map_size L' + m = max_map_size L + num_vars B m.
+Proof.
+  revert L L' m; induction B; simpl; intros L L' m Hdis Hun Hinit.
+  - eapply IHB in Hinit. 
+    + rewrite Hinit. rewrite set_fun_vars_max_size_None.
+      rewrite get_bool_false_length, num_vars_acc. omega.
+      
+      destruct (L ! v) eqn:Heq; eauto. exfalso. eapply Hdis.
+      constructor; eauto. eexists; eauto.
+
+    + unfold set_fun_vars. destruct (get_bool_false l). now sets.
+      rewrite Dom_map_set. inv Hun. sets. 
+
+    + inv Hun. sets.
+
+  - congruence.
+Qed.
+
+
+Lemma init_live_fun_max_size L B :
+  unique_functions B ->
+  init_live_fun B = L ->  
+  max_map_size L = num_vars B 0.
+Proof.
+  intros.
+  eapply init_live_fun_aux_max_size in H0; eauto.
+  rewrite max_map_size_empty in H0. simpl in H0. rewrite <- H0. omega.
+
+  rewrite Dom_map_empty. sets.
+Qed.
+
+Lemma add_escaping_max_size L x :
+  max_map_size L = max_map_size (add_escaping L x).
+Proof.
+  unfold add_escaping. destruct (get_fun_vars L x) eqn:Hget; subst; eauto.
+
+  erewrite set_fun_vars_max_size. reflexivity. eassumption.
+
+  rewrite get_bool_true_length. reflexivity.
+Qed. 
+
+Lemma add_escapings_max_size L x :
+  max_map_size L = max_map_size (add_escapings L x).
+Proof.
+  revert L; induction x; simpl; intros L; subst; eauto.
+  erewrite <- IHx.
+  erewrite add_escaping_max_size; reflexivity.
+Qed.
+
+
+Lemma escaping_fun_fundefs_max_size_mut :  
+  (forall e L,
+      max_map_size L = max_map_size (escaping_fun_exp e L)) /\
+  (forall B L,
+      max_map_size L = max_map_size (escaping_fun_fundefs B L)). 
+Proof.
+  exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto;
+    try (now rewrite <- IHe; eapply add_escapings_max_size);
+    try (now rewrite <- IHe; eapply add_escaping_max_size).
+  - simpl in IHl.
+    rewrite <- IHl, <- IHe. reflexivity.
+  - simpl in *.
+    rewrite <- IHe, <- IHB. reflexivity.
+  - eapply add_escapings_max_size.
+  - eapply add_escaping_max_size.
+  - simpl in *.
+    rewrite <- IHB, <- IHe. reflexivity.
+Qed. 
+
+Lemma escaping_fun_exp_max_size :  
+  (forall e L,
+      max_map_size L = max_map_size (escaping_fun_exp e L)).
+Proof. eapply escaping_fun_fundefs_max_size_mut. Qed.
+
+Lemma escaping_fun_fundefs_max_size :  
+  (forall B L,
+      max_map_size L = max_map_size (escaping_fun_fundefs B L)).
+Proof. eapply escaping_fun_fundefs_max_size_mut. Qed.
+
+
+Lemma find_live_sound (B : fundefs) (e : exp) L :
+  no_fun_defs B -> (* no nested fundefs *)
+  unique_functions B -> (* unique bindings *)
+  find_live (Efun B e) = Some L ->
+  live_map_sound B L.
+Proof.
+  intros Hnf Hun Hl. unfold find_live in *.
+  assert (Hl' := Hl).
+  
+  eapply find_live_helper_size in Hl; eauto.
+  inv Hl; eauto.
+  eapply find_live_helper_max_size in Hl'; eauto.
+
+  rewrite <- escaping_fun_exp_max_size, <- escaping_fun_fundefs_max_size in Hl'.
+  
+  erewrite init_live_fun_max_size  with (L := init_live_fun _) in Hl'; eauto.
+
+  assert (Hleq := max_map_size_leq L). omega.
+Qed.
+  
+  

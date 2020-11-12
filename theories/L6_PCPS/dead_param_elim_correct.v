@@ -80,13 +80,15 @@ Inductive Dead (S : Ensemble var) (L : live_fun) : exp -> Prop :=
     forall (x f : var) (ys : list var) (ft : fun_tag) (e : exp),
       ~ f \in S ->
       Disjoint _ (FromList ys) S -> 
-      L ! f = None -> 
+      L ! f = None ->
+      Dead S L e ->          
       Dead S L (Eletapp x f ft ys e)
 | Live_LetApp_Known :
     forall (x f : var) (ys : list var) (ft : fun_tag) (e : exp) (bs : list bool),
       L ! f = Some bs ->
       ~ f \in S ->
       Disjoint _ S (FromList (live_args ys bs)) ->      
+      Dead S L e ->          
       Dead S L (Eletapp x f ft ys e). 
   
   
@@ -271,6 +273,7 @@ Proof.
         eapply Included_trans; [| eapply live_expr_subset ].
         unfold add_fun_vars, get_fun_vars. rewrite Heq.
         rewrite FromSet_union_list.  sets.
+      * eapply IHe; eauto.
     + eapply Live_LetApp_Unknown; eauto.
       * intros Hc. eapply Hdis. constructor; eauto.
         eapply live_expr_subset.
@@ -700,52 +703,62 @@ Proof.
   rewrite Dom_map_empty. sets.
 Qed.
 
-Lemma add_escaping_max_size L x :
-  max_map_size L = max_map_size (add_escaping L x).
+Lemma remove_escaping_max_size L x :
+  max_map_size (remove_escaping L x) <= max_map_size L.
 Proof.
-  unfold add_escaping. destruct (get_fun_vars L x) eqn:Hget; subst; eauto.
+  unfold remove_escaping. destruct (get_fun_vars L x) eqn:Hget; subst; eauto.
 
-  erewrite set_fun_vars_max_size. reflexivity. eassumption.
+  unfold max_map_size.
+  edestruct cps.M.elements_remove. eassumption. 
+  destructAll. rewrite H, H0.
+  rewrite !fold_left_app. simpl.
+  
+  rewrite <- (plus_O_n (fold_left _ x0 0)).
+  erewrite !List_util.fold_left_acc_plus. simpl. omega.
+  intros ? ? [? ? ]. omega.
+  intros ? ? [? ? ]. omega.
+  intros ? ? [? ? ]. omega.  
+Qed.
 
-  rewrite get_bool_true_length. reflexivity.
-Qed. 
 
-Lemma add_escapings_max_size L x :
-  max_map_size L = max_map_size (add_escapings L x).
+Lemma remove_escapings_max_size L x :
+  max_map_size (remove_escapings L x) <= max_map_size L.
 Proof.
   revert L; induction x; simpl; intros L; subst; eauto.
-  erewrite <- IHx.
-  erewrite add_escaping_max_size; reflexivity.
+  specialize (IHx (remove_escaping L a)).
+  assert (Hleq := remove_escaping_max_size L a). omega.
 Qed.
 
 
 Lemma escaping_fun_fundefs_max_size_mut :  
   (forall e L,
-      max_map_size L = max_map_size (escaping_fun_exp e L)) /\
+      max_map_size (escaping_fun_exp e L) <= max_map_size L) /\
   (forall B L,
-      max_map_size L = max_map_size (escaping_fun_fundefs B L)). 
+      max_map_size (escaping_fun_fundefs B L) <= max_map_size L). 
 Proof.
   exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto;
-    try (now rewrite <- IHe; eapply add_escapings_max_size);
-    try (now rewrite <- IHe; eapply add_escaping_max_size).
+    try (now eapply le_trans; [ eapply IHe | eapply remove_escapings_max_size ]);
+    try (now eapply le_trans; [ eapply IHe | eapply remove_escaping_max_size ]). 
+  - eapply remove_escaping_max_size. 
   - simpl in IHl.
-    rewrite <- IHl, <- IHe. reflexivity.
+    eapply le_trans; [| eapply remove_escaping_max_size ].
+    eapply le_trans; [| eapply IHl ]. eapply IHe.
   - simpl in *.
-    rewrite <- IHe, <- IHB. reflexivity.
-  - eapply add_escapings_max_size.
-  - eapply add_escaping_max_size.
+    eapply le_trans. eapply IHe. eapply IHB.
+  - eapply remove_escapings_max_size.
+  - eapply remove_escaping_max_size.
   - simpl in *.
-    rewrite <- IHB, <- IHe. reflexivity.
+    eapply le_trans. eapply IHB. eapply IHe.
 Qed. 
 
 Lemma escaping_fun_exp_max_size :  
   (forall e L,
-      max_map_size L = max_map_size (escaping_fun_exp e L)).
+      max_map_size (escaping_fun_exp e L) <= max_map_size L).
 Proof. eapply escaping_fun_fundefs_max_size_mut. Qed.
 
 Lemma escaping_fun_fundefs_max_size :  
   (forall B L,
-      max_map_size L = max_map_size (escaping_fun_fundefs B L)).
+      max_map_size (escaping_fun_fundefs B L) <= max_map_size L).
 Proof. eapply escaping_fun_fundefs_max_size_mut. Qed.
 
 
@@ -762,11 +775,207 @@ Proof.
   inv Hl; eauto.
   eapply find_live_helper_max_size in Hl'; eauto.
 
-  rewrite <- escaping_fun_exp_max_size, <- escaping_fun_fundefs_max_size in Hl'.
+  assert (Hleq1 := escaping_fun_fundefs_max_size B (init_live_fun B)).
+  assert (Hleq2 := escaping_fun_exp_max_size e (escaping_fun_fundefs B (init_live_fun B))).
   
-  erewrite init_live_fun_max_size  with (L := init_live_fun _) in Hl'; eauto.
-
+  erewrite init_live_fun_max_size  with (L := init_live_fun _) in *; eauto.
+  
   assert (Hleq := max_map_size_leq L). omega.
 Qed.
   
   
+(* Domain of live_fun is preserved *)
+
+
+Lemma update_live_fun_dom L L' f xs S d :
+  update_live_fun L f xs S = Some (L', d) ->
+  Dom_map L <--> Dom_map L'.
+Proof.
+  intros Hl.
+  unfold update_live_fun in Hl.
+  destruct (get_fun_vars L f) eqn:Hf; try congruence.
+  unfold get_fun_vars in *.
+  destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
+  destruct diff.
+  
+  - inv Hl. unfold set_fun_vars. destruct bs. reflexivity.
+    rewrite Dom_map_set. rewrite (Union_Same_set [set f] (Dom_map L)). reflexivity.
+    eapply Singleton_Included. eexists; eauto.
+    
+  - inv Hl. reflexivity. 
+Qed.
+
+
+Lemma live_dom L L' d d' B :
+  live B L d = Some (L', d') ->
+  Dom_map L <--> Dom_map L'.
+Proof.
+  revert L L' d d'; induction B; simpl; intros L L' d d' Hl; subst.
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [[L'' b] | ] eqn:Heq.
+    2:{ congruence. }
+    destruct b; simpl in *.
+    + eapply IHB in Hl. rewrite <- Hl.
+      eapply update_live_fun_dom. eassumption.
+    + edestruct update_live_fun_false. 
+      eassumption. destructAll. 
+      eapply IHB. eassumption.
+  - inv Hl. reflexivity.
+Qed. 
+
+Lemma find_live_dom B L n L' :
+  find_live_helper B L n = Some L' ->
+  Dom_map L <--> Dom_map L'.
+Proof.
+  revert B L L'. induction n; intros.
+  - inv H. reflexivity.
+  - simpl in H.
+    destruct (live B L false) as [[L1 diff] | ]  eqn:Hlive; [| congruence ].
+    
+    destruct diff.
+
+    + eapply live_dom in Hlive.
+      rewrite Hlive. eauto.
+
+    + inv H.
+      eapply live_dom. eassumption.
+Qed. 
+  
+
+Lemma init_live_fun_aux_dom L B L' :
+  init_live_fun_aux L B = L' ->  
+  Dom_map L' \subset name_in_fundefs B :|: Dom_map L.
+Proof.
+  revert L L'; induction B; simpl; intros L L' Hinit.
+  - rewrite IHB; eauto.
+    unfold set_fun_vars. destruct l; simpl. sets.
+    rewrite Dom_map_set. sets.
+  - subst. sets.
+Qed.
+
+
+
+Inductive Known_exp (S : Ensemble var) : exp -> Prop :=
+| Known_Constr : 
+    forall (x : var) (ys : list var) (ct : ctor_tag) (e : exp), 
+      Disjoint _ (FromList ys) S -> 
+      Known_exp S e ->
+      Known_exp S (Econstr x ct ys e)
+| Known_Prim : 
+  forall (x : var) (g : prim) (ys : list var) (e : exp), 
+    Disjoint _ (FromList ys) S -> 
+    Known_exp S e ->
+    Known_exp S (Eprim x g ys e)
+| Known_Proj : 
+    forall (x : var) (ct : ctor_tag) (n : N) (y : var) (e : exp), 
+      ~ y \in S ->
+     Known_exp S e ->
+     Known_exp S (Eproj x ct n y e)
+| Known_Case: 
+    forall (x : var) (ce : list (ctor_tag * exp)),
+      ~ x \in S ->
+      Forall (fun p => Known_exp S (snd p)) ce -> 
+      Known_exp S (Ecase x ce)
+| Known_Fun:
+    forall B e,
+      Known_fundefs S B ->
+      Known_exp S e ->
+      Known_exp S (Efun B e)      
+| Known_Halt : 
+    forall (x : var),
+      ~ x \in S ->
+      Known_exp S (Ehalt x)
+| Known_App :
+    forall (f : var) (ys : list var) (ft : fun_tag),
+      Disjoint _ (FromList ys) S -> 
+      Known_exp S (Eapp f ft ys)
+| Known_LetApp :
+    forall (x f : var) (ys : list var) (ft : fun_tag) (e : exp),
+      Disjoint _ (FromList ys) S -> 
+      Known_exp S e ->
+      Known_exp S (Eletapp x f ft ys e)
+with Known_fundefs (S : Ensemble var) : fundefs -> Prop := 
+| Known_Fcons :
+    forall f ft xs e B,
+      Known_exp S e ->
+      Known_fundefs S B ->
+      Known_fundefs S (Fcons f ft xs e B)      
+| Known_Fnil : 
+    Known_fundefs S Fnil. 
+
+Lemma remove_escaping_disjoint L x :
+  ~ x \in (Dom_map (remove_escaping L x)).
+Proof.
+  unfold remove_escaping. destruct (get_fun_vars L x) eqn:Hget; subst; eauto.
+  rewrite Dom_map_remove. intros Hc. inv Hc. now eauto.
+  intros Hc. inv Hc. unfold get_fun_vars in *. congruence. 
+Qed.
+
+Lemma remove_escaping_preserves_disjoint S L x :
+  Disjoint _ S (Dom_map L) -> 
+  Disjoint _ S (Dom_map (remove_escaping L x)).
+Proof.
+  unfold remove_escaping. destruct (get_fun_vars L x) eqn:Hget; subst; eauto.
+  rewrite Dom_map_remove. sets.
+Qed.
+
+  
+Lemma remove_escapings_preserves_disjoint S L x :
+  Disjoint _ S (Dom_map L) -> 
+  Disjoint _ S (Dom_map (remove_escapings L x)).
+Proof.
+  revert L; induction x; simpl; intros L Hdis; subst; eauto.
+  eapply IHx. 
+  eapply remove_escaping_preserves_disjoint. eassumption.
+Qed.
+
+
+Lemma remove_escapings_disjoint L x :
+  Disjoint _ (FromList x) (Dom_map (remove_escapings L x)).
+Proof.
+  revert L; induction x; simpl; intros L; subst; eauto.
+  - normalize_sets. now sets.
+  - normalize_sets. assert (H := remove_escaping_disjoint L a).
+    specialize (IHx (remove_escaping L a)).
+  eapply Union_Disjoint_l; eauto.
+  eapply remove_escapings_preserves_disjoint. eapply Disjoint_Singleton_l. eassumption.
+Qed.
+
+Lemma escaping_fun_presrves_disjoint :  
+  (forall e S L,
+      Disjoint _ S (Dom_map L) -> 
+      Disjoint _ S (Dom_map  (escaping_fun_exp e L))) /\
+  (forall B S L,
+      Disjoint _ S (Dom_map L) -> 
+      Disjoint _ S (Dom_map (escaping_fun_fundefs B L))). 
+Proof.
+  exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto;
+  eauto using remove_escapings_preserves_disjoint, remove_escaping_preserves_disjoint. 
+Qed. 
+
+
+
+Lemma escaping_fun_fundefs_sound :  
+  (forall e L,
+      Known_exp (Dom_map (escaping_fun_exp e L)) e) /\
+  (forall B L,
+      Known_fundefs (Dom_map (escaping_fun_fundefs B L)) B). 
+Proof.
+  exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto;
+    try (now econstructor; eauto; eapply escaping_fun_presrves_disjoint; eapply remove_escapings_disjoint).
+  econstructor. 
+    try (now econstructor; eauto; eapply escaping_fun_presrves_disjoint; eapply remove_escaping_disjoint).
+    
+
+    , remove_escaping_disjoint. 
+    try (now eapply le_trans; [ eapply IHe | eapply remove_escapings_max_size ]);
+    try (now eapply le_trans; [ eapply IHe | eapply remove_escaping_max_size ]). 
+  - simpl in IHl.
+    eapply le_trans. eapply IHl. eapply IHe.
+  - simpl in *.
+    eapply le_trans. eapply IHe. eapply IHB.
+  - eapply remove_escapings_max_size.
+  - eapply remove_escaping_max_size.
+  - simpl in *.
+    eapply le_trans. eapply IHB. eapply IHe.
+Qed. 
+

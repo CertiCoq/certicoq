@@ -61,29 +61,28 @@ end.
 
 Definition init_live_fun (B : fundefs) : live_fun := init_live_fun_aux (M.empty _) B.
 
-Definition add_escaping (L : live_fun) (f : var) : live_fun :=
+(* Identity escaping functions *)
+
+Definition remove_escaping (L : live_fun) (f : var) : live_fun :=
   match get_fun_vars L f with
-  | Some bs => set_fun_vars L f (get_bool_true bs)
+  | Some bs => M.remove f L
   | None => L
   end.
 
-Definition add_escapings (L : live_fun) (fs : list var) : live_fun :=
-  fold_left add_escaping fs L.
-
-
-(* IDENTIFYING ESCAPING FUNCTIONS *)
+Definition remove_escapings (L : live_fun) (fs : list var) : live_fun :=
+  fold_left remove_escaping fs L.
 
 Fixpoint escaping_fun_exp (e : exp) (L : live_fun) := 
 match e with 
-| Eapp f t ys => add_escapings L ys
-| Econstr x t ys e' => escaping_fun_exp e' (add_escapings L ys)
-| Eproj x t n y e' => escaping_fun_exp e' (add_escaping L y)
-| Eletapp x f ft ys e' => escaping_fun_exp e' (add_escapings L ys)
-| Ecase x P =>
-  fold_left (fun L '(c', e') => escaping_fun_exp e' L) P L
-| Ehalt x => add_escaping L x
+| Eapp f t ys => remove_escapings L ys
+| Econstr x t ys e' => escaping_fun_exp e' (remove_escapings L ys)
+| Eproj x t n y e' => escaping_fun_exp e' (remove_escaping L y)
+| Eletapp x f ft ys e' => escaping_fun_exp e' (remove_escapings L ys)
+| Ecase x P => (* Technically not escaping occurence, but it is useful to remove x too *)
+  fold_left (fun L '(c', e') => escaping_fun_exp e' L) P (remove_escaping L x)
+| Ehalt x => remove_escaping L x
 | Efun fl e' => escaping_fun_exp e' (escaping_fun_fundefs fl L)
-| Eprim x fs ys e' => escaping_fun_exp e' (add_escapings L ys)
+| Eprim x fs ys e' => escaping_fun_exp e' (remove_escapings L ys)
 end
 with escaping_fun_fundefs (B : fundefs) (L : live_fun) := 
        match B with 
@@ -93,7 +92,7 @@ with escaping_fun_fundefs (B : fundefs) (L : live_fun) :=
        | Fnil => L
        end. 
 
-(* LIVE PARAMETER ANALYSIS *)
+(* LIve parameter analysis *)
 
 Definition add_fun_vars (L : live_fun) (f : var) (xs : list var) (S : PS.t) : PS.t :=
   match get_fun_vars L f with
@@ -202,6 +201,7 @@ Definition arityMap : Type := M.t fun_tag.
 
 Definition elimM := @compM' arityMap.
 
+
 (* Single pass to create arity map. Assumes that initial fun_tags are consistent with arities *)
 Fixpoint make_arityMap (e : exp) (m : arityMap) : arityMap :=
   match e with
@@ -226,8 +226,7 @@ with make_arityMap_fundefs (B : fundefs) (m : arityMap) : arityMap :=
        end.
 
 Definition get_fun_tag (n : nat) : elimM fun_tag :=
-  st <- get_state tt ;;
-  let m := st in
+  m <- get_state tt ;;
   let p := Positive_as_DT.of_succ_nat n in
   match M.get p m with
   | Some t => ret t
@@ -236,7 +235,9 @@ Definition get_fun_tag (n : nat) : elimM fun_tag :=
     put_state (M.set p ft m) ;;
     ret ft
   end.       
-  
+
+
+(* For debugging *)
 
 Definition show_bool (b : bool) : string :=
   if b then "true" else "false".
@@ -251,6 +252,34 @@ Fixpoint show_bool_list (bs : list bool) : string :=
 
 
 
+Fixpoint is_hoisted_exp (e : exp) : bool :=
+  match e with 
+  | Econstr _ _ _ e
+  | Eproj _ _ _ _ e
+  | Eletapp _ _ _ _ e
+  | Eprim _ _ _ e => is_hoisted_exp e
+  | Ecase x bs =>
+    fold_left (fun b p => b && is_hoisted_exp (snd p)) bs true
+  | Efun B e => false
+  | Eapp _ _ _ => true
+  | Ehalt _ => true
+  end.
+  
+Fixpoint is_hoisted_fundefs (B : fundefs) : bool :=
+  match B with
+  | Fcons _ _ _ e B =>
+    is_hoisted_exp e && is_hoisted_fundefs B
+  | Fnil => true
+  end.
+
+Definition is_hoisted (e : exp) :=
+  match e with
+  | Efun B e => is_hoisted_fundefs B && is_hoisted_exp e
+  | _ => is_hoisted_exp e
+  end.
+
+(** Do dead paremeter elimination *)
+
 Fixpoint eliminate_expr (L : live_fun) (e : exp) : elimM exp := 
 match e with 
 | Econstr x t ys e' =>
@@ -260,7 +289,7 @@ match e with
   e'' <- eliminate_expr L e' ;;
   ret (Eproj x t m y e'')
 | Eletapp x f ft ys e' =>
-  f_str <- get_pp_name f ;;
+  (* f_str <- get_pp_name f ;; *)
   (* state.log_msg (String.concat " " ["Letapp" ; f_str ]) ;; *)
   match get_fun_vars L f with
   | Some bs =>
@@ -269,7 +298,7 @@ match e with
     let ys' := live_args ys bs in
     e'' <- eliminate_expr L e';;
     ft <- get_fun_tag (length ys') ;;
-    ys_names <- get_pp_names_list ys' ;;
+    (* ys_names <- get_pp_names_list ys' ;; *)
     (* state.log_msg (String.concat " " ["Function entry" ; f_str ; "found"; "id"; cps_show.show_pos f]) ;; *)
     (* state.log_msg (String.concat " " ("New params" :: ys_names)) ;;    *)
     ret (Eletapp x f ft ys' e'')
@@ -309,9 +338,9 @@ Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : elimM fundefs :=
     match get_fun_vars L f with
     | Some bs =>
       let ys' := live_args ys bs in
-      f_str <- get_pp_name f ;;
-      ys_names <- get_pp_names_list ys' ;;
-      ys_or <- get_pp_names_list ys ;;
+      (* f_str <- get_pp_name f ;; *)
+      (* ys_names <- get_pp_names_list ys' ;; *)
+      (* ys_or <- get_pp_names_list ys ;; *)
       (* state.log_msg (String.concat " " ["Def Function entry" ; f_str ; "found" ; "id"; cps_show.show_pos f]) ;; *)
       (* state.log_msg (String.concat " " ("Def New params" :: ys_names)) ;; *)
       (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;; *)
@@ -319,27 +348,32 @@ Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : elimM fundefs :=
       B'' <- eliminate_fundefs B' L ;;
       ft <- get_fun_tag (length ys') ;;
       ret (Fcons f ft ys' e' B'')
-    | None => failwith "Known function not found in live_fun map"
+    | None =>
+      e' <- eliminate_expr L e ;;
+      B'' <- eliminate_fundefs B' L ;;
+      ret (Fcons f ft ys e' B'')
     end
   | Fnil => ret Fnil
   end. 
            
-Fixpoint eliminate (e : exp) (c_data : comp_data) : error exp * comp_data := 
-  match e with 
-  | Efun B e' =>
-    match find_live e with
-    | Some L =>
-      let m := make_arityMap e (M.empty _) in
-      match run_compM (eliminate_fundefs B L) c_data m with
-      | (Ret B', (c_data, m)) => 
-        match run_compM (eliminate_expr L e') c_data m with
-        | (Ret e'', (c_data, m)) =>
-          (Ret (Efun B' e''), c_data)
+Fixpoint eliminate (e : exp) (c_data : comp_data) : error exp * comp_data :=
+  if is_hoisted e then 
+    match e with 
+    | Efun B e' =>
+      match find_live e with
+      | Some L =>
+        let m := make_arityMap e (M.empty _) in
+        match run_compM (eliminate_fundefs B L) c_data m with
+        | (Ret B', (c_data, m)) => 
+          match run_compM (eliminate_expr L e') c_data m with
+          | (Ret e'', (c_data, m)) =>
+            (Ret (Efun B' e''), c_data)
+          | (Err s, (c_data, m)) => (Err s, c_data)
+          end
         | (Err s, (c_data, m)) => (Err s, c_data)
         end
-      | (Err s, (c_data, m)) => (Err s, c_data)
+      | None => (Ret e, c_data)
       end
-    | None => (Err "Dead param elim: find_live failed", c_data)
+    | e => (Ret e, c_data)
     end
-  | e => (Ret e, c_data)
-  end.
+  else (Ret e, c_data).

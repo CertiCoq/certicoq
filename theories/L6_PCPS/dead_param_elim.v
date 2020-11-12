@@ -78,8 +78,8 @@ match e with
 | Econstr x t ys e' => escaping_fun_exp e' (remove_escapings L ys)
 | Eproj x t n y e' => escaping_fun_exp e' (remove_escaping L y)
 | Eletapp x f ft ys e' => escaping_fun_exp e' (remove_escapings L ys)
-| Ecase x P => (* Technically not escaping occurence, but it is useful to remove x too *)
-  fold_left (fun L '(c', e') => escaping_fun_exp e' L) P (remove_escaping L x)
+| Ecase x P =>
+  fold_left (fun L '(c', e') => escaping_fun_exp e' L) P L
 | Ehalt x => remove_escaping L x
 | Efun fl e' => escaping_fun_exp e' (escaping_fun_fundefs fl L)
 | Eprim x fs ys e' => escaping_fun_exp e' (remove_escapings L ys)

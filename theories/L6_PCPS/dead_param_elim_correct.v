@@ -739,10 +739,8 @@ Proof.
   exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto;
     try (now eapply le_trans; [ eapply IHe | eapply remove_escapings_max_size ]);
     try (now eapply le_trans; [ eapply IHe | eapply remove_escaping_max_size ]). 
-  - eapply remove_escaping_max_size. 
   - simpl in IHl.
-    eapply le_trans; [| eapply remove_escaping_max_size ].
-    eapply le_trans; [| eapply IHl ]. eapply IHe.
+    eapply le_trans. eapply IHl. eapply IHe.
   - simpl in *.
     eapply le_trans. eapply IHe. eapply IHB.
   - eapply remove_escapings_max_size.
@@ -872,7 +870,6 @@ Inductive Known_exp (S : Ensemble var) : exp -> Prop :=
      Known_exp S (Eproj x ct n y e)
 | Known_Case: 
     forall (x : var) (ce : list (ctor_tag * exp)),
-      ~ x \in S ->
       Forall (fun p => Known_exp S (snd p)) ce -> 
       Known_exp S (Ecase x ce)
 | Known_Fun:
@@ -902,32 +899,123 @@ with Known_fundefs (S : Ensemble var) : fundefs -> Prop :=
 | Known_Fnil : 
     Known_fundefs S Fnil. 
 
-Lemma remove_escaping_disjoint L x :
-  ~ x \in (Dom_map (remove_escaping L x)).
+
+(* Dom subset *)
+
+Lemma remove_escaping_subset L x :
+  Dom_map (remove_escaping L x) \subset Dom_map L.
 Proof.
-  unfold remove_escaping. destruct (get_fun_vars L x) eqn:Hget; subst; eauto.
-  rewrite Dom_map_remove. intros Hc. inv Hc. now eauto.
-  intros Hc. inv Hc. unfold get_fun_vars in *. congruence. 
+  unfold remove_escaping. destruct (get_fun_vars L x) eqn:Hget; subst; sets.
+  rewrite Dom_map_remove. sets.
 Qed.
+
+Lemma remove_escapings_subset L x :
+  Dom_map (remove_escapings L x) \subset Dom_map L.
+Proof.
+  revert L; induction x; simpl; intros L; subst; sets.
+  eapply Included_trans. eapply IHx. eapply remove_escaping_subset.
+Qed.
+
+
+Lemma escaping_fun_subset_mut :  
+  (forall e L,
+      (Dom_map  (escaping_fun_exp e L)) \subset Dom_map L) /\
+  (forall B L,
+      (Dom_map (escaping_fun_fundefs B L)) \subset Dom_map L). 
+Proof.
+  exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto; sets;
+  try now (eapply Included_trans; [ eapply IHe | ]; 
+           eauto using remove_escaping_subset, remove_escapings_subset).
+  - simpl in *. eapply Included_trans. eapply IHl. eapply IHe.
+  - eapply remove_escapings_subset.
+  - eapply remove_escaping_subset.
+  - eapply Included_trans. eapply IHB. eapply IHe.
+Qed. 
+
+Lemma escaping_fun_exp_subset : 
+  (forall e L,
+      (Dom_map  (escaping_fun_exp e L)) \subset Dom_map L).
+Proof. eapply escaping_fun_subset_mut. Qed.
+
+
+Lemma escaping_fun_fundefs_subset : 
+  (forall e L,
+      (Dom_map (escaping_fun_fundefs e L)) \subset Dom_map L).
+Proof. eapply escaping_fun_subset_mut. Qed.
+
+  
 
 Lemma remove_escaping_preserves_disjoint S L x :
   Disjoint _ S (Dom_map L) -> 
   Disjoint _ S (Dom_map (remove_escaping L x)).
 Proof.
-  unfold remove_escaping. destruct (get_fun_vars L x) eqn:Hget; subst; eauto.
-  rewrite Dom_map_remove. sets.
+  intros Hc. eapply Disjoint_Included_r. eapply remove_escaping_subset. sets.
 Qed.
-
   
 Lemma remove_escapings_preserves_disjoint S L x :
   Disjoint _ S (Dom_map L) -> 
   Disjoint _ S (Dom_map (remove_escapings L x)).
 Proof.
-  revert L; induction x; simpl; intros L Hdis; subst; eauto.
-  eapply IHx. 
-  eapply remove_escaping_preserves_disjoint. eassumption.
+  intros Hc. eapply Disjoint_Included_r. eapply remove_escapings_subset. sets.
 Qed.
 
+Lemma escaping_fun_exp_preserves_disjoint :  
+  forall e S L,
+    Disjoint _ S (Dom_map L) -> 
+    Disjoint _ S (Dom_map  (escaping_fun_exp e L)).
+Proof.
+  intros. eapply Disjoint_Included_r. eapply escaping_fun_exp_subset. sets.
+Qed. 
+
+Lemma escaping_fun_fundefs_preserves_disjoint :  
+  forall B S L,
+    Disjoint _ S (Dom_map L) -> 
+    Disjoint _ S (Dom_map  (escaping_fun_fundefs B L)).
+Proof.
+  intros. eapply Disjoint_Included_r. eapply escaping_fun_fundefs_subset. sets.
+Qed. 
+
+
+Lemma Known_exp_monotonic_mut :  
+  (forall e S1 S2,
+      Known_exp S1 e ->
+      S2 \subset S1 ->
+      Known_exp S2 e) /\
+  (forall B S1 S2,
+      Known_fundefs S1 B ->
+      S2 \subset S1 ->
+      Known_fundefs S2 B).
+Proof.
+  exp_defs_induction IHe IHl IHB; simpl; intros; subst; inv H; eauto; try (now econstructor; eauto; sets).
+  - inv H2. econstructor. econstructor.
+    now eauto.
+    assert (Hk : Known_exp S1 (Ecase v l)) by (econstructor; eassumption).
+    eapply IHl in Hk; eauto. inv Hk. eassumption.
+Qed.
+
+
+Corollary Known_exp_monotonic : 
+  forall e S1 S2,
+    Known_exp S1 e ->
+    S2 \subset S1 ->
+    Known_exp S2 e.
+Proof. eapply Known_exp_monotonic_mut. Qed.
+
+Corollary Known_fundefs_monotonic : 
+  forall B S1 S2,
+    Known_fundefs S1 B ->
+    S2 \subset S1 ->
+    Known_fundefs S2 B.
+Proof. eapply Known_exp_monotonic_mut. Qed.
+
+
+Lemma remove_escaping_disjoint L x :
+  ~ x \in (Dom_map (remove_escaping L x)).
+Proof.
+  unfold remove_escaping. destruct (get_fun_vars L x) eqn:Hget; subst; eauto.
+  rewrite Dom_map_remove. intros Hc. inv Hc. now eauto.
+  intros Hc. inv Hc. unfold get_fun_vars in *. congruence.
+Qed.
 
 Lemma remove_escapings_disjoint L x :
   Disjoint _ (FromList x) (Dom_map (remove_escapings L x)).
@@ -936,23 +1024,9 @@ Proof.
   - normalize_sets. now sets.
   - normalize_sets. assert (H := remove_escaping_disjoint L a).
     specialize (IHx (remove_escaping L a)).
-  eapply Union_Disjoint_l; eauto.
-  eapply remove_escapings_preserves_disjoint. eapply Disjoint_Singleton_l. eassumption.
-Qed.
-
-Lemma escaping_fun_presrves_disjoint :  
-  (forall e S L,
-      Disjoint _ S (Dom_map L) -> 
-      Disjoint _ S (Dom_map  (escaping_fun_exp e L))) /\
-  (forall B S L,
-      Disjoint _ S (Dom_map L) -> 
-      Disjoint _ S (Dom_map (escaping_fun_fundefs B L))). 
-Proof.
-  exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto;
-  eauto using remove_escapings_preserves_disjoint, remove_escaping_preserves_disjoint. 
-Qed. 
-
-
+    eapply Union_Disjoint_l; eauto.
+    eapply remove_escapings_preserves_disjoint. eapply Disjoint_Singleton_l. eassumption.
+ Qed.
 
 Lemma escaping_fun_fundefs_sound :  
   (forall e L,
@@ -961,21 +1035,25 @@ Lemma escaping_fun_fundefs_sound :
       Known_fundefs (Dom_map (escaping_fun_fundefs B L)) B). 
 Proof.
   exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto;
-    try (now econstructor; eauto; eapply escaping_fun_presrves_disjoint; eapply remove_escapings_disjoint).
-  econstructor. 
-    try (now econstructor; eauto; eapply escaping_fun_presrves_disjoint; eapply remove_escaping_disjoint).
-    
-
-    , remove_escaping_disjoint. 
-    try (now eapply le_trans; [ eapply IHe | eapply remove_escapings_max_size ]);
-    try (now eapply le_trans; [ eapply IHe | eapply remove_escaping_max_size ]). 
-  - simpl in IHl.
-    eapply le_trans. eapply IHl. eapply IHe.
-  - simpl in *.
-    eapply le_trans. eapply IHe. eapply IHB.
-  - eapply remove_escapings_max_size.
-  - eapply remove_escaping_max_size.
-  - simpl in *.
-    eapply le_trans. eapply IHB. eapply IHe.
+    try (now econstructor; eauto; eapply escaping_fun_exp_preserves_disjoint; eapply remove_escapings_disjoint).
+  - econstructor. econstructor.
+    + simpl.
+      eapply Known_exp_monotonic. eapply IHe.
+      assert (Hsub := escaping_fun_exp_subset (Ecase v l) (escaping_fun_exp e L)). eassumption.
+    + simpl in *. 
+      specialize (IHl (escaping_fun_exp e L)). inv IHl. eassumption.
+  - econstructor; eauto.
+    assert (Hdis : Disjoint _ [set v0] (Dom_map (escaping_fun_exp e (remove_escaping L v0)))).
+    { eapply escaping_fun_exp_preserves_disjoint. eapply Disjoint_Singleton_l.
+      eapply remove_escaping_disjoint. }
+    intros Hc. eapply Hdis; eauto.
+  - econstructor; eauto.
+    eapply Known_fundefs_monotonic. eapply IHB.
+    eapply escaping_fun_exp_subset.
+  - econstructor. eapply remove_escapings_disjoint.
+  - econstructor. eapply remove_escaping_disjoint.
+  - econstructor; eauto.
+    eapply Known_exp_monotonic. eapply IHe.
+    eapply escaping_fun_fundefs_subset.
 Qed. 
 

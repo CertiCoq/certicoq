@@ -259,7 +259,7 @@ Fixpoint is_hoisted_exp (e : exp) : bool :=
   | Eletapp _ _ _ _ e
   | Eprim _ _ _ e => is_hoisted_exp e
   | Ecase x bs =>
-    fold_left (fun b p => b && is_hoisted_exp (snd p)) bs true
+    forallb (fun p => is_hoisted_exp (snd p)) bs
   | Efun B e => false
   | Eapp _ _ _ => true
   | Ehalt _ => true

@@ -820,7 +820,7 @@ Proof.
   - inv Hl. reflexivity.
 Qed. 
 
-Lemma find_live_dom B L n L' :
+Lemma find_live_helper_dom B L n L' :
   find_live_helper B L n = Some L' ->
   Dom_map L <--> Dom_map L'.
 Proof.
@@ -849,7 +849,6 @@ Proof.
     rewrite Dom_map_set. sets.
   - subst. sets.
 Qed.
-
 
 
 Inductive Known_exp (S : Ensemble var) : exp -> Prop :=
@@ -1055,5 +1054,80 @@ Proof.
   - econstructor; eauto.
     eapply Known_exp_monotonic. eapply IHe.
     eapply escaping_fun_fundefs_subset.
+Qed. 
+
+Lemma find_live_fun_map_dom B e L :
+  find_live (Efun B e) = Some L ->
+  Dom_map L \subset name_in_fundefs B /\
+  Known_exp (Dom_map L) (Efun B e). 
+Proof.
+  intros Hf. unfold find_live in *.
+  eapply find_live_helper_dom in Hf.
+  rewrite <- !Hf at 1. split.
+
+  - eapply Included_trans. eapply escaping_fun_exp_subset.
+    eapply Included_trans. eapply escaping_fun_fundefs_subset.
+    eapply Included_trans. eapply init_live_fun_aux_dom. reflexivity.
+    rewrite Dom_map_empty. sets.
+
+  - eapply Known_exp_monotonic; [| eapply Hf ].
+    destruct escaping_fun_fundefs_sound.
+
+    econstructor.
+
+    + eapply Known_fundefs_monotonic. eapply H0.
+      eapply Included_trans. eapply escaping_fun_exp_subset. reflexivity.
+
+    + eapply H.
+Qed.
+  
+(* Top-level theorem for liveness analysis *)
+Corollary find_live_sound_top (B : fundefs) (e : exp) L :
+  no_fun_defs B -> (* no nested fundefs *)
+  unique_functions B -> (* unique bindings *)
+  find_live (Efun B e) = Some L ->
+  live_map_sound B L /\
+  Dom_map L \subset name_in_fundefs B /\
+  Known_exp (Dom_map L) (Efun B e).
+Proof.
+  intros Hnf Hun Hl.
+  edestruct find_live_fun_map_dom. eassumption.
+  split; eauto. eapply find_live_sound; eassumption.
+Qed.
+
+
+(* is_hoisted is correct *)
+
+Lemma is_hoisted_exp_correct e :
+  is_hoisted_exp e = true ->
+  no_fun e.
+Proof.
+  induction e using exp_ind'; simpl; intros; eauto. 
+  - simpl in *.
+    eapply andb_prop in H. destructAll.
+    econstructor; eauto.
+  - congruence.
+Qed. 
+
+
+Lemma is_hoisted_fundefs_correct B :
+  is_hoisted_fundefs B = true ->
+  no_fun_defs B.
+Proof.
+  induction B; simpl; intros; eauto.
+
+  eapply andb_prop in H. destructAll.  
+  econstructor; eauto.
+  eapply is_hoisted_exp_correct; eauto.
+Qed. 
+
+
+Lemma is_hoisted_correct B e :
+  is_hoisted (Efun B e) = true ->
+  no_fun_defs B /\ no_fun e.
+Proof.
+  intros H. simpl in *.  eapply andb_prop in H.
+  destructAll. 
+  split; eauto using is_hoisted_exp_correct, is_hoisted_fundefs_correct.
 Qed. 
 

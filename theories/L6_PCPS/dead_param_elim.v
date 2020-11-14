@@ -198,11 +198,15 @@ Definition is_nil {A} (l : list A) : bool :=
 
 
 Definition arityMap : Type := M.t fun_tag.
+Definition ftagMap : Type := M.t fun_tag.
 
-Definition elimM := @compM' arityMap.
+Definition elimM := @compM' unit.
 
+
+(** * fun_tag bookeeping *)
 
 (* Single pass to create arity map. Assumes that initial fun_tags are consistent with arities *)
+
 Fixpoint make_arityMap (e : exp) (m : arityMap) : arityMap :=
   match e with
   | Econstr _ _ _ e => make_arityMap e m
@@ -225,16 +229,34 @@ with make_arityMap_fundefs (B : fundefs) (m : arityMap) : arityMap :=
        | Fnil => m
        end.
 
-Definition get_fun_tag (n : nat) : elimM fun_tag :=
-  m <- get_state tt ;;
-  let p := Positive_as_DT.of_succ_nat n in
-  match M.get p m with
-  | Some t => ret t
-  | None =>
-    ft <- get_ftag (N.of_nat n) ;;
-    put_state (M.set p ft m) ;;
-    ret ft
-  end.       
+
+(* TODO move *)
+
+Definition make_ftag (arity : nat) (c : comp_data) : fun_tag * comp_data:=
+  let 'mkCompData x c i f e fenv names imap log := c in
+  (f, mkCompData x c i (f + 1)%positive e (M.set f (N.of_nat arity, (List_util.fromN (0%N) arity)) fenv) names imap log).
+
+
+
+Fixpoint create_fun_tag (L : live_fun) (m : arityMap) (B : fundefs) (c : comp_data) (fmap : ftagMap) : ftagMap * comp_data := 
+  match B with 
+  | Fcons f ft ys e B =>
+    match get_fun_vars L f with
+    | Some bs =>
+      let n := length (live_args ys bs) in
+      let p := Positive_as_DT.of_succ_nat n in
+      match M.get p m with
+      | Some t => create_fun_tag L m B c (M.set f t fmap)  
+      | None =>
+        let '(ft, c') := make_ftag n c in
+        create_fun_tag L m B c' (M.set f ft fmap)
+      end
+    | None => create_fun_tag L m B c fmap
+    end
+  | Fnil => (fmap, c)
+  end.
+
+
 
 
 (* For debugging *)
@@ -280,92 +302,108 @@ Definition is_hoisted (e : exp) :=
 
 (** Do dead paremeter elimination *)
 
-Fixpoint eliminate_expr (L : live_fun) (e : exp) : elimM exp := 
-match e with 
-| Econstr x t ys e' =>
-  e'' <- eliminate_expr L e' ;;
-  ret (Econstr x t ys e'')
-| Eproj x t m y e' =>
-  e'' <- eliminate_expr L e' ;;
-  ret (Eproj x t m y e'')
-| Eletapp x f ft ys e' =>
-  (* f_str <- get_pp_name f ;; *)
-  (* state.log_msg (String.concat " " ["Letapp" ; f_str ]) ;; *)
-  match get_fun_vars L f with
-  | Some bs =>
-    ys_or <- get_pp_names_list ys ;;    
-    (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;;  *)
-    let ys' := live_args ys bs in
-    e'' <- eliminate_expr L e';;
-    ft <- get_fun_tag (length ys') ;;
-    (* ys_names <- get_pp_names_list ys' ;; *)
-    (* state.log_msg (String.concat " " ["Function entry" ; f_str ; "found"; "id"; cps_show.show_pos f]) ;; *)
-    (* state.log_msg (String.concat " " ("New params" :: ys_names)) ;;    *)
-    ret (Eletapp x f ft ys' e'')
-  | None =>
-    e'' <- eliminate_expr L e' ;;
-    ret (Eletapp x f ft ys e'')
-  end
-| Ecase x P =>
-  P' <- (fix mapM_LD (l : list (ctor_tag * exp)) : elimM (list (ctor_tag * exp)) :=
-          match l with 
-          | [] => ret []
-          | (c', e') :: l' =>
-            e' <- eliminate_expr L e';;
-            l' <- mapM_LD l' ;;
-            ret ((c', e') :: l')
-          end) P ;;
-  ret (Ecase x P')
-| Ehalt x => ret (Ehalt x)
-| Efun fl e' => ret e
-| Eprim x f ys e' =>
-  e'' <- eliminate_expr L e' ;;
-  ret (Eprim x f ys e'')
-| Eapp f ft ys => 
-  match get_fun_vars L f with
-  | Some bs =>
-    let ys' := live_args ys bs in
-    ft <- get_fun_tag (length ys') ;;
-    ret (Eapp f ft ys')
-  | None => ret (Eapp f ft ys)
-  end
-end.
+Section Elim.
+
+  Context (fmap : ftagMap). 
+
+  Definition get_fun_tag (f : var) : fun_tag :=
+    match M.get f fmap with
+  | Some t => t
+  | None => 1%positive (* dummy *)
+  end.       
 
 
-Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : elimM fundefs := 
-  match B with 
-  | Fcons f ft ys e B' =>
-    match get_fun_vars L f with
-    | Some bs =>
-      let ys' := live_args ys bs in
+  
+  Fixpoint eliminate_expr (L : live_fun) (e : exp) : elimM exp := 
+    match e with 
+    | Econstr x t ys e' =>
+      e'' <- eliminate_expr L e' ;;
+      ret (Econstr x t ys e'')
+    | Eproj x t m y e' =>
+      e'' <- eliminate_expr L e' ;;
+      ret (Eproj x t m y e'')
+    | Eletapp x f ft ys e' =>
       (* f_str <- get_pp_name f ;; *)
-      (* ys_names <- get_pp_names_list ys' ;; *)
-      (* ys_or <- get_pp_names_list ys ;; *)
-      (* state.log_msg (String.concat " " ["Def Function entry" ; f_str ; "found" ; "id"; cps_show.show_pos f]) ;; *)
-      (* state.log_msg (String.concat " " ("Def New params" :: ys_names)) ;; *)
-      (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;; *)
-      e' <- eliminate_expr L e ;;
-      B'' <- eliminate_fundefs B' L ;;
-      ft <- get_fun_tag (length ys') ;;
-      ret (Fcons f ft ys' e' B'')
-    | None =>
-      e' <- eliminate_expr L e ;;
-      B'' <- eliminate_fundefs B' L ;;
-      ret (Fcons f ft ys e' B'')
-    end
-  | Fnil => ret Fnil
-  end. 
-           
-Fixpoint eliminate (e : exp) (c_data : comp_data) : error exp * comp_data :=
+      (* state.log_msg (String.concat " " ["Letapp" ; f_str ]) ;; *)
+      match get_fun_vars L f with
+      | Some bs =>
+        (* ys_or <- get_pp_names_list ys ;;     *)
+        (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;;  *)
+        let ys' := live_args ys bs in
+        e'' <- eliminate_expr L e';;
+        let ft' := get_fun_tag f in
+        (* ys_names <- get_pp_names_list ys' ;; *)
+        (* state.log_msg (String.concat " " ["Function entry" ; f_str ; "found"; "id"; cps_show.show_pos f]) ;; *)
+        (* state.log_msg (String.concat " " ("New params" :: ys_names)) ;;    *)
+        ret (Eletapp x f ft' ys' e'')
+      | None =>
+        e'' <- eliminate_expr L e' ;;
+        ret (Eletapp x f ft ys e'')
+      end
+    | Ecase x P =>
+      P' <- (fix mapM_LD (l : list (ctor_tag * exp)) : elimM (list (ctor_tag * exp)) :=
+               match l with 
+               | [] => ret []
+               | (c', e') :: l' =>
+                 e' <- eliminate_expr L e';;
+                 l' <- mapM_LD l' ;;
+                 ret ((c', e') :: l')
+               end) P ;;
+      ret (Ecase x P')
+    | Ehalt x => ret (Ehalt x)
+    | Efun fl e' => ret e
+    | Eprim x f ys e' =>
+      e'' <- eliminate_expr L e' ;;
+      ret (Eprim x f ys e'')
+    | Eapp f ft ys => 
+      match get_fun_vars L f with
+      | Some bs =>
+        let ys' := live_args ys bs in
+        let ft' := get_fun_tag f in
+        ret (Eapp f ft' ys')
+      | None => ret (Eapp f ft ys)
+      end
+    end.
+
+
+  Fixpoint eliminate_fundefs (L : live_fun) (B : fundefs) : elimM fundefs := 
+    match B with 
+    | Fcons f ft ys e B' =>
+      match get_fun_vars L f with
+      | Some bs =>
+        let ys' := live_args ys bs in
+        (* f_str <- get_pp_name f ;; *)
+        (* ys_names <- get_pp_names_list ys' ;; *)
+        (* ys_or <- get_pp_names_list ys ;; *)
+        (* state.log_msg (String.concat " " ["Def Function entry" ; f_str ; "found" ; "id"; cps_show.show_pos f]) ;; *)
+        (* state.log_msg (String.concat " " ("Def New params" :: ys_names)) ;; *)
+        (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;; *)
+        e' <- eliminate_expr L e ;;
+        B'' <- eliminate_fundefs L B' ;;
+        let ft' := get_fun_tag f in
+        ret (Fcons f ft' ys' e' B'')
+      | None =>
+        e' <- eliminate_expr L e ;;
+        B'' <- eliminate_fundefs L B' ;;
+        ret (Fcons f ft ys e' B'')
+      end
+    | Fnil => ret Fnil
+    end. 
+
+End Elim.
+  
+Definition DPE (e : exp) (c_data : comp_data) : error exp * comp_data :=
   if is_hoisted e then 
     match e with 
     | Efun B e' =>
       match find_live e with
       | Some L =>
         let m := make_arityMap e (M.empty _) in
-        match run_compM (eliminate_fundefs B L) c_data m with
+        let '(ftagMap, c_data) := create_fun_tag L m B c_data (M.empty _) in 
+        
+        match run_compM (eliminate_fundefs ftagMap L B) c_data tt with
         | (Ret B', (c_data, m)) => 
-          match run_compM (eliminate_expr L e') c_data m with
+          match run_compM (eliminate_expr ftagMap L e') c_data tt with
           | (Ret e'', (c_data, m)) =>
             (Ret (Efun B' e''), c_data)
           | (Err s, (c_data, m)) => (Err s, c_data)

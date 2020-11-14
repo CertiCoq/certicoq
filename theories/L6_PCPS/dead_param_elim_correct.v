@@ -8,6 +8,17 @@ Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinN
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat.
 
+Require Import L6.alpha_conv L6.cps L6.cps_util L6.ctx L6.state L6.set_util L6.identifiers L6.List_util
+        L6.functions L6.Ensembles_util L6.uncurry L6.tactics.
+Require Import Coq.ZArith.Znumtheory Coq.Strings.String.
+Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
+Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad ExtLib.Data.Monads.OptionMonad.
+Require Import compcert.lib.Coqlib.
+
+Import ListNotations Nnat MonadNotation PS.
+
+
 
 Import MonadNotation.
 Open Scope monad_scope.
@@ -68,34 +79,20 @@ Inductive Elim_fundefs (L : live_fun) (find_tag : var -> option fun_tag) : funde
   Elim_fundefs L find_tag Fnil Fnil
 | Elim_cons_in_map : 
     forall (F : fundefs) (F' : fundefs) (e : exp) (e' : exp) (xs : list var) (bs : list bool)
-           (g : var) (ft ft' : fun_tag) (S : Ensemble var), 
+           (g : var) (ft ft' : fun_tag), 
       L ! g = Some bs ->
       find_tag g = Some ft' ->            
       Elim_expr L find_tag e e' ->
       Elim_fundefs L find_tag F F' ->
       Elim_fundefs L find_tag (Fcons g ft xs e F) (Fcons g ft' (live_args xs bs) e' F')
 | Elim_cons_not_in_map : 
-    forall (F : fundefs) (F' : fundefs) (e : exp) (e' : exp) (xs : list var) (bs : list bool)
-           (g : var) (ft : fun_tag) (S : Ensemble var), 
+    forall (F : fundefs) (F' : fundefs) (e : exp) (e' : exp) (xs : list var)
+           (g : var) (ft : fun_tag), 
       L ! g = None ->  
       Elim_expr L find_tag e e' ->
       Elim_fundefs L find_tag F F' ->
       Elim_fundefs L find_tag (Fcons g ft xs e F) (Fcons g ft xs e' F'). 
 
-
-(* Inductive Dead_fundefs (L : live_fun) : fundefs -> Prop :=  *)
-(* | Known_Fcons_S : *)
-(*     forall f ft xs e B, *)
-(*       Dead S L e -> *)
-(*       Dead_fundefs S L B -> *)
-(*       Dead_fundefs S L (Fcons f ft xs e B) *)
-(* | Known_Fcons : *)
-(*     forall f ft xs e B, *)
-(*       Dead S L e -> *)
-(*       Dead_fundefs S L B -> *)
-(*       Dead_fundefs S L (Fcons f ft xs e B)       *)
-(* | Known_Fnil :  *)
-(*     Dead_fundefs S L Fnil.  *)
 
 
 Lemma Elim_fundefs_exists_Some L find_tag B B' bs f ft xs e :
@@ -145,7 +142,6 @@ Lemma Elim_fundefs_name_in_fundefs L find_tag B B' :
 Proof.
   intros H. induction H; simpl; sets.
 Qed. 
-
 
 Lemma live_args_NoDup {A} (xs : list A) bs :
   NoDup xs ->
@@ -257,6 +253,236 @@ Proof.
 Qed.   
 
 
+Lemma Dead_Disjoint S L find_tag e e' :
+  Dead S L e ->
+  Elim_expr L find_tag e e' ->
+  Disjoint _ S (occurs_free e').
+Proof.
+  revert e'.
+  induction e using exp_ind'; intros e' Hdead Helim; inv Helim; inv Hdead;
+    try congruence; repeat normalize_occurs_free; sets;
+      try (now eapply Union_Disjoint_r; sets).
+  - inv H2. normalize_occurs_free. sets.
+  - inv H2. inv H3. destruct y. normalize_occurs_free. simpl in *. inv H4.
+    eapply Union_Disjoint_r. now sets.
+    eapply Union_Disjoint_r. now sets. 
+    eapply IHe0; econstructor; eassumption.
+  - repeat subst_exp.
+    eapply Union_Disjoint_r. now sets.
+    eapply Disjoint_Included_r. eapply Setminus_Included. sets.
+  - repeat subst_exp. sets.
+Qed.   
+
+
+Lemma dead_arg_live_arg xs bs :
+  FromList xs <--> FromList (dead_args xs bs) :|: FromList (live_args xs bs). 
+Proof.
+  revert bs. induction xs; intros [|]; simpl.
+  - rewrite !FromList_nil at 1. sets.
+  - rewrite !FromList_nil at 1. sets.
+  - repeat normalize_sets. sets.
+  - destruct b; repeat normalize_sets; sets.
+    rewrite (IHxs l). now sets.
+    rewrite (IHxs l). now sets.    
+Qed.     
+  
+Lemma Elim_exp_occurs_free L find_tag e e' :
+  Elim_expr L find_tag e e' ->
+  occurs_free e' \subset occurs_free e.
+Proof.
+  revert e'.
+  induction e using exp_ind'; intros e' Helim; inv Helim;
+    try repeat normalize_occurs_free; sets.
+  - inv H2. normalize_occurs_free. sets.
+  - inv H2. destruct y. normalize_occurs_free. simpl in *. inv H1.
+    rewrite !Union_assoc. eapply Included_Union_compat; sets.
+    eapply IHe0. econstructor; eauto.
+  - assert (Hsub := live_args_subset ys bs). sets.
+  - assert (Hsub := live_args_subset l bs). sets.
+Qed.   
+
+Lemma Elim_fundefs_occurs_free L find_tag B B' :
+  Elim_fundefs L find_tag B B' ->
+  live_map_sound B L ->
+  occurs_free_fundefs B' \subset occurs_free_fundefs B.
+Proof.
+  intros Helim Hl; induction Helim; sets.
+  - repeat normalize_occurs_free.
+    eapply Included_Union_compat.
+    + eapply Hl in H. 2:{ now left. }
+      rewrite (dead_arg_live_arg xs bs).
+      rewrite Elim_fundefs_name_in_fundefs with (B := F); eauto.
+      eapply Dead_Disjoint in H; [| eassumption ]. 
+      rewrite <- (Setminus_Disjoint (occurs_free e')) at 1; [| eapply Disjoint_sym; eassumption ].
+      rewrite Setminus_Union. 
+      eapply Included_trans.
+      
+      eapply Included_Setminus_compat; [ eapply Elim_exp_occurs_free; eassumption | reflexivity ].
+      sets.
+    + eapply Included_Setminus_compat; sets.
+      eapply IHHelim.
+      intro; intros. eapply Hl; eauto. now right; eauto. 
+  - repeat normalize_occurs_free.
+    eapply Included_Union_compat.
+    + rewrite Elim_fundefs_name_in_fundefs with (B := F); eauto.
+      eapply Included_Setminus_compat; sets.
+      eapply Elim_exp_occurs_free. eassumption.
+    + eapply Included_Setminus_compat; sets.
+      eapply IHHelim.
+      intro; intros. eapply Hl; eauto. now right; eauto.
+Qed. 
+
+
+Require Import lambda_lifting_corresp.
+
+Section Corresp. 
+
+  
+  Opaque bind ret. 
+
+  (** * The DPE is sound w.r.t. its relational specification *)
+
+  Lemma eliminate_expr_sound (fmap : ftagMap) (L : live_fun) (Hdom : Dom_map L \subset Dom_map fmap) :
+    forall (e : exp) (Hnf : no_fun e),      
+       {{ fun r s => True }}          
+         eliminate_expr fmap L e
+       {{ fun r s e' s' =>
+            s = s' /\
+            Elim_expr L (fun x => fmap ! x) e e' }}.
+  Proof. 
+    induction e using exp_ind'; intros; inv Hnf; simpl;
+      try
+        (now eapply bind_triple;
+         [ eapply IHe | 
+           intros; eapply return_triple; intros; destructAll; split; [ eauto | econstructor; eauto ] ] ).
+
+    - (* Ecase nil *)
+      eapply return_triple; intros; split; eauto. constructor; eauto.
+
+    - (* Ecase cons *)
+      setoid_rewrite assoc. eapply bind_triple.
+      + eapply IHe; eauto.
+      + intros e' s1. simpl.
+        setoid_rewrite st_eq_Ecase. eapply pre_curry_r. intros He.
+        eapply bind_triple.
+        * eapply pre_strenghtening with (P := fun _ s => s1 = s /\ True).
+          clear; now firstorder.
+          eapply frame_rule. 
+          eapply IHe0; eauto.
+        * simpl. intros. eapply pre_curry_l. intros Heq; subst.
+          eapply pre_curry_r. intros Hel. assert (Hel' := Hel). inv Hel'.
+          eapply return_triple. intros. split; eauto.
+          econstructor; eauto.
+
+    - (* Eletapp *)
+      unfold get_fun_vars.      
+      destruct (L ! f) eqn:Hget.
+
+      + (* Some *)
+        
+        assert (He : exists ft, fmap ! f = Some ft).
+        { eapply Hdom. eexists; eauto. }
+        destructAll.
+
+        unfold dead_param_elim.get_fun_tag. rewrite H.
+
+        eapply bind_triple.
+        * eapply IHe; eauto.
+        * intros e' s1. simpl.
+          eapply return_triple; intros; destructAll; split; [ eauto | econstructor; eauto ].
+
+      + (* None *)
+        
+        eapply bind_triple.
+        * eapply IHe; eauto.
+        * intros e' s1. simpl.
+          eapply return_triple; intros; destructAll; split; [ eauto | econstructor; eauto ].
+
+    - (* Eapp *)
+
+      unfold get_fun_vars.      
+      destruct (L ! v) eqn:Hget.
+
+      + (* Some *)
+        
+        assert (He : exists ft, fmap ! v = Some ft).
+        { eapply Hdom. eexists; eauto. }
+        destructAll.
+
+        unfold dead_param_elim.get_fun_tag. rewrite H.
+        
+        eapply return_triple; intros; destructAll; split; [ eauto | econstructor; eauto ].
+
+      + (* None *)
+        eapply return_triple; intros; destructAll; split; [ eauto | econstructor; eauto ].
+
+    - eapply return_triple; intros; destructAll; split; [ eauto | econstructor; eauto ].
+  Qed.
+
+
+  Lemma eliminate_fundefs_sound (fmap : ftagMap) (L : live_fun) (Hdom : Dom_map L \subset Dom_map fmap) :
+    forall (B : fundefs) (Hnf : no_fun_defs B),      
+      {{ fun r s => True }}          
+        eliminate_fundefs fmap L B
+      {{ fun r s B' s' =>
+           s = s' /\
+           Elim_fundefs L (fun x => fmap ! x) B B' }}.
+  Proof.
+    induction B; intros; inv Hnf; simpl.
+    - (* Fcons *)
+      unfold get_fun_vars.
+      destruct (L ! v) eqn:Hget.
+
+      + (* Some *)
+        
+        assert (He : exists ft, fmap ! v = Some ft).
+        { eapply Hdom. eexists; eauto. }
+        destructAll.
+        
+        unfold dead_param_elim.get_fun_tag. rewrite H.
+        
+        eapply bind_triple.
+        * eapply eliminate_expr_sound; eauto.          
+        * intros e' s1. simpl.
+          eapply pre_curry_r. intros He.
+          
+          eapply bind_triple.
+
+          -- eapply pre_strenghtening with (P := fun _ s => s1 = s /\ True).
+             clear; now firstorder.
+             eapply frame_rule. 
+             eapply IHB; eauto.
+
+          -- simpl; intros. eapply return_triple. intros. destructAll.
+             split; eauto. econstructor; eauto. 
+
+      + (* None *)
+        
+        eapply bind_triple.
+        * eapply eliminate_expr_sound; eauto.          
+        * intros e' s1. simpl.
+          eapply pre_curry_r. intros He.
+          
+          eapply bind_triple.
+
+          -- eapply pre_strenghtening with (P := fun _ s => s1 = s /\ True).
+             clear; now firstorder.
+             eapply frame_rule. 
+             eapply IHB; eauto.
+
+          -- simpl; intros. eapply return_triple. intros. destructAll.
+             split; eauto. econstructor; eauto. 
+             
+
+    - (* Fnil *)
+
+      eapply return_triple. intros. split; eauto. econstructor.
+  Qed.
+      
+End Corresp.
+  
+  
+  
 Section Correct.
 
   Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
@@ -566,7 +792,7 @@ Section Correct.
     
   Lemma Elim_expr_correct : 
     forall k e e' L find_tag S rho1 rho2
-           (Hdis1 : Disjoint _ (Dom_map L) (bound_var e :|: occurs_free e))          
+           (Hdis1 : Disjoint _ (Dom_map L) (bound_var e))
            
            (Hd : Dead S L e)
            (Hk : Known_exp (Dom_map L) e)
@@ -574,8 +800,6 @@ Section Correct.
            (Hfinv : fun_inv L find_tag k rho1 rho2)
            
            (Henv : preord_env_P cenv PG (occurs_free e \\ S \\ Dom_map L) k rho1 rho2)
-
-           (Hbin : binding_in_map (occurs_free e) rho1)
 
            (Helim : Elim_expr L find_tag e e'),
       
@@ -591,7 +815,7 @@ Section Correct.
         normalize_occurs_free. sets.
       + intros. eapply IHk; eauto.
 
-        * eapply Disjoint_Included_r. eapply bound_var_occurs_free_Econstr_Included. eassumption.
+        * repeat normalize_bound_var_in_ctx. sets.
         * eapply fun_inv_set_Disjoint. eapply fun_inv_monotonic. eassumption. omega.
           repeat normalize_occurs_free_in_ctx. sets.
         * eapply preord_env_P_extend.
@@ -599,9 +823,6 @@ Section Correct.
           eapply preord_env_P_monotonic; [| eassumption ]. omega.
           normalize_occurs_free. sets. rewrite !Setminus_Union_distr, !Setminus_Union. now sets.
           rewrite preord_val_eq. simpl. split; eauto.
-        * eapply binding_in_map_antimon.
-          eapply Included_Union_Setminus with (s2 := [set v]); tci. eapply binding_in_map_set.
-          eapply binding_in_map_antimon; eauto. normalize_occurs_free. sets.
 
     - (* Ecase nil *)
       inv H2.
@@ -621,24 +842,18 @@ Section Correct.
         intros Hc. eapply Hfinv in Hc. destructAll. congruence.
       + intros. eapply IHe; eauto.
         * intros; eauto. eapply IHk; eauto. omega.
-        * eapply Disjoint_Included_r.
-          eapply bound_var_occurs_free_Ecase_Included. 2:{ eassumption. } now left.
+        * repeat normalize_bound_var_in_ctx. sets.
         * eapply fun_inv_monotonic; eauto. omega. 
         * eapply preord_env_P_antimon.
           eapply preord_env_P_monotonic; [| eassumption ]. omega.
           normalize_occurs_free. sets.
-        * eapply binding_in_map_antimon; [| eassumption ].
-          normalize_occurs_free. sets.
 
       + eapply IHe0; eauto.
-        * eapply Disjoint_Included_r.
-          eapply bound_var_occurs_free_Ecase_cons_Included. eassumption.
+        * repeat normalize_bound_var_in_ctx. sets.
         * constructor; eauto.
         * constructor; eauto.
         * eapply preord_env_P_antimon.
           eapply preord_env_P_monotonic; [| eassumption ]. omega.
-          normalize_occurs_free. sets.
-        * eapply binding_in_map_antimon; [| eassumption ].
           normalize_occurs_free. sets.
         * econstructor. eauto.
 
@@ -653,7 +868,7 @@ Section Correct.
         reflexivity.
       + intros. eapply IHk; eauto.
         
-        * eapply Disjoint_Included_r. eapply bound_var_occurs_free_Eproj_Included. eassumption.
+        * repeat normalize_bound_var_in_ctx. sets.
         * eapply fun_inv_set_Disjoint. eapply fun_inv_monotonic; eauto. omega.
           repeat normalize_occurs_free_in_ctx. sets.
         * eapply preord_env_P_extend.
@@ -661,9 +876,6 @@ Section Correct.
           eapply preord_env_P_monotonic; [| eassumption ]. omega.
           normalize_occurs_free. sets. rewrite !Setminus_Union_distr, !Setminus_Union. now sets.
           eassumption.
-        * eapply binding_in_map_antimon.
-          eapply Included_Union_Setminus with (s2 := [set v]); tci. eapply binding_in_map_set.
-          eapply binding_in_map_antimon; eauto. normalize_occurs_free. sets.
 
     - (* Eletapp None *)
       eapply preord_exp_letapp_compat.
@@ -680,7 +892,7 @@ Section Correct.
         normalize_occurs_free. sets.
       + intros. eapply IHk; eauto.
         
-        * eapply Disjoint_Included_r. eapply bound_var_occurs_free_Eletapp_Included. eassumption.
+        * repeat normalize_bound_var_in_ctx. sets.
         * eapply fun_inv_set_Disjoint.
           eapply fun_inv_monotonic; eauto. omega.
           repeat normalize_occurs_free_in_ctx. sets.
@@ -689,9 +901,6 @@ Section Correct.
           eapply preord_env_P_monotonic; [| eassumption ]. omega.
           normalize_occurs_free. sets. rewrite !Setminus_Union_distr, !Setminus_Union. now sets.
           eassumption.
-        * eapply binding_in_map_antimon.
-          eapply Included_Union_Setminus with (s2 := [set x]); tci. eapply binding_in_map_set.
-          eapply binding_in_map_antimon; eauto. normalize_occurs_free. sets.
           
     - (* Eletapp Some *)
       repeat subst_exp. 
@@ -705,7 +914,7 @@ Section Correct.
       + eassumption. 
       + intros. eapply IHk; eauto.
         
-        * eapply Disjoint_Included_r. eapply bound_var_occurs_free_Eletapp_Included. eassumption.
+        * repeat normalize_bound_var_in_ctx. sets.
         * eapply fun_inv_set_Disjoint.
           eapply fun_inv_monotonic; eauto. omega.
           repeat normalize_occurs_free_in_ctx. sets.
@@ -714,9 +923,6 @@ Section Correct.
           eapply preord_env_P_monotonic; [| eassumption ]. omega.
           normalize_occurs_free. sets. rewrite !Setminus_Union_distr, !Setminus_Union. now sets.
           eassumption.
-        * eapply binding_in_map_antimon.
-          eapply Included_Union_Setminus with (s2 := [set x]); tci. eapply binding_in_map_set.
-          eapply binding_in_map_antimon; eauto. normalize_occurs_free. sets.
 
 
     - (* Eapp None *) 
@@ -843,29 +1049,24 @@ Section Correct.
         normalize_sets. sets.
   Qed.
 
-
-
+  
   Lemma Elim_fundefs_correct : 
-    forall k B B' L find_tag rho1 rho2
+    forall k B B' S L find_tag rho1 rho2
            (Hun : unique_bindings_fundefs B)
            (Hnf : no_fun_defs B)
            
-           (Hdis1 : Disjoint _ (Dom_map L) (bound_var_fundefs B :|: occurs_free_fundefs B))          
+           (Hdis1 : Disjoint _ (Dom_map L) (bound_var_fundefs B \\ name_in_fundefs B))          
            (Hdom : Dom_map L \subset name_in_fundefs B)
            
            (Hd : live_map_sound B L)
            (Hk : Known_fundefs (Dom_map L) B)
            
-           (Hfinv : fun_inv L find_tag k rho1 rho2)
-
-           (Henv : preord_env_P cenv PG (occurs_free_fundefs B \\ Dom_map L) k rho1 rho2)
-
-           (Hbin : binding_in_map (occurs_free_fundefs B) rho1)
+           (Henv : preord_env_P cenv PG (occurs_free_fundefs B :|: S \\ Dom_map L) k rho1 rho2)
 
            (Helim : Elim_fundefs L find_tag B B'),
 
       fun_inv L find_tag k (def_funs B B rho1 rho1) (def_funs B' B' rho2 rho2) /\      
-      preord_env_P cenv PG ((name_in_fundefs B :|: occurs_free_fundefs B) \\ Dom_map L) k
+      preord_env_P cenv PG ((name_in_fundefs B :|: occurs_free_fundefs B :|: S) \\ Dom_map L) k
                    (def_funs B B rho1 rho1) (def_funs B' B' rho2 rho2).
   Proof with now eauto with Ensembles_DB.
     induction k as [k IHk] using lt_wf_rec1; intros. split.
@@ -889,11 +1090,10 @@ Section Correct.
         assert (Hand : forall m, m < k ->
                                  fun_inv L find_tag m (def_funs B1 B1 rho0 rho0) (def_funs B' B' rho2 rho2) /\
                                  preord_env_P cenv PG
-                                              (name_in_fundefs B1 :|: occurs_free_fundefs B1  \\ Dom_map L) m
+                                              (name_in_fundefs B1 :|: occurs_free_fundefs B1 :|: S \\ Dom_map L) m
                                               (def_funs B1 B1 rho0 rho0) (def_funs B' B' rho2 rho2)).
         { intros. eapply IHk; try eassumption.
-          - eapply fun_inv_monotonic. eassumption. omega.
-          - eapply preord_env_P_monotonic; [| eassumption ]. omega. } 
+          eapply preord_env_P_monotonic; [| eassumption ]. omega. } 
         
         do 6 eexists. repeat split.
         * eapply find_def_complete.
@@ -905,16 +1105,27 @@ Section Correct.
           edestruct (Hand j) as [Hinv' Henv']. omega.
             
           eapply Elim_expr_correct; try eassumption. 
-          -- eapply Disjoint_Included_r. eapply bound_var_occurs_free_in_fun_Included.
-             eapply find_def_correct. eassumption. eassumption.
+          -- repeat normalize_bound_var_in_ctx. sets.
+             eapply Disjoint_Included_r; [| eassumption ].
+             eapply Included_Setminus.
+             eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption.
+             eapply Included_trans;
+               [| eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eassumption ].
+             now sets.
           -- eapply Hd. eapply find_def_correct. eassumption. eassumption.
           -- eapply Known_fundefs_fun_in_fundefs. eassumption. eapply find_def_correct. eassumption.
-          -- assert (Hin : FromList xs1 \subset bound_var_fundefs B1).
-             { eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eassumption ].
-               sets. } 
+          -- assert (Hdis :  Disjoint map_util.M.elt (FromList xs1) (Dom_map L)).
+             { eapply Disjoint_sym.
+               eapply Disjoint_Included_r; [| eassumption ].
+               eapply Included_Setminus.
+               eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption.
+               eapply Included_trans;
+                 [| eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eassumption ].
+             now sets. } 
              eapply fun_inv_set_lists_Disjoint_l; eauto; sets.
-             eapply fun_inv_set_lists_Disjoint_r; eauto; sets.
-             eapply Disjoint_Included_l. eapply live_args_subset. sets. 
+             eapply fun_inv_set_lists_Disjoint_r; [| | now eauto ].
+             eassumption.
+             eapply Disjoint_Included_l. eapply live_args_subset. sets.             
           -- rewrite Setminus_Union. rewrite Union_commut, <- Setminus_Union.
              eapply preord_env_P_set_lists_live; eauto.
              eapply preord_env_P_antimon. eassumption.
@@ -922,11 +1133,6 @@ Section Correct.
              eapply Included_Setminus_compat. eapply Setminus_Included_Included_Union.
              eapply Included_trans. eapply occurs_free_in_fun.
              eapply find_def_correct. eassumption. sets. reflexivity.
-
-          -- eapply binding_in_map_antimon.
-             2:{ eapply binding_in_map_set_lists; [| now eauto ].
-                 eapply binding_in_map_def_funs. eassumption. }
-             eapply occurs_free_in_fun. eapply find_def_correct. eassumption.
 
     - intros x Hinx v Hgetx. destruct (Decidable_name_in_fundefs B).
       destruct (Dec x).
@@ -952,11 +1158,10 @@ Section Correct.
           assert (Hand : forall m, m < k ->
                                    fun_inv L find_tag m (def_funs B B rho1 rho1) (def_funs B' B' rho2 rho2) /\
                                    preord_env_P cenv PG
-                                                (name_in_fundefs B :|: occurs_free_fundefs B  \\ Dom_map L) m
+                                                (name_in_fundefs B :|: occurs_free_fundefs B :|: S \\ Dom_map L) m
                                                 (def_funs B B rho1 rho1) (def_funs B' B' rho2 rho2)).
           { intros. eapply IHk; try eassumption.
-            - eapply fun_inv_monotonic. eassumption. omega.
-            - eapply preord_env_P_monotonic; [| eassumption ]. omega. } 
+            eapply preord_env_P_monotonic; [| eassumption ]. omega. } 
           
 
           do 3 eexists. repeat split.
@@ -970,88 +1175,253 @@ Section Correct.
 
              { eapply preord_exp_post_monotonic. eapply HGPost. eassumption.
                eapply Elim_expr_correct with (S := Empty_set _); try eassumption. 
-               - eapply Disjoint_Included_r. eapply bound_var_occurs_free_in_fun_Included.
-                 eapply find_def_correct. eassumption. eassumption.
+               - repeat normalize_bound_var_in_ctx. sets.
+                 eapply Disjoint_Included_r; [| eassumption ].
+                 eapply Included_Setminus.
+                 eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption.
+                 eapply Included_trans;
+                   [| eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eassumption ].
+                 now sets.
                - eapply Dead_empty. eapply no_fun_in_fundefs. eassumption.
                  eapply find_def_correct. eassumption.
                - eapply Known_fundefs_fun_in_fundefs. eassumption. eapply find_def_correct. eassumption.                 
-               - assert (Hin : FromList xs1 \subset bound_var_fundefs B).
-                  { eapply Included_trans; [| eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eassumption ].
-                    sets. } 
-                  eapply fun_inv_set_lists_Disjoint_l; eauto; sets.
-                  eapply fun_inv_set_lists_Disjoint_r; eauto; sets.
+               - assert (Hdis :  Disjoint map_util.M.elt (FromList xs1) (Dom_map L)).
+                 { eapply Disjoint_sym.
+                   eapply Disjoint_Included_r; [| eassumption ].
+                   eapply Included_Setminus.
+                   eapply unique_bindings_fun_in_fundefs. eapply find_def_correct. eassumption. eassumption.
+                   eapply Included_trans;
+                     [| eapply fun_in_fundefs_bound_var_fundefs; eapply find_def_correct; eassumption ].
+                   now sets. } 
+                 eapply fun_inv_set_lists_Disjoint_l; eauto; sets.
+                 eapply fun_inv_set_lists_Disjoint_r; [| | now eauto ]; sets.
                - normalize_sets.
                  eapply preord_env_P_set_lists_l; eauto.
 
                  intros. inv H10. eapply occurs_free_in_fun in H11; [| eapply find_def_correct; eassumption ].
-                 constructor; eauto. inv H11; eauto. exfalso; eauto.
-               - eapply binding_in_map_antimon. 
-                 2:{ eapply binding_in_map_set_lists; [| now eauto ].
-                     eapply binding_in_map_def_funs. eassumption. }
-                 eapply occurs_free_in_fun. eapply find_def_correct. eassumption. }
+                 constructor; eauto. inv H11; eauto. exfalso; eauto. }
 
       + rewrite def_funs_neq in Hgetx; eauto. rewrite def_funs_neq.
         2:{ intros Hc. eapply n. eapply Elim_fundefs_name_in_fundefs in Hc; eauto. }
-        eapply Henv; eauto. inv Hinx. inv H; eauto.
+        eapply Henv; eauto. inv Hinx. inv H; eauto. inv H1; eauto.
         now exfalso; eauto. constructor; eauto.
+        constructor; eauto. 
   Qed.
-            
-         
 
 
-(*
-      
-Lemma eliminate_expr_correct: 
-  forall e sig fm st S
-         (Hun : unique_bindings e)          
-         (Hdis1 : Disjoint _ (Dom_map L) (bound_var e :|: occurs_free e))          
-         (Hnf : no_fun e)
-         
-         (Hd : Dead S L e)
-         (Hk : Known_exp (Dom_map L) e)
-         
-         (Hfinv : fun_inv F L rho1 rho2),
-    
-      {{ fun _ s => True }}
-        eliminate_expr L e 
-      {{ fun _ s e' s' =>
-           next_var (fst s) = next_var (fst s) /\
-           unique_bindings e' /\
-           occurs_free e' \subset occurs_free e /\
-           bound_var e' \subset bound_var e /\
-           (forall k rho1 rho2,
-               preord_env_P_inj cenv PG (occurs_free e \\ S \\ Dom_map L) k (apply_r sig) rho1 rho2 ->
-               binding_in_map (occurs_free e) ->                 
-               preord_exp cenv (P1 d) PG k (e, rho1) (e', rho2)) }}.
-
-    (forall B sig sig0 fm st S
-            (Hun : unique_bindings_fundefs B)
-            (Hdis1 : Disjoint _ (bound_var_fundefs B) (occurs_free_fundefs B :|: (occurs_free_fun_map fm \\ name_in_fundefs B)))
-            (Hdis3 : Disjoint _ S (image (apply_r sig) (occurs_free_fundefs B :|: occurs_free_fun_map fm)))
-            (Hdis4 : Disjoint _ (bound_var_fundefs B \\ name_in_fundefs B) (Dom_map fm))
-            (Hdis5 : just_for_fun_inv B fm)
-                        
-            (Hfm : fun_map_vars fm S sig)
-            (Hnames1 : NoDup (apply_r_list sig (all_fun_name B)))
-            (Hnames2 : Disjoint _ S (FromList (apply_r_list sig (all_fun_name B)))), 
-        {{ fun _ s => fresh S (next_var (fst s)) }}
-          inline_fundefs St IH d sig0 sig fm B st
-        {{ fun _ s B' s' =>
-             fresh S (next_var (fst s')) /\ next_var (fst s) <= next_var (fst s') /\
-             unique_bindings_fundefs B' /\
-             occurs_free_fundefs B' \subset image (apply_r sig) (occurs_free_fundefs B :|: occurs_free_fun_map fm) /\
-             bound_var_fundefs B' \\ name_in_fundefs B' \subset (Range (next_var (fst s)) (next_var (fst s'))) /\
-             all_fun_name B' = apply_r_list sig (all_fun_name B) /\
-             (forall f xs ft e1,
-                 find_def f B = Some (ft, xs, e1) ->
-                 exists xs' e2,
-                   find_def (apply_r sig f) B' = Some (ft, xs', e2) /\
-                   length xs = length xs' /\ NoDup xs' /\ FromList xs' \subset S /\
-                   (forall rho1 rho2 k,
-                       preord_env_P_inj cenv PG (occurs_free_fundefs B :|: name_in_fundefs B :|: FromList xs )
-                                        k (apply_r sig <{ xs ~> xs' }>) rho1 rho2 ->
-                       fun_map_inv d (occurs_free_fundefs B :|: name_in_fundefs B :|: FromList xs) fm rho1 rho2 k (set_list (combine xs xs') sig) ->
-                       preord_exp cenv (P1 d) PG k (e1, rho1) (e2, rho2))) }}).
-  
+  Lemma create_fun_tag_dom_subset L am B (c c' : comp_data) (fm fm' : ftagMap) :
+    create_fun_tag L am B c fm = (fm', c') ->
+    Dom_map fm \subset Dom_map fm'.
   Proof.
-*)
+    revert c c' fm fm'.
+    induction B; intros c c' fm fm' Hcr; simpl in *; sets.
+
+    - unfold get_fun_vars in *.
+
+      destruct (L ! v) eqn:Hget.
+      
+      + destruct (am ! (Positive_as_DT.of_succ_nat (Datatypes.length (live_args l l0)))).
+        eapply Included_trans; [| eapply IHB; eauto ].
+        rewrite Dom_map_set. sets.
+
+        destruct (dead_param_elim.make_ftag (Datatypes.length (live_args l l0)) c).
+        eapply Included_trans; [| eapply IHB; eauto ].
+        rewrite Dom_map_set. sets.
+
+      + eauto.
+        
+    - inv Hcr. sets.
+  Qed.
+
+
+
+  Lemma create_fun_tag_dom L am B (c c' : comp_data) (fm fm' : ftagMap) :
+    create_fun_tag L am B c fm = (fm', c') ->
+    Dom_map L :&: name_in_fundefs B \subset Dom_map fm'.
+  Proof.
+    revert c c' fm fm'.
+    induction B; intros c c' fm fm' Hcr; simpl in *; sets.
+
+    - unfold get_fun_vars in *.
+
+      destruct (L ! v) eqn:Hget.
+
+      + destruct (am ! (Positive_as_DT.of_succ_nat (Datatypes.length (live_args l l0)))).
+        * rewrite Intersection_commut, Intersection_Union_distr.
+          eapply Union_Included; eauto.
+          2:{ rewrite Intersection_commut. eauto. }
+
+          eapply create_fun_tag_dom_subset in Hcr.
+          eapply Included_trans. eapply Included_Intersection_l. 
+          eapply Included_trans; [| eassumption ].
+          rewrite Dom_map_set. sets.
+
+        * destruct (dead_param_elim.make_ftag (Datatypes.length (live_args l l0)) c).
+          rewrite Intersection_commut, Intersection_Union_distr.
+          eapply Union_Included; eauto.
+          2:{ rewrite Intersection_commut. eauto. }
+
+          eapply create_fun_tag_dom_subset in Hcr.
+          eapply Included_trans. eapply Included_Intersection_l. 
+          eapply Included_trans; [| eassumption ].
+          rewrite Dom_map_set. sets.
+          
+      + rewrite Intersection_commut. rewrite Union_commut.
+        rewrite closure_conversion_util.Intersection_Union_Disjoint.
+        rewrite Intersection_commut. eapply IHB. eassumption.
+        eapply Disjoint_Singleton_l. intros Hc. inv Hc. congruence.
+        
+    - rewrite Intersection_Empty_set_abs_r. sets. 
+  Qed. 
+
+  Lemma create_fun_tag_next_var L am B (c c' : comp_data) (fm fm' : ftagMap) :
+    create_fun_tag L am B c fm = (fm', c') ->
+    next_var c = next_var c'.
+  Proof.
+    revert c c' fm fm'.
+    induction B; intros c c' fm fm' Hcr; simpl in *; eauto.
+    
+    - unfold get_fun_vars in *.
+      
+      destruct (L ! v) eqn:Hget.
+
+      + destruct (am ! (Positive_as_DT.of_succ_nat (Datatypes.length (live_args l l0)))).
+        * eapply IHB. eassumption.
+        * destruct (dead_param_elim.make_ftag (Datatypes.length (live_args l l0)) c) eqn:Ht.
+
+          unfold dead_param_elim.make_ftag in *. destruct c. inv Ht. simpl.
+          eapply IHB in Hcr. simpl in *. eassumption.
+          
+      + eapply IHB. eassumption.
+        
+    - inv Hcr. reflexivity.
+  Qed. 
+
+  
+  (* TODO move *)
+  
+  Lemma max_var_le e e' :
+    bound_var e :|: occurs_free e \subset bound_var e' :|: occurs_free e' ->
+    (max_var e 1 <= max_var e' 1)%positive. 
+  Proof.
+    intros Hin.
+    assert (Hin' := max_var_subset e).
+    eapply Hin in Hin'.
+    inv Hin'.
+    eapply bound_var_leq_max_var. eassumption.
+    eapply occurs_free_leq_max_var. eassumption.
+  Qed.
+
+  
+  Lemma DPE_correct_top  (e : exp) (c : comp_data) :
+    unique_bindings e ->
+    (max_var e 1%positive < next_var c)%positive ->
+    Disjoint _ (bound_var e) (occurs_free e) ->
+    exists e' c',
+      DPE e c = (Ret e', c') /\
+      unique_bindings e' /\
+      occurs_free e' \subset occurs_free e /\
+      Disjoint _ (bound_var e') (occurs_free e') /\
+      (max_var e' 1%positive < next_var c')%positive /\     
+      (forall k rho1 rho2,
+          preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
+          binding_in_map (occurs_free e) rho1 ->
+          preord_exp cenv PL PG k (e, rho1) (e', rho2)).
+  Proof.
+    intros Hun Hleq Hdis. unfold DPE.
+
+    (* identity case *)
+    assert (Hid :
+              exists (e' : exp) (c' : comp_data),
+                (Ret e, c) = (Ret e', c') /\
+                unique_bindings e' /\
+                occurs_free e' \subset occurs_free e /\
+                Disjoint var (bound_var e') (occurs_free e') /\
+                (max_var e' 1 < next_var c')%positive /\
+                (forall (k : nat) (rho1 rho2 : env),
+                    preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
+                    binding_in_map (occurs_free e) rho1 -> preord_exp' cenv (preord_val cenv) PL PG k (e, rho1) (e', rho2))).
+    { do 2 eexists. split; [| split; [| split; [| split; [| split ] ]]]; eauto; sets.
+      intros. eapply preord_exp_refl; eauto. }
+    
+    destruct (is_hoisted e) eqn:Hhoist; [| now eauto ].
+    destruct e; try now eauto.
+    destruct (find_live (Efun f e)) as [ L |  ] eqn:Hlive; [| now eauto ]. 
+    destruct (create_fun_tag L (make_arityMap (Efun f e) (M.empty fun_tag)) f c (M.empty fun_tag)) eqn:Hfmap.
+
+    (* something actually happens *)
+    edestruct is_hoisted_correct. eassumption. destructAll. 
+    
+    edestruct find_live_sound_top. eassumption.
+    eapply unique_bindings_fundefs_unique_functions. inv Hun. eassumption. eassumption.
+
+    destructAll. 
+
+    assert (Hceq := create_fun_tag_next_var _ _ _ _ _ _ _ Hfmap). rewrite Hceq in *. 
+
+    eapply create_fun_tag_dom in Hfmap. 
+    rewrite Intersection_Same_set in Hfmap; [| eassumption ]. 
+
+      
+    unfold run_compM. 
+    
+    assert (Hsb := eliminate_fundefs_sound f0 L Hfmap f H tt (c0, tt) I).
+    destruct (compM.runState (eliminate_fundefs f0 L f) tt (c0, tt)) as [[ B' | ] c1].
+    contradiction.  destructAll.
+    
+    assert (Hse := eliminate_expr_sound f0 L Hfmap e H0 tt (c0, tt) I).
+    destruct (compM.runState (eliminate_expr f0 L e) tt (c0, tt)) as [[ e' | ] c1].
+    contradiction. destructAll.
+    
+    (* bound_var *)
+    assert (Hbe := Elim_exp_bound_var _ _ _ _ H12).
+    assert (Hbf := Elim_fundefs_bound_var _ _ _ _ H11).
+    (* unique bindings *)
+    inv Hun. 
+    assert (Hue := Elim_exp_unique_bindings _ _ _ _ H12 H14).
+    assert (Huf := Elim_fundefs_unique_bindings _ _ _ _ H11 H15).
+    (* free vars *)
+    assert (Hfve := Elim_exp_occurs_free _ _ _ _ H12).
+    assert (Hfvf := Elim_fundefs_occurs_free _ _ _ _ H11 H7).
+    
+    
+    do 2 eexists.  split; [| split; [| split; [| split; [| split ] ]]].
+    - reflexivity.
+    - econstructor; eauto.
+      eapply Disjoint_Included. eassumption. eassumption. sets.
+    - repeat normalize_occurs_free.
+      rewrite Elim_fundefs_name_in_fundefs with (B := f); eauto. sets.
+    - eapply Disjoint_Included; [| | eapply Hdis ].
+      + repeat normalize_occurs_free.
+        rewrite Elim_fundefs_name_in_fundefs with (B := f); eauto. 
+        sets.
+      + repeat normalize_bound_var. sets.
+    - eapply Pos.le_lt_trans; [| eassumption ]. eapply max_var_le. 
+      repeat normalize_occurs_free. repeat normalize_bound_var.
+      rewrite Elim_fundefs_name_in_fundefs with (B := f); eauto. sets.
+
+    - (* Semantic correctness *)
+      intros k rho1 rho2 Henv Hbin. 
+      inv H9.
+      
+      eapply Elim_fundefs_correct in H11; try eauto.
+      2:{ sets. }
+      2:{ eapply preord_env_P_antimon. eassumption. normalize_occurs_free. sets. }
+      destructAll.
+
+      eapply preord_exp_fun_compat.
+      + eapply HPost.
+      + eapply HPost.
+      + eapply Elim_expr_correct; try eassumption.
+        * eapply Disjoint_Included_l.
+          eapply Included_trans. eassumption.
+          eapply name_in_fundefs_bound_var_fundefs. sets.
+        * eapply Dead_empty. eassumption.
+        * eapply fun_inv_monotonic. eassumption. omega.
+        * eapply preord_env_P_antimon.
+          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          repeat normalize_sets. eapply Included_Setminus_compat; sets.
+          rewrite Union_Setminus_Included; sets. tci.
+  Qed. 
+
+End Correct.

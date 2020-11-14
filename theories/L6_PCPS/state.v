@@ -148,13 +148,19 @@ Section CompM.
     s <- compM.get ;;
     compM.put (fst s, st).
 
+  Definition make_ftag (arity : nat) (c : comp_data) : fun_tag * comp_data:=
+    let 'mkCompData x c i f e fenv names imap log := c in
+    (f, mkCompData x c i (f + 1)%positive e (M.set f (N.of_nat arity, (List_util.fromN (0%N) arity)) fenv) names imap log).
+
+  
   (** Get a fresh function tag and register it in fun_env *)
+
+  (* TODO write in terms of make_ftag *)
   Definition get_ftag (arity : N) : compM' fun_tag :=
     p <- compM.get ;;
     let '(mkCompData x c i f e fenv names imap log, st) := p in
     compM.put (mkCompData x c i (f + 1)%positive e (M.set f (arity, (fromN (0%N) (BinNat.N.to_nat arity))) fenv) names imap log, st) ;;
     ret f.
-
   
   Definition run_compM {A} (m: compM' A) (st : comp_data) (s : S)
     : error A * (comp_data * S) := runState m tt (st, s).

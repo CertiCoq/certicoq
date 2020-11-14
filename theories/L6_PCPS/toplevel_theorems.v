@@ -188,19 +188,6 @@ Section LambdaLift.
 End LambdaLift.
   
 
-Lemma max_var_le e e' :
-  bound_var e :|: occurs_free e \subset bound_var e' :|: occurs_free e' ->
-  max_var e 1 <= max_var e' 1. 
-Proof.
-  intros Hin.
-  assert (Hin' := max_var_subset e).
-  eapply Hin in Hin'.
-  inv Hin'.
-  eapply bound_var_leq_max_var. eassumption.
-  eapply occurs_free_leq_max_var. eassumption.
-Qed.
-
-
 (* TODO move *)
 Section Refl.
   

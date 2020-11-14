@@ -123,7 +123,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       inl_known       : bool;    (* If true, lambda lifting inlines known calls inside wrappers *)
       inl_before      : bool;    (* Perform shrink/inline loop before closure conversion *)
       inl_after       : bool;    (* Perform shrink/inline loop after closure conversion *)
-      dead_param_elim : bool;    (* Turn it off for the top-level theorm because it does not have a proof yet *)
+      dpe             : bool;    (* Turn it off for the top-level theorm because it does not have a proof yet *)
     }.
 
 
@@ -187,8 +187,8 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
       e <- (if inl_after anf_opts then
               time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100) e
             else id_trans e) ;;
-      e <- (if dead_param_elim anf_opts then
-              time_anf "Dead param elim" dead_param_elim.eliminate e
+      e <- (if dpe anf_opts then
+              time_anf "Dead param elim" dead_param_elim.DPE e
             else id_trans e) ;;
       e <- time_anf "Shrink" shrink_err e;;
       e <- (if inl_known anf_opts then
@@ -378,7 +378,7 @@ Definition make_anf_options (opts : Options) : anf_options :=
      inl_known    := inl_known;
      inl_before   := inl_before;
      inl_after    := inl_after;
-     dead_param_elim := true;
+     dpe          := true;
   |}.
 
 

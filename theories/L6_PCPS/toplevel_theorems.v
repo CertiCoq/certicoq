@@ -6,7 +6,8 @@ Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.set_util
         L6.Ensembles_util L6.List_util L6.size_cps L6.tactics L6.relations L6.rel_comp
         L6.uncurry L6.uncurry_proto L6.bounds L6.shrink_cps L6.shrink_cps_toplevel
         L6.closure_conversion L6.closure_conversion_util L6.hoisting
-        L6.lambda_lifting L6.lambda_lifting_correct L6.uncurry_correct.
+        L6.lambda_lifting L6.lambda_lifting_correct L6.uncurry_correct
+        L6.dead_param_elim L6.dead_param_elim_correct.
 Require Export L6.logical_relations L6.logical_relations_cc L6.alpha_conv
         L6.inline_letapp L6.inline L6.inline_correct L6.algebra L6.state.
 Require Import Common.compM.
@@ -259,7 +260,7 @@ Section CCHoist.
         * unfold closure_conversion_hoist. rewrite H. rewrite Hhoist. simpl. reflexivity.
         * split. eassumption. sets.
         * eapply Pos.le_lt_trans; [| eassumption ].
-          eapply max_var_le. eapply Included_Union_compat. eassumption. eassumption.
+          eapply dead_param_elim_correct.max_var_le. eapply Included_Union_compat. eassumption. eassumption.
         * do 2 eexists. econstructor. split.
           ++ eapply preord_exp_n_refl.
              clear; firstorder.
@@ -438,6 +439,48 @@ Section Uncurry.
 
 End Uncurry.
 
+
+Section DPE.
+
+  Lemma DPE_correct e c :
+    well_scoped e ->
+    max_var e 1 < state.next_var c ->
+    exists (e' : exp) (c' : state.comp_data),
+      DPE e c = (Ret e', c') /\
+      max_var e' 1 < state.next_var c' /\
+      wf_pres e e' /\
+      well_scoped e'  /\
+      (forall (k : nat) (rho1 rho2 : env),
+          preord_env_P cenv (ll_bound 0) (occurs_free e) k rho1 rho2 ->
+          binding_in_map (occurs_free e) rho1 ->
+          preord_exp cenv (simple_bound 0) (simple_bound 0) k (e, rho1) (e', rho2)).
+  Proof.
+    intros.
+    edestruct DPE_correct_top with (PL := simple_bound 0)
+                                   (PG := simple_bound 0).   
+    - intros. eapply simple_bound_compat.
+    - eapply H.
+    - eassumption.
+    - eapply H.
+    - destructAll. do 2 eexists. split. eassumption.
+      split. eassumption.
+      split. eassumption. split.
+      split; eassumption.
+      eassumption.
+  Qed.
+
+  Corollary DPE_correct_corr :
+    correct DPE.
+  Proof.
+    intro; intros.
+    edestruct DPE_correct; eauto. destructAll. 
+    do 2 eexists. repeat (split; [ eassumption | ]).
+    eexists. econstructor. now eauto. eassumption. split.
+    eapply simple_bound_compat. eapply simple_bound_post_upper_bound.
+  Qed.
+  
+End DPE.
+  
 End ToplevelTheorems.
 
 Require Import ExtLib.Structures.Monad L6.toplevel.
@@ -543,7 +586,6 @@ Section Compose.
   Qed.
   
   Theorem anf_pipeline_correct opts :
-    dead_param_elim opts = false -> (* We don't yet have a proof for dead param elim phase, so turn off *)
     correct_cc cenv clo_tag (anf_pipeline opts).
   Proof.
     intros Heq.
@@ -592,9 +634,12 @@ Section Compose.
     eapply correct_time. now eapply inline_loop_correct.
     now eapply correct_id_trans.
 
-    eapply correct_compose.
+    eapply correct_compose. 
 
-    rewrite Heq. now eapply correct_id_trans.
+    destruct (dpe opts).
+
+    eapply correct_time. now eapply DPE_correct_corr.
+    now eapply correct_id_trans.
 
     eapply correct_compose.
 
@@ -614,7 +659,6 @@ Section Compose.
 
   (* Top-level correctness for whole programs *)
   Corollary anf_pipeline_whole_program_correct opts e c :
-    dead_param_elim opts = false -> (* We don't yet have a proof for dead param elim phase, so turn off *)
 
     closed_exp e ->
     
@@ -663,7 +707,6 @@ Section Compose.
 
   (* Top-level correctness for linking *)
   Corollary anf_pipeline_linking_correct lf x o1 o2 e1 e2 c1 c2 :
-    dead_param_elim o1 = false -> dead_param_elim o2 = false -> (* We don't yet have a proof for dead param elim phase, so turn off *)
 
     closed_exp e1 ->
     well_scoped e1 ->
@@ -691,7 +734,7 @@ Section Compose.
     eapply R_n_exp_in_refines.
     
     6:{ eapply Rel_exp_n_preserves_linking; eauto.
-        - intros. eapply H15.
+        - intros. eapply H13.
         - eapply simple_bound_compat. }
 
     now eauto.

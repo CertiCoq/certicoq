@@ -581,7 +581,7 @@ Section Log_rel.
       (* for simplicity don't model the semantics of the target since it doesn't matter *)
       PG (e1, rhoc1', c1, cout1)  (e2, rhoc2, c2, cout2) -> 
       P (Eapp x t ys, rho1, c1 <+> one (Eapp x t ys), cout1 <+> one (Eapp x t ys))
-        (Eapp x' t' ys', rho2, c2 <+> one (Eapp x' t' ys'), cout2 <+> one (Eapp x t ys)).
+        (Eapp x' t' ys', rho2, c2 <+> one (Eapp x' t' ys'), cout2 <+> one (Eapp x' t' ys')).
    
   Definition post_letapp_compat' x f t ys e1 rho1 x' f' t' ys' e2 rho2 (P1 P2 : PostT) (PG : PostGT):=
     forall xs e_b1 v1  e_b2 v2 
@@ -1000,6 +1000,32 @@ Section Log_rel.
                ++ eassumption.
     Qed.
 
+    (* Slightly stronger version *)
+    Lemma preord_exp_case_cons_compat_alt k rho1 rho2 x1 x2 c e1 e2 D1 D2
+          (Hcompat_hd : post_case_compat_hd' x1 c e1 D1 rho1  x2 c e2 D2 rho2 P1 P2)
+          (Hcompat_tl : post_case_compat_tl' x1 c e1 D1 rho1  x2 c e2 D2 rho2 P2 P2)
+          (HOOT : post_OOT' (Ecase x1 ((c, e1) :: D1)) rho1 (Ecase x2 ((c, e2) :: D2)) rho2 P2) :
+      Forall2 (fun p p' => fst p = fst p') D1 D2 ->
+      ((exists c vs, rho1 ! x1 = Some (Vconstr c vs)) -> preord_var_env PG k rho1 rho2 x1 x2) ->
+      (forall m, m < k -> preord_exp P1 PG m (e1, rho1) (e2, rho2)) ->
+      preord_exp P2 PG k (Ecase x1 D1, rho1)
+                 (Ecase x2 D2, rho2) ->
+      preord_exp P2 PG k (Ecase x1 ((c, e1) :: D1), rho1)
+                 (Ecase x2 ((c, e2) :: D2), rho2).
+    Proof.
+      intros Hall Henv Hexp_hd Hexp_tl v1 c1 cout Hleq1 Hstep1. inv Hstep1.
+      - (* ΟΟΤ *)
+        exists OOT, c1, <0>. split. constructor; eauto; eassumption.
+        split; [| now eauto ]. eapply HOOT; eassumption.        
+      - inv H. inv H3.
+        specialize (Henv ltac:(do 2 eexists; eassumption)).
+        eapply preord_exp_case_cons_compat; eauto.
+        econstructor 2. econstructor; eauto. econstructor; eauto. 
+    Qed.
+
+
+
+    
     Axiom Prim_axiom :
       forall f f' v1,
         M.get f pr = Some f' ->

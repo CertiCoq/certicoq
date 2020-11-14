@@ -29,10 +29,10 @@ Definition set_fun_vars (m : live_fun) (f : var) (b : list bool) :=
   end. 
 
 (* Apply bit mask to argument list*)
-Fixpoint live_args (ys : list var) (bs : list bool) : list var := 
-  match ys, bs with 
+Fixpoint live_args {A} (ys : list A) (bs : list bool) : list A := 
+  match bs, ys with 
   | [], [] => ys
-  | y :: ys', b :: bs' => 
+  |  b :: bs', y :: ys' => 
     if b then y :: (live_args ys' bs')
     else live_args ys' bs'
   | _, _ => ys

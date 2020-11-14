@@ -222,7 +222,7 @@ Proof.
   eapply live_expr_subset.
 Qed.
   
-Lemma live_args_subset ys bs:
+Lemma live_args_subset {A} (ys : list A) bs:
   FromList (live_args ys bs) \subset FromList ys.
 Proof.
   revert bs; induction ys; intros [ | [|] bs ]; simpl; sets.

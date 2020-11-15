@@ -121,15 +121,44 @@ Section Inline_Eq.
       ret (Ehalt x')
     end.
 
+  
+  Definition hide_body {A} {a : A} := a.
 
-  Lemma beta_contract_eq (d : nat) (e : exp) (sig : r_map) (fm:fun_map) (s:St) : 
+  Lemma inline_exp_eq (d : nat) (e : exp) (sig : r_map) (fm:fun_map) (s:St) : 
     inline_exp _ IH d e sig fm s = inline_exp' d e sig fm s.
   Proof.
-    unfold inline_exp; destruct e; try reflexivity.
+    unfold inline_exp. unfold inline_exp'. rewrite Program.Wf.Fix_eq; simpl; try reflexivity.
+    (*   match goal with *)
+    (* | |- context C [@Wf.Fix_sub ?A ?R ?wf ?P ?f ?a] => *)
+    (*   set (body := hide_body (a:=f)) in |-; *)
+    (*   let newg := context C [ @Wf.Fix_sub A R wf P body a ] in change_no_check newg *)
+    (* end. *)
+    (* Wf.WfExtensionality.unfold_sub inline_exp (inline_exp _ IH d e sig fm s). *)
+    (* destruct e; lazy [projT1 projT2 fst snd]; unfold inline_exp, inline_exp'; *)
+    (*   lazy [projT1 projT2 fst snd]. *)
+    (* { lazy [projT1 projT2 fst snd]; reflexivity. } *)
+    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
+    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
+    (* optimize_heap. *)
+    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
+    (* optimize_heap. *)
+    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
+    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
+    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
+    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
+
+    (* unfold inline_exp; destruct e; try reflexivity. *)
+    (* - admit. *)
+    (* - rewrite Program.Wf.Fix_eq. simpl. reflexivity.  *)
+    (* f_equal. simpl.  *)
+    (* reflexivity. compcert/lib/Wfsimpl.v lemmas might help *)
+
+
     (* XXX ask *)
   Admitted.
     
 End Inline_Eq. 
+
 (* get_fresh_name[s] specs *)
 
 

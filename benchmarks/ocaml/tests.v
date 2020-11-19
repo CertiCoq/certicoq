@@ -34,12 +34,18 @@ Definition demo2 (_ : unit) := List.map negb (repeat2 true false 100).
 Definition list_sum  (_ : unit) := List.fold_left plus (List.repeat 1 100) 0.
 
 (* Veristar *)
-
 Definition vs_easy (_ : unit) :=
-  match vs.main with
-  | Valid => true
-  | _ => false
-  end.
+  (fix loop (n : nat) (res : veristar_result) :=
+     match n with
+     | 0 =>
+       match res with
+       | Valid => true
+       | _ => false
+       end
+     | S n =>
+       let res := check_entailment example_ent in
+       loop n res
+     end) 100  Valid.
 
 Definition vs_hard (_ : unit) :=
   match vs.main_h with

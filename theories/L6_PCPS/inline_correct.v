@@ -1335,7 +1335,7 @@ Section Inline_correct.
   
   Proof.
     induction d as [d IHd] using lt_wf_rec1.
-    exp_defs_induction IHe IHl IHB; intros; inv Hun; try rewrite beta_contract_eq; (destruct (HProp d); [ eassumption | ]).
+    exp_defs_induction IHe IHl IHB; intros; inv Hun; try rewrite inline_exp_eq; (destruct (HProp d); [ eassumption | ]).
     - (* constr *)
       eapply bind_triple. eapply pre_transfer_r. now eapply get_fresh_name_spec.
       intros x w1. simpl. eapply pre_curry_l. intros Hf'. eapply pre_curry_l. intros HinS. 
@@ -1403,7 +1403,7 @@ Section Inline_correct.
       + normalize_bound_var. sets.
       + intros. eapply preord_exp_case_nil_compat. now eauto.
     - (* Ecase (_ :: _) *)
-      simpl. setoid_rewrite assoc. eapply bind_triple.
+      unfold inline_exp. simpl. setoid_rewrite assoc at 1. eapply bind_triple.
       + eapply pre_transfer_r. eapply IHe.
         * eassumption.
         * repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
@@ -1422,7 +1422,7 @@ Section Inline_correct.
         eapply pre_curry_l. intros Hrel. eapply pre_curry_l. intros Hcase.
         eapply pre_curry_l. intros Hfv. eapply pre_curry_l. intros Hun. 
         setoid_rewrite st_eq_Ecase. eapply bind_triple.
-        * setoid_rewrite beta_contract_eq in IHl. unfold inline_exp' in IHl.
+        * setoid_rewrite inline_exp_eq in IHl. unfold inline_exp' in IHl.
           do 2 eapply frame_rule. eapply pre_transfer_r.
           eapply IHl.
           -- eassumption.

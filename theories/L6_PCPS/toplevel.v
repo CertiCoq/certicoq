@@ -181,8 +181,6 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
             else id_trans e) ;;
       e <- time_anf "Shrink" shrink_err e;;
       e <- time_anf "Closure conversion and hoisting" (closure_conversion_hoist clo_tag clo_ind_tag) e ;;
-      (* Update the names map. TODO find which transformation does not register all names and remove that. *)
-      (* e <- update_c_data e ;;  *)
       e <- time_anf "Shrink" shrink_err e;;
       e <- (if inl_after anf_opts then
               time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100) e
@@ -215,123 +213,6 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
         (Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e), log_to_string log)
       end.
     
-(* The old L6 pipeline. Don't delete yet.
-
-    (* Optimizing L6 pipeline *)
-    Definition L6_pipeline               
-               (t : L6_FullTerm) : error L6_FullTerm * string :=
-      let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
-      (* make compilation state *)
-      let c_data :=
-          let next_var :=
-              ((identifiers.max_var e0 1) + 1)%positive in
-          let next_fun_tag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) fenv 1 + 1 in
-          pack_data next_var ctag itag next_fun_tag cenv fenv nenv nil
-      in
-      let res : error (exp * comp_data):=
-          (* Apply ANF transformations *)
-          (* Shrink reduction *)
-          let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e0) in
-          (* Uncurring *)
-          let '(e_err, s, c_data) := time_anf "Uncurry" (fun _ => uncurry_fuel cps 100 e c_data) in
-          e <- e_err ;;
-          (* Inlining *)
-          let (e_err, c_data) := time_anf "Inline uncurry wrappers" (fun _ => inline_uncurry next_var e s 10 100 c_data) in
-          e <- e_err ;;
-          (* Inline small functions *) 
-          let (e_err, c_data) := if inl_before then time_anf "Inline/shrink loop" (fun _ => inline_small next_var e s 10 100 c_data) else (compM.Ret e, c_data) in
-          e <- e_err ;;
-          (* Shrink reduction *)
-          let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) in
-          (* lambda lifting *)
-          let (e_rr, c_data) := if ((opt =? 1)%nat)%bool then
-                                  time_anf "Lambda lift" (fun _ => lambda_lift e args no_push inl_wrappers c_data) 
-                                else (compM.Ret e, c_data) in
-          e <- e_rr ;;
-          (* Shrink reduction *)
-          let (e, _) := if (opt =? 1)%nat then time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) else (e, 0%nat)  in
-          (* Closure conversion *)
-          let (e_err, c_data) := time_anf "Closure conversion and hoisting"
-                                          (fun _ => hoisting.closure_conversion_hoist bogus_closure_tag (* bogus_cloind_tag *) e c_data) in
-          let '(mkCompData next ctag itag ftag cenv fenv names log) := c_data in
-          e <- e_err ;;
-          let c_data :=
-              let cc_var := ((identifiers.max_var e 1) + 1)%positive in (* ΧΧΧ check why this is needed *)
-              pack_data cc_var ctag itag ftag (add_closure_tag bogus_closure_tag bogus_cloind_tag cenv) fenv (add_binders_exp names e) log
-          in
-          (* Shrink reduction *)
-          let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) in
-          (* Shrink reduction *)
-          let (e, _) := if (opt =? 2)%nat then time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) else (e, 0%nat) in
-          (* Dead parameter elimination *)
-          let (e_err, c_data) := time_anf "Dead param elim" (fun _ => dead_param_elim.eliminate e c_data) in
-          e <- e_err ;;
-          (* Shrink reduction *)
-          let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) in
-          (* Inline small functions *) 
-          let (e_err, c_data) := if inl_after then time_anf "Inline/shrink loop" (fun _ => inline_small next_var e s 10 100 c_data) else (compM.Ret e, c_data) in
-          e <- e_err ;;
-          (* Inline in wrapper functions *)
-          let (e_err, c_data) := if inl_known then
-                                   let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) in
-                                   time_anf "Inline known functions inside wrappers" (fun _ => inline_lifted next_var e s 10 1000 c_data)
-                                 else (compM.Ret e, c_data) in
-          e <- e_err ;;
-
-          ret (e, c_data)
-      in
-      match res with
-      | compM.Err s =>
-        (Err ("Failed compiling L6 program: " ++ s)%string, "")
-      | compM.Ret (e, c_data) =>
-        let (_, ctag, itag, ftag, cenv, fenv, nenv, log) := c_data in
-        (Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e), log_to_string log)
-      end.
-
-
-
-    (* Just for debugging *)
-    Definition L6_pipeline_print (t : L6_FullTerm) : error L6_FullTerm * string :=
-      let '(prims, cenv, ctag, itag, nenv, fenv, _, e0) := t in
-      (* make compilation state *)
-      let c_data :=
-          let next_var :=
-              ((identifiers.max_var e0 1) + 1)%positive in
-          let next_fun_tag := M.fold (fun cm => fun ft => fun _ => Pos.max cm ft) fenv 1 + 1 in
-          pack_data next_var ctag itag next_fun_tag cenv fenv nenv (M.empty _) nil
-      in
-      let res : error (exp * comp_data):=
-          (* Apply ANF transformations *)
-          (* Shrink reduction *)
-          let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e0) in
-          (* Uncurring *)
-          let '(e_err, c_data) := time_anf "Uncurry" (fun _ => uncurry_top cps e c_data) in
-          (* let '(e_err, s, c_data) := time_anf "Uncurry" (fun _ => uncurry_fuel cps 100 e c_data) in *)
-          e <- e_err ;;
-          (* Inlining *)
-          let (e_err, c_data) := time_anf "Inline uncurry wrappers" (fun _ => inline_uncurry next_var 10 100 e c_data) in
-          e <- e_err ;;
-          (* Inline small functions *) 
-          let (e_err, c_data) := time_anf "Inline/shrink loop" (fun _ => inline_shrink_loop next_var 10 100 e c_data) in
-          e <- e_err ;;
-          (* Shrink reduction *)
-          let (e, _) := time_anf "Shrink" (fun _ => shrink_cps.shrink_top e) in
-          (* lambda lifting *)
-          let (e_rr, c_data) := if ((opt =? 1)%nat)%bool then
-                                  time_anf "Lambda lift" (fun _ => lambda_lift args no_push inl_wrappers e c_data) 
-                                else (compM.Ret e, c_data) in
-
-          ret (e, c_data)
-      in
-      match res with
-      | compM.Err s =>
-        (Err ("Failed compiling L6 program: " ++ s)%string, "")
-      | compM.Ret (e, c_data) =>
-        let (_, ctag, itag, ftag, cenv, fenv, nenv, _, log) := c_data in
-        (Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e), log_to_string log)
-      end.
-*)
-    
 End Pipeline.
 
 
@@ -349,7 +230,8 @@ End Pipeline.
 6: Like 0, but do not perform inline/shrink loop before CC
 7: Like 0, but do not perform inline/shrink loop after CC
 8: Like 0, but do not perform inline/shrink at all
- *)
+9: Like 0, but non-selective lambda lifting
+*)
 
 Open Scope nat.
   
@@ -366,13 +248,14 @@ Definition make_anf_options (opts : Options) : anf_options :=
       | 6 => (true, false, 1, false, true)
       | 7 => (true, false, 1, true, false)
       | 8 => (true, false, 1, false, false)
+      | 9 => (true, false, 1000, true, true)
       | _ => default
       end
   in
   {| time := Pipeline_utils.time opts;
      cps  := negb (Pipeline_utils.direct opts);
      do_lambda_lift := (1 <=? o_level opts);
-     args := Pipeline_utils.c_args opts;
+     args := if anf_conf opts =? 9 then 1000 else Pipeline_utils.c_args opts;
      no_push := no_push; 
      inl_wrappers := inl_wrappers;
      inl_known    := inl_known;

@@ -1214,6 +1214,19 @@ Section Refinement.
           (Hwf_trans : Transitive wf_pres)
           (Hub : Pr_implies_post_upper_bound PostProp).
 
+  Lemma cc_approx_exp_in_refines P PG (HP : post_upper_bound P) e1 e2 :
+    (forall k, cc_approx_exp cenv ctag k P PG (e1, M.empty _) (e2, M.empty _)) ->
+    refines value_ref_cc e1 e2.
+  Proof.
+    intros Hc1. split.
+    - intros. edestruct Hc1; eauto. destructAll.
+      destruct x. contradiction. 
+      do 3 eexists. split. eassumption. eapply cc_approx_val_in_value_ref.
+      eassumption. 
+    - intros.
+      eapply cc_approx_exp_preserves_divergence; eauto.
+  Qed.
+
   
   Lemma R_n_exp_in_refines P PG (HP : post_upper_bound P) n m e1 e2 :
     closed_exp e1 ->

@@ -761,7 +761,7 @@ ProofIrrelevance.proof_irrelevance : forall (P : Prop) (p1 p2 : P), p1 = p2
 FunctionalExtensionality.functional_extensionality_dep : forall (A : Type) (B : A -> Type)
                                                            (f g : forall x : A, B x),
                                                          (forall x : A, f x = g x) -> f = g
-beta_contract_eq : forall (St : Type) (IH : InlineHeuristic St) (d : nat) (e : exp) (sig : r_map) 
+inline_exp_eq : forall (St : Type) (IH : InlineHeuristic St) (d : nat) (e : exp) (sig : r_map) 
                      (fm : fun_map) (s : St), inline_exp St IH d e sig fm s = inline_exp' St IH d e sig fm s
 
 *)

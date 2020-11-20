@@ -11,6 +11,7 @@
 * `identifiers.v`: definitions related to λ_ANF variables (free, bound, etc.)
 * `stemctx.v`: bound vars in the stems of 1-hole contexts
  
+Lines of code: spec 4394/proof 4980/comments 874
 
 ## Transformations and proofs
 
@@ -40,11 +41,16 @@
 * `toplevel.v` : λ_ANF pipeline
 * `toplevel_theorems.v` : Top-level theorems for each transformation and top-level theorem + corollaries for the λ_ANF pipeline
 
+Lines of code: spec 10121/proof 25568/comments 5254
+
+
 ## Proof frameworks
 
 * `logical_relations.v`: The reflexive LR
 * `logical_relations_cc.v`: The closure conversion LR
 * `rel_comp.v`: The compositional relational framework (+ behavioral refinement definitions)
+
+Lines of code: spec 1729/proof 2603/comments 884
 
 
 ## Various libraries
@@ -58,6 +64,9 @@
 * `Ensembles_util.v`: Ensemble utilities
 * `functions.v`: useful facts about functions
 * `tactics.v`: some tactics
+
+Lines of code: spec 2725/proof 4251/comments 171
+
 
 Rewriting framework
 

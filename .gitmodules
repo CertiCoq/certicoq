@@ -2,14 +2,6 @@
 	path = submodules/coq-ext-lib
 	url = https://github.com/mattam82/coq-ext-lib.git
 	branch = fix-8.11
-[submodule "submodules/SquiggleEq"]
-	path = submodules/SquiggleEq
-	url = https://github.com/mattam82/SquiggleEq.git
-	branch = fix-8.11
-[submodule "submodules/paramcoq"]
-	path = submodules/paramcoq
-	url = https://github.com/coq-community/paramcoq.git
-	branch = v8.11
 [submodule "submodules/Equations"]
 	path = submodules/Equations
 	url = http://github.com/mattam82/Coq-Equations

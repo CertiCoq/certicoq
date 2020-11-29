@@ -339,6 +339,8 @@ extraction/zpower.mli
 
 
 # plugin
+plugin_utils.ml
+plugin_utils.mli
 certicoq.mli
 certicoq.ml
 g_certicoq.mlg

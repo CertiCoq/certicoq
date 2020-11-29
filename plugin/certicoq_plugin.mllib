@@ -177,6 +177,7 @@ Glue_utils
 Glue
 Ffi
 Pipeline
+Plugin_utils
 Certicoq
 G_certicoq
 Certicoq_plugin_mod

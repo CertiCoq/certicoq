@@ -8,6 +8,8 @@ open Certicoq
 open Ltac_plugin
 open Stdarg
 open Pcoq.Prim
+open Plugin_utils
+
 }
 
 VERNAC ARGUMENT EXTEND cargs 
@@ -23,6 +25,12 @@ VERNAC ARGUMENT EXTEND cargs
 | [ "-ext" string(s) ] -> { EXT(s) }
 END
 
+
+VERNAC ARGUMENT EXTEND extract_cnst 
+| [ reference(gr) "=>" string(str) ] -> { extract_constant (Constrintern.locate_reference gr) str }
+END
+
+
 VERNAC ARGUMENT EXTEND ffiargs
 | [ "-prefix" string(s) ] -> { PREFIX(s) }
 | [ cargs(c) ] -> { c }
@@ -30,6 +38,11 @@ END
 
 VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
 | [ "CertiCoq" "Compile" cargs_list(l) global(gr) ] -> {
+    let gr = Nametab.global gr in
+    let opts = Certicoq.make_options l in
+    Certicoq.compile_with_glue opts gr
+  }
+| [ "CertiCoq" "Compile" cargs_list(l) global(gr) "Extract" "Constant" "[" extract_cnst_list_sep(cs, ",") "]" ] -> {
     let gr = Nametab.global gr in
     let opts = Certicoq.make_options l in
     Certicoq.compile_with_glue opts gr

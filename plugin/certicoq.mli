@@ -25,7 +25,6 @@ type options =
 
 val default_options : options
 val make_options : command_args list -> options
-val help_msg : string
 
 val compile_with_glue : options -> Names.GlobRef.t -> unit
 val compile_only : options -> Names.GlobRef.t -> unit

@@ -8,8 +8,11 @@ open Printer
 open Ast_quoter
 open ExceptionMonad
 open AstCommon
+open Plugin_utils
 
 (** Various Utils *)
+
+(* TODO move to plugin_utils *)
 
 let pr_char c = str (Char.escaped c)
 
@@ -35,6 +38,7 @@ let debug_msg (flag : bool) (s : string) =
   if flag then
     Feedback.msg_debug (str s)
   else ()
+
 
 (** Compilation Command Arguments *)
 
@@ -75,27 +79,6 @@ let default_options : options =
     dev       = 0;
     prefix    = ""
   }
-
-let help_msg : string =
-  "Usage:\n\
-To compile an program named <gid> type:\n\
-   CertiCoq Compile [options] <gid>.\n\n\
-To show this help message type:\n\
-   CertiCoq -help.\n\n\
-To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
-   CertiCoq Show IR [options] <global_identifier>.\n\n\
-Valid options:\n\
--direct   :  Produce direct-style code (as opposed to he default which is continuation-passing style)\n\
--time     :  Time each compilation phase\n\
--time_anf :  Time λanf optimizations\n\
--O n      :  Perform more aggressive optimizations. 1: lambda lifting for closure environment unboxing, 2: lambda lifting and inling for lambda lifting shells\n\
--debug    :  Show debugging information\n\
--args X   :  Specify how many arguments are used in the C translation (on top of the thread_info argument)\n\
--ext S    :  Specify the string s to be appended to the file name\n\
--prefix S :  Specify the string s to be prepended to the FFI functions (to avoid clashes with C functions)\n\
-\n\
-To show this help message type:\n\
-CertiCoq -help.\n"
 
 
 let make_options (l : command_args list) : options =

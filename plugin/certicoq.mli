@@ -21,10 +21,11 @@ type options =
     ext       : string;
     dev       : int;
     prefix    : string;
+    prims     : ((BasicAst.kername * char list) * Datatypes.nat) list;
   }
 
 val default_options : options
-val make_options : command_args list -> options
+val make_options : command_args list -> ((BasicAst.kername * char list) * Datatypes.nat) list -> options
 
 val compile_with_glue : options -> Names.GlobRef.t -> unit
 val compile_only : options -> Names.GlobRef.t -> unit

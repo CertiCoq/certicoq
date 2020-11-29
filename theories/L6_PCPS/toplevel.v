@@ -14,7 +14,7 @@ Import Monads.
 
 Import MonadNotation.
 
-Let L6env : Type := prims * ctor_env * ctor_tag * ind_tag * name_env * fun_env * eval.env.
+Let L6env : Type := eval.prims * ctor_env * ctor_tag * ind_tag * name_env * fun_env * eval.env.
 Let L6term : Type := cps.exp.
 Let L6val : Type := cps.val.
 Let L6_FullTerm : Type := L6env * L6term.

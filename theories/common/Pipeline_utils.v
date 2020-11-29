@@ -23,7 +23,10 @@ Record Options :=
     time_anf : bool;  (* Track timing for the ANF pipeline *)
     debug    : bool;  (* Log debug messages *)
     dev      : nat;   (* for development purposes *)
-    prefix   : string (* prefix to generated FFI functions *)
+    prefix   : string; (* prefix to generated FFI *)
+
+    prims    : list (kername * string * nat); (* List of constants that are realized in the target code.
+                                               * kername: constant name, string: name of target primitive, nat: arrity -- initially 0 *)
   }.
 
 (* Compilation info, such as timing, debug and error messages *)

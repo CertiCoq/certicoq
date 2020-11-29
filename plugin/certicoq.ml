@@ -65,6 +65,7 @@ type options =
     ext       : string;
     dev       : int;
     prefix    : string;
+    prims     : ((BasicAst.kername * char list) * Datatypes.nat) list;
   }
 
 let default_options : options =
@@ -77,11 +78,12 @@ let default_options : options =
     anf_conf  = 0;
     ext       = "";
     dev       = 0;
-    prefix    = ""
+    prefix    = "";
+    prims     = [];
   }
 
 
-let make_options (l : command_args list) : options =
+let make_options (l : command_args list) (pr : ((BasicAst.kername * char list) * Datatypes.nat) list) : options =
   let rec aux (o : options) l =
     match l with
     | [] -> o
@@ -95,7 +97,9 @@ let make_options (l : command_args list) : options =
     | EXT s    :: xs -> aux {o with ext = s} xs
     | DEV n    :: xs -> aux {o with dev = n} xs
     | PREFIX s :: xs -> aux {o with prefix = s} xs
-  in aux default_options l
+  in
+  let o = aux default_options l in
+  {o with prims = pr}
 
 let make_pipeline_options (opts : options) =
   let cps    = opts.cps in
@@ -107,7 +111,8 @@ let make_pipeline_options (opts : options) =
   let anfc = coq_nat_of_int opts.anf_conf in
   let dev = coq_nat_of_int opts.dev in
   let prefix = chars_of_string opts.prefix in
-  Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix
+  let prims = opts.prims in
+  Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix prims
 
 (** Main Compilation Functions *)
 
@@ -177,7 +182,7 @@ let generate_glue opts term const =
     CErrors.user_err ~hdr:"glue-code" (str "Could not generate glue code: " ++ pr_char_list s))
 
 
-let compile_with_glue opts gr =
+let compile_with_glue (opts : options) (gr : Names.GlobRef.t) : unit =
   let (term, const) = quote opts gr in
   compile opts term const;
   generate_glue opts term const

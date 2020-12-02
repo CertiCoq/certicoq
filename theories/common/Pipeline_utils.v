@@ -1,7 +1,7 @@
 From Coq Require Import List Unicode.Utf8 Strings.Ascii Strings.String.
 From ExtLib Require Import Monads.
 Require Import Common.AstCommon Common.compM.
-
+From Coq Require Import PArith. 
 Import MonadNotation ListNotations.
 
 Open Scope monad_scope.
@@ -25,9 +25,11 @@ Record Options :=
     dev      : nat;   (* for development purposes *)
     prefix   : string; (* prefix to generated FFI *)
 
-    prims    : list (kername * string * nat); (* List of constants that are realized in the target code.
-                                               * kername: constant name, string: name of target primitive, nat: arrity -- initially 0 *)
+    prims    : list (kername * string);
+    (* List of constants that are realized in the target code.
+     * kername: constant name, string: name of target primitive *)
   }.
+
 
 (* Compilation info, such as timing, debug and error messages *)
 Record CompInfo :=

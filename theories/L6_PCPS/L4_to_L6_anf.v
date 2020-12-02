@@ -21,14 +21,13 @@ Open Scope monad_scope.
 
 Section Tags.
 
-  Variable fun_tag : fun_tag. (* Regular function (lam) in cps *)
+  Context (fun_tag : fun_tag) (* Unary function tag *)  
+          (default_tag : ctor_tag)
+          (default_itag : ind_tag)
+          (next_id : positive). 
   
-  Variable default_tag : ctor_tag.
-  Variable default_itag : ind_tag. 
-    
   Definition anfM := @compM' unit.
   
-  Definition next_id := 103%positive. (* next var *)
   
   (* Converting a DeBruijn index to named variable *)
   (** The actual map grows from 1 onward. We keep the pointer p to the last entry of the map. 
@@ -214,7 +213,8 @@ Section Tags.
         (* f <- get_named_str "f_proof" ;; *)
         (* y <- get_named_str "x" ;; *)
         (* let c := consume_fun f y in              *)
-        (* ret (Anf_Var f, c) *)
+            (* ret (Anf_Var f, c) *)
+      | Prim_e p => failwith "Prim not supported "
       end    
     with convert_anf_exps (es : expression.exps) (vm : var_map) : anfM (list var * exp_ctx) :=
            match es with

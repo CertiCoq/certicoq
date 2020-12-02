@@ -65,7 +65,8 @@ Inductive exp: Type :=
 | Match_e: exp -> forall (pars:N) (* # of parameters *), branches_e -> exp
 | Let_e: name -> exp -> exp -> exp
 | Fix_e: efnlst -> N -> exp  (* implicitly lambdas *)
-| Prf_e : exp
+| Prf_e: exp
+| Prim_e: positive -> exp
 with exps: Type :=
 | enil: exps
 | econs: exp -> exps -> exps
@@ -238,6 +239,7 @@ Fixpoint shift n k e :=
     | Match_e e p bs => Match_e (shift n k e) p (shift_branches' shift n k bs)
     | Fix_e es k' => Fix_e (shift_efnlst shift n (efnlst_length es + k) es) k'
     | Prf_e => Prf_e
+    | Prim_e p => Prim_e p
   end.
 
 Definition shifts := shift_exps' shift.
@@ -299,6 +301,7 @@ Function subst (v:exp) k (e:exp): exp :=
     | Match_e e p bs => Match_e (subst v k e) p (subst_branches v k bs)
     | Fix_e es k' => Fix_e (subst_efnlst v (efnlst_length es + k) es) k'
     | Prf_e => Prf_e
+    | Prim_e p => Prim_e p
   end
 with substs (v:exp) k (es:exps) : exps :=
        match es with
@@ -330,6 +333,7 @@ Function sbst (v:exp) k (e:exp): exp :=
     | Match_e e p bs => Match_e (sbst v k e) p (sbst_branches v k bs)
     | Fix_e es k' => Fix_e (sbst_efnlst v (efnlst_length es + k) es) k'
     | Prf_e => Prf_e
+    | Prim_e p => Prim_e p
   end
 with sbsts (v:exp) k (es:exps) : exps :=
        match es with
@@ -717,6 +721,7 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                    | _ => None
                  end
                | Var_e e => None
+               | Prim_e p => None                                                   
              end
   end
 with evals_n n (es:exps) : option exps :=
@@ -1264,7 +1269,8 @@ Inductive is_value: exp -> Prop :=
 | lam_is_value: forall na e, is_value (Lam_e na e)
 | con_is_value: forall d es, are_values es -> is_value (Con_e d es)
 | fix_is_value: forall es k, is_value (Fix_e es k)
-| prf_is_value : is_value Prf_e
+| prf_is_value: is_value Prf_e
+(* | prim_is_value: forall p, is_value (Prim_e p) *)
 with are_values: exps -> Prop :=
 | enil_are_values: are_values enil
 | econs_are_values: forall e es, is_value e -> are_values es ->
@@ -1297,6 +1303,7 @@ Fixpoint is_valueb (e:exp): bool :=
     | Let_e _ _ _ => false
     | Fix_e _ _ => true
     | Prf_e => true
+    | Prim_e p => false (* arguable *)
   end
 with are_valuesb (es:exps): bool :=
        match es with
@@ -1314,6 +1321,7 @@ Proof.
   try discriminate; try inversion H1.
   - constructor. rewrite <- H. auto.
   - inversion H0; subst. rewrite H. auto.
+  - inv H.   
   - destruct (is_valueb e); try discriminate. constructor.
     + apply H; auto.
     + apply H0; auto. 
@@ -1439,6 +1447,7 @@ Proof.
   apply my_is_value_ind; simpl; intros; auto; try constructor; auto.
   inv H. lia.
   inv H0. auto.
+  
   inv H1. intuition.
   inv H1. intuition.
 Qed.
@@ -1564,6 +1573,7 @@ Function maxFree (e:exp): Z :=
     | Match_e e p bs => Z.max (maxFree e) (maxFreeB bs)
     | Fix_e es k' => maxFreeF es - (Z.of_N (efnlst_length es))
     | Prf_e => -1
+    | Prim_e _ => -1
   end
 with maxFreeC (es:exps) : Z :=
     match es with
@@ -1668,6 +1678,7 @@ Function eval_ns (n:nat) (e:exp) {struct n}: option exp :=
       | _ => None
       end
     | Var_e e => None
+    | Prim_e e => None
     end
   end.
 

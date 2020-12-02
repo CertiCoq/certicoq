@@ -4,7 +4,7 @@ Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
 Require Import Coq.Sorting.Sorted.
 Require Import Arith.
 Require Import ExtLib.Data.String.
-Require Import Common.AstCommon.
+Require Import Common.AstCommon Common.compM.
 Require Import Znumtheory.
 Require Import Bool.
 (* ask about this import *)
@@ -45,8 +45,9 @@ From CertiCoq.L7 Require Import L6_to_Clight.
 
 Section CPS.
 
-  Context (func_tag kon_tag default_tag default_itag : positive).
-
+  Context (func_tag kon_tag default_tag default_itag : positive)
+          (next_id : positive).
+ 
   Definition consume_fun (f x : var) : exp_ctx :=
     Efun1_c (Fcons f func_tag [x] (Ehalt f) Fnil) Hole_c. 
 
@@ -412,7 +413,8 @@ Fixpoint add_names lnames vars tgm : conv_env :=
    (* let (f, next) := gensym next (nNamed "f_proof"%string) in *)
    (* let (x, next) := gensym next (nNamed "x"%string) in *)
    (* let c := consume_fun f x in *)
-   (* ret (c |[ cps.Eapp k kon_tag (f::nil) ]|, next) *)          
+          (* ret (c |[ cps.Eapp k kon_tag (f::nil) ]|, next) *)
+    | Prim_e p => None (* failwith "Prim not supported" *)
     end
 
   (* with cvt_triples_exps (es : expression.exps) (vn : list var) (next : symgen) *)
@@ -608,10 +610,10 @@ Fixpoint add_names lnames vars tgm : conv_env :=
   Definition convert_top (ee:ienv * expression.exp) :
     option (ctor_env * name_env * fun_env * ctor_tag * ind_tag * cps.exp) :=
     let '(_, cG, ctag, itag,  dcm) := convert_env (fst ee) in
-    let f := (100%positive) in
-    let k := (101%positive) in
-    let x := (102%positive) in
-    r <- cps_cvt (snd ee) nil k (SG (103%positive, n_empty)) dcm;;
+    let f := next_id in
+    let k := (next_id + 1)%positive in
+    let x := (next_id + 2)%positive in
+    r <- cps_cvt (snd ee) nil k (SG ((next_id + 3)%positive, n_empty)) dcm;;
     let (e', sg) := r : (cps.exp * symgen) in
     match sg with
       SG (next, nM) =>

@@ -19,98 +19,99 @@ Let L6term : Type := cps.exp.
 Let L6val : Type := cps.val.
 Let L6_FullTerm : Type := L6env * L6term.
 
-Instance L6_Lang : Lang L6_FullTerm :=
-  { Value := L6val;
-    TermWf := fun p =>
-                let '(_, e) := p in
-                identifiers.closed_exp e /\
-                identifiers.unique_bindings e ;
-    BigStep := fun p v =>
-                 let '(pr, cenv, ctag, itag, nenv, fenv, rho, e) := p in
-                 exists c, bstep_cost pr cenv rho e v c
-  }.
+Section IDENT.
+  
+  Context (next_var : positive).
+
+  Instance L6_Lang : Lang L6_FullTerm :=
+    { Value := L6val;
+      TermWf := fun p =>
+                  let '(_, e) := p in
+                  identifiers.closed_exp e /\
+                  identifiers.unique_bindings e ;
+      BigStep := fun p v =>
+                   let '(pr, cenv, ctag, itag, nenv, fenv, rho, e) := p in
+                   exists c, bstep_cost pr cenv rho e v c
+    }.
 
 
-(* starting tags for L5_to_L6, anything under default is reserved for special
+  (* starting tags for L5_to_L6, anything under default is reserved for special
    constructors/types *)
-Definition default_ctor_tag := 99%positive.
-Definition default_ind_tag := 99%positive.
-(* assigned for the constructor and the type of closures *)
-Definition clo_tag := 15%positive.
-Definition clo_ind_tag := 16%positive.
-(* tags for functions and continuations *)
-Definition fun_fun_tag := 3%positive.
-Definition kon_fun_tag := 2%positive.
+  Definition default_ctor_tag := 99%positive.
+  Definition default_ind_tag := 99%positive.
+  (* assigned for the constructor and the type of closures *)
+  Definition clo_tag := 15%positive.
+  Definition clo_ind_tag := 16%positive.
+  (* tags for functions and continuations *)
+  Definition fun_fun_tag := 3%positive.
+  Definition kon_fun_tag := 2%positive.
 
-(* First available variable to use *)
-(* TODO make param in ANF/CPS translations *)
-Definition next_var := 103%positive.
 
-Definition compile_L6_CPS : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
-  fun src => 
+  Definition compile_L6_CPS : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
+    fun src => 
       debug_msg "Translating from L4 to L6 (CPS)" ;;
       LiftErrorCertiCoqTrans "L6 CPS"
-        (fun (p : toplevel.L4Term) =>
-           match L4_to_L6.convert_top fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag p with
-           | Some (cenv, nenv, fenv, ctag, itag, e) => 
-             (* (compM.Ret e, data) => *)
-             Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e)
-           | None => Err "Error when compiling from L4 to L6"
-           end) src.
+                             (fun (p : toplevel.L4Term) =>
+                                match L4_to_L6.convert_top fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag next_var p with
+                                | Some (cenv, nenv, fenv, ctag, itag, e) => 
+                                  (* (compM.Ret e, data) => *)
+                                  Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e)
+                                | None => Err "Error when compiling from L4 to L6"
+                                end) src.
 
-Definition compile_L6_ANF : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
-  fun src => 
+  Definition compile_L6_ANF : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
+    fun src => 
       debug_msg "Translating from L4 to L6 (ANF)" ;;
       LiftErrorCertiCoqTrans "L6 ANF"
-        (fun (p : toplevel.L4Term) =>
-           match convert_top_anf fun_fun_tag default_ctor_tag default_ind_tag p with
-           | (compM.Ret e, data) =>
-              let (_, ctag, itag, ftag, cenv, fenv, nenv, _, _) := data in
-              Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e)
-           | (compM.Err s, _) => Err s
-           end) src.
+                             (fun (p : toplevel.L4Term) =>
+                                match convert_top_anf fun_fun_tag default_ctor_tag default_ind_tag next_var p with
+                                | (compM.Ret e, data) =>
+                                  let (_, ctag, itag, ftag, cenv, fenv, nenv, _, _) := data in
+                                  Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e)
+                                | (compM.Err s, _) => Err s
+                                end) src.
 
-(** * Definition of L6 backend pipelines *)
+  (** * Definition of L6 backend pipelines *)
 
-(* Add all names to name env *)
-Definition update_var (names : cps_util.name_env) (x : var)
-  : cps_util.name_env :=
-  match M.get x names with
-  | Some (nNamed _) => names
-  | Some nAnon => M.set x (nNamed "x") names
-  | None => M.set x (nNamed "x") names
-  end.
+  (* Add all names to name env *)
+  Definition update_var (names : cps_util.name_env) (x : var)
+    : cps_util.name_env :=
+    match M.get x names with
+    | Some (nNamed _) => names
+    | Some nAnon => M.set x (nNamed "x") names
+    | None => M.set x (nNamed "x") names
+    end.
 
-Definition update_vars names xs :=
-  List.fold_left update_var xs names.
+  Definition update_vars names xs :=
+    List.fold_left update_var xs names.
 
-(** Adds missing names to name environment for the C translation *)
-Fixpoint add_binders_exp (names : cps_util.name_env) (e : exp)
-  : name_env :=
-  match e with
-  | Econstr x _ _ e
-  | Eprim x _ _ e
-  | Eletapp x _ _ _ e          
-  | Eproj x _ _ _ e => add_binders_exp (update_var names x) e
-  | Ecase _ pats =>
-    List.fold_left (fun names p => add_binders_exp names (snd p)) pats names
-  | Eapp _ _ _
-  | Ehalt _ => names
-  | Efun B e => add_binders_exp (add_binders_fundefs names B) e
-  end
-with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.name_env :=
-  match B with
-  | Fcons f _ xs e1 B1 =>
-    add_binders_fundefs (add_binders_exp (update_vars (update_var names f) xs) e1) B1
-  | Fnil => names
-  end.
+  (** Adds missing names to name environment for the C translation *)
+  Fixpoint add_binders_exp (names : cps_util.name_env) (e : exp)
+    : name_env :=
+    match e with
+    | Econstr x _ _ e
+    | Eprim x _ _ e
+    | Eletapp x _ _ _ e          
+    | Eproj x _ _ _ e => add_binders_exp (update_var names x) e
+    | Ecase _ pats =>
+      List.fold_left (fun names p => add_binders_exp names (snd p)) pats names
+    | Eapp _ _ _
+    | Ehalt _ => names
+    | Efun B e => add_binders_exp (add_binders_fundefs names B) e
+    end
+  with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.name_env :=
+         match B with
+         | Fcons f _ xs e1 B1 =>
+           add_binders_fundefs (add_binders_exp (update_vars (update_var names f) xs) e1) B1
+         | Fnil => names
+         end.
 
   Definition log_prog (e : exp) (c_data : comp_data) : comp_data :=
-  match c_data with
-  | mkCompData nv nc ni nf cenv fenv nenv imap log =>
-    let msg := cps_show.show_exp nenv cenv false e in
-    mkCompData nv nc ni nf cenv fenv nenv imap ("term" :: msg :: log)      
-  end.
+    match c_data with
+    | mkCompData nv nc ni nf cenv fenv nenv imap log =>
+      let msg := cps_show.show_exp nenv cenv false e in
+      mkCompData nv nc ni nf cenv fenv nenv imap ("term" :: msg :: log)      
+    end.
 
 
   Record anf_options :=
@@ -132,7 +133,7 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
 
   Definition anf_state (A : Type) := comp_data -> error A * comp_data.
 
-    
+  
   Global Instance MonadState : Monad anf_state :=
     { ret A x := (fun c_data  => (Ret x, c_data));
       bind A B m f :=
@@ -213,10 +214,10 @@ with add_binders_fundefs (names : cps_util.name_env) (B : fundefs) : cps_util.na
         (Ret (prims, cenv, ctag, itag, nenv, fenv, M.empty _, e), log_to_string log)
       end.
     
-End Pipeline.
+  End Pipeline.
 
 
-(* ANF/Lambda-lifting Configurations for measuring performance. Passed through the anf_conf flag.
+  (* ANF/Lambda-lifting Configurations for measuring performance. Passed through the anf_conf flag.
 
 0: (DEFAULT)
    - LL: agressive inlining of wrappers at known call cites (always the known function is called)
@@ -231,53 +232,55 @@ End Pipeline.
 7: Like 0, but do not perform inline/shrink loop after CC
 8: Like 0, but do not perform inline/shrink at all
 9: Like 0, but non-selective lambda lifting
-*)
+   *)
 
-Open Scope nat.
+  Open Scope nat.
   
-Definition make_anf_options (opts : Options) : anf_options :=
-  let '(inl_wrappers, inl_known, no_push, inl_before, inl_after) :=
-      let default := (true, false, 1, true, true) in 
-      match anf_conf opts with
-      | 0 => default
-      | 1 => (false, false, 1, true, true)
-      | 2 => (true, true, 1, true, true)
-      | 3 => (true, false, 0, true, true)
-      | 4 => (true, false, 2, true, true)
-      | 5 => (true, false, 10, true, true)
-      | 6 => (true, false, 1, false, true)
-      | 7 => (true, false, 1, true, false)
-      | 8 => (true, false, 1, false, false)
-      | 9 => (true, false, 1000, true, true)
-      | _ => default
-      end
-  in
-  {| time := Pipeline_utils.time opts;
-     cps  := negb (Pipeline_utils.direct opts);
-     do_lambda_lift := (1 <=? o_level opts);
-     args := if anf_conf opts =? 9 then 1000 else Pipeline_utils.c_args opts;
-     no_push := no_push; 
-     inl_wrappers := inl_wrappers;
-     inl_known    := inl_known;
-     inl_before   := inl_before;
-     inl_after    := inl_after;
-     dpe          := true;
-  |}.
+  Definition make_anf_options (opts : Options) : anf_options :=
+    let '(inl_wrappers, inl_known, no_push, inl_before, inl_after) :=
+        let default := (true, false, 1, true, true) in 
+        match anf_conf opts with
+        | 0 => default
+        | 1 => (false, false, 1, true, true)
+        | 2 => (true, true, 1, true, true)
+        | 3 => (true, false, 0, true, true)
+        | 4 => (true, false, 2, true, true)
+        | 5 => (true, false, 10, true, true)
+        | 6 => (true, false, 1, false, true)
+        | 7 => (true, false, 1, true, false)
+        | 8 => (true, false, 1, false, false)
+        | 9 => (true, false, 1000, true, true)
+        | _ => default
+        end
+    in
+    {| time := Pipeline_utils.time opts;
+       cps  := negb (Pipeline_utils.direct opts);
+       do_lambda_lift := (1 <=? o_level opts);
+       args := if anf_conf opts =? 9 then 1000 else Pipeline_utils.c_args opts;
+       no_push := no_push; 
+       inl_wrappers := inl_wrappers;
+       inl_known    := inl_known;
+       inl_before   := inl_before;
+       inl_after    := inl_after;
+       dpe          := true;
+    |}.
 
 
-Definition compile_L6 : CertiCoqTrans L6_FullTerm L6_FullTerm :=
-  fun src => 
-    debug_msg "Compiling L6" ;;
-    opts <- get_options ;;
-    (* Make anf_options *)
-    let anf_opts := make_anf_options opts in
-    LiftErrorLogCertiCoqTrans "L6 Pipeline" (run_anf_pipeline anf_opts) src.
+  Definition compile_L6 : CertiCoqTrans L6_FullTerm L6_FullTerm :=
+    fun src => 
+      debug_msg "Compiling L6" ;;
+      opts <- get_options ;;
+      (* Make anf_options *)
+      let anf_opts := make_anf_options opts in
+      LiftErrorLogCertiCoqTrans "L6 Pipeline" (run_anf_pipeline anf_opts) src.
 
 
-Definition compile_L6_debug : CertiCoqTrans L6_FullTerm L6_FullTerm :=
-  fun src =>
-    debug_msg "Compiling L6" ;;
-    opts <- get_options ;;
-    (* Make anf_options *)
-    let anf_opts := make_anf_options opts in
-    LiftErrorLogCertiCoqTrans "L6 Pipeline" (run_anf_pipeline anf_opts) src.
+  Definition compile_L6_debug : CertiCoqTrans L6_FullTerm L6_FullTerm :=
+    fun src =>
+      debug_msg "Compiling L6" ;;
+      opts <- get_options ;;
+      (* Make anf_options *)
+      let anf_opts := make_anf_options opts in
+      LiftErrorLogCertiCoqTrans "L6 Pipeline" (run_anf_pipeline anf_opts) src.
+
+End IDENT.

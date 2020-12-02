@@ -14,7 +14,10 @@ Import Monads.
 
 Import MonadNotation.
 
-Let L6env : Type := eval.prims * ctor_env * ctor_tag * ind_tag * name_env * fun_env * eval.env.
+Definition prim_env := M.t (kername * string (* C definition *) * nat (* arity *)). 
+
+Let L6env : Type := eval.prims * prim_env * ctor_env * ctor_tag * ind_tag * name_env * fun_env * eval.env.
+
 Let L6term : Type := cps.exp.
 Let L6val : Type := cps.val.
 Let L6_FullTerm : Type := L6env * L6term.
@@ -30,7 +33,7 @@ Section IDENT.
                   identifiers.closed_exp e /\
                   identifiers.unique_bindings e ;
       BigStep := fun p v =>
-                   let '(pr, cenv, ctag, itag, nenv, fenv, rho, e) := p in
+                   let '(pr, prims, cenv, ctag, itag, nenv, fenv, rho, e) := p in
                    exists c, bstep_cost pr cenv rho e v c
     }.
 
@@ -47,27 +50,33 @@ Section IDENT.
   Definition kon_fun_tag := 2%positive.
 
 
-  Definition compile_L6_CPS : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
+  Definition make_prim_env (prims : list (kername * string * nat * positive)) : prim_env :=    
+    List.fold_left (fun map '(k, s, ar, p) => M.set p (k, s, ar) map) prims (M.empty _).
+
+  
+  Definition compile_L6_CPS (prims : list (kername * string * nat * positive)) : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
     fun src => 
       debug_msg "Translating from L4 to L6 (CPS)" ;;
       LiftErrorCertiCoqTrans "L6 CPS"
                              (fun (p : toplevel.L4Term) =>
-                                match L4_to_L6.convert_top fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag next_var p with
+                                let prim_env := make_prim_env prims in
+                                match L4_to_L6.convert_top prim_env fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag next_var p with
                                 | Some (cenv, nenv, fenv, ctag, itag, e) => 
                                   (* (compM.Ret e, data) => *)
-                                  Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e)
+                                  Ret (M.empty _, prim_env, cenv, ctag, itag, nenv, fenv, M.empty _, e)
                                 | None => Err "Error when compiling from L4 to L6"
                                 end) src.
 
-  Definition compile_L6_ANF : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
+  Definition compile_L6_ANF (prims : list (kername * string * nat * positive)) : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
     fun src => 
       debug_msg "Translating from L4 to L6 (ANF)" ;;
       LiftErrorCertiCoqTrans "L6 ANF"
                              (fun (p : toplevel.L4Term) =>
-                                match convert_top_anf fun_fun_tag default_ctor_tag default_ind_tag next_var p with
+                                let prim_env := make_prim_env prims in
+                                match convert_top_anf prim_env fun_fun_tag default_ctor_tag default_ind_tag next_var p with
                                 | (compM.Ret e, data) =>
                                   let (_, ctag, itag, ftag, cenv, fenv, nenv, _, _) := data in
-                                  Ret (M.empty _, cenv, ctag, itag, nenv, fenv, M.empty _, e)
+                                  Ret (M.empty _, prim_env, cenv, ctag, itag, nenv, fenv, M.empty _, e)
                                 | (compM.Err s, _) => Err s
                                 end) src.
 
@@ -153,20 +162,7 @@ Section IDENT.
     Context (anf_opts : anf_options).
 
     Definition time_anf {A B} (name : string) (f : A -> B) : A -> B :=
-      if time anf_opts then
-        timePhase name f
-      else
-        f.    
-
-
-    Definition update_c_data : anf_trans :=
-      fun e c =>
-        let c_data :=
-            let '(mkCompData next ctag itag ftag cenv fenv names imap log) := c in
-            let cc_var := ((identifiers.max_var e 1) + 1)%positive in (* ΧΧΧ check why this is needed *)
-            pack_data cc_var ctag itag ftag (add_closure_tag clo_tag clo_ind_tag cenv) fenv (add_binders_exp names e) imap log
-        in
-        (Ret e, c_data). 
+      if time anf_opts then timePhase name f else f.    
     
     (* Optimizing λANF pipeline *)
 

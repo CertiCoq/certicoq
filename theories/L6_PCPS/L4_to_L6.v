@@ -1,29 +1,21 @@
 (* Conversion from L4.expression to L6.cps *)
 
-Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
-Require Import Coq.Sorting.Sorted.
-Require Import Arith.
+Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String
+        Coq.Sorting.Sorted Coq.Arith.Arith.
 Require Import ExtLib.Data.String.
 Require Import Common.AstCommon Common.compM.
-Require Import Znumtheory.
-Require Import Bool.
+
 (* ask about this import *)
 Require compcert.lib.Maps.
-(* Require Recdef. *)
-Import Nnat.
+
 Import ListNotations.
 
 Require Import L4.expression L4.exp_eval.
-Require Import Coq.Relations.Relation_Definitions.
-Require Import Coq.Classes.Morphisms.
+(* Require Import Coq.Relations.Relation_Definitions. *)
+(* Require Import Coq.Classes.Morphisms. *)
 (* Require Import Coq.Classes.RelationClasses. *)
-Require Import cps.
-Require Import cps_show.
-Require Import eval.
-Require Import ctx.
-Require Import logical_relations.
-Require Import alpha_conv.
-Require Import L6.List_util L6.algebra. 
+Require Import L6.cps L6.cps_show  L6.eval L6.ctx L6.List_util. 
+Require Import compcert.lib.Coqlib.
 
 Require Import ExtLib.Data.Monads.OptionMonad.
 Require Import ExtLib.Structures.Monads.
@@ -31,23 +23,13 @@ Require Import ExtLib.Structures.Monads.
 Import Monad.MonadNotation.
 Open Scope monad_scope.
 
-
-Require Import functions.
-Require Import compcert.lib.Coqlib.
-Require Import Ensembles.
-Require Import Ensembles_util.
-Require Import L6.tactics. 
-
-From CertiCoq.L7 Require Import L6_to_Clight.
-
-(* Added for L6_evaln *)
-(* Require Import exceptionMonad. *)
-
 Section CPS.
 
+  Context (prim_map : M.t (kername * string (* C definition *) * nat (* arity *))). 
   Context (func_tag kon_tag default_tag default_itag : positive)
           (next_id : positive).
- 
+
+  (* Zoe: For translating proof. TODO *)
   Definition consume_fun (f x : var) : exp_ctx :=
     Efun1_c (Fcons f func_tag [x] (Ehalt f) Fnil) Hole_c. 
 
@@ -78,12 +60,12 @@ Section CPS.
 
 
   Definition name_env := M.t BasicAst.name.
-  Definition n_empty:name_env := M.empty _.
-
+  Definition n_empty : name_env := M.empty _.
+  
   Definition t_info:Type := fun_tag.
   Definition t_map := M.t t_info.
   Definition t_empty:t_map := M.empty _.
-
+  
   (* get the fun_tag of a variable, func_tag if not found *)
   Fixpoint get_f (n:var) (sig:t_map): fun_tag :=
     match M.get n sig with
@@ -100,8 +82,8 @@ Section CPS.
 
   Definition ienv := list (BasicAst.kername * AstCommon.itypPack).
 
-
-  Inductive symgen := SG : (var * name_env) -> symgen.
+  
+  Inductive symgen := SG : (var * name_env) -> symgen. (* TODO use compilation monad instead *)
 
   Definition gensym : symgen -> name -> (var * symgen) :=
     fun s n => match s with
@@ -313,6 +295,22 @@ Fixpoint add_names lnames vars tgm : conv_env :=
              e1)
     end.
 
+  Fixpoint convert_prim (n : nat) (* arity *)
+           (prim : positive) (args : list var) (kont : var)
+           (next : symgen) : (cps.exp * symgen) :=
+    match n with
+    | 0%nat =>
+      let (pr, next) := gensym next (nNamed "prim"%string) in      
+      (Eprim pr prim (List.rev args) (Eapp kont kon_tag [pr]), next)
+    | S n =>
+      let (arg, next) := gensym next (nNamed "p_arg"%string) in
+      let (kont1, next) := gensym next (nNamed "p_k"%string) in            
+      let (f, next) := gensym next (nNamed "prim_wrapper"%string) in            
+      let '(trm, next) := convert_prim n prim (arg :: args) kont1 next in
+      (Efun (Fcons f func_tag [kont1; arg] trm Fnil) (Eapp kont kon_tag [f]), next)
+    end.                  
+  
+
   (* returns cps exp, var and next fresh var *)
   Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (next : symgen)
            (tgm : constr_env) : option (cps.exp * symgen) :=
@@ -414,9 +412,13 @@ Fixpoint add_names lnames vars tgm : conv_env :=
    (* let (x, next) := gensym next (nNamed "x"%string) in *)
    (* let c := consume_fun f x in *)
           (* ret (c |[ cps.Eapp k kon_tag (f::nil) ]|, next) *)
-    | Prim_e p => None (* failwith "Prim not supported" *)
+    | Prim_e p =>
+      match M.get p prim_map with
+      | Some (nm, s, ar) =>
+        Some (convert_prim ar p [] k next)
+      | None => None (* failwith "Internal error: identifier for primitive not found" *)
+      end
     end
-
   (* with cvt_triples_exps (es : expression.exps) (vn : list var) (next : symgen) *)
   (*                       (tgm : constr_env) *)
   (*      : option ((list (cps.exp * var * var)) * symgen) := *)

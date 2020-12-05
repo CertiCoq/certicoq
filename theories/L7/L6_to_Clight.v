@@ -305,7 +305,7 @@ Definition mkFunTy (n : nat) : type :=
   Tfunction (Tcons threadInf (mkFunTyList n)) Tvoid cc_default.
 
 Definition mkPrimTy (n : nat) :=
-  Tfunction (mkFunTyList n) Tvoid cc_default.
+  Tfunction (mkFunTyList n) val cc_default.
 
 Definition make_tinfoTy : type :=
   (Tfunction Tnil threadInf cc_default).

@@ -51,11 +51,7 @@ Section IDENT.
 
 
   Definition make_prim_env (prims : list (kername * string * nat * positive)) : prim_env :=    
-    List.fold_left (fun map '(k, s, ar, p) => M.set p (k, s, ar) map) prims (M.empty _).
-
-  Definition add_prim_names (prims : list (kername * string * nat * positive)) (nenv : name_env) : name_env :=
-        List.fold_left (fun map '(k, s, ar, p) => M.set p (nNamed s) map) prims nenv.
-  
+    List.fold_left (fun map '(k, s, ar, p) => M.set p (k, s, ar) map) prims (M.empty _).  
   
   Definition compile_L6_CPS (prims : list (kername * string * nat * positive)) : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
     fun src => 
@@ -66,7 +62,7 @@ Section IDENT.
                                 match L4_to_L6.convert_top prim_env fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag next_var p with
                                 | Some (cenv, nenv, fenv, ctag, itag, e) => 
                                   (* (compM.Ret e, data) => *)
-                                  Ret (M.empty _, prim_env, cenv, ctag, itag, add_prim_names prims nenv, fenv, M.empty _, e)
+                                  Ret (M.empty _, prim_env, cenv, ctag, itag, nenv, fenv, M.empty _, e)
                                 | None => Err "Error when compiling from L4 to L6"
                                 end) src.
 

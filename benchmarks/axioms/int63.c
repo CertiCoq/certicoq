@@ -9,9 +9,7 @@ unsigned long long one_int63() {
 
 extern unsigned long long add_int63(unsigned long long i1, unsigned long long i2) {
 
-  //more efficient way to do this?
-  
-  return ((((i1>>1) + (i2>>1))<<1) + 1);
+  return (i1 + i2 - 1);
   
 }
 

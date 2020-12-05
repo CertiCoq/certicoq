@@ -9,8 +9,14 @@ unsigned long long one_int63() {
 
 extern unsigned long long add_int63(unsigned long long i1, unsigned long long i2) {
 
-  return (i1 + i2 - 1);
+  //more efficient way to do this?
   
+  return ((((i1>>1) + (i2>>1))<<1) + 1);
+
+  
+  // This might be problematic because of overflow/underflow
+  // return (i1 + (i2 - 1);
+  // return (i1 + i2 - 1);
 }
 
 
@@ -19,6 +25,6 @@ extern unsigned long long print_int63(unsigned long long i) {
 }
 
 
-void print_new_line(unsigned long long u) {
+void print_new_line(unsigned long long) {
   printf("\n");
 }

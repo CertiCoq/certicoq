@@ -325,3 +325,11 @@ let print_dest_names prog names dest =
   List.iter (fun n -> add_name (remove_primes n))  names;
   print_program (formatter_of_out_channel oc) prog;
   close_out oc
+
+let print_dest_names_imports prog names (dest : string) (imports : string list) =
+  let oc = open_out dest in  
+  List.iter (fun n -> add_name (remove_primes n))  names;
+  let fm = formatter_of_out_channel oc in 
+  List.iter (fun s -> fprintf fm "#include \"%s\"" s) imports;
+  print_program fm prog;
+  close_out oc

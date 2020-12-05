@@ -18,17 +18,17 @@ let chars_of_string (s : string) : char list =
 
 (* From GlobRef to kername *)
 
-let extract_constant (g : Names.GlobRef.t) (s : string) : (((BasicAst.kername * char list) * Datatypes.nat) * int) =
+let extract_constant (g : Names.GlobRef.t) (s : string) : (BasicAst.kername * char list)  =
   match g with
-  | Names.GlobRef.ConstRef c -> ((quote_kn (Names.Constant.canonical c), chars_of_string s), Datatypes.O (* arrity is intially zero and computed later. See pipeline.v *) )
+  | Names.GlobRef.ConstRef c -> (quote_kn (Names.Constant.canonical c), chars_of_string s)
   | Names.GlobRef.VarRef(v) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found a variable. Only constants can be realized in C.")
   | Names.GlobRef.IndRef(i) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found an inductive type. Only constants can be realized in C.")
   | Names.GlobRef.ConstructRef(c) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found a constructor. Only constants can be realized in C. ")
 
-let rec debug_mappings (ms : (((BasicAst.kername * char list) * Datatypes.nat) * int) list) : unit =
+let rec debug_mappings (ms : (BasicAst.kername * char list) list) : unit =
   match ms with
   | [] -> ()
-  | (((k, s), _), _) :: ms ->     
+  | (k, s) :: ms ->     
      Feedback.msg_debug (str ("Kername: " ^ (string_of_chars (BasicAst.string_of_kername k)) ^ " C: "  ^ (string_of_chars s)));
      debug_mappings ms
      

@@ -39,6 +39,8 @@ let debug_msg (flag : bool) (s : string) =
     Feedback.msg_debug (str s)
   else ()
 
+let printProg prog names (dest : string) (import : string list) =
+  PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest import
 
 (** Compilation Command Arguments *)
 
@@ -65,7 +67,7 @@ type options =
     ext       : string;
     dev       : int;
     prefix    : string;
-    prims     : ((BasicAst.kername * char list) * Datatypes.nat) list;
+    prims     : (BasicAst.kername * char list) list;
   }
 
 let default_options : options =
@@ -83,7 +85,7 @@ let default_options : options =
   }
 
 
-let make_options (l : command_args list) (pr : ((BasicAst.kername * char list) * Datatypes.nat) list) : options =
+let make_options (l : command_args list) (pr : (BasicAst.kername * char list) list) : options =
   let rec aux (o : options) l =
     match l with
     | [] -> o
@@ -134,7 +136,7 @@ let quote opts gr =
   (term, const)
 
 (* Compile Quoted term with CertiCoq *)
-let compile opts term const =
+let compile opts term const imports =
   let debug = opts.debug in
   let options = make_pipeline_options opts in
 
@@ -144,10 +146,10 @@ let compile opts term const =
     debug_msg debug "Finished compiling, printing to file.";
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-    let cstr = Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
-    let hstr = Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
-    Pipeline.printProg (nenv,prg) cstr;
-    Pipeline.printProg (nenv,header) hstr;
+    let cstr = Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c" in
+    let hstr = Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h" in
+    printProg prg nenv cstr [] (* (List.map Tm_util.string_to_list imports) *);
+    printProg header nenv hstr [];
     let time = (Unix.gettimeofday() -. time) in
     Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
     debug_msg debug "Pipeline debug:";
@@ -171,10 +173,10 @@ let generate_glue opts term const =
       debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-    let cstr = Tm_util.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
-    let hstr = Tm_util.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
-    Pipeline.printProg (nenv, prg) cstr;
-    Pipeline.printProg (nenv, header) hstr;
+    let cstr = "glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c" in
+    let hstr = "glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h" in
+    printProg prg nenv cstr [];
+    printProg header nenv hstr [];
 
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Printed glue code to file in %f s.." time)
@@ -182,14 +184,14 @@ let generate_glue opts term const =
     CErrors.user_err ~hdr:"glue-code" (str "Could not generate glue code: " ++ pr_char_list s))
 
 
-let compile_with_glue (opts : options) (gr : Names.GlobRef.t) : unit =
+let compile_with_glue (opts : options) (gr : Names.GlobRef.t) (imports : string list) : unit =
   let (term, const) = quote opts gr in
-  compile opts term const;
+  compile opts term const imports;
   generate_glue opts term const
 
-let compile_only opts gr =
+let compile_only opts gr imports =
   let (term, const) = quote opts gr in
-  compile opts term const
+  compile opts term const imports
 
 let generate_glue_only opts gr =
   let (term, const) = quote opts gr in
@@ -255,10 +257,10 @@ let ffi_command opts gr =
       debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-    let cstr = Tm_util.string_to_list ("ffi." ^ name ^ suff ^ ".c") in
-    let hstr = Tm_util.string_to_list ("ffi." ^ name ^ suff ^ ".h") in
-    Pipeline.printProg (nenv, prg) cstr;
-    Pipeline.printProg (nenv, header) hstr;
+    let cstr = ("ffi." ^ name ^ suff ^ ".c") in
+    let hstr = ("ffi." ^ name ^ suff ^ ".h") in
+    printProg prg nenv cstr [];
+    printProg header nenv hstr [];
 
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Printed FFI glue code to file in %f s.." time)

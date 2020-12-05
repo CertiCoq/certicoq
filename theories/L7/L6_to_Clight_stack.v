@@ -27,13 +27,6 @@ Require Import compcert.common.AST
 Require Import L6.set_util L6.cps L6.identifiers L6.cps_show L6.state.
 Require Import Clightdefs.
 
-(* Axioms that are only realized in ocaml *)
-Variable (print_Clight : Clight.program -> unit).
-Variable (print_Clight_dest : Clight.program -> String.string -> unit).
-Variable (print_Clight_dest_names' : Clight.program -> list (positive * name) -> String.string -> unit).
-Variable (print : String.string -> unit).
-
-
 Section TRANSLATION.
 
 (* Stand-in for arbitrary identifiers *)
@@ -290,22 +283,13 @@ Transparent Init_int.
 Transparent make_vint.
 Transparent make_cint.
 
-Notation funTy := (Tfunction (Tcons threadInf Tnil) Tvoid
-                             {| cc_vararg := false;
-                                cc_unproto := false;
-                                cc_structret := false |}).
+Notation funTy := (Tfunction (Tcons threadInf Tnil) Tvoid cc_default).
 
 Notation pfunTy := (Tpointer funTy noattr).
 
-Notation gcTy := (Tfunction (Tcons (Tpointer val noattr) (Tcons threadInf Tnil)) Tvoid
-                            {| cc_vararg := false;
-                               cc_unproto := false;
-                               cc_structret := false |}).
+Notation gcTy := (Tfunction (Tcons (Tpointer val noattr) (Tcons threadInf Tnil)) Tvoid cc_default).
 
-Notation isptrTy := (Tfunction (Tcons val Tnil) (Tint IBool Unsigned noattr)
-                               {| cc_vararg := false;
-                                  cc_unproto := false;
-                                  cc_structret := false |}).
+Notation isptrTy := (Tfunction (Tcons val Tnil) (Tint IBool Unsigned noattr) cc_default).
 
 Notation valPtr := (Tpointer val {| attr_volatile := false; attr_alignas := None |}).
 Notation valPtrPtr := (Tpointer valPtr {| attr_volatile := false; attr_alignas := None |}).
@@ -321,20 +305,16 @@ Fixpoint mkFunTyList (n : nat) : typelist :=
   end.
 
 Definition mkFunTy (n : nat) :=
-  (Tfunction (Tcons threadInf (mkFunTyList n)) Tvoid
-             {| cc_vararg := false;
-                cc_unproto := false;
-                cc_structret := false |}).
+  (Tfunction (Tcons threadInf (mkFunTyList n)) Tvoid cc_default).
+
+Definition mkPrimTy (n : nat) :=
+  (Tfunction (mkFunTyList n) Tvoid cc_default).
 
 Notation make_tinfoTy :=
-  (Tfunction Tnil threadInf {| cc_vararg := false;
-                               cc_unproto := false;
-                               cc_structret := false |}).
+  (Tfunction Tnil threadInf cc_default).
 
 Notation exportTy :=
-  (Tfunction (Tcons threadInf Tnil) valPtr {| cc_vararg := false;
-                                              cc_unproto := false;
-                                              cc_structret := false |}).
+  (Tfunction (Tcons threadInf Tnil) valPtr cc_default).
 
 
 Notation "'var' x" := (Etempvar x val) (at level 20).
@@ -557,8 +537,13 @@ Fixpoint mkCallVars (fenv : fun_env) (map: fun_info_env) (n : nat) (vs : list po
   end.
 
 Definition mkCall (loc : option positive) (fenv : fun_env) (map: fun_info_env) (f : expr) n (vs : list positive) : error statement :=
-  v <- (mkCallVars fenv map n (firstn nParam vs)) ;;
+  v <- mkCallVars fenv map n (firstn nParam vs) ;;
   ret (Scall loc f (tinf :: v)).
+
+Definition mkPrimCall (res : positive) (pr : positive) (ar : nat)  (fenv : fun_env) (map: fun_info_env) (vs : list positive) : error statement :=
+  args <- mkCallVars fenv map ar vs ;;  
+  ret (Scall (Some res) ([mkPrimTy ar] (Evar pr (mkPrimTy ar))) args).
+
 
 Fixpoint asgnFunVars' (vs : list positive) (ind : list N) : error statement :=
   match vs with
@@ -706,91 +691,93 @@ Section Translation.
 
 
   Section Body.
-    Context (fun_vars : list positive)
-            (loc_vars : FVSet) (* The set of local vars including definitions and arguments *)
-            (locs : list N)
-            (nenv : M.t BasicAst.name).
+    Context
+      (prim_map : list (kername * string * nat * positive))
+      (fun_vars : list positive)
+      (loc_vars : FVSet) (* The set of local vars including definitions and arguments *)
+      (locs : list N)
+      (nenv : M.t BasicAst.name).
 
 (* Returns the statement and the number of stack slots needed *)
 
-Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind_env) (map : fun_info_env) (slots : N) : error (statement * N):=
-  match e with
-  | Econstr x t vs e' =>
-    prog <- assignConstructorS cenv ienv fenv map x t vs ;;
-    progn <- translate_body e' fenv cenv ienv map slots ;;
-    ret ((prog ; (fst progn)), snd progn)
-  | Ecase x cs =>
-    p <- ((fix makeCases (l : list (ctor_tag * exp)) : error (labeled_statements * labeled_statements * N) :=
-            match l with
-            | nil => ret (LSnil, LSnil, slots)
-            | cons p l' =>
-              progn <- translate_body (snd p) fenv cenv ienv map slots ;;
-              pn <- makeCases l' ;;
-              let (prog, n) := (progn : statement * N) in
-              let '(ls , ls', n') := (pn : labeled_statements * labeled_statements * N) in
-              p <- make_ctor_rep cenv (fst p) ;;
-              match p with 
-              | boxed t a =>
-                let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
-                (match ls with
-                 | LSnil =>
-                   ret ((LScons None (Ssequence prog Sbreak) ls), ls', N.max n n')
-                 | LScons _ _ _ =>
-                   ret ((LScons (Some (Z.land tag 255)) (Ssequence prog Sbreak) ls), ls', N.max n n')
-                 end)
-              | enum t =>
-                let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
-                (match ls' with
-                 | LSnil =>
-                   ret (ls, (LScons None (Ssequence prog Sbreak) ls'), N.max n n')
-                 | LScons _ _ _ =>
-                   ret (ls, (LScons (Some (Z.shiftr tag 1)) (Ssequence prog Sbreak) ls'), N.max n n')
-                 end)
-              end
-         end) cs) ;;
-      let '(ls , ls', slots') := p in
-      ret ((make_case_switch x ls ls'), slots')
-  | Eletapp x f t vs e' => 
-    (* Compute the local variables that are live after the call  *)
-    let fvs_post_call := PS.inter (exp_fv e') loc_vars in
-    let fvs := PS.remove x fvs_post_call in
-    let fvs_list := PS.elements fvs in
-    (* Check if the new binding has to be pushed to the frame during the GC call *)                
-    let fv_gc := if PS.mem x fvs_post_call then cons x nil else nil in
-    (* push live vars to the stack. We're pushing exactly the vars that are live beyond the current point. *)
-    let '(make_stack, slots_call) :=
-        let (push, slots) := push_live_vars fvs_list in
-        (push ; update_stack slots; set_stack slots false, slots)
+    Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind_env) (map : fun_info_env) (slots : N) : error (statement * N):=
+      match e with
+      | Econstr x t vs e' =>
+        prog <- assignConstructorS cenv ienv fenv map x t vs ;;
+        progn <- translate_body e' fenv cenv ienv map slots ;;
+        ret ((prog ; (fst progn)), snd progn)
+      | Ecase x cs =>
+        p <- ((fix makeCases (l : list (ctor_tag * exp)) : error (labeled_statements * labeled_statements * N) :=
+                 match l with
+                 | nil => ret (LSnil, LSnil, slots)
+                 | cons p l' =>
+                   progn <- translate_body (snd p) fenv cenv ienv map slots ;;
+                   pn <- makeCases l' ;;
+                   let (prog, n) := (progn : statement * N) in
+                   let '(ls , ls', n') := (pn : labeled_statements * labeled_statements * N) in
+                   p <- make_ctor_rep cenv (fst p) ;;
+                   match p with 
+                   | boxed t a =>
+                     let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
+                     (match ls with
+                      | LSnil =>
+                        ret ((LScons None (Ssequence prog Sbreak) ls), ls', N.max n n')
+                      | LScons _ _ _ =>
+                        ret ((LScons (Some (Z.land tag 255)) (Ssequence prog Sbreak) ls), ls', N.max n n')
+                      end)
+                   | enum t =>
+                     let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
+                     (match ls' with
+                      | LSnil =>
+                        ret (ls, (LScons None (Ssequence prog Sbreak) ls'), N.max n n')
+                      | LScons _ _ _ =>
+                        ret (ls, (LScons (Some (Z.shiftr tag 1)) (Ssequence prog Sbreak) ls'), N.max n n')
+                      end)
+                   end
+                 end) cs) ;;
+        let '(ls , ls', slots') := p in
+        ret ((make_case_switch x ls ls'), slots')
+      | Eletapp x f t vs e' => 
+        (* Compute the local variables that are live after the call  *)
+        let fvs_post_call := PS.inter (exp_fv e') loc_vars in
+        let fvs := PS.remove x fvs_post_call in
+        let fvs_list := PS.elements fvs in
+        (* Check if the new binding has to be pushed to the frame during the GC call *)                
+        let fv_gc := if PS.mem x fvs_post_call then cons x nil else nil in
+        (* push live vars to the stack. We're pushing exactly the vars that are live beyond the current point. *)
+        let '(make_stack, slots_call) :=
+            let (push, slots) := push_live_vars fvs_list in
+            (push ; update_stack slots; set_stack slots false, slots)
+        in
+        let discard_stack := pop_live_vars fvs_list; reset_stack slots_call false in
+  match M.get t fenv return (error (statement * N)) with 
+  | Some inf =>
+    let name :=
+        match M.get f nenv with
+        | Some n => show_name n
+        | None => "not an entry"
+        end
     in
-    let discard_stack := pop_live_vars fvs_list; reset_stack slots_call false in
-    match M.get t fenv return (error (statement * N)) with 
-    | Some inf =>
-      let name :=
-          match M.get f nenv with
-          | Some n => show_name n
-          | None => "not an entry"
-          end
-      in
-      asgn <- (if args_opt then asgnAppVars_fast fun_vars vs locs (snd inf) fenv map name
-               else asgnAppVars vs (snd inf) fenv map name) ;;
-      let f_var :=  makeVar f fenv map in
-      let pnum := min (N.to_nat (fst inf)) nParam in
-      c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] f_var) pnum vs) ;;
-      let alloc := max_allocs e' in
-      (* Call GC after the call if needed *)
-      let (gc_call, slots_gc) := make_GC_call alloc fv_gc slots_call in
-      progn <- translate_body e' fenv cenv ienv map (N.max slots slots_gc);;
-      Ret ((asgn ; Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
-           make_stack;
-           c;
-           allocIdent ::= Efield tinfd allocIdent valPtr; limitIdent ::= Efield tinfd limitIdent valPtr;
-           x ::= Field(args, Z.of_nat 1);
-           gc_call;
-           discard_stack;
-           fst progn),
-           snd progn)
-    | None => Err "translate_body: Unknown function application in Eletapp"
-    end
+    asgn <- (if args_opt then asgnAppVars_fast fun_vars vs locs (snd inf) fenv map name
+             else asgnAppVars vs (snd inf) fenv map name) ;;
+    let f_var := makeVar f fenv map in
+    let pnum := min (N.to_nat (fst inf)) nParam in
+    c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] f_var) pnum vs) ;;
+    let alloc := max_allocs e' in
+    (* Call GC after the call if needed *)
+    let (gc_call, slots_gc) := make_GC_call alloc fv_gc slots_call in
+    progn <- translate_body e' fenv cenv ienv map (N.max slots slots_gc);;
+    Ret ((asgn ; Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
+         make_stack;
+         c;
+         allocIdent ::= Efield tinfd allocIdent valPtr; limitIdent ::= Efield tinfd limitIdent valPtr;
+         x ::= Field(args, Z.of_nat 1);
+         gc_call;
+         discard_stack;
+         fst progn),
+         snd progn)
+  | None => Err "translate_body: Unknown function application in Eletapp"
+  end
   | Eproj x t n v e' =>
     progn <- translate_body e' fenv cenv ienv map slots ;;
     Ret ((x ::= Field(var v, Z.of_N n) ; fst progn), snd progn)
@@ -809,18 +796,21 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv:ctor_env) (ienv : n_ind
       let pnum := min (N.to_nat (fst inf)) nParam in
       c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] f_var) pnum vs) ;;
       ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr ; c,
-           slots)
+                                                                                                                  slots)
     | None => Err "translate_body: Unknown function application in Eapp"
     end
-  | Eprim x p vs e => Err "translate_body: Primitives not supported"
+  | Eprim x p vs e' =>    
+    c <- mkPrimCall x p (length vs) fenv map vs ;;
+    '(prog, slots) <- translate_body e' fenv cenv ienv map slots ;;
+    ret (c; prog, slots)
   | Ehalt x =>
     (* set args[1] to x  and return *)
     ret ((args[ Z.of_nat 1 ] :::= (makeVar x fenv map));
-          Efield tinfd allocIdent valPtr :::= allocPtr; Efield tinfd limitIdent valPtr :::= limitPtr,
-         slots)
-  end.
+        Efield tinfd allocIdent valPtr :::= allocPtr; Efield tinfd limitIdent valPtr :::= limitPtr,
+                                                      slots)
+    end.
 
-End Body.
+  End Body.
 
 Definition mkFun
            (root_size : Z) (* size of roots array *)
@@ -1265,27 +1255,6 @@ Definition stripOption (p : (option Clight.program)) : Clight.program :=
   match p with
   | None => empty_program
   | Some p' => p'
-  end.
-
-(* TODO explanation why this is needed *)
-Definition print_Clight_dest_names : Clight.program -> list (positive * name) -> String.string -> unit :=
-  fun p s l => print_Clight_dest_names' p s l.
-
-Fixpoint print_err (errs : errmsg) : unit :=
-  match errs with
-  | nil => tt
-  | cons e errs' =>
-    match e with
-    | MSG s => print s
-    | CTX n => print " with context "
-    | POS p => print " at position "
-    end
-  end.
-
-Definition print_err_Clight (p : res Clight.program) : unit :=
-  match p with
-  | Error e => print_err e
-  | OK p' => print_Clight p'
   end.
 
 End TRANSLATION.

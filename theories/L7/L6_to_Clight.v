@@ -31,12 +31,6 @@ Require Import L6.cps
 Require Import Clightdefs.
 Require Import L6.cps_show.
 
-(* Axioms that are only realized in ocaml *)
-Parameter (print_Clight : Clight.program -> unit).
-Parameter (print_Clight_dest : Clight.program -> String.string -> unit).
-Parameter (print_Clight_dest_names' : Clight.program -> list (positive * name) -> String.string -> unit).
-Parameter (print : String.string -> unit).
-
 
 Section TRANSLATION.
 
@@ -310,6 +304,9 @@ Fixpoint mkFunTyList (n : nat) : typelist :=
 Definition mkFunTy (n : nat) : type :=
   Tfunction (Tcons threadInf (mkFunTyList n)) Tvoid cc_default.
 
+Definition mkPrimTy (n : nat) :=
+  Tfunction (mkFunTyList n) Tvoid cc_default.
+
 Definition make_tinfoTy : type :=
   (Tfunction Tnil threadInf cc_default).
 
@@ -517,6 +514,10 @@ Definition mkCall
   | Some v => Some (Scall None f (tinf :: v))
   | None => None
   end.
+
+Definition mkPrimCall (res : positive) (pr : positive) (ar : nat)  (fenv : fun_env) (map: fun_info_env) (vs : list positive) : option statement :=
+  args <- mkCallVars fenv map ar vs ;;  
+  ret (Scall (Some res) ([mkPrimTy ar] (Evar pr (mkPrimTy ar))) args).
 
 Fixpoint asgnFunVars'
          (vs : list positive) (ind : list N) : option statement :=
@@ -750,7 +751,10 @@ Fixpoint translate_body
          Efield tinfd allocIdent valPtr :::= allocPtr ;;;
          Efield tinfd limitIdent valPtr :::= limitPtr ;;;
          c)
-  | Eprim x p vs e => None
+  | Eprim x p vs e' =>
+    prog <- translate_body e' fenv cenv ienv map ;;
+    pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
+    ret (pr_call ;;; prog)
   | Ehalt x =>
     (* set args[1] to x and return *)
     ret (Efield tinfd allocIdent valPtr :::= allocPtr ;;;
@@ -819,8 +823,8 @@ Fixpoint translate_body_fast
     c <- (mkCall fenv map ([Tpointer (mkFunTy pnum) noattr] vv) pnum vs) ;;
     ret (asgn ;;; Efield tinfd allocIdent valPtr :::= allocPtr ;;; Efield tinfd limitIdent valPtr :::= limitPtr ;;; c ;;; allocIdent ::= Efield tinfd allocIdent valPtr ;;; x ::= Field(args, Z.of_nat 1) ;;; prog)
   | Eproj x t n v e' =>
-      prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
-     ret (x ::= Field(var v, Z.of_N n) ;;; prog)
+    prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
+    ret (x ::= Field(var v, Z.of_N n) ;;; prog)
   | Efun fnd e => None
   | Eapp x t vs =>
     inf <- M.get t fenv ;;
@@ -832,7 +836,11 @@ Fixpoint translate_body_fast
          Efield tinfd allocIdent valPtr :::= allocPtr ;;;
          Efield tinfd limitIdent valPtr :::= limitPtr ;;;
          c)
-  | Eprim x p vs e => None
+  | Eprim x p vs e' =>
+    prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
+    pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
+    ret (pr_call ;;; prog)
+        
   | Ehalt x =>
     (* set args[1] to x and return *)
     ret (Efield tinfd allocIdent valPtr :::= allocPtr ;;;
@@ -1784,26 +1792,5 @@ Definition stripOption (p : (option Clight.program)) : Clight.program :=
   | Some p' => p'
   end.
 
-(* TODO explanation why this is needed *)
-Definition print_Clight_dest_names : Clight.program -> list (positive * name) -> String.string -> unit :=
-  (* fun p s l => print_Clight_dest_names' p s l. *)
-  print_Clight_dest_names'.
-
-Fixpoint print_err (errs : errmsg) : unit :=
-  match errs with
-  | nil => tt
-  | cons e errs' =>
-    match e with
-    | MSG s => print s
-    | CTX n => print " with context "
-    | POS p => print " at position "
-    end
-  end.
-
-Definition print_err_Clight (p : res Clight.program) : unit :=
-  match p with
-  | Error e => print_err e
-  | OK p' => print_Clight p'
-  end.
 
 End TRANSLATION.

@@ -40,16 +40,21 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
 | [ "CertiCoq" "Compile" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
     let opts = Certicoq.make_options l [] in
-    Certicoq.compile_with_glue opts gr
+    Certicoq.compile_with_glue opts gr []
   }
-| [ "CertiCoq" "Compile" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" ] -> {
+| [ "CertiCoq" "Compile" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" "Include" "[" string_list_sep(imps, ",") "]" ] -> {
     let gr = Nametab.global gr in
     let opts = Certicoq.make_options l cs in
-    Certicoq.compile_with_glue opts gr
+    Certicoq.compile_with_glue opts gr imps
   }
 | [ "CertiCoq" "Show" "IR" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
     let opts = Certicoq.make_options l [] in
+    Certicoq.show_ir opts gr
+  }
+| [ "CertiCoq" "Show" "IR" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" ] -> {
+    let gr = Nametab.global gr in
+    let opts = Certicoq.make_options l cs in
     Certicoq.show_ir opts gr
   }
 | [ "CertiCoq" "FFI" ffiargs_list(l) global(gr) ] -> {

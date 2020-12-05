@@ -125,7 +125,7 @@ let quote opts gr =
   let sigma = Evd.from_env env in
   let sigma, c = Evarutil.new_global sigma gr in
   let const = match gr with
-    | Globnames.ConstRef c -> c
+    | Names.GlobRef.ConstRef c -> c
     | _ -> CErrors.user_err ~hdr:"template-coq"
        (Printer.pr_global gr ++ str" is not a constant definition") in
   debug_msg debug "Quoting";
@@ -148,7 +148,7 @@ let compile opts term const imports =
     let suff = opts.ext in
     let cstr = Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c" in
     let hstr = Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h" in
-    printProg prg nenv cstr [] (* (List.map Tm_util.string_to_list imports) *);
+    printProg prg nenv cstr imports (* (List.map Tm_util.string_to_list imports) *);
     printProg header nenv hstr [];
     let time = (Unix.gettimeofday() -. time) in
     Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
@@ -231,7 +231,7 @@ let quote_ind opts gr : Ast_quoter.quoted_program * string =
   let sigma = Evd.from_env env in
   let sigma, c = Evarutil.new_global sigma gr in
   let name = match gr with
-    | Globnames.IndRef i -> 
+    | Names.GlobRef.IndRef i -> 
         let (mut, _) = i in
         Names.KerName.to_string (Names.MutInd.canonical mut)
     | _ -> CErrors.user_err ~hdr:"template-coq"

@@ -25,6 +25,6 @@ extern unsigned long long print_int63(unsigned long long i) {
 }
 
 
-void print_new_line(unsigned long long) {
+void print_new_line(unsigned long long u) {
   printf("\n");
 }

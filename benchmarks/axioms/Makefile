@@ -13,7 +13,6 @@ copy:
 	cp ../../theories/Runtime/values.h ./
 	cp ../../theories/Runtime/main.c ./
 	cp ../../theories/Runtime/config.h ./
-	cp ../../theories/Runtime/mod.py ./
 
 clean:
 	rm -f ./gc.c
@@ -34,4 +33,5 @@ tests: tests.v
 	coqc $(COQOPTS) tests.v
 
 print_lst:
-	$(CCOMPILER) -o print_lst -Wno-everything -O2 -fomit-frame-pointer print_lst_main.c gc.c CertiCoq.Benchmarks.tests.print_lst.c glue.CertiCoq.Benchmarks.tests.print_lst.c print.c
+	$(CCOMPILER) -o print_lst -Wno-everything -O2 -fomit-frame-pointer main.c gc.c CertiCoq.Benchmarks.tests.print_lst.c glue.CertiCoq.Benchmarks.tests.print_lst.c print.c
+	$(CCOMPILER) -o fibn -Wno-everything -O2 -fomit-frame-pointer main.c gc.c CertiCoq.Benchmarks.tests.fibn.c glue.CertiCoq.Benchmarks.tests.fibn.c int63.c

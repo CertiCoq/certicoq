@@ -994,23 +994,11 @@ Section CONTRACT.
               fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
             end (eq_refl _))                
        end (eq_refl _))
-    | Eprim x f ys e =>
-      match (get_c x count) return _ with
-      | 0%nat =>
-        let count' := dec_census_list sig ys count in
-        incr_steps (contract sig count' e sub im)
-      | _ =>
-        (match contract sig count e sub im return _ with
-         | existT   (e', steps', count', im') bp  =>
-           (match (get_c x count') return _ with
-            | 0%nat =>
-              let count'' := dec_census_list sig ys count'  in
-              existT _ (e', steps' + 1, count'', im') bp
-            | _ =>
-              let ys' := apply_r_list sig ys in
-              existT _ (Eprim x f ys' e', steps', count', im') bp
-            end)
-         end)
+    | Eprim x f ys e => (* Prims may have side effects and are not considered dead code *)
+      match contract sig count e sub im return _ with
+      | existT   (e', steps', count', im') bp  =>
+        let ys' := apply_r_list sig ys in
+        existT _ (Eprim x f ys' e', steps', count', im') bp
       end
     | Ecase v cl =>
       let v' := apply_r sig v in
@@ -1255,23 +1243,11 @@ Section CONTRACT.
               fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
             end (eq_refl _))                
        end (eq_refl _))
-    | Eprim x f ys e=>
-      match (get_c x count) with
-      | 0%nat =>
-        let count' := dec_census_list sig ys count in
-        incr_steps (contract sig count' e sub im)
-      | _ =>
-        (match contract sig count e sub im with
-         | existT   (e', steps, count', im') bp  =>
-           (match (get_c x count') with
-            | 0%nat =>
-              let count'' := dec_census_list sig ys count'  in
-              existT _ (e', steps + 1, count'', im') bp
-            | _ =>
-              let ys' := apply_r_list sig ys in
-              existT _ (Eprim x f ys' e', steps, count', im') bp
-            end)
-         end)
+    | Eprim x f ys e =>
+      match contract sig count e sub im return _ with
+      | existT   (e', steps', count', im') bp  =>
+        let ys' := apply_r_list sig ys in
+        existT _ (Eprim x f ys' e', steps', count', im') bp
       end
     | Ecase v cl =>
       let v' := apply_r sig v in

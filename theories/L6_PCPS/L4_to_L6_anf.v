@@ -21,14 +21,14 @@ Open Scope monad_scope.
 
 Section Tags.
 
-  Variable fun_tag : fun_tag. (* Regular function (lam) in cps *)
+  Context (prim_map : M.t (kername * string (* C definition *) * nat (* arity *))) 
+          (fun_tag : fun_tag) (* Unary function tag *)  
+          (default_tag : ctor_tag)
+          (default_itag : ind_tag)
+          (next_id : positive). 
   
-  Variable default_tag : ctor_tag.
-  Variable default_itag : ind_tag. 
-    
   Definition anfM := @compM' unit.
   
-  Definition next_id := 103%positive. (* next var *)
   
   (* Converting a DeBruijn index to named variable *)
   (** The actual map grows from 1 onward. We keep the pointer p to the last entry of the map. 
@@ -59,7 +59,8 @@ Section Tags.
   | Anf_App (f x : var)
   | Constr (c : ctor_tag) (xs : list var)
   | Proj (c : ctor_tag) (n : N) (y : var)
-  | Fun (ft : cps.fun_tag) (x : var) (e : cps.exp).
+  | Fun (ft : cps.fun_tag) (x : var) (e : cps.exp)
+  | Prim (pr : positive) (xs : list var).
 
   Definition anf_term : Type := anf_value * exp_ctx.
 
@@ -77,6 +78,9 @@ Section Tags.
     | Fun ft x e =>
       x' <- get_named_str" y" ;; (* Get variable for interim result *)
       ret (C |[ Efun (Fcons x' ft [x] e Fnil) (Ehalt x') ]|)
+    | Prim pr xs =>
+      x' <- get_named_str "y" ;; (* Get variable for interim result *)
+      ret (C |[ Eprim x' pr xs (Ehalt x') ]|)
     end.
 
   Definition anf_term_to_ctx (t : anf_term) (n : name) : anfM (var * exp_ctx) :=
@@ -95,6 +99,9 @@ Section Tags.
     | Fun ft x e =>
       x' <- get_named n ;; (* XXX keep n or n'? *)
       ret (x', comp_ctx_f C (Efun1_c (Fcons x' ft [x] e Fnil) (Hole_c)))
+    | Prim pr xs =>
+      x' <- get_named n ;; (* Get variable for interim result *)
+      ret (x', comp_ctx_f C (Eprim_c x' pr xs Hole_c))
     end.
 
   Definition def_name := nNamed "y".
@@ -152,6 +159,24 @@ Section Tags.
         let '(fs, vm') := lvm in
         ret (f_name :: fs, vm')     
       end.
+
+    Fixpoint convert_prim (n : nat) (* arity *)
+             (prim : positive) (args : list var) : anfM anf_term :=
+      match n with
+      | 0%nat =>
+        x <- get_named_str "prim" ;; 
+        ret (Anf_Var x, Eprim_c x prim (List.rev args) Hole_c)
+      | S n =>
+        arg <- get_named_str "p_arg" ;; 
+        f <- get_named_str "prim_wrapper" ;; 
+        '(anf_val, C) <- convert_prim n prim (arg :: args) ;;
+        match anf_val with
+        | Anf_Var x =>
+          ret (Anf_Var f,  Efun1_c (Fcons f fun_tag [arg] (C|[ Ehalt x ]|) Fnil) Hole_c)
+        | _ => failwith "Internal error: Expected And_Var but found something else."
+        end
+      end.
+
 
     Fixpoint convert_anf (e : expression.exp) (vm : var_map) : anfM anf_term :=
       match e with
@@ -214,7 +239,12 @@ Section Tags.
         (* f <- get_named_str "f_proof" ;; *)
         (* y <- get_named_str "x" ;; *)
         (* let c := consume_fun f y in              *)
-        (* ret (Anf_Var f, c) *)
+            (* ret (Anf_Var f, c) *)
+      | Prim_e p =>
+        match M.get p prim_map with
+        | Some (nm, s, ar) => convert_prim ar p []
+        | None =>failwith "Internal error: identifier for primitive not found"
+        end
       end    
     with convert_anf_exps (es : expression.exps) (vm : var_map) : anfM (list var * exp_ctx) :=
            match es with

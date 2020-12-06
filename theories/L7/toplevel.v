@@ -33,46 +33,56 @@ Definition prevFld:positive := 89.
 
 Let Cprogram := (cps_util.name_env * Clight.program * Clight.program)%type.
 
-Definition Clight_trans (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram :=
+Definition add_prim_names (prims : list (kername * string * nat * positive)) (nenv : L4_to_L6.name_env) : L4_to_L6.name_env :=
+  List.fold_left (fun map '(k, s, ar, p) => cps.M.set p (nNamed s) map) prims nenv.
+
+
+Definition Clight_trans (prims : list (kername * string * nat * positive)) (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram :=
   let '(_, cenv, ctag, itag, nenv, fenv, _, prog) := t in
   let p := L6_to_Clight.compile
              argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
              tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
              args prog cenv nenv in
   match p with
-  | exceptionMonad.Ret p =>
-    Ret (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p))
+  | exceptionMonad.Ret (nenv, prog, head) =>
+    Ret (add_prim_names prims nenv, stripOption mainIdent prog, stripOption mainIdent head)
   | Exc s => Err s
   end.
 
 
 (* TODO unify with the one above, propagate errors *)
-Definition Clight_trans_fast (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram :=
+Definition Clight_trans_fast (prims : list (kername * string * nat * positive)) (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram :=
   let '(_, cenv, ctag, itag, nenv, fenv, _, prog) := t in
-  let p := L6_to_Clight.compile_fast
-             argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
-             tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-             args prog cenv nenv in
-  Ret (fst (fst p), stripOption mainIdent (snd (fst p)), stripOption mainIdent (snd p)).
+  let '(nenv, prog, head) := L6_to_Clight.compile_fast
+                               argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
+                               tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
+                               args prog cenv nenv in
+  Ret (add_prim_names prims nenv, stripOption mainIdent prog, stripOption mainIdent head).
 
 
-Definition Clight_trans_ANF (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram * string :=
+Definition Clight_trans_ANF (prims : list (kername * string * nat * positive)) (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram * string :=
   let '(_, cenv, ctag, itag, nenv, fenv, _, prog) := t in
-  L6_to_Clight_stack.compile
-    argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
-    tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-    args
-    stackframeTIdent frameIdent rootIdent fpIdent nextFld rootIdent prevFld
-    false (* args optimization *)
-    prog cenv nenv.
+  let '(p, str) := L6_to_Clight_stack.compile
+                     argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
+                     tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
+                     args
+                     stackframeTIdent frameIdent rootIdent fpIdent nextFld rootIdent prevFld
+                     false (* args optimization *)
+                     prog cenv nenv in
+  match p with
+  | Ret (nenv, prog, head) =>
+    (Ret (add_prim_names prims nenv, prog, head), str)
+  | Err s => (Err s, str)
+  end.
 
-Definition compile_Clight : CertiCoqTrans toplevel.L6_FullTerm Cprogram :=
+
+Definition compile_Clight (prims : list (kername * string * nat * positive)) : CertiCoqTrans toplevel.L6_FullTerm Cprogram :=
   fun s =>
     debug_msg "Translating from L6 to C" ;;
     opts <- get_options ;;
     let args := c_args opts in
     let cps := negb (direct opts) in
     if cps then 
-      LiftErrorCertiCoqTrans "L7" (Clight_trans args) s
+      LiftErrorCertiCoqTrans "L7" (Clight_trans prims args) s
     else
-      LiftErrorLogCertiCoqTrans "L7" (Clight_trans_ANF args) s.
+      LiftErrorLogCertiCoqTrans "L7" (Clight_trans_ANF prims args) s.

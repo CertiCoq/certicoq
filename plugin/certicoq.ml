@@ -8,8 +8,11 @@ open Printer
 open Ast_quoter
 open ExceptionMonad
 open AstCommon
+open Plugin_utils
 
 (** Various Utils *)
+
+(* TODO move to plugin_utils *)
 
 let pr_char c = str (Char.escaped c)
 
@@ -36,6 +39,9 @@ let debug_msg (flag : bool) (s : string) =
     Feedback.msg_debug (str s)
   else ()
 
+let printProg prog names (dest : string) (import : string list) =
+  PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest import
+
 (** Compilation Command Arguments *)
 
 type command_args =
@@ -61,6 +67,7 @@ type options =
     ext       : string;
     dev       : int;
     prefix    : string;
+    prims     : (BasicAst.kername * char list) list;
   }
 
 let default_options : options =
@@ -73,32 +80,12 @@ let default_options : options =
     anf_conf  = 0;
     ext       = "";
     dev       = 0;
-    prefix    = ""
+    prefix    = "";
+    prims     = [];
   }
 
-let help_msg : string =
-  "Usage:\n\
-To compile an program named <gid> type:\n\
-   CertiCoq Compile [options] <gid>.\n\n\
-To show this help message type:\n\
-   CertiCoq -help.\n\n\
-To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
-   CertiCoq Show IR [options] <global_identifier>.\n\n\
-Valid options:\n\
--direct   :  Produce direct-style code (as opposed to he default which is continuation-passing style)\n\
--time     :  Time each compilation phase\n\
--time_anf :  Time λanf optimizations\n\
--O n      :  Perform more aggressive optimizations. 1: lambda lifting for closure environment unboxing, 2: lambda lifting and inling for lambda lifting shells\n\
--debug    :  Show debugging information\n\
--args X   :  Specify how many arguments are used in the C translation (on top of the thread_info argument)\n\
--ext S    :  Specify the string s to be appended to the file name\n\
--prefix S :  Specify the string s to be prepended to the FFI functions (to avoid clashes with C functions)\n\
-\n\
-To show this help message type:\n\
-CertiCoq -help.\n"
 
-
-let make_options (l : command_args list) : options =
+let make_options (l : command_args list) (pr : (BasicAst.kername * char list) list) : options =
   let rec aux (o : options) l =
     match l with
     | [] -> o
@@ -112,7 +99,9 @@ let make_options (l : command_args list) : options =
     | EXT s    :: xs -> aux {o with ext = s} xs
     | DEV n    :: xs -> aux {o with dev = n} xs
     | PREFIX s :: xs -> aux {o with prefix = s} xs
-  in aux default_options l
+  in
+  let o = aux default_options l in
+  {o with prims = pr}
 
 let make_pipeline_options (opts : options) =
   let cps    = opts.cps in
@@ -124,7 +113,8 @@ let make_pipeline_options (opts : options) =
   let anfc = coq_nat_of_int opts.anf_conf in
   let dev = coq_nat_of_int opts.dev in
   let prefix = chars_of_string opts.prefix in
-  Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix
+  let prims = opts.prims in
+  Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix prims
 
 (** Main Compilation Functions *)
 
@@ -135,7 +125,7 @@ let quote opts gr =
   let sigma = Evd.from_env env in
   let sigma, c = Evarutil.new_global sigma gr in
   let const = match gr with
-    | Globnames.ConstRef c -> c
+    | Names.GlobRef.ConstRef c -> c
     | _ -> CErrors.user_err ~hdr:"template-coq"
        (Printer.pr_global gr ++ str" is not a constant definition") in
   debug_msg debug "Quoting";
@@ -146,7 +136,7 @@ let quote opts gr =
   (term, const)
 
 (* Compile Quoted term with CertiCoq *)
-let compile opts term const =
+let compile opts term const imports =
   let debug = opts.debug in
   let options = make_pipeline_options opts in
 
@@ -156,10 +146,10 @@ let compile opts term const =
     debug_msg debug "Finished compiling, printing to file.";
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-    let cstr = Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
-    let hstr = Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
-    Pipeline.printProg (nenv,prg) cstr;
-    Pipeline.printProg (nenv,header) hstr;
+    let cstr = Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c" in
+    let hstr = Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h" in
+    printProg prg nenv cstr imports (* (List.map Tm_util.string_to_list imports) *);
+    printProg header nenv hstr [];
     let time = (Unix.gettimeofday() -. time) in
     Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
     debug_msg debug "Pipeline debug:";
@@ -183,10 +173,10 @@ let generate_glue opts term const =
       debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-    let cstr = Tm_util.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
-    let hstr = Tm_util.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
-    Pipeline.printProg (nenv, prg) cstr;
-    Pipeline.printProg (nenv, header) hstr;
+    let cstr = "glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c" in
+    let hstr = "glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h" in
+    printProg prg nenv cstr [];
+    printProg header nenv hstr [];
 
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Printed glue code to file in %f s.." time)
@@ -194,14 +184,14 @@ let generate_glue opts term const =
     CErrors.user_err ~hdr:"glue-code" (str "Could not generate glue code: " ++ pr_char_list s))
 
 
-let compile_with_glue opts gr =
+let compile_with_glue (opts : options) (gr : Names.GlobRef.t) (imports : string list) : unit =
   let (term, const) = quote opts gr in
-  compile opts term const;
+  compile opts term const imports;
   generate_glue opts term const
 
-let compile_only opts gr =
+let compile_only opts gr imports =
   let (term, const) = quote opts gr in
-  compile opts term const
+  compile opts term const imports
 
 let generate_glue_only opts gr =
   let (term, const) = quote opts gr in
@@ -241,7 +231,7 @@ let quote_ind opts gr : Ast_quoter.quoted_program * string =
   let sigma = Evd.from_env env in
   let sigma, c = Evarutil.new_global sigma gr in
   let name = match gr with
-    | Globnames.IndRef i -> 
+    | Names.GlobRef.IndRef i -> 
         let (mut, _) = i in
         Names.KerName.to_string (Names.MutInd.canonical mut)
     | _ -> CErrors.user_err ~hdr:"template-coq"
@@ -267,10 +257,10 @@ let ffi_command opts gr =
       debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-    let cstr = Tm_util.string_to_list ("ffi." ^ name ^ suff ^ ".c") in
-    let hstr = Tm_util.string_to_list ("ffi." ^ name ^ suff ^ ".h") in
-    Pipeline.printProg (nenv, prg) cstr;
-    Pipeline.printProg (nenv, header) hstr;
+    let cstr = ("ffi." ^ name ^ suff ^ ".c") in
+    let hstr = ("ffi." ^ name ^ suff ^ ".h") in
+    printProg prg nenv cstr [];
+    printProg header nenv hstr [];
 
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Printed FFI glue code to file in %f s.." time)

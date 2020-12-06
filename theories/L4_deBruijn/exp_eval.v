@@ -229,6 +229,7 @@ Fixpoint parallel_sbst (e : exp) (depth : N) (esubst : list exp) :=
   | Match_e e1 n bs =>
     Match_e (parallel_sbst e1 depth esubst) n (parallel_sbst_branches bs depth esubst)
   | Prf_e => Prf_e
+  | Prim_e p => Prim_e p               
   end
 with parallel_sbsts (es : exps) (depth : N) (esubst : list exp) :=
        match es with
@@ -1120,6 +1121,7 @@ Proof.
     rewrite (N.add_comm i (efnlst_length efns)). eassumption.
     eassumption.
   - intros n rho Hwf Hrho. simpl. constructor.
+  - intros. inv H. 
   - unfold parallel_sbst_makes_wf_exps. simpl. constructor.
   - unfold parallel_sbst_makes_wf_exps.
     intros e IHe es IHes n rho Hwf Hrho.
@@ -2020,6 +2022,7 @@ Proof.
     reflexivity.
   - intros n rho Hwf. simpl. reflexivity.
   - unfold parallel_sbst_inv_wf_exps. reflexivity.
+  - econstructor. 
   - intros e IHe es IHes.
     unfold parallel_sbst_inv_wf_exps in *.
     intros n rho Hwf. simpl.
@@ -2159,6 +2162,7 @@ Proof.
     simpl. reflexivity.
   - unfold parallel_sbst_with_sbst_exps.
     simpl. reflexivity.
+  - econstructor. 
   - intros e IHe es Hes.
     unfold parallel_sbst_with_sbst_exps in *.
     intros rho x n Hwf1 Hwf2.
@@ -2276,6 +2280,7 @@ Proof.
     eapply IH; try eassumption.
   - simpl. reflexivity.
   - unfold sbst_commut_exps. simpl. reflexivity.
+  - econstructor. 
   - unfold sbst_commut_exps.
     intros e IH1 es IH2 e1 e2 n He1 He2 Hwf.
     simpl. inv Hwf. f_equal.
@@ -2404,6 +2409,7 @@ Proof.
     zify. omega.
   - simpl. reflexivity.
   - unfold sbst_commut_exps_strong. simpl. reflexivity.
+  - econstructor. 
   - unfold sbst_commut_exps_strong.
     intros e IH1 es IH2 e1 e2 n m He1 He2 Hwf Hleq.
     simpl. inv Hwf. f_equal.
@@ -2613,6 +2619,7 @@ Proof.
     simpl. f_equal. eapply IH.
   - reflexivity.
   - unfold parallel_sbst_nil_rho_exps. reflexivity.
+  - econstructor. 
   - unfold parallel_sbst_nil_rho_exps.
     intros e IH1 es IH2 n.
     simpl. f_equal; eauto.
@@ -2752,6 +2759,7 @@ Proof.
     rewrite N.add_assoc in H1. rewrite (N.add_comm n (efnlst_length efns)).
     eassumption.
   - simpl. reflexivity.
+  - econstructor. 
   - unfold parallel_sbst_env_app_exps. simpl. reflexivity.
   - unfold parallel_sbst_env_app_exps.
     intros e IH1 es IH2 rho rhof n Henv Hwf.

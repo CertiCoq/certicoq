@@ -23,10 +23,11 @@ Require Import ExtrOcamlString ExtrOcamlZInt.
 Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
 
 (* L6_to_Clight *)
-Extract Constant L6_to_Clight.print_Clight => "PrintClight.print_if".
-Extract Constant L6_to_Clight.print_Clight_dest => "PrintClight.print_dest".
-Extract Constant L6_to_Clight.print_Clight_dest_names' => "PrintClight.print_dest_names".
-Extract Constant L6_to_Clight.print => "print_string".
+(* Extract Constant pipeline.print_Clight => "PrintClight.print_if". *)
+(* Extract Constant L6_to_Clight.print_Clight_dest => "PrintClight.print_dest". *)
+(* Extract Constant L6_to_Clight.print_Clight_dest_names => "PrintClight.print_dest_names". *)
+(* Extract Constant pipeline.print_Clight_names_dest_imports => "PrintClight.print_dest_names_imports". *)
+(* Extract Constant pipeline.print => "print_string". *)
 
 
 (* Time each phase, print to debug channel *)
@@ -74,10 +75,10 @@ Separate Extraction
          Floats.Float32.of_bits Floats.Float.of_bits
          Floats.Float32.to_bits Floats.Float.to_bits
          String.length
-         Compiler.pipeline.printProg
          Compiler.pipeline.make_opts
          Compiler.pipeline.compile
          Compiler.pipeline.make_glue
          Compiler.pipeline.make_ffi
-         Compiler.pipeline.show_IR.
+         Compiler.pipeline.show_IR
+         cps.M.elements.
 Cd "..".

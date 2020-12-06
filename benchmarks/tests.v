@@ -85,7 +85,7 @@ CertiCoq Compile -ext "_cps" demo1.
 CertiCoq Compile -direct demo1.
 CertiCoq Compile -O 1 -ext "_cps_opt" demo1.
 CertiCoq Compile -direct -O 1 -ext "_opt" demo1.
-CertiCoq Compile -direct -config 9 -O 1 -ext "_opt_ll" demo1.
+CertiCoq Compile -direct -args 1000 -config 9 -O 1 -ext "_opt_ll" demo1.
 
 Eval compute in "Compiling demo2".
 
@@ -93,7 +93,7 @@ CertiCoq Compile -ext "_cps" demo2.
 CertiCoq Compile -direct demo2.
 CertiCoq Compile -O 1 -ext "_cps_opt" demo2.
 CertiCoq Compile -direct -O 1 -ext "_opt" demo2.
-CertiCoq Compile -direct -config 9 -O 1 -ext "_opt_ll" demo2.
+CertiCoq Compile -direct -args 1000 -config 9 -O 1 -ext "_opt_ll" demo2.
 
 Eval compute in "Compiling demo3".
 
@@ -101,7 +101,7 @@ CertiCoq Compile -ext "_cps" demo3.
 CertiCoq Compile -direct demo3.
 CertiCoq Compile -O 1 -ext "_cps_opt" demo3.
 CertiCoq Compile -direct -O 1 -ext "_opt" demo3.
-CertiCoq Compile -direct -config 9 -O 1 -ext "_opt_ll" demo3.
+CertiCoq Compile -direct -args 1000 -config 9 -O 1 -ext "_opt_ll" demo3.
 
 Eval compute in "Compiling list_sum".
 
@@ -109,7 +109,7 @@ CertiCoq Compile -ext "_cps" list_sum.
 CertiCoq Compile -direct list_sum.
 CertiCoq Compile -O 1 -ext "_cps_opt" list_sum.
 CertiCoq Compile -direct -O 1 -ext "_opt" list_sum.
-CertiCoq Compile -direct -config 9 -O 1 -ext "_opt_ll" list_sum.
+CertiCoq Compile -direct -args 1000 -config 9 -O 1 -ext "_opt_ll" list_sum.
 
 
 Eval compute in "Compiling vs_easy".
@@ -118,7 +118,7 @@ CertiCoq Compile -direct -time_anf vs_easy.
 CertiCoq Compile -ext "_cps" -time_anf vs_easy.
 CertiCoq Compile -time -O 1 -ext "_cps_opt" vs_easy.
 CertiCoq Compile -direct -O 1 -ext "_opt" vs_easy.
-CertiCoq Compile -direct -config 9 -O 1 -ext "_opt_ll" vs_easy.
+CertiCoq Compile -direct -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_easy.
 
 Eval compute in "Compiling vs_hard".
 
@@ -126,7 +126,7 @@ CertiCoq Compile -ext "_cps" vs_hard.
 CertiCoq Compile -direct vs_hard.
 CertiCoq Compile -O 1 -ext "_cps_opt" vs_hard.
 CertiCoq Compile -direct -O 1 -ext "_opt" vs_hard.
-CertiCoq Compile -direct -config 9 -O 1 -ext "_opt_ll" vs_hard.
+CertiCoq Compile -direct -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_hard.
 
 
 Eval compute in "Compiling binom".
@@ -135,7 +135,7 @@ CertiCoq Compile -ext "_cps" binom.
 CertiCoq Compile -direct binom.
 CertiCoq Compile -O 1 -ext "_cps_opt" binom.
 CertiCoq Compile -direct -O 1 -ext "_opt" binom.
-CertiCoq Compile -direct -config 9 -O 1 -ext "_opt_ll" binom.
+CertiCoq Compile -direct -args 1000 -config 9 -O 1 -ext "_opt_ll" binom.
 
 
 Eval compute in "Compiling color".
@@ -144,7 +144,7 @@ CertiCoq Compile -time -ext "_cps" color.
 CertiCoq Compile -time -direct color.
 CertiCoq Compile -time -O 1 -ext "_cps_opt" color.
 CertiCoq Compile -time -direct -O 1 -ext "_opt" color.
-CertiCoq Compile -direct -config 9 -O 1 -ext "_opt_ll" color.
+CertiCoq Compile -direct -args 1000 -config 9 -O 1 -ext "_opt_ll" color.
 
 (* Don't compile slow sha *)
 (* Eval compute in "Compiling sha". *)
@@ -160,4 +160,4 @@ CertiCoq Compile -ext "_cps" sha_fast.
 CertiCoq Compile -direct sha_fast.
 CertiCoq Compile -O 1 -ext "_cps_opt" sha_fast.
 CertiCoq Compile -direct -O 1 -ext "_opt" sha_fast.
-CertiCoq Compile -direct -config 9 -O 1 -ext "_opt_ll" sha_fast.
+CertiCoq Compile -direct -args 1000 -config 9 -O 1 -ext "_opt_ll" sha_fast.

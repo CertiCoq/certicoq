@@ -21,14 +21,14 @@ type options =
     ext       : string;
     dev       : int;
     prefix    : string;
+    prims     : (BasicAst.kername * char list) list;
   }
 
 val default_options : options
-val make_options : command_args list -> options
-val help_msg : string
+val make_options : command_args list -> (BasicAst.kername * char list) list -> options
 
-val compile_with_glue : options -> Names.GlobRef.t -> unit
-val compile_only : options -> Names.GlobRef.t -> unit
+val compile_with_glue : options -> Names.GlobRef.t -> string list -> unit
+val compile_only : options -> Names.GlobRef.t -> string list -> unit
 val generate_glue_only : options -> Names.GlobRef.t -> unit
 val show_ir : options -> Names.GlobRef.t -> unit
 val ffi_command : options -> Names.GlobRef.t -> unit

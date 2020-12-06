@@ -1,6 +1,4 @@
 From CertiCoq.Plugin Require Import CertiCoq.
-From MetaCoq.SafeChecker Require Import Loader.
-From MetaCoq.Erasure Require Import Loader.
 
 Require Import Arith PArith List String Ascii.
 Require Import ExtLib.Data.String.

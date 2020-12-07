@@ -30,7 +30,7 @@ Definition print_list (l : list nat) : unit :=
 
 Definition print_lst := print_list [1;2;3;4;5].
 
-CertiCoq Compile -direct print_lst
+CertiCoq Compile print_lst
 Extract Constants [ print_nat => "print_gallina_nat", print_str => "print_gallina_string", new_line => "print_new_line" ]
 Include [ "print.h" ].
 
@@ -63,6 +63,6 @@ Definition fibn : unit :=
   let _ := print_int63 (fib 11) in
   new_line tt.
 
-CertiCoq Compile -direct fibn
+CertiCoq Compile fibn
 Extract Constants [ add => "add_int63", zero_int63 => "zero_int63", one_int63 => "one_int63", print_int63 => "print_int63", new_line => "print_new_line" ]
 Include [ "int63.h" ].

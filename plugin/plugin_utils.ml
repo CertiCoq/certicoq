@@ -36,22 +36,23 @@ let rec debug_mappings (ms : (BasicAst.kername * char list) list) : unit =
      
 let help_msg : string =
   "Usage:\n\
-To compile an program named <gid> type:\n\
-   CertiCoq Compile [options] <gid>.\n\n\
+To compile an Gallina definition named <gid> type:\n\
+   CertiCoq Compile <options> <gid>.\n\n\
 To show this help message type:\n\
    CertiCoq -help.\n\n\
 To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
-   CertiCoq Show IR [options] <global_identifier>.\n\n\
+   CertiCoq Show IR <options> <gid>.\n\n\
 Valid options:\n\
--direct   :  Produce direct-style code (as opposed to he default which is continuation-passing style)\n\
--time     :  Time each compilation phase\n\
--time_anf :  Time λanf optimizations\n\
--O n      :  Perform more aggressive optimizations. 1: lambda lifting for closure environment unboxing, 2: lambda lifting and inling for lambda lifting shells\n\
+-file S   :  Specify the filename. Default: the fully qualified name of <gid>.\n\
+-ext S    :  Specify the string s to be appended to the filename\n\
+-prefix S :  Specify the string s to be prepended to the FFI functions (to avoid clashes with C functions)\n\
+-O N      :  Where N=0 or N=1. N=1 (default) will enable the λΑΝF transformation lambda-lifting that will try to allocate closure environments is registers. N=0 disables lambda lifting.\n\
 -debug    :  Show debugging information\n\
 -args X   :  Specify how many arguments are used in the C translation (on top of the thread_info argument)\n\
--ext S    :  Specify the string s to be appended to the file name\n\
--prefix S :  Specify the string s to be prepended to the FFI functions (to avoid clashes with C functions)\n\
-\n\
-To show this help message type:\n\
-CertiCoq -help.\n"
+-cps      :  Compile using continuation-passing style code (default: direct-style compilation)\n\
+-time     :  Time each compilation phase\n\
+-time_anf :  Time λanf optimizations\n\
+\n\n\
+To compile Gallina constants to specific C functions use:\n\
+   CertiCoq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\", ... , \"fileM.h\" ]."
 

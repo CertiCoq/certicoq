@@ -1,5 +1,5 @@
 type command_args =
- | ANF
+ | CPS
  | TIME
  | TIMEANF
  | OPT of int
@@ -9,6 +9,7 @@ type command_args =
  | EXT of string (* Filename extension to be appended to the file name *)
  | DEV of int
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
+ | FILENAME of string (* Name of the generated file *)
 
 type options =
   { cps       : bool;
@@ -18,6 +19,7 @@ type options =
     debug     : bool;
     args      : int;
     anf_conf  : int;
+    filename  : string;
     ext       : string;
     dev       : int;
     prefix    : string;
@@ -25,8 +27,10 @@ type options =
   }
 
 val default_options : options
-val make_options : command_args list -> (BasicAst.kername * char list) list -> options
+val make_options : command_args list -> (BasicAst.kername * char list) list -> string -> options
 
+val get_name : Names.GlobRef.t -> string
+  
 val compile_with_glue : options -> Names.GlobRef.t -> string list -> unit
 val compile_only : options -> Names.GlobRef.t -> string list -> unit
 val generate_glue_only : options -> Names.GlobRef.t -> unit

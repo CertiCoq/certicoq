@@ -30,4 +30,4 @@ Definition prog `{StringFFI} : IO unit :=
 
 CertiCoq FFI IO_Impl.
 CertiCoq FFI StringFFI.
-CertiCoq Compile prog.
+CertiCoq Compile -cps prog.

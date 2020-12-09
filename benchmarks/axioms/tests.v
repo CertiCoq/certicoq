@@ -56,7 +56,7 @@ Fixpoint fib_aux (n : nat) (prev0 prev1 : int63) :=
 Fixpoint fib (n : nat) := fib_aux n zero_int63 one_int63.
 
 Definition fibn : unit :=
-  let _ := print_int63 (fib 13) in
+  let _ := print_int63 (fib 11) in
   new_line tt.
 
 CertiCoq Compile fibn

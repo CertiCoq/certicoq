@@ -37,7 +37,7 @@ Include [ "print.h" ].
 (* Example 2: int 63 *)
 
 Axiom (int63 : Type).
-Axiom (add : int63 -> int63 -> int63).
+Axiom (add_int63 : int63 -> int63 -> int63).
 Axiom (minus : int63 -> int63 -> int63).
 Axiom (mul : int63 -> int63 -> int63).
 Axiom (print_int63 : int63 -> unit).
@@ -50,15 +50,27 @@ Fixpoint fib_aux (n : nat) (prev0 prev1 : int63) :=
   match n with
   | 0 => prev0
   | 1 => prev1
-  | S n => fib_aux n (add prev0 prev1) prev0
+  | S n => fib_aux n prev1 (add_int63 prev0 prev1)
   end.
 
-Fixpoint fib (n : nat) := fib_aux (n - 1) zero_int63 one_int63.
+Fixpoint fib (n : nat) := fib_aux n zero_int63 one_int63.
 
 Definition fibn : unit :=
-  let _ := print_int63 (fib 11) in
+  let _ := print_int63 (fib 13) in
   new_line tt.
 
 CertiCoq Compile fibn
-Extract Constants [ add => "add_int63", zero_int63 => "zero_int63", one_int63 => "one_int63", print_int63 => "print_int63", new_line => "print_new_line" ]
+Extract Constants [ add_int63 => "add_int63", zero_int63 => "zero_int63", one_int63 => "one_int63", print_int63 => "print_int63", new_line => "print_new_line" ]
+Include [ "int63.h" ].
+
+
+(* Example 3: list_sum with int63 -- add_int63 is first class *)
+
+Definition list_sum_int63 :=
+  let n := List.fold_left add_int63 (List.repeat one_int63 100) zero_int63 in
+  let _ := print_int63 n in new_line tt.
+
+
+CertiCoq Compile list_sum_int63
+Extract Constants [ add_int63 => "add_int63", zero_int63 => "zero_int63", one_int63 => "one_int63", print_int63 => "print_int63", new_line => "print_new_line" ]
 Include [ "int63.h" ].

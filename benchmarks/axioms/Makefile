@@ -33,5 +33,6 @@ tests: tests.v
 	coqc $(COQOPTS) tests.v
 
 print_lst:
-	$(CCOMPILER) -o print_lst -Wno-everything -O2 -fomit-frame-pointer main.c gc.c CertiCoq.Benchmarks.tests.print_lst.c glue.CertiCoq.Benchmarks.tests.print_lst.c print.c
-	$(CCOMPILER) -o fibn -Wno-everything -O2 -fomit-frame-pointer main.c gc.c CertiCoq.Benchmarks.tests.fibn.c glue.CertiCoq.Benchmarks.tests.fibn.c int63.c
+	$(CCOMPILER) -o print_lst -Wno-everything -O2 -fomit-frame-pointer main.c gc_stack.c CertiCoq.Benchmarks.tests.print_lst.c glue.CertiCoq.Benchmarks.tests.print_lst.c print.c
+	$(CCOMPILER) -o fibn -Wno-everything -O2 -fomit-frame-pointer main.c gc_stack.c CertiCoq.Benchmarks.tests.fibn.c glue.CertiCoq.Benchmarks.tests.fibn.c int63.c
+	$(CCOMPILER) -o list_sum_int63 -Wno-everything -O2 -fomit-frame-pointer main.c gc_stack.c CertiCoq.Benchmarks.tests.list_sum_int63.c glue.CertiCoq.Benchmarks.tests.list_sum_int63.c int63.c

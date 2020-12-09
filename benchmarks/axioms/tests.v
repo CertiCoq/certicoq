@@ -6,6 +6,7 @@ Require Import ExtLib.Data.String.
 Import ListNotations. 
 
 (* Example 1: printing axioms *)
+
 Axiom (print_nat : nat -> unit).
 Axiom (print_str : string -> unit).
 Axiom (new_line : unit -> unit).
@@ -47,15 +48,12 @@ Axiom (one_int63 : int63).
 
 Fixpoint fib_aux (n : nat) (prev0 prev1 : int63) :=
   match n with
-  | 0 => add prev0 prev1
+  | 0 => prev0
+  | 1 => prev1
   | S n => fib_aux n (add prev0 prev1) prev0
   end.
 
-Fixpoint fib (n : nat) :=
-  match n with
-  | 0 => zero_int63
-  | _ => fib_aux (n - 1) zero_int63 one_int63
-  end.
+Fixpoint fib (n : nat) := fib_aux (n - 1) zero_int63 one_int63.
 
 Definition fibn : unit :=
   let _ := print_int63 (fib 11) in

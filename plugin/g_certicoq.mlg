@@ -13,16 +13,17 @@ open Plugin_utils
 }
 
 VERNAC ARGUMENT EXTEND cargs 
-| [ "-direct" ] -> { ANF }
+| [ "-cps" ] -> { CPS }
 | [ "-time" ] -> { TIME }
 | [ "-time_anf" ] -> { TIMEANF }
 | [ "-O" natural(n) ] -> { OPT(n) }
 | [ "-debug" ] -> { DEBUG }
 | [ "-args" natural(n) ] -> { ARGS(n) }
 | [ "-config" natural(n) ] -> { ANFCONFIG(n) }
-(* Zoe: -config  Too measure different ANF configurations. Not for user purposes *)
+(* Zoe: -config  To measure different ANF configurations. Not for user purposes *)
 | [ "-dev" natural(n) ] -> { DEV(n) }
 | [ "-ext" string(s) ] -> { EXT(s) }
+| [ "-file" string(s) ] -> { FILENAME(s) }
 END
 
 
@@ -39,27 +40,27 @@ END
 VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
 | [ "CertiCoq" "Compile" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
-    let opts = Certicoq.make_options l [] in
+    let opts = Certicoq.make_options l [] (get_name gr) in
     Certicoq.compile_with_glue opts gr []
   }
 | [ "CertiCoq" "Compile" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" "Include" "[" string_list_sep(imps, ",") "]" ] -> {
     let gr = Nametab.global gr in
-    let opts = Certicoq.make_options l cs in
+    let opts = Certicoq.make_options l cs (get_name gr) in
     Certicoq.compile_with_glue opts gr imps
   }
 | [ "CertiCoq" "Show" "IR" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
-    let opts = Certicoq.make_options l [] in
+    let opts = Certicoq.make_options l [] (get_name gr) in
     Certicoq.show_ir opts gr
   }
 | [ "CertiCoq" "Show" "IR" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" ] -> {
     let gr = Nametab.global gr in
-    let opts = Certicoq.make_options l cs in
+    let opts = Certicoq.make_options l cs (get_name gr) in
     Certicoq.show_ir opts gr
   }
 | [ "CertiCoq" "FFI" ffiargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
-    let opts = Certicoq.make_options l [] in
+    let opts = Certicoq.make_options l [] (get_name gr) in
     Certicoq.ffi_command opts gr
   }
 | [ "CertiCoq" "-help" ] -> {

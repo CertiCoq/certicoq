@@ -45,7 +45,7 @@ let printProg prog names (dest : string) (import : string list) =
 (** Compilation Command Arguments *)
 
 type command_args =
- | ANF
+ | CPS
  | TIME
  | TIMEANF
  | OPT of int
@@ -55,6 +55,7 @@ type command_args =
  | EXT of string (* Filename extension to be appended to the file name *)
  | DEV of int    (* For development purposes *)
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
+ | FILENAME of string (* Name of the generated file *)
 
 type options =
   { cps       : bool;
@@ -64,6 +65,7 @@ type options =
     debug     : bool;
     args      : int;
     anf_conf  : int;
+    filename  : string;
     ext       : string;
     dev       : int;
     prefix    : string;
@@ -71,13 +73,14 @@ type options =
   }
 
 let default_options : options =
-  { cps       = true;
+  { cps       = false;
     time      = false;
     time_anf  = false;
-    olevel    = 0;
+    olevel    = 1;
     debug     = false;
     args      = 5;
     anf_conf  = 0;
+    filename  = "";
     ext       = "";
     dev       = 0;
     prefix    = "";
@@ -85,11 +88,11 @@ let default_options : options =
   }
 
 
-let make_options (l : command_args list) (pr : (BasicAst.kername * char list) list) : options =
+let make_options (l : command_args list) (pr : (BasicAst.kername * char list) list) (fname : string) : options =
   let rec aux (o : options) l =
     match l with
     | [] -> o
-    | ANF      :: xs -> aux {o with cps = false} xs
+    | CPS      :: xs -> aux {o with cps = true} xs
     | TIME     :: xs -> aux {o with time = true} xs
     | TIMEANF  :: xs -> aux {o with time_anf = true} xs
     | OPT n    :: xs -> aux {o with olevel = n} xs
@@ -99,8 +102,10 @@ let make_options (l : command_args list) (pr : (BasicAst.kername * char list) li
     | EXT s    :: xs -> aux {o with ext = s} xs
     | DEV n    :: xs -> aux {o with dev = n} xs
     | PREFIX s :: xs -> aux {o with prefix = s} xs
+    | FILENAME s :: xs -> aux {o with filename = s} xs
   in
-  let o = aux default_options l in
+  let opts = { default_options with filename = fname } in
+  let o = aux opts l in
   {o with prims = pr}
 
 let make_pipeline_options (opts : options) =
@@ -116,7 +121,15 @@ let make_pipeline_options (opts : options) =
   let prims = opts.prims in
   Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix prims
 
+
 (** Main Compilation Functions *)
+
+(* Get fully qualified name of a constant *)
+let get_name (gr : Names.GlobRef.t) : string =
+  match gr with
+  | Names.GlobRef.ConstRef c -> Names.KerName.to_string (Names.Constant.canonical c)
+  | _ -> CErrors.user_err ~hdr:"template-coq" (Printer.pr_global gr ++ str " is not a constant definition")
+
 
 (* Quote Coq term *)
 let quote opts gr =
@@ -124,30 +137,26 @@ let quote opts gr =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let sigma, c = Evarutil.new_global sigma gr in
-  let const = match gr with
-    | Names.GlobRef.ConstRef c -> c
-    | _ -> CErrors.user_err ~hdr:"template-coq"
-       (Printer.pr_global gr ++ str" is not a constant definition") in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
   let term = quote_term_rec env (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
-  (term, const)
+  term
 
 (* Compile Quoted term with CertiCoq *)
-let compile opts term const imports =
+let compile opts term imports =
   let debug = opts.debug in
   let options = make_pipeline_options opts in
-
   let p = Pipeline.compile options term in
   match p with
   | (CompM.Ret ((nenv, header), prg), dbg) ->
     debug_msg debug "Finished compiling, printing to file.";
     let time = Unix.gettimeofday() in
+    let fname = opts.filename in
     let suff = opts.ext in
-    let cstr = Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c" in
-    let hstr = Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h" in
+    let cstr = fname ^ suff ^ ".c" in
+    let hstr = fname ^ suff ^ ".h" in
     printProg prg nenv cstr imports (* (List.map Tm_util.string_to_list imports) *);
     printProg header nenv hstr [];
     let time = (Unix.gettimeofday() -. time) in
@@ -160,7 +169,7 @@ let compile opts term const imports =
     CErrors.user_err ~hdr:"pipeline" (str "Could not compile: " ++ (pr_char_list s) ++ str "\n")
 
 (* Generate glue code for the compiled program *)
-let generate_glue opts term const =
+let generate_glue opts term =
   let debug = opts.debug in
   let options = make_pipeline_options opts in
 
@@ -173,8 +182,9 @@ let generate_glue opts term const =
       debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-    let cstr = "glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c" in
-    let hstr = "glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h" in
+    let fname = opts.filename in
+    let cstr = "glue." ^ fname ^ suff ^ ".c" in
+    let hstr = "glue." ^ fname ^ suff ^ ".h" in
     printProg prg nenv cstr [];
     printProg header nenv hstr [];
 
@@ -185,17 +195,17 @@ let generate_glue opts term const =
 
 
 let compile_with_glue (opts : options) (gr : Names.GlobRef.t) (imports : string list) : unit =
-  let (term, const) = quote opts gr in
-  compile opts term const imports;
-  generate_glue opts term const
+  let term = quote opts gr in
+  compile opts term imports;
+  generate_glue opts term
 
 let compile_only opts gr imports =
-  let (term, const) = quote opts gr in
-  compile opts term const imports
+  let term = quote opts gr in
+  compile opts term imports
 
 let generate_glue_only opts gr =
-  let (term, const) = quote opts gr in
-  generate_glue opts term const
+  let term = quote opts gr in
+  generate_glue opts term
 
 let print_to_file (s : string) (file : string) =
   let f = open_out file in
@@ -203,7 +213,7 @@ let print_to_file (s : string) (file : string) =
   close_out f
 
 let show_ir opts gr =
-  let (term, const) = quote opts gr in
+  let term = quote opts gr in
   let debug = opts.debug in
   let options = make_pipeline_options opts in
   let p = Pipeline.show_IR options term in
@@ -212,7 +222,8 @@ let show_ir opts gr =
     debug_msg debug "Finished compiling, printing to file.";
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-    let file = (Names.KerName.to_string (Names.Constant.canonical const)) ^ suff ^ ".ir" in
+    let fname = opts.filename in
+    let file = fname ^ suff ^ ".ir" in
     print_to_file (string_of_chars prg) file;
     let time = (Unix.gettimeofday() -. time) in
     Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));

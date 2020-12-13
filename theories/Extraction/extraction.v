@@ -11,8 +11,7 @@ Require compcert.common.AST
         compcert.common.Globalenvs
         Int31.
 
-Require L7.Clightexec
-        Glue.glue
+Require Glue.glue
         Compiler.pipeline.
 
 (* Standard lib *)

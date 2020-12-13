@@ -39,7 +39,10 @@ clean:
 	rm -f ./glue.*.*.c
 	rm -f ./glue.*.*.h
 	rm -f ./*.vo
+	rm -f ./*.vos
+	rm -f ./*.vok
 	rm -f ./*.glob
+	rm -f ${EXEC}
 
 cleanexec:
 	rm -f $(EXEC)

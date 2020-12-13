@@ -1,0 +1,160 @@
+Notes on primops,  12 October 2020,  A. Appel
+
+Based on discussion with Zoe and Joomy, and on some additions
+of my own, here's a proposal for how to do primops.
+[Warning: None of the Coq code has been typechecked...]
+
+Several kinds of primops:  
+C functions, integer constants, strings, ...
+
+Inductive primop_rep :=
+| Primop_func: string -> nat -> primop_rep
+| Primop_num: Int63.int -> primop_rep
+| Primop_string: string -> primop_rep.
+| Primop_bad : primop_rep.
+
+I'll start with functions, and defer numbers and strings until later.
+
+
+PRIMITIVE FUNCTIONS.
+
+Primop C functions take (any fixed number of) arguments that are
+Coq-compatible values, and return a result that's a Coq-compatible
+value.  C functions don't have closures.
+
+Each C function is its own Axiom.  Since certain packages of C
+functions rely on abstract data types (ADTs) of their own, there
+will also be types that are Axioms, which (we hope) will be
+erased as noncomputational.
+
+Example:
+
+Axiom twobit : Set.
+Axiom to_twobit: bool -> bool -> twobit.
+Axiom fstbit: twobit -> bool.
+Axiom sndbit: twobit -> bool.
+
+Definition test_twobit :=
+  let x := to_tobit true false in
+  andb (fstbit x) (sndbit x).
+  
+(It would be desirable to package these up as a dependent record,
+but for now we will not do that, because that would require extra
+work at the closure-conversion and hoisting phases.  Later we can
+do this by an extra pass.)
+
+When we compile test_twobit, then erase types, then do the let-binding
+of environments, we will have an expression with three free variables
+to_twobit, fstbit, sndbit.  (We hope that the twobit type will not be
+free.)  These will appear as free de Bruijn indices at the L4 language.
+
+Somehow, we need to arrive at L4 with an environment mapping from
+these de Bruijn indices to the primop_rep type.  Since
+deBruijn indices are dense, I'll illustrate using a list:
+
+Definition primop_env: list primop_rep :=
+  [Primop_func "to_twobit" 2; 
+   Primop_func "fstbit" 1; 
+   Primop_func "sndbit" 1].
+
+The L4-to-L6 conversion must convert each of these de Bruijn
+variables to a Prim in the L6 expression language:
+
+Inductive exp : Type :=
+  . . .
+| Eprim: var -> prim -> list var -> exp -> exp
+
+where type "prim" is convertible with positive.  The meaning
+of (Eprim x p [y0;y1;y2] e1)  is,  "let x = p(y0,y1,y2) in e1".
+
+To convert from primop_rep to prim we use:
+
+(* From Clightdefs.v *)
+Definition ident_of_string:  string -> ident.
+(* The next three items are now CompCert's master branch; see
+   https://github.com/AbsInt/CompCert/issues/372   and
+   https://github.com/AbsInt/CompCert/blob/master/exportclight/Clightdefs.v *)
+Definition string_of_ident:  ident -> string.
+Lemma string_of_ident_of_string:
+  forall s, string_of_ident (ident_of_string s) = s.
+Lemma NOT_ident_of_string_of_ident:
+   ~ forall i, ident_of_string (string_of_ident i) = i.
+(* Note that this is injective but not bijective. *)
+
+Upon this we will define:
+
+Definition prim_of_rep (p: primop_rep) : prim :=
+match p with
+| Primop_func name arity => xO (xO (xO (ident_of_string name)))
+| Primop_num n => xO (xO (xI (Z.to_pos (1 + Int63.to_Z n))))
+| Primop_string s => xO (xI (xO (ident_of_string s))).
+
+Definition rep_of_prim (p: prim) (arity: nat) : primop_rep :=
+match p with
+| xO (xO (xO i)) => Primop_func (string_of_ident i) arity
+| xO (xO (xI i)) => Primop_num (Int63.of_Z (Z.of_pos i - 1))
+| xO (xI (xO i)) => Primop_string (string_of_ident i)
+| _ => Primop_bad.
+
+Now, the L4-to-L6 translation of a de Bruijn variable, using
+the primop_env, is something like this:
+
+Definition convert_prim (primop_env: list primop_rep)
+  (deb_var: N) (bind_var: var) (cont: exp) : option exp :=
+match nth_error primop_env (N.to_nat deb_var) with
+| Some p => let r := prim_of_rep p in
+    match p with
+    | Primop_func name arity =>
+      convert_prim_func r arity bind_var cont
+    | Primop_num n =>
+      convert_prim_num r bind_var cont
+    | Primop_string s =>
+      convert_prim_string r bind_var cont
+| None => None
+end.
+
+Definition convert_prim_func (r: prim) (arity: nat) (x: var) (ce: exp) :=
+ Efun x ... Efun ... Efun ... (* enough to curry "arity" times *)
+    (* body of innermost function: *)
+     (Eprim z r args (Ehalt z)  (* "args" comes from the currying *)
+ ce.
+
+Naturally, we hope to rely on uncurrying and inlining to make this
+efficient in the common case.
+
+
+NUMBERS
+
+To handle numbers, we want something like this:
+
+Require Import Int63.  (* Coq 8.12's built-in 63-bit unsigned integers *)
+
+The number 123%int63 will be represented as,
+   Eprim x (rep_to_prim (Primop_num 123)) nil (Ehalt x)
+
+
+STRINGS
+
+. . . later . . .
+
+
+GENERATING C CODE FROM Eprim
+
+in L6_to_Clight.translate_body, generate code something like this:
+
+| Eprim x p vs e =>
+    match rep_of_prim p (length vs) with
+    | Primop_func name arity =>
+      Some (Ssequence
+            (Scall (Some x) 
+             (Evar (ident_of_string x) (type_of_arity arity))
+             (map whatever vs))
+	    e')
+    | Primop_num n =>
+      e' <- translate_body e ;;
+      Some (Ssequence
+       	    (Sset x (Econst_long (Int64.repr (2 * Int63.to_Z n + 1)) (Tlong Unsigned noattr)))
+	    e')
+    | _ => None 
+    end
+    

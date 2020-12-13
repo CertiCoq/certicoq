@@ -39,13 +39,13 @@ The authors intend to open-source license this software during the first quarter
   We depend on the following Coq packages:
 
   `ExtLib` and `MetaCoq` (which requires `Equations`).
-   All three packages are currently install using git modules (see below).
+   All three packages are currently installed using git modules (see below).
 
 ### Building the dependencies
     
   From the `certicoq/` directory, run:
 
-   # make submodules
+    # make submodules
 
 ### Building the compiler
   

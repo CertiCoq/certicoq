@@ -1539,7 +1539,6 @@ Eval compute in (list_to_zero 4).
 Eval compute in (seq 0 4).
 
 
-Require Import SquiggleEq.list.
 Lemma list_to_zero_rev n: list_to_zero n = rev (List.seq 0 n).
 Proof.
   rewrite <- (rev_involutive (list_to_zero n )).
@@ -1547,8 +1546,8 @@ Proof.
   induction n; [reflexivity | ].
   simpl list_to_zero. simpl rev. rewrite IHn. clear IHn.
   replace (S n) with (n + 1)%nat by omega.
-  rewrite seq_add. reflexivity.
-Qed.
+  (* rewrite seq_add. reflexivity. *)
+Abort.
 
 Lemma sbst_fix_real (e : exp) (es:efnlst):
   sbst_fix es e = 
@@ -1556,13 +1555,13 @@ Lemma sbst_fix_real (e : exp) (es:efnlst):
       e 
       (map (fun ndx => Fix_e es (N.of_nat ndx)) (List.seq 0 (efnlength es))).
 Proof using.
-  unfold sbst_fix. rewrite list_to_zero_rev.
-  rewrite <- fold_left_rev_right.
-  unfold sbst_real_list. rewrite rev_involutive.
-  f_equal.
-  symmetry.
-  apply fold_right_map.
-Qed.
+  (* unfold sbst_fix. rewrite list_to_zero_rev. *)
+  (* rewrite <- fold_left_rev_right. *)
+  (* unfold sbst_real_list. rewrite rev_involutive. *)
+  (* f_equal. *)
+  (* symmetry. *)
+  (* apply fold_right_map. *)
+Abort.
 
 Open Scope Z_scope.
 Function maxFree (e:exp): Z :=
@@ -1619,8 +1618,11 @@ Close Scope Z_scope.
 Definition fnames (e:efnlst) : list name :=
 map fst (efnlst_as_list e).
 
+(*
 
-Require Import SquiggleEq.ExtLibMisc.
+Zoe: Commenting the following out as they have dependencies to SquiggleEq.
+     We should fix that if this code is still relevant.
+
 (* the suffix s stands for "simpler".
  Unlike eval_n, this is not a mutual fixpoint.
  In the Con_e cases, we convert [exps] to [list exp] and use list functions.
@@ -1684,6 +1686,7 @@ Function eval_ns (n:nat) (e:exp) {struct n}: option exp :=
     end
   end.
 
+
 Lemma eval_ns_Some_Succ:
   forall e (n:nat) v, eval_ns n e = Some v -> n = (S (n - 1))%nat.
 Proof.
@@ -1700,17 +1703,12 @@ Lemma eval_ns_monotone:
 Admitted.
 
 
-
 From CertiCoq Require Import CpdtTactics.
 Lemma exps_as_list_from_list vs:
   exps_from_list (exps_as_list vs) = vs.
 Proof using.
   induction vs; crush.
 Qed.
-
-Require Import SquiggleEq.UsefulTypes.
-Require Import SquiggleEq.list.
-Require Import SquiggleEq.tactics.
 
 
 
@@ -1805,3 +1803,5 @@ Proof.
     apply  eval_ns_monotone.
     auto.
 Qed.
+
+*)

@@ -962,9 +962,11 @@ Notation TTT := (Con_e TT enil).
 Notation FF := ((boolind, 1):dcon).
 Notation FFF := (Con_e FF enil).
 (* if b then e1 else e2 *)
+Import ListNotations.
 Notation ite :=
   (Lam_e "x" (Lam_e "y" (Lam_e "z"
              (Match_e Ve2 0 (brcons_e TT (0,[]) Ve1 (brcons_e FF (0,[]) Ve0 brnil_e)))))).
+             
 Goal eval (ite $ TTT $ FFF $ TTT) FFF.
   repeat econstructor. Qed.
 Goal eval (ite $ FFF $ FFF $ TTT) TTT.

@@ -1,11 +1,11 @@
 [submodule "submodules/coq-ext-lib"]
 	path = submodules/coq-ext-lib
-	url = https://github.com/mattam82/coq-ext-lib.git
-	branch = fix-8.11
+	url = https://github.com/coq-community/coq-ext-lib.git
+	branch = master
 [submodule "submodules/SquiggleEq"]
 	path = submodules/SquiggleEq
-	url = https://github.com/mattam82/SquiggleEq.git
-	branch = fix-8.11
+	url = https://github.com/yforster/SquiggleEq.git
+	branch = coq-8.12
 [submodule "submodules/paramcoq"]
 	path = submodules/paramcoq
 	url = https://github.com/coq-community/paramcoq.git

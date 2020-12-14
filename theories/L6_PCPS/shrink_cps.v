@@ -544,8 +544,6 @@ Definition f_pair {A B C D} (f: A -> A -> B) (g: C -> C -> D)
 
 Definition tag := positive.
 
-
-
 Fixpoint update_census_list (sig:r_map) (ys:list var) (fun_delta:var -> c_map -> nat) (count:c_map) :=
   match ys with
   | [] => count

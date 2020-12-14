@@ -55,3 +55,7 @@ CertiCoq.Benchmarks.Binom.main.c
 CertiCoq.Benchmarks.Binom.main.h
 plugin/g_certicoq.ml
 benchmarks/lib/.Makefile.d
+CertiCoq.Benchmarks.lib.Binom.main.c
+CertiCoq.Benchmarks.lib.Binom.main.h
+glue.CertiCoq.Benchmarks.lib.Binom.main.c
+glue.CertiCoq.Benchmarks.lib.Binom.main.h

@@ -108,7 +108,7 @@ Section MEASURECONTRACT.
       simpl in *;
       try ((destruct (inline_letapp e x) as [ [C'' z'] | ] eqn:Heq''; try congruence); inv Heq; simpl; eauto using Peano.le_n_S).
     congruence.
-    eapply Peano.le_n_S. specialize (IHe C'' (eq_refl _)). omega.
+    eapply Peano.le_n_S. specialize (IHe C'' (eq_refl)). omega.
     inv Heq. simpl. reflexivity.
     inv Heq. simpl. eauto.
   Defined.
@@ -544,9 +544,11 @@ Definition f_pair {A B C D} (f: A -> A -> B) (g: C -> C -> D)
 
 Definition tag := positive.
 
+Import ListNotations.
+
 Fixpoint update_census_list (sig:r_map) (ys:list var) (fun_delta:var -> c_map -> nat) (count:c_map) :=
   match ys with
-  | [] => count
+  | [ ] => count
   | y::ys' =>
     let y' := apply_r sig y in
     update_census_list sig ys' fun_delta (M.set y' (fun_delta y' count) count)
@@ -774,7 +776,7 @@ Section CONTRACT.
               existT _ ((y,e')::cl'', (steps' + steps''), count'', inl'') (b_map_le_i_trans _ _ bp _ bp')
             end)
          end
-     end) (eq_refl cl).
+     end) (@eq_refl _ cl).
   
   (* oe is original expression of form (Efun fds e'), every e on which contract is called is a subterm of oe ( by subterm_fds ) *)  
   Theorem subfds_Fcons {f t ys e fds' e0}:
@@ -851,7 +853,7 @@ Section CONTRACT.
                end
              end)
           end)
-     end) (eq_refl fds).
+     end) (@eq_refl _ fds).
 
 
 
@@ -873,7 +875,7 @@ Section CONTRACT.
     match res as k return (k = res -> contractT im) with
     | existT (e_body, steps, count, im') bp =>
       fun Heq => existT _ (e_body, steps + 1, count, im') bp
-    end (eq_refl _).
+    end (eq_refl).
   
   Program Fixpoint contract (sig:r_map) (count:c_map) (e:exp) (sub:ctx_map) (im:b_map) {measure (term_sub_inl_size (e,sub,im))}
     : contractT im :=
@@ -970,28 +972,28 @@ Section CONTRACT.
                             return (k =  contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' -> contractT im) with
                       | existT (e', steps', c, i) bp => 
                         fun Heql => existT _ (e', steps' + 1, c, i) (b_map_i_true _ _ _ bp)
-                      end (eq_refl _))
+                      end (eq_refl))
                  | None =>
                    (fun Heq5 =>
                       match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                       | existT  (e', steps, count', im') bp =>
                         fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-                      end (eq_refl _))
-                 end (eq_refl _))
+                      end (eq_refl))
+                 end (eq_refl))
             | false =>
               (fun Heq5 =>
                  match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                  | existT  (e', steps, count', im') bp =>
                    fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-                 end (eq_refl _))                
-            end (eq_refl _))
+                 end (eq_refl))                
+            end (eq_refl))
        | _ =>
          (fun Heq5 =>
             match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
             | existT  (e', steps, count', im') bp =>
               fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-            end (eq_refl _))                
-       end (eq_refl _))
+            end (eq_refl))                
+       end (eq_refl))
     | Eprim x f ys e => (* Prims may have side effects and are not considered dead code *)
       match contract sig count e sub im return _ with
       | existT   (e', steps', count', im') bp  =>
@@ -1219,28 +1221,28 @@ Section CONTRACT.
                             return (k =  contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' -> contractT im) with
                       | existT (e', steps', c, i) bp => 
                         fun Heql => existT _ (e', steps' + 1, c, i) (b_map_i_true _ _ _ bp)
-                      end (eq_refl _))
+                      end (eq_refl))
                  | None =>
                    (fun Heq5 =>
                       match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                       | existT  (e', steps, count', im') bp =>
                         fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-                      end (eq_refl _))
-                 end (eq_refl _))
+                      end (eq_refl))
+                 end (eq_refl))
             | false =>
               (fun Heq5 =>
                  match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                  | existT  (e', steps, count', im') bp =>
                    fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-                 end (eq_refl _))                
-            end (eq_refl _))
+                 end (eq_refl))                
+            end (eq_refl))
        | _ =>
          (fun Heq5 =>
             match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
             | existT  (e', steps, count', im') bp =>
               fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-            end (eq_refl _))                
-       end (eq_refl _))
+            end (eq_refl))                
+       end (eq_refl))
     | Eprim x f ys e =>
       match contract sig count e sub im return _ with
       | existT   (e', steps', count', im') bp  =>
@@ -1269,8 +1271,8 @@ Section CONTRACT.
                with
                | existT  (cl', steps, count', im') bp =>
                  fun Heqc => existT _ (Ecase v' cl', steps, count', im') bp
-               end) (eq_refl _)
-          end) (eq_refl _)
+               end) (eq_refl)
+          end) (eq_refl)
        | _ =>
          (match contractcases (Ecase v cl, sub, im)
                               (fun rm cm es H => contract rm cm (fst (fst es)) (snd (fst es)) (snd es)) sig count im sub cl (subcl_refl cl) (le_n _) as anonymous'
@@ -1281,7 +1283,7 @@ Section CONTRACT.
           | existT (cl', steps, count', im') bp  =>
             fun Heqc =>
               existT _ (Ecase v' cl', steps, count', im') bp
-          end) (eq_refl _)
+          end) (eq_refl)
        end )
     | Efun fl e =>
       (match  precontractfun sig count sub fl as anonymous'
@@ -1301,7 +1303,7 @@ Section CONTRACT.
                  end)
               end
             end)
-       end) (eq_refl _)
+       end) (eq_refl)
 
     | Eapp f t ys =>
       let f' := apply_r sig f in
@@ -1335,11 +1337,11 @@ Section CONTRACT.
                  | false =>
                    fun Heqm =>
                      existT _ (Eapp f' t ys', 0, count, im) (ble_refl im)
-                 end) (eq_refl _)
+                 end) (eq_refl)
             | _ => fun Heqs => existT _ (Eapp f' t ys', 0, count, im) (ble_refl im)
-            end) (eq_refl _)
+            end) (eq_refl)
        | _ => fun _ => existT _ (Eapp f' t ys', 0, count, im) (ble_refl im)
-       end) (eq_refl _)
+       end) (eq_refl)
     end.
 
 

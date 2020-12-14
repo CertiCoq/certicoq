@@ -463,7 +463,7 @@ Fixpoint mangle (inds : ind_info) (e : term) : GM string :=
   | e => raise ("mangle: Unrecognized type: " +++ string_of_term e)
   end.
 
-Fixpoint decompose_sorts (ty : term) : list name × term :=
+Fixpoint decompose_sorts (ty : term) : list aname × term :=
   match ty with
   | tProd n (tSort _) ty =>
     let '(ns, ty) := decompose_sorts ty in
@@ -565,6 +565,9 @@ Record frame := mk_frame {
   hRights : list term;
   hRoot : term }.
 
+Definition nAnon := {| binder_name := nAnon; binder_relevance := Relevant |}.
+Definition nNamed n := {| binder_name := nNamed n; binder_relevance := Relevant |}.
+
 Definition fn : term -> term -> term := tProd nAnon.
 Definition type0 := tSort Universe.type0.
 Definition func x t e := tLambda (nNamed x) t e.
@@ -587,7 +590,7 @@ Definition gen_univ_univD (qual : modpath) (typename : kername) (g : mind_graph_
   let univ := tInd univ_ind [] in
   let body :=
     func "u" univ
-      (tCase (univ_ind, O)
+      (tCase ((univ_ind, O), Relevant)
         (lam univ type0)
         (tRel 0) (map (fun '(_, ty) => (O, ty)) mgTypes))
   in ({|
@@ -691,7 +694,7 @@ Definition gen_frameD (qual : modpath) (typename : kername) (univD_kername : ker
   in
   let body :=
     func "A" univ_ty (func "B" univ_ty (func "h" frame_ty
-      (tCase (frame_ind, O)
+      (tCase ((frame_ind, O), Relevant)
         (func "A" univ_ty (func "B" univ_ty (func "h" frame_ty
           (fn (univD (tRel 2)) (univD (tRel 2))))))
         (tRel O) (map mk_arm fs))))

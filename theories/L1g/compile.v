@@ -241,7 +241,7 @@ Definition Cstr_npars_nargs
       | None => raise ("Cstr_npars_nargs:nth_error bodies")
       | Some  {| ind_ctors := ctors |} =>
         match List.nth_error ctors ncst with
-        | Some (_, _, nargs) => ret (npars, nargs)
+        | Some (_, nargs) => ret (npars, nargs)
         | None => raise ("Cstr_npars_nargs:nth_error ctors")
         end
       end
@@ -297,7 +297,7 @@ Fixpoint program_Pgm_aux (g:global_declarations) : environ Term :=
 From MetaCoq Require Import SafeChecker.SafeTemplateChecker MCProd.
 From MetaCoq.SafeChecker Require Import PCUICSafeChecker.
 From MetaCoq.PCUIC Require Import TemplateToPCUIC.
-From MetaCoq.Erasure Require Import ErasureFunction SafeTemplateErasure.
+From MetaCoq.Erasure Require Import ErasureFunction Erasure.
 Require Import Common.classes Common.Pipeline_utils Common.compM.
 
 Existing Instance envcheck_monad.
@@ -307,15 +307,7 @@ Open Scope string_scope.
 Definition erase (p:Template.Ast.program) : error (global_context × term) :=
   let p := fix_program_universes p in
   match erase_template_program p with
-    | CorrectDecl (gc, t) => Ret (gc, t)
-  | EnvError Σ err => 
-    let str :=
-      match err with
-      | AlreadyDeclared id => "Already declared: " ++ id
-      | IllFormedDecl id e => "Type error: " ++ PCUICSafeChecker.string_of_type_error Σ e ++ ", while checking " ++ id
-      end
-    in
-    Err ("L1g.program_Program: erase_template_program failed with error:" ++ str)
+    | (gc, t) => Ret (gc, t)
   end.
 
 Definition program_Program (p:global_context × term) : (Program Term) :=

@@ -120,7 +120,6 @@ Proof.
   revert e. induction P as [| [c' e'] P IHp]; intros x H; try now inv H.
   simpl in H. inv H.
   destruct (M.elt_eq c' c); inv H1; try now constructor.
-  constructor 2. now eapply IHp.
 Qed.
 
 Lemma Forall2_findtag {A B} c Pats1 Pats2 (e : A) (P : A -> B  -> Prop) :

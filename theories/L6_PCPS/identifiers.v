@@ -4841,8 +4841,7 @@ Proof.
     now constructor.
     simpl. destruct (cps_util.var_dec v v0). exfalso; auto. auto.
   - inv H5; eauto. eapply not_occur_list_not_in; eauto.
-  - eapply IHB; eauto.
-  - eapply IHB; eauto.
+  Unshelve. all:now econstructor.
 Qed.
 
 Ltac normalize_occurs_free_ctx :=

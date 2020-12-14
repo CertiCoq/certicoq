@@ -271,14 +271,16 @@ Qed.
 
 (* ---------- exp_c application agrees with app_ctx_f + app_f_ctx_f ---------- *)
 
+Notation "C '⟦+' x '+⟧'" := (framesD C x) (at level 15).
+
 Fixpoint app_exp_ctx_eq (C : exp_ctx) e {struct C} :
-  C |[ e ]| = ([C]! : exp_c exp_univ_exp exp_univ_exp) ⟦ e ⟧
+  C |[ e ]| = ([C]! : exp_c exp_univ_exp exp_univ_exp) ⟦+ e +⟧
 with app_fundefs_ctx_eq (C : fundefs_ctx) e {struct C} :
-  app_f_ctx_f C e = ([C]! : exp_c exp_univ_exp exp_univ_fundefs) ⟦ e ⟧.
+  app_f_ctx_f C e = ([C]! : exp_c exp_univ_exp exp_univ_fundefs) ⟦+ e +⟧.
 Proof.
   all: destruct C; simpl;
     try lazymatch goal with
-    | |- context [(?fs >++ ?gs) ⟦ _ ⟧] =>
+    | |- context [(?fs >++ ?gs) ⟦+ _ +⟧] =>
       rewrite (@frames_compose_law exp_univ Frame_exp _ _ _ fs gs)
     end; simpl; normalize_roundtrips; try reflexivity;
     try solve [(rewrite <- app_exp_ctx_eq + rewrite <- app_fundefs_ctx_eq); reflexivity].
@@ -287,7 +289,7 @@ Proof.
     repeat rewrite frames_compose_law.
     rewrite <- app_exp_ctx_eq.
     simpl.
-    assert (Harms : forall ces1 ces2, c_of_ces ces1 ⟦ ces2 ⟧ = ces1 ++ ces2). {
+    assert (Harms : forall ces1 ces2, c_of_ces ces1 ⟦+ ces2 +⟧ = ces1 ++ ces2). {
       clear; induction ces1 as [| [c e] ces1 IHces]; intros ces2; [reflexivity|].
       unfold c_of_ces; now rewrite fold_right_cons, frames_compose_law, IHces. }
     now rewrite Harms.
@@ -298,11 +300,11 @@ Local Ltac mk_corollary parent :=
   symmetry; apply parent.
 
 Corollary app_exp_c_eq (C : exp_c exp_univ_exp exp_univ_exp) :
-  forall e, C ⟦ e ⟧ = ![C] |[ e ]|.
+  forall e, C ⟦+ e +⟧ = ![C] |[ e ]|.
 Proof. iso C; intros e; now rewrite app_exp_ctx_eq, isoABA. Qed.
 
 Corollary app_f_exp_c_eq (C : exp_c exp_univ_exp exp_univ_fundefs) :
-  forall e, C ⟦ e ⟧ = app_f_ctx_f ![C] e.
+  forall e, C ⟦+ e +⟧ = app_f_ctx_f ![C] e.
 Proof. iso C; intros e. now rewrite app_fundefs_ctx_eq, isoABA. Qed.
 
 (* ---------- exp_c composition agrees with comp_ctx_f + comp_f_ctx_f ---------- *)
@@ -376,7 +378,7 @@ Definition used {A} : univD A -> Ensemble cps.var :=
    Then show that for every hole type can find x1, x2 such that
      glb_x (frameD f x) = frameD f x1 ∩ frameD f x2 *)
 Definition used_c {A B} (C : exp_c A B) : Ensemble cps.var :=
-  fun x => forall e, In _ (used (C ⟦ e ⟧)) x.
+  fun x => forall e, In _ (used (C ⟦+ e +⟧)) x.
 
 Local Ltac clearpose H x e :=
   pose (x := e); assert (H : x = e) by (subst x; reflexivity); clearbody x.
@@ -468,18 +470,18 @@ Lemma used_c_comp {A B root} (C : exp_c B root) (D : exp_c A B) :
 Proof. induction D; simpl; [|rewrite IHD]; eauto with Ensembles_DB. Qed.
 
 Lemma used_app {A B} (C : exp_c A B) (e : univD A) :
-  used (C ⟦ e ⟧) <--> used_c C :|: used e.
+  used (C ⟦+ e +⟧) <--> used_c C :|: used e.
 Proof.
   induction C; simpl; [eauto with Ensembles_DB|].
   rewrite IHC, used_frameD; eauto with Ensembles_DB.
 Qed.
 
 Corollary used_vars_app (C : exp_c exp_univ_exp exp_univ_exp) (e : exp) :
-  used_vars (C ⟦ e ⟧) <--> used_c C :|: used_vars e.
+  used_vars (C ⟦+ e +⟧) <--> used_c C :|: used_vars e.
 Proof. change (used_vars ?e) with (@used exp_univ_exp e); apply @used_app. Qed.
 
 Corollary used_vars_fundefs_app (C : exp_c exp_univ_fundefs exp_univ_exp) (fds : fundefs) :
-  used_vars (C ⟦ fds ⟧) <--> used_c C :|: used_vars_fundefs fds.
+  used_vars (C ⟦+ fds +⟧) <--> used_c C :|: used_vars_fundefs fds.
 Proof. change (used_vars ?e) with (@used exp_univ_exp e); apply @used_app. Qed.
 
 (* Useful fact for some of the passes: every C : exp_c exp_univ_fundefs exp_univ_exp
@@ -498,7 +500,7 @@ Fixpoint fundefs_rev (fds : fundefs) : fundefs :=
   end.
 
 Lemma ctx_of_fds_app (fds1 : fundefs) : forall fds2 : fundefs,
-  ctx_of_fds fds1 ⟦ fds2 ⟧ = fundefs_append (fundefs_rev fds1) fds2.
+  ctx_of_fds fds1 ⟦+ fds2 +⟧ = fundefs_append (fundefs_rev fds1) fds2.
 Proof.
   induction fds1 as [f ft xs e fds1 IHfds1|]; [|reflexivity].
   intros fds2; cbn. rewrite IHfds1, <- fundefs_append_assoc. reflexivity.
@@ -620,40 +622,40 @@ Proof.
 Qed.
 
 Lemma exp_c_size_ge {A B} (C : exp_c A B) (x : univD A) :
-  (univ_size (C ⟦ x ⟧) >= univ_size x)%nat.
+  (univ_size (C ⟦+ x +⟧) >= univ_size x)%nat.
 Proof.
   induction C as [|A AB B f C]; simpl; [lia|].
-  assert (univ_size (C ⟦ exp_frameD A AB f x ⟧) >= univ_size (frameD f x))%nat by apply IHC.
+  assert (univ_size (C ⟦+ exp_frameD A AB f x +⟧) >= univ_size (frameD f x))%nat by apply IHC.
   assert (univ_size (frameD f x) > univ_size x)%nat by apply frame_size_gt.
   lia.
 Qed.
 
 Definition exp_c_size_eq {A B} (C : exp_c A B) (x : univD A) :
-  univ_size (C ⟦ x ⟧) = univ_size x -> JMeq C (<[]> : exp_c A A).
+  univ_size (C ⟦+ x +⟧) = univ_size x -> JMeq C (<[]> : exp_c A A).
 Proof.
   destruct C as [|A AB B f C]; simpl; [constructor|intros HC].
-  assert (univ_size (C ⟦ exp_frameD A AB f x ⟧) >= univ_size (exp_frameD A AB f x))%nat
+  assert (univ_size (C ⟦+ exp_frameD A AB f x +⟧) >= univ_size (exp_frameD A AB f x))%nat
    by apply exp_c_size_ge.
   assert (univ_size (exp_frameD A AB f x) > univ_size x)%nat by apply frame_size_gt.
   lia.
 Qed.
 
-Lemma exp_ext_nil {A B} (C : exp_c A B) : A = B -> (forall x, JMeq x (C ⟦ x ⟧)) -> JMeq C (<[]> : exp_c A A).
+Lemma exp_ext_nil {A B} (C : exp_c A B) : A = B -> (forall x, JMeq x (C ⟦+ x +⟧)) -> JMeq C (<[]> : exp_c A A).
 Proof.
   destruct C as [|A AB B f C]; [constructor|simpl].
   intros HeqB Hext; subst; specialize (Hext univ_inhabitant).
   inversion Hext; inv_ex.
   apply f_equal with (f := univ_size) in H.
   match type of Hext with
-  | JMeq _ (?C ⟦ ?f ⟧) =>
+  | JMeq _ (?C ⟦+ ?f +⟧) =>
     match f with
     | exp_frameD _ _ _ ?x =>
-      assert (univ_size (C ⟦ f ⟧) >= univ_size f)%nat by apply exp_c_size_ge;
+      assert (univ_size (C ⟦+ f +⟧) >= univ_size f)%nat by apply exp_c_size_ge;
       assert (univ_size f > univ_size x)%nat by apply frame_size_gt;
       lia
     end
   end.
 Qed.
 
-Corollary exp_ext_nil' {A B} (C : exp_c A B) : A = B -> (forall x, JMeq x (C ⟦ x ⟧)) -> JMeq C (<[]> : exp_c B B).
+Corollary exp_ext_nil' {A B} (C : exp_c A B) : A = B -> (forall x, JMeq x (C ⟦+ x +⟧)) -> JMeq C (<[]> : exp_c B B).
 Proof. intros; subst; now apply exp_ext_nil. Qed.

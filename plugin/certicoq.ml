@@ -155,15 +155,15 @@ let compile opts term imports =
     let time = Unix.gettimeofday() in
     let fname = opts.filename in
     let suff = opts.ext in
-(*  let cstr = fname ^ suff ^ ".c" in
+    let cstr = fname ^ suff ^ ".c" in
     let hstr = fname ^ suff ^ ".h" in
     printProg prg nenv cstr imports (* (List.map Tm_util.string_to_list imports) *);
     printProg header nenv hstr [];
-*)
-    let cstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
-    let hstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
-    Pipeline.printProg (nenv,prg) cstr;
-    Pipeline.printProg (nenv,header) hstr;
+
+    (* let cstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
+     * let hstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
+     * Pipeline.printProg (nenv,prg) cstr;
+     * Pipeline.printProg (nenv,header) hstr; *)
     let time = (Unix.gettimeofday() -. time) in
     Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
     debug_msg debug "Pipeline debug:";
@@ -187,18 +187,18 @@ let generate_glue opts term =
       debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-<<<<<<< HEAD
+(* <<<<<<< HEAD *)
     let fname = opts.filename in
     let cstr = "glue." ^ fname ^ suff ^ ".c" in
     let hstr = "glue." ^ fname ^ suff ^ ".h" in
     printProg prg nenv cstr [];
     printProg header nenv hstr [];
-=======
-    let cstr = Metacoq_template_plugin.Tm_util.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
-    let hstr = Metacoq_template_plugin.Tm_util.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
-    Pipeline.printProg (nenv, prg) cstr;
-    Pipeline.printProg (nenv, header) hstr;
->>>>>>> coq-8.12
+(* =======) *)
+    (* let cstr = Metacoq_template_plugin.Tm_util.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
+     * let hstr = Metacoq_template_plugin.Tm_util.string_to_list ("glue." ^ Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
+     * Pipeline.printProg (nenv, prg) cstr;
+     * Pipeline.printProg (nenv, header) hstr; *)
+(* >>>>>>> coq-8.12 *)
 
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Printed glue code to file in %f s.." time)
@@ -206,33 +206,33 @@ let generate_glue opts term =
     CErrors.user_err ~hdr:"glue-code" (str "Could not generate glue code: " ++ pr_char_list s))
 
 
-<<<<<<< HEAD
+(* <<<<<<< HEAD *)
 let compile_with_glue (opts : options) (gr : Names.GlobRef.t) (imports : string list) : unit =
   let term = quote opts gr in
-  compile opts term imports;
-  generate_glue opts term
+  compile opts (Obj.magic term) imports;
+  generate_glue opts (Obj.magic term)
 
 let compile_only opts gr imports =
   let term = quote opts gr in
-  compile opts term imports
+  compile opts (Obj.magic term) imports
 
 let generate_glue_only opts gr =
   let term = quote opts gr in
-  generate_glue opts term
-=======
-let compile_with_glue opts gr =
-  let (term, const) = quote opts gr in
-  compile opts (Obj.magic term) const;
-  generate_glue opts (Obj.magic term) const
-
-let compile_only opts gr =
-  let (term, const) = quote opts gr in
-  compile opts (Obj.magic term) const
-
-let generate_glue_only opts gr =
-  let (term, const) = quote opts gr in
-  generate_glue opts (Obj.magic term) const
->>>>>>> coq-8.12
+  generate_glue opts (Obj.magic term)
+(* =======
+ * let compile_with_glue opts gr =
+ *   let (term, const) = quote opts gr in
+ *   compile opts (Obj.magic term) const;
+ *   generate_glue opts (Obj.magic term) const
+ * 
+ * let compile_only opts gr =
+ *   let (term, const) = quote opts gr in
+ *   compile opts (Obj.magic term) const
+ * 
+ * let generate_glue_only opts gr =
+ *   let (term, const) = quote opts gr in
+ *   generate_glue opts (Obj.magic term) const
+ * >>>>>>> coq-8.12 *)
 
 let print_to_file (s : string) (file : string) =
   let f = open_out file in
@@ -295,17 +295,17 @@ let ffi_command opts gr =
       debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
-<<<<<<< HEAD
+(* <<<<<<< HEAD *)
     let cstr = ("ffi." ^ name ^ suff ^ ".c") in
     let hstr = ("ffi." ^ name ^ suff ^ ".h") in
     printProg prg nenv cstr [];
     printProg header nenv hstr [];
-=======
-    let cstr = Metacoq_template_plugin.Tm_util.string_to_list ("ffi." ^ name ^ suff ^ ".c") in
-    let hstr = Metacoq_template_plugin.Tm_util.string_to_list ("ffi." ^ name ^ suff ^ ".h") in
-    Pipeline.printProg (nenv, prg) cstr;
-    Pipeline.printProg (nenv, header) hstr;
->>>>>>> coq-8.12
+(* =======
+ *     let cstr = Metacoq_template_plugin.Tm_util.string_to_list ("ffi." ^ name ^ suff ^ ".c") in
+ *     let hstr = Metacoq_template_plugin.Tm_util.string_to_list ("ffi." ^ name ^ suff ^ ".h") in
+ *     Pipeline.printProg (nenv, prg) cstr;
+ *     Pipeline.printProg (nenv, header) hstr;
+ * >>>>>>> coq-8.12 *)
 
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Printed FFI glue code to file in %f s.." time)

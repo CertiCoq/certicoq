@@ -326,12 +326,12 @@ extraction/rewriting.ml
 extraction/rewriting.mli
 extraction/round.ml
 extraction/round.mli
-extraction/safeErasureFunction.ml
-extraction/safeErasureFunction.mli
+extraction/erasureFunction.ml
+extraction/erasureFunction.mli
 extraction/safeTemplateChecker.ml
 extraction/safeTemplateChecker.mli
-extraction/safeTemplateErasure.ml
-extraction/safeTemplateErasure.mli
+extraction/erasure.ml
+extraction/erasure.mli
 extraction/set_util.ml
 extraction/set_util.mli
 extraction/shrink_cps.ml
@@ -398,6 +398,18 @@ extraction/zbool.ml
 extraction/zbool.mli
 extraction/zpower.ml
 extraction/zpower.mli
+
+extraction/signature.mli
+extraction/signature.ml
+extraction/eAstUtils.mli
+extraction/eAstUtils.ml
+extraction/kernames.mli
+extraction/kernames.ml
+extraction/classes2.mli
+extraction/classes2.ml
+extraction/eOptimizePropDiscr.mli
+extraction/eOptimizePropDiscr.ml
+
 
 # plugin
 plugin_utils.ml

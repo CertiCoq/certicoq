@@ -66,6 +66,7 @@ Monad_utils
 MSetWeakList
 EqdepFacts
 Utils
+Kernames
 Init
 
 Ssrbool
@@ -116,8 +117,9 @@ ELiftSubst
 ETyping
 EPretty
 Extract
+EOptimizePropDiscr
 ErasureFunction
-SafeErasureFunction
+Erasure
 SafeTemplateErasure
 
 ZArith_dec
@@ -133,6 +135,7 @@ OrdersFacts
 MSetInterface
 Bracket
 ExtLibMisc
+Classes2
 AstCommon
 Round
 MSetRBT

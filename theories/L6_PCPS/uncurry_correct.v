@@ -2871,7 +2871,6 @@ Section uncurry_correct.
   Proof.
     intros; apply uncurry_rel_to_triple; simpl; intros.
     eapply uncurry_rel_preserves_occurs_free; eauto.
-(*>>>>>>> coq-8.12*)
   Qed.
 
 (* uncurry_proto corresp *)

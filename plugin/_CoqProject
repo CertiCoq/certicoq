@@ -105,8 +105,8 @@ extraction/closure_conversion.ml
 extraction/closure_conversion.mli
 extraction/compM.ml
 extraction/compM.mli
-extraction/compare_dec.ml
-extraction/compare_dec.mli
+#extraction/compare_dec.ml
+#extraction/compare_dec.mli
 extraction/compile0.ml
 extraction/compile0.mli
 extraction/compile1.ml
@@ -206,8 +206,8 @@ extraction/mCList.ml
 extraction/mCList.mli
 extraction/mCProd.ml
 extraction/mCProd.mli
-extraction/mCString.ml
-extraction/mCString.mli
+# extraction/mCString.ml
+# extraction/mCString.mli
 extraction/mCUtils.ml
 extraction/mCUtils.mli
 extraction/mSetDecide.ml
@@ -266,8 +266,8 @@ extraction/pCUICAst.mli
 extraction/pCUICAstUtils.ml
 extraction/pCUICAstUtils.mli
 
-extraction/pCUICChecker.ml
-extraction/pCUICChecker.mli
+#extraction/pCUICChecker.ml
+#extraction/pCUICChecker.mli
 extraction/pCUICCumulativity.ml
 extraction/pCUICCumulativity.mli
 extraction/pCUICLiftSubst.ml
@@ -280,10 +280,10 @@ extraction/pCUICNormal.ml
 extraction/pCUICNormal.mli
 extraction/pCUICPosition.ml
 extraction/pCUICPosition.mli
-extraction/pCUICPretty.ml
-extraction/pCUICPretty.mli
-extraction/pCUICReflect.ml
-extraction/pCUICReflect.mli
+# extraction/pCUICPretty.ml
+# extraction/pCUICPretty.mli
+# extraction/pCUICReflect.ml
+# extraction/pCUICReflect.mli
 extraction/pCUICSafeChecker.ml
 extraction/pCUICSafeChecker.mli
 extraction/pCUICSafeConversion.ml

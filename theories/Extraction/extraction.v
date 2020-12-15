@@ -93,8 +93,9 @@ Separate Extraction
          Compiler.pipeline.compile
          Compiler.pipeline.make_glue
          Compiler.pipeline.make_ffi
-         cps.M.elements.
+         cps.M.elements
          Compiler.pipeline.show_IR.
+
 Recursive Extraction Library BinPos.
 Recursive Extraction Library OrdersTac.
 

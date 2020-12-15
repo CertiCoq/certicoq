@@ -1065,7 +1065,7 @@ Section CONTRACT.
        | _ => existT _ (Eapp f' t ys', 0, count, im) (ble_refl im)
        end)
     end. 
-  Solve Obligations with (program_simpl; unfold term_sub_inl_size; simpl;  rewrite <- Nat.add_succ_r;  rewrite <- Nat.add_lt_mono_l;  eapply Nat.le_lt_trans; [apply sub_set_size | (simpl; unfold lt; reflexivity)]).
+  Solve Obligations with try (program_simpl; unfold term_sub_inl_size; simpl;  rewrite <- ?Nat.add_succ_r;  rewrite <- ?Nat.add_lt_mono_l;  eapply Nat.le_lt_trans; [apply sub_set_size | (simpl; unfold lt; reflexivity)]).
   Next Obligation.
     unfold term_sub_inl_size in *; simpl in *. 
     assert (term_size k < term_size (Ecase v cl))%nat.
@@ -1129,8 +1129,8 @@ Section CONTRACT.
     destructAll.
     apply Bool.negb_true_iff. auto.
   Defined.
- 
-  
+  Next Obligation.
+  Admitted.
 
   Definition contract_def (sig:r_map) (count:c_map) (e:exp) (sub:ctx_map) (im:b_map): contractT im  :=
     match e with
@@ -1343,7 +1343,6 @@ Section CONTRACT.
        | _ => fun _ => existT _ (Eapp f' t ys', 0, count, im) (ble_refl im)
        end) (eq_refl)
     end.
-
 
   Arguments contract:simpl never.
   Obligation Tactic := program_simplify ; auto with *.

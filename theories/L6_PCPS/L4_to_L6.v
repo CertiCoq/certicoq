@@ -742,7 +742,7 @@ Fixpoint add_names lnames vars tgm : conv_env :=
     - simpl. unfold cps_cvt_env. reflexivity.
   Qed. 
 
-<<<<<<< HEAD
+(*<<<<<<< HEAD
 =======
 Section Post.
   
@@ -2872,7 +2872,6 @@ Extract Constant   varImplDummyPair.varClassNVar =>
 " (fun f (p:int*bool) -> varClass0 (f (fst p)))".
 
 Extraction "test1.ml" test_result.
-*)
 
->>>>>>> coq-8.12
+*) *) 
 End CPS.

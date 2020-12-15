@@ -270,7 +270,6 @@ Proof.
   - repeat subst_exp.
     eapply Union_Disjoint_r. now sets.
     eapply Disjoint_Included_r. eapply Setminus_Included. sets.
-  - repeat subst_exp. sets.
 Qed.   
 
 

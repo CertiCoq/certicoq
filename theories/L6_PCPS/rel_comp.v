@@ -980,8 +980,6 @@ Section Refinement.
     destruct v1; destruct v2; simpl; try easy.
     split; intros [H1 H2]; split; eauto.
     + revert l0 H2. induction l; intros l0 H2; destruct l0; intros; eauto.  
-      now exfalso; eauto.
-      now exfalso; eauto.
       inv H2. constructor. easy. eauto. 
     + induction H2; eauto.
   Qed.
@@ -992,8 +990,6 @@ Section Refinement.
     destruct v1; destruct v2; simpl; try easy. 
     split; intros [H1 H2]; split; eauto. 
     + revert l0 H2. induction l; intros l0 H2; destruct l0; intros; eauto.  
-      now exfalso; eauto.
-      now exfalso; eauto.
       inv H2. constructor. easy. eauto. 
     + induction H2; eauto.
   Qed.

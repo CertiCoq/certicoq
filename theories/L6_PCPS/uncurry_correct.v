@@ -1,4 +1,4 @@
->Require Import L6.cps L6.size_cps L6.cps_util L6.eval L6.logical_relations L6.set_util L6.identifiers L6.ctx
+Require Import L6.cps L6.size_cps L6.cps_util L6.eval L6.logical_relations L6.set_util L6.identifiers L6.ctx
         L6.Ensembles_util L6.List_util L6.alpha_conv L6.functions L6.uncurry L6.uncurry_rel
         L6.shrink_cps_correct L6.algebra.
 Require Import FunInd.
@@ -1827,9 +1827,6 @@ Section uncurry_correct.
     - now eauto. 
     - eapply uncurry_step_correct; [| | | |apply H5|apply Henv]; auto.
     - intros; eapply IHn; [| | | |apply H6|apply preord_env_P_refl]; auto.
-(*<<<<<<< HEAD
-=======*)
-      constructor; eauto. clear; now firstorder. 
   Qed.
     
   Transparent bind ret.
@@ -2125,20 +2122,20 @@ Section uncurry_correct.
            (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k kt [g]))
            (Fcons f1 ft1 (gv ++ fv) ge fds))) rest ]|).
 
-  Lemma uncurry_rw_correct k e1 e2 rho1 rho2 :
+(*   Lemma uncurry_rw_correct k e1 e2 rho1 rho2 :
     uncurry_rw e1 e2 ->
     preord_env_P cenv PostG (occurs_free e1) k rho1 rho2 ->
     preord_exp cenv Post PostG k (e1, rho1) (e2, rho2).
   Proof.
     inversion 1; intros Henv.
-    apply preord_exp_compat. constructor; now try easy_post.
+    apply preord_exp_compat. { constructor; now try easy_post. all:firstorder with auto.
     constructor; now try easy_post.
     clear dependent rho1; clear dependent rho2; subst e1 e2.
     intros k' rho1 rho2 Hk' Henv.
     apply (uncurry_step_correct_fundefs_curried
              k' rest f ft k0 kt fv g gt gv ge pre_fds fds f1 ft1 fv1 gv1 s
              rho1 rho2 (M.set g true (M.empty _))); try assumption.
-  Abort.
+  Abort. *)
   End RwExperiment.
 
   Lemma get_name_triple : forall s f str,

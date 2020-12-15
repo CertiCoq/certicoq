@@ -410,7 +410,7 @@ Definition get_constructors
   let fix pi_types_to_class_fields
           (e : Ast.term) : ffiM (list (sanitized_name * Ast.term)) :=
     match e with
-    | Ast.tProd (nNamed field_name) t e' =>
+    | Ast.tProd (mkBindAnn (nNamed field_name) _) t e' =>
         log ("Handing the field " ++ field_name) ;;
         (* TODO MAYBE convert field_name to kername by qualifying it *)
         (* right now we qualify the names with the option the user provides *)

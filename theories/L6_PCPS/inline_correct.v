@@ -1759,7 +1759,7 @@ Section Inline_correct.
                            eapply fun_map_inv_antimon. eapply fun_map_inv_mon.
                            eapply fun_map_inv_i_mon. eassumption. omega. omega. normalize_occurs_free. now sets.
                             
-                           eapply eq_env_P_refl. SearchAbout C. 
+                           eapply eq_env_P_refl. 
                            eapply eq_env_P_antimon. eassumption. 
                            normalize_bound_var_ctx. normalize_sets. intros y Hin Hin'.
                            eapply bound_var_inline_letapp in Hin'; [| eassumption ]. eapply Hdis3.

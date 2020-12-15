@@ -243,7 +243,7 @@ Section L1Constructors.
     match ty, params with
     (* Parameters have to be named!
        Ideally we'd print an error message otherwise. *)
-    | Ast.tProd (nNamed x) e1 e2, _ :: p' =>
+    | Ast.tProd (mkBindAnn (nNamed x) _) e1 e2, _ :: p' =>
         dissect_types p' (dParam x :: ctx) e2
     | Ast.tProd _ e1 e2, nil =>
         let e1' := dissect_type ctx e1 in

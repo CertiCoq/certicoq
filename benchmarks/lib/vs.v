@@ -149,7 +149,7 @@ Inductive ret_kind (val : Type) : Type :=
 | Failure : ret_kind val.
 
 Arguments Success [val].
-Arguments Failure [val].
+Arguments Failure {val}.
 
 (* variables.v *)
 

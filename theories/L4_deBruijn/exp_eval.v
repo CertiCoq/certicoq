@@ -3142,8 +3142,8 @@ Proof.
       assert (Hwf2 : well_formed_in_env e2'' rho).
       { eapply well_formed_in_env_App in H2.
         destruct H2 as [He1'' He2'']. eassumption. } 
-      destruct (H rho _ Hwf1 H3 (eq_refl _)) as [v1 [He1 Hr1]].
-      destruct (H0 rho _ Hwf2 H3 (eq_refl _)) as [v2' [He2 Hr2]].      
+      destruct (H rho _ Hwf1 H3 (@eq_refl _ _)) as [v1 [He1 Hr1]].
+      destruct (H0 rho _ Hwf2 H3 (@eq_refl _ _)) as [v2' [He2 Hr2]].      
       inv Hr1.
       assert (HClos_wf: well_formed_val (Clos_v rho0 na e')).
         { eapply eval_env_preserves_well_formed.
@@ -3216,7 +3216,7 @@ Proof.
       assert (Hwf1: well_formed_in_env e1'' rho).
       { eapply well_formed_in_env_Let in H1.
         eassumption. }
-      destruct (H rho _ Hwf1 H2 (eq_refl _)) as [v1' [He1 Hr1]].
+      destruct (H rho _ Hwf1 H2 (@eq_refl _ _)) as [v1' [He1 Hr1]].
       assert (Hwf2: well_formed_in_env e2'' (v1' :: rho)). 
       { inv H1. unfold well_formed_in_env.
         unfold list.NLength in *. simpl.
@@ -3347,8 +3347,8 @@ Proof.
       { eapply well_formed_in_env_App in H2.
         destruct H2 as [He1'' He2'']. eassumption. }
 
-      destruct (H rho _ Hwf1 H3 (eq_refl _)) as [v1 [He1 Hr1]].
-      destruct (H0 rho _ Hwf2 H3 (eq_refl _)) as [v2' [He2 Hr2]].
+      destruct (H rho _ Hwf1 H3 (@eq_refl _ _)) as [v1 [He1 Hr1]].
+      destruct (H0 rho _ Hwf2 H3 (eq_refl)) as [v2' [He2 Hr2]].
       inv Hr1.
       
       assert (HClosFix_wf: well_formed_val (ClosFix_v rho0 fnlst_t k2)).
@@ -3418,9 +3418,9 @@ Proof.
       assert (Hwf1 : well_formed_in_env e1'' rho).
       { inv H1. eapply H6. }      
       assert (Hwf2 : well_formed_in_env e2'' rho).
-      { inv H1. eapply H7. } 
-      destruct (H rho _ Hwf1 H2 (eq_refl _)) as [v1 [He1 Hr1]].
-      destruct (H0 rho _ Hwf2 H2 (eq_refl _)) as [v2' [He2 Hr2]].
+      { inv H1. eapply H7. }
+      destruct (H rho _ Hwf1 H2 (eq_refl)) as [v1 [He1 Hr1]].
+      destruct (H0 rho _ Hwf2 H2 (eq_refl)) as [v2' [He2 Hr2]].
       inv Hr1.
       eexists. split.
       * eapply eval_ProofApp. eassumption. eapply He2.

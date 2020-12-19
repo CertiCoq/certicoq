@@ -3934,7 +3934,7 @@ Proof.
   assert (0 <= Z.min (size a) (size b)).
     generalize (size_range a) (size_range b). zify; omega.
   apply bits_size_3. auto. intros.
-  rewrite bits_and. zify. subst z z0. destruct H1.
+  rewrite bits_and. zify. subst. destruct H1.
   rewrite (bits_size_2 a). auto. omega.
   rewrite (bits_size_2 b). apply andb_false_r. omega.
   omega.

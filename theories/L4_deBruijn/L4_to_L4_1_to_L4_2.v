@@ -25,6 +25,8 @@ Require Import ExtLib.Data.Map.FMapPositive.
 Require Import Common.TermAbs.
 Require Import SquiggleEq.termsDB.
 
+Import ListNotations.
+
 (** It is the id function if fst p = (length (snd p)). Otherwise, the list of names
 is truncated or padded to make the length right. If we can guarantee the equality, 
 we can replace this function with the identity function *)
@@ -32,8 +34,6 @@ Definition mkNames (p: N*list BasicAst.name) :=
   let (n,vnames) := p in
   let vnames := firstn  (N.to_nat n) vnames in
   list.listPad BasicAst.nAnon vnames  (N.to_nat n).
-
-
 
 Fixpoint tL4_to_L4_1 (e:exp) {struct e}: (@DTerm BasicAst.name L4Opid):=
 match e with

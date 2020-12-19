@@ -20,6 +20,7 @@ Require Import L6.cps L6.ctx L6.logical_relations L6.tactics L6.cps_util L6.List
         L6.functions L6.relations L6.rename L6.inline_letapp L6.algebra.
 
 Open Scope ctx_scope.
+Import ListNotations.
 
 (** general rewrite rules that preserves semantics
     - Fun_inline replaces one occurence on f by its definition

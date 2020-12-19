@@ -362,7 +362,7 @@ Section L1Types.
     end.
 
   Definition context_names (ctx : Ast.context) : list string :=
-    map (fun d => match Ast.decl_name d with
+    map (fun d => match binder_name (Ast.decl_name d) with
                   | nNamed x => x
                   | _ => ""%string (* TODO error handling *)
                   end) ctx.

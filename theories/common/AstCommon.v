@@ -218,8 +218,8 @@ Definition environ := list (kername * envClass).
 *** template-coq [program].  Independent of term structure
 **)
 (* Malecha's [program] is inside out *)
-Definition cnstr_Cnstr (c: string * term * nat) : Cnstr :=
-  mkCnstr (fst (fst c)) (snd c).
+Definition cnstr_Cnstr (c: string * nat) : Cnstr :=
+  mkCnstr (fst c) (snd c).
 
 Definition ibody_ityp (iib:one_inductive_body) : ityp :=
   let Ctors := map cnstr_Cnstr (ind_ctors iib)

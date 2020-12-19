@@ -4,8 +4,6 @@ Require Import Coq.Setoids.Setoid.
 Require Import Coq.Classes.Morphisms.
 Import RelationClasses.
 
-
-
 Require Import ExtLib.Data.Bool.
 Require compcert.lib.Maps.
 Require Import compcert.lib.Coqlib.
@@ -18,6 +16,7 @@ Require Import Libraries.maps_util.
 Require Import L6.Ensembles_util L6.cps L6.rename L6.ctx L6.logical_relations L6.tactics L6.cps_util
         L6.List_util L6.shrink_cps L6.eval L6.set_util L6.identifiers L6.stemctx L6.shrink_cps_correct L6.inline_letapp. 
 
+Import ListNotations.
 
 
 Ltac dec_vars :=

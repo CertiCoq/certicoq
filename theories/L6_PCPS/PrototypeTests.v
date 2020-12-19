@@ -32,7 +32,7 @@ Instance Frame_exp_inj : @Frame_inj exp_univ _.
 Proof. unfold Frame_inj; destruct f; simpl; ltac1:(congruence). Defined.
 
 Check frames_nil >:: cons_fundef0 [] >:: fFun2 0%nat [].
-Check fun e => <[ cons_fundef0 []; fFun2 0%nat [] ]> ⟦ e ⟧.
+Check fun e => framesD <[ cons_fundef0 []; fFun2 0%nat [] ]> e.
 
 Definition used_vars_var : var -> list var := fun x => [x].
 Definition used_vars_constr : constr -> list var := fun _ => [].
@@ -53,9 +53,11 @@ with used_vars_fundef (fd : fundef) :=
   f :: xs ++ used_vars_exp e.
 Definition used_vars_arm := used_vars_arm' used_vars_exp.
 
+Notation "C '⟦+' x '+⟧'" := (framesD C x) (at level 10).
+
 (* Example: commonly want to track max used vars for fresh name generation *)
 Definition used_vars_prop {A : exp_univ} (C : frames_t A exp_univ_exp) (e : univD A) (x : var) : Prop :=
-  ~ In x (used_vars_exp (C ⟦ e ⟧)).
+  ~ In x (used_vars_exp (C ⟦+ e +⟧)).
 
 (* When just moving up and down, next fresh var doesn't need to be updated *)
 
@@ -72,27 +74,27 @@ Extraction Inline Preserves_S_dn_exp Preserves_S_up_exp.
 Inductive R : exp -> exp -> Prop :=
 | R0 : forall (C : frames_t exp_univ_exp exp_univ_exp) x c ys ys' e,
     ys' = ys ++ ys ->
-    R (C⟦eCons x c ys e⟧) (C⟦eCons x c ys' (Rec e)⟧)
+    R (C⟦+ eCons x c ys e+⟧) (C⟦+ eCons x c ys' (Rec e) +⟧)
 | R1 : forall (C : frames_t exp_univ_exp exp_univ_exp) x c y ys ys' e,
     #|ys| = 4%nat ->
     (forall D : frames_t exp_univ_exp exp_univ_exp, D >++ C = D >++ C) ->
     e = e ->
     ys' = ys ++ [y; y] ->
-    R (C⟦eCons x c (y :: ys) e⟧) (C⟦eCons x c ys' (Rec e)⟧)
+    R (C⟦+ eCons x c (y :: ys) e+⟧) (C⟦+eCons x c ys' (Rec e)+⟧)
 | R2 : forall (C : frames_t exp_univ_list_fundef exp_univ_exp) f x xs xs' e fds,
     #|xs| = 0%nat ->
     xs ++ [x] = xs' ->
     C = C ->
-    BottomUp (R (C⟦fFun f (x :: xs) e :: fds⟧) (C⟦fFun f xs' e :: fds⟧))
+    BottomUp (R (C⟦+ fFun f (x :: xs) e :: fds +⟧) (C⟦+ fFun f xs' e :: fds+⟧))
 | R3 : forall (C : frames_t exp_univ_list_fundef exp_univ_exp) f x x' xs xs' e fds,
     #|xs| = 0%nat ->
     xs ++ [x] = xs' ->
     C = C ->
-    BottomUp (R (C⟦fFun f (x :: x' :: xs) e :: fds⟧) (C⟦fFun f xs' e :: fds⟧)).
+    BottomUp (R (C⟦+ fFun f (x :: x' :: xs) e :: fds +⟧) (C⟦+ fFun f xs' e :: fds+⟧)).
 
 Definition I_R {A} (C : frames_t A exp_univ_exp) (n : nat) : Prop := C = C.
 
-Definition I_S {A} (C : frames_t A exp_univ_exp) (x : univD A) (n : nat) : Prop := C⟦x⟧ = C⟦x⟧.
+Definition I_S {A} (C : frames_t A exp_univ_exp) (x : univD A) (n : nat) : Prop := C⟦+x+⟧ = C⟦+x+⟧.
 
 Instance Preserves_R_R_C : Preserves_R (@I_R).
 Proof. intros A B C C_ok f [n _]; exists n; unerase; reflexivity. Defined.
@@ -260,6 +262,7 @@ Goal True.
     end))).
 Abort.
 
+Definition nNamed s := {| binder_name := nNamed s; binder_relevance := Relevant |}.
 Definition test_case_tree (pat pat_ty ret_ty success failure : term) : TemplateMonad unit :=
   mlet (ast, nameless) <- runGM (
     let! ast :=
@@ -343,25 +346,25 @@ Definition const_fun {A B} (x : A) (y : B) : B := y.
 Inductive R' : exp -> exp -> Prop :=
 | R'0 : forall (C : frames_t exp_univ_exp exp_univ_exp) x c ys ys' e,
     ys' = ys ++ ys ->
-    R' (C⟦eCons x c ys e⟧) (C⟦eCons x c ys' (Rec (const_fun tt e))⟧)
+    R' (C⟦+eCons x c ys e+⟧) (C⟦+eCons x c ys' (Rec (const_fun tt e))+⟧)
 | R'1 : forall (C : frames_t exp_univ_exp exp_univ_exp) x c y ys ys' e,
     #|ys| = 4%nat /\
     (forall D : frames_t exp_univ_exp exp_univ_exp, D >++ C = D >++ C) /\
     e = e /\
     ys' = ys ++ [y; y] ->
-    R' (C⟦eCons x c (y :: ys) e⟧) (C⟦eCons x c ys' (Rec e)⟧)
+    R' (C⟦+eCons x c (y :: ys) e+⟧) (C⟦+eCons x c ys' (Rec e)+⟧)
 | R'4 : forall (C : frames_t exp_univ_exp exp_univ_exp) x c ys e,
-    R' (C⟦eCons x c ys e⟧) (C⟦eCons x c ys (eCons x c ys (Rec e))⟧)
+    R' (C⟦+eCons x c ys e+⟧) (C⟦+eCons x c ys (eCons x c ys (Rec e))+⟧)
 | R'2 : forall (C : frames_t exp_univ_list_fundef exp_univ_exp) f x xs xs' e fds,
     #|xs| = 0%nat /\
     xs ++ [x] = xs' /\
     C = C ->
-    BottomUp (R' (C⟦fFun f (x :: xs) e :: fds⟧) (C⟦fFun f xs' e :: fds⟧))
+    BottomUp (R' (C⟦+fFun f (x :: xs) e :: fds+⟧) (C⟦+fFun f xs' e :: fds+⟧))
 | R'3 : forall (C : frames_t exp_univ_list_fundef exp_univ_exp) f x x' xs xs' e fds,
     #|xs| = 0%nat /\
     xs ++ [x] = xs' /\
     C = C ->
-    BottomUp (R' (C⟦fFun f (x :: x' :: xs) e :: fds⟧) (C⟦fFun f xs' e :: fds⟧)).
+    BottomUp (R' (C⟦+fFun f (x :: x' :: xs) e :: fds+⟧) (C⟦+fFun f xs' e :: fds+⟧)).
 
 Goal True.
   ltac1:(
@@ -577,14 +580,14 @@ Inductive cp_fold : exp -> exp -> Prop :=
     (exists D E ys, C = D >:: eCons3 x c ys >++ E) /\
     (exists l r, ces = l ++ (c, e) :: r) ->
     cp_fold
-      (C ⟦ eCase x ces ⟧)
-      (C ⟦ Rec e ⟧)
+      (C ⟦+ eCase x ces +⟧)
+      (C ⟦+ Rec e +⟧)
 | cp_proj_fold : forall (C : frames_t exp_univ_exp exp_univ_exp) x y y' ys n e,
     (exists D E c, C = D >:: eCons3 y c ys >++ E) /\
     nth_error ys n = Some y' ->
     cp_fold
-      (C ⟦ eProj x y n e ⟧)
-      (C ⟦ Rec (subst_exp (one_renaming x y') e) ⟧).
+      (C ⟦+ eProj x y n e +⟧)
+      (C ⟦+ Rec (subst_exp (one_renaming x y') e) +⟧).
 
 Definition I_cp_env {A} (C : frames_t A exp_univ_exp) (ρ : var -> option (constr × list var)) : Prop :=
   forall x c ys, ρ x = Some (c, ys) ->
@@ -651,7 +654,7 @@ Defined.
 
 Lemma app_as_ctx :
   forall l ces c r e, ces = l ++ (c, e) :: r ->
-  exists C : frames_t exp_univ_exp exp_univ_list_prod_constr_exp, ces = C ⟦ e ⟧.
+  exists C : frames_t exp_univ_exp exp_univ_list_prod_constr_exp, ces = C ⟦+ e +⟧.
 Proof.
   induction l; simpl; intros.
   - subst; now exists <[cons_prod_constr_exp0 r; pair_constr_exp1 c]>.

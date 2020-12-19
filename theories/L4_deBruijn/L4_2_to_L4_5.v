@@ -690,7 +690,14 @@ Proof using.
   intros Hs.
   unfold let_bindc. simpl. autorewrite with list.
   addFreshVarsSpec2 vn pp. simpl.
-  setoid_rewrite <- Heqvn.
+  enough (ssubst_aux
+  (let_bindn vn cargs (oterm o (map (fun v : NVar => bterm [] (vterm v)) vn)))
+  sub =
+let_bindn vn
+  (map (fun t : NTerm => ssubst_aux t sub) cargs)
+  (oterm o
+     (map (fun v : NVar => bterm [] (vterm v))
+        (vn)))). subst. eassumption. 
   clear Heqvn. repnd.
   set (tt:=(oterm o (map (fun v : NVar => bterm [] (vterm v)) vn))).
   assert (disjoint (free_vars tt) (dom_sub sub)) as Has.
@@ -783,7 +790,7 @@ Proof using.
   rewrite IHcargs; auto;[ | noRepDis2].
   rewrite <- app_assoc.
   f_equal.
-  rewrite remove_app.
+  rewrite list.remove_app.
   f_equal;[ | apply (remove_nvars_comm [v] vn); fail].
   rewrite remove_trivial; auto.
   noRepDis2.
@@ -1142,12 +1149,14 @@ Proof using.
     apply zetao. apply liftRbt_eqlista. assumption.
   + apply (f_equal (map (get_nt))) in H3. repeat rewrite map_map in H3.
     simpl in H3. repeat rewrite map_id in H3. subst.
-    applydup eqlistA_length in Hz. setoid_rewrite  Hz0. pose proof Hind as Hindb.
+    applydup eqlistA_length in Hz.
+     pose proof Hind as Hindb.
     eapply eval_Con_e_zeta in Hind; eauto.
     exrepnd. subst.  unfold  L4_5_Term in *.
     exists (Con_e d vsp). split;
                        [ |     unfold Con_e; replace  (length vs) with  (length vsp) by congruence;
                                apply zetao; apply liftRbt_eqlista; assumption].
+    rewrite  Hz0.
     apply eval_letbindc;[ | | constructor; auto];[ | ]; hnf;[ rwsimplC | ];
       eapply zetalFvarsNil; eauto; intros ? Hin;
         [eapply (combine_in_right _ _ vs es) in Hin
@@ -1164,7 +1173,7 @@ Proof using.
   simpl in Hinds. unfold subst in Hinds.
   eapply  ssubst_commute_L4_5_zeta with (sub2 := [(x,vargz)])in Hzr;
     [specialize (Hinds _ Hzr) | | | ]; simpl; auto; cpx;
-      [ | prove_sub_range_sat | autorewrite with list; forder Hprea Hpref].
+      [ | prove_sub_range_sat | autorewrite with list; firstorder auto with *].
   exrepnd.
   eexists; split; [ eapply eval_Let_e ;eauto | ] ; eauto; fail.
 - intros d ? ? ? b vv Hevd Hf Hevs Hprem Hpred Hpredv Hindd _ _ Hinds ? Hz.

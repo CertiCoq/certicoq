@@ -216,6 +216,8 @@ Section Notations.
   Open Scope monad_scope.
   Require Import SquiggleEq.ExtLibMisc.
 
+  Import ListNotations.
+
 
 Fixpoint convert (e:CTerm) (sv: s_map) (sk:s_map) (tgm:conv_env) (n:var) (*  {struct e } *): option (exp * var * conv_env) :=
     match e with

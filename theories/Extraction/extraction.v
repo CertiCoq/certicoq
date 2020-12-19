@@ -50,13 +50,27 @@ Extract Constant Int31.On => "0".
 Extract Constant Int31.In => "1".
 
 Extract Inductive Decimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
+Extract Inductive Hexadecimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
+Extract Inductive Numeral.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
+
+Extraction Inline Equations.Prop.Classes.noConfusion.
+Extraction Inline Equations.Prop.Logic.eq_elim.
+Extraction Inline Equations.Prop.Logic.eq_elim_r.
+Extraction Inline Equations.Prop.Logic.transport.
+Extraction Inline Equations.Prop.Logic.transport_r.
+Extraction Inline Equations.Prop.Logic.False_rect_dep.
+Extraction Inline Equations.Prop.Logic.True_rect_dep.
+Extraction Inline Equations.Init.pr1.
+Extraction Inline Equations.Init.pr2.
+Extraction Inline Equations.Init.hidebody.
+Extraction Inline Equations.Prop.DepElim.solution_left.
 
 Extract Inlined Constant RandyPrelude.ascii_dec_bool => "(=)".
 
 (* Avoid name clashes with OCaml or Coq module names *)
 Extraction Blacklist config List String Nat Int Ast Universes UnivSubst Typing Retyping 
            OrderedType Logic Common Equality Char char uGraph
-           Instances Classes Term Monad Coqlib Errors Compile Checker Eq Classes0.
+           Instances Classes Term Monad Coqlib Errors Compile Checker Eq Classes0 Numeral.
 
 (* Cutting the dependency to R.
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".
@@ -79,6 +93,10 @@ Separate Extraction
          Compiler.pipeline.compile
          Compiler.pipeline.make_glue
          Compiler.pipeline.make_ffi
-         Compiler.pipeline.show_IR
-         cps.M.elements.
+         cps.M.elements
+         Compiler.pipeline.show_IR.
+
+Recursive Extraction Library BinPos.
+Recursive Extraction Library OrdersTac.
+
 Cd "..".

@@ -1,4 +1,4 @@
-open Ast_quoter
+open Metacoq_template_plugin.Ast_quoter
 open Names
 open Pp
 
@@ -20,7 +20,7 @@ let chars_of_string (s : string) : char list =
 
 let extract_constant (g : Names.GlobRef.t) (s : string) : (BasicAst.kername * char list)  =
   match g with
-  | Names.GlobRef.ConstRef c -> (quote_kn (Names.Constant.canonical c), chars_of_string s)
+  | Names.GlobRef.ConstRef c -> (Obj.magic (quote_kn (Names.Constant.canonical c)), chars_of_string s)
   | Names.GlobRef.VarRef(v) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found a variable. Only constants can be realized in C.")
   | Names.GlobRef.IndRef(i) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found an inductive type. Only constants can be realized in C.")
   | Names.GlobRef.ConstructRef(c) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found a constructor. Only constants can be realized in C. ")

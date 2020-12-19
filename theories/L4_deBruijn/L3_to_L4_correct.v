@@ -1684,7 +1684,6 @@ Proof.
   - destruct pars; simpl; intros [=]. now subst args'.
   - destruct pars; simpl; intros [=]. now subst args'.
     rewrite <- (IHargs _ _ H0). equaln.
-    destruct pars; simpl. auto. now rewrite Pos.pred_N_succ.
 Qed.
 
 Lemma crct_dnthBody e dts m nm bod :

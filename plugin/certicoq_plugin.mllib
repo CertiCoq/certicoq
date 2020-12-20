@@ -27,11 +27,9 @@ MSetDecide
 MSetList
 MSetProperties
 BinNums
-Compare_dec
 MCList
 MCProd
 MCCompare
-MCString
 Config0
 Universes0
 BasicAst

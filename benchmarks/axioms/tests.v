@@ -53,7 +53,7 @@ Fixpoint fib_aux (n : nat) (prev0 prev1 : int63) :=
   | S n => fib_aux n prev1 (add_int63 prev0 prev1)
   end.
 
-Fixpoint fib (n : nat) := fib_aux n zero_int63 one_int63.
+Definition fib (n : nat) := fib_aux n zero_int63 one_int63.
 
 Definition fibn : unit :=
   let _ := print_int63 (fib 11) in

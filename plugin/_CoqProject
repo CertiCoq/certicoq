@@ -4,6 +4,8 @@
 
 
 # plugin
+plugin_utils.ml
+plugin_utils.mli
 certicoq.mli
 certicoq.ml
 g_certicoq.mlg
@@ -409,14 +411,3 @@ extraction/classes2.mli
 extraction/classes2.ml
 extraction/eOptimizePropDiscr.mli
 extraction/eOptimizePropDiscr.ml
-
-
-# plugin
-plugin_utils.ml
-plugin_utils.mli
-certicoq.mli
-certicoq.ml
-g_certicoq.mlg
-certicoq_plugin_mod.ml
-certicoq_plugin.mllib
-CertiCoq.v

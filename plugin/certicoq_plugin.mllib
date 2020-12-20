@@ -120,6 +120,8 @@ ErasureFunction
 Erasure
 SafeTemplateErasure
 
+OptionMonad
+
 ZArith_dec
 Coqlib0
 Zbool

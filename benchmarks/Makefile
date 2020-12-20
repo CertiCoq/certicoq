@@ -1,4 +1,4 @@
-COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R ./ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
+COQOPTS = -R ../theories/compcert compcert -R ./ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
 CCOMPILER=gcc
 
 # Names of the benchmarks

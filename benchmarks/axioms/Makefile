@@ -1,4 +1,4 @@
-COQOPTS = -R ../plugin CertiCoq.Plugin -I ../plugin -R ./ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
+COQOPTS = -R ./ CertiCoq.Benchmarks -R ../lib CertiCoq.Benchmarks.lib
 CCOMPILER=gcc
 
 default: copy tests print_lst

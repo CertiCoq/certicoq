@@ -17,11 +17,11 @@ Alternatively, you may install these dependencies independenly.
 
 #### MetaCoq
 
-You'll need to install the `8.12` branch from [MetaCoq's github](https://github.com/MetaCoq/metacoq/tree/coq-8.12).
+You'll need to install the `coq-8.12` branch from [MetaCoq's github](https://github.com/MetaCoq/metacoq/tree/coq-8.12).
 
 #### ExtLib and Equations
 
-You may install [ExtLib](https://github.com/coq-community/coq-ext-lib) (v0.11.3) and [Equations](https://github.com/mattam82/Coq-Equations) (v1.2.3) from sources or from opam or from their source code.
+You may install [ExtLib](https://github.com/coq-community/coq-ext-lib) (v0.11.3) and [Equations](https://github.com/mattam82/Coq-Equations) (v1.2.3) from opam or from their source code.
 
 ### Building the compiler
 

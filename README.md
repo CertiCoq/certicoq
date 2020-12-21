@@ -53,4 +53,4 @@ Structure of the theories directory:
 
 ## Bugs 
 
-We use github's [issue tracker](https://github.com/PrincetonUniversity/certicoq/issues) keep track of bugs and feature requests.
+We use github's [issue tracker](https://github.com/PrincetonUniversity/certicoq/issues) to keep track of bugs and feature requests.

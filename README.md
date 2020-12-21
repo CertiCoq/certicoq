@@ -48,10 +48,9 @@ Structure of the theories directory:
 * `theories/L1g`: 1st pass, moves from (MetaCoq's) λbox to our similar L1g
 * `theories/L2k_noCnstrParams`: 2nd pass, eta expands constructors and removes constructor parameters 
 * `theories/L4_deBruijn`: 3rd pass, let-bind environment
-* `theories/L6_PCPS` contains the λANF pipeline (and conversions -- direct and CPS -- to λ_ANF)
+* `theories/L6_PCPS` contains the λANF pipeline (and conversions -- direct and CPS -- to λANF)
 * `theories/L7` contains the C code generator.
 * `theories/compcert` contains a local copy of the compcert compiler
-
 
 
 ## Bugs 

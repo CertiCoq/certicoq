@@ -8,13 +8,13 @@
 
 ## Overview
 
-CertiCoq is a compiler for Gallina, the specification language of the [Coq proof assistant](https://coq.inria.fr/refman/index.html). CertiCoq targets to Clight, a subset of the C language that can be compiled with any C compiler, including the [CompCert]() verified compiler.
+CertiCoq is a compiler for Gallina, the specification language of the [Coq proof assistant](https://coq.inria.fr/refman/index.html). CertiCoq targets to Clight, a subset of the C language that can be compiled with any C compiler, including the [CompCert](http://compcert.org) verified compiler.
 
 Large parts of the CertiCoq compiler have been verified whereas others are in the process of being verified.
 
 ## Documentation
 
-The [CertiCoq Wiki](https://github.com/PrincetonUniversity/certicoq/wiki) has instructions for using the [CertiCoq plugin](https://github.com/PrincetonUniversity/certicoq/wiki/The-CertiCoq-plugin) to compile Gallina to C and use the generated C code.
+The [CertiCoq Wiki](https://github.com/PrincetonUniversity/certicoq/wiki) has instructions for using the [CertiCoq plugin](https://github.com/PrincetonUniversity/certicoq/wiki/The-CertiCoq-plugin) to compile Gallina to C and interfacing and compiling the generated C code.
 
 You can also find some demos [here](https://github.com/PrincetonUniversity/certicoq/blob/master/benchmarks/tests.v) and [here](https://github.com/PrincetonUniversity/certicoq/blob/master/benchmarks/axioms/tests.v).
 
@@ -34,12 +34,12 @@ Abhishek Anand, Greg Morrisett, Randy Pollack, Olivier Savary Belanger, Matthew 
 
 CertiCoq is open source and distributed unter the [MIT lisence](https://github.com/MetaCoq/metacoq/tree/coq-8.11/LICENSE).
 
-
 ## Directory structure
 
 * `theories/` contains the sources of the compiler
 * `plugin/` contains the CertiCoq plugin for Coq 
-* `benchmarks/` contains our bechmark suite
+* `benchmarks/` contains the bechmark suite
+* `glue/` contains the glue code generator
 
 Structure of the theories directory:
 
@@ -51,3 +51,9 @@ Structure of the theories directory:
 * `theories/L6_PCPS` contains the λANF pipeline (and conversions -- direct and CPS -- to λ_ANF)
 * `theories/L7` contains the C code generator.
 * `theories/compcert` contains a local copy of the compcert compiler
+
+
+
+## Bugs 
+
+We use github's [issue tracker](https://github.com/PrincetonUniversity/certicoq/issues) keep track of bugs and feature requests.

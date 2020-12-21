@@ -1,21 +1,27 @@
-## Installation Instructions
-
-See [INSTALL.md](https://github.com/PrincetonUniversity/certicoq/INSTALL.md)  for installation instructions.
+# Installing CertiCoq
 
 ### Prerequisites
 
-  To install the compiler, you need OCaml and Coq.8.9.1.
+To install the compiler, you need OCaml (tested with `4.07.1` ) and Coq 8.12.
 
-  We depend on the following Coq packages:
-
-  `ExtLib` and `MetaCoq` (which requires `Equations`).
-   All three packages are currently installed using git modules (see below).
+We depend on the following Coq packages:  
+`ExtLib` and `MetaCoq` (which requires `Equations`).
 
 ### Building the dependencies
 
-  From the `certicoq/` directory, run:
+ You can install the dependencies using git modules. From the `certicoq/` directory, run:
 
     # make submodules
+
+Alternatively, you may install these dependencies independenly. 
+
+#### MetaCoq
+
+You'll need to install the `8.12` branch from [MetaCoq's github](https://github.com/MetaCoq/metacoq/tree/coq-8.12).
+
+#### ExtLib and Equations
+
+You may install [ExtLib](https://github.com/coq-community/coq-ext-lib) (v0.11.3) and [Equations](https://github.com/mattam82/Coq-Equations) (v1.2.3) from sources or from opam or from their source code.
 
 ### Building the compiler
 
@@ -28,7 +34,7 @@ See [INSTALL.md](https://github.com/PrincetonUniversity/certicoq/INSTALL.md)  fo
 
     # make install
 
-  To test the installation, go to 'certicoq/benchmarks' and run
+  To test the installation, you can go to `certicoq/benchmarks` and run
 
     # make all
 

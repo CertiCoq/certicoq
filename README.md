@@ -30,13 +30,13 @@ Abhishek Anand, Greg Morrisett, Randy Pollack, Olivier Savary Belanger, Matthew 
 
 ## License 
 
-CertiCoq is open source and distributed unter the [MIT lisence](LICENSE.md).
+CertiCoq is open source and distributed under the [MIT license](LICENSE.md).
 
 ## Directory structure
 
 * `theories/` contains the sources of the compiler
 * `plugin/` contains the CertiCoq plugin for Coq 
-* `benchmarks/` contains the bechmark suite
+* `benchmarks/` contains the benchmark suite
 * `glue/` contains the glue code generator
 
 Structure of the theories directory:

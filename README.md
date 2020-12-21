@@ -1,10 +1,8 @@
 # CertiCoq
 
-```
 <p align="center">
 <img src="https://zoep.github.io/certicoq.png" alt="MetaCoq" width="100px"/>
 </p>
-```
 
 ## Overview
 
@@ -20,7 +18,7 @@ You can also find some demos [here](https://github.com/PrincetonUniversity/certi
 
 ## Installation Instructions
 
-See [INSTALL.md](https://github.com/PrincetonUniversity/certicoq/INSTALL.md)  for installation instructions.
+See [INSTALL.md](INSTALL.md)  for installation instructions.
 
 ## Current Members
 
@@ -32,7 +30,7 @@ Abhishek Anand, Greg Morrisett, Randy Pollack, Olivier Savary Belanger, Matthew 
 
 ## License 
 
-CertiCoq is open source and distributed unter the [MIT lisence](https://github.com/MetaCoq/metacoq/tree/coq-8.11/LICENSE).
+CertiCoq is open source and distributed unter the [MIT lisence](LICENSE.md).
 
 ## Directory structure
 

@@ -186,7 +186,7 @@ let generate_glue (standalone : bool) opts globs =
   let options = make_pipeline_options opts in
 
   let time = Unix.gettimeofday() in
-  (match Pipeline.make_glue options globs with
+  (match Glue.generate_glue options globs with
   | CompM.Ret (((nenv, header), prg), logs) ->
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Generated glue code in %f s.." time);
@@ -272,7 +272,7 @@ let ffi_command opts gr =
   let options = make_pipeline_options opts in
 
   let time = Unix.gettimeofday() in
-  (match Pipeline.make_ffi options (Obj.magic term) with
+  (match Ffi.generate_ffi options (Obj.magic term) with
   | CompM.Ret (((nenv, header), prg), logs) ->
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Generated FFI glue code in %f s.." time);

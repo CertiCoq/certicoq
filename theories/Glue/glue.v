@@ -1270,7 +1270,7 @@ Definition make_glue_program
 Definition generate_glue
            (opts : Options)
            (globs : Ast.global_env) (* an L1 program *)
-           : error (name_env * option Clight.program * option Clight.program * list string) :=
+           : error (name_env * Clight.program * Clight.program * list string) :=
   let init : gstate_data :=
       {| gstate_gensym := 2%positive
        ; gstate_ienv   := M.empty _
@@ -1284,10 +1284,11 @@ Definition generate_glue
   let '(err, st) := runState (make_glue_program (rev globs)) opts init in
   let nenv := gstate_nenv st in
   match err with
-  | Ret (header, source) =>
+  | Err s => Err s
+  | Ret (Some header, Some source) =>
     Ret (nenv (* the name environment to be passed to C generation *) ,
          header (* the header content *),
          source (* the source content *),
          rev (gstate_log st) (* logged messages *))
-  | Err s => Err s
+  | Ret _ => Err "No Clight program generated"
   end.

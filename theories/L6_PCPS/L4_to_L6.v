@@ -548,61 +548,161 @@ Fixpoint add_names lnames vars tgm : conv_env :=
 
   (* scratch *)
   (* how to ensure fresh variables? *)
-  Inductive cps_cvt_rel : expression.exp -> list var -> var -> cps.exp -> Prop :=
+  Inductive cps_cvt_rel : Ensemble var -> (* Input fresh identifiers *)
+                          expression.exp -> (* Input L4 exp *)
+                          list var -> (* deBruijn index map *)
+                          var -> (* Continuation variable *)
+                          constr_env ->
+                          Ensemble var -> (* Output fresh identifiers *)
+                          cps.exp -> (* CPS converted exp *)
+                          Prop :=
   | e_Var :
-      forall v vn x k,
+      forall S v vn x k tgm,
         v = (nth vn (N.to_nat x)) ->
-        cps_cvt_rel (Var_e x) vn k (cps.Eapp k kon_tag (v::nil))
+        cps_cvt_rel S (Var_e x) vn k tgm S (cps.Eapp k kon_tag (v::nil))
   | e_Lam :
-      forall na e1 e1' x1 vn k k1 f,
-        cps_cvt_rel e1 (x1::vn) k1 e1' ->
-        cps_cvt_rel (Lam_e na e1) vn k (cps.Efun
-                                          (Fcons f func_tag (k1::x1::nil) e1' Fnil)
-                                          (cps.Eapp k kon_tag (f::nil)))
-  | e_App :
-      forall e1 e1' e2 e2' k k1 k2 x1 x2 vn,
-        cps_cvt_rel e1 vn k1 e1' ->
-        cps_cvt_rel e2 vn k2 e2' ->
-        cps_cvt_rel (App_e e1 e2)
+      forall S S' na e1 e1' x1 vn k k1 f tgm,
+        x1 \in S ->
+        f \in (S \\ [set x1]) ->
+        k1 \in (S \\ (f |: [set x1])) ->
+        cps_cvt_rel (S \\ (k1 |: [set f] :|: [set x1])) e1 (x1::vn) k1 tgm S' e1' ->
+        cps_cvt_rel S
+                    (Lam_e na e1)
                     vn
                     k
-                    (cps.Efun
-                       (Fcons k1 kon_tag (x1::nil)
-                              (cps.Efun
-                                 (Fcons k2 kon_tag (x2::nil)
-                                        (cps.Eapp x1 func_tag
-                                                  (k::x2::nil)) Fnil)
-                                 e2') Fnil)
-                       e1')
+                    tgm
+                    S'
+                    (cps.Efun (Fcons f func_tag (k1::x1::nil) e1' Fnil)
+                              (cps.Eapp k kon_tag (f::nil)))
+  | e_App :
+      forall S1 S2 S3 e1 e1' e2 e2' k k1 k2 x1 x2 vn tgm,
+        x1 \in S1 ->
+        k1 \in (S1 \\ [set x1]) ->
+        x2 \in S2 ->
+        k2 \in (S2 \\ [set x2]) ->
+        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 vn k1 tgm S2 e1' ->
+        cps_cvt_rel (S2 \\ (k2 |: [set x2])) e2 vn k2 tgm S3 e2' ->
+        cps_cvt_rel S1
+                    (App_e e1 e2)
+                    vn
+                    k
+                    tgm
+                    S3
+                    (cps.Efun (Fcons k1 kon_tag (x1::nil)
+                                     (cps.Efun (Fcons k2 kon_tag (x2::nil)
+                                                      (cps.Eapp x1 func_tag
+                                                                (k::x2::nil))
+                                                      Fnil)
+                                               e2') Fnil)
+                              e1')
+  | e_Con :
+      forall S1 S2 c_tag dci tgm es e' k x1 k1 vn vx,
+        c_tag = dcon_to_tag dci tgm ->
+        x1 \in S1 ->
+        k1 \in (S1 \\ [set x1]) ->
+        FromList vx \subset (S1 \\ (k1 |: [set x1])) ->
+        Datatypes.length vx = N.to_nat (exps_length es) ->
+        cps_cvt_rel_exps (S1 \\ (k1 |: [set x1] :|: FromList vx))
+                         es vn k1 [] tgm S2 e' ->
+        cps_cvt_rel S1
+                    (Con_e dci es)
+                    vn
+                    k
+                    tgm
+                    S2
+                    (Efun (Fcons k1 kon_tag vx
+                                 (Econstr x1 c_tag vx
+                                          (Eapp k kon_tag [x1])) Fnil)
+            e')
   | e_Let :
-      forall na e1 e1' e2 e2' x vn k k1,
-        cps_cvt_rel e2 (x::vn) k e2' ->
-        cps_cvt_rel e1 vn k1 e1' ->
-        cps_cvt_rel (Let_e na e1 e2) vn k (cps.Efun
-                                             (Fcons k1 kon_tag (x::nil) e2' Fnil)
-                                             e1')
+      forall S1 S2 S3 na e1 e1' e2 e2' x1 vn k k1 tgm,
+        x1 \in S1 ->
+        k1 \in (S1 \\ [set x1]) ->
+        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e2 (x1::vn) k tgm S2 e2' ->
+        cps_cvt_rel S2 e1 vn k1 tgm S3 e1' ->
+        cps_cvt_rel S1
+                    (Let_e na e1 e2)
+                    vn
+                    k
+                    tgm
+                    S3
+                    (cps.Efun (Fcons k1 kon_tag (x1::nil) e2' Fnil) e1')
+  (* | e_Match : *)
+  (*     forall S1 S2 S3 e1 e1' bs vn k x1 k1 n, *)
+  (*       x1 \in S1 -> *)
+  (*       k1 \in (S1 \\ [set x1]) -> *)
+  (*       cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 vn k tgm S2 e1' -> *)
+  (*       cps_cvt_branches_rel S2 bs vn k x1 tgm S3 bs' -> *)
+  (*       cps_cvt_rel S1 *)
+  (*                   (Match_e e1 n bs) *)
+  (*                   vn *)
+  (*                   k *)
+  (*                   tgm *)
+  (*                   (Efun (Fcons k1 kon_tag [x1] (Ecase x1 bs') Fnil) e1') *)
   | e_Fix :
-      forall fnlst i i' nlst vn k fdefs,
+      forall S1 S2 fnlst i i' nlst vn k fdefs tgm,
+        FromList nlst \subset S1 ->
+        NoDup nlst ->
         List.length nlst = efnlength fnlst ->
-        cps_cvt_rel_efnlst fnlst (nlst ++ vn) nlst fdefs ->
+        cps_cvt_rel_efnlst (S1 \\ (FromList nlst)) fnlst (nlst ++ vn) nlst tgm S2 fdefs ->
         i' = (nth nlst (N.to_nat i)) ->
-        cps_cvt_rel (Fix_e fnlst i) vn k (cps.Efun fdefs
-                                                   (cps.Eapp k kon_tag (i'::nil)))
+        cps_cvt_rel S1
+                    (Fix_e fnlst i)
+                    vn
+                    k
+                    tgm
+                    S2
+                    (cps.Efun fdefs (cps.Eapp k kon_tag (i'::nil)))
+                    
+  with cps_cvt_rel_exps :
+         Ensemble var -> expression.exps -> list var -> var -> list var ->
+         constr_env -> Ensemble var -> exp -> Prop :=
+  | e_Enil :
+      forall S vn k vx tgm,
+        cps_cvt_rel_exps S enil vn k vx tgm S (Eapp k kon_tag (rev vx))
+  | e_Econs :
+      forall S1 S2 S3 vn k vx e es e' es' tgm x1 k1,
+        x1 \in S1 ->
+        k1 \in (S1 \\ [set x1]) ->
+        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e vn k1 tgm S2 e' ->
+        cps_cvt_rel_exps S2 es vn k (x1::vx) tgm S3 es' ->
+        cps_cvt_rel_exps S1
+                         (econs e es)
+                         vn
+                         k
+                         vx
+                         tgm
+                         S3
+                         (Efun (Fcons k1 kon_tag [x1] es' Fnil) e')
+                         
   with cps_cvt_rel_efnlst :
-         expression.efnlst -> list var -> list var -> fundefs -> Prop :=
+         Ensemble var ->
+         expression.efnlst ->
+         list var ->
+         list var ->
+         constr_env ->
+         Ensemble var ->
+         fundefs ->
+         Prop :=
   | e_Eflnil :
-      forall vn nlst,
-        cps_cvt_rel_efnlst eflnil vn nlst Fnil
+      forall S vn nlst tgm,
+        cps_cvt_rel_efnlst S eflnil vn nlst tgm S Fnil
   | e_Eflcons :
-      forall vn nlst e1 e1' fnlst' fdefs' cvar n1 na x k',
-        cps_cvt_rel e1 (x::vn) k' e1' ->
-        cps_cvt_rel_efnlst fnlst' vn (List.tl nlst) fdefs' ->
+      forall S1 S2 S3 vn nlst e1 e1' fnlst' fdefs' cvar n1 na x1 k1 tgm,
+        x1 \in S1 ->
+        k1 \in (S1 \\ [set x1]) ->
+        isLambda e1 ->
+        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 (x1::vn) k1 tgm S2 e1' ->
+        cps_cvt_rel_efnlst S2 fnlst' vn (List.tl nlst) tgm S3 fdefs' ->
         List.hd_error nlst = Some cvar ->
         cps_cvt_rel_efnlst
+          S1 
           (eflcons n1 (Lam_e na e1) fnlst')
           vn
           nlst
-          (Fcons cvar func_tag (k'::x::nil) e1' fdefs').                       
+          tgm
+          S3
+          (Fcons cvar func_tag (k1::x1::nil) e1' fdefs').                       
 
 
   Definition convert_top (ee:ienv * expression.exp) :

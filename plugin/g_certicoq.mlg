@@ -67,7 +67,7 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
   }
 | [ "CertiCoq" "FFI" ffiargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
-    let opts = Certicoq.make_options l [] (get_name gr) in
+    let opts = Certicoq.make_options l [] "" in
     Certicoq.ffi_command opts gr
   }
 | [ "CertiCoq" "Generate" "Glue" glueargs_list(l) "[" global_list_sep(grs, ",") "]" ] -> {

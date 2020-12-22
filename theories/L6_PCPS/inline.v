@@ -1,16 +1,13 @@
-(* Generic beta-contraction phase for (stateful) heuristics based on function definitions and call sites, with bounded inlining depth
-   *)
-Require Import Common.compM Common.Pipeline_utils L6.cps.
-Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
+Require Import Common.compM Common.Pipeline_utils.
+From Coq Require Import ZArith.ZArith Lists.List Strings.String micromega.Lia.
 Import ListNotations.
 Require Import identifiers.
-Require Import L6.state L6.cps_util L6.cps_show L6.ctx L6.uncurry L6.shrink_cps L6.rename L6.inline_letapp.
+Require Import L6.state L6.cps_util L6.cps_show L6.ctx L6.uncurry L6.shrink_cps L6.rename L6.inline_letapp L6.cps.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
 Require Coq.Program.Wf.
 Require Import Program.
-(* Require Import Template.monad_utils. *)
 Require Import Coq.Structures.OrdersEx.
 
 Import MonadNotation.
@@ -85,7 +82,7 @@ Section Inline.
     d = fst (split_fuel d) + snd (split_fuel d). 
   Proof.
     unfold split_fuel. simpl. rewrite (NPeano.Nat.div2_odd d) at 1. simpl.    
-    omega.
+    lia.
   Qed.    
   
   Program Fixpoint inline_exp (d : nat) {measure d} :=
@@ -193,15 +190,15 @@ Section Inline.
 
   Next Obligation.
     eapply le_trans. reflexivity. eapply le_n_S. 
-    eapply NPeano.Nat.div2_decr. omega.
+    eapply NPeano.Nat.div2_decr. lia.
   Qed.
   Next Obligation.
-    destruct d'. simpl. omega.
-    replace (S (S d')) with (S d' + 1) by omega. 
+    destruct d'. simpl. lia.
+    replace (S (S d')) with (S d' + 1) by lia. 
     eapply plus_lt_le_compat.
-    eapply NPeano.Nat.lt_div2. omega. 
+    eapply NPeano.Nat.lt_div2. lia. 
     
-    destruct ((Nat.odd (S d'))); simpl; omega.
+    destruct ((Nat.odd (S d'))); simpl; lia.
   Qed.
 
 

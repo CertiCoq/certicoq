@@ -1,5 +1,5 @@
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
-     MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles
+     MSets.MSetRBT Lists.List micromega.Lia Sets.Ensembles
      Relations.Relations Strings.String.
 
 From CertiCoq.Common Require Import AstCommon exceptionMonad.

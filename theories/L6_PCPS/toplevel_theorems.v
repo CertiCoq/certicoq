@@ -1,6 +1,6 @@
 
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
-        Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
+        Coq.Lists.List Coq.micromega.Lia Coq.Sets.Ensembles.
 
 Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.set_util
         L6.Ensembles_util L6.List_util L6.size_cps L6.tactics L6.relations L6.rel_comp
@@ -112,7 +112,7 @@ Section Inline.
    repeat (split; [ eassumption | ]).
    eexists. econstructor. now eauto. eassumption.
    split.
-   unfold inline_bound_top. eapply inline_bound_compat. omega.
+   unfold inline_bound_top. eapply inline_bound_compat. lia.
    eapply inline_bound_post_upper_bound.
  Qed.
 
@@ -128,7 +128,7 @@ Section Inline.
    repeat (split; [ eassumption | ]).
    eexists. econstructor. now eauto. eassumption.
    split.
-   unfold inline_bound_top. eapply inline_bound_compat. omega.
+   unfold inline_bound_top. eapply inline_bound_compat. lia.
    eapply inline_bound_post_upper_bound.
  Qed.
 
@@ -157,7 +157,7 @@ Section LambdaLift.
     - intros. eapply ll_bound_compat.
     - intros. eapply ll_bound_compat.
       exact (M.empty _). exact 0%nat.
-    - eapply ll_bound_mon. omega.
+    - eapply ll_bound_mon. lia.
     - intros. eapply ll_bound_local_steps; eauto.
     - intros. eapply ll_bound_local_app.
     - intros. eapply ll_bound_local_steps_let_app; eauto.
@@ -268,7 +268,7 @@ Section CCHoist.
              2:{ eassumption. }
              2:{ econstructor. intros. eapply H6. eassumption.
                  eassumption.
-                 split. eapply hoisting_bound_compat. omega.
+                 split. eapply hoisting_bound_compat. lia.
                  eapply hoisting_bound_post_upper_bound. }
              intros. eassumption.
   Qed.
@@ -301,7 +301,7 @@ Section Shrink.
     { eapply Hs.
       
       - intros. eapply inline_bound_compat. eassumption.
-      - intros. eapply inline_bound_compat. omega.
+      - intros. eapply inline_bound_compat. lia.
       - intros. eapply inline_bound_post_Eapp_l.
       - eapply inline_bound_remove_steps_letapp.
       - assert (Hs' := inline_bound_remove_steps_letapp_OOT cenv 0 0 1).
@@ -368,7 +368,7 @@ Section InlineLoop.
        split. eassumption. eexists. 
        econstructor 2.
        * econstructor 1. now eauto. eassumption.
-         split. eapply inline_bound_compat. omega.
+         split. eapply inline_bound_compat. lia.
          eapply inline_bound_post_upper_bound.
        * econstructor 2. eassumption. eassumption.
      + do 2 eexists. rewrite H1.
@@ -379,7 +379,7 @@ Section InlineLoop.
        rewrite Hshrink. eexists. simpl.
        econstructor 2.
        * econstructor 1. now eauto. eassumption.
-         split. eapply inline_bound_compat. omega.
+         split. eapply inline_bound_compat. lia.
          eapply inline_bound_post_upper_bound.
        * eassumption.
   Qed.

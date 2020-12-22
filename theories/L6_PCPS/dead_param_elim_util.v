@@ -3,7 +3,7 @@ Require Import L6.cps L6.identifiers L6.ctx L6.set_util L6.state
         L6.hoisting.
 Require Import compcert.lib.Coqlib Common.compM Common.Pipeline_utils.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia
         maps_util.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat.
@@ -361,9 +361,9 @@ Proof.
     + inv Hupd. reflexivity.
     + destruct (update_bs S xs bs) as [bs'' d] eqn:Hupd'.
       destruct b.
-      * inv Hupd. simpl. eapply IHxs in Hupd'. omega.
+      * inv Hupd. simpl. eapply IHxs in Hupd'. lia.
       * inv Hupd. eapply IHxs in Hupd'. simpl. 
-        destruct (PS.mem a S); omega.
+        destruct (PS.mem a S); lia.
 Qed.       
 
 Lemma update_bs_bitsize S xs bs bs' :
@@ -376,10 +376,10 @@ Proof.
     + inv Hupd.
     + destruct (update_bs S xs bs) as [bs'' d] eqn:Hupd'.
       destruct b.
-      * inv Hupd. simpl. eapply IHxs in Hupd'. omega.
+      * inv Hupd. simpl. eapply IHxs in Hupd'. lia.
       * inv Hupd. simpl. 
         destruct (PS.mem a S).
-        -- eapply update_bs_bitsize_leq in Hupd'. omega.
+        -- eapply update_bs_bitsize_leq in Hupd'. lia.
         -- simpl in H1. subst. eapply IHxs. eassumption.
 Qed.
 
@@ -393,7 +393,7 @@ Proof.
     + inv Hupd. reflexivity.
     + destruct (update_bs S xs bs) as [bs'' d] eqn:Hupd'.
       destruct b.
-      * inv Hupd. simpl. eapply IHxs in Hupd'. omega.
+      * inv Hupd. simpl. eapply IHxs in Hupd'. lia.
       * inv Hupd. simpl.
         eapply IHxs in Hupd'. congruence.
 Qed.
@@ -416,10 +416,10 @@ Proof.
   rewrite !fold_left_app. simpl.
   rewrite <- (plus_O_n (fold_left _ _ _ + bitsize l)).
   rewrite <- (plus_O_n (fold_left _ x 0 + bitsize bs)).
-  erewrite !List_util.fold_left_acc_plus. simpl. omega.
+  erewrite !List_util.fold_left_acc_plus. simpl. lia.
 
-  intros ? ? [? ? ]. omega.
-  intros ? ? [? ? ]. omega.
+  intros ? ? [? ? ]. lia.
+  intros ? ? [? ? ]. lia.
 Qed.
 
   
@@ -435,7 +435,7 @@ Proof.
   destruct diff.
   
   - inv Hl. assert (Hupd' := Hupd). eapply update_bs_bitsize in Hupd.
-    eapply set_fun_vars_map_size with (bs := bs) in Hf. omega.
+    eapply set_fun_vars_map_size with (bs := bs) in Hf. lia.
     eapply update_bs_length. eassumption.
   - inv Hl. reflexivity.
 Qed.
@@ -452,7 +452,7 @@ Proof.
   destruct diff.
   
   - inv Hl. assert (Hupd' := Hupd). eapply update_bs_bitsize in Hupd.
-    eapply set_fun_vars_map_size with (bs := bs) in Hf. omega.
+    eapply set_fun_vars_map_size with (bs := bs) in Hf. lia.
     eapply update_bs_length. eassumption.
   - inv Hl.
 Qed.
@@ -506,7 +506,7 @@ Lemma find_live_helper_size B L n L' :
   map_size L + n <= map_size L'.
 Proof.
   revert B L L'. induction n; intros.
-  - inv H0. right. omega.
+  - inv H0. right. lia.
   - simpl in H0.
     destruct (live B L false) as [[L1 diff] | ]  eqn:Hlive; [| congruence ].
     
@@ -515,7 +515,7 @@ Proof.
     + eapply IHn in H0; eauto. inv H0. now left.
       right.
 
-      eapply live_size in Hlive. omega.
+      eapply live_size in Hlive. lia.
 
     + inv H0. eapply live_correct in Hlive; eauto.
       destructAll. now left.
@@ -527,7 +527,7 @@ Qed.
 Lemma bitsize_leq bs :
   bitsize bs <= Datatypes.length bs.
 Proof.
-  induction bs; simpl; eauto. destruct a; omega.
+  induction bs; simpl; eauto. destruct a; lia.
 Qed.
   
 Lemma max_map_size_leq L :
@@ -537,7 +537,7 @@ Proof.
   eapply List_util.fold_left_monotonic; eauto.
   intros. destruct x2. simpl.
   assert (Hleq := bitsize_leq l). 
-  omega.
+  lia.
 Qed.
 
 
@@ -568,8 +568,8 @@ Proof.
   rewrite <- (plus_O_n (fold_left _ _ _  + length l)).
   erewrite !List_util.fold_left_acc_plus. simpl. congruence.
 
-  intros ? ? [? ? ]. omega.
-  intros ? ? [? ? ]. omega.
+  intros ? ? [? ? ]. lia.
+  intros ? ? [? ? ]. lia.
 Qed.
 
 
@@ -621,7 +621,7 @@ Proof.
       congruence.
 
     + inv H0.
-      eapply live_max_size in Hlive. omega.
+      eapply live_max_size in Hlive. lia.
 Qed. 
 
 Lemma set_fun_vars_max_size_None L f bs :
@@ -630,7 +630,7 @@ Lemma set_fun_vars_max_size_None L f bs :
 Proof.
   intros Heq. unfold set_fun_vars.
   destruct bs.
-  { simpl. omega. }
+  { simpl. lia. }
   
   generalize (b :: bs). clear b bs. intros bs.
   unfold map_size, max_map_size.
@@ -641,9 +641,9 @@ Proof.
   
   rewrite <- (plus_O_n (fold_left _ _ _ + length bs)).
   rewrite <- (plus_O_n (fold_left _ x 0)).
-  erewrite !List_util.fold_left_acc_plus. simpl. omega.
-  intros ? ? [? ? ]. omega.
-  intros ? ? [? ? ]. omega.
+  erewrite !List_util.fold_left_acc_plus. simpl. lia.
+  intros ? ? [? ? ]. lia.
+  intros ? ? [? ? ]. lia.
 Qed.
 
 Lemma get_bool_false_length {A} (l : list A) :
@@ -664,7 +664,7 @@ Proof.
   revert m n. induction B; intros; simpl; eauto.
 
   rewrite <- plus_assoc. rewrite (plus_comm m). rewrite plus_assoc.
-  rewrite IHB. omega.
+  rewrite IHB. lia.
 Qed. 
   
 
@@ -677,7 +677,7 @@ Proof.
   revert L L' m; induction B; simpl; intros L L' m Hdis Hun Hinit.
   - eapply IHB in Hinit. 
     + rewrite Hinit. rewrite set_fun_vars_max_size_None.
-      rewrite get_bool_false_length, num_vars_acc. omega.
+      rewrite get_bool_false_length, num_vars_acc. lia.
       
       destruct (L ! v) eqn:Heq; eauto. exfalso. eapply Hdis.
       constructor; eauto. eexists; eauto.
@@ -698,7 +698,7 @@ Lemma init_live_fun_max_size L B :
 Proof.
   intros.
   eapply init_live_fun_aux_max_size in H0; eauto.
-  rewrite max_map_size_empty in H0. simpl in H0. rewrite <- H0. omega.
+  rewrite max_map_size_empty in H0. simpl in H0. rewrite <- H0. lia.
 
   rewrite Dom_map_empty. sets.
 Qed.
@@ -714,10 +714,10 @@ Proof.
   rewrite !fold_left_app. simpl.
   
   rewrite <- (plus_O_n (fold_left _ x0 0)).
-  erewrite !List_util.fold_left_acc_plus. simpl. omega.
-  intros ? ? [? ? ]. omega.
-  intros ? ? [? ? ]. omega.
-  intros ? ? [? ? ]. omega.  
+  erewrite !List_util.fold_left_acc_plus. simpl. lia.
+  intros ? ? [? ? ]. lia.
+  intros ? ? [? ? ]. lia.
+  intros ? ? [? ? ]. lia.  
 Qed.
 
 
@@ -726,7 +726,7 @@ Lemma remove_escapings_max_size L x :
 Proof.
   revert L; induction x; simpl; intros L; subst; eauto.
   specialize (IHx (remove_escaping L a)).
-  assert (Hleq := remove_escaping_max_size L a). omega.
+  assert (Hleq := remove_escaping_max_size L a). lia.
 Qed.
 
 
@@ -778,7 +778,7 @@ Proof.
   
   erewrite init_live_fun_max_size  with (L := init_live_fun _) in *; eauto.
   
-  assert (Hleq := max_map_size_leq L). omega.
+  assert (Hleq := max_map_size_leq L). lia.
 Qed.
   
   

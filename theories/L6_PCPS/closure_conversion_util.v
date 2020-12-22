@@ -8,7 +8,7 @@ From CertiCoq Require Import L6.cps L6.size_cps L6.cps_util L6.set_util L6.ident
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory ArithRing Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia.
 
 Import ListNotations.
 
@@ -1476,7 +1476,7 @@ Section Closure_conversion_util.
     intros Hctx. induction Hctx; eauto.
     rewrite sizeOf_exp_ctx_comp_ctx. simpl.
     specialize (project_var_sizeOf_ctx_exp _ _ _ _ _ _ _ _ _ _ _ _ H).
-    omega.
+    lia.
   Qed.
 
   Lemma Closure_conversion_fundefs_numOf_fundefs Funs (GFuns : Ensemble var) (σ : var -> var) (c : ctor_tag) 

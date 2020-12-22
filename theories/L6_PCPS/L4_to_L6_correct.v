@@ -240,7 +240,7 @@ Section Post.
               ) eqn:Hgen.
             destruct p eqn: Hp.
             inv Hgen2. reflexivity. }
-          rewrite Heq. zify. omega. 
+          rewrite Heq. zify. lia. 
     Qed.
 
     Lemma gensym_n_nAnon'_cons :
@@ -330,7 +330,7 @@ Section Post.
           simpl. rewrite extend_gss. reflexivity.
         + simpl in *.
           rewrite extend_gso.
-          eapply IHvars1. omega.
+          eapply IHvars1. lia.
           inv Hdup. eassumption.
           eassumption.
           eassumption.
@@ -365,7 +365,7 @@ Section Post.
       intros next1 next2 na v Hgen.
       destruct next1. simpl in Hgen.
       destruct p. inv Hgen.
-      simpl. zify. omega.
+      simpl. zify. lia.
     Qed. 
 
     Lemma lt_symgen_In_lst :
@@ -383,7 +383,7 @@ Section Post.
         inv Hin.
         + assert (Hgt: (v' >= v)%positive).
           { eapply geq_gensym in Hgen. simpl in Hgen. eassumption. } 
-          zify. omega.
+          zify. lia.
         + eapply IHvars in H. destruct H.
           eassumption. eassumption.
     Qed.
@@ -396,7 +396,7 @@ Section Post.
       intros n nenv na v next H.
       simpl in H.
       unfold lt_symgen. destruct next. destruct p.
-      inv H. zify. omega.
+      inv H. zify. lia.
     Qed.
 
     Lemma lt_symgen_gensym_2 :
@@ -407,7 +407,7 @@ Section Post.
       intros next1 next2 v na H.
       destruct next1. destruct p. simpl in H.
       destruct next2. destruct p. inv H.
-      unfold lt_symgen. zify. omega.
+      unfold lt_symgen. zify. lia.
     Qed. 
 
     Lemma lt_lst_symgen_gensym_n' :
@@ -416,11 +416,11 @@ Section Post.
         (v1 <= v2)%positive.
     Proof.
       induction n; intros v1 v2 nenv nenv' vars Hgen.
-      - simpl in Hgen. inv Hgen. zify. omega.
+      - simpl in Hgen. inv Hgen. zify. lia.
       - simpl in Hgen.
         destruct (gensym_n_nAnon' (Pos.succ v1) (M.set v1 nAnon nenv) n) eqn:Hgen2.
         destruct p eqn:Hp. inv Hgen.
-        eapply IHn in Hgen2. zify. omega. 
+        eapply IHn in Hgen2. zify. lia. 
     Qed. 
 
     Lemma lt_lst_symgen_gensym_n :
@@ -440,7 +440,7 @@ Section Post.
         destruct p. inv Hgen2. inv Hgen.
         econstructor.
         + unfold lt_symgen. eapply lt_lst_symgen_gensym_n' in Hgen3.
-          zify. omega. 
+          zify. lia. 
         + specialize IHn with (next1 := (SG (Pos.succ v, (M.set v nAnon n0)))).
           eapply IHn. unfold gensym_n_nAnon.
           destruct (gensym_n_nAnon' (Pos.succ v) (M.set v nAnon n0) n).
@@ -459,7 +459,7 @@ Section Post.
         pose proof lt_symgen_gensym as Hgen2.
         destruct next1. destruct p. eapply Hgen2 in Hgen.  
         unfold lt_symgen in *. destruct next2. destruct p.
-        zify. omega.
+        zify. lia.
         eapply IHvars. eassumption. eassumption.
     Qed.
 
@@ -477,7 +477,7 @@ Section Post.
           destruct next1. destruct p. simpl in Hgen.
           destruct (gensym_n_nAnon' v n0 n) eqn:Hgen'. destruct p.
           eapply lt_lst_symgen_gensym_n' in Hgen'.
-          inv Hgen. unfold lt_symgen in *. zify. omega. 
+          inv Hgen. unfold lt_symgen in *. zify. lia. 
         + inv Hall.
           eapply IHvars1. eassumption. eassumption.
     Qed. 
@@ -573,7 +573,7 @@ Section Post.
       induction l; intros x Hall.
       - intros Hnot. inv Hnot.
       - intros Hnot. inv Hall. inv Hnot.
-        zify. omega.
+        zify. lia.
         unfold not in IHl. eapply IHl. eassumption. eassumption.
     Qed.
 
@@ -588,10 +588,10 @@ Section Post.
         destruct (gensym_n_nAnon' (Pos.succ (Pos.succ v))
                                   (M.set (Pos.succ v) nAnon nenv) n) eqn:Hgen.
         destruct p eqn:Hp. inv H. econstructor.
-        zify. omega.
+        zify. lia.
         eapply IHn in Hgen. eapply All_Forall.Forall_impl.
         eassumption.
-        intros x H. simpl in H. zify. omega.
+        intros x H. simpl in H. zify. lia.
     Qed.
 
     Lemma Forall_lt_gensym_n_Pos_succ :
@@ -605,10 +605,10 @@ Section Post.
         destruct (gensym_n' (Pos.succ (Pos.succ v))
                             (M.set (Pos.succ v) a nenv) nlst) eqn:Hgen.
         destruct p. inv H. econstructor.
-        zify. omega.
+        zify. lia.
         eapply IHnlst in Hgen. eapply All_Forall.Forall_impl.
         eassumption.
-        intros x H. simpl in H. zify. omega.
+        intros x H. simpl in H. zify. lia.
     Qed. 
 
     Lemma gensym_n_nAnon_NoDup :
@@ -870,7 +870,7 @@ Section Post.
                eapply geq_gensym in Hgen_k1.
                destruct next1. destruct p. eapply lt_symgen_gensym_2 in Hgen_x1.
                unfold lt_symgen in Hgen_x1. unfold geq_symgen in Hgen_k1.
-               destruct s. destruct p. zify. omega.
+               destruct s. destruct p. zify. lia.
                5: { rewrite <- H2. eassumption. }
                5: { eassumption. }
                admit.
@@ -924,7 +924,7 @@ Proof.
           destruct (efnlst_length fnl). simpl in Hlen.
           rewrite Pos2Nat.inj_1 in Hlen.
           inv Hlen. simpl. eassumption. 
-          simpl in *. destruct p; try (zify; omega). 
+          simpl in *. destruct p; try (zify; lia). 
           eassumption. eassumption.
     Qed. 
 
@@ -1042,7 +1042,7 @@ Proof.
           (* econstructor. rewrite M.gempty in H3. inv H3. *)
           (* eapply cps_cvt_env_alpha_equiv. *)
           (* eapply H. eassumption. intros m Hlt3. *)
-          (* eapply IH. omega. eassumption. eassumption.  *)
+          (* eapply IH. lia. eassumption. eassumption.  *)
           (* admit. admit. admit. *)
           (* rewrite Setminus_Same_set_Empty_set. rewrite image_Empty_set. *)
           (* eapply Disjoint_Empty_set_l. *)
@@ -1053,7 +1053,7 @@ Proof.
           (* admit. admit. admit. *)
           (* inversion Hall. eassumption. *)
           admit.
-          omega.
+          lia.
         }
 
       - simpl in Hv1, Hv2.
@@ -1263,7 +1263,7 @@ Proof.
                 (* eapply preord_env_P_inj_f_eq_subdomain. *)
                 (* eapply preord_env_P_inj_antimon. *)
                 (* eapply preord_env_P_inj_monotonic. *)
-                (* 2: { eassumption. } omega. *)
+                (* 2: { eassumption. } lia. *)
                 (* sets. *)
                 (* assert (Hsets : (FromList vars1 :|: Empty_set _) <--> *)
                 (*                                                  (FromList vars1)). *)
@@ -1278,9 +1278,9 @@ Proof.
                 (* admit. admit. eassumption. *)
                 (* inversion Hall. eassumption. *)
                 admit. 
-                omega.
+                lia.
               }
-            - omega. }
+            - lia. }
           
       - (* App_e *)
         intros e1 IHe1 e2 IHe2 e1' e2' k1 k2 vars1 vars2 rho1 rho2
@@ -1384,7 +1384,7 @@ Proof.
                 - eapply preord_var_env_extend_neq.
                   eapply preord_var_env_extend_neq.
                   eapply preord_var_env_extend_eq. inversion Hall.
-                  eapply preord_val_monotonic. eassumption. omega.
+                  eapply preord_val_monotonic. eassumption. lia.
                   admit. admit. admit. admit.
                 - econstructor.
                   eapply preord_var_env_extend_eq. eassumption.
@@ -1395,7 +1395,7 @@ Proof.
                   eapply preord_var_env_extend_neq.
                   replace k2 with ((id {k1 ~> k2} <{ vars1 ~> vars2}>) k1).
                   eapply preord_var_env_monotonic. eapply Henv.
-                  now left. omega. rewrite extend_lst_gso. 
+                  now left. lia. rewrite extend_lst_gso. 
                   rewrite extend_gss. reflexivity. 
                   admit. admit. admit. admit. admit. admit. admit. admit. admit.
                   econstructor. 
@@ -1403,10 +1403,10 @@ Proof.
                 - admit.
                 - admit.
                 - eassumption. }
-              omega. }
+              lia. }
           admit.
           admit.
-          admit. eassumption. omega.
+          admit. eassumption. lia.
           
       - (* Con_e *)
         intros dc es IH e1 e2 k1 k2 vars1 vars2 rho1 rho2
@@ -1506,7 +1506,7 @@ Proof.
                 eapply preord_env_P_inj_set_not_In_P_r.
                 eapply preord_env_P_inj_monotonic.
                 2 : { eassumption. }
-                omega.
+                lia.
                 admit. admit. admit. admit. admit. admit.
                 admit.
                 econstructor.
@@ -1522,7 +1522,7 @@ Proof.
               admit.
               admit.
               eassumption. }
-          omega.
+          lia.
           
       - (* Match_e *)
         intros e IHe pars bs IHbs e1 e3 k1 k2 vars1 vars2 rho1 rho2
@@ -1593,11 +1593,11 @@ Proof.
             eapply preord_env_P_inj_set_not_In_P_l.
             eapply preord_env_P_inj_set_not_In_P_r.
             eapply preord_env_P_inj_monotonic.
-            2: { eassumption. } omega.
+            2: { eassumption. } lia.
             admit. admit. admit. admit.
             eapply preord_var_env_extend_eq. inversion Hall. eassumption. } 
             admit. admit. admit. eassumption. 
-            omega.
+            lia.
           
       - (* Let_e *)
         intros na e1 IHe1 e2 IHe2 e1' e2' k1 k2 vars1 vars2 rho1 rho2
@@ -1657,9 +1657,9 @@ Proof.
             simpl. f_equal. eassumption.
             admit.
             simpl. admit.
-            omega. }
+            lia. }
           admit. admit. admit.
-          eassumption. omega.
+          eassumption. lia.
           
       - (* Fix_e *)
         intros efns IHefnlst n e1 e2 k1 k2 vars1 vars2 rho1 rho2
@@ -1716,7 +1716,7 @@ Proof.
               Admitted.
               
               admit.
-            - omega. } 
+            - lia. } 
       - (* Prf_e *)
         admit.
         

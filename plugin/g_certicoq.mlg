@@ -37,6 +37,13 @@ VERNAC ARGUMENT EXTEND ffiargs
 | [ cargs(c) ] -> { c }
 END
 
+VERNAC ARGUMENT EXTEND glueargs
+| [ "-cps" ] -> { CPS }
+| [ "-debug" ] -> { DEBUG }
+| [ "-args" natural(n) ] -> { ARGS(n) }
+| [ "-file" string(s) ] -> { FILENAME(s) }
+END
+
 VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
 | [ "CertiCoq" "Compile" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
@@ -62,6 +69,11 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
     let gr = Nametab.global gr in
     let opts = Certicoq.make_options l [] (get_name gr) in
     Certicoq.ffi_command opts gr
+  }
+| [ "CertiCoq" "Generate" "Glue" glueargs_list(l) "[" global_list_sep(grs, ",") "]" ] -> {
+    let grs = List.map Nametab.global grs in
+    let opts = Certicoq.make_options l [] "" in
+    Certicoq.glue_command opts grs
   }
 | [ "CertiCoq" "-help" ] -> {
     Feedback.msg_info (str help_msg)

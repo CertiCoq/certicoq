@@ -29,6 +29,10 @@ let chars_of_string (s : string) : char list =
     if i < 0 then l else exp (i - 1) (s.[i] :: l) in
   exp (String.length s - 1) []
 
+(* remove duplicates but preserve order, keep the leftmost element *)
+let nub (xs : 'a list) : 'a list = 
+  List.fold_right (fun x xs -> if List.mem x xs then xs else x :: xs) xs []
+
 let rec coq_nat_of_int x =
   match x with
   | 0 -> Datatypes.O
@@ -174,12 +178,15 @@ let compile opts term imports =
     CErrors.user_err ~hdr:"pipeline" (str "Could not compile: " ++ (pr_char_list s) ++ str "\n")
 
 (* Generate glue code for the compiled program *)
-let generate_glue opts term =
+let generate_glue (standalone : bool) opts globs =
+  if standalone && opts.filename = "" then
+    CErrors.user_err ~hdr:"glue-code" (str "You need to provide a file name with the -file option.")
+  else
   let debug = opts.debug in
   let options = make_pipeline_options opts in
 
   let time = Unix.gettimeofday() in
-  (match Pipeline.make_glue options term with
+  (match Glue.generate_glue options globs with
   | CompM.Ret (((nenv, header), prg), logs) ->
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Generated glue code in %f s.." time);
@@ -188,8 +195,8 @@ let generate_glue opts term =
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
     let fname = opts.filename in
-    let cstr = "glue." ^ fname ^ suff ^ ".c" in
-    let hstr = "glue." ^ fname ^ suff ^ ".h" in
+    let cstr = if standalone then fname ^ ".c" else "glue." ^ fname ^ suff ^ ".c" in
+    let hstr = if standalone then fname ^ ".h" else "glue." ^ fname ^ suff ^ ".h" in
     printProg prg nenv cstr [];
     printProg header nenv hstr [];
 
@@ -202,7 +209,7 @@ let generate_glue opts term =
 let compile_with_glue (opts : options) (gr : Names.GlobRef.t) (imports : string list) : unit =
   let term = quote opts gr in
   compile opts (Obj.magic term) imports;
-  generate_glue opts (Obj.magic term)
+  generate_glue false opts (fst (Obj.magic term))
 
 let compile_only opts gr imports =
   let term = quote opts gr in
@@ -210,7 +217,7 @@ let compile_only opts gr imports =
 
 let generate_glue_only opts gr =
   let term = quote opts gr in
-  generate_glue opts (Obj.magic term)
+  generate_glue true opts (fst (Obj.magic term))
 
 let print_to_file (s : string) (file : string) =
   let f = open_out file in
@@ -265,7 +272,7 @@ let ffi_command opts gr =
   let options = make_pipeline_options opts in
 
   let time = Unix.gettimeofday() in
-  (match Pipeline.make_ffi options (Obj.magic term) with
+  (match Ffi.generate_ffi options (Obj.magic term) with
   | CompM.Ret (((nenv, header), prg), logs) ->
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Generated FFI glue code in %f s.." time);
@@ -282,3 +289,9 @@ let ffi_command opts gr =
     debug_msg debug (Printf.sprintf "Printed FFI glue code to file in %f s.." time)
   | CompM.Err s ->
     CErrors.user_err ~hdr:"ffi-glue-code" (str "Could not generate FFI glue code: " ++ pr_char_list s))
+
+let glue_command opts grs =
+  let terms = grs |> List.rev
+              |> List.map (fun gr -> fst (quote opts gr)) 
+              |> List.concat |> nub in
+  generate_glue true opts (Obj.magic terms)

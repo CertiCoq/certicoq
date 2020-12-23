@@ -13,6 +13,8 @@ Import VeriStar.
 
 CertiCoq -help.
 
+CertiCoq Generate Glue -file "basics" [ nat, list, bool ].
+
 (* Demo 1 *)
 
 Definition demo1 := List.app (List.repeat true 500) (List.repeat false 300).

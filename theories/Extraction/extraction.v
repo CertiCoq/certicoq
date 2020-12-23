@@ -90,8 +90,8 @@ Separate Extraction
          String.length
          Compiler.pipeline.make_opts
          Compiler.pipeline.compile
-         Compiler.pipeline.make_glue
-         Compiler.pipeline.make_ffi
+         Glue.glue.generate_glue
+         Glue.ffi.generate_ffi
          cps.M.elements
          Compiler.pipeline.show_IR.
 

@@ -796,11 +796,11 @@ Section CtorArrays.
         (max_len, i ++ init_l)
     end.
 
-  Fixpoint make_name_array
-           (tag : ind_L1_tag)
-           (kn : kername)
-           (ctors : list (BasicAst.ident * Ast.term * nat))
-           : glueM def :=
+  Definition make_name_array
+             (tag : ind_L1_tag)
+             (kn : kername)
+             (ctors : list (BasicAst.ident * Ast.term * nat))
+             : glueM def :=
     let (max_len, init_l) := normalized_names_array ctors 1 in
     let ty := tarray (tarray tschar (Z.of_nat max_len))
                      (Z.of_nat (length ctors)) in
@@ -1269,9 +1269,8 @@ Definition make_glue_program
 (* The entry point for glue code generation *)
 Definition generate_glue
            (opts : Options)
-           (p : Ast.program) (* an L1 program *)
-           : error (name_env * option Clight.program * option Clight.program * list string) :=
-  let (globs, _) := p in
+           (globs : Ast.global_env) (* an L1 program *)
+           : error (name_env * Clight.program * Clight.program * list string) :=
   let init : gstate_data :=
       {| gstate_gensym := 2%positive
        ; gstate_ienv   := M.empty _
@@ -1285,10 +1284,11 @@ Definition generate_glue
   let '(err, st) := runState (make_glue_program (rev globs)) opts init in
   let nenv := gstate_nenv st in
   match err with
-  | Ret (header, source) =>
+  | Err s => Err s
+  | Ret (Some header, Some source) =>
     Ret (nenv (* the name environment to be passed to C generation *) ,
          header (* the header content *),
          source (* the source content *),
          rev (gstate_log st) (* logged messages *))
-  | Err s => Err s
+  | Ret _ => Err "No Clight program generated"
   end.

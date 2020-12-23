@@ -3,7 +3,7 @@ Require Import L6.cps L6.identifiers L6.ctx L6.set_util L6.state L6.alpha_conv
         L6.hoisting L6.dead_param_elim_util L6.eval L6.algebra L6.logical_relations.
 Require Import compcert.lib.Coqlib Common.compM Common.Pipeline_utils.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia
         maps_util.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat.
@@ -599,7 +599,7 @@ Section Correct.
   Proof.
     intros [Hyp Hinv] Hd. split; eauto. intro; intros. edestruct Hinv; eauto. destructAll.
     do 6 eexists. repeat split. eassumption. eassumption. eassumption. intros.
-    eapply preord_exp_monotonic. eapply H8; eauto. omega. omega.
+    eapply preord_exp_monotonic. eapply H8; eauto. lia. lia.
   Qed. 
 
   Lemma live_args_nil {A} xs :
@@ -692,17 +692,17 @@ Section Correct.
         eapply set_lists_length_eq. eassumption.
 
         edestruct Hval. 
-        omega.
+        lia.
         eapply List_util.Forall2_monotonic; [| eassumption ]. intros.
-        eapply preord_val_monotonic. eassumption. omega.
-        2:{ eassumption. } omega. 
+        eapply preord_val_monotonic. eassumption. lia.
+        2:{ eassumption. } lia. 
         destructAll.
 
         destruct x0; try contradiction.  
         
         edestruct Hexp with (m := k - 1 - to_nat cin1) as (v2' & c2' & t2' & Hstep2' & Hpost' & Hval');
           [  | | | eassumption | ]. simpl in *.
-        omega. simpl in H1. eassumption. omega. 
+        lia. simpl in H1. eassumption. lia. 
 
         exists v2', (x1 <+> c2' <+> (one (Eletapp x f ft' (live_args ys bs) e'))). eexists.
         split; [| split ]; eauto.
@@ -712,7 +712,7 @@ Section Correct.
           eapply HGPost. eassumption. eassumption.
           eassumption.
         * eapply preord_res_monotonic. eassumption.
-          rewrite !to_nat_add. unfold one. rewrite to_nat_one. omega. 
+          rewrite !to_nat_add. unfold one. rewrite to_nat_one. lia. 
       + edestruct (preord_env_P_get_list_live_args ys) with (bs := bs) as [vs' [Hgetl' Hprevs]]; eauto.
         eapply Included_Setminus; [| eapply Included_Setminus ]; sets.
         eapply Disjoint_Included_l. eapply live_args_subset. now sets.
@@ -726,10 +726,10 @@ Section Correct.
         eapply set_lists_length_eq. eassumption.
         
         edestruct Hval. 
-        omega.
+        lia.
         eapply List_util.Forall2_monotonic; [| eassumption ]. intros.
-        eapply preord_val_monotonic. eassumption. omega.
-        2:{ eassumption. } omega. 
+        eapply preord_val_monotonic. eassumption. lia.
+        2:{ eassumption. } lia. 
         destructAll.
         
         destruct x0; try contradiction. 
@@ -773,10 +773,10 @@ Section Correct.
       eapply set_lists_length_eq. eassumption.
 
       edestruct Hval. 
-      omega.
+      lia.
       eapply List_util.Forall2_monotonic; [| eassumption ]. intros.
-      eapply preord_val_monotonic. eassumption. omega.
-      2:{ eassumption. } omega. 
+      eapply preord_val_monotonic. eassumption. lia.
+      2:{ eassumption. } lia. 
       destructAll.
       
       do 3 eexists.
@@ -785,7 +785,7 @@ Section Correct.
         econstructor; try eassumption. now eauto.
       * simpl. eapply HPost; eauto. eapply HGPost. eassumption. eassumption.
       * eapply preord_res_monotonic. eassumption.
-        rewrite !to_nat_add. unfold one. rewrite to_nat_one. omega. 
+        rewrite !to_nat_add. unfold one. rewrite to_nat_one. lia. 
   Qed.
   
     
@@ -815,11 +815,11 @@ Section Correct.
       + intros. eapply IHk; eauto.
 
         * repeat normalize_bound_var_in_ctx. sets.
-        * eapply fun_inv_set_Disjoint. eapply fun_inv_monotonic. eassumption. omega.
+        * eapply fun_inv_set_Disjoint. eapply fun_inv_monotonic. eassumption. lia.
           repeat normalize_occurs_free_in_ctx. sets.
         * eapply preord_env_P_extend.
           eapply preord_env_P_antimon.
-          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
           normalize_occurs_free. sets. rewrite !Setminus_Union_distr, !Setminus_Union. now sets.
           rewrite preord_val_eq. simpl. split; eauto.
 
@@ -840,11 +840,11 @@ Section Correct.
         eassumption.
         intros Hc. eapply Hfinv in Hc. destructAll. congruence.
       + intros. eapply IHe; eauto.
-        * intros; eauto. eapply IHk; eauto. omega.
+        * intros; eauto. eapply IHk; eauto. lia.
         * repeat normalize_bound_var_in_ctx. sets.
-        * eapply fun_inv_monotonic; eauto. omega. 
+        * eapply fun_inv_monotonic; eauto. lia. 
         * eapply preord_env_P_antimon.
-          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
           normalize_occurs_free. sets.
 
       + eapply IHe0; eauto.
@@ -852,7 +852,7 @@ Section Correct.
         * constructor; eauto.
         * constructor; eauto.
         * eapply preord_env_P_antimon.
-          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
           normalize_occurs_free. sets.
         * econstructor. eauto.
 
@@ -868,11 +868,11 @@ Section Correct.
       + intros. eapply IHk; eauto.
         
         * repeat normalize_bound_var_in_ctx. sets.
-        * eapply fun_inv_set_Disjoint. eapply fun_inv_monotonic; eauto. omega.
+        * eapply fun_inv_set_Disjoint. eapply fun_inv_monotonic; eauto. lia.
           repeat normalize_occurs_free_in_ctx. sets.
         * eapply preord_env_P_extend.
           eapply preord_env_P_antimon.
-          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
           normalize_occurs_free. sets. rewrite !Setminus_Union_distr, !Setminus_Union. now sets.
           eassumption.
 
@@ -893,11 +893,11 @@ Section Correct.
         
         * repeat normalize_bound_var_in_ctx. sets.
         * eapply fun_inv_set_Disjoint.
-          eapply fun_inv_monotonic; eauto. omega.
+          eapply fun_inv_monotonic; eauto. lia.
           repeat normalize_occurs_free_in_ctx. sets.
         * eapply preord_env_P_extend.
           eapply preord_env_P_antimon.
-          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
           normalize_occurs_free. sets. rewrite !Setminus_Union_distr, !Setminus_Union. now sets.
           eassumption.
           
@@ -915,11 +915,11 @@ Section Correct.
         
         * repeat normalize_bound_var_in_ctx. sets.
         * eapply fun_inv_set_Disjoint.
-          eapply fun_inv_monotonic; eauto. omega.
+          eapply fun_inv_monotonic; eauto. lia.
           repeat normalize_occurs_free_in_ctx. sets.
         * eapply preord_env_P_extend.
           eapply preord_env_P_antimon.
-          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
           normalize_occurs_free. sets. rewrite !Setminus_Union_distr, !Setminus_Union. now sets.
           eassumption.
 
@@ -1092,7 +1092,7 @@ Section Correct.
                                               (name_in_fundefs B1 :|: occurs_free_fundefs B1 :|: S \\ Dom_map L) m
                                               (def_funs B1 B1 rho0 rho0) (def_funs B' B' rho2 rho2)).
         { intros. eapply IHk; try eassumption.
-          eapply preord_env_P_monotonic; [| eassumption ]. omega. } 
+          eapply preord_env_P_monotonic; [| eassumption ]. lia. } 
         
         do 6 eexists. repeat split.
         * eapply find_def_complete.
@@ -1101,7 +1101,7 @@ Section Correct.
           eassumption. 
         * now eauto.
         * intros.
-          edestruct (Hand j) as [Hinv' Henv']. omega.
+          edestruct (Hand j) as [Hinv' Henv']. lia.
             
           eapply Elim_expr_correct; try eassumption. 
           -- repeat normalize_bound_var_in_ctx. sets.
@@ -1160,7 +1160,7 @@ Section Correct.
                                                 (name_in_fundefs B :|: occurs_free_fundefs B :|: S \\ Dom_map L) m
                                                 (def_funs B B rho1 rho1) (def_funs B' B' rho2 rho2)).
           { intros. eapply IHk; try eassumption.
-            eapply preord_env_P_monotonic; [| eassumption ]. omega. } 
+            eapply preord_env_P_monotonic; [| eassumption ]. lia. } 
           
 
           do 3 eexists. repeat split.
@@ -1170,7 +1170,7 @@ Section Correct.
              eassumption. 
           -- now eauto.
           -- intros.
-             edestruct (Hand j) as [Hinv' Henv']. omega.
+             edestruct (Hand j) as [Hinv' Henv']. lia.
 
              { eapply preord_exp_post_monotonic. eapply HGPost. eassumption.
                eapply Elim_expr_correct with (S := Empty_set _); try eassumption. 
@@ -1416,9 +1416,9 @@ Section Correct.
           eapply Included_trans. eassumption.
           eapply name_in_fundefs_bound_var_fundefs. sets.
         * eapply Dead_empty. eassumption.
-        * eapply fun_inv_monotonic. eassumption. omega.
+        * eapply fun_inv_monotonic. eassumption. lia.
         * eapply preord_env_P_antimon.
-          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
           repeat normalize_sets. eapply Included_Setminus_compat; sets.
           rewrite Union_Setminus_Included; sets. tci.
   Qed. 

@@ -3,7 +3,7 @@
  *)
 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
-         MSets.MSetRBT Lists.List omega.Omega Sets.Ensembles Relations.Relations
+         MSets.MSetRBT Lists.List micromega.Lia Sets.Ensembles Relations.Relations
          Classes.Morphisms.
 From CertiCoq.L6 Require Import Ensembles_util set_util functions List_util.
 From compcert.lib Require Import Coqlib Maps.

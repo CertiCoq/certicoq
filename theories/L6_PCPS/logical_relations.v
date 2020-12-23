@@ -4,7 +4,7 @@
  
 Require Import compcert.lib.Coqlib.
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
-        Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
+        Coq.Lists.List Coq.micromega.Lia Coq.Sets.Ensembles.
 Require Import Coq.Logic.Classical_Prop Coq.Logic.Classical_Pred_Type.
 
 Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.map_util
@@ -149,7 +149,7 @@ Section Log_rel.
           split; [ now eauto | now eapply IHxs ].
       - split; intros Hpre; simpl; intros; 
         edestruct (Hpre vs1 vs2 0) as [xs2 [e2 [rho' [H1' [H2' H3']]]]];
-        eauto; do 4 eexists; repeat split; eauto; intros Hc; exfalso; omega.
+        eauto; do 4 eexists; repeat split; eauto; intros Hc; exfalso; lia.
       - revert l0; induction l as [| x xs IHxs];
         intros l2; destruct l2 as [| y ys ];
         split; intros H; try (now simpl in H; inv H); try now (simpl; eauto).
@@ -161,7 +161,7 @@ Section Log_rel.
       - split; intros Hpre; simpl; intros;
           try now (edestruct Hpre as [xs2 [e2 [rho' [H1' [H2' H3']]]]]; eauto;
                    do 3 eexists; do 2 (split; eauto); intros Hleq Hf' v1 cin cout Hleq' Hstep;
-           (assert (Heq : k - (k - j) = j) by omega); rewrite Heq in *;
+           (assert (Heq : k - (k - j) = j) by lia); rewrite Heq in *;
            eapply H3'; eauto).
     Qed.
 
@@ -453,7 +453,7 @@ Section Log_rel.
     - intros vs1 vs2 j t1 xs e1 rho1' Hlen Hf' Heq.
       edestruct Hpre as [xs2 [e2 [rho2' [H1 [H2 H3]]]]]; eauto.
       do 3 eexists; split; eauto. split; eauto. intros Hleq' Hall. 
-      eapply H3; eauto. omega. 
+      eapply H3; eauto. lia. 
   Qed.  
 
   Lemma preord_var_env_monotonic k rho1 rho2 j z x:
@@ -500,9 +500,9 @@ Section Log_rel.
       j <= k -> preord_exp Post PostG j (rho1, e1) (rho2, e2).
   Proof.
     intros rho1 e1 rho2 e2 j Hpre Hleq v1 cin Hlt Hstep Hns.
-    edestruct (Hpre v1 cin) as [v2 [cin' [H1 [H2 [H3 H4]]]]]; eauto. omega.
+    edestruct (Hpre v1 cin) as [v2 [cin' [H1 [H2 [H3 H4]]]]]; eauto. lia.
     do 3 eexists; split; eauto. split; eauto. 
-    eapply preord_res_monotonic. eassumption. omega.
+    eapply preord_res_monotonic. eassumption. lia.
   Qed.
 
   Lemma preord_exp_post_monotonic_strong k (P1 P2 : PostT) PG e1 rho1 e2 rho2 :
@@ -693,7 +693,7 @@ Section Log_rel.
       m >= n ->
       m - (n - k) = m - n + k.    
     Proof. 
-      intros. omega. 
+      intros. lia. 
     Qed.
     
    (** * Compatibility Properties *)
@@ -721,16 +721,16 @@ Section Log_rel.
         
         edestruct (Hpre (k - to_nat (one (Econstr x t ys1 e1)))) as [v2 [cin' [cout' [Hstep [Hpost Hval]]]]];
           [| | | eassumption | ]; eauto. 
-        unfold one. simpl in *. omega.
+        unfold one. simpl in *. lia.
         
         eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption.
-        omega. unfold one; simpl in *; omega.
+        lia. unfold one; simpl in *; lia.
         
         do 3 eexists. split; [| split ]. 
         econstructor 2; eauto. now econstructor; eauto.  
         eapply Hcompat; try eassumption.
         eapply preord_res_monotonic. eassumption. 
-        simpl in *. rewrite to_nat_add. unfold one. simpl in *. omega.
+        simpl in *. rewrite to_nat_add. unfold one. simpl in *. lia.
     Qed. 
 
     (* TODO check if can be avoided *)
@@ -758,13 +758,13 @@ Section Log_rel.
         
         edestruct (Hpre (k - to_nat (one (Econstr x t ys1 e1)))) as [v2 [cin' [cout' [Hstep [Hpost Hval]]]]];
           [| | | | eassumption | ]; eauto.   
-        unfold one in *; simpl in *. omega. omega.  
+        unfold one in *; simpl in *. lia. lia.  
         
         do 3 eexists. split; [| split ]. 
         econstructor 2; eauto. now econstructor; eauto.
         eapply Hcompat; eassumption.
         eapply preord_res_monotonic. eassumption. 
-        rewrite to_nat_add. unfold one in *; simpl in *. omega.
+        rewrite to_nat_add. unfold one in *; simpl in *. lia.
     Qed. 
 
 
@@ -793,15 +793,15 @@ Section Log_rel.
           try eassumption.
         edestruct (Hexp  (k - 1)) as [v2' [cin' [cout' [Hstep [Hpost Hval']]]]];
           [ | | | eassumption | ]; eauto.
-        unfold one in *; simpl in *; omega.
-        eapply preord_val_monotonic. eassumption. omega. 
-        unfold one in *; simpl in *. omega. 
+        unfold one in *; simpl in *; lia.
+        eapply preord_val_monotonic. eassumption. lia. 
+        unfold one in *; simpl in *. lia. 
         
         do 3 eexists. split; [| split ]. 
         econstructor 2; eauto. now econstructor 2; eauto.
         eapply Hcompat; try eassumption.
         eapply preord_res_monotonic. eassumption.
-        rewrite to_nat_add. unfold one; simpl in *; omega.
+        rewrite to_nat_add. unfold one; simpl in *; lia.
     Qed.
 
     (* TODO move *)
@@ -833,14 +833,14 @@ Section Log_rel.
         assert (Hg := to_nat_one (exp_to_fin (Eapp x1 ft ys1))).         
 
         edestruct H' as [v2 [cin' [cout' [Hstep' [Hpost' Hpre'']]]]];
-          eauto; try (unfold one in *; simpl in *; omega).   
+          eauto; try (unfold one in *; simpl in *; lia).   
         + eapply Forall2_monotonic; [| now eauto ].
-          intros. eapply (preord_val_monotonic PG k); [ now eauto | omega ].
+          intros. eapply (preord_val_monotonic PG k); [ now eauto | lia ].
         + do 3 eexists. split; [| split ].
           econstructor 2; eauto. now econstructor; eauto. 
           eapply Hcompat; eassumption. 
           eapply preord_res_monotonic. eassumption. 
-          rewrite to_nat_add. simpl in *; omega.
+          rewrite to_nat_add. simpl in *; lia.
     Qed.
 
 
@@ -874,22 +874,22 @@ Section Log_rel.
           now eapply Forall2_length; eauto.   
 
           edestruct H' with (cin := cin1) as [v2 [cin' [cout' [Hstep' [Hpost' Hpre'']]]]]. 
-          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia.
           
           eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic.
-          eassumption. omega. simpl in *; omega. eassumption.
+          eassumption. lia. simpl in *; lia. eassumption.
 
           
           destruct v2; try contradiction. simpl in Hpre''. 
           edestruct Hexp as [v2' [cin'' [cout'' [Hstep  [Hpost Hval']]]]]; [ | eassumption | | eassumption | ]; eauto.
-          repeat eexists. unfold one in *; simpl in *; omega. 
-          simpl in *; omega.
+          repeat eexists. unfold one in *; simpl in *; lia. 
+          simpl in *; lia.
 
           repeat eexists.
           * econstructor 2. econstructor; eauto. 
           * eapply Hcompat; eassumption.
           * eapply preord_res_monotonic. eassumption. 
-            rewrite !to_nat_add; omega.
+            rewrite !to_nat_add; lia.
         + edestruct Henv as [v' [Hget Hpre]]; eauto.
           rewrite preord_val_eq in Hpre.
           destruct v'; try (now simpl in Hpre; contradiction).
@@ -899,9 +899,9 @@ Section Log_rel.
           rewrite !to_nat_add in Hleq1.
           assert (Hg := to_nat_one (exp_to_fin (Eletapp x f1 ft ys1 e1))).
           
-          edestruct H'; try eassumption. unfold one in *; simpl in *; omega. 
+          edestruct H'; try eassumption. unfold one in *; simpl in *; lia. 
           eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic.
-          eassumption. simpl in *; omega. simpl in *; omega. 
+          eassumption. simpl in *; lia. simpl in *; lia. 
 
           destructAll. repeat eexists.
 
@@ -928,7 +928,7 @@ Section Log_rel.
 
         rewrite !plus_zero. 
         eapply Hbase.
-        eapply preord_val_monotonic. eassumption. omega.
+        eapply preord_val_monotonic. eassumption. lia.
     Qed.
     
     Lemma preord_exp_case_nil_compat k rho1 rho2 x1 x2
@@ -966,7 +966,7 @@ Section Log_rel.
           edestruct (Hexp_hd (k - 1)) as [v2 [c2 [cout' [Hstep2 [Hpost Hpre2]]]]];
             [ | | eassumption | ]; eauto.
 
-          unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia. unfold one in *; simpl in *; lia.
           
           edestruct Henv as [v2' [Hget Hpre]]; eauto.
           rewrite preord_val_eq in Hpre.
@@ -979,11 +979,11 @@ Section Log_rel.
 
           eapply Hcompat_hd. eassumption.
           eapply preord_res_monotonic. eassumption. 
-          rewrite to_nat_add. unfold one in *; simpl in *; omega.
+          rewrite to_nat_add. unfold one in *; simpl in *; lia.
         + inv H5. contradiction.
           edestruct Hexp_tl as [v2 [c2 [cout' [Hstep2 [Hpost2 Hpre2]]]]].
           2:{ econstructor 2; eauto. econstructor; eauto. }
-          * rewrite to_nat_add. unfold one in *. simpl in *; omega.
+          * rewrite to_nat_add. unfold one in *. simpl in *; lia.
           * eapply Henv in H2. destruct H2 as [v2' [Hgetx2 Hval]].  
             assert (Hval' := Hval). rewrite preord_val_eq in Hval'. 
             destruct v2'; try contradiction. simpl in Hval'. inv Hval'.  
@@ -1046,7 +1046,7 @@ Section Log_rel.
       preord_exp P2 PG k (Eprim x1 f ys1 e1, rho1) (Eprim x2 f ys2 e2, rho2).
     Proof.
       intros Hall Hpre v1 cin Hleq1 Hstep1. 
-      destruct (lt_dec cin (cost (Eprim x1 f ys1 e1))); inv Hstep1; try omega. 
+      destruct (lt_dec cin (cost (Eprim x1 f ys1 e1))); inv Hstep1; try lia. 
       - (* OOT *) 
         exists OOT, cin. split. constructor. 
         simpl in *. erewrite <- Forall2_length; [| eassumption ]. 
@@ -1055,19 +1055,19 @@ Section Log_rel.
         edestruct preord_var_env_get_list as [vs2 [Hget' Hpre']]; eauto.
         edestruct Prim_axiom as [v2 [Heq Hprev2]]; eauto.
         edestruct (Hpre (k - 1)) as [v2' [c2 [Hstepv2' [Hpost2 Hprev2']]]]; [ | | | eassumption | ]; eauto.
-        simpl in *; omega.
+        simpl in *; lia.
         eapply preord_val_monotonic. eassumption.
-        omega. simpl in *; omega.
+        lia. simpl in *; lia.
         eexists. exists (c2 + cost (Eprim x2 f ys2 e2)). split; [| split ].
-        econstructor 2; eauto. omega. 
+        econstructor 2; eauto. lia. 
         econstructor; eauto.
-        replace (c2 + cost (Eprim x2 f ys2 e2) - cost (Eprim x2 f ys2 e2)) with c2 by omega.  
+        replace (c2 + cost (Eprim x2 f ys2 e2) - cost (Eprim x2 f ys2 e2)) with c2 by lia.  
         eassumption.
         replace cin with (cin - cost (Eprim x1 f ys1 e1) + cost (Eprim x2 f ys2 e2)).
-          2:{ simpl in *. eapply Forall2_length in Hall. rewrite Hall. omega. } 
+          2:{ simpl in *. eapply Forall2_length in Hall. rewrite Hall. lia. } 
         eapply HPost. eassumption.
         eapply preord_res_monotonic. eassumption. 
-        simpl in *. omega.
+        simpl in *. lia.
     Qed.
 *)
 
@@ -1106,13 +1106,13 @@ Section Log_rel.
         edestruct Hexp as [v2' [c2 [cout' [Hstepv2' [Hprev2' Hpost]]]]];
           [ | eassumption | ]; eauto.
         
-        unfold one in *; simpl in *; omega.
+        unfold one in *; simpl in *; lia.
         
         repeat eexists.
         
         econstructor 2; eauto. now econstructor; eauto.
         eapply Hcompat. eassumption.
-        eapply preord_res_monotonic. eassumption. rewrite to_nat_add. unfold one in *; simpl in *; omega.
+        eapply preord_res_monotonic. eassumption. rewrite to_nat_add. unfold one in *; simpl in *; lia.
     Qed.
 
     Lemma preord_exp_Efun_l k boundG rho1 rho2 B e e' (HOOT : post_OOT P2) :
@@ -1128,10 +1128,10 @@ Section Log_rel.
         rewrite !to_nat_add in Hleq1.
         assert (Hg := to_nat_one (exp_to_fin (Efun B e))).
         
-        edestruct Hexp as [v2' [c2 [cout' [Hstep2 [Hub Hcc2]]]]]; [| eassumption | ]; try (unfold one in *; simpl in *; omega).
+        edestruct Hexp as [v2' [c2 [cout' [Hstep2 [Hub Hcc2]]]]]; [| eassumption | ]; try (unfold one in *; simpl in *; lia).
         
         repeat eexists; eauto.
-        eapply preord_res_monotonic. eassumption. rewrite to_nat_add. unfold one in *; simpl in *; omega.
+        eapply preord_res_monotonic. eassumption. rewrite to_nat_add. unfold one in *; simpl in *; lia.
     Qed.
 
     Lemma preord_exp_Efun_r k boundG rho1 rho2 B e e' (HOOT : post_OOT P2) :
@@ -1145,7 +1145,7 @@ Section Log_rel.
         eapply HOOT. eassumption.
         simpl; eauto.
       - edestruct Hexp as [v2' [c2 [cout' [Hstep2 [Hub Hcc2]]]]]; [| constructor 2; eassumption | ].
-        unfold one in *; simpl in *; omega.
+        unfold one in *; simpl in *; lia.
         
         repeat eexists; eauto. econstructor 2. econstructor. eassumption.
     Qed.
@@ -1189,11 +1189,11 @@ Section Log_rel.
         simpl; eauto.
       - inv H. repeat subst_exp. rewrite to_nat_add in Hleq. 
         edestruct Hyp as (v2 & c2 & cout' & Hstep' & Hpost & Hval); [ | | | | | eassumption | ]; eauto.
-        omega.
+        lia.
 
         eexists. exists c2, cout'. split; [ eassumption | split ].
         eapply Hls; eauto.        
-        eapply preord_res_monotonic. eassumption. rewrite to_nat_add. omega.
+        eapply preord_res_monotonic. eassumption. rewrite to_nat_add. lia.
     Qed. 
     
     Fixpoint exp_ctx_len (c : exp_ctx) : nat :=
@@ -1234,7 +1234,7 @@ Section Log_rel.
       - intros v1 c1 cout1 Hleq1 Hstep1. 
         edestruct IHHctx as [v2 [c2 [cout2 [Hstep2 [HP Hcc2]]]]]; try eassumption.
         simpl exp_ctx_len.
-        replace (m + S (exp_ctx_len C)) with ((m + exp_ctx_len C) + 1) by omega.
+        replace (m + S (exp_ctx_len C)) with ((m + exp_ctx_len C) + 1) by lia.
         exists v2, (c2 <+> one ((Eproj_c y t N Γ C |[ e' ]|))). repeat eexists.
         econstructor 2; eauto. econstructor; eauto.
 
@@ -1245,18 +1245,18 @@ Section Log_rel.
         edestruct IHHctx as [v2' [c2 [cout2 [Hstep2 [Hub Hcc2]]]]]; try eassumption.
         simpl exp_ctx_len.
         replace (m + S (@Datatypes.length var ys + exp_ctx_len C))
-          with ((m + exp_ctx_len C) + (1 + @Datatypes.length var ys)) by omega.
+          with ((m + exp_ctx_len C) + (1 + @Datatypes.length var ys)) by lia.
         exists v2', (c2 <+> one (Econstr_c x t ys C |[ e' ]|)). repeat eexists. 
         econstructor 2; eauto. econstructor; eauto. 
         simpl. replace (m + S (exp_ctx_len C)) with ((m + exp_ctx_len C) + 1).
                 
         erewrite <- !(@to_nat_one _ fuel). unfold one. eapply H1 with (C := Econstr_c x t ys Hole_c); eauto.
         econstructor; eauto. econstructor; eauto. 
-        replace (m + S (@Datatypes.length var ys)) with (m + 1 + @Datatypes.length var ys) by omega. simpl; omega. 
+        replace (m + S (@Datatypes.length var ys)) with (m + 1 + @Datatypes.length var ys) by lia. simpl; lia. 
         eassumption. 
       - intros v1' c1 cout2 Hleq1 Hstep1.  
         simpl exp_ctx_len. 
-        replace (m + S (exp_ctx_len C)) with (m + exp_ctx_len C + 1) by omega. 
+        replace (m + S (exp_ctx_len C)) with (m + exp_ctx_len C + 1) by lia. 
         edestruct IHHctx as [v2' [c2 [cout2' [Hstep2 [Hub Hcc2]]]]];
           [ | | eassumption | ].
         + eassumption.
@@ -1296,31 +1296,31 @@ Section Log_rel.
     preord_exp P2 boundG k (C |[ e ]|, rho1) (e', rho2).
   Proof.
     intros H1 Hzero Hlen Hcc. 
-    destruct C; try (simpl in Hlen; omega); try (destruct C; simpl in Hlen; try omega).
+    destruct C; try (simpl in Hlen; lia); try (destruct C; simpl in Hlen; try lia).
     - intros v1 c1 cout1 Hleq1 Hstep1. inv Hstep1. 
       + simpl in *. eexists OOT, c1, <0>. split.
         econstructor 1. unfold one. erewrite one_eq. eassumption.
         split; eauto. eapply Hzero. eassumption.
       + inv H. repeat subst_exp. rewrite to_nat_add in *. 
-        edestruct Hcc as [v2' [c2 [cout2 [Hstep2 [Hub Hcc2]]]]]; [| | eassumption| ]; try omega. 
+        edestruct Hcc as [v2' [c2 [cout2 [Hstep2 [Hub Hcc2]]]]]; [| | eassumption| ]; try lia. 
         econstructor; eauto. now econstructor.  
 
         repeat eexists; eauto.
 
         
         eapply H1; eauto. econstructor; eauto. now econstructor.
-        eapply preord_res_monotonic. eassumption. omega.
+        eapply preord_res_monotonic. eassumption. lia.
     - intros v1 c1 cout1 Hleq1 Hstep1. inv Hstep1. 
       + simpl in *. exists OOT, c1, <0>. split.
         econstructor 1. unfold one. erewrite one_eq. eassumption.
         split; eauto. eapply Hzero. eassumption.
       + inv H. rewrite to_nat_add in *. 
-        edestruct Hcc as [v2' [c2 [cout2 [Hstep2 [Hub Hcc2]]]]]; [| | eassumption | ]; try omega.
+        edestruct Hcc as [v2' [c2 [cout2 [Hstep2 [Hub Hcc2]]]]]; [| | eassumption | ]; try lia.
         econstructor; eauto. now econstructor.
 
         repeat eexists; eauto. simpl in *. 
         eapply H1; eauto. econstructor; eauto. now econstructor.
-        eapply preord_res_monotonic. eassumption. omega.
+        eapply preord_res_monotonic. eassumption. lia.
         
     - intros v' c1 cout1 Hleq1 Hstep1. inv Hstep1.
       + simpl in *. exists OOT, c1, <0>. split.
@@ -1332,13 +1332,13 @@ Section Log_rel.
         econstructor 1. unfold one. erewrite one_eq. eassumption.
         split; eauto. eapply Hzero. eassumption.
       + inv H. repeat subst_exp. rewrite to_nat_add in *.
-        edestruct Hcc as [v2' [c2 [cout2 [Hstep2 [Hub Hcc2]]]]]; [| | eassumption | ]; try omega.
+        edestruct Hcc as [v2' [c2 [cout2 [Hstep2 [Hub Hcc2]]]]]; [| | eassumption | ]; try lia.
 
         econstructor; eauto. now econstructor.
 
         repeat eexists; eauto. simpl in *.
         eapply H1; eauto. econstructor; eauto. now econstructor.
-        eapply preord_res_monotonic. eassumption. omega.
+        eapply preord_res_monotonic. eassumption. lia.
   Qed.
 
     (** Context application lemma, left *)
@@ -1359,34 +1359,34 @@ Section Log_rel.
         + simpl in *. exists OOT.
         repeat subst_exp.
     
-        edestruct I HHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; [| eassumption | | | ]; try omega.
-          + intros. eapply H1; eauto. simpl; omega.
+        edestruct I HHctx as [v2 [c2 [Hstep2 [HP Hcc2]]]]; [| eassumption | | | ]; try lia.
+          + intros. eapply H1; eauto. simpl; lia.
           + eassumption.
           +  
              repeat eexists; eauto.
           simpl.
-          replace (m + S (size_cps.exp_ctx_len C)) with (m + size_cps.exp_ctx_len C + 1) by omega.
-          eapply H1; eauto. simpl; omega.
-          eapply preord_val_monotonic. eassumption. omega.
+          replace (m + S (size_cps.exp_ctx_len C)) with (m + size_cps.exp_ctx_len C + 1) by lia.
+          eapply H1; eauto. simpl; lia.
+          eapply preord_val_monotonic. eassumption. lia.
         - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
-          edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
-          intros. eapply H1; eauto. simpl; omega.
+          edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try lia.
+          intros. eapply H1; eauto. simpl; lia.
           repeat eexists; eauto.
           simpl.
           rewrite <- (plus_assoc c 1 _).
           replace (m + S (@Datatypes.length var ys + size_cps.exp_ctx_len C))
-            with ((m + (size_cps.exp_ctx_len C)) + (1 + @Datatypes.length var ys)) by omega.
-          eapply H1; eauto. simpl; omega. 
-          eapply preord_val_monotonic. eassumption. omega.
+            with ((m + (size_cps.exp_ctx_len C)) + (1 + @Datatypes.length var ys)) by lia.
+          eapply H1; eauto. simpl; lia. 
+          eapply preord_val_monotonic. eassumption. lia.
         - intros v1' c1 Hleq1 Hstep1. inv Hstep1. repeat subst_exp.
-          edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try omega.
-          intros. eapply H1; eauto. simpl; omega.
+          edestruct IHHctx as [v2' [c2 [Hstep2 [Hub Hcc2]]]]; [| eassumption | | eassumption | ]; try lia.
+          intros. eapply H1; eauto. simpl; lia.
           repeat eexists; eauto.
           simpl.
           replace (m + S (set_util.PS.cardinal (fundefs_fv B) + size_cps.exp_ctx_len C))
-            with ((m + (size_cps.exp_ctx_len C)) + (1 + set_util.PS.cardinal (fundefs_fv B))) by omega.
-          eapply H1; eauto. simpl; omega. 
-          eapply preord_val_monotonic. eassumption. omega.
+            with ((m + (size_cps.exp_ctx_len C)) + (1 + set_util.PS.cardinal (fundefs_fv B))) by lia.
+          eapply H1; eauto. simpl; lia. 
+          eapply preord_val_monotonic. eassumption. lia.
       Qed. *)
     
     
@@ -1476,10 +1476,10 @@ Section Log_rel.
           exists xs1. exists e1. exists rho2'. split; eauto.
           split; [ now eauto |]. intros Hleq Hpre'. 
           eapply preord_exp_post_monotonic. eassumption.
-          eapply Hyp. omega.
+          eapply Hyp. lia.
           eapply preord_env_P_set_lists_l; [| | eauto | eauto | eauto]. 
-          * apply IH'; eauto. intros. apply Hyp. omega. eauto.
-            eapply (preord_env_P_monotonic PG _ k); eauto. omega.
+          * apply IH'; eauto. intros. apply Hyp. lia. eauto.
+            eapply (preord_env_P_monotonic PG _ k); eauto. lia.
           * intros x Hin Hfr. simpl.
             apply find_def_correct in Hf'; eauto.
             specialize (occurs_free_in_fun _ _ _ _ _ Hf' x Hfr); intros H1.
@@ -1503,48 +1503,48 @@ Section Log_rel.
       (* Each case follows from the corresponding compat lemma *)
       - eapply preord_exp_constr_compat; eauto; intros.
         * eapply Forall2_same. intros x HIn. apply Henv. now constructor.
-        * eapply IHe. intros. eapply IH; eauto. omega.
+        * eapply IHe. intros. eapply IH; eauto. lia.
           eapply preord_env_P_extend.
           eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ].
-          omega.
+          lia.
           now (normalize_occurs_free; eauto with Ensembles_DB). 
           rewrite preord_val_eq. constructor; eauto.
       - eapply preord_exp_case_nil_compat. now eauto.
       - eapply preord_exp_case_cons_compat; eauto.
         now apply Forall2_refl.
         intros m Hlt. apply IHe; try eassumption.
-        intros. eapply IH; eauto. omega.
+        intros. eapply IH; eauto. lia.
         eapply preord_env_P_antimon. 
-        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        eapply preord_env_P_monotonic; [| eassumption ]. lia.
         normalize_occurs_free. sets.
         eapply IHe0; eauto.
         eapply preord_env_P_antimon. 
-        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        eapply preord_env_P_monotonic; [| eassumption ]. lia.
         normalize_occurs_free. sets.
       - eapply preord_exp_proj_compat; eauto.
         intros m v1 v2 Hlt Hval. apply IHe; try eassumption.
-        intros. eapply IH; eauto. omega.
+        intros. eapply IH; eauto. lia.
         eapply preord_env_P_extend; eauto.
         eapply preord_env_P_antimon.
-        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        eapply preord_env_P_monotonic; [| eassumption ]. lia.
         now (normalize_occurs_free; eauto with Ensembles_DB).
       - eapply preord_exp_letapp_compat; eauto.
         eapply Henv. constructor. now left.
         eapply Forall2_same. intros. apply Henv. constructor. now right.
         intros m v1 v2 Hlt Hval. 
         eapply IHe; try eassumption.
-        intros. eapply IH; eauto. omega.
+        intros. eapply IH; eauto. lia.
         eapply preord_env_P_extend; eauto.
         eapply preord_env_P_antimon.
-        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        eapply preord_env_P_monotonic; [| eassumption ]. lia.
         now (normalize_occurs_free; eauto with Ensembles_DB).
       - eapply preord_exp_fun_compat; eauto.
         eapply IHe; try eassumption. 
-        intros. eapply IH; eauto. omega. 
+        intros. eapply IH; eauto. lia. 
         eapply preord_env_P_antimon.
         eapply preord_env_P_def_funs_pre; eauto.
-        intros. eapply IH; eauto. omega. 
-        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        intros. eapply IH; eauto. lia. 
+        eapply preord_env_P_monotonic; [| eassumption ]. lia.
         now eapply occurs_free_Efun_Included.
       - eapply preord_exp_app_compat. now eauto. now eauto.
         intros x HP. apply Henv; eauto.
@@ -1588,7 +1588,7 @@ Section Log_rel.
         eapply preord_exp_refl; eauto. 
         eapply preord_env_P_set_lists_l; [| | eauto | eauto | eauto].
         apply IH'; eauto. 
-        eapply (preord_env_P_monotonic PG _ k); eauto. omega.
+        eapply (preord_env_P_monotonic PG _ k); eauto. lia.
         intros x Hin Hfr. 
         apply find_def_correct in Hf'.
         edestruct (occurs_free_in_fun _ _ _ _ _ Hf' x Hfr);
@@ -1634,7 +1634,7 @@ Section Log_rel.
       edestruct (set_lists_length (def_funs f0 f0 t t) (def_funs f0 f0 t t))
         as [rho2' Hset']; eauto.
       do 3 eexists; split; eauto. split; eauto. intros Hc.
-      exfalso. omega.
+      exfalso. lia.
     - split; eauto. constructor; eauto. rewrite preord_val_eq; eauto.
         destruct IHx0. eauto.
     - intros.
@@ -1701,7 +1701,7 @@ Section Log_rel.
         eapply Forall2_refl. clear; now firstorder. 
       + intros m Hlt. eapply preord_exp_refl; eauto.
         eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. 
-        omega. repeat normalize_occurs_free. now sets. 
+        lia. repeat normalize_occurs_free. now sets. 
       + eapply IHP1'; [| eassumption ].
         eapply preord_env_P_antimon. eassumption.
         repeat normalize_occurs_free. now sets.
@@ -1737,8 +1737,8 @@ Section Log_rel.
         eapply preord_exp_refl; try now eauto. 
         eapply preord_env_P_set_lists_l; [| | now eauto | now eauto | now eauto ].
         eapply IH'; eauto. 
-        intros. eapply Hpre; eauto. omega. 
-        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        intros. eapply Hpre; eauto. lia. 
+        eapply preord_env_P_monotonic; [| eassumption ]. lia.
         intros x H Hfv. 
         eapply find_def_correct in Hf'; eauto.
         eapply occurs_free_in_fun in Hfv; eauto.
@@ -1748,11 +1748,11 @@ Section Log_rel.
         intros Hleq Hall.
         eapply preord_exp_post_monotonic; [| eapply Hpre ]. 
         inv Hprops. eassumption.
-        omega.
+        lia.
         eapply preord_env_P_set_lists_l; [| | eauto | eauto | eauto ].
         eapply IH'; eauto.
-        intros. eapply Hpre; eauto. omega. 
-        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        intros. eapply Hpre; eauto. lia. 
+        eapply preord_env_P_monotonic; [| eassumption ]. lia.
         intros x H Hfv. 
         eapply find_def_correct in Hf'; eauto.
         eapply occurs_free_in_fun in Hfv; eauto.
@@ -1800,11 +1800,11 @@ Section Log_rel.
       + eapply Forall2_same. intros x Hin. eapply Hpre. constructor; eauto.
       + intros m vs1 vs2 Hlt Hall. eapply IHc; eauto.
 
-        * intros. eapply IH'; eauto. omega. 
-        * intros. eapply Hyp; eauto. omega.
+        * intros. eapply IH'; eauto. lia. 
+        * intros. eapply Hyp; eauto. lia.
         * eapply preord_env_P_extend.
 
-          eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]. lia.
           simpl. normalize_occurs_free.  sets.
 
           rewrite preord_val_eq. simpl; split; eauto.
@@ -1812,11 +1812,11 @@ Section Log_rel.
     - simpl. eapply preord_exp_proj_compat; eauto.
       + eapply Hpre. constructor; eauto.
       + intros m v1 v2 Hlt Hval. eapply IHc; eauto.
-        * intros. eapply IH'; eauto. omega.
-        * intros. eapply Hyp; eauto. omega.
+        * intros. eapply IH'; eauto. lia.
+        * intros. eapply Hyp; eauto. lia.
         * eapply preord_env_P_extend; [| assumption ].
           eapply preord_env_P_antimon; eauto.
-          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
           simpl. normalize_occurs_free. sets.
     - simpl. eapply preord_exp_prim_compat; eauto.
       + eapply Forall2_same. intros x Hin. eapply Hpre. constructor; eauto.
@@ -1826,25 +1826,25 @@ Section Log_rel.
         now right.
       + intros m vs1 vs2 Hlt Hall.
         eapply IHc; eauto. intros.
-        * eapply IH'. omega. eassumption. eassumption.
-        * intros; eapply Hyp; eauto; omega.
+        * eapply IH'. lia. eassumption. eassumption.
+        * intros; eapply Hyp; eauto; lia.
         * eapply preord_env_P_extend; [| assumption ].
           eapply preord_env_P_antimon.
-          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
           simpl. normalize_occurs_free. now eauto with Ensembles_DB.          
     - simpl. eapply preord_exp_case_compat; eauto. intros i Hlt. 
-      eapply IHc; auto. intros. eapply IH'; eauto. omega. 
-      intros. eapply Hyp; eauto. omega. 
+      eapply IHc; auto. intros. eapply IH'; eauto. lia. 
+      intros. eapply Hyp; eauto. lia. 
       eapply preord_env_P_antimon; eauto.
-      eapply preord_env_P_monotonic; [| eassumption ]. omega.
+      eapply preord_env_P_monotonic; [| eassumption ]. lia.
       eapply occurs_free_Ecase_Included; eauto.
       eapply in_or_app. right. left; eauto.
     - simpl. eapply preord_exp_fun_compat; eauto.
-      eapply IHc; auto. intros. eapply IH'; eauto. omega. 
-      intros. eapply Hyp; eauto. omega. 
+      eapply IHc; auto. intros. eapply IH'; eauto. lia. 
+      intros. eapply Hyp; eauto. lia. 
       eapply preord_env_P_def_funs_cor.
       eapply preord_env_P_antimon.
-      eapply preord_env_P_monotonic; [| eassumption ]. omega.
+      eapply preord_env_P_monotonic; [| eassumption ]. lia.
       intros x' H'. inv H'.
       + inv H. simpl. constructor; eauto.
       + simpl. eapply Free_Efun2; eauto.
@@ -1853,11 +1853,11 @@ Section Log_rel.
        eapply preord_exp_refl; eauto.      
        eapply preord_env_P_antimon.
        eapply preord_env_P_def_funs_compat_pre.
-      * intros. eapply IH'. omega.
-        intros. eapply Hyp; eauto. omega.
+      * intros. eapply IH'. lia.
+        intros. eapply Hyp; eauto. lia.
         eassumption.
       * eapply preord_env_P_antimon.
-        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        eapply preord_env_P_monotonic; [| eassumption ]. lia.
         simpl. rewrite occurs_free_Efun. reflexivity.
       * rewrite <- Union_Included_Union_Setminus. now sets. tci. sets. 
   Qed.
@@ -1963,18 +1963,18 @@ Section Log_rel.
     Proof.
       intros Htrans rho1 rho2 rho3 e1 e2 e3 H1 H2 v1 c1 cout1 Hleq1 Hstep1.
       edestruct H1 as [v2 [c2 [cout2 [Hstep2 [Hpost2 Hpre2]]]]]; eauto. 
-      edestruct (H2 (to_nat c2)) as [v3 [c3 [cout3 [Hstep3 [Hpost3 Hpre3]]]]]; [| eauto |]. omega.
+      edestruct (H2 (to_nat c2)) as [v3 [c3 [cout3 [Hstep3 [Hpost3 Hpre3]]]]]; [| eauto |]. lia.
       exists v3, c3, cout3. split; eauto. 
       split.
       
       eexists. split. eassumption. eassumption. 
       eapply preord_res_trans_pre; eauto.
-      {intros. eapply Htrans; eauto. omega. }
+      {intros. eapply Htrans; eauto. lia. }
       intros m.
-      edestruct (H2 (m + to_nat c2)) as [v3' [c3' [cout3' [Hstep3' [Hpost3' Hpre3']]]]]; [| eauto |]. omega.
+      edestruct (H2 (m + to_nat c2)) as [v3' [c3' [cout3' [Hstep3' [Hpost3' Hpre3']]]]]; [| eauto |]. lia.
       destruct v1; destruct v2; destruct v3; destruct v3'; try contradiction; eauto. 
       eapply bstep_fuel_deterministic in Hstep3; [| eapply Hstep3' ]. inv Hstep3. 
-      eapply preord_val_monotonic; eauto. omega.
+      eapply preord_val_monotonic; eauto. lia.
     Qed.
 
     Lemma preord_val_trans (k : nat) v1 v2 v3 :
@@ -2014,7 +2014,7 @@ Section Log_rel.
         eapply preord_exp_post_monotonic; [| eapply preord_exp_trans_pre ].
         eassumption. 
         
-        intros. eapply H; eauto. omega.
+        intros. eapply H; eauto. lia.
         eapply preord_exp_post_monotonic; [| eapply Hpre2; eauto ].
         intros c1 c2 HG.
         destruct c1 as [[e rho] c1]. destruct c2 as [[e' rho'] c2].
@@ -2024,7 +2024,7 @@ Section Log_rel.
           as [xs3' [e3' [rho3' [Hf3' [Hs3' Hpre3']]]]]; eauto.
         rewrite Hf3 in Hf3'. inv Hf3'. rewrite <- Hs3 in Hs3'. inv Hs3'.
         eapply preord_exp_post_monotonic; [| eapply Hpre3'; eauto ].
-        intros c1 c2 HG. eapply Hp2; now eauto. omega. 
+        intros c1 c2 HG. eapply Hp2; now eauto. lia. 
         eapply Forall2_refl. eapply preord_val_refl; eauto.
       - intros v1 v2 H1 H2; specialize (H2 k); rewrite !preord_val_eq in *.
         destruct v1; destruct v2; 
@@ -2093,12 +2093,12 @@ Section Log_rel.
         eapply preord_env_P_set_lists_l with (P1 := occurs_free e1 \\ FromList xs1); try eassumption; try now eauto.
         eapply preord_env_P_antimon with (P2 := occurs_free_fundefs B' :|: name_in_fundefs B'). 
         eapply IH'. eassumption. rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_r.
-        eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega. simpl.
+        eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. lia. simpl.
         
         eapply Included_Setminus. now sets. eapply Included_trans; [| eassumption ]. sets. reflexivity.
         now sets. eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint.
 
-        intros. eapply Hyp1. omega. eassumption.
+        intros. eapply Hyp1. lia. eassumption.
 
         eapply Setminus_Included_Included_Union. eapply Included_trans. eapply occurs_free_in_fun.
         eapply find_def_correct. eassumption. now sets.
@@ -2374,7 +2374,7 @@ Section Log_rel.
       with (k := j + c) (rho := def_funs B2 B2 rho1' rho1') as [v2 [c2 [Hst2 [Hp2 Hv2]]]]; (try now eapply H5); eauto.
     - intros. eapply HGPost. now eapply H0.
     - admit.
-    - omega.
+    - lia.
     - do 2 eexists. split; eauto. split; eauto. simpl in Hp2. admit. eapply Hp2. 
     - apply preord_env_P_antimon with
           (P2 := Union var (FromList xs1)
@@ -2414,13 +2414,13 @@ Section Log_rel.
         eapply preord_env_P_set_lists_not_in_P_l; eauto with Ensembles_DB.
         eapply preord_env_P_extend. rewrite Setminus_Same_set_Empty_set.
         eapply preord_env_Empty_set. 
-        eapply H; eauto. now constructor; eauto. intros. eapply Hyp; eauto. omega.
+        eapply H; eauto. now constructor; eauto. intros. eapply Hyp; eauto. lia.
       + inv Hun. eapply preord_env_P_set_lists_not_in_P_r; eauto.
         * eapply preord_env_P_set_not_in_P_r; eauto.
           eapply preord_env_P_def_funs_not_in_P_l; eauto with Ensembles_DB.
           eapply preord_env_P_set_lists_not_in_P_l; eauto with Ensembles_DB.
           eapply preord_env_P_set_not_in_P_l; eauto with Ensembles_DB.
-          eapply preord_env_P_antimon. eapply Hyp. omega.
+          eapply preord_env_P_antimon. eapply Hyp. lia.
           eapply preord_env_Empty_set. eauto with Ensembles_DB.
           eapply Disjoint_Singleton_r. intros Hc. apply H7.
           apply name_in_fundefs_bound_var_fundefs; eauto.
@@ -2476,7 +2476,7 @@ Section Log_rel.
           rewrite def_funs_append. eapply H; eauto. eapply preord_env_Empty_set.
           now eauto with Ensembles_DB.
           eapply preord_val_def_funs_append_pre; eauto. intros; eauto.
-          eapply H; eauto. omega.
+          eapply H; eauto. lia.
           destruct (M.elt_eq v f); try congruence. 
           apply find_def_correct in Hf.
           intros x Hin Hfr. specialize (occurs_free_in_fun _ _ _ _ _ Hf x Hfr).

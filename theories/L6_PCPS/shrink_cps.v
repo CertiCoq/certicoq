@@ -1,19 +1,14 @@
-Require Import Coq.Relations.Relations.
-Require Import Coq.Relations.Relations.
-Require Import Coq.Setoids.Setoid.
-Require Import Coq.Classes.Morphisms.
+From Coq Require Import Arith.Arith PArith.BinPos micromega.Lia Program.Program micromega.Lia Sets.Ensembles Sorting.Permutation
+     Relations.Relations Setoids.Setoid Classes.Morphisms funind.Recdef.
+
 Import RelationClasses.
 
 Require compcert.lib.Maps.
 
-
 Require Import ExtLib.Data.Bool.
 
-
-Require Coq.funind.Recdef.
 Import Nnat.
-Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz Coq.Sets.Ensembles.
-Require Import Coq.Sorting.Permutation.
+Require Import ExtLib.Data.String ExtLib.Data.List.
 Require Import Libraries.maps_util.
 Require Import L6.cps.
 Require Import L6.ctx L6.rename L6.state.
@@ -108,7 +103,7 @@ Section MEASURECONTRACT.
       simpl in *;
       try ((destruct (inline_letapp e x) as [ [C'' z'] | ] eqn:Heq''; try congruence); inv Heq; simpl; eauto using Peano.le_n_S).
     congruence.
-    eapply Peano.le_n_S. specialize (IHe C'' (eq_refl)). omega.
+    eapply Peano.le_n_S. specialize (IHe C'' (eq_refl)). lia.
     inv Heq. simpl. reflexivity.
     inv Heq. simpl. eauto.
   Defined.
@@ -138,7 +133,7 @@ Section MEASURECONTRACT.
       sub_inl_size sub inl =
       list_inl_size (M.elements sub) inl.
   Proof.
-    unfold sub_inl_size, list_inl_size. intros. apply fold_symmetric; intros; omega.
+    unfold sub_inl_size, list_inl_size. intros. apply fold_symmetric; intros; lia.
   Qed.
 
 
@@ -162,8 +157,8 @@ Section MEASURECONTRACT.
     rewrite IHf1.
     assert (Hf2 := min_funs_size f2).
     assert (Hf1 := min_funs_size f1).
-    omega.
-    omega.
+    lia.
+    lia.
   Defined.
 
   Definition term_sub_inl_size (esi: (exp * ctx_map * b_map)): nat :=
@@ -190,7 +185,7 @@ Section MEASURECONTRACT.
   Proof.
     induction l; intros.
     reflexivity.
-    simpl. rewrite IHl. omega.
+    simpl. rewrite IHl. lia.
   Qed.
 
   Theorem svalue_inl_not: forall a x im,
@@ -241,7 +236,7 @@ Section MEASURECONTRACT.
     unfold list_inl_size in H3. rewrite H3.
     unfold svalue_inl_size.
     simpl. rewrite H0.
-    unfold get_b. rewrite M.gss. omega.
+    unfold get_b. rewrite M.gss. lia.
     intro. apply H2.
     apply Coqlib.in_app. auto.
   Qed.
@@ -267,7 +262,7 @@ Section MEASURECONTRACT.
       rewrite fold_right_plus_init.
       rewrite fold_right_plus_init with
           (n := (svalue_inl_size (x, s) inl + fold_right Init.Nat.add 0 (map (fun v : positive * svalue => svalue_inl_size v inl) x1))).
-      omega.
+      lia.
     - unfold sub_inl_size.
       erewrite M.elements_extensional.
       apply Nat.eq_le_incl.
@@ -294,7 +289,7 @@ Section MEASURECONTRACT.
     rewrite fold_right_plus_init.
     rewrite fold_right_plus_init with (n := (fold_right Init.Nat.add 0 (map (fun v0 : positive * svalue => svalue_inl_size v0 im) x1))).
     assert (svalue_inl_size (x, v) im <= svalue_size v) by apply svalue_inl_le.
-    omega.
+    lia.
   Qed.
 
   Theorem set_some_size:
@@ -315,7 +310,7 @@ Section MEASURECONTRACT.
     rewrite fold_right_plus_init.
     rewrite fold_right_plus_init
       with (n := (svalue_inl_size (x, v') im + fold_right Init.Nat.add 0 (map (fun v0 : positive * svalue => svalue_inl_size v0 im) x1))).
-    omega.
+    lia.
   Qed.
 
 
@@ -326,9 +321,9 @@ Section MEASURECONTRACT.
     assert (svalue_inl_size (x, v) im <= svalue_size v) by apply svalue_inl_le.
     destruct (M.get x sub) eqn:gxs.
     - apply set_some_size with (v := v) (im := im) in gxs.
-      omega.
+      lia.
     - apply set_none_size with (v := v) (im := im) in gxs.
-      omega.
+      lia.
   Qed.
 
   Theorem constr_sub_size:
@@ -337,13 +332,13 @@ Section MEASURECONTRACT.
   Proof.
     intros. unfold term_sub_inl_size. simpl.
     assert ((sub_inl_size (M.set v (SVconstr t lv) sub) im <= svalue_size (SVconstr t lv)  + sub_inl_size sub im))%nat.
-    apply sub_set_size. simpl in H. omega.
+    apply sub_set_size. simpl in H. lia.
   Defined.
 
   Theorem subfds_fds_size: forall fds' fds, subfds_fds fds fds' -> (funs_size fds < funs_size fds')%nat.
   Proof.
     induction fds'; intros.
-    - inversion H; subst. apply IHfds' in H2. simpl. omega. simpl. omega.
+    - inversion H; subst. apply IHfds' in H2. simpl. lia. simpl. lia.
     - inversion H.
   Defined.
 
@@ -357,10 +352,10 @@ Section MEASURECONTRACT.
     - destruct a.
       inv H.
       + inv H0.
-        simpl. omega.
+        simpl. lia.
       + apply IHcl in H0.
         simpl. simpl in H0.
-        omega.
+        lia.
   Defined.
 
   Theorem dsubterm_fds_size:
@@ -368,8 +363,8 @@ Section MEASURECONTRACT.
       dsubterm_fds_e e fds -> (term_size e < funs_size fds)%nat.
   Proof.
     induction fds; intros.
-    inv H. simpl. omega.
-    apply IHfds in H2. simpl; omega.
+    inv H. simpl. lia.
+    apply IHfds in H2. simpl; lia.
     inv H.
   Defined.
 
@@ -379,8 +374,8 @@ Section MEASURECONTRACT.
   Proof.
     intros. inv H; auto.
     -  eapply case_size; eauto.
-    - apply dsubterm_fds_size in H0. simpl. omega.
-    - simpl. omega.
+    - apply dsubterm_fds_size in H0. simpl. lia.
+    - simpl. lia.
   Defined.
 
 
@@ -398,8 +393,8 @@ Section MEASURECONTRACT.
       subterm_fds_e e fds -> (term_size e < funs_size fds)%nat.
   Proof.
     intros. induction H.
-    - apply subterm_size in H.  simpl. omega.
-    - simpl. omega.
+    - apply subterm_size in H.  simpl. lia.
+    - simpl. lia.
   Defined.
 
   
@@ -407,7 +402,7 @@ Section MEASURECONTRACT.
     forall e e', subterm_or_eq e e' -> (term_size e <= term_size e')%nat.
   Proof.
     intros. induction H.
-    apply dsubterm_size in H; omega.
+    apply dsubterm_size in H; lia.
     reflexivity.
     etransitivity; eauto.
   Defined.
@@ -417,14 +412,14 @@ Section MEASURECONTRACT.
     forall fds fds', subfds_or_eq fds fds' -> (funs_size fds <= funs_size fds')%nat.
   Proof.
     destruct fds; intros; inversion H; try (subst; reflexivity).
-    - apply subfds_fds_size in H0. omega.
-    - inversion H0; subst. simpl; omega.  simpl; omega.
+    - apply subfds_fds_size in H0. lia.
+    - inversion H0; subst. simpl; lia.  simpl; lia.
   Defined.
 
   Corollary subfds_e_size:
     forall fds e, subfds_e fds e -> (funs_size fds < term_size e)%nat.
   Proof.
-    intros. inversion H. destructAll. apply subfds_or_eq_size in H1. apply subterm_or_eq_size in H0. simpl in H0. omega.
+    intros. inversion H. destructAll. apply subfds_or_eq_size in H1. apply subterm_or_eq_size in H0. simpl in H0. lia.
   Defined.
 
 
@@ -460,7 +455,7 @@ Section MEASURECONTRACT.
     intros. unfold svalue_inl_size. destruct v; simpl.
     destruct (get_b p inl) eqn:gbp.
     apply  H in gbp. rewrite gbp; auto.
-    destruct (get_b p inl'); omega.
+    destruct (get_b p inl'); lia.
   Qed.
 
 
@@ -474,7 +469,7 @@ Section MEASURECONTRACT.
     reflexivity.
     unfold list_inl_size in *. simpl.
     assert ( svalue_inl_size a inl' <=  svalue_inl_size a inl) by (apply svalue_inl_b_map_le; auto).
-    omega.
+    lia.
   Qed.
 
   Inductive b_map_le_i : b_map -> b_map -> Prop :=
@@ -640,7 +635,7 @@ Theorem term_size_rename_all_ns sig :
   (forall e, term_size (rename_all_ns sig e) = term_size e) /\
   (forall B, funs_size (rename_all_fun_ns sig B) = funs_size B).
 Proof.
-  exp_defs_induction IHe IHl IHb; simpl; try omega.    
+  exp_defs_induction IHe IHl IHb; simpl; try lia.    
   rewrite IHe. f_equal. simpl in IHl. inv IHl. rewrite H0. reflexivity.
 Qed.
   
@@ -950,8 +945,8 @@ Section CONTRACT.
        | (1%nat, Some (SVfun t' xs e_body)) =>
          (fun Heq1 =>
             (* need t = t' and |xs| = |ys| (also that f' is not already inlined which is needed for the termination proof) *)
-            match ((Pos.eqb t' t) && (Init.Nat.eqb (length ys) (length xs)) && (negb (get_b f' im)))%bool as k
-                  return (k = ((t' =? t)%positive && (length ys =? length xs) && negb (get_b f' im))%bool -> contractT im)
+            match ((BinPos.Pos.eqb t' t) && (Init.Nat.eqb (length ys) (length xs)) && (negb (get_b f' im)))%bool as k
+                  return (k = ((BinPos.Pos.eqb t' t)%positive && (length ys =? length xs) && negb (get_b f' im))%bool -> contractT im)
             with
             | true =>
               fun Heq2 =>                         
@@ -1048,7 +1043,7 @@ Section CONTRACT.
        | 1%nat => (match (M.get f' sub) with
                    | Some (SVfun t' xs m)  =>
                      (* need t = t' and |xs| = |ys| (also that f' is not already inlined which is needed for the termination proof) *)
-                     (match (andb (Pos.eqb t' t) (andb (Init.Nat.eqb (length ys) (length xs)) (negb (get_b f' im))))
+                     (match (andb (BinPos.Pos.eqb t' t) (andb (Init.Nat.eqb (length ys) (length xs)) (negb (get_b f' im))))
                       with
                       | true =>
                         let im' := M.set f' true im in
@@ -1121,7 +1116,7 @@ Section CONTRACT.
     eapply le_lt_trans. eapply plus_le_compat_r. eapply term_size_inline_letapp.
     now eauto. rewrite (proj1 (term_size_rename_all_ns _)).    
     rewrite plus_comm, plus_assoc.
-    rewrite <- H4. omega.
+    rewrite <- H4. lia.
     symmetry in Heq2.
     apply Bool.andb_true_iff in Heq2.
     destructAll.
@@ -1203,8 +1198,8 @@ Section CONTRACT.
        | (1%nat, Some (SVfun t' xs e_body)) =>
          (fun Heq1 =>
             (* need t = t' and |xs| = |ys| (also that f' is not already inlined which is needed for the termination proof) *)
-            match ((Pos.eqb t' t) && (Init.Nat.eqb (length ys) (length xs)) && (negb (get_b f' im)))%bool as k
-                  return (k = ((t' =? t)%positive && (length ys =? length xs) && negb (get_b f' im))%bool -> contractT im)
+            match ((BinPos.Pos.eqb t' t) && (Init.Nat.eqb (length ys) (length xs)) && (negb (get_b f' im)))%bool as k
+                  return (k = ((BinPos.Pos.eqb t' t)%positive && (length ys =? length xs) && negb (get_b f' im))%bool -> contractT im)
             with
             | true =>
               fun Heq2 =>                         
@@ -1319,11 +1314,11 @@ Section CONTRACT.
             | Some (SVfun t' xs m)  =>
               fun Heqs =>
                 (* need t = t' and |xs| = |ys| (also that f' is not already inlined which is needed for the termination proof) *)
-                (match (andb (Pos.eqb t' t) (andb (Init.Nat.eqb (length ys) (length xs)) (negb (get_b f' im)))) as
+                (match (andb (BinPos.Pos.eqb t' t) (andb (Init.Nat.eqb (length ys) (length xs)) (negb (get_b f' im)))) as
                        anonymous'
                        return
                        (anonymous' =
-                        ((t' =? t)%positive &&
+                        ((BinPos.Pos.eqb t' t)%positive &&
                          ((length ys =? length xs) && negb (get_b f' im)))%bool -> contractT im)
                  with
                  | true =>
@@ -1356,7 +1351,7 @@ Section CONTRACT.
       contract_def sig count e sub im.
   Proof.
     intros.
-    unfold contract. unfold contract_func. 
+    unfold contract. unfold contract_func.
     match goal with
     | |- context C [@Fix_sub ?A ?R ?wf ?P ?f ?a] =>
       set (body := hide_body (a:=f)) in |-;
@@ -1375,8 +1370,9 @@ Section CONTRACT.
     { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
     { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
   Qed.
-
+  
 End CONTRACT.
+
 
 (* Perform 1 pass of contract of e *)
 Definition shrink_top (e:exp) : exp * nat :=

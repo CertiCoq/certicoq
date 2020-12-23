@@ -5,7 +5,7 @@
 From CertiCoq Require Import L6.Ensembles_util L6.tactics.
 From compcert.lib Require Import Coqlib.
 From Coq Require Import Numbers.BinNums NArith.BinNat PArith.BinPos Relations.Relations
-     Classes.Morphisms Lists.List Sets.Ensembles Program.Basics.
+     Classes.Morphisms Lists.List Sets.Ensembles Program.Basics micromega.Lia.
 
 Import ListNotations.
 
@@ -1283,9 +1283,9 @@ Definition h (x : nat) := (x/(1 + M))%nat.
 Lemma left_inverse_f : left_inverse h f.
 Proof.
   unfold left_inverse, f_eq, h, f, compose. intros x. 
-  replace x with (1 * x)%nat at 1 by omega.
+  replace x with (1 * x)%nat at 1 by lia.
   rewrite <- Nat.mul_add_distr_r.
   rewrite Nat.mul_comm.                       
-  rewrite Nat.div_mul; try omega.
+  rewrite Nat.div_mul; try lia.
   reflexivity.
 Qed.

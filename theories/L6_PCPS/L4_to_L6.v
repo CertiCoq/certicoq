@@ -627,18 +627,19 @@ Fixpoint add_names lnames vars tgm : conv_env :=
                     tgm
                     S3
                     (cps.Efun (Fcons k1 kon_tag (x1::nil) e2' Fnil) e1')
-  (* | e_Match : *)
-  (*     forall S1 S2 S3 e1 e1' bs vn k x1 k1 n, *)
-  (*       x1 \in S1 -> *)
-  (*       k1 \in (S1 \\ [set x1]) -> *)
-  (*       cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 vn k tgm S2 e1' -> *)
-  (*       cps_cvt_branches_rel S2 bs vn k x1 tgm S3 bs' -> *)
-  (*       cps_cvt_rel S1 *)
-  (*                   (Match_e e1 n bs) *)
-  (*                   vn *)
-  (*                   k *)
-  (*                   tgm *)
-  (*                   (Efun (Fcons k1 kon_tag [x1] (Ecase x1 bs') Fnil) e1') *)
+  | e_Match :
+      forall S1 S2 S3 e1 e1' bs bs' vn k x1 k1 n tgm,
+        x1 \in S1 ->
+        k1 \in (S1 \\ [set x1]) ->
+        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 vn k tgm S2 e1' ->
+        cps_cvt_rel_branches S2 bs vn k x1 tgm S3 bs' ->
+        cps_cvt_rel S1
+                    (Match_e e1 n bs)
+                    vn
+                    k
+                    tgm
+                    S3
+                    (Efun (Fcons k1 kon_tag [x1] (Ecase x1 bs') Fnil) e1')
   | e_Fix :
       forall S1 S2 fnlst i i' nlst vn k fdefs tgm,
         FromList nlst \subset S1 ->
@@ -702,7 +703,39 @@ Fixpoint add_names lnames vars tgm : conv_env :=
           nlst
           tgm
           S3
-          (Fcons cvar func_tag (k1::x1::nil) e1' fdefs').                       
+          (Fcons cvar func_tag (k1::x1::nil) e1' fdefs')
+  with cps_cvt_rel_branches :
+         Ensemble var ->
+         expression.branches_e ->
+         list var ->
+         var (* continuation variable *) ->
+         var (* binding for scrutinee *) ->
+         constr_env ->
+         Ensemble var ->
+         list (ctor_tag * exp) ->
+         Prop :=
+  | e_Brnil :
+      forall S vn k r tgm,
+        cps_cvt_rel_branches S brnil_e vn k r tgm S []
+  | e_Brcons:
+      forall S1 S2 S3 vn k r e ce bs' cbs' vars lnames n m ctx_p tg dc tgm,
+        tg = dcon_to_tag dc tgm ->
+        cps_cvt_rel_branches S1 bs' vn k r tgm S2 cbs' ->
+        FromList vars \subset S2 ->
+        NoDup vars ->
+        Datatypes.length vars = Datatypes.length lnames ->
+        (ctx_p, m) =
+        ctx_bind_proj tg r (Datatypes.length vars) (hd 1%positive vars) 0 ->
+        cps_cvt_rel (S2 \\ (FromList vars)) e ((List.rev vars) ++ vn) k tgm S3 ce ->
+        cps_cvt_rel_branches
+          S1
+          (brcons_e dc (n, lnames) e bs')
+          vn
+          k
+          r
+          tgm
+          S3
+          ((tg, app_ctx_f ctx_p ce)::cbs').
 
 
   Definition convert_top (ee:ienv * expression.exp) :

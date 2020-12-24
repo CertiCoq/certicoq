@@ -1783,14 +1783,64 @@ Section Post.
                     (M.set x v' (M.set k vk (M.empty cps.val))))
                    (e', (M.set k vk rho)).
 
-    (* Definition cps_cvt_correct_exps i := *)
-    (*   forall es vs rho, *)
-    (*     Forall2 (fun e v => eval_env rho e v) (exps_to_list es) vs' -> *)
-    (*     cps_env_rel vnames vs rho -> *)
-    (*     Disjoint _ (FromList vnames) (FromList vx) -> *)
-    (*     Disjoint _ (k |: (FromList vnames :|: FromList vx)) S -> *)
-    (*     cps_cvt_rel_exps S es vnames k vx cnstrs S' fdefs -> *)
-        
+    Definition cps_cvt_correct_exps i :=
+      forall es es' vs rho vnames k x vk es'' vs' S S',
+        Forall2 (fun e v => eval_env vs e v) (exps_to_list es) es' ->
+        cps_env_rel vnames vs rho ->
+        Disjoint _ (k |: (FromList vnames)) S ->
+        Forall2 (fun e e' => cps_cvt_rel S e vnames k cnstrs S' e')
+                (exps_to_list es) es'' ->
+        Forall2 cps_val_rel es' vs' ->
+        Forall2 (fun e' v' =>
+                   preord_exp cenv P1 PG i
+                       ((Eapp k kon_tag (x::nil)),
+                        (M.set x v' (M.set k vk (M.empty cps.val))))
+                       (e', (M.set k vk rho)))
+                es'' vs'.
+
+    Definition cps_cvt_correct_efnlst i :=
+      forall efns efns' vs rho vnames k x vk efns'' vs' S S',
+        Forall2 (fun p v => let (na, e) := p : (name * expression.exp) in
+                             eval_env vs e v) (efnlst_as_list efns) efns' ->
+        cps_env_rel vnames vs rho ->
+        Disjoint _ (k |: (FromList vnames)) S ->
+        Forall2 (fun p e' => let (na, e) := p : (name * expression.exp) in
+                   cps_cvt_rel S e vnames k cnstrs S' e')
+                (efnlst_as_list efns) efns'' ->
+        Forall2 cps_val_rel efns' vs' ->
+        Forall2 (fun e' v' =>
+                   preord_exp cenv P1 PG i
+                       ((Eapp k kon_tag (x::nil)),
+                        (M.set x v' (M.set k vk (M.empty cps.val))))
+                       (e', (M.set k vk rho)))
+                efns'' vs'.
+
+    Definition cps_cvt_correct_branches i :=
+      forall bs bs' vs rho vnames k x vk bs'' vs' S S',
+        Forall2 (fun p v => let '(dc, (n, l), e) := p in
+                            eval_env vs e v) (branches_as_list bs) bs' ->
+        cps_env_rel vnames vs rho ->
+        Disjoint _ (k |: (FromList vnames)) S ->
+        Forall2 (fun p e' => let '(dc, (n, l), e) := p in
+                            cps_cvt_rel S e vnames k cnstrs S' e')
+                (branches_as_list bs) bs'' ->
+        Forall2 cps_val_rel bs' vs' ->
+        Forall2 (fun e' v' =>
+                   preord_exp cenv P1 PG i
+                       ((Eapp k kon_tag (x::nil)),
+                        (M.set x v' (M.set k vk (M.empty cps.val))))
+                       (e', (M.set k vk rho)))
+                bs'' vs'.
+
+    Lemma cps_cvt_correct:
+      forall k,
+        (cps_cvt_correct_exp k) /\
+        (cps_cvt_correct_exps k) /\
+        (cps_cvt_correct_efnlst k) /\
+        (cps_cvt_correct_branches k).
+    Proof.
+      intros k. induction k as [k IHk] using lt_wf_rec1. eapply my_exp_ind.
+      - 
 
     Definition cps_cvt_correct_e c :=
       forall e e' rho rho' rho_m v v' x k vk vars

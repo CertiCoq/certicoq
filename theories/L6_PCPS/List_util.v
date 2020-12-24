@@ -4,7 +4,7 @@
 
 
 From Coq Require Import Lists.List Relations.Relations Classes.RelationClasses
-         omega.Omega Numbers.BinNums Structures.OrdersEx Sets.Ensembles
+         micromega.Lia Numbers.BinNums Structures.OrdersEx Sets.Ensembles
          Lists.SetoidList ZArith Arith Sorting.Permutation SetoidPermutation
          FunInd.
 
@@ -77,8 +77,8 @@ Lemma Forall2_asym_length {A} (R : A -> A -> Prop) (l1 l2 : list A) :
   Forall2_asym R l1 l2 -> length l1 <= length l2. 
 Proof.
   revert l2. induction l1 as [| x xs IHxs ]; intros l2 H.
-  - inv H; simpl. omega.
-  - inv H. simpl. eapply IHxs in H4. omega.
+  - inv H; simpl. lia.
+  - inv H. simpl. eapply IHxs in H4. lia.
 Qed.
 
 Lemma Forall2_monotonic {A B} (R R' : A -> B -> Prop) (l1 : list A) (l2 : list B):
@@ -206,8 +206,8 @@ Lemma Forall2_asym_trivial {A} (R : A -> A -> Prop) (l1 l2 : list A) :
 Proof.
   intros H.
   revert l2; induction l1 as [| x l IHl]; intros l2 Hlen; eauto.
-  destruct l2; simpl in *; try omega. constructor; eauto.
-  eapply IHl; omega.
+  destruct l2; simpl in *; try lia. constructor; eauto.
+  eapply IHl; lia.
 Qed.
 
 Lemma Forall2_same {A} (R : A -> A -> Prop) l:
@@ -449,7 +449,7 @@ Proof.
     + destruct IHl as [n Hnth].
       eassumption. 
       exists (n+1)%N. simpl. destruct (n + 1)%N eqn:Heq; eauto. 
-      zify. omega. 
+      zify. lia. 
       rewrite <- Heq. rewrite N_as_OT.add_sub.
       eassumption.
 Qed.
@@ -470,17 +470,17 @@ Lemma nthN_app {A} (l1 l2 : list A) N :
   (nthN (l1 ++ l2) N = nthN l2 (N - N.of_nat (length l1))%N /\ (N.of_nat (length l1) <= N)%N).
 Proof. 
   revert N; induction l1; intros N.
-  - right. rewrite app_nil_l, N.sub_0_r. split; eauto. simpl. zify; omega.
+  - right. rewrite app_nil_l, N.sub_0_r. split; eauto. simpl. zify; lia.
   - destruct N; [now eauto |].
     destruct (IHl1 ((N.pos p)-1)%N) as [H1 | [H2 H3]].
     now eauto.
     replace (N.of_nat (length (a :: l1))) with (1 + N.of_nat (length l1))%N.
     replace (N.pos p - (1 + N.of_nat (length l1)))%N with
     (N.pos p - 1 - N.of_nat (length l1))%N.
-    right. split. now eauto. zify. omega. 
-    zify; omega. 
+    right. split. now eauto. zify. lia. 
+    zify; lia. 
     simpl (length _). rewrite Nnat.Nat2N.inj_succ.
-    zify. omega. 
+    zify. lia. 
 Qed.
 
 Lemma nthN_app_geq {A} (l1 l2 : list A) N :
@@ -491,11 +491,11 @@ Proof.
   - simpl. rewrite N.sub_0_r. reflexivity.
   - simpl length in *. 
     destruct N. 
-    zify. omega.
+    zify. lia.
     rewrite Nnat.Nat2N.inj_succ.
     rewrite <- N.add_1_l, N_as_DT.sub_add_distr. 
     rewrite <- IHl1.
-    reflexivity. zify. omega. 
+    reflexivity. zify. lia. 
 Qed.
 
 Lemma nthN_is_Some_app {A} (l1 l2 : list A) N x :
@@ -518,12 +518,12 @@ Proof.
   induction l1 as [| x xs IHxs ]; intros l2 n H Hnth.
   - inv Hnth.
   - destruct n as [| n]; destruct l2; try discriminate.
-    + simpl in H. omega.
+    + simpl in H. lia.
     + simpl in Hnth. inv Hnth.
       eexists. split; simpl; eauto.
-    + simpl in H. omega.
+    + simpl in H. lia.
     + edestruct IHxs with (l2 := l2) as [v2 Hnth2]; eauto.
-      simpl in H. omega.
+      simpl in H. lia.
 Qed.
 
 Lemma nthN_is_Some_length {A} (l : list A) N x :
@@ -533,10 +533,10 @@ Proof.
   revert N. induction l; intros N Heq.
   - inv Heq. 
   - destruct N. inv Heq.
-    unfold length. rewrite Nnat.Nat2N.inj_succ. zify. omega. 
+    unfold length. rewrite Nnat.Nat2N.inj_succ. zify. lia. 
     assert (Hlt : ((N.pos p)-1 < N.of_nat (length l))%N) by eauto.
     simpl (length _). rewrite Nnat.Nat2N.inj_succ.
-    zify. omega. 
+    zify. lia. 
 Qed.
 
 Lemma Forall2_nthN {A B} (R : A -> B -> Prop) l1 l2
@@ -584,9 +584,9 @@ Lemma max_list_spec1 l z :
   (z <= max_list l z)%positive.
 Proof.
   revert z. induction l; intros z.
-  - simpl. zify; omega.
+  - simpl. zify; lia.
   - simpl. eapply Pos.le_trans; [| now eapply IHl ].
-    zify; omega. 
+    zify; lia. 
 Qed.
 
 Lemma max_list_spec2 l z x :
@@ -596,7 +596,7 @@ Proof.
   - inv Hin.
   - inv Hin; simpl. 
     + eapply Pos.le_trans; [| now eapply max_list_spec1 ].
-      zify; omega.
+      zify; lia.
     + now apply IHl.
 Qed.
 
@@ -606,7 +606,7 @@ Lemma max_list_acc_mon z1 z2 l :
 Proof.
   revert z1 z2; induction l; intros z1 z2 Hleq.
   - eassumption.
-  - simpl. eapply IHl. zify; omega.
+  - simpl. eapply IHl. zify; lia.
 Qed.
 
 Lemma max_list_acc_commutes l y z :
@@ -631,7 +631,7 @@ Qed.
 Lemma max_list_one l y :
   List_util.max_list l y = Pos.max (List_util.max_list l 1) y.
 Proof.
-  rewrite Pos.max_comm, <- max_list_acc_commutes. f_equal. zify; omega.
+  rewrite Pos.max_comm, <- max_list_acc_commutes. f_equal. zify; lia.
 Qed.
 
 
@@ -663,8 +663,8 @@ Lemma NoDup_cons_l {A} (l1 l2 : list A):
   NoDup l1.
 Proof.
   induction l1; simpl; intros H; constructor; eauto.
-  - inv H. firstorder.
-  - inv H; firstorder.
+  - inv H. firstorder auto with *.
+  - inv H; firstorder auto with *.
 Qed.
 
 Lemma NoDup_cons_r {A} (l1 l2 : list A):
@@ -792,7 +792,7 @@ Proof.
   - reflexivity.
   - simpl. eapply le_trans; [| eapply IHl ].
     eapply fold_left_monotonic.
-    + intros. omega.
+    + intros. lia.
     + rewrite Nat.mul_add_distr_r.
       eapply plus_le_compat.
       eapply mult_le_compat_l.
@@ -943,7 +943,7 @@ Lemma Sublist_length {A : Type} (l1 l2 : list A) :
   Sublist l1 l2 ->
   length l1 <= length l2.
 Proof.
-  intros Hsub; induction Hsub; eauto; simpl; omega.
+  intros Hsub; induction Hsub; eauto; simpl; lia.
 Qed.
 
 

@@ -410,7 +410,7 @@ Definition get_constructors
   let fix pi_types_to_class_fields
           (e : Ast.term) : ffiM (list (sanitized_name * Ast.term)) :=
     match e with
-    | Ast.tProd (nNamed field_name) t e' =>
+    | Ast.tProd (mkBindAnn (nNamed field_name) _) t e' =>
         log ("Handing the field " ++ field_name) ;;
         (* TODO MAYBE convert field_name to kername by qualifying it *)
         (* right now we qualify the names with the option the user provides *)
@@ -442,7 +442,7 @@ Definition get_constructors
 Definition generate_ffi
            (opts : Options)
            (p : Ast.program)
-           : error (name_env * option Clight.program * option Clight.program * list string) :=
+           : error (name_env * Clight.program * Clight.program * list string) :=
   let init : fstate_data :=
       {| fstate_gensym := 2%positive
        ; fstate_nenv   := M.empty _
@@ -452,10 +452,11 @@ Definition generate_ffi
       runState ((get_constructors >=> make_ffi_program) p) opts init in
   let nenv := fstate_nenv st in
   match err with
-  | Ret (header, source) =>
+  | Err s => Err s
+  | Ret (Some header, Some source) =>
     Ret (nenv (* the name environment to be passed to C generation *) ,
          header (* the header content *),
          source (* the source content *),
          rev (fstate_log st) (* logged messages *))
-  | Err s => Err s
+  | Ret _ => Err "No Clight program generated"
   end.

@@ -114,7 +114,7 @@ Definition test :=
   (Efun (Fcons 1 2 [3] (Ehalt 3) Fnil) (Ehalt 1)))%positive.
 
 Definition dummy_tag := 1%positive.
-Definition c := pack_data 10%positive dummy_tag dummy_tag dummy_tag  (M.empty _) (M.empty _) (M.empty _) [].
+Definition c := pack_data 10%positive dummy_tag dummy_tag dummy_tag  (M.empty _) (M.empty _) (M.empty _) (M.empty _) [].
 
 Definition testf := Eval native_compute in (freshen_top test c).
 

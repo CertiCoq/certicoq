@@ -14,7 +14,7 @@ echo "Running ocamlopt program..."
 ./ocaml/mainopt $N > ocamlopt_bench.txt
 
 echo "Running CertiCoq programs..."
-printf "      &   ANF   &    CPS    &  ocamlc  & ocamlopt \n"
+printf "      &   ANF   &    CPS    &  ocamlc  & ocamlopt %s \n" "\\\\"
 for f in $FILES
 do
     # Find ANF time    
@@ -34,6 +34,6 @@ do
 
 	ESC='\\'
 	# output latex table
-	printf "{${ESC}tt ${f}} &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  \n" "$timeanf" "$timecps" "$timeocamlopt" "$timeocamlc" "$ratio"
+	printf "{${ESC}tt ${f}} &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  %s \n" "$timeanf" "$timecps" "$timeocamlopt" "$timeocamlc" "$ratio" "\\\\"
     fi
 done

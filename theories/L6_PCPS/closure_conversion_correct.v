@@ -10,7 +10,7 @@ From CertiCoq.L6 Require Import cps size_cps cps_util set_util hoisting identifi
 Require Import compcert.lib.Coqlib.
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
-                        NArith.BinNat PArith.BinPos Sets.Ensembles Omega
+                        NArith.BinNat PArith.BinPos Sets.Ensembles micromega.Lia
                         Sorting.Permutation ArithRing.
 Import ListNotations.
 
@@ -28,6 +28,7 @@ Section Closure_conversion_correct.
   Variable pr : prims.
   Variable cenv : ctor_env.
   Variable clo_tag : ctor_tag.
+  Variable clo_itag : ind_tag.
 
   Context (boundL : nat -> @PostT fuel trace) (* Local *)
           (* the nat parameter is usefull when we want to give an upper bound to the steps, but for now its a dummy paramater *)
@@ -236,9 +237,9 @@ Section Closure_conversion_correct.
           assert (HK : Fun_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (FromList xs1) (name_in_fundefs B1) (extend_fundefs' id B1 Γ) /\
                        GFun_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') GFuns').
           { eapply IHk with (B1 := B1); try eassumption. 
-            - intros. eapply IHe; eauto. omega.
-            - eapply GFun_inv_monotonic; eauto. omega.
-            - eapply FV_inv_strong_monotonic. eassumption. omega. } 
+            - intros. eapply IHe; eauto. lia.
+            - eapply GFun_inv_monotonic; eauto. lia.
+            - eapply FV_inv_strong_monotonic. eassumption. lia. } 
           edestruct HK as [Hf Hg].          
           (* Apply IHe *)
           eapply IHe with (Scope := FromList xs1) (GFuns := GFuns');
@@ -297,7 +298,7 @@ Section Closure_conversion_correct.
              eapply cc_approx_val_monotonic. eapply Hyp; eauto. 
              now eapply not_In_Empty_set. now eapply not_In_Empty_set.
              intros Hc. eapply add_global_funs_included in Hc; [| | eassumption ]; tci. inv Hc; eauto.
-             omega. eassumption.
+             lia. eassumption.
     - edestruct Hfvs as [c' [vs [Hgetg [Hleq Hallg]]]].
       assert (Hpre : GFun_inv k (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (GFuns \\ name_in_fundefs B1)).
       { intros f1 v1 c1 Hnin2 Hget. inv Hnin2.
@@ -330,9 +331,9 @@ Section Closure_conversion_correct.
           assert (HK : Fun_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (FromList xs1) (name_in_fundefs B1) (extend_fundefs' id B1 Γ) /\
                        GFun_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (name_in_fundefs B1 :|: GFuns)).
           { eapply IHk with (B1 := B1); try eassumption. 
-            - intros. eapply IHe; eauto. omega.
-            - eapply GFun_inv_monotonic; eauto. omega.
-            - eapply FV_inv_strong_monotonic. eassumption. omega.
+            - intros. eapply IHe; eauto. lia.
+            - eapply GFun_inv_monotonic; eauto. lia.
+            - eapply FV_inv_strong_monotonic. eassumption. lia.
             - constructor; eauto. }
           destruct HK as [Hkf Hkg].
           assert (Hdis1 : Disjoint map_util.M.elt (name_in_fundefs B1 :|: GFuns) (FromList xs1)).
@@ -564,7 +565,7 @@ Section Closure_conversion_correct.
     n <= n * m.
   Proof.
     rewrite Nat.mul_comm.
-    edestruct mult_O_le; eauto. omega.
+    edestruct mult_O_le; eauto. lia.
   Qed.
 
   Lemma plus_le_mult  (a1 a2 b1 b2 b3 : nat) :
@@ -639,7 +640,7 @@ Section Closure_conversion_correct.
     (forall C, exp_ctx_len C <= sizeOf_exp_ctx C) /\
     (forall C, fundefs_ctx_len C <= sizeOf_fundefs_ctx C).
   Proof. 
-    exp_fundefs_ctx_induction IHC IHB; intros; simpl; try omega.
+    exp_fundefs_ctx_induction IHC IHB; intros; simpl; try lia.
   Qed.    
 
 
@@ -696,7 +697,6 @@ Section Closure_conversion_correct.
             * eapply cc_approx_env_P_extend with (v2 := Vconstr t vs2).
               eapply cc_approx_env_P_antimon; [ eassumption |]...
               rewrite cc_approx_val_eq. constructor; eauto.
-              eapply logical_relations.Forall2_Forall2_asym_included; eauto. (* TODO fix dependency *)
             * now eauto.
             * eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
               eapply occurs_free_Econstr_Included. 
@@ -765,7 +765,7 @@ Section Closure_conversion_correct.
       eapply ctx_to_rho_cc_approx_exp; eauto.
       + eapply cc_approx_exp_proj_compat with (P1 := boundL 0).
         * eapply HPost_proj; eauto. 
-        * eapply HOOT; simpl; omega.
+        * eapply HOOT; simpl; lia.
         * eassumption.
         * intros v1' v2' c1 vs1 Hget Hin Hv.
           { eapply IHe; [ now eauto | | | | | | | | | | eassumption ].
@@ -798,7 +798,7 @@ Section Closure_conversion_correct.
     - (* Case letapp *)
       inv Hcc.
       assert (Hadm : sizeOf_exp_ctx C <= 4 + 4 * length ys).
-      { eapply le_trans. eapply project_vars_sizeOf_ctx_exp; eauto. simpl; omega. }
+      { eapply le_trans. eapply project_vars_sizeOf_ctx_exp; eauto. simpl; lia. }
       edestruct HFVs with (x0 := f) as [v' Hgetv]. normalize_occurs_free...
       edestruct (@binding_in_map_get_list val) with (xs := ys) as [vs Hgetvs]; eauto. normalize_occurs_free...
 
@@ -838,12 +838,12 @@ Section Closure_conversion_correct.
       + intros m v4 v5 rho2'' Hleq' Hvs Hctx. inv Hctx. inv H11. inv H19. repeat subst_exp. 
         eapply cc_approx_exp_monotonic.
         eapply IHe with (k := m); [ | | | | | | | | | | eassumption ].
-        * intros. eapply IHk; eauto. omega. 
+        * intros. eapply IHk; eauto. lia. 
         * eapply cc_approx_env_P_extend; [| eassumption ].
           eapply cc_approx_env_P_set_not_in_P_r.
           eapply cc_approx_env_P_set_not_in_P_r.
           eapply cc_approx_env_P_antimon.
-          eapply cc_approx_env_P_monotonic; [| eassumption ]. omega. now sets.
+          eapply cc_approx_env_P_monotonic; [| eassumption ]. lia. now sets.
           rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set, Union_Empty_set_neut_l.
           eapply Disjoint_In_l; [| eassumption ].
           eapply Disjoint_Included; [ | | eapply H4 ]; sets.
@@ -888,7 +888,7 @@ Section Closure_conversion_correct.
           eapply project_vars_free_set_Included. eassumption.  
           
           apply Fun_inv_set_In_Scope_l. now eauto.
-          eapply Fun_inv_monotonic. eapply Fun_inv_mon. eassumption. omega.
+          eapply Fun_inv_monotonic. eapply Fun_inv_mon. eassumption. lia.
         * eapply FV_inv_set_In_Scope_l. now constructor.
           eapply FV_inv_set_r. intros Hc. eapply Hnin.
           subst. now eauto.
@@ -897,7 +897,7 @@ Section Closure_conversion_correct.
           eapply project_vars_free_set_Included. eassumption. eassumption. now sets.
           intros Hc; subst. eapply H4. constructor.
           eapply project_vars_free_set_Included. eassumption. eapply H15. now sets.
-          eapply FV_inv_extend_Scope_GFuns. eapply FV_inv_monotonic. eassumption. omega.
+          eapply FV_inv_extend_Scope_GFuns. eapply FV_inv_monotonic. eassumption. lia.
         * eapply GFun_inv_set_not_In_GFuns_l.
           intros Hc. eapply Hd. now constructor; eauto.
           eapply GFun_inv_set_not_In_GFuns_r.
@@ -912,7 +912,7 @@ Section Closure_conversion_correct.
           eauto 10 with Ensembles_DB functions_BD.
           eapply project_vars_free_set_Included. eassumption.
           eapply GFun_inv_antimon. eapply GFun_inv_monotonic; eauto. sets.
-        * omega.
+        * lia.
     - (* Case Efun -- the hardest one! *)
       inv Hcc.
       assert (Hsub : FromList FVs' \subset occurs_free_fundefs f2).
@@ -924,7 +924,7 @@ Section Closure_conversion_correct.
       destruct Ha as [vs Hget_list].
       (* sizes of evaluation contexts *)
       assert (HC1 : sizeOf_exp_ctx C' <= 4 * (length FVs')) by
-          (eapply le_trans; [ now eapply project_vars_sizeOf_ctx_exp; eauto | omega ]).
+          (eapply le_trans; [ now eapply project_vars_sizeOf_ctx_exp; eauto | lia ]).
 
       edestruct project_vars_ctx_to_rho as [rho2' Hto_rho]; [ | eassumption | | | | | ]; eauto. now sets.
       edestruct project_vars_correct as [Happ [Hfun' [Henv' [Hgfun' Hvar]]]]; eauto. now sets.
@@ -963,7 +963,7 @@ Section Closure_conversion_correct.
         + { eapply IHe with (GFuns := GFuns') (Funs := name_in_fundefs f2 :|: Funs)
                             (Scope := Scope \\ name_in_fundefs f2)
                             (genv := extend_fundefs' genv f2 Γ'); (try now eapply H17); eauto.
-            * intros. eapply IHk; eauto. omega. 
+            * intros. eapply IHk; eauto. lia. 
             * eapply cc_approx_env_P_def_funs_not_In_P_l.
               now eauto with Ensembles_DB.
               eapply cc_approx_env_P_def_funs_not_In_P_r. sets.
@@ -972,7 +972,7 @@ Section Closure_conversion_correct.
               
               eapply cc_approx_env_P_set_not_in_P_r.
               eapply cc_approx_env_P_antimon; [ eapply cc_approx_env_P_monotonic; [| eassumption ] |].
-              omega. now sets.
+              lia. now sets.
               intros Hin. inv Hin. eapply H5. constructor; eauto. right. left. now eauto. 
             * eapply binding_in_map_antimon.
               eapply Included_trans. now eapply occurs_free_Efun_Included.
@@ -998,7 +998,7 @@ Section Closure_conversion_correct.
               eapply Included_trans. eapply Included_Setminus_compat; [| reflexivity ].
               eapply Setminus_Setminus_Included. tci. sets.
               eapply Disjoint_Included; [| | eapply Hd' ]; sets. normalize_bound_var...
-            * eapply Fun_inv_Union; [| | eapply Fun_inv_monotonic; eauto ]. sets. 2:{ omega. }
+            * eapply Fun_inv_Union; [| | eapply Fun_inv_monotonic; eauto ]. sets. 2:{ lia. }
               eapply Fun_inv_def_funs.
               ** erewrite <- closure_conversion_fundefs_Same_set_image; [| eassumption ].
                  eapply Disjoint_Included_l. eapply name_in_fundefs_bound_var_fundefs.
@@ -1011,7 +1011,7 @@ Section Closure_conversion_correct.
                  intros Hc. eapply H5. constructor; eauto.
                  right. left. now eauto.
                  intros Hc. subst. eapply H5. constructor. now eauto.
-                 now eauto. eapply Fun_inv_monotonic; eauto. omega.
+                 now eauto. eapply Fun_inv_monotonic; eauto. lia.
             * eapply FV_inv_antimonotonic_add_global_funs; [ | | eassumption | ]; tci.            
               eapply FV_inv_def_funs.
               ** intros Hc. eapply Hnin. constructor. 
@@ -1022,7 +1022,7 @@ Section Closure_conversion_correct.
                   now eapply name_in_fundefs_bound_var_fundefs.
               ** eapply FV_inv_set_r.
                  intros Hc. subst. eapply H5. constructor; eauto.
-                 eapply FV_inv_monotonic. eassumption. omega.
+                 eapply FV_inv_monotonic. eassumption. lia.
               ** sets.
             * eapply GFun_inv_fuse with (names := name_in_fundefs f2); tci; sets. 
               ** eapply GFun_inv_def_funs_not_In_GFuns_r.
@@ -1032,12 +1032,12 @@ Section Closure_conversion_correct.
                  eapply GFun_inv_set_not_In_GFuns_r.
                  intros Hc. eapply H5. constructor; eauto. inv Hc. now sets.
                  eapply GFun_inv_antimon. eapply GFun_inv_monotonic. eassumption.
-                 omega. sets.
-              ** eapply GFun_inv_monotonic. eassumption. omega. }          
+                 lia. sets.
+              ** eapply GFun_inv_monotonic. eassumption. lia. }          
     - (* Case Eapp *)
       inv Hcc.
       assert(Hadm : sizeOf_exp_ctx C <= 4 * length l + 4)
-        by (eapply le_trans; [ now eapply project_vars_sizeOf_ctx_exp; eauto | simpl; omega ]).
+        by (eapply le_trans; [ now eapply project_vars_sizeOf_ctx_exp; eauto | simpl; lia ]).
       edestruct HFVs with (x := v) as [v' Hgetv]. normalize_occurs_free...
       edestruct (@binding_in_map_get_list val) with (xs := l) as [vs Hgetvs]; eauto. normalize_occurs_free...
   
@@ -1236,7 +1236,7 @@ Section Closure_conversion_correct.
     Disjoint _ (bound_var e) (occurs_free e) ->
     (max_var e 1%positive < next_var c)%positive ->
     exists e' c',      
-      closure_conversion_top clo_tag e c = (Ret e', c') /\
+      closure_conversion_top clo_tag clo_itag e c = (Ret e', c') /\
       unique_bindings e' /\
       occurs_free e' \subset occurs_free e /\
       Disjoint _ (bound_var e') (occurs_free e') /\
@@ -1251,13 +1251,13 @@ Section Closure_conversion_correct.
     set (fvmap := populate_map (exp_fv e) (Maps.PTree.empty VarInfo)).
     destruct (closure_conversion.get_name c) as [G c1] eqn:Hg. 
     assert (Hlt' : (max_var e 1 < next_var c1)%positive).
-    { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; omega. }
+    { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; lia. }
 
     assert (Hlt'' : (max_var e 1 < G)%positive).
-    { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; omega. }
+    { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; lia. }
 
     assert (Hlt''' : (G < next_var c1)%positive).
-    { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; omega. }
+    { unfold closure_conversion.get_name in *. destruct c. simpl in *. inv Hg. simpl. zify; lia. }
     
     
     set (S := (fun x : var => G < x)%positive).
@@ -1277,10 +1277,10 @@ Section Closure_conversion_correct.
       unfold S. eapply Union_Disjoint_r.
       - constructor. intros x Hnin. inv Hnin.
         eapply occurs_free_leq_max_var with (y := 1%positive) in H. unfold Ensembles.In in *.
-        zify. omega.
+        zify. lia.
       - constructor. intros x Hnin. inv Hnin. inv H0. 
         eapply occurs_free_leq_max_var with (y := 1%positive) in H. unfold Ensembles.In in *.
-        zify. omega. }
+        zify. lia. }
       
     assert (Hgmap: gfuns_inv (PTree.empty GFunInfo) (Empty_set positive)).
     { unfold gfuns_inv.
@@ -1301,22 +1301,22 @@ Section Closure_conversion_correct.
       
       unfold S. eapply Union_Disjoint_r.
       - constructor. intros x Hnin. inv Hnin. inv H0.
-        + eapply bound_var_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. omega.
-        + eapply occurs_free_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. omega.
+        + eapply bound_var_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. lia.
+        + eapply occurs_free_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. lia.
       - constructor. intros x Hnin. inv Hnin. inv H0.
-        unfold Ensembles.In in *. zify. omega. } 
+        unfold Ensembles.In in *. zify. lia. } 
 
     assert (Hnin : ~ In var (used_vars e) G).
     { intros Hc. inv Hc.
-      - eapply bound_var_leq_max_var with (y := 1%positive) in H. unfold Ensembles.In in *. zify. omega.
-      - eapply occurs_free_leq_max_var with (y := 1%positive) in H. unfold Ensembles.In in *. zify. omega. }
+      - eapply bound_var_leq_max_var with (y := 1%positive) in H. unfold Ensembles.In in *. zify. lia.
+      - eapply occurs_free_leq_max_var with (y := 1%positive) in H. unfold Ensembles.In in *. zify. lia. }
     
     unfold triple in *.
     assert (Hf' : fresh S (next_var (fst (c1, tt)))).
-    { unfold S, fresh. intros. unfold Ensembles.In in *. simpl in *. zify; omega. }
+    { unfold S, fresh. intros. unfold Ensembles.In in *. simpl in *. zify; lia. }
 
     specialize (Hsound Hfvmap Hsub Hbnin Hgmap Hun Hdis1 Hdis2 Hdis3 Hnin tt (c1, tt) Hf').
-
+    
     unfold run_compM.
     destruct (runState (exp_closure_conv clo_tag e fvmap (PTree.empty GFunInfo) 1%positive G) tt (c1, tt))
       as [ p [c2 w2]] eqn:Hcc.
@@ -1339,16 +1339,22 @@ Section Closure_conversion_correct.
         eapply Union_Disjoint_l. now sets.
         constructor. intros z Hninz. inv Hninz.
         eapply occurs_free_leq_max_var with (y := 1%positive) in H7.
-        unfold Ensembles.In, Range in *. simpl in *. zify; omega.
+        unfold Ensembles.In, Range in *. simpl in *. zify; lia.
     - rewrite (H0 e').
       assert (Hin := max_var_subset (x |[ e' ]|)). 
       inv Hin. 
       + eapply bound_var_app_ctx in H6. inv H6.
-        * eapply H2 in H7. unfold Ensembles.In, Range in *. simpl in *. zify; omega.
+        * eapply H2 in H7.
+          destruct c2. simpl in *.
+          unfold Ensembles.In, Range in *. simpl in *. zify; lia.
         * eapply H4 in H7. inv H7.
-          ++ eapply bound_var_leq_max_var with (y := 1%positive) in H6. unfold Ensembles.In in *. zify. omega.
-          ++ unfold Ensembles.In, Range in *. simpl in *. zify; omega.
-      + eapply Hs in H6. eapply occurs_free_leq_max_var with (y := 1%positive) in H6. unfold Ensembles.In in *. zify. omega.
+          ++ eapply bound_var_leq_max_var with (y := 1%positive) in H6.
+             destruct c2. simpl in *.
+             unfold Ensembles.In in *. zify. lia.
+          ++ destruct c2. simpl in *.
+             unfold Ensembles.In, Range in *. simpl in *. zify; lia.
+      + destruct c2. simpl in *.
+        eapply Hs in H6. eapply occurs_free_leq_max_var with (y := 1%positive) in H6. unfold Ensembles.In in *. zify. lia.
     - rewrite (H0 e'). intros z Hin. 
       rewrite <- (Union_Empty_set_neut_l _ (funnames_in_exp (x |[ e' ]|))).
       eapply Closure_conversion_closed_fundefs. eassumption.
@@ -1357,7 +1363,7 @@ Section Closure_conversion_correct.
       rewrite (H0 e').
       eapply Closure_conversion_correct_top; try eassumption.
       intros Hn.
-      eapply bound_var_leq_max_var with (y := 1%positive) in Hn. unfold Ensembles.In in *. zify. omega.
+      eapply bound_var_leq_max_var with (y := 1%positive) in Hn. unfold Ensembles.In in *. zify. lia.
   Qed.     
 
 End Closure_conversion_correct.

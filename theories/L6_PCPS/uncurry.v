@@ -323,6 +323,9 @@ Section UNCURRY.
   End UncurryTop.
 
 
-  Definition uncurry_fuel cps n e c := uncurry_fuel'' uncurry_exp cps n e c. 
+  Definition uncurry_fuel cps n e c : error exp * comp_data :=
+    let '(eerr, inline_map, c') := uncurry_fuel'' uncurry_exp cps n e c in
+    let c' := put_inline_map inline_map c' in
+    (eerr, c'). 
 
 End UNCURRY.

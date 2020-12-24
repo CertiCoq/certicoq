@@ -10,7 +10,7 @@ N=$1
 
 
 echo "Running CertiCoq programs..."
-printf "      &   ANF   & ANF OPT & SPEEDUP &   CPS   & CPS OPT & SPEEDUP \n"
+printf "      &   ANF   & ANF OPT & SPEEDUP &   CPS   & CPS OPT & SPEEDUP %s \n" "\\\\"
 for f in $FILES
 do
     # Find ANF time    
@@ -28,5 +28,5 @@ do
     
     ESC='\\'
     # output latex table
-    printf "{${ESC}tt ${f}} &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  \n" "$timeanf" "$timeanfopt" "$speedupanf" "$timecps" "$timecpsopt" "$speedupcps"
+    printf "{${ESC}tt ${f}} &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  &  %.3f  %s \n" "$timeanf" "$timeanfopt" "$speedupanf" "$timecps" "$timecpsopt" "$speedupcps" "\\\\"
 done

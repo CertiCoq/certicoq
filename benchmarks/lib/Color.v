@@ -29,7 +29,7 @@
 (*  PRELIMINARIES:  EFFICIENT DATA STRUCTURES FOR REPRESENTING
     SETS OF NODES, and FUNCTIONS THAT MAP NODES TO WHATEVER *)
 
-Require Import List Omega.
+Require Import List Omega micromega.Lia.
 Require Import FSets.    (* Efficient functional sets *)
 Require Import FMaps.  (* Efficient functional maps *)
 Require Import Compare_dec.  (* to get lt_dec on natural numbers *)
@@ -281,9 +281,9 @@ clear Heqf.
 induction H; simpl.
 destruct (H0 y).
 symmetry in H. rewrite (H1 H).
-clear. induction l; simpl; intros. auto. destruct (f a). simpl; auto. omega.
-omega.
-destruct (f y). simpl; omega. omega.
+clear. induction l; simpl; intros. auto. destruct (f a). simpl; auto. lia.
+lia.
+destruct (f y). simpl; lia. lia.
 Qed.
 (* /ADMITTED *)
 (** [] *)
@@ -369,9 +369,9 @@ induction H; simpl.
 destruct H as [H H'].
 destruct (H0 y).
 symmetry in H. rewrite (H1 H).
-clear. induction l; simpl; intros. auto. destruct (f a). simpl; auto. omega.
-omega.
-destruct (f y). simpl; omega. omega.
+clear. induction l; simpl; intros. auto. destruct (f a). simpl; auto. lia.
+lia.
+destruct (f y). simpl; lia. lia.
 Qed.
 (* /ADMITTED *)
 (** [] *)
@@ -680,7 +680,7 @@ Proof.
  intros.  rewrite Z2Nat.inj_pred. apply Z.gtb_lt in H.
  apply Nat.lt_pred_l. intro.
  pose proof (Z2Nat.id i). rewrite H0 in H1. simpl in H1.
- absurd (0%Z=i). omega. apply H1; omega.
+ absurd (0%Z=i). lia. apply H1; lia.
 Defined.
 
 Function iota' (i: Z) (al: list Z) {measure Z.to_nat i} : list Z :=

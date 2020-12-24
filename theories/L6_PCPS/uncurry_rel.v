@@ -5,11 +5,10 @@ Require Import FunInd.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Strings.String.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
 Require Import Common.compM.
-Require Import Lia.
 
 Import ListNotations MonadNotation.
 
@@ -38,7 +37,7 @@ Section list_lemmas.
       simpl in H. remember (set_lists l l1 rho).
       destruct o; [|congruence].
       rewrite <- IHl with (rho := rho). now exists t. 
-    - (* :: <- *) destruct l1; [easy|]. simpl in H. apply Nat.succ_inj in H.
+    - (* :: <- *) destruct l1; [easy|]. simpl in H. apply NPeano.Nat.succ_inj in H.
       rewrite <- IHl with (rho := rho) in H. destruct H.
       simpl. rewrite <- H. now exists (M.set a a0 x).
   Qed.
@@ -94,7 +93,7 @@ Section list_lemmas.
         apply length_exists_set_lists with (rho0 := rho) in H. destruct H. congruence.
       + assert (length l = length v). {
           apply set_lists_length in Heqo0. 
-          repeat rewrite app_length in Heqo0. simpl in Heqo0. omega.
+          repeat rewrite app_length in Heqo0. simpl in Heqo0. lia.
         }
         apply length_exists_set_lists with (rho0 := (M.set a b rho)) in H. destruct H. congruence.
   Qed.
@@ -107,7 +106,7 @@ Section list_lemmas.
     length l = length (a ++ [b]) -> exists a1 b1, l = a1 ++ [b1].
   Proof.
     induction l; intros.
-    - rewrite app_length in H. inversion H. rewrite plus_comm in H1. inversion H1.
+    - rewrite app_length in H. inversion H. rewrite Plus.plus_comm in H1. inversion H1.
     - destruct a0.
       + assert (l = []) by (destruct l; [easy|inversion H]). subst.
         now exists [], a.
@@ -1766,7 +1765,7 @@ Lemma uncurry_step_increases_size_mut :
 Proof with eauto with Ensembles_DB.
   intros P Q.
   uncurry_step_induction_mut P Q IHstep IH; subst P; subst Q;
-  try (try destruct arm; simpl in *; omega).
+  try (try destruct arm; simpl in *; lia).
 Qed.
 
 Corollary uncurry_step_increases_size : forall e s m e1 s1 m1,
@@ -1783,7 +1782,7 @@ Proof.
   intros; intros H1.
   apply uncurry_step_increases_size in H.
   apply uncurry_step_increases_size in H1.
-  omega.
+  lia.
 Qed.
 
 Lemma uncurry_fundefs_step_acyclic : forall e s m e1 s1 m1 s2 m2,
@@ -1792,7 +1791,7 @@ Proof.
   intros; intros H1.
   apply uncurry_fundefs_step_increases_size in H.
   apply uncurry_fundefs_step_increases_size in H1.
-  omega.
+  lia.
 Qed.
 
 Local Ltac step_isnt_cyclic :=

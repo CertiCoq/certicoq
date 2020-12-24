@@ -3,7 +3,7 @@ Require Import L6.tactics.
 From CertiCoq.L6 Require Import cps ctx Ensembles_util List_util functions map_util identifiers cps_util stemctx
      rename logical_relations alpha_conv eval functions.
 From Coq Require Import Arith.Arith NArith.BinNat Strings.String Lists.List
-     omega.Omega Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
+     micromega.Lia Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
 From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
 Require Import ExtLib.Structures.Monad ExtLib.Structures.MonadState ExtLib.Data.Monads.StateMonad.
 
@@ -259,7 +259,7 @@ Proof.
   - inv Hnum. pi0. eapply IHe in Hin'; try eassumption; eauto. destructAll. split; eauto.
     constructor; eassumption.
   - Opaque num_occur_list. inv Hin. inv Hnum. split; eauto.
-    replace (num_occur_list (v :: l) g) with (num_occur_list (v :: l) g + 0) by omega.
+    replace (num_occur_list (v :: l) g) with (num_occur_list (v :: l) g + 0) by lia.
     econstructor. eauto. econstructor.
   - inv Hnum. pi0. eapply IHe in H4; eauto. destructAll. split; eauto.
     rewrite plus_comm. constructor. eassumption.
@@ -279,17 +279,17 @@ Proof.
                             | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
                             end); try congruence.
   - inv Hnum. eapply IHe in Hin'; eauto. destructAll.
-    eexists; split. econstructor. eassumption. omega.
+    eexists; split. econstructor. eassumption. lia.
   - inv Hnum. eapply IHe in Hin'; eauto. destructAll.
-    eexists; split. econstructor. eassumption. omega.
+    eexists; split. econstructor. eassumption. lia.
   - inv Hnum. eapply IHe in Hin'; eauto. destructAll.
-    eexists; split. econstructor. eassumption. omega.
+    eexists; split. econstructor. eassumption. lia.
   - inv Hnum. eapply IHe in Hin'; eauto. destructAll.
-    eexists; split. econstructor. eassumption. eassumption. omega.
-  - inv Hnum. inv Hin. eexists; split. econstructor. now constructor. omega.
+    eexists; split. econstructor. eassumption. eassumption. lia.
+  - inv Hnum. inv Hin. eexists; split. econstructor. now constructor. lia.
   - inv Hnum. eapply IHe in Hin'; eauto. destructAll.
-    eexists; split. econstructor. eassumption. omega.
-  - inv Hin. eexists. split. constructor. omega.
+    eexists; split. econstructor. eassumption. lia.
+  - inv Hin. eexists. split. constructor. lia.
 Qed.
 
 Lemma inline_letapp_var_num_occur x e C x' :
@@ -302,15 +302,15 @@ Proof.
                      destruct (inline_letapp E X) as [[C' z] | ] eqn:Hin'; inv Hin
                    end);
               try now (destruct (IHe C' eq_refl); eauto; destructAll; right;
-                       eauto; eexists; split; [| econstructor; eassumption ]; omega).
+                       eauto; eexists; split; [| econstructor; eassumption ]; lia).
   - congruence.
   - destruct (IHe C' eq_refl); eauto. right. destructAll.
     edestruct (proj2 (e_num_occur_mut x')). 
     eexists. constructor. 2:{ econstructor; eauto. }
-    omega.
+    lia.
   - inv Hin. now left.
   - inv Hin. right. eauto. eexists. split. 2:{ econstructor. }
-    simpl. rewrite peq_true. omega.
+    simpl. rewrite peq_true. lia.
 Qed.
 
 Lemma inline_letapp_None e x sig :
@@ -384,11 +384,11 @@ Proof.
     (try match goal with
          | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
          end); try congruence; try (edestruct IHe; eauto; destructAll);
-      (try now eexists; split; [| eapply num_occur_eq; econstructor; eauto ]; omega).
+      (try now eexists; split; [| eapply num_occur_eq; econstructor; eauto ]; lia).
   - edestruct e_num_occur_fds. eexists. split. 2:{ eapply num_occur_eq. constructor; eassumption. reflexivity. }
-    omega.
+    lia.
   - eexists. split. 2:{ constructor. }
-    inv Hin. simpl. rewrite peq_true. omega.
+    inv Hin. simpl. rewrite peq_true. lia.
 Qed.
 
 Lemma inline_letapp_num_occur e v C x z n :
@@ -402,21 +402,21 @@ Proof.
     (try match goal with
          | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
          end); try congruence; inv Hnum; destruct (var_dec z x); subst;
-      (try now eapply num_occur_ec_eq; [ constructor; eapply IHe; eauto | omega ]);
+      (try now eapply num_occur_ec_eq; [ constructor; eapply IHe; eauto | lia ]);
       (try now edestruct inline_letapp_gt_zero; [ eassumption | eassumption | ]; destructAll;
        match goal with
        | [H1 : num_occur _ _ _, H2 : num_occur _ _ _ |- _ ] => eapply num_occur_det in H1; [| eapply H2 ]; subst
        end;
-       eapply num_occur_ec_eq; [ constructor; eapply IHe; eauto | omega ]).
+       eapply num_occur_ec_eq; [ constructor; eapply IHe; eauto | lia ]).
   - edestruct inline_letapp_gt_zero; [ eassumption | eassumption | ]; destructAll.
     match goal with
     | [H1 : num_occur _ _ _, H2 : num_occur _ _ _ |- _ ] => eapply num_occur_det in H1; [| eapply H2 ]; subst
     end.
-    eapply num_occur_ec_eq. constructor. eapply IHe; eauto. eassumption. omega .
-  - eapply num_occur_ec_eq. constructor. eapply IHe; eauto. eassumption. omega .
+    eapply num_occur_ec_eq. constructor. eapply IHe; eauto. eassumption. lia .
+  - eapply num_occur_ec_eq. constructor. eapply IHe; eauto. eassumption. lia .
   - inv Hin. contradiction.
-  - inv Hin. eapply num_occur_ec_eq. econstructor. now constructor. omega.
-  - inv Hin. eapply num_occur_ec_eq. econstructor. simpl. rewrite peq_true. omega.
+  - inv Hin. eapply num_occur_ec_eq. econstructor. now constructor. lia.
+  - inv Hin. eapply num_occur_ec_eq. econstructor. simpl. rewrite peq_true. lia.
   - inv Hin. eapply num_occur_ec_eq. econstructor. simpl. rewrite peq_false; eauto.
 Qed. 
 
@@ -595,8 +595,8 @@ Section Inline_correct.
         
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite !to_nat_add in Hleq.
           
-          unfold one in *; simpl in *; omega.
-          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia.
+          unfold one in *; simpl in *; lia.
 
           destruct r2; [ simpl in Hv2; contradiction | ].
           eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll. 
@@ -604,7 +604,7 @@ Section Inline_correct.
           
           edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [cin3 [cout3 [Hs3 [Hp3 Hv3]]]]];
             [ | |  | | | | now eapply H14 | ]; eauto. 
-          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia.
           
           rewrite (get_list_length_eq _ _ _ H7). eapply set_lists_length_eq. now eauto. 
 
@@ -612,9 +612,9 @@ Section Inline_correct.
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
             2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
             eapply preord_env_P_inj_antimon.
-            eapply preord_env_P_inj_monotonic; [| eassumption ]. omega. normalize_occurs_free. sets.  } 
+            eapply preord_env_P_inj_monotonic; [| eassumption ]. lia. normalize_occurs_free. sets.  } 
             
-          unfold one in *; simpl in *; omega.          
+          unfold one in *; simpl in *; lia.          
           inv H.
 
           do 3 eexists. split; [| split ].
@@ -629,10 +629,10 @@ Section Inline_correct.
              
              eapply Hless_steps_letapp; try eassumption. left. eassumption.
              
-          -- eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *. simpl in *; omega.
+          -- eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *. simpl in *; lia.
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
           
-          unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia. unfold one in *; simpl in *; lia.
           
           destruct r2; [ | simpl in Hv2; contradiction ].
 
@@ -647,7 +647,7 @@ Section Inline_correct.
       + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
         
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
-          unfold one in *. simpl in *; omega. unfold one in *; simpl in *; omega.
+          unfold one in *. simpl in *; lia. unfold one in *; simpl in *; lia.
           
           
           destruct r2; [ simpl in Hv2; contradiction | ].
@@ -655,7 +655,7 @@ Section Inline_correct.
           inv H2. inv H.
           
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
-          unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia. unfold one in *; simpl in *; lia.
 
           destruct r2; [ | simpl in Hv2; contradiction ].
 
@@ -673,8 +673,8 @@ Section Inline_correct.
       + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
          
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
-          unfold one in *; simpl in *; omega.
-          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia.
+          unfold one in *; simpl in *; lia.
           
           destruct r2; [ simpl in Hv2; contradiction | ]. 
           eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll. 
@@ -682,7 +682,7 @@ Section Inline_correct.
           
           edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [cin3 [cout3 [Hs3 [Hp3 Hv3]]]]];
             [ | | | | | | now eapply H14 | ]; eauto.
-          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia.
           
           rewrite (get_list_length_eq _ _ _ H7). eapply set_lists_length_eq. now eauto. 
           
@@ -690,9 +690,9 @@ Section Inline_correct.
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
             2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
             eapply preord_env_P_inj_antimon.
-            eapply preord_env_P_inj_monotonic; [| eassumption ]. omega. normalize_occurs_free. sets. } 
+            eapply preord_env_P_inj_monotonic; [| eassumption ]. lia. normalize_occurs_free. sets. } 
           
-          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia.
           
           do 3 eexists. split. eapply interpret_ctx_bstep_r. eassumption. eassumption.
           
@@ -701,11 +701,11 @@ Section Inline_correct.
           
           now right; eauto.
           
-          eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *; simpl in *; omega.
+          eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *; simpl in *; lia.
           
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
           
-          unfold one in *. simpl in *; omega. unfold one in *; simpl in *; omega.
+          unfold one in *. simpl in *; lia. unfold one in *; simpl in *; lia.
 
           destruct r2; [ | simpl in Hv2; contradiction ].
           
@@ -872,8 +872,8 @@ Section Inline_correct.
         
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite !to_nat_add in Hleq.
           
-          unfold one in *; simpl in *; omega.
-          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia.
+          unfold one in *; simpl in *; lia.
 
           destruct r2; [ simpl in Hv2; contradiction | ].
           eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll. 
@@ -882,7 +882,7 @@ Section Inline_correct.
           edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [cin3 [cout3 [Hs3 [Hp3 Hv3]]]]];
             [ | | | | | | | | |now eapply H14 | ]; eauto. 
 
-          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia.
           
           rewrite (get_list_length_eq _ _ _ H7). eapply set_lists_length_eq. now eauto.
 
@@ -899,10 +899,10 @@ Section Inline_correct.
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
             2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
             eapply preord_env_P_inj_antimon.
-            eapply preord_env_P_inj_monotonic; [| eassumption ]. omega. normalize_occurs_free. sets.
+            eapply preord_env_P_inj_monotonic; [| eassumption ]. lia. normalize_occurs_free. sets.
             intros Hc. eapply Hdis. constructor; [| eassumption ]. normalize_bound_var_ctx. eauto. }
             
-          unfold one in *; simpl in *; omega.          
+          unfold one in *; simpl in *; lia.          
 
           do 3 eexists. split; [| split ].
 
@@ -914,10 +914,10 @@ Section Inline_correct.
              rewrite  <- (algebra.plus_assoc cout). rewrite  <- (algebra.plus_assoc _ _ cout3).
              do 2 rewrite <- algebra.plus_assoc. eapply Hless_steps_letapp; eauto.
              
-          -- eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *. simpl in *; omega.
+          -- eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *. simpl in *; lia.
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
           
-          unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia. unfold one in *; simpl in *; lia.
           
           destruct r2; [ | simpl in Hv2; contradiction ].
 
@@ -932,7 +932,7 @@ Section Inline_correct.
       + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
         
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
-          unfold one in *. simpl in *; omega. unfold one in *; simpl in *; omega.
+          unfold one in *. simpl in *; lia. unfold one in *; simpl in *; lia.
           
           
           destruct r2; [ simpl in Hv2; contradiction | ].
@@ -940,7 +940,7 @@ Section Inline_correct.
           inv H2. inv H.
           
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
-          unfold one in *; simpl in *; omega. unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia. unfold one in *; simpl in *; lia.
 
           destruct r2; [ | simpl in Hv2; contradiction ].
 
@@ -958,8 +958,8 @@ Section Inline_correct.
       + rewrite !to_nat_add in Hleq. assert (Hone := to_nat_one (exp_to_fin (Eletapp x f' t ys e1))). inv H.
          
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto; rewrite to_nat_add in Hleq.
-          unfold one in *; simpl in *; omega.
-          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia.
+          unfold one in *; simpl in *; lia.
           
           destruct r2; [ simpl in Hv2; contradiction | ].
           eapply interpret_ctx_bstep_l in Hs2; [| eassumption ]. destructAll. 
@@ -967,7 +967,7 @@ Section Inline_correct.
 
           edestruct (Hyp2 (k - 1 - to_nat cin1)) as [r3 [cin3 [cout3 [Hs3 [Hp3 Hv3]]]]];
             [ | | | | | | | | | now eapply H14 | ]; eauto.
-          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia.
           
           rewrite (get_list_length_eq _ _ _ H7). eapply set_lists_length_eq. now eauto. 
 
@@ -984,19 +984,19 @@ Section Inline_correct.
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
             2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
             eapply preord_env_P_inj_antimon.
-            eapply preord_env_P_inj_monotonic; [| eassumption ]. omega. normalize_occurs_free. sets. } 
+            eapply preord_env_P_inj_monotonic; [| eassumption ]. lia. normalize_occurs_free. sets. } 
 
-          unfold one in *; simpl in *; omega.
+          unfold one in *; simpl in *; lia.
           do 3 eexists. split. eapply interpret_ctx_bstep_r. eassumption. eassumption.
 
           split. 
           eapply Hless_steps_letapp; eauto. rewrite !plus_zero in Hp2. now eauto.
           
-          eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *; simpl in *; omega.
+          eapply preord_res_monotonic. eassumption. rewrite !to_nat_add. unfold one in *; simpl in *; lia.
           
         * edestruct (Hyp1 (k -1)) as [r2 [cin2' [cout2' [Hs2 [Hp2 Hv2]]]]]; [ | | | | | | now eapply H13 | ]; eauto.
           
-          unfold one in *. simpl in *; omega. unfold one in *; simpl in *; omega.
+          unfold one in *. simpl in *; lia. unfold one in *; simpl in *; lia.
 
           destruct r2; [ | simpl in Hv2; contradiction ].
           
@@ -1094,11 +1094,11 @@ Section Inline_correct.
     intros Hexp Hinl1 Hinl2 Hi1 Hi2 Henv Hdis z Hin v Hget. destruct (peq z x'); subst.
     - rewrite extend_gss.
       edestruct inline_letapp_eval_l with (C := C1); eauto. destructAll.
-      eapply (Hexp (k + to_nat x0)) in H; [| omega ]. destructAll. 
+      eapply (Hexp (k + to_nat x0)) in H; [| lia ]. destructAll. 
       destruct x2; eauto. now inv H0. 
       edestruct inline_letapp_eval_r with (C := C2); eauto. destructAll.
       eapply interpret_ctx_fuel_deterministic in H3; [| clear H3; eauto ]. destructAll.
-      eexists. split. eassumption. simpl in H2. eapply preord_val_monotonic. eassumption. omega.
+      eexists. split. eassumption. simpl in H2. eapply preord_val_monotonic. eassumption. lia.
     - inv Hin. inv H. contradiction. inv H.
       erewrite <- interpret_ctx_fuel_env_eq_P in Hget; [| eassumption | | ].
       2:{ eapply Disjoint_Singleton_r. eassumption. }
@@ -1191,13 +1191,13 @@ Section Inline_correct.
     exists m2', n = m1 + m2' /\ m2' < m2. 
   Proof.
     revert m1 m2. induction n; intros.
-    - assert (m1 = 0) by omega. subst. destruct m2. omega.
+    - assert (m1 = 0) by lia. subst. destruct m2. lia.
       eexists. split; eauto. 
     - destruct m1.
-      + destruct m2. omega.
-        eexists. split. reflexivity. omega.
-      + edestruct IHn with (m1 := m1) (m2 := m2). omega. omega.
-        destructAll. eexists x. split. omega. eassumption.
+      + destruct m2. lia.
+        eexists. split. reflexivity. lia.
+      + edestruct IHn with (m1 := m1) (m2 := m2). lia. lia.
+        destructAll. eexists x. split. lia. eassumption.
   Qed. 
       
   Lemma inline_letapp_Ehole e z z' :
@@ -1308,7 +1308,7 @@ Section Inline_correct.
     destruct v.
     - edestruct bstep_fuel_ctx_OOT. eassumption. eapply interprable_inline_letapp. eassumption.
       + eassert (H' := H). eapply inline_letapp_eval_OOT_l in H'; [| eassumption ].
-        edestruct (Hexp (k + to_nat cin)); [| eassumption | ]. omega. destructAll. 
+        edestruct (Hexp (k + to_nat cin)); [| eassumption | ]. lia. destructAll. 
         destruct x0; [| contradiction ].        
         eapply inline_letapp_eval_OOT_r in H0; [| eassumption ]. destructAll.
         destruct x4. 
@@ -1324,42 +1324,42 @@ Section Inline_correct.
         edestruct inline_letapp_eval_l with (C := C1). eassumption. eassumption. eassumption.
         destructAll. rewrite to_nat_add in *.
         edestruct (Hexp (k + to_nat x6)); [| eassumption | ].
-        omega. destructAll.
+        lia. destructAll.
         destruct x8. contradiction. 
         edestruct inline_letapp_eval_r with (C := C2). eassumption. eassumption.
         destructAll. 
         
-        edestruct Hrel with (m := k); [ omega | | | eassumption | ]; [| omega |].
+        edestruct Hrel with (m := k); [ lia | | | eassumption | ]; [| lia |].
         
         intros z Hin v1 Hget. inv Hin. eexists. rewrite extend_gss. split. eassumption.
         repeat subst_exp. 
-        simpl in H7. eapply preord_val_monotonic. eassumption. omega. destructAll.
+        simpl in H7. eapply preord_val_monotonic. eassumption. lia. destructAll.
         do 3 eexists. split; [| split ].
         * eapply interpret_ctx_bstep_r. eassumption. eassumption.
         * eapply Hposti; eassumption.
-        * eapply preord_res_monotonic. eassumption. omega.
+        * eapply preord_res_monotonic. eassumption. lia.
     - assert (Hstep' := Hstep). eapply interpret_ctx_bstep_l in Hstep'. destructAll.
       2:{ eapply interprable_inline_letapp. eassumption. }
       edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
       edestruct inline_letapp_eval_l with (C := C1); try eassumption.
       destructAll. 
-      edestruct (Hexp (k + to_nat x6)); [| eassumption | ]. omega. destructAll.
+      edestruct (Hexp (k + to_nat x6)); [| eassumption | ]. lia. destructAll.
       destruct x8. contradiction. 
       edestruct inline_letapp_eval_r with (C := C2). eassumption. eassumption.
       destructAll.
 
       rewrite to_nat_add in Hleq. 
-      edestruct Hrel with (m := k); [ omega | | | eassumption | ]. 
+      edestruct Hrel with (m := k); [ lia | | | eassumption | ]. 
 
       intros z Hin v1 Hget. inv Hin. eexists. rewrite extend_gss. split. eassumption.
       repeat subst_exp. 
-      simpl in H7. eapply preord_val_monotonic. eassumption. omega. omega.
+      simpl in H7. eapply preord_val_monotonic. eassumption. lia. lia.
       destructAll.
       
       do 3 eexists. split; [| split ].
       + eapply interpret_ctx_bstep_r. eassumption. eassumption.
       + eapply Hposti; eassumption.
-      + eapply preord_res_monotonic. eassumption. rewrite to_nat_add. omega.
+      + eapply preord_res_monotonic. eassumption. rewrite to_nat_add. lia.
   Qed.
 
   
@@ -1385,7 +1385,7 @@ Section Inline_correct.
     destruct v.
     - edestruct bstep_fuel_ctx_OOT. eassumption. eapply interprable_inline_letapp. eassumption.
       + eassert (H' := H). eapply inline_letapp_eval_OOT_l in H'; [| eassumption ].
-        edestruct (Hexp (k + to_nat cin)); [| eassumption | ]. omega.
+        edestruct (Hexp (k + to_nat cin)); [| eassumption | ]. lia.
         destructAll. destruct x0; [| contradiction ].
         eapply inline_letapp_eval_OOT_r in H0; [| eassumption ]. destructAll. 
         destruct x4.
@@ -1400,7 +1400,7 @@ Section Inline_correct.
         edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
         edestruct inline_letapp_eval_l with (C := C1). eassumption. eassumption. eassumption.
         destructAll. 
-        edestruct (Hexp (k + to_nat x6)); [ | eassumption | ]. omega.
+        edestruct (Hexp (k + to_nat x6)); [ | eassumption | ]. lia.
 
         destructAll.
         destruct x8. contradiction. 
@@ -1408,38 +1408,38 @@ Section Inline_correct.
         destructAll. 
         rewrite to_nat_add in *.
 
-        edestruct Hrel with (m := k); [ omega | | | eassumption | ]; [| omega | ]. 
+        edestruct Hrel with (m := k); [ lia | | | eassumption | ]; [| lia | ]. 
         intros z Hin v1 Hget. inv Hin. eexists. rewrite extend_gss. split. eassumption.
         repeat subst_exp. 
-        simpl in H8. eapply cc_approx_val_monotonic. eassumption. omega.        
+        simpl in H8. eapply cc_approx_val_monotonic. eassumption. lia.        
         destructAll.
         do 3 eexists. split; [| split ].
         * eapply interpret_ctx_bstep_r. eassumption. eassumption.
         * eapply Hposti; eassumption.
-        * eapply cc_approx_res_monotonic. eassumption. omega.
+        * eapply cc_approx_res_monotonic. eassumption. lia.
     - assert (Hstep' := Hstep). eapply interpret_ctx_bstep_l in Hstep'. destructAll.
       2:{ eapply interprable_inline_letapp. eassumption. }
       edestruct inline_letapp_get with (C := C1) (e := e1). eassumption. eassumption. eassumption.
       edestruct inline_letapp_eval_l with (C := C1); try eassumption.
       destructAll. 
-      edestruct (Hexp (k + to_nat x6)); [| eassumption | ]. omega.
+      edestruct (Hexp (k + to_nat x6)); [| eassumption | ]. lia.
 
       destructAll.
       destruct x8. contradiction. 
       edestruct inline_letapp_eval_r with (C := C2). eassumption. eassumption.
       destructAll.
       
-      edestruct Hrel with (m := k); [ omega | | | eassumption | ].
+      edestruct Hrel with (m := k); [ lia | | | eassumption | ].
 
       intros z Hin v1 Hget. inv Hin. eexists. rewrite extend_gss. split. eassumption.
       repeat subst_exp. 
-      simpl in H7. eapply cc_approx_val_monotonic. eassumption. omega. rewrite to_nat_add in Hleq. omega.
+      simpl in H7. eapply cc_approx_val_monotonic. eassumption. lia. rewrite to_nat_add in Hleq. lia.
       destructAll.      
       do 3 eexists. split; [| split ].
       + eapply interpret_ctx_bstep_r. eassumption. eassumption.
       + eapply Hposti; eassumption.
       + eapply cc_approx_res_monotonic. eassumption.
-        rewrite to_nat_add. omega.
+        rewrite to_nat_add. lia.
   Qed.
   
 End Inline_correct.

@@ -7,7 +7,7 @@ From CertiCoq.L6 Require Import cps cps_util set_util identifiers ctx Ensembles_
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-               Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
+               Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
 Import Common.compM.
@@ -70,10 +70,10 @@ Section CC_correct.
     intros x [r3 w3].
     eapply return_triple. 
     intros ? [r4 w4] H2. inv H2. intros [H1 H2]. inv H1; inv H2. intros.
-    split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. omega.
-    simpl. split. zify; omega.
-    intros z Hin. constructor. eapply H; eauto. simpl. zify. omega.
-    intros Hc. inv Hc. zify; omega.
+    split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. lia.
+    simpl. split. zify; lia.
+    intros z Hin. constructor. eapply H; eauto. simpl. zify. lia.
+    intros Hc. inv Hc. zify; lia.
   Qed.
 
   Lemma FVmap_inv_set_bound FVmap Scope Funs GFuns FVs x :
@@ -255,8 +255,8 @@ Section CC_correct.
         { unfold is_exp_ctx; reflexivity. }
         { repeat constructor. inversion 1. }
         { intros arb; repeat normalize_bound_var_ctx; normalize_sets.
-          intros Harb; inv Harb. unfold In, Range in *; zify; omega. }
-        { zify; omega. }
+          intros Harb; inv Harb. unfold In, Range in *; zify; lia. }
+        { zify; lia. }
     - eapply bind_triple.
       + eapply get_name_spec.  
       + intros x' s. eapply return_triple. intros _ s' [Hx' [Hrange [Hf Hf']]].
@@ -269,8 +269,8 @@ Section CC_correct.
         { repeat constructor; inversion 1. }
         { auto. }
         { intros arb; repeat normalize_bound_var_ctx; normalize_sets.
-          intros Harb; inv Harb. unfold In, Range in *; zify; omega. }
-        { zify; omega. }
+          intros Harb; inv Harb. unfold In, Range in *; zify; lia. }
+        { zify; lia. }
     - eapply return_triple. intros _ [s d] Hin'.      
       exists Hole_c. eexists; splits.
       { constructor; eapply Minv1. eauto. }
@@ -278,7 +278,7 @@ Section CC_correct.
       { constructor. }
       { auto. }
       { intros arb; repeat normalize_bound_var_ctx. intros Harb; inv Harb. }
-      { zify; omega. }
+      { zify; lia. }
     - assert (HScope : ~ x \in Scope). {
         intros Hc; apply Minv1 in Hc; congruence. }
       assert (HFuns : ~ x \in Funs). {
@@ -316,13 +316,13 @@ Section CC_correct.
             change (~ ?S ?x) with (~ x \in S) in *; normalize_bound_var_ctx;
               eauto with Ensembles_DB.
           rewrite Union_demorgan; split; try normalize_bound_var_ctx; eauto with Ensembles_DB.
-          intros Hc; inv Hc; unfold In, Range in *; zify; omega.
+          intros Hc; inv Hc; unfold In, Range in *; zify; lia.
         * repeat normalize_bound_var_ctx; normalize_sets; solve_Union_Inc.
           -- eapply Included_trans; [apply Singleton_Included, Hran_y|].
-             intros arb Harb; unfold Range, In in *; zify; omega.
+             intros arb Harb; unfold Range, In in *; zify; lia.
           -- eapply Included_trans; [apply Singleton_Included, Hran_g_env|].
-             intros arb Harb; unfold Range, In in *; zify; omega.
-        * unfold Range, In in *; zify; omega.
+             intros arb Harb; unfold Range, In in *; zify; lia.
+        * unfold Range, In in *; zify; lia.
       + specialize (Hin x (In_singleton _ x)).
         rewrite !In_or_Iff_Union in Hin.
         assert (HGFuns : ~ x \in GFuns). {
@@ -596,7 +596,7 @@ Section CC_correct.
       + unfold is_exp_ctx; reflexivity. + constructor.
       + auto.
       + intros x; inversion 1.
-      + zify; omega.
+      + zify; lia.
     - eapply bind_triple.
       + eapply pre_strenghtening; [|eapply get_var_project_var_sound; eauto].
         { simpl; intros ? ? [Hleft ?]; exact Hleft. }
@@ -619,11 +619,11 @@ Section CC_correct.
         * apply unique_bindings_c_comp; auto.
           eapply Disjoint_Included_l; [apply Hran|].
           eapply Disjoint_Included_r; [apply Hran'|].
-          constructor; intros arb Harb; inv Harb; unfold In, Range in *; zify; omega.
+          constructor; intros arb Harb; inv Harb; unfold In, Range in *; zify; lia.
         * normalize_bound_var_ctx.
           apply Union_Included; eapply Included_trans; try eassumption.
-          all: intros arb Harb; unfold Range, In in *; zify; omega.
-        * zify; omega.
+          all: intros arb Harb; unfold Range, In in *; zify; lia.
+        * zify; lia.
   Qed.
 
   Corollary get_vars_project_vars_sound Scope Funs GFuns gfuns c Γ FVs FVmap S xs :
@@ -645,7 +645,7 @@ Section CC_correct.
     intros Hb Hfv Hgfuns.
     eapply pre_strenghtening.
     2: apply get_vars_project_vars_sound' with (S_pre := Empty_set _) (s_pre := 1%positive); auto.
-    intros st s Hfresh; split; auto; split; eauto with Ensembles_DB; zify; omega.
+    intros st s Hfresh; split; auto; split; eauto with Ensembles_DB; zify; lia.
   Qed.
   
   Lemma to_env_BoundVar_f_eq_subdomain FVmap x S :
@@ -742,7 +742,7 @@ Section CC_correct.
          | _ => ret fe
        end).
   Proof.
-    unfold pbind, ret.
+    unfold bind, ret.
     intros r s. simpl. destruct (runState m1 r s).
     destruct e; simpl; auto.
     destruct (runState m2 r p).
@@ -874,12 +874,12 @@ Section CC_correct.
           rewrite app_length in Hnth. simpl length in *.
           destruct (N - N.of_nat (length FVs))%N eqn:Heq; simpl in Hn; try congruence.
           inv Hn. rewrite M.gss; eauto.
-          repeat f_equal. zify. omega. 
+          repeat f_equal. zify. lia. 
       + subst. intros Hget.
         rewrite M.gsspec in Hget. destruct (peq x' x).
         * subst. inv Hget. repeat split; eauto.
           rewrite nthN_app_geq. rewrite N.sub_diag. reflexivity. 
-          zify; omega. 
+          zify; lia. 
         * edestruct H3 as [_ [H1' [H2' [H3' H4']]]].
           eassumption.
           repeat split; eauto. apply nthN_is_Some_app. eassumption.
@@ -954,7 +954,7 @@ Section CC_correct.
         contradiction Hnin.
         apply Hran in H.
         apply Hfresh.
-        unfold In, Range in *; zify; omega.
+        unfold In, Range in *; zify; lia.
       + replace map_new with
         (fst ((fix
                 add_fvs (l : list M.elt) (n : N)
@@ -984,7 +984,7 @@ Section CC_correct.
         induction fv as [|v fv IHfv]; intros n vars FVmap_i Hlen Hinv Hb Hb' Hnin Hdis Hdup.
         * simpl. rewrite app_nil_r. eauto.
         * simpl. replace (vars ++ v :: fv) with ((vars ++ [v]) ++ fv). simpl.
-          eapply IHfv. rewrite app_length. simpl. zify. omega.
+          eapply IHfv. rewrite app_length. simpl. zify. lia.
           eapply FVmap_inv_set_free_var. now eauto. eassumption. 
           now intros Hc; inv Hc. now intros Hc; inv Hc. 
           { normalize_sets. apply Disjoint_sym, Disjoint_Union_l in Hdis.
@@ -1396,7 +1396,7 @@ Section CC_correct.
 
   (* move to proper file *)
   Lemma fresh_inc S x y : (y >= x)%positive -> fresh S x -> fresh S y.
-  Proof. unfold fresh, In; intros Hyx Hx; intros; apply Hx; zify; omega. Qed.
+  Proof. unfold fresh, In; intros Hyx Hx; intros; apply Hx; zify; lia. Qed.
   
   Lemma fundefs_append_used_vars : forall B1 B2 B3,
     fundefs_append B1 B2 = B3 ->
@@ -1741,25 +1741,25 @@ Section CC_correct.
           eapply return_triple.
           intros _ s'' [Hfresh [C' [Hctx' [Hcc [Hran'' [Hinc'' [Hbv'' Huniq'']]]]]]] [Hf' [Hran' Hinc']] Hf; eauto.
           split; [|exists C; splits]; auto.
-          -- eapply fresh_inc; [|eassumption]; zify; omega.
+          -- eapply fresh_inc; [|eassumption]; zify; lia.
           -- rewrite Hctx'; simpl. econstructor; [|eassumption|].
              ++ eapply FV_preserves_disjoint_inv; eauto.
              ++ eapply Closure_conversion_f_eq_subdomain; [eassumption|].
                 rewrite <- to_env_BoundVar_f_eq. apply f_eq_subdomain_extend_not_In_S_l.
                 intros Hc. inv Hc. now eauto. reflexivity. 
           -- eapply Included_trans; try eassumption.
-             intros arb Harb; unfold Range, In in *; zify; omega.
-          -- zify; omega.
+             intros arb Harb; unfold Range, In in *; zify; lia.
+          -- zify; lia.
           -- simpl. rewrite Hctx'. repeat normalize_bound_var.
              rewrite bound_var_app_ctx.
              apply Union_Included; auto with Ensembles_DB. apply Union_Included.
              ++ (* BV(C') ⊆ [s', s'') by Hran'' and [s', s'') ⊆ [s, s'') by Hinc' *)
                 eapply Included_trans; [apply Hran''|].
-                intros x Hx; right; unfold In, Range in *; zify; omega.
+                intros x Hx; right; unfold In, Range in *; zify; lia.
              ++ (* BV(C') ⊆ BV(e) ∪ {v} ∪ [s', s'') by Hbv'' and [s', s'') ⊆ [s, s'') by Hinc' *)
                 eapply Included_trans; [apply Hbv''|].
                 rewrite <- Union_assoc. apply Included_Union_compat; [apply Included_refl|].
-                intros x Hx; right; unfold In, Range in *; zify; omega.
+                intros x Hx; right; unfold In, Range in *; zify; lia.
           -- simpl. rewrite Hctx'.
              (* UB(C[Econstr v t xs (C'[e'])])
                   <=> UB(C) /\ UB(C') /\ UB(e') /\ (BV(C) # {v} # BV(C') # BV(e'))
@@ -1784,30 +1784,30 @@ Section CC_correct.
                 ** apply Hran'' in H0.
                    destruct HD1 as [HD1]. contradiction (HD1 v).
                    constructor; [|normalize_used_vars; left; left; right; left; now left].
-                   apply Hf; unfold Range, In in *; zify; omega.
+                   apply Hf; unfold Range, In in *; zify; lia.
                 ** apply Hbv'' in H0. inv H0.
                    --- now inv Huniq.
                    --- destruct HD1 as [HD1]. contradiction (HD1 v).
                        constructor; [|normalize_used_vars; left; left; right; left; now left].
-                       apply Hf; unfold Range, In in *; zify; omega.
+                       apply Hf; unfold Range, In in *; zify; lia.
              ++ normalize_bound_var.
                 rewrite bound_var_app_ctx.
                 decomp_Disjoint; splits_Disjoint.
                 ** eapply Disjoint_Included_l; [|eapply Disjoint_Included_r]; try eassumption.
-                   constructor; intros x; intros Hc; inv Hc; unfold In, Range in *; zify; omega.
+                   constructor; intros x; intros Hc; inv Hc; unfold In, Range in *; zify; lia.
                 ** eapply Disjoint_Included_l; [|eapply Disjoint_Included_r]; try eassumption.
                    apply Union_Disjoint_r.
                    --- assert (HSdis : Range (next_var (fst s)) (next_var (fst s')) \subset S). {
-                         intros x Hx; apply Hf; unfold Range, In in *; zify; omega. }
+                         intros x Hx; apply Hf; unfold Range, In in *; zify; lia. }
                        eapply Disjoint_Included_l; [apply HSdis|].
                        unfold used_vars in *.
                        eapply Disjoint_Included_r; [|apply H3].
                        normalize_bound_var...
-                   --- constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; omega.
+                   --- constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; lia.
                 ** eapply Disjoint_Included_l; [apply Hran'|].
                    constructor; intros x Hx; inv Hx. inv H8. destruct H3 as [Hc].
                    contradiction (Hc x); constructor.
-                   --- apply Hf; unfold Range, In in *; zify; omega.
+                   --- apply Hf; unfold Range, In in *; zify; lia.
                    --- normalize_used_vars; left; now left.
     - setoid_rewrite left_id.
       eapply bind_triple'.
@@ -1815,7 +1815,7 @@ Section CC_correct.
         intros x Hx. eapply Hbin1. rewrite occurs_free_Ecase_nil. eassumption.
       + intros [x f] s. eapply return_triple.
         intros _ s' [Hfresh [C [S' [[Hproj [Hctx Huniq']] [Hf' [Hran Hinc]]]]]].
-        split; [eapply fresh_inc; [|eassumption]; zify; omega|]; exists C; splits; auto.
+        split; [eapply fresh_inc; [|eassumption]; zify; lia|]; exists C; splits; auto.
         { econstructor; [| eassumption | constructor].
           eapply FV_preserves_disjoint_inv; eauto. }
         { simpl; normalize_bound_var; eauto with Ensembles_DB. }
@@ -1849,7 +1849,7 @@ Section CC_correct.
         eapply pre_strenghtening.
         2: eapply H0 with (FVmap := FVmap) (Γ := Γ) (c := c0); try eassumption.
         { simpl. intros _ s Hconj; decompose [and] Hconj. intros arb Harb.
-          apply Hfresh. zify; omega. }
+          apply Hfresh. zify; lia. }
         * (* FV(Ecase v l) ⊆ FV(Ecase v ((c, e) :: l)) *)
           clear - Hbin1; normalize_occurs_free_in_ctx.
           intros x Hx. specialize (Hbin1 x).
@@ -1869,25 +1869,25 @@ Section CC_correct.
           edestruct e''; eapply return_triple;
             intros _ s''' [Hpre [Hfresh_s''' [C2 [Hctx2 [Hcc2' Hf2]]]]]; inv Hcc2'.
           destruct Hf2 as [HbvC2 [Hinc'' [Hbv_case Huniq'']]], Hpre as [HbvC [Hinc' [Hbv_e Huniq_e]]].
-          split; [eapply fresh_inc; [|eassumption]; zify; omega|]; eexists; splits.
+          split; [eapply fresh_inc; [|eassumption]; zify; lia|]; eexists; splits.
           { eassumption. }
           { econstructor; try eassumption.
             constructor; auto; splits; auto; simpl.
             rewrite Hctx; repeat eexists; eauto. }
           { (* Follows from HbvC2, Hinc' *)
             eapply Included_trans; [apply HbvC2|].
-            intros x Hx; unfold In, Range in *; zify; omega. }
-          { zify; omega. }
+            intros x Hx; unfold In, Range in *; zify; lia. }
+          { zify; lia. }
           { simpl; repeat normalize_bound_var. rewrite Hctx.
             rewrite bound_var_app_ctx.
             (* Follows from HbvC, Hinc'', Hbv_e, Hbv_case *)
             solve_Union_Inc.
             - eapply Included_trans; [apply Hinc'|].
-              intros x Hx; right; unfold In, Range in *; zify; omega.
+              intros x Hx; right; unfold In, Range in *; zify; lia.
             - eapply Included_trans; [apply Huniq_e|]; solve_Union_Inc.
-              intros x Hx; right; unfold In, Range in *; zify; omega.
+              intros x Hx; right; unfold In, Range in *; zify; lia.
             - eapply Included_trans; [apply Hbv_case|]; solve_Union_Inc.
-              intros x Hx; right; unfold In, Range in *; zify; omega. }
+              intros x Hx; right; unfold In, Range in *; zify; lia. }
           { simpl. unfold is_exp_ctx in Hctx. rewrite Hctx.
              rewrite (proj1 (ub_app_ctx_f _)); splits.
              - rewrite (proj1 (ub_app_ctx_f _)) in Huniq''.
@@ -1902,9 +1902,9 @@ Section CC_correct.
                  * constructor; intros x Hx; inv Hx.
                    destruct HD1 as [HD1]; contradiction (HD1 x).
                    constructor.
-                   -- apply Hfresh; unfold In, Range in *; zify; omega.
+                   -- apply Hfresh; unfold In, Range in *; zify; lia.
                    -- unfold used_vars; normalize_bound_var; left; left; right; left; now right.
-                 * constructor; intros x Hx; inv Hx; unfold In, Range in *; zify; omega.
+                 * constructor; intros x Hx; inv Hx; unfold In, Range in *; zify; lia.
                  * destruct Huniq_e as [Hbve' Huniq_e].
                    eapply Disjoint_Included_l; [apply Hbve'|].
                    eapply Disjoint_Included_r; [apply Hbv_case|].
@@ -1913,28 +1913,28 @@ Section CC_correct.
                    -- constructor; intros x Hx; inv Hx.
                       destruct HD1 as [HD1]; contradiction (HD1 x).
                       constructor.
-                      ++ apply Hfresh; unfold In, Range in *; zify; omega.
+                      ++ apply Hfresh; unfold In, Range in *; zify; lia.
                       ++ unfold used_vars; normalize_bound_var; left; left; right; left; now right.
                    -- constructor; intros x Hx; inv Hx.
                       destruct HD1 as [HD1]; contradiction (HD1 x).
                       constructor.
-                      ++ apply Hfresh; unfold In, Range in *; zify; omega.
+                      ++ apply Hfresh; unfold In, Range in *; zify; lia.
                       ++ unfold used_vars; normalize_bound_var; left; left; right; left; now left.
-                   -- constructor; intros x Hx; inv Hx; unfold In, Range in *; zify; omega.
+                   -- constructor; intros x Hx; inv Hx; unfold In, Range in *; zify; lia.
              - normalize_bound_var. rewrite bound_var_app_ctx; splits_Disjoint.
                + eapply Disjoint_Included_l; [apply HbvC2|].
                  eapply Disjoint_Included_r; [apply Hinc'|].
-                 constructor; intros x Hx; inv Hx; unfold In, Range in *; zify; omega.
+                 constructor; intros x Hx; inv Hx; unfold In, Range in *; zify; lia.
                + eapply Disjoint_Included_l; [apply HbvC2|].
                  destruct Huniq_e as [Hbv_e' Huniq'].
                  eapply Disjoint_Included_r; [apply Hbv_e'|]; splits_Disjoint.
                  * constructor; intros x Hx; inv Hx.
                    destruct HD1 as [HD1]; contradiction (HD1 x).
                    constructor.
-                   -- apply Hfresh; unfold In, Range in *; zify; omega.
+                   -- apply Hfresh; unfold In, Range in *; zify; lia.
                    -- unfold used_vars; normalize_bound_var; left; left; right; left; now left.
                  * constructor; intros x Hx; inv Hx.
-                   unfold In, Range in *; zify; omega.
+                   unfold In, Range in *; zify; lia.
                + rewrite (proj1 (ub_app_ctx_f _)) in Huniq''.
                  now destruct Huniq'' as [HunqiC2 [Huniqcase HdisC2]]. }
     - eapply bind_triple'.
@@ -1988,7 +1988,7 @@ Section CC_correct.
           intros Hc; contradiction HD2; normalize_used_vars; right; now right.
         * intros e' s'. eapply return_triple.
           intros _ s'' [Hfresh' [C' [Hctx' [Hcc [HbvC' [Hinc' [Hbv' Huniq'']]]]]]] [Hfresh'' [HbvC Hinc]].
-          split; [eapply fresh_inc; [|eassumption]; zify; omega|].
+          split; [eapply fresh_inc; [|eassumption]; zify; lia|].
           eexists; splits. { eassumption. }
           { simpl. rewrite Hctx'. econstructor; try eassumption.
             - eapply Disjoint_free_set in Minv.
@@ -2002,15 +2002,15 @@ Section CC_correct.
               rewrite <- to_env_BoundVar_f_eq. apply f_eq_subdomain_extend_not_In_S_l.
               + intros Hc. inv Hc. now eauto.
               + reflexivity. }
-          { eapply Included_trans; [apply HbvC|]. intros x' Hx; unfold In, Range in *; zify; omega. }
-          { zify; omega. }
+          { eapply Included_trans; [apply HbvC|]. intros x' Hx; unfold In, Range in *; zify; lia. }
+          { zify; lia. }
           { simpl; repeat normalize_bound_var. rewrite Hctx'.
             rewrite bound_var_app_ctx.
             solve_Union_Inc.
             - eapply Included_trans; [apply HbvC'|].
-              intros x' Hx; right; unfold In, Range in *; zify; omega.
+              intros x' Hx; right; unfold In, Range in *; zify; lia.
             - eapply Included_trans; [apply Hbv'|]; solve_Union_Inc.
-              intros x' Hx; right; unfold In, Range in *; zify; omega. }
+              intros x' Hx; right; unfold In, Range in *; zify; lia. }
           { simpl; rewrite Hctx'.
              rewrite (proj1 (ub_app_ctx_f _)); splits; auto.
              ++ constructor; auto.
@@ -2019,30 +2019,30 @@ Section CC_correct.
                 ** apply HbvC' in H0.
                    destruct HD1 as [HD1]. contradiction (HD1 v).
                    constructor; [|normalize_used_vars; left; left; right; now left].
-                   apply Hfresh; unfold Range, In in *; zify; omega.
+                   apply Hfresh; unfold Range, In in *; zify; lia.
                 ** apply Hbv' in H0. inv H0.
                    --- now inv Huniq.
                    --- destruct HD1 as [HD1]. contradiction (HD1 v).
                        constructor; [|normalize_used_vars; left; left; right; now left].
-                       apply Hfresh; unfold Range, In in *; zify; omega.
+                       apply Hfresh; unfold Range, In in *; zify; lia.
              ++ normalize_bound_var.
                 rewrite bound_var_app_ctx.
                 decomp_Disjoint; splits_Disjoint.
                 ** eapply Disjoint_Included_l; [|eapply Disjoint_Included_r]; try eassumption.
-                   constructor; intros x'; intros Hc; inv Hc; unfold In, Range in *; zify; omega.
+                   constructor; intros x'; intros Hc; inv Hc; unfold In, Range in *; zify; lia.
                 ** eapply Disjoint_Included_l; [|eapply Disjoint_Included_r]; try eassumption.
                    apply Union_Disjoint_r.
                    --- assert (HSdis : Range (next_var (fst s)) (next_var (fst s')) \subset S). {
-                         intros x' Hx; apply Hfresh; unfold Range, In in *; zify; omega. }
+                         intros x' Hx; apply Hfresh; unfold Range, In in *; zify; lia. }
                        eapply Disjoint_Included_l; [apply HSdis|].
                        unfold used_vars in *.
                        eapply Disjoint_Included_r; [|apply H3].
                        normalize_bound_var...
-                   --- constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; omega.
+                   --- constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; lia.
                 ** eapply Disjoint_Included_l; [apply HbvC|].
                    constructor; intros x' Hx; inv Hx. inv H8. destruct H3 as [Hc].
                    contradiction (Hc x'); constructor.
-                   --- apply Hfresh; unfold Range, In in *; zify; omega.
+                   --- apply Hfresh; unfold Range, In in *; zify; lia.
                    --- normalize_used_vars; now left. }
     - eapply bind_triple'; [apply get_var_project_var_sound; try eassumption|].
       { (* f ∈ FV(let x = f(ys) in e) *)
@@ -2148,7 +2148,7 @@ Section CC_correct.
       apply pre_curry_rl; intros Hcc_e'.
       apply return_triple.
       intros _ s_final [Hfresh_final [HbvC_e' [Hinc_e' [Hbv_e' Huniq_e']]]].
-      split; [eapply fresh_inc; [|eassumption]; zify; omega|]; exists (comp_ctx_f C_f C_ys); splits.
+      split; [eapply fresh_inc; [|eassumption]; zify; lia|]; exists (comp_ctx_f C_f C_ys); splits.
       { unfold is_exp_ctx; simpl; intros ?. now rewrite Hctx, Hctx_ys, app_ctx_f_fuse. }
       { simpl. unfold is_exp_ctx in Hctx_e'; rewrite Hctx_e'.
         eapply CC_Eletapp with (S := S).
@@ -2156,62 +2156,62 @@ Section CC_correct.
         - econstructor; eassumption.
         - auto.
         - now inv HS_Γ'.
-        - intros Hc; subst; unfold In, Range in *; zify; omega. (* ptr ∈ [s_ptr, s_Γ') while Γ' ∈ [s_Γ', s_e') *)
+        - intros Hc; subst; unfold In, Range in *; zify; lia. (* ptr ∈ [s_ptr, s_Γ') while Γ' ∈ [s_Γ', s_e') *)
         - eapply Closure_conversion_f_eq_subdomain. eassumption.
           rewrite <- to_env_BoundVar_f_eq. apply f_eq_subdomain_extend_not_In_S_l.
           + intros Hc. inv Hc. now eauto.
           + reflexivity. }
         { (* Follows from HbvC, Hinc' *)
           normalize_bound_var_ctx; solve_Union_Inc.
-          - eapply Included_trans; [apply HbvC_f|]; intros x' Hx; unfold In, Range in *; zify; omega.
-          - eapply Included_trans; [apply HbvC_ys|]; intros x' Hx; unfold In, Range in *; zify; omega. }
-        { zify; omega. }
+          - eapply Included_trans; [apply HbvC_f|]; intros x' Hx; unfold In, Range in *; zify; lia.
+          - eapply Included_trans; [apply HbvC_ys|]; intros x' Hx; unfold In, Range in *; zify; lia. }
+        { zify; lia. }
         { simpl; repeat normalize_bound_var. rewrite Hctx_e'.
           rewrite bound_var_app_ctx.
           solve_Union_Inc.
-          - eapply Included_trans; [apply HbvC_e'|]; intros x' Hx; right; unfold In, Range in *; zify; omega.
+          - eapply Included_trans; [apply HbvC_e'|]; intros x' Hx; right; unfold In, Range in *; zify; lia.
           - eapply Included_trans; [apply Hbv_e'|]; solve_Union_Inc.
-            intros x' Hx; right; unfold In, Range in *; zify; omega.
-          - intros x' Hx; inv Hx; right; unfold In, Range in *; zify; omega.
-          - intros x' Hx; inv Hx; right; unfold In, Range in *; zify; omega. }
+            intros x' Hx; right; unfold In, Range in *; zify; lia.
+          - intros x' Hx; inv Hx; right; unfold In, Range in *; zify; lia.
+          - intros x' Hx; inv Hx; right; unfold In, Range in *; zify; lia. }
         { simpl; rewrite Hctx_e'.
           rewrite (proj1 (ub_app_ctx_f _)); splits.
           - apply unique_bindings_c_comp; auto.
             eapply Disjoint_Included_l; [apply HbvC_f|].
             eapply Disjoint_Included_r; [apply HbvC_ys|].
-            constructor; intros x' Hx; inv Hx; unfold In, Range in *; zify; omega.
+            constructor; intros x' Hx; inv Hx; unfold In, Range in *; zify; lia.
           - constructor; auto.
             { change (~ ?S ?x) with (~ x \in S).
               repeat normalize_bound_var. rewrite bound_var_app_ctx.
               rewrite !Union_demorgan; splits.
-              - intros Hc; apply HbvC_e' in Hc. unfold Range, In in *; zify; omega.
+              - intros Hc; apply HbvC_e' in Hc. unfold Range, In in *; zify; lia.
               - intros Hc; apply Hbv_e' in Hc.
-                inv Hc; [|unfold Range, In in *; zify; omega].
+                inv Hc; [|unfold Range, In in *; zify; lia].
                 destruct HD1 as [HD1]; contradiction (HD1 ptr).
                 constructor.
-                + apply Hfresh; unfold Range, In in *; zify; omega.
+                + apply Hfresh; unfold Range, In in *; zify; lia.
                 + unfold used_vars; normalize_bound_var; left; left; right; left; now left.
               - intros Hc; inv Hc. 
                 destruct HD1 as [HD1]; contradiction (HD1 ptr).
                 constructor.
-                + apply Hfresh; unfold Range, In in *; zify; omega.
+                + apply Hfresh; unfold Range, In in *; zify; lia.
                 + unfold used_vars; normalize_bound_var; left; left; right; left; now right.
-              - intros Hc; inv Hc. unfold Range, In in *; zify; omega. }
+              - intros Hc; inv Hc. unfold Range, In in *; zify; lia. }
             constructor; auto.
             { change (~ ?S ?x) with (~ x \in S).
               repeat normalize_bound_var; rewrite bound_var_app_ctx.
               rewrite !Union_demorgan; splits.
-              - intros Hc; apply HbvC_e' in Hc. unfold Range, In in *; zify; omega.
+              - intros Hc; apply HbvC_e' in Hc. unfold Range, In in *; zify; lia.
               - intros Hc; apply Hbv_e' in Hc.
-                inv Hc; [|unfold Range, In in *; zify; omega].
+                inv Hc; [|unfold Range, In in *; zify; lia].
                 destruct HD1 as [HD1]; contradiction (HD1 Γ').
                 constructor.
-                + apply Hfresh; unfold Range, In in *; zify; omega.
+                + apply Hfresh; unfold Range, In in *; zify; lia.
                 + unfold used_vars; normalize_bound_var; left; left; right; left; now left.
               - intros Hc; inv Hc. 
                 destruct HD1 as [HD1]; contradiction (HD1 Γ').
                 constructor.
-                + apply Hfresh; unfold Range, In in *; zify; omega.
+                + apply Hfresh; unfold Range, In in *; zify; lia.
                 + unfold used_vars; normalize_bound_var; left; left; right; left; now right. }
             constructor; auto.
             { change (~ ?S ?x) with (~ x \in S).
@@ -2219,60 +2219,60 @@ Section CC_correct.
               - intros Hc; apply HbvC_e' in Hc.
                 destruct HD1 as [HD1]; contradiction (HD1 x).
                 constructor.
-                + apply Hfresh; unfold Range, In in *; zify; omega.
+                + apply Hfresh; unfold Range, In in *; zify; lia.
                 + unfold used_vars; normalize_bound_var; left; left; right; left; now right.
               - intros Hc; apply Hbv_e' in Hc. inv Hc.
                 + now inv Huniq.
                 + destruct HD1 as [HD1]; contradiction (HD1 x).
                   constructor.
-                  * apply Hfresh; unfold Range, In in *; zify; omega.
+                  * apply Hfresh; unfold Range, In in *; zify; lia.
                   * unfold used_vars; normalize_bound_var; left; left; right; left; now right. }
           - normalize_bound_var_ctx. repeat normalize_bound_var.
             rewrite bound_var_app_ctx. splits_Disjoint.
             + eapply Disjoint_Included_l; [apply HbvC_f|].
               eapply Disjoint_Included_r; [apply HbvC_e'|].
-              constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; omega.
+              constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; lia.
             + eapply Disjoint_Included_l; [apply HbvC_ys|].
               eapply Disjoint_Included_r; [apply HbvC_e'|].
-              constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; omega.
+              constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; lia.
             + eapply Disjoint_Included_l; [apply HbvC_f|].
               eapply Disjoint_Included_r; [apply Hbv_e'|].
-              splits_Disjoint; [|constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; omega].
+              splits_Disjoint; [|constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; lia].
               constructor; intros x' Hx; inv Hx. destruct HD1 as [HD1]; contradiction (HD1 x').
               constructor.
-              * apply Hfresh; unfold In, Range in *; zify; omega.
+              * apply Hfresh; unfold In, Range in *; zify; lia.
               * unfold used_vars; normalize_bound_var; left; left; right; left; now left.
             + eapply Disjoint_Included_l; [apply HbvC_ys|].
               eapply Disjoint_Included_r; [apply Hbv_e'|].
-              splits_Disjoint; [|constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; omega].
+              splits_Disjoint; [|constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; lia].
               constructor; intros x' Hx; inv Hx. destruct HD1 as [HD1]; contradiction (HD1 x').
               constructor.
-              * apply Hfresh; unfold In, Range in *; zify; omega.
+              * apply Hfresh; unfold In, Range in *; zify; lia.
               * unfold used_vars; normalize_bound_var; left; left; right; left; now left.
             + eapply Disjoint_Included_l; [apply HbvC_f|].
               constructor; intros x' Hx; inv Hx. inv H1.
               destruct HD1 as [HD1]; contradiction (HD1 x').
               constructor.
-              * apply Hfresh; unfold In, Range in *; zify; omega.
+              * apply Hfresh; unfold In, Range in *; zify; lia.
               * unfold used_vars; normalize_bound_var; left; left; right; left; now right.
             + eapply Disjoint_Included_l; [apply HbvC_ys|].
               constructor; intros x' Hx; inv Hx. inv H1.
               destruct HD1 as [HD1]; contradiction (HD1 x').
               constructor.
-              * apply Hfresh; unfold In, Range in *; zify; omega.
+              * apply Hfresh; unfold In, Range in *; zify; lia.
               * unfold used_vars; normalize_bound_var; left; left; right; left; now right.
             + eapply Disjoint_Included_l; [apply HbvC_f|].
               constructor; intros x' Hx; inv Hx. inv H1.
-              unfold In, Range in *; zify; omega.
+              unfold In, Range in *; zify; lia.
             + eapply Disjoint_Included_l; [apply HbvC_ys|].
               constructor; intros x' Hx; inv Hx. inv H1.
-              unfold In, Range in *; zify; omega.
+              unfold In, Range in *; zify; lia.
             + eapply Disjoint_Included_l; [apply HbvC_f|].
               constructor; intros x' Hx; inv Hx. inv H1.
-              unfold In, Range in *; zify; omega.
+              unfold In, Range in *; zify; lia.
             + eapply Disjoint_Included_l; [apply HbvC_ys|].
               constructor; intros x' Hx; inv Hx. inv H1.
-              unfold In, Range in *; zify; omega. }
+              unfold In, Range in *; zify; lia. }
     - remember (filter _ _) as FVs_pre eqn:HFVs_pre.
       remember (match FVs_pre with [] => true | _ :: _ => false end) as is_closed eqn:Hclos.
       assert (HFVs_pre_eq : FromList FVs_pre <--> occurs_free_fundefs f2 \\ GFuns). {
@@ -2537,7 +2537,7 @@ Section CC_correct.
       intros e' s_e'; apply return_triple.
       intros _ s_final [[Hfresh_e' [HbvB' [Hinc_e' Huniq_B']]]
                           [Hfresh_final [C_e' [Hctx_e' [Hcc_e' [HbvC_e' [Hinc_final [Hbv_e' Huniq_e']]]]]]]].
-      split; [eapply fresh_inc; [|eassumption]; zify; omega|].
+      split; [eapply fresh_inc; [|eassumption]; zify; lia|].
       exists (comp_ctx_f C_env (Econstr_c Γ' c' FVs' Hole_c)); splits.
       + simpl; unfold is_exp_ctx; intros expr. now rewrite Hctx_env.
       + simpl. unfold is_exp_ctx in Hctx_e'; rewrite Hctx_e'.
@@ -2600,18 +2600,18 @@ Section CC_correct.
         (* BV(C_env) ⊆ [s_Γ', s_final) by HbvC_env
            {Γ'} ⊆ [s_Γ', s_env) ⊆ [s_Γ', s_final) by Hran_Γ' and Hinc* *)
         solve_Union_Inc.
-        * eapply Included_trans; [apply HbvC_env|]. intros x Hx; unfold In, Range in *; zify; omega.
-        * intros x Hx; inv Hx; unfold In, Range in *; zify; omega.
-      + zify; omega.
+        * eapply Included_trans; [apply HbvC_env|]. intros x Hx; unfold In, Range in *; zify; lia.
+        * intros x Hx; inv Hx; unfold In, Range in *; zify; lia.
+      + zify; lia.
       + simpl; unfold is_exp_ctx in Hctx_e'; rewrite Hctx_e'; repeat normalize_bound_var.
         rewrite bound_var_app_ctx.
         solve_Union_Inc.
         * eapply Included_trans; [apply HbvB'|]; solve_Union_Inc.
-          intros x Hx; right; unfold In, Range in *; zify; omega.
+          intros x Hx; right; unfold In, Range in *; zify; lia.
         * eapply Included_trans; [apply HbvC_e'|]; solve_Union_Inc.
-          intros x Hx; right; unfold In, Range in *; zify; omega.
+          intros x Hx; right; unfold In, Range in *; zify; lia.
         * eapply Included_trans; [apply Hbv_e'|]; solve_Union_Inc.
-          intros x Hx; right; unfold In, Range in *; zify; omega.
+          intros x Hx; right; unfold In, Range in *; zify; lia.
       + simpl; unfold is_exp_ctx in Hctx_e'; rewrite Hctx_e'.
         rewrite <- app_ctx_f_fuse; simpl.
         rewrite (proj1 (ub_app_ctx_f _)); splits; auto.
@@ -2624,35 +2624,35 @@ Section CC_correct.
           -- rewrite !Union_demorgan; splits.
              ++ intros Hc. apply HbvB' in Hc. inv Hc.
                 ** destruct HD1 as [HD1]; contradiction (HD1 Γ').
-                   constructor; [apply HS_Γ'; unfold Range, In in *; zify; omega|].
+                   constructor; [apply HS_Γ'; unfold Range, In in *; zify; lia|].
                    unfold used_vars; normalize_bound_var; constructor; left; right; left; now left.
-                ** unfold In, Range in *; zify; omega.
-             ++ intros Hc; apply HbvC_e' in Hc; unfold In, Range in *; zify; omega.
+                ** unfold In, Range in *; zify; lia.
+             ++ intros Hc; apply HbvC_e' in Hc; unfold In, Range in *; zify; lia.
              ++ intros Hc; apply Hbv_e' in Hc; inv Hc.
                 ** destruct HD1 as [HD1]; contradiction (HD1 Γ').
-                   constructor; [apply HS_Γ'; unfold Range, In in *; zify; omega|].
+                   constructor; [apply HS_Γ'; unfold Range, In in *; zify; lia|].
                    unfold used_vars; normalize_bound_var; constructor; left; right; left; now right.
-                ** unfold In, Range in *; zify; omega.
+                ** unfold In, Range in *; zify; lia.
           -- splits_Disjoint.
              ++ eapply Disjoint_Included_l; [apply HbvC_e'|].
                 eapply Disjoint_Included_r; [apply HbvB'|]; splits_Disjoint.
                 ** constructor; intros x Hx; inv Hx.
                    destruct HD1 as [HD1]; contradiction (HD1 x).
-                   constructor; [apply HS_Γ'; unfold Range, In in *; zify; omega|].
+                   constructor; [apply HS_Γ'; unfold Range, In in *; zify; lia|].
                    unfold used_vars; normalize_bound_var; constructor; left; right; left; now left.
-                ** constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; omega.
+                ** constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; lia.
              ++ eapply Disjoint_Included_l; [apply Hbv_e'|].
                 eapply Disjoint_Included_r; [apply HbvB'|]; splits_Disjoint.
                 ** now inv Huniq.
                 ** constructor; intros x Hx; inv Hx.
                    destruct HD1 as [HD1]; contradiction (HD1 x).
-                   constructor; [apply HS_Γ'; unfold Range, In in *; zify; omega|].
+                   constructor; [apply HS_Γ'; unfold Range, In in *; zify; lia|].
                    unfold used_vars; normalize_bound_var; constructor; left; right; left; now left.
                 ** constructor; intros x Hx; inv Hx.
                    destruct HD1 as [HD1]; contradiction (HD1 x).
-                   constructor; [apply HS_Γ'; unfold Range, In in *; zify; omega|].
+                   constructor; [apply HS_Γ'; unfold Range, In in *; zify; lia|].
                    unfold used_vars; normalize_bound_var; constructor; left; right; left; now right.
-                ** constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; omega.
+                ** constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; lia.
         * repeat normalize_bound_var; rewrite bound_var_app_ctx.
           splits_Disjoint.
           -- eapply Disjoint_Included_l; [apply HbvC_env|].
@@ -2660,22 +2660,22 @@ Section CC_correct.
              splits_Disjoint.
              ++ constructor; intros x Hx; inv Hx.
                 destruct HD1 as [HD1]; contradiction (HD1 x).
-                constructor; [apply HS_Γ'; unfold Range, In in *; zify; omega|].
+                constructor; [apply HS_Γ'; unfold Range, In in *; zify; lia|].
                 unfold used_vars; normalize_bound_var; constructor; left; right; left; now left.
-             ++ constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; omega.
+             ++ constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; lia.
           -- eapply Disjoint_Included_l; [apply HbvC_env|].
              eapply Disjoint_Included_r; [apply HbvC_e'|].
-             constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; omega.
+             constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; lia.
           -- eapply Disjoint_Included_l; [apply HbvC_env|].
              eapply Disjoint_Included_r; [apply Hbv_e'|].
              splits_Disjoint.
              ++ constructor; intros x Hx; inv Hx.
                 destruct HD1 as [HD1]; contradiction (HD1 x).
-                constructor; [apply HS_Γ'; unfold Range, In in *; zify; omega|].
+                constructor; [apply HS_Γ'; unfold Range, In in *; zify; lia|].
                 unfold used_vars; normalize_bound_var; constructor; left; right; left; now right.
-             ++ constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; omega.
+             ++ constructor; intros x Hx; inv Hx; unfold Range, In in *; zify; lia.
           -- eapply Disjoint_Included_l; [apply HbvC_env|].
-             constructor; intros x Hx; inv Hx. inv H2. unfold In, Range in *; zify; omega.
+             constructor; intros x Hx; inv Hx. inv H2. unfold In, Range in *; zify; lia.
     - eapply bind_triple'.
       + eapply get_var_project_var_sound; try eassumption.
         eapply Included_trans; [|apply Hbin1].
@@ -2705,7 +2705,7 @@ Section CC_correct.
           intros x'' s3. eapply pre_curry_l. intros Hf2. 
           eapply return_triple.
           intros _ s5 Hf5. simpl.
-          split; [eapply fresh_inc; [|eassumption]; zify; omega|].
+          split; [eapply fresh_inc; [|eassumption]; zify; lia|].
           exists (comp_ctx_f C1 C2); splits.
           { intros e. rewrite <- app_ctx_f_fuse. congruence. }
           { eapply CC_Eapp with (S := S).
@@ -2714,17 +2714,17 @@ Section CC_correct.
             - intuition.
             - (* Hf5 *) destruct Hf5 as [Hf5 _]. now inv Hf5.
             - (* Ranges in Hf2, Hf5 *) intros Hc; subst; decompose [and] Hf2; decompose [and] Hf5.
-              unfold Range, In in *; zify; omega. }
+              unfold Range, In in *; zify; lia. }
           { (* Ranges and Hf1, HF5 *)
             normalize_bound_var_ctx; solve_Union_Inc.
             - eapply Included_trans; [apply (proj1 (proj2 Hfresh'))|].
-              intros x''' Hx; unfold Range, In in *; zify; omega.
+              intros x''' Hx; unfold Range, In in *; zify; lia.
             - eapply Included_trans; [apply (proj1 Hf1)|].
-              intros x''' Hx; unfold Range, In in *; zify; omega. }
-          { zify; omega. }
+              intros x''' Hx; unfold Range, In in *; zify; lia. }
+          { zify; lia. }
           { repeat normalize_bound_var; repeat normalize_sets.
             (* Ranges in Hf2, Hf5 *)
-            solve_Union_Inc; intros arb Harb; inv Harb; unfold In, Range in *; zify; omega. }
+            solve_Union_Inc; intros arb Harb; inv Harb; unfold In, Range in *; zify; lia. }
           { rewrite <- app_ctx_f_fuse.
             destruct Hfresh' as [Hfresh' [HbvC1 HincC1]].
             destruct Hf1 as [HbvC2 HincC2].
@@ -2740,18 +2740,18 @@ Section CC_correct.
               + inversion 1.
             - repeat normalize_bound_var; repeat normalize_sets; splits_Disjoint.
               + eapply Disjoint_Included_l; [apply HbvC2|].
-                constructor; intros arb Harb; inv Harb. inv H0. unfold In, Range in *; zify; omega.
+                constructor; intros arb Harb; inv Harb. inv H0. unfold In, Range in *; zify; lia.
               + eapply Disjoint_Included_l; [apply HbvC2|].
-                constructor; intros arb Harb; inv Harb. inv H0. unfold In, Range in *; zify; omega.
+                constructor; intros arb Harb; inv Harb. inv H0. unfold In, Range in *; zify; lia.
             - rewrite bound_var_app_ctx; repeat normalize_bound_var; repeat normalize_sets.
               splits_Disjoint.
               + eapply Disjoint_Included_l; [apply HbvC1|].
                 eapply Disjoint_Included_r; [apply HbvC2|].
-                constructor; intros arb Harb; inv Harb; unfold In, Range in *; zify; omega.
+                constructor; intros arb Harb; inv Harb; unfold In, Range in *; zify; lia.
               + eapply Disjoint_Included_l; [apply HbvC1|].
-                constructor; intros arb Harb; inv Harb. inv H0. unfold In, Range in *; zify; omega.
+                constructor; intros arb Harb; inv Harb. inv H0. unfold In, Range in *; zify; lia.
               + eapply Disjoint_Included_l; [apply HbvC1|].
-                constructor; intros arb Harb; inv Harb. inv H0. unfold In, Range in *; zify; omega. }
+                constructor; intros arb Harb; inv Harb. inv H0. unfold In, Range in *; zify; lia. }
     - eapply bind_triple'.
       + eapply get_vars_project_vars_sound; try eassumption.
         intros x Hx. eapply Hbin1. eauto.
@@ -2801,7 +2801,7 @@ Section CC_correct.
           intros Hc; contradiction HD2; normalize_used_vars; now right.
         * intros e' s'. eapply return_triple.
           intros _ s'' [[Hfresh' [HbvC Hinc]] [Hfresh'' [C' [Hctx' [Hcc [HbvC' [Hinc' [Hbve' Huniq'']]]]]]]]; eauto.
-          split; [eapply fresh_inc; [|eassumption]; zify; omega|].
+          split; [eapply fresh_inc; [|eassumption]; zify; lia|].
           eexists; splits.
           { now eapply Hctx. }
           { simpl. unfold is_exp_ctx in Hctx'. rewrite Hctx'. econstructor; [| eassumption |].
@@ -2810,13 +2810,13 @@ Section CC_correct.
               rewrite <- to_env_BoundVar_f_eq. apply f_eq_subdomain_extend_not_In_S_l.
               intros Hc. inv Hc. now eauto. reflexivity. }
           { (* HbvC and s'' > s' *)
-            eapply Included_trans; [apply HbvC|]; intros x Hx; unfold Range, In in *; zify; omega. }
-          { zify; omega. }
+            eapply Included_trans; [apply HbvC|]; intros x Hx; unfold Range, In in *; zify; lia. }
+          { zify; lia. }
           { simpl; normalize_bound_var. unfold is_exp_ctx in Hctx'; rewrite Hctx'.
             rewrite bound_var_app_ctx. solve_Union_Inc.
-            - eapply Included_trans; [apply HbvC'|]. right; unfold Range, In in *; zify; omega.
+            - eapply Included_trans; [apply HbvC'|]. right; unfold Range, In in *; zify; lia.
             - eapply Included_trans; [apply Hbve'|]; normalize_bound_var; solve_Union_Inc.
-              right; unfold Range, In in *; zify; omega. }
+              right; unfold Range, In in *; zify; lia. }
           { simpl. rewrite Hctx'.
              rewrite (proj1 (ub_app_ctx_f _)); splits; auto.
              ++ constructor; auto.
@@ -2825,42 +2825,42 @@ Section CC_correct.
                 ** apply HbvC' in H0.
                    destruct HD1 as [HD1]. contradiction (HD1 v).
                    constructor; [|normalize_used_vars; left; left; right; left; now left].
-                   apply Hfresh; unfold Range, In in *; zify; omega.
+                   apply Hfresh; unfold Range, In in *; zify; lia.
                 ** apply Hbve' in H0. inv H0.
                    --- now inv Huniq.
                    --- destruct HD1 as [HD1]. contradiction (HD1 v).
                        constructor; [|normalize_used_vars; left; left; right; left; now left].
-                       apply Hfresh; unfold Range, In in *; zify; omega.
+                       apply Hfresh; unfold Range, In in *; zify; lia.
              ++ normalize_bound_var.
                 rewrite bound_var_app_ctx.
                 decomp_Disjoint; splits_Disjoint.
                 ** eapply Disjoint_Included_l; [|eapply Disjoint_Included_r]; try eassumption.
-                   constructor; intros x'; intros Hc; inv Hc; unfold In, Range in *; zify; omega.
+                   constructor; intros x'; intros Hc; inv Hc; unfold In, Range in *; zify; lia.
                 ** eapply Disjoint_Included_l; [|eapply Disjoint_Included_r]; try eassumption.
                    apply Union_Disjoint_r.
                    --- assert (HSdis : Range (next_var (fst s)) (next_var (fst s')) \subset S). {
-                         intros x' Hx; apply Hfresh; unfold Range, In in *; zify; omega. }
+                         intros x' Hx; apply Hfresh; unfold Range, In in *; zify; lia. }
                        eapply Disjoint_Included_l; [apply HSdis|].
                        unfold used_vars in *.
                        eapply Disjoint_Included_r; [|apply H3].
                        normalize_bound_var...
-                   --- constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; omega.
+                   --- constructor; intros x' Hx; inv Hx; unfold Range, In in *; zify; lia.
                 ** eapply Disjoint_Included_l; [apply HbvC|].
                    constructor; intros x' Hx; inv Hx. inv H8. destruct H3 as [Hc].
                    contradiction (Hc x'); constructor.
-                   --- apply Hfresh; unfold Range, In in *; zify; omega.
+                   --- apply Hfresh; unfold Range, In in *; zify; lia.
                    --- normalize_used_vars; left; now left. }
     - eapply bind_triple'. eapply get_var_project_var_sound; eauto.
       { eapply Included_trans; [|apply Hbin1]. normalize_occurs_free... }
       intros [x f] s1. apply return_triple.
       intros _ s2 [Hfresh [C [S' [[Hproj [Hctx Huniq']] Hf]]]].
-      split; [eapply fresh_inc; [|eassumption]; zify; omega|].
+      split; [eapply fresh_inc; [|eassumption]; zify; lia|].
       eexists; splits.
       + eassumption.
       + simpl. econstructor; try eassumption.
         eapply FV_preserves_disjoint_inv; eauto.
       + intuition.
-      + zify; omega.
+      + zify; lia.
       + simpl; normalize_bound_var; eauto with Ensembles_DB.
       + simpl. rewrite (proj1 (ub_app_ctx_f _)); splits; auto.
         * constructor.
@@ -2981,7 +2981,7 @@ Section CC_correct.
       intros B' s_B'; apply return_triple.
       intros _ s_final [[Hfresh_B' [HbvC_e [Hinc_B' [Hbv_e' Huniq_e']]]]
                           [Hfresh_final [Hcc_B' [Hbv_B' [Hinc_final' Huniq_B']]]]].
-      split; [eapply fresh_inc; [|eassumption]; zify; omega|].
+      split; [eapply fresh_inc; [|eassumption]; zify; lia|].
       unfold is_exp_ctx in Hctx_e; rewrite Hctx_e.
       splits.
       + eapply CC_Fcons with (FVs := FVs); auto.
@@ -3011,24 +3011,24 @@ Section CC_correct.
           eapply Closure_conversion_f_eq_subdomain; [|apply Hfeq]; auto.
       + repeat normalize_bound_var; normalize_sets; rewrite bound_var_app_ctx.
         decomp_Disjoint; solve_Union_Inc.
-        * (* HΓ_ran *) intros x Hx; inv Hx. right. unfold In, Range in *; zify; omega.
+        * (* HΓ_ran *) intros x Hx; inv Hx. right. unfold In, Range in *; zify; lia.
         * (* HbvC_e + ranges *)
-          eapply Included_trans; [apply HbvC_e|]; right; unfold In, Range in *; zify; omega.
+          eapply Included_trans; [apply HbvC_e|]; right; unfold In, Range in *; zify; lia.
         * (* Hbv_e' + ranges *)
           eapply Included_trans; [apply Hbv_e'|].
           solve_Union_Inc.
-          right; unfold In, Range in *; zify; omega.
+          right; unfold In, Range in *; zify; lia.
         * (* Hbv_B' + ranges *)
           eapply Included_trans; [apply Hbv_B'|].
           solve_Union_Inc.
-          right; unfold In, Range in *; zify; omega.
-      + zify; omega.
+          right; unfold In, Range in *; zify; lia.
+      + zify; lia.
       + constructor; auto; change (~ ?S ?x) with (~ x \in S);
           rewrite ?bound_var_app_ctx, ?Union_demorgan; splits; splits_Disjoint.
         * intros Hc; apply HbvC_e in Hc.
           destruct HD1 as [HD1]; contradiction (HD1 v).
           constructor.
-          -- apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+          -- apply Hfresh_Γ; unfold In, Range in *; zify; lia.
           -- subst Bg. unfold used_vars_fundefs.
              rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                by reflexivity.
@@ -3037,7 +3037,7 @@ Section CC_correct.
           -- now inv Huniq.
           -- destruct HD1 as [HD1]; contradiction (HD1 v).
              constructor.
-             ++ apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+             ++ apply Hfresh_Γ; unfold In, Range in *; zify; lia.
              ++ unfold used_vars_fundefs.
                 rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                   by reflexivity.
@@ -3046,7 +3046,7 @@ Section CC_correct.
           -- now inv Huniq.
           -- destruct HD1 as [HD1]; contradiction (HD1 v).
              constructor.
-             ++ apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+             ++ apply Hfresh_Γ; unfold In, Range in *; zify; lia.
              ++ unfold used_vars_fundefs.
                 rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                   by reflexivity.
@@ -3054,12 +3054,12 @@ Section CC_correct.
         * normalize_sets; splits_Disjoint.
           -- eapply Disjoint_Included_l; [apply HbvC_e|].
              constructor; intros x Hx; inv Hx. inv H2.
-             unfold In, Range in *; zify; omega.
+             unfold In, Range in *; zify; lia.
           -- eapply Disjoint_Included_l; [apply HbvC_e|].
              constructor; intros x Hx; inv Hx.
              destruct HD1 as [HD1]; contradiction (HD1 x).
              constructor.
-             ++ apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+             ++ apply Hfresh_Γ; unfold In, Range in *; zify; lia.
              ++ unfold used_vars_fundefs.
                 rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                   by reflexivity.
@@ -3069,19 +3069,19 @@ Section CC_correct.
              ++ constructor; intros x Hx; inv Hx. inv H2.
                 destruct HD1 as [HD1]; contradiction (HD1 x).
                 constructor.
-                ** apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+                ** apply Hfresh_Γ; unfold In, Range in *; zify; lia.
                 ** unfold used_vars_fundefs.
                    rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                      by reflexivity.
                    normalize_bound_var; left; left; left; right; right; right; now left.
              ++ constructor; intros x Hx; inv Hx. inv H2.
-                unfold In, Range in *; zify; omega.
+                unfold In, Range in *; zify; lia.
           -- eapply Disjoint_Included_l; [apply Hbv_e'|]; splits_Disjoint.
              ++ now inv Huniq.
              ++ constructor; intros x Hx; inv Hx.
                 destruct HD1 as [HD1]; contradiction (HD1 x).
                 constructor.
-                ** apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+                ** apply Hfresh_Γ; unfold In, Range in *; zify; lia.
                 ** unfold used_vars_fundefs.
                    rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                      by reflexivity.
@@ -3091,19 +3091,19 @@ Section CC_correct.
              ++ constructor; intros x Hx; inv Hx. inv H2.
                 destruct HD1 as [HD1]; contradiction (HD1 x).
                 constructor.
-                ** apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+                ** apply Hfresh_Γ; unfold In, Range in *; zify; lia.
                 ** unfold used_vars_fundefs.
                    rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                      by reflexivity.
                    normalize_bound_var; left; left; left; right; right; right; now right.
              ++ constructor; intros x Hx; inv Hx. inv H2.
-                unfold In, Range in *; zify; omega.
+                unfold In, Range in *; zify; lia.
           -- eapply Disjoint_Included_l; [apply Hbv_B'|]; splits_Disjoint.
              ++ now inv Huniq.
              ++ constructor; intros x Hx; inv Hx.
                 destruct HD1 as [HD1]; contradiction (HD1 x).
                 constructor.
-                ** apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+                ** apply Hfresh_Γ; unfold In, Range in *; zify; lia.
                 ** unfold used_vars_fundefs.
                    rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                      by reflexivity.
@@ -3114,19 +3114,19 @@ Section CC_correct.
           -- constructor; intros x Hx; inv Hx.
              destruct HD1 as [HD1]; contradiction (HD1 x).
              constructor.
-             ** apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+             ** apply Hfresh_Γ; unfold In, Range in *; zify; lia.
              ** unfold used_vars_fundefs.
                 rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                   by reflexivity.
                 normalize_bound_var; left; left; left; right; right; right; now right.
-          -- constructor; intros x Hx; inv Hx; unfold In, Range in *; zify; omega.
+          -- constructor; intros x Hx; inv Hx; unfold In, Range in *; zify; lia.
         * eapply Disjoint_Included_l; [apply Hbv_e'|].
           eapply Disjoint_Included_r; [apply Hbv_B'|]; splits_Disjoint.
           -- now inv Huniq.
           -- constructor; intros x Hx; inv Hx.
              destruct HD1 as [HD1]; contradiction (HD1 x).
              constructor.
-             ** apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+             ** apply Hfresh_Γ; unfold In, Range in *; zify; lia.
              ** unfold used_vars_fundefs.
                 rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                   by reflexivity.
@@ -3134,17 +3134,17 @@ Section CC_correct.
           -- constructor; intros x Hx; inv Hx.
              destruct HD1 as [HD1]; contradiction (HD1 x).
              constructor.
-             ** apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+             ** apply Hfresh_Γ; unfold In, Range in *; zify; lia.
              ** unfold used_vars_fundefs.
                 rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                   by reflexivity.
                 normalize_bound_var; left; left; left; right; right; right; now left.
-          -- constructor; intros x Hx; inv Hx. unfold In, Range in *; zify; omega.
+          -- constructor; intros x Hx; inv Hx. unfold In, Range in *; zify; lia.
         * normalize_sets; rewrite Union_demorgan; split; intros Hc.
           -- inv Hc.
              destruct HD1 as [HD1]; contradiction (HD1 v).
              constructor.
-             ** apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+             ** apply Hfresh_Γ; unfold In, Range in *; zify; lia.
              ** unfold used_vars_fundefs.
                 rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                   by reflexivity.
@@ -3154,7 +3154,7 @@ Section CC_correct.
           intros Hc.
           destruct HD1 as [HD1]; contradiction (HD1 Γ).
           constructor.
-          ** apply Hfresh_Γ; unfold In, Range in *; zify; omega.
+          ** apply Hfresh_Γ; unfold In, Range in *; zify; lia.
           ** subst Bg. unfold used_vars_fundefs.
              rewrite fundefs_append_bound_vars with (B3 := fundefs_append Bl (Fcons v t l e f5))
                by reflexivity.
@@ -3164,7 +3164,7 @@ Section CC_correct.
       splits; auto.
       + constructor.
       + eauto with Ensembles_DB.
-      + zify; omega.
+      + zify; lia.
       + constructor.
   Qed.
 
@@ -3365,13 +3365,13 @@ Section CC_correct.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e Hin. rewrite bound_var_Eproj.
         apply Union_Included. eapply Included_trans; [ eassumption |]...
-        apply Singleton_Included. right. eapply Hf. zify; omega.
+        apply Singleton_Included. right. eapply Hf. zify; lia.
       + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e Hin'. rewrite bound_var_Econstr.
         apply Union_Included. eapply Included_trans; [ eassumption |]...
-        apply Singleton_Included. right. eapply Hf. zify; omega.
+        apply Singleton_Included. right. eapply Hf. zify; lia.
       + apply return_triple.
         intros i' Hf. split.
         * intros e Hin'. eapply Included_trans; [ eassumption |]...
@@ -3442,7 +3442,7 @@ Section CC_correct.
         Union_Empty_set_neut_l.
         apply image_monotonic. now apply Setminus_Included.
         eapply Included_trans. eassumption. now apply Setminus_Included.
-        apply Singleton_Included. eapply Hf1. zify; omega.
+        apply Singleton_Included. eapply Hf1. zify; lia.
         now left; eauto.
       + eapply fresh_monotonic; [| eassumption ].
         now apply Setminus_Included.
@@ -3576,7 +3576,7 @@ Section CC_correct.
         apply Union_Included.
         eapply Included_trans; [ eassumption |]...
         apply Included_Union_preserv_l. apply Included_Union_preserv_r.
-        apply Singleton_Included. apply Hf1. zify; omega.
+        apply Singleton_Included. apply Hf1. zify; lia.
         now apply Setminus_Included.
         eapply fresh_monotonic; [| eassumption ]...
       + intros [[c' map'] f] _. apply pre_curry_l.
@@ -3629,8 +3629,8 @@ Section CC_correct.
       eapply He. eapply He'.
       rewrite !bound_var_Eproj, !bound_var_Eapp, !Union_Empty_set_neut_l.
       apply Union_Included. eapply Singleton_Included.
-      eapply Hf'. zify; omega.
-      eapply Singleton_Included. eapply Hf. zify; omega.
+      eapply Hf'. zify; lia.
+      eapply Singleton_Included. eapply Hf. zify; lia.
       eapply fresh_monotonic; [| eassumption ]...
     - eapply bind_triple.
       + eapply get_vars_bound_var_Included.
@@ -3679,7 +3679,7 @@ Section CC_correct.
       apply Union_Included. rewrite FromList_cons.
       apply Union_Included. apply Included_Union_preserv_r.
       apply Included_Union_preserv_l. apply Singleton_Included.
-      eapply Hf. zify; omega. now eauto with Ensembles_DB.
+      eapply Hf. zify; lia. now eauto with Ensembles_DB.
       apply Union_Included. eapply Included_trans; [ eassumption |]...
       eauto with Ensembles_DB.
       eapply Included_trans; [ eassumption |].
@@ -4357,14 +4357,14 @@ Section CC_correct.
         intros e Hin Hd Hun. constructor; [| eassumption ].
         intros Hc. eapply Hd.
         eapply Hin in Hc. inv Hc. constructor. eauto. 
-        eapply Hf. zify; omega. inv H. exfalso; eauto.
+        eapply Hf. zify; lia. inv H. exfalso; eauto.
       + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e Hin Hd Hun. constructor; [| eassumption ].
         intros Hc. eapply Hd.
         eapply Hin in Hc. inv Hc. constructor. eauto. 
-        eapply Hf. zify; omega. inv H. exfalso; eauto.
+        eapply Hf. zify; lia. inv H. exfalso; eauto.
       + apply return_triple.
         intros i' Hf. split.
         intros e Hin Hd Hun. eassumption. 
@@ -4748,15 +4748,15 @@ Section CC_correct.
           eapply Disjoint_Setminus_r...
           constructor. intros Hc. eapply bound_var_Efun in Hc. 
           inv Hc. eapply Hinc4 in H. inv H.
-          eapply HD with (x := Γ'). constructor. eapply Hf1. zify; omega.
+          eapply HD with (x := Γ'). constructor. eapply Hf1. zify; lia.
           now eauto.
           inv H0. inv H. inv H0. inv H. inv H0. now eauto.
           eapply Hin2 in H. inv H. inv H0. now eauto.
           rewrite Hseq in H. inv H. eapply Hin3 in H0.
-          inv H0. eapply HD with (x := Γ'). constructor. eapply Hf1. zify; omega.
+          inv H0. eapply HD with (x := Γ'). constructor. eapply Hf1. zify; lia.
           now repeat normalize_bound_var; eauto. inv H.
           inv H0. inv H. now eauto.
-          eapply HD with (x := Γ'). constructor. eapply Hf1. zify; omega.
+          eapply HD with (x := Γ'). constructor. eapply Hf1. zify; lia.
           left. rewrite bound_var_Efun. left. now eapply name_in_fundefs_bound_var_fundefs.
           constructor. eapply Hun2. eapply Disjoint_Included_l. eassumption.
           eapply Union_Disjoint_l. eassumption.
@@ -4821,19 +4821,19 @@ Section CC_correct.
         repeat normalize_bound_var. rewrite Union_Empty_set_neut_l.
         apply Union_Included.
         apply Included_Union_preserv_r. eapply Singleton_Included.
-        eapply HΓ'. zify; omega.
+        eapply HΓ'. zify; lia.
         apply Included_Union_preserv_r. eapply Singleton_Included.
-        eapply Hg'. zify; omega.
+        eapply Hg'. zify; lia.
         now apply Included_refl. apply Disjoint_sym. eassumption.
         eapply Hun2. repeat normalize_bound_var. rewrite Union_Empty_set_neut_l.
         apply Union_Included.
         apply Included_Union_preserv_r. eapply Singleton_Included.
-        eapply HΓ'. zify; omega.
+        eapply HΓ'. zify; lia.
         apply Included_Union_preserv_r. eapply Singleton_Included.
-        eapply Hg'. zify; omega.
+        eapply Hg'. zify; lia.
         eapply Disjoint_sym. eapply Disjoint_Included_l; [| eassumption ]...
         constructor.
-        intros Hc. inv Hc. eapply HΓ' with (y := g'). zify; omega.
+        intros Hc. inv Hc. eapply HΓ' with (y := g'). zify; lia.
         now eauto. now inv H5. 
         constructor. intros Hc. now inv Hc. 
         now constructor.
@@ -4954,7 +4954,7 @@ Section CC_correct.
           eapply Union_Disjoint_l. rewrite FromList_cons.
           eapply Union_Disjoint_r; [| eassumption ].
           eapply Disjoint_Singleton_r. intros H. eapply HD with (x := x).
-          constructor. eapply Hfx. zify. omega.
+          constructor. eapply Hfx. zify. lia.
           normalize_bound_var...
           rewrite FromList_cons. eapply Union_Disjoint_r.
           eapply Disjoint_Setminus_l...
@@ -4966,7 +4966,7 @@ Section CC_correct.
           apply Union_Disjoint_l.
           apply Union_Disjoint_r; [| eassumption ].
           eapply Disjoint_Included_r with (s6 := S).
-          apply Singleton_Included. eapply Hfx. zify; omega.
+          apply Singleton_Included. eapply Hfx. zify; lia.
           eapply Disjoint_Included_l_sym; [| eassumption ]. 
           normalize_bound_var...
           apply Union_Disjoint_l. apply Union_Disjoint_r.
@@ -4978,7 +4978,7 @@ Section CC_correct.
           apply Union_Disjoint_r.
           eapply Disjoint_Included; [| | now apply HD' ].
           apply Included_Union_preserv_r. apply Singleton_Included.
-          apply Hfx. zify; omega.
+          apply Hfx. zify; lia.
           apply image_monotonic...          
           eapply Disjoint_Included; [| | now apply HD' ].
           apply Included_Union_preserv_l.
@@ -5000,15 +5000,15 @@ Section CC_correct.
           intros Hc. apply FromList_cons in Hc.
           destruct (Maps.PTree.get v FVmap) as [v' |] eqn:Heq; try destruct v';
           try (inv Hc; [ inv H; eapply HD with (x := v);
-                         constructor; [ eapply Hfx; zify; omega | now eauto ]
+                         constructor; [ eapply Hfx; zify; lia | now eauto ]
                        | now eauto ]).
           inv Hc.
           inv H. eapply HD'. constructor. now eexists; eauto.
-          unfold subst. rewrite Heq. right. eapply Hfx. zify; omega.
+          unfold subst. rewrite Heq. right. eapply Hfx. zify; lia.
           eapply HD'. constructor. now eexists; eauto.
           unfold subst. rewrite Heq. now left; eauto.
           constructor; eauto. intros Hinl.
-          eapply HD with (x := x). constructor. eapply Hfx. zify; omega.
+          eapply HD with (x := x). constructor. eapply Hfx. zify; lia.
           left. normalize_bound_var...
         * split. normalize_bound_var.
           apply Union_Disjoint_r. apply Disjoint_Singleton_r.
@@ -5023,11 +5023,11 @@ Section CC_correct.
           normalize_bound_var. left. do 3 right. now apply name_in_fundefs_bound_var_fundefs.
           apply Union_Disjoint_r. rewrite FromList_cons. apply Union_Disjoint_l.
           apply Union_Disjoint_r. apply Disjoint_Singleton_r. intros Hc; inv Hc.
-          eapply HD. constructor; [| now eauto ]. eapply Hfx; zify; omega.
+          eapply HD. constructor; [| now eauto ]. eapply Hfx; zify; lia.
           now eauto with Ensembles_DB.
           eapply Disjoint_Included_l. now apply name_in_fundefs_bound_var_fundefs.
           apply Union_Disjoint_r. apply Disjoint_Singleton_r. intros Hc. 
-          eapply HD. constructor; [| now eauto ]. apply Hfx; zify; omega.
+          eapply HD. constructor; [| now eauto ]. apply Hfx; zify; lia.
           eassumption.
           apply Union_Disjoint_r.
           eapply Disjoint_Included_r. eassumption.

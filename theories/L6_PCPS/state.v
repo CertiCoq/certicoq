@@ -2,9 +2,9 @@ Require Import Common.compM Common.Pipeline_utils.
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx
         L6.List_util L6.functions L6.cps_show L6.Ensembles_util L6.tactics.
 Require Import Coq.ZArith.ZArith.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Strings.String Coq.Strings.Ascii
-        Coq.Sets.Ensembles.
+From Coq Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+     NArith.BinNat PArith.BinPos Strings.String Strings.Ascii
+     Sets.Ensembles micromega.Lia.
 Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads.
 
@@ -29,6 +29,7 @@ Section CompM.
                                            cenv : ctor_env;
                                            fenv : fun_env; (* Maps fun_tag's to (number of args,  list (arg no)) *)
                                            nenv : name_env;
+                                           inline_map : M.tree nat; (* marks functions for inlining *)
                                            log : list string;
                                          }.
   
@@ -43,9 +44,9 @@ Section CompM.
   (** Get a fresh name, and register a pretty name by appending a suffix to the pretty name of the old var *)
   Definition get_name (old_var : var) (suff : string) : compM' var :=
     p <- compM.get ;;
-    let '(mkCompData n c i f e fenv names log, st) := p in
+    let '(mkCompData n c i f e fenv names imap log, st) := p in
     let names' := add_entry names n old_var suff in
-    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' log, st) ;;
+    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' imap log, st) ;;
     ret n.
 
 
@@ -64,9 +65,9 @@ Section CompM.
      constuct a new name environment. *)
   Definition get_name' (old_var : var) (suff : string) (nenv_old : name_env) : compM' var :=
     p <- compM.get ;;
-    let '(mkCompData n c i f e fenv nenv log, st) := p in
+    let '(mkCompData n c i f e fenv nenv imap log, st) := p in
     let nenv' := add_entry_from_map nenv nenv_old n old_var suff in
-    compM.put (mkCompData ((n+1)%positive) c i f e fenv nenv' log, st) ;;
+    compM.put (mkCompData ((n+1)%positive) c i f e fenv nenv' imap log, st) ;;
     ret n.
 
   
@@ -80,9 +81,9 @@ Section CompM.
   (** Get a fresh name, and register a pretty name by appending a suffix to the pretty name of the old var *)
   Definition get_named (s : name) : compM' var :=
     p <- compM.get ;;
-    let '(mkCompData n c i f e fenv names log, st) := p in
+    let '(mkCompData n c i f e fenv names imap log, st) := p in
     let names' := M.set n s names in
-    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' log, st) ;;
+    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' imap log, st) ;;
     ret n.
 
   Definition get_named_lst (s : list name) : compM' (list var) := mapM get_named s.
@@ -91,29 +92,29 @@ Section CompM.
   (** Get a fresh name, and create a new pretty name *)
   Definition get_named_str (name : string) : compM' var :=
     p <- compM.get ;;
-    let '(mkCompData n c i f e fenv names log, st) := p in
+    let '(mkCompData n c i f e fenv names imap log, st) := p in
     let names' := add_entry_str names n name in
-    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' log, st) ;;
+    compM.put (mkCompData ((n+1)%positive) c i f e fenv names' imap log, st) ;;
     ret n.
 
   (* Get the next fresh record tag of a fresh type *)
   Definition make_record_ctor_tag (n : N) : compM' ctor_tag :=
     p <- compM.get ;;
-    let '(mkCompData x c i f e fenv names log, st) := p  in
+    let '(mkCompData x c i f cenv fenv names imap log, st) := p  in
     let inf := {| ctor_name := nAnon
                 ; ctor_ind_name := nAnon
                 ; ctor_ind_tag := i
                 ; ctor_arity := n
                 ; ctor_ordinal := 0%N
                 |} : ctor_ty_info in
-    let e' := ((M.set c inf e) : ctor_env) in
-    compM.put (mkCompData x (c+1)%positive (i+1)%positive f e' fenv names log, st) ;;
+    let cenv' := ((M.set c inf cenv) : ctor_env) in
+    compM.put (mkCompData x (c+1)%positive (i+1)%positive f cenv' fenv names imap log, st) ;;
     ret c.
 
   (* Register a constructor tag of some type i *)
   Definition register_record_ctor_tag (c : ctor_tag) (i : ind_tag) (n : N) : compM' unit :=
     p <- compM.get ;;
-    let '(mkCompData x c i f e fenv names log, st) := p  in
+    let '(mkCompData x c i f e fenv names imap log, st) := p  in
     let inf := {| ctor_name := nAnon
                 ; ctor_ind_name := nAnon
                 ; ctor_ind_tag := i
@@ -121,7 +122,7 @@ Section CompM.
                 ; ctor_ordinal := 0%N
                 |} : ctor_ty_info in
     let e' := ((M.set c inf e) : ctor_env) in
-    compM.put (mkCompData x c i f e' fenv names log, st).
+    compM.put (mkCompData x c i f e' fenv names imap log, st).
 
   (* Get the pretty name of a binder *)
   Definition get_pp_name (x : var) : compM' string :=
@@ -134,8 +135,8 @@ Section CompM.
   (* Log a new message *)
   Definition log_msg (msg : string) : compM' unit :=
     s <- compM.get ;;
-    let '(mkCompData x c i f e fenv names log, st) := s in
-    compM.put (mkCompData x c i f e fenv names (msg :: log)%string, st).
+    let '(mkCompData x c i f e fenv names imap log, st) := s in
+    compM.put (mkCompData x c i f e fenv names imap (msg :: log)%string, st).
 
   (* Access the transformation specific state *)
   Definition get_state (_ : unit) : compM' S :=
@@ -147,20 +148,36 @@ Section CompM.
     s <- compM.get ;;
     compM.put (fst s, st).
 
+  Definition make_ftag (arity : nat) (c : comp_data) : fun_tag * comp_data:=
+    let 'mkCompData x c i f e fenv names imap log := c in
+    (f, mkCompData x c i (f + 1)%positive e (M.set f (N.of_nat arity, (List_util.fromN (0%N) arity)) fenv) names imap log).
+
+  
   (** Get a fresh function tag and register it in fun_env *)
+
+  (* TODO write in terms of make_ftag *)
   Definition get_ftag (arity : N) : compM' fun_tag :=
     p <- compM.get ;;
-    let '(mkCompData x c i f e fenv names log, st) := p in
-    compM.put (mkCompData x c i (f + 1)%positive e (M.set f (arity, (fromN (0%N) (BinNat.N.to_nat arity))) fenv) names log, st) ;;
+    let '(mkCompData x c i f e fenv names imap log, st) := p in
+    compM.put (mkCompData x c i (f + 1)%positive e (M.set f (arity, (fromN (0%N) (BinNat.N.to_nat arity))) fenv) names imap log, st) ;;
     ret f.
-
+  
   Definition run_compM {A} (m: compM' A) (st : comp_data) (s : S)
     : error A * (comp_data * S) := runState m tt (st, s).
 
   Definition pack_data := mkCompData.
+  
+  Definition put_inline_map (imap : M.tree nat) (c : comp_data) : comp_data :=
+    let 'mkCompData x c i f cenv fenv names _ log := c in
+    mkCompData x c i f cenv fenv names imap log.
 
-  (* Returns the name environment and the log *)
-  Definition get_result (d : comp_data) : name_env * string := (nenv d, log_to_string (log d)).
+  Definition put_ctor_env (cenv : ctor_env) (c : comp_data) : comp_data :=
+    let '(mkCompData next ctag itag ftag _ fenv names imap log) := c in
+    pack_data next ctag itag ftag cenv fenv names imap log.
+
+  Definition get_ctor_env (cenv : ctor_env) (c : comp_data) : ctor_env :=
+    let '(mkCompData next ctag itag ftag cenv fenv names imap log) := c in
+    cenv.
   
 End CompM.
 
@@ -173,7 +190,7 @@ Lemma Disjoint_Range (x1 x2 x1' x2' : positive) :
   Disjoint _ (Range x1 x2) (Range x1' x2').
 Proof.
   intros Hleq. constructor. intros x Hin. inv Hin.
-  unfold Range, Ensembles.In in *. simpl in *. zify. omega.
+  unfold Range, Ensembles.In in *. simpl in *. zify. lia.
 Qed.    
 
 Lemma Range_Subset (x1 x2 x1' x2' : positive) :
@@ -182,7 +199,7 @@ Lemma Range_Subset (x1 x2 x1' x2' : positive) :
   Range x1' x2' \subset Range x1 x2.
 Proof.
   intros H1 H2. intros z Hin. unfold Range, Ensembles.In in *.
-  inv Hin. zify. omega.
+  inv Hin. zify. lia.
 Qed.
           
 Lemma fresh_Range S (x1 x2 : positive) :
@@ -213,10 +230,10 @@ Proof.
   intros x [r3 w3].
   eapply return_triple. 
   intros ? [r4 w4] H2. inv H2. intros [H1 H2]. inv H1; inv H2. intros.
-  split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. omega.
-  simpl. split. zify; omega.
-  intros z Hin. constructor. eapply H; eauto. zify. omega.
-  intros Hc. inv Hc. zify; omega.
+  split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. lia.
+  simpl. split. zify; lia.
+  intros z Hin. constructor. eapply H; eauto. zify. lia.
+  intros Hc. inv Hc. zify; lia.
 Qed.
 
 Lemma get_names_lst_spec A S ns str :
@@ -243,9 +260,9 @@ Proof.
     + simpl. congruence.
     + eapply Union_Included. sets. eapply Included_trans. eapply H4. sets.
     + eapply Union_Included. eapply Singleton_Included.
-      eapply Range_Subset; [| | eassumption ]. reflexivity. zify. omega.
-      eapply Included_trans. eassumption. eapply Range_Subset. zify; omega. reflexivity.
-    + zify; omega.
+      eapply Range_Subset; [| | eassumption ]. reflexivity. zify. lia.
+      eapply Included_trans. eassumption. eapply Range_Subset. zify; lia. reflexivity.
+    + zify; lia.
     + rewrite <- Setminus_Union. eassumption.
 Qed.
 
@@ -268,10 +285,10 @@ Proof.
   intros x [r3 w3].
   eapply return_triple. 
   intros ? [r4 w4] H2. inv H2. intros [H1 H2]. inv H1; inv H2. intros.
-  split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. omega.
-  simpl. split. zify; omega.
-  intros z Hin. constructor. eapply H; eauto. zify. omega.
-  intros Hc. inv Hc. zify; omega.
+  split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. lia.
+  simpl. split. zify; lia.
+  intros z Hin. constructor. eapply H; eauto. zify. lia.
+  intros Hc. inv Hc. zify; lia.
 Qed.
 
 Lemma get_names_lst'_spec A S ns str old_m :
@@ -298,9 +315,9 @@ Proof.
     + simpl. congruence.
     + eapply Union_Included. sets. eapply Included_trans. eapply H4. sets.
     + eapply Union_Included. eapply Singleton_Included.
-      eapply Range_Subset; [| | eassumption ]. reflexivity. zify. omega.
-      eapply Included_trans. eassumption. eapply Range_Subset. zify; omega. reflexivity.
-    + zify; omega.
+      eapply Range_Subset; [| | eassumption ]. reflexivity. zify. lia.
+      eapply Included_trans. eassumption. eapply Range_Subset. zify; lia. reflexivity.
+    + zify; lia.
     + rewrite <- Setminus_Union. eassumption.
 Qed.
 

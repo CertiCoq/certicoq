@@ -1,4 +1,6 @@
 Require Import Coq.Strings.Ascii Coq.Strings.String.
+Open Scope string_scope.
+
 Infix "+++" := append (at level 60, right associativity).
 
 Require Import Coq.Lists.List.
@@ -461,7 +463,7 @@ Fixpoint mangle (inds : ind_info) (e : term) : GM string :=
   | e => raise ("mangle: Unrecognized type: " +++ string_of_term e)
   end.
 
-Fixpoint decompose_sorts (ty : term) : list name × term :=
+Fixpoint decompose_sorts (ty : term) : list aname × term :=
   match ty with
   | tProd n (tSort _) ty =>
     let '(ns, ty) := decompose_sorts ty in
@@ -563,6 +565,9 @@ Record frame := mk_frame {
   hRights : list term;
   hRoot : term }.
 
+Definition nAnon := {| binder_name := nAnon; binder_relevance := Relevant |}.
+Definition nNamed n := {| binder_name := nNamed n; binder_relevance := Relevant |}.
+
 Definition fn : term -> term -> term := tProd nAnon.
 Definition type0 := tSort Universe.type0.
 Definition func x t e := tLambda (nNamed x) t e.
@@ -578,7 +583,6 @@ Definition gen_univ_univD (qual : modpath) (typename : kername) (g : mind_graph_
   let ind_entry : one_inductive_entry := {|
     mind_entry_typename := ty_u;
     mind_entry_arity := type0;
-    mind_entry_template := false;
     mind_entry_consnames := tys;
     mind_entry_lc := repeat (tRel 0) #|tys| |}
   in
@@ -586,7 +590,7 @@ Definition gen_univ_univD (qual : modpath) (typename : kername) (g : mind_graph_
   let univ := tInd univ_ind [] in
   let body :=
     func "u" univ
-      (tCase (univ_ind, O)
+      (tCase ((univ_ind, O), Relevant)
         (lam univ type0)
         (tRel 0) (map (fun '(_, ty) => (O, ty)) mgTypes))
   in ({|
@@ -595,7 +599,8 @@ Definition gen_univ_univD (qual : modpath) (typename : kername) (g : mind_graph_
     mind_entry_params := [];
     mind_entry_inds := [ind_entry];
     mind_entry_universes := Monomorphic_entry (LevelSet.empty, ConstraintSet.empty);
-    mind_entry_variance := None;
+    mind_entry_template := false;
+    mind_entry_cumulative := false;
     mind_entry_private := None |}, ty_ns, (qual, snd typename +++ "_univD"), body).
 
 Definition holes_of {A} (xs : list A) : list ((list A × A) × list A) :=
@@ -661,7 +666,6 @@ Definition gen_frame_t (qual : modpath) (typename : kername) (inds : ind_info) (
   let ind_entry : one_inductive_entry := {|
     mind_entry_typename := snd typename +++ "_frame_t";
     mind_entry_arity := fn univ (fn univ type0);
-    mind_entry_template := false;
     mind_entry_consnames := map (fun h => h.(hName)) fs;
     mind_entry_lc := ctr_types |}
   in
@@ -671,7 +675,8 @@ Definition gen_frame_t (qual : modpath) (typename : kername) (inds : ind_info) (
     mind_entry_params := [];
     mind_entry_inds := [ind_entry];
     mind_entry_universes := Monomorphic_entry (LevelSet.empty, ConstraintSet.empty);
-    mind_entry_variance := None;
+    mind_entry_template := false;
+    mind_entry_cumulative := false;
     mind_entry_private := None |}.
 
 Definition gen_frameD (qual : modpath) (typename : kername) (univD_kername : kername) (fs : list frame)
@@ -689,7 +694,7 @@ Definition gen_frameD (qual : modpath) (typename : kername) (univD_kername : ker
   in
   let body :=
     func "A" univ_ty (func "B" univ_ty (func "h" frame_ty
-      (tCase (frame_ind, O)
+      (tCase ((frame_ind, O), Relevant)
         (func "A" univ_ty (func "B" univ_ty (func "h" frame_ty
           (fn (univD (tRel 2)) (univD (tRel 2))))))
         (tRel O) (map mk_arm fs))))

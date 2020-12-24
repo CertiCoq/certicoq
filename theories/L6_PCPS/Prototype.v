@@ -1,4 +1,5 @@
 Require Import Coq.Strings.Ascii Coq.Strings.String.
+Open Scope string_scope.
 Infix "+++" := append (at level 60, right associativity).
 
 Require Import Coq.Lists.List.
@@ -27,6 +28,8 @@ Set Universe Polymorphism.
 Require Export CertiCoq.L6.Rewriting.
 Require Export CertiCoq.L6.PrototypeGenFrame.
 
+Open Scope list_scope.
+
 (* -------------------- Converting between named and indices --------------------
    Indices are a real pain for some of the things we want to do.
    Hack: quoted ASTs will never contain names starting with $, so we're free to use
@@ -42,13 +45,13 @@ Definition gensym (suffix : string) : GM string :=
   let! _ := modify (fun n => 1 + n) in
   ret (string_of_N n +++ "$" +++ suffix).
 
-Definition add_sigils (x : name) : GM string :=
-  match x with
-  | nAnon => gensym ""
-  | nNamed s => gensym s
+Definition add_sigils (x : aname) : GM string :=
+  match binder_name x with
+  | BasicAst.nAnon => gensym ""
+  | BasicAst.nNamed s => gensym s
   end.
 
-Fixpoint remove_sigils (s : string) : name :=
+Fixpoint remove_sigils (s : string) : aname :=
   match s with
   | EmptyString => nNamed s
   | "$" => nAnon
@@ -130,10 +133,10 @@ Definition find_str (s : string) (ss : list string) : GM nat :=
 
 Definition indices_of (Γ : list string) (t : term) : GM term :=
   let index_of Γ s := find_str s Γ in
-  let go_name (x : name) : (name × string) :=
-    match x with
-    | nAnon => (nAnon, "anon") (* can never be referred to in named rep, so don't care if there are clashes *)
-    | nNamed s => (remove_sigils s, s)
+  let go_name (x : aname) : (aname × string) :=
+    match binder_name x with
+    | BasicAst.nAnon => (nAnon, "anon") (* can never be referred to in named rep, so don't care if there are clashes *)
+    | BasicAst.nNamed s => (remove_sigils s, s)
     end
   in
   let fix go (n : nat) (Γ : list string) (tm : term) : GM term :=
@@ -207,10 +210,10 @@ Compute runGM' 0 (check_roundtrip [] <%
 (* Renames binders too, and doesn't respect scoping rules at all *)
 Definition rename (σ : Map string string) : term -> term :=
   let go_str (s : string) : string := find_d s s σ in
-  let go_name (na : name) : name :=
-    match na with
-    | nAnon => na
-    | nNamed id => nNamed (go_str id)
+  let go_name (na : aname) : aname :=
+    match binder_name na with
+    | BasicAst.nAnon => na
+    | BasicAst.nNamed id => nNamed (go_str id)
     end
   in
   fix go (tm : term) : term :=
@@ -365,9 +368,9 @@ Definition named_ctx := list (string × context_decl).
 Definition named_of_context (Γ : context) : GM named_ctx :=
   foldrM
     (fun d m =>
-      match d.(decl_name) with
-      | nAnon => raise "named_of_context: nAnon"
-      | nNamed s => ret ((s, d) :: m)
+      match binder_name d.(decl_name) with
+      | BasicAst.nAnon => raise "named_of_context: nAnon"
+      | BasicAst.nNamed s => ret ((s, d) :: m)
       end)
     []
     Γ.
@@ -1059,7 +1062,7 @@ Definition gen_case_tree (ind_info : ind_info) (epats : list (term × term))
               ret (name, constr_ty, arity))
             body.(ind_ctors)
         in
-        tCase (ind, nparams) (tLambda nAnon (mkApps (tInd ind []) pars) ret_ty) e <$>
+        tCase ((ind, nparams), Relevant) (tLambda nAnon (mkApps (tInd ind []) pars) ret_ty) e <$>
           mapiM_nat
             (fun i '(_, constr_ty, arity) =>
               let '(xs, ts, rty) := decompose_prod constr_ty in
@@ -1067,18 +1070,18 @@ Definition gen_case_tree (ind_info : ind_info) (epats : list (term × term))
                 if i ==? n_constr then
                   mapM
                     (fun '(x, arg) =>
-                      match x, arg with
-                      | nAnon, _ => raise "gen_case_tree: name anon"
+                      match binder_name x, arg with
+                      | BasicAst.nAnon, _ => raise "gen_case_tree: name anon"
                       | _, tVar x => ret x
-                      | nNamed x, _ => ret x
+                      | BasicAst.nNamed x, _ => ret x
                       end)
                     (combine xs args)
                 else
                   mapM
                     (fun x =>
-                      match x with
-                      | nAnon => raise "gen_case_tree: name anon"
-                      | nNamed x => ret x
+                      match binder_name x with
+                      | BasicAst.nAnon => raise "gen_case_tree: name anon"
+                      | BasicAst.nNamed x => ret x
                       end)
                     xs
               in
@@ -1484,7 +1487,7 @@ Ltac mk_smart_constr_children Root Rstep I_R I_S C s hasHrel Hrel :=
       match goal with |- result _ _ ?C ?e1 =>
       match type of s' with State _ C ?e2 =>
       match type of C with erased ?T =>
-        assert (Hrel'' : «e_map (fun (C : T) => clos_refl_trans _ Rstep (C⟦e1⟧) (C⟦e2⟧)) C»);
+        assert (Hrel'' : «e_map (fun (C : T) => clos_refl_trans _ Rstep (framesD C e1) (framesD C e2)) C»);
         [unerase; eapply rt_trans; [exact Hrel|exact Hrel']|];
         clear Hrel Hrel'
       end end end;

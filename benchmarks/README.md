@@ -14,9 +14,6 @@ To clean and recompile the library run
   # make cleanlib
   # make lib
 
-Some of these benchmarks are featured in Olivier Savary Belanger's thesis [1],
-for an old version of the compiler.
-
 To run the compiled benchmarks:
 
    # sh run.sh X
@@ -37,8 +34,3 @@ To add a new benchmark
    the result
 
 3) Go to file TESTS, add the name of the new benchmark at the end of the file.
-
-
-References
-----------
-[1] Savary Belanger, Olivier. Verified Extraction for Coq. PhD Thesis, Princeton University, 2019.

@@ -8,7 +8,7 @@ Require Import L6.cps L6.ctx L6.cps_util L6.set_util L6.identifiers L6.Ensembles
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia.
 
 Import ListNotations.
 
@@ -1500,8 +1500,8 @@ Section Alpha_conv_correct.
               [ | eassumption | |  | now eauto | now eauto | now eauto ].
             eapply preord_env_P_inj_antimon.
             * eapply IH'; try eassumption.
-              ** intros. eapply IHe; eauto. omega.
-              ** eapply (preord_env_P_inj_monotonic _ k). omega.
+              ** intros. eapply IHe; eauto. lia.
+              ** eapply (preord_env_P_inj_monotonic _ k). lia.
                  eassumption.
             * eapply Setminus_Included_Included_Union.
               eapply Included_trans.
@@ -1551,7 +1551,7 @@ Section Alpha_conv_correct.
         * eapply injective_subdomain_antimon; eauto...
         * eapply preord_env_P_inj_set.
           eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. 
-          omega. normalize_occurs_free...
+          lia. normalize_occurs_free...
           rewrite preord_val_eq. constructor; eauto using Forall2_Forall2_asym_included.
           eassumption.
     - (* Ecase nil *)
@@ -1564,13 +1564,13 @@ Section Alpha_conv_correct.
         * eapply injective_subdomain_antimon. eassumption.
           normalize_occurs_free...
         * eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ].
-          omega. normalize_occurs_free...
+          lia. normalize_occurs_free...
       + eapply IHe0.
         * eapply injective_subdomain_antimon. eassumption.
           normalize_occurs_free...
         * now constructor; eauto.
         * eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ].
-          omega. normalize_occurs_free...
+          lia. normalize_occurs_free...
     - (* Eproj *)
       eapply preord_exp_proj_compat; eauto; intros.
       assert (Hinj' : injective_subdomain (v |: occurs_free e1) (g {v ~> x'})).
@@ -1584,7 +1584,7 @@ Section Alpha_conv_correct.
       * eapply injective_subdomain_antimon; eauto...
       * eapply preord_env_P_inj_set.
         eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. 
-        omega. normalize_occurs_free... eassumption. eassumption.    
+        lia. normalize_occurs_free... eassumption. eassumption.    
     - (* Eletapp *)
       eapply preord_exp_letapp_compat; eauto; intros.
       + eapply Henv. econstructor. now left.
@@ -1603,7 +1603,7 @@ Section Alpha_conv_correct.
         * eapply injective_subdomain_antimon; eauto...
         * eapply preord_env_P_inj_set.
           eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. 
-          omega. normalize_occurs_free... eassumption. eassumption.
+          lia. normalize_occurs_free... eassumption. eassumption.
     - (* Efun *)
       eapply preord_exp_fun_compat.
       + intros.
@@ -1620,7 +1620,7 @@ Section Alpha_conv_correct.
           eapply Disjoint_Included_r; [| eassumption ]. normalize_occurs_free. sets. }
         now eauto. 
       + now eauto.
-      + eapply preord_exp_monotonic. eapply IHe1; [| eassumption |]. 3:{ omega. }
+      + eapply preord_exp_monotonic. eapply IHe1; [| eassumption |]. 3:{ lia. }
         * eapply injective_subdomain_antimon.
           eapply construct_fundefs_injection_injective_pres.
           eassumption.
@@ -1657,7 +1657,7 @@ Section Alpha_conv_correct.
         * eapply injective_subdomain_antimon; eauto...
         * eapply preord_env_P_inj_set.
           eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. 
-          omega. normalize_occurs_free...
+          lia. normalize_occurs_free...
           eassumption. eassumption. *)
     - eapply preord_exp_halt_compat; eauto.
   Qed.

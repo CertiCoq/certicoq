@@ -30,6 +30,13 @@ Fixpoint cst_offset (e : env) (s : kername) : N :=
   | (c, e) :: tl => if eq_kername s c then 0 else 1 + cst_offset tl s
   end.
 
+Fixpoint find_prim (prims : list (kername * string * nat * positive)) (n : kername) : option positive :=
+  match prims with
+  | [] => None
+  | (c, s, ar, pos) :: prims => if eq_kername n c then Some pos else find_prim prims n
+  end.
+
+
 (** Inductive environment, kept to record arities of constructors.
     No more parameters by this stage. *)
 Definition ienv := list (kername * itypPack).
@@ -49,8 +56,10 @@ Definition map_exps (f : exp -> exp) :=
   end.
 
 Section TermTranslation.
+
   Variable e : env.
-    
+  Variable prims : list (kername * string * nat * positive).
+           
   Fixpoint strip_lam (k : nat) (e : exp) : list name * exp :=
     match k, e with
     | 0%nat, _ => ([], e)
@@ -88,8 +97,13 @@ Section TermTranslation.
     | L3t.TLambda n t => Lam_e n (trans (1+k) t)
     | L3t.TLetIn n t u => Let_e n (trans k t) (trans (1+k) u)
     | L3t.TApp t u => App_e (trans k t) (trans k u)
-    | L3t.TConst s => (* Transform to let-binding *)
-      Var_e (cst_offset e s + k)
+    | L3t.TConst s =>
+      match find_prim prims s with 
+      | Some p => Prim_e p
+      | None => 
+        (* Transform to let-binding *)
+        Var_e (cst_offset e s + k)
+      end
     | L3t.TConstruct ind c args =>
       let args' := trans_args trans k args in
       Con_e (dcon_of_con ind c) args'
@@ -103,32 +117,40 @@ Section TermTranslation.
     | L3t.TProj proj t => Prf_e     (****  FIX  ****)
     end.
 
+
+  Definition translate t :=
+    trans 0 t.
+
 End TermTranslation.
 
-Definition translate (e : env) t :=
-  trans e 0 t.
+Section EnvTranslation.
+  
+  Variable prims : list (kername * string * nat * positive).
 
-Definition translate_entry x acc :=
-  match x with
-  | (s, ecTrm t) =>
-    let t' := translate acc t in
-    (s, t') :: acc
-  | (s, ecTyp _ _) => acc
-  end.
+  
+  Definition translate_entry x acc :=
+    match x with
+    | (s, ecTrm t) =>
+      let t' := translate acc prims t in
+      (s, t') :: acc
+    | (s, ecTyp _ _) => acc
+    end.
 
-Definition translate_entry_aux x acc : option (string * exp) :=
-  match x with
-  | (s, ecTrm t) =>
-    let t' := translate acc t in
-    Some (s, t')
-  | (s, ecTyp _ _) => None
-  end.
+  Definition translate_entry_aux x acc : option (string * exp) :=
+    match x with
+    | (s, ecTrm t) =>
+      let t' := translate acc prims t in
+      Some (s, t')
+    | (s, ecTyp _ _) => None
+    end.
 
-Definition translate_env_aux (e : environ L2k.compile.Term) (k : env) : env :=
-  fold_right translate_entry k e.
+  Definition translate_env_aux (e : environ L2k.compile.Term) (k : env) : env :=
+    fold_right translate_entry k e.
 
-Definition translate_env (e : environ L2k.compile.Term) : env :=
-  translate_env_aux e [].
+  Definition translate_env (e : environ L2k.compile.Term) : env :=
+    translate_env_aux e [].
+
+End EnvTranslation.
 
 Definition inductive_entry_aux {A} (x : kername * envClass A) acc : ienv :=
   match x with
@@ -147,6 +169,7 @@ Definition mkLets (e : env) (t : exp) :=
 Require Import L3_to_L3_eta.
 
 Definition translate_program
+           (prims : list (kername * string * nat * positive))
            (e: environ L2k.compile.Term) (t: L3t.Term) : exp :=
-  let e' := translate_env e in
-  mkLets e' (translate e' t).
+  let e' := translate_env prims e in
+  mkLets e' (translate e' prims t).

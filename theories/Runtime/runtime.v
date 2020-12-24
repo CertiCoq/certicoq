@@ -765,6 +765,6 @@ prog_public :=
 prog_main := _main;
 prog_types := composites;
 prog_comp_env := make_composite_env composites;
-prog_comp_env_eq := refl_equal _
+prog_comp_env_eq := refl_equal 
 |}.
 

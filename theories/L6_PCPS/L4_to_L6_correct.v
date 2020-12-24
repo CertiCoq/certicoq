@@ -1,4 +1,4 @@
-Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String.
+Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String Coq.micromega.Lia.
 Require Import Coq.Sorting.Sorted.
 Require Import Arith.
 Require Import ExtLib.Data.String.
@@ -20,8 +20,7 @@ Require Import cps_show.
 Require Import eval.
 Require Import ctx.
 Require Import logical_relations.
-Require Import alpha_conv.
-Require Import L6.List_util L6.algebra. 
+Require Import L6.List_util L6.algebra L6.alpha_conv. 
 
 Require Import ExtLib.Data.Monads.OptionMonad.
 Require Import ExtLib.Structures.Monads.
@@ -49,19 +48,21 @@ Section Post.
             (Hprops : Post_properties cenv P1 P1 PG)
             (HpropsG : Post_properties cenv PG PG PG)
             (Hincl : inclusion _ (comp P1 P1) P1)
-            (HinclG : inclusion _ P1 PG).
+            (HinclG : inclusion _ P1 PG)
+            (pr_env : M.t (kername * string * nat)).
 
     Context (func_tag kon_tag default_tag default_itag : positive).
 
     Definition cps_cvt_rel := cps_cvt_rel func_tag kon_tag default_tag.
     Definition cps_cvt_rel_exps := cps_cvt_rel_exps func_tag kon_tag default_tag.
     Definition cps_cvt_rel_efnlst := cps_cvt_rel_efnlst func_tag kon_tag default_tag.
+    Definition cps_cvt_rel_branches := cps_cvt_rel_branches func_tag kon_tag default_tag.
 
      Definition cps_cvt_exp_alpha_equiv k :=
      forall e e1 e2 k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4,
         cps_cvt_rel S1 e vars1 k1 cnstrs S2 e1 ->
         cps_cvt_rel S3 e vars2 k2 cnstrs S4 e2 ->
-        NoDup vars1 ->
+        NoDup vars1 -> (* TODO is this needed? *)
         ~(k1 \in (FromList vars1)) ->
         List.length vars1 = List.length vars2 ->
         Disjoint _ (FromList vars1) S1 ->
@@ -98,21 +99,19 @@ Section Post.
                          (def_funs fdefs2 fdefs2 rho2 rho2).
     
     Definition cps_cvt_branches_alpha_equiv (k : nat) :=
-      forall (bs : branches_e),
-        True.
-      (* forall bs bs1 bs2 k1 k2 r1 r2 vars1 vars2 x1 x2 rho1 rho2 *)
-      (*        S1 S2 S3 S4, *)
-      (*   cps_cvt_branches_rel S1 bs vars1 k1 r1 cnstrs S2 bs1 -> *)
-      (*   cps_cvt_branches_rel S3 bs vars2 k2 r2 cnstrs S4 bs2 -> *)
-      (*   NoDup vars1 -> *)
-      (*   ~(k1 \in (FromList vars1)) -> *)
-      (*   List.length vars1 = List.length vars2 -> *)
-      (*   Disjoint _ (FromList vars1) S1 -> *)
-      (*   preord_env_P_inj cenv PG (k1 |: FromList vars1) k *)
-      (*                    (id {k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 -> *)
-      (*   preord_var_env cenv PG k rho1 rho2 x1 x2 -> *)
-      (*   preord_exp cenv P1 PG k (Ecase x1 bs1, rho1)  (Ecase x2 bs2, rho2). *)
-
+      forall bs bs1 bs2 k1 k2 vars1 vars2 x1 x2 rho1 rho2
+             S1 S2 S3 S4,
+        cps_cvt_rel_branches S1 bs vars1 k1 x1 cnstrs S2 bs1 ->
+        cps_cvt_rel_branches S3 bs vars2 k2 x2 cnstrs S4 bs2 ->        
+        NoDup vars1 ->
+        ~(k1 \in (FromList vars1)) ->        
+        List.length vars1 = List.length vars2 ->
+        Disjoint _ (FromList vars1) S1 ->       
+        preord_env_P_inj cenv PG (k1 |: FromList vars1) k
+                         (id {k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->        
+        preord_var_env cenv PG k rho1 rho2 x1 x2 ->
+        preord_exp cenv P1 PG k (Ecase x1 bs1, rho1)  (Ecase x2 bs2, rho2).
+    
     Definition cps_cvt_alpha_equiv_statement k :=
       cps_cvt_exp_alpha_equiv k /\
       cps_cvt_exps_alpha_equiv k /\
@@ -1295,7 +1294,7 @@ Section Post.
               ) eqn:Hgen.
             destruct p eqn: Hp.
             inv Hgen2. reflexivity. }
-          rewrite Heq. zify. omega. 
+          rewrite Heq. zify. lia. 
     Qed.
 
     Lemma gensym_n_nAnon'_cons :
@@ -1385,7 +1384,7 @@ Section Post.
           simpl. rewrite extend_gss. reflexivity.
         + simpl in *.
           rewrite extend_gso.
-          eapply IHvars1. omega.
+          eapply IHvars1. lia.
           inv Hdup. eassumption.
           eassumption.
           eassumption.
@@ -1420,7 +1419,7 @@ Section Post.
       intros next1 next2 na v Hgen.
       destruct next1. simpl in Hgen.
       destruct p. inv Hgen.
-      simpl. zify. omega.
+      simpl. zify. lia.
     Qed. 
 
     Lemma lt_symgen_In_lst :
@@ -1438,7 +1437,7 @@ Section Post.
         inv Hin.
         + assert (Hgt: (v' >= v)%positive).
           { eapply geq_gensym in Hgen. simpl in Hgen. eassumption. } 
-          zify. omega.
+          zify. lia.
         + eapply IHvars in H. destruct H.
           eassumption. eassumption.
     Qed.
@@ -1451,7 +1450,7 @@ Section Post.
       intros n nenv na v next H.
       simpl in H.
       unfold lt_symgen. destruct next. destruct p.
-      inv H. zify. omega.
+      inv H. zify. lia.
     Qed.
 
     Lemma lt_symgen_gensym_2 :
@@ -1462,7 +1461,7 @@ Section Post.
       intros next1 next2 v na H.
       destruct next1. destruct p. simpl in H.
       destruct next2. destruct p. inv H.
-      unfold lt_symgen. zify. omega.
+      unfold lt_symgen. zify. lia.
     Qed. 
 
     Lemma lt_lst_symgen_gensym_n' :
@@ -1471,11 +1470,11 @@ Section Post.
         (v1 <= v2)%positive.
     Proof.
       induction n; intros v1 v2 nenv nenv' vars Hgen.
-      - simpl in Hgen. inv Hgen. zify. omega.
+      - simpl in Hgen. inv Hgen. zify. lia.
       - simpl in Hgen.
         destruct (gensym_n_nAnon' (Pos.succ v1) (M.set v1 nAnon nenv) n) eqn:Hgen2.
         destruct p eqn:Hp. inv Hgen.
-        eapply IHn in Hgen2. zify. omega. 
+        eapply IHn in Hgen2. zify. lia. 
     Qed. 
 
     Lemma lt_lst_symgen_gensym_n :
@@ -1495,7 +1494,7 @@ Section Post.
         destruct p. inv Hgen2. inv Hgen.
         econstructor.
         + unfold lt_symgen. eapply lt_lst_symgen_gensym_n' in Hgen3.
-          zify. omega. 
+          zify. lia. 
         + specialize IHn with (next1 := (SG (Pos.succ v, (M.set v nAnon n0)))).
           eapply IHn. unfold gensym_n_nAnon.
           destruct (gensym_n_nAnon' (Pos.succ v) (M.set v nAnon n0) n).
@@ -1514,7 +1513,7 @@ Section Post.
         pose proof lt_symgen_gensym as Hgen2.
         destruct next1. destruct p. eapply Hgen2 in Hgen.  
         unfold lt_symgen in *. destruct next2. destruct p.
-        zify. omega.
+        zify. lia.
         eapply IHvars. eassumption. eassumption.
     Qed.
 
@@ -1532,7 +1531,7 @@ Section Post.
           destruct next1. destruct p. simpl in Hgen.
           destruct (gensym_n_nAnon' v n0 n) eqn:Hgen'. destruct p.
           eapply lt_lst_symgen_gensym_n' in Hgen'.
-          inv Hgen. unfold lt_symgen in *. zify. omega. 
+          inv Hgen. unfold lt_symgen in *. zify. lia. 
         + inv Hall.
           eapply IHvars1. eassumption. eassumption.
     Qed. 
@@ -1628,7 +1627,7 @@ Section Post.
       induction l; intros x Hall.
       - intros Hnot. inv Hnot.
       - intros Hnot. inv Hall. inv Hnot.
-        zify. omega.
+        zify. lia.
         unfold not in IHl. eapply IHl. eassumption. eassumption.
     Qed.
 
@@ -1643,10 +1642,10 @@ Section Post.
         destruct (gensym_n_nAnon' (Pos.succ (Pos.succ v))
                                   (M.set (Pos.succ v) nAnon nenv) n) eqn:Hgen.
         destruct p eqn:Hp. inv H. econstructor.
-        zify. omega.
+        zify. lia.
         eapply IHn in Hgen. eapply All_Forall.Forall_impl.
         eassumption.
-        intros x H. simpl in H. zify. omega.
+        intros x H. simpl in H. zify. lia.
     Qed.
 
     Lemma Forall_lt_gensym_n_Pos_succ :
@@ -1660,10 +1659,10 @@ Section Post.
         destruct (gensym_n' (Pos.succ (Pos.succ v))
                             (M.set (Pos.succ v) a nenv) nlst) eqn:Hgen.
         destruct p. inv H. econstructor.
-        zify. omega.
+        zify. lia.
         eapply IHnlst in Hgen. eapply All_Forall.Forall_impl.
         eassumption.
-        intros x H. simpl in H. zify. omega.
+        intros x H. simpl in H. zify. lia.
     Qed. 
 
     Lemma gensym_n_nAnon_NoDup :
@@ -1736,6 +1735,7 @@ Section Post.
       eapply In_image. eassumption. eassumption.
     Qed.
 
+    
     Lemma f_eq_subdomain_extend_lst
           (A : Type) (S : Ensemble positive) (f f' : positive -> A)
           (xs : list positive) (ys : list A) :
@@ -1771,6 +1771,8 @@ Section Post.
       rewrite M.gso in *; eauto.
     Qed.
 
+    (** ** Correctness statements *)
+    
     Definition cps_cvt_correct_exp i :=
       forall e v rho vs vnames k x vk e' v' S S',
         eval_env vs e v ->
@@ -1842,126 +1844,126 @@ Section Post.
       intros k. induction k as [k IHk] using lt_wf_rec1. eapply my_exp_ind.
       - 
 
-    Definition cps_cvt_correct_e c :=
-      forall e e' rho rho' rho_m v v' x k vk vars
-             next1 next2 next3,
-        eval_env rho e v ->
-        ~(x = k) ->
-        (lt_symgen k next1) /\ (lt_symgen x next1) ->
-        (* (lt_symgen x next4) /\ (lt_symgen k next4) -> *)
-        cps_env_rel rho rho' -> 
-        gensym_n_nAnon next1 (List.length rho') = (vars, next2) ->
-        set_lists vars rho' (M.empty cps.val) = Some rho_m ->
-        cps_cvt e vars k next2 cnstrs = Some (e', next3) ->
-        (* cps_cvt_val v next4 cnstrs = Some (v', next5) -> *)
-        obs_rel' v v' ->
-        preord_exp cenv P1 PG c
-                   ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
-                   (e', (M.set k vk rho_m)).
+    (* Definition cps_cvt_correct_e c := *)
+    (*   forall e e' rho rho' rho_m v v' x k vk vars *)
+    (*          next1 next2 next3, *)
+    (*     eval_env rho e v -> *)
+    (*     ~(x = k) -> *)
+    (*     (lt_symgen k next1) /\ (lt_symgen x next1) -> *)
+    (*     (* (lt_symgen x next4) /\ (lt_symgen k next4) -> *) *)
+    (*     cps_env_rel rho rho' ->  *)
+    (*     gensym_n_nAnon next1 (List.length rho') = (vars, next2) -> *)
+    (*     set_lists vars rho' (M.empty cps.val) = Some rho_m -> *)
+    (*     cps_cvt e vars k next2 cnstrs = Some (e', next3) -> *)
+    (*     (* cps_cvt_val v next4 cnstrs = Some (v', next5) -> *) *)
+    (*     obs_rel' v v' -> *)
+    (*     preord_exp cenv P1 PG c *)
+    (*                ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val)))) *)
+    (*                (e', (M.set k vk rho_m)). *)
 
-    Definition cps_cvt_correct_es c :=
-      forall es es' rho rho' rho_m vs vs' x k vk vars 
-             next1 next2 next3 next4 next5,
-        Forall2 (fun e v => eval_env rho e v) (exps_to_list es) vs ->
-        ~(x = k) ->
-        (lt_symgen x next1) /\ (lt_symgen x next1) /\
-        (lt_symgen x next4) /\ (lt_symgen k next4) ->
-        cps_env_rel rho rho' ->
-        gensym_n_nAnon next1 (List.length rho') = (vars, next2) ->
-        set_lists vars rho' (M.empty cps.val) = Some rho_m ->
-        cps_cvt_exps' es vars k next2 cnstrs = Some (es', next3) ->
-        Forall2 (fun v v' => cps_cvt_val v next4 cnstrs = Some (v', next5)) vs vs' ->
-        Forall2
-          (fun e' v' =>
-             preord_exp cenv P1 PG c
-                        ((Eapp k kon_tag (x::nil)),
-                         (M.set x v' (M.set k vk (M.empty cps.val))))
-                        (e', (M.set k vk rho_m)))
-          es' vs'.
+    (* Definition cps_cvt_correct_es c := *)
+    (*   forall es es' rho rho' rho_m vs vs' x k vk vars  *)
+    (*          next1 next2 next3 next4 next5, *)
+    (*     Forall2 (fun e v => eval_env rho e v) (exps_to_list es) vs -> *)
+    (*     ~(x = k) -> *)
+    (*     (lt_symgen x next1) /\ (lt_symgen x next1) /\ *)
+    (*     (lt_symgen x next4) /\ (lt_symgen k next4) -> *)
+    (*     cps_env_rel rho rho' -> *)
+    (*     gensym_n_nAnon next1 (List.length rho') = (vars, next2) -> *)
+    (*     set_lists vars rho' (M.empty cps.val) = Some rho_m -> *)
+    (*     cps_cvt_exps' es vars k next2 cnstrs = Some (es', next3) -> *)
+    (*     Forall2 (fun v v' => cps_cvt_val v next4 cnstrs = Some (v', next5)) vs vs' -> *)
+    (*     Forall2 *)
+    (*       (fun e' v' => *)
+    (*          preord_exp cenv P1 PG c *)
+    (*                     ((Eapp k kon_tag (x::nil)), *)
+    (*                      (M.set x v' (M.set k vk (M.empty cps.val)))) *)
+    (*                     (e', (M.set k vk rho_m))) *)
+    (*       es' vs'. *)
 
-    Definition cps_cvt_correct_efnlst c :=
-      forall efns efns' rho rho' rho_m vfns vfns' x k vk vars 
-             next1 next2 next3 next4 next5,
-        Forall2 (fun p v => let (na, e) := p : (name * expression.exp) in
-                            eval_env rho e v) (efnlst_as_list efns) vfns ->
-        ~(x = k) ->
-        (lt_symgen x next1) /\ (lt_symgen x next1) /\
-        (lt_symgen x next4) /\ (lt_symgen k next4) ->
-        cps_env_rel rho rho' ->
-        gensym_n_nAnon next1 (List.length rho') = (vars, next2) ->
-        set_lists vars rho' (M.empty cps.val) = Some rho_m ->
-        cps_cvt_efnlst' efns vars k next2 cnstrs = Some (efns', next3) ->
-        Forall2 (fun v v' => cps_cvt_val v next4 cnstrs = Some (v', next5)) vfns vfns' ->
-        Forall2
-          (fun e' v' =>
-             preord_exp cenv P1 PG c
-                        (e', (M.set k vk rho_m))
-                        ((Eapp k kon_tag (x::nil)),
-                         (M.set x v' (M.set k vk (M.empty cps.val)))))
-          efns' vfns'.
+    (* Definition cps_cvt_correct_efnlst c := *)
+    (*   forall efns efns' rho rho' rho_m vfns vfns' x k vk vars  *)
+    (*          next1 next2 next3 next4 next5, *)
+    (*     Forall2 (fun p v => let (na, e) := p : (name * expression.exp) in *)
+    (*                         eval_env rho e v) (efnlst_as_list efns) vfns -> *)
+    (*     ~(x = k) -> *)
+    (*     (lt_symgen x next1) /\ (lt_symgen x next1) /\ *)
+    (*     (lt_symgen x next4) /\ (lt_symgen k next4) -> *)
+    (*     cps_env_rel rho rho' -> *)
+    (*     gensym_n_nAnon next1 (List.length rho') = (vars, next2) -> *)
+    (*     set_lists vars rho' (M.empty cps.val) = Some rho_m -> *)
+    (*     cps_cvt_efnlst' efns vars k next2 cnstrs = Some (efns', next3) -> *)
+    (*     Forall2 (fun v v' => cps_cvt_val v next4 cnstrs = Some (v', next5)) vfns vfns' -> *)
+    (*     Forall2 *)
+    (*       (fun e' v' => *)
+    (*          preord_exp cenv P1 PG c *)
+    (*                     (e', (M.set k vk rho_m)) *)
+    (*                     ((Eapp k kon_tag (x::nil)), *)
+    (*                      (M.set x v' (M.set k vk (M.empty cps.val))))) *)
+    (*       efns' vfns'. *)
 
 
-    Definition cps_cvt_correct_branches c :=
-      forall bs bs' rho rho' rho_m vs vs' x k vk vars 
-             next1 next2 next3 next4 next5,
-        Forall2 (fun p v => let '(dc, (n, l), e) := p in
-                            eval_env rho e v) (branches_as_list bs) vs ->
-        ~(x = k) ->
-        (lt_symgen x next1) /\ (lt_symgen x next1) /\
-        (lt_symgen x next4) /\ (lt_symgen k next4) ->
-        cps_env_rel rho rho' ->
-        gensym_n_nAnon next1 (List.length rho') = (vars, next2) ->
-        set_lists vars rho' (M.empty cps.val) = Some rho_m ->
-        cps_cvt_branches' bs vars k next2 cnstrs = Some (bs', next3) ->
-        Forall2 (fun v v' => cps_cvt_val v next4 cnstrs = Some (v', next5)) vs vs' ->
-        Forall2
-          (fun e' v' =>
-             preord_exp cenv P1 PG c
-                        (e', (M.set k vk rho_m))
-                        ((Eapp k kon_tag (x::nil)),
-                         (M.set x v' (M.set k vk (M.empty cps.val)))))
-          bs' vs'.
+    (* Definition cps_cvt_correct_branches c := *)
+    (*   forall bs bs' rho rho' rho_m vs vs' x k vk vars  *)
+    (*          next1 next2 next3 next4 next5, *)
+    (*     Forall2 (fun p v => let '(dc, (n, l), e) := p in *)
+    (*                         eval_env rho e v) (branches_as_list bs) vs -> *)
+    (*     ~(x = k) -> *)
+    (*     (lt_symgen x next1) /\ (lt_symgen x next1) /\ *)
+    (*     (lt_symgen x next4) /\ (lt_symgen k next4) -> *)
+    (*     cps_env_rel rho rho' -> *)
+    (*     gensym_n_nAnon next1 (List.length rho') = (vars, next2) -> *)
+    (*     set_lists vars rho' (M.empty cps.val) = Some rho_m -> *)
+    (*     cps_cvt_branches' bs vars k next2 cnstrs = Some (bs', next3) -> *)
+    (*     Forall2 (fun v v' => cps_cvt_val v next4 cnstrs = Some (v', next5)) vs vs' -> *)
+    (*     Forall2 *)
+    (*       (fun e' v' => *)
+    (*          preord_exp cenv P1 PG c *)
+    (*                     (e', (M.set k vk rho_m)) *)
+    (*                     ((Eapp k kon_tag (x::nil)), *)
+    (*                      (M.set x v' (M.set k vk (M.empty cps.val))))) *)
+    (*       bs' vs'. *)
 
     
-    Lemma cps_cvt_correct:
-      forall k,
-        (cps_cvt_correct_e k) /\
-        (cps_cvt_correct_es k) /\
-        (cps_cvt_correct_efnlst k) /\
-        (cps_cvt_correct_branches k).
-    Proof.
-      intros k. induction k as [k IHk] using lt_wf_rec1. eapply my_exp_ind.
-      - intros n e' rho rho' rho_m v v' x k0 vk vars 
-               next1 next2 next3 H H0 H1 H2 H3 H4 H5 H6.
-        inv H. simpl in H5.
-        destruct (nth_error vars (N.to_nat n)) eqn:Heqn. 2:{ congruence. }
-        inv H5.
-        eapply preord_exp_app_compat.
-        + eapply HPost_app. eapply Hprops. 
-        + eapply HPost_OOT. eapply Hprops. 
-        + unfold preord_var_env.
-          intros v1 Hgetv1. rewrite M.gso in Hgetv1.
-          -- rewrite M.gss in Hgetv1. inv Hgetv1.
-             eexists. rewrite M.gss. split.
-             reflexivity.
-             eapply preord_val_refl. eapply HpropsG. 
-          -- unfold not in *.
-             intros Hfalse. symmetry in Hfalse.
-             apply H0 in Hfalse. destruct Hfalse. 
-        + econstructor.
-          -- unfold preord_var_env.
-             intros v1 Hgetv1. rewrite M.gss in Hgetv1.
-             inv Hgetv1. eexists. admit.
-          -- econstructor.
-      - intros na e IH e' rho rho' rho_m v v' x k0 vk vars
-               next1 next2 next3 Heval Hneq Hlt Hrel Hgen Hset Hcvt Hcvt_val.
-        inv Heval. simpl in Hcvt. 
-        destruct (gensym next2 (nNamed "k_lam")) eqn: Hgen_k.
-        destruct (gensym s (nNamed "x_lam")) eqn: Hgen_x.
-        destruct (gensym s0 na) eqn:Hgen_f.
-        destruct (cps_cvt e (v0 :: vars) v s1 cnstrs) eqn:Hcvt_e.
-        destruct p eqn:Hp. inv Hcvt.
-        2 : { inv Hcvt. }
+    (* Lemma cps_cvt_correct: *)
+    (*   forall k, *)
+    (*     (cps_cvt_correct_e k) /\ *)
+    (*     (cps_cvt_correct_es k) /\ *)
+    (*     (cps_cvt_correct_efnlst k) /\ *)
+    (*     (cps_cvt_correct_branches k). *)
+    (* Proof. *)
+    (*   intros k. induction k as [k IHk] using lt_wf_rec1. eapply my_exp_ind. *)
+    (*   - intros n e' rho rho' rho_m v v' x k0 vk vars  *)
+    (*            next1 next2 next3 H H0 H1 H2 H3 H4 H5 H6. *)
+    (*     inv H. simpl in H5. *)
+    (*     destruct (nth_error vars (N.to_nat n)) eqn:Heqn. 2:{ congruence. } *)
+    (*     inv H5. *)
+    (*     eapply preord_exp_app_compat. *)
+    (*     + eapply HPost_app. eapply Hprops.  *)
+    (*     + eapply HPost_OOT. eapply Hprops.  *)
+    (*     + unfold preord_var_env. *)
+    (*       intros v1 Hgetv1. rewrite M.gso in Hgetv1. *)
+    (*       -- rewrite M.gss in Hgetv1. inv Hgetv1. *)
+    (*          eexists. rewrite M.gss. split. *)
+    (*          reflexivity. *)
+    (*          eapply preord_val_refl. eapply HpropsG.  *)
+    (*       -- unfold not in *. *)
+    (*          intros Hfalse. symmetry in Hfalse. *)
+    (*          apply H0 in Hfalse. destruct Hfalse.  *)
+    (*     + econstructor. *)
+    (*       -- unfold preord_var_env. *)
+    (*          intros v1 Hgetv1. rewrite M.gss in Hgetv1. *)
+    (*          inv Hgetv1. eexists. admit. *)
+    (*       -- econstructor. *)
+    (*   - intros na e IH e' rho rho' rho_m v v' x k0 vk vars *)
+    (*            next1 next2 next3 Heval Hneq Hlt Hrel Hgen Hset Hcvt Hcvt_val. *)
+    (*     inv Heval. simpl in Hcvt.  *)
+    (*     destruct (gensym next2 (nNamed "k_lam")) eqn: Hgen_k. *)
+    (*     destruct (gensym s (nNamed "x_lam")) eqn: Hgen_x. *)
+    (*     destruct (gensym s0 na) eqn:Hgen_f. *)
+    (*     destruct (cps_cvt e (v0 :: vars) v s1 cnstrs) eqn:Hcvt_e. *)
+    (*     destruct p eqn:Hp. inv Hcvt. *)
+    (*     2 : { inv Hcvt. } *)
         (* Zoe: commneting out because some stuff have changed *) 
         (* 
     rewrite cps_cvt_val_eq in Hcvt_val. simpl in Hcvt_val.
@@ -1989,23 +1991,23 @@ Section Post.
 
          *)
         
-        admit.
-      - admit.
-      - admit.
-      - admit.
-      - intros na e IH1 e0 IH2 e' rho rho' rho_m v v' x k0 vk vars
-               next1 next2 next3 Heval Hneq Hlt Hrel Hgen Hset Hcvt Hcvt_val.
-        simpl in Hcvt.
-        destruct (gensym next2 na) eqn: Hgen_x.
-        destruct (gensym s (nNamed "k")) eqn: Hgen_k.
-        destruct (cps_cvt e0 (v0 :: vars) k0 s0 cnstrs) eqn: Hcvt_e0.
-        2 : { congruence. } 
-        destruct p eqn: Hp.
-        destruct (cps_cvt e vars v1 s1 cnstrs) eqn: Hcvt_e.
-        2 : { congruence. } 
-        destruct p0 eqn: Hp0.
-        inv Hcvt.
-        inv Heval.
+      (*   admit. *)
+      (* - admit. *)
+      (* - admit. *)
+      (* - admit. *)
+      (* - intros na e IH1 e0 IH2 e' rho rho' rho_m v v' x k0 vk vars *)
+      (*          next1 next2 next3 Heval Hneq Hlt Hrel Hgen Hset Hcvt Hcvt_val. *)
+      (*   simpl in Hcvt. *)
+      (*   destruct (gensym next2 na) eqn: Hgen_x. *)
+      (*   destruct (gensym s (nNamed "k")) eqn: Hgen_k. *)
+      (*   destruct (cps_cvt e0 (v0 :: vars) k0 s0 cnstrs) eqn: Hcvt_e0. *)
+      (*   2 : { congruence. }  *)
+      (*   destruct p eqn: Hp. *)
+      (*   destruct (cps_cvt e vars v1 s1 cnstrs) eqn: Hcvt_e. *)
+      (*   2 : { congruence. }  *)
+      (*   destruct p0 eqn: Hp0. *)
+      (*   inv Hcvt. *)
+      (*   inv Heval. *)
         (* Zoe: commneting out because some stuff have changed *) 
     (* 
 
@@ -2090,33 +2092,13 @@ Section Post.
       - admit.
       - eassumption.
       - (* ? *) *)
-    Abort. 
+    (* Abort.  *)
 
     
-    (* cenv needs to related to dcon? *)
-    Lemma cps_cvt_correct':
-forall e m rho rho' rhomap x k vk e' v v' v'' v''' penv cenv
-             vars cnstrs next1 next2 next3 next4 next5,
-        eval_env rho e v ->
-        cps_cvt_env rho next1 cnstrs = Some (rho', next2) ->
-        gensym_n_nAnon next2 (List.length rho') = (vars, next3) ->
-        set_lists vars rho' (M.empty cps.val) = Some rhomap ->
-        cps_cvt e vars k next3 cnstrs = Some (e', next4) ->
-        cps_cvt_val v next1 cnstrs = Some (v', next5) ->
-        bstep_e penv cenv (M.set x v' (M.set k vk (M.empty cps.val))) (Eapp k kon_tag (x::nil)) v'' m ->
-        exists n, bstep_e penv cenv (M.set k vk rhomap) e' v''' n /\
-                  exists f, (Alpha_conv_val v'' v''' f).
-    Proof.
-      intros e. 
-      eapply my_exp_ind.
-      
-    Abort. 
-    
-
-    Inductive bigStepResult {Term Value : Type} : Type :=
-      Result : Value -> bigStepResult 
-    | OutOfTime : Term -> bigStepResult 
-    | Error : string -> option Term -> bigStepResult.
+    (* Inductive bigStepResult {Term Value : Type} : Type := *)
+    (*   Result : Value -> bigStepResult  *)
+    (* | OutOfTime : Term -> bigStepResult  *)
+    (* | Error : string -> option Term -> bigStepResult. *)
 
     (* Definition L6_evaln_fun n p : @bigStepResult (env * exp) cps.val := *)
     (*   let '((penv, cenv, nenv, fenv), (rho, e)) := p *)
@@ -2148,6 +2130,8 @@ forall e m rho rho' rhomap x k vk e' v v' v'' v''' penv cenv
     (*   L7.L6_to_Clight.print ((show_cenv cenv) ++ (show_env nenv cenv false rho) ++ *)
     (*                                           (show_val nenv cenv false v)). *)
 
+    Abort.
+    
 End Post.
 (*
 Quote Recursively Definition test1_program :=
@@ -2239,5 +2223,3 @@ Extract Constant   varImplDummyPair.varClassNVar =>
 
 Extraction "test1.ml" test_result.
 *)
-
-End CPS.

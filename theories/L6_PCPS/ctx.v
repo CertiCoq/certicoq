@@ -2,7 +2,7 @@
  * Part of the CertiCoq project
  *)
 
-From Coq Require Import Arith.Arith NArith.BinNat Lists.List omega.Omega.
+From Coq Require Import Arith.Arith NArith.BinNat Lists.List micromega.Lia.
 Require Import L6.tactics.
 From CertiCoq.L6 Require Import cps set_util.
 Require Import ExtLib.Structures.Monad.

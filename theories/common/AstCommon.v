@@ -218,8 +218,8 @@ Definition environ := list (kername * envClass).
 *** template-coq [program].  Independent of term structure
 **)
 (* Malecha's [program] is inside out *)
-Definition cnstr_Cnstr (c: string * term * nat) : Cnstr :=
-  mkCnstr (fst (fst c)) (snd c).
+Definition cnstr_Cnstr (c: string * nat) : Cnstr :=
+  mkCnstr (fst c) (snd c).
 
 Definition ibody_ityp (iib:one_inductive_body) : ityp :=
   let Ctors := map cnstr_Cnstr (ind_ctors iib)
@@ -568,9 +568,7 @@ End trm_Sec.
 
 (* Timing facilities, instanciated by extraction in extraction.v *)
 
+Definition timePhase: forall A B, string -> (A -> B) -> A -> B := fun A B s f a => f a.
 
-
-Definition timePhase: forall A, string -> (Datatypes.unit -> A) -> A := fun a s f => f tt.
-
-Lemma timePhase_id: forall {A:Type} s (x:Datatypes.unit -> A), timePhase s x = x tt.
+Lemma timePhase_id: forall {A B:Type} s (x : A -> B) (a : A), timePhase s x a = x a.
 Proof. reflexivity. Qed.

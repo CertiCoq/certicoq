@@ -3,7 +3,7 @@
  *)
 
 From Coq Require Import Lists.List Lists.SetoidList NArith.BinNat PArith.BinPos
-     MSets.MSetRBT Sets.Ensembles Omega Sorting.Permutation Logic.Decidable.
+     MSets.MSetRBT Sets.Ensembles micromega.Lia Sorting.Permutation Logic.Decidable.
 
 From compcert.lib Require Import Coqlib.
 Require Import L6.tactics.
@@ -2865,20 +2865,20 @@ Proof.
   exp_defs_induction IHe IHl IHb; intros y;
   try now (eapply Pos.le_trans; [| now eapply IHe ];
            eapply Pos.le_trans; [| now eapply max_list_spec1 ];
-           zify; omega).
-  - simpl; zify; omega.
+           zify; lia).
+  - simpl; zify; lia.
   - simpl. eapply Pos.le_trans. now apply IHe. 
     now apply IHl.
   - simpl. eapply Pos.le_trans. now apply IHb.
     now apply IHe.
   - simpl. eapply Pos.le_trans; [| eapply max_list_spec1 ].
-    zify; omega.
-  - simpl. zify; omega.
+    zify; lia.
+  - simpl. zify; lia.
   - simpl. eapply Pos.le_trans. now apply IHe.
     eapply Pos.le_trans. now apply max_list_spec1.
     eapply Pos.le_trans; [| now apply IHb ].
-    eapply max_list_acc_mon. zify; omega. 
-  - simpl. zify; omega. 
+    eapply max_list_acc_mon. zify; lia. 
+  - simpl. zify; lia. 
 Qed.
 
 Corollary acc_leq_max_var e y :
@@ -2905,14 +2905,14 @@ Proof.
   try (simpl; inv HIn; [| now eauto ];
        (eapply Pos.le_trans; [| now eapply acc_leq_max_var ];
         eapply Pos.le_trans; [| now eapply max_list_spec1 ];
-        zify; omega)).
+        zify; lia)).
   - inv HIn. inv H3.
   - inv HIn. inv H3; [| now  eauto]. inv H.
     eapply Pos.le_trans; [| eapply acc_leq_max_var with (e := Ecase v l) ].
     now eauto.
   - simpl. inv HIn; [| now eauto ].
     eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
-    zify; omega.
+    zify; lia.
   - inv HIn; [| now eauto ].
     simpl. eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
     now eauto.
@@ -2923,13 +2923,13 @@ Proof.
       * inv H.
         eapply Pos.le_trans; [| now eapply acc_leq_max_var_fundefs ].
         eapply Pos.le_trans; [| now eapply max_list_spec1 ].
-        zify; omega.
+        zify; lia.
       * eapply Pos.le_trans; [| now eapply acc_leq_max_var_fundefs ].
         now eapply max_list_spec2.
     + eapply Pos.le_trans; [| now eapply acc_leq_max_var_fundefs ].
       eapply Pos.le_trans; [| now eapply max_list_spec1 ].
       eapply Pos.le_trans. now apply IHe with (y := y); eauto.
-      zify; omega.
+      zify; lia.
   - inv HIn.
 Qed.
 
@@ -2959,32 +2959,32 @@ Proof.
   try (inv HIn; [| now eauto ];
        simpl; eapply Pos.le_trans; [| now eapply acc_leq_max_var ];
        now eapply max_list_spec2).
-  - inv HIn. simpl; zify; omega.
+  - inv HIn. simpl; zify; lia.
   - inv HIn; [ now eauto | | now eauto ].
     simpl. eapply Pos.le_trans; [| eapply acc_leq_max_var with (e := Ecase v l) ].
     now eauto.
   - simpl. inv HIn; [| now eauto ].
     eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
-    zify; omega.
+    zify; lia.
   - simpl. inv HIn; [| now eauto ]. inv H5; eauto. 
     eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
-    eapply Pos.le_trans; [| now eapply max_list_spec1 ]. zify; omega.
+    eapply Pos.le_trans; [| now eapply max_list_spec1 ]. zify; lia.
     eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
     now eapply max_list_spec2.
   - inv HIn; [ now eauto |].
     simpl. eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
     now eauto.
   - inv HIn; simpl.
-    eapply Pos.le_trans; [| now eapply max_list_spec1 ]. zify; omega.
+    eapply Pos.le_trans; [| now eapply max_list_spec1 ]. zify; lia.
     now eapply max_list_spec2.
   - simpl; inv HIn; [| now eauto ].
     eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
     now apply max_list_spec2.
-  - inv HIn. simpl. zify; omega.
+  - inv HIn. simpl. zify; lia.
   - inv HIn; [| now eauto ].
     simpl. eapply Pos.le_trans. eapply IHe with (y := y). eassumption.
     eapply Pos.le_trans; [| now eapply acc_leq_max_var_fundefs ].
-    eapply Pos.le_trans; [| now eapply max_list_spec1 ]. zify; omega.
+    eapply Pos.le_trans; [| now eapply max_list_spec1 ]. zify; lia.
   - inv HIn. 
 Qed.
 
@@ -3013,17 +3013,17 @@ Proof.
   - simpl in *. rewrite IHe, IHl. reflexivity.
   - simpl.
     assert (Heq : Pos.max v0 (Pos.max v (Pos.max y z)) = Pos.max (Pos.max v0 (Pos.max v y)) z).
-    { zify. omega. }
+    { zify. lia. }
     rewrite Heq. rewrite IHe. reflexivity.
   - simpl.
     assert (Heq : Pos.max f (Pos.max x (Pos.max y z)) = Pos.max (Pos.max f (Pos.max x y)) z).
-    { zify. omega. }
+    { zify. lia. }
     rewrite Heq, Pos.max_comm. rewrite max_list_acc_commutes, Pos.max_comm, IHe. reflexivity.
   - simpl. rewrite IHB. rewrite IHe. reflexivity.
-  - simpl. rewrite Pos.max_assoc, Pos.max_comm. rewrite max_list_acc_commutes. zify; omega.
-  - simpl. zify; omega.
+  - simpl. rewrite Pos.max_assoc, Pos.max_comm. rewrite max_list_acc_commutes. zify; lia.
+  - simpl. zify; lia.
   - simpl. rewrite IHe.
-    assert (Heq : Pos.max v (Pos.max (max_var e y) z) = Pos.max z (Pos.max v (max_var e y))) by (zify; omega).
+    assert (Heq : Pos.max v (Pos.max (max_var e y) z) = Pos.max z (Pos.max v (max_var e y))) by (zify; lia).
     rewrite Heq. rewrite max_list_acc_commutes. rewrite Pos.max_comm. rewrite IHB. reflexivity.
   - reflexivity.
 Qed.
@@ -3031,13 +3031,13 @@ Qed.
 Lemma max_var_acc e z :
   max_var e z = Pos.max (max_var e 1%positive) z.
 Proof.
-  rewrite <- (proj1 max_var_acc_commutes). f_equal. zify; omega.
+  rewrite <- (proj1 max_var_acc_commutes). f_equal. zify; lia.
 Qed. 
 
 Lemma max_var_fundefs_acc B z :
   max_var_fundefs B z = Pos.max (max_var_fundefs B 1%positive) z.
 Proof.
-  rewrite <- (proj2 max_var_acc_commutes). f_equal. zify; omega.
+  rewrite <- (proj2 max_var_acc_commutes). f_equal. zify; lia.
 Qed. 
 
 
@@ -3058,7 +3058,7 @@ Lemma aux_acc l v z :
                 end)l 1%positive). 
 Proof.
   revert z. induction l; intros.
-  - zify; omega.
+  - zify; lia.
   - simpl. destruct a. simpl. rewrite IHl.
     rewrite max_var_acc. rewrite (Pos.max_comm _ z).  rewrite <- Pos.max_assoc. rewrite <- IHl.
     reflexivity.
@@ -3070,13 +3070,13 @@ Lemma max_var_subset_mut :
   (forall B z, max_var_fundefs B z%positive \in z |: bound_var_fundefs B :|: occurs_free_fundefs B).  
 Proof.
   exp_defs_induction IHe IHl IHB; intros.
-  - simpl. replace (Pos.max v 1%positive) with v by (zify; omega). rewrite max_var_acc. 
+  - simpl. replace (Pos.max v 1%positive) with v by (zify; lia). rewrite max_var_acc. 
     destruct (Pos.max_spec (max_var e 1%positive) (List_util.max_list l v)).
     + inv H. rewrite H1.
       eapply Included_trans. 3:{ eapply max_list_in_list. } reflexivity.
       normalize_bound_var. normalize_occurs_free. sets.
     + inv H. rewrite H1. eapply bound_var_occurs_free_Econstr_Included. eauto.
-  - simpl. normalize_occurs_free. replace (Pos.max 1%positive v) with v by (zify; omega). sets.
+  - simpl. normalize_occurs_free. replace (Pos.max 1%positive v) with v by (zify; lia). sets.
   - simpl. rewrite aux_acc.
     match goal with
     | [_ : _ |- context[Pos.max ?A ?B] ] => 
@@ -3084,14 +3084,14 @@ Proof.
     end.
     + inv H. rewrite H1. eapply bound_var_occurs_free_Ecase_cons_Included. eassumption.
     + inv H. rewrite H1. eapply bound_var_occurs_free_Ecase_Included. now left. eassumption.
-  - simpl. replace (Pos.max v 1%positive) with v by (zify; omega). rewrite max_var_acc. 
+  - simpl. replace (Pos.max v 1%positive) with v by (zify; lia). rewrite max_var_acc. 
     destruct (Pos.max_spec (max_var e 1%positive) (Pos.max v0 v)).
     + inv H. rewrite H1.
       destruct (Pos.max_spec v0 v).
       * inv H. rewrite H3. now eauto.
       * inv H. rewrite H3. now eauto.
     + inv H. rewrite H1. eapply bound_var_occurs_free_Eproj_Included. eauto.
-  - simpl. replace (Pos.max x 1%positive) with x by (zify; omega). rewrite max_var_acc. 
+  - simpl. replace (Pos.max x 1%positive) with x by (zify; lia). rewrite max_var_acc. 
     destruct (Pos.max_spec (max_var e 1%positive) (List_util.max_list ys (Pos.max f x))).
     + inv H. rewrite H1.
       eapply Included_trans. 3:{ eapply max_list_in_list. } reflexivity.
@@ -3114,15 +3114,15 @@ Proof.
     { simpl. repeat normalize_bound_var. repeat normalize_occurs_free. simpl. repeat normalize_sets.
       eauto. } 
   - simpl. eapply Included_trans. 3:{ eapply max_list_in_list. } reflexivity.
-    replace (Pos.max v 1%positive) with v by (zify; omega).
+    replace (Pos.max v 1%positive) with v by (zify; lia).
     normalize_bound_var. normalize_occurs_free. sets.
-  - simpl. replace (Pos.max v 1) with v by (zify; omega). rewrite max_var_acc. 
+  - simpl. replace (Pos.max v 1) with v by (zify; lia). rewrite max_var_acc. 
     destruct (Pos.max_spec (max_var e 1%positive) (List_util.max_list l v)).
     + inv H. rewrite H1.
       eapply Included_trans. 3:{ eapply max_list_in_list. } reflexivity.
       normalize_bound_var. normalize_occurs_free. sets.
     + inv H. rewrite H1. eapply bound_var_occurs_free_Eprim_Included. eauto.
-  - simpl. replace (Pos.max 1%positive v) with v by (zify; omega). normalize_occurs_free. eauto.
+  - simpl. replace (Pos.max 1%positive v) with v by (zify; lia). normalize_occurs_free. eauto.
   - simpl. rewrite max_var_acc. eapply Included_trans. 3:{ eapply IHB. } reflexivity. eapply Union_Included. eapply Union_Included.
     + eapply Singleton_Included.
       eapply Included_trans. 3:{ eapply max_list_in_list. } reflexivity.
@@ -4841,8 +4841,7 @@ Proof.
     now constructor.
     simpl. destruct (cps_util.var_dec v v0). exfalso; auto. auto.
   - inv H5; eauto. eapply not_occur_list_not_in; eauto.
-  - eapply IHB; eauto.
-  - eapply IHB; eauto.
+  Unshelve. all:now econstructor.
 Qed.
 
 Ltac normalize_occurs_free_ctx :=
@@ -5308,7 +5307,7 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
 
   Lemma occurs_in_vars_correct : forall a l, occurs_in_vars a l = true <-> List.In a l.
   Proof.
-    induction l; [firstorder|].
+    induction l; [firstorder auto with *|].
     destruct (Pos.eqb_spec a a0); subst.
     simpl; rewrite Pos.eqb_refl; simpl; split; intros; [now left|easy].
     simpl; rewrite <- Pos.eqb_neq in n; unfold eq_var; rewrite n; simpl.
@@ -5349,7 +5348,7 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
   Qed.
 *)
   Lemma negb_not : forall a b, a = negb b <-> a <> b.
-  Proof. destruct a; destruct b; firstorder. Qed.
+  Proof. destruct a; destruct b; firstorder auto with *. Qed.
 
   Lemma Disjoint_Singleton_In : forall A S a,
     Decidable S -> Disjoint A S [set a] <-> ~ Ensembles.In _ S a.
@@ -5625,7 +5624,7 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
     intros;
     rewrite Ensemble_iff_In_iff; intros a;
     translate_used_vars_to_firstorder a;
-    firstorder.
+    firstorder auto with *.
 
   Lemma used_vars_Econstr : forall x c args e,
     used_vars (Econstr x c args e) <--> x |: FromList args :|: used_vars e.

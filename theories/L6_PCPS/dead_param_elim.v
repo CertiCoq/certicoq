@@ -5,7 +5,7 @@
 Require Import L6.cps L6.identifiers L6.ctx L6.set_util L6.state.
 Require Import compcert.lib.Coqlib Common.compM Common.Pipeline_utils.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat.
 
@@ -22,7 +22,21 @@ Definition live_fun : Type :=  M.t (list bool).
 
 Definition get_fun_vars (m : live_fun) (f : var) := M.get f m. 
 
-Definition set_fun_vars (m : live_fun) (f : var) (b : list bool) := M.set f b m. 
+Definition set_fun_vars (m : live_fun) (f : var) (b : list bool) :=
+  match b with
+  | [] => m
+  | _ => M.set f b m
+  end. 
+
+(* Apply bit mask to argument list*)
+Fixpoint live_args {A} (ys : list A) (bs : list bool) : list A := 
+  match bs, ys with 
+  | [], [] => ys
+  |  b :: bs', y :: ys' => 
+    if b then y :: (live_args ys' bs')
+    else live_args ys' bs'
+  | _, _ => ys
+  end. 
 
 (* Get list of list of bools corresponding to fundefs *)
 Fixpoint get_bool_false {A} (ys : list A) : list bool := 
@@ -45,35 +59,30 @@ Fixpoint init_live_fun_aux (m : live_fun) (B : fundefs) : live_fun :=
 end. 
 
 
-Definition get_live_initial (B : fundefs) : live_fun := init_live_fun_aux (M.empty _) B.
+Definition init_live_fun (B : fundefs) : live_fun := init_live_fun_aux (M.empty _) B.
 
-Definition add_escaping (L : live_fun) (f : var) : live_fun :=
+(* Identity escaping functions *)
+
+Definition remove_escaping (L : live_fun) (f : var) : live_fun :=
   match get_fun_vars L f with
-  | Some bs => set_fun_vars L f (get_bool_true bs)
+  | Some bs => M.remove f L
   | None => L
   end.
 
-Fixpoint add_escapings (L : live_fun) (fs : list var) : live_fun :=
-  fold_left add_escaping fs L.
+Definition remove_escapings (L : live_fun) (fs : list var) : live_fun :=
+  fold_left remove_escaping fs L.
 
-
-(* IDENTIFYING ESCAPING FUNCTIONS *)
 Fixpoint escaping_fun_exp (e : exp) (L : live_fun) := 
 match e with 
-| Eapp f t ys => add_escapings L ys
-| Econstr x t ys e' => escaping_fun_exp e' (add_escapings L ys)
-| Eproj x t n y e' => escaping_fun_exp e' (add_escaping L y)
-| Eletapp x f ft ys e' => escaping_fun_exp e' (add_escapings L ys)
-| Ecase x P => 
-  (fix mapM_LD (l : list (ctor_tag * exp)) (L : live_fun) := 
-     match l with 
-     | [] => L
-     | (c', e') :: l' =>
-       let L' := escaping_fun_exp e' L in mapM_LD l' L'
-     end) P L
-| Ehalt x => add_escaping L x
+| Eapp f t ys => remove_escapings L ys
+| Econstr x t ys e' => escaping_fun_exp e' (remove_escapings L ys)
+| Eproj x t n y e' => escaping_fun_exp e' (remove_escaping L y)
+| Eletapp x f ft ys e' => escaping_fun_exp e' (remove_escapings L ys)
+| Ecase x P =>
+  fold_left (fun L '(c', e') => escaping_fun_exp e' L) P L
+| Ehalt x => remove_escaping L x
 | Efun fl e' => escaping_fun_exp e' (escaping_fun_fundefs fl L)
-| Eprim x fs ys e' => escaping_fun_exp e' (add_escapings L ys)
+| Eprim x fs ys e' => escaping_fun_exp e' (remove_escapings L ys)
 end
 with escaping_fun_fundefs (B : fundefs) (L : live_fun) := 
        match B with 
@@ -83,28 +92,21 @@ with escaping_fun_fundefs (B : fundefs) (L : live_fun) :=
        | Fnil => L
        end. 
 
-(* LIVE PARAMETER ANALYSIS *)
-
-Definition add_list (xs : list var) (s : PS.t)  :=
-  fold_left (fun s x => PS.add x s) xs s.
+(* LIve parameter analysis *)
 
 Definition add_fun_vars (L : live_fun) (f : var) (xs : list var) (S : PS.t) : PS.t :=
-  let fix aux xs (bs : list bool) S :=
-      match xs, bs with
-      | [], _ | _, [] => S
-      | x :: xs, b :: bs =>
-        if b then aux xs bs (PS.add x S) else aux xs bs S
-      end in
   match get_fun_vars L f with
-  | Some bs => aux xs bs S
-  | None => add_list xs S
+  | Some bs =>
+    let xs' := live_args xs bs in
+    union_list S xs'
+  | None => union_list S xs
   end.
 
 (* Returns a set that's an underapproximation of the live vars in e *) 
 Fixpoint live_expr (L : live_fun) (e : exp) (S : PS.t) : PS.t := 
 match e with 
 | Econstr x t ys e' => 
-  live_expr L e' (add_list ys S)
+  live_expr L e' (union_list S ys)
 | Eproj x t m y e' =>
   live_expr L e' (PS.add y S)
 | Eletapp x f ft ys e' =>
@@ -112,35 +114,32 @@ match e with
   let S'' := add_fun_vars L f ys S' in
   live_expr L e' S''
 | Ecase x P =>
-  let S' := PS.add x S in
-  (fix mapM_LD  (S: PS.t) (l : list (ctor_tag * exp)) : PS.t := 
-     match l with 
-     | [] => S
-     | (c', e') :: l'=>
-       let S' := live_expr L e' S in
-       mapM_LD S' l'
-     end) S' P
+  PS.add x (fold_left (fun S '(c', e') => live_expr L e' S) P S)
 | Ehalt x => PS.add x S 
 | Eapp f t ys =>  
   let S' := PS.add f S in
-  add_fun_vars L f ys S
+  add_fun_vars L f ys S'
 | Efun fl e' => S (* Should not happen, assuming hoisted program *)
-| Eprim x f ys e' => live_expr L e' (add_list ys S)
+| Eprim x f ys e' => live_expr L e' (union_list S ys)
 end.
+
+Fixpoint update_bs (S : PS.t) xs (bs : list bool) : (list bool * bool) :=
+  match xs, bs with
+  | [], _ | _, [] => (bs, false)
+  | x :: xs, b :: bs =>
+    let (bs', d) := update_bs S xs bs in
+    if b then (b :: bs', d) (* if the bit is on don't change it *)
+    else
+      let b' := PS.mem x S in
+      (b' :: bs', (negb (eqb b b') || d))
+  end.
 
 Definition update_live_fun (L : live_fun) (f : var) (xs : list var) (S : PS.t) : option (live_fun * bool):=
   match get_fun_vars L f with
   | Some bs =>
-    let fix update_bs xs bs : (list bool * bool) :=
-        match xs, bs with
-        | [], _ | _, [] => ([], false)
-        | x :: xs, b :: bs =>
-          let (bs', d) := update_bs xs bs in
-          let b' := PS.mem x S in
-          ((b' || b) :: bs', (negb (eqb b b') || d))
-        end in
-    let (bs, diff) := update_bs xs bs in
-    Some (set_fun_vars L f bs, diff)
+    let (bs, diff) := update_bs S xs bs in
+    if diff then Some (set_fun_vars L f bs, diff)
+    else  Some (L, diff)
   | None => None
   end.
 
@@ -181,23 +180,15 @@ end.
 Fixpoint find_live (e : exp) : option live_fun := 
   match e with 
   | Efun B e' =>
-    let initial_L := get_live_initial B in
+    let initial_L := init_live_fun B in
+    (* Mark all variables of escaping function as live *)
     let L' := escaping_fun_exp e' (escaping_fun_fundefs B initial_L) in
-    let n := num_vars B 0 in
+    let n := num_vars B 0 + 1 in
     find_live_helper B L' n
   | _ => Some (M.empty _)
   end. 
 
 (* ELIMINATING VARIABLES *)
-
-Fixpoint live_args (ys : list var) (bs : list bool) : list var := 
-match ys, bs with 
-| [], [] => ys
-| y :: ys', b :: bs' => 
-  if (eqb b true) then y :: (live_args ys' bs')
-  else live_args ys' bs'
-| _, _ => ys
-end. 
 
 Definition is_nil {A} (l : list A) : bool :=
   match l with
@@ -207,10 +198,15 @@ Definition is_nil {A} (l : list A) : bool :=
 
 
 Definition arityMap : Type := M.t fun_tag.
+Definition ftagMap : Type := M.t fun_tag.
 
-Definition elimM := @compM' arityMap.
+Definition elimM := @compM' unit.
+
+
+(** * fun_tag bookeeping *)
 
 (* Single pass to create arity map. Assumes that initial fun_tags are consistent with arities *)
+
 Fixpoint make_arityMap (e : exp) (m : arityMap) : arityMap :=
   match e with
   | Econstr _ _ _ e => make_arityMap e m
@@ -233,18 +229,37 @@ with make_arityMap_fundefs (B : fundefs) (m : arityMap) : arityMap :=
        | Fnil => m
        end.
 
-Definition get_fun_tag (n : nat) : elimM fun_tag :=
-  st <- get_state tt ;;
-  let m := st in
-  let p := Positive_as_DT.of_succ_nat n in
-  match M.get p m with
-  | Some t => ret t
-  | None =>
-    ft <- get_ftag (N.of_nat n) ;;
-    put_state (M.set p ft m) ;;
-    ret ft
-  end.       
-  
+
+(* TODO move *)
+
+Definition make_ftag (arity : nat) (c : comp_data) : fun_tag * comp_data:=
+  let 'mkCompData x c i f e fenv names imap log := c in
+  (f, mkCompData x c i (f + 1)%positive e (M.set f (N.of_nat arity, (List_util.fromN (0%N) arity)) fenv) names imap log).
+
+
+
+Fixpoint create_fun_tag (L : live_fun) (m : arityMap) (B : fundefs) (c : comp_data) (fmap : ftagMap) : ftagMap * comp_data := 
+  match B with 
+  | Fcons f ft ys e B =>
+    match get_fun_vars L f with
+    | Some bs =>
+      let n := length (live_args ys bs) in
+      let p := Positive_as_DT.of_succ_nat n in
+      match M.get p m with
+      | Some t => create_fun_tag L m B c (M.set f t fmap)  
+      | None =>
+        let '(ft, c') := make_ftag n c in
+        create_fun_tag L m B c' (M.set f ft fmap)
+      end
+    | None => create_fun_tag L m B c fmap
+    end
+  | Fnil => (fmap, c)
+  end.
+
+
+
+
+(* For debugging *)
 
 Definition show_bool (b : bool) : string :=
   if b then "true" else "false".
@@ -259,95 +274,144 @@ Fixpoint show_bool_list (bs : list bool) : string :=
 
 
 
-Fixpoint eliminate_expr (L : live_fun) (e : exp) : elimM exp := 
-match e with 
-| Econstr x t ys e' =>
-  e'' <- eliminate_expr L e' ;;
-  ret (Econstr x t ys e'')
-| Eproj x t m y e' =>
-  e'' <- eliminate_expr L e' ;;
-  ret (Eproj x t m y e'')
-| Eletapp x f ft ys e' =>
-  f_str <- get_pp_name f ;;
-  (* state.log_msg (String.concat " " ["Letapp" ; f_str ]) ;; *)
-  match get_fun_vars L f with
-  | Some bs =>
-    ys_or <- get_pp_names_list ys ;;    
-    (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;;  *)
-    let ys' := live_args ys bs in
-    e'' <- eliminate_expr L e';;
-    ft <- get_fun_tag (length ys') ;;
-    ys_names <- get_pp_names_list ys' ;;
-    (* state.log_msg (String.concat " " ["Function entry" ; f_str ; "found"; "id"; cps_show.show_pos f]) ;; *)
-    (* state.log_msg (String.concat " " ("New params" :: ys_names)) ;;    *)
-    ret (Eletapp x f ft ys' e'')
-  | None =>
-    e'' <- eliminate_expr L e' ;;
-    ret (Eletapp x f ft ys e'')
-  end
-| Ecase x P =>
-  P' <- (fix mapM_LD (l : list (ctor_tag * exp)) : elimM (list (ctor_tag * exp)) :=
-          match l with 
-          | [] => ret []
-          | (c', e') :: l' =>
-            e' <- eliminate_expr L e';;
-            l' <- mapM_LD l' ;;
-            ret ((c', e') :: l')
-          end) P ;;
-  ret (Ecase x P')
-| Ehalt x => ret (Ehalt x)
-| Efun fl e' => ret e
-| Eprim x f ys e' =>
-  e'' <- eliminate_expr L e' ;;
-  ret (Eprim x f ys e'')
-| Eapp f ft ys => 
-  match get_fun_vars L f with
-  | Some bs =>
-    let ys' := live_args ys bs in
-    ft <- get_fun_tag (length ys') ;;
-    ret (Eapp f ft ys')
-  | None => ret (Eapp f ft ys)
-  end
-end.
-
-
-Fixpoint eliminate_fundefs (B : fundefs) (L : live_fun) : elimM fundefs := 
-  match B with 
-  | Fcons f ft ys e B' =>
-    match get_fun_vars L f with
-    | Some bs =>
-      let ys' := live_args ys bs in
-      f_str <- get_pp_name f ;;
-      ys_names <- get_pp_names_list ys' ;;
-      ys_or <- get_pp_names_list ys ;;
-      (* state.log_msg (String.concat " " ["Def Function entry" ; f_str ; "found" ; "id"; cps_show.show_pos f]) ;; *)
-      (* state.log_msg (String.concat " " ("Def New params" :: ys_names)) ;; *)
-      (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;; *)
-      e' <- eliminate_expr L e ;;
-      B'' <- eliminate_fundefs B' L ;;
-      ft <- get_fun_tag (length ys') ;;
-      ret (Fcons f ft ys' e' B'')
-    | None => failwith "Known function not found in live_fun map"
-    end
-  | Fnil => ret Fnil
-  end. 
-           
-Fixpoint eliminate (e : exp) (c_data : comp_data) : error exp * comp_data := 
+Fixpoint is_hoisted_exp (e : exp) : bool :=
   match e with 
-  | Efun B e' =>
-    match find_live e with
-    | Some L =>
-      let m := make_arityMap e (M.empty _) in
-      match run_compM (eliminate_fundefs B L) c_data m with
-      | (Ret B', (c_data, m)) => 
-        match run_compM (eliminate_expr L e') c_data m with
-        | (Ret e'', (c_data, m)) =>
-          (Ret (Efun B' e''), c_data)
+  | Econstr _ _ _ e
+  | Eproj _ _ _ _ e
+  | Eletapp _ _ _ _ e
+  | Eprim _ _ _ e => is_hoisted_exp e
+  | Ecase x bs =>
+    forallb (fun p => is_hoisted_exp (snd p)) bs
+  | Efun B e => false
+  | Eapp _ _ _ => true
+  | Ehalt _ => true
+  end.
+  
+Fixpoint is_hoisted_fundefs (B : fundefs) : bool :=
+  match B with
+  | Fcons _ _ _ e B =>
+    is_hoisted_exp e && is_hoisted_fundefs B
+  | Fnil => true
+  end.
+
+Definition is_hoisted (e : exp) :=
+  match e with
+  | Efun B e => is_hoisted_fundefs B && is_hoisted_exp e
+  | _ => is_hoisted_exp e
+  end.
+
+(** Do dead paremeter elimination *)
+
+Section Elim.
+
+  Context (fmap : ftagMap). 
+
+  Definition get_fun_tag (f : var) : fun_tag :=
+    match M.get f fmap with
+  | Some t => t
+  | None => 1%positive (* dummy *)
+  end.       
+
+
+  
+  Fixpoint eliminate_expr (L : live_fun) (e : exp) : elimM exp := 
+    match e with 
+    | Econstr x t ys e' =>
+      e'' <- eliminate_expr L e' ;;
+      ret (Econstr x t ys e'')
+    | Eproj x t m y e' =>
+      e'' <- eliminate_expr L e' ;;
+      ret (Eproj x t m y e'')
+    | Eletapp x f ft ys e' =>
+      (* f_str <- get_pp_name f ;; *)
+      (* state.log_msg (String.concat " " ["Letapp" ; f_str ]) ;; *)
+      match get_fun_vars L f with
+      | Some bs =>
+        (* ys_or <- get_pp_names_list ys ;;     *)
+        (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;;  *)
+        let ys' := live_args ys bs in
+        e'' <- eliminate_expr L e';;
+        let ft' := get_fun_tag f in
+        (* ys_names <- get_pp_names_list ys' ;; *)
+        (* state.log_msg (String.concat " " ["Function entry" ; f_str ; "found"; "id"; cps_show.show_pos f]) ;; *)
+        (* state.log_msg (String.concat " " ("New params" :: ys_names)) ;;    *)
+        ret (Eletapp x f ft' ys' e'')
+      | None =>
+        e'' <- eliminate_expr L e' ;;
+        ret (Eletapp x f ft ys e'')
+      end
+    | Ecase x P =>
+      P' <- (fix mapM_LD (l : list (ctor_tag * exp)) : elimM (list (ctor_tag * exp)) :=
+               match l with 
+               | [] => ret []
+               | (c', e') :: l' =>
+                 e' <- eliminate_expr L e';;
+                 l' <- mapM_LD l' ;;
+                 ret ((c', e') :: l')
+               end) P ;;
+      ret (Ecase x P')
+    | Ehalt x => ret (Ehalt x)
+    | Efun fl e' => ret e
+    | Eprim x f ys e' =>
+      e'' <- eliminate_expr L e' ;;
+      ret (Eprim x f ys e'')
+    | Eapp f ft ys => 
+      match get_fun_vars L f with
+      | Some bs =>
+        let ys' := live_args ys bs in
+        let ft' := get_fun_tag f in
+        ret (Eapp f ft' ys')
+      | None => ret (Eapp f ft ys)
+      end
+    end.
+
+
+  Fixpoint eliminate_fundefs (L : live_fun) (B : fundefs) : elimM fundefs := 
+    match B with 
+    | Fcons f ft ys e B' =>
+      match get_fun_vars L f with
+      | Some bs =>
+        let ys' := live_args ys bs in
+        (* f_str <- get_pp_name f ;; *)
+        (* ys_names <- get_pp_names_list ys' ;; *)
+        (* ys_or <- get_pp_names_list ys ;; *)
+        (* state.log_msg (String.concat " " ["Def Function entry" ; f_str ; "found" ; "id"; cps_show.show_pos f]) ;; *)
+        (* state.log_msg (String.concat " " ("Def New params" :: ys_names)) ;; *)
+        (* state.log_msg (String.concat " " ("bs" ::  show_bool_list bs :: "Original Params" :: ys_or )) ;; *)
+        e' <- eliminate_expr L e ;;
+        B'' <- eliminate_fundefs L B' ;;
+        let ft' := get_fun_tag f in
+        ret (Fcons f ft' ys' e' B'')
+      | None =>
+        e' <- eliminate_expr L e ;;
+        B'' <- eliminate_fundefs L B' ;;
+        ret (Fcons f ft ys e' B'')
+      end
+    | Fnil => ret Fnil
+    end. 
+
+End Elim.
+  
+Definition DPE (e : exp) (c_data : comp_data) : error exp * comp_data :=
+  if is_hoisted e then 
+    match e with 
+    | Efun B e' =>
+      match find_live e with
+      | Some L =>
+        let m := make_arityMap e (M.empty _) in
+        let '(ftagMap, c_data) := create_fun_tag L m B c_data (M.empty _) in 
+        
+        match run_compM (eliminate_fundefs ftagMap L B) c_data tt with
+        | (Ret B', (c_data, m)) => 
+          match run_compM (eliminate_expr ftagMap L e') c_data tt with
+          | (Ret e'', (c_data, m)) =>
+            (Ret (Efun B' e''), c_data)
+          | (Err s, (c_data, m)) => (Err s, c_data)
+          end
         | (Err s, (c_data, m)) => (Err s, c_data)
         end
-      | (Err s, (c_data, m)) => (Err s, c_data)
+      | None => (Ret e, c_data)
       end
-    | None => (Err "Dead param elim: find_live failed", c_data)
+    | e => (Ret e, c_data)
     end
-  | e => (Ret e, c_data)
-  end.
+  else (Ret e, c_data).

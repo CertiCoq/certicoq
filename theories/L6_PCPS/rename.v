@@ -1,5 +1,5 @@
 From Coq Require Import Lists.List Lists.SetoidList NArith.BinNat
-     PArith.BinPos MSets.MSetRBT Sets.Ensembles Omega Logic.Decidable.
+     PArith.BinPos MSets.MSetRBT Sets.Ensembles micromega.Lia Logic.Decidable.
 From compcert.lib Require Import Coqlib.
 From CertiCoq.L6 Require Import cps cps_util ctx set_util Ensembles_util
      List_util map_util identifiers functions.

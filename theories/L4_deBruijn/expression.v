@@ -65,7 +65,8 @@ Inductive exp: Type :=
 | Match_e: exp -> forall (pars:N) (* # of parameters *), branches_e -> exp
 | Let_e: name -> exp -> exp -> exp
 | Fix_e: efnlst -> N -> exp  (* implicitly lambdas *)
-| Prf_e : exp
+| Prf_e: exp
+| Prim_e: positive -> exp
 with exps: Type :=
 | enil: exps
 | econs: exp -> exps -> exps
@@ -238,6 +239,7 @@ Fixpoint shift n k e :=
     | Match_e e p bs => Match_e (shift n k e) p (shift_branches' shift n k bs)
     | Fix_e es k' => Fix_e (shift_efnlst shift n (efnlst_length es + k) es) k'
     | Prf_e => Prf_e
+    | Prim_e p => Prim_e p
   end.
 
 Definition shifts := shift_exps' shift.
@@ -299,6 +301,7 @@ Function subst (v:exp) k (e:exp): exp :=
     | Match_e e p bs => Match_e (subst v k e) p (subst_branches v k bs)
     | Fix_e es k' => Fix_e (subst_efnlst v (efnlst_length es + k) es) k'
     | Prf_e => Prf_e
+    | Prim_e p => Prim_e p
   end
 with substs (v:exp) k (es:exps) : exps :=
        match es with
@@ -330,6 +333,7 @@ Function sbst (v:exp) k (e:exp): exp :=
     | Match_e e p bs => Match_e (sbst v k e) p (sbst_branches v k bs)
     | Fix_e es k' => Fix_e (sbst_efnlst v (efnlst_length es + k) es) k'
     | Prf_e => Prf_e
+    | Prim_e p => Prim_e p
   end
 with sbsts (v:exp) k (es:exps) : exps :=
        match es with
@@ -717,6 +721,7 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                    | _ => None
                  end
                | Var_e e => None
+               | Prim_e p => None                                                   
              end
   end
 with evals_n n (es:exps) : option exps :=
@@ -957,9 +962,11 @@ Notation TTT := (Con_e TT enil).
 Notation FF := ((boolind, 1):dcon).
 Notation FFF := (Con_e FF enil).
 (* if b then e1 else e2 *)
+Import ListNotations.
 Notation ite :=
   (Lam_e "x" (Lam_e "y" (Lam_e "z"
              (Match_e Ve2 0 (brcons_e TT (0,[]) Ve1 (brcons_e FF (0,[]) Ve0 brnil_e)))))).
+             
 Goal eval (ite $ TTT $ FFF $ TTT) FFF.
   repeat econstructor. Qed.
 Goal eval (ite $ FFF $ FFF $ TTT) TTT.
@@ -1264,7 +1271,8 @@ Inductive is_value: exp -> Prop :=
 | lam_is_value: forall na e, is_value (Lam_e na e)
 | con_is_value: forall d es, are_values es -> is_value (Con_e d es)
 | fix_is_value: forall es k, is_value (Fix_e es k)
-| prf_is_value : is_value Prf_e
+| prf_is_value: is_value Prf_e
+(* | prim_is_value: forall p, is_value (Prim_e p) *)
 with are_values: exps -> Prop :=
 | enil_are_values: are_values enil
 | econs_are_values: forall e es, is_value e -> are_values es ->
@@ -1297,6 +1305,7 @@ Fixpoint is_valueb (e:exp): bool :=
     | Let_e _ _ _ => false
     | Fix_e _ _ => true
     | Prf_e => true
+    | Prim_e p => false (* arguable *)
   end
 with are_valuesb (es:exps): bool :=
        match es with
@@ -1314,6 +1323,7 @@ Proof.
   try discriminate; try inversion H1.
   - constructor. rewrite <- H. auto.
   - inversion H0; subst. rewrite H. auto.
+  - inv H.   
   - destruct (is_valueb e); try discriminate. constructor.
     + apply H; auto.
     + apply H0; auto. 
@@ -1439,6 +1449,7 @@ Proof.
   apply my_is_value_ind; simpl; intros; auto; try constructor; auto.
   inv H. lia.
   inv H0. auto.
+  
   inv H1. intuition.
   inv H1. intuition.
 Qed.
@@ -1528,7 +1539,6 @@ Eval compute in (list_to_zero 4).
 Eval compute in (seq 0 4).
 
 
-Require Import SquiggleEq.list.
 Lemma list_to_zero_rev n: list_to_zero n = rev (List.seq 0 n).
 Proof.
   rewrite <- (rev_involutive (list_to_zero n )).
@@ -1536,8 +1546,8 @@ Proof.
   induction n; [reflexivity | ].
   simpl list_to_zero. simpl rev. rewrite IHn. clear IHn.
   replace (S n) with (n + 1)%nat by omega.
-  rewrite seq_add. reflexivity.
-Qed.
+  (* rewrite seq_add. reflexivity. *)
+Abort.
 
 Lemma sbst_fix_real (e : exp) (es:efnlst):
   sbst_fix es e = 
@@ -1545,13 +1555,13 @@ Lemma sbst_fix_real (e : exp) (es:efnlst):
       e 
       (map (fun ndx => Fix_e es (N.of_nat ndx)) (List.seq 0 (efnlength es))).
 Proof using.
-  unfold sbst_fix. rewrite list_to_zero_rev.
-  rewrite <- fold_left_rev_right.
-  unfold sbst_real_list. rewrite rev_involutive.
-  f_equal.
-  symmetry.
-  apply fold_right_map.
-Qed.
+  (* unfold sbst_fix. rewrite list_to_zero_rev. *)
+  (* rewrite <- fold_left_rev_right. *)
+  (* unfold sbst_real_list. rewrite rev_involutive. *)
+  (* f_equal. *)
+  (* symmetry. *)
+  (* apply fold_right_map. *)
+Abort.
 
 Open Scope Z_scope.
 Function maxFree (e:exp): Z :=
@@ -1564,6 +1574,7 @@ Function maxFree (e:exp): Z :=
     | Match_e e p bs => Z.max (maxFree e) (maxFreeB bs)
     | Fix_e es k' => maxFreeF es - (Z.of_N (efnlst_length es))
     | Prf_e => -1
+    | Prim_e _ => -1
   end
 with maxFreeC (es:exps) : Z :=
     match es with
@@ -1607,8 +1618,11 @@ Close Scope Z_scope.
 Definition fnames (e:efnlst) : list name :=
 map fst (efnlst_as_list e).
 
+(*
 
-Require Import SquiggleEq.ExtLibMisc.
+Zoe: Commenting the following out as they have dependencies to SquiggleEq.
+     We should fix that if this code is still relevant.
+
 (* the suffix s stands for "simpler".
  Unlike eval_n, this is not a mutual fixpoint.
  In the Con_e cases, we convert [exps] to [list exp] and use list functions.
@@ -1668,8 +1682,10 @@ Function eval_ns (n:nat) (e:exp) {struct n}: option exp :=
       | _ => None
       end
     | Var_e e => None
+    | Prim_e e => None
     end
   end.
+
 
 Lemma eval_ns_Some_Succ:
   forall e (n:nat) v, eval_ns n e = Some v -> n = (S (n - 1))%nat.
@@ -1687,17 +1703,12 @@ Lemma eval_ns_monotone:
 Admitted.
 
 
-
 From CertiCoq Require Import CpdtTactics.
 Lemma exps_as_list_from_list vs:
   exps_from_list (exps_as_list vs) = vs.
 Proof using.
   induction vs; crush.
 Qed.
-
-Require Import SquiggleEq.UsefulTypes.
-Require Import SquiggleEq.list.
-Require Import SquiggleEq.tactics.
 
 
 
@@ -1792,3 +1803,5 @@ Proof.
     apply  eval_ns_monotone.
     auto.
 Qed.
+
+*)

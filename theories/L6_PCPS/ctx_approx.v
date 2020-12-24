@@ -2,7 +2,7 @@
  * Author: Zoe Paraskevopoulou, 2016
  *)
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Lists.List Coq.omega.Omega
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Lists.List Coq.micromega.Lia
         Coq.Relations.Relations Coq.Classes.RelationClasses.
 From CertiCoq.L6 Require Import cps ctx eval logical_relations identifiers tactics.
 

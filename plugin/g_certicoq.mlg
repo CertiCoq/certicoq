@@ -8,41 +8,72 @@ open Certicoq
 open Ltac_plugin
 open Stdarg
 open Pcoq.Prim
+open Plugin_utils
+
 }
 
 VERNAC ARGUMENT EXTEND cargs 
-| [ "-direct" ] -> { ANF }
+| [ "-cps" ] -> { CPS }
 | [ "-time" ] -> { TIME }
 | [ "-time_anf" ] -> { TIMEANF }
 | [ "-O" natural(n) ] -> { OPT(n) }
 | [ "-debug" ] -> { DEBUG }
 | [ "-args" natural(n) ] -> { ARGS(n) }
 | [ "-config" natural(n) ] -> { ANFCONFIG(n) }
-(* Zoe: -config  Too measure different ANF configurations. Not for user purposes *)
+(* Zoe: -config  To measure different ANF configurations. Not for user purposes *)
 | [ "-dev" natural(n) ] -> { DEV(n) }
 | [ "-ext" string(s) ] -> { EXT(s) }
+| [ "-file" string(s) ] -> { FILENAME(s) }
 END
+
+
+VERNAC ARGUMENT EXTEND extract_cnst 
+| [ reference(gr) "=>" string(str) ] -> { extract_constant (Constrintern.locate_reference gr) str }
+END
+
 
 VERNAC ARGUMENT EXTEND ffiargs
 | [ "-prefix" string(s) ] -> { PREFIX(s) }
 | [ cargs(c) ] -> { c }
 END
 
+VERNAC ARGUMENT EXTEND glueargs
+| [ "-cps" ] -> { CPS }
+| [ "-debug" ] -> { DEBUG }
+| [ "-args" natural(n) ] -> { ARGS(n) }
+| [ "-file" string(s) ] -> { FILENAME(s) }
+END
+
 VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
 | [ "CertiCoq" "Compile" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
-    let opts = Certicoq.make_options l in
-    Certicoq.compile_with_glue opts gr
+    let opts = Certicoq.make_options l [] (get_name gr) in
+    Certicoq.compile_with_glue opts gr []
+  }
+| [ "CertiCoq" "Compile" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" "Include" "[" string_list_sep(imps, ",") "]" ] -> {
+    let gr = Nametab.global gr in
+    let opts = Certicoq.make_options l cs (get_name gr) in
+    Certicoq.compile_with_glue opts gr imps
   }
 | [ "CertiCoq" "Show" "IR" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
-    let opts = Certicoq.make_options l in
+    let opts = Certicoq.make_options l [] (get_name gr) in
+    Certicoq.show_ir opts gr
+  }
+| [ "CertiCoq" "Show" "IR" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" ] -> {
+    let gr = Nametab.global gr in
+    let opts = Certicoq.make_options l cs (get_name gr) in
     Certicoq.show_ir opts gr
   }
 | [ "CertiCoq" "FFI" ffiargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
-    let opts = Certicoq.make_options l in
+    let opts = Certicoq.make_options l [] "" in
     Certicoq.ffi_command opts gr
+  }
+| [ "CertiCoq" "Generate" "Glue" glueargs_list(l) "[" global_list_sep(grs, ",") "]" ] -> {
+    let grs = List.map Nametab.global grs in
+    let opts = Certicoq.make_options l [] "" in
+    Certicoq.glue_command opts grs
   }
 | [ "CertiCoq" "-help" ] -> {
     Feedback.msg_info (str help_msg)

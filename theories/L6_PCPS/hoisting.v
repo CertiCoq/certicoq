@@ -8,7 +8,7 @@ Require Import L6.cps L6.cps_util L6.identifiers L6.eval L6.env L6.ctx L6.size_c
         L6.algebra L6.closure_conversion L6.closure_conversion_util L6.state.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.Lists.List Coq.NArith.BinNat Coq.Relations.Relations
-        Coq.omega.Omega Coq.Sets.Ensembles Coq.Classes.Morphisms.
+        Coq.micromega.Lia Coq.Sets.Ensembles Coq.Classes.Morphisms.
 
 Import ListNotations.
 
@@ -88,9 +88,10 @@ Definition exp_hoist (e : exp) :=
 
 Section CC.
   Context (clo_tag : ctor_tag). (* Tag for closure records *)
+  Context (clo_itag : ind_tag). (* Inductive tag for closure records *)
   
   Definition closure_conversion_hoist (e : exp) (c: comp_data) : error exp * comp_data :=    
-    let '(e'_err, c') := closure_conversion_top clo_tag e c in
+    let '(e'_err, c') := closure_conversion_top clo_tag clo_itag e c in
     match e'_err with 
     | Ret e' => (Ret (fst (exp_hoist e')), c')
     | Err str => (Err str, c')
@@ -819,14 +820,14 @@ Section Hoisting_correct.
         eapply Erase_nested_fundefs_name_in_fundefs; eassumption.
       + eauto.
       + intros Hlt Hall.
-        eapply preord_exp_post_monotonic with (P1 := P1 n1). eapply Hd'. omega.
+        eapply preord_exp_post_monotonic with (P1 := P1 n1). eapply Hd'. lia.
 
         assert (Hsplit' := Hsplit).
         eapply split_fds_sym in Hsplit.
         edestruct (split_fds_trans _ _ _ _ _ Hs2 Hsplit) as [Bprev' [Hs3 Hs4]].
         eapply IHe with (Ball := Ball) (Bprev := Bprev');
           last eassumption; try eassumption.
-        * omega.
+        * lia.
         * eapply unique_bindings_fun_in_fundefs.
           eapply find_def_correct. eassumption.
           eassumption.
@@ -838,7 +839,7 @@ Section Hoisting_correct.
           clear Hs3 Hs4. 
           (* eapply IHk to show that inner def_funs are related *)
           { eapply IHk with (Ball := Ball); last eassumption; try eassumption. 
-            - intros. eapply IHe; eauto. omega. 
+            - intros. eapply IHe; eauto. lia. 
             - reflexivity.
             - intros z Hinz v Hgetz. 
               inv Hinz. 
@@ -848,7 +849,7 @@ Section Hoisting_correct.
               
               edestruct Henv as [v2 [Hget2 Hv2]]; eauto. constructor; eauto.
               rewrite Hfuns in Hget2. inv Hget2; eauto.
-              eapply preord_val_monotonic. eassumption. omega.
+              eapply preord_val_monotonic. eassumption. lia.
               eapply Hfvs; eauto.
               eapply Hfvs; eauto.
             - eexists. intros f1 Hf. rewrite def_funs_eq. reflexivity.
@@ -878,7 +879,7 @@ Section Hoisting_correct.
       eapply preord_env_P_antimon. eassumption. sets.
   Qed.
 
-  Require Import Coq.micromega.Lia. 
+  Require Import micromega.Lia. 
 
   (** * Correctness of Erase_fundefs *)
   
@@ -902,7 +903,7 @@ Section Hoisting_correct.
     induction k as [k IHk] using lt_wf_rec1.
     intros e; revert k IHk; induction e using exp_ind';
       intros k IHk e' Bprev B Ball m Hleq' rho rho' Hun1 Hun2 Henv Hfuns Hsplit Hdis Hfvs Hhoist;
-      inv Hhoist; inv Hun2; try (assert (Hd' := HP m); destruct Hd'; try omega).
+      inv Hhoist; inv Hun2; try (assert (Hd' := HP m); destruct Hd'; try lia).
     - (* Econstr *)
       eapply preord_exp_constr_compat.
       + now eauto.
@@ -914,10 +915,9 @@ Section Hoisting_correct.
         * eassumption.
         * eapply preord_env_P_extend.
           -- eapply preord_env_P_antimon.
-             eapply preord_env_P_monotonic; [| eassumption ]. omega. 
+             eapply preord_env_P_monotonic; [| eassumption ]. lia. 
              normalize_occurs_free. sets.
           -- rewrite preord_val_eq. constructor; eauto.
-             eapply Forall2_Forall2_asym_included. eassumption.
         * eapply funs_inv_env_set. eassumption.
           eapply Disjoint_In_l. eapply Disjoint_sym. eassumption.
           normalize_bound_var; sets.
@@ -926,7 +926,7 @@ Section Hoisting_correct.
         * intros B' Hbin. eapply Hfvs. constructor; eauto.
         * eassumption.
     - (* Ecase nil *)
-      eapply preord_exp_case_nil_compat. eapply HP. omega.
+      eapply preord_exp_case_nil_compat. eapply HP. lia.
     - (* Ecase cons *)
       eapply split_fds_sym in H8.
       edestruct split_fds_trans as [Bnew [Hs1 Hs2]].
@@ -935,16 +935,16 @@ Section Hoisting_correct.
       edestruct split_fds_trans as [Bnew' [Hs1' Hs2']].
       now eapply H8. eapply split_fds_sym. eassumption.      
       eapply preord_exp_case_cons_compat; eauto.
-      + eapply HP. omega.
-      + eapply HP. omega.
-      + eapply HP. omega.
+      + eapply HP. lia.
+      + eapply HP. lia.
+      + eapply HP. lia.
       + eapply Erase_fundefs_Ecase. eassumption.
       + intros m Hlt.
         eapply preord_exp_post_monotonic. eapply HPmon with (n := m0). lia.
         eapply IHk; last eassumption; eauto.
         * lia.
         * eapply preord_env_P_antimon.
-          eapply preord_env_P_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_monotonic; [| eassumption ]. lia.
           normalize_occurs_free; sets.
         * apply split_fds_sym. eassumption.
         * eapply Disjoint_Included_r; [| eassumption ].
@@ -972,7 +972,7 @@ Section Hoisting_correct.
         * eassumption.
         * eapply preord_env_P_extend.
           -- eapply preord_env_P_antimon.
-             eapply preord_env_P_monotonic; [| eassumption ]. omega.
+             eapply preord_env_P_monotonic; [| eassumption ]. lia.
              normalize_occurs_free. sets.
           -- eassumption.
         * eapply funs_inv_env_set. eassumption.
@@ -995,7 +995,7 @@ Section Hoisting_correct.
         * eassumption.
         * eapply preord_env_P_extend.
           -- eapply preord_env_P_antimon.
-             eapply preord_env_P_monotonic; [| eassumption ]. omega.
+             eapply preord_env_P_monotonic; [| eassumption ]. lia.
              normalize_occurs_free. sets.
           -- eassumption.
         * eapply funs_inv_env_set. eassumption.
@@ -1017,18 +1017,18 @@ Section Hoisting_correct.
         eapply preord_exp_post_monotonic. eapply HPmon with (n := n). lia.
                                   
         eapply IHe with (Ball := Ball); [ | | eassumption | eassumption | | | | | | eassumption ].
-        * intros. eapply IHk; eauto. omega.
+        * intros. eapply IHk; eauto. lia.
         * lia. 
         * eapply preord_env_P_antimon.
           -- { eapply Erase_nested_fundefs_correct with (S := occurs_free_fundefs f2 :|: occurs_free e);
                [ | | | | | | | | | | eassumption ].
                - lia. 
-               - intros. eapply IHk; eauto. omega.
+               - intros. eapply IHk; eauto. lia.
                - eapply Hun1.
                - eassumption.
                - sets.
                - eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ].
-                 omega. normalize_occurs_free; sets.
+                 lia. normalize_occurs_free; sets.
                  rewrite Setminus_Union_distr. sets.
                - eassumption.
                - eapply split_fds_sym.  eassumption.
@@ -1097,7 +1097,7 @@ Section Hoisting_correct.
       - eauto.
       - edestruct Erase_fundefs_unique_bindings. eassumption. eassumption. destructAll.
         eapply hoisting_correct with (Bprev := Fnil) (B := B) (Ball := B).
-        + omega. 
+        + lia. 
         + eassumption.
         + eassumption.
         + eapply preord_env_P_def_funs_not_in_P_r. eassumption. 
@@ -1278,7 +1278,7 @@ Lemma split_fds_fundefs_fundefs_count B B' B'' :
   split_fds B B' B'' ->
   fundefs_fun_count B + fundefs_fun_count B' = fundefs_fun_count B''.
 Proof.
-  intros H. induction H; eauto; simpl; omega.
+  intros H. induction H; eauto; simpl; lia.
 Qed.
 
 (** The number of functions definitions is invariant w.r.t hoist_rw *)
@@ -1288,13 +1288,13 @@ Proof.
   intros e1 e2 Heq Hrw; inv Hrw; simpl; eauto.
   - rewrite <- !fold_left_rev_right, !rev_app_distr.
     simpl. generalize (rev tes') as l', (rev tes) as l, 0.
-    induction l'; intros l n; simpl. omega.
-    rewrite <- IHl'. omega.
-  - erewrite <- split_fds_fundefs_fundefs_count; eauto. omega.
+    induction l'; intros l n; simpl. lia.
+    rewrite <- IHl'. lia.
+  - erewrite <- split_fds_fundefs_fundefs_count; eauto. lia.
   - apply split_fds_fundefs_fundefs_count in H.
     apply split_fds_fundefs_fundefs_count in H0.
     apply split_fds_fundefs_fundefs_count in H1. simpl in *.
-    omega.
+    lia.
 Qed.
       
 Lemma fun_count_ctx_compat :
@@ -1310,7 +1310,7 @@ Proof.
   simpl. generalize (rev l') as l1, (rev l) as l2, 0.
   induction l1; intros l2 n; simpl.
   now erewrite IHc; eauto.
-  rewrite IHl1. omega.
+  rewrite IHl1. lia.
 Qed.
 
 (** The number of functions definitions is invariant w.r.t hoist_star *)
@@ -1564,7 +1564,7 @@ Proof.
   - eauto. inv H.  inv H0. eauto. exfalso.
     eapply exp_fun_cnt_refl_trans_clo_invariant in Hrwstar; eauto.
     eapply exp_fun_cnt_refl_trans_clo_invariant in H1; eauto.
-    simpl in *. omega.
+    simpl in *. lia.
 Qed.
 
 Lemma hoist_star_Ecase_cons_2 x c e tes tes' B :
@@ -2426,7 +2426,7 @@ Section hoisting_correct.
           + eapply Included_trans. eapply occurs_free_Efun_Included with (B := B).
             rewrite Union_assoc. apply Included_Union_compat; eauto using Included_refl.
           eapply occurs_free_Econstr_Included.
-        - omega. 
+        - lia. 
         - eexists; eexists (c2 + (1 + numOf_fundefs B + set_util.PS.cardinal (fundefs_fv B))
                             + 1 + Datatypes.length ys).
           repeat split; eauto. rewrite <- plus_assoc.
@@ -2436,7 +2436,7 @@ Section hoisting_correct.
           intros y Hin Hc. eapply HD.
           constructor. constructor 2. constructor.
           now apply name_in_fundefs_bound_var_fundefs; eauto.
-          now constructor. eapply preord_val_monotonic. eassumption. omega. }
+          now constructor. eapply preord_val_monotonic. eassumption. lia. }
     -  intros v1 c1 Hleq1 Hstep1.
        { inv Hstep1.
          edestruct Henv as [v' [Hget Hpre]]; eauto.
@@ -2455,7 +2455,7 @@ Section hoisting_correct.
                intros x' H'. 
                econstructor; [| eapply in_or_app; right; constructor; eauto ].
                constructor; eauto.
-           + omega. 
+           + lia. 
            + eexists; exists (c2 + 1). eauto. constructor; eauto. econstructor; eauto.
              rewrite def_funs_neq; eauto. intros Hn.
              eapply HD. econstructor.

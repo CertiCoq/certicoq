@@ -4,7 +4,7 @@
 
 
 From Coq Require Import ZArith List SetoidList NArith.BinNat PArith.BinPos
-     MSets.MSetRBT Sets.Ensembles Omega Sorting.Permutation.
+     MSets.MSetRBT Sets.Ensembles micromega.Lia Sorting.Permutation.
 From CertiCoq.L6 Require Import List_util cps ctx identifiers Ensembles_util set_util cps_util map_util.
 
 Require Import compcert.lib.Maps.
@@ -169,18 +169,18 @@ Lemma sizeOf_val_monotic i i' v :
   sizeOf_val i v <= sizeOf_val i' v.
 Proof.
   revert i' v. induction i as [i IHi] using lt_wf_rec1; intros i' v.
-  destruct i; try (simpl; omega). intros Hlt.
+  destruct i; try (simpl; lia). intros Hlt.
   induction v using val_ind'.
-  - destruct i'; simpl; omega.
-  - destruct i'; try now (simpl; omega).
+  - destruct i'; simpl; lia.
+  - destruct i'; try now (simpl; lia).
     rewrite !sizeOf_val_Vconstr_unfold.
     eapply Nat.max_le_compat; eauto. 
-  - destruct i'; try now (simpl; omega).
+  - destruct i'; try now (simpl; lia).
     eapply Nat.max_le_compat; eauto.
     unfold sizeOf_env. eapply Mfold_monotonic; eauto.
     intros. eapply Nat.max_le_compat; eauto.
-    rewrite !sizeOf_val_eq; eapply IHi; omega.
-  - destruct i'; simpl; omega.
+    rewrite !sizeOf_val_eq; eapply IHi; lia.
+  - destruct i'; simpl; lia.
 Qed.
 
 Lemma sizeOf_env_monotic i i' v :
@@ -246,7 +246,7 @@ Definition num_fundefs_in_exp_env i e rho := max (num_fundefs_in_exp e) (num_fun
 Lemma numOf_fundefs_le_sizeOf_fundefs B :
   numOf_fundefs B <= sizeOf_fundefs B.
 Proof.
-  induction B; eauto; simpl; omega.
+  induction B; eauto; simpl; lia.
 Qed.
 
 Lemma sizeOf_env_set k rho x v :
@@ -294,7 +294,7 @@ Lemma sizeOf_env_get_list k rho xs vs :
   max_list_nat_with_measure (sizeOf_val k) 0 vs  <= sizeOf_env k rho.
 Proof.
   revert vs. induction xs; intros vs Hgetl. 
-  - destruct vs; try discriminate; simpl; omega.
+  - destruct vs; try discriminate; simpl; lia.
   - simpl in Hgetl.
     destruct (rho ! a) eqn:Hgeta; try discriminate.
     destruct (get_list xs rho) eqn:Hgetl'; try discriminate.
@@ -307,7 +307,7 @@ Proof.
       eapply sizeOf_env_get. eassumption.
       intros x v1 v2. rewrite <- !Max.max_assoc, (Max.max_comm (sizeOf_val k v1)).
       reflexivity.
-    + eapply Nat.max_lub; omega.
+    + eapply Nat.max_lub; lia.
 Qed.
 
 Lemma sizeOf_env_set_constr k rho xs c vs y:
@@ -318,14 +318,14 @@ Proof.
   assert (Hlow : sizeOf_env k rho <= max (sizeOf_val k (Vconstr c vs)) (sizeOf_env k rho))
     by apply Max.le_max_r.
   assert (Hhigh :  max (sizeOf_val k (Vconstr c vs)) (sizeOf_env k rho) <= sizeOf_env k rho).
-  { eapply Nat.max_lub; try omega.
-    destruct k; simpl. omega.
+  { eapply Nat.max_lub; try lia.
+    destruct k; simpl. lia.
     unfold max_list_nat_with_measure. eapply le_trans.
     eapply fold_left_monotonic; [| now eauto ].
     intros. rewrite sizeOf_val_eq. eapply Nat.max_le_compat.
     now eauto. now eauto.
     eapply (sizeOf_env_get_list (S k)). eassumption. }
-  omega.
+  lia.
 Qed.
 
 Lemma sizeOf_env_set_proj k rho x c vs y v :
@@ -337,12 +337,12 @@ Proof.
   assert (Hlow : sizeOf_env k rho <= max (sizeOf_val k v) (sizeOf_env k rho))
     by apply Max.le_max_r.
   assert (Hhigh :  max (sizeOf_val k v) (sizeOf_env k rho) <= sizeOf_env k rho).
-  { eapply Nat.max_lub; try omega.
+  { eapply Nat.max_lub; try lia.
     eapply le_trans; [ | now eapply sizeOf_env_get; eauto ].
     destruct k; eauto. simpl (sizeOf_val (S k) (Vconstr c vs)).
     rewrite <- sizeOf_val_eq.
     eapply max_list_nat_spec2. eassumption. }
-  omega.
+  lia.
 Qed.
 
 Lemma sizeOf_env_def_funs k rho B B' :
@@ -353,7 +353,7 @@ Proof.
   - rewrite sizeOf_env_set. destruct k; simpl; eauto.
     eapply Nat.max_lub; eauto.
     rewrite Max.max_comm. eapply Nat.max_le_compat; eauto.
-    eapply sizeOf_env_monotic. omega.
+    eapply sizeOf_env_monotic. lia.
   - eapply Max.le_max_l.
 Qed.
 
@@ -371,9 +371,9 @@ Qed.
 (*   sizeOf_exp e <= sizeOf_fundefs B. *)
 (* Proof. *)
 (*   intros Hin. induction B; inv Hin. *)
-(*   - inv H. simpl; omega. *)
+(*   - inv H. simpl; lia. *)
 (*   - eapply le_trans. eapply IHB; eauto. *)
-(*     simpl. omega.   *)
+(*     simpl. lia.   *)
 (* Qed. *)
 
 
@@ -410,7 +410,7 @@ Proof.
   rewrite (Max.max_comm (max_list_nat_with_measure _ _ _) _), Max.max_assoc.
   eapply Nat.max_lub.
   - eapply le_trans; [| now eapply sizeOf_env_get; eauto ].
-    destruct k; try omega. simpl. rewrite <- minus_n_O.
+    destruct k; try lia. simpl. rewrite <- minus_n_O.
     eapply le_trans.
     + eapply Nat.max_le_compat.
       * eassumption.
@@ -418,14 +418,14 @@ Proof.
     + rewrite (Max.max_comm (sizeOf_env k rho')),
       Max.max_assoc, Max.max_idempotent; eauto.
   - eapply le_trans. eapply (max_list_nat_monotonic _ _ (sizeOf_val k)); eauto.
-    intros. eapply sizeOf_val_monotic. omega.
+    intros. eapply sizeOf_val_monotic. lia.
     eapply sizeOf_env_get_list; eauto.
 Qed.
 
 Lemma sizeOf_exp_grt_1 e :
   1 <= sizeOf_exp e.
 Proof.
-  induction e using exp_ind'; simpl; eauto; omega.
+  induction e using exp_ind'; simpl; eauto; lia.
 Qed.
 
 (** Lemmas about context sizes *)
@@ -436,10 +436,10 @@ Lemma sizeOf_exp_ctx_comp_ctx_mut :
      sizeOf_fundefs_ctx (comp_f_ctx_f B e) = sizeOf_fundefs_ctx B + sizeOf_exp_ctx e).
 Proof.
   exp_fundefs_ctx_induction IHe IHB; 
-  try (intros C; simpl; eauto; rewrite IHe; omega);
-  try (intros C; simpl; eauto; rewrite IHB; omega).
+  try (intros C; simpl; eauto; rewrite IHe; lia);
+  try (intros C; simpl; eauto; rewrite IHB; lia).
   (* probably tactic misses an intro pattern *)
-  intros l' C. simpl. rewrite IHe; omega.
+  intros l' C. simpl. rewrite IHe; lia.
 Qed.
 
 Corollary sizeOf_exp_ctx_comp_ctx :
@@ -462,9 +462,9 @@ Lemma fun_in_fundefs_sizeOf_exp B f tau xs e :
   sizeOf_exp e <= sizeOf_fundefs B.
 Proof.
   intros Hin. induction B; inv Hin.
-  - inv H. simpl; omega.
+  - inv H. simpl; lia.
   - eapply le_trans. eapply IHB; eauto.
-    simpl. omega.
+    simpl. lia.
 Qed.
 
   (** *  Useful definitions and lemmas for the  bound. *)
@@ -487,35 +487,35 @@ Lemma max_exp_env_Econstr k x t ys e rho :
   max_exp_env k e rho <= max_exp_env k (Econstr x t ys e) rho.
 Proof.
   eapply Nat.max_le_compat_r.
-  simpl. omega.
+  simpl. lia.
 Qed.
 
 Lemma max_exp_env_Eproj k x t N y e rho :
   max_exp_env k e rho <= max_exp_env k (Eproj x t N y e) rho.
 Proof.
   eapply Nat.max_le_compat_r.
-  simpl. omega.
+  simpl. lia.
 Qed.
 
 Lemma max_exp_env_Ecase_cons_hd k x c e l rho :
   max_exp_env k e rho <= max_exp_env k (Ecase x ((c, e) :: l)) rho.
 Proof.
   eapply Nat.max_le_compat_r.
-  simpl. omega.
+  simpl. lia.
 Qed.
 
 Lemma max_exp_env_Ecase_cons_tl k x c e l rho :
   max_exp_env k (Ecase x l) rho <= max_exp_env k (Ecase x ((c, e) :: l)) rho.
 Proof.
   eapply Nat.max_le_compat_r.
-  simpl. omega.
+  simpl. lia.
 Qed.
 
 Lemma max_exp_env_Eprim k x f ys e rho :
   max_exp_env k e rho <= max_exp_env k (Eprim x f ys e) rho.
 Proof.
   eapply Nat.max_le_compat_r.
-  simpl. omega.
+  simpl. lia.
 Qed.
 
 Lemma max_exp_env_Efun k B e rho :
@@ -526,7 +526,7 @@ Proof.
     now apply sizeOf_env_def_funs.
   - rewrite (Max.max_comm (sizeOf_env _ _)), Max.max_assoc.
     eapply Nat.max_le_compat_r.
-    eapply Nat.max_lub; simpl; omega.
+    eapply Nat.max_lub; simpl; lia.
   Qed.
 
 (* Lemma about the number of free variables *)
@@ -550,7 +550,7 @@ Proof.
     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2;
       [| now apply Setminus_Included ].
     eapply Same_set_FromList_length in Hin1.
-    eapply IHe in Hin2. omega.
+    eapply IHe in Hin2. lia.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
   - rewrite <- (Union_Empty_set_neut_r [set v]) in Heq.
@@ -563,7 +563,7 @@ Proof.
     rewrite <- HP in Hnd.
     eapply Permutation_length in HP. rewrite <- HP.
     rewrite !app_length.
-    eapply IHe in Hin1. eapply IHl in Hin2. simpl in *. omega.
+    eapply IHe in Hin1. eapply IHl in Hin2. simpl in *. lia.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
     eapply Singleton_Included. eauto.
@@ -577,7 +577,7 @@ Proof.
     rewrite <- (Union_Empty_set_neut_r [set v0]) in Hin1.
     rewrite <- FromList_nil, <- FromList_cons in Hin1.
     eapply Same_set_FromList_length in Hin1.
-    eapply IHe in Hin2. simpl in *. omega.
+    eapply IHe in Hin2. simpl in *. lia.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
@@ -589,7 +589,7 @@ Proof.
       [| now apply Setminus_Included ].
     rewrite <- FromList_cons in Hin1.
     eapply Same_set_FromList_length in Hin1.
-    eapply IHe in Hin2. simpl in Hin1. omega.
+    eapply IHe in Hin2. simpl in Hin1. lia.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
@@ -599,7 +599,7 @@ Proof.
     rewrite app_length.
     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) _)) in Hin2;
       [| now apply Setminus_Included ].
-    eapply IHb in Hin1. eapply IHe in Hin2. omega.
+    eapply IHb in Hin1. eapply IHe in Hin2. lia.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
@@ -610,7 +610,7 @@ Proof.
     rewrite <- (Union_Empty_set_neut_r [set v]) in Hin2.
     rewrite <- FromList_nil, <- FromList_cons in Hin2.
     eapply Same_set_FromList_length in Hin2.
-    simpl in *. omega.
+    simpl in *. lia.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
@@ -621,7 +621,7 @@ Proof.
     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2;
       [| now apply Setminus_Included ].
     eapply Same_set_FromList_length in Hin1.
-    eapply IHe in Hin2. omega.
+    eapply IHe in Hin2. lia.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
   - rewrite <- (Union_Empty_set_neut_r [set v]) in Heq.
@@ -635,7 +635,7 @@ Proof.
       [| now apply Setminus_Included ].
     eapply (Included_trans (FromList l1) (Setminus var _ _)) in Hin1;
       [| now apply Setminus_Included ]. 
-    eapply IHe in Hin1. eapply IHb in Hin2. omega.
+    eapply IHe in Hin1. eapply IHb in Hin2. lia.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
   - rewrite <- FromList_nil in Heq.

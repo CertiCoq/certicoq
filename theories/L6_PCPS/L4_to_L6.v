@@ -562,7 +562,7 @@ Fixpoint add_names lnames vars tgm : conv_env :=
                           Prop :=
   | e_Var :
       forall S v vn x k tgm,
-        v = (nth vn (N.to_nat x)) ->
+        nth_error vn (N.to_nat x) = Some v -> 
         cps_cvt_rel S (Var_e x) vn k tgm S (cps.Eapp k kon_tag (v::nil))
   | e_Lam :
       forall S S' na e1 e1' x1 vn k k1 f tgm,
@@ -650,7 +650,7 @@ Fixpoint add_names lnames vars tgm : conv_env :=
         NoDup nlst ->
         List.length nlst = efnlength fnlst ->
         cps_cvt_rel_efnlst (S1 \\ (FromList nlst)) fnlst (nlst ++ vn) nlst tgm S2 fdefs ->
-        i' = (nth nlst (N.to_nat i)) ->
+        nth_error nlst (N.to_nat i) = Some i' ->
         cps_cvt_rel S1
                     (Fix_e fnlst i)
                     vn

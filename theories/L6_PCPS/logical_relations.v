@@ -208,24 +208,26 @@ Section Log_rel.
 
   (** Lemmas about extending the environment *)
   Lemma preord_var_env_extend_eq :
-    forall (rho1 rho2 : env) (k : nat) (x : var) (v1 v2 : val),
+    forall (rho1 rho2 : env) (k : nat) (x1 x2 : var) (v1 v2 : cps.val),
       preord_val PostG k v1 v2 ->
-      preord_var_env PostG k (M.set x v1 rho1) (M.set x v2 rho2) x x.
+      preord_var_env PostG k (M.set x1 v1 rho1) (M.set x2 v2 rho2) x1 x2.
   Proof.
-    intros rho1 rho2 k x v1 v2 Hval x' Hget.
+    intros rho1 rho2 k x1 x2 v1 v2 Hval x' Hget.
     rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss. split; eauto.
   Qed.
 
-    
+  
   Lemma preord_var_env_extend_neq :
-    forall (rho1 rho2 : env) (k : nat) (x y : var) (v1 v2 : val),
-      preord_var_env PostG k rho1 rho2 y y ->
-      y <> x ->
-      preord_var_env PostG k (M.set x v1 rho1) (M.set x v2 rho2) y y.
+    forall (rho1 rho2 : env) (k : nat) (x1 x2 y1 y2 : var) (v1 v2 : cps.val),
+      preord_var_env PostG k rho1 rho2 y1 y2 ->
+      y1 <> x1 ->
+      y2 <> x2 ->      
+      preord_var_env PostG k (M.set x1 v1 rho1) (M.set x2 v2 rho2) y1 y2.
   Proof.
-    intros rho1 rho2 k x  y v1 v2 Hval Hneq x' Hget.
+    intros rho1 rho2 k x1 x2 y1 y2 v1 v2 Hval Hneq Hneq' x' Hget.
     rewrite M.gso in *; eauto.
   Qed.
+
 
   Lemma preord_var_env_extend :
     forall (rho1 rho2 : env) (k : nat) (x y : var) (v1 v2 : val),
@@ -238,6 +240,25 @@ Section Log_rel.
     - apply preord_var_env_extend_eq; eauto.
     - apply preord_var_env_extend_neq; eauto.
   Qed.
+
+
+  Lemma preord_var_env_def_funs_not_In_l k B1 rho1 rho2 k1 k2 : 
+    ~ k1 \in name_in_fundefs B1 ->
+             preord_var_env PostG k rho1 rho2 k1 k2 ->
+             preord_var_env PostG k (def_funs B1 B1 rho1 rho1) rho2 k1 k2.
+  Proof.
+    intros Hnin Henv x Hget.
+    rewrite def_funs_neq in Hget; eauto.
+  Qed. 
+
+  Lemma preord_var_env_def_funs_not_In_r k B2 rho1 rho2 k1 k2 : 
+    ~ k2 \in name_in_fundefs B2 ->
+             preord_var_env PostG k rho1 rho2 k1 k2 ->
+             preord_var_env PostG k rho1 (def_funs B2 B2 rho2 rho2) k1 k2.
+  Proof.
+    intros Hnin Henv x Hget.
+    rewrite def_funs_neq; eauto.
+  Qed. 
 
   (** The environment relation is antimonotonic in the set
     * of free variables *) 
@@ -433,6 +454,30 @@ Section Log_rel.
     destruct x; try contradiction. destruct H as [Heq Hall]; eauto. subst.
     eexists; split; eauto. 
   Qed.
+
+  Lemma preord_val_fun k f1 f2 rho1 rho2 B1 B2 ft xs1 xs2 e1 e2 :
+    find_def f1 B1 = Some (ft, xs1, e1) ->
+    find_def f2 B2 = Some (ft, xs2, e2) -> 
+    
+    (forall rho1' j vs1 vs2,
+        Datatypes.length vs1 = Datatypes.length vs2 ->
+        Some rho1' = set_lists xs1 vs1 (def_funs B1 B1 rho1 rho1) ->
+        exists (rho2' : env),
+          Some rho2' = set_lists xs2 vs2 (def_funs B2 B2 rho2 rho2) /\
+          ((j < k)%nat ->
+           Forall2 (preord_val PostG j) vs1 vs2 ->
+           preord_exp' preord_val PostG PostG j (e1, rho1') (e2, rho2'))) ->
+    
+    
+    preord_val PostG k (Vfun rho1 B1 f1) (Vfun rho2 B2 f2).
+  Proof.
+    intros Hf1 Hf2 Hexp. rewrite preord_val_eq.
+    intro; intros. repeat subst_exp. 
+    edestruct Hexp. eassumption. eassumption. destructAll.
+    do 3 eexists. split; [ | split ]. eassumption.
+    eassumption. eauto. 
+  Qed. 
+
 
   (** * Index Anti-Monotonicity Properties *)
 

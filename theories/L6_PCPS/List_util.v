@@ -1181,3 +1181,24 @@ Proof.
       eassumption.
 Qed.
 
+
+
+(* Lemmas about [nth] *)
+
+Lemma nth_FromList :
+  forall A (l : list A) n x,
+    nth_error l n = Some x ->
+    x \in (FromList l).
+Proof.
+  intros A l n x Hx.
+  generalize dependent n. induction l; intros n Hx.
+  - destruct n eqn:Hn; inv Hx. 
+  - destruct n eqn:Hn.
+    + simpl in Hx. inv Hx.
+      unfold FromList. simpl. 
+      left. reflexivity.
+    + simpl in Hx. 
+      unfold FromList in *. unfold In in *.
+      simpl. right. eapply IHl.
+      eassumption.
+Qed.

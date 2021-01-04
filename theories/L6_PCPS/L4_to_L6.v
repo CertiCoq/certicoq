@@ -29,7 +29,7 @@ Section CPS.
   Context (func_tag kon_tag default_tag default_itag : positive)
           (next_id : positive).
 
-  (* Zoe: For translating proof. TODO *)
+  (* Zoe: For erasing boxes translating proof. TODO *)
   Definition consume_fun (f x : var) : exp_ctx :=
     Efun1_c (Fcons f func_tag [x] (Ehalt f) Fnil) Hole_c. 
 
@@ -635,7 +635,7 @@ Fixpoint add_names lnames vars tgm : conv_env :=
       forall S1 S2 S3 e1 e1' bs bs' vn k x1 k1 n tgm,
         x1 \in S1 ->
         k1 \in (S1 \\ [set x1]) ->
-        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 vn k tgm S2 e1' ->
+        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 vn k1 tgm S2 e1' ->
         cps_cvt_rel_branches S2 bs vn k x1 tgm S3 bs' ->
         cps_cvt_rel S1
                     (Match_e e1 n bs)
@@ -690,24 +690,20 @@ Fixpoint add_names lnames vars tgm : conv_env :=
          fundefs ->
          Prop :=
   | e_Eflnil :
-      forall S vn nlst tgm,
-        cps_cvt_rel_efnlst S eflnil vn nlst tgm S Fnil
+      forall S vn tgm,
+        cps_cvt_rel_efnlst S eflnil vn [] tgm S Fnil
   | e_Eflcons :
-      forall S1 S2 S3 vn nlst e1 e1' fnlst' fdefs' cvar n1 na x1 k1 tgm,
+      forall S1 S2 S3 vn nlst e1 e1' fnlst' fdefs' n n1 na x1 k1 tgm,
         x1 \in S1 ->
         k1 \in (S1 \\ [set x1]) ->
         isLambda e1 ->
         cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 (x1::vn) k1 tgm S2 e1' ->
-        cps_cvt_rel_efnlst S2 fnlst' vn (List.tl nlst) tgm S3 fdefs' ->
-        List.hd_error nlst = Some cvar ->
+        cps_cvt_rel_efnlst S2 fnlst' vn nlst tgm S3 fdefs' ->
         cps_cvt_rel_efnlst
-          S1 
-          (eflcons n1 (Lam_e na e1) fnlst')
-          vn
-          nlst
-          tgm
-          S3
-          (Fcons cvar func_tag (k1::x1::nil) e1' fdefs')
+          S1 (eflcons n1 (Lam_e na e1) fnlst')
+          vn (n :: nlst)
+          tgm S3
+          (Fcons n func_tag (k1::x1::nil) e1' fdefs')
   with cps_cvt_rel_branches :
          Ensemble var ->
          expression.branches_e ->

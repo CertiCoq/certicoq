@@ -13,7 +13,7 @@ Require Import L4.expression L4.exp_eval.
 
 Require Import cps cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
-        tactics L4_to_L6 L6.tactics. 
+        tactics L4_to_L6 L6.tactics identifiers cps_util rename. 
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
@@ -80,6 +80,40 @@ Section Post.
       cps_env_rel' cps_val_rel.
 
 
+    (** ** Subset lemmas *)
+    
+    Definition cps_cvt_exp_subset :=
+      forall e e' k1 vars1 S1 S2,
+        cps_cvt_rel S1 e vars1 k1 cnstrs S2 e' ->
+        S2 \subset S1.
+
+    Definition cps_cvt_exps_subset :=
+      forall e e' k1 vars1 vs S1 S2,
+        cps_cvt_rel_exps S1 e vars1 k1 vs cnstrs S2 e' ->
+        S2 \subset S1.
+
+    Definition cps_cvt_efnlst_subset :=
+      forall S1 efns vars1 nlst1 cnstrs S2 fdefs1,
+        cps_cvt_rel_efnlst S1 efns vars1 nlst1 cnstrs S2 fdefs1 ->
+        S2 \subset S1.
+
+    Definition cps_cvt_branches_subset :=
+      forall S1 bs vars1 k1 x1 cnstrs S2 bs1,
+        cps_cvt_rel_branches S1 bs vars1 k1 x1 cnstrs S2 bs1 ->
+        S2 \subset S1.
+
+    
+    Definition cps_cvt_rel_subset_stmt :=
+      cps_cvt_exp_subset /\
+      cps_cvt_exps_subset /\
+      cps_cvt_efnlst_subset /\
+      cps_cvt_branches_subset.
+
+
+    Lemma cps_cvt_rel_subset : cps_cvt_rel_subset_stmt. 
+    Admitted.
+    
+    
     (** ** Alpha-equivalence statements *)
     
      Definition cps_cvt_exp_alpha_equiv k :=
@@ -89,7 +123,10 @@ Section Post.
         NoDup vars1 -> (* TODO is this needed? *)
         ~(k1 \in (FromList vars1)) ->
         List.length vars1 = List.length vars2 ->
+
         Disjoint _ (k1 |: FromList vars1) S1 ->
+        Disjoint _ (k2 |: FromList vars2) S3 ->
+
         preord_env_P_inj cenv PG (k1 |: FromList vars1) k
                          (id { k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
         preord_exp cenv P1 PG k (e1, rho1) (e2, rho2).
@@ -101,7 +138,10 @@ Section Post.
         NoDup vars1 ->
         ~(k1 \in (FromList vars1)) ->
         List.length vars1 = List.length vars2 ->
+        
         Disjoint _ (k1 |: FromList vars1) S1 ->
+        Disjoint _ (k2 |: FromList vars2) S3 ->
+
         preord_env_P_inj cenv PG (k1 |: FromList vars1) k
                          (id { k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
         preord_exp cenv P1 PG k (es1, rho1) (es2, rho2). 
@@ -114,8 +154,11 @@ Section Post.
         NoDup vars1 ->
         ~(k1 \in (FromList vars1)) ->
         List.length vars1 = List.length vars2 ->
+
         Disjoint _ (k1 |: FromList vars1) S1 ->
-        preord_env_P_inj cenv PG (k1 |: FromList vars1) k
+        Disjoint _ (k2 |: FromList vars2) S3 ->
+
+        preord_env_P_inj cenv PG (k1 |: (FromList vars1 \\ FromList nlst1)) k
                          (id {k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
         preord_env_P_inj cenv PG (k1 |: (FromList vars1 :|: FromList nlst1)) k
                          (id {k1 ~> k2 } <{ vars1 ~> vars2 }> <{ nlst1 ~> nlst2}>)
@@ -130,7 +173,10 @@ Section Post.
         NoDup vars1 ->
         ~(k1 \in (FromList vars1)) ->        
         List.length vars1 = List.length vars2 ->
+
         Disjoint _ (k1 |: FromList vars1) S1 ->       
+        Disjoint _ (k2 |: FromList vars2) S3 ->
+        
         preord_env_P_inj cenv PG (k1 |: FromList vars1) k
                          (id {k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->        
         preord_var_env cenv PG k rho1 rho2 x1 x2 ->
@@ -149,64 +195,38 @@ Section Post.
         cps_val_rel v v1 ->
         cps_val_rel v v2 ->
         preord_val cenv PG k v1 v2.     
-
-
-    Lemma id_vars_nth_error :
-      forall A vars1 vars2 n (f: var -> A) v1 v2,
-        List.length vars1 = List.length vars2 ->
-        NoDup vars1 ->
-        nth_error vars1 n = Some v1 ->
-        nth_error vars2 n = Some v2 ->
-        (f <{ vars1 ~> vars2 }>) v1 = v2.
+    
+    
+    Lemma cps_cvt_rel_efnlst_name_in_fundes S1 na vars nlst S2 B : 
+      cps_cvt_rel_efnlst S1 na vars nlst cnstrs S2 B ->
+      name_in_fundefs B <--> FromList nlst.
     Proof.
-      intros A vars1. induction vars1; intros vars2 n f v1 v2 Hlen Hdup Hv1 Hv2.
-      - destruct vars2 eqn:Hvars2.
-        destruct n eqn:Hn; simpl in Hv1; inv Hv1.
-        inv Hlen. 
-      - destruct vars2 eqn:Hvars2.
-        inv Hlen.
-        destruct n eqn:Hn.
-        + simpl in Hv1, Hv2.
-          inv Hv1. inv Hv2.
-          simpl. rewrite extend_gss. reflexivity.
-        + simpl in *.
-          rewrite extend_gso.
-          eapply IHvars1. lia.
-          inv Hdup. eassumption.
-          eassumption.
-          eassumption.
-          intros Heq.
-          eapply nth_error_In in Hv1.
-          inv Hdup. contradiction.
-    Qed. 
-
-    Lemma nth_FromList :
-      forall A l n x,
-        nth_error l n = Some x ->
-        In A (FromList l) x.
-    Proof.
-      intros A l n x Hx.
-      generalize dependent n. induction l; intros n Hx.
-      - destruct n eqn:Hn; inv Hx. 
-      - destruct n eqn:Hn.
-        + simpl in Hx. inv Hx.
-          unfold FromList. simpl. 
-          left. reflexivity.
-        + simpl in Hx. 
-          unfold FromList in *. unfold In in *.
-          simpl. right. eapply IHl.
-          eassumption.
+      intros H. induction H.
+      - normalize_sets. simpl. sets. 
+      - simpl. normalize_sets. sets.
     Qed.
+
+
+    Lemma cps_cvt_rel_efnlst_all_fun_name S1 na vars nlst S2 B : 
+      cps_cvt_rel_efnlst S1 na vars nlst cnstrs S2 B ->
+      all_fun_name B = nlst.
+    Proof.
+      intros H. induction H.
+      - reflexivity.
+      - simpl. congruence.
+    Qed.
+
+    
+    Opaque preord_exp'. 
     
     Lemma cps_cvt_alpha_equiv :
       forall k, cps_cvt_alpha_equiv_statement k.
     Proof.
-      (* induction k using lt_wf_rec. *)
-      intros k.
+      induction k using lt_wf_rec.
       eapply my_exp_ind.
       - (* Var_e *)
         intros n e1 e2 k1 k2 vars1 vars2 rho1 rho2
-               S1 S2 S3 S4 He1 He2 Hdup Hnot Hlen Hlt Henv.
+               S1 S2 S3 S4 He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
         inv He1. inv He2.
         eapply preord_exp_app_compat.
         + eapply Hprops. (* invariants *)
@@ -219,13 +239,13 @@ Section Post.
           eapply Henv. left. reflexivity.
         + econstructor; [ | now econstructor ].
           * assert (Heq: ((id {k1 ~> k2}) <{ vars1 ~> vars2 }>) v = v0). 
-            { eapply id_vars_nth_error; eauto. }
+            { eapply extend_lst_get_nth_error; eauto. }
             rewrite <- Heq. eapply Henv. right.
             eapply nth_FromList. eassumption.
 
       - (* Lam_e *)
         intros na e IH e1 e2 k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
-               He1 He2 Hdup Hnot Hlen Hdis Henv.
+               He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
         simpl in He1, He2. inv He1; inv He2.  
         eapply preord_exp_fun_compat.
         + eapply Hprops. (* invariants *)
@@ -238,586 +258,744 @@ Section Post.
               { rewrite extend_lst_gso. rewrite extend_gss. reflexivity.
                 eassumption. }
               rewrite Heq.
-              inv H2; inv H4. inv H5; inv H7. 
+              inv H3; inv H5. inv H6; inv H8. 
               
               eapply preord_env_P_inj_set_not_In_P_l.
               eapply preord_env_P_inj_set_not_In_P_r.
               eassumption.
+
               3:{ now left. }
-              2:{ intros Hc. eapply Hdis. constructor; [ | eassumption ].
-                  
-                  
-                  inv Hc. inv H7; eauto. eapply Hlt. inv Hc; eauto. inv H7; eauto. intros Hc. inv Hc. inv H. 
-              3:{ xsets. 
-              intros Him. eapply image_extend_lst_Included in Him.
-              rewrite image_extend_In_S in Him. ; sets. 
+              2:{ intros Hc. eapply Hdis1. constructor; [ | eapply H0 ]. eassumption. }
               
+              intros Him. eapply image_extend_lst_Included in Him; eauto.
+              rewrite image_extend_In_S in Him; eauto.
               
-              admit. admit. left. reflexivity.
+              assert (Hseq : k1 |: FromList vars1 \\ FromList vars1 \\ [set k1] <--> Empty_set _) by sets.
+
+              rewrite Hseq, image_Empty_set in Him. repeat normalize_sets.
+              now eapply Hdis2; sets.
+
+              rewrite Setminus_Union_distr. left. rewrite Setminus_Disjoint. reflexivity.
+              sets.
+
             - econstructor. 2: { econstructor. }
               simpl. unfold preord_var_env.
               intros v5 Hset.
               rewrite M.gss in Hset. inv Hset.
               eexists. split.
-              rewrite M.gss. reflexivity.
-              rewrite preord_val_eq. unfold preord_val'.
-              { intros vs1 vs2 j tg xs1 e2 rho1' Hlen_eq Hfind Hset.
-                simpl in Hfind. simpl.
-                rewrite peq_true in *.
-                inv Hfind.
-                pose proof (set_lists_length2) as Hset2.
-                edestruct Hset2 with (rho := (def_funs (Fcons v1 func_tag [v; v0] e2 Fnil)
-                                                       (Fcons v1 func_tag [v; v0] e2 Fnil) rho1 rho1))
-                                     (xs1 := [v; v0]) (vs1 := vs1)
-                                     (xs2 := [v3; v2]) (vs2 := vs2); clear Hset2.
-                econstructor.
+              rewrite M.gss. reflexivity. eapply preord_val_fun.
+              simpl. rewrite Coqlib.peq_true. reflexivity.
+              simpl. rewrite Coqlib.peq_true. reflexivity.
+
+              intros. destruct vs1 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+              destruct vs2 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+              inv H1. eexists. split. reflexivity.
+
+              intros Hlt Hall. 
+              
+              eapply preord_exp_post_monotonic. now eapply HinclG.
+              eapply preord_exp_monotonic.
+              edestruct (H j) as [ Hexp _ _ _   ]. lia.
+              eapply Hexp.
+              + eassumption.
+              + eassumption.
+              + constructor. intros Hc. eapply Hdis1. now sets. eassumption.
+              + repeat normalize_sets. inv H5. intros Hc. inv Hc.
+                * inv H5. eauto.
+                * eapply Hdis1. now sets.
+              + simpl. congruence.
+              + repeat normalize_sets. xsets. (* ^^ yay sets *)
+              + repeat normalize_sets. xsets. (* ^^ yay sets *)
+              + repeat normalize_sets. simpl.
+                assert (Hfeq : f_eq (((id {k3 ~> k4}) <{ vars1 ~> vars2 }>) {x1 ~> x0})
+                                    (((id <{ vars1 ~> vars2 }>) {x1 ~> x0}) {k3 ~> k4})).
+                { rewrite extend_extend_lst_commut; eauto.
+                  rewrite extend_commut; eauto. reflexivity. 
+                  - inv H5. intros Hc. subst. eauto.
+                  - inv H8. intros Hc. subst. eauto.
+                  - inv H5. intros Hc. eapply Hdis1. sets.
+                  - inv H8. intros Hc. eapply Hdis2. sets. }
+                
+                rewrite Hfeq.
+
+                inv Hall. inv H13. clear H16.
+
+                eapply preord_env_P_inj_set_alt; eauto.
+                eapply preord_env_P_inj_set_alt; eauto.
+                eapply preord_env_P_inj_set_not_In_P_l.
+                eapply preord_env_P_inj_set_not_In_P_r.
+
+                eapply preord_env_P_inj_f_eq_subdomain.
+
+                eapply preord_env_P_inj_antimon.
+                eapply preord_env_P_inj_monotonic.
+                2: { eassumption. } omega.
+                now xsets.
+
+                rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. (* TODO add to normalize_sets *)
+                repeat normalize_sets.
+                rewrite Setminus_Union, (Union_commut [set k3]), <- Setminus_Union.
+                rewrite Setminus_Same_set_Empty_set. repeat normalize_sets.
+                eapply f_eq_subdomain_extend_lst.
                 eassumption.
-                symmetry. rewrite H1. eassumption.
-                simpl in Hset.
-                destruct vs1. inv Hset.
-                destruct vs1. inv Hset.
-                destruct vs1; inv Hset.
-                simpl in H0.
-                destruct vs2. inv H0.
-                destruct vs2. inv H0.
-                destruct vs2. 2: { inv H0. } rewrite <- H1. inv H0.
-                eexists. eexists. eexists. split.
-                reflexivity. split.
+
+                eapply f_eq_subdomain_extend_not_In_S_l; [ | reflexivity ].
+
+                * intros Hc. inv Hc. inv H1. inv H9. eauto.
+
+                * intros Hc. eapply image_extend_lst_Included in Hc.
+                  rewrite image_id in Hc. inv Hc. inv H1. inv H7. inv H1.
+                  inv H7; eauto.  inv H1; eauto.
+                  inv H6. eapply Hdis2. now sets. eassumption.
+
+                * intros Hc. inv Hc. inv H1. inv H9; eauto. inv H1; eauto.
+                  inv H3. eapply Hdis1. now sets.
+
+                * intros Hc. eapply image_extend_lst_Included in Hc.
+                  rewrite image_id in Hc. inv Hc. inv H1. inv H7. inv H1.
+                  inv H7; eauto.  inv H1; eauto.
+                  inv H6. eapply Hdis2. now sets. eassumption.
+
+                * intros Hc. inv Hc. inv H1. inv H7; eauto. inv H1; eauto.
+                  inv H7; eauto.
+                  
+                  inv H1. rewrite extend_gss in H8. inv H8. now eauto. 
+
+                  rewrite extend_gso in H8.
+                  2:{ intros Hc; subst. rewrite extend_gss in H8. inv H8. now eauto. }
+                  edestruct (@extend_lst_gss var). eassumption. eassumption. inv H7.
+                  eapply Hdis2. constructor. right. eassumption. inv H8. eassumption.
+
+
+              + lia.
+                
+            - lia. }
+          
+      - (* App_e *)
+        intros e1 IHe1 e2 IHe2 e1' e2' k1 k2 vars1 vars2 rho1 rho2
+               S1 S2 S3 S4 He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
+        inv He1. inv He2.  
+        eapply preord_exp_fun_compat.
+        + eapply Hprops. (* invariants *)
+        + eapply Hprops. (* invariants *)
+        + { eapply preord_exp_monotonic. eapply IHe1; try eassumption.
+            - inv H3. intros Hc. eapply Hdis1. sets.
+            - sets.
+            - sets.
+            - simpl.
+              assert (Hfeq : f_eq ((id {k3 ~> k5}) <{ vars1 ~> vars2 }>)
+                                  ((id <{ vars1 ~> vars2 }>) {k3 ~> k5})). 
+              { rewrite extend_extend_lst_commut; eauto. reflexivity. 
+                - inv H3. intros Hc. eapply Hdis1. sets.
+                - inv H8. intros Hc. eapply Hdis2. sets. }
+
+              rewrite Hfeq.
+
+              eapply preord_env_P_inj_set_alt; eauto.
+
+              + eapply preord_env_P_inj_f_eq_subdomain.                
+                eapply preord_env_P_inj_antimon. eassumption.
+                now sets.
+                rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set.
+                normalize_sets.
+                eapply f_eq_subdomain_extend_lst. eassumption.
+                eapply f_eq_subdomain_extend_not_In_S_l.
+                
+                intros Hc. inv Hc. now inv H0.
                 reflexivity.
+
+              + eapply preord_val_fun.
+                simpl. rewrite Coqlib.peq_true. reflexivity.
+                simpl. rewrite Coqlib.peq_true. reflexivity.
+
+                intros. destruct vs1 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+                destruct vs2 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+                inv H1. eexists. split. reflexivity.
+
+                intros Hlt Hall. simpl.
+                { eapply preord_exp_fun_compat.
+
+                  + admit. (* invariants *)
+                  + admit. (* invariants *)
+                  + { destruct H with (m := (j - 1)%nat) as [ IHe _]. omega. 
+                      eapply IHe; try eassumption.
+                      - admit. (* subset lemma for cvt_rel. *)
+                      - admit. (* subset lemma for cvt_rel. *)
+                      - admit. (* subset lemma for cvt_rel. *)
+                      - simpl.
+                        assert (Hfeq' : f_eq ((id {k4 ~> k6}) <{ vars1 ~> vars2 }>)
+                                            ((id <{ vars1 ~> vars2 }>) {k4 ~> k6})). 
+                        { rewrite extend_extend_lst_commut; eauto. reflexivity. 
+                          - admit. (* subset lemma for cvt_rel. *)
+                          - admit. (* subset lemma for cvt_rel. *) }
+
+                        rewrite Hfeq'.
+                        
+
+                        eapply preord_env_P_inj_set_alt; eauto.
+                        
+                        + rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set.
+                          normalize_sets.
+                          eapply preord_env_P_inj_set_not_In_P_l.
+                          eapply preord_env_P_inj_set_not_In_P_r.
+                          eapply preord_env_P_inj_set_not_In_P_l.
+                          eapply preord_env_P_inj_set_not_In_P_r.
+
+                          eapply preord_env_P_inj_f_eq_subdomain.
+                          eapply preord_env_P_inj_antimon.
+                          eapply preord_env_P_inj_monotonic. 2:{ eassumption. } lia.
+                          now sets.
+                          eapply f_eq_subdomain_extend_lst. eassumption.
+                          eapply f_eq_subdomain_extend_not_In_S_l; [ | reflexivity ].
+
+                          * intros Hc. inv Hc. now inv H1.
+                          * inv H8. intros Hc.  eapply image_extend_lst_Included in Hc.
+                            rewrite image_id in Hc. inv Hc.
+                            inv H8. now inv H14.
+                            eapply Hdis2. now sets. eassumption.
+                          * inv H3. intros Hc. inv Hc. eapply Hdis1. sets.
+                          * inv H5. intros Hc. inv Hc. eapply Hdis1. admit. (* lemma *)
+                          * intros Hc. inv Hc. eapply Hdis1. sets.
+
+                        + eapply preord_val_fun.
+                          simpl. rewrite Coqlib.peq_true. reflexivity.
+                          simpl. rewrite Coqlib.peq_true. reflexivity.
+                          
+                          intros. destruct vs1 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+                          destruct vs2 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+                          inv H1. eexists. split. reflexivity.
+                          
+                          intros Hlt' Hall'. simpl.
+                          { eapply preord_exp_app_compat.
+                            - admit. (* invariants *)
+                            - admit. (* invariants *)
+                            - inv H11. eapply preord_var_env_extend_neq.
+                              eapply preord_var_env_extend_neq.
+                              eapply preord_var_env_extend_eq.
+                              inv Hall. eapply preord_val_monotonic. eassumption. lia.
+                              
+                              admit. (* lemma *)
+                              admit. (* lemma *)
+                              admit. (* lemma *)
+                              admit. (* lemma *)
+
+                            - inv H11. constructor; [ | constructor; eauto ].
+                              + eapply preord_var_env_extend_neq.
+                                eapply preord_var_env_extend_neq.
+                                eapply preord_var_env_extend_neq.
+                                eapply preord_var_env_extend_neq.
+                                eapply preord_var_env_monotonic.
+                                assert (Heq: k2 = ((id {k1 ~> k2}) <{ vars1 ~> vars2 }>) k1).
+                                { rewrite extend_lst_gso. rewrite extend_gss. reflexivity.
+                                  eassumption. }
+                                rewrite Heq. eapply Henv. now left. lia.
+                                admit.
+                                admit.
+                                admit.
+                                admit.
+                                admit.
+                                admit.
+                                admit.
+                                admit. (* var neq *)
+
+                              + eapply preord_var_env_extend_eq.
+                                inv Hall'. eassumption. } 
+
+                        + admit. } }
+              + admit.
+
+            - lia. }       
+      - (* Con_e *)
+        intros dc es IH e1 e2 k1 k2 vars1 vars2 rho1 rho2
+               S1 S2 S3 S4 He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
+        inv He1; inv He2.
+        eapply preord_exp_fun_compat.
+        + eapply Hprops. (* invariants *)
+        + eapply Hprops. (* invariants *)
+        + { eapply preord_exp_monotonic. eapply IH; try eassumption.
+            - inv H4. intros Hc. eapply Hdis1. sets.
+            - xsets.
+            - xsets.
+            - simpl.
+              assert (Hfeq : f_eq ((id {k3 ~> k4}) <{ vars1 ~> vars2 }>)
+                                  ((id <{ vars1 ~> vars2 }>) {k3 ~> k4})). 
+              { rewrite extend_extend_lst_commut; eauto. reflexivity. 
+                - inv H4. intros Hc. eapply Hdis1. sets.
+                - inv H8. intros Hc. eapply Hdis2. sets. }
+              
+              rewrite Hfeq.
+              
+              eapply preord_env_P_inj_set_alt; eauto.
+              
+              + eapply preord_env_P_inj_f_eq_subdomain.                
+                eapply preord_env_P_inj_antimon. eassumption.
+                now sets.
+                
+                rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set.
+                normalize_sets.
+                eapply f_eq_subdomain_extend_lst. eassumption.
+                eapply f_eq_subdomain_extend_not_In_S_l.
+                
+                intros Hc. inv Hc. now inv H0. reflexivity.
+
+              + eapply preord_val_fun.
+                simpl. rewrite Coqlib.peq_true. reflexivity.
+                simpl. rewrite Coqlib.peq_true. reflexivity.
+                
+                intros. 
+
+                edestruct set_lists_length2 with
+                    (rho1 := rho1')
+                    (rho' := def_funs
+                               (Fcons k4 kon_tag vx0 (Econstr x0 (dcon_to_tag default_tag dc cnstrs) vx0 (Eapp k2 kon_tag [x0])) Fnil)
+                               (Fcons k4 kon_tag vx0 (Econstr x0 (dcon_to_tag default_tag dc cnstrs) vx0 (Eapp k2 kon_tag [x0])) Fnil)
+                               rho2 rho2); [ | | now eauto | ].
+                rewrite H7. rewrite H11. reflexivity. eassumption. 
+
+                eexists. split. now eauto. 
+
                 intros Hlt2 Hall.
-                eapply preord_exp_post_monotonic.
-                eapply HinclG.
-                eapply preord_exp_monotonic.
-                edestruct H with (m := j) as (IHstep & _). eassumption.
-                eapply IHstep.
-                eassumption.
-                eassumption.
-                admit. admit.
-                simpl. f_equal. eassumption.
-                admit. simpl.
-                (* Zoe: Something broke here because of argument flip *)
-                (* eapply preord_env_P_inj_set_alt. *)
-                (* rewrite Setminus_Union_distr at 1. *)
-                (* rewrite FromList_cons. (* normalize_sets *) *)
-                (* assert (Hsets: ([set v] \\ [set v0] :|: *)
-                (*                         (v0 |: FromList vars1 \\ [set v0])) *)
-                (*                  <--> ([set v] :|: (FromList vars1))). *)
-                (* { rewrite Setminus_Union_distr. *)
-                (*   rewrite Setminus_Same_set_Empty_set. normalize_sets. *)
-                (*   rewrite Setminus_Disjoint. rewrite Setminus_Disjoint. *)
-                (*   reflexivity. admit. admit. } *)
-                (* rewrite Hsets. clear Hsets. *)
-                (* rewrite extend_extend_lst_commut. *)
-                (* eapply preord_env_P_inj_set_alt. *)
-                (* rewrite Setminus_Union_distr at 1. *)
-                (* rewrite Setminus_Same_set_Empty_set. *)
-                (* rewrite Setminus_Disjoint. normalize_sets. *)
-                (* eapply preord_env_P_inj_set_not_In_P_l. *)
-                (* eapply preord_env_P_inj_set_not_In_P_r. *)
-                (* (* follows from Henv? *) *)
-                (* eapply preord_env_P_inj_f_eq_subdomain. *)
-                (* eapply preord_env_P_inj_antimon. *)
-                (* eapply preord_env_P_inj_monotonic. *)
-                (* 2: { eassumption. } omega. *)
-                (* sets. *)
-                (* assert (Hsets : (FromList vars1 :|: Empty_set _) <--> *)
-                (*                                                  (FromList vars1)). *)
-                (* { sets. } *)
-                (* rewrite <- Hsets. *)
-                (* eapply f_eq_subdomain_extend_lst. *)
-                (* eassumption. intros x Hin. inv Hin.  *)
-                (* admit. *)
-                (* admit. admit.  *)
-                (* inversion Hall. inversion H6. eassumption. *)
-                (* admit. *)
-                (* admit. admit. eassumption. *)
-                (* inversion Hall. eassumption. *)
-                admit.
-                omega.
-              }
+                { eapply preord_exp_constr_compat.
+                  - admit. (* invariants *)
+                  - admit. (* invariants *)
+                  - rewrite <- map_extend_lst_same with (xs := vx) (xs' := vx0)
+                                                        (f := id).
+                    eapply Forall2_preord_var_env_map.
+                    2: { reflexivity. }
+                    eapply preord_env_P_inj_set_lists_alt.
+                    rewrite Setminus_Same_set_Empty_set.
+                    intros x' Hin. now inv Hin.
+                    eassumption.
+
+                    admit. (* TODO add NoDUp vx to rel *)
+                    admit. (* TODO add NoDUp vx to rel *)
+                    congruence.
+                    rewrite Setminus_Same_set_Empty_set, image_id. now sets.
+                    now eauto. now eauto.
+                    admit. (* TODO add NoDUp vx to rel *)
+                    replace (@Datatypes.length positive vx) with (@Datatypes.length var vx) by reflexivity.
+                    congruence.
+
+                  - intros m vs vs' Hlt Hall1.
+                    eapply preord_exp_app_compat.
+                    + eapply Hprops.
+                    + eapply Hprops.
+                    + assert (Heq: k2 = ((id {k1 ~> k2}) <{ vars1 ~> vars2 }>) k1).
+                      { rewrite extend_lst_gso.
+                        rewrite extend_gss. reflexivity.
+                        eassumption. }
+                      rewrite Heq.
+                      eapply preord_env_P_inj_set_not_In_P_l.
+                      eapply preord_env_P_inj_set_not_In_P_r.
+                      eapply preord_env_P_inj_set_lists_l_Disjoint.
+                      2: { now eauto. }
+                      eapply preord_env_P_inj_set_lists_r_Disjoint.
+                      2: { eassumption. }
+                      eapply preord_env_P_inj_set_not_In_P_l.
+                      eapply preord_env_P_inj_set_not_In_P_r.
+                      eapply preord_env_P_inj_monotonic.
+                      2 : { eassumption. }
+                      lia.
+
+                      * intros Hc. eapply image_extend_lst_Included in Hc.
+                        inv Hc.
+                        
+                        eapply image_extend_Included' in H10. 
+                        rewrite image_id in H10.
+
+                        rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set in H10.
+                        repeat normalize_sets.
+                        rewrite Setminus_Union, (Union_commut (FromList vars1)), <- Setminus_Union, Setminus_Same_set_Empty_set in H10.
+                        repeat normalize_sets. 
+                        inv H10. inv H8. eapply Hdis2. now sets.
+                        inv H8. eapply Hdis2. now sets.
+                        eassumption.
+
+                      * intros Hc. inv Hc. inv H10.
+                        inv H4. eapply Hdis1. now sets.
+                        inv H4. eapply Hdis1. now sets.
+
+                      * eapply Disjoint_Included_r.
+                        eapply image_extend_lst_Included. eassumption.
+                        eapply Union_Disjoint_r; sets.
+                        rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set.
+                        repeat normalize_sets.
+                        eapply Disjoint_Included_r.
+                        eapply image_monotonic. eapply Setminus_Included.
+                        eapply Disjoint_Included_r.
+                        eapply image_extend_Included'.
+                        eapply Union_Disjoint_r.
+                        rewrite image_id.
+                        rewrite Setminus_Same_set_Empty_set. now sets.
+
+                        admit. admit. (* TODO change rel *)
+
+                      * admit. (* TODO change rel *)
+
+                      * intros Hc.
+                        eapply image_extend_lst_Included in Hc. inv Hc.
+                        rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set in H10.
+                        repeat normalize_sets.
+                        eapply image_extend_Included' in H10. rewrite  image_id in H10.
+                        inv H10. inv H12. inv H10. now eauto.
+                        inv H12. eapply Hdis2. now sets.
+                        eapply Hdis2. now sets.
+                        eassumption.
+
+                      * intros Hc. inv Hc. inv H10. 
+                        eapply Hdis1; now sets.
+                        eapply Hdis1; now sets.
+
+                      * now left.
+
+                    + constructor; [ | now eauto ].
+                      eapply preord_var_env_extend_eq.
+                      rewrite preord_val_eq. simpl.
+                      split. reflexivity. eassumption. }
+
+              + rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set. normalize_sets. 
+                intros Hc. eapply image_extend_lst_Included in Hc.
+                inv Hc.
+
+                rewrite image_id in H0. inv H0. now inv H1.
+
+                inv H8. eapply Hdis2. constructor; now eauto. eassumption.
+
             - omega. }
           
-(*       - (* App_e *) *)
-(*         intros e1 IHe1 e2 IHe2 e1' e2' k1 k2 vars1 vars2 rho1 rho2 *)
-(*                next1 next2 next3 next4 He1 He2 Hdup Hnot Hlen Hlt Henv. *)
-(*         simpl in He1, He2. *)
-(*         destruct (gensym next1 (nNamed "k1")) eqn:Hgen1_k1. *)
-(*         destruct (gensym s (nNamed "x1")) eqn:Hgen1_x1. *)
-(*         destruct (cps_cvt e1 vars1 v s0 cnstrs) eqn:Hcvt1_e1. 2: { inv He1. } *)
-(*         destruct p. destruct (gensym s1 (nNamed "k2")) eqn:Hgen1_k2. *)
-(*         destruct (gensym s2 (nNamed "x2")) eqn:Hgen1_x2. *)
-(*         destruct (cps_cvt e2 vars1 v1 s3 cnstrs) eqn:Hcvt1_e2. 2: { inv He1. } *)
-(*         destruct p. inv He1. *)
-(*         destruct (gensym next3 (nNamed "k1")) eqn:Hgen2_k1. *)
-(*         destruct (gensym s4 (nNamed "x1")) eqn:Hgen2_x1. *)
-(*         destruct (cps_cvt e1 vars2 v3 s5 cnstrs) eqn:Hcvt2_e1. 2: { inv He2. } *)
-(*         destruct p. destruct (gensym s6 (nNamed "k2")) eqn:Hgen2_k2. *)
-(*         destruct (gensym s7 (nNamed "x2")) eqn:Hgen2_x2. *)
-(*         destruct (cps_cvt e2 vars2 v5 s8 cnstrs) eqn:Hgen2_e2. 2: { inv He2. } *)
-(*         destruct p. inv He2. *)
-(*         eapply preord_exp_fun_compat. *)
-(*         + admit. *)
-(*         + admit. *)
-(*         + simpl. eapply preord_exp_monotonic. *)
-(*           eapply IHe1. eassumption. eassumption. eassumption. *)
-(*           admit. eassumption. admit. *)
-(*           rewrite extend_extend_lst_commut. *)
-(*           eapply preord_env_P_inj_set_alt. *)
-(*           rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. *)
-(*           rewrite Setminus_Disjoint. normalize_sets. *)
-(*           (* from Henv *) admit. admit. *)
-(*           rewrite preord_val_eq. unfold preord_val'. *)
-(*           { intros vs1 vs2 j tg xs1 e5 rho1' Hlen_eq Hfind Hset. *)
-(*             simpl in Hfind. simpl. *)
-(*             rewrite peq_true in *. *)
-(*             inv Hfind. *)
-(*             pose proof (set_lists_length2) as Hset2. *)
-(*             edestruct Hset2 with (rho := (def_funs *)
-(*                                             (Fcons v tg [v0] *)
-(*                                                    (Efun (Fcons v1 tg [v2] *)
-(*                                                                 (Eapp v0 func_tag *)
-(*                                                                       [k1; v2]) Fnil) *)
-(*                                                          e0) Fnil) *)
-(*                                             (Fcons v tg [v0] *)
-(*                                                    (Efun (Fcons v1 tg [v2] *)
-(*                                                                 (Eapp v0 func_tag *)
-(*                                                                       [k1; v2]) Fnil) *)
-(*                                                          e0) Fnil) *)
-(*                                             rho1 rho1)) *)
-(*                                      (xs1 := [v0]) (vs1 := vs1) *)
-(*                                      (xs2 := [v4]) (vs2 := vs2); clear Hset2. *)
-(*             now econstructor. eassumption. *)
-(*             symmetry. eassumption. *)
-(*             simpl in Hset. destruct vs1. inv Hset. *)
-(*             destruct vs1; inv Hset. *)
-(*             eexists. eexists. eexists. split. *)
-(*             reflexivity. split. *)
-(*             symmetry. eassumption. *)
-(*             simpl in H0. destruct vs2. inv H0. *)
-(*             destruct vs2. 2: { inv H0. } rewrite <- H1. inv H0.  *)
-(*             intros Hlt2 Hall.   *)
-(*             eapply preord_exp_fun_compat. *)
-(*             - admit. *)
-(*             - admit. *)
-(*             - simpl. eapply preord_exp_monotonic. *)
-(*               edestruct (H j). eassumption. eapply H0. *)
-(*               eassumption. eassumption. eassumption. *)
-(*               admit. *)
-(*               eassumption. admit. *)
-(*               { rewrite extend_extend_lst_commut. *)
-(*                 eapply preord_env_P_inj_set_alt. rewrite Setminus_Union_distr. *)
-(*                 rewrite Setminus_Same_set_Empty_set. rewrite Setminus_Disjoint. *)
-(*                 normalize_sets. *)
-(*                 eapply preord_env_P_inj_set_not_In_P_l. *)
-(*                 eapply preord_env_P_inj_set_not_In_P_r. *)
-(*                 eapply preord_env_P_inj_set_not_In_P_l. *)
-(*                 eapply preord_env_P_inj_set_not_In_P_r. *)
-(*                 (* from Henv *) admit. *)
-(*                 admit. admit. admit. admit. admit. *)
-(*                 rewrite preord_val_eq. unfold preord_val'. *)
-(*                 intros vs1 vs2 l tg' xs1 e5 rho1' Hlen_eq2 Hfind Hset. *)
-(*                 simpl in *. *)
-(*                 rewrite peq_true in *. rewrite <- H1. inv Hfind. *)
-(*                 pose proof (set_lists_length2) as Hset2. *)
-(*                 edestruct Hset2 with (xs1 := [v2]) (vs1 := vs1) *)
-(*                                      (xs2 := [v6]) (vs2 := vs2); clear Hset2. *)
-(*                 now econstructor. eassumption. *)
-(*                 symmetry. eassumption. *)
-(*                 eexists. eexists. eexists. split. *)
-(*                 reflexivity. split. *)
-(*                 symmetry. eassumption. *)
-(*                 intros Hlt3 Hall2. *)
-(*                 destruct vs2. simpl in H3. inv H3. *)
-(*                 simpl in H3. destruct vs2. 2: { inv H3. } *)
-(*                 destruct vs1. simpl in Hset. inv Hset. *)
-(*                 simpl in Hset. destruct vs1. 2: { inv Hset. } *)
-(*                 inversion Hset. inversion H3. subst rho1' x. clear Hset H3.  *)
-(*                 inversion Hall2. subst x l0 y l'. clear H8 Hall2.  *)
-(*                 eapply preord_exp_app_compat. *)
-(*                 - admit. *)
-(*                 - admit. *)
-(*                 - eapply preord_var_env_extend_neq. *)
-(*                   eapply preord_var_env_extend_neq. *)
-(*                   eapply preord_var_env_extend_eq. inversion Hall. *)
-(*                   eapply preord_val_monotonic. eassumption. omega. *)
-(*                   admit. admit. admit. admit. *)
-(*                 - econstructor. *)
-(*                   eapply preord_var_env_extend_eq. eassumption. *)
-(*                   econstructor. *)
-(*                   eapply preord_var_env_extend_neq. *)
-(*                   eapply preord_var_env_extend_neq. *)
-(*                   eapply preord_var_env_extend_neq. *)
-(*                   eapply preord_var_env_extend_neq. *)
-(*                   replace k2 with ((id {k1 ~> k2} <{ vars1 ~> vars2}>) k1). *)
-(*                   eapply preord_var_env_monotonic. eapply Henv. *)
-(*                   now left. omega. rewrite extend_lst_gso.  *)
-(*                   rewrite extend_gss. reflexivity.  *)
-(*                   admit. admit. admit. admit. admit. admit. admit. admit. admit. *)
-(*                   econstructor.  *)
-(*                 - admit. *)
-(*                 - admit. *)
-(*                 - admit. *)
-(*                 - eassumption. } *)
-(*               omega. } *)
-(*           admit. *)
-(*           admit. *)
-(*           admit. eassumption. omega. *)
-          
-(*       - (* Con_e *) *)
-(*         intros dc es IH e1 e2 k1 k2 vars1 vars2 rho1 rho2 *)
-(*                next1 next2 next3 next4 He1 He2 Hdup Hnot Hlen Hlt Henv. *)
-(*         simpl in He1, He2. *)
-(*         destruct (gensym next1 (nNamed "k'")) eqn:Hgen_k1. *)
-(*         destruct (gensym s (nNamed "x'")) eqn:Hgen_x1. *)
-(*         destruct (gensym_n_nAnon s0 (N.to_nat (exps_length es))) eqn:Hgen_n_es1. *)
-(*         destruct (cps_cvt_exps es vars1 v [] s1 cnstrs) eqn:Hcvt_exps1. *)
-(*         2: { inv He1. }  *)
-(*         destruct p eqn:Hp. inv He1. *)
-(*         destruct (gensym next3 (nNamed "k'")) eqn:Hgen_k2. *)
-(*         destruct (gensym s2 (nNamed "x'")) eqn:Hgen_x2. *)
-(*         destruct (gensym_n_nAnon s3 (N.to_nat (exps_length es))) eqn:Hgen_n_es2. *)
-(*         destruct (cps_cvt_exps es vars2 v1 [] s4 cnstrs) eqn:Hcvt_exps2. *)
-(*         2: { inv He2. }  *)
-(*         destruct p eqn:Hp. inv He2. *)
-(*         eapply preord_exp_fun_compat. *)
-(*         + admit. *)
-(*         + admit. *)
-(*         + eapply preord_exp_monotonic. *)
-(*           { eapply IH. *)
-(*             - eassumption. *)
-(*             - eassumption. *)
-(*             - eassumption. *)
-(*             - eapply lt_symgen_In_lst. eassumption. eassumption. *)
-(*             - eassumption. *)
-(*             - eapply Forall_lt_symgen_gensym_n. *)
-(*               eapply Forall_lt_symgen_gensym. *)
-(*               eapply Forall_lt_symgen_gensym. *)
-(*               eassumption. eassumption. eassumption. eassumption.  *)
-(*             - simpl. *)
-(*               rewrite extend_extend_lst_commut.  *)
-(*               eapply preord_env_P_inj_set_alt. *)
-(*               rewrite Setminus_Union_distr at 1. *)
-(*               eapply preord_env_P_inj_f_eq_subdomain. *)
-(*               eapply preord_env_P_inj_antimon. *)
-(*               eassumption. sets. *)
-(*               admit. *)
-(*               rewrite preord_val_eq. unfold preord_val'. *)
-(*               { intros vs1 vs2 j tg xs1 e1 rho1' Hlen_eq Hfind Hset. *)
-(*                 simpl in Hfind. simpl. *)
-(*                 rewrite peq_true in *.  *)
-(*                 inv Hfind. *)
-(*                 pose proof (set_lists_length2) as Hset2. *)
-(*                 simpl in Hset. *)
-(*                 edestruct Hset2 with (rho := (M.set v *)
-(*                                                     (Vfun rho1 *)
-(*                                                           (Fcons v kon_tag xs1 *)
-(*                                                                  (Econstr v0 (dcon_to_tag dc cnstrs) xs1 (Eapp k1 kon_tag [v0])) *)
-(*                                                                  Fnil) v) rho1)) *)
-(*                                      (xs1 := xs1) (vs1 := vs1) (xs2 := l0) (vs2 := vs2); *)
-(*                   clear Hset2.  *)
-(*                 eapply gensym_n_nAnon_length_eq. eassumption. eassumption.  *)
-(*                 eassumption. *)
-(*                 symmetry. rewrite H1. eassumption. *)
-(*                 eexists. eexists. eexists. split. *)
-(*                 reflexivity. split. *)
-(*                 symmetry. eassumption. *)
-(*                 intros Hlt2 Hall. *)
-(*                 eapply preord_exp_constr_compat. *)
-(*                 admit. *)
-(*                 admit. *)
-(*                 rewrite <- map_extend_lst_same with (xs := xs1) (xs' := l0) *)
-(*                                                     (f := id). *)
-(*                 eapply Forall2_preord_var_env_map. *)
-(*                 2: { reflexivity. } *)
-(*                 eapply preord_env_P_inj_set_lists_alt. *)
-(*                 rewrite Setminus_Same_set_Empty_set. *)
-(*                 intros x' Hin. inv Hin. *)
-(*                 eassumption. *)
-(*                 eapply gensym_n_nAnon_NoDup. eassumption. *)
-(*                 eapply gensym_n_nAnon_NoDup. eassumption. *)
-(*                 eapply gensym_n_nAnon_length_eq. eassumption. eassumption. *)
-(*                 rewrite image_id.  rewrite Setminus_Same_set_Empty_set. *)
-(*                 now sets. *)
-(*                 now eauto. *)
-(*                 eassumption. *)
-(*                 eapply gensym_n_nAnon_NoDup. eassumption. *)
-(*                 eapply gensym_n_nAnon_length_eq. eassumption. eassumption. *)
-(*                 intros m vs0 vs3 Hlt3 Hall2. *)
-(*                 eapply preord_exp_app_compat. *)
-(*                 admit. *)
-(*                 admit. *)
-(*                 assert (Heq: k2 = ((id {k1 ~> k2}) <{ vars1 ~> vars2 }>) k1). *)
-(*                 { rewrite extend_lst_gso. *)
-(*                   rewrite extend_gss. reflexivity. *)
-(*                   eassumption. } *)
-(*                 rewrite Heq. *)
-(*                 eapply preord_env_P_inj_set_not_In_P_l. *)
-(*                 eapply preord_env_P_inj_set_not_In_P_r. *)
-(*                 eapply preord_env_P_inj_set_lists_l_Disjoint. *)
-(*                 2: { now eauto. } *)
-(*                 eapply preord_env_P_inj_set_lists_r_Disjoint. *)
-(*                 2: { eassumption. } *)
-(*                 eapply preord_env_P_inj_set_not_In_P_l. *)
-(*                 eapply preord_env_P_inj_set_not_In_P_r. *)
-(*                 eapply preord_env_P_inj_monotonic. *)
-(*                 2 : { eassumption. } *)
-(*                 omega. *)
-(*                 admit. admit. admit. admit. admit. admit. *)
-(*                 admit. *)
-(*                 econstructor. *)
-(*                 unfold preord_var_env. *)
-(*                 intros v3 Hv3. *)
-(*                 rewrite M.gss in Hv3. inversion Hv3. rewrite M.gss. *)
-(*                 eexists. split. reflexivity. *)
-(*                 rewrite preord_val_eq. econstructor. *)
-(*                 reflexivity. *)
-(*                 eapply Forall2_Forall2_asym_included. eassumption. *)
-(*                 econstructor. } *)
-(*               admit. *)
-(*               admit. *)
-(*               admit. *)
-(*               eassumption. } *)
-(*           omega. *)
-          
-(*       - (* Match_e *) *)
-(*         intros e IHe pars bs IHbs e1 e3 k1 k2 vars1 vars2 rho1 rho2 *)
-(*                next1 next2 next3 next4 He1 He2 Hdup Hnot Hlen Hlt Henv. *)
-(*         simpl in He1. destruct (gensym next1 (nNamed "k1")) eqn:Hgen_k1. *)
-(*         destruct (gensym s (nNamed "x1")) eqn:Hgen_x1.  *)
-(*         destruct (cps_cvt e vars1 v s0 cnstrs) eqn:Hcvt_e1. 2: { inv He1. } *)
-(*         destruct p. destruct (cps_cvt_branches bs vars1 k1 v0 s1 cnstrs) eqn:Hbs1. *)
-(*         2: { inv He1. } destruct p. inv He1. *)
-(*         simpl in He2. destruct (gensym next3 (nNamed "k1")) eqn:Hgen_k2. *)
-(*         destruct (gensym s2 (nNamed "x1")) eqn:Hgen_x2. *)
-(*         destruct (cps_cvt e vars2 v1 s3 cnstrs) eqn: Hcvt_e2. 2: { inv He2. } *)
-(*         destruct p. destruct (cps_cvt_branches bs vars2 k2 v2 s4 cnstrs) eqn:Hbs2. *)
-(*         2: { inv He2. } destruct p. inv He2. *)
-(*         eapply preord_exp_fun_compat. *)
-(*         + admit. *)
-(*         + admit. *)
-(*         + simpl. *)
-(*           eapply preord_exp_monotonic. *)
-(*           eapply preord_exp_post_monotonic. eapply HinclG. *)
-(*           eapply IHe. *)
-(*           eassumption. eassumption. *)
-(*           eassumption. *)
-(*           admit. *)
-(*           eassumption. *)
-(*           admit. *)
-(*           rewrite extend_extend_lst_commut.  *)
-(*           eapply preord_env_P_inj_set_alt. *)
-(*           rewrite Setminus_Union_distr. *)
-(*           rewrite Setminus_Same_set_Empty_set. normalize_sets.  *)
-(*           rewrite Setminus_Disjoint.  *)
-(*           eapply preord_env_P_inj_f_eq_subdomain. *)
-(*           eapply preord_env_P_inj_antimon. *)
-(*           eapply preord_env_P_inj_monotonic. *)
-(*           reflexivity. *)
-(*           eassumption. *)
-(*           sets. *)
-(*           admit. admit. *)
-(*           rewrite preord_val_eq. unfold preord_val'. *)
-(*           { intros vs1 vs2 j tg xs1 e2 rho1' Hlen_eq Hfind Hset. *)
-(*             simpl in Hfind. simpl. *)
-(*             rewrite peq_true in *. inv Hfind. *)
-(*             pose proof (set_lists_length2) as Hset2. *)
-(*             edestruct Hset2 with (xs1 := [v0]) (vs1 := vs1) *)
-(*                                  (xs2 := [v2]) (vs2 := vs2); clear Hset2. *)
-(*             simpl. reflexivity. *)
-(*             eassumption. *)
-(*             symmetry. eassumption. *)
-(*             eexists. eexists. eexists. *)
-(*             split. reflexivity. *)
-(*             split. eauto. *)
-(*             intros Hlt2 Hall. edestruct (H j). eassumption. *)
-(*             edestruct H3 as (_ & _ & IHbs').  *)
-(*             eapply preord_exp_post_monotonic. eapply HinclG. *)
-(*             simpl in Hset, H0.  *)
-(*             destruct vs1. congruence. *)
-(*             destruct vs1. 2: { congruence. } inversion Hset. *)
-(*             destruct vs2. congruence. destruct vs2. 2: { congruence. } *)
-(*             inversion H0. *)
-(*             eapply IHbs'. *)
-(*             eassumption. eassumption. *)
-(*             eassumption. *)
-(*             eassumption. *)
-(*             eassumption. *)
-(*             admit. *)
-(*             eapply preord_env_P_inj_set_not_In_P_l. *)
-(*             eapply preord_env_P_inj_set_not_In_P_r. *)
-(*             eapply preord_env_P_inj_set_not_In_P_l. *)
-(*             eapply preord_env_P_inj_set_not_In_P_r. *)
-(*             eapply preord_env_P_inj_monotonic. *)
-(*             2: { eassumption. } omega. *)
-(*             admit. admit. admit. admit. *)
-(*             eapply preord_var_env_extend_eq. inversion Hall. eassumption. }  *)
-(*             admit. admit. admit. eassumption.  *)
-(*             omega. *)
-          
-(*       - (* Let_e *) *)
-(*         intros na e1 IHe1 e2 IHe2 e1' e2' k1 k2 vars1 vars2 rho1 rho2 *)
-(*                next1 next2 next3 next4 He1 He2 Hdup Hnot Hlen Hlt Henv. *)
-(*         simpl in He1, He2. *)
-(*         destruct (gensym next1 na) eqn:Hgen_na1. *)
-(*         destruct (gensym s (nNamed "k")) eqn:Hgen_k1. *)
-(*         destruct (cps_cvt e2 (v :: vars1) k1 s0 cnstrs) eqn:Hcvt1_e2. 2: { inv He1. } *)
-(*         destruct p. destruct (cps_cvt e1 vars1 v0 s1 cnstrs) eqn:Hcvt1_e1. *)
-(*         2: { inv He1. } destruct p. inv He1. *)
-(*         destruct (gensym next3 na) eqn:Hgen_na2. *)
-(*         destruct (gensym s2 (nNamed "k")) eqn:Hgen_k2. *)
-(*         destruct (cps_cvt e2 (v1 :: vars2) k2 s3 cnstrs) eqn:Hcvt2_e2. 2: { inv He2. } *)
-(*         destruct p. destruct (cps_cvt e1 vars2 v2 s4 cnstrs) eqn:Hcvt2_e1. *)
-(*         2: { inv He2. } destruct p. inv He2.  *)
-(*         eapply preord_exp_fun_compat. *)
-(*         + admit. *)
-(*         + admit. *)
-(*         + simpl. eapply preord_exp_monotonic. *)
-(*           eapply IHe1. *)
-(*           eassumption. eassumption. eassumption. *)
-(*           admit. *)
-(*           eassumption. *)
-(*           admit. *)
-(*           rewrite extend_extend_lst_commut.  *)
-(*           eapply preord_env_P_inj_set_alt. *)
-(*           rewrite Setminus_Union_distr at 1. rewrite Setminus_Same_set_Empty_set. *)
-(*           rewrite Setminus_Disjoint. normalize_sets. *)
-(*           (* from Henv -- how to show? *) admit. *)
-(*           admit. *)
-(*           rewrite preord_val_eq. unfold preord_val'. *)
-(*           { intros vs1 vs2 j tg xs1 e5 rho1' Hlen_eq Hfind Hset. *)
-(*             simpl in Hfind. simpl. *)
-(*             rewrite peq_true in *.  *)
-(*             inv Hfind. *)
-(*             pose proof (set_lists_length2) as Hset2. *)
-(*             edestruct Hset2 with (rho := (M.set v0 *)
-(*                                                 (Vfun rho1 *)
-(*                                                       (Fcons v0 tg [v] e5 Fnil) v0) *)
-(*                                                 rho1)) *)
-(*                                  (xs1 := [v]) (vs1 := vs1) *)
-(*                                  (xs2 := [v1]) (vs2 := vs2); *)
-(*               clear Hset2. *)
-(*             simpl. reflexivity. *)
-(*             eassumption. *)
-(*             simpl in Hset. destruct vs1. inv Hset. *)
-(*             destruct vs1. simpl. symmetry. eassumption.  *)
-(*             inv Hset. *)
-(*             eexists. eexists. eexists. split. *)
-(*             reflexivity. split. *)
-(*             symmetry. eassumption. *)
-(*             intros Hlt2 Hall. *)
-(*             eapply preord_exp_post_monotonic. eapply Hprops. *)
-(*             eapply preord_exp_monotonic. eapply IHe2.  *)
-(*             eassumption. eassumption. *)
-(*             admit. admit. *)
-(*             simpl. f_equal. eassumption. *)
-(*             admit. *)
-(*             simpl. admit. *)
-(*             omega. } *)
-(*           admit. admit. admit. *)
-(*           eassumption. omega. *)
-          
-(*       - (* Fix_e *) *)
-(*         intros efns IHefnlst n e1 e2 k1 k2 vars1 vars2 rho1 rho2 *)
-(*                next1 next2 next3 next4 He1 He2 Hdup Hnot Hlen Hall Henv. *)
-(*         simpl in He1. destruct (efnlst_names efns) eqn:Hnames1. *)
-(*         destruct (gensym_n next1 l) eqn:Hgen_l1. *)
-(*         destruct (cps_cvt_efnlst efns (l0 ++ vars1) l0 s cnstrs) eqn:Hcvt_efns1. *)
-(*         2: { inv He1. } destruct p. destruct (nth_error l0 (N.to_nat n)) eqn:Herr1. *)
-(*         2: { inv He1. } inv He1. *)
-(*         simpl in He2. destruct (efnlst_names efns) eqn:Hnames2. *)
-(*         destruct (gensym_n next3 l1) eqn:Hgen_l2. *)
-(*         destruct (cps_cvt_efnlst efns (l2 ++ vars2) l2 s0 cnstrs) eqn:Hcvt_efns2. *)
-(*         2: { inv He2. } destruct p. destruct (nth_error l2 (N.to_nat n)) eqn:Herr2. *)
-(*         2: { inv He2. } inv He2. *)
-(*         eapply preord_exp_fun_compat. *)
-(*         + admit. *)
-(*         + admit. *)
-(*         + { eapply preord_exp_monotonic.  *)
-(*             eapply preord_exp_app_compat with (k := k). *)
-(*             - admit. *)
-(*             - admit. *)
-(*             - assert (Heq: k2 = ((id {k1 ~> k2}) <{ vars1 ~> vars2 }>) k1). *)
-(*               { rewrite extend_lst_gso. *)
-(*                 rewrite extend_gss. reflexivity. *)
-(*                 eassumption. } *)
-(*               rewrite Heq. *)
-(*               (* need to get rid of f and f0? *) *)
-(*               admit. *)
-(*             - econstructor. 2: { econstructor. } *)
-(*               unfold preord_var_env. intros v1 Hget. *)
+      - (* Match_e *)
+        intros e IHe pars bs IHbs e1 e3 k1 k2 vars1 vars2 rho1 rho2
+               S1 S2 S3 S4 He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
+        inv He1; inv He2.
+        eapply preord_exp_fun_compat.
+        + eapply Hprops.
+        + eapply Hprops.
+        + eapply preord_exp_monotonic.
+          eapply IHe; try eassumption.
+          * inv H5. intros Hc. eapply Hdis1. sets.
+          * sets.
+          * sets.
+          * simpl. rewrite extend_extend_lst_commut.
+            eapply preord_env_P_inj_set_alt.
+            rewrite Setminus_Union_distr.
+            rewrite Setminus_Same_set_Empty_set. normalize_sets.
+            rewrite Setminus_Disjoint.
+            eapply preord_env_P_inj_f_eq_subdomain.
+            eapply preord_env_P_inj_antimon.
+            eapply preord_env_P_inj_monotonic.
+            reflexivity.
+            eassumption.
+            sets.
 
-(*               Set Nested Proofs Allowed.  *)
+            eapply f_eq_subdomain_extend_lst. eassumption.
+            rewrite Setminus_Same_set_Empty_set.
+            intros x Hx. now inv Hx.
+            inv H5. eapply Disjoint_Included_r.
+            eapply Singleton_Included. eassumption. sets.
 
-(*               Lemma cps_cvt_efnlst_def_funs: *)
-(*                 forall efns vars l v f rho next1 next2, *)
-(*                   List.In v l -> *)
-(*                   N.to_nat (efnlst_length efns) = Datatypes.length l -> *)
-(*                   cps_cvt_efnlst efns vars l next1 cnstrs = Some (f, next2) -> *)
-(*                   exists v', *)
-(*                     (def_funs f f rho rho) ! v = v'. *)
-(*               Proof. *)
-(*                 intros efns vars l v f rho next1 next2 Hin Hlen Hcvt. *)
-(*                 induction efns. *)
-(*                 - simpl in Hcvt. inv Hcvt. simpl in *. *)
-(*                   destruct l. inv Hin. inv Hlen. *)
-(*                 - simpl in Hcvt. destruct (gensym next1 (nNamed "fix_x")) eqn:Hgenx. *)
-(*                   destruct (gensym s (nNamed "fix_k")) eqn:Hgens. *)
-(*                   destruct e eqn:He; inv Hcvt. *)
-(*                   destruct (cps_cvt e0 (v0 :: vars) v1 s0 cnstrs) eqn:Hcvt. *)
-(*                   2: { inv H0. } destruct p. *)
-(*                   destruct (cps_cvt_efnlst efns vars (tl l) s1 cnstrs) eqn:Hcvt2. *)
-(*                   2: { inv H0. } destruct p. inv H0. inv Hcvt.  *)
-(*                   admit. *)
-(*               Admitted. *)
+            { eapply preord_val_fun.
+              simpl.
+              simpl. rewrite Coqlib.peq_true. reflexivity.
+              simpl. rewrite Coqlib.peq_true. reflexivity.
+
+              intros. destruct vs1 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+              destruct vs2 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+              inv H1. eexists. split. reflexivity.
               
-(*               admit. *)
-(*             - omega. }  *)
-(*       - (* Prf_e *) *)
-(*         admit. *)
-        
-(*       - (* enil *) *)
-(*         admit. *)
-        
-(*       - (* exps *) *)
-(*         admit. *)
-        
-(*       - (* eflnil *) *)
-(*         admit. *)
-        
-(*       - (* eflcons *) *)
-(*         admit. *)
-        
-(*       - (* brnil_e *) *)
-(*         admit. *)
-        
-(*       - (* brcons_e *) *)
-(*         intros dc p e IHe bs IHbs bs1 bs2 k1 k2 r1 r2 vars1 vars2 x1 x2 *)
-(*                rho1 rho2 next1 next2 next3 next4 *)
-(*                Hbs1 Hbs2 Hdup Hnot Hlen Hlt Henv Hvar. *)
-(*         simpl in Hbs1, Hbs2. *)
-(*         destruct p. *)
-(*         destruct (cps_cvt_branches bs vars1 k1 r1 next1 cnstrs) eqn:Hcvt_bs1. *)
-(*         2: { inv Hbs1. } destruct p. destruct (gensym_n s (rev l)) eqn:Hgen_l. *)
-(*         destruct (ctx_bind_proj (dcon_to_tag dc cnstrs) r1 (Datatypes.length l) *)
-(*                                 (hd 1%positive l1) 0) eqn:Hctx1. *)
-(*         destruct (cps_cvt e (rev l1 ++ vars1) k1 s0 cnstrs) eqn:Hcvt_e1. *)
-(*         2: { inv Hbs1. } destruct p. inv Hbs1. *)
-(*         destruct (cps_cvt_branches bs vars2 k2 r2 next3 cnstrs) eqn:Hcvt_bs2. *)
-(*         2: { inv Hbs2. } destruct p. destruct (gensym_n s1 (rev l)) eqn:Hgen_l2. *)
-(*         destruct (ctx_bind_proj (dcon_to_tag dc cnstrs) r2 (Datatypes.length l) *)
-(*                                 (hd 1%positive l3) 0) eqn:Hctx2. *)
-(*         destruct (cps_cvt e (rev l3 ++ vars2) k2 s2 cnstrs) eqn:Hcvt_e2. *)
-(*         2: { inv Hbs2. } destruct p. inv Hbs2. *)
-(*         eapply preord_exp_case_cons_compat. *)
-(*         + admit. *)
-(*         + admit. *)
-(*         + admit. *)
-(*         + admit. *)
-(*         + eassumption. *)
-(*         + admit. *)
-(*         + eapply IHbs; eassumption. *)
-(*     Admitted. *)
+              intros Hlt Hall. 
+              
+              eapply preord_exp_monotonic.
+              eapply preord_exp_post_monotonic. eapply HinclG. 
+              edestruct (H j) as (_ & _ & _ & Hexp ). lia.
+              eapply Hexp; try eassumption.
+              + admit. (* lemma. *)
+              + admit. (* lemma *)
+              + eapply preord_env_P_inj_set_not_In_P_l.
+                eapply preord_env_P_inj_set_not_In_P_r.
+                eapply preord_env_P_inj_set_not_In_P_l.
+                eapply preord_env_P_inj_set_not_In_P_r.
+                eapply preord_env_P_inj_monotonic.
+                2: { eassumption. } lia.
 
+                * intros Hc. eapply image_extend_lst_Included in Hc.
+                  inv Hc.
+                  
+                  eapply image_extend_Included' in H1. 
+                  rewrite image_id in H1.
+
+                  assert (Heq : k1 |: FromList vars1 \\ FromList vars1 \\ [set k1] <--> Empty_set  _) by now sets.
+                  rewrite Heq in H1. repeat normalize_sets. inv H1.
+                  inv H7. eapply Hdis2. now sets.
+                  inv H7. eapply Hdis2. now sets.
+                  eassumption.
+
+                * intros Hc.
+                  inv H5. eapply Hdis1. now sets.
+
+                * intros Hc. eapply image_extend_lst_Included in Hc.
+                  inv Hc.
+                  
+                  eapply image_extend_Included' in H1. 
+                  rewrite image_id in H1.
+
+                  assert (Heq : k1 |: FromList vars1 \\ FromList vars1 \\ [set k1] <--> Empty_set  _) by now sets.
+                  rewrite Heq in H1. repeat normalize_sets. inv H1.
+                  inv H7. eapply Hdis2. now sets.
+                  inv H7. eapply Hdis2. now sets.
+                  eassumption.
+
+                * intros Hc.
+                  inv H5. eapply Hdis1. now sets.
+
+              + eapply preord_var_env_extend_eq. inv Hall. eassumption.
+
+              + omega. }
+
+            rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set.
+            repeat normalize_sets.
+            intros Hc. eapply image_extend_lst_Included in Hc.
+            inv Hc.
+            
+            assert (Heq : (FromList vars1 \\ [set k3] \\ FromList vars1) <--> Empty_set  _) by now sets.
+            rewrite Heq, image_id in H0. now inv H0.
+            inv H7. eapply Hdis2. now sets. eassumption.
+
+            intros Hin. inv H5. eapply Hdis1. now sets.
+
+            intros Hin. inv H7. eapply Hdis2. now sets.
+            eassumption.
+
+          * lia.
+            
+      - (* Let_e *)
+        intros na e1 IHe1 e2 IHe2 e1' e2' k1 k2 vars1 vars2 rho1 rho2
+               S1 S2 S3 S4 He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
+        inv He1; inv He2.
+        eapply preord_exp_fun_compat.
+        + eapply Hprops. (* invariants *)
+        + eapply Hprops. (* invariants *)
+        + { eapply preord_exp_monotonic. eapply IHe1; try eassumption.
+            - inv H5. intros Hc. eapply Hdis1. sets.
+            - admit. (* lemma *)
+            - admit. (* lemma *)
+            - simpl.
+              assert (Hfeq : f_eq ((id {k3 ~> k4}) <{ vars1 ~> vars2 }>)
+                                  ((id <{ vars1 ~> vars2 }>) {k3 ~> k4})). 
+              { rewrite extend_extend_lst_commut; eauto. reflexivity. 
+                - inv H5. intros Hc. eapply Hdis1. sets.
+                - inv H7. intros Hc. eapply Hdis2. sets. }
+              
+              rewrite Hfeq.
+
+              eapply preord_env_P_inj_set_alt; eauto.
+              
+              + eapply preord_env_P_inj_f_eq_subdomain.                
+                eapply preord_env_P_inj_antimon. eassumption.
+                now sets.
+                rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set.
+                normalize_sets.
+                eapply f_eq_subdomain_extend_lst. eassumption.
+                eapply f_eq_subdomain_extend_not_In_S_l.
+                
+                intros Hc. inv Hc. now inv H0.
+                reflexivity.
+                
+              + eapply preord_val_fun.
+                simpl. rewrite Coqlib.peq_true. reflexivity.
+                simpl. rewrite Coqlib.peq_true. reflexivity.
+
+                intros. destruct vs1 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+                destruct vs2 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+                inv H1. eexists. split. reflexivity.
+
+                intros Hlt Hall.
+                edestruct (H j) as [Hexp _]. lia.
+                eapply preord_exp_post_monotonic. eapply HinclG. 
+                eapply Hexp; try eassumption.
+                constructor; try eassumption.
+                intros Hc. eapply Hdis1; now sets.
+
+                repeat normalize_sets. intros Hc.
+                inv Hc. inv H1. eapply Hdis1. now sets.
+                eapply Hdis1. now sets.
+                simpl. congruence.
+
+                repeat normalize_sets. now xsets.
+                repeat normalize_sets. now xsets.
+                
+                simpl. repeat normalize_sets.
+                
+                
+                eapply preord_env_P_inj_set_alt; eauto.
+                
+                * rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set.
+                  repeat normalize_sets.
+                  eapply preord_env_P_inj_set_not_In_P_l.
+                  eapply preord_env_P_inj_set_not_In_P_r.
+                  
+                  eapply preord_env_P_inj_antimon.
+                  eapply preord_env_P_inj_monotonic. 2:{ eassumption. } lia.
+                  now sets.
+
+                  ** intros Hc. eapply image_extend_lst_Included in Hc.
+                     inv Hc.
+                     eapply image_extend_Included' in H1.
+                     rewrite image_id in H1.
+                     assert (Heq: [set k1] \\ [set x1] :|: (FromList vars1 \\ [set x1]) \\ FromList vars1 \\ [set k1] <--> Empty_set _) by sets.
+
+                     rewrite Heq in H1. repeat normalize_sets. inv H1.
+                     inv H7. eapply Hdis2. now sets.
+                     inv H7. eapply Hdis2. now sets.
+                     eassumption.
+
+                  ** rewrite <- Setminus_Union_distr. intros Hc. inv Hc.
+                     inv H5. eapply Hdis1; eauto.
+
+                * inv Hall. eassumption.
+
+                * intros Hc. eapply image_extend_lst_Included in Hc.
+                  inv Hc.
+                  eapply image_extend_Included' in H1.
+                  rewrite image_id in H1.
+                  assert (Heq: k1 |: (x1 |: FromList vars1) \\ [set x1] \\ FromList vars1 \\ [set k1] <--> Empty_set _) by xsets.
+                  rewrite Heq in H1. repeat normalize_sets. inv H1.
+                  eapply Hdis2. now sets.
+                  eapply Hdis2. now sets.
+                  eassumption.
+
+              + rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set.
+                normalize_sets.
+                intros Hc. eapply image_extend_lst_Included in Hc.
+                inv Hc.
+                rewrite image_id in H0. inv H0. inv H1. now eauto.
+
+                inv H7. eapply Hdis2. now sets. eassumption.
+
+            - omega. }
+          
+          
+      - (* Fix_e *)
+        intros na e IH e1 e2 k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
+               He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
+        simpl in He1, He2. inv He1; inv He2.  
+        eapply preord_exp_fun_compat.
+        + eapply Hprops. (* invariants *)
+        + eapply Hprops. (* invariants *)
+        + { simpl. eapply preord_exp_app_compat. 
+            - eapply Hprops. (* invariants *)
+            - eapply Hprops. (* invariants *)
+            - eapply preord_var_env_monotonic.
+
+              eapply preord_var_env_def_funs_not_In_l.
+
+              rewrite cps_cvt_rel_efnlst_name_in_fundes; [ | eassumption ].
+              intros Hin. eapply Hdis1. now constructor; eauto.
+
+              eapply preord_var_env_def_funs_not_In_r.
+
+              rewrite cps_cvt_rel_efnlst_name_in_fundes; [ | eassumption ].
+              intros Hin. eapply Hdis2. now constructor; eauto.
+
+              assert (Heq: k2 = ((id {k1 ~> k2}) <{ vars1 ~> vars2 }>) k1).
+              { rewrite extend_lst_gso. rewrite extend_gss. reflexivity. eassumption. }
+              rewrite Heq.
+              eapply Henv. now left. lia.
+
+            - set (Heq1 := cps_cvt_rel_efnlst_all_fun_name _ _ _ _ _ _ H6).
+              set (Heq2 := cps_cvt_rel_efnlst_all_fun_name _ _ _ _ _ _ H10). 
+              constructor; eauto.
+
+              eapply preord_env_P_inj_def_funs.
+              rewrite Heq1. eassumption.
+              rewrite Heq2. eassumption.
+              congruence.
+              rewrite Heq1. eassumption.
+              rewrite Heq2. eassumption.
+
+              2:{ rewrite Heq1, Heq2. eapply preord_env_P_inj_monotonic with (k0 := k). lia.
+                  eapply e; try eassumption.
+                  6:{ rewrite extend_lst_app.
+                      2:{ replace (@Datatypes.length positive) with (@Datatypes.length var) by reflexivity.
+                          congruence. }
+
+                      repeat normalize_sets.
+
+                      rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set.
+                      repeat normalize_sets.
+                      
+                      eapply preord_env_P_inj_f_eq_subdomain.
+                
+                      eapply preord_env_P_inj_antimon. eassumption.
+                      eapply Included_Union_compat. reflexivity. now sets.
+                      
+                      rewrite f_eq_subdomain_extend_lst_Disjoint with (xs := nlst).
+                      reflexivity.
+                      eapply Union_Disjoint_r; [ | now sets ].
+                      eapply Disjoint_Singleton_r.
+                      intros Hc. eapply Hdis1. now constructor; eauto. } 
+                  
+                  - eapply NoDup_app; eauto.
+                    eapply Disjoint_sym. eapply Disjoint_Included; [ | | eapply Hdis1 ]; now sets.
+
+                  - normalize_sets.
+                    intros H1. destruct H1.
+                    eapply Hdis1. now constructor; eauto.
+                    now eauto.
+
+                  - rewrite !app_length. congruence.
+
+                  - normalize_sets. now xsets. 
+
+                  - normalize_sets. now xsets. }
+
+              + normalize_sets.
+                rewrite cps_cvt_rel_efnlst_name_in_fundes; eauto. now sets. }
+
+      - (* Prf_e *)
+        admit.
+        
+      - (* enil *)
+        admit.
+        
+      - (* exps *)
+        admit.
+        
+      - (* eflnil *)
+        admit.
+        
+      - (* eflcons *)
+        admit.
+        
+      - (* brnil_e *)
+        admit.
+        
+      - (* brcons_e *)
+        admit.
+        (* intros dc p e IHe bs IHbs bs1 bs2 k1 k2 r1 r2 vars1 vars2 x1 x2 *)
+        (*        rho1 rho2 next1 next2 next3 next4 *)
+        (*        Hbs1 Hbs2 Hdup Hnot Hlen Hlt Henv Hvar. *)
+        (* simpl in Hbs1, Hbs2. *)
+        (* destruct p. *)
+        (* destruct (cps_cvt_branches bs vars1 k1 r1 next1 cnstrs) eqn:Hcvt_bs1. *)
+        (* 2: { inv Hbs1. } destruct p. destruct (gensym_n s (rev l)) eqn:Hgen_l. *)
+        (* destruct (ctx_bind_proj (dcon_to_tag dc cnstrs) r1 (Datatypes.length l) *)
+        (*                         (hd 1%positive l1) 0) eqn:Hctx1. *)
+        (* destruct (cps_cvt e (rev l1 ++ vars1) k1 s0 cnstrs) eqn:Hcvt_e1. *)
+        (* 2: { inv Hbs1. } destruct p. inv Hbs1. *)
+        (* destruct (cps_cvt_branches bs vars2 k2 r2 next3 cnstrs) eqn:Hcvt_bs2. *)
+        (* 2: { inv Hbs2. } destruct p. destruct (gensym_n s1 (rev l)) eqn:Hgen_l2. *)
+        (* destruct (ctx_bind_proj (dcon_to_tag dc cnstrs) r2 (Datatypes.length l) *)
+        (*                         (hd 1%positive l3) 0) eqn:Hctx2. *)
+        (* destruct (cps_cvt e (rev l3 ++ vars2) k2 s2 cnstrs) eqn:Hcvt_e2. *)
+        (* 2: { inv Hbs2. } destruct p. inv Hbs2. *)
+        (* eapply preord_exp_case_cons_compat. *)
+        (* + admit. *)
+        (* + admit. *)
+        (* + admit. *)
+        (* + admit. *)
+        (* + eassumption. *)
+        (* + admit. *)
+        (* + eapply IHbs; eassumption. *)
     Admitted.
 
     Lemma cps_cvt_val_alpha_equiv :
@@ -1742,25 +1920,6 @@ Section Post.
         eapply IHxs; eauto.
     Qed.
 
-    Lemma preord_var_env_extend_eq PostG :
-      forall (rho1 rho2 : env) (k : nat) (x1 x2 : var) (v1 v2 : cps.val),
-        preord_val cenv PostG k v1 v2 ->
-        preord_var_env cenv PostG k (M.set x1 v1 rho1) (M.set x2 v2 rho2) x1 x2.
-    Proof.
-      intros rho1 rho2 k x1 x2 v1 v2 Hval x' Hget.
-      rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss. split; eauto.
-    Qed.
-    
-    Lemma preord_var_env_extend_neq PostG :
-      forall (rho1 rho2 : env) (k : nat) (x1 x2 y1 y2 : var) (v1 v2 : cps.val),
-        preord_var_env cenv PostG k rho1 rho2 y1 y2 ->
-        y1 <> x1 ->
-        y2 <> x2 ->      
-        preord_var_env cenv PostG k (M.set x1 v1 rho1) (M.set x2 v2 rho2) y1 y2.
-    Proof.
-      intros rho1 rho2 k x1 x2 y1 y2 v1 v2 Hval Hneq Hneq' x' Hget.
-      rewrite M.gso in *; eauto.
-    Qed.
 
     (** ** Correctness statements *)
     

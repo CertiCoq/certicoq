@@ -552,6 +552,55 @@ Proof.
        eexists; split; eauto. now constructor 2.
 Qed.
 
+Lemma f_eq_subdomain_extend_lst
+      (A : Type) (S : Ensemble positive) (f f' : positive -> A)
+      (xs : list positive) (ys : list A) :
+  List.length xs = List.length ys -> 
+  f_eq_subdomain (S \\ FromList xs) f f' ->
+  f_eq_subdomain S (f <{xs ~> ys}>) (f' <{xs ~> ys}>).
+Proof.
+  revert A S f f' ys.
+  induction xs; intros.
+  - simpl. repeat normalize_sets. eassumption.
+  - destruct ys; simpl. inv H. inv H. simpl.
+    normalize_sets. eapply f_eq_subdomain_antimon.
+    2:{ eapply f_eq_subdomain_extend. 
+        eapply IHxs; eauto. rewrite <- Setminus_Union in H0.
+        eassumption. }
+    xsets.
+    rewrite Union_Setminus_Included; tci; sets.        
+Qed.
+
+Lemma extend_lst_get_nth_error :
+  forall A vars1 vars2 n (f: positive -> A) v1 v2,
+    List.length vars1 = List.length vars2 ->
+    NoDup vars1 ->
+    nth_error vars1 n = Some v1 ->
+    nth_error vars2 n = Some v2 ->
+    (f <{ vars1 ~> vars2 }>) v1 = v2.
+Proof.
+  intros A vars1. induction vars1; intros vars2 n f v1 v2 Hlen Hdup Hv1 Hv2.
+  - destruct vars2 eqn:Hvars2.
+    destruct n eqn:Hn; simpl in Hv1; inv Hv1.
+    inv Hlen. 
+  - destruct vars2 eqn:Hvars2.
+    inv Hlen.
+    destruct n eqn:Hn.
+    + simpl in Hv1, Hv2.
+      inv Hv1. inv Hv2.
+      simpl. rewrite extend_gss. reflexivity.
+    + simpl in *.
+      rewrite extend_gso.
+      eapply IHvars1. lia.
+      inv Hdup. eassumption.
+      eassumption.
+      eassumption.
+      intros Heq.
+      eapply nth_error_In in Hv1.
+      inv Hdup. contradiction.
+Qed.
+
+
 Lemma extend_lst_app {A} (f : positive -> A) xs xs' ys ys' :
   length xs = length ys -> 
   f_eq (f <{xs ++ xs' ~> ys ++ ys'}>)

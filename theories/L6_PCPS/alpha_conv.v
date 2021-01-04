@@ -39,6 +39,31 @@ Proof.
 Qed.
 
 
+Lemma extend_fundefs_name_in_fundefs f B1 B2 x :
+  cps_util.numOf_fundefs B1 = cps_util.numOf_fundefs B2 ->
+  x \in name_in_fundefs B1 ->
+  exists y, extend_fundefs f B1 B2 x = y /\ y \in name_in_fundefs B2. 
+Proof.
+  revert B2. induction B1; intros B2 Heq Hin; destruct B2; simpl in *; try congruence.
+  - destruct (var_dec v x); subst.
+    + eexists. rewrite extend_gss. split; eauto.
+    + inv Hin. inv H. congruence.
+      inv Heq. edestruct IHB1; eauto. destructAll.
+      rewrite extend_gso; eauto. 
+  - inv Hin.
+Qed.
+
+Lemma extend_fundefs_not_name_in_fundefs f B1 B2 x :
+  ~ x \in name_in_fundefs B1 ->
+  extend_fundefs f B1 B2 x = f x. 
+Proof.
+  revert B2. induction B1; intros B2 Hnin; destruct B2; simpl; eauto.
+  simpl in *. rewrite extend_gso; eauto.
+
+  intros Hc; subst. eauto.
+Qed.
+
+
 (* These are required to make sure that at every step of extending the function
    it is injective, which is useful for proofs with induction on the list or fundefs *)
 Inductive construct_lst_injection : (var -> var) -> list var -> list var -> (var -> var) -> Prop :=
@@ -1022,10 +1047,36 @@ Section Alpha_conv_correct.
     intros Henv Hfeq y Hin. rewrite <- Hfeq; eauto.
   Qed.
 
-    Lemma preord_env_P_inj_eq_r S S' sig k rho1 rho2 rho3 :
-      preord_env_P_inj S k sig rho1 rho2 ->
-      eq_env_P (image sig S') rho2 rho3 ->
-      preord_env_P_inj (Intersection _ S  S') k sig rho1 rho3.
+
+  Lemma preord_env_P_inj_def_funs
+        S (rho1 rho2 : env) (k : nat) (B1 B2 B1' B2' : fundefs)
+        (f : var -> var) x1 x2 n :
+    NoDup (all_fun_name B1) ->
+    NoDup (all_fun_name B2) ->
+    Datatypes.length (all_fun_name B1) = Datatypes.length (all_fun_name B2) ->
+
+    nth_error (all_fun_name B1) n = Some x1 ->
+    nth_error (all_fun_name B2) n = Some x2 ->
+
+    name_in_fundefs B1 \subset S ->
+    
+    preord_env_P_inj S k (f <{ all_fun_name B1 ~> all_fun_name B2 }>)
+                     (def_funs B1' B1 rho1 rho1) (def_funs B2' B2 rho2 rho2) ->
+    preord_var_env cenv PG k (def_funs B1' B1 rho1 rho1) (def_funs B2' B2 rho2 rho2) x1 x2.
+  Proof.
+    intros Hun1 Hun2 Hlen Hn1 Hn2 Hin Henv x Hget.
+
+    edestruct Henv; eauto. eapply Hin.
+    
+    eapply Same_set_all_fun_name. eapply nth_FromList. eassumption.
+    
+    erewrite extend_lst_get_nth_error in H; eauto.
+  Qed. 
+
+  Lemma preord_env_P_inj_eq_r S S' sig k rho1 rho2 rho3 :
+    preord_env_P_inj S k sig rho1 rho2 ->
+    eq_env_P (image sig S') rho2 rho3 ->
+    preord_env_P_inj (Intersection _ S  S') k sig rho1 rho3.
   Proof.
     intros Henv Heq x Hin v Hget. inv Hin.
     rewrite <- Heq; eauto. eapply Henv; eauto.
@@ -1225,6 +1276,8 @@ Section Alpha_conv_correct.
       eapply Included_trans; [| eassumption ].
       rewrite FromList_cons...
   Qed.
+
+
 
   Lemma preord_env_P_inj_get_list_l (S : var -> Prop) k f rho1 rho2 xs vs1 :
     preord_env_P_inj S k f rho1 rho2 ->

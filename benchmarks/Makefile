@@ -10,6 +10,7 @@ EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS)) $(patsubst %, %_cps_opt, $(TESTS)) 
 
 default: copy exec run
 all: copy lib tests exec run
+alldearg: copy lib deargtests exec run
 
 .PHONY: all default clean lib cleanlib tests run copy $(TESTS)
 
@@ -59,6 +60,9 @@ cleanlib:
 tests: tests.v
 	coqc $(COQOPTS) tests.v
 
+deargtests: testsdearg.v
+	coqc $(COQOPTS) testsdearg.v
+
 ## Compile with the default C compiler
 $(TESTS): $(CFILES)
 	$(CCOMPILER) -o $@_cps -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue.CertiCoq.Benchmarks.tests.$@_cps.c
@@ -66,6 +70,10 @@ $(TESTS): $(CFILES)
 	$(CCOMPILER) -o $@_cps_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt.c glue.CertiCoq.Benchmarks.tests.$@_cps_opt.c
 	$(CCOMPILER) -o $@_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt.c glue.CertiCoq.Benchmarks.tests.$@_opt.c
 	$(CCOMPILER) -o $@_opt_ll -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt_ll.c glue.CertiCoq.Benchmarks.tests.$@_opt_ll.c
+	$(CCOMPILER) -o $@_dearg_cps -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_dearg_cps.c glue.CertiCoq.Benchmarks.tests.$@_dearg_cps.c
+	$(CCOMPILER) -o $@_dearg -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_dearg.c glue.CertiCoq.Benchmarks.tests.$@_dearg.c
+	$(CCOMPILER) -o $@_dearg_cps_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_dearg_cps_opt.c glue.CertiCoq.Benchmarks.tests.$@_dearg_cps_opt.c
+	$(CCOMPILER) -o $@_dearg_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_dearg_opt.c glue.CertiCoq.Benchmarks.tests.$@_dearg_opt.c
 
 ## Compile with compcert
 # $(TESTS): $(CFILES)

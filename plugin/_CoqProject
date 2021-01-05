@@ -328,6 +328,8 @@ extraction/rewriting.ml
 extraction/rewriting.mli
 extraction/round.ml
 extraction/round.mli
+extraction/eLiftSubst.ml
+extraction/eLiftSubst.mli
 extraction/erasureFunction.ml
 extraction/erasureFunction.mli
 extraction/safeTemplateChecker.ml
@@ -400,6 +402,10 @@ extraction/zbool.ml
 extraction/zbool.mli
 extraction/zpower.ml
 extraction/zpower.mli
+
+# verified dearg optimisation
+extraction/dearg.ml
+extraction/dearg.mli
 
 extraction/signature.mli
 extraction/signature.ml

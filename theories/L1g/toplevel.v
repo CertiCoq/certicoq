@@ -1,4 +1,5 @@
 Require Import L1g.compile.
+Require Import L1g.dearg.
 Require Import L1g.term.
 Require Import L1g.program.
 Require Import L1g.wcbvEval.
@@ -31,3 +32,11 @@ Instance L1g_Lang : Lang (Program Term) :=
                     end;
     BigStep := fun s sv => WcbvEval (env s) (main s) sv
   }.
+
+Definition dearg_lbox : CertiCoqTrans EAst.program EAst.program :=
+  fun p =>
+    let ds := analyze_env (fst p) in
+    let ind_masks := trim_ind_masks ds.(ind_masks) in
+    let const_masks := trim_const_masks ds.(const_masks) in
+    debug_msg "Removing dead arguments (dearging) on Lbox" ;;
+    (LiftErrorCertiCoqTrans "Dearg Lbox" (Basics.compose ret (dearg_prog ind_masks const_masks)) p).

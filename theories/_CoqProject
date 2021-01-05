@@ -14,6 +14,8 @@ common/classes.v
 
 # L1g
 L1g/compile.v
+L1g/dearg.v
+L1g/deargCorrect.v
 L1g/term.v
 L1g/program.v
 L1g/wndEval.v

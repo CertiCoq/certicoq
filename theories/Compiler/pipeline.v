@@ -1,4 +1,5 @@
 Require Export L1g.toplevel L2k.toplevel L4.toplevel L6.toplevel L7.toplevel.
+Require Import L1g.dearg.
 Require Import compcert.lib.Maps.
 Require Import ZArith.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
@@ -99,11 +100,12 @@ End Pipeline.
 Let next_id := 100%positive.
 
 (** * The main CertiCoq pipeline, with MetaCoq's erasure and C-code generation *)
-
 Definition pipeline (p : Template.Ast.program) :=
   let genv := fst p in
   '(prs, next_id) <- register_prims next_id genv ;;
   p <- erase_PCUIC p ;;
+  o <- get_options ;;
+  p <- (if (dev o =? 1)%nat then dearg_lbox p else ret p) ;;
   p <- CertiCoq_pipeline next_id prs false p ;;
   compile_Clight prs p.
 
@@ -144,7 +146,6 @@ Definition make_opts
      dev := dev;
      Pipeline_utils.prefix := prefix;
      prims :=  prims |}.
-
 
 Definition compile (opts : Options) (p : Template.Ast.program) :=
   run_pipeline _ _ opts p pipeline.

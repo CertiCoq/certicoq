@@ -35,7 +35,6 @@ jobs:
       - run: opam repo add coq-released https://coq.inria.fr/opam/released
       - run: opam install coq.8.12.1 coq-ext-lib
 
-      - run: opam exec - git submodules init
       - run: opam exec -- coqc benchmarks/test_submodules.v || opam exec -- make submodules
       - run: opam exec -- make -j 2
       - run: opam exec -- make plugin

@@ -31,5 +31,5 @@ cd metacoq
 echo "Rebuilding MetaCoq"
 clean
 ./configure.sh local
-make -j 2 all
+make -j 2 translations all
 make install

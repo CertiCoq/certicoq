@@ -21,13 +21,13 @@ cd submodules
 # make install
 # cd ..
 
-cd Equations
-echo "Rebuilding Equations"
-clean
-coq_makefile -f _CoqProject -o Makefile
-make all
-make install
-cd ..
+# cd Equations
+# echo "Rebuilding Equations"
+# clean
+# coq_makefile -f _CoqProject -o Makefile
+# make all
+# make install
+# cd ..
 
 cd metacoq
 echo "Rebuilding MetaCoq"

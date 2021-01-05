@@ -34,6 +34,6 @@ jobs:
       - run: opam repo add coq-released https://coq.inria.fr/opam/released
       - run: opam install coq.8.12.1
 
-      - run: opam exec -- ((echo "Require Import MetaCoq.Erasure.EAll." > test.v && coqc test.v) || make submodules) && rm -f test.v  
+      - run: opam exec -- coqc benchmarks/test-submodules.v || make submodules
       - run: opam exec -- make -j 2
       - run: opam exec -- make plugin

@@ -196,7 +196,7 @@ PrintCsyntax
 PrintClight
 L6_to_Clight
 L6_to_Clight_stack
-Optimize
+Dearg
 Toplevel
 Toplevel0
 Toplevel1

@@ -88,10 +88,9 @@ CertiCoq Compile -cps -ext "_cps_opt" demo1.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" demo1.
 
 (* with dearging *)
-CertiCoq Compile -dev 1 -ext "_dearg_cps" demo1.
-CertiCoq Compile -dev 1 -ext "_dearg" -direct demo1.
-CertiCoq Compile -dev 1 -O 1 -ext "_dearg_cps_opt" demo1.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_dearg_opt" demo1.
+CertiCoq Compile -dev 1 -ext "_dearg_opt" demo1.
+CertiCoq Compile -dev 1 -cps -ext "_dearg_cps_opt" demo1.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_dearg_opt_ll" demo1.
 
 
 Eval compute in "Compiling demo2".
@@ -103,10 +102,9 @@ CertiCoq Compile -cps -ext "_cps_opt" demo2.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" demo2.
 
 (* with dearging *)
-CertiCoq Compile -dev 1 -ext "_dearg_cps" demo2.
-CertiCoq Compile -dev 1 -ext "_dearg" -direct demo2.
-CertiCoq Compile -dev 1 -O 1 -ext "_dearg_cps_opt" demo2.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_dearg_opt" demo2.
+CertiCoq Compile -dev 1 -ext "_dearg_opt" demo2.
+CertiCoq Compile -dev 1 -cps -ext "_dearg_cps_opt" demo2.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_dearg_opt_ll" demo2.
 
 Eval compute in "Compiling demo3".
 
@@ -117,10 +115,9 @@ CertiCoq Compile -cps -ext "_cps_opt" demo3.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" demo3.
 
 (* with dearging *)
-CertiCoq Compile -dev 1 -ext "_dearg_cps" demo3.
-CertiCoq Compile -dev 1 -ext "_dearg" -direct demo3.
-CertiCoq Compile -dev 1 -O 1 -ext "_dearg_cps_opt" demo3.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_dearg_opt" demo3.
+CertiCoq Compile -dev 1 -ext "_dearg_opt" demo3.
+CertiCoq Compile -dev 1 -cps -ext "_dearg_cps_opt" demo3.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_dearg_opt_ll" demo3.
 
 
 Eval compute in "Compiling list_sum".
@@ -132,10 +129,9 @@ CertiCoq Compile -cps -ext "_cps_opt" list_sum.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" list_sum.
 
 (* with dearging *)
-CertiCoq Compile -dev 1 -ext "_dearg_cps" list_sum.
-CertiCoq Compile -dev 1 -ext "_dearg" -direct list_sum.
-CertiCoq Compile -dev 1 -O 1 -ext "_dearg_cps_opt" list_sum.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_dearg_opt" list_sum.
+CertiCoq Compile -dev 1 -ext "_dearg_opt" list_sum.
+CertiCoq Compile -dev 1 -cps -ext "_dearg_cps_opt" list_sum.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_dearg_opt_ll" list_sum.
 
 
 Eval compute in "Compiling vs_easy".
@@ -143,14 +139,13 @@ Eval compute in "Compiling vs_easy".
 CertiCoq Compile -O 0 -cps -ext "_cps" -time_anf vs_easy.
 CertiCoq Compile -O 0 -time_anf vs_easy.
 CertiCoq Compile -ext "_opt" vs_easy.
-CertiCoq Compile -time -cps -ext "_cps_opt" vs_easy.
+CertiCoq Compile -cps -ext "_cps_opt" vs_easy.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_easy.
 
 (* with dearging *)
-CertiCoq Compile -dev 1 -ext "_dearg_cps" vs_easy.
-CertiCoq Compile -dev 1 -ext "_dearg" -direct vs_easy.
-CertiCoq Compile -dev 1 -O 1 -ext "_dearg_cps_opt" vs_easy.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_dearg_opt" vs_easy.
+CertiCoq Compile -dev 1 -ext "_dearg_opt" vs_easy.
+CertiCoq Compile -dev 1 -cps -ext "_dearg_cps_opt" vs_easy.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_dearg_opt_ll" vs_easy.
 
 
 Eval compute in "Compiling vs_hard".
@@ -162,11 +157,9 @@ CertiCoq Compile -cps -ext "_cps_opt" vs_hard.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_hard.
 
 (* with dearging *)
-CertiCoq Compile -dev 1 -ext "_dearg_cps" vs_hard.
-CertiCoq Compile -dev 1 -ext "_dearg" -direct vs_hard.
-CertiCoq Compile -dev 1 -O 1 -ext "_dearg_cps_opt" vs_hard.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_dearg_opt" vs_hard.
-
+CertiCoq Compile -dev 1 -ext "_dearg_opt" vs_hard.
+CertiCoq Compile -dev 1 -cps -ext "_dearg_cps_opt" vs_hard.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_dearg_opt_ll" vs_hard.
 
 Eval compute in "Compiling binom".
 
@@ -177,26 +170,23 @@ CertiCoq Compile -cps -ext "_cps_opt" binom.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" binom.
 
 (* with dearging *)
-CertiCoq Compile -dev 1 -ext "_dearg_cps" binom.
-CertiCoq Compile -dev 1 -ext "_dearg" -direct binom.
-CertiCoq Compile -dev 1 -O 1 -ext "_dearg_cps_opt" binom.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_dearg_opt" binom.
+CertiCoq Compile -dev 1 -ext "_dearg_opt" binom.
+CertiCoq Compile -dev 1 -cps -ext "_dearg_cps_opt" binom.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_dearg_opt_ll" binom.
 
 
 Eval compute in "Compiling color".
 
-CertiCoq Compile -O 0 -time color.
-CertiCoq Compile -O 0 -time -cps -ext "_cps" color.
-CertiCoq Compile -time -ext "_opt" color.
-CertiCoq Compile -time -cps -ext "_cps_opt" color.
+CertiCoq Compile -O 0 color.
+CertiCoq Compile -O 0 -cps -ext "_cps" color.
+CertiCoq Compile -ext "_opt" color.
+CertiCoq Compile -cps -ext "_cps_opt" color.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" color.
 
 (* with dearging *)
-CertiCoq Compile -dev 1 -ext "_dearg_cps" color.
-CertiCoq Compile -dev 1 -ext "_dearg" -direct color.
-CertiCoq Compile -dev 1 -O 1 -ext "_dearg_cps_opt" color.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_dearg_opt" color.
-
+CertiCoq Compile -dev 1 -ext "_dearg_opt" color.
+CertiCoq Compile -dev 1 -cps -ext "_dearg_cps_opt" color.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_dearg_opt_ll" color.
 (* Don't compile slow sha *)
 (* Eval compute in "Compiling sha". *)
 
@@ -212,3 +202,8 @@ CertiCoq Compile -O 0 -cps -ext "_cps" sha_fast.
 CertiCoq Compile -ext "_opt" sha_fast.
 CertiCoq Compile -cps -ext "_cps_opt" sha_fast.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" sha_fast.
+
+(* with dearging *)
+CertiCoq Compile -dev 1 -ext "_dearg_opt" sha_fast.
+CertiCoq Compile -dev 1 -cps -ext "_dearg_cps_opt" sha_fast.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_dearg_opt_ll" sha_fast.

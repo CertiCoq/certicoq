@@ -13,6 +13,8 @@ Import VeriStar.
 
 CertiCoq -help.
 
+CertiCoq Generate Glue -file "basics" [ nat, list, bool ].
+
 (* Demo 1 *)
 
 Definition demo1 := List.app (List.repeat true 500) (List.repeat false 300).
@@ -38,10 +40,17 @@ Definition list_sum := List.fold_left plus (List.repeat 1 100) 0.
 (* Veristar *)
 
 Definition vs_easy :=
-  match vs.main with
-  | Valid => true
-  | _ => false
-  end.
+  (fix loop (n : nat) (res : veristar_result) :=
+     match n with
+     | 0 =>
+       match res with
+       | Valid => true
+       | _ => false
+       end
+     | S n =>
+       let res := check_entailment example_ent in
+       loop n res
+     end) 100  Valid.
 
 Definition vs_hard :=
   match vs.main_h with
@@ -72,76 +81,87 @@ Definition sha_fast := sha256.SHA_256' (sha256.str_to_bytes test).
 
 Eval compute in "Compiling demo1".
 
-CertiCoq Compile -dev 1 -direct -time_anf vs_easy.
+CertiCoq Compile -dev 1 -O 0 demo1.
+CertiCoq Compile -dev 1 -O 0 -cps -ext "_cps" demo1.
+CertiCoq Compile -dev 1 -ext "_opt" demo1.
+CertiCoq Compile -dev 1 -cps -ext "_cps_opt" demo1.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_opt_ll" demo1.
 
-CertiCoq Compile -dev 1 -ext "_cps" demo1.
-CertiCoq Compile -dev 1 -direct demo1.
-CertiCoq Compile -dev 1 -O 1 -ext "_cps_opt" demo1.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_opt" demo1.
 
 Eval compute in "Compiling demo2".
 
-CertiCoq Compile -dev 1 -ext "_cps" demo2.
-CertiCoq Compile -dev 1 -direct demo2.
-CertiCoq Compile -dev 1 -O 1 -ext "_cps_opt" demo2.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_opt" demo2.
+CertiCoq Compile -dev 1 -O 0 demo2.
+CertiCoq Compile -dev 1 -O 0 -cps -ext "_cps" demo2.
+CertiCoq Compile -dev 1 -ext "_opt" demo2.
+CertiCoq Compile -dev 1 -cps -ext "_cps_opt" demo2.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_opt_ll" demo2.
+
 
 Eval compute in "Compiling demo3".
 
-CertiCoq Compile -dev 1 -ext "_cps" demo3.
-CertiCoq Compile -dev 1 -direct demo3.
-CertiCoq Compile -dev 1 -O 1 -ext "_cps_opt" demo3.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_opt" demo3.
+CertiCoq Compile -dev 1 -O 0 demo3.
+CertiCoq Compile -dev 1 -O 0 -cps -ext "_cps" demo3.
+CertiCoq Compile -dev 1 -ext "_opt" demo3.
+CertiCoq Compile -dev 1 -cps -ext "_cps_opt" demo3.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_opt_ll" demo3.
+
 
 Eval compute in "Compiling list_sum".
 
-CertiCoq Compile -dev 1 -ext "_cps" list_sum.
-CertiCoq Compile -dev 1 -direct list_sum.
-CertiCoq Compile -dev 1 -O 1 -ext "_cps_opt" list_sum.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_opt" list_sum.
+CertiCoq Compile -dev 1 -O 0 list_sum.
+CertiCoq Compile -dev 1 -O 0 -cps -ext "_cps" list_sum.
+CertiCoq Compile -dev 1 -ext "_opt" list_sum.
+CertiCoq Compile -dev 1 -cps -ext "_cps_opt" list_sum.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_opt_ll" list_sum.
 
 
 Eval compute in "Compiling vs_easy".
 
-CertiCoq Compile -dev 1 -direct -time_anf vs_easy.
-CertiCoq Compile -dev 1 -ext "_cps" -time_anf vs_easy.
-CertiCoq Compile -dev 1 -time -O 1 -ext "_cps_opt" vs_easy.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_opt" vs_easy.
+CertiCoq Compile -dev 1 -O 0 -cps -ext "_cps" -time_anf vs_easy.
+CertiCoq Compile -dev 1 -O 0 -time_anf vs_easy.
+CertiCoq Compile -dev 1 -ext "_opt" vs_easy.
+CertiCoq Compile -dev 1 -time -cps -ext "_cps_opt" vs_easy.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_easy.
+
 
 Eval compute in "Compiling vs_hard".
 
-CertiCoq Compile -dev 1 -ext "_cps" vs_hard.
-CertiCoq Compile -dev 1 -direct vs_hard.
-CertiCoq Compile -dev 1 -O 1 -ext "_cps_opt" vs_hard.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_opt" vs_hard.
+CertiCoq Compile -dev 1 -O 0 vs_hard.
+CertiCoq Compile -dev 1 -O 0 -cps -ext "_cps" vs_hard.
+CertiCoq Compile -dev 1 -ext "_opt" vs_hard.
+CertiCoq Compile -dev 1 -cps -ext "_cps_opt" vs_hard.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_hard.
 
 
 Eval compute in "Compiling binom".
 
-CertiCoq Compile -dev 1 -ext "_cps" binom.
-CertiCoq Compile -dev 1 -direct binom.
-CertiCoq Compile -dev 1 -O 1 -ext "_cps_opt" binom.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_opt" binom.
+CertiCoq Compile -dev 1 -O 0 binom.
+CertiCoq Compile -dev 1 -O 0 -cps -ext "_cps" binom.
+CertiCoq Compile -dev 1 -ext "_opt" binom.
+CertiCoq Compile -dev 1 -cps -ext "_cps_opt" binom.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_opt_ll" binom.
 
 
 Eval compute in "Compiling color".
 
-CertiCoq Compile -dev 1 -time -ext "_cps" color.
-CertiCoq Compile -dev 1 -time -direct color.
-CertiCoq Compile -dev 1 -time -O 1 -ext "_cps_opt" color.
-CertiCoq Compile -dev 1 -time -direct -O 1 -ext "_opt" color.
+CertiCoq Compile -dev 1 -O 0 -time color.
+CertiCoq Compile -dev 1 -O 0 -time -cps -ext "_cps" color.
+CertiCoq Compile -dev 1 -time -ext "_opt" color.
+CertiCoq Compile -dev 1 -time -cps -ext "_cps_opt" color.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_opt_ll" color.
 
 (* Don't compile slow sha *)
 (* Eval compute in "Compiling sha". *)
 
-(* CertiCoq Compile -dev 1 -ext "_cps" sha. *)
-(* CertiCoq Compile -dev 1 -direct sha. *)
-(* CertiCoq Compile -dev 1 -O 1 -ext "_cps_opt" sha. *)
-(* CertiCoq Compile -dev 1 -direct -O 1 -ext "_opt" sha. *)
+(* CertiCoq Compile -cps -ext "_cps" sha. *)
+(* CertiCoq Compile sha. *)
+(* CertiCoq Compile -O 1 -cps -ext "_cps_opt" sha. *)
+(* CertiCoq Compile -O 1 -ext "_opt" sha. *)
 
 Eval compute in "Compiling sha_fast".
 
-CertiCoq Compile -dev 1 -ext "_cps" sha_fast.
-CertiCoq Compile -dev 1 -direct sha_fast.
-CertiCoq Compile -dev 1 -O 1 -ext "_cps_opt" sha_fast.
-CertiCoq Compile -dev 1 -direct -O 1 -ext "_opt" sha_fast.
+CertiCoq Compile -dev 1 -O 0 sha_fast.
+CertiCoq Compile -dev 1 -O 0 -cps -ext "_cps" sha_fast.
+CertiCoq Compile -dev 1 -ext "_opt" sha_fast.
+CertiCoq Compile -dev 1 -cps -ext "_cps_opt" sha_fast.
+CertiCoq Compile -dev 1 -args 1000 -config 9 -O 1 -ext "_opt_ll" sha_fast.

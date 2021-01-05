@@ -1,0 +1,40 @@
+name: Test compilation
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        target: [ submodules ]
+
+    steps:
+
+      - name: Try to restore opam cache
+        id: opam-cache
+        uses: actions/cache@v2
+        with:
+          path: "~/.opam"
+          key: opam-${{github.base_ref}}-${{github.ref}} 
+          restore-keys: |
+            opam--refs/heads/${{github.base_ref}}
+
+      - name: Install OCaml
+        uses: avsm/setup-ocaml@v1
+        with:
+          ocaml-version: 4.07.1+flambda
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - run: opam repo add coq-released https://coq.inria.fr/opam/released
+      - run: opam install coq.8.12.1 
+
+      - run: opam exec -- coqc benchmarks/test_submodules.v || opam exec -- make submodules
+      - run: opam exec -- make -j 2
+      - run: opam exec -- make plugin

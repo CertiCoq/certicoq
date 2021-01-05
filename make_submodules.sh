@@ -12,20 +12,18 @@ clean() {
 
 cd submodules
 
-## This is currently failing, do not install from submodules but use opam instead
-# cd coq-ext-lib
-# echo "Rebuilding coq-ext-lib"
-# clean
-# coq_makefile -f _CoqProject -o Makefile
-# make all
-# make install
-# cd ..
+cd coq-ext-lib
+echo "Rebuilding coq-ext-lib"
+clean
+make -j 2
+make install
+cd ..
 
 cd Equations
 echo "Rebuilding Equations"
 clean
-coq_makefile -f _CoqProject -o Makefile
-make all
+./configure.sh
+make
 make install
 cd ..
 
@@ -33,6 +31,5 @@ cd metacoq
 echo "Rebuilding MetaCoq"
 clean
 ./configure.sh local
-make translations
-make all
+make -j 2 translations all
 make install

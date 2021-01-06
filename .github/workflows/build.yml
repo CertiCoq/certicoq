@@ -26,7 +26,7 @@ jobs:
 
       - name: Obtain submodule hash
         id: submodule-hash
-        run: echo ::set-output name=HASH::$(git submodule status | sha256sum | awk '{print $1}' | sed 's/ *$//g')
+        run: echo ::set-output name=HASH::$(git submodule status | awk '{print $1}' | sha256sum | awk '{print $1}' | sed 's/ *$//g')
 
       - name: Try to restore opam cache
         id: opam-cache

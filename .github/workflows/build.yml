@@ -44,10 +44,10 @@ jobs:
       - run: opam install coq.${{ env.COQ_VERSION }}
 
       - run: opam exec -- coqc benchmarks/test_submodules.v || opam exec -- make submodules
-        if: matrix.target == "submodules"
+        if: matrix.target == submodules
 
       - run: opam install . --deps-only --with-doc --with-test
-        if: matrix.target == "opam"
+        if: matrix.target == opam
 
       - run: opam exec -- make -j 2
       - run: opam exec -- make plugin

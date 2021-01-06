@@ -9,24 +9,30 @@ CertiCoq depends on the following Coq packages:
 
 #### Building the dependencies
 
-##### Ext-lib
+The dependencies can either be installed manually (from sources or via `opam`) or automatically via provided submodules.
+
+##### Manual installation of dependencies
+
+###### Ext-lib
 
 You can install [ExtLib](https://github.com/coq-community/coq-ext-lib) (v0.11.2) from the source code or from opam with `opam install coq-ext-lib.0.11.2`.
 
-##### Equations
+###### Equations
 
 You can install [Equations](https://github.com/mattam82/Coq-Equations) (v1.2.3) from opam or from their source code or from opam with `opam install coq-equations.1.2.3+8.12`.
 
-##### MetaCoq
+###### MetaCoq
 
 Currently, MetaCoq needs to be installed manually from the `coq-8.12` branch in [MetaCoq's github](https://github.com/MetaCoq/metacoq/tree/coq-8.12). 
 
-#### Submodules 
+#### Installation of dependencies via submodules
 
-Alternatively, you may install Equations and MetaCoq using git modules.  From the `certicoq/` directory, run:
+Make sure that you do not have any of the dependencies installed already.
+From the `certicoq/` directory, run:
 
     # make submodules
-
+    
+Note that this approach will only work if your installation path for Coq is writable without root privileges, this should for instance be the case if Coq was installed via `opam`.
 
 ### Building the compiler
 

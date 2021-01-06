@@ -25,7 +25,7 @@ You can install [Equations](https://github.com/mattam82/Coq-Equations) (v1.2.3) 
 
 Currently, MetaCoq needs to be installed manually from the `coq-8.12` branch in [MetaCoq's github](https://github.com/MetaCoq/metacoq/tree/coq-8.12). 
 
-#### Installation of dependencies via submodules
+##### Installation of dependencies via submodules
 
 Make sure that you do not have any of the dependencies installed already.
 From the `certicoq/` directory, run:

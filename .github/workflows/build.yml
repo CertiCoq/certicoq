@@ -32,7 +32,7 @@ jobs:
       - name: Install OCaml
         uses: avsm/setup-ocaml@v1
         with:
-          ocaml-version: OCAML_VERSION
+          ocaml-version: ${{ env.OCAML_VERSION }}
 
       - name: Checkout code
         uses: actions/checkout@v2

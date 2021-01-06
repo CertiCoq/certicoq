@@ -51,4 +51,3 @@ jobs:
 
       - run: opam exec -- make -j 2
       - run: opam exec -- make plugin
-'

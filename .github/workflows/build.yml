@@ -2,6 +2,10 @@ name: Test compilation
 
 on: [push, pull_request]
 
+env:
+  OCAML_VERSION: 4.07.1+flambda
+  COQ_VERSION: 8.12.1
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -12,19 +16,23 @@ jobs:
 
     steps:
 
+      - name: Obtain submodule hash
+        id: submodule-hash
+        run: echo '::set-output name=HASH::$(git submodule status | sha256sum | awk "{print $1}")' 
+
       - name: Try to restore opam cache
         id: opam-cache
         uses: actions/cache@v2
         with:
           path: "~/.opam"
-          key: opam-${{github.base_ref}}-${{github.ref}} 
+          key: opam-${{ steps.submodule-hash.outputs.HASH }}-${{github.base_ref}}-${{github.ref}} 
           restore-keys: |
-            opam--refs/heads/${{github.base_ref}}
+            opam-${{ steps.submodule-hash.outputs.HASH }}--refs/heads/${{github.base_ref}}
 
       - name: Install OCaml
         uses: avsm/setup-ocaml@v1
         with:
-          ocaml-version: 4.07.1+flambda
+          ocaml-version: OCAML_VERSION
 
       - name: Checkout code
         uses: actions/checkout@v2
@@ -33,7 +41,7 @@ jobs:
           submodules: true
 
       - run: opam repo add coq-released https://coq.inria.fr/opam/released
-      - run: opam install coq.8.12.1 
+      - run: opam install coq.${{ env.COQ_VERSION }}
 
       - run: opam exec -- coqc benchmarks/test_submodules.v || opam exec -- make submodules
       - run: opam exec -- make -j 2

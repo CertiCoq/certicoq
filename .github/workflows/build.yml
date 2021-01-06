@@ -16,6 +16,16 @@ jobs:
 
     steps:
 
+      - run: git submodule status
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - run: git submodule status
+
       - name: Obtain submodule hash
         id: submodule-hash
         run: echo ::set-output name=HASH::$(git submodule status | sha256sum | awk '{print $1}' | sed 's/ *$//g')
@@ -31,14 +41,9 @@ jobs:
 
       - name: Install OCaml
         uses: avsm/setup-ocaml@v1
+        if: steps.opam-cache.outputs.cache-hit != 'true'
         with:
           ocaml-version: ${{ env.OCAML_VERSION }}
-
-      - name: Checkout code
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 1
-          submodules: true
 
       - run: opam repo add coq-released https://coq.inria.fr/opam/released
       - run: opam install coq.${{ env.COQ_VERSION }}

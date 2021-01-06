@@ -16,8 +16,6 @@ jobs:
 
     steps:
 
-      - run: git submodule status
-
       - name: Checkout code
         uses: actions/checkout@v2
         with:

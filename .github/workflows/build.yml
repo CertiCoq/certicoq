@@ -2,6 +2,10 @@ name: Test compilation
 
 on: [push, pull_request]
 
+env:
+  OCAML_VERSION: 4.07.1+flambda
+  COQ_VERSION: 8.12.1
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -12,29 +16,41 @@ jobs:
 
     steps:
 
-      - name: Try to restore opam cache
-        id: opam-cache
-        uses: actions/cache@v2
-        with:
-          path: "~/.opam"
-          key: opam-${{github.base_ref}}-${{github.ref}} 
-          restore-keys: |
-            opam--refs/heads/${{github.base_ref}}
-
-      - name: Install OCaml
-        uses: avsm/setup-ocaml@v1
-        with:
-          ocaml-version: 4.07.1+flambda
-
       - name: Checkout code
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
           submodules: true
 
+      - run: git submodule status
+
+      - name: Obtain submodule hash
+        id: submodule-hash
+        run: echo ::set-output name=HASH::$(git submodule status | awk '{print $1}' | sha256sum | awk '{print $1}' | sed 's/ *$//g')
+
+      - name: Try to restore opam cache
+        id: opam-cache
+        uses: actions/cache@v2
+        with:
+          path: "~/.opam"
+          key: opam-${{ steps.submodule-hash.outputs.HASH }}-${{github.base_ref}}-${{github.ref}} 
+          restore-keys: |
+            opam-${{ steps.submodule-hash.outputs.HASH }}--refs/heads/${{github.base_ref}}
+
+      - name: Install OCaml
+        uses: avsm/setup-ocaml@v1
+        if: steps.opam-cache.outputs.cache-hit != 'true'
+        with:
+          ocaml-version: ${{ env.OCAML_VERSION }}
+
       - run: opam repo add coq-released https://coq.inria.fr/opam/released
-      - run: opam install coq.8.12.1 
+      - run: opam install coq.${{ env.COQ_VERSION }}
 
       - run: opam exec -- coqc benchmarks/test_submodules.v || opam exec -- make submodules
+        if: matrix.target == 'submodules'
+
+      - run: opam install . --deps-only --with-doc --with-test
+        if: matrix.target == 'opam'
+
       - run: opam exec -- make -j 2
       - run: opam exec -- make plugin

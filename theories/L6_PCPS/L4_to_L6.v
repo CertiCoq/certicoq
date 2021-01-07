@@ -714,20 +714,19 @@ Fixpoint add_names lnames vars tgm : conv_env :=
       forall S vn k r tgm,
         cps_cvt_rel_branches S brnil_e vn k r tgm S []
   | e_Brcons:
-      forall S1 S2 S3 vn k r e ce bs' cbs' vars lnames proj_vars n ctx_p tg dc tgm,
+      forall S1 S2 S3 vn k r e ce bs' cbs' vars lnames n ctx_p tg dc tgm,
         tg = dcon_to_tag dc tgm ->
         FromList vars \subset S2 ->
-        FromList proj_vars \subset S2 \\ FromList vars ->
 
         NoDup vars ->
         Datatypes.length vars = Datatypes.length lnames ->
 
 
-        ctx_bind_proj tg r proj_vars 0 = ctx_p ->
+        ctx_bind_proj tg r vars 0 = ctx_p ->
 
         cps_cvt_rel_branches S1 bs' vn k r tgm S2 cbs' ->
         
-        cps_cvt_rel (S2 \\ (FromList vars) \\ (FromList proj_vars)) e ((List.rev vars) ++ vn) k tgm S3 ce ->
+        cps_cvt_rel (S2 \\ (FromList vars)) e ((List.rev vars) ++ vn) k tgm S3 ce ->
 
         cps_cvt_rel_branches
           S1 (brcons_e dc (n, lnames) e bs') vn k r tgm S3 ((tg, app_ctx_f ctx_p ce)::cbs').

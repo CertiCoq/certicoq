@@ -159,13 +159,12 @@ Fixpoint add_names lnames vars tgm : conv_env :=
 
   (* Bind m projections (starting from the (p+1)th) of var r to
    variables [n, n+m[, returns the generated context and n+m *)
-  Fixpoint ctx_bind_proj (tg:ctor_tag) (r:positive) (m:nat) (n:var) (p:nat)
-    : (exp_ctx * var) :=
-    match m with
-    | O => (Hole_c, n)
-    | S m' =>
-      let (ctx_p', n') := ctx_bind_proj tg r m' n p in
-      (Eproj_c  n' tg (N.of_nat (m'+p)) r ctx_p', Pos.succ n')
+  Fixpoint ctx_bind_proj (tg:ctor_tag) (r:positive) (vars : list var) (p:nat) : exp_ctx :=
+    match vars with
+    | [] => Hole_c
+    | v :: vars =>
+      let ctx_p':= ctx_bind_proj tg r vars (p + 1) in
+      (Eproj_c v tg (N.of_nat p) r ctx_p')
     end.
 
   (* returns length of given expression.efnlst *)
@@ -481,15 +480,11 @@ Fixpoint add_names lnames vars tgm : conv_env :=
          | brnil_e => ret (nil, next)
          | brcons_e dc (i, lnames) e bl' =>
            let tg := dcon_to_tag dc tgm in
-           let l := List.length lnames in
-           rb <- cps_cvt_branches bl' vn k r next tgm;;
-           let (cbl, next) := rb : (list (ctor_tag * exp) * symgen) in
+           '(cbl, next) <- cps_cvt_branches bl' vn k r next tgm;;
            let (vars, next) := gensym_n next (List.rev lnames) in
-           let (ctx_p, _) :=
-               ctx_bind_proj tg r l (List.hd (1%positive) vars) 0
-           in
+           let ctx_p := ctx_bind_proj tg r vars 0 in
            let vars_rev := List.rev vars in
-           re <- cps_cvt e (vars_rev ++ vn) k next tgm;;
+           re <- cps_cvt e (vars_rev ++ vn) k next tgm;; (* TODO check if rev is needed after refactoring *)
            let '(ce, next) := re : (exp * symgen) in
            ret ((tg, app_ctx_f ctx_p ce)::cbl, next)
          end.
@@ -550,8 +545,9 @@ Fixpoint add_names lnames vars tgm : conv_env :=
   Definition lt_lst_symgen (vars : list var) (next : symgen) : Prop :=
     Forall (fun v => lt_symgen v next) vars. 
 
-  (* scratch *)
-  (* how to ensure fresh variables? *)
+
+
+  
   Inductive cps_cvt_rel : Ensemble var -> (* Input fresh identifiers *)
                           expression.exp -> (* Input L4 exp *)
                           list var -> (* deBruijn index map *)
@@ -718,24 +714,23 @@ Fixpoint add_names lnames vars tgm : conv_env :=
       forall S vn k r tgm,
         cps_cvt_rel_branches S brnil_e vn k r tgm S []
   | e_Brcons:
-      forall S1 S2 S3 vn k r e ce bs' cbs' vars lnames n m ctx_p tg dc tgm,
+      forall S1 S2 S3 vn k r e ce bs' cbs' vars lnames proj_vars n ctx_p tg dc tgm,
         tg = dcon_to_tag dc tgm ->
-        cps_cvt_rel_branches S1 bs' vn k r tgm S2 cbs' ->
         FromList vars \subset S2 ->
+        FromList proj_vars \subset S2 \\ FromList vars ->
+
         NoDup vars ->
         Datatypes.length vars = Datatypes.length lnames ->
-        (ctx_p, m) =
-        ctx_bind_proj tg r (Datatypes.length vars) (hd 1%positive vars) 0 ->
-        cps_cvt_rel (S2 \\ (FromList vars)) e ((List.rev vars) ++ vn) k tgm S3 ce ->
+
+
+        ctx_bind_proj tg r proj_vars 0 = ctx_p ->
+
+        cps_cvt_rel_branches S1 bs' vn k r tgm S2 cbs' ->
+        
+        cps_cvt_rel (S2 \\ (FromList vars) \\ (FromList proj_vars)) e ((List.rev vars) ++ vn) k tgm S3 ce ->
+
         cps_cvt_rel_branches
-          S1
-          (brcons_e dc (n, lnames) e bs')
-          vn
-          k
-          r
-          tgm
-          S3
-          ((tg, app_ctx_f ctx_p ce)::cbs').
+          S1 (brcons_e dc (n, lnames) e bs') vn k r tgm S3 ((tg, app_ctx_f ctx_p ce)::cbs').
 
 
   Definition convert_top (ee:ienv * expression.exp) :
@@ -756,7 +751,7 @@ Fixpoint add_names lnames vars tgm : conv_env :=
                      (Fcons k kon_tag (x::nil) (Ehalt x) Fnil))
               (cps.Eapp f kon_tag (k::nil))))
     end.
-
+  
   Fixpoint rho_names (rho : exp_eval.env) : list name :=
     match rho with
     | nil => nil

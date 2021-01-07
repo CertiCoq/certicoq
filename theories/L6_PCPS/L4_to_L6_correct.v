@@ -1903,9 +1903,12 @@ Section Post.
 
       - (* App_e *)
         
-        intros e1 IHe1 e2 IHe2 y rho vs vnames k x vk e' v' S S' Heval Hcenv Hdis Hcps Hval. 
-        inv Heval. inv Hcps. inv Hval.
+        intros e1 IHe1 e2 IHe2 v rho vs vnames k x vk e' v' S S' Heval Hcenv Hdis Hcps Hval.
+        inv Heval.
 
+        + (* Lam *)
+          inv Hcps. inv Hval.
+    Abort. 
 (*
 
   equiv_exp cenv fuel Hfuel trace Htrace P1 PG

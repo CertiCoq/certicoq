@@ -1434,35 +1434,28 @@ Section Post.
                   rewrite !app_length. congruence. } 
           
       - (* brnil_e *)
-        admit.
-        
+        intros bs1 bs2 k1 k2 vars1 vars2 x1 x2 rho1 rho2
+               S1 S2 S3 S4 He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv Hvar.
+        inv He1; inv He2.
+        eapply preord_exp_case_nil_compat.
+        eapply Hprops.
+
+
       - (* brcons_e *)
-        admit.
-        (* intros dc p e IHe bs IHbs bs1 bs2 k1 k2 r1 r2 vars1 vars2 x1 x2 *)
-        (*        rho1 rho2 next1 next2 next3 next4 *)
-        (*        Hbs1 Hbs2 Hdup Hnot Hlen Hlt Henv Hvar. *)
-        (* simpl in Hbs1, Hbs2. *)
-        (* destruct p. *)
-        (* destruct (cps_cvt_branches bs vars1 k1 r1 next1 cnstrs) eqn:Hcvt_bs1. *)
-        (* 2: { inv Hbs1. } destruct p. destruct (gensym_n s (rev l)) eqn:Hgen_l. *)
-        (* destruct (ctx_bind_proj (dcon_to_tag dc cnstrs) r1 (Datatypes.length l) *)
-        (*                         (hd 1%positive l1) 0) eqn:Hctx1. *)
-        (* destruct (cps_cvt e (rev l1 ++ vars1) k1 s0 cnstrs) eqn:Hcvt_e1. *)
-        (* 2: { inv Hbs1. } destruct p. inv Hbs1. *)
-        (* destruct (cps_cvt_branches bs vars2 k2 r2 next3 cnstrs) eqn:Hcvt_bs2. *)
-        (* 2: { inv Hbs2. } destruct p. destruct (gensym_n s1 (rev l)) eqn:Hgen_l2. *)
-        (* destruct (ctx_bind_proj (dcon_to_tag dc cnstrs) r2 (Datatypes.length l) *)
-        (*                         (hd 1%positive l3) 0) eqn:Hctx2. *)
-        (* destruct (cps_cvt e (rev l3 ++ vars2) k2 s2 cnstrs) eqn:Hcvt_e2. *)
-        (* 2: { inv Hbs2. } destruct p. inv Hbs2. *)
-        (* eapply preord_exp_case_cons_compat. *)
-        (* + admit. *)
-        (* + admit. *)
-        (* + admit. *)
-        (* + admit. *)
-        (* + eassumption. *)
-        (* + admit. *)
-        (* + eapply IHbs; eassumption. *)
+        intros d p e IHe bs IHbs bs1 bs2 k1 k2 vars1 vars2 x1 x2 rho1 rho2
+               S1 S2 S3 S4 He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv Hvar.
+        inv He1; inv He2.
+        eapply preord_exp_case_cons_compat.
+        + eapply Hprops.
+        + eapply Hprops.
+        + eapply Hprops.
+        + admit. (* easy lemma *)
+        + eassumption.
+        + intros. 
+          eapply preord_exp_monotonic.
+          * admit. (* bind proj lemma *)
+          * admit.
+        + eapply IHbs; try eassumption.
     Admitted.
     
     Lemma cps_cvt_val_alpha_equiv :

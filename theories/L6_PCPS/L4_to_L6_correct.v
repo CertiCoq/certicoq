@@ -213,31 +213,34 @@ Section Post.
         preord_exp cenv P1 PG k (es1, rho1) (es2, rho2). 
 
     Definition cps_cvt_efnlst_alpha_equiv k :=
-      forall efns fdefs1 fdefs2 k1 k2 vars1 vars2 nlst1 nlst2 rho1 rho2
-             S1 S2 S3 S4 f1 f2 n,
+      forall efns fdefs1 fdefs2 k1 k2 vars1 vars2 vars1' vars2' nlst1 nlst2 rho1 rho2
+             S1 S2 S3 S4,
         cps_cvt_rel_efnlst S1 efns vars1 nlst1 cnstrs S2 fdefs1 ->
         cps_cvt_rel_efnlst S3 efns vars2 nlst2 cnstrs S4 fdefs2 ->
 
+        vars1 = nlst1 ++ vars1' ->
+        vars2 = nlst2 ++ vars2' ->
+        
         NoDup vars1 ->
         NoDup (all_fun_name fdefs1) ->
         NoDup (all_fun_name fdefs2) ->
 
-        ~(k1 \in (FromList vars1)) ->
-        List.length vars1 = List.length vars2 ->
+        List.length vars1' = List.length vars2' ->
+        List.length (all_fun_name fdefs1) = List.length (all_fun_name fdefs2) ->
 
         Disjoint _ (k1 |: FromList vars1) S1 ->
         Disjoint _ (k2 |: FromList vars2) S3 ->
-        
-        (* Disjoint _ (FromList vars1) (name_in_fundefs fdefs1) -> *)
-        (* Disjoint _ (FromList vars2) (name_in_fundefs fdefs2) -> *)
 
-        
-        nth_error (all_fun_name fdefs1) n = Some f1 ->
-        nth_error (all_fun_name fdefs2) n = Some f2 ->
-        
-        preord_env_P_inj cenv PG (k1 |: (FromList vars1) \\ name_in_fundefs fdefs1) k
-                         (id {k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
-        preord_val cenv PG k (Vfun rho1 fdefs1 f1) (Vfun rho2 fdefs2 f2).
+        Disjoint var (k2 |: FromList vars2') (name_in_fundefs fdefs2) -> 
+                
+        preord_env_P_inj cenv PG (k1 |: FromList vars1') k
+                         (id {k1 ~> k2 } <{ vars1' ~> vars2' }>) rho1 rho2 ->
+        preord_env_P_inj cenv PG (k1 |: (FromList vars1 :|: FromList nlst1)) k
+                         (id {k1 ~> k2 } <{ vars1' ~> vars2' }> <{ all_fun_name fdefs1 ~> all_fun_name fdefs2 }>)
+                         (def_funs fdefs1 fdefs1 rho1 rho1)
+                         (def_funs fdefs2 fdefs2 rho2 rho2).
+
+        (* preord_val cenv PG k (Vfun rho1 fdefs1 f1) (Vfun rho2 fdefs2 f2). *)
 
     
     Definition cps_cvt_branches_alpha_equiv (k : nat) :=
@@ -379,82 +382,6 @@ Section Post.
     Qed. 
       
     
-    (* Lemma exp_ind_alt_exp : forall (P : expression.exp -> Prop) (P0 : exps -> Prop) (P1 : efnlst -> Prop) (P2 : branches_e -> Prop), *)
-    (*     (forall n : N, P (Var_e n)) -> *)
-    (*     (forall (n : name) (e : expression.exp), P e -> P (Lam_e n e)) -> *)
-    (*     (forall e : expression.exp, P e -> forall e0 : expression.exp, P e0 -> P (e $ e0)) -> *)
-    (*     (forall (d : dcon) (e : exps), P0 e -> P (Con_e d e)) -> *)
-    (*     (forall e : expression.exp, P e -> forall (pars : N) (b : branches_e), P2 b -> P (Match_e e pars b)) -> *)
-    (*     (forall (n : name) (e : expression.exp), P e -> forall e0 : expression.exp, P e0 -> P (Let_e n e e0)) -> *)
-    (*     (forall e : efnlst, P1 e -> forall n : N, P (Fix_e e n)) -> *)
-    (*     P Prf_e -> *)
-    (*     (forall p : positive, P (Prim_e p)) -> *)
-    (*     P0 enil -> *)
-    (*     (forall e : expression.exp, P e -> forall e0 : exps, P0 e0 -> P0 (econs e e0)) -> *)
-    (*     P1 eflnil -> *)
-    (*     (forall (n : name) (e : expression.exp) (efns : efnlst), in_efnlist n e efns -> P e -> P1 efns) -> *)
-    (*     P2 brnil_e -> *)
-    (*     (forall (d : dcon) (p : N * list name) (e : expression.exp), *)
-    (*         P e -> forall b : branches_e, P2 b -> P2 (brcons_e d p e b)) -> *)
-    (*     (forall e : expression.exp, P e) *)
-    (* with exp_ind_alt_exps : forall (P : expression.exp -> Prop) (P0 : exps -> Prop) (P1 : efnlst -> Prop) (P2 : branches_e -> Prop), *)
-    (*     (forall n : N, P (Var_e n)) -> *)
-    (*     (forall (n : name) (e : expression.exp), P e -> P (Lam_e n e)) -> *)
-    (*     (forall e : expression.exp, P e -> forall e0 : expression.exp, P e0 -> P (e $ e0)) -> *)
-    (*     (forall (d : dcon) (e : exps), P0 e -> P (Con_e d e)) -> *)
-    (*     (forall e : expression.exp, P e -> forall (pars : N) (b : branches_e), P2 b -> P (Match_e e pars b)) -> *)
-    (*     (forall (n : name) (e : expression.exp), P e -> forall e0 : expression.exp, P e0 -> P (Let_e n e e0)) -> *)
-    (*     (forall e : efnlst, P1 e -> forall n : N, P (Fix_e e n)) -> *)
-    (*     P Prf_e -> *)
-    (*     (forall p : positive, P (Prim_e p)) -> *)
-    (*     P0 enil -> *)
-    (*     (forall e : expression.exp, P e -> forall e0 : exps, P0 e0 -> P0 (econs e e0)) -> *)
-    (*     P1 eflnil -> *)
-    (*     (forall (n : name) (e : expression.exp) (efns : efnlst), in_efnlist n e efns -> P e -> P1 efns) -> *)
-    (*     P2 brnil_e -> *)
-    (*     (forall (d : dcon) (p : N * list name) (e : expression.exp), *)
-    (*         P e -> forall b : branches_e, P2 b -> P2 (brcons_e d p e b)) -> *)
-    (*     (forall e : exps, P0 e) *)
-    (* with exp_ind_alt_efnlst : forall (P : expression.exp -> Prop) (P0 : exps -> Prop) (P1 : efnlst -> Prop) (P2 : branches_e -> Prop), *)
-    (*     (forall n : N, P (Var_e n)) -> *)
-    (*     (forall (n : name) (e : expression.exp), P e -> P (Lam_e n e)) -> *)
-    (*     (forall e : expression.exp, P e -> forall e0 : expression.exp, P e0 -> P (e $ e0)) -> *)
-    (*     (forall (d : dcon) (e : exps), P0 e -> P (Con_e d e)) -> *)
-    (*     (forall e : expression.exp, P e -> forall (pars : N) (b : branches_e), P2 b -> P (Match_e e pars b)) -> *)
-    (*     (forall (n : name) (e : expression.exp), P e -> forall e0 : expression.exp, P e0 -> P (Let_e n e e0)) -> *)
-    (*     (forall e : efnlst, P1 e -> forall n : N, P (Fix_e e n)) -> *)
-    (*     P Prf_e -> *)
-    (*     (forall p : positive, P (Prim_e p)) -> *)
-    (*     P0 enil -> *)
-    (*     (forall e : expression.exp, P e -> forall e0 : exps, P0 e0 -> P0 (econs e e0)) -> *)
-    (*     P1 eflnil -> *)
-    (*     (forall (n : name) (e : expression.exp) (efns : efnlst), in_efnlist n e efns -> P e -> P1 efns) -> *)
-    (*     P2 brnil_e -> *)
-    (*     (forall (d : dcon) (p : N * list name) (e : expression.exp), *)
-    (*         P e -> forall b : branches_e, P2 b -> P2 (brcons_e d p e b)) -> *)
-    (*     (forall e : efnlst, P1 e) *)
-    (* with exp_ind_alt_branches : forall (P : expression.exp -> Prop) (P0 : exps -> Prop) (P1 : efnlst -> Prop) (P2 : branches_e -> Prop), *)
-    (*               (forall n : N, P (Var_e n)) -> *)
-    (*     (forall (n : name) (e : expression.exp), P e -> P (Lam_e n e)) -> *)
-    (*     (forall e : expression.exp, P e -> forall e0 : expression.exp, P e0 -> P (e $ e0)) -> *)
-    (*     (forall (d : dcon) (e : exps), P0 e -> P (Con_e d e)) -> *)
-    (*     (forall e : expression.exp, P e -> forall (pars : N) (b : branches_e), P2 b -> P (Match_e e pars b)) -> *)
-    (*     (forall (n : name) (e : expression.exp), P e -> forall e0 : expression.exp, P e0 -> P (Let_e n e e0)) -> *)
-    (*     (forall e : efnlst, P1 e -> forall n : N, P (Fix_e e n)) -> *)
-    (*     P Prf_e -> *)
-    (*     (forall p : positive, P (Prim_e p)) -> *)
-    (*     P0 enil -> *)
-    (*     (forall e : expression.exp, P e -> forall e0 : exps, P0 e0 -> P0 (econs e e0)) -> *)
-    (*     P1 eflnil -> *)
-    (*     (forall (n : name) (e : expression.exp) (efns : efnlst), in_efnlist n e efns -> P e -> P1 efns) -> *)
-    (*     P2 brnil_e -> *)
-    (*     (forall (d : dcon) (p : N * list name) (e : expression.exp), *)
-    (*         P e -> forall b : branches_e, P2 b -> P2 (brcons_e d p e b)) -> *)
-    (*     (forall b : branches_e, P2 b). *)
-    (* Proof. *)
-
-    (* TODO move *)
-
     Lemma FromList_rev {A} (l : list A) :
       FromList (rev l) <--> FromList l.
     Proof.
@@ -1125,9 +1052,9 @@ Section Post.
           
           
       - (* Fix_e *)
-        intros na e IH e1 e2 k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
+        intros e IH na e1 e2 k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
                He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
-        inv He1; inv He2.  
+        simpl in He1, He2. inv He1; inv He2.  
         eapply preord_exp_fun_compat.
         + eapply Hprops. (* invariants *)
         + eapply Hprops. (* invariants *)
@@ -1154,61 +1081,16 @@ Section Post.
             - set (Heq1 := cps_cvt_rel_efnlst_all_fun_name _ _ _ _ _ _ H6).
               set (Heq2 := cps_cvt_rel_efnlst_all_fun_name _ _ _ _ _ _ H10). 
               constructor; eauto.
-              
-              eapply preord_env_P_inj_def_funs with (S := k1 |: FromList vars1 :|: name_in_fundefs fdefs).
+
+              eapply preord_env_P_inj_def_funs.
               rewrite Heq1. eassumption.
               rewrite Heq2. eassumption.
               congruence.
               rewrite Heq1. eassumption.
               rewrite Heq2. eassumption.
-              now sets.
 
-              eapply preord_env_P_inj_def_funs_Vfun.
-                  
-              + eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic;  [ |  eassumption ]. lia.
-                sets.
-
-              + congruence.
-              + rewrite Heq1. eassumption.
-
-              + rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set.
-                repeat normalize_sets.
-                eapply Disjoint_Included_l.
-                eapply image_extend_lst_Included. eassumption.
-                eapply Union_Disjoint_l.
-                
-                eapply Disjoint_Included_l.
-                eapply image_extend_Included'.
-                eapply Union_Disjoint_l.
-                rewrite image_id.
-                assert (Heq : (k1 |: FromList vars1 \\ name_in_fundefs fdefs \\ FromList vars1 \\ [set k1]) <--> Empty_set _). now xsets.
-                rewrite Heq. now sets.
-
-                rewrite Same_set_all_fun_name. rewrite Heq2.
-                eapply Disjoint_Singleton_l. intros Hc. now eapply Hdis2; sets.
-
-                rewrite Same_set_all_fun_name. rewrite Heq2.
-                eapply Disjoint_Included; [ | | eapply Hdis2 ]. eassumption. now sets.
-                
-              + { intros. eapply preord_val_monotonic. eapply e; try eassumption.
-                  8:{ rewrite extend_lst_app.
-                       2:{ replace (@Datatypes.length positive) with (@Datatypes.length var) by reflexivity.
-                           congruence. }
-                       
-                       repeat normalize_sets.
-                       
-                       rewrite !Setminus_Union_distr. rewrite <- Heq1, <- Same_set_all_fun_name at 1.
-                       rewrite Setminus_Same_set_Empty_set. repeat normalize_sets.
-                       
-                       eapply preord_env_P_inj_f_eq_subdomain.
-                       
-                       eapply preord_env_P_inj_antimon. eassumption.
-                       eapply Included_Union_compat. now eapply Setminus_Included. now sets.
-                                                                     
-                       rewrite f_eq_subdomain_extend_lst_Disjoint with (xs := nlst).
-                       reflexivity.
-
-                       rewrite <- Heq1. rewrite <- Same_set_all_fun_name. now sets. }
+              2:{ eapply preord_env_P_inj_monotonic with (k0 := k). lia.
+                  eapply IH; try eassumption. reflexivity. reflexivity. 
                   
                   - eapply NoDup_app; eauto.
                     eapply Disjoint_sym. eapply Disjoint_Included; [ | | eapply Hdis1 ]; now sets.
@@ -1216,23 +1098,17 @@ Section Post.
                   - rewrite Heq1. eassumption.
                   - rewrite Heq2. eassumption.
 
-                  - normalize_sets.
-                    intros Hc. destruct Hc.
-                    eapply Hdis1. now constructor; eauto.
-                    now eauto.
-
-                  - rewrite !app_length. congruence.
+                  - congruence.
                     
                   - normalize_sets. now xsets.
-
+                    
                   - normalize_sets. now xsets.
-
-                  (* - normalize_sets. admit. (* wrong *) *)
-
-                  (* - normalize_sets. admit. (* wrong *) *)
-
-                  - omega. } }
-
+                    
+                  - rewrite Same_set_all_fun_name. rewrite Heq2. now xsets. } 
+                    
+              + normalize_sets.
+                rewrite cps_cvt_rel_efnlst_name_in_fundes; eauto. now sets. }
+          
       - (* Prf_e *)
         intros e1 e2 k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
                He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
@@ -1417,94 +1293,145 @@ Section Post.
             - lia. } 
           
       - (* eflnil *)
-        intros B1 B2 k1 k2 vars1 vars2 nl1 nl2 rho1 rho2 S1 S2 S3 S4
-               f1 f2 n He1 He2 Hnd Hnd1 Hnd2 Hnin1 Hlen Hdis1 Hdis2 (* Hdis3 Hdis4 *)  Hnth1 Hnth2 Henv.
+        intros B1 B2 k1 k2 vars1 vars2 vars1' vars2' nl1 nl2 rho1 rho2 S1 S2 S3 S4
+               He1 He2 Heq1 Heq2 Hnd Hnd1 Hnd2 Hlen1 Hlen2 Hdis1 Hdis2 Hdis3 Henv.
         inv He1. inv He2. simpl. repeat normalize_sets.
-        rewrite preord_val_eq. intro; intros. inv H1. 
+        simpl in *. repeat normalize_sets. eassumption. 
         
       - (* eflcons *)
-        intros n e efns Hin IHe B1 B2 k1 k2 vars1 vars2 nl1 nl2 rho1 rho2 S1 S2 S3 S4
-               f1 f2 m He1 He2 Hnd Hnd1 Hnd2 Hnin1 Hlen Hdis1 Hdis2 (* Hdis3 Hdis4 *) Hnth1 Hnth2 Henv.
+        intros n e efns Hin IHe B1 B2 k1 k2 vars1 vars2 vars1' vars2' nl1 nl2 rho1 rho2 S1 S2 S3 S4
+               He1 He2 Heql1 Heql2 Hnd Hnd1 Hnd2 Hlen1 Hlen2 Hdis1 Hdis2 Hdis3 Henv.
 
-        edestruct cps_cvt_rel_efnlst_exists with (S1 := S1); try eassumption.  destructAll.
-        edestruct cps_cvt_rel_efnlst_exists with (S1 := S3); try eassumption.  destructAll.
-        
-        eapply preord_val_fun.          
-        + eassumption.
-        + eassumption.
-        + intros rho1' j vs1 vs2 Hlen' Hset.
-          destruct vs1 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
-          destruct vs2 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
-          inv Hset. eexists. split. reflexivity.              
-          intros Hlt Hall. inv Hall. inv H17.
+        induction k using lt_wf_rec.
+ 
+        assert (Heq1 : all_fun_name B1 = nl1). { eapply cps_cvt_rel_efnlst_all_fun_name; eauto. }
+
+        assert (Heq2 : all_fun_name B2 = nl2). { eapply cps_cvt_rel_efnlst_all_fun_name; eauto. }
+
+        eapply preord_env_P_inj_def_funs_Vfun. 
+
+        + rewrite Same_set_all_fun_name. rewrite Heq1.
+          eapply preord_env_P_inj_antimon. eassumption.
+          rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set.
+          subst. repeat normalize_sets. xsets.
           
-          { edestruct (H j) as [ Hexp _ _ _   ]. lia. repeat subst_exp. 
-            eapply preord_exp_post_monotonic. eapply HinclG.
-            eapply Hexp.
-            + eassumption.
-            + eassumption.
-            + constructor; [ | eassumption ]. intros Hc. eapply Hdis1. now sets.
-            + repeat normalize_sets. inv H3. intros Hc. inv Hc.
-              * inv H3. eauto.
-              * eapply Hdis1. now sets.
-            + simpl. congruence.
-            + repeat normalize_sets.
-              eapply Union_Disjoint_l; sets.
-              eapply Union_Disjoint_l; sets.
-              eapply Disjoint_Included; [ | | eapply Hdis1 ]; sets.
-            + repeat normalize_sets.
-              eapply Union_Disjoint_l; sets.
-              eapply Union_Disjoint_l; sets.
-              eapply Disjoint_Included; [ | | eapply Hdis2 ]; sets.
-            + repeat normalize_sets. simpl.
-              assert (Hfeq : f_eq (((id {x ~> x6}) <{ vars1 ~> vars2 }>) {x0 ~> x7})
-                                  (((id <{ vars1 ~> vars2 }>) {x0 ~> x7}) {x ~> x6})).
-              { rewrite extend_extend_lst_commut; eauto.
-                rewrite extend_commut; eauto. reflexivity. 
-                - inv H3. intros Hc. subst. eauto.
-                - inv H9. intros Hc. subst. eauto.
-                - inv H3. intros Hc. eapply Hdis1. sets.
-                - inv H9. intros Hc. eapply Hdis2. sets. }
+        + eassumption.
+
+        + eassumption.
+
+        + subst. rewrite Same_set_all_fun_name.
+          eapply Disjoint_Included_l.
+          eapply image_extend_lst_Included. eassumption.
+          eapply Union_Disjoint_l.
+          
+          eapply Disjoint_Included_l.
+          eapply image_extend_Included'.
+          eapply Union_Disjoint_l.
+          rewrite image_id.
+          assert (Heq : k1 |: (FromList (all_fun_name B1 ++ vars1') :|: FromList (all_fun_name B1)) \\
+                           FromList (all_fun_name B1) \\ FromList vars1' \\ [set k1] <--> Empty_set _).
+          { repeat normalize_sets. now xsets. }
+          
+          rewrite Heq. now sets.
+          
+          rewrite Same_set_all_fun_name. repeat normalize_sets.
+
+          rewrite <- Same_set_all_fun_name. now xsets. 
+          now sets.
+                    
+        + { intros. 
+            edestruct cps_cvt_rel_efnlst_exists with (S1 := S1); try eassumption. destructAll.
+            edestruct cps_cvt_rel_efnlst_exists with (S1 := S3); try eassumption. destructAll.
+            
+            eapply preord_val_fun.          
+            - eassumption.
+            - eassumption.
+            - intros rho1' j vs1 vs2 Hlen' Hset.
+              destruct vs1 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+              destruct vs2 as [ | ? [ | ? [ | ]] ]; simpl in *; try congruence.
+              inversion Hset. eexists. split. reflexivity.              
+              intros Hlt Hall. inv Hall. inv H21. clear H22.
               
-              rewrite Hfeq.
-              
-              eapply preord_env_P_inj_set_alt; eauto.
-              eapply preord_env_P_inj_set_alt; eauto.
-              eapply preord_env_P_inj_def_funs_neq_l.
-              eapply preord_env_P_inj_def_funs_neq_r.
+              edestruct (H j) as [ Hexp _ _ _   ]. lia. repeat subst_exp. 
+              eapply preord_exp_post_monotonic. eapply HinclG.
+              eapply Hexp.
+              + eassumption.
+              + eassumption.
+              + constructor; [ | eassumption ]. repeat normalize_sets.
+                intros Hc. eapply Hdis1.
+                eapply in_app_or in Hc. inv Hc; eauto. 
+              + repeat normalize_sets. inv H6. intros Hc. inv Hc.
+                * inv H6. eauto.
+                * eapply Hdis1. now sets.
+              + simpl. rewrite !app_length. congruence.
+              + repeat normalize_sets.
+                eapply Union_Disjoint_l; sets.
+                eapply Union_Disjoint_l; sets.
+                eapply Disjoint_Included; [ | | eapply Hdis1 ]; sets.
+              + repeat normalize_sets.
+                eapply Union_Disjoint_l; sets.
+                eapply Union_Disjoint_l; sets.
+                eapply Disjoint_Included; [ | | eapply Hdis2 ]; sets.
+              + repeat normalize_sets. simpl.
+                assert (Hfeq : f_eq (((id {x ~> x6}) <{ all_fun_name B1 ++ vars1' ~> all_fun_name B2 ++ vars2' }>) {x0 ~> x7})
+                                    (((id <{ all_fun_name B1 ++ vars1' ~> all_fun_name B2 ++ vars2' }>) {x0 ~> x7}) {x ~> x6})).
+                { rewrite extend_extend_lst_commut; eauto.
+                  rewrite extend_commut; eauto. reflexivity. 
+                  - inv H6. intros Hc. subst. eauto.
+                  - inv H12. intros Hc. subst. eauto.
+                  - inv H6. intros Hc. eapply Hdis1.
+                    eapply in_app_or in Hc. inv Hc; eauto.
+                  - inv H12. intros Hc. eapply Hdis2.
+                    eapply in_app_or in Hc. inv Hc; eauto.
+                  - rewrite !app_length. congruence. }
+                
+                rewrite Hfeq. 
+                
+                eapply preord_env_P_inj_set_alt; eauto.
+                eapply preord_env_P_inj_set_alt; eauto.
 
-              eapply preord_env_P_inj_f_eq_subdomain.
-              
-              eapply preord_env_P_inj_antimon.
-              eapply preord_env_P_inj_monotonic.
-              2: { eassumption. } omega.
-              now xsets.
+                * eapply preord_env_P_inj_f_eq_subdomain.
+                  eapply preord_env_P_inj_antimon.
+                  { eapply H0.
+                    - lia.
+                    - intros. eapply H. lia.
+                    - eauto.
+                    - eapply preord_env_P_inj_antimon.
+                      eapply preord_env_P_inj_monotonic. 2:{ eassumption. } lia.
+                      repeat normalize_sets. sets. }
+                  
+                  repeat normalize_sets. now xsets.
 
-              * eapply f_eq_subdomain_extend_lst. eassumption.
-                
-                eapply f_eq_subdomain_extend_not_In_S_l; [ | reflexivity ].
-                
-                intros Hc. inv Hc. inv H6. inv H13. inv H6; eauto. inv H13; eauto.
+                  rewrite extend_lst_app.
 
-              * eapply Disjoint_Included_l. 
-                eapply image_extend_lst_Included. eassumption. rewrite image_id.
-                xsets. 
-              * xsets.
-              * intros Hc. eapply image_extend_lst_Included in Hc; eauto.
-                rewrite image_id in Hc. inv Hc; eauto. inv H6; eauto. inv H12; eauto. 
-                inv H6; eauto. inv H12; eauto. now inv H6; eauto. 
-                eapply Hdis2. now sets.
-                
-              * intros Hc. eapply image_extend_Included' in Hc.
-                inv H9. inv Hc; eauto.
-                
-                eapply image_extend_lst_Included in H9; eauto.
-                rewrite image_id in H9.
-                
-                assert (Heq : x |: (x0 |: FromList vars1) \\ [set x] \\ [set x0] \\ FromList vars1 <--> Empty_set _) by xsets.
+                  eapply f_eq_subdomain_extend_lst. eassumption.
+                  eapply f_eq_subdomain_extend_lst. eassumption.
+                  
+                  
+                  assert (Hfeq' : (x |: (x0 |: (FromList (all_fun_name B1) :|: FromList vars1')) \\ [set x] \\ [set x0] \\
+                                     FromList (all_fun_name B1) \\ FromList vars1') <--> Empty_set _) by xsets.
+                  rewrite Hfeq'. intros z Hinz. now inv Hinz. eassumption. 
+                  
+                * intros Hc. eapply image_extend_lst_Included in Hc; eauto.
+                  rewrite image_id in Hc. inv Hc; eauto. inv H9; eauto. inv H15; eauto. 
+                  inv H9; eauto. inv H15; eauto. repeat normalize_sets. now inv H9; eauto.
 
-                rewrite Heq in H9. repeat normalize_sets.
-                now eapply Hdis2; eauto. }
+                  repeat normalize_sets. eapply Hdis2. now sets.
+                  rewrite !app_length. congruence.                  
+                  
+                * intros Hc. eapply image_extend_Included' in Hc.
+                  inv H12. inv Hc; eauto.
+                  
+                  eapply image_extend_lst_Included in H12; eauto.
+                  rewrite image_id in H12.
+
+                  repeat normalize_sets.
+                  assert (Heq :x |: (x0 |: (FromList (all_fun_name B1) :|: FromList vars1')) \\ [set x] \\ [set x0] \\
+                                 (FromList (all_fun_name B1) :|: FromList vars1') <--> Empty_set _) by xsets.
+                  
+                  rewrite Heq in H12. repeat normalize_sets.
+                  now eapply Hdis2; eauto.
+                  rewrite !app_length. congruence. } 
           
       - (* brnil_e *)
         admit.
@@ -1537,7 +1464,7 @@ Section Post.
         (* + admit. *)
         (* + eapply IHbs; eassumption. *)
     Admitted.
-
+    
     Lemma cps_cvt_val_alpha_equiv :
       forall k, cps_cvt_val_alpha_equiv_statement k.
     Proof.

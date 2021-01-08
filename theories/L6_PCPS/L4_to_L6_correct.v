@@ -1709,7 +1709,9 @@ Section Post.
                   replace (@Datatypes.length positive) with (@Datatypes.length var); eauto. congruence.
 
           * lia.
-        + eapply IHbs; try eassumption. 
+        + eapply IHbs; try eassumption.
+
+          Grab Existential Variables. eassumption.
     Qed.
     
     Lemma cps_cvt_val_alpha_equiv :

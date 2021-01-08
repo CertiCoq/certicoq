@@ -159,12 +159,13 @@ Fixpoint add_names lnames vars tgm : conv_env :=
 
   (* Bind m projections (starting from the (p+1)th) of var r to
    variables [n, n+m[, returns the generated context and n+m *)
-  Fixpoint ctx_bind_proj (tg:ctor_tag) (r:positive) (vars : list var) (p:nat) : exp_ctx :=
+  Fixpoint ctx_bind_proj (tg:ctor_tag) (r:positive) (vars : list var) (args:nat) (* initially the length of args list *)
+    : exp_ctx :=
     match vars with
     | [] => Hole_c
     | v :: vars =>
-      let ctx_p':= ctx_bind_proj tg r vars (p + 1) in
-      (Eproj_c v tg (N.of_nat p) r ctx_p')
+      let ctx_p':= ctx_bind_proj tg r vars (args - 1) in
+      (Eproj_c v tg (N.of_nat (args - 1)) r ctx_p')
     end.
 
   (* returns length of given expression.efnlst *)
@@ -479,12 +480,14 @@ Fixpoint add_names lnames vars tgm : conv_env :=
          match bl with
          | brnil_e => ret (nil, next)
          | brcons_e dc (i, lnames) e bl' =>
+           (* Zoe: Did some refactoring to remove list rev and make the proof easier. Double check it's still OK.
+              Now the first variable in vars binds the last constructor argument.
+            *)
            let tg := dcon_to_tag dc tgm in
            '(cbl, next) <- cps_cvt_branches bl' vn k r next tgm;;
-           let (vars, next) := gensym_n next (List.rev lnames) in
-           let ctx_p := ctx_bind_proj tg r vars 0 in
-           let vars_rev := List.rev vars in
-           re <- cps_cvt e (vars_rev ++ vn) k next tgm;; (* TODO check if rev is needed after refactoring *)
+           let (vars, next) := gensym_n next lnames in
+           let ctx_p := ctx_bind_proj tg r vars (List.length vars) in
+           re <- cps_cvt e (vars ++ vn) k next tgm;; 
            let '(ce, next) := re : (exp * symgen) in
            ret ((tg, app_ctx_f ctx_p ce)::cbl, next)
          end.
@@ -602,6 +605,7 @@ Fixpoint add_names lnames vars tgm : conv_env :=
         k1 \in (S1 \\ [set x1]) ->
         FromList vx \subset (S1 \\ (k1 |: [set x1])) ->
         Datatypes.length vx = N.to_nat (exps_length es) ->
+        NoDup vx ->        
         cps_cvt_rel_exps (S1 \\ (k1 |: [set x1] :|: FromList vx))
                          es vn k1 [] tgm S2 e' ->
         cps_cvt_rel S1
@@ -726,7 +730,7 @@ Fixpoint add_names lnames vars tgm : conv_env :=
 
         cps_cvt_rel_branches S1 bs' vn k r tgm S2 cbs' ->
         
-        cps_cvt_rel (S2 \\ (FromList vars)) e ((List.rev vars) ++ vn) k tgm S3 ce ->
+        cps_cvt_rel (S2 \\ (FromList vars)) e (vars ++ vn) k tgm S3 ce ->
 
         cps_cvt_rel_branches
           S1 (brcons_e dc (n, lnames) e bs') vn k r tgm S3 ((tg, app_ctx_f ctx_p ce)::cbs').

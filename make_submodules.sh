@@ -12,33 +12,18 @@ clean() {
 
 cd submodules
 
-cd paramcoq
-echo "Rebuilding paramcoq"
-clean
-make
-make install
-cd ..
-
 cd coq-ext-lib
 echo "Rebuilding coq-ext-lib"
 clean
-coq_makefile -f _CoqProject -o Makefile
-make all
-make install
-cd ..
-
-cd SquiggleEq
-echo "Rebuilding SquiggleEq"
-clean
-make all
+make -j 2
 make install
 cd ..
 
 cd Equations
 echo "Rebuilding Equations"
 clean
-coq_makefile -f _CoqProject -o Makefile
-make all
+./configure.sh
+make
 make install
 cd ..
 
@@ -46,6 +31,5 @@ cd metacoq
 echo "Rebuilding MetaCoq"
 clean
 ./configure.sh local
-make translations
-make all
+make -j 2 translations all
 make install

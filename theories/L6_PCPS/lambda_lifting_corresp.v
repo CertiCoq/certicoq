@@ -9,8 +9,8 @@ From CertiCoq.Common Require Import compM.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad ExtLib.Data.Monads.OptionMonad.
 Require Import compcert.lib.Coqlib.
 Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega.
+From Coq Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+     NArith.BinNat PArith.BinPos Sets.Ensembles micromega.Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
 Import ListNotations MonadNotation.
@@ -906,23 +906,24 @@ Section Lambda_lifting_corresp.
                          end) (fundefs_true_fv lift_dec FNmap f2))).
 
       set (args := (if
-                       max_args - fundefs_max_params f2 <?
-                       Datatypes.length
-                         (if
-                             existsb (fun x : var => max_push <? stack_push_fundefs x f2)
-                                     (PS.elements fvs)
-                           then []
-                           else PS.elements fvs)
+                       (max_args - fundefs_max_params f2 <?
+                        Datatypes.length
+                          (if
+                              existsb (fun x : var => max_push <? stack_push_fundefs x f2)
+                                      (PS.elements fvs)
+                            then []
+                            else PS.elements fvs))%nat
                      then []
                      else
                        if
-                         existsb (fun x : var => max_push <? stack_push_fundefs x f2) (PS.elements fvs)
+                         existsb (fun x : var => (max_push <? stack_push_fundefs x f2)%nat)
+                                 (PS.elements fvs)
                        then []
                        else PS.elements fvs)).
-
+      
       assert (Hsub : FromList args \subset FromList (PS.elements (fundefs_true_fv lift_dec FNmap f2))).
       { unfold args.
-        destruct (_ <? _). normalize_sets. now sets.
+        destruct (_ <? _)%nat. normalize_sets. now sets.
         destruct (existsb _). normalize_sets. now sets.
         unfold fvs. rewrite <- !FromSet_elements.
         intros s Hin. eapply FromSet_sound in Hin; [| reflexivity ].
@@ -930,7 +931,7 @@ Section Lambda_lifting_corresp.
         clear. intro; intros. subst. reflexivity. }
       assert (Hndargs : NoDup args).
       { unfold args.
-        destruct (_ <? _). now constructor.
+        destruct (_ <? _)%nat. now constructor.
         destruct (existsb _). now constructor.
         unfold fvs.
         eapply NoDupA_NoDup. eapply PS.elements_spec2w. }
@@ -1355,7 +1356,6 @@ Section Lambda_lifting_corresp.
       Grab Existential Variables.
       eassumption. eassumption. eassumption. 
   Qed.
-
 
   
 End Lambda_lifting_corresp.

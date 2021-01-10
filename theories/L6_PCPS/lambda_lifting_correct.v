@@ -7,7 +7,7 @@ Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.tactics
         L6.logical_relations L6.alpha_conv L6.algebra L6.state L6.lambda_lifting_corresp .
 Require Import compcert.lib.Coqlib.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Omega Lia.
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat MonadNotation.
 Require Import Common.compM. 
@@ -256,7 +256,7 @@ Section Lambda_lifting_correct.
     edestruct Hinv as
         [rho3 [rho3' [B2 [f2 [xs2 [e2 [vs2'' [Hget' [Hdef' [Hgetl [Hset' Hpre]]]]]]]]]]]; eauto.
     do 7 eexists; repeat split; try eassumption.
-    intros Hlt. eapply Hpre. omega.
+    intros Hlt. eapply Hpre. lia.
   Qed.
 
   Instance Funs_inv_Proper : Proper (eq ==> eq ==> eq ==> f_eq ==> eq ==> iff) Funs_inv.
@@ -319,7 +319,7 @@ Section Lambda_lifting_correct.
         intros Hc. eapply Hdis1; now constructor; eauto. 
 
         erewrite <- (get_list_length_eq (map f1 fvs) vs2'); eauto. 
-        rewrite list_length_map. omega.
+        rewrite list_length_map. lia.
 
         eapply preord_exp_app_r with (P1 := P1 1); [|  | | eassumption | | ].
         * rewrite <- (map_length f1 fvs). rewrite Hleq. 
@@ -476,9 +476,9 @@ Section Lambda_lifting_correct.
     assert 
       (HB1 : forall j, j < k -> Funs_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') sig1 zeta1).
     { intros j leq. eapply IHk; last (now apply Hllfuns); eauto.
-      - intros. eapply IHe; eauto. omega.
-      - eapply preord_env_P_inj_monotonic; [| eassumption]. omega.
-      - eapply Funs_inv_monotonic. eassumption. omega. }
+      - intros. eapply IHe; eauto. lia.
+      - eapply preord_env_P_inj_monotonic; [| eassumption]. lia.
+      - eapply Funs_inv_monotonic. eassumption. lia. }
     (* ASSERTIONS *)
     assert (Hname : name_in_fundefs B1 \subset bound_var_fundefs B1).
     { eapply name_in_fundefs_bound_var_fundefs. }
@@ -683,7 +683,7 @@ Section Lambda_lifting_correct.
                        -- symmetry. eassumption.
                        -- eapply preord_env_P_inj_def_funs_neq_l. eapply preord_env_P_inj_def_funs_neq_r.
                           eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_f_eq_subdomain.
-                          eapply preord_env_P_inj_monotonic; [| eassumption ]. omega.
+                          eapply preord_env_P_inj_monotonic; [| eassumption ]. lia.
                           ++ eapply Add_functions_sig_eq_alt. eassumption. now sets.
                           ++ eassumption.
                           ++ rewrite Fundefs_lambda_lift_name_in_fundefs2 with (B' := B2); [| eassumption ].
@@ -725,7 +725,7 @@ Section Lambda_lifting_correct.
                    eapply Disjoint_Included; [| | eapply Hd2 ]. now xsets. eapply Included_trans.
                    eapply Included_trans. eapply Setminus_Included. eassumption. now xsets.                   
                    now sets. }
-          ++ omega.
+          ++ lia.
     + rewrite def_funs_neq in Hgetf1; [| eassumption ].
       erewrite Add_functions_eq in Hzeq; [| eassumption | eassumption ].
       edestruct Hfinv as (rho2 & rho2' & B2' & f2' & xs2 & e2 & cs2 & Hgetf2 & Hf2 & Hgetl & Hset2  & Hyp).
@@ -918,9 +918,9 @@ Section Lambda_lifting_correct.
                                         j sig (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho')). (*  /\ *)
                        (* Funs_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (extend_fundefs sig B1 B1) zeta) *)
     { intros j leq. eapply IHk; last (now apply Hllfuns); eauto.
-      - intros. eapply IHe; eauto. omega.
-      - eapply preord_env_P_inj_monotonic; [| eassumption]. omega.
-      - eapply Funs_inv_monotonic. eassumption. omega. }
+      - intros. eapply IHe; eauto. lia.
+      - eapply preord_env_P_inj_monotonic; [| eassumption]. lia.
+      - eapply Funs_inv_monotonic. eassumption. lia. }
 
     intros x Hxin v Hget. destruct (Decidable_name_in_fundefs B1) as [Hdec]. destruct (Hdec x); clear Hdec.
     - (* x is in B1 *)  
@@ -1003,9 +1003,9 @@ Section Lambda_lifting_correct.
               simpl. rewrite extend_fundefs_neq. reflexivity. eassumption. } 
 
           eapply IHk; [ eassumption | | eassumption | | | | | | | | | | | eassumption ]; try eassumption.
-          -- intros. eapply IHe; eauto. omega.
-          -- eapply preord_env_P_inj_monotonic; [| eassumption ]. omega.
-          -- eapply Funs_inv_monotonic. eassumption. omega.
+          -- intros. eapply IHe; eauto. lia.
+          -- eapply preord_env_P_inj_monotonic; [| eassumption ]. lia.
+          -- eapply Funs_inv_monotonic. eassumption. lia.
           -- normalize_occurs_free. eapply Setminus_Included_Included_Union. eapply Included_trans.
              eapply occurs_free_in_fun. eapply find_def_correct. eassumption. sets.
         * eapply Disjoint_Included_l. eapply image_extend_fundefs. eapply Union_Disjoint_l.
@@ -1015,7 +1015,7 @@ Section Lambda_lifting_correct.
         eapply Funs_inv_def_funs; [ eassumption | | | ].
         * now xsets.
         * eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hd1 ]... 
-        * eapply Funs_inv_monotonic. eassumption. omega.
+        * eapply Funs_inv_monotonic. eassumption. lia.
         * xsets.
           eapply Disjoint_Included_l.
           eapply image_extend_fundefs. eapply Union_Disjoint_l.
@@ -1058,15 +1058,15 @@ Section Lambda_lifting_correct.
         rewrite !to_nat_add in Hleq. unfold one in Hleq. erewrite to_nat_one in Hleq.
         
         edestruct Hyp2 as (v2' & c2' & t2' & Hstep2' & Hpost' & Hval'); [  | | | eassumption | ]. simpl in *.
-        omega.
+        lia.
          
-        eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega.
+        eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. lia.
         
-        omega. 
+        lia. 
         destruct v2'; try (simpl in *; contradiction). 
 
         edestruct Hyp as (v2 & c2 & t2 & Hstep2 & Hpost & Hval); [ | eassumption | | eassumption | ].
-        simpl in *; omega. omega.
+        simpl in *; lia. lia.
         exists v2, (c2' <+> c2 <+> (one (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e'))),
         (t2' <+> t2 <+> (one (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e'))). 
         split; [| split ]; eauto.
@@ -1076,7 +1076,7 @@ Section Lambda_lifting_correct.
         * simpl. eapply PG_P_local_steps_let_app. eassumption. eassumption. eassumption.
           eassumption. eassumption.
         * eapply preord_res_monotonic. eassumption.
-          rewrite !to_nat_add. unfold one. rewrite to_nat_one. omega. 
+          rewrite !to_nat_add. unfold one. rewrite to_nat_one. lia. 
       + edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
         normalize_occurs_free. now sets.
         assert (Hlen := Forall2_length _ _ _ Hprevs). 
@@ -1087,9 +1087,9 @@ Section Lambda_lifting_correct.
         rewrite !to_nat_add in Hleq. unfold one in Hleq. erewrite to_nat_one in Hleq.        
         edestruct Hyp2 as (v2' & c2' & t2' & Hstep2' & Hpost' & Hval'); [  | | | eassumption | ]. simpl in *.
 
-        omega.  
-        eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega. 
-        simpl in *; omega. 
+        lia.  
+        eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. lia. 
+        simpl in *; lia. 
         destruct v2'; try (simpl in *; contradiction).
         exists OOT. do 2 eexists. 
         split; [| split ].
@@ -1126,8 +1126,8 @@ Section Lambda_lifting_correct.
 
       rewrite !to_nat_add in Hleq. unfold one in Hleq. erewrite to_nat_one in Hleq.
 
-     edestruct Hyp2 as (v2' & c2' & t2' & Hstep2' & Hpost' & Hval'); [ simpl in *; omega | | | eassumption | ].
-     eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. omega. simpl in *; omega.
+     edestruct Hyp2 as (v2' & c2' & t2' & Hstep2' & Hpost' & Hval'); [ simpl in *; lia | | | eassumption | ].
+     eapply Forall2_monotonic; [| eassumption ]. intros. eapply preord_val_monotonic. eassumption. lia. simpl in *; lia.
      repeat subst_exp.
      
      exists v2'. do 2 eexists.
@@ -1136,7 +1136,7 @@ Section Lambda_lifting_correct.
        rewrite list_append_map. eapply get_list_app. eassumption. eassumption. 
      + eapply PG_P_local_steps_app. eassumption. eassumption. eassumption. eassumption.
      + eapply preord_res_monotonic. eassumption. rewrite to_nat_add. unfold one. rewrite to_nat_one.
-       simpl in *; omega.
+       simpl in *; lia.
 
       Grab Existential Variables. eassumption. eassumption. eassumption. eassumption.
   Qed.
@@ -1205,7 +1205,7 @@ Section Lambda_lifting_correct.
           normalize_occurs_free...
         * eapply preord_env_P_inj_set_alt.
           eapply preord_env_P_inj_antimon.
-          eapply preord_env_P_inj_monotonic; [| eassumption]. omega.
+          eapply preord_env_P_inj_monotonic; [| eassumption]. lia.
           normalize_occurs_free...
           rewrite preord_val_eq. constructor. reflexivity.
           eassumption. 
@@ -1218,7 +1218,7 @@ Section Lambda_lifting_correct.
           intros Hc. eapply Hfvs. now constructor; eauto.
           intros Hc. eapply Him. constructor; eauto.
           eapply image_monotonic; [| eassumption ]...
-          eapply Funs_inv_monotonic. eassumption. omega.
+          eapply Funs_inv_monotonic. eassumption. lia.
     - eapply preord_exp_case_nil_compat. eauto. 
     - inv Hun. edestruct Exp_lambda_lift_Ecase as [P'' [Heq Hall]]; eauto. inv Heq.
       eapply preord_exp_case_cons_compat; eauto.
@@ -1238,9 +1238,9 @@ Section Lambda_lifting_correct.
           normalize_occurs_free... normalize_bound_var...
         * eapply binding_in_map_antimon; [| eassumption ].
           normalize_occurs_free...
-        * eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. omega.
+        * eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. lia.
           normalize_occurs_free...
-        * eapply Funs_inv_monotonic. eassumption. omega.
+        * eapply Funs_inv_monotonic. eassumption. lia.
       + assert (Hinc' : Included _ S'0 S).
         { eapply Exp_Lambda_lift_free_set_Included; eauto. }
         eapply IHe0; eauto.
@@ -1290,7 +1290,7 @@ Section Lambda_lifting_correct.
           eapply image_monotonic. rewrite !Setminus_Union_distr.
           normalize_occurs_free...
         * eapply preord_env_P_inj_set_alt.
-          eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. lia.
           normalize_occurs_free... eassumption.
           intros Hc. eapply Him. constructor; eauto.
           eapply image_monotonic; [| eassumption ].
@@ -1301,7 +1301,7 @@ Section Lambda_lifting_correct.
           intros Hc. eapply Hfvs. now constructor; eauto.
           intros Hc. eapply Him. constructor; eauto.
           eapply image_monotonic; [| eassumption ]...
-          eapply Funs_inv_monotonic. eassumption. omega.
+          eapply Funs_inv_monotonic. eassumption. lia.
     - (* Eletapp known *)
       eapply Funs_inv_Eletapp; [| eassumption | eassumption | eassumption ].
       intros m v1 v2 Hlt Hval. inv Hun.
@@ -1328,7 +1328,7 @@ Section Lambda_lifting_correct.
         eapply image_monotonic. rewrite !Setminus_Union_distr.
         normalize_occurs_free...
       * eapply preord_env_P_inj_set_alt.
-        eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. omega.
+        eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. lia.
         normalize_occurs_free... eassumption.
         intros Hc. eapply Him. constructor; eauto.
         eapply image_monotonic; [| eassumption ].
@@ -1339,7 +1339,7 @@ Section Lambda_lifting_correct.
         intros Hc. eapply Hfvs. now constructor; eauto.
         intros Hc. eapply Him. constructor; eauto.
         eapply image_monotonic; [| eassumption ]...
-        eapply Funs_inv_monotonic. eassumption. omega.
+        eapply Funs_inv_monotonic. eassumption. lia.
     - (* Eletapp unknown *)
       inv Hun. eapply preord_exp_letapp_compat.
       + eapply HPost_letapp. (* post *)
@@ -1373,7 +1373,7 @@ Section Lambda_lifting_correct.
           normalize_occurs_free...
         * eapply preord_env_P_inj_set_alt.
           eapply preord_env_P_inj_antimon.
-          eapply preord_env_P_inj_monotonic; [| eassumption]. omega.
+          eapply preord_env_P_inj_monotonic; [| eassumption]. lia.
           normalize_occurs_free... eassumption. 
           intros Hc. eapply Him. constructor; eauto.
           eapply image_monotonic; [| eassumption ].
@@ -1384,7 +1384,7 @@ Section Lambda_lifting_correct.
           intros Hc. eapply Hfvs. now constructor; eauto.
           intros Hc. eapply Him. constructor; eauto.
           eapply image_monotonic; [| eassumption ]...
-          eapply Funs_inv_monotonic. eassumption. omega. 
+          eapply Funs_inv_monotonic. eassumption. lia. 
     - (* Efun 2 *)
       assert (Hinc' : Included _ S'' S).
       { eapply Included_trans.
@@ -1398,7 +1398,7 @@ Section Lambda_lifting_correct.
 
       repeat normalize_bound_var_in_ctx.  
       inv Hun. eapply preord_exp_fun_compat; [  now eauto | now eapply HPost_fun' | ].
-      replace 1 with (0 + 1) by omega. 
+      replace 1 with (0 + 1) by lia. 
       eapply ctx_to_rho_preord_exp with (C := Efun1_c fds Hole_c). 
       eassumption. eassumption. eassumption. 
       intros. eapply P1_ctx_r; eauto. 
@@ -1578,7 +1578,7 @@ Section Lambda_lifting_correct.
            eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hf ].
            eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. now sets.
            eapply Add_functions_free_set_Included. eassumption.
-      * omega.
+      * lia.
     - (* Efun 3 *)
       repeat normalize_bound_var_in_ctx.
 
@@ -1641,7 +1641,7 @@ Section Lambda_lifting_correct.
         -- eapply Funs_inv_f_eq_subdomain. 2: eassumption. 
             intros z Hinz. rewrite extend_fundefs_neq. reflexivity.
             intros Hc. eapply Hdis. constructor; eauto.
-      * omega.
+      * lia.
     - (* App known *)
       eapply Funs_inv_Eapp; [ eassumption | eassumption | eassumption ].
     - (* App unknown *)
@@ -1677,7 +1677,7 @@ Section Lambda_lifting_correct.
           eapply image_monotonic. rewrite !Setminus_Union_distr.
           normalize_occurs_free...
         * eapply preord_env_P_inj_set_alt. 
-          eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. omega.
+          eapply preord_env_P_inj_antimon. eapply preord_env_P_inj_monotonic; [| eassumption ]. lia.
           normalize_occurs_free...
           eassumption.
           intros Hc. eapply Him. constructor; eauto.
@@ -1689,7 +1689,7 @@ Section Lambda_lifting_correct.
           intros Hc. eapply Hfvs. now constructor; eauto.
           intros Hc. eapply Him. constructor; eauto.
           eapply image_monotonic; [| eassumption ]...
-          eapply Funs_inv_monotonic. eassumption. omega. *)
+          eapply Funs_inv_monotonic. eassumption. lia. *)
     - eapply preord_exp_halt_compat; eauto.
    Qed.
 
@@ -1736,8 +1736,8 @@ Section Lambda_lifting_correct.
 
      assert (Hfresh : Disjoint var (fun x : var => (max_var e 1 < x)%positive) (bound_var e :|: occurs_free e)).
      { constructor. intros x Hnin. inv Hnin. inv H0.
-       - eapply bound_var_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. omega.
-       - eapply occurs_free_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. omega. }
+       - eapply bound_var_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. lia.
+       - eapply occurs_free_leq_max_var with (y := 1%positive) in H1. unfold Ensembles.In in *. zify. lia. }
      
      specialize (Hsound ltac:(sets) ltac:(sets) ltac:(eassumption) ltac:(eassumption) ltac:(sets) ltac:(sets) ltac:(eassumption)).
      
@@ -1750,7 +1750,7 @@ Section Lambda_lifting_correct.
      destruct (runState tt (c, tt)) as [e' [c' u]] eqn:Hstate. simpl in *.
      
      assert (Hf : fresh (fun x : var => (max_var e 1 < x)%positive) (next_var (fst (c, tt)))).
-     { unfold fresh. intros. unfold Ensembles.In in *. simpl in *. zify; omega. }
+     { unfold fresh. intros. unfold Ensembles.In in *. simpl in *. zify; lia. }
 
      assert (Hren_empty : f_eq (rename (M.empty _)) id).
      { intros x. unfold rename. rewrite M.gempty. reflexivity. }
@@ -1781,7 +1781,7 @@ Section Lambda_lifting_correct.
        inv Hin.
        + eapply Hsub' in H1. inv H1.
          * simpl in *. find_subsets. eapply bound_var_leq_max_var in H2. 
-           assert (Hin : x (next_var c')). eapply H0. zify; omega.
+           assert (Hin : x (next_var c')). eapply H0. zify; lia.
            eapply H in Hin. unfold In in *. 
            eapply Pos.le_lt_trans. eassumption. eassumption.
          * inv H2. simpl in *.
@@ -1789,7 +1789,7 @@ Section Lambda_lifting_correct.
        + eapply Hsub in H1. simpl in *. find_subsets. 
          eapply occurs_free_leq_max_var in H1.
          eapply Pos.le_lt_trans. eassumption. 
-         assert (Hin : x (next_var c')). eapply H0. simpl; zify; omega.
+         assert (Hin : x (next_var c')). eapply H0. simpl; zify; lia.
          eapply H in Hin. unfold In in *. eassumption.
      - intros. eapply Exp_lambda_lift_correct; try eassumption.
        + rewrite !Heq, !Heq', Hren_empty. rewrite image_id.

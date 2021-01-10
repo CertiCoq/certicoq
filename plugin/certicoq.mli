@@ -36,3 +36,4 @@ val compile_only : options -> Names.GlobRef.t -> string list -> unit
 val generate_glue_only : options -> Names.GlobRef.t -> unit
 val show_ir : options -> Names.GlobRef.t -> unit
 val ffi_command : options -> Names.GlobRef.t -> unit
+val glue_command : options -> Names.GlobRef.t list -> unit

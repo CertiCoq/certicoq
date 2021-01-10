@@ -1,5 +1,5 @@
-Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
-        Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles Coq.micromega.Lia.
+From Coq Require Import NArith.BinNat Arith Relations.Relations MSets.MSets MSets.MSetRBT
+     Lists.List micromega.Lia Sets.Ensembles.
 
 Require Import L6.cps L6.eval L6.Ensembles_util L6.List_util L6.tactics L6.set_util L6.ctx
         L6.logical_relations L6.logical_relations_cc L6.algebra L6.inline_letapp L6.lambda_lifting_correct.
@@ -27,7 +27,7 @@ Section Bounds.
   Solve Obligations with (intro; intros; simpl; lia).
   Solve Obligations with (simpl; lia).
   Next Obligation.
-    destruct (lt_dec x y); auto. right. eexists (x - y). lia.
+    destruct (Compare_dec.lt_dec x y); auto. right. eexists (x - y). lia.
   Qed.
   
   Global Program Instance fuel_res_ones : @resource_ones fin nat fuel_res_pre. 
@@ -104,7 +104,7 @@ Section Bounds.
 
       - intro; intros. intro; intros. 
         unfold inline_bound in *; unfold_all; simpl.
-        assert (c = 0). eapply Nat.lt_1_r. eassumption. subst. lia.
+        assert (c = 0). eapply NPeano.Nat.lt_1_r. eassumption. subst. lia.
       - intro; intros. unfold post_base'. 
         unfold inline_bound in *; unfold_all; simpl. lia.
       - intro; intros; unfold inline_bound in *.
@@ -149,7 +149,7 @@ Section Bounds.
       
       assert (Hleq' : (1 + 2 * G + 2 * G * 2 * G) * cin1 + 2 * L * 2 * G + 2 * L <=
                       (1 + 2 * G + 2 * G * 2 * G) * cin2 + 2 * L * 2 * G + 2 * L).
-      { eapply le_trans. eassumption. eapply le_trans.
+      { eapply Le.le_trans. eassumption. eapply Le.le_trans.
         eapply plus_le_compat_r. eapply plus_le_compat_l. eapply mult_le_compat_l. eassumption.
         lia. } 
       
@@ -285,14 +285,14 @@ Section Bounds.
     Proof.
       intros. intro; intros. intro; intros.
       unfold simple_bound in *. unfold_all. simpl in *.
-      omega.
+      lia.
     Qed.
 
     Lemma Hbase : forall j, post_base (simple_bound j).
     Proof.
       intros. intro; intros. unfold post_base'.
       unfold simple_bound in *. unfold_all. simpl in *.
-      omega.
+      lia.
     Qed.
 
     Context (clo_tag : ctor_tag).
@@ -526,7 +526,7 @@ Section Bounds.
         simple_bound 0 (e, rho, c1, cout1) (Eapp f1 ft1 (gv1 ++ fv1), rho', plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1))), plus cout2 (one (Eapp f1 ft1 (gv1 ++ fv1)))). 
     Proof. 
       intros. destruct cout1; destruct cout2. unfold simple_bound in *. unfold_all. simpl in *.
-      omega.
+      lia.
     Qed.
 
     Lemma Hpost_idemp : inclusion _ (comp (simple_bound 0) (simple_bound 0)) (simple_bound 0).
@@ -534,7 +534,7 @@ Section Bounds.
       intro; intros.
       destruct x as [[[? ?] ?] [? ?]]; destruct y as [[[? ?] ?] [? ?]].
       unfold comp, simple_bound in *. unfold_all. destructAll.
-      destruct x as [[[? ?] ?] [? ?]]. simpl in *. omega.
+      destruct x as [[[? ?] ?] [? ?]]. simpl in *. lia.
     Qed.
 
   End UncurryBound. 

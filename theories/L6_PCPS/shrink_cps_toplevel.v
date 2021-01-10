@@ -1,6 +1,5 @@
-Require compcert.lib.Maps.
-Require Import Relation_Definitions Ensembles.
-Require Import compcert.lib.Coqlib.
+Require compcert.lib.Maps compcert.lib.Coqlib.
+From Coq Require Import Relation_Definitions Ensembles micromega.Lia micromega.Zify PArith.BinPos.
 Require Import L6.Ensembles_util L6.cps L6.rename L6.ctx L6.logical_relations L6.tactics L6.cps_util
         L6.List_util L6.shrink_cps L6.eval L6.set_util L6.identifiers L6.stemctx L6.shrink_cps_correct
         L6.shrink_cps_corresp L6.inline_letapp L6.algebra L6.Ensembles_util
@@ -104,15 +103,15 @@ Section Srink_top_correct.
       split; [| split; [| split; [| split ]]].
       + clear H2 H1 H0 Hun Hdis. revert n H3. induction H5; intros.
         { edestruct IHrefl_trans_closure_n with (n0 := n).
-          eassumption. eassumption. omega. destructAll. 
+          eassumption. eassumption. lia. destructAll. 
           eexists. split.
           2:{ eapply preord_exp_n_trans; [| eassumption ].
               econstructor. intros. eapply gen_rw_correct; eauto.                  
               eapply grw_preserves_fv. eassumption.
               split. now eauto. eassumption. }
-          omega. }
+          lia. }
         
-        exists 1. split. omega.
+        exists 1. split. lia.
         econstructor. intros. eapply preord_exp_refl.
         eassumption. eassumption.
         clear. firstorder.
@@ -128,7 +127,7 @@ Section Srink_top_correct.
       
       econstructor.
       + intros Hc. eapply bound_var_leq_max_var with (y := 1%positive) in Hc.
-        zify. omega.
+        zify. lia.
       + intros Hc. inv Hc.
       + rewrite <- FromSet_elements. rewrite <- exp_fv_correct. sets.
       + normalize_bound_var. sets.
@@ -136,7 +135,7 @@ Section Srink_top_correct.
       + intros Hc. eapply FromSet_elements in Hc.
         rewrite <- exp_fv_correct in Hc.
         eapply occurs_free_leq_max_var with (y := 1%positive) in Hc.
-        zify. omega.
+        zify. lia.
       + eapply NoDupA_NoDup. eapply PS.elements_spec2w.
       + eassumption.
       + now constructor.

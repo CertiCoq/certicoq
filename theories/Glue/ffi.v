@@ -442,7 +442,7 @@ Definition get_constructors
 Definition generate_ffi
            (opts : Options)
            (p : Ast.program)
-           : error (name_env * option Clight.program * option Clight.program * list string) :=
+           : error (name_env * Clight.program * Clight.program * list string) :=
   let init : fstate_data :=
       {| fstate_gensym := 2%positive
        ; fstate_nenv   := M.empty _
@@ -452,10 +452,11 @@ Definition generate_ffi
       runState ((get_constructors >=> make_ffi_program) p) opts init in
   let nenv := fstate_nenv st in
   match err with
-  | Ret (header, source) =>
+  | Err s => Err s
+  | Ret (Some header, Some source) =>
     Ret (nenv (* the name environment to be passed to C generation *) ,
          header (* the header content *),
          source (* the source content *),
          rev (fstate_log st) (* logged messages *))
-  | Err s => Err s
+  | Ret _ => Err "No Clight program generated"
   end.

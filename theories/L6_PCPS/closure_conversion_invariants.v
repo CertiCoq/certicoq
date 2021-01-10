@@ -8,7 +8,7 @@ From CertiCoq Require Import cps size_cps cps_util set_util hoisting identifiers
 Require Import compcert.lib.Coqlib.
 From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
-                        NArith.BinNat PArith.BinPos Sets.Ensembles Omega
+                        NArith.BinNat PArith.BinPos Sets.Ensembles micromega.Lia
                         Sorting.Permutation ArithRing.
 Import ListNotations.
 
@@ -140,7 +140,7 @@ Section Closure_conversion_invariants.
     edestruct Hinv with (f := f) as
         [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
     repeat eexists; eauto.
-    eapply cc_approx_val_monotonic. eassumption. omega. 
+    eapply cc_approx_val_monotonic. eassumption. lia. 
   Qed.
 
   (** Extend the two environments with a variable that is not the current environment

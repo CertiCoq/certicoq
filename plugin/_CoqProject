@@ -107,8 +107,8 @@ extraction/closure_conversion.ml
 extraction/closure_conversion.mli
 extraction/compM.ml
 extraction/compM.mli
-#extraction/compare_dec.ml
-#extraction/compare_dec.mli
+# extraction/compare_dec.ml
+# extraction/compare_dec.mli
 extraction/compile0.ml
 extraction/compile0.mli
 extraction/compile1.ml
@@ -246,8 +246,8 @@ extraction/nPeano.ml
 extraction/nPeano.mli
 extraction/numeral0.ml
 extraction/numeral0.mli
-# extraction/optionMonad.ml
-# extraction/optionMonad.mli
+extraction/optionMonad.ml
+extraction/optionMonad.mli
 extraction/orders.ml
 extraction/orders.mli
 extraction/ordersEx.ml

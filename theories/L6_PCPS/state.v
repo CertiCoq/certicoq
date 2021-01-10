@@ -2,9 +2,9 @@ Require Import Common.compM Common.Pipeline_utils.
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx
         L6.List_util L6.functions L6.cps_show L6.Ensembles_util L6.tactics.
 Require Import Coq.ZArith.ZArith.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Strings.String Coq.Strings.Ascii
-        Coq.Sets.Ensembles.
+From Coq Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+     NArith.BinNat PArith.BinPos Strings.String Strings.Ascii
+     Sets.Ensembles micromega.Lia.
 Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads.
 
@@ -190,7 +190,7 @@ Lemma Disjoint_Range (x1 x2 x1' x2' : positive) :
   Disjoint _ (Range x1 x2) (Range x1' x2').
 Proof.
   intros Hleq. constructor. intros x Hin. inv Hin.
-  unfold Range, Ensembles.In in *. simpl in *. zify. omega.
+  unfold Range, Ensembles.In in *. simpl in *. zify. lia.
 Qed.    
 
 Lemma Range_Subset (x1 x2 x1' x2' : positive) :
@@ -199,7 +199,7 @@ Lemma Range_Subset (x1 x2 x1' x2' : positive) :
   Range x1' x2' \subset Range x1 x2.
 Proof.
   intros H1 H2. intros z Hin. unfold Range, Ensembles.In in *.
-  inv Hin. zify. omega.
+  inv Hin. zify. lia.
 Qed.
           
 Lemma fresh_Range S (x1 x2 : positive) :
@@ -230,10 +230,10 @@ Proof.
   intros x [r3 w3].
   eapply return_triple. 
   intros ? [r4 w4] H2. inv H2. intros [H1 H2]. inv H1; inv H2. intros.
-  split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. omega.
-  simpl. split. zify; omega.
-  intros z Hin. constructor. eapply H; eauto. zify. omega.
-  intros Hc. inv Hc. zify; omega.
+  split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. lia.
+  simpl. split. zify; lia.
+  intros z Hin. constructor. eapply H; eauto. zify. lia.
+  intros Hc. inv Hc. zify; lia.
 Qed.
 
 Lemma get_names_lst_spec A S ns str :
@@ -260,9 +260,9 @@ Proof.
     + simpl. congruence.
     + eapply Union_Included. sets. eapply Included_trans. eapply H4. sets.
     + eapply Union_Included. eapply Singleton_Included.
-      eapply Range_Subset; [| | eassumption ]. reflexivity. zify. omega.
-      eapply Included_trans. eassumption. eapply Range_Subset. zify; omega. reflexivity.
-    + zify; omega.
+      eapply Range_Subset; [| | eassumption ]. reflexivity. zify. lia.
+      eapply Included_trans. eassumption. eapply Range_Subset. zify; lia. reflexivity.
+    + zify; lia.
     + rewrite <- Setminus_Union. eassumption.
 Qed.
 
@@ -285,10 +285,10 @@ Proof.
   intros x [r3 w3].
   eapply return_triple. 
   intros ? [r4 w4] H2. inv H2. intros [H1 H2]. inv H1; inv H2. intros.
-  split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. omega.
-  simpl. split. zify; omega.
-  intros z Hin. constructor. eapply H; eauto. zify. omega.
-  intros Hc. inv Hc. zify; omega.
+  split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. lia.
+  simpl. split. zify; lia.
+  intros z Hin. constructor. eapply H; eauto. zify. lia.
+  intros Hc. inv Hc. zify; lia.
 Qed.
 
 Lemma get_names_lst'_spec A S ns str old_m :
@@ -315,9 +315,9 @@ Proof.
     + simpl. congruence.
     + eapply Union_Included. sets. eapply Included_trans. eapply H4. sets.
     + eapply Union_Included. eapply Singleton_Included.
-      eapply Range_Subset; [| | eassumption ]. reflexivity. zify. omega.
-      eapply Included_trans. eassumption. eapply Range_Subset. zify; omega. reflexivity.
-    + zify; omega.
+      eapply Range_Subset; [| | eassumption ]. reflexivity. zify. lia.
+      eapply Included_trans. eassumption. eapply Range_Subset. zify; lia. reflexivity.
+    + zify; lia.
     + rewrite <- Setminus_Union. eassumption.
 Qed.
 

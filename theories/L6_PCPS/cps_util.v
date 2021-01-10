@@ -6,7 +6,7 @@ From compcert.lib Require Import Coqlib.
 Require Import L6.tactics.
 From CertiCoq.L6 Require Import cps ctx Ensembles_util List_util functions map_util.
 From Coq Require Import Arith.Arith NArith.BinNat Strings.String Lists.List
-     omega.Omega Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
+     micromega.Lia Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
 From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
 Require Import ExtLib.Structures.Monad ExtLib.Structures.MonadState ExtLib.Data.Monads.StateMonad.
 
@@ -49,8 +49,8 @@ Proof.
   induction cl; intros.
   - inversion H.
   - simpl in H. destruct a. destruct (M.elt_eq c v).
-    + inversion H. simpl. omega.
-    + simpl. apply IHcl in H. omega.
+    + inversion H. simpl. lia.
+    + simpl. apply IHcl in H. lia.
 Qed.
 
 Lemma findtag_In_patterns {A} P c (v : A) :
@@ -905,11 +905,11 @@ Proof.
     eexists. eexists.
     split. constructor; eauto.
     split; eauto.
-    omega.
+    lia.
   - simpl.
     destructAll.
     inv H.
-    replace (n + m + x1) with (n + (m + x1)) by omega.
+    replace (n + m + x1) with (n + (m + x1)) by lia.
     constructor. auto.
     apply IHl. exists m, x1. split; auto.
 Qed.
@@ -935,50 +935,50 @@ Proof.
     split.
     constructor; eauto.
     split; eauto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_n.
     constructor. rewrite IHc.
     eexists; eexists; eauto.
-    omega.
+    lia.
   - inv H. apply IHc in H7. destructAll.
     eexists; eexists.
     split.
     constructor; eauto.
     split; eauto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_n.
     constructor. rewrite IHc.
     eexists; eexists; eauto.
-    omega.
+    lia.
   - inv H. eapply IHc in H7.
     destructAll.
     eexists; eexists.
     split.
     constructor; eauto.
     split; eauto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_n.
     constructor. rewrite IHc.
     eexists; eexists; eauto.
-    omega.    
+    lia.    
   - inv H. apply IHc in H6. destructAll.
     eexists; eexists.
     split.
     constructor; eauto.
     split; eauto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_n.
     constructor. rewrite IHc.
     eexists; eexists; eauto.
-    omega.
+    lia.
   - inv H.
     apply num_occur_app_case in H4.
     destructAll.
@@ -988,7 +988,7 @@ Proof.
     split.
     constructor; eauto.
     split. eauto.
-    omega.
+    lia.
   - destructAll.
     inv H. simpl.
     eapply num_occur_n.
@@ -996,20 +996,20 @@ Proof.
     apply num_occur_app_case. eexists; eexists. split; eauto.
     split. constructor; eauto. apply IHc. eexists; eexists; eauto.
     reflexivity.
-    simpl. omega.
+    simpl. lia.
   - inv H. apply IHc in H2.
     destructAll.
     eexists; eexists.
     split.
     constructor; eauto.
     split; eauto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_n. simpl. constructor.
     apply IHc. eexists; eexists; eauto.
     apply H6.
-    omega.
+    lia.
   - inv H.
     apply IHf in H5.
     destructAll.
@@ -1017,25 +1017,25 @@ Proof.
     split.
     constructor; eauto.
     split; eauto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     simpl.
     eapply num_occur_n. constructor; eauto.
     apply IHf.
     eexists; eexists; eauto.
-    omega.
+    lia.
   - inv H. apply IHc in H7.
     destructAll.
     eexists; eexists.
     split.
     constructor; eauto.
     split; eauto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     simpl.
-    replace (n+ m + x1) with ((n + x1)+m) by omega.
+    replace (n+ m + x1) with ((n + x1)+m) by lia.
     constructor.
     apply IHc.
     eexists; eexists; eauto.
@@ -1047,11 +1047,11 @@ Proof.
     split.
     constructor; eauto.
     split; eauto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     simpl.
-    replace (n+ m + x1) with (n + (m +x1)) by omega.
+    replace (n+ m + x1) with (n + (m +x1)) by lia.
     constructor.
     auto.
     apply IHf.
@@ -1136,9 +1136,9 @@ Proof.
   - inv H5. inv H4. reflexivity.
   - inv H1. inv H2. inv H7. inv H6.
     specialize (H0 (num_occur_list [v0] v + m) (num_occur_list [v0] v+m0)).
-    replace (num_occur_list [v0] v + (n1 + m)) with (n1 + (num_occur_list [v0] v + m)) by omega.
+    replace (num_occur_list [v0] v + (n1 + m)) with (n1 + (num_occur_list [v0] v + m)) by lia.
     rewrite H0.
-    specialize (H _ _ H8 H7). omega.
+    specialize (H _ _ H8 H7). lia.
     constructor; auto.
     constructor; auto.
   - inv H1; inv H2; eauto.
@@ -1194,83 +1194,83 @@ Proof.
   - inv H. apply IHc1 in H6. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_ec_n.
     constructor. rewrite IHc1. eauto.
-    omega.
+    lia.
   - inv H. apply IHc1 in H7. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_ec_n.
     constructor. rewrite IHc1. eauto.
-    omega.
+    lia.
   - inv H. apply IHc1 in H7. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_ec_n.
     constructor. rewrite IHc1. eauto.
-    omega.
+    lia.
  - inv H. apply IHc1 in H6. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_ec_n.
     constructor; eauto. rewrite IHc1. eauto.
-    omega.
+    lia.
   - inv H. apply IHc1 in H8. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_ec_n.
     constructor; eauto. rewrite IHc1. eauto.
-    omega.
+    lia.
   - inv H. apply IHc1 in H2. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
-    omega.
+    lia.
   - destructAll. inv H.
     eapply num_occur_ec_n.
     constructor; eauto. rewrite IHc1. eauto.
-    omega.    
+    lia.    
   - inv H. apply IHfc1 in H5. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_ec_n.
     constructor; eauto. rewrite IHfc1. eauto.
-    omega.
+    lia.
   - inv H. apply IHc1 in H7. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_fdc_n.
     constructor; eauto. rewrite IHc1. eauto.
-    omega.
+    lia.
   - inv H. apply IHfc1 in H8. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
-    omega.
+    lia.
   - destructAll.
     inv H.
     eapply num_occur_fdc_n.
     constructor; eauto. rewrite IHfc1. eauto.
-    omega.
+    lia.
 Qed.
 
 Theorem num_occur_ec_comp_ctx:

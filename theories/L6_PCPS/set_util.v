@@ -3,7 +3,7 @@
  *)
 
 From Coq Require Import PArith.PArith MSets.MSetRBT Classes.Morphisms Sets.Ensembles
-     Relations.Relations Lists.List Lists.SetoidList Permutation Omega.
+     Relations.Relations Lists.List Lists.SetoidList Permutation micromega.Lia.
 Require Import compcert.lib.Coqlib L6.tactics.
 From CertiCoq.L6 Require Import Ensembles_util List_util functions.
 
@@ -327,7 +327,7 @@ Lemma PS_nonempty_add (S : PS.t) :
   exists x S', ~ PS.In x S' /\ PS.Equal S (PS.add x S'). 
 Proof.
   intros Hsize. destruct (PS.elements S) eqn:Helem. 
-  - rewrite PS.cardinal_spec, Helem in Hsize; eauto. simpl in *. omega.
+  - rewrite PS.cardinal_spec, Helem in Hsize; eauto. simpl in *. lia.
   - eexists e, (PS.remove e S). split.
 
     intros Hin. eapply PS.remove_spec in Hin.
@@ -422,11 +422,11 @@ Proof.
   revert S. induction n; intros S Heq.
   - eapply H. eapply PS_cardinal_empty. now eauto. eassumption.
   - edestruct PS_nonempty_add as (e & S' & HninS & HeqS).
-    rewrite <- Heq. omega. 
+    rewrite <- Heq. lia. 
     eapply H. eassumption. eapply IH. 
     eassumption. eapply IHn.
     rewrite HeqS in Heq. simpl in Heq. 
-    rewrite <- PS_cardinal_add in Heq. omega.
+    rewrite <- PS_cardinal_add in Heq. lia.
     eassumption.
 Qed.
 
@@ -1081,7 +1081,7 @@ Proof.
       destruct (PS.mem (f a) s1) eqn:Heq'.
       eapply mem_spec in Heq'. rewrite PS_cardinal_add_in with (x := f a); eauto.
       rewrite <- PS_cardinal_add with (x := f a); eauto.
-      omega.
+      lia.
       intros Hc. eapply mem_spec in Hc. congruence.
       intros Hc. eapply mem_spec in Hc. congruence.
     + intros x Hina. eapply add_spec in Hina. inv Hina.

@@ -1,6 +1,6 @@
 
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
-        Coq.Lists.List Coq.omega.Omega Coq.Sets.Ensembles.
+        Coq.Lists.List Coq.micromega.Lia Coq.Sets.Ensembles.
 Require Import L6.cps L6.eval L6.cps_util L6.identifiers L6.ctx L6.set_util
         L6.Ensembles_util L6.List_util L6.tactics L6.relations L6.algebra. 
 Require Export L6.logical_relations L6.logical_relations_cc L6.alpha_conv L6.inline_letapp.
@@ -83,35 +83,35 @@ Section RelComp.
     R_n R P Pr k a b -> 0 < k.
   Proof.
     intros Hrel. induction Hrel; eauto.
-    omega.
+    lia.
   Qed.
   
   Lemma preord_res_n_OOT_r n v :
     ~ preord_res_n n (Res v) OOT.
   Proof.
     revert v. induction n using lt_wf_rec1; destruct n; intros m Hyp.
-    - eapply R_n_not_zero in Hyp. omega.
+    - eapply R_n_not_zero in Hyp. lia.
     - inv Hyp.
       + now specialize (H1 0); eauto.
       + assert (Hlt : 0 < n0). { eapply R_n_not_zero. eassumption. }
         assert (Hlt' : 0 < m0). { eapply R_n_not_zero. eassumption. }
         destruct c'.
-        * eapply H. 2:{ eapply H1. } omega.
-        * eapply H. 2:{ eapply H2. } omega.
+        * eapply H. 2:{ eapply H1. } lia.
+        * eapply H. 2:{ eapply H2. } lia.
   Qed.
   
   Lemma preord_res_n_OOT_l n v :
     ~ preord_res_n n OOT (Res v).
   Proof.
     revert v. induction n using lt_wf_rec1; destruct n; intros m Hyp.
-    - eapply R_n_not_zero in Hyp. omega.
+    - eapply R_n_not_zero in Hyp. lia.
     - inv Hyp.
       + now specialize (H1 0); eauto.
       + assert (Hlt : 0 < n0). { eapply R_n_not_zero. eassumption. }
         assert (Hlt' : 0 < m0). { eapply R_n_not_zero. eassumption. }
         destruct c'.
-        * eapply H. 2:{ eapply H2. } omega.
-        * eapply H. 2:{ eapply H1. } omega.
+        * eapply H. 2:{ eapply H2. } lia.
+        * eapply H. 2:{ eapply H1. } lia.
   Qed.
 
   Context (Hwf : forall e1 e2, wf_pres e1 e2 -> preserves_fv e1 e2).
@@ -177,12 +177,12 @@ Section RelComp.
       eapply preord_env_P_antimon; [| eapply Hwfe ].
       now intros z Hin; inv Hin.
       intros z Hc1. eapply Hwfe in Hc1. now inv Hc1.
-      omega. destructAll.
+      lia. destructAll.
       destruct v1.
       * destruct x; eauto.
       * destruct x; eauto. destruct x2. contradiction.
         eapply bstep_fuel_deterministic in H3; [| clear H3; eassumption ].
-        inv H3. eapply preord_res_monotonic. eassumption. omega.
+        inv H3. eapply preord_res_monotonic. eassumption. lia.
       * clear. firstorder.
       * clear; now firstorder.
     + intros.
@@ -280,7 +280,7 @@ Section RelComp.
     edestruct (H2 (to_nat x2) rho1 rho2); [ | | | eassumption | ].
     intros z Hin. eapply Hwf_c in Hin. now inv Hin. eapply preord_exp_n_wf_pres. eassumption. eassumption.
     intros z Hin. eapply Hwf_c in Hin. now inv Hin. eapply preord_exp_n_wf_pres. eassumption. eassumption.
-    omega.
+    lia.
     
     destructAll.
     
@@ -312,13 +312,13 @@ Section RelComp.
         
         intros z Hin. eapply Hwf_c in Hin. now inv Hin. eapply preord_exp_n_wf_pres; eauto. eassumption. 
 
-        omega. 
+        lia. 
         destructAll.
         
         destruct x1. contradiction.
         
         eapply bstep_fuel_deterministic in H9; [| clear H9; eassumption ]. destructAll.
-        eapply cc_approx_res_monotonic. eassumption. omega.
+        eapply cc_approx_res_monotonic. eassumption. lia.
 
     - eapply Hwf_c; eauto. eapply Hwf_c; eauto. eapply preord_exp_n_wf_pres; eauto.
 
@@ -413,7 +413,7 @@ Section Linking.
         inv Hset1.
         destruct vs2; [| simpl in *; congruence ].
         rewrite peq_true. do 3 eexists. split. reflexivity. split. reflexivity.
-        intros. eapply (Hexp1 j) in H2; [| omega ]. destructAll. do 3 eexists. split. eassumption.
+        intros. eapply (Hexp1 j) in H2; [| lia ]. destructAll. do 3 eexists. split. eassumption.
         split. eapply HGPost. eassumption. eassumption. 
       + now constructor.
       + intros. eapply Hexp2.
@@ -456,7 +456,7 @@ Section Linking.
           destruct xs; [| simpl in H12; congruence ]. simpl in *. inv H12.
           rewrite M.gss in *. inv H5. simpl in *. rewrite peq_true in *. inv H11. 
 
-          edestruct (Hexp1 (k + to_nat cin1 + to_nat cin2)); try eassumption. omega. 
+          edestruct (Hexp1 (k + to_nat cin1 + to_nat cin2)); try eassumption. lia. 
           destructAll. destruct x0. contradiction. 
           
           edestruct (Hexp2 (k + to_nat cin2)); try eassumption.
@@ -464,7 +464,7 @@ Section Linking.
           2:{ rewrite <- (Union_Empty_set_neut_l _ [set x]). eapply binding_in_map_set.
               intros z Hin. inv Hin. }
 
-          2:{ omega. }
+          2:{ lia. }
 
           
           2:{ destructAll.
@@ -474,16 +474,16 @@ Section Linking.
               split.
               eapply HPost_letapp; eauto. rewrite M.gss. reflexivity.  reflexivity.
               simpl. rewrite peq_true. reflexivity. reflexivity.
-              eapply cc_approx_res_monotonic. eassumption. rewrite !to_nat_add. omega. }
+              eapply cc_approx_res_monotonic. eassumption. rewrite !to_nat_add. lia. }
 
           simpl. intros w1 Hget. inv Hget. intros v3 Hget1. rewrite M.gss in *. simpl in *. inv Hget1.
           eexists. split; eauto.
-          eapply cc_approx_val_monotonic. eassumption. omega.
+          eapply cc_approx_val_monotonic. eassumption. lia.
         * simpl in *. inv H10.
           destruct xs; [| simpl in H12; congruence ]. simpl in *. inv H12.
           rewrite M.gss in *. inv H6. simpl in *. rewrite peq_true in *. inv H11. 
           
-          edestruct (Hexp1 (k + to_nat cin)); try eassumption. omega. 
+          edestruct (Hexp1 (k + to_nat cin)); try eassumption. lia. 
           destructAll. destruct x0. 2:{ contradiction. }
 
           do 3 eexists. split. econstructor 2. eapply BStept_letapp_oot.
@@ -514,8 +514,8 @@ Section Linking.
   Proof.
     intros H. inv H. do 2 eexists. now split; eauto.
     eapply plus_is_one in H0. inv H0. inv H.
-    - eapply R_n_not_zero in H1. omega.
-    - inv H. eapply R_n_not_zero in H2. omega.      
+    - eapply R_n_not_zero in H1. lia.
+    - inv H. eapply R_n_not_zero in H2. lia.      
   Qed.
   
 End Linking.
@@ -822,7 +822,7 @@ Section LinkingFast.
           destruct vs1; [| congruence ]. inv Hset1. destruct vs2. simpl in *. congruence.
           destruct vs2; [| simpl in *; congruence ].
           rewrite peq_true. do 3 eexists. split. reflexivity. split. reflexivity.
-          intros. eapply (Hexp1 j) in H4; [| omega ]. destructAll. do 3 eexists. split. eassumption.
+          intros. eapply (Hexp1 j) in H4; [| lia ]. destructAll. do 3 eexists. split. eassumption.
           split. eapply HinclG. eassumption. eassumption. 
         * assert (Hleq : (z' <= max_var e2 (max_var e2' z'))%positive).
           { eapply Pos.le_trans. eapply acc_leq_max_var. eapply acc_leq_max_var. }
@@ -835,10 +835,10 @@ Section LinkingFast.
           rewrite M.gso; auto.
           eapply H0 in Hget; [| reflexivity ]. destructAll.
           rewrite functions.extend_gss in H1. 
-          eexists. split; eauto. eapply preord_val_monotonic. eassumption. omega.
+          eexists. split; eauto. eapply preord_val_monotonic. eassumption. lia.
           
-          intros Hc. rewrite Hc in Hleq at 1. zify; omega.
-          intros Hc. rewrite Hc in Hleq' at 1. zify; omega.
+          intros Hc. rewrite Hc in Hleq at 1. zify; lia.
+          intros Hc. rewrite Hc in Hleq' at 1. zify; lia.
   Qed.
 
   Lemma cc_approx_exp_preserves_linking_fast x e1 e2 e1' e2' (Hincl : inclusion _ P PG):
@@ -884,11 +884,11 @@ Section LinkingFast.
           assert (Hleqz : (z <= max_var e (max_var e1' z))%positive).
           { eapply Pos.le_trans. eapply acc_leq_max_var. eapply acc_leq_max_var. }
           rewrite M.gso in H6.
-          2:{ intros Hc. zify. omega. }
+          2:{ intros Hc. zify. lia. }
           destruct (rho' ! z) eqn:Hgetz; inv H6.
           edestruct H0. reflexivity. eassumption. destructAll. rewrite functions.extend_gss in H1. 
           
-          eapply (Hexp1 (m + 2  + to_nat cin)) in H13; try omega. 
+          eapply (Hexp1 (m + 2  + to_nat cin)) in H13; try lia. 
           
 
           destructAll.
@@ -900,14 +900,14 @@ Section LinkingFast.
              simpl. rewrite M.gso. rewrite H1. reflexivity.
              
              intros Heq.
-             zify. omega.
+             zify. lia.
              simpl. rewrite peq_true. reflexivity. simpl. reflexivity. eassumption.
           -- simpl. eapply HGPost in H4.  eapply HPost_app in H4.
              unfold one in *. simpl in *. eassumption. 
              rewrite M.gss. reflexivity. simpl. rewrite M.gso. rewrite Hgetz. reflexivity.
-             intros Hc. zify; omega.
+             intros Hc. zify; lia.
              simpl. rewrite peq_true. reflexivity. simpl. reflexivity.
-          -- eapply cc_approx_res_monotonic. eassumption. omega.
+          -- eapply cc_approx_res_monotonic. eassumption. lia.
   Qed.
   
 End LinkingFast.
@@ -1209,6 +1209,19 @@ Section Refinement.
           (Hwf : forall e1 e2, wf_pres e1 e2 -> preserves_fv e1 e2)
           (Hwf_trans : Transitive wf_pres)
           (Hub : Pr_implies_post_upper_bound PostProp).
+
+  Lemma cc_approx_exp_in_refines P PG (HP : post_upper_bound P) e1 e2 :
+    (forall k, cc_approx_exp cenv ctag k P PG (e1, M.empty _) (e2, M.empty _)) ->
+    refines value_ref_cc e1 e2.
+  Proof.
+    intros Hc1. split.
+    - intros. edestruct Hc1; eauto. destructAll.
+      destruct x. contradiction. 
+      do 3 eexists. split. eassumption. eapply cc_approx_val_in_value_ref.
+      eassumption. 
+    - intros.
+      eapply cc_approx_exp_preserves_divergence; eauto.
+  Qed.
 
   
   Lemma R_n_exp_in_refines P PG (HP : post_upper_bound P) n m e1 e2 :

@@ -1,5 +1,0 @@
-((coq-mode . (coq-load-path . (("../../compcert" "compcert")
-                                ("../../../libraries" "Libraries")
-                                ("../../common" "Common")
-                                ("../../L6_PCPS" "L6")
-                                ("../../L6_PCPS/Heap" "L6.Heap")))))

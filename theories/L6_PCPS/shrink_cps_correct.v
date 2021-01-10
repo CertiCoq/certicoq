@@ -9,7 +9,7 @@ Require Import ExtLib.Data.Bool.
 Require Coq.funind.Recdef.
 Require Import compcert.lib.Coqlib.
 Import Nnat.
-Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz Coq.Sets.Ensembles Coq.Logic.Decidable Coq.Lists.ListDec.
+Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.micromega.Lia Coq.Program.Program micromega.Lia Coq.Sets.Ensembles Coq.Logic.Decidable Coq.Lists.ListDec.
 Require Import Libraries.CpdtTactics Coq.Sorting.Permutation.
 Require Import Libraries.HashMap.
 Require Import Libraries.maps_util.
@@ -357,7 +357,7 @@ Section Shrink_correct.
       subst.
       inv H0.
       specialize (IHB1 _ _ _ H10 H1).
-      replace (n0 + m0 + m) with (n0 + (m0 + m)) by omega.
+      replace (n0 + m0 + m) with (n0 + (m0 + m)) by lia.
       constructor; auto.
       inv H.
     - simpl in H. inv H0. auto.
@@ -372,7 +372,7 @@ Section Shrink_correct.
     induction B1; intros.
     - simpl in H. inv H.
       apply IHB1 in H8. destructAll. exists (n + x0), x1. split.
-      constructor; auto. split; auto. omega.
+      constructor; auto. split; auto. lia.
     - simpl in H. exists 0, nm. split; auto. constructor.
   Qed.
 
@@ -383,7 +383,7 @@ Section Shrink_correct.
       preord_exp cenv (P1 1) PG k (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e, rho1)
                  ((Efun (fundefs_append B1 B2) e), rho2).
   Proof.
-    intros k rho1 rho2 fb e B1 B2 xs t f Hnin Hub H H0. destruct (HPost 1). omega.
+    intros k rho1 rho2 fb e B1 B2 xs t f Hnin Hub H H0. destruct (HPost 1). lia.
     
     eapply preord_exp_fun_compat; eauto.
     simpl. eapply preord_exp_refl; eauto.
@@ -412,9 +412,9 @@ Section Shrink_correct.
            intros Hlt Hall.
            eapply preord_exp_refl; eauto.
            eapply preord_env_P_set_lists_l with (P1 := occurs_free e1 \\ FromList xs1); eauto.
-           replace i with (i + 1 - 1) by omega.
+           replace i with (i + 1 - 1) by lia.
            erewrite find_def_fundefs_append_Fcons_neq in Hf1; try eassumption.
-           eapply IHk'. omega. eassumption. eassumption.
+           eapply IHk'. lia. eassumption. eassumption.
            intros Hc. inv Hc.
            -- eapply not_occurs_not_free in H2; eauto. inv Hub. pi0. eassumption.
            -- inv Hub. pi0. eapply not_occurs_not_free in H8; eauto.
@@ -422,7 +422,7 @@ Section Shrink_correct.
               eapply occurs_free_in_fun in Hf1. inv H2. inv H3. eapply Hf1 in H2.
               inv H2; eauto. inv H3; eauto.
            -- eapply preord_env_P_monotonic; [| eapply preord_env_P_antimon; try eassumption ].
-              omega. eapply Union_Included. now sets.
+              lia. eapply Union_Included. now sets.
               do 2 eapply Setminus_Included_Included_Union. eapply Included_trans.
               eapply occurs_free_in_fun. eapply find_def_correct. eassumption. now sets.
            -- intros y Hnin' Hfv. constructor; eauto.
@@ -430,7 +430,7 @@ Section Shrink_correct.
            eapply fundefs_append_name_in_fundefs. reflexivity. inv n0; eauto.
            right; right; eauto.
        + rewrite def_funs_neq in *; eauto. eapply preord_env_P_monotonic in Henv.
-         eapply Henv. right; constructor; eauto. eassumption. omega.
+         eapply Henv. right; constructor; eauto. eassumption. lia.
          intros Hc. eapply n0. eapply fundefs_append_name_in_fundefs in Hc; [| reflexivity ].
          eapply fundefs_append_name_in_fundefs. reflexivity. inv Hc; eauto. inv H1; eauto.
          inv H2; eauto. contradiction.
@@ -518,13 +518,13 @@ Section Shrink_correct.
     exp_fundefs_ctx_induction IHe IHf; intros; auto; try (simpl; rewrite IHe; reflexivity).
     - simpl.
       apply eq_S.
-      induction l. simpl. rewrite IHe. omega.
+      induction l. simpl. rewrite IHe. lia.
       simpl. destruct a.
-      rewrite IHl. omega.
-    - simpl. rewrite IHe. omega.
-    - simpl. rewrite IHf. omega.
-    - simpl. rewrite IHe. omega.
-    - simpl. rewrite IHf. omega.
+      rewrite IHl. lia.
+    - simpl. rewrite IHe. lia.
+    - simpl. rewrite IHf. lia.
+    - simpl. rewrite IHe. lia.
+    - simpl. rewrite IHf. lia.
   Qed.
 
   Lemma ctx_circular:
@@ -534,7 +534,7 @@ Section Shrink_correct.
     intros.
     assert (term_size(c |[e]|) = ctx_size c + term_size e) by apply app_ctx_size.
     rewrite H in H0.
-    destruct c; auto; exfalso; simpl in H0; omega.
+    destruct c; auto; exfalso; simpl in H0; lia.
   Qed.
 
 
@@ -733,8 +733,8 @@ Section Shrink_correct.
         eapply preord_exp_refl; eauto.
         eapply preord_env_P_set_lists_l; [| | now eauto | now eauto | now eauto ].
         eapply IH'; eauto.
-        intros. eapply Hpre; eauto. omega.
-        eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        intros. eapply Hpre; eauto. lia.
+        eapply preord_env_P_monotonic; [| eassumption ]. lia.
         intros x0 H Hfv.
         eapply find_def_correct in Hf; eauto.
         eapply occurs_free_in_fun in Hfv; eauto.
@@ -771,9 +771,9 @@ Section Shrink_correct.
 
         eapply preord_env_P_set_lists_l; [| | eauto | eauto | eauto ].
         eapply IH'; eauto.
-        intros. eapply Hpre; eauto. omega.
+        intros. eapply Hpre; eauto. lia.
         repeat normalize_sets. 
-        eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega. sets.
+        eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. lia. sets.
         intros x1 Hv Hfv.
         eapply find_def_correct in Hf; eauto. inv Hfv; eauto.
         eapply occurs_free_in_fun in H0; eauto. inv H0. now exfalso; eauto.
@@ -822,7 +822,7 @@ Section Shrink_correct.
     preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     revert c S1 S rho1 rho2 e1 e2. induction k as [ k IH' ] using lt_wf_rec1.
-    induction c; intros S1 S rho1 rho2 e1 e2 Hyp Hbv Hpre; eauto; (destruct (HPost 1); [ omega | ]).
+    induction c; intros S1 S rho1 rho2 e1 e2 Hyp Hbv Hpre; eauto; (destruct (HPost 1); [ lia | ]).
     - simpl. apply Hyp. auto.
       simpl in Hpre. apply Hpre.
       apply eq_env_P_refl.
@@ -835,18 +835,18 @@ Section Shrink_correct.
          eapply preord_exp_monotonic. eapply IH'; eauto.
          {
            intros.
-           apply Hyp; eauto. omega.
+           apply Hyp; eauto. lia.
            eapply eq_env_P_set_not_in_P_l'; eauto.
            eapply eq_env_P_set_not_in_P_l'; eauto.
          }
          eapply Disjoint_Included_l; eauto.
          left; auto.
          apply preord_env_P_extend.
-         eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]. omega.
+         eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]. lia.
          simpl.
          rewrite occurs_free_Econstr.
          rewrite Setminus_Union_distr. now sets.
-         rewrite preord_val_eq. constructor. reflexivity. eassumption. omega.
+         rewrite preord_val_eq. constructor. reflexivity. eassumption. lia.
     - simpl app_ctx_f.
       rewrite bound_stem_Eproj_c in Hbv.
       eapply preord_exp_proj_compat; eauto.
@@ -859,13 +859,13 @@ Section Shrink_correct.
         eapply IH'; eauto.
         {
           intros.
-          apply Hyp; eauto. omega.
+          apply Hyp; eauto. lia.
           eapply eq_env_P_set_not_in_P_l'; eauto.
           eapply eq_env_P_set_not_in_P_l'; eauto.
         }
         eauto with Ensembles_DB.
         eapply preord_env_P_extend; [| assumption ].
-        eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]; omega.
+        eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]; lia.
         simpl. rewrite Setminus_Union_distr. rewrite occurs_free_Eproj. sets.
     - simpl.
       rewrite bound_stem_Eprim_c in Hbv.
@@ -898,29 +898,29 @@ Section Shrink_correct.
         eapply preord_exp_monotonic. eapply IH'; eauto.
         {
           intros.
-          apply Hyp; eauto. omega.
+          apply Hyp; eauto. lia.
           eapply eq_env_P_set_not_in_P_l'; eauto.
           eapply eq_env_P_set_not_in_P_l'; eauto.
         }
         eapply Disjoint_Included_l; eauto.
         left; auto.
         apply preord_env_P_extend.
-        eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]. lia.
         simpl.
         rewrite occurs_free_Eletapp. rewrite Setminus_Union_distr. 
-        eauto 10 with Ensembles_DB. eassumption. omega.
+        eauto 10 with Ensembles_DB. eassumption. lia.
     - simpl; eapply preord_exp_case_compat; eauto.
       eapply preord_env_P_antimon. eassumption. simpl. now sets.
       intros m Hlt.
       eapply IH'; auto.
       {
         intros.
-        apply Hyp; eauto. omega.
+        apply Hyp; eauto. lia.
       }
       rewrite bound_stem_Case_c in Hbv.
       eapply Disjoint_Included_l; eauto.
       reflexivity.
-      eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]. omega.
+      eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]. lia.
       simpl. intros x0 H.
       inv H; eauto. left. eapply occurs_free_Ecase_Included; eauto.
       eapply in_or_app. right. left; eauto.
@@ -946,7 +946,7 @@ Section Shrink_correct.
       eapply preord_env_P_def_funs_cor; eauto.
       eapply preord_env_P_antimon; [ eassumption |].
       simpl. rewrite occurs_free_Efun.
-      rewrite Setminus_Union_distr. eauto with Ensembles_DB. omega.
+      rewrite Setminus_Union_distr. eauto with Ensembles_DB. lia.
     - simpl. eapply preord_exp_fun_compat; eauto.
       eapply preord_exp_refl; eauto.
       eapply preord_env_P_antimon.
@@ -954,14 +954,14 @@ Section Shrink_correct.
       erewrite occurs_free_Efun in Hpre. 
       eapply preord_env_P_def_funs_compat_pre_vals_stem_set with (S1 := S1 :|: (occurs_free e \\ name_in_fundefs (f <[ e1 ]>))); eauto.
       { intros. eapply IH' with (S1 := S1 :|: (occurs_free e \\ name_in_fundefs (f <[ e1 ]>))); eauto.
-        omega.
+        lia.
         intros.
-        eapply Hyp; eauto. omega. eapply preord_env_P_antimon. eassumption.
+        eapply Hyp; eauto. lia. eapply preord_env_P_antimon. eassumption.
         now sets.
         eapply eq_env_P_trans.
         apply H1. auto.
         eapply eq_env_P_trans; eauto. }
-      + eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega.
+      + eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. lia.
         sets.
       + rewrite bound_stem_Fun2_c in Hbv. eassumption.
       + rewrite bound_stem_Fun2_c in Hbv. eassumption.
@@ -1061,11 +1061,11 @@ Section Shrink_correct.
       edestruct (preord_exp_refl cenv (P1 0) PG). now eauto.
       eapply preord_env_P_antimon. apply Hcc. 3:{ eassumption. }
       eapply occurs_free_Ecase_Included. eapply find_tag_nth_In_patterns; eassumption.
-      rewrite to_nat_add in Hleq. simpl; omega.
+      rewrite to_nat_add in Hleq. simpl; lia.
       destructAll.
       do 3 eexists. split; [| split ]. eassumption. 
       now eapply Hless_steps_case; eauto.
-      eapply preord_res_monotonic. eassumption. rewrite to_nat_add. omega.
+      eapply preord_res_monotonic. eassumption. rewrite to_nat_add. lia.
   Qed.
 
 
@@ -1076,7 +1076,7 @@ Section Shrink_correct.
     preord_env_P cenv PG (occurs_free (Econstr x c0 ys (c |[ Ecase x cl ]|))) k rho1 rho2 ->
     preord_exp cenv (P1 1) PG k (Econstr x c0 ys (c |[ Ecase x cl ]|), rho1) (Econstr x c0 ys (c |[ e ]|), rho2).
   Proof.
-    intros Hf Hb Henv. assert (HP := HPost). destruct (HP 1). omega.
+    intros Hf Hb Henv. assert (HP := HPost). destruct (HP 1). lia.
     eapply preord_exp_constr_compat; eauto.
     eapply Forall2_same. intros y Hin. eapply Henv. now constructor; eauto.
     intros m vs1 vs2 Hlt Hall.
@@ -1085,7 +1085,7 @@ Section Shrink_correct.
     - intros k' rho1' rho2' Hpre Hget1.
       rewrite Union_Empty_set_neut_r in Hpre. eapply rw_case_local; eassumption.
     - eapply preord_env_P_extend.
-      eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega.
+      eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. lia.
       normalize_occurs_free; now sets.
       rewrite preord_val_eq. simpl. split; auto.
   Qed.
@@ -1150,7 +1150,7 @@ Section Shrink_correct.
     revert e1 m rho1 rho2. induction k as [k IHk] using lt_wf_rec1.
     intros e1.
     revert k IHk; induction e1 using exp_ind'; intros k IHk m rho1 rho2 Hdis Hpre;
-      (assert (HP := HPost n); destruct HP; [ omega | ]).
+      (assert (HP := HPost n); destruct HP; [ lia | ]).
     - (* Econstr *)
       simpl; eapply preord_exp_constr_compat; eauto; intros.
       + eapply Forall2_preord_var_env_map. eassumption.
@@ -1165,7 +1165,7 @@ Section Shrink_correct.
              constructor; eauto. rewrite image'_Union. right; eauto.
           -- eapply preord_env_P_inj_antimon.
              eapply preord_env_P_inj_monotonic; [| eassumption ].
-             omega. normalize_occurs_free; sets.
+             lia. normalize_occurs_free; sets.
           -- rewrite preord_val_eq. simpl; split; eauto.
     - (* Ecase nil *)
       simpl; eapply preord_exp_case_nil_compat; eauto; intros.
@@ -1179,7 +1179,7 @@ Section Shrink_correct.
           normalize_occurs_free. rewrite !image'_Union. now sets.
         * eapply preord_env_P_inj_antimon.
           eapply preord_env_P_inj_monotonic; [| eassumption ].
-          omega. normalize_occurs_free; sets.
+          lia. normalize_occurs_free; sets.
       + eapply IHe0.
         * eauto.
         * eapply Disjoint_Included; [| | eassumption ].
@@ -1187,7 +1187,7 @@ Section Shrink_correct.
           normalize_occurs_free. rewrite !image'_Union. now sets.
         * eapply preord_env_P_inj_antimon.
           eapply preord_env_P_inj_monotonic; [| eassumption ].
-          omega. normalize_occurs_free; sets.
+          lia. normalize_occurs_free; sets.
     - (* Eproj *)
       simpl; eapply preord_exp_proj_compat; eauto; intros.
       eapply IHk; [ eassumption | | ].
@@ -1200,7 +1200,7 @@ Section Shrink_correct.
            constructor; eauto. rewrite image'_Union. right; eauto.
         -- eapply preord_env_P_inj_antimon.
            eapply preord_env_P_inj_monotonic; [| eassumption ].
-           omega. normalize_occurs_free; sets.
+           lia. normalize_occurs_free; sets.
         -- eassumption.
     - (* Eletapp *)
       simpl; eapply preord_exp_letapp_compat; eauto; intros.
@@ -1217,7 +1217,7 @@ Section Shrink_correct.
              constructor; eauto. rewrite image'_Union. right; eauto.
           -- eapply preord_env_P_inj_antimon.
              eapply preord_env_P_inj_monotonic; [| eassumption ].
-             omega. normalize_occurs_free; sets.
+             lia. normalize_occurs_free; sets.
           -- eassumption.
     - (* Efun *)
       simpl; eapply preord_exp_fun_compat; eauto.
@@ -1272,8 +1272,8 @@ Section Shrink_correct.
                        eapply Included_trans. eapply occurs_free_in_fun; eauto. rewrite <- Same_set_all_fun_name.
                        normalize_occurs_free. sets.
                    --- eapply preord_env_P_inj_antimon. eapply IHk'; [ eassumption | | ].
-                       +++ intros. eapply IHk; eauto. omega.
-                       +++ eapply preord_env_P_inj_monotonic; [| eassumption ]. omega.
+                       +++ intros. eapply IHk; eauto. lia.
+                       +++ eapply preord_env_P_inj_monotonic; [| eassumption ]. lia.
                        +++ eapply Setminus_Included_Included_Union. eapply Included_trans.
                            eapply occurs_free_in_fun. eassumption. normalize_occurs_free. sets.
                    --- eassumption.
@@ -1288,7 +1288,7 @@ Section Shrink_correct.
           now eexists; split; eauto.
           constructor; eauto. eapply name_in_fundefs_bound_var_fundefs. eassumption.
           intros Hc'. eapply n0. eapply Same_set_all_fun_name. eassumption.
-      + omega.
+      + lia.
     - (* Eapp *)
       simpl; eapply preord_exp_app_compat; eauto; intros.
       + eapply Forall2_preord_var_env_map. eassumption.
@@ -1366,7 +1366,7 @@ Section Shrink_correct.
       preord_exp cenv (P1 1) PG k (Econstr x t ys (c |[ Eproj x' t' n x e ]|) , rho1 )
                  (Econstr x t ys (c |[ rename y x' e ]|), rho2).
   Proof.
-    intros Hn1 Hn2 Hn3 Hleq Hneq Hnth Henv. assert (HP := HPost 1). destruct HP. omega.
+    intros Hn1 Hn2 Hn3 Hleq Hneq Hnth Henv. assert (HP := HPost 1). destruct HP. lia.
     eapply preord_exp_constr_compat_alt; eauto.
     + eapply Forall2_same. intros. eapply Henv. now constructor.
     + intros m vs1 vs2 Hlt Hg1 Hg2.
@@ -1387,7 +1387,7 @@ Section Shrink_correct.
         -- reflexivity.
         -- intros rho1'' Hrho1'; inv Hrho1'. inv H8.
            eapply rename_all_correct.
-           ++ omega.
+           ++ lia.
            ++ eapply Disjoint_Included_l.
               eapply image'_get_Singleton. eapply Disjoint_Singleton_l. eassumption.
            ++ simpl in Hgetl1, Hgetl2.
@@ -1398,17 +1398,17 @@ Section Shrink_correct.
               inv Hgetl2. inv Hgetl1. inv H6.
               eapply preord_env_P_inj_set_l_apply_r; eauto. eapply preord_env_P_inj_map_id. 
               eapply preord_env_P_antimon. eassumption. normalize_occurs_free; sets.
-              subst_exp. eapply preord_val_monotonic; eauto. omega.
+              subst_exp. eapply preord_val_monotonic; eauto. lia.
       * repeat normalize_sets.
         eapply Union_Disjoint_r; eapply Disjoint_Singleton_r; eauto.
       * eapply preord_env_P_extend.
-        eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega.
+        eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. lia.
         normalize_occurs_free. now sets.
         rewrite preord_val_eq.  split; eauto.
         edestruct preord_env_P_get_list_l as [vs2' [Hg2' Hvs]]; [| | eapply Hg1 |]. eassumption.
         normalize_occurs_free; sets.
         subst_exp. eapply Forall2_monotonic; [ | eassumption ].
-        intros. eapply preord_val_monotonic. eassumption. omega.
+        intros. eapply preord_val_monotonic. eassumption. lia.
   Qed.
   
   
@@ -1488,7 +1488,7 @@ Section Shrink_correct.
                (Efun fds (c |[ Eapp f t vs ]|), rho1)
                (Efun fds (c |[ (rename_all (set_list (combine xs vs) (M.empty var)) fb)]|), rho2).
   Proof.
-    intros Hf1 Hd1 Hun1 Hd2 Hd3 Hpre. assert (HP := HPost 1). destruct HP. omega.
+    intros Hf1 Hd1 Hun1 Hd2 Hd3 Hpre. assert (HP := HPost 1). destruct HP. lia.
     eapply preord_exp_fun_compat; eauto.
     assert (Hget1 : M.get f (def_funs fds fds rho1 rho1) = Some (Vfun rho1 fds f)). 
     { rewrite def_funs_eq. reflexivity. eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct.
@@ -1511,7 +1511,7 @@ Section Shrink_correct.
       rewrite <- Heq1 in Hget. rewrite def_funs_eq in Hget; eauto. inv Hget. repeat subst_exp.
        
       eapply rename_all_correct.
-      ++ omega.
+      ++ lia.
       ++ eapply Disjoint_Included_l. eapply image'_get_set_list. 
          eapply Disjoint_sym. eapply Disjoint_Included_l; [| eassumption ].
          now sets.
@@ -1525,7 +1525,7 @@ Section Shrink_correct.
          ** eapply preord_env_P_antimon. 
             eapply preord_env_P_def_funs_pre. eassumption.
             { intros. eapply preord_exp_refl; eauto. }
-            eapply preord_env_P_monotonic; [| eassumption ]. omega.
+            eapply preord_env_P_monotonic; [| eassumption ]. lia.
             eapply Setminus_Included_Included_Union.
             eapply Included_trans. eapply occurs_free_in_fun. eapply find_def_correct; eauto.
             normalize_occurs_free. sets.
@@ -1537,7 +1537,7 @@ Section Shrink_correct.
     * eapply preord_env_P_antimon.
       eapply preord_env_P_def_funs_pre with (e := c |[ Eapp f t vs ]|); eauto.
       { intros. eapply preord_exp_refl; eauto. } 
-      eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega. reflexivity.
+      eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. lia. reflexivity.
       normalize_occurs_free. rewrite <- Union_assoc, <- Union_Setminus; tci. sets.
   Qed.
 
@@ -1590,7 +1590,7 @@ Section Shrink_correct.
                (Efun fds (c |[ Eletapp x f t vs e1 ]|), rho1)
                (Efun fds (c |[ C' |[ rename x' x e1 ]| ]|), rho2).
   Proof.
-    intros Hf1 Hd1 Hun1 Hd2 Hd3  Hd4 Hd5 Hnin Hnd Hpre. assert (HP := HPost 1). destruct HP. omega.
+    intros Hf1 Hd1 Hun1 Hd2 Hd3  Hd4 Hd5 Hnin Hnd Hpre. assert (HP := HPost 1). destruct HP. lia.
     eapply preord_exp_fun_compat; eauto.
     assert (Hget1 : M.get f (def_funs fds fds rho1 rho1) = Some (Vfun rho1 fds f)). 
     { rewrite def_funs_eq. reflexivity. eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct.
@@ -1615,7 +1615,7 @@ Section Shrink_correct.
         2:{ left; eauto. } simpl (_ |[ _ ]|).
 
         eapply rename_all_correct.
-        * omega.
+        * lia.
         * eapply Disjoint_Included_l. eapply image'_get_set_list. sets.
         * edestruct preord_env_P_get_list_l as [vs2 [Hget' Hvall]]; [ | | eassumption | ]. eassumption. 
           normalize_occurs_free. now sets. 
@@ -1624,7 +1624,7 @@ Section Shrink_correct.
              ** eapply preord_env_P_antimon.
                 eapply preord_env_P_def_funs_pre. eassumption.
                 { intros. eapply preord_exp_refl; eauto. }
-                eapply preord_env_P_monotonic; [| eassumption ]. omega.
+                eapply preord_env_P_monotonic; [| eassumption ]. lia.
                 eapply Setminus_Included_Included_Union.
                 eapply Included_trans. eapply occurs_free_in_fun. eapply find_def_correct; eauto.
                 normalize_occurs_free. sets.
@@ -1633,11 +1633,11 @@ Section Shrink_correct.
                 eapply occurs_free_in_fun in H; [| eapply find_def_correct; eassumption ].
                 inv H; eauto. contradiction.
           -- eapply Forall2_monotonic; [| eassumption ]. intros z1 z2 Hv.
-             eapply preord_val_monotonic; eauto. omega.
+             eapply preord_val_monotonic; eauto. lia.
       + intros m rho3 rho4 rhoc B' f' t' xs1' e' Hlt Hgetf Hfind Hlen Henv.
         rewrite <- Heq1 in Hgetf; [| now left; eauto ]. rewrite def_funs_eq in Hgetf. inv Hgetf. repeat subst_exp. 
         eapply rename_all_correct.
-        * omega.
+        * lia.
         * eapply Disjoint_Included_l. 
           eapply image'_get_Singleton.
           destruct (inline_letapp_var_eq _ _ _ _ Hnd).
@@ -1680,7 +1680,7 @@ Section Shrink_correct.
     - eapply preord_env_P_antimon.
       eapply preord_env_P_def_funs_pre with (e := c |[ Eletapp x f t vs e1 ]|); eauto.
       { intros. eapply preord_exp_refl; eauto. }
-      eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. omega. reflexivity.
+      eapply preord_env_P_antimon. eapply preord_env_P_monotonic; [| eassumption ]. lia. reflexivity.
       normalize_occurs_free. rewrite <- Union_assoc, <- Union_Setminus; tci. sets.
   Qed.
 
@@ -1846,7 +1846,7 @@ Section Shrink_correct.
       inv H0. eapply fundefs_append_num_occur' in H6.
       destruct H6 as [n1 [n2 [Hn1 [Hn2 Heq_z]]]]. pi0. inv Hn2. pi0.
       apply rm_any_fundefs; auto.
-      + replace 0 with (0 + (0 + 0)) by omega.
+      + replace 0 with (0 + (0 + 0)) by lia.
         econstructor. eassumption. eapply fundefs_append_num_occur. reflexivity.
         eassumption. eassumption.
       + eapply preord_env_P_antimon. eassumption.      
@@ -1909,7 +1909,7 @@ Section Shrink_correct.
     induction H; intros.
     - eapply preord_exp_post_monotonic.
       eapply HcompP1. 
-      eapply preord_exp_trans; eauto. destruct (HPost 1). omega.
+      eapply preord_exp_trans; eauto. destruct (HPost 1). lia.
       revert HGPost HcompP1. clear. now firstorder.
       eapply gen_rw_correct; try eassumption.      
       intros m. eapply IHrefl_trans_closure_n.
@@ -3057,9 +3057,9 @@ Section Shrink_Rewrites.
     destruct (M.get a sigma) eqn:gas.
     exfalso.
     apply H. exists v; auto.
-    destruct (cps_util.var_dec a a). omega.
+    destruct (cps_util.var_dec a a). lia.
     exfalso; apply n. auto.
-    destruct (cps_util.var_dec f (apply_r sigma a)); omega.
+    destruct (cps_util.var_dec f (apply_r sigma a)); lia.
   Qed.
 
   Lemma num_occur_list_not_range: forall f sigma,
@@ -3072,7 +3072,7 @@ Section Shrink_Rewrites.
     - simpl.
       destruct (cps_util.var_dec f a).
       + subst.
-        destruct (cps_util.var_dec a (apply_r sigma a)); omega.
+        destruct (cps_util.var_dec a (apply_r sigma a)); lia.
       + destruct (cps_util.var_dec f (apply_r sigma a)).
         * exfalso. apply H.
           exists a.
@@ -3080,7 +3080,7 @@ Section Shrink_Rewrites.
           destruct  (Maps.PTree.get a sigma).
           subst; auto.
           exfalso; apply n; auto.
-        * omega.
+        * lia.
   Qed.
 
   Local Hint Constructors num_occur num_occur_fds num_occur_case num_occur_ec num_occur_fdc : core.
@@ -3118,9 +3118,9 @@ substitution to a term cannot increase the occurence count for that variable. *)
       auto.
     - simpl in H2. inv H1. inv H2. inv H8. inv H7.
       replace (num_occur_list [v] f + (n + m)) with
-          (n + (num_occur_list [v] f + m)) by omega.
+          (n + (num_occur_list [v] f + m)) by lia.
       replace ((num_occur_list (@cons var (apply_r sigma v) (@nil var)) f) + (n0 + m0)) with
-          (n0 + (num_occur_list (@cons var (apply_r sigma v) (@nil var)) f + m0)) by omega.
+          (n0 + (num_occur_list (@cons var (apply_r sigma v) (@nil var)) f + m0)) by lia.
       apply plus_le_compat.
       eapply H; eauto.
       eapply H0; eauto.
@@ -3203,7 +3203,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - inv H0; inv H1.
       specialize (H _ _ H8 H7).
       assert (Hnn := num_occur_list_not_range _ _ Hs l).
-      omega.
+      lia.
     - inv H; inv H0.
       inv H5; inv H4.
       rewrite plus_0_r.
@@ -3215,31 +3215,31 @@ substitution to a term cannot increase the occurence count for that variable. *)
       assert (  num_occur_list [apply_r sig v] f + m0 <=
                 num_occur_list [v] f + m).
       eapply H0. constructor; auto. constructor; auto.
-      simpl in *. omega.
+      simpl in *. lia.
     - inv H0; inv H1.
       specialize (H _ _ H9 H8).
       assert (Hnn := num_occur_list_not_range _ _ Hs [v0]).
-      simpl in *. omega.
+      simpl in *. lia.
     - inv H0; inv H1.
       specialize (H _ _ H9 H8).
       assert (Hnn := num_occur_list_not_range _ _ Hs (f0 :: ys)).
-      simpl in *; omega.
+      simpl in *; lia.
     - inv H1; inv H2.
       specialize (H _ _ H8 H9).
       specialize (H0 _ _ H5 H4).
-      omega.
+      lia.
     - inv H; inv H0.
       apply (num_occur_list_not_range _ _ Hs (v::l)).
     - inv H0; inv H1.
       specialize (H _ _ H8 H7).
       assert (Hnn := num_occur_list_not_range _ _ Hs l).
-      omega.
+      lia.
     - inv H; inv H0.
       apply (num_occur_list_not_range _ _ Hs [v]).
     - inv H1; inv H2.
       specialize (H _ _ H10 H9).
       specialize (H0 _ _ H11 H12).
-      omega.
+      lia.
     - inv H; inv H0; auto.
   Qed.
 
@@ -3295,9 +3295,9 @@ substitution to a term cannot increase the occurence count for that variable. *)
       auto.
     - simpl in H2. inv H1. inv H2. inv H8. inv H7.
       replace (num_occur_list [v] f + (n + m)) with
-          (n + (num_occur_list [v] f + m)) by omega.
+          (n + (num_occur_list [v] f + m)) by lia.
       replace (Init.Nat.add (num_occur_list (@cons var (apply_r sigma v) (@nil var)) f) (Init.Nat.add n0 m0)) with
-          (n0 + (num_occur_list (@cons var (apply_r sigma v) (@nil var)) f + m0)) by omega.
+          (n0 + (num_occur_list (@cons var (apply_r sigma v) (@nil var)) f + m0)) by lia.
       apply plus_le_compat.
       eapply H; eauto.
       eapply H0; eauto.
@@ -3356,9 +3356,9 @@ substitution to a term cannot increase the occurence count for that variable. *)
       rewrite apply_r_set1.
       destruct (cps_util.var_dec f y).
       exfalso; auto.
-      destruct (cps_util.var_dec f (apply_r sigma a)); omega.
+      destruct (cps_util.var_dec f (apply_r sigma a)); lia.
     - rewrite apply_r_set2  by auto.
-      destruct (cps_util.var_dec f (apply_r sigma a)); omega.
+      destruct (cps_util.var_dec f (apply_r sigma a)); lia.
   Qed.
 
 
@@ -3375,7 +3375,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - subst.
       rewrite apply_r_set1.
       destruct (cps_util.var_dec f y). subst.
-      destruct (cps_util.var_dec y (apply_r sigma a)); omega.
+      destruct (cps_util.var_dec y (apply_r sigma a)); lia.
       destruct (cps_util.var_dec f (apply_r sigma a)).
       exfalso. unfold apply_r  in e.
       destruct (Maps.PTree.get a sigma) eqn:gas.
@@ -3383,7 +3383,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       auto.
       auto.
     - rewrite apply_r_set2; auto.
-      destruct (cps_util.var_dec f (apply_r sigma a)); omega.
+      destruct (cps_util.var_dec f (apply_r sigma a)); lia.
   Qed.
 
   Lemma num_occur_sig_unaffected:
@@ -3399,7 +3399,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     eapply (proj1 (num_occur_rename_all_not_dom_mut _)); eauto.
     assert (m <= n).
     eapply (proj1 (num_occur_rename_all_ns_not_range_mut _ _ H0)); eauto.
-    omega.
+    lia.
   Qed.
 
   Lemma num_occur_rename_all_ns_set_not_x:
@@ -3521,7 +3521,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     intros.
     assert (n <= m). eapply (proj1 (num_occur_rename_all_ns_set _ _ _ H1)); eauto.
     assert (m <= n). eapply (proj1 (num_occur_rename_all_ns_set_not_x _ _ _ _ H H0)); eauto.
-    omega.
+    lia.
   Qed.
 
   Lemma not_occur_rename_not_dom:
@@ -3572,10 +3572,10 @@ substitution to a term cannot increase the occurence count for that variable. *)
       destruct (cps_util.var_dec y a).
       exfalso; auto.
       destruct (cps_util.var_dec y y). 2: exfalso; auto.
-      omega.
+      lia.
     - rewrite apply_r_set2 by auto.
       rewrite apply_r_empty.
-      destruct (cps_util.var_dec y a); omega.
+      destruct (cps_util.var_dec y a); lia.
   Qed.
 
   Lemma num_occur_arl_kill:
@@ -3612,26 +3612,26 @@ substitution to a term cannot increase the occurence count for that variable. *)
       rewrite num_occur_arl_kill; auto.
     - eapply num_occur_n. constructor. constructor.
       assert (Hn := num_occur_arl_kill _ _ Hrx Hdx [v]).
-      simpl in Hn. simpl. omega.
+      simpl in Hn. simpl. lia.
     - eapply num_occur_n. constructor. constructor. eauto.
       inv H0; pi0; eauto. simpl.
       inv H0; pi0. destruct (cps_util.var_dec x (apply_r sig v)); subst; pi0; auto.
     - eapply num_occur_n. constructor; eauto.
       assert (Hn := num_occur_arl_kill _ _ Hrx Hdx [v0]).
-      simpl in *; omega.
+      simpl in *; lia.
     - eapply num_occur_n. constructor; eauto.
       assert (Hn := num_occur_arl_kill _ _ Hrx Hdx (f::ys)).
-      simpl in *. omega.
+      simpl in *. lia.
     - eapply num_occur_n. constructor; eauto.
       auto.
     - eapply num_occur_n. constructor; eauto.
       assert (Hn := num_occur_arl_kill _ _ Hrx Hdx (v::l)).
-      simpl in *. omega.
+      simpl in *. lia.
     - eapply num_occur_n. constructor; eauto.
       rewrite num_occur_arl_kill; auto.
     - eapply num_occur_n. constructor; auto.
       assert (Hn := num_occur_arl_kill _ _ Hrx Hdx [v]).
-      simpl in *; omega.
+      simpl in *; lia.
     - eapply num_occur_fds_n.  constructor; eauto.
       auto.
     - constructor.
@@ -3660,7 +3660,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       rewrite num_occur_arl; auto.
       eapply num_occur_n.
       constructor; eauto.
-      rewrite num_occur_set_arl; auto. omega.
+      rewrite num_occur_set_arl; auto. lia.
     - inv H; inv H0.
       inv H5; inv H4.
       split.
@@ -3685,7 +3685,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
         simpl. auto.
       + eapply num_occur_n.
         constructor. constructor; eauto.
-        simpl. omega.
+        simpl. lia.
     - specialize (H _ _ H9 H8).
       destruct H.
       split.
@@ -3694,44 +3694,44 @@ substitution to a term cannot increase the occurence count for that variable. *)
       simpl in Hn. simpl. rewrite plus_0_r. auto.
       eapply num_occur_n. constructor; eauto.
       assert (Hnn := num_occur_set_arl _ _ Hxy [v0]).
-      simpl. simpl in Hnn. unfold var in *. unfold M.elt in *. rewrite Hnn. omega.
+      simpl. simpl in Hnn. unfold var in *. unfold M.elt in *. rewrite Hnn. lia.
     - specialize (H _ _ H9 H8).
       inv H. split; eapply num_occur_n; eauto.
       assert (Hn := num_occur_arl _ _ (f::ys) Hxy).
       simpl in Hn. simpl.
-      unfold var in *. unfold M.elt in *. omega.
+      unfold var in *. unfold M.elt in *. lia.
       assert (Hnn := num_occur_set_arl _ _ Hxy (f::ys)).
-      simpl. simpl in Hnn. unfold var in *. unfold M.elt in *. omega.
+      simpl. simpl in Hnn. unfold var in *. unfold M.elt in *. lia.
     - inv H1; inv H2.
       specialize (H _ _ H8 H9).
       specialize (H0 _ _ H5 H4).
       destructAll. split; eapply num_occur_n; eauto.
-      omega.
+      lia.
     - inv H; inv H0. split; eapply num_occur_n; eauto.
       assert (Hn := num_occur_arl _ _ (v::l) Hxy).
       simpl in Hn. simpl.
-      unfold var in *. unfold M.elt in *. omega.
+      unfold var in *. unfold M.elt in *. lia.
       assert (Hnn := num_occur_set_arl _ _ Hxy (v::l)).
-      simpl. simpl in Hnn. unfold var in *. unfold M.elt in *. omega.
+      simpl. simpl in Hnn. unfold var in *. unfold M.elt in *. lia.
     - specialize (H _ _ H8 H7).
       destruct H.
       split; eapply num_occur_n; eauto.
       rewrite num_occur_arl; auto.
-      rewrite num_occur_set_arl; auto. omega.
+      rewrite num_occur_set_arl; auto. lia.
     - inv H; inv H0.
       split; eapply num_occur_n; eauto.
       assert (Hn := num_occur_arl _ _ [v] Hxy).
       simpl in Hn. simpl. unfold var in *.
       unfold M.elt in *.
-      omega.
+      lia.
       assert (Hnn := num_occur_set_arl _ _ Hxy [v]).
-      simpl. simpl in Hnn. unfold var in *.  unfold M.elt in *. omega.
+      simpl. simpl in Hnn. unfold var in *.  unfold M.elt in *. lia.
     - inv H1; inv H2. specialize (H _ _ H10 H9).
       specialize (H0 _ _ H11 H12).
       destruct H; destruct H0.
       split.
       eapply num_occur_fds_n. constructor; eauto.  auto.
-      eapply num_occur_fds_n. constructor; eauto.  omega.
+      eapply num_occur_fds_n. constructor; eauto.  lia.
     - inv H; inv H0. split; auto.
   Qed.
 
@@ -3892,7 +3892,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       destruct (cps_util.var_dec f f).
       2: (exfalso; apply n; auto).
       assert (x = 0 /\ num_occur_list vs f = 0 /\ m = 0).
-      omega.
+      lia.
       clear H3.
       apply fundefs_append_num_occur' in H6.
       destructAll.
@@ -3974,7 +3974,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       eapply unique_bindings_fundefs_unique_functions. eassumption.
     - (* App inlining *)
       exists 2; split; eauto.
-      replace 2 with (1 + 1) by omega.
+      replace 2 with (1 + 1) by lia.
 
       assert (Hub := H0).
         eapply split_fds_unique_bindings_fundefs_l in H0; [| eapply fundefs_append_split_fds; reflexivity ]. 
@@ -4029,10 +4029,10 @@ substitution to a term cannot increase the occurence count for that variable. *)
         Transparent num_occur_list.
         - inv H7. eapply num_occur_app_ctx_mut in H9.
           destructAll. inv H4. simpl in H6. rewrite peq_true in H6.
-          assert (Heq0 : num_occur_list vs f = 0) by omega.
-          assert (Heqx : x = 0) by omega.
-          assert (Heqm : m = 0) by omega. subst.
-          replace 0 with (0 + 0) by omega. constructor; [| eassumption ].
+          assert (Heq0 : num_occur_list vs f = 0) by lia.
+          assert (Heqx : x = 0) by lia.
+          assert (Heqm : m = 0) by lia. subst.
+          replace 0 with (0 + 0) by lia. constructor; [| eassumption ].
 
           eapply num_occur_app_ctx_mut. exists 0, 0. split; [| split ]; eauto. 
 
@@ -4045,14 +4045,14 @@ substitution to a term cannot increase the occurence count for that variable. *)
 
           eapply fundefs_append_num_occur' in H10. destructAll. pi0. inv H7. pi0.
           eapply num_occur_rename_all_ns_not_range in H23; [| eassumption | ]. 
-          assert (Heq : m = 0) by omega. subst. eassumption.
+          assert (Heq : m = 0) by lia. subst. eassumption.
 
           intros Hc. eapply Range_map_set_list in Hc. eapply not_occur_list; eauto. }
 
     - (* Let app inlining *)
       eexists 2; split; eauto.
       assert (Hdefs:= H). assert (Hub := H0).
-      replace 2 with (1 + 1) by omega.
+      replace 2 with (1 + 1) by lia.
 
       eapply split_fds_unique_bindings_fundefs_l in H0; [| eapply fundefs_append_split_fds; reflexivity ]. 
       destructAll. inv H2.
@@ -4140,12 +4140,12 @@ substitution to a term cannot increase the occurence count for that variable. *)
         
         - inv H6. eapply num_occur_app_ctx_mut in H21.
           destructAll. inv H6. simpl in H9. rewrite peq_true in H9.
-          assert (Heq0 : num_occur_list vs f = 0) by omega.
-          assert (Heqx : x0 = 0) by omega.
-          assert (Heqm : m = 0) by omega.
-          assert (Heqn : n = 0) by omega. subst.
+          assert (Heq0 : num_occur_list vs f = 0) by lia.
+          assert (Heqx : x0 = 0) by lia.
+          assert (Heqm : m = 0) by lia.
+          assert (Heqn : n = 0) by lia. subst.
           
-          replace 0 with (0 + 0) by omega. constructor; [| eassumption ].
+          replace 0 with (0 + 0) by lia. constructor; [| eassumption ].
           
           eapply num_occur_app_ctx_mut. exists 0, 0. split; [| split ]; eauto. 
           
@@ -4164,7 +4164,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
               as [m Ho].
 
             eapply num_occur_rename_all_ns_not_range in H27; [| eassumption | ]. 
-            assert (Heq : m = 0) by omega. subst. eassumption.            
+            assert (Heq : m = 0) by lia. subst. eassumption.            
             intros Hc. eapply Range_map_set_list in Hc. eapply not_occur_list; eauto.
             intros Hc; subst.
             eapply HdisFV. constructor. right. normalize_bound_var. now right.
@@ -4172,7 +4172,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
           { edestruct (e_num_occur f (rename_all_ns (M.set x x' (M.empty var)) e1))
               as [m Ho].
             eapply num_occur_rename_all_ns_not_range in H28; [| eassumption | ]. 
-            assert (Heq : m = 0) by omega. subst. eassumption.
+            assert (Heq : m = 0) by lia. subst. eassumption.
             intros Hc. 
             eapply Range_map_set_list with (xs0 := [x]) (vs0 := [x']) in Hc.
             repeat normalize_sets. inv Hc. eapply inline_letapp_var_eq in H8. inv H8; subst.
@@ -4490,9 +4490,9 @@ substitution to a term cannot increase the occurence count for that variable. *)
 
           eapply of_fun_rm with (c := Hole_c). eassumption. 
           inv H1. eapply num_occur_app_ctx in H12. destructAll. inv H7. 
-          simpl in H10. rewrite peq_true in H10. assert (Heqx : x0 = 0) by omega.
-          assert (Heqn : n = 0) by omega. assert (Heqm : m = 0) by omega. subst.
-          replace 0 with ((0 + 0) + 0) by omega. 
+          simpl in H10. rewrite peq_true in H10. assert (Heqx : x0 = 0) by lia.
+          assert (Heqn : n = 0) by lia. assert (Heqm : m = 0) by lia. subst.
+          replace 0 with ((0 + 0) + 0) by lia. 
           econstructor; eauto.
 
           eapply fundefs_append_num_occur' in H13. destructAll. pi0.
@@ -4503,8 +4503,8 @@ substitution to a term cannot increase the occurence count for that variable. *)
             as [m Ho].
           inv H9. pi0.
           eapply num_occur_rename_all_ns_not_range in H26; [| eassumption | ]. 
-          assert (Heq : m = 0) by omega. subst. eassumption.            
-          intros Hc. eapply Range_map_set_list in Hc. eapply not_occur_list; eauto. omega.
+          assert (Heq : m = 0) by lia. subst. eassumption.            
+          intros Hc. eapply Range_map_set_list in Hc. eapply not_occur_list; eauto. lia.
           eassumption. 
           
           split; eauto.
@@ -4514,7 +4514,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
           edestruct (e_num_occur f (rename_all_ns (M.set x x' (M.empty var)) e1)) as [m Ho].
           
           eapply num_occur_rename_all_ns_not_range with (e := e1) in H27; [| eassumption | ]. 
-          assert (Heq : m = 0) by omega. subst. eassumption.
+          assert (Heq : m = 0) by lia. subst. eassumption.
           intros Hc. 
           eapply Range_map_set_list with (xs0 := [x]) (vs0 := [x']) in Hc.
           repeat normalize_sets. inv Hc. eapply inline_letapp_var_eq in H2. inv H2; subst.
@@ -4526,7 +4526,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
           inv H2. inv H11.
 
           inv H9. pi0. now eapply not_occurs_not_free in H28; eauto.
-          eapply Range_map_set_list in H11. eapply not_occur_list; [| eassumption ]. omega.
+          eapply Range_map_set_list in H11. eapply not_occur_list; [| eassumption ]. lia.
           eassumption. 
         * repeat normalize_bound_var. rewrite fundefs_append_bound_vars; [| reflexivity ].
           rewrite fundefs_append_bound_vars with (B3 := fundefs_append B1 (Fcons f t xs fb B2)); [| reflexivity ].
@@ -4722,9 +4722,9 @@ substitution to a term cannot increase the occurence count for that variable. *)
       eapply gen_sr_rw_preserves; eauto.
       eapply gen_sr_in_rw in H; eauto. destructAll.
       eexists (x + m1).
-      split. omega.
+      split. lia.
       eapply refl_trans_closure_n_trans; eauto.
-    - eexists; split; [| eapply Refl ]. omega.
+    - eexists; split; [| eapply Refl ]. lia.
   Qed.
 
   

@@ -158,9 +158,111 @@ module Little =
   | D9 d1 -> D9 (succ_double d1)
  end
 
+type uint0 =
+| Nil1
+| D10 of uint0
+| D11 of uint0
+| D12 of uint0
+| D13 of uint0
+| D14 of uint0
+| D15 of uint0
+| D16 of uint0
+| D17 of uint0
+| D18 of uint0
+| D19 of uint0
+| Da of uint0
+| Db of uint0
+| Dc of uint0
+| Dd of uint0
+| De of uint0
+| Df of uint0
+
+type int0 =
+| Pos0 of uint0
+| Neg0 of uint0
+
+(** val revapp0 : uint0 -> uint0 -> uint0 **)
+
+let rec revapp0 d0 d' =
+  match d0 with
+  | Nil1 -> d'
+  | D10 d1 -> revapp0 d1 (D10 d')
+  | D11 d1 -> revapp0 d1 (D11 d')
+  | D12 d1 -> revapp0 d1 (D12 d')
+  | D13 d1 -> revapp0 d1 (D13 d')
+  | D14 d1 -> revapp0 d1 (D14 d')
+  | D15 d1 -> revapp0 d1 (D15 d')
+  | D16 d1 -> revapp0 d1 (D16 d')
+  | D17 d1 -> revapp0 d1 (D17 d')
+  | D18 d1 -> revapp0 d1 (D18 d')
+  | D19 d1 -> revapp0 d1 (D19 d')
+  | Da d1 -> revapp0 d1 (Da d')
+  | Db d1 -> revapp0 d1 (Db d')
+  | Dc d1 -> revapp0 d1 (Dc d')
+  | Dd d1 -> revapp0 d1 (Dd d')
+  | De d1 -> revapp0 d1 (De d')
+  | Df d1 -> revapp0 d1 (Df d')
+
+(** val rev0 : uint0 -> uint0 **)
+
+let rev0 d0 =
+  revapp0 d0 Nil1
+
+module Coq_Little =
+ struct
+  (** val double : uint0 -> uint0 **)
+
+  let rec double = function
+  | Nil1 -> Nil1
+  | D10 d1 -> D10 (double d1)
+  | D11 d1 -> D12 (double d1)
+  | D12 d1 -> D14 (double d1)
+  | D13 d1 -> D16 (double d1)
+  | D14 d1 -> D18 (double d1)
+  | D15 d1 -> Da (double d1)
+  | D16 d1 -> Dc (double d1)
+  | D17 d1 -> De (double d1)
+  | D18 d1 -> D10 (succ_double d1)
+  | D19 d1 -> D12 (succ_double d1)
+  | Da d1 -> D14 (succ_double d1)
+  | Db d1 -> D16 (succ_double d1)
+  | Dc d1 -> D18 (succ_double d1)
+  | Dd d1 -> Da (succ_double d1)
+  | De d1 -> Dc (succ_double d1)
+  | Df d1 -> De (succ_double d1)
+
+  (** val succ_double : uint0 -> uint0 **)
+
+  and succ_double = function
+  | Nil1 -> D11 Nil1
+  | D10 d1 -> D11 (double d1)
+  | D11 d1 -> D13 (double d1)
+  | D12 d1 -> D15 (double d1)
+  | D13 d1 -> D17 (double d1)
+  | D14 d1 -> D19 (double d1)
+  | D15 d1 -> Db (double d1)
+  | D16 d1 -> Dd (double d1)
+  | D17 d1 -> Df (double d1)
+  | D18 d1 -> D11 (succ_double d1)
+  | D19 d1 -> D13 (succ_double d1)
+  | Da d1 -> D15 (succ_double d1)
+  | Db d1 -> D17 (succ_double d1)
+  | Dc d1 -> D19 (succ_double d1)
+  | Dd d1 -> Db (succ_double d1)
+  | De d1 -> Dd (succ_double d1)
+  | Df d1 -> Df (succ_double d1)
+ end
+
+type uint1 =
+| UIntDec of uint
+| UIntHex of uint0
+
+type int1 =
+| IntDec of int
+| IntHex of int0
+
 module Coq__1 = struct
- (** val add : nat -> nat -> nat **)
- let rec add n0 m =
+ (** val add : nat -> nat -> nat **)let rec add n0 m =
    match n0 with
    | O -> m
    | S p -> S (add p m)
@@ -268,10 +370,9 @@ module OrderedTypeFacts =
   (** val lt_dec : O.t -> O.t -> sumbool **)
 
   let lt_dec x y =
-    let c0 = compSpec2Type x y (O.compare x y) in
-    (match c0 with
-     | CompLtT -> Left
-     | _ -> Right)
+    let c0 = compSpec2Type x y (O.compare x y) in (match c0 with
+                                                   | CompLtT -> Left
+                                                   | _ -> Right)
 
   (** val eqb : O.t -> O.t -> bool **)
 
@@ -318,16 +419,14 @@ module Coq_Pos =
 
   let rec add x y =
     match x with
-    | XI p ->
-      (match y with
-       | XI q -> XO (add_carry p q)
-       | XO q -> XI (add p q)
-       | XH -> XO (succ p))
-    | XO p ->
-      (match y with
-       | XI q -> XI (add p q)
-       | XO q -> XO (add p q)
-       | XH -> XI p)
+    | XI p -> (match y with
+               | XI q -> XO (add_carry p q)
+               | XO q -> XI (add p q)
+               | XH -> XO (succ p))
+    | XO p -> (match y with
+               | XI q -> XI (add p q)
+               | XO q -> XO (add p q)
+               | XH -> XI p)
     | XH -> (match y with
              | XI q -> XO (succ q)
              | XO q -> XI q
@@ -337,21 +436,18 @@ module Coq_Pos =
 
   and add_carry x y =
     match x with
-    | XI p ->
-      (match y with
-       | XI q -> XI (add_carry p q)
-       | XO q -> XO (add_carry p q)
-       | XH -> XI (succ p))
-    | XO p ->
-      (match y with
-       | XI q -> XO (add_carry p q)
-       | XO q -> XI (add p q)
-       | XH -> XO (succ p))
-    | XH ->
-      (match y with
-       | XI q -> XI (succ q)
-       | XO q -> XO (succ q)
-       | XH -> XI XH)
+    | XI p -> (match y with
+               | XI q -> XI (add_carry p q)
+               | XO q -> XO (add_carry p q)
+               | XH -> XI (succ p))
+    | XO p -> (match y with
+               | XI q -> XO (add_carry p q)
+               | XO q -> XI (add p q)
+               | XH -> XO (succ p))
+    | XH -> (match y with
+             | XI q -> XI (succ q)
+             | XO q -> XO (succ q)
+             | XH -> XI XH)
 
   (** val pred_double : positive -> positive **)
 
@@ -521,16 +617,14 @@ module Coq_Pos =
 
   let rec compare_cont r x y =
     match x with
-    | XI p ->
-      (match y with
-       | XI q -> compare_cont r p q
-       | XO q -> compare_cont Gt p q
-       | XH -> Gt)
-    | XO p ->
-      (match y with
-       | XI q -> compare_cont Lt p q
-       | XO q -> compare_cont r p q
-       | XH -> Gt)
+    | XI p -> (match y with
+               | XI q -> compare_cont r p q
+               | XO q -> compare_cont Gt p q
+               | XH -> Gt)
+    | XO p -> (match y with
+               | XI q -> compare_cont Lt p q
+               | XO q -> compare_cont r p q
+               | XH -> Gt)
     | XH -> (match y with
              | XH -> r
              | _ -> Lt)
@@ -583,8 +677,7 @@ module Coq_Pos =
     | _ -> False
 
   (** val sqrtrem_step :
-      (positive -> positive) -> (positive -> positive) -> (positive, mask)
-      prod -> (positive, mask) prod **)
+      (positive -> positive) -> (positive -> positive) -> (positive, mask) prod -> (positive, mask) prod **)
 
   let sqrtrem_step f g = function
   | Pair (s, y) ->
@@ -633,11 +726,10 @@ module Coq_Pos =
              | Gt -> gcdn n1 (sub a' b') b0)
           | XO b1 -> gcdn n1 a0 b1
           | XH -> XH)
-       | XO a1 ->
-         (match b0 with
-          | XI _ -> gcdn n1 a1 b0
-          | XO b1 -> XO (gcdn n1 a1 b1)
-          | XH -> XH)
+       | XO a1 -> (match b0 with
+                   | XI _ -> gcdn n1 a1 b0
+                   | XO b1 -> XO (gcdn n1 a1 b1)
+                   | XH -> XH)
        | XH -> XH)
 
   (** val gcd : positive -> positive -> positive **)
@@ -645,9 +737,7 @@ module Coq_Pos =
   let gcd a0 b0 =
     gcdn (Coq__1.add (size_nat a0) (size_nat b0)) a0 b0
 
-  (** val ggcdn :
-      nat -> positive -> positive -> (positive, (positive, positive) prod)
-      prod **)
+  (** val ggcdn : nat -> positive -> positive -> (positive, (positive, positive) prod) prod **)
 
   let rec ggcdn n0 a0 b0 =
     match n0 with
@@ -661,27 +751,20 @@ module Coq_Pos =
              | Eq -> Pair (a0, (Pair (XH, XH)))
              | Lt ->
                let Pair (g, p) = ggcdn n1 (sub b' a') a0 in
-               let Pair (ba, aa) = p in
-               Pair (g, (Pair (aa, (add aa (XO ba)))))
+               let Pair (ba, aa) = p in Pair (g, (Pair (aa, (add aa (XO ba)))))
              | Gt ->
                let Pair (g, p) = ggcdn n1 (sub a' b') b0 in
-               let Pair (ab, bb) = p in
-               Pair (g, (Pair ((add bb (XO ab)), bb))))
-          | XO b1 ->
-            let Pair (g, p) = ggcdn n1 a0 b1 in
-            let Pair (aa, bb) = p in Pair (g, (Pair (aa, (XO bb))))
+               let Pair (ab, bb) = p in Pair (g, (Pair ((add bb (XO ab)), bb))))
+          | XO b1 -> let Pair (g, p) = ggcdn n1 a0 b1 in let Pair (aa, bb) = p in Pair (g, (Pair (aa, (XO bb))))
           | XH -> Pair (XH, (Pair (a0, XH))))
        | XO a1 ->
          (match b0 with
-          | XI _ ->
-            let Pair (g, p) = ggcdn n1 a1 b0 in
-            let Pair (aa, bb) = p in Pair (g, (Pair ((XO aa), bb)))
+          | XI _ -> let Pair (g, p) = ggcdn n1 a1 b0 in let Pair (aa, bb) = p in Pair (g, (Pair ((XO aa), bb)))
           | XO b1 -> let Pair (g, p) = ggcdn n1 a1 b1 in Pair ((XO g), p)
           | XH -> Pair (XH, (Pair (a0, XH))))
        | XH -> Pair (XH, (Pair (XH, b0))))
 
-  (** val ggcd :
-      positive -> positive -> (positive, (positive, positive) prod) prod **)
+  (** val ggcd : positive -> positive -> (positive, (positive, positive) prod) prod **)
 
   let ggcd a0 b0 =
     ggcdn (Coq__1.add (size_nat a0) (size_nat b0)) a0 b0
@@ -702,16 +785,14 @@ module Coq_Pos =
 
   let rec coq_lor p q =
     match p with
-    | XI p0 ->
-      (match q with
-       | XI q0 -> XI (coq_lor p0 q0)
-       | XO q0 -> XI (coq_lor p0 q0)
-       | XH -> p)
-    | XO p0 ->
-      (match q with
-       | XI q0 -> XI (coq_lor p0 q0)
-       | XO q0 -> XO (coq_lor p0 q0)
-       | XH -> XI p0)
+    | XI p0 -> (match q with
+                | XI q0 -> XI (coq_lor p0 q0)
+                | XO q0 -> XI (coq_lor p0 q0)
+                | XH -> p)
+    | XO p0 -> (match q with
+                | XI q0 -> XI (coq_lor p0 q0)
+                | XO q0 -> XO (coq_lor p0 q0)
+                | XH -> XI p0)
     | XH -> (match q with
              | XO q0 -> XI q0
              | _ -> q)
@@ -766,11 +847,10 @@ module Coq_Pos =
        | XI q0 -> coq_Nsucc_double (coq_lxor p0 q0)
        | XO q0 -> coq_Ndouble (coq_lxor p0 q0)
        | XH -> Npos (XI p0))
-    | XH ->
-      (match q with
-       | XI q0 -> Npos (XO q0)
-       | XO q0 -> Npos (XI q0)
-       | XH -> N0)
+    | XH -> (match q with
+             | XI q0 -> Npos (XO q0)
+             | XO q0 -> Npos (XI q0)
+             | XH -> N0)
 
   (** val shiftl_nat : positive -> nat -> positive **)
 
@@ -864,10 +944,8 @@ module Coq_Pos =
     | D5 l -> of_uint_acc l (add (XI (XO XH)) (mul (XO (XI (XO XH))) acc))
     | D6 l -> of_uint_acc l (add (XO (XI XH)) (mul (XO (XI (XO XH))) acc))
     | D7 l -> of_uint_acc l (add (XI (XI XH)) (mul (XO (XI (XO XH))) acc))
-    | D8 l ->
-      of_uint_acc l (add (XO (XO (XO XH))) (mul (XO (XI (XO XH))) acc))
-    | D9 l ->
-      of_uint_acc l (add (XI (XO (XO XH))) (mul (XO (XI (XO XH))) acc))
+    | D8 l -> of_uint_acc l (add (XO (XO (XO XH))) (mul (XO (XI (XO XH))) acc))
+    | D9 l -> of_uint_acc l (add (XI (XO (XO XH))) (mul (XO (XI (XO XH))) acc))
 
   (** val of_uint : uint -> n **)
 
@@ -884,6 +962,55 @@ module Coq_Pos =
   | D8 l -> Npos (of_uint_acc l (XO (XO (XO XH))))
   | D9 l -> Npos (of_uint_acc l (XI (XO (XO XH))))
 
+  (** val of_hex_uint_acc : uint0 -> positive -> positive **)
+
+  let rec of_hex_uint_acc d0 acc =
+    match d0 with
+    | Nil1 -> acc
+    | D10 l -> of_hex_uint_acc l (mul (XO (XO (XO (XO XH)))) acc)
+    | D11 l -> of_hex_uint_acc l (add XH (mul (XO (XO (XO (XO XH)))) acc))
+    | D12 l -> of_hex_uint_acc l (add (XO XH) (mul (XO (XO (XO (XO XH)))) acc))
+    | D13 l -> of_hex_uint_acc l (add (XI XH) (mul (XO (XO (XO (XO XH)))) acc))
+    | D14 l -> of_hex_uint_acc l (add (XO (XO XH)) (mul (XO (XO (XO (XO XH)))) acc))
+    | D15 l -> of_hex_uint_acc l (add (XI (XO XH)) (mul (XO (XO (XO (XO XH)))) acc))
+    | D16 l -> of_hex_uint_acc l (add (XO (XI XH)) (mul (XO (XO (XO (XO XH)))) acc))
+    | D17 l -> of_hex_uint_acc l (add (XI (XI XH)) (mul (XO (XO (XO (XO XH)))) acc))
+    | D18 l -> of_hex_uint_acc l (add (XO (XO (XO XH))) (mul (XO (XO (XO (XO XH)))) acc))
+    | D19 l -> of_hex_uint_acc l (add (XI (XO (XO XH))) (mul (XO (XO (XO (XO XH)))) acc))
+    | Da l -> of_hex_uint_acc l (add (XO (XI (XO XH))) (mul (XO (XO (XO (XO XH)))) acc))
+    | Db l -> of_hex_uint_acc l (add (XI (XI (XO XH))) (mul (XO (XO (XO (XO XH)))) acc))
+    | Dc l -> of_hex_uint_acc l (add (XO (XO (XI XH))) (mul (XO (XO (XO (XO XH)))) acc))
+    | Dd l -> of_hex_uint_acc l (add (XI (XO (XI XH))) (mul (XO (XO (XO (XO XH)))) acc))
+    | De l -> of_hex_uint_acc l (add (XO (XI (XI XH))) (mul (XO (XO (XO (XO XH)))) acc))
+    | Df l -> of_hex_uint_acc l (add (XI (XI (XI XH))) (mul (XO (XO (XO (XO XH)))) acc))
+
+  (** val of_hex_uint : uint0 -> n **)
+
+  let rec of_hex_uint = function
+  | Nil1 -> N0
+  | D10 l -> of_hex_uint l
+  | D11 l -> Npos (of_hex_uint_acc l XH)
+  | D12 l -> Npos (of_hex_uint_acc l (XO XH))
+  | D13 l -> Npos (of_hex_uint_acc l (XI XH))
+  | D14 l -> Npos (of_hex_uint_acc l (XO (XO XH)))
+  | D15 l -> Npos (of_hex_uint_acc l (XI (XO XH)))
+  | D16 l -> Npos (of_hex_uint_acc l (XO (XI XH)))
+  | D17 l -> Npos (of_hex_uint_acc l (XI (XI XH)))
+  | D18 l -> Npos (of_hex_uint_acc l (XO (XO (XO XH))))
+  | D19 l -> Npos (of_hex_uint_acc l (XI (XO (XO XH))))
+  | Da l -> Npos (of_hex_uint_acc l (XO (XI (XO XH))))
+  | Db l -> Npos (of_hex_uint_acc l (XI (XI (XO XH))))
+  | Dc l -> Npos (of_hex_uint_acc l (XO (XO (XI XH))))
+  | Dd l -> Npos (of_hex_uint_acc l (XI (XO (XI XH))))
+  | De l -> Npos (of_hex_uint_acc l (XO (XI (XI XH))))
+  | Df l -> Npos (of_hex_uint_acc l (XI (XI (XI XH))))
+
+  (** val of_num_uint : uint1 -> n **)
+
+  let of_num_uint = function
+  | UIntDec d1 -> of_uint d1
+  | UIntHex d1 -> of_hex_uint d1
+
   (** val of_int : int -> positive option **)
 
   let of_int = function
@@ -891,6 +1018,20 @@ module Coq_Pos =
                | N0 -> None
                | Npos p -> Some p)
   | Neg _ -> None
+
+  (** val of_hex_int : int0 -> positive option **)
+
+  let of_hex_int = function
+  | Pos0 d1 -> (match of_hex_uint d1 with
+                | N0 -> None
+                | Npos p -> Some p)
+  | Neg0 _ -> None
+
+  (** val of_num_int : int1 -> positive option **)
+
+  let of_num_int = function
+  | IntDec d1 -> of_int d1
+  | IntHex d1 -> of_hex_int d1
 
   (** val to_little_uint : positive -> uint **)
 
@@ -904,10 +1045,37 @@ module Coq_Pos =
   let to_uint p =
     rev (to_little_uint p)
 
+  (** val to_little_hex_uint : positive -> uint0 **)
+
+  let rec to_little_hex_uint = function
+  | XI p0 -> Coq_Little.succ_double (to_little_hex_uint p0)
+  | XO p0 -> Coq_Little.double (to_little_hex_uint p0)
+  | XH -> D11 Nil1
+
+  (** val to_hex_uint : positive -> uint0 **)
+
+  let to_hex_uint p =
+    rev0 (to_little_hex_uint p)
+
+  (** val to_num_uint : positive -> uint1 **)
+
+  let to_num_uint p =
+    UIntDec (to_uint p)
+
   (** val to_int : positive -> int **)
 
   let to_int n0 =
     Pos (to_uint n0)
+
+  (** val to_hex_int : positive -> int0 **)
+
+  let to_hex_int p =
+    Pos0 (to_hex_uint p)
+
+  (** val to_num_int : positive -> int1 **)
+
+  let to_num_int n0 =
+    IntDec (to_int n0)
 
   (** val eq_dec : positive -> positive -> sumbool **)
 
@@ -926,8 +1094,7 @@ module Coq_Pos =
   (** val peano_rect : 'a1 -> (positive -> 'a1 -> 'a1) -> positive -> 'a1 **)
 
   let rec peano_rect a0 f p =
-    let f2 = peano_rect (f XH a0) (fun p0 x -> f (succ (XO p0)) (f (XO p0) x))
-    in
+    let f2 = peano_rect (f XH a0) (fun p0 x -> f (succ (XO p0)) (f (XO p0) x)) in
     (match p with
      | XI q -> f (XO q) (f2 q)
      | XO q -> f2 q
@@ -943,16 +1110,14 @@ module Coq_Pos =
   | PeanoSucc of positive * coq_PeanoView
 
   (** val coq_PeanoView_rect :
-      'a1 -> (positive -> coq_PeanoView -> 'a1 -> 'a1) -> positive ->
-      coq_PeanoView -> 'a1 **)
+      'a1 -> (positive -> coq_PeanoView -> 'a1 -> 'a1) -> positive -> coq_PeanoView -> 'a1 **)
 
   let rec coq_PeanoView_rect f f0 _ = function
   | PeanoOne -> f
   | PeanoSucc (p0, p1) -> f0 p0 p1 (coq_PeanoView_rect f f0 p0 p1)
 
   (** val coq_PeanoView_rec :
-      'a1 -> (positive -> coq_PeanoView -> 'a1 -> 'a1) -> positive ->
-      coq_PeanoView -> 'a1 **)
+      'a1 -> (positive -> coq_PeanoView -> 'a1 -> 'a1) -> positive -> coq_PeanoView -> 'a1 **)
 
   let rec coq_PeanoView_rec f f0 _ = function
   | PeanoOne -> f
@@ -962,15 +1127,13 @@ module Coq_Pos =
 
   let rec peanoView_xO _ = function
   | PeanoOne -> PeanoSucc (XH, PeanoOne)
-  | PeanoSucc (p0, q0) ->
-    PeanoSucc ((succ (XO p0)), (PeanoSucc ((XO p0), (peanoView_xO p0 q0))))
+  | PeanoSucc (p0, q0) -> PeanoSucc ((succ (XO p0)), (PeanoSucc ((XO p0), (peanoView_xO p0 q0))))
 
   (** val peanoView_xI : positive -> coq_PeanoView -> coq_PeanoView **)
 
   let rec peanoView_xI _ = function
   | PeanoOne -> PeanoSucc ((succ XH), (PeanoSucc (XH, PeanoOne)))
-  | PeanoSucc (p0, q0) ->
-    PeanoSucc ((succ (XI p0)), (PeanoSucc ((XI p0), (peanoView_xI p0 q0))))
+  | PeanoSucc (p0, q0) -> PeanoSucc ((succ (XI p0)), (PeanoSucc ((XI p0), (peanoView_xI p0 q0))))
 
   (** val peanoView : positive -> coq_PeanoView **)
 
@@ -979,8 +1142,7 @@ module Coq_Pos =
   | XO p0 -> peanoView_xO p0 (peanoView p0)
   | XH -> PeanoOne
 
-  (** val coq_PeanoView_iter :
-      'a1 -> (positive -> 'a1 -> 'a1) -> positive -> coq_PeanoView -> 'a1 **)
+  (** val coq_PeanoView_iter : 'a1 -> (positive -> 'a1 -> 'a1) -> positive -> coq_PeanoView -> 'a1 **)
 
   let rec coq_PeanoView_iter a0 f _ = function
   | PeanoOne -> a0
@@ -1021,8 +1183,7 @@ module Coq_Pos =
   module Private_Dec =
    struct
     (** val max_case_strong :
-        positive -> positive -> (positive -> positive -> __ -> 'a1 -> 'a1) ->
-        (__ -> 'a1) -> (__ -> 'a1) -> 'a1 **)
+        positive -> positive -> (positive -> positive -> __ -> 'a1 -> 'a1) -> (__ -> 'a1) -> (__ -> 'a1) -> 'a1 **)
 
     let max_case_strong n0 m compat hl hr =
       let c0 = compSpec2Type n0 m (compare n0 m) in
@@ -1030,9 +1191,7 @@ module Coq_Pos =
        | CompGtT -> compat n0 (max n0 m) __ (hl __)
        | _ -> compat m (max n0 m) __ (hr __))
 
-    (** val max_case :
-        positive -> positive -> (positive -> positive -> __ -> 'a1 -> 'a1) ->
-        'a1 -> 'a1 -> 'a1 **)
+    (** val max_case : positive -> positive -> (positive -> positive -> __ -> 'a1 -> 'a1) -> 'a1 -> 'a1 -> 'a1 **)
 
     let max_case n0 m x x0 x1 =
       max_case_strong n0 m x (fun _ -> x0) (fun _ -> x1)
@@ -1043,8 +1202,7 @@ module Coq_Pos =
       max_case n0 m (fun _ _ _ h0 -> h0) Left Right
 
     (** val min_case_strong :
-        positive -> positive -> (positive -> positive -> __ -> 'a1 -> 'a1) ->
-        (__ -> 'a1) -> (__ -> 'a1) -> 'a1 **)
+        positive -> positive -> (positive -> positive -> __ -> 'a1 -> 'a1) -> (__ -> 'a1) -> (__ -> 'a1) -> 'a1 **)
 
     let min_case_strong n0 m compat hl hr =
       let c0 = compSpec2Type n0 m (compare n0 m) in
@@ -1052,9 +1210,7 @@ module Coq_Pos =
        | CompGtT -> compat m (min n0 m) __ (hr __)
        | _ -> compat n0 (min n0 m) __ (hl __))
 
-    (** val min_case :
-        positive -> positive -> (positive -> positive -> __ -> 'a1 -> 'a1) ->
-        'a1 -> 'a1 -> 'a1 **)
+    (** val min_case : positive -> positive -> (positive -> positive -> __ -> 'a1 -> 'a1) -> 'a1 -> 'a1 -> 'a1 **)
 
     let min_case n0 m x x0 x1 =
       min_case_strong n0 m x (fun _ -> x0) (fun _ -> x1)
@@ -1065,8 +1221,7 @@ module Coq_Pos =
       min_case n0 m (fun _ _ _ h0 -> h0) Left Right
    end
 
-  (** val max_case_strong :
-      positive -> positive -> (__ -> 'a1) -> (__ -> 'a1) -> 'a1 **)
+  (** val max_case_strong : positive -> positive -> (__ -> 'a1) -> (__ -> 'a1) -> 'a1 **)
 
   let max_case_strong n0 m x x0 =
     Private_Dec.max_case_strong n0 m (fun _ _ _ x1 -> x1) x x0
@@ -1081,8 +1236,7 @@ module Coq_Pos =
   let max_dec =
     Private_Dec.max_dec
 
-  (** val min_case_strong :
-      positive -> positive -> (__ -> 'a1) -> (__ -> 'a1) -> 'a1 **)
+  (** val min_case_strong : positive -> positive -> (__ -> 'a1) -> (__ -> 'a1) -> 'a1 **)
 
   let min_case_strong n0 m x x0 =
     Private_Dec.min_case_strong n0 m (fun _ _ _ x1 -> x1) x x0
@@ -1098,11 +1252,11 @@ module Coq_Pos =
     Private_Dec.min_dec
  end
 
-(** val rev0 : 'a1 list -> 'a1 list **)
+(** val rev1 : 'a1 list -> 'a1 list **)
 
-let rec rev0 = function
+let rec rev1 = function
 | Nil -> Nil
-| Cons (x, l') -> app (rev0 l') (Cons (x, Nil))
+| Cons (x, l') -> app (rev1 l') (Cons (x, Nil))
 
 (** val rev_append : 'a1 list -> 'a1 list -> 'a1 list **)
 
@@ -1150,10 +1304,9 @@ let rec forallb f = function
 
 let rec filter f = function
 | Nil -> Nil
-| Cons (x, l0) ->
-  (match f x with
-   | True -> Cons (x, (filter f l0))
-   | False -> filter f l0)
+| Cons (x, l0) -> (match f x with
+                   | True -> Cons (x, (filter f l0))
+                   | False -> filter f l0)
 
 (** val partition : ('a1 -> bool) -> 'a1 list -> ('a1 list, 'a1 list) prod **)
 
@@ -1208,29 +1361,26 @@ module Make =
 
     let rec mem x = function
     | Leaf -> False
-    | Node (_, l, k, r) ->
-      (match X.compare x k with
-       | Eq -> True
-       | Lt -> mem x l
-       | Gt -> mem x r)
+    | Node (_, l, k, r) -> (match X.compare x k with
+                            | Eq -> True
+                            | Lt -> mem x l
+                            | Gt -> mem x r)
 
     (** val min_elt : tree -> elt option **)
 
     let rec min_elt = function
     | Leaf -> None
-    | Node (_, l, x, _) ->
-      (match l with
-       | Leaf -> Some x
-       | Node (_, _, _, _) -> min_elt l)
+    | Node (_, l, x, _) -> (match l with
+                            | Leaf -> Some x
+                            | Node (_, _, _, _) -> min_elt l)
 
     (** val max_elt : tree -> elt option **)
 
     let rec max_elt = function
     | Leaf -> None
-    | Node (_, _, x, r) ->
-      (match r with
-       | Leaf -> Some x
-       | Node (_, _, _, _) -> max_elt r)
+    | Node (_, _, x, r) -> (match r with
+                            | Leaf -> Some x
+                            | Node (_, _, _, _) -> max_elt r)
 
     (** val choose : tree -> elt option **)
 
@@ -1259,8 +1409,7 @@ module Make =
 
     let rec rev_elements_aux acc = function
     | Leaf -> acc
-    | Node (_, l, x, r) ->
-      rev_elements_aux (Cons (x, (rev_elements_aux acc l))) r
+    | Node (_, l, x, r) -> rev_elements_aux (Cons (x, (rev_elements_aux acc l))) r
 
     (** val rev_elements : tree -> X.t list **)
 
@@ -1318,24 +1467,20 @@ module Make =
       | Leaf -> e0
       | Node (_, l, x, r) -> cons l (More (x, r, e0))
 
-    (** val compare_more :
-        X.t -> (enumeration -> comparison) -> enumeration -> comparison **)
+    (** val compare_more : X.t -> (enumeration -> comparison) -> enumeration -> comparison **)
 
     let compare_more x1 cont = function
     | End -> Gt
-    | More (x2, r2, e3) ->
-      (match X.compare x1 x2 with
-       | Eq -> cont (cons r2 e3)
-       | x -> x)
+    | More (x2, r2, e3) -> (match X.compare x1 x2 with
+                            | Eq -> cont (cons r2 e3)
+                            | x -> x)
 
-    (** val compare_cont :
-        tree -> (enumeration -> comparison) -> enumeration -> comparison **)
+    (** val compare_cont : tree -> (enumeration -> comparison) -> enumeration -> comparison **)
 
     let rec compare_cont s1 cont e2 =
       match s1 with
       | Leaf -> cont e2
-      | Node (_, l1, x1, r1) ->
-        compare_cont l1 (compare_more x1 (compare_cont r1 cont)) e2
+      | Node (_, l1, x1, r1) -> compare_cont l1 (compare_more x1 (compare_cont r1 cont)) e2
 
     (** val compare_end : enumeration -> comparison **)
 
@@ -1389,18 +1534,15 @@ module Make =
          | Leaf -> False
          | Node (_, l2, x2, r2) ->
            (match X.compare x1 x2 with
-            | Eq ->
-              (match subset l1 l2 with
-               | True -> subset r1 r2
-               | False -> False)
-            | Lt ->
-              (match subsetl (subset l1) x1 l2 with
-               | True -> subset r1 s2
-               | False -> False)
-            | Gt ->
-              (match subsetr (subset r1) x1 r2 with
-               | True -> subset l1 s2
-               | False -> False)))
+            | Eq -> (match subset l1 l2 with
+                     | True -> subset r1 r2
+                     | False -> False)
+            | Lt -> (match subsetl (subset l1) x1 l2 with
+                     | True -> subset r1 s2
+                     | False -> False)
+            | Gt -> (match subsetr (subset r1) x1 r2 with
+                     | True -> subset l1 s2
+                     | False -> False)))
 
     type t = tree
 
@@ -1435,23 +1577,17 @@ module Make =
                | Leaf -> Node (Black, l, k, r)
                | Node (t1, b0, y, c1) ->
                  (match t1 with
-                  | Red ->
-                    Node (Red, (Node (Black, a0, x, b0)), y, (Node (Black,
-                      c1, k, r)))
+                  | Red -> Node (Red, (Node (Black, a0, x, b0)), y, (Node (Black, c1, k, r)))
                   | Black -> Node (Black, l, k, r)))
             | Node (t1, a1, x0, b0) ->
               (match t1 with
-               | Red ->
-                 Node (Red, (Node (Black, a1, x0, b0)), x, (Node (Black, c0,
-                   k, r)))
+               | Red -> Node (Red, (Node (Black, a1, x0, b0)), x, (Node (Black, c0, k, r)))
                | Black ->
                  (match c0 with
                   | Leaf -> Node (Black, l, k, r)
                   | Node (t2, b1, y, c1) ->
                     (match t2 with
-                     | Red ->
-                       Node (Red, (Node (Black, a0, x, b1)), y, (Node (Black,
-                         c1, k, r)))
+                     | Red -> Node (Red, (Node (Black, a0, x, b1)), y, (Node (Black, c1, k, r)))
                      | Black -> Node (Black, l, k, r)))))
          | Black -> Node (Black, l, k, r))
 
@@ -1468,23 +1604,17 @@ module Make =
              | Leaf -> Node (Black, l, k, r)
              | Node (t1, c0, z0, d1) ->
                (match t1 with
-                | Red ->
-                  Node (Red, (Node (Black, l, k, b0)), y, (Node (Black, c0,
-                    z0, d1)))
+                | Red -> Node (Red, (Node (Black, l, k, b0)), y, (Node (Black, c0, z0, d1)))
                 | Black -> Node (Black, l, k, r)))
           | Node (t1, b1, y0, c0) ->
             (match t1 with
-             | Red ->
-               Node (Red, (Node (Black, l, k, b1)), y0, (Node (Black, c0, y,
-                 d0)))
+             | Red -> Node (Red, (Node (Black, l, k, b1)), y0, (Node (Black, c0, y, d0)))
              | Black ->
                (match d0 with
                 | Leaf -> Node (Black, l, k, r)
                 | Node (t2, c1, z0, d1) ->
                   (match t2 with
-                   | Red ->
-                     Node (Red, (Node (Black, l, k, b0)), y, (Node (Black,
-                       c1, z0, d1)))
+                   | Red -> Node (Red, (Node (Black, l, k, b0)), y, (Node (Black, c1, z0, d1)))
                    | Black -> Node (Black, l, k, r)))))
        | Black -> Node (Black, l, k, r))
 
@@ -1501,33 +1631,23 @@ module Make =
              | Leaf -> Node (Black, l, k, r)
              | Node (t1, c0, z1, d1) ->
                (match t1 with
-                | Red ->
-                  Node (Red, (Node (Black, l, k, b0)), z0, (Node (Black, c0,
-                    z1, d1)))
+                | Red -> Node (Red, (Node (Black, l, k, b0)), z0, (Node (Black, c0, z1, d1)))
                 | Black -> Node (Black, l, k, r)))
           | Node (t1, b1, y, c0) ->
             (match t1 with
              | Red ->
                (match d0 with
-                | Leaf ->
-                  Node (Red, (Node (Black, l, k, b1)), y, (Node (Black, c0,
-                    z0, d0)))
+                | Leaf -> Node (Red, (Node (Black, l, k, b1)), y, (Node (Black, c0, z0, d0)))
                 | Node (t2, c1, z1, d1) ->
                   (match t2 with
-                   | Red ->
-                     Node (Red, (Node (Black, l, k, b0)), z0, (Node (Black,
-                       c1, z1, d1)))
-                   | Black ->
-                     Node (Red, (Node (Black, l, k, b1)), y, (Node (Black,
-                       c0, z0, d0)))))
+                   | Red -> Node (Red, (Node (Black, l, k, b0)), z0, (Node (Black, c1, z1, d1)))
+                   | Black -> Node (Red, (Node (Black, l, k, b1)), y, (Node (Black, c0, z0, d0)))))
              | Black ->
                (match d0 with
                 | Leaf -> Node (Black, l, k, r)
                 | Node (t2, c1, z1, d1) ->
                   (match t2 with
-                   | Red ->
-                     Node (Red, (Node (Black, l, k, b0)), z0, (Node (Black,
-                       c1, z1, d1)))
+                   | Red -> Node (Red, (Node (Black, l, k, b0)), z0, (Node (Black, c1, z1, d1)))
                    | Black -> Node (Black, l, k, r)))))
        | Black -> Node (Black, l, k, r))
 
@@ -1546,9 +1666,7 @@ module Make =
                | Node (t1, a1, y, b0) ->
                  (match t1 with
                   | Red -> Node (Red, l, k, r)
-                  | Black ->
-                    Node (Red, (Node (Black, l, k, a1)), y,
-                      (rbal' b0 z0 (makeRed c0)))))
+                  | Black -> Node (Red, (Node (Black, l, k, a1)), y, (rbal' b0 z0 (makeRed c0)))))
             | Black -> rbal' l k (Node (Red, a0, z0, c0))))
       | Node (t0, a0, x, b0) ->
         (match t0 with
@@ -1564,9 +1682,7 @@ module Make =
                   | Node (t2, a2, y, b1) ->
                     (match t2 with
                      | Red -> Node (Red, l, k, r)
-                     | Black ->
-                       Node (Red, (Node (Black, l, k, a2)), y,
-                         (rbal' b1 z0 (makeRed c0)))))
+                     | Black -> Node (Red, (Node (Black, l, k, a2)), y, (rbal' b1 z0 (makeRed c0)))))
                | Black -> rbal' l k (Node (Red, a1, z0, c0)))))
 
     (** val rbalS : tree -> X.t -> tree -> tree **)
@@ -1583,9 +1699,7 @@ module Make =
              | Node (t1, b1, y, c0) ->
                (match t1 with
                 | Red -> Node (Red, l, k, r)
-                | Black ->
-                  Node (Red, (lbal (makeRed a0) x b1), y, (Node (Black, c0,
-                    k, r)))))
+                | Black -> Node (Red, (lbal (makeRed a0) x b1), y, (Node (Black, c0, k, r)))))
           | Black -> lbal (Node (Red, a0, x, b0)) k r))
     | Node (t0, b0, y, c0) ->
       (match t0 with
@@ -1601,9 +1715,7 @@ module Make =
                 | Node (t2, b2, y0, c1) ->
                   (match t2 with
                    | Red -> Node (Red, l, k, r)
-                   | Black ->
-                     Node (Red, (lbal (makeRed a0) x b2), y0, (Node (Black,
-                       c1, k, r)))))
+                   | Black -> Node (Red, (lbal (makeRed a0) x b2), y0, (Node (Black, c1, k, r)))))
              | Black -> lbal (Node (Red, a0, x, b1)) k r)))
 
     (** val ins : X.t -> tree -> tree **)
@@ -1613,14 +1725,12 @@ module Make =
     | Node (c0, l, y, r) ->
       (match X.compare x y with
        | Eq -> s
-       | Lt ->
-         (match c0 with
-          | Red -> Node (Red, (ins x l), y, r)
-          | Black -> lbal (ins x l) y r)
-       | Gt ->
-         (match c0 with
-          | Red -> Node (Red, l, y, (ins x r))
-          | Black -> rbal l y (ins x r)))
+       | Lt -> (match c0 with
+                | Red -> Node (Red, (ins x l), y, r)
+                | Black -> lbal (ins x l) y r)
+       | Gt -> (match c0 with
+                | Red -> Node (Red, l, y, (ins x r))
+                | Black -> rbal l y (ins x r)))
 
     (** val add : X.t -> tree -> tree **)
 
@@ -1644,9 +1754,7 @@ module Make =
                | Leaf -> Node (Red, ll, lx, (Node (Red, lrl, rx, rr)))
                | Node (t0, lr', x, rl') ->
                  (match t0 with
-                  | Red ->
-                    Node (Red, (Node (Red, ll, lx, lr')), x, (Node (Red, rl',
-                      rx, rr)))
+                  | Red -> Node (Red, (Node (Red, ll, lx, lr')), x, (Node (Red, rl', rx, rr)))
                   | Black -> Node (Red, ll, lx, (Node (Red, lrl, rx, rr)))))
             | Black -> Node (Red, ll, lx, (append lr r)))
          | Black ->
@@ -1658,9 +1766,7 @@ module Make =
                | Leaf -> lbalS ll lx (Node (Black, lrl, rx, rr))
                | Node (t0, lr', x, rl') ->
                  (match t0 with
-                  | Red ->
-                    Node (Red, (Node (Black, ll, lx, lr')), x, (Node (Black,
-                      rl', rx, rr)))
+                  | Red -> Node (Red, (Node (Black, ll, lx, lr')), x, (Node (Black, rl', rx, rr)))
                   | Black -> lbalS ll lx (Node (Black, lrl, rx, rr))))))
       in append_l
 
@@ -1706,8 +1812,7 @@ module Make =
 
     let remove_min = function
     | Leaf -> None
-    | Node (_, l, x, r) ->
-      let Pair (k, t1) = delmin l x r in Some (Pair (k, (makeBlack t1)))
+    | Node (_, l, x, r) -> let Pair (k, t1) = delmin l x r in Some (Pair (k, (makeBlack t1)))
 
     (** val bogus : (tree, elt list) prod **)
 
@@ -1726,18 +1831,16 @@ module Make =
     | Cons (x, acc0) -> Pair ((Node (Red, Leaf, x, Leaf)), acc0)
 
     (** val treeify_cont :
-        (elt list -> (tree, elt list) prod) -> (elt list -> (tree, elt list)
-        prod) -> elt list -> (tree, elt list) prod **)
+        (elt list -> (tree, elt list) prod) -> (elt list -> (tree, elt list) prod) -> elt list -> (tree, elt
+        list) prod **)
 
     let treeify_cont f g acc =
       let Pair (l, l0) = f acc in
       (match l0 with
        | Nil -> bogus
-       | Cons (x, acc0) ->
-         let Pair (r, acc1) = g acc0 in Pair ((Node (Black, l, x, r)), acc1))
+       | Cons (x, acc0) -> let Pair (r, acc1) = g acc0 in Pair ((Node (Black, l, x, r)), acc1))
 
-    (** val treeify_aux :
-        bool -> positive -> elt list -> (tree, elt list) prod **)
+    (** val treeify_aux : bool -> positive -> elt list -> (tree, elt list) prod **)
 
     let rec treeify_aux pred0 = function
     | XI n1 -> treeify_cont (treeify_aux False n1) (treeify_aux pred0 n1)
@@ -1779,9 +1882,7 @@ module Make =
     let filter f s =
       treeify (filter_aux f s Nil)
 
-    (** val partition_aux :
-        (elt -> bool) -> tree -> X.t list -> X.t list -> (X.t list, X.t list)
-        prod **)
+    (** val partition_aux : (elt -> bool) -> tree -> X.t list -> X.t list -> (X.t list, X.t list) prod **)
 
     let rec partition_aux f s acc1 acc2 =
       match s with
@@ -1795,8 +1896,7 @@ module Make =
     (** val partition : (elt -> bool) -> t -> (t, t) prod **)
 
     let partition f s =
-      let Pair (ok, ko) = partition_aux f s Nil Nil in
-      Pair ((treeify ok), (treeify ko))
+      let Pair (ok, ko) = partition_aux f s Nil Nil in Pair ((treeify ok), (treeify ko))
 
     (** val union_list : elt list -> elt list -> elt list -> elt list **)
 
@@ -1871,10 +1971,9 @@ module Make =
     let skip_black t0 =
       match skip_red t0 with
       | Leaf -> Leaf
-      | Node (t1, t', t2, t3) ->
-        (match t1 with
-         | Red -> Node (Red, t', t2, t3)
-         | Black -> t')
+      | Node (t1, t', t2, t3) -> (match t1 with
+                                  | Red -> Node (Red, t', t2, t3)
+                                  | Black -> t')
 
     (** val compare_height : tree -> tree -> tree -> tree -> comparison **)
 
@@ -1882,38 +1981,33 @@ module Make =
       match skip_red s1x with
       | Leaf ->
         (match skip_red s1 with
-         | Leaf ->
-           (match skip_red s2x with
-            | Leaf -> Eq
-            | Node (_, _, _, _) -> Lt)
+         | Leaf -> (match skip_red s2x with
+                    | Leaf -> Eq
+                    | Node (_, _, _, _) -> Lt)
          | Node (_, s1', _, _) ->
            (match skip_red s2 with
             | Leaf -> Eq
             | Node (_, s2', _, _) ->
               (match skip_red s2x with
                | Leaf -> Eq
-               | Node (_, s2x', _, _) ->
-                 compare_height Leaf s1' s2' (skip_black s2x'))))
+               | Node (_, s2x', _, _) -> compare_height Leaf s1' s2' (skip_black s2x'))))
       | Node (_, s1x', _, _) ->
         (match skip_red s1 with
          | Leaf ->
            (match skip_red s2 with
-            | Leaf ->
-              (match skip_red s2x with
-               | Leaf -> Gt
-               | Node (_, _, _, _) -> Lt)
-            | Node (_, _, _, _) ->
-              (match skip_red s2x with
-               | Leaf -> Eq
-               | Node (_, _, _, _) -> Lt))
+            | Leaf -> (match skip_red s2x with
+                       | Leaf -> Gt
+                       | Node (_, _, _, _) -> Lt)
+            | Node (_, _, _, _) -> (match skip_red s2x with
+                                    | Leaf -> Eq
+                                    | Node (_, _, _, _) -> Lt))
          | Node (_, s1', _, _) ->
            (match skip_red s2 with
             | Leaf -> Gt
             | Node (_, s2', _, _) ->
               (match skip_red s2x with
                | Leaf -> compare_height (skip_black s1x') s1' s2' Leaf
-               | Node (_, s2x', _, _) ->
-                 compare_height (skip_black s1x') s1' s2' (skip_black s2x'))))
+               | Node (_, s2x', _, _) -> compare_height (skip_black s1x') s1' s2' (skip_black s2x'))))
 
     (** val union : t -> t -> t **)
 
@@ -1979,14 +2073,12 @@ module Make =
     type coq_R_min_elt =
     | R_min_elt_0 of tree
     | R_min_elt_1 of tree * Color.t * tree * X.t * tree
-    | R_min_elt_2 of tree * Color.t * tree * X.t * tree * Color.t * tree
-       * X.t * tree * elt option * coq_R_min_elt
+    | R_min_elt_2 of tree * Color.t * tree * X.t * tree * Color.t * tree * X.t * tree * elt option * coq_R_min_elt
 
     type coq_R_max_elt =
     | R_max_elt_0 of tree
     | R_max_elt_1 of tree * Color.t * tree * X.t * tree
-    | R_max_elt_2 of tree * Color.t * tree * X.t * tree * Color.t * tree
-       * X.t * tree * elt option * coq_R_max_elt
+    | R_max_elt_2 of tree * Color.t * tree * X.t * tree * Color.t * tree * X.t * tree * elt option * coq_R_max_elt
 
     module L = MakeListOrdering(X)
 
@@ -1996,8 +2088,7 @@ module Make =
     | End -> Nil
     | More (x, t0, r) -> Cons (x, (app (elements t0) (flatten_e r)))
 
-    (** val rcase :
-        (tree -> X.t -> tree -> 'a1) -> (tree -> 'a1) -> tree -> 'a1 **)
+    (** val rcase : (tree -> X.t -> tree -> 'a1) -> (tree -> 'a1) -> tree -> 'a1 **)
 
     let rcase f g t0 = match t0 with
     | Leaf -> g t0
@@ -2005,9 +2096,7 @@ module Make =
                                | Red -> f a0 x b0
                                | Black -> g t0)
 
-    (** val rrcase :
-        (tree -> X.t -> tree -> X.t -> tree -> 'a1) -> (tree -> 'a1) -> tree
-        -> 'a1 **)
+    (** val rrcase : (tree -> X.t -> tree -> X.t -> tree -> 'a1) -> (tree -> 'a1) -> tree -> 'a1 **)
 
     let rrcase f g t0 = match t0 with
     | Leaf -> g t0
@@ -2018,25 +2107,21 @@ module Make =
           | Leaf ->
             (match c0 with
              | Leaf -> g t0
-             | Node (t2, b0, y, c1) ->
-               (match t2 with
-                | Red -> f a0 x b0 y c1
-                | Black -> g t0))
+             | Node (t2, b0, y, c1) -> (match t2 with
+                                        | Red -> f a0 x b0 y c1
+                                        | Black -> g t0))
           | Node (t2, a1, x0, b0) ->
             (match t2 with
              | Red -> f a1 x0 b0 x c0
              | Black ->
                (match c0 with
                 | Leaf -> g t0
-                | Node (t3, b1, y, c1) ->
-                  (match t3 with
-                   | Red -> f a0 x b1 y c1
-                   | Black -> g t0))))
+                | Node (t3, b1, y, c1) -> (match t3 with
+                                           | Red -> f a0 x b1 y c1
+                                           | Black -> g t0))))
        | Black -> g t0)
 
-    (** val rrcase' :
-        (tree -> X.t -> tree -> X.t -> tree -> 'a1) -> (tree -> 'a1) -> tree
-        -> 'a1 **)
+    (** val rrcase' : (tree -> X.t -> tree -> X.t -> tree -> 'a1) -> (tree -> 'a1) -> tree -> 'a1 **)
 
     let rrcase' f g t0 = match t0 with
     | Leaf -> g t0
@@ -2047,26 +2132,23 @@ module Make =
           | Leaf ->
             (match c0 with
              | Leaf -> g t0
-             | Node (t2, b0, y0, c1) ->
-               (match t2 with
-                | Red -> f a0 y b0 y0 c1
-                | Black -> g t0))
+             | Node (t2, b0, y0, c1) -> (match t2 with
+                                         | Red -> f a0 y b0 y0 c1
+                                         | Black -> g t0))
           | Node (t2, a1, x, b0) ->
             (match t2 with
              | Red ->
                (match c0 with
                 | Leaf -> f a1 x b0 y c0
-                | Node (t3, b1, y0, c1) ->
-                  (match t3 with
-                   | Red -> f a0 y b1 y0 c1
-                   | Black -> f a1 x b0 y c0))
+                | Node (t3, b1, y0, c1) -> (match t3 with
+                                            | Red -> f a0 y b1 y0 c1
+                                            | Black -> f a1 x b0 y c0))
              | Black ->
                (match c0 with
                 | Leaf -> g t0
-                | Node (t3, b1, y0, c1) ->
-                  (match t3 with
-                   | Red -> f a0 y b1 y0 c1
-                   | Black -> g t0))))
+                | Node (t3, b1, y0, c1) -> (match t3 with
+                                            | Red -> f a0 y b1 y0 c1
+                                            | Black -> g t0))))
        | Black -> g t0)
    end
 
@@ -2247,7 +2329,7 @@ let add_id =
 type var = Ident.t
 
 type expr =
-| Nil1
+| Nil2
 | Var of var
 
 type pn_atom =
@@ -2267,7 +2349,7 @@ type entailment =
 (** val subst_expr : var -> expr -> expr -> expr **)
 
 let subst_expr i t0 t' = match t' with
-| Nil1 -> Nil1
+| Nil2 -> Nil2
 | Var j -> (match Ident.eq_dec i j with
             | Left -> t0
             | Right -> t')
@@ -2293,10 +2375,9 @@ let isGeq = function
 
 let rec insert cmp a0 l = match l with
 | Nil -> Cons (a0, Nil)
-| Cons (h, t0) ->
-  (match isGeq (cmp a0 h) with
-   | True -> Cons (a0, l)
-   | False -> Cons (h, (insert cmp a0 t0)))
+| Cons (h, t0) -> (match isGeq (cmp a0 h) with
+                   | True -> Cons (a0, l)
+                   | False -> Cons (h, (insert cmp a0 t0)))
 
 (** val rsort : ('a1 -> 'a1 -> comparison) -> 'a1 list -> 'a1 list **)
 
@@ -2304,16 +2385,14 @@ let rec rsort cmp = function
 | Nil -> Nil
 | Cons (h, t0) -> insert cmp h (rsort cmp t0)
 
-(** val insert_uniq :
-    ('a1 -> 'a1 -> comparison) -> 'a1 -> 'a1 list -> 'a1 list **)
+(** val insert_uniq : ('a1 -> 'a1 -> comparison) -> 'a1 -> 'a1 list -> 'a1 list **)
 
 let rec insert_uniq cmp a0 l = match l with
 | Nil -> Cons (a0, Nil)
-| Cons (h, t0) ->
-  (match cmp a0 h with
-   | Eq -> l
-   | Lt -> Cons (h, (insert_uniq cmp a0 t0))
-   | Gt -> Cons (a0, l))
+| Cons (h, t0) -> (match cmp a0 h with
+                   | Eq -> l
+                   | Lt -> Cons (h, (insert_uniq cmp a0 t0))
+                   | Gt -> Cons (a0, l))
 
 (** val rsort_uniq : ('a1 -> 'a1 -> comparison) -> 'a1 list -> 'a1 list **)
 
@@ -2321,8 +2400,7 @@ let rec rsort_uniq cmp = function
 | Nil -> Nil
 | Cons (h, t0) -> insert_uniq cmp h (rsort_uniq cmp t0)
 
-(** val compare_list :
-    ('a1 -> 'a1 -> comparison) -> 'a1 list -> 'a1 list -> comparison **)
+(** val compare_list : ('a1 -> 'a1 -> comparison) -> 'a1 list -> 'a1 list -> comparison **)
 
 let rec compare_list f xl yl =
   match xl with
@@ -2332,10 +2410,9 @@ let rec compare_list f xl yl =
   | Cons (x, xl') ->
     (match yl with
      | Nil -> Gt
-     | Cons (y, yl') ->
-       (match f x y with
-        | Eq -> compare_list f xl' yl'
-        | x0 -> x0))
+     | Cons (y, yl') -> (match f x y with
+                         | Eq -> compare_list f xl' yl'
+                         | x0 -> x0))
 
 type pure_atom =
 | Eqv of expr * expr
@@ -2376,21 +2453,19 @@ type clause =
 
 let expr_cmp e0 e' =
   match e0 with
-  | Nil1 -> (match e' with
-             | Nil1 -> Eq
+  | Nil2 -> (match e' with
+             | Nil2 -> Eq
              | Var _ -> Lt)
   | Var v -> (match e' with
-              | Nil1 -> Gt
+              | Nil2 -> Gt
               | Var v' -> Ident.compare v v')
 
 (** val pure_atom_cmp : pure_atom -> pure_atom -> comparison **)
 
 let pure_atom_cmp a0 a' =
-  let Eqv (e1, e2) = a0 in
-  let Eqv (e1', e2') = a' in
-  (match expr_cmp e1 e1' with
-   | Eq -> expr_cmp e2 e2'
-   | x -> x)
+  let Eqv (e1, e2) = a0 in let Eqv (e1', e2') = a' in (match expr_cmp e1 e1' with
+                                                       | Eq -> expr_cmp e2 e2'
+                                                       | x -> x)
 
 (** val order_eqv_pure_atom : pure_atom -> pure_atom **)
 
@@ -2419,23 +2494,17 @@ let mkPureClause gamma delta =
 (** val order_eqv_clause : clause -> clause **)
 
 let order_eqv_clause = function
-| PureClause (pa, pa', _) ->
-  mkPureClause (normalize_atoms (filter nonreflex_atom pa))
-    (normalize_atoms pa')
+| PureClause (pa, pa', _) -> mkPureClause (normalize_atoms (filter nonreflex_atom pa)) (normalize_atoms pa')
 | PosSpaceClause (pa, pa', sa') ->
-  PosSpaceClause ((normalize_atoms (filter nonreflex_atom pa)),
-    (normalize_atoms pa'), sa')
+  PosSpaceClause ((normalize_atoms (filter nonreflex_atom pa)), (normalize_atoms pa'), sa')
 | NegSpaceClause (pa, sa, pa') ->
-  NegSpaceClause ((normalize_atoms (filter nonreflex_atom pa)), sa,
-    (normalize_atoms pa'))
+  NegSpaceClause ((normalize_atoms (filter nonreflex_atom pa)), sa, (normalize_atoms pa'))
 
 (** val mk_pureL : pn_atom -> clause **)
 
 let mk_pureL = function
-| Equ (x, y) ->
-  mkPureClause Nil (Cons ((order_eqv_pure_atom (Eqv (x, y))), Nil))
-| Nequ (x, y) ->
-  mkPureClause (Cons ((order_eqv_pure_atom (Eqv (x, y))), Nil)) Nil
+| Equ (x, y) -> mkPureClause Nil (Cons ((order_eqv_pure_atom (Eqv (x, y))), Nil))
+| Nequ (x, y) -> mkPureClause (Cons ((order_eqv_pure_atom (Eqv (x, y))), Nil)) Nil
 
 (** val mk_pureR : pn_atom list -> (pure_atom list, pure_atom list) prod **)
 
@@ -2443,12 +2512,8 @@ let rec mk_pureR = function
 | Nil -> Pair (Nil, Nil)
 | Cons (p, l') ->
   (match p with
-   | Equ (x, y) ->
-     let Pair (p0, n0) = mk_pureR l' in
-     Pair ((Cons ((order_eqv_pure_atom (Eqv (x, y))), p0)), n0)
-   | Nequ (x, y) ->
-     let Pair (p0, n0) = mk_pureR l' in
-     Pair (p0, (Cons ((order_eqv_pure_atom (Eqv (x, y))), n0))))
+   | Equ (x, y) -> let Pair (p0, n0) = mk_pureR l' in Pair ((Cons ((order_eqv_pure_atom (Eqv (x, y))), p0)), n0)
+   | Nequ (x, y) -> let Pair (p0, n0) = mk_pureR l' in Pair (p0, (Cons ((order_eqv_pure_atom (Eqv (x, y))), n0))))
 
 (** val cnf : entailment -> clause list **)
 
@@ -2504,10 +2569,9 @@ let expr_geq a0 b0 =
 (** val norm_pure_atom : pure_atom -> pure_atom **)
 
 let norm_pure_atom = function
-| Eqv (i, j) ->
-  (match expr_lt i j with
-   | True -> Eqv (j, i)
-   | False -> Eqv (i, j))
+| Eqv (i, j) -> (match expr_lt i j with
+                 | True -> Eqv (j, i)
+                 | False -> Eqv (i, j))
 
 (** val subst_pure : var -> expr -> pure_atom -> pure_atom **)
 
@@ -2525,10 +2589,9 @@ let compare_space_atom a0 b0 =
   match a0 with
   | Next (i, j) ->
     (match b0 with
-     | Next (i', j') ->
-       (match expr_cmp i i' with
-        | Eq -> expr_cmp j j'
-        | x -> x)
+     | Next (i', j') -> (match expr_cmp i i' with
+                         | Eq -> expr_cmp j j'
+                         | x -> x)
      | Lseg (i', _) -> (match expr_cmp i i' with
                         | Eq -> Lt
                         | x -> x))
@@ -2537,10 +2600,9 @@ let compare_space_atom a0 b0 =
      | Next (i', _) -> (match expr_cmp i i' with
                         | Eq -> Gt
                         | x -> x)
-     | Lseg (i', j') ->
-       (match expr_cmp i i' with
-        | Eq -> expr_cmp j j'
-        | x -> x))
+     | Lseg (i', j') -> (match expr_cmp i i' with
+                         | Eq -> expr_cmp j j'
+                         | x -> x))
 
 (** val compare_clause : clause -> clause -> comparison **)
 
@@ -2627,11 +2689,9 @@ module OrderedClause =
         | CompEqT -> Left
         | _ -> assert false (* absurd case *))
      | Lt -> Right
-     | Gt ->
-       let c0 = compSpec2Type x y (compare_clause' x y) in
-       (match c0 with
-        | CompEqT -> Left
-        | _ -> Right))
+     | Gt -> let c0 = compSpec2Type x y (compare_clause' x y) in (match c0 with
+                                                                  | CompEqT -> Left
+                                                                  | _ -> Right))
  end
 
 module M = Make(OrderedClause)
@@ -2649,14 +2709,11 @@ let empty_clause =
 (** val remove_trivial_atoms : pure_atom list -> pure_atom list **)
 
 let remove_trivial_atoms =
-  filter (fun a0 ->
-    let Eqv (e1, e2) = a0 in
-    (match expr_cmp e1 e2 with
-     | Eq -> False
-     | _ -> True))
+  filter (fun a0 -> let Eqv (e1, e2) = a0 in (match expr_cmp e1 e2 with
+                                              | Eq -> False
+                                              | _ -> True))
 
-(** val subst_pures_delete :
-    var -> expr -> pure_atom list -> pure_atom list **)
+(** val subst_pures_delete : var -> expr -> pure_atom list -> pure_atom list **)
 
 let subst_pures_delete i e0 =
   compose remove_trivial_atoms (subst_pures i e0)
@@ -2685,17 +2742,17 @@ let drop_reflex_lseg =
     | Next (_, _) -> True
     | Lseg (e0, e1) ->
       (match e0 with
-       | Nil1 -> (match e1 with
-                  | Nil1 -> False
+       | Nil2 -> (match e1 with
+                  | Nil2 -> False
                   | Var _ -> True)
        | Var x -> (match e1 with
-                   | Nil1 -> True
+                   | Nil2 -> True
                    | Var y -> negb (eq_var x y))))
 
 (** val greater_than_expr : var -> expr -> bool **)
 
 let greater_than_expr i = function
-| Nil1 -> True
+| Nil2 -> True
 | Var j -> (match Ident.compare i j with
             | Gt -> True
             | _ -> False)
@@ -2706,34 +2763,30 @@ let greater_than_atom s u =
   let Eqv (s0, t0) = s in
   let Eqv (u0, v) = u in
   (match match match expr_lt u0 s0 with
-               | True ->
-                 (match expr_geq s0 v with
-                  | True -> True
-                  | False -> expr_geq t0 v)
+               | True -> (match expr_geq s0 v with
+                          | True -> True
+                          | False -> expr_geq t0 v)
                | False -> False with
          | True -> True
          | False ->
            (match expr_lt v s0 with
-            | True ->
-              (match expr_geq s0 u0 with
-               | True -> True
-               | False -> expr_geq t0 u0)
+            | True -> (match expr_geq s0 u0 with
+                       | True -> True
+                       | False -> expr_geq t0 u0)
             | False -> False) with
    | True -> True
    | False ->
      (match match expr_lt u0 t0 with
-            | True ->
-              (match expr_geq s0 v with
-               | True -> True
-               | False -> expr_geq t0 v)
+            | True -> (match expr_geq s0 v with
+                       | True -> True
+                       | False -> expr_geq t0 v)
             | False -> False with
       | True -> True
       | False ->
         (match expr_lt v t0 with
-         | True ->
-           (match expr_geq s0 u0 with
-            | True -> True
-            | False -> expr_geq t0 u0)
+         | True -> (match expr_geq s0 u0 with
+                    | True -> True
+                    | False -> expr_geq t0 u0)
          | False -> False)))
 
 (** val greater_than_atoms : pure_atom -> pure_atom list -> bool **)
@@ -2745,13 +2798,11 @@ let greater_than_atoms s delta =
 
 let greater_than_all i =
   forallb (fun a0 ->
-    let Eqv (x, y) = a0 in
-    (match greater_than_expr i x with
-     | True -> greater_than_expr i y
-     | False -> False))
+    let Eqv (x, y) = a0 in (match greater_than_expr i x with
+                            | True -> greater_than_expr i y
+                            | False -> False))
 
-(** val merge :
-    ('a1 -> 'a1 -> comparison) -> 'a1 list -> 'a1 list -> 'a1 list **)
+(** val merge : ('a1 -> 'a1 -> comparison) -> 'a1 list -> 'a1 list -> 'a1 list **)
 
 let rec merge cmp l1 l2 =
   let rec merge_aux l3 =
@@ -2770,10 +2821,9 @@ let rec merge cmp l1 l2 =
 (** val pure_atom2pn_atom : bool -> pure_atom -> pn_atom **)
 
 let pure_atom2pn_atom b0 = function
-| Eqv (e1, e2) ->
-  (match b0 with
-   | True -> Equ (e1, e2)
-   | False -> Nequ (e1, e2))
+| Eqv (e1, e2) -> (match b0 with
+                   | True -> Equ (e1, e2)
+                   | False -> Nequ (e1, e2))
 
 (** val pn_atom_cmp : pn_atom -> pn_atom -> comparison **)
 
@@ -2798,9 +2848,7 @@ let pn_atom_cmp a1 a2 =
 
 let pure_clause2pn_list = function
 | PureClause (gamma, delta, _) ->
-  rsort pn_atom_cmp
-    (app (map (pure_atom2pn_atom False) gamma)
-      (map (pure_atom2pn_atom True) delta))
+  rsort pn_atom_cmp (app (map (pure_atom2pn_atom False) gamma) (map (pure_atom2pn_atom True) delta))
 | _ -> Nil
 
 (** val compare_clause2 : clause -> clause -> comparison **)
@@ -2809,9 +2857,7 @@ let compare_clause2 cl1 cl2 =
   match cl1 with
   | PureClause (_, _, _) ->
     (match cl2 with
-     | PureClause (_, _, _) ->
-       compare_list pn_atom_cmp (pure_clause2pn_list cl1)
-         (pure_clause2pn_list cl2)
+     | PureClause (_, _, _) -> compare_list pn_atom_cmp (pure_clause2pn_list cl1) (pure_clause2pn_list cl2)
      | _ -> compare_clause cl1 cl2)
   | _ -> compare_clause cl1 cl2
 
@@ -2857,35 +2903,28 @@ module DebuggingHooks =
   let print_spatial_model c0 _ =
     c0
 
-  (** val print_spatial_model2 :
-      clause -> clause -> (var, expr) prod list -> clause **)
+  (** val print_spatial_model2 : clause -> clause -> (var, expr) prod list -> clause **)
 
   let print_spatial_model2 _ c' _ =
     c'
 
   (** val print_ce_clause :
-      (var, expr) prod list -> clause -> ce_type -> (((var, expr) prod list,
-      clause) prod, ce_type) prod **)
+      (var, expr) prod list -> clause -> ce_type -> (((var, expr) prod list, clause) prod, ce_type) prod **)
 
   let print_ce_clause r cl ct =
     Pair ((Pair (r, cl)), ct)
  end
 
-(** val lookC :
-    ('a1 -> 'a1 -> comparison) -> ('a1 -> 'a2) -> 'a1 -> ('a1, 'a2) prod list
-    -> 'a2 **)
+(** val lookC : ('a1 -> 'a1 -> comparison) -> ('a1 -> 'a2) -> 'a1 -> ('a1, 'a2) prod list -> 'a2 **)
 
 let rec lookC a_cmp fAB a0 = function
 | Nil -> fAB a0
 | Cons (p, cs') ->
-  let Pair (a1, b1) = p in
-  (match isEq (a_cmp a0 a1) with
-   | True -> b1
-   | False -> lookC a_cmp fAB a0 cs')
+  let Pair (a1, b1) = p in (match isEq (a_cmp a0 a1) with
+                            | True -> b1
+                            | False -> lookC a_cmp fAB a0 cs')
 
-(** val rewriteC :
-    ('a2 -> 'a2 -> comparison) -> 'a2 -> 'a2 -> ('a1, 'a2) prod list -> ('a1,
-    'a2) prod list **)
+(** val rewriteC : ('a2 -> 'a2 -> comparison) -> 'a2 -> 'a2 -> ('a1, 'a2) prod list -> ('a1, 'a2) prod list **)
 
 let rec rewriteC b_cmp b1 b2 = function
 | Nil -> Nil
@@ -2897,15 +2936,14 @@ let rec rewriteC b_cmp b1 b2 = function
    | False -> Cons ((Pair (a1, b1')), new_cs))
 
 (** val mergeC :
-    ('a1 -> 'a1 -> comparison) -> ('a2 -> 'a2 -> comparison) -> ('a1 -> 'a2)
-    -> 'a1 -> 'a1 -> ('a1, 'a2) prod list -> ('a1, 'a2) prod list **)
+    ('a1 -> 'a1 -> comparison) -> ('a2 -> 'a2 -> comparison) -> ('a1 -> 'a2) -> 'a1 -> 'a1 -> ('a1, 'a2) prod
+    list -> ('a1, 'a2) prod list **)
 
 let mergeC a_cmp b_cmp fAB a1 a2 cs =
   match isEq (b_cmp (lookC a_cmp fAB a1 cs) (lookC a_cmp fAB a2 cs)) with
   | True -> cs
   | False ->
-    Cons ((Pair (a1, (lookC a_cmp fAB a2 cs))), (Cons ((Pair (a2,
-      (lookC a_cmp fAB a2 cs))),
+    Cons ((Pair (a1, (lookC a_cmp fAB a2 cs))), (Cons ((Pair (a2, (lookC a_cmp fAB a2 cs))),
       (rewriteC b_cmp (lookC a_cmp fAB a1 cs) (lookC a_cmp fAB a2 cs) cs))))
 
 (** val cclose_aux : clause list -> (expr, expr) prod list **)
@@ -2930,9 +2968,7 @@ let rec cclose_aux = function
 (** val cclose : clause list -> clause list **)
 
 let cclose l =
-  map (fun p ->
-    let Pair (e1, e2) = p in mkPureClause Nil (Cons ((Eqv (e1, e2)), Nil)))
-    (cclose_aux l)
+  map (fun p -> let Pair (e1, e2) = p in mkPureClause Nil (Cons ((Eqv (e1, e2)), Nil))) (cclose_aux l)
 
 module Superposition =
  struct
@@ -2950,8 +2986,7 @@ module Superposition =
   | Cons (b0, _) -> pure_atom_gt a0 b0
 
   (** val ef_aux :
-      pure_atom list -> var -> expr -> expr -> pure_atom list -> pure_atom
-      list -> clause list -> clause list **)
+      pure_atom list -> var -> expr -> expr -> pure_atom list -> pure_atom list -> clause list -> clause list **)
 
   let rec ef_aux neg u0 u v pos0 pos l0 =
     match pos with
@@ -2963,10 +2998,8 @@ module Superposition =
              | False -> False with
        | True ->
          Cons
-           ((mkPureClause
-              (insert_uniq pure_atom_cmp (norm_pure_atom (Eqv (v, t0))) neg)
-              (insert_uniq pure_atom_cmp (norm_pure_atom (Eqv (u, t0)))
-                (merge pure_atom_cmp (rev0 pos0) pos))),
+           ((mkPureClause (insert_uniq pure_atom_cmp (norm_pure_atom (Eqv (v, t0))) neg)
+              (insert_uniq pure_atom_cmp (norm_pure_atom (Eqv (u, t0))) (merge pure_atom_cmp (rev1 pos0) pos))),
            (ef_aux neg u0 u v (insert_uniq pure_atom_cmp a2 pos0) pos' l0))
        | False -> l0)
 
@@ -2982,11 +3015,10 @@ module Superposition =
           | Cons (p, pos) ->
             let Eqv (u, v) = p in
             (match u with
-             | Nil1 -> l0
-             | Var u0 ->
-               (match greater_than_all u0 neg with
-                | True -> ef_aux neg u0 u v Nil pos l0
-                | False -> l0)))
+             | Nil2 -> l0
+             | Var u0 -> (match greater_than_all u0 neg with
+                          | True -> ef_aux neg u0 u v Nil pos l0
+                          | False -> l0)))
        | _ -> l0)
     | _ -> l0
 
@@ -3008,7 +3040,7 @@ module Superposition =
                 | Cons (p0, pos) ->
                   let Eqv (s, t0) = p0 in
                   (match s with
-                   | Nil1 -> l0
+                   | Nil2 -> l0
                    | Var s0 ->
                      (match match match match match expr_eq s s' with
                                               | True -> expr_lt t0 s
@@ -3022,10 +3054,8 @@ module Superposition =
                       | True ->
                         Cons
                           ((mkPureClause
-                             (insert_uniq pure_atom_cmp
-                               (norm_pure_atom (Eqv (t0, v)))
-                               (merge pure_atom_cmp neg neg'))
-                             (merge pure_atom_cmp pos pos')), l0)
+                             (insert_uniq pure_atom_cmp (norm_pure_atom (Eqv (t0, v)))
+                               (merge pure_atom_cmp neg neg')) (merge pure_atom_cmp pos pos')), l0)
                       | False -> l0)))
              | _ -> l0))
        | _ -> l0)
@@ -3037,7 +3067,7 @@ module Superposition =
           | Cons (p, pos) ->
             let Eqv (s, t0) = p in
             (match s with
-             | Nil1 -> l0
+             | Nil2 -> l0
              | Var s0 ->
                (match d0 with
                 | PureClause (neg', delta0, _) ->
@@ -3046,30 +3076,18 @@ module Superposition =
                    | Cons (p0, pos') ->
                      let Eqv (s', v) = p0 in
                      (match s' with
-                      | Nil1 -> l0
+                      | Nil2 -> l0
                       | Var s'0 ->
-                        (match match match match match match match match 
-                                                                   expr_eq s
-                                                                    s' with
-                                                                   | True ->
-                                                                    expr_lt
-                                                                    t0 s
-                                                                   | False ->
-                                                                    False with
-                                                             | True ->
-                                                               expr_lt v s'
+                        (match match match match match match match match expr_eq s s' with
+                                                                   | True -> expr_lt t0 s
+                                                                   | False -> False with
+                                                             | True -> expr_lt v s'
                                                              | False -> False with
-                                                       | True ->
-                                                         pure_atom_gt1 (Eqv
-                                                           (s, t0)) pos
+                                                       | True -> pure_atom_gt1 (Eqv (s, t0)) pos
                                                        | False -> False with
-                                                 | True ->
-                                                   pure_atom_gt1 (Eqv (s',
-                                                     v)) pos'
+                                                 | True -> pure_atom_gt1 (Eqv (s', v)) pos'
                                                  | False -> False with
-                                           | True ->
-                                             pure_atom_gt (Eqv (s, t0)) (Eqv
-                                               (s', v))
+                                           | True -> pure_atom_gt (Eqv (s, t0)) (Eqv (s', v))
                                            | False -> False with
                                      | True -> greater_than_all s0 neg
                                      | False -> False with
@@ -3078,8 +3096,7 @@ module Superposition =
                          | True ->
                            Cons
                              ((mkPureClause (merge pure_atom_cmp neg neg')
-                                (insert_uniq pure_atom_cmp
-                                  (norm_pure_atom (Eqv (t0, v)))
+                                (insert_uniq pure_atom_cmp (norm_pure_atom (Eqv (t0, v)))
                                   (merge pure_atom_cmp pos pos'))), l0)
                          | False -> l0)))
                 | _ -> l0)))
@@ -3102,10 +3119,9 @@ module Superposition =
        (match expr_eq s v with
         | True -> norm_pure_atom (Eqv (t0, t0))
         | False -> norm_pure_atom (Eqv (t0, v)))
-     | False ->
-       (match expr_eq s v with
-        | True -> norm_pure_atom (Eqv (u, t0))
-        | False -> atm))
+     | False -> (match expr_eq s v with
+                 | True -> norm_pure_atom (Eqv (u, t0))
+                 | False -> atm))
 
   (** val rewrite_in_space : expr -> expr -> space_atom -> space_atom **)
 
@@ -3123,10 +3139,9 @@ module Superposition =
          (match delta with
           | Nil -> atm
           | Cons (p, l) ->
-            let Eqv (s, t0) = p in
-            (match l with
-             | Nil -> rewrite_in_space s t0 atm
-             | Cons (_, _) -> atm))
+            let Eqv (s, t0) = p in (match l with
+                                    | Nil -> rewrite_in_space s t0 atm
+                                    | Cons (_, _) -> atm))
        | Cons (_, _) -> atm)
     | _ -> atm
 
@@ -3144,16 +3159,12 @@ module Superposition =
             (match l with
              | Nil ->
                (match d0 with
-                | PureClause (neg, pos, _) ->
-                  mkPureClause (map (rewrite_by s t0) neg)
-                    (map (rewrite_by s t0) pos)
+                | PureClause (neg, pos, _) -> mkPureClause (map (rewrite_by s t0) neg) (map (rewrite_by s t0) pos)
                 | PosSpaceClause (neg, pos, space) ->
-                  PosSpaceClause ((map (rewrite_by s t0) neg),
-                    (map (rewrite_by s t0) pos),
+                  PosSpaceClause ((map (rewrite_by s t0) neg), (map (rewrite_by s t0) pos),
                     (map (rewrite_in_space s t0) space))
                 | NegSpaceClause (neg, space, pos) ->
-                  NegSpaceClause ((map (rewrite_by s t0) neg),
-                    (map (rewrite_in_space s t0) space),
+                  NegSpaceClause ((map (rewrite_by s t0) neg), (map (rewrite_in_space s t0) space),
                     (map (rewrite_by s t0) pos)))
              | Cons (_, _) -> d0))
        | Cons (_, _) -> d0)
@@ -3163,8 +3174,7 @@ module Superposition =
 
   let delete_resolved c0 = match c0 with
   | PureClause (neg, pos, _) ->
-    mkPureClause (rsort_uniq pure_atom_cmp (remove_trivial_atoms neg))
-      (rsort_uniq pure_atom_cmp pos)
+    mkPureClause (rsort_uniq pure_atom_cmp (remove_trivial_atoms neg)) (rsort_uniq pure_atom_cmp pos)
   | _ -> c0
 
   (** val not_taut : clause -> bool **)
@@ -3173,11 +3183,9 @@ module Superposition =
     negb
       (match c0 with
        | PureClause (neg, pos, _) ->
-         (match existsb (fun a0 ->
-                  existsb (fun b0 -> pure_atom_eq a0 b0) pos) neg with
+         (match existsb (fun a0 -> existsb (fun b0 -> pure_atom_eq a0 b0) pos) neg with
           | True -> True
-          | False ->
-            existsb (fun a0 -> let Eqv (e1, e2) = a0 in expr_eq e1 e2) pos)
+          | False -> existsb (fun a0 -> let Eqv (e1, e2) = a0 in expr_eq e1 e2) pos)
        | _ -> False)
 
   (** val simplify : clause list -> clause -> clause **)
@@ -3185,8 +3193,7 @@ module Superposition =
   let simplify l c0 =
     delete_resolved (fold_left (fun d0 c1 -> demodulate c1 d0) l c0)
 
-  (** val simplify_atoms :
-      clause list -> space_atom list -> space_atom list **)
+  (** val simplify_atoms : clause list -> space_atom list -> space_atom list **)
 
   let simplify_atoms l atms =
     fold_left (fun atms0 d0 -> map (rewrite_clause_in_space d0) atms0) l atms
@@ -3196,43 +3203,32 @@ module Superposition =
   let infer cty c0 l =
     DebuggingHooks.print_inferred_list
       (rsort_uniq compare_clause
-        (filter not_taut
-          (map (simplify Nil)
-            (ef cty c0 (fold_left (fun l0 d0 -> sp cty c0 d0 l0) l Nil)))))
+        (filter not_taut (map (simplify Nil) (ef cty c0 (fold_left (fun l0 d0 -> sp cty c0 d0 l0) l Nil)))))
 
   (** val is_model_of : model -> pure_atom list -> pure_atom list -> bool **)
 
   let is_model_of r gamma delta =
-    match fold_right (fun ve -> subst_pures_delete (fst ve) (snd ve))
-            (remove_trivial_atoms gamma) r with
-    | Nil ->
-      negb
-        (forallb nonreflex_atom
-          (fold_right (fun ve -> subst_pures (fst ve) (snd ve)) delta r))
+    match fold_right (fun ve -> subst_pures_delete (fst ve) (snd ve)) (remove_trivial_atoms gamma) r with
+    | Nil -> negb (forallb nonreflex_atom (fold_right (fun ve -> subst_pures (fst ve) (snd ve)) delta r))
     | Cons (_, _) -> True
 
   (** val is_model_of_PI : model -> clause -> bool **)
 
   let is_model_of_PI r = function
   | NegSpaceClause (pi_plus, _, pi_minus) ->
-    (match fold_right (fun ve -> subst_pures_delete (fst ve) (snd ve))
-             (remove_trivial_atoms pi_plus) r with
-     | Nil ->
-       forallb nonreflex_atom
-         (fold_right (fun ve -> subst_pures (fst ve) (snd ve)) pi_minus r)
+    (match fold_right (fun ve -> subst_pures_delete (fst ve) (snd ve)) (remove_trivial_atoms pi_plus) r with
+     | Nil -> forallb nonreflex_atom (fold_right (fun ve -> subst_pures (fst ve) (snd ve)) pi_minus r)
      | Cons (_, _) -> False)
   | _ -> False
 
   (** val reduces : model -> var -> bool **)
 
   let reduces r v =
-    existsb (fun ve' ->
-      match Ident.eq_dec v (fst ve') with
-      | Left -> True
-      | Right -> False) r
+    existsb (fun ve' -> match Ident.eq_dec v (fst ve') with
+                        | Left -> True
+                        | Right -> False) r
 
-  (** val clause_generate :
-      model -> clause -> (((var, expr) prod, clause) prod, ce_type) sum **)
+  (** val clause_generate : model -> clause -> (((var, expr) prod, clause) prod, ce_type) sum **)
 
   let clause_generate r cl = match cl with
   | PureClause (gamma, delta0, _) ->
@@ -3241,7 +3237,7 @@ module Superposition =
      | Cons (p, delta) ->
        let Eqv (l, r0) = p in
        (match l with
-        | Nil1 -> Inr CexpL
+        | Nil2 -> Inr CexpL
         | Var l' ->
           (match match match greater_than_expr l' r0 with
                        | True -> greater_than_all l' gamma
@@ -3252,28 +3248,25 @@ module Superposition =
              (match reduces r l' with
               | True -> Inr CexpR
               | False ->
-                (match is_model_of (rev0 r) Nil (map (rewrite_by l r0) delta) with
+                (match is_model_of (rev1 r) Nil (map (rewrite_by l r0) delta) with
                  | True -> Inr CexpEf
                  | False -> Inl (Pair ((Pair (l', r0)), cl))))
            | False -> Inr CexpL)))
   | _ -> Inr CexpL
 
   (** val partial_mod :
-      model -> clause list -> clause list -> ((model, clause list) prod,
-      ((model, clause) prod, ce_type) prod) sum **)
+      model -> clause list -> clause list -> ((model, clause list) prod, ((model, clause) prod, ce_type) prod) sum **)
 
   let rec partial_mod r acc = function
   | Nil -> Inl (Pair (r, acc))
   | Cons (cl, l') ->
     (match cl with
      | PureClause (gamma, delta, _) ->
-       (match is_model_of (rev0 r) gamma delta with
+       (match is_model_of (rev1 r) gamma delta with
         | True -> partial_mod r acc l'
         | False ->
           (match clause_generate r cl with
-           | Inl p ->
-             let Pair (p0, cl') = p in
-             partial_mod (Cons (p0, r)) (Cons (cl', acc)) l'
+           | Inl p -> let Pair (p0, cl') = p in partial_mod (Cons (p0, r)) (Cons (cl', acc)) l'
            | Inr cty -> Inr (DebuggingHooks.print_ce_clause r cl cty)))
      | _ -> Inl (Pair (r, acc)))
 
@@ -3293,18 +3286,16 @@ module Superposition =
   let is_unit_clause = function
   | PureClause (gamma, delta, _) ->
     (match gamma with
-     | Nil ->
-       (match delta with
-        | Nil -> False
-        | Cons (_, l) -> (match l with
-                          | Nil -> True
-                          | Cons (_, _) -> False))
+     | Nil -> (match delta with
+               | Nil -> False
+               | Cons (_, l) -> (match l with
+                                 | Nil -> True
+                                 | Cons (_, _) -> False))
      | Cons (_, _) -> False)
   | _ -> False
 
   (** val main_terminate :
-      positive -> clause list -> clause list -> (((superposition_result,
-      clause list) prod, M.t) prod, M.t) prod **)
+      positive -> clause list -> clause list -> (((superposition_result, clause list) prod, M.t) prod, M.t) prod **)
 
   let rec main_terminate n0 units l =
     match Coq_Pos.eqb n0 XH with
@@ -3315,18 +3306,12 @@ module Superposition =
        | False ->
          let Pair (us, rs) = partition is_unit_clause l in
          (match partial_mod Nil Nil
-                  (filter not_taut
-                    (map
-                      (simplify (DebuggingHooks.print_eqs_list (cclose us)))
-                      rs)) with
+                  (filter not_taut (map (simplify (DebuggingHooks.print_eqs_list (cclose us))) rs)) with
           | Inl p ->
             let Pair (r, selected) = p in
-            Pair ((Pair ((Pair ((C_example (r, (clause_list2set selected))),
-            (cclose (app (cclose us) units)))),
-            (clause_list2set
-              (filter not_taut
-                (map (simplify (DebuggingHooks.print_eqs_list (cclose us)))
-                  rs))))), M.empty)
+            Pair ((Pair ((Pair ((C_example (r, (clause_list2set selected))), (cclose (app (cclose us) units)))),
+            (clause_list2set (filter not_taut (map (simplify (DebuggingHooks.print_eqs_list (cclose us))) rs))))),
+            M.empty)
           | Inr p ->
             let Pair (p0, cty) = p in
             let Pair (_, cl) = p0 in
@@ -3335,18 +3320,11 @@ module Superposition =
                 (rsort (rev_cmp compare_clause2)
                   (app
                     (infer cty cl
-                      (filter not_taut
-                        (map
-                          (simplify
-                            (DebuggingHooks.print_eqs_list (cclose us))) rs)))
-                    (filter not_taut
-                      (map
-                        (simplify (DebuggingHooks.print_eqs_list (cclose us)))
-                        rs)))))))
+                      (filter not_taut (map (simplify (DebuggingHooks.print_eqs_list (cclose us))) rs)))
+                    (filter not_taut (map (simplify (DebuggingHooks.print_eqs_list (cclose us))) rs)))))))
 
   (** val main :
-      positive -> clause list -> clause list -> (((superposition_result,
-      clause list) prod, M.t) prod, M.t) prod **)
+      positive -> clause list -> clause list -> (((superposition_result, clause list) prod, M.t) prod, M.t) prod **)
 
   let rec main n0 units l =
     match Coq_Pos.eqb n0 XH with
@@ -3357,18 +3335,12 @@ module Superposition =
        | False ->
          let Pair (us, rs) = partition is_unit_clause l in
          (match partial_mod Nil Nil
-                  (filter not_taut
-                    (map
-                      (simplify (DebuggingHooks.print_eqs_list (cclose us)))
-                      rs)) with
+                  (filter not_taut (map (simplify (DebuggingHooks.print_eqs_list (cclose us))) rs)) with
           | Inl p ->
             let Pair (r, selected) = p in
-            Pair ((Pair ((Pair ((C_example (r, (clause_list2set selected))),
-            (cclose (app (cclose us) units)))),
-            (clause_list2set
-              (filter not_taut
-                (map (simplify (DebuggingHooks.print_eqs_list (cclose us)))
-                  rs))))), M.empty)
+            Pair ((Pair ((Pair ((C_example (r, (clause_list2set selected))), (cclose (app (cclose us) units)))),
+            (clause_list2set (filter not_taut (map (simplify (DebuggingHooks.print_eqs_list (cclose us))) rs))))),
+            M.empty)
           | Inr p ->
             let Pair (p0, cty) = p in
             let Pair (_, cl) = p0 in
@@ -3377,24 +3349,15 @@ module Superposition =
                 (rsort (rev_cmp compare_clause2)
                   (app
                     (infer cty cl
-                      (filter not_taut
-                        (map
-                          (simplify
-                            (DebuggingHooks.print_eqs_list (cclose us))) rs)))
-                    (filter not_taut
-                      (map
-                        (simplify (DebuggingHooks.print_eqs_list (cclose us)))
-                        rs)))))))
+                      (filter not_taut (map (simplify (DebuggingHooks.print_eqs_list (cclose us))) rs)))
+                    (filter not_taut (map (simplify (DebuggingHooks.print_eqs_list (cclose us))) rs)))))))
 
-  (** val check_clauseset :
-      M.t -> (((superposition_result, clause list) prod, M.t) prod, M.t) prod **)
+  (** val check_clauseset : M.t -> (((superposition_result, clause list) prod, M.t) prod, M.t) prod **)
 
   let check_clauseset s =
-    main (XO (XO (XO (XO (XO (XO (XO (XO (XO (XI (XO (XI (XO (XO (XI (XI (XO
-      (XI (XO (XI (XI (XO (XO (XI (XI (XI (XO (XI (XI
-      XH))))))))))))))))))))))))))))) Nil
-      (DebuggingHooks.print_pures_list
-        (rsort (rev_cmp compare_clause2) (M.elements (M.filter not_taut s))))
+    main (XO (XO (XO (XO (XO (XO (XO (XO (XO (XI (XO (XI (XO (XO (XI (XI (XO (XI (XO (XI (XI (XO (XO (XI (XI (XI
+      (XO (XI (XI XH))))))))))))))))))))))))))))) Nil
+      (DebuggingHooks.print_pures_list (rsort (rev_cmp compare_clause2) (M.elements (M.filter not_taut s))))
  end
 
 module HeapResolve =
@@ -3409,17 +3372,15 @@ module HeapResolve =
        | Cons (p, delta) ->
          let Eqv (e0, y) = p in
          (match e0 with
-          | Nil1 -> sc
+          | Nil2 -> sc
           | Var x ->
             (match sc with
              | PureClause (_, _, _) -> sc
              | PosSpaceClause (gamma', delta', sigma) ->
                PosSpaceClause ((rsort_uniq pure_atom_cmp (app gamma gamma')),
-                 (rsort_uniq pure_atom_cmp (app delta delta')),
-                 (subst_spaces x y sigma))
+                 (rsort_uniq pure_atom_cmp (app delta delta')), (subst_spaces x y sigma))
              | NegSpaceClause (gamma', sigma, delta') ->
-               NegSpaceClause ((rsort_uniq pure_atom_cmp (app gamma gamma')),
-                 (subst_spaces x y sigma),
+               NegSpaceClause ((rsort_uniq pure_atom_cmp (app gamma gamma')), (subst_spaces x y sigma),
                  (rsort_uniq pure_atom_cmp (app delta delta'))))))
     | _ -> sc
 
@@ -3427,17 +3388,13 @@ module HeapResolve =
 
   let normalize2_4 sc = match sc with
   | PureClause (_, _, _) -> sc
-  | PosSpaceClause (gamma, delta, sigma) ->
-    PosSpaceClause (gamma, delta, (drop_reflex_lseg sigma))
-  | NegSpaceClause (gamma, sigma, delta) ->
-    NegSpaceClause (gamma, (drop_reflex_lseg sigma), delta)
+  | PosSpaceClause (gamma, delta, sigma) -> PosSpaceClause (gamma, delta, (drop_reflex_lseg sigma))
+  | NegSpaceClause (gamma, sigma, delta) -> NegSpaceClause (gamma, (drop_reflex_lseg sigma), delta)
 
   (** val norm : M.t -> clause -> clause **)
 
   let norm s sc =
-    normalize2_4
-      (fold_right normalize1_3 sc
-        (rsort (rev_cmp compare_clause2) (M.elements s)))
+    normalize2_4 (fold_right normalize1_3 sc (rsort (rev_cmp compare_clause2) (M.elements s)))
 
   (** val do_well1_2 : space_atom list -> pure_atom list list **)
 
@@ -3445,13 +3402,12 @@ module HeapResolve =
   | Nil -> Nil
   | Cons (s, sc') ->
     (match s with
-     | Next (e0, _) ->
-       (match e0 with
-        | Nil1 -> Cons (Nil, (do_well1_2 sc'))
-        | Var _ -> do_well1_2 sc')
+     | Next (e0, _) -> (match e0 with
+                        | Nil2 -> Cons (Nil, (do_well1_2 sc'))
+                        | Var _ -> do_well1_2 sc')
      | Lseg (e0, y) ->
        (match e0 with
-        | Nil1 -> Cons ((Cons ((Eqv (y, Nil1)), Nil)), (do_well1_2 sc'))
+        | Nil2 -> Cons ((Cons ((Eqv (y, Nil2)), Nil)), (do_well1_2 sc'))
         | Var _ -> do_well1_2 sc'))
 
   (** val next_in_dom : Ident.t -> space_atom list -> bool **)
@@ -3462,11 +3418,10 @@ module HeapResolve =
     (match s with
      | Next (e0, _) ->
        (match e0 with
-        | Nil1 -> next_in_dom x sc'
-        | Var x' ->
-          (match Ident.eq_dec x x' with
-           | Left -> True
-           | Right -> next_in_dom x sc'))
+        | Nil2 -> next_in_dom x sc'
+        | Var x' -> (match Ident.eq_dec x x' with
+                     | Left -> True
+                     | Right -> next_in_dom x sc'))
      | Lseg (_, _) -> next_in_dom x sc')
 
   (** val next_in_dom1 : Ident.t -> expr -> space_atom list -> bool **)
@@ -3477,13 +3432,12 @@ module HeapResolve =
     (match s with
      | Next (e0, y') ->
        (match e0 with
-        | Nil1 -> next_in_dom1 x y sc'
+        | Nil2 -> next_in_dom1 x y sc'
         | Var x' ->
           (match Ident.eq_dec x x' with
-           | Left ->
-             (match expr_eq y y' with
-              | True -> True
-              | False -> next_in_dom1 x y sc')
+           | Left -> (match expr_eq y y' with
+                      | True -> True
+                      | False -> next_in_dom1 x y sc')
            | Right -> next_in_dom1 x y sc'))
      | Lseg (_, _) -> next_in_dom1 x y sc')
 
@@ -3495,13 +3449,12 @@ module HeapResolve =
     (match s with
      | Next (e0, y') ->
        (match e0 with
-        | Nil1 -> next_in_dom2 x y sc'
+        | Nil2 -> next_in_dom2 x y sc'
         | Var x' ->
           (match Ident.eq_dec x x' with
-           | Left ->
-             (match expr_eq y y' with
-              | True -> next_in_dom2 x y sc'
-              | False -> Some y')
+           | Left -> (match expr_eq y y' with
+                      | True -> next_in_dom2 x y sc'
+                      | False -> Some y')
            | Right -> next_in_dom2 x y sc'))
      | Lseg (_, _) -> next_in_dom2 x y sc')
 
@@ -3513,11 +3466,10 @@ module HeapResolve =
     (match s with
      | Next (e0, _) ->
        (match e0 with
-        | Nil1 -> do_well3 sc'
-        | Var x ->
-          (match next_in_dom x sc' with
-           | True -> Cons (Nil, (do_well3 sc'))
-           | False -> do_well3 sc'))
+        | Nil2 -> do_well3 sc'
+        | Var x -> (match next_in_dom x sc' with
+                    | True -> Cons (Nil, (do_well3 sc'))
+                    | False -> do_well3 sc'))
      | Lseg (_, _) -> do_well3 sc')
 
   (** val lseg_in_dom2 : Ident.t -> expr -> space_atom list -> expr option **)
@@ -3529,13 +3481,12 @@ module HeapResolve =
      | Next (_, _) -> lseg_in_dom2 x y sc'
      | Lseg (x0, y0) ->
        (match x0 with
-        | Nil1 -> lseg_in_dom2 x y sc'
+        | Nil2 -> lseg_in_dom2 x y sc'
         | Var x' ->
           (match Ident.eq_dec x x' with
-           | Left ->
-             (match negb (expr_eq y0 y) with
-              | True -> Some y0
-              | False -> lseg_in_dom2 x y sc')
+           | Left -> (match negb (expr_eq y0 y) with
+                      | True -> Some y0
+                      | False -> lseg_in_dom2 x y sc')
            | Right -> lseg_in_dom2 x y sc')))
 
   (** val lseg_in_dom_atoms : Ident.t -> space_atom list -> pure_atom list **)
@@ -3547,12 +3498,10 @@ module HeapResolve =
      | Next (_, _) -> lseg_in_dom_atoms x sc'
      | Lseg (x0, y0) ->
        (match x0 with
-        | Nil1 -> lseg_in_dom_atoms x sc'
+        | Nil2 -> lseg_in_dom_atoms x sc'
         | Var x' ->
           (match Ident.eq_dec x x' with
-           | Left ->
-             Cons ((order_eqv_pure_atom (Eqv (x0, y0))),
-               (lseg_in_dom_atoms x sc'))
+           | Left -> Cons ((order_eqv_pure_atom (Eqv (x0, y0))), (lseg_in_dom_atoms x sc'))
            | Right -> lseg_in_dom_atoms x sc')))
 
   (** val do_well4_5 : space_atom list -> pure_atom list list **)
@@ -3563,23 +3512,18 @@ module HeapResolve =
     (match a0 with
      | Next (e0, _) ->
        (match e0 with
-        | Nil1 -> do_well4_5 sc'
+        | Nil2 -> do_well4_5 sc'
         | Var x' ->
-          let atms = map (fun a1 -> Cons (a1, Nil)) (lseg_in_dom_atoms x' sc')
-          in
-          app atms (do_well4_5 sc'))
+          let atms = map (fun a1 -> Cons (a1, Nil)) (lseg_in_dom_atoms x' sc') in app atms (do_well4_5 sc'))
      | Lseg (x0, y) ->
        (match x0 with
-        | Nil1 -> do_well4_5 sc'
+        | Nil2 -> do_well4_5 sc'
         | Var x' ->
           let l0 = lseg_in_dom_atoms x' sc' in
           (match l0 with
            | Nil -> do_well4_5 sc'
            | Cons (_, _) ->
-             let atms =
-               map (fun a1 ->
-                 normalize_atoms (Cons ((Eqv (x0, y)), (Cons (a1, Nil))))) l0
-             in
+             let atms = map (fun a1 -> normalize_atoms (Cons ((Eqv (x0, y)), (Cons (a1, Nil))))) l0 in
              app atms (do_well4_5 sc'))))
 
   (** val do_well : space_atom list -> pure_atom list list **)
@@ -3592,9 +3536,7 @@ module HeapResolve =
   let do_wellformed = function
   | PosSpaceClause (gamma, delta, sigma) ->
     let sigma' = rsort (rev_cmp compare_space_atom) sigma in
-    clause_list2set
-      (map (fun ats -> mkPureClause gamma (normalize_atoms (app ats delta)))
-        (do_well sigma'))
+    clause_list2set (map (fun ats -> mkPureClause gamma (normalize_atoms (app ats delta))) (do_well sigma'))
   | _ -> M.empty
 
   (** val spatial_resolution : clause -> clause -> M.t **)
@@ -3604,19 +3546,14 @@ module HeapResolve =
     | PosSpaceClause (gamma', delta', sigma') ->
       (match nc with
        | NegSpaceClause (gamma, sigma, delta) ->
-         (match eq_space_atomlist (rsort compare_space_atom sigma)
-                  (rsort compare_space_atom sigma') with
-          | True ->
-            M.singleton
-              (order_eqv_clause
-                (mkPureClause (app gamma gamma') (app delta delta')))
+         (match eq_space_atomlist (rsort compare_space_atom sigma) (rsort compare_space_atom sigma') with
+          | True -> M.singleton (order_eqv_clause (mkPureClause (app gamma gamma') (app delta delta')))
           | False -> M.empty)
        | _ -> M.empty)
     | _ -> M.empty
 
   (** val unfolding1' :
-      space_atom list -> space_atom list -> space_atom list -> (pure_atom,
-      space_atom list) prod list **)
+      space_atom list -> space_atom list -> space_atom list -> (pure_atom, space_atom list) prod list **)
 
   let rec unfolding1' sigma0 sigma1 = function
   | Nil -> Nil
@@ -3625,16 +3562,14 @@ module HeapResolve =
      | Next (_, _) -> unfolding1' (Cons (a0, sigma0)) sigma1 sigma2'
      | Lseg (x, z0) ->
        (match x with
-        | Nil1 -> unfolding1' (Cons (a0, sigma0)) sigma1 sigma2'
+        | Nil2 -> unfolding1' (Cons (a0, sigma0)) sigma1 sigma2'
         | Var x' ->
           (match next_in_dom1 x' z0 sigma1 with
            | True ->
              Cons ((Pair ((Eqv (x, z0)),
-               (insert (rev_cmp compare_space_atom) (Next (x, z0))
-                 (app (rev0 sigma0) sigma2')))),
+               (insert (rev_cmp compare_space_atom) (Next (x, z0)) (app (rev1 sigma0) sigma2')))),
                (unfolding1' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2'))
-           | False ->
-             unfolding1' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2')))
+           | False -> unfolding1' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2')))
 
   (** val unfolding1 : clause -> clause -> clause list **)
 
@@ -3646,16 +3581,14 @@ module HeapResolve =
          let l0 = unfolding1' Nil sigma1 sigma2 in
          let build_clause = fun p ->
            let Pair (atm, sigma2') = p in
-           NegSpaceClause (gamma', sigma2',
-           (insert_uniq pure_atom_cmp (order_eqv_pure_atom atm) delta'))
+           NegSpaceClause (gamma', sigma2', (insert_uniq pure_atom_cmp (order_eqv_pure_atom atm) delta'))
          in
          map build_clause l0
        | _ -> Nil)
     | _ -> Nil
 
   (** val unfolding2' :
-      space_atom list -> space_atom list -> space_atom list -> (pure_atom,
-      space_atom list) prod list **)
+      space_atom list -> space_atom list -> space_atom list -> (pure_atom, space_atom list) prod list **)
 
   let rec unfolding2' sigma0 sigma1 = function
   | Nil -> Nil
@@ -3664,17 +3597,15 @@ module HeapResolve =
      | Next (_, _) -> unfolding2' (Cons (a0, sigma0)) sigma1 sigma2'
      | Lseg (x, z0) ->
        (match x with
-        | Nil1 -> unfolding2' (Cons (a0, sigma0)) sigma1 sigma2'
+        | Nil2 -> unfolding2' (Cons (a0, sigma0)) sigma1 sigma2'
         | Var x' ->
           (match next_in_dom2 x' z0 sigma1 with
            | Some y ->
              Cons ((Pair ((Eqv (x, z0)),
                (insert (rev_cmp compare_space_atom) (Next (x, y))
-                 (insert (rev_cmp compare_space_atom) (Lseg (y, z0))
-                   (app (rev0 sigma0) sigma2'))))),
+                 (insert (rev_cmp compare_space_atom) (Lseg (y, z0)) (app (rev1 sigma0) sigma2'))))),
                (unfolding2' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2'))
-           | None ->
-             unfolding2' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2')))
+           | None -> unfolding2' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2')))
 
   (** val unfolding2 : clause -> clause -> clause list **)
 
@@ -3686,16 +3617,13 @@ module HeapResolve =
          let l0 = unfolding2' Nil sigma1 sigma2 in
          let build_clause = fun p ->
            let Pair (atm, sigma2') = p in
-           NegSpaceClause (gamma', sigma2',
-           (insert_uniq pure_atom_cmp (order_eqv_pure_atom atm) delta'))
+           NegSpaceClause (gamma', sigma2', (insert_uniq pure_atom_cmp (order_eqv_pure_atom atm) delta'))
          in
          map build_clause l0
        | _ -> Nil)
     | _ -> Nil
 
-  (** val unfolding3' :
-      space_atom list -> space_atom list -> space_atom list -> space_atom
-      list list **)
+  (** val unfolding3' : space_atom list -> space_atom list -> space_atom list -> space_atom list list **)
 
   let rec unfolding3' sigma0 sigma1 = function
   | Nil -> Nil
@@ -3704,20 +3632,17 @@ module HeapResolve =
      | Next (_, _) -> unfolding3' (Cons (a0, sigma0)) sigma1 sigma2'
      | Lseg (x, e0) ->
        (match x with
-        | Nil1 -> unfolding3' (Cons (a0, sigma0)) sigma1 sigma2'
+        | Nil2 -> unfolding3' (Cons (a0, sigma0)) sigma1 sigma2'
         | Var x' ->
           (match e0 with
-           | Nil1 ->
-             (match lseg_in_dom2 x' Nil1 sigma1 with
+           | Nil2 ->
+             (match lseg_in_dom2 x' Nil2 sigma1 with
               | Some y ->
                 Cons
                   ((insert (rev_cmp compare_space_atom) (Lseg (x, y))
-                     (insert (rev_cmp compare_space_atom) (Lseg (y, Nil1))
-                       (app (rev0 sigma0) sigma2'))),
-                  (unfolding3' (Cons ((Lseg (x, Nil1)), sigma0)) sigma1
-                    sigma2'))
-              | None ->
-                unfolding3' (Cons ((Lseg (x, Nil1)), sigma0)) sigma1 sigma2')
+                     (insert (rev_cmp compare_space_atom) (Lseg (y, Nil2)) (app (rev1 sigma0) sigma2'))),
+                  (unfolding3' (Cons ((Lseg (x, Nil2)), sigma0)) sigma1 sigma2'))
+              | None -> unfolding3' (Cons ((Lseg (x, Nil2)), sigma0)) sigma1 sigma2')
            | Var _ -> unfolding3' (Cons (a0, sigma0)) sigma1 sigma2')))
 
   (** val unfolding3 : clause -> clause -> clause list **)
@@ -3728,16 +3653,11 @@ module HeapResolve =
       (match sc2 with
        | NegSpaceClause (gamma', sigma2, delta') ->
          let l0 = unfolding3' Nil sigma1 sigma2 in
-         let build_clause = fun sigma2' -> NegSpaceClause (gamma', sigma2',
-           delta')
-         in
-         map build_clause l0
+         let build_clause = fun sigma2' -> NegSpaceClause (gamma', sigma2', delta') in map build_clause l0
        | _ -> Nil)
     | _ -> Nil
 
-  (** val unfolding4NPR' :
-      space_atom list -> space_atom list -> space_atom list -> space_atom
-      list list **)
+  (** val unfolding4NPR' : space_atom list -> space_atom list -> space_atom list -> space_atom list list **)
 
   let rec unfolding4NPR' sigma0 sigma1 = function
   | Nil -> Nil
@@ -3746,10 +3666,10 @@ module HeapResolve =
      | Next (_, _) -> unfolding4NPR' (Cons (a0, sigma0)) sigma1 sigma2'
      | Lseg (x, z0) ->
        (match x with
-        | Nil1 -> unfolding4NPR' (Cons (a0, sigma0)) sigma1 sigma2'
+        | Nil2 -> unfolding4NPR' (Cons (a0, sigma0)) sigma1 sigma2'
         | Var x' ->
           (match z0 with
-           | Nil1 -> unfolding4NPR' (Cons (a0, sigma0)) sigma1 sigma2'
+           | Nil2 -> unfolding4NPR' (Cons (a0, sigma0)) sigma1 sigma2'
            | Var z' ->
              (match lseg_in_dom2 x' z0 sigma1 with
               | Some y ->
@@ -3757,15 +3677,10 @@ module HeapResolve =
                  | True ->
                    Cons
                      ((insert (rev_cmp compare_space_atom) (Lseg (x, y))
-                        (insert (rev_cmp compare_space_atom) (Lseg (y, z0))
-                          (app (rev0 sigma0) sigma2'))),
-                     (unfolding4NPR' (Cons ((Lseg (x, z0)), sigma0)) sigma1
-                       sigma2'))
-                 | False ->
-                   unfolding4NPR' (Cons ((Lseg (x, z0)), sigma0)) sigma1
-                     sigma2')
-              | None ->
-                unfolding4NPR' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2'))))
+                        (insert (rev_cmp compare_space_atom) (Lseg (y, z0)) (app (rev1 sigma0) sigma2'))),
+                     (unfolding4NPR' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2'))
+                 | False -> unfolding4NPR' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2')
+              | None -> unfolding4NPR' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2'))))
 
   (** val unfolding4 : clause -> clause -> clause list **)
 
@@ -3777,15 +3692,12 @@ module HeapResolve =
          let l0 = unfolding4NPR' Nil sigma1 sigma2 in
          let gG' = rsort_uniq pure_atom_cmp (app gamma gamma') in
          let dD' = rsort_uniq pure_atom_cmp (app delta delta') in
-         let build_clause = fun sigma2' -> NegSpaceClause (gG', sigma2', dD')
-         in
-         map build_clause l0
+         let build_clause = fun sigma2' -> NegSpaceClause (gG', sigma2', dD') in map build_clause l0
        | _ -> Nil)
     | _ -> Nil
 
   (** val unfolding6NPR' :
-      space_atom list -> space_atom list -> space_atom list -> (pure_atom,
-      space_atom list) prod list **)
+      space_atom list -> space_atom list -> space_atom list -> (pure_atom, space_atom list) prod list **)
 
   let rec unfolding6NPR' sigma0 sigma1 = function
   | Nil -> Nil
@@ -3794,10 +3706,10 @@ module HeapResolve =
      | Next (_, _) -> unfolding6NPR' (Cons (a0, sigma0)) sigma1 sigma2'
      | Lseg (x, z0) ->
        (match x with
-        | Nil1 -> unfolding6NPR' (Cons (a0, sigma0)) sigma1 sigma2'
+        | Nil2 -> unfolding6NPR' (Cons (a0, sigma0)) sigma1 sigma2'
         | Var x' ->
           (match z0 with
-           | Nil1 -> unfolding6NPR' (Cons (a0, sigma0)) sigma1 sigma2'
+           | Nil2 -> unfolding6NPR' (Cons (a0, sigma0)) sigma1 sigma2'
            | Var z' ->
              (match Ident.eq_dec x' z' with
               | Left -> unfolding6NPR' sigma0 sigma1 sigma2'
@@ -3807,15 +3719,10 @@ module HeapResolve =
                    let atms = lseg_in_dom_atoms z' sigma1 in
                    let build_res = fun atm -> Pair (atm,
                      (insert (rev_cmp compare_space_atom) (Lseg (x, y))
-                       (insert (rev_cmp compare_space_atom) (Lseg (y, z0))
-                         (app (rev0 sigma0) sigma2'))))
+                       (insert (rev_cmp compare_space_atom) (Lseg (y, z0)) (app (rev1 sigma0) sigma2'))))
                    in
-                   app (map build_res atms)
-                     (unfolding6NPR' (Cons ((Lseg (x, z0)), sigma0)) sigma1
-                       sigma2')
-                 | None ->
-                   unfolding6NPR' (Cons ((Lseg (x, z0)), sigma0)) sigma1
-                     sigma2')))))
+                   app (map build_res atms) (unfolding6NPR' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2')
+                 | None -> unfolding6NPR' (Cons ((Lseg (x, z0)), sigma0)) sigma1 sigma2')))))
 
   (** val unfolding6 : clause -> clause -> clause list **)
 
@@ -3829,8 +3736,7 @@ module HeapResolve =
          let dD' = rsort_uniq pure_atom_cmp (app delta delta') in
          let build_clause = fun p ->
            let Pair (atm, sigma2') = p in
-           NegSpaceClause (gG', sigma2',
-           (insert_uniq pure_atom_cmp (order_eqv_pure_atom atm) dD'))
+           NegSpaceClause (gG', sigma2', (insert_uniq pure_atom_cmp (order_eqv_pure_atom atm) dD'))
          in
          map build_clause l0
        | _ -> Nil)
@@ -3862,9 +3768,7 @@ module HeapResolve =
 
   let do_unfold' pc nc l =
     app (unfolding1 pc nc)
-      (app (unfolding2 pc nc)
-        (app (unfolding3 pc nc)
-          (app (unfolding4 pc nc) (app (unfolding6 pc nc) l))))
+      (app (unfolding2 pc nc) (app (unfolding3 pc nc) (app (unfolding4 pc nc) (app (unfolding6 pc nc) l))))
 
   (** val do_unfold : nat -> clause -> M.t -> M.t **)
 
@@ -3880,28 +3784,21 @@ module HeapResolve =
 
   let unfolding pc nc =
     M.fold (fun c0 -> M.union (spatial_resolution pc c0))
-      (do_unfold (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+      (do_unfold (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+        (S (S (S (S (S (S (S (S (S (S (S (S (S
         O))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
         pc (M.add nc M.empty)) M.empty
  end
@@ -3929,8 +3826,7 @@ module VeriStar =
   let pures =
     M.filter pureb
 
-  (** val sublistg :
-      ('a1 -> 'a1 -> comparison) -> 'a1 list -> 'a1 list -> bool **)
+  (** val sublistg : ('a1 -> 'a1 -> comparison) -> 'a1 list -> 'a1 list -> bool **)
 
   let rec sublistg cmp l1 l2 =
     match l1 with
@@ -3938,13 +3834,11 @@ module VeriStar =
     | Cons (a0, l1') ->
       (match l2 with
        | Nil -> False
-       | Cons (b0, l2') ->
-         (match isEq (cmp a0 b0) with
-          | True -> sublistg cmp l1' l2'
-          | False -> False))
+       | Cons (b0, l2') -> (match isEq (cmp a0 b0) with
+                            | True -> sublistg cmp l1' l2'
+                            | False -> False))
 
-  (** val sublist :
-      ('a1 -> 'a1 -> comparison) -> 'a1 list -> 'a1 list -> bool **)
+  (** val sublist : ('a1 -> 'a1 -> comparison) -> 'a1 list -> 'a1 list -> bool **)
 
   let rec sublist cmp l1 l2 =
     match l1 with
@@ -3980,9 +3874,7 @@ module VeriStar =
   let incorp s t0 =
     M.union s (M.fold relim1 s t0)
 
-  (** val the_loop_terminate :
-      positive -> space_atom list -> clause -> M.t -> clause ->
-      veristar_result **)
+  (** val the_loop_terminate : positive -> space_atom list -> clause -> M.t -> clause -> veristar_result **)
 
   let rec the_loop_terminate n0 sigma nc s cl =
     match Coq_Pos.eqb n0 XH with
@@ -4000,15 +3892,11 @@ module VeriStar =
                       (DebuggingHooks.print_wf_set
                         (HeapResolve.do_wellformed
                           (DebuggingHooks.print_spatial_model
-                            (HeapResolve.norm
-                              (DebuggingHooks.print_wf_set selected)
-                              (PosSpaceClause (Nil, Nil,
-                              (Superposition.simplify_atoms units sigma)))) r)))
-                      s_star) s_star) with
+                            (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
+                              (Superposition.simplify_atoms units sigma)))) r))) s_star) s_star) with
           | True ->
-            (match Superposition.is_model_of_PI (rev0 r)
-                     (DebuggingHooks.print_spatial_model
-                       (Superposition.simplify units nc) r) with
+            (match Superposition.is_model_of_PI (rev1 r)
+                     (DebuggingHooks.print_spatial_model (Superposition.simplify units nc) r) with
              | True ->
                (match isEq
                         (M.compare
@@ -4016,100 +3904,67 @@ module VeriStar =
                             (DebuggingHooks.print_wf_set
                               (HeapResolve.do_wellformed
                                 (DebuggingHooks.print_spatial_model
-                                  (HeapResolve.norm
-                                    (DebuggingHooks.print_wf_set selected)
-                                    (PosSpaceClause (Nil, Nil,
-                                    (Superposition.simplify_atoms units sigma))))
-                                  r))) s_star)
+                                  (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil,
+                                    Nil, (Superposition.simplify_atoms units sigma)))) r))) s_star)
                           (incorp
                             (DebuggingHooks.print_unfold_set
                               (pures
                                 (HeapResolve.unfolding
                                   (DebuggingHooks.print_spatial_model
-                                    (HeapResolve.norm
-                                      (DebuggingHooks.print_wf_set selected)
-                                      (PosSpaceClause (Nil, Nil,
-                                      (Superposition.simplify_atoms units
-                                        sigma)))) r)
+                                    (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause
+                                      (Nil, Nil, (Superposition.simplify_atoms units sigma)))) r)
                                   (DebuggingHooks.print_spatial_model2
                                     (DebuggingHooks.print_spatial_model
-                                      (HeapResolve.norm
-                                        (DebuggingHooks.print_wf_set selected)
-                                        (PosSpaceClause (Nil, Nil,
-                                        (Superposition.simplify_atoms units
-                                          sigma)))) r)
-                                    (HeapResolve.norm selected
-                                      (Superposition.simplify units nc)) r))))
+                                      (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause
+                                        (Nil, Nil, (Superposition.simplify_atoms units sigma)))) r)
+                                    (HeapResolve.norm selected (Superposition.simplify units nc)) r))))
                             (incorp
                               (DebuggingHooks.print_wf_set
                                 (HeapResolve.do_wellformed
                                   (DebuggingHooks.print_spatial_model
-                                    (HeapResolve.norm
-                                      (DebuggingHooks.print_wf_set selected)
-                                      (PosSpaceClause (Nil, Nil,
-                                      (Superposition.simplify_atoms units
-                                        sigma)))) r))) s_star))) with
+                                    (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause
+                                      (Nil, Nil, (Superposition.simplify_atoms units sigma)))) r))) s_star))) with
                 | True -> C_example r
                 | False ->
-                  the_loop_terminate (Coq_Pos.pred n0)
-                    (Superposition.simplify_atoms units sigma)
+                  the_loop_terminate (Coq_Pos.pred n0) (Superposition.simplify_atoms units sigma)
                     (Superposition.simplify units nc)
                     (incorp
                       (DebuggingHooks.print_unfold_set
                         (pures
                           (HeapResolve.unfolding
                             (DebuggingHooks.print_spatial_model
-                              (HeapResolve.norm
-                                (DebuggingHooks.print_wf_set selected)
-                                (PosSpaceClause (Nil, Nil,
-                                (Superposition.simplify_atoms units sigma))))
-                              r)
+                              (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
+                                (Superposition.simplify_atoms units sigma)))) r)
                             (DebuggingHooks.print_spatial_model2
                               (DebuggingHooks.print_spatial_model
-                                (HeapResolve.norm
-                                  (DebuggingHooks.print_wf_set selected)
-                                  (PosSpaceClause (Nil, Nil,
-                                  (Superposition.simplify_atoms units sigma))))
-                                r)
-                              (HeapResolve.norm selected
-                                (Superposition.simplify units nc)) r))))
+                                (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil,
+                                  Nil, (Superposition.simplify_atoms units sigma)))) r)
+                              (HeapResolve.norm selected (Superposition.simplify units nc)) r))))
                       (incorp
                         (DebuggingHooks.print_wf_set
                           (HeapResolve.do_wellformed
                             (DebuggingHooks.print_spatial_model
-                              (HeapResolve.norm
-                                (DebuggingHooks.print_wf_set selected)
-                                (PosSpaceClause (Nil, Nil,
-                                (Superposition.simplify_atoms units sigma))))
-                              r))) s_star))
+                              (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
+                                (Superposition.simplify_atoms units sigma)))) r))) s_star))
                     (DebuggingHooks.print_spatial_model
-                      (HeapResolve.norm
-                        (DebuggingHooks.print_wf_set selected)
-                        (PosSpaceClause (Nil, Nil,
+                      (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
                         (Superposition.simplify_atoms units sigma)))) r))
              | False -> C_example r)
           | False ->
-            the_loop_terminate (Coq_Pos.pred n0)
-              (Superposition.simplify_atoms units sigma)
+            the_loop_terminate (Coq_Pos.pred n0) (Superposition.simplify_atoms units sigma)
               (Superposition.simplify units nc)
               (incorp
                 (DebuggingHooks.print_wf_set
                   (HeapResolve.do_wellformed
                     (DebuggingHooks.print_spatial_model
-                      (HeapResolve.norm
-                        (DebuggingHooks.print_wf_set selected)
-                        (PosSpaceClause (Nil, Nil,
-                        (Superposition.simplify_atoms units sigma)))) r)))
-                s_star)
+                      (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
+                        (Superposition.simplify_atoms units sigma)))) r))) s_star)
               (DebuggingHooks.print_spatial_model
-                (HeapResolve.norm (DebuggingHooks.print_wf_set selected)
-                  (PosSpaceClause (Nil, Nil,
+                (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
                   (Superposition.simplify_atoms units sigma)))) r))
        | Superposition.Aborted l -> Aborted (l, cl))
 
-  (** val the_loop :
-      positive -> space_atom list -> clause -> M.t -> clause ->
-      veristar_result **)
+  (** val the_loop : positive -> space_atom list -> clause -> M.t -> clause -> veristar_result **)
 
   let rec the_loop n0 sigma nc s cl =
     match Coq_Pos.eqb n0 XH with
@@ -4127,15 +3982,11 @@ module VeriStar =
                       (DebuggingHooks.print_wf_set
                         (HeapResolve.do_wellformed
                           (DebuggingHooks.print_spatial_model
-                            (HeapResolve.norm
-                              (DebuggingHooks.print_wf_set selected)
-                              (PosSpaceClause (Nil, Nil,
-                              (Superposition.simplify_atoms units sigma)))) r)))
-                      s_star) s_star) with
+                            (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
+                              (Superposition.simplify_atoms units sigma)))) r))) s_star) s_star) with
           | True ->
-            (match Superposition.is_model_of_PI (rev0 r)
-                     (DebuggingHooks.print_spatial_model
-                       (Superposition.simplify units nc) r) with
+            (match Superposition.is_model_of_PI (rev1 r)
+                     (DebuggingHooks.print_spatial_model (Superposition.simplify units nc) r) with
              | True ->
                (match isEq
                         (M.compare
@@ -4143,94 +3994,63 @@ module VeriStar =
                             (DebuggingHooks.print_wf_set
                               (HeapResolve.do_wellformed
                                 (DebuggingHooks.print_spatial_model
-                                  (HeapResolve.norm
-                                    (DebuggingHooks.print_wf_set selected)
-                                    (PosSpaceClause (Nil, Nil,
-                                    (Superposition.simplify_atoms units sigma))))
-                                  r))) s_star)
+                                  (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil,
+                                    Nil, (Superposition.simplify_atoms units sigma)))) r))) s_star)
                           (incorp
                             (DebuggingHooks.print_unfold_set
                               (pures
                                 (HeapResolve.unfolding
                                   (DebuggingHooks.print_spatial_model
-                                    (HeapResolve.norm
-                                      (DebuggingHooks.print_wf_set selected)
-                                      (PosSpaceClause (Nil, Nil,
-                                      (Superposition.simplify_atoms units
-                                        sigma)))) r)
+                                    (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause
+                                      (Nil, Nil, (Superposition.simplify_atoms units sigma)))) r)
                                   (DebuggingHooks.print_spatial_model2
                                     (DebuggingHooks.print_spatial_model
-                                      (HeapResolve.norm
-                                        (DebuggingHooks.print_wf_set selected)
-                                        (PosSpaceClause (Nil, Nil,
-                                        (Superposition.simplify_atoms units
-                                          sigma)))) r)
-                                    (HeapResolve.norm selected
-                                      (Superposition.simplify units nc)) r))))
+                                      (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause
+                                        (Nil, Nil, (Superposition.simplify_atoms units sigma)))) r)
+                                    (HeapResolve.norm selected (Superposition.simplify units nc)) r))))
                             (incorp
                               (DebuggingHooks.print_wf_set
                                 (HeapResolve.do_wellformed
                                   (DebuggingHooks.print_spatial_model
-                                    (HeapResolve.norm
-                                      (DebuggingHooks.print_wf_set selected)
-                                      (PosSpaceClause (Nil, Nil,
-                                      (Superposition.simplify_atoms units
-                                        sigma)))) r))) s_star))) with
+                                    (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause
+                                      (Nil, Nil, (Superposition.simplify_atoms units sigma)))) r))) s_star))) with
                 | True -> C_example r
                 | False ->
-                  the_loop (Coq_Pos.pred n0)
-                    (Superposition.simplify_atoms units sigma)
+                  the_loop (Coq_Pos.pred n0) (Superposition.simplify_atoms units sigma)
                     (Superposition.simplify units nc)
                     (incorp
                       (DebuggingHooks.print_unfold_set
                         (pures
                           (HeapResolve.unfolding
                             (DebuggingHooks.print_spatial_model
-                              (HeapResolve.norm
-                                (DebuggingHooks.print_wf_set selected)
-                                (PosSpaceClause (Nil, Nil,
-                                (Superposition.simplify_atoms units sigma))))
-                              r)
+                              (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
+                                (Superposition.simplify_atoms units sigma)))) r)
                             (DebuggingHooks.print_spatial_model2
                               (DebuggingHooks.print_spatial_model
-                                (HeapResolve.norm
-                                  (DebuggingHooks.print_wf_set selected)
-                                  (PosSpaceClause (Nil, Nil,
-                                  (Superposition.simplify_atoms units sigma))))
-                                r)
-                              (HeapResolve.norm selected
-                                (Superposition.simplify units nc)) r))))
+                                (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil,
+                                  Nil, (Superposition.simplify_atoms units sigma)))) r)
+                              (HeapResolve.norm selected (Superposition.simplify units nc)) r))))
                       (incorp
                         (DebuggingHooks.print_wf_set
                           (HeapResolve.do_wellformed
                             (DebuggingHooks.print_spatial_model
-                              (HeapResolve.norm
-                                (DebuggingHooks.print_wf_set selected)
-                                (PosSpaceClause (Nil, Nil,
-                                (Superposition.simplify_atoms units sigma))))
-                              r))) s_star))
+                              (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
+                                (Superposition.simplify_atoms units sigma)))) r))) s_star))
                     (DebuggingHooks.print_spatial_model
-                      (HeapResolve.norm
-                        (DebuggingHooks.print_wf_set selected)
-                        (PosSpaceClause (Nil, Nil,
+                      (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
                         (Superposition.simplify_atoms units sigma)))) r))
              | False -> C_example r)
           | False ->
-            the_loop (Coq_Pos.pred n0)
-              (Superposition.simplify_atoms units sigma)
+            the_loop (Coq_Pos.pred n0) (Superposition.simplify_atoms units sigma)
               (Superposition.simplify units nc)
               (incorp
                 (DebuggingHooks.print_wf_set
                   (HeapResolve.do_wellformed
                     (DebuggingHooks.print_spatial_model
-                      (HeapResolve.norm
-                        (DebuggingHooks.print_wf_set selected)
-                        (PosSpaceClause (Nil, Nil,
-                        (Superposition.simplify_atoms units sigma)))) r)))
-                s_star)
+                      (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
+                        (Superposition.simplify_atoms units sigma)))) r))) s_star)
               (DebuggingHooks.print_spatial_model
-                (HeapResolve.norm (DebuggingHooks.print_wf_set selected)
-                  (PosSpaceClause (Nil, Nil,
+                (HeapResolve.norm (DebuggingHooks.print_wf_set selected) (PosSpaceClause (Nil, Nil,
                   (Superposition.simplify_atoms units sigma)))) r))
        | Superposition.Aborted l -> Aborted (l, cl))
 
@@ -4242,10 +4062,9 @@ module VeriStar =
     let Assertion (_, sigma) = a0 in
     let Assertion (pi', sigma') = a1 in
     let Pair (pi'plus, pi'minus) = mk_pureR pi' in
-    the_loop (XO (XO (XO (XO (XO (XO (XO (XO (XO (XI (XO (XI (XO (XO (XI (XI
-      (XO (XI (XO (XI (XI (XO (XO (XI (XI (XI (XO (XI (XI
-      XH))))))))))))))))))))))))))))) sigma (NegSpaceClause (pi'plus, sigma',
-      pi'minus)) (DebuggingHooks.print_new_pures_set s) empty_clause
+    the_loop (XO (XO (XO (XO (XO (XO (XO (XO (XO (XI (XO (XI (XO (XO (XI (XI (XO (XI (XO (XI (XI (XO (XO (XI (XI
+      (XI (XO (XI (XI XH))))))))))))))))))))))))))))) sigma (NegSpaceClause (pi'plus, sigma', pi'minus))
+      (DebuggingHooks.print_new_pures_set s) empty_clause
  end
 
 (** val a : expr **)
@@ -4276,10 +4095,9 @@ let e =
 (** val example_ent : entailment **)
 
 let example_ent () =
-  Entailment ((Assertion ((Cons ((Nequ (c, e)), Nil)), (Cons ((Lseg (a, b)),
-    (Cons ((Lseg (a, c)), (Cons ((Next (c, d)), (Cons ((Lseg (d, e)),
-    Nil)))))))))), (Assertion (Nil, (Cons ((Lseg (b, c)), (Cons ((Lseg (c,
-    e)), Nil)))))))
+  Entailment ((Assertion ((Cons ((Nequ (c, e)), Nil)), (Cons ((Lseg (a, b)), (Cons ((Lseg (a, c)), (Cons ((Next
+    (c, d)), (Cons ((Lseg (d, e)), Nil)))))))))), (Assertion (Nil, (Cons ((Lseg (b, c)), (Cons ((Lseg (c, e)),
+    Nil)))))))
 
 (** val vs_easy : unit0 -> bool **)
 
@@ -4290,10 +4108,8 @@ let vs_easy _ =
             | VeriStar.Valid -> True
             | _ -> False)
     | S n1 -> let res0 = VeriStar.check_entailment (example_ent ()) in loop n1 res0
-  in loop (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-       (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-       (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-       (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
-       (S (S (S (S (S (S (S (S (S
+  in loop (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+       (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
+       (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S (S
        O))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
        VeriStar.Valid

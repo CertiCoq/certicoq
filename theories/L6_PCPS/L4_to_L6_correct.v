@@ -98,39 +98,6 @@ Section Post.
     Definition cps_cvt_rel_branches := cps_cvt_rel_branches func_tag kon_tag default_tag.
 
 
-    (** ** CPS value relation *)
-
-
-    Definition cps_env_rel' (P : value -> val -> Prop) (vn : list var)
-               (vs : list value) (rho : M.t val) :=
-      Forall2 (fun v x => exists v',  M.get x rho = Some v' /\ P v v') vs vn.   
-    
-
-    Inductive cps_val_rel : value -> val -> Prop :=
-    | rel_Con :
-        forall vs vs' dc c_tag cnstrs,
-          Forall2 (fun v v' => cps_val_rel v v') vs vs' ->
-          dcon_to_tag default_tag dc cnstrs = c_tag ->
-          cps_val_rel (Con_v dc vs) (Vconstr c_tag vs')
-    | rel_Prf :
-        cps_val_rel Prf_v (Vint 0)
-    | rel_Clos :
-        forall rho rho_m names na k x f e e' cnstrs S1 S2,
-          cps_env_rel' cps_val_rel names rho rho_m ->
-          (* Forall2 (fun v v' => cps_val_rel v v') rho vs -> *)
-          (* set_lists names vs (M.empty val) = Some rho_m -> *)
-          (* (k > List.last names (1%positive))%positive /\ (x > k)%positive *)
-          (* /\ (f > x)%positive /\ (n > f)%positive -> *)
-          Disjoint _ (FromList (k::x::f::nil)) S1 ->
-          ~ x \in k |: [set f]->
-          f <> k ->
-          (* cps_cvt e names k (SG (n, nenv)) cnstrs = Some (e', next) ->  *)
-          cps_cvt_rel S1 e (x :: names) k cnstrs S2 e' ->
-          cps_val_rel (Clos_v rho na e)
-                      (Vfun rho_m (Fcons f func_tag (x::k::nil) e' Fnil) f).
-
-    Definition cps_env_rel : list var -> list value -> M.t val -> Prop :=
-      cps_env_rel' cps_val_rel.
 
 
     Opaque preord_exp'. 
@@ -410,14 +377,6 @@ Section Post.
       cps_cvt_exps_alpha_equiv k /\
       cps_cvt_efnlst_alpha_equiv k /\
       cps_cvt_branches_alpha_equiv k.
-
-    
-    Definition cps_cvt_val_alpha_equiv_statement k :=
-      forall v v1 v2,
-        cps_val_rel v v1 ->
-        cps_val_rel v v2 ->
-        preord_val cenv PG k v1 v2.     
-    
     
     Lemma cps_cvt_rel_efnlst_name_in_fundes S1 na vars nlst S2 B : 
       cps_cvt_rel_efnlst S1 na vars nlst cnstrs S2 B ->
@@ -1713,10 +1672,138 @@ Section Post.
 
           Grab Existential Variables. eassumption.
     Qed.
+
+
+    (** ** CPS value relation *)
+
+
+    Definition cps_env_rel' (P : value -> val -> Prop) (vn : list var)
+               (vs : list value) (rho : M.t val) :=
+      Forall2 (fun v x => exists v',  M.get x rho = Some v' /\ P v v') vs vn.   
+    
+    
+    Inductive cps_val_rel : value -> val -> Prop :=
+    | rel_Con :
+        forall vs vs' dc c_tag,
+          Forall2 (fun v v' => cps_val_rel v v') vs vs' ->
+          dcon_to_tag default_tag dc cnstrs = c_tag ->
+          cps_val_rel (Con_v dc vs) (Vconstr c_tag vs')
+    | rel_Prf :
+        cps_val_rel Prf_v (Vint 0)
+    | rel_Clos :
+        forall vs rho names na k x f e e' S1 S2,
+          cps_env_rel' cps_val_rel names vs rho ->
+
+          NoDup names ->
+
+          ~ x \in FromList names ->
+
+          ~ x \in k |: [set f] :|: FromList names ->
+          ~ k \in f |: FromList names ->
+
+          cps_cvt_rel S1 e (x :: names) k cnstrs S2 e' ->
+          cps_val_rel (Clos_v vs na e)
+                      (Vfun rho (Fcons f func_tag (x::k::nil) e' Fnil) f).
+
+    Definition cps_env_rel : list var -> list value -> M.t val -> Prop :=
+      cps_env_rel' cps_val_rel.
+
+    (** ** CPS value relation *)
+    
+    Definition cps_cvt_val_alpha_equiv_statement k :=
+      forall v v1 v2,
+        cps_val_rel v v1 ->
+        cps_val_rel v v2 ->
+        preord_val cenv PG k v1 v2.
     
     Lemma cps_cvt_val_alpha_equiv :
       forall k, cps_cvt_val_alpha_equiv_statement k.
     Proof.
+      intros k v.
+      set (P := fun (v : value) => forall v1 v2 : val, cps_val_rel v v1 -> cps_val_rel v v2 -> preord_val cenv PG k v1 v2).
+
+      eapply value_ind' with (P := P); subst P; simpl.
+      
+      - intros dcon vs IH v1 v2 Hrel1 Hrel2.
+        inv Hrel1; inv Hrel2.
+        rewrite preord_val_eq. simpl. split; eauto.
+        revert vs' vs'0 H1 H2.
+        induction IH; intros vs1 vs2 H1 H2.
+        + inv H1. inv H2. constructor.
+        + inv H1; inv H2. constructor; eauto.
+
+      - intros v1 v2 Hrel1 Hrel2. inv Hrel1; inv Hrel2.
+        rewrite preord_val_eq. reflexivity.
+
+      - intros vs1 na e Hall v1 v2 Hrel1 Hrel2.
+        inv Hrel1; inv Hrel2.
+        rewrite preord_val_eq. simpl. intros.
+        rewrite Coqlib.peq_true in *. inv H0. 
+        destruct vs0 as [ | ? [ | ? [ | ] ] ]; simpl in *; try congruence. inv H1.
+        destruct vs2 as [ | ? [ | ? [ | ] ] ]; simpl in *; try congruence.
+        do 3 eexists. split. reflexivity. split. simpl. reflexivity.
+        intros.
+        
+        eapply preord_exp_post_monotonic. eapply HinclG.
+        destruct (cps_cvt_alpha_equiv j) as [Hexp  _].
+        eapply Hexp.
+        + omega.
+        + eassumption. 
+        + eassumption.
+        + constructor; eauto.
+        + normalize_sets.
+          
+          admit. (*  ~ In var (FromList (x :: names)) k0 *)
+        + simpl. admit. (*  S (Datatypes.length names) = S (Datatypes.length names0) *)
+        + normalize_sets. admit. (* Disjoint var (k0 |: (x |: FromList names)) S1 *)
+        + normalize_sets. admit. (* Disjoint var (k0 |: (x |: FromList names)) S1 *)
+        + repeat normalize_sets. simpl.
+          (* add names to env *)
+          inv H1. inv H17.
+          (* add clos to env *)
+          admit.
+
+      - intros vs1 na e Hall v1 v2 Hrel1 Hrel2.
+        inv Hrel1; inv Hrel2.
+        rewrite preord_val_eq. simpl. intros.
+        rewrite Coqlib.peq_true in *. inv H0. 
+        destruct vs0 as [ | ? [ | ? [ | ] ] ]; simpl in *; try congruence. inv H1.
+        destruct vs2 as [ | ? [ | ? [ | ] ] ]; simpl in *; try congruence.
+        do 3 eexists. split. reflexivity. split. simpl. reflexivity.
+        intros.
+        
+        eapply preord_exp_post_monotonic. eapply HinclG.
+        destruct (cps_cvt_alpha_equiv j) as [Hexp  _].
+        eapply Hexp.
+        + omega.
+        + eassumption. 
+        + eassumption.
+        + admit. (* NoDup (x :: names) *)
+        + admit. (*  ~ In var (FromList (x :: names)) k0 *)
+        + simpl. admit. (*  S (Datatypes.length names) = S (Datatypes.length names0) *)
+        + normalize_sets. admit. (* Disjoint var (k0 |: (x |: FromList names)) S1 *)
+        + normalize_sets. admit. (* Disjoint var (k0 |: (x |: FromList names)) S1 *)
+        + repeat normalize_sets. simpl.
+          (* add names to env *)
+          inv H1. inv H17.
+          (* add clos to env *)
+          admit.
+
+          split; eauto.
+        admit.
+        revert vs' vs'0 H1 H2.
+        induction IH; intros vs1 vs2 H1 H2.
+        + inv H1. inv H2. constructor.
+        + inv H1; inv H2. constructor; eauto.
+        split; eauto.
+          clear H0 H4 H5. revert l' l'0 H2 H7; induction l; intros.
+          * inv H2; inv H7. constructor.
+          * inv H2; inv H7. constructor; eauto.
+            
+          * 
+      
+      v v1 v2 Hrel1 Hrel2
+      
     Admitted.
       
     

@@ -72,10 +72,11 @@ Definition sha_fast (_ : unit) := sha256.SHA_256' (sha256.str_to_bytes test).
 Extraction "demo1" demo1.
 Extraction "demo2" demo2.
 Extraction "demo2" demo2.
+Extraction "list_sum" list_sum.
 (* Modified by hand *)
-(* Extraction "vs_easy" vs_easy. *)
-(* Extraction "vs_hard" vs_hard. *)
+(* Extraction "vs_easy_aut" vs_easy. *)
 (* Modified by hand *)
+(* Extraction "vs_hard_aut" vs_hard. *)
 (* Definition binom (_ : unit) := Binom.main. *)
 (* Extraction "binom" binom. *)
 (* Does not typecheck *)

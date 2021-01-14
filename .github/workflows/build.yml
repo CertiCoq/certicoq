@@ -39,7 +39,6 @@ jobs:
 
       - name: Install OCaml
         uses: avsm/setup-ocaml@v1
-        if: steps.opam-cache.outputs.cache-hit != 'true'
         with:
           ocaml-version: ${{ env.OCAML_VERSION }}
 

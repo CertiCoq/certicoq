@@ -410,17 +410,11 @@ Section FUEL_SEM.
   
   (** * {Fuel,environment}-based semantics for L4 *)
   Inductive eval_env_step: env -> exp -> result -> fuel -> Prop :=
-  (* just an experiment for now, assume only one exp in list and no OOT *) 
-  | eval_Con_empty_step:
-      forall (e: expression.exp) (v : value) (rho: env) (dc: dcon),
-        eval_env_fuel_many rho es rs f ->
-        eval_env_step rho (Con_e dc es) (Val (Con_v dc vs)) 
-                      
-  (* | eval_Con_empty_step: *)
-  (*     forall (es: expression.exps) (vs : list value) (rho: env) (dc: dcon) (fs : list fuel), *)
-  (*       (* eval_env_fuel_many rho es rs f -> *) *)
-  (*       eval_env_step rho (Con_e dc es) (Val (Con_v dc vs)) (add_list fs) *)
-
+  | eval_Con_step:
+      forall (es es1 es2: expression.exps) (e : exp) (vs : list value) (rho: env) (dc: dcon) (fs : list fuel) f,
+        Forall3 (fun e v f => eval_env_fuel rho e (Val v) f) (exps_to_list es) vs fs ->
+        eval_env_fuel rho e OOT f ->
+        eval_env_step rho (Con_e dc es) OOT (add_list fs <+> f)
   | eval_Con_step_OOT:
       forall (es es1 es2: expression.exps) (e : exp) (vs : list value) (rho: env) (dc: dcon) (fs : list fuel) f,
         exps_to_list es = exps_to_list es1 ++ e :: exps_to_list es2 ->
@@ -490,23 +484,6 @@ Section FUEL_SEM.
         eval_env_fuel rho e1 OOT f1 ->
         eval_env_step rho (Match_e e1 n brnchs) OOT f1
 
-  with eval_env_fuel_constr : dcon -> env -> list exp -> result -> fuel  -> Prop :=
-  | eval_empty : forall rho, eval_env_fuel_many dc rho [] (Val (Con_e dcon [])) <0>
-  | eval_cons :
-      forall dc rho e es v vs f1 f2,
-        eval_env_fuel rho e (Val v) f1 ->
-        eval_env_fuel_many dc rho es (Con_e dc vs) f2 ->
-        eval_env_fuel_many dc rho (e :: es) (Val (Con_e dc (v :: vs))) (f1 <+> f2)
-  | eval_cons_OOT1 :
-      forall rho e es f1,
-        eval_env_fuel rho e OOT f1 ->
-        eval_env_fuel_many dc rho (e :: es) OOT f1
-  | eval_cons_OOT2 :
-      forall rho e es f1,
-        eval_env_fuel rho e (Val v) f1 ->
-        eval_env_fuel_many dc rho es OOT f2 ->
-        eval_env_fuel_many dc rho (e :: es) OOT (f1 <+> f2)
-
   with eval_env_fuel: env -> exp -> result -> fuel -> Prop :=
   (* Values *) 
   | eval_Var_fuel:
@@ -530,9 +507,12 @@ Section FUEL_SEM.
         eval_env_step rho e r c ->
         eval_env_fuel rho e r (c <+> (one e)).
 
+
+  (* TODO better induction principle *)
+  
   Scheme eval_env_step_ind' := Minimality for eval_env_step Sort Prop
     with eval_env_fuel_ind' := Minimality for eval_env_fuel Sort Prop.
-
+  
   
 End FUEL_SEM.
 

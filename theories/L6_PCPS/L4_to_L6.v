@@ -675,7 +675,7 @@ Section Translate.
           match anf_val with
           | Anf_Var x =>
             ret (Anf_Var f,  Efun1_c (Fcons f func_tag [arg] (C|[ Ehalt x ]|) Fnil) Hole_c)
-          | _ => failwith "Internal error: Expected And_Var but found something else."
+          | _ => failwith "Internal error: Expected Anf_Var but found something else."
           end
         end.
 

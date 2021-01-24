@@ -430,13 +430,12 @@ Section FUEL_SEM.
         eval_env_fuel (v2::rho') e1' r f3 ->
         eval_env_step rho (App_e e1 e2) r (f1 <+> f2 <+> f3)
   | eval_App_step_OOT1 :
-      forall (e1 e2 e1': expression.exp) (rho : env) (f1 : fuel),
+      forall (e1 e2 : expression.exp) (rho : env) (f1 : fuel),
         eval_env_fuel rho e1 OOT f1 ->
         eval_env_step rho (App_e e1 e2) OOT f1
   | eval_App_step_OOT2 :
-      forall (e1 e2 e1': expression.exp) (na : name) (rho rho': env)
-             (f1 f2 : fuel),
-        eval_env_fuel rho e1 (Val (Clos_v rho' na e1')) f1 ->
+      forall (e1 e2 : expression.exp) (v : value) (rho : env) (f1 f2 : fuel),
+        eval_env_fuel rho e1 (Val v) f1 ->
         eval_env_fuel rho e2 OOT f2 ->
         eval_env_step rho (App_e e1 e2) OOT (f1 <+> f2)
 
@@ -452,23 +451,21 @@ Section FUEL_SEM.
         eval_env_step rho (Let_e na e1 e2) OOT f1
                       
   | eval_FixApp_step: 
-      forall (e1 e2 e': expression.exp) (rho rho' rho'': env) (n: N)
+      forall (e1 e2 e': expression.exp) (rho rho' rho'': env) (n: N) (na : name)
              (fnlst: efnlst) (v2 : value) r f1 f2 f3,
         eval_env_fuel rho e1 (Val (ClosFix_v rho' fnlst n)) f1 ->
-        enthopt (N.to_nat n) fnlst = Some e' ->
+        enthopt (N.to_nat n) fnlst = Some (Lam_e na e') ->
         make_rec_env_rev_order fnlst rho' = rho'' ->
         eval_env_fuel rho e2 (Val v2) f2 ->
-        eval_env_fuel rho'' (App_e e' (val_to_exp v2)) r f3 ->
+        eval_env_fuel (v2::rho') e' r f3 ->
         eval_env_step rho (App_e e1 e2) r (f1 <+> f2 <+> f3)
   | eval_FixApp_step_OOT1: (* Ugly :( *)
-      forall (e1 e2 e': expression.exp) (rho : env) (f1 : fuel),
+      forall (e1 e2 : expression.exp) (rho : env) (f1 : fuel),
         eval_env_fuel rho e1 OOT f1 ->
         eval_env_step rho (App_e e1 e2) OOT f1
   | eval_FixApp_step_OOT2: (* Ugly :( *)
-      forall (e1 e2 e': expression.exp) (rho rho' : env) (n: N)
-             (fnlst: efnlst) (v2 : value) f1 f2,
-        eval_env_fuel rho e1 (Val (ClosFix_v rho' fnlst n)) f1 ->
-        enthopt (N.to_nat n) fnlst = Some e' ->
+      forall (e1 e2 : expression.exp) (v : value) (rho : env) (n: N) (v2 : value) f1 f2,
+        eval_env_fuel rho e1 (Val v) f1 ->
         eval_env_fuel rho e2 OOT f2 ->
         eval_env_step rho (App_e e1 e2) OOT (f1 <+> f2)
                       
@@ -480,9 +477,9 @@ Section FUEL_SEM.
         eval_env_fuel ((List.rev vs) ++ rho) e' r f2 ->
         eval_env_step rho (Match_e e1 n brnchs) r (f1 <+> f2)
   | eval_Match_step_OOT:
-      forall (e1 e': expression.exp) (rho: env) (n: N) (brnchs: branches_e) (f1 : fuel),
+      forall (e1 : expression.exp) (rho: env) (n: N) (br: branches_e) (f1 : fuel),
         eval_env_fuel rho e1 OOT f1 ->
-        eval_env_step rho (Match_e e1 n brnchs) OOT f1
+        eval_env_step rho (Match_e e1 n br) OOT f1
 
   with eval_env_fuel: env -> exp -> result -> fuel -> Prop :=
   (* Values *) 

@@ -457,13 +457,13 @@ Section FUEL_SEM.
         enthopt (N.to_nat n) fnlst = Some (Lam_e na e') ->
         make_rec_env_rev_order fnlst rho' = rho'' ->
         eval_env_fuel rho e2 (Val v2) f2 ->
-        eval_env_fuel (v2::rho') e' r f3 ->
+        eval_env_fuel (v2 :: rho'') e' r f3 ->
         eval_env_step rho (App_e e1 e2) r (f1 <+> f2 <+> f3)
   | eval_FixApp_step_OOT1: (* Ugly :( *)
       forall (e1 e2 : expression.exp) (rho : env) (f1 : fuel),
         eval_env_fuel rho e1 OOT f1 ->
         eval_env_step rho (App_e e1 e2) OOT f1
-  | eval_FixApp_step_OOT2: (* Ugly :( *)
+  | eval_FixApp_step_OOT2: 
       forall (e1 e2 : expression.exp) (v : value) (rho : env) (n: N) (v2 : value) f1 f2,
         eval_env_fuel rho e1 (Val v) f1 ->
         eval_env_fuel rho e2 OOT f2 ->

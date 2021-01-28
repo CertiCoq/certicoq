@@ -120,6 +120,7 @@ CertiCoq Compile -ext "_opt" vs_easy.
 CertiCoq Compile -time -cps -ext "_cps_opt" vs_easy.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_easy.
 
+(*
 Eval compute in "Compiling vs_hard".
 
 CertiCoq Compile -O 0 vs_hard.
@@ -161,3 +162,4 @@ CertiCoq Compile -O 0 -cps -ext "_cps" sha_fast.
 CertiCoq Compile -ext "_opt" sha_fast.
 CertiCoq Compile -cps -ext "_cps_opt" sha_fast.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" sha_fast.
+*)

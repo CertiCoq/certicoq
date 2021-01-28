@@ -263,7 +263,7 @@ Section Translate.
       | Fix_e fnlst i =>
         let names_lst :=  fnames fnlst in
         nlst <- get_named_lst names_lst ;;
-        fdefs <- cps_cvt_efnlst fnlst (nlst ++ vn) nlst tgm;;
+        fdefs <- cps_cvt_efnlst fnlst (List.rev nlst ++ vn) nlst tgm;;
         match nth_error nlst (N.to_nat i) with
         | Some i' => 
           ret (Efun fdefs (Eapp k kon_tag (i'::nil)))
@@ -463,19 +463,19 @@ Section Translate.
                     S3
                     (Efun (Fcons k1 kon_tag [x1] (Ecase x1 bs') Fnil) e1')
   | e_Fix :
-      forall S1 S2 fnlst i i' nlst vn k fdefs tgm,
-        FromList nlst \subset S1 ->
-        NoDup nlst ->
-        List.length nlst = efnlength fnlst ->
-        cps_cvt_rel_efnlst (S1 \\ (FromList nlst)) fnlst (nlst ++ vn) nlst tgm S2 fdefs ->
-        nth_error nlst (N.to_nat i) = Some i' ->
+      forall S1 S2 i f fnlst fnames vn k fdefs tgm,
+        FromList fnames \subset S1 ->
+        NoDup fnames ->
+        List.length fnames = efnlength fnlst ->
+        cps_cvt_rel_efnlst (S1 \\ (FromList fnames)) fnlst (List.rev fnames ++ vn) fnames tgm S2 fdefs ->
+        nth_error fnames (N.to_nat i) = Some f ->
         cps_cvt_rel S1
                     (Fix_e fnlst i)
                     vn
                     k
                     tgm
                     S2
-                    (cps.Efun fdefs (cps.Eapp k kon_tag (i'::nil)))
+                    (cps.Efun fdefs (cps.Eapp k kon_tag (f::nil)))
                     
   with cps_cvt_rel_exps :
          Ensemble var -> expression.exps -> list var -> var -> list var ->
@@ -511,17 +511,16 @@ Section Translate.
       forall S vn tgm,
         cps_cvt_rel_efnlst S eflnil vn [] tgm S Fnil
   | e_Eflcons :
-      forall S1 S2 S3 vn nlst e1 e1' fnlst' fdefs' n n1 na x1 k1 tgm,
+      forall S1 S2 S3 vn fnames e1 e1' fnlst fdefs n n1 na x1 k1 tgm,
         x1 \in S1 ->
         k1 \in (S1 \\ [set x1]) ->
         isLambda e1 ->
         cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 (x1::vn) k1 tgm S2 e1' ->
-        cps_cvt_rel_efnlst S2 fnlst' vn nlst tgm S3 fdefs' ->
+        cps_cvt_rel_efnlst S2 fnlst vn fnames tgm S3 fdefs ->
         cps_cvt_rel_efnlst
-          S1 (eflcons n1 (Lam_e na e1) fnlst')
-          vn (n :: nlst)
-          tgm S3
-          (Fcons n func_tag (k1::x1::nil) e1' fdefs')
+          S1 (eflcons n1 (Lam_e na e1) fnlst)
+          vn (n :: fnames) tgm S3
+          (Fcons n func_tag (k1::x1::nil) e1' fdefs)
   with cps_cvt_rel_branches :
          Ensemble var ->
          expression.branches_e ->

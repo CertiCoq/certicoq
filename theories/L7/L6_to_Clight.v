@@ -53,24 +53,25 @@ Definition max_args : Z := 1024%Z.
 
 (* temporary function to get something working *)
 (* returns (n-1) :: (n-2) :: ... :: 0 :: nil for a list of size n *)
-Fixpoint makeArgList' (vs : list positive) : list N :=
+Fixpoint makeArgList' {A} (vs : list A) : list N :=
   match vs with
   | nil => nil
   | x :: vs' => (N.of_nat (length vs')) :: (makeArgList' vs')
   end.
 
 (* [0; ..; length vs - 1] *)
-Definition makeArgList (vs : list positive) : list N := rev (makeArgList' vs).
+Definition makeArgList {A} (vs : list A) : list N := rev (makeArgList' vs).
 
-(* TODO: what is this? *)
-Definition fun_info_env : Type := M.t (positive * fun_tag).
+(* fun_info_env holds mappings f ↦ (fi, t) where
+     f is function name
+     fi is the name of f's fun_info array
+     t is fun_tag associated with f
+*)
+Definition fun_info_env : Type := M.t (var * fun_tag).
 
-(* Compute a fun_env by looking at the number of arguments functions
-   are applied to, assumes that all functions sharing the same tags have the same arity 
-
-   Compute a map with
-     t ↦ (|vs|, [0; ..; length vs - 1]) 
-   for each (Eapp x t vs) and (Fcons _ t vs _ _) in e.
+(* fun_env holds mappings
+     t ↦ (|vs|, [0; ..; |vs| - 1]) 
+   for each (Eapp x t vs) and (Fcons _ t vs _ _) in the expression being compiled.
 *)
 Fixpoint compute_fun_env' (fenv : fun_env) (e : exp) {struct e} : fun_env :=
   match e with
@@ -91,6 +92,7 @@ with compute_fun_env_fundefs fnd fenv {struct fnd} :=
     compute_fun_env_fundefs fnd' (compute_fun_env' fenv' e)
   end.
 
+(*
 (* OS: this only computes fenv for known functions. *)
 Fixpoint compute_fun_env_fds fnd fenv :=
   match fnd with
@@ -99,13 +101,13 @@ Fixpoint compute_fun_env_fds fnd fenv :=
     let fenv' := M.set t (N.of_nat (length vs), makeArgList vs) fenv in
     compute_fun_env_fds fnd' fenv'
   end.
+*)
 
 (* fun_env maps tags to function info *)
-Definition compute_fun_env (e : exp) : fun_env :=
-  compute_fun_env' (M.empty fun_ty_info) e.
+Definition compute_fun_env : exp -> fun_env := compute_fun_env' (M.empty _).
 
 (* A list of variable names in e that refer to offsets in the args array. *)
-Fixpoint get_allocs (e : exp) : list positive :=
+Fixpoint get_allocs (e : exp) : list var :=
   match e with
   | Econstr x t vs e' => x :: get_allocs e'
   | Ecase x cs => fold_right (fun '(_, e) allocs => get_allocs e ++ allocs) nil cs
@@ -135,19 +137,11 @@ Fixpoint max_allocs (e : exp) : nat :=
     end
   | Ecase x cs => fold_left (fun allocs '(_, e) => max (max_allocs e) allocs) cs 0
   | Eproj x t n v e' => max_allocs e'
-  | Eletapp x f t ys e' => max_allocs e' (* XXX Zoe: This doesn't include the allocation happening by the function *)
-  | Efun fnd e' => max (max_allocs_fundefs fnd) (max_allocs e')
-    (* John: recursive call on fundefs shouldn't be necessary. 
-       But it doesn't matter anyway since codegenerator receives hoisted terms *)
+  | Eletapp x f t ys e' => max_allocs e' (* Zoe: This doesn't include the allocation happening by the function *)
+  | Efun fds e => 0 (* unreachable: we assume terms are hoisted *)
   | Eapp x t vs => 0
   | Eprim x p vs e' => max_allocs e'
   | Ehalt x => 0
-  end
-with max_allocs_fundefs (fnd : fundefs) :=
-  match fnd with
-  | Fnil => 0
-  | Fcons f t vs e fnd' => max (length vs + max_allocs e) (max_allocs_fundefs fnd')
-    (* John: is |vs| really necessary? *)
   end.
 
 (*
@@ -180,10 +174,10 @@ with max_pars_fundefs (fnd : fundefs) :=
    constructors, so the list should be non-empty in all cases we care about. *)
 Definition n_ind_ty_info : Type := BasicAst.name * list ctor_ty_info.
 
-(* An [n_ind_env] maps each [ind_tag] to its name and list of constructors *)
+(* An n_ind_env maps each ind_tag to its name and list of constructors *)
 Definition n_ind_env := M.t n_ind_ty_info.
 
-(* John: Note that [c], the [ctor_tag] associated with [cinfo], is unused. *)
+(* John: Note that c, the ctor_tag associated with cinfo, is unused. *)
 Definition update_ind_env (ienv : n_ind_env) (c : ctor_tag) (cinfo : ctor_ty_info) : n_ind_env :=
   let '{| ctor_name := name
         ; ctor_ind_name := name_ty
@@ -196,8 +190,7 @@ Definition update_ind_env (ienv : n_ind_env) (c : ctor_tag) (cinfo : ctor_ty_inf
   | Some (name_ty, iInf) => M.set t (name_ty, cinfo :: iInf) ienv
   end.
 
-(* Compute an [n_ind_env] from a [ctor_env]. 
-   A [ctor_env] maps [ctor_tag]s to [ctor_ty_info]s *)
+(* Compute an n_ind_env from a ctor_env. *)
 Definition compute_ind_env (cenv : ctor_env) : n_ind_env :=
   M.fold update_ind_env cenv (M.empty _).
 
@@ -206,12 +199,6 @@ Inductive ctor_rep : Type :=
 | enum : N -> ctor_rep
 (* [boxed t a] represents a construct with arity [a] and ordinal [t]  *)
 | boxed : N -> N -> ctor_rep.
-
-Definition make_ctor_rep (cenv : ctor_env) (ct : ctor_tag) : option ctor_rep :=
-  cinfo <- M.get ct cenv ;;
-  if (cinfo.(ctor_arity) =? 0)%N
-  then Some (enum cinfo.(ctor_ordinal))
-  else Some (boxed cinfo.(ctor_ordinal) cinfo.(ctor_arity)).
 
 (* The type of the thread info struct and a pointer to it *)
 Definition threadStructInf : type := Tstruct thread_info_id noattr.
@@ -233,10 +220,13 @@ Definition val : type := if Archi.ptr64 then ulong_ty else uint_ty.
 Definition uval : type := if Archi.ptr64 then ulong_ty else uint_ty.
 Definition sval : type := if Archi.ptr64 then long_ty else int_ty.
 Definition val_typ : typ := if Archi.ptr64 then AST.Tlong else Tany32.
+(* [Init_int x] = a C int literal in an initializer, with value x *)
 Definition Init_int (x : Z) : init_data :=
   if Archi.ptr64 then (Init_int64 (Int64.repr x)) else (Init_int32 (Int.repr x)).
+(* [make_vint z] = a C int value with value z *)
 Definition make_vint (z : Z) : Values.val :=
   if Archi.ptr64 then Vlong (Int64.repr z) else Values.Vint (Int.repr z).
+(* [make_cint z t] = C integer constant with value z of type t *)
 Definition make_cint (z : Z) (t : type) : expr :=
   if Archi.ptr64 then Econst_long (Int64.repr z) t else (Econst_int (Int.repr z) t).
 Transparent val.
@@ -246,48 +236,62 @@ Transparent Init_int.
 Transparent make_vint.
 Transparent make_cint.
 
+(* typedef void (*pfunTy)(struct thread_info *); 
+   The type of a function that doesn't take arguments in registers. *)
 Definition funTy : type :=
   Tfunction (Tcons threadInf Tnil) Tvoid cc_default.
-
 Definition pfunTy : type := Tpointer funTy noattr.
 
+(* typedef const uintnat *fun_info;
+   void garbage_collect(fun_info fi, struct thread_info *tinfo); *)
 Definition gc_ty : type :=
   Tfunction (Tcons (Tpointer val noattr) (Tcons threadInf Tnil)) Tvoid cc_default.
 
+(* bool isptr(val); *)
 Definition isptr_ty : type :=
   Tfunction (Tcons val Tnil) (Tint IBool Unsigned noattr) cc_default.
 
 Definition valPtr : type :=
   Tpointer val {| attr_volatile := false; attr_alignas := None |}.
 
+(* The type of the args array *)
 Definition argvTy : type :=
   Tpointer val {| attr_volatile := false; attr_alignas := None |}.
 
 Definition bool_ty : type :=
   Tint IBool Unsigned noattr.
 
-(* mk_arg_tys n = repeat val n *)
+(* mk_arg_tys n = val, ..
+                  ------- n times *)
 Fixpoint mk_arg_tys (n : nat) : typelist :=
   match n with
   | 0 => Tnil
   | S n' => Tcons val (mk_arg_tys n')
   end.
 
+(* mk_fun_ty n = void(struct thread_info *ti, val, ..)
+                                              ------- n times
+   The type of a function that takes n arguments in registers. *)
 Definition mk_fun_ty (n : nat) : type :=
   Tfunction (Tcons threadInf (mk_arg_tys n)) Tvoid cc_default.
 
+(* mk_prim_ty n = val(val, ..)
+                      ------- n times
+   The type of a primop with arity n. *)
 Definition mk_prim_ty (n : nat) :=
   Tfunction (mk_arg_tys n) val cc_default.
 
+(* struct thread_info *make_tinfo(void); *)
 Definition make_tinfo_ty : type :=
   (Tfunction Tnil threadInf cc_default).
 
+(* val *export();
+   TODO: The type of an exported program? *)
 Definition export_ty : type :=
   Tfunction (Tcons threadInf Tnil) valPtr cc_default.
 
 Notation "'var' x" := (Etempvar x val) (at level 20).
 Notation "'ptr_var' x" := (Etempvar x valPtr) (at level 20).
-
 Notation "'bvar' x" := (Etempvar x bool_ty) (at level 20).
 Notation "'fun_var' x" := (Evar x funTy) (at level 20).
 
@@ -301,22 +305,19 @@ Definition isptr : expr := Evar isptr_id isptr_ty.
 Definition tinf  : expr := (Etempvar tinfo_id threadInf).
 Definition tinfd : expr := (Ederef tinf threadStructInf).
 
+(* TODO: What is a heap_info? *)
 Notation heap_info := (Tstruct heap_info_id noattr).
 
 Definition add (a b : expr) := Ebinop Oadd a b valPtr.
 Infix "+'" := add (at level 30).
-
 Definition sub (a b : expr) := Ebinop Osub a b valPtr.
 Infix "-'" := sub (at level 30).
-
 Definition int_eq (a b : expr) := Ebinop Oeq a b type_bool.
 Infix "='" := int_eq (at level 35).
-
 Definition c_not (a : expr) := Eunop Onotbool a type_bool.
 Notation "'!' a" := (c_not a) (at level 40).
 
 Notation seq := Ssequence.
-
 Notation "p ';;;' q" := (seq p q) (at level 100, format " p ';;;' '//' q ").
 
 Infix "::=" := Sset (at level 50).
@@ -342,8 +343,38 @@ Notation "'Field(' t ',' n ')'" :=
 Notation "'args[' n ']'" :=
   ( *(add args (c_int n%Z val))) (at level 36).
 
-(* Call the gc to reserve enough space for the function body *)
-Definition reserve_body (fun_info : positive) (l : Z) : statement :=
+Section CODEGEN.
+
+(* constructor tag c ↦ 
+     Build_ctor_ty_info 
+       ctor_name 
+       ctor_ind_name 
+       ctor_ind_tag 
+       ctor_arity 
+       ctor_ordinal *)
+Variable (cenv : ctor_env). 
+(*
+(* ind_tag i ↦ (name of inductive with tag i, ctor_ty_infos for each constructor) *)
+Variable (ienv : n_ind_env). *)
+(* fun_tag t ↦ (n, [0; ..; n-1]) where n = arity of the function with tag t *)
+Variable (fenv : fun_env).
+(* function name f ↦ (fun_info TODO, f's fun_tag) *)
+Variable (fienv : fun_info_env). 
+
+Definition make_ctor_rep (ct : ctor_tag) : option ctor_rep :=
+  cinfo <- M.get ct cenv ;;
+  if (cinfo.(ctor_arity) =? 0)%N
+  then Some (enum cinfo.(ctor_ordinal))
+  else Some (boxed cinfo.(ctor_ordinal) cinfo.(ctor_arity)).
+
+(* fun_info is an identifier that holds the fun_info,
+   l is the length of the fun_info array,
+   Returns code to call garbage_collect if limit-alloc <= fun_info[0],
+   specifically for the entry point body(). 
+   
+   Since body() doesn't take any arguments, we don't need to worry about
+   storing arguments passed as registers into the args array. *)
+Definition reserve_body (fun_info : ident) (l : Z) : statement :=
   let arr := (Evar fun_info (Tarray uval l noattr)) in
   Sifthenelse
     (!(Ebinop Ole (Ederef arr uval) (limit_ptr -' alloc_ptr) type_bool))
@@ -353,49 +384,70 @@ Definition reserve_body (fun_info : positive) (l : Z) : statement :=
 
 (* Don't shift the tag for boxed, make sure it is under 255 
    (John: is this a TODO item? The function doesn't make sure t<255 in the boxed case) *)
-Definition make_tagZ (cenv : ctor_env) (ct : ctor_tag) : option Z :=
-  match make_ctor_rep cenv ct with
+Definition make_tagZ (ct : ctor_tag) : option Z :=
+  match make_ctor_rep ct with
   | Some (enum t) => Some (Z.shiftl (Z.of_N t) 1 + 1)
   | Some (boxed t a) => Some (Z.shiftl (Z.of_N a) 10 + Z.of_N t)
   | None => None
   end%Z.
 
-Definition make_tag (cenv : ctor_env) (ct : ctor_tag) : option expr :=
-  match make_tagZ cenv ct with
-  | Some t => Some (c_int t val)
-  | None => None
-  end.
+Definition make_tag (ct : ctor_tag) : option expr :=
+  t <- make_tagZ ct ;;
+  ret (c_int t val).
 
-(* TODO: What is this and what is [fun_info_env]? *)
+(* To use variables in Clight expressions, need variable name and its type.
+   Variables that refer to functions must have type
+     void(struct thread_info *ti, val, ..)
+                                  ------- n times
+   where n = min(n_param, arity of the function).
+
+   All other variables just have type val. 
+*)
+
+(* x is the name of the function,
+   locs is the list [0; ..; arity(x) - 1],
+   Returns a well-formed Evar node for referring to x. *)
 Definition mk_fun_var (x : ident) (locs : list N) : expr :=
   Evar x (mk_fun_ty (length (firstn n_param locs))).
 
-Definition make_var (x : ident) (fenv : fun_env) (map : fun_info_env) : expr :=
-  match M.get x map with
-  | None => var x
+(* make_var x = Evar x t where t is x's C type *)
+Definition make_var (x : ident) : expr :=
+  match M.get x fienv with
+  (* if x is a function name with tag t... *)
   | Some (_, t) =>
     match M.get t fenv with
-    | None => var x
-    | Some (_, locs) => mk_fun_var x locs
+    (* ...and tag t corresponds to a function with arity n, then x has function type *)
+    | Some (n, locs) => mk_fun_var x locs (* locs = [0; ..; n-1]. TODO: could just use n instead of locs *)
+    | None => (* should be unreachable *) var x
     end
+  (* otherwise, x is just a regular variable *)
+  | None => var x
   end.
 
-(* Initialize fields cur .. cur+|vs| of x to each v ∈ vs.
-   If v is a function name, initialize using mk_fun_var; otherwise use var *)
-Fixpoint asgn_constr' (fenv : fun_env) (map : fun_info_env)
-         (x : ident) (cur : nat) (vs : list ident) : statement :=
+(* asgn_constr' x cur vs =
+            x[cur] = vs[0];
+        x[cur + 1] = vs[1];
+                   .
+                   .
+     x[cur + |vs|] = vs[|vs| - 1] 
+
+   Assumes |vs|>0. *)
+Fixpoint asgn_constr' (x : ident) (cur : nat) (vs : list ident) : statement :=
   match vs with
-  | nil => (* shouldn't be reached *) Sskip
-  | v :: nil => Field(var x, Z.of_nat cur) :::= (*[val]*) make_var v fenv map
+  | nil => (* should be unreachable *) Sskip
+  (* TODO: Why isn't the cast necessary in the case where v is a function? *)
+  | v :: nil => Field(var x, Z.of_nat cur) :::= (*[val]*) make_var v
   | v :: vs =>
-    Field(var x, Z.of_nat cur) :::= (*[val]*) make_var v fenv map ;;;
-    asgn_constr' fenv map x (S cur) vs
+    Field(var x, Z.of_nat cur) :::= (*[val]*) make_var v ;;;
+    asgn_constr' x (S cur) vs
   end.
 
-Definition asgn_constr (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
-           (x : ident) (t : ctor_tag) (vs : list ident) :=
-  tag <- make_tag cenv t ;;
-  rep <- make_ctor_rep cenv t ;;
+(* asgn_constr x c vs = 
+     code to set x to (Constr c vs)
+     if boxed (i.e., |vs|>0), x is a heap pointer. *)
+Definition asgn_constr (x : ident) (c : ctor_tag) (vs : list ident) :=
+  tag <- make_tag c ;;
+  rep <- make_ctor_rep c ;;
   match rep with
   | enum _ => ret (x ::= tag)
   | boxed _ a =>
@@ -403,7 +455,7 @@ Definition asgn_constr (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (ma
       x ::= [val] (alloc_ptr +' c_int Z.one val) ;;;
       alloc_id ::= alloc_ptr +' c_int (Z.of_N (a + 1)) val ;;;
       Field(var x, -1) :::= tag ;;;
-      asgn_constr' fenv map x 0 vs)
+      asgn_constr' x 0 vs)
   end.
 
 (* This is not valid in Clight if x is a Vptr, implementing instead as an external function
@@ -416,38 +468,50 @@ Definition is_ptr (x : positive) :=
     (c_int 0 val).
  *)
 
+(* is_ptr ret_id v = 
+     code to check if v is a pointer and store the result in ret_id *)
 Definition is_ptr (ret_id : ident) (v : ident) : statement :=
   Scall (Some ret_id) isptr ([val](var v) :: nil).
 
-Definition is_boxed (cenv : ctor_env) (ienv : n_ind_env) (ct : ctor_tag) : bool :=
-  match make_ctor_rep cenv ct with
+Definition is_boxed (ct : ctor_tag) : bool :=
+  match make_ctor_rep ct with
   | Some (boxed _ _) => true
   | Some (enum _) | None => false
   end.
 
-Fixpoint mk_call_vars (fenv : fun_env) (map : fun_info_env)
-         (n : nat) (vs : list positive) : option (list expr) :=
+(* mk_call_vars n vs = Some (map make_var vs) if n = |vs| else None *)
+Fixpoint mk_call_vars (n : nat) (vs : list ident) : option (list expr) :=
   match n, vs with
   | 0, nil => Some nil
   | S n, v :: vs' =>
-    rest <- mk_call_vars fenv map n vs' ;;
-    ret (make_var v fenv map :: rest)
+    rest <- mk_call_vars n vs' ;;
+    ret (make_var v :: rest)
   | _, _ => None
   end.
 
-Definition mk_call (fenv : fun_env) (map : fun_info_env)
-           (f : expr) (n : nat) (vs : list positive) : option statement :=
-  match mk_call_vars fenv map n (firstn n_param vs) with
-  | Some v => Some (Scall None f (tinf :: v))
-  | None => None
-  end.
+(* mk_call f n vs = Some (f(tinfo, vs..)) if n = min(n_param, |vs|) else None *)
+Definition mk_call (f : expr) (n : nat) (vs : list ident) : option statement :=
+  vs <- mk_call_vars n (firstn n_param vs) ;;
+  ret (Scall None f (tinf :: vs)).
 
-Definition mk_prim_call (res : ident) (pr : ident) (ar : nat)
-           (fenv : fun_env) (map: fun_info_env) (vs : list ident) : option statement :=
-  args <- mk_call_vars fenv map ar vs ;;  
+(* mk_prim_call res pr ar vs = Some (res = pr(vs..)) if ar = min(n_param, |vs|) else None *)
+Definition mk_prim_call (res pr : ident) (ar : nat) (vs : list ident) : option statement :=
+  args <- mk_call_vars ar vs ;;  
   ret (Scall (Some res) ([mk_prim_ty ar] (Evar pr (mk_prim_ty ar))) args).
 
-Fixpoint asgn_fun_vars' (vs : list positive) (ind : list N) : option statement :=
+(* Load arguments from the args array.
+
+   asgn_fun_vars' vs ind =
+     vs[|ind| - 1] = args[ind[|ind| - 1]];
+                   .
+                   .
+             vs[1] = args[ind[1]];
+             vs[0] = args[ind[0]];
+
+   Reads arguments from the args array at indices ind.
+   Stores them in local variables vs.
+*)
+Fixpoint asgn_fun_vars' (vs : list ident) (ind : list N) : option statement :=
   match vs, ind with
   | nil, nil => ret Sskip
   | v :: vs, i :: ind => 
@@ -456,45 +520,59 @@ Fixpoint asgn_fun_vars' (vs : list positive) (ind : list N) : option statement :
   | _, _ => None
   end.
 
+(* Like asgn_fun_vars' but skip the first n_param arguments. *)
 Definition asgn_fun_vars (vs : list positive) (ind : list N) : option statement :=
   asgn_fun_vars' (skipn n_param vs) (skipn n_param ind).
 
-Fixpoint asgn_app_vars'' (vs : list positive) (ind : list N)
-         (fenv : fun_env) (map : fun_info_env) : option statement :=
+(* asgn_app_vars'' vs ind =
+            args[ind[0]] = vs[0];
+            args[ind[1]] = vs[1];
+                         .
+                         .
+     args[ind[|ind| - 1] = vs[|ind| - 1];
+
+   Reads arguments from local variables vs.
+   Stores them in the args array at indices ind.
+*)
+Fixpoint asgn_app_vars'' (vs : list ident) (ind : list N) : option statement :=
   match vs, ind with
   | nil, nil => ret Sskip
   | v :: vs, i :: ind =>
-    rest <- asgn_app_vars'' vs ind fenv map ;;
-    ret (rest ;;; args[ Z.of_N i ] :::= make_var v fenv map)
-    (* John: is there a reason for reversing the order of assignments compared to [asgn_fun_vars]? *)
+    rest <- asgn_app_vars'' vs ind ;;
+    ret (rest ;;; args[ Z.of_N i ] :::= make_var v)
   | _, _ => None
   end.
 
-Definition asgn_app_vars'
-           (vs : list positive)
-           (ind : list N)
-           (fenv : fun_env)
-           (map : fun_info_env) : option statement :=
-  asgn_app_vars'' (skipn n_param vs) (skipn n_param ind) fenv map.
+(* Like asgn_app_vars'', but skip the first n_param arguments. *)
+Definition asgn_app_vars' (vs : list ident) (ind : list N) : option statement :=
+  asgn_app_vars'' (skipn n_param vs) (skipn n_param ind).
 
-Fixpoint get_ind {A} (eq : A -> A -> bool) (l : list A) (x : A) : option nat :=
+Fixpoint index_of {A} (eq : A -> A -> bool) (l : list A) (x : A) : option nat :=
   match l with
   | nil => None
-  | x :: l' =>
-    if eq x x then Some 0 else
-    n <- get_ind eq l' x ;;
+  | x' :: l' =>
+    if eq x x' then Some 0 else
+    n <- index_of eq l' x ;;
     ret (S n)
   end.
 
-(* TODO: What are myvs and myind? *)
-Fixpoint remove_app_vars (myvs vs : list positive)
-         (myind ind : list N) : option (list positive * list N) :=
+(* remove_app_vars myvs vs myind ind =
+      if
+        |myvs| = |myind|
+        |vs| = |ind|
+        zip myvs myind ⊆ zip vs ind
+      then
+        Some (unzip (zip vs ind \ zip myvs myind))
+      else
+        None *)
+Fixpoint remove_app_vars (myvs vs : list ident) (myind ind : list N)
+  : option (list ident * list N) :=
   match vs, ind with
   | nil, nil => Some (nil, nil)
   | v :: vs, i :: ind =>
     '(vs, ind) <- remove_app_vars myvs vs myind ind ;;
     match
-      n <- get_ind Pos.eqb myvs v ;;
+      n <- index_of Pos.eqb myvs v ;;
       i' <- nth_error myind n ;;
       if N.eqb i i' then ret (vs, ind) else None
     with
@@ -504,109 +582,131 @@ Fixpoint remove_app_vars (myvs vs : list positive)
   | _, _ => None
   end.
 
-Definition asgn_app_vars_fast'
-           (myvs vs : list positive)
-           (myind ind : list N)
-           (fenv : fun_env)
-           (map : fun_info_env) : option statement :=
+(* Like asgn_app_vars'' but ignore variables in myvs/indices in myind *)
+Definition asgn_app_vars_fast' (myvs vs : list ident) (myind ind : list N) : option statement :=
   '(vs, ind) <- remove_app_vars myvs (skipn n_param vs) myind (skipn n_param ind) ;;
-  asgn_app_vars'' vs ind fenv map.
+  asgn_app_vars'' vs ind.
 
-(* Optional, reduce register pressure *)
-Definition asgn_app_vars (vs : list positive) (ind : list N)
-           (fenv : fun_env) (map : fun_info_env) : option statement :=
-  match asgn_app_vars' vs ind fenv map with
+(* To reduce register pressure while loading arguments from the args array,
+   instead of emitting
+     tinfo->args[..] = ..;
+     tinfo->args[..] = ..;
+     tinfo->args[..] = ..;
+     tinfo->args[..] = ..;
+   we'll first cache tinfo->args:
+     args = tinfo->args;
+     args[..] = ..;
+     args[..] = ..;
+     args[..] = ..;
+     args[..] = ..; 
+*)
+Definition asgn_app_vars (vs : list ident) (ind : list N) : option statement :=
+  s <- asgn_app_vars' vs ind ;;
+  ret (args_id ::= Efield tinfd args_id (Tarray uval max_args noattr) ;;; s).
+
+(* Like asgn_app_vars, but ignore variables in myvs/indices in myind *)
+Definition asgn_app_vars_fast (myvs vs : list ident) (myind ind : list N) : option statement :=
+  match asgn_app_vars_fast' myvs vs myind ind with
   | Some s => ret (args_id ::= Efield tinfd args_id (Tarray uval max_args noattr) ;;; s)
   | None => None
   end.
 
-Definition asgn_app_vars_fast (myvs vs : list positive) (myind ind : list N)
-           (fenv : fun_env) (map : fun_info_env) : option statement :=
-  match asgn_app_vars_fast' myvs vs myind ind fenv map with
-  | Some s => ret (args_id ::= Efield tinfd args_id (Tarray uval max_args noattr) ;;; s)
-  | None => None
-  end.
-
-Definition reserve (funInf : positive) (l : Z) (vs : list positive) (ind : list N)
-           (fenv : fun_env) (map : fun_info_env) : option statement :=
-  let arr := Evar funInf (Tarray uval l noattr) in
-  bef <- asgn_app_vars'' (firstn n_param vs) (firstn n_param ind) fenv map ;;
+(* Returns code to invoke the garbage collector if necessary, at the beginning of a function body.
+   - fi holds the fun_info; fi[0] is the maximum number of words needed by
+     the function body being compiled.
+   - l is the length of fi
+   - vs are the function's arguments
+   - ind are the indices of each argument in the args array
+*)
+Definition reserve (fi : ident) (l : Z) (vs : list ident) (ind : list N) : option statement :=
+  let arr := Evar fi (Tarray uval l noattr) in
+  bef <- asgn_app_vars'' (firstn n_param vs) (firstn n_param ind) ;;
   aft <- asgn_fun_vars' (firstn n_param vs) (firstn n_param ind) ;;
   ret (
     Sifthenelse
+      (* If fi[0] > limit-alloc (i.e., there might not be enough space left on the heap), *)
       (!(Ebinop Ole (Ederef arr uval) (limit_ptr -' alloc_ptr) type_bool))
-      (bef ;;;
+      ((* Store the arguments that were passed in registers into the args array *)
+       bef ;;;
+       (* Invoke the gc *)
        Scall None gc (arr :: tinf :: nil) ;;;
+       (* Update our local copy of alloc *)
        alloc_id ::= Efield tinfd alloc_id valPtr ;;;
+       (* Retrieve the arguments that were passed in registers from the args array.
+          (Need to retrieve because garbage collection can move pointers around.) *)
        aft)
       Sskip).
 
-Definition reserve' (funInf : positive) (l : Z) (vs : list positive) (ind : list N)
-           (fenv : fun_env) (map : fun_info_env) : option statement :=
-  let arr := Evar funInf (Tarray uval l noattr) in
+(*
+(* Like reserve, but instead of reading from a local copy of alloc and limit,
+   read from tinfo->alloc and tinfo->limit. *)
+Definition reserve' (fi : ident) (l : Z) (vs : list ident) (ind : list N) : option statement :=
+  let arr := Evar fi (Tarray uval l noattr) in
   let allocF := Efield tinfd alloc_id valPtr in
   let limitF := Efield tinfd limit_id valPtr in
-  bef <- asgn_app_vars'' (firstn n_param vs) (firstn n_param ind) fenv map ;;
+  bef <- asgn_app_vars'' (firstn n_param vs) (firstn n_param ind) ;;
   aft <- asgn_fun_vars' (firstn n_param vs) (firstn n_param ind) ;;
   ret (
     Sifthenelse
       (!(Ebinop Ole (Ederef arr uval) (limitF -' allocF) type_bool))
       (bef ;;; Scall None gc (arr :: tinf :: nil) ;;; aft)
       Sskip).
+*)
 
-(* ls = boxed cases; ls' = unboxed cases *)
-Definition make_case_switch (x : positive)
-           (ls : labeled_statements) (ls' : labeled_statements) : statement :=
+(* x = scrutinee; ls = boxed cases; ls' = unboxed cases *)
+Definition make_case_switch (x : ident) (ls ls' : labeled_statements) : statement :=
   is_ptr case_id x;;;
   Sifthenelse
     (bvar case_id)
     (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
     (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val) ls').
 
-Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv : ctor_env)
-         (ienv : n_ind_env) (map : fun_info_env) : option statement :=
+Fixpoint translate_body (e : exp) : option statement :=
   match e with
-  | Econstr x t vs e' =>
-    prog <- asgn_constr cenv ienv fenv map x t vs ;;
-    prog' <- translate_body e' fenv cenv ienv map ;;
-    ret (prog ;;; prog')
+  | Econstr x t vs e =>
+    s_constr <- asgn_constr x t vs ;;
+    rest <- translate_body e ;;
+    ret (s_constr ;;; rest)
   | Ecase x cs =>
     (* ls <- boxed cases (Vptr), ls' <- unboxed (Vint) *)
     '(ls, ls') <-
-       (fix makeCases (l : list (ctor_tag * exp)) :=
+       (fix make_cases (l : list (ctor_tag * exp)) :=
          match l with
          | nil => ret (LSnil, LSnil)
          | (c, e) :: l' =>
-           prog <- translate_body e fenv cenv ienv map ;;
-           '(ls, ls') <- makeCases l' ;;
-           match make_ctor_rep cenv c with
+           rest <- translate_body e ;;
+           '(ls, ls') <- make_cases l' ;;
+           match make_ctor_rep c with
            | Some (boxed t a) =>
-             let tag := (Z.shiftl (Z.of_N a) 10 + Z.of_N t)%Z in
              match ls with
-             | LSnil => ret (LScons None (prog ;;; Sbreak) ls, ls')
+             | LSnil => ret (LScons None (rest ;;; Sbreak) ls, ls')
              | LScons _ _ _ =>
-               ret (LScons (Some (Z.land tag 255)) (prog ;;; Sbreak) ls, ls')
+               (* TODO: Z.land tag 255 is just Z.land (Z.of_N t) 255 right? *)
+               let tag := (Z.shiftl (Z.of_N a) 10 + Z.of_N t)%Z in
+               ret (LScons (Some (Z.land tag 255)) (rest ;;; Sbreak) ls, ls')
              end
            | Some (enum t) =>
-             let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
              match ls' with
-             | LSnil => ret (ls, LScons None (prog ;;; Sbreak) ls')
+             | LSnil => ret (ls, LScons None (rest ;;; Sbreak) ls')
              | LScons _ _ _ =>
-               ret (ls, LScons (Some (Z.shiftr tag 1)) (prog ;;; Sbreak) ls')
+               (* TODO: Z.shiftr tag 1 = Z.of_N t *)
+               let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
+               ret (ls, LScons (Some (Z.shiftr tag 1)) (rest ;;; Sbreak) ls')
              end
            | None => None
            end
          end) cs ;;
     ret (make_case_switch x ls ls')
-  | Eletapp x f t vs e' =>
-    (* TODO: Should this case even be handled? Since there's no shadow stack, 
-       we can't properly manage memory of programs that use letapp anyway. *)
-    prog <- translate_body e' fenv cenv ienv map ;;
-    inf <- M.get t fenv ;;
-    asgn <- asgn_app_vars vs (snd inf) fenv map ;;
-    let vv := make_var f fenv map in
-    let pnum := min (N.to_nat (fst inf)) n_param in
-    c <- mk_call fenv map ([Tpointer (mk_fun_ty pnum) noattr] vv) pnum vs ;;
+  | Eletapp x f t vs e =>
+    (* TODO: Should this case even be handled? Since there's no shadow
+       stack in this version of the code generator, we can't properly
+       manage memory of programs that use letapp anyway. *)
+    prog <- translate_body e ;;
+    '(arity, indices) <- M.get t fenv ;;
+    asgn <- asgn_app_vars vs indices ;;
+    let vv := make_var f in
+    let pnum := min (N.to_nat arity) n_param in
+    c <- mk_call ([Tpointer (mk_fun_ty pnum) noattr] vv) pnum vs ;;
     ret (
       asgn ;;;
       Efield tinfd alloc_id valPtr :::= alloc_ptr ;;;
@@ -615,176 +715,184 @@ Fixpoint translate_body (e : exp) (fenv : fun_env) (cenv : ctor_env)
       alloc_id ::= Efield tinfd alloc_id valPtr ;;;
       x ::= Field(args, Z.of_nat 1) ;;;
       prog)
-  | Eproj x t n v e' =>
-    prog <- translate_body e' fenv cenv ienv map ;;
+  | Eproj x t n v e =>
+    prog <- translate_body e ;;
     ret (x ::= Field(var v, Z.of_N n) ;;; prog)
   | Efun fnd e => None
-  | Eapp x t vs =>
-    inf <- M.get t fenv ;;
-    asgn <- asgn_app_vars vs (snd inf) fenv map ;;
-    let vv :=  make_var x fenv map in
-    let pnum := min (N.to_nat (fst inf)) n_param in
-    c <- (mk_call fenv map ([Tpointer (mk_fun_ty pnum) noattr] vv) pnum vs) ;;
-    ret (asgn ;;;
-         Efield tinfd alloc_id valPtr :::= alloc_ptr ;;;
-         Efield tinfd limit_id valPtr :::= limit_ptr ;;;
-         c)
-  | Eprim x p vs e' =>
-    prog <- translate_body e' fenv cenv ienv map ;;
-    pr_call <- mk_prim_call x p (length vs) fenv map vs ;;
+  | Eapp f t vs =>
+    '(arity, indices) <- M.get t fenv ;;
+    asgn <- asgn_app_vars vs indices ;;
+    let f := make_var f in
+    let pnum := min (N.to_nat arity) n_param in
+    call <- mk_call ([Tpointer (mk_fun_ty pnum) noattr] f) pnum vs ;;
+    ret (
+      asgn ;;;
+      Efield tinfd alloc_id valPtr :::= alloc_ptr ;;;
+      Efield tinfd limit_id valPtr :::= limit_ptr ;;;
+      call)
+  | Eprim x p vs e =>
+    pr_call <- mk_prim_call x p (length vs) vs ;;
+    prog <- translate_body e ;;
     ret (pr_call ;;; prog)
   | Ehalt x =>
     (* set args[1] to x and return *)
     ret (
       Efield tinfd alloc_id valPtr :::= alloc_ptr ;;;
       Efield tinfd limit_id valPtr :::= limit_ptr ;;;
-      args[ Z.of_nat 1 ] :::= make_var x fenv map)
+      args[ Z.of_nat 1 ] :::= make_var x)
   end.
 
-(* John: This looks like [translate_body] but with calls to [asgn_app_vars] replaced by
-   calls to [asgn_app_vars_fast]. *)
-Fixpoint translate_body_fast (e : exp) (fenv : fun_env) (cenv : ctor_env) (ienv : n_ind_env)
-         (map : fun_info_env) (myvs : list positive) (myind : list N) : option statement :=
+(* Like translate_body, but with calls to asgn_app_vars replaced by
+   calls to asgn_app_vars_fast (myvs:=myvs) (myind:=myind). *)
+Fixpoint translate_body_fast (e : exp) (myvs : list ident) (myind : list N) : option statement :=
   match e with
-  | Econstr x t vs e' =>
-    prog <- asgn_constr cenv ienv fenv map x t vs ;;
-    prog' <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
-    ret (prog ;;; prog')
+  | Econstr x t vs e =>
+    s_constr <- asgn_constr x t vs ;;
+    rest <- translate_body_fast e myvs myind ;;
+    ret (s_constr ;;; rest)
   | Ecase x cs =>
     (* ls <- boxed cases (Vptr), ls <- unboxed (Vint) *)
-    p <- ((fix makeCases (l : list (ctor_tag * exp)) :=
-            match l with
-            | nil => ret (LSnil, LSnil)
-            | cons p l' =>
-              prog <- translate_body_fast (snd p) fenv cenv ienv map myvs myind ;;
-                   p' <- makeCases l' ;;
-                   let '(ls, ls') := p' in
-                   match (make_ctor_rep cenv (fst p)) with
-                   | Some (boxed t a ) =>
-                     let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
-                     (match ls with
-                     | LSnil =>
-                       ret ((LScons None
-                                    (prog ;;; Sbreak)
-                                    ls), ls')
-                     | LScons _ _ _ =>
-                       ret ((LScons (Some (Z.land tag 255))
-                                    (prog ;;; Sbreak)
-                                    ls), ls')
-                     end)
-                   | Some (enum t) =>
-                     let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
-                     (match ls' with
-                     | LSnil =>
-                       ret (ls, (LScons None
-                                        (prog ;;; Sbreak)
-                                        ls'))
-                     | LScons _ _ _ =>
-                       ret (ls, (LScons (Some (Z.shiftr tag 1))
-                                        (prog ;;; Sbreak)
-                                        ls'))
-                     end)
-                   | None => None
-                   end
-            end) cs) ;;
-      let '(ls, ls') := p in
+    '(ls, ls') <-
+      (fix make_cases (l : list (ctor_tag * exp)) :=
+         match l with
+         | nil => ret (LSnil, LSnil)
+         | (c, e) :: l' =>
+           rest <- translate_body_fast e myvs myind ;;
+           '(ls, ls') <- make_cases l' ;;
+           match make_ctor_rep c with
+           | Some (boxed t a) =>
+             match ls with
+             | LSnil => ret (LScons None (rest ;;; Sbreak) ls, ls')
+             | LScons _ _ _ =>
+               (* TODO: extra tag computation *)
+               let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
+               ret (LScons (Some (Z.land tag 255)) (rest ;;; Sbreak) ls, ls')
+             end
+           | Some (enum t) =>
+             match ls' with
+             | LSnil => ret (ls, LScons None (rest ;;; Sbreak) ls')
+             | LScons _ _ _ =>
+               (* TODO: extra tag computation *)
+               let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
+               ret (ls, LScons (Some (Z.shiftr tag 1)) (rest ;;; Sbreak) ls')
+             end
+           | None => None
+           end
+         end) cs ;;
       ret (make_case_switch x ls ls')
-  | Eletapp x f t vs e' =>
-    prog <- translate_body_fast e' fenv cenv ienv map myvs myind;;
-    inf <- M.get t fenv ;;
-    asgn <- asgn_app_vars_fast myvs vs myind (snd inf) fenv map ;;
-    let vv :=  make_var f fenv map in
-    let pnum := min (N.to_nat (fst inf)) n_param in
-    c <- (mk_call fenv map ([Tpointer (mk_fun_ty pnum) noattr] vv) pnum vs) ;;
-    ret (asgn ;;; Efield tinfd alloc_id valPtr :::= alloc_ptr ;;; Efield tinfd limit_id valPtr :::= limit_ptr ;;; c ;;; alloc_id ::= Efield tinfd alloc_id valPtr ;;; x ::= Field(args, Z.of_nat 1) ;;; prog)
-  | Eproj x t n v e' =>
-    prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
-    ret (x ::= Field(var v, Z.of_N n) ;;; prog)
+  | Eletapp x f t vs e =>
+    let vv := make_var f in
+    '(arity, indices) <- M.get t fenv ;;
+    asgn <- asgn_app_vars_fast myvs vs myind indices ;;
+    let pnum := min (N.to_nat arity) n_param in
+    call <- (mk_call ([Tpointer (mk_fun_ty pnum) noattr] vv) pnum vs) ;;
+    rest <- translate_body_fast e myvs myind;;
+    ret (
+      asgn ;;;
+      Efield tinfd alloc_id valPtr :::= alloc_ptr ;;; 
+      Efield tinfd limit_id valPtr :::= limit_ptr ;;; 
+      call ;;; 
+      alloc_id ::= Efield tinfd alloc_id valPtr ;;; 
+      x ::= Field(args, Z.of_nat 1) ;;; 
+      rest)
+  | Eproj x t n v e =>
+    rest <- translate_body_fast e myvs myind ;;
+    ret (x ::= Field(var v, Z.of_N n) ;;; rest)
   | Efun fnd e => None
-  | Eapp x t vs =>
-    inf <- M.get t fenv ;;
-    asgn <- asgn_app_vars_fast myvs vs myind (snd inf) fenv map ;;
-    let vv :=  make_var x fenv map in
-    let pnum := min (N.to_nat (fst inf)) n_param in
-    c <- (mk_call fenv map ([mk_fun_ty pnum] vv) pnum vs) ;;
-    ret (asgn ;;;
-         Efield tinfd alloc_id valPtr :::= alloc_ptr ;;;
-         Efield tinfd limit_id valPtr :::= limit_ptr ;;;
-         c)
-  | Eprim x p vs e' =>
-    prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
-    pr_call <- mk_prim_call x p (length vs) fenv map vs ;;
-    ret (pr_call ;;; prog)
-        
+  | Eapp f t vs =>
+    let vv := make_var f in
+    '(arity, indices) <- M.get t fenv ;;
+    asgn <- asgn_app_vars_fast myvs vs myind indices ;;
+    let pnum := min (N.to_nat arity) n_param in
+    call <- mk_call ([mk_fun_ty pnum] vv) pnum vs ;;
+    ret (
+      asgn ;;;
+      Efield tinfd alloc_id valPtr :::= alloc_ptr ;;;
+      Efield tinfd limit_id valPtr :::= limit_ptr ;;;
+      call)
+  | Eprim x p vs e =>
+    pr_call <- mk_prim_call x p (length vs) vs ;;
+    rest <- translate_body_fast e myvs myind ;;
+    ret (pr_call ;;; rest)
   | Ehalt x =>
     (* set args[1] to x and return *)
-    ret (Efield tinfd alloc_id valPtr :::= alloc_ptr ;;;
-         Efield tinfd limit_id valPtr :::= limit_ptr ;;;
-         args[ Z.of_nat 1 ] :::= (make_var x fenv map))
+    ret (
+      Efield tinfd alloc_id valPtr :::= alloc_ptr ;;;
+      Efield tinfd limit_id valPtr :::= limit_ptr ;;;
+      args[ Z.of_nat 1 ] :::= make_var x)
   end.
 
-Definition mk_fun (vs : list positive) (loc : list positive) (body : statement) : function :=
+(* Make a Clight function for an L6 function with 
+   - parameters vs,
+   - local variables loc,
+   - translated body body *)
+Definition mk_fun (vs : list ident) (loc : list ident) (body : statement) : function :=
   mkfunction
     Tvoid
     cc_default
+    (* Parameters *)
     ((tinfo_id, threadInf) :: map (fun x => (x, val)) (firstn n_param vs))
+    (* Local variables *)
     (map (fun x => (x, val)) (skipn n_param vs ++ loc) ++ (alloc_id, valPtr)
       :: (limit_id, valPtr)
-      :: (args_id, valPtr) 
+      :: (args_id, valPtr)
       :: (case_id, bool_ty)
       :: nil)
+    (* Temporaries *)
     nil
     body.
 
-Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env)
-         (ienv : n_ind_env) (map : fun_info_env)
-  : option (list (positive * globdef Clight.fundef type)) :=
+(* Translate each f(xs) = e ∈ fnd into (f, Clight function implementing e) *)
+Fixpoint translate_fundefs (fnd : fundefs) : option (list (ident * globdef Clight.fundef type)) :=
   match fnd with
   | Fnil => ret nil
   | Fcons f t vs e fnd' =>
-    rest <- translate_fundefs fnd' fenv cenv ienv map ;;
-    body <- translate_body e fenv cenv ienv map ;;
-    '(l, locs) <- M.get t fenv ;;
-    asgn <- asgn_fun_vars vs locs ;;
-    gc_arr_id <- M.get f map ;;
-    res <- reserve (fst gc_arr_id) (Z.of_N (l + 2)) vs locs fenv map ;;
+    '(arity, indices) <- M.get t fenv ;;
+    '(fun_info, _) <- M.get f fienv ;;
+    reserve_space <- reserve fun_info (Z.of_N (arity + 2)) vs indices ;;
+    asgn <- asgn_fun_vars vs indices ;;
+    body <- translate_body e ;;
+    let body :=
+      (* Make local copies of tinfo->alloc, tinfo->limit, tinfo->args *)
+      alloc_id ::= Efield tinfd alloc_id valPtr ;;;
+      limit_id ::= Efield tinfd limit_id valPtr ;;;
+      args_id ::= Efield tinfd args_id (Tarray uval max_args noattr);;;
+      (* Make sure there's enough space; invoke gc if necessary *)
+      reserve_space ;;;
+      (* Load arguments from the args array *)
+      asgn ;;;
+      body
+    in
+    rest <- translate_fundefs fnd' ;;
+    ret ((f, Gfun (Internal (mk_fun vs (get_allocs e) body))) :: rest)
+  end.
+
+(* Like translate_fundefs, but use translate_body_fast (myvs:=vs) (myind:=indices) *)
+Fixpoint translate_fundefs_fast (fnd : fundefs) : option (list (ident * globdef Clight.fundef type)) :=
+  match fnd with
+  | Fnil => ret nil
+  | Fcons f t vs e fnd' =>
+    '(arity, indices) <- M.get t fenv ;;
+    '(fi, _) <- M.get f fienv ;;
+    reserve_space <- reserve fi (Z.of_N (arity + 2)) vs indices ;;
+    asgn <- asgn_fun_vars vs indices ;;
+    body <- translate_body_fast e vs indices ;;
     let body :=
       alloc_id ::= Efield tinfd alloc_id valPtr ;;;
       limit_id ::= Efield tinfd limit_id valPtr ;;;
       args_id ::= Efield tinfd args_id (Tarray uval max_args noattr);;;
-      res ;;;
+      reserve_space ;;;
       asgn ;;;
       body
     in
+    rest <- translate_fundefs fnd' ;;
     ret ((f, Gfun (Internal (mk_fun vs (get_allocs e) body))) :: rest)
   end.
 
-Fixpoint translate_fundefs_fast (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env)
-         (ienv : n_ind_env) (map : fun_info_env)
-  : option (list (positive * globdef Clight.fundef type)) :=
-  match fnd with
-  | Fnil => ret nil
-  | Fcons f t vs e fnd' =>
-    rest <- translate_fundefs_fast fnd' fenv cenv ienv map ;;
-    '(l, locs) <- M.get t fenv ;;
-    body <- translate_body_fast e fenv cenv ienv map vs locs ;;
-    asgn <- asgn_fun_vars vs locs ;;
-    gc_arr_id <- M.get f map ;;
-    res <- reserve (fst gc_arr_id) (Z.of_N (l + 2)) vs locs fenv map ;;
-    let body :=
-      alloc_id ::= Efield tinfd alloc_id valPtr ;;;
-      limit_id ::= Efield tinfd limit_id valPtr ;;;
-      args_id ::= Efield tinfd args_id (Tarray uval max_args noattr);;;
-      res ;;;
-      asgn ;;;
-      body
-    in
-    ret ((f, Gfun (Internal (mk_fun vs (get_allocs e) body))) :: rest)
-  end.
-
-Definition make_extern_decl (nenv : name_env)
-           (def : positive * globdef Clight.fundef type)
-           (gv : bool) : option (positive * globdef Clight.fundef type) :=
+Definition make_extern_decl
+           (nenv : name_env)
+           (def : ident * globdef Clight.fundef type)
+           (gv : bool) : option (ident * globdef Clight.fundef type) :=
   match def with
   | (f_id, Gfun (Internal f)) =>
     match M.get f_id nenv with
@@ -810,8 +918,8 @@ Definition make_extern_decl (nenv : name_env)
   end.
 
 Fixpoint make_extern_decls (nenv : name_env)
-         (defs : list (positive * globdef Clight.fundef type))
-         (gv : bool) : list (positive * globdef Clight.fundef type) :=
+         (defs : list (ident * globdef Clight.fundef type))
+         (gv : bool) : list (ident * globdef Clight.fundef type) :=
   match defs with
   | fdefs :: defs' =>
     let decls := make_extern_decls nenv defs' gv in
@@ -832,15 +940,14 @@ Definition body_external_decl : positive * globdef Clight.fundef type :=
          (signature_of_type params Tvoid cc_default))
       params Tvoid cc_default)).
 
-Definition translate_funs (e : exp) (fenv : fun_env) (cenv : ctor_env)
-           (ienv : n_ind_env) (m : fun_info_env)
+Definition translate_funs (e : exp)
   : option (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e => (* currently assuming e is body *)
-    funs <- translate_fundefs fnd fenv cenv ienv m  ;;
+    funs <- translate_fundefs fnd ;;
     let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
-    body <- translate_body e fenv cenv ienv m ;;
-    '(gc_arr_id, _) <- M.get main_id m ;;
+    body <- translate_body e ;;
+    '(gc_arr_id, _) <- M.get main_id fienv ;;
     let args_expr := Efield tinfd args_id (Tarray uval max_args noattr) in
     let fn :=
       mkfunction val cc_default ((tinfo_id, threadInf) :: nil)
@@ -860,15 +967,14 @@ Definition translate_funs (e : exp) (fenv : fun_env) (cenv : ctor_env)
   | _ => None
   end.
 
-Definition translate_funs_fast (e : exp) (fenv : fun_env) (cenv : ctor_env)
-           (ienv : n_ind_env) (m : fun_info_env)
+Definition translate_funs_fast (e : exp)
   : option (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e => (* currently assuming e is body *)
-    funs <- translate_fundefs_fast fnd fenv cenv ienv m ;;
+    funs <- translate_fundefs_fast fnd ;;
     let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
-    body <- translate_body e fenv cenv ienv m ;;
-    '(gcArr_id, _) <- M.get main_id m ;;
+    body <- translate_body e ;;
+    '(gcArr_id, _) <- M.get main_id fienv ;;
     let fn :=
       mkfunction Tvoid cc_default ((tinfo_id, threadInf) :: nil)
         (map (fun x => (x, val)) localVars ++ (alloc_id, valPtr) 
@@ -918,6 +1024,8 @@ Definition update_name_env_fun_info (f f_inf : positive) (nenv : name_env) : nam
     | nNamed s => M.set f_inf (nNamed (append s "_info")) nenv
     end
   end.
+
+End CODEGEN.
 
 (* see runtime for description and uses of fundef_info.
   In summary,
@@ -1011,7 +1119,7 @@ Definition make_defs (e : exp) (fenv : fun_env) (cenv: ctor_env)
   fun_info' <- make_funinfo e fenv nenv ;;
   match fun_info' with
   | Some (fun_info, map, nenv') =>
-    match translate_funs e fenv cenv ienv map with
+    match translate_funs cenv fenv map e with
     | None => ret (exceptionMonad.Exc "translate_funs")
     | Some fun_defs => ret (ret (nenv', global_defs e ++ fun_info ++ rev fun_defs))
     end
@@ -1024,7 +1132,7 @@ Definition make_defs_fast (e : exp) (fenv : fun_env) (cenv: ctor_env)
   fun_inf' <- make_funinfo e fenv nenv ;;
   match fun_inf' with
   | Some (fun_inf, map, nenv') =>
-    match translate_funs_fast e fenv cenv ienv map with
+    match translate_funs_fast cenv fenv map e with
     | None => ret None
     | Some fun_defs => ret (Some (nenv', global_defs e ++ fun_inf ++ rev fun_defs))
     end

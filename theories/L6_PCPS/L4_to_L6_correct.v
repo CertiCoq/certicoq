@@ -14,7 +14,7 @@ Require Import L4.expression L4.exp_eval.
 Require Import cps cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
         tactics L4_to_L6 L4_to_L6_util L6.tactics identifiers
-        bounds cps_util rename. 
+        bounds cps_util rename L4.fuel_sem. 
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
@@ -160,6 +160,28 @@ Section Correct.
                     preord_exp cenv (cps_bound (f <+> exp_eval.one e)) eq_fuel i
                                ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
                                (e', rho)) /\
+      (* Source diverges *)
+      (r = exp_eval.OOT ->
+       exists c, ((f <+> exp_eval.one e) <= c)%nat /\ bstep_fuel cenv rho e' c OOT tt).
+
+  Definition cps_cvt_correct_exp_fuel_many (vs : exp_eval.env) (es : expression.exps) (vs1 : list value) (f : nat)  :=
+    forall rho vnames k xs vk e' S S' i vs2,
+      Disjoint _ (k |: FromList vnames) S ->
+      ~ FromList xs \in k |: FromList vnames ->
+      ~ k \in FromList vnames ->
+                      
+      cps_env_rel vnames vs rho ->
+      M.get k rho = Some vk ->
+
+      cps_cvt_rel_exps S es vnames k y  s cnstrs S' e' ->
+
+      (* Source terminates *)
+      Forall2 (cps_val_rel) vs1 vs2 ->
+      exists rho',
+        set_lists (M.set k vk (M.empty cps.val)) xs vs1 = Some rho' /\ 
+        preord_exp cenv (cps_bound f) eq_fuel i
+                   ((Eapp k kon_tag xs), rho')
+                   (e', rho).
       (* Source diverges *)
       (r = exp_eval.OOT ->
        exists c, ((f <+> exp_eval.one e) <= c)%nat /\ bstep_fuel cenv rho e' c OOT tt).
@@ -337,27 +359,6 @@ Section Correct.
         
         destruct (Hyp (S n) t). eassumption. destructAll.
         eauto. 
-    Qed.
-
-    Lemma make_rec_env_rev_order_app fns vs :
-      exists vs', make_rec_env_rev_order fns vs = vs' ++ vs /\
-                  List.length vs' = efnlength fns /\
-                  forall n, (n < efnlength fns)%nat ->
-                            nth_error vs' n = Some (ClosFix_v vs fns (N.of_nat (efnlength fns - n - 1))).
-    Proof.
-      unfold make_rec_env_rev_order. generalize (efnlength fns) as m. 
-      induction m.
-      - simpl. eexists []. split. reflexivity. split.
-        compute. reflexivity.
-        intros. lia.
-      - destructAll.
-        eexists (ClosFix_v vs fns (N.of_nat (Datatypes.length x)) :: x). simpl.
-        split; [ | split ].
-        + rewrite H. reflexivity.
-        + reflexivity.
-        + intros. destruct n.
-          * simpl. rewrite Nat.sub_0_r. reflexivity.
-          * simpl. eapply H1. lia.
     Qed.
 
     Lemma cps_cvt_rel_efnlst_all_fun_name S efns vs fnames S' fdefs :

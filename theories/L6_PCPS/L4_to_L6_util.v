@@ -5,7 +5,7 @@ Require compcert.lib.Maps compcert.lib.Coqlib.
 
 Import ListNotations.
 
-Require Import L4.expression L4.exp_eval.
+Require Import L4.expression L4.fuel_sem.
 
 (* Require Import Coq.Relations.Relation_Definitions. *)
 (* Require Import Coq.Classes.Morphisms. *)

@@ -174,32 +174,28 @@ Section Correct.
       (r = fuel_sem.OOT ->
        exists c, ((f <+> fuel_sem.one e) <= c)%nat /\ bstep_fuel cenv rho e' c eval.OOT tt).
 
-  Definition cps_cvt_correct_exps_fuel (vs : fuel_sem.env) (es : expression.exps) (vs1 : list value) (f : nat)  :=
-    forall rho vnames k (* xs *) vk e' S S' vs2 ys vs',
+  Definition cps_cvt_correct_exps (vs : fuel_sem.env) (es : expression.exps) (vs1 : list value) (f : nat)  :=
+    forall rho vnames e' S S' vs2 xs e_app,
       well_formed_env vs ->
       exps_wf (N.of_nat (Datatypes.length vnames)) es ->
       
-      Disjoint _ (k |: FromList vnames) S ->
-      ~ k \in FromList vnames ->
+      Disjoint _ (FromList vnames :|: FromList xs) S ->
+      (* ~ k \in FromList vnames -> *)
 
-      Disjoint _ (FromList ys) (k |: S) ->
-      NoDup ys ->
+      (* Disjoint _ (FromList ys) (k |: S) -> *)
+      (* NoDup ys -> *)
       
       cps_env_rel vnames vs rho ->
-      M.get k rho = Some vk ->
 
-      cps_cvt_rel_exps S es vnames k ys cnstrs S' e' ->
+      cps_cvt_rel_exps S es vnames e_app xs cnstrs S' e' ->
       
       Forall2 (cps_val_rel) vs1 vs2 ->
-      get_list ys rho = Some vs' ->
         
-      exists xs rho',
-        NoDup xs /\ FromList xs \subset S /\
-        set_lists (rev ys ++ xs) (rev vs' ++ vs2) (M.set k vk (M.empty cps.val)) = Some rho' /\ 
+      exists rho',
+        set_lists xs vs2 rho = Some rho' /\ 
         forall i,
           preord_exp cenv (cps_bound f) eq_fuel i
-                     ((Eapp k kon_tag (rev ys ++ xs)), rho')
-                     (e', rho).
+                     (e_app, rho') (e', rho).
 
   Lemma get_list_rev A xs (vs  : list A) rho :
     get_list xs rho = Some vs ->
@@ -502,7 +498,7 @@ Section Correct.
     Lemma cps_cvt_correct : forall vs e r f, eval_env_fuel vs e r f -> cps_cvt_correct_exp vs e r f.
     Proof.
       eapply eval_env_fuel_ind' with (P1 := cps_cvt_correct_exp)
-                                     (P0 := cps_cvt_correct_exps_fuel)
+                                     (P0 := cps_cvt_correct_exps)
                                      (P := cps_cvt_correct_exp_step).
 
       - (* Con_e terminates *)
@@ -524,36 +520,37 @@ Section Correct.
                                             (Econstr x1 (dcon_to_tag default_tag dc cnstrs) vx (Eapp k kon_tag [x1])) Fnil)
                                      k1) rho). 
 
-            edestruct IH with (ys := @nil var) (vs' := @nil val) (rho := rho'); [ | | | | | | | | eassumption | | | ].
+            edestruct IH with (rho := rho'); [ | | | | eassumption | | ].
             - eassumption.
             - eassumption.
             - eapply Union_Disjoint_l; sets.
-            - intros Hc. inv H4. eapply Hdis; eauto.
-            - normalize_sets. sets.
-            - now constructor.
+              xsets. 
+            (* - intros Hc. inv H4. eapply Hdis; eauto. *)
+            (* - normalize_sets. sets. *)
+            (* - now constructor. *)
             - unfold rho'. eapply cps_env_rel_weaken. eassumption.
               intros Hc. inv_setminus. eapply Hdis; eauto.
-            - unfold rho'. rewrite M.gss. reflexivity.
+            (* - unfold rho'. rewrite M.gss. reflexivity. *)
             - eassumption.
-            - reflexivity.
             - destructAll.
               
               eapply preord_exp_trans. tci. eapply eq_fuel_idemp. 
               
-              2:{ intros m. simpl. eapply H9. } 
-
+              2:{ intros m. simpl. eapply H0. } 
+              
 
               edestruct (set_lists_length3 rho' vx vs').
               { replace (@Datatypes.length map_util.M.elt) with (@Datatypes.length var) in * by reflexivity.
-                rewrite H6. eapply Forall2_length in H2. rewrite <- H2.
+                rewrite H7. eapply Forall2_length in H2. rewrite <- H2.
                 erewrite <- eval_fuel_many_length. reflexivity. eassumption. }
               
               eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
               
               2:{ intros m. eapply preord_exp_Eapp_red.
                   - erewrite <- set_lists_not_In; [ | eassumption | ].
+                    unfold rho'. 
                     rewrite M.gss. reflexivity.
-                    simpl. intros Hc. eapply H0 in Hc. inv_setminus; eauto.
+                    simpl. intros Hc. eapply H6 in Hc. inv_setminus; eauto.
                   - simpl. rewrite Coqlib.peq_true. reflexivity.
                   - simpl. eapply get_list_set_lists; eassumption.
                   - simpl. eassumption. }

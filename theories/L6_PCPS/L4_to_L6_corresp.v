@@ -41,7 +41,8 @@ Section Corresp.
       }} .
 
   Definition cps_cvt_exps_corresp := 
-    forall es S vn xs k ctrs (Hwf : exps_wf (N.of_nat (List.length vn)) es),
+    forall es S vn xs k ctrs (Hwf : exps_wf (N.of_nat (List.length vn)) es)
+           (Hlen : List.length xs = N.to_nat (exps_length es)),
            (* (Hdis : Disjoint _ S [set k]), *)
       {{ fun _ s => fresh S (next_var (fst s)) }}
         cps_cvt_exps prim_map func_tag kon_tag default_tag es vn k xs ctrs 
@@ -543,15 +544,34 @@ Section Corresp.
 
       eapply bind_triple.
       eapply frame_rule. eapply frame_rule.
+
+      eapply get_named_str_lst_spec.
+
+      intros xs' w3. simpl.
+      eapply pre_curry_l; intros Hsub'.
+      eapply pre_curry_l; intros Hlt''.
+      eapply pre_curry_l; intros Hnd'.
+      eapply pre_curry_l; intros Hlen'.
+      eapply pre_curry_l; intros Hsub''.
+
+      eapply bind_triple.
+      eapply frame_rule. eapply frame_rule.
       
-      eapply H. eassumption.      
+      eapply H. eassumption.
+
+      rewrite map_length in *. rewrite Hlen'. 
+      { clear. induction e; simpl. congruence.
+        rewrite IHe.  
+        destruct (exps_length e0). lia.
+        destruct p; lia. }
       
-      intros e' w3. simpl. 
+      
+      intros e' w4. simpl. 
 
       eapply return_triple. intros. destructAll.
       
       eexists. split; eauto. econstructor; eauto.
-
+      
       rewrite Hlen. rewrite map_length.
 
       clear. induction e; eauto. simpl. destruct (exps_length e0); simpl; try lia. 
@@ -703,10 +723,13 @@ Section Corresp.
 
     - (* enil *)
 
-      eapply return_triple. intros. eexists. split.
-      now constructor. eassumption.
+      eapply return_triple. intros. eexists. split; [ | eassumption ].
+      destruct xs; simpl in *; try congruence. constructor. 
 
     - (* econs *)
+      destruct xs.
+      { inv Hlen. destruct (exps_length e0). lia. destruct p; lia. } 
+      
       eapply bind_triple. eapply pre_post_copy. unfold cps_cvt; simpl.
       eapply get_named_str_fresh. 
       intros x w. simpl.
@@ -715,16 +738,6 @@ Section Corresp.
       
       eapply bind_triple.
       
-      eapply frame_rule. eapply frame_rule. 
-      eapply get_named_spec.
-      
-      intros k1 w2. simpl.
-      eapply pre_curry_l; intros Hr1.
-      eapply pre_curry_l; intros Hlt1.
-      eapply pre_curry_l; intros Hk1.
-      
-      eapply bind_triple.
-
       eapply frame_rule. eapply frame_rule. 
       eapply H. eassumption.
 
@@ -736,6 +749,8 @@ Section Corresp.
       
       eapply bind_triple.
       eapply H0. eassumption.
+
+      simpl in Hlen. destruct (exps_length e0). lia. destruct p; lia.
 
       intros e2 w4. eapply return_triple. intros. destructAll. 
       

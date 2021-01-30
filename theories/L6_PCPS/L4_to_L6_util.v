@@ -1286,9 +1286,27 @@ Section Post.
           
       - (* Prf_e *)
         intros e1 e2 m k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
-               He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
+               Hlt He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
         inv He1; inv He2.
-
+        eapply preord_exp_constr_compat.
+        + eapply Hprops.
+        + eapply Hprops.
+        + constructor.
+        + intros.
+          eapply preord_exp_app_compat. 
+          * eapply Hprops.
+          * eapply Hprops.
+          *  assert (Heq: k2 = ((id {k1 ~> k2}) <{ vars1 ~> vars2 }>) k1).
+             { rewrite extend_lst_gso. rewrite extend_gss. reflexivity. now eauto. }
+             eapply preord_var_env_extend_neq.
+             eapply preord_var_env_monotonic.
+             rewrite Heq. eapply Henv. now left. lia.
+             intros Hc; inv Hc; eapply Hdis1; now eauto. 
+             intros Hc; inv Hc; eapply Hdis2; now eauto. 
+          * constructor; eauto.
+            eapply preord_var_env_extend_eq.
+            rewrite preord_val_eq. simpl; split; eauto.
+            
       - (* Prim_e *)
         intros p e1 e2 m k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
                He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.

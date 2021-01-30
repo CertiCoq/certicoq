@@ -476,6 +476,10 @@ Section Translate.
                     tgm
                     S2
                     (cps.Efun fdefs (cps.Eapp k kon_tag (f::nil)))
+  | e_Prf :
+      forall S vn k tgm x,
+        x \in S ->
+        cps_cvt_rel S Prf_e vn k tgm (S \\ [set x]) (Econstr x default_tag nil (Eapp k kon_tag (x::nil)))
                     
   with cps_cvt_rel_exps :
          Ensemble var -> expression.exps -> list var -> var -> list var ->

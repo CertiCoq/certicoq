@@ -207,6 +207,23 @@ Section Translate.
       end.                  
 
 
+    
+    Fixpoint names_lst_len (ns : list name) (m : nat) : list name :=
+      match ns, m with
+      | _, 0%nat => []
+      | [], S _ => repeat nAnon m
+      | n :: ns, S m => n :: names_lst_len ns m
+      end.
+
+    Lemma names_lst_length ns m :
+      List.length (names_lst_len ns m) = m.
+    Proof.
+      revert m; induction ns; intros m; destruct m; simpl; try reflexivity.
+      - rewrite repeat_length. reflexivity.
+      - rewrite IHns. reflexivity.
+    Qed.
+    
+
     (** ** Main CPS conversion program *)
   
     Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (tgm : constr_env) : cpsM cps.exp :=
@@ -217,11 +234,11 @@ Section Translate.
         | None => failwith  "Unknown DeBruijn index"
         end
       | App_e e1 e2 =>
-        k1 <- get_named_str "k1"%string ;;
         x1 <- get_named_str "x1"%string ;;
-        e1' <- cps_cvt e1 vn k1 tgm;;
-        k2 <- get_named_str "k2"%string ;;
+        k1 <- get_named_str "k1"%string ;;
         x2 <- get_named_str "x2"%string ;;
+        k2 <- get_named_str "k2"%string ;;
+        e1' <- cps_cvt e1 vn k1 tgm;;
         e2' <- cps_cvt e2 vn k2 tgm;;
         ret (Efun
                (Fcons k1 kon_tag (x1::nil)
@@ -231,9 +248,9 @@ Section Translate.
                          e2') Fnil)
                e1')
       | Lam_e n e1 =>
-        k1 <- get_named_str "k1"%string ;;
         x1 <- get_named_str "x1"%string ;;
         f <- get_named n ;;
+        k1 <- get_named_str "k1"%string ;;
         e1' <- cps_cvt e1 (x1::vn) k1 tgm ;;
         ret (Efun
                (Fcons f func_tag (k1::x1::nil) e1' Fnil)
@@ -250,8 +267,8 @@ Section Translate.
 
       | Con_e dci es =>
         let c_tag := dcon_to_tag dci tgm in
-        k' <- get_named_str "k'"%string ;;
         x' <- get_named_str "x'"%string ;;
+        k' <- get_named_str "k'"%string ;;
         vx <- get_named_str_lst (map (fun _ => "x") (exps_as_list es)) ;;
         e' <- cps_cvt_exps es vn k' nil tgm;;
         ret (Efun
@@ -271,8 +288,8 @@ Section Translate.
         end
           
       | Match_e e1 n bl =>
-        k1 <- get_named_str "k1"%string ;;
         x1 <- get_named_str "x1"%string ;;
+        k1 <- get_named_str "k1"%string ;;
         e1' <- cps_cvt e1 vn k1 tgm;;
         cbl <- cps_cvt_branches bl vn k x1 tgm;;
         ret (Efun (Fcons k1 kon_tag (x1::nil) (Ecase x1 cbl) Fnil) e1')
@@ -298,8 +315,8 @@ Section Translate.
            match es with
            | enil => ret (Eapp k kon_tag (List.rev vx))
            | econs e es' =>
-             k1 <- get_named_str "k1"%string ;;
              x1 <- get_named_str "x1"%string ;;
+             k1 <- get_named_str "k1"%string ;;
              e' <- cps_cvt e vn k1 tgm;;
              e_exp <- cps_cvt_exps es' vn k (x1 :: vx) tgm;;
              ret (Efun (Fcons k1 kon_tag (x1::nil) e_exp Fnil) e')
@@ -312,8 +329,8 @@ Section Translate.
            match fdefs with
            | eflnil => ret Fnil
            | eflcons n1 e1 fdefs' =>
-             k' <- get_named_str "k"%string ;;
              x <- get_named_str "x"%string ;;
+             k' <- get_named_str "k"%string ;;
              let curr_var := List.hd 1%positive nlst in
              match e1 with
              | Lam_e n2 e2 =>
@@ -335,7 +352,7 @@ Section Translate.
               *)
              let tg := dcon_to_tag dc tgm in
              cbl <- cps_cvt_branches bl' vn k r tgm;;
-             vars <- get_named_lst lnames ;;
+             vars <- get_named_lst (names_lst_len lnames (N.to_nat i)) ;;
              let ctx_p := ctx_bind_proj tg r vars (List.length vars) in
              ce <- cps_cvt e (vars ++ vn) k tgm ;; 
              ret ((tg, app_ctx_f ctx_p ce)::cbl)
@@ -386,7 +403,7 @@ Section Translate.
         x1 \in S ->
         f \in (S \\ [set x1]) ->
         k1 \in (S \\ (f |: [set x1])) ->
-        cps_cvt_rel (S \\ (k1 |: [set f] :|: [set x1])) e1 (x1::vn) k1 tgm S' e1' ->
+        cps_cvt_rel (S \\ [set x1] \\ [set f] \\ [set k1]) e1 (x1::vn) k1 tgm S' e1' ->
         cps_cvt_rel S
                     (Lam_e na e1)
                     vn
@@ -399,10 +416,10 @@ Section Translate.
       forall S1 S2 S3 e1 e1' e2 e2' k k1 k2 x1 x2 vn tgm,
         x1 \in S1 ->
         k1 \in (S1 \\ [set x1]) ->
-        x2 \in S2 ->
-        k2 \in (S2 \\ [set x2]) ->
-        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 vn k1 tgm S2 e1' ->
-        cps_cvt_rel (S2 \\ (k2 |: [set x2])) e2 vn k2 tgm S3 e2' ->
+        x2 \in (S1 \\ [set x1] \\ [set k1]) ->
+        k2 \in (S1 \\ [set x1] \\ [set k1] \\ [set x2]) ->
+        cps_cvt_rel (S1 \\ [set x1] \\ [set k1] \\ [set x2] \\ [set k2]) e1 vn k1 tgm S2 e1' ->
+        cps_cvt_rel S2 e2 vn k2 tgm S3 e2' ->
         cps_cvt_rel S1
                     (App_e e1 e2)
                     vn
@@ -421,10 +438,10 @@ Section Translate.
         c_tag = dcon_to_tag dci tgm ->
         x1 \in S1 ->
         k1 \in (S1 \\ [set x1]) ->
-        FromList vx \subset (S1 \\ (k1 |: [set x1])) ->
+        FromList vx \subset (S1 \\ [set x1] \\ [set k1]) ->
         Datatypes.length vx = N.to_nat (exps_length es) ->
         NoDup vx ->        
-        cps_cvt_rel_exps (S1 \\ (k1 |: [set x1] :|: FromList vx))
+        cps_cvt_rel_exps (S1 \\ [set x1] \\ [set k1] \\ FromList vx)
                          es vn k1 [] tgm S2 e' ->
         cps_cvt_rel S1
                     (Con_e dci es)
@@ -440,7 +457,7 @@ Section Translate.
       forall S1 S2 S3 na e1 e1' e2 e2' x1 vn k k1 tgm,
         x1 \in S1 ->
         k1 \in (S1 \\ [set x1]) ->
-        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e2 (x1::vn) k tgm S2 e2' ->
+        cps_cvt_rel (S1 \\ [set x1] \\ [set k1]) e2 (x1::vn) k tgm S2 e2' ->
         cps_cvt_rel S2 e1 vn k1 tgm S3 e1' ->
         cps_cvt_rel S1
                     (Let_e na e1 e2)
@@ -453,7 +470,7 @@ Section Translate.
       forall S1 S2 S3 e1 e1' bs bs' vn k x1 k1 n tgm,
         x1 \in S1 ->
         k1 \in (S1 \\ [set x1]) ->
-        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 vn k1 tgm S2 e1' ->
+        cps_cvt_rel (S1 \\ [set x1] \\ [set k1]) e1 vn k1 tgm S2 e1' ->
         cps_cvt_rel_branches S2 bs vn k x1 tgm S3 bs' ->
         cps_cvt_rel S1
                     (Match_e e1 n bs)
@@ -491,7 +508,7 @@ Section Translate.
       forall S1 S2 S3 vn k vx e es e' es' tgm x1 k1,
         x1 \in S1 ->
         k1 \in (S1 \\ [set x1]) ->
-        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e vn k1 tgm S2 e' ->
+        cps_cvt_rel (S1 \\ [set x1] \\ [set k1]) e vn k1 tgm S2 e' ->
         cps_cvt_rel_exps S2 es vn k (x1::vx) tgm S3 es' ->
         cps_cvt_rel_exps S1
                          (econs e es)
@@ -518,8 +535,7 @@ Section Translate.
       forall S1 S2 S3 vn fnames e1 e1' fnlst fdefs n n1 na x1 k1 tgm,
         x1 \in S1 ->
         k1 \in (S1 \\ [set x1]) ->
-        isLambda e1 ->
-        cps_cvt_rel (S1 \\ (k1 |: [set x1])) e1 (x1::vn) k1 tgm S2 e1' ->
+        cps_cvt_rel (S1 \\ [set x1] \\ [set k1]) e1 (x1::vn) k1 tgm S2 e1' ->
         cps_cvt_rel_efnlst S2 fnlst vn fnames tgm S3 fdefs ->
         cps_cvt_rel_efnlst
           S1 (eflcons n1 (Lam_e na e1) fnlst)
@@ -544,10 +560,10 @@ Section Translate.
         FromList vars \subset S2 ->
 
         NoDup vars ->
-        Datatypes.length vars = Datatypes.length lnames ->
+        Datatypes.length vars = N.to_nat n ->
 
 
-        ctx_bind_proj tg r vars 0 = ctx_p ->
+        ctx_bind_proj tg r vars (N.to_nat n) = ctx_p ->
 
         cps_cvt_rel_branches S1 bs' vn k r tgm S2 cbs' ->
         

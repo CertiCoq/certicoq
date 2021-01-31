@@ -232,7 +232,7 @@ Section FUEL_SEM.
       forall rho e es v vs f fs,
         eval_env_fuel rho e (Val v) f ->
         eval_fuel_many rho es vs fs ->
-        eval_fuel_many rho (econs e es) (v :: vs) (f <+> f)
+        eval_fuel_many rho (econs e es) (v :: vs) (f <+> fs)
                       
   with eval_env_fuel: env -> exp -> result -> fuel -> Prop :=
   (* Values *) 

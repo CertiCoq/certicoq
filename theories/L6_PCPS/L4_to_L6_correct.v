@@ -82,6 +82,11 @@ Section Bounds.
 
 End Bounds.
 
+Ltac inv_setminus :=
+  match goal with
+  | [ H : In _ (?S \\ ?Q) _ |- _ ] => inv H; try inv_setminus
+  end.
+
 
 Section FV.
 
@@ -94,22 +99,20 @@ Section FV.
       occurs_free e' \subset k1 |: FromList vars1 :|: S1.
 
   Definition cps_cvt_exps_fv_stmt :=
-    forall e e' e_app vars1 ks xs S1 S2,
-      Disjoint _ (FromList ks) S1 ->
-      cps_cvt_rel_exps func_tag kon_tag default_tag S1 e vars1 e_app xs ks cnstrs S2 e' ->
-      occurs_free e_app \subset FromList ks :|: FromList vars1 :|: S1 ->
-      (* XXX wrong stmt *)
-      occurs_free e' \subset FromList vars1 :|: S1.
+    forall es e' e_app vars1 ks xs S1 S2,
+      (* Disjoint _ (FromList ks) (FromList vars1 :|: S1) -> *)
+      cps_cvt_rel_exps func_tag kon_tag default_tag S1 es vars1 e_app xs ks cnstrs S2 e' ->
+      occurs_free e' \subset (FromList vars1 :|: S1 :|: (occurs_free e_app \\ FromList ks)).
 
   Definition cps_cvt_efnlst_fv_stmt :=
-    forall S1 efns vars1 nlst1 S2 fdefs1,
+    forall efns S1 vars1 nlst1 S2 fdefs1,
       cps_cvt_rel_efnlst func_tag kon_tag default_tag S1 efns vars1 nlst1 cnstrs S2 fdefs1 ->
       occurs_free_fundefs fdefs1 \subset FromList vars1 :|: S1.
 
   Definition cps_cvt_branches_fv_stmt :=
-    forall S1 bs vars1 k1 x1 S2 bs1 x,
+    forall bs S1 vars1 k1 x1 S2 bs1,
       cps_cvt_rel_branches func_tag kon_tag default_tag S1 bs vars1 k1 x1 cnstrs S2 bs1 ->
-      occurs_free (Ecase x bs1) \\ [set x] \subset S1.
+      occurs_free (Ecase x1 bs1) \\ [set x1] \subset k1 |: FromList vars1 :|: S1.
   
   
   Definition cps_cvt_rel_fv_stmt :=
@@ -118,22 +121,199 @@ Section FV.
     cps_cvt_efnlst_fv_stmt /\
     cps_cvt_branches_fv_stmt.
   
+  Lemma ctx_bind_proj_occurs_free t x1 vars n e : 
+    occurs_free (ctx_bind_proj t x1 vars n |[ e ]|) \subset x1 |: occurs_free e.
+  Proof.
+    revert n; induction vars; intros n; simpl.
+    - now sets.
+    - repeat normalize_occurs_free. eapply Union_Included; sets.
+  Qed.
 
   Lemma cps_cvt_rel_fv : cps_cvt_rel_fv_stmt. 
-  Admitted. 
+  Proof.
+    eapply exp_ind_alt_2; intros.
+    - (* Var_e *)
+      inv H. normalize_occurs_free. repeat normalize_sets.
+      eapply nth_error_In in H2.
+      eapply Union_Included; sets.
+      
+    - (* Lem_e *)
+      inv H0. repeat normalize_occurs_free. repeat normalize_sets.
+      inv_setminus. 
+      eapply Union_Included; sets.
+
+      + eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H. eassumption.
+        simpl. repeat normalize_sets. 
+        xsets.
+
+      + simpl. repeat normalize_sets. rewrite Setminus_Union_distr.
+        eapply Union_Included; sets.
+
+    - (* App_e *)
+      inv H1. do 5 normalize_occurs_free. simpl. repeat rewrite occurs_free_fundefs_Fnil at 1.
+
+      eapply Union_Included.
+
+      + normalize_sets.
+        eapply Union_Included; sets.
+        rewrite !Setminus_Union_distr. eapply Union_Included; sets.
+        eapply Union_Included; sets.
+        eapply Union_Included; sets.
+        eapply Union_Included; sets.
+
+        do 2 eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H0. eassumption.
+        eapply cps_cvt_exp_subset in H9.
+        eapply Union_Included; sets.
+        now xsets.
+        eapply Included_trans. eassumption. now xsets.
+
+      + apply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H. eassumption. xsets.
+
+    - (* Con_e *)
+      inv H0.
+      repeat normalize_occurs_free. simpl. repeat normalize_sets.
+      eapply Union_Included.
+      rewrite Setminus_Union_distr. now eapply Union_Included; xsets.
+
+      eapply Setminus_Included_Included_Union.
+      eapply Included_trans. eapply H. eassumption.
+      
+      (* rewrite !Setminus_Union_distr. eapply Union_Included. *)
+      eapply Union_Included. eapply Union_Included.
+      now sets. now xsets.
+      repeat normalize_occurs_free.
+      rewrite !Setminus_Union_distr. eapply Union_Included; sets.
+      eapply Setminus_Included_Included_Union. eapply Included_trans.
+      eassumption. xsets.
+
+    - (* Match_e *)
+      inv H1.
+      repeat normalize_occurs_free. simpl.
+      eapply Union_Included.
+      eapply Union_Included; sets.
+
+      + repeat normalize_sets.
+        rewrite (Union_commut [set k0]).
+        rewrite <- Setminus_Union. apply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H0. eassumption.
+        eapply cps_cvt_exp_subset in H13.
+        eapply Union_Included; sets.
+        eapply Included_trans. eassumption. sets.
+
+      +  repeat normalize_sets. apply Setminus_Included_Included_Union.
+         eapply Included_trans. eapply H. eassumption. now xsets.
+
+    - (* Let_e *)
+      inv H1.
+      repeat normalize_occurs_free. simpl. repeat normalize_sets.
+      eapply Union_Included.
+
+      + eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H0. eassumption.
+        repeat normalize_sets. now xsets.
+
+      + eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H. eassumption.
+        repeat normalize_sets.
+        eapply Union_Included; sets.
+        eapply Included_trans. eapply cps_cvt_exp_subset. eassumption. now sets.
+
+
+    - (* Fix_e *)
+      inv H0.
+      repeat normalize_occurs_free. simpl. repeat normalize_sets.
+      eapply nth_error_In in H13. 
+      eapply Union_Included; [ | now xsets ].
+      eapply Included_trans. eapply H. eassumption.
+      repeat normalize_sets. rewrite FromList_rev. xsets.
+
+    - (* Prf_e *)
+      inv H. repeat normalize_occurs_free. repeat normalize_sets. 
+      xsets.
+
+    - (* Prim_e *)
+      inv H.
+
+    - (* enil *)
+      inv H. normalize_sets. sets.
+
+    - (* econs *)
+      inv H1.
+      repeat normalize_occurs_free. simpl. repeat normalize_sets.
+      eapply Union_Included. 
+
+      + apply Setminus_Included_Included_Union.
+        eapply cps_cvt_exp_subset in H5. 
+        eapply Included_trans. eapply H0. eassumption.
+        (* now eapply Disjoint_Included; [ | | eassumption ]; sets. *)
+
+        rewrite (Union_commut _ (FromList ks0)), <- Setminus_Union. 
+        rewrite <- !Union_assoc. rewrite <- Union_Included_Union_Setminus with (s3 := [set k1]) (s2 := k1 |: _); tci; sets.
+        
+      + apply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H. eassumption.
+        
+        eapply Union_Included; sets.
+
+    - (* efnil *)
+      inv H. normalize_occurs_free. sets.
+
+    - (* efcons *)
+      split; intros.  2:{ inv H2. exfalso. now eapply H. }
+
+      inv H2. inv H4. repeat normalize_occurs_free. simpl. repeat normalize_sets.
+      
+      eapply Union_Included.
+
+      + eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H0. eassumption.
+        repeat normalize_sets.
+        eapply Union_Included; sets.
+        eapply Union_Included; sets.
+
+      + eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H1. eassumption.
+        eapply Union_Included; sets.
+        eapply Included_trans. eapply cps_cvt_exp_subset. eassumption. now sets.
+
+    - inv H. repeat normalize_occurs_free. sets.
+
+    - inv H1. repeat normalize_occurs_free. repeat normalize_sets.
+      rewrite !Setminus_Union_distr. eapply Union_Included. now sets.
+      
+      eapply Union_Included.
+
+      eapply Setminus_Included_Included_Union.
+      eapply Included_trans. eapply ctx_bind_proj_occurs_free.
+      
+      eapply Union_Included; sets. eapply Included_trans.
+      eapply H. eassumption.
+      eapply cps_cvt_branches_subset in H18. 
+      rewrite FromList_app.
+      eapply Union_Included; sets.
+      eapply Union_Included; sets.
+      eapply Union_Included; sets.
+      eapply Included_trans. eassumption. now sets.
+
+      eapply H0. eassumption.
+
+  Qed. 
 
   
   Corollary cps_cvt_exp_fv : cps_cvt_exp_fv_stmt.
   Proof. eapply (proj1 cps_cvt_rel_fv). Qed.
 
-  (* Corollary cps_cvt_exps_fv : cps_cvt_exps_fv_stmt. *)
-  (* Proof. eapply (proj1 (proj2 cps_cvt_rel_fv)). Qed. *)
+  Corollary cps_cvt_exps_fv : cps_cvt_exps_fv_stmt.
+  Proof. eapply (proj1 (proj2 cps_cvt_rel_fv)). Qed.
 
-  (* Corollary cps_cvt_efnlst_fv : cps_cvt_efnlst_fv_stmt. *)
-  (* Proof. eapply (proj1 (proj2 (proj2 cps_cvt_rel_fv))). Qed. *)
+  Corollary cps_cvt_efnlst_fv : cps_cvt_efnlst_fv_stmt.
+  Proof. eapply (proj1 (proj2 (proj2 cps_cvt_rel_fv))). Qed.
 
-  (* Corollary cps_cvt_branches_fv : cps_cvt_branches_fv_stmt. *)
-  (* Proof. eapply (proj2 (proj2 (proj2 cps_cvt_rel_fv))). Qed. *)
+  Corollary cps_cvt_branches_fv : cps_cvt_branches_fv_stmt.
+  Proof. eapply (proj2 (proj2 (proj2 cps_cvt_rel_fv))). Qed.
 
 
 End FV. 
@@ -339,7 +519,6 @@ Section Correct.
       eapply Union_Disjoint_l. now sets.
       eapply Disjoint_Included; [ | | eapply Hdis ]; sets.
       eapply Disjoint_Included; [ | | eapply Hdis ]; sets.
-      eassumption. (* TODO remove var *)
   Qed. 
       
      
@@ -742,7 +921,7 @@ Section Correct.
             eapply cps_cvt_branches_subset. eassumption.
           * eapply Included_Setminus_compat; sets.
             eapply cps_cvt_branches_subset. eassumption. 
-          * now sets. 
+          * now sets.
           * simpl. rewrite <- H2.  eapply find_tag_hd.
         + edestruct IHHrel. eassumption. reflexivity. destructAll.
           do 6 eexists.
@@ -752,7 +931,21 @@ Section Correct.
             intros Hc. eapply dcon_to_tag_inj in Hc. subst; eauto.
     Qed.
 
-    
+    Lemma cps_cvt_rel_branches_find_branch_wf S1 brs vs k r S2 P dc e n j :
+      branches_wf j brs ->
+      cps_cvt_rel_branches S1 brs vs k r cnstrs S2 P ->
+      find_branch dc n brs = Some e ->
+      exp_wf (n + j) e.
+    Proof.
+      intros Hwf Hrel Hf.
+      induction Hrel.
+      - inv Hf.
+      - inv Hwf. unfold find_branch in Hf. destruct (classes.eq_dec dc dc0); subst.
+        + simpl in *.
+          destruct (N.eq_dec n0 n); try congruence.
+        + eauto.
+    Qed.
+
     Lemma eval_fuel_many_length vs es vs1 f1 :
       eval_fuel_many vs es vs1 f1 ->
       List.length vs1 = N.to_nat (exps_length es).
@@ -873,10 +1066,23 @@ Section Correct.
     Qed.
     
                                                
-    Ltac inv_setminus :=
-      match goal with
-      | [ H : In _ (?S \\ ?Q) _ |- _ ] => inv H; try inv_setminus
-      end.
+
+    Lemma eval_fuel_many_wf vs es vs' f :
+      well_formed_env vs -> 
+      exps_wf (N.of_nat (List.length vs)) es -> 
+      eval_fuel_many vs es vs' f ->
+      Forall well_formed_val vs'.
+    Proof.
+      intros Hwf Hwf' Heval.
+      induction Heval.
+      - now constructor.
+      - inv Hwf'.
+        constructor; eauto.
+        
+        eapply eval_env_step_preserves_wf. eassumption. reflexivity.
+        eassumption. eassumption.
+    Qed. 
+        
     
     Lemma cps_cvt_correct : forall vs e r f, eval_env_fuel vs e r f -> cps_cvt_correct_exp vs e r f.
     Proof.
@@ -982,12 +1188,17 @@ Section Correct.
         
         intros _.
 
+        assert (Hwf := H1). eapply exps_wf_app with (es2 := econs e es2) in H1; [ | eassumption ].
+        destruct H1 as [ H1 Hwf' ].
+        
         edestruct cps_cvt_rel_exps_app with (es2 := econs e es2). eassumption. eassumption.
         destructAll.
 
         assert (Hex :  exists vs2, Forall2 (cps_val_rel) vs1 vs2).
-        { eapply cps_val_rel_exists_list.         
-          admit. } destructAll.
+        { eapply cps_val_rel_exists_list. eapply eval_fuel_many_wf in Heval.
+          eassumption. eassumption.
+          eapply Forall2_length in Hcenv. rewrite Hcenv. eassumption. } 
+        destructAll.
 
 
         set (rho' := M.set k1
@@ -998,14 +1209,15 @@ Section Correct.
 
 
         unfold cps_cvt_correct_exps in *.
+        
         eapply IH with (rho := rho') (ys := []) (vs' := []) in H13; clear IH; [ | | | | | | | | | | eassumption | reflexivity ]; eauto.
         + destructAll.
 
           inv H11.
-
+          
           assert (Hex' : exists z, ~ In var (k0 |: FromList vnames) z).
           { eapply ToMSet_non_member. tci. } destructAll.
-
+          
           set (rho'' := M.set k0 (Vfun x8 (Fcons k0 kon_tag [x9] es' Fnil) k0) x8).
           eapply IHoot with (rho := rho'') in H17.
 
@@ -1023,7 +1235,7 @@ Section Correct.
             
           * eassumption.
           * eassumption.
-          * admit. (* exps wf list lemma  easy wf *)
+          * inv Hwf'. eassumption.
           * eapply Disjoint_Included_r. eassumption.
             eapply Union_Disjoint_l.
             repeat rewrite FromList_app, FromList_cons at 1. now sets.
@@ -1048,7 +1260,6 @@ Section Correct.
           * unfold rho''. rewrite M.gss. reflexivity.
           * reflexivity.
 
-        + admit. (* wf _lemma *) 
         + repeat rewrite FromList_app; rewrite FromList_nil.
           eapply Union_Disjoint_l; sets.
           eapply Union_Disjoint_l; sets.
@@ -1075,7 +1286,20 @@ Section Correct.
         + unfold rho'. eapply cps_env_rel_weaken. eassumption.
           intros Hc. inv_setminus. eapply Hdis; eauto.
 
-        + admit.
+        + eapply Disjoint_Included_l.
+          eapply cps_cvt_exps_fv. eassumption.
+          normalize_occurs_free. normalize_sets.
+          eapply Disjoint_sym. eapply Disjoint_Union_l. rewrite <- FromList_app with (l2 := x6).
+          rewrite Union_commut. eapply Union_Disjoint_r.
+          * eapply Disjoint_Included_l. eassumption. normalize_sets.
+            eapply Setminus_Disjoint_preserv_r.
+            eapply Union_Disjoint_r. eapply Union_Disjoint_r. now xsets. now xsets. now sets.
+
+          * eapply Union_Disjoint_r.
+
+            eapply Disjoint_Included_l. eassumption. now xsets.
+
+            eapply Disjoint_Included_r. eassumption. now xsets.
           
       - (* App_e Clos_v *) 
         intros e1 e2 e1' v2 r' na vs vs' f1 f2 f3  Heval1 IH1 Heval2 IH2 Heval3 IH3.
@@ -1947,6 +2171,7 @@ Section Correct.
         assert (Hex' : exists z, ~ In var (k |: FromList (x2 ++ vnames)) z).
         { eapply ToMSet_non_member. tci. } destructAll. 
 
+        rewrite Nnat.Nat2N.id in *.
         
         split. 
         
@@ -1963,8 +2188,10 @@ Section Correct.
 
               2:{ intros i. eapply IH2 ; [ | | | | | | | eassumption | reflexivity | eassumption ]. 
                   - eapply Forall_app. split; eauto.
-                    eapply Forall_rev. admit.
-                  - admit. (* branches wf *)
+                    eapply Forall_rev. inv Hvwf. eassumption.
+                  - rewrite app_length, Nnat.Nat2N.inj_add. 
+                    eapply cps_cvt_rel_branches_find_branch_wf. eassumption.
+                    eassumption. rewrite H5. eassumption.
                   - normalize_sets.
                     eapply Disjoint_Included_r. eassumption.
                     rewrite Union_commut, <- Union_assoc. 
@@ -2029,7 +2256,52 @@ Section Correct.
 
         
         { intros ?; subst.
-          
+          edestruct IH2 ; [ | | | | | | | eassumption | ]. 
+          - eapply Forall_app. split; eauto.
+            eapply Forall_rev. inv Hvwf. eassumption.
+          - rewrite app_length, Nnat.Nat2N.inj_add. 
+            eapply cps_cvt_rel_branches_find_branch_wf. eassumption.
+            eassumption. rewrite H5. eassumption.
+          - normalize_sets.
+            eapply Disjoint_Included_r. eassumption.
+            rewrite Union_commut, <- Union_assoc. 
+            eapply Union_Disjoint_l; sets.
+
+            eapply Disjoint_Included_r.
+            eapply Included_trans. eapply Setminus_Included. eassumption.
+            sets.
+          - eassumption. 
+          - normalize_sets.
+            intros Hc; inv Hc; eauto.
+            eapply H1 in H16. eapply HS2 in H16. inv_setminus. eapply Hdis; eauto.
+          - eapply Forall2_app.
+            rewrite <- rev_involutive with (l := x2). eapply All_Forall.Forall2_rev.
+            rewrite app_nil_end with (l := vs').
+            rewrite app_nil_end with (l := rev x2).
+            eapply cps_env_rel_extend_setlists. now constructor.
+            eapply get_list_set_lists.
+            now eapply NoDup_rev; eauto.
+            eassumption.
+            eassumption.
+
+            eapply cps_env_rel_weaken_setlists with (rho := rho').
+            repeat eapply cps_env_rel_weaken. eassumption.
+            intros Hc. inv_setminus. now eapply Hdis; eauto. 
+            intros Hc. inv_setminus. now eapply Hdis; eauto.
+            eassumption.
+            rewrite FromList_rev.
+
+            eapply Disjoint_Included_l.
+            eapply Included_trans. eassumption. eassumption. sets. 
+
+          - erewrite <- set_lists_not_In; [ | now eauto | ].                    
+            unfold rho'. rewrite !M.gso.
+            eassumption.
+            intros hc. inv_setminus. now eapply Hdis; eauto.
+            intros hc. inv_setminus. now eapply Hdis; eauto.
+            intros Hc.
+            eapply in_rev in Hc.
+            eapply H1 in Hc. eapply HS2 in Hc. inv_setminus. eapply Hdis; eauto.
 
           - destruct (H17 ltac:(reflexivity)). destructAll. eapply Hexp in H19; [ | reflexivity ]. destructAll.
             destruct x10; try contradiction. destruct x12. eexists. split; [ | eassumption ].
@@ -2501,7 +2773,12 @@ Section Correct.
 
       - (* STEP *)
         now eauto. (* Immediate from IH for eval_step *)
-        
-    Abort. 
+
+        Grab Existential Variables.
+        exact 0%nat. exact 0%nat. exact 0%nat.
+        exact 0%nat. exact 0%nat. exact 0%nat.
+        exact 0%nat. exact 0%nat. exact 0%nat.
+        exact 0%nat. (* Where do this come from??? *) 
+    Qed. 
     
-End Post.
+End Correct.

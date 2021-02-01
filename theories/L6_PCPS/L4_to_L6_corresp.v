@@ -41,14 +41,15 @@ Section Corresp.
       }} .
 
   Definition cps_cvt_exps_corresp := 
-    forall es S vn xs k ctrs (Hwf : exps_wf (N.of_nat (List.length vn)) es)
-           (Hlen : List.length xs = N.to_nat (exps_length es)),
+    forall es S vn xs ks k ctrs (Hwf : exps_wf (N.of_nat (List.length vn)) es)
+           (Hlen : List.length xs = N.to_nat (exps_length es))
+           (Hlen' : List.length ks = N.to_nat (exps_length es)),
            (* (Hdis : Disjoint _ S [set k]), *)
       {{ fun _ s => fresh S (next_var (fst s)) }}
-        cps_cvt_exps prim_map func_tag kon_tag default_tag es vn k xs ctrs 
+        cps_cvt_exps prim_map func_tag kon_tag default_tag es vn k xs ks ctrs 
       {{ fun _ s e' s' =>
            exists S',
-             cps_cvt_rel_exps func_tag kon_tag default_tag S es vn k xs ctrs S' e' /\
+             cps_cvt_rel_exps func_tag kon_tag default_tag S es vn k xs ks ctrs S' e' /\
              fresh S' (next_var (fst s')) 
              (* (next_var (fst s') >= next_var (fst s))%positive /\ *)
              (* bound_var e' \subset Range (next_var (fst s)) (next_var (fst s')) /\ *)
@@ -556,17 +557,31 @@ Section Corresp.
 
       eapply bind_triple.
       eapply frame_rule. eapply frame_rule.
-      
-      eapply H. eassumption.
 
-      rewrite map_length in *. rewrite Hlen'. 
+      eapply get_named_str_lst_spec.
+      
+      intros ks' w4. simpl.
+      eapply pre_curry_l; intros Hsub1.
+      eapply pre_curry_l; intros Hlt1.
+      eapply pre_curry_l; intros Hnd1.
+      eapply pre_curry_l; intros Hlen1.
+      eapply pre_curry_l; intros Hsub2.
+      
+      eapply bind_triple.
+      eapply frame_rule. eapply frame_rule.
+
+      assert (Hlenes : Datatypes.length (exps_as_list e) = N.to_nat (exps_length e)).
       { clear. induction e; simpl. congruence.
         rewrite IHe.  
         destruct (exps_length e0). lia.
         destruct p; lia. }
       
+      eapply H. eassumption.
+
+      rewrite map_length in *. rewrite Hlen'. eassumption.
+      rewrite map_length in *. rewrite Hlen1. eassumption.
       
-      intros e' w4. simpl. 
+      intros e' w6. simpl. 
 
       eapply return_triple. intros. destructAll.
       
@@ -724,33 +739,28 @@ Section Corresp.
     - (* enil *)
 
       eapply return_triple. intros. eexists. split; [ | eassumption ].
-      destruct xs; simpl in *; try congruence. constructor. 
+      destruct xs; simpl in *; try congruence.
+      destruct ks; simpl in *; try congruence. constructor. 
 
     - (* econs *)
       destruct xs.
       { inv Hlen. destruct (exps_length e0). lia. destruct p; lia. } 
+      destruct ks.
+      { inv Hlen'. destruct (exps_length e0). lia. destruct p; lia. } 
       
       eapply bind_triple. eapply pre_post_copy. unfold cps_cvt; simpl.
-      eapply get_named_str_fresh. 
-      intros x w. simpl.
-      eapply pre_curry_l; intros Hfresh.
-      eapply pre_curry_l; intros Hx.
-      
-      eapply bind_triple.
-      
-      eapply frame_rule. eapply frame_rule. 
       eapply H. eassumption.
-
+      
       intros e1 w3. simpl.
-      eapply pre_curry_l; intros Hr2.      
-      eapply pre_curry_l; intros Hlt2.
+      eapply pre_curry_l; intros Hf.      
       eapply pre_existential. intros S1. 
       eapply pre_curry_l; intros Hrel1.
       
       eapply bind_triple.
       eapply H0. eassumption.
-
+      
       simpl in Hlen. destruct (exps_length e0). lia. destruct p; lia.
+      simpl in Hlen'. destruct (exps_length e0). lia. destruct p; lia.
 
       intros e2 w4. eapply return_triple. intros. destructAll. 
       

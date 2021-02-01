@@ -83,6 +83,60 @@ Section Bounds.
 End Bounds.
 
 
+Section FV.
+
+  Context (func_tag kon_tag default_tag default_itag : positive)
+          (cnstrs : conId_map).
+  
+  Definition cps_cvt_exp_fv_stmt :=
+    forall e e' k1 vars1 S1 S2,
+      cps_cvt_rel func_tag kon_tag default_tag S1 e vars1 k1 cnstrs S2 e' ->
+      occurs_free e' \subset k1 |: FromList vars1 :|: S1.
+
+  Definition cps_cvt_exps_fv_stmt :=
+    forall e e' e_app vars1 ks xs S1 S2,
+      Disjoint _ (FromList ks) S1 ->
+      cps_cvt_rel_exps func_tag kon_tag default_tag S1 e vars1 e_app xs ks cnstrs S2 e' ->
+      occurs_free e_app \subset FromList ks :|: FromList vars1 :|: S1 ->
+      (* XXX wrong stmt *)
+      occurs_free e' \subset FromList vars1 :|: S1.
+
+  Definition cps_cvt_efnlst_fv_stmt :=
+    forall S1 efns vars1 nlst1 S2 fdefs1,
+      cps_cvt_rel_efnlst func_tag kon_tag default_tag S1 efns vars1 nlst1 cnstrs S2 fdefs1 ->
+      occurs_free_fundefs fdefs1 \subset FromList vars1 :|: S1.
+
+  Definition cps_cvt_branches_fv_stmt :=
+    forall S1 bs vars1 k1 x1 S2 bs1 x,
+      cps_cvt_rel_branches func_tag kon_tag default_tag S1 bs vars1 k1 x1 cnstrs S2 bs1 ->
+      occurs_free (Ecase x bs1) \\ [set x] \subset S1.
+  
+  
+  Definition cps_cvt_rel_fv_stmt :=
+    cps_cvt_exp_fv_stmt /\
+    cps_cvt_exps_fv_stmt /\
+    cps_cvt_efnlst_fv_stmt /\
+    cps_cvt_branches_fv_stmt.
+  
+
+  Lemma cps_cvt_rel_fv : cps_cvt_rel_fv_stmt. 
+  Admitted. 
+
+  
+  Corollary cps_cvt_exp_fv : cps_cvt_exp_fv_stmt.
+  Proof. eapply (proj1 cps_cvt_rel_fv). Qed.
+
+  (* Corollary cps_cvt_exps_fv : cps_cvt_exps_fv_stmt. *)
+  (* Proof. eapply (proj1 (proj2 cps_cvt_rel_fv)). Qed. *)
+
+  (* Corollary cps_cvt_efnlst_fv : cps_cvt_efnlst_fv_stmt. *)
+  (* Proof. eapply (proj1 (proj2 (proj2 cps_cvt_rel_fv))). Qed. *)
+
+  (* Corollary cps_cvt_branches_fv : cps_cvt_branches_fv_stmt. *)
+  (* Proof. eapply (proj2 (proj2 (proj2 cps_cvt_rel_fv))). Qed. *)
+
+
+End FV. 
 
 Section Correct.
 
@@ -174,29 +228,123 @@ Section Correct.
       (r = fuel_sem.OOT ->
        exists c, ((f <+> fuel_sem.one e) <= c)%nat /\ bstep_fuel cenv rho e' c eval.OOT tt).
 
+
   Definition cps_cvt_correct_exps (vs : fuel_sem.env) (es : expression.exps) (vs1 : list value) (f : nat)  :=
-    forall rho vnames e' S S' vs2 xs e_app,
+    forall rho vnames e' e_app S S' vs2 xs ys ks vs',
       well_formed_env vs ->
       exps_wf (N.of_nat (Datatypes.length vnames)) es ->
       
-      Disjoint _ (FromList vnames :|: FromList xs) S ->
-      (* ~ k \in FromList vnames -> *)
+      Disjoint _ (FromList vnames :|: FromList xs :|: FromList ys :|: FromList ks) S ->
 
-      (* Disjoint _ (FromList ys) (k |: S) -> *)
-      (* NoDup ys -> *)
+      Disjoint _ (FromList vnames) (FromList xs :|: FromList ys :|: FromList ks) ->
+      Disjoint _ (FromList ks) (FromList xs :|: FromList ys) ->
+      Disjoint _ (FromList xs) (FromList ys) ->
+      NoDup xs ->
       
       cps_env_rel vnames vs rho ->
 
-      cps_cvt_rel_exps S es vnames e_app xs cnstrs S' e' ->
+      Disjoint _ (occurs_free e_app) (FromList ks) ->
+      (* M.get k rho = Some vk -> *)
+      
+      cps_cvt_rel_exps S es vnames e_app xs ks cnstrs S' e' ->
       
       Forall2 (cps_val_rel) vs1 vs2 ->
-        
-      exists rho',
-        set_lists xs vs2 rho = Some rho' /\ 
+      get_list ys rho = Some vs' ->
+      
+      exists rho1,
+        set_lists (ys ++ xs) (vs' ++ vs2) rho = Some rho1 /\
         forall i,
-          preord_exp cenv (cps_bound f) eq_fuel i
-                     (e_app, rho') (e', rho).
+          preord_exp cenv (cps_bound f) eq_fuel i (e_app, rho1) (e', rho).
 
+  
+  Lemma exps_to_list_inj es1 es2 :
+    exps_to_list es1 = exps_to_list es2 ->
+    es1 = es2.
+  Proof.
+    revert es2.
+    induction es1; intros es2 Heq; destruct es2; inv Heq.
+
+    reflexivity.
+
+    f_equal. eauto.
+
+  Qed.
+
+  Lemma cps_cvt_rel_exps_app S es es1 es2 vnames e_app xs ks S' e' :
+    exps_to_list es = exps_to_list es1 ++ exps_to_list es2 ->
+    cps_cvt_rel_exps S es vnames e_app xs ks cnstrs S' e' ->
+    exists S'' e'' xs1 xs2 ks1 ks2,
+      xs = xs1 ++ xs2 /\
+      ks = ks1 ++ ks2 /\
+      S'' \subset S /\
+      cps_cvt_rel_exps S'' es2 vnames e_app xs2 ks2 cnstrs S' e'' /\
+      cps_cvt_rel_exps S es1 vnames e'' xs1 ks1 cnstrs S'' e'.
+  Proof.
+    revert S es es2 vnames e_app xs ks S' e'.
+    induction es1; intros S es es2 vnames e_app xs ks S' e' Heq Hrel. 
+
+    - simpl in Heq. eapply exps_to_list_inj in Heq. subst.
+      do 2 eexists. exists []. exists xs. exists []. exists ks. 
+      split. reflexivity. split. reflexivity. split. reflexivity. 
+      split. eassumption. now econstructor. 
+
+    - destruct es. simpl in Heq. now inv Heq. inv Hrel.
+
+      simpl in *. inv Heq. 
+
+      edestruct IHes1. eassumption. eassumption.
+      destructAll. 
+
+      do 2 eexists. exists (x1 :: x2), x3. exists (k1 :: x4), x5.  split; [ | split; [ | split; [ | split ]]].
+
+      reflexivity.  reflexivity.
+      
+      2:{ eassumption. }
+      
+      eapply Included_trans. eassumption. 
+      eapply Included_trans. eapply cps_cvt_exp_subset. eassumption. now sets.
+      
+      econstructor; eauto.
+
+  Qed.
+      
+
+  Lemma cps_cvt_rel_exps_occurs_free S es vnames e_app xs ks S' e' :
+    cps_cvt_rel_exps S es vnames e_app xs ks cnstrs S' e' ->
+    Disjoint _ (FromList vnames :|: S) (FromList ks) ->
+    NoDup ks ->
+    Disjoint _ (occurs_free e') (FromList ks).
+  Proof.
+    intros Hrel Hdis Hnd.
+    induction Hrel.
+    - normalize_sets. sets.
+    - repeat normalize_occurs_free.
+      repeat normalize_sets. simpl.
+      repeat rewrite FromList_cons in Hdis at 1. 
+      inv Hnd. 
+      
+      specialize (IHHrel
+                    ltac:(eapply cps_cvt_exp_subset in H; eapply Disjoint_Included; [ | | eapply Hdis ]; sets)
+                    H3
+                 ). 
+      eapply Union_Disjoint_r; sets.
+      eapply Union_Disjoint_l; sets.
+      
+      normalize_sets.
+      eapply cps_cvt_exp_fv in H.
+      eapply Disjoint_Included_l.
+      eapply Included_trans. eapply Setminus_Included. eassumption.
+      eapply Union_Disjoint_l; sets.
+
+      eapply Union_Disjoint_l. now sets.
+      eapply Disjoint_Included; [ | | eapply Hdis ]; sets.
+      eapply Disjoint_Included; [ | | eapply Hdis ]; sets.
+      eassumption. (* TODO remove var *)
+  Qed. 
+      
+     
+      
+  
   Lemma get_list_rev A xs (vs  : list A) rho :
     get_list xs rho = Some vs ->
     get_list (rev xs) rho = Some (rev vs).
@@ -331,8 +479,6 @@ Section Correct.
       destruct x as [[[? ?] ?] ?]. congruence.
     Qed.
            
-    Opaque preord_exp'.
-
     (* TODO move *) 
     Ltac destruct_tuples :=
       try match goal with
@@ -373,6 +519,24 @@ Section Correct.
       simpl. intros x1 x2 Hin1 Hin2 Hr. rewrite M.gso; eauto.
       intros Hc; subst; auto.
     Qed.
+
+
+    Lemma cps_env_rel_weaken_setlists vnames vs xs vs' rho rho' :
+      cps_env_rel vnames vs rho ->
+      set_lists xs vs' rho = Some rho' ->
+      Disjoint _ (FromList xs) (FromList vnames) ->
+      cps_env_rel vnames vs rho'.
+    Proof.
+      revert vs' rho rho'; induction xs; intros vs1 rho1 rho2 Hrel Hset Hdis.
+      - destruct vs1; inv Hset.  eassumption.
+      - destruct vs1; inv Hset.
+        destruct (set_lists xs vs1 rho1) eqn:Hset; inv H0.
+        repeat normalize_sets. 
+        eapply cps_env_rel_weaken.
+        eapply IHxs. eassumption. eassumption.
+        sets.
+        intros Hc. eapply Hdis; eauto.
+    Qed.
     
 
     Lemma cps_env_rel_extend vnames vs x v v' rho :
@@ -383,6 +547,22 @@ Section Correct.
     Proof.
       intros Henv Hget Hval. unfold cps_env_rel, L4_to_L6_util.cps_env_rel, cps_env_rel' in *.
       econstructor; eauto.
+    Qed.
+
+    
+    Lemma cps_env_rel_extend_setlists vnames vs xs vs1 vs2 rho :
+      cps_env_rel vnames vs rho ->
+      get_list xs  rho = Some vs2 ->
+      Forall2 (cps_val_rel) vs1 vs2 ->
+      cps_env_rel (xs ++ vnames) (vs1 ++ vs) rho.
+    Proof.
+      revert vs1 vs2 rho; induction xs; intros vs1 vs2 rho1 Hrel Hset Hall.
+      - simpl. inv Hset. inv Hall. eassumption.
+      - simpl in Hset.
+        destruct (rho1 ! a) eqn:Hget; try congruence.
+        destruct (get_list xs rho1) eqn:Hgetl; try congruence. 
+        inv Hset. inv Hall. simpl.
+        eapply cps_env_rel_extend; eauto.
     Qed.
 
 
@@ -398,6 +578,22 @@ Section Correct.
       - eapply cps_env_rel_weaken; eauto.
     Qed.
 
+
+    Lemma cps_env_rel_extend_weaken_setlists vnames vs xs vs1 vs2 rho rho' :
+      cps_env_rel vnames vs rho ->
+      set_lists xs vs2 rho = Some rho' ->
+      Forall2 (cps_val_rel) vs1 vs2 ->
+      Disjoint _ (FromList xs) (FromList vnames) ->
+      NoDup xs ->
+      cps_env_rel (xs ++ vnames) (vs1 ++ vs) rho'.
+    Proof.
+      intros.
+      eapply cps_env_rel_extend_setlists; eauto.
+      eapply cps_env_rel_weaken_setlists; eauto.
+      eapply get_list_set_lists; eauto.
+    Qed.
+
+
     Lemma nth_error_Forall2 (A B : Type) (P : A -> B -> Prop) (l : list A) (l' : list B) :
       (forall n t,
           nth_error l n = Some t ->
@@ -411,6 +607,7 @@ Section Correct.
         destruct (Hyp 0%nat a). reflexivity. destructAll. inv H. eassumption.
 
         eapply IHl; [ | congruence ].
+
         intros.
         
         destruct (Hyp (S n) t). eassumption. destructAll.
@@ -475,9 +672,87 @@ Section Correct.
         eapply cps_fix_rel_names in Hfix. rewrite <- Hfix.
         eapply Same_set_all_fun_name. eassumption.
     Qed.
+
+
+    Lemma cps_val_rel_exists_list vs1 :
+      Forall (well_formed_val) vs1 ->
+      exists vs2, Forall2 (cps_val_rel) vs1 vs2.
+    Proof.
+      intros Hall; induction Hall.
+      - eexists. constructor.
+      - destructAll.
+        edestruct cps_val_rel_exists.
+        exact (M.empty _). (* TODO remove arg *)
+        eassumption.
+        eexists. constructor. eauto. eassumption.
+    Qed.
+
+
+    Lemma exps_wf_app es es1 es2 n :
+      exps_to_list es = exps_to_list es1 ++ exps_to_list es2 ->
+      exps_wf n es ->
+      exps_wf n es1 /\ exps_wf n es2. 
+    Proof.
+      revert es1 es2; induction es; intros es1 es2 Heq Hwf.
+      + destruct es1; destruct es2; simpl in *; try congruence.
+        split; constructor. 
+      + destruct es1; simpl in *; try congruence; inv Heq; inv Hwf.
+        * destruct es2; inv H0.
+          
+          edestruct IHes with (es1 := enil). split. eassumption.
+          split. 
+          constructor. constructor; eauto. 
+          eapply exps_to_list_inj in H2. subst; eauto.
+
+        * edestruct IHes with (es1 := es1) (es2 := es2). eassumption.
+          eassumption. split.
+          constructor. eassumption. eassumption. eassumption.
+    Qed.
+
+
+    Context
+      (dcon_to_tag_inj :
+         forall tgm dc dc',
+           dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').    
     
+    Lemma cps_cvt_rel_branches_find_branch S1 brs vs k r S2 P dc e tg n :
+      cps_cvt_rel_branches S1 brs vs k r cnstrs S2 P ->
+      find_branch dc n brs = Some e ->
+      tg = dcon_to_tag default_tag dc cnstrs ->
+       exists vars S1' S2' ce ctx_p m,
+         FromList vars \subset S1 /\
+         List.length vars = N.to_nat n /\
+         S1' \subset S1 \\ FromList vars /\
+         NoDup vars /\
+         ctx_bind_proj tg r vars (List.length vars) = ctx_p /\
+         find_tag_nth P tg (ctx_p |[ ce ]|) m /\
+         L4_to_L6.cps_cvt_rel func_tag kon_tag default_tag S1' e 
+                              (vars ++ vs) k cnstrs S2' ce. 
+    Proof.
+      intros Hrel Hf Htg.
+      induction Hrel.
+      - inv Hf.
+      - unfold find_branch in Hf. destruct (classes.eq_dec dc dc0); subst.
+        + simpl in *.
+          destruct (N.eq_dec n0 n); try congruence.
+          inv Hf.
+          do 6 eexists.
+          split; [ | split ; [ | split ; [ | split; [ | split ; [ | split ] ] ] ] ]; try eassumption.
+          * eapply Included_trans. eassumption.
+            eapply cps_cvt_branches_subset. eassumption.
+          * eapply Included_Setminus_compat; sets.
+            eapply cps_cvt_branches_subset. eassumption. 
+          * now sets. 
+          * simpl. rewrite <- H2.  eapply find_tag_hd.
+        + edestruct IHHrel. eassumption. reflexivity. destructAll.
+          do 6 eexists.
+          split; [ | split ; [ | split ; [ | split; [ | split ; [ | split ] ] ] ] ]; last eassumption; try eassumption.
+          * reflexivity.
+          * constructor. eassumption.
+            intros Hc. eapply dcon_to_tag_inj in Hc. subst; eauto.
+    Qed.
 
-
+    
     Lemma eval_fuel_many_length vs es vs1 f1 :
       eval_fuel_many vs es vs1 f1 ->
       List.length vs1 = N.to_nat (exps_length es).
@@ -489,7 +764,115 @@ Section Correct.
       destruct (exps_length es); try lia.
       destruct p; lia.
     Qed.
+
+    Lemma preord_exp_Eproj_red k x ctag y N e vs v rho :
+      M.get y rho = Some (Vconstr ctag vs) ->
+      nthN vs N = Some v ->
+      preord_exp cenv one_step eq_fuel k (e, M.set x v rho) (Eproj x ctag N y e, rho).
+    Proof.
+      intros Hget Hnth r c1 c2 Hleq Hstep.
+      do 3 eexists. split. econstructor 2. econstructor; eauto. 
+      split. simpl. unfold_all. lia. 
+      eapply preord_res_refl; tci.
+    Qed.
+
+
+    Lemma preord_exp_Ecase_red k rho ctag vs P e n y :
+      M.get y rho = Some (Vconstr ctag vs) ->
+      find_tag_nth P ctag e n ->
+      preord_exp cenv one_step eq_fuel k (e, rho) (Ecase y P, rho).
+    Proof.
+      intros Hget Hnth r c1 c2 Hleq Hstep.
+      do 3 eexists. split. econstructor 2. econstructor; eauto.
+      admit. (* case consistent??? *) 
+      split. simpl. unfold_all. lia. 
+      eapply preord_res_refl; tci.
+    Admitted.
+
+
+    Definition eq_fuel_n (n : nat) : @PostT nat unit :=
+      fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) => (f1 + n)%nat = f2.
+
+
+    Opaque preord_exp'.
+
+    Lemma ctx_bind_proj_preord_exp :
+      forall vars C k r n e rho rho' vs vs'  ctag,
+        n = (List.length vars) ->
+        ~ r \in FromList vars ->
+        ctx_bind_proj ctag r vars n = C ->
+        M.get r rho = Some (Vconstr ctag (vs ++ vs')) ->    
+        set_lists (rev vars) vs rho = Some rho' ->
+        preord_exp cenv (eq_fuel_n n) eq_fuel k (e, rho') (C |[ e ]|, rho).
+    Proof.
+      induction vars; intros C k r n e rho rho' vs vs' ctag Heq Hnin Hctx Hget Hset.
+      - destruct vs. 2:{ simpl in Hset. destruct (rev vs); inv Hset. }
+        simpl in Hset. inv Hset.
+        simpl.
+        eapply preord_exp_post_monotonic.
+        2:{ eapply preord_exp_refl. tci. eapply preord_env_P_refl. tci. }
+
+        unfold eq_fuel, eq_fuel_n. intro; intros. destruct_tuples. lia.
+
+      - destruct n; inv Heq.
+        simpl in *. 
+        revert vs Hget Hset.
+        intros vs. eapply MCList.rev_ind with (l := vs); intros.
+
+        + eapply set_lists_length_eq in Hset.
+          rewrite app_length in Hset. inv Hset. lia.
+          
+        + simpl in Hset.
+
+          assert (Hlen : Datatypes.length (rev vars) = Datatypes.length l). 
+          { eapply set_lists_length_eq in Hset. rewrite !app_length in Hset. simpl in *.
+            replace (@Datatypes.length map_util.M.elt) with (@Datatypes.length positive) in * by reflexivity.
+            lia. } 
+
+          edestruct (@set_lists_app val). eassumption. eassumption.
+
+          destructAll. inv H0.
+
+          (* rewrite rev_unit in *. *)
+          (* destruct (set_lists vars (rev l) rho) eqn:Hset'; inv Hset. *)
+          (* simpl. *)
+
+          (* edestruct (set_lists_length3 (M.set a x rho) vars (rev l)). *)
+                  
+          (* eapply set_lists_length_eq. eassumption. *)
+          
+          eapply preord_exp_post_monotonic.
+          2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+
+              2:{ intros m. eapply preord_exp_Eproj_red. eassumption.
+                  eapply nthN_is_Some_app. 
+                  eapply set_lists_length_eq in Hset.
+                  rewrite rev_length in *.
+                  replace (@Datatypes.length map_util.M.elt) with (@Datatypes.length positive) in * by reflexivity.
+                  rewrite Hlen. rewrite nthN_app_geq. simpl.
+                  
+                  replace (N.of_nat (Datatypes.length l - 0) - N.of_nat (Datatypes.length l)) with 0 by lia.
+                  reflexivity.
+                  lia. }
+
+              repeat normalize_sets.
+
+              eapply IHvars with (vs := l). reflexivity. eauto.
+              
+              rewrite <- minus_n_O. reflexivity.
+              
+              rewrite M.gso; eauto. 
+              
+              rewrite app_assoc. eassumption.
+              
+              now intros Hc; subst; eauto. eassumption. }
+              
+          { unfold comp, eq_fuel_n, eq_fuel. intro; intros. destructAll. destruct_tuples.
+            unfold one_step in *. lia. }
+
+    Qed.
     
+                                               
     Ltac inv_setminus :=
       match goal with
       | [ H : In _ (?S \\ ?Q) _ |- _ ] => inv H; try inv_setminus
@@ -500,14 +883,14 @@ Section Correct.
       eapply eval_env_fuel_ind' with (P1 := cps_cvt_correct_exp)
                                      (P0 := cps_cvt_correct_exps)
                                      (P := cps_cvt_correct_exp_step).
-
+      
       - (* Con_e terminates *)
         intros es vs1 vs dc f1 Heval IH.
         intros rho vnames k x vk e' S S' i Hwfenv Hwf Hdis Hnin1 Hnin2 Hcenv Hget Hcps.
         inv Hwf. inv Hcps. split; [ | congruence ]. 
         
         intros v1 v2 Heq Hrel. inv Heq. inv Hrel. 
-        
+                
         eapply preord_exp_post_monotonic.
         
         2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
@@ -518,45 +901,52 @@ Section Correct.
                                (Vfun rho
                                      (Fcons k1 kon_tag vx
                                             (Econstr x1 (dcon_to_tag default_tag dc cnstrs) vx (Eapp k kon_tag [x1])) Fnil)
-                                     k1) rho). 
-
-            edestruct IH with (rho := rho'); [ | | | | eassumption | | ].
+                                     k1) rho).
+            
+            edestruct IH with (ys := @nil var) (vs' := @nil val) (rho := rho'); [ | | | | | | | | | eassumption | eassumption | | ]. 
             - eassumption.
             - eassumption.
-            - eapply Union_Disjoint_l; sets.
-              xsets. 
-            (* - intros Hc. inv H4. eapply Hdis; eauto. *)
-            (* - normalize_sets. sets. *)
-            (* - now constructor. *)
+            - repeat normalize_sets. eapply Union_Disjoint_l; xsets.
+            - repeat normalize_sets.
+              eapply Disjoint_Included; [ | | eapply Hdis ]; sets.
+              eapply Union_Included; eapply Included_trans; eauto; sets.
+            - repeat normalize_sets.
+              eapply Disjoint_Included_l; eauto; sets.
+            - repeat normalize_sets; sets.
+            - eassumption.              
             - unfold rho'. eapply cps_env_rel_weaken. eassumption.
               intros Hc. inv_setminus. eapply Hdis; eauto.
-            (* - unfold rho'. rewrite M.gss. reflexivity. *)
-            - eassumption.
+            - normalize_occurs_free.
+              eapply Union_Disjoint_l.
+              now eapply Disjoint_Included_r; eauto; sets.
+              now eapply Disjoint_Included_r; eauto; sets.
+            - reflexivity.
             - destructAll.
               
               eapply preord_exp_trans. tci. eapply eq_fuel_idemp. 
               
               2:{ intros m. simpl. eapply H0. } 
-              
+
 
               edestruct (set_lists_length3 rho' vx vs').
               { replace (@Datatypes.length map_util.M.elt) with (@Datatypes.length var) in * by reflexivity.
-                rewrite H7. eapply Forall2_length in H2. rewrite <- H2.
+                rewrite H8. eapply Forall2_length in H2. rewrite <- H2.
                 erewrite <- eval_fuel_many_length. reflexivity. eassumption. }
+              
+              simpl in *.
               
               eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
               
-              2:{ intros m. eapply preord_exp_Eapp_red.
+              2:{ intros m. simpl. eapply preord_exp_Eapp_red.
                   - erewrite <- set_lists_not_In; [ | eassumption | ].
-                    unfold rho'. 
-                    rewrite M.gss. reflexivity.
+                    unfold rho'. rewrite M.gss. reflexivity.
                     simpl. intros Hc. eapply H6 in Hc. inv_setminus; eauto.
                   - simpl. rewrite Coqlib.peq_true. reflexivity.
                   - simpl. eapply get_list_set_lists; eassumption.
                   - simpl. eassumption. }
               
               eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
-
+              
               2:{ intros m. eapply preord_exp_Econstr_red.
                   eapply get_list_set_lists. eassumption.
                   eassumption. }
@@ -586,8 +976,107 @@ Section Correct.
             destructAll. destruct_tuples. subst. simpl in *. lia. }
 
       - (* Con_e OOT *)
-        admit.
+        intros es es1 es2 e vs1 vs dc f1 fs Heq Heval IH Hoot IHoot.
+        intros rho vnames k x vk e' S S' i Hwfenv Hwf Hdis Hnin1 Hnin2 Hcenv Hget Hcps.
+        inv Hwf. inv Hcps. split. congruence.
         
+        intros _.
+
+        edestruct cps_cvt_rel_exps_app with (es2 := econs e es2). eassumption. eassumption.
+        destructAll.
+
+        assert (Hex :  exists vs2, Forall2 (cps_val_rel) vs1 vs2).
+        { eapply cps_val_rel_exists_list.         
+          admit. } destructAll.
+
+
+        set (rho' := M.set k1
+                           (Vfun rho
+                                 (Fcons k1 kon_tag vx
+                                        (Econstr x1 (dcon_to_tag default_tag dc cnstrs) vx (Eapp k kon_tag [x1])) Fnil)
+                                 k1) rho).
+
+
+        unfold cps_cvt_correct_exps in *.
+        eapply IH with (rho := rho') (ys := []) (vs' := []) in H13; clear IH; [ | | | | | | | | | | eassumption | reflexivity ]; eauto.
+        + destructAll.
+
+          inv H11.
+
+          assert (Hex' : exists z, ~ In var (k0 |: FromList vnames) z).
+          { eapply ToMSet_non_member. tci. } destructAll.
+
+          set (rho'' := M.set k0 (Vfun x8 (Fcons k0 kon_tag [x9] es' Fnil) k0) x8).
+          eapply IHoot with (rho := rho'') in H17.
+
+          * destructAll.
+            assert (Hoot' : bstep_fuel cenv x8 (Efun (Fcons k0 kon_tag [x9] es' Fnil) e') (x4 + 1)%nat OOT tt).
+            { replace tt with (tt <+> tt) by reflexivity. econstructor 2. econstructor. simpl. eassumption. }
+            
+            edestruct H13. reflexivity. eassumption. destructAll.
+            eexists. split.
+            2:{ replace tt with (tt <+> tt). econstructor 2. econstructor. simpl.
+                destruct x6; [ | contradiction ]. destruct x11. eassumption.
+                reflexivity. }
+            
+            simpl. unfold cps_bound, one, fuel_sem.one in *; simpl; unfold_all. lia.
+            
+          * eassumption.
+          * eassumption.
+          * admit. (* exps wf list lemma  easy wf *)
+          * eapply Disjoint_Included_r. eassumption.
+            eapply Union_Disjoint_l.
+            repeat rewrite FromList_app, FromList_cons at 1. now sets.
+            xsets. 
+          * eassumption.
+          * intros Hc. eapply Hdis. constructor. now right.
+            eapply H7.
+            repeat rewrite FromList_app, FromList_cons at 1. now sets.
+          * unfold rho'. eapply cps_env_rel_weaken.
+            simpl in *.
+            eapply cps_env_rel_weaken_setlists; [ | eauto | ].
+            repeat eapply cps_env_rel_weaken. eassumption.
+            intros Hc. inv_setminus. eapply Hdis. now eauto.
+            eapply Disjoint_sym. eapply Disjoint_Included; [ | | eapply Hdis ]; sets.
+            eapply Included_trans.
+            eapply Included_trans; [ | eapply H6 ].
+            repeat rewrite FromList_app, FromList_cons at 1. now sets. now sets.
+            intros Hc.
+            eapply Hdis. constructor. now right.
+            eapply H7.
+            repeat rewrite FromList_app, FromList_cons at 1. now sets.
+          * unfold rho''. rewrite M.gss. reflexivity.
+          * reflexivity.
+
+        + admit. (* wf _lemma *) 
+        + repeat rewrite FromList_app; rewrite FromList_nil.
+          eapply Union_Disjoint_l; sets.
+          eapply Union_Disjoint_l; sets.
+          eapply Union_Disjoint_l; sets.
+          xsets. 
+        + eapply Disjoint_Included; [ | | eapply Hdis ]; sets. do 2 normalize_sets.  
+          eapply Union_Included. 
+
+          eapply Included_trans.
+          eapply Included_trans; [ | eapply H6 ].
+          repeat rewrite FromList_app.  now sets. now sets. 
+
+          
+          eapply Included_trans.
+          eapply Included_trans; [ | eapply H7 ].
+          repeat rewrite FromList_app.  now sets. now sets.
+
+        + eapply Disjoint_Union_l.
+          rewrite <- FromList_app. eapply Disjoint_Included_l. eassumption.
+          rewrite FromList_app, FromList_nil. sets.
+
+        + normalize_sets. sets.
+        + eapply NoDup_cons_l. eassumption.
+        + unfold rho'. eapply cps_env_rel_weaken. eassumption.
+          intros Hc. inv_setminus. eapply Hdis; eauto.
+
+        + admit.
+          
       - (* App_e Clos_v *) 
         intros e1 e2 e1' v2 r' na vs vs' f1 f2 f3  Heval1 IH1 Heval2 IH2 Heval3 IH3.
         intros rho vnames k x vk e' S S' f Hwfenv Hwf Hdis Hnin1 Hnin2 Hcenv Hget Hcps.
@@ -1376,7 +1865,177 @@ Section Correct.
           unfold fuel_sem.one in *. simpl in *. lia.
           
       - (* Match_e *)
-        admit.
+        intros e1 e' vs dc vs' n brs r f1 f2 Heval1 IH1  Hfind Heval2 IH2.
+        intros rho vnames k x vk e2 S S' f Henvwf Hwf Hdis Hnin1 Hnin2 Hcenv Hstep Hcps. 
+        inv Hwf. inv Hcps. 
+
+        assert (Hvwf : well_formed_val (Con_v dc vs')).
+        { eapply eval_env_step_preserves_wf in Heval1. eassumption. reflexivity.
+          eassumption. unfold well_formed_in_env.
+          eapply Forall2_length in Hcenv. rewrite Hcenv. eassumption. }
+
+        assert (Hex : exists v2, cps_val_rel (Con_v dc vs') v2).
+        { eapply cps_val_rel_exists; eassumption. }
+        
+        assert (Hex' : exists z, ~ In var (k1 |: FromList vnames) z).
+        { eapply ToMSet_non_member. tci. } destructAll.
+
+        assert (Hwf := H0). inv Hwf.
+
+        assert (HS2 := H12). eapply cps_cvt_exp_subset in HS2.
+
+        edestruct cps_cvt_rel_branches_find_branch. eassumption. eassumption. reflexivity.
+        destructAll.
+
+        set (rho' := map_util.M.set x1 (Vconstr (dcon_to_tag default_tag dc cnstrs) vs'0)
+                                    (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] (Ecase x1 bs') Fnil) k1) rho)).
+              
+        edestruct (set_lists_length3 rho' (rev x2) vs'0).
+        { rewrite rev_length. rewrite H5, Nnat.Nat2N.id. eapply Forall2_length. eassumption. } 
+        destructAll. 
+
+
+        assert (Hexp : forall j, preord_exp' cenv (preord_val cenv)
+                                             (cps_bound (f1 <+> fuel_sem.one (Match_e e1 n brs))) eq_fuel j
+                                             (x5, x6) (Efun (Fcons k1 kon_tag [x1] (Ecase x1 bs') Fnil) e1', rho)).
+        { intros j. eapply preord_exp_post_monotonic.
+          2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              
+              2:{ intros m. eapply preord_exp_Efun_red. } 
+
+              assert (Hex' : exists z, ~ In var (k1 |: FromList vnames) z).
+              { eapply ToMSet_non_member. tci. } destructAll.
+              
+              eapply preord_exp_trans. tci. eapply eq_fuel_idemp. 
+              
+              2:{ intros m. simpl. eapply IH1; [ | | | | | | |  eassumption | reflexivity | ].
+                  - eassumption.
+                  - eassumption. 
+                  - eapply Union_Disjoint_l; sets.
+                  - eassumption.
+                  - intros Hc. inv_setminus. eapply Hdis; eauto.
+                  - eapply cps_env_rel_weaken. eassumption.
+                    inv_setminus. intros Hc. eapply Hdis; eauto.
+                  - rewrite M.gss. reflexivity. 
+                  - eassumption. }
+              
+              eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              
+              2:{ intros m. eapply preord_exp_Eapp_red.
+                  - rewrite M.gso; eauto. rewrite M.gss. reflexivity. intros Hc; subst; eauto.
+                  - simpl. rewrite Coqlib.peq_true. reflexivity.
+                  - simpl. rewrite M.gss. reflexivity.
+                  - simpl. reflexivity. } 
+
+              
+              eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              
+              2:{ intros m. eapply preord_exp_Ecase_red.
+                  - rewrite M.gss. reflexivity. 
+                  - eassumption. }              
+
+              eapply ctx_bind_proj_preord_exp with (vs' := []); try reflexivity. 
+              - intros Hc. eapply H1 in Hc. eapply HS2 in Hc. inv_setminus. now eauto.
+              - unfold rho'. rewrite M.gss. rewrite app_nil_r. reflexivity.
+              - eassumption. }
+
+          
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+            intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
+            destructAll. destruct_tuples. subst. simpl in *. lia. } } 
+
+        assert (Hex' : exists z, ~ In var (k |: FromList (x2 ++ vnames)) z).
+        { eapply ToMSet_non_member. tci. } destructAll. 
+
+        
+        split. 
+        
+        (* Termination *)
+        { intros v v' Heq Hval. subst.
+          
+          eapply preord_exp_post_monotonic.
+
+          2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+
+              2:{ eassumption. }
+              
+              eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+
+              2:{ intros i. eapply IH2 ; [ | | | | | | | eassumption | reflexivity | eassumption ]. 
+                  - eapply Forall_app. split; eauto.
+                    eapply Forall_rev. admit.
+                  - admit. (* branches wf *)
+                  - normalize_sets.
+                    eapply Disjoint_Included_r. eassumption.
+                    rewrite Union_commut, <- Union_assoc. 
+                    eapply Union_Disjoint_l; sets.
+
+                    eapply Disjoint_Included_r.
+                    eapply Included_trans. eapply Setminus_Included. eassumption.
+                    sets.
+                  - eassumption. 
+                  - normalize_sets.
+                    intros Hc; inv Hc; eauto.
+                    eapply H1 in H16. eapply HS2 in H16. inv_setminus. eapply Hdis; eauto.
+                  - eapply Forall2_app.
+                    rewrite <- rev_involutive with (l := x2). eapply All_Forall.Forall2_rev.
+                    rewrite app_nil_end with (l := vs').
+                    rewrite app_nil_end with (l := rev x2).
+                    eapply cps_env_rel_extend_setlists. now constructor.
+                    eapply get_list_set_lists.
+                    now eapply NoDup_rev; eauto.
+                    eassumption.
+                    eassumption.
+
+                    eapply cps_env_rel_weaken_setlists with (rho := rho').
+                    repeat eapply cps_env_rel_weaken. eassumption.
+                    intros Hc. inv_setminus. now eapply Hdis; eauto. 
+                    intros Hc. inv_setminus. now eapply Hdis; eauto.
+                    eassumption.
+                    rewrite FromList_rev.
+
+                    eapply Disjoint_Included_l.
+                    eapply Included_trans. eassumption. eassumption. sets. 
+
+                  - erewrite <- set_lists_not_In; [ | now eauto | ].                    
+                    unfold rho'. rewrite !M.gso.
+                    eassumption.
+                    intros hc. inv_setminus. now eapply Hdis; eauto.
+                    intros hc. inv_setminus. now eapply Hdis; eauto.
+                    intros Hc.
+                    eapply in_rev in Hc.
+                    eapply H1 in Hc. eapply HS2 in Hc. inv_setminus. eapply Hdis; eauto. } 
+
+          eapply preord_exp_app_compat with (P2 := eq_fuel).
+          now eapply eq_fuel_compat. 
+          now eapply eq_fuel_compat. 
+          
+          eapply preord_var_env_extend_neq. 
+          eapply preord_var_env_get.
+          2:{ eapply M.gss. }
+          2:{ rewrite M.gss. reflexivity. }
+
+          eapply preord_val_refl. now tci. 
+          now intros Hc; subst; eauto.
+          now intros Hc; subst; eauto.
+          constructor.
+          eapply preord_var_env_extend_eq.
+          eapply preord_val_refl. now tci. now constructor. } 
+        
+        (* Invariant composition *)
+        { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
+          destructAll. destruct_tuples. subst. simpl in *. lia. } }
+
+        
+        { intros ?; subst.
+          
+
+          - destruct (H17 ltac:(reflexivity)). destructAll. eapply Hexp in H19; [ | reflexivity ]. destructAll.
+            destruct x10; try contradiction. destruct x12. eexists. split; [ | eassumption ].
+            
+            unfold fuel_sem.one in *. simpl in *. lia. } 
+        
         
       - (* Match_e OOT *)
         intros e1 vs n br f1 Hoot IH.
@@ -1403,127 +2062,155 @@ Section Correct.
           simpl. eassumption.
 
       - (* enil *)
+        (* enil *)
         intros vs'.
-        intros rho vnames k vk e' S S' vs2 ys vs'' Hwfenv Hwf Hdis Hnin1 Hdis' Hnd Hcenv Hget Hcps Hall Hgetl.
-        inv Hall. inv Hcps.
-        edestruct (set_lists_length3 (M.set k vk (M.empty val)) (rev ys ++ []) (rev vs'' ++ [])).
-        { rewrite !app_nil_r, !rev_length. eapply get_list_length_eq. eassumption. }
 
-        exists [], x.
-        split; [ | split; [ | split ] ].
-        + now constructor.
-        + normalize_sets. now sets.
-        + eassumption.
-        + intros. rewrite !app_nil_r. 
-          eapply preord_exp_app_compat.
-          * intro; intros. unfold eq_fuel, cps_bound in *. simpl in *. subst.
-            unfold_all. lia.
-          * intro; intros. unfold eq_fuel, cps_bound in *. simpl in *. subst.
-            unfold_all. lia.
-          * eapply preord_var_env_get.
-            2:{ erewrite <- set_lists_not_In; [ | eassumption | ]. eapply M.gss.
-                rewrite app_nil_r. intros Hc. eapply in_rev in Hc.
-                eapply Hdis'; eauto. }
-            2:{ eassumption. }
-            eapply preord_val_refl. tci.
-          * rewrite !app_nil_r in *.
-            eapply get_list_set_lists in H.
-            eapply preord_var_env_get_list; [ | eassumption | ].
-            2:{ eapply get_list_rev. eassumption. }
-            eapply Forall2_refl. intro. eapply preord_val_refl. tci.
-            eapply NoDup_rev. eassumption.
+        intros rho vnames e' e_app S S' vs2 xs ys ks vs'' Hwfenv Hwf
+               Hdis Hdis' Hdis'' Hdis''' Hnd Hcenv Hfv Hcps Hall Hgetl.
+        inv Hall. inv Hcps.
+        
+        edestruct (set_lists_length3 rho (ys ++ []) (vs'' ++ [])).
+        { rewrite !app_nil_r. eapply get_list_length_eq. eassumption. }
+        
+        eexists. split. eassumption.
+        intros i. 
+        eapply preord_exp_post_monotonic.
+        
+        2:{ eapply preord_exp_refl. tci.
+
+
+            assert (Henv : preord_env_P_inj cenv eq_fuel (occurs_free e') i id x rho).
+            { eapply preord_env_P_inj_f_eq_subdomain.
+              eapply preord_env_P_inj_set_lists_l; eauto.
+              eapply preord_env_P_refl. tci.
+              rewrite !app_nil_r. eapply Forall2_refl. intro. eapply preord_val_refl. tci.
+              rewrite !app_nil_r. rewrite apply_r_set_list_f_eq.
+
+              clear. induction ys. simpl.
+              intros z Hin. rewrite apply_r_empty. reflexivity.
+              simpl. intros z Hin.
+              destruct (Coqlib.peq z a). subst. rewrite extend_gss; eauto.
+              rewrite extend_gso; eauto. }
+
+            unfold preord_env_P_inj, id in *.  eassumption. } 
+
+        (* Invariant composition *)
+        { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.
+          destructAll. destruct_tuples. subst. simpl in *. lia. }
 
       - (* econs *)
         intros vs' we es v vs f1 fs Heval1 IH1 Heval2 IH2.
-        intros rho vnames k vk e' S S' vs2 ys vs'' Hwfenv Hwf Hdis Hnin1 Hdis' Hnd Hcenv Hget Hcps Hall Hgetl.
-        inv Hall. inv Hcps. inv Hwf.
-
-        set (rho' := M.set x1 y (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] es' Fnil) k1) rho)). 
-        edestruct IH2 with (rho := rho'); [ | | | | | | | | eassumption | eassumption | | ].
+        intros rho vnames e' e_app S S' vs2 xs ys ks vs'' Hwfenv Hwf Hdis Hdis' Hdis'' Hdis''' Hnd
+               Hcenv Hfv Hcps Hall Hgetl.
+        inv Hall. inv Hcps. inv Hwf.        
+        
+        set (rho' := M.set x1 y (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] es' Fnil) k1) rho)).
+        
+        replace (ys ++ x1 :: xs0) with ((ys ++ [x1]) ++ xs0) in *.
+        2:{ rewrite app_cons with (a := x1) (l2 := xs0). reflexivity.  }
+        
+        edestruct IH2 with (ys := ys ++ [x1]) (vs'0 := vs'' ++ [y]) (rho := rho');
+          [ | | | | | | | | | eassumption | eassumption | | ].
         + eassumption.
-        + eassumption.
-        + eapply Disjoint_Included_r.
-          eapply cps_cvt_exp_subset. eassumption.
-          sets.
         + eassumption.
         + repeat normalize_sets.
-          eapply Union_Disjoint_r.
-          * eapply Disjoint_Singleton_r. intros Hc. inv_setminus. inv Hc; eauto.
-            inv H4. now eapply Hdis; eauto.
-            eapply Hdis'; eauto.
-          * eapply Disjoint_Included_r. eapply cps_cvt_exp_subset. eassumption.
-            eapply Union_Disjoint_l; sets.
-        + constructor; eauto.
-          intros Hc. inv_setminus. eapply Hdis'; eauto.
-        + unfold rho'.
-          repeat eapply cps_env_rel_weaken. eassumption.
-          inv_setminus. intros Hc. now eapply Hdis; eauto.
-          intros Hc. now eapply Hdis; eauto.
-        + unfold rho'. rewrite !M.gso. eassumption.
-          inv_setminus. intros Hc; subst. now eapply Hdis; eauto.
-          intros Hc. subst. now eapply Hdis; eauto.
-        + simpl. unfold rho'. rewrite M.gss.
-          rewrite !get_list_set_neq. rewrite Hgetl. reflexivity.
-          intros Hc. inv_setminus. now eapply Hdis'; eauto. 
-          intros Hc. now eapply Hdis'; eauto. 
-        +
-          destructAll. 
-          eexists (x1 :: x). eexists x0.
+          eapply Disjoint_Included_r.
+          eapply cps_cvt_exp_subset. eassumption.
+          xsets.
+        + repeat normalize_sets.
+          eapply Disjoint_Included; [ | | eapply Hdis' ]; sets.
+        + repeat normalize_sets.
+          eapply Union_Disjoint_r; sets.
+          eapply Disjoint_Included; [ | | eapply Hdis'' ]; sets.
+          eapply Disjoint_Included; [ | | eapply Hdis'' ]; sets.
+        + repeat normalize_sets.
+          inv Hnd. eapply Union_Disjoint_r; sets.
+        + inv Hnd. eassumption.
+        + repeat normalize_sets. unfold rho'. repeat eapply cps_env_rel_weaken.
+          eassumption.
+          intros Hc. eapply Hdis'; eauto.
+          intros Hc. eapply Hdis'; eauto.
+        + repeat normalize_sets. sets. 
+        + unfold rho'. eapply get_list_app.          
+          repeat normalize_sets. rewrite !get_list_set_neq. eassumption.
+          intros Hc. now eapply Hdis''; eauto.
+          intros Hc. now eapply Hdis'''; eauto.
+          simpl. rewrite M.gss. reflexivity.
+        + destructAll. 
 
-          split; [ | split; [ | split ]].
-          * constructor; eauto.
-            intros Hc. eapply H0 in Hc.
-            eapply cps_cvt_exp_subset in Hc; [ | eassumption ].
-            inv_setminus. eauto.
-          * normalize_sets. eapply Union_Included.
-            eapply Singleton_Included. eassumption.
-            eapply Included_trans. eassumption.
-            eapply Included_trans. eapply cps_cvt_exp_subset. eassumption.
-            now sets.
-          * rewrite app_cons at 1.
-            rewrite app_cons with (a := y) at 1. eassumption.
-          * intros i. 
+          edestruct (set_lists_length3 rho ((ys ++ [x1]) ++ xs0) ((vs'' ++ [y]) ++ l')).
+          eapply set_lists_length_eq. eassumption. 
 
-            eapply preord_exp_post_monotonic. 
+          eexists. split.
+
+          rewrite app_cons with (a := y). eassumption.  
+
+          intros i. 
+
+          eapply preord_exp_post_monotonic. 
           
-            2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
-            
-            2:{ intros m. eapply preord_exp_Efun_red. } 
+          2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              
+              2:{ intros m. eapply preord_exp_Efun_red. } 
 
-            assert (Hex' : exists z, ~ In var (k1 |: FromList vnames) z).
-            { eapply ToMSet_non_member. tci. } destructAll.
+              assert (Hex' : exists z, ~ In var (k1 |: FromList vnames) z).
+              { eapply ToMSet_non_member. tci. } destructAll.
+              
+              eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              
+              2:{ intros m. eapply IH1; [ | | | | | | | eassumption | reflexivity | ].
+                  - eassumption.
+                  - eassumption.
+                  - eapply Union_Disjoint_l; sets.
+                    repeat normalize_sets. sets.
+                  - eassumption.
+                  - repeat normalize_sets.
+                    intros Hc. eapply Hdis'; eauto.
+                  - simpl.
+                    eapply cps_env_rel_weaken. eassumption.
+                    repeat normalize_sets. intros Hc. eapply Hdis'; eauto.
+                  - simpl. eapply M.gss.
+                  - eassumption. }
+              
+              eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              
+              2:{ intros m. eapply preord_exp_Eapp_red.
+                  - rewrite M.gso; eauto.
+                    rewrite M.gss. reflexivity.
+                    intros Hc; subst. now eauto.
+                  - simpl. rewrite Coqlib.peq_true. reflexivity.
+                  - simpl. rewrite M.gss. reflexivity.
+                  - simpl. reflexivity. }
+              
+              simpl in H0.
 
-            eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
 
-            2:{ intros m. eapply IH1; [ | | | | | | | eassumption | reflexivity | ].
-                - eassumption.
-                - eassumption.
-                - eapply Union_Disjoint_l; sets.
-                - eassumption.
-                - intros Hc. inv_setminus. eapply Hdis; eauto.
-                - simpl.
-                  eapply cps_env_rel_weaken. eassumption.
-                  intros Hc. inv_setminus. eapply Hdis; eauto.
-                - simpl. eapply M.gss.
-                - eassumption. }
+              2:{ eassumption. }
+ 
+              eapply preord_exp_refl. tci. 
 
-            eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              eapply uncurry_correct.preord_env_P_set_lists_extend; eauto.
 
-            2:{ intros m. eapply preord_exp_Eapp_red.
-                - rewrite M.gso; eauto.
-                  rewrite M.gss. reflexivity.
-                  intros Hc; subst. now inv_setminus; eauto.
-                - simpl. rewrite Coqlib.peq_true. reflexivity.
-                - simpl. rewrite M.gss. reflexivity.
-                - simpl. reflexivity. }
-            
-            rewrite app_cons. 
-            simpl in H9. eapply H9. }
-         
+              2:{ eapply Forall2_refl. intro. eapply preord_val_refl. tci. }
+
+              unfold rho'.
+ 
+              eapply preord_env_P_set_not_in_P_r.
+              eapply preord_env_P_set_not_in_P_r.
+
+              eapply preord_env_P_refl. now tci.
+
+              repeat normalize_sets.
+              now sets. 
+              repeat normalize_sets. now sets. } 
+          
           (* Invariant composition *)
           { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.
             destructAll. destruct_tuples. subst. simpl in *. lia. }
+
           
       - (* Var_e *)
         intros z vs v Hnth.   

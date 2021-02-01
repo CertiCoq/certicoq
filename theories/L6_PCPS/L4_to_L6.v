@@ -271,7 +271,8 @@ Section Translate.
         k' <- get_named_str "k'"%string ;;
         vx <- get_named_str_lst (map (fun _ => "x") (exps_as_list es)) ;;
         xs <- get_named_str_lst (map (fun _ => "x") (exps_as_list es)) ;;
-        e' <- cps_cvt_exps es vn (Eapp k' kon_tag xs) xs tgm;;
+        ks <- get_named_str_lst (map (fun _ => "k") (exps_as_list es)) ;;
+        e' <- cps_cvt_exps es vn (Eapp k' kon_tag xs) xs ks tgm;;
         ret (Efun
                (Fcons k' kon_tag vx
                       (Econstr x' c_tag vx
@@ -311,17 +312,16 @@ Section Translate.
         end
       end
 
-    with cps_cvt_exps (es : expression.exps) (vn : list var) (e_app : exp) (xs : list var) (tgm : constr_env)
+    with cps_cvt_exps (es : expression.exps) (vn : list var) (e_app : exp) (xs ks : list var) (tgm : constr_env)
          : cpsM cps.exp :=
            match es with
            | enil => ret e_app
            | econs e es' =>
-             match xs with
-             | [] => failwith "Internal error: wrong number of arguments in constructor continuation"
-             | x1 :: xs =>
-               k1 <- get_named_str "k1"%string ;;
+             match xs, ks with
+             | [], _ | _, [] => failwith "Internal error: wrong number of arguments in constructor continuation"
+             | x1 :: xs, k1 :: ks =>
                e' <- cps_cvt e vn k1 tgm;;
-               e_exp <- cps_cvt_exps es' vn e_app xs tgm;;
+               e_exp <- cps_cvt_exps es' vn e_app xs ks tgm;;
                ret (Efun (Fcons k1 kon_tag (x1::nil) e_exp Fnil) e')
              end
            end
@@ -437,19 +437,21 @@ Section Translate.
                                                e2') Fnil)
                               e1')
   | e_Con :
-      forall S1 S2 c_tag dci tgm es e' k x1 k1 vn vx xs,
+      forall S1 S2 c_tag dci tgm es e' k x1 k1 vn vx xs ks,
         c_tag = dcon_to_tag dci tgm ->
 
         x1 \in S1 ->
         k1 \in (S1 \\ [set x1]) ->
         FromList vx \subset (S1 \\ [set x1] \\ [set k1]) ->
         FromList xs \subset (S1 \\ [set x1] \\ [set k1] \\ FromList vx) ->
-       
+        FromList ks \subset (S1 \\ [set x1] \\ [set k1] \\ FromList vx \\ FromList xs) ->
+               
         Datatypes.length vx = N.to_nat (exps_length es) ->
         NoDup vx ->
-        NoDup xs -> 
-        cps_cvt_rel_exps (S1 \\ [set x1] \\ [set k1] \\ FromList vx \\ FromList xs) 
-                         es vn (Eapp k1 kon_tag xs) xs tgm S2 e' ->
+        NoDup xs ->
+        NoDup ks -> 
+        cps_cvt_rel_exps (S1 \\ [set x1] \\ [set k1] \\ FromList vx \\ FromList xs \\ FromList ks) 
+                         es vn (Eapp k1 kon_tag xs) xs ks tgm S2 e' ->
         cps_cvt_rel S1
                     (Con_e dci es)
                     vn
@@ -506,21 +508,21 @@ Section Translate.
         cps_cvt_rel S Prf_e vn k tgm (S \\ [set x]) (Econstr x default_tag nil (Eapp k kon_tag (x::nil)))
                     
   with cps_cvt_rel_exps :
-         Ensemble var -> expression.exps -> list var -> exp -> list var ->
+         Ensemble var -> expression.exps -> list var -> exp -> list var -> list var ->
          constr_env -> Ensemble var -> exp -> Prop :=
   | e_Enil :
       forall S vn e_app  tgm,
-        cps_cvt_rel_exps S enil vn e_app [] tgm S e_app
+        cps_cvt_rel_exps S enil vn e_app [] [] tgm S e_app
   | e_Econs :
-      forall S1 S2 S3 vn e_app xs e es e' es' tgm x1 k1,
-        k1 \in S1 ->
-        cps_cvt_rel (S1 \\ [set k1]) e vn k1 tgm S2 e' ->
-        cps_cvt_rel_exps S2 es vn e_app xs tgm S3 es' ->
+      forall S1 S2 S3 vn e_app x1 xs k1 ks e es e' es' tgm,
+        cps_cvt_rel S1 e vn k1 tgm S2 e' ->
+        cps_cvt_rel_exps S2 es vn e_app xs ks tgm S3 es' ->
         cps_cvt_rel_exps S1
                          (econs e es)
                          vn
                          e_app
                          (x1 :: xs)
+                         (k1 :: ks)
                          tgm
                          S3
                          (Efun (Fcons k1 kon_tag [x1] es' Fnil) e')

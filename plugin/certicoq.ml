@@ -92,7 +92,7 @@ let default_options : options =
   }
 
 
-let make_options (l : command_args list) (pr : (BasicAst.kername * char list) list) (fname : string) : options =
+let make_options (l : command_args list) (pr : (BasicAst.kername * char list * bool) list) (fname : string) : options =
   let rec aux (o : options) l =
     match l with
     | [] -> o

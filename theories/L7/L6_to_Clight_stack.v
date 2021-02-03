@@ -752,7 +752,6 @@ Section Translation.
             let (push, slots) := push_live_vars fvs_list in
             (push ; update_stack slots; set_stack slots false, slots)
         in
-        let discard_stack := pop_live_vars fvs_list; reset_stack slots_call false in
         match M.get t fenv return (error (statement * N)) with 
         | Some inf =>
           let name :=
@@ -769,6 +768,8 @@ Section Translation.
           let alloc := max_allocs e' in
           (* Call GC after the call if needed *)
           let (gc_call, slots_gc) := make_GC_call alloc fv_gc slots_call in
+          (* Pop live vars from the stack *)
+          let discard_stack := pop_live_vars fvs_list; reset_stack slots_call false in
           progn <- translate_body e' fenv cenv ienv map (N.max slots slots_gc);;
           Ret ((asgn ; Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
                make_stack;
@@ -820,11 +821,12 @@ Section Translation.
             let (push, slots) := push_live_vars fvs_list in
             (push ; update_stack slots; set_stack slots false, slots)
         in
-        let discard_stack := pop_live_vars fvs_list; reset_stack slots_call false in
         c <- mkPrimCallTinfo x p (length vs) fenv map vs ;;
         let alloc := max_allocs e' in
         (* Call GC after the call if needed *)
         let (gc_call, slots_gc) := make_GC_call alloc fv_gc slots_call in
+        (* Pop live vars from the stack *)
+        let discard_stack := pop_live_vars fvs_list; reset_stack slots_call false in
         '(prog, slots) <- translate_body e' fenv cenv ienv map (N.max slots slots_gc);; 
         Ret ((Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
              make_stack;

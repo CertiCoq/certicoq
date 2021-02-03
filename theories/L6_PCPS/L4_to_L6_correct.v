@@ -2778,7 +2778,7 @@ Section Correct.
         exact 0%nat. exact 0%nat. exact 0%nat.
         exact 0%nat. exact 0%nat. exact 0%nat.
         exact 0%nat. exact 0%nat. exact 0%nat.
-        exact 0%nat. (* Where do this come from??? *) 
+        exact 0%nat. (* Where do these come from??? *) 
     Qed. 
     
 End Correct.

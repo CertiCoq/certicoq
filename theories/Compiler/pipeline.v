@@ -131,7 +131,7 @@ Definition make_opts
            (debug : bool)                            (* Debug log *)
            (dev : nat)                               (* Extra flag for development purposes *)
            (prefix : string)                         (* Prefix for the FFI. Check why is this needed in the pipeline and not just the plugin *)
-           (prims : list ((kername * string), bool)) (* list of extracted constants *)
+           (prims : list (kername * string * bool))  (* list of extracted constants *)
   : Options :=
   {| direct := negb cps;
      c_args := args;

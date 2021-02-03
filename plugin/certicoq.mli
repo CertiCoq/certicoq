@@ -23,7 +23,7 @@ type options =
     ext       : string;
     dev       : int;
     prefix    : string;
-    prims     : (BasicAst.kername * char list) list;
+    prims     : ((BasicAst.kername * char list) * bool) list;
   }
 
 val default_options : options

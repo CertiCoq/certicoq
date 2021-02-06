@@ -134,39 +134,39 @@ Fixpoint update_bs (S : PS.t) xs (bs : list bool) : (list bool * bool) :=
       (b' :: bs', (negb (eqb b b') || d))
   end.
 
-Definition update_live_fun (L : live_fun) (f : var) (xs : list var) (S : PS.t) : option (live_fun * bool):=
+Definition update_live_fun (L : live_fun) (f : var) (xs : list var) (S : PS.t) : error (live_fun * bool):=
   match get_fun_vars L f with
   | Some bs =>
     let (bs, diff) := update_bs S xs bs in
-    if diff then Some (set_fun_vars L f bs, diff)
-    else  Some (L, diff)
-  | None => None
+    if diff then Ret (set_fun_vars L f bs, diff)
+    else  Ret (L, diff)
+  | None => Err "update_live_fun: get_live_vars failed"
   end.
 
 
 (* One pass through fundefs to L variables and keep track of live variables *)
-Fixpoint live (B : fundefs) (L : live_fun) (diff : bool) : option (live_fun * bool) := 
+Fixpoint live (B : fundefs) (L : live_fun) (diff : bool) : error (live_fun * bool) := 
 match B with 
 | Fcons f ft xs e B' => 
   let S := live_expr L e PS.empty in
   match update_live_fun L f xs S with
-  | Some (L', d) => live B' L' (d || diff)
-  | None => None
+  | Ret (L', d) => live B' L' (d || diff)
+  | Err s => Err s
   end  
-| Fnil => Some (L, diff)
+| Fnil => Ret (L, diff)
 end. 
 
 (* Iteratively create live functions for B, when they are equal, stop *)
 (* Note that a naive upper bound for the number of passes is the number of total variables
    as at each step, if the process doesn't terminate at least one variable must be eliminated *)
-Fixpoint find_live_helper (B : fundefs) (prev_L : live_fun) (n : nat) : option live_fun := 
+Fixpoint find_live_helper (B : fundefs) (prev_L : live_fun) (n : nat) : error live_fun := 
 match n with 
-| 0 => Some prev_L
+| 0 => Ret prev_L
 | S n' =>
   match live B prev_L false with
-  | Some (curr_L, diff) =>
-    if diff then find_live_helper B curr_L n' else Some curr_L (* should be equal to prevL *)
-  | None => None
+  | Ret (curr_L, diff) =>
+    if diff then find_live_helper B curr_L n' else Ret curr_L (* should be equal to prevL *)
+  | Err s => Err s
   end
 end.
 
@@ -177,7 +177,7 @@ match B with
 end. 
 
 
-Fixpoint find_live (e : exp) : option live_fun := 
+Fixpoint find_live (e : exp) : error live_fun := 
   match e with 
   | Efun B e' =>
     let initial_L := init_live_fun B in
@@ -185,7 +185,7 @@ Fixpoint find_live (e : exp) : option live_fun :=
     let L' := escaping_fun_exp e' (escaping_fun_fundefs B initial_L) in
     let n := num_vars B 0 + 1 in
     find_live_helper B L' n
-  | _ => Some (M.empty _)
+  | _ => Ret (M.empty _)
   end. 
 
 (* ELIMINATING VARIABLES *)
@@ -397,7 +397,7 @@ Definition DPE (e : exp) (c_data : comp_data) : error exp * comp_data :=
     match e with 
     | Efun B e' =>
       match find_live e with
-      | Some L =>
+      | Ret L =>
         let m := make_arityMap e (M.empty _) in
         let '(ftagMap, c_data) := create_fun_tag L m B c_data (M.empty _) in 
         
@@ -410,8 +410,8 @@ Definition DPE (e : exp) (c_data : comp_data) : error exp * comp_data :=
           end
         | (Err s, (c_data, m)) => (Err s, c_data)
         end
-      | None => (Ret e, c_data)
+      | Err s => (Ret e, add_log s c_data)
       end
     | e => (Ret e, c_data)
     end
-  else (Ret e, c_data).
+  else (Ret e, add_log "Internal error: program is not hoisted" c_data).

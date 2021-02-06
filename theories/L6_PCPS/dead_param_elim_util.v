@@ -109,18 +109,18 @@ Definition live_fun_consistent (L : live_fun) (B : fundefs) :=
 (* Lemmas about [live] *)
 
 Lemma live_diff B L L' d :
-  live B L d = Some (L', false) ->
+  live B L d = Ret (L', false) ->
   d = false.
 Proof.
   revert L L' d. induction B; simpl; intros L L' d Hl; eauto.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ [L'' d''] | ].
-    + eapply IHB in Hl. destruct d; eauto. destruct d''; eauto.
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' d''] ].
     + inv Hl.
+    + eapply IHB in Hl. destruct d; eauto. destruct d''; eauto.
   - inv Hl; eauto.
 Qed.
 
 Lemma update_live_fun_false L L' f xs S :
-  update_live_fun L f xs S = Some (L', false) ->
+  update_live_fun L f xs S = Ret (L', false) ->
   exists bs,
     get_fun_vars L f = Some bs /\
     L = L' /\ Disjoint _ (FromSet S) (FromList (dead_args xs bs)).
@@ -312,12 +312,12 @@ Qed.
       
 Lemma live_correct L L' B :
   no_fun_defs B -> (* no nested functions in B *)
-  live B L false = Some (L', false) -> 
+  live B L false = Ret (L', false) -> 
   L = L' /\ live_map_sound B L.
 Proof.
   revert L L'; induction B; simpl; intros L L' Hnf Hl.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [[L'' b] | ] eqn:Heq.
-    2:{ congruence. }
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' b] ] eqn:Heq.
+    congruence.
     
     assert (Hd := live_diff _ _ _ _ Hl). destruct b; inv Hd.
     simpl in *. 
@@ -424,7 +424,7 @@ Qed.
 
   
 Lemma update_live_fun_size_leq L L' b f xs S :
-  update_live_fun L f xs S = Some (L', b) ->
+  update_live_fun L f xs S = Ret (L', b) ->
   map_size L <= map_size L'.
 Proof.
   intros Hl.
@@ -441,7 +441,7 @@ Proof.
 Qed.
 
 Lemma update_live_fun_size L L' f xs S :
-  update_live_fun L f xs S = Some (L', true) ->
+  update_live_fun L f xs S = Ret (L', true) ->
   map_size L < map_size L'.
 Proof.
   intros Hl.
@@ -459,12 +459,12 @@ Qed.
 
 
 Lemma live_size_leq L L' d d' B :
-  live B L d = Some (L', d') ->
+  live B L d = Ret (L', d') ->
   map_size L <= map_size L'.
 Proof.
   revert L L' d d'; induction B; simpl; intros L L' d d' Hl; subst.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [[L'' b] | ] eqn:Heq.
-    2:{ congruence. }
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' b] ] eqn:Heq.
+    congruence.
     destruct b; simpl in *.
     + eapply le_trans.
       eapply update_live_fun_size_leq. 
@@ -478,13 +478,13 @@ Qed.
 
 
 Lemma live_size L L' B :
-  live B L false = Some (L', true) ->
+  live B L false = Ret (L', true) ->
   map_size L < map_size L'.
 Proof.
   assert (Heq : false = false) by reflexivity. revert Heq. generalize false at 1 3. 
   revert L L'; induction B; simpl; intros L L' d Heq Hl; subst.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [[L'' b] | ] eqn:Heq.
-    2:{ congruence. }
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' b]] eqn:Heq.
+    congruence.
     destruct b; simpl in *.
     + eapply lt_le_trans.
       eapply update_live_fun_size. eassumption.
@@ -499,7 +499,7 @@ Qed.
 
 Lemma find_live_helper_size B L n L' :
   no_fun_defs B -> 
-  find_live_helper B L n = Some L' ->
+  find_live_helper B L n = Ret L' ->
   (* either a fixpoint is reached *)
   live_map_sound B L' \/ 
   (* or the distance between L and L' is at least n *)
@@ -508,7 +508,7 @@ Proof.
   revert B L L'. induction n; intros.
   - inv H0. right. lia.
   - simpl in H0.
-    destruct (live B L false) as [[L1 diff] | ]  eqn:Hlive; [| congruence ].
+    destruct (live B L false) as [ | [L1 diff] ]  eqn:Hlive; [ congruence | ].
     
     destruct diff.
 
@@ -574,7 +574,7 @@ Qed.
 
 
 Lemma update_live_fun_max_size L L' b f xs S :
-  update_live_fun L f xs S = Some (L', b) ->
+  update_live_fun L f xs S = Ret (L', b) ->
   max_map_size L' = max_map_size L.
 Proof.
   intros Hl.
@@ -593,12 +593,12 @@ Qed.
 
 
 Lemma live_max_size L L' d d' B :
-  live B L d = Some (L', d') ->
+  live B L d = Ret (L', d') ->
   max_map_size L' = max_map_size L.
 Proof.
   revert L L' d d'; induction B; simpl; intros L L' d d' Hl; subst.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [[L'' b] | ] eqn:Heq.
-    2:{ congruence. }
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' b] ] eqn:Heq.
+    congruence.
     
     eapply IHB in Hl. eapply update_live_fun_max_size in Heq. congruence.
   - inv Hl. reflexivity. 
@@ -607,13 +607,13 @@ Qed.
 
 Lemma find_live_helper_max_size B L n L' :
   no_fun_defs B -> 
-  find_live_helper B L n = Some L' ->
+  find_live_helper B L n = Ret L' ->
   max_map_size L' = max_map_size L.
 Proof.
   revert B L L'. induction n; intros.
   - inv H0. reflexivity.
   - simpl in H0.
-    destruct (live B L false) as [[L1 diff] | ]  eqn:Hlive; [| congruence ].
+    destruct (live B L false) as [ | [L1 diff] ]  eqn:Hlive; [ congruence | ].
     
     destruct diff.
 
@@ -763,7 +763,7 @@ Proof. eapply escaping_fun_fundefs_max_size_mut. Qed.
 Lemma find_live_sound (B : fundefs) (e : exp) L :
   no_fun_defs B -> (* no nested fundefs *)
   unique_functions B -> (* unique bindings *)
-  find_live (Efun B e) = Some L ->
+  find_live (Efun B e) = Ret L ->
   live_map_sound B L.
 Proof.
   intros Hnf Hun Hl. unfold find_live in *.
@@ -786,7 +786,7 @@ Qed.
 
 
 Lemma update_live_fun_dom L L' f xs S d :
-  update_live_fun L f xs S = Some (L', d) ->
+  update_live_fun L f xs S = Ret (L', d) ->
   Dom_map L <--> Dom_map L'.
 Proof.
   intros Hl.
@@ -805,12 +805,12 @@ Qed.
 
 
 Lemma live_dom L L' d d' B :
-  live B L d = Some (L', d') ->
+  live B L d = Ret (L', d') ->
   Dom_map L <--> Dom_map L'.
 Proof.
   revert L L' d d'; induction B; simpl; intros L L' d d' Hl; subst.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [[L'' b] | ] eqn:Heq.
-    2:{ congruence. }
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' b] ] eqn:Heq.
+    congruence.
     destruct b; simpl in *.
     + eapply IHB in Hl. rewrite <- Hl.
       eapply update_live_fun_dom. eassumption.
@@ -821,13 +821,13 @@ Proof.
 Qed. 
 
 Lemma find_live_helper_dom B L n L' :
-  find_live_helper B L n = Some L' ->
+  find_live_helper B L n = Ret L' ->
   Dom_map L <--> Dom_map L'.
 Proof.
   revert B L L'. induction n; intros.
   - inv H. reflexivity.
   - simpl in H.
-    destruct (live B L false) as [[L1 diff] | ]  eqn:Hlive; [| congruence ].
+    destruct (live B L false) as [ | [L1 diff] ]  eqn:Hlive; [ congruence | ].
     
     destruct diff.
 
@@ -1057,7 +1057,7 @@ Proof.
 Qed. 
 
 Lemma find_live_fun_map_dom B e L :
-  find_live (Efun B e) = Some L ->
+  find_live (Efun B e) = Ret L ->
   Dom_map L \subset name_in_fundefs B /\
   Known_exp (Dom_map L) (Efun B e). 
 Proof.
@@ -1085,7 +1085,7 @@ Qed.
 Corollary find_live_sound_top (B : fundefs) (e : exp) L :
   no_fun_defs B -> (* no nested fundefs *)
   unique_functions B -> (* unique bindings *)
-  find_live (Efun B e) = Some L ->
+  find_live (Efun B e) = Ret L ->
   live_map_sound B L /\
   Dom_map L \subset name_in_fundefs B /\
   Known_exp (Dom_map L) (Efun B e).

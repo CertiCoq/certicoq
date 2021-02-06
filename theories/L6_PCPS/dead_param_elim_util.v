@@ -405,10 +405,7 @@ Lemma set_fun_vars_map_size L f l bs :
   map_size L + bitsize bs =  map_size (set_fun_vars L f bs) + bitsize l.
 Proof.
   intros Heq Hlen. unfold set_fun_vars.
-  destruct bs.
-  { destruct l; inv Hlen. reflexivity. }
-
-  revert Hlen. generalize (b :: bs). clear b bs. intros bs Hlen.
+  
   unfold map_size.
   edestruct elements_set_some. eassumption.
   destructAll.
@@ -554,10 +551,7 @@ Lemma set_fun_vars_max_size L f l bs :
   max_map_size (set_fun_vars L f bs) = max_map_size L.
 Proof.
   intros Heq Hlen. unfold set_fun_vars.
-  destruct bs.
-  { destruct l; inv Hlen. reflexivity. }
-  
-  revert Hlen. generalize (b :: bs). clear b bs. intros bs Hlen.
+
   unfold map_size, max_map_size.
   edestruct elements_set_some. eassumption.
   destructAll.
@@ -629,10 +623,7 @@ Lemma set_fun_vars_max_size_None L f bs :
   max_map_size (set_fun_vars L f bs) = max_map_size L + length bs.
 Proof.
   intros Heq. unfold set_fun_vars.
-  destruct bs.
-  { simpl. lia. }
-  
-  generalize (b :: bs). clear b bs. intros bs.
+
   unfold map_size, max_map_size.
   edestruct elements_set_none. eassumption.
   destructAll.
@@ -682,9 +673,9 @@ Proof.
       destruct (L ! v) eqn:Heq; eauto. exfalso. eapply Hdis.
       constructor; eauto. eexists; eauto.
 
-    + unfold set_fun_vars. destruct (get_bool_false l). now sets.
+    + unfold set_fun_vars.
       rewrite Dom_map_set. inv Hun. sets. 
-
+      
     + inv Hun. sets.
 
   - congruence.
@@ -796,7 +787,7 @@ Proof.
   destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
   destruct diff.
   
-  - inv Hl. unfold set_fun_vars. destruct bs. reflexivity.
+  - inv Hl. unfold set_fun_vars.
     rewrite Dom_map_set. rewrite (Union_Same_set [set f] (Dom_map L)). reflexivity.
     eapply Singleton_Included. eexists; eauto.
     
@@ -845,7 +836,7 @@ Lemma init_live_fun_aux_dom L B L' :
 Proof.
   revert L L'; induction B; simpl; intros L L' Hinit.
   - rewrite IHB; eauto.
-    unfold set_fun_vars. destruct l; simpl. sets.
+    unfold set_fun_vars.
     rewrite Dom_map_set. sets.
   - subst. sets.
 Qed.
@@ -1129,5 +1120,4 @@ Proof.
   intros H. simpl in *.  eapply andb_prop in H.
   destructAll. 
   split; eauto using is_hoisted_exp_correct, is_hoisted_fundefs_correct.
-Qed. 
-
+Qed.

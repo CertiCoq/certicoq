@@ -23,10 +23,7 @@ Definition live_fun : Type :=  M.t (list bool).
 Definition get_fun_vars (m : live_fun) (f : var) := M.get f m. 
 
 Definition set_fun_vars (m : live_fun) (f : var) (b : list bool) :=
-  match b with
-  | [] => m
-  | _ => M.set f b m
-  end. 
+  M.set f b m.
 
 (* Apply bit mask to argument list*)
 Fixpoint live_args {A} (ys : list A) (bs : list bool) : list A := 
@@ -140,7 +137,7 @@ Definition update_live_fun (L : live_fun) (f : var) (xs : list var) (S : PS.t) :
     let (bs, diff) := update_bs S xs bs in
     if diff then Ret (set_fun_vars L f bs, diff)
     else  Ret (L, diff)
-  | None => Err "update_live_fun: get_live_vars failed"
+  | None => Err "update_live_fun: get_fun_vars failed"
   end.
 
 

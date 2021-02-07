@@ -131,26 +131,24 @@ Fixpoint update_bs (S : PS.t) xs (bs : list bool) : (list bool * bool) :=
       (b' :: bs', (negb (eqb b b') || d))
   end.
 
-Definition update_live_fun (L : live_fun) (f : var) (xs : list var) (S : PS.t) : error (live_fun * bool):=
+Definition update_live_fun (L : live_fun) (f : var) (xs : list var) (S : PS.t) : live_fun * bool :=
   match get_fun_vars L f with
   | Some bs =>
     let (bs, diff) := update_bs S xs bs in
-    if diff then Ret (set_fun_vars L f bs, diff)
-    else  Ret (L, diff)
-  | None => Err "update_live_fun: get_fun_vars failed"
+    if diff then (set_fun_vars L f bs, diff)
+    else  (L, diff)
+  | None => (L, false)
   end.
 
 
 (* One pass through fundefs to L variables and keep track of live variables *)
-Fixpoint live (B : fundefs) (L : live_fun) (diff : bool) : error (live_fun * bool) := 
+Fixpoint live (B : fundefs) (L : live_fun) (diff : bool) : live_fun * bool := 
 match B with 
 | Fcons f ft xs e B' => 
   let S := live_expr L e PS.empty in
-  match update_live_fun L f xs S with
-  | Ret (L', d) => live B' L' (d || diff)
-  | Err s => Err s
-  end  
-| Fnil => Ret (L, diff)
+  let (L', d) := update_live_fun L f xs S in
+  live B' L' (d || diff)
+| Fnil => (L, diff)
 end. 
 
 (* Iteratively create live functions for B, when they are equal, stop *)
@@ -160,11 +158,8 @@ Fixpoint find_live_helper (B : fundefs) (prev_L : live_fun) (n : nat) : error li
 match n with 
 | 0 => Ret prev_L
 | S n' =>
-  match live B prev_L false with
-  | Ret (curr_L, diff) =>
-    if diff then find_live_helper B curr_L n' else Ret curr_L (* should be equal to prevL *)
-  | Err s => Err s
-  end
+  let (curr_L, diff) := live B prev_L false in
+  if diff then find_live_helper B curr_L n' else Ret curr_L (* should be equal to prevL *)
 end.
 
 Fixpoint num_vars (B : fundefs) (n : nat) : nat := 

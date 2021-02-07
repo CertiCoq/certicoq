@@ -109,82 +109,57 @@ Definition live_fun_consistent (L : live_fun) (B : fundefs) :=
 (* Lemmas about [live] *)
 
 Lemma live_diff B L L' d :
-  live B L d = Ret (L', false) ->
+  live B L d = (L', false) ->
   d = false.
 Proof.
   revert L L' d. induction B; simpl; intros L L' d Hl; eauto.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' d''] ].
-    + inv Hl.
-    + eapply IHB in Hl. destruct d; eauto. destruct d''; eauto.
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' d''].
+    eapply IHB in Hl. destruct d; eauto. destruct d''; eauto.
   - inv Hl; eauto.
 Qed.
 
 Lemma update_live_fun_false L L' f xs S :
-  update_live_fun L f xs S = Ret (L', false) ->
-  exists bs,
-    get_fun_vars L f = Some bs /\
-    L = L' /\ Disjoint _ (FromSet S) (FromList (dead_args xs bs)).
+  update_live_fun L f xs S = (L', false) ->
+  L = L' /\
+  (forall bs,
+      get_fun_vars L f = Some bs ->
+      Disjoint _ (FromSet S) (FromList (dead_args xs bs))).
 Proof.
   intros Hl.
   unfold update_live_fun in Hl.
-  destruct (get_fun_vars L f) eqn:Hf; try congruence.
-  eexists.
-  split. reflexivity. 
-  unfold get_fun_vars in *.
-  destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
-  inv Hl.
-  destruct diff. congruence. inv H0. 
-  assert (Hsuff : Disjoint positive (FromSet S) (FromList (dead_args xs l))).
-  { clear Hf. revert l bs Hupd.
-    induction xs; intros l bs Hupd.
-    - inv Hupd. 
-      destruct bs; eauto; simpl; normalize_sets; sets.
-    - destruct l.
-      { simpl. normalize_sets; sets. } 
-      simpl in *. 
-      destruct (update_bs S xs l) as [bs' diff] eqn:Hrec.
-      inv Hupd.
-      destruct b.
-      + inv H0. eauto.
-      + inv H0.
-        eapply orb_false_iff in H2. inv H2.
-        destruct (PS.mem a S) eqn:Hmem. now inv H. clear H.
-        specialize (IHxs l bs' Hrec). 
-        normalize_sets. eapply Union_Disjoint_r; [| eassumption ].  
-        eapply Disjoint_Singleton_r. 
-        intros Hc. eapply FromSet_sound in Hc; [| reflexivity ].
-        eapply PS.mem_spec in Hc. congruence. }
-  split. reflexivity.
-  eassumption.
+  destruct (get_fun_vars L f) eqn:Hf.
+  - unfold get_fun_vars in *.
+    destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
+    inv Hl.
+    destruct diff. congruence. inv H0.
+    split. reflexivity.
+    intros bs' Hget. inv Hget.
+    
+    assert (Hsuff : Disjoint  positive (FromSet S) (FromList (dead_args xs bs'))).
+    { clear Hf. revert bs bs' Hupd.
+      induction xs; intros bs bs' Hupd.
+      - inv Hupd.
+        destruct bs; eauto; simpl; normalize_sets; sets.
+      - destruct bs'.
+        { simpl. normalize_sets; sets. }
+        simpl in *.
+        
+        destruct (update_bs S xs bs') eqn:Hup. 
+        destruct b. inv Hupd.        
+        * eapply IHxs. eassumption.
+        * inv Hupd. 
+          eapply orb_false_iff in H1. inv H1.
+          destruct (PS.mem a S) eqn:Hmem. now inv H. clear H.
+          specialize (IHxs l bs' Hup).
+          normalize_sets. eapply Union_Disjoint_r; [| eassumption ].
+          eapply Disjoint_Singleton_r.
+          intros Hc. eapply FromSet_sound in Hc; [| reflexivity ].
+          eapply PS.mem_spec in Hc. congruence. }
+    eassumption.
+
+  - inv Hl. split; eauto. congruence. 
 Qed.
 
-
-
-
-(* Lemma live_expr_monotonic L e Q1 Q2 : *)
-(*   FromSet Q1 \subset FromSet Q2 -> *)
-(*   FromSet (live_expr L e Q1) \subset FromSet (live_expr L e Q2). *)
-(* Proof. *)
-(*   revert Q1 Q2. induction e using exp_ind'; intros Q1 Q2 Hsub; simpl; eauto. *)
-(*   - eapply IHe. rewrite !FromSet_union_list; sets. *)
-(*   - rewrite !FromSet_add; sets. *)
-(*   - eapply IHe. rewrite !FromSet_add. sets. *)
-(*   - eapply IHe.  *)
-
-(*     simpl in *.  *)
-
-(*     ~eapply IHe. rewrite !FromSet_union_list; sets. *)
-(*   - *)
-(*     try now (eapply Included_trans; [| eapply IHe ]; rewrite FromSet_union_list; sets). *)
-(*   - rewrite FromSet_add; sets. *)
-(*   - simpl in *. eapply Included_trans. eapply IHe0. *)
-(*     assert (Hsub : FromSet (PS.add v Q) \subset FromSet (live_expr L e (PS.add v Q))). *)
-(*     { eapply IHe. } *)
-(*     clear IHe. revert Hsub. generalize (PS.add v Q), (live_expr L e (PS.add v Q)). *)
-(*     clear IHe0. induction l; intros. *)
-(*     + eassumption. *)
-(*     + destruct a. eapply IHl; eauto. *)
-(*       2:{ reflexivity. } *)
 
 Lemma add_fun_vars_subset L v l Q : 
   FromSet Q \subset FromSet (add_fun_vars L v l Q).
@@ -312,25 +287,30 @@ Qed.
       
 Lemma live_correct L L' B :
   no_fun_defs B -> (* no nested functions in B *)
-  live B L false = Ret (L', false) -> 
+  live B L false = (L', false) -> 
   L = L' /\ live_map_sound B L.
 Proof.
   revert L L'; induction B; simpl; intros L L' Hnf Hl.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' b] ] eqn:Heq.
-    congruence.
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' b] eqn:Heq.
     
     assert (Hd := live_diff _ _ _ _ Hl). destruct b; inv Hd.
     simpl in *. 
+
     edestruct update_live_fun_false; try eassumption.
+    
     destructAll.
+    
     eapply IHB in Hl. inv Hl.
+    
     split. reflexivity.
-    { intro; intros.  inv H0.
-      - inv H4. eapply live_expr_sound. inv Hnf. eassumption.
-        unfold get_fun_vars in *. subst_exp.
-        eassumption. 
-      - eapply H2. eassumption. eassumption. } 
+
+    { intro; intros. inv H.
+      - inv H3. eapply live_expr_sound. inv Hnf. eassumption.
+        unfold get_fun_vars in *. eapply H0. eassumption.
+      - eapply H1. eassumption. eassumption. } 
+
     inv Hnf. eassumption.
+
   - inv Hl. split; eauto.
     intro; intros. inv H.
 Qed. 
@@ -421,12 +401,12 @@ Qed.
 
   
 Lemma update_live_fun_size_leq L L' b f xs S :
-  update_live_fun L f xs S = Ret (L', b) ->
+  update_live_fun L f xs S = (L', b) ->
   map_size L <= map_size L'.
 Proof.
   intros Hl.
   unfold update_live_fun in Hl.
-  destruct (get_fun_vars L f) eqn:Hf; try congruence.
+  destruct (get_fun_vars L f) eqn:Hf.
   unfold get_fun_vars in *.
   destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
   destruct diff.
@@ -435,10 +415,11 @@ Proof.
     eapply set_fun_vars_map_size with (bs := bs) in Hf. lia.
     eapply update_bs_length. eassumption.
   - inv Hl. reflexivity.
+  - inv Hl. reflexivity. 
 Qed.
 
 Lemma update_live_fun_size L L' f xs S :
-  update_live_fun L f xs S = Ret (L', true) ->
+  update_live_fun L f xs S = (L', true) ->
   map_size L < map_size L'.
 Proof.
   intros Hl.
@@ -456,12 +437,11 @@ Qed.
 
 
 Lemma live_size_leq L L' d d' B :
-  live B L d = Ret (L', d') ->
+  live B L d = (L', d') ->
   map_size L <= map_size L'.
 Proof.
   revert L L' d d'; induction B; simpl; intros L L' d d' Hl; subst.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' b] ] eqn:Heq.
-    congruence.
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' b] eqn:Heq.
     destruct b; simpl in *.
     + eapply le_trans.
       eapply update_live_fun_size_leq. 
@@ -475,13 +455,13 @@ Qed.
 
 
 Lemma live_size L L' B :
-  live B L false = Ret (L', true) ->
+  live B L false = (L', true) ->
   map_size L < map_size L'.
 Proof.
   assert (Heq : false = false) by reflexivity. revert Heq. generalize false at 1 3. 
   revert L L'; induction B; simpl; intros L L' d Heq Hl; subst.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' b]] eqn:Heq.
-    congruence.
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' b] eqn:Heq.
+
     destruct b; simpl in *.
     + eapply lt_le_trans.
       eapply update_live_fun_size. eassumption.
@@ -505,7 +485,7 @@ Proof.
   revert B L L'. induction n; intros.
   - inv H0. right. lia.
   - simpl in H0.
-    destruct (live B L false) as [ | [L1 diff] ]  eqn:Hlive; [ congruence | ].
+    destruct (live B L false) as [L1 diff]  eqn:Hlive.
     
     destruct diff.
 
@@ -568,7 +548,7 @@ Qed.
 
 
 Lemma update_live_fun_max_size L L' b f xs S :
-  update_live_fun L f xs S = Ret (L', b) ->
+  update_live_fun L f xs S = (L', b) ->
   max_map_size L' = max_map_size L.
 Proof.
   intros Hl.
@@ -587,12 +567,11 @@ Qed.
 
 
 Lemma live_max_size L L' d d' B :
-  live B L d = Ret (L', d') ->
+  live B L d = (L', d') ->
   max_map_size L' = max_map_size L.
 Proof.
   revert L L' d d'; induction B; simpl; intros L L' d d' Hl; subst.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' b] ] eqn:Heq.
-    congruence.
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' b] eqn:Heq.
     
     eapply IHB in Hl. eapply update_live_fun_max_size in Heq. congruence.
   - inv Hl. reflexivity. 
@@ -607,7 +586,7 @@ Proof.
   revert B L L'. induction n; intros.
   - inv H0. reflexivity.
   - simpl in H0.
-    destruct (live B L false) as [ | [L1 diff] ]  eqn:Hlive; [ congruence | ].
+    destruct (live B L false) as [L1 diff]  eqn:Hlive.
     
     destruct diff.
 
@@ -777,7 +756,7 @@ Qed.
 
 
 Lemma update_live_fun_dom L L' f xs S d :
-  update_live_fun L f xs S = Ret (L', d) ->
+  update_live_fun L f xs S = (L', d) ->
   Dom_map L <--> Dom_map L'.
 Proof.
   intros Hl.
@@ -791,17 +770,17 @@ Proof.
     rewrite Dom_map_set. rewrite (Union_Same_set [set f] (Dom_map L)). reflexivity.
     eapply Singleton_Included. eexists; eauto.
     
-  - inv Hl. reflexivity. 
+  - inv Hl. reflexivity.
+  - inv Hl. reflexivity.
 Qed.
 
 
 Lemma live_dom L L' d d' B :
-  live B L d = Ret (L', d') ->
+  live B L d = (L', d') ->
   Dom_map L <--> Dom_map L'.
 Proof.
   revert L L' d d'; induction B; simpl; intros L L' d d' Hl; subst.
-  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [ | [L'' b] ] eqn:Heq.
-    congruence.
+  - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' b] eqn:Heq.
     destruct b; simpl in *.
     + eapply IHB in Hl. rewrite <- Hl.
       eapply update_live_fun_dom. eassumption.
@@ -818,7 +797,7 @@ Proof.
   revert B L L'. induction n; intros.
   - inv H. reflexivity.
   - simpl in H.
-    destruct (live B L false) as [ | [L1 diff] ]  eqn:Hlive; [ congruence | ].
+    destruct (live B L false) as [L1 diff] eqn:Hlive.
     
     destruct diff.
 

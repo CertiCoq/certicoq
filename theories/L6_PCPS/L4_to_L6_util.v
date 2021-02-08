@@ -21,11 +21,99 @@ Import Monad.MonadNotation.
 
 Open Scope monad_scope.
 
+Section IP.
+
+    Context (P : expression.exp -> Prop) (P0 : exps -> Prop) (P1 : efnlst -> Prop) (P2 : branches_e -> Prop). 
+
+    Context
+      (H1 : forall n : N, P (Var_e n))
+      (H2 : forall (n : name) (e : expression.exp), P e -> P (Lam_e n e))
+      (H3: forall e : expression.exp, P e -> forall e0 : expression.exp, P e0 -> P (e $ e0))
+      (H4 : forall (d : dcon) (e : exps), P0 e -> P (Con_e d e))
+      (H5 : forall e : expression.exp, P e -> forall (pars : N) (b : branches_e), P2 b -> P (Match_e e pars b))
+      (H6 : forall (n : name) (e : expression.exp), P e -> forall e0 : expression.exp, P e0 -> P (Let_e n e e0))
+      (H7 : forall e : efnlst, P1 e -> forall n : N, P (Fix_e e n))
+      (H9 : P Prf_e)
+      (H10 : forall p : positive, P (Prim_e p))
+      (H11 : P0 enil)
+      (H12 : forall e : expression.exp, P e -> forall e0 : exps, P0 e0 -> P0 (econs e e0))
+      (H13 : P1 eflnil)
+      (H14 : forall (n : name) (e : expression.exp),
+          (forall n' e', e = Lam_e n' e' ->  P e' -> forall e0 : efnlst, P1 e0 -> P1 (eflcons n e e0)) /\          
+          (~ isLambda e -> P e -> forall e0 : efnlst, P1 e0 -> P1 (eflcons n e e0)))
+      (H15 : P2 brnil_e)
+      (H16 : forall (d : dcon) (p : N * list name) (e : expression.exp), P e -> forall b : branches_e, P2 b -> P2 (brcons_e d p e b)).
+
+    Lemma exp_ind_alt2 : forall e, P e
+    with exps_ind_alt2 : forall es, P0 es
+    with efnlst_ind_alt2 : forall fns, P1 fns
+    with branches_ind_alt2 : forall brs, P2 brs. 
+    Proof.
+      - intros. destruct e.
+        + eapply H1.
+        + eapply H2. eapply exp_ind_alt2.
+        + eapply H3; eapply exp_ind_alt2.
+        + eapply H4. eapply exps_ind_alt2.
+        + eapply H5. eapply exp_ind_alt2. eapply branches_ind_alt2.
+        + eapply H6; eapply exp_ind_alt2.
+        + eapply H7. eapply efnlst_ind_alt2.
+        + eapply H9.
+        + eapply H10.
+      - intros. destruct es.
+        + eapply H11.
+        + eapply H12. eapply exp_ind_alt2.
+          eapply exps_ind_alt2.
+      - intros. destruct fns.
+        + eapply H13.
+        + assert (Hdec : isLambda e \/ ~ isLambda e).
+          { destruct e; eauto. now left. }      
+          destruct Hdec.
+          * destruct e; try contradiction.
+            edestruct H14.
+            eapply H0. reflexivity. 
+            eapply exp_ind_alt2; eauto.
+            eapply efnlst_ind_alt2.
+          * edestruct H14.
+            eapply H8. eassumption.
+            eapply exp_ind_alt2; eauto.
+            eapply efnlst_ind_alt2.
+      - intros brs. destruct brs.
+        + eapply H15.
+        + eapply H16.
+          eapply exp_ind_alt2.
+          eapply branches_ind_alt2.
+    Qed. 
+
+
+    Lemma exp_ind_alt_2 :
+      (forall e : expression.exp, P e) /\
+      (forall e : exps, P0 e) /\
+      (forall e : efnlst, P1 e) /\
+      (forall b : branches_e, P2 b).
+    Proof.
+      repeat split.
+      eapply exp_ind_alt2.
+      eapply exps_ind_alt2.
+      eapply efnlst_ind_alt2.
+      eapply branches_ind_alt2.
+    Qed.
+    
+  End IP.
+
 Section SUBSETS.
 
   (** ** Subset lemmas *)
   Context (func_tag kon_tag default_tag : positive) (cnstrs : conId_map).
   
+
+  Lemma Setminus_Included_preserv_alt:
+    forall {A: Type} (S1 S2 S3: Ensemble A),
+      S1 \subset S2 \\ S3 -> S1 \subset S2.
+  Proof.
+    intros A S1 S2 S3 H. unfold Included in *.
+    intros x Hin. eapply H in Hin.
+    unfold Setminus in Hin. unfold In in *. destruct Hin. eassumption.
+  Qed. 
 
   Definition cps_cvt_exp_subset_stmt :=
     forall e e' k1 vars1 S1 S2,
@@ -33,42 +121,134 @@ Section SUBSETS.
       S2 \subset S1.
 
   Definition cps_cvt_exps_subset_stmt :=
-    forall e e' k1 vars1 ks vs S1 S2,
-      cps_cvt_rel_exps func_tag kon_tag default_tag S1 e vars1 ks k1 vs cnstrs S2 e' ->
+    forall e e' k1 vars1 vs ks S1 S2,
+      cps_cvt_rel_exps func_tag kon_tag default_tag S1 e vars1 k1 vs ks cnstrs S2 e' ->
       S2 \subset S1.
 
   Definition cps_cvt_efnlst_subset_stmt :=
-    forall S1 efns vars1 nlst1 S2 fdefs1,
+    forall efns S1 vars1 nlst1 S2 fdefs1,
       cps_cvt_rel_efnlst func_tag kon_tag default_tag S1 efns vars1 nlst1 cnstrs S2 fdefs1 ->
       S2 \subset S1.
 
   Definition cps_cvt_branches_subset_stmt :=
-    forall S1 bs vars1 k1 x1 S2 bs1,
+    forall bs S1 vars1 k1 x1 S2 bs1,
       cps_cvt_rel_branches func_tag kon_tag default_tag S1 bs vars1 k1 x1 cnstrs S2 bs1 ->
       S2 \subset S1.
 
   
   Definition cps_cvt_rel_subset_stmt :=
-    cps_cvt_exp_subset_stmt /\
-    cps_cvt_exps_subset_stmt /\
-    cps_cvt_efnlst_subset_stmt /\
-    cps_cvt_branches_subset_stmt.
+    (cps_cvt_exp_subset_stmt) /\
+    (cps_cvt_exps_subset_stmt) /\
+    (cps_cvt_efnlst_subset_stmt) /\
+    (cps_cvt_branches_subset_stmt).
 
+  Lemma cps_cvt_rel_subset : cps_cvt_rel_subset_stmt.
+  Proof.
+    eapply exp_ind_alt_2. 
+    - (* Var_e *)
+      intros n e' k1 vars1 S1 S2 Hrel.
+      inv Hrel. eapply Included_refl.
+      
+    - (* Lam_e *)
+      intros na e IH e' k1 vars1 S1 S2 Hrel.
+      inv Hrel. eapply IH in H10.
+      eapply Setminus_Included_preserv_alt.
+      eapply Setminus_Included_preserv_alt.
+      eapply Setminus_Included_preserv_alt.
+      eassumption.
 
-  Lemma cps_cvt_rel_subset : cps_cvt_rel_subset_stmt. 
-  Admitted. 
+    - (* App_e *)
+      intros e1 IHe1 e2 IHe2 e' k1 vars1 S1 S2 Hrel.
+      inv Hrel. eapply IHe1 in H6. eapply IHe2 in H12.
+      eapply Setminus_Included_preserv_alt in H6.
+      eapply Setminus_Included_preserv_alt in H6.
+      eapply Setminus_Included_preserv_alt in H6.
+      eapply Setminus_Included_preserv_alt in H6.
+      eapply Included_trans; eassumption.
+
+    - (* Con_e *)
+      intros dc es IH e' k1 vars1 S1 S2 Hrel.
+      inv Hrel. eapply IH in H17.
+      eapply Setminus_Included_preserv_alt in H17.
+      eapply Setminus_Included_preserv_alt in H17.
+      eapply Setminus_Included_preserv_alt in H17.
+      eapply Setminus_Included_preserv_alt in H17.
+      eapply Setminus_Included_preserv_alt in H17.
+      eassumption.
+
+    - (* Match_e *)
+      intros e IHe pars bs IHbs e' k1 vars1 S1 S2 Hrel.
+      inv Hrel. eapply IHe in H10. eapply IHbs in H11.
+      eapply Setminus_Included_preserv_alt in H10.
+      eapply Setminus_Included_preserv_alt in H10.
+      eapply Included_trans; eassumption.
+
+    - (* Let_e *)
+      intros na e1 IHe1 e2 IHe2 e' k1 vars1 S1 S2 Hrel.
+      inv Hrel. eapply IHe1 in H11. eapply IHe2 in H10.
+      eapply Setminus_Included_preserv_alt in H10.
+      eapply Setminus_Included_preserv_alt in H10.
+      eapply Included_trans; eassumption.
+
+    - (* Fix_e *)
+      intros efns IHefns n e' k1 vars1 S1 S2 Hrel.
+      inv Hrel. eapply IHefns in H5.
+      eapply Setminus_Included_preserv_alt in H5. eassumption.
+
+    - (* Prf_e *)
+      intros e' k1 vars1 S1 S2 Hrel. inv Hrel.
+      eapply Setminus_Included. 
+
+    - (* Prim_e *)
+      intros p e' k1 vars1 S1 S2 Hrel. inv Hrel.
+
+    - (* enil *)
+      unfold cps_cvt_exps_subset_stmt.
+      intros e' k1 vars vs ks S1 S2 Hrel. inv Hrel. eapply Included_refl.
+
+    - (* econs *)
+      intros e IHe es IHes e' k1 vars1 vs ks S1 S2 Hrel.
+      inv Hrel. eapply IHe in H2. eapply IHes in H10.
+      eapply Included_trans; eassumption.
+
+    - (* eflnil *)
+      intros S1 vars1 nlst1 S2 fdefs1 Hrel. inv Hrel. eapply Included_refl.
+
+    - (* eflcons *)
+      split.
+      + intros na' e' Hlam IHe' efns IHefns S1 vars1 nlst1 S2 fdefs1 Hrel.
+        inv Hrel. inv H0. eapply IHe' in H10. eapply IHefns in H11.
+        eapply Setminus_Included_preserv_alt in H10.
+        eapply Setminus_Included_preserv_alt in H10.
+        eapply Included_trans; eassumption.
+      + intros Hnot IHe efns IHefns S1 vars1 nlst1 S2 fdefs1 Hrel.
+        inv Hrel. unfold isLambda in Hnot. contradiction.  
+
+    - (* brnil *)
+      intros S1 vars1 k1 x1 S2 bs1 Hrel. inv Hrel. eapply Included_refl.
+
+    - (* brcons *)
+      intros dc p e IHe bs IHbs S1 vars1 k1 x1 S2 bs1 Hrel.
+      inv Hrel. eapply IHe in H16. eapply IHbs in H15.
+      eapply Setminus_Included_preserv_alt in H16.
+      eapply Included_trans; eassumption.
+  Qed. 
 
   
-  Corollary cps_cvt_exp_subset : cps_cvt_exp_subset_stmt.
+  Corollary cps_cvt_exp_subset :
+    cps_cvt_exp_subset_stmt.
   Proof. eapply (proj1 cps_cvt_rel_subset). Qed.
 
-  Corollary cps_cvt_exps_subset : cps_cvt_exps_subset_stmt.
+  Corollary cps_cvt_exps_subset :
+    cps_cvt_exps_subset_stmt.
   Proof. eapply (proj1 (proj2 cps_cvt_rel_subset)). Qed.
 
-  Corollary cps_cvt_efnlst_subset : cps_cvt_efnlst_subset_stmt.
+  Corollary cps_cvt_efnlst_subset :
+    cps_cvt_efnlst_subset_stmt.
   Proof. eapply (proj1 (proj2 (proj2 cps_cvt_rel_subset))). Qed.
 
-  Corollary cps_cvt_branches_subset : cps_cvt_branches_subset_stmt.
+  Corollary cps_cvt_branches_subset :
+    cps_cvt_branches_subset_stmt.
   Proof. eapply (proj2 (proj2 (proj2 cps_cvt_rel_subset))). Qed.
   
                                                           

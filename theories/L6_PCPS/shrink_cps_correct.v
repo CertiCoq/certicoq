@@ -1896,7 +1896,7 @@ Section Shrink_correct.
   Qed.
 
   Context (HcompP1 : inclusion _ (comp (P1 1) (P1 1)) (P1 1))
-          (HGPost' : inclusion _ PG (P1 1)).  
+          (HGPost' : inclusion (exp * env * fuel * trace) (comp PG PG) PG).  
 
   (* NOTE : works only for trivial postcondition. For meaningful ones we need to compose differently *)
   Lemma gr_clos_correct n e e' :  
@@ -1909,8 +1909,7 @@ Section Shrink_correct.
     induction H; intros.
     - eapply preord_exp_post_monotonic.
       eapply HcompP1. 
-      eapply preord_exp_trans; eauto. destruct (HPost 1). lia.
-      revert HGPost HcompP1. clear. now firstorder.
+      eapply preord_exp_trans; eauto.
       eapply gen_rw_correct; try eassumption.      
       intros m. eapply IHrefl_trans_closure_n.
       eapply preord_env_P_refl; eauto.

@@ -1961,16 +1961,9 @@ Section Log_rel.
 
   Section Trans.
     
-    Context (P1 P2 : PostT) (* Local *)
-            (PG  : PostGT) (* Global *)
+    Context (PG  : PostGT) (* Global *)
             (HpropG: Post_properties PG PG PG)
-            (HGPost : inclusion _ (comp P1 P2) PG)
-            (Hp1 : inclusion _ PG P1)
-            (Hp2 : inclusion _ PG P2).
-    
-    (* NOTE : the above are satisfiable only for trivial postconditons. 
-     * It seems that transitivity cannot be obtained for any relation 
-       that is not idempotent (ie R <--> R ∘ R) *)
+            (HGPost : inclusion _ (comp PG PG) PG).
     
   (** * Transitivity Properties *)
   
@@ -1991,9 +1984,9 @@ Section Log_rel.
       specialize (H2 0); contradiction.
       eapply Hyp; eauto.  
     Qed.
-
+    
     (** Expression relation is transitive *)
-    Lemma preord_exp_trans_pre (k : nat) :
+    Lemma preord_exp_trans_pre P1 P2 (k : nat) :
       (* The induction hypothesis for transitivity of
        the value relation. *)
       (forall k' v1 v2 v3,
@@ -2021,7 +2014,7 @@ Section Log_rel.
       eapply bstep_fuel_deterministic in Hstep3; [| eapply Hstep3' ]. inv Hstep3. 
       eapply preord_val_monotonic; eauto. lia.
     Qed.
-
+    
     Lemma preord_val_trans (k : nat) v1 v2 v3 :
       preord_val PG k v1 v2 ->
       (forall m, preord_val PG m v2 v3) ->
@@ -2060,16 +2053,15 @@ Section Log_rel.
         eassumption. 
         
         intros. eapply H; eauto. lia.
-        eapply preord_exp_post_monotonic; [| eapply Hpre2; eauto ].
-        intros c1 c2 HG.
-        destruct c1 as [[e rho] c1]. destruct c2 as [[e' rho'] c2].
-        eapply Hp1. now eauto.
-        intros m. specialize (H2 (m + 1)). rewrite !preord_val_eq in H2.
+
+        eapply Hpre2; eauto.
+        
+        intros m.
+        specialize (H2 (m + 1)). rewrite !preord_val_eq in H2.
         edestruct (H2 vs3 vs3) with (j := m)
           as [xs3' [e3' [rho3' [Hf3' [Hs3' Hpre3']]]]]; eauto.
         rewrite Hf3 in Hf3'. inv Hf3'. rewrite <- Hs3 in Hs3'. inv Hs3'.
-        eapply preord_exp_post_monotonic; [| eapply Hpre3'; eauto ].
-        intros c1 c2 HG. eapply Hp2; now eauto. lia. 
+        eapply Hpre3'. lia.
         eapply Forall2_refl. eapply preord_val_refl; eauto.
       - intros v1 v2 H1 H2; specialize (H2 k); rewrite !preord_val_eq in *.
         destruct v1; destruct v2; 
@@ -2091,9 +2083,10 @@ Section Log_rel.
     edestruct (H2 m) as [v''' [Hget''' Hpre''']]; eauto.
     rewrite Hget'' in Hget'''. now inv Hget'''.
   Qed.
+
   
   Corollary preord_exp_trans (k : nat) :
-    forall rho1 rho2 rho3 e1 e2 e3,
+    forall P1 P2 rho1 rho2 rho3 e1 e2 e3,
       preord_exp P1 PG k (e1, rho1) (e2, rho2) ->
       (forall m, preord_exp P2 PG m (e2, rho2) (e3, rho3)) ->
       preord_exp (comp P1 P2) PG k (e1, rho1) (e3, rho3).
@@ -2101,9 +2094,8 @@ Section Log_rel.
     intros. eapply preord_exp_trans_pre; eauto.
     intros. eapply preord_val_trans; eauto.
   Qed.
-
-  Context  (Hprops : Post_properties P1 P1 PG).
-
+  
+  Context (P1 : PostT) (Hprops : Post_properties P1 P1 PG).
 
   Lemma preord_env_P_def_funs_pre' k (S1 : var -> Prop) B B' rho1 rho2 :
     preord_env_P PG (S1 \\ name_in_fundefs B) k rho1 rho2 ->

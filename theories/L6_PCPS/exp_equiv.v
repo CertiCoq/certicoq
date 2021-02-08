@@ -44,8 +44,9 @@ Section LogRelEquiv.
       eapply preord_env_P_refl. eassumption.
   Qed. 
 
-  Context (Hincl : inclusion _ (comp Post Post) PostG)
-          (HinclG : inclusion _ PostG Post).
+  Context (Hincl : inclusion _ (comp PostG PostG) PostG)
+          (HinclG1 : inclusion _ PostG Post)
+          (HinclG2 : inclusion _ Post PostG).
 
   
   (* TODO move. + inclusion_refl in rel_comp.v *)
@@ -59,29 +60,53 @@ Section LogRelEquiv.
   Proof.
     constructor; destruct x, y, z; intros k.
     - eapply preord_exp_post_monotonic.
-      
+       
       eapply inclusion_trans. eapply Hincl. eassumption. 
       
       inv H. inv H0.
       eapply preord_exp_trans; eauto.
+      eapply preord_exp_post_monotonic; eauto.
+      intros. 
+      eapply preord_exp_post_monotonic; eauto.
+      
     - eapply preord_exp_post_monotonic.
       
       eapply inclusion_trans. eapply Hincl. eassumption. 
       
       inv H. inv H0.
       eapply preord_exp_trans; eauto.
+      eapply preord_exp_post_monotonic; eauto.
+      intros. 
+      eapply preord_exp_post_monotonic; eauto.
+
   Qed.
   
 
-  Global Instance equiv_exp_Symmetric : Symmetric equiv_exp.
+  Global Instance equiv_exp_PreOrder : PreOrder equiv_exp.
+  Proof. constructor; tci. Qed.
+  
+
+  Example rewrite_exp_equiv p1 p2 p3 :
+    equiv_exp p2 p1 -> equiv_exp p2 p3.
+  Proof.
+    intros H. rewrite H.
+  Abort.
+
+  Example rewrite_exp_equiv p1 p2 p3 :
+    equiv_exp p2 p1 -> equiv_exp p2 p3.
+  Proof.
+    intros H. rewrite H.
+  Abort.
+
+    Global Instance equiv_exp_Symmetric : Symmetric equiv_exp.
   Proof.
     constructor; destruct x, y; intros k; inv H; eauto.
   Qed.
-  
+
+
 
   Global Instance equiv_exp_Equivalence : Equivalence equiv_exp.
   Proof. constructor; tci. Qed.
-
 
   Example rewrite_exp_equiv p1 p2 p3 :
     equiv_exp p1 p2 -> equiv_exp p2 p3.
@@ -90,3 +115,4 @@ Section LogRelEquiv.
   Abort.
 
 End LogRelEquiv.
+

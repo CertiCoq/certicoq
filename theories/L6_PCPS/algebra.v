@@ -99,7 +99,7 @@ Definition exp_ctx_to_fin (C: exp_ctx) : fin :=
   | Efun1_c _ _ => Five
   | Efun2_c _ _ => Five
   | Eprim_c _ _ _ _ => Six
-  | Hole_c => One (* we should never use this function on exmpty contexts *)
+  | Hole_c => One (* we should never use this function on empty contexts *)
   end.
 
 

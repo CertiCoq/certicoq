@@ -36,7 +36,6 @@ Qed.
 Definition env := list value.
 
 
-
 (* make_rec_env definitions and lemmas *)
 Definition make_rec_env (fnlst : efnlst) (rho : env) : env :=
   let fix make_env_aux funcs n :=
@@ -612,8 +611,8 @@ Proof.
 Qed. 
 
 Lemma nth_inlist_Forall A (P : A -> Prop) :
-  forall l n default,
-    lt (N.to_nat n) (List.length l) -> 
+  forall (l : list A) (n : N) (default : A),
+    Nat.lt (N.to_nat n) (List.length l) -> 
     Forall P l ->
     P (nth (N.to_nat n) l default).
 Proof.
@@ -630,7 +629,7 @@ Proof.
     rewrite Heq. eapply IHl.
     inv Hl. eassumption.
     inversion Hn. rewrite <- Hnat. try (zify; omega).
-    rewrite <- Heq. subst. omega.
+    rewrite <- Heq. subst. zify. omega.
 Qed. 
 
 Lemma make_rec_env_exists fnlst rho n : 
@@ -981,7 +980,7 @@ Qed.
 
 Lemma N2Nat_inj_lt :
    forall n1 n2,
-     n1 < n2 <-> lt (N.to_nat n1) (N.to_nat n2).
+     n1 < n2 <-> Nat.lt (N.to_nat n1) (N.to_nat n2).
 Proof.
   intros n1 n2. split.
   - intros H. destruct n1; destruct n2.
@@ -990,7 +989,7 @@ Proof.
     + inv H.
     + zify. omega.
   - intros H. destruct n1; destruct n2.
-    + omega.
+    + zify. omega.
     + zify. omega.
     + inv H.
     + zify. omega. 
@@ -1595,16 +1594,16 @@ Qed.
 
 Lemma len_cons_lt:
       forall n (e : exp) l,
-        lt (S n) (List.length ((e::nil) ++ l)) -> lt n (List.length l).
+        Nat.lt (S n) (List.length ((e::nil) ++ l)) -> Nat.lt n (List.length l).
 Proof.
   intros n e l H.
-  simpl in H. omega.
+  simpl in H. zify. omega.
 Qed. 
 
 (* NLength uses N.of_nat *)
 Lemma nth_inlist_is_value :
   forall l n default,
-    lt (N.to_nat n) (List.length l) -> 
+    Nat.lt (N.to_nat n) (List.length l) -> 
     Forall is_value_env l ->
     is_value_env (nth (N.to_nat n) l default).
 Proof.
@@ -1621,7 +1620,7 @@ Proof.
     rewrite Heq. eapply IHl.
     inv Hl. eassumption.
     inversion Hn. rewrite <- Hnat. try (zify; omega).
-    rewrite <- Heq. omega.
+    rewrite <- Heq. zify; omega.
 Qed. 
 
 
@@ -1796,7 +1795,7 @@ Lemma not_default_then_nth:
   forall (n: N) (l : list exp) default val,
   nth (N.to_nat n) l default = val ->
   val <> default ->
-  lt (N.to_nat n) (List.length l).
+  Nat.lt (N.to_nat n) (List.length l).
 Proof.
   intros n l default val H H1.
   generalize dependent n.
@@ -1804,7 +1803,7 @@ Proof.
   - simpl in *. destruct (N.to_nat n).
     unfold not in H1. symmetry in Hn. apply H1 in Hn. destruct Hn.
     unfold not in H1. symmetry in Hn. apply H1 in Hn. destruct Hn.
-  - simpl in *. destruct (N.to_nat n). omega.
+  - simpl in *. destruct (N.to_nat n). zify. omega.
     eapply lt_n_S. 
     specialize IHl with (N.of_nat n0).
     rewrite (Nnat.Nat2N.id n0) in IHl.

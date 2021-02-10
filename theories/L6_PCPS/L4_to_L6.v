@@ -268,16 +268,9 @@ Section Translate.
       | Con_e dci es =>
         let c_tag := dcon_to_tag dci tgm in
         x' <- get_named_str "x'"%string ;;
-        k' <- get_named_str "k'"%string ;;
-        vx <- get_named_str_lst (map (fun _ => "x") (exps_as_list es)) ;;
         xs <- get_named_str_lst (map (fun _ => "x") (exps_as_list es)) ;;
         ks <- get_named_str_lst (map (fun _ => "k") (exps_as_list es)) ;;
-        e' <- cps_cvt_exps es vn (Eapp k' kon_tag xs) xs ks tgm;;
-        ret (Efun
-               (Fcons k' kon_tag vx
-                      (Econstr x' c_tag vx
-                               (Eapp k kon_tag (x'::nil))) Fnil)
-               e')
+        cps_cvt_exps es vn (Econstr x' c_tag xs (Eapp k kon_tag (x'::nil))) xs ks tgm
 
       | Fix_e fnlst i =>
         let names_lst :=  fnames fnlst in
@@ -371,7 +364,7 @@ Section Translate.
              (Fcons f kon_tag (k::nil) e'
                     (Fcons k kon_tag (x::nil) (Ehalt x) Fnil))
              (cps.Eapp f kon_tag (k::nil))). 
-
+    
 
     Definition convert_top (ee:ienv * expression.exp) : error cps.exp * comp_data :=
       let '(_, cenv, ctag, itag, dcm) := convert_env (fst ee) in
@@ -441,8 +434,6 @@ Section Translate.
         c_tag = dcon_to_tag dci tgm ->
 
         x1 \in S1 ->
-        k1 \in (S1 \\ [set x1]) ->
-        FromList vx \subset (S1 \\ [set x1] \\ [set k1]) ->
         FromList xs \subset (S1 \\ [set x1] \\ [set k1] \\ FromList vx) ->
         FromList ks \subset (S1 \\ [set x1] \\ [set k1] \\ FromList vx \\ FromList xs) ->
                
@@ -451,17 +442,14 @@ Section Translate.
         NoDup xs ->
         NoDup ks -> 
         cps_cvt_rel_exps (S1 \\ [set x1] \\ [set k1] \\ FromList vx \\ FromList xs \\ FromList ks) 
-                         es vn (Eapp k1 kon_tag xs) xs ks tgm S2 e' ->
+                         es vn (Econstr x1 c_tag xs (Eapp k kon_tag [x1])) xs ks tgm S2 e' ->
         cps_cvt_rel S1
                     (Con_e dci es)
                     vn
                     k
                     tgm
                     S2
-                    (Efun (Fcons k1 kon_tag vx
-                                 (Econstr x1 c_tag vx
-                                          (Eapp k kon_tag [x1])) Fnil)
-                          e')
+                    e'
   | e_Let :
       forall S1 S2 S3 na e1 e1' e2 e2' x1 vn k k1 tgm,
         x1 \in S1 ->

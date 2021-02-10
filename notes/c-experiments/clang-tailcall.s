@@ -178,6 +178,40 @@ j16:                                    # @j16
 	.size	j16, .Ltmp27-j16
 	.cfi_endproc
 
+	.globl	h8
+	.align	16, 0x90
+	.type	h8,@function
+h8:                                     # @h8
+	.cfi_startproc
+# BB#0:
+	movq	%rdx, %rax
+	movq	%rdi, %rdx
+	movq	%rsi, %rdi
+	movq	%rdx, %rsi
+	movq	%rcx, %rdx
+	movq	%rax, %rcx
+	jmp	f8                      # TAILCALL
+.Ltmp28:
+	.size	h8, .Ltmp28-h8
+	.cfi_endproc
+
+	.globl	h12
+	.align	16, 0x90
+	.type	h12,@function
+h12:                                    # @h12
+	.cfi_startproc
+# BB#0:
+	movq	%rdx, %rax
+	movq	%rdi, %rdx
+	movq	%rsi, %rdi
+	movq	%rdx, %rsi
+	movq	%rcx, %rdx
+	movq	%rax, %rcx
+	jmp	f12                     # TAILCALL
+.Ltmp29:
+	.size	h12, .Ltmp29-h12
+	.cfi_endproc
+
 
 	.ident	"clang version 3.4.2 (tags/RELEASE_34/dot2-final)"
 	.section	".note.GNU-stack","",@progbits

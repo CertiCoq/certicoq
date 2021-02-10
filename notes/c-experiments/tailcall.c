@@ -1,7 +1,9 @@
 #include <stddef.h>
 
 extern size_t f4(size_t, size_t, size_t, size_t);
+extern size_t f6(size_t, size_t, size_t, size_t, size_t, size_t);
 extern size_t f8(size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t);
+extern size_t f12(size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t);
 extern size_t f16(size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t, size_t);
 
 // Tail calls from n-argument functions to m-argument functions tested
@@ -58,5 +60,31 @@ size_t j16(size_t a, size_t b, size_t c, size_t d,
 //     I don't actually understand why it's not necessary to pop the stack.
 //clang: ditto
 //ccomp: 30 loads, stores, and moves; two instructions to adjust stack;
-       then jump.  Adequate.
+//       then jump.  Adequate.
 }
+
+size_t h6(size_t a, size_t b, size_t c, size_t d,
+	   size_t e, size_t f) {
+  return f6(b,a,d,c, e,f);
+// gcc: 
+//clang:
+//ccomp: 6 moves, 3 other stack-fiddling instructions, jmp.  Adequate
+}
+
+size_t h8(size_t a, size_t b, size_t c, size_t d,
+	   size_t e, size_t f, size_t g, size_t h) {
+  return f8(b,a,d,c, e,f,g,h);
+// gcc: 
+//clang: 6 moves, then jmp.
+//ccomp: call-and-return with 24-byte stack frame. No tail-call opt.
+}
+
+size_t h12(size_t a, size_t b, size_t c, size_t d,
+	   size_t e, size_t f, size_t g, size_t h,
+	   size_t i, size_t j, size_t k, size_t l) {
+  return f12(b,a,d,c, e,f,g,h,i,j,k,l);
+// gcc: 6 moves, then jmp.
+//clang:
+//ccomp: call-and-return with 88-byte stack frame. No tail-call opt.
+}
+

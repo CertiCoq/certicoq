@@ -42,7 +42,7 @@ Variable (body_id : ident).
 Variable (thread_info_id : ident).
 Variable (tinfo_id : ident).
 Variable (heap_info_id : ident).
-Variable (numArgs_id : ident).
+Variable (num_args_id : ident).
 Variable (isptr_id : ident). (* ident for the is_ptr external function *)
 Variable (case_id : ident). (* ident for the case variable, TODO: generate that automatically and only when needed *)
 
@@ -106,7 +106,7 @@ Fixpoint compute_fun_env_fds fnd fenv :=
 (* fun_env maps tags to function info *)
 Definition compute_fun_env : exp -> fun_env := compute_fun_env' (M.empty _).
 
-(* A list of variable names in e that refer to offsets in the args array. *)
+(* A list of variable names bound in e. *)
 Fixpoint get_allocs (e : exp) : list var :=
   match e with
   | Econstr x t vs e' => x :: get_allocs e'
@@ -197,7 +197,8 @@ Definition compute_ind_env (cenv : ctor_env) : n_ind_env :=
 Inductive ctor_rep : Type :=
 (* [enum t] represents a constructor with no parameters with ordinal [t] *)
 | enum : N -> ctor_rep
-(* [boxed t a] represents a construct with arity [a] and ordinal [t]  *)
+(* [boxed t a] represents a construct with arity [a] and ordinal [t].
+   Assume t<256. *)
 | boxed : N -> N -> ctor_rep.
 
 (* The type of the thread info struct and a pointer to it *)
@@ -353,12 +354,9 @@ Section CODEGEN.
        ctor_arity 
        ctor_ordinal *)
 Variable (cenv : ctor_env). 
-(*
-(* ind_tag i ↦ (name of inductive with tag i, ctor_ty_infos for each constructor) *)
-Variable (ienv : n_ind_env). *)
 (* fun_tag t ↦ (n, [0; ..; n-1]) where n = arity of the function with tag t *)
 Variable (fenv : fun_env).
-(* function name f ↦ (fun_info TODO, f's fun_tag) *)
+(* function name f ↦ (the name of f's fun_info, f's fun_tag) *)
 Variable (fienv : fun_info_env). 
 
 Definition make_ctor_rep (ct : ctor_tag) : option ctor_rep :=
@@ -435,7 +433,6 @@ Definition make_var (x : ident) : expr :=
 Fixpoint asgn_constr' (x : ident) (cur : nat) (vs : list ident) : statement :=
   match vs with
   | nil => (* should be unreachable *) Sskip
-  (* TODO: Why isn't the cast necessary in the case where v is a function? *)
   | v :: nil => Field(var x, Z.of_nat cur) :::= (*[val]*) make_var v
   | v :: vs =>
     Field(var x, Z.of_nat cur) :::= (*[val]*) make_var v ;;;
@@ -558,9 +555,7 @@ Fixpoint index_of {A} (eq : A -> A -> bool) (l : list A) (x : A) : option nat :=
 
 (* remove_app_vars myvs vs myind ind =
       if
-        |myvs| = |myind|
         |vs| = |ind|
-        zip myvs myind ⊆ zip vs ind
       then
         Some (unzip (zip vs ind \ zip myvs myind))
       else
@@ -626,7 +621,10 @@ Definition reserve (fi : ident) (l : Z) (vs : list ident) (ind : list N) : optio
     Sifthenelse
       (* If fi[0] > limit-alloc (i.e., there might not be enough space left on the heap), *)
       (!(Ebinop Ole (Ederef arr uval) (limit_ptr -' alloc_ptr) type_bool))
-      ((* Store the arguments that were passed in registers into the args array *)
+      ((* Store the arguments that were passed in registers into the args array 
+          TODO: Technically, isn't this unnecessary? 
+          When executing function calls, we store every argument in the args array.
+          (See Eapp case of translate_body, below.) *)
        bef ;;;
        (* Invoke the gc *)
        Scall None gc (arr :: tinf :: nil) ;;;
@@ -637,7 +635,6 @@ Definition reserve (fi : ident) (l : Z) (vs : list ident) (ind : list N) : optio
        aft)
       Sskip).
 
-(*
 (* Like reserve, but instead of reading from a local copy of alloc and limit,
    read from tinfo->alloc and tinfo->limit. *)
 Definition reserve' (fi : ident) (l : Z) (vs : list ident) (ind : list N) : option statement :=
@@ -651,7 +648,6 @@ Definition reserve' (fi : ident) (l : Z) (vs : list ident) (ind : list N) : opti
       (!(Ebinop Ole (Ederef arr uval) (limitF -' allocF) type_bool))
       (bef ;;; Scall None gc (arr :: tinf :: nil) ;;; aft)
       Sskip).
-*)
 
 (* x = scrutinee; ls = boxed cases; ls' = unboxed cases *)
 Definition make_case_switch (x : ident) (ls ls' : labeled_statements) : statement :=
@@ -680,41 +676,18 @@ Fixpoint translate_body (e : exp) : option statement :=
            | Some (boxed t a) =>
              match ls with
              | LSnil => ret (LScons None (rest ;;; Sbreak) ls, ls')
-             | LScons _ _ _ =>
-               (* TODO: Z.land tag 255 is just Z.land (Z.of_N t) 255 right? *)
-               let tag := (Z.shiftl (Z.of_N a) 10 + Z.of_N t)%Z in
-               ret (LScons (Some (Z.land tag 255)) (rest ;;; Sbreak) ls, ls')
+             | LScons _ _ _ => ret (LScons (Some (Z.of_N t)) (rest ;;; Sbreak) ls, ls')
              end
            | Some (enum t) =>
              match ls' with
              | LSnil => ret (ls, LScons None (rest ;;; Sbreak) ls')
-             | LScons _ _ _ =>
-               (* TODO: Z.shiftr tag 1 = Z.of_N t *)
-               let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
-               ret (ls, LScons (Some (Z.shiftr tag 1)) (rest ;;; Sbreak) ls')
+             | LScons _ _ _ => ret (ls, LScons (Some (Z.of_N t)) (rest ;;; Sbreak) ls')
              end
            | None => None
            end
          end) cs ;;
     ret (make_case_switch x ls ls')
-  | Eletapp x f t vs e =>
-    (* TODO: Should this case even be handled? Since there's no shadow
-       stack in this version of the code generator, we can't properly
-       manage memory of programs that use letapp anyway. *)
-    prog <- translate_body e ;;
-    '(arity, indices) <- M.get t fenv ;;
-    asgn <- asgn_app_vars vs indices ;;
-    let vv := make_var f in
-    let pnum := min (N.to_nat arity) n_param in
-    c <- mk_call ([Tpointer (mk_fun_ty pnum) noattr] vv) pnum vs ;;
-    ret (
-      asgn ;;;
-      Efield tinfd alloc_id valPtr :::= alloc_ptr ;;;
-      Efield tinfd limit_id valPtr :::= limit_ptr ;;;
-      c ;;;
-      alloc_id ::= Efield tinfd alloc_id valPtr ;;;
-      x ::= Field(args, Z.of_nat 1) ;;;
-      prog)
+  | Eletapp x f t vs e => None
   | Eproj x t n v e =>
     prog <- translate_body e ;;
     ret (x ::= Field(var v, Z.of_N n) ;;; prog)
@@ -763,18 +736,12 @@ Fixpoint translate_body_fast (e : exp) (myvs : list ident) (myind : list N) : op
            | Some (boxed t a) =>
              match ls with
              | LSnil => ret (LScons None (rest ;;; Sbreak) ls, ls')
-             | LScons _ _ _ =>
-               (* TODO: extra tag computation *)
-               let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
-               ret (LScons (Some (Z.land tag 255)) (rest ;;; Sbreak) ls, ls')
+             | LScons _ _ _ => ret (LScons (Some (Z.of_N t)) (rest ;;; Sbreak) ls, ls')
              end
            | Some (enum t) =>
              match ls' with
              | LSnil => ret (ls, LScons None (rest ;;; Sbreak) ls')
-             | LScons _ _ _ =>
-               (* TODO: extra tag computation *)
-               let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
-               ret (ls, LScons (Some (Z.shiftr tag 1)) (rest ;;; Sbreak) ls')
+             | LScons _ _ _ => ret (ls, LScons (Some (Z.of_N t)) (rest ;;; Sbreak) ls')
              end
            | None => None
            end
@@ -842,29 +809,34 @@ Definition mk_fun (vs : list ident) (loc : list ident) (body : statement) : func
     nil
     body.
 
+(* Translate f(xs) = e into Clight function implementing e *)
+Definition translate_fundef f t vs e : option function :=
+  '(arity, indices) <- M.get t fenv ;;
+  '(fun_info, _) <- M.get f fienv ;;
+  reserve_space <- reserve fun_info (Z.of_N (arity + 2)) vs indices ;;
+  asgn <- asgn_fun_vars vs indices ;;
+  body <- translate_body e ;;
+  let body :=
+    (* Make local copies of tinfo->alloc, tinfo->limit, tinfo->args *)
+    alloc_id ::= Efield tinfd alloc_id valPtr ;;;
+    limit_id ::= Efield tinfd limit_id valPtr ;;;
+    args_id ::= Efield tinfd args_id (Tarray uval max_args noattr);;;
+    (* Make sure there's enough space; invoke gc if necessary *)
+    reserve_space ;;;
+    (* Load arguments from the args array *)
+    asgn ;;;
+    body
+  in
+  ret (mk_fun vs (get_allocs e) body).
+
 (* Translate each f(xs) = e ∈ fnd into (f, Clight function implementing e) *)
 Fixpoint translate_fundefs (fnd : fundefs) : option (list (ident * globdef Clight.fundef type)) :=
   match fnd with
   | Fnil => ret nil
   | Fcons f t vs e fnd' =>
-    '(arity, indices) <- M.get t fenv ;;
-    '(fun_info, _) <- M.get f fienv ;;
-    reserve_space <- reserve fun_info (Z.of_N (arity + 2)) vs indices ;;
-    asgn <- asgn_fun_vars vs indices ;;
-    body <- translate_body e ;;
-    let body :=
-      (* Make local copies of tinfo->alloc, tinfo->limit, tinfo->args *)
-      alloc_id ::= Efield tinfd alloc_id valPtr ;;;
-      limit_id ::= Efield tinfd limit_id valPtr ;;;
-      args_id ::= Efield tinfd args_id (Tarray uval max_args noattr);;;
-      (* Make sure there's enough space; invoke gc if necessary *)
-      reserve_space ;;;
-      (* Load arguments from the args array *)
-      asgn ;;;
-      body
-    in
+    fn <- translate_fundef f t vs e ;;
     rest <- translate_fundefs fnd' ;;
-    ret ((f, Gfun (Internal (mk_fun vs (get_allocs e) body))) :: rest)
+    ret ((f, Gfun (Internal fn)) :: rest)
   end.
 
 (* Like translate_fundefs, but use translate_body_fast (myvs:=vs) (myind:=indices) *)
@@ -885,7 +857,7 @@ Fixpoint translate_fundefs_fast (fnd : fundefs) : option (list (ident * globdef 
       asgn ;;;
       body
     in
-    rest <- translate_fundefs fnd' ;;
+    rest <- translate_fundefs_fast fnd' ;;
     ret ((f, Gfun (Internal (mk_fun vs (get_allocs e) body))) :: rest)
   end.
 
@@ -1176,7 +1148,7 @@ Definition add_inf_vars (nenv : name_env) : name_env :=
   M.set tinfo_id (nNamed "tinfo"%string) (
   M.set heap_info_id (nNamed "heap"%string) (
   M.set case_id (nNamed "arg"%string) (
-  M.set numArgs_id (nNamed "num_args"%string) nenv))))))))))).
+  M.set num_args_id (nNamed "num_args"%string) nenv))))))))))).
 
 Definition ensure_unique (l : M.t name) : M.t name :=
   M.map
@@ -1210,7 +1182,7 @@ Fixpoint make_arg_list' (n : nat) (nenv : name_env) : nState (name_env * list (i
     ret (nenv, (new_id, val) :: rest_id)
   end.
 
-Fixpoint make_arg_list (n:nat) (nenv:name_env) : nState (name_env * list (ident * type)) :=
+Definition make_arg_list (n:nat) (nenv:name_env) : nState (name_env * list (ident * type)) :=
   '(nenv, rest_l) <- make_arg_list' n nenv;;
   ret (nenv, rev rest_l).
 
@@ -1275,7 +1247,7 @@ Notation char_ptr_ty := (Tpointer tschar noattr).
 Notation name_ty := (Tpointer char_ptr_ty noattr).
 Notation arity_ty := (Tpointer val noattr).
 
-Fixpoint make_elim_asgn (argv:ident) (val_id:ident) (arr:nat): statement :=
+Definition make_elim_asgn (argv:ident) (val_id:ident) (arr:nat): statement :=
   let argv_proj := make_proj (var argv) 0%nat arr in
   let val_proj := make_proj (var val_id) 0%nat arr in
   make_asgn argv_proj val_proj.
@@ -1594,11 +1566,7 @@ Definition make_header
   ret (Some (nenv, (halt_f :: (halt_clo_id, halt_clo_def) ::
                    (tinfo_id, tinf_def) ::
                    call_0 :: call_1 :: call_2 :: call_3 :: nil))).
-
-
-
 (* end of header file *)
-Require Import L6.cps_show.
 
 Definition compile (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
   exceptionMonad.exception (M.t BasicAst.name * option Clight.program * option Clight.program) :=

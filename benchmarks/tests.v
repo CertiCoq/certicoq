@@ -6,19 +6,6 @@ Require Import CertiCoq.Benchmarks.lib.sha256.
 
 From CertiCoq.Plugin Require Import CertiCoq.
 
-Definition anf_test :=
-  let fix slow_id n := match n with 0 => 0 | S n => S (slow_id n) end in
-  let x := 0 in
-  let y := slow_id x in
-  let z := slow_id x in
-  let w := slow_id x in
-  w.
-
-CertiCoq -help.
-CertiCoq Compile -args 1 anf_test.
-
-Definition demo1 := List.app (List.repeat true 500) (List.repeat false 300).
-
 Open Scope string.
 
 Import ListNotations.

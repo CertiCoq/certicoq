@@ -253,8 +253,7 @@ Definition mk_prim_ty (n : nat) :=
 Notation make_tinfo_ty :=
   (Tfunction Tnil threadInf cc_default).
 
-(* val *export();
-   TODO: The type of an exported program? *)
+(* val *export(struct thread_info *ti); *)
 Notation export_ty :=
   (Tfunction (Tcons threadInf Tnil) val_ptr cc_default).
 
@@ -265,11 +264,11 @@ Notation limit_ptr := (Etempvar limit_id val_ptr).
 Notation args := (Etempvar args_id val_ptr).
 Notation gc := (Evar gc_id gc_ty).
 
-(* changed tinf to be tempvar and have type Tstruct rather than Tptr Tstruct *)
-Notation tinf := (Etempvar tinfo_id threadInf).
-Notation tinfd := (Ederef tinf threadStructInf).
+(* changed tinfo to be tempvar and have type Tstruct rather than Tptr Tstruct *)
+Notation tinfo := (Etempvar tinfo_id threadInf).
+Notation tinfd := (Ederef tinfo threadStructInf).
 
-Notation heapInf := (Tstruct heap_info_id noattr).
+(* Notation heapInf := (Tstruct heap_info_id noattr). *)
 
 Definition add (a b : expr) := Ebinop Oadd a b val_ptr.
 Notation " a '+'' b " := (add a b) (at level 30).
@@ -312,7 +311,7 @@ Notation "'args[' n ']'" :=
 (* Stack-related ids *)
 Variable (stackframe_ty_id : ident). (* the stack_frame type *)
 Variable (frame_id : ident). (* the stack frame of the current function *)
-Variable (root_id : ident). (* live roots array *)
+Variable (root_id : ident). (* live root array *)
 Variable (fp_id : ident). (* frame pointer, part of thread_info *)
 (* Fields of stack_frame struct *)
 Variable (next_fld : ident).
@@ -329,22 +328,22 @@ Definition root_ty size := Tarray val size noattr.
 Definition root_ty_ptr := val_ptr.
 
 (* local vars declared when a function uses the stack *)
-(* struct stack_frame frame; val roots[MAX_LOCS]; *)
+(* struct stack_frame frame; val root[MAX_LOCS]; *)
 Definition stack_decl size : list (ident * type)  :=
   (frame_id, stackframe_ty) :: (* local variable for local stack frame *)
   (root_id, root_ty size) :: nil. (* local variable for the live array *)
 
-(* Notation for handling the roots array *)
-Notation roots := (Etempvar root_id val_ptr).
-Notation "'roots[' n ']'" := ( *(add roots (c_int n%Z val))) (at level 36).
+(* Notation for handling the root array *)
+Notation root := (Etempvar root_id val_ptr).
+Notation "'root[' n ']'" := ( *(add root (c_int n%Z val))) (at level 36).
 
 Notation frame := (Evar frame_id stackframe_ty).
 
 (* Initialize local stack frame. Called before the first function call that uses the current stack *)
 Definition init_stack : statement :=
-  (* frame.next = roots; *)
+  (* frame.next = root; *)
   (Efield frame next_fld val_ptr :::= Evar root_id root_ty_ptr);
-  (* frame.roots = roots; *)
+  (* frame.root = root; *)
   (Efield frame root_fld root_ty_ptr :::= Evar root_id root_ty_ptr);
   (* frame.prev = tinf->fp; *)
   (Efield frame prev_fld stackframe_ty_ptr :::= Efield tinfd fp_id stackframe_ty_ptr).
@@ -360,7 +359,7 @@ Definition set_stack (sp : N) (b : bool) : statement :=
 Definition update_stack (sp : N) : statement :=
   if (sp =? 0)%N then Sskip else 
   (* frame.next = root + SP *)
-  (Efield frame next_fld val_ptr :::= (add roots (c_int (Z.of_N sp) val))).
+  (Efield frame next_fld val_ptr :::= (add root (c_int (Z.of_N sp) val))).
 
 (* Resets the frame pointer after a call, so that if subsequent calls don't use the stack the empty frame is not pushed. *)
 (* b is true if it's a call to the GC after a normal call, so the stack will be reset anyway *)
@@ -371,28 +370,42 @@ Definition reset_stack (sp : N) (b : bool) : statement :=
 
 (* Pushes single var in frame *)
 Definition push_var (sp : N) (x : ident) :=
-  roots[ Z.of_N sp ] :::= Evar x val_ptr.
+  root[ Z.of_N sp ] :::= Evar x val_ptr.
 
 (* Pops single var from frame *)
 Definition pop_var (sp : N) (x : ident) := 
-  x ::= roots[ Z.of_N sp ].
+  x ::= root[ Z.of_N sp ].
 
 Definition push_live_vars_offset (off : N) (xs : list ident) : statement * N :=
   (fix aux xs (n : N) (stmt : statement) : statement * N :=
      match xs with
      | nil => (stmt, n)
-     | x :: xs => aux xs (n+1)%N (push_var n x; stmt)
+     | x :: xs => aux xs (n+1)%N (root[ Z.of_N n ] :::= Evar x val_ptr (* TODO: cast? *); stmt)
      end) xs off Sskip.
 
 Definition pop_live_vars_offset (off : N) (xs : list ident) : statement :=
   (fix aux xs n stmt : statement :=
      match xs with
      | nil => stmt
-     | x :: xs => aux xs (n+1)%N (pop_var n x; stmt)
+     | x :: xs => aux xs (n+1)%N (x ::= root[ Z.of_N n ] (* TODO: cast? *); stmt)
      end) xs off Sskip.
 
+(* push_live_vars [x; y; ..] =
+             .
+             .
+     root[1] = y;
+     root[0] = x;
+     /*skip*/
+*)
 Definition push_live_vars (xs : list ident) : statement * N := push_live_vars_offset 0%N xs.
 
+(* pop_live_vars [x; y; ..] =
+       .
+       .
+     y = root[1];
+     x = root[0];
+     /*skip*/
+*)
 Definition pop_live_vars (xs : list ident) : statement := pop_live_vars_offset 0%N xs. 
 
 (** * Shadow stack defs END *)
@@ -451,29 +464,29 @@ Definition mk_var (x : ident) :=
   | None => var x
   end.
 
-(* asgn_constr_boxed x cur vs =
-            x[cur] = vs[0];
-        x[cur + 1] = vs[1];
+(* asgn_constr_boxed x n vs =
+            x[n] = vs[0];
+        x[n + 1] = vs[1];
                    .
                    .
-     x[cur + |vs|] = vs[|vs| - 1] 
+     x[n + |vs|] = vs[|vs| - 1] 
 
    Assumes |vs|>0. *)
-Fixpoint asgn_constr_boxed (x : ident) (cur : nat) (vs : list ident) : statement :=
+Fixpoint asgn_constr_boxed (x : ident) (n : nat) (vs : list ident) : statement :=
   match vs with
   | nil => (* shouldn't be reached *) Sskip
-  | v :: nil => Field(var x, Z.of_nat cur) :::= (*[val]*) mk_var v
+  | v :: nil => Field(var x, Z.of_nat n) :::= mk_var v
   | cons v vs' =>
-    Field(var x, Z.of_nat cur) :::= (*[val]*) mk_var v;
-    asgn_constr_boxed x (cur+1) vs'
+    Field(var x, Z.of_nat n) :::= mk_var v;
+    asgn_constr_boxed x (n+1) vs'
   end.
 
 (* asgn_constr x c vs = 
      code to set x to (Constr c vs)
      if boxed (i.e., |vs|>0), x is a heap pointer. *)
-Definition asgn_constr (x : ident) (t : ctor_tag) (vs : list ident) :=
-  tag <- make_tag t ;;
-  rep <- find_ctor_rep t ;;
+Definition asgn_constr (x : ident) (c : ctor_tag) (vs : list ident) :=
+  tag <- make_tag c ;;
+  rep <- find_ctor_rep c ;;
   match rep with
   | enum _ => ret (x ::= tag)
   | boxed _ a =>
@@ -484,29 +497,17 @@ Definition asgn_constr (x : ident) (t : ctor_tag) (vs : list ident) :=
   end.
 
 (* Zoe: inlining the isptr function to avoid extra function call in C *)
-Definition isptr (retId : ident) (v : ident) : expr :=
+Definition isptr (v : ident) : expr :=
   Ebinop Oeq (Ebinop Oand (Evar v val) (Econst_int Int.one int_ty) bool_ty)
          (Econst_int Int.zero int_ty) bool_ty.
 
-(* mk_call_vars n vs = Some (map make_var vs) if n = |vs| else None *)
-Fixpoint mk_call_vars (n : nat) (vs : list ident) : error (list expr) :=
-  match n, vs with
-  | 0, nil => ret nil
-  | S n, cons v vs' =>
-    rest <- mk_call_vars n vs' ;;
-    ret (mk_var v :: rest)
-  | _, _ => Err "mk_call_vars: n != |vs|"
-  end.
+(* mk_call loc f vs = (loc = f(tinfo, first n variables in vs..)) *)
+Definition mk_call (loc : option ident) (f : expr) (vs : list ident) : statement :=
+  Scall loc f (tinfo :: map mk_var (firstn n_param vs)).
 
-(* mk_call f n vs = Some (f(tinfo, vs..)) if n = min(n_param, |vs|) else None *)
-Definition mk_call (loc : option ident) (f : expr) (n : nat) (vs : list ident) : error statement :=
-  v <- mk_call_vars n (firstn n_param vs) ;;
-  ret (Scall loc f (tinf :: v)).
-
-(* mk_prim_call res pr ar vs = Some (res = pr(vs..)) if ar = min(n_param, |vs|) else None *)
-Definition mk_prim_call (res : ident) (pr : ident) (ar : nat) (vs : list ident) : error statement :=
-  args <- mk_call_vars ar vs ;;  
-  ret (Scall (Some res) ([mk_prim_ty ar] (Evar pr (mk_prim_ty ar))) args).
+(* mk_prim_call res pr ar vs = (res = pr(vs..)) *)
+Definition mk_prim_call (res : ident) (pr : ident) (vs : list ident) : statement :=
+  Scall (Some res) (Evar pr (mk_prim_ty (length vs))) (map mk_var vs).
 
 (* Load arguments from the args array.
 
@@ -538,7 +539,7 @@ Definition asgn_fun_vars (vs : list ident) (ind : list N) : error statement :=
             args[ind[1]] = vs[1];
                          .
                          .
-     args[ind[|ind| - 1] = vs[|ind| - 1];
+    args[ind[|ind| - 1]] = vs[|ind| - 1];
 
    Reads arguments from local variables vs.
    Stores them in the args array at indices ind.
@@ -609,9 +610,6 @@ Definition asgn_app_vars_fast myvs vs myind ind name :=
   s <- asgn_app_vars_fast' myvs vs myind ind name ;;
   ret (args_id ::= Efield tinfd args_id (Tarray uval max_args noattr); s).
 
-Definition set_nalloc (num : expr) : statement :=
-  Efield tinfd nalloc_id val :::= num. 
-
 (** * GC call *)
 Definition make_gc_call (num_allocs : nat) (stack_vars : list ident) (stack_offset : N) : statement * N :=
   let after_call := negb (stack_offset =? 0)%N in
@@ -619,23 +617,17 @@ Definition make_gc_call (num_allocs : nat) (stack_vars : list ident) (stack_offs
   let make_gc_stack := push; update_stack slots; set_stack slots after_call in
   let discard_stack := pop_live_vars_offset stack_offset stack_vars; reset_stack slots after_call in
   let nallocs := c_int (Z.of_nat num_allocs) val in 
+  let set_nalloc := Efield tinfd nalloc_id val :::= nallocs in
   if (num_allocs =? 0)%nat then (Sskip, stack_offset) else 
     ((Sifthenelse
         (!(Ebinop Ole nallocs (limit_ptr -' alloc_ptr) type_bool))
         (make_gc_stack;
-         set_nalloc nallocs;
-         Scall None gc (tinf :: nil);
+         set_nalloc;
+         Scall None gc (tinfo :: nil);
          discard_stack;
          alloc_id ::= Efield tinfd alloc_id val_ptr;
          limit_id ::= Efield tinfd limit_id val_ptr)
         Sskip), slots).
-
-Definition make_case_switch (x : ident) (ls ls' : labeled_statements) :=
-  Sifthenelse
-    (isptr case_id x)
-    (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
-    (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val)
-             ls').
 
 (** * Shadow stack strategy *)
 (* ZOE TODO: update text
@@ -650,7 +642,7 @@ Definition make_case_switch (x : ident) (ls ls' : labeled_statements) :=
 (* To create the shadow stack:
 
    long long int live[MAX_live];
-   frame_pointer fp = { next = *live; roots=*live; prev:=tinfo->sp}
+   frame_pointer fp = { next = *live; root=*live; prev:=tinfo->sp}
    long long int *next = fp.next;
    tinfo->sp = *fp 
  *)
@@ -679,122 +671,132 @@ Section Translation.
 
   Section Body.
     Context
-      (prim_map : list (kername * string * nat * positive))
       (fun_vars : list ident)
       (loc_vars : FVSet) (* The set of local vars including definitions and arguments *)
       (locs : list N)
       (nenv : M.t BasicAst.name).
 
-    (* Returns the statement and the number of stack slots needed *)
+    Definition mk_fn_call f t ys :=
+      match M.get t fenv with 
+      | Some (arity, inds) =>
+        let name :=
+          match M.get f nenv with
+          | Some n => show_name n
+          | None => "not an entry"
+          end
+        in
+        asgn <- (if args_opt
+                then asgn_app_vars_fast fun_vars ys locs inds name
+                else asgn_app_vars ys inds name) ;;
+        let arity := N.to_nat arity in
+        let n := min arity n_param in
+        if negb (length ys =? arity)%nat then Err "mk_fn_call: arity mismatch" else
+        let call :=
+          Scall None
+                ([Tpointer (mk_fun_ty n) noattr] (mk_var f))
+                (tinfo :: map mk_var (firstn n_param ys))
+        in
+        ret (asgn, call)
+      | None => Err "mk_fun_call: unknown function application"
+      end.
 
-    Fixpoint translate_body (e : exp) (slots : N) : error (statement * N):=
+    Definition mk_cases (translate_body : exp -> N -> error (statement * N)) :=
+      fix mk_cases (slots : N) (l : list (ctor_tag * exp))
+      : error (labeled_statements * labeled_statements * N) :=
+        match l with
+        | nil => ret (LSnil, LSnil, slots)
+        | (c, e) :: l' =>
+          '(prog, n) <- translate_body e slots ;;
+          '(ls, ls', n') <- mk_cases slots l' ;;
+          p <- find_ctor_rep c ;;
+          match p with 
+          | boxed t a =>
+            let tag :=
+              match ls with
+              | LSnil => None
+              | LScons _ _ _ => Some (Z.land (Z.shiftl (Z.of_N a) 10 + Z.of_N t) 255)%Z
+              end
+            in
+            ret (LScons tag (Ssequence prog Sbreak) ls, ls', N.max n n')
+          | enum t =>
+            let tag :=
+              match ls' with
+              | LSnil => None
+              | LScons _ _ _ => Some (Z.shiftr (Z.shiftl (Z.of_N t) 1 + 1) 1)%Z
+              end
+            in
+            ret (ls, LScons tag (Ssequence prog Sbreak) ls', N.max n n')
+          end
+        end.
+
+    (* Returns the statement and the number of stack slots needed *)
+    Fixpoint translate_body (e : exp) (slots : N) {struct e} : error (statement * N) :=
       match e with
       | Econstr x t vs e' =>
         stm_constr <- asgn_constr x t vs ;;
-        '(stm_e, slots) <- translate_body e' slots ;;
-        ret ((stm_constr; stm_e), slots)
+        '(stm_e', slots) <- translate_body e' slots ;;
+        ret ((stm_constr; stm_e'), slots)
       | Ecase x cs =>
-        '(ls, ls', slots) <-
-          (fix make_cases (l : list (ctor_tag * exp)) : error (labeled_statements * labeled_statements * N) :=
-             match l with
-             | nil => ret (LSnil, LSnil, slots)
-             | (c, e) :: l' =>
-               '(prog, n) <- translate_body e slots ;;
-               '(ls, ls', n') <- make_cases l' ;;
-               p <- find_ctor_rep c ;;
-               match p with 
-               | boxed t a =>
-                 match ls with
-                 | LSnil => ret (LScons None (Ssequence prog Sbreak) ls, ls', N.max n n')
-                 | LScons _ _ _ =>
-                   let tag := (Z.shiftl (Z.of_N a) 10 + Z.of_N t)%Z in
-                   ret (LScons (Some (Z.land tag 255)) (Ssequence prog Sbreak) ls, ls', N.max n n')
-                 end
-               | enum t =>
-                 match ls' with
-                 | LSnil => ret (ls, LScons None (Ssequence prog Sbreak) ls', N.max n n')
-                 | LScons _ _ _ =>
-                   let tag := (Z.shiftl (Z.of_N t) 1 + 1)%Z in
-                   ret (ls, LScons (Some (Z.shiftr tag 1)) (Ssequence prog Sbreak) ls', N.max n n')
-                 end
-               end
-             end) cs ;;
-        ret (make_case_switch x ls ls', slots)
+        '(boxed_cases, unboxed_cases, slots) <- mk_cases translate_body slots cs ;;
+        ret (Sifthenelse
+              (isptr x)
+              (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) boxed_cases)
+              (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val) unboxed_cases),
+             slots)
       | Eletapp x f t vs e' => 
         (* Compute the local variables that are live after the call  *)
         let fvs_post_call := PS.inter (exp_fv e') loc_vars in
         let fvs := PS.remove x fvs_post_call in
         let fvs_list := PS.elements fvs in
-        (* Check if the new binding has to be pushed to the frame during the GC call *)                
-        let fv_gc := if PS.mem x fvs_post_call then cons x nil else nil in
-        (* push live vars to the stack. We're pushing exactly the vars that are live beyond the current point. *)
+        (* Push live vars to the stack. We're pushing exactly the vars that are live beyond the current point. *)
         let '(make_stack, slots_call) :=
           let (push, slots) := push_live_vars fvs_list in
           (push; update_stack slots; set_stack slots false, slots)
         in
         let discard_stack := (pop_live_vars fvs_list; reset_stack slots_call false) in
-        match M.get t fenv with 
-        | Some inf =>
-          let name :=
-            match M.get f nenv with
-            | Some n => show_name n
-            | None => "not an entry"
-            end
-          in
-          asgn <- (if args_opt
-                  then asgn_app_vars_fast fun_vars vs locs (snd inf) name
-                  else asgn_app_vars vs (snd inf) name) ;;
-          let pnum := min (N.to_nat (fst inf)) n_param in
-          call_fn <- mk_call None ([Tpointer (mk_fun_ty pnum) noattr] (mk_var f)) pnum vs ;;
-          let alloc := max_allocs e' in
-          (* Call GC after the call if needed *)
-          let '(gc_call, slots_gc) := make_gc_call alloc fv_gc slots_call in
-          '(prog, slots) <- translate_body e' (N.max slots slots_gc);;
-          Ret ((asgn;
-                Efield tinfd alloc_id val_ptr :::= alloc_ptr;
-                Efield tinfd limit_id val_ptr :::= limit_ptr;
-                make_stack;
-                call_fn;
-                alloc_id ::= Efield tinfd alloc_id val_ptr;
-                limit_id ::= Efield tinfd limit_id val_ptr;
-                x ::= Field(args, Z.of_nat 1);
-                gc_call;
-                discard_stack;
-                prog),
-               slots)
-        | None => Err "translate_body: Unknown function application in Eletapp"
-        end
+        '(asgn, call) <- mk_fn_call f t vs ;;
+        let alloc := max_allocs e' in
+        (* Check if the new binding has to be pushed to the frame during the GC call *)
+        let fv_gc := if PS.mem x fvs_post_call then x :: nil else nil in
+        (* Call GC after the call if needed *)
+        let '(gc_call, slots_gc) := make_gc_call alloc fv_gc slots_call in
+        '(prog, slots) <- translate_body e' (N.max slots slots_gc);;
+        ret ((asgn;
+              Efield tinfd alloc_id val_ptr :::= alloc_ptr;
+              Efield tinfd limit_id val_ptr :::= limit_ptr;
+              make_stack;
+              call;
+              alloc_id ::= Efield tinfd alloc_id val_ptr;
+              limit_id ::= Efield tinfd limit_id val_ptr;
+              x ::= args[ Z.of_nat 1 ];
+              gc_call;
+              discard_stack;
+              prog),
+             slots)
       | Eproj x t n v e' =>
         '(stm_e, slots) <- translate_body e' slots ;;
         Ret ((x ::= Field(var v, Z.of_N n); stm_e), slots)
       | Efun fnd e => Err "translate_body: Nested function detected"
-      | Eapp x t vs =>
-        match M.get t fenv with
-        | Some inf =>
-          let name :=
-            match M.get x nenv with
-            | Some n => show_name n
-            | None => "not an entry"
-            end
-          in
-          asgn <- (if args_opt
-                  then asgn_app_vars_fast fun_vars vs locs (snd inf) name
-                  else asgn_app_vars vs (snd inf) name) ;;
-          let pnum := min (N.to_nat (fst inf)) n_param in
-          call_fn <- (mk_call None ([Tpointer (mk_fun_ty pnum) noattr] (mk_var x)) pnum vs) ;;
-          ret ((asgn;
-                Efield tinfd alloc_id val_ptr :::= alloc_ptr;
-                Efield tinfd limit_id val_ptr :::= limit_ptr;
-                call_fn),
-               slots)
-        | None => Err "translate_body: Unknown function application in Eapp"
-        end
+      | Eapp f t vs =>
+        (* TODO: Will the ANF pipeline optimize tail calls? i.e. turn
+             let x = f y .. in
+             halt x
+           into
+             f y .. 
+           ? (Also, will ANF conversion produce tail calls?) *)
+        '(asgn, call) <- mk_fn_call f t vs ;;
+        ret ((asgn;
+              Efield tinfd alloc_id val_ptr :::= alloc_ptr;
+              Efield tinfd limit_id val_ptr :::= limit_ptr;
+              call),
+             slots)
       | Eprim x p vs e' =>    
-        call_prim <- mk_prim_call x p (length vs) vs ;;
         '(stm_e, slots) <- translate_body e' slots ;;
-        ret ((call_prim; stm_e), slots)
+        ret ((Scall (Some x) (Evar p (mk_prim_ty (length vs))) (map mk_var vs);
+              stm_e),
+             slots)
       | Ehalt x =>
-        (* set args[1] to x  and return *)
+        (* set args[1] to x and return *)
         ret ((args[ Z.of_nat 1 ] :::= mk_var x;
               Efield tinfd alloc_id val_ptr :::= alloc_ptr;
               Efield tinfd limit_id val_ptr :::= limit_ptr),
@@ -804,7 +806,7 @@ Section Translation.
   End Body.
 
 Definition mk_fun
-           (root_size : Z) (* size of roots array *)
+           (root_size : Z) (* size of root array *)
            (vs : list ident) (* args *)
            (loc : list ident) (* local vars *)
            (body : statement) : function :=
@@ -822,8 +824,7 @@ Fixpoint translate_fundefs (fnd : fundefs) (nenv : name_env) : error (list (iden
     rest <- translate_fundefs fnd' nenv ;;
     match M.get t fenv with
     | None => Err "translate_fundefs: Unknown function tag"
-    | Some inf =>
-      let '(l, locs) := inf in
+    | Some (l, locs) =>
       asgn <- asgn_fun_vars vs locs ;; (* project remaining params out of args array *)
       let num_allocs := max_allocs e in
       let loc_vars := get_locals e in

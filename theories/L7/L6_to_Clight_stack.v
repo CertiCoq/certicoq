@@ -700,14 +700,16 @@ Section Translation.
       | None => Err "mk_fun_call: unknown function application"
       end.
 
-    Definition mk_cases (translate_body : exp -> N -> error (statement * N)) :=
-      fix mk_cases (slots : N) (l : list (ctor_tag * exp))
-      : error (labeled_statements * labeled_statements * N) :=
+    Definition mk_cases (translate_body : exp -> error (statement * FVSet * N)) :=
+      fix mk_cases (l : list (ctor_tag * exp))
+      : error (labeled_statements * labeled_statements * FVSet * N) :=
         match l with
-        | nil => ret (LSnil, LSnil, slots)
+        | nil => ret (LSnil, LSnil, PS.empty, 0)%N
         | (c, e) :: l' =>
-          '(prog, n) <- translate_body e slots ;;
-          '(ls, ls', n') <- mk_cases slots l' ;;
+          '(prog, fv_e, n_e) <- translate_body e ;;
+          '(ls, ls', fv_l', n_l') <- mk_cases l' ;;
+          let fv := PS.union fv_e fv_l' in
+          let n := N.max n_e n_l' in
           p <- find_ctor_rep c ;;
           match p with 
           | boxed t a =>
@@ -717,7 +719,7 @@ Section Translation.
               | LScons _ _ _ => Some (Z.land (Z.shiftl (Z.of_N a) 10 + Z.of_N t) 255)%Z
               end
             in
-            ret (LScons tag (Ssequence prog Sbreak) ls, ls', N.max n n')
+            ret (LScons tag (Ssequence prog Sbreak) ls, ls', fv, n)
           | enum t =>
             let tag :=
               match ls' with
@@ -725,27 +727,28 @@ Section Translation.
               | LScons _ _ _ => Some (Z.shiftr (Z.shiftl (Z.of_N t) 1 + 1) 1)%Z
               end
             in
-            ret (ls, LScons tag (Ssequence prog Sbreak) ls', N.max n n')
+            ret (ls, LScons tag (Ssequence prog Sbreak) ls', fv, n)
           end
         end.
 
     (* Returns the statement and the number of stack slots needed *)
-    Fixpoint translate_body (e : exp) (slots : N) {struct e} : error (statement * N) :=
+    Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
       match e with
       | Econstr x t vs e' =>
         stm_constr <- asgn_constr x t vs ;;
-        '(stm_e', slots) <- translate_body e' slots ;;
-        ret ((stm_constr; stm_e'), slots)
+        '(stm_e', fv_e', n_e') <- translate_body e' ;;
+        ret ((stm_constr; stm_e'), PS.remove x (add_list PS.empty fv_e' vs), n_e')
       | Ecase x cs =>
-        '(boxed_cases, unboxed_cases, slots) <- mk_cases translate_body slots cs ;;
+        '(boxed_cases, unboxed_cases, fv_cs, n_cs) <- mk_cases translate_body cs ;;
         ret (Sifthenelse
               (isptr x)
               (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) boxed_cases)
               (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val) unboxed_cases),
-             slots)
-      | Eletapp x f t vs e' => 
+             PS.add x fv_cs, n_cs)
+      | Eletapp x f t vs e' =>
+        '(prog, fv_e', n_e') <- translate_body e' ;;
         (* Compute the local variables that are live after the call  *)
-        let fvs_post_call := PS.inter (exp_fv e') loc_vars in
+        let fvs_post_call := PS.inter fv_e' loc_vars in
         let fvs := PS.remove x fvs_post_call in
         let fvs_list := PS.elements fvs in
         (* Push live vars to the stack. We're pushing exactly the vars that are live beyond the current point. *)
@@ -760,7 +763,6 @@ Section Translation.
         let fv_gc := if PS.mem x fvs_post_call then x :: nil else nil in
         (* Call GC after the call if needed *)
         let '(gc_call, slots_gc) := make_gc_call alloc fv_gc slots_call in
-        '(prog, slots) <- translate_body e' (N.max slots slots_gc);;
         ret ((asgn;
               Efield tinfd alloc_id val_ptr :::= alloc_ptr;
               Efield tinfd limit_id val_ptr :::= limit_ptr;
@@ -772,35 +774,30 @@ Section Translation.
               gc_call;
               discard_stack;
               prog),
-             slots)
+             PS.remove x (add_list PS.empty fv_e' vs),
+             N.max slots_call (N.max slots_gc n_e'))
       | Eproj x t n v e' =>
-        '(stm_e, slots) <- translate_body e' slots ;;
-        Ret ((x ::= Field(var v, Z.of_N n); stm_e), slots)
+        '(stm_e, fv_e', n_e') <- translate_body e' ;;
+        ret ((x ::= Field(var v, Z.of_N n); stm_e), PS.remove x (PS.add v fv_e'), n_e')
       | Efun fnd e => Err "translate_body: Nested function detected"
       | Eapp f t vs =>
-        (* TODO: Will the ANF pipeline optimize tail calls? i.e. turn
-             let x = f y .. in
-             halt x
-           into
-             f y .. 
-           ? (Also, will ANF conversion produce tail calls?) *)
         '(asgn, call) <- mk_fn_call f t vs ;;
         ret ((asgn;
               Efield tinfd alloc_id val_ptr :::= alloc_ptr;
               Efield tinfd limit_id val_ptr :::= limit_ptr;
               call),
-             slots)
+             PS.add f (add_list PS.empty PS.empty vs), 0)%N
       | Eprim x p vs e' =>    
-        '(stm_e, slots) <- translate_body e' slots ;;
+        '(stm_e, fv_e', n_e') <- translate_body e' ;;
         ret ((Scall (Some x) (Evar p (mk_prim_ty (length vs))) (map mk_var vs);
               stm_e),
-             slots)
+             PS.remove x (add_list PS.empty fv_e' vs), n_e')
       | Ehalt x =>
         (* set args[1] to x and return *)
         ret ((args[ Z.of_nat 1 ] :::= mk_var x;
               Efield tinfd alloc_id val_ptr :::= alloc_ptr;
               Efield tinfd limit_id val_ptr :::= limit_ptr),
-             slots)
+             PS.empty, 0)%N
       end.
 
   End Body.
@@ -832,7 +829,7 @@ Fixpoint translate_fundefs (fnd : fundefs) (nenv : name_env) : error (list (iden
       let loc_ids := union_list var_set loc_vars  in
       let live_vars := PS.elements (PS.inter (exp_fv e) var_set) in 
       let (gc, _) := make_gc_call num_allocs live_vars 0%N in
-      '(body, stack_slots) <- translate_body vs loc_ids locs nenv e 0 ;;
+      '(body, _, stack_slots) <- translate_body vs loc_ids locs nenv e ;;
       let stack_slots := N.max (N.of_nat (length live_vars)) stack_slots in
       Ret ((f , Gfun (Internal
                       (mk_fun (Z.of_N stack_slots) vs loc_vars
@@ -895,7 +892,7 @@ Definition translate_program (args_opt : bool) (e : exp) nenv :
     funs <- translate_fundefs args_opt fnd nenv ;;
     let allocs := max_allocs e in
     let (gc_call, _) := make_gc_call allocs nil (* no live roots to push *) 0%N in
-    '(body, slots) <- translate_body args_opt [] (union_list PS.empty localVars) [] nenv e 0 ;;
+    '(body, _, slots) <- translate_body args_opt [] (union_list PS.empty localVars) [] nenv e ;;
     let argsExpr := Efield tinfd args_id (Tarray uval max_args noattr) in
     ret ((body_id , Gfun (Internal
                               (mkfunction val

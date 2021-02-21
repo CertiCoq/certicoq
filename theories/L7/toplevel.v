@@ -85,4 +85,5 @@ Definition compile_Clight (prims : list (kername * string * nat * positive)) : C
     if cps then 
       LiftErrorCertiCoqTrans "L7" (Clight_trans prims args) s
     else
+      debug_msg "Using new ANF translation" ;;
       LiftErrorLogCertiCoqTrans "L7" (Clight_trans_ANF prims args) s.

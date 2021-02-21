@@ -79,6 +79,9 @@ Definition sha_fast := sha256.SHA_256' (sha256.str_to_bytes test).
 (* CertiCoq Show IR -config 2 -direct -time_anf -ext "_inl" vs_easy. *)
 (* CertiCoq Show IR -config 2 -direct -O 1 -time_anf -ext "_opt_no_inl" vs_easy. *)
 
+CertiCoq -help.
+CertiCoq Compile -debug demo1.
+
 Eval compute in "Compiling demo1".
 
 CertiCoq Compile -O 0 demo1.

@@ -53,7 +53,7 @@ Definition show_name (name : BasicAst.name) : string :=
 Definition get_fname f (nenv : name_env) : string := 
   match M.get f nenv with
   | Some name => show_name name
-  | None => "Undef"
+  | None => "not an entry"
   end.
 
 Definition max_args := 1024%Z.
@@ -69,35 +69,39 @@ Fixpoint make_arg_list' (vs : list positive) : list N :=
 (* [0; ..; |vs| - 1] *)
 Definition make_arg_list (vs : list positive) : list N := rev (make_arg_list' vs).
 
-(* fun_info_env holds mappings f ↦ (fi, t) where
+(* fun_info_env holds mappings f ↦ t where
      f is function name
-     fi is the name of f's fun_info array TODO: can we delete this?
      t is fun_tag associated with f
 *)
-Definition fun_info_env : Type := M.t (ident * fun_tag).
+Definition fun_info_env : Type := M.t fun_tag.
+
+Definition hoisted_exp := (fundefs * exp)%type.
+
+Definition mk_hoisted_exp (e : exp) : hoisted_exp :=
+  match e with
+  | Efun fds e => (fds, e)
+  | _ => (Fnil, e)
+  end.
 
 (* Compute a fun_env by looking at the number of arguments functions
    are applied to, assumes that all functions sharing the same tags have the same arity.
 
    fun_env holds mappings
      t ↦ (|vs|, [0; ..; |vs| - 1]) 
-   for each (Eapp f t vs) and (Fcons f t vs _ _) in the expression being compiled.
+   for each (Fcons f t vs _ _) in the expression being compiled.
 
    The list [0; ..; |vs| - 1] gives the locations of f's arguments in the args array.
-   (Simple for now, but may get fancier with custom calling conventions) *)
-Fixpoint compute_fun_env' (fenv : fun_env) (e : exp) {struct e} : fun_env :=
-  match e with
-  | Econstr x t vs e' => compute_fun_env' fenv e'
-  | Ecase x cs => fold_left (fun p '(_, e) => compute_fun_env' p e) cs fenv
-  | Eproj x t n v e' => compute_fun_env' fenv e'
-  | Eletapp x f t vs e' =>
-    compute_fun_env' (M.set t (N.of_nat (length vs), make_arg_list vs) fenv) e'
-  | Efun fnd e' => M.empty _ (* unreachable (we are compiling hoisted terms) *)
-  | Eapp x t vs => M.set t (N.of_nat (length vs), make_arg_list vs) fenv
-  | Eprim x p vs e' => compute_fun_env' fenv e'
-  | Ehalt x => fenv
+   (Simple for now, but may get fancier with custom calling conventions)
+
+   Since we are compiling hoisted programs, we need only look at the toplevel function definitions.
+*)
+Fixpoint compute_fun_env' (fenv : fun_env) (fds : fundefs) : fun_env :=
+  match fds with
+  | Fcons f t xs e fds =>
+    compute_fun_env' (M.set t (N.of_nat (length xs), make_arg_list xs) fenv) fds
+  | Fnil => fenv
   end.
-Definition compute_fun_env : exp -> fun_env := compute_fun_env' (M.empty _).
+Definition compute_fun_env : fundefs -> fun_env := compute_fun_env' (M.empty _).
 
 (* Compute the bound variables of a function body *) 
 Fixpoint get_locals' (e : exp) (acc : list ident) : list ident :=
@@ -130,65 +134,6 @@ Fixpoint max_allocs (e : exp) : nat :=
   | Eprim x p vs e' => max_allocs e'
   | Ehalt x => 0
   end.
-
-(* TODO: move this to cps and replace the current definition of ind_ty_info
-
-   1) name of inductive type
-   2) list containing, for each constructor of the inductive type:
-      2.1 name of the constructor
-      2.2 tag of the contructor (in ctor_env)
-      2.3 arity of the constructor
-      2.4 ordinal of the constructor *)
-Definition n_ind_ty_info : Type := BasicAst.name * list (BasicAst.name * ctor_tag * N * N).
-
-(* n_ind_env (aka named ienv) holds mappings
-     ind_tag t ↦ (inductive name, [(constructor name, ctor_tag c, arity, ordinal); ..])
-   for each inductive type. *)
-Definition n_ind_env := M.t n_ind_ty_info.
-
-Definition update_ind_env (ienv : n_ind_env) (c : ctor_tag) (cInf : ctor_ty_info) : n_ind_env :=
-  let '{| ctor_name := name
-        ; ctor_ind_name := nameTy
-        ; ctor_ind_tag := t
-        ; ctor_arity := arity
-        ; ctor_ordinal := ord
-        |} := cInf in
-  match (M.get t ienv) with
-  | None => M.set t (nameTy, (name, c, arity, ord) :: nil) ienv
-  | Some (nameTy, iInf) => M.set t (nameTy, (name, c, arity, ord) :: iInf) ienv
-  end.
-
-(* ctor_env holds mappings
-     ctor_tag c ↦ {| constructor name; inductive name; ind_tag; arity; ordinal |}
-   for each constructor in c. *)
-Definition compute_ind_env (cenv : ctor_env) : n_ind_env :=
-  M.fold update_ind_env cenv (M.empty _).
-
-(* Both (cenv : ctor_env) and (compute_ind_env cenv : n_ind_env) represent the same 6-place relation: *)
-Section IENV_SPEC.
-
-Definition ind_info_rel :=
-  forall (ind_name ctor_name : BasicAst.name) (t : ind_tag) (c : ctor_tag) (arity ordinal : N), Prop.
-
-Definition rel_of_ctor_env (cenv : ctor_env) : ind_info_rel :=
-  fun ind ctor t c arity ordinal =>
-  M.get c cenv = Some (Build_ctor_ty_info ind ctor t arity ordinal).
-
-Definition rel_of_n_ind_env (ienv : n_ind_env) : ind_info_rel :=
-  fun ind ctor t c arity ordinal =>
-  exists ctors,
-  M.get t ienv = Some (ind, ctors) /\
-  In (ctor, c, arity, ordinal) ctors.
-
-Lemma compute_ind_env_sound (cenv : ctor_env) ind ctor itag ctag arity ordinal :
-  rel_of_ctor_env cenv ind ctor itag ctag arity ordinal <->
-  rel_of_n_ind_env (compute_ind_env cenv) ind ctor itag ctag arity ordinal.
-Proof.
-  unfold compute_ind_env.
-  rewrite M.fold_spec.
-Admitted.
-
-End IENV_SPEC.
 
 (** * Clight abbreviations *)
 
@@ -413,7 +358,6 @@ Definition pop_live_vars (xs : list ident) : statement := pop_live_vars_offset 0
 Section CODEGEN.
 
 Variable (cenv : ctor_env). 
-Variable (ienv : n_ind_env). 
 Variable (fenv : fun_env).
 Variable (fienv : fun_info_env). 
 
@@ -453,7 +397,7 @@ Definition make_tag (ct : ctor_tag) : error expr :=
 Definition mk_var (x : ident) :=
   match M.get x fienv with
   (* if x is a function name with tag t... *)
-  | Some (_, t) =>
+  | Some t =>
     match M.get t fenv with
     (* ...and tag t corresponds to a function with arity n, then x has function type *)
     | Some (_, locs) => Evar x (mk_fun_ty (length (firstn n_param locs)))
@@ -672,19 +616,14 @@ Section Translation.
   Section Body.
     Context
       (fun_vars : list ident)
-      (loc_vars : FVSet) (* The set of local vars including definitions and arguments *)
+      (locals : FVSet) (* The set of local vars including definitions and arguments *)
       (locs : list N)
       (nenv : M.t BasicAst.name).
 
     Definition mk_fn_call f t ys :=
       match M.get t fenv with 
       | Some (arity, inds) =>
-        let name :=
-          match M.get f nenv with
-          | Some n => show_name n
-          | None => "not an entry"
-          end
-        in
+        let name := get_fname f nenv in
         asgn <- (if args_opt
                 then asgn_app_vars_fast fun_vars ys locs inds name
                 else asgn_app_vars ys inds name) ;;
@@ -701,14 +640,13 @@ Section Translation.
       end.
 
     Definition mk_cases (translate_body : exp -> error (statement * FVSet * N)) :=
-      fix mk_cases (l : list (ctor_tag * exp))
-      : error (labeled_statements * labeled_statements * FVSet * N) :=
+      fix mk_cases l : error (labeled_statements * labeled_statements * FVSet * N) :=
         match l with
         | nil => ret (LSnil, LSnil, PS.empty, 0)%N
         | (c, e) :: l' =>
-          '(prog, fv_e, n_e) <- translate_body e ;;
-          '(ls, ls', fv_l', n_l') <- mk_cases l' ;;
-          let fv := PS.union fv_e fv_l' in
+          '(prog, fvs_e, n_e) <- translate_body e ;;
+          '(ls, ls', fvs_l', n_l') <- mk_cases l' ;;
+          let fvs := PS.union fvs_e fvs_l' in
           let n := N.max n_e n_l' in
           p <- find_ctor_rep c ;;
           match p with 
@@ -716,53 +654,58 @@ Section Translation.
             let tag :=
               match ls with
               | LSnil => None
-              | LScons _ _ _ => Some (Z.land (Z.shiftl (Z.of_N a) 10 + Z.of_N t) 255)%Z
+              | LScons _ _ _ => Some (Z.land (Z.of_N t) 255)%Z
               end
             in
-            ret (LScons tag (Ssequence prog Sbreak) ls, ls', fv, n)
+            ret (LScons tag (Ssequence prog Sbreak) ls, ls', fvs, n)
           | enum t =>
             let tag :=
               match ls' with
               | LSnil => None
-              | LScons _ _ _ => Some (Z.shiftr (Z.shiftl (Z.of_N t) 1 + 1) 1)%Z
+              | LScons _ _ _ => Some (Z.of_N t)%Z
               end
             in
-            ret (ls, LScons tag (Ssequence prog Sbreak) ls', fv, n)
+            ret (ls, LScons tag (Ssequence prog Sbreak) ls', fvs, n)
           end
         end.
 
-    (* Returns the statement and the number of stack slots needed *)
+    (* fvs ∪ ({x} ∩ locals) *)
+    Definition add_local_fv fvs x := if PS.mem x locals then PS.add x fvs else fvs.
+
+    (* fvs ∪ (FromList xs ∩ locals) *)
+    Definition add_local_fvs fvs xs := fold_left add_local_fv xs fvs.
+
+    (* Returns (C code for e, FV(e) ∩ locals, number of stack slots needed) 
+       Number of stack slots needed =
+         max(|(FV(e')\x)∩locals| for each Eletapp x f t ys e' we encounter in e) *)
     Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
       match e with
-      | Econstr x t vs e' =>
-        stm_constr <- asgn_constr x t vs ;;
-        '(stm_e', fv_e', n_e') <- translate_body e' ;;
-        ret ((stm_constr; stm_e'), PS.remove x (add_list PS.empty fv_e' vs), n_e')
+      | Econstr x t ys e' =>
+        stm_constr <- asgn_constr x t ys ;;
+        '(stm_e', fvs_e', n_e') <- translate_body e' ;;
+        ret ((stm_constr; stm_e'), add_local_fvs (PS.remove x fvs_e') ys, n_e')
       | Ecase x cs =>
-        '(boxed_cases, unboxed_cases, fv_cs, n_cs) <- mk_cases translate_body cs ;;
+        '(boxed_cases, unboxed_cases, fvs_cs, n_cs) <- mk_cases translate_body cs ;;
         ret (Sifthenelse
               (isptr x)
               (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) boxed_cases)
               (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val) unboxed_cases),
-             PS.add x fv_cs, n_cs)
-      | Eletapp x f t vs e' =>
-        '(prog, fv_e', n_e') <- translate_body e' ;;
+             add_local_fv fvs_cs x, n_cs)
+      | Eletapp x f t ys e' =>
         (* Compute the local variables that are live after the call  *)
-        let fvs_post_call := PS.inter fv_e' loc_vars in
-        let fvs := PS.remove x fvs_post_call in
-        let fvs_list := PS.elements fvs in
+        '(prog, fvs_e', n_e') <- translate_body e' ;;
+        let fvs := PS.elements (PS.remove x fvs_e') in
         (* Push live vars to the stack. We're pushing exactly the vars that are live beyond the current point. *)
         let '(make_stack, slots_call) :=
-          let (push, slots) := push_live_vars fvs_list in
+          let (push, slots) := push_live_vars fvs in
           (push; update_stack slots; set_stack slots false, slots)
         in
-        let discard_stack := (pop_live_vars fvs_list; reset_stack slots_call false) in
-        '(asgn, call) <- mk_fn_call f t vs ;;
-        let alloc := max_allocs e' in
+        let discard_stack := (pop_live_vars fvs; reset_stack slots_call false) in
+        '(asgn, call) <- mk_fn_call f t ys ;;
         (* Check if the new binding has to be pushed to the frame during the GC call *)
-        let fv_gc := if PS.mem x fvs_post_call then x :: nil else nil in
+        let fvs_gc := if PS.mem x fvs_e' then x :: nil else nil in
         (* Call GC after the call if needed *)
-        let '(gc_call, slots_gc) := make_gc_call alloc fv_gc slots_call in
+        let '(gc_call, slots_gc) := make_gc_call (max_allocs e') fvs_gc slots_call in
         ret ((asgn;
               Efield tinfd alloc_id val_ptr :::= alloc_ptr;
               Efield tinfd limit_id val_ptr :::= limit_ptr;
@@ -774,30 +717,30 @@ Section Translation.
               gc_call;
               discard_stack;
               prog),
-             PS.remove x (add_list PS.empty fv_e' vs),
+             add_local_fvs (PS.remove x fvs_e') (f :: ys),
              N.max slots_call (N.max slots_gc n_e'))
-      | Eproj x t n v e' =>
-        '(stm_e, fv_e', n_e') <- translate_body e' ;;
-        ret ((x ::= Field(var v, Z.of_N n); stm_e), PS.remove x (PS.add v fv_e'), n_e')
+      | Eproj x t n y e' =>
+        '(stm_e, fvs_e', n_e') <- translate_body e' ;;
+        ret ((x ::= Field(var y, Z.of_N n); stm_e), add_local_fv (PS.remove x fvs_e') y, n_e')
       | Efun fnd e => Err "translate_body: Nested function detected"
-      | Eapp f t vs =>
-        '(asgn, call) <- mk_fn_call f t vs ;;
+      | Eapp f t ys =>
+        '(asgn, call) <- mk_fn_call f t ys ;;
         ret ((asgn;
               Efield tinfd alloc_id val_ptr :::= alloc_ptr;
               Efield tinfd limit_id val_ptr :::= limit_ptr;
               call),
-             PS.add f (add_list PS.empty PS.empty vs), 0)%N
-      | Eprim x p vs e' =>    
-        '(stm_e, fv_e', n_e') <- translate_body e' ;;
-        ret ((Scall (Some x) (Evar p (mk_prim_ty (length vs))) (map mk_var vs);
+             add_local_fvs PS.empty (f :: ys), 0)%N
+      | Eprim x p ys e' =>    
+        '(stm_e, fvs_e', n_e') <- translate_body e' ;;
+        ret ((Scall (Some x) (Evar p (mk_prim_ty (length ys))) (map mk_var ys);
               stm_e),
-             PS.remove x (add_list PS.empty fv_e' vs), n_e')
+             add_local_fvs (PS.remove x fvs_e') ys, n_e')
       | Ehalt x =>
         (* set args[1] to x and return *)
         ret ((args[ Z.of_nat 1 ] :::= mk_var x;
               Efield tinfd alloc_id val_ptr :::= alloc_ptr;
               Efield tinfd limit_id val_ptr :::= limit_ptr),
-             PS.empty, 0)%N
+             add_local_fv PS.empty x, 0)%N
       end.
 
   End Body.
@@ -826,10 +769,10 @@ Fixpoint translate_fundefs (fnd : fundefs) (nenv : name_env) : error (list (iden
       let num_allocs := max_allocs e in
       let loc_vars := get_locals e in
       let var_set := union_list PS.empty vs in
-      let loc_ids := union_list var_set loc_vars  in
-      let live_vars := PS.elements (PS.inter (exp_fv e) var_set) in 
+      let loc_ids := union_list var_set loc_vars in
+      '(body, live_loc_ids, stack_slots) <- translate_body vs loc_ids locs nenv e ;;
+      let live_vars := PS.elements (PS.inter live_loc_ids var_set) in 
       let (gc, _) := make_gc_call num_allocs live_vars 0%N in
-      '(body, _, stack_slots) <- translate_body vs loc_ids locs nenv e ;;
       let stack_slots := N.max (N.of_nat (length live_vars)) stack_slots in
       Ret ((f , Gfun (Internal
                       (mk_fun (Z.of_N stack_slots) vs loc_vars
@@ -884,31 +827,28 @@ Definition lift_error {A : Type} (o : option A) (s : string) : error A :=
   | None => Err s
   end.
 
-Definition translate_program (args_opt : bool) (e : exp) nenv :
+Definition translate_program (args_opt : bool) (e : hoisted_exp) nenv :
   error (list (positive * globdef Clight.fundef type)) :=
-  match e with
-  | Efun fnd e => 
-    let localVars := get_locals e in
-    funs <- translate_fundefs args_opt fnd nenv ;;
-    let allocs := max_allocs e in
-    let (gc_call, _) := make_gc_call allocs nil (* no live roots to push *) 0%N in
-    '(body, _, slots) <- translate_body args_opt [] (union_list PS.empty localVars) [] nenv e ;;
-    let argsExpr := Efield tinfd args_id (Tarray uval max_args noattr) in
-    ret ((body_id , Gfun (Internal
-                              (mkfunction val
-                                          cc_default
-                                          ((tinfo_id, threadInf)::nil)
-                                          ((map (fun x => (x , val)) localVars) ++ (stack_decl (Z.of_N slots)) ++ (alloc_id, val_ptr)::(limit_id, val_ptr)::(args_id, val_ptr)::nil)
-                                          nil
-                                          (alloc_id ::= Efield tinfd alloc_id val_ptr ;
-                                           limit_id ::= Efield tinfd limit_id val_ptr ;
-                                           args_id ::= Efield tinfd args_id (Tarray uval max_args noattr);
-                                           init_stack ;
-                                           gc_call;
-                                           body ;
-                                           Sreturn (Some (Field(argsExpr, Z.of_nat 1))))))) :: funs)
-  | _ => Err "translate_program: Missing toplevel function block"
-  end.
+  let '(fnd, e) := e in
+  let localVars := get_locals e in
+  funs <- translate_fundefs args_opt fnd nenv ;;
+  let allocs := max_allocs e in
+  let (gc_call, _) := make_gc_call allocs nil (* no live roots to push *) 0%N in
+  '(body, _, slots) <- translate_body args_opt [] (union_list PS.empty localVars) [] nenv e ;;
+  let argsExpr := Efield tinfd args_id (Tarray uval max_args noattr) in
+  ret ((body_id , Gfun (Internal
+                            (mkfunction val
+                                        cc_default
+                                        ((tinfo_id, threadInf)::nil)
+                                        ((map (fun x => (x , val)) localVars) ++ (stack_decl (Z.of_N slots)) ++ (alloc_id, val_ptr)::(limit_id, val_ptr)::(args_id, val_ptr)::nil)
+                                        nil
+                                        (alloc_id ::= Efield tinfd alloc_id val_ptr ;
+                                         limit_id ::= Efield tinfd limit_id val_ptr ;
+                                         args_id ::= Efield tinfd args_id (Tarray uval max_args noattr);
+                                         init_stack ;
+                                         gc_call;
+                                         body ;
+                                         Sreturn (Some (Field(argsExpr, Z.of_nat 1))))))) :: funs).
 
 Definition nState := @compM' positive.
 
@@ -925,15 +865,6 @@ Fixpoint make_ind_array (l : list N) : list init_data :=
 
 End CODEGEN.
 
-Definition update_name_env_fun_info (f f_inf : positive) (nenv : name_env) : name_env :=
-  match M.get f nenv with
-  | None => M.set f_inf (nNamed (append (show_pos f) "_info")) nenv
-  | Some n => match n with
-              | nAnon => M.set f_inf (nNamed (append (append "x" (show_pos f)) "_info")) nenv
-              | nNamed s => M.set f_inf (nNamed (append s "_info")) nenv
-              end
-  end.
-
 (* see runtime for description and uses of fundef_info.
   In summary,
   fi[0] = number of words that can be allocated by function
@@ -941,59 +872,31 @@ Definition update_name_env_fun_info (f f_inf : positive) (nenv : name_env) : nam
   rest = indices of live roots in args array
 *)
 
-Fixpoint make_fundef_info (fnd : fundefs) (fenv : fun_env) (nenv : name_env)
-  : nState (list (positive * globdef Clight.fundef type) * fun_info_env * name_env) :=
+Fixpoint make_fundef_info (fnd : fundefs) (fenv : fun_env)
+  : error fun_info_env :=
   match fnd with
-  | Fnil => ret (nil, M.empty (positive * fun_tag), nenv)
+  | Fnil => ret (M.empty _)
   | Fcons x t vs e fnd' =>
     match M.get t fenv with
-    | None => failwith "make_fundef_info: Unknown tag"
-    | Some inf =>
-      let '(n, l) := inf in
-      rest <- make_fundef_info fnd' fenv nenv ;;
-      let '(defs, fienv, nenv') := rest in
-      info_name <- getName ;;
-      let len := Z.of_nat (length l) in
+    | None => Err "make_fundef_info: Unknown tag"
+    | Some (n, l) =>
+      fienv <- make_fundef_info fnd' fenv ;;
       (* it should be the case that n (computed arity from tag) = len (actual arity) *)
-      let ind :=
-          mkglobvar
-            (Tarray uval
-                    (len + 2%Z)
-                    noattr)
-            ((Init_int (Z.of_nat (max_allocs e))) :: (Init_int len) :: (make_ind_array l)) true false in
-      ret ((info_name , Gvar ind) :: defs,
-           M.set x (info_name , t) fienv,
-           update_name_env_fun_info x info_name nenv')
+      ret (M.set x t fienv)
     end
   end.
 
-Definition add_bodyinfo (e : exp) (fenv : fun_env) (nenv : name_env) (fienv: fun_info_env) (defs:list (positive * globdef Clight.fundef type)) :=
-  info_name <- getName ;;
-  let ind :=
-      mkglobvar
-        (Tarray uval
-                2%Z
-                noattr)
-        ((Init_int (Z.of_nat (max_allocs e))) :: (Init_int 0%Z) :: nil) true false in
-  ret ((info_name , Gvar ind) :: defs,
-       M.set main_id (info_name , 1%positive) fienv,
-       M.set info_name (nNamed "body_info"%string) nenv).
-
+Definition add_bodyinfo (fienv: fun_info_env) :=
+  M.set main_id (1%positive) fienv.
+  (* TODO: need to enforce the invariant that all other fun tags are greater than 1 *)
 
 (* Make fundef_info for functions in fnd (if any), and for the body of the program *)
-Definition make_funinfo (e : exp) (fenv : fun_env) (nenv : name_env)
-  : nState (list (positive * globdef Clight.fundef type) * fun_info_env * name_env) :=
-  match e with
-  | Efun fnd e' =>
-    p <- make_fundef_info fnd fenv nenv;;
-    let '(defs, fienv, nenv') := p in
-    add_bodyinfo e' fenv nenv' fienv defs
-  | _ => failwith "make_funinfo: Function block expected"
-  end.
+Definition make_funinfo (e : hoisted_exp) (fenv : fun_env) : error fun_info_env :=
+  let '(fds, e) := e in
+  fienv <- make_fundef_info fds fenv ;;
+  ret (add_bodyinfo fienv).
 
-
-Definition global_defs (e : exp)
-  : list (positive * globdef Clight.fundef type) :=
+Definition global_defs : list (positive * globdef Clight.fundef type) :=
     (gc_id , Gfun (External (EF_external "gc"
                                               (mksignature (val_typ :: nil) None cc_default))
                                  (Tcons threadInf Tnil)
@@ -1007,16 +910,11 @@ Definition global_defs (e : exp)
       ))
     :: nil.
 
-Definition make_defs (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (nenv : name_env) :
-  nState (name_env * (list (positive * globdef Clight.fundef type))) :=
-  fun_inf' <- make_funinfo e fenv nenv ;;
-  let '(fun_inf, fienv, nenv') := fun_inf' in
-  match translate_program cenv fenv fienv args_opt e nenv with
-  | Err s => failwith s
-  | Ret fun_defs' =>
-    let fun_defs := rev fun_defs' in
-    ret (nenv', (global_defs e ++ fun_inf ++ fun_defs)%list)
-  end.
+Definition make_defs (args_opt : bool) (e : hoisted_exp) (fenv : fun_env) (cenv: ctor_env) (nenv : name_env) :
+  error (list (positive * globdef Clight.fundef type)) :=
+  fienv <- make_funinfo e fenv ;;
+  fun_defs' <- translate_program cenv fenv fienv args_opt e nenv ;;
+  ret (global_defs ++ rev fun_defs')%list.
 
 (* Types declared at the begining of the program *)
 Definition composites : list composite_definition :=
@@ -1044,14 +942,6 @@ Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
   match res with
   | Error e => Err "mk_prog_opt"
   | OK p => ret p
-  end.
-
-(* Wrap program in empty Efun if e.g. fully inlined *)
-Definition wrap_in_fun (e:exp) :=
-  match e with
-  | Efun fds e' =>
-    e
-  | _ => Efun Fnil e
   end.
 
 Definition inf_vars :=
@@ -1165,29 +1055,21 @@ Definition export_rec : positive * globdef Clight.fundef type :=
 
 Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_env) :
   error (M.t BasicAst.name * Clight.program * Clight.program) * string :=
-  let e := wrap_in_fun e in
-  let fenv := compute_fun_env e in
-  let ienv := compute_ind_env cenv in
-  (* debug *)
-  (* let dbg := (cps_show.show_exp nenv0 cenv false e) ++ Pipeline_utils.newline ++ log ++ Pipeline_utils.newline ++ check_tags fenv nenv0 e in *)
-  (* end debug *)
-  let p'' := make_defs args_opt e fenv cenv ienv nenv0 in
-  (* state *)
-  let n := ((max_var e 100) + 1)%positive in
-  let comp_d := pack_data 1%positive 1%positive  1%positive 1%positive cenv fenv nenv0 (M.empty nat) [] in (* XXX dummy *)
-  (* run compM *)
-  let err : error (M.t BasicAst.name * Clight.program * Clight.program) :=
-      let '(res, (p, m)) := run_compM p'' comp_d n in
-      '(nenv1, defs) <- res ;;
-      let nenv := (add_inf_vars (ensure_unique nenv1)) in
-      let forward_defs := make_extern_decls nenv defs false in
-      body <- mk_prog_opt [body_external_decl] main_id false;;
-      head <- mk_prog_opt (make_tinfo_rec :: export_rec :: forward_defs ++ defs)%list main_id true ;;
-      ret (M.set make_tinfo_id (nNamed "make_tinfo"%string)
-                 (M.set export_id (nNamed "export"%string) nenv),
-           body, head)
-  in
-  (err, "").
+  let res :=
+    let e := mk_hoisted_exp e in
+    let fenv := compute_fun_env (fst e) in
+    (* debug *)
+    (* let dbg := (cps_show.show_exp nenv0 cenv false e) ++ Pipeline_utils.newline ++ log ++ Pipeline_utils.newline ++ check_tags fenv nenv0 e in *)
+    (* end debug *)
+    defs <- make_defs args_opt e fenv cenv nenv0 ;;
+    let nenv := (add_inf_vars (ensure_unique nenv0)) in
+    let forward_defs := make_extern_decls nenv defs false in
+    body <- mk_prog_opt [body_external_decl] main_id false;;
+    head <- mk_prog_opt (make_tinfo_rec :: export_rec :: forward_defs ++ defs)%list main_id true ;;
+    ret (M.set make_tinfo_id (nNamed "make_tinfo"%string)
+               (M.set export_id (nNamed "export"%string) nenv),
+         body, head)
+  in (res, "").
 
 Definition err {A : Type} (s : String.string) : res A :=
   Error (MSG s :: nil).

@@ -59,14 +59,15 @@ Definition Clight_trans_fast (prims : list (kername * string * nat * positive)) 
                                args prog cenv nenv in
   Ret (add_prim_names prims nenv, stripOption mainIdent prog, stripOption mainIdent head).
 
+Print L6_to_Clight_stack.compile.
 
 Definition Clight_trans_ANF (prims : list (kername * string * nat * positive)) (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram * string :=
   let '(_, cenv, ctag, itag, nenv, fenv, _, prog) := t in
   let '(p, str) := L6_to_Clight_stack.compile
-                     argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
-                     tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-                     args
-                     stackframeTIdent frameIdent rootIdent fpIdent nextFld rootIdent prevFld
+                     mainIdent threadInfIdent allocIdent limitIdent heapInfIdent argsIdent fpIdent
+                     nallocIdent stackframeTIdent nextFld rootFld prevFld tinfIdent frameIdent rootIdent 
+                     args 
+                     gcIdent bodyIdent (* isptrIdent *)
                      false (* args optimization *)
                      prog cenv nenv in
   match p with

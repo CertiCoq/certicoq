@@ -9,27 +9,25 @@ Open Scope alg_scope.
 (* Environment semantics values *)
 Inductive value :=
 | Con_v : dcon -> list value -> value 
-| Prf_v : value
+(* | Prf_v : value *)
 | Clos_v : list value -> name -> expression.exp -> value
 | ClosFix_v : list value -> efnlst -> N -> value.
 
 Lemma value_ind' (P : value -> Prop) :
   (forall dcon vs, Forall P vs -> P (Con_v dcon vs)) ->
-  (P Prf_v) ->
   (forall vs na e, Forall P vs -> P (Clos_v vs na e)) ->
   (forall vs fnl n, Forall P vs -> P (ClosFix_v vs fnl n)) ->
   (forall v,  P v).
 Proof.
-  intros H1 H2 H3 H4.
+  intros H1 H2 H3.
   fix IHv 1; intros v. destruct v.
   - eapply H1. induction l.
     constructor.
     constructor. eapply IHv. eassumption.
-  - eauto.
-  - eapply H3. induction l.
+  - eapply H2. induction l.
     constructor.
     constructor. eapply IHv. eassumption. 
-  - eapply H4. induction l.
+  - eapply H3. induction l.
     constructor.
     constructor. eapply IHv. eassumption. 
 Qed.
@@ -202,15 +200,15 @@ Section FUEL_SEM.
         eval_env_fuel rho e2 (Val v2) f2 ->
         eval_env_fuel (v2 :: rho'') e' r f3 ->
         eval_env_step rho (App_e e1 e2) r (f1 <+> f2 <+> f3)
-  | eval_FixApp_step_OOT1:
-      forall (e1 e2 : expression.exp) (rho : env) (f1 : fuel),
-        eval_env_fuel rho e1 OOT f1 ->
-        eval_env_step rho (App_e e1 e2) OOT f1
-  | eval_FixApp_step_OOT2: 
-      forall (e1 e2 : expression.exp) (v : value) (rho : env) f1 f2,
-        eval_env_fuel rho e1 (Val v) f1 ->
-        eval_env_fuel rho e2 OOT f2 ->
-        eval_env_step rho (App_e e1 e2) OOT (f1 <+> f2)
+  (* | eval_FixApp_step_OOT1: (* TODO remove case *) *)
+  (*     forall (e1 e2 : expression.exp) (rho : env) (f1 : fuel), *)
+  (*       eval_env_fuel rho e1 OOT f1 -> *)
+  (*       eval_env_step rho (App_e e1 e2) OOT f1 *)
+  (* | eval_FixApp_step_OOT2: (* TODO remove case *) *)
+  (*     forall (e1 e2 : expression.exp) (v : value) (rho : env) f1 f2, *)
+  (*       eval_env_fuel rho e1 (Val v) f1 -> *)
+  (*       eval_env_fuel rho e2 OOT f2 -> *)
+  (*       eval_env_step rho (App_e e1 e2) OOT (f1 <+> f2) *)
                       
   | eval_Match_step:
       forall (e1 e': expression.exp) (rho: env) (dc: dcon) (vs: list value)
@@ -274,8 +272,6 @@ Section FUEL_SEM.
         forall dc vs,
           Forall well_formed_val vs ->
           well_formed_val (Con_v dc vs)
-    | Wf_Prf :
-        well_formed_val Prf_v
     | Wf_Clos :
         forall vs n e,
           Forall well_formed_val vs -> 
@@ -456,5 +452,190 @@ Section FUEL_SEM.
 
 
   End WF.
+
+
+  Lemma exps_to_list_append e1 e2 :
+    exps_to_list (exps_append e1 e2) = exps_to_list e1 ++ exps_to_list e2.
+  Proof.
+    induction e1. reflexivity.
+    simpl. rewrite IHe1. reflexivity.
+  Qed.
+
+  Lemma fuel_sem_OOT vs e r f f' :
+    eval_env_fuel vs e r f ->
+    lt f' f -> 
+    eval_env_fuel vs e OOT f'.
+  Proof.   
+    pose (P := fun (vs : env) (e : exp) (r : result) (f : fuel) => 
+                 forall f',
+                   lt f' f -> 
+                   eval_env_step vs e OOT f').
     
+    pose (P1 := fun (vs : env) (e : exp) (r : result) (f : fuel) => 
+                  forall f',
+                    lt f' f -> 
+                    eval_env_fuel vs e OOT f').
+    
+    pose (P2 := fun (vs : env) (es : exps) (vs' : list value) (f : fuel) =>
+                  forall f',
+                    lt f' f -> 
+                    exists es1 e es2 vs1 fs f'',
+                      exps_to_list es = exps_to_list es1 ++ e :: exps_to_list es2 /\
+                      f' = (fs <+> f'') /\
+                      eval_fuel_many vs es1 vs1 fs /\ eval_env_fuel vs e OOT f'').
+    
+    intros Heval. revert f'.
+    eapply eval_env_fuel_ind' with (P := P) (P0 := P2) (P1 := P1);
+      unfold P, P1, P2; intros; try congruence.
+
+    - edestruct H0. eassumption. destructAll. 
+      econstructor; eassumption.
+
+    - edestruct (lt_all_dec f' fs).
+      + edestruct H1. eassumption. destructAll. 
+        rewrite H6, <- app_assoc in H. simpl in H. 
+        econstructor.
+        rewrite H. f_equal. f_equal.
+        replace (e0 :: exps_to_list es2) with (exps_to_list (econs e0 es2)) by reflexivity.
+        rewrite <- exps_to_list_append. reflexivity.
+        eassumption.
+        eassumption.
+
+      + destructAll. rewrite (plus_comm fs) in H4.
+        eapply plus_stable in H4. rewrite plus_comm.
+        econstructor. eassumption. eassumption. 
+        eapply H3; eauto.
+
+    - edestruct (lt_all_dec f' f1).
+
+      + eapply eval_App_step_OOT1; eauto.
+
+      + destructAll.
+        rewrite plus_assoc in H5.
+        rewrite !(plus_comm f1) in H5.
+        eapply plus_stable in H5.
+
+        edestruct (lt_all_dec x f2).
+
+        * rewrite plus_comm. eapply eval_App_step_OOT2; eauto.
+
+        * destructAll.
+          rewrite !(plus_comm f2) in H5.
+          eapply plus_stable in H5.
+
+          rewrite plus_assoc. 
+          rewrite (plus_comm f2 f1), (plus_comm x0).
+
+          eapply eval_App_step; eauto.
+
+    - eapply eval_App_step_OOT1; eauto.
+
+    - edestruct (lt_all_dec f' f1).
+
+      + eapply eval_App_step_OOT1; eauto.
+
+      + destructAll. rewrite (plus_comm f1) in H3.
+        eapply plus_stable in H3.
+        rewrite plus_comm. 
+        eapply eval_App_step_OOT2; eauto.
+
+    - edestruct (lt_all_dec f' f1).
+
+      + eapply eval_Let_step_OOT; eauto.
+
+      + destructAll. rewrite (plus_comm f1) in H3.
+        eapply plus_stable in H3.
+        rewrite plus_comm. 
+        eapply eval_Let_step; eauto.
+
+    - eapply eval_Let_step_OOT; eauto.
+
+    - edestruct (lt_all_dec f' f1).
+
+      + eapply eval_App_step_OOT1; eauto.
+
+      + destructAll.
+        rewrite plus_assoc in H7.
+        rewrite !(plus_comm f1) in H7.
+        eapply plus_stable in H7.
+
+        edestruct (lt_all_dec x f2).
+
+        * rewrite plus_comm. eapply eval_App_step_OOT2; eauto.
+
+        * destructAll.
+          rewrite !(plus_comm f2) in H7.
+          eapply plus_stable in H7.
+          
+          rewrite plus_assoc. 
+          rewrite (plus_comm f2 f1), (plus_comm x0).
+
+          eapply eval_FixApp_step; eauto.
+
+    - edestruct (lt_all_dec f' f1).
+
+      + eapply eval_Match_step_OOT; eauto.
+
+      + destructAll. 
+        rewrite !(plus_comm f1) in H4.
+        eapply plus_stable in H4.
+        rewrite plus_comm. eapply eval_Match_step; eauto.
+
+    - eapply eval_Match_step_OOT; eauto.
+
+    - exfalso. eapply lt_zero; eauto.
+
+    - edestruct (lt_all_dec f' f0).
+
+      + exists enil. do 5 eexists.
+        split. simpl. reflexivity.
+        split. rewrite plus_zero. reflexivity.
+        split. constructor.
+        eauto.
+
+      + destructAll.
+        rewrite !(plus_comm f0) in H3.
+        eapply plus_stable in H3.
+        edestruct H2. eassumption. destructAll.
+
+        exists (econs e0 x0). do 5 eexists. split.
+
+        simpl. rewrite H4. reflexivity. split.
+
+        
+        rewrite (plus_comm _ f0), plus_assoc. reflexivity.
+        split. econstructor; eauto.  eassumption.
+
+    - exfalso. eapply lt_zero; eauto.
+
+    - exfalso. eapply lt_zero; eauto.
+
+    - exfalso. eapply lt_zero; eauto.
+
+    - eapply lt_one in H. subst.
+      exfalso; eapply lt_zero; eauto.
+
+    - edestruct (lt_all_dec f' (one e0)).
+
+      + econstructor. eassumption.
+
+      + destructAll.
+        eapply plus_stable in H1.
+        eapply eval_step. eauto.
+
+    - eassumption.
+  Qed. 
+
+
+      
+      
+  Lemma fuel_sem_monotonic vs e f f' :
+    eval_env_fuel vs e OOT f ->
+    lt f' f -> 
+    eval_env_fuel vs e OOT f'.
+  Proof.
+    eapply fuel_sem_OOT.
+  Qed.      
+    
+  
 End FUEL_SEM.

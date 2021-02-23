@@ -194,35 +194,360 @@ Section Refinement.
 
         simpl in *. eapply cps_val_comp. eassumption. eassumption.
 
-    - 
+    - intros Hdiv.
 
-        ines .eassumption. 
-      exact (M.empty _).
+      intros c. specialize (Hdiv c).
+      edestruct cps_cvt_correct
+        with (rho := M.set k
+                           (Vfun (M.empty _) (Fcons k kon_tag [x] (Ehalt x) Fnil) k)
+                           (M.empty _)) (x := x); try eassumption.
+      + now constructor.
+      + simpl. eassumption.
+      + repeat normalize_sets.
+        eapply Disjoint_Singleton_l. simpl.
+        intros Hin. unfold In in *. lia.
+      + repeat normalize_sets. intros Hc. inv Hc.
+        eauto.
+      + intros Hc. inv Hc. 
+      + constructor.
+      + rewrite M.gss. reflexivity.
+      + clear H0.
+        specialize (H1 eq_refl). destructAll.
+
+        destruct c.
+
+        * eexists. constructor. simpl.
+          unfold one, one_i. simpl. lia.
+
+        * eexists. replace (S c) with (c + 1)%nat by lia.
+          econstructor 2. econstructor.
+          simpl.
+          edestruct Nat.le_exists_sub with (n := c) (m := x2). lia. destructAll.   
+          eapply bstep_fuel_OOT_monotonic in H1.
+          destructAll. destruct x2. eassumption. 
+
+          Grab Existential Variables. exact 0%nat.
+  Qed.
+
+
+  Section Linking.
+
+    Definition link_src (e_lib e_cli : expression.exp) :=
+      Let_e nAnon e_lib e_cli.
+
+
+    Definition link_trg (k1 x1 : var) (e_lib e_cli : cps.exp) :=
+      (* Efun (Fcons k2 kon_tag [x2] (Ehalt x1) Fnil) *)
+      (Efun (Fcons k1 kon_tag [x1] e_cli Fnil) e_lib).
+           
+
+    Lemma linking_correct e_lib e_cli k1 x1 r f:
+      forall rho k x vk e_lib' e_cli' i,
+        exp_wf 0%N e_lib ->
+        exp_wf 1%N e_cli ->
+        
+        eval_env_fuel [] (link_src e_lib e_cli) r f ->
+
+        cps_rel_top e_cli [x1] k e_cli' ->
+        cps_rel_top e_lib [] k1 e_lib' ->
+
+        x1 <> k ->
+        k1 <> k ->
+        x <> k ->
+        
+        M.get k rho = Some vk ->
+        
+        (* Source terminates *)
+        (forall v v',
+            r = (Val v) ->
+            cps_val_rel func_tag kon_tag dtag cnstrs v v' ->
+            preord_exp cenv (cps_bound f) eq_fuel i
+                  ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
+                  (link_trg k1 x1 e_lib' e_cli', rho)) /\
+        (* SOurce diverges *)
+        (r = fuel_sem.OOT ->
+         exists c, (f <= c)%nat /\ bstep_fuel cenv rho (link_trg k1 x1 e_lib' e_cli') c eval.OOT tt).
+    Proof.
+      intros rho k x vk e_lib' e_cli' i Hwf1 Hwf2 Heval Hcps1 Hcps2 Hneq1 Hneq2 Hneq3 Hget.
+      inv Heval.
+
+      - split. congruence.
+        intros _. eexists 0%nat. split.
+
+        simpl in *. unfold fuel_sem.one, one_i in *. simpl in *. lia.
+        constructor 1. unfold one, one_i. simpl. lia. 
+
+      - inv H.
+
+        + assert (Heval1 := H6). eapply cps_cvt_correct in H6; eauto.
+          assert (Heval2 := H7). eapply cps_cvt_correct in H7; eauto.
+          
+          unfold link_trg.
+
+          assert (Hwfv2 : well_formed_val v1).
+          { eapply eval_env_step_preserves_wf; [ | reflexivity | | ]. eassumption.
+            now constructor. eassumption. } 
+
+          assert (Hex' : exists v', cps_val_rel func_tag kon_tag dtag cnstrs v1 v').
+          { eapply cps_val_rel_exists. eassumption. (* TODO remove arg *) eassumption. } destructAll. 
+
+          inv Hcps1. inv Hcps2.
+          
+          assert (Heq : forall m, preord_exp' cenv (preord_val cenv) (cps_bound (f1 <+> fuel_sem.one (link_src e_lib e_cli))) eq_fuel m
+                                              (e_cli', map_util.M.set x1 x0 (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] e_cli' Fnil) k1) rho))
+                                              (Efun (Fcons k1 kon_tag [x1] e_cli' Fnil) e_lib', rho)). 
+        { intros j. eapply preord_exp_post_monotonic.
+          2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              
+              2:{ intros m. eapply preord_exp_Efun_red. } 
+              assert (Hex' : exists z, ~ In var (k1 |: FromList []) z).
+              { eapply ToMSet_non_member. tci. } destructAll.
+              
+              eapply preord_exp_trans. tci. eapply eq_fuel_idemp. 
+
+              
+              2:{ intros m. simpl. eapply H6; [ | | | | | | | eassumption | reflexivity | ].
+                  - now constructor.
+                  - eassumption. 
+                  - repeat normalize_sets. eapply Disjoint_Singleton_l.
+                    unfold In. simpl. lia.
+                  - eassumption.
+                  - intros Hc. inv Hc.
+                  - econstructor.
+                  - rewrite M.gss. reflexivity.
+                  - eassumption. }
+               
+              eapply preord_exp_Eapp_red.
+              - rewrite M.gso; eauto. rewrite M.gss. reflexivity. intros Hc; subst; eauto.
+              - simpl. rewrite Coqlib.peq_true. reflexivity.
+              - simpl. rewrite M.gss. reflexivity.
+              - simpl. reflexivity. } 
+          
+          (* Invariant composition *)
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+            intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
+            destructAll. destruct x4, x5. repeat destruct p, p0. subst. simpl. lia. } } 
+        
+        assert (Hex : exists x, ~ In var (k |: FromList [x1]) x).
+        { eapply ToMSet_non_member. tci. } destructAll.
+        
+        split. 
+        (* Termination *) 
+        { intros v v' Heq1 Hvrel. subst. 
+          
+          eapply preord_exp_post_monotonic.
+          
+          2:{ eapply preord_exp_trans; [ | | | eassumption ]. tci. eapply eq_fuel_idemp. 
+              
+              eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              
+              2:{ intros m. eapply H7; [ | | | | | | | eassumption | reflexivity | eassumption ].
+                  - constructor; eauto.
+                  - simpl Datatypes.length. rewrite Nnat.Nat2N.inj_succ, <- OrdersEx.N_as_OT.add_1_l. eassumption. 
+                  - repeat normalize_sets. eapply Union_Disjoint_l; sets.
+                    eapply Disjoint_Singleton_l. unfold In. simpl. lia.
+                    eapply Disjoint_Singleton_l. unfold In. simpl. lia.
+                  - eassumption.
+                  - repeat normalize_sets. intros Hc; inv Hc; eauto.
+                  - eapply cps_env_rel_extend_weaken; eauto.
+                    eapply cps_env_rel_weaken; eauto. constructor.
+                  - rewrite !M.gso. eassumption.
+                    now eauto. now eauto. }
+
+              eapply preord_exp_app_compat with (P2 := eq_fuel).
+              now eapply eq_fuel_compat. 
+              now eapply eq_fuel_compat. 
+              
+              eapply preord_var_env_extend_neq. 
+              eapply preord_var_env_extend_eq.
+              eapply preord_val_refl. now tci.
+              now eauto.
+              
+              now intros Hc; subst; eauto.
+              constructor.
+              eapply preord_var_env_extend_eq.
+              eapply preord_val_refl. now tci. now constructor. } 
+          
+          (* Invariant composition *)
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+            intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
+            destructAll. destruct x5, x6. repeat destruct p, p0. subst.
+            simpl in *. lia. } }
+               
+        (* OOT *)
+        { intros ?; subst.
+
+          edestruct H7 with (rho := M.set x1 x0 (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] e_cli' Fnil) k1) rho));
+            [ | | | | | | | eassumption | ].
+          - constructor; eauto.
+          - eassumption.
+          - repeat normalize_sets.
+            eapply Union_Disjoint_l; sets.
+            eapply Disjoint_Singleton_l. unfold In. simpl. lia.
+            eapply Disjoint_Singleton_l. unfold In. simpl. lia.
+          - eassumption.
+          - repeat normalize_sets. intros Hc; inv Hc; eauto.
+          - eapply cps_env_rel_extend_weaken; eauto.
+            eapply cps_env_rel_weaken; eauto. constructor.
+          - rewrite !M.gso. eassumption.
+            now eauto. now eauto.
+          - destruct (H4 ltac:(reflexivity)). destructAll. eapply Heq in H8; [ | reflexivity ]. destructAll.
+            destruct x6; try contradiction. destruct x8. eexists. split; [ | eassumption ].
+            
+            unfold fuel_sem.one in *. simpl in *. lia. } 
+        
+      + (* Let_e, OOT *)
+        split. congruence.
+        intros _.
+        set (rho' := M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] e_cli' Fnil) k1) rho).
+        
+        assert (Hex : exists x, ~ In var (k1 |: FromList []) x).
+        { eapply ToMSet_non_member. tci. } destructAll.
+        
+        assert (Heval1 := H6). eapply cps_cvt_correct in H6; eauto.
+
+        inv Hcps1. inv Hcps2. 
+        
+        edestruct (H6 rho'); [ | | | | | | | eassumption | ].
+        * constructor.
+        * eassumption.
+        * repeat normalize_sets.
+          eapply Disjoint_Singleton_l. unfold In. simpl. lia.
+        * eassumption.
+        * intros Hc. inv Hc.
+        * econstructor.
+        * unfold rho'. rewrite M.gss. reflexivity.
+        * edestruct H3. reflexivity. destructAll.
+          exists (x4 + 1)%nat.
+          split. unfold fuel_sem.one. simpl. lia.
+          replace tt with (tt <+> tt) by reflexivity. eapply BStepf_run. econstructor; eauto.
+
+          
+          Grab Existential Variables. exact 0%nat. exact 0%nat.
+          
+    Qed.      
       
-    edestruct 
 
+    Theorem cps_corrrect_top_sep_comp e_lib e_cli k1 k2 x1 x2 :
+      exp_wf 0%N e_lib ->
+      exp_wf 1%N e_cli ->
+      
+      x1 <> k2 ->
+      k1 <> k2 ->
+      x2 <> k2 ->
+
+      exists e_cli' e_lib',
+        cps_rel_top e_cli [x1] k2 e_cli' /\
+        cps_rel_top e_lib [] k1 e_lib' /\
+        refines (link_src e_lib e_cli)
+                (Efun (Fcons k2 kon_tag [x2] (Ehalt x2) Fnil) (link_trg k1 x1 e_lib' e_cli')).
+      
+    Proof.
+      intros Hwf1 Hwf2 Hneq1 Hneq2 Hneq3.
+
+      edestruct cps_rel_exists with (xs := @nil var).
+      eassumption.
+      eassumption.
+      
+      destructAll.
+      
+      edestruct cps_rel_exists with (xs := [x1]).
+      eassumption.
+      eassumption.
+      
+      destructAll.
+      
+      
+      do 2 eexists. split; [ | split ].
+      eexists. eassumption.
+      eexists. eassumption.
+      
+      
+      split.
+      
+      - intro; intros.
+        edestruct linking_correct
+          with (rho := M.set k2
+                             (Vfun (M.empty _) (Fcons k2 kon_tag [x2] (Ehalt x2) Fnil) k2)
+                             (M.empty _)) (x := x2).
+        + eapply Hwf1.
+        + eapply Hwf2.
+        + eassumption.
+        + eexists. eassumption.
+        + eexists. eassumption.
+        + now eauto.
+        + now eauto.
+        + now eauto.
+        + rewrite M.gss. reflexivity.
+        + clear H3.
+          
+          edestruct cps_val_rel_exists as [v2 Hval]. eassumption.
+          eapply eval_env_step_preserves_wf. eassumption. reflexivity. constructor.
+          constructor.
+          eassumption. eassumption.
+          specialize (H2 v1 v2 eq_refl Hval).
+          
+          edestruct H2. reflexivity.
+          
+          econstructor 2. econstructor.
+          rewrite M.gso. rewrite M.gss. reflexivity.
+          now eauto.
+          simpl. rewrite M.gss. reflexivity.
+          simpl. rewrite Coqlib.peq_true. reflexivity.
+          simpl. reflexivity.
+          
+          econstructor 2. econstructor. rewrite M.gss. reflexivity.
+          
+          destructAll. destruct x5. contradiction.
+          
+          destruct x7.
+
+          do 2 eexists. split.
+
+          replace tt with (tt <+> tt) by reflexivity.
+          econstructor 2. 
+          econstructor. simpl. eassumption.
+
+          simpl in *. eapply cps_val_comp. eassumption. eassumption.
+
+      - intros Hdiv.
+
+        intros c. specialize (Hdiv c).
+        edestruct linking_correct
+          with (rho := M.set k2
+                             (Vfun (M.empty _) (Fcons k2 kon_tag [x2] (Ehalt x2) Fnil) k2)
+                             (M.empty _)) (x := x2).
+        + eapply Hwf1.
+        + eapply Hwf2.
+        + eassumption.
+        + eexists. eassumption.
+        + eexists. eassumption.
+        + now eauto.
+        + now eauto.
+        + now eauto.
+        + rewrite M.gss. reflexivity.
+        + clear H1.
+          specialize (H2 eq_refl). destructAll.
+
+          destruct c.
+          
+          * eexists. constructor. simpl.
+            unfold one, one_i. simpl. lia.
+
+          * eexists. replace (S c) with (c + 1)%nat by lia.
+            econstructor 2. econstructor.
+            simpl.
+            edestruct Nat.le_exists_sub with (n := c) (m := x5). lia. destructAll.   
+            eapply bstep_fuel_OOT_monotonic in H2.
+            destructAll. destruct x5. eassumption. 
+            
+            Grab Existential Variables. exact 0%nat.
+    Qed.
+
+
+  End Linking.
+
+  
+End Refinement.
     
-    . 
-    cps_exp_rel_exists
-    edestruct (cps_fix_rel_exists (max_list xs k + 1) 
-    
-well_formed_env vs ->
-exp_wf (N.of_nat (Datatypes.length vnames))
-  e ->
-Disjoint var (k |: FromList vnames) S ->
-~ In var (k |: FromList vnames) x ->
-~ In var (FromList vnames) k ->
-cps_env_rel func_tag kon_tag default_tag
-  cnstrs vnames vs rho ->
-rho ! k = Some vk ->
-cps_cvt_rel func_tag kon_tag default_tag S
-  e vnames k cnstrs S' e' ->
-(forall (v : value) (v' : val),
- r = Val v ->
- cps_val_rel func_tag kon_tag default_tag
-   cnstrs v v' ->
- preord_exp cenv (cps_bound f) eq_fuel i
-   (Eapp k kon_tag [x],
-   M.set x v' (M.set k vk (M.empty val)))
-   (e', rho)) /\
-(r = fuel_sem.OOT ->
+ 

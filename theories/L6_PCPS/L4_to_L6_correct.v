@@ -1968,126 +1968,7 @@ Section Correct.
             destruct x8; try contradiction. destruct x10. eexists. split; [ | eassumption ].
             
             unfold fuel_sem.one in *. simpl in *. lia. } 
-        
-
-      - (* App_e, ClosFix_v, OOT 1 *)
-        intros e1 e2 vs f1 Hoot IH.
-        intros rho vnames k x vk e' S S' f Hwfenv Hwf Hdis Hnin1 Hnin2 Hcenv Hget Hcps. split.
-        congruence.
-        intros _. inv Hcps. inv Hwf.
-        set (rho' := M.set k1 (Vfun rho
-                                    (Fcons k1 kon_tag [x1]
-                                           (Efun
-                                              (Fcons k2 kon_tag [x2] (Eapp x1 func_tag [k; x2]) Fnil)
-                                              e2') Fnil) k1) rho).
-        assert (Hex : exists x, ~ In var (k1 |: FromList vnames) x).
-        { eapply ToMSet_non_member. tci. } destructAll. 
-        
-        edestruct IH with (rho := rho'); [ | | | | | | | eassumption | ].
-        + eassumption.
-        + eassumption.          
-        + eapply Union_Disjoint_l; sets.
-          eapply Disjoint_Included; [ | | eapply Hdis ]; sets.
-        + eassumption.
-        + intros Hc; inv H2; eapply Hdis; eauto.
-        + unfold rho'.
-          eapply cps_env_rel_weaken; try eassumption.
-          inv H2. intros Hc. eapply Hdis; eauto.
-        + unfold rho'. rewrite M.gss. reflexivity.
-        + destruct H5. reflexivity. destructAll. eexists (x3 + 1)%nat. split.
-          unfold fuel_sem.one. simpl. lia.
-          replace tt with (tt <+> tt) by reflexivity. eapply BStepf_run. econstructor.
-          simpl. eassumption.
-          
-      - (* App_e, ClosFix_v, OOT 2 *)
-        intros e1 e2 v vs f1 f2 He1 IH1 Hoot IH2.
-        intros rho vnames k x vk e' S S' f Hwfenv Hwf Hdis Hnin1 Hnin2 Hcenv Hget Hcps. split.
-        congruence.
-        intros _. inv Hcps. inv Hwf.
-
-        assert (Hlen : Datatypes.length vs = Datatypes.length vnames).
-        { unfold well_formed_in_env. eapply Forall2_length. eassumption. }
-        
-        assert (Hwfv2 : well_formed_val v).
-        { eapply eval_env_step_preserves_wf; [ | reflexivity | | ]. eassumption.
-          eassumption. unfold well_formed_in_env. rewrite Hlen. eassumption. } 
-                
-        assert (Hex' : exists v', cps_val_rel v v').
-        { eapply cps_val_rel_exists. eassumption. (* TODO remove arg *) eassumption. } 
-        destructAll.
-
-        set (rho' := M.set k2 (Vfun (M.set x1 x0 (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] (Efun (Fcons k2 kon_tag [x2] (Eapp x1 func_tag [k; x2]) Fnil) e2') Fnil) k1) rho)) (Fcons k2 kon_tag [x2] (Eapp x1 func_tag [k; x2]) Fnil) k2)
-                           (M.set x1 x0
-                                  (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1]
-                                                             (Efun (Fcons k2 kon_tag [x2] (Eapp x1 func_tag [k; x2])
-                                                                          Fnil) e2') Fnil) k1) rho))).
-        
-        assert (Heq : forall m, preord_exp' cenv (preord_val cenv) (cps_bound (f1 <+>fuel_sem.one (e1 $ e2))) eq_fuel m
-                                            (e2', rho')
-                                            (Efun (Fcons k1 kon_tag [x1] (Efun (Fcons k2 kon_tag [x2] (Eapp x1 func_tag [k; x2]) Fnil) e2') Fnil)
-                                                  e1', rho)). 
-        { intros j. eapply preord_exp_post_monotonic.
-          2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
-              
-              2:{ intros m. eapply preord_exp_Efun_red. } 
-              assert (Hex' : exists z, ~ In var (k1 |: FromList vnames) z).
-              { eapply ToMSet_non_member. tci. } destructAll.
-              
-              eapply preord_exp_trans. tci. eapply eq_fuel_idemp. 
-              
-              2:{ intros m. simpl. eapply IH1; [ | | | | | | | eassumption | reflexivity | ].
-                  - eassumption.
-                  - eassumption.
-                  - eapply Union_Disjoint_l; sets.
-                    eapply Disjoint_Included; [ | | eapply Hdis ]; sets.
-                  - eassumption.
-                  - intros Hc. inv H2. eapply Hdis; eauto.
-                  - eapply cps_env_rel_weaken. eassumption.
-                    inv H2. intros Hc. eapply Hdis; eauto.
-                  - rewrite M.gss. reflexivity. 
-                  - eassumption. }
-          
-              eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
-              
-              2:{ intros m. eapply preord_exp_Eapp_red.
-                  - rewrite M.gso; eauto. rewrite M.gss. reflexivity. intros Hc; subst; eauto.
-                  - simpl. rewrite Coqlib.peq_true. reflexivity.
-                  - simpl. rewrite M.gss. reflexivity.
-                  - simpl. reflexivity. }  
-              
-              eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
-               
-              2:{ intros m. eapply preord_exp_Efun_red. } simpl. 
-
-              eapply preord_exp_refl. tci.
-              eapply preord_env_P_refl. tci. }
-          
-          (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
-            intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
-            destructAll. destruct_tuples. subst. simpl. lia. } }  
-
-        
-        assert (Hex : exists x, ~ In var (k2 |: FromList (vnames)) x).
-        { eapply ToMSet_non_member. tci. } destructAll.
-
-        assert (HS2 := H6). eapply cps_cvt_rel_subset in HS2. 
-        
-        edestruct IH2 with (rho := rho'); [ | | | | | | | eassumption | ].
-        + eassumption.
-        + eassumption.
-        + eapply Disjoint_Included_r. eassumption. 
-          eapply Union_Disjoint_l; sets.
-          repeat eapply Setminus_Disjoint_preserv_r. sets. 
-        + eassumption.
-        + inv_setminus. intros Hc; eauto. eapply Hdis; eauto.          
-        + inv_setminus.
-          repeat eapply cps_env_rel_weaken; eauto; now intros Hc; eapply Hdis; eauto.
-        + unfold rho'. rewrite M.gss. reflexivity.
-        + destruct (H9 ltac:(reflexivity)). destructAll. eapply Heq in H11; [ | reflexivity ]. destructAll.
-          destruct x5; try contradiction. destruct x7. eexists. split; [ | eassumption ].
-          unfold fuel_sem.one in *. simpl in *. lia.
-          
+                  
       - (* Match_e *)
         intros e1 e' vs dc vs' n brs r f1 f2 Heval1 IH1  Hfind Heval2 IH2.
         intros rho vnames k x vk e2 S S' f Henvwf Hwf Hdis Hnin1 Hnin2 Hcenv Hstep Hcps. 
@@ -2777,8 +2658,8 @@ Section Correct.
         Grab Existential Variables.
         exact 0%nat. exact 0%nat. exact 0%nat.
         exact 0%nat. exact 0%nat. exact 0%nat.
-        exact 0%nat. exact 0%nat. exact 0%nat.
-        exact 0%nat. (* Where do these come from??? *) 
+        exact 0%nat. exact 0%nat.
+        (* Where do these come from??? *) 
     Qed. 
     
 End Correct.

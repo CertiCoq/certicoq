@@ -1991,8 +1991,6 @@ Section Post.
           Forall2 (fun v v' => cps_val_rel v v') vs vs' ->
           dcon_to_tag default_tag dc cnstrs = c_tag ->
           cps_val_rel (Con_v dc vs) (Vconstr c_tag vs')
-    | rel_Prf :
-        cps_val_rel Prf_v (Vint 0)
     | rel_Clos :
         forall vs rho names na k x f e e' S1 S2,
           cps_env_rel' cps_val_rel names vs rho ->
@@ -2145,9 +2143,6 @@ Section Post.
         induction IH; intros vs1 vs2 H1 H2.
         + inv H1. inv H2. constructor.
         + inv H1; inv H2. constructor; eauto.
-
-      - intros v1 v2 Hrel1 Hrel2. inv Hrel1; inv Hrel2.
-        rewrite preord_val_eq. reflexivity.
 
       - intros vs1 na e Hall v1 v2 Hrel1 Hrel2.
         inv Hrel1; inv Hrel2.

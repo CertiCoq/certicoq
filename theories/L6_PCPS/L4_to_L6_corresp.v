@@ -245,50 +245,6 @@ Section Corresp.
         now constructor; eauto.
         constructor; eauto. intros Hc; inv Hc; eauto; inv H14; now eauto.
       + eassumption. 
-      (* + lia. *)
-      (* + repeat normalize_bound_var. repeat normalize_sets.  *)
-      (*   eapply Union_Included; [ | eapply Union_Included; [ eapply Union_Included | ] ]. *)
-      (*   * eapply Singleton_Included. unfold In, Range in *. lia. *)
-      (*   * eapply Singleton_Included. unfold In, Range in *. lia. *)
-      (*   * eapply Singleton_Included. unfold In, Range in *. lia. *)
-      (*   * eapply Included_trans. eassumption. eapply Range_Subset; lia. *)
-      (* + constructor. now constructor. *)
-      (*   constructor; eauto. *)
-      (*   * intros Hc. eapply H6 in Hc. unfold In, Range in *. lia. *)
-      (*   * intros Hc. inv Hc. *)
-      (*   * repeat normalize_sets. *)
-      (*     eapply Union_Disjoint_r. *)
-      (*     eapply Disjoint_Singleton_r. *)
-      (*     intros Hc. eapply H6 in Hc. unfold In, Range in *. lia. *)
-      (*     eapply Disjoint_Singleton_r. *)
-      (*     intros Hc. eapply H6 in Hc. unfold In, Range in *. lia. *)
-      (*   * repeat normalize_bound_var. sets. *)
-      (*   * repeat normalize_bound_var. sets. *)
-      (*   * inv_setminus. intros Hc. inv Hc; eauto. inv H14; eauto. *)
-      (*   * inv_setminus. constructor. *)
-      (*     intros Hc; inv Hc; now eauto. *)
-      (*     constructor; eauto. constructor. *)
-      (*   * constructor.  *)
-      (*   * repeat normalize_bound_var. sets. *)
-      (* + inv_setminus. repeat normalize_bound_var. repeat normalize_occurs_free. simpl. *)
-      (*   rewrite !FromList_cons, !FromList_nil at 1. *)
-      (*   rewrite Setminus_Empty_set_abs_r. rewrite !Union_Empty_set_neut_r at 1. *)
-      (*   eapply Union_Disjoint_r. now sets. *)
-      (*   eapply Union_Disjoint_r. *)
-      (*   eapply Union_Disjoint_l. now sets. *)
-      (*   rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set. normalize_sets.  *)
-      (*   eapply Union_Disjoint_r. *)
-      (*   eapply Disjoint_Singleton_r. now intros Hc; inv Hc; inv H14; eapply Hdis; eauto. *)
-      (*   eapply Disjoint_Singleton_r. now intros Hc; inv Hc; inv H14; eapply Hdis; eauto. *)
-      (*   eapply Union_Disjoint_l; sets. *)
-      (*   rewrite Setminus_Union_distr, Setminus_Same_set_Empty_set. normalize_sets.  *)
-      (*   eapply Disjoint_Included_r. eassumption. *)
-
-      (*   assert (Hleq : (k < next_var (fst w))%positive). *)
-      (*   { eapply POrderedType.Positive_as_DT.lt_nle. intros Hc. eapply Hfresh in Hc. *)
-      (*     eapply Hdis; eauto. } *)
-      (*   eapply Disjoint_Included_l. eapply Setminus_Included. *)
-      (*   eapply Disjoint_Singleton_l. intros Hc. unfold In, Range in *. lia. *)
 
     - (* App_e *)
       unfold cps_cvt. 
@@ -339,17 +295,10 @@ Section Corresp.
       eapply pre_curry_l; intros Hlt2.
       eapply pre_existential. intros S1. 
       eapply pre_curry_l; intros Hrel1.
-
-      (* eapply pre_strenghtening. *)
-      (* intros st s Hyp. destructAll. exact (conj (conj H6 H7) (conj H2 (conj H3 H1))). *)
-      
-      (* eapply pre_curry_l. intros [Hun Hdis']. *)
       
       eapply bind_triple.      
       
-      (* eapply frame_rule. eapply frame_rule.  *)
       eapply H0 with (S := S1). eassumption.
-      (* eapply Disjoint_Included_l. eapply cps_cvt_exp_subset. eassumption.  now sets. *)
       
       intros e2 w6. simpl. eapply return_triple.
       intros. destructAll.
@@ -357,83 +306,6 @@ Section Corresp.
       eexists. split.
       + econstructor; eauto.
       + eassumption.
-      (* + lia. *)
-      (* + rewrite !bound_var_Efun, !bound_var_fundefs_Fcons. *)
-      (*   rewrite !bound_var_Efun, !bound_var_fundefs_Fcons, !bound_var_Eapp, !bound_var_fundefs_Fnil at 1. *)
-      (*   repeat normalize_sets.  *)
-      (*   eapply Union_Included. *)
-      (*   eapply Union_Included; [ | eapply Union_Included; [ | eapply Union_Included; [ eapply Union_Included |  ] ] ]. *)
-      (*   * eapply Singleton_Included. unfold In, Range in *. lia. *)
-      (*   * eapply Singleton_Included. unfold In, Range in *. lia. *)
-      (*   * eapply Singleton_Included. unfold In, Range in *. lia. *)
-      (*   * eapply Singleton_Included. unfold In, Range in *. lia. *)
-      (*   * eapply Included_trans. eassumption. eapply Range_Subset; lia. *)
-      (*   * eapply Included_trans. eassumption. eapply Range_Subset; lia. *)
-      (* + constructor; eauto. *)
-      (*   constructor; eauto. *)
-      (*   * intros Hc. eapply bound_var_Efun in Hc. *)
-      (*     repeat normalize_bound_var_in_ctx. repeat normalize_sets. inv_setminus. *)
-      (*     inv Hc; eauto. inv H20; eauto. inv H21; eauto. inv H21; eauto. *)
-      (*     eapply H8 in H20. unfold In, Range in *. lia. *)
-      (*   * intros Hc. inv Hc. *)
-      (*   * repeat normalize_bound_var. repeat normalize_sets. inv_setminus. *)
-      (*     eapply Union_Disjoint_l. eapply Union_Disjoint_l.           *)
-      (*     eapply Disjoint_Singleton_r. now intros Hc; inv Hc; eauto. *)
-      (*     eapply Disjoint_Singleton_r. now intros Hc; inv Hc; eauto. *)
-      (*     eapply Disjoint_Singleton_r. *)
-      (*     intros Hc. eapply H8 in Hc. unfold In, Range in *. lia. *)
-      (*   * repeat normalize_bound_var. sets. *)
-      (*   * rewrite bound_var_fundefs_Fnil. sets. *)
-      (*   * inv_setminus. intros Hc. inv Hc; eauto. *)
-      (*   * inv_setminus. constructor. *)
-      (*     intros Hc; inv Hc; now eauto. *)
-      (*     constructor; eauto. *)
-      (*   * constructor; eauto. *)
-      (*     constructor; eauto. *)
-      (*     now intros Hc; inv Hc.  *)
-      (*     now intros Hc; inv Hc.  *)
-      (*     normalize_bound_var. now sets. *)
-      (*     normalize_bound_var. now sets. *)
-      (*     normalize_bound_var. now sets. *)
-      (*     intros Hc. inv_setminus. inv Hc; eauto. *)
-      (*     constructor. intros Hc. now inv Hc.  *)
-      (*     now constructor. *)
-      (*     now constructor. now constructor. *)
-      (*     repeat normalize_bound_var. repeat normalize_sets. *)
-      (*     eapply Disjoint_Included_l. eassumption. *)
-      (*     eapply Union_Disjoint_r. eapply Disjoint_Singleton_r. *)
-      (*     intros Hc. unfold In, Range in *. lia. *)
-      (*     eapply Disjoint_Singleton_r. *)
-      (*     intros Hc. unfold In, Range in *. lia. *)
-      (*   * constructor. *)
-      (*   * do 4 normalize_bound_var. rewrite !bound_var_fundefs_Fnil at 1. *)
-      (*     repeat normalize_sets. *)
-      (*     rewrite !Union_assoc. *)
-      (*     eapply Union_Disjoint_r. *)
-      (*     -- eapply Disjoint_Included_l. eassumption. *)
-      (*        repeat eapply Union_Disjoint_r. *)
-      (*        eapply Disjoint_Singleton_r. intros Hc; unfold In, Range in *. lia. *)
-      (*        eapply Disjoint_Singleton_r. intros Hc; unfold In, Range in *. lia. *)
-      (*        eapply Disjoint_Singleton_r. intros Hc; unfold In, Range in *. lia. *)
-      (*        eapply Disjoint_Singleton_r. intros Hc; unfold In, Range in *. lia. *)
-      (*     -- eapply Disjoint_Included. eassumption. eassumption. *)
-      (*        eapply Disjoint_Range. lia. *)
-
-      (* + do 5 normalize_bound_var. rewrite !bound_var_fundefs_Fnil at 1. *)
-      (*   do 5 normalize_occurs_free. rewrite !occurs_free_fundefs_Fnil at 1. *)
-      (*   simpl. *)
-      (*   rewrite !FromList_cons, !FromList_nil, !Union_Empty_set_neut_r at 1. *)
-      (*   repeat normalize_sets.  *)
-
-      (*   eapply Union_Disjoint_r. *)
-      (*   eapply Union_Disjoint_r. now sets. *)
-      (*   eapply Union_Disjoint_r. *)
-      (*   eapply Union_Disjoint_l. now sets. *)
-      (*   admit. *)
-      (*   eapply Union_Disjoint_r. *)
-      (*   eapply Union_Disjoint_r. *)
-      (*   eapply Union_Disjoint_l. now sets. *)
-      (*   admit. *)
     - (* Con_e *)
       eapply bind_triple. eapply pre_post_copy. unfold cps_cvt; simpl.
       eapply get_named_str_fresh. 
@@ -818,33 +690,6 @@ Section Corresp.
     - simpl. rewrite IHn. reflexivity.
   Qed.
 
-  (* Lemma pos_seq_In start n : *)
-  (*   Disjoint _ (FromList (pos_seq start n)) (fun x => (start + Pos.of_nat n <= x)%positive). *)
-  (* Proof. *)
-  (*   revert start. induction n; intros start. *)
-  (*   - simpl. normalize_sets. sets. *)
-  (*   - simpl. normalize_sets. *)
-  (*     eapply Union_Disjoint_l. *)
-  (*     + eapply Disjoint_Singleton_l. *)
-  (*       intros Hc. unfold In in *. *)
-  (*       destruct n; lia. *)
-  (*     + eapply Disjoint_Included_r; [ | eapply IHn ]. *)
-  (*       intros y. unfold In. simpl. *)
-  (*       destruct n. lia.  *)
-        
-  (*   intros start Hin. *)
-  (*   - inv Hin. *)
-  (*   - inv Hin. *)
-  (*     + lia. *)
-  (*     + eapply IHn in H. *)
-  (*       split. lia. *)
-  (*       simpl in *. destruct n; try lia. *)
-  (*       simpl lia.  *)
-  (*     reflexivity. *)
-  (*   - simpl. rewrite IHn. reflexivity. *)
-  (* Qed. *)
-
-
   Lemma pos_seq_In start n x :
     List.In x (pos_seq start n) ->
     (start <= x <= Pos.of_nat (Pos.to_nat start + n)%nat)%positive.
@@ -865,8 +710,36 @@ Section Corresp.
     - simpl. constructor; eauto.
       intros Hc. eapply pos_seq_In in Hc. lia.
   Qed.
-    
 
+  Lemma cps_rel_exists e xs k m ctrs :
+    exp_wf (N.of_nat (List.length xs)) e ->
+    exists e' S',
+      cps_cvt_rel func_tag kon_tag default_tag (fun x => (m <= x)%positive) e xs k ctrs S' e'.
+  Proof.
+    intros Hwf.
+    destruct cps_cvt_sound as (Hexp & _).
+
+    set (comp_d := pack_data m
+                             1%positive 1%positive 1%positive
+                             (M.empty _) (M.empty _) (M.empty _) (M.empty _) []).
+
+    set (S := fun x => (m <= x)%positive).
+    
+    edestruct (runState (cps_cvt prim_map func_tag kon_tag default_tag e 
+                                 xs k ctrs) tt (comp_d, tt)) eqn:Hcvt.
+
+    assert (Hf : fresh S m).
+    { unfold S, fresh, In. lia. }
+
+    specialize (Hexp e S xs k ctrs Hwf tt (comp_d, tt) Hf).
+
+    rewrite Hcvt in Hexp. destruct e0. contradiction.
+
+    destructAll.
+    do 2 eexists. eassumption.
+  Qed. 
+
+  
   Lemma cps_fix_rel_exists m efns ctrs fnames names fnames' : 
     efnlst_wf (N.of_nat (List.length (fnames ++ names))) efns ->
     Disjoint _ (fun x => (m <= x)%positive) (FromList fnames :|: FromList names) ->
@@ -960,9 +833,6 @@ Section Corresp.
         inv H.
         eexists. constructor. econstructor. eassumption. eassumption. reflexivity.
         
-    - (* Prf_v *)
-      eexists. constructor; eauto.
-      
     - (* Clos_v *)
 
       set (k := 1%positive).
@@ -993,7 +863,7 @@ Section Corresp.
 
       destruct cps_cvt_sound as (Hexp & _).
 
-      specialize (H4 Prf_v). 
+      specialize (H4 (Clos_v [] nAnon e)). 
 
       assert (Hwf : exp_wf (N.of_nat (Datatypes.length (x :: names))) e).
       { unfold well_formed_in_env in *. simpl in *.

@@ -64,11 +64,10 @@ Print L6_to_Clight_stack.compile.
 Definition Clight_trans_ANF (prims : list (kername * string * nat * positive)) (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram * string :=
   let '(_, cenv, ctag, itag, nenv, fenv, _, prog) := t in
   let '(p, str) := L6_to_Clight_stack.compile
-                     mainIdent threadInfIdent allocIdent limitIdent heapInfIdent argsIdent fpIdent
+                     args
+                     threadInfIdent allocIdent limitIdent heapInfIdent argsIdent fpIdent
                      nallocIdent stackframeTIdent nextFld rootFld prevFld tinfIdent frameIdent rootIdent 
-                     args 
-                     gcIdent bodyIdent (* isptrIdent *)
-                     false (* args optimization *)
+                     gcIdent bodyIdent mainIdent (* isptrIdent *)
                      prog cenv nenv in
   match p with
   | Ret (nenv, prog, head) =>

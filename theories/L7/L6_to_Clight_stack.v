@@ -42,75 +42,53 @@ Definition make_hoisted_exp (e : exp) : hoisted_exp :=
   | _ => (Fnil, e)
   end.
 
-(* Convert a variable to its pretty name *)
-Definition get_fname f (nenv : name_env) : string := 
+Definition pretty_fun_name f (nenv : name_env) : string := 
   match M.get f nenv with
   | Some nAnon => "anon"
   | Some (nNamed n) => n
   | None => "not an entry"
   end.
 
+(* The number of parameters to be passed as C function parameters *)
+Variable (n_param : nat).
+
 (* The size of the args array. No function can take more than max_args parameters. *)
 Definition max_args := 1024%Z.
 
-(* fun_info_env holds mappings f ↦ t where
-     f is function name
-     t is fun_tag associated with f
-   TODO: Why do we need this? *)
-Definition fun_info_env : Type := M.t fun_tag.
-
-Fixpoint make_fundef_info (fds : fundefs) (fenv : fun_env) : error fun_info_env :=
-  match fds with
-  | Fnil => ret (M.empty _)
-  | Fcons f t vs e fds' =>
-    match M.get t fenv with
-    | None => Err "make_fundef_info: Unknown tag"
-    | Some (n, l) =>
-      fienv <- make_fundef_info fds' fenv ;;
-      (* it should be the case that n (computed arity from tag) = len (actual arity) *)
-      ret (M.set f t fienv)
-    end
-  end.
-
-Variable (main_id : ident).
-Definition add_body_info (fienv : fun_info_env) :=
-  M.set main_id (1%positive) fienv.
-  (* TODO: need to enforce the invariant that all other fun tags are greater than 1 *)
-
-Definition make_fun_info (fds : fundefs) (fenv : fun_env) : error fun_info_env :=
-  fienv <- make_fundef_info fds fenv ;;
-  ret (add_body_info fienv).
-
 (* fun_env holds mappings
-     t ↦ (|vs|, [0; ..; |vs| - 1]) 
-   for each (Fcons f t vs _ _) in the expression being compiled.
+     f ↦ (|ys|, [0; ..; |ys| - 1]) 
+   for each
+     (Fcons f t ys _ _),
+     (Eletapp _ f _ ys _), or
+     (Eapp f _ ys)
+   in the expression being compiled.
 
-   The list [0; ..; |vs| - 1] gives the locations of f's arguments in the args array.
-   (Simple for now, but may get fancier with custom calling conventions)
-
-   Since we are compiling hoisted programs, we need only look at the toplevel function definitions. *)
-Fixpoint compute_fun_env' (fenv : fun_env) (fds : fundefs) : fun_env :=
-  match fds with
-  | Fcons f t xs e fds =>
-    compute_fun_env' (M.set t (N.of_nat (length xs), mapi (fun n _ => n) 0 xs) fenv) fds
-  | Fnil => fenv
-  end.
-Definition compute_fun_env : fundefs -> fun_env := compute_fun_env' (M.empty _).
-
-(* Compute the bound variables of a function body.
-   Used to declare all local variables used by the generated C code *)
-Fixpoint get_locals' (e : exp) (acc : list ident) : list ident :=
+   The list [0; ..; |ys| - 1] gives the locations of f's arguments in the args array.
+   (Simple for now, but may get fancier with custom calling conventions) *)
+Fixpoint compute_fun_env' (fenv : fun_env) (e : exp) : fun_env :=
   match e with
-  | Econstr x t vs e' => get_locals' e' (x :: acc)
-  | Ecase x cs => fold_left (fun acc '(_, e) => get_locals' e acc) cs acc
-  | Eproj x t n v e' => get_locals' e' (x :: acc)
-  | Eletapp x f t xs e' => get_locals' e' (x :: acc)
-  | Efun fnd e' => [] (* unreachable (we are compiling hoisted terms) *)
-  | Eapp x t vs => acc
-  | Eprim x p vs e' => get_locals' e' (x :: acc)
-  | Ehalt x => acc
+  | Econstr x t ys e' => compute_fun_env' fenv e'
+  | Ecase x cs => fold_left (fun fenv '(_, e) => compute_fun_env' fenv e) cs fenv
+  | Eproj x t n v e' => compute_fun_env' fenv e'
+  | Eletapp x f t ys e' =>
+    compute_fun_env' (M.set f (N.of_nat (length ys), mapi (fun n _ => n) 0 ys) fenv) e'
+  | Efun fds e' =>
+    let fenv := compute_fun_env_fundefs fds fenv in
+    compute_fun_env' fenv e'
+  | Eapp f t ys => M.set f (N.of_nat (length ys) , mapi (fun n _ => n) 0 ys) fenv
+  | Eprim x p ys e' => compute_fun_env' fenv e'
+  | Ehalt x => fenv
+  end
+with compute_fun_env_fundefs fds fenv : fun_env :=
+  match fds with
+  | Fnil => fenv
+  | Fcons f t ys e fds' =>
+    let fenv := M.set f (N.of_nat (length ys), mapi (fun n _ => n) 0 ys) fenv in
+    let fenv := compute_fun_env' fenv e in
+    compute_fun_env_fundefs fds' fenv
   end.
-Definition get_locals (e : exp) : list ident := get_locals' e [].
+Definition compute_fun_env : hoisted_exp -> fun_env :=
+  fun '(fds, e) => compute_fun_env' (M.empty _) (Efun fds e).
 
 (* Max number of words allocated by e up to the next function call.
    (Only compute up to next function call because that's when GC will run next) *)
@@ -126,7 +104,7 @@ Fixpoint max_allocs (e : exp) : nat :=
   | Ecase x cs => fold_left (fun allocs '(_, e) => max (max_allocs e) allocs) cs 0
   | Eproj x t n v e' => max_allocs e'
   | Eletapp x f t ys e' => 0
-  | Efun fnd e' => 0 (* unreachable (we are compiling hoisted terms) *)
+  | Efun fds e' => 0 (* unreachable (we are compiling hoisted terms) *)
   | Eapp x t vs => 0
   | Eprim x p vs e' => max_allocs e'
   | Ehalt x => 0
@@ -219,34 +197,26 @@ Definition stack_decl size : list (ident * type) :=
 
 (* Each generated function body also declares the following local variables:
      value *alloc;
-     value *limit;
-     value *args; *)
+     value *limit; *)
 Definition alloc := Etempvar alloc_id (tptr value).
 Definition limit := Etempvar limit_id (tptr value).
-Definition args := Etempvar args_id (tptr value).
-
-(* The number of parameters to be passed as C function parameters *)
-Variable (n_param : nat).
-
-Variable (gc_id : ident).
-Variable (body_id : ident).
 
 (* Variable (isptr_id : ident). (* ident for the is_ptr external function *) *)
 
-(* void garbage_collect(struct thread_info *tinfo); *)
+(* void garbage_collect(struct thread_info *tinfo);
+   struct thread_info *make_tinfo(void);
+   value *export(struct thread_info *ti); *)
+Variable (gc_id : ident).
 Definition gc := Evar gc_id (Tfunction (Tcons threadInf Tnil) Tvoid cc_default).
-
-(* fun_ty n = void(struct thread_info *ti, value, ..)
-   prim_ty n = value(value, ..) *)
-Definition value_tys (n : nat) : typelist := Nat.iter n (Tcons value) Tnil.
-Definition fun_ty (n : nat) := Tfunction (Tcons threadInf (value_tys n)) Tvoid cc_default.
-Definition prim_ty (n : nat) := Tfunction (value_tys n) value cc_default.
-
-(* struct thread_info *make_tinfo(void); *)
 Definition make_tinfo_ty := Tfunction Tnil threadInf cc_default.
-
-(* value *export(struct thread_info *ti); *)
 Definition export_ty := Tfunction (Tcons threadInf Tnil) (tptr value) cc_default.
+Variable (body_id : ident).
+
+(* fun_ty n = void(struct thread_info *ti, value, .. min(n_param, n) times)
+   prim_ty n = value(value, .. n times) *)
+Definition value_tys (n : nat) : typelist := Nat.iter n (Tcons value) Tnil.
+Definition fun_ty (n : nat) := Tfunction (Tcons threadInf (value_tys (min n_param n))) Tvoid cc_default.
+Definition prim_ty (n : nat) := Tfunction (value_tys n) value cc_default.
 
 Notation "'var' x" := (Etempvar x value) (at level 20).
 Notation "a '+'' b" := (Ebinop Oadd a b (tptr value)) (at level 30).
@@ -266,17 +236,10 @@ Notation "a '.[' n ']'" :=
 
 Definition statements : list statement -> statement := fold_right Ssequence Sskip.
 
-(* Initialize local shadow stack frame on function entry *)
-Definition init_stack : statement :=
-  frame.next :::= roots;
-  frame.root :::= roots;
-  frame.prev :::= tinfo->fp.
-
 Section CODEGEN.
 
 Variable (cenv : ctor_env). 
 Variable (fenv : fun_env).
-Variable (fienv : fun_info_env). 
 
 Inductive ctor_rep : Type :=
 (* [enum t] represents a constructor with no parameters with ordinal [t] *)
@@ -311,64 +274,28 @@ Definition make_tag (r : ctor_rep) : expr :=
      Ecast (Evar x suitable-fn-type) value if x is a toplevel function
      Etempvar x value otherwise *)
 Definition make_var (x : ident) :=
-  match M.get x fienv with
-  (* if x is a function name with tag t... *)
-  | Some t =>
-    match M.get t fenv with
-    (* ...and tag t corresponds to a function with arity n, then x has function type *)
-    | Some (_, locs) => Ecast (Evar x (fun_ty (length (firstn n_param locs)))) value
-    | None => (* should be unreachable *) var x
-    end
+  match M.get x fenv with
+  (* if f is a function with arity |locs|, then x has function type *)
+  | Some (_, locs) => Ecast (Evar x (fun_ty (length locs))) value
   (* otherwise, x is just a regular variable *)
   | None => var x
   end.
 
-Section Translation.
-
-Context (args_opt : bool).
-
 Section Body.
 
 Context
-  (fun_vars : list ident)
   (locals : FVSet) (* The set of local variables including definitions and arguments *)
-  (locs : list N)
   (nenv : M.t BasicAst.name).
 
-(* Load arguments from the args array.
-
-   TODO: isn't
-     tinfo->args[x]
-   always more efficient than
-     args = tinfo->args;
-     args[x]
-   ?
-*)
-
-(* TODO: clean and document *)
-Definition make_fun_call (tail_position : bool) f t ys :=
-  match M.get t fenv with 
+Definition make_fun_call (tail_position : bool) f ys :=
+  match M.get f fenv with 
   | Some (arity, inds) =>
     let arity := N.to_nat arity in
     if negb (length ys =? arity)%nat then
-      Err ("make_fun_call: arity mismatch: " ++ get_fname f nenv)%string
+      Err ("make_fun_call: arity mismatch: " ++ pretty_fun_name f nenv)%string
     else
-      let caller_yis :=
-        fold_left
-          (fun caller_yis '(y, i) => M.set y i caller_yis)
-          (skipn n_param (combine fun_vars locs))
-          (M.empty _)
-      in
-      let already_in_place y i :=
-        match M.get y caller_yis with
-        | Some i' => N.eqb i i'
-        | None => false
-        end
-      in
       ret (statements
-             (map (fun '(y, i) =>
-                    if args_opt && already_in_place y i then Sskip else
-                    tinfo->args.[Z.of_N i] :::= make_var y)
+             (map (fun '(y, i) => tinfo->args.[Z.of_N i] :::= make_var y)
                   (skipn n_param (combine ys inds)))%bool;
            tinfo->alloc :::= alloc;
            tinfo->limit :::= limit;
@@ -470,14 +397,14 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
     let live_minus_x := PS.remove x live_after_call in
     let live_minus_x_list := PS.elements live_minus_x in
     let n_live_minus_x := Z.of_nat (length live_minus_x_list) in
-    call <- make_fun_call false f t ys ;;
+    call <- make_fun_call false f ys ;;
     let retrieve_roots xs := statements (mapi (fun n x => x ::= roots.[Z.of_N n]) 0 xs) in
     let stm :=
       statements (mapi (fun n x => roots.[Z.of_N n] :::= var x) 0 live_minus_x_list);
       frame.next :::= roots +' c_int n_live_minus_x value;
       tinfo->fp :::= &frame;
       call;
-      x ::= args.[1];
+      x ::= tinfo->args.[1];
       match max_allocs e with 0 => Sskip | S _ as allocs =>
         let x_live := PS.mem x live_after_call in
         match x_live with false => Sskip | true =>
@@ -500,7 +427,7 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
   | Efun fnd e => Err "translate_body: nested function detected"
   (* [[f(ys)]] = call f *)
   | Eapp f t ys =>
-    call <- make_fun_call true f t ys ;;
+    call <- make_fun_call true f ys ;;
     ret (call, add_local_fvs PS.empty (f :: ys), 0)%N
   (* [[let x = p(ys) in e]] = (x = p(ys); [[e]]) *)
   | Eprim x p ys e =>    
@@ -510,7 +437,7 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
          add_local_fvs (PS.remove x fvs_e) ys, n_e)
   (* [[halt x]] = (args[1] = x; store alloc and limit in tinfo) *)
   | Ehalt x =>
-    ret ((args.[1] :::= make_var x;
+    ret ((tinfo->args.[1] :::= make_var x;
           tinfo->alloc :::= alloc;
           tinfo->limit :::= limit),
          add_local_fv PS.empty x, 0)%N
@@ -529,13 +456,18 @@ Definition make_fun (size : Z) (xs locals : list ident) (body : statement) : fun
              nil
              body.
 
+Definition init_shadow_stack_frame :=
+  frame.next :::= roots;
+  frame.root :::= roots;
+  frame.prev :::= tinfo->fp.
+
 Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list definition) :=
   match fds with
   | Fnil => Ret nil
   | Fcons f t xs e fds' =>
     defs <- translate_fundefs fds' nenv ;;
-    match M.get t fenv with
-    | None => Err "translate_fundefs: Unknown function tag"
+    match M.get f fenv with
+    | None => Err "translate_fundefs: Unknown function name"
     | Some (_, locs) =>
       (* [[f(xs.., ys..) = e]] (where |xs| = n_param) =
            void f(thread struct_info *tinfo, value x, ..) {
@@ -553,9 +485,9 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
                pop frame from shadow stack
              [[e]]
            } *)
-      let locals := get_locals e in
+      let locals := PS.elements (exp_bv e) in
       let xs_set := union_list PS.empty xs in
-      '(body, live_xs, stack_slots) <- translate_body xs (union_list xs_set locals) locs nenv e ;;
+      '(body, live_xs, stack_slots) <- translate_body (union_list xs_set locals) nenv e ;;
       let live_xs_list := PS.elements live_xs in 
       let n_live_xs := N.of_nat (length live_xs_list) in
       let allocs := max_allocs e in
@@ -563,8 +495,8 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
         alloc_id ::= tinfo->alloc;
         limit_id ::= tinfo->limit;
         args_id ::= tinfo->args;
-        statements (map (fun '(x, i) => x ::= args.[Z.of_N i]) (skipn n_param (combine xs locs)));
-        init_stack;
+        statements (map (fun '(x, i) => x ::= tinfo->args.[Z.of_N i]) (skipn n_param (combine xs locs)));
+        init_shadow_stack_frame;
         match allocs with 0 => Sskip | S _ as allocs =>
           statements (mapi (fun n x => roots.[Z.of_N n] :::= var x) 0 live_xs_list);
           frame.next :::= roots +' c_int (Z.of_N n_live_xs) value;
@@ -585,8 +517,6 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
     end
   end.
 
-End Translation.
-
 (* [[let rec fds in e]] =
      [[fds]]
      value body(struct thread_info *tinfo) {
@@ -600,16 +530,16 @@ End Translation.
        [[e]]
        return tinfo->args[1];
      } *)
-Definition translate_program (args_opt : bool) (fds_e : hoisted_exp) (nenv : name_env) : error (list definition) :=
+Definition translate_program (fds_e : hoisted_exp) (nenv : name_env) : error (list definition) :=
   let '(fds, e) := fds_e in
-  let locals := get_locals e in
-  funs <- translate_fundefs args_opt fds nenv ;;
-  '(body, _, slots) <- translate_body args_opt [] (union_list PS.empty locals) [] nenv e ;;
+  let locals := PS.elements (exp_bv e) in
+  funs <- translate_fundefs fds nenv ;;
+  '(body, _, slots) <- translate_body (union_list PS.empty locals) nenv e ;;
   let body :=
     alloc_id ::= tinfo->alloc;
     limit_id ::= tinfo->limit;
     args_id ::= tinfo->args;
-    init_stack;
+    init_shadow_stack_frame;
     match max_allocs e with 0 => Sskip | S _ as allocs =>
       create_space (max_allocs e)
     end;
@@ -633,6 +563,7 @@ End CODEGEN.
 Definition make_tinfo_id := 20%positive.
 Definition export_id := 21%positive.
 
+Variable (main_id : ident).
 Definition inf_vars :=
   (* (isptr_id, nNamed "is_ptr") :: *)
   (args_id, nNamed "args") ::
@@ -685,9 +616,9 @@ Fixpoint check_tags' (e : exp) (log : list string) :=
     let s :=
       match M.get t fenv with
       | Some (n, l) =>
-        "LetApp: Function " ++ get_fname f nenv ++ " has arity " ++ show_binnat n ++
+        "LetApp: Function " ++ pretty_fun_name f nenv ++ " has arity " ++ show_binnat n ++
         " " ++ nat2string10 (length l)
-      | None => "LetApp: Function " ++ get_fname f nenv ++ " was not found in fun_env"
+      | None => "LetApp: Function " ++ pretty_fun_name f nenv ++ " was not found in fun_env"
       end
     in check_tags' e (s :: log)
   | Efun B e =>
@@ -697,9 +628,9 @@ Fixpoint check_tags' (e : exp) (log : list string) :=
     let s :=
       match M.get t fenv with
       | Some (n, l) =>
-        "App: Function " ++ get_fname f nenv ++ " has arity " ++ show_binnat n ++
+        "App: Function " ++ pretty_fun_name f nenv ++ " has arity " ++ show_binnat n ++
         " " ++ nat2string10 (length l)
-      | None => "App: Function " ++ get_fname f nenv ++ " was not found in fun_env"
+      | None => "App: Function " ++ pretty_fun_name f nenv ++ " was not found in fun_env"
       end
     in s :: log
   | Ehalt x => log
@@ -710,9 +641,9 @@ with check_tags_fundefs' (B : fundefs) (log : list string) : list string :=
     let s :=
       match M.get t fenv with
       | Some (n, l) =>
-        "Definition " ++ get_fname f nenv ++ " has tag " ++ show_pos t ++ Pipeline_utils.newline ++
-        "Def: Function " ++ get_fname f nenv ++ " has arity " ++ show_binnat n ++ " " ++ nat2string10 (length l)
-      | None => "Def: Function " ++ get_fname f nenv ++ " was not found in fun_env"
+        "Definition " ++ pretty_fun_name f nenv ++ " has tag " ++ show_pos t ++ Pipeline_utils.newline ++
+        "Def: Function " ++ pretty_fun_name f nenv ++ " has arity " ++ show_binnat n ++ " " ++ nat2string10 (length l)
+      | None => "Def: Function " ++ pretty_fun_name f nenv ++ " was not found in fun_env"
       end
     in
     let log := check_tags_fundefs' B' (s :: log) in
@@ -756,7 +687,7 @@ Definition body_decl : definition :=
   let ext_fn := EF_external "body" (signature_of_type param_tys Tvoid cc_default) in
   (body_id, Gfun (External ext_fn param_tys Tvoid cc_default)).
 
-Definition make_defs args_opt fds_e cenv nenv : error (list definition) :=
+Definition make_defs fds_e cenv nenv : error (list definition) :=
   let global_defs := 
     let gc_fn := EF_external "gc" (mksignature (ast_value :: nil) None cc_default) in
     (* let is_ptr_fn := EF_external "is_ptr" (mksignature (ast_value :: nil) None cc_default) in *)
@@ -764,9 +695,8 @@ Definition make_defs args_opt fds_e cenv nenv : error (list definition) :=
     (* (isptr_id, Gfun (External is_ptr_fn (Tcons value Tnil) type_bool cc_default)) :: *)
     nil
   in
-  let fenv := compute_fun_env (fst fds_e) in
-  fienv <- make_fun_info (fst fds_e) fenv ;;
-  fun_defs' <- translate_program cenv fenv fienv args_opt fds_e nenv ;;
+  let fenv := compute_fun_env fds_e in
+  fun_defs' <- translate_program cenv fenv fds_e nenv ;;
   ret (global_defs ++ rev fun_defs')%list.
 
 Definition make_prog (defs : list definition) (main : ident) (add_comp : bool) : error Clight.program :=
@@ -776,7 +706,7 @@ Definition make_prog (defs : list definition) (main : ident) (add_comp : bool) :
   | OK p => ret p
   end.
 
-Definition compile args_opt e cenv nenv : error (name_env * Clight.program * Clight.program) * string :=
+Definition compile e cenv nenv : error (name_env * Clight.program * Clight.program) * string :=
   let log := "" in
   (* let log :=
        cps_show.show_exp nenv0 cenv false e ++
@@ -785,7 +715,7 @@ Definition compile args_opt e cenv nenv : error (name_env * Clight.program * Cli
   let res :=
     header <- make_prog [body_decl] main_id false ;;
     let nenv := add_inf_vars (ensure_unique nenv) in
-    defs <- make_defs args_opt (make_hoisted_exp e) cenv nenv ;;
+    defs <- make_defs (make_hoisted_exp e) cenv nenv ;;
     impl <- make_prog (make_tinfo_rec :: export_rec :: make_decls nenv defs false ++ defs)%list main_id true ;;
     ret (nenv, header, impl)
   in (res, log).

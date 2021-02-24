@@ -430,18 +430,16 @@ Section Translate.
                                                e2') Fnil)
                               e1')
   | e_Con :
-      forall S1 S2 c_tag dci tgm es e' k x1 k1 vn vx xs ks,
+      forall S1 S2 c_tag dci tgm es e' k x1 vn xs ks,
         c_tag = dcon_to_tag dci tgm ->
 
         x1 \in S1 ->
-        FromList xs \subset (S1 \\ [set x1] \\ [set k1] \\ FromList vx) ->
-        FromList ks \subset (S1 \\ [set x1] \\ [set k1] \\ FromList vx \\ FromList xs) ->
+        FromList xs \subset (S1 \\ [set x1]) ->
+        FromList ks \subset (S1 \\ [set x1] \\ FromList xs) ->
                
-        Datatypes.length vx = N.to_nat (exps_length es) ->
-        NoDup vx ->
         NoDup xs ->
         NoDup ks -> 
-        cps_cvt_rel_exps (S1 \\ [set x1] \\ [set k1] \\ FromList vx \\ FromList xs \\ FromList ks) 
+        cps_cvt_rel_exps (S1 \\ [set x1] \\ FromList xs \\ FromList ks) 
                          es vn (Econstr x1 c_tag xs (Eapp k kon_tag [x1])) xs ks tgm S2 e' ->
         cps_cvt_rel S1
                     (Con_e dci es)

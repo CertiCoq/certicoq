@@ -315,16 +315,6 @@ Section Corresp.
       
       eapply bind_triple.
       
-      eapply frame_rule. eapply frame_rule. 
-      eapply get_named_spec.
-
-      intros k1 w1. simpl.
-      eapply pre_curry_l; intros Hinx.
-      eapply pre_curry_l; intros Hr.
-      eapply pre_curry_l; intros Hk.
-      
-      eapply bind_triple.
-      
       eapply frame_rule. eapply frame_rule.
       eapply get_named_str_lst_spec.
 
@@ -348,42 +338,22 @@ Section Corresp.
       eapply pre_curry_l; intros Hlen'.
       eapply pre_curry_l; intros Hsub''.
 
-      eapply bind_triple.
-      eapply frame_rule. eapply frame_rule.
-
-      eapply get_named_str_lst_spec.
-      
-      intros ks' w4. simpl.
-      eapply pre_curry_l; intros Hsub1.
-      eapply pre_curry_l; intros Hlt1.
-      eapply pre_curry_l; intros Hnd1.
-      eapply pre_curry_l; intros Hlen1.
-      eapply pre_curry_l; intros Hsub2.
-      
-      eapply bind_triple.
-      eapply frame_rule. eapply frame_rule.
-
       assert (Hlenes : Datatypes.length (exps_as_list e) = N.to_nat (exps_length e)).
       { clear. induction e; simpl. congruence.
         rewrite IHe.  
         destruct (exps_length e0). lia.
         destruct p; lia. }
-      
-      eapply H. eassumption.
 
-      rewrite map_length in *. rewrite Hlen'. eassumption.
-      rewrite map_length in *. rewrite Hlen1. eassumption.
-      
-      intros e' w6. simpl. 
+      eapply pre_strenghtening.
+      2:{ eapply post_weakening.
+          2:{ eapply H. eassumption.
+              rewrite Hlen. rewrite map_length. eassumption.
+              rewrite Hlen'. rewrite map_length. eassumption. }
+          simpl. intros. destructAll.
+          eexists. split. econstructor; try eassumption. reflexivity.
+          eassumption. }
 
-      eapply return_triple. intros. destructAll.
-      
-      eexists. split; eauto. econstructor; eauto.
-      
-      rewrite Hlen. rewrite map_length.
-
-      clear. induction e; eauto. simpl. destruct (exps_length e0); simpl; try lia. 
-      destruct p; lia.
+      simpl. intros. destructAll. eassumption.
 
     - (* Match_e *)
       eapply bind_triple. eapply pre_post_copy. unfold cps_cvt; simpl.
@@ -671,8 +641,7 @@ Section Corresp.
       intros. rewrite M.gso. eassumption.
       intros Heq; subst.
       inv Hnd; eauto.
-  Qed.
-      
+  Qed.      
 
 
   Fixpoint pos_seq (start : var) (n : nat) : list positive :=

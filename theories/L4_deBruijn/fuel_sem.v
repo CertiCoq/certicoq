@@ -40,49 +40,26 @@ Inductive result :=
 | OOT : result.
 
 
-Section L4_fuel.
 
-  Definition exp_to_fin (e: exp) : fin :=
-    match e with
-    | Var_e _
-    | Lam_e _ _
-    | Fix_e _ _
-    | Prf_e
-    | Con_e _ _ => One (* Values map to One *)
-                     
-    | App_e _ _ 
-    | Match_e _ _ _ 
-    | Let_e _ _ _ 
-    | Prim_e _ => Two (* Reducible terms to Two *)
-    end.
+Fixpoint max_binders_branches (br : branches_e) : nat :=
+  match br with
+  | brnil_e => 0
+  | brcons_e _ (m, _) _ br =>
+    max (N.to_nat m) (max_binders_branches br)
+  end.    
+
+  
+Section L4_fuel.
       
   
-  Class L4_resource {A} :=
-  { HRes :> @resource fin A;
-    one := (fun e => @one_i _ _ HRes (exp_to_fin e));
-    one_ctx := (fun C => @one_i _ _ HRes (exp_ctx_to_fin C)) }.
-
-  (* Fuel resource *)
-
-  Class L4_fuel_resource {A} :=
-    { HRexp_f :> @L4_resource A;
-      HOrd    :> @ordered fin A HRes;
-      HOne    :> @resource_ones fin A HRes;
-      HNat    :> @nat_hom fin A HRes
-    }.
+  Class L4_resource  :=
+  { HRes :> @resource exp nat; }. 
 
 End L4_fuel.
 
 Section Util.
 
   (** Helper functions for going between exps and lists *)
-  Fixpoint exps_to_list (es : expression.exps) : list exp :=
-    match es with
-    | enil => nil
-    | econs e es' =>
-      let l := exps_to_list es' in
-      e::l
-    end.
 
   Definition make_rec_env_rev_order (fnlst : efnlst) (rho : env) : env :=
     let fix make_env_aux l :=
@@ -141,53 +118,53 @@ Section FUEL_SEM.
       forall (x : A) (y : B) (z : C) (l : list A) (l' : list B) (l'' : list C),
         R x y z -> Forall3 R l l' l'' -> Forall3 R (x :: l) (y :: l') (z :: l'').
 
-  Context {fuel : Type} {Hf : @L4_fuel_resource fuel}.
+  Context {Hf : L4_resource}.
 
-  Fixpoint add_list (l : list fuel) : fuel :=
+  Fixpoint add_list (l : list nat) : nat :=
     match l with
     | nil => <0>
     | cons f fs => f <+> add_list fs
     end.
   
   
-  (** * {Fuel,environment}-based semantics for L4 *)
-  Inductive eval_env_step: env -> exp -> result -> fuel -> Prop :=
+  (** * {Nat,environment}-based semantics for L4 *)
+  Inductive eval_env_step: env -> exp -> result -> nat -> Prop :=
   | eval_Con_step:
-      forall (es : expression.exps) (vs : list value) (rho: env) (dc: dcon) (fs : fuel),
+      forall (es : expression.exps) (vs : list value) (rho: env) (dc: dcon) (fs : nat),
         eval_fuel_many rho es vs fs ->
         eval_env_step rho (Con_e dc es) (Val (Con_v dc vs)) fs
   | eval_Con_step_OOT:
-      forall (es es1 es2: expression.exps) (e : exp) (vs : list value) (rho: env) (dc: dcon) (fs f : fuel),
-        exps_to_list es = exps_to_list es1 ++ e :: exps_to_list es2 ->
+      forall (es es1 es2: expression.exps) (e : exp) (vs : list value) (rho: env) (dc: dcon) (fs f : nat),
+        exps_as_list es = exps_as_list es1 ++ e :: exps_as_list es2 ->
         eval_fuel_many rho es1 vs fs ->
         eval_env_fuel rho e OOT f ->
         eval_env_step rho (Con_e dc es) OOT (fs <+> f)
 
   | eval_App_step:
       forall (e1 e2 e1': expression.exp) v2 r (na : name) (rho rho': env)
-             (f1 f2 f3 : fuel),
+             (f1 f2 f3 : nat),
         eval_env_fuel rho e1 (Val (Clos_v rho' na e1')) f1 ->
         eval_env_fuel rho e2 (Val v2) f2 ->
         eval_env_fuel (v2::rho') e1' r f3 ->
         eval_env_step rho (App_e e1 e2) r (f1 <+> f2 <+> f3)
   | eval_App_step_OOT1 :
-      forall (e1 e2 : expression.exp) (rho : env) (f1 : fuel),
+      forall (e1 e2 : expression.exp) (rho : env) (f1 : nat),
         eval_env_fuel rho e1 OOT f1 ->
         eval_env_step rho (App_e e1 e2) OOT f1
   | eval_App_step_OOT2 :
-      forall (e1 e2 : expression.exp) (v : value) (rho : env) (f1 f2 : fuel),
+      forall (e1 e2 : expression.exp) (v : value) (rho : env) (f1 f2 : nat),
         eval_env_fuel rho e1 (Val v) f1 ->
         eval_env_fuel rho e2 OOT f2 ->
         eval_env_step rho (App_e e1 e2) OOT (f1 <+> f2)
 
                       
   | eval_Let_step:
-      forall (e1 e2 : expression.exp) (v1 : value) (r : result) (rho: env) (na: name) (f1 f2 : fuel),
+      forall (e1 e2 : expression.exp) (v1 : value) (r : result) (rho: env) (na: name) (f1 f2 : nat),
         eval_env_fuel rho e1 (Val v1) f1 ->
         eval_env_fuel (v1::rho) e2 r f2 ->
         eval_env_step rho (Let_e na e1 e2) r (f1 <+> f2)
   | eval_Let_step_OOT:
-      forall (e1 e2 : expression.exp) (rho: env) (na: name) (f1 : fuel),
+      forall (e1 e2 : expression.exp) (rho: env) (na: name) (f1 : nat),
         eval_env_fuel rho e1 OOT f1 ->
         eval_env_step rho (Let_e na e1 e2) OOT f1
                       
@@ -218,11 +195,11 @@ Section FUEL_SEM.
         eval_env_fuel ((List.rev vs) ++ rho) e' r f2 ->
         eval_env_step rho (Match_e e1 n brnchs) r (f1 <+> f2)
   | eval_Match_step_OOT:
-      forall (e1 : expression.exp) (rho: env) (n: N) (br: branches_e) (f1 : fuel),
+      forall (e1 : expression.exp) (rho: env) (n: N) (br: branches_e) (f1 : nat),
         eval_env_fuel rho e1 OOT f1 ->
         eval_env_step rho (Match_e e1 n br) OOT f1
 
-  with eval_fuel_many: env -> exps -> list value -> fuel -> Prop :=
+  with eval_fuel_many: env -> exps -> list value -> nat -> Prop :=
   | eval_many_enil :
       forall rho,
         eval_fuel_many rho enil [] <0>
@@ -232,7 +209,7 @@ Section FUEL_SEM.
         eval_fuel_many rho es vs fs ->
         eval_fuel_many rho (econs e es) (v :: vs) (f <+> fs)
                       
-  with eval_env_fuel: env -> exp -> result -> fuel -> Prop :=
+  with eval_env_fuel: env -> exp -> result -> nat -> Prop :=
   (* Values *) 
   | eval_Var_fuel:
       forall (x: N) (rho: env) (v: value),
@@ -246,14 +223,14 @@ Section FUEL_SEM.
         eval_env_fuel rho (Fix_e fnlst n) (Val (ClosFix_v rho fnlst n)) <0>
   (* OOT *)
   | eval_OOT :
-      forall rho (e : exp) (c : fuel),
-        (c << one e) ->
+      forall rho (e : exp) (c : nat),
+        (c < one_i e)%nat ->
         eval_env_fuel rho e OOT c
   (* STEP *)
   | eval_step : (* take a step *)
-      forall rho e r (c : fuel),
+      forall rho e r (c : nat),
         eval_env_step rho e r c ->
-        eval_env_fuel rho e r (c <+> (one e)).
+        eval_env_fuel rho e r (c <+> (one_i e)).
 
 
   Scheme eval_env_step_ind' := Minimality for eval_env_step Sort Prop
@@ -360,19 +337,19 @@ Section FUEL_SEM.
                   well_formed_in_env e vs ->
                   well_formed_val v.
     Proof.
-      pose (P := fun (vs : env) (e : exp) (r : result) (f : fuel) => 
+      pose (P := fun (vs : env) (e : exp) (r : result) (f : nat) => 
                    forall v,
                      r = Val v ->
                      well_formed_env vs ->
                      well_formed_in_env e vs ->
                      well_formed_val v).
 
-      pose (P1 := fun (vs : env) (es : exps) (vs' : list value) (f : fuel) => 
+      pose (P1 := fun (vs : env) (es : exps) (vs' : list value) (f : nat) => 
                     well_formed_env vs ->
                     well_formed_exps_in_env es vs ->
                     Forall well_formed_val vs').
 
-      pose (P2 := fun (vs : env) (e : exp) (r : result) (f : fuel) => 
+      pose (P2 := fun (vs : env) (e : exp) (r : result) (f : nat) => 
                     forall v,
                       r = Val v ->
                       well_formed_env vs ->
@@ -454,29 +431,30 @@ Section FUEL_SEM.
   End WF.
 
 
-  Lemma exps_to_list_append e1 e2 :
-    exps_to_list (exps_append e1 e2) = exps_to_list e1 ++ exps_to_list e2.
+  Lemma exps_as_list_append e1 e2 :
+    exps_as_list (exps_append e1 e2) = exps_as_list e1 ++ exps_as_list e2.
   Proof.
     induction e1. reflexivity.
     simpl. rewrite IHe1. reflexivity.
   Qed.
 
+  (* 
   Lemma fuel_sem_OOT vs e r f f' :
     eval_env_fuel vs e r f ->
     lt f' f -> 
     eval_env_fuel vs e OOT f'.
   Proof.   
-    pose (P := fun (vs : env) (e : exp) (r : result) (f : fuel) => 
+    pose (P := fun (vs : env) (e : exp) (r : result) (f : nat) => 
                  forall f',
                    lt f' f -> 
                    eval_env_step vs e OOT f').
     
-    pose (P1 := fun (vs : env) (e : exp) (r : result) (f : fuel) => 
+    pose (P1 := fun (vs : env) (e : exp) (r : result) (f : nat) => 
                   forall f',
                     lt f' f -> 
                     eval_env_fuel vs e OOT f').
     
-    pose (P2 := fun (vs : env) (es : exps) (vs' : list value) (f : fuel) =>
+    pose (P2 := fun (vs : env) (es : exps) (vs' : list value) (f : nat) =>
                   forall f',
                     lt f' f -> 
                     exists es1 e es2 vs1 fs f'',
@@ -615,7 +593,7 @@ Section FUEL_SEM.
     - eapply lt_one in H. subst.
       exfalso; eapply lt_zero; eauto.
 
-    - edestruct (lt_all_dec f' (one e0)).
+    - edestruct (lt_all_dec f' (one_i e0)).
 
       + econstructor. eassumption.
 
@@ -626,7 +604,6 @@ Section FUEL_SEM.
     - eassumption.
   Qed. 
 
-
       
       
   Lemma fuel_sem_monotonic vs e f f' :
@@ -636,6 +613,7 @@ Section FUEL_SEM.
   Proof.
     eapply fuel_sem_OOT.
   Qed.      
-    
+*)     
   
 End FUEL_SEM.
+

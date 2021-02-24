@@ -24,16 +24,29 @@ Open Scope monad_scope.
 
 Section Bounds.
 
-  Global Instance L4_resource_nat : @L4_resource nat.
+  Definition cost_exp (e: expression.exp) : nat := 1.
+  
+  Program Instance resource_L4 : @resource expression.exp nat :=
+    { zero := 0;
+      one_i := cost_exp;
+      plus := Nat.add
+    }.
+  Next Obligation.
+    lia.
+  Qed.
+  Next Obligation.
+    lia.
+  Qed.
+  Next Obligation.
+    lia.
+  Qed.
+
+  Global Instance L4_resource_nat : L4_resource.
   Proof.
-    econstructor.
+    constructor. eapply resource_L4. 
   Defined.   
   
-  Global Instance L4_fuel_resource_nat : @L4_fuel_resource nat.
-  Proof.
-    econstructor; tci.
-  Defined.
-
+  
   Global Program Instance trace_res_pre : @resource fin unit :=
     { zero := tt;
       one_i fin := tt;
@@ -59,7 +72,7 @@ Section Bounds.
 
   Definition cps_bound_exps (f_src : nat) : @PostT nat unit :=
     fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) =>
-      (f1 + f_src <= f2 + 1)%nat.
+      (f1 + f_src + 1 <= f2)%nat.
 
   Ltac unfold_all :=
     try unfold zero in *;
@@ -81,6 +94,7 @@ Section Bounds.
   Qed. 
 
 End Bounds.
+
 
 Ltac inv_setminus :=
   match goal with
@@ -175,10 +189,6 @@ Section FV.
     - (* Con_e *)
       inv H0.
       repeat normalize_occurs_free. simpl. repeat normalize_sets.
-      eapply Union_Included.
-      rewrite Setminus_Union_distr. now eapply Union_Included; xsets.
-
-      eapply Setminus_Included_Included_Union.
       eapply Included_trans. eapply H. eassumption.
       
       (* rewrite !Setminus_Union_distr. eapply Union_Included. *)
@@ -187,7 +197,8 @@ Section FV.
       repeat normalize_occurs_free.
       rewrite !Setminus_Union_distr. eapply Union_Included; sets.
       eapply Setminus_Included_Included_Union. eapply Included_trans.
-      eassumption. xsets.
+      eassumption. now xsets.
+      repeat normalize_sets. xsets.
 
     - (* Match_e *)
       inv H1.
@@ -401,14 +412,15 @@ Section Correct.
 
       (* Source terminates *)
       (forall v v', r = (Val v) -> cps_val_rel v v' ->
-                    preord_exp cenv (cps_bound (f <+> fuel_sem.one e)) eq_fuel i
+                    preord_exp cenv (cps_bound (f <+> one_i e)) eq_fuel i
                                ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
                                (e', rho)) /\
       (* Source diverges *)
       (r = fuel_sem.OOT ->
-       exists c, ((f <+> fuel_sem.one e) <= c)%nat /\ bstep_fuel cenv rho e' c eval.OOT tt).
+       exists c, ((f <+> one_i e) <= c)%nat /\ bstep_fuel cenv rho e' c eval.OOT tt).
 
 
+  
   Definition cps_cvt_correct_exps (vs : fuel_sem.env) (es : expression.exps) (vs1 : list value) (f : nat)  :=
     forall rho vnames e' e_app S S' vs2 xs ys ks vs',
       well_formed_env vs ->
@@ -438,7 +450,7 @@ Section Correct.
 
   
   Lemma exps_to_list_inj es1 es2 :
-    exps_to_list es1 = exps_to_list es2 ->
+    exps_as_list es1 = exps_as_list es2 ->
     es1 = es2.
   Proof.
     revert es2.
@@ -451,7 +463,7 @@ Section Correct.
   Qed.
 
   Lemma cps_cvt_rel_exps_app S es es1 es2 vnames e_app xs ks S' e' :
-    exps_to_list es = exps_to_list es1 ++ exps_to_list es2 ->
+    exps_as_list es = exps_as_list es1 ++ exps_as_list es2 ->
     cps_cvt_rel_exps S es vnames e_app xs ks cnstrs S' e' ->
     exists S'' e'' xs1 xs2 ks1 ks2,
       xs = xs1 ++ xs2 /\
@@ -868,7 +880,7 @@ Section Correct.
 
 
     Lemma exps_wf_app es es1 es2 n :
-      exps_to_list es = exps_to_list es1 ++ exps_to_list es2 ->
+      exps_as_list es = exps_as_list es1 ++ exps_as_list es2 ->
       exps_wf n es ->
       exps_wf n es1 /\ exps_wf n es2. 
     Proof.
@@ -1025,14 +1037,6 @@ Section Correct.
           edestruct (@set_lists_app val). eassumption. eassumption.
 
           destructAll. inv H0.
-
-          (* rewrite rev_unit in *. *)
-          (* destruct (set_lists vars (rev l) rho) eqn:Hset'; inv Hset. *)
-          (* simpl. *)
-
-          (* edestruct (set_lists_length3 (M.set a x rho) vars (rev l)). *)
-                  
-          (* eapply set_lists_length_eq. eassumption. *)
           
           eapply preord_exp_post_monotonic.
           2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
@@ -1084,6 +1088,16 @@ Section Correct.
     Qed. 
         
     
+    Lemma exps_as_list_len e :
+      Datatypes.length (exps_as_list e) = N.to_nat (exps_length e).
+    Proof.
+      induction e; simpl. congruence.
+      rewrite IHe.  
+      destruct (exps_length e0). lia.
+      destruct p; lia.
+    Qed.
+
+    
     Lemma cps_cvt_correct : forall vs e r f, eval_env_fuel vs e r f -> cps_cvt_correct_exp vs e r f.
     Proof.
       eapply eval_env_fuel_ind' with (P1 := cps_cvt_correct_exp)
@@ -1097,19 +1111,9 @@ Section Correct.
         
         intros v1 v2 Heq Hrel. inv Heq. inv Hrel. 
                 
-        eapply preord_exp_post_monotonic.
+        eapply preord_exp_post_monotonic. 
         
-        2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
-            
-            2:{ intros m. eapply preord_exp_Efun_red. } 
-            
-            set (rho' := M.set k1
-                               (Vfun rho
-                                     (Fcons k1 kon_tag vx
-                                            (Econstr x1 (dcon_to_tag default_tag dc cnstrs) vx (Eapp k kon_tag [x1])) Fnil)
-                                     k1) rho).
-            
-            edestruct IH with (ys := @nil var) (vs' := @nil val) (rho := rho'); [ | | | | | | | | | eassumption | eassumption | | ]. 
+        2:{ edestruct IH with (ys := @nil var) (vs' := @nil val) (rho := rho); [ | | | | | | | | | eassumption | eassumption | | ]. 
             - eassumption.
             - eassumption.
             - repeat normalize_sets. eapply Union_Disjoint_l; xsets.
@@ -1120,54 +1124,35 @@ Section Correct.
               eapply Disjoint_Included_l; eauto; sets.
             - repeat normalize_sets; sets.
             - eassumption.              
-            - unfold rho'. eapply cps_env_rel_weaken. eassumption.
-              intros Hc. inv_setminus. eapply Hdis; eauto.
-            - normalize_occurs_free.
+            - eassumption.
+            - repeat normalize_occurs_free. repeat normalize_sets. 
               eapply Union_Disjoint_l.
               now eapply Disjoint_Included_r; eauto; sets.
+              rewrite Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set. normalize_sets.
               now eapply Disjoint_Included_r; eauto; sets.
             - reflexivity.
             - destructAll.
-              
+
               eapply preord_exp_trans. tci. eapply eq_fuel_idemp. 
               
               2:{ intros m. simpl. eapply H0. } 
-
-
-              edestruct (set_lists_length3 rho' vx vs').
-              { replace (@Datatypes.length map_util.M.elt) with (@Datatypes.length var) in * by reflexivity.
-                rewrite H8. eapply Forall2_length in H2. rewrite <- H2.
-                erewrite <- eval_fuel_many_length. reflexivity. eassumption. }
-              
-              simpl in *.
-              
-              eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
-              
-              2:{ intros m. simpl. eapply preord_exp_Eapp_red.
-                  - erewrite <- set_lists_not_In; [ | eassumption | ].
-                    unfold rho'. rewrite M.gss. reflexivity.
-                    simpl. intros Hc. eapply H6 in Hc. inv_setminus; eauto.
-                  - simpl. rewrite Coqlib.peq_true. reflexivity.
-                  - simpl. eapply get_list_set_lists; eassumption.
-                  - simpl. eassumption. }
-              
+                             
               eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
               
               2:{ intros m. eapply preord_exp_Econstr_red.
                   eapply get_list_set_lists. eassumption.
                   eassumption. }
-
+              
               eapply preord_exp_app_compat with (P2 := eq_fuel).
               now eapply eq_fuel_compat. 
               now eapply eq_fuel_compat. 
-              
+               
               eapply preord_var_env_extend_neq. 
               eapply preord_var_env_get.
               2:{ eapply M.gss. }
               2:{ erewrite <- set_lists_not_In; [ | eassumption | ].
-                  unfold rho'. rewrite M.gso. eassumption.
-                  intros Hc; subst. inv H4. now eapply Hdis; eauto.
-                  intros Hc. eapply H5 in Hc. inv_setminus. eapply Hdis; eauto. }
+                  eassumption.
+                  simpl. intros Hc; subst. eapply H4 in Hc. inv Hc. now eapply Hdis; eauto. }
               
               eapply preord_val_refl. now tci. 
               now intros Hc; subst; eauto.
@@ -1177,9 +1162,9 @@ Section Correct.
               eapply preord_val_refl. now tci. now constructor. } 
         
           (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
-            destructAll. destruct_tuples. subst. simpl in *. lia. }
+            destructAll. destruct_tuples. subst. simpl in *. unfold cost_exp. lia. }
 
       - (* Con_e OOT *)
         intros es es1 es2 e vs1 vs dc f1 fs Heq Heval IH Hoot IHoot.
@@ -1200,38 +1185,33 @@ Section Correct.
           eapply Forall2_length in Hcenv. rewrite Hcenv. eassumption. } 
         destructAll.
 
-
-        set (rho' := M.set k1
-                           (Vfun rho
-                                 (Fcons k1 kon_tag vx
-                                        (Econstr x1 (dcon_to_tag default_tag dc cnstrs) vx (Eapp k kon_tag [x1])) Fnil)
-                                 k1) rho).
-
-
         unfold cps_cvt_correct_exps in *.
+        assert (Hexps := H9).
         
-        eapply IH with (rho := rho') (ys := []) (vs' := []) in H13; clear IH; [ | | | | | | | | | | eassumption | reflexivity ]; eauto.
+        eapply IH with (rho := rho) (ys := []) (vs' := []) in H9; clear IH; [ | | | | | | | | | | eassumption | reflexivity ]; eauto.
         + destructAll.
 
-          inv H11.
+          inv H7.
           
-          assert (Hex' : exists z, ~ In var (k0 |: FromList vnames) z).
+          assert (Hex' : exists z, ~ In var (k1 |: FromList vnames) z).
           { eapply ToMSet_non_member. tci. } destructAll.
           
-          set (rho'' := M.set k0 (Vfun x8 (Fcons k0 kon_tag [x9] es' Fnil) k0) x8).
-          eapply IHoot with (rho := rho'') in H17.
+          set (rho'' := (M.set k1 (Vfun x8 (Fcons k1 kon_tag [x9] es' Fnil) k1) x8)).
 
+          eapply IHoot with (rho := rho'') in H13.
+          
           * destructAll.
-            assert (Hoot' : bstep_fuel cenv x8 (Efun (Fcons k0 kon_tag [x9] es' Fnil) e') (x4 + 1)%nat OOT tt).
+            assert (Hoot' : bstep_fuel cenv x8 (Efun (Fcons k1 kon_tag [x9] es' Fnil) e'0) (x4 + 1)%nat OOT tt).
             { replace tt with (tt <+> tt) by reflexivity. econstructor 2. econstructor. simpl. eassumption. }
             
-            edestruct H13. reflexivity. eassumption. destructAll.
+            edestruct H9. reflexivity. eassumption. destructAll.
             eexists. split.
-            2:{ replace tt with (tt <+> tt). econstructor 2. econstructor. simpl.
+            2:{ replace tt with (tt <+> tt).
                 destruct x6; [ | contradiction ]. destruct x11. eassumption.
                 reflexivity. }
             
-            simpl. unfold cps_bound, one, fuel_sem.one in *; simpl; unfold_all. lia.
+            simpl. unfold cps_bound, one, one_i in *; simpl; unfold_all.
+            unfold cost_exp. lia. 
             
           * eassumption.
           * eassumption.
@@ -1242,20 +1222,19 @@ Section Correct.
             xsets. 
           * eassumption.
           * intros Hc. eapply Hdis. constructor. now right.
-            eapply H7.
+            eapply H5.
             repeat rewrite FromList_app, FromList_cons at 1. now sets.
-          * unfold rho'. eapply cps_env_rel_weaken.
+          * unfold rho''. eapply cps_env_rel_weaken.
             simpl in *.
             eapply cps_env_rel_weaken_setlists; [ | eauto | ].
             repeat eapply cps_env_rel_weaken. eassumption.
-            intros Hc. inv_setminus. eapply Hdis. now eauto.
             eapply Disjoint_sym. eapply Disjoint_Included; [ | | eapply Hdis ]; sets.
             eapply Included_trans.
-            eapply Included_trans; [ | eapply H6 ].
+            eapply Included_trans; [ | eapply H4 ].
             repeat rewrite FromList_app, FromList_cons at 1. now sets. now sets.
             intros Hc.
             eapply Hdis. constructor. now right.
-            eapply H7.
+            eapply H5.
             repeat rewrite FromList_app, FromList_cons at 1. now sets.
           * unfold rho''. rewrite M.gss. reflexivity.
           * reflexivity.
@@ -1264,17 +1243,17 @@ Section Correct.
           eapply Union_Disjoint_l; sets.
           eapply Union_Disjoint_l; sets.
           eapply Union_Disjoint_l; sets.
-          xsets. 
+
         + eapply Disjoint_Included; [ | | eapply Hdis ]; sets. do 2 normalize_sets.  
           eapply Union_Included. 
 
           eapply Included_trans.
-          eapply Included_trans; [ | eapply H6 ].
+          eapply Included_trans; [ | eapply H4 ].
           repeat rewrite FromList_app.  now sets. now sets. 
 
           
           eapply Included_trans.
-          eapply Included_trans; [ | eapply H7 ].
+          eapply Included_trans; [ | eapply H5 ].
           repeat rewrite FromList_app.  now sets. now sets.
 
         + eapply Disjoint_Union_l.
@@ -1283,17 +1262,19 @@ Section Correct.
 
         + normalize_sets. sets.
         + eapply NoDup_cons_l. eassumption.
-        + unfold rho'. eapply cps_env_rel_weaken. eassumption.
-          intros Hc. inv_setminus. eapply Hdis; eauto.
 
         + eapply Disjoint_Included_l.
           eapply cps_cvt_exps_fv. eassumption.
-          normalize_occurs_free. normalize_sets.
+          repeat normalize_occurs_free. normalize_sets.
           eapply Disjoint_sym. eapply Disjoint_Union_l. rewrite <- FromList_app with (l2 := x6).
           rewrite Union_commut. eapply Union_Disjoint_r.
           * eapply Disjoint_Included_l. eassumption. normalize_sets.
             eapply Setminus_Disjoint_preserv_r.
-            eapply Union_Disjoint_r. eapply Union_Disjoint_r. now xsets. now xsets. now sets.
+            eapply Union_Disjoint_r. now sets.
+            rewrite !Setminus_Union_distr. rewrite Setminus_Same_set_Empty_set.
+            rewrite Setminus_Empty_set_abs_r. rewrite !Union_Empty_set_neut_l. 
+            eapply Disjoint_sym.
+            eapply Disjoint_Included; [ | | eapply Hdis ]; sets.
 
           * eapply Union_Disjoint_r.
 
@@ -1326,7 +1307,7 @@ Section Correct.
         destructAll. inv H0.
         
         (* Prove that whole CPS-term is related to the body of the app -- useful for both cases *) 
-        assert (Heq : forall m, preord_exp' cenv (preord_val cenv) (cps_bound (f1 <+> f2 <+> fuel_sem.one (e1 $ e2))) eq_fuel m
+        assert (Heq : forall m, preord_exp' cenv (preord_val cenv) (cps_bound (f1 <+> f2 <+> one_i (e1 $ e2))) eq_fuel m
                                             (e', M.set k0 vk (M.set x4 x0 (M.set f0 (Vfun rho0 (Fcons f0 func_tag [k0; x4] e' Fnil) f0) rho0)))
                                             (Efun (Fcons k1 kon_tag [x1] (Efun (Fcons k2 kon_tag [x2] (Eapp x1 func_tag [k; x2]) Fnil) e2') Fnil)
                                                   e1'0, rho)). 
@@ -1394,7 +1375,6 @@ Section Correct.
                   - simpl. rewrite M.gss. reflexivity.
                   - simpl. reflexivity. } 
               
-              (* inv H0. simpl. *)
               eapply preord_exp_Eapp_red.
               - rewrite M.gso; eauto. rewrite M.gso; eauto.
                 rewrite M.gss. reflexivity.
@@ -1413,9 +1393,9 @@ Section Correct.
               - simpl. reflexivity. } 
 
           (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
-            destructAll. destruct_tuples. subst. simpl. lia. } }  
+            destructAll. destruct_tuples. subst. simpl. unfold cost_exp. lia. } }
 
         split.
 
@@ -1458,7 +1438,7 @@ Section Correct.
               eapply preord_val_refl. now tci. now constructor. } 
           
           (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
             destructAll. destruct_tuples. subst. simpl in *. lia. } } 
           
@@ -1484,7 +1464,7 @@ Section Correct.
           - destruct (H9 ltac:(reflexivity)). destructAll. eapply Heq in H17; [ | reflexivity ]. destructAll.
             destruct x6; try contradiction. destruct x8. eexists. split; [ | eassumption ].
             
-            unfold fuel_sem.one in *. simpl in *. lia. } 
+            unfold one_i in *. simpl in *. lia. } 
 
       - (* App_e Clos_v, OOT 1 *)
         intros e1 e2 vs f1 Hoot IH.
@@ -1511,7 +1491,7 @@ Section Correct.
           intros Hc. inv H2. eapply Hdis; eauto. 
         + unfold rho'. rewrite M.gss. reflexivity.
         + destruct H5. reflexivity. destructAll. eexists (x3 + 1)%nat. split.
-          unfold fuel_sem.one. simpl. lia.
+          unfold one_i. simpl. unfold cost_exp. lia.
           replace tt with (tt <+> tt) by reflexivity. eapply BStepf_run. econstructor.
           simpl. eassumption.
           
@@ -1537,7 +1517,7 @@ Section Correct.
                                                              (Efun (Fcons k2 kon_tag [x2] (Eapp x1 func_tag [k; x2])
                                                                           Fnil) e2') Fnil) k1) rho))).
         
-        assert (Heq : forall m, preord_exp' cenv (preord_val cenv) (cps_bound (f1 <+>fuel_sem.one (e1 $ e2))) eq_fuel m
+        assert (Heq : forall m, preord_exp' cenv (preord_val cenv) (cps_bound (f1 <+> one_i (e1 $ e2))) eq_fuel m
                                             (e2', rho')
                                             (Efun (Fcons k1 kon_tag [x1] (Efun (Fcons k2 kon_tag [x2] (Eapp x1 func_tag [k; x2]) Fnil) e2') Fnil)
                                                   e1', rho)). 
@@ -1578,9 +1558,9 @@ Section Correct.
               eapply preord_env_P_refl. tci. }
           
           (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
-            destructAll. destruct_tuples. subst. simpl. lia. } }  
+            destructAll. destruct_tuples. subst. simpl. unfold cost_exp. lia. } }  
 
         
         assert (Hex : exists x, ~ In var (k2 |: FromList (vnames)) x).
@@ -1602,7 +1582,7 @@ Section Correct.
         + unfold rho'. rewrite M.gss. reflexivity.
         + destruct (H9 ltac:(reflexivity)). destructAll. eapply Heq in H11; [ | reflexivity ]. destructAll.
           destruct x5; try contradiction. destruct x7. eexists. split; [ | eassumption ].
-          unfold fuel_sem.one in *. simpl in *. lia.
+          unfold one_i in *. simpl in *. lia.
 
       - (* Let_e *)
         intros e1 e2 v1 r vs na f1 f2 He1 IH1 He2 IH2.
@@ -1620,7 +1600,7 @@ Section Correct.
         { eapply cps_val_rel_exists. eassumption. (* TODO remove arg *) eassumption. } destructAll. 
         
         (* Prove that whole CPS-term is related to the body of the app -- useful for both cases *) 
-        assert (Heq : forall m, preord_exp' cenv (preord_val cenv) (cps_bound (f1 <+> fuel_sem.one (Let_e na e1 e2))) eq_fuel m
+        assert (Heq : forall m, preord_exp' cenv (preord_val cenv) (cps_bound (f1 <+> one_i (Let_e na e1 e2))) eq_fuel m
                                             (e2', map_util.M.set x1 x0 (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] e2' Fnil) k1) rho))
                                             (Efun (Fcons k1 kon_tag [x1] e2' Fnil) e1', rho)). 
         { intros j. eapply preord_exp_post_monotonic.
@@ -1651,9 +1631,9 @@ Section Correct.
               - simpl. reflexivity. } 
           
           (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
-            destructAll. destruct_tuples. subst. simpl. lia. } } 
+            destructAll. destruct_tuples. subst. simpl. unfold cost_exp. lia. } } 
 
         assert (Hex : exists x, ~ In var (k |: FromList (x1 :: vnames)) x).
         { eapply ToMSet_non_member. tci. } destructAll.
@@ -1698,9 +1678,9 @@ Section Correct.
               eapply preord_val_refl. now tci. now constructor. } 
           
           (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
-            destructAll. destruct_tuples. subst. simpl in *. lia. } } 
+            destructAll. destruct_tuples. subst. simpl in *. unfold cost_exp in *. lia. } } 
         
         (* OOT *)
         { intros ?; subst.
@@ -1726,7 +1706,7 @@ Section Correct.
           - destruct (H5 ltac:(reflexivity)). destructAll. eapply Heq in H8; [ | reflexivity ]. destructAll.
             destruct x4; try contradiction. destruct x6. eexists. split; [ | eassumption ].
             
-            unfold fuel_sem.one in *. simpl in *. lia. } 
+            unfold one_i in *. simpl in *. lia. } 
         
       - (* Let_e, OOT *)
         intros e1 e2 vs na f1 Hoot IH. 
@@ -1752,7 +1732,7 @@ Section Correct.
           intros Hc. inv H4. eapply Hdis; eauto.
         + unfold rho'. rewrite M.gss. reflexivity.
         + destruct H1. reflexivity. destructAll. eexists (x2 + 1)%nat. split.
-          unfold fuel_sem.one. simpl. lia.
+          unfold one_i. simpl. unfold cost_exp. lia.
           replace tt with (tt <+> tt) by reflexivity. eapply BStepf_run. econstructor; eauto.
 
       - (* App_e, ClosFix_v *)
@@ -1783,7 +1763,7 @@ Section Correct.
         destruct H0 as (y1 & na' & e3 & e3' & Hu). destructAll.  
         repeat subst_exp. 
         (* Prove that whole CPS-term is related to the body of the app -- useful for both cases *) 
-        assert (Heq : forall m, preord_exp' cenv (preord_val cenv) (cps_bound (f1 <+> f2 <+> fuel_sem.one (e1 $ e2))) eq_fuel m
+        assert (Heq : forall m, preord_exp' cenv (preord_val cenv) (cps_bound (f1 <+> f2 <+> one_i (e1 $ e2))) eq_fuel m
                                             (e3', (map_util.M.set x3 vk (map_util.M.set y1 x0 (def_funs Bs Bs rho0 rho0))))
                                             (Efun (Fcons k1 kon_tag [x1] (Efun (Fcons k2 kon_tag [x2] (Eapp x1 func_tag [k; x2]) Fnil) e2') Fnil) e1'0,
                                              rho)). 
@@ -1869,9 +1849,9 @@ Section Correct.
               - simpl. reflexivity. } 
 
           (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
-            destructAll. destruct_tuples. subst. simpl. lia. } }  
+            destructAll. destruct_tuples. subst. simpl. unfold cost_exp. lia. } }  
 
         split. 
 
@@ -1928,7 +1908,7 @@ Section Correct.
               eapply preord_val_refl. now tci. now constructor. } 
           
           (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
             destructAll. destruct_tuples. subst. simpl in *. lia. } } 
         
@@ -1967,7 +1947,7 @@ Section Correct.
           - destruct (H22 ltac:(reflexivity)). destructAll. eapply Heq in H24; [ | reflexivity ]. destructAll.
             destruct x8; try contradiction. destruct x10. eexists. split; [ | eassumption ].
             
-            unfold fuel_sem.one in *. simpl in *. lia. } 
+            unfold one_i in *. simpl in *. lia. } 
                   
       - (* Match_e *)
         intros e1 e' vs dc vs' n brs r f1 f2 Heval1 IH1  Hfind Heval2 IH2.
@@ -2001,7 +1981,7 @@ Section Correct.
 
 
         assert (Hexp : forall j, preord_exp' cenv (preord_val cenv)
-                                             (cps_bound (f1 <+> fuel_sem.one (Match_e e1 n brs))) eq_fuel j
+                                             (cps_bound (f1 <+> one_i (Match_e e1 n brs))) eq_fuel j
                                              (x5, x6) (Efun (Fcons k1 kon_tag [x1] (Ecase x1 bs') Fnil) e1', rho)).
         { intros j. eapply preord_exp_post_monotonic.
           2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
@@ -2045,9 +2025,9 @@ Section Correct.
               - eassumption. }
 
           
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
-            destructAll. destruct_tuples. subst. simpl in *. lia. } } 
+            destructAll. destruct_tuples. subst. simpl in *. unfold cost_exp. lia. } } 
 
         assert (Hex' : exists z, ~ In var (k |: FromList (x2 ++ vnames)) z).
         { eapply ToMSet_non_member. tci. } destructAll. 
@@ -2131,7 +2111,7 @@ Section Correct.
           eapply preord_val_refl. now tci. now constructor. } 
         
         (* Invariant composition *)
-        { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+        { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
           intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
           destructAll. destruct_tuples. subst. simpl in *. lia. } }
 
@@ -2187,7 +2167,7 @@ Section Correct.
           - destruct (H17 ltac:(reflexivity)). destructAll. eapply Hexp in H19; [ | reflexivity ]. destructAll.
             destruct x10; try contradiction. destruct x12. eexists. split; [ | eassumption ].
             
-            unfold fuel_sem.one in *. simpl in *. lia. } 
+            unfold one_i in *. simpl in *. lia. } 
         
         
       - (* Match_e OOT *)
@@ -2210,12 +2190,11 @@ Section Correct.
           intros hc. inv H4. eapply Hdis; eauto.
         + unfold rho'. rewrite M.gss. reflexivity.          
         + destruct H1. reflexivity. destructAll. eexists (x2 + 1)%nat. split.
-          unfold fuel_sem.one. simpl. lia.
+          unfold one_i. simpl. unfold cost_exp. lia.
           replace tt with (tt <+> tt) by reflexivity. eapply BStepf_run. econstructor.
           simpl. eassumption.
 
       - (* enil *)
-        (* enil *)
         intros vs'.
 
         intros rho vnames e' e_app S S' vs2 xs ys ks vs'' Hwfenv Hwf
@@ -2248,7 +2227,7 @@ Section Correct.
             unfold preord_env_P_inj, id in *.  eassumption. } 
 
         (* Invariant composition *)
-        { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+        { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
           intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.
           destructAll. destruct_tuples. subst. simpl in *. lia. }
 
@@ -2360,7 +2339,7 @@ Section Correct.
               repeat normalize_sets. now sets. } 
           
           (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.
             destructAll. destruct_tuples. subst. simpl in *. lia. }
 
@@ -2648,8 +2627,8 @@ Section Correct.
         intros rho vnames k x vk e' S S' f Hwfenv Hwf Hdis Hnin1 Hnin2 Hcenv Hcps. split.
         congruence.
         intros _.
-        unfold fuel_sem.one, lt in *. simpl in *. 
-        eexists 0%nat. split. lia.
+        unfold one_i, lt in *. simpl in *. 
+        unfold cost_exp in *. eexists 0%nat. split. lia.
         constructor 1. unfold algebra.one. simpl. lia.
 
       - (* STEP *)

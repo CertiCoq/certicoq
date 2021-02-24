@@ -162,7 +162,7 @@ Section SUBSETS.
       
     - (* Con_e *)
       intros dc es IH e' k1 vars1 S1 S2 Hrel.
-      inv Hrel. eapply IH in H15.
+      inv Hrel. eapply IH in H13.
       eapply Included_trans. eassumption. sets. 
 
     - (* Match_e *)
@@ -1056,15 +1056,12 @@ Section Post.
           eapply H5 in H0. inv_setminus. now eapply Hdis1; eauto.
         + repeat normalize_sets. sets. 
           eapply Union_Disjoint_r; eapply Disjoint_Included_r; eauto; sets.
-          eapply Disjoint_Included; [ | | eapply Hdis1 ]; sets. 
         + repeat normalize_sets.
           eapply Union_Disjoint_l; sets.
           eapply Union_Disjoint_l; sets.
-          eapply Disjoint_Included; [ | | eapply Hdis1 ]; sets.          
         + repeat normalize_sets.
           eapply Union_Disjoint_l; sets.
           eapply Union_Disjoint_l; sets.
-          eapply Disjoint_Included; [ | | eapply Hdis2 ]; sets.          
         + repeat normalize_sets. sets.
         + repeat normalize_sets.
           eapply Union_Disjoint_l; sets.
@@ -1108,7 +1105,7 @@ Section Post.
                   rewrite Hseq in H0. inv H0. now inv H1. inv H1.
                   eapply Hdis2. now constructor; eauto.
                   
-                  eapply H11 in H0. inv_setminus. now eauto.
+                  eapply H9 in H0. inv_setminus. now eauto.
                   eassumption.
 
                ++ intros Hc.

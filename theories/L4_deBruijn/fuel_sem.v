@@ -50,10 +50,9 @@ Fixpoint max_binders_branches (br : branches_e) : nat :=
 
   
 Section L4_fuel.
-      
-  
-  Class L4_resource  :=
-  { HRes :> @resource exp nat; }. 
+        
+  Class L4_resource {A} :=
+  { HRes :> @resource exp A; }. 
 
 End L4_fuel.
 
@@ -110,6 +109,13 @@ Section Util.
   
 End Util. 
 
+Fixpoint add_list {fuel : Type} {Hf : @L4_resource fuel} (l : list fuel) : fuel :=
+  match l with
+  | nil => <0>
+  | cons f fs => f <+> add_list fs
+  end.
+
+
 Section FUEL_SEM.
 
   Inductive Forall3 {A B C : Type} (R : A -> B -> C -> Prop) : list A -> list B -> list C -> Prop :=
@@ -118,120 +124,106 @@ Section FUEL_SEM.
       forall (x : A) (y : B) (z : C) (l : list A) (l' : list B) (l'' : list C),
         R x y z -> Forall3 R l l' l'' -> Forall3 R (x :: l) (y :: l') (z :: l'').
 
-  Context {Hf : L4_resource}.
+  Context {trace : Type} {Hf : @L4_resource nat} {Ht : @L4_resource trace}.
 
-  Fixpoint add_list (l : list nat) : nat :=
-    match l with
-    | nil => <0>
-    | cons f fs => f <+> add_list fs
-    end.
-  
   
   (** * {Nat,environment}-based semantics for L4 *)
-  Inductive eval_env_step: env -> exp -> result -> nat -> Prop :=
+  Inductive eval_env_step: env -> exp -> result -> nat -> trace -> Prop :=
   | eval_Con_step:
-      forall (es : expression.exps) (vs : list value) (rho: env) (dc: dcon) (fs : nat),
-        eval_fuel_many rho es vs fs ->
-        eval_env_step rho (Con_e dc es) (Val (Con_v dc vs)) fs
+      forall (es : expression.exps) (vs : list value) (rho: env) (dc: dcon) fs ts,
+        eval_fuel_many rho es vs fs ts ->
+        eval_env_step rho (Con_e dc es) (Val (Con_v dc vs)) fs ts
   | eval_Con_step_OOT:
-      forall (es es1 es2: expression.exps) (e : exp) (vs : list value) (rho: env) (dc: dcon) (fs f : nat),
+      forall (es es1 es2: expression.exps) (e : exp) (vs : list value) (rho: env) (dc: dcon) fs f t ts,
         exps_as_list es = exps_as_list es1 ++ e :: exps_as_list es2 ->
-        eval_fuel_many rho es1 vs fs ->
-        eval_env_fuel rho e OOT f ->
-        eval_env_step rho (Con_e dc es) OOT (fs <+> f)
+        eval_fuel_many rho es1 vs fs ts ->
+        eval_env_fuel rho e OOT f t ->
+        eval_env_step rho (Con_e dc es) OOT  (fs <+> f) (ts <+> t)
 
   | eval_App_step:
       forall (e1 e2 e1': expression.exp) v2 r (na : name) (rho rho': env)
-             (f1 f2 f3 : nat),
-        eval_env_fuel rho e1 (Val (Clos_v rho' na e1')) f1 ->
-        eval_env_fuel rho e2 (Val v2) f2 ->
-        eval_env_fuel (v2::rho') e1' r f3 ->
-        eval_env_step rho (App_e e1 e2) r (f1 <+> f2 <+> f3)
+             f1 f2 f3 t1 t2 t3,
+        eval_env_fuel rho e1 (Val (Clos_v rho' na e1')) f1 t1 ->
+        eval_env_fuel rho e2 (Val v2) f2 t2 ->
+        eval_env_fuel (v2::rho') e1' r f3 t3 ->
+        eval_env_step rho (App_e e1 e2) r (f1 <+> f2 <+> f3) (t1 <+> t2 <+> t3)
   | eval_App_step_OOT1 :
-      forall (e1 e2 : expression.exp) (rho : env) (f1 : nat),
-        eval_env_fuel rho e1 OOT f1 ->
-        eval_env_step rho (App_e e1 e2) OOT f1
+      forall (e1 e2 : expression.exp) (rho : env) f1 t1,
+        eval_env_fuel rho e1 OOT f1 t1 ->
+        eval_env_step rho (App_e e1 e2) OOT f1 t1
   | eval_App_step_OOT2 :
-      forall (e1 e2 : expression.exp) (v : value) (rho : env) (f1 f2 : nat),
-        eval_env_fuel rho e1 (Val v) f1 ->
-        eval_env_fuel rho e2 OOT f2 ->
-        eval_env_step rho (App_e e1 e2) OOT (f1 <+> f2)
+      forall (e1 e2 : expression.exp) (v : value) (rho : env) f1 f2 t1 t2,
+        eval_env_fuel rho e1 (Val v) f1 t1 ->
+        eval_env_fuel rho e2 OOT f2 t2 ->
+        eval_env_step rho (App_e e1 e2) OOT (f1 <+> f2) (t1 <+> t2)
 
                       
   | eval_Let_step:
-      forall (e1 e2 : expression.exp) (v1 : value) (r : result) (rho: env) (na: name) (f1 f2 : nat),
-        eval_env_fuel rho e1 (Val v1) f1 ->
-        eval_env_fuel (v1::rho) e2 r f2 ->
-        eval_env_step rho (Let_e na e1 e2) r (f1 <+> f2)
+      forall (e1 e2 : expression.exp) (v1 : value) (r : result) (rho: env) (na: name) f1 f2 t1 t2,
+        eval_env_fuel rho e1 (Val v1) f1 t1 ->
+        eval_env_fuel (v1::rho) e2 r f2 t2 ->
+        eval_env_step rho (Let_e na e1 e2) r (f1 <+> f2) (t1 <+> t2)
   | eval_Let_step_OOT:
-      forall (e1 e2 : expression.exp) (rho: env) (na: name) (f1 : nat),
-        eval_env_fuel rho e1 OOT f1 ->
-        eval_env_step rho (Let_e na e1 e2) OOT f1
+      forall (e1 e2 : expression.exp) (rho: env) (na: name) f1 t1,
+        eval_env_fuel rho e1 OOT f1 t1 ->
+        eval_env_step rho (Let_e na e1 e2) OOT f1 t1
                       
   | eval_FixApp_step: 
       forall (e1 e2 e': expression.exp) (rho rho' rho'': env) (n: N) (na : name)
-             (fnlst: efnlst) (v2 : value) r f1 f2 f3,
-        eval_env_fuel rho e1 (Val (ClosFix_v rho' fnlst n)) f1 ->
+             (fnlst: efnlst) (v2 : value) r f1 f2 f3 t1 t2 t3,
+        eval_env_fuel rho e1 (Val (ClosFix_v rho' fnlst n)) f1 t1 ->
         enthopt (N.to_nat n) fnlst = Some (Lam_e na e') ->
         make_rec_env_rev_order fnlst rho' = rho'' ->
-        eval_env_fuel rho e2 (Val v2) f2 ->
-        eval_env_fuel (v2 :: rho'') e' r f3 ->
-        eval_env_step rho (App_e e1 e2) r (f1 <+> f2 <+> f3)
-  (* | eval_FixApp_step_OOT1: (* TODO remove case *) *)
-  (*     forall (e1 e2 : expression.exp) (rho : env) (f1 : fuel), *)
-  (*       eval_env_fuel rho e1 OOT f1 -> *)
-  (*       eval_env_step rho (App_e e1 e2) OOT f1 *)
-  (* | eval_FixApp_step_OOT2: (* TODO remove case *) *)
-  (*     forall (e1 e2 : expression.exp) (v : value) (rho : env) f1 f2, *)
-  (*       eval_env_fuel rho e1 (Val v) f1 -> *)
-  (*       eval_env_fuel rho e2 OOT f2 -> *)
-  (*       eval_env_step rho (App_e e1 e2) OOT (f1 <+> f2) *)
+        eval_env_fuel rho e2 (Val v2) f2 t2 ->
+        eval_env_fuel (v2 :: rho'') e' r f3 t3 ->
+        eval_env_step rho (App_e e1 e2) r (f1 <+> f2 <+> f3) (t1 <+> t2 <+> t3)
                       
   | eval_Match_step:
       forall (e1 e': expression.exp) (rho: env) (dc: dcon) (vs: list value)
-             (n: N) (brnchs: branches_e) (r: result) f1 f2,
-        eval_env_fuel rho e1 (Val (Con_v dc vs)) f1 ->
+             (n: N) (brnchs: branches_e) (r: result) f1 f2 t1 t2,
+        eval_env_fuel rho e1 (Val (Con_v dc vs)) f1 t1 ->
         find_branch dc (N.of_nat (List.length vs)) brnchs = Some e' ->
-        eval_env_fuel ((List.rev vs) ++ rho) e' r f2 ->
-        eval_env_step rho (Match_e e1 n brnchs) r (f1 <+> f2)
+        eval_env_fuel ((List.rev vs) ++ rho) e' r f2 t2 ->
+        eval_env_step rho (Match_e e1 n brnchs) r (f1 <+> f2) (t1 <+> t2)
   | eval_Match_step_OOT:
-      forall (e1 : expression.exp) (rho: env) (n: N) (br: branches_e) (f1 : nat),
-        eval_env_fuel rho e1 OOT f1 ->
-        eval_env_step rho (Match_e e1 n br) OOT f1
+      forall (e1 : expression.exp) (rho: env) (n: N) (br: branches_e) f1 t1,
+        eval_env_fuel rho e1 OOT f1 t1 ->
+        eval_env_step rho (Match_e e1 n br) OOT f1 t1
 
-  with eval_fuel_many: env -> exps -> list value -> nat -> Prop :=
+  with eval_fuel_many: env -> exps -> list value -> nat -> trace -> Prop :=
   | eval_many_enil :
       forall rho,
-        eval_fuel_many rho enil [] <0>
+        eval_fuel_many rho enil [] <0> <0>
   | eval_many_econs :
-      forall rho e es v vs f fs,
-        eval_env_fuel rho e (Val v) f ->
-        eval_fuel_many rho es vs fs ->
-        eval_fuel_many rho (econs e es) (v :: vs) (f <+> fs)
+      forall rho e es v vs f fs t ts,
+        eval_env_fuel rho e (Val v) f t ->
+        eval_fuel_many rho es vs fs ts ->
+        eval_fuel_many rho (econs e es) (v :: vs) (f <+> fs) (t <+> ts)
                       
-  with eval_env_fuel: env -> exp -> result -> nat -> Prop :=
+  with eval_env_fuel: env -> exp -> result -> nat -> trace -> Prop :=
   (* Values *) 
   | eval_Var_fuel:
       forall (x: N) (rho: env) (v: value),
         nth_error rho (N.to_nat x) = Some v ->
-        eval_env_fuel rho (Var_e x) (Val v) <0>
+        eval_env_fuel rho (Var_e x) (Val v) <0> <0>
   | eval_Lam_fuel:
       forall (e: expression.exp) (rho:env) (na: name),
-        eval_env_fuel rho (Lam_e na e) (Val (Clos_v rho na e)) <0>
+        eval_env_fuel rho (Lam_e na e) (Val (Clos_v rho na e)) <0> (one_i (Lam_e na e))
   | eval_Fix_fuel:
       forall (n: N) (rho: env) (fnlst: efnlst),
-        eval_env_fuel rho (Fix_e fnlst n) (Val (ClosFix_v rho fnlst n)) <0>
+        eval_env_fuel rho (Fix_e fnlst n) (Val (ClosFix_v rho fnlst n)) <0> (one_i (Fix_e fnlst n))
   (* OOT *)
   | eval_OOT :
-      forall rho (e : exp) (c : nat),
-        (c < one_i e)%nat ->
-        eval_env_fuel rho e OOT c
+      forall rho (e : exp) f t,
+        (f < one_i e)%nat ->
+        eval_env_fuel rho e OOT f t
   (* STEP *)
   | eval_step : (* take a step *)
-      forall rho e r (c : nat),
-        eval_env_step rho e r c ->
-        eval_env_fuel rho e r (c <+> (one_i e)).
+      forall rho e r (f : nat) t,
+        eval_env_step rho e r f t ->
+        eval_env_fuel rho e r (f <+> (one_i e)) (t <+> (one_i e)).
 
+  Set Printing All. 
 
   Scheme eval_env_step_ind' := Minimality for eval_env_step Sort Prop
     with eval_fuel_many_ind' :=  Minimality for eval_fuel_many Sort Prop
@@ -275,13 +267,13 @@ Section FUEL_SEM.
     Require Import Lia. 
 
     Lemma well_formed_in_env_Match_branches:
-      forall e e' bs rho i dc vs f,
-        eval_env_fuel rho e (Val (Con_v dc vs)) f ->
+      forall e e' bs rho i dc vs f t,
+        eval_env_fuel rho e (Val (Con_v dc vs)) f t ->
         well_formed_in_env (Match_e e i bs) rho ->
         find_branch dc (N.of_nat (Datatypes.length vs)) bs = Some e' ->
         well_formed_in_env e' (rev vs ++ rho).
     Proof.
-      intros e e' bs rho i d vs f Heval Hwf H.
+      intros e e' bs rho i d vs f t Heval Hwf H.
       inv Hwf.
       unfold well_formed_in_env.
       rewrite app_length. rewrite Nnat.Nat2N.inj_add.
@@ -330,33 +322,33 @@ Section FUEL_SEM.
 
     
     Lemma eval_env_step_preserves_wf :
-      forall vs e r f,
-        eval_env_fuel vs e r f ->
+      forall vs e r f t,
+        eval_env_fuel vs e r f t ->
         forall v, r = Val v ->
                   well_formed_env vs ->
                   well_formed_in_env e vs ->
                   well_formed_val v.
     Proof.
-      pose (P := fun (vs : env) (e : exp) (r : result) (f : nat) => 
+      pose (P := fun (vs : env) (e : exp) (r : result) (f : nat) (t : trace) => 
                    forall v,
                      r = Val v ->
                      well_formed_env vs ->
                      well_formed_in_env e vs ->
                      well_formed_val v).
 
-      pose (P1 := fun (vs : env) (es : exps) (vs' : list value) (f : nat) => 
+      pose (P1 := fun (vs : env) (es : exps) (vs' : list value) (f : nat) (t : trace) => 
                     well_formed_env vs ->
                     well_formed_exps_in_env es vs ->
                     Forall well_formed_val vs').
 
-      pose (P2 := fun (vs : env) (e : exp) (r : result) (f : nat) => 
+      pose (P2 := fun (vs : env) (e : exp) (r : result) (f : nat) (t : trace) => 
                     forall v,
                       r = Val v ->
                       well_formed_env vs ->
                       well_formed_in_env e vs ->
                       well_formed_val v).
 
-      intros vs e r f Heval. 
+      intros vs e r f t Heval. 
       eapply eval_env_fuel_ind' with (P := P) (P0 := P1) (P1 := P2);
       unfold P, P1, P2; intros; try congruence.
       

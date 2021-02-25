@@ -75,15 +75,16 @@ Section Refinement.
   Qed.
 
   Definition diverge (v : list value) (e : expression.exp) :=
-    forall (c1 : nat), eval_env_fuel v e fuel_sem.OOT c1.
+    forall (c : nat), exists t, eval_env_fuel v e fuel_sem.OOT c t.
+
   
-  
-  Program Definition refines (e1 : expression.exp) (e2 : cps.exp) := 
+  Program Definition refines M (e1 : expression.exp) (e2 : cps.exp) := 
     (* Termination *)
-    (forall (v1 : value) (c1 : nat),
-        eval_env_fuel [] e1 (Val v1) c1 ->
+    (forall (v1 : value) (c1 t1 : nat),
+        eval_env_fuel [] e1 (Val v1) c1 t1 ->
         exists (v2 : val) (c2 : nat),
           bstep_fuel cenv (M.empty _) e2 c2 (Res v2) tt /\
+          (c2 <= t1 + M)%nat /\
           value_ref v1 v2) /\
     (* Divergence *)    
     (diverge [] e1 -> eval.diverge cenv (M.empty _) e2).
@@ -134,7 +135,7 @@ Section Refinement.
     exp_wf 0%N e ->
     exists e',
       cps_rel_top e [] k e' /\
-      refines e (Efun (Fcons k kon_tag [x] (Ehalt x) Fnil) e').
+      refines 3 e (Efun (Fcons k kon_tag [x] (Ehalt x) Fnil) e').
   Proof.
     intros Hwf.
     edestruct cps_rel_exists with (xs := @nil var).
@@ -166,8 +167,8 @@ Section Refinement.
       + clear H2.
 
         edestruct cps_val_rel_exists as [v2 Hval]. eassumption.
-        eapply eval_env_step_preserves_wf. eassumption. reflexivity. constructor.
-        eassumption.
+        eapply (@eval_env_step_preserves_wf nat L4_resource_fuel L4_resource_trace).
+        eassumption. reflexivity. constructor. eassumption.
         
         specialize (H1 v1 v2 eq_refl Hval).
 
@@ -186,21 +187,22 @@ Section Refinement.
         
         destruct x4.
 
-        do 2 eexists. split.
+        do 2 eexists. split; [ | split ].
 
         replace tt with (tt <+> tt) by reflexivity.
         econstructor 2. 
         econstructor. simpl. eassumption.
 
+        simpl in *.  unfold one, one_i; simpl. lia.
         simpl in *. eapply cps_val_comp. eassumption. eassumption.
 
     - intros Hdiv.
 
-      intros c. specialize (Hdiv c).
+      intros c. specialize (Hdiv c). destructAll.
       edestruct cps_cvt_correct
         with (rho := M.set k
                            (Vfun (M.empty _) (Fcons k kon_tag [x] (Ehalt x) Fnil) k)
-                           (M.empty _)) (x := x); try eassumption.
+                           (M.empty _)) (x := x); try eassumption. 
       + now constructor.
       + simpl. eassumption.
       + repeat normalize_sets.
@@ -211,8 +213,8 @@ Section Refinement.
       + intros Hc. inv Hc. 
       + constructor.
       + rewrite M.gss. reflexivity.
-      + clear H0.
-        specialize (H1 eq_refl). destructAll.
+      + clear H1.
+        specialize (H2 eq_refl). destructAll.
 
         destruct c.
 
@@ -222,9 +224,9 @@ Section Refinement.
         * eexists. replace (S c) with (c + 1)%nat by lia.
           econstructor 2. econstructor.
           simpl.
-          edestruct Nat.le_exists_sub with (n := c) (m := x2). lia. destructAll.   
-          eapply bstep_fuel_OOT_monotonic in H1.
-          destructAll. destruct x2. eassumption. 
+          edestruct Nat.le_exists_sub with (n := c) (m := x3). lia. destructAll.   
+          eapply bstep_fuel_OOT_monotonic in H2.
+          destructAll. destruct x3. eassumption. 
 
           Grab Existential Variables. exact 0%nat.
   Qed.
@@ -241,12 +243,12 @@ Section Refinement.
       (Efun (Fcons k1 kon_tag [x1] e_cli Fnil) e_lib).
            
 
-    Lemma linking_correct e_lib e_cli k1 x1 r f:
+    Lemma linking_correct e_lib e_cli k1 x1 r f t :
       forall rho k x vk e_lib' e_cli' i,
         exp_wf 0%N e_lib ->
         exp_wf 1%N e_cli ->
         
-        eval_env_fuel [] (link_src e_lib e_cli) r f ->
+        eval_env_fuel [] (link_src e_lib e_cli) r f t ->
 
         cps_rel_top e_cli [x1] k e_cli' ->
         cps_rel_top e_lib [] k1 e_lib' ->
@@ -261,7 +263,7 @@ Section Refinement.
         (forall v v',
             r = (Val v) ->
             cps_val_rel func_tag kon_tag dtag cnstrs v v' ->
-            preord_exp cenv (cps_bound f) eq_fuel i
+            preord_exp cenv (cps_bound f t) eq_fuel i
                   ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
                   (link_trg k1 x1 e_lib' e_cli', rho)) /\
         (* SOurce diverges *)
@@ -271,21 +273,23 @@ Section Refinement.
       intros rho k x vk e_lib' e_cli' i Hwf1 Hwf2 Heval Hcps1 Hcps2 Hneq1 Hneq2 Hneq3 Hget.
       inv Heval.
 
-      - split. congruence.
-        intros _. eexists 0%nat. split.
+      - split. congruence. 
+        intros _. simpl in *. unfold fuel_exp in *.
+        eexists 0%nat. split.
 
-        simpl in *. unfold fuel_sem.one, one_i in *. simpl in *. lia.
+        simpl in *. lia.
         constructor 1. unfold one, one_i. simpl. lia. 
 
       - inv H.
 
-        + assert (Heval1 := H6). eapply cps_cvt_correct in H6; eauto.
-          assert (Heval2 := H7). eapply cps_cvt_correct in H7; eauto.
+        + assert (Heval1 := H7). eapply cps_cvt_correct in H7; eauto.
+          assert (Heval2 := H8). eapply cps_cvt_correct in H8; eauto.
           
           unfold link_trg.
 
           assert (Hwfv2 : well_formed_val v1).
-          { eapply eval_env_step_preserves_wf; [ | reflexivity | | ]. eassumption.
+          { eapply (@eval_env_step_preserves_wf nat L4_resource_fuel L4_resource_trace);
+              [ | reflexivity | | ]. eassumption.
             now constructor. eassumption. } 
 
           assert (Hex' : exists v', cps_val_rel func_tag kon_tag dtag cnstrs v1 v').
@@ -293,7 +297,11 @@ Section Refinement.
 
           inv Hcps1. inv Hcps2.
           
-          assert (Heq : forall m, preord_exp' cenv (preord_val cenv) (cps_bound (f1 <+> fuel_sem.one (link_src e_lib e_cli))) eq_fuel m
+          assert (Heq : forall m, preord_exp' cenv (preord_val cenv)
+                                              (cps_bound (f1 <+> @one_i _ _ fuel_resource_L4 (link_src e_lib e_cli))
+                                                         (t1 <+> @one_i _ _ trace_resource_L4 (link_src e_lib e_cli)))
+
+                                              eq_fuel m
                                               (e_cli', map_util.M.set x1 x0 (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] e_cli' Fnil) k1) rho))
                                               (Efun (Fcons k1 kon_tag [x1] e_cli' Fnil) e_lib', rho)). 
         { intros j. eapply preord_exp_post_monotonic.
@@ -306,7 +314,7 @@ Section Refinement.
               eapply preord_exp_trans. tci. eapply eq_fuel_idemp. 
 
               
-              2:{ intros m. simpl. eapply H6; [ | | | | | | | eassumption | reflexivity | ].
+              2:{ intros m. simpl. eapply H7; [ | | | | | | | eassumption | reflexivity | ].
                   - now constructor.
                   - eassumption. 
                   - repeat normalize_sets. eapply Disjoint_Singleton_l.
@@ -324,9 +332,9 @@ Section Refinement.
               - simpl. reflexivity. } 
           
           (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
-            destructAll. destruct x4, x5. repeat destruct p, p0. subst. simpl. lia. } } 
+            destructAll. destruct x4, x5. repeat destruct p, p0. subst. simpl. unfold fuel_exp. simpl. lia. } } 
         
         assert (Hex : exists x, ~ In var (k |: FromList [x1]) x).
         { eapply ToMSet_non_member. tci. } destructAll.
@@ -341,7 +349,7 @@ Section Refinement.
               
               eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
               
-              2:{ intros m. eapply H7; [ | | | | | | | eassumption | reflexivity | eassumption ].
+              2:{ intros m. eapply H8; [ | | | | | | | eassumption | reflexivity | eassumption ].
                   - constructor; eauto.
                   - simpl Datatypes.length. rewrite Nnat.Nat2N.inj_succ, <- OrdersEx.N_as_OT.add_1_l. eassumption. 
                   - repeat normalize_sets. eapply Union_Disjoint_l; sets.
@@ -369,7 +377,7 @@ Section Refinement.
               eapply preord_val_refl. now tci. now constructor. } 
           
           (* Invariant composition *)
-          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, fuel_sem.one.
+          { unfold inclusion, comp, eq_fuel, one_step, cps_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
             destructAll. destruct x5, x6. repeat destruct p, p0. subst.
             simpl in *. lia. } }
@@ -377,12 +385,12 @@ Section Refinement.
         (* OOT *)
         { intros ?; subst.
 
-          edestruct H7 with (rho := M.set x1 x0 (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] e_cli' Fnil) k1) rho));
+          edestruct H8 with (rho := M.set x1 x0 (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] e_cli' Fnil) k1) rho));
             [ | | | | | | | eassumption | ].
           - constructor; eauto.
           - eassumption.
           - repeat normalize_sets.
-            eapply Union_Disjoint_l; sets.
+            eapply Union_Disjoint_l. 
             eapply Disjoint_Singleton_l. unfold In. simpl. lia.
             eapply Disjoint_Singleton_l. unfold In. simpl. lia.
           - eassumption.
@@ -391,10 +399,10 @@ Section Refinement.
             eapply cps_env_rel_weaken; eauto. constructor.
           - rewrite !M.gso. eassumption.
             now eauto. now eauto.
-          - destruct (H4 ltac:(reflexivity)). destructAll. eapply Heq in H8; [ | reflexivity ]. destructAll.
+          - destruct (H4 ltac:(reflexivity)). destructAll. eapply Heq in H6; [ | reflexivity ]. destructAll.
             destruct x6; try contradiction. destruct x8. eexists. split; [ | eassumption ].
             
-            unfold fuel_sem.one in *. simpl in *. lia. } 
+            unfold one_i in *. simpl in *. lia. } 
         
       + (* Let_e, OOT *)
         split. congruence.
@@ -404,11 +412,11 @@ Section Refinement.
         assert (Hex : exists x, ~ In var (k1 |: FromList []) x).
         { eapply ToMSet_non_member. tci. } destructAll.
         
-        assert (Heval1 := H6). eapply cps_cvt_correct in H6; eauto.
+        assert (Heval1 := H7). eapply cps_cvt_correct in H7; eauto.
 
         inv Hcps1. inv Hcps2. 
         
-        edestruct (H6 rho'); [ | | | | | | | eassumption | ].
+        edestruct (H7 rho'); [ | | | | | | | eassumption | ].
         * constructor.
         * eassumption.
         * repeat normalize_sets.
@@ -419,7 +427,7 @@ Section Refinement.
         * unfold rho'. rewrite M.gss. reflexivity.
         * edestruct H3. reflexivity. destructAll.
           exists (x4 + 1)%nat.
-          split. unfold fuel_sem.one. simpl. lia.
+          split. unfold one_i. simpl. unfold fuel_exp. lia.
           replace tt with (tt <+> tt) by reflexivity. eapply BStepf_run. econstructor; eauto.
 
           
@@ -439,7 +447,7 @@ Section Refinement.
       exists e_cli' e_lib',
         cps_rel_top e_cli [x1] k2 e_cli' /\
         cps_rel_top e_lib [] k1 e_lib' /\
-        refines (link_src e_lib e_cli)
+        refines 3 (link_src e_lib e_cli)
                 (Efun (Fcons k2 kon_tag [x2] (Ehalt x2) Fnil) (link_trg k1 x1 e_lib' e_cli')).
       
     Proof.
@@ -448,6 +456,7 @@ Section Refinement.
       edestruct cps_rel_exists with (xs := @nil var).
       eassumption.
       eassumption.
+
       
       destructAll.
       
@@ -482,7 +491,7 @@ Section Refinement.
         + clear H3.
           
           edestruct cps_val_rel_exists as [v2 Hval]. eassumption.
-          eapply eval_env_step_preserves_wf. eassumption. reflexivity. constructor.
+          eapply (@eval_env_step_preserves_wf nat L4_resource_fuel L4_resource_trace). eassumption. reflexivity. constructor.
           constructor.
           eassumption. eassumption.
           specialize (H2 v1 v2 eq_refl Hval).
@@ -502,17 +511,18 @@ Section Refinement.
           
           destruct x7.
 
-          do 2 eexists. split.
+          do 2 eexists. split; [ | split ].
 
           replace tt with (tt <+> tt) by reflexivity.
           econstructor 2. 
           econstructor. simpl. eassumption.
 
+          simpl in *. unfold one, one_i. simpl. lia. 
           simpl in *. eapply cps_val_comp. eassumption. eassumption.
 
       - intros Hdiv.
 
-        intros c. specialize (Hdiv c).
+        intros c. specialize (Hdiv c). destructAll.
         edestruct linking_correct
           with (rho := M.set k2
                              (Vfun (M.empty _) (Fcons k2 kon_tag [x2] (Ehalt x2) Fnil) k2)
@@ -526,8 +536,8 @@ Section Refinement.
         + now eauto.
         + now eauto.
         + rewrite M.gss. reflexivity.
-        + clear H1.
-          specialize (H2 eq_refl). destructAll.
+        + clear H2.
+          specialize (H3 eq_refl). destructAll.
 
           destruct c.
           
@@ -537,9 +547,9 @@ Section Refinement.
           * eexists. replace (S c) with (c + 1)%nat by lia.
             econstructor 2. econstructor.
             simpl.
-            edestruct Nat.le_exists_sub with (n := c) (m := x5). lia. destructAll.   
-            eapply bstep_fuel_OOT_monotonic in H2.
-            destructAll. destruct x5. eassumption. 
+            edestruct Nat.le_exists_sub with (n := c) (m := x6). lia. destructAll.   
+            eapply bstep_fuel_OOT_monotonic in H3.
+            destructAll. destruct x6. eassumption. 
             
             Grab Existential Variables. exact 0%nat.
     Qed.

@@ -545,7 +545,7 @@ Definition mkPrimCall (res : positive) (pr : positive) (ar : nat)  (fenv : fun_e
 
 Definition mkPrimCallTinfo (res : positive) (pr : positive) (ar : nat)  (fenv : fun_env) (map: fun_info_env) (vs : list positive) : error statement :=
   args <- mkCallVars fenv map ar vs ;;  
-  ret (Scall (Some res) ([mkPrimTyTinfo ar] (Evar pr (mkPrimTyTinfo ar))) args).
+  ret (Scall (Some res) ([mkPrimTyTinfo ar] (Evar pr (mkPrimTyTinfo ar))) (tinf :: args)).
 
 
 Fixpoint asgnFunVars' (vs : list positive) (ind : list N) : error statement :=

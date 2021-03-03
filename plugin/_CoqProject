@@ -338,6 +338,8 @@ extraction/set_util.ml
 extraction/set_util.mli
 extraction/shrink_cps.ml
 extraction/shrink_cps.mli
+extraction/shrink_proto.ml
+extraction/shrink_proto.mli
 extraction/ssrbool.ml
 extraction/ssrbool.mli
 extraction/state.ml

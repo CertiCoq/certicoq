@@ -1,7 +1,7 @@
 Require Import ZArith.
 Require Import Common.compM.
 From CertiCoq Require Import
-     L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6_anf L6.L4_to_L6
+     L6.cps L6.cps_util L6.state L6.eval L6.shrink_proto L6.L4_to_L6_anf L6.L4_to_L6
      L6.inline L6.uncurry_proto L6.closure_conversion
      L6.closure_conversion L6.hoisting L6.dead_param_elim L6.lambda_lifting.
 From CertiCoq Require Import L4.toplevel.

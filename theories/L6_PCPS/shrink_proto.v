@@ -1476,3 +1476,22 @@ Proof.
     unshelve eapply (k x p (apply_r_list σ ys)); [exists σ|]; [solve_delayD..|reflexivity].
   - (* Rename halt *) intros _ R x [σ [Hdom Hran]] k; unfold_delayD; exact (k (apply_r σ x) eq_refl).
 Defined.
+
+Eval unfold rewriter, rewriter', Fuel, rw_for in ltac:(let x := type of rw_shrink in exact x).
+
+Axiom trust_me : forall {A}, A.
+
+Definition shrink_top (e : exp) : exp.
+Proof.
+  refine (run_rewriter rw_shrink e (exist _ (M.empty _) _) (exist _ _ _)).
+  - unerase; unfold R_shrink, R_ctors; intros; now rewrite M.gempty in H.
+  - Unshelve. 2:{ exact (census_exp_succ (M.empty _) e (M.empty _)). }
+    unerase; unfold S_shrink; split.
+    + exact trust_me. (* We will assume the terms are well scoped. *)
+    + intros x; rewrite census_exp_succ_corresp.
+      rewrite rename_all_id.
+      unfold get_count, nat_of_count; rewrite M.gempty.
+      cbn. lia.
+Defined.
+
+Definition shrink_err (e : exp) (c : comp_data) := (compM.Ret (shrink_top e), c). 

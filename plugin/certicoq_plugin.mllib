@@ -167,7 +167,6 @@ Rewriting
 Uncurry_proto
 Color
 Shrink_cps
-Shrink_proto
 Closure_conversion
 Hoisting
 Lambda_lifting

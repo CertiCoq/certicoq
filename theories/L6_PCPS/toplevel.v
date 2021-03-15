@@ -160,33 +160,33 @@ Section IDENT.
 
     Context (anf_opts : anf_options).
 
-    Definition time_anf {A B} (name : string) (f : A -> B) : A -> B :=
-      if time anf_opts then timePhase name f else f.    
+    Definition time_anf {A} (name : string) (f : anf_state A) : anf_state A :=
+      fun s => if time anf_opts then timePhase name f s else f s.
     
     (* Optimizing λANF pipeline *)
 
     Definition anf_pipeline (e : exp) : anf_state exp :=
-      e <- time_anf "Shrink" shrink_err e;;
-      e <- time_anf "Uncurry" (uncurry_top (cps anf_opts)) e ;;
-      e <- time_anf "Inline uncurry wrappers" (inline_uncurry next_var 10 100) e ;;
+      e <- time_anf "Shrink" (shrink_err e) ;;
+      e <- time_anf "Uncurry" (uncurry_top (cps anf_opts) e) ;;
+      e <- time_anf "Inline uncurry wrappers" (inline_uncurry next_var 10 100 e) ;;
       e <- (if inl_before anf_opts then
-              time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100) e
+              time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100 e)
             else id_trans e) ;;
       e <- (if (do_lambda_lift anf_opts) then
-              time_anf "Lambda lift" (lambda_lift (args anf_opts) (no_push anf_opts) (inl_wrappers anf_opts)) e
+              time_anf "Lambda lift" (lambda_lift (args anf_opts) (no_push anf_opts) (inl_wrappers anf_opts) e)
             else id_trans e) ;;
-      e <- time_anf "Shrink" shrink_err e;;
-      e <- time_anf "Closure conversion and hoisting" (closure_conversion_hoist clo_tag clo_ind_tag) e ;;
-      e <- time_anf "Shrink" shrink_err e;;
+      e <- time_anf "Shrink" (shrink_err e) ;;
+      e <- time_anf "Closure conversion and hoisting" (closure_conversion_hoist clo_tag clo_ind_tag e) ;;
+      e <- time_anf "Shrink" (shrink_err e) ;;
       e <- (if inl_after anf_opts then
-              time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100) e
+              time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100 e)
             else id_trans e) ;;
       e <- (if dpe anf_opts then
-              time_anf "Dead param elim" dead_param_elim.DPE e
+              time_anf "Dead param elim" (dead_param_elim.DPE e)
             else id_trans e) ;;
-      e <- time_anf "Shrink" shrink_err e;;
+      e <- time_anf "Shrink" (shrink_err e);;
       e <- (if inl_known anf_opts then
-              time_anf "Inline known functions inside wrappers" (inline_lifted next_var 10 1000) e
+              time_anf "Inline known functions inside wrappers" (inline_lifted next_var 10 1000 e)
             else id_trans e) ;;
       ret e. 
 

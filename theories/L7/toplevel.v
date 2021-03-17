@@ -30,6 +30,7 @@ Definition nextFld:positive := 87.
 Definition rootFld:positive := 88.
 Definition prevFld:positive := 89.
 
+Definition builtin_unreachableIdent:positive := 93.
 
 Let Cprogram := (cps_util.name_env * Clight.program * Clight.program)%type.
 
@@ -67,7 +68,7 @@ Definition Clight_trans_ANF (prims : list (kername * string * nat * positive)) (
                      args
                      threadInfIdent allocIdent limitIdent heapInfIdent argsIdent fpIdent
                      nallocIdent stackframeTIdent nextFld rootFld prevFld tinfIdent frameIdent rootIdent 
-                     gcIdent bodyIdent mainIdent (* isptrIdent *)
+                     gcIdent bodyIdent mainIdent builtin_unreachableIdent (* isptrIdent *)
                      prog cenv nenv in
   match p with
   | Ret (nenv, prog, head) =>

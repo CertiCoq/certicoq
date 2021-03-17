@@ -212,6 +212,11 @@ Definition make_tinfo_ty := Tfunction Tnil threadInf cc_default.
 Definition export_ty := Tfunction (Tcons threadInf Tnil) (tptr value) cc_default.
 Variable (body_id : ident).
 
+Variable (builtin_unreachable_id : ident).
+Definition builtin_unreachable : statement :=
+  let f := Evar builtin_unreachable_id (Tfunction Tnil Tvoid cc_default) in
+  Scall None f nil.
+
 (* fun_ty n = void(struct thread_info *ti, value, .. min(n_param, n) times)
    prim_ty n = value(value, .. n times) *)
 Definition value_tys (n : nat) : typelist := Nat.iter n (Tcons value) Tnil.
@@ -312,7 +317,9 @@ Definition make_fun_call (tail_position : bool) f ys :=
 Definition make_cases (translate_body : exp -> error (statement * FVSet * N)) :=
   fix make_cases l : error (labeled_statements * labeled_statements * FVSet * N) :=
     match l with
-    | nil => ret (LSnil, LSnil, PS.empty, 0)%N
+    | nil =>
+      let unreachable_cases := LScons None builtin_unreachable LSnil in
+      ret (unreachable_cases, unreachable_cases, PS.empty, 0)%N
     | (c, e) :: l' =>
       '(prog, fvs_e, n_e) <- translate_body e ;;
       '(ls, ls', fvs_l', n_l') <- make_cases l' ;;
@@ -583,7 +590,8 @@ Definition inf_vars :=
   (root_fld, nNamed "root") ::
   (prev_fld, nNamed "prev") :: 
   (make_tinfo_id, nNamed "make_tinfo") ::
-  (export_id, nNamed "export") :: nil.
+  (export_id, nNamed "export") ::
+  (builtin_unreachable_id, nNamed "__builtin_unreachable") :: nil.
 
 Definition add_inf_vars (nenv : name_env) : name_env :=
   List.fold_left (fun nenv '(x, name) => M.set x name nenv) inf_vars nenv.

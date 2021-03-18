@@ -23,16 +23,24 @@ Require Import compcert.common.AST
         compcert.cfrontend.Clight
         compcert.common.Values.
 
-Require Import L6.set_util L6.cps L6.identifiers L6.cps_show L6.state.
+Require Import L6.set_util L6.cps L6.identifiers L6.cps_show L6.state L6.algebra.
 Require Import Clightdefs.
+
+(* For proofs *)
+Require Import
+        compcert.common.Memory
+        compcert.common.Globalenvs
+        L6.eval
+        Coq.Relations.Relations.
 
 Section TRANSLATION.
 
-Fixpoint mapi {A B} (f : N -> A -> B) (n : N) (xs : list A) : list B :=
-  match xs with
-  | [] => []
-  | x :: xs => f n x :: mapi f (n + 1)%N xs
-  end.
+Definition mapi {A B} (f : N -> A -> B) :=
+  fix go (n : N) (xs : list A) : list B :=
+    match xs with
+    | [] => []
+    | x :: xs => f n x :: go (n + 1)%N xs
+    end.
 
 (* We only translate hoisted terms *)
 Definition hoisted_exp := (fundefs * exp)%type.
@@ -261,10 +269,13 @@ Definition get_ctor_rep (c : ctor_tag) : error ctor_rep :=
   | None => Err ("find_ctor_rep: unknown constructor with tag " ++ show_pos c)
   end.
 
+Definition rep_unboxed (t : N) : Z := Z.shiftl (Z.of_N t) 1 + 1.
+Definition rep_boxed (t a : N) : Z := Z.shiftl (Z.of_N a) 10 + Z.of_N t.
+
 Definition make_tag (r : ctor_rep) : expr :=
   match r with
-  | enum t => c_int (Z.shiftl (Z.of_N t) 1 + 1) value
-  | boxed t a => c_int (Z.shiftl (Z.of_N a) 10 + Z.of_N t) value
+  | enum t => c_int (rep_unboxed t) value
+  | boxed t a => c_int (rep_boxed t a) value
   end%Z.
 
 (* To use variables in Clight expressions, need variable name and its type.
@@ -727,5 +738,118 @@ Definition compile e cenv nenv : error (name_env * Clight.program * Clight.progr
     impl <- make_prog (make_tinfo_rec :: export_rec :: make_decls nenv defs false ++ defs)%list main_id true ;;
     ret (nenv, header, impl)
   in (res, log).
+
+Section PROOF.
+
+Variable (cenv : ctor_env).
+Variable (fenv : fun_env).
+
+(* The C program that we link with *)
+Variable (prog : program).
+
+(* Its global environment *)
+Let prog_genv : genv := globalenv prog.
+
+(* "traceless" step2: like step2, but force the trace to be empty
+    (i.e., no builtins or external calls) *)
+Notation step2 := (step2 prog_genv).
+Definition tstep2 (s1 s2 : Clight.state) : Prop := step2 s1 Events.E0 s2.
+Definition tsteps2 := clos_trans _ tstep2.
+
+Definition make_vint (z : Z) : Values.val :=
+  if Archi.ptr64
+  then Vlong (Int64.repr z)
+  else Values.Vint (Int.repr z).
+
+Fixpoint closed_val (v : cps.val) :=
+  match v with
+  | Vconstr c vs => fold_right (fun v P => closed_val v /\ P) True vs
+  | Vfun rho fds f => M.bempty rho = true
+  | Vint _ => True
+  end.
+
+Definition int_chunk := if Archi.ptr64 then Mint64 else Mint32.
+Definition int_size := size_chunk int_chunk.
+Definition header_offset o := Ptrofs.unsigned (Ptrofs.sub o (Ptrofs.repr int_size)).
+Definition index_offset o i := Ptrofs.unsigned (Ptrofs.add o (Ptrofs.repr (int_size * i))).
+
+Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
+
+Section ExpRelation.
+Context (rel_val : forall (k : nat) (v : cps.val) (m : Memory.mem) (cv : Values.val), Prop).
+Definition rel_exp' k (rho : env) (e : cps.exp) m (tenv : temp_env) (stmt : statement) : Prop :=
+  forall v (cin : fuel) (cout : trace) fn cont,
+  to_nat cin <= k ->
+  (* if running e in environment rho yields a value v in under k function calls, *)
+  bstep_fuel cenv rho e cin (Res v) cout ->
+  exists tenv' m' b o cv',
+  (* then running stmt down to Sskip yields args[1] related to v *)
+  tstep2 (State fn stmt cont empty_env tenv m) (State fn Sskip cont empty_env tenv' m') /\
+  tenv' ! args_id = Some (Vptr b o) /\
+  Mem.load int_chunk m b (index_offset o 1) = Some cv' /\
+  rel_val (k - to_nat cin) v m' cv'.
+End ExpRelation.
+
+Reserved Notation "v '~_{' k '}' '⟨' m '|' cv '⟩'" (at level 80, no associativity).
+Reserved Notation "'⟨' rho '|' e '⟩' '~_{' k '}' '⟨' m '|' tenv '|' stm '⟩'" (at level 80, no associativity).
+Fixpoint rel_val (k : nat) :=
+  fix rel_val_aux (v : cps.val) (m : Memory.mem) (cv : Values.val) : Prop :=
+  match v, cv with
+  | Vint v, cv => cv = make_vint (rep_unboxed (Z.to_N v))
+  | Vconstr t [], cv =>
+    match get_ctor_rep cenv t with
+    | Ret (enum t) => cv = make_vint (rep_unboxed t)
+    | _ => False
+    end
+  | Vconstr t vs, Vptr b o =>
+    match get_ctor_rep cenv t with
+    | Ret (boxed t a) =>
+      Mem.load int_chunk m b (header_offset o) = Some (make_vint (rep_boxed t a)) /\
+      let arg_ok i v :=
+        match Mem.load int_chunk m b (index_offset o (Z.of_N i)) with
+        | Some cv => rel_val_aux v m cv
+        | None => False
+        end
+      in Forall id (mapi arg_ok 0 vs)
+    | _ => False
+    end
+  | Vfun rho fds f, Vptr b o =>
+    exists t xs e arity indices fn,
+    o = Ptrofs.zero /\
+    find_def f fds = Some (t, xs, e) /\
+    fenv ! f = Some (arity, indices) /\
+    Genv.find_symbol prog_genv f = Some b /\
+    Genv.find_funct prog_genv (Vptr b o) = Some (Internal fn) /\
+    forall j vs_firstn vs_lastn m cvs_firstn cvs_lastn rho_xvs env tenv m_cvs_firstn args_b args_o,
+    j < k ->
+    match k with
+    | 0 => True
+    | S k =>
+      (* suppose that f is called with arguments vs and fn with arguments cvs,
+         related at level min(k,j) (written as k-(k-j) to convince Coq of well-foundedness) *)
+      length vs_firstn = n_param ->
+      length cvs_firstn = n_param ->
+      length vs_lastn = length cvs_lastn ->
+      length cvs_lastn = length (skipn n_param indices) ->
+      let vs := (vs_firstn ++ vs_lastn)%list in
+      let cvs := (cvs_firstn ++ cvs_lastn)%list in
+      Forall2 (fun v cv => v ~_{k-(k-j)} ⟨m | cv⟩) vs cvs ->
+      (* if extend rho with xs↦vs... *)
+      set_lists xs vs (def_funs fds fds rho rho) = Some rho_xvs ->
+      (* and extend the C configuration with xs↦cvs... *)
+      function_entry2 prog_genv fn cvs_firstn m env tenv m_cvs_firstn ->
+      tenv ! args_id = Some (Vptr args_b args_o) ->
+      let arg_ok cv i := Mem.load int_chunk m args_b (index_offset args_o (Z.of_N i)) = Some cv in
+      Forall2 arg_ok cvs_lastn (skipn n_param indices) ->
+      (* then e is related to the body of fn at level min(k,j) *)
+      ⟨rho | e⟩ ~_{k-(k-j)} ⟨m_cvs_firstn | tenv | fn_body fn⟩
+    end
+  | _, _ => False
+  end
+where "v '~_{' k '}' '⟨' m '|' cv '⟩'" := (rel_val k v m cv)
+and "'⟨' rho '|' e '⟩' '~_{' k '}' '⟨' m '|' tenv '|' stm '⟩'" :=
+  (rel_exp' rel_val k rho e m tenv stm).
+
+End PROOF.
 
 End TRANSLATION.

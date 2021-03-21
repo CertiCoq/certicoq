@@ -23,7 +23,7 @@ Require Import compcert.common.AST
         compcert.cfrontend.Clight
         compcert.common.Values.
 
-Require Import L6.set_util L6.cps L6.identifiers L6.cps_show L6.state L6.algebra.
+Require Import L6.set_util L6.cps L6.identifiers L6.cps_show L6.state.
 Require Import Clightdefs.
 
 (* For proofs *)
@@ -31,9 +31,14 @@ Require Import
         compcert.common.Memory
         compcert.common.Globalenvs
         L6.eval
-        Coq.Relations.Relations.
+        L6.algebra
+        Coq.Sets.Ensembles
+        L6.Ensembles_util
+        L6.ctx
+        Coq.Relations.Relations
+        Lia.
 
-Section TRANSLATION.
+Section CODEGEN.
 
 Definition mapi {A B} (f : N -> A -> B) :=
   fix go (n : N) (xs : list A) : list B :=
@@ -83,7 +88,7 @@ Fixpoint compute_fun_env' (fenv : fun_env) (e : exp) : fun_env :=
   | Efun fds e' =>
     let fenv := compute_fun_env_fundefs fds fenv in
     compute_fun_env' fenv e'
-  | Eapp f t ys => M.set f (N.of_nat (length ys) , mapi (fun n _ => n) 0 ys) fenv
+  | Eapp f t ys => M.set f (N.of_nat (length ys), mapi (fun n _ => n) 0 ys) fenv
   | Eprim x p ys e' => compute_fun_env' fenv e'
   | Ehalt x => fenv
   end
@@ -744,7 +749,7 @@ Section PROOF.
 Variable (cenv : ctor_env).
 Variable (fenv : fun_env).
 
-(* The C program that we link with *)
+(* The C program produced by the code generator*)
 Variable (prog : program).
 
 (* Its global environment *)
@@ -754,7 +759,7 @@ Let prog_genv : genv := globalenv prog.
     (i.e., no builtins or external calls) *)
 Notation step2 := (step2 prog_genv).
 Definition tstep2 (s1 s2 : Clight.state) : Prop := step2 s1 Events.E0 s2.
-Definition tsteps2 := clos_trans _ tstep2.
+Definition tsteps2 := clos_refl_trans _ tstep2.
 
 Definition make_vint (z : Z) : Values.val :=
   if Archi.ptr64
@@ -773,83 +778,288 @@ Definition int_size := size_chunk int_chunk.
 Definition header_offset o := Ptrofs.unsigned (Ptrofs.sub o (Ptrofs.repr int_size)).
 Definition index_offset o i := Ptrofs.unsigned (Ptrofs.add o (Ptrofs.repr (int_size * i))).
 
+Notation "'match!' e1 'with' p 'in' e2" :=
+  (match e1 with p => e2 | _ => False end)
+  (at level 80, p pattern, e1 at next level, right associativity).
+
 Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
 
-Section ExpRelation.
-Context (rel_val : forall (k : nat) (v : cps.val) (m : Memory.mem) (cv : Values.val), Prop).
-Definition rel_exp' k (rho : env) (e : cps.exp) m (tenv : temp_env) (stmt : statement) : Prop :=
-  forall v (cin : fuel) (cout : trace) fn cont,
-  to_nat cin <= k ->
-  (* if running e in environment rho yields a value v in under k function calls, *)
-  bstep_fuel cenv rho e cin (Res v) cout ->
-  exists tenv' m' b o cv',
-  (* then running stmt down to Sskip yields args[1] related to v *)
-  tstep2 (State fn stmt cont empty_env tenv m) (State fn Sskip cont empty_env tenv' m') /\
-  tenv' ! args_id = Some (Vptr b o) /\
-  Mem.load int_chunk m b (index_offset o 1) = Some cv' /\
-  rel_val (k - to_nat cin) v m' cv'.
-End ExpRelation.
+Section CycleBreakers.
 
-Reserved Notation "v '~_{' k '}' '⟨' m '|' cv '⟩'" (at level 80, no associativity).
-Reserved Notation "'⟨' rho '|' e '⟩' '~_{' k '}' '⟨' m '|' tenv '|' stm '⟩'" (at level 80, no associativity).
-Fixpoint rel_val (k : nat) :=
-  fix rel_val_aux (v : cps.val) (m : Memory.mem) (cv : Values.val) : Prop :=
+Context (rel_val : forall (k : nat) (v : cps.val) (m : Memory.mem) (cv : Values.val), Prop).
+
+Definition rel_exp k (rho : env) (e : cps.exp) stmt tenv m : Prop :=
+  forall v (cin : fuel) (cout : trace) (fn : function) (cont : cont),
+  (* if running e in environment rho yields a value v in j <= k cost, *)
+  to_nat cin <= k ->
+  bstep_fuel cenv rho e cin (Res v) cout ->
+  exists tenv' m',
+  (* then running stmt down to Sskip yields args[1] related to v at level k-j *)
+  tsteps2 (State fn stmt cont empty_env tenv m) (State fn Sskip cont empty_env tenv' m') /\
+  match! tenv' ! args_id with Some (Vptr b o) in
+  match! Mem.load int_chunk m' b (index_offset o 1) with Some cv' in
+  rel_val (k - to_nat cin) v m' cv'.
+
+Definition Forall' := fold_right and True.
+Definition rel_val_aux (k : nat) :=
+  fix go (v : cps.val) (m : Memory.mem) (cv : Values.val) : Prop :=
   match v, cv with
   | Vint v, cv => cv = make_vint (rep_unboxed (Z.to_N v))
   | Vconstr t [], cv =>
-    match get_ctor_rep cenv t with
-    | Ret (enum t) => cv = make_vint (rep_unboxed t)
-    | _ => False
-    end
+    match! get_ctor_rep cenv t with Ret (enum t) in
+    cv = make_vint (rep_unboxed t)
   | Vconstr t vs, Vptr b o =>
-    match get_ctor_rep cenv t with
-    | Ret (boxed t a) =>
-      Mem.load int_chunk m b (header_offset o) = Some (make_vint (rep_boxed t a)) /\
-      let arg_ok i v :=
-        match Mem.load int_chunk m b (index_offset o (Z.of_N i)) with
-        | Some cv => rel_val_aux v m cv
-        | None => False
-        end
-      in Forall id (mapi arg_ok 0 vs)
-    | _ => False
-    end
+    match! get_ctor_rep cenv t with Ret (boxed t a) in
+    Mem.load int_chunk m b (header_offset o) = Some (make_vint (rep_boxed t a)) /\
+    let arg_ok i v :=
+      match! Mem.load int_chunk m b (index_offset o (Z.of_N i)) with Some cv in
+      go v m cv
+    in Forall' (mapi arg_ok 0 vs)
   | Vfun rho fds f, Vptr b o =>
-    exists t xs e arity indices fn,
     o = Ptrofs.zero /\
-    find_def f fds = Some (t, xs, e) /\
-    fenv ! f = Some (arity, indices) /\
+    match! find_def f fds with Some (t, xs, e) in
+    match! fenv ! f with Some (arity, indices) in
     Genv.find_symbol prog_genv f = Some b /\
-    Genv.find_funct prog_genv (Vptr b o) = Some (Internal fn) /\
-    forall j vs_firstn vs_lastn m cvs_firstn cvs_lastn rho_xvs env tenv m_cvs_firstn args_b args_o,
+    match! Genv.find_funct prog_genv (Vptr b o) with Some (Internal fn) in
+    forall j vs_firstn vs_rest m cvs_firstn cvs_rest rho_xvs env tenv m_cvs_firstn args_b args_o,
     j < k ->
     match k with
     | 0 => True
     | S k =>
       (* suppose that f is called with arguments vs and fn with arguments cvs,
-         related at level min(k,j) (written as k-(k-j) to convince Coq of well-foundedness) *)
+         related at level j (written as k-(k-j) to convince Coq of well-foundedness) *)
+      let j := k-(k-j) in
       length vs_firstn = n_param ->
       length cvs_firstn = n_param ->
-      length vs_lastn = length cvs_lastn ->
-      length cvs_lastn = length (skipn n_param indices) ->
-      let vs := (vs_firstn ++ vs_lastn)%list in
-      let cvs := (cvs_firstn ++ cvs_lastn)%list in
-      Forall2 (fun v cv => v ~_{k-(k-j)} ⟨m | cv⟩) vs cvs ->
+      length vs_rest = length cvs_rest ->
+      length cvs_rest = length (skipn n_param indices) ->
+      let vs := (vs_firstn ++ vs_rest)%list in
+      let cvs := (cvs_firstn ++ cvs_rest)%list in
+      Forall2 (fun v cv => rel_val j v m cv) vs cvs ->
       (* if extend rho with xs↦vs... *)
       set_lists xs vs (def_funs fds fds rho rho) = Some rho_xvs ->
       (* and extend the C configuration with xs↦cvs... *)
-      function_entry2 prog_genv fn cvs_firstn m env tenv m_cvs_firstn ->
       tenv ! args_id = Some (Vptr args_b args_o) ->
       let arg_ok cv i := Mem.load int_chunk m args_b (index_offset args_o (Z.of_N i)) = Some cv in
-      Forall2 arg_ok cvs_lastn (skipn n_param indices) ->
-      (* then e is related to the body of fn at level min(k,j) *)
-      ⟨rho | e⟩ ~_{k-(k-j)} ⟨m_cvs_firstn | tenv | fn_body fn⟩
+      Forall2 arg_ok cvs_rest (skipn n_param indices) ->
+      function_entry2 prog_genv fn cvs_firstn m env tenv m_cvs_firstn ->
+      (* then e is related to the body of fn at level j *)
+      rel_exp j rho e (fn_body fn) tenv m_cvs_firstn
     end
   | _, _ => False
-  end
-where "v '~_{' k '}' '⟨' m '|' cv '⟩'" := (rel_val k v m cv)
-and "'⟨' rho '|' e '⟩' '~_{' k '}' '⟨' m '|' tenv '|' stm '⟩'" :=
-  (rel_exp' rel_val k rho e m tenv stm).
+  end.
+
+End CycleBreakers.
+
+Fixpoint rel_val (k : nat) := rel_val_aux rel_val k.
+
+(* Values are related to (C value, heap) pairs *)
+Notation "v '~_{' k '}' '⟨' m '|' cv '⟩'" :=
+  (rel_val k v m cv) (at level 80, no associativity).
+
+(* Evaluation states (rho, e) are related to Clight machine states.
+   - The function and cont parameters of Clight.step are excluded from
+     the state because they're same before and after running stm in the
+     definition of rel_exp.
+   - The temp_env parameter is excluded too because it should be empty
+     throughout (we're using Clight.step2, which binds function
+     parameters to temporaries instead of addressable stack locals)
+*)
+Notation "'REL' '(' rho ',' e ')' '~_{' k '}' '⟨' stm '|' tenv '|' m '⟩'" :=
+  (rel_exp rel_val k rho e stm tenv m)
+  (at level 80, no associativity).
+
+Lemma rel_val_eqn k : rel_val k = rel_val_aux rel_val k. Proof. now destruct k. Qed.
+
+Section LogicalRelationFacts.
+
+Section Antimonotonicity.
+
+Notation rel_val_stmt :=
+  (forall j k v m cv,
+   j <= k ->
+   v ~_{k} ⟨m | cv⟩ ->
+   v ~_{j} ⟨m | cv⟩)
+  (only parsing).
+Lemma rel_exp_antimon' (Hval : rel_val_stmt) j k rho e stm tenv m :
+  j <= k ->
+  REL (rho, e) ~_{k} ⟨stm | tenv | m⟩ ->
+  REL (rho, e) ~_{j} ⟨stm | tenv | m⟩.
+Proof.
+  unfold rel_exp; intros Hle Hk v cin cout fn cont Hcost Hbstep.
+  edestruct Hk as [tenv' [m' [Hsteps Hres]]]; eauto; [lia|].
+  exists tenv', m'; split; [eauto|].
+  destruct (tenv' ! args_id) as [[] |]; try contradiction.
+  destruct (Mem.load _ _ _ _); try contradiction.
+  eapply Hval; [|eassumption]; lia.
+Qed.
+
+(* TODO: hoist and maybe find better way to express this theorem *)
+Lemma mapi_rel {A B} (R : B -> B -> Prop) op z (f g : _ -> A -> B) i (xs : list A) :
+  forall (Hfg_ok : forall i x, List.In x xs -> R (f i x) (g i x))
+    (HR_z_ok : R z z)
+    (HR_op_ok : forall x y x' y', R x y -> R x' y' -> R (op x x') (op y y')),
+  R (fold_right op z (mapi f i xs)) (fold_right op z (mapi g i xs)).
+Proof.
+  intros; revert i; induction xs as [|x xs IHxs]; cbn; [easy|]; intros i.
+  apply HR_op_ok; [apply Hfg_ok; now left|].
+  apply IHxs; intros i' x' Hin; apply Hfg_ok; now right.
+Qed.
+
+Fixpoint sizeof_val v :=
+  match v with
+  | Vconstr t vs => 1 + fold_right (fun v n => sizeof_val v + n) 0 vs
+  | Vfun rho fds f => 1
+  | Vint _ => 0
+  end.
+Lemma rel_val_antimon : rel_val_stmt.
+Proof.
+  intros j k; revert j.
+  induction k as [k IHk] using lt_wf_ind.
+  intros j v; revert j.
+  remember (sizeof_val v) as sv eqn:Hsv; generalize dependent v.
+  induction sv as [sv IHsv] using lt_wf_ind.
+  intros v Hsv j m cv Hle.
+  rewrite !rel_val_eqn; destruct v as [t [|v vs] |rho fds f|i].
+  - auto.
+  - cbn; destruct cv; auto; destruct (get_ctor_rep _ _) as [| [|tag arity]] eqn:Hrep; auto.
+    intros [Hload Hforall]; split; [easy|].
+    change (_ /\ Forall' (mapi ?f 1 _)) with (Forall' (mapi f 0 (v :: vs))) in *.
+    pose proof @mapi_rel val Prop (fun P Q => P -> Q) and True as mapi_rel.
+    specialize mapi_rel with (i := 0%N) (xs := v :: vs).
+    match goal with _ : Forall' (mapi ?f' _ _) |- _ => specialize mapi_rel with (f := f') end.
+    match goal with |- Forall' (mapi ?g' _ _) => specialize mapi_rel with (g := g') end.
+    apply mapi_rel; clear mapi_rel; [|tauto..].
+    intros i' x Hin.
+    destruct (Mem.load _ m b (index_offset i (Z.of_N i'))); [|tauto].
+    rewrite <- !rel_val_eqn; eapply IHsv; auto.
+    subst sv; destruct Hin as [[] |Hin]; [cbn; lia|clear - Hin].
+    induction vs as [|v' vs IHvs]; [easy|].
+    destruct Hin as [[] |Hin]; [cbn; lia|cbn in *; specialize (IHvs Hin); lia].
+  - simpl; destruct cv; auto.
+    destruct (find_def f fds) as [[[f' xs] e] |] eqn:Hfind; auto.
+    destruct (fenv ! f) as [[arity indices] |] eqn:Hindices; auto.
+    intros [Hi_zero Hrest]; split; [easy|]; revert Hrest.
+    intros [Hfind_symbol Hrest]; split; [easy|]; revert Hrest.
+    match goal with |- context [if ?e1 then ?e2 else ?e3] =>
+      change (if e1 then e2 else e3) with (Genv.find_funct prog_genv (Vptr b i));
+      destruct (Genv.find_funct prog_genv (Vptr b i)) as [[fn|] |] eqn:Hfind_funct; auto
+    end.
+    intros Hfuture_call; intros*; intros Hlt; destruct j; [easy|].
+    intros Hvs_firstn_ok Hcvs_firstn_ok Hvs_rest_ok Hcvs_rest_ok Hvs_related.
+    intros Hextend_rho Hextend_args Hextend_locals Hentry.
+    replace (j - (j - j0)) with j0 in * by lia.
+    destruct k as [|k]; [lia|].
+    specialize Hfuture_call with (j := j0).
+    replace (k - (k - j0)) with j0 in Hfuture_call by lia.
+    eapply Hfuture_call; eauto; lia.
+  - auto.
+Qed.
+
+Definition rel_exp_antimon := rel_exp_antimon' rel_val_antimon.
+
+End Antimonotonicity.
+
+Section ReductionPreservesRelatedness.
+
+(* Refinement of Clight states *)
+Definition Clight_state_refines := fun '(stm1, tenv1, m1) '(stm2, tenv2, m2) =>
+  forall fn cont tenv' m',
+  tsteps2 (State fn stm1 cont empty_env tenv1 m1) (State fn Sskip cont empty_env tenv' m')
+  -> tsteps2 (State fn stm2 cont empty_env tenv2 m2) (State fn Sskip cont empty_env tenv' m').
+Infix "⊑" := Clight_state_refines (at level 80, no associativity).
+
+(* Refinement preserves relatedness *)
+Lemma rel_exp_refines stm' tenv' m' k rho e stm tenv m :
+  (stm', tenv', m') ⊑ (stm, tenv, m) ->
+  REL (rho, e) ~_{k} ⟨stm' | tenv' | m'⟩ ->
+  REL (rho, e) ~_{k} ⟨stm | tenv | m⟩.
+Proof.
+  unfold rel_exp; intros Hsimple_step Hrel.
+  intros v cin cout fn cont Hk Hbstep.
+  edestruct Hrel as [tenv'' [m'' [Hstep2_after Hres]]]; eauto.
+Qed.
+
+(* Reduction is a refinement *)
+
+Definition L7_steps := fun '(stm, tenv, m) '(stm', tenv', m') =>
+  (forall fn cont, tsteps2 (State fn stm cont empty_env tenv m) (State fn stm' cont empty_env tenv' m')).
+Infix "-->" := L7_steps (at level 80, no associativity).
+
+Lemma step_refines stm tenv m stm' tenv' m' :
+  (stm, tenv, m) --> (stm', tenv', m') ->
+  (stm', tenv', m') ⊑ (stm, tenv, m).
+Proof. intros Hsteps fn cont tenv'' m'' Hsteps'. eapply rt_trans; eauto. apply Hsteps. Qed.
+
+Lemma rel_exp_steps stm' tenv' m' k rho e stm tenv m :
+  (stm, tenv, m) --> (stm', tenv', m') ->
+  REL (rho, e) ~_{k} ⟨stm' | tenv' | m'⟩ ->
+  REL (rho, e) ~_{k} ⟨stm | tenv | m⟩.
+Proof. intros; eapply rel_exp_refines; eauto; now apply step_refines. Qed.
+
+(* Simple statements (no break/continue/etc) can be right-associated *)
+
+Ltac impossible :=
+  match goal with
+  (* Contradictory circular hypothesis like Kseq s cont = cont *)
+  | H : Kseq _ _ = _ |- _ =>
+    pose (f := fix go k := match k with Kseq _ k => S (go k) | _ => 0 end);
+    apply (f_equal f) in H; cbn in H; lia
+  end ||
+  intuition congruence.
+
+Lemma seq_assoc s1 s2 s3 tenv m :
+  ((s1; (s2; s3)), tenv, m) ⊑ (((s1; s2); s3), tenv, m).
+Proof.
+  intros fn cont tenv' m' Hsteps.
+  unfold tsteps2 in *; rewrite clos_rt_rt1n_iff in *.
+  inv Hsteps.
+  inv H; try impossible.
+  assert (exists tenv' m',
+    tstep2 (State fn s1 (Kseq (s2; s3) cont) empty_env tenv m)
+           (State fn Sskip (Kseq (s2; s3) cont) empty_env tenv' m')).
+  { admit. }
+  (* This is pretty annoying to do quickly, because each of s1, s2, s3 might not terminate.
+       https://github.com/AbsInt/CompCert/blob/26ddb90280b45e92d90eead89edb237f2922824a/cfrontend/ClightBigstep.v
+     seems to have a bigstep semantics; it'd be nice if we could use this instead. *)
+Abort.
+
+(* TODO: similar lemmas for each constructor of L6's bstep *)
+
+End ReductionPreservesRelatedness.
+
+End LogicalRelationFacts.
+
+Lemma translate_body_fvs locals nenv e :
+  match translate_body cenv fenv locals nenv e with
+  | Ret (_, fvs, _) => fvs = exp_fv e (* TODO: may have to weaken to extensional equality *)
+  | _ => True
+  end.
+Proof.
+Admitted.
+
+Lemma translate_body_n_slots locals nenv e :
+  match translate_body cenv fenv locals nenv e with
+  | Ret (_, _, n_slots) =>
+    forall C x f t ys e', e = C |[ Eletapp x f t ys e' ]| ->
+    N.to_nat n_slots >= PS.cardinal (PS.inter (exp_fv e) locals)
+  | _ => True
+  end.
+Proof.
+Admitted.
+
+Lemma translate_body_stm locals nenv e :
+  match translate_body cenv fenv locals nenv e with
+  | Ret (stm, _, _) =>
+    forall rho e k tenv m,
+    (* rho ~_{k, occurs_free e} ⟨m | tenv⟩ -> *)
+    (* TODO: extra assumptions *)
+    REL (rho, e) ~_{k} ⟨stm | tenv | m⟩
+  | _ => True
+  end.
+Proof.
+Admitted.
 
 End PROOF.
 
-End TRANSLATION.
+End CODEGEN.

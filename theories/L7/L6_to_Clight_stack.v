@@ -1018,6 +1018,7 @@ Proof.
 Qed.
 
 (* The smallstep semantics [step] reduces states *)
+(* TODO: add a letapp constructor to [step] *)
 Infix "-->" := (step pr cenv) (at level 80).
 Lemma red_step ρ e ρ' e' :
   (ρ, e) --> (ρ', e') ->
@@ -1097,23 +1098,172 @@ Qed.
 
 (** * Main theorem *)
 
-Lemma translate_body_fvs locals nenv e :
+Lemma bind_ret {A B} x (f : A -> error B) : (x <- Ret x ;; f x) = f x.
+Proof. reflexivity. Qed.
+
+Arguments Monad.bind : simpl never.
+Arguments add_local_fvs : simpl never.
+Arguments exp_fv : simpl never.
+Arguments PS.cardinal : simpl never.
+
+Ltac bind_step_in H x Hx :=
+  match type of H with
+  | context [_ <- ?e ;; _] => destruct e as [|x] eqn:Hx; [inv H|rewrite bind_ret in H]
+  end.
+
+Ltac bind_step x Hx :=
+  match goal with
+  | |- match _ <- ?e ;; _ with
+      | Err _ => True
+      | Ret _ => _
+      end =>
+    destruct e as [|x] eqn:Hx; [exact I|rewrite bind_ret]
+  end.
+
+Lemma add_local_fv_ok locals fvs x :
+  FromSet (add_local_fv locals fvs x) <--> FromSet fvs :|: ([set x] :&: FromSet locals).
+Proof.
+  unfold add_local_fv; destruct (PS.mem x locals) eqn:Hin; [rewrite PS.mem_spec in Hin|].
+  - rewrite FromSet_add.
+    rewrite Intersection_Same_set; [apply Union_commut|].
+    apply Singleton_Included.
+    eapply FromSet_complete; eauto with Ensembles_DB.
+  - assert (~ PS.In x locals) by (intros Hin'; now rewrite <- PS.mem_spec in Hin').
+    assert (~ x \in FromSet locals) by (intros Hin'; now eapply FromSet_sound in Hin').
+    rewrite Intersection_Disjoint; eauto with Ensembles_DB.
+Qed.
+
+Lemma add_local_fvs_ok locals fvs xs :
+  FromSet (add_local_fvs locals fvs xs) <--> FromSet fvs :|: (FromList xs :&: FromSet locals).
+Proof.
+  revert fvs; induction xs as [|x xs IHxs]; intros fvs.
+  - cbn; rewrite FromList_nil, Intersection_Empty_set_abs_l; eauto with Ensembles_DB.
+  - unfold add_local_fvs in *; cbn; rewrite IHxs, add_local_fv_ok, FromList_cons.
+    rewrite Intersection_Union_distr; eauto with Ensembles_DB.
+Qed.
+
+Lemma FromSet_remove x s : FromSet (PS.remove x s) <--> FromSet s \\ [set x].
+Proof.
+  unfold Same_set, FromSet, FromList; split; intros y Hy; unfold In in *.
+  - rewrite <- MCList.InA_In_eq, PS.elements_spec1, PS.remove_spec in Hy.
+    destruct Hy; split; [unfold In|intros Hin; inv Hin; auto].
+    now rewrite <- MCList.InA_In_eq, PS.elements_spec1.
+  - inv Hy; unfold In in *; rewrite <- MCList.InA_In_eq, PS.elements_spec1, PS.remove_spec in *.
+    split; auto; intros Heq; subst; now apply H0.
+Qed.
+
+Lemma Intersection_extract_Setminus {U} (S1 S2 S3 : Ensemble U) :
+  (S1 \\ S2) :&: S3 <--> (S1 :&: S3) \\ S2.
+Proof. split; intros x Hx; inv Hx; now inv H. Qed.
+
+Fixpoint translate_body_fvs locals nenv e {struct e} :
   match translate_body cenv fenv locals nenv e with
-  | Ret (_, fvs, _) => fvs = exp_fv e (* TODO: may have to weaken to extensional equality *)
+  | Ret (_, fvs, _) => FromSet fvs <--> occurs_free e :&: FromSet locals
   | _ => True
   end.
 Proof.
-Admitted.
+  rename translate_body_fvs into IHe; destruct e.
+  - cbn. bind_step rep Hrep.
+    destruct rep as [t|t a]; rewrite bind_ret;
+    bind_step result He; destruct result as [[? fvs_e] ?];
+    specialize (IHe locals nenv e); rewrite He in IHe;
+    rewrite add_local_fvs_ok, FromSet_remove; normalize_occurs_free;
+    rewrite Intersection_Union_distr, Union_commut;
+    apply Same_set_Union_compat; eauto with Ensembles_DB;
+    rewrite IHe, Intersection_extract_Setminus; eauto with Ensembles_DB.
+  - cbn. bind_step cases Hcases; destruct cases as [[[??] fvs_cs] ?].
+    rewrite add_local_fv_ok.
+    revert dependent n; revert l0 l1 fvs_cs;
+    induction l as [| [c e] ces IHces]; intros l0 l1 fvs_cs n Hcases; cbn in *.
+    + inv Hcases; rewrite FromSet_empty; normalize_occurs_free; eauto with Ensembles_DB.
+    + bind_step_in Hcases e' He'; destruct e' as [[? fvs_e] ?].
+      bind_step_in Hcases ces' Hces'; destruct ces' as [[[??]fvs_ces]?].
+      specialize (IHces _ _ _ _ eq_refl).
+      bind_step_in Hcases rep Hrep.
+      assert (fvs_cs = PS.union fvs_e fvs_ces) by (now destruct rep); subst.
+      specialize (IHe locals nenv e); rewrite He' in IHe.
+      normalize_occurs_free; rewrite FromSet_union, <- Union_assoc, IHces, IHe, !Intersection_Union_distr.
+      split; repeat apply Union_Included; eauto with Ensembles_DB.
+      eapply Included_trans; [|apply Included_Union_r].
+      apply Included_Intersection_compat; eauto with Ensembles_DB.
+  - cbn. bind_step e' He; destruct e' as [[? fvs_e]?].
+    specialize (IHe locals nenv e); rewrite He in IHe.
+    normalize_occurs_free; rewrite add_local_fv_ok, FromSet_remove, IHe.
+    rewrite !Intersection_Union_distr, Union_commut.
+    apply Same_set_Union_compat; eauto with Ensembles_DB.
+    now rewrite Intersection_extract_Setminus.
+  - cbn. bind_step e' He; destruct e' as [[? fvs_e]?].
+    bind_step call Hcall; normalize_occurs_free.
+    specialize (IHe locals nenv e); rewrite He in IHe.
+    rewrite add_local_fvs_ok, FromSet_remove, IHe, FromList_cons, !Intersection_Union_distr, Union_commut.
+    apply Same_set_Union_compat; eauto with Ensembles_DB.
+    now rewrite Intersection_extract_Setminus.
+  - exact I.
+  - cbn. bind_step call Hcall. normalize_occurs_free.
+    rewrite add_local_fvs_ok, FromList_cons, !Intersection_Union_distr, Union_commut, FromSet_empty.
+    split; repeat apply Union_Included; eauto with Ensembles_DB.
+  - cbn. bind_step e' He; destruct e' as [[? fvs_e]?].
+    specialize (IHe locals nenv e); rewrite He in IHe.
+    normalize_occurs_free; rewrite add_local_fvs_ok, FromSet_remove, IHe.
+    rewrite !Intersection_Union_distr, Union_commut.
+    apply Same_set_Union_compat; eauto with Ensembles_DB.
+    now rewrite Intersection_extract_Setminus.
+  - cbn. normalize_occurs_free; rewrite add_local_fv_ok, FromSet_empty; eauto with Ensembles_DB.
+Qed.
 
-Lemma translate_body_n_slots locals nenv e :
+Lemma max_ge_or m n p :
+  N.to_nat (N.max m n) >= p <-> N.to_nat m >= p \/ N.to_nat n >= p.
+Proof. lia. Qed.
+
+Fixpoint translate_body_n_slots locals nenv e {struct e} :
   match translate_body cenv fenv locals nenv e with
   | Ret (_, _, n_slots) =>
     forall C x f t ys e', e = C |[ Eletapp x f t ys e' ]| ->
-    N.to_nat n_slots >= PS.cardinal (PS.inter (exp_fv e) locals)
+    N.to_nat n_slots >= PS.cardinal (PS.inter (exp_fv e') locals)
   | _ => True
   end.
 Proof.
-Admitted.
+  rename translate_body_n_slots into IHe; destruct e.
+  - cbn. bind_step rep Hrep.
+    destruct rep as [t|t a]; rewrite bind_ret;
+    bind_step result He; destruct result as [[? fvs_e] ?];
+    specialize (IHe locals nenv e); rewrite He in IHe;
+    intros C x f ft ys e' Hsubterm; destruct C; inv Hsubterm; now eapply IHe.
+  - cbn. bind_step cases Hcases; destruct cases as [[[??] fvs_cs] ?].
+    revert dependent n; revert l0 l1 fvs_cs;
+    induction l as [| [c e] ces IHces]; intros l0 l1 fvs_cs n Hcases; cbn in *.
+    + intros C x f t ys e' Hsubterm; destruct C; inv Hsubterm.
+      apply (f_equal (@length _)) in H1; rewrite app_length in H1; cbn in H1; lia.
+    + bind_step_in Hcases e' He'; destruct e' as [[? fvs_e] ?].
+      bind_step_in Hcases ces' Hces'; destruct ces' as [[[??]fvs_ces]?].
+      specialize (IHces _ _ _ _ eq_refl).
+      bind_step_in Hcases rep Hrep.
+      assert (n = N.max n0 n1) by (now destruct rep); subst; clear Hcases Hrep.
+      specialize (IHe locals nenv e); rewrite He' in IHe.
+      intros C x f t ys e' Hsubterm; destruct C; inv Hsubterm.
+      destruct l3 as [| [c_ e_] ces_l].
+      * inv H1. rewrite max_ge_or; left; now eapply IHe.
+      * inv H1. rewrite max_ge_or; right.
+        now eapply (IHces (Ecase_c v0 ces_l c0 C l4)).
+  - cbn. bind_step e' He; destruct e' as [[? fvs_e]?].
+    specialize (IHe locals nenv e); rewrite He in IHe.
+    intros C x f ft ys e' Hsubterm; destruct C; inv Hsubterm; now eapply IHe.
+  - cbn. bind_step e' He; destruct e' as [[? fvs_e]?].
+    bind_step call Hcall.
+    specialize (IHe locals nenv e); rewrite He in IHe.
+    intros C x g gt ys e' Hsubterm; destruct C; inv Hsubterm.
+    2:{ rewrite max_ge_or; left; now eapply IHe. }
+    rewrite max_ge_or, Nnat.Nat2N.id; right.
+    pose proof translate_body_fvs locals nenv e' as Hfvs; rewrite He in Hfvs.
+    rewrite exp_fv_correct, <- FromSet_intersection in Hfvs.
+    apply Same_set_From_set, Proper_carinal in Hfvs; lia.
+  - exact I.
+  - cbn. bind_step call Hcall; intros C x g gt ys e' Hsubterm; destruct C; inv Hsubterm.
+  - cbn. bind_step e' He; destruct e' as [[? fvs_e]?].
+    specialize (IHe locals nenv e); rewrite He in IHe.
+    intros C x f ft ys e' Hsubterm; destruct C; inv Hsubterm; now eapply IHe.
+  - cbn. intros C x g gt ys e' Hsubterm; destruct C; inv Hsubterm.
+Qed.
 
 Lemma translate_body_stm locals nenv e :
   match translate_body cenv fenv locals nenv e with

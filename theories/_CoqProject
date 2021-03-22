@@ -179,6 +179,7 @@ compcert/common/Determinism.v
 compcert/cfrontend/Ctypes.v
 compcert/cfrontend/Cop.v
 compcert/cfrontend/Clight.v
+compcert/cfrontend/ClightBigstep.v
 compcert/cfrontend/Csyntax.v
 compcert/cfrontend/Csem.v
 compcert/cfrontend/Cstrategy.v

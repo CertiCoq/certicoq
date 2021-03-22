@@ -30,13 +30,11 @@ Require Import Clightdefs.
 Require Import
         compcert.common.Memory
         compcert.common.Globalenvs
-        L6.eval
-        L6.algebra
-        Coq.Sets.Ensembles
-        L6.Ensembles_util
-        L6.ctx
+        compcert.cfrontend.ClightBigstep
         Coq.Relations.Relations
-        Lia.
+        Coq.Sets.Ensembles
+        Lia
+        L6.eval L6.algebra L6.Ensembles_util L6.ctx.
 
 Section CODEGEN.
 
@@ -746,20 +744,15 @@ Definition compile e cenv nenv : error (name_env * Clight.program * Clight.progr
 
 Section PROOF.
 
+Variable (pr : prims).
 Variable (cenv : ctor_env).
 Variable (fenv : fun_env).
 
-(* The C program produced by the code generator*)
+(* The C program produced by the code generator *)
 Variable (prog : program).
 
 (* Its global environment *)
 Let prog_genv : genv := globalenv prog.
-
-(* "traceless" step2: like step2, but force the trace to be empty
-    (i.e., no builtins or external calls) *)
-Notation step2 := (step2 prog_genv).
-Definition tstep2 (s1 s2 : Clight.state) : Prop := step2 s1 Events.E0 s2.
-Definition tsteps2 := clos_refl_trans _ tstep2.
 
 Definition make_vint (z : Z) : Values.val :=
   if Archi.ptr64
@@ -769,7 +762,7 @@ Definition make_vint (z : Z) : Values.val :=
 Fixpoint closed_val (v : cps.val) :=
   match v with
   | Vconstr c vs => fold_right (fun v P => closed_val v /\ P) True vs
-  | Vfun rho fds f => M.bempty rho = true
+  | Vfun ρ fds f => M.bempty ρ = true
   | Vint _ => True
   end.
 
@@ -778,24 +771,34 @@ Definition int_size := size_chunk int_chunk.
 Definition header_offset o := Ptrofs.unsigned (Ptrofs.sub o (Ptrofs.repr int_size)).
 Definition index_offset o i := Ptrofs.unsigned (Ptrofs.add o (Ptrofs.repr (int_size * i))).
 
+(** * Logical relation between λ-ANF and Clight *)
+
 Notation "'match!' e1 'with' p 'in' e2" :=
   (match e1 with p => e2 | _ => False end)
   (at level 80, p pattern, e1 at next level, right associativity).
 
 Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
 
+(* Bigstep evaluation of statements: unlike exec_stmt,
+   - Force the trace to be empty
+   - Force outcome to be Out_normal (i.e., statement can't exit early
+     via return/break/continue) *)
+Definition texec := fun '(env, tenv, m, stmt) '(tenv', m') =>
+  exec_stmt prog_genv env tenv m stmt Events.E0 tenv' m' Out_normal.
+Infix "⇓" := texec (at level 80, no associativity).
+
 Section CycleBreakers.
 
 Context (rel_val : forall (k : nat) (v : cps.val) (m : Memory.mem) (cv : Values.val), Prop).
 
-Definition rel_exp k (rho : env) (e : cps.exp) stmt tenv m : Prop :=
-  forall v (cin : fuel) (cout : trace) (fn : function) (cont : cont),
-  (* if running e in environment rho yields a value v in j <= k cost, *)
+Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
+  forall v (cin : fuel) (cout : trace),
+  (* if running e in environment ρ yields a value v in j <= k cost, *)
   to_nat cin <= k ->
-  bstep_fuel cenv rho e cin (Res v) cout ->
+  bstep_fuel cenv ρ e cin (Res v) cout ->
   exists tenv' m',
   (* then running stmt down to Sskip yields args[1] related to v at level k-j *)
-  tsteps2 (State fn stmt cont empty_env tenv m) (State fn Sskip cont empty_env tenv' m') /\
+  (env, tenv, m, stmt) ⇓ (tenv', m') /\
   match! tenv' ! args_id with Some (Vptr b o) in
   match! Mem.load int_chunk m' b (index_offset o 1) with Some cv' in
   rel_val (k - to_nat cin) v m' cv'.
@@ -815,84 +818,65 @@ Definition rel_val_aux (k : nat) :=
       match! Mem.load int_chunk m b (index_offset o (Z.of_N i)) with Some cv in
       go v m cv
     in Forall' (mapi arg_ok 0 vs)
-  | Vfun rho fds f, Vptr b o =>
+  | Vfun ρ fds f, Vptr b o =>
     o = Ptrofs.zero /\
     match! find_def f fds with Some (t, xs, e) in
     match! fenv ! f with Some (arity, indices) in
     Genv.find_symbol prog_genv f = Some b /\
     match! Genv.find_funct prog_genv (Vptr b o) with Some (Internal fn) in
-    forall j vs_firstn vs_rest m cvs_firstn cvs_rest rho_xvs env tenv m_cvs_firstn args_b args_o,
+    forall j vs m cvs ρ_xvs env tenv m_cvs_firstn args_b args_o,
     j < k ->
     match k with
     | 0 => True
     | S k =>
-      (* suppose that f is called with arguments vs and fn with arguments cvs,
-         related at level j (written as k-(k-j) to convince Coq of well-foundedness) *)
+      (* suppose that f is called with arguments vs and fn with arguments cvs, and that vs
+         and cvs are related at level j<k (written as k-(k-j) to convince Coq of well-foundedness). *)
       let j := k-(k-j) in
-      length vs_firstn = n_param ->
-      length cvs_firstn = n_param ->
-      length vs_rest = length cvs_rest ->
-      length cvs_rest = length (skipn n_param indices) ->
-      let vs := (vs_firstn ++ vs_rest)%list in
-      let cvs := (cvs_firstn ++ cvs_rest)%list in
       Forall2 (fun v cv => rel_val j v m cv) vs cvs ->
-      (* if extend rho with xs↦vs... *)
-      set_lists xs vs (def_funs fds fds rho rho) = Some rho_xvs ->
+      (* if extend ρ with xs↦vs... *)
+      set_lists xs vs (def_funs fds fds ρ ρ) = Some ρ_xvs ->
       (* and extend the C configuration with xs↦cvs... *)
       tenv ! args_id = Some (Vptr args_b args_o) ->
       let arg_ok cv i := Mem.load int_chunk m args_b (index_offset args_o (Z.of_N i)) = Some cv in
-      Forall2 arg_ok cvs_rest (skipn n_param indices) ->
-      function_entry2 prog_genv fn cvs_firstn m env tenv m_cvs_firstn ->
+      Forall2 arg_ok (skipn n_param cvs) (skipn n_param indices) ->
+      function_entry1 prog_genv fn (firstn n_param cvs) m env tenv m_cvs_firstn ->
       (* then e is related to the body of fn at level j *)
-      rel_exp j rho e (fn_body fn) tenv m_cvs_firstn
+      rel_exp' j ρ e env tenv m_cvs_firstn (fn_body fn)
     end
   | _, _ => False
   end.
 
 End CycleBreakers.
 
-Fixpoint rel_val (k : nat) := rel_val_aux rel_val k.
+(* L6 values are related to (C value, heap) pairs *)
+Fixpoint rel_val (k : nat) := fun v '(m, cv) => 
+  rel_val_aux (fun k v m cv => rel_val k v (m, cv)) k v m cv.
+Notation "v '~ᵥ{' k '}' cv" := (rel_val k v cv) (at level 80).
 
-(* Values are related to (C value, heap) pairs *)
-Notation "v '~_{' k '}' '⟨' m '|' cv '⟩'" :=
-  (rel_val k v m cv) (at level 80, no associativity).
+(* L6 (environment, term) pairs are related to Clight (environment, heap, statement) triples *)
+Definition rel_exp (k : nat) := fun '(ρ, e) '(env, tenv, m, stmt) => 
+  rel_exp' (fun k v m cv => rel_val k v (m, cv)) k ρ e env tenv m stmt.
+Notation "e '~{' k '}' ce" := (rel_exp k e ce) (at level 80).
 
-(* Evaluation states (rho, e) are related to Clight machine states.
-   - The function and cont parameters of Clight.step are excluded from
-     the state because they're same before and after running stm in the
-     definition of rel_exp.
-   - The temp_env parameter is excluded too because it should be empty
-     throughout (we're using Clight.step2, which binds function
-     parameters to temporaries instead of addressable stack locals)
-*)
-Notation "'REL' '(' rho ',' e ')' '~_{' k '}' '⟨' stm '|' tenv '|' m '⟩'" :=
-  (rel_exp rel_val k rho e stm tenv m)
-  (at level 80, no associativity).
+(* L6 environments are related to (environment, heap) pairs wrt a set of identifiers S *)
+Definition rel_env k := fun S ρ '(env, tenv, m) =>
+  forall x, x \in S ->
+  match ρ!x with
+  | Some v =>
+    match tenv!x with
+    | Some v' => v ~ᵥ{k} (m, v')
+    | None =>
+      match env!x : option (_ * type) with
+      | Some (b, _) => v ~ᵥ{k} (m, Vptr b Ptrofs.zero)
+      | None => False
+      end
+    end
+  | None => True
+  end.
+Notation "ρ '~ₑ{' k ',' S '}' cρ" := (rel_env k S ρ cρ) (at level 80).
+Notation "ρ '~ₑ{' k '}' cρ" := (rel_env k (fun _ => True) ρ cρ) (at level 80).
 
-Lemma rel_val_eqn k : rel_val k = rel_val_aux rel_val k. Proof. now destruct k. Qed.
-
-Section LogicalRelationFacts.
-
-Section Antimonotonicity.
-
-Notation rel_val_stmt :=
-  (forall j k v m cv,
-   j <= k ->
-   v ~_{k} ⟨m | cv⟩ ->
-   v ~_{j} ⟨m | cv⟩)
-  (only parsing).
-Lemma rel_exp_antimon' (Hval : rel_val_stmt) j k rho e stm tenv m :
-  j <= k ->
-  REL (rho, e) ~_{k} ⟨stm | tenv | m⟩ ->
-  REL (rho, e) ~_{j} ⟨stm | tenv | m⟩.
-Proof.
-  unfold rel_exp; intros Hle Hk v cin cout fn cont Hcost Hbstep.
-  edestruct Hk as [tenv' [m' [Hsteps Hres]]]; eauto; [lia|].
-  exists tenv', m'; split; [eauto|].
-  destruct (tenv' ! args_id) as [[] |]; try contradiction.
-  destruct (Mem.load _ _ _ _); try contradiction.
-  eapply Hval; [|eassumption]; lia.
-Qed.
+(** * Antimonotonicity of the logical relation *)
 
 (* TODO: hoist and maybe find better way to express this theorem *)
 Lemma mapi_rel {A B} (R : B -> B -> Prop) op z (f g : _ -> A -> B) i (xs : list A) :
@@ -909,10 +893,17 @@ Qed.
 Fixpoint sizeof_val v :=
   match v with
   | Vconstr t vs => 1 + fold_right (fun v n => sizeof_val v + n) 0 vs
-  | Vfun rho fds f => 1
+  | Vfun ρ fds f => 1
   | Vint _ => 0
   end.
-Lemma rel_val_antimon : rel_val_stmt.
+Lemma rel_val_eqn k v m cv :
+  rel_val k v (m, cv) = rel_val_aux (fun k v m cv => rel_val k v (m, cv)) k v m cv.
+Proof. now destruct k. Qed.
+
+Lemma rel_val_antimon : forall j k v m cv,
+  j <= k ->
+  v ~ᵥ{k} (m, cv) ->
+  v ~ᵥ{j} (m, cv).
 Proof.
   intros j k; revert j.
   induction k as [k IHk] using lt_wf_ind.
@@ -920,7 +911,7 @@ Proof.
   remember (sizeof_val v) as sv eqn:Hsv; generalize dependent v.
   induction sv as [sv IHsv] using lt_wf_ind.
   intros v Hsv j m cv Hle.
-  rewrite !rel_val_eqn; destruct v as [t [|v vs] |rho fds f|i].
+  rewrite !rel_val_eqn; destruct v as [t [|v vs] |ρ fds f|i].
   - auto.
   - cbn; destruct cv; auto; destruct (get_ctor_rep _ _) as [| [|tag arity]] eqn:Hrep; auto.
     intros [Hload Hforall]; split; [easy|].
@@ -947,7 +938,7 @@ Proof.
     end.
     intros Hfuture_call; intros*; intros Hlt; destruct j; [easy|].
     intros Hvs_firstn_ok Hcvs_firstn_ok Hvs_rest_ok Hcvs_rest_ok Hvs_related.
-    intros Hextend_rho Hextend_args Hextend_locals Hentry.
+    intros Hextend_ρ Hextend_args Hextend_locals Hentry.
     replace (j - (j - j0)) with j0 in * by lia.
     destruct k as [|k]; [lia|].
     specialize Hfuture_call with (j := j0).
@@ -956,79 +947,155 @@ Proof.
   - auto.
 Qed.
 
-Definition rel_exp_antimon := rel_exp_antimon' rel_val_antimon.
-
-End Antimonotonicity.
-
-Section ReductionPreservesRelatedness.
-
-(* Refinement of Clight states *)
-Definition Clight_state_refines := fun '(stm1, tenv1, m1) '(stm2, tenv2, m2) =>
-  forall fn cont tenv' m',
-  tsteps2 (State fn stm1 cont empty_env tenv1 m1) (State fn Sskip cont empty_env tenv' m')
-  -> tsteps2 (State fn stm2 cont empty_env tenv2 m2) (State fn Sskip cont empty_env tenv' m').
-Infix "⊑" := Clight_state_refines (at level 80, no associativity).
-
-(* Refinement preserves relatedness *)
-Lemma rel_exp_refines stm' tenv' m' k rho e stm tenv m :
-  (stm', tenv', m') ⊑ (stm, tenv, m) ->
-  REL (rho, e) ~_{k} ⟨stm' | tenv' | m'⟩ ->
-  REL (rho, e) ~_{k} ⟨stm | tenv | m⟩.
+Lemma rel_exp_antimon j k ρ e env tenv m stmt :
+  j <= k ->
+  (ρ, e) ~{k} (env, tenv, m, stmt) ->
+  (ρ, e) ~{j} (env, tenv, m, stmt).
 Proof.
-  unfold rel_exp; intros Hsimple_step Hrel.
-  intros v cin cout fn cont Hk Hbstep.
+  intros Hle Hk v cin cout Hcost Hbstep.
+  edestruct Hk as [tenv' [m' [Hsteps Hres]]]; eauto; [lia|].
+  exists tenv', m'; split; [eauto|].
+  destruct (tenv' ! args_id) as [[] |]; try contradiction.
+  destruct (Mem.load _ _ _ _); try contradiction.
+  eapply rel_val_antimon; [|eassumption]; lia.
+Qed.
+
+Lemma rel_env_antimon j k S ρ env tenv m :
+  j <= k ->
+  ρ ~ₑ{k, S} (env, tenv, m) ->
+  ρ ~ₑ{j, S} (env, tenv, m).
+Proof.
+  intros Hle Hk x Hx; specialize (Hk x Hx).
+  destruct (ρ ! x); [|easy].
+  destruct (tenv ! x); [eapply rel_val_antimon; eauto|].
+  destruct (env ! x) as [[] |]; [|easy].
+  eapply rel_val_antimon; eauto.
+Qed.
+
+Lemma rel_env_antimon_S k S1 S2 ρ env tenv m :
+  S1 \subset S2 ->
+  ρ ~ₑ{k, S2} (env, tenv, m) ->
+  ρ ~ₑ{k, S1} (env, tenv, m).
+Proof. intros Hle Hk x Hx; now apply Hk, Hle. Qed.
+
+(** * λ-ANF reductions preserve relatedness *)
+
+(* (ρ2, e2) is "more reduced than" (ρ1, e1) if it evaluates to the
+   exact same value with less-or-equal cost *)
+Definition L6_state_red := fun '(ρ1, e1) '(ρ2, e2) =>
+  forall cin1 v cout1, bstep_fuel cenv ρ1 e1 cin1 (Res v) cout1 ->
+  exists cin2 cout2, bstep_fuel cenv ρ2 e2 cin2 (Res v) cout2 /\ to_nat cin2 <= to_nat cin1.
+
+Lemma rel_exp_red ρ' e' k ρ e env tenv m stmt :
+  L6_state_red (ρ, e) (ρ', e') ->
+  (ρ', e') ~{k} (env, tenv, m, stmt) ->
+  (ρ, e) ~{k} (env, tenv, m, stmt).
+Proof.
+  unfold rel_exp; intros Hred Hrel v cin cout Hk Hbstep.
+  edestruct Hred as [cin' [cout' [Hstep' Hstep'_le]]]; eauto.
+  assert (Hcin'_k : to_nat cin' <= k) by lia.
+  specialize (Hrel _ _ _ Hcin'_k Hstep').
+  destruct Hrel as [tenv' [m' [Hbstep' Hval_rel]]].
+  do 2 eexists; split; eauto.
+  destruct (_ ! _) as [[] |]; try contradiction.
+  destruct (Mem.load _ _ _ _); try contradiction.
+  eapply rel_val_antimon; [|eassumption]; lia.
+Qed.
+
+(* TODO: move somewhere; used to connect smallstep [step] to bigstep [bstep_fuel]
+   (latter uses find_tag_nth; former uses findtag) *)
+Lemma find_tag_nth_findtag ces c e n :
+  cps_util.find_tag_nth ces c e n ->
+  findtag ces c = Some e.
+Proof.
+  revert n; induction ces as [| [c1 e1] ces IHces];
+  intros n; [inversion 1|destruct ces as [| [c2 e2] ces]].
+  - intros H; inv H; cbn; [|inv H6]. now destruct (M.elt_eq c c); [|easy].
+  - intros H; inv H.
+    + cbn; now destruct (M.elt_eq c c); [|easy].
+    + remember ((c2, e2) :: ces) as ces' eqn:Hces'; clear Hces'.
+      cbn; destruct (M.elt_eq c1 c); easy.
+Qed.
+
+(* The smallstep semantics [step] reduces states *)
+Infix "-->" := (step pr cenv) (at level 80).
+Lemma red_step ρ e ρ' e' :
+  (ρ, e) --> (ρ', e') ->
+  L6_state_red (ρ, e) (ρ', e').
+Proof.
+  intros H; inv H; intros cin value cout Hstep.
+  - inv Hstep; inv H; exists cin0, cout0; split; [congruence|rewrite to_nat_add; lia].
+  - inv Hstep; inv H; exists cin0, cout0; split; [congruence|rewrite to_nat_add; lia].
+  - inv Hstep; inv H; exists cin0, cout0; split; [|rewrite to_nat_add; lia].
+    apply find_tag_nth_findtag in H8; congruence.
+  - inv Hstep; inv H; exists cin0, cout0; split; [congruence|rewrite to_nat_add; lia].
+  - inv Hstep; inv H; exists cin0, cout0; split; [congruence|rewrite to_nat_add; lia].
+  - inv Hstep; inv H.
+Qed.
+
+(* λ-ANF reductions preserve relatedness *)
+Corollary rel_exp_step ρ' e' k ρ e env tenv m stmt :
+  (ρ, e) --> (ρ', e') ->
+  (ρ', e') ~{k} (env, tenv, m, stmt) ->
+  (ρ, e) ~{k} (env, tenv, m, stmt).
+Proof. intros Hstep Hrel; eapply rel_exp_red; eauto; now apply red_step. Qed.
+
+(** * Clight reductions preserve relatedness *)
+
+Definition Clight_state_red := fun '(env1, tenv1, m1, stmt1) '(env2, tenv2, m2, stmt2) =>
+  forall tenv' m',
+  (env2, tenv2, m2, stmt2) ⇓ (tenv', m') ->
+  (env1, tenv1, m1, stmt1) ⇓ (tenv', m').
+Infix "~~>" := Clight_state_red (at level 80).
+
+Lemma rel_exp_Clight_red env' tenv' m' stmt' k ρ e env tenv m stmt :
+  (env, tenv, m, stmt) ~~> (env', tenv', m', stmt') ->
+  (ρ, e) ~{k} (env', tenv', m', stmt') ->
+  (ρ, e) ~{k} (env, tenv, m, stmt).
+Proof.
+  unfold rel_exp; intros Hsimple_step Hrel v cin cout Hk Hbstep.
   edestruct Hrel as [tenv'' [m'' [Hstep2_after Hres]]]; eauto.
 Qed.
 
-(* Reduction is a refinement *)
-
-Definition L7_steps := fun '(stm, tenv, m) '(stm', tenv', m') =>
-  (forall fn cont, tsteps2 (State fn stm cont empty_env tenv m) (State fn stm' cont empty_env tenv' m')).
-Infix "-->" := L7_steps (at level 80, no associativity).
-
-Lemma step_refines stm tenv m stm' tenv' m' :
-  (stm, tenv, m) --> (stm', tenv', m') ->
-  (stm', tenv', m') ⊑ (stm, tenv, m).
-Proof. intros Hsteps fn cont tenv'' m'' Hsteps'. eapply rt_trans; eauto. apply Hsteps. Qed.
-
-Lemma rel_exp_steps stm' tenv' m' k rho e stm tenv m :
-  (stm, tenv, m) --> (stm', tenv', m') ->
-  REL (rho, e) ~_{k} ⟨stm' | tenv' | m'⟩ ->
-  REL (rho, e) ~_{k} ⟨stm | tenv | m⟩.
-Proof. intros; eapply rel_exp_refines; eauto; now apply step_refines. Qed.
-
-(* Simple statements (no break/continue/etc) can be right-associated *)
-
-Ltac impossible :=
-  match goal with
-  (* Contradictory circular hypothesis like Kseq s cont = cont *)
-  | H : Kseq _ _ = _ |- _ =>
-    pose (f := fix go k := match k with Kseq _ k => S (go k) | _ => 0 end);
-    apply (f_equal f) in H; cbn in H; lia
-  end ||
-  intuition congruence.
-
-Lemma seq_assoc s1 s2 s3 tenv m :
-  ((s1; (s2; s3)), tenv, m) ⊑ (((s1; s2); s3), tenv, m).
+(* Statements can be right-associated *)
+Lemma red_seq_assoc s1 s2 s3 env tenv m :
+  (env, tenv, m, ((s1; s2); s3)) ~~> (env, tenv, m, (s1; (s2; s3))).
 Proof.
-  intros fn cont tenv' m' Hsteps.
-  unfold tsteps2 in *; rewrite clos_rt_rt1n_iff in *.
-  inv Hsteps.
-  inv H; try impossible.
-  assert (exists tenv' m',
-    tstep2 (State fn s1 (Kseq (s2; s3) cont) empty_env tenv m)
-           (State fn Sskip (Kseq (s2; s3) cont) empty_env tenv' m')).
-  { admit. }
-  (* This is pretty annoying to do quickly, because each of s1, s2, s3 might not terminate.
-       https://github.com/AbsInt/CompCert/blob/26ddb90280b45e92d90eead89edb237f2922824a/cfrontend/ClightBigstep.v
-     seems to have a bigstep semantics; it'd be nice if we could use this instead. *)
-Abort.
+  intros tenv' m' Hs123; inv Hs123; [|contradiction].
+  inv H9; [|contradiction].
+  unfold "⇓"; rewrite <- H4, <- Events.Eapp_assoc; repeat (eapply exec_Sseq_1; eauto).
+Qed.
 
-(* TODO: similar lemmas for each constructor of L6's bstep *)
+Definition eval_expr_operator := fun '(env, tenv, m, e) v =>
+  eval_expr prog_genv env tenv m e v.
+Definition eval_lvalue_operator := fun '(env, tenv, m, e) '(b, o) =>
+  eval_lvalue prog_genv env tenv m e b o.
+Infix "⇓ᵣ" := eval_expr_operator (at level 80).
+Infix "⇓ₗ" := eval_lvalue_operator (at level 80).
 
-End ReductionPreservesRelatedness.
+(* Reduction rules *)
 
-End LogicalRelationFacts.
+Lemma red_skip env tenv m s :
+  (env, tenv, m, (Sskip; s)) ~~> (env, tenv, m, s).
+Proof.
+  intros tenv' m' Hexec.
+  unfold "⇓"; change Events.E0 with (Events.Eapp Events.E0 Events.E0).
+  eapply exec_Sseq_1; [constructor|eauto].
+Qed.
+
+Lemma red_set env tenv m x a v s :
+  (env, tenv, m, a) ⇓ᵣ v ->
+  (env, tenv, m, (x ::= a; s)) ~~> (env, M.set x v tenv, m, s).
+Proof.
+  intros Heval tenv' m' Hexec.
+  unfold "⇓"; change Events.E0 with (Events.Eapp Events.E0 Events.E0).
+  eapply exec_Sseq_1; [now constructor|eauto].
+Qed.
+
+(* TODO: basically, want one rule for each C code fragment corresponding to an L6 reduction step *)
+(* TODO: axiomatize the behavior of calls to the garbage collector here *)
+
+(** * Main theorem *)
 
 Lemma translate_body_fvs locals nenv e :
   match translate_body cenv fenv locals nenv e with
@@ -1050,11 +1117,11 @@ Admitted.
 
 Lemma translate_body_stm locals nenv e :
   match translate_body cenv fenv locals nenv e with
-  | Ret (stm, _, _) =>
-    forall rho e k tenv m,
-    (* rho ~_{k, occurs_free e} ⟨m | tenv⟩ -> *)
+  | Ret (stmt, _, _) =>
+    forall ρ e k env tenv m,
+    ρ ~ₑ{k, occurs_free e} (env, tenv, m) ->
     (* TODO: extra assumptions *)
-    REL (rho, e) ~_{k} ⟨stm | tenv | m⟩
+    (ρ, e) ~{k} (env, tenv, m, stmt)
   | _ => True
   end.
 Proof.

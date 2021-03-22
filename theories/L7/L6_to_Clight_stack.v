@@ -779,6 +779,11 @@ Notation "'match!' e1 'with' p 'in' e2" :=
 
 Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
 
+(* Bigstep evaluation of terms *)
+Definition bstep_res := fun '(ρ, e, cin) '(v, cout) =>
+  bstep_fuel cenv ρ e cin (Res v) cout.
+Infix "⇓cps" := bstep_res (at level 80).
+
 (* Bigstep evaluation of statements: unlike exec_stmt,
    - Force the trace to be empty
    - Force outcome to be Out_normal (i.e., statement can't exit early
@@ -795,7 +800,7 @@ Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
   forall v (cin : fuel) (cout : trace),
   (* if running e in environment ρ yields a value v in j <= k cost, *)
   to_nat cin <= k ->
-  bstep_fuel cenv ρ e cin (Res v) cout ->
+  (ρ, e, cin) ⇓cps (v, cout) ->
   exists tenv' m',
   (* then running stmt down to Sskip yields args[1] related to v at level k-j *)
   (env, tenv, m, stmt) ⇓ (tenv', m') /\
@@ -980,66 +985,49 @@ Proof. intros Hle Hk x Hx; now apply Hk, Hle. Qed.
 
 (** * λ-ANF reductions preserve relatedness *)
 
-(* (ρ2, e2) is "more reduced than" (ρ1, e1) if it evaluates to the
-   exact same value with less-or-equal cost *)
-Definition L6_state_red := fun '(ρ1, e1) '(ρ2, e2) =>
-  forall cin1 v cout1, bstep_fuel cenv ρ1 e1 cin1 (Res v) cout1 ->
-  exists cin2 cout2, bstep_fuel cenv ρ2 e2 cin2 (Res v) cout2 /\ to_nat cin2 <= to_nat cin1.
+Ltac solve_rel_exp_reduction :=
+  unfold rel_exp, rel_exp'; intros Hweaker v cin cout Hk Hbstep;
+  inv Hbstep; match goal with | H : bstep _ _ _ _ _ _ |- _ => inv H end;
+  rewrite to_nat_add in *;
+  edestruct Hweaker as [tenv' [m' [Hstep Hresult]]]; [idtac..|eassumption|]; [idtac..|lia|]; eauto;
+  do 2 eexists; split; eauto;
+  destruct (tenv' ! args_id) as [[] |]; eauto;
+  destruct (Mem.load _ _ _ _); eauto;
+  eapply rel_val_antimon; [|eauto]; lia.
 
-Lemma rel_exp_red ρ' e' k ρ e env tenv m stmt :
-  L6_state_red (ρ, e) (ρ', e') ->
-  (ρ', e') ~{k} (env, tenv, m, stmt) ->
-  (ρ, e) ~{k} (env, tenv, m, stmt).
-Proof.
-  unfold rel_exp; intros Hred Hrel v cin cout Hk Hbstep.
-  edestruct Hred as [cin' [cout' [Hstep' Hstep'_le]]]; eauto.
-  assert (Hcin'_k : to_nat cin' <= k) by lia.
-  specialize (Hrel _ _ _ Hcin'_k Hstep').
-  destruct Hrel as [tenv' [m' [Hbstep' Hval_rel]]].
-  do 2 eexists; split; eauto.
-  destruct (_ ! _) as [[] |]; try contradiction.
-  destruct (Mem.load _ _ _ _); try contradiction.
-  eapply rel_val_antimon; [|eassumption]; lia.
-Qed.
+Lemma rel_exp_constr k ρ x c ys e env tenv m stmt :
+  (forall vs,
+    get_list ys ρ = Some vs ->
+    (M.set x (Vconstr c vs) ρ, e) ~{k} (env, tenv, m, stmt)) ->
+  (ρ, Econstr x c ys e) ~{k} (env, tenv, m, stmt).
+Proof. solve_rel_exp_reduction. Qed.
 
-(* TODO: move somewhere; used to connect smallstep [step] to bigstep [bstep_fuel]
-   (latter uses find_tag_nth; former uses findtag) *)
-Lemma find_tag_nth_findtag ces c e n :
-  cps_util.find_tag_nth ces c e n ->
-  findtag ces c = Some e.
-Proof.
-  revert n; induction ces as [| [c1 e1] ces IHces];
-  intros n; [inversion 1|destruct ces as [| [c2 e2] ces]].
-  - intros H; inv H; cbn; [|inv H6]. now destruct (M.elt_eq c c); [|easy].
-  - intros H; inv H.
-    + cbn; now destruct (M.elt_eq c c); [|easy].
-    + remember ((c2, e2) :: ces) as ces' eqn:Hces'; clear Hces'.
-      cbn; destruct (M.elt_eq c1 c); easy.
-Qed.
+Lemma rel_exp_proj k ρ x c n y e env tenv m stmt :
+  (forall vs v,
+    ρ!y = Some (Vconstr c vs) ->
+    nthN vs n = Some v ->
+    (M.set x v ρ, e) ~{k} (env, tenv, m, stmt)) ->
+  (ρ, Eproj x c n y e) ~{k} (env, tenv, m, stmt).
+Proof. solve_rel_exp_reduction. Qed.
 
-(* The smallstep semantics [step] reduces states *)
-(* TODO: add a letapp constructor to [step] *)
-Infix "-->" := (step pr cenv) (at level 80).
-Lemma red_step ρ e ρ' e' :
-  (ρ, e) --> (ρ', e') ->
-  L6_state_red (ρ, e) (ρ', e').
-Proof.
-  intros H; inv H; intros cin value cout Hstep.
-  - inv Hstep; inv H; exists cin0, cout0; split; [congruence|rewrite to_nat_add; lia].
-  - inv Hstep; inv H; exists cin0, cout0; split; [congruence|rewrite to_nat_add; lia].
-  - inv Hstep; inv H; exists cin0, cout0; split; [|rewrite to_nat_add; lia].
-    apply find_tag_nth_findtag in H8; congruence.
-  - inv Hstep; inv H; exists cin0, cout0; split; [congruence|rewrite to_nat_add; lia].
-  - inv Hstep; inv H; exists cin0, cout0; split; [congruence|rewrite to_nat_add; lia].
-  - inv Hstep; inv H.
-Qed.
+Lemma rel_exp_case k ρ x ces env tenv m stmt :
+  (forall c vs n e,
+    ρ!x = Some (Vconstr c vs) ->
+    cps_util.caseConsistent cenv ces c ->
+    cps_util.find_tag_nth ces c e n ->
+    (ρ, e) ~{k} (env, tenv, m, stmt)) ->
+  (ρ, Ecase x ces) ~{k} (env, tenv, m, stmt).
+Proof. solve_rel_exp_reduction. Qed.
 
-(* λ-ANF reductions preserve relatedness *)
-Corollary rel_exp_step ρ' e' k ρ e env tenv m stmt :
-  (ρ, e) --> (ρ', e') ->
-  (ρ', e') ~{k} (env, tenv, m, stmt) ->
-  (ρ, e) ~{k} (env, tenv, m, stmt).
-Proof. intros Hstep Hrel; eapply rel_exp_red; eauto; now apply red_step. Qed.
+Lemma rel_exp_app k ρ f t ys env tenv m stmt :
+  (forall ρ_f fds f' vs xs e ρ_f_xvs,
+    ρ!f = Some (Vfun ρ_f fds f') ->
+    get_list ys ρ = Some vs ->
+    find_def f' fds = Some (t, xs, e) ->
+    set_lists xs vs (def_funs fds fds ρ_f ρ_f) = Some ρ_f_xvs ->
+    (ρ_f_xvs, e) ~{k} (env, tenv, m, stmt)) ->
+  (ρ, Eapp f t ys) ~{k} (env, tenv, m, stmt).
+Proof. solve_rel_exp_reduction. Qed.
 
 (** * Clight reductions preserve relatedness *)
 
@@ -1047,10 +1035,10 @@ Definition Clight_state_red := fun '(env1, tenv1, m1, stmt1) '(env2, tenv2, m2, 
   forall tenv' m',
   (env2, tenv2, m2, stmt2) ⇓ (tenv', m') ->
   (env1, tenv1, m1, stmt1) ⇓ (tenv', m').
-Infix "~~>" := Clight_state_red (at level 80).
+Infix "-->" := Clight_state_red (at level 80).
 
 Lemma rel_exp_Clight_red env' tenv' m' stmt' k ρ e env tenv m stmt :
-  (env, tenv, m, stmt) ~~> (env', tenv', m', stmt') ->
+  (env, tenv, m, stmt) --> (env', tenv', m', stmt') ->
   (ρ, e) ~{k} (env', tenv', m', stmt') ->
   (ρ, e) ~{k} (env, tenv, m, stmt).
 Proof.
@@ -1058,9 +1046,13 @@ Proof.
   edestruct Hrel as [tenv'' [m'' [Hstep2_after Hres]]]; eauto.
 Qed.
 
+Lemma Clight_red_trans s1 s2 s3 :
+  s1 --> s2 -> s2 --> s3 -> s1 --> s3.
+Proof. destruct s1 as [[[??]?]?], s2 as [[[??]?]?], s3 as [[[??]?]?]; cbn; eauto. Qed.
+
 (* Statements can be right-associated *)
 Lemma red_seq_assoc s1 s2 s3 env tenv m :
-  (env, tenv, m, ((s1; s2); s3)) ~~> (env, tenv, m, (s1; (s2; s3))).
+  (env, tenv, m, ((s1; s2); s3)) --> (env, tenv, m, (s1; (s2; s3))).
 Proof.
   intros tenv' m' Hs123; inv Hs123; [|contradiction].
   inv H9; [|contradiction].
@@ -1077,7 +1069,7 @@ Infix "⇓ₗ" := eval_lvalue_operator (at level 80).
 (* Reduction rules *)
 
 Lemma red_skip env tenv m s :
-  (env, tenv, m, (Sskip; s)) ~~> (env, tenv, m, s).
+  (env, tenv, m, (Sskip; s)) --> (env, tenv, m, s).
 Proof.
   intros tenv' m' Hexec.
   unfold "⇓"; change Events.E0 with (Events.Eapp Events.E0 Events.E0).
@@ -1086,7 +1078,7 @@ Qed.
 
 Lemma red_set env tenv m x a v s :
   (env, tenv, m, a) ⇓ᵣ v ->
-  (env, tenv, m, (x ::= a; s)) ~~> (env, M.set x v tenv, m, s).
+  (env, tenv, m, (x ::= a; s)) --> (env, M.set x v tenv, m, s).
 Proof.
   intros Heval tenv' m' Hexec.
   unfold "⇓"; change Events.E0 with (Events.Eapp Events.E0 Events.E0).
@@ -1094,7 +1086,24 @@ Proof.
 Qed.
 
 (* TODO: basically, want one rule for each C code fragment corresponding to an L6 reduction step *)
-(* TODO: axiomatize the behavior of calls to the garbage collector here *)
+(* TODO: need a way to specify the structure of the heap *)
+
+(** * Relating λ-ANF calls to Clight calls *)
+
+(*
+
+Lemma rel_exp_letapp_compat k ρ x f t ys e env tenv m stmt :
+  (forall ρ_f fds f' vs xs e ρ_f_xvs v,
+    ρ!f = Some (Vfun ρ_f fds f') ->
+    get_list ys ρ = Some vs ->
+    find_def f' fds = Some (t, xs, e_f) ->
+    set_lists xs vs (def_funs fds fds ρ_f ρ_f) = Some ρ_f_xvs ->
+    (ρ_f_xvs, e_f, cin) ⇓f (v, cout) ->
+    (M.set x v ρ, e_f) ~{k} (env, tenv, m, stmt)) ->
+  (ρ, Eletapp x f t ys e) ~{k} (env, tenv, m, stmt).
+Proof. solve_rel_exp_reduction. Qed.
+
+*)
 
 (** * Main theorem *)
 

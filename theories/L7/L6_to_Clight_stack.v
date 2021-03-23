@@ -829,6 +829,18 @@ Proof.
   eapply exec_Sseq_1; [now constructor|eauto].
 Qed.
 
+Lemma Cred_assign env tenv m a1 a2 v_pre v b o m' s :
+  (env, tenv, m, a1) ⇓ₗ (b, o) ->
+  (env, tenv, m, a2) ⇓ᵣ v_pre ->
+  sem_cast v_pre (typeof a2) (typeof a1) m = Some v ->
+  assign_loc prog_genv (typeof a1) m b o v m' ->
+  (env, tenv, m, (a1 :::= a2; s)) --> (env, tenv, m', s).
+Proof.
+  intros Heval_dst Heval_src Hcast Hassign tenv' m'' Hexec.
+  unfold "⇓"; change Events.E0 with (Events.Eapp Events.E0 Events.E0).
+  eapply exec_Sseq_1; [now econstructor|eauto].
+Qed.
+
 Lemma Cred_if env tenv m a v b s1 s2 s :
   (env, tenv, m, a) ⇓ᵣ v ->
   bool_val v (typeof a) m = Some b ->
@@ -839,6 +851,13 @@ Proof.
   unfold "⇓" in *; inv Hexec; [|easy].
   eapply exec_Sseq_1; [econstructor|]; eauto.
 Qed.
+
+Lemma Cred_if' env tenv m a v b s1 s2 :
+  (env, tenv, m, a) ⇓ᵣ v ->
+  bool_val v (typeof a) m = Some b ->
+  (env, tenv, m, Sifthenelse a s1 s2) -->
+  (env, tenv, m, if b then s1 else s2).
+Proof. intros Heval Hbool tenv' m' Hexec; econstructor; eauto. Qed.
 
 (** ** Address spaces *)
 
@@ -879,17 +898,19 @@ Definition rel_val_aux (k : nat) :=
   fix go (v : cps.val) (m : Memory.mem) (cv : Values.val) : Prop :=
   match v, cv with
   | Vint v, cv => cv = make_vint (rep_unboxed (Z.to_N v))
-  | Vconstr t [], cv =>
-    match! get_ctor_rep cenv t with Ret (enum t) in
-    cv = make_vint (rep_unboxed t)
-  | Vconstr t vs, Vptr b o =>
-    match! get_ctor_rep cenv t with Ret (boxed t a) in
-    Mem.load int_chunk m b (header_offset o) = Some (make_vint (rep_boxed t a)) /\
-    let arg_ok i v :=
-      (* TODO: do we only ever load memory in int_chunk chunks? if so, can define as helper function *)
-      match! Mem.load int_chunk m b (index_offset o (Z.of_N i)) with Some cv in
-      go v m cv
-    in Forall' (mapi arg_ok 0 vs)
+  | Vconstr t vs, cv =>
+    match get_ctor_rep cenv t with
+    | Ret (enum t) => cv = make_vint (rep_unboxed t)
+    | Ret (boxed t a) =>
+      match! cv with Vptr b o in
+      Mem.load int_chunk m b (header_offset o) = Some (make_vint (rep_boxed t a)) /\
+      let arg_ok i v :=
+        (* TODO: do we only ever load memory in int_chunk chunks? if so, can define as helper function *)
+        match! Mem.load int_chunk m b (index_offset o (Z.of_N i)) with Some cv in
+        go v m cv
+      in Forall' (mapi arg_ok 0 vs)
+    | _ => False
+    end
   | Vfun ρ fds f, Vptr b o =>
     o = Ptrofs.zero /\
     match! find_def f fds with Some (t, xs, e) in
@@ -980,7 +1001,8 @@ Proof.
   intros v Hsv j m cv Hle.
   rewrite !rel_val_eqn; destruct v as [t [|v vs] |ρ fds f|i].
   - auto.
-  - cbn; destruct cv; auto; destruct (get_ctor_rep _ _) as [| [|tag arity]] eqn:Hrep; auto.
+  - cbn; destruct (get_ctor_rep _ _) as [| [tag|tag arity]] eqn:Hrep; auto.
+    destruct cv; auto; 
     intros [Hload Hforall]; split; [easy|].
     change (_ /\ Forall' (mapi ?f 1 _)) with (Forall' (mapi f 0 (v :: vs))) in *.
     pose proof @mapi_rel val Prop (fun P Q => P -> Q) and True as mapi_rel.
@@ -1132,6 +1154,10 @@ Lemma rel_exp_app k ρ f t ys env tenv m stmt :
     (ρ_f_xvs, e) ~{k} (env, tenv, m, stmt)) ->
   (ρ, Eapp f t ys) ~{k} (env, tenv, m, stmt).
 Proof. solve_rel_exp_reduction. Qed.
+
+Lemma rel_exp_prim k ρ x p ys e env tenv m stmt :
+  (ρ, Eprim x p ys e) ~{k} (env, tenv, m, stmt).
+Proof. intros v cin cout Hk Hrun; inv Hrun; inv H. Qed.
 
 (** ** Clight reductions preserve relatedness *)
 
@@ -1345,8 +1371,9 @@ Lemma translate_body_stm locals nenv k : forall e,
   end.
 Proof.
   induction k as [k IHk] using lt_wf_ind; fix IHe 1; destruct e.
-  - (* Econstr *)
-    cbn. bind_step rep Hrep. destruct rep as [t|t a]; rewrite bind_ret.
+  - (* let x = Con c ys in e *)
+    rename v into x, l into ys; cbn.
+    bind_step rep Hrep; destruct rep as [t|t a]; rewrite bind_ret.
     + (* Unboxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
       intros ρ env tenv m Hρ.
@@ -1354,14 +1381,11 @@ Proof.
       eapply rel_exp_Cred; [apply Cred_set; now constructor|].
       specialize (IHe e); rewrite He in IHe; apply IHe. Guarded.
       eapply rel_env_antimon_S.
-      { apply (Included_Union_Setminus _ [set v]); eauto with Decidable_DB. }
-      rewrite rel_env_union; split; [|apply rel_env_gss_sing; auto].
-      { eapply rel_env_antimon_S in Hρ; [|normalize_occurs_free; apply Included_refl].
-        rewrite rel_env_union in Hρ; destruct Hρ as [_ Hρ].
-        apply rel_env_gso; [intros Hin; now inv Hin|auto]. }
-      rewrite rel_val_eqn; cbn.
-      destruct vs. 2:{ admit. (* TODO: l can't be empty *) }
-      now rewrite Hrep.
+      { apply (Included_Union_Setminus _ [set x]); eauto with Decidable_DB. }
+      eapply rel_env_antimon_S in Hρ; [|normalize_occurs_free; apply Included_refl].
+      rewrite rel_env_union in Hρ; destruct Hρ as [_ Hρ].
+      rewrite rel_env_union; split; [apply rel_env_gso; [intros Hin; now inv Hin|auto] |].
+      apply rel_env_gss_sing; rewrite rel_val_eqn; cbn; now rewrite Hrep.
     + (* Boxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
       intros ρ env tenv m Hρ.
@@ -1369,7 +1393,81 @@ Proof.
       repeat progress (eapply rel_exp_Cred; [apply Cred_seq_assoc|]).
       eapply rel_exp_Cred; [apply Cred_set|].
       { admit. }
+      eapply rel_exp_Cred; [apply Cred_set|].
+      { admit. }
+      eapply rel_exp_Cred; [eapply Cred_assign|].
+      (* TODO:
+           Want assumption like
+             state_ok env tenv m
+           containing all the invariants we need the state to satisfy during execution
+           - limit..alloc is disjoint from the rest of the heap and writable
+           - alloc = tinfo->alloc
+           - limit = tinfo->limit
+           - tinfo contains shadow stack
+           - etc
+           Then can prove lemmas of the form
+             state_ok env tenv m
+             --------------------------------------
+             ∃ b o, (env, tenv, a) ⇓ᵣ (b, o) /\ ...
+           to solve the obligations needed to step through each statement. *)
+      { admit. }
+      { admit. }
+      { admit. }
+      { admit. }
       admit.
+  - (* case x of { ces } *)
+    rename v into x, l into ces; cbn.
+    bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
+    intros* Hρ; eapply rel_exp_Cred; [eapply Cred_if'|].
+    { admit. }
+    { admit. }
+    revert boxed_cases unboxed_cases fvs_cs n_cs Hces ρ env tenv m Hρ.
+    induction ces as [| [c e] ces IHces]; intros*; [inv Hces; intros; now apply rel_exp_case|].
+    apply rel_exp_case; intros c' vs n e_taken Hx Hconsistent Hfind_tag.
+    rename Hces into Hceces; cbn in Hceces. 
+    bind_step_in Hceces e' He; destruct e' as [[stm_e fvs_e] n_e].
+    bind_step_in Hceces ces' Hces; destruct ces' as [[[boxed_cases' unboxed_cases'] fvs_ces] n_ces].
+    bind_step_in Hceces rep Hrep; destruct rep as [t|t a]; inv Hceces.
+    + (* New case arm is unboxed *)
+      (* If e = e_taken, IHe gives e ~ stm_e.
+         Otherwise, switch body is equivalent to unboxed_cases', and can use IHces. *)
+      admit.
+    + (* New case arm is boxed *)
+      (* Same idea as in previous subcase *) admit.
+  - (* let x = Proj c n y in e *)
+    rename v into x, v0 into y; cbn.
+    bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
+    intros* Hρ; apply rel_exp_proj; intros* Hy Hproj.
+    eapply rel_exp_Cred; [eapply Cred_set|].
+    { admit. }
+    specialize (IHe e); rewrite He in IHe; apply IHe. Guarded.
+    eapply rel_env_antimon_S.
+    { apply (Included_Union_Setminus _ [set x]); eauto with Decidable_DB. }
+    eapply rel_env_antimon_S in Hρ; [|normalize_occurs_free; apply Included_refl].
+    rewrite rel_env_union in Hρ; destruct Hρ as [_ Hρ].
+    rewrite rel_env_union; split; [apply rel_env_gso; [intros Hin; now inv Hin|auto] |].
+    apply rel_env_gss_sing.
+    admit.
+  - (* let x = f ft ys in e *)
+    rename v into x, v0 into f, f into ft, l into ys; cbn.
+    bind_step e' He; destruct e' as [[stm_e live_after_call] n_e].
+    bind_step call Hcall; intros* Hρ.
+    repeat progress (eapply rel_exp_Cred; [apply Cred_seq_assoc|]).
+    admit. (* TODO: proof sketch *)
+  - (* let rec fds in e *) exact I.
+  - (* f ft ys *)
+    rename v into f, f into ft, l into ys; cbn.
+    bind_step call Hcall; intros* Hρ.
+    apply rel_exp_app; intros* Hfun Hget_ys Hfind_def Hset_lists.
+    admit.
+  - (* let x = Prim p ys in e *)
+    rename v into x, l into ys; cbn.
+    bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
+    intros* Hρ; apply rel_exp_prim.
+  - (* halt x *)
+    rename v into x; cbn; intros* Hρ.
+    eapply rel_exp_Cred; [apply Cred_seq_assoc|].
+    admit.
 Abort.
 
 End PROOF.

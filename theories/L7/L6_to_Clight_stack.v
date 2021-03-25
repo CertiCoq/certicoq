@@ -1444,41 +1444,6 @@ Notation "'match!' e1 'with' p 'in' e2" :=
   (match e1 with p => e2 | _ => False end)
   (at level 80, p pattern, e1 at next level, right associativity).
 
-(** Predicates on the temp environment *)
-Definition tpred := temp_env -> Prop.
-Definition tmapsto x v : tpred := fun tenv => tenv!x = Some v.
-
-(** *** Chunks of memory *)
-
-
-Definition chunk := (block * ptrofs * list Values.val)%type.
-
-Definition mpred := mem -> Prop.
-Definition mmapsto : _ -> _ -> mpred := fun '(b, o, i) vs =>
-  All (mapi (fun i v => load m b (index_offset o i) = Some v) i vs).
-
-Definition addrs := Ensemble (block * Z).
-Definition Addrs m : addrs :=
-  fun '(b, o) => match load m b o with Some _ => True | None => False end.
-
-Definition temp_mapsto := fun x v (tenv : temp_env) => tenv!x = Some v.
-Definition mem_mapsto := fun '(b, o, i) vs m => 
-  All (mapi (fun i v => load m b (index_offset o i) = Some v) i vs).
-Definition lift_and {A} p q (x : A) := p x /\ q x.
-
-Declare Scope pred_scope.
-Delimit Scope pred_scope with P.
-Infix "↦" := temp_mapsto (at level 80) : pred_scope.
-Infix "↦ₘ" := mem_mapsto (at level 80) : pred_scope.
-Infix "," := lift_and (at level 100) : pred_scope.
-
-Definition pred := temp_env -> mem -> Prop.
-Definition make_pred temp_pred mem_pred : pred :=
-  fun tenv m => temp_pred tenv /\ mem_pred m.
-Notation "'{' T ';' M '}'" := (make_pred T M).
-
-Definition 
-
 (** * Logical relation between λ-ANF and Clight *)
 
 Definition make_vint (z : Z) : Values.val :=
@@ -1518,7 +1483,7 @@ Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
   (env, tenv, m, stmt) ⇓ (tenv', m') /\
   (* TODO: this should be tinfo->args[1], not args[1] *)
   match! tenv' ! args_id with Some (Vptr b o) in
-  match! load m' b (index_offset o 1) with Some cv' in
+  match! load m' b (O.unsigned o) 1 with Some cv' in
   rel_val (k - to_nat cin) v m' cv'.
   (* m', tenv' is a valid CertiCoq heap and roots array represents same values *)
 
@@ -1531,9 +1496,9 @@ Definition rel_val_aux (k : nat) :=
     | Ret (enum t) => cv = make_vint (rep_unboxed t)
     | Ret (boxed t a) =>
       match! cv with Vptr b o in
-      load m b (index_offset o (-1)) = Some (make_vint (rep_boxed t a)) /\
+      load m b (O.unsigned o) (-1) = Some (make_vint (rep_boxed t a)) /\
       let arg_ok i v :=
-        match! load m b (index_offset o i) with Some cv in
+        match! load m b (O.unsigned o) i with Some cv in
         go v m cv
       in All (mapi arg_ok 0 vs)
     | _ => False
@@ -1558,7 +1523,7 @@ Definition rel_val_aux (k : nat) :=
       (** and extend the C configuration with xs↦cvs... *)
       tenv ! args_id = Some (Vptr args_b args_o) ->
       (* TODO: this is wrong; should be indices specified by calling convention *)
-      let arg_ok cv i := load m args_b (index_offset args_o (Z.of_N i)) = Some cv in
+      let arg_ok cv i := load m args_b (O.unsigned args_o) (Z.of_N i) = Some cv in
       Forall2 arg_ok (skipn n_param cvs) (skipn n_param indices) ->
       function_entry1 prog_genv fn (firstn n_param cvs) m env tenv m_cvs_firstn ->
       (** then e is related to the body of fn at level j *)
@@ -1645,7 +1610,7 @@ Proof.
     match goal with |- All (mapi ?g' _ _) => specialize mapi_rel with (g := g') end.
     apply mapi_rel; clear mapi_rel; [|tauto..].
     intros i' x Hin.
-    destruct (load m b (index_offset i i')); [|tauto].
+    destruct (load m b (O.unsigned i) i'); [|tauto].
     rewrite <- !rel_val_eqn; eapply IHsv; auto.
     subst sv; destruct Hin as [[] |Hin]; [cbn; lia|clear - Hin].
     induction vs as [|v' vs IHvs]; [easy|].
@@ -1679,7 +1644,7 @@ Proof.
   edestruct Hk as [tenv' [m' [Hsteps Hres]]]; eauto; [lia|].
   exists tenv', m'; split; [eauto|].
   destruct (tenv' ! args_id) as [[] |]; try contradiction.
-  destruct (load _ _ _); try contradiction.
+  destruct (load _ _ _ _); try contradiction.
   eapply rel_val_antimon; [|eassumption]; lia.
 Qed.
 
@@ -1750,7 +1715,7 @@ Ltac solve_rel_exp_reduction :=
   edestruct Hweaker as [tenv' [m' [Hstep Hresult]]]; [idtac..|eassumption|]; [idtac..|lia|]; eauto;
   do 2 eexists; split; eauto;
   destruct (tenv' ! args_id) as [[] |]; eauto;
-  destruct (load _ _ _); eauto;
+  destruct (load _ _ _ _); eauto;
   eapply rel_val_antimon; [|eauto]; lia.
 
 Lemma rel_exp_constr k ρ x c ys e env tenv m stmt :
@@ -1795,7 +1760,7 @@ Proof.
   edestruct Hsimpler as [tenv' [m' [Heval' Hresult]]]; eauto; try lia.
   exists tenv', m'; split; [auto|].
   destruct (tenv' ! args_id) as [[] |]; try contradiction.
-  destruct (load _ _ _); [|easy].
+  destruct (load _ _ _ _); [|easy].
   eapply rel_val_antimon; [|eauto]; lia.
 Qed.
 

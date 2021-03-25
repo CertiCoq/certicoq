@@ -754,9 +754,11 @@ Fixpoint set_ith {A} (xs : list A) (i : Z) (y : A) : list A :=
   | x :: xs => if Z.eq_dec i 0 then y :: xs else x :: set_ith xs (Z.pred i) y
   end.
 
+Notation "'#|' xs '|'" := (Z.of_nat (length xs)).
+
 Lemma get_ith_range {A} (xs : list A) i y :
   get_ith xs i = Some y ->
-  (0 <= i < Z.of_nat (length xs))%Z.
+  (0 <= i < #|xs|)%Z.
 Proof.
   revert i; induction xs as [|x xs IHxs]; [easy|intros* Hget].
   cbn in Hget; destruct (Coqlib.zeq i 0) as [|Hne]; [subst|];
@@ -776,7 +778,7 @@ Proof.
 Qed.
 
 Lemma get_ith_in_range {A} (xs : list A) i :
-  (0 <= i < Z.of_nat (length xs))%Z ->
+  (0 <= i < #|xs|)%Z ->
   exists x, get_ith xs i = Some x.
 Proof.
   revert i; induction xs as [|x xs IHxs]; [cbn; lia|intros i Hi].
@@ -784,7 +786,7 @@ Proof.
 Qed.
 
 Lemma ith_gss {A} (xs : list A) i y :
-  (0 <= i < Z.of_nat (length xs))%Z ->
+  (0 <= i < #|xs|)%Z ->
   get_ith (set_ith xs i y) i = Some y.
 Proof.
   revert i; induction xs as [|x xs IHxs]; [cbn; lia|intros i Hi].
@@ -1114,7 +1116,7 @@ Infix "↦" := mapsto (at level 80).
     - The lowest and highest offsets are both representable as word-sized integers *)
 Definition chunk_lower : chunk -> Z := fun '(b, o, i, vs) => (o + word_size*i)%Z.
 Definition chunk_upper : chunk -> Z := fun '((b, o, i, vs) as c) => 
-  (chunk_lower c + word_size * Z.of_nat (length vs))%Z.
+  (chunk_lower c + word_size * #|vs|)%Z.
 Definition chunk_denote : chunk -> mem -> Prop :=
   fun '((b, o, init, vs) as c) m =>
   (forall i v, get_ith vs i = Some v -> load m b o (i + init) = Some v) /\
@@ -1167,7 +1169,7 @@ Ltac superlia :=
     end
   | H : get_ith ?xs ?i = Some _ |- _ =>
     lazymatch goal with
-    | H : (0 <= i < Z.of_nat (length xs))%Z |- _ => fail
+    | H : (0 <= i < #|xs|)%Z |- _ => fail
     | _ => pose proof (get_ith_range _ _ _ H)
     end
   | |- context [length (set_ith ?xs ?i ?y)] =>
@@ -1186,7 +1188,7 @@ Ltac superlia :=
   (pose proof concretize_word_size);
   lia.
 
-Lemma chunk_cons b o init v vs m :
+Lemma chunk_cons' b o init v vs m :
   ((b, o, init) ↦ v :: vs) ∈ m ->
   ((b, o, init+1)%Z ↦ vs) ∈ m.
 Proof.
@@ -1196,6 +1198,22 @@ Proof.
   apply Hget; cbn; destruct (Coqlib.zeq (i + 1)%Z 0).
   - apply Coqlib.list_nth_z_range in Hget'; lia.
   - rewrite <- Hget'; f_equal; lia.
+Qed.
+
+Lemma chunk_cons b o init v vs m :
+  ((b, o, init) ↦ v :: vs) ∈ m <->
+  ((b, o, init) ↦ v :: []) ∈ m /\ ((b, o, init+1)%Z ↦ vs) ∈ m.
+Proof.
+  split; [intros Hvvs|intros [Hv Hvs]].
+  - split; [|now eapply chunk_cons'].
+    split; [intros i v' Hget|split; cbn in *; [tauto|superlia]].
+    assert (i = 0)%Z by (destruct i; now cbn in Hget); subst.
+    now apply Hvvs.
+  - split; [intros i v' Hget|split; cbn in *; [tauto|superlia]].
+    cbn in Hget; destruct (Coqlib.zeq i 0) as [|Hne]; [subst|].
+    + inv Hget; now apply Hv.
+    + destruct Hvs as [Hvs _].
+      apply Hvs in Hget; rewrite <- Hget; f_equal; lia.
 Qed.
 
 Lemma chunk_load m b o v : forall vs init i,
@@ -1208,7 +1226,7 @@ Proof.
   destruct (Coqlib.zeq (i - init) 0) as [Heq|Hne].
   - inv Hnth; assert (i = init) by lia; subst init.
     now apply (proj1 Hchunk 0%Z).
-  - apply chunk_cons in Hchunk.
+  - apply chunk_cons' in Hchunk.
     eapply IHvs; eauto.
     rewrite <- Hnth; f_equal; lia.
 Qed.
@@ -1216,7 +1234,7 @@ Qed.
 Arguments Z.of_nat : simpl never.
 Lemma chunk_store_same m m' b o v : forall vs init i,
   val_wf v ->
-  (0 <= i < Z.of_nat (length vs))%Z ->
+  (0 <= i < #|vs|)%Z ->
   store m b o (i + init) v = Some m' ->
   ((b, o, init) ↦ vs) ∈ m ->
   ((b, o, init) ↦ set_ith vs i v) ∈ m'.
@@ -1228,12 +1246,12 @@ Proof.
     + assert (val_wf v'') by now inv Hget.
       inv Hget; rewrite <- (val_wf_load_result v'') by auto.
       eapply Mem.load_store_same; eauto.
-    + apply chunk_cons in Hchunk.
+    + apply chunk_cons' in Hchunk.
       apply Hchunk in Hget; rewrite <- Hget.
       replace (Z.pred i + (init + 1))%Z with (i + init)%Z by lia.
       eapply Mem.load_store_other; eauto; superlia.
   - pose proof set_ith_len v vs (Z.pred i).
-    pose proof Hchunk as Hchunk_next; apply chunk_cons in Hchunk_next.
+    pose proof Hchunk as Hchunk_next; apply chunk_cons' in Hchunk_next.
     specialize (IHvs (init + 1)%Z (Z.pred i) Hwf).
     replace (Z.pred i + (init + 1))%Z with (i + init)%Z in * by lia.
     split; [intros j v'' Hget|split; [|cbn in *; superlia]].
@@ -1261,8 +1279,8 @@ Lemma chunk_disjoint_simpl b1 o1 i1 vs1 b2 o2 i2 vs2 :
   let c2 := (b2, o2, i2) ↦ vs2 in
   chunk_disjoint c1 c2 <->
   b1 <> b2 \/
-  length vs1 = 0 \/
-  length vs2 = 0 \/
+  #|vs1| = 0%Z \/
+  #|vs2| = 0%Z \/
   (chunk_upper c1 <= chunk_lower c2)%Z \/
   (chunk_upper c2 <= chunk_lower c1)%Z.
 Proof.
@@ -1270,18 +1288,13 @@ Proof.
   lazy zeta; rewrite Heqc1, Heqc2.
   unfold "↦", chunk_disjoint, chunk_locs in *; rewrite Disjoint_pair_simpl.
   split; [intros H|subst; cbn in *; superlia].
-  destruct (Pos.eq_dec b1 b2); [right|now left].
-  destruct (Nat.eq_dec (length vs1) 0); [now left|right].
-  destruct (Nat.eq_dec (length vs2) 0); [now left|right].
-  assert (chunk_lower c1 < chunk_upper c1)%Z by (subst; cbn in *; superlia).
-  assert (chunk_lower c2 < chunk_upper c2)%Z by (subst; cbn in *; superlia).
   destruct (Z_le_dec (chunk_lower c1) (chunk_lower c2)).
   + specialize (H b1 (chunk_lower c2)); subst; cbn in *; superlia.
   + specialize (H b1 (chunk_lower c1)); subst; cbn in *; superlia.
 Qed.
 
 Lemma chunk_store_other m m' b o v vs init i : forall c,
-  (0 <= i < Z.of_nat (length vs))%Z ->
+  (0 <= i < #|vs|)%Z ->
   store m b o (i + init) v = Some m' ->
   ((b, o, init) ↦ vs) ∈ m ->
   c ∈ m ->
@@ -1293,8 +1306,7 @@ Proof.
   split; [|split; auto].
   intros i' v' Hget; erewrite <- Hc_load; eauto.
   eapply Mem.load_store_other; eauto.
-  rewrite chunk_disjoint_simpl in Hdisjoint.
-  cbn in *; superlia.
+  rewrite chunk_disjoint_simpl in Hdisjoint; cbn in *; superlia.
 Qed.
 
 Arguments mapsto : simpl never.
@@ -1348,9 +1360,12 @@ Lemma chunk_disjoint_Same_set2 c c1 c2 :
   chunk_disjoint c c1 <-> chunk_disjoint c c2.
 Proof. unfold chunk_disjoint; intros ->; easy. Qed.
 
+Ltac split_ands :=
+  repeat match goal with |- _ /\ _ => split end.
+
 Lemma mpred_store m m' b o v vs init i : forall p q,
   val_wf v ->
-  (0 <= i < Z.of_nat (length vs))%Z ->
+  (0 <= i < #|vs|)%Z ->
   store m b o (i + init) v = Some m' ->
   m ⊨ (p ++ ((b, o, init) ↦ vs) :: q)%list ->
   m' ⊨ (p ++ ((b, o, init) ↦ set_ith vs i v) :: q)%list.
@@ -1361,12 +1376,11 @@ Proof.
   rewrite All_and in Hsep.
   assert (Hunchanged : forall p,
            All (map (fun c => c ∈ m) p) ->
-           All (map (fun c => chunk_disjoint c ((b, o, init) ↦ vs)) p)
-           ->
+           All (map (fun c => chunk_disjoint c ((b, o, init) ↦ vs)) p) ->
            All (map (fun c => c ∈ m') p)).
   { intros r Hall Hdisjoint'; induction r as [|r Hr]; [easy|].
     cbn in *; split; [|tauto]. eapply chunk_store_other; eauto; tauto. }
-  rewrite All_and; (repeat match goal with |- _ /\ _ => split end); try tauto.
+  rewrite All_and; split_ands; try tauto.
   - apply Hunchanged; tauto.
   - eapply chunk_store_same; eauto; tauto.
   - apply Hunchanged; [tauto|].
@@ -1381,6 +1395,69 @@ Proof.
     pose proof Hstore as Hsame.
     apply (Mem.store_unchanged_on P) in Hsame; [|subst P; lazy zeta; superlia].
     split; intros [b' o']; unfold mem_locs, In; intros [v' Hbo']; eauto with mem.
+Qed.
+
+Lemma All_disjoint_com c p :
+  All (map (fun x => chunk_disjoint x c) p) <-> All (map (chunk_disjoint c) p).
+Proof. apply All_iff; intros [[[]]]; destruct c as [[[]]]; apply chunk_disjoint_com. Qed.
+
+Lemma empty_chunk m b o i vs :
+  ((b, o, i) ↦ vs) ∈ m ->
+  ((b, o, i) ↦ []) ∈ m <-> True.
+Proof. unfold "↦", "∈"; cbn; intuition (congruence||superlia). Qed.
+
+Lemma chunk_in_app m b o : forall vs i ws,
+  (((b, o, i) ↦ vs ++ ws) ∈ m)%list <->
+  ((((b, o, i) ↦ vs) ∈ m) /\ (((b, o, i + #|vs|) ↦ ws) ∈ m))%list%Z.
+Proof.
+  induction vs as [|v vs IHvs]; intros i ws.
+  - cbn; replace (i + Z.of_nat 0)%Z with i by lia.
+    split; [intros H; rewrite empty_chunk by eauto|]; easy.
+  - cbn; rewrite chunk_cons, IHvs.
+    assert (i + 1 + #|vs| = i + Z.of_nat (S (length vs)))%Z by lia.
+    repeat match goal with
+    | |- context [((?b, ?o, ?i) ↦ ?v :: ?vs) ∈ m] =>
+      lazymatch vs with [] => fail | _ => rewrite (chunk_cons b o i v vs) end
+    end.
+    intuition (eauto||congruence).
+Qed.
+
+Lemma chunk_disjoint_segments b o i vs ws :
+  chunk_disjoint ((b, o, i) ↦ vs) ((b, o, i + #|vs|) ↦ ws)%Z <-> True.
+Proof. rewrite chunk_disjoint_simpl; unfold "↦"; cbn in *; superlia. Qed.
+
+Lemma chunk_disjoint_app b o i vs ws c :
+  chunk_disjoint ((b, o, i) ↦ vs ++ ws)%list c <->
+  chunk_disjoint ((b, o, i) ↦ vs) c /\
+  chunk_disjoint ((b, o, i + #|vs|) ↦ ws)%Z c.
+Proof.
+  destruct c as [[[b' o'] i'] vs']; change (b', o', i', vs') with ((b', o', i') ↦ vs').
+  rewrite !chunk_disjoint_simpl; unfold "↦"; cbn in *; rewrite !app_length; superlia.
+Qed.
+
+Lemma All_chunk_disjoint_app p b o i vs ws :
+  All (map (chunk_disjoint ((b, o, i) ↦ vs ++ ws)) p)%list <->
+  All (map (chunk_disjoint ((b, o, i) ↦ vs)) p) /\
+  All (map (chunk_disjoint ((b, o, i + #|vs|) ↦ ws)) p)%Z.
+Proof. rewrite All_iff; [|apply chunk_disjoint_app]; now rewrite All_and. Qed.
+
+Lemma chunk_locs_app b o i vs ws :
+  chunk_locs ((b, o, i) ↦ vs ++ ws)%list <-->
+  chunk_locs ((b, o, i) ↦ vs) :|: chunk_locs ((b, o, i + #|vs|) ↦ ws)%Z.
+Proof.
+  unfold chunk_locs, "↦"; cbn; split; intros [b' o'];
+  rewrite In_or_Iff_Union; unfold In; cbn; rewrite !app_length; superlia.
+Qed.
+
+Lemma split_chunk m p b o i vs ws q :
+  m ⊨ (p ++ ((b, o, i) ↦ vs ++ ws) :: q)%list <->
+  m ⊨ (p ++ ((b, o, i) ↦ vs) :: ((b, o, i + #|vs|) ↦ ws) :: q)%list%Z.
+Proof.
+  unfold "⊨"; rewrite !map_app, !All_app, !mutually_disjoint_app, !Bigcup_app; cbn;
+  rewrite !All_and, !All_disjoint_com, !chunk_in_app, !chunk_disjoint_segments,
+    !All_chunk_disjoint_app, !chunk_locs_app.
+  split; intros H; decompose [and] H; split_ands; auto;
+  (eapply Included_trans; [eassumption|]; repeat apply Union_Included; sets).
 Qed.
 
 (** The Clight machine state looks as follows at function entry:

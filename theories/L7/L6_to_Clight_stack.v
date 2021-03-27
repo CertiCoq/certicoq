@@ -1182,7 +1182,7 @@ Fixpoint mpred_denote_aux (P : mpred) (S : Ensemble address) (m : mem) : Prop :=
     Disjoint _ S1 S2 /\
     m |=_{S1} P /\
     m |=_{S2} Q
-  | Mem m' => S <--> dom_mem m' /\ Mem.extends m' m
+  | Mem m' => S <--> dom_mem m' /\ Mem.unchanged_on (fun b o => S (b, o)) m' m
   end
 where "m |=_{ S } P" := (mpred_denote_aux P S m).
 
@@ -1378,16 +1378,13 @@ Proof.
       rewrite <- Hload; eapply Mem.load_store_other; eauto; superlia.
 Qed.
 
-(* LEM is not needed if we require that all sets describing subheaps be decidable *)
-Definition LEM := Coq.Logic.Classical_Prop.classic.
 Lemma mpred_unchanged_on S P m m' :
-  Mem.nextblock m = Mem.nextblock m' ->
   Mem.unchanged_on (fun b o => S (b, o)) m m' ->
   m |=_{S} P ->
   m' |=_{S} P.
 Proof.
   revert S; induction P as [[b o] vs|P IHP Q IHQ|m'']; cbn;
-  intros S Hnext_eq Hunchanged Hm.
+  intros S Hunchanged Hm.
   - destruct Hm as [?[?[Hload [??]]]]; split_ands; auto.
     intros i v Hget; eapply Mem.load_unchanged_on; eauto.
     intros o'; cbn; rewrite Ensemble_iff_In_iff in H.
@@ -1397,36 +1394,8 @@ Proof.
       eapply Mem.unchanged_on_implies; eauto; cbn; intros; now apply (proj2 HS).
     + apply IHQ; auto.
       eapply Mem.unchanged_on_implies; eauto; cbn; intros; now apply (proj2 HS).
-  - destruct Hm as [H Hext]; split; [auto|].
-    rewrite Ensemble_iff_In_iff in H.
-    destruct Hext as [Hnext Hinj Hperm_inv]; constructor.
-    + congruence.
-    + destruct Hinj as [Hperm Halign Hmemval]; constructor.
-      * intros b' b delta o k p Heq Hperm_b; inv Heq.
-        destruct Hunchanged as [_ Hunchanged _].
-        rewrite <- Hunchanged.
-        -- eapply Hperm; eauto; reflexivity.
-        -- rewrite H; replace (o + 0)%Z with o by lia.
-           eapply Mem.perm_max, Mem.perm_implies; eauto; constructor.
-        -- apply Mem.perm_valid_block in Hperm_b.
-           unfold Mem.valid_block in *; change Coqlib.Plt with Pos.lt in *; lia.
-      * intros b' b delta chunk o p Heq Hrange_perm; inv Heq.
-        apply Z.divide_0_r.
-      * intros b' o b delta Heq Hperm_b; inv Heq.
-        destruct Hunchanged as [_ Hperm_unchanged Hcontents_unchanged].
-        rewrite Hcontents_unchanged; auto.
-        -- replace (o + 0)%Z with o by lia.
-           rewrite H; eapply Mem.perm_max, Mem.perm_implies; eauto; constructor.
-        -- eapply Hperm; eauto; reflexivity.
-    + intros*; intros Hperm_m'.
-      (* :( *)
-      destruct (LEM (dom_mem m'' (b, ofs))) as [Hin|Hnin]; [|now right].
-      eapply Hperm_inv. destruct Hinj as [Hperm _ _].
-      destruct Hunchanged as [_ Hperm_unchanged _].
-      rewrite <- Hperm_unchanged in Hperm_m'; auto.
-      * now rewrite H.
-      * apply Mem.perm_valid_block in Hperm_m'.
-        unfold Mem.valid_block in *; change Coqlib.Plt with Pos.lt in *; lia.
+  - destruct Hm as [H Hunchanged']; split; [auto|].
+    eapply Mem.unchanged_on_trans; eauto.
 Qed.
 
 Lemma mapsto_store_sepcon S P b o i v vs m m' :
@@ -1451,8 +1420,6 @@ Proof.
         specialize (HS1 (b, o')); rewrite HS1.
         unfold dom_mapsto, In.
         intuition superlia. }
-    pose proof Hstore as Hnext.
-    apply Mem.nextblock_store in Hnext; symmetry in Hnext.
     eapply mpred_unchanged_on; eauto.
 Qed.
 
@@ -1545,6 +1512,193 @@ Proof.
   - eapply mapsto_store_sepcon; eauto.
   - rewrite sepcon_comm in *; eapply mapsto_store_sepcon; eauto.
 Qed.
+
+Definition increase_nextblock_to (b : block) (m : mem) :
+  (b >= Mem.nextblock m)%positive -> mem.
+Proof.
+  destruct m; intros H; unshelve econstructor.
+  - exact mem_contents. - exact mem_access. - exact b. - exact access_max.
+  - abstract (intros b' o k Hge; change Coqlib.Plt with Pos.lt in *;
+    cbn in H; apply nextblock_noaccess; lia).
+  - exact contents_default.
+Defined.
+
+Definition dom_alloc (b : block) (lo hi : Z) : Ensemble (block * Z) :=
+  fun '(b', o) => b' = b /\ (lo <= o < hi)%Z.
+
+Definition alloc_alone (m : mem) (lo hi : Z) : mem.
+Proof.
+  refine (fst (Mem.alloc (increase_nextblock_to (Mem.nextblock m) Mem.empty _) lo hi)).
+  abstract (cbn; lia).
+Defined.
+
+Transparent Mem.alloc.
+Lemma dom_alloc_alone m lo hi :
+  dom_mem (alloc_alone m lo hi) <--> dom_alloc (Mem.nextblock m) lo hi.
+Proof.
+  apply Ensemble_iff_In_iff; intros [b o].
+  unfold dom_mem, Mem.perm, alloc_alone, Mem.alloc; cbn.
+  destruct (Pos.eq_dec (Mem.nextblock m) b) as [|Hne]; [subst|].
+  - rewrite PMap.gss.
+    destruct (Coqlib.zle lo o); [|now cbn].
+    destruct (Coqlib.zlt o hi); [|now cbn].
+    assert (Horder : perm_order Freeable Nonempty <-> True) by (split; auto; constructor).
+    cbn; now rewrite Horder.
+  - now rewrite PMap.gso, PMap.gi by auto.
+Qed.
+
+Lemma alloc_alone_dom_disjoint m lo hi :
+  Disjoint _ (dom_mem m) (dom_mem (alloc_alone m lo hi)).
+Proof.
+  unfold address; rewrite Disjoint_pair_simpl; intros b o.
+  unfold dom_mem; intros [Hm Halone].
+  destruct m; unfold Mem.perm, Mem.perm_order', Mem.alloc in *; cbn in *.
+  destruct (Pos.eq_dec nextblock b) as [|Hne]; [subst|].
+  - rewrite PMap.gss in *.
+    destruct (Coqlib.zle lo o), (Coqlib.zlt o hi); cbn in Halone; auto.
+    rewrite nextblock_noaccess in Hm; auto.
+    unfold Coqlib.Plt; lia.
+  - now rewrite PMap.gso, PMap.gi in Halone by auto.
+Qed.
+
+Lemma alloc_alone_perm m lo hi b o :
+  Mem.perm (alloc_alone m lo hi) b o Max Nonempty <->
+  (b = Mem.nextblock m /\ lo <= o < hi)%Z.
+Proof.
+  unfold Mem.perm, Mem.perm_order', "!!"; cbn.
+  destruct (Pos.eq_dec b (Mem.nextblock m)) as [|Hne]; [subst|].
+  - rewrite M.gss.
+    destruct (Coqlib.zle lo o); cbn; [|lia].
+    destruct (Coqlib.zlt o hi); cbn; [|lia].
+    assert (Horder : perm_order Freeable Nonempty <-> True) by (split; auto; constructor).
+    rewrite Horder; lia.
+  - rewrite M.gso, M.gempty by auto; lia.
+Qed.
+
+Lemma alloc_alone_unchanged_on m lo hi :
+  Mem.unchanged_on (fun b o => dom_mem (alloc_alone m lo hi) (b, o)) (alloc_alone m lo hi)
+                   (fst (Mem.alloc m lo hi)).
+Proof.
+  constructor.
+  - cbn; unfold Coqlib.Ple; lia.
+  - unfold dom_mem; intros* Hperm Hvalid.
+    rewrite alloc_alone_perm in Hperm.
+    destruct Hperm; subst.
+    unfold Mem.perm; cbn.
+    rewrite !PMap.gss.
+    destruct (Coqlib.zle lo ofs); [|now cbn].
+    destruct (Coqlib.zlt ofs hi); [|now cbn].
+    now cbn.
+  - unfold dom_mem; intros* Hperm Hperm'.
+    rewrite alloc_alone_perm in Hperm.
+    destruct Hperm; subst; cbn.
+    now rewrite !PMap.gss.
+Qed.
+
+Lemma alloc_alone_dom_mem m lo hi :
+  dom_mem (fst (Mem.alloc m lo hi)) <-->
+  dom_mem m :|: dom_mem (alloc_alone m lo hi).
+Proof.
+  apply Ensemble_iff_In_iff; intros [b o].
+  rewrite In_or_Iff_Union; unfold In.
+  unfold dom_mem, Mem.perm; cbn.
+  destruct m as [c a next access noaccess default]; cbn.
+  destruct (Pos.eq_dec next b) as [|Hne]; [subst|].
+  - rewrite !PMap.gss.
+    rewrite noaccess; [|unfold Coqlib.Plt; lia]; cbn.
+    destruct (Coqlib.zle lo o); [|easy].
+    destruct (Coqlib.zlt o hi); [|easy].
+    now cbn.
+  - rewrite !PMap.gso, !PMap.gi by auto.
+    now cbn.
+Qed.
+Opaque Mem.alloc.
+
+Lemma mpred_alloc P m lo hi :
+  m |= P -> fst (Mem.alloc m lo hi) |= P ⋆ Mem (alloc_alone m lo hi).
+Proof.
+  intros Hm; cbn.
+  exists (dom_mem m), (dom_mem (alloc_alone m lo hi)); split_ands.
+  - apply alloc_alone_dom_mem.
+  - apply alloc_alone_dom_disjoint.
+  - eapply mpred_unchanged_on; eauto.
+    destruct (Mem.alloc m lo hi) eqn:Halloc.
+    eapply Mem.alloc_unchanged_on; eauto.
+  - sets.
+  - apply alloc_alone_unchanged_on.
+Qed.
+
+Lemma unchanged_on_iff S1 S2 m m' :
+  S1 <--> S2 ->
+  Mem.unchanged_on (fun b o => S1 (b, o)) m m' <->
+  Mem.unchanged_on (fun b o => S2 (b, o)) m m'.
+Proof.
+  intros H; split; intros Hunchanged; eapply Mem.unchanged_on_implies;
+  eauto; cbn; intros; now apply H.
+Qed.
+
+Lemma mpred_Same_set P S1 S2 m :
+  S1 <--> S2 ->
+  m |=_{S1} P <-> m |=_{S2} P.
+Proof.
+  induction P as [[b o] vs|P IHP Q IHQ|m'']; cbn.
+  - intros ->; split; intros Hand; decompose [and] Hand; split_ands; sets.
+  - intros H; split; intros Hand; decompose [ex and] Hand.
+    + do 2 eexists; split_ands; eauto.
+      now rewrite <- H.
+    + do 2 eexists; split_ands; eauto; now rewrite H.
+  - intros H. erewrite unchanged_on_iff; eauto. now rewrite H.
+Qed.
+
+Transparent Mem.free Mem.unchecked_free.
+Lemma dom_mem_free m b lo hi m' :
+  Mem.free m b lo hi = Some m' ->
+  dom_mem m' <--> dom_mem m \\ dom_alloc b lo hi.
+Proof.
+  intros Hfree; apply Ensemble_iff_In_iff; intros [b' o'].
+  unfold dom_mem; rewrite not_In_Setminus; unfold In.
+  unfold Mem.free in Hfree.
+  destruct (Mem.range_perm_dec _ _ _ _ _ _) as [Hfreeable|]; inv Hfree.
+  destruct m; unfold Mem.perm; cbn in *.
+  destruct (Pos.eq_dec b b') as [|Hne]; [subst|].
+  - rewrite PMap.gss.
+    destruct (Coqlib.zle lo o'); [|now cbn].
+    destruct (Coqlib.zlt o' hi); [|now cbn].
+    now cbn.
+  - now rewrite PMap.gso by auto.
+Qed.
+Opaque Mem.free Mem.unchecked_free.
+
+Transparent Mem.alloc.
+Lemma mpred_free P m b lo hi m_old m' :
+  b = Mem.nextblock m_old ->
+  m |= P ⋆ Mem (alloc_alone m_old lo hi) ->
+  Mem.free m b lo hi = Some m' ->
+  m' |= P.
+Proof.
+  intros Hnext_eq [S1 [S2 [HS [HD [HS1 [HS2 Hunchanged]]]]]] Hfree.
+  assert (Hunchanged' : Mem.unchanged_on (fun b o => S1 (b, o)) m m').
+  { eapply Mem.free_unchanged_on; eauto.
+    intros i Hi Hbad. destruct HD as [HD].
+    contradiction (HD (b, i)).
+    constructor; auto.
+    rewrite Ensemble_iff_In_iff in HS2.
+    rewrite HS2; cbn.
+    cbn; unfold Mem.perm, Mem.perm_order'; subst b.
+    unfold alloc_alone, Mem.alloc; cbn.
+    rewrite PMap.gss.
+    destruct (Coqlib.zle lo i); [|lia].
+    destruct (Coqlib.zlt i hi); [|lia].
+    cbn; auto with mem. }
+  assert (Hdom_m' : S1 <--> dom_mem m').
+  { apply dom_mem_free in Hfree.
+    rewrite Hfree, HS, HS2, dom_alloc_alone, Hnext_eq in *.
+    rewrite Setminus_Union_Included; sets. }
+  rewrite mpred_Same_set in HS1 by apply Hdom_m'.
+  eapply mpred_unchanged_on; eauto.
+  eapply unchanged_on_iff; [symmetry; apply Hdom_m'|auto].
+Qed.
+Opaque Mem.alloc.
 
 (*
 

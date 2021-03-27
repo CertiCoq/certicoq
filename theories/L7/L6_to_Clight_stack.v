@@ -1048,10 +1048,10 @@ Let prog_genv : genv := globalenv prog.
 
 (** Bigstep evaluation of statements: unlike exec_stmt,
     - Force the trace to be empty
-    - Force outcome to be Out_normal (i.e., statement can't exit early
-      via return/break/continue) *)
-Definition texec := fun '(env, tenv, m, stmt) '(tenv', m') =>
-  exec_stmt prog_genv env tenv m stmt Events.E0 tenv' m' Out_normal.
+    - Force outcome to be Out_return (Some (v, value)) *)
+Definition texec := fun '(env, tenv, m, stmt) '(tenv', m', v) =>
+  exec_stmt prog_genv env tenv m stmt Events.E0 
+            tenv' m' (Out_return (Some (v, value))).
 Infix "⇓" := texec (at level 80, no associativity).
 
 (** Bigstep evaluation of l- and r-values *)
@@ -1066,65 +1066,71 @@ Infix "⇓ₗ" := eval_lvalue_operator (at level 80).
     execution starting from (env2, tenv2, m2, stmt2) can be used to construct an execution
     starting from (env1, tenv1, m1, stmt1) *)
 Definition Clight_state_red := fun '(env1, tenv1, m1, stmt1) '(env2, tenv2, m2, stmt2) =>
-  forall tenv' m',
-  (env2, tenv2, m2, stmt2) ⇓ (tenv', m') ->
-  (env1, tenv1, m1, stmt1) ⇓ (tenv', m').
+  forall tenv' m' v,
+  (env2, tenv2, m2, stmt2) ⇓ (tenv', m', v) ->
+  (env1, tenv1, m1, stmt1) ⇓ (tenv', m', v).
 Infix "-->" := Clight_state_red (at level 80).
 
 Lemma Cred_trans s1 s2 s3 :
   s1 --> s2 -> s2 --> s3 -> s1 --> s3.
 Proof. destruct s1 as [[[??]?]?], s2 as [[[??]?]?], s3 as [[[??]?]?]; cbn; eauto. Qed.
 
-Lemma Cred_seq_assoc s1 s2 s3 env tenv m :
+Lemma Cred_seq_assoc env tenv m s1 s2 s3 :
   (env, tenv, m, ((s1; s2); s3)) --> (env, tenv, m, (s1; (s2; s3))).
 Proof.
-  intros tenv' m' Hs123; inv Hs123; [|contradiction].
-  inv H9; [|contradiction].
-  unfold "⇓"; rewrite <- H4, <- Events.Eapp_assoc; repeat (eapply exec_Sseq_1; eauto).
-Qed.
-
-Lemma Cred_seq_congl env tenv m s tenv' m' s' cont :
-  (env, tenv, m, s) --> (env, tenv', m', s') ->
-  (env, tenv, m, (s; cont)) --> (env, tenv', m', (s'; cont)).
-Proof.
-  intros Hs tenv'' m'' Hseq; unfold "-->", "⇓" in *; inv Hseq; [|easy].
-  let solve_assertion :=
-    unfold Events.E0, Events.Eapp in *;
-    destruct t1; cbn in *; congruence
-  in
-  assert (t1 = Events.E0) by solve_assertion;
-  assert (t2 = Events.E0) by solve_assertion;
-  subst.
-  eapply exec_Sseq_1; eauto.
+  intros tenv' m' v H; unfold "⇓" in *; inv H.
+  - inv H10.
+    + rewrite <- Events.Eapp_assoc. do 2 (eapply exec_Sseq_1; eauto).
+    + constructor; [|easy]. eapply exec_Sseq_1; eauto.
+  - now do 2 (constructor; [|easy]).
 Qed.
 
 Lemma Cred_skip env tenv m s :
   (env, tenv, m, (Sskip; s)) --> (env, tenv, m, s).
 Proof.
-  intros tenv' m' Hexec.
-  unfold "⇓"; change Events.E0 with (Events.Eapp Events.E0 Events.E0).
+  intros tenv' m' v H; unfold "⇓".
+  change Events.E0 with (Events.Eapp Events.E0 Events.E0).
   eapply exec_Sseq_1; [constructor|eauto].
 Qed.
 
-Lemma Cred_set env tenv m x a v :
+Lemma Cred_set env tenv m x a v s :
   (env, tenv, m, a) ⇓ᵣ v ->
-  (env, tenv, m, x ::= a) --> (env, M.set x v tenv, m, Sskip).
-Proof. intros; intros ?? Hexec; inv Hexec; econstructor; eauto. Qed.
+  (env, tenv, m, (x ::= a; s)) --> (env, M.set x v tenv, m, s).
+Proof.
+  intros; intros ??? Hexec; unfold "⇓".
+  change Events.E0 with (Events.Eapp Events.E0 Events.E0).
+  eapply exec_Sseq_1; eauto; econstructor; eauto.
+Qed.
 
-Lemma Cred_assign env tenv m a1 a2 v_pre v b o m' :
+Lemma Cred_assign env tenv m a1 a2 v_pre v b o m' s :
   (env, tenv, m, a1) ⇓ₗ (b, o) ->
   (env, tenv, m, a2) ⇓ᵣ v_pre ->
   sem_cast v_pre (typeof a2) (typeof a1) m = Some v ->
   assign_loc prog_genv (typeof a1) m b o v m' ->
-  (env, tenv, m, a1 :::= a2) --> (env, tenv, m', Sskip).
-Proof. intros; intros ?? Hexec; inv Hexec; econstructor; eauto. Qed.
+  (env, tenv, m, (a1 :::= a2; s)) --> (env, tenv, m', s).
+Proof.
+  intros; intros ??? Hexec; unfold "⇓".
+  change Events.E0 with (Events.Eapp Events.E0 Events.E0).
+  eapply exec_Sseq_1; eauto; econstructor; eauto.
+Qed.
 
-Lemma Cred_if env tenv m a v b s1 s2 :
+Lemma Cred_if env tenv m a v b s1 s2 s :
+  (env, tenv, m, a) ⇓ᵣ v ->
+  bool_val v (typeof a) m = Some b ->
+  (env, tenv, m, (Sifthenelse a s1 s2; s)) -->
+  (env, tenv, m, ((if b then s1 else s2); s)).
+Proof.
+  intros; intros ??? Hexec; unfold "⇓"; inv Hexec.
+  - eapply exec_Sseq_1; eauto; econstructor; eauto.
+  - constructor; eauto; econstructor; eauto.
+Qed.
+
+Lemma Cred_if' env tenv m a v b s1 s2 :
   (env, tenv, m, a) ⇓ᵣ v ->
   bool_val v (typeof a) m = Some b ->
   (env, tenv, m, Sifthenelse a s1 s2) -->
   (env, tenv, m, if b then s1 else s2).
-Proof. intros; intros ???; econstructor; eauto. Qed.
+Proof. intros; intros ??? Hexec; unfold "⇓"; econstructor; eauto. Qed.
 
 (** ** Memory & memory predicates *)
 
@@ -1661,6 +1667,8 @@ Section CycleBreakers.
 
 Context (rel_val : forall (k : nat) (v : cps.val) (m : Memory.mem) (cv : Values.val), Prop).
 
+Print exec_stmt.
+
 Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
   forall v (cin : fuel) (cout : trace),
   (** if running e in environment ρ yields a value v in j <= k cost, *)
@@ -1668,13 +1676,10 @@ Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
   (ρ, e, cin) ⇓cps (v, cout) ->
   (* m, tenv is a valid CertiCoq heap (alloc, limit, roots, ...)
      roots array represents some values -> *)
-  exists tenv' m',
-  (** then running stmt yields args[1] related to v at level k-j *)
-  (env, tenv, m, stmt) ⇓ (tenv', m') /\
-  (* TODO: this should be tinfo->args[1], not args[1] *)
-  match! tenv' ! args_id with Some (Vptr b o) in
-  match! load m' b (O.unsigned o + 1*word_size) with Some cv' in
-  rel_val (k - to_nat cin) v m' cv'.
+  exists tenv' m' cv,
+  (** then running stmt yields a value related to v at level k-j *)
+  (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
+  rel_val (k - to_nat cin) v m' cv.
   (* m', tenv' is a valid CertiCoq heap and roots array represents same values *)
 
 (* TODO: state some kinda frame rule, to be filled in later *)
@@ -1835,10 +1840,8 @@ Lemma rel_exp_antimon j k ρ e env tenv m stmt :
   (ρ, e) ~{j} (env, tenv, m, stmt).
 Proof.
   intros Hle Hk v cin cout Hcost Hbstep.
-  edestruct Hk as [tenv' [m' [Hsteps Hres]]]; eauto; [lia|].
-  exists tenv', m'; split; [eauto|].
-  destruct (tenv' ! args_id) as [[] |]; try contradiction.
-  destruct (load _ _ _); try contradiction.
+  edestruct Hk as [tenv' [m' [cv [Hsteps Hres]]]]; eauto; [lia|].
+  exists tenv', m', cv; split; [eauto|].
   eapply rel_val_antimon; [|eassumption]; lia.
 Qed.
 
@@ -1906,10 +1909,8 @@ Ltac solve_rel_exp_reduction :=
   unfold rel_exp, rel_exp'; intros Hweaker v cin cout Hk Hbstep;
   inv Hbstep; match goal with | H : bstep _ _ _ _ _ _ |- _ => inv H end;
   rewrite to_nat_add in *;
-  edestruct Hweaker as [tenv' [m' [Hstep Hresult]]]; [idtac..|eassumption|]; [idtac..|lia|]; eauto;
-  do 2 eexists; split; eauto;
-  destruct (tenv' ! args_id) as [[] |]; eauto;
-  destruct (load _ _ _); eauto;
+  edestruct Hweaker as [tenv' [m' [cv [Hstep Hresult]]]]; [idtac..|eassumption|]; [idtac..|lia|]; eauto;
+  do 3 eexists; split; eauto;
   eapply rel_val_antimon; [|eauto]; lia.
 
 Lemma rel_exp_constr k ρ x c ys e env tenv m stmt :
@@ -1951,10 +1952,8 @@ Proof.
   assert (to_nat cin0 <= k - 1) by lia.
   assert (Hk_f : exists k_f, k = S k_f) by (destruct k as [|k]; [|exists k]; lia).
   destruct Hk_f as [k_f Heq].
-  edestruct Hsimpler as [tenv' [m' [Heval' Hresult]]]; eauto; try lia.
-  exists tenv', m'; split; [auto|].
-  destruct (tenv' ! args_id) as [[] |]; try contradiction.
-  destruct (load _ _ _); [|easy].
+  edestruct Hsimpler as [tenv' [m' [cv [Heval' Hresult]]]]; eauto; try lia.
+  exists tenv', m', cv; split; [auto|].
   eapply rel_val_antimon; [|eauto]; lia.
 Qed.
 
@@ -1970,20 +1969,16 @@ Lemma rel_exp_Cred env' tenv' m' stmt' k ρ e env tenv m stmt :
   (ρ, e) ~{k} (env, tenv, m, stmt).
 Proof.
   unfold rel_exp; intros Hsimple_step Hrel v cin cout Hk Hbstep.
-  edestruct Hrel as [tenv'' [m'' [Hstep2_after Hres]]]; eauto.
+  edestruct Hrel as [tenv'' [m'' [cv [Hstep2_after Hres]]]]; eauto.
+  (do 3 eexists); eauto.
 Qed.
 
 (** Fully right-associate all [;]s *)
 Ltac norm_seq := repeat progress (eapply rel_exp_Cred; [apply Cred_seq_assoc|]).
 
-(** Step from _ ~{k} (env, tenv, m, (s; cont))
-    to _ ~{k} (env, tenv', m', cont)
-    using [lemma : (env, tenv, m, s) --> (env, tenv', m', Sskip)] *)
-Ltac Cstep lemma :=
-  eapply rel_exp_Cred; [eapply Cred_trans; [eapply Cred_seq_congl, lemma|apply Cred_skip] |].
-
-(** Ditto, but without the cont *)
-Ltac Cstep' lemma := eapply rel_exp_Cred; [eapply lemma|].
+(** Step from _ ~{k} (env, tenv, m, s) to _ ~{k} (env, tenv', m', s')
+    using [lemma : (env, tenv, m, s) --> (env, tenv', m', s')] *)
+Ltac Cstep lemma := eapply rel_exp_Cred; [eapply lemma|].
 
 (** * Main theorem *)
 
@@ -2050,7 +2045,7 @@ Proof.
   - (* case x of { ces } *)
     rename v into x, l into ces; cbn.
     bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
-    intros* Hρ; Cstep' Cred_if.
+    intros* Hρ; Cstep Cred_if'.
     { admit. }
     { admit. }
     revert boxed_cases unboxed_cases fvs_cs n_cs Hces ρ env tenv m Hρ.

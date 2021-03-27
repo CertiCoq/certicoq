@@ -232,10 +232,15 @@ Definition builtin_unreachable : statement :=
   let f := Evar builtin_unreachable_id (Tfunction Tnil Tvoid cc_default) in
   Scall None f nil.
 
-(** fun_ty n = void(struct thread_info *ti, value, .. min(n_param, n) times)
+(** Each function declares a local variable
+      value ret;
+    for storing the results of tail calls. *)
+Variable (ret_id : ident).
+
+(** fun_ty n = value(struct thread_info *ti, value, .. min(n_param, n) times)
     prim_ty n = value(value, .. n times) *)
 Definition value_tys (n : nat) : typelist := Nat.iter n (Tcons value) Tnil.
-Definition fun_ty (n : nat) := Tfunction (Tcons threadInf (value_tys (min n_param n))) Tvoid cc_default.
+Definition fun_ty (n : nat) := Tfunction (Tcons threadInf (value_tys (min n_param n))) value cc_default.
 Definition prim_ty (n : nat) := Tfunction (value_tys n) value cc_default.
 
 Notation "'var' x" := (Etempvar x value) (at level 20).
@@ -308,7 +313,7 @@ Context
   (locals : FVSet) (* The set of local variables including definitions and arguments *)
   (nenv : M.t BasicAst.name).
 
-Definition make_fun_call (tail_position : bool) f ys :=
+Definition make_fun_call (destination : ident) f ys :=
   match M.get f fenv with 
   | Some (arity, inds) =>
     let arity := N.to_nat arity in
@@ -320,13 +325,9 @@ Definition make_fun_call (tail_position : bool) f ys :=
                   (skipn n_param (combine ys inds)))%bool;
            tinfo->alloc :::= alloc;
            tinfo->limit :::= limit;
-           Scall None
+           Scall (Some destination)
                  (Ecast (make_var f) (Tpointer (fun_ty (min arity n_param)) noattr))
-                 (tinfo :: map make_var (firstn n_param ys));
-           match tail_position with true => Sskip | false =>
-             alloc_id ::= tinfo->alloc;
-             limit_id ::= tinfo->limit
-           end)
+                 (tinfo :: map make_var (firstn n_param ys)))
   | None => Err "make_fun_call: unknown function application"
   end.
 
@@ -408,8 +409,8 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
   (** [[let x = f(y, ..) in e]] =
         store local variables live after call (= locals∩(FV(e)\x)) in roots array
         push frame onto shadow stack
-        call f (may GC)
-        x = args[1]
+        x = call f (may GC)
+        retreieve new limit, alloc from tinfo
         if max_allocs(e) > 0,
           if (max_allocs(e) > limit - alloc) {
             if x live call (<-> x ∈ locals∩FV(e)), store it in roots array
@@ -424,14 +425,15 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
     let live_minus_x := PS.remove x live_after_call in
     let live_minus_x_list := PS.elements live_minus_x in
     let n_live_minus_x := Z.of_nat (length live_minus_x_list) in
-    call <- make_fun_call false f ys ;;
+    call <- make_fun_call x f ys ;;
     let retrieve_roots xs := statements (mapi (fun i x => x ::= roots.[i]) 0 xs) in
     let stm :=
       statements (mapi (fun i x => roots.[i] :::= var x) 0 live_minus_x_list);
       frame.next :::= roots +' c_int n_live_minus_x value;
       tinfo->fp :::= &frame;
       call;
-      x ::= tinfo->args.[1];
+      alloc_id ::= tinfo->alloc;
+      limit_id ::= tinfo->limit;
       match max_allocs e with 0 => Sskip | S _ as allocs =>
         if PS.mem x live_after_call then
           create_space allocs
@@ -452,21 +454,23 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
     '(stm_e, fvs_e, n_e) <- translate_body e ;;
     ret ((x ::= (var y).[Z.of_N n]; stm_e), add_local_fv (PS.remove x fvs_e) y, n_e)
   | Efun fnd e => Err "translate_body: nested function detected"
-  (** [[f(ys)]] = call f *)
+  (** [[f(ys)]] =
+        ret_temp = call f with arguments ys;
+        return ret_temp *)
   | Eapp f t ys =>
-    call <- make_fun_call true f ys ;;
-    ret (call, add_local_fvs PS.empty (f :: ys), 0)%N
+    call <- make_fun_call ret_id f ys ;;
+    ret ((call; Sreturn (Some (var ret_id))), add_local_fvs PS.empty (f :: ys), 0)%N
   (** [[let x = p(ys) in e]] = (x = p(ys); [[e]]) *)
   | Eprim x p ys e =>    
     '(stm_e, fvs_e, n_e) <- translate_body e ;;
     ret ((Scall (Some x) (Evar p (prim_ty (length ys))) (map make_var ys);
           stm_e),
          add_local_fvs (PS.remove x fvs_e) ys, n_e)
-  (** [[halt x]] = (args[1] = x; store alloc and limit in tinfo) *)
+  (** [[halt x]] = (store alloc and limit in tinfo; return x) *)
   | Ehalt x =>
-    ret ((tinfo->args.[1] :::= make_var x;
-          tinfo->alloc :::= alloc;
-          tinfo->limit :::= limit),
+    ret ((tinfo->alloc :::= alloc;
+          tinfo->limit :::= limit;
+          Sreturn (Some (var x))),
          add_local_fv PS.empty x, 0)%N
   end.
 
@@ -476,10 +480,10 @@ Definition definition := (ident * globdef Clight.fundef type)%type.
 
 Definition make_fun (size : Z) (xs locals : list ident) (body : statement) : function :=
   let make_decls := map (fun x => (x, value)) in
-  mkfunction Tvoid cc_default
+  mkfunction value cc_default
              ((tinfo_id, threadInf) :: make_decls (firstn n_param xs))
              (make_decls (skipn n_param xs ++ locals) ++ stack_decl size ++
-              (alloc_id, tptr value) :: (limit_id, tptr value) :: (args_id, tptr value) :: nil)%list
+              (alloc_id, tptr value) :: (limit_id, tptr value) :: (ret_id, value) :: [])%list
              nil
              body.
 
@@ -497,7 +501,7 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
     | None => Err "translate_fundefs: Unknown function name"
     | Some (_, locs) =>
       (** [[f(xs.., ys..) = e]] (where |xs| = n_param) =
-            void f(thread struct_info *tinfo, value x, ..) {
+            value f(thread struct_info *tinfo, value x, ..) {
               alloc = tinfo->alloc;
               limit = tinfo->limit;
               args = tinfo->args;
@@ -523,7 +527,6 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
       let body :=
         alloc_id ::= tinfo->alloc;
         limit_id ::= tinfo->limit;
-        args_id ::= tinfo->args;
         statements (map (fun '(x, i) => x ::= tinfo->args.[Z.of_N i]) (skipn n_param (combine xs locs)));
         init_shadow_stack_frame;
         match allocs with 0 => Sskip | S _ as allocs =>
@@ -557,7 +560,6 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
           use GC to create max_allocs(e) words of free space on the heap
           (no need to push or pop locals because nothing is live yet)
         [[e]]
-        return tinfo->args[1];
       } *)
 Definition translate_program (fds_e : hoisted_exp) (nenv : name_env) : error (list definition) :=
   let '(fds, e) := fds_e in
@@ -567,21 +569,19 @@ Definition translate_program (fds_e : hoisted_exp) (nenv : name_env) : error (li
   let body :=
     alloc_id ::= tinfo->alloc;
     limit_id ::= tinfo->limit;
-    args_id ::= tinfo->args;
     init_shadow_stack_frame;
     match max_allocs e with 0 => Sskip | S _ as allocs =>
       create_space (max_allocs e) Sskip Sskip
     end;
-    body;
-    Sreturn (Some (tinfo->args.[1]))
+    body
   in
   let locals :=
     (map (fun x => (x, value)) locals ++
      stack_decl (Z.of_N slots) ++ 
      (alloc_id, tptr value) :: 
      (limit_id, tptr value) :: 
-     (args_id, tptr value) :: 
-     nil)%list
+     (ret_id, value) :: 
+     [])%list
   in
   let fn := mkfunction value cc_default ((tinfo_id, threadInf) :: nil) locals nil body in
   ret ((body_id, Gfun (Internal fn)) :: funs).
@@ -613,7 +613,9 @@ Definition inf_vars :=
   (prev_fld, nNamed "prev") :: 
   (make_tinfo_id, nNamed "make_tinfo") ::
   (export_id, nNamed "export") ::
-  (builtin_unreachable_id, nNamed "__builtin_unreachable") :: nil.
+  (builtin_unreachable_id, nNamed "__builtin_unreachable") ::
+  (ret_id, nNamed "ret") ::
+  [].
 
 Definition add_inf_vars (nenv : name_env) : name_env :=
   List.fold_left (fun nenv '(x, name) => M.set x name nenv) inf_vars nenv.
@@ -714,8 +716,8 @@ Fixpoint make_decls (nenv : name_env) (defs : list definition) (gv : bool) : lis
 
 Definition body_decl : definition :=
   let param_tys := type_of_params ((tinfo_id, threadInf):: nil) in
-  let ext_fn := EF_external "body" (signature_of_type param_tys Tvoid cc_default) in
-  (body_id, Gfun (External ext_fn param_tys Tvoid cc_default)).
+  let ext_fn := EF_external "body" (signature_of_type param_tys value cc_default) in
+  (body_id, Gfun (External ext_fn param_tys value cc_default)).
 
 Definition make_defs fds_e cenv nenv : error (list definition) :=
   let global_defs := 
@@ -1157,12 +1159,8 @@ Infix "⋆" := Sepcon (at level 78, right associativity).
 Definition dom_mem (m : mem) : Ensemble address :=
   fun '(b, o) => Mem.perm m b o Max Nonempty.
 
-Search Mem.perm.
-
 Definition dom_mapsto (b : block) (o : Z) (vs : list Values.val) :=
   fun '(b', o') => b = b' /\ (o <= o' < o + #|vs|*word_size)%Z.
-
-Definition LEM := Coq.Logic.Classical_Prop.classic.
 
 Reserved Notation "m |=_{ S } P" (at level 79).
 Fixpoint mpred_denote_aux (P : mpred) (S : Ensemble address) (m : mem) : Prop :=
@@ -1374,6 +1372,8 @@ Proof.
       rewrite <- Hload; eapply Mem.load_store_other; eauto; superlia.
 Qed.
 
+(* LEM is not needed if we require that all sets describing subheaps be decidable *)
+Definition LEM := Coq.Logic.Classical_Prop.classic.
 Lemma mpred_unchanged_on S P m m' :
   Mem.nextblock m = Mem.nextblock m' ->
   Mem.unchanged_on (fun b o => S (b, o)) m m' ->
@@ -1669,7 +1669,7 @@ Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
   (* m, tenv is a valid CertiCoq heap (alloc, limit, roots, ...)
      roots array represents some values -> *)
   exists tenv' m',
-  (** then running stmt down to Sskip yields args[1] related to v at level k-j *)
+  (** then running stmt yields args[1] related to v at level k-j *)
   (env, tenv, m, stmt) ⇓ (tenv', m') /\
   (* TODO: this should be tinfo->args[1], not args[1] *)
   match! tenv' ! args_id with Some (Vptr b o) in
@@ -2111,11 +2111,6 @@ Proof.
     { admit. }
     { admit. }
     Cstep Cred_assign.
-    { admit. }
-    { admit. }
-    { admit. }
-    { admit. }
-    Cstep' Cred_assign.
     { admit. }
     { admit. }
     { admit. }

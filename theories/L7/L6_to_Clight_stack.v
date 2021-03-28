@@ -1158,9 +1158,13 @@ Definition address := (block * Z)%type.
 Inductive mpred :=
 | Mapsto (bo : address) (vs : list Values.val)
 | Sepcon (P Q : mpred)
+| Exists {A} (F : A -> mpred)
 | Mem (m : mem).
 Infix "↦" := Mapsto (at level 77).
 Infix "⋆" := Sepcon (at level 78, right associativity).
+Notation "'∃' x .. y , p" :=
+  (Exists (fun x => .. (Exists (fun y => p)) ..))
+  (at level 200, x binder, y binder, right associativity).
 
 Definition dom_mem (m : mem) : Ensemble address :=
   fun '(b, o) => Mem.perm m b o Max Nonempty.
@@ -1182,6 +1186,7 @@ Fixpoint mpred_denote_aux (P : mpred) (S : Ensemble address) (m : mem) : Prop :=
     Disjoint _ S1 S2 /\
     m |=_{S1} P /\
     m |=_{S2} Q
+  | Exists _ F => exists x, m |=_{S} F x
   | Mem m' => S <--> dom_mem m' /\ Mem.unchanged_on (fun b o => S (b, o)) m' m
   end
 where "m |=_{ S } P" := (mpred_denote_aux P S m).
@@ -1383,7 +1388,7 @@ Lemma mpred_unchanged_on S P m m' :
   m |=_{S} P ->
   m' |=_{S} P.
 Proof.
-  revert S; induction P as [[b o] vs|P IHP Q IHQ|m'']; cbn;
+  revert S; induction P as [[b o] vs|P IHP Q IHQ|A F IHF|m'']; cbn;
   intros S Hunchanged Hm.
   - destruct Hm as [?[?[Hload [??]]]]; split_ands; auto.
     intros i v Hget; eapply Mem.load_unchanged_on; eauto.
@@ -1394,6 +1399,7 @@ Proof.
       eapply Mem.unchanged_on_implies; eauto; cbn; intros; now apply (proj2 HS).
     + apply IHQ; auto.
       eapply Mem.unchanged_on_implies; eauto; cbn; intros; now apply (proj2 HS).
+  - destruct Hm as [x Hx]; eexists; eauto.
   - destruct Hm as [H Hunchanged']; split; [auto|].
     eapply Mem.unchanged_on_trans; eauto.
 Qed.
@@ -1641,12 +1647,13 @@ Lemma mpred_Same_set P S1 S2 m :
   S1 <--> S2 ->
   m |=_{S1} P <-> m |=_{S2} P.
 Proof.
-  induction P as [[b o] vs|P IHP Q IHQ|m'']; cbn.
+  induction P as [[b o] vs|P IHP Q IHQ|A F IHF|m'']; cbn.
   - intros ->; split; intros Hand; decompose [and] Hand; split_ands; sets.
   - intros H; split; intros Hand; decompose [ex and] Hand.
     + do 2 eexists; split_ands; eauto.
       now rewrite <- H.
     + do 2 eexists; split_ands; eauto; now rewrite H.
+  - intros H; split; intros [x Hx]; exists x; now specialize (IHF x).
   - intros H. erewrite unchanged_on_iff; eauto. now rewrite H.
 Qed.
 
@@ -1700,8 +1707,32 @@ Proof.
 Qed.
 Opaque Mem.alloc.
 
-(*
+Definition vint (z : Z) : Values.val :=
+  if Archi.ptr64
+  then Vlong (Int64.repr z)
+  else Values.Vint (Int.repr z).
 
+Lemma mpred_Mem F P m m_inner :
+  m_inner |= P ->
+  m |= F (Mem m_inner) ->
+  m |= F P.
+Proof. Abort.
+
+Lemma mpred_Ex {A} F (G : A -> _) S m :
+  is_frame F ->
+  m |=_{S} F (∃ x, G x) <-> exists x, m |=_{S} F (G x).
+Proof.
+  destruct 1.
+  1: now cbn.
+  1: rewrite frame_swap_hole by auto.
+  1: erewrite MCUtils.iff_ex; [|intros x; apply frame_swap_hole; auto].
+  all:
+    cbn; split; intros Hexand; decompose [ex and] Hexand;
+    (repeat match goal with |- exists _, _ => eexists end);
+    split_ands; eauto.
+Qed.
+
+(*
 tenv ! alloc_id = Vptr nursery_b alloc_o ->
 tenv ! limit_id = Vptr nursery_b limit_o ->
 tenv ! tinfo_id = Vptr tinfo_b tinfo_o ->
@@ -1719,7 +1750,7 @@ m ⊨
       Vptr heap_b heap_o ::
       Vptr args_b args_o :: 
       Vptr fp_b fp_o :: 
-      make_vint nalloc :: [])) ::
+      vint nalloc :: [])) ::
   ((frame_b, frame_o) ↦ (frame_next :: (roots_b, roots_o) :: (fp_b, fp_o) :: [])) ::
   ((roots_b, roots_o) ↦ roots) ::
   ((args_b, args_o) ↦ args) ::
@@ -1730,9 +1761,7 @@ m ⊨
  * gc_aux (nonempty)
  * c managed heap (readable)
  * frame m' (TODO)
-
 *)
-
 (** The Clight machine state looks as follows at function entry:
       temporary environment
         tinfo_id ↦ (tinfo_b, tinfo_o)
@@ -1790,16 +1819,57 @@ m ⊨
     At each step, each of the segments listed under "mem" are mutually disjoint, and also disjoint from the CertiCoq heap.
 *)
 
+Notation "P 'where' Q" := (∃ (_ : Q), P) (at level 100).
+Definition mpure (P : Prop) : mpred := ∃ m, Mem m where P.
+
+Definition stack_top (frame_addrs : list (block * ptrofs)) :=
+  match frame_addrs with
+  | [] => Vnullptr
+  | (b, o) :: _ => Vptr b o
+  end.
+
+(** A shadow stack at addresses frame_addrs containing root arrays at addresses
+    root_addrs, containing values cvss. The addresses of each frame and root array
+    are made explicit so we can require that they be preserved across function calls
+    and GC. The values inside each root array are made explicit so we can relate them
+    to CertiCoq values. *)
+Fixpoint shadow_stack
+         (frame_addrs root_addrs : list (block * ptrofs))
+         (cvss : list (list Values.val)) : mpred :=
+  match frame_addrs, root_addrs, cvss with
+  | [], [], [] => mpure True
+  | (f_b, f_o) :: frame_addrs, (r_b, r_o) :: root_addrs, rs :: cvss =>
+    (f_b, O.unsigned f_o) ↦
+      Vptr r_b (O.repr (O.unsigned r_o + #|rs|*word_size)) ::
+      Vptr r_b r_o :: stack_top frame_addrs :: [] ⋆
+    (r_b, O.unsigned r_o) ↦ rs ⋆
+    shadow_stack frame_addrs root_addrs cvss
+  | _, _, _ => mpure False
+  end.
+
+(** A store is well-formed if it contains
+    - A well-formed thread_info pointing to a nursery, args array, and shadow stack
+    - A CertiCoq heap that can be freely modified by GC *)
+Definition valid_mem tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs cvss : mpred :=
+  ∃ nursery_b alloc_o,
+  (∃ limit_o heap nalloc,
+   (tinfo_b, O.unsigned tinfo_o) ↦
+   (Vptr nursery_b alloc_o :: Vptr nursery_b limit_o :: heap ::
+    Vptr args_b args_o :: stack_top frame_addrs :: nalloc :: [])) ⋆
+  (∃ free_space, (nursery_b, O.unsigned alloc_o) ↦ free_space) ⋆
+  ((args_b, O.unsigned args_o) ↦ args) ⋆
+  (shadow_stack frame_addrs root_addrs cvss) ⋆
+  (∃ gc_heap, Mem gc_heap).
+
+(* The state during the execution of an L6 program *)
+
+Axiom garbage_collect_spec : True (* TODO*).
+
 Notation "'match!' e1 'with' p 'in' e2" :=
   (match e1 with p => e2 | _ => False end)
   (at level 80, p pattern, e1 at next level, right associativity).
 
 (** * Logical relation between λ-ANF and Clight *)
-
-Definition make_vint (z : Z) : Values.val :=
-  if Archi.ptr64
-  then Vlong (Int64.repr z)
-  else Values.Vint (Int.repr z).
 
 Fixpoint closed_val (v : cps.val) :=
   match v with
@@ -1821,33 +1891,66 @@ Section CycleBreakers.
 
 Context (rel_val : forall (k : nat) (v : cps.val) (m : Memory.mem) (cv : Values.val), Prop).
 
-Print exec_stmt.
+Definition rel_shadow_stack k vss m cvss :=
+  Forall2 (Forall2 (fun v cv => rel_val k v m cv)) vss cvss.
 
 Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
-  forall v (cin : fuel) (cout : trace),
+  forall v cin cout tinfo_b tinfo_o args_b args_o frame_addrs root_addrs vss frame,
   (** if running e in environment ρ yields a value v in j <= k cost, *)
   to_nat cin <= k ->
   (ρ, e, cin) ⇓cps (v, cout) ->
-  (* m, tenv is a valid CertiCoq heap (alloc, limit, roots, ...)
-     roots array represents some values -> *)
-  exists tenv' m' cv,
-  (** then running stmt yields a value related to v at level k-j *)
-  (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
-  rel_val (k - to_nat cin) v m' cv.
-  (* m', tenv' is a valid CertiCoq heap and roots array represents same values *)
+  (** and m is a valid CertiCoq memory with shadow stack cvss related to vss at level k, *)
+  m |=
+    (∃ args cvss, valid_mem tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs cvss
+     (* TODO: is this OK? Seems like it breaks monotonicity.
 
-(* TODO: state some kinda frame rule, to be filled in later *)
+        If not OK, could do the following:
+        Define a relation has_shape relating L6 values to Clight values:
+          has_shape m (Vint i) (vint ci) <-> i = ci
+          has_shape m (Vconstr c vs) (Vptr b o) <->
+            m contains cvs at (b, o) /\ Forall2 (has_shape m) vs cvs
+          has_shape m (Vfun rho fds f) (Vptr b o) <-> True
+        Define compatible_shapes relating L6 values two different Clight value-mem pairs:
+          compatible_shapes m m' (Vint i) (vint ci) (vint ci') <-> i = ci = ci'
+          compatible_shapes m m' (Vconstr c vs) (Vptr b o) (Vptr b' o') <->
+            m contains cvs at (b, o) /\ Forall2 (has_shape m) vs cvs /\
+            m' contains cvs' at (b', o') /\ Forall2 (has_shape m') vs cvs' /\
+            Forall3 (compatible_shapes m m') vs cvs cvs'
+          compatible_shapes m m' (Vfun rho fds f) (Vptr b o) (Vptr b' o') <->
+            (b, o) = (b', o')
+
+        Then, in here and in the axiomatization of the GC, only require
+          has_shape m vss cvss
+        and ensure
+          compatible_shapes m m' vss cvss cvss'.
+        
+        Separately, prove that compatible_shapes respects the value relation; i.e.
+          Forall2 (λ v cv ⇒ rel_val k v m cv) vss cvss ->
+          compatible_shapes vss cvss cvss' ->
+          Forall2 (λ v cv ⇒ rel_val k v m cv) vss cvss'. *)
+     where rel_shadow_stack k vss m cvss) ⋆
+    frame ->
+  (** then running stmt yields a result (m', cv), *)
+  exists tenv' m' cv,
+  (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
+  (** m' is still a valid CertiCoq memory containing a shadow stack related to vss at level k, *)
+  m' |=
+    (∃ args cvss, valid_mem tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs cvss
+     where rel_shadow_stack k vss m' cvss) ⋆
+    frame /\
+  (** and cv is related to v at level k-j *)
+  rel_val (k - to_nat cin) v m' cv.
 
 Definition rel_val_aux (k : nat) :=
   fix go (v : cps.val) (m : Memory.mem) (cv : Values.val) : Prop :=
   match v, cv with
-  | Vint v, cv => cv = make_vint (rep_unboxed (Z.to_N v))
+  | Vint v, cv => cv = vint (rep_unboxed (Z.to_N v))
   | Vconstr t vs, cv =>
     match get_ctor_rep cenv t with
-    | Ret (enum t) => cv = make_vint (rep_unboxed t)
+    | Ret (enum t) => cv = vint (rep_unboxed t)
     | Ret (boxed t a) =>
       match! cv with Vptr b o in
-      load m b (O.unsigned o + (-1)*word_size) = Some (make_vint (rep_boxed t a)) /\
+      load m b (O.unsigned o + (-1)*word_size) = Some (vint (rep_boxed t a)) /\
       let arg_ok i v :=
         match! load m b (O.unsigned o + i*word_size) with Some cv in
         go v m cv
@@ -1859,27 +1962,38 @@ Definition rel_val_aux (k : nat) :=
     match! find_def f fds with Some (t, xs, e) in
     match! fenv ! f with Some (arity, indices) in
     Genv.find_symbol prog_genv f = Some b /\
-    match! Genv.find_funct prog_genv (Vptr b o) with Some (Internal fn) in
-    (* TODO phrase in terms of eval_funcall *)
-    forall j vs m cvs ρ_xvs env tenv m_cvs_firstn args_b args_o,
+    match! Genv.find_funct prog_genv (Vptr b o) with Some fn in
+    forall j vs ρ_xvs cin cout,
+    forall cvs m tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs vss frame,
     j < k ->
     match k with
     | 0 => True
     | S k =>
-      (** suppose that f is called with arguments vs and fn with arguments cvs, and that vs
-         and cvs are related at level j<k (written as k-(k-j) to convince Coq of well-foundedness). *)
+      (** if vs are related to cvs at level j<k (written as k-(k-j) to convince
+          Coq of well-foundedness) *)
       let j := k-(k-j) in
       Forall2 (fun v cv => rel_val j v m cv) vs cvs ->
-      (** if extend ρ with xs↦vs... *)
+      (** and calling the L6 function with arguments xs↦vs yields v in i<=j steps, *)
       set_lists xs vs (def_funs fds fds ρ ρ) = Some ρ_xvs ->
-      (** and extend the C configuration with xs↦cvs... *)
-      tenv ! args_id = Some (Vptr args_b args_o) ->
-      (* TODO: this is wrong; should be indices specified by calling convention *)
-      let arg_ok cv i := load m args_b (O.unsigned args_o + Z.of_N i * word_size) = Some cv in
-      Forall2 arg_ok (skipn n_param cvs) (skipn n_param indices) ->
-      function_entry1 prog_genv fn (firstn n_param cvs) m env tenv m_cvs_firstn ->
-      (** then e is related to the body of fn at level j *)
-      rel_exp' j ρ_xvs e env tenv m_cvs_firstn (fn_body fn)
+      to_nat cin <= j ->
+      (ρ_xvs, e, cin) ⇓cps (v, cout) ->
+      (** then the corresponding C call evaluates to (m', cv), *)
+      let arg_ok i cv := load m args_b (O.unsigned args_o + Z.of_N i * word_size) = Some cv in
+      Forall2 arg_ok (skipn n_param indices) (skipn n_param cvs) ->
+      m |=
+        (∃ cvss, valid_mem tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs cvss
+         where rel_shadow_stack j vss m cvss) ⋆
+        frame ->
+      exists m' cv,
+      eval_funcall prog_genv m fn (Vptr tinfo_b tinfo_o :: firstn n_param cvs) Events.E0 m' cv /\
+      (** and m' is a valid mem, the addresses of the args array and each frame and root array in
+          the shadow stack are preserved across the call, the shadow stack is related to its L6
+          counterpart at level j, and the result cv is related to v at level (j - i) *)
+      m' |=
+        (∃ args cvss, valid_mem tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs cvss
+         where rel_shadow_stack j vss m' cvss) ⋆
+        frame /\
+      rel_val (j - to_nat cin) v m' cv
     end
   | _, _ => False
   end.
@@ -1973,6 +2087,7 @@ Proof.
     destruct (fenv ! f) as [[arity indices] |] eqn:Hindices; auto.
     intros [Hi_zero Hrest]; split; [easy|]; revert Hrest.
     intros [Hfind_symbol Hrest]; split; [easy|]; revert Hrest.
+    admit. (* TODO *) (*
     match goal with |- context [if ?e1 then ?e2 else ?e3] =>
       change (if e1 then e2 else e3) with (Genv.find_funct prog_genv (Vptr b i));
       destruct (Genv.find_funct prog_genv (Vptr b i)) as [[fn|] |] eqn:Hfind_funct; auto
@@ -1984,16 +2099,19 @@ Proof.
     destruct k as [|k]; [lia|].
     specialize Hfuture_call with (j := j0).
     replace (k - (k - j0)) with j0 in Hfuture_call by lia.
-    eapply Hfuture_call; eauto; lia.
+    eapply Hfuture_call; eauto; lia. *)
   - auto.
-Qed.
+Admitted.
 
+(*
 Lemma rel_exp_antimon j k ρ e env tenv m stmt :
   j <= k ->
   (ρ, e) ~{k} (env, tenv, m, stmt) ->
   (ρ, e) ~{j} (env, tenv, m, stmt).
 Proof.
-  intros Hle Hk v cin cout Hcost Hbstep.
+  intros Hle Hk v; intros* Hcost Hbstep Hm.
+  unfold rel_exp, rel_exp' in Hk.
+  edestruct Hk as [tenv' [m' [cv H]]]; try apply Hm.
   edestruct Hk as [tenv' [m' [cv [Hsteps Hres]]]]; eauto; [lia|].
   exists tenv', m', cv; split; [eauto|].
   eapply rel_val_antimon; [|eassumption]; lia.
@@ -2270,6 +2388,7 @@ Proof.
          (ρ, Ehalt x) ~{k} (env, tenv, m, Sskip) *)
     admit.
 Abort.
+*)
 
 End PROOF.
 

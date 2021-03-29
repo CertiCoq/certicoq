@@ -185,7 +185,7 @@ Definition composites : list composite_definition :=
 
 (** Each generated function takes a (struct thread_info *tinfo) as argument *)
 Context (tinfo_id : ident).
-Definition tinfo := Etempvar tinfo_id threadInf.
+Definition tinfo := Evar tinfo_id threadInf.
 Definition tinfd := Ederef tinfo threadStructInf.
 Notation "tinfo->alloc" := (Efield tinfd alloc_id (tptr value)).
 Notation "tinfo->limit" := (Efield tinfd limit_id (tptr value)).
@@ -199,7 +199,7 @@ Notation "tinfo->nalloc" := (Efield tinfd nalloc_id value).
     where size upper bounds the number of variables live at GC calls. *)
 Context (frame_id roots_id : ident).
 Definition roots_ty size := Tarray value size noattr.
-Definition roots := Etempvar roots_id (tptr value).
+Definition roots := Evar roots_id (tptr value).
 Definition frame := Evar frame_id stack_frame.
 Notation "frame.next" := (Efield frame next_fld (tptr value)).
 Notation "frame.root" := (Efield frame root_fld (tptr value)).
@@ -211,8 +211,8 @@ Definition stack_decl size : list (ident * type) :=
 (** Each generated function body also declares the following local variables:
       value *alloc;
       value *limit; *)
-Definition alloc := Etempvar alloc_id (tptr value).
-Definition limit := Etempvar limit_id (tptr value).
+Definition alloc := Evar alloc_id (tptr value).
+Definition limit := Evar limit_id (tptr value).
 
 (* Variable (isptr_id : ident). (* ident for the is_ptr external function *) *)
 
@@ -243,7 +243,7 @@ Definition value_tys (n : nat) : typelist := Nat.iter n (Tcons value) Tnil.
 Definition fun_ty (n : nat) := Tfunction (Tcons threadInf (value_tys (min n_param n))) value cc_default.
 Definition prim_ty (n : nat) := Tfunction (value_tys n) value cc_default.
 
-Notation "'var' x" := (Etempvar x value) (at level 20).
+Notation "'var' x" := (Evar x value) (at level 20).
 Notation "a '+'' b" := (Ebinop Oadd a b (tptr value)) (at level 30).
 Notation "a '-'' b" := (Ebinop Osub a b (tptr value)) (at level 30).
 Notation "a '<'' b" := (Ebinop Olt a b type_bool) (at level 40).
@@ -251,8 +251,7 @@ Notation "a '>>'' b" := (Ebinop Oshr a b value) (at level 30).
 Notation "a '&'' b" := (Ebinop Oand a b value) (at level 30).
 Notation "a '=='' b" := (Ebinop Oeq a b type_bool) (at level 40).
 Notation " p ';' q " := (Ssequence p q) (at level 100, format " p ';' '//' q ").
-Infix "::=" := Sset (at level 50).
-Infix ":::=" := Sassign (at level 50).
+Infix "::=" := Sassign (at level 50).
 Notation "'*' p " := (Ederef p value) (at level 40).
 Notation "'&' p " := (Eaddrof p (Tpointer (typeof p) noattr)) (at level 40).
 Definition c_int n t := if Archi.ptr64 then Econst_long (Int64.repr n) t else Econst_int (Int.repr n%Z) t.
@@ -300,7 +299,7 @@ Definition make_tag (r : ctor_rep) : expr :=
 
     make_var x =
       Ecast (Evar x suitable-fn-type) value if x is a toplevel function
-      Etempvar x value otherwise *)
+      Evar x value otherwise *)
 Definition make_var (x : ident) :=
   match M.get x fenv with
   | Some (_, locs) => Ecast (Evar x (fun_ty (length locs))) value
@@ -321,10 +320,10 @@ Definition make_fun_call (destination : ident) f ys :=
       Err ("make_fun_call: arity mismatch: " ++ pretty_fun_name f nenv)%string
     else
       ret (statements
-             (map (fun '(y, i) => tinfo->args.[Z.of_N i] :::= make_var y)
+             (map (fun '(y, i) => tinfo->args.[Z.of_N i] ::= make_var y)
                   (skipn n_param (combine ys inds)))%bool;
-           tinfo->alloc :::= alloc;
-           tinfo->limit :::= limit;
+           tinfo->alloc ::= alloc;
+           tinfo->limit ::= limit;
            Scall (Some destination)
                  (Ecast (make_var f) (Tpointer (fun_ty (min arity n_param)) noattr))
                  (tinfo :: map make_var (firstn n_param ys)))
@@ -356,12 +355,12 @@ Definition create_space (n : nat) pre post : statement :=
   Sifthenelse
     (limit -' alloc <' n)
     (pre;
-     tinfo->alloc :::= alloc;
-     tinfo->limit :::= limit;
-     tinfo->nalloc :::= n;
+     tinfo->alloc ::= alloc;
+     tinfo->limit ::= limit;
+     tinfo->nalloc ::= n;
      Scall None gc (tinfo :: nil);
-     alloc_id ::= tinfo->alloc;
-     limit_id ::= tinfo->limit;
+     alloc ::= tinfo->alloc;
+     limit ::= tinfo->limit;
      post)
     Sskip.
 
@@ -387,12 +386,12 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
     rep <- get_ctor_rep c ;;
     stm_constr <-
       match rep with
-      | enum t => ret (x ::= make_tag rep)
+      | enum t => ret (var x ::= make_tag rep)
       | boxed t a =>
-        ret (x ::= Ecast (alloc +' c_int 1 value) value;
-             alloc_id ::= alloc +' c_int (Z.of_N (a + 1)) value;
-             (var x).[-1] :::= make_tag rep;
-             statements (mapi (fun i y => (var x).[i] :::= make_var y) 0 ys))
+        ret (var x ::= Ecast (alloc +' c_int 1 value) value;
+             alloc ::= alloc +' c_int (Z.of_N (a + 1)) value;
+             (var x).[-1] ::= make_tag rep;
+             statements (mapi (fun i y => (var x).[i] ::= make_var y) 0 ys))
       end ;;
     '(stm_e, fvs_e, n_e) <- translate_body e ;;
     ret ((stm_constr; stm_e), add_local_fvs (PS.remove x fvs_e) ys, n_e)
@@ -426,25 +425,25 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
     let live_minus_x_list := PS.elements live_minus_x in
     let n_live_minus_x := Z.of_nat (length live_minus_x_list) in
     call <- make_fun_call x f ys ;;
-    let retrieve_roots xs := statements (mapi (fun i x => x ::= roots.[i]) 0 xs) in
+    let retrieve_roots xs := statements (mapi (fun i x => var x ::= roots.[i]) 0 xs) in
     let stm :=
-      statements (mapi (fun i x => roots.[i] :::= var x) 0 live_minus_x_list);
-      frame.next :::= roots +' c_int n_live_minus_x value;
-      tinfo->fp :::= &frame;
+      statements (mapi (fun i x => roots.[i] ::= var x) 0 live_minus_x_list);
+      frame.next ::= roots +' c_int n_live_minus_x value;
+      tinfo->fp ::= &frame;
       call;
-      alloc_id ::= tinfo->alloc;
-      limit_id ::= tinfo->limit;
+      alloc ::= tinfo->alloc;
+      limit ::= tinfo->limit;
       match max_allocs e with 0 => Sskip | S _ as allocs =>
         if PS.mem x live_after_call then
           create_space allocs
-            (roots.[n_live_minus_x] :::= var x;
-             frame.next :::= roots +' c_int (1 + n_live_minus_x) value)
-            (x ::= roots.[n_live_minus_x])
+            (roots.[n_live_minus_x] ::= var x;
+             frame.next ::= roots +' c_int (1 + n_live_minus_x) value)
+            (var x ::= roots.[n_live_minus_x])
         else
           create_space allocs Sskip Sskip
       end;
       retrieve_roots live_minus_x_list;
-      tinfo->fp :::= frame.prev;
+      tinfo->fp ::= frame.prev;
       stm_e
     in
     ret (stm, add_local_fvs live_minus_x (f :: ys),
@@ -452,7 +451,7 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
   (** [[let x = y.n in e]] = (x = y[n]; [[e]]) *)
   | Eproj x t n y e =>
     '(stm_e, fvs_e, n_e) <- translate_body e ;;
-    ret ((x ::= (var y).[Z.of_N n]; stm_e), add_local_fv (PS.remove x fvs_e) y, n_e)
+    ret ((var x ::= (var y).[Z.of_N n]; stm_e), add_local_fv (PS.remove x fvs_e) y, n_e)
   | Efun fnd e => Err "translate_body: nested function detected"
   (** [[f(ys)]] =
         ret_temp = call f with arguments ys;
@@ -468,8 +467,8 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
          add_local_fvs (PS.remove x fvs_e) ys, n_e)
   (** [[halt x]] = (store alloc and limit in tinfo; return x) *)
   | Ehalt x =>
-    ret ((tinfo->alloc :::= alloc;
-          tinfo->limit :::= limit;
+    ret ((tinfo->alloc ::= alloc;
+          tinfo->limit ::= limit;
           Sreturn (Some (var x))),
          add_local_fv PS.empty x, 0)%N
   end.
@@ -488,9 +487,9 @@ Definition make_fun (size : Z) (xs locals : list ident) (body : statement) : fun
              body.
 
 Definition init_shadow_stack_frame :=
-  frame.next :::= roots;
-  frame.root :::= roots;
-  frame.prev :::= tinfo->fp.
+  frame.next ::= roots;
+  frame.root ::= roots;
+  frame.prev ::= tinfo->fp.
 
 Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list definition) :=
   match fds with
@@ -525,17 +524,17 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
       let n_live_xs := N.of_nat (length live_xs_list) in
       let allocs := max_allocs e in
       let body :=
-        alloc_id ::= tinfo->alloc;
-        limit_id ::= tinfo->limit;
-        statements (map (fun '(x, i) => x ::= tinfo->args.[Z.of_N i]) (skipn n_param (combine xs locs)));
+        alloc ::= tinfo->alloc;
+        limit ::= tinfo->limit;
+        statements (map (fun '(x, i) => var x ::= tinfo->args.[Z.of_N i]) (skipn n_param (combine xs locs)));
         init_shadow_stack_frame;
         match allocs with 0 => Sskip | S _ as allocs =>
           create_space allocs
-            (statements (mapi (fun i x => roots.[i] :::= var x) 0 live_xs_list);
-             frame.next :::= roots +' c_int (Z.of_N n_live_xs) value;
-             tinfo->fp :::= &frame)
-            (statements (mapi (fun i x => x ::= roots.[i]) 0 live_xs_list);
-             tinfo->fp :::= frame.prev)
+            (statements (mapi (fun i x => roots.[i] ::= var x) 0 live_xs_list);
+             frame.next ::= roots +' c_int (Z.of_N n_live_xs) value;
+             tinfo->fp ::= &frame)
+            (statements (mapi (fun i x => var x ::= roots.[i]) 0 live_xs_list);
+             tinfo->fp ::= frame.prev)
         end;
         body
       in
@@ -567,8 +566,8 @@ Definition translate_program (fds_e : hoisted_exp) (nenv : name_env) : error (li
   funs <- translate_fundefs fds nenv ;;
   '(body, _, slots) <- translate_body (union_list PS.empty locals) nenv e ;;
   let body :=
-    alloc_id ::= tinfo->alloc;
-    limit_id ::= tinfo->limit;
+    alloc ::= tinfo->alloc;
+    limit ::= tinfo->limit;
     init_shadow_stack_frame;
     match max_allocs e with 0 => Sskip | S _ as allocs =>
       create_space (max_allocs e) Sskip Sskip
@@ -1093,21 +1092,12 @@ Proof.
   eapply exec_Sseq_1; [constructor|eauto].
 Qed.
 
-Lemma Cred_set env tenv m x a v s :
-  (env, tenv, m, a) ⇓ᵣ v ->
-  (env, tenv, m, (x ::= a; s)) --> (env, M.set x v tenv, m, s).
-Proof.
-  intros; intros ??? Hexec; unfold "⇓".
-  change Events.E0 with (Events.Eapp Events.E0 Events.E0).
-  eapply exec_Sseq_1; eauto; econstructor; eauto.
-Qed.
-
 Lemma Cred_assign env tenv m a1 a2 v_pre v b o m' s :
   (env, tenv, m, a1) ⇓ₗ (b, o) ->
   (env, tenv, m, a2) ⇓ᵣ v_pre ->
   sem_cast v_pre (typeof a2) (typeof a1) m = Some v ->
   assign_loc prog_genv (typeof a1) m b o v m' ->
-  (env, tenv, m, (a1 :::= a2; s)) --> (env, tenv, m', s).
+  (env, tenv, m, (a1 ::= a2; s)) --> (env, tenv, m', s).
 Proof.
   intros; intros ??? Hexec; unfold "⇓".
   change Events.E0 with (Events.Eapp Events.E0 Events.E0).

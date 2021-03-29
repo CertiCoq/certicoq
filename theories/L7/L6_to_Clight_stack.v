@@ -720,7 +720,7 @@ Definition body_decl : definition :=
 
 Definition make_defs fds_e cenv nenv : error (list definition) :=
   let global_defs := 
-    let gc_fn := EF_external "gc" (mksignature (ast_value :: nil) None cc_default) in
+    let gc_fn := EF_external "garbage_collect" (mksignature (ast_value :: nil) None cc_default) in
     (* let is_ptr_fn := EF_external "is_ptr" (mksignature (ast_value :: nil) None cc_default) in *)
     (gc_id, Gfun (External gc_fn (Tcons threadInf Tnil) Tvoid cc_default)) ::
     (* (isptr_id, Gfun (External is_ptr_fn (Tcons value Tnil) type_bool cc_default)) :: *)
@@ -811,6 +811,28 @@ Proof.
   - cbn; destruct (Coqlib.zeq j 0); [easy|now rewrite IHxs].
 Qed.
 
+Lemma get_ith_prefix {A} (vs ws : list A) i :
+  (i < #|vs|)%Z ->
+  get_ith (vs ++ ws) i = get_ith vs i.
+Proof.
+  revert i; induction vs as [|v vs IHvs]; intros i.
+  - cbn in *; intros H.
+    destruct (get_ith ws i) as [w|] eqn:Hget; [|auto].
+    apply get_ith_range in Hget; lia.
+  - cbn in *; destruct (Coqlib.zeq i 0) as [|Hne]; [now subst|intros H].
+    now rewrite IHvs; [|lia].
+Qed.
+
+Lemma get_ith_suffix {A} (vs ws : list A) i :
+  (#|vs| <= i)%Z ->
+  get_ith (vs ++ ws) i = get_ith ws (i - #|vs|).
+Proof.
+  revert i; induction vs as [|v vs IHvs]; intros i; cbn.
+  - now replace (Z.of_nat 0 + i)%Z with i by lia.
+  - destruct (Coqlib.zeq i 0) as [|Hne]; [now subst|intros H].
+    rewrite IHvs; [|lia]; f_equal; lia.
+Qed.
+
 Definition All := fold_right and True.
 Definition Ex := fold_right or False.
 Definition Bigcup {A} := fold_right (Union _) (Empty_set A).
@@ -837,29 +859,30 @@ Proof.
   intuition.
 Qed.
 
-Definition union_with {A} (f : A -> A -> A) (m1 m2 : PMap.t A) :=
-  (f (fst m1) (fst m2),
-   PTree.combine
-     (fun v1 v2 =>
-        match v1, v2 with
-        | Some v1, Some v2 => Some (f v1 v2)
-        | Some v, None | None, Some v => Some v
-        | None, None => None
-        end)
-     (snd m1) (snd m2)).
+Definition Forall2' {A B} (R : A -> B -> Prop) :=
+  fix go xs ys :=
+    match xs, ys with
+    | [], [] => True
+    | x :: xs, y :: ys => R x y /\ go xs ys
+    | _, _ => False
+    end.
 
-Lemma union_with_spec {A} (f : A -> A -> A) m1 m2 x :
-  (union_with f m1 m2) !! x =
-  match PTree.get x (snd m1), PTree.get x (snd m2) with
-  | Some v1, Some v2 => f v1 v2
-  | Some v, None | None, Some v => v
-  | None, None => f (fst m1) (fst m2)
-  end.
+Lemma Forall2'_spec {A B} (R : A -> B -> Prop) xs ys :
+  Forall2' R xs ys <-> Forall2 R xs ys.
 Proof.
-  unfold union_with, "!!"; cbn.
-  rewrite PTree.gcombine by auto.
-  now destruct (PTree.get x (snd m1)), (PTree.get x (snd m2)).
+  split; intros H.
+  - generalize dependent ys; induction xs as [|x xs IHxs];
+    destruct ys as [|y ys]; now inversion 1.
+  - induction H; now cbn.
 Qed.
+
+Definition Forall3 {A B C} (R : A -> B -> C -> Prop) :=
+  fix go xs ys zs :=
+    match xs, ys, zs with
+    | [], [], [] => True
+    | x :: xs, y :: ys, z :: zs => R x y z /\ go xs ys zs
+    | _, _, _ => False
+    end.
 (* TODO move the above lemmas/definitions to more proper places *)
 
 Variable (pr : prims).
@@ -1154,7 +1177,9 @@ Infix "↦" := Mapsto (at level 77).
 Infix "⋆" := Sepcon (at level 78, right associativity).
 Notation "'∃' x .. y , p" :=
   (Exists (fun x => .. (Exists (fun y => p)) ..))
-  (at level 200, x binder, y binder, right associativity).
+  (at level 78, x binder, y binder, right associativity).
+
+Definition mempty : mpred := Mem Mem.empty.
 
 Definition dom_mem (m : mem) : Ensemble address :=
   fun '(b, o) => Mem.perm m b o Max Nonempty.
@@ -1183,6 +1208,12 @@ where "m |=_{ S } P" := (mpred_denote_aux P S m).
 
 Definition mpred_denote (P : mpred) (m : mem) : Prop := m |=_{dom_mem m} P.
 Notation "m |= P" := (mpred_denote P m) (at level 79).
+
+Notation "P 'WITH' Q" := (∃ (_ : Q), P) (at level 78).
+Definition mpure (P : Prop) : mpred := ∃ m, Mem m WITH P.
+
+Definition contains P m := m |= P ⋆ mpure True.
+Infix "∈" := contains (at level 79).
 
 Ltac split_ands :=
   repeat match goal with |- _ /\ _ => split end.
@@ -1279,30 +1310,6 @@ Proof.
   destruct (Z_le_dec o1 o2).
   + specialize (H b1 o2); subst; cbn in *; superlia.
   + specialize (H b1 o1); subst; cbn in *; superlia.
-Qed.
-
-(* TODO hoist *)
-Lemma get_ith_prefix {A} (vs ws : list A) i :
-  (i < #|vs|)%Z ->
-  get_ith (vs ++ ws) i = get_ith vs i.
-Proof.
-  revert i; induction vs as [|v vs IHvs]; intros i.
-  - cbn in *; intros H.
-    destruct (get_ith ws i) as [w|] eqn:Hget; [|auto].
-    apply get_ith_range in Hget; lia.
-  - cbn in *; destruct (Coqlib.zeq i 0) as [|Hne]; [now subst|intros H].
-    now rewrite IHvs; [|lia].
-Qed.
-
-(* TODO hoist *)
-Lemma get_ith_suffix {A} (vs ws : list A) i :
-  (#|vs| <= i)%Z ->
-  get_ith (vs ++ ws) i = get_ith ws (i - #|vs|).
-Proof.
-  revert i; induction vs as [|v vs IHvs]; intros i; cbn.
-  - now replace (Z.of_nat 0 + i)%Z with i by lia.
-  - destruct (Coqlib.zeq i 0) as [|Hne]; [now subst|intros H].
-    rewrite IHvs; [|lia]; f_equal; lia.
 Qed.
 
 Lemma mapsto_app S b o vs ws m :
@@ -1424,6 +1431,49 @@ Lemma sepcon_comm P Q S m :
 Proof.
   cbn; split; intros [S1[S2[HS[HD[HP HQ]]]]]; exists S2, S1;
   rewrite HS; intuition (eauto||sets).
+Qed.
+
+Lemma unchanged_on_iff S1 S2 m m' :
+  S1 <--> S2 ->
+  Mem.unchanged_on (fun b o => S1 (b, o)) m m' <->
+  Mem.unchanged_on (fun b o => S2 (b, o)) m m'.
+Proof.
+  intros H; split; intros Hunchanged; eapply Mem.unchanged_on_implies;
+  eauto; cbn; intros; now apply H.
+Qed.
+
+Lemma mpred_Same_set P S1 S2 m :
+  S1 <--> S2 ->
+  m |=_{S1} P <-> m |=_{S2} P.
+Proof.
+  induction P as [[b o] vs|P IHP Q IHQ|A F IHF|m'']; cbn.
+  - intros ->; split; intros Hand; decompose [and] Hand; split_ands; sets.
+  - intros H; split; intros Hand; decompose [ex and] Hand.
+    + do 2 eexists; split_ands; eauto.
+      now rewrite <- H.
+    + do 2 eexists; split_ands; eauto; now rewrite H.
+  - intros H; split; intros [x Hx]; exists x; now specialize (IHF x).
+  - intros H. erewrite unchanged_on_iff; eauto. now rewrite H.
+Qed.
+
+Lemma dom_mem_empty : dom_mem Mem.empty <--> Empty_set _.
+Proof.
+  apply Ensemble_iff_In_iff; intros [b o].
+  unfold dom_mem, Mem.perm; cbn.
+  rewrite PMap.gi, In_Empty_set; now cbn.
+Qed.
+
+Lemma Sepcon_mempty P S m :
+  m |=_{S} P ⋆ mempty <-> m |=_{S} P.
+Proof.
+  cbn. split; [intros [S1 [S2 [HS [HD [HP [HS2 Hsame]]]]]] |intros Hm].
+  - rewrite dom_mem_empty, HS2 in *.
+    eapply mpred_Same_set; [|apply HP].
+    rewrite HS; sets.
+  - exists S, (Empty_set _); split_ands; eauto; sets.
+    + now rewrite dom_mem_empty.
+    + constructor; try solve [inversion 1].
+      unfold Coqlib.Ple; cbn; lia.
 Qed.
 
 Inductive is_frame : (mpred -> mpred) -> Prop :=
@@ -1610,7 +1660,7 @@ Proof.
 Qed.
 Opaque Mem.alloc.
 
-Lemma mpred_alloc P m lo hi :
+Lemma mpred_alloc' P m lo hi :
   m |= P -> fst (Mem.alloc m lo hi) |= P ⋆ Mem (alloc_alone m lo hi).
 Proof.
   intros Hm; cbn.
@@ -1622,29 +1672,6 @@ Proof.
     eapply Mem.alloc_unchanged_on; eauto.
   - sets.
   - apply alloc_alone_unchanged_on.
-Qed.
-
-Lemma unchanged_on_iff S1 S2 m m' :
-  S1 <--> S2 ->
-  Mem.unchanged_on (fun b o => S1 (b, o)) m m' <->
-  Mem.unchanged_on (fun b o => S2 (b, o)) m m'.
-Proof.
-  intros H; split; intros Hunchanged; eapply Mem.unchanged_on_implies;
-  eauto; cbn; intros; now apply H.
-Qed.
-
-Lemma mpred_Same_set P S1 S2 m :
-  S1 <--> S2 ->
-  m |=_{S1} P <-> m |=_{S2} P.
-Proof.
-  induction P as [[b o] vs|P IHP Q IHQ|A F IHF|m'']; cbn.
-  - intros ->; split; intros Hand; decompose [and] Hand; split_ands; sets.
-  - intros H; split; intros Hand; decompose [ex and] Hand.
-    + do 2 eexists; split_ands; eauto.
-      now rewrite <- H.
-    + do 2 eexists; split_ands; eauto; now rewrite H.
-  - intros H; split; intros [x Hx]; exists x; now specialize (IHF x).
-  - intros H. erewrite unchanged_on_iff; eauto. now rewrite H.
 Qed.
 
 Transparent Mem.free Mem.unchecked_free.
@@ -1667,7 +1694,7 @@ Qed.
 Opaque Mem.free Mem.unchecked_free.
 
 Transparent Mem.alloc.
-Lemma mpred_free P m b lo hi m_old m' :
+Lemma mpred_free' P m b lo hi m_old m' :
   b = Mem.nextblock m_old ->
   m |= P ⋆ Mem (alloc_alone m_old lo hi) ->
   Mem.free m b lo hi = Some m' ->
@@ -1697,11 +1724,6 @@ Proof.
 Qed.
 Opaque Mem.alloc.
 
-Definition vint (z : Z) : Values.val :=
-  if Archi.ptr64
-  then Vlong (Int64.repr z)
-  else Values.Vint (Int.repr z).
-
 Lemma mpred_Mem F P m m_inner :
   m_inner |= P ->
   m |= F (Mem m_inner) ->
@@ -1722,95 +1744,39 @@ Proof.
     split_ands; eauto.
 Qed.
 
-(*
-tenv ! alloc_id = Vptr nursery_b alloc_o ->
-tenv ! limit_id = Vptr nursery_b limit_o ->
-tenv ! tinfo_id = Vptr tinfo_b tinfo_o ->
-tenv ! frame_id = Vptr frame_b frame_o ->
-tenv ! roots_id = Vptr roots_b roots_o ->
-tenv ! args_id = Vptr args_b args_o ->
-(#|free_space| = (O.unsigned limit_o - O.unsigned alloc_o)/word_size)%Z ->
-nalloc = TODO ->
-is_shadow_stack shadow_stack rootss ->
-m ⊨
-  ((nursery_b, alloc_o) ↦ free_space) ::
-  ((tinfo_b, tinfo_o) ↦
-     (tinfo_alloc :: 
-      tinfo_limit :: 
-      Vptr heap_b heap_o ::
-      Vptr args_b args_o :: 
-      Vptr fp_b fp_o :: 
-      vint nalloc :: [])) ::
-  ((frame_b, frame_o) ↦ (frame_next :: (roots_b, roots_o) :: (fp_b, fp_o) :: [])) ::
-  ((roots_b, roots_o) ↦ roots) ::
-  ((args_b, args_o) ↦ args) ::
-  stack ++
-  shadow_stack ++
- * stuff allocated on nursery (writable)
- * gc_heap (readable)
- * gc_aux (nonempty)
- * c managed heap (readable)
- * frame m' (TODO)
-*)
-(** The Clight machine state looks as follows at function entry:
-      temporary environment
-        tinfo_id ↦ (tinfo_b, tinfo_o)
-        frame_id ↦ (frame_b, frame_o)
-        alloc_id ↦ (nursery_b, alloc_o)
-        limit_id ↦ (nursery_b, limit_o)
-        args_id ↦ (args_b, args_o)
-        roots_id ↦ (roots_b, roots_o)
-      memory
-        (tinfo_b, tinfo_b) ↦ [_, _, _, (args_b, args_o), (fp_b, fp_o), nalloc]
-        (nursery_b, alloc_o) ↦ [_ × (limit_o - alloc_o)]
-        (roots_b, roots_o) ↦ [_ × size]
-        (frame_b, frame_o) ↦ [_, _, _]
-        (args_b, args_o) ↦ [_ × max_args]
-    where
-      nalloc ≥ max_allocs(L6 term to execute)
-      size ≥ |FV(e)| for all subterms (let y = f(xs) in e) of the L6 term to execute
-    (Assuming that parameters have all been stored in temporary variables and that
-     alloc/limit/etc have been fetched from tinfo)
+Definition allocd b lo hi :=
+  ∃ m, Mem (alloc_alone m lo hi) WITH b = Mem.nextblock m.
 
-    During execution, the free space (nursery_b, [alloc_o, limit_o)) may shrink and
-    the temporary environment accumulates bindings for intermediate values.
+Lemma mpred_alloc P m b lo hi m' :
+  m |= P ->
+  Mem.alloc m lo hi = (m', b) ->
+  m' |= P ⋆ allocd b lo hi.
+Proof.
+  intros Hm Halloc; unfold allocd.
+  apply mpred_Ex; eauto with FrameDB.
+  exists m; apply mpred_Ex; eauto with FrameDB.
+  pose proof Halloc as Hb.
+  apply Mem.alloc_result in Hb; exists Hb.
+  replace m' with (fst (Mem.alloc m lo hi))
+    by (destruct (Mem.alloc m lo hi); now inv Halloc).
+  now apply mpred_alloc'.
+Qed.
 
-    Before calling a function f,
-    - tinfo is updated with the new alloc and limit
-    - values live across the call are pushed onto the shadow stack
-    - (skin n_param arguments) are stored in the args array at the indices specified by
-      f's calling convention
-    Now the state looks like (only relevant changes shown):
-      temp
-        ‥ bindings for intermediate values ‥
-      mem
-        (tinfo_b, tinfo_b) ↦ [(nursery_b, alloc_o), (nursery_b, limit_o), _, (args_b, args_o), (frame_b, frame_o), nalloc]
-        (roots_b, roots_o) ↦ [pushed Coq values ‥]
-        (frame_b, frame_o) ↦ [(roots_b, roots_o + |pushed Coq values|), (roots_b, roots_o), (fp_b, fp_o)]
-        (args_b, args_o) ↦ [‥ (skipn n_param ys) at indices specified by calling convention ‥]
+Lemma mpred_free P m b lo hi m' :
+  m |= P ⋆ allocd b lo hi ->
+  Mem.free m b lo hi = Some m' ->
+  m' |= P.
+Proof.
+  unfold allocd; intros Hm Hfree. 
+  apply mpred_Ex in Hm; eauto with FrameDB; destruct Hm as [m_old Hm].
+  apply mpred_Ex in Hm; eauto with FrameDB; destruct Hm as [Hb Hm].
+  eapply mpred_free'; eauto.
+Qed.
 
-    After calling f(ys):
-      mem
-        (tinfo_b, tinfo_b) ↦ [(nursery_b, alloc_o), (nursery_b, limit_o), _, (args_b, args_o), (frame_b, frame_o), nalloc]
-        (roots_b, roots_o) ↦ [pushed Coq values' ‥]
-        (frame_b, frame_o) ↦ [(roots_b, roots_o + |pushed Coq values'|), (roots_b, roots_o), (fp_b, fp_o)]
-        (args_b, args_o) ↦ [‥ f(ys) at index 1 ‥]
-      where
-        pushed Coq values' still represents the Coq values pushed before the call, but may have moved by GC
-    
-    After garbage collection and popping everything back out:
-      mem
-        (tinfo_b, tinfo_b) ↦ [(nursery_b, alloc_o), (nursery_b, limit_o), _, (args_b, args_o), (fp_b, fp_o), nalloc]
-        (nursery_b, alloc_o) ↦ [_ × (limit_o - alloc_o)]
-        (roots_b, roots_o) ↦ [_ × size]
-        (frame_b, frame_o) ↦ [_, _, _]
-        (args_b, args_o) ↦ [_ × max_args]
-
-    At each step, each of the segments listed under "mem" are mutually disjoint, and also disjoint from the CertiCoq heap.
-*)
-
-Notation "P 'where' Q" := (∃ (_ : Q), P) (at level 100).
-Definition mpure (P : Prop) : mpred := ∃ m, Mem m where P.
+Definition vint (z : Z) : Values.val :=
+  if Archi.ptr64
+  then Vlong (Int64.repr z)
+  else Values.Vint (Int.repr z).
 
 Definition stack_top (frame_addrs : list (block * ptrofs)) :=
   match frame_addrs with
@@ -1818,16 +1784,16 @@ Definition stack_top (frame_addrs : list (block * ptrofs)) :=
   | (b, o) :: _ => Vptr b o
   end.
 
-(** A shadow stack at addresses frame_addrs containing root arrays at addresses
+(** A shadow stack at addresses frame_addrs, containing root arrays at addresses
     root_addrs, containing values cvss. The addresses of each frame and root array
-    are made explicit so we can require that they be preserved across function calls
-    and GC. The values inside each root array are made explicit so we can relate them
-    to CertiCoq values. *)
+    are parameters instead of existentially quantified so we can require that they
+    be preserved across function calls and GC. The values inside each root array
+    are parameters so we can relate them to L6 values. *)
 Fixpoint shadow_stack
          (frame_addrs root_addrs : list (block * ptrofs))
          (cvss : list (list Values.val)) : mpred :=
   match frame_addrs, root_addrs, cvss with
-  | [], [], [] => mpure True
+  | [], [], [] => mempty
   | (f_b, f_o) :: frame_addrs, (r_b, r_o) :: root_addrs, rs :: cvss =>
     (f_b, O.unsigned f_o) ↦
       Vptr r_b (O.repr (O.unsigned r_o + #|rs|*word_size)) ::
@@ -1837,33 +1803,108 @@ Fixpoint shadow_stack
   | _, _, _ => mpure False
   end.
 
-(** A store is well-formed if it contains
+(** A mem is well-formed if it contains
     - A well-formed thread_info pointing to a nursery, args array, and shadow stack
-    - A CertiCoq heap that can be freely modified by GC *)
-Definition valid_mem tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs cvss : mpred :=
-  ∃ nursery_b alloc_o,
-  (∃ limit_o heap nalloc,
+    - A CertiCoq heap that can be freely modified by GC
+    - A frame, possibly containing "outliers" (memory outside of the GC heap that's
+      reachable from a root) and local variables *)
+Definition valid_mem
+           nursery_b alloc_o limit_o
+           tinfo_b tinfo_o
+           args frame_addrs root_addrs cvss nalloc frame : mpred :=
+  ∃ args_b args_o,
+  (∃ old_alloc old_limit heap,
    (tinfo_b, O.unsigned tinfo_o) ↦
-   (Vptr nursery_b alloc_o :: Vptr nursery_b limit_o :: heap ::
-    Vptr args_b args_o :: stack_top frame_addrs :: nalloc :: [])) ⋆
-  (∃ free_space, (nursery_b, O.unsigned alloc_o) ↦ free_space) ⋆
+   (old_alloc :: old_limit :: heap ::
+    Vptr args_b args_o :: stack_top frame_addrs :: vint nalloc :: [])) ⋆
+   (∃ free_space, (nursery_b, O.unsigned alloc_o) ↦ free_space
+    WITH #|free_space| = (O.unsigned limit_o - O.unsigned alloc_o)/word_size)%Z ⋆
   ((args_b, O.unsigned args_o) ↦ args) ⋆
   (shadow_stack frame_addrs root_addrs cvss) ⋆
-  (∃ gc_heap, Mem gc_heap).
-
-(* The state during the execution of an L6 program *)
-
-Axiom garbage_collect_spec : True (* TODO*).
+  (∃ gc_heap, Mem gc_heap) ⋆
+  frame.
 
 Notation "'match!' e1 'with' p 'in' e2" :=
   (match e1 with p => e2 | _ => False end)
   (at level 80, p pattern, e1 at next level, right associativity).
 
-(** * Logical relation between λ-ANF and Clight *)
+(** [has_shape m v cv] if nested constructor applications in v are well represented
+    in (m, cv), and if function values correspond to pointers. *)
+Fixpoint has_shape m v cv :=
+  match v, cv with
+  | Vint i, cv => cv = vint i
+  | Vconstr c vs, cv =>
+    match get_ctor_rep cenv c with
+    | Ret (enum t) => cv = vint (rep_unboxed t)
+    | Ret (boxed t a) =>
+      match! cv with Vptr b o in
+      exists cvs,
+      ((b, O.unsigned o - word_size) ↦ vint (rep_boxed t a) :: cvs) ∈ m /\
+      Forall2' (has_shape m) vs cvs
+    | _ => False
+    end
+  | Vfun ρ fds f, Vptr b o => True
+  | _, _ => False
+  end%Z.
+
+(** [compatible_shape m m' v cv cv'] if
+    - [has_shape m v cv],
+    - [has_shape m' v cv'],
+    - cv and cv' are exactly the same at function values *)
+Fixpoint compatible_shape m m' v cv cv' :=
+  match v, cv, cv' with
+  | Vint i, cv, cv' => cv = vint i /\ cv = cv'
+  | Vconstr c vs, cv, cv' =>
+    match get_ctor_rep cenv c with
+    | Ret (enum t) => cv = vint (rep_unboxed t) /\ cv = cv'
+    | Ret (boxed t a) =>
+      match! cv with Vptr b o in
+      match! cv' with Vptr b' o' in
+      exists cvs cvs',
+      ((b, O.unsigned o - word_size) ↦ vint (rep_boxed t a) :: cvs) ∈ m /\
+      ((b', O.unsigned o' - word_size) ↦ vint (rep_boxed t a) :: cvs') ∈ m' /\
+      Forall3 (compatible_shape m m') vs cvs cvs'
+    | _ => False
+    end
+  | Vfun ρ fds f, Vptr b o, Vptr b' o' => b = b' /\ o = o'
+  | _, _, _ => False
+  end%Z.
+
+Definition has_shapes m := Forall2 (Forall2 (has_shape m)).
+Definition compatible_shapes m m' := Forall3 (Forall3 (compatible_shape m m')).
+
+Axiom garbage_collect_spec :
+  forall tinfo_b tinfo_o frame_addrs root_addrs vss cvss nalloc frame m,
+  (** if m is a valid CertiCoq mem containing
+      - thread_info struct with nalloc = # of bytes to make available,
+      - shadow stack cvss representing L6 values vss, *)
+  m |= ∃ nursery_b alloc_o limit_o args,
+       valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
+                 args frame_addrs root_addrs cvss nalloc frame ->
+  has_shapes m vss cvss ->
+  (** then GC produces m', *)
+  exists m' limit_o alloc_o cvss',
+  Events.external_functions_sem
+    "garbage_collect"
+    (mksignature [ast_value] None cc_default) prog_genv
+    [Vptr tinfo_b tinfo_o] m Events.E0 Vundef m' /\
+  (** m' is a valid CertiCoq mem,
+      the thread_info's location stays the same,
+      the addresses of each shadow stack frame stay the same,
+      the nursery contains limit-alloc >= nalloc words of free space,
+      the shadow stack contains new contents cvss', *)
+  m' |= ∃ nursery_b args nalloc,
+        valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
+                  args frame_addrs root_addrs cvss' nalloc frame /\
+  ((O.unsigned limit_o - O.unsigned alloc_o)/word_size >= nalloc)%Z /\
+  (** and the contents of the new shadow stack still represents vss *)
+  compatible_shapes m m' vss cvss cvss'.
+
+(** * Logical relation between λ-ANF_CC and Clight *)
 
 Fixpoint closed_val (v : cps.val) :=
   match v with
-  | Vconstr c vs => fold_right (fun v P => closed_val v /\ P) True vs
+  | Vconstr c vs => All (map closed_val vs)
   | Vfun ρ fds f => M.bempty ρ = true
   | Vint _ => True
   end.
@@ -1881,53 +1922,27 @@ Section CycleBreakers.
 
 Context (rel_val : forall (k : nat) (v : cps.val) (m : Memory.mem) (cv : Values.val), Prop).
 
-Definition rel_shadow_stack k vss m cvss :=
-  Forall2 (Forall2 (fun v cv => rel_val k v m cv)) vss cvss.
-
 Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
-  forall v cin cout tinfo_b tinfo_o args_b args_o frame_addrs root_addrs vss frame,
+  forall v cin cout vss,
+  forall tinfo_b tinfo_o frame_addrs root_addrs cvss frame,
   (** if running e in environment ρ yields a value v in j <= k cost, *)
   to_nat cin <= k ->
   (ρ, e, cin) ⇓cps (v, cout) ->
-  (** and m is a valid CertiCoq memory with shadow stack cvss related to vss at level k, *)
-  m |=
-    (∃ args cvss, valid_mem tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs cvss
-     (* TODO: is this OK? Seems like it breaks monotonicity.
-
-        If not OK, could do the following:
-        Define a relation has_shape relating L6 values to Clight values:
-          has_shape m (Vint i) (vint ci) <-> i = ci
-          has_shape m (Vconstr c vs) (Vptr b o) <->
-            m contains cvs at (b, o) /\ Forall2 (has_shape m) vs cvs
-          has_shape m (Vfun rho fds f) (Vptr b o) <-> True
-        Define compatible_shapes relating L6 values two different Clight value-mem pairs:
-          compatible_shapes m m' (Vint i) (vint ci) (vint ci') <-> i = ci = ci'
-          compatible_shapes m m' (Vconstr c vs) (Vptr b o) (Vptr b' o') <->
-            m contains cvs at (b, o) /\ Forall2 (has_shape m) vs cvs /\
-            m' contains cvs' at (b', o') /\ Forall2 (has_shape m') vs cvs' /\
-            Forall3 (compatible_shapes m m') vs cvs cvs'
-          compatible_shapes m m' (Vfun rho fds f) (Vptr b o) (Vptr b' o') <->
-            (b, o) = (b', o')
-
-        Then, in here and in the axiomatization of the GC, only require
-          has_shape m vss cvss
-        and ensure
-          compatible_shapes m m' vss cvss cvss'.
-        
-        Separately, prove that compatible_shapes respects the value relation; i.e.
-          Forall2 (λ v cv ⇒ rel_val k v m cv) vss cvss ->
-          compatible_shapes vss cvss cvss' ->
-          Forall2 (λ v cv ⇒ rel_val k v m cv) vss cvss'. *)
-     where rel_shadow_stack k vss m cvss) ⋆
-    frame ->
+  (** and m is a valid CertiCoq memory with shadow stack cvss related to vss, *)
+  m |= ∃ nursery_b alloc_o limit_o args nalloc,
+       valid_mem nursery_b alloc_o limit_o
+                 tinfo_b tinfo_o
+                 args frame_addrs root_addrs cvss nalloc frame ->
+  has_shapes m vss cvss ->
   (** then running stmt yields a result (m', cv), *)
-  exists tenv' m' cv,
+  exists tenv' m' cv cvss',
   (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
-  (** m' is still a valid CertiCoq memory containing a shadow stack related to vss at level k, *)
-  m' |=
-    (∃ args cvss, valid_mem tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs cvss
-     where rel_shadow_stack k vss m' cvss) ⋆
-    frame /\
+  (** m' is still a valid CertiCoq memory with shadow stack cvss' compatible with cvss, *)
+  m' |= ∃ nursery_b alloc_o limit_o args nalloc,
+        valid_mem nursery_b alloc_o limit_o
+                  tinfo_b tinfo_o
+                  args frame_addrs root_addrs cvss' nalloc frame /\
+  compatible_shapes m m' vss cvss cvss' /\
   (** and cv is related to v at level k-j *)
   rel_val (k - to_nat cin) v m' cv.
 
@@ -1940,21 +1955,19 @@ Definition rel_val_aux (k : nat) :=
     | Ret (enum t) => cv = vint (rep_unboxed t)
     | Ret (boxed t a) =>
       match! cv with Vptr b o in
-      load m b (O.unsigned o + (-1)*word_size) = Some (vint (rep_boxed t a)) /\
-      let arg_ok i v :=
-        match! load m b (O.unsigned o + i*word_size) with Some cv in
-        go v m cv
-      in All (mapi arg_ok 0 vs)
+      exists cvs,
+      ((b, O.unsigned o - word_size) ↦ vint (rep_boxed t a) :: cvs) ∈ m /\
+      Forall2' (fun v cv => go v m cv) vs cvs
     | _ => False
-    end
+    end%Z
   | Vfun ρ fds f, Vptr b o =>
-    o = O.zero /\
+    match! M.bempty ρ with true in (* TODO: OK to assume closed? *)
     match! find_def f fds with Some (t, xs, e) in
     match! fenv ! f with Some (arity, indices) in
-    Genv.find_symbol prog_genv f = Some b /\
     match! Genv.find_funct prog_genv (Vptr b o) with Some fn in
-    forall j vs ρ_xvs cin cout,
-    forall cvs m tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs vss frame,
+    forall j vs ρ_xvs cin cout vss,
+    forall cvs m tinfo_b tinfo_o,
+    forall args frame_addrs root_addrs cvss frame,
     j < k ->
     match k with
     | 0 => True
@@ -1964,29 +1977,42 @@ Definition rel_val_aux (k : nat) :=
       let j := k-(k-j) in
       Forall2 (fun v cv => rel_val j v m cv) vs cvs ->
       (** and calling the L6 function with arguments xs↦vs yields v in i<=j steps, *)
-      set_lists xs vs (def_funs fds fds ρ ρ) = Some ρ_xvs ->
+      set_lists xs vs (def_funs fds fds (M.empty _) (M.empty _)) = Some ρ_xvs ->
       to_nat cin <= j ->
       (ρ_xvs, e, cin) ⇓cps (v, cout) ->
       (** then the corresponding C call evaluates to (m', cv), *)
-      let arg_ok i cv := load m args_b (O.unsigned args_o + Z.of_N i * word_size) = Some cv in
-      Forall2 arg_ok (skipn n_param indices) (skipn n_param cvs) ->
-      m |=
-        (∃ cvss, valid_mem tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs cvss
-         where rel_shadow_stack j vss m cvss) ⋆
-        frame ->
-      exists m' cv,
+      Forall2 (fun i cv => get_ith args (Z.of_N i) = Some cv)
+              (skipn n_param indices) (skipn n_param cvs) ->
+      m |= ∃ nursery_b alloc_o limit_o nalloc,
+           valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
+                     args frame_addrs root_addrs cvss nalloc frame ->
+      has_shapes m vss cvss ->
+      exists m' cv cvss',
       eval_funcall prog_genv m fn (Vptr tinfo_b tinfo_o :: firstn n_param cvs) Events.E0 m' cv /\
-      (** and m' is a valid mem, the addresses of the args array and each frame and root array in
-          the shadow stack are preserved across the call, the shadow stack is related to its L6
-          counterpart at level j, and the result cv is related to v at level (j - i) *)
-      m' |=
-        (∃ args cvss, valid_mem tinfo_b tinfo_o args_b args_o args frame_addrs root_addrs cvss
-         where rel_shadow_stack j vss m' cvss) ⋆
-        frame /\
+      (** and m' is still a valid CertiCoq memory, *)
+      m' |= ∃ nursery_b alloc_o limit_o args nalloc,
+            valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
+                      args frame_addrs root_addrs cvss' nalloc frame /\
+      compatible_shapes m m' vss cvss cvss' /\
+      (** and cv is related to v at level j-i *)
       rel_val (j - to_nat cin) v m' cv
     end
   | _, _ => False
   end.
+
+(* TODO:
+   Prove that compatible_shapes respects the value relation; i.e.
+     Forall2 (λ v cv ⇒ rel_val k v m cv) vss cvss ->
+     Forall3 (Forall3 (compatible_shapes m m')) vss cvss cvss' ->
+     Forall2 (λ v cv' ⇒ rel_val k v m' cv') vss cvss'.
+
+   Should be doable by induction on vss.
+   Case (Vconstr c vs) ∈ vss:
+     vs ~ (m', cvs) from vs ~ (m, cvs) and compatible m m' vs cvs
+   Case (Vfun rho fds f) ∈ vss:
+     Vfun rho fds f ~ (m, cv) <-> Vfun rho fds f ~ (m', cv)
+   because value relation doesn't mention m when relating function values.
+*)
 
 End CycleBreakers.
 
@@ -2000,22 +2026,15 @@ Definition rel_exp (k : nat) := fun '(ρ, e) '(env, tenv, m, stmt) =>
   rel_exp' (fun k v m cv => rel_val k v (m, cv)) k ρ e env tenv m stmt.
 Notation "e '~{' k '}' ce" := (rel_exp k e ce) (at level 80).
 
-(** L6 environments are related to (temp environment, heap) pairs wrt a set of identifiers S.
-
-    Note: we require all identifiers in ρ to be in the temp environment only.
-    The local environment env is used by the bigstep semantics to hold values for function parameters.
-    TODO To move these values into tenv, the code generator loads each parameter into a temporary on
-    function entry.
-
-    The reason env shows up at all, in rel_exp, is to support linking with hand-written C code.
-    Someone may want to prove that their C code implements an L6 function; the extra env parameter
-    will let them do that without having to rewrite their C code to put all function parameters
-    into temporaries before using them. *)
-Definition rel_env k := fun S ρ '(tenv, m) =>
+(** L6 environments are related to (environment, heap) pairs wrt a set of identifiers S. *)
+Definition rel_env k : _ -> _ -> Clight.env * _ -> _ := fun S ρ '(env, m) =>
   forall x, x \in S ->
   match! ρ!x with Some v in
-  match! tenv!x with Some cv in
-  v ~ᵥ{k} (m, cv).
+  let k b := match! load m b 0%Z with Some cv in v ~ᵥ{k} (m, cv) in
+  match env!x with
+  | Some (b, ty) => k b
+  | None => match! Genv.find_symbol prog_genv x with Some b in k b
+  end.
 Notation "ρ '~ₑ{' k ',' S '}' tenv" := (rel_env k S ρ tenv) (at level 80).
 Notation "ρ '~ₑ{' k '}' tenv" := (rel_env k (fun _ => True) ρ tenv) (at level 80).
 
@@ -2043,6 +2062,7 @@ Lemma rel_val_eqn k v m cv :
   rel_val k v (m, cv) = rel_val_aux (fun k v m cv => rel_val k v (m, cv)) k v m cv.
 Proof. now destruct k. Qed.
 
+(*
 Arguments Z.mul : simpl never.
 Lemma rel_val_antimon : forall j k v m cv,
   j <= k ->
@@ -2378,6 +2398,7 @@ Proof.
          (ρ, Ehalt x) ~{k} (env, tenv, m, Sskip) *)
     admit.
 Abort.
+*)
 *)
 
 End PROOF.

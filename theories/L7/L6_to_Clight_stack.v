@@ -208,12 +208,6 @@ Definition stack_decl size : list (ident * type) :=
   (frame_id, stack_frame) ::
   (roots_id, roots_ty size) :: nil.
 
-(** Each generated function body also declares the following local variables:
-      value *alloc;
-      value *limit; *)
-Definition alloc := Evar alloc_id (tptr value).
-Definition limit := Evar limit_id (tptr value).
-
 (* Variable (isptr_id : ident). (* ident for the is_ptr external function *) *)
 
 (** void garbage_collect(struct thread_info *tinfo);
@@ -232,9 +226,13 @@ Definition builtin_unreachable : statement :=
   let f := Evar builtin_unreachable_id (Tfunction Tnil Tvoid cc_default) in
   Scall None f nil.
 
-(** Each function declares a local variable
-      value ret;
-    for storing the results of tail calls. *)
+(** Each generated function body also declares the following temporary variables:
+      value *alloc;
+      value *limit;
+      value ret_id;
+    ret_id is used to store the results of tail calls. *)
+Definition alloc := Etempvar alloc_id (tptr value).
+Definition limit := Etempvar limit_id (tptr value).
 Variable (ret_id : ident).
 
 (** fun_ty n = value(struct thread_info *ti, value, .. min(n_param, n) times)
@@ -243,6 +241,9 @@ Definition value_tys (n : nat) : typelist := Nat.iter n (Tcons value) Tnil.
 Definition fun_ty (n : nat) := Tfunction (Tcons threadInf (value_tys (min n_param n))) value cc_default.
 Definition prim_ty (n : nat) := Tfunction (value_tys n) value cc_default.
 
+Declare Scope C_scope.
+Delimit Scope C_scope with C.
+
 Notation "'var' x" := (Evar x value) (at level 20).
 Notation "a '+'' b" := (Ebinop Oadd a b (tptr value)) (at level 30).
 Notation "a '-'' b" := (Ebinop Osub a b (tptr value)) (at level 30).
@@ -250,7 +251,7 @@ Notation "a '<'' b" := (Ebinop Olt a b type_bool) (at level 40).
 Notation "a '>>'' b" := (Ebinop Oshr a b value) (at level 30).
 Notation "a '&'' b" := (Ebinop Oand a b value) (at level 30).
 Notation "a '=='' b" := (Ebinop Oeq a b type_bool) (at level 40).
-Notation " p ';' q " := (Ssequence p q) (at level 100, format " p ';' '//' q ").
+Notation " p '.;' q " := (Ssequence p q) (at level 100, format " p '.;' '//' q ") : C_scope.
 Infix "::=" := Sset (at level 50).
 Infix ":::=" := Sassign (at level 50).
 Notation "'*' p " := (Ederef p value) (at level 40).
@@ -321,12 +322,12 @@ Definition make_fun_call (destination : ident) f ys :=
     else
       ret (statements
              (map (fun '(y, i) => tinfo->args.[Z.of_N i] :::= make_var y)
-                  (skipn n_param (combine ys inds)))%bool;
-           tinfo->alloc :::= alloc;
-           tinfo->limit :::= limit;
+                  (skipn n_param (combine ys inds)))%bool.;
+           tinfo->alloc :::= alloc.;
+           tinfo->limit :::= limit.;
            Scall (Some destination)
                  (Ecast (make_var f) (Tpointer (fun_ty (min arity n_param)) noattr))
-                 (tinfo :: map make_var (firstn n_param ys)))
+                 (tinfo :: map make_var (firstn n_param ys)))%C
   | None => Err "make_fun_call: unknown function application"
   end.
 
@@ -343,9 +344,9 @@ Definition make_cases (translate_body : exp -> error (statement * FVSet * N)) :=
       let n := N.max n_e n_l' in
       p <- get_ctor_rep c ;;
       match p with
-      | boxed t a => ret (LScons (Some (Z.of_N t)) (prog; Sbreak) ls, ls', fvs, n)
-      | enum t => ret (ls, LScons (Some (Z.of_N t)) (prog; Sbreak) ls', fvs, n)
-      end
+      | boxed t a => ret (LScons (Some (Z.of_N t)) (prog.; Sbreak) ls, ls', fvs, n)
+      | enum t => ret (ls, LScons (Some (Z.of_N t)) (prog.; Sbreak) ls', fvs, n)
+      end%C
     end.
 
 (** Use limit and alloc to check whether nursery contains n words of free space.
@@ -354,14 +355,14 @@ Definition create_space (n : nat) pre post : statement :=
   let n := c_int (Z.of_nat n) value in 
   Sifthenelse
     (limit -' alloc <' n)
-    (pre;
-     tinfo->alloc :::= alloc;
-     tinfo->limit :::= limit;
-     tinfo->nalloc :::= n;
-     Scall None gc (tinfo :: nil);
-     alloc_id ::= tinfo->alloc;
-     limit_id ::= tinfo->limit;
-     post)
+    (pre.;
+     tinfo->alloc :::= alloc.;
+     tinfo->limit :::= limit.;
+     tinfo->nalloc :::= n.;
+     Scall None gc (tinfo :: nil).;
+     alloc_id ::= tinfo->alloc.;
+     limit_id ::= tinfo->limit.;
+     post)%C
     Sskip.
 
 (** fvs ∪ ({x} ∩ locals) *)
@@ -388,13 +389,13 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
       match rep with
       | enum t => ret (x ::= make_tag rep)
       | boxed t a =>
-        ret (x ::= Ecast (alloc +' c_int 1 value) value;
-             alloc_id ::= alloc +' c_int (Z.of_N (a + 1)) value;
-             (var x).[-1] :::= make_tag rep;
+        ret (x ::= Ecast (alloc +' c_int 1 value) value.;
+             alloc_id ::= alloc +' c_int (Z.of_N (a + 1)) value.;
+             (var x).[-1] :::= make_tag rep.;
              statements (mapi (fun i y => (var x).[i] :::= make_var y) 0 ys))
       end ;;
     '(stm_e, fvs_e, n_e) <- translate_body e ;;
-    ret ((stm_constr; stm_e), add_local_fvs (PS.remove x fvs_e) ys, n_e)
+    ret ((stm_constr.; stm_e), add_local_fvs (PS.remove x fvs_e) ys, n_e)
   (** [[Ecase x cs]] = 
         if (isptr(x)) { switch on x[-1]&255 over boxed cases } 
         else { switch on x>>1 over unboxed cases } *)
@@ -427,23 +428,23 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
     call <- make_fun_call x f ys ;;
     let retrieve_roots xs := statements (mapi (fun i x => x ::= roots.[i]) 0 xs) in
     let stm :=
-      statements (mapi (fun i x => roots.[i] :::= var x) 0 live_minus_x_list);
-      frame.next :::= roots +' c_int n_live_minus_x value;
-      tinfo->fp :::= &frame;
-      call;
-      alloc_id ::= tinfo->alloc;
-      limit_id ::= tinfo->limit;
+      statements (mapi (fun i x => roots.[i] :::= var x) 0 live_minus_x_list).;
+      frame.next :::= roots +' c_int n_live_minus_x value.;
+      tinfo->fp :::= &frame.;
+      call.;
+      alloc_id ::= tinfo->alloc.;
+      limit_id ::= tinfo->limit.;
       match max_allocs e with 0 => Sskip | S _ as allocs =>
         if PS.mem x live_after_call then
           create_space allocs
-            (roots.[n_live_minus_x] :::= var x;
+            (roots.[n_live_minus_x] :::= var x.;
              frame.next :::= roots +' c_int (1 + n_live_minus_x) value)
             (x ::= roots.[n_live_minus_x])
         else
           create_space allocs Sskip Sskip
-      end;
-      retrieve_roots live_minus_x_list;
-      tinfo->fp :::= frame.prev;
+      end.;
+      retrieve_roots live_minus_x_list.;
+      tinfo->fp :::= frame.prev.;
       stm_e
     in
     ret (stm, add_local_fvs live_minus_x (f :: ys),
@@ -451,27 +452,27 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
   (** [[let x = y.n in e]] = (x = y[n]; [[e]]) *)
   | Eproj x t n y e =>
     '(stm_e, fvs_e, n_e) <- translate_body e ;;
-    ret ((x ::= (var y).[Z.of_N n]; stm_e), add_local_fv (PS.remove x fvs_e) y, n_e)
+    ret ((x ::= (var y).[Z.of_N n].; stm_e), add_local_fv (PS.remove x fvs_e) y, n_e)
   | Efun fnd e => Err "translate_body: nested function detected"
   (** [[f(ys)]] =
         ret_temp = call f with arguments ys;
         return ret_temp *)
   | Eapp f t ys =>
     call <- make_fun_call ret_id f ys ;;
-    ret ((call; Sreturn (Some (var ret_id))), add_local_fvs PS.empty (f :: ys), 0)%N
+    ret ((call.; Sreturn (Some (var ret_id))), add_local_fvs PS.empty (f :: ys), 0)%N
   (** [[let x = p(ys) in e]] = (x = p(ys); [[e]]) *)
   | Eprim x p ys e =>    
     '(stm_e, fvs_e, n_e) <- translate_body e ;;
-    ret ((Scall (Some x) (Evar p (prim_ty (length ys))) (map make_var ys);
+    ret ((Scall (Some x) (Evar p (prim_ty (length ys))) (map make_var ys).;
           stm_e),
          add_local_fvs (PS.remove x fvs_e) ys, n_e)
   (** [[halt x]] = (store alloc and limit in tinfo; return x) *)
   | Ehalt x =>
-    ret ((tinfo->alloc :::= alloc;
-          tinfo->limit :::= limit;
+    ret ((tinfo->alloc :::= alloc.;
+          tinfo->limit :::= limit.;
           Sreturn (Some (var x))),
          add_local_fv PS.empty x, 0)%N
-  end.
+  end%C.
 
 End Body.
 
@@ -487,9 +488,9 @@ Definition make_fun (size : Z) (xs locals : list ident) (body : statement) : fun
              body.
 
 Definition init_shadow_stack_frame :=
-  frame.next :::= roots;
-  frame.root :::= roots;
-  frame.prev :::= tinfo->fp.
+  (frame.next :::= roots.;
+   frame.root :::= roots.;
+   frame.prev :::= tinfo->fp)%C.
 
 Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list definition) :=
   match fds with
@@ -524,18 +525,18 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
       let n_live_xs := N.of_nat (length live_xs_list) in
       let allocs := max_allocs e in
       let body :=
-        alloc_id ::= tinfo->alloc;
-        limit_id ::= tinfo->limit;
-        statements (map (fun '(x, i) => x ::= tinfo->args.[Z.of_N i]) (skipn n_param (combine xs locs)));
-        init_shadow_stack_frame;
+        alloc_id ::= tinfo->alloc.;
+        limit_id ::= tinfo->limit.;
+        statements (map (fun '(x, i) => x ::= tinfo->args.[Z.of_N i]) (skipn n_param (combine xs locs))).;
+        init_shadow_stack_frame.;
         match allocs with 0 => Sskip | S _ as allocs =>
           create_space allocs
-            (statements (mapi (fun i x => roots.[i] :::= var x) 0 live_xs_list);
-             frame.next :::= roots +' c_int (Z.of_N n_live_xs) value;
+            (statements (mapi (fun i x => roots.[i] :::= var x) 0 live_xs_list).;
+             frame.next :::= roots +' c_int (Z.of_N n_live_xs) value.;
              tinfo->fp :::= &frame)
-            (statements (mapi (fun i x => x ::= roots.[i]) 0 live_xs_list);
+            (statements (mapi (fun i x => x ::= roots.[i]) 0 live_xs_list).;
              tinfo->fp :::= frame.prev)
-        end;
+        end.;
         body
       in
       let stack_slots :=
@@ -546,7 +547,7 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
       in
       ret ((f, Gfun (Internal (make_fun stack_slots xs locals body))) :: defs)
     end
-  end.
+  end%C.
 
 (** [[let rec fds in e]] =
       [[fds]]
@@ -566,13 +567,13 @@ Definition translate_program (fds_e : hoisted_exp) (nenv : name_env) : error (li
   funs <- translate_fundefs fds nenv ;;
   '(body, _, slots) <- translate_body (union_list PS.empty temps) nenv e ;;
   let body :=
-    alloc_id ::= tinfo->alloc;
-    limit_id ::= tinfo->limit;
-    init_shadow_stack_frame;
-    match max_allocs e with 0 => Sskip | S _ as allocs =>
-      create_space (max_allocs e) Sskip Sskip
-    end;
-    body
+    (alloc_id ::= tinfo->alloc.;
+     limit_id ::= tinfo->limit.;
+     init_shadow_stack_frame.;
+     match max_allocs e with 0 => Sskip | S _ as allocs =>
+       create_space (max_allocs e) Sskip Sskip
+     end.;
+     body)%C
   in
   let locals := stack_decl (Z.of_N slots) in
   let temps :=
@@ -1096,7 +1097,7 @@ Lemma Cred_trans s1 s2 s3 :
 Proof. destruct s1 as [[[??]?]?], s2 as [[[??]?]?], s3 as [[[??]?]?]; cbn; eauto. Qed.
 
 Lemma Cred_seq_assoc env tenv m s1 s2 s3 :
-  (env, tenv, m, ((s1; s2); s3)) --> (env, tenv, m, (s1; (s2; s3))).
+  (env, tenv, m, ((s1.; s2).; s3))%C --> (env, tenv, m, (s1.; (s2.; s3)))%C.
 Proof.
   intros tenv' m' v H; unfold "⇓" in *; inv H.
   - inv H10.
@@ -1106,7 +1107,7 @@ Proof.
 Qed.
 
 Lemma Cred_skip env tenv m s :
-  (env, tenv, m, (Sskip; s)) --> (env, tenv, m, s).
+  (env, tenv, m, (Sskip.; s))%C --> (env, tenv, m, s).
 Proof.
   intros tenv' m' v H; unfold "⇓".
   change Events.E0 with (Events.Eapp Events.E0 Events.E0).
@@ -1115,7 +1116,7 @@ Qed.
 
 Lemma Cred_set env tenv m x v a s :
   (env, tenv, m, a) ⇓ᵣ v ->
-  (env, tenv, m, (x ::= a; s)) --> (env, M.set x v tenv, m, s).
+  (env, tenv, m, (x ::= a.; s))%C --> (env, M.set x v tenv, m, s).
 Proof.
   intros; intros ??? Hexec; unfold "⇓".
   change Events.E0 with (Events.Eapp Events.E0 Events.E0).
@@ -1127,7 +1128,7 @@ Lemma Cred_assign env tenv m a1 a2 v_pre v b o m' s :
   (env, tenv, m, a2) ⇓ᵣ v_pre ->
   sem_cast v_pre (typeof a2) (typeof a1) m = Some v ->
   assign_loc prog_genv (typeof a1) m b o v m' ->
-  (env, tenv, m, (a1 :::= a2; s)) --> (env, tenv, m', s).
+  (env, tenv, m, (a1 :::= a2.; s))%C --> (env, tenv, m', s).
 Proof.
   intros; intros ??? Hexec; unfold "⇓".
   change Events.E0 with (Events.Eapp Events.E0 Events.E0).
@@ -1137,8 +1138,8 @@ Qed.
 Lemma Cred_if env tenv m a v b s1 s2 s :
   (env, tenv, m, a) ⇓ᵣ v ->
   bool_val v (typeof a) m = Some b ->
-  (env, tenv, m, (Sifthenelse a s1 s2; s)) -->
-  (env, tenv, m, ((if b then s1 else s2); s)).
+  (env, tenv, m, (Sifthenelse a s1 s2.; s))%C -->
+  (env, tenv, m, ((if b then s1 else s2).; s))%C.
 Proof.
   intros; intros ??? Hexec; unfold "⇓"; inv Hexec.
   - eapply exec_Sseq_1; eauto; econstructor; eauto.
@@ -1799,47 +1800,42 @@ Proof.
   eapply mpred_free'; eauto.
 Qed.
 
-(* TODO
-Definition local_word b (v : Values.val) :=
-  ∃ m m', Mem m'
-  WITH Some m' = store (alloc_alone m 0 word_size) b 0 v
-  WITH b = Mem.nextblock m.
-
-Search Mem.store list.
-Definition local_words b (v : list Values.val) :=
-  ∃ m m', Mem m'
-  WITH Some m' = store (alloc_alone m 0 word_size) b 0 v
-  WITH b = Mem.nextblock m.
-*)
-
 Definition vint (z : Z) : Values.val :=
   if Archi.ptr64
   then Vlong (Int64.repr z)
   else Values.Vint (Int.repr z).
 
-Definition stack_top (frame_addrs : list (block * ptrofs)) :=
-  match frame_addrs with
+(** The spine of the shadow stack contains a linked list of frame structs and root arrays.
+    Each root array has a fixed size, large enough to fit all the live variables at each GC. *)
+Record stack_frame_spine :=
+{ ss_frame : block * ptrofs;
+  ss_root : block * ptrofs;
+  ss_size : Z }.
+Definition stack_spine := list stack_frame_spine.
+
+Definition stack_top (ss : stack_spine) :=
+  match ss with
   | [] => Vnullptr
-  | (b, o) :: _ => Vptr b o
+  | {| ss_frame := (b, o) |} :: _ => Vptr b o
   end.
 
-(** A shadow stack at addresses frame_addrs, containing root arrays at addresses
-    root_addrs, containing values cvss. The addresses of each frame and root array
-    are parameters instead of existentially quantified so we can require that they
-    be preserved across function calls and GC. The values inside each root array
-    are parameters so we can relate them to L6 values. *)
-Fixpoint shadow_stack
-         (frame_addrs root_addrs : list (block * ptrofs))
-         (cvss : list (list Values.val)) : mpred :=
-  match frame_addrs, root_addrs, cvss with
-  | [], [], [] => mempty
-  | (f_b, f_o) :: frame_addrs, (r_b, r_o) :: root_addrs, rs :: cvss =>
-    (f_b, O.unsigned f_o) ↦_{Freeable}
-      Vptr r_b (O.repr (O.unsigned r_o + #|rs|*word_size)) ::
-      Vptr r_b r_o :: stack_top frame_addrs :: [] ⋆
-    (r_b, O.unsigned r_o) ↦_{Freeable} rs ⋆
-    shadow_stack frame_addrs root_addrs cvss
-  | _, _, _ => mpure False
+(** A frame of the shadow stack with spine [sp], next pointer [next], containing roots [cvs]. *)
+Definition shadow_stack_frame (sp : stack_frame_spine) (cvs : list Values.val) (next : Values.val) :=
+  let '{| ss_frame := (f_b, f_o); ss_root := (r_b, r_o); ss_size := n |} := sp in
+  (f_b, O.unsigned f_o) ↦_{Freeable}
+    [Vptr r_b (O.repr (O.unsigned r_o + #|cvs|*word_size));
+     Vptr r_b r_o;
+     next] ⋆
+  (∃ suffix, (r_b, O.unsigned r_o) ↦_{Freeable} cvs ++ suffix
+   WITH #|cvs ++ suffix| = n).
+
+(** A shadow stack with roots [cvss]. *)
+Fixpoint shadow_stack (ss : stack_spine) (cvss : list (list Values.val)) : mpred :=
+  match ss, cvss with
+  | [], [] => mempty
+  | fr :: ss, cvs :: cvss =>
+    shadow_stack_frame fr cvs (stack_top ss) ⋆ shadow_stack ss cvss
+  | _, _ => mpure False
   end.
 
 (** A mem is well-formed if it contains
@@ -1850,16 +1846,15 @@ Fixpoint shadow_stack
 Definition valid_mem
            nursery_b alloc_o limit_o
            tinfo_b tinfo_o
-           args frame_addrs root_addrs cvss nalloc frame : mpred :=
+           args ss cvss nalloc frame : mpred :=
   ∃ args_b args_o,
   (∃ old_alloc old_limit heap,
    (tinfo_b, O.unsigned tinfo_o) ↦_{Writable}
-   (old_alloc :: old_limit :: heap ::
-    Vptr args_b args_o :: stack_top frame_addrs :: vint nalloc :: [])) ⋆
+   [old_alloc; old_limit; heap; Vptr args_b args_o; stack_top ss; vint nalloc]) ⋆
    (∃ free_space, (nursery_b, O.unsigned alloc_o) ↦_{Writable} free_space
     WITH #|free_space| = (O.unsigned limit_o - O.unsigned alloc_o)/word_size)%Z ⋆
   ((args_b, O.unsigned args_o) ↦_{Writable} args) ⋆
-  (shadow_stack frame_addrs root_addrs cvss) ⋆
+  shadow_stack ss cvss ⋆
   (∃ gc_heap, Mem gc_heap) ⋆
   frame.
 
@@ -1913,13 +1908,13 @@ Definition has_shapes m := Forall2 (Forall2 (has_shape m)).
 Definition compatible_shapes m m' := Forall3 (Forall3 (compatible_shape m m')).
 
 Axiom garbage_collect_spec :
-  forall tinfo_b tinfo_o frame_addrs root_addrs vss cvss nalloc frame m,
+  forall tinfo_b tinfo_o vss ss cvss nalloc frame m,
   (** if m is a valid CertiCoq mem containing
       - thread_info struct with nalloc = # of bytes to make available,
       - shadow stack cvss representing L6 values vss, *)
   m |= ∃ nursery_b alloc_o limit_o args,
        valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                 args frame_addrs root_addrs cvss nalloc frame ->
+                 args ss cvss nalloc frame ->
   has_shapes m vss cvss ->
   (** then GC produces m', *)
   exists m' limit_o alloc_o cvss',
@@ -1929,12 +1924,12 @@ Axiom garbage_collect_spec :
     [Vptr tinfo_b tinfo_o] m Events.E0 Vundef m' /\
   (** m' is a valid CertiCoq mem,
       the thread_info's location stays the same,
-      the addresses of each shadow stack frame stay the same,
+      the shadow stack's spine stays the same,
       the nursery contains limit-alloc >= nalloc words of free space,
-      the shadow stack contains new contents cvss', *)
+      the shadow stack contains new roots cvss', *)
   m' |= ∃ nursery_b args nalloc,
         valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                  args frame_addrs root_addrs cvss' nalloc frame /\
+                  args ss cvss' nalloc frame /\
   ((O.unsigned limit_o - O.unsigned alloc_o)/word_size >= nalloc)%Z /\
   (** and the contents of the new shadow stack still represents vss *)
   compatible_shapes m m' vss cvss cvss'.
@@ -1947,6 +1942,19 @@ Fixpoint closed_val (v : cps.val) :=
   | Vfun ρ fds f => M.bempty ρ = true
   | Vint _ => True
   end.
+
+(* TODO
+Definition local_word b (v : Values.val) :=
+  ∃ m m', Mem m'
+  WITH Some m' = store (alloc_alone m 0 word_size) b 0 v
+  WITH b = Mem.nextblock m.
+
+Search Mem.store list.
+Definition local_words b (v : list Values.val) :=
+  ∃ m m', Mem m'
+  WITH Some m' = store (alloc_alone m 0 word_size) b 0 v
+  WITH b = Mem.nextblock m.
+*)
 
 Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
 
@@ -1963,7 +1971,7 @@ Context (rel_val : forall (k : nat) (v : cps.val) (m : Memory.mem) (cv : Values.
 
 Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
   forall v cin cout vss,
-  forall tinfo_b tinfo_o frame_addrs root_addrs cvss frame,
+  forall tinfo_b tinfo_o ss cvss frame,
   (** if running e in environment ρ yields a value v in j <= k cost, *)
   to_nat cin <= k ->
   (ρ, e, cin) ⇓cps (v, cout) ->
@@ -1971,7 +1979,7 @@ Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
   m |= ∃ nursery_b alloc_o limit_o args nalloc,
        valid_mem nursery_b alloc_o limit_o
                  tinfo_b tinfo_o
-                 args frame_addrs root_addrs cvss nalloc frame ->
+                 args ss cvss nalloc frame ->
   has_shapes m vss cvss ->
   (** then running stmt yields a result (m', cv), *)
   exists tenv' m' cv cvss',
@@ -1980,7 +1988,7 @@ Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
   m' |= ∃ nursery_b alloc_o limit_o args nalloc,
         valid_mem nursery_b alloc_o limit_o
                   tinfo_b tinfo_o
-                  args frame_addrs root_addrs cvss' nalloc frame /\
+                  args ss cvss' nalloc frame /\
   compatible_shapes m m' vss cvss cvss' /\
   (** and cv is related to v at level k-j *)
   rel_val (k - to_nat cin) v m' cv.
@@ -2006,7 +2014,7 @@ Definition rel_val_aux (k : nat) :=
     match! Genv.find_funct prog_genv (Vptr b o) with Some fn in
     forall j vs ρ_xvs cin cout vss,
     forall cvs m tinfo_b tinfo_o,
-    forall args frame_addrs root_addrs cvss frame,
+    forall args ss cvss frame,
     j < k ->
     match k with
     | 0 => True
@@ -2024,14 +2032,14 @@ Definition rel_val_aux (k : nat) :=
               (skipn n_param indices) (skipn n_param cvs) ->
       m |= ∃ nursery_b alloc_o limit_o nalloc,
            valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                     args frame_addrs root_addrs cvss nalloc frame ->
+                     args ss cvss nalloc frame ->
       has_shapes m vss cvss ->
       exists m' cv cvss',
       eval_funcall prog_genv m fn (Vptr tinfo_b tinfo_o :: firstn n_param cvs) Events.E0 m' cv /\
       (** and m' is still a valid CertiCoq memory, *)
       m' |= ∃ nursery_b alloc_o limit_o args nalloc,
             valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                      args frame_addrs root_addrs cvss' nalloc frame /\
+                      args ss cvss' nalloc frame /\
       compatible_shapes m m' vss cvss cvss' /\
       (** and cv is related to v at level j-i *)
       rel_val (j - to_nat cin) v m' cv

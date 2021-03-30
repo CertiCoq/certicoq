@@ -1177,11 +1177,11 @@ Qed.
 Definition address := (block * Z)%type.
 
 Inductive mpred :=
-(* TODO technically could be a derived form *)
 | Mapsto (bo : address) (p : permission) (vs : list Values.val)
 | Sepcon (P Q : mpred)
 | Exists {A} (F : A -> mpred)
-| Mem (m : mem).
+| Mem (m : mem)
+| Pure (P : Prop).
 Notation "bo '↦_{' p '}' vs" := (Mapsto bo p vs) (at level 77).
 Infix "⋆" := Sepcon (at level 78, right associativity).
 Notation "'∃' x .. y , p" :=
@@ -1213,6 +1213,7 @@ Fixpoint mpred_denote_aux (P : mpred) (S : Ensemble address) (m : mem) : Prop :=
     m |=_{S2} Q
   | Exists _ F => exists x, m |=_{S} F x
   | Mem m' => S <--> dom_mem m' /\ Mem.unchanged_on (fun b o => S (b, o)) m' m
+  | Pure P => P
   end
 where "m |=_{ S } P" := (mpred_denote_aux P S m).
 
@@ -1220,9 +1221,8 @@ Definition mpred_denote (P : mpred) (m : mem) : Prop := m |=_{dom_mem m} P.
 Notation "m |= P" := (mpred_denote P m) (at level 79).
 
 Notation "P 'WITH' Q" := (∃ (_ : Q), P) (at level 78).
-Definition mpure (P : Prop) : mpred := ∃ m, Mem m WITH P.
 
-Definition contains P m := m |= P ⋆ mpure True.
+Definition contains P m := m |= P ⋆ Pure True.
 Infix "∈" := contains (at level 79).
 
 Ltac split_ands :=
@@ -1406,7 +1406,7 @@ Lemma mpred_unchanged_on S P m m' :
   m |=_{S} P ->
   m' |=_{S} P.
 Proof.
-  revert S; induction P as [[b o] p vs|P IHP Q IHQ|A F IHF|m'']; cbn;
+  revert S; induction P as [[b o] p vs|P IHP Q IHQ|A F IHF|m''|Q]; cbn;
   intros S Hunchanged Hm.
   - destruct Hm as [Hperm[HS[?[Hload [??]]]]]; split_ands; auto.
     + destruct Hunchanged as [Hle Hperm' Haccess]; intros o' Ho'.
@@ -1426,6 +1426,7 @@ Proof.
   - destruct Hm as [x Hx]; eexists; eauto.
   - destruct Hm as [H Hunchanged']; split; [auto|].
     eapply Mem.unchanged_on_trans; eauto.
+  - auto.
 Qed.
 
 Lemma mapsto_store_sepcon S P b o p i v vs m m' :
@@ -1473,7 +1474,7 @@ Lemma mpred_Same_set P S1 S2 m :
   S1 <--> S2 ->
   m |=_{S1} P <-> m |=_{S2} P.
 Proof.
-  induction P as [[b o] vs|P IHP Q IHQ|A F IHF|m'']; cbn.
+  induction P as [[b o] vs|P IHP Q IHQ|A F IHF|m''|Q]; cbn.
   - intros ->; split; intros Hand; decompose [and] Hand; split_ands; sets.
   - intros H; split; intros Hand; decompose [ex and] Hand.
     + do 2 eexists; split_ands; eauto.
@@ -1481,6 +1482,7 @@ Proof.
     + do 2 eexists; split_ands; eauto; now rewrite H.
   - intros H; split; intros [x Hx]; exists x; now specialize (IHF x).
   - intros H. erewrite unchanged_on_iff; eauto. now rewrite H.
+  - tauto.
 Qed.
 
 Lemma dom_mem_empty : dom_mem Mem.empty <--> Empty_set _.
@@ -1534,7 +1536,17 @@ Proof.
   intuition (try (rewrite <- IHHF + rewrite IHHF + rewrite HPQ + rewrite <- HPQ); eauto).
 Qed.
 
-Ltac rewrite_entailment F H :=
+Lemma frame_entail F P Q S m :
+  is_frame F ->
+  (forall S', m |=_{S'} P -> m |=_{S'} Q) ->
+  m |=_{S} F P -> m |=_{S} F Q.
+Proof.
+  intros HF HPQ; revert S; induction HF; [auto|intros S..];
+  intros [S1 [S2 [HS [HD [HP HQ]]]]]; do 2 eexists;
+  intuition (try (rewrite <- IHHF + rewrite IHHF + rewrite HPQ + rewrite <- HPQ); eauto).
+Qed.
+
+Ltac rewrite_equiv F H :=
   rewrite (frame_cong F);
   [|eauto with FrameDB|intros; apply H].
 
@@ -1545,18 +1557,48 @@ Proof.
   intros HF; revert S; induction HF as [|F Q' HF IHF|F P' HF IHF|Q'|P']; intros S.
   - apply sepcon_comm.
   - rewrite !sepcon_assoc.
-    rewrite_entailment (fun H => F P ⋆ H) sepcon_comm.
-    rewrite_entailment (fun H => F Q ⋆ H) sepcon_comm.
+    rewrite_equiv (fun H => F P ⋆ H) sepcon_comm.
+    rewrite_equiv (fun H => F Q ⋆ H) sepcon_comm.
     rewrite <- !sepcon_assoc.
-    rewrite_entailment (fun H => H ⋆ Q') IHF.
-    now symmetry in IHF; rewrite_entailment (fun H => H ⋆ Q') IHF.
+    rewrite_equiv (fun H => H ⋆ Q') IHF.
+    now symmetry in IHF; rewrite_equiv (fun H => H ⋆ Q') IHF.
   - rewrite !sepcon_assoc.
-    now rewrite_entailment (fun H => F P' ⋆ H) sepcon_comm.
+    now rewrite_equiv (fun H => F P' ⋆ H) sepcon_comm.
   - rewrite !sepcon_assoc.
-    rewrite_entailment (fun H => P ⋆ H) sepcon_comm.
+    rewrite_equiv (fun H => P ⋆ H) sepcon_comm.
     now rewrite sepcon_comm, !sepcon_assoc.
   - rewrite !sepcon_assoc.
-    now rewrite_entailment (fun H => P' ⋆ H) sepcon_comm.
+    now rewrite_equiv (fun H => P' ⋆ H) sepcon_comm.
+Qed.
+
+Lemma mapsto_in_cons b o p v vs m :
+  (b, o) ↦_{p} v :: vs ∈ m ->
+  (b, o + word_size)%Z ↦_{p} vs ∈ m.
+Proof.
+  unfold "∈", "|=".
+  rewrite_equiv (fun H => H ⋆ Pure True) mapsto_cons.
+  rewrite sepcon_assoc.
+  rewrite sepcon_comm.
+  rewrite sepcon_assoc.
+  intros [S1 [S2 [HS [HD [Hm HTrue]]]]].
+  exists S1, S2; split_ands; auto; exact I.
+Qed.
+
+Lemma mapsto_unique b o p vs vs' m :
+  ((b, o) ↦_{p} vs) ∈ m ->
+  ((b, o) ↦_{p} vs') ∈ m ->
+  #|vs| = #|vs'| ->
+  vs = vs'.
+Proof.
+  revert b o vs'; induction vs as [|v vs IHvs]; intros b o vs'.
+  - destruct vs'; cbn; [auto|lia].
+  - destruct vs' as [|v' vs']; [cbn; lia|]; intros Hvs Hvs' Hlen; f_equal.
+    + cbn in *; decompose [ex and] Hvs; decompose [ex and] Hvs'.
+      now repeat match goal with H : forall (_ : Z), _ |- _ => try specialize (H 0%Z _ eq_refl); cbn in H end.
+    + apply mapsto_in_cons in Hvs.
+      apply mapsto_in_cons in Hvs'.
+      specialize (IHvs _ _ _ Hvs Hvs').
+      apply IHvs; cbn in *; lia.
 Qed.
 
 Lemma mpred_load S F b o p i v vs m :
@@ -1835,28 +1877,8 @@ Fixpoint shadow_stack (ss : stack_spine) (cvss : list (list Values.val)) : mpred
   | [], [] => mempty
   | fr :: ss, cvs :: cvss =>
     shadow_stack_frame fr cvs (stack_top ss) ⋆ shadow_stack ss cvss
-  | _, _ => mpure False
+  | _, _ => Pure False
   end.
-
-(** A mem is well-formed if it contains
-    - A well-formed thread_info pointing to a nursery, args array, and shadow stack
-    - A CertiCoq heap that can be freely modified by GC
-    - A frame, possibly containing "outliers" (memory outside of the GC heap that's
-      reachable from a root) and local variables *)
-Definition valid_mem
-           nursery_b alloc_o limit_o
-           tinfo_b tinfo_o
-           args ss cvss nalloc frame : mpred :=
-  ∃ args_b args_o,
-  (∃ old_alloc old_limit heap,
-   (tinfo_b, O.unsigned tinfo_o) ↦_{Writable}
-   [old_alloc; old_limit; heap; Vptr args_b args_o; stack_top ss; vint nalloc]) ⋆
-   (∃ free_space, (nursery_b, O.unsigned alloc_o) ↦_{Writable} free_space
-    WITH #|free_space| = (O.unsigned limit_o - O.unsigned alloc_o)/word_size)%Z ⋆
-  ((args_b, O.unsigned args_o) ↦_{Writable} args) ⋆
-  shadow_stack ss cvss ⋆
-  (∃ gc_heap, Mem gc_heap) ⋆
-  frame.
 
 Notation "'match!' e1 'with' p 'in' e2" :=
   (match e1 with p => e2 | _ => False end)
@@ -1895,6 +1917,7 @@ Fixpoint compatible_shape m m' v cv cv' :=
       match! cv with Vptr b o in
       match! cv' with Vptr b' o' in
       exists cvs cvs',
+      #|cvs| = #|vs| /\
       ((b, O.unsigned o - word_size) ↦_{Readable} vint (rep_boxed t a) :: cvs) ∈ m /\
       ((b', O.unsigned o' - word_size) ↦_{Readable} vint (rep_boxed t a) :: cvs') ∈ m' /\
       Forall3 (compatible_shape m m') vs cvs cvs'
@@ -1907,15 +1930,34 @@ Fixpoint compatible_shape m m' v cv cv' :=
 Definition has_shapes m := Forall2 (Forall2 (has_shape m)).
 Definition compatible_shapes m m' := Forall3 (Forall3 (compatible_shape m m')).
 
+(** A mem is well-formed if it contains
+    - A well-formed thread_info pointing to a nursery, args array, and shadow stack
+    - A CertiCoq heap that can be freely modified by GC
+    - A frame, possibly containing "outliers" (memory outside of the GC heap that's
+      reachable from a root) and local variables *)
+Definition valid_mem
+           nursery_b alloc_o limit_o
+           tinfo_b tinfo_o
+           args vss ss cvss nalloc outliers frame : mpred :=
+  ∃ args_b args_o,
+  (∃ old_alloc old_limit heap,
+   (tinfo_b, O.unsigned tinfo_o) ↦_{Writable}
+     [old_alloc; old_limit; heap; Vptr args_b args_o; stack_top ss; vint nalloc]) ⋆
+   (∃ free_space, (nursery_b, O.unsigned alloc_o) ↦_{Writable} free_space
+    WITH #|free_space| = (O.unsigned limit_o - O.unsigned alloc_o)/word_size)%Z ⋆
+  ((args_b, O.unsigned args_o) ↦_{Writable} args) ⋆
+  shadow_stack ss cvss ⋆
+  (∃ m, Mem m WITH (m |= (∃ gc_heap, Mem gc_heap) ⋆ outliers /\ has_shapes m vss cvss)) ⋆
+  frame.
+
 Axiom garbage_collect_spec :
-  forall tinfo_b tinfo_o vss ss cvss nalloc frame m,
+  forall tinfo_b tinfo_o vss ss cvss nalloc outliers frame m,
   (** if m is a valid CertiCoq mem containing
       - thread_info struct with nalloc = # of bytes to make available,
       - shadow stack cvss representing L6 values vss, *)
   m |= ∃ nursery_b alloc_o limit_o args,
        valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                 args ss cvss nalloc frame ->
-  has_shapes m vss cvss ->
+                 args vss ss cvss nalloc outliers frame ->
   (** then GC produces m', *)
   exists m' limit_o alloc_o cvss',
   Events.external_functions_sem
@@ -1929,7 +1971,7 @@ Axiom garbage_collect_spec :
       the shadow stack contains new roots cvss', *)
   m' |= ∃ nursery_b args nalloc,
         valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                  args ss cvss' nalloc frame /\
+                  args vss ss cvss' nalloc outliers frame /\
   ((O.unsigned limit_o - O.unsigned alloc_o)/word_size >= nalloc)%Z /\
   (** and the contents of the new shadow stack still represents vss *)
   compatible_shapes m m' vss cvss cvss'.
@@ -1965,33 +2007,9 @@ Definition bstep_res := fun '(ρ, e, cin) '(v, cout) =>
   bstep_fuel cenv ρ e cin (Res v) cout.
 Infix "⇓cps" := bstep_res (at level 80).
 
-Section CycleBreakers.
+Section ValueRelation.
 
 Context (rel_val : forall (k : nat) (v : cps.val) (m : Memory.mem) (cv : Values.val), Prop).
-
-Definition rel_exp' k (ρ : env) (e : cps.exp) env tenv m stmt : Prop :=
-  forall v cin cout vss,
-  forall tinfo_b tinfo_o ss cvss frame,
-  (** if running e in environment ρ yields a value v in j <= k cost, *)
-  to_nat cin <= k ->
-  (ρ, e, cin) ⇓cps (v, cout) ->
-  (** and m is a valid CertiCoq memory with shadow stack cvss related to vss, *)
-  m |= ∃ nursery_b alloc_o limit_o args nalloc,
-       valid_mem nursery_b alloc_o limit_o
-                 tinfo_b tinfo_o
-                 args ss cvss nalloc frame ->
-  has_shapes m vss cvss ->
-  (** then running stmt yields a result (m', cv), *)
-  exists tenv' m' cv cvss',
-  (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
-  (** m' is still a valid CertiCoq memory with shadow stack cvss' compatible with cvss, *)
-  m' |= ∃ nursery_b alloc_o limit_o args nalloc,
-        valid_mem nursery_b alloc_o limit_o
-                  tinfo_b tinfo_o
-                  args ss cvss' nalloc frame /\
-  compatible_shapes m m' vss cvss cvss' /\
-  (** and cv is related to v at level k-j *)
-  rel_val (k - to_nat cin) v m' cv.
 
 Definition rel_val_aux (k : nat) :=
   fix go (v : cps.val) (m : Memory.mem) (cv : Values.val) : Prop :=
@@ -2014,7 +2032,7 @@ Definition rel_val_aux (k : nat) :=
     match! Genv.find_funct prog_genv (Vptr b o) with Some fn in
     forall j vs ρ_xvs cin cout vss,
     forall cvs m tinfo_b tinfo_o,
-    forall args ss cvss frame,
+    forall args ss cvss outliers frame,
     j < k ->
     match k with
     | 0 => True
@@ -2032,14 +2050,13 @@ Definition rel_val_aux (k : nat) :=
               (skipn n_param indices) (skipn n_param cvs) ->
       m |= ∃ nursery_b alloc_o limit_o nalloc,
            valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                     args ss cvss nalloc frame ->
-      has_shapes m vss cvss ->
+                     args vss ss cvss nalloc outliers frame ->
       exists m' cv cvss',
       eval_funcall prog_genv m fn (Vptr tinfo_b tinfo_o :: firstn n_param cvs) Events.E0 m' cv /\
       (** and m' is still a valid CertiCoq memory, *)
       m' |= ∃ nursery_b alloc_o limit_o args nalloc,
             valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                      args ss cvss' nalloc frame /\
+                      args vss ss cvss' nalloc outliers frame /\
       compatible_shapes m m' vss cvss cvss' /\
       (** and cv is related to v at level j-i *)
       rel_val (j - to_nat cin) v m' cv
@@ -2047,17 +2064,16 @@ Definition rel_val_aux (k : nat) :=
   | _, _ => False
   end.
 
-End CycleBreakers.
+End ValueRelation.
 
 (** L6 values are related to (C value, heap) pairs *)
 Fixpoint rel_val (k : nat) := fun v '(m, cv) => 
   rel_val_aux (fun k v m cv => rel_val k v (m, cv)) k v m cv.
 Notation "v '~ᵥ{' k '}' cv" := (rel_val k v cv) (at level 80).
 
-(** L6 (environment, term) pairs are related to Clight (environment, heap, statement) triples *)
-Definition rel_exp (k : nat) := fun '(ρ, e) '(env, tenv, m, stmt) => 
-  rel_exp' (fun k v m cv => rel_val k v (m, cv)) k ρ e env tenv m stmt.
-Notation "e '~{' k '}' ce" := (rel_exp k e ce) (at level 80).
+Lemma rel_val_eqn k v m cv :
+  rel_val k v (m, cv) = rel_val_aux (fun k v m cv => rel_val k v (m, cv)) k v m cv.
+Proof. now destruct k. Qed.
 
 Definition rel_tenv k := fun S ρ '(tenv, m) =>
   forall x, x \in S ->
@@ -2075,6 +2091,28 @@ Definition rel_env k := fun S ρ '(env, m) =>
   | None => match! Genv.find_symbol prog_genv x with Some b in k b
   end.
 Notation "ρ '~ₑ{' k ',' S '}' envm" := (rel_env k S ρ envm) (at level 80).
+
+(** L6 (environment, term) pairs are related to Clight (environment, heap, statement) triples *)
+Definition rel_exp (k : nat) := fun '(ρ, e) '(env, tenv, m, stmt) => 
+  forall v cin cout vss,
+  forall nursery_b alloc_o limit_o tinfo_b tinfo_o ss cvss outliers frame,
+  (** if running e in environment ρ yields a value v in j <= k cost, *)
+  to_nat cin <= k ->
+  (ρ, e, cin) ⇓cps (v, cout) ->
+  (** and m is a valid CertiCoq memory with shadow stack cvss related to vss, *)
+  m |= ∃ args nalloc, valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
+                                args vss ss cvss nalloc outliers frame ->
+  (** then running stmt yields a result (m', cv), *)
+  exists tenv' m' cv cvss',
+  (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
+  (** m' is still a valid CertiCoq memory with shadow stack cvss' compatible with cvss, *)
+  m' |= ∃ nursery_b alloc_o limit_o args nalloc,
+        valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
+                  args vss ss cvss' nalloc outliers frame /\
+  compatible_shapes m m' vss cvss cvss' /\
+  (** and cv is related to v at level k-j *)
+  v ~ᵥ{k - to_nat cin} (m', cv).
+Notation "e '~{' k '}' ce" := (rel_exp k e ce) (at level 80).
 
 (** ** Antimonotonicity of the logical relation *)
 
@@ -2096,9 +2134,6 @@ Fixpoint sizeof_val v :=
   | Vfun ρ fds f => 1
   | Vint _ => 0
   end.
-Lemma rel_val_eqn k v m cv :
-  rel_val k v (m, cv) = rel_val_aux (fun k v m cv => rel_val k v (m, cv)) k v m cv.
-Proof. now destruct k. Qed.
 
 Arguments Z.mul : simpl never.
 Arguments Genv.find_funct : simpl never.
@@ -2129,7 +2164,7 @@ Proof.
     destruct (fenv ! f) as [[arity indices] |] eqn:Hindices; auto.
     destruct (Genv.find_funct _ _) as [fn|] eqn:Hfunct; auto.
     intros Hfuture_call * Hlt; destruct j; [easy|].
-    intros Hvs_ok Hρ_xvs Hfuel Hbstep Hrest_args Hm Hshapes.
+    intros Hvs_ok Hρ_xvs Hfuel Hbstep Hrest_args Hm.
     replace (j - (j - j0)) with j0 in * by lia.
     destruct k as [|k]; [lia|].
     specialize Hfuture_call with (j := j0).
@@ -2143,8 +2178,7 @@ Lemma rel_exp_antimon j k ρ e env tenv m stmt :
   (ρ, e) ~{k} (env, tenv, m, stmt) ->
   (ρ, e) ~{j} (env, tenv, m, stmt).
 Proof.
-  intros Hle Hk v; intros* Hcost Hbstep Hm Hshapes.
-  unfold rel_exp, rel_exp' in Hk.
+  intros Hle Hk v; intros* Hcost Hbstep Hm.
   edestruct Hk as [tenv' [m' [cv [cvss' H]]]]; try apply Hm; eauto; [lia|].
   decompose [and] H.
   exists tenv', m', cv, cvss'; split_ands; eauto.
@@ -2226,27 +2260,156 @@ Proof.
   - intros x Hx; inv Hx; [apply HS1|apply HS2]; easy.
 Qed.
 
-(* TODO:
-   Prove that compatible_shapes respects the value relation; i.e.
-     Forall2 (λ v cv ⇒ rel_val k v m cv) vss cvss ->
-     Forall3 (Forall3 (compatible_shapes m m')) vss cvss cvss' ->
-     Forall2 (λ v cv' ⇒ rel_val k v m' cv') vss cvss'.
+Lemma rel_val_fun_mem k ρ fds f m m' cv :
+  Vfun ρ fds f ~ᵥ{k} (m, cv) ->
+  Vfun ρ fds f ~ᵥ{k} (m', cv).
+Proof. rewrite !rel_val_eqn; intros H; exact H. Qed.
 
-   Should be doable by induction on vss.
-   Case (Vconstr c vs) ∈ vss:
-     vs ~ (m', cvs) from vs ~ (m, cvs) and compatible m m' vs cvs
-   Case (Vfun rho fds f) ∈ vss:
-     Vfun rho fds f ~ (m, cv) <-> Vfun rho fds f ~ (m', cv)
-   because value relation doesn't mention m when relating function values.
-*)
+Lemma rel_val_compatible_shape k m m' v cv cv' :
+  v ~ᵥ{k} (m, cv) ->
+  compatible_shape m m' v cv cv' ->
+  v ~ᵥ{k} (m', cv').
+Proof.
+  remember (sizeof_val v) as sv eqn:Hsv; generalize dependent v.
+  revert cv cv'; induction sv as [sv IHsv] using lt_wf_ind.
+  intros cv cv' [t vs|ρ fds f|i] Hsv.
+  - rewrite !rel_val_eqn; simpl.
+    destruct (get_ctor_rep _ _); auto.
+    destruct c as [t'|t' a]; auto; [intuition congruence|].
+    destruct cv; auto; destruct cv'; auto.
+    rename i into o, b0 into b', i0 into o'.
+    intros [cvs [Hvs Hvs_rel]] [cvs_ [cvs' [Hlen [Hcvs_ [Hcvs' Hcompat]]]]].
+    assert (Hcvs : cvs = cvs_).
+    { eapply mapsto_unique in Hvs; eauto; [now inv Hvs|].
+      cbn; do 2 f_equal.
+      rewrite Forall2'_spec in Hvs_rel; apply Forall2_length in Hvs_rel.
+      cbn in *; lia. }
+    subst cvs_; clear Hcvs_; exists cvs'; split; auto.
+    rewrite Forall2'_spec in *.
+    clear Hvs Hlen Hcvs'; generalize dependent sv.
+    revert cvs' Hcompat; induction Hvs_rel; intros cvs' Hcompat sv IHsv Hsv.
+    + destruct cvs'; inv Hcompat; constructor.
+    + destruct cvs' as [|cv' cvs']; [inv Hcompat|constructor].
+      * rewrite <- rel_val_eqn in *.
+        eapply IHsv; eauto; [|now inv Hcompat].
+        cbn in Hsv; lia.
+      * eapply IHHvs_rel with (sv := sizeof_val (Vconstr t l)); eauto; [now inv Hcompat|].
+        intros; eapply IHsv; eauto.
+        cbn in *; lia.
+  - cbn. destruct cv; auto; destruct cv'; auto.
+    intros Hfun [<- <-]; eapply rel_val_fun_mem; eauto.
+  - intros Hint [-> <-]; rewrite !rel_val_eqn in *; apply Hint.
+Qed.
+
+(* TODO hoist *)
+Lemma dom_mapsto_Decidable b o vs :
+  Decidable (dom_mapsto b o vs).
+Proof.
+  constructor; intros [b' o']; cbn.
+  destruct (Pos.eq_dec b b'); [|now right].
+  destruct (Z_le_dec o o'); [|now right].
+  destruct (Z_lt_dec o' (o + #|vs|*word_size))%Z; [|now right].
+  now left.
+Qed.
+Hint Resolve dom_mapsto_Decidable : DecidableDB.
+
+Lemma mapsto_in_unchanged b o p vs S m m' :
+  dom_mapsto b o vs \subset S ->
+  Mem.unchanged_on (fun b o => S (b, o)) m m' ->
+  (b, o) ↦_{p} vs ∈ m ->
+  (b, o) ↦_{p} vs ∈ m'.
+Proof.
+  intros Hdom Hsame [S1 [S2 [HS [HD [[Hperm [HS1 [Hwf [Hload Hbound]]]] _]]]]].
+  assert (Hdom_m' : dom_mapsto b o vs \subset dom_mem m').
+  { intros [b' o']; unfold In; intros Hbo'.
+    assert (b' = b) by (now cbn in Hbo'); subst b'.
+    destruct vs as [|v vs]; [cbn in Hbo'; lia|].
+    destruct Hsame; unfold dom_mem; rewrite <- unchanged_on_perm.
+    - unfold Mem.range_perm in Hperm.
+      apply Mem.perm_cur_max.
+      eapply Mem.perm_implies; [|apply perm_any_N].
+      apply Hperm. cbn in *. superlia.
+    - now apply Hdom.
+    - eapply Mem.perm_valid_block with (ofs := o).
+      apply Hperm. cbn in *. lia. }
+  exists (dom_mapsto b o vs), (dom_mem m' \\ dom_mapsto b o vs); split_ands; auto.
+  - rewrite <- Union_Setminus_Same_set; auto with DecidableDB; sets.
+  - sets.
+  - cbn; split_ands; auto; try lia; sets.
+    + unfold Mem.range_perm in *; intros o' Ho'.
+      destruct Hsame. rewrite <- unchanged_on_perm; auto.
+      * now apply Hdom.
+      * eapply Mem.perm_valid_block; eauto.
+    + intros i v Hget.
+      erewrite <- Hload; eauto.
+      eapply Mem.load_unchanged_on_1; eauto.
+      * eapply Mem.perm_valid_block with (ofs := o).
+        apply Hperm. destruct vs; [now cbn in Hget|cbn; superlia].
+      * cbn; intros; apply Hdom; unfold In; cbn; superlia.
+  - exact I.
+Qed.
+
+Lemma rel_val_mem_unchanged k v m m' cv :
+  Mem.unchanged_on (fun b o => dom_mem m (b, o)) m m' ->
+  v ~ᵥ{k} (m, cv) ->
+  v ~ᵥ{k} (m', cv).
+Proof.
+  intros Hunchanged.
+  remember (sizeof_val v) as sv eqn:Hsv; generalize dependent v.
+  revert cv; induction sv as [sv IHsv] using lt_wf_ind.
+  intros cv v Hsv Hrel.
+  destruct v as [t vs|ρ fds f|i].
+  - rewrite rel_val_eqn in *; simpl in Hrel|-*.
+    destruct (get_ctor_rep _ _) as [| [tag|tag a]]; auto.
+    destruct cv; auto; rename i into o.
+    destruct Hrel as [cvs [Hcvs Hrel_cvs]].
+    exists cvs; split.
+    + eapply mapsto_in_unchanged.
+      * apply Included_refl.
+      * eapply Mem.unchanged_on_implies; eauto.
+        cbn; intros b_ o' [<- Ho'] Hvalid.
+        cbn in Hcvs. decompose [ex and] Hcvs.
+        apply Mem.perm_cur_max.
+        eapply Mem.perm_implies; [|apply perm_any_N].
+        match goal with H : Mem.range_perm _ _ _ _ _ Readable |- _ => apply H end.
+        superlia.
+      * apply Hcvs.
+    + rewrite Forall2'_spec in *.
+      generalize dependent sv; clear Hcvs.
+      induction Hrel_cvs; intros sv IHsv Hsv; constructor.
+      * rewrite <- rel_val_eqn in *.
+        eapply IHsv; eauto; cbn in *; lia.
+      * unshelve eapply (IHHrel_cvs _ _ eq_refl).
+        intros; unshelve eapply (IHsv _ _ _ _ eq_refl); eauto.
+        cbn in *; lia.
+  - eapply rel_val_fun_mem; eauto.
+  - rewrite rel_val_eqn in *; now cbn in *.
+Qed.
+
+(* TODO hoist *)
+Lemma mpred_Mem_unchanged F m' S m :
+  is_frame F ->
+  m |=_{S} F (Mem m') ->
+  Mem.unchanged_on (fun b o => dom_mem m' (b, o)) m' m.
+Proof.
+  inversion 1.
+  { intros [Hm Hsame].
+    eapply Mem.unchanged_on_implies; eauto.
+    now intros; apply Hm. }
+  1: rewrite frame_swap_hole by auto.
+  all:
+    cbn; intros Hexand; decompose [ex and] Hexand; clear Hexand;
+    eapply Mem.unchanged_on_implies; eauto; intros;
+    now match goal with H : _ <--> dom_mem _ |- _ => rewrite Ensemble_iff_In_iff in H; rewrite H end.
+Qed.
 
 (** ** λ-ANF reductions preserve relatedness *)
 
 Ltac solve_rel_exp_reduction :=
-  unfold rel_exp, rel_exp'; intros Hweaker * Hk Hbstep Hm Hshapes;
+  intros Hsimpler v * Hk Hbstep Hm;
   inv Hbstep; match goal with | H : bstep _ _ _ _ _ _ |- _ => inv H end;
   rewrite to_nat_add in *;
-  edestruct Hweaker as [tenv' H]; try (decompose [ex and] H; clear H);
+  edestruct Hsimpler as [tenv' H]; try (decompose [ex and] H; clear H);
   try eassumption; try lia;
   do 4 eexists; split_ands; eauto;
   eapply rel_val_antimon; [|eauto]; lia.
@@ -2285,8 +2448,7 @@ Lemma rel_exp_app k ρ f t ys env tenv m stmt :
     (ρ_f_xvs, e) ~{k_f} (env, tenv, m, stmt)) ->
   (ρ, Eapp f t ys) ~{k} (env, tenv, m, stmt).
 Proof.
-  unfold rel_exp, rel_exp'.
-  intros Hsimpler * Hk Heval Hm Hshapes; inv Heval; inv H.
+  intros Hsimpler v * Hk Heval Hm; inv Heval; inv H.
   rewrite to_nat_add in *; specialize (one_app_nonzero f t ys).
   assert (to_nat cin0 <= k - 1) by lia.
   assert (Hk_f : exists k_f, k = S k_f) by (destruct k as [|k]; [|exists k]; lia).
@@ -2300,31 +2462,11 @@ Lemma rel_exp_prim k ρ x p ys e env tenv m stmt :
   (ρ, Eprim x p ys e) ~{k} (env, tenv, m, stmt).
 Proof. intros v * Hk Hrun; inv Hrun; inv H. Qed.
 
-(** ** Clight reductions preserve relatedness *)
-
-(*
-Lemma rel_exp_Cred env' tenv' m' stmt' k ρ e env tenv m stmt :
-  (env, tenv, m, stmt) --> (env', tenv', m', stmt') ->
-  (ρ, e) ~{k} (env', tenv', m', stmt') ->
-  (ρ, e) ~{k} (env, tenv, m, stmt).
-Proof.
-  unfold rel_exp; intros Hsimple_step Hrel v cin cout Hk Hbstep.
-  edestruct Hrel as [tenv'' [m'' [cv [cvss'' [Hstep2_after Hres]]]]]; eauto.
-  (do 3 eexists); eauto.
-Qed.
-
-(** Fully right-associate all [;]s *)
-Ltac norm_seq := repeat progress (eapply rel_exp_Cred; [apply Cred_seq_assoc|]).
-
-(** Step from _ ~{k} (env, tenv, m, s) to _ ~{k} (env, tenv', m', s')
-    using [lemma : (env, tenv, m, s) --> (env, tenv', m', s')] *)
-Ltac Cstep lemma := eapply rel_exp_Cred; [eapply lemma|].
-*)
-
 (** * Main theorem *)
 
 Arguments rel_val : simpl never.
 Arguments rel_exp : simpl never.
+Arguments rel_tenv : simpl never.
 Arguments rel_env : simpl never.
 
 Ltac normalize_occurs_free_in H :=
@@ -2333,6 +2475,7 @@ Ltac normalize_occurs_free_in H :=
 Lemma translate_body_stm locals nenv k : forall e,
   match translate_body cenv fenv locals nenv e with
   | Ret (stmt, _, _) => forall ρ env tenv m,
+    bound_var e \subset FromSet locals ->
     ρ ~ₜ{k, occurs_free e :&: FromSet locals} (tenv, m) ->
     ρ ~ₑ{k, occurs_free e \\ FromSet locals} (env, m) ->
     (* TODO: extra assumptions *)
@@ -2347,7 +2490,7 @@ Proof.
     bind_step rep Hrep; destruct rep as [t|t a]; rewrite bind_ret.
     + (* Unboxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros ρ env tenv m Htenv Henv.
+      intros* Hbv Htenv Henv.
       apply rel_exp_constr; intros vs Hget.
       admit.
       (*
@@ -2360,7 +2503,7 @@ Proof.
       apply rel_env_gss_sing; rewrite rel_val_eqn; cbn; now rewrite Hrep. *)
     + (* Boxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros ρ env tenv m Htenv Henv.
+      intros* Hbv Htenv Henv.
       apply rel_exp_constr; intros vs Hget.
       (*
       norm_seq; Cstep Cred_set.
@@ -2390,7 +2533,8 @@ Proof.
   - (* case x of { ces } *)
     rename v into x, l into ces; cbn.
     bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
-    intros* Htenv Henv; admit. (*Cstep Cred_if'.
+    intros* Hbv Htenv Henv.
+    admit. (*Cstep Cred_if'.
     { admit. }
     { admit. }
     revert boxed_cases unboxed_cases fvs_cs n_cs Hces ρ env tenv m Hρ.
@@ -2409,7 +2553,7 @@ Proof.
   - (* let x = Proj c n y in e *)
     rename v into x, v0 into y; cbn.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros* Htenv Henv; apply rel_exp_proj; intros* Hy Hproj.
+    intros* Hbv Htenv Henv; apply rel_exp_proj; intros* Hy Hproj.
     admit. (*
     Cstep Cred_set.
     { admit. }
@@ -2421,9 +2565,10 @@ Proof.
     apply rel_env_gss_sing.
     admit. *)
   - (* let x = f ft ys in e *)
-    rename v into x, v0 into f, f into ft, l into ys; cbn.
+    rename v into x, v0 into f, f into ft, l into ys; simpl.
     bind_step e' He; destruct e' as [[stm_e live_after_call] n_e].
-    bind_step call Hcall; intros* Htenv Henv.
+    bind_step call Hcall; intros* Hbv Htenv Henv.
+    intros v* Hk Hbstep Hm.
     admit. (*
     norm_seq.
     admit.
@@ -2437,14 +2582,14 @@ Proof.
   - (* let rec fds in e *) exact I.
   - (* f ft ys *)
     rename v into f, f into ft, l into ys; cbn.
-    bind_step call Hcall; intros* Htenv Henv.
+    bind_step call Hcall; intros* Hbv Htenv Henv.
     apply rel_exp_app; intros* -> Hfun Hget_ys Hfind_def Hset_lists.
     (* TODO: lemma about make_fun_call *)
     admit.
   - (* let x = Prim p ys in e *)
     rename v into x, l into ys; cbn.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros* Htenv Henv; apply rel_exp_prim.
+    intros* Hbv Htenv Henv; apply rel_exp_prim.
   - (* halt x *)
     rename v into x; cbn; intros* Hρ.
     admit. (*

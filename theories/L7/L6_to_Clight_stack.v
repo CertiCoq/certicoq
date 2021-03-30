@@ -1007,15 +1007,17 @@ Lemma max_ge_or m n p :
   N.to_nat (N.max m n) >= p <-> N.to_nat m >= p \/ N.to_nat n >= p.
 Proof. lia. Qed.
 
+Definition max_live locals e n :=
+  forall C x f t ys e', e = C |[ Eletapp x f t ys e' ]| ->
+  n >= PS.cardinal (PS.inter (exp_fv e') locals).
+
 Fixpoint translate_body_n_slots locals nenv e {struct e} :
   match translate_body cenv fenv locals nenv e with
-  | Ret (_, _, n_slots) =>
-    forall C x f t ys e', e = C |[ Eletapp x f t ys e' ]| ->
-    N.to_nat n_slots >= PS.cardinal (PS.inter (exp_fv e') locals)
+  | Ret (_, _, n_slots) => max_live locals e (N.to_nat n_slots)
   | _ => True
   end.
 Proof.
-  rename translate_body_n_slots into IHe; destruct e.
+  unfold max_live; rename translate_body_n_slots into IHe; destruct e.
   - cbn. bind_step rep Hrep.
     destruct rep as [t|t a]; rewrite bind_ret;
     bind_step result He; destruct result as [[? fvs_e] ?];
@@ -1064,8 +1066,6 @@ Variable (prog : program).
 
 (** Its global environment *)
 Let prog_genv : genv := globalenv prog.
-
-(** ** "Reductions" in machine state *)
 
 (** Bigstep evaluation of statements: unlike exec_stmt,
     - Force the trace to be empty
@@ -2092,28 +2092,6 @@ Definition rel_env k := fun S ρ '(env, m) =>
   end.
 Notation "ρ '~ₑ{' k ',' S '}' envm" := (rel_env k S ρ envm) (at level 80).
 
-(** L6 (environment, term) pairs are related to Clight (environment, heap, statement) triples *)
-Definition rel_exp (k : nat) := fun '(ρ, e) '(env, tenv, m, stmt) => 
-  forall v cin cout vss,
-  forall nursery_b alloc_o limit_o tinfo_b tinfo_o ss cvss outliers frame,
-  (** if running e in environment ρ yields a value v in j <= k cost, *)
-  to_nat cin <= k ->
-  (ρ, e, cin) ⇓cps (v, cout) ->
-  (** and m is a valid CertiCoq memory with shadow stack cvss related to vss, *)
-  m |= ∃ args nalloc, valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                                args vss ss cvss nalloc outliers frame ->
-  (** then running stmt yields a result (m', cv), *)
-  exists tenv' m' cv cvss',
-  (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
-  (** m' is still a valid CertiCoq memory with shadow stack cvss' compatible with cvss, *)
-  m' |= ∃ nursery_b alloc_o limit_o args nalloc,
-        valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                  args vss ss cvss' nalloc outliers frame /\
-  compatible_shapes m m' vss cvss cvss' /\
-  (** and cv is related to v at level k-j *)
-  v ~ᵥ{k - to_nat cin} (m', cv).
-Notation "e '~{' k '}' ce" := (rel_exp k e ce) (at level 80).
-
 (** ** Antimonotonicity of the logical relation *)
 
 (* TODO: hoist and maybe find better way to express this theorem *)
@@ -2171,18 +2149,6 @@ Proof.
     replace (k - (k - j0)) with j0 in Hfuture_call by lia.
     eapply Hfuture_call; eauto; lia.
   - auto.
-Qed.
-
-Lemma rel_exp_antimon j k ρ e env tenv m stmt :
-  j <= k ->
-  (ρ, e) ~{k} (env, tenv, m, stmt) ->
-  (ρ, e) ~{j} (env, tenv, m, stmt).
-Proof.
-  intros Hle Hk v; intros* Hcost Hbstep Hm.
-  edestruct Hk as [tenv' [m' [cv [cvss' H]]]]; try apply Hm; eauto; [lia|].
-  decompose [and] H.
-  exists tenv', m', cv, cvss'; split_ands; eauto.
-  eapply rel_val_antimon; [|eassumption]; lia.
 Qed.
 
 Lemma rel_tenv_antimon j k S ρ tenv m :
@@ -2403,95 +2369,78 @@ Proof.
     now match goal with H : _ <--> dom_mem _ |- _ => rewrite Ensemble_iff_In_iff in H; rewrite H end.
 Qed.
 
-(** ** λ-ANF reductions preserve relatedness *)
+Section TRANSLATE_BODY_CORRECT.
 
-Ltac solve_rel_exp_reduction :=
-  intros Hsimpler v * Hk Hbstep Hm;
-  inv Hbstep; match goal with | H : bstep _ _ _ _ _ _ |- _ => inv H end;
-  rewrite to_nat_add in *;
-  edestruct Hsimpler as [tenv' H]; try (decompose [ex and] H; clear H);
-  try eassumption; try lia;
-  do 4 eexists; split_ands; eauto;
-  eapply rel_val_antimon; [|eauto]; lia.
-
-Lemma rel_exp_constr k ρ x c ys e env tenv m stmt :
-  (forall vs,
-    get_list ys ρ = Some vs ->
-    (M.set x (Vconstr c vs) ρ, e) ~{k} (env, tenv, m, stmt)) ->
-  (ρ, Econstr x c ys e) ~{k} (env, tenv, m, stmt).
-Proof. solve_rel_exp_reduction. Qed.
-
-Lemma rel_exp_proj k ρ x c n y e env tenv m stmt :
-  (forall vs v,
-    ρ!y = Some (Vconstr c vs) ->
-    nthN vs n = Some v ->
-    (M.set x v ρ, e) ~{k} (env, tenv, m, stmt)) ->
-  (ρ, Eproj x c n y e) ~{k} (env, tenv, m, stmt).
-Proof. solve_rel_exp_reduction. Qed.
-
-Lemma rel_exp_case k ρ x ces env tenv m stmt :
-  (forall c vs n e,
-    ρ!x = Some (Vconstr c vs) ->
-    cps_util.caseConsistent cenv ces c ->
-    cps_util.find_tag_nth ces c e n ->
-    (ρ, e) ~{k} (env, tenv, m, stmt)) ->
-  (ρ, Ecase x ces) ~{k} (env, tenv, m, stmt).
-Proof. solve_rel_exp_reduction. Qed.
-
-Lemma rel_exp_app k ρ f t ys env tenv m stmt :
-  (forall k_f ρ_f fds f' vs xs e ρ_f_xvs,
-    k = S k_f ->
-    ρ!f = Some (Vfun ρ_f fds f') ->
-    get_list ys ρ = Some vs ->
-    find_def f' fds = Some (t, xs, e) ->
-    set_lists xs vs (def_funs fds fds ρ_f ρ_f) = Some ρ_f_xvs ->
-    (ρ_f_xvs, e) ~{k_f} (env, tenv, m, stmt)) ->
-  (ρ, Eapp f t ys) ~{k} (env, tenv, m, stmt).
-Proof.
-  intros Hsimpler v * Hk Heval Hm; inv Heval; inv H.
-  rewrite to_nat_add in *; specialize (one_app_nonzero f t ys).
-  assert (to_nat cin0 <= k - 1) by lia.
-  assert (Hk_f : exists k_f, k = S k_f) by (destruct k as [|k]; [|exists k]; lia).
-  destruct Hk_f as [k_f Heq].
-  edestruct Hsimpler as [tenv' [m' [cv [cvss' Hrest]]]]; eauto; try lia.
-  decompose [and] Hrest; exists tenv', m', cv, cvss'; split_ands; auto.
-  eapply rel_val_antimon; [|eauto]; lia.
-Qed.
-
-Lemma rel_exp_prim k ρ x p ys e env tenv m stmt :
-  (ρ, Eprim x p ys e) ~{k} (env, tenv, m, stmt).
-Proof. intros v * Hk Hrun; inv Hrun; inv H. Qed.
+Context (locals : FVSet).
 
 (** * Main theorem *)
 
 Arguments rel_val : simpl never.
-Arguments rel_exp : simpl never.
 Arguments rel_tenv : simpl never.
 Arguments rel_env : simpl never.
 
 Ltac normalize_occurs_free_in H :=
   eapply rel_env_antimon_S in H; [|normalize_occurs_free; apply Included_refl].
 
-Lemma translate_body_stm locals nenv k : forall e,
+Definition postcond env tenv m stmt P :=
+  exists tenv' m' cv,
+  (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
+  P tenv' m' cv.
+
+(* TODO lemmas like forward_set, forward_assign, ...
+   to step through generated code in proofs *)
+
+Lemma translate_body_stm nenv k : forall e,
   match translate_body cenv fenv locals nenv e with
-  | Ret (stmt, _, _) => forall ρ env tenv m,
+  | Ret (stmt, _, _) => 
+    (** if running e in environment ρ yields a value v in j <= k cost, *)
+    forall ρ v cin cout vss,
+    to_nat cin <= k ->
+    (ρ, e, cin) ⇓cps (v, cout) ->
+    (** and tenv+env contains bindings for alloc, limit, frame, roots, *)
+    forall env tenv m,
+    forall nursery_b alloc_o limit_o frame_b roots_b n_roots,
+    tenv ! alloc_id = Some (Vptr nursery_b alloc_o) ->
+    tenv ! limit_id = Some (Vptr nursery_b limit_o) ->
+    env ! frame_id = Some (frame_b, stack_frame) ->
+    env ! roots_id = Some (roots_b, roots_ty n_roots) ->
+    max_live locals e (Z.to_nat n_roots) ->
+    (** and environments agree on the free variables of e, *)
     bound_var e \subset FromSet locals ->
     ρ ~ₜ{k, occurs_free e :&: FromSet locals} (tenv, m) ->
     ρ ~ₑ{k, occurs_free e \\ FromSet locals} (env, m) ->
-    (* TODO: extra assumptions *)
-    (ρ, e) ~{k} (env, tenv, m, stmt)
+    (** and m is a valid CertiCoq memory with shadow stack cvss related to vss, *)
+    forall tinfo_b tinfo_o ss cvss outliers frame,
+    let frame :=
+      (∃ next_o, (frame_b, 0%Z) ↦_{Freeable}
+        [Vptr roots_b next_o; Vptr roots_b O.zero; stack_top ss]) ⋆
+      (∃ cvs, (roots_b, 0%Z) ↦_{Freeable} cvs WITH #|cvs| = n_roots) ⋆
+      frame
+    in
+    m |= ∃ args nalloc, valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
+                                  args vss ss cvss nalloc outliers
+                                  frame ->
+    (** then running stmt yields a result (m', cv), *)
+    exists tenv' m' cv,
+    (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
+    (** cv is related to v at level k-j, *)
+    v ~ᵥ{k - to_nat cin} (m', cv) /\
+    (** and m' is still a valid memory with shadow stack cvss' compatible with cvss *)
+    exists cvss',
+    m' |= ∃ nursery_b alloc_o limit_o args nalloc,
+          valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
+                    args vss ss cvss' nalloc outliers frame /\
+    compatible_shapes m m' vss cvss cvss'
   | _ => True
   end.
 Proof.
   (* TODO: induction on step index by not be necessary *)
   induction k as [k IHk] using lt_wf_ind; fix IHe 1; destruct e.
   - (* let x = Con c ys in e *)
-    rename v into x, l into ys; cbn.
+    rename v into x, l into ys; simpl.
     bind_step rep Hrep; destruct rep as [t|t a]; rewrite bind_ret.
     + (* Unboxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros* Hbv Htenv Henv.
-      apply rel_exp_constr; intros vs Hget.
       admit.
       (*
       Cstep Cred_set; [constructor|].
@@ -2503,8 +2452,7 @@ Proof.
       apply rel_env_gss_sing; rewrite rel_val_eqn; cbn; now rewrite Hrep. *)
     + (* Boxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros* Hbv Htenv Henv.
-      apply rel_exp_constr; intros vs Hget.
+      admit.
       (*
       norm_seq; Cstep Cred_set.
       { admit. }
@@ -2529,11 +2477,9 @@ Proof.
       { admit. }
       { admit. }
       { admit. } *)
-      admit.
   - (* case x of { ces } *)
-    rename v into x, l into ces; cbn.
+    rename v into x, l into ces; simpl.
     bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
-    intros* Hbv Htenv Henv.
     admit. (*Cstep Cred_if'.
     { admit. }
     { admit. }
@@ -2551,9 +2497,8 @@ Proof.
     + (* New case arm is boxed *)
       (* Same idea as in previous subcase *) admit. *)
   - (* let x = Proj c n y in e *)
-    rename v into x, v0 into y; cbn.
+    rename v into x, v0 into y; simpl.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros* Hbv Htenv Henv; apply rel_exp_proj; intros* Hy Hproj.
     admit. (*
     Cstep Cred_set.
     { admit. }
@@ -2567,8 +2512,7 @@ Proof.
   - (* let x = f ft ys in e *)
     rename v into x, v0 into f, f into ft, l into ys; simpl.
     bind_step e' He; destruct e' as [[stm_e live_after_call] n_e].
-    bind_step call Hcall; intros* Hbv Htenv Henv.
-    intros v* Hk Hbstep Hm.
+    bind_step call Hcall.
     admit. (*
     norm_seq.
     admit.
@@ -2581,17 +2525,16 @@ Proof.
        thus ρ is still related to the heap wrt fvs(e) and we can instantiate IHe accordingly *) *)
   - (* let rec fds in e *) exact I.
   - (* f ft ys *)
-    rename v into f, f into ft, l into ys; cbn.
-    bind_step call Hcall; intros* Hbv Htenv Henv.
-    apply rel_exp_app; intros* -> Hfun Hget_ys Hfind_def Hset_lists.
-    (* TODO: lemma about make_fun_call *)
+    rename v into f, f into ft, l into ys; simpl.
+    bind_step call Hcall.
     admit.
+    (* TODO: lemma about make_fun_call *)
   - (* let x = Prim p ys in e *)
-    rename v into x, l into ys; cbn.
+    rename v into x, l into ys; simpl.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros* Hbv Htenv Henv; apply rel_exp_prim.
+    admit.
   - (* halt x *)
-    rename v into x; cbn; intros* Hρ.
+    rename v into x; simpl.
     admit. (*
     norm_seq; Cstep Cred_assign.
     { admit. }
@@ -2609,6 +2552,8 @@ Proof.
          (ρ, Ehalt x) ~{k} (env, tenv, m, Sskip) *)
     admit. *)
 Abort.
+
+End TRANSLATE_BODY_CORRECT.
 
 End PROOF.
 

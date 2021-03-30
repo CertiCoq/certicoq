@@ -481,9 +481,9 @@ Definition make_fun (size : Z) (xs locals : list ident) (body : statement) : fun
   let make_decls := map (fun x => (x, value)) in
   mkfunction value cc_default
              ((tinfo_id, threadInf) :: make_decls (firstn n_param xs))
-             (make_decls (skipn n_param xs ++ locals) ++ stack_decl size ++
-              (alloc_id, tptr value) :: (limit_id, tptr value) :: (ret_id, value) :: [])%list
-             nil
+             (stack_decl size)%list
+             ((alloc_id, tptr value) :: (limit_id, tptr value) :: (ret_id, value) ::
+              make_decls (skipn n_param xs ++ locals))%list
              body.
 
 Definition init_shadow_stack_frame :=
@@ -562,9 +562,9 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
       } *)
 Definition translate_program (fds_e : hoisted_exp) (nenv : name_env) : error (list definition) :=
   let '(fds, e) := fds_e in
-  let locals := PS.elements (exp_bv e) in
+  let temps := PS.elements (exp_bv e) in
   funs <- translate_fundefs fds nenv ;;
-  '(body, _, slots) <- translate_body (union_list PS.empty locals) nenv e ;;
+  '(body, _, slots) <- translate_body (union_list PS.empty temps) nenv e ;;
   let body :=
     alloc_id ::= tinfo->alloc;
     limit_id ::= tinfo->limit;
@@ -574,15 +574,13 @@ Definition translate_program (fds_e : hoisted_exp) (nenv : name_env) : error (li
     end;
     body
   in
-  let locals :=
-    (map (fun x => (x, value)) locals ++
-     stack_decl (Z.of_N slots) ++ 
-     (alloc_id, tptr value) :: 
-     (limit_id, tptr value) :: 
-     (ret_id, value) :: 
-     [])%list
-  in
-  let fn := mkfunction value cc_default ((tinfo_id, threadInf) :: nil) locals nil body in
+  let locals := stack_decl (Z.of_N slots) in
+  let temps :=
+    (alloc_id, tptr value) :: 
+    (limit_id, tptr value) :: 
+    (ret_id, value) ::
+    map (fun x => (x, value)) temps in
+  let fn := mkfunction value cc_default ((tinfo_id, threadInf) :: nil) locals temps body in
   ret ((body_id, Gfun (Internal fn)) :: funs).
 
 End CODEGEN.
@@ -2002,7 +2000,7 @@ Definition rel_val_aux (k : nat) :=
     | _ => False
     end%Z
   | Vfun ρ fds f, Vptr b o =>
-    match! M.bempty ρ with true in (* TODO: OK to assume closed? *)
+    match! M.bempty ρ with true in
     match! find_def f fds with Some (t, xs, e) in
     match! fenv ! f with Some (arity, indices) in
     match! Genv.find_funct prog_genv (Vptr b o) with Some fn in
@@ -2041,20 +2039,6 @@ Definition rel_val_aux (k : nat) :=
   | _, _ => False
   end.
 
-(* TODO:
-   Prove that compatible_shapes respects the value relation; i.e.
-     Forall2 (λ v cv ⇒ rel_val k v m cv) vss cvss ->
-     Forall3 (Forall3 (compatible_shapes m m')) vss cvss cvss' ->
-     Forall2 (λ v cv' ⇒ rel_val k v m' cv') vss cvss'.
-
-   Should be doable by induction on vss.
-   Case (Vconstr c vs) ∈ vss:
-     vs ~ (m', cvs) from vs ~ (m, cvs) and compatible m m' vs cvs
-   Case (Vfun rho fds f) ∈ vss:
-     Vfun rho fds f ~ (m, cv) <-> Vfun rho fds f ~ (m', cv)
-   because value relation doesn't mention m when relating function values.
-*)
-
 End CycleBreakers.
 
 (** L6 values are related to (C value, heap) pairs *)
@@ -2067,17 +2051,22 @@ Definition rel_exp (k : nat) := fun '(ρ, e) '(env, tenv, m, stmt) =>
   rel_exp' (fun k v m cv => rel_val k v (m, cv)) k ρ e env tenv m stmt.
 Notation "e '~{' k '}' ce" := (rel_exp k e ce) (at level 80).
 
-(** L6 environments are related to (environment, heap) pairs wrt a set of identifiers S. *)
-Definition rel_env k : _ -> _ -> Clight.env * _ -> _ := fun S ρ '(env, m) =>
+Definition rel_tenv k := fun S ρ '(tenv, m) =>
+  forall x, x \in S ->
+  match! ρ!x with Some v in
+  match! tenv!x with Some cv in
+  v ~ᵥ{k} (m, cv).
+Notation "ρ '~ₜ{' k ',' S '}' tenvm" := (rel_tenv k S ρ tenvm) (at level 80).
+
+Definition rel_env k := fun S ρ '(env, m) =>
   forall x, x \in S ->
   match! ρ!x with Some v in
   let k b := match! load m b 0%Z with Some cv in v ~ᵥ{k} (m, cv) in
-  match env!x with
+  match env!x : option (_ * type) with
   | Some (b, ty) => k b
   | None => match! Genv.find_symbol prog_genv x with Some b in k b
   end.
-Notation "ρ '~ₑ{' k ',' S '}' tenv" := (rel_env k S ρ tenv) (at level 80).
-Notation "ρ '~ₑ{' k '}' tenv" := (rel_env k (fun _ => True) ρ tenv) (at level 80).
+Notation "ρ '~ₑ{' k ',' S '}' envm" := (rel_env k S ρ envm) (at level 80).
 
 (** ** Antimonotonicity of the logical relation *)
 
@@ -2103,8 +2092,8 @@ Lemma rel_val_eqn k v m cv :
   rel_val k v (m, cv) = rel_val_aux (fun k v m cv => rel_val k v (m, cv)) k v m cv.
 Proof. now destruct k. Qed.
 
-(*
 Arguments Z.mul : simpl never.
+Arguments Genv.find_funct : simpl never.
 Lemma rel_val_antimon : forall j k v m cv,
   j <= k ->
   v ~ᵥ{k} (m, cv) ->
@@ -2116,81 +2105,84 @@ Proof.
   remember (sizeof_val v) as sv eqn:Hsv; generalize dependent v.
   induction sv as [sv IHsv] using lt_wf_ind.
   intros v Hsv j m cv Hle.
-  rewrite !rel_val_eqn; destruct v as [t [|v vs] |ρ fds f|i].
-  - auto.
-  - cbn; destruct (get_ctor_rep _ _) as [| [tag|tag arity]] eqn:Hrep; auto.
+  rewrite !rel_val_eqn; destruct v as [t vs|ρ fds f|i].
+  - simpl; destruct (get_ctor_rep _ _) as [| [tag|tag arity]] eqn:Hrep; auto.
     destruct cv; auto.
-    intros [Hload Hforall]; split; [easy|].
-    change (_ /\ All (mapi ?f 1 _)) with (All (mapi f 0 (v :: vs))) in *.
-    pose proof @mapi_rel val Prop (fun P Q => P -> Q) and True as mapi_rel.
-    specialize mapi_rel with (i := 0%Z) (xs := v :: vs).
-    match goal with _ : All (mapi ?f' _ _) |- _ => specialize mapi_rel with (f := f') end.
-    match goal with |- All (mapi ?g' _ _) => specialize mapi_rel with (g := g') end.
-    apply mapi_rel; clear mapi_rel; [|tauto..].
-    intros i' x Hin.
-    destruct (load m b (O.unsigned i + i' * word_size))%Z; [|tauto].
-    rewrite <- !rel_val_eqn; eapply IHsv; auto.
-    subst sv; destruct Hin as [[] |Hin]; [cbn; lia|clear - Hin].
-    induction vs as [|v' vs IHvs]; [easy|].
-    destruct Hin as [[] |Hin]; [cbn; lia|cbn in *; specialize (IHvs Hin); lia].
+    intros [cvs [Hm Hrel]]; exists cvs; split; [easy|].
+    rewrite Forall2'_spec in *.
+    clear Hm; generalize dependent sv.
+    induction Hrel; intros sv IHsv Hsv; constructor.
+    + rewrite <- rel_val_eqn in *. eapply IHsv; eauto. cbn in Hsv; lia.
+    + eapply (IHHrel (sizeof_val (Vconstr t l))); eauto.
+      intros; eapply IHsv; eauto. cbn in *; lia.
   - simpl; destruct cv; auto.
+    destruct (M.bempty ρ); auto.
     destruct (find_def f fds) as [[[f' xs] e] |] eqn:Hfind; auto.
     destruct (fenv ! f) as [[arity indices] |] eqn:Hindices; auto.
-    intros [Hi_zero Hrest]; split; [easy|]; revert Hrest.
-    intros [Hfind_symbol Hrest]; split; [easy|]; revert Hrest.
-    admit. (* TODO *) (*
-    match goal with |- context [if ?e1 then ?e2 else ?e3] =>
-      change (if e1 then e2 else e3) with (Genv.find_funct prog_genv (Vptr b i));
-      destruct (Genv.find_funct prog_genv (Vptr b i)) as [[fn|] |] eqn:Hfind_funct; auto
-    end.
-    intros Hfuture_call; intros*; intros Hlt; destruct j; [easy|].
-    intros Hvs_firstn_ok Hcvs_firstn_ok Hvs_rest_ok Hcvs_rest_ok Hvs_related.
-    intros Hextend_ρ Hextend_args Hextend_locals Hentry.
+    destruct (Genv.find_funct _ _) as [fn|] eqn:Hfunct; auto.
+    intros Hfuture_call * Hlt; destruct j; [easy|].
+    intros Hvs_ok Hρ_xvs Hfuel Hbstep Hrest_args Hm Hshapes.
     replace (j - (j - j0)) with j0 in * by lia.
     destruct k as [|k]; [lia|].
     specialize Hfuture_call with (j := j0).
     replace (k - (k - j0)) with j0 in Hfuture_call by lia.
-    eapply Hfuture_call; eauto; lia. *)
+    eapply Hfuture_call; eauto; lia.
   - auto.
-Admitted.
+Qed.
 
-(*
 Lemma rel_exp_antimon j k ρ e env tenv m stmt :
   j <= k ->
   (ρ, e) ~{k} (env, tenv, m, stmt) ->
   (ρ, e) ~{j} (env, tenv, m, stmt).
 Proof.
-  intros Hle Hk v; intros* Hcost Hbstep Hm.
+  intros Hle Hk v; intros* Hcost Hbstep Hm Hshapes.
   unfold rel_exp, rel_exp' in Hk.
-  edestruct Hk as [tenv' [m' [cv H]]]; try apply Hm.
-  edestruct Hk as [tenv' [m' [cv [Hsteps Hres]]]]; eauto; [lia|].
-  exists tenv', m', cv; split; [eauto|].
+  edestruct Hk as [tenv' [m' [cv [cvss' H]]]]; try apply Hm; eauto; [lia|].
+  decompose [and] H.
+  exists tenv', m', cv, cvss'; split_ands; eauto.
   eapply rel_val_antimon; [|eassumption]; lia.
 Qed.
 
-Lemma rel_env_antimon j k S ρ tenv m :
+Lemma rel_tenv_antimon j k S ρ tenv m :
   j <= k ->
-  ρ ~ₑ{k, S} (tenv, m) ->
-  ρ ~ₑ{j, S} (tenv, m).
+  ρ ~ₜ{k, S} (tenv, m) ->
+  ρ ~ₜ{j, S} (tenv, m).
 Proof.
   intros Hle Hk x Hx; specialize (Hk x Hx).
   destruct (ρ ! x); [|easy].
   destruct (tenv ! x); [eapply rel_val_antimon; eauto|easy].
 Qed.
 
-Lemma rel_env_antimon_S k S1 S2 ρ tenv m :
+Lemma rel_env_antimon j k S ρ env m :
+  j <= k ->
+  ρ ~ₑ{k, S} (env, m) ->
+  ρ ~ₑ{j, S} (env, m).
+Proof.
+  intros Hle Hk x Hx; specialize (Hk x Hx).
+  destruct (ρ ! x); [|easy]; lazy zeta in *.
+  destruct (env ! x) as [[b _] |]; [|destruct (Genv.find_symbol _ _); [|easy]].
+  all: destruct (load _ _ _); [eapply rel_val_antimon; eauto|easy].
+Qed.
+
+Lemma rel_tenv_antimon_S k S1 S2 ρ tenv m :
   S1 \subset S2 ->
-  ρ ~ₑ{k, S2} (tenv, m) ->
-  ρ ~ₑ{k, S1} (tenv, m).
+  ρ ~ₜ{k, S2} (tenv, m) ->
+  ρ ~ₜ{k, S1} (tenv, m).
+Proof. intros Hle Hk x Hx; now apply Hk, Hle. Qed.
+
+Lemma rel_env_antimon_S k S1 S2 ρ env m :
+  S1 \subset S2 ->
+  ρ ~ₑ{k, S2} (env, m) ->
+  ρ ~ₑ{k, S1} (env, m).
 Proof. intros Hle Hk x Hx; now apply Hk, Hle. Qed.
 
 (** ** Lemmas about the environment relation *)
 
-Lemma rel_env_gss k S x v cv ρ tenv m :
+Lemma rel_tenv_gss k S x v cv ρ tenv m :
   x \in S ->
   v ~ᵥ{k} (m, cv) ->
-  ρ ~ₑ{k, S \\ [set x]} (tenv, m) ->
-  M.set x v ρ ~ₑ{k, S} (M.set x cv tenv, m).
+  ρ ~ₜ{k, S \\ [set x]} (tenv, m) ->
+  M.set x v ρ ~ₜ{k, S} (M.set x cv tenv, m).
 Proof.
   intros Hin Hv Hρ x' Hx'.
   destruct (M.elt_eq x x') as [Heq|Hne]; [subst x'; now rewrite !M.gss|].
@@ -2198,42 +2190,57 @@ Proof.
   apply Hρ; constructor; [auto|now inversion 1].
 Qed.
 
-Lemma rel_env_gss_sing k x v cv ρ tenv m :
+Lemma rel_tenv_gss_sing k x v cv ρ tenv m :
   v ~ᵥ{k} (m, cv) ->
-  M.set x v ρ ~ₑ{k, [set x]} (M.set x cv tenv, m).
+  M.set x v ρ ~ₜ{k, [set x]} (M.set x cv tenv, m).
 Proof.
   intros Hv x' Hx'.
   destruct (M.elt_eq x x') as [Heq|Hne]; [|now inv Hx'].
   subst x'; now rewrite !M.gss.
 Qed.
 
-Lemma rel_env_gso k S x v cv ρ tenv m :
+Lemma rel_tenv_gso k S x v cv ρ tenv m :
   ~ x \in S ->
-  ρ ~ₑ{k, S} (tenv, m) ->
-  M.set x v ρ ~ₑ{k, S} (M.set x cv tenv, m).
+  ρ ~ₜ{k, S} (tenv, m) ->
+  M.set x v ρ ~ₜ{k, S} (M.set x cv tenv, m).
 Proof.
   intros Hin Hρ x' Hx'.
   destruct (M.elt_eq x x') as [Heq|Hne]; [easy|].
   rewrite !M.gso by auto. now apply Hρ.
 Qed.
 
-Lemma rel_env_union k S1 S2 ρ tenv m :
-  ρ ~ₑ{k, S1 :|: S2} (tenv, m) <->
-  ρ ~ₑ{k, S1} (tenv, m) /\ ρ ~ₑ{k, S2} (tenv, m).
+Lemma rel_tenv_union k S1 S2 ρ tenv m :
+  ρ ~ₜ{k, S1 :|: S2} (tenv, m) <->
+  ρ ~ₜ{k, S1} (tenv, m) /\ ρ ~ₜ{k, S2} (tenv, m).
 Proof.
   split; [intros HS12|intros [HS1 HS2]].
   - split; intros x Hx; now apply HS12.
   - intros x Hx; inv Hx; [apply HS1|apply HS2]; easy.
 Qed.
 
+(* TODO:
+   Prove that compatible_shapes respects the value relation; i.e.
+     Forall2 (λ v cv ⇒ rel_val k v m cv) vss cvss ->
+     Forall3 (Forall3 (compatible_shapes m m')) vss cvss cvss' ->
+     Forall2 (λ v cv' ⇒ rel_val k v m' cv') vss cvss'.
+
+   Should be doable by induction on vss.
+   Case (Vconstr c vs) ∈ vss:
+     vs ~ (m', cvs) from vs ~ (m, cvs) and compatible m m' vs cvs
+   Case (Vfun rho fds f) ∈ vss:
+     Vfun rho fds f ~ (m, cv) <-> Vfun rho fds f ~ (m', cv)
+   because value relation doesn't mention m when relating function values.
+*)
+
 (** ** λ-ANF reductions preserve relatedness *)
 
 Ltac solve_rel_exp_reduction :=
-  unfold rel_exp, rel_exp'; intros Hweaker v cin cout Hk Hbstep;
+  unfold rel_exp, rel_exp'; intros Hweaker * Hk Hbstep Hm Hshapes;
   inv Hbstep; match goal with | H : bstep _ _ _ _ _ _ |- _ => inv H end;
   rewrite to_nat_add in *;
-  edestruct Hweaker as [tenv' [m' [cv [Hstep Hresult]]]]; [idtac..|eassumption|]; [idtac..|lia|]; eauto;
-  do 3 eexists; split; eauto;
+  edestruct Hweaker as [tenv' H]; try (decompose [ex and] H; clear H);
+  try eassumption; try lia;
+  do 4 eexists; split_ands; eauto;
   eapply rel_val_antimon; [|eauto]; lia.
 
 Lemma rel_exp_constr k ρ x c ys e env tenv m stmt :
@@ -2270,29 +2277,31 @@ Lemma rel_exp_app k ρ f t ys env tenv m stmt :
     (ρ_f_xvs, e) ~{k_f} (env, tenv, m, stmt)) ->
   (ρ, Eapp f t ys) ~{k} (env, tenv, m, stmt).
 Proof.
-  intros Hsimpler v cin cout Hk Heval; inv Heval; inv H.
+  unfold rel_exp, rel_exp'.
+  intros Hsimpler * Hk Heval Hm Hshapes; inv Heval; inv H.
   rewrite to_nat_add in *; specialize (one_app_nonzero f t ys).
   assert (to_nat cin0 <= k - 1) by lia.
   assert (Hk_f : exists k_f, k = S k_f) by (destruct k as [|k]; [|exists k]; lia).
   destruct Hk_f as [k_f Heq].
-  edestruct Hsimpler as [tenv' [m' [cv [Heval' Hresult]]]]; eauto; try lia.
-  exists tenv', m', cv; split; [auto|].
+  edestruct Hsimpler as [tenv' [m' [cv [cvss' Hrest]]]]; eauto; try lia.
+  decompose [and] Hrest; exists tenv', m', cv, cvss'; split_ands; auto.
   eapply rel_val_antimon; [|eauto]; lia.
 Qed.
 
 Lemma rel_exp_prim k ρ x p ys e env tenv m stmt :
   (ρ, Eprim x p ys e) ~{k} (env, tenv, m, stmt).
-Proof. intros v cin cout Hk Hrun; inv Hrun; inv H. Qed.
+Proof. intros v * Hk Hrun; inv Hrun; inv H. Qed.
 
 (** ** Clight reductions preserve relatedness *)
 
+(*
 Lemma rel_exp_Cred env' tenv' m' stmt' k ρ e env tenv m stmt :
   (env, tenv, m, stmt) --> (env', tenv', m', stmt') ->
   (ρ, e) ~{k} (env', tenv', m', stmt') ->
   (ρ, e) ~{k} (env, tenv, m, stmt).
 Proof.
   unfold rel_exp; intros Hsimple_step Hrel v cin cout Hk Hbstep.
-  edestruct Hrel as [tenv'' [m'' [cv [Hstep2_after Hres]]]]; eauto.
+  edestruct Hrel as [tenv'' [m'' [cv [cvss'' [Hstep2_after Hres]]]]]; eauto.
   (do 3 eexists); eauto.
 Qed.
 
@@ -2302,6 +2311,7 @@ Ltac norm_seq := repeat progress (eapply rel_exp_Cred; [apply Cred_seq_assoc|]).
 (** Step from _ ~{k} (env, tenv, m, s) to _ ~{k} (env, tenv', m', s')
     using [lemma : (env, tenv, m, s) --> (env, tenv', m', s')] *)
 Ltac Cstep lemma := eapply rel_exp_Cred; [eapply lemma|].
+*)
 
 (** * Main theorem *)
 
@@ -2315,7 +2325,8 @@ Ltac normalize_occurs_free_in H :=
 Lemma translate_body_stm locals nenv k : forall e,
   match translate_body cenv fenv locals nenv e with
   | Ret (stmt, _, _) => forall ρ env tenv m,
-    ρ ~ₑ{k, occurs_free e} (tenv, m) ->
+    ρ ~ₜ{k, occurs_free e :&: FromSet locals} (tenv, m) ->
+    ρ ~ₑ{k, occurs_free e \\ FromSet locals} (env, m) ->
     (* TODO: extra assumptions *)
     (ρ, e) ~{k} (env, tenv, m, stmt)
   | _ => True
@@ -2328,19 +2339,22 @@ Proof.
     bind_step rep Hrep; destruct rep as [t|t a]; rewrite bind_ret.
     + (* Unboxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros ρ env tenv m Hρ.
+      intros ρ env tenv m Htenv Henv.
       apply rel_exp_constr; intros vs Hget.
+      admit.
+      (*
       Cstep Cred_set; [constructor|].
       specialize (IHe e); rewrite He in IHe; apply IHe. Guarded.
       eapply rel_env_antimon_S; [apply (Included_Union_Setminus _ [set x]); sets|].
       normalize_occurs_free_in Hρ.
       rewrite rel_env_union in Hρ; destruct Hρ as [_ Hρ].
       rewrite rel_env_union; split; [apply rel_env_gso; [intros Hin; now inv Hin|auto] |].
-      apply rel_env_gss_sing; rewrite rel_val_eqn; cbn; now rewrite Hrep.
+      apply rel_env_gss_sing; rewrite rel_val_eqn; cbn; now rewrite Hrep. *)
     + (* Boxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros ρ env tenv m Hρ.
+      intros ρ env tenv m Htenv Henv.
       apply rel_exp_constr; intros vs Hget.
+      (*
       norm_seq; Cstep Cred_set.
       { admit. }
       Cstep Cred_set.
@@ -2363,12 +2377,12 @@ Proof.
       { admit. }
       { admit. }
       { admit. }
-      { admit. }
+      { admit. } *)
       admit.
   - (* case x of { ces } *)
     rename v into x, l into ces; cbn.
     bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
-    intros* Hρ; Cstep Cred_if'.
+    intros* Htenv Henv; admit. (*Cstep Cred_if'.
     { admit. }
     { admit. }
     revert boxed_cases unboxed_cases fvs_cs n_cs Hces ρ env tenv m Hρ.
@@ -2383,11 +2397,12 @@ Proof.
          Otherwise, switch body is equivalent to unboxed_cases', and can use IHces. *)
       admit.
     + (* New case arm is boxed *)
-      (* Same idea as in previous subcase *) admit.
+      (* Same idea as in previous subcase *) admit. *)
   - (* let x = Proj c n y in e *)
     rename v into x, v0 into y; cbn.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros* Hρ; apply rel_exp_proj; intros* Hy Hproj.
+    intros* Htenv Henv; apply rel_exp_proj; intros* Hy Hproj.
+    admit. (*
     Cstep Cred_set.
     { admit. }
     specialize (IHe e); rewrite He in IHe; apply IHe. Guarded.
@@ -2396,11 +2411,12 @@ Proof.
     rewrite rel_env_union in Hρ; destruct Hρ as [_ Hρ].
     rewrite rel_env_union; split; [apply rel_env_gso; [intros Hin; now inv Hin|auto] |].
     apply rel_env_gss_sing.
-    admit.
+    admit. *)
   - (* let x = f ft ys in e *)
     rename v into x, v0 into f, f into ft, l into ys; cbn.
     bind_step e' He; destruct e' as [[stm_e live_after_call] n_e].
-    bind_step call Hcall; intros* Hρ.
+    bind_step call Hcall; intros* Htenv Henv.
+    admit. (*
     norm_seq.
     admit.
     (* idea: we get from the call that the values in the shadow stack are preserved.
@@ -2409,20 +2425,21 @@ Proof.
        we then push x onto the shadow stack, and maybe call gc.
        gc spec will say that all the values on the shadow stack are preserved.
        this includes, again, all the variables live after the call.
-       thus ρ is still related to the heap wrt fvs(e) and we can instantiate IHe accordingly *)
+       thus ρ is still related to the heap wrt fvs(e) and we can instantiate IHe accordingly *) *)
   - (* let rec fds in e *) exact I.
   - (* f ft ys *)
     rename v into f, f into ft, l into ys; cbn.
-    bind_step call Hcall; intros* Hρ.
+    bind_step call Hcall; intros* Htenv Henv.
     apply rel_exp_app; intros* -> Hfun Hget_ys Hfind_def Hset_lists.
     (* TODO: lemma about make_fun_call *)
     admit.
   - (* let x = Prim p ys in e *)
     rename v into x, l into ys; cbn.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros* Hρ; apply rel_exp_prim.
+    intros* Htenv Henv; apply rel_exp_prim.
   - (* halt x *)
     rename v into x; cbn; intros* Hρ.
+    admit. (*
     norm_seq; Cstep Cred_assign.
     { admit. }
     { admit. }
@@ -2437,10 +2454,8 @@ Proof.
                 ρ(x) ~ᵥ{k} (m, args[1])
          ---------------------------------------
          (ρ, Ehalt x) ~{k} (env, tenv, m, Sskip) *)
-    admit.
+    admit. *)
 Abort.
-*)
-*)
 
 End PROOF.
 

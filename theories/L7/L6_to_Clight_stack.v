@@ -251,7 +251,8 @@ Notation "a '>>'' b" := (Ebinop Oshr a b value) (at level 30).
 Notation "a '&'' b" := (Ebinop Oand a b value) (at level 30).
 Notation "a '=='' b" := (Ebinop Oeq a b type_bool) (at level 40).
 Notation " p ';' q " := (Ssequence p q) (at level 100, format " p ';' '//' q ").
-Infix "::=" := Sassign (at level 50).
+Infix "::=" := Sset (at level 50).
+Infix ":::=" := Sassign (at level 50).
 Notation "'*' p " := (Ederef p value) (at level 40).
 Notation "'&' p " := (Eaddrof p (Tpointer (typeof p) noattr)) (at level 40).
 Definition c_int n t := if Archi.ptr64 then Econst_long (Int64.repr n) t else Econst_int (Int.repr n%Z) t.
@@ -289,28 +290,27 @@ Definition make_tag (r : ctor_rep) : expr :=
   | boxed t a => c_int (rep_boxed t a) value
   end%Z.
 
+Section Body.
+
+Context
+  (locals : FVSet) (* The set of local variables including definitions and arguments *)
+  (nenv : M.t BasicAst.name).
+
 (** To use variables in Clight expressions, need variable name and its type.
     Variables that refer to functions must have type
       void(struct thread_info *ti, val, ..)
                                    ------- n times
     where n = min(n_param, arity of the function).
 
-    All other variables just have type val. 
-
-    make_var x =
-      Ecast (Evar x suitable-fn-type) value if x is a toplevel function
-      Evar x value otherwise *)
+    All other variables just have type val. *)
 Definition make_var (x : ident) :=
   match M.get x fenv with
-  | Some (_, locs) => Ecast (Evar x (fun_ty (length locs))) value
+  | Some (_, locs) =>
+    if PS.mem x locals
+    then Ecast (Etempvar x (fun_ty (length locs))) value
+    else Ecast (Evar x (fun_ty (length locs))) value
   | None => var x
   end.
-
-Section Body.
-
-Context
-  (locals : FVSet) (* The set of local variables including definitions and arguments *)
-  (nenv : M.t BasicAst.name).
 
 Definition make_fun_call (destination : ident) f ys :=
   match M.get f fenv with 
@@ -320,10 +320,10 @@ Definition make_fun_call (destination : ident) f ys :=
       Err ("make_fun_call: arity mismatch: " ++ pretty_fun_name f nenv)%string
     else
       ret (statements
-             (map (fun '(y, i) => tinfo->args.[Z.of_N i] ::= make_var y)
+             (map (fun '(y, i) => tinfo->args.[Z.of_N i] :::= make_var y)
                   (skipn n_param (combine ys inds)))%bool;
-           tinfo->alloc ::= alloc;
-           tinfo->limit ::= limit;
+           tinfo->alloc :::= alloc;
+           tinfo->limit :::= limit;
            Scall (Some destination)
                  (Ecast (make_var f) (Tpointer (fun_ty (min arity n_param)) noattr))
                  (tinfo :: map make_var (firstn n_param ys)))
@@ -355,12 +355,12 @@ Definition create_space (n : nat) pre post : statement :=
   Sifthenelse
     (limit -' alloc <' n)
     (pre;
-     tinfo->alloc ::= alloc;
-     tinfo->limit ::= limit;
-     tinfo->nalloc ::= n;
+     tinfo->alloc :::= alloc;
+     tinfo->limit :::= limit;
+     tinfo->nalloc :::= n;
      Scall None gc (tinfo :: nil);
-     alloc ::= tinfo->alloc;
-     limit ::= tinfo->limit;
+     alloc_id ::= tinfo->alloc;
+     limit_id ::= tinfo->limit;
      post)
     Sskip.
 
@@ -386,12 +386,12 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
     rep <- get_ctor_rep c ;;
     stm_constr <-
       match rep with
-      | enum t => ret (var x ::= make_tag rep)
+      | enum t => ret (x ::= make_tag rep)
       | boxed t a =>
-        ret (var x ::= Ecast (alloc +' c_int 1 value) value;
-             alloc ::= alloc +' c_int (Z.of_N (a + 1)) value;
-             (var x).[-1] ::= make_tag rep;
-             statements (mapi (fun i y => (var x).[i] ::= make_var y) 0 ys))
+        ret (x ::= Ecast (alloc +' c_int 1 value) value;
+             alloc_id ::= alloc +' c_int (Z.of_N (a + 1)) value;
+             (var x).[-1] :::= make_tag rep;
+             statements (mapi (fun i y => (var x).[i] :::= make_var y) 0 ys))
       end ;;
     '(stm_e, fvs_e, n_e) <- translate_body e ;;
     ret ((stm_constr; stm_e), add_local_fvs (PS.remove x fvs_e) ys, n_e)
@@ -409,7 +409,7 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
         store local variables live after call (= locals∩(FV(e)\x)) in roots array
         push frame onto shadow stack
         x = call f (may GC)
-        retreieve new limit, alloc from tinfo
+        retrieve new limit, alloc from tinfo
         if max_allocs(e) > 0,
           if (max_allocs(e) > limit - alloc) {
             if x live call (<-> x ∈ locals∩FV(e)), store it in roots array
@@ -425,25 +425,25 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
     let live_minus_x_list := PS.elements live_minus_x in
     let n_live_minus_x := Z.of_nat (length live_minus_x_list) in
     call <- make_fun_call x f ys ;;
-    let retrieve_roots xs := statements (mapi (fun i x => var x ::= roots.[i]) 0 xs) in
+    let retrieve_roots xs := statements (mapi (fun i x => x ::= roots.[i]) 0 xs) in
     let stm :=
-      statements (mapi (fun i x => roots.[i] ::= var x) 0 live_minus_x_list);
-      frame.next ::= roots +' c_int n_live_minus_x value;
-      tinfo->fp ::= &frame;
+      statements (mapi (fun i x => roots.[i] :::= var x) 0 live_minus_x_list);
+      frame.next :::= roots +' c_int n_live_minus_x value;
+      tinfo->fp :::= &frame;
       call;
-      alloc ::= tinfo->alloc;
-      limit ::= tinfo->limit;
+      alloc_id ::= tinfo->alloc;
+      limit_id ::= tinfo->limit;
       match max_allocs e with 0 => Sskip | S _ as allocs =>
         if PS.mem x live_after_call then
           create_space allocs
-            (roots.[n_live_minus_x] ::= var x;
-             frame.next ::= roots +' c_int (1 + n_live_minus_x) value)
-            (var x ::= roots.[n_live_minus_x])
+            (roots.[n_live_minus_x] :::= var x;
+             frame.next :::= roots +' c_int (1 + n_live_minus_x) value)
+            (x ::= roots.[n_live_minus_x])
         else
           create_space allocs Sskip Sskip
       end;
       retrieve_roots live_minus_x_list;
-      tinfo->fp ::= frame.prev;
+      tinfo->fp :::= frame.prev;
       stm_e
     in
     ret (stm, add_local_fvs live_minus_x (f :: ys),
@@ -451,7 +451,7 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
   (** [[let x = y.n in e]] = (x = y[n]; [[e]]) *)
   | Eproj x t n y e =>
     '(stm_e, fvs_e, n_e) <- translate_body e ;;
-    ret ((var x ::= (var y).[Z.of_N n]; stm_e), add_local_fv (PS.remove x fvs_e) y, n_e)
+    ret ((x ::= (var y).[Z.of_N n]; stm_e), add_local_fv (PS.remove x fvs_e) y, n_e)
   | Efun fnd e => Err "translate_body: nested function detected"
   (** [[f(ys)]] =
         ret_temp = call f with arguments ys;
@@ -467,8 +467,8 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
          add_local_fvs (PS.remove x fvs_e) ys, n_e)
   (** [[halt x]] = (store alloc and limit in tinfo; return x) *)
   | Ehalt x =>
-    ret ((tinfo->alloc ::= alloc;
-          tinfo->limit ::= limit;
+    ret ((tinfo->alloc :::= alloc;
+          tinfo->limit :::= limit;
           Sreturn (Some (var x))),
          add_local_fv PS.empty x, 0)%N
   end.
@@ -487,9 +487,9 @@ Definition make_fun (size : Z) (xs locals : list ident) (body : statement) : fun
              body.
 
 Definition init_shadow_stack_frame :=
-  frame.next ::= roots;
-  frame.root ::= roots;
-  frame.prev ::= tinfo->fp.
+  frame.next :::= roots;
+  frame.root :::= roots;
+  frame.prev :::= tinfo->fp.
 
 Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list definition) :=
   match fds with
@@ -524,17 +524,17 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
       let n_live_xs := N.of_nat (length live_xs_list) in
       let allocs := max_allocs e in
       let body :=
-        alloc ::= tinfo->alloc;
-        limit ::= tinfo->limit;
-        statements (map (fun '(x, i) => var x ::= tinfo->args.[Z.of_N i]) (skipn n_param (combine xs locs)));
+        alloc_id ::= tinfo->alloc;
+        limit_id ::= tinfo->limit;
+        statements (map (fun '(x, i) => x ::= tinfo->args.[Z.of_N i]) (skipn n_param (combine xs locs)));
         init_shadow_stack_frame;
         match allocs with 0 => Sskip | S _ as allocs =>
           create_space allocs
-            (statements (mapi (fun i x => roots.[i] ::= var x) 0 live_xs_list);
-             frame.next ::= roots +' c_int (Z.of_N n_live_xs) value;
-             tinfo->fp ::= &frame)
-            (statements (mapi (fun i x => var x ::= roots.[i]) 0 live_xs_list);
-             tinfo->fp ::= frame.prev)
+            (statements (mapi (fun i x => roots.[i] :::= var x) 0 live_xs_list);
+             frame.next :::= roots +' c_int (Z.of_N n_live_xs) value;
+             tinfo->fp :::= &frame)
+            (statements (mapi (fun i x => x ::= roots.[i]) 0 live_xs_list);
+             tinfo->fp :::= frame.prev)
         end;
         body
       in
@@ -566,8 +566,8 @@ Definition translate_program (fds_e : hoisted_exp) (nenv : name_env) : error (li
   funs <- translate_fundefs fds nenv ;;
   '(body, _, slots) <- translate_body (union_list PS.empty locals) nenv e ;;
   let body :=
-    alloc ::= tinfo->alloc;
-    limit ::= tinfo->limit;
+    alloc_id ::= tinfo->alloc;
+    limit_id ::= tinfo->limit;
     init_shadow_stack_frame;
     match max_allocs e with 0 => Sskip | S _ as allocs =>
       create_space (max_allocs e) Sskip Sskip
@@ -1115,12 +1115,21 @@ Proof.
   eapply exec_Sseq_1; [constructor|eauto].
 Qed.
 
+Lemma Cred_set env tenv m x v a s :
+  (env, tenv, m, a) ⇓ᵣ v ->
+  (env, tenv, m, (x ::= a; s)) --> (env, M.set x v tenv, m, s).
+Proof.
+  intros; intros ??? Hexec; unfold "⇓".
+  change Events.E0 with (Events.Eapp Events.E0 Events.E0).
+  eapply exec_Sseq_1; eauto; econstructor; eauto.
+Qed.
+
 Lemma Cred_assign env tenv m a1 a2 v_pre v b o m' s :
   (env, tenv, m, a1) ⇓ₗ (b, o) ->
   (env, tenv, m, a2) ⇓ᵣ v_pre ->
   sem_cast v_pre (typeof a2) (typeof a1) m = Some v ->
   assign_loc prog_genv (typeof a1) m b o v m' ->
-  (env, tenv, m, (a1 ::= a2; s)) --> (env, tenv, m', s).
+  (env, tenv, m, (a1 :::= a2; s)) --> (env, tenv, m', s).
 Proof.
   intros; intros ??? Hexec; unfold "⇓".
   change Events.E0 with (Events.Eapp Events.E0 Events.E0).
@@ -1169,12 +1178,11 @@ Qed.
 Definition address := (block * Z)%type.
 
 Inductive mpred :=
-(* TODO technically could be a derived form *)
-| Mapsto (bo : address) (p : permission) (vs : list Values.val)
+| Mapsto (bo : address) (vs : list Values.val)
 | Sepcon (P Q : mpred)
 | Exists {A} (F : A -> mpred)
 | Mem (m : mem).
-Notation "bo '↦_{' p '}' vs" := (Mapsto bo p vs) (at level 77).
+Infix "↦" := Mapsto (at level 77).
 Infix "⋆" := Sepcon (at level 78, right associativity).
 Notation "'∃' x .. y , p" :=
   (Exists (fun x => .. (Exists (fun y => p)) ..))
@@ -1191,8 +1199,7 @@ Definition dom_mapsto (b : block) (o : Z) (vs : list Values.val) :=
 Reserved Notation "m |=_{ S } P" (at level 79).
 Fixpoint mpred_denote_aux (P : mpred) (S : Ensemble address) (m : mem) : Prop :=
   match P with
-  | (b, o) ↦_{p} vs =>
-    Mem.range_perm m b o (o + #|vs|*word_size) Cur p /\
+  | (b, o) ↦ vs =>
     S <--> dom_mapsto b o vs /\
     All (map val_wf vs) /\
     (forall i v, get_ith vs i = Some v -> load m b (o + i*word_size) = Some v) /\
@@ -1314,16 +1321,15 @@ Proof.
   + specialize (H b1 o1); subst; cbn in *; superlia.
 Qed.
 
-Lemma mapsto_app S b o p vs ws m :
-  m |=_{S} ((b, o) ↦_{p} vs ++ ws)%list <->
-  m |=_{S} ((b, o) ↦_{p} vs) ⋆ ((b, o + #|vs|*word_size) ↦_{p} ws)%Z.
+Lemma mapsto_app S b o vs ws m :
+  m |=_{S} ((b, o) ↦ vs ++ ws)%list <->
+  m |=_{S} ((b, o) ↦ vs) ⋆ ((b, o + #|vs|*word_size) ↦ ws)%Z.
 Proof.
   unfold mpred_denote_aux; split.
-  - intros [Hperm [Hdom [Hwf [Hloads Hbounds]]]].
+  - intros [Hdom [Hwf [Hloads Hbounds]]].
     rewrite dom_mapsto_app, map_app, All_app, app_length in *.
     do 2 eexists; split; [eassumption|].
-    split_ands; try (sets||tauto||cbn in *; superlia||
-                     unfold Mem.range_perm in *; intros o' Ho'; apply Hperm; superlia).
+    split_ands; try (sets||tauto||cbn in *; superlia).
     + rewrite dom_mapsto_Disjoint_simpl; superlia.
     + intros i v Hget.
       apply Hloads; rewrite <- Hget.
@@ -1335,43 +1341,33 @@ Proof.
       apply get_ith_range in Hget'.
       rewrite get_ith_suffix by lia.
       rewrite <- Hget; f_equal; lia.
-  - intros [S1 [S2 [HS [HD [[Hperm1 [HS1 [Hwf1 [Hload1 Hbound1]]]]
-                            [Hperm2 [HS2 [Hwf2 [Hload2 Hbound2]]]]]]]]].
+  - intros [S1 [S2 [HS [HD [[HS1 [Hwf1 [Hload1 Hbound1]]] [HS2 [Hwf2 [Hload2 Hbound2]]]]]]]].
     rewrite dom_mapsto_app, map_app, All_app, app_length, HS, HS1, HS2 in *.
     split_ands; try (sets||tauto||cbn in *; superlia).
-    + unfold Mem.range_perm in *; intros o' Ho'.
-      specialize (Hperm1 o'); specialize (Hperm2 o').
-      match type of Hperm1 with ?t1 -> _ =>
-      match type of Hperm2 with ?t2 -> _ =>
-        assert (Hcases : t1 \/ t2) by superlia
-      end end.
-      destruct Hcases; eauto.
-    + intros i v Hget.
-      assert (Hcases : ((0 <= i < #|vs|) \/ (#|vs| <= i < #|vs| + #|ws|))%Z).
-      { apply get_ith_range in Hget. rewrite app_length in Hget. lia. }
-      destruct Hcases as [Hprefix|Hsuffix].
-      * apply Hload1; rewrite <- Hget, get_ith_prefix by lia; auto.
-      * replace (o + i*word_size)%Z with (o + #|vs|*word_size + (i-#|vs|)*word_size)%Z by lia.
-        apply Hload2; rewrite <- Hget, get_ith_suffix by lia; auto.
+    intros i v Hget.
+    assert (Hcases : ((0 <= i < #|vs|) \/ (#|vs| <= i < #|vs| + #|ws|))%Z).
+    { apply get_ith_range in Hget. rewrite app_length in Hget. lia. }
+    destruct Hcases as [Hprefix|Hsuffix].
+    + apply Hload1; rewrite <- Hget, get_ith_prefix by lia; auto.
+    + replace (o + i*word_size)%Z with (o + #|vs|*word_size + (i-#|vs|)*word_size)%Z by lia.
+      apply Hload2; rewrite <- Hget, get_ith_suffix by lia; auto.
 Qed.
 
-Lemma mapsto_cons S b o p v vs m :
-  m |=_{S} ((b, o) ↦_{p} v :: vs) <->
-  m |=_{S} ((b, o) ↦_{p} [v]) ⋆ ((b, o + word_size) ↦_{p} vs)%Z.
+Lemma mapsto_cons S b o v vs m :
+  m |=_{S} ((b, o) ↦ v :: vs) <->
+  m |=_{S} ((b, o) ↦ [v]) ⋆ ((b, o + word_size) ↦ vs)%Z.
 Proof. apply mapsto_app with (vs := [v]). Qed.
 
-Lemma mapsto_store S b o p i v vs m m' :
+Lemma mapsto_store S b o i v vs m m' :
   val_wf v ->
   (0 <= i < #|vs|)%Z ->
   store m b (o + i*word_size) v = Some m' ->
-  m |=_{S} ((b, o) ↦_{p} vs) ->
-  m' |=_{S} ((b, o) ↦_{p} set_ith vs i v).
+  m |=_{S} ((b, o) ↦ vs) ->
+  m' |=_{S} ((b, o) ↦ set_ith vs i v).
 Proof.
   unfold mpred_denote_aux.
-  intros Hwf_v Hbound Hstore [Hperm [HS [Hwf_vs [Hload Hbounds]]]].
+  intros Hwf_v Hbound Hstore [HS [Hwf_vs [Hload Hbounds]]].
   split_ands; try (cbn in *; superlia).
-  - unfold Mem.range_perm in *; rewrite set_ith_len; intros o' Ho'.
-    eapply Mem.perm_store_1; eauto.
   - rewrite HS; clear; revert i o; induction vs as [|v' vs IHvs]; [easy|intros i o].
     cbn; destruct (Z.eq_dec i 0) as [|Hne]; [subst|].
     + apply Ensemble_iff_In_iff; intros [b' o'].
@@ -1398,18 +1394,12 @@ Lemma mpred_unchanged_on S P m m' :
   m |=_{S} P ->
   m' |=_{S} P.
 Proof.
-  revert S; induction P as [[b o] p vs|P IHP Q IHQ|A F IHF|m'']; cbn;
+  revert S; induction P as [[b o] vs|P IHP Q IHQ|A F IHF|m'']; cbn;
   intros S Hunchanged Hm.
-  - destruct Hm as [Hperm[HS[?[Hload [??]]]]]; split_ands; auto.
-    + destruct Hunchanged as [Hle Hperm' Haccess]; intros o' Ho'.
-      apply Hperm'; auto.
-      * rewrite Ensemble_iff_In_iff in HS; rewrite HS.
-        unfold dom_mapsto, In; lia.
-      * eapply Mem.perm_valid_block.
-        apply Hperm; eauto.
-    + intros i v Hget; eapply Mem.load_unchanged_on; eauto.
-      intros o'; cbn; rewrite Ensemble_iff_In_iff in HS.
-      specialize (HS (b, o')); rewrite HS; unfold In, dom_mapsto; superlia.
+  - destruct Hm as [?[?[Hload [??]]]]; split_ands; auto.
+    intros i v Hget; eapply Mem.load_unchanged_on; eauto.
+    intros o'; cbn; rewrite Ensemble_iff_In_iff in H.
+    specialize (H (b, o')); rewrite H; unfold In, dom_mapsto; superlia.
   - destruct Hm as [S1[S2[HS[?[??]]]]]; do 2 eexists; split_ands; eauto.
     + apply IHP; auto. 
       eapply Mem.unchanged_on_implies; eauto; cbn; intros; now apply (proj2 HS).
@@ -1420,15 +1410,15 @@ Proof.
     eapply Mem.unchanged_on_trans; eauto.
 Qed.
 
-Lemma mapsto_store_sepcon S P b o p i v vs m m' :
+Lemma mapsto_store_sepcon S P b o i v vs m m' :
   val_wf v ->
   (0 <= i < #|vs|)%Z ->
   store m b (o + i*word_size) v = Some m' ->
-  m |=_{S} ((b, o) ↦_{p} vs) ⋆ P ->
-  m' |=_{S} ((b, o) ↦_{p} set_ith vs i v) ⋆ P.
+  m |=_{S} ((b, o) ↦ vs) ⋆ P ->
+  m' |=_{S} ((b, o) ↦ set_ith vs i v) ⋆ P.
 Proof.
-  remember ((b, o) ↦_{p} vs) as bovs.
-  remember ((b, o) ↦_{p} set_ith vs i v) as bovs'.
+  remember ((b, o) ↦ vs) as bovs.
+  remember ((b, o) ↦ set_ith vs i v) as bovs'.
   cbn; subst bovs bovs'; intros Hwf Hrange Hstore.
   intros [S1 [S2 [HS [HD [Hbovs HP]]]]]; exists S1, S2; split_ands; auto.
   - eapply mapsto_store; eauto.
@@ -1437,7 +1427,7 @@ Proof.
     2:{ rewrite (Disjoint_pair_simpl S1 S2) in HD.
         intros o'; specialize (HD b o').
         intros Hin_S1 Hin_S2; contradiction HD.
-        destruct Hbovs as [Hperm [HS1 _]].
+        destruct Hbovs as [HS1 _].
         rewrite Ensemble_iff_In_iff in HS1.
         specialize (HS1 (b, o')); rewrite HS1.
         unfold dom_mapsto, In.
@@ -1551,23 +1541,23 @@ Proof.
     now rewrite_entailment (fun H => P' ⋆ H) sepcon_comm.
 Qed.
 
-Lemma mpred_load S F b o p i v vs m :
+Lemma mpred_load S F b o i v vs m :
   is_frame F ->
   get_ith vs i = Some v ->
-  m |=_{S} F ((b, o) ↦_{p} vs) ->
+  m |=_{S} F ((b, o) ↦ vs) ->
   load m b (o + i*word_size) = Some v.
 Proof.
   intros HF Hget; revert S; induction HF; intros S Hm;
   cbn in Hm; decompose [ex and] Hm; eauto.
 Qed.
 
-Lemma mpred_store S F b o p i v vs m m' :
+Lemma mpred_store S F b o i v vs m m' :
   is_frame F ->
   val_wf v ->
   (0 <= i < #|vs|)%Z ->
   store m b (o + i*word_size) v = Some m' ->
-  m |=_{S} F ((b, o) ↦_{p} vs) ->
-  m' |=_{S} F ((b, o) ↦_{p} set_ith vs i v).
+  m |=_{S} F ((b, o) ↦ vs) ->
+  m' |=_{S} F ((b, o) ↦ set_ith vs i v).
 Proof.
   intros HF Hwf Hrange Hstore Hm; destruct HF.
   - eapply mapsto_store; eauto.
@@ -1792,19 +1782,6 @@ Proof.
   eapply mpred_free'; eauto.
 Qed.
 
-(* TODO
-Definition local_word b (v : Values.val) :=
-  ∃ m m', Mem m'
-  WITH Some m' = store (alloc_alone m 0 word_size) b 0 v
-  WITH b = Mem.nextblock m.
-
-Search Mem.store list.
-Definition local_words b (v : list Values.val) :=
-  ∃ m m', Mem m'
-  WITH Some m' = store (alloc_alone m 0 word_size) b 0 v
-  WITH b = Mem.nextblock m.
-*)
-
 Definition vint (z : Z) : Values.val :=
   if Archi.ptr64
   then Vlong (Int64.repr z)
@@ -1827,10 +1804,10 @@ Fixpoint shadow_stack
   match frame_addrs, root_addrs, cvss with
   | [], [], [] => mempty
   | (f_b, f_o) :: frame_addrs, (r_b, r_o) :: root_addrs, rs :: cvss =>
-    (f_b, O.unsigned f_o) ↦_{Freeable}
+    (f_b, O.unsigned f_o) ↦
       Vptr r_b (O.repr (O.unsigned r_o + #|rs|*word_size)) ::
       Vptr r_b r_o :: stack_top frame_addrs :: [] ⋆
-    (r_b, O.unsigned r_o) ↦_{Freeable} rs ⋆
+    (r_b, O.unsigned r_o) ↦ rs ⋆
     shadow_stack frame_addrs root_addrs cvss
   | _, _, _ => mpure False
   end.
@@ -1846,12 +1823,12 @@ Definition valid_mem
            args frame_addrs root_addrs cvss nalloc frame : mpred :=
   ∃ args_b args_o,
   (∃ old_alloc old_limit heap,
-   (tinfo_b, O.unsigned tinfo_o) ↦_{Writable}
+   (tinfo_b, O.unsigned tinfo_o) ↦
    (old_alloc :: old_limit :: heap ::
     Vptr args_b args_o :: stack_top frame_addrs :: vint nalloc :: [])) ⋆
-   (∃ free_space, (nursery_b, O.unsigned alloc_o) ↦_{Writable} free_space
+   (∃ free_space, (nursery_b, O.unsigned alloc_o) ↦ free_space
     WITH #|free_space| = (O.unsigned limit_o - O.unsigned alloc_o)/word_size)%Z ⋆
-  ((args_b, O.unsigned args_o) ↦_{Writable} args) ⋆
+  ((args_b, O.unsigned args_o) ↦ args) ⋆
   (shadow_stack frame_addrs root_addrs cvss) ⋆
   (∃ gc_heap, Mem gc_heap) ⋆
   frame.
@@ -1871,7 +1848,7 @@ Fixpoint has_shape m v cv :=
     | Ret (boxed t a) =>
       match! cv with Vptr b o in
       exists cvs,
-      ((b, O.unsigned o - word_size) ↦_{Readable} vint (rep_boxed t a) :: cvs) ∈ m /\
+      ((b, O.unsigned o - word_size) ↦ vint (rep_boxed t a) :: cvs) ∈ m /\
       Forall2' (has_shape m) vs cvs
     | _ => False
     end
@@ -1893,8 +1870,8 @@ Fixpoint compatible_shape m m' v cv cv' :=
       match! cv with Vptr b o in
       match! cv' with Vptr b' o' in
       exists cvs cvs',
-      ((b, O.unsigned o - word_size) ↦_{Readable} vint (rep_boxed t a) :: cvs) ∈ m /\
-      ((b', O.unsigned o' - word_size) ↦_{Readable} vint (rep_boxed t a) :: cvs') ∈ m' /\
+      ((b, O.unsigned o - word_size) ↦ vint (rep_boxed t a) :: cvs) ∈ m /\
+      ((b', O.unsigned o' - word_size) ↦ vint (rep_boxed t a) :: cvs') ∈ m' /\
       Forall3 (compatible_shape m m') vs cvs cvs'
     | _ => False
     end
@@ -1988,7 +1965,7 @@ Definition rel_val_aux (k : nat) :=
     | Ret (boxed t a) =>
       match! cv with Vptr b o in
       exists cvs,
-      ((b, O.unsigned o - word_size) ↦_{Readable} vint (rep_boxed t a) :: cvs) ∈ m /\
+      ((b, O.unsigned o - word_size) ↦ vint (rep_boxed t a) :: cvs) ∈ m /\
       Forall2' (fun v cv => go v m cv) vs cvs
     | _ => False
     end%Z

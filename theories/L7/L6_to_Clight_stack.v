@@ -40,6 +40,8 @@ Module O := Ptrofs.
 
 Section CODEGEN.
 
+Notation "'#|' xs '|'" := (Z.of_nat (length xs)).
+
 Definition mapi {A B} (f : Z -> A -> B) :=
   fix go (i : Z) (xs : list A) : list B :=
     match xs with
@@ -105,23 +107,23 @@ Definition compute_fun_env : hoisted_exp -> fun_env :=
 
 (** Max number of words allocated by e up to the next function call.
     (Only compute up to next function call because that's when GC will run next) *)
-Fixpoint max_allocs (e : exp) : nat :=
+Fixpoint max_allocs (e : exp) : Z :=
   match e with
   | Econstr x t vs e' =>
     match vs with
     (* Unboxed: no allocation necessary *)
     | [] => max_allocs e'
     (* Boxed: allocate 1 word for header + |vs| words for arguments *)
-    | _ => S (length vs) + max_allocs e'
+    | _ => 1 + #|vs| + max_allocs e'
     end
-  | Ecase x cs => fold_left (fun allocs '(_, e) => max (max_allocs e) allocs) cs 0
+  | Ecase x cs => fold_left (fun allocs '(_, e) => Z.max (max_allocs e) allocs) cs 0
   | Eproj x t n v e' => max_allocs e'
   | Eletapp x f t ys e' => 0
   | Efun fds e' => 0 (* unreachable (we are compiling hoisted terms) *)
   | Eapp x t vs => 0
   | Eprim x p vs e' => max_allocs e'
   | Ehalt x => 0
-  end.
+  end%Z.
 
 (** * Clight abbreviations *)
 
@@ -231,8 +233,8 @@ Definition builtin_unreachable : statement :=
       value *limit;
       value ret_id;
     ret_id is used to store the results of tail calls. *)
-Definition alloc := Etempvar alloc_id (tptr value).
-Definition limit := Etempvar limit_id (tptr value).
+Notation alloc := (Etempvar alloc_id (tptr value)).
+Notation limit := (Etempvar limit_id (tptr value)).
 Variable (ret_id : ident).
 
 (** fun_ty n = value(struct thread_info *ti, value, .. min(n_param, n) times)
@@ -244,7 +246,7 @@ Definition prim_ty (n : nat) := Tfunction (value_tys n) value cc_default.
 Declare Scope C_scope.
 Delimit Scope C_scope with C.
 
-Notation "'var' x" := (Evar x value) (at level 20).
+Notation "'var' x" := (Etempvar x value) (at level 20).
 Notation "a '+'' b" := (Ebinop Oadd a b (tptr value)) (at level 30).
 Notation "a '-'' b" := (Ebinop Osub a b (tptr value)) (at level 30).
 Notation "a '<'' b" := (Ebinop Olt a b type_bool) (at level 40).
@@ -286,10 +288,11 @@ Definition rep_unboxed (t : N) : Z := Z.shiftl (Z.of_N t) 1 + 1.
 Definition rep_boxed (t a : N) : Z := Z.shiftl (Z.of_N a) 10 + Z.of_N t.
 
 Definition make_tag (r : ctor_rep) : expr :=
-  match r with
-  | enum t => c_int (rep_unboxed t) value
-  | boxed t a => c_int (rep_boxed t a) value
-  end%Z.
+  c_int match r with
+        | enum t => rep_unboxed t
+        | boxed t a => rep_boxed t a
+        end%Z
+        value.
 
 Section Body.
 
@@ -351,14 +354,13 @@ Definition make_cases (translate_body : exp -> error (statement * FVSet * N)) :=
 
 (** Use limit and alloc to check whether nursery contains n words of free space.
     If not, run pre, invoke GC, then run post. *)
-Definition create_space (n : nat) pre post : statement :=
-  let n := c_int (Z.of_nat n) value in 
+Definition create_space (n : Z) pre post : statement :=
   Sifthenelse
-    (limit -' alloc <' n)
+    (limit -' alloc <' c_int n value)
     (pre.;
      tinfo->alloc :::= alloc.;
      tinfo->limit :::= limit.;
-     tinfo->nalloc :::= n.;
+     tinfo->nalloc :::= c_int n value.;
      Scall None gc (tinfo :: nil).;
      alloc_id ::= tinfo->alloc.;
      limit_id ::= tinfo->limit.;
@@ -386,13 +388,15 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
   | Econstr x c ys e =>
     rep <- get_ctor_rep c ;;
     stm_constr <-
-      match rep with
-      | enum t => ret (x ::= make_tag rep)
-      | boxed t a =>
+      match rep, ys with
+      | enum t, [] => ret (x ::= make_tag rep)
+      | enum _, _ :: _ => Err "translate_body: unboxed constructor given arguments"
+      | boxed t a, _ :: _ =>
         ret (x ::= Ecast (alloc +' c_int 1 value) value.;
-             alloc_id ::= alloc +' c_int (Z.of_N (a + 1)) value.;
+             alloc_id ::= alloc +' c_int (#|ys| + 1) value.;
              (var x).[-1] :::= make_tag rep.;
              statements (mapi (fun i y => (var x).[i] :::= make_var y) 0 ys))
+      | boxed _ _, [] => Err "translate_body: boxed constructor not given arguments"
       end ;;
     '(stm_e, fvs_e, n_e) <- translate_body e ;;
     ret ((stm_constr.; stm_e), add_local_fvs (PS.remove x fvs_e) ys, n_e)
@@ -434,15 +438,15 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
       call.;
       alloc_id ::= tinfo->alloc.;
       limit_id ::= tinfo->limit.;
-      match max_allocs e with 0 => Sskip | S _ as allocs =>
-        if PS.mem x live_after_call then
-          create_space allocs
-            (roots.[n_live_minus_x] :::= var x.;
-             frame.next :::= roots +' c_int (1 + n_live_minus_x) value)
-            (x ::= roots.[n_live_minus_x])
-        else
-          create_space allocs Sskip Sskip
-      end.;
+      let allocs := max_allocs e in
+      (if Z.eq_dec allocs 0%Z then Sskip else
+       if PS.mem x live_after_call then
+         create_space allocs
+           (roots.[n_live_minus_x] :::= var x.;
+            frame.next :::= roots +' c_int (1 + n_live_minus_x) value)
+           (x ::= roots.[n_live_minus_x])
+       else
+         create_space allocs Sskip Sskip).;
       retrieve_roots live_minus_x_list.;
       tinfo->fp :::= frame.prev.;
       stm_e
@@ -529,21 +533,19 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
         limit_id ::= tinfo->limit.;
         statements (map (fun '(x, i) => x ::= tinfo->args.[Z.of_N i]) (skipn n_param (combine xs locs))).;
         init_shadow_stack_frame.;
-        match allocs with 0 => Sskip | S _ as allocs =>
-          create_space allocs
-            (statements (mapi (fun i x => roots.[i] :::= var x) 0 live_xs_list).;
-             frame.next :::= roots +' c_int (Z.of_N n_live_xs) value.;
-             tinfo->fp :::= &frame)
-            (statements (mapi (fun i x => x ::= roots.[i]) 0 live_xs_list).;
-             tinfo->fp :::= frame.prev)
-        end.;
+        (if Z.eq_dec allocs 0%Z then Sskip else
+         create_space allocs
+           (statements (mapi (fun i x => roots.[i] :::= var x) 0 live_xs_list).;
+            frame.next :::= roots +' c_int (Z.of_N n_live_xs) value.;
+            tinfo->fp :::= &frame)
+           (statements (mapi (fun i x => x ::= roots.[i]) 0 live_xs_list).;
+            tinfo->fp :::= frame.prev)).;
         body
       in
       let stack_slots :=
-        match allocs with
-        | 0 => Z.of_N stack_slots
-        | S _ => Z.of_N (N.max n_live_xs stack_slots)
-        end
+        if Z.eq_dec allocs 0%Z
+        then Z.of_N stack_slots
+        else Z.of_N (N.max n_live_xs stack_slots)
       in
       ret ((f, Gfun (Internal (make_fun stack_slots xs locals body))) :: defs)
     end
@@ -570,9 +572,9 @@ Definition translate_program (fds_e : hoisted_exp) (nenv : name_env) : error (li
     (alloc_id ::= tinfo->alloc.;
      limit_id ::= tinfo->limit.;
      init_shadow_stack_frame.;
-     match max_allocs e with 0 => Sskip | S _ as allocs =>
-       create_space (max_allocs e) Sskip Sskip
-     end.;
+     let allocs := max_allocs e in
+     (if Z.eq_dec allocs 0%Z then Sskip else
+      create_space allocs Sskip Sskip).;
      body)%C
   in
   let locals := stack_decl (Z.of_N slots) in
@@ -759,8 +761,6 @@ Fixpoint set_ith {A} (xs : list A) (i : Z) (y : A) : list A :=
   | [] => []
   | x :: xs => if Z.eq_dec i 0 then y :: xs else x :: set_ith xs (Z.pred i) y
   end.
-
-Notation "'#|' xs '|'" := (Z.of_nat (length xs)).
 
 Lemma get_ith_range {A} (xs : list A) i y :
   get_ith xs i = Some y ->
@@ -956,7 +956,7 @@ Fixpoint translate_body_fvs locals nenv e {struct e} :
 Proof.
   rename translate_body_fvs into IHe; destruct e.
   - cbn. bind_step rep Hrep.
-    destruct rep as [t|t a]; rewrite bind_ret;
+    destruct rep as [t|t a], l as [|y ys]; try exact I; rewrite bind_ret;
     bind_step result He; destruct result as [[? fvs_e] ?];
     specialize (IHe locals nenv e); rewrite He in IHe;
     rewrite add_local_fvs_ok, FromSet_remove; normalize_occurs_free;
@@ -1019,7 +1019,7 @@ Fixpoint translate_body_n_slots locals nenv e {struct e} :
 Proof.
   unfold max_live; rename translate_body_n_slots into IHe; destruct e.
   - cbn. bind_step rep Hrep.
-    destruct rep as [t|t a]; rewrite bind_ret;
+    destruct rep as [t|t a], l as [|y' ys']; try exact I; rewrite bind_ret;
     bind_step result He; destruct result as [[? fvs_e] ?];
     specialize (IHe locals nenv e); rewrite He in IHe;
     intros C x f ft ys e' Hsubterm; destruct C; inv Hsubterm; now eapply IHe.
@@ -1204,7 +1204,7 @@ Fixpoint mpred_denote_aux (P : mpred) (S : Ensemble address) (m : mem) : Prop :=
     S <--> dom_mapsto b o vs /\
     All (map val_wf vs) /\
     (forall i v, get_ith vs i = Some v -> load m b (o + i*word_size) = Some v) /\
-    (o >= 0)%Z /\ (o + #|vs|*word_size < O.modulus)%Z (* all addresses are representable *)
+    (o >= 0)%Z /\ (o + #|vs|*word_size < O.modulus)%Z /\ (align_chunk word_chunk | o)%Z (* all addresses are representable *)
   | P ⋆ Q =>
     exists S1 S2, 
     S <--> S1 :|: S2 /\
@@ -1243,6 +1243,20 @@ Qed.
 Lemma concretize_word_size : (word_size = 4 \/ word_size = 8)%Z.
 Proof. unfold word_size, word_chunk; destruct Archi.ptr64; cbn; lia. Qed.
 
+Arguments "+"%Z : simpl never.
+Fixpoint max_allocs_nonneg e :
+  (max_allocs e >= 0)%Z.
+Proof.
+  rename max_allocs_nonneg into IHe.
+  destruct e; cbn; try solve [clear IHe; lia|apply IHe].
+  - destruct l; [apply IHe|cbn; specialize (IHe e); lia].
+  - remember 0%Z as init eqn:Hinit; rewrite Hinit in IHe; rewrite Hinit at 2.
+    replace 0%Z with (Z.min init 0) by lia.
+    clear Hinit; revert init; induction l as [| [c e] ces IHces]; [cbn; lia|intros init].
+    cbn; specialize (IHe e).
+    specialize (IHces (Z.max (max_allocs e) init)); lia.
+Qed.
+
 Ltac superlia :=
   repeat match goal with
   | |- context [Z.of_nat ?e] =>
@@ -1254,6 +1268,11 @@ Ltac superlia :=
     lazymatch goal with
     | H : (0 <= Z.of_nat e)%Z |- _ => fail
     | _ => pose proof (Zle_0_nat e)
+    end
+  | H : context [max_allocs ?e] |- _ =>
+    lazymatch goal with
+    | H : (max_allocs e >= 0)%Z |- _ => fail
+    | _ => pose proof (max_allocs_nonneg e)
     end
   | H : get_ith ?xs ?i = Some _ |- _ =>
     lazymatch goal with
@@ -1322,6 +1341,9 @@ Proof.
   + specialize (H b1 o1); subst; cbn in *; superlia.
 Qed.
 
+Lemma align_word_chunk_size : align_chunk word_chunk = word_size.
+Proof. now unfold word_size, word_chunk; destruct Archi.ptr64. Qed.
+
 Lemma mapsto_app S b o p vs ws m :
   m |=_{S} ((b, o) ↦_{p} vs ++ ws)%list <->
   m |=_{S} ((b, o) ↦_{p} vs) ⋆ ((b, o + #|vs|*word_size) ↦_{p} ws)%Z.
@@ -1343,6 +1365,9 @@ Proof.
       apply get_ith_range in Hget'.
       rewrite get_ith_suffix by lia.
       rewrite <- Hget; f_equal; lia.
+    + apply Z.divide_add_r; [easy|].
+      rewrite align_word_chunk_size.
+      apply Z.divide_factor_r.
   - intros [S1 [S2 [HS [HD [[Hperm1 [HS1 [Hwf1 [Hload1 Hbound1]]]]
                             [Hperm2 [HS2 [Hwf2 [Hload2 Hbound2]]]]]]]]].
     rewrite dom_mapsto_app, map_app, All_app, app_length, HS, HS1, HS2 in *.
@@ -1399,6 +1424,7 @@ Proof.
     + rewrite ith_gso in Hget by auto.
       specialize (Hload _ _ Hget).
       rewrite <- Hload; eapply Mem.load_store_other; eauto; superlia.
+  - easy.
 Qed.
 
 Lemma mpred_unchanged_on S P m m' :
@@ -1418,6 +1444,8 @@ Proof.
     + intros i v Hget; eapply Mem.load_unchanged_on; eauto.
       intros o'; cbn; rewrite Ensemble_iff_In_iff in HS.
       specialize (HS (b, o')); rewrite HS; unfold In, dom_mapsto; superlia.
+    + easy.
+    + easy.
   - destruct Hm as [S1[S2[HS[?[??]]]]]; do 2 eexists; split_ands; eauto.
     + apply IHP; auto. 
       eapply Mem.unchanged_on_implies; eauto; cbn; intros; now apply (proj2 HS).
@@ -1508,7 +1536,7 @@ Qed.
 Inductive is_frame : (mpred -> mpred) -> Prop :=
 | is_frame_hole : is_frame (fun P => P)
 | is_frame_sepcon1 F Q : is_frame F -> is_frame (fun P => F P ⋆ Q)
-| is_frame_sepcon2 F P : is_frame F -> is_frame (fun Q => F P ⋆ Q)
+| is_frame_sepcon2 F P : is_frame F -> is_frame (fun Q => P ⋆ F Q)
 (* These (redundant) cases make proof search possible *)
 | is_frame_sepcon1' Q : is_frame (fun P => P ⋆ Q)
 | is_frame_sepcon2' P : is_frame (fun Q => P ⋆ Q).
@@ -1563,7 +1591,7 @@ Proof.
     rewrite_equiv (fun H => H ⋆ Q') IHF.
     now symmetry in IHF; rewrite_equiv (fun H => H ⋆ Q') IHF.
   - rewrite !sepcon_assoc.
-    now rewrite_equiv (fun H => F P' ⋆ H) sepcon_comm.
+    now rewrite_equiv (fun H => P' ⋆ H) IHF.
   - rewrite !sepcon_assoc.
     rewrite_equiv (fun H => P ⋆ H) sepcon_comm.
     now rewrite sepcon_comm, !sepcon_assoc.
@@ -1623,7 +1651,8 @@ Proof.
   - eapply mapsto_store; eauto.
   - rewrite frame_swap_hole in * by auto.
     rewrite sepcon_comm in *; eapply mapsto_store_sepcon; eauto.
-  - rewrite sepcon_comm in *; eapply mapsto_store_sepcon; eauto.
+  - rewrite sepcon_comm, frame_swap_hole in *; auto.
+    rewrite sepcon_comm in *; eapply mapsto_store_sepcon; eauto.
   - eapply mapsto_store_sepcon; eauto.
   - rewrite sepcon_comm in *; eapply mapsto_store_sepcon; eauto.
 Qed.
@@ -1803,14 +1832,17 @@ Lemma mpred_Ex {A} F (G : A -> _) S m :
   is_frame F ->
   m |=_{S} F (∃ x, G x) <-> exists x, m |=_{S} F (G x).
 Proof.
-  destruct 1.
+  intros HF; revert S; induction HF; intros S.
   1: now cbn.
   1: rewrite frame_swap_hole by auto.
   1: erewrite MCUtils.iff_ex; [|intros x; apply frame_swap_hole; auto].
+  2: rewrite sepcon_comm, frame_swap_hole by auto.
+  2: erewrite MCUtils.iff_ex; [|intros x; apply sepcon_comm].
+  2: erewrite MCUtils.iff_ex; [|intros x; apply frame_swap_hole; auto].
   all:
-    cbn; split; intros Hexand; decompose [ex and] Hexand;
+    try solve [cbn; split; intros Hexand; decompose [ex and] Hexand;
     (repeat match goal with |- exists _, _ => eexists end);
-    split_ands; eauto.
+    split_ands; eauto].
 Qed.
 
 Definition allocd b lo hi :=
@@ -2312,6 +2344,7 @@ Proof.
       * eapply Mem.perm_valid_block with (ofs := o).
         apply Hperm. destruct vs; [now cbn in Hget|cbn; superlia].
       * cbn; intros; apply Hdom; unfold In; cbn; superlia.
+    + easy.
   - exact I.
 Qed.
 
@@ -2363,6 +2396,7 @@ Proof.
     eapply Mem.unchanged_on_implies; eauto.
     now intros; apply Hm. }
   1: rewrite frame_swap_hole by auto.
+  2: rewrite sepcon_comm, frame_swap_hole by auto.
   all:
     cbn; intros Hexand; decompose [ex and] Hexand; clear Hexand;
     eapply Mem.unchanged_on_implies; eauto; intros;
@@ -2387,12 +2421,426 @@ Definition postcond env tenv m stmt P :=
   (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
   P tenv' m' cv.
 
+Lemma fwd_red env tenv m s env' tenv' m' s' P :
+  (env, tenv, m, s) --> (env', tenv', m', s') ->
+  postcond env' tenv' m' s' P ->
+  postcond env tenv m s P.
+Proof.
+  intros Hred [tenv'' [m'' [cv [Hstep HP]]]].
+  exists tenv'', m'', cv; split; auto.
+Qed.
+
+Ltac fwd H := eapply fwd_red; [eapply H|].
+
 (* TODO lemmas like forward_set, forward_assign, ...
    to step through generated code in proofs *)
+
+(* TODO prove an induction scheme for values with IH like: Forall P vs -> P (Vconstr c vs) *)
+(* TODO lemmas about has_shape and friends and subheaps;
+   e.g. has_shape v m cv -> unchanged_on S m m' -> has_shape v m' cv *)
+
+Lemma typeof_c_int i t : typeof (c_int i t) = t.
+Proof. unfold c_int; now destruct Archi.ptr64. Qed.
+
+Lemma eval_expr_int ge env tenv m i :
+  eval_expr ge env tenv m (c_int i value) (vint i).
+Proof. unfold c_int, vint; destruct Archi.ptr64; constructor. Qed.
+Hint Resolve eval_expr_int : EvalDB.
+
+Lemma sem_ptr_add ge b o i m :
+  sem_add ge (Vptr b o) (tptr value) (vint i) value m =
+  Some (Vptr b (O.repr (O.unsigned o + i*word_size)))%Z.
+Proof.
+  unfold value, tptr, vint, word_size, size_chunk, word_chunk.
+  destruct Archi.ptr64 eqn:Harchi; cbn; do 2 f_equal.
+  - unfold Ptrofs.add.
+    unfold Ptrofs.mul.
+    apply O.eqm_samerepr.
+    apply O.eqm_add; [apply O.eqm_refl|].
+    eapply O.eqm_trans; [apply O.eqm_sym, O.eqm_unsigned_repr|].
+    rewrite Z.mul_comm.
+    apply O.eqm_mult; [|apply O.eqm_refl].
+    erewrite O.agree64_of_int_eq; [|now apply O.agree64_repr].
+    apply O.eqm_sym, O.eqm_unsigned_repr.
+  - unfold Ptrofs.add.
+    unfold Ptrofs.mul.
+    apply O.eqm_samerepr.
+    apply O.eqm_add; [apply O.eqm_refl|].
+    eapply O.eqm_trans; [apply O.eqm_sym, O.eqm_unsigned_repr|].
+    rewrite Z.mul_comm.
+    apply O.eqm_mult; [|apply O.eqm_refl].
+    erewrite O.agree32_of_ints_eq; auto; [|now apply O.agree32_repr].
+    apply O.eqm_sym, O.eqm_unsigned_repr.
+Qed.
+Hint Resolve sem_ptr_add : EvalDB.
+
+Lemma eval_ptr_add ge env tenv m i p b o :
+  typeof p = tptr value ->
+  eval_expr ge env tenv m p (Vptr b o) ->
+  eval_expr ge env tenv m (p +' c_int i value) (Vptr b (O.repr (O.unsigned o + i*word_size))).
+Proof.
+  intros Hp Heval; econstructor; cbn; eauto with EvalDB.
+  now rewrite typeof_c_int, Hp, sem_ptr_add.
+Qed.
+Hint Resolve eval_ptr_add : EvalDB.
+Hint Constructors eval_expr eval_lvalue : EvalDB.
+
+Lemma eval_ptr_add_cast ge env tenv m i p b o :
+  typeof p = tptr value ->
+  eval_expr ge env tenv m p (Vptr b o) ->
+  eval_expr ge env tenv m (Ecast (p +' c_int i value) value) (Vptr b (O.repr (O.unsigned o + i*word_size))).
+Proof. intros Hp Heval; econstructor; eauto with EvalDB. Qed.
+Hint Resolve eval_ptr_add_cast : EvalDB.
+
+Lemma eval_unfold env tenv m e v :
+  eval_expr prog_genv env tenv m e v ->
+  (env, tenv, m, e) ⇓ᵣ v.
+Proof. auto. Qed.
+Hint Resolve eval_unfold : EvalDB.
+
+Lemma evall_unfold env tenv m e b o :
+  eval_lvalue prog_genv env tenv m e b o ->
+  (env, tenv, m, e) ⇓ₗ (b, o).
+Proof. auto. Qed.
+Hint Resolve evall_unfold : EvalDB.
+
+(*    
+Definition eval_expr_operator := fun '(env, tenv, m, e) v =>
+  eval_expr prog_genv env tenv m e v.
+Definition eval_lvalue_operator := fun '(env, tenv, m, e) '(b, o) =>
+  eval_lvalue prog_genv env tenv m e b o.
+ *)
+
+Fixpoint NoDup' {A} (xs : list A) :=
+  match xs with
+  | [] => True
+  | x :: xs => All (map (fun x' => x <> x') xs) /\ NoDup' xs
+  end.
+
+Lemma notin_spec {A} (x : A) xs : 
+  All (map (fun x' => x <> x') xs) <-> ~ List.In x xs.
+Proof.
+  induction xs as [|x' xs IHxs]; [cbn; tauto|].
+  cbn; rewrite IHxs.
+  assert (x <> x' <-> x' <> x) by intuition congruence.
+  tauto.
+Qed.
+
+Lemma NoDup'_spec {A} (xs : list A) :
+  NoDup' xs <-> NoDup xs.
+Proof.
+  induction xs as [|x xs IHxs]; [split; constructor|].
+  cbn; now rewrite NoDup_cons_iff, notin_spec.
+Qed.
+
+Fixpoint exp_bv_list e :=
+  match e with
+  | Econstr x t ys e' => x :: exp_bv_list e'
+  | Ecase x cs => fold_right (@app _) [] (map (fun '(c, e) => exp_bv_list e) cs)
+  | Eproj x t n v e' => x :: exp_bv_list e'
+  | Eletapp x f t ys e' => x :: exp_bv_list e'
+  | Efun fds e' => fds_bv_list fds ++ exp_bv_list e'
+  | Eapp f t ys => []
+  | Eprim x p ys e' => x :: exp_bv_list e'
+  | Ehalt x => []
+  end%list
+with fds_bv_list fds :=
+  match fds with
+  | Fnil => []
+  | Fcons f t ys e fds' => f :: ys ++ exp_bv_list e ++ fds_bv_list fds'
+  end%list.
+
+Lemma exp_bv_list_spec e :
+  FromList (exp_bv_list e) <--> bound_var e
+with fds_bv_list_spec fds :
+  FromList (fds_bv_list fds) <--> bound_var_fundefs fds.
+Proof.
+  all: rename exp_bv_list_spec into IHe, fds_bv_list_spec into IHfds.
+  - destruct e; try solve [cbn; normalize_bound_var; rewrite ?FromList_cons, ?IHe; sets].
+    + induction l as [| [c e] ces IHces]; cbn; normalize_bound_var; [clear IHe IHfds; sets|].
+      now rewrite FromList_app, IHe, IHces.
+    + now cbn; rewrite FromList_app, IHe, IHfds; normalize_bound_var. Guarded.
+  - destruct fds as [f t xs e fds|]; [|now cbn; normalize_bound_var].
+    now cbn; normalize_bound_var; rewrite FromList_cons, !FromList_app, IHe, IHfds.
+Qed.
+
+Hint Extern 1 ((M.set _ _ _) ! _ = Some _) => rewrite M.gso by easy : EvalDB.
+Hint Resolve M.gss : EvalDB.
+
+Lemma sem_cast_ptr b o m :
+  sem_cast (Vptr b o) value (tptr value) m = Some (Vptr b o).
+Proof. unfold sem_cast, value; cbn; destruct Archi.ptr64; now cbn. Qed.
+Hint Resolve sem_cast_ptr : EvalDB.
+Hint Extern 1 (eval_expr _ _ _ _ (make_tag _) _) => unfold make_tag : EvalDB.
+
+Lemma sem_cast_int_same i m :
+  sem_cast (vint i) value value m = Some (vint i).
+Proof. unfold sem_cast, value, vint; destruct Archi.ptr64; cbn; now destruct Archi.ptr64. Qed.
+Hint Resolve sem_cast_int_same : EvalDB.
+
+Lemma access_mode_value :
+  access_mode value = By_value word_chunk.
+Proof. unfold value, word_chunk; now destruct Archi.ptr64. Qed.
+Hint Resolve access_mode_value : EvalDB.
+
+Lemma repr_unsigned_addl e1 e2 :
+  O.repr (O.unsigned (O.repr e1) + e2) = O.repr (e1 + e2).
+Proof. apply O.eqm_samerepr; auto with ints. Qed.
+
+Lemma sem_cast_ptr_same b o m :
+  sem_cast (Vptr b o) value value m = Some (Vptr b o).
+Proof. unfold sem_cast, value; destruct Archi.ptr64 eqn:Harchi; cbn; now rewrite Harchi. Qed.
+Hint Resolve sem_cast_ptr_same : EvalDB.
+
+Lemma sem_cast_ptr_ptr_same b o m :
+  sem_cast (Vptr b o) (tptr value) (tptr value) m = Some (Vptr b o).
+Proof. unfold sem_cast, tptr, value; destruct Archi.ptr64 eqn:Harchi; now cbn. Qed.
+Hint Resolve sem_cast_ptr_ptr_same : EvalDB.
+
+Definition val_defined_wf v :=
+  if Archi.ptr64 then match v with Vlong _ | Vptr _ _ => True | _ => False end
+  else match v with Values.Vint _ | Vptr _ _ => True | _ => False end.
+Lemma val_defined_wf_wf v : val_defined_wf v -> val_wf v.
+Proof. unfold val_wf, val_defined_wf; destruct Archi.ptr64, v; tauto. Qed.
+Hint Resolve val_defined_wf_wf : EvalDB.
+
+Lemma sem_cast_wf_same v m :
+  val_defined_wf v -> sem_cast v value value m = Some v.
+Proof. unfold val_defined_wf, sem_cast, value; destruct Archi.ptr64 eqn:Harchi; cbn; rewrite Harchi; destruct v; tauto. Qed.
+Hint Resolve sem_cast_wf_same : EvalDB.
+
+(* TODO hoist *)
+Transparent Mem.store.
+Lemma store_ex b o i v vs m :
+  ((b, o) ↦_{Writable} vs) ∈ m ->
+  (0 <= i < #|vs|)%Z -> exists m',
+  store m b (o + i*word_size) v = Some m'.
+Proof.
+  intros Hm Hbound.
+  unfold store, Mem.store; cbn.
+  destruct (Mem.valid_access_dec _ _ _ _ _) as [|Hwat]; [eauto|].
+  contradiction Hwat.
+  cbn in Hm; decompose [ex and] Hm; clear Hm.
+  unfold Mem.valid_access; split.
+  - match goal with
+    | H : Mem.range_perm _ _ _ _ _ _ |- _ =>
+      intros ??; eapply H; superlia
+    end.
+  - apply Z.divide_add_r; [easy|].
+    rewrite align_word_chunk_size.
+    apply Z.divide_factor_r.
+Qed.
+Opaque Mem.store.
+
+(* TODO hoist *)
+Lemma mpred_frame_in F P m :
+  is_frame F ->
+  m |= F P ->
+  P ∈ m.
+Proof.
+  intros HF; induction HF as [|F Q' HF IHF|F P' HF IHF|Q'|P'].
+  { unfold "|="; intros H; exists (dom_mem m), (Empty_set _).
+    split_ands; sets; eauto; exact I. }
+  1: unfold "|="; rewrite frame_swap_hole by auto.
+  2: unfold "|="; rewrite sepcon_comm, frame_swap_hole by auto.
+  all:
+    unfold "|="; cbn; intros [S1 [S2 H]]; decompose [ex and] H; clear H;
+    match goal with
+    | H : _ |=_{?S} _, H' : _ |=_{?S'} _ |- _ =>
+      exists S, S'; split_ands; eauto; sets;
+      now rewrite Union_commut
+    end.
+Qed.
+
+(* TODO hoist *)
+Lemma store_dom_mem b o v m m' :
+  store m b o v = Some m' ->
+  dom_mem m <--> dom_mem m'.
+Proof.
+  intros Hm; apply Ensemble_iff_In_iff; intros [b' o']; unfold In, dom_mem.
+  split; intros Hperm.
+  - eapply Mem.perm_store_1; eauto.
+  - eapply Mem.perm_store_2; eauto.
+Qed.
+
+Lemma fwd_arr_assign F env tenv m offset a i e b o v s vs P :
+  is_frame F ->
+  val_defined_wf v ->
+  (env, tenv, m, a) ⇓ᵣ (Vptr b (O.repr (O.unsigned o + offset*word_size))) ->
+  (env, tenv, m, e) ⇓ᵣ v ->
+  typeof a = value \/ typeof a = tptr value ->
+  typeof e = value ->
+  (0 <= offset <= 1)%Z ->
+  (0 <= offset + i < #|vs|)%Z ->
+  m |= F ((b, O.unsigned o) ↦_{Writable} vs) ->
+  (forall m',
+    store m b (O.unsigned o + (offset + i)*word_size)%Z v = Some m' ->
+    m' |= F ((b, O.unsigned o) ↦_{Writable} set_ith vs (offset + i) v)%Z ->
+    postcond env tenv m' s P) ->
+  postcond env tenv m (a.[i] :::= e.; s)%C P.
+Proof.
+  intros HF Hv Ha He Htypeof_a Htypeof_e Hoffset Hi Hm Hcont.
+  pose proof Hm as Hm_in.
+  apply mpred_frame_in in Hm_in; [|auto].
+  eapply store_ex with (v := v) in Hm_in; eauto.
+  destruct Hm_in as [m' Hstore].
+  pose proof Hstore as Hmpred.
+  eapply mpred_store in Hmpred; eauto; [|auto with EvalDB].
+  rewrite mpred_Same_set in Hmpred; [|eapply store_dom_mem; eauto].
+  specialize (Hcont _ Hstore Hmpred).
+  fwd Cred_assign.
+  - constructor.
+    apply eval_ptr_add; auto.
+    econstructor; eauto with EvalDB.
+    destruct Htypeof_a as [Hty|Hty]; rewrite Hty; eauto with EvalDB.
+  - eauto with EvalDB.
+  - rewrite Htypeof_e; eauto with EvalDB.
+  - eapply assign_loc_value; [cbn; rewrite access_mode_value; reflexivity|].
+    rewrite <- Hstore; unfold Mem.storev, store; f_equal.
+    apply mpred_frame_in in Hmpred; [|auto].
+    cbn in Hmpred; decompose [ex and] Hmpred; clear Hmpred.
+    rewrite O.unsigned_repr; rewrite O.unsigned_repr; unfold O.max_unsigned; superlia.
+  - apply Hcont.
+Qed.
+
+Lemma fwd_arr_assign' F env tenv m a i e b o v s vs P :
+  is_frame F ->
+  val_defined_wf v ->
+  (env, tenv, m, a) ⇓ᵣ (Vptr b o) ->
+  (env, tenv, m, e) ⇓ᵣ v ->
+  typeof a = value \/ typeof a = tptr value ->
+  typeof e = value ->
+  (0 <= i < #|vs|)%Z ->
+  m |= F ((b, O.unsigned o) ↦_{Writable} vs) ->
+  (forall m',
+    store m b (O.unsigned o + i*word_size)%Z v = Some m' ->
+    m' |= F ((b, O.unsigned o) ↦_{Writable} set_ith vs i v)%Z ->
+    postcond env tenv m' s P) ->
+  postcond env tenv m (a.[i] :::= e.; s)%C P.
+Proof.
+  intros; eapply fwd_arr_assign with (offset := 0%Z); eauto; [|lia].
+  replace (O.unsigned o + 0*word_size)%Z with (O.unsigned o) by lia.
+  now rewrite O.repr_unsigned.
+Qed.
+
+Lemma vint_wf i : val_defined_wf (vint i).
+Proof. unfold val_defined_wf, vint; now destruct Archi.ptr64. Qed.
+Hint Resolve vint_wf : EvalDB.
+
+Ltac destruct_ex_ctx F x H :=
+  rewrite (mpred_Ex F) in H; [|auto with FrameDB]; destruct H as [x H].
+
+Ltac destruct_ex x H := destruct_ex_ctx (fun H : mpred => H) x H.
+
+Ltac exists_ex_ctx F x :=
+  rewrite (mpred_Ex F); [|auto with FrameDB]; exists x.
+Ltac exists_ex x := exists_ex_ctx (fun H : mpred => H) x.
+
+Ltac split_ex_ctx F :=
+  rewrite (mpred_Ex F); [|auto with FrameDB]; unshelve eexists.
+Ltac split_ex := split_ex_ctx (fun H : mpred => H).
+
+Ltac rewrite_equiv_in F H Hin :=
+  rewrite (frame_cong F) in Hin;
+  [|eauto with FrameDB|intros; apply H].
+
+(* TODO hoist *)
+Lemma skipn_len {A} n (xs : list A) :
+  (0 <= n <= #|xs| -> #|skipn (Z.to_nat n) xs| = #|xs| - n)%Z.
+Proof.
+  remember (Z.to_nat n) as nat_n eqn:Hnat; generalize dependent n.
+  revert xs; induction nat_n as [|nat_n IHnat]; intros xs n Hnat; [cbn; lia|].
+  destruct xs as [|x xs]; [cbn; lia|].
+  specialize (IHnat xs (Z.pred n)).
+  cbn; intros Hn; rewrite IHnat; lia.
+Qed.
+
+(* TODO hoist *)
+Lemma firstn_len {A} n (xs : list A) :
+  (0 <= n <= #|xs| -> #|firstn (Z.to_nat n) xs| = n)%Z.
+Proof.
+  remember (Z.to_nat n) as nat_n eqn:Hnat; generalize dependent n.
+  revert xs; induction nat_n as [|nat_n IHnat]; intros xs n Hnat; [cbn; lia|].
+  destruct xs as [|x xs]; [cbn; lia|].
+  specialize (IHnat xs (Z.pred n)).
+  cbn; rewrite !Nat2Z.inj_succ; intros H; rewrite IHnat; lia.
+Qed.
+
+Lemma mem_nursery_alloc n m nursery_b alloc_o limit_o tinfo_b tinfo_o vss ss cvss outliers frame :
+  (0 <= n <= (O.unsigned limit_o - O.unsigned alloc_o)/word_size)%Z ->
+  m |= ∃ args nalloc, valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
+                                args vss ss cvss nalloc outliers frame ->
+  m |= (∃ vs, (nursery_b, O.unsigned alloc_o) ↦_{Writable} vs WITH #|vs| = n) ⋆
+       ∃ args nalloc, valid_mem nursery_b (O.repr (O.unsigned alloc_o + n*word_size))%Z
+                                limit_o tinfo_b tinfo_o
+                                args vss ss cvss nalloc outliers frame.
+Proof.
+  intros Hbound Hm. unfold "|=" in *.
+  destruct_ex args Hm; destruct_ex nalloc Hm.
+  unfold valid_mem in *.
+  destruct_ex args_b Hm; destruct_ex args_o Hm.
+  match goal with
+  | Hm : _ |=_{_} ?P ⋆ _ ⋆ ?Q |- _ |=_{_} ?R ⋆ _ =>
+    destruct_ex_ctx (fun H => P ⋆ H ⋆ Q) free_space Hm;
+    destruct_ex_ctx (fun H => P ⋆ H ⋆ Q) Hfree_space Hm;
+    exists_ex_ctx (fun H => R ⋆ H) args;
+    exists_ex_ctx (fun H => R ⋆ H) nalloc;
+    exists_ex_ctx (fun H => R ⋆ H) args_b;
+    exists_ex_ctx (fun H => R ⋆ H) args_o
+  end.
+  match goal with
+  | |- _ |=_{_} ?P ⋆ ?Q ⋆ _ ⋆ ?R =>
+    exists_ex_ctx (fun H => P ⋆ Q ⋆ H ⋆ R) (skipn (Z.to_nat n) free_space);
+    split_ex_ctx (fun H => P ⋆ Q ⋆ H ⋆ R)
+  end.
+  { rewrite skipn_len, Hfree_space by lia.
+    rewrite O.unsigned_repr; auto.
+    - unfold Z.sub. now rewrite Z.opp_add_distr, Z.add_assoc, <- Z.mul_opp_l, Z_div_plus.
+    - unfold O.max_unsigned; cbn in Hm. decompose [ex and] Hm; clear Hm. superlia. }
+  match goal with
+  | |- _ |=_{_} _ ⋆ ?P =>
+    exists_ex_ctx (fun H => H ⋆ P) (firstn (Z.to_nat n) free_space);
+    split_ex_ctx (fun H => H ⋆ P)
+  end.
+  { rewrite firstn_len; lia. }
+  rewrite <- (firstn_skipn (Z.to_nat n) free_space) in Hm.
+  match type of Hm with
+  | _ |=_{_} ?P ⋆ _ ⋆ ?Q =>
+    rewrite_equiv_in (fun H => P ⋆ H ⋆ Q) mapsto_app Hm;
+    rewrite_equiv_in (fun H => P ⋆ H) sepcon_assoc Hm;
+    rewrite <- sepcon_assoc in Hm
+  end.
+  match type of Hm with
+  | _ |=_{_} (_ ⋆ _) ⋆ ?Q =>
+    rewrite_equiv_in (fun H => H ⋆ Q) sepcon_comm Hm;
+    rewrite sepcon_assoc in Hm
+  end.
+  replace #|firstn (Z.to_nat n) free_space| with n in *; [rewrite O.unsigned_repr; auto|].
+  - unfold O.max_unsigned; cbn in Hm; decompose [ex and] Hm; clear Hm; superlia.
+  - rewrite firstn_len; lia.
+Qed.
+
+(* TODO hoist *)
+Lemma mapsto_perm_order F p b o p' vs S m :
+  is_frame F ->
+  perm_order p p' ->
+  m |=_{S} F ((b, o) ↦_{p} vs) ->
+  m |=_{S} F ((b, o) ↦_{p'} vs).
+Proof.
+  intros HF Hperm Hm.
+  eapply frame_entail; try eassumption.
+  clear - Hperm; cbn; intros S Hm; decompose [and] Hm; clear Hm; split_ands; auto.
+  eapply Mem.range_perm_implies; eauto.
+Qed.
 
 Lemma translate_body_stm nenv k : forall e,
   match translate_body cenv fenv locals nenv e with
   | Ret (stmt, _, _) => 
+    NoDup' ([alloc_id; limit_id] ++ exp_bv_list e)%list ->
+    (* (* TODO: probably overkill, delete if unneeded *)
+       [thread_info_id; alloc_id; limit_id; heap_id; args_id; fp_id; nalloc_id;
+       stack_frame_id; tinfo_id; frame_id; roots_id; gc_id; body_id;
+       builtin_unreachable_id; ret_id] *)
     (** if running e in environment ρ yields a value v in j <= k cost, *)
     forall ρ v cin cout vss,
     to_nat cin <= k ->
@@ -2405,6 +2853,7 @@ Lemma translate_body_stm nenv k : forall e,
     env ! frame_id = Some (frame_b, stack_frame) ->
     env ! roots_id = Some (roots_b, roots_ty n_roots) ->
     max_live locals e (Z.to_nat n_roots) ->
+    (max_allocs e <= (O.unsigned limit_o - O.unsigned alloc_o)/word_size)%Z ->
     (** and environments agree on the free variables of e, *)
     bound_var e \subset FromSet locals ->
     ρ ~ₜ{k, occurs_free e :&: FromSet locals} (tenv, m) ->
@@ -2438,13 +2887,13 @@ Proof.
   induction k as [k IHk] using lt_wf_ind; fix IHe 1; destruct e.
   - (* let x = Con c ys in e *)
     rename v into x, l into ys; simpl.
-    bind_step rep Hrep; destruct rep as [t|t a]; rewrite bind_ret.
+    bind_step rep Hrep; destruct rep as [t|t a]; destruct ys as [|y ys]; try exact I; rewrite bind_ret.
     + (* Unboxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
+      intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+      fwd Cred_set; [constructor|].
       admit.
-      (*
-      Cstep Cred_set; [constructor|].
-      specialize (IHe e); rewrite He in IHe; apply IHe. Guarded.
+      (*specialize (IHe e); rewrite He in IHe; eapply IHe. Guarded.
       eapply rel_env_antimon_S; [apply (Included_Union_Setminus _ [set x]); sets|].
       normalize_occurs_free_in Hρ.
       rewrite rel_env_union in Hρ; destruct Hρ as [_ Hρ].
@@ -2452,37 +2901,31 @@ Proof.
       apply rel_env_gss_sing; rewrite rel_val_eqn; cbn; now rewrite Hrep. *)
     + (* Boxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
+      intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+      repeat fwd Cred_seq_assoc.
+      fwd Cred_set; [eauto with EvalDB|].
+      fwd Cred_set; [eauto with EvalDB|].
+      apply (mem_nursery_alloc (#|ys| + 1)%Z) in Hm.
+      2:{ clear - Hallocs; cbn in *; superlia. }
+      unfold "|=" in *.
+      match type of Hm with
+      | _ |=_{_} _ ⋆ ?P =>
+        destruct_ex_ctx (fun H => H ⋆ P) vs Hm;
+        destruct_ex_ctx (fun H => H ⋆ P) Hvs Hm;
+        destruct vs as [|tag_slot args_slots]; [cbn in Hvs; lia|];
+        eapply (fwd_arr_assign (fun H => H ⋆ P)); eauto with FrameDB EvalDB; try lia
+      end.
+      intros m' Hstore Hm'.
+      (* TODO: generalize fwd_arr_assign to a sequence of statements initializing a subarray *)
       admit.
-      (*
-      norm_seq; Cstep Cred_set.
-      { admit. }
-      Cstep Cred_set.
-      { admit. }
-      Cstep Cred_assign.
-      (* TODO:
-           Want assumption like
-             state_ok env tenv m
-           containing all the invariants we need the state to satisfy during execution
-           - limit..alloc is disjoint from the rest of the heap and writable
-           - alloc = tinfo->alloc
-           - limit = tinfo->limit
-           - tinfo contains shadow stack
-           - etc
-           Then can prove lemmas of the form
-             state_ok env tenv m
-             --------------------------------------
-             ∃ b o, (env, tenv, a) ⇓ᵣ (b, o) /\ ...
-           to solve the obligations needed to step through each statement. *)
-      { admit. }
-      { admit. }
-      { admit. }
-      { admit. } *)
   - (* case x of { ces } *)
     rename v into x, l into ces; simpl.
     bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
-    admit. (*Cstep Cred_if'.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+    fwd Cred_if'.
     { admit. }
     { admit. }
+    admit. (*
     revert boxed_cases unboxed_cases fvs_cs n_cs Hces ρ env tenv m Hρ.
     induction ces as [| [c e] ces IHces]; intros*; [inv Hces; intros; now apply rel_exp_case|].
     apply rel_exp_case; intros c' vs n e_taken Hx Hconsistent Hfind_tag.
@@ -2499,9 +2942,10 @@ Proof.
   - (* let x = Proj c n y in e *)
     rename v into x, v0 into y; simpl.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    admit. (*
-    Cstep Cred_set.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+    fwd Cred_set.
     { admit. }
+    admit. (*
     specialize (IHe e); rewrite He in IHe; apply IHe. Guarded.
     eapply rel_env_antimon_S; [apply (Included_Union_Setminus _ [set x]); sets|].
     normalize_occurs_free_in Hρ.
@@ -2513,6 +2957,8 @@ Proof.
     rename v into x, v0 into f, f into ft, l into ys; simpl.
     bind_step e' He; destruct e' as [[stm_e live_after_call] n_e].
     bind_step call Hcall.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+    repeat fwd Cred_seq_assoc.
     admit. (*
     norm_seq.
     admit.
@@ -2527,16 +2973,20 @@ Proof.
   - (* f ft ys *)
     rename v into f, f into ft, l into ys; simpl.
     bind_step call Hcall.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
     admit.
     (* TODO: lemma about make_fun_call *)
   - (* let x = Prim p ys in e *)
     rename v into x, l into ys; simpl.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    admit.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+    now inv Hbstep.
   - (* halt x *)
     rename v into x; simpl.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+    repeat fwd Cred_seq_assoc.
     admit. (*
-    norm_seq; Cstep Cred_assign.
+    Cstep Cred_assign.
     { admit. }
     { admit. }
     { admit. }

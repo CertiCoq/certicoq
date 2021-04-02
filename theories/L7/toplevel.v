@@ -23,6 +23,7 @@ Definition caseIdent:positive := 83.
 Definition stackframeTIdent:positive := 78. (* the stack_frame type *)
 Definition frameIdent:positive := 79. (* the stack frame of the current function *)
 Definition rootIdent:positive := 84. (* live roots array *)
+Definition rootTempIdent:positive := 96. (* live roots array, as a temp variable *)
 Definition spIdent:positive := 85. (* stack pointer *)
 Definition fpIdent:positive := 86. (* frame pointer *)
 (* Fields of stack_frame struct *)
@@ -70,6 +71,7 @@ Definition Clight_trans_ANF (prims : list (kername * string * nat * positive)) (
                      threadInfIdent allocIdent limitIdent heapInfIdent argsIdent fpIdent
                      nallocIdent stackframeTIdent nextFld rootFld prevFld tinfIdent frameIdent rootIdent 
                      isptrIdent gcIdent bodyIdent mainIdent builtin_unreachableIdent retIdent caseIdent
+                     rootTempIdent
                      prog cenv nenv in
   match p with
   | Ret (nenv, prog, head) =>

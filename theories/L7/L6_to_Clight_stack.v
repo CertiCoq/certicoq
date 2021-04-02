@@ -201,7 +201,7 @@ Notation "tinfo->nalloc" := (Efield tinfd nalloc_id value).
     where size upper bounds the number of variables live at GC calls. *)
 Context (frame_id roots_id : ident).
 Definition roots_ty size := Tarray value size noattr.
-Definition roots := Evar roots_id (tptr value).
+Definition roots_array size := Evar roots_id (roots_ty size).
 Definition frame := Evar frame_id stack_frame.
 Notation "frame.next" := (Efield frame next_fld (tptr value)).
 Notation "frame.root" := (Efield frame root_fld (tptr value)).
@@ -237,14 +237,28 @@ Definition builtin_unreachable : statement :=
 (** Each generated function body also declares the following temporary variables:
       value *alloc;
       value *limit;
-      value ret_id;
-      bool case_id
-    ret_id is used to store the results of tail calls.
-    case_id is used to store the results of calls to isptr. *)
+      value ret;
+      bool case_id;
+      value *roots_temp;
+    ret is used to store the results of tail calls.
+    case_id is used to store the results of calls to isptr.
+    roots_temp is used to store the roots array.
+      Q: Why not just refer to the roots array using roots_id?
+      A: roots_id is a fixed-size stack-allocated array.
+         To refer to it, need to know its size to write (Evar roots_id (Tarray ..)).
+         The size is computed together with the generated C code, in translate_body.
+         Therefore, it's not available until after translate_body.
+         To avoid doing two passes, we can refer to the roots array via roots_temp,
+         which just has type (tptr value). Then, we can emit
+           roots_temp = roots;
+         at function entry to intiailize roots_temp properly.
+*)
 Notation alloc := (Etempvar alloc_id (tptr value)).
 Notation limit := (Etempvar limit_id (tptr value)).
 Variable (ret_id : ident).
 Variable (case_id : ident).
+Variable (roots_temp_id : ident).
+Notation roots := (Etempvar roots_temp_id (tptr value)).
 
 (** fun_ty n = value(struct thread_info *ti, value, .. min(n_param, n) times)
     prim_ty n = value(value, .. n times) *)
@@ -310,7 +324,7 @@ Context
   (nenv : M.t BasicAst.name).
 
 (** To use variables in Clight expressions, need variable name and its type.
-    Variables that refer to functions must have type
+    Variables that refer to top-level functions must have type
       void(struct thread_info *ti, val, ..)
                                    ------- n times
     where n = min(n_param, arity of the function).
@@ -320,7 +334,7 @@ Definition make_var (x : ident) :=
   match M.get x fenv with
   | Some (_, locs) =>
     if PS.mem x locals
-    then Ecast (Etempvar x (fun_ty (length locs))) value
+    then var x
     else Ecast (Evar x (fun_ty (length locs))) value
   | None => var x
   end.
@@ -442,7 +456,7 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
     call <- make_fun_call x f ys ;;
     let retrieve_roots xs := statements (mapi (fun i x => x ::= roots.[i]) 0 xs) in
     let stm :=
-      statements (mapi (fun i x => roots.[i] :::= var x) 0 live_minus_x_list).;
+      statements (mapi (fun i x => roots.[i] :::= make_var x) 0 live_minus_x_list).;
       frame.next :::= roots +' c_int n_live_minus_x value.;
       tinfo->fp :::= &frame.;
       call.;
@@ -498,12 +512,13 @@ Definition make_fun (size : Z) (xs locals : list ident) (body : statement) : fun
              ((tinfo_id, threadInf) :: make_decls (firstn n_param xs))
              (stack_decl size)%list
              ((alloc_id, tptr value) :: (limit_id, tptr value) :: (ret_id, value) ::
-              (case_id, bool_ty) ::
+              (case_id, bool_ty) :: (roots_temp_id, tptr value) ::
               make_decls (skipn n_param xs ++ locals))%list
              body.
 
-Definition init_shadow_stack_frame :=
-  (frame.next :::= roots.;
+Definition init_shadow_stack_frame size :=
+  (roots_temp_id ::= roots_array size.;
+   frame.next :::= roots.;
    frame.root :::= roots.;
    frame.prev :::= tinfo->fp)%C.
 
@@ -539,11 +554,16 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
       let live_xs_list := PS.elements live_xs in 
       let n_live_xs := N.of_nat (length live_xs_list) in
       let allocs := max_allocs e in
+      let stack_slots :=
+        if Z.eq_dec allocs 0%Z
+        then Z.of_N stack_slots
+        else Z.of_N (N.max n_live_xs stack_slots)
+      in
       let body :=
         alloc_id ::= tinfo->alloc.;
         limit_id ::= tinfo->limit.;
         statements (map (fun '(x, i) => x ::= tinfo->args.[Z.of_N i]) (skipn n_param (combine xs locs))).;
-        init_shadow_stack_frame.;
+        init_shadow_stack_frame stack_slots.;
         (if Z.eq_dec allocs 0%Z then Sskip else
          create_space allocs
            (statements (mapi (fun i x => roots.[i] :::= var x) 0 live_xs_list).;
@@ -552,11 +572,6 @@ Fixpoint translate_fundefs (fds : fundefs) (nenv : name_env) : error (list defin
            (statements (mapi (fun i x => x ::= roots.[i]) 0 live_xs_list).;
             tinfo->fp :::= frame.prev)).;
         body
-      in
-      let stack_slots :=
-        if Z.eq_dec allocs 0%Z
-        then Z.of_N stack_slots
-        else Z.of_N (N.max n_live_xs stack_slots)
       in
       ret ((f, Gfun (Internal (make_fun stack_slots xs locals body))) :: defs)
     end
@@ -582,7 +597,7 @@ Definition translate_program (fds_e : hoisted_exp) (nenv : name_env) : error (li
   let body :=
     (alloc_id ::= tinfo->alloc.;
      limit_id ::= tinfo->limit.;
-     init_shadow_stack_frame.;
+     init_shadow_stack_frame (Z.of_N slots).;
      let allocs := max_allocs e in
      (if Z.eq_dec allocs 0%Z then Sskip else
       create_space allocs Sskip Sskip).;
@@ -594,6 +609,7 @@ Definition translate_program (fds_e : hoisted_exp) (nenv : name_env) : error (li
     (limit_id, tptr value) :: 
     (ret_id, value) ::
     (case_id, bool_ty) ::
+    (roots_temp_id, tptr value) ::
     map (fun x => (x, value)) temps in
   let fn := mkfunction value cc_default ((tinfo_id, threadInf) :: nil) locals temps body in
   ret ((body_id, Gfun (Internal fn)) :: funs).
@@ -628,6 +644,7 @@ Definition inf_vars :=
   (builtin_unreachable_id, nNamed "__builtin_unreachable") ::
   (ret_id, nNamed "ret") ::
   (case_id, nNamed "case_id") ::
+  (roots_temp_id, nNamed "roots_temp") ::
   [].
 
 Definition add_inf_vars (nenv : name_env) : name_env :=
@@ -765,6 +782,7 @@ Definition compile e cenv nenv : error (name_env * Clight.program * Clight.progr
     ret (nenv, header, impl)
   in (res, log).
 
+(*
 Section PROOF.
 
 Definition get_ith {A} := @Coqlib.list_nth_z A.
@@ -1580,7 +1598,7 @@ Goal True.
   end.
 Abort.
 
-Lemma frame_cong F P Q S m :
+Lemma frame_cong' F P Q S m :
   is_frame F ->
   (forall S', m |=_{S'} P <-> m |=_{S'} Q) ->
   m |=_{S} F P <-> m |=_{S} F Q.
@@ -1600,22 +1618,15 @@ Proof.
   intuition (try (rewrite <- IHHF + rewrite IHHF + rewrite HPQ + rewrite <- HPQ); eauto).
 Qed.
 
-Lemma frame_entail F P Q :
-  is_frame F ->
-  P |-- Q ->
-  F P |-- F Q.
-Proof.
-  intros HF HPQ S m Hm.
-  eapply frame_entail'; try eassumption.
-  intros; now apply HPQ.
-Qed.
+Definition mpred_equiv P Q := forall S m, m |=_{S} P <-> m |=_{S} Q.
+Infix "<=>" := mpred_equiv (at level 79).
 
 Ltac rewrite_equiv F H :=
-  rewrite (frame_cong F);
+  rewrite (frame_cong' F);
   [|eauto with FrameDB|intros; apply H].
 
 Ltac rewrite_equiv_l F H :=
-  rewrite <- (frame_cong F);
+  rewrite <- (frame_cong' F);
   [|eauto with FrameDB|intros; apply H].
 
 Lemma frame_swap_hole S F P Q m :
@@ -1637,6 +1648,97 @@ Proof.
     now rewrite sepcon_comm, !sepcon_assoc.
   - rewrite !sepcon_assoc.
     now rewrite_equiv (fun H => P' ⋆ H) sepcon_comm.
+Qed.
+
+Lemma mpred_Ex {A} F (G : A -> _) S m :
+  is_frame F ->
+  m |=_{S} F (∃ x, G x) <-> exists x, m |=_{S} F (G x).
+Proof.
+  intros HF; revert S; induction HF; intros S.
+  1: now cbn.
+  1: rewrite frame_swap_hole by auto.
+  1: erewrite MCUtils.iff_ex; [|intros x; apply frame_swap_hole; auto].
+  2: rewrite sepcon_comm, frame_swap_hole by auto.
+  2: erewrite MCUtils.iff_ex; [|intros x; apply sepcon_comm].
+  2: erewrite MCUtils.iff_ex; [|intros x; apply frame_swap_hole; auto].
+  all:
+    try solve [cbn; split; intros Hexand; decompose [ex and] Hexand;
+    (repeat match goal with |- exists _, _ => eexists end);
+    split_ands; eauto].
+Qed.
+
+Ltac destruct_ex_ctx F x H :=
+  rewrite (mpred_Ex F) in H; [|auto with FrameDB]; destruct H as [x H].
+Ltac destruct_ex x H := destruct_ex_ctx (fun H : mpred => H) x H.
+
+Ltac exists_ex_ctx F x :=
+  rewrite (mpred_Ex F); [|auto with FrameDB]; exists x.
+Ltac exists_ex x := exists_ex_ctx (fun H : mpred => H) x.
+
+Ltac split_ex_ctx F :=
+  rewrite (mpred_Ex F); [|auto with FrameDB]; unshelve eexists.
+Ltac split_ex := split_ex_ctx (fun H : mpred => H).
+
+Ltac rewrite_equiv_in F H Hin :=
+  rewrite (frame_cong' F) in Hin;
+  [|eauto with FrameDB|intros; apply H].
+
+Lemma mpred_equiv_ex {A} (P Q : A -> _) :
+  (forall x, P x <=> Q x) ->
+  ∃ x, P x <=> ∃ x, Q x.
+Proof.
+  intros HPQ; split; intros Hm;
+  destruct_ex x Hm;
+  exists_ex x; now apply HPQ.
+Qed.
+
+Lemma mpred_ex_entail {A} (P : A -> _) x :
+  P x |-- ∃ x, P x.
+Proof. intros S m Hm; now exists_ex x. Qed.
+
+Lemma frame_entail F P Q :
+  is_frame F ->
+  P |-- Q ->
+  F P |-- F Q.
+Proof.
+  intros HF HPQ S m Hm.
+  eapply frame_entail'; try eassumption.
+  intros; now apply HPQ.
+Qed.
+
+Lemma mpred_ex_sepcon {A} P (Q : A -> _) :
+  ∃ x, P ⋆ Q x <=> P ⋆ ∃ x, Q x.
+Proof.
+  split; intros Hm.
+  - destruct_ex x Hm.
+    eapply frame_entail; auto with FrameDB; [apply mpred_ex_entail|]; eauto.
+  - cbn in Hm. destruct Hm as [S1 [S2 [HS [HD [HP [x HQ]]]]]].
+    cbn; exists x; do 2 eexists; eauto.
+Qed.
+
+Lemma mpred_equiv_sym P Q :
+  P <=> Q -> Q <=> P.
+Proof.
+  unfold "<=>"; intros HPQ; split; intros Hm.
+  - now rewrite HPQ.
+  - now rewrite <- HPQ.
+Qed.
+
+Lemma mpred_equiv_trans P Q R :
+  P <=> Q -> Q <=> R -> P <=> R.
+Proof.
+  unfold "<=>"; intros HPQ HQR; split; intros Hm.
+  - now rewrite <- HQR, <- HPQ.
+  - now rewrite HPQ, HQR.
+Qed.
+
+Lemma frame_cong F P Q :
+  is_frame F ->
+  P <=> Q ->
+  F P <=> F Q.
+Proof.
+  intros HF HPQ S m.
+  apply frame_cong'; auto.
 Qed.
 
 Lemma mpred_aux_Included m S P :
@@ -1915,23 +2017,6 @@ Lemma mpred_Mem F P m m_inner :
   m |= F P.
 Proof. Abort.
 
-Lemma mpred_Ex {A} F (G : A -> _) S m :
-  is_frame F ->
-  m |=_{S} F (∃ x, G x) <-> exists x, m |=_{S} F (G x).
-Proof.
-  intros HF; revert S; induction HF; intros S.
-  1: now cbn.
-  1: rewrite frame_swap_hole by auto.
-  1: erewrite MCUtils.iff_ex; [|intros x; apply frame_swap_hole; auto].
-  2: rewrite sepcon_comm, frame_swap_hole by auto.
-  2: erewrite MCUtils.iff_ex; [|intros x; apply sepcon_comm].
-  2: erewrite MCUtils.iff_ex; [|intros x; apply frame_swap_hole; auto].
-  all:
-    try solve [cbn; split; intros Hexand; decompose [ex and] Hexand;
-    (repeat match goal with |- exists _, _ => eexists end);
-    split_ands; eauto].
-Qed.
-
 Definition allocd b lo hi :=
   ∃ m, Mem (alloc_alone m lo hi) WITH b = Mem.nextblock m.
 
@@ -1968,7 +2053,7 @@ Definition vint (z : Z) : Values.val :=
 
 (** The spine of the shadow stack contains a linked list of frame structs and root arrays.
     Each root array has a fixed size, large enough to fit all the live variables at each GC. *)
-Record stack_frame_spine :=
+Record stack_frame_spine := mk_ss_frame
 { ss_frame : block * ptrofs;
   ss_root : block * ptrofs;
   ss_size : Z }.
@@ -2051,9 +2136,8 @@ Definition compatible_shapes P P' := Forall3 (Forall3 (compatible_shape P P')).
 
 (** A mem is well-formed if it contains
     - A well-formed thread_info pointing to a nursery, args array, and shadow stack
-    - A CertiCoq heap that can be freely modified by GC
-    - A frame, possibly containing "outliers" (memory outside of the GC heap that's
-      reachable from a root) and local variables *)
+    - A heap of values, part of which freely modified by GC, and part of which contains
+      "outliers" (memory outside of the GC heap that's reachable from a root) *)
 Definition valid_mem
            nursery_b alloc_o limit_o
            tinfo_b tinfo_o
@@ -2744,7 +2828,7 @@ Proof.
   - eapply Mem.perm_store_2; eauto.
 Qed.
 
-Lemma fwd_arr_assign F env tenv m offset a i e b o v s vs P :
+Lemma fwd_store F env tenv m offset a i e b o v s vs P :
   is_frame F ->
   val_defined_wf v ->
   (env, tenv, m, a) ⇓ᵣ (Vptr b (O.repr (O.unsigned o + offset*word_size))) ->
@@ -2784,7 +2868,7 @@ Proof.
   - apply Hcont.
 Qed.
 
-Lemma fwd_arr_assign' F env tenv m a i e b o v s vs P :
+Lemma fwd_store' F env tenv m a i e b o v s vs P :
   is_frame F ->
   val_defined_wf v ->
   (env, tenv, m, a) ⇓ᵣ (Vptr b o) ->
@@ -2799,7 +2883,7 @@ Lemma fwd_arr_assign' F env tenv m a i e b o v s vs P :
     postcond env tenv m' s P) ->
   postcond env tenv m (a.[i] :::= e.; s)%C P.
 Proof.
-  intros; eapply fwd_arr_assign with (offset := 0%Z); eauto; [|lia].
+  intros; eapply fwd_store with (offset := 0%Z); eauto; [|lia].
   replace (O.unsigned o + 0*word_size)%Z with (O.unsigned o) by lia.
   now rewrite O.repr_unsigned.
 Qed.
@@ -2807,23 +2891,6 @@ Qed.
 Lemma vint_wf i : val_defined_wf (vint i).
 Proof. unfold val_defined_wf, vint; now destruct Archi.ptr64. Qed.
 Hint Resolve vint_wf : EvalDB.
-
-Ltac destruct_ex_ctx F x H :=
-  rewrite (mpred_Ex F) in H; [|auto with FrameDB]; destruct H as [x H].
-
-Ltac destruct_ex x H := destruct_ex_ctx (fun H : mpred => H) x H.
-
-Ltac exists_ex_ctx F x :=
-  rewrite (mpred_Ex F); [|auto with FrameDB]; exists x.
-Ltac exists_ex x := exists_ex_ctx (fun H : mpred => H) x.
-
-Ltac split_ex_ctx F :=
-  rewrite (mpred_Ex F); [|auto with FrameDB]; unshelve eexists.
-Ltac split_ex := split_ex_ctx (fun H : mpred => H).
-
-Ltac rewrite_equiv_in F H Hin :=
-  rewrite (frame_cong F) in Hin;
-  [|eauto with FrameDB|intros; apply H].
 
 (* TODO hoist *)
 Lemma skipn_len {A} n (xs : list A) :
@@ -2924,12 +2991,13 @@ Context (fenv_inv : forall x description,
   PS.mem x locals = false ->
   Genv.find_symbol prog_genv x <> None).
 
-(** fenv does not contain alloc, limit, ret, or case *)
+(** fenv does not contain alloc, limit, ret, case, or roots_temp *)
 Context
   (fenv_alloc : fenv ! alloc_id = None)
   (fenv_limit : fenv ! limit_id = None)
   (fenv_ret : fenv ! ret_id = None)
-  (fenv_case : fenv ! case_id = None).
+  (fenv_case : fenv ! case_id = None)
+  (fenv_roots_temp : fenv ! roots_temp_id = None).
 
 (** env only contains the frame struct and root array *)
 Definition env_inv (env : Clight.env) :=
@@ -2939,7 +3007,12 @@ Definition env_inv (env : Clight.env) :=
     either a local variable or one of {alloc_id, limit_id, ret_id, case_id} *)
 Definition tenv_inv (tenv : Clight.temp_env) :=
   forall x cv, tenv!x = Some cv ->
-          (PS.mem x locals = true \/ x = alloc_id \/ x = limit_id \/ x = ret_id \/ x = case_id) /\
+          (PS.mem x locals = true
+           \/ x = alloc_id
+           \/ x = limit_id
+           \/ x = ret_id
+           \/ x = case_id
+           \/ x = roots_temp_id) /\
           val_defined_wf cv.
 
 Lemma env_get_wf env tenv x v :
@@ -3143,8 +3216,8 @@ Lemma fwd_stores F ρ env tenv m offset a i (ys : list cps.var) b o s vs P :
    (env, tenv, m, a) ⇓ᵣ (Vptr b (O.repr (O.unsigned o + offset*word_size)))) ->
   typeof a = value \/ typeof a = tptr value ->
   (0 <= offset <= 1 /\ 0 <= offset + #|ys| <= #|vs| /\ 0 <= offset + i <= #|vs| - #|ys|)%Z ->
-  All (map (fun y => frame_id <> y) ys) ->
-  All (map (fun y => roots_id <> y) ys) ->
+  ~ List.In frame_id ys ->
+  ~ List.In roots_id ys ->
   env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
   All (map (fun x => ρ!x <> None) ys) ->
   All (map (fun x => (env, tenv)!!!x <> None) ys) ->
@@ -3162,7 +3235,7 @@ Proof.
   assert (Henv_x : exists cv, (env, tenv)!!!y = Some cv).
   { cbn in Henv. destruct ((env, tenv)!!!y) eqn:Hy; [eauto|intuition congruence]. }
   destruct Henv_x as [cv Hcv].
-  eapply fwd_arr_assign with (F := fun H => F H).
+  eapply fwd_store with (F := fun H => F H).
   4:{ eapply eval_make_var; eauto; try easy.
       apply Hρ; now rewrite FromList_cons. }
   all: try eassumption; eauto with FrameDB InvDB EvalDB; try solve[lia|cbn in *; superlia].
@@ -3175,6 +3248,30 @@ Proof.
   rewrite Z.add_assoc, overwrite_sublist_snoc in Hm''.
   eapply Hsimpler; eauto.
   cbn. now rewrite Hcv, Hvs'.
+Qed.
+
+Lemma fwd_stores' F ρ env tenv m a i (ys : list cps.var) b o s vs P :
+  is_frame F ->
+  (forall m P,
+    m |= F P ->
+   (env, tenv, m, a) ⇓ᵣ (Vptr b o)) ->
+  typeof a = value \/ typeof a = tptr value ->
+  (0 <= #|ys| <= #|vs| /\ 0 <= i <= #|vs| - #|ys|)%Z ->
+  ~ List.In frame_id ys ->
+  ~ List.In roots_id ys ->
+  env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
+  All (map (fun x => ρ!x <> None) ys) ->
+  All (map (fun x => (env, tenv)!!!x <> None) ys) ->
+  m |= F ((b, O.unsigned o) ↦_{Writable} vs) ->
+  (forall m' vs',
+    (env, tenv) !!!! ys = Some vs' ->
+    m' |= F ((b, O.unsigned o) ↦_{Writable} overwrite_sublist vs i vs') ->
+    postcond env tenv m' s P) ->
+  postcond env tenv m (statements (mapi (fun i y => a.[i] :::= make_var fenv locals y) i ys).; s)%C P.
+Proof.
+  intros; eapply fwd_stores with (offset := 0%Z); eauto; try lia.
+  intros. replace (O.unsigned o + 0*word_size)%Z with (O.unsigned o) by lia.
+  now rewrite O.repr_unsigned.
 Qed.
 
 Lemma tenv_inv_set_alloc tenv b o :
@@ -3338,10 +3435,48 @@ Proof.
   - rewrite !rel_val_eqn; now cbn.
 Qed.
 
+(* Hdis : Disjoint _ S1 S2 contradictory at x.
+   Assumes Hdis already normalized *)
+Ltac dis_bad Hdis x :=
+  destruct Hdis as [Hdis]; contradiction (Hdis x);
+  constructor; auto.
+
+(* Assumes Hdis already normalized *)
+Ltac vars_neq Hdis x y :=
+  assert (x <> y) by (clear - Hdis; intros ?; subst y; dis_bad Hdis x).
+
+(* TODO take this list of temporary variables and define it somewhere to avoid duplication; e.g. tenv_inv uses it too *)
+Context (NoDup_tempvars : NoDup [alloc_id; limit_id; frame_id; roots_id; ret_id; case_id; roots_temp_id]).
+
+Lemma valid_mem_sepcon_frame nursery_b alloc_o limit_o tinfo_b tinfo_o
+      args ss cvss nalloc values P frame :
+  valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
+    args ss cvss nalloc values
+    (P ⋆ frame)
+  <=>
+  P ⋆ valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
+    args ss cvss nalloc values
+    frame.
+Proof.
+  unfold valid_mem.
+  eapply mpred_equiv_trans; [|apply mpred_ex_sepcon].
+  apply mpred_equiv_ex; intros args_b.
+  eapply mpred_equiv_trans; [|apply mpred_ex_sepcon].
+  apply mpred_equiv_ex; intros args_o.
+  intros S m.
+  rewrite (sepcon_comm P).
+  match goal with 
+  | |- _ <-> (_ |=_{_} (?P1 ⋆ ?P2 ⋆ ?P3 ⋆ ?P4 ⋆ ?P5 ⋆ _) ⋆ _) =>
+    rewrite (frame_stuff_hole (fun H => P1 ⋆ P2 ⋆ P3 ⋆ P4 ⋆ P5 ⋆ H)); auto with FrameDB;
+    rewrite_equiv (fun H => P1 ⋆ P2 ⋆ P3 ⋆ P4 ⋆ P5 ⋆ H) sepcon_comm
+  end.
+  reflexivity.
+Qed.
+
 Lemma translate_body_stm nenv k : forall e,
   match translate_body cenv fenv locals nenv e with
-  | Ret (stmt, _, _) => 
-    Disjoint _ (FromList [alloc_id; limit_id; frame_id; roots_id; ret_id; case_id]) (used_vars e) ->
+  | Ret (stmt, _, _) =>
+    Disjoint _ (FromList [alloc_id; limit_id; frame_id; roots_id; ret_id; case_id; roots_temp_id]) (used_vars e) ->
     well_scoped e ->
     (* (* TODO: probably overkill, delete if unneeded *)
        [thread_info_id; alloc_id; limit_id; heap_id; args_id; fp_id; nalloc_id;
@@ -3398,7 +3533,7 @@ Proof.
     bind_step rep Hrep; destruct rep as [t|t a]; destruct ys as [|y ys]; try exact I; rewrite bind_ret.
     + (* Unboxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros Hdup Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+      intros Hdis Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
       fwd Cred_set; [constructor|].
       admit.
       (*specialize (IHe e); rewrite He in IHe; eapply IHe. Guarded.
@@ -3409,27 +3544,11 @@ Proof.
       apply rel_env_gss_sing; rewrite rel_val_eqn; cbn; now rewrite Hrep. *)
     + (* Boxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros Hdup Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+      intros Hdis Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+      normalize_used_vars. rewrite !FromList_cons in Hdis.
       repeat fwd Cred_seq_assoc.
       fwd Cred_set; [eauto with EvalDB|].
-      assert (x <> frame_id).
-      { clear - Hdup. normalize_used_vars.
-        rewrite !FromList_cons in Hdup.
-        intros Heq; subst frame_id.
-        destruct Hdup as [Hdup]; contradiction (Hdup x).
-        auto. }
-      assert (x <> roots_id).
-      { clear - Hdup. normalize_used_vars.
-        rewrite !FromList_cons in Hdup.
-        intros Heq; subst roots_id.
-        destruct Hdup as [Hdup]; contradiction (Hdup x).
-        constructor; auto. }
-      assert (x <> alloc_id).
-      { clear - Hdup. normalize_used_vars.
-        rewrite !FromList_cons in Hdup.
-        intros Heq; subst alloc_id.
-        destruct Hdup as [Hdup]; contradiction (Hdup x).
-        constructor; auto. }
+      vars_neq Hdis x alloc_id.
       fwd Cred_set; [eauto with EvalDB|].
       (* Grab some bytes from the nursery *)
       apply (mem_nursery_alloc (#|y::ys| + 1)%Z) in Hm.
@@ -3441,13 +3560,15 @@ Proof.
         destruct_ex_ctx (fun H => H ⋆ P) vs Hm;
         destruct_ex_ctx (fun H => H ⋆ P) Hvs Hm;
         destruct vs as [|tag_slot args_slots]; [cbn in Hvs; lia|];
-        eapply (fwd_arr_assign (fun H => H ⋆ P)); eauto with FrameDB EvalDB; try lia
+        eapply (fwd_store (fun H => H ⋆ P)); eauto with FrameDB EvalDB; try lia
       end.
       intros m' Hstore Hm'.
       replace (1 + -1)%Z with 0%Z in * by lia.
       rewrite ?Z.mul_0_l, ?Z.add_0_r, ?Z.mul_1_l in *.
       simpl set_ith in Hm'; unfold "|=" in *.
       (* Store the arguments *)
+      vars_neq Hdis x frame_id.
+      vars_neq Hdis x roots_id.
       match type of Hm' with
       | _ |=_{_} _ ⋆ ?P =>
         eapply (fwd_stores (fun H => H ⋆ P)); try eassumption; eauto with FrameDB
@@ -3455,8 +3576,12 @@ Proof.
       { replace (O.unsigned alloc_o + word_size)%Z with (O.unsigned alloc_o + 1*word_size)%Z by lia.
         eauto with EvalDB. }
       { cbn in Hvs; cbn; lia. }
-      { admit. }
-      { admit. }
+      { clear - Hdis; intros [Hin|Hin].
+        - subst frame_id; dis_bad Hdis y.
+        - dis_bad Hdis frame_id. }
+      { clear - Hdis; intros [Hin|Hin].
+        - subst roots_id; dis_bad Hdis y.
+        - dis_bad Hdis roots_id. }
       { normalize_bound_var_in_ctx.
         decompose [and] Henvs; split_ands; eauto with InvDB Ensembles_DB. }
       { eapply env_rel_all_some; eauto.
@@ -3483,7 +3608,7 @@ Proof.
   - (* case x of { ces } *)
     rename v into x, l into ces; simpl.
     bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
-    intros Hdup Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
     (*fwd Cred_if'.
     { admit. }
     { admit. }*)
@@ -3504,7 +3629,7 @@ Proof.
   - (* let x = Proj c n y in e *)
     rename v into x, v0 into y; simpl.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros Hdup Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
     fwd Cred_set.
     { admit. }
     admit. (*
@@ -3519,8 +3644,38 @@ Proof.
     rename v into x, v0 into f, f into ft, l into ys; simpl.
     bind_step e' He; destruct e' as [[stm_e live_after_call] n_e].
     bind_step call Hcall.
-    intros Hdup Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    rename frame0 into mem_frame.
+    rewrite used_vars_Eletapp in *. rewrite !FromList_cons in Hdis.
     repeat fwd Cred_seq_assoc.
+    unfold "|=" in *.
+    destruct_ex_ctx (fun H:mpred => H) args Hm.
+    destruct_ex_ctx (fun H:mpred => H) nalloc Hm.
+    apply valid_mem_sepcon_frame in Hm.
+    rewrite (frame_cong' (fun H => _ ⋆ H)) in Hm; auto with FrameDB; [|intros; apply valid_mem_sepcon_frame].
+    match type of Hm with
+    | _ |=_{_} _ ⋆ ?P => destruct_ex_ctx (fun H => H ⋆ P) next_o Hm
+    end.
+    match type of Hm with
+    | _ |=_{_} ?P ⋆ _ ⋆ ?Q =>
+      destruct_ex_ctx (fun H => P ⋆ H ⋆ Q) cvs Hm;
+      destruct_ex_ctx (fun H => P ⋆ H ⋆ Q) Hcvs Hm
+    end.
+    match type of Hm with
+    | _ |=_{_} ?P ⋆ _ ⋆ ?Q =>
+      eapply (fwd_stores' (fun H => P ⋆ H ⋆ Q)); try eassumption; auto with FrameDB
+    end.
+    Print eval_lvalue.
+    intros.
+    debug eauto with EvalDB.
+    apply eval_Etempvar.
+    { eapply eval_Elvalue.
+      eauto with EvalDB.
+      unfold roots.
+      debug eauto with EvalDB.
+      apply eval_Evar_local.
+      Print 
+    
     admit. (*
     norm_seq.
     admit.
@@ -3535,17 +3690,17 @@ Proof.
   - (* f ft ys *)
     rename v into f, f into ft, l into ys; simpl.
     bind_step call Hcall.
-    intros Hdup Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
     admit.
     (* TODO: lemma about make_fun_call *)
   - (* let x = Prim p ys in e *)
     rename v into x, l into ys; simpl.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros Hdup Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
     now inv Hbstep.
   - (* halt x *)
     rename v into x; simpl.
-    intros Hdup Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
     repeat fwd Cred_seq_assoc.
     admit. (*
     Cstep Cred_assign.
@@ -3568,5 +3723,6 @@ Abort.
 End TRANSLATE_BODY_CORRECT.
 
 End PROOF.
+*)
 
 End CODEGEN.

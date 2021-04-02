@@ -69,7 +69,7 @@ Definition Clight_trans_ANF (prims : list (kername * string * nat * positive)) (
                      args
                      threadInfIdent allocIdent limitIdent heapInfIdent argsIdent fpIdent
                      nallocIdent stackframeTIdent nextFld rootFld prevFld tinfIdent frameIdent rootIdent 
-                     gcIdent bodyIdent mainIdent builtin_unreachableIdent retIdent (* isptrIdent *)
+                     isptrIdent gcIdent bodyIdent mainIdent builtin_unreachableIdent retIdent caseIdent
                      prog cenv nenv in
   match p with
   | Ret (nenv, prog, head) =>

@@ -1970,7 +1970,7 @@ Definition compatible_shapes m m' := Forall3 (Forall3 (compatible_shape m m')).
 Definition valid_mem
            nursery_b alloc_o limit_o
            tinfo_b tinfo_o
-           args vss ss cvss nalloc outliers frame : mpred :=
+           args ss cvss nalloc m_values frame : mpred :=
   ∃ args_b args_o,
   (∃ old_alloc old_limit heap,
    (tinfo_b, O.unsigned tinfo_o) ↦_{Writable}
@@ -1979,19 +1979,21 @@ Definition valid_mem
     WITH #|free_space| = (O.unsigned limit_o - O.unsigned alloc_o)/word_size)%Z ⋆
   ((args_b, O.unsigned args_o) ↦_{Writable} args) ⋆
   shadow_stack ss cvss ⋆
-  (∃ m, Mem m WITH (m |= (∃ gc_heap, Mem gc_heap) ⋆ outliers /\ has_shapes m vss cvss)) ⋆
+  Mem m_values ⋆
   frame.
 
 Axiom garbage_collect_spec :
-  forall tinfo_b tinfo_o vss ss cvss nalloc outliers frame m,
+  forall tinfo_b tinfo_o vss ss cvss nalloc outliers m_values frame m,
   (** if m is a valid CertiCoq mem containing
       - thread_info struct with nalloc = # of bytes to make available,
       - shadow stack cvss representing L6 values vss, *)
   m |= ∃ nursery_b alloc_o limit_o args,
        valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                 args vss ss cvss nalloc outliers frame ->
+                 args ss cvss nalloc m_values frame ->
+  m_values |= outliers ⋆ Pure True ->
+  has_shapes m_values vss cvss ->
   (** then GC produces m', *)
-  exists m' limit_o alloc_o cvss',
+  exists m' limit_o alloc_o cvss' m_values',
   Events.external_functions_sem
     "garbage_collect"
     (mksignature [ast_value] None cc_default) prog_genv
@@ -2003,10 +2005,11 @@ Axiom garbage_collect_spec :
       the shadow stack contains new roots cvss', *)
   m' |= ∃ nursery_b args nalloc,
         valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                  args vss ss cvss' nalloc outliers frame /\
+                  args ss cvss' nalloc m_values' frame /\
   ((O.unsigned limit_o - O.unsigned alloc_o)/word_size >= nalloc)%Z /\
+  m_values' |= outliers ⋆ Pure True ->
   (** and the contents of the new shadow stack still represents vss *)
-  compatible_shapes m m' vss cvss cvss'.
+  compatible_shapes m_values m_values' vss cvss cvss'.
 
 (** * Logical relation between λ-ANF_CC and Clight *)
 
@@ -2064,7 +2067,7 @@ Definition rel_val_aux (k : nat) :=
     match! Genv.find_funct prog_genv (Vptr b o) with Some fn in
     forall j vs ρ_xvs cin cout vss,
     forall cvs m tinfo_b tinfo_o,
-    forall args ss cvss outliers frame,
+    forall args ss cvss outliers m_values frame,
     j < k ->
     match k with
     | 0 => True
@@ -2082,13 +2085,16 @@ Definition rel_val_aux (k : nat) :=
               (skipn n_param indices) (skipn n_param cvs) ->
       m |= ∃ nursery_b alloc_o limit_o nalloc,
            valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                     args vss ss cvss nalloc outliers frame ->
-      exists m' cv cvss',
+                     args ss cvss nalloc m_values frame ->
+      m_values |= outliers ⋆ Pure True ->
+      has_shapes m_values vss cvss ->
+      exists m' cv cvss' m_values',
       eval_funcall prog_genv m fn (Vptr tinfo_b tinfo_o :: firstn n_param cvs) Events.E0 m' cv /\
       (** and m' is still a valid CertiCoq memory, *)
       m' |= ∃ nursery_b alloc_o limit_o args nalloc,
             valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                      args vss ss cvss' nalloc outliers frame /\
+                      args ss cvss' nalloc m_values' frame /\
+      m_values' |= outliers ⋆ Pure True /\
       compatible_shapes m m' vss cvss cvss' /\
       (** and cv is related to v at level j-i *)
       rel_val (j - to_nat cin) v m' cv
@@ -2107,21 +2113,21 @@ Lemma rel_val_eqn k v m cv :
   rel_val k v (m, cv) = rel_val_aux (fun k v m cv => rel_val k v (m, cv)) k v m cv.
 Proof. now destruct k. Qed.
 
-Definition rel_tenv k := fun S ρ '(tenv, m) =>
-  forall x, x \in S ->
-  match! ρ!x with Some v in
-  match! tenv!x with Some cv in
-  v ~ᵥ{k} (m, cv).
-Notation "ρ '~ₜ{' k ',' S '}' tenvm" := (rel_tenv k S ρ tenvm) (at level 80).
-
-Definition rel_env k := fun S ρ '(env, m) =>
-  forall x, x \in S ->
-  match! ρ!x with Some v in
-  let k b := match! load m b 0%Z with Some cv in v ~ᵥ{k} (m, cv) in
-  match env!x : option (_ * type) with
-  | Some (b, ty) => k b
-  | None => match! Genv.find_symbol prog_genv x with Some b in k b
+Definition env_get : Clight.env * Clight.temp_env -> ident -> option Values.val :=
+  fun '(env, tenv) x =>
+  match tenv!x, env!x, Genv.find_symbol prog_genv x with
+  | Some v, _, _ => Some v
+  | None, Some (b, _), _
+  | None, None, Some b => Some (Vptr b O.zero)
+  | _, _, _ => None
   end.
+Infix "!!!" := env_get (at level 60, no associativity).
+
+Definition rel_env k := fun S ρ '(env, tenv, m) =>
+  forall x, x \in S ->
+  match! ρ!x with Some v in
+  match! (env, tenv) !!! x with Some cv in
+  v ~ᵥ{k} (m, cv).
 Notation "ρ '~ₑ{' k ',' S '}' envm" := (rel_env k S ρ envm) (at level 80).
 
 (** ** Antimonotonicity of the logical relation *)
@@ -2183,75 +2189,59 @@ Proof.
   - auto.
 Qed.
 
-Lemma rel_tenv_antimon j k S ρ tenv m :
+Lemma rel_env_antimon j k S ρ env tenv m :
   j <= k ->
-  ρ ~ₜ{k, S} (tenv, m) ->
-  ρ ~ₜ{j, S} (tenv, m).
-Proof.
-  intros Hle Hk x Hx; specialize (Hk x Hx).
-  destruct (ρ ! x); [|easy].
-  destruct (tenv ! x); [eapply rel_val_antimon; eauto|easy].
-Qed.
-
-Lemma rel_env_antimon j k S ρ env m :
-  j <= k ->
-  ρ ~ₑ{k, S} (env, m) ->
-  ρ ~ₑ{j, S} (env, m).
+  ρ ~ₑ{k, S} (env, tenv, m) ->
+  ρ ~ₑ{j, S} (env, tenv, m).
 Proof.
   intros Hle Hk x Hx; specialize (Hk x Hx).
   destruct (ρ ! x); [|easy]; lazy zeta in *.
-  destruct (env ! x) as [[b _] |]; [|destruct (Genv.find_symbol _ _); [|easy]].
-  all: destruct (load _ _ _); [eapply rel_val_antimon; eauto|easy].
+  destruct ((env, tenv) !!! x); [|easy].
+  eapply rel_val_antimon; eauto.
 Qed.
 
-Lemma rel_tenv_antimon_S k S1 S2 ρ tenv m :
+Lemma rel_env_antimon_S k S1 S2 ρ env tenv m :
   S1 \subset S2 ->
-  ρ ~ₜ{k, S2} (tenv, m) ->
-  ρ ~ₜ{k, S1} (tenv, m).
-Proof. intros Hle Hk x Hx; now apply Hk, Hle. Qed.
-
-Lemma rel_env_antimon_S k S1 S2 ρ env m :
-  S1 \subset S2 ->
-  ρ ~ₑ{k, S2} (env, m) ->
-  ρ ~ₑ{k, S1} (env, m).
+  ρ ~ₑ{k, S2} (env, tenv, m) ->
+  ρ ~ₑ{k, S1} (env, tenv, m).
 Proof. intros Hle Hk x Hx; now apply Hk, Hle. Qed.
 
 (** ** Lemmas about the environment relation *)
 
-Lemma rel_tenv_gss k S x v cv ρ tenv m :
+Lemma rel_env_gss k S x v cv ρ env tenv m :
   x \in S ->
   v ~ᵥ{k} (m, cv) ->
-  ρ ~ₜ{k, S \\ [set x]} (tenv, m) ->
-  M.set x v ρ ~ₜ{k, S} (M.set x cv tenv, m).
+  ρ ~ₑ{k, S \\ [set x]} (env, tenv, m) ->
+  M.set x v ρ ~ₑ{k, S} (env, M.set x cv tenv, m).
 Proof.
-  intros Hin Hv Hρ x' Hx'.
-  destruct (M.elt_eq x x') as [Heq|Hne]; [subst x'; now rewrite !M.gss|].
+  intros Hin Hv Hρ x' Hx'; unfold "!!!".
+  destruct (M.elt_eq x x') as [|Hne]; [subst x'; now rewrite !M.gss|].
   rewrite !M.gso by auto.
   apply Hρ; constructor; [auto|now inversion 1].
 Qed.
 
-Lemma rel_tenv_gss_sing k x v cv ρ tenv m :
+Lemma rel_env_gss_sing k x v cv ρ env tenv m :
   v ~ᵥ{k} (m, cv) ->
-  M.set x v ρ ~ₜ{k, [set x]} (M.set x cv tenv, m).
+  M.set x v ρ ~ₑ{k, [set x]} (env, M.set x cv tenv, m).
 Proof.
   intros Hv x' Hx'.
   destruct (M.elt_eq x x') as [Heq|Hne]; [|now inv Hx'].
-  subst x'; now rewrite !M.gss.
+  subst x'; unfold "!!!"; now rewrite !M.gss.
 Qed.
 
-Lemma rel_tenv_gso k S x v cv ρ tenv m :
+Lemma rel_env_gso k S x v cv ρ env tenv m :
   ~ x \in S ->
-  ρ ~ₜ{k, S} (tenv, m) ->
-  M.set x v ρ ~ₜ{k, S} (M.set x cv tenv, m).
+  ρ ~ₑ{k, S} (env, tenv, m) ->
+  M.set x v ρ ~ₑ{k, S} (env, M.set x cv tenv, m).
 Proof.
   intros Hin Hρ x' Hx'.
   destruct (M.elt_eq x x') as [Heq|Hne]; [easy|].
-  rewrite !M.gso by auto. now apply Hρ.
+  unfold "!!!"; rewrite !M.gso by auto. now apply Hρ.
 Qed.
 
-Lemma rel_tenv_union k S1 S2 ρ tenv m :
-  ρ ~ₜ{k, S1 :|: S2} (tenv, m) <->
-  ρ ~ₜ{k, S1} (tenv, m) /\ ρ ~ₜ{k, S2} (tenv, m).
+Lemma rel_env_union k S1 S2 ρ env tenv m :
+  ρ ~ₑ{k, S1 :|: S2} (env, tenv, m) <->
+  ρ ~ₑ{k, S1} (env, tenv, m) /\ ρ ~ₑ{k, S2} (env, tenv, m).
 Proof.
   split; [intros HS12|intros [HS1 HS2]].
   - split; intros x Hx; now apply HS12.
@@ -2410,7 +2400,6 @@ Context (locals : FVSet).
 (** * Main theorem *)
 
 Arguments rel_val : simpl never.
-Arguments rel_tenv : simpl never.
 Arguments rel_env : simpl never.
 
 Ltac normalize_occurs_free_in H :=
@@ -2504,13 +2493,6 @@ Lemma evall_unfold env tenv m e b o :
 Proof. auto. Qed.
 Hint Resolve evall_unfold : EvalDB.
 
-(*    
-Definition eval_expr_operator := fun '(env, tenv, m, e) v =>
-  eval_expr prog_genv env tenv m e v.
-Definition eval_lvalue_operator := fun '(env, tenv, m, e) '(b, o) =>
-  eval_lvalue prog_genv env tenv m e b o.
- *)
-
 Fixpoint NoDup' {A} (xs : list A) :=
   match xs with
   | [] => True
@@ -2533,6 +2515,7 @@ Proof.
   cbn; now rewrite NoDup_cons_iff, notin_spec.
 Qed.
 
+(* TODO delete *)
 Fixpoint exp_bv_list e :=
   match e with
   | Econstr x t ys e' => x :: exp_bv_list e'
@@ -2550,6 +2533,7 @@ with fds_bv_list fds :=
   | Fcons f t ys e fds' => f :: ys ++ exp_bv_list e ++ fds_bv_list fds'
   end%list.
 
+(* TODO delete *)
 Lemma exp_bv_list_spec e :
   FromList (exp_bv_list e) <--> bound_var e
 with fds_bv_list_spec fds :
@@ -2562,6 +2546,39 @@ Proof.
     + now cbn; rewrite FromList_app, IHe, IHfds; normalize_bound_var. Guarded.
   - destruct fds as [f t xs e fds|]; [|now cbn; normalize_bound_var].
     now cbn; normalize_bound_var; rewrite FromList_cons, !FromList_app, IHe, IHfds.
+Qed.
+
+Fixpoint exp_vars_list e :=
+  match e with
+  | Econstr x t ys e' => x :: ys ++ exp_vars_list e'
+  | Ecase x cs => x :: fold_right (@app _) [] (map (fun '(c, e) => exp_vars_list e) cs)
+  | Eproj x t n y e' => x :: y :: exp_vars_list e'
+  | Eletapp x f t ys e' => x :: f :: ys ++ exp_vars_list e'
+  | Efun fds e' => fds_vars_list fds ++ exp_vars_list e'
+  | Eapp f t ys => f :: ys
+  | Eprim x p ys e' => x :: ys ++ exp_vars_list e'
+  | Ehalt x => [x]
+  end%list
+with fds_vars_list fds :=
+  match fds with
+  | Fnil => []
+  | Fcons f t ys e fds' => f :: ys ++ exp_vars_list e ++ fds_vars_list fds'
+  end%list.
+
+Lemma exp_vars_list_spec e :
+  FromList (exp_vars_list e) <--> used_vars e
+with fds_vars_list_spec fds :
+  FromList (fds_vars_list fds) <--> used_vars_fundefs fds.
+Proof.
+  all: rename exp_vars_list_spec into IHe, fds_vars_list_spec into IHfds.
+  - destruct e;
+      try solve [cbn; normalize_used_vars; rewrite ?FromList_cons, ?FromList_app, ?FromList_nil, ?IHe; sets].
+    Guarded.
+    induction l as [| [c e] ces IHces]; cbn; normalize_used_vars; [clear IHe IHfds; sets|].
+    rewrite FromList_cons, FromList_app, Union_assoc, (Union_commut [set v]), <- Union_assoc.
+    rewrite <- FromList_cons, IHces, IHe; sets. Guarded.
+  - destruct fds as [f t xs e fds|]; [|now cbn; normalize_used_vars].
+    now cbn; normalize_used_vars; rewrite FromList_cons, !FromList_app, IHe, IHfds, !Union_assoc.
 Qed.
 
 Hint Extern 1 ((M.set _ _ _) ! _ = Some _) => rewrite M.gso by easy : EvalDB.
@@ -2766,14 +2783,14 @@ Proof.
   cbn; rewrite !Nat2Z.inj_succ; intros H; rewrite IHnat; lia.
 Qed.
 
-Lemma mem_nursery_alloc n m nursery_b alloc_o limit_o tinfo_b tinfo_o vss ss cvss outliers frame :
+Lemma mem_nursery_alloc n m nursery_b alloc_o limit_o tinfo_b tinfo_o ss cvss m_values frame :
   (0 <= n <= (O.unsigned limit_o - O.unsigned alloc_o)/word_size)%Z ->
   m |= ∃ args nalloc, valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                                args vss ss cvss nalloc outliers frame ->
+                                args ss cvss nalloc m_values frame ->
   m |= (∃ vs, (nursery_b, O.unsigned alloc_o) ↦_{Writable} vs WITH #|vs| = n) ⋆
        ∃ args nalloc, valid_mem nursery_b (O.repr (O.unsigned alloc_o + n*word_size))%Z
                                 limit_o tinfo_b tinfo_o
-                                args vss ss cvss nalloc outliers frame.
+                                args ss cvss nalloc m_values frame.
 Proof.
   intros Hbound Hm. unfold "|=" in *.
   destruct_ex args Hm; destruct_ex nalloc Hm.
@@ -2833,10 +2850,366 @@ Proof.
   eapply Mem.range_perm_implies; eauto.
 Qed.
 
+Context (global_local_disjoint : forall x v,
+  Genv.find_symbol prog_genv x = Some v ->
+  PS.mem x locals = false).
+
+(** non-local variables in the fun_env must be in the global environment *)
+Context (fenv_inv : forall x description,
+  fenv!x = Some description ->
+  PS.mem x locals = false ->
+  Genv.find_symbol prog_genv x <> None).
+
+(** fenv does not contain alloc, limit, or ret *)
+Context
+  (fenv_alloc : fenv ! alloc_id = None)
+  (fenv_limit : fenv ! limit_id = None)
+  (fenv_ret : fenv ! ret_id = None).
+
+(** env only contains the frame struct and root array *)
+Definition env_inv (env : Clight.env) :=
+  forall x, x <> frame_id /\ x <> roots_id -> env!x = None.
+
+(** every x in the temp environment corresponds to a well-defined value, and is
+    either a local variable or one of {alloc_id, limit_id, ret_id} *)
+Definition tenv_inv (tenv : Clight.temp_env) :=
+  forall x cv, tenv!x = Some cv ->
+          (PS.mem x locals = true \/ x = alloc_id \/ x = limit_id \/ x = ret_id) /\
+          val_defined_wf cv.
+
+Lemma env_get_wf env tenv x v :
+  tenv_inv tenv ->
+  (env, tenv) !!! x = Some v -> val_defined_wf v.
+Proof.
+  unfold "!!!"; destruct (tenv!x) eqn:Htenv_get.
+  - intros Htenv H; inv H; now eapply Htenv.
+  - destruct (env!x) as [[] |].
+    + now inversion 2.
+    + destruct (Genv.find_symbol _ _); now inversion 2.
+Qed.
+Hint Resolve env_get_wf : EvalDB.
+
+Lemma sem_cast_fptr_val cv n m :
+  val_defined_wf cv ->
+  sem_cast cv (fun_ty n) value m = Some cv.
+Proof.
+  unfold val_defined_wf, value, fun_ty, sem_cast;
+  destruct Archi.ptr64 eqn:Harchi; cbn; rewrite Harchi; destruct cv; easy.
+Qed.
+Hint Resolve sem_cast_fptr_val : EvalDB.
+
+Hint Extern 1 (sem_cast _ (typeof (_ _)) _ _ = _) => simpl typeof : EvalDB.
+Hint Constructors deref_loc : EvalDB.
+
+Definition ρ_inv (ρ : eval.env) :=
+  (** if x is in ρ and the global env, then it must be in fun_env *)
+  forall x v b,
+  ρ ! x = Some v ->
+  Genv.find_symbol prog_genv x = Some b ->
+  fenv ! x <> None.
+
+Lemma eval_make_var x ρ env tenv cv m :
+  x <> frame_id /\ x <> roots_id ->
+  env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
+  ρ!x <> None ->
+  (env, tenv) !!! x = Some cv ->
+  eval_expr prog_genv env tenv m (make_var fenv locals x) cv.
+Proof.
+  intros Hx [Henv [Htenv Hρ]] Hρ_some Henv_some.
+  (* destruct (_ ! _) as [v|] eqn:Hget_ρ; [|easy]. *)
+  unfold make_var; unfold "!!!" in Henv_some.
+  specialize (Henv x Hx); rewrite Henv in *.
+  destruct (fenv ! x) as [[arity locs] |] eqn:Hfenv.
+  - destruct (tenv!x) eqn:Hget_tenv.
+    + inv Henv_some.
+      pose proof Hget_tenv as Hlocals_wf.
+      apply Htenv in Hlocals_wf.
+      destruct Hlocals_wf as [Hlocals Hwf].
+      decompose [or] Hlocals; [|now subst x..].
+      destruct (PS.mem x locals); [|easy].
+      eauto with EvalDB.
+    + destruct (Genv.find_symbol _ _) as [b|] eqn:Hgenv; [|easy].
+      erewrite global_local_disjoint; eauto.
+      eauto 7 with EvalDB.
+  - destruct (tenv!x) eqn:Hget_tenv; [inv Henv_some; eauto with EvalDB|].
+    destruct (Genv.find_symbol prog_genv x) eqn:Hgenv; [|easy].
+    destruct (ρ!x) eqn:Hρx; [|congruence].
+    exfalso; eapply Hρ; eauto.
+Qed.
+
+Reserved Infix "!!!!" (at level 60, no associativity).
+Fixpoint get_env_list envs xs :=
+  match xs with
+  | [] => Some []
+  | x :: xs =>
+    match envs !!! x, envs !!!! xs with
+    | Some cv, Some cvs => Some (cv :: cvs)
+    | _, _ => None
+    end
+  end
+where "envs !!!! xs" := (get_env_list envs xs).
+
+(* TODO hoist *)
+Fixpoint overwrite_sublist {A} (xs : list A) i ys :=
+  match ys with
+  | [] => xs
+  | y :: ys => set_ith (overwrite_sublist xs (i + 1) ys) i y
+  end%Z.
+
+(* TODO hoist *)
+Lemma set_ith_range {A} (xs : list A) i y :
+  ~ (0 <= i < #|xs|)%Z ->
+  set_ith xs i y = xs.
+Proof.
+  revert i; induction xs as [|x xs IHxs]; [easy|intros* Hget].
+  cbn; destruct (Z.eq_dec i 0) as [|Hne]; [subst; cbn in *; lia|].
+  rewrite IHxs; auto; cbn in *; lia.
+Qed.
+
+(* TODO hoist *)
+Lemma set_ith_prefix {A} (vs ws : list A) i v :
+  (i < #|vs|)%Z ->
+  (set_ith (vs ++ ws) i v = set_ith vs i v ++ ws)%list.
+Proof.
+  revert i; induction vs as [|v' vs IHvs]; intros i.
+  - cbn in *; intros H.
+    now rewrite set_ith_range by lia.
+  - intros Hi; cbn; destruct (Z.eq_dec i 0) as [|Hne]; [now subst|].
+    now rewrite IHvs by (cbn in *; superlia).
+Qed.
+
+(* TODO hoist *)
+Lemma set_ith_suffix {A} (vs ws : list A) i w :
+  (#|vs| <= i)%Z ->
+  (set_ith (vs ++ ws) i w = vs ++ set_ith ws (i - #|vs|) w)%list.
+Proof.
+  revert i; induction vs as [|v vs IHvs]; intros i; cbn.
+  - now replace (Z.of_nat 0 + i)%Z with i by lia.
+  - destruct (Z.eq_dec i 0) as [|Hne]; [now subst|intros H].
+    rewrite IHvs by lia.
+    do 2 f_equal; f_equal; superlia.
+Qed.
+
+(* TODO hoist *)
+Lemma get_ith_firstn_skipn {A} i xs (x : A) :
+  (0 <= i < #|xs|)%Z ->
+  get_ith xs i = Some x ->
+  firstn (Z.to_nat 1) (skipn (Z.to_nat i) xs) = [x].
+Proof.
+  revert i; induction xs as [|x' xs IHxs]; intros i Hi Hget; [inv Hget|].
+  cbn in Hget; destruct (Coqlib.zeq i 0) as [|Hne]; [subst; inv Hget|].
+  - now change (Z.to_nat 0) with 0; change (Z.to_nat 1) with 1.
+  - replace (Z.to_nat i) with (S (Z.to_nat (Z.pred i))) by lia; cbn.
+    rewrite IHxs; auto; superlia.
+Qed.
+
+(* TODO hoist *)
+Lemma overwrite_sublist_spec {A} (xs : list A) i ys :
+  (0 <= i < #|xs| - #|ys|)%Z ->
+  (overwrite_sublist xs i ys =
+   firstn (Z.to_nat i) xs ++ ys ++ skipn (Z.to_nat (i + #|ys|)) xs)%list%Z.
+Proof.
+  revert dependent i; induction ys as [|y ys IHys]; intros i Hi; cbn.
+  - replace (i + Z.of_nat 0)%Z with i by lia.
+    now rewrite firstn_skipn.
+  - rewrite IHys by (cbn in *; superlia).
+    rewrite set_ith_prefix by (rewrite firstn_len by superlia; lia).
+    replace (Z.to_nat (i + 1)) with (Z.to_nat i + Z.to_nat 1) by lia.
+    rewrite MCList.firstn_add.
+    rewrite set_ith_suffix by (rewrite firstn_len by superlia; lia).
+    rewrite firstn_len by superlia.
+    replace (i - i)%Z with 0%Z by lia.
+    destruct (get_ith_in_range xs i) as [x Hget]; [lia|].
+    erewrite get_ith_firstn_skipn; eauto; [|lia]; cbn.
+    rewrite <- !app_assoc; cbn.
+    do 4 f_equal; lia.
+Qed.
+
+Lemma typeof_make_var x : typeof (make_var fenv locals x) = value.
+Proof. unfold make_var; destruct (fenv!x) as [[] |]; destruct (PS.mem x locals); now cbn. Qed.
+Hint Resolve typeof_make_var : EvalDB.
+
+Lemma env_invs_project1 env tenv ρ :
+  env_inv env /\ tenv_inv tenv /\ ρ_inv ρ -> env_inv env.
+Proof. easy. Qed.
+Hint Resolve env_invs_project1 : InvDB.
+
+Lemma env_invs_project2 env tenv ρ :
+  env_inv env /\ tenv_inv tenv /\ ρ_inv ρ -> tenv_inv tenv.
+Proof. easy. Qed.
+Hint Resolve env_invs_project2 : InvDB.
+
+Lemma env_invs_project3 env tenv ρ :
+  env_inv env /\ tenv_inv tenv /\ ρ_inv ρ -> ρ_inv ρ.
+Proof. easy. Qed.
+Hint Resolve env_invs_project3 : InvDB.
+
+(* TODO hoist *)
+Lemma set_ith_commut {A} (xs : list A) i j x_i x_j :
+  i <> j -> set_ith (set_ith xs i x_i) j x_j = set_ith (set_ith xs j x_j) i x_i.
+Proof.
+  revert i j; induction xs as [|x xs IHxs]; [now cbn|cbn]; intros i j.
+  destruct (Z.eq_dec i 0), (Z.eq_dec j 0); cbn;
+  destruct (Z.eq_dec i 0), (Z.eq_dec j 0); cbn; try lia; auto.
+  intros Hne; f_equal.
+  now rewrite IHxs by lia.
+Qed.
+
+(* TODO hoist *)
+Lemma overwrite_sublist_set_ith_comm {A} xs i j (ys : list A) y :
+  ~ (i <= j < j + #|ys|)%Z ->
+  overwrite_sublist (set_ith xs j y) i ys = 
+  set_ith (overwrite_sublist xs i ys) j y.
+Proof.
+  revert i; induction ys as [|y' ys IHys]; [now cbn|cbn; intros i Hbound].
+  now rewrite IHys, set_ith_commut by lia.
+Qed.
+
+(* TODO hoist *)
+Lemma overwrite_sublist_snoc {A} xs i (y : A) ys :
+  overwrite_sublist (set_ith xs i y) (i + 1)%Z ys = 
+  overwrite_sublist xs i (y :: ys).
+Proof. cbn; now rewrite overwrite_sublist_set_ith_comm by lia. Qed.
+
+(* TODO hoist *)
+Lemma is_frame_comp F G :
+  is_frame F ->
+  is_frame G ->
+  is_frame (fun h => F (G h)).
+Proof. induction 1; eauto with FrameDB. Qed.
+Hint Resolve is_frame_comp : FrameDB.
+
+Arguments "!!!" : simpl never.
+Lemma fwd_stores F ρ env tenv m offset a i (ys : list cps.var) b o s vs P :
+  is_frame F ->
+  (forall m P,
+    m |= F P ->
+   (env, tenv, m, a) ⇓ᵣ (Vptr b (O.repr (O.unsigned o + offset*word_size)))) ->
+  typeof a = value \/ typeof a = tptr value ->
+  (0 <= offset <= 1 /\ 0 <= offset + #|ys| <= #|vs| /\ 0 <= offset + i <= #|vs| - #|ys|)%Z ->
+  All (map (fun y => frame_id <> y) ys) ->
+  All (map (fun y => roots_id <> y) ys) ->
+  env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
+  All (map (fun x => ρ!x <> None) ys) ->
+  All (map (fun x => (env, tenv)!!!x <> None) ys) ->
+  m |= F ((b, O.unsigned o) ↦_{Writable} vs) ->
+  (forall m' vs',
+    (env, tenv) !!!! ys = Some vs' ->
+    m' |= F ((b, O.unsigned o) ↦_{Writable} overwrite_sublist vs (offset + i) vs') ->
+    postcond env tenv m' s P) ->
+  postcond env tenv m (statements (mapi (fun i y => a.[i] :::= make_var fenv locals y) i ys).; s)%C P.
+Proof.
+  intros HF Ha Hty_a Hbounds Hframe Hroots Henvs Hρ Henv Hm Hsimpler.
+  revert vs m i Hm Hbounds Hsimpler; induction ys as [|y ys IHys]; intros vs m i Hm Hbounds Hsimpler.
+  { cbn. fwd Cred_skip. apply (Hsimpler m []); auto. }
+  cbn in Hframe,Hroots|-*; fwd Cred_seq_assoc.
+  assert (Henv_x : exists cv, (env, tenv)!!!y = Some cv).
+  { cbn in Henv. destruct ((env, tenv)!!!y) eqn:Hy; [eauto|intuition congruence]. }
+  destruct Henv_x as [cv Hcv].
+  eapply fwd_arr_assign with (F := fun H => F H).
+  4:{ eapply eval_make_var; eauto; try easy.
+      apply Hρ; now rewrite FromList_cons. }
+  all: try eassumption; eauto with FrameDB InvDB EvalDB; try solve[lia|cbn in *; superlia].
+  intros m' Hstore Hm'.
+  eapply IHys; eauto; try now cbn in *.
+  { cbn in *; superlia. }
+  intros m'' vs' Hvs' Hm''.
+  specialize (Hsimpler m'' (cv :: vs')).
+  simpl overwrite_sublist in Hsimpler.
+  rewrite Z.add_assoc, overwrite_sublist_snoc in Hm''.
+  eapply Hsimpler; eauto.
+  cbn. now rewrite Hcv, Hvs'.
+Qed.
+
+Lemma tenv_inv_set_alloc tenv b o :
+  tenv_inv tenv -> tenv_inv (M.set alloc_id (Vptr b o) tenv).
+Proof.
+  unfold tenv_inv; intros Htenv; intros x cv Hget.
+  destruct (Pos.eq_dec alloc_id x) as [|Hne]; [subst x|].
+  - rewrite M.gss in Hget; inv Hget; unfold val_defined_wf; destruct Archi.ptr64; easy.
+  - rewrite M.gso in Hget; auto.
+Qed.
+Hint Resolve tenv_inv_set_alloc : InvDB.
+
+Lemma tenv_inv_set_limit tenv b o :
+  tenv_inv tenv -> tenv_inv (M.set limit_id (Vptr b o) tenv).
+Proof.
+  unfold tenv_inv; intros Htenv; intros x cv Hget.
+  destruct (Pos.eq_dec limit_id x) as [|Hne]; [subst x|].
+  - rewrite M.gss in Hget; inv Hget; unfold val_defined_wf; destruct Archi.ptr64; easy.
+  - rewrite M.gso in Hget; auto.
+Qed.
+Hint Resolve tenv_inv_set_limit : InvDB.
+
+Lemma tenv_inv_set_ret tenv b o :
+  tenv_inv tenv -> tenv_inv (M.set ret_id (Vptr b o) tenv).
+Proof.
+  unfold tenv_inv; intros Htenv; intros x cv Hget.
+  destruct (Pos.eq_dec ret_id x) as [|Hne]; [subst x|].
+  - rewrite M.gss in Hget; inv Hget; unfold val_defined_wf; destruct Archi.ptr64; easy.
+  - rewrite M.gso in Hget; auto.
+Qed.
+Hint Resolve tenv_inv_set_ret : InvDB.
+
+Lemma tenv_inv_set_x x tenv b o :
+  x \in FromSet locals ->
+  tenv_inv tenv -> tenv_inv (M.set x (Vptr b o) tenv).
+Proof.
+  unfold tenv_inv; intros Hin Htenv; intros x' cv Hget.
+  destruct (Pos.eq_dec x x') as [|Hne]; [subst x'|].
+  - rewrite M.gss in Hget; inv Hget; split; [|unfold val_defined_wf; destruct Archi.ptr64; easy].
+    left. apply PS.mem_spec. eapply FromSet_sound; eauto; sets.
+  - rewrite M.gso in Hget; auto.
+Qed.
+Hint Resolve tenv_inv_set_x : InvDB.
+
+Lemma env_rel_all_some ρ k S env xs :
+  ρ ~ₑ{k, S} env ->
+  FromList xs \subset S ->
+  All (map (fun x => ρ!x <> None) xs).
+Proof.
+  intros Hrel Hxs.
+  induction xs as [|x xs IHxs]; [easy|cbn].
+  split; [|apply IHxs; eapply Included_trans; eauto; now right].
+  destruct env as [[??]?].
+  specialize (Hrel x).
+  intros Heq; rewrite Heq in Hrel; apply Hrel.
+  apply Hxs; now left.
+Qed.
+Hint Resolve env_rel_all_some : InvDB.
+
+Lemma env_rel_all_some_tenv ρ k S env tenv m xs :
+  ρ ~ₑ{k, S} (env, tenv, m) ->
+  FromList xs \subset S ->
+  All (map (fun x => (env, tenv)!!!x <> None) xs).
+Proof.
+  intros Hrel Hxs.
+  induction xs as [|x xs IHxs]; [easy|cbn].
+  split; [|apply IHxs; eapply Included_trans; eauto; now right].
+  specialize (Hrel x).
+  destruct (ρ!x).
+  2:{ contradiction Hrel; apply Hxs; now left. }
+  intros Heq; rewrite Heq in Hrel; apply Hrel.
+  apply Hxs; now left.
+Qed.
+Hint Resolve env_rel_all_some_tenv : InvDB.
+
+Lemma env_rel_all_some_tenv_set env tenv x v xs :
+  All (map (fun x => (env, tenv) !!! x <> None) xs) ->
+  All (map (fun x' => (env, M.set x v tenv) !!! x' <> None) xs).
+Proof.
+  intros Hxs; induction xs as [|x' xs IHxs]; [easy|].
+  cbn; split; [|apply IHxs; now cbn in *].
+  destruct Hxs as [Hx _]; clear - Hx; unfold "!!!" in *.
+  destruct (Pos.eq_dec x x') as [|Hne]; [subst; now rewrite M.gss in *|].
+  rewrite M.gso in *; auto.
+Qed.
+Hint Resolve env_rel_all_some_tenv_set : InvDB.
+
 Lemma translate_body_stm nenv k : forall e,
   match translate_body cenv fenv locals nenv e with
   | Ret (stmt, _, _) => 
-    NoDup' ([alloc_id; limit_id] ++ exp_bv_list e)%list ->
+    NoDup' ([alloc_id; limit_id; frame_id; roots_id] ++ exp_vars_list e)%list ->
     (* (* TODO: probably overkill, delete if unneeded *)
        [thread_info_id; alloc_id; limit_id; heap_id; args_id; fp_id; nalloc_id;
        stack_frame_id; tinfo_id; frame_id; roots_id; gc_id; body_id;
@@ -2847,7 +3220,7 @@ Lemma translate_body_stm nenv k : forall e,
     (ρ, e, cin) ⇓cps (v, cout) ->
     (** and tenv+env contains bindings for alloc, limit, frame, roots, *)
     forall env tenv m,
-    forall nursery_b alloc_o limit_o frame_b roots_b n_roots,
+    forall nursery_b alloc_o limit_o frame_b roots_b n_roots m_values,
     tenv ! alloc_id = Some (Vptr nursery_b alloc_o) ->
     tenv ! limit_id = Some (Vptr nursery_b limit_o) ->
     env ! frame_id = Some (frame_b, stack_frame) ->
@@ -2856,8 +3229,8 @@ Lemma translate_body_stm nenv k : forall e,
     (max_allocs e <= (O.unsigned limit_o - O.unsigned alloc_o)/word_size)%Z ->
     (** and environments agree on the free variables of e, *)
     bound_var e \subset FromSet locals ->
-    ρ ~ₜ{k, occurs_free e :&: FromSet locals} (tenv, m) ->
-    ρ ~ₑ{k, occurs_free e \\ FromSet locals} (env, m) ->
+    env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
+    ρ ~ₑ{k, occurs_free e} (env, tenv, m_values) ->
     (** and m is a valid CertiCoq memory with shadow stack cvss related to vss, *)
     forall tinfo_b tinfo_o ss cvss outliers frame,
     let frame :=
@@ -2867,19 +3240,21 @@ Lemma translate_body_stm nenv k : forall e,
       frame
     in
     m |= ∃ args nalloc, valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                                  args vss ss cvss nalloc outliers
+                                  args ss cvss nalloc m_values
                                   frame ->
+    m_values |= outliers ⋆ Pure True ->
+    has_shapes m_values vss cvss ->
     (** then running stmt yields a result (m', cv), *)
     exists tenv' m' cv,
     (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
     (** cv is related to v at level k-j, *)
     v ~ᵥ{k - to_nat cin} (m', cv) /\
     (** and m' is still a valid memory with shadow stack cvss' compatible with cvss *)
-    exists cvss',
+    exists cvss' m_values',
     m' |= ∃ nursery_b alloc_o limit_o args nalloc,
           valid_mem nursery_b alloc_o limit_o tinfo_b tinfo_o
-                    args vss ss cvss' nalloc outliers frame /\
-    compatible_shapes m m' vss cvss cvss'
+                    args ss cvss' nalloc m_values' frame /\
+    compatible_shapes m_values m_values' vss cvss cvss'
   | _ => True
   end.
 Proof.
@@ -2890,7 +3265,7 @@ Proof.
     bind_step rep Hrep; destruct rep as [t|t a]; destruct ys as [|y ys]; try exact I; rewrite bind_ret.
     + (* Unboxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+      intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hm_values Hshapes.
       fwd Cred_set; [constructor|].
       admit.
       (*specialize (IHe e); rewrite He in IHe; eapply IHe. Guarded.
@@ -2901,11 +3276,11 @@ Proof.
       apply rel_env_gss_sing; rewrite rel_val_eqn; cbn; now rewrite Hrep. *)
     + (* Boxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+      intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hm_values Hshapes.
       repeat fwd Cred_seq_assoc.
       fwd Cred_set; [eauto with EvalDB|].
       fwd Cred_set; [eauto with EvalDB|].
-      apply (mem_nursery_alloc (#|ys| + 1)%Z) in Hm.
+      apply (mem_nursery_alloc (#|y::ys| + 1)%Z) in Hm.
       2:{ clear - Hallocs; cbn in *; superlia. }
       unfold "|=" in *.
       match type of Hm with
@@ -2916,12 +3291,33 @@ Proof.
         eapply (fwd_arr_assign (fun H => H ⋆ P)); eauto with FrameDB EvalDB; try lia
       end.
       intros m' Hstore Hm'.
-      (* TODO: generalize fwd_arr_assign to a sequence of statements initializing a subarray *)
+      replace (1 + -1)%Z with 0%Z in * by lia.
+      rewrite ?Z.mul_0_l, ?Z.add_0_r, ?Z.mul_1_l in *.
+      simpl set_ith in Hm'; unfold "|=" in *.
+      match type of Hm' with
+      | _ |=_{_} _ ⋆ ?P =>
+        eapply (fwd_stores (fun H => H ⋆ P)); try eassumption; eauto with FrameDB
+      end.
+      { replace (O.unsigned alloc_o + word_size)%Z with (O.unsigned alloc_o + 1*word_size)%Z by lia.
+        eauto with EvalDB. }
+      { cbn in Hvs; cbn; lia. }
+      { clear - Hdup; cbn in *; now rewrite !map_app, !All_app in *. }
+      { clear - Hdup; cbn in *; now rewrite !map_app, !All_app in *. }
+      { normalize_bound_var_in_ctx.
+        decompose [and] Henvs; split_ands; eauto with InvDB Ensembles_DB. }
+      { eapply env_rel_all_some; eauto.
+        normalize_occurs_free; rewrite !FromList_cons; sets. }
+      { do 2 apply env_rel_all_some_tenv_set.
+        eapply env_rel_all_some_tenv; eauto.
+        normalize_occurs_free; rewrite !FromList_cons; sets. }
+      intros m'' cv_ys Hcv_ys Hm''.
+      specialize (IHe e); rewrite He in IHe.
+      (* instantiate IH *)
       admit.
   - (* case x of { ces } *)
     rename v into x, l into ces; simpl.
     bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
-    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hm_values Hshapes.
     fwd Cred_if'.
     { admit. }
     { admit. }
@@ -2942,7 +3338,7 @@ Proof.
   - (* let x = Proj c n y in e *)
     rename v into x, v0 into y; simpl.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hm_values Hshapes.
     fwd Cred_set.
     { admit. }
     admit. (*
@@ -2957,7 +3353,7 @@ Proof.
     rename v into x, v0 into f, f into ft, l into ys; simpl.
     bind_step e' He; destruct e' as [[stm_e live_after_call] n_e].
     bind_step call Hcall.
-    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hm_values Hshapes.
     repeat fwd Cred_seq_assoc.
     admit. (*
     norm_seq.
@@ -2973,17 +3369,17 @@ Proof.
   - (* f ft ys *)
     rename v into f, f into ft, l into ys; simpl.
     bind_step call Hcall.
-    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hm_values Hshapes.
     admit.
     (* TODO: lemma about make_fun_call *)
   - (* let x = Prim p ys in e *)
     rename v into x, l into ys; simpl.
     bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hm_values Hshapes.
     now inv Hbstep.
   - (* halt x *)
     rename v into x; simpl.
-    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Htenv Henv*Hm.
+    intros Hdup*Hk Hbstep*Halloc Hlimit Hframe Hroots Hlive Hallocs Hbv Henvs Henv_rel*Hm Hm_values Hshapes.
     repeat fwd Cred_seq_assoc.
     admit. (*
     Cstep Cred_assign.

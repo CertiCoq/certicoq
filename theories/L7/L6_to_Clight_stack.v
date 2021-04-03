@@ -3008,17 +3008,19 @@ Context
 Definition env_inv (env : Clight.env) :=
   forall x, x <> frame_id /\ x <> roots_id -> env!x = None.
 
-(** every x in the temp environment corresponds to a well-defined value, and is
-    either a local variable or one of {alloc_id, limit_id, ret_id, case_id} *)
 Definition tenv_inv (tenv : Clight.temp_env) :=
-  forall x cv, tenv!x = Some cv ->
-          (PS.mem x locals = true
-           \/ x = alloc_id
-           \/ x = limit_id
-           \/ x = ret_id
-           \/ x = case_id
-           \/ x = roots_temp_id) /\
-          val_defined_wf cv.
+  (** every x in the temp environment corresponds to a well-defined value, and
+      is either a local variable or one of {alloc, limit, ret, case_id, roots_temp} *)
+  (forall x cv, tenv!x = Some cv ->
+           (PS.mem x locals = true
+            \/ x = alloc_id
+            \/ x = limit_id
+            \/ x = ret_id
+            \/ x = case_id
+            \/ x = roots_temp_id) /\
+           val_defined_wf cv) /\
+  (** every local variable is in tenv *)
+  (forall x, PS.mem x locals = true -> tenv!x <> None).
 
 Lemma env_get_wf env tenv x v :
   tenv_inv tenv ->
@@ -3281,45 +3283,48 @@ Proof.
   now rewrite O.repr_unsigned.
 Qed.
 
-Lemma tenv_inv_set_alloc tenv b o :
-  tenv_inv tenv -> tenv_inv (M.set alloc_id (Vptr b o) tenv).
-Proof.
-  unfold tenv_inv; intros Htenv; intros x cv Hget.
-  destruct (Pos.eq_dec alloc_id x) as [|Hne]; [subst x|].
-  - rewrite M.gss in Hget; inv Hget; unfold val_defined_wf; destruct Archi.ptr64; easy.
-  - rewrite M.gso in Hget; auto.
-Qed.
+Lemma set_get_None {A} (m : M.t A) k v k' :
+  (M.set k v m) ! k' = None ->
+  m ! k' = None.
+Proof. destruct (Pos.eq_dec k k'); [subst; rewrite M.gss|rewrite M.gso by auto]; easy. Qed.
+
+Ltac solve_tenv_inv_set special_ident :=
+  unfold tenv_inv; intros Hwf [Htenv1 Htenv2]; split;
+  [intros x cv Hget;
+   destruct (Pos.eq_dec special_ident x) as [|Hne]; [subst x|];
+   [rewrite M.gss in Hget; inv Hget; easy
+   |rewrite M.gso in Hget; auto]
+  |intros* Hlocal Heq; eapply Htenv2; eauto; eapply set_get_None; eauto].
+
+Lemma tenv_inv_set_alloc tenv v :
+  val_defined_wf v ->
+  tenv_inv tenv -> tenv_inv (M.set alloc_id v tenv).
+Proof. solve_tenv_inv_set alloc_id. Qed.
 Hint Resolve tenv_inv_set_alloc : InvDB.
 
-Lemma tenv_inv_set_limit tenv b o :
-  tenv_inv tenv -> tenv_inv (M.set limit_id (Vptr b o) tenv).
-Proof.
-  unfold tenv_inv; intros Htenv; intros x cv Hget.
-  destruct (Pos.eq_dec limit_id x) as [|Hne]; [subst x|].
-  - rewrite M.gss in Hget; inv Hget; unfold val_defined_wf; destruct Archi.ptr64; easy.
-  - rewrite M.gso in Hget; auto.
-Qed.
+Lemma tenv_inv_set_limit tenv v :
+  val_defined_wf v ->
+  tenv_inv tenv -> tenv_inv (M.set limit_id v tenv).
+Proof. solve_tenv_inv_set limit_id. Qed.
 Hint Resolve tenv_inv_set_limit : InvDB.
 
-Lemma tenv_inv_set_ret tenv b o :
-  tenv_inv tenv -> tenv_inv (M.set ret_id (Vptr b o) tenv).
-Proof.
-  unfold tenv_inv; intros Htenv; intros x cv Hget.
-  destruct (Pos.eq_dec ret_id x) as [|Hne]; [subst x|].
-  - rewrite M.gss in Hget; inv Hget; unfold val_defined_wf; destruct Archi.ptr64; easy.
-  - rewrite M.gso in Hget; auto.
-Qed.
+Lemma tenv_inv_set_ret tenv v :
+  val_defined_wf v ->
+  tenv_inv tenv -> tenv_inv (M.set ret_id v tenv).
+Proof. solve_tenv_inv_set ret_id. Qed.
 Hint Resolve tenv_inv_set_ret : InvDB.
 
-Lemma tenv_inv_set_x x tenv b o :
+Lemma tenv_inv_set_x x tenv v :
+  val_defined_wf v ->
   x \in FromSet locals ->
-  tenv_inv tenv -> tenv_inv (M.set x (Vptr b o) tenv).
+  tenv_inv tenv -> tenv_inv (M.set x v tenv).
 Proof.
-  unfold tenv_inv; intros Hin Htenv; intros x' cv Hget.
-  destruct (Pos.eq_dec x x') as [|Hne]; [subst x'|].
-  - rewrite M.gss in Hget; inv Hget; split; [|unfold val_defined_wf; destruct Archi.ptr64; easy].
-    left. apply PS.mem_spec. eapply FromSet_sound; eauto; sets.
-  - rewrite M.gso in Hget; auto.
+  unfold tenv_inv; intros Hwf Hlocals [Htenv1 Htenv2]; split.
+  - intros x' cv Hget; destruct (Pos.eq_dec x x') as [|Hne]; [subst x'|].
+    + rewrite M.gss in Hget; inv Hget; split; [|auto].
+      left. apply PS.mem_spec. eapply FromSet_sound; eauto; sets.
+    + rewrite M.gso in Hget; auto.
+  - intros* Hlocal Hnone; eapply Htenv2; eauto; eapply set_get_None; eauto.
 Qed.
 Hint Resolve tenv_inv_set_x : InvDB.
 
@@ -4032,6 +4037,215 @@ Proof.
   now destruct (skipn n xs).
 Qed.
 
+Lemma exp_ind'' (P : exp -> Prop)
+      (Hconstr : forall x c ys e, P e -> P (Econstr x c ys e))
+      (Hcase : forall x ces (IHces : forall c e, List.In (c, e) ces -> P e), P (Ecase x ces))
+      (Hproj : forall x t n y e, P e -> P (Eproj x t n y e))
+      (Hletapp : forall x f t ys e, P e -> P (Eletapp x f t ys e))
+      (Hfun : forall fds e, P e -> P (Efun fds e))
+      (Happ : forall f t ys, P (Eapp f t ys))
+      (Hprim : forall x p ys e, P e -> P (Eprim x p ys e))
+      (Hhalt : forall x, P (Ehalt x))
+  : forall e, P e.
+Proof.
+  fix IHe 1; intros [].
+  - apply Hconstr, IHe.
+  - apply Hcase; intros c' e' Hce'.
+    induction l as [| [c e] ces IHces].
+    + inversion Hce'.
+    + destruct Hce' as [Hl|Hr].
+      * inversion Hl; subst e'; apply IHe. Guarded.
+      * eapply IHces, Hr.
+  - apply Hproj, IHe.
+  - apply Hletapp, IHe.
+  - apply Hfun, IHe.
+  - apply Happ.
+  - apply Hprim, IHe.
+  - apply Hhalt.
+Qed.
+
+Lemma fwd_call env tenv m m' a tyargs tyres cconv optid al s vargs f vf vres P :
+  classify_fun (typeof a) = fun_case_f tyargs tyres cconv ->
+  eval_expr prog_genv env tenv m a vf ->
+  eval_exprlist prog_genv env tenv m al tyargs vargs ->
+  Genv.find_funct prog_genv vf = Some f ->
+  type_of_fundef f = Tfunction tyargs tyres cconv ->
+  eval_funcall prog_genv m f vargs Events.E0 m' vres ->
+  postcond env (set_opttemp optid vres tenv) m' s P ->
+  postcond env tenv m (Scall optid a al.; s)%C P.
+Proof.
+  unfold postcond; intros Hclassify Heval Hevals Hfind Htype Hcall Hnext.
+  destruct Hnext as [tenv' [m'' [cv [Hstep HP]]]].
+  exists tenv', m'', cv; split; auto.
+  unfold "⇓". change Events.E0 with (Events.Eapp Events.E0 Events.E0).
+  eapply exec_Sseq_1; eauto.
+  econstructor; eauto.
+Qed.
+
+Lemma rel_val_in_ρ k S x ρ env tenv values :
+  x \in S ->
+  ρ ~ₑ{k, S} (env, tenv, values) ->
+  exists v, ρ!x = Some v.
+Proof.
+  intros Hx Henv; specialize (Henv x Hx).
+  destruct (ρ ! x); auto; eauto.
+Qed.
+
+Lemma rel_val_in_env k S x ρ env tenv values :
+  x \in S ->
+  ρ ~ₑ{k, S} (env, tenv, values) ->
+  exists cv, (env, tenv) !!! x = Some cv.
+Proof.
+  intros Hx Henv; specialize (Henv x Hx).
+  destruct (ρ ! x); auto.
+  destruct (_ !!! _); eauto.
+Qed.
+
+Lemma rel_val_in_ρs k S xs ρ env tenv values :
+  FromList xs \subset S ->
+  ρ ~ₑ{k, S} (env, tenv, values) ->
+  exists vs, get_list xs ρ = Some vs.
+Proof.
+  induction xs as [|x xs IHxs]; [now exists [] |intros Hsub Hrel].
+  edestruct (rel_val_in_ρ k S x) as [v Hv]; try eassumption; eauto.
+  { eapply Included_trans; sets; now left. }
+  destruct IHxs as [vs Hvs]; auto; [eapply Included_trans; eauto; now right|].
+  cbn; rewrite Hv, Hvs; eauto.
+Qed.
+
+Lemma rel_val_in_envs k S xs ρ env tenv values :
+  FromList xs \subset S ->
+  ρ ~ₑ{k, S} (env, tenv, values) ->
+  exists cvs, (env, tenv) !!!! xs = Some cvs.
+Proof.
+  induction xs as [|x xs IHxs]; [now exists [] |intros Hsub Hrel].
+  edestruct (rel_val_in_env k S x) as [cv Hcv]; try eassumption; eauto.
+  { eapply Included_trans; sets; now left. }
+  destruct IHxs as [cvs Hcvs]; auto; [eapply Included_trans; eauto; now right|].
+  cbn; rewrite Hcv, Hcvs; eauto.
+Qed.
+
+Lemma rel_val_xs_related' k S xs vs cvs ρ env tenv values :
+  FromList xs \subset S ->
+  ρ ~ₑ{k, S} (env, tenv, values) ->
+  get_list xs ρ = Some vs ->
+  (env, tenv) !!!! xs = Some cvs ->
+  Forall2 (fun v cv => v ~ᵥ{k} (values, cv)) vs cvs.
+Proof.
+  revert vs cvs; induction xs as [|x xs IHxs]; intros vs cvs Hsub Hrel Hget Hcget.
+  - cbn in *; inv Hget; inv Hcget; constructor.
+  - cbn in Hget; cbn in Hcget.
+    destruct (ρ ! x) as [v|] eqn:Hρ; [|easy].
+    destruct (get_list xs ρ) as [vs'|] eqn:Hρs; [|easy].
+    destruct ((env, tenv) !!! x) as [cv|] eqn:Hc; [|easy].
+    destruct ((env, tenv) !!!! xs) as [cvs'|] eqn:Hcs; [|easy].
+    inv Hget; inv Hcget; constructor.
+    + specialize (Hrel x); rewrite Hρ, Hc in Hrel; apply Hrel.
+      eapply Included_trans; eauto; sets; now left.
+    + apply IHxs; eauto.
+      eapply Included_trans; eauto; now right.
+Qed.
+
+Lemma rel_val_xs_related k S xs ρ env tenv values :
+  FromList xs \subset S ->
+  ρ ~ₑ{k, S} (env, tenv, values) -> exists vs cvs,
+  get_list xs ρ = Some vs /\
+  (env, tenv) !!!! xs = Some cvs /\
+  Forall2 (fun v cv => v ~ᵥ{k} (values, cv)) vs cvs.
+Proof.
+  intros Hsub Hrel.
+  edestruct (rel_val_in_ρs k S xs) as [vs Hvs]; eauto.
+  edestruct (rel_val_in_envs k S xs) as [cvs Hcvs]; eauto.
+  do 2 eexists; split_ands; eauto.
+  eapply rel_val_xs_related'; eauto.
+Qed.
+
+(* TODO: generalize the version in map_util to P : A -> B -> Prop and use that instead *)
+Lemma set_lists_Forall2_get' {A} {B} (P : A -> B -> Prop)
+      xs vs1 vs2 rho1 rho2 rho1' rho2' x :
+  Forall2 P vs1 vs2 ->
+  set_lists xs vs1 rho1 = Some rho1' ->
+  set_lists xs vs2 rho2 = Some rho2' ->
+  List.In x xs ->
+  exists v1 v2,
+    M.get x rho1' = Some v1 /\
+    M.get x rho2' = Some v2 /\ P v1 v2.
+Proof.
+  revert rho1' rho2' vs1 vs2.
+  induction xs; simpl; intros rho1' rho2' vs1 vs2 Hall Hset1 Hset2 Hin.
+  - inv Hin.
+  - destruct (Coqlib.peq a x); subst.
+    + destruct vs1; destruct vs2; try discriminate.
+      destruct (set_lists xs vs1 rho1) eqn:Heq1;
+        destruct (set_lists xs vs2 rho2) eqn:Heq2; try discriminate.
+      inv Hset1; inv Hset2. inv Hall.
+      repeat eexists; try rewrite M.gss; eauto.
+    + destruct vs1; destruct vs2; try discriminate.
+      destruct (set_lists xs vs1 rho1) eqn:Heq1;
+        destruct (set_lists xs vs2 rho2) eqn:Heq2; try discriminate.
+      inv Hset1; inv Hset2. inv Hall. inv Hin; try congruence.
+      edestruct IHxs as [v1 [v2 [Hget1 [Hget2 HP]]]]; eauto.
+      repeat eexists; eauto; rewrite M.gso; eauto.
+Qed.
+
+Lemma set_related_lists_rel_val k S xs vs cvs ρ_old tenv_old ρ env tenv values :
+  Forall2 (fun v cv => v ~ᵥ{k} (values, cv)) vs cvs ->
+  set_lists xs vs ρ_old = Some ρ ->
+  set_lists xs cvs tenv_old = Some tenv ->
+  S \subset FromList xs ->
+  ρ ~ₑ{k, S} (env, tenv, values).
+Proof.
+  intros Hforall Hset_ρ Hset_tenv Hsub x Hx.
+  eapply Hsub in Hx; unfold In, FromList in Hx.
+  edestruct @set_lists_Forall2_get' as [v [cv [Hv [Hcv Hrel]]]]; eauto; cbn in Hrel.
+  rewrite Hv; unfold "!!!"; rewrite Hcv; assumption.
+Qed.
+
+Lemma tenv_inv_set_lists xs vs old_tenv tenv :
+  Forall val_defined_wf vs ->
+  tenv_inv old_tenv ->
+  FromList xs \subset FromSet locals ->
+  set_lists xs vs old_tenv = Some tenv ->
+  tenv_inv tenv.
+Proof.
+  intros Hwf Htenv Hsub Hset.
+  generalize dependent vs; generalize dependent tenv;
+    induction xs as [|x xs IHxs]; [now destruct vs; cbn|].
+  destruct vs as [|v vs]; [easy|]; intros Hwf Hset.
+  cbn in Hset; destruct (set_lists xs vs old_tenv) as [tenv'|] eqn:Htenv'; [|easy].
+  inv Hwf; inv Hset; eapply tenv_inv_set_x; auto.
+  { rewrite FromList_cons in Hsub; eapply Included_trans; eauto; sets. }
+  eapply IHxs; eauto; sets.
+  eapply Included_trans; eauto; sets; now right.
+Qed.
+
+Lemma ρ_inv_set_lists xs vs old_ρ ρ vs' :
+  ρ_inv old_ρ ->
+  get_list xs old_ρ = Some vs' ->
+  set_lists xs vs old_ρ = Some ρ ->
+  ρ_inv ρ.
+Proof.
+  revert vs vs' ρ; induction xs as [|x xs IHxs]; [destruct vs; cbn; try easy; inversion 3; now subst|].
+  destruct vs as [|v vs]; [cbn; inversion 3|].
+  intros vs' ρ Hρ Hvs.
+  cbn. destruct (set_lists xs vs old_ρ) as [ρ'|] eqn:Hρ'; [|easy].
+  intros H; inv H.
+  unfold ρ_inv in *; intros x' v' b' Hget Hgenv.
+  destruct (Pos.eq_dec x x') as [|Hne]; [subst x'; rewrite M.gss in Hget|].
+  - inv Hget.
+    destruct vs' as [|v'' vs'].
+    + cbn in Hvs. destruct (old_ρ ! x), (get_list xs old_ρ); easy.
+    + cbn in Hvs. destruct (old_ρ ! x) as [v''_|] eqn:Hold_ρ; [|easy].
+      destruct (get_list xs old_ρ); [|easy]. inv Hvs.
+      eapply Hρ; eauto.
+  - rewrite M.gso in Hget by auto.
+    destruct vs' as [|v'' vs'].
+    + cbn in Hvs. destruct (old_ρ ! x), (get_list xs old_ρ); easy.
+    + cbn in Hvs. destruct (old_ρ ! x) as [v''_|] eqn:Hold_ρ; [|easy].
+      destruct (get_list xs old_ρ); [|easy]. inv Hvs.
+      eapply IHxs; eauto.
+Qed.
+
 Lemma translate_body_stm nenv k : forall e,
   match translate_body cenv fenv locals nenv e with
   | Ret (stmt, _, _) =>
@@ -4089,10 +4303,10 @@ Lemma translate_body_stm nenv k : forall e,
   end.
 Proof.
   (* TODO: induction on step index by not be necessary *)
-  induction k as [k IHk] using lt_wf_ind; fix IHe 1; destruct e.
+  induction k as [k IHk] using lt_wf_ind.
+  induction e using exp_ind''.
   - (* let x = Con c ys in e *)
-    rename v into x, l into ys; simpl.
-    bind_step rep Hrep; destruct rep as [t|t a]; destruct ys as [|y ys]; try exact I; rewrite bind_ret.
+    simpl. bind_step rep Hrep; destruct rep as [t|t a]; destruct ys as [|y ys]; try exact I; rewrite bind_ret.
     + (* Unboxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
       intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
@@ -4122,7 +4336,7 @@ Proof.
         destruct_ex_ctx (fun H => H ⋆ P) vs Hm;
         destruct_ex_ctx (fun H => H ⋆ P) Hvs Hm;
         destruct vs as [|tag_slot args_slots]; [cbn in Hvs; lia|];
-        eapply (fwd_store (fun H => H ⋆ P))
+        eapply (fwd_store (fun H => H ⋆ P)) with (ty := value)
       end.
       4:{ eauto with EvalDB. }
       all: eauto with FrameDB EvalDB; try lia; auto with mem.
@@ -4135,7 +4349,7 @@ Proof.
       vars_neq Hdis x roots_id.
       match type of Hm' with
       | _ |=_{_} _ ⋆ ?P =>
-        eapply (fwd_stores (fun H => H ⋆ P)); try eassumption;
+        eapply (fwd_stores (fun H => H ⋆ P)) with (ty := value); try eassumption;
         eauto with FrameDB; auto with mem
       end.
       { replace (O.unsigned alloc_o + word_size)%Z with (O.unsigned alloc_o + 1*word_size)%Z by lia.
@@ -4148,31 +4362,29 @@ Proof.
         - subst roots_id; dis_bad Hdis y.
         - dis_bad Hdis roots_id. }
       { normalize_bound_var_in_ctx.
-        decompose [and] Henvs; split_ands; eauto with InvDB Ensembles_DB. }
+        decompose [and] Henvs; split_ands; eauto with EvalDB InvDB Ensembles_DB.}
       { eapply env_rel_all_some; eauto.
         normalize_occurs_free; rewrite !FromList_cons; sets. }
       { do 2 apply env_rel_all_some_tenv_set.
         eapply env_rel_all_some_tenv; eauto.
         normalize_occurs_free; rewrite !FromList_cons; sets. }
-      intros m'' cv_ys Hcv_ys Hm''.
+      intros m'' cv_skipn_ys Hcv_skipn_ys Hm''.
       rewrite overwrite_sublist_spec in Hm''.
-      2:{ apply get_env_list_len in Hcv_ys.
+      2:{ apply get_env_list_len in Hcv_skipn_ys.
           change cps.var with ident in *.
-          clear - Hvs Hcv_ys.
+          clear - Hvs Hcv_skipn_ys.
           cbn in *; lia. }
       rewrite skipn_all2 in Hm''.
-      2:{ apply get_env_list_len in Hcv_ys.
-          clear - Hvs Hcv_ys; change cps.var with ident in *; cbn in *; lia. }
+      2:{ apply get_env_list_len in Hcv_skipn_ys.
+          clear - Hvs Hcv_skipn_ys; change cps.var with ident in *; cbn in *; lia. }
       rewrite app_nil_r in Hm''.
       simpl firstn in Hm''; simpl "++"%list in Hm''.
       (* Continue with e via IH *)
-      specialize (IHe e); rewrite He in IHe.
       inv Hbstep; match goal with H : bstep _ _ _ _ _ _ |- _ => inv H end.
       specialize IHe with (cin := cin0).
       admit.
   - (* case x of { ces } *)
-    rename v into x, l into ces; simpl.
-    bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
+    simpl. bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
     intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
     (*fwd Cred_if'.
     { admit. }
@@ -4192,11 +4404,8 @@ Proof.
     + (* New case arm is boxed *)
       (* Same idea as in previous subcase *) admit. *)
   - (* let x = Proj c n y in e *)
-    rename v into x, v0 into y; simpl.
-    bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
+    simpl. bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
     intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
-    fwd Cred_set.
-    { admit. }
     admit. (*
     specialize (IHe e); rewrite He in IHe; apply IHe. Guarded.
     eapply rel_env_antimon_S; [apply (Included_Union_Setminus _ [set x]); sets|].
@@ -4206,8 +4415,7 @@ Proof.
     apply rel_env_gss_sing.
     admit. *)
   - (* let x = f ft ys in e *)
-    rename v into x, v0 into f, f into ft, l into ys; simpl.
-    bind_step e' He; destruct e' as [[stm_e live_after_call] n_e].
+    simpl. bind_step e' He; destruct e' as [[stm_e live_after_call] n_e].
     unfold make_fun_call.
     destruct (fenv ! f) as [[arity inds] |] eqn:Hget_fenv; [|exact I].
     destruct (negb (_ =? _)%nat) eqn:Harity_match; [exact I|].
@@ -4235,10 +4443,9 @@ Proof.
     { (* Hlive *) admit. }
     match type of Hm with
     | _ |=_{_} ?P ⋆ _ ⋆ ?Q =>
-      eapply (fwd_stores' (fun H => P ⋆ H ⋆ Q)) with (vs := cvs); try eassumption;
+      eapply (fwd_stores' (fun H => P ⋆ H ⋆ Q)) with (ty := value) (vs := cvs); try eassumption;
       auto with FrameDB; eauto with EvalDB; auto with mem
     end.
-    { right; cbn. reflexivity. }
     { unfold PS.elt, cps.var, M.elt in *. lia. }
     { (* live_after_call ⊆ FV(e) ⊆ vars(e) # frame_id *) admit. }
     { (* same argument as above *) admit. }
@@ -4253,17 +4460,15 @@ Proof.
     (* Set frame.next *)
     match type of Hm_live_no_x with
     |  _ |= _ ⋆ ?P =>
-      eapply (fwd_frame_next (fun H => H ⋆ P)); eauto with EvalDB FrameDB
+      eapply (fwd_frame_next (fun H => H ⋆ P)) with (ty := value); eauto with EvalDB FrameDB
     end.
-    { right; cbn; reflexivity. }
     intros m_new_frame Hm_new_frame.
     (* Push frame onto shadow stack *)
     unfold valid_mem in Hm_new_frame; unfold "|=" in *.
     match type of Hm_new_frame with
     | _ |=_{_} ?P ⋆ ?Q ⋆ _ ⋆ ?R =>
-      eapply (fwd_tinfo_fp (fun H => P ⋆ Q ⋆ H ⋆ R)); eauto with EvalDB FrameDB
+      eapply (fwd_tinfo_fp (fun H => P ⋆ Q ⋆ H ⋆ R)) with (ty := stack_frame); eauto with EvalDB FrameDB
     end.
-    { right; cbn. reflexivity. }
     intros m_frame_pushed Hm_frame_pushed; unfold "|=" in *.
     (* Store arguments n+1, .. in the args array at indices inds *)
     repeat fwd Cred_seq_assoc.
@@ -4279,7 +4484,8 @@ Proof.
     { (* roots_id # ys by Hdis *) admit. }
     { (* Henv_rel ==> skip n ys ⊆ ys ⊆ FV(let x = f ys in e) ⊆ dom(ρ) *) admit. }
     { (* same argument as above *) admit. }
-    intros m_args_stored v_ys Hv_ys Hm_args_stored; unfold "|=" in *.
+    intros m_args_stored v_skipn_ys Hv_skipn_ys Hm_args_stored; unfold "|=" in *.
+    (* Update tinfo->alloc and tinfo->limit *)
     match type of Hm_args_stored with
     | _ |=_{_} ?P ⋆ ?Q ⋆ _ ⋆ ?R =>
       eapply (fwd_tinfo_alloc (fun H => P ⋆ Q ⋆ H ⋆ R)) with (ty := value);
@@ -4293,6 +4499,51 @@ Proof.
     end.
     intros m_limit_stored Hm_limit_stored; unfold "|=" in *.
     (* The local frame struct is now a part of the shadow stack *)
+    rewrite <- sepcon_assoc in Hm_limit_stored.
+    match type of Hm_limit_stored with
+    | _ |=_{_} ((?f_b, _) ↦_{_} [Vptr _ (O.repr (_ + ?len*_)); Vptr ?r_b ?r_o; ?next] ⋆
+                (_, _) ↦_{_} (?cvs ++ ?suffix)) ⋆
+               ?P =>
+      (assert (Hlen_equal : len = #|cvs|) by now apply get_env_list_len in Hvs_live_no_x);
+      pose (new_frame := mk_ss_frame (f_b, O.zero) (r_b, r_o) #|cvs++suffix|);
+      apply (frame_entail (fun H => H ⋆ P))
+        with (Q := shadow_stack_frame new_frame cvs next)
+        in Hm_limit_stored;
+      auto with FrameDB
+    end.
+    2:{ cbn; intros S m_arbitrary.
+      match goal with
+      | |- _ |=_{_} _ ⋆ (_ ↦_{_} _ ++ ?suffix) -> _ |=_{_} ?P ⋆ _ =>
+        intros Hm_arbitrary;
+        exists_ex_ctx (fun H => P ⋆ H) suffix;
+        split_ex_ctx (fun H => P ⋆ H); [reflexivity|]
+      end.
+      cbn in Hlen_equal; rewrite Hlen_equal in Hm_arbitrary; assumption. }
+    rewrite sepcon_comm in Hm_limit_stored.
+    match type of Hm_limit_stored with
+    | _ |=_{_} (?P ⋆ ?Q ⋆ shadow_stack ?ss ?cvss ⋆ ?R) ⋆ shadow_stack_frame ?s ?cvs _ =>
+      rewrite (frame_stuff_hole (fun H => P ⋆ Q ⋆ H ⋆ R)) in Hm_limit_stored; auto with FrameDB;
+      rewrite_equiv_in (fun H => P ⋆ Q ⋆ H ⋆ R) sepcon_comm Hm_limit_stored;
+      change (shadow_stack_frame _ _ _ ⋆ shadow_stack _ _) with (shadow_stack (s :: ss) (cvs :: cvss)) in *
+    end.
+    change (Vptr frame_b Ptrofs.zero) with (stack_top (new_frame :: ss)) in *.
+    match type of Hm_limit_stored with
+    | _ |=_{_} ?P =>
+      change P with (valid_mem nursery_b alloc_o limit_o alloc_o limit_o tinfo_b tinfo_o
+                               (set_iths args v_skipn_ys (skipn n_param inds))
+                               (new_frame :: ss) (vs_live_no_x :: cvss)
+                               nalloc values frame) in Hm_limit_stored
+    end.
+    assert (Hcv_firstn_ys : exists cv_firstn_ys, (env, tenv) !!!! firstn n_param ys = Some cv_firstn_ys).
+    { admit. }
+    eapply fwd_call.
+    { cbn. reflexivity. }
+    { (* TODO: (env, tenv)!!!f = Some (Vptr f_b f_o) *) admit. }
+    { (* TODO: (env, tenv)!!!!(firstn n_param ys) = Some cv_firstn_ys *) admit. }
+    { (* Follows from Hrel_env *) admit. }
+    { (* TODO: might need to add this to value relation *) admit. }
+    { (* From Hrel_env *) admit. }
+    simpl set_opttemp.
     (* (firstn n_param ys) are related to their C counterparts by Henv_rel *)
     (* (skipn n_param ys) are related to their C counterparts and in the right spots in the args array *)
     (* Make the call, via Henv_rel at f *)
@@ -4306,18 +4557,16 @@ Proof.
        thus ρ is still related to the heap wrt fvs(e) and we can instantiate IHe accordingly *)
   - (* let rec fds in e *) exact I.
   - (* f ft ys *)
-    rename v into f, f into ft, l into ys; simpl.
-    bind_step call Hcall.
+    simpl. bind_step call Hcall.
     intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
     admit.
     (* TODO: lemma about make_fun_call *)
   - (* let x = Prim p ys in e *)
-    rename v into x, l into ys; simpl.
-    bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
+    simpl. bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
     intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
     now inv Hbstep.
   - (* halt x *)
-    rename v into x; simpl.
+    simpl.
     intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
     repeat fwd Cred_seq_assoc.
     admit. (*

@@ -3791,29 +3791,33 @@ Proof.
     eapply mpred_store; eauto with EvalDB; cbn; lia.
 Qed.
 
-Lemma fwd_tinfo_fp F env tenv m e ty tinfo_b tinfo_o alloc limit args fp nalloc b o s P :
+Lemma fwd_tinfo_fp F env tenv m e ty tinfo_b tinfo_o alloc limit args fp nalloc v s P :
   is_frame F ->
+  val_defined_wf v ->
   tenv ! tinfo_id = Some (Vptr tinfo_b tinfo_o) ->
   typeof e = value \/ typeof e = tptr ty ->
-  (env, tenv, m, e) ⇓ᵣ Vptr b o ->
+  (env, tenv, m, e) ⇓ᵣ v ->
   m |= F (∃ heap, (tinfo_b, O.unsigned tinfo_o) ↦_{Writable} [alloc; limit; heap] ++ args ++ [fp; nalloc]
           WITH #|args| = max_args) ->
   (forall m',
-     m' |= F (∃ heap, (tinfo_b, O.unsigned tinfo_o) ↦_{Writable} [alloc; limit; heap] ++ args ++ [Vptr b o; nalloc]
+     m' |= F (∃ heap, (tinfo_b, O.unsigned tinfo_o) ↦_{Writable} [alloc; limit; heap] ++ args ++ [v; nalloc]
               WITH #|args| = max_args) ->
     postcond env tenv m' s P) ->
   postcond env tenv m (tinfo->fp :::= e.; s)%C P.
 Proof.
-  intros HF Henv Htype Heval Hm Hsimpler.
-  assert (sem_cast (Vptr b o) (typeof e) (typeof (tinfo->fp)) m = Some (Vptr b o)).
-  { destruct Htype as [Htype|Htype]; rewrite Htype; eauto with EvalDB. }
+  intros HF Hwf Henv Htype Heval Hm Hsimpler.
+  assert (sem_cast v (typeof e) (typeof (tinfo->fp)) m = Some v).
+  { destruct Htype as [Htype|Htype]; rewrite Htype;
+      unfold val_defined_wf in Hwf; unfold value, tptr;
+      destruct Archi.ptr64 eqn:Harchi; cbn; destruct v; try auto;
+      unfold sem_cast; cbn; now rewrite Harchi. }
   decompose [ex and] prog_co_thread_info.
   unfold "|=" in *.
   destruct_ex_ctx F heap Hm.
   destruct_ex_ctx F Hargs_len Hm.
   pose proof Hm as Hm_in.
   apply mpred_frame_in in Hm_in; [|auto].
-  eapply store_ex with (i := (3+max_args)%Z) (v := Vptr b o) in Hm_in; eauto; auto with mem; try (cbn; lia).
+  eapply store_ex with (i := (3+max_args)%Z) (v := v) in Hm_in; eauto; auto with mem; try (cbn; lia).
   destruct Hm_in as [m' Hstore].
   fwd Cred_assign; eauto with EvalDB.
   - econstructor; cbn; eauto.
@@ -3835,8 +3839,8 @@ Proof.
     (rewrite mpred_Ex by auto); exists heap.
     rewrite mpred_Same_set in Hm; [|eapply store_dom_mem; eauto].
     exists_ex_ctx F Hargs_len.
-    replace ([alloc; limit; heap] ++ args ++ [Vptr b o; nalloc])%list
-      with (set_ith ([alloc; limit; heap] ++ args ++ [fp; nalloc]) (3+max_args)%Z (Vptr b o))%list.
+    replace ([alloc; limit; heap] ++ args ++ [v; nalloc])%list
+      with (set_ith ([alloc; limit; heap] ++ args ++ [fp; nalloc]) (3+max_args)%Z v)%list.
     + eapply mpred_store; eauto with EvalDB; cbn.
       rewrite app_length; cbn. superlia.
     + rewrite !set_ith_suffix by (cbn; lia).
@@ -4852,6 +4856,167 @@ Proof.
   superlia.
 Qed.
 
+Lemma fwd_load F env tenv m a i x ty b o p s vs P :
+  is_frame F ->
+  (env, tenv, m, a) ⇓ᵣ (Vptr b o) ->
+  typeof a = value \/ typeof a = tptr ty ->
+  (0 <= i < #|vs|)%Z ->
+  perm_order p Readable ->
+  m |= F ((b, O.unsigned o) ↦_{p} vs) ->
+  (forall v,
+    get_ith vs i = Some v ->
+    postcond env (M.set x v tenv) m s P) ->
+  postcond env tenv m (x ::= a.[i].; s)%C P.
+Proof.
+  intros HF Ha Hty Hbound Hperm Hm Hcont.
+  apply get_ith_in_range in Hbound; destruct Hbound as [v Hv].
+  fwd Cred_set.
+  - econstructor.
+    + econstructor; econstructor; eauto with EvalDB.
+      econstructor; eauto with EvalDB.
+      { destruct Hty as [Hty|Hty]; rewrite Hty; eauto with EvalDB. }
+      cbn; eauto with EvalDB.
+    + econstructor; eauto with EvalDB.
+      apply mpred_frame_in in Hm; [|auto]; cbn in Hm; decompose [ex and] Hm.
+      unfold Mem.loadv, load in *.
+      rewrite O.unsigned_repr by superlia.
+      eauto.
+  - auto.
+Qed.
+
+Fixpoint add_to_env vs (tenv : Clight.temp_env) xs i :=
+  match xs with
+  | [] => Some tenv
+  | x :: xs =>
+    match get_ith vs i with
+    | Some v => add_to_env vs (M.set x v tenv) xs (i + 1)%Z
+    | None => None
+    end
+  end.
+
+Lemma skipn_nil_len {A} n : forall xs : list A,
+  skipn n xs = [] -> n >= length xs.
+Proof.
+  induction n as [|n IHn]; destruct xs as [|x xs]; cbn; try easy.
+  intros H; specialize (IHn _ H); lia.
+Qed.
+
+Lemma skipn_len_le {A} n : forall xs : list A,
+  length (skipn n xs) <= length xs - n.
+Proof. induction n as [|n IHn]; destruct xs as [|x xs]; cbn; easy. Qed.
+
+Lemma pos_list_in_dec : forall (x : positive) xs, {List.In x xs} + {~ List.In x xs}.
+Proof.
+  induction xs as [|x' xs IHxs]; [now right|].
+  destruct (Pos.eq_dec x x') as [|Hne]; [subst x'; left; now left|].
+  destruct IHxs as [Hin|Hno]; [left; now right|right; intros [->|Hwat]; easy].
+Qed.
+
+Lemma set_lists_snoc {A} xs vs x v (ρ ρ1 ρ2 : M.t A) :
+  ~ List.In x xs ->
+  set_lists xs vs (M.set x v ρ) = Some ρ1 ->
+  set_lists (x :: xs) (v :: vs) ρ = Some ρ2 ->
+  forall y, ρ1!y = ρ2!y.
+Proof.
+  cbn [set_lists].
+  destruct (set_lists xs vs ρ) as [ρxv|] eqn:Hρxv; [|easy].
+  intros Hnotin Hxvs_xv Hxv_xvs; inv Hxv_xvs; intros y.
+  destruct (pos_list_in_dec y xs) as [Hyes|Hno].
+  - assert (y <> x) by (intros ->; contradiction Hnotin).
+    rewrite M.gso by auto.
+    edestruct (set_lists_Forall2_get eq xs vs vs ρ (M.set x v ρ)) as [vx [vx' [Hvx [Hvx' Hvx_eq]]]];
+      try eassumption; try apply Forall2_refl; congruence.
+  - destruct (Pos.eq_dec x y) as [<-|Hne].
+    + rewrite M.gss.
+      erewrite <- set_lists_not_In with (rho' := ρ1); eauto.
+      now rewrite M.gss.
+    + rewrite M.gso by auto.
+      erewrite <- set_lists_not_In with (rho := M.set x v ρ) (rho' := ρ1); eauto.
+      erewrite <- set_lists_not_In with (rho := ρ) (rho' := ρxv); eauto.
+      now rewrite M.gso by auto.
+Qed.
+
+Lemma add_to_env_set_lists vs xs : forall tenv i ρ,
+  (0 <= i <= #|vs| - #|xs|)%Z ->
+  NoDup xs ->
+  add_to_env vs tenv xs i = Some ρ -> exists ρ',
+  set_lists xs (firstn (Z.to_nat #|xs|) (skipn (Z.to_nat i) vs)) tenv = Some ρ' /\
+  forall x, ρ!x = ρ'!x.
+Proof.
+  induction xs as [|x xs IHxs].
+  - cbn; intros tenv i Hi.
+    now rewrite Nat2Z.id; cbn.
+  - intros tenv i ρ Hi.
+    assert (Hget : (0 <= i < #|vs|)%Z) by (cbn in *; lia).
+    apply get_ith_in_range in Hget.
+    destruct Hget as [vi Hvi].
+    cbn [add_to_env]. rewrite Hvi.
+    intros Hdup Hadd; inv Hdup.
+    edestruct IHxs as [ρ' [Hρ' Hρρ']]; try apply Hadd; try (cbn in *; superlia); auto.
+    replace (Z.to_nat (i + 1)) with (Z.to_nat i + 1) in * by lia.
+    rewrite <- MCList.skipn_skipn in Hρ'.
+    destruct (skipn (Z.to_nat i) vs) as [|vi' vis] eqn:Hskip_vs.
+    { cbn; rewrite !firstn_nil; cbn.
+      apply skipn_nil_len in Hskip_vs.
+      cbn in *. superlia. }
+    cbn [skipn] in Hρ'.
+    pose proof skipn_len_le (Z.to_nat i) vs as Hskipn_len.
+    replace (Z.to_nat #|x::xs|) with (1 + Z.to_nat #|xs|) by (cbn; lia).
+    rewrite MCList.firstn_add; cbn [firstn skipn app].
+    edestruct (set_lists_length3 tenv) as [ρ'' Hρ''].
+    2: exists ρ''; split; eauto.
+    + cbn. rewrite firstn_length_le.
+      * cbn; now rewrite Nat2Z.id.
+      * apply f_equal with (f := fun xs => #|xs|) in Hskip_vs.
+        rewrite skipn_len in Hskip_vs by lia.
+        cbn in *; superlia.
+    + intros y; transitivity (ρ' ! y); auto.
+      eapply set_lists_snoc; eauto.
+      apply get_ith_firstn_skipn in Hvi.
+      apply f_equal with (f := firstn (Z.to_nat 1)) in Hskip_vs.
+      now rewrite Hvi in Hskip_vs; inv Hskip_vs.
+Qed.
+
+Lemma fwd_loads F P_tenv env tenv m a i xs ty b o p s vs P :
+  is_frame F ->
+  (forall tenv,
+    P_tenv tenv ->
+    (env, tenv, m, a) ⇓ᵣ (Vptr b o)) ->
+  P_tenv tenv ->
+  (forall tenv x v, List.In x xs -> P_tenv tenv -> P_tenv (M.set x v tenv)) ->
+  typeof a = value \/ typeof a = tptr ty ->
+  (0 <= #|xs| < #|vs| /\ 0 <= i <= #|vs| - #|xs|)%Z ->
+  perm_order p Readable ->
+  m |= F ((b, O.unsigned o) ↦_{p} vs) ->
+  (forall tenv',
+    add_to_env vs tenv xs i = Some tenv' ->
+    postcond env tenv' m s P) ->
+  postcond env tenv m (statements (mapi (fun i x => x ::= a.[i]) i xs).; s)%C P.
+Proof.
+  intros HF Ha Htenv_base Htenv_ind Hty Hbounds Hperm Hm Hcont.
+  revert tenv vs m i Ha Htenv_base Htenv_ind Hm Hbounds Hcont; induction xs as [|x xs IHxs];
+  intros tenv vs m i Ha Htenv_base Htenv_ind Hm Hbounds Hcont.
+  { cbn. fwd Cred_skip. apply Hcont; auto. }
+  cbn. fwd Cred_seq_assoc.
+  eapply fwd_load; eauto; try (cbn in *; superlia).
+  intros vi Hget_vi.
+  eapply IHxs; eauto.
+  { apply Htenv_ind; auto; now left. }
+  { intros; apply Htenv_ind; auto; now right. }
+  { cbn in *; superlia. }
+  intros tenv' Htenv'.
+  apply Hcont; cbn; now rewrite Hget_vi.
+Qed.
+
+(* TODO hoist *)
+Lemma mpred_ex_intro {A} S m F G (x : A) :
+  is_frame F ->
+  m |=_{S} F (G x) -> m |=_{S} F (∃ x, G x).
+Proof.
+  intros HF Hm.
+  rewrite mpred_Ex by auto; now exists x.
+Qed.
+
 Hint Extern 0 ((M.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Hint Extern 0 ((PTree.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Lemma translate_body_stm nenv k : forall e,
@@ -4884,6 +5049,7 @@ Lemma translate_body_stm nenv k : forall e,
     ρ ~ₑ{k, occurs_free e} (env, tenv, values) ->
     (** and m is a valid CertiCoq memory with shadow stack cvss related to vss, *)
     forall ss cvss outliers frame,
+    val_defined_wf (stack_top ss) ->
     let frame :=
       (∃ next_o, (frame_b, 0%Z) ↦_{Freeable}
         [Vptr roots_b next_o; Vptr roots_b O.zero; stack_top ss]) ⋆
@@ -4919,7 +5085,7 @@ Proof.
     simpl. bind_step rep Hrep; destruct rep as [t|t a]; destruct ys as [|y ys]; try exact I; rewrite bind_ret.
     + (** Unboxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+      intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
       fwd Cred_set; [constructor|].
       admit.
       (*specialize (IHe e); rewrite He in IHe; eapply IHe. Guarded.
@@ -4930,7 +5096,7 @@ Proof.
       apply rel_env_gss_sing; rewrite rel_val_eqn; cbn; now rewrite Hrep. *)
     + (** Boxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+      intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
       normalize_used_vars. rewrite !FromList_cons in Hdis.
       repeat fwd Cred_seq_assoc.
       fwd Cred_set; [eauto with EvalDB|].
@@ -4995,7 +5161,7 @@ Proof.
       admit.
   - (** case x of { ces } *)
     simpl. bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
-    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
     (*fwd Cred_if'.
     { admit. }
     { admit. }*)
@@ -5015,7 +5181,7 @@ Proof.
       (* Same idea as in previous subcase *) admit. *)
   - (** let x = Proj c n y in e *)
     simpl. bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
     admit. (*
     specialize (IHe e); rewrite He in IHe; apply IHe. Guarded.
     eapply rel_env_antimon_S; [apply (Included_Union_Setminus _ [set x]); sets|].
@@ -5030,7 +5196,7 @@ Proof.
     destruct (fenv ! f) as [[arity inds] |] eqn:Hf_cc; [|exact I].
     destruct (negb (_ =? _)%nat) eqn:Harity_match; [exact I|].
     rewrite bind_ret.
-    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
     rewrite used_vars_Eletapp in *. rewrite !FromList_cons in Hdis.
     repeat fwd Cred_seq_assoc.
     (** Store variables live after call \ {x} in roots array *)
@@ -5077,7 +5243,8 @@ Proof.
     unfold valid_mem in Hm_frame_no_x; unfold "|=" in *.
     match type of Hm_frame_no_x with
     | _ |=_{_} ?P ⋆ ?Q ⋆ _ ⋆ ?R =>
-      eapply (fwd_tinfo_fp (fun H => P ⋆ Q ⋆ H ⋆ R)) with (ty := stack_frame); eauto with EvalDB FrameDB
+      eapply (fwd_tinfo_fp (fun H => P ⋆ Q ⋆ H ⋆ R))
+        with (ty := stack_frame) (v := Vptr frame_b _); eauto with EvalDB FrameDB
     end.
     intros m_frame_pushed Hm_frame_pushed; unfold "|=" in *.
     (** Store arguments n+1, .. in the args array at indices inds *)
@@ -5246,18 +5413,25 @@ Proof.
       pose (tenv_call := tenv_call');
       change tenv_call' with tenv_call
     end.
+    assert (Halloc_ne_limit : alloc_id <> limit_id).
+    { rewrite <- NoDup'_spec in NoDup_tempvars.
+      clear - NoDup_tempvars; cbn in *; easy. }
     eapply fwd_seq with (P := fun tenv_gc m_gc _ =>
       (** after the if-then-else,
           - the new tenv contains a binding (x ↦ cvx_gc),
           - and the new mem contains a possibly-GC'd heap values_gc + enough free space for max_allocs,
           - and the shapes vss post-GC are compatible with their shapes pre-GC 
           - and the shape of x is comaptible with its shape pre-GC if x is live after the call *)
-      exists cvx_gc values_gc alloc_o_gc limit_o_gc cvs_gc cvss_gc maybe_x,
+      exists cvx_gc values_gc nursery_b_gc alloc_o_gc limit_o_gc cvs_gc cvss_gc maybe_x,
       tenv_gc ! x = Some cvx_gc /\
-      m_gc |= ∃ nursery_b_gc talloc_o_gc tlimit_o_gc args nalloc,
+      tenv_gc ! limit_id = Some (Vptr nursery_b_gc limit_o_gc) /\
+      tenv_gc ! alloc_id = Some (Vptr nursery_b_gc alloc_o_gc) /\
+      (forall x', x' <> x -> x' <> limit_id -> x' <> alloc_id -> tenv_gc ! x' = tenv_call ! x') /\
+      m_gc |= ∃ talloc_o_gc tlimit_o_gc args nalloc,
               valid_mem nursery_b_gc talloc_o_gc tlimit_o_gc alloc_o_gc limit_o_gc
                         tinfo_b tinfo_o args (frame_no_x :: ss) ((cvs_gc ++ maybe_x) :: cvss_gc)%list
                         nalloc values_gc frame /\
+      values_gc |-- outliers ⋆ Pure True /\
       (max_allocs e * word_size <= O.unsigned limit_o_gc - O.unsigned alloc_o_gc)%Z /\
       (if PS.mem x live_after_call then compatible_shape values_call values_gc vx cvx cvx_gc else True) /\
       compatible_shapes values_call values_gc (vs_live_no_x :: vss)
@@ -5266,15 +5440,17 @@ Proof.
     ); [auto 10 with NormalDB|..].
     { destruct (Z.eq_dec _ _) as [Hno_allocs|Hyes_allocs].
       { apply fwd_skip.
-        exists cvx, values_call, alloc_o_call, limit_o_call, cvs_live_no_x_call, cvss_call, [].
+        exists cvx, values_call, nursery_b_call, alloc_o_call, limit_o_call, cvs_live_no_x_call, cvss_call, [].
         split_ands; auto; try solve [eauto with ShapeDB].
         - subst tenv_call.
           vars_neq Hdis x limit_id.
           vars_neq Hdis x alloc_id.
           rewrite !M.gso by auto.
           now rewrite M.gss.
+        - subst tenv_call. now rewrite M.gss.
+        - subst tenv_call. rewrite M.gso by auto. now rewrite M.gss.
         - unfold "|=".
-          exists_ex nursery_b_call; exists_ex alloc_o_call; exists_ex limit_o_call.
+          exists_ex alloc_o_call; exists_ex limit_o_call.
           rewrite app_nil_r.
           assumption.
         - destruct_ex args' Hm_call; destruct_ex nalloc' Hm_call.
@@ -5286,9 +5462,6 @@ Proof.
       destruct (PS.mem x live_after_call) eqn:Hx_live_after_call.
       - (** x live after call *)
         unfold create_space.
-        assert (Halloc_ne_limit : alloc_id <> limit_id).
-        { rewrite <- NoDup'_spec in NoDup_tempvars.
-          clear - NoDup_tempvars; cbn in *; easy. }
         pose proof Hm_call as Hm_call'.
         destruct_ex args' Hm_call'; destruct_ex nalloc' Hm_call'.
         edestruct eval_space_check' with (env := env) (n := max_allocs e) (tenv := tenv_call)
@@ -5300,17 +5473,21 @@ Proof.
         destruct cmp_b.
         2:{ (** Enough space in nursery; no need to GC *)
           apply fwd_skip.
-          exists cvx, values_call, alloc_o_call, limit_o_call, cvs_live_no_x_call, cvss_call, [].
+          exists cvx, values_call, nursery_b_call, alloc_o_call, limit_o_call, cvs_live_no_x_call, cvss_call, [].
           split_ands; auto; try solve [eauto with ShapeDB].
           - subst tenv_call.
             vars_neq Hdis x limit_id.
             vars_neq Hdis x alloc_id.
             rewrite !M.gso by auto.
             now rewrite M.gss.
+          - subst tenv_call. now rewrite M.gss.
+          - subst tenv_call. rewrite M.gso by auto. now rewrite M.gss.
           - unfold "|=".
-            exists_ex nursery_b_call; exists_ex alloc_o_call; exists_ex limit_o_call.
-            rewrite app_nil_r. assumption.
-          - lia. }
+            exists_ex alloc_o_call; exists_ex limit_o_call.
+            rewrite app_nil_r.
+            assumption.
+          - destruct_ex args'' Hm_call; destruct_ex nalloc'' Hm_call.
+            apply valid_mem_limit_alloc_nonneg in Hm_call; lia. }
         repeat fwd Cred_seq_assoc.
         (** Store x in the roots array *)
         unfold valid_mem in Hm_call.
@@ -5329,9 +5506,9 @@ Proof.
         vars_neq Hdis x frame_id.
         vars_neq Hdis x roots_id.
         vars_neq Hdis roots_temp_id x.
-        assert (roots_temp_id <> alloc_id).
+        assert (Hroots_temp_ne_alloc : roots_temp_id <> alloc_id).
         { clear - NoDup_tempvars; rewrite <- NoDup'_spec in NoDup_tempvars; now cbn in *. }
-        assert (roots_temp_id <> limit_id).
+        assert (Hroots_temp_ne_limit : roots_temp_id <> limit_id).
         { clear - NoDup_tempvars; rewrite <- NoDup'_spec in NoDup_tempvars; now cbn in *. }
         match type of Hm_call with
         | _ |=_{_} (?P ⋆ _) ⋆ ?Q =>
@@ -5481,10 +5658,14 @@ Proof.
               rewrite ?app_length in *; cbn in *.
               rewrite O.unsigned_zero; superlia. }
         apply fwd_skip.
-        exists cvx_gc, values_gc, alloc_o_gc, limit_o_gc, cvs_gc, cvss_gc, [cvx_gc].
+        exists cvx_gc, values_gc, nursery_b_gc, alloc_o_gc, limit_o_gc, cvs_gc, cvss_gc, [cvx_gc].
         split_ands; auto.
         + now rewrite M.gss.
-        + exists_ex nursery_b_gc; exists_ex alloc_o_gc; exists_ex limit_o_gc;
+        + rewrite M.gso by auto. now rewrite M.gss.
+        + rewrite !M.gso by auto. now rewrite M.gss.
+        + intros x' Hx'_x Hx'_limit Hx'_alloc.
+          now rewrite !M.gso by auto.
+        + exists_ex alloc_o_gc; exists_ex limit_o_gc;
             exists_ex args_gc; exists_ex nalloc_gc.
           replace frame_no_x with new_frame; [apply Hm_gc_folded|].
           subst new_frame frame_no_x; f_equal; auto.
@@ -5492,9 +5673,6 @@ Proof.
         + superlia.
       - (** x not live after call *)
         unfold create_space.
-        assert (Halloc_ne_limit : alloc_id <> limit_id).
-        { rewrite <- NoDup'_spec in NoDup_tempvars.
-          clear - NoDup_tempvars; cbn in *; easy. }
         pose proof Hm_call as Hm_call'.
         destruct_ex args' Hm_call'; destruct_ex nalloc' Hm_call'.
         edestruct eval_space_check' with (env := env) (n := max_allocs e) (tenv := tenv_call)
@@ -5506,15 +5684,17 @@ Proof.
         destruct cmp_b.
         2:{ (** Enough space in nursery; no need to GC *)
           apply fwd_skip.
-          exists cvx, values_call, alloc_o_call, limit_o_call, cvs_live_no_x_call, cvss_call, [].
+          exists cvx, values_call, nursery_b_call, alloc_o_call, limit_o_call, cvs_live_no_x_call, cvss_call, [].
           split_ands; auto; try solve [eauto with ShapeDB].
           - subst tenv_call.
             vars_neq Hdis x limit_id.
             vars_neq Hdis x alloc_id.
             rewrite !M.gso by auto.
             now rewrite M.gss.
+          - subst tenv_call. now rewrite M.gss.
+          - subst tenv_call. rewrite !M.gso by auto. now rewrite M.gss.
           - unfold "|=".
-            exists_ex nursery_b_call; exists_ex alloc_o_call; exists_ex limit_o_call.
+            exists_ex alloc_o_call; exists_ex limit_o_call.
             rewrite app_nil_r. assumption.
           - lia. }
         repeat fwd Cred_seq_assoc.
@@ -5605,23 +5785,157 @@ Proof.
         destruct_ex args_gc Hm_gc; destruct_ex nalloc_gc Hm_gc.
         destruct cvss_gc as [|cvs_gc cvss_gc]; [destruct Hcompat_gc|].
         apply fwd_skip.
-        exists cvx, values_gc, alloc_o_gc, limit_o_gc, cvs_gc, cvss_gc, [].
+        exists cvx, values_gc, nursery_b_gc, alloc_o_gc, limit_o_gc, cvs_gc, cvss_gc, [].
         split_ands; auto.
         + vars_neq Hdis x limit_id. vars_neq Hdis x alloc_id.
           rewrite !M.gso by auto. now rewrite M.gss.
-        + exists_ex nursery_b_gc; exists_ex alloc_o_gc; exists_ex limit_o_gc;
+        + now rewrite M.gss.
+        + rewrite M.gso by auto. now rewrite M.gss.
+        + intros; now rewrite !M.gso by auto.
+        + exists_ex alloc_o_gc; exists_ex limit_o_gc;
             exists_ex args_gc; exists_ex nalloc_gc.
           rewrite app_nil_r.
           replace frame_no_x with new_frame; [apply Hm_gc|].
           subst new_frame frame_no_x; f_equal; auto.
         + superlia. }
-    intros tenv_gc m_gc [cvx_gc [values_gc [alloc_o_gc [limit_o_gc [cvs_gc [cvss_gc 
-      [maybe_x [Htenv_gc [Hm_gc [Hfree_space [Hcvx_compat Hcvs_compat]]]]]]]]]]].
+    intros tenv_gc m_gc [cvx_gc [values_gc [nursery_b_gc [alloc_o_gc [limit_o_gc
+      [cvs_gc [cvss_gc [maybe_x [Htenv_gc_x [Htenv_gc_limit [Htenv_gc_alloc 
+      [Htenv_gc [Hm_gc [Hvalues_gc [Hfree_space [Hcvx_compat Hcvs_compat]]]]]]]]]]]]]]]].
     (** Retrieve |live\x| from the roots array *)
-    
-    (** Pop frame from the shadow stack *)
+    unfold "|=" in *.
+    destruct_ex talloc_o_gc Hm_gc.
+    destruct_ex tlimit_o_gc Hm_gc.
+    destruct_ex args_gc Hm_gc.
+    destruct_ex nalloc_gc Hm_gc.
+    unfold valid_mem, shadow_stack in Hm_gc; fold shadow_stack in Hm_gc.
+    match type of Hm_gc with
+    | _ |=_{_} ?P ⋆ ?Q ⋆ _ ⋆ ?S =>
+      rewrite_equiv_in (fun H => P ⋆ Q ⋆ H ⋆ S) sepcon_comm Hm_gc;
+      rewrite <- (frame_stuff_hole (fun H => P ⋆ Q ⋆ H ⋆ S)) in Hm_gc; auto with FrameDB;
+      rewrite sepcon_comm in Hm_gc
+    end.
+    unfold shadow_stack_frame, frame_no_x in Hm_gc.
+    match type of Hm_gc with
+    | _ |=_{_} (?P ⋆ _) ⋆ ?Q =>
+      destruct_ex_ctx (fun H => (P ⋆ H) ⋆ Q) suffix_gc Hm_gc;
+      destruct_ex_ctx (fun H => (P ⋆ H) ⋆ Q) Hsuffix_gc Hm_gc
+    end.
+    assert (Hlen_cvs_gc : #|cvs_gc| = #|vs_live_no_x|).
+    { (* Hcvs_compat *) admit. }
+    match type of Hm_gc with
+    | _ |=_{_} (?P ⋆ _) ⋆ ?Q =>
+      eapply (fwd_loads (fun H => (P ⋆ H) ⋆ Q))
+        with (P_tenv := fun tenv => tenv!roots_temp_id = Some (Vptr roots_b O.zero))
+             (ty := value); auto with FrameDB mem; try apply Hm_gc
+    end.
+    { eauto with EvalDB. }
+    { vars_neq Hdis roots_temp_id x.
+      assert (Hroots_temp_ne_alloc : roots_temp_id <> alloc_id).
+      { clear - NoDup_tempvars; rewrite <- NoDup'_spec in NoDup_tempvars; now cbn in *. }
+      assert (Hroots_temp_ne_limit : roots_temp_id <> limit_id).
+      { clear - NoDup_tempvars; rewrite <- NoDup'_spec in NoDup_tempvars; now cbn in *. }
+      rewrite Htenv_gc; auto.
+      subst tenv_call; rewrite !M.gso by auto; auto. }
+    { intros ? x_in_live; intros.
+      assert (x_in_live <> roots_temp_id).
+      { intros Hwat; subst x_in_live; destruct Hdis as [Hdis].
+        contradiction (Hdis roots_temp_id); constructor; auto 10.
+        (* roots_temp_id ∈ |live\x| ==> roots_temp_id ∈ FV(e) ⊆ used_vars e *)
+        admit. }
+      now rewrite M.gso by auto. }
+    { (* looks fine *) admit. }
+    intros tenv_roots Htenv_roots.
+    apply add_to_env_set_lists in Htenv_roots.
+    2:{ (* looks fine *) admit. }
+    2:{ (* PS produces NoDup lists *) admit. }
+    destruct Htenv_roots as [tenv_roots' [Htenv_roots Htenv_roots']].
+    change (Z.to_nat 0) with 0 in Htenv_roots; cbn [skipn] in Htenv_roots.
+    (** Pop frame from shadow stack *)
+    match type of Hm_gc with
+    | _ |=_{_} ?P ⋆ _ ⋆ ?Q =>
+      eapply (fwd_tinfo_fp (fun H => P ⋆ H ⋆ Q)) with (v := stack_top ss);
+       auto with FrameDB; try apply Hm_gc
+    end.
+    { (* tenv_roots ! tinfo_id = tenv_roots' ! tinfo_id
+         = tenv_gc ! tinfo_id (b/c tinfo_id ∉ |live\x|),
+         = tenv_call ! tinfo_id (b/c tinfo_id ∉ {limit, alloc}),
+         = tenv ! tinfo_id (b/c tinfo_id ∉ {limit, alloc}),
+         = Some (Vptr tinfo_b tinfo_b) *)
+      admit. }
+    { right; reflexivity. }
+    { decompose [ex and] prog_co_stack_frame.
+      econstructor.
+      - econstructor; eauto with EvalDB. reflexivity.
+      - econstructor; eauto.
+        + reflexivity.
+        + unfold Ptrofs.add.
+          change (O.unsigned (O.repr (2 * word_size))) with (2 * word_size)%Z.
+          unfold Mem.loadv.
+          rewrite Mptr_word.
+          rewrite O.unsigned_repr.
+          2:{ cbn in Hm_gc; decompose [ex and] Hm_gc; clear Hm_gc. superlia. }
+          match type of Hm_gc with
+          | _ |=_{_} (_ ⋆ ?P) ⋆ ?Q =>
+            eapply (mpred_load _ (fun H => (H ⋆ P) ⋆ Q));
+              auto with FrameDB; try apply Hm_gc
+          end.
+          reflexivity. }
+    intros m_pop Hm_pop.
+    (** Massage m_pop until it's ready for IH *)
+    unfold "|=" in Hm_pop.
+    match type of Hm_pop with
+    | _ |=_{_} ((?bo ↦_{?p} [Vptr ?roots_b ?next; ?root; ?prev]) ⋆ ?P) ⋆ ?Q =>
+      eapply mpred_ex_intro
+        with (F := fun H => (H ⋆ P) ⋆ Q) (G := fun H => bo ↦_{p} [Vptr roots_b H; root; prev])
+        in Hm_pop;
+      auto with FrameDB
+    end.
+    assert (Hroots_len_same : #|(cvs_gc ++ maybe_x) ++ suffix_gc| = #|cvs|).
+    { (* should be fine *) admit. }
+    match type of Hm_pop with
+    | _ |=_{_} (?P ⋆ (?bo ↦_{?p} ?cvs')) ⋆ ?Q =>
+      eapply mpred_ex_intro
+        with (F := fun H => (P ⋆ H) ⋆ Q) (G := fun H => bo ↦_{p} cvs')
+             (x0 := Hroots_len_same)
+        in Hm_pop;
+      auto with FrameDB
+    end.
+    match type of Hm_pop with
+    | _ |=_{_} (?P ⋆ (?bo ↦_{?p} ?cvs' WITH #|?cvs'| = #|cvs|)) ⋆ ?Q =>
+      eapply mpred_ex_intro
+        with (F := fun H => (P ⋆ H) ⋆ Q) (G := fun H => bo ↦_{p} H WITH #|H| = #|cvs|)
+        in Hm_pop;
+      auto with FrameDB
+    end.
+    rewrite sepcon_comm in Hm_pop.
+    change (O.unsigned O.zero) with 0%Z in Hm_pop.
+    match type of Hm_pop with
+    | _ |=_{_} (?P ⋆ ?Q ⋆ ?R ⋆ ?S ⋆ _) ⋆ _ =>
+      rewrite (frame_stuff_hole (fun H => P ⋆ Q ⋆ R ⋆ S ⋆ H)) in Hm_pop;
+      auto with FrameDB;
+      rewrite_equiv_in (fun H => P ⋆ Q ⋆ R ⋆ S ⋆ H) sepcon_comm Hm_pop;
+      rewrite_equiv_in (fun H => P ⋆ Q ⋆ R ⋆ S ⋆ H) sepcon_assoc Hm_pop
+    end.
+    apply valid_mem_fold in Hm_pop.
+    rewrite <- postcond'_spec.
     (** Continue as e, via IH *)
-    admit.
+    edestruct IHe as [tenv_end [m_end [cv_end [Hend [cvss_end
+     [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
+    4:{ eassumption. }
+    15:{
+      exists_ex args_gc; exists_ex nalloc_gc; exists_ex talloc_o_gc; exists_ex tlimit_o_gc.
+      apply Hm_pop. }
+    17:{ exists tenv_end, m_end, cv_end; split; eauto.
+         exists cvss_end, values_end; split_ands; eauto.
+         - eapply rel_val_antimon; [|eauto].
+           rewrite !to_nat_add. lia.
+         - (* transitivity across the compatible_shapes assumptions *)
+           admit. }
+    all: try assumption.
+    (* Most seem fine. ρ_inv ρ[x↦vx] could be tricky.
+       Need to show, in the case that vx is a function value (ρ', fds, f),
+       that fenv(x) = fenv(f)... *)
+    all: admit.
     (* idea: we get from the call that the values in the shadow stack are preserved.
        (that is, if stack represents vs before call then stack still represents vs after call.)
        this includes all of the variables live after the call (except x, which isn't defined yet)
@@ -5632,16 +5946,16 @@ Proof.
   - (** let rec fds in e *) exact I.
   - (** f ft ys *)
     simpl. bind_step call Hcall.
-    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
     admit.
     (* TODO: lemma about make_fun_call *)
   - (** let x = Prim p ys in e *)
     simpl. bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
     now inv Hbstep.
   - (** halt x *)
     simpl.
-    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Hm Hvalues Hshapes.
+    intros Hdis Hscope*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
     repeat fwd Cred_seq_assoc.
     admit. (*
     Cstep Cred_assign.

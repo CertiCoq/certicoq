@@ -132,8 +132,8 @@ Fixpoint max_allocs (e : exp) : Z :=
     NOTE: in Clight, SIZEOF_PTR == SIZEOF_INT *)
 Definition value :=
   if Archi.ptr64
-  then Tlong Signed noattr
-  else Tint I32 Signed noattr.
+  then Tlong Unsigned noattr
+  else Tint I32 Unsigned noattr.
 Definition ast_value :=
   if Archi.ptr64 then AST.Tlong else Tany32.
 Definition make_cint (z : Z) (t : type) : expr :=
@@ -367,9 +367,11 @@ Definition make_cases (translate_body : exp -> error (statement * FVSet * N)) :=
       let fvs := PS.union fvs_e fvs_l' in
       let n := N.max n_e n_l' in
       p <- get_ctor_rep c ;;
+      (** We don't need to insert break statements: our generated programs always
+          return using Sreturn at the end, so fall-through is impossible. *)
       match p with
-      | boxed t a => ret (LScons (Some (Z.of_N t)) (prog.; Sbreak) ls, ls', fvs, n)
-      | enum t => ret (ls, LScons (Some (Z.of_N t)) (prog.; Sbreak) ls', fvs, n)
+      | boxed t a => ret (LScons (Some (Z.of_N t)) prog ls, ls', fvs, n)
+      | enum t => ret (ls, LScons (Some (Z.of_N t)) prog ls', fvs, n)
       end%C
     end.
 
@@ -424,11 +426,11 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
         else { switch on x>>1 over unboxed cases } *)
   | Ecase x cs =>
     '(boxed_cases, unboxed_cases, fvs_cs, n_cs) <- make_cases translate_body cs ;;
-    ret (Scall (Some case_id) isptr [var x].;
+    ret (Scall (Some case_id) isptr [make_var x].;
          Sifthenelse
            (Etempvar case_id bool_ty)
-           (Sswitch ((var x).[-1] &' make_cint 255 value) boxed_cases)
-           (Sswitch (var x >>' make_cint 1 value) unboxed_cases),
+           (Sswitch ((make_var x).[-1] &' make_cint 255 value) boxed_cases)
+           (Sswitch (make_var x >>' make_cint 1 value) unboxed_cases),
          add_local_fv fvs_cs x, n_cs)
   (** [[let x = f(y, ..) in e]] =
         store local variables live after call (= locals∩(FV(e)\x)) in roots array
@@ -1235,7 +1237,7 @@ Fixpoint mpred_denote_aux (P : mpred) (S : Ensemble address) (m : mem) : Prop :=
     S <--> dom_mapsto b o vs /\
     All (map val_wf vs) /\
     (forall i v, get_ith vs i = Some v -> load m b (o + i*word_size) = Some v) /\
-    (o >= 0)%Z /\ (o + #|vs|*word_size <= O.max_signed)%Z /\ (align_chunk word_chunk | o)%Z (* all addresses are representable *)
+    (o >= 0)%Z /\ (o + #|vs|*word_size <= O.max_unsigned)%Z /\ (align_chunk word_chunk | o)%Z (* all addresses are representable *)
   | P ⋆ Q =>
     exists S1 S2, 
     S <--> S1 :|: S2 /\
@@ -1326,6 +1328,8 @@ Ltac superlia :=
   (pose proof concretize_word_size);
   (pose proof O.max_signed_unsigned);
   (pose proof O.min_signed_neg);
+  (pose proof O.wordsize_max_unsigned);
+  (pose proof O.max_signed_pos);
   lia.
 
 Lemma dom_mapsto_nil b o :
@@ -2150,7 +2154,8 @@ Definition valid_mem
      args ++ [stack_top ss; vint nalloc]
    WITH #|args| = max_args) ⋆
    (∃ free_space, (nursery_b, O.unsigned alloc_o) ↦_{Writable} free_space
-    WITH #|free_space|*word_size = O.unsigned limit_o - O.unsigned alloc_o)%Z ⋆
+    WITH (#|free_space|*word_size = O.unsigned limit_o - O.unsigned alloc_o /\ 
+          #|free_space|*word_size <= O.max_signed))%Z ⋆
   shadow_stack ss cvss ⋆
   values ⋆
   frame.
@@ -2611,8 +2616,11 @@ Proof.
     eapply O.eqm_trans; [apply O.eqm_sym, O.eqm_unsigned_repr|].
     rewrite Z.mul_comm.
     apply O.eqm_mult; [|apply O.eqm_refl].
-    erewrite O.agree32_of_ints_eq; auto; [|now apply O.agree32_repr].
-    apply O.eqm_sym, O.eqm_unsigned_repr.
+    unfold O.of_intu, O.of_int.
+    apply O.eqm_sym.
+    eapply O.eqm_trans; [|apply O.eqm_unsigned_repr].
+    rewrite <- O.eqm32 by auto.
+    apply Int.eqm_unsigned_repr.
 Qed.
 Hint Resolve sem_ptr_add : EvalDB.
 
@@ -2997,6 +3005,7 @@ Proof.
     split_ex_ctx (fun H => P ⋆ Q ⋆ H ⋆ R)
   end.
   { pose proof Hfree_space as Hfree_space_old.
+    destruct Hfree_space as [Hfree_space Hbound'].
     apply wordsize_mul_div in Hfree_space.
     destruct Hbound as [Hbound_lower Hbound].
     apply wordsize_mul_div_le in Hbound.
@@ -3004,7 +3013,7 @@ Proof.
     rewrite O.unsigned_repr.
     - unfold Z.sub. rewrite Z.opp_add_distr, Z.add_assoc.
       do 2 change (?x + - ?y)%Z with (x - y)%Z.
-      rewrite <- !Hfree_space_old.
+      rewrite <- !(proj1 Hfree_space_old).
       rewrite Z_div_mult by superlia.
       now rewrite Z.mul_sub_distr_r.
     - cbn in Hm; decompose [ex and] Hm; superlia. }
@@ -3014,6 +3023,7 @@ Proof.
     split_ex_ctx (fun H => H ⋆ P)
   end.
   { pose proof Hfree_space as Hfree_space_old.
+    destruct Hfree_space as [Hfree_space Hbound'].
     apply wordsize_mul_div in Hfree_space.
     destruct Hbound as [Hbound_lower Hbound].
     apply wordsize_mul_div_le in Hbound.
@@ -3033,6 +3043,7 @@ Proof.
   replace #|firstn (Z.to_nat n) free_space| with n in *; [rewrite O.unsigned_repr; auto|].
   - cbn in Hm; decompose [ex and] Hm; clear Hm; superlia.
   - pose proof Hfree_space as Hfree_space_old.
+    destruct Hfree_space as [Hfree_space Hbound'].
     apply wordsize_mul_div in Hfree_space.
     destruct Hbound as [Hbound_lower Hbound].
     apply wordsize_mul_div_le in Hbound.
@@ -3099,29 +3110,31 @@ Definition env_inv (env : Clight.env) :=
   forall x, x <> frame_id /\ x <> roots_id -> env!x = None.
 
 Definition tenv_inv (tenv : Clight.temp_env) :=
-  (** every x in the temp environment corresponds to a well-defined value, and
+  (** every non-case_id x in the temp environment corresponds to a well-defined value, and
       is either a local variable or one of {tinfo, alloc, limit, ret, case_id, roots_temp} *)
-  (forall x cv, tenv!x = Some cv ->
+  (forall x cv, x <> case_id ->
+           tenv!x = Some cv ->
            (PS.mem x locals = true
             \/ x = tinfo_id
             \/ x = alloc_id
             \/ x = limit_id
             \/ x = ret_id
-            \/ x = case_id
             \/ x = roots_temp_id) /\
            val_defined_wf cv) /\
+  (forall cv, tenv!case_id = Some cv -> cv = Vtrue \/ cv = Vfalse) /\
   (** every local variable is in tenv *)
   (forall x, PS.mem x locals = true -> tenv!x <> None).
 
 Lemma env_get_wf env tenv x v :
+  x <> case_id ->
   tenv_inv tenv ->
   (env, tenv) !!! x = Some v -> val_defined_wf v.
 Proof.
   unfold "!!!"; destruct (tenv!x) eqn:Htenv_get.
-  - intros Htenv H; inv H; now eapply Htenv.
+  - intros Hne Htenv H; inv H. eapply Htenv; eauto.
   - destruct (env!x) as [[] |].
-    + now inversion 2.
-    + destruct (Genv.find_symbol _ _); now inversion 2.
+    + now inversion 3.
+    + destruct (Genv.find_symbol _ _); now inversion 3.
 Qed.
 Hint Resolve env_get_wf : EvalDB.
 
@@ -3145,7 +3158,7 @@ Definition ρ_inv (ρ : eval.env) :=
   fenv ! x <> None.
 
 Lemma eval_make_var x ρ env tenv cv m :
-  x <> frame_id /\ x <> roots_id ->
+  x <> case_id /\ x <> frame_id /\ x <> roots_id ->
   env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
   ρ!x <> None ->
   (env, tenv) !!! x = Some cv ->
@@ -3154,19 +3167,24 @@ Proof.
   intros Hx [Henv [Htenv Hρ]] Hρ_some Henv_some.
   (* destruct (_ ! _) as [v|] eqn:Hget_ρ; [|easy]. *)
   unfold make_var; unfold "!!!" in Henv_some.
-  specialize (Henv x Hx); rewrite Henv in *.
+  specialize (Henv x); rewrite Henv in * by tauto.
   destruct (fenv ! x) as [[arity locs] |] eqn:Hfenv.
   - destruct (tenv!x) eqn:Hget_tenv.
     + inv Henv_some.
       pose proof Hget_tenv as Hlocals_wf.
-      apply Htenv in Hlocals_wf.
+      apply Htenv in Hlocals_wf; try easy.
       destruct Hlocals_wf as [Hlocals Hwf].
       decompose [or] Hlocals; [|now subst x..].
       destruct (PS.mem x locals); [|easy].
       eauto with EvalDB.
     + destruct (Genv.find_symbol _ _) as [b|] eqn:Hgenv; [|easy].
       erewrite global_local_disjoint; eauto.
-      eauto 7 with EvalDB.
+      inv Henv_some.
+      econstructor.
+      { econstructor.
+        - eapply eval_Evar_global; try easy.
+        - eauto with EvalDB. }
+      eauto with EvalDB.
   - destruct (tenv!x) eqn:Hget_tenv; [inv Henv_some; eauto with EvalDB|].
     destruct (Genv.find_symbol prog_genv x) eqn:Hgenv; [|easy].
     destruct (ρ!x) eqn:Hρx; [|congruence].
@@ -3314,6 +3332,7 @@ Lemma fwd_stores F ρ env tenv m offset a i ty (ys : list cps.var) p b o s vs P 
    (env, tenv, m, a) ⇓ᵣ (Vptr b (O.repr (O.unsigned o + offset*word_size)))) ->
   typeof a = value \/ typeof a = tptr ty ->
   (0 <= offset <= 1 /\ 0 <= offset + #|ys| <= #|vs| /\ 0 <= offset + i <= #|vs| - #|ys|)%Z ->
+  ~ List.In case_id ys ->
   ~ List.In frame_id ys ->
   ~ List.In roots_id ys ->
   env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
@@ -3327,10 +3346,10 @@ Lemma fwd_stores F ρ env tenv m offset a i ty (ys : list cps.var) p b o s vs P 
     postcond env tenv m' s P) ->
   postcond env tenv m (statements (mapi (fun i y => a.[i] :::= make_var fenv locals y) i ys).; s)%C P.
 Proof.
-  intros HF Ha Hty_a Hbounds Hframe Hroots Henvs Hρ Henv Hperm Hm Hsimpler.
+  intros HF Ha Hty_a Hbounds Hcase Hframe Hroots Henvs Hρ Henv Hperm Hm Hsimpler.
   revert vs m i Hm Hbounds Hsimpler; induction ys as [|y ys IHys]; intros vs m i Hm Hbounds Hsimpler.
   { cbn. fwd Cred_skip. apply (Hsimpler m []); auto. }
-  cbn in Hframe,Hroots|-*; fwd Cred_seq_assoc.
+  cbn in Hcase,Hframe,Hroots|-*; fwd Cred_seq_assoc.
   assert (Henv_x : exists cv, (env, tenv)!!!y = Some cv).
   { cbn in Henv. destruct ((env, tenv)!!!y) eqn:Hy; [eauto|intuition congruence]. }
   destruct Henv_x as [cv Hcv].
@@ -3338,6 +3357,7 @@ Proof.
   4:{ eapply eval_make_var; eauto; try easy.
       apply Hρ; now rewrite FromList_cons. }
   all: try eassumption; eauto with FrameDB InvDB EvalDB; try solve[lia|cbn in *; superlia].
+  eapply env_get_wf; eauto; try easy.
   intros m' Hstore Hm'.
   eapply IHys; eauto; try now cbn in *.
   { cbn in *; superlia. }
@@ -3356,6 +3376,7 @@ Lemma fwd_stores' F ρ env tenv m a i ty (ys : list cps.var) p b o s vs P :
    (env, tenv, m, a) ⇓ᵣ (Vptr b o)) ->
   typeof a = value \/ typeof a = tptr ty ->
   (0 <= #|ys| <= #|vs| /\ 0 <= i <= #|vs| - #|ys|)%Z ->
+  ~ List.In case_id ys ->
   ~ List.In frame_id ys ->
   ~ List.In roots_id ys ->
   env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
@@ -3379,13 +3400,19 @@ Lemma set_get_None {A} (m : M.t A) k v k' :
   m ! k' = None.
 Proof. destruct (Pos.eq_dec k k'); [subst; rewrite M.gss|rewrite M.gso by auto]; easy. Qed.
 
+Hypothesis NoDup_vars : NoDup [gc_id; isptr_id; tinfo_id; alloc_id; limit_id; frame_id; roots_id; ret_id; case_id; roots_temp_id].
+
 Ltac solve_tenv_inv_set special_ident :=
-  unfold tenv_inv; intros Hwf [Htenv1 Htenv2]; split;
-  [intros x cv Hget;
+  unfold tenv_inv; intros Hwf [Htenv1 [Htenv2 Htenv3]]; split_ands;
+  [intros x cv Hcase Hget;
    destruct (Pos.eq_dec special_ident x) as [|Hne]; [subst x|];
    [rewrite M.gss in Hget; inv Hget; easy
    |rewrite M.gso in Hget; auto]
-  |intros* Hlocal Heq; eapply Htenv2; eauto; eapply set_get_None; eauto].
+  |assert (special_ident <> case_id)
+     by (intros ->; rewrite <- NoDup'_spec in NoDup_vars; cbn in NoDup_vars; easy);
+   (rewrite M.gso by auto);
+   apply Htenv2
+  |intros* Hlocal Heq; eapply Htenv3; eauto; eapply set_get_None; eauto].
 
 Lemma tenv_inv_set_alloc tenv v :
   val_defined_wf v ->
@@ -3405,17 +3432,43 @@ Lemma tenv_inv_set_ret tenv v :
 Proof. solve_tenv_inv_set ret_id. Qed.
 Hint Resolve tenv_inv_set_ret : InvDB.
 
+Lemma tenv_inv_set_case tenv v :
+  v = Vtrue \/ v = Vfalse ->
+  tenv_inv tenv -> tenv_inv (M.set case_id v tenv).
+Proof.
+  intros Hv [Htenv1 [Htenv2 Htenv3]]; unfold tenv_inv; split_ands.
+  - intros x cv Hcase Hget.
+    destruct (Pos.eq_dec case_id x) as [|Hne]; [easy|].
+    rewrite M.gso in Hget by auto.
+    apply Htenv1; auto.
+  - rewrite M.gss; auto. congruence.
+  - intros* Hlocal Heq; eapply Htenv3; eauto; eapply set_get_None; eauto.
+Qed.
+
+Lemma tenv_inv_set_case_true tenv :
+  tenv_inv tenv -> tenv_inv (M.set case_id Vtrue tenv).
+Proof. now apply tenv_inv_set_case. Qed.
+Hint Resolve tenv_inv_set_case_true : InvDB.
+
+Lemma tenv_inv_set_case_false tenv :
+  tenv_inv tenv -> tenv_inv (M.set case_id Vfalse tenv).
+Proof. now apply tenv_inv_set_case. Qed.
+Hint Resolve tenv_inv_set_case_false : InvDB.
+
 Lemma tenv_inv_set_x x tenv v :
   val_defined_wf v ->
+  x <> case_id ->
   x \in FromSet locals ->
   tenv_inv tenv -> tenv_inv (M.set x v tenv).
 Proof.
-  unfold tenv_inv; intros Hwf Hlocals [Htenv1 Htenv2]; split.
-  - intros x' cv Hget; destruct (Pos.eq_dec x x') as [|Hne]; [subst x'|].
+  unfold tenv_inv; intros Hwf Hcase Hlocals [Htenv1 [Htenv2 Htenv3]]; split_ands.
+  - intros x' cv Hcase' Hget; destruct (Pos.eq_dec x x') as [|Hne]; [subst x'|].
     + rewrite M.gss in Hget; inv Hget; split; [|auto].
       left. apply PS.mem_spec. eapply FromSet_sound; eauto; sets.
     + rewrite M.gso in Hget; auto.
-  - intros* Hlocal Hnone; eapply Htenv2; eauto; eapply set_get_None; eauto.
+  - destruct (Pos.eq_dec x case_id); [now subst|].
+    rewrite M.gso by auto; apply Htenv2.
+  - intros* Hlocal Hnone; eapply Htenv3; eauto; eapply set_get_None; eauto.
 Qed.
 Hint Resolve tenv_inv_set_x : InvDB.
 
@@ -4068,6 +4121,7 @@ Lemma fwd_args_stores F ρ env tenv m tinfo_b tinfo_o alloc limit args fp nalloc
   #|ys| = #|inds| ->
   NoDup inds ->
   Forall (fun i => 0 <= Z.of_N i < #|args|)%Z inds ->
+  ~ List.In case_id ys ->
   ~ List.In frame_id ys ->
   ~ List.In roots_id ys ->
   env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
@@ -4082,12 +4136,12 @@ Lemma fwd_args_stores F ρ env tenv m tinfo_b tinfo_o alloc limit args fp nalloc
     postcond env tenv m' s P) ->
   postcond env tenv m (statements (map (fun '(y, i) => tinfo->args.[Z.of_N i] :::= make_var fenv locals y) (combine ys inds)).; s)%C P.
 Proof.
-  intros HF Htinfo Hlen_eq Hnodup Hbounds Hframe Hroots Henvs Hρ Henv Hm Hsimpler.
+  intros HF Htinfo Hlen_eq Hnodup Hbounds Hcase Hframe Hroots Henvs Hρ Henv Hm Hsimpler.
   revert args inds Hlen_eq Hnodup m Hm Hbounds Hsimpler; induction ys as [|y ys IHys];
     intros args inds Hlen_eq Hnodup m Hm Hbounds Hsimpler.
   { cbn. fwd Cred_skip. apply (Hsimpler m []); auto. }
   destruct inds as [|i inds]; [now inv Hlen_eq|].
-  cbn in Hframe,Hroots|-*; fwd Cred_seq_assoc.
+  cbn in Hcase,Hframe,Hroots|-*; fwd Cred_seq_assoc.
   assert (Henv_x : exists cv, (env, tenv)!!!y = Some cv).
   { cbn in Henv. destruct ((env, tenv)!!!y) eqn:Hy; [eauto|intuition congruence]. }
   destruct Henv_x as [cv Hcv].
@@ -4097,8 +4151,9 @@ Proof.
   6:{ eapply eval_make_var; eauto; try easy.
       apply Hρ; now rewrite FromList_cons. }
   all: try eassumption; eauto with FrameDB InvDB EvalDB; try solve[lia|inv Hbounds; cbn in *; superlia].
+  { eapply env_get_wf; eauto. easy. }
   intros m' Hm'.
-  eapply IHys with (args := set_ith args (Z.of_N i) cv); eauto; try (clear - Hρ Henv Hlen_eq; now cbn in *).
+  eapply IHys with (args := set_ith args (Z.of_N i) cv); eauto; try (clear - Hρ Henv Hlen_eq; now cbn in * ).
   { now inv Hnodup. }
   { rewrite set_ith_len. apply Hm'. }
   { inv Hbounds. now rewrite set_ith_len. }
@@ -4299,18 +4354,21 @@ Qed.
 Lemma tenv_inv_set_lists xs vs old_tenv tenv :
   Forall val_defined_wf vs ->
   tenv_inv old_tenv ->
+  ~ List.In case_id xs ->
   FromList xs \subset FromSet locals ->
   set_lists xs vs old_tenv = Some tenv ->
   tenv_inv tenv.
 Proof.
-  intros Hwf Htenv Hsub Hset.
+  intros Hwf Htenv Hcase Hsub Hset.
   generalize dependent vs; generalize dependent tenv;
     induction xs as [|x xs IHxs]; [now destruct vs; cbn|].
   destruct vs as [|v vs]; [easy|]; intros Hwf Hset.
   cbn in Hset; destruct (set_lists xs vs old_tenv) as [tenv'|] eqn:Htenv'; [|easy].
   inv Hwf; inv Hset; eapply tenv_inv_set_x; auto.
+  { cbn in Hcase; easy. }
   { rewrite FromList_cons in Hsub; eapply Included_trans; eauto; sets. }
   eapply IHxs; eauto; sets.
+  { cbn in Hcase; easy. }
   eapply Included_trans; eauto; sets; now right.
 Qed.
 
@@ -4456,9 +4514,6 @@ Ltac dis_bad Hdis x :=
 (* Assumes Hdis already normalized *)
 Ltac vars_neq Hdis x y :=
   assert (x <> y) by (clear - Hdis; intros ?; subst y; dis_bad Hdis x).
-
-(* TODO take this list of temporary variables and define it somewhere to avoid duplication; e.g. tenv_inv uses it too *)
-Hypothesis NoDup_tempvars : NoDup [gc_id; tinfo_id; alloc_id; limit_id; frame_id; roots_id; ret_id; case_id; roots_temp_id].
 
 Inductive normal_stmt s :=
   mk_normal_stmt :
@@ -4681,6 +4736,58 @@ Proof. auto. Qed.
 Lemma sizeof_value ge : sizeof ge value = word_size.
 Proof. now unfold value, word_size, size_chunk, word_chunk; cbn; destruct Archi.ptr64; cbn. Qed.
 
+Lemma wordsize_divides_modulus : (word_size | O.modulus)%Z.
+Proof.
+  unfold word_size, size_chunk, word_chunk, O.modulus, O.wordsize, Wordsize_Ptrofs.wordsize;
+    destruct Archi.ptr64.
+  - exists (two_power_nat 61).
+    rewrite !two_power_nat_S, !Coqlib.two_power_nat_O.
+    lia.
+  - exists (two_power_nat 30).
+    rewrite !two_power_nat_S, !Coqlib.two_power_nat_O.
+    lia.
+Qed.
+
+Lemma unsigned_repr_lt i j :
+  (O.unsigned (O.repr i) < j)%Z ->
+  (i <= O.max_unsigned)%Z ->
+  (i < j)%Z.
+Proof.
+  intros Hrepr Hupper.
+  assert (Hcases : ((i < 0) \/ (0 <= i))%Z) by lia.
+  destruct Hcases as [Hneg|Hnneg].
+  - pose proof O.unsigned_range (O.repr i) as Hj_nneg. lia.
+  - rewrite O.unsigned_repr in Hrepr by lia. lia.
+Qed.
+
+Lemma mod_div_word_size_bounds :
+  (0 < O.modulus/word_size < O.modulus)%Z.
+Proof.
+  unfold word_size, size_chunk, word_chunk, O.modulus, O.wordsize, Wordsize_Ptrofs.wordsize;
+    destruct Archi.ptr64.
+  - rewrite !two_power_nat_S, !Coqlib.two_power_nat_O.
+    change 8%Z with (2*2*2)%Z.
+    rewrite !Z.mul_assoc.
+    rewrite <- !Zdiv_Zdiv by lia.
+    rewrite Z.mul_1_r.
+    rewrite !Z.div_mul by lia.
+    lia.
+  - rewrite !two_power_nat_S, !Coqlib.two_power_nat_O.
+    change 4%Z with (2*2)%Z.
+    rewrite !Z.mul_assoc.
+    rewrite <- !Zdiv_Zdiv by lia.
+    rewrite Z.mul_1_r.
+    rewrite !Z.div_mul by lia.
+    lia.
+Qed.
+
+Lemma word_size_lt_max_signed : (word_size < O.max_signed)%Z.
+Proof.
+  unfold word_size, size_chunk, word_chunk, O.max_signed, O.half_modulus,
+  O.modulus, O.wordsize, Wordsize_Ptrofs.wordsize;
+    destruct Archi.ptr64; now cbv.
+Qed.
+
 Lemma eval_space_check' S env tenv m nursery_b limit_o alloc_o tlimit_o talloc_o
       tinfo_b tinfo_o args ss cvss nalloc values frame n :
   (0 <= n <= O.max_signed)%Z ->
@@ -4765,6 +4872,7 @@ Proof.
         | H : (_ * _ = O.unsigned limit_o - O.unsigned alloc_o)%Z |- _ => rewrite <- H in *
         end.
         apply Z.mul_lt_mono_pos_r; [superlia|].
+        pose proof word_size_lt_max_signed.
         rewrite !O.signed_repr in Hlt by superlia.
         rewrite Z.quot_mul in Hlt by superlia.
         rewrite !O.agree32_repr in Hlt by auto.
@@ -4772,6 +4880,11 @@ Proof.
         rewrite !Int.repr_unsigned in Hlt.
         rewrite <- !O.agree32_repr in Hlt by auto.
         rewrite !O.unsigned_repr in Hlt by superlia.
+        rewrite O.repr_unsigned in Hlt.
+        unfold O.of_intu, O.of_int in Hlt.
+        rewrite <- O.agree32_repr in Hlt by auto.
+        rewrite O.repr_unsigned in Hlt.
+        rewrite O.unsigned_repr in Hlt by superlia.
         superlia.
       * unfold Int.eq. destruct (Coqlib.zeq _ _) as [Heq|Hne]; [|now contradiction Hne]; cbn.
         unfold O.sub, O.divs in Hge.
@@ -4782,13 +4895,19 @@ Proof.
         apply Z.le_ge; apply Z.ge_le in Hge.
         apply Z.mul_le_mono_pos_r; [superlia|].
         rewrite !O.signed_repr in Hge by superlia.
+        pose proof word_size_lt_max_signed.
+        rewrite O.signed_repr in Hge by superlia.
         rewrite Z.quot_mul in Hge by superlia.
         rewrite <- !O.agree32_of_ints in Hge by auto.
         unfold O.to_int, O.of_ints in Hge.
         rewrite !O.agree32_repr in Hge by auto.
         rewrite !Int.repr_signed, !Int.repr_unsigned in Hge.
         rewrite <- !O.agree32_repr in Hge by auto.
-        rewrite !O.unsigned_repr in Hge by superlia; superlia.
+        unfold O.of_intu, O.of_int in Hge.
+        rewrite <- O.agree32_repr in Hge by auto.
+        rewrite !O.repr_unsigned in Hge.
+        rewrite !O.unsigned_repr in Hge by superlia.
+        superlia.
 Qed.
 
 Lemma rel_val_wf k v P cv :
@@ -4818,6 +4937,13 @@ Hypothesis prog_genv_has_gc : exists b,
   let ext_fn := EF_external "garbage_collect" sig in
   let fn := External ext_fn (Tcons threadInf Tnil) Tvoid cc_default in
   Genv.find_symbol prog_genv gc_id = Some b /\
+  Genv.find_funct prog_genv (Vptr b O.zero) = Some fn.
+
+Hypothesis prog_genv_has_isptr : exists b,
+  let sig := mksignature (ast_value :: nil) None cc_default in
+  let ext_fn := EF_external "is_ptr" sig in
+  let fn := External ext_fn (Tcons value Tnil) bool_ty cc_default in
+  Genv.find_symbol prog_genv isptr_id = Some b /\
   Genv.find_funct prog_genv (Vptr b O.zero) = Some fn.
 
 Lemma has_shapes_snoc_top P v cv vs cvs vss cvss :
@@ -5036,13 +5162,13 @@ Qed.
 
 Ltac tempvars_neq_as H x y :=
   assert (H : x <> y)
-  by (clear - thread_info_id calling_convention NoDup_tempvars;
-     rewrite <- NoDup'_spec in NoDup_tempvars; now cbn in *).
+  by (clear - thread_info_id calling_convention NoDup_vars;
+     rewrite <- NoDup'_spec in NoDup_vars; now cbn in * ).
 
 Ltac tempvars_neq x y :=
   assert (x <> y)
-  by (clear - thread_info_id calling_convention NoDup_tempvars;
-      rewrite <- NoDup'_spec in NoDup_tempvars; now cbn in *).
+  by (clear - thread_info_id calling_convention NoDup_vars;
+      rewrite <- NoDup'_spec in NoDup_vars; now cbn in * ).
 
 (* TODO hoist *)
 Lemma max_live_ctx C e n :
@@ -5053,53 +5179,411 @@ Proof.
   now rewrite app_ctx_f_fuse in HCe.
 Qed.
 
+(*
+Print make_cases.
+Print translate_body.
+Lemma make_cases_unboxed_spec :
+  cps_util.find_tag_nth ces c e n ->
+  make_cases cenv (translate_body cenv fenv locals nenv) = Ret (boxed, unboxed, fvs, n) ->
+ *)
+
+(* TODO hoist *)
+Lemma bind_assoc {A B C} m (j : A -> error B) (k : B -> error C) :
+ (y <- (x <- m ;; j x) ;; k y) = (x <- m ;; y <- j x ;; k y).
+Proof. destruct m; reflexivity. Qed.
+
+Lemma fwd_switch env tenv m e i ls P :
+  (0 <= i < O.max_unsigned)%Z ->
+  typeof e = value ->
+  (env, tenv, m, e) ⇓ᵣ vint i ->
+  postcond' env tenv m (seq_of_labeled_statement (select_switch i ls)) P ->
+  postcond' env tenv m (Sswitch e ls) P.
+Proof.
+  intros Hbound Hty Heval [env' [tenv' [m' [Hrun HP]]]]; do 3 eexists; split; eauto.
+  unfold "⇓"; change (Out_return ?v) with (outcome_switch (Out_return v)).
+  econstructor; eauto.
+  rewrite Hty.
+  unfold vint, value; destruct Archi.ptr64 eqn:Harchi; cbn.
+  - rewrite <- O.agree64_repr by auto. 
+    rewrite O.unsigned_repr; auto; superlia.
+  - rewrite <- O.agree32_repr by auto.
+    rewrite O.unsigned_repr; auto; superlia.
+Qed.
+
+Hypothesis cenv_tags_representable : forall c,
+  match get_ctor_rep cenv c with
+  | Ret (enum t) => 0 <= rep_unboxed t <= O.max_signed
+  | Ret (boxed t a) =>
+    0 <= Z.of_N t < Zpower.two_power_pos 8 /\
+    0 <= Z.of_N a < Zpower.two_power_nat (Ptrofs.wordsize - 10)
+  | _ => True
+  end%Z.
+
+Hypothesis cenv_tags_inj : forall c c',
+  c <> c' ->
+  match get_ctor_rep cenv c, get_ctor_rep cenv c' with
+  | Ret (enum t), Ret (enum t') => t <> t'
+  | Ret (boxed t a), Ret (boxed t' a') => t <> t'
+  | _, _ => True
+  end.
+
+Lemma max_signed_archi : O.max_signed = if Archi.ptr64 then Int64.max_signed else Int.max_signed.
+Proof.
+  unfold O.max_signed, O.half_modulus, O.modulus, O.wordsize, Wordsize_Ptrofs.wordsize.
+  unfold Int64.max_signed, Int64.half_modulus, Int.max_signed, Int.half_modulus.
+  unfold Int64.modulus, Int64.wordsize, Wordsize_64.wordsize.
+  unfold Int.modulus, Int.wordsize, Wordsize_32.wordsize.
+  now destruct Archi.ptr64.
+Qed.
+
+Lemma eval_shiftr1 ge env tenv m e i :
+  (0 <= i < O.max_signed)%Z ->
+  typeof e = value ->
+  eval_expr ge env tenv m e (vint i) ->
+  eval_expr ge env tenv m (e >>' c_int 1 value) (vint (Z.shiftr i 1)).
+Proof.
+  intros Hbound Hty He; econstructor; eauto with EvalDB.
+  cbn; rewrite Hty, typeof_c_int.
+  unfold vint, value; rewrite max_signed_archi in Hbound; destruct Archi.ptr64 eqn:Harchi; cbn.
+  - unfold Int64.ltu.
+    destruct (Coqlib.zlt _ _) as [Hok|Hwat].
+    2:{ unfold Int64.iwordsize in *.
+        rewrite <- !O.agree64_repr in Hwat by auto.
+        unfold Int64.zwordsize, Int64.wordsize, Wordsize_64.wordsize in *.
+        assert (Z.of_nat 64 <= O.max_signed)%Z.
+        { unfold O.max_signed, O.half_modulus, O.modulus, O.wordsize, Wordsize_Ptrofs.wordsize; rewrite Harchi.
+          unfold two_power_nat, Z.div; now cbv. }
+        rewrite !O.unsigned_repr in Hwat by superlia.
+        superlia. }
+    do 2 f_equal.
+    rewrite Int64.shru_div_two_p.
+    pose proof Int64.min_signed_neg.
+    pose proof Int64.max_signed_unsigned.
+    rewrite <- O.Zshiftr_div_two_p.
+    2:{ rewrite Int64.unsigned_repr by superlia. lia. }
+    rewrite Int64.unsigned_repr by superlia.
+    reflexivity.
+  - unfold Int.ltu.
+    destruct (Coqlib.zlt _ _) as [Hok|Hwat].
+    2:{ unfold Int.iwordsize in *.
+        rewrite <- !O.agree32_repr in Hwat by auto.
+        unfold Int.zwordsize, Int.wordsize, Wordsize_32.wordsize in *.
+        assert (Z.of_nat 32 <= O.max_signed)%Z.
+        { unfold O.max_signed, O.half_modulus, O.modulus, O.wordsize, Wordsize_Ptrofs.wordsize; rewrite Harchi.
+          unfold two_power_nat, Z.div; now cbv. }
+        rewrite !O.unsigned_repr in Hwat by superlia.
+        superlia. }
+    do 2 f_equal.
+    rewrite Int.shru_div_two_p.
+    pose proof Int.min_signed_neg.
+    pose proof Int.max_signed_unsigned.
+    rewrite <- O.Zshiftr_div_two_p.
+    2:{ rewrite Int.unsigned_repr by superlia. lia. }
+    rewrite Int.unsigned_repr by superlia.
+    reflexivity.
+Qed.
+
+Lemma binarith_value :
+  binarith_type (classify_binarith value value) = value.
+Proof. unfold value; destruct Archi.ptr64 eqn:Harchi; cbn; easy. Qed.
+
+Lemma max_unsigned_archi : O.max_unsigned = if Archi.ptr64 then Int64.max_unsigned else Int.max_unsigned.
+Proof.
+  unfold O.max_unsigned, O.half_modulus, O.modulus, O.wordsize, Wordsize_Ptrofs.wordsize.
+  unfold Int64.max_unsigned, Int64.half_modulus, Int.max_unsigned, Int.half_modulus.
+  unfold Int64.modulus, Int64.wordsize, Wordsize_64.wordsize.
+  unfold Int.modulus, Int.wordsize, Wordsize_32.wordsize.
+  now destruct Archi.ptr64.
+Qed.
+
+Lemma eval_and255 ge env tenv m e i :
+  (0 <= i < O.max_unsigned)%Z ->
+  typeof e = value ->
+  eval_expr ge env tenv m e (vint i) ->
+  eval_expr ge env tenv m (e &' c_int 255 value) (vint (Z.land i 255)).
+Proof.
+  intros Hbound Hty He; econstructor; eauto with EvalDB.
+  cbn; rewrite Hty, typeof_c_int.
+  unfold sem_and, sem_binarith; cbn.
+  rewrite !binarith_value, !sem_cast_wf_same; auto with EvalDB.
+  unfold vint, value; rewrite max_unsigned_archi in Hbound; destruct Archi.ptr64 eqn:Harchi; cbn.
+  - do 2 f_equal.
+    unfold Int64.and.
+    pose proof Int64.min_signed_neg.
+    pose proof Int64.max_signed_unsigned.
+    rewrite Int64.unsigned_repr by superlia.
+    rewrite Int64.unsigned_repr; auto.
+    cbv; split; inversion 1.
+  - do 2 f_equal.
+    unfold Int.and.
+    pose proof Int.min_signed_neg.
+    pose proof Int.max_signed_unsigned.
+    rewrite Int.unsigned_repr by superlia.
+    rewrite Int.unsigned_repr; auto.
+    cbv; split; inversion 1.
+Qed.
+
+Lemma env_gso env tenv x v y :
+  x <> y ->
+  (env, PTree.set x v tenv) !!! y = (env, tenv) !!! y.
+Proof. now unfold "!!!"; intros H; rewrite M.gso by auto. Qed.
+
+Lemma repr_unboxed_shiftr i:
+  Z.shiftr (Z.shiftl i 1 + 1) 1 = i.
+Proof.
+  rewrite O.Zshiftl_mul_two_p by lia.
+  unfold Z.shiftr. 
+  simpl Z.shiftl.
+  unfold Zpower.two_power_pos. simpl.
+  rewrite Zdiv.Zdiv2_div. 
+  replace (i * 2 + 1)%Z with (OrdersEx.Z_as_OT.b2z true + 2 * i)%Z by (simpl OrdersEx.Z_as_OT.b2z; omega).
+  apply OrdersEx.Z_as_OT.add_b2z_double_div2.
+Qed.
+
+(* TODO hoist *)
+Lemma postcond'_seq env tenv m s s_skipd P :
+  postcond' env tenv m s P ->
+  postcond' env tenv m (s.; s_skipd)%C P.
+Proof.
+  intros [env' [tenv' [m' [Heval HP]]]].
+  exists env', tenv', m'; split; auto.
+  constructor; eauto. easy.
+Qed.
+
+Theorem pos_testbit_nat_impossible:
+  forall b,
+  ~(forall d : nat, 0 <= d -> Pos.testbit_nat b d = false).
+Proof.
+  induction b; intro.
+  - apply IHb; intros.
+    assert ( 0 <= 0) by reflexivity.
+    apply H in H1. inv H1.
+  - apply IHb.
+    intros.    
+    simpl in H.    
+    assert (0 <= S d) by lia.
+    apply H in H1.
+    auto.
+  - assert (0 <= 0).
+    reflexivity.
+    apply H in H0. inv H0.    
+Qed.
+
+Theorem pland_split_nat:
+  forall c a b,
+  (forall d, d < c -> Pos.testbit_nat a d = false) -> 
+  (forall d, c <= d -> Pos.testbit_nat b d = false) ->
+                Pos.land a b = 0%N.
+Proof.
+  induction c; intros.
+  - apply pos_testbit_nat_impossible in H0.
+    inv H0.
+  - destruct a.
+    + (* impossible: a needs to be 0 on lower bits *)
+      assert (0 < S c) by lia.
+      apply H in H1.
+      inv H1.
+    + destruct b.
+      * simpl.
+        rewrite IHc; intros.
+        reflexivity.
+        simpl in H.
+        assert (S d < S c) by lia.
+        apply H in H2. auto.
+        assert (S c <= S d) by lia.
+        apply H0 in H2.
+        simpl in H2. auto.
+      * simpl.
+        rewrite IHc; intros.
+        reflexivity.
+        simpl in H.
+        assert (S d < S c) by lia.
+        apply H in H2. auto.
+        assert (S c <= S d) by lia.
+        apply H0 in H2.
+        simpl in H2. auto.
+      * reflexivity.
+    + (* impossible: a needs to be 0 on lower bits *)
+      assert (0 < S c) by lia.
+      apply H in H1.
+      inv H1.
+Qed.
+
+Lemma repr_boxed_and t a :
+  (0 <= Z.of_N t < Zpower.two_power_pos 8)%Z ->
+  (0 <= Z.of_N a < Zpower.two_power_nat (Ptrofs.wordsize - 10))%Z ->
+  Z.land (rep_boxed t a) 255 = Z.of_N t.
+Proof.
+  intros Hbound_t Hbound_a.
+  unfold rep_boxed.
+  apply Z.bits_inj.
+  unfold Z.eqf.
+  intro.
+  rewrite Z.land_spec.
+  assert (Hcase_z:= Z.lt_ge_cases n 0%Z).
+  destruct Hcase_z as [Hnz | Hnz].
+  { (* testbit = false *)
+    destruct n. exfalso; lia.
+    exfalso. assert (0 < Z.pos p)%Z by apply Pos2Z.pos_is_pos. lia.
+    reflexivity.
+  }    
+  assert (Hcase := Z.lt_ge_cases n 8%Z).
+  destruct Hcase.
+  - replace 255%Z with (Z.pred (2^8))%Z.
+    rewrite <- Z.ones_equiv. 
+    rewrite Z.ones_spec_low.
+    rewrite Bool.andb_true_r.
+    rewrite Z.add_nocarry_lxor.
+    rewrite Z.lxor_spec.
+    rewrite OrdersEx.Z_as_OT.shiftl_spec_low.
+    rewrite Bool.xorb_false_l.
+    reflexivity. lia.
+    (* multiple cases depending of if one is 0 or not *)
+    {
+      destruct (Z.shiftl (Z.of_N a) 10) eqn:Ha.
+      - reflexivity.
+      - destruct (Z.of_N t) eqn:Hb.
+        + reflexivity.
+        + simpl.
+          rewrite pland_split_nat with (c := 8). reflexivity.
+          * intros.
+            rewrite <- Ndigits.Ptestbit_Pbit.            
+            destruct d. simpl.
+            destruct (Z.of_N a). simpl in Ha.
+            assert (0 < Z.pos p)%Z by apply Pos2Z.pos_is_pos. lia.
+            simpl in Ha. inv Ha. reflexivity.
+            inv Ha. 
+            replace false with
+                (Z.testbit (Z.pos p)  (Z.of_nat (S d))).
+            reflexivity. 
+            rewrite <- Ha.
+            apply Z.shiftl_spec_low.
+            apply Nat2Z.inj_lt in H0.
+            simpl Z.of_nat in *. lia.
+          * intros.
+            rewrite Zpower.two_power_pos_nat in Hbound_t.
+            rewrite <- Ndigits.Ptestbit_Pbit.            
+            destruct d. exfalso; lia.
+            replace false with
+                (Z.testbit (Z.pos p0)  (Z.of_nat (S d))). reflexivity.
+            eapply Int.Ztestbit_above.
+            apply Hbound_t.
+            apply Nat2Z.inj_le in H0.
+            replace (Pos.to_nat 8) with 8.
+            lia. reflexivity.
+        + destruct t; inv Hb.
+      - exfalso.
+        destruct Hbound_a.
+        rewrite <- Z.shiftl_nonneg with (n := 10%Z) in H0.
+        rewrite Ha in H0.
+        assert (Hnn := Zlt_neg_0 p). lia.
+    }
+    lia.
+    simpl. reflexivity.
+  - (* always false *)
+    rewrite Bool.andb_false_intro2.
+    symmetry.
+    eapply Byte.Ztestbit_above with (n := 8).
+    rewrite Zpower.two_power_nat_correct. 
+    rewrite Zpower.two_power_pos_correct in *.
+    unfold Z.pow_pos in H. simpl in *.
+    lia.
+    simpl. lia.
+    eapply Byte.Ztestbit_above with (n := 8).
+    rewrite Zpower.two_power_nat_correct. simpl. lia.
+    simpl. lia.
+Qed.
+
+Lemma eval_load ge env tenv m nursery_b alloc_o limit_o tinfo_b tinfo_o ss cvss values frame b o t a cvs i e :
+  typeof e = value ->
+  eval_expr ge env tenv m e (Vptr b o) ->
+  (-1 <= i < #|cvs|)%Z ->
+  m |= ∃ (args : list Values.val) (nalloc : Z) (talloc_o tlimit_o : ptrofs),
+     valid_mem nursery_b talloc_o tlimit_o alloc_o limit_o tinfo_b tinfo_o args ss cvss nalloc values frame ->
+  values |-- (b, (O.unsigned o - word_size)%Z) ↦_{Readable} vint (rep_boxed t a) :: cvs ⋆ Pure True -> exists v,
+  get_ith (vint (rep_boxed t a) :: cvs) (i + 1)%Z = Some v /\
+  eval_expr ge env tenv m (e.[i]) v.
+Proof.
+  intros Hty Heval Hbound Hm Hvalues.
+  edestruct (get_ith_in_range (vint (rep_boxed t a) :: cvs) (i + 1)%Z) as [v Hv].
+  { cbn; superlia. }
+  unfold "|=" in *.
+  destruct_ex args Hm.
+  destruct_ex nalloc Hm.
+  destruct_ex talloc_o Hm.
+  destruct_ex tlimit_o Hm.
+  unfold valid_mem in Hm.
+  match type of Hm with
+  | _ |=_{_} ?P ⋆ ?Q ⋆ ?R ⋆ _ ⋆ ?S =>
+    eapply (frame_entail (fun H => P ⋆ Q ⋆ R ⋆ H ⋆ S)) in Hm;
+      auto with FrameDB; eauto
+  end.
+  eexists; split; eauto.
+  econstructor.
+  - econstructor; eauto with EvalDB.
+    econstructor; eauto with EvalDB.
+    + econstructor; eauto with EvalDB.
+      rewrite Hty; eauto with EvalDB.
+    + cbn. eauto with EvalDB.
+  - econstructor; [apply access_mode_value|].
+    unfold Mem.loadv. rewrite O.unsigned_repr.
+    2:{ cbn in Hm; decompose [ex and] Hm; clear Hm. superlia. }
+    replace (O.unsigned o + i * word_size)%Z
+      with ((O.unsigned o - word_size) + (i + 1)*word_size)%Z by lia.
+    match type of Hm with
+    | _ |=_{_} ?P ⋆ ?Q ⋆ ?R ⋆ (_ ⋆ ?S) ⋆ ?T =>
+      eapply (mpred_load _ (fun H => P ⋆ Q ⋆ R ⋆ (H ⋆ S) ⋆ T));
+        auto with FrameDB; eauto
+    end.
+Qed.
+
 Hint Extern 0 ((M.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Hint Extern 0 ((PTree.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Lemma translate_body_stm nenv k : forall e,
+  Disjoint _ (FromList [gc_id; tinfo_id; alloc_id; limit_id; frame_id; roots_id; ret_id; case_id; roots_temp_id]) (used_vars e) ->
+  well_scoped e ->
+  fenv_respects_tags e ->
+  (* (* TODO: probably overkill, delete if unneeded *)
+     [thread_info_id; alloc_id; limit_id; heap_id; args_id; fp_id; nalloc_id;
+     stack_frame_id; tinfo_id; frame_id; roots_id; gc_id; body_id;
+     builtin_unreachable_id; ret_id] *)
+  (** if running e in environment ρ yields a value v in j <= k cost, *)
+  forall ρ v cin cout vss,
+  to_nat cin <= k ->
+  (ρ, e, cin) ⇓cps (v, cout) ->
+  (** and tenv+env contains bindings for alloc, limit, frame, roots, .. *)
+  forall env tenv m,
+  forall nursery_b tinfo_b tinfo_o alloc_o limit_o frame_b roots_b n_roots values,
+  tenv ! tinfo_id = Some (Vptr tinfo_b tinfo_o) ->
+  tenv ! alloc_id = Some (Vptr nursery_b alloc_o) ->
+  tenv ! limit_id = Some (Vptr nursery_b limit_o) ->
+  tenv ! roots_temp_id = Some (Vptr roots_b O.zero) ->
+  env ! frame_id = Some (frame_b, stack_frame) ->
+  max_live locals e (Z.to_nat n_roots) ->
+  (max_allocs e * word_size <= O.unsigned limit_o - O.unsigned alloc_o)%Z ->
+  (** and environments agree on the free variables of e
+      and satisfy their respective invariants, *)
+  bound_var e \subset FromSet locals ->
+  env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
+  ρ ~ₑ{k, occurs_free e} (env, tenv, values) ->
+  (** and m is a valid CertiCoq memory with shadow stack cvss related to vss, *)
+  forall ss cvss outliers frame,
+  val_defined_wf (stack_top ss) ->
+  let frame :=
+    (∃ next_o, (frame_b, 0%Z) ↦_{Freeable}
+      [Vptr roots_b next_o; Vptr roots_b O.zero; stack_top ss]) ⋆
+    (∃ cvs, (roots_b, 0%Z) ↦_{Freeable} cvs WITH #|cvs| = n_roots) ⋆
+    frame
+  in
+  m |= ∃ args nalloc talloc_o tlimit_o,
+       valid_mem nursery_b talloc_o tlimit_o
+                 alloc_o limit_o tinfo_b tinfo_o
+                 args ss cvss nalloc values
+                 frame ->
+  values |-- outliers ⋆ Pure True ->
+  has_shapes values vss cvss ->
   match translate_body cenv fenv locals nenv e with
   | Ret (stmt, _, _) =>
-    Disjoint _ (FromList [gc_id; tinfo_id; alloc_id; limit_id; frame_id; roots_id; ret_id; case_id; roots_temp_id]) (used_vars e) ->
-    well_scoped e ->
-    fenv_respects_tags e ->
-    (* (* TODO: probably overkill, delete if unneeded *)
-       [thread_info_id; alloc_id; limit_id; heap_id; args_id; fp_id; nalloc_id;
-       stack_frame_id; tinfo_id; frame_id; roots_id; gc_id; body_id;
-       builtin_unreachable_id; ret_id] *)
-    (** if running e in environment ρ yields a value v in j <= k cost, *)
-    forall ρ v cin cout vss,
-    to_nat cin <= k ->
-    (ρ, e, cin) ⇓cps (v, cout) ->
-    (** and tenv+env contains bindings for alloc, limit, frame, roots, .. *)
-    forall env tenv m,
-    forall nursery_b tinfo_b tinfo_o alloc_o limit_o frame_b roots_b n_roots values,
-    tenv ! tinfo_id = Some (Vptr tinfo_b tinfo_o) ->
-    tenv ! alloc_id = Some (Vptr nursery_b alloc_o) ->
-    tenv ! limit_id = Some (Vptr nursery_b limit_o) ->
-    tenv ! roots_temp_id = Some (Vptr roots_b O.zero) ->
-    env ! frame_id = Some (frame_b, stack_frame) ->
-    max_live locals e (Z.to_nat n_roots) ->
-    (max_allocs e * word_size <= O.unsigned limit_o - O.unsigned alloc_o)%Z ->
-    (** and environments agree on the free variables of e
-        and satisfy their respective invariants, *)
-    bound_var e \subset FromSet locals ->
-    env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
-    ρ ~ₑ{k, occurs_free e} (env, tenv, values) ->
-    (** and m is a valid CertiCoq memory with shadow stack cvss related to vss, *)
-    forall ss cvss outliers frame,
-    val_defined_wf (stack_top ss) ->
-    let frame :=
-      (∃ next_o, (frame_b, 0%Z) ↦_{Freeable}
-        [Vptr roots_b next_o; Vptr roots_b O.zero; stack_top ss]) ⋆
-      (∃ cvs, (roots_b, 0%Z) ↦_{Freeable} cvs WITH #|cvs| = n_roots) ⋆
-      frame
-    in
-    m |= ∃ args nalloc talloc_o tlimit_o,
-         valid_mem nursery_b talloc_o tlimit_o
-                   alloc_o limit_o tinfo_b tinfo_o
-                   args ss cvss nalloc values
-                   frame ->
-    values |-- outliers ⋆ Pure True ->
-    has_shapes values vss cvss ->
     (** then running stmt yields a result (m', cv), *)
     exists tenv' m' cv,
     (env, tenv, m, stmt) ⇓ (tenv', m', cv) /\
@@ -5117,12 +5601,15 @@ Lemma translate_body_stm nenv k : forall e,
 Proof.
   (* TODO: induction on step index by not be necessary *)
   induction k as [k IHk] using lt_wf_ind.
-  induction e using exp_ind''.
+  intros e Hdis; rewrite !FromList_cons in Hdis; revert e Hdis.
+  induction e using exp_ind''; lazy zeta;
+    intros Hdis Hscope Hftags*Hk Hbstep*Htinfo Halloc Hlimit Hroots
+           Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
   - (** let x = Con c ys in e *)
     simpl. bind_step rep Hrep; destruct rep as [t|t a]; destruct ys as [|y ys]; try exact I; rewrite bind_ret.
     + (** Unboxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros Hdis Hscope Hftags*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
+      intros.
       fwd Cred_set; [constructor|].
       admit.
       (*specialize (IHe e); rewrite He in IHe; eapply IHe. Guarded.
@@ -5133,7 +5620,6 @@ Proof.
       apply rel_env_gss_sing; rewrite rel_val_eqn; cbn; now rewrite Hrep. *)
     + (** Boxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros Hdis Hscope Hftags*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
       normalize_used_vars. rewrite !FromList_cons in Hdis.
       repeat fwd Cred_seq_assoc.
       fwd Cred_set; [eauto with EvalDB|].
@@ -5169,13 +5655,19 @@ Proof.
         eauto with EvalDB. }
       { cbn in Hvs; cbn; lia. }
       { clear - Hdis; intros [Hin|Hin].
+        - subst case_id; dis_bad Hdis y.
+        - dis_bad Hdis case_id. }
+      { clear - Hdis; intros [Hin|Hin].
         - subst frame_id; dis_bad Hdis y.
         - dis_bad Hdis frame_id. }
       { clear - Hdis; intros [Hin|Hin].
         - subst roots_id; dis_bad Hdis y.
         - dis_bad Hdis roots_id. }
       { normalize_bound_var_in_ctx.
-        decompose [and] Henvs; split_ands; eauto with EvalDB InvDB Ensembles_DB. }
+        decompose [and] Henvs; split_ands; eauto with EvalDB InvDB Ensembles_DB.
+        apply tenv_inv_set_alloc; auto with EvalDB.
+        apply tenv_inv_set_x; auto with EvalDB.
+        vars_neq Hdis x case_id. auto. }
       { eapply env_rel_all_some; eauto.
         normalize_occurs_free; rewrite !FromList_cons; sets. }
       { do 2 apply env_rel_all_some_tenv_set.
@@ -5197,28 +5689,153 @@ Proof.
       specialize IHe with (cin := cin0).
       admit.
   - (** case x of { ces } *)
-    simpl. bind_step ces' Hces; destruct ces' as [[[boxed_cases unboxed_cases] fvs_cs] n_cs].
-    intros Hdis Hscope Hftags*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
-    (*fwd Cred_if'.
-    { admit. }
-    { admit. }*)
-    admit. (*
-    revert boxed_cases unboxed_cases fvs_cs n_cs Hces ρ env tenv m Hρ.
-    induction ces as [| [c e] ces IHces]; intros*; [inv Hces; intros; now apply rel_exp_case|].
-    apply rel_exp_case; intros c' vs n e_taken Hx Hconsistent Hfind_tag.
-    rename Hces into Hceces; cbn in Hceces. 
-    bind_step_in Hceces e' He; destruct e' as [[stm_e fvs_e] n_e].
-    bind_step_in Hceces ces' Hces; destruct ces' as [[[boxed_cases' unboxed_cases'] fvs_ces] n_ces].
-    bind_step_in Hceces rep Hrep; destruct rep as [t|t a]; inv Hceces.
-    + (* New case arm is unboxed *)
-      (* If e = e_taken, IHe gives e ~ stm_e.
-         Otherwise, switch body is equivalent to unboxed_cases', and can use IHces. *)
-      admit.
-    + (* New case arm is boxed *)
-      (* Same idea as in previous subcase *) admit. *)
+    inv Hbstep. rename cin0 into cin, cout0 into cout. inv H.
+    rename e into e_taken, t into c, vl into vs, H2 into Hx, H3 into HcaseConsistent, H5 into Hfind_tag, H9 into Hbstep.
+    edestruct (rel_val_x_related x) as [vx [cvx [Hρx [Henvx Hrelx]]]]; try eassumption; sets.
+    induction Hfind_tag as [c e_taken ces|c_skipped e_skipped ces c e n Hfind_tag IHfind_tag Hc_skipped].
+    + (** First branch taken *)
+      simpl. rewrite bind_assoc. bind_step e' He_taken; destruct e' as [[stm_e_taken fvs_e_taken] n_e_taken].
+      rewrite bind_assoc. bind_step ces' Hces.
+      destruct ces' as [[[boxed_cases unboxed_cases] fvs_ces] n_ces].
+      pose proof cenv_tags_representable c as c_representable.
+      rewrite bind_assoc.
+      normalize_used_vars.
+      rewrite proto_util.used_vars_Ecase in Hdis.
+      destruct (get_ctor_rep _ _) as [| [t|t a]] eqn:Hrep; [exact I| |];
+        rewrite !bind_ret; rewrite ?Hrep in c_representable.
+      * (** Taken branch is an unboxed case *)
+        apply postcond'_refl; rewrite postcond'_spec.
+        rewrite Hx in Hρx; inv Hρx.
+        rewrite rel_val_eqn in Hrelx; cbn in Hrelx.
+        rewrite Hrep in Hrelx; subst cvx.
+        (** Call is_ptr *)
+        vars_neq Hdis x case_id.
+        vars_neq Hdis x frame_id.
+        vars_neq Hdis x roots_id.
+        destruct prog_genv_has_isptr as [isptr_b [Hfind_isptr_symbol Hfind_isptr_funct]].
+        eapply fwd_call; try reflexivity; try eassumption; try reflexivity.
+        { econstructor; [|eauto with EvalDB].
+          tempvars_neq isptr_id frame_id.
+          tempvars_neq isptr_id roots_id.
+          eapply eval_Evar_global; eauto.
+          eapply Henvs; auto. }
+        { econstructor; [..|constructor].
+          - eapply eval_make_var; eauto. split_ands; easy.
+          - rewrite typeof_make_var. eauto with EvalDB. }
+        { constructor. unfold Events.external_call. apply is_ptr_false. }
+        cbn [set_opttemp].
+        fwd Cred_if'.
+        { constructor; rewrite M.gss. reflexivity. }
+        { cbn. rewrite Int.eq_true. reflexivity. }
+        cbn [negb].
+        rewrite <- postcond'_spec.
+        unfold rep_unboxed in *.
+        eapply fwd_switch; try reflexivity.
+        2:{
+          apply eval_shiftr1; eauto with EvalDB.
+          2:{ eapply eval_make_var; eauto.
+              - decompose [and] Henvs; split_ands; eauto with EvalDB InvDB.
+              - congruence.
+              - rewrite env_gso by auto. eauto. }
+          (* by c_representable *)
+          admit. }
+        { (* by c_representable *) admit. }
+        rewrite repr_unboxed_shiftr.
+        unfold select_switch, select_switch_case.
+        destruct (Coqlib.zeq _ _) as [_|Hne]; [|lia].
+        cbn [seq_of_labeled_statement].
+        apply postcond'_seq.
+        (** Continue with taken branch via IH *)
+        specialize (IHces c e_taken); rewrite He_taken in IHces.
+        edestruct IHces as [tenv_end [m_end [cv_end [Hend [cvss_end
+         [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
+        6:{ eassumption. }
+        17:{ eassumption. }
+        19:{ exists tenv_end, m_end, cv_end; split; try eassumption.
+             exists cvss_end, values_end; split_ands; eauto.
+             rewrite to_nat_add; eapply rel_val_antimon; try eassumption.
+             lia. }
+        all: try assumption.
+        (* looks fine *)
+        all: admit.
+      * (** Taken branch is a boxed case *)
+        apply postcond'_refl; rewrite postcond'_spec.
+        rewrite Hx in Hρx; inv Hρx.
+        rewrite rel_val_eqn in Hrelx; cbn in Hrelx.
+        rewrite Hrep in Hrelx.
+        destruct cvx; try solve [destruct Hrelx].
+        rename b into cvx_b, i into cvx_o.
+        destruct Hrelx as [cvs [Hcvs Hrel_cvs]].
+        (** Call is_ptr *)
+        vars_neq Hdis x case_id.
+        vars_neq Hdis x frame_id.
+        vars_neq Hdis x roots_id.
+        destruct prog_genv_has_isptr as [isptr_b [Hfind_isptr_symbol Hfind_isptr_funct]].
+        eapply fwd_call; try reflexivity; try eassumption; try reflexivity.
+        { econstructor; [|eauto with EvalDB].
+          tempvars_neq isptr_id frame_id.
+          tempvars_neq isptr_id roots_id.
+          eapply eval_Evar_global; eauto.
+          eapply Henvs; auto. }
+        { econstructor; [..|constructor].
+          - eapply eval_make_var; eauto. split_ands; easy.
+          - rewrite typeof_make_var. eauto with EvalDB. }
+        { constructor. unfold Events.external_call. apply is_ptr_true. }
+        cbn [set_opttemp].
+        fwd Cred_if'.
+        { constructor; rewrite M.gss. reflexivity. }
+        { cbn. rewrite Int.eq_false by easy. reflexivity. }
+        cbn [negb].
+        rewrite <- postcond'_spec.
+        unfold rep_boxed in *.
+        (** Evaluate the scrutinee *)
+        edestruct eval_load
+          with (e := make_var fenv locals x) (i := (-1)%Z)
+               (tenv := PTree.set case_id Vtrue tenv)
+          as [cv_tag [Hcv_tag Heval_cv_tag]]; try eassumption.
+        { now rewrite typeof_make_var. }
+        { eapply eval_make_var; eauto. split_ands; eauto with InvDB.
+          - easy.
+          - rewrite env_gso by auto. eassumption. }
+        { lia. }
+        replace (-1 + 1)%Z with 0%Z in Hcv_tag by lia.
+        cbn in Hcv_tag; inv Hcv_tag.
+        eapply fwd_switch; try reflexivity.
+        2:{
+          apply eval_and255; eauto with EvalDB.
+          unfold rep_boxed. (* should follow from c_representable. *)
+          admit. }
+        { (* c_representable *)
+          admit. }
+        unfold select_switch, select_switch_case.
+        rewrite repr_boxed_and.
+        destruct (Coqlib.zeq _ _) as [_|Hne]; [|lia].
+        cbn [seq_of_labeled_statement].
+        apply postcond'_seq.
+        (** Continue with taken branch via IH *)
+        specialize (IHces c e_taken); rewrite He_taken in IHces.
+        edestruct IHces as [tenv_end [m_end [cv_end [Hend [cvss_end
+         [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
+        6:{ eassumption. }
+        17:{ eassumption. }
+        19:{ exists tenv_end, m_end, cv_end; split; try eassumption.
+             exists cvss_end, values_end; split_ands; eauto.
+             rewrite to_nat_add; eapply rel_val_antimon; try eassumption.
+             lia. }
+        all: try assumption.
+        (* looks fine *)
+        all: admit.
+    + (** One of the other branches taken *)
+      simpl. rewrite bind_assoc. bind_step e' He_skipd; destruct e' as [[stm_e_skipd fvs_e_skipd] n_e_skipd].
+      rewrite bind_assoc. bind_step ces' Hces.
+      destruct ces' as [[[boxed_cases unboxed_cases] fvs_ces] n_ces].
+      rewrite bind_assoc. destruct (get_ctor_rep _ _) as [| [t|t a]] eqn:Hrep; [exact I| |]; rewrite !bind_ret.
+      * (** Skipped branch is an unboxed case *)
+        admit.
+      * (** Skipped branch is a boxed case *)
+        admit.
   - (** let x = Proj c n y in e *)
     simpl. bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros Hdis Hscope Hftags*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
     admit. (*
     specialize (IHe e); rewrite He in IHe; apply IHe. Guarded.
     eapply rel_env_antimon_S; [apply (Included_Union_Setminus _ [set x]); sets|].
@@ -5233,8 +5850,7 @@ Proof.
     destruct (fenv ! f) as [[arity inds] |] eqn:Hf_cc; [|exact I].
     destruct (negb (_ =? _)%nat) eqn:Harity_match; [exact I|].
     rewrite bind_ret.
-    intros Hdis Hscope Hftags*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
-    rewrite used_vars_Eletapp in *. rewrite !FromList_cons in Hdis.
+    rewrite used_vars_Eletapp in *. rewrite ?FromList_cons in Hdis.
     repeat fwd Cred_seq_assoc.
     (** Store variables live after call \ {x} in roots array *)
     unfold "|=" in *.
@@ -5260,7 +5876,8 @@ Proof.
       auto with FrameDB; eauto with EvalDB; auto with mem
     end.
     { unfold PS.elt, cps.var, M.elt in *. lia. }
-    { (* live_after_call ⊆ FV(e) ⊆ vars(e) # frame_id *) admit. }
+    { (* live_after_call ⊆ FV(e) ⊆ vars(e) # case_id *) admit. }
+    { (* same argument as above *) admit. }
     { (* same argument as above *) admit. }
     { (* Henv_rel ==> FV(e)\x ⊆ dom(ρ) *) admit. }
     { (* same argument as above *) admit. }
@@ -5294,6 +5911,7 @@ Proof.
     { (* #|ys| = #|inds| *) admit. }
     { (* NoDup inds *) admit. }
     { (* invariant on inds, obtained from invariant on fenv *) admit. }
+    { (* case_id # ys by Hdis *) admit. }
     { (* frame_id # ys by Hdis *) admit. }
     { (* roots_id # ys by Hdis *) admit. }
     { (* Henv_rel ==> skip n ys ⊆ ys ⊆ FV(let x = f ys in e) ⊆ dom(ρ) *) admit. }
@@ -5436,8 +6054,8 @@ Proof.
       vars_neq Hdis x alloc_id.
       vars_neq Hdis x tinfo_id.
       rewrite !M.gso; auto.
-      rewrite <- NoDup'_spec in NoDup_tempvars.
-      clear - NoDup_tempvars; cbn in *; easy. }
+      rewrite <- NoDup'_spec in NoDup_vars.
+      clear - NoDup_vars; cbn in *; easy. }
     repeat fwd Cred_seq_assoc.
     (** Step through outer if-then-else *)
     destruct cvss_call as [|cvs_live_no_x_call cvss_call]; [destruct Hcompat_shapes|].
@@ -5447,8 +6065,8 @@ Proof.
       change tenv_call' with tenv_call
     end.
     assert (Halloc_ne_limit : alloc_id <> limit_id).
-    { rewrite <- NoDup'_spec in NoDup_tempvars.
-      clear - NoDup_tempvars; cbn in *; easy. }
+    { rewrite <- NoDup'_spec in NoDup_vars.
+      clear - NoDup_vars; cbn in *; easy. }
     eapply fwd_seq with (P := fun tenv_gc m_gc _ =>
       (** after the if-then-else,
           - the new tenv contains a binding (x ↦ cvx_gc),
@@ -5961,16 +6579,11 @@ Proof.
   - (** let rec fds in e *) exact I.
   - (** f ft ys *)
     simpl. bind_step call Hcall.
-    intros Hdis Hscope Hftags*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
     admit.
     (* TODO: lemma about make_fun_call *)
-  - (** let x = Prim p ys in e *)
-    simpl. bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    intros Hdis Hscope Hftags*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
-    now inv Hbstep.
+  - (** let x = Prim p ys in e *) now inv Hbstep.
   - (** halt x *)
     simpl.
-    intros Hdis Hscope Hftags*Hk Hbstep*Htinfo Halloc Hlimit Hroots Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
     repeat fwd Cred_seq_assoc.
     admit. (*
     Cstep Cred_assign.
@@ -5990,7 +6603,6 @@ Proof.
     admit. *)
 Abort.
 
-Print bstep_fuel.
 End TRANSLATE_BODY_CORRECT.
 
 (* TODO will probably need something like this to prove translate_fundefs correct *)

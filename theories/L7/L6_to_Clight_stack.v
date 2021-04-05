@@ -478,7 +478,7 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
   (** [[let x = y.n in e]] = (x = y[n]; [[e]]) *)
   | Eproj x t n y e =>
     '(stm_e, fvs_e, n_e) <- translate_body e ;;
-    ret ((x ::= (var y).[Z.of_N n].; stm_e), add_local_fv (PS.remove x fvs_e) y, n_e)
+    ret ((x ::= (make_var y).[Z.of_N n].; stm_e), add_local_fv (PS.remove x fvs_e) y, n_e)
   | Efun fnd e => Err "translate_body: nested function detected"
   (** [[f(ys)]] =
         ret_temp = call f with arguments ys;
@@ -496,7 +496,7 @@ Fixpoint translate_body (e : exp) {struct e} : error (statement * FVSet * N) :=
   | Ehalt x =>
     ret ((tinfo->alloc :::= alloc.;
           tinfo->limit :::= limit.;
-          Sreturn (Some (var x))),
+          Sreturn (Some (make_var x))),
          add_local_fv PS.empty x, 0)%N
   end%C.
 
@@ -2233,7 +2233,7 @@ Definition rel_val_aux (k : nat) :=
   | Vint v, cv => cv = vint (rep_unboxed (Z.to_N v))
   | Vconstr t vs, cv =>
     match get_ctor_rep cenv t with
-    | Ret (enum t) => cv = vint (rep_unboxed t)
+    | Ret (enum t) => cv = vint (rep_unboxed t) /\ vs = []
     | Ret (boxed t a) =>
       match! cv with Vptr b o in
       exists cvs,
@@ -4914,7 +4914,7 @@ Lemma rel_val_wf k v P cv :
 Proof.
   destruct v; rewrite rel_val_eqn; cbn.
   - destruct (get_ctor_rep _ _) as [| [t|t a]]; auto.
-    + intros H; subst cv; auto with EvalDB.
+    + intros [H ?]; subst cv; auto with EvalDB.
     + destruct cv; auto with EvalDB.
   - destruct cv; auto with EvalDB.
   - intros ->; auto with EvalDB.
@@ -5591,7 +5591,7 @@ Proof.
   destruct (get_ctor_rep _ _) as [| [t|t a]] eqn:Hrep; [destruct Hrel_x| |];
     rewrite ?Hrep in c_representable.
   - (** c is an unboxed constructor *)
-    subst cv. rewrite postcond'_spec.
+    destruct Hrel_x as [-> ->]. rewrite postcond'_spec.
     (** Call is_ptr *)
     destruct prog_genv_has_isptr as [isptr_b [Hfind_isptr_symbol Hfind_isptr_funct]].
     pose proof is_ptr_spec as is_ptr_false.
@@ -5734,6 +5734,28 @@ Proof.
       eapply IHces; eauto.
 Qed.
 
+(* TODO hoist *)
+Definition nthN_range {A} (xs : list A) n y : 
+  nthN xs n = Some y -> (0 <= Z.of_N n < #|xs|)%Z.
+Proof.
+  revert n; induction xs as [|x xs IHxs]; [inversion 1|intros n].
+  cbn [nthN]; destruct (N.eq_dec n 0) as [->|Hne]; [inversion 1; cbn; superlia|].
+  destruct n; [easy|].
+  intros H; specialize (IHxs _ H).
+  cbn; superlia.
+Qed.
+
+(* TODO hoist *)
+Lemma postcond_ret env tenv m e cv (P : _ -> _ -> _ -> Prop) :
+  typeof e = value ->
+  (env, tenv, m, e) ⇓ᵣ cv ->
+  P tenv m cv ->
+  postcond' env tenv m (Sreturn (Some e)) P.
+Proof.
+  intros Hty He HP; do 3 eexists; split_ands; eauto.
+  unfold "⇓". rewrite <- Hty. constructor; auto.
+Qed.
+
 Hint Extern 0 ((M.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Hint Extern 0 ((PTree.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Lemma translate_body_stm k : forall e,
@@ -5806,15 +5828,19 @@ Proof.
     simpl. bind_step rep Hrep; destruct rep as [t|t a]; destruct ys as [|y ys]; try exact I; rewrite bind_ret.
     + (** Unboxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-      intros.
-      fwd Cred_set; [constructor|].
-      admit.
-      (*specialize (IHe e); rewrite He in IHe; eapply IHe. Guarded.
-      eapply rel_env_antimon_S; [apply (Included_Union_Setminus _ [set x]); sets|].
-      normalize_occurs_free_in Hρ.
-      rewrite rel_env_union in Hρ; destruct Hρ as [_ Hρ].
-      rewrite rel_env_union; split; [apply rel_env_gso; [intros Hin; now inv Hin|auto] |].
-      apply rel_env_gss_sing; rewrite rel_val_eqn; cbn; now rewrite Hrep. *)
+      fwd Cred_set; eauto with EvalDB.
+      rewrite <- postcond'_spec.
+      inv Hbstep; match goal with H : bstep _ _ _ _ _ _ |- _ => inv H end.
+      edestruct IHe as [tenv_end [m_end [cv_end [Hend [cvss_end
+       [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
+      5:{ eassumption. }
+      16:{ eassumption. }
+      18:{ exists tenv_end, m_end, cv_end; split; try eassumption.
+           exists cvss_end, values_end; split_ands; eauto.
+           rewrite to_nat_add; eapply rel_val_antimon; try eassumption. lia. }
+      all: try assumption.
+      (* looks fine *)
+      all: admit.
     + (** Boxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
       normalize_used_vars. rewrite !FromList_cons in Hdis.
@@ -5881,10 +5907,36 @@ Proof.
           clear - Hvs Hcv_skipn_ys; change cps.var with ident in *; cbn in *; lia. }
       rewrite app_nil_r in Hm''.
       simpl firstn in Hm''; simpl "++"%list in Hm''.
+      (** Massage m'' until ready for IH *)
+      unfold "|=" in *.
+      match type of Hm'' with
+      | _ |=_{_} ?P ⋆ _ =>
+        destruct_ex_ctx (fun H => P ⋆ H) args Hm'';
+        destruct_ex_ctx (fun H => P ⋆ H) nalloc Hm'';
+        destruct_ex_ctx (fun H => P ⋆ H) talloc_o Hm'';
+        destruct_ex_ctx (fun H => P ⋆ H) tlimit_o Hm''
+      end.
+      unfold valid_mem in Hm''. rewrite sepcon_comm in Hm''.
+      match type of Hm'' with
+      | _ |=_{_} (?P ⋆ ?Q ⋆ ?R ⋆ _ ⋆ ?S) ⋆ ?new_segment =>
+        rewrite (frame_stuff_hole (fun H => P ⋆ Q ⋆ R ⋆ H ⋆ S)) in Hm''; auto with FrameDB;
+        remember (values ⋆ new_segment) as values' eqn:Hvalues'
+      end.
+      apply valid_mem_fold in Hm''.
       (** Continue with e via IH *)
       inv Hbstep; match goal with H : bstep _ _ _ _ _ _ |- _ => inv H end.
-      specialize IHe with (cin := cin0).
-      admit.
+      edestruct IHe as [tenv_end [m_end [cv_end [Hend [cvss_end
+       [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
+      5:{ eassumption. }
+      16:{ exists_ex args; exists_ex nalloc; exists_ex talloc_o; exists_ex tlimit_o.
+           apply Hm''. }
+      18:{ rewrite <- postcond'_spec.
+           exists tenv_end, m_end, cv_end; split; try eassumption.
+           exists cvss_end, values_end; split_ands; eauto.
+           - rewrite to_nat_add; eapply rel_val_antimon; try eassumption. lia.
+           - (* TODO sepcon doesn't affect comaptivle shapes *) admit. }
+      (* looks fine *)
+      all: admit.
   - (** case x of { ces } *)
     inv Hbstep. rename cin0 into cin, cout0 into cout. inv H.
     rename e into e_taken, t into c, vl into vs, H2 into Hx, H3 into HcaseConsistent, H5 into Hfind_tag, H9 into Hbstep.
@@ -5915,14 +5967,40 @@ Proof.
     all: admit.
   - (** let x = Proj c n y in e *)
     simpl. bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
-    admit. (*
-    specialize (IHe e); rewrite He in IHe; apply IHe. Guarded.
-    eapply rel_env_antimon_S; [apply (Included_Union_Setminus _ [set x]); sets|].
-    normalize_occurs_free_in Hρ.
-    rewrite rel_env_union in Hρ; destruct Hρ as [_ Hρ].
-    rewrite rel_env_union; split; [apply rel_env_gso; [intros Hin; now inv Hin|auto] |].
-    apply rel_env_gss_sing.
-    admit. *)
+    inv Hbstep. rename cin0 into cin, cout0 into cout; inv H.
+    rename t into c, v0 into v_n, H9 into Hy, H10 into Hv_n, H11 into Hbstep.
+    edestruct (rel_val_x_related y) as [vy [cvy [Hvy [Hcvy Hrely]]]]; try eassumption; sets.
+    rewrite Hy in Hvy; inv Hvy.
+    rewrite rel_val_eqn in Hrely; cbn in Hrely.
+    destruct (get_ctor_rep _ _) as [| [t|t a]]; [destruct Hrely| |].
+    { destruct Hrely as [-> ->]. inv Hv_n. }
+    destruct cvy; try solve [destruct Hrely].
+    rename b into cvy_b, i into cvy_o.
+    destruct Hrely as [cvs [Hcvs Hcvs_rel]].
+    normalize_used_vars.
+    vars_neq Hdis y case_id.
+    vars_neq Hdis y frame_id.
+    vars_neq Hdis y roots_id.
+    edestruct eval_load with (i := Z.of_N n) as [vx [Hvx Heval_vx]]; try eassumption.
+    2:{ eapply eval_make_var; eauto. easy. }
+    { apply typeof_make_var. }
+    { apply nthN_range in Hv_n.
+      rewrite Forall2'_spec in Hcvs_rel.
+      apply Forall2_length in Hcvs_rel.
+      superlia. }
+    fwd Cred_set; [eassumption|].
+    rewrite <- postcond'_spec.
+    edestruct IHe as [tenv_end [m_end [cv_end [Hend [cvss_end
+     [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
+    5:{ eassumption. }
+    16:{ eassumption. }
+    18:{ exists tenv_end, m_end, cv_end; split; try eassumption.
+         exists cvss_end, values_end; split_ands; eauto.
+         rewrite to_nat_add; eapply rel_val_antimon; try eassumption.
+         lia. }
+    all: try assumption.
+    (* looks fine *)
+    all: admit.
   - (** let x = f ft ys in e *)
     simpl. bind_step e' He; destruct e' as [[stm_e live_after_call] n_e].
     unfold make_fun_call.
@@ -6117,7 +6195,7 @@ Proof.
       - rewrite typeof_make_var.
         change (Tpointer ?t noattr) with (tptr t).
         now rewrite sem_cast_ptr'. }
-    { (* should be doable *) admit. }
+    { (* TODO lemma about this (eval exprlist of tinfo :: a bunch of make_vars) *) admit. }
     { (* TODO: might need to add this to value relation *) admit. }
     simpl set_opttemp.
     (** Retrieve new alloc and limit *)
@@ -6657,29 +6735,154 @@ Proof.
     all: admit.
   - (** let rec fds in e *) exact I.
   - (** f ft ys *)
-    simpl. bind_step call Hcall.
-    admit.
-    (* TODO: lemma about make_fun_call *)
+    cbn [translate_body]. unfold make_fun_call.
+    destruct (fenv ! f) as [[arity inds] |] eqn:Hf_cc; [|exact I].
+    destruct (negb (_ =? _)%nat) eqn:Harity_match; [exact I|].
+    rewrite bind_ret.
+    normalize_used_vars.
+    repeat fwd Cred_seq_assoc.
+    (** Store arguments n+1, .. in the args array at indices inds *)
+    unfold "|=" in *.
+    destruct_ex args Hm.
+    destruct_ex nalloc Hm.
+    destruct_ex talloc_o Hm.
+    destruct_ex tlimit_o Hm.
+    rewrite skipn_combine.
+    unfold valid_mem in Hm.
+    match type of Hm with
+    | _ |=_{_} _ ⋆ ?P =>
+      eapply (fwd_args_stores (fun H => H ⋆ P)); eauto with EvalDB FrameDB
+    end.
+    { (* #|ys| = #|inds| *) admit. }
+    { (* NoDup inds *) admit. }
+    { (* invariant on inds, obtained from invariant on fenv *) admit. }
+    { (* case_id # ys by Hdis *) admit. }
+    { (* frame_id # ys by Hdis *) admit. }
+    { (* roots_id # ys by Hdis *) admit. }
+    { (* Henv_rel ==> skip n ys ⊆ ys ⊆ FV(f(ys)) ⊆ dom(ρ) *) admit. }
+    { (* same argument as above *) admit. }
+    intros m_args_stored cv_skipn_ys Hcv_skipn_ys Hm_args_stored; unfold "|=" in *.
+    (** Update tinfo->alloc and tinfo->limit *)
+    match type of Hm_args_stored with
+    | _ |=_{_} _ ⋆ ?P =>
+      eapply (fwd_tinfo_alloc (fun H => H ⋆ P)) with (ty := value);
+      eauto with EvalDB FrameDB
+    end.
+    intros m_alloc_stored Hm_alloc_stored; unfold "|=" in *.
+    match type of Hm_alloc_stored with
+    | _ |=_{_} _ ⋆ ?P =>
+      eapply (fwd_tinfo_limit (fun H => H ⋆ P)) with (ty := value);
+      eauto with EvalDB FrameDB
+    end.
+    intros m_limit_stored Hm_limit_stored; unfold "|=" in *.
+    apply valid_mem_fold in Hm_limit_stored.
+    (** The functions are related *)
+    inv Hbstep. rename cin0 into cin, cout0 into cout; inv H.
+    rename fl into fds, rho' into ρ_f, rho'' into ρ_f_xvs, H3 into Hρ_f,
+    H4 into Hρ_get_ys, H6 into Hfind_def, H10 into Hρ_f_xvs, H11 into Hbstep.
+    edestruct rel_val_x_related with (x := f) as [v_f [cv_f [Hv_f [Hcv_f Hrel_f]]]]; try eassumption.
+    { normalize_occurs_free; sets. }
+    (assert (v_f = Vfun ρ_f fds f') by congruence); subst v_f; clear Hρ_f.
+    rewrite rel_val_eqn in Hrel_f; cbn [rel_val_aux] in Hrel_f.
+    destruct cv_f; try solve [destruct Hrel_f]; rename b into f_b, i into f_o.
+    rewrite Hfind_def in Hrel_f.
+    (* destruct (M.bempty ρ_f) eqn:Hρ_f_empty; [|destruct Hrel_f]. *)
+    pose proof Hf_cc as Hf_cc_tag.
+    erewrite (Hftags Hole_c) in Hf_cc_tag; [|left; do 2 eexists; reflexivity].
+    rewrite Hf_cc_tag in Hrel_f.
+    destruct (Genv.find_funct _ _) as [fn|] eqn:Hfind_funct; [|destruct Hrel_f].
+    (** The arguments are related *)
+    edestruct rel_val_xs_related with (xs := firstn n_param ys)
+      as [v_firstn_ys [cv_firstn_ys [Hv_firstn_ys [Hcv_firstn_ys Hrel_firstn_ys]]]]; eauto.
+    { normalize_occurs_free; eapply Included_trans; sets. }
+    edestruct rel_val_xs_related with (xs := skipn n_param ys)
+      as [v_skipn_ys [cv_skipn_ys' [Hv_skipn_ys [Hcv_skipn_ys' Hrel_skipn_ys]]]]; eauto.
+    { normalize_occurs_free; eapply Included_trans; sets. }
+    assert (cv_skipn_ys' = cv_skipn_ys).
+    { now apply some_inj; rewrite <- Hcv_skipn_ys, <- Hcv_skipn_ys'. }
+    subst cv_skipn_ys'; clear Hcv_skipn_ys'.
+    (** The args array contains (skipn n_param ys) at the right indices *)
+    rewrite Bool.negb_false_iff, Nat.eqb_eq in Harity_match.
+    destruct (fenv_cc_inv _ _ _ Hf_cc) as [Harity_eq [Hnodup_inds Hbounds_inds]].
+    match goal with
+    | H : context [set_iths ?args ?skipn_ys ?indices] |- _ =>
+      (unshelve epose proof (set_iths_spec args skipn_ys indices _ _ _) as Hargs_in_right_places); auto
+    end.
+    { (* Harity_eq, get_env_list_len in Hcv_skipn_ys *) admit. }
+    { (* #|args| = max_args *) admit. }
+    (** Because the functions are related, the call will produce related results *)
+    specialize (one_app_nonzero f t ys).
+    destruct k as [|k]; [rewrite to_nat_add in Hk; lia|].
+    unfold "|=" in Hrel_f.
+    specialize Hrel_f with (j := k) (cin := cin)
+                           (cvs := (cv_firstn_ys ++ cv_skipn_ys)%list)
+                           (cvss := cvss)
+                           (args := set_iths args cv_skipn_ys (skipn n_param inds)).
+    replace (k - (k - k)) with k in Hrel_f by lia.
+    edestruct Hrel_f as [m_call [cvx [cvss_call [values_call 
+      [Heval_funcall [Hm_call [Hvalues_call [Hcompat_shapes Hrel_call]]]]]]]]; try eassumption.
+    { lia. }
+    { (* Hrel_firstn_ys, Hrel_skipn_ys *) admit. }
+    { rewrite !to_nat_add in Hk. lia. }
+    { (* Hargs_in_right_places + lemma about skipn *) admit. }
+    { exists_ex nursery_b. exists_ex alloc_o. exists_ex limit_o. exists_ex nalloc.
+      apply Hm_limit_stored. }
+    (** Make the call *)
+    eapply fwd_call; try eassumption.
+    { cbn. reflexivity. }
+    { econstructor.
+      - eapply eval_make_var; eauto.
+        + vars_neq Hdis f frame_id.
+          vars_neq Hdis f roots_id.
+          now split.
+        + intros Hnone; congruence.
+      - rewrite typeof_make_var.
+        change (Tpointer ?t noattr) with (tptr t).
+        now rewrite sem_cast_ptr'. }
+    { (* TODO lemma about this *) admit. }
+    { (* TODO: might need to add this to value relation *) admit. }
+    cbn [set_opttemp].
+    rewrite <- postcond'_spec.
+    eapply postcond_ret; eauto with EvalDB.
+    exists cvss_call, values_call; split_ands; auto.
+    eapply rel_val_antimon; try eassumption.
+    rewrite !to_nat_add; lia.
   - (** let x = Prim p ys in e *) now inv Hbstep.
   - (** halt x *)
-    simpl.
-    repeat fwd Cred_seq_assoc.
-    admit. (*
-    Cstep Cred_assign.
-    { admit. }
-    { admit. }
-    { admit. }
-    { admit. }
-    Cstep Cred_assign.
-    { admit. }
-    { admit. }
-    { admit. }
-    { admit. }
-    (* TODO: lemma rel_exp_halt
-                ρ(x) ~ᵥ{k} (m, args[1])
-         ---------------------------------------
-         (ρ, Ehalt x) ~{k} (env, tenv, m, Sskip) *)
-    admit. *)
+    cbn [translate_body]; repeat fwd Cred_seq_assoc.
+    unfold "|=" in *.
+    destruct_ex args Hm.
+    destruct_ex nalloc Hm.
+    destruct_ex talloc_o Hm.
+    destruct_ex tlimit_o Hm.
+    unfold valid_mem in Hm.
+    match type of Hm with
+    | _ |=_{_} _ ⋆ ?P =>
+      eapply (fwd_tinfo_alloc (fun H => H ⋆ P)) with (ty := value) in Hm;
+        eauto with FrameDB EvalDB
+    end.
+    intros m_alloc Hm_alloc; unfold "|=" in *.
+    match type of Hm_alloc with
+    | _ |=_{_} _ ⋆ ?P =>
+      eapply (fwd_tinfo_limit (fun H => H ⋆ P)) with (ty := value) in Hm_alloc;
+        eauto with FrameDB EvalDB
+    end.
+    intros m_limit Hm_limit; unfold "|=" in *.
+    apply valid_mem_fold in Hm_limit.
+    rewrite <- postcond'_spec.
+    edestruct (rel_val_x_related x) as [vx [cvx [Hvx [Hcvx Hrelx]]]]; try eassumption; sets.
+    inv Hbstep; inv H. rename H4 into Hx.
+    rewrite Hx in Hvx; inv Hvx.
+    normalize_used_vars.
+    vars_neq Hdis x case_id.
+    vars_neq Hdis x frame_id.
+    vars_neq Hdis x roots_id.
+    eapply postcond_ret; eauto with EvalDB.
+    { eapply eval_make_var; eauto. easy. }
+    exists cvss, values; split_ands; auto with ShapeDB.
+    + eapply rel_val_antimon; try eassumption. rewrite to_nat_add; lia.
+    + exists_ex nursery_b; exists_ex alloc_o; exists_ex limit_o.
+      exists_ex args. exists_ex nalloc. apply Hm_limit.
 Abort.
 
 End TRANSLATE_BODY_CORRECT.

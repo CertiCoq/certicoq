@@ -5343,7 +5343,7 @@ Proof.
   simpl Z.shiftl.
   unfold Zpower.two_power_pos. simpl.
   rewrite Zdiv.Zdiv2_div. 
-  replace (i * 2 + 1)%Z with (OrdersEx.Z_as_OT.b2z true + 2 * i)%Z by (simpl OrdersEx.Z_as_OT.b2z; omega).
+  replace (i * 2 + 1)%Z with (OrdersEx.Z_as_OT.b2z true + 2 * i)%Z by (simpl OrdersEx.Z_as_OT.b2z; lia).
   apply OrdersEx.Z_as_OT.add_b2z_double_div2.
 Qed.
 
@@ -6341,6 +6341,78 @@ Proof.
   induction ces1 as [| [c' e'] ces1 IHces1]; cbn; lia.
 Qed.
 
+(* TODO hoist *)
+Lemma nthN_get_ith : forall {A} (vs : list A) n, get_ith vs (Z.of_N n) = nthN vs n.
+Proof.
+  clear; induction vs as [|v vs IHvs]; [reflexivity|].
+  cbn in *; intros n.
+  destruct (Coqlib.zeq (Z.of_N n) 0) as [Heq|Hne].
+  - destruct n; auto. lia.
+  - destruct n; try lia. rewrite <- IHvs. f_equal; lia.
+Qed.
+
+(* TODO hoist *)
+Lemma rel_env_sepcon' : forall k S ρ P Q env tenv,
+  ρ ~ₑ{k, S} (env, tenv, P) ->
+  ρ ~ₑ{k, S} (env, tenv, Q ⋆ P).
+Proof.
+  clear; intros* Hrel x Hx; specialize (Hrel x Hx).
+  destruct (ρ!x); [|easy].
+  destruct (_!!!_); [|easy].
+  eapply rel_val_entail; [intros S' m Hm; rewrite sepcon_comm in Hm; apply Hm|].
+  apply rel_val_sepcon; auto.
+Qed.
+
+(* TODO hoist *)
+Lemma env_list_gso : forall (ys : list ident) (x : ident) (env : Clight.env) (tenv : temp_env) v,
+           ~ List.In x ys -> (env, PTree.set x v tenv) !!!! ys = (env, tenv) !!!! ys.
+Proof.
+  clear; induction ys as [|y ys IHys]; [reflexivity|].
+  intros* Hin; cbn in *.
+  rewrite env_gso by (intros Heq; subst; contradiction Hin; now left).
+  rewrite IHys by auto.
+  auto.
+Qed.
+
+(* TODO hoist *)
+Lemma has_shape_sepcon : forall v cv Q P,
+  has_shape P v cv ->
+  has_shape (Q ⋆ P) v cv.
+Proof.
+  clear; induction v as [c vs IHvs|ρ fds f|z] using val_ind''.
+  - intros* H; cbn in *; destruct (get_ctor_rep _ _) as [| [t|t a]]; auto.
+    destruct cv; auto.
+    destruct H as [cvs [HP Hvs]].
+    exists cvs; split.
+    + eapply entail_trans.
+      { intros S m Hm; rewrite sepcon_comm in Hm; apply Hm. }
+      eapply entail_trans.
+      { apply (frame_entail (fun H => H ⋆ Q)); auto with FrameDB; eauto. }
+      intros S m Hm; rewrite sepcon_assoc in Hm.
+      eapply frame_entail; auto with FrameDB; eauto; apply entail_True.
+    + rewrite Forall2'_spec in *.
+      clear HP. revert cvs Hvs; induction vs as [|v vs IHvs'].
+      * destruct cvs as [|cv cvs]; auto. inversion 1.
+      * destruct cvs as [|cv cvs]; auto. inversion 1. 
+        intros Hforall; inv Hforall; constructor.
+        -- apply IHvs; eauto; now left.
+        -- apply IHvs'; auto. intros; apply IHvs; auto. now right.
+  - easy.
+  - easy.
+Qed.
+
+(* TODO hoist *)
+Lemma has_shapes_sepcon : forall vss cvss Q P,
+  has_shapes P vss cvss ->
+  has_shapes (Q ⋆ P) vss cvss.
+Proof.
+  intros* H; unfold has_shapes in *.
+  eapply Forall2_monotonic; [|apply H].
+  intros* H'.
+  eapply Forall2_monotonic; [|apply H'].
+  intros; apply has_shape_sepcon; auto.
+Qed.
+
 Hint Extern 0 ((M.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Hint Extern 0 ((PTree.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Lemma translate_body_stm : forall e k,
@@ -6348,10 +6420,6 @@ Lemma translate_body_stm : forall e k,
   well_scoped e ->
   fenv_respects_tags e ->
   max_allocs_representable e ->
-  (* (* TODO: probably overkill, delete if unneeded *)
-     [thread_info_id; alloc_id; limit_id; heap_id; args_id; fp_id; nalloc_id;
-     stack_frame_id; tinfo_id; frame_id; roots_id; gc_id; body_id;
-     builtin_unreachable_id; ret_id] *)
   (** if running e in environment ρ yields a value v in j <= k cost, *)
   forall ρ v cin cout vss,
   to_nat cin <= k ->
@@ -6555,31 +6623,12 @@ Proof.
           constructor; auto 15. right; now right. }
         apply rel_env_gss.
         2:{ 
-(* TODO hoist *)
-assert (rel_env_sepcon' : forall k S ρ P Q env tenv,
-  ρ ~ₑ{k, S} (env, tenv, P) ->
-  ρ ~ₑ{k, S} (env, tenv, Q ⋆ P)).
-{
-  clear; intros* Hrel x Hx; specialize (Hrel x Hx).
-  destruct (ρ!x); [|easy].
-  destruct (_!!!_); [|easy].
-  eapply rel_val_entail; [intros S' m Hm; rewrite sepcon_comm in Hm; apply Hm|].
-  apply rel_val_sepcon; auto.
-}
             apply rel_env_sepcon'.
             eapply rel_env_antimon_S; [|apply Henv_rel].
             normalize_occurs_free; sets. }
         rewrite rel_val_eqn; cbn. rewrite Hrep.
         edestruct (rel_val_xs_related (y :: ys)) as [vys [cvys [Hvys [Hcvys Hrelys]]]]; [|apply Henv_rel|].
         { normalize_occurs_free; sets. }
-        (* TODO hoist *)
-        assert (env_list_gso : forall (ys : list ident) (x : ident) (env : Clight.env) (tenv : temp_env) v,
-                   ~ List.In x ys -> (env, PTree.set x v tenv) !!!! ys = (env, tenv) !!!! ys).
-        { clear; induction ys as [|y ys IHys]; [reflexivity|].
-          intros* Hin; cbn in *.
-          rewrite env_gso by (intros Heq; subst; contradiction Hin; now left).
-          rewrite IHys by auto.
-          auto. }
         assert (~ List.In alloc_id (y :: ys)).
         { intros Hin; destruct Hdis as [Hdis]; contradiction (Hdis alloc_id).
           constructor; auto 15. left; right. inv Hin; auto. }
@@ -6612,40 +6661,7 @@ assert (rel_env_sepcon' : forall k S ρ P Q env tenv,
         rewrite sepcon_assoc in Hma.
         eapply frame_entail; eauto with FrameDB.
         apply entail_True.
-      * (* TODO hoist *)
-        assert (has_shape_sepcon : forall v cv Q P,
-          has_shape P v cv ->
-          has_shape (Q ⋆ P) v cv).
-        { clear; induction v as [c vs IHvs|ρ fds f|z] using val_ind''.
-          - intros* H; cbn in *; destruct (get_ctor_rep _ _) as [| [t|t a]]; auto.
-            destruct cv; auto.
-            destruct H as [cvs [HP Hvs]].
-            exists cvs; split.
-            + eapply entail_trans.
-              { intros S m Hm; rewrite sepcon_comm in Hm; apply Hm. }
-              eapply entail_trans.
-              { apply (frame_entail (fun H => H ⋆ Q)); auto with FrameDB; eauto. }
-              intros S m Hm; rewrite sepcon_assoc in Hm.
-              eapply frame_entail; auto with FrameDB; eauto; apply entail_True.
-            + rewrite Forall2'_spec in *.
-              clear HP. revert cvs Hvs; induction vs as [|v vs IHvs'].
-              * destruct cvs as [|cv cvs]; auto. inversion 1.
-              * destruct cvs as [|cv cvs]; auto. inversion 1. 
-                intros Hforall; inv Hforall; constructor.
-                -- apply IHvs; eauto; now left.
-                -- apply IHvs'; auto. intros; apply IHvs; auto. now right.
-          - easy.
-          - easy. }
-        (* TODOhoist *)
-        assert (has_shapes_sepcon : forall vss cvss Q P,
-          has_shapes P vss cvss ->
-          has_shapes (Q ⋆ P) vss cvss).
-        { clear - has_shape_sepcon; intros* H; unfold has_shapes in *.
-          eapply Forall2_monotonic; [|apply H].
-          intros* H'.
-          eapply Forall2_monotonic; [|apply H'].
-          intros; apply has_shape_sepcon; auto. }
-        now apply has_shapes_sepcon.
+      * now apply has_shapes_sepcon.
   - (** case x of { ces } *)
     inv Hbstep. rename cin0 into cin, cout0 into cout. inv H.
     rename e into e_taken, t into c, vl into vs, H2 into Hx, H3 into HcaseConsistent, H5 into Hfind_tag, H9 into Hbstep.
@@ -6718,13 +6734,6 @@ assert (rel_env_sepcon' : forall k S ρ P Q env tenv,
       superlia. }
     fwd Cred_set; [eassumption|].
     rewrite <- postcond'_spec.
-    (* TODO hoist *)
-    assert (nthN_get_ith : forall {A} (vs : list A) n, get_ith vs (Z.of_N n) = nthN vs n).
-    { clear; induction vs as [|v vs IHvs]; [reflexivity|].
-      cbn in *; intros n.
-      destruct (Coqlib.zeq (Z.of_N n) 0) as [Heq|Hne].
-      - destruct n; auto. lia.
-      - destruct n; try lia. rewrite <- IHvs. f_equal; lia. }
     vars_neq Hdis x tinfo_id.
     vars_neq Hdis x alloc_id.
     vars_neq Hdis x limit_id.
@@ -8223,7 +8232,7 @@ assert (rel_env_sepcon' : forall k S ρ P Q env tenv,
     + eapply rel_val_antimon; try eassumption. rewrite to_nat_add; lia.
     + exists_ex nursery_b; exists_ex alloc_o; exists_ex limit_o.
       exists_ex args. exists_ex nalloc. apply Hm_limit.
-Abort.
+Qed.
 
 End TRANSLATE_BODY_CORRECT.
 

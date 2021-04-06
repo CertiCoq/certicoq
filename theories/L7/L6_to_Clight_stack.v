@@ -5132,7 +5132,7 @@ Lemma fwd_loads F P_tenv env tenv m a i xs ty b o p s vs P :
   P_tenv tenv ->
   (forall tenv x v, List.In x xs -> P_tenv tenv -> P_tenv (M.set x v tenv)) ->
   typeof a = value \/ typeof a = tptr ty ->
-  (0 <= #|xs| < #|vs| /\ 0 <= i <= #|vs| - #|xs|)%Z ->
+  (0 <= #|xs| <= #|vs| /\ 0 <= i <= #|vs| - #|xs|)%Z ->
   perm_order p Readable ->
   m |= F ((b, O.unsigned o) ↦_{p} vs) ->
   (forall tenv',
@@ -6235,6 +6235,66 @@ Proof.
     eapply (rel_val_compatible_shape' F G k P P'); eauto.
 Qed.
 
+Inductive single_ctx_frame : exp_ctx -> Prop :=
+| single_constr x c ys : single_ctx_frame (Econstr_c x c ys Hole_c)
+| single_proj x t n y : single_ctx_frame (Eproj_c x t n y Hole_c)
+| single_prim x p ys : single_ctx_frame (Eprim_c x p ys Hole_c)
+| single_letapp x f t ys : single_ctx_frame (Eletapp_c x f t ys Hole_c).
+Hint Constructors single_ctx_frame : CtxDB.                                            
+
+Lemma well_scoped_single_ctx C e :
+  single_ctx_frame C ->
+  well_scoped (C |[ e ]|) ->
+  well_scoped e.
+Proof. intros; eapply well_scoped_inv; eauto. Qed.
+Hint Resolve well_scoped_single_ctx : CtxDB.
+
+Lemma fenv_respects_tags_single_ctx C e :
+  single_ctx_frame C ->
+  fenv_respects_tags (C |[ e ]|) ->
+  fenv_respects_tags e.
+Proof. intros; eapply fenv_respects_tags_ctx; eauto. Qed.
+Hint Resolve fenv_respects_tags_single_ctx : CtxDB.
+
+Lemma max_allocs_representable_single_ctx C e :
+  single_ctx_frame C ->
+  max_allocs_representable (C |[ e ]|) ->
+  max_allocs_representable e.
+Proof. intros; eapply max_allocs_representable_ctx; eauto. Qed.
+Hint Resolve max_allocs_representable_single_ctx : CtxDB.
+
+Lemma max_live_single_ctx C e n :
+  single_ctx_frame C ->
+  max_live locals (C |[ e ]|) n ->
+  max_live locals e n.
+Proof. intros; eapply max_live_ctx; eauto. Qed.
+Hint Resolve max_live_single_ctx : CtxDB.
+
+Ltac solve_bound_var_locals :=
+  match goal with
+  | |- bound_var _ \subset FromSet locals => eapply Included_trans; [|eassumption]; normalize_bound_var; sets
+  end.
+
+Ltac solve_IH_obligations :=
+  solve
+    [assumption
+    |solve_bound_var_locals
+    |eauto 2 with CtxDB
+    |try normalize_used_vars; eapply Disjoint_Included_r; [|eassumption]; sets
+    |(repeat match goal with H : context [to_nat (plus _ _)] |- _ => rewrite to_nat_add in H end); lia
+    |rewrite ?M.gso by easy; auto; now rewrite M.gss].
+
+Instance mset_remove (S : Ensemble positive) x `{H : ToMSet S} : ToMSet (S \\ [set x]).
+Proof. exists (PS.remove x mset); rewrite FromSet_remove; destruct H; sets. Qed.
+
+(* TODO hoist *)
+Lemma skipn_preserves_eq_len : forall {A B} n (xs : list A) (ys : list B),
+  length xs = length ys -> length (skipn n xs) = length (skipn n ys).
+Proof.
+  clear; induction n as [|n IHn]; [auto|].
+  destruct xs as [|x xs], ys as [|y ys]; try easy.
+Qed.
+
 Hint Extern 0 ((M.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Hint Extern 0 ((PTree.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Lemma translate_body_stm : forall e k,
@@ -6309,6 +6369,11 @@ Proof.
       fwd Cred_set; eauto with EvalDB.
       rewrite <- postcond'_spec.
       inv Hbstep; match goal with H : bstep _ _ _ _ _ _ |- _ => inv H end.
+      normalize_used_vars.
+      vars_neq Hdis x tinfo_id.
+      vars_neq Hdis x alloc_id.
+      vars_neq Hdis x limit_id.
+      vars_neq Hdis x roots_temp_id.
       edestruct (IHe k) as [tenv_end [m_end [cv_end [Hend [cvss_end
        [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
       6:{ eassumption. }
@@ -6316,7 +6381,7 @@ Proof.
       19:{ exists tenv_end, m_end, cv_end; split; try eassumption.
            exists cvss_end, values_end; split_ands; eauto.
            rewrite to_nat_add; eapply rel_val_antimon; try eassumption. lia. }
-      all: try assumption.
+      all: try solve_IH_obligations.
       (* looks fine TODO tactic to solve these IH obligations *)
       all: admit.
     + (** Boxed *)
@@ -6430,7 +6495,7 @@ Proof.
                       (fun H => P ⋆ Q ⋆ R ⋆ (S ⋆ H) ⋆ T)
                       (fun H => P ⋆ Q ⋆ R ⋆ H ⋆ T)); auto with FrameDB; eauto
              end. }
-      all: auto with EvalDB; try (repeat rewrite M.gso by easy; now rewrite M.gss).
+      all: try solve_IH_obligations.
       (* looks fine *)
       all: admit.
   - (** case x of { ces } *)
@@ -6457,7 +6522,7 @@ Proof.
          exists cvss_end, values_end; split_ands; eauto.
          rewrite to_nat_add; eapply rel_val_antimon; try eassumption.
          lia. }
-    all: try assumption.
+    all: try solve_IH_obligations.
     { eapply cps_util.find_tag_nth_In_patterns; eauto. }
     (* looks fine *)
     all: admit.
@@ -6486,6 +6551,10 @@ Proof.
       superlia. }
     fwd Cred_set; [eassumption|].
     rewrite <- postcond'_spec.
+    vars_neq Hdis x tinfo_id.
+    vars_neq Hdis x alloc_id.
+    vars_neq Hdis x limit_id.
+    vars_neq Hdis x roots_temp_id.
     edestruct (IHe k) as [tenv_end [m_end [cv_end [Hend [cvss_end
      [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
     6:{ eassumption. }
@@ -6494,7 +6563,7 @@ Proof.
          exists cvss_end, values_end; split_ands; eauto.
          rewrite to_nat_add; eapply rel_val_antimon; try eassumption.
          lia. }
-    all: try assumption.
+    all: try solve_IH_obligations.
     (* looks fine *)
     all: admit.
   - (** let x = f ft ys in e *)
@@ -6523,19 +6592,85 @@ Proof.
       destruct_ex_ctx (fun H => P ⋆ H ⋆ Q) cvs Hm;
       destruct_ex_ctx (fun H => P ⋆ H ⋆ Q) Hcvs Hm
     end.
+    pose (live_no_x_list := PS.elements (PS.remove x live_after_call)).
+    assert (Hlive_no_x_list : FromList live_no_x_list
+         <--> occurs_free e :&: FromSet locals \\ [set x]).
+    { subst live_no_x_list.
+      rewrite <- FromSet_elements.
+      rewrite FromSet_remove.
+      rewrite Hlive_after_call.
+      sets. }
+    assert (Hlive_after_call_len : PS.cardinal live_after_call <= PS.cardinal (PS.inter (exp_fv e) locals)).
+    { assert (Hvs : occurs_free e :&: FromSet locals <--> FromSet live_after_call). { symmetry; auto. }
+      assert (Hfvs_mset : {H : ToMSet (occurs_free e :&: FromSet locals)
+                          | @mset _ H = live_after_call}).
+      { exists (Build_ToMSet _ _ Hvs). reflexivity. }
+      destruct Hfvs_mset as [Hmset <-].
+      assert (Hrhs : occurs_free e :&: FromSet locals <--> FromSet (PS.inter (exp_fv e) locals)).
+      { rewrite FromSet_intersection. rewrite exp_fv_correct. sets. }
+      assert (Hrhs_mset : {H : ToMSet (occurs_free e :&: FromSet locals) | @mset _ H = PS.inter (exp_fv e) locals}).
+      { exists (Build_ToMSet _ _ Hrhs). reflexivity. }
+      destruct Hrhs_mset as [Hmset' <-].
+      apply PS_elements_subset. sets. }
+    assert (Hlive_no_x_len : length live_no_x_list <= PS.cardinal (PS.inter (exp_fv e) locals)).
+    { subst live_no_x_list.
+      rewrite <- PS.cardinal_spec.
+      rewrite exp_fv_correct in Hlive_no_x_list.
+      rewrite <- FromSet_intersection in Hlive_no_x_list.
+      assert (Hvs : occurs_free e :&: FromSet locals \\ [set x] <--> FromSet (PS.remove x live_after_call)).
+      { rewrite FromSet_remove. rewrite Hlive_after_call. sets. }
+      assert (Hfvs_mset : {H : ToMSet (occurs_free e :&: FromSet locals \\ [set x])
+                          | @mset _ H = PS.remove x live_after_call}).
+      { exists (Build_ToMSet _ _ Hvs). reflexivity. }
+      destruct Hfvs_mset as [Hmset <-].
+      assert (Hrhs : occurs_free e :&: FromSet locals <--> FromSet (PS.inter (exp_fv e) locals)).
+      { rewrite FromSet_intersection. rewrite exp_fv_correct. sets. }
+      assert (Hrhs_mset : {H : ToMSet (occurs_free e :&: FromSet locals) | @mset _ H = PS.inter (exp_fv e) locals}).
+      { exists (Build_ToMSet _ _ Hrhs). reflexivity. }
+      destruct Hrhs_mset as [Hmset' <-].
+      apply PS_elements_subset. sets. }
     assert (Hle_cvs : (#|PS.elements (PS.remove x live_after_call)| <= #|cvs|)%Z).
-    { (* Hlive *) admit. }
+    { rewrite Hcvs. unfold max_live in Hlive.
+      specialize (Hlive Hole_c _ _ _ _ _ eq_refl).
+      subst live_no_x_list. lia. }
     match type of Hm with
     | _ |=_{_} ?P ⋆ _ ⋆ ?Q =>
       eapply (fwd_stores' (fun H => P ⋆ H ⋆ Q)) with (ty := value) (vs := cvs); try eassumption;
       auto with FrameDB; eauto with EvalDB; auto with mem
     end.
     { unfold PS.elt, cps.var, M.elt in *. lia. }
-    { (* live_after_call ⊆ FV(e) ⊆ vars(e) # case_id *) admit. }
-    { (* same argument as above *) admit. }
-    { (* same argument as above *) admit. }
-    { (* Henv_rel ==> FV(e)\x ⊆ dom(ρ) *) admit. }
-    { (* same argument as above *) admit. }
+    { change (~ List.In ?x ?xs) with (~ x \in FromList xs).
+      rewrite <- FromSet_elements, FromSet_remove.
+      intros Hcase; inv Hcase.
+      rewrite Hlive_after_call in H. inv H.
+      destruct Hdis as [Hdis]; contradiction (Hdis case_id); constructor; auto 10.
+      now do 3 right. }
+    { change (~ List.In ?x ?xs) with (~ x \in FromList xs).
+      rewrite <- FromSet_elements, FromSet_remove.
+      intros Hcase; inv Hcase.
+      rewrite Hlive_after_call in H. inv H.
+      destruct Hdis as [Hdis]; contradiction (Hdis frame_id); constructor; auto 10.
+      now do 3 right. }
+    { change (~ List.In ?x ?xs) with (~ x \in FromList xs).
+      rewrite <- FromSet_elements, FromSet_remove.
+      intros Hcase; inv Hcase.
+      rewrite Hlive_after_call in H. inv H.
+      destruct Hdis as [Hdis]; contradiction (Hdis roots_id); constructor; auto 10.
+      now do 3 right. }
+    { rewrite All_spec; intros x' Hx'.
+      change (List.In ?x ?xs) with (x \in FromList xs) in Hx'.
+      rewrite <- FromSet_elements, FromSet_remove in Hx'.
+      inv Hx'. rewrite Hlive_after_call in H; inv H.
+      edestruct (rel_val_x_related x') as [vx' [cvx' [Hvx' [Hcvx' Hrelx']]]]; [|apply Henv_rel|]; eauto.
+      { normalize_occurs_free; right. constructor; auto. }
+      easy. }
+    { rewrite All_spec; intros x' Hx'.
+      change (List.In ?x ?xs) with (x \in FromList xs) in Hx'.
+      rewrite <- FromSet_elements, FromSet_remove in Hx'.
+      inv Hx'. rewrite Hlive_after_call in H; inv H.
+      edestruct (rel_val_x_related x') as [vx' [cvx' [Hvx' [Hcvx' Hrelx']]]]; [|apply Henv_rel|]; eauto.
+      { normalize_occurs_free; right. constructor; auto. }
+      easy. }
     intros m_live_no_x cvs_live_no_x Hcvs_live_no_x Hm_live_no_x.
     rewrite overwrite_sublist_spec in Hm_live_no_x.
     2:{ apply get_env_list_len in Hcvs_live_no_x.
@@ -6557,11 +6692,14 @@ Proof.
     intros m_frame_pushed Hm_frame_pushed; unfold "|=" in *.
     (** Some useful facts for later *)
     assert (Hcase_notin_ys : ~ List.In case_id ys).
-    { (* Hdis *) admit. }
+    { intros wat; destruct Hdis as [Hdis]; contradiction (Hdis case_id).
+      constructor; auto 10. }
     assert (Hframe_notin_ys : ~ List.In frame_id ys).
-    { (* Hdis *) admit. }
+    { intros wat; destruct Hdis as [Hdis]; contradiction (Hdis frame_id).
+      constructor; auto 10. }
     assert (Hroots_notin_ys : ~ List.In roots_id ys).
-    { (* Hdis *) admit. }
+    { intros wat; destruct Hdis as [Hdis]; contradiction (Hdis roots_id).
+      constructor; auto 10. }
     (** Store arguments n+1, .. in the args array at indices inds *)
     repeat fwd Cred_seq_assoc.
     rewrite skipn_combine.
@@ -6569,11 +6707,33 @@ Proof.
     | _ |=_{_} ?P ⋆ ?Q ⋆ _ ⋆ ?R =>
       eapply (fwd_args_stores (fun H => P ⋆ Q ⋆ H ⋆ R)); eauto with EvalDB FrameDB
     end.
-    { (* #|ys| = #|inds| *) admit. }
-    { (* invariant on inds, obtained from invarinat on fenv *) admit. }
-    { (* invariant on inds, obtained from invariant on fenv *) admit. }
-    { (* Henv_rel ==> skip n ys ⊆ ys ⊆ FV(let x = f ys in e) ⊆ dom(ρ) *) admit. }
-    { (* same argument as above *) admit. }
+    { (* #|ys| = #|inds| *)
+      do 2 f_equal; apply skipn_preserves_eq_len.
+      specialize (fenv_cc_inv _ _ _ Hf_cc).
+      rewrite Bool.negb_false_iff in Harity_match.
+      apply beq_nat_true in Harity_match.
+      lia. }
+    { specialize (fenv_cc_inv _ _ _ Hf_cc); easy. }
+    { specialize (fenv_cc_inv _ _ _ Hf_cc).
+      eapply Forall_impl; try apply fenv_cc_inv; cbn.
+      match type of Hm_frame_pushed with
+      | _ |=_{_} ?P ⋆ ?Q ⋆ _ ⋆ ?R =>
+        destruct_ex_ctx (fun H => P ⋆ Q ⋆ H ⋆ R) args' Hm_frame_pushed;
+        destruct_ex_ctx (fun H => P ⋆ Q ⋆ H ⋆ R) Hlen_args Hm_frame_pushed
+      end.
+      lia. }
+    { rewrite All_spec; intros x' Hx'.
+      change (List.In ?x ?xs) with (x \in FromList xs) in Hx'.
+      apply FromList_skipn in Hx'.
+      edestruct (rel_val_x_related x') as [vx' [cvx' [Hvx' [Hcvx' Hrelx']]]]; [|apply Henv_rel|]; eauto.
+      { normalize_occurs_free; left; right. auto. }
+      easy. }
+    { rewrite All_spec; intros x' Hx'.
+      change (List.In ?x ?xs) with (x \in FromList xs) in Hx'.
+      apply FromList_skipn in Hx'.
+      edestruct (rel_val_x_related x') as [vx' [cvx' [Hvx' [Hcvx' Hrelx']]]]; [|apply Henv_rel|]; eauto.
+      { normalize_occurs_free; left; right. auto. }
+      intros Hwat. unfold temp_env in *. congruence. }
     intros m_args_stored cv_skipn_ys Hcv_skipn_ys Hm_args_stored; unfold "|=" in *.
     (** Update tinfo->alloc and tinfo->limit *)
     match type of Hm_args_stored with
@@ -6652,14 +6812,29 @@ Proof.
     | H : context [set_iths ?args ?skipn_ys ?indices] |- _ =>
       (unshelve epose proof (set_iths_spec args skipn_ys indices _ _ _) as Hargs_in_right_places); auto
     end.
-    { (* Harity_eq, get_env_list_len in Hcv_skipn_ys *) admit. }
-    { (* #|args| = max_args *) admit. }
+    { apply get_env_list_len in Hcv_skipn_ys.
+      rewrite <- Hcv_skipn_ys.
+      do 2 f_equal. apply skipn_preserves_eq_len. lia. }
+    { (* #|args| = max_args *)
+      specialize (fenv_cc_inv _ _ _ Hf_cc).
+      eapply Forall_impl; try apply fenv_cc_inv; cbn.
+      intros.
+      match type of Hm_frame_pushed with
+      | _ |=_{_} ?P ⋆ ?Q ⋆ _ ⋆ ?R =>
+        destruct_ex_ctx (fun H => P ⋆ Q ⋆ H ⋆ R) args' Hm_frame_pushed;
+        destruct_ex_ctx (fun H => P ⋆ Q ⋆ H ⋆ R) Hlen_args Hm_frame_pushed
+      end. lia. }
     (** The live variables \ {x} are related *)
     edestruct rel_val_xs_related with (xs := PS.elements (PS.remove x live_after_call))
       as [vs_live_no_x [cvs_live_no_x' [Hvs_live_no_x [Hcvs_live_no_x' Hrel_live_no_x]]]]; eauto.
     { rewrite <- FromSet_elements, FromSet_remove.
       apply Setminus_Included_Included_Union; normalize_occurs_free.
-      admit. (* live_after_call = fv(e) & locals *) }
+      rewrite Hlive_after_call.
+      eapply Included_trans; [apply Included_Intersection_l|].
+      rewrite <- !Union_assoc.
+      apply Included_Union_preserv_r.
+      apply Included_Union_preserv_r.
+      sets. }
     assert (cvs_live_no_x' = cvs_live_no_x).
     { rewrite Hcvs_live_no_x in Hcvs_live_no_x'; now inv Hcvs_live_no_x'. }
     subst cvs_live_no_x'; clear Hcvs_live_no_x'.
@@ -6680,9 +6855,33 @@ Proof.
     edestruct Hrel_f as [m_call [cvx [cvss_call [values_call 
       [Heval_funcall [Hm_call [Hvalues_call [Hcompat_shapes Hrel_call]]]]]]]]; try eassumption.
     { lia. }
-    { (* Hrel_firstn_ys, Hrel_skipn_ys *) admit. }
+    { pose proof Hv_skipn_ys as Hv_ys.
+      eapply get_list_app in Hv_ys; try apply Hv_firstn_ys.
+      rewrite firstn_skipn, Hρ_get_ys in Hv_ys; inv Hv_ys.
+      apply Forall2_app; eapply Forall2_monotonic; eauto; cbn;
+        intros ? ? Hrel; eapply rel_val_antimon; try apply Hrel; lia. }
     { rewrite !to_nat_add in Hk. lia. }
-    { (* Hargs_in_right_places + lemma about skipn *) admit. }
+    { rewrite skipn_app.
+      destruct (dec_le (length ys) n_param) as [Hle|Hgt].
+      - assert (Hskipn_inds : skipn n_param inds = []).
+        { apply skipn_all2. superlia. }
+        rewrite Hskipn_inds in *.
+        rewrite skipn_all2 in Hv_skipn_ys by auto.
+        inv Hv_skipn_ys.
+        assert (length cv_firstn_ys <= length ys).
+        { apply get_env_list_len in Hcv_firstn_ys.
+          assert (length (firstn n_param ys) <= length ys).
+          { rewrite firstn_length. lia. }
+          superlia. }
+        rewrite skipn_all2 with (n := n_param) by superlia.
+        destruct cv_skipn_ys; [|inv Hargs_in_right_places].
+        rewrite skipn_nil.
+        constructor.
+      - apply get_env_list_len in Hcv_firstn_ys.
+        rewrite firstn_length_le in Hcv_firstn_ys by superlia.
+        rewrite skipn_all2 with (n := n_param) (l := cv_firstn_ys) by lia.
+        replace (n_param - length cv_firstn_ys) with 0 by lia.
+        cbn. auto. }
     { exists_ex nursery_b. exists_ex alloc_o. exists_ex limit_o. exists_ex nalloc.
       apply Hm_limit_stored. }
     (** Make the call *)
@@ -6698,7 +6897,32 @@ Proof.
         change (Tpointer ?t noattr) with (tptr t).
         now rewrite sem_cast_ptr'. }
     { econstructor; eauto with EvalDB.
-      (* eval_exprlist_make_var *) admit. }
+      destruct (dec_le (length ys) n_param) as [Hle|Hgt].
+      - rewrite firstn_all2 in Hcv_firstn_ys by lia.
+        rewrite (@firstn_all2 ident n_param ys) by superlia.
+        rewrite (@skipn_all2 ident n_param ys) in Hcv_skipn_ys by superlia.
+        inv Hcv_skipn_ys. rewrite app_nil_r.
+        pose proof Hcv_firstn_ys as Hcv_firstn_ys_old.
+        apply get_env_list_len in Hcv_firstn_ys.
+        rewrite (@firstn_all2 Values.val n_param cv_firstn_ys) by superlia.
+        replace (Nat.min n_param (N.to_nat arity)) with (length ys) by superlia.
+        eapply eval_exprlist_make_var; eauto.
+      - pose proof Hcv_firstn_ys as Hcv_firstn_ys_old.
+        apply get_env_list_len in Hcv_firstn_ys.
+        assert (n_param < length ys) by lia.
+        assert (n_param = length (firstn n_param ys)).
+        { rewrite firstn_length. lia. }
+        rewrite firstn_prefix by superlia.
+        replace (Nat.min n_param (N.to_nat arity)) with (length (firstn n_param ys)) by superlia.
+        assert (In_firstn : forall {A} (x : A) n xs,
+          ~ List.In x xs ->
+          ~ List.In x (firstn n xs)).
+        { clear; induction n as [|n IHn]; destruct xs as [|x' xs]; try easy.
+          cbn; intros Hnotin; cbn; intros [Hl|Hr]; subst; auto. eapply IHn; eauto.
+          rewrite firstn_firstn. replace (Nat.min n n) with n by lia. auto. }
+        eapply eval_exprlist_make_var; eauto.
+        rewrite firstn_all2 with (l := cv_firstn_ys) by superlia.
+        auto. }
     cbn [set_opttemp].
     (** Retrieve new alloc and limit *)
     destruct_ex nursery_b_call Hm_call.
@@ -6769,7 +6993,9 @@ Proof.
           apply valid_mem_limit_alloc_nonneg in Hm_call; lia.
         - destruct (PS.mem _ _); eauto with ShapeDB EvalDB. }
       assert (Hcall_preserves_len : #|PS.elements (PS.remove x live_after_call)| = #|cvs_live_no_x_call|).
-      { rewrite Hlen_equal. (* Hcompat_shapes ==> lengths are equal *) admit. }
+      { rewrite Hlen_equal.
+        destruct Hcompat_shapes as [Hframe_compat Hstack_compat].
+        apply Forall3_len in Hframe_compat; lia. }
       (** Step through inner if-then-else *)
       destruct (PS.mem x live_after_call) eqn:Hx_live_after_call.
       - (** x live after call *)
@@ -6820,6 +7046,34 @@ Proof.
         vars_neq Hdis roots_temp_id x.
         tempvars_neq_as Hroots_temp_ne_alloc roots_temp_id alloc_id.
         tempvars_neq_as Hroots_temp_ne_limit roots_temp_id limit_id.
+        assert (length cvs >= PS.cardinal (PS.inter (exp_fv e) locals)).
+        { specialize (Hlive Hole_c _ _ _ _ _ eq_refl).
+          rewrite Nat2Z.id in Hlive. auto. }
+        assert (length cvs_live_no_x = length live_no_x_list).
+        { change (?x <> ?y) with (neq' x y) in *.
+          subst live_no_x_list; lia. }
+        assert (PS.cardinal live_after_call > length live_no_x_list).
+        { subst live_no_x_list.
+          rewrite <- PS.cardinal_spec.
+          assert (Hadd_rem_eq : PS.Equal live_after_call (PS.add x (PS.remove x live_after_call))).
+          { apply Same_set_From_set.
+            rewrite Hlive_after_call, FromSet_add, FromSet_remove, Hlive_after_call.
+            assert (Hx_locals : [set x] <--> [set x] :&: FromSet locals).
+            { split; sets. apply Included_Intersection_l. }
+            eapply Same_set_trans.
+            2:{ apply Same_set_Union_compat; [symmetry; apply Hx_locals|apply Same_set_refl]. }
+            rewrite <- Intersection_extract_Setminus.
+            rewrite <- Intersection_Union_distr.
+            apply Same_set_Intersection_compat; sets.
+            apply Union_Setminus_Same_set; auto with Decidable_DB.
+            apply PS.mem_spec in Hx_live_after_call.
+            eapply FromSet_complete in Hx_live_after_call; [|symmetry; eauto].
+            inv Hx_live_after_call; sets. }
+          apply Proper_carinal in Hadd_rem_eq.
+          rewrite Hadd_rem_eq.
+          change (?x <> ?y) with (neq' x y) in *.
+          rewrite <- PS_cardinal_add; [lia|].
+          rewrite PS.remove_spec. easy. }
         match type of Hm_call with
         | _ |=_{_} (?P ⋆ _) ⋆ ?Q =>
           destruct_ex_ctx (fun H => (P ⋆ H) ⋆ Q) suffix Hm_call;
@@ -6829,19 +7083,24 @@ Proof.
         end.
         { rewrite Hlen_equal, Hsuffix.
           (* x is live after the call, so |cvs| ≥ |live| = |live\x| + 1 *)
-          admit. }
+          split; try lia.
+          rewrite app_length.
+          rewrite skipn_length, Z.add_0_l.
+          change (?x <> ?y) with (neq' x y) in *.
+          superlia. }
         intros m_store_x Hstore_x Hm_store_x; unfold "|=" in *.
         (** Since x is live after call, suffix (the remaining slots on the shadow stack frame) must be nonempty *)
         destruct suffix as [|overwritten_by_x suffix].
-        { exfalso; clear - Hcall_preserves_len Hsuffix Hlen_equal He Hbv Hlive Hx_live_after_call.
-          epose proof translate_body_fvs _ _ e as Hfvs; rewrite He in Hfvs.
-          unfold max_live in Hlive.
-          specialize (Hlive Hole_c _ _ _ _ _ eq_refl).
-          destruct cvs as [|cv cvs].
-          - (* x ∈ locals but |locals| <= 0 *)
-            admit.
-          - (* Hsuffix contradiction *)
-            admit. }
+        { rewrite app_nil_r, Z.add_0_l, Nat2Z.id in Hsuffix.
+          assert (length cvs_live_no_x = length live_no_x_list).
+          { apply get_env_list_len in Hcvs_live_no_x. auto. }
+          destruct (skipn (length cvs_live_no_x) cvs) as [|cv' cvs'] eqn:Hskipn.
+          { apply skipn_nil_len in Hskipn.
+            change (?x <> ?y) with (neq' x y) in *. lia. }
+          change (?x <> ?y) with (neq' x y) in *.
+          rewrite app_length in Hsuffix; cbn in Hsuffix.
+          destruct Hcompat_shapes as [Hframe_compat Hstack_compat].
+          apply Forall3_len in Hframe_compat; lia. }
         rewrite set_ith_suffix in Hm_store_x by (clear - Hcall_preserves_len; lia).
         rewrite Hcall_preserves_len, Z.sub_diag in Hm_store_x.
         simpl set_ith in Hm_store_x.
@@ -6946,7 +7205,11 @@ Proof.
         end.
         assert (Hlen_cvs_gc : #|PS.elements (PS.remove x live_after_call)| = #|cvs_gc|).
         { (* |cvs_gc| = |vs_live_no_x| by Hcompat_gc
-             = |live\x| by Hvs_live_no_x *) admit. }
+             = |live\x| by Hvs_live_no_x *)
+          destruct Hcompat_gc as [Hframe_compat Hstack_compat].
+          apply Forall3_len in Hframe_compat.
+          apply get_list_length_eq in Hvs_live_no_x.
+          change (?x <> ?y) with (neq' x y) in *; lia. }
         fwd Cred_set'.
         { econstructor.
           - econstructor. econstructor; eauto 10 with EvalDB.
@@ -7127,7 +7390,6 @@ Proof.
     assert (Hlen_cvs_gc : #|cvs_gc| = #|vs_live_no_x|).
     { destruct Hcvs_compat as [Hcvs_compat Hcvss_compat].
       apply Forall3_len in Hcvs_compat. lia. }
-    pose (live_no_x_list := PS.elements (PS.remove x live_after_call)).
     assert (Hlen_vs_live_no_x : #|vs_live_no_x| = #|live_no_x_list|).
     { apply get_list_length_eq in Hvs_live_no_x. subst live_no_x_list. auto. }
     match type of Hm_gc with
@@ -7147,13 +7409,17 @@ Proof.
       { intros Hwat; subst x_in_live; destruct Hdis as [Hdis].
         contradiction (Hdis roots_temp_id); constructor; auto 10.
         (* roots_temp_id ∈ |live\x| ==> roots_temp_id ∈ FV(e) ⊆ used_vars e *)
-        admit. }
+        change (List.In ?x ?xs) with (x \in FromList xs) in H.
+        rewrite <- FromSet_elements in H.
+        rewrite FromSet_remove in H.
+        rewrite Hlive_after_call in H.
+        inv H. inv H1. right; right; now right. }
       now rewrite M.gso by auto. }
-    { (* looks fine *) admit. }
+    { change (?x <> ?y) with (neq' x y) in *. superlia. }
     intros tenv_roots Htenv_roots.
     apply add_to_env_set_lists in Htenv_roots.
-    2:{ (* looks fine *) admit. }
-    2:{ (* PS produces NoDup lists *) admit. }
+    2:{ change (?x <> ?y) with (neq' x y) in *. superlia. }
+    2:{ apply PS_elements_NoDup. }
     destruct Htenv_roots as [tenv_roots' [Htenv_roots Htenv_roots']].
     change (Z.to_nat 0) with 0 in Htenv_roots; cbn [skipn] in Htenv_roots.
     (** Pop frame from shadow stack *)
@@ -7167,7 +7433,21 @@ Proof.
          = tenv_call ! tinfo_id (b/c tinfo_id ∉ {limit, alloc}),
          = tenv ! tinfo_id (b/c tinfo_id ∉ {limit, alloc}),
          = Some (Vptr tinfo_b tinfo_b) *)
-      admit. }
+      rewrite Htenv_roots'.
+      assert (Hnotin_new : ~ List.In tinfo_id live_no_x_list).
+      { change (~ tinfo_id \in FromList live_no_x_list).
+        subst live_no_x_list.
+        rewrite <- FromSet_elements.
+        rewrite FromSet_remove, Hlive_after_call.
+        intros H; inv H. inv H0.
+        destruct Hdis as [Hdis]; contradiction (Hdis tinfo_id).
+        constructor; auto 10. right; right; now right. }
+      erewrite <- set_lists_not_In; try apply Hnotin_new; try apply Htenv_roots.
+      tempvars_neq tinfo_id limit_id.
+      tempvars_neq tinfo_id alloc_id.
+      vars_neq Hdis tinfo_id x.
+      rewrite Htenv_gc by auto.
+      subst tenv_call; rewrite !M.gso by auto. auto. }
     { right; reflexivity. }
     { decompose [ex and] prog_co_stack_frame.
       econstructor.
@@ -7197,7 +7477,10 @@ Proof.
       auto with FrameDB
     end.
     assert (Hroots_len_same : #|(cvs_gc ++ maybe_x) ++ suffix_gc| = #|cvs|).
-    { (* should be fine *) admit. }
+    { rewrite Z.add_0_l, Nat2Z.id in Hsuffix_gc.
+      assert (#|cvs_live_no_x ++ skipn (length cvs_live_no_x) cvs| = #|cvs|).
+      { rewrite app_length, skipn_length; lia. }
+      change (?x <> ?y) with (neq' x y) in *; superlia. }
     match type of Hm_pop with
     | _ |=_{_} (?P ⋆ (?bo ↦_{?p} ?cvs')) ⋆ ?Q =>
       eapply mpred_ex_intro
@@ -7227,13 +7510,6 @@ Proof.
     (** Collect some useful facts before invoke IH *)
     rewrite !firstn_prefix in Htenv_roots by (subst live_no_x_list; superlia).
     rewrite firstn_all2 in Htenv_roots by (subst live_no_x_list; superlia).
-    assert (Hlive_no_x_list : FromList live_no_x_list
-         <--> occurs_free e :&: FromSet locals \\ [set x]).
-    { subst live_no_x_list.
-      rewrite <- FromSet_elements.
-      rewrite FromSet_remove.
-      rewrite Hlive_after_call.
-      sets. }
     assert (Hinv_tenv_roots : tenv_inv tenv_roots).
     { unfold tenv_inv; split_ands.
       - intros x' cvx' Hx'_case Hx_roots.
@@ -7419,10 +7695,10 @@ Proof.
                [..|apply Hcompat_end]; try assumption; try apply Hm_pop;
                  auto with FrameDB
            end. }
-    all: try assumption.
-    14:{ destruct Hcvs_compat as [Hcvs_compat Hcvss_compat].
-         eauto with ShapeDB. }
-    13:{ destruct (PS.mem x live_after_call) eqn:Hx_live.
+    all: try solve_IH_obligations.
+    7:{ destruct Hcvs_compat as [Hcvs_compat Hcvss_compat].
+        eauto with ShapeDB. }
+    6:{ destruct (PS.mem x live_after_call) eqn:Hx_live.
          - rewrite PS.mem_spec in Hx_live.
            symmetry in Hlive_after_call.
            eapply FromSet_complete in Hx_live; eauto.
@@ -7480,11 +7756,14 @@ Proof.
     repeat fwd Cred_seq_assoc.
     (** Some useful facts for later *)
     assert (Hcase_notin_ys : ~ List.In case_id ys).
-    { (* Hdis *) admit. }
+    { intros wat; destruct Hdis as [Hdis]; contradiction (Hdis case_id).
+      constructor; auto 10. }
     assert (Hframe_notin_ys : ~ List.In frame_id ys).
-    { (* Hdis *) admit. }
+    { intros wat; destruct Hdis as [Hdis]; contradiction (Hdis frame_id).
+      constructor; auto 10. }
     assert (Hroots_notin_ys : ~ List.In roots_id ys).
-    { (* Hdis *) admit. }
+    { intros wat; destruct Hdis as [Hdis]; contradiction (Hdis roots_id).
+      constructor; auto 10. }
     (** Store arguments n+1, .. in the args array at indices inds *)
     unfold "|=" in *.
     destruct_ex args Hm.
@@ -7497,11 +7776,31 @@ Proof.
     | _ |=_{_} _ ⋆ ?P =>
       eapply (fwd_args_stores (fun H => H ⋆ P)); eauto with EvalDB FrameDB
     end.
-    { (* #|ys| = #|inds| *) admit. }
-    { (* invariant on inds, obtained from invariant on fenv *) admit. }
-    { (* invariant on inds, obtained from invariant on fenv *) admit. }
-    { (* Henv_rel ==> skip n ys ⊆ ys ⊆ FV(f(ys)) ⊆ dom(ρ) *) admit. }
-    { (* same argument as above *) admit. }
+    { (* #|ys| = #|inds| *)
+      do 2 f_equal; apply skipn_preserves_eq_len.
+      specialize (fenv_cc_inv _ _ _ Hf_cc).
+      rewrite Bool.negb_false_iff in Harity_match.
+      apply beq_nat_true in Harity_match.
+      lia. }
+    { specialize (fenv_cc_inv _ _ _ Hf_cc); easy. }
+    { specialize (fenv_cc_inv _ _ _ Hf_cc).
+      eapply Forall_impl; try apply fenv_cc_inv; cbn.
+      match type of Hm with
+      | _ |=_{_} _ ⋆ ?P =>
+        destruct_ex_ctx (fun H => H ⋆ P) args' Hm;
+        destruct_ex_ctx (fun H => H ⋆ P) Hlen_args Hm
+      end.
+      lia. }
+    { rewrite All_spec; intros x' Hx'.
+      change (List.In ?x ?xs) with (x \in FromList xs) in Hx'.
+      apply FromList_skipn in Hx'.
+      edestruct (rel_val_x_related x') as [vx' [cvx' [Hvx' [Hcvx' Hrelx']]]]; [|apply Henv_rel|]; eauto.
+      easy. }
+    { rewrite All_spec; intros x' Hx'.
+      change (List.In ?x ?xs) with (x \in FromList xs) in Hx'.
+      apply FromList_skipn in Hx'.
+      edestruct (rel_val_x_related x') as [vx' [cvx' [Hvx' [Hcvx' Hrelx']]]]; [|apply Henv_rel|]; eauto.
+      intros Hwat. unfold temp_env in *. congruence. }
     intros m_args_stored cv_skipn_ys Hcv_skipn_ys Hm_args_stored; unfold "|=" in *.
     (** Update tinfo->alloc and tinfo->limit *)
     match type of Hm_args_stored with
@@ -7549,8 +7848,18 @@ Proof.
     | H : context [set_iths ?args ?skipn_ys ?indices] |- _ =>
       (unshelve epose proof (set_iths_spec args skipn_ys indices _ _ _) as Hargs_in_right_places); auto
     end.
-    { (* Harity_eq, get_env_list_len in Hcv_skipn_ys *) admit. }
-    { (* #|args| = max_args *) admit. }
+    { apply get_env_list_len in Hcv_skipn_ys.
+      rewrite <- Hcv_skipn_ys.
+      do 2 f_equal. apply skipn_preserves_eq_len. lia. }
+    { (* #|args| = max_args *)
+      specialize (fenv_cc_inv _ _ _ Hf_cc).
+      eapply Forall_impl; try apply fenv_cc_inv; cbn.
+      intros.
+      match type of Hm with
+      | _ |=_{_} _ ⋆ ?P =>
+        destruct_ex_ctx (fun H => H ⋆ P) args' Hm;
+        destruct_ex_ctx (fun H => H ⋆ P) Hlen_args Hm
+      end. lia. }
     (** Because the functions are related, the call will produce related results *)
     specialize (one_app_nonzero f t ys).
     destruct k as [|k]; [rewrite to_nat_add in Hk; lia|].
@@ -7564,9 +7873,33 @@ Proof.
     edestruct Hrel_f as [m_call [cvx [cvss_call [values_call 
       [Heval_funcall [Hm_call [Hvalues_call [Hcompat_shapes Hrel_call]]]]]]]]; try eassumption.
     { lia. }
-    { (* Hrel_firstn_ys, Hrel_skipn_ys *) admit. }
+    { pose proof Hv_skipn_ys as Hv_ys.
+      eapply get_list_app in Hv_ys; try apply Hv_firstn_ys.
+      rewrite firstn_skipn, Hρ_get_ys in Hv_ys; inv Hv_ys.
+      apply Forall2_app; eapply Forall2_monotonic; eauto; cbn;
+        intros ? ? Hrel; eapply rel_val_antimon; try apply Hrel; lia. }
     { rewrite !to_nat_add in Hk. lia. }
-    { (* Hargs_in_right_places + lemma about skipn *) admit. }
+    { rewrite skipn_app.
+      destruct (dec_le (length ys) n_param) as [Hle|Hgt].
+      - assert (Hskipn_inds : skipn n_param inds = []).
+        { apply skipn_all2. superlia. }
+        rewrite Hskipn_inds in *.
+        rewrite skipn_all2 in Hv_skipn_ys by auto.
+        inv Hv_skipn_ys.
+        assert (length cv_firstn_ys <= length ys).
+        { apply get_env_list_len in Hcv_firstn_ys.
+          assert (length (firstn n_param ys) <= length ys).
+          { rewrite firstn_length. lia. }
+          superlia. }
+        rewrite skipn_all2 with (n := n_param) by superlia.
+        destruct cv_skipn_ys; [|inv Hargs_in_right_places].
+        rewrite skipn_nil.
+        constructor.
+      - apply get_env_list_len in Hcv_firstn_ys.
+        rewrite firstn_length_le in Hcv_firstn_ys by superlia.
+        rewrite skipn_all2 with (n := n_param) (l := cv_firstn_ys) by lia.
+        replace (n_param - length cv_firstn_ys) with 0 by lia.
+        cbn. auto. }
     { exists_ex nursery_b. exists_ex alloc_o. exists_ex limit_o. exists_ex nalloc.
       apply Hm_limit_stored. }
     (** Make the call *)
@@ -7582,7 +7915,32 @@ Proof.
         change (Tpointer ?t noattr) with (tptr t).
         now rewrite sem_cast_ptr'. }
     { econstructor; eauto with EvalDB.
-      (* eval_exprlist_make_var *) admit. }
+      destruct (dec_le (length ys) n_param) as [Hle|Hgt].
+      - rewrite firstn_all2 in Hcv_firstn_ys by lia.
+        rewrite (@firstn_all2 ident n_param ys) by superlia.
+        rewrite (@skipn_all2 ident n_param ys) in Hcv_skipn_ys by superlia.
+        inv Hcv_skipn_ys. rewrite app_nil_r.
+        pose proof Hcv_firstn_ys as Hcv_firstn_ys_old.
+        apply get_env_list_len in Hcv_firstn_ys.
+        rewrite (@firstn_all2 Values.val n_param cv_firstn_ys) by superlia.
+        replace (Nat.min n_param (N.to_nat arity)) with (length ys) by superlia.
+        eapply eval_exprlist_make_var; eauto.
+      - pose proof Hcv_firstn_ys as Hcv_firstn_ys_old.
+        apply get_env_list_len in Hcv_firstn_ys.
+        assert (n_param < length ys) by lia.
+        assert (n_param = length (firstn n_param ys)).
+        { rewrite firstn_length. lia. }
+        rewrite firstn_prefix by superlia.
+        replace (Nat.min n_param (N.to_nat arity)) with (length (firstn n_param ys)) by superlia.
+        assert (In_firstn : forall {A} (x : A) n xs,
+          ~ List.In x xs ->
+          ~ List.In x (firstn n xs)).
+        { clear; induction n as [|n IHn]; destruct xs as [|x' xs]; try easy.
+          cbn; intros Hnotin; cbn; intros [Hl|Hr]; subst; auto. eapply IHn; eauto.
+          rewrite firstn_firstn. replace (Nat.min n n) with n by lia. auto. }
+        eapply eval_exprlist_make_var; eauto.
+        rewrite firstn_all2 with (l := cv_firstn_ys) by superlia.
+        auto. }
     cbn [set_opttemp].
     rewrite <- postcond'_spec.
     eapply postcond_ret; eauto with EvalDB.

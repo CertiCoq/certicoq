@@ -2246,6 +2246,9 @@ Definition rel_val_aux (k : nat) :=
     match! find_def f fds with Some (t, xs, e) in
     match! calling_convention t with Some (arity, indices) in
     match! Genv.find_funct prog_genv (Vptr b o) with Some fn in
+    type_of_fundef fn =
+      Tfunction (Tcons threadInf (value_tys (Nat.min n_param (N.to_nat arity)))) value
+      cc_default /\
     forall j vs ρ_xvs cin cout vss v,
     forall cvs m tinfo_b tinfo_o,
     forall args ss cvss outliers values frame,
@@ -2361,7 +2364,7 @@ Proof.
     destruct (find_def f fds) as [[[t xs] e] |] eqn:Hfind; auto.
     destruct (calling_convention t) as [[arity indices] |] eqn:Hindices; auto.
     destruct (Genv.find_funct _ _) as [fn|] eqn:Hfunct; auto.
-    intros Hfuture_call * Hlt; destruct j; [easy|].
+    intros [Hty Hfuture_call]; split; [auto|]; intros*Hlt; destruct j; [easy|].
     intros Hvs_ok Hρ_xvs Hfuel Hbstep Hrest_args Hm.
     replace (j - (j - j0)) with j0 in * by lia.
     destruct k as [|k]; [lia|].
@@ -5575,6 +5578,7 @@ Lemma fwd_case ces k ρ x vs env tenv cv m nursery_b alloc_o limit_o tinfo_b tin
   cps_util.find_tag_nth ces c e n_ce ->
   make_cases cenv (translate_body cenv fenv locals nenv) ces = Ret (boxed_cases, unboxed_cases, fvs_cases, n_cases) ->
   (forall stm_e fvs_e n_e cv_isptr,
+    cv_isptr = Vtrue \/ cv_isptr = Vfalse ->
     translate_body cenv fenv locals nenv e = Ret (stm_e, fvs_e, n_e) ->
     postcond' env (M.set case_id cv_isptr tenv) m stm_e P) ->
   postcond' env tenv m
@@ -5756,12 +5760,227 @@ Proof.
   unfold "⇓". rewrite <- Hty. constructor; auto.
 Qed.
 
+Lemma eval_exprlist_make_var xs env tenv ρ vs cvs m :
+  ~ List.In case_id xs ->
+  ~ List.In frame_id xs ->
+  ~ List.In roots_id xs ->
+  env_inv env /\ tenv_inv tenv /\ ρ_inv ρ ->
+  get_list xs ρ = Some vs ->
+  (env, tenv) !!!! xs = Some cvs ->
+  eval_exprlist prog_genv env tenv m (map (make_var fenv locals) xs) (value_tys (length xs)) cvs.
+Proof.
+  revert vs cvs; induction xs as [|x xs IHxs]; intros vs cvs.
+  - cbn; intros. assert (cvs = []) by congruence. subst cvs; constructor.
+  - intros Hcase Hframe Hroots Henvs Hρ_get Henv_get; cbn.
+    cbn in Hρ_get. destruct (ρ ! x) as [vx|] eqn:Hρ_x; [|easy].
+    destruct (get_list xs ρ) as [vxs|] eqn:Hρ_xs; [|easy].
+    inv Hρ_get.
+    cbn in Henv_get.
+    destruct ((env, tenv) !!! x) as [cv|] eqn:Henv_x; [|easy].
+    destruct ((env, tenv) !!!! xs) as [cvs'|] eqn:Henv_xs; [|easy].
+    inv Henv_get.
+    cbn in *; econstructor.
+    + eapply eval_make_var; eauto with EvalDB; try easy.
+    + rewrite typeof_make_var. apply env_get_wf in Henv_x; try easy.
+      eauto with EvalDB.
+    + eapply IHxs; auto.
+Qed.
+
+Lemma not_In_skipn {A} n xs (x : A) :
+  ~ List.In x xs ->
+  ~ List.In x (skipn n xs).
+Proof.
+  revert xs; induction n as [|n IHn]; [auto|intros xs].
+  destruct xs as [|x' xs]; [auto|cbn].
+  intros; apply IHn; intros Hwat; auto.
+Qed.
+Hint Resolve not_In_skipn : EvalDB.
+
+Lemma NoDup_skipn {A} n : forall (xs : list A),
+  NoDup xs -> NoDup (skipn n xs).
+Proof.
+  induction n as [|n IHn]; [auto|].
+  destruct xs as [|x xs]; [intros H; inv H; cbn; constructor|].
+  intros H; inv H; cbn; now apply IHn.
+Qed.
+Hint Resolve NoDup_skipn : EvalDB.
+
+(* TODO hoist *)
+Lemma pure_True_dup :
+  Pure True |-- Pure True ⋆ Pure True.
+Proof.
+  intros S m [HS _]; cbn; exists S, (Empty_set _); split_ands; eauto; sets.
+Qed.
+
+(* TODO hoist *)
+Lemma compatible_shape_entail P Q P' v cv cv' :
+  P |-- Q ⋆ Pure True ->
+  compatible_shape Q P' v cv cv' ->
+  compatible_shape P P' v cv cv'.
+Proof.
+  intros HPQ; revert cv cv'; induction v as [c vs IHvs|ρ fds f|z] using val_ind''; intros cv cv'.
+  - cbn. destruct (get_ctor_rep _ _) as [| [t|t a]]; auto.
+    destruct cv, cv'; auto.
+    intros [cvs [cvs' [Hlen [Hcvs [Hcvs' Hcvs_rel]]]]].
+    exists cvs, cvs'; split_ands; auto.
+    + eapply entail_trans; eauto.
+      eapply entail_trans; [|eapply (frame_entail (fun H => _ ⋆ H)); [|apply (entail_True (Pure True ⋆ Pure True))]; auto with FrameDB].
+      eapply entail_trans; [|intros S m Hm; rewrite <- sepcon_assoc; apply Hm].
+      apply (frame_entail (fun H => H ⋆ Pure True)); auto with FrameDB.
+    + clear - IHvs Hcvs_rel; revert cvs cvs' Hcvs_rel; induction vs as [|v vs IHvs']; auto.
+      destruct cvs, cvs'; auto. intros Hcvs_rel; inv Hcvs_rel.
+      constructor.
+      * eapply IHvs; eauto; now left.
+      * eapply IHvs'; eauto. intros; apply IHvs; auto. now right.
+  - eauto.
+  - eauto.
+Qed.
+
+(* TODO hoist *)
+Lemma compatible_shapes_entail P Q P' vss : forall cvss cvss',
+  P |-- Q ⋆ Pure True ->
+  compatible_shapes Q P' vss cvss cvss' ->
+  compatible_shapes P P' vss cvss cvss'.
+Proof.
+  induction vss as [|vs vss IHvss];
+    destruct cvss as [|cvs cvss];
+    destruct cvss' as [|cvs' cvss']; try easy.
+  intros HPQ [Hcvs Hcvss]; constructor; eauto.
+  revert cvs cvs' Hcvs; induction vs as [|v vs IHvs]; destruct cvs as [|cv cvs], cvs' as [|cv' cvs']; auto.
+  intros [Hcv Hcvs]; constructor; auto.
+  eapply compatible_shape_entail; eauto.
+Qed.
+
+(* TODO hoist *)
+Lemma compatible_shapes_sepcon P Q P' vss cvss cvss' :
+  compatible_shapes Q P' vss cvss cvss' ->
+  compatible_shapes (P ⋆ Q) P' vss cvss cvss'.
+Proof.
+  intros; eapply compatible_shapes_entail; eauto.
+  eapply entail_trans; [intros S m Hm; rewrite sepcon_comm in Hm; apply Hm|].
+  apply (frame_entail (fun H => Q ⋆ H)); auto with FrameDB; apply entail_True.
+Qed.
+Hint Resolve compatible_shapes_sepcon : ShapeDB.
+
+(* TODO hoist *)
+Lemma frame_mem_ex' F S P m :
+  is_frame F ->
+  m |=_{S} F P -> exists S',
+  m |=_{S'} P.
+Proof.
+  intros HF; revert S; induction HF as [|F Q' HF IHF|F P' HF IHF|Q'|P']; intros S Hm;
+    cbn in Hm; decompose [ex and] Hm; try eapply IHF; eauto.
+Qed.
+
+(* TODO hoist *)
+Lemma mapsto_unique' F G b o p vs vs' m P Q :
+  is_frame F -> is_frame G ->
+  m |= F P ->
+  m |= G (Q ⋆ P) ->
+  P |-- ((b, o) ↦_{p} vs) ⋆ Pure True ->
+  Q ⋆ P |-- ((b, o) ↦_{p} vs') ⋆ Pure True ->
+  #|vs| = #|vs'| ->
+  vs = vs'.
+Proof.
+  intros HF HG Hm Hm' Hvs Hvs' Hlen.
+  revert b o vs' Hvs Hvs' Hlen; induction vs as [|v vs IHvs]; intros b o vs' Hvs Hvs'.
+  - destruct vs'; cbn; [auto|lia].
+  - destruct vs' as [|v' vs']; [cbn; lia|]; intros Hlen; f_equal.
+    + apply frame_mem_ex' in Hm; auto.
+      destruct Hm as [S Hm].
+      eapply frame_mem_ex' in Hm'; auto.
+      destruct Hm' as [S' Hm'].
+      specialize (Hvs _ _ Hm).
+      specialize (Hvs' _ _ Hm').
+      cbn in *; decompose [ex and] Hvs; decompose [ex and] Hvs'.
+      now repeat match goal with H : forall (_ : Z), _ |- _ => try specialize (H 0%Z _ eq_refl); cbn in H end.
+    + eapply entail_trans' in Hvs; [|apply mapsto_in_cons].
+      eapply entail_trans' in Hvs'; [|apply mapsto_in_cons].
+      eapply IHvs; eauto.
+      cbn in *; lia.
+Qed.
+
+Lemma has_shape_compatible_shape_restriction F G m Q P P' v : forall cv cv',
+  is_frame F -> is_frame G ->
+  m |= F P ->
+  m |= G (Q ⋆ P) ->
+  has_shape P v cv ->
+  compatible_shape (Q ⋆ P) P' v cv cv' ->
+  compatible_shape P P' v cv cv'.
+Proof.
+  induction v as [c vs IHvs|ρ fds f|z] using val_ind''.
+  - cbn; destruct (get_ctor_rep _ _) as [| [t|t a]]; auto.
+    intros cv cv' HF HG HmF HmG; destruct cv, cv'; auto.
+    intros [cvs [Hcvs Hshape]] [cvs_ [cvs' [Hlen [Hcvs_ [Hcvs' Hcompat]]]]].
+    assert (#|vs| = #|cvs|) by (rewrite Forall2'_spec in Hshape; now apply Forall2_length in Hshape).
+    assert (#|vs| = #|cvs_|) by now apply Forall3_len in Hcompat.
+    assert (#|cvs| = #|cvs_|) by lia.
+    assert (Heq : vint (rep_boxed t a) :: cvs = vint (rep_boxed t a) :: cvs_).
+    { eapply (mapsto_unique' F G); eauto; cbn; try lia. }
+    (assert (cvs = cvs_) by congruence); subst cvs_.
+    exists cvs, cvs'; split_ands; auto.
+    clear - HF HG HmF HmG Hshape IHvs Hcompat.
+    revert cvs cvs' Hshape Hcompat; induction vs as [|v' vs IHvs']; auto.
+    destruct cvs as [|cv cvs], cvs' as [|cv' cvs']; auto.
+    intros [Hcv_shape Hcvs_shape] [Hcv_compat Hcvs_compat]; constructor.
+    + eapply IHvs; eauto. now left.
+    + eapply IHvs'; eauto. intros; eapply IHvs; eauto. now right.
+  - auto.
+  - auto.
+Qed.
+
+Lemma has_shapes_compatible_shapes_restriction F G m Q P P' vss : forall cvss cvss',
+  is_frame F -> is_frame G ->
+  m |= F P ->
+  m |= G (Q ⋆ P) ->
+  has_shapes P vss cvss ->
+  compatible_shapes (Q ⋆ P) P' vss cvss cvss' ->
+  compatible_shapes P P' vss cvss cvss'.
+Proof.
+  induction vss as [|vs vss IHvss];
+    destruct cvss as [|cvs cvss];
+    destruct cvss' as [|cvs' cvss']; try easy.
+  intros HF HG HmF HmG Hshapes Hcompat.
+  inv Hshapes; inv Hcompat; constructor; eauto.
+  generalize dependent cvs; generalize dependent cvs'.
+  induction vs as [|v vs IHvs]; destruct cvs as [|cv cvs], cvs' as [|cv' cvs']; auto.
+  intros Hshape Hcompat; inv Hshape; inv Hcompat; constructor; auto.
+  eapply has_shape_compatible_shape_restriction; try apply HmG; try apply HmF; eauto.
+Qed.
+
+(* To hide inequalities from lia *)
+Definition neq' {A} (x y : A) := x <> y.
+Arguments neq' : simpl never.
+
+Definition max_allocs_representable e :=
+  forall C e', e = C |[ e' ]| -> (0 <= max_allocs e' <= O.max_signed)%Z.
+
+Lemma max_allocs_representable_ctx C e :
+  max_allocs_representable (C |[ e ]|) ->
+  max_allocs_representable e.
+Proof.
+  intros HCe D e' HDe'; specialize (HCe (comp_ctx_f C D) e').
+  apply HCe; rewrite <- app_ctx_f_fuse; congruence.
+Qed.
+
+(* TODO hoist *)
+Lemma rel_env_gso_r k S x cv ρ env tenv m :
+  ~ x \in S ->
+  ρ ~ₑ{k, S} (env, tenv, m) ->
+  ρ ~ₑ{k, S} (env, M.set x cv tenv, m).
+Proof.
+  intros Hin Hρ x' Hx'.
+  destruct (M.elt_eq x x') as [Heq|Hne]; [easy|].
+  unfold "!!!"; rewrite !M.gso by auto. now apply Hρ.
+Qed.
+
 Hint Extern 0 ((M.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Hint Extern 0 ((PTree.set ?x _ _) ! ?x = Some _) => rewrite M.gss; reflexivity : EvalDB.
 Lemma translate_body_stm k : forall e,
   Disjoint _ (FromList [gc_id; tinfo_id; alloc_id; limit_id; frame_id; roots_id; ret_id; case_id; roots_temp_id]) (used_vars e) ->
   well_scoped e ->
   fenv_respects_tags e ->
+  max_allocs_representable e ->
   (* (* TODO: probably overkill, delete if unneeded *)
      [thread_info_id; alloc_id; limit_id; heap_id; args_id; fp_id; nalloc_id;
      stack_frame_id; tinfo_id; frame_id; roots_id; gc_id; body_id;
@@ -5818,11 +6037,9 @@ Lemma translate_body_stm k : forall e,
   | _ => True
   end.
 Proof.
-  (* TODO: induction on step index by not be necessary *)
-  induction k as [k IHk] using lt_wf_ind.
   intros e Hdis; rewrite !FromList_cons in Hdis; revert e Hdis.
   induction e using exp_ind''; lazy zeta;
-    intros Hdis Hscope Hftags*Hk Hbstep*Htinfo Halloc Hlimit Hroots
+    intros Hdis Hscope Hftags Hmax_allocs*Hk Hbstep*Htinfo Halloc Hlimit Hroots
            Hframe Hlive Hallocs Hbv Henvs Henv_rel*Htop_wf Hm Hvalues Hshapes.
   - (** let x = Con c ys in e *)
     simpl. bind_step rep Hrep; destruct rep as [t|t a]; destruct ys as [|y ys]; try exact I; rewrite bind_ret.
@@ -5833,13 +6050,13 @@ Proof.
       inv Hbstep; match goal with H : bstep _ _ _ _ _ _ |- _ => inv H end.
       edestruct IHe as [tenv_end [m_end [cv_end [Hend [cvss_end
        [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
-      5:{ eassumption. }
-      16:{ eassumption. }
-      18:{ exists tenv_end, m_end, cv_end; split; try eassumption.
+      6:{ eassumption. }
+      17:{ eassumption. }
+      19:{ exists tenv_end, m_end, cv_end; split; try eassumption.
            exists cvss_end, values_end; split_ands; eauto.
            rewrite to_nat_add; eapply rel_val_antimon; try eassumption. lia. }
       all: try assumption.
-      (* looks fine *)
+      (* looks fine TODO tactic to solve these IH obligations *)
       all: admit.
     + (** Boxed *)
       bind_step e' He; destruct e' as [[stm_e fvs_e] n_e].
@@ -5920,21 +6137,39 @@ Proof.
       match type of Hm'' with
       | _ |=_{_} (?P ⋆ ?Q ⋆ ?R ⋆ _ ⋆ ?S) ⋆ ?new_segment =>
         rewrite (frame_stuff_hole (fun H => P ⋆ Q ⋆ R ⋆ H ⋆ S)) in Hm''; auto with FrameDB;
+        rewrite_equiv_in (fun H => P ⋆ Q ⋆ R ⋆ H ⋆ S) sepcon_comm Hm'';
         remember (values ⋆ new_segment) as values' eqn:Hvalues'
       end.
       apply valid_mem_fold in Hm''.
       (** Continue with e via IH *)
+      vars_neq Hdis x tinfo_id.
+      vars_neq Hdis x limit_id.
+      vars_neq Hdis x roots_temp_id.
+      tempvars_neq alloc_id limit_id.
+      tempvars_neq tinfo_id alloc_id.
+      tempvars_neq tinfo_id limit_id.
+      tempvars_neq alloc_id roots_temp_id.
+      tempvars_neq limit_id roots_temp_id.
       inv Hbstep; match goal with H : bstep _ _ _ _ _ _ |- _ => inv H end.
       edestruct IHe as [tenv_end [m_end [cv_end [Hend [cvss_end
        [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
-      5:{ eassumption. }
-      16:{ exists_ex args; exists_ex nalloc; exists_ex talloc_o; exists_ex tlimit_o.
+      6:{ eassumption. }
+      17:{ exists_ex args; exists_ex nalloc; exists_ex talloc_o; exists_ex tlimit_o.
            apply Hm''. }
-      18:{ rewrite <- postcond'_spec.
+      19:{ rewrite <- postcond'_spec.
            exists tenv_end, m_end, cv_end; split; try eassumption.
            exists cvss_end, values_end; split_ands; eauto.
-           - rewrite to_nat_add; eapply rel_val_antimon; try eassumption. lia.
-           - (* TODO sepcon doesn't affect comaptivle shapes *) admit. }
+           - rewrite to_nat_add; eapply rel_val_antimon; try eassumption.
+             change (?x <> ?y) with (neq' x y) in *.
+             lia.
+           - unfold valid_mem in Hm''.
+             match type of Hm'' with
+             | _ |=_{_} ?P ⋆ ?Q ⋆ ?R ⋆ (?S ⋆ _) ⋆ ?T =>
+               eapply (has_shapes_compatible_shapes_restriction
+                      (fun H => P ⋆ Q ⋆ R ⋆ (S ⋆ H) ⋆ T)
+                      (fun H => P ⋆ Q ⋆ R ⋆ H ⋆ T)); auto with FrameDB; eauto
+             end. }
+      all: auto with EvalDB; try (repeat rewrite M.gso by easy; now rewrite M.gss).
       (* looks fine *)
       all: admit.
   - (** case x of { ces } *)
@@ -5950,14 +6185,14 @@ Proof.
     edestruct (rel_val_x_related x) as [vx' [cvx' [Hvx' [Hcvx Hrel_cvx]]]]; try eassumption; sets.
     rewrite Hx in Hvx'; inv Hvx'.
     eapply fwd_case; try eassumption.
-    intros stm_taken fvs_taken n_taken cv_isptr He_taken.
+    intros stm_taken fvs_taken n_taken cv_isptr Hcv_isptr He_taken.
     (** Continue with taken branch via IH *)
     specialize (IHces c e_taken); rewrite He_taken in IHces.
     edestruct IHces as [tenv_end [m_end [cv_end [Hend [cvss_end
      [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
-    6:{ eassumption. }
-    17:{ eassumption. }
-    19:{ exists tenv_end, m_end, cv_end; split; try eassumption.
+    7:{ eassumption. }
+    18:{ eassumption. }
+    20:{ exists tenv_end, m_end, cv_end; split; try eassumption.
          exists cvss_end, values_end; split_ands; eauto.
          rewrite to_nat_add; eapply rel_val_antimon; try eassumption.
          lia. }
@@ -5992,9 +6227,9 @@ Proof.
     rewrite <- postcond'_spec.
     edestruct IHe as [tenv_end [m_end [cv_end [Hend [cvss_end
      [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
-    5:{ eassumption. }
-    16:{ eassumption. }
-    18:{ exists tenv_end, m_end, cv_end; split; try eassumption.
+    6:{ eassumption. }
+    17:{ eassumption. }
+    19:{ exists tenv_end, m_end, cv_end; split; try eassumption.
          exists cvss_end, values_end; split_ands; eauto.
          rewrite to_nat_add; eapply rel_val_antimon; try eassumption.
          lia. }
@@ -6058,6 +6293,13 @@ Proof.
         with (ty := stack_frame) (v := Vptr frame_b _); eauto with EvalDB FrameDB
     end.
     intros m_frame_pushed Hm_frame_pushed; unfold "|=" in *.
+    (** Some useful facts for later *)
+    assert (Hcase_notin_ys : ~ List.In case_id ys).
+    { (* Hdis *) admit. }
+    assert (Hframe_notin_ys : ~ List.In frame_id ys).
+    { (* Hdis *) admit. }
+    assert (Hroots_notin_ys : ~ List.In roots_id ys).
+    { (* Hdis *) admit. }
     (** Store arguments n+1, .. in the args array at indices inds *)
     repeat fwd Cred_seq_assoc.
     rewrite skipn_combine.
@@ -6066,11 +6308,8 @@ Proof.
       eapply (fwd_args_stores (fun H => P ⋆ Q ⋆ H ⋆ R)); eauto with EvalDB FrameDB
     end.
     { (* #|ys| = #|inds| *) admit. }
-    { (* NoDup inds *) admit. }
+    { (* invariant on inds, obtained from invarinat on fenv *) admit. }
     { (* invariant on inds, obtained from invariant on fenv *) admit. }
-    { (* case_id # ys by Hdis *) admit. }
-    { (* frame_id # ys by Hdis *) admit. }
-    { (* roots_id # ys by Hdis *) admit. }
     { (* Henv_rel ==> skip n ys ⊆ ys ⊆ FV(let x = f ys in e) ⊆ dom(ρ) *) admit. }
     { (* same argument as above *) admit. }
     intros m_args_stored cv_skipn_ys Hcv_skipn_ys Hm_args_stored; unfold "|=" in *.
@@ -6170,6 +6409,7 @@ Proof.
     specialize (one_letapp_nonzero x f t ys e).
     destruct k as [|k]; [rewrite to_nat_add in Hk; lia|].
     unfold "|=" in Hrel_f.
+    destruct Hrel_f as [Hty_f Hrel_f].
     specialize Hrel_f with (j := k) (cin := cin_call)
                            (cvs := (cv_firstn_ys ++ cv_skipn_ys)%list)
                            (cvss := cvs_live_no_x :: cvss)
@@ -6185,7 +6425,7 @@ Proof.
       apply Hm_limit_stored. }
     (** Make the call *)
     eapply fwd_call; try eassumption.
-    { cbn. reflexivity. }
+    { cbn. do 3 f_equal. lia. }
     { econstructor.
       - eapply eval_make_var; eauto.
         + vars_neq Hdis f frame_id.
@@ -6195,9 +6435,9 @@ Proof.
       - rewrite typeof_make_var.
         change (Tpointer ?t noattr) with (tptr t).
         now rewrite sem_cast_ptr'. }
-    { (* TODO lemma about this (eval exprlist of tinfo :: a bunch of make_vars) *) admit. }
-    { (* TODO: might need to add this to value relation *) admit. }
-    simpl set_opttemp.
+    { econstructor; eauto with EvalDB.
+      (* eval_exprlist_make_var *) admit. }
+    cbn [set_opttemp].
     (** Retrieve new alloc and limit *)
     destruct_ex nursery_b_call Hm_call.
     destruct_ex alloc_o_call Hm_call.
@@ -6274,7 +6514,7 @@ Proof.
         destruct_ex args' Hm_call'; destruct_ex nalloc' Hm_call'.
         edestruct eval_space_check' with (env := env) (n := max_allocs e) (tenv := tenv_call)
           as [cmp_v [Hcmp_v [cmp_b [Heval_cmp_b Hcmp_b]]]]; try apply Hm_call'.
-        { (* TODO invariant on max_allocs never being more than max_signed *) admit. }
+        { now apply (Hmax_allocs (Eletapp_c x f t ys Hole_c)). }
         { subst tenv_call; now rewrite M.gss. }
         { subst tenv_call. rewrite M.gso by auto. now rewrite M.gss. }
         fwd Cred_if'; eauto.
@@ -6479,7 +6719,7 @@ Proof.
         destruct_ex args' Hm_call'; destruct_ex nalloc' Hm_call'.
         edestruct eval_space_check' with (env := env) (n := max_allocs e) (tenv := tenv_call)
           as [cmp_v [Hcmp_v [cmp_b [Heval_cmp_b Hcmp_b]]]]; try apply Hm_call'.
-        { (* TODO invariant on max_allocs never being more than max_signed *) admit. }
+        { now apply (Hmax_allocs (Eletapp_c x f t ys Hole_c)). }
         { subst tenv_call; now rewrite M.gss. }
         { subst tenv_call. rewrite M.gso by auto. now rewrite M.gss. }
         fwd Cred_if'; eauto.
@@ -6717,17 +6957,29 @@ Proof.
     (** Continue as e, via IH *)
     edestruct IHe as [tenv_end [m_end [cv_end [Hend [cvss_end
      [values_end [Hrel_end [Hm_end [Hvalues_end Hcompat_end]]]]]]]]].
-    5:{ eassumption. }
-    16:{
+    6:{ eassumption. }
+    17:{
       exists_ex args_gc; exists_ex nalloc_gc; exists_ex talloc_o_gc; exists_ex tlimit_o_gc.
       apply Hm_pop. }
-    18:{ exists tenv_end, m_end, cv_end; split; eauto.
+    19:{ exists tenv_end, m_end, cv_end; split; eauto.
          exists cvss_end, values_end; split_ands; eauto.
          - eapply rel_val_antimon; [|eauto].
            rewrite !to_nat_add. lia.
          - (* transitivity across the compatible_shapes assumptions *)
            admit. }
     all: try assumption.
+    14:{ destruct Hcvs_compat as [Hcvs_compat Hcvss_compat].
+         eauto with ShapeDB. }
+    13:{ (* the two environments agree on x by Hrel_call, Hcvx_compat.
+            all other variables are in cvs_live_no_x,
+            which is related to ρ(|live\x|) by Henv_rel,
+            and compatible with cvs_live_no_x_call by Hcompat_shapes,
+            and compatible with cvs_gc by Hcvs_compat.
+            also,
+              (env, tenv_roots) !!!! |live\x|
+                = (env, tenv_roots') !!!! |live\x| by Htenv_roots'
+                = cvs_gc by Htenv_roots *)
+        admit. }
     (* looks fine.
        ρ_inv (M.set x vx ρ) because
          ρ_inv ρ by Henvs
@@ -6741,6 +6993,13 @@ Proof.
     rewrite bind_ret.
     normalize_used_vars.
     repeat fwd Cred_seq_assoc.
+    (** Some useful facts for later *)
+    assert (Hcase_notin_ys : ~ List.In case_id ys).
+    { (* Hdis *) admit. }
+    assert (Hframe_notin_ys : ~ List.In frame_id ys).
+    { (* Hdis *) admit. }
+    assert (Hroots_notin_ys : ~ List.In roots_id ys).
+    { (* Hdis *) admit. }
     (** Store arguments n+1, .. in the args array at indices inds *)
     unfold "|=" in *.
     destruct_ex args Hm.
@@ -6754,11 +7013,8 @@ Proof.
       eapply (fwd_args_stores (fun H => H ⋆ P)); eauto with EvalDB FrameDB
     end.
     { (* #|ys| = #|inds| *) admit. }
-    { (* NoDup inds *) admit. }
     { (* invariant on inds, obtained from invariant on fenv *) admit. }
-    { (* case_id # ys by Hdis *) admit. }
-    { (* frame_id # ys by Hdis *) admit. }
-    { (* roots_id # ys by Hdis *) admit. }
+    { (* invariant on inds, obtained from invariant on fenv *) admit. }
     { (* Henv_rel ==> skip n ys ⊆ ys ⊆ FV(f(ys)) ⊆ dom(ρ) *) admit. }
     { (* same argument as above *) admit. }
     intros m_args_stored cv_skipn_ys Hcv_skipn_ys Hm_args_stored; unfold "|=" in *.
@@ -6814,6 +7070,7 @@ Proof.
     specialize (one_app_nonzero f t ys).
     destruct k as [|k]; [rewrite to_nat_add in Hk; lia|].
     unfold "|=" in Hrel_f.
+    destruct Hrel_f as [Hty_f Hrel_f].
     specialize Hrel_f with (j := k) (cin := cin)
                            (cvs := (cv_firstn_ys ++ cv_skipn_ys)%list)
                            (cvss := cvss)
@@ -6829,7 +7086,7 @@ Proof.
       apply Hm_limit_stored. }
     (** Make the call *)
     eapply fwd_call; try eassumption.
-    { cbn. reflexivity. }
+    { cbn. do 3 f_equal. lia. }
     { econstructor.
       - eapply eval_make_var; eauto.
         + vars_neq Hdis f frame_id.
@@ -6839,8 +7096,8 @@ Proof.
       - rewrite typeof_make_var.
         change (Tpointer ?t noattr) with (tptr t).
         now rewrite sem_cast_ptr'. }
-    { (* TODO lemma about this *) admit. }
-    { (* TODO: might need to add this to value relation *) admit. }
+    { econstructor; eauto with EvalDB.
+      (* eval_exprlist_make_var *) admit. }
     cbn [set_opttemp].
     rewrite <- postcond'_spec.
     eapply postcond_ret; eauto with EvalDB.

@@ -79,7 +79,7 @@ Extract Inlined Constant Fappli_IEEE.round_mode => "fun _ -> assert false".
 Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false". *)
 
 Cd "Extraction".
-(* Set Extraction Flag 2031. (* default optimizations + linear let + linear beta *) *)
+Set Extraction Flag 2031. (* default optimizations + linear let + linear beta *)
 Separate Extraction
          Ctypes.merge_attributes Ctypes.remove_attributes Ctypes.build_composite_env
          Csyntax

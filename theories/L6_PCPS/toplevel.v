@@ -2,7 +2,7 @@ Require Import ZArith.
 Require Import Common.compM.
 From CertiCoq Require Import
      L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6_anf L6.L4_to_L6
-     L6.inline L6.uncurry_proto L6.closure_conversion
+     L6.inline L6.uncurry L6.uncurry_proto L6.shrink_proto L6.closure_conversion
      L6.closure_conversion L6.hoisting L6.dead_param_elim L6.lambda_lifting.
 From CertiCoq Require Import L4.toplevel.
 (* From CertiCoq.L7 Require Import L6_to_Clight. *)
@@ -133,6 +133,8 @@ Section IDENT.
       inl_before      : bool;    (* Perform shrink/inline loop before closure conversion *)
       inl_after       : bool;    (* Perform shrink/inline loop after closure conversion *)
       dpe             : bool;    (* Turn it off for the top-level theorm because it does not have a proof yet *)
+      proto_shrinker  : bool;    (* Use tool-derived partial shrinker instead of manually-written shrinker *)
+      proto_uncurryer : bool;    (* Use tool-derived uncurryer instead of manually-written uncurryer *)
     }.
 
 
@@ -162,12 +164,22 @@ Section IDENT.
 
     Definition time_anf {A} (name : string) (f : anf_state A) : anf_state A :=
       fun s => if time anf_opts then timePhase name f s else f s.
-    
+
+    Definition time_shrink e :=
+      if anf_opts.(proto_shrinker)
+      then time_anf "Partial shrink (tool-derived)" (L6.shrink_proto.shrink_err e)
+      else time_anf "Shrink (manual)" (L6.shrink_cps.shrink_err e).
+
+    Definition time_uncurry e :=
+      if anf_opts.(proto_uncurryer)
+      then time_anf "Uncurry (tool-derived)" (L6.uncurry_proto.uncurry_top (cps anf_opts) e)
+      else time_anf "Uncurry (manual)" (L6.uncurry.uncurry_fuel (cps anf_opts) 100 e).
+
     (* Optimizing λANF pipeline *)
 
     Definition anf_pipeline (e : exp) : anf_state exp :=
-      e <- time_anf "Shrink" (shrink_err e) ;;
-      e <- time_anf "Uncurry" (uncurry_top (cps anf_opts) e) ;;
+      e <- time_shrink e ;;
+      e <- time_uncurry e ;;
       e <- time_anf "Inline uncurry wrappers" (inline_uncurry next_var 10 100 e) ;;
       e <- (if inl_before anf_opts then
               time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100 e)
@@ -175,16 +187,16 @@ Section IDENT.
       e <- (if (do_lambda_lift anf_opts) then
               time_anf "Lambda lift" (lambda_lift (args anf_opts) (no_push anf_opts) (inl_wrappers anf_opts) e)
             else id_trans e) ;;
-      e <- time_anf "Shrink" (shrink_err e) ;;
+      e <- time_shrink e ;;
       e <- time_anf "Closure conversion and hoisting" (closure_conversion_hoist clo_tag clo_ind_tag e) ;;
-      e <- time_anf "Shrink" (shrink_err e) ;;
+      e <- time_shrink e ;;
       e <- (if inl_after anf_opts then
               time_anf "Inline/shrink loop" (inline_shrink_loop next_var 10 100 e)
             else id_trans e) ;;
       e <- (if dpe anf_opts then
               time_anf "Dead param elim" (dead_param_elim.DPE e)
             else id_trans e) ;;
-      e <- time_anf "Shrink" (shrink_err e);;
+      e <- time_shrink e ;;
       e <- (if inl_known anf_opts then
               time_anf "Inline known functions inside wrappers" (inline_lifted next_var 10 1000 e)
             else id_trans e) ;;
@@ -248,6 +260,14 @@ Section IDENT.
         | _ => default
         end
     in
+    let '(proto_shrinker, proto_uncurryer) := 
+      match dev opts with
+      | 1 => (false, false)
+      | 2 => (true, false)
+      | 3 => (true, true)
+      | _ => (false, true)
+      end
+    in
     {| time := Pipeline_utils.time opts;
        cps  := negb (Pipeline_utils.direct opts);
        do_lambda_lift := (1 <=? o_level opts);
@@ -258,6 +278,8 @@ Section IDENT.
        inl_before   := inl_before;
        inl_after    := inl_after;
        dpe          := true;
+       proto_shrinker := proto_shrinker;
+       proto_uncurryer := proto_uncurryer;
     |}.
 
 

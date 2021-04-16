@@ -165,6 +165,7 @@ Proto_util
 Frame
 Rewriting
 Uncurry_proto
+Shrink_proto
 Color
 Shrink_cps
 Closure_conversion

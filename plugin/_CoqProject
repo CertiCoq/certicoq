@@ -374,6 +374,8 @@ extraction/uncurry.ml
 extraction/uncurry.mli
 extraction/uncurry_proto.ml
 extraction/uncurry_proto.mli
+extraction/shrink_proto.ml
+extraction/shrink_proto.mli
 extraction/universes0.ml
 extraction/universes0.mli
 # extraction/usefulTypes.ml

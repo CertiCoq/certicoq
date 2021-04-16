@@ -1157,10 +1157,69 @@ Proof.
       repeat normalize_bound_var; collapse_primes; eauto with Ensembles_DB.
 Qed.
 
-Definition rw_shrink :
-  rewriter exp_univ_exp true tt shrink_step _ (@D_rename) _ (@R_shrink) _ (@S_shrink).
+Lemma size_apply_r σ x : size (apply_r σ x) = size x.
+Proof. reflexivity. Qed. 
+
+Lemma size_apply_r_list σ xs : size (apply_r_list σ xs) = size xs.
 Proof.
-  mk_rw; try lazymatch goal with |- ExtraVars _ -> _ => clear | |- ConstrDelay _ -> _ => clear end.
+  unfold apply_r_list; induction xs; cbn;
+  now rewrite ?size_apply_r, ?IHxs.
+Qed.
+
+Lemma size_rename_all_ns σ e : size (rename_all_ns σ e) = size e
+with size_rename_all_fun_ns σ fds : size (rename_all_fun_ns σ fds) = size fds.
+Proof.
+  all:
+    rename size_rename_all_ns into IHe, size_rename_all_fun_ns into IHf;
+    (destruct e||destruct fds); cbn;
+    rewrite ?size_apply_r, ?size_apply_r_list, ?IHe, ?IHf; try reflexivity.
+  do 2 f_equal. induction l as [| [c e] ces IHces]; cbn; [reflexivity|].
+  rewrite <- IHces, IHe. reflexivity.
+Qed.
+
+Lemma univ_size_delayD {A} σ e :
+  univ_size (rename σ e) = @univ_size A e.
+Proof.
+  destruct A; cbn; rewrite ?size_apply_r_list, ?size_rename_all_ns, ?size_rename_all_fun_ns; try reflexivity.
+  - destruct e. cbn. rewrite size_rename_all_ns; reflexivity.
+  - induction e as [|[c e] ces IHces]; cbn; auto.
+    now rewrite IHces, size_rename_all_ns.
+Qed.
+
+Lemma e_in_ces_smaller (c : ctor_tag) (e : exp) ces :
+  In (c, e) ces -> size e < size ces.
+Proof.
+  induction ces as [|[c' e'] ces IHces]; [inversion 1|].
+  intros [Hhd|Htl]; [inv Hhd; cbn; lia|].
+  specialize (IHces Htl); cbn; lia.
+Qed.
+
+Definition rw_shrink :
+  rewriter exp_univ_exp false (fun A C e => @univ_size A e)
+           shrink_step _ (@D_rename) _ (@R_shrink) _ (@S_shrink).
+Proof.
+  mk_rw;
+    try lazymatch goal with
+    | |- ExtraVars _ -> _ => clear | |- ConstrDelay _ -> _ => clear
+    (* Solve easy obligations about termination *)
+    | |- MetricDecreasing -> ?obligation =>
+      try solve
+      [intros _; cbn in *;
+       try change (size_exp ?e) with (size e);
+       try change (size_list _ ?x) with (size x);
+       try change (size_fundefs ?x) with (size x);
+       lia
+      |lazymatch obligation with
+       | context[delayD (e:=?e) ?d] =>
+         destruct d; subst; cbn in *;
+         rewrite ?size_rename_all_ns;
+         try match goal with
+         | H : rename_all_ns _ _ = rename_all_ns _ _ |- _ =>
+           apply f_equal with (f := size_exp) in H;
+           rewrite !size_rename_all_ns in H
+         end; lia
+       end]
+    end.
   - (* Case folding *) intros _ R C C_ok x ces d r s success failure.
     destruct r as [ρ Hρ] eqn:Hr, d as [σ Hσ] eqn:Hd; unfold delayD, D_rename, Delayed_D_rename in *.
     pose (x0 := apply_r σ x); specialize success with (x0 := x0).
@@ -1475,6 +1534,13 @@ Proof.
   - (* Rename prim binding *) intros _ R x p ys e [σ [Hdom Hran]] k; unfold_delayD.
     unshelve eapply (k x p (apply_r_list σ ys)); [exists σ|]; [solve_delayD..|reflexivity].
   - (* Rename halt *) intros _ R x [σ [Hdom Hran]] k; unfold_delayD; exact (k (apply_r σ x) eq_refl).
+  - (* Case folding decreases term size *)
+    intros _; destruct d0. cbn in H1|-*. apply f_equal with (f := size_exp) in H1.
+    rewrite size_rename_all_ns in *. rewrite <- H1.
+    destruct H as [_ H]. apply e_in_ces_smaller in H.
+    change (size_exp ?e) with (size e) in *.
+    change (size_list _ ?ces) with (size ces) in *.
+    lia.
 Defined.
 
 Eval unfold rewriter, rewriter', Fuel, rw_for in ltac:(let x := type of rw_shrink in exact x).

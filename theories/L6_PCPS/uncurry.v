@@ -299,7 +299,7 @@ Section UNCURRY.
               gvs' <- get_names_lst gvs "" ;;
               fvs' <- get_names_lst fvs "" ;;
               f' <- get_name f "_uncurried" ;;
-              let fp_numargs := length (gvs' ++ fvs')  in               
+              let fp_numargs := length (gvs' ++ fvs') in
               _ <- mark_as_uncurried g ;;
               _ <- markToInline fp_numargs f g;;
               fp_ft <- get_fun_tag (BinNat.N.of_nat fp_numargs);;
@@ -317,129 +317,6 @@ Section UNCURRY.
             fe' <- uncurry_rec_item cps (Exp fe) ;;
             ret (Fcons f f_ft fvs fe' fds1') } } }.
 
-    (*
-    Obligation Tactic :=
-      try abstract (
-        Tactics.program_simplify;
-        CoreTactics.equations_simpl;
-        try Tactics.program_solve_wf;
-        lia).
-    Program Fixpoint uncurry_rec_item (cps : bool) (item : rec_item) {measure (sizeof item)}
-      : uncurryM (match item with
-                  | Exp _ => exp
-                  | Fundefs _ => fundefs
-                  | Cases _ => list (ctor_tag * exp)
-                  end) :=
-      match item with
-      | Exp e =>
-        match e with
-        | Econstr x ct vs e1 =>
-          e1' <- uncurry_rec_item cps (Exp e1) ;; 
-          ret (Econstr x ct vs e1')
-        | Ecase x arms =>
-          arms' <- uncurry_rec_item cps (Cases arms) ;;
-          ret (Ecase x arms')
-        | Eproj x ct n y e1 =>
-          e1' <- uncurry_rec_item cps (Exp e1) ;;
-          ret (Eproj x ct n y e1')
-        | Eletapp x f ft ys e1 =>
-          e1' <- uncurry_rec_item cps (Exp e1) ;;
-          ret (Eletapp x f ft ys e1')
-        | Eapp x ft xs => ret (Eapp x ft xs)
-        | Eprim x p xs e1 =>
-          e1' <- uncurry_rec_item cps (Exp e1) ;;
-          ret (Eprim x p xs e1')
-        | Efun fds e1 =>
-          fds' <- uncurry_rec_item cps (Fundefs fds) ;;
-          e1' <- uncurry_rec_item cps (Exp e1) ;;
-          ret (Efun fds' e1')
-        | Ehalt x => ret (Ehalt x)
-        end
-      | Cases ces =>
-        match ces with
-        | nil => ret nil
-        | (c, e) :: ces =>
-          e <- uncurry_rec_item cps (Exp e) ;;
-          ces <- uncurry_rec_item cps (Cases ces) ;;
-          ret ((c, e) :: ces)
-        end
-      | Fundefs fds =>
-        if cps then            
-          match fds with
-          | Fnil => ret Fnil
-          | Fcons f f_ft fvs fe fds1 =>
-            match fvs, fe with
-            | fk::fvs, Efun (Fcons g gt gvs ge Fnil)
-                            (Eapp fk' fk_ft (g'::nil)) =>
-              (* XXX CHANGED *) (* ge' <- uncurry_rec_item cps ge ;; *)
-              (* Zoe : Nested carried arguments should be handled one-at-a-time,
-                     so that functions with > 2 arguments get uncurried properly.
-                     Therefore the body of g will be uncurried at the next iteration
-                     of the transformat ion.
-               *)
-              if eq_var fk fk' && eq_var g g' &&
-                 negb (occurs_in_exp g ge) &&
-                 negb (occurs_in_exp fk ge)
-              then
-                (* log_msg (f_str ++ " is uncurried" ) ;; *)
-                gvs' <- get_names_lst gvs "" ;;
-                fvs' <- get_names_lst fvs "" ;;
-                f' <- get_name f "_uncurried" ;;
-                let fp_numargs := length (gvs' ++ fvs')  in
-                _ <- markToInline fp_numargs f g;;
-                fp_ft <- get_fun_tag (BinNat.N.of_nat fp_numargs);;
-                fds1' <- uncurry_rec_item cps (Fundefs (Fcons f' fp_ft (gvs ++ fvs) ge fds1)) ;;
-                ret (Fcons f f_ft (fk::fvs')
-                           (* Note: tag given for arity |fvs| + |gvs|  *)
-                           (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil)
-                                 (Eapp fk fk_ft (g::nil)))
-                           fds1')
-              else
-                (* log_msg (f_str ++ " is not uncurried (candidate)" ) ;; *)
-                fds1' <- uncurry_rec_item cps (Fundefs fds1) ;;
-                fe' <- uncurry_rec_item cps (Exp fe) ;;
-                ret (Fcons f f_ft (fk::fvs) fe' fds1')
-            | _, _ =>
-              (* log_msg (f_str ++ " is not uncurried" ) ;; *)
-              fds1' <- uncurry_rec_item cps (Fundefs fds1) ;;
-              fe' <- uncurry_rec_item cps (Exp fe) ;;
-              ret (Fcons f f_ft fvs fe' fds1')
-            end
-          end
-        else
-          match fds with
-          | Fnil => ret Fnil
-          | Fcons f f_ft fvs fe fds1 =>
-            match fe with
-            | Efun (Fcons g gt gvs ge Fnil)
-                   (Ehalt g') =>
-              if eq_var g g' && negb (occurs_in_exp g ge)
-              then               
-                gvs' <- get_names_lst gvs "" ;;
-                fvs' <- get_names_lst fvs "" ;;
-                f' <- get_name f "_uncurried" ;;
-                let fp_numargs := length (gvs' ++ fvs')  in               
-                _ <- markToInline fp_numargs f g;;
-                fp_ft <- get_fun_tag (BinNat.N.of_nat fp_numargs);;
-                fds1' <- uncurry_rec_item cps (Fundefs (Fcons f' fp_ft (gvs ++ fvs) ge fds1)) ;;
-                ret (Fcons f f_ft fvs'
-                           (Efun (Fcons g gt gvs' (Eapp f' fp_ft (gvs' ++ fvs')) Fnil)
-                                 (Ehalt g))
-                           fds1')
-              else
-                fds1' <- uncurry_rec_item cps (Fundefs fds1) ;;
-                fe' <- uncurry_rec_item cps (Exp fe) ;;
-                ret (Fcons f f_ft fvs fe' fds1')
-            | _ =>
-              fds1' <- uncurry_rec_item cps (Fundefs fds1) ;;
-              fe' <- uncurry_rec_item cps (Exp fe) ;;
-              ret (Fcons f f_ft fvs fe' fds1')
-            end
-          end
-      end.
-    Next Obligation. abstract (apply Wf.measure_wf, Wf_nat.lt_wf). Defined.
-  *)
-
     Definition uncurry_exp cps e := uncurry_rec_item cps (Exp e).
     Definition uncurry_fundefs cps fds := uncurry_rec_item cps (Fundefs fds).
 
@@ -449,24 +326,13 @@ Section UNCURRY.
      
        For this we need to lift the constraint that negb (occurs_in_exp g ge) by 
        redefining the g wrapper inside f'. This however messes up the uncurring
-       pattern for the inner args, so we need to do this in two stages.
-
-     *)
+       pattern for the inner args, so we need to do this in two stages. *)
 
   End Uncurry_prog.
-    
-  Section UncurryTop. 
 
-    Definition uncurry_top cps (e:exp) (c : comp_data) : error exp * M.t nat * comp_data :=
-      let local_st := (false, M.empty _, M.empty _, (0%nat, (M.empty _))) in
-      let '(e, (c, (_, _, _ , (_, st)))) := run_compM (uncurry_exp cps e) c local_st in
-      (e, st, c).
-
-  End UncurryTop.
-
-  Definition uncurry_fuel cps (n:nat) e c : error exp * comp_data :=
-    let '(eerr, inline_map, c') := uncurry_top cps e c in
-    let c' := put_inline_map inline_map c' in
-    (eerr, c'). 
+  Definition uncurry_top cps e c : error exp * comp_data :=
+    let local_st := (false, M.empty _, M.empty _, (0%nat, (M.empty _))) in
+    let '(e_err, (c', (_, _, _ , (_, inline_map)))) := run_compM (uncurry_exp cps e) c local_st in
+    (e_err, put_inline_map inline_map c').
 
 End UNCURRY.

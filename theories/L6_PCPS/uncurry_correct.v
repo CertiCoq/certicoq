@@ -2062,7 +2062,6 @@ Section uncurry_correct.
 
   Definition from_maxvar v := fun a => (a < v)%positive.
   Definition from_fresh st := from_maxvar (next_free st).
-  
 
   Lemma already_uncurried_triple : forall s f,
     {{fun _ s' => s = s'}} uncurry.already_uncurried f

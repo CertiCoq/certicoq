@@ -1553,7 +1553,12 @@ Proof.
   - unerase; unfold R_shrink, R_ctors; intros; now rewrite M.gempty in H.
   - Unshelve. 2:{ exact (census_exp_succ (M.empty _) e (M.empty _)). }
     unerase; unfold S_shrink; split.
-    + exact trust_me. (* We will assume the terms are well scoped. *)
+    + exact trust_me. (* We will assume the terms are well scoped.
+                         This does not waive any proof obligations relevant to the correctness of
+                         the tool-derived implementation with respect to its relational specification.
+                         It is only needed to execute the partial shrinker for benchmarks.
+                         (The alternative would be to replumb proofs of well-scopedness throughout
+                         the backend pipeline.) *)
     + intros x; rewrite census_exp_succ_corresp.
       rewrite rename_all_id.
       unfold get_count, nat_of_count; rewrite M.gempty.

@@ -100,8 +100,8 @@ def latex_of_stats(manual_stats, auto_stats):
     def escape_for_latex(s): return s.replace('_', '\\_')
     return '\n'.join(
         f"{escape_for_latex(prog)} & " +
-        f"{manual_times['mean']:.2f} & {manual_times['stdev']:.2f} & " +
-        f"{auto_stats[prog]['mean']:.2f} & {auto_stats[prog]['stdev']:.2f} \\\\\\hline"
+        f"{manual_times['mean']:.2f} $\\pm$ {manual_times['stdev']:.2f} & " +
+        f"{auto_stats[prog]['mean']:.2f} $\\pm$ {auto_stats[prog]['stdev']:.2f} \\\\\\hline"
         for prog, manual_times in manual_stats.items()
     )
 

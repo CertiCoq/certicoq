@@ -173,7 +173,7 @@ Section IDENT.
     Definition time_uncurry e :=
       if anf_opts.(proto_uncurryer)
       then time_anf "Uncurry (tool-derived)" (L6.uncurry_proto.uncurry_top (cps anf_opts) e)
-      else time_anf "Uncurry (manual)" (L6.uncurry.uncurry_fuel (cps anf_opts) 100 e).
+      else time_anf "Uncurry (manual)" (L6.uncurry.uncurry_fuel (cps anf_opts) 0 e).
 
     (* Optimizing λANF pipeline *)
 

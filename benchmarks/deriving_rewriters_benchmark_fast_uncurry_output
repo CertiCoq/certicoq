@@ -1,0 +1,3040 @@
+-------------------- run 1 --------------------
+---------- all manual ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.644963
+Debug: Time elapsed in L1g:  0.014424
+Debug: Time elapsed in L2k:  0.000476
+Debug: Time elapsed in L2k_eta:  0.000687
+Debug: Time elapsed in L4:  0.005132
+Debug: Time elapsed in L6 ANF:  0.021174
+Debug: Time elapsed in Shrink (manual):  0.040337
+Debug: Time elapsed in Uncurry (manual):  0.005994
+Debug: Time elapsed in Inline uncurry wrappers:  0.033348
+Debug: Time elapsed in Inline/shrink loop:  0.222449
+Debug: Time elapsed in Shrink (manual):  0.011977
+Debug: Time elapsed in Closure conversion and hoisting:  0.029906
+Debug: Time elapsed in Shrink (manual):  0.035361
+Debug: Time elapsed in Inline/shrink loop:  0.443682
+Debug: Time elapsed in Dead param elim:  0.003461
+Debug: Time elapsed in Shrink (manual):  0.020960
+Debug: Time elapsed in L6 Pipeline:  0.848535
+Debug: Time elapsed in L7:  0.364688
+Debug: Printed to file in 0.295051 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.778345
+Debug: Time elapsed in L1g:  0.013492
+Debug: Time elapsed in L2k:  0.000485
+Debug: Time elapsed in L2k_eta:  0.000748
+Debug: Time elapsed in L4:  0.005278
+Debug: Time elapsed in L6 ANF:  0.019472
+Debug: Time elapsed in Shrink (manual):  0.040873
+Debug: Time elapsed in Uncurry (manual):  0.009042
+Debug: Time elapsed in Inline uncurry wrappers:  0.032395
+Debug: Time elapsed in Inline/shrink loop:  0.410374
+Debug: Time elapsed in Shrink (manual):  0.014521
+Debug: Time elapsed in Closure conversion and hoisting:  0.033473
+Debug: Time elapsed in Shrink (manual):  0.040816
+Debug: Time elapsed in Inline/shrink loop:  0.454577
+Debug: Time elapsed in Dead param elim:  0.003443
+Debug: Time elapsed in Shrink (manual):  0.034224
+Debug: Time elapsed in L6 Pipeline:  1.075596
+Debug: Time elapsed in L7:  0.367327
+Debug: Printed to file in 0.308680 s..
+binom:
+Debug: Time elapsed in Lbox:  0.039336
+Debug: Time elapsed in L1g:  0.005471
+Debug: Time elapsed in L2k:  0.000708
+Debug: Time elapsed in L2k_eta:  0.000162
+Debug: Time elapsed in L4:  0.000288
+Debug: Time elapsed in L6 ANF:  0.105209
+Debug: Time elapsed in Shrink (manual):  0.017961
+Debug: Time elapsed in Uncurry (manual):  0.000967
+Debug: Time elapsed in Inline uncurry wrappers:  0.015417
+Debug: Time elapsed in Inline/shrink loop:  0.064152
+Debug: Time elapsed in Shrink (manual):  0.011659
+Debug: Time elapsed in Closure conversion and hoisting:  0.009551
+Debug: Time elapsed in Shrink (manual):  0.012601
+Debug: Time elapsed in Inline/shrink loop:  0.026753
+Debug: Time elapsed in Dead param elim:  0.000793
+Debug: Time elapsed in Shrink (manual):  0.010879
+Debug: Time elapsed in L6 Pipeline:  0.171437
+Debug: Time elapsed in L7:  0.131032
+Debug: Printed to file in 0.156362 s..
+color:
+Debug: Time elapsed in Lbox:  10.103307
+Debug: Time elapsed in L1g:  0.066011
+Debug: Time elapsed in L2k:  0.001635
+Debug: Time elapsed in L2k_eta:  0.001060
+Debug: Time elapsed in L4:  0.001754
+Debug: Time elapsed in L6 ANF:  0.107982
+Debug: Time elapsed in Shrink (manual):  0.134103
+Debug: Time elapsed in Uncurry (manual):  0.006488
+Debug: Time elapsed in Inline uncurry wrappers:  0.172559
+Debug: Time elapsed in Inline/shrink loop:  0.664441
+Debug: Time elapsed in Shrink (manual):  0.088225
+Debug: Time elapsed in Closure conversion and hoisting:  0.070064
+Debug: Time elapsed in Shrink (manual):  0.100333
+Debug: Time elapsed in Inline/shrink loop:  1.041920
+Debug: Time elapsed in Dead param elim:  0.003806
+Debug: Time elapsed in Shrink (manual):  0.089866
+Debug: Time elapsed in L6 Pipeline:  2.373103
+Debug: Time elapsed in L7:  3.252854
+Debug: Printed to file in 1.155131 s..
+sha:
+Debug: Time elapsed in Lbox:  4.193646
+Debug: Time elapsed in L1g:  0.023346
+Debug: Time elapsed in L2k:  0.000938
+Debug: Time elapsed in L2k_eta:  0.000527
+Debug: Time elapsed in L4:  0.001581
+Debug: Time elapsed in L6 ANF:  0.084109
+Debug: Time elapsed in Shrink (manual):  0.047519
+Debug: Time elapsed in Uncurry (manual):  0.003970
+Debug: Time elapsed in Inline uncurry wrappers:  0.073071
+Debug: Time elapsed in Inline/shrink loop:  0.613481
+Debug: Time elapsed in Shrink (manual):  0.037957
+Debug: Time elapsed in Closure conversion and hoisting:  0.037525
+Debug: Time elapsed in Shrink (manual):  0.058829
+Debug: Time elapsed in Inline/shrink loop:  0.558014
+Debug: Time elapsed in Dead param elim:  0.003377
+Debug: Time elapsed in Shrink (manual):  0.039063
+Debug: Time elapsed in L6 Pipeline:  1.473806
+Debug: Time elapsed in L7:  0.815691
+Debug: Printed to file in 0.335807 s..
+---------- shrink proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.858662
+Debug: Time elapsed in L1g:  0.014216
+Debug: Time elapsed in L2k:  0.000468
+Debug: Time elapsed in L2k_eta:  0.000682
+Debug: Time elapsed in L4:  0.005120
+Debug: Time elapsed in L6 ANF:  0.017960
+Debug: Time elapsed in Partial shrink (tool-derived):  0.048942
+Debug: Time elapsed in Uncurry (manual):  0.015033
+Debug: Time elapsed in Inline uncurry wrappers:  0.088830
+Debug: Time elapsed in Inline/shrink loop:  0.328752
+Debug: Time elapsed in Partial shrink (tool-derived):  0.022445
+Debug: Time elapsed in Closure conversion and hoisting:  0.030099
+Debug: Time elapsed in Partial shrink (tool-derived):  0.116337
+Debug: Time elapsed in Inline/shrink loop:  0.419531
+Debug: Time elapsed in Dead param elim:  0.003377
+Debug: Time elapsed in Partial shrink (tool-derived):  0.075030
+Debug: Time elapsed in L6 Pipeline:  1.150048
+Debug: Time elapsed in L7:  0.358444
+Debug: Printed to file in 0.301068 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.696098
+Debug: Time elapsed in L1g:  0.013190
+Debug: Time elapsed in L2k:  0.000487
+Debug: Time elapsed in L2k_eta:  0.000718
+Debug: Time elapsed in L4:  0.005088
+Debug: Time elapsed in L6 ANF:  0.022675
+Debug: Time elapsed in Partial shrink (tool-derived):  0.044823
+Debug: Time elapsed in Uncurry (manual):  0.015837
+Debug: Time elapsed in Inline uncurry wrappers:  0.091130
+Debug: Time elapsed in Inline/shrink loop:  0.496033
+Debug: Time elapsed in Partial shrink (tool-derived):  0.028994
+Debug: Time elapsed in Closure conversion and hoisting:  0.030141
+Debug: Time elapsed in Partial shrink (tool-derived):  0.106823
+Debug: Time elapsed in Inline/shrink loop:  0.429843
+Debug: Time elapsed in Dead param elim:  0.003612
+Debug: Time elapsed in Partial shrink (tool-derived):  0.068357
+Debug: Time elapsed in L6 Pipeline:  1.316580
+Debug: Time elapsed in L7:  0.362463
+Debug: Printed to file in 0.338018 s..
+binom:
+Debug: Time elapsed in Lbox:  0.039862
+Debug: Time elapsed in L1g:  0.005511
+Debug: Time elapsed in L2k:  0.000682
+Debug: Time elapsed in L2k_eta:  0.000158
+Debug: Time elapsed in L4:  0.000301
+Debug: Time elapsed in L6 ANF:  0.105213
+Debug: Time elapsed in Partial shrink (tool-derived):  0.010959
+Debug: Time elapsed in Uncurry (manual):  0.001604
+Debug: Time elapsed in Inline uncurry wrappers:  0.019145
+Debug: Time elapsed in Inline/shrink loop:  0.064852
+Debug: Time elapsed in Partial shrink (tool-derived):  0.010755
+Debug: Time elapsed in Closure conversion and hoisting:  0.012717
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007805
+Debug: Time elapsed in Inline/shrink loop:  0.026349
+Debug: Time elapsed in Dead param elim:  0.000829
+Debug: Time elapsed in Partial shrink (tool-derived):  0.008012
+Debug: Time elapsed in L6 Pipeline:  0.163771
+Debug: Time elapsed in L7:  0.128750
+Debug: Printed to file in 0.133322 s..
+color:
+Debug: Time elapsed in Lbox:  9.120666
+Debug: Time elapsed in L1g:  0.065581
+Debug: Time elapsed in L2k:  0.001652
+Debug: Time elapsed in L2k_eta:  0.001303
+Debug: Time elapsed in L4:  0.001870
+Debug: Time elapsed in L6 ANF:  0.100261
+Debug: Time elapsed in Partial shrink (tool-derived):  0.130487
+Debug: Time elapsed in Uncurry (manual):  0.013967
+Debug: Time elapsed in Inline uncurry wrappers:  0.126613
+Debug: Time elapsed in Inline/shrink loop:  0.700909
+Debug: Time elapsed in Partial shrink (tool-derived):  0.159313
+Debug: Time elapsed in Closure conversion and hoisting:  0.072810
+Debug: Time elapsed in Partial shrink (tool-derived):  0.077921
+Debug: Time elapsed in Inline/shrink loop:  1.163078
+Debug: Time elapsed in Dead param elim:  0.006978
+Debug: Time elapsed in Partial shrink (tool-derived):  0.074083
+Debug: Time elapsed in L6 Pipeline:  2.527754
+Debug: Time elapsed in L7:  3.235805
+Debug: Printed to file in 1.046938 s..
+sha:
+Debug: Time elapsed in Lbox:  3.799268
+Debug: Time elapsed in L1g:  0.023562
+Debug: Time elapsed in L2k:  0.000929
+Debug: Time elapsed in L2k_eta:  0.000467
+Debug: Time elapsed in L4:  0.001617
+Debug: Time elapsed in L6 ANF:  0.096963
+Debug: Time elapsed in Partial shrink (tool-derived):  0.061721
+Debug: Time elapsed in Uncurry (manual):  0.007387
+Debug: Time elapsed in Inline uncurry wrappers:  0.055027
+Debug: Time elapsed in Inline/shrink loop:  0.386739
+Debug: Time elapsed in Partial shrink (tool-derived):  0.068042
+Debug: Time elapsed in Closure conversion and hoisting:  0.035918
+Debug: Time elapsed in Partial shrink (tool-derived):  0.041487
+Debug: Time elapsed in Inline/shrink loop:  0.753554
+Debug: Time elapsed in Dead param elim:  0.003699
+Debug: Time elapsed in Partial shrink (tool-derived):  0.037120
+Debug: Time elapsed in L6 Pipeline:  1.451670
+Debug: Time elapsed in L7:  0.805821
+Debug: Printed to file in 0.324355 s..
+---------- uncurry proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.709492
+Debug: Time elapsed in L1g:  0.014224
+Debug: Time elapsed in L2k:  0.000482
+Debug: Time elapsed in L2k_eta:  0.000681
+Debug: Time elapsed in L4:  0.005041
+Debug: Time elapsed in L6 ANF:  0.068625
+Debug: Time elapsed in Shrink (manual):  0.041033
+Debug: Time elapsed in Uncurry (tool-derived):  0.004507
+Debug: Time elapsed in Inline uncurry wrappers:  0.030648
+Debug: Time elapsed in Inline/shrink loop:  0.209670
+Debug: Time elapsed in Shrink (manual):  0.012311
+Debug: Time elapsed in Closure conversion and hoisting:  0.029955
+Debug: Time elapsed in Shrink (manual):  0.038515
+Debug: Time elapsed in Inline/shrink loop:  0.433498
+Debug: Time elapsed in Dead param elim:  0.003486
+Debug: Time elapsed in Shrink (manual):  0.019927
+Debug: Time elapsed in L6 Pipeline:  0.826117
+Debug: Time elapsed in L7:  0.354659
+Debug: Printed to file in 0.295944 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.707962
+Debug: Time elapsed in L1g:  0.013848
+Debug: Time elapsed in L2k:  0.000502
+Debug: Time elapsed in L2k_eta:  0.000719
+Debug: Time elapsed in L4:  0.005535
+Debug: Time elapsed in L6 ANF:  0.019590
+Debug: Time elapsed in Shrink (manual):  0.041774
+Debug: Time elapsed in Uncurry (tool-derived):  0.003862
+Debug: Time elapsed in Inline uncurry wrappers:  0.031802
+Debug: Time elapsed in Inline/shrink loop:  0.393020
+Debug: Time elapsed in Shrink (manual):  0.015283
+Debug: Time elapsed in Closure conversion and hoisting:  0.029157
+Debug: Time elapsed in Shrink (manual):  0.039633
+Debug: Time elapsed in Inline/shrink loop:  0.459766
+Debug: Time elapsed in Dead param elim:  0.002915
+Debug: Time elapsed in Shrink (manual):  0.018644
+Debug: Time elapsed in L6 Pipeline:  1.037464
+Debug: Time elapsed in L7:  0.365258
+Debug: Printed to file in 0.317598 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042314
+Debug: Time elapsed in L1g:  0.005949
+Debug: Time elapsed in L2k:  0.000782
+Debug: Time elapsed in L2k_eta:  0.000193
+Debug: Time elapsed in L4:  0.000316
+Debug: Time elapsed in L6 ANF:  0.120169
+Debug: Time elapsed in Shrink (manual):  0.011859
+Debug: Time elapsed in Uncurry (tool-derived):  0.000789
+Debug: Time elapsed in Inline uncurry wrappers:  0.014098
+Debug: Time elapsed in Inline/shrink loop:  0.057501
+Debug: Time elapsed in Shrink (manual):  0.011258
+Debug: Time elapsed in Closure conversion and hoisting:  0.009568
+Debug: Time elapsed in Shrink (manual):  0.017362
+Debug: Time elapsed in Inline/shrink loop:  0.026054
+Debug: Time elapsed in Dead param elim:  0.000890
+Debug: Time elapsed in Shrink (manual):  0.013278
+Debug: Time elapsed in L6 Pipeline:  0.163245
+Debug: Time elapsed in L7:  0.131439
+Debug: Printed to file in 0.300282 s..
+color:
+Debug: Time elapsed in Lbox:  9.661107
+Debug: Time elapsed in L1g:  0.073141
+Debug: Time elapsed in L2k:  0.001706
+Debug: Time elapsed in L2k_eta:  0.001302
+Debug: Time elapsed in L4:  0.001862
+Debug: Time elapsed in L6 ANF:  0.107843
+Debug: Time elapsed in Shrink (manual):  0.132059
+Debug: Time elapsed in Uncurry (tool-derived):  0.006634
+Debug: Time elapsed in Inline uncurry wrappers:  0.145618
+Debug: Time elapsed in Inline/shrink loop:  0.631024
+Debug: Time elapsed in Shrink (manual):  0.088361
+Debug: Time elapsed in Closure conversion and hoisting:  0.069421
+Debug: Time elapsed in Shrink (manual):  0.099236
+Debug: Time elapsed in Inline/shrink loop:  1.069183
+Debug: Time elapsed in Dead param elim:  0.005438
+Debug: Time elapsed in Shrink (manual):  0.093274
+Debug: Time elapsed in L6 Pipeline:  2.341758
+Debug: Time elapsed in L7:  3.420421
+Debug: Printed to file in 2.163920 s..
+sha:
+Debug: Time elapsed in Lbox:  3.771947
+Debug: Time elapsed in L1g:  0.024260
+Debug: Time elapsed in L2k:  0.000972
+Debug: Time elapsed in L2k_eta:  0.000506
+Debug: Time elapsed in L4:  0.001634
+Debug: Time elapsed in L6 ANF:  0.088062
+Debug: Time elapsed in Shrink (manual):  0.044910
+Debug: Time elapsed in Uncurry (tool-derived):  0.003788
+Debug: Time elapsed in Inline uncurry wrappers:  0.050503
+Debug: Time elapsed in Inline/shrink loop:  0.577234
+Debug: Time elapsed in Shrink (manual):  0.036204
+Debug: Time elapsed in Closure conversion and hoisting:  0.033519
+Debug: Time elapsed in Shrink (manual):  0.050023
+Debug: Time elapsed in Inline/shrink loop:  0.545090
+Debug: Time elapsed in Dead param elim:  0.007851
+Debug: Time elapsed in Shrink (manual):  0.031846
+Debug: Time elapsed in L6 Pipeline:  1.381894
+Debug: Time elapsed in L7:  0.837293
+Debug: Printed to file in 0.346714 s..
+-------------------- run 2 --------------------
+---------- all manual ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.669629
+Debug: Time elapsed in L1g:  0.015457
+Debug: Time elapsed in L2k:  0.000522
+Debug: Time elapsed in L2k_eta:  0.000773
+Debug: Time elapsed in L4:  0.005453
+Debug: Time elapsed in L6 ANF:  0.021719
+Debug: Time elapsed in Shrink (manual):  0.035744
+Debug: Time elapsed in Uncurry (manual):  0.005911
+Debug: Time elapsed in Inline uncurry wrappers:  0.033120
+Debug: Time elapsed in Inline/shrink loop:  0.211048
+Debug: Time elapsed in Shrink (manual):  0.011637
+Debug: Time elapsed in Closure conversion and hoisting:  0.029879
+Debug: Time elapsed in Shrink (manual):  0.035430
+Debug: Time elapsed in Inline/shrink loop:  0.443526
+Debug: Time elapsed in Dead param elim:  0.003553
+Debug: Time elapsed in Shrink (manual):  0.020817
+Debug: Time elapsed in L6 Pipeline:  0.831785
+Debug: Time elapsed in L7:  0.357015
+Debug: Printed to file in 0.300195 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.786182
+Debug: Time elapsed in L1g:  0.013875
+Debug: Time elapsed in L2k:  0.000520
+Debug: Time elapsed in L2k_eta:  0.000758
+Debug: Time elapsed in L4:  0.005404
+Debug: Time elapsed in L6 ANF:  0.019734
+Debug: Time elapsed in Shrink (manual):  0.039300
+Debug: Time elapsed in Uncurry (manual):  0.009010
+Debug: Time elapsed in Inline uncurry wrappers:  0.028674
+Debug: Time elapsed in Inline/shrink loop:  0.401394
+Debug: Time elapsed in Shrink (manual):  0.011966
+Debug: Time elapsed in Closure conversion and hoisting:  0.029853
+Debug: Time elapsed in Shrink (manual):  0.037356
+Debug: Time elapsed in Inline/shrink loop:  0.444601
+Debug: Time elapsed in Dead param elim:  0.003517
+Debug: Time elapsed in Shrink (manual):  0.034134
+Debug: Time elapsed in L6 Pipeline:  1.041394
+Debug: Time elapsed in L7:  0.371836
+Debug: Printed to file in 0.320956 s..
+binom:
+Debug: Time elapsed in Lbox:  0.041607
+Debug: Time elapsed in L1g:  0.005720
+Debug: Time elapsed in L2k:  0.000710
+Debug: Time elapsed in L2k_eta:  0.000162
+Debug: Time elapsed in L4:  0.000299
+Debug: Time elapsed in L6 ANF:  0.108428
+Debug: Time elapsed in Shrink (manual):  0.018135
+Debug: Time elapsed in Uncurry (manual):  0.000991
+Debug: Time elapsed in Inline uncurry wrappers:  0.015722
+Debug: Time elapsed in Inline/shrink loop:  0.065336
+Debug: Time elapsed in Shrink (manual):  0.011551
+Debug: Time elapsed in Closure conversion and hoisting:  0.009770
+Debug: Time elapsed in Shrink (manual):  0.012772
+Debug: Time elapsed in Inline/shrink loop:  0.027216
+Debug: Time elapsed in Dead param elim:  0.000806
+Debug: Time elapsed in Shrink (manual):  0.011042
+Debug: Time elapsed in L6 Pipeline:  0.174079
+Debug: Time elapsed in L7:  0.132940
+Debug: Printed to file in 0.161755 s..
+color:
+Debug: Time elapsed in Lbox:  10.147327
+Debug: Time elapsed in L1g:  0.070459
+Debug: Time elapsed in L2k:  0.001698
+Debug: Time elapsed in L2k_eta:  0.001618
+Debug: Time elapsed in L4:  0.001932
+Debug: Time elapsed in L6 ANF:  0.109740
+Debug: Time elapsed in Shrink (manual):  0.136509
+Debug: Time elapsed in Uncurry (manual):  0.006619
+Debug: Time elapsed in Inline uncurry wrappers:  0.175339
+Debug: Time elapsed in Inline/shrink loop:  0.662277
+Debug: Time elapsed in Shrink (manual):  0.088557
+Debug: Time elapsed in Closure conversion and hoisting:  0.071200
+Debug: Time elapsed in Shrink (manual):  0.102154
+Debug: Time elapsed in Inline/shrink loop:  1.057025
+Debug: Time elapsed in Dead param elim:  0.003809
+Debug: Time elapsed in Shrink (manual):  0.093117
+Debug: Time elapsed in L6 Pipeline:  2.397893
+Debug: Time elapsed in L7:  3.421583
+Debug: Printed to file in 1.210966 s..
+sha:
+Debug: Time elapsed in Lbox:  3.962964
+Debug: Time elapsed in L1g:  0.024709
+Debug: Time elapsed in L2k:  0.000968
+Debug: Time elapsed in L2k_eta:  0.000553
+Debug: Time elapsed in L4:  0.001698
+Debug: Time elapsed in L6 ANF:  0.087272
+Debug: Time elapsed in Shrink (manual):  0.048371
+Debug: Time elapsed in Uncurry (manual):  0.003929
+Debug: Time elapsed in Inline uncurry wrappers:  0.073922
+Debug: Time elapsed in Inline/shrink loop:  0.611051
+Debug: Time elapsed in Shrink (manual):  0.039677
+Debug: Time elapsed in Closure conversion and hoisting:  0.041398
+Debug: Time elapsed in Shrink (manual):  0.052101
+Debug: Time elapsed in Inline/shrink loop:  0.553249
+Debug: Time elapsed in Dead param elim:  0.003227
+Debug: Time elapsed in Shrink (manual):  0.038924
+Debug: Time elapsed in L6 Pipeline:  1.466741
+Debug: Time elapsed in L7:  0.847899
+Debug: Printed to file in 0.350770 s..
+---------- shrink proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.886184
+Debug: Time elapsed in L1g:  0.015124
+Debug: Time elapsed in L2k:  0.000499
+Debug: Time elapsed in L2k_eta:  0.000716
+Debug: Time elapsed in L4:  0.005391
+Debug: Time elapsed in L6 ANF:  0.022169
+Debug: Time elapsed in Partial shrink (tool-derived):  0.052535
+Debug: Time elapsed in Uncurry (manual):  0.016351
+Debug: Time elapsed in Inline uncurry wrappers:  0.084893
+Debug: Time elapsed in Inline/shrink loop:  0.332037
+Debug: Time elapsed in Partial shrink (tool-derived):  0.023031
+Debug: Time elapsed in Closure conversion and hoisting:  0.031384
+Debug: Time elapsed in Partial shrink (tool-derived):  0.120692
+Debug: Time elapsed in Inline/shrink loop:  0.425770
+Debug: Time elapsed in Dead param elim:  0.003400
+Debug: Time elapsed in Partial shrink (tool-derived):  0.073271
+Debug: Time elapsed in L6 Pipeline:  1.175406
+Debug: Time elapsed in L7:  0.372208
+Debug: Printed to file in 0.299337 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.732754
+Debug: Time elapsed in L1g:  0.014054
+Debug: Time elapsed in L2k:  0.000510
+Debug: Time elapsed in L2k_eta:  0.000749
+Debug: Time elapsed in L4:  0.005462
+Debug: Time elapsed in L6 ANF:  0.023136
+Debug: Time elapsed in Partial shrink (tool-derived):  0.046921
+Debug: Time elapsed in Uncurry (manual):  0.016091
+Debug: Time elapsed in Inline uncurry wrappers:  0.092958
+Debug: Time elapsed in Inline/shrink loop:  0.499354
+Debug: Time elapsed in Partial shrink (tool-derived):  0.029640
+Debug: Time elapsed in Closure conversion and hoisting:  0.030743
+Debug: Time elapsed in Partial shrink (tool-derived):  0.110726
+Debug: Time elapsed in Inline/shrink loop:  0.444778
+Debug: Time elapsed in Dead param elim:  0.003650
+Debug: Time elapsed in Partial shrink (tool-derived):  0.069940
+Debug: Time elapsed in L6 Pipeline:  1.345803
+Debug: Time elapsed in L7:  0.374260
+Debug: Printed to file in 0.354478 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042196
+Debug: Time elapsed in L1g:  0.005983
+Debug: Time elapsed in L2k:  0.000755
+Debug: Time elapsed in L2k_eta:  0.000177
+Debug: Time elapsed in L4:  0.000307
+Debug: Time elapsed in L6 ANF:  0.115631
+Debug: Time elapsed in Partial shrink (tool-derived):  0.010040
+Debug: Time elapsed in Uncurry (manual):  0.001690
+Debug: Time elapsed in Inline uncurry wrappers:  0.018889
+Debug: Time elapsed in Inline/shrink loop:  0.064673
+Debug: Time elapsed in Partial shrink (tool-derived):  0.010340
+Debug: Time elapsed in Closure conversion and hoisting:  0.012729
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007783
+Debug: Time elapsed in Inline/shrink loop:  0.026582
+Debug: Time elapsed in Dead param elim:  0.000842
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007905
+Debug: Time elapsed in L6 Pipeline:  0.162215
+Debug: Time elapsed in L7:  0.130801
+Debug: Printed to file in 0.138036 s..
+color:
+Debug: Time elapsed in Lbox:  9.407476
+Debug: Time elapsed in L1g:  0.069967
+Debug: Time elapsed in L2k:  0.001713
+Debug: Time elapsed in L2k_eta:  0.001317
+Debug: Time elapsed in L4:  0.001812
+Debug: Time elapsed in L6 ANF:  0.103472
+Debug: Time elapsed in Partial shrink (tool-derived):  0.132610
+Debug: Time elapsed in Uncurry (manual):  0.013914
+Debug: Time elapsed in Inline uncurry wrappers:  0.127320
+Debug: Time elapsed in Inline/shrink loop:  0.694538
+Debug: Time elapsed in Partial shrink (tool-derived):  0.154174
+Debug: Time elapsed in Closure conversion and hoisting:  0.071901
+Debug: Time elapsed in Partial shrink (tool-derived):  0.076161
+Debug: Time elapsed in Inline/shrink loop:  1.149057
+Debug: Time elapsed in Dead param elim:  0.006830
+Debug: Time elapsed in Partial shrink (tool-derived):  0.075225
+Debug: Time elapsed in L6 Pipeline:  2.509689
+Debug: Time elapsed in L7:  3.402919
+Debug: Printed to file in 1.076070 s..
+sha:
+Debug: Time elapsed in Lbox:  3.863534
+Debug: Time elapsed in L1g:  0.027047
+Debug: Time elapsed in L2k:  0.001007
+Debug: Time elapsed in L2k_eta:  0.000532
+Debug: Time elapsed in L4:  0.001581
+Debug: Time elapsed in L6 ANF:  0.100283
+Debug: Time elapsed in Partial shrink (tool-derived):  0.065822
+Debug: Time elapsed in Uncurry (manual):  0.007451
+Debug: Time elapsed in Inline uncurry wrappers:  0.056072
+Debug: Time elapsed in Inline/shrink loop:  0.394186
+Debug: Time elapsed in Partial shrink (tool-derived):  0.068994
+Debug: Time elapsed in Closure conversion and hoisting:  0.036997
+Debug: Time elapsed in Partial shrink (tool-derived):  0.042306
+Debug: Time elapsed in Inline/shrink loop:  0.766009
+Debug: Time elapsed in Dead param elim:  0.003536
+Debug: Time elapsed in Partial shrink (tool-derived):  0.038704
+Debug: Time elapsed in L6 Pipeline:  1.481028
+Debug: Time elapsed in L7:  0.855560
+Debug: Printed to file in 0.339739 s..
+---------- uncurry proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.748479
+Debug: Time elapsed in L1g:  0.015300
+Debug: Time elapsed in L2k:  0.000508
+Debug: Time elapsed in L2k_eta:  0.000736
+Debug: Time elapsed in L4:  0.005398
+Debug: Time elapsed in L6 ANF:  0.074204
+Debug: Time elapsed in Shrink (manual):  0.042713
+Debug: Time elapsed in Uncurry (tool-derived):  0.004566
+Debug: Time elapsed in Inline uncurry wrappers:  0.031275
+Debug: Time elapsed in Inline/shrink loop:  0.215658
+Debug: Time elapsed in Shrink (manual):  0.012581
+Debug: Time elapsed in Closure conversion and hoisting:  0.030519
+Debug: Time elapsed in Shrink (manual):  0.038918
+Debug: Time elapsed in Inline/shrink loop:  0.430419
+Debug: Time elapsed in Dead param elim:  0.003494
+Debug: Time elapsed in Shrink (manual):  0.019835
+Debug: Time elapsed in L6 Pipeline:  0.831559
+Debug: Time elapsed in L7:  0.353404
+Debug: Printed to file in 0.301434 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.680360
+Debug: Time elapsed in L1g:  0.013857
+Debug: Time elapsed in L2k:  0.000489
+Debug: Time elapsed in L2k_eta:  0.000719
+Debug: Time elapsed in L4:  0.005395
+Debug: Time elapsed in L6 ANF:  0.019596
+Debug: Time elapsed in Shrink (manual):  0.042582
+Debug: Time elapsed in Uncurry (tool-derived):  0.003838
+Debug: Time elapsed in Inline uncurry wrappers:  0.031351
+Debug: Time elapsed in Inline/shrink loop:  0.397887
+Debug: Time elapsed in Shrink (manual):  0.015201
+Debug: Time elapsed in Closure conversion and hoisting:  0.029024
+Debug: Time elapsed in Shrink (manual):  0.040033
+Debug: Time elapsed in Inline/shrink loop:  0.460593
+Debug: Time elapsed in Dead param elim:  0.002911
+Debug: Time elapsed in Shrink (manual):  0.018708
+Debug: Time elapsed in L6 Pipeline:  1.043767
+Debug: Time elapsed in L7:  0.366867
+Debug: Printed to file in 0.317220 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042291
+Debug: Time elapsed in L1g:  0.005959
+Debug: Time elapsed in L2k:  0.000744
+Debug: Time elapsed in L2k_eta:  0.000186
+Debug: Time elapsed in L4:  0.000309
+Debug: Time elapsed in L6 ANF:  0.120738
+Debug: Time elapsed in Shrink (manual):  0.011832
+Debug: Time elapsed in Uncurry (tool-derived):  0.000812
+Debug: Time elapsed in Inline uncurry wrappers:  0.013995
+Debug: Time elapsed in Inline/shrink loop:  0.058046
+Debug: Time elapsed in Shrink (manual):  0.011102
+Debug: Time elapsed in Closure conversion and hoisting:  0.009433
+Debug: Time elapsed in Shrink (manual):  0.017249
+Debug: Time elapsed in Inline/shrink loop:  0.026596
+Debug: Time elapsed in Dead param elim:  0.000915
+Debug: Time elapsed in Shrink (manual):  0.013400
+Debug: Time elapsed in L6 Pipeline:  0.163926
+Debug: Time elapsed in L7:  0.131904
+Debug: Printed to file in 0.288652 s..
+color:
+Debug: Time elapsed in Lbox:  9.671056
+Debug: Time elapsed in L1g:  0.070663
+Debug: Time elapsed in L2k:  0.001690
+Debug: Time elapsed in L2k_eta:  0.001105
+Debug: Time elapsed in L4:  0.001842
+Debug: Time elapsed in L6 ANF:  0.108257
+Debug: Time elapsed in Shrink (manual):  0.133487
+Debug: Time elapsed in Uncurry (tool-derived):  0.006809
+Debug: Time elapsed in Inline uncurry wrappers:  0.145884
+Debug: Time elapsed in Inline/shrink loop:  0.636679
+Debug: Time elapsed in Shrink (manual):  0.089102
+Debug: Time elapsed in Closure conversion and hoisting:  0.068322
+Debug: Time elapsed in Shrink (manual):  0.099929
+Debug: Time elapsed in Inline/shrink loop:  1.077813
+Debug: Time elapsed in Dead param elim:  0.005581
+Debug: Time elapsed in Shrink (manual):  0.093964
+Debug: Time elapsed in L6 Pipeline:  2.359031
+Debug: Time elapsed in L7:  3.373229
+Debug: Printed to file in 2.160618 s..
+sha:
+Debug: Time elapsed in Lbox:  3.770448
+Debug: Time elapsed in L1g:  0.025027
+Debug: Time elapsed in L2k:  0.000968
+Debug: Time elapsed in L2k_eta:  0.000466
+Debug: Time elapsed in L4:  0.001647
+Debug: Time elapsed in L6 ANF:  0.088907
+Debug: Time elapsed in Shrink (manual):  0.045546
+Debug: Time elapsed in Uncurry (tool-derived):  0.003788
+Debug: Time elapsed in Inline uncurry wrappers:  0.049664
+Debug: Time elapsed in Inline/shrink loop:  0.571536
+Debug: Time elapsed in Shrink (manual):  0.035795
+Debug: Time elapsed in Closure conversion and hoisting:  0.033365
+Debug: Time elapsed in Shrink (manual):  0.047756
+Debug: Time elapsed in Inline/shrink loop:  0.542866
+Debug: Time elapsed in Dead param elim:  0.008003
+Debug: Time elapsed in Shrink (manual):  0.031734
+Debug: Time elapsed in L6 Pipeline:  1.370983
+Debug: Time elapsed in L7:  0.822953
+Debug: Printed to file in 0.339390 s..
+-------------------- run 3 --------------------
+---------- all manual ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.669344
+Debug: Time elapsed in L1g:  0.016183
+Debug: Time elapsed in L2k:  0.000562
+Debug: Time elapsed in L2k_eta:  0.000768
+Debug: Time elapsed in L4:  0.005539
+Debug: Time elapsed in L6 ANF:  0.021431
+Debug: Time elapsed in Shrink (manual):  0.035792
+Debug: Time elapsed in Uncurry (manual):  0.005282
+Debug: Time elapsed in Inline uncurry wrappers:  0.032107
+Debug: Time elapsed in Inline/shrink loop:  0.210802
+Debug: Time elapsed in Shrink (manual):  0.011148
+Debug: Time elapsed in Closure conversion and hoisting:  0.029791
+Debug: Time elapsed in Shrink (manual):  0.035073
+Debug: Time elapsed in Inline/shrink loop:  0.434976
+Debug: Time elapsed in Dead param elim:  0.003548
+Debug: Time elapsed in Shrink (manual):  0.020185
+Debug: Time elapsed in L6 Pipeline:  0.819759
+Debug: Time elapsed in L7:  0.355278
+Debug: Printed to file in 0.299338 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.789712
+Debug: Time elapsed in L1g:  0.013998
+Debug: Time elapsed in L2k:  0.000519
+Debug: Time elapsed in L2k_eta:  0.000761
+Debug: Time elapsed in L4:  0.005401
+Debug: Time elapsed in L6 ANF:  0.019708
+Debug: Time elapsed in Shrink (manual):  0.039925
+Debug: Time elapsed in Uncurry (manual):  0.009023
+Debug: Time elapsed in Inline uncurry wrappers:  0.034410
+Debug: Time elapsed in Inline/shrink loop:  0.402220
+Debug: Time elapsed in Shrink (manual):  0.012030
+Debug: Time elapsed in Closure conversion and hoisting:  0.031219
+Debug: Time elapsed in Shrink (manual):  0.038366
+Debug: Time elapsed in Inline/shrink loop:  0.448759
+Debug: Time elapsed in Dead param elim:  0.003446
+Debug: Time elapsed in Shrink (manual):  0.034356
+Debug: Time elapsed in L6 Pipeline:  1.055355
+Debug: Time elapsed in L7:  0.371310
+Debug: Printed to file in 0.327121 s..
+binom:
+Debug: Time elapsed in Lbox:  0.041663
+Debug: Time elapsed in L1g:  0.005718
+Debug: Time elapsed in L2k:  0.000707
+Debug: Time elapsed in L2k_eta:  0.000161
+Debug: Time elapsed in L4:  0.000314
+Debug: Time elapsed in L6 ANF:  0.109902
+Debug: Time elapsed in Shrink (manual):  0.017980
+Debug: Time elapsed in Uncurry (manual):  0.000985
+Debug: Time elapsed in Inline uncurry wrappers:  0.015567
+Debug: Time elapsed in Inline/shrink loop:  0.065587
+Debug: Time elapsed in Shrink (manual):  0.011709
+Debug: Time elapsed in Closure conversion and hoisting:  0.009753
+Debug: Time elapsed in Shrink (manual):  0.012612
+Debug: Time elapsed in Inline/shrink loop:  0.029565
+Debug: Time elapsed in Dead param elim:  0.000838
+Debug: Time elapsed in Shrink (manual):  0.011471
+Debug: Time elapsed in L6 Pipeline:  0.176806
+Debug: Time elapsed in L7:  0.133738
+Debug: Printed to file in 0.161257 s..
+color:
+Debug: Time elapsed in Lbox:  10.133280
+Debug: Time elapsed in L1g:  0.070226
+Debug: Time elapsed in L2k:  0.001674
+Debug: Time elapsed in L2k_eta:  0.001281
+Debug: Time elapsed in L4:  0.001799
+Debug: Time elapsed in L6 ANF:  0.113209
+Debug: Time elapsed in Shrink (manual):  0.139947
+Debug: Time elapsed in Uncurry (manual):  0.006763
+Debug: Time elapsed in Inline uncurry wrappers:  0.172672
+Debug: Time elapsed in Inline/shrink loop:  0.662436
+Debug: Time elapsed in Shrink (manual):  0.089135
+Debug: Time elapsed in Closure conversion and hoisting:  0.073653
+Debug: Time elapsed in Shrink (manual):  0.102693
+Debug: Time elapsed in Inline/shrink loop:  1.068480
+Debug: Time elapsed in Dead param elim:  0.003753
+Debug: Time elapsed in Shrink (manual):  0.091089
+Debug: Time elapsed in L6 Pipeline:  2.411930
+Debug: Time elapsed in L7:  3.422300
+Debug: Printed to file in 1.204298 s..
+sha:
+Debug: Time elapsed in Lbox:  3.953494
+Debug: Time elapsed in L1g:  0.024717
+Debug: Time elapsed in L2k:  0.001118
+Debug: Time elapsed in L2k_eta:  0.000521
+Debug: Time elapsed in L4:  0.001599
+Debug: Time elapsed in L6 ANF:  0.088157
+Debug: Time elapsed in Shrink (manual):  0.048303
+Debug: Time elapsed in Uncurry (manual):  0.003863
+Debug: Time elapsed in Inline uncurry wrappers:  0.073535
+Debug: Time elapsed in Inline/shrink loop:  0.619867
+Debug: Time elapsed in Shrink (manual):  0.037892
+Debug: Time elapsed in Closure conversion and hoisting:  0.036122
+Debug: Time elapsed in Shrink (manual):  0.051194
+Debug: Time elapsed in Inline/shrink loop:  0.557518
+Debug: Time elapsed in Dead param elim:  0.003296
+Debug: Time elapsed in Shrink (manual):  0.039925
+Debug: Time elapsed in L6 Pipeline:  1.472404
+Debug: Time elapsed in L7:  0.846398
+Debug: Printed to file in 0.350836 s..
+---------- shrink proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.891257
+Debug: Time elapsed in L1g:  0.015152
+Debug: Time elapsed in L2k:  0.000487
+Debug: Time elapsed in L2k_eta:  0.000705
+Debug: Time elapsed in L4:  0.005371
+Debug: Time elapsed in L6 ANF:  0.018550
+Debug: Time elapsed in Partial shrink (tool-derived):  0.050185
+Debug: Time elapsed in Uncurry (manual):  0.014831
+Debug: Time elapsed in Inline uncurry wrappers:  0.084698
+Debug: Time elapsed in Inline/shrink loop:  0.331392
+Debug: Time elapsed in Partial shrink (tool-derived):  0.023047
+Debug: Time elapsed in Closure conversion and hoisting:  0.030594
+Debug: Time elapsed in Partial shrink (tool-derived):  0.119867
+Debug: Time elapsed in Inline/shrink loop:  0.431348
+Debug: Time elapsed in Dead param elim:  0.003360
+Debug: Time elapsed in Partial shrink (tool-derived):  0.076037
+Debug: Time elapsed in L6 Pipeline:  1.166988
+Debug: Time elapsed in L7:  0.383164
+Debug: Printed to file in 0.298050 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.727860
+Debug: Time elapsed in L1g:  0.014243
+Debug: Time elapsed in L2k:  0.000539
+Debug: Time elapsed in L2k_eta:  0.000767
+Debug: Time elapsed in L4:  0.005437
+Debug: Time elapsed in L6 ANF:  0.023283
+Debug: Time elapsed in Partial shrink (tool-derived):  0.047497
+Debug: Time elapsed in Uncurry (manual):  0.016021
+Debug: Time elapsed in Inline uncurry wrappers:  0.100327
+Debug: Time elapsed in Inline/shrink loop:  0.499205
+Debug: Time elapsed in Partial shrink (tool-derived):  0.029850
+Debug: Time elapsed in Closure conversion and hoisting:  0.030887
+Debug: Time elapsed in Partial shrink (tool-derived):  0.111398
+Debug: Time elapsed in Inline/shrink loop:  0.444154
+Debug: Time elapsed in Dead param elim:  0.003608
+Debug: Time elapsed in Partial shrink (tool-derived):  0.069475
+Debug: Time elapsed in L6 Pipeline:  1.353453
+Debug: Time elapsed in L7:  0.372073
+Debug: Printed to file in 0.348904 s..
+binom:
+Debug: Time elapsed in Lbox:  0.049228
+Debug: Time elapsed in L1g:  0.005838
+Debug: Time elapsed in L2k:  0.000735
+Debug: Time elapsed in L2k_eta:  0.000172
+Debug: Time elapsed in L4:  0.000315
+Debug: Time elapsed in L6 ANF:  0.110637
+Debug: Time elapsed in Partial shrink (tool-derived):  0.010965
+Debug: Time elapsed in Uncurry (manual):  0.001735
+Debug: Time elapsed in Inline uncurry wrappers:  0.019402
+Debug: Time elapsed in Inline/shrink loop:  0.067097
+Debug: Time elapsed in Partial shrink (tool-derived):  0.010941
+Debug: Time elapsed in Closure conversion and hoisting:  0.013164
+Debug: Time elapsed in Partial shrink (tool-derived):  0.008054
+Debug: Time elapsed in Inline/shrink loop:  0.028635
+Debug: Time elapsed in Dead param elim:  0.000992
+Debug: Time elapsed in Partial shrink (tool-derived):  0.009806
+Debug: Time elapsed in L6 Pipeline:  0.171604
+Debug: Time elapsed in L7:  0.145577
+Debug: Printed to file in 0.142783 s..
+color:
+Debug: Time elapsed in Lbox:  9.405700
+Debug: Time elapsed in L1g:  0.070470
+Debug: Time elapsed in L2k:  0.001727
+Debug: Time elapsed in L2k_eta:  0.001129
+Debug: Time elapsed in L4:  0.001795
+Debug: Time elapsed in L6 ANF:  0.103609
+Debug: Time elapsed in Partial shrink (tool-derived):  0.133526
+Debug: Time elapsed in Uncurry (manual):  0.014087
+Debug: Time elapsed in Inline uncurry wrappers:  0.129516
+Debug: Time elapsed in Inline/shrink loop:  0.698518
+Debug: Time elapsed in Partial shrink (tool-derived):  0.153011
+Debug: Time elapsed in Closure conversion and hoisting:  0.072115
+Debug: Time elapsed in Partial shrink (tool-derived):  0.076614
+Debug: Time elapsed in Inline/shrink loop:  1.154376
+Debug: Time elapsed in Dead param elim:  0.006791
+Debug: Time elapsed in Partial shrink (tool-derived):  0.074487
+Debug: Time elapsed in L6 Pipeline:  2.514633
+Debug: Time elapsed in L7:  3.386847
+Debug: Printed to file in 1.069300 s..
+sha:
+Debug: Time elapsed in Lbox:  3.867845
+Debug: Time elapsed in L1g:  0.024700
+Debug: Time elapsed in L2k:  0.000966
+Debug: Time elapsed in L2k_eta:  0.000509
+Debug: Time elapsed in L4:  0.001634
+Debug: Time elapsed in L6 ANF:  0.099401
+Debug: Time elapsed in Partial shrink (tool-derived):  0.065379
+Debug: Time elapsed in Uncurry (manual):  0.007884
+Debug: Time elapsed in Inline uncurry wrappers:  0.061092
+Debug: Time elapsed in Inline/shrink loop:  0.390389
+Debug: Time elapsed in Partial shrink (tool-derived):  0.065930
+Debug: Time elapsed in Closure conversion and hoisting:  0.036721
+Debug: Time elapsed in Partial shrink (tool-derived):  0.042436
+Debug: Time elapsed in Inline/shrink loop:  0.774795
+Debug: Time elapsed in Dead param elim:  0.003482
+Debug: Time elapsed in Partial shrink (tool-derived):  0.040520
+Debug: Time elapsed in L6 Pipeline:  1.489609
+Debug: Time elapsed in L7:  0.849814
+Debug: Printed to file in 0.337017 s..
+---------- uncurry proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.749138
+Debug: Time elapsed in L1g:  0.015129
+Debug: Time elapsed in L2k:  0.000486
+Debug: Time elapsed in L2k_eta:  0.000722
+Debug: Time elapsed in L4:  0.005360
+Debug: Time elapsed in L6 ANF:  0.073390
+Debug: Time elapsed in Shrink (manual):  0.042771
+Debug: Time elapsed in Uncurry (tool-derived):  0.004644
+Debug: Time elapsed in Inline uncurry wrappers:  0.031236
+Debug: Time elapsed in Inline/shrink loop:  0.215397
+Debug: Time elapsed in Shrink (manual):  0.012524
+Debug: Time elapsed in Closure conversion and hoisting:  0.030119
+Debug: Time elapsed in Shrink (manual):  0.040346
+Debug: Time elapsed in Inline/shrink loop:  0.458412
+Debug: Time elapsed in Dead param elim:  0.003491
+Debug: Time elapsed in Shrink (manual):  0.020101
+Debug: Time elapsed in L6 Pipeline:  0.860659
+Debug: Time elapsed in L7:  0.358378
+Debug: Printed to file in 0.310884 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.676744
+Debug: Time elapsed in L1g:  0.014003
+Debug: Time elapsed in L2k:  0.000493
+Debug: Time elapsed in L2k_eta:  0.000717
+Debug: Time elapsed in L4:  0.005443
+Debug: Time elapsed in L6 ANF:  0.021988
+Debug: Time elapsed in Shrink (manual):  0.045504
+Debug: Time elapsed in Uncurry (tool-derived):  0.003947
+Debug: Time elapsed in Inline uncurry wrappers:  0.032189
+Debug: Time elapsed in Inline/shrink loop:  0.395016
+Debug: Time elapsed in Shrink (manual):  0.015253
+Debug: Time elapsed in Closure conversion and hoisting:  0.029022
+Debug: Time elapsed in Shrink (manual):  0.040412
+Debug: Time elapsed in Inline/shrink loop:  0.465292
+Debug: Time elapsed in Dead param elim:  0.002989
+Debug: Time elapsed in Shrink (manual):  0.019856
+Debug: Time elapsed in L6 Pipeline:  1.051840
+Debug: Time elapsed in L7:  0.365407
+Debug: Printed to file in 0.314593 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042357
+Debug: Time elapsed in L1g:  0.005849
+Debug: Time elapsed in L2k:  0.000741
+Debug: Time elapsed in L2k_eta:  0.000187
+Debug: Time elapsed in L4:  0.000310
+Debug: Time elapsed in L6 ANF:  0.118972
+Debug: Time elapsed in Shrink (manual):  0.012584
+Debug: Time elapsed in Uncurry (tool-derived):  0.000799
+Debug: Time elapsed in Inline uncurry wrappers:  0.014143
+Debug: Time elapsed in Inline/shrink loop:  0.058749
+Debug: Time elapsed in Shrink (manual):  0.011960
+Debug: Time elapsed in Closure conversion and hoisting:  0.009916
+Debug: Time elapsed in Shrink (manual):  0.018698
+Debug: Time elapsed in Inline/shrink loop:  0.027369
+Debug: Time elapsed in Dead param elim:  0.000933
+Debug: Time elapsed in Shrink (manual):  0.013727
+Debug: Time elapsed in L6 Pipeline:  0.169482
+Debug: Time elapsed in L7:  0.132899
+Debug: Printed to file in 0.285520 s..
+color:
+Debug: Time elapsed in Lbox:  9.698397
+Debug: Time elapsed in L1g:  0.070884
+Debug: Time elapsed in L2k:  0.001689
+Debug: Time elapsed in L2k_eta:  0.001287
+Debug: Time elapsed in L4:  0.001851
+Debug: Time elapsed in L6 ANF:  0.108095
+Debug: Time elapsed in Shrink (manual):  0.131801
+Debug: Time elapsed in Uncurry (tool-derived):  0.006682
+Debug: Time elapsed in Inline uncurry wrappers:  0.146295
+Debug: Time elapsed in Inline/shrink loop:  0.638683
+Debug: Time elapsed in Shrink (manual):  0.088825
+Debug: Time elapsed in Closure conversion and hoisting:  0.069456
+Debug: Time elapsed in Shrink (manual):  0.104998
+Debug: Time elapsed in Inline/shrink loop:  1.078666
+Debug: Time elapsed in Dead param elim:  0.005753
+Debug: Time elapsed in Shrink (manual):  0.093682
+Debug: Time elapsed in L6 Pipeline:  2.366319
+Debug: Time elapsed in L7:  3.428690
+Debug: Printed to file in 2.149635 s..
+sha:
+Debug: Time elapsed in Lbox:  3.759059
+Debug: Time elapsed in L1g:  0.024934
+Debug: Time elapsed in L2k:  0.001011
+Debug: Time elapsed in L2k_eta:  0.000523
+Debug: Time elapsed in L4:  0.001646
+Debug: Time elapsed in L6 ANF:  0.088565
+Debug: Time elapsed in Shrink (manual):  0.045451
+Debug: Time elapsed in Uncurry (tool-derived):  0.003770
+Debug: Time elapsed in Inline uncurry wrappers:  0.051608
+Debug: Time elapsed in Inline/shrink loop:  0.579857
+Debug: Time elapsed in Shrink (manual):  0.036171
+Debug: Time elapsed in Closure conversion and hoisting:  0.033612
+Debug: Time elapsed in Shrink (manual):  0.048300
+Debug: Time elapsed in Inline/shrink loop:  0.551051
+Debug: Time elapsed in Dead param elim:  0.008070
+Debug: Time elapsed in Shrink (manual):  0.031883
+Debug: Time elapsed in L6 Pipeline:  1.390742
+Debug: Time elapsed in L7:  0.839466
+Debug: Printed to file in 0.335209 s..
+-------------------- run 4 --------------------
+---------- all manual ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.663617
+Debug: Time elapsed in L1g:  0.015381
+Debug: Time elapsed in L2k:  0.000512
+Debug: Time elapsed in L2k_eta:  0.000752
+Debug: Time elapsed in L4:  0.005406
+Debug: Time elapsed in L6 ANF:  0.022178
+Debug: Time elapsed in Shrink (manual):  0.036199
+Debug: Time elapsed in Uncurry (manual):  0.005978
+Debug: Time elapsed in Inline uncurry wrappers:  0.033631
+Debug: Time elapsed in Inline/shrink loop:  0.219591
+Debug: Time elapsed in Shrink (manual):  0.011612
+Debug: Time elapsed in Closure conversion and hoisting:  0.030091
+Debug: Time elapsed in Shrink (manual):  0.035172
+Debug: Time elapsed in Inline/shrink loop:  0.438473
+Debug: Time elapsed in Dead param elim:  0.003524
+Debug: Time elapsed in Shrink (manual):  0.020996
+Debug: Time elapsed in L6 Pipeline:  0.846037
+Debug: Time elapsed in L7:  0.355266
+Debug: Printed to file in 0.305653 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.802234
+Debug: Time elapsed in L1g:  0.014054
+Debug: Time elapsed in L2k:  0.000509
+Debug: Time elapsed in L2k_eta:  0.000755
+Debug: Time elapsed in L4:  0.005444
+Debug: Time elapsed in L6 ANF:  0.020100
+Debug: Time elapsed in Shrink (manual):  0.039816
+Debug: Time elapsed in Uncurry (manual):  0.009111
+Debug: Time elapsed in Inline uncurry wrappers:  0.028866
+Debug: Time elapsed in Inline/shrink loop:  0.399116
+Debug: Time elapsed in Shrink (manual):  0.011795
+Debug: Time elapsed in Closure conversion and hoisting:  0.030529
+Debug: Time elapsed in Shrink (manual):  0.037831
+Debug: Time elapsed in Inline/shrink loop:  0.455560
+Debug: Time elapsed in Dead param elim:  0.003438
+Debug: Time elapsed in Shrink (manual):  0.034364
+Debug: Time elapsed in L6 Pipeline:  1.052034
+Debug: Time elapsed in L7:  0.365213
+Debug: Printed to file in 0.320538 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042292
+Debug: Time elapsed in L1g:  0.005747
+Debug: Time elapsed in L2k:  0.000735
+Debug: Time elapsed in L2k_eta:  0.000171
+Debug: Time elapsed in L4:  0.000301
+Debug: Time elapsed in L6 ANF:  0.110366
+Debug: Time elapsed in Shrink (manual):  0.018399
+Debug: Time elapsed in Uncurry (manual):  0.000967
+Debug: Time elapsed in Inline uncurry wrappers:  0.015488
+Debug: Time elapsed in Inline/shrink loop:  0.065565
+Debug: Time elapsed in Shrink (manual):  0.011700
+Debug: Time elapsed in Closure conversion and hoisting:  0.009736
+Debug: Time elapsed in Shrink (manual):  0.012598
+Debug: Time elapsed in Inline/shrink loop:  0.027917
+Debug: Time elapsed in Dead param elim:  0.000806
+Debug: Time elapsed in Shrink (manual):  0.011127
+Debug: Time elapsed in L6 Pipeline:  0.175034
+Debug: Time elapsed in L7:  0.130576
+Debug: Printed to file in 0.163347 s..
+color:
+Debug: Time elapsed in Lbox:  10.145672
+Debug: Time elapsed in L1g:  0.071592
+Debug: Time elapsed in L2k:  0.001695
+Debug: Time elapsed in L2k_eta:  0.001310
+Debug: Time elapsed in L4:  0.001847
+Debug: Time elapsed in L6 ANF:  0.112812
+Debug: Time elapsed in Shrink (manual):  0.138506
+Debug: Time elapsed in Uncurry (manual):  0.006477
+Debug: Time elapsed in Inline uncurry wrappers:  0.170941
+Debug: Time elapsed in Inline/shrink loop:  0.688171
+Debug: Time elapsed in Shrink (manual):  0.089353
+Debug: Time elapsed in Closure conversion and hoisting:  0.071748
+Debug: Time elapsed in Shrink (manual):  0.101264
+Debug: Time elapsed in Inline/shrink loop:  1.069575
+Debug: Time elapsed in Dead param elim:  0.003840
+Debug: Time elapsed in Shrink (manual):  0.093494
+Debug: Time elapsed in L6 Pipeline:  2.434743
+Debug: Time elapsed in L7:  3.475771
+Debug: Printed to file in 1.212488 s..
+sha:
+Debug: Time elapsed in Lbox:  4.940204
+Debug: Time elapsed in L1g:  0.028474
+Debug: Time elapsed in L2k:  0.002162
+Debug: Time elapsed in L2k_eta:  0.001308
+Debug: Time elapsed in L4:  0.002638
+Debug: Time elapsed in L6 ANF:  0.111416
+Debug: Time elapsed in Shrink (manual):  0.062082
+Debug: Time elapsed in Uncurry (manual):  0.004236
+Debug: Time elapsed in Inline uncurry wrappers:  0.094987
+Debug: Time elapsed in Inline/shrink loop:  0.776998
+Debug: Time elapsed in Shrink (manual):  0.048548
+Debug: Time elapsed in Closure conversion and hoisting:  0.044495
+Debug: Time elapsed in Shrink (manual):  0.062274
+Debug: Time elapsed in Inline/shrink loop:  0.682053
+Debug: Time elapsed in Dead param elim:  0.003583
+Debug: Time elapsed in Shrink (manual):  0.049035
+Debug: Time elapsed in L6 Pipeline:  1.829346
+Debug: Time elapsed in L7:  1.006265
+Debug: Printed to file in 0.397814 s..
+---------- shrink proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.977067
+Debug: Time elapsed in L1g:  0.015863
+Debug: Time elapsed in L2k:  0.000540
+Debug: Time elapsed in L2k_eta:  0.000736
+Debug: Time elapsed in L4:  0.005638
+Debug: Time elapsed in L6 ANF:  0.019122
+Debug: Time elapsed in Partial shrink (tool-derived):  0.057121
+Debug: Time elapsed in Uncurry (manual):  0.015763
+Debug: Time elapsed in Inline uncurry wrappers:  0.086986
+Debug: Time elapsed in Inline/shrink loop:  0.355803
+Debug: Time elapsed in Partial shrink (tool-derived):  0.028494
+Debug: Time elapsed in Closure conversion and hoisting:  0.033687
+Debug: Time elapsed in Partial shrink (tool-derived):  0.124561
+Debug: Time elapsed in Inline/shrink loop:  0.454694
+Debug: Time elapsed in Dead param elim:  0.003409
+Debug: Time elapsed in Partial shrink (tool-derived):  0.077640
+Debug: Time elapsed in L6 Pipeline:  1.239892
+Debug: Time elapsed in L7:  0.418912
+Debug: Printed to file in 0.377147 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.773932
+Debug: Time elapsed in L1g:  0.014021
+Debug: Time elapsed in L2k:  0.000497
+Debug: Time elapsed in L2k_eta:  0.000740
+Debug: Time elapsed in L4:  0.005440
+Debug: Time elapsed in L6 ANF:  0.022963
+Debug: Time elapsed in Partial shrink (tool-derived):  0.045883
+Debug: Time elapsed in Uncurry (manual):  0.015748
+Debug: Time elapsed in Inline uncurry wrappers:  0.090774
+Debug: Time elapsed in Inline/shrink loop:  0.484077
+Debug: Time elapsed in Partial shrink (tool-derived):  0.029085
+Debug: Time elapsed in Closure conversion and hoisting:  0.030074
+Debug: Time elapsed in Partial shrink (tool-derived):  0.110227
+Debug: Time elapsed in Inline/shrink loop:  0.443006
+Debug: Time elapsed in Dead param elim:  0.003512
+Debug: Time elapsed in Partial shrink (tool-derived):  0.069924
+Debug: Time elapsed in L6 Pipeline:  1.323345
+Debug: Time elapsed in L7:  0.367873
+Debug: Printed to file in 0.352292 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042660
+Debug: Time elapsed in L1g:  0.005774
+Debug: Time elapsed in L2k:  0.000703
+Debug: Time elapsed in L2k_eta:  0.000159
+Debug: Time elapsed in L4:  0.000305
+Debug: Time elapsed in L6 ANF:  0.108596
+Debug: Time elapsed in Partial shrink (tool-derived):  0.010536
+Debug: Time elapsed in Uncurry (manual):  0.001650
+Debug: Time elapsed in Inline uncurry wrappers:  0.018728
+Debug: Time elapsed in Inline/shrink loop:  0.063555
+Debug: Time elapsed in Partial shrink (tool-derived):  0.010677
+Debug: Time elapsed in Closure conversion and hoisting:  0.012536
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007586
+Debug: Time elapsed in Inline/shrink loop:  0.026012
+Debug: Time elapsed in Dead param elim:  0.000853
+Debug: Time elapsed in Partial shrink (tool-derived):  0.008388
+Debug: Time elapsed in L6 Pipeline:  0.161273
+Debug: Time elapsed in L7:  0.127814
+Debug: Printed to file in 0.135702 s..
+color:
+Debug: Time elapsed in Lbox:  9.256760
+Debug: Time elapsed in L1g:  0.069713
+Debug: Time elapsed in L2k:  0.001659
+Debug: Time elapsed in L2k_eta:  0.001084
+Debug: Time elapsed in L4:  0.001739
+Debug: Time elapsed in L6 ANF:  0.101620
+Debug: Time elapsed in Partial shrink (tool-derived):  0.131016
+Debug: Time elapsed in Uncurry (manual):  0.013794
+Debug: Time elapsed in Inline uncurry wrappers:  0.127858
+Debug: Time elapsed in Inline/shrink loop:  0.686684
+Debug: Time elapsed in Partial shrink (tool-derived):  0.150252
+Debug: Time elapsed in Closure conversion and hoisting:  0.070837
+Debug: Time elapsed in Partial shrink (tool-derived):  0.076263
+Debug: Time elapsed in Inline/shrink loop:  1.136336
+Debug: Time elapsed in Dead param elim:  0.006560
+Debug: Time elapsed in Partial shrink (tool-derived):  0.078104
+Debug: Time elapsed in L6 Pipeline:  2.479288
+Debug: Time elapsed in L7:  3.334319
+Debug: Printed to file in 1.185562 s..
+sha:
+Debug: Time elapsed in Lbox:  3.909362
+Debug: Time elapsed in L1g:  0.025001
+Debug: Time elapsed in L2k:  0.001013
+Debug: Time elapsed in L2k_eta:  0.000522
+Debug: Time elapsed in L4:  0.001582
+Debug: Time elapsed in L6 ANF:  0.099936
+Debug: Time elapsed in Partial shrink (tool-derived):  0.065870
+Debug: Time elapsed in Uncurry (manual):  0.007655
+Debug: Time elapsed in Inline uncurry wrappers:  0.056342
+Debug: Time elapsed in Inline/shrink loop:  0.397902
+Debug: Time elapsed in Partial shrink (tool-derived):  0.066980
+Debug: Time elapsed in Closure conversion and hoisting:  0.037007
+Debug: Time elapsed in Partial shrink (tool-derived):  0.042267
+Debug: Time elapsed in Inline/shrink loop:  0.775101
+Debug: Time elapsed in Dead param elim:  0.003607
+Debug: Time elapsed in Partial shrink (tool-derived):  0.039356
+Debug: Time elapsed in L6 Pipeline:  1.493067
+Debug: Time elapsed in L7:  0.823981
+Debug: Printed to file in 0.341296 s..
+---------- uncurry proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.744058
+Debug: Time elapsed in L1g:  0.015223
+Debug: Time elapsed in L2k:  0.000498
+Debug: Time elapsed in L2k_eta:  0.000711
+Debug: Time elapsed in L4:  0.005396
+Debug: Time elapsed in L6 ANF:  0.073797
+Debug: Time elapsed in Shrink (manual):  0.043800
+Debug: Time elapsed in Uncurry (tool-derived):  0.004633
+Debug: Time elapsed in Inline uncurry wrappers:  0.031947
+Debug: Time elapsed in Inline/shrink loop:  0.216544
+Debug: Time elapsed in Shrink (manual):  0.012521
+Debug: Time elapsed in Closure conversion and hoisting:  0.029957
+Debug: Time elapsed in Shrink (manual):  0.039416
+Debug: Time elapsed in Inline/shrink loop:  0.437597
+Debug: Time elapsed in Dead param elim:  0.003499
+Debug: Time elapsed in Shrink (manual):  0.019988
+Debug: Time elapsed in L6 Pipeline:  0.841536
+Debug: Time elapsed in L7:  0.361207
+Debug: Printed to file in 0.302502 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.675667
+Debug: Time elapsed in L1g:  0.013872
+Debug: Time elapsed in L2k:  0.000489
+Debug: Time elapsed in L2k_eta:  0.000715
+Debug: Time elapsed in L4:  0.005499
+Debug: Time elapsed in L6 ANF:  0.019607
+Debug: Time elapsed in Shrink (manual):  0.043281
+Debug: Time elapsed in Uncurry (tool-derived):  0.003888
+Debug: Time elapsed in Inline uncurry wrappers:  0.031687
+Debug: Time elapsed in Inline/shrink loop:  0.400197
+Debug: Time elapsed in Shrink (manual):  0.015343
+Debug: Time elapsed in Closure conversion and hoisting:  0.029175
+Debug: Time elapsed in Shrink (manual):  0.040579
+Debug: Time elapsed in Inline/shrink loop:  0.461345
+Debug: Time elapsed in Dead param elim:  0.002903
+Debug: Time elapsed in Shrink (manual):  0.019063
+Debug: Time elapsed in L6 Pipeline:  1.049058
+Debug: Time elapsed in L7:  0.388241
+Debug: Printed to file in 0.319813 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042340
+Debug: Time elapsed in L1g:  0.005903
+Debug: Time elapsed in L2k:  0.000739
+Debug: Time elapsed in L2k_eta:  0.000182
+Debug: Time elapsed in L4:  0.000311
+Debug: Time elapsed in L6 ANF:  0.120366
+Debug: Time elapsed in Shrink (manual):  0.011843
+Debug: Time elapsed in Uncurry (tool-derived):  0.000786
+Debug: Time elapsed in Inline uncurry wrappers:  0.014250
+Debug: Time elapsed in Inline/shrink loop:  0.058448
+Debug: Time elapsed in Shrink (manual):  0.011179
+Debug: Time elapsed in Closure conversion and hoisting:  0.009490
+Debug: Time elapsed in Shrink (manual):  0.017272
+Debug: Time elapsed in Inline/shrink loop:  0.026395
+Debug: Time elapsed in Dead param elim:  0.000918
+Debug: Time elapsed in Shrink (manual):  0.013748
+Debug: Time elapsed in L6 Pipeline:  0.164927
+Debug: Time elapsed in L7:  0.137132
+Debug: Printed to file in 0.284898 s..
+color:
+Debug: Time elapsed in Lbox:  9.669810
+Debug: Time elapsed in L1g:  0.072067
+Debug: Time elapsed in L2k:  0.001692
+Debug: Time elapsed in L2k_eta:  0.001100
+Debug: Time elapsed in L4:  0.001839
+Debug: Time elapsed in L6 ANF:  0.110402
+Debug: Time elapsed in Shrink (manual):  0.133797
+Debug: Time elapsed in Uncurry (tool-derived):  0.006686
+Debug: Time elapsed in Inline uncurry wrappers:  0.145799
+Debug: Time elapsed in Inline/shrink loop:  0.639678
+Debug: Time elapsed in Shrink (manual):  0.089667
+Debug: Time elapsed in Closure conversion and hoisting:  0.069406
+Debug: Time elapsed in Shrink (manual):  0.101113
+Debug: Time elapsed in Inline/shrink loop:  1.076070
+Debug: Time elapsed in Dead param elim:  0.005400
+Debug: Time elapsed in Shrink (manual):  0.094273
+Debug: Time elapsed in L6 Pipeline:  2.363408
+Debug: Time elapsed in L7:  3.427874
+Debug: Printed to file in 2.154060 s..
+sha:
+Debug: Time elapsed in Lbox:  3.768745
+Debug: Time elapsed in L1g:  0.024433
+Debug: Time elapsed in L2k:  0.000968
+Debug: Time elapsed in L2k_eta:  0.000509
+Debug: Time elapsed in L4:  0.001631
+Debug: Time elapsed in L6 ANF:  0.087985
+Debug: Time elapsed in Shrink (manual):  0.046294
+Debug: Time elapsed in Uncurry (tool-derived):  0.003988
+Debug: Time elapsed in Inline uncurry wrappers:  0.051272
+Debug: Time elapsed in Inline/shrink loop:  0.583443
+Debug: Time elapsed in Shrink (manual):  0.036963
+Debug: Time elapsed in Closure conversion and hoisting:  0.033275
+Debug: Time elapsed in Shrink (manual):  0.049006
+Debug: Time elapsed in Inline/shrink loop:  0.569622
+Debug: Time elapsed in Dead param elim:  0.008266
+Debug: Time elapsed in Shrink (manual):  0.032457
+Debug: Time elapsed in L6 Pipeline:  1.415518
+Debug: Time elapsed in L7:  0.834055
+Debug: Printed to file in 0.344619 s..
+-------------------- run 5 --------------------
+---------- all manual ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.665122
+Debug: Time elapsed in L1g:  0.015426
+Debug: Time elapsed in L2k:  0.000501
+Debug: Time elapsed in L2k_eta:  0.000716
+Debug: Time elapsed in L4:  0.005428
+Debug: Time elapsed in L6 ANF:  0.021451
+Debug: Time elapsed in Shrink (manual):  0.036374
+Debug: Time elapsed in Uncurry (manual):  0.005973
+Debug: Time elapsed in Inline uncurry wrappers:  0.033474
+Debug: Time elapsed in Inline/shrink loop:  0.215729
+Debug: Time elapsed in Shrink (manual):  0.012001
+Debug: Time elapsed in Closure conversion and hoisting:  0.030213
+Debug: Time elapsed in Shrink (manual):  0.035297
+Debug: Time elapsed in Inline/shrink loop:  0.434788
+Debug: Time elapsed in Dead param elim:  0.003634
+Debug: Time elapsed in Shrink (manual):  0.020735
+Debug: Time elapsed in L6 Pipeline:  0.829285
+Debug: Time elapsed in L7:  0.358706
+Debug: Printed to file in 0.305658 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.791739
+Debug: Time elapsed in L1g:  0.013942
+Debug: Time elapsed in L2k:  0.000499
+Debug: Time elapsed in L2k_eta:  0.000715
+Debug: Time elapsed in L4:  0.005429
+Debug: Time elapsed in L6 ANF:  0.018921
+Debug: Time elapsed in Shrink (manual):  0.039107
+Debug: Time elapsed in Uncurry (manual):  0.009009
+Debug: Time elapsed in Inline uncurry wrappers:  0.028785
+Debug: Time elapsed in Inline/shrink loop:  0.401015
+Debug: Time elapsed in Shrink (manual):  0.011897
+Debug: Time elapsed in Closure conversion and hoisting:  0.030815
+Debug: Time elapsed in Shrink (manual):  0.037641
+Debug: Time elapsed in Inline/shrink loop:  0.450035
+Debug: Time elapsed in Dead param elim:  0.003505
+Debug: Time elapsed in Shrink (manual):  0.034054
+Debug: Time elapsed in L6 Pipeline:  1.047512
+Debug: Time elapsed in L7:  0.365766
+Debug: Printed to file in 0.320314 s..
+binom:
+Debug: Time elapsed in Lbox:  0.041636
+Debug: Time elapsed in L1g:  0.005760
+Debug: Time elapsed in L2k:  0.000712
+Debug: Time elapsed in L2k_eta:  0.000163
+Debug: Time elapsed in L4:  0.000305
+Debug: Time elapsed in L6 ANF:  0.112838
+Debug: Time elapsed in Shrink (manual):  0.018091
+Debug: Time elapsed in Uncurry (manual):  0.000985
+Debug: Time elapsed in Inline uncurry wrappers:  0.015682
+Debug: Time elapsed in Inline/shrink loop:  0.064723
+Debug: Time elapsed in Shrink (manual):  0.011383
+Debug: Time elapsed in Closure conversion and hoisting:  0.009711
+Debug: Time elapsed in Shrink (manual):  0.012677
+Debug: Time elapsed in Inline/shrink loop:  0.027250
+Debug: Time elapsed in Dead param elim:  0.000820
+Debug: Time elapsed in Shrink (manual):  0.011005
+Debug: Time elapsed in L6 Pipeline:  0.173063
+Debug: Time elapsed in L7:  0.129479
+Debug: Printed to file in 0.160265 s..
+color:
+Debug: Time elapsed in Lbox:  10.167252
+Debug: Time elapsed in L1g:  0.075342
+Debug: Time elapsed in L2k:  0.001706
+Debug: Time elapsed in L2k_eta:  0.001133
+Debug: Time elapsed in L4:  0.001872
+Debug: Time elapsed in L6 ANF:  0.112210
+Debug: Time elapsed in Shrink (manual):  0.139223
+Debug: Time elapsed in Uncurry (manual):  0.006681
+Debug: Time elapsed in Inline uncurry wrappers:  0.171216
+Debug: Time elapsed in Inline/shrink loop:  0.672070
+Debug: Time elapsed in Shrink (manual):  0.089331
+Debug: Time elapsed in Closure conversion and hoisting:  0.070675
+Debug: Time elapsed in Shrink (manual):  0.099703
+Debug: Time elapsed in Inline/shrink loop:  1.067138
+Debug: Time elapsed in Dead param elim:  0.003787
+Debug: Time elapsed in Shrink (manual):  0.091290
+Debug: Time elapsed in L6 Pipeline:  2.412453
+Debug: Time elapsed in L7:  3.368196
+Debug: Printed to file in 1.204555 s..
+sha:
+Debug: Time elapsed in Lbox:  3.948064
+Debug: Time elapsed in L1g:  0.024541
+Debug: Time elapsed in L2k:  0.000968
+Debug: Time elapsed in L2k_eta:  0.000499
+Debug: Time elapsed in L4:  0.001592
+Debug: Time elapsed in L6 ANF:  0.087437
+Debug: Time elapsed in Shrink (manual):  0.048048
+Debug: Time elapsed in Uncurry (manual):  0.003813
+Debug: Time elapsed in Inline uncurry wrappers:  0.074646
+Debug: Time elapsed in Inline/shrink loop:  0.617050
+Debug: Time elapsed in Shrink (manual):  0.038232
+Debug: Time elapsed in Closure conversion and hoisting:  0.035860
+Debug: Time elapsed in Shrink (manual):  0.050664
+Debug: Time elapsed in Inline/shrink loop:  0.555535
+Debug: Time elapsed in Dead param elim:  0.003264
+Debug: Time elapsed in Shrink (manual):  0.039610
+Debug: Time elapsed in L6 Pipeline:  1.467611
+Debug: Time elapsed in L7:  0.838148
+Debug: Printed to file in 0.353964 s..
+---------- shrink proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.890758
+Debug: Time elapsed in L1g:  0.014740
+Debug: Time elapsed in L2k:  0.000488
+Debug: Time elapsed in L2k_eta:  0.000696
+Debug: Time elapsed in L4:  0.005379
+Debug: Time elapsed in L6 ANF:  0.018361
+Debug: Time elapsed in Partial shrink (tool-derived):  0.049410
+Debug: Time elapsed in Uncurry (manual):  0.014898
+Debug: Time elapsed in Inline uncurry wrappers:  0.085071
+Debug: Time elapsed in Inline/shrink loop:  0.331769
+Debug: Time elapsed in Partial shrink (tool-derived):  0.023410
+Debug: Time elapsed in Closure conversion and hoisting:  0.031261
+Debug: Time elapsed in Partial shrink (tool-derived):  0.118722
+Debug: Time elapsed in Inline/shrink loop:  0.426537
+Debug: Time elapsed in Dead param elim:  0.003407
+Debug: Time elapsed in Partial shrink (tool-derived):  0.074006
+Debug: Time elapsed in L6 Pipeline:  1.160136
+Debug: Time elapsed in L7:  0.372545
+Debug: Printed to file in 0.301761 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.729525
+Debug: Time elapsed in L1g:  0.014616
+Debug: Time elapsed in L2k:  0.000520
+Debug: Time elapsed in L2k_eta:  0.000799
+Debug: Time elapsed in L4:  0.005609
+Debug: Time elapsed in L6 ANF:  0.023702
+Debug: Time elapsed in Partial shrink (tool-derived):  0.047654
+Debug: Time elapsed in Uncurry (manual):  0.016138
+Debug: Time elapsed in Inline uncurry wrappers:  0.092949
+Debug: Time elapsed in Inline/shrink loop:  0.511566
+Debug: Time elapsed in Partial shrink (tool-derived):  0.030792
+Debug: Time elapsed in Closure conversion and hoisting:  0.030825
+Debug: Time elapsed in Partial shrink (tool-derived):  0.110383
+Debug: Time elapsed in Inline/shrink loop:  0.435506
+Debug: Time elapsed in Dead param elim:  0.003672
+Debug: Time elapsed in Partial shrink (tool-derived):  0.068777
+Debug: Time elapsed in L6 Pipeline:  1.349306
+Debug: Time elapsed in L7:  0.370927
+Debug: Printed to file in 0.356215 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042209
+Debug: Time elapsed in L1g:  0.005785
+Debug: Time elapsed in L2k:  0.000728
+Debug: Time elapsed in L2k_eta:  0.000167
+Debug: Time elapsed in L4:  0.000308
+Debug: Time elapsed in L6 ANF:  0.110667
+Debug: Time elapsed in Partial shrink (tool-derived):  0.009927
+Debug: Time elapsed in Uncurry (manual):  0.001763
+Debug: Time elapsed in Inline uncurry wrappers:  0.019419
+Debug: Time elapsed in Inline/shrink loop:  0.064613
+Debug: Time elapsed in Partial shrink (tool-derived):  0.010594
+Debug: Time elapsed in Closure conversion and hoisting:  0.012837
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007792
+Debug: Time elapsed in Inline/shrink loop:  0.026605
+Debug: Time elapsed in Dead param elim:  0.000825
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007950
+Debug: Time elapsed in L6 Pipeline:  0.163137
+Debug: Time elapsed in L7:  0.130936
+Debug: Printed to file in 0.139988 s..
+color:
+Debug: Time elapsed in Lbox:  9.412162
+Debug: Time elapsed in L1g:  0.069757
+Debug: Time elapsed in L2k:  0.001684
+Debug: Time elapsed in L2k_eta:  0.001133
+Debug: Time elapsed in L4:  0.001840
+Debug: Time elapsed in L6 ANF:  0.103621
+Debug: Time elapsed in Partial shrink (tool-derived):  0.133974
+Debug: Time elapsed in Uncurry (manual):  0.014200
+Debug: Time elapsed in Inline uncurry wrappers:  0.128125
+Debug: Time elapsed in Inline/shrink loop:  0.696418
+Debug: Time elapsed in Partial shrink (tool-derived):  0.158448
+Debug: Time elapsed in Closure conversion and hoisting:  0.072078
+Debug: Time elapsed in Partial shrink (tool-derived):  0.077597
+Debug: Time elapsed in Inline/shrink loop:  1.155937
+Debug: Time elapsed in Dead param elim:  0.006995
+Debug: Time elapsed in Partial shrink (tool-derived):  0.073957
+Debug: Time elapsed in L6 Pipeline:  2.519375
+Debug: Time elapsed in L7:  3.326657
+Debug: Printed to file in 1.068267 s..
+sha:
+Debug: Time elapsed in Lbox:  3.848167
+Debug: Time elapsed in L1g:  0.024429
+Debug: Time elapsed in L2k:  0.001001
+Debug: Time elapsed in L2k_eta:  0.000525
+Debug: Time elapsed in L4:  0.001604
+Debug: Time elapsed in L6 ANF:  0.100780
+Debug: Time elapsed in Partial shrink (tool-derived):  0.065828
+Debug: Time elapsed in Uncurry (manual):  0.007476
+Debug: Time elapsed in Inline uncurry wrappers:  0.056112
+Debug: Time elapsed in Inline/shrink loop:  0.385532
+Debug: Time elapsed in Partial shrink (tool-derived):  0.069797
+Debug: Time elapsed in Closure conversion and hoisting:  0.036001
+Debug: Time elapsed in Partial shrink (tool-derived):  0.041604
+Debug: Time elapsed in Inline/shrink loop:  0.753295
+Debug: Time elapsed in Dead param elim:  0.003662
+Debug: Time elapsed in Partial shrink (tool-derived):  0.037946
+Debug: Time elapsed in L6 Pipeline:  1.458286
+Debug: Time elapsed in L7:  0.835804
+Debug: Printed to file in 0.342366 s..
+---------- uncurry proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.745175
+Debug: Time elapsed in L1g:  0.015103
+Debug: Time elapsed in L2k:  0.000488
+Debug: Time elapsed in L2k_eta:  0.000718
+Debug: Time elapsed in L4:  0.005735
+Debug: Time elapsed in L6 ANF:  0.073993
+Debug: Time elapsed in Shrink (manual):  0.041598
+Debug: Time elapsed in Uncurry (tool-derived):  0.004631
+Debug: Time elapsed in Inline uncurry wrappers:  0.030551
+Debug: Time elapsed in Inline/shrink loop:  0.211238
+Debug: Time elapsed in Shrink (manual):  0.012453
+Debug: Time elapsed in Closure conversion and hoisting:  0.032599
+Debug: Time elapsed in Shrink (manual):  0.041073
+Debug: Time elapsed in Inline/shrink loop:  0.424538
+Debug: Time elapsed in Dead param elim:  0.003534
+Debug: Time elapsed in Shrink (manual):  0.020090
+Debug: Time elapsed in L6 Pipeline:  0.823962
+Debug: Time elapsed in L7:  0.354957
+Debug: Printed to file in 0.307290 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.680533
+Debug: Time elapsed in L1g:  0.014804
+Debug: Time elapsed in L2k:  0.000529
+Debug: Time elapsed in L2k_eta:  0.000773
+Debug: Time elapsed in L4:  0.005619
+Debug: Time elapsed in L6 ANF:  0.020431
+Debug: Time elapsed in Shrink (manual):  0.041945
+Debug: Time elapsed in Uncurry (tool-derived):  0.004219
+Debug: Time elapsed in Inline uncurry wrappers:  0.031672
+Debug: Time elapsed in Inline/shrink loop:  0.393595
+Debug: Time elapsed in Shrink (manual):  0.015475
+Debug: Time elapsed in Closure conversion and hoisting:  0.029331
+Debug: Time elapsed in Shrink (manual):  0.041215
+Debug: Time elapsed in Inline/shrink loop:  0.462453
+Debug: Time elapsed in Dead param elim:  0.002998
+Debug: Time elapsed in Shrink (manual):  0.018696
+Debug: Time elapsed in L6 Pipeline:  1.043278
+Debug: Time elapsed in L7:  0.365108
+Debug: Printed to file in 0.315433 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042334
+Debug: Time elapsed in L1g:  0.005871
+Debug: Time elapsed in L2k:  0.000744
+Debug: Time elapsed in L2k_eta:  0.000187
+Debug: Time elapsed in L4:  0.000314
+Debug: Time elapsed in L6 ANF:  0.118949
+Debug: Time elapsed in Shrink (manual):  0.011841
+Debug: Time elapsed in Uncurry (tool-derived):  0.000793
+Debug: Time elapsed in Inline uncurry wrappers:  0.014112
+Debug: Time elapsed in Inline/shrink loop:  0.060744
+Debug: Time elapsed in Shrink (manual):  0.011497
+Debug: Time elapsed in Closure conversion and hoisting:  0.009556
+Debug: Time elapsed in Shrink (manual):  0.017374
+Debug: Time elapsed in Inline/shrink loop:  0.026771
+Debug: Time elapsed in Dead param elim:  0.000916
+Debug: Time elapsed in Shrink (manual):  0.013472
+Debug: Time elapsed in L6 Pipeline:  0.167661
+Debug: Time elapsed in L7:  0.131962
+Debug: Printed to file in 0.287575 s..
+color:
+Debug: Time elapsed in Lbox:  9.647453
+Debug: Time elapsed in L1g:  0.070657
+Debug: Time elapsed in L2k:  0.001684
+Debug: Time elapsed in L2k_eta:  0.001092
+Debug: Time elapsed in L4:  0.001852
+Debug: Time elapsed in L6 ANF:  0.108016
+Debug: Time elapsed in Shrink (manual):  0.132228
+Debug: Time elapsed in Uncurry (tool-derived):  0.006586
+Debug: Time elapsed in Inline uncurry wrappers:  0.144390
+Debug: Time elapsed in Inline/shrink loop:  0.630161
+Debug: Time elapsed in Shrink (manual):  0.089811
+Debug: Time elapsed in Closure conversion and hoisting:  0.069281
+Debug: Time elapsed in Shrink (manual):  0.099558
+Debug: Time elapsed in Inline/shrink loop:  1.065726
+Debug: Time elapsed in Dead param elim:  0.005561
+Debug: Time elapsed in Shrink (manual):  0.093190
+Debug: Time elapsed in L6 Pipeline:  2.338029
+Debug: Time elapsed in L7:  3.409526
+Debug: Printed to file in 2.147481 s..
+sha:
+Debug: Time elapsed in Lbox:  3.750730
+Debug: Time elapsed in L1g:  0.024879
+Debug: Time elapsed in L2k:  0.000986
+Debug: Time elapsed in L2k_eta:  0.000532
+Debug: Time elapsed in L4:  0.001601
+Debug: Time elapsed in L6 ANF:  0.088375
+Debug: Time elapsed in Shrink (manual):  0.045387
+Debug: Time elapsed in Uncurry (tool-derived):  0.003833
+Debug: Time elapsed in Inline uncurry wrappers:  0.051637
+Debug: Time elapsed in Inline/shrink loop:  0.574585
+Debug: Time elapsed in Shrink (manual):  0.036149
+Debug: Time elapsed in Closure conversion and hoisting:  0.033340
+Debug: Time elapsed in Shrink (manual):  0.048363
+Debug: Time elapsed in Inline/shrink loop:  0.544416
+Debug: Time elapsed in Dead param elim:  0.008579
+Debug: Time elapsed in Shrink (manual):  0.032115
+Debug: Time elapsed in L6 Pipeline:  1.379385
+Debug: Time elapsed in L7:  0.837526
+Debug: Printed to file in 0.333480 s..
+-------------------- run 6 --------------------
+---------- all manual ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.666844
+Debug: Time elapsed in L1g:  0.015520
+Debug: Time elapsed in L2k:  0.000532
+Debug: Time elapsed in L2k_eta:  0.000766
+Debug: Time elapsed in L4:  0.005484
+Debug: Time elapsed in L6 ANF:  0.021324
+Debug: Time elapsed in Shrink (manual):  0.035815
+Debug: Time elapsed in Uncurry (manual):  0.005831
+Debug: Time elapsed in Inline uncurry wrappers:  0.032343
+Debug: Time elapsed in Inline/shrink loop:  0.213322
+Debug: Time elapsed in Shrink (manual):  0.011267
+Debug: Time elapsed in Closure conversion and hoisting:  0.029544
+Debug: Time elapsed in Shrink (manual):  0.035344
+Debug: Time elapsed in Inline/shrink loop:  0.433508
+Debug: Time elapsed in Dead param elim:  0.003561
+Debug: Time elapsed in Shrink (manual):  0.020829
+Debug: Time elapsed in L6 Pipeline:  0.822412
+Debug: Time elapsed in L7:  0.355455
+Debug: Printed to file in 0.306600 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.793472
+Debug: Time elapsed in L1g:  0.014035
+Debug: Time elapsed in L2k:  0.000500
+Debug: Time elapsed in L2k_eta:  0.000743
+Debug: Time elapsed in L4:  0.005460
+Debug: Time elapsed in L6 ANF:  0.019577
+Debug: Time elapsed in Shrink (manual):  0.038434
+Debug: Time elapsed in Uncurry (manual):  0.009183
+Debug: Time elapsed in Inline uncurry wrappers:  0.027987
+Debug: Time elapsed in Inline/shrink loop:  0.392517
+Debug: Time elapsed in Shrink (manual):  0.011775
+Debug: Time elapsed in Closure conversion and hoisting:  0.030180
+Debug: Time elapsed in Shrink (manual):  0.037452
+Debug: Time elapsed in Inline/shrink loop:  0.446009
+Debug: Time elapsed in Dead param elim:  0.003522
+Debug: Time elapsed in Shrink (manual):  0.034475
+Debug: Time elapsed in L6 Pipeline:  1.033143
+Debug: Time elapsed in L7:  0.360314
+Debug: Printed to file in 0.316093 s..
+binom:
+Debug: Time elapsed in Lbox:  0.041963
+Debug: Time elapsed in L1g:  0.006013
+Debug: Time elapsed in L2k:  0.000736
+Debug: Time elapsed in L2k_eta:  0.000166
+Debug: Time elapsed in L4:  0.000305
+Debug: Time elapsed in L6 ANF:  0.110761
+Debug: Time elapsed in Shrink (manual):  0.018694
+Debug: Time elapsed in Uncurry (manual):  0.000985
+Debug: Time elapsed in Inline uncurry wrappers:  0.015641
+Debug: Time elapsed in Inline/shrink loop:  0.064919
+Debug: Time elapsed in Shrink (manual):  0.011293
+Debug: Time elapsed in Closure conversion and hoisting:  0.009855
+Debug: Time elapsed in Shrink (manual):  0.012305
+Debug: Time elapsed in Inline/shrink loop:  0.027227
+Debug: Time elapsed in Dead param elim:  0.000828
+Debug: Time elapsed in Shrink (manual):  0.011200
+Debug: Time elapsed in L6 Pipeline:  0.173654
+Debug: Time elapsed in L7:  0.132159
+Debug: Printed to file in 0.161043 s..
+color:
+Debug: Time elapsed in Lbox:  10.162199
+Debug: Time elapsed in L1g:  0.072704
+Debug: Time elapsed in L2k:  0.001701
+Debug: Time elapsed in L2k_eta:  0.001146
+Debug: Time elapsed in L4:  0.001858
+Debug: Time elapsed in L6 ANF:  0.112278
+Debug: Time elapsed in Shrink (manual):  0.138415
+Debug: Time elapsed in Uncurry (manual):  0.006669
+Debug: Time elapsed in Inline uncurry wrappers:  0.172532
+Debug: Time elapsed in Inline/shrink loop:  0.666906
+Debug: Time elapsed in Shrink (manual):  0.089338
+Debug: Time elapsed in Closure conversion and hoisting:  0.070444
+Debug: Time elapsed in Shrink (manual):  0.099725
+Debug: Time elapsed in Inline/shrink loop:  1.062527
+Debug: Time elapsed in Dead param elim:  0.003808
+Debug: Time elapsed in Shrink (manual):  0.090868
+Debug: Time elapsed in L6 Pipeline:  2.402510
+Debug: Time elapsed in L7:  3.392438
+Debug: Printed to file in 1.202970 s..
+sha:
+Debug: Time elapsed in Lbox:  3.960630
+Debug: Time elapsed in L1g:  0.024562
+Debug: Time elapsed in L2k:  0.000976
+Debug: Time elapsed in L2k_eta:  0.000489
+Debug: Time elapsed in L4:  0.001636
+Debug: Time elapsed in L6 ANF:  0.088184
+Debug: Time elapsed in Shrink (manual):  0.047975
+Debug: Time elapsed in Uncurry (manual):  0.003835
+Debug: Time elapsed in Inline uncurry wrappers:  0.073194
+Debug: Time elapsed in Inline/shrink loop:  0.616062
+Debug: Time elapsed in Shrink (manual):  0.037429
+Debug: Time elapsed in Closure conversion and hoisting:  0.035759
+Debug: Time elapsed in Shrink (manual):  0.049617
+Debug: Time elapsed in Inline/shrink loop:  0.556640
+Debug: Time elapsed in Dead param elim:  0.003807
+Debug: Time elapsed in Shrink (manual):  0.040927
+Debug: Time elapsed in L6 Pipeline:  1.466233
+Debug: Time elapsed in L7:  0.831014
+Debug: Printed to file in 0.353876 s..
+---------- shrink proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.894418
+Debug: Time elapsed in L1g:  0.014600
+Debug: Time elapsed in L2k:  0.000476
+Debug: Time elapsed in L2k_eta:  0.000694
+Debug: Time elapsed in L4:  0.005187
+Debug: Time elapsed in L6 ANF:  0.018279
+Debug: Time elapsed in Partial shrink (tool-derived):  0.048905
+Debug: Time elapsed in Uncurry (manual):  0.014806
+Debug: Time elapsed in Inline uncurry wrappers:  0.083343
+Debug: Time elapsed in Inline/shrink loop:  0.329880
+Debug: Time elapsed in Partial shrink (tool-derived):  0.022740
+Debug: Time elapsed in Closure conversion and hoisting:  0.030753
+Debug: Time elapsed in Partial shrink (tool-derived):  0.117163
+Debug: Time elapsed in Inline/shrink loop:  0.421274
+Debug: Time elapsed in Dead param elim:  0.003409
+Debug: Time elapsed in Partial shrink (tool-derived):  0.074905
+Debug: Time elapsed in L6 Pipeline:  1.148811
+Debug: Time elapsed in L7:  0.366545
+Debug: Printed to file in 0.301465 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.753242
+Debug: Time elapsed in L1g:  0.014092
+Debug: Time elapsed in L2k:  0.000515
+Debug: Time elapsed in L2k_eta:  0.000746
+Debug: Time elapsed in L4:  0.005487
+Debug: Time elapsed in L6 ANF:  0.022702
+Debug: Time elapsed in Partial shrink (tool-derived):  0.046927
+Debug: Time elapsed in Uncurry (manual):  0.015572
+Debug: Time elapsed in Inline uncurry wrappers:  0.092103
+Debug: Time elapsed in Inline/shrink loop:  0.488421
+Debug: Time elapsed in Partial shrink (tool-derived):  0.029548
+Debug: Time elapsed in Closure conversion and hoisting:  0.029249
+Debug: Time elapsed in Partial shrink (tool-derived):  0.109714
+Debug: Time elapsed in Inline/shrink loop:  0.436198
+Debug: Time elapsed in Dead param elim:  0.003554
+Debug: Time elapsed in Partial shrink (tool-derived):  0.068713
+Debug: Time elapsed in L6 Pipeline:  1.321052
+Debug: Time elapsed in L7:  0.370593
+Debug: Printed to file in 0.357745 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042740
+Debug: Time elapsed in L1g:  0.005812
+Debug: Time elapsed in L2k:  0.000727
+Debug: Time elapsed in L2k_eta:  0.000167
+Debug: Time elapsed in L4:  0.000318
+Debug: Time elapsed in L6 ANF:  0.109453
+Debug: Time elapsed in Partial shrink (tool-derived):  0.009801
+Debug: Time elapsed in Uncurry (manual):  0.001575
+Debug: Time elapsed in Inline uncurry wrappers:  0.018495
+Debug: Time elapsed in Inline/shrink loop:  0.064510
+Debug: Time elapsed in Partial shrink (tool-derived):  0.010966
+Debug: Time elapsed in Closure conversion and hoisting:  0.012933
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007824
+Debug: Time elapsed in Inline/shrink loop:  0.026644
+Debug: Time elapsed in Dead param elim:  0.000828
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007884
+Debug: Time elapsed in L6 Pipeline:  0.162216
+Debug: Time elapsed in L7:  0.128518
+Debug: Printed to file in 0.137482 s..
+color:
+Debug: Time elapsed in Lbox:  9.413227
+Debug: Time elapsed in L1g:  0.070548
+Debug: Time elapsed in L2k:  0.001724
+Debug: Time elapsed in L2k_eta:  0.001310
+Debug: Time elapsed in L4:  0.001910
+Debug: Time elapsed in L6 ANF:  0.103254
+Debug: Time elapsed in Partial shrink (tool-derived):  0.132884
+Debug: Time elapsed in Uncurry (manual):  0.014133
+Debug: Time elapsed in Inline uncurry wrappers:  0.129893
+Debug: Time elapsed in Inline/shrink loop:  0.689271
+Debug: Time elapsed in Partial shrink (tool-derived):  0.157248
+Debug: Time elapsed in Closure conversion and hoisting:  0.071887
+Debug: Time elapsed in Partial shrink (tool-derived):  0.079770
+Debug: Time elapsed in Inline/shrink loop:  1.152015
+Debug: Time elapsed in Dead param elim:  0.007272
+Debug: Time elapsed in Partial shrink (tool-derived):  0.074595
+Debug: Time elapsed in L6 Pipeline:  2.510606
+Debug: Time elapsed in L7:  3.339634
+Debug: Printed to file in 1.068294 s..
+sha:
+Debug: Time elapsed in Lbox:  3.880811
+Debug: Time elapsed in L1g:  0.025177
+Debug: Time elapsed in L2k:  0.001002
+Debug: Time elapsed in L2k_eta:  0.000490
+Debug: Time elapsed in L4:  0.001668
+Debug: Time elapsed in L6 ANF:  0.101250
+Debug: Time elapsed in Partial shrink (tool-derived):  0.065399
+Debug: Time elapsed in Uncurry (manual):  0.007553
+Debug: Time elapsed in Inline uncurry wrappers:  0.056699
+Debug: Time elapsed in Inline/shrink loop:  0.386313
+Debug: Time elapsed in Partial shrink (tool-derived):  0.069777
+Debug: Time elapsed in Closure conversion and hoisting:  0.035905
+Debug: Time elapsed in Partial shrink (tool-derived):  0.041614
+Debug: Time elapsed in Inline/shrink loop:  0.756135
+Debug: Time elapsed in Dead param elim:  0.003633
+Debug: Time elapsed in Partial shrink (tool-derived):  0.038070
+Debug: Time elapsed in L6 Pipeline:  1.462137
+Debug: Time elapsed in L7:  0.833931
+Debug: Printed to file in 0.340004 s..
+---------- uncurry proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.740975
+Debug: Time elapsed in L1g:  0.015054
+Debug: Time elapsed in L2k:  0.000485
+Debug: Time elapsed in L2k_eta:  0.000713
+Debug: Time elapsed in L4:  0.005413
+Debug: Time elapsed in L6 ANF:  0.073246
+Debug: Time elapsed in Shrink (manual):  0.042065
+Debug: Time elapsed in Uncurry (tool-derived):  0.004598
+Debug: Time elapsed in Inline uncurry wrappers:  0.032011
+Debug: Time elapsed in Inline/shrink loop:  0.217309
+Debug: Time elapsed in Shrink (manual):  0.013387
+Debug: Time elapsed in Closure conversion and hoisting:  0.029492
+Debug: Time elapsed in Shrink (manual):  0.039102
+Debug: Time elapsed in Inline/shrink loop:  0.422385
+Debug: Time elapsed in Dead param elim:  0.003522
+Debug: Time elapsed in Shrink (manual):  0.019848
+Debug: Time elapsed in L6 Pipeline:  0.825321
+Debug: Time elapsed in L7:  0.354206
+Debug: Printed to file in 0.305407 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.687466
+Debug: Time elapsed in L1g:  0.014034
+Debug: Time elapsed in L2k:  0.000491
+Debug: Time elapsed in L2k_eta:  0.000713
+Debug: Time elapsed in L4:  0.005460
+Debug: Time elapsed in L6 ANF:  0.019669
+Debug: Time elapsed in Shrink (manual):  0.042564
+Debug: Time elapsed in Uncurry (tool-derived):  0.004051
+Debug: Time elapsed in Inline uncurry wrappers:  0.031305
+Debug: Time elapsed in Inline/shrink loop:  0.395335
+Debug: Time elapsed in Shrink (manual):  0.015361
+Debug: Time elapsed in Closure conversion and hoisting:  0.028907
+Debug: Time elapsed in Shrink (manual):  0.040493
+Debug: Time elapsed in Inline/shrink loop:  0.466700
+Debug: Time elapsed in Dead param elim:  0.002955
+Debug: Time elapsed in Shrink (manual):  0.019269
+Debug: Time elapsed in L6 Pipeline:  1.048543
+Debug: Time elapsed in L7:  0.368016
+Debug: Printed to file in 0.318407 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042568
+Debug: Time elapsed in L1g:  0.005853
+Debug: Time elapsed in L2k:  0.000743
+Debug: Time elapsed in L2k_eta:  0.000182
+Debug: Time elapsed in L4:  0.000307
+Debug: Time elapsed in L6 ANF:  0.124995
+Debug: Time elapsed in Shrink (manual):  0.012030
+Debug: Time elapsed in Uncurry (tool-derived):  0.000784
+Debug: Time elapsed in Inline uncurry wrappers:  0.014053
+Debug: Time elapsed in Inline/shrink loop:  0.058287
+Debug: Time elapsed in Shrink (manual):  0.011498
+Debug: Time elapsed in Closure conversion and hoisting:  0.009420
+Debug: Time elapsed in Shrink (manual):  0.017333
+Debug: Time elapsed in Inline/shrink loop:  0.026378
+Debug: Time elapsed in Dead param elim:  0.000885
+Debug: Time elapsed in Shrink (manual):  0.013532
+Debug: Time elapsed in L6 Pipeline:  0.164786
+Debug: Time elapsed in L7:  0.130928
+Debug: Printed to file in 0.283805 s..
+color:
+Debug: Time elapsed in Lbox:  9.726442
+Debug: Time elapsed in L1g:  0.070672
+Debug: Time elapsed in L2k:  0.001690
+Debug: Time elapsed in L2k_eta:  0.001164
+Debug: Time elapsed in L4:  0.001829
+Debug: Time elapsed in L6 ANF:  0.111437
+Debug: Time elapsed in Shrink (manual):  0.133146
+Debug: Time elapsed in Uncurry (tool-derived):  0.006687
+Debug: Time elapsed in Inline uncurry wrappers:  0.150504
+Debug: Time elapsed in Inline/shrink loop:  0.632497
+Debug: Time elapsed in Shrink (manual):  0.091888
+Debug: Time elapsed in Closure conversion and hoisting:  0.070273
+Debug: Time elapsed in Shrink (manual):  0.101580
+Debug: Time elapsed in Inline/shrink loop:  1.079833
+Debug: Time elapsed in Dead param elim:  0.005294
+Debug: Time elapsed in Shrink (manual):  0.095454
+Debug: Time elapsed in L6 Pipeline:  2.368687
+Debug: Time elapsed in L7:  3.429202
+Debug: Printed to file in 2.140536 s..
+sha:
+Debug: Time elapsed in Lbox:  3.774250
+Debug: Time elapsed in L1g:  0.024972
+Debug: Time elapsed in L2k:  0.000985
+Debug: Time elapsed in L2k_eta:  0.000497
+Debug: Time elapsed in L4:  0.001646
+Debug: Time elapsed in L6 ANF:  0.088682
+Debug: Time elapsed in Shrink (manual):  0.045271
+Debug: Time elapsed in Uncurry (tool-derived):  0.003860
+Debug: Time elapsed in Inline uncurry wrappers:  0.051960
+Debug: Time elapsed in Inline/shrink loop:  0.578896
+Debug: Time elapsed in Shrink (manual):  0.037283
+Debug: Time elapsed in Closure conversion and hoisting:  0.033371
+Debug: Time elapsed in Shrink (manual):  0.050307
+Debug: Time elapsed in Inline/shrink loop:  0.549902
+Debug: Time elapsed in Dead param elim:  0.008306
+Debug: Time elapsed in Shrink (manual):  0.032385
+Debug: Time elapsed in L6 Pipeline:  1.392480
+Debug: Time elapsed in L7:  0.839609
+Debug: Printed to file in 0.336311 s..
+-------------------- run 7 --------------------
+---------- all manual ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.668011
+Debug: Time elapsed in L1g:  0.015355
+Debug: Time elapsed in L2k:  0.000507
+Debug: Time elapsed in L2k_eta:  0.000750
+Debug: Time elapsed in L4:  0.005527
+Debug: Time elapsed in L6 ANF:  0.021673
+Debug: Time elapsed in Shrink (manual):  0.035685
+Debug: Time elapsed in Uncurry (manual):  0.005841
+Debug: Time elapsed in Inline uncurry wrappers:  0.033239
+Debug: Time elapsed in Inline/shrink loop:  0.209915
+Debug: Time elapsed in Shrink (manual):  0.011508
+Debug: Time elapsed in Closure conversion and hoisting:  0.029148
+Debug: Time elapsed in Shrink (manual):  0.034811
+Debug: Time elapsed in Inline/shrink loop:  0.433181
+Debug: Time elapsed in Dead param elim:  0.003528
+Debug: Time elapsed in Shrink (manual):  0.020434
+Debug: Time elapsed in L6 Pipeline:  0.818386
+Debug: Time elapsed in L7:  0.361445
+Debug: Printed to file in 0.303040 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.793599
+Debug: Time elapsed in L1g:  0.013875
+Debug: Time elapsed in L2k:  0.000498
+Debug: Time elapsed in L2k_eta:  0.000733
+Debug: Time elapsed in L4:  0.005523
+Debug: Time elapsed in L6 ANF:  0.019694
+Debug: Time elapsed in Shrink (manual):  0.039118
+Debug: Time elapsed in Uncurry (manual):  0.009412
+Debug: Time elapsed in Inline uncurry wrappers:  0.028759
+Debug: Time elapsed in Inline/shrink loop:  0.399460
+Debug: Time elapsed in Shrink (manual):  0.012227
+Debug: Time elapsed in Closure conversion and hoisting:  0.030494
+Debug: Time elapsed in Shrink (manual):  0.038290
+Debug: Time elapsed in Inline/shrink loop:  0.446133
+Debug: Time elapsed in Dead param elim:  0.003486
+Debug: Time elapsed in Shrink (manual):  0.034004
+Debug: Time elapsed in L6 Pipeline:  1.043035
+Debug: Time elapsed in L7:  0.361443
+Debug: Printed to file in 0.335683 s..
+binom:
+Debug: Time elapsed in Lbox:  0.041605
+Debug: Time elapsed in L1g:  0.005711
+Debug: Time elapsed in L2k:  0.000709
+Debug: Time elapsed in L2k_eta:  0.000166
+Debug: Time elapsed in L4:  0.000300
+Debug: Time elapsed in L6 ANF:  0.109215
+Debug: Time elapsed in Shrink (manual):  0.018118
+Debug: Time elapsed in Uncurry (manual):  0.000976
+Debug: Time elapsed in Inline uncurry wrappers:  0.015765
+Debug: Time elapsed in Inline/shrink loop:  0.064826
+Debug: Time elapsed in Shrink (manual):  0.011284
+Debug: Time elapsed in Closure conversion and hoisting:  0.009740
+Debug: Time elapsed in Shrink (manual):  0.012724
+Debug: Time elapsed in Inline/shrink loop:  0.027200
+Debug: Time elapsed in Dead param elim:  0.000806
+Debug: Time elapsed in Shrink (manual):  0.011174
+Debug: Time elapsed in L6 Pipeline:  0.173343
+Debug: Time elapsed in L7:  0.132042
+Debug: Printed to file in 0.163286 s..
+color:
+Debug: Time elapsed in Lbox:  10.168991
+Debug: Time elapsed in L1g:  0.070568
+Debug: Time elapsed in L2k:  0.001664
+Debug: Time elapsed in L2k_eta:  0.001309
+Debug: Time elapsed in L4:  0.001850
+Debug: Time elapsed in L6 ANF:  0.112203
+Debug: Time elapsed in Shrink (manual):  0.140123
+Debug: Time elapsed in Uncurry (manual):  0.006606
+Debug: Time elapsed in Inline uncurry wrappers:  0.176218
+Debug: Time elapsed in Inline/shrink loop:  0.669580
+Debug: Time elapsed in Shrink (manual):  0.088854
+Debug: Time elapsed in Closure conversion and hoisting:  0.071102
+Debug: Time elapsed in Shrink (manual):  0.099694
+Debug: Time elapsed in Inline/shrink loop:  1.062610
+Debug: Time elapsed in Dead param elim:  0.003800
+Debug: Time elapsed in Shrink (manual):  0.091665
+Debug: Time elapsed in L6 Pipeline:  2.411589
+Debug: Time elapsed in L7:  3.379522
+Debug: Printed to file in 1.204353 s..
+sha:
+Debug: Time elapsed in Lbox:  3.928224
+Debug: Time elapsed in L1g:  0.024909
+Debug: Time elapsed in L2k:  0.000968
+Debug: Time elapsed in L2k_eta:  0.000643
+Debug: Time elapsed in L4:  0.002230
+Debug: Time elapsed in L6 ANF:  0.109601
+Debug: Time elapsed in Shrink (manual):  0.050129
+Debug: Time elapsed in Uncurry (manual):  0.003849
+Debug: Time elapsed in Inline uncurry wrappers:  0.074881
+Debug: Time elapsed in Inline/shrink loop:  0.613390
+Debug: Time elapsed in Shrink (manual):  0.037850
+Debug: Time elapsed in Closure conversion and hoisting:  0.035766
+Debug: Time elapsed in Shrink (manual):  0.051137
+Debug: Time elapsed in Inline/shrink loop:  0.557377
+Debug: Time elapsed in Dead param elim:  0.003354
+Debug: Time elapsed in Shrink (manual):  0.039629
+Debug: Time elapsed in L6 Pipeline:  1.468295
+Debug: Time elapsed in L7:  0.828763
+Debug: Printed to file in 0.350755 s..
+---------- shrink proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.888741
+Debug: Time elapsed in L1g:  0.014667
+Debug: Time elapsed in L2k:  0.000487
+Debug: Time elapsed in L2k_eta:  0.000690
+Debug: Time elapsed in L4:  0.005246
+Debug: Time elapsed in L6 ANF:  0.018090
+Debug: Time elapsed in Partial shrink (tool-derived):  0.048858
+Debug: Time elapsed in Uncurry (manual):  0.014748
+Debug: Time elapsed in Inline uncurry wrappers:  0.084243
+Debug: Time elapsed in Inline/shrink loop:  0.335446
+Debug: Time elapsed in Partial shrink (tool-derived):  0.023106
+Debug: Time elapsed in Closure conversion and hoisting:  0.031277
+Debug: Time elapsed in Partial shrink (tool-derived):  0.118719
+Debug: Time elapsed in Inline/shrink loop:  0.422287
+Debug: Time elapsed in Dead param elim:  0.003751
+Debug: Time elapsed in Partial shrink (tool-derived):  0.095791
+Debug: Time elapsed in L6 Pipeline:  1.189646
+Debug: Time elapsed in L7:  0.378423
+Debug: Printed to file in 0.301235 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.738812
+Debug: Time elapsed in L1g:  0.014143
+Debug: Time elapsed in L2k:  0.000510
+Debug: Time elapsed in L2k_eta:  0.000785
+Debug: Time elapsed in L4:  0.005473
+Debug: Time elapsed in L6 ANF:  0.023220
+Debug: Time elapsed in Partial shrink (tool-derived):  0.046978
+Debug: Time elapsed in Uncurry (manual):  0.016055
+Debug: Time elapsed in Inline uncurry wrappers:  0.092242
+Debug: Time elapsed in Inline/shrink loop:  0.495110
+Debug: Time elapsed in Partial shrink (tool-derived):  0.029570
+Debug: Time elapsed in Closure conversion and hoisting:  0.030882
+Debug: Time elapsed in Partial shrink (tool-derived):  0.110226
+Debug: Time elapsed in Inline/shrink loop:  0.443388
+Debug: Time elapsed in Dead param elim:  0.003614
+Debug: Time elapsed in Partial shrink (tool-derived):  0.070473
+Debug: Time elapsed in L6 Pipeline:  1.339547
+Debug: Time elapsed in L7:  0.377408
+Debug: Printed to file in 0.352964 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042223
+Debug: Time elapsed in L1g:  0.005921
+Debug: Time elapsed in L2k:  0.000774
+Debug: Time elapsed in L2k_eta:  0.000194
+Debug: Time elapsed in L4:  0.000320
+Debug: Time elapsed in L6 ANF:  0.109918
+Debug: Time elapsed in Partial shrink (tool-derived):  0.009800
+Debug: Time elapsed in Uncurry (manual):  0.001601
+Debug: Time elapsed in Inline uncurry wrappers:  0.018396
+Debug: Time elapsed in Inline/shrink loop:  0.064493
+Debug: Time elapsed in Partial shrink (tool-derived):  0.009561
+Debug: Time elapsed in Closure conversion and hoisting:  0.012827
+Debug: Time elapsed in Partial shrink (tool-derived):  0.008474
+Debug: Time elapsed in Inline/shrink loop:  0.028838
+Debug: Time elapsed in Dead param elim:  0.000857
+Debug: Time elapsed in Partial shrink (tool-derived):  0.008314
+Debug: Time elapsed in L6 Pipeline:  0.163912
+Debug: Time elapsed in L7:  0.131367
+Debug: Printed to file in 0.138675 s..
+color:
+Debug: Time elapsed in Lbox:  9.399314
+Debug: Time elapsed in L1g:  0.070501
+Debug: Time elapsed in L2k:  0.001683
+Debug: Time elapsed in L2k_eta:  0.001323
+Debug: Time elapsed in L4:  0.001772
+Debug: Time elapsed in L6 ANF:  0.103798
+Debug: Time elapsed in Partial shrink (tool-derived):  0.132893
+Debug: Time elapsed in Uncurry (manual):  0.013993
+Debug: Time elapsed in Inline uncurry wrappers:  0.127607
+Debug: Time elapsed in Inline/shrink loop:  0.689355
+Debug: Time elapsed in Partial shrink (tool-derived):  0.152606
+Debug: Time elapsed in Closure conversion and hoisting:  0.070429
+Debug: Time elapsed in Partial shrink (tool-derived):  0.075327
+Debug: Time elapsed in Inline/shrink loop:  1.130972
+Debug: Time elapsed in Dead param elim:  0.006822
+Debug: Time elapsed in Partial shrink (tool-derived):  0.072572
+Debug: Time elapsed in L6 Pipeline:  2.474218
+Debug: Time elapsed in L7:  3.995709
+Debug: Printed to file in 1.079790 s..
+sha:
+Debug: Time elapsed in Lbox:  3.852642
+Debug: Time elapsed in L1g:  0.025169
+Debug: Time elapsed in L2k:  0.000992
+Debug: Time elapsed in L2k_eta:  0.000517
+Debug: Time elapsed in L4:  0.001586
+Debug: Time elapsed in L6 ANF:  0.099868
+Debug: Time elapsed in Partial shrink (tool-derived):  0.065471
+Debug: Time elapsed in Uncurry (manual):  0.007311
+Debug: Time elapsed in Inline uncurry wrappers:  0.055085
+Debug: Time elapsed in Inline/shrink loop:  0.399198
+Debug: Time elapsed in Partial shrink (tool-derived):  0.066218
+Debug: Time elapsed in Closure conversion and hoisting:  0.037201
+Debug: Time elapsed in Partial shrink (tool-derived):  0.042678
+Debug: Time elapsed in Inline/shrink loop:  0.762748
+Debug: Time elapsed in Dead param elim:  0.003470
+Debug: Time elapsed in Partial shrink (tool-derived):  0.040383
+Debug: Time elapsed in L6 Pipeline:  1.480762
+Debug: Time elapsed in L7:  0.846640
+Debug: Printed to file in 0.342998 s..
+---------- uncurry proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.744648
+Debug: Time elapsed in L1g:  0.015237
+Debug: Time elapsed in L2k:  0.000494
+Debug: Time elapsed in L2k_eta:  0.000723
+Debug: Time elapsed in L4:  0.005382
+Debug: Time elapsed in L6 ANF:  0.072536
+Debug: Time elapsed in Shrink (manual):  0.042256
+Debug: Time elapsed in Uncurry (tool-derived):  0.004724
+Debug: Time elapsed in Inline uncurry wrappers:  0.030917
+Debug: Time elapsed in Inline/shrink loop:  0.218450
+Debug: Time elapsed in Shrink (manual):  0.012525
+Debug: Time elapsed in Closure conversion and hoisting:  0.030280
+Debug: Time elapsed in Shrink (manual):  0.038998
+Debug: Time elapsed in Inline/shrink loop:  0.426959
+Debug: Time elapsed in Dead param elim:  0.003494
+Debug: Time elapsed in Shrink (manual):  0.020065
+Debug: Time elapsed in L6 Pipeline:  0.830261
+Debug: Time elapsed in L7:  0.359362
+Debug: Printed to file in 0.301486 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.683559
+Debug: Time elapsed in L1g:  0.013881
+Debug: Time elapsed in L2k:  0.000500
+Debug: Time elapsed in L2k_eta:  0.000714
+Debug: Time elapsed in L4:  0.005449
+Debug: Time elapsed in L6 ANF:  0.019690
+Debug: Time elapsed in Shrink (manual):  0.041645
+Debug: Time elapsed in Uncurry (tool-derived):  0.003820
+Debug: Time elapsed in Inline uncurry wrappers:  0.031507
+Debug: Time elapsed in Inline/shrink loop:  0.389548
+Debug: Time elapsed in Shrink (manual):  0.015150
+Debug: Time elapsed in Closure conversion and hoisting:  0.028627
+Debug: Time elapsed in Shrink (manual):  0.039485
+Debug: Time elapsed in Inline/shrink loop:  0.462094
+Debug: Time elapsed in Dead param elim:  0.002911
+Debug: Time elapsed in Shrink (manual):  0.018683
+Debug: Time elapsed in L6 Pipeline:  1.035086
+Debug: Time elapsed in L7:  0.366190
+Debug: Printed to file in 0.318953 s..
+binom:
+Debug: Time elapsed in Lbox:  0.043572
+Debug: Time elapsed in L1g:  0.005913
+Debug: Time elapsed in L2k:  0.000741
+Debug: Time elapsed in L2k_eta:  0.000184
+Debug: Time elapsed in L4:  0.000311
+Debug: Time elapsed in L6 ANF:  0.119000
+Debug: Time elapsed in Shrink (manual):  0.011899
+Debug: Time elapsed in Uncurry (tool-derived):  0.000782
+Debug: Time elapsed in Inline uncurry wrappers:  0.014132
+Debug: Time elapsed in Inline/shrink loop:  0.057525
+Debug: Time elapsed in Shrink (manual):  0.011253
+Debug: Time elapsed in Closure conversion and hoisting:  0.009470
+Debug: Time elapsed in Shrink (manual):  0.017223
+Debug: Time elapsed in Inline/shrink loop:  0.025948
+Debug: Time elapsed in Dead param elim:  0.000897
+Debug: Time elapsed in Shrink (manual):  0.013529
+Debug: Time elapsed in L6 Pipeline:  0.163213
+Debug: Time elapsed in L7:  0.131072
+Debug: Printed to file in 0.285003 s..
+color:
+Debug: Time elapsed in Lbox:  9.683622
+Debug: Time elapsed in L1g:  0.070634
+Debug: Time elapsed in L2k:  0.001689
+Debug: Time elapsed in L2k_eta:  0.001308
+Debug: Time elapsed in L4:  0.001860
+Debug: Time elapsed in L6 ANF:  0.108058
+Debug: Time elapsed in Shrink (manual):  0.134870
+Debug: Time elapsed in Uncurry (tool-derived):  0.006839
+Debug: Time elapsed in Inline uncurry wrappers:  0.147535
+Debug: Time elapsed in Inline/shrink loop:  0.626407
+Debug: Time elapsed in Shrink (manual):  0.088572
+Debug: Time elapsed in Closure conversion and hoisting:  0.068913
+Debug: Time elapsed in Shrink (manual):  0.101926
+Debug: Time elapsed in Inline/shrink loop:  1.062555
+Debug: Time elapsed in Dead param elim:  0.005472
+Debug: Time elapsed in Shrink (manual):  0.092632
+Debug: Time elapsed in L6 Pipeline:  2.337214
+Debug: Time elapsed in L7:  3.398944
+Debug: Printed to file in 2.145978 s..
+sha:
+Debug: Time elapsed in Lbox:  3.748681
+Debug: Time elapsed in L1g:  0.025194
+Debug: Time elapsed in L2k:  0.000974
+Debug: Time elapsed in L2k_eta:  0.000506
+Debug: Time elapsed in L4:  0.001608
+Debug: Time elapsed in L6 ANF:  0.088528
+Debug: Time elapsed in Shrink (manual):  0.045553
+Debug: Time elapsed in Uncurry (tool-derived):  0.003852
+Debug: Time elapsed in Inline uncurry wrappers:  0.053990
+Debug: Time elapsed in Inline/shrink loop:  0.575512
+Debug: Time elapsed in Shrink (manual):  0.036115
+Debug: Time elapsed in Closure conversion and hoisting:  0.033346
+Debug: Time elapsed in Shrink (manual):  0.048155
+Debug: Time elapsed in Inline/shrink loop:  0.545417
+Debug: Time elapsed in Dead param elim:  0.007772
+Debug: Time elapsed in Shrink (manual):  0.031643
+Debug: Time elapsed in L6 Pipeline:  1.382327
+Debug: Time elapsed in L7:  0.832285
+Debug: Printed to file in 0.335924 s..
+-------------------- run 8 --------------------
+---------- all manual ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.667383
+Debug: Time elapsed in L1g:  0.015961
+Debug: Time elapsed in L2k:  0.000527
+Debug: Time elapsed in L2k_eta:  0.000763
+Debug: Time elapsed in L4:  0.005659
+Debug: Time elapsed in L6 ANF:  0.022302
+Debug: Time elapsed in Shrink (manual):  0.036287
+Debug: Time elapsed in Uncurry (manual):  0.005876
+Debug: Time elapsed in Inline uncurry wrappers:  0.033664
+Debug: Time elapsed in Inline/shrink loop:  0.214277
+Debug: Time elapsed in Shrink (manual):  0.011486
+Debug: Time elapsed in Closure conversion and hoisting:  0.030525
+Debug: Time elapsed in Shrink (manual):  0.035148
+Debug: Time elapsed in Inline/shrink loop:  0.440388
+Debug: Time elapsed in Dead param elim:  0.003596
+Debug: Time elapsed in Shrink (manual):  0.020357
+Debug: Time elapsed in L6 Pipeline:  0.832695
+Debug: Time elapsed in L7:  0.360211
+Debug: Printed to file in 0.302694 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.793620
+Debug: Time elapsed in L1g:  0.013863
+Debug: Time elapsed in L2k:  0.000544
+Debug: Time elapsed in L2k_eta:  0.000772
+Debug: Time elapsed in L4:  0.006269
+Debug: Time elapsed in L6 ANF:  0.019732
+Debug: Time elapsed in Shrink (manual):  0.040200
+Debug: Time elapsed in Uncurry (manual):  0.009113
+Debug: Time elapsed in Inline uncurry wrappers:  0.028320
+Debug: Time elapsed in Inline/shrink loop:  0.399236
+Debug: Time elapsed in Shrink (manual):  0.012152
+Debug: Time elapsed in Closure conversion and hoisting:  0.031286
+Debug: Time elapsed in Shrink (manual):  0.037685
+Debug: Time elapsed in Inline/shrink loop:  0.450321
+Debug: Time elapsed in Dead param elim:  0.003476
+Debug: Time elapsed in Shrink (manual):  0.034149
+Debug: Time elapsed in L6 Pipeline:  1.047536
+Debug: Time elapsed in L7:  0.364650
+Debug: Printed to file in 0.323053 s..
+binom:
+Debug: Time elapsed in Lbox:  0.041892
+Debug: Time elapsed in L1g:  0.005830
+Debug: Time elapsed in L2k:  0.000736
+Debug: Time elapsed in L2k_eta:  0.000189
+Debug: Time elapsed in L4:  0.000301
+Debug: Time elapsed in L6 ANF:  0.108759
+Debug: Time elapsed in Shrink (manual):  0.018048
+Debug: Time elapsed in Uncurry (manual):  0.000970
+Debug: Time elapsed in Inline uncurry wrappers:  0.015534
+Debug: Time elapsed in Inline/shrink loop:  0.067093
+Debug: Time elapsed in Shrink (manual):  0.011287
+Debug: Time elapsed in Closure conversion and hoisting:  0.009705
+Debug: Time elapsed in Shrink (manual):  0.012674
+Debug: Time elapsed in Inline/shrink loop:  0.028219
+Debug: Time elapsed in Dead param elim:  0.000800
+Debug: Time elapsed in Shrink (manual):  0.011012
+Debug: Time elapsed in L6 Pipeline:  0.176120
+Debug: Time elapsed in L7:  0.129775
+Debug: Printed to file in 0.161402 s..
+color:
+Debug: Time elapsed in Lbox:  10.170905
+Debug: Time elapsed in L1g:  0.070823
+Debug: Time elapsed in L2k:  0.001694
+Debug: Time elapsed in L2k_eta:  0.001139
+Debug: Time elapsed in L4:  0.001796
+Debug: Time elapsed in L6 ANF:  0.114767
+Debug: Time elapsed in Shrink (manual):  0.140593
+Debug: Time elapsed in Uncurry (manual):  0.006634
+Debug: Time elapsed in Inline uncurry wrappers:  0.172454
+Debug: Time elapsed in Inline/shrink loop:  0.677061
+Debug: Time elapsed in Shrink (manual):  0.089730
+Debug: Time elapsed in Closure conversion and hoisting:  0.071579
+Debug: Time elapsed in Shrink (manual):  0.101333
+Debug: Time elapsed in Inline/shrink loop:  1.073053
+Debug: Time elapsed in Dead param elim:  0.003845
+Debug: Time elapsed in Shrink (manual):  0.092507
+Debug: Time elapsed in L6 Pipeline:  2.430080
+Debug: Time elapsed in L7:  3.363674
+Debug: Printed to file in 1.201117 s..
+sha:
+Debug: Time elapsed in Lbox:  3.926135
+Debug: Time elapsed in L1g:  0.024937
+Debug: Time elapsed in L2k:  0.000959
+Debug: Time elapsed in L2k_eta:  0.000490
+Debug: Time elapsed in L4:  0.001608
+Debug: Time elapsed in L6 ANF:  0.087553
+Debug: Time elapsed in Shrink (manual):  0.050411
+Debug: Time elapsed in Uncurry (manual):  0.003922
+Debug: Time elapsed in Inline uncurry wrappers:  0.075842
+Debug: Time elapsed in Inline/shrink loop:  0.621622
+Debug: Time elapsed in Shrink (manual):  0.039432
+Debug: Time elapsed in Closure conversion and hoisting:  0.035840
+Debug: Time elapsed in Shrink (manual):  0.051495
+Debug: Time elapsed in Inline/shrink loop:  0.563016
+Debug: Time elapsed in Dead param elim:  0.003337
+Debug: Time elapsed in Shrink (manual):  0.040820
+Debug: Time elapsed in L6 Pipeline:  1.486697
+Debug: Time elapsed in L7:  0.828257
+Debug: Printed to file in 0.347931 s..
+---------- shrink proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.907647
+Debug: Time elapsed in L1g:  0.014567
+Debug: Time elapsed in L2k:  0.000476
+Debug: Time elapsed in L2k_eta:  0.000697
+Debug: Time elapsed in L4:  0.005276
+Debug: Time elapsed in L6 ANF:  0.018264
+Debug: Time elapsed in Partial shrink (tool-derived):  0.050191
+Debug: Time elapsed in Uncurry (manual):  0.014880
+Debug: Time elapsed in Inline uncurry wrappers:  0.084405
+Debug: Time elapsed in Inline/shrink loop:  0.339886
+Debug: Time elapsed in Partial shrink (tool-derived):  0.023238
+Debug: Time elapsed in Closure conversion and hoisting:  0.030828
+Debug: Time elapsed in Partial shrink (tool-derived):  0.120302
+Debug: Time elapsed in Inline/shrink loop:  0.423023
+Debug: Time elapsed in Dead param elim:  0.003414
+Debug: Time elapsed in Partial shrink (tool-derived):  0.073481
+Debug: Time elapsed in L6 Pipeline:  1.174846
+Debug: Time elapsed in L7:  0.373671
+Debug: Printed to file in 0.300563 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.734424
+Debug: Time elapsed in L1g:  0.014100
+Debug: Time elapsed in L2k:  0.000516
+Debug: Time elapsed in L2k_eta:  0.000751
+Debug: Time elapsed in L4:  0.005426
+Debug: Time elapsed in L6 ANF:  0.023327
+Debug: Time elapsed in Partial shrink (tool-derived):  0.046757
+Debug: Time elapsed in Uncurry (manual):  0.016025
+Debug: Time elapsed in Inline uncurry wrappers:  0.093146
+Debug: Time elapsed in Inline/shrink loop:  0.501339
+Debug: Time elapsed in Partial shrink (tool-derived):  0.029920
+Debug: Time elapsed in Closure conversion and hoisting:  0.030830
+Debug: Time elapsed in Partial shrink (tool-derived):  0.112176
+Debug: Time elapsed in Inline/shrink loop:  0.437158
+Debug: Time elapsed in Dead param elim:  0.003598
+Debug: Time elapsed in Partial shrink (tool-derived):  0.069757
+Debug: Time elapsed in L6 Pipeline:  1.341762
+Debug: Time elapsed in L7:  0.377660
+Debug: Printed to file in 0.353532 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042535
+Debug: Time elapsed in L1g:  0.005859
+Debug: Time elapsed in L2k:  0.000740
+Debug: Time elapsed in L2k_eta:  0.000186
+Debug: Time elapsed in L4:  0.000326
+Debug: Time elapsed in L6 ANF:  0.109781
+Debug: Time elapsed in Partial shrink (tool-derived):  0.009972
+Debug: Time elapsed in Uncurry (manual):  0.001611
+Debug: Time elapsed in Inline uncurry wrappers:  0.019108
+Debug: Time elapsed in Inline/shrink loop:  0.064612
+Debug: Time elapsed in Partial shrink (tool-derived):  0.010465
+Debug: Time elapsed in Closure conversion and hoisting:  0.013014
+Debug: Time elapsed in Partial shrink (tool-derived):  0.008585
+Debug: Time elapsed in Inline/shrink loop:  0.027229
+Debug: Time elapsed in Dead param elim:  0.000831
+Debug: Time elapsed in Partial shrink (tool-derived):  0.008139
+Debug: Time elapsed in L6 Pipeline:  0.164295
+Debug: Time elapsed in L7:  0.134420
+Debug: Printed to file in 0.140773 s..
+color:
+Debug: Time elapsed in Lbox:  9.372098
+Debug: Time elapsed in L1g:  0.072742
+Debug: Time elapsed in L2k:  0.001708
+Debug: Time elapsed in L2k_eta:  0.001292
+Debug: Time elapsed in L4:  0.001747
+Debug: Time elapsed in L6 ANF:  0.105707
+Debug: Time elapsed in Partial shrink (tool-derived):  0.133908
+Debug: Time elapsed in Uncurry (manual):  0.014047
+Debug: Time elapsed in Inline uncurry wrappers:  0.127337
+Debug: Time elapsed in Inline/shrink loop:  0.693191
+Debug: Time elapsed in Partial shrink (tool-derived):  0.154204
+Debug: Time elapsed in Closure conversion and hoisting:  0.071603
+Debug: Time elapsed in Partial shrink (tool-derived):  0.076296
+Debug: Time elapsed in Inline/shrink loop:  1.158744
+Debug: Time elapsed in Dead param elim:  0.006870
+Debug: Time elapsed in Partial shrink (tool-derived):  0.072952
+Debug: Time elapsed in L6 Pipeline:  2.510828
+Debug: Time elapsed in L7:  3.381985
+Debug: Printed to file in 1.074547 s..
+sha:
+Debug: Time elapsed in Lbox:  3.871403
+Debug: Time elapsed in L1g:  0.025144
+Debug: Time elapsed in L2k:  0.000981
+Debug: Time elapsed in L2k_eta:  0.000519
+Debug: Time elapsed in L4:  0.001675
+Debug: Time elapsed in L6 ANF:  0.099914
+Debug: Time elapsed in Partial shrink (tool-derived):  0.064086
+Debug: Time elapsed in Uncurry (manual):  0.007585
+Debug: Time elapsed in Inline uncurry wrappers:  0.056185
+Debug: Time elapsed in Inline/shrink loop:  0.399968
+Debug: Time elapsed in Partial shrink (tool-derived):  0.065671
+Debug: Time elapsed in Closure conversion and hoisting:  0.036776
+Debug: Time elapsed in Partial shrink (tool-derived):  0.042301
+Debug: Time elapsed in Inline/shrink loop:  0.767090
+Debug: Time elapsed in Dead param elim:  0.003382
+Debug: Time elapsed in Partial shrink (tool-derived):  0.040296
+Debug: Time elapsed in L6 Pipeline:  1.484347
+Debug: Time elapsed in L7:  0.844337
+Debug: Printed to file in 0.343808 s..
+---------- uncurry proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.745137
+Debug: Time elapsed in L1g:  0.015415
+Debug: Time elapsed in L2k:  0.000544
+Debug: Time elapsed in L2k_eta:  0.000739
+Debug: Time elapsed in L4:  0.005515
+Debug: Time elapsed in L6 ANF:  0.074346
+Debug: Time elapsed in Shrink (manual):  0.042947
+Debug: Time elapsed in Uncurry (tool-derived):  0.004608
+Debug: Time elapsed in Inline uncurry wrappers:  0.030886
+Debug: Time elapsed in Inline/shrink loop:  0.214451
+Debug: Time elapsed in Shrink (manual):  0.012458
+Debug: Time elapsed in Closure conversion and hoisting:  0.030086
+Debug: Time elapsed in Shrink (manual):  0.039559
+Debug: Time elapsed in Inline/shrink loop:  0.431721
+Debug: Time elapsed in Dead param elim:  0.003469
+Debug: Time elapsed in Shrink (manual):  0.020023
+Debug: Time elapsed in L6 Pipeline:  0.831933
+Debug: Time elapsed in L7:  0.356746
+Debug: Printed to file in 0.297512 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.685487
+Debug: Time elapsed in L1g:  0.013927
+Debug: Time elapsed in L2k:  0.000502
+Debug: Time elapsed in L2k_eta:  0.000732
+Debug: Time elapsed in L4:  0.005439
+Debug: Time elapsed in L6 ANF:  0.019566
+Debug: Time elapsed in Shrink (manual):  0.041939
+Debug: Time elapsed in Uncurry (tool-derived):  0.003951
+Debug: Time elapsed in Inline uncurry wrappers:  0.031249
+Debug: Time elapsed in Inline/shrink loop:  0.400233
+Debug: Time elapsed in Shrink (manual):  0.015354
+Debug: Time elapsed in Closure conversion and hoisting:  0.029066
+Debug: Time elapsed in Shrink (manual):  0.042045
+Debug: Time elapsed in Inline/shrink loop:  0.461504
+Debug: Time elapsed in Dead param elim:  0.002936
+Debug: Time elapsed in Shrink (manual):  0.019167
+Debug: Time elapsed in L6 Pipeline:  1.049081
+Debug: Time elapsed in L7:  0.370206
+Debug: Printed to file in 0.320834 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042647
+Debug: Time elapsed in L1g:  0.006001
+Debug: Time elapsed in L2k:  0.000744
+Debug: Time elapsed in L2k_eta:  0.000190
+Debug: Time elapsed in L4:  0.000357
+Debug: Time elapsed in L6 ANF:  0.120159
+Debug: Time elapsed in Shrink (manual):  0.011807
+Debug: Time elapsed in Uncurry (tool-derived):  0.000789
+Debug: Time elapsed in Inline uncurry wrappers:  0.014066
+Debug: Time elapsed in Inline/shrink loop:  0.058274
+Debug: Time elapsed in Shrink (manual):  0.011421
+Debug: Time elapsed in Closure conversion and hoisting:  0.009397
+Debug: Time elapsed in Shrink (manual):  0.017514
+Debug: Time elapsed in Inline/shrink loop:  0.026029
+Debug: Time elapsed in Dead param elim:  0.000778
+Debug: Time elapsed in Shrink (manual):  0.013301
+Debug: Time elapsed in L6 Pipeline:  0.163931
+Debug: Time elapsed in L7:  0.131927
+Debug: Printed to file in 0.293162 s..
+color:
+Debug: Time elapsed in Lbox:  9.636176
+Debug: Time elapsed in L1g:  0.071491
+Debug: Time elapsed in L2k:  0.001745
+Debug: Time elapsed in L2k_eta:  0.001141
+Debug: Time elapsed in L4:  0.001833
+Debug: Time elapsed in L6 ANF:  0.110724
+Debug: Time elapsed in Shrink (manual):  0.132054
+Debug: Time elapsed in Uncurry (tool-derived):  0.006729
+Debug: Time elapsed in Inline uncurry wrappers:  0.145117
+Debug: Time elapsed in Inline/shrink loop:  0.634616
+Debug: Time elapsed in Shrink (manual):  0.090277
+Debug: Time elapsed in Closure conversion and hoisting:  0.070089
+Debug: Time elapsed in Shrink (manual):  0.101371
+Debug: Time elapsed in Inline/shrink loop:  1.057173
+Debug: Time elapsed in Dead param elim:  0.005463
+Debug: Time elapsed in Shrink (manual):  0.090599
+Debug: Time elapsed in L6 Pipeline:  2.335018
+Debug: Time elapsed in L7:  3.398670
+Debug: Printed to file in 2.145837 s..
+sha:
+Debug: Time elapsed in Lbox:  3.771501
+Debug: Time elapsed in L1g:  0.026081
+Debug: Time elapsed in L2k:  0.000975
+Debug: Time elapsed in L2k_eta:  0.000516
+Debug: Time elapsed in L4:  0.001682
+Debug: Time elapsed in L6 ANF:  0.087966
+Debug: Time elapsed in Shrink (manual):  0.045207
+Debug: Time elapsed in Uncurry (tool-derived):  0.003828
+Debug: Time elapsed in Inline uncurry wrappers:  0.049296
+Debug: Time elapsed in Inline/shrink loop:  0.569021
+Debug: Time elapsed in Shrink (manual):  0.035482
+Debug: Time elapsed in Closure conversion and hoisting:  0.033356
+Debug: Time elapsed in Shrink (manual):  0.046922
+Debug: Time elapsed in Inline/shrink loop:  0.534930
+Debug: Time elapsed in Dead param elim:  0.007795
+Debug: Time elapsed in Shrink (manual):  0.031781
+Debug: Time elapsed in L6 Pipeline:  1.358554
+Debug: Time elapsed in L7:  0.832539
+Debug: Printed to file in 0.335587 s..
+-------------------- run 9 --------------------
+---------- all manual ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.669949
+Debug: Time elapsed in L1g:  0.015424
+Debug: Time elapsed in L2k:  0.000500
+Debug: Time elapsed in L2k_eta:  0.000715
+Debug: Time elapsed in L4:  0.005439
+Debug: Time elapsed in L6 ANF:  0.021414
+Debug: Time elapsed in Shrink (manual):  0.035642
+Debug: Time elapsed in Uncurry (manual):  0.005201
+Debug: Time elapsed in Inline uncurry wrappers:  0.032092
+Debug: Time elapsed in Inline/shrink loop:  0.207468
+Debug: Time elapsed in Shrink (manual):  0.011162
+Debug: Time elapsed in Closure conversion and hoisting:  0.029946
+Debug: Time elapsed in Shrink (manual):  0.034644
+Debug: Time elapsed in Inline/shrink loop:  0.439450
+Debug: Time elapsed in Dead param elim:  0.003605
+Debug: Time elapsed in Shrink (manual):  0.020077
+Debug: Time elapsed in L6 Pipeline:  0.820343
+Debug: Time elapsed in L7:  0.355724
+Debug: Printed to file in 0.305395 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.785020
+Debug: Time elapsed in L1g:  0.013890
+Debug: Time elapsed in L2k:  0.000489
+Debug: Time elapsed in L2k_eta:  0.000728
+Debug: Time elapsed in L4:  0.005373
+Debug: Time elapsed in L6 ANF:  0.019619
+Debug: Time elapsed in Shrink (manual):  0.039319
+Debug: Time elapsed in Uncurry (manual):  0.010231
+Debug: Time elapsed in Inline uncurry wrappers:  0.028544
+Debug: Time elapsed in Inline/shrink loop:  0.388744
+Debug: Time elapsed in Shrink (manual):  0.011166
+Debug: Time elapsed in Closure conversion and hoisting:  0.029655
+Debug: Time elapsed in Shrink (manual):  0.036993
+Debug: Time elapsed in Inline/shrink loop:  0.440483
+Debug: Time elapsed in Dead param elim:  0.003509
+Debug: Time elapsed in Shrink (manual):  0.033854
+Debug: Time elapsed in L6 Pipeline:  1.024123
+Debug: Time elapsed in L7:  0.366453
+Debug: Printed to file in 0.316701 s..
+binom:
+Debug: Time elapsed in Lbox:  0.041497
+Debug: Time elapsed in L1g:  0.005702
+Debug: Time elapsed in L2k:  0.000709
+Debug: Time elapsed in L2k_eta:  0.000165
+Debug: Time elapsed in L4:  0.000300
+Debug: Time elapsed in L6 ANF:  0.108208
+Debug: Time elapsed in Shrink (manual):  0.017892
+Debug: Time elapsed in Uncurry (manual):  0.000992
+Debug: Time elapsed in Inline uncurry wrappers:  0.014697
+Debug: Time elapsed in Inline/shrink loop:  0.064417
+Debug: Time elapsed in Shrink (manual):  0.011131
+Debug: Time elapsed in Closure conversion and hoisting:  0.009506
+Debug: Time elapsed in Shrink (manual):  0.012170
+Debug: Time elapsed in Inline/shrink loop:  0.028132
+Debug: Time elapsed in Dead param elim:  0.000835
+Debug: Time elapsed in Shrink (manual):  0.011862
+Debug: Time elapsed in L6 Pipeline:  0.172353
+Debug: Time elapsed in L7:  0.132427
+Debug: Printed to file in 0.159586 s..
+color:
+Debug: Time elapsed in Lbox:  10.133138
+Debug: Time elapsed in L1g:  0.070327
+Debug: Time elapsed in L2k:  0.001702
+Debug: Time elapsed in L2k_eta:  0.001103
+Debug: Time elapsed in L4:  0.001794
+Debug: Time elapsed in L6 ANF:  0.110129
+Debug: Time elapsed in Shrink (manual):  0.138259
+Debug: Time elapsed in Uncurry (manual):  0.006746
+Debug: Time elapsed in Inline uncurry wrappers:  0.170384
+Debug: Time elapsed in Inline/shrink loop:  0.658513
+Debug: Time elapsed in Shrink (manual):  0.088473
+Debug: Time elapsed in Closure conversion and hoisting:  0.072595
+Debug: Time elapsed in Shrink (manual):  0.098464
+Debug: Time elapsed in Inline/shrink loop:  1.053816
+Debug: Time elapsed in Dead param elim:  0.003843
+Debug: Time elapsed in Shrink (manual):  0.090694
+Debug: Time elapsed in L6 Pipeline:  2.383109
+Debug: Time elapsed in L7:  3.417597
+Debug: Printed to file in 1.201364 s..
+sha:
+Debug: Time elapsed in Lbox:  3.938892
+Debug: Time elapsed in L1g:  0.024734
+Debug: Time elapsed in L2k:  0.000964
+Debug: Time elapsed in L2k_eta:  0.000502
+Debug: Time elapsed in L4:  0.001597
+Debug: Time elapsed in L6 ANF:  0.087623
+Debug: Time elapsed in Shrink (manual):  0.048277
+Debug: Time elapsed in Uncurry (manual):  0.003788
+Debug: Time elapsed in Inline uncurry wrappers:  0.072127
+Debug: Time elapsed in Inline/shrink loop:  0.610382
+Debug: Time elapsed in Shrink (manual):  0.037248
+Debug: Time elapsed in Closure conversion and hoisting:  0.036161
+Debug: Time elapsed in Shrink (manual):  0.048980
+Debug: Time elapsed in Inline/shrink loop:  0.547192
+Debug: Time elapsed in Dead param elim:  0.003458
+Debug: Time elapsed in Shrink (manual):  0.038945
+Debug: Time elapsed in L6 Pipeline:  1.447516
+Debug: Time elapsed in L7:  0.835055
+Debug: Printed to file in 0.367888 s..
+---------- shrink proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.892096
+Debug: Time elapsed in L1g:  0.015019
+Debug: Time elapsed in L2k:  0.000491
+Debug: Time elapsed in L2k_eta:  0.000737
+Debug: Time elapsed in L4:  0.005389
+Debug: Time elapsed in L6 ANF:  0.018016
+Debug: Time elapsed in Partial shrink (tool-derived):  0.049132
+Debug: Time elapsed in Uncurry (manual):  0.014650
+Debug: Time elapsed in Inline uncurry wrappers:  0.081921
+Debug: Time elapsed in Inline/shrink loop:  0.324724
+Debug: Time elapsed in Partial shrink (tool-derived):  0.022816
+Debug: Time elapsed in Closure conversion and hoisting:  0.031037
+Debug: Time elapsed in Partial shrink (tool-derived):  0.115596
+Debug: Time elapsed in Inline/shrink loop:  0.423635
+Debug: Time elapsed in Dead param elim:  0.003482
+Debug: Time elapsed in Partial shrink (tool-derived):  0.073738
+Debug: Time elapsed in L6 Pipeline:  1.142482
+Debug: Time elapsed in L7:  0.370935
+Debug: Printed to file in 0.297704 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.730772
+Debug: Time elapsed in L1g:  0.014816
+Debug: Time elapsed in L2k:  0.000544
+Debug: Time elapsed in L2k_eta:  0.000729
+Debug: Time elapsed in L4:  0.005509
+Debug: Time elapsed in L6 ANF:  0.022870
+Debug: Time elapsed in Partial shrink (tool-derived):  0.047069
+Debug: Time elapsed in Uncurry (manual):  0.014825
+Debug: Time elapsed in Inline uncurry wrappers:  0.095465
+Debug: Time elapsed in Inline/shrink loop:  0.485775
+Debug: Time elapsed in Partial shrink (tool-derived):  0.029903
+Debug: Time elapsed in Closure conversion and hoisting:  0.029841
+Debug: Time elapsed in Partial shrink (tool-derived):  0.109820
+Debug: Time elapsed in Inline/shrink loop:  0.432816
+Debug: Time elapsed in Dead param elim:  0.003603
+Debug: Time elapsed in Partial shrink (tool-derived):  0.069307
+Debug: Time elapsed in L6 Pipeline:  1.319431
+Debug: Time elapsed in L7:  0.372044
+Debug: Printed to file in 0.352988 s..
+binom:
+Debug: Time elapsed in Lbox:  0.043293
+Debug: Time elapsed in L1g:  0.006431
+Debug: Time elapsed in L2k:  0.000980
+Debug: Time elapsed in L2k_eta:  0.000188
+Debug: Time elapsed in L4:  0.000310
+Debug: Time elapsed in L6 ANF:  0.111395
+Debug: Time elapsed in Partial shrink (tool-derived):  0.009827
+Debug: Time elapsed in Uncurry (manual):  0.001613
+Debug: Time elapsed in Inline uncurry wrappers:  0.018560
+Debug: Time elapsed in Inline/shrink loop:  0.065050
+Debug: Time elapsed in Partial shrink (tool-derived):  0.009561
+Debug: Time elapsed in Closure conversion and hoisting:  0.012856
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007822
+Debug: Time elapsed in Inline/shrink loop:  0.026690
+Debug: Time elapsed in Dead param elim:  0.000826
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007943
+Debug: Time elapsed in L6 Pipeline:  0.161481
+Debug: Time elapsed in L7:  0.129001
+Debug: Printed to file in 0.138726 s..
+color:
+Debug: Time elapsed in Lbox:  9.388798
+Debug: Time elapsed in L1g:  0.069896
+Debug: Time elapsed in L2k:  0.001680
+Debug: Time elapsed in L2k_eta:  0.001248
+Debug: Time elapsed in L4:  0.001925
+Debug: Time elapsed in L6 ANF:  0.103342
+Debug: Time elapsed in Partial shrink (tool-derived):  0.131895
+Debug: Time elapsed in Uncurry (manual):  0.014302
+Debug: Time elapsed in Inline uncurry wrappers:  0.128281
+Debug: Time elapsed in Inline/shrink loop:  0.687314
+Debug: Time elapsed in Partial shrink (tool-derived):  0.169465
+Debug: Time elapsed in Closure conversion and hoisting:  0.071159
+Debug: Time elapsed in Partial shrink (tool-derived):  0.076075
+Debug: Time elapsed in Inline/shrink loop:  1.140519
+Debug: Time elapsed in Dead param elim:  0.006912
+Debug: Time elapsed in Partial shrink (tool-derived):  0.072866
+Debug: Time elapsed in L6 Pipeline:  2.500407
+Debug: Time elapsed in L7:  3.356049
+Debug: Printed to file in 1.066629 s..
+sha:
+Debug: Time elapsed in Lbox:  3.867059
+Debug: Time elapsed in L1g:  0.024976
+Debug: Time elapsed in L2k:  0.000966
+Debug: Time elapsed in L2k_eta:  0.000500
+Debug: Time elapsed in L4:  0.001629
+Debug: Time elapsed in L6 ANF:  0.101179
+Debug: Time elapsed in Partial shrink (tool-derived):  0.063503
+Debug: Time elapsed in Uncurry (manual):  0.007498
+Debug: Time elapsed in Inline uncurry wrappers:  0.056394
+Debug: Time elapsed in Inline/shrink loop:  0.385943
+Debug: Time elapsed in Partial shrink (tool-derived):  0.065347
+Debug: Time elapsed in Closure conversion and hoisting:  0.035748
+Debug: Time elapsed in Partial shrink (tool-derived):  0.041391
+Debug: Time elapsed in Inline/shrink loop:  0.753410
+Debug: Time elapsed in Dead param elim:  0.003692
+Debug: Time elapsed in Partial shrink (tool-derived):  0.037376
+Debug: Time elapsed in L6 Pipeline:  1.451273
+Debug: Time elapsed in L7:  0.836674
+Debug: Printed to file in 0.337498 s..
+---------- uncurry proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.746276
+Debug: Time elapsed in L1g:  0.015122
+Debug: Time elapsed in L2k:  0.000498
+Debug: Time elapsed in L2k_eta:  0.000719
+Debug: Time elapsed in L4:  0.005463
+Debug: Time elapsed in L6 ANF:  0.073272
+Debug: Time elapsed in Shrink (manual):  0.040824
+Debug: Time elapsed in Uncurry (tool-derived):  0.004598
+Debug: Time elapsed in Inline uncurry wrappers:  0.030456
+Debug: Time elapsed in Inline/shrink loop:  0.209765
+Debug: Time elapsed in Shrink (manual):  0.012464
+Debug: Time elapsed in Closure conversion and hoisting:  0.028517
+Debug: Time elapsed in Shrink (manual):  0.038699
+Debug: Time elapsed in Inline/shrink loop:  0.424868
+Debug: Time elapsed in Dead param elim:  0.003535
+Debug: Time elapsed in Shrink (manual):  0.019807
+Debug: Time elapsed in L6 Pipeline:  0.815149
+Debug: Time elapsed in L7:  0.349293
+Debug: Printed to file in 0.290768 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.681287
+Debug: Time elapsed in L1g:  0.013891
+Debug: Time elapsed in L2k:  0.000491
+Debug: Time elapsed in L2k_eta:  0.000722
+Debug: Time elapsed in L4:  0.005574
+Debug: Time elapsed in L6 ANF:  0.019583
+Debug: Time elapsed in Shrink (manual):  0.040585
+Debug: Time elapsed in Uncurry (tool-derived):  0.003846
+Debug: Time elapsed in Inline uncurry wrappers:  0.031494
+Debug: Time elapsed in Inline/shrink loop:  0.388125
+Debug: Time elapsed in Shrink (manual):  0.015310
+Debug: Time elapsed in Closure conversion and hoisting:  0.027326
+Debug: Time elapsed in Shrink (manual):  0.039834
+Debug: Time elapsed in Inline/shrink loop:  0.453183
+Debug: Time elapsed in Dead param elim:  0.002941
+Debug: Time elapsed in Shrink (manual):  0.018603
+Debug: Time elapsed in L6 Pipeline:  1.022884
+Debug: Time elapsed in L7:  0.364916
+Debug: Printed to file in 0.318771 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042436
+Debug: Time elapsed in L1g:  0.005942
+Debug: Time elapsed in L2k:  0.000720
+Debug: Time elapsed in L2k_eta:  0.000158
+Debug: Time elapsed in L4:  0.000311
+Debug: Time elapsed in L6 ANF:  0.118611
+Debug: Time elapsed in Shrink (manual):  0.012641
+Debug: Time elapsed in Uncurry (tool-derived):  0.000777
+Debug: Time elapsed in Inline uncurry wrappers:  0.014126
+Debug: Time elapsed in Inline/shrink loop:  0.055951
+Debug: Time elapsed in Shrink (manual):  0.011289
+Debug: Time elapsed in Closure conversion and hoisting:  0.009616
+Debug: Time elapsed in Shrink (manual):  0.017676
+Debug: Time elapsed in Inline/shrink loop:  0.025075
+Debug: Time elapsed in Dead param elim:  0.000812
+Debug: Time elapsed in Shrink (manual):  0.012769
+Debug: Time elapsed in L6 Pipeline:  0.161308
+Debug: Time elapsed in L7:  0.133778
+Debug: Printed to file in 0.288125 s..
+color:
+Debug: Time elapsed in Lbox:  9.681799
+Debug: Time elapsed in L1g:  0.071136
+Debug: Time elapsed in L2k:  0.001673
+Debug: Time elapsed in L2k_eta:  0.001314
+Debug: Time elapsed in L4:  0.001900
+Debug: Time elapsed in L6 ANF:  0.107354
+Debug: Time elapsed in Shrink (manual):  0.132101
+Debug: Time elapsed in Uncurry (tool-derived):  0.006924
+Debug: Time elapsed in Inline uncurry wrappers:  0.143383
+Debug: Time elapsed in Inline/shrink loop:  0.625004
+Debug: Time elapsed in Shrink (manual):  0.088067
+Debug: Time elapsed in Closure conversion and hoisting:  0.068518
+Debug: Time elapsed in Shrink (manual):  0.098503
+Debug: Time elapsed in Inline/shrink loop:  1.060795
+Debug: Time elapsed in Dead param elim:  0.005619
+Debug: Time elapsed in Shrink (manual):  0.092077
+Debug: Time elapsed in L6 Pipeline:  2.322495
+Debug: Time elapsed in L7:  3.377043
+Debug: Printed to file in 2.142188 s..
+sha:
+Debug: Time elapsed in Lbox:  3.748038
+Debug: Time elapsed in L1g:  0.024477
+Debug: Time elapsed in L2k:  0.000968
+Debug: Time elapsed in L2k_eta:  0.000502
+Debug: Time elapsed in L4:  0.001579
+Debug: Time elapsed in L6 ANF:  0.088617
+Debug: Time elapsed in Shrink (manual):  0.045519
+Debug: Time elapsed in Uncurry (tool-derived):  0.003849
+Debug: Time elapsed in Inline uncurry wrappers:  0.049768
+Debug: Time elapsed in Inline/shrink loop:  0.571137
+Debug: Time elapsed in Shrink (manual):  0.035614
+Debug: Time elapsed in Closure conversion and hoisting:  0.033042
+Debug: Time elapsed in Shrink (manual):  0.046703
+Debug: Time elapsed in Inline/shrink loop:  0.541130
+Debug: Time elapsed in Dead param elim:  0.007961
+Debug: Time elapsed in Shrink (manual):  0.031912
+Debug: Time elapsed in L6 Pipeline:  1.367548
+Debug: Time elapsed in L7:  0.824913
+Debug: Printed to file in 0.336568 s..
+-------------------- run 10 --------------------
+---------- all manual ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.666390
+Debug: Time elapsed in L1g:  0.015772
+Debug: Time elapsed in L2k:  0.000517
+Debug: Time elapsed in L2k_eta:  0.000729
+Debug: Time elapsed in L4:  0.005501
+Debug: Time elapsed in L6 ANF:  0.021195
+Debug: Time elapsed in Shrink (manual):  0.036262
+Debug: Time elapsed in Uncurry (manual):  0.005235
+Debug: Time elapsed in Inline uncurry wrappers:  0.032046
+Debug: Time elapsed in Inline/shrink loop:  0.208661
+Debug: Time elapsed in Shrink (manual):  0.011145
+Debug: Time elapsed in Closure conversion and hoisting:  0.030303
+Debug: Time elapsed in Shrink (manual):  0.036389
+Debug: Time elapsed in Inline/shrink loop:  0.446465
+Debug: Time elapsed in Dead param elim:  0.003509
+Debug: Time elapsed in Shrink (manual):  0.019971
+Debug: Time elapsed in L6 Pipeline:  0.831085
+Debug: Time elapsed in L7:  0.352299
+Debug: Printed to file in 0.305393 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.792030
+Debug: Time elapsed in L1g:  0.013952
+Debug: Time elapsed in L2k:  0.000485
+Debug: Time elapsed in L2k_eta:  0.000754
+Debug: Time elapsed in L4:  0.005446
+Debug: Time elapsed in L6 ANF:  0.019071
+Debug: Time elapsed in Shrink (manual):  0.038363
+Debug: Time elapsed in Uncurry (manual):  0.009280
+Debug: Time elapsed in Inline uncurry wrappers:  0.027350
+Debug: Time elapsed in Inline/shrink loop:  0.386507
+Debug: Time elapsed in Shrink (manual):  0.011214
+Debug: Time elapsed in Closure conversion and hoisting:  0.030063
+Debug: Time elapsed in Shrink (manual):  0.037154
+Debug: Time elapsed in Inline/shrink loop:  0.443841
+Debug: Time elapsed in Dead param elim:  0.003533
+Debug: Time elapsed in Shrink (manual):  0.034694
+Debug: Time elapsed in L6 Pipeline:  1.023594
+Debug: Time elapsed in L7:  0.363173
+Debug: Printed to file in 0.317824 s..
+binom:
+Debug: Time elapsed in Lbox:  0.041668
+Debug: Time elapsed in L1g:  0.005718
+Debug: Time elapsed in L2k:  0.000726
+Debug: Time elapsed in L2k_eta:  0.000162
+Debug: Time elapsed in L4:  0.000300
+Debug: Time elapsed in L6 ANF:  0.109008
+Debug: Time elapsed in Shrink (manual):  0.018544
+Debug: Time elapsed in Uncurry (manual):  0.000947
+Debug: Time elapsed in Inline uncurry wrappers:  0.015351
+Debug: Time elapsed in Inline/shrink loop:  0.065805
+Debug: Time elapsed in Shrink (manual):  0.011290
+Debug: Time elapsed in Closure conversion and hoisting:  0.009632
+Debug: Time elapsed in Shrink (manual):  0.011916
+Debug: Time elapsed in Inline/shrink loop:  0.027012
+Debug: Time elapsed in Dead param elim:  0.000868
+Debug: Time elapsed in Shrink (manual):  0.011191
+Debug: Time elapsed in L6 Pipeline:  0.173295
+Debug: Time elapsed in L7:  0.130698
+Debug: Printed to file in 0.160084 s..
+color:
+Debug: Time elapsed in Lbox:  10.200435
+Debug: Time elapsed in L1g:  0.071922
+Debug: Time elapsed in L2k:  0.001761
+Debug: Time elapsed in L2k_eta:  0.001171
+Debug: Time elapsed in L4:  0.001855
+Debug: Time elapsed in L6 ANF:  0.113305
+Debug: Time elapsed in Shrink (manual):  0.136157
+Debug: Time elapsed in Uncurry (manual):  0.006599
+Debug: Time elapsed in Inline uncurry wrappers:  0.169761
+Debug: Time elapsed in Inline/shrink loop:  0.656226
+Debug: Time elapsed in Shrink (manual):  0.088084
+Debug: Time elapsed in Closure conversion and hoisting:  0.071364
+Debug: Time elapsed in Shrink (manual):  0.098576
+Debug: Time elapsed in Inline/shrink loop:  1.047917
+Debug: Time elapsed in Dead param elim:  0.003797
+Debug: Time elapsed in Shrink (manual):  0.089760
+Debug: Time elapsed in L6 Pipeline:  2.369562
+Debug: Time elapsed in L7:  3.416665
+Debug: Printed to file in 1.207646 s..
+sha:
+Debug: Time elapsed in Lbox:  3.931291
+Debug: Time elapsed in L1g:  0.023951
+Debug: Time elapsed in L2k:  0.000948
+Debug: Time elapsed in L2k_eta:  0.000511
+Debug: Time elapsed in L4:  0.001552
+Debug: Time elapsed in L6 ANF:  0.086922
+Debug: Time elapsed in Shrink (manual):  0.048164
+Debug: Time elapsed in Uncurry (manual):  0.003771
+Debug: Time elapsed in Inline uncurry wrappers:  0.073153
+Debug: Time elapsed in Inline/shrink loop:  0.609566
+Debug: Time elapsed in Shrink (manual):  0.037168
+Debug: Time elapsed in Closure conversion and hoisting:  0.036490
+Debug: Time elapsed in Shrink (manual):  0.049160
+Debug: Time elapsed in Inline/shrink loop:  0.546530
+Debug: Time elapsed in Dead param elim:  0.003354
+Debug: Time elapsed in Shrink (manual):  0.038800
+Debug: Time elapsed in L6 Pipeline:  1.447035
+Debug: Time elapsed in L7:  0.842703
+Debug: Printed to file in 0.351072 s..
+---------- shrink proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.890107
+Debug: Time elapsed in L1g:  0.015043
+Debug: Time elapsed in L2k:  0.000489
+Debug: Time elapsed in L2k_eta:  0.000714
+Debug: Time elapsed in L4:  0.005516
+Debug: Time elapsed in L6 ANF:  0.017802
+Debug: Time elapsed in Partial shrink (tool-derived):  0.049033
+Debug: Time elapsed in Uncurry (manual):  0.014781
+Debug: Time elapsed in Inline uncurry wrappers:  0.082879
+Debug: Time elapsed in Inline/shrink loop:  0.326981
+Debug: Time elapsed in Partial shrink (tool-derived):  0.023078
+Debug: Time elapsed in Closure conversion and hoisting:  0.031372
+Debug: Time elapsed in Partial shrink (tool-derived):  0.120635
+Debug: Time elapsed in Inline/shrink loop:  0.420630
+Debug: Time elapsed in Dead param elim:  0.003342
+Debug: Time elapsed in Partial shrink (tool-derived):  0.073026
+Debug: Time elapsed in L6 Pipeline:  1.147376
+Debug: Time elapsed in L7:  0.367717
+Debug: Printed to file in 0.300797 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.737246
+Debug: Time elapsed in L1g:  0.015118
+Debug: Time elapsed in L2k:  0.000534
+Debug: Time elapsed in L2k_eta:  0.000772
+Debug: Time elapsed in L4:  0.005643
+Debug: Time elapsed in L6 ANF:  0.022956
+Debug: Time elapsed in Partial shrink (tool-derived):  0.047608
+Debug: Time elapsed in Uncurry (manual):  0.015144
+Debug: Time elapsed in Inline uncurry wrappers:  0.091533
+Debug: Time elapsed in Inline/shrink loop:  0.486689
+Debug: Time elapsed in Partial shrink (tool-derived):  0.030122
+Debug: Time elapsed in Closure conversion and hoisting:  0.029775
+Debug: Time elapsed in Partial shrink (tool-derived):  0.110683
+Debug: Time elapsed in Inline/shrink loop:  0.433352
+Debug: Time elapsed in Dead param elim:  0.003578
+Debug: Time elapsed in Partial shrink (tool-derived):  0.069039
+Debug: Time elapsed in L6 Pipeline:  1.318569
+Debug: Time elapsed in L7:  0.371765
+Debug: Printed to file in 0.353548 s..
+binom:
+Debug: Time elapsed in Lbox:  0.043237
+Debug: Time elapsed in L1g:  0.005864
+Debug: Time elapsed in L2k:  0.000719
+Debug: Time elapsed in L2k_eta:  0.000162
+Debug: Time elapsed in L4:  0.000312
+Debug: Time elapsed in L6 ANF:  0.109475
+Debug: Time elapsed in Partial shrink (tool-derived):  0.009792
+Debug: Time elapsed in Uncurry (manual):  0.001604
+Debug: Time elapsed in Inline uncurry wrappers:  0.018477
+Debug: Time elapsed in Inline/shrink loop:  0.064389
+Debug: Time elapsed in Partial shrink (tool-derived):  0.009712
+Debug: Time elapsed in Closure conversion and hoisting:  0.013034
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007840
+Debug: Time elapsed in Inline/shrink loop:  0.026816
+Debug: Time elapsed in Dead param elim:  0.000871
+Debug: Time elapsed in Partial shrink (tool-derived):  0.007948
+Debug: Time elapsed in L6 Pipeline:  0.161231
+Debug: Time elapsed in L7:  0.131033
+Debug: Printed to file in 0.139173 s..
+color:
+Debug: Time elapsed in Lbox:  9.394199
+Debug: Time elapsed in L1g:  0.069916
+Debug: Time elapsed in L2k:  0.001719
+Debug: Time elapsed in L2k_eta:  0.001331
+Debug: Time elapsed in L4:  0.001806
+Debug: Time elapsed in L6 ANF:  0.103232
+Debug: Time elapsed in Partial shrink (tool-derived):  0.133617
+Debug: Time elapsed in Uncurry (manual):  0.014036
+Debug: Time elapsed in Inline uncurry wrappers:  0.125910
+Debug: Time elapsed in Inline/shrink loop:  0.706812
+Debug: Time elapsed in Partial shrink (tool-derived):  0.151481
+Debug: Time elapsed in Closure conversion and hoisting:  0.070305
+Debug: Time elapsed in Partial shrink (tool-derived):  0.075210
+Debug: Time elapsed in Inline/shrink loop:  1.136311
+Debug: Time elapsed in Dead param elim:  0.006875
+Debug: Time elapsed in Partial shrink (tool-derived):  0.075011
+Debug: Time elapsed in L6 Pipeline:  2.506093
+Debug: Time elapsed in L7:  4.024033
+Debug: Printed to file in 1.074552 s..
+sha:
+Debug: Time elapsed in Lbox:  3.888141
+Debug: Time elapsed in L1g:  0.024753
+Debug: Time elapsed in L2k:  0.000972
+Debug: Time elapsed in L2k_eta:  0.000514
+Debug: Time elapsed in L4:  0.001594
+Debug: Time elapsed in L6 ANF:  0.100348
+Debug: Time elapsed in Partial shrink (tool-derived):  0.065764
+Debug: Time elapsed in Uncurry (manual):  0.007614
+Debug: Time elapsed in Inline uncurry wrappers:  0.056046
+Debug: Time elapsed in Inline/shrink loop:  0.394099
+Debug: Time elapsed in Partial shrink (tool-derived):  0.064798
+Debug: Time elapsed in Closure conversion and hoisting:  0.036907
+Debug: Time elapsed in Partial shrink (tool-derived):  0.042246
+Debug: Time elapsed in Inline/shrink loop:  0.769854
+Debug: Time elapsed in Dead param elim:  0.003500
+Debug: Time elapsed in Partial shrink (tool-derived):  0.039603
+Debug: Time elapsed in L6 Pipeline:  1.481423
+Debug: Time elapsed in L7:  0.846384
+Debug: Printed to file in 0.341185 s..
+---------- uncurry proto ----------
+vs_easy:
+Debug: Time elapsed in Lbox:  0.751439
+Debug: Time elapsed in L1g:  0.015301
+Debug: Time elapsed in L2k:  0.000492
+Debug: Time elapsed in L2k_eta:  0.000734
+Debug: Time elapsed in L4:  0.005418
+Debug: Time elapsed in L6 ANF:  0.073312
+Debug: Time elapsed in Shrink (manual):  0.044047
+Debug: Time elapsed in Uncurry (tool-derived):  0.004636
+Debug: Time elapsed in Inline uncurry wrappers:  0.031028
+Debug: Time elapsed in Inline/shrink loop:  0.216189
+Debug: Time elapsed in Shrink (manual):  0.012532
+Debug: Time elapsed in Closure conversion and hoisting:  0.030001
+Debug: Time elapsed in Shrink (manual):  0.039763
+Debug: Time elapsed in Inline/shrink loop:  0.431747
+Debug: Time elapsed in Dead param elim:  0.003424
+Debug: Time elapsed in Shrink (manual):  0.019861
+Debug: Time elapsed in L6 Pipeline:  0.834838
+Debug: Time elapsed in L7:  0.354455
+Debug: Printed to file in 0.302674 s..
+vs_hard:
+Debug: Time elapsed in Lbox:  0.679391
+Debug: Time elapsed in L1g:  0.013834
+Debug: Time elapsed in L2k:  0.000500
+Debug: Time elapsed in L2k_eta:  0.000709
+Debug: Time elapsed in L4:  0.005442
+Debug: Time elapsed in L6 ANF:  0.019551
+Debug: Time elapsed in Shrink (manual):  0.042147
+Debug: Time elapsed in Uncurry (tool-derived):  0.003820
+Debug: Time elapsed in Inline uncurry wrappers:  0.031763
+Debug: Time elapsed in Inline/shrink loop:  0.401469
+Debug: Time elapsed in Shrink (manual):  0.015590
+Debug: Time elapsed in Closure conversion and hoisting:  0.029075
+Debug: Time elapsed in Shrink (manual):  0.040024
+Debug: Time elapsed in Inline/shrink loop:  0.468825
+Debug: Time elapsed in Dead param elim:  0.003404
+Debug: Time elapsed in Shrink (manual):  0.023883
+Debug: Time elapsed in L6 Pipeline:  1.061659
+Debug: Time elapsed in L7:  0.378204
+Debug: Printed to file in 0.319868 s..
+binom:
+Debug: Time elapsed in Lbox:  0.042556
+Debug: Time elapsed in L1g:  0.005863
+Debug: Time elapsed in L2k:  0.000740
+Debug: Time elapsed in L2k_eta:  0.000188
+Debug: Time elapsed in L4:  0.000309
+Debug: Time elapsed in L6 ANF:  0.122162
+Debug: Time elapsed in Shrink (manual):  0.012120
+Debug: Time elapsed in Uncurry (tool-derived):  0.000807
+Debug: Time elapsed in Inline uncurry wrappers:  0.014328
+Debug: Time elapsed in Inline/shrink loop:  0.059017
+Debug: Time elapsed in Shrink (manual):  0.011391
+Debug: Time elapsed in Closure conversion and hoisting:  0.009543
+Debug: Time elapsed in Shrink (manual):  0.017541
+Debug: Time elapsed in Inline/shrink loop:  0.025948
+Debug: Time elapsed in Dead param elim:  0.000870
+Debug: Time elapsed in Shrink (manual):  0.014378
+Debug: Time elapsed in L6 Pipeline:  0.166575
+Debug: Time elapsed in L7:  0.133331
+Debug: Printed to file in 0.286189 s..
+color:
+Debug: Time elapsed in Lbox:  9.667661
+Debug: Time elapsed in L1g:  0.070652
+Debug: Time elapsed in L2k:  0.001675
+Debug: Time elapsed in L2k_eta:  0.001303
+Debug: Time elapsed in L4:  0.001817
+Debug: Time elapsed in L6 ANF:  0.107891
+Debug: Time elapsed in Shrink (manual):  0.131521
+Debug: Time elapsed in Uncurry (tool-derived):  0.006701
+Debug: Time elapsed in Inline uncurry wrappers:  0.144908
+Debug: Time elapsed in Inline/shrink loop:  0.623988
+Debug: Time elapsed in Shrink (manual):  0.089349
+Debug: Time elapsed in Closure conversion and hoisting:  0.068966
+Debug: Time elapsed in Shrink (manual):  0.097866
+Debug: Time elapsed in Inline/shrink loop:  1.056706
+Debug: Time elapsed in Dead param elim:  0.005523
+Debug: Time elapsed in Shrink (manual):  0.093355
+Debug: Time elapsed in L6 Pipeline:  2.327603
+Debug: Time elapsed in L7:  3.402077
+Debug: Printed to file in 2.142452 s..
+sha:
+Debug: Time elapsed in Lbox:  3.764347
+Debug: Time elapsed in L1g:  0.024389
+Debug: Time elapsed in L2k:  0.000974
+Debug: Time elapsed in L2k_eta:  0.000513
+Debug: Time elapsed in L4:  0.001684
+Debug: Time elapsed in L6 ANF:  0.088154
+Debug: Time elapsed in Shrink (manual):  0.045341
+Debug: Time elapsed in Uncurry (tool-derived):  0.003870
+Debug: Time elapsed in Inline uncurry wrappers:  0.049673
+Debug: Time elapsed in Inline/shrink loop:  0.570677
+Debug: Time elapsed in Shrink (manual):  0.035958
+Debug: Time elapsed in Closure conversion and hoisting:  0.033841
+Debug: Time elapsed in Shrink (manual):  0.047124
+Debug: Time elapsed in Inline/shrink loop:  0.540593
+Debug: Time elapsed in Dead param elim:  0.007641
+Debug: Time elapsed in Shrink (manual):  0.032059
+Debug: Time elapsed in L6 Pipeline:  1.367684
+Debug: Time elapsed in L7:  0.830107
+Debug: Printed to file in 0.335212 s..

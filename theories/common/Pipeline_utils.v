@@ -1,7 +1,8 @@
 From Coq Require Import List Unicode.Utf8 Strings.Ascii Strings.String.
+From Coq Require Import PArith.
 From ExtLib Require Import Monads.
 Require Import Common.AstCommon Common.compM.
-From Coq Require Import PArith. 
+
 Import MonadNotation ListNotations.
 
 Open Scope monad_scope.
@@ -38,13 +39,15 @@ Record CompInfo :=
     debug_log   : list String.string;
   }.
 
+Definition pipelineM := compM Options CompInfo.
+
+
 (* TODO use more efficient string representation as in cps_show *)
 
 Section Translation.
 
   Context (Src Dst : Type).
 
-  Definition pipelineM := compM Options CompInfo.
 
   Definition CertiCoqTrans := Src -> pipelineM Dst.
 
@@ -53,11 +56,11 @@ Section Translation.
   (*   ( fun p => bind ( e1 p ) (  .. ( bind ( em p ) ( fun p => en p ) ) .. )) (at level 110, right associativity). *)
 
   Definition get_options : pipelineM Options := @compM.ask _ _.
-
+    
   Definition log_msg (s : string) : pipelineM unit :=
     '(Build_CompInfo tm log dbg) <- get ;;
-    put (Build_CompInfo tm (s :: log) dbg).
-
+    put (Build_CompInfo tm (s :: log) dbg).                        
+  
   Definition debug_msg (s : string) : pipelineM unit :=
     o <- get_options ;;
     if (debug o) then

@@ -111,7 +111,11 @@ Section CompM.
   
   Definition local {A} (f : R -> R) (m : compM A) : compM A :=    
     State _ (fun r w => runState _ m (f r) w).
-  
+
+
+  Global Instance Monad_CompM : Monad compM. 
+  Proof. unfold compM. eauto with typeclass_instances. Defined.
+
 End CompM.
 
 
@@ -178,7 +182,7 @@ Section Hoare.
                                                    (@bind (compM R W) _ A B).
   Proof. 
     intros [m1] [m2] Hfeq f1 f2 Heq r w; subst.
-    unfold st_eq, runState in Hfeq. simpl.
+    unfold st_eq, runState, bind, Monad_CompM in *. simpl.
     rewrite Hfeq. reflexivity. 
   Qed.
   

@@ -1,5 +1,5 @@
 From MetaCoq.Template Require Import Universes.
-From MetaCoq Require Export Template.BasicAst Template.Ast.
+From MetaCoq Require Import Template.BasicAst Template.Ast.
 From MetaCoq Require Export Erasure.EAst.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Peano_dec.

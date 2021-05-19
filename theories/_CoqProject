@@ -106,6 +106,7 @@ L6_PCPS/lambda_lifting_correct.v
 L6_PCPS/lambda_lifting_corresp.v
 L6_PCPS/inline.v
 L6_PCPS/inline_correct.v
+L6_PCPS/inline_proto.v
 L6_PCPS/toplevel.v
 
 # Compcert

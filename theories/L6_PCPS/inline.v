@@ -85,7 +85,7 @@ Section Inline.
     lia.
   Qed.    
   
-  Program Fixpoint inline_exp (d : nat) {measure d} :=
+  Fixpoint inline_exp (d : nat) (j : nat) {struct d} :=
     let fix inline_exp_aux (e : exp) (sig : r_map) (fm:fun_map) (s:St) {struct e} : inlineM exp :=
         match e with
         | Econstr x t ys e =>
@@ -115,17 +115,17 @@ Section Inline.
          let '(s', s'' , inl_dec) := update_letApp _ IH f t ys' s in
          (* fstr <- get_pp_name f' ;; *)
          (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl_dec then else "not ") ++ "inlined") ;; *)
-         (match (inl_dec, M.get f fm, d) with
-          | (true, Some  (ft, xs, e), S d') =>
+         (match (inl_dec, M.get f fm, d, j) with
+          | (true, Some  (ft, xs, e), S d', S j') =>
             if (Nat.eqb (List.length xs) (List.length ys)) then 
               let sig' := set_list (combine xs ys') sig  in
               x' <- get_fresh_name x ;;
-              let '(d1, d2) := split_fuel d' in
-              e' <- inline_exp d1 e sig' (M.remove f fm) s' ;;
+              let '(j1, j2) := split_fuel j' in
+              e' <- inline_exp d' j1 e sig' (M.remove f fm) s' ;;
               match inline_letapp e' x' with
               | Some (C, x') =>
                 click ;; 
-                ec' <- inline_exp d2 ec (M.set x x' sig) fm s'' ;;
+                ec' <- inline_exp d' j2 ec (M.set x x' sig) fm s'' ;;
                 ret (C |[ ec' ]|)
               | _ =>
                 x' <- get_fresh_name x ;;
@@ -166,12 +166,12 @@ Section Inline.
          let (s', inl) := update_App _ IH f t ys' s in
          (* fstr <- get_pp_name f' ;; *)
          (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl then "" else "not ") ++ "inlined") ;; *)
-         (match (inl, M.get f fm, d) with
-          | (true, Some (ft, xs, e), S d') =>
+         (match (inl, M.get f fm, d, j) with
+          | (true, Some (ft, xs, e), S d', S j') =>
             if (Nat.eqb (List.length xs) (List.length ys))%bool then
               let sig' := set_list (combine xs ys') sig  in
               click ;;
-              inline_exp d' e sig' (M.remove f fm) s'
+              inline_exp d' j' e sig' (M.remove f fm) s'
             else
               ret (Eapp f' t ys')
           | _ =>
@@ -187,20 +187,6 @@ Section Inline.
          ret (Ehalt x')
         end
     in inline_exp_aux.
-
-  Next Obligation.
-    eapply le_trans. reflexivity. eapply le_n_S. 
-    eapply NPeano.Nat.div2_decr. lia.
-  Qed.
-  Next Obligation.
-    destruct d'. simpl. lia.
-    replace (S (S d')) with (S d' + 1) by lia. 
-    eapply plus_lt_le_compat.
-    eapply NPeano.Nat.lt_div2. lia. 
-    
-    destruct ((Nat.odd (S d'))); simpl; lia.
-  Qed.
-
 
   (* Since inlining will rename *all* bound variables, we can restart
      the name count, so we dont generate large positive numbers
@@ -230,7 +216,7 @@ Section Inline.
   
   Definition inline_top' (d:nat) (s:St) (e:exp) (c:comp_data) : error exp * comp_data * bool :=
     let (c, nenv) := restart_names e c in     
-    let '(e', (st', (click, _old_map))) := run_compM (inline_exp d e (M.empty var) (M.empty _) s) c (false, nenv) in
+    let '(e', (st', (click, _old_map))) := run_compM (inline_exp d d e (M.empty var) (M.empty _) s) c (false, nenv) in
     (e', st', click).
 
   Definition inline_top (d:nat) (s:St) (e:exp) (c:comp_data)  : error exp * comp_data :=

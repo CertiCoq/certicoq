@@ -1,5 +1,5 @@
 (* Well-scopedness definition for L6. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 Require Import L6.set_util L6.cps L6.eval L6.cps_util L6.ctx L6.identifiers.

@@ -56,6 +56,7 @@ Require Import Relations.
 Require Import Axioms.
 Require Import Coqlib.
 Require Import Recdef.
+Require Import Coq.micromega.Lia.
 
 Section PARMOV.
 
@@ -1106,7 +1107,7 @@ Lemma measure_decreasing_1:
   forall st st',
   dtransition st st' -> measure st' < measure st.
 Proof.
-  induction 1; repeat (simpl; rewrite List.app_length); simpl; omega.
+  induction 1; repeat (simpl; rewrite List.app_length); simpl; lia.
 Qed.
 
 Lemma measure_decreasing_2:

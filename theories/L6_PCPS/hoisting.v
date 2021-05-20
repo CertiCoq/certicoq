@@ -1,5 +1,5 @@
 (* Computational definition and declarative spec for function hoisting. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 Require Import Common.AstCommon Common.compM.
@@ -878,8 +878,6 @@ Section Hoisting_correct.
       eapply preord_env_P_def_funs_not_in_P_l; [| sets ]. 
       eapply preord_env_P_antimon. eassumption. sets.
   Qed.
-
-  Require Import micromega.Lia. 
 
   (** * Correctness of Erase_fundefs *)
   

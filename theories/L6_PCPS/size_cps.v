@@ -1,5 +1,5 @@
 (* Size of CPS term, values, environments, etc. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2017
+ * Author: Anonymized, 2017
  *)
 
 

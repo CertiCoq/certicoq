@@ -9,7 +9,7 @@ Open Scope monad_scope.
 Open Scope string.
 
 (** * Common Interface for composing CertiCoq Transformations *)
-(* Author: Zoe Paraskevopoulou, 2019 *)
+(* Author: Anonymized, 2019 *)
 
 (* Compiler options *)
 Record Options :=

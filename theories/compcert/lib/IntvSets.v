@@ -16,6 +16,7 @@
 (** Finite sets of integer intervals *)
 
 Require Import Coqlib.
+Require Import Coq.micromega.Lia.
 
 Module ISet.
 
@@ -59,7 +60,7 @@ Proof.
 + destruct (zle l x); simpl.
   * tauto.
   * split; intros. congruence.
-    exfalso. destruct H0. omega. exploit BELOW; eauto. omega.
+    exfalso. destruct H0. lia. exploit BELOW; eauto. lia.
 + rewrite IHok. intuition.
 Qed.
 
@@ -74,14 +75,14 @@ Lemma contains_In:
   (contains l0 h0 s = true <-> (forall x, l0 <= x < h0 -> In x s)).
 Proof.
   induction 2; simpl.
-- intuition. elim (H0 l0); omega.
+- intuition. elim (H0 l0); lia.
 - destruct (zle h0 h); simpl.
   destruct (zle l l0); simpl.
   intuition.
   rewrite IHok. intuition. destruct (H3 x); auto. exfalso.
-  destruct (H3 l0). omega. omega. exploit BELOW; eauto. omega.
+  destruct (H3 l0). lia. lia. exploit BELOW; eauto. lia.
   rewrite IHok. intuition. destruct (H3 x); auto. exfalso.
-  destruct (H3 h). omega. omega. exploit BELOW; eauto. omega.
+  destruct (H3 h). lia. lia. exploit BELOW; eauto. lia.
 Qed.
 
 Fixpoint add (L H: Z) (s: t) {struct s} : t :=
@@ -115,10 +116,10 @@ Proof.
   constructor. auto. intros. inv H0. constructor.
   destruct (zlt h l0).
   constructor; auto. intros. rewrite In_add in H1; auto.
-  destruct H1. omega. auto.
+  destruct H1. lia. auto.
   destruct (zlt h0 l).
-  constructor. auto. simpl; intros. destruct H1. omega. exploit BELOW; eauto. omega.
-  constructor. omega. auto. auto.
+  constructor. auto. simpl; intros. destruct H1. lia. exploit BELOW; eauto. lia.
+  constructor. lia. auto. auto.
   apply IHok. xomega.
 Qed.
 
@@ -141,21 +142,21 @@ Proof.
   induction 1; simpl.
   tauto.
   destruct (zlt h l0).
-  simpl. rewrite IHok. intuition omega.
+  simpl. rewrite IHok. intuition lia.
   destruct (zlt h0 l).
-  simpl. intuition. exploit BELOW; eauto. omega.
+  simpl. intuition. exploit BELOW; eauto. lia.
   destruct (zlt l l0).
   destruct (zlt h0 h); simpl. clear IHok. split.
   intros [A | [A | A]].
-  split. omega. left; omega.
-  split. omega. left; omega.
-  split. exploit BELOW; eauto. omega. auto.
+  split. lia. left; lia.
+  split. lia. left; lia.
+  split. exploit BELOW; eauto. lia. auto.
   intros [A [B | B]].
-  destruct (zlt x l0). left; omega. right; left; omega.
+  destruct (zlt x l0). left; lia. right; left; lia.
   auto.
-  intuition omega.
+  intuition lia.
   destruct (zlt h0 h); simpl.
-  intuition. exploit BELOW; eauto. omega.
+  intuition. exploit BELOW; eauto. lia.
   rewrite IHok. intuition. omegaContradiction.
 Qed.
 
@@ -170,9 +171,9 @@ Proof.
   constructor; auto.
   destruct (zlt l l0).
   destruct (zlt h0 h).
-  constructor. omega. intros. inv H1. omega. exploit BELOW; eauto. omega.
-  constructor. omega. auto. auto.
-  constructor; auto. intros. rewrite In_remove in H1 by auto. destruct H1. exploit BELOW; eauto. omega.
+  constructor. lia. intros. inv H1. lia. exploit BELOW; eauto. lia.
+  constructor. lia. auto. auto.
+  constructor; auto. intros. rewrite In_remove in H1 by auto. destruct H1. exploit BELOW; eauto. lia.
   destruct (zlt h0 h).
   constructor; auto.
   auto.
@@ -237,12 +238,12 @@ Proof.
   constructor; auto. intros.
   assert (In x (inter (Cons l h s) s0)) by exact H3.
   rewrite In_inter in H4; auto. apply BELOW0. tauto.
-  constructor. omega. intros. rewrite In_inter in H3; auto. apply BELOW. tauto.
+  constructor. lia. intros. rewrite In_inter in H3; auto. apply BELOW. tauto.
   auto.
   destruct (zle h h0).
-  constructor. omega. intros. rewrite In_inter in H3; auto. apply BELOW. tauto.
+  constructor. lia. intros. rewrite In_inter in H3; auto. apply BELOW. tauto.
   auto.
-  constructor. omega. intros.
+  constructor. lia. intros.
   assert (In x (inter (Cons l h s) s0)) by exact H3.
   rewrite In_inter in H4; auto. apply BELOW0. tauto.
   auto.
@@ -281,20 +282,20 @@ Lemma beq_spec:
 Proof.
   induction 1; destruct 1; simpl.
 - tauto.
-- split; intros. discriminate. exfalso. apply (H0 l). left; omega.
-- split; intros. discriminate. exfalso. apply (H0 l). left; omega.
+- split; intros. discriminate. exfalso. apply (H0 l). left; lia.
+- split; intros. discriminate. exfalso. apply (H0 l). left; lia.
 - split; intros.
 + InvBooleans. subst. rewrite IHok in H3 by auto. rewrite H3. tauto.
 + destruct (zeq l l0). destruct (zeq h h0). simpl. subst.
   apply IHok. auto. intros; split; intros.
-  destruct (proj1 (H1 x)); auto. exfalso. exploit BELOW; eauto. omega.
-  destruct (proj2 (H1 x)); auto. exfalso. exploit BELOW0; eauto. omega.
+  destruct (proj1 (H1 x)); auto. exfalso. exploit BELOW; eauto. lia.
+  destruct (proj2 (H1 x)); auto. exfalso. exploit BELOW0; eauto. lia.
   exfalso. subst l0. destruct (zlt h h0).
-  destruct (proj2 (H1 h)). left; omega. omega. exploit BELOW; eauto. omega.
-  destruct (proj1 (H1 h0)). left; omega. omega. exploit BELOW0; eauto. omega.
+  destruct (proj2 (H1 h)). left; lia. lia. exploit BELOW; eauto. lia.
+  destruct (proj1 (H1 h0)). left; lia. lia. exploit BELOW0; eauto. lia.
   exfalso. destruct (zlt l l0).
-  destruct (proj1 (H1 l)). left; omega. omega. exploit BELOW0; eauto. omega.
-  destruct (proj2 (H1 l0)). left; omega. omega. exploit BELOW; eauto. omega.
+  destruct (proj1 (H1 l)). left; lia. lia. exploit BELOW0; eauto. lia.
+  destruct (proj2 (H1 l0)). left; lia. lia. exploit BELOW; eauto. lia.
 Qed.
 
 End R.

@@ -32,6 +32,7 @@ Require Import Ctypes.
 Require Import Cop.
 Require Import Csyntax.
 Require Import Csem.
+Require Import Coq.micromega.Lia.
 
 Section STRATEGY.
 
@@ -2735,7 +2736,7 @@ Proof.
   cofix COEL.
   intros. inv H.
 (* cons left *)
-  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Ecall a1 (exprlist_app al (Econs x al0)) ty)).
   eauto. eapply leftcontext_compose; eauto. constructor. auto.
   apply exprlist_app_leftcontext; auto. traceEq.
@@ -2746,7 +2747,7 @@ Proof.
   eapply leftcontext_compose; eauto. repeat constructor. auto.
   apply exprlist_app_leftcontext; auto.
   eapply forever_N_star with (a2 := (esizelist al0)).
-  eexact R. simpl; omega.
+  eexact R. simpl; lia.
   change (Econs a1' al0) with (exprlist_app (Econs a1' Enil) al0).
   rewrite <- exprlist_app_assoc.
   eapply COEL. eauto. auto. auto.
@@ -2755,42 +2756,42 @@ Proof.
 
   intros. inv H.
 (* field *)
-  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Efield x f0 ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* valof *)
-  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Evalof x ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* deref *)
-  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Ederef x ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* addrof *)
-  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Eaddrof x ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* unop *)
-  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Eunop op x ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* binop left *)
-  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Ebinop op x a2 ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* binop right *)
   destruct (eval_expr_to_steps _ _ _ _ _ _ _ H1 (fun x => C(Ebinop op x a2 ty)) f k)
   as [P [Q R]].
   eapply leftcontext_compose; eauto. repeat constructor.
-  eapply forever_N_star with (a2 := (esize a2)). eexact R. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a2)). eexact R. simpl; lia.
   eapply COE with (C := fun x => C(Ebinop op a1' x ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. auto. traceEq.
 (* cast *)
-  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Ecast x ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* seqand left *)
-  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Eseqand x a2 ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* seqand 2 *)
@@ -2803,7 +2804,7 @@ Proof.
   eapply COE with (C := fun x => (C (Eparen x type_bool ty))). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* seqor left *)
-  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Eseqor x a2 ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* seqor 2 *)
@@ -2816,7 +2817,7 @@ Proof.
   eapply COE with (C := fun x => (C (Eparen x type_bool ty))). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* condition top *)
-  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Econdition x a2 a3 ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* condition *)
@@ -2829,33 +2830,33 @@ Proof.
   eapply COE with (C := fun x => (C (Eparen x ty ty))). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* assign left *)
-  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Eassign x a2 ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* assign right *)
   destruct (eval_expr_to_steps _ _ _ _ _ _ _ H1 (fun x => C(Eassign x a2 ty)) f k)
   as [P [Q R]].
   eapply leftcontext_compose; eauto. repeat constructor.
-  eapply forever_N_star with (a2 := (esize a2)). eexact R. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a2)). eexact R. simpl; lia.
   eapply COE with (C := fun x => C(Eassign a1' x ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. auto. traceEq.
 (* assignop left *)
-  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Eassignop op x a2 tyres ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* assignop right *)
   destruct (eval_expr_to_steps _ _ _ _ _ _ _ H1 (fun x => C(Eassignop op x a2 tyres ty)) f k)
   as [P [Q R]].
   eapply leftcontext_compose; eauto. repeat constructor.
-  eapply forever_N_star with (a2 := (esize a2)). eexact R. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a2)). eexact R. simpl; lia.
   eapply COE with (C := fun x => C(Eassignop op a1' x tyres ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. auto. traceEq.
 (* postincr *)
-  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a0)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Epostincr id x ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* comma left *)
-  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Ecomma x a2 ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* comma right *)
@@ -2866,14 +2867,14 @@ Proof.
   left; eapply step_comma; eauto. reflexivity.
   eapply COE with (C := C); eauto. traceEq.
 (* call left *)
-  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; omega.
+  eapply forever_N_star with (a2 := (esize a1)). apply star_refl. simpl; lia.
   eapply COE with (C := fun x => C(Ecall x a2 ty)). eauto.
   eapply leftcontext_compose; eauto. repeat constructor. traceEq.
 (* call right *)
   destruct (eval_expr_to_steps _ _ _ _ _ _ _ H1 (fun x => C(Ecall x a2 ty)) f k)
   as [P [Q R]].
   eapply leftcontext_compose; eauto. repeat constructor.
-  eapply forever_N_star with (a2 := (esizelist a2)). eexact R. simpl; omega.
+  eapply forever_N_star with (a2 := (esizelist a2)). eexact R. simpl; lia.
   eapply COEL with (al := Enil). eauto. auto. auto. auto. traceEq.
 (* call *)
   destruct (eval_expr_to_steps _ _ _ _ _ _ _ H1 (fun x => C(Ecall x rargs ty)) f k)

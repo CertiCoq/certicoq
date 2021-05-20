@@ -169,7 +169,7 @@ match B with
 end. 
 
 
-Fixpoint find_live (e : exp) : error live_fun := 
+Definition find_live (e : exp) : error live_fun := 
   match e with 
   | Efun B e' =>
     let initial_L := init_live_fun B in

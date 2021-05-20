@@ -1,5 +1,5 @@
 (* Function library. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 From CertiCoq Require Import L6.Ensembles_util L6.tactics.
@@ -36,6 +36,8 @@ Definition f_eq  {A B} (f1 f2 : A -> B) : Prop :=  forall x, f1 x = f2 x.
   * the decidable equality proof. TODO: fix this *)
 Definition extend {A} (f: positive -> A) (x : positive) (x' : A) : (positive -> A) :=
   fun z => if peq z x then x' else f z.
+
+Declare Scope fun_scope.
 
 Notation " f '{' x '~>' y '}' " := (extend f x y) (at level 10, no associativity)
                                    : fun_scope.

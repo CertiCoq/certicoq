@@ -19,6 +19,7 @@ COPYING file for more details.
 
 (** Basic operations on floats: alignment, addition, multiplication *)
 Require Import Raux Defs Float_prop.
+Require Import Coq.micromega.Lia.
 
 Set Implicit Arguments.
 Set Strongly Strict Implicit.
@@ -50,7 +51,7 @@ case (Zle_bool e1 e2) ; intros He ; split ; trivial.
 now rewrite <- F2R_change_exp.
 rewrite <- F2R_change_exp.
 apply refl_equal.
-omega.
+lia.
 Qed.
 
 Theorem Falign_spec_exp:

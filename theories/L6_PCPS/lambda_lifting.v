@@ -1,5 +1,5 @@
 (* Computational definition and declarative spec for lambda lifting. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 Require Import Common.compM.

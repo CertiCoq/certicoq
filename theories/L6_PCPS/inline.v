@@ -365,7 +365,7 @@ Definition InineUncurriedPats: InlineHeuristic (M.t bool) :=
   |}.
 
 
-Fixpoint find_uncurried_pats_anf (fds : fundefs) (s:M.t bool) : M.t bool :=
+Definition find_uncurried_pats_anf (fds : fundefs) (s:M.t bool) : M.t bool :=
   match fds with
   | Fcons f t xs (Efun (Fcons h ht ys e Fnil) (Ehalt h')) fds' =>
     let s' := if ((h =? h') && negb (occurs_in_exp f (Efun (Fcons h ht ys e Fnil) (Ehalt h'))))%bool then M.set f true s else s in
@@ -424,7 +424,7 @@ Definition inline_shrink_loop (max_var : var) (bound:nat) (d:nat) (e:exp) (c : c
 
 
 (* Inline the calls to known functions from the escaping  wrappers *)
-Fixpoint find_indirect_call (f : var) (e : exp) (s:M.t bool) : M.t bool :=
+Definition find_indirect_call (f : var) (e : exp) (s:M.t bool) : M.t bool :=
   let b := (fix is_wrapper e :=
               match e with
               | Econstr _ _ _  e

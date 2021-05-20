@@ -4,6 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Program.Basics.
 Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
 Require Import Common.AstCommon.
 Require Import L1g.term.
 Require Import L1g.program.
@@ -425,60 +426,60 @@ Proof.
   induction 1; intros; try (exists 0; intros mx h; reflexivity).
   - destruct IHWcbvEval1, IHWcbvEval2. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    simpl. rewrite (j mx); try omega. rewrite H1; try omega.
-    rewrite H2; try omega. reflexivity.
+    simpl. rewrite (j mx); try lia. rewrite H1; try lia.
+    rewrite H2; try lia. reflexivity.
   - dstrctn IHWcbvEval.
-    exists (S x). intros m hm. simpl. rewrite (j m); try omega.
+    exists (S x). intros m hm. simpl. rewrite (j m); try lia.
     unfold lookupDfn in H.
     + destruct (lookup nm p).
-      * destruct e. myInjection H. apply j0. omega. discriminate.
+      * destruct e. myInjection H. apply j0. lia. discriminate.
       * discriminate.
   - destruct IHWcbvEval1, IHWcbvEval2, IHWcbvEval3.
     exists (S (max x (max x0 x1))). intros m h.
     assert (j1:= max_fst x (max x0 x1)). 
-    assert (lx: m > x). omega.
+    assert (lx: m > x). lia.
     assert (j2:= max_snd x (max x0 x1)).
     assert (j3:= max_fst x0 x1).
-    assert (lx0: m > x0). omega.
+    assert (lx0: m > x0). lia.
     assert (j4:= max_snd x0 x1).
     assert (j5:= max_fst x0 x1).
-    assert (lx1: m > x1). omega.
+    assert (lx1: m > x1). lia.
     assert (k:wcbvEval m fn = Ret (TLambda nm bod)).
     { rewrite (j m). apply H2.
-      assert (l:= max_fst x (max x0 x1)); omega. omega. }
+      assert (l:= max_fst x (max x0 x1)); lia. lia. }
     assert (k0:wcbvEval m a1 = Ret a1').
     { rewrite (j m). apply H3. 
       assert (l:= max_snd x (max x0 x1)). assert (l':= max_fst x0 x1).
-      omega. omega. }
-    simpl. rewrite (j m); try omega.
-    rewrite H2; try omega. rewrite H3; try omega. rewrite H4; try omega.
+      lia. lia. }
+    simpl. rewrite (j m); try lia.
+    rewrite H2; try lia. rewrite H3; try lia. rewrite H4; try lia.
     reflexivity.
   - destruct IHWcbvEval1, IHWcbvEval2. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    simpl. rewrite (j mx); try omega. rewrite H1; try omega.
-    rewrite H2; try omega. reflexivity.
+    simpl. rewrite (j mx); try lia. rewrite H1; try lia.
+    rewrite H2; try lia. reflexivity.
   - destruct IHWcbvEval1, IHWcbvEval2. exists (S (max x0 x1)). intros mx h.
     assert (l1:= max_fst x0 x1). assert (l2:= max_snd x0 x1).
-    cbn. rewrite (j mx); try omega. rewrite H2; try omega.
-   rewrite H0; try omega. rewrite H3; try omega. reflexivity.
+    cbn. rewrite (j mx); try lia. rewrite H2; try lia.
+   rewrite H0; try lia. rewrite H3; try lia. reflexivity.
   - destruct IHWcbvEval1, IHWcbvEval2. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     destruct H0 as [a [b c]].
-    simpl. rewrite (j mx); try omega. rewrite H2; try omega.
-    destruct fn'; try rewrite H3; try omega; try reflexivity.
+    simpl. rewrite (j mx); try lia. rewrite H2; try lia.
+    destruct fn'; try rewrite H3; try lia; try reflexivity.
     + elim c. reflexivity.
     + elim a. auto.
     + elim b. auto.
   - destruct IHWcbvEval1, IHWcbvEval2. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    simpl. destruct ml. rewrite (j mx); try omega. rewrite H4; try omega.  
+    simpl. destruct ml. rewrite (j mx); try lia. rewrite H4; try lia.  
     rewrite H0. unfold snd in H1. rewrite H1. rewrite H2.
-    rewrite H5; try omega. reflexivity.
+    rewrite H5; try lia. reflexivity.
   - destruct IHWcbvEval1, IHWcbvEval2. exists (S (max x0 x1)). intros mx h.
     assert (l1:= max_fst x0 x1). assert (l2:= max_snd x0 x1).
-    simpl. rewrite (j mx); try omega. rewrite H3; try omega.
+    simpl. rewrite (j mx); try lia. rewrite H3; try lia.
     rewrite H0. rewrite H1. rewrite rfl_Nat_eqb.
-    rewrite H4; try omega. reflexivity.
+    rewrite H4; try lia. reflexivity.
 Qed.
 
 Lemma WcbvEval_wcbvEval:
@@ -488,8 +489,8 @@ Proof.
   intros t s h.
   edestruct (pre_WcbvEval_wcbvEval). eassumption.
   exists (S x). intros m hm. specialize (H (m - 1)).
-  assert (k: m = S (m - 1)). { omega. }
-  rewrite k. apply H. omega.
+  assert (k: m = S (m - 1)). { lia. }
+  rewrite k. apply H. lia.
 Qed.
 
 Lemma wcbvEval_up:

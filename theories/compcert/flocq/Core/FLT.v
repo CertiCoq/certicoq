@@ -21,6 +21,7 @@ COPYING file for more details.
 Require Import Raux Defs Round_pred Generic_fmt Float_prop.
 Require Import FLX FIX Ulp Round_NE.
 Require Import Psatz.
+Require Import Coq.micromega.Lia.
 
 Section RND_FLT.
 
@@ -46,7 +47,7 @@ intros k.
 unfold FLT_exp.
 generalize (prec_gt_0 prec).
 repeat split ;
-  intros ; zify ; omega.
+  intros ; zify ; lia.
 Qed.
 
 Theorem generic_format_FLT :
@@ -93,7 +94,7 @@ simpl in ex.
 specialize (He Hx0).
 apply Rlt_le_trans with (1 := proj2 He).
 apply bpow_le.
-cut (ex' - prec <= ex)%Z. omega.
+cut (ex' - prec <= ex)%Z. lia.
 unfold ex, FLT_exp.
 apply Z.le_max_l.
 apply Z.le_max_r.
@@ -106,7 +107,7 @@ Proof.
 intros e He.
 apply generic_format_bpow; unfold FLT_exp.
 apply Z.max_case; try assumption.
-unfold Prec_gt_0 in prec_gt_0_; omega.
+unfold Prec_gt_0 in prec_gt_0_; lia.
 Qed.
 
 
@@ -136,7 +137,7 @@ apply Zmax_left.
 destruct (mag beta x) as (ex, He).
 unfold FLX_exp. simpl.
 specialize (He Hx0).
-cut (emin + prec - 1 < ex)%Z. omega.
+cut (emin + prec - 1 < ex)%Z. lia.
 apply (lt_bpow beta).
 apply Rle_lt_trans with (1 := Hx).
 apply He.
@@ -192,7 +193,7 @@ apply Zmax_right.
 unfold FIX_exp.
 destruct (mag beta x) as (ex, Hex).
 simpl.
-cut (ex - 1 < emin + prec)%Z. omega.
+cut (ex - 1 < emin + prec)%Z. lia.
 apply (lt_bpow beta).
 apply Rle_lt_trans with (2 := Hx).
 now apply Hex.
@@ -222,7 +223,7 @@ apply generic_inclusion_le...
 intros e He.
 unfold FIX_exp.
 apply Z.max_lub.
-omega.
+lia.
 apply Z.le_refl.
 Qed.
 
@@ -245,13 +246,13 @@ unfold generic_format, scaled_mantissa, cexp, F2R; simpl.
 rewrite Rmult_1_l, (mag_unique beta 1 1).
 { unfold FLT_exp.
   destruct (Z.max_spec_le (1 - prec) emin) as [(H,Hm)|(H,Hm)]; rewrite Hm;
-    (rewrite <- IZR_Zpower; [|unfold Prec_gt_0 in prec_gt_0_; omega]);
+    (rewrite <- IZR_Zpower; [|unfold Prec_gt_0 in prec_gt_0_; lia]);
     (rewrite Ztrunc_IZR, IZR_Zpower, <-bpow_plus;
-     [|unfold Prec_gt_0 in prec_gt_0_; omega]);
+     [|unfold Prec_gt_0 in prec_gt_0_; lia]);
     now replace (_ + _)%Z with Z0 by ring. }
 rewrite Rabs_R1; simpl; split; [now right|].
 rewrite IZR_Zpower_pos; simpl; rewrite Rmult_1_r; apply IZR_lt.
-apply (Z.lt_le_trans _ 2); [omega|]; apply Zle_bool_imp_le, beta.
+apply (Z.lt_le_trans _ 2); [lia|]; apply Zle_bool_imp_le, beta.
 Qed.
 
 Theorem ulp_FLT_small: forall x, (Rabs x < bpow (emin+prec))%R ->
@@ -263,17 +264,17 @@ unfold ulp; case Req_bool_spec; intros Hx2.
 case (negligible_exp_spec FLT_exp).
 intros T; specialize (T (emin-1)%Z); contradict T.
 apply Zle_not_lt; unfold FLT_exp.
-apply Z.le_trans with (2:=Z.le_max_r _ _); omega.
+apply Z.le_trans with (2:=Z.le_max_r _ _); lia.
 assert (V:FLT_exp emin = emin).
 unfold FLT_exp; apply Z.max_r.
-unfold Prec_gt_0 in prec_gt_0_; omega.
+unfold Prec_gt_0 in prec_gt_0_; lia.
 intros n H2; rewrite <-V.
 apply f_equal, fexp_negligible_exp_eq...
-omega.
+lia.
 (* x <> 0 *)
 apply f_equal; unfold cexp, FLT_exp.
 apply Z.max_r.
-assert (mag beta x-1 < emin+prec)%Z;[idtac|omega].
+assert (mag beta x-1 < emin+prec)%Z;[idtac|lia].
 destruct (mag beta x) as (e,He); simpl.
 apply lt_bpow with beta.
 apply Rle_lt_trans with (2:=Hx).
@@ -296,7 +297,7 @@ rewrite <- bpow_plus.
 right; apply f_equal.
 replace (e - 1 + (1 - prec))%Z with (e - prec)%Z by ring.
 apply Z.max_l.
-assert (emin+prec-1 < e)%Z; try omega.
+assert (emin+prec-1 < e)%Z; try lia.
 apply lt_bpow with beta.
 apply Rle_lt_trans with (1:=Hx).
 now apply He.
@@ -334,7 +335,7 @@ unfold ulp; rewrite Req_bool_false;
   [|now intro H; apply Nzx, (Rmult_eq_reg_r (bpow e));
     [rewrite Rmult_0_l|apply Rgt_not_eq, Rlt_gt, bpow_gt_0]].
 rewrite (Req_bool_false _ _ Nzx), <- bpow_plus; f_equal; unfold cexp, FLT_exp.
-rewrite (mag_mult_bpow _ _ _ Nzx), !Z.max_l; omega.
+rewrite (mag_mult_bpow _ _ _ Nzx), !Z.max_l; lia.
 Qed.
 
 Lemma succ_FLT_exact_shift_pos :
@@ -380,7 +381,7 @@ Global Instance FLT_exp_monotone : Monotone_exp FLT_exp.
 Proof.
 intros ex ey.
 unfold FLT_exp.
-zify ; omega.
+zify ; lia.
 Qed.
 
 (** and it allows a rounding to nearest, ties to even. *)
@@ -397,10 +398,10 @@ destruct (Zmax_spec (e - prec) emin) as [(H1,H2)|(H1,H2)] ;
   rewrite H2 ; clear H2.
 generalize (Zmax_spec (e + 1 - prec) emin).
 generalize (Zmax_spec (e - prec + 1 - prec) emin).
-omega.
+lia.
 generalize (Zmax_spec (e + 1 - prec) emin).
 generalize (Zmax_spec (emin + 1 - prec) emin).
-omega.
+lia.
 Qed.
 
 End RND_FLT.

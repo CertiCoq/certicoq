@@ -519,7 +519,7 @@ End MEASURECONTRACT.
 
 
 (* option_map on pairs of option *)
-Fixpoint f_opt {A} f on om : option A :=
+Definition f_opt {A} f on om : option A :=
   match on with
   | Some n =>
     (match om with

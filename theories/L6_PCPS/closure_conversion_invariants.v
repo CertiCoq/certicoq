@@ -1,5 +1,5 @@
 (* Correctness proof for closure conversion. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 Require Import L6.tactics L6.closure_conversion L6.closure_conversion_util L6.algebra.

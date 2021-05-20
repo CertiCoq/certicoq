@@ -22,6 +22,7 @@ COPYING file for more details.
 
 Require Import Reals Psatz.
 Require Import Core Operations.
+Require Import Coq.micromega.Lia.
 
 Definition Zrnd_odd x :=  match Req_EM_T x (IZR (Zfloor x))  with
   | left _   => Zfloor x
@@ -68,7 +69,7 @@ assert (H0:(Zfloor x <= Zfloor y)%Z) by now apply Zfloor_le.
 case (Zle_lt_or_eq _ _  H0); intros H1.
 apply Rle_trans with (1:=Zceil_ub _).
 rewrite Zceil_floor_neq.
-apply IZR_le; omega.
+apply IZR_le; lia.
 now apply sym_not_eq.
 contradict Hy2.
 rewrite <- H1, Hx2; discriminate.
@@ -503,7 +504,7 @@ Proof.
 intros x Hx.
 apply generic_inclusion_mag with fexp; trivial; intros Hx2.
 generalize (fexpe_fexp (mag beta x)).
-omega.
+lia.
 Qed.
 
 
@@ -525,7 +526,7 @@ rewrite Rmult_assoc, <- bpow_plus.
 rewrite <- Hg1; unfold F2R.
 apply f_equal, f_equal.
 ring.
-omega.
+lia.
 split; trivial.
 split.
 unfold canonical, cexp.
@@ -536,7 +537,7 @@ rewrite Z.even_pow.
 rewrite Even_beta.
 apply Bool.orb_true_intro.
 now right.
-omega.
+lia.
 Qed.
 
 
@@ -713,7 +714,7 @@ rewrite Zmult_1_r; apply Rinv_le.
 exact Rlt_0_2.
 apply IZR_le.
 specialize (radix_gt_1 beta).
-omega.
+lia.
 apply Rlt_le_trans with (bpow (fexp e)*1)%R.
 2: right; ring.
 unfold Rdiv; apply Rmult_lt_compat_l.
@@ -766,7 +767,7 @@ rewrite Zplus_comm; unfold Zminus; apply f_equal2.
 rewrite Fexp_Fplus.
 rewrite Z.min_l.
 now rewrite Fexp_d.
-rewrite Hu'2; omega.
+rewrite Hu'2; lia.
 Qed.
 
 Lemma m_eq_0: (0 = F2R d)%R ->  exists f:float beta,
@@ -797,7 +798,7 @@ Lemma fexp_m_eq_0:  (0 = F2R d)%R ->
 Proof with auto with typeclass_instances.
 intros Y.
 assert ((fexp (mag beta (F2R u) - 1) <= fexp (mag beta (F2R u))))%Z.
-2: omega.
+2: lia.
 destruct (mag beta x) as (e,He).
 rewrite Rabs_right in He.
 2: now left.
@@ -812,8 +813,8 @@ ring_simplify (fexp e + 1 - 1)%Z.
 replace (fexp (fexp e)) with (fexp e).
 case exists_NE_; intros V.
 contradict V; rewrite Even_beta; discriminate.
-rewrite (proj2 (V e)); omega.
-apply sym_eq, valid_exp; omega.
+rewrite (proj2 (V e)); lia.
+apply sym_eq, valid_exp; lia.
 Qed.
 
 Lemma Fm:  generic_format beta fexpe m.
@@ -829,7 +830,7 @@ rewrite <- Fexp_d; trivial.
 rewrite Cd.
 unfold cexp.
 generalize (fexpe_fexp (mag beta (F2R d))).
-omega.
+lia.
 (* *)
 destruct m_eq_0 as (g,(Hg1,Hg2)); trivial.
 apply generic_format_F2R' with g.
@@ -838,7 +839,7 @@ intros H; unfold cexp; rewrite Hg2.
 rewrite mag_m_0; try assumption.
 apply Z.le_trans with (1:=fexpe_fexp _).
 generalize (fexp_m_eq_0 Y).
-omega.
+lia.
 Qed.
 
 
@@ -857,7 +858,7 @@ rewrite <- Fexp_d; trivial.
 rewrite Cd.
 unfold cexp.
 generalize (fexpe_fexp  (mag beta (F2R d))).
-omega.
+lia.
 (* *)
 destruct m_eq_0 as (g,(Hg1,Hg2)); trivial.
 apply exists_even_fexp_lt.
@@ -866,7 +867,7 @@ rewrite Hg2.
 rewrite mag_m_0; trivial.
 apply Z.le_lt_trans with (1:=fexpe_fexp _).
 generalize (fexp_m_eq_0 Y).
-omega.
+lia.
 Qed.
 
 
@@ -952,7 +953,7 @@ eexists; split.
 apply sym_eq, Y.
 simpl; unfold cexp.
 apply Z.le_lt_trans with (1:=fexpe_fexp _).
-omega.
+lia.
 absurd (true=false).
 discriminate.
 rewrite <- Hk3, <- Hk'3.

@@ -11,6 +11,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Bool.Bool.
 Require Import Coq.Bool.DecBool.
+Require Import Coq.micromega.Lia.
 Require Import Coq.omega.Omega.
 Require Import Common.exceptionMonad.
 Require Import FunInd.
@@ -224,7 +225,7 @@ Proof.
 Qed.  
 
 (** turn decidable comparisons into Prop comparisons **)
-Ltac Compare_Prop := 
+Ltac Compare_Prop :=
   match goal with
     | [ H:(_ ?= _) = Eq |- _ ] =>
       let j := fresh "j" in
@@ -348,10 +349,10 @@ Lemma complete_nat_induct:
          (ih:forall (n:nat), (forall (x:nat), x < n -> P x) -> P n),
   forall m, P m.
   intros P ih m. apply ih. induction m.
-  + intros x j. omega.
+  + intros x j. lia.
   + intros x j. inversion j.
     * apply ih. assumption.
-    * assert (k: x < m). omega. apply IHm. assumption.
+    * assert (k: x < m). lia. apply IHm. assumption.
 Qed.
 
 Lemma wf_ind:
@@ -406,8 +407,8 @@ Proof.
   induction m; intros.
   - cbn in *. contradiction.
   - destruct H.
-    + subst; omega.
-    + pose proof (IHm H). omega.
+    + subst; lia.
+    + pose proof (IHm H). lia.
 Qed.
 
 Lemma list_to_zero_length:
@@ -417,7 +418,7 @@ Proof.
   cbn. rewrite IHm. reflexivity.
 Qed.
 
-Fixpoint list_to_1 (n:nat) : list nat :=
+Definition list_to_1 (n:nat) : list nat :=
   match n with
   | 0 => nil
   | S 0 => nil
@@ -672,7 +673,7 @@ Lemma string_neq_bool_neq:
 intros a1 a2 h j. subst. rewrite string_eq_bool_rfl in h. discriminate.
 Qed.
 
-Fixpoint string_compare (ss ts:string) : Prop :=
+Definition string_compare (ss ts:string) : Prop :=
   match string_eq_bool ss ts with
     | true => True
     | false => False
@@ -702,4 +703,3 @@ Qed.
 Lemma max_snd: forall m n, max m n >= n.
 induction m; induction n; simpl; intuition.
 Qed.
-

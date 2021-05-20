@@ -198,7 +198,7 @@ Proof.
   unfold map_get_r; intros. 
   destruct (var_dec v0 x).
   - subst. rewrite M.grs. rewrite M.gso. rewrite M.grs. reflexivity. assumption.
-  - rewrite M.gro. Focus 2. assumption. destruct (var_dec v0 y).
+  - rewrite M.gro. 2: assumption. destruct (var_dec v0 y).
     + subst. rewrite M.gss. rewrite M.gss. reflexivity.
     + rewrite M.gso. rewrite M.gso. rewrite M.gro. reflexivity. assumption. assumption. assumption.
 Qed.      
@@ -372,7 +372,7 @@ Section EQDMAP.
     unfold map_getd_r; intros. unfold getd. 
     destruct (var_dec v0 x).
     - subst. rewrite M.grs. rewrite M.gso. rewrite M.grs. reflexivity. assumption.
-    - rewrite M.gro. Focus 2. assumption. destruct (var_dec v0 y).
+    - rewrite M.gro. 2: assumption. destruct (var_dec v0 y).
       + subst. rewrite M.gss. rewrite M.gss. reflexivity.
       + rewrite M.gso. rewrite M.gso. rewrite M.gro. reflexivity. assumption. assumption. assumption.
   Qed.      

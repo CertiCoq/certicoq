@@ -17,15 +17,15 @@ MetaCoq Run (mk_Frame_ops
                (MPfile ["cps_proto"; "L6"; "CertiCoq"])
                (MPfile ["cps"; "L6"; "CertiCoq"], "exp")
                exp [var; fun_tag; ctor_tag; prim; N; list var]).
-Print exp_univ.
-Print exp_univD.
+(* Print exp_univ. *)
+(* Print exp_univD. *)
 
 Instance Frame_exp : Frame exp_univ := exp_Frame_ops.
 Instance AuxData_exp : AuxData exp_univ := exp_aux_data.
 
-Print exp_frame_t.
-Print exp_frameD.
-Print exp_Frame_ops.
+(* Print exp_frame_t. *)
+(* Print exp_frameD. *)
+(* Print exp_Frame_ops. *)
 
 Open Scope list_scope.
 

@@ -896,7 +896,7 @@ Definition lift_error {A : Type} (o : option A) (s : string) : error A :=
   | None => Err s
   end.
 
-Fixpoint translate_program (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (fmap : fun_info_env) nenv :
+Definition translate_program (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (fmap : fun_info_env) nenv :
   error (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e => 

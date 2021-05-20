@@ -31,8 +31,8 @@ Unset Strict Unquote Universe Mode.
 Instance Frame_exp_inj : @Frame_inj exp_univ _.
 Proof. unfold Frame_inj; destruct f; simpl; ltac1:(congruence). Defined.
 
-Check frames_nil >:: cons_fundef0 [] >:: fFun2 0%nat [].
-Check fun e => framesD <[ cons_fundef0 []; fFun2 0%nat [] ]> e.
+(* Check frames_nil >:: cons_fundef0 [] >:: fFun2 0%nat []. *)
+(* Check fun e => framesD <[ cons_fundef0 []; fFun2 0%nat [] ]> e. *)
 
 Definition used_vars_var : var -> list var := fun x => [x].
 Definition used_vars_constr : constr -> list var := fun _ => [].
@@ -110,6 +110,9 @@ Extraction Inline Preserves_R_R_C Preserves_S_dn_St Preserves_S_up_St.
 (* Run TemplateProgram (tmPrint =<< parse_rel R). *) (* For some reason, this hangs.. *)
 
 (* ...but this doesn't: *)
+
+(* Commenting out because it causes a lot of printing during compilation.
+
 Goal True.
   ltac1:(parse_rel 0 R ltac:(fun x n => idtac x)).
 Abort.
@@ -261,6 +264,7 @@ Goal True.
           ltac:(fun x => idtac))
     end))).
 Abort.
+ *)
 
 Definition nNamed s := {| binder_name := nNamed s; binder_relevance := Relevant |}.
 Definition test_case_tree (pat pat_ty ret_ty success failure : term) : TemplateMonad unit :=
@@ -297,6 +301,7 @@ Run TemplateProgram (test_case_tree
   <%exp%> <%nat%> (mkApps <%plus%> [tVar "$n"; tVar "$m"]) <%O%>).
 *)
 
+(* 
 Goal True.
   ltac1:(
     parse_rel 0 R ltac:(fun rules n =>
@@ -336,7 +341,7 @@ Goal True.
           ltac:(fun x => idtac))
     end))).
 Abort.
-
+*)
 (* Context (opaque_delay_t : forall {A : exp_univ}, univD A -> Set) *)
 (*        `{Hopaque_delay : @Delayed exp_univ Frame_exp (@opaque_delay_t)}. *)
 Definition opaque_delay_t {A : exp_univ} (e : univD A) := unit.
@@ -401,7 +406,7 @@ Proof.
 Defined.
 
 Set Extraction Flag 2031. (* default + linear let + linear beta *)
-Recursive Extraction rw_R.
+(* Recursive Extraction rw_R. *)
 (* - is directly recursive (fixpoint combinator gone) 
    - context parameter erased *)
 
@@ -476,7 +481,7 @@ Proof.
 Defined.
 
 Set Extraction Flag 2031. (* default + linear let + linear beta *)
-Recursive Extraction rw_R_m.
+(* Recursive Extraction rw_R_m. *)
 (* - is directly recursive (fixpoint combinator gone) 
    - context parameter erased
    - no fuel parameter (termination argument erased) *)
@@ -748,7 +753,7 @@ Proof.
 Defined.
 
 Set Extraction Flag 2031. (* default + linear let + linear beta *)
-Recursive Extraction rw_cp. (* no fuel parameter *)
+(* Recursive Extraction rw_cp. (* no fuel parameter *) *)
 
 Definition rw_cp_top e : result (Root:=exp_univ_exp) cp_fold (I_S_plain (S:=unit)) (erase <[]>) e.
 Proof.

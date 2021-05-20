@@ -19,6 +19,7 @@ COPYING file for more details.
 
 (** * Fixed-point format *)
 Require Import Raux Defs Round_pred Generic_fmt Ulp Round_NE.
+Require Import Coq.micromega.Lia.
 
 Section RND_FIX.
 
@@ -86,7 +87,7 @@ intros x; unfold ulp.
 case Req_bool_spec; intros Zx.
 case (negligible_exp_spec FIX_exp).
 intros T; specialize (T (emin-1)%Z); contradict T.
-unfold FIX_exp; omega.
+unfold FIX_exp; lia.
 intros n _; reflexivity.
 reflexivity.
 Qed.

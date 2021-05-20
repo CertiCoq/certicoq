@@ -81,9 +81,9 @@ Proof.
   ltac1:(unerase; lia).
 Defined.
 
-Print thingy.
-(* Since n and its proof are carried separately, both are erased entirely *)
-Recursive Extraction thingy.
+(* Print thingy. *)
+(* (* Since n and its proof are carried separately, both are erased entirely *) *)
+(* Recursive Extraction thingy. *)
 End Example.
 
 (* -------------------- Fixpoint combinator -------------------- *)
@@ -173,9 +173,9 @@ Defined.
 
 End FixENExample.
 
-Print FixENExample.plus.
+(* Print FixENExample.plus. *)
 Set Extraction Flag 2031. (* default + linear let + linear beta *)
-Recursive Extraction FixENExample.plus.
+(* Recursive Extraction FixENExample.plus. *)
 
 (* -------------------- 1-hole contexts built from frames -------------------- *)
 

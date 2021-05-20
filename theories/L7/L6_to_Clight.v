@@ -997,7 +997,7 @@ Definition body_external_decl : positive * globdef Clight.fundef type :=
                              params Tvoid cc_default)).
 
 
-Fixpoint translate_funs
+Definition translate_funs
          (e : exp)
          (fenv : fun_env)
          (cenv: ctor_env)
@@ -1027,7 +1027,7 @@ Fixpoint translate_funs
   | _ => None
   end.
 
-Fixpoint translate_funs_fast
+Definition translate_funs_fast
          (e : exp)
          (fenv : fun_env)
          (cenv: ctor_env)
@@ -1135,7 +1135,7 @@ Fixpoint make_fundef_info
 
 
 
-Fixpoint add_bodyinfo
+Definition add_bodyinfo
          (e : exp)
          (fenv : fun_env)
          (nenv : name_env)
@@ -1155,7 +1155,7 @@ Fixpoint add_bodyinfo
 
 
 (* Make fundef_info for functions in fnd (if any), and for the body of the program *)
-Fixpoint make_funinfo
+Definition make_funinfo
          (e : exp)
          (fenv : fun_env)
          (nenv : name_env)
@@ -1320,7 +1320,7 @@ Fixpoint make_argList' (n : nat) (nenv : name_env) : nState (name_env * list (id
                 ret (nenv, (new_id,val)::rest_id)
   end.
 
-Fixpoint make_argList (n:nat) (nenv:name_env) : nState (name_env * list (ident * type)) :=
+Definition make_argList (n:nat) (nenv:name_env) : nState (name_env * list (ident * type)) :=
   rest <- make_argList' n nenv;;
        let (nenv, rest_l) := rest in
        ret (nenv, rev rest_l).
@@ -1393,7 +1393,7 @@ Notation nameTy    := (Tpointer charPtrTy noattr).
 Notation arityTy   := (Tpointer val noattr).
 
 
-Fixpoint make_elim_Asgn (argv:ident) (valIdent:ident) (arr:nat): statement :=
+Definition make_elim_Asgn (argv:ident) (valIdent:ident) (arr:nat): statement :=
   let argv_proj := make_proj (var argv) 0%nat arr in
   let val_proj := make_proj (var valIdent) 0%nat arr in
   make_Asgn argv_proj val_proj.
@@ -1717,7 +1717,7 @@ Definition make_header
 
 
 (* end of header file *)
-Require Import L6.cps_show.
+
 
 Definition compile (e : exp) (cenv : ctor_env) (nenv : M.t BasicAst.name) :
   exceptionMonad.exception (M.t BasicAst.name * option Clight.program * option Clight.program) :=

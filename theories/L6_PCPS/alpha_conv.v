@@ -1,5 +1,5 @@
 (* Definition and semantics preservation proof for alpha conversion. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 

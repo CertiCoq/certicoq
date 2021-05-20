@@ -19,6 +19,7 @@ Require Import Errors Maps Integers Floats.
 Require Import AST Values Memory Events Globalenvs Determinism.
 Require Import Ctypes Cop Csyntax Csem.
 Require Cstrategy.
+Require Import Coq.micromega.Lia.
 
 Local Open Scope string_scope.
 Local Open Scope list_scope.
@@ -293,7 +294,7 @@ Definition assign_copy_ok (ty: type) (b: block) (ofs: ptrofs) (b': block) (ofs':
 Remark check_assign_copy:
   forall (ty: type) (b: block) (ofs: ptrofs) (b': block) (ofs': ptrofs),
   { assign_copy_ok ty b ofs b' ofs' } + {~ assign_copy_ok ty b ofs b' ofs' }.
-Proof with try (right; intuition omega).
+Proof with try (right; intuition lia).
   intros. unfold assign_copy_ok.
   assert (alignof_blockcopy ge ty > 0) by apply alignof_blockcopy_pos.
   destruct (Zdivide_dec (alignof_blockcopy ge ty) (Ptrofs.unsigned ofs')); auto...
@@ -310,8 +311,8 @@ Proof with try (right; intuition omega).
   destruct (zeq (Ptrofs.unsigned ofs') (Ptrofs.unsigned ofs)); auto.
   destruct (zle (Ptrofs.unsigned ofs' + sizeof ge ty) (Ptrofs.unsigned ofs)); auto.
   destruct (zle (Ptrofs.unsigned ofs + sizeof ge ty) (Ptrofs.unsigned ofs')); auto.
-  right; intuition omega.
-  destruct Y... left; intuition omega.
+  right; intuition lia.
+  destruct Y... left; intuition lia.
 Defined.
 
 Definition do_assign_loc (w: world) (ty: type) (m: mem) (b: block) (ofs: ptrofs) (v: val): option (world * trace * mem) :=
@@ -479,19 +480,19 @@ Definition memcpy_args_ok
 Remark memcpy_check_args:
   forall sz al bdst odst bsrc osrc,
   {memcpy_args_ok sz al bdst odst bsrc osrc} + {~memcpy_args_ok sz al bdst odst bsrc osrc}.
-Proof with try (right; intuition omega).
+Proof with try (right; intuition lia).
   intros.
   assert (X: {al = 1 \/ al = 2 \/ al = 4 \/ al = 8} + {~(al = 1 \/ al = 2 \/ al = 4 \/ al = 8)}).
     destruct (zeq al 1); auto. destruct (zeq al 2); auto.
     destruct (zeq al 4); auto. destruct (zeq al 8); auto...
   unfold memcpy_args_ok. destruct X...
-  assert (al > 0) by (intuition omega).
+  assert (al > 0) by (intuition lia).
   destruct (zle 0 sz)...
   destruct (Zdivide_dec al sz); auto...
   assert(U: forall x, {sz > 0 -> (al | x)} + {~(sz > 0 -> (al | x))}).
     intros. destruct (zeq sz 0).
     left; intros; omegaContradiction.
-    destruct (Zdivide_dec al x); auto. right; red; intros. elim n0. apply H0. omega.
+    destruct (Zdivide_dec al x); auto. right; red; intros. elim n0. apply H0. lia.
   destruct (U osrc); auto...
   destruct (U odst); auto...
   assert (Y: {bsrc <> bdst \/ osrc = odst \/ osrc + sz <= odst \/ odst + sz <= osrc}
@@ -500,8 +501,8 @@ Proof with try (right; intuition omega).
     destruct (zeq osrc odst); auto.
     destruct (zle (osrc + sz) odst); auto.
     destruct (zle (odst + sz) osrc); auto.
-    right; intuition omega.
-  destruct Y... left; intuition omega.
+    right; intuition lia.
+  destruct Y... left; intuition lia.
 Defined.
 
 Definition do_ef_memcpy (sz al: Z)
@@ -583,7 +584,7 @@ Proof with try congruence.
   split. apply SIZE in Heqo. subst v. econstructor; eauto. constructor.
 (* EF_free *)
   unfold do_ef_free. destruct vargs... destruct v... destruct vargs...
-  mydestr. split. apply SIZE in Heqo0. econstructor; eauto. congruence. omega. constructor.
+  mydestr. split. apply SIZE in Heqo0. econstructor; eauto. congruence. lia. constructor.
 (* EF_memcpy *)
   unfold do_ef_memcpy. destruct vargs... destruct v... destruct vargs...
   destruct v... destruct vargs... mydestr. 
@@ -630,7 +631,7 @@ Proof.
   inv H0. erewrite SIZE by eauto. rewrite H1, H2. auto.
 (* EF_free *)
   inv H; unfold do_ef_free.
-  inv H0. rewrite H1. erewrite SIZE by eauto. rewrite zlt_true. rewrite H3. auto. omega.
+  inv H0. rewrite H1. erewrite SIZE by eauto. rewrite zlt_true. rewrite H3. auto. lia.
 (* EF_memcpy *)
   inv H; unfold do_ef_memcpy.
   inv H0. rewrite Decidable_complete. rewrite H7; rewrite H8; auto.

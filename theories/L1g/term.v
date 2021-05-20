@@ -5,7 +5,7 @@ Require Import Coq.Bool.Bool.
 Require Import Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
 Require Export Common.Common Common.AstCommon.
 Require Export L1g.compile.
 
@@ -115,9 +115,9 @@ Lemma TrmSAize_mkApp:
   forall args t a, TrmSize t < TrmSize (mkApp (TApp t a) args).
 Proof.
   induction args; intros.
-  - cbn. omega.
+  - cbn. lia.
   - cbn. specialize (IHargs (TApp t a0) a).
-    cbn in IHargs. omega.
+    cbn in IHargs. lia.
 Qed.
 
 Lemma mkApp_TConstruct_inject:
@@ -359,16 +359,16 @@ Lemma tappend_tcons_tunit:
     tappend bs (tcons x cs) = tappend ds cs -> tappend bs (tunit x) = ds.
 Proof.
   induction bs; destruct ds; cbn; intros.
-  - assert (j:= f_equal tlength H). cbn in j. omega.
+  - assert (j:= f_equal tlength H). cbn in j. lia.
   - injection H. intros. subst x. destruct ds.
     + reflexivity.
     + injection H; intros.
       assert (j:= f_equal tlength H). cbn in j.
-      rewrite tlength_tappend in j. omega.
+      rewrite tlength_tappend in j. lia.
   - destruct cs.
     + discriminate.
     + injection H; intros. assert (j:= f_equal tlength H0).
-      rewrite tlength_tappend in j. cbn in j. omega.
+      rewrite tlength_tappend in j. cbn in j. lia.
   - injection H; intros.  assert (j:= f_equal tlength H0).
     rewrite tlength_tappend in j. cbn in j.
     specialize (IHbs _ _ _ H0). rewrite IHbs. rewrite H1. reflexivity.
@@ -477,9 +477,9 @@ Lemma tsplit_sanity:
 Proof.
   intros n t ts. functional induction (tsplit n t ts); intros; cbn.
   - intuition.
-  - destruct n. elim y. omega.
+  - destruct n. elim y. lia.
   - destruct ls. elim y. intuition.
-  - rewrite e1 in IHo. omega.
+  - rewrite e1 in IHo. lia.
   - rewrite e1 in IHo. rewrite (proj1 IHo). rewrite (proj2 IHo).
     intuition.
 Qed.
@@ -701,7 +701,7 @@ Qed.
 Lemma tnth_extend1:
   forall n l t,  tnth n l = Some t -> n < tlength l.
 Proof.
-  induction n; induction l; simpl; intros; try discriminate; try omega.
+  induction n; induction l; simpl; intros; try discriminate; try lia.
   - apply lt_n_S. eapply IHn. eassumption.
 Qed.
 
@@ -709,7 +709,7 @@ Lemma tnth_extend2:
   forall n l,  n < tlength l -> exists t, tnth n l = Some t.
 Proof.
   induction n; intros.
-  - destruct l. simpl in H. omega. exists t. reflexivity.
+  - destruct l. simpl in H. lia. exists t. reflexivity.
   - destruct l. inversion H. simpl in H.
     specialize (IHn _ (lt_S_n _ _ H)). destruct IHn. exists x.
     simpl. assumption.
@@ -955,7 +955,7 @@ Proof.
     + rewrite <- tappend_assoc. simpl. reflexivity.
     + right. split; try split.
       * exists fn1, fn2, t. reflexivity.
-      * omega.
+      * lia.
       * apply tIn_tappend1.
   - exists (TConst s), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
@@ -1004,7 +1004,7 @@ Proof.
     + rewrite <- tappend_assoc. simpl. reflexivity.
     + right. split; try split.
       * exists fn1, fn2, t. reflexivity.
-      * omega.
+      * lia.
       * apply tIn_tappend1.
   - exists (TConst s), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
@@ -1558,7 +1558,7 @@ Proof.
   try (solve[constructor; intuition]).  
   - destruct (lt_eq_lt_dec n0 n) as [[h | h] | h].
     + rewrite (proj1 (nat_compare_lt _ _) h). apply IRelLt. assumption.
-    + rewrite (proj2 (Nat.compare_eq_iff _ _) h). subst. apply IRelEq.
+    + rewrite (proj2 (NPeano.Nat.compare_eq_iff _ _) h). subst. apply IRelEq.
     + rewrite (proj1 (nat_compare_gt _ _)). apply IRelGt.
       assumption. assumption.
 Qed.
@@ -1588,7 +1588,7 @@ Proof.
   try (solve [unfold instantiate; constructor]).
   - destruct (lt_eq_lt_dec n m) as [[h|h]|h]; unfold instantiate.
     + rewrite (proj1 (nat_compare_lt _ _) h). constructor.
-    + rewrite (proj2 (Nat.compare_eq_iff _ _) h). assumption.
+    + rewrite (proj2 (NPeano.Nat.compare_eq_iff _ _) h). assumption.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
   - change (WFapp (TLambda nm (instantiate t (S n) bod))). constructor.
     + apply H0. assumption.
@@ -1748,14 +1748,14 @@ Lemma fold_left_pres_WFTrm:
     forall t, WFTrm t (a + List.length ns) -> WFTrm (fold_left f ns t) a.
 Proof.
   intros f. induction ns; cbn; intros.
-  - replace (a + 0) with a in H0. assumption. omega.
+  - replace (a + 0) with a in H0. assumption. lia.
   - apply IHns.
     + intros. apply H; try assumption. apply (or_intror H3).
     + replace (a0 + S (Datatypes.length ns))
         with (S (a0 + (Datatypes.length ns))) in H0.
-      assert (j: a0 + Datatypes.length ns >= a0). omega.
+      assert (j: a0 + Datatypes.length ns >= a0). lia.
       specialize (H t _ j H0).
-      apply H. apply (or_introl eq_refl). omega.
+      apply H. apply (or_introl eq_refl). lia.
 Qed.
 
 Lemma fold_left_pres_WFapp:

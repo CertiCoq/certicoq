@@ -67,7 +67,7 @@ Section CPS.
   Definition t_empty:t_map := M.empty _.
   
   (* get the fun_tag of a variable, func_tag if not found *)
-  Fixpoint get_f (n:var) (sig:t_map): fun_tag :=
+  Definition get_f (n:var) (sig:t_map): fun_tag :=
     match M.get n sig with
     | None => func_tag
     | Some v => v

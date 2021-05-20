@@ -16,7 +16,7 @@ Definition freshM : Type -> Type := @compM' unit.
 (* TODO: move apply_r and apply_r_list to cps_util, and all_fun_name (and proofs) to identifiers *)
 (* after freshen_term e sigma curr l = e', curr', l', BV(e') are in interval [curr, curr'[ and disjoint from l *)
 
-(* XXX Compied temporarily from shrink_cps. Probably move to common file *)
+(* XXX Copied temporarily from shrink_cps. Probably move to common file *)
 Definition apply_r sigma y :=
   match (@M.get M.elt y sigma) with
     | Some v => v
@@ -116,9 +116,9 @@ Definition test :=
 Definition dummy_tag := 1%positive.
 Definition c := pack_data 10%positive dummy_tag dummy_tag dummy_tag  (M.empty _) (M.empty _) (M.empty _) (M.empty _) [].
 
-Definition testf := Eval native_compute in (freshen_top test c).
+(* Definition testf := Eval native_compute in (freshen_top test c). *)
 
-Definition test2 :=
-  (Econstr 1 2 [3; 4] (Econstr 1 2 [3; 4] (Ehalt 1)))%positive.
+(* Definition test2 := *)
+(*   (Econstr 1 2 [3; 4] (Econstr 1 2 [3; 4] (Ehalt 1)))%positive. *)
 
-Definition testf2 := Eval native_compute in (freshen_top test2 c).
+(* Definition testf2 := Eval native_compute in (freshen_top test2 c). *)

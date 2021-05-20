@@ -3,7 +3,7 @@ Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
 Require Import Common.Common.  (* shared namespace *)
 Require Import L2k.compile.
 
@@ -291,13 +291,13 @@ Lemma na_isLambda_etaExpand_args:
       isOLambda (etaExpand_args
                    na actualArgs (fun b => TLambda nAnon (F b)) computedArgs).
 Proof.
-  induction na; induction actualArgs; cbn; intros; try omega; auto.
+  induction na; induction actualArgs; cbn; intros; try lia; auto.
   - apply isOLambda_Some.
   - refine (IHna tnil _  (fun b : Terms => TLambda nAnon (F b))
                  (tappend (lifts 0 computedArgs) (tunit (TRel 0)))).
-    cbn. omega.
+    cbn. lia.
   - refine (IHna actualArgs _  F (tappend computedArgs (tunit t))).
-    omega.
+    lia.
 Qed.
     
 Lemma na_isConstruct_etaExpand_args:
@@ -308,9 +308,9 @@ Lemma na_isConstruct_etaExpand_args:
          (etaExpand_args
             na aArgs (fun b => TConstruct i m npars) cArgs)).
 Proof.
-  induction na; induction aArgs; cbn; intros; try omega.
+  induction na; induction aArgs; cbn; intros; try lia.
   - apply isOConstruct_Some.
-  - assert (j: na = tlength aArgs). omega.
+  - assert (j: na = tlength aArgs). lia.
     eapply (IHna aArgs j i m npars). 
 Qed.
 
@@ -358,9 +358,9 @@ Lemma na_isConstruct_etaExpand_args:
       isOConstruct (etaExpand_args
                      na aArgs (fun b => TConstruct i m (F b)) cArgs).
 Proof.
-  induction na; induction aArgs; cbn; intros; try omega.
+  induction na; induction aArgs; cbn; intros; try lia.
   - cbn in *. destruct aArgs; intuition. 
-  - assert (j0: na < tlength aArgs). omega.
+  - assert (j0: na < tlength aArgs). lia.
     Check (IHna _ j0). assumption.
 Qed.
  ******************)
@@ -378,9 +378,9 @@ Lemma na_isConstruct_etaExpand_args:
       isWrong (etaExpand_args na aArgs
                               (fun b => TConstruct i m (F b)) cArgs).
 Proof.
-  induction na; induction aArgs; cbn; intros; try omega.
+  induction na; induction aArgs; cbn; intros; try lia.
   - intuition. 
-  - left. assert (j0: na < tlength aArgs). omega.
+  - left. assert (j0: na < tlength aArgs). lia.
     Check (IHna _ j0). assumption.
 Qed.
 
@@ -398,8 +398,8 @@ Lemma na_isLam_or_isConstruct_etaExpand_args:
              na actualArgs (fun b => TConstruct i m (F b)) computedArgs)).
 Proof.
   intros. destruct (le_lt_dec (tlength actualArgs) na).
-  - left. intros. split. omega. eapply na_isLambda_etaExpand_args. omega.
-  - right. intros. split. omega. eapply na_isConstruct_etaExpand_args. omega.
+  - left. intros. split. lia. eapply na_isLambda_etaExpand_args. lia.
+  - right. intros. split. lia. eapply na_isConstruct_etaExpand_args. lia.
 Qed.
  ***********************)
 
@@ -416,8 +416,8 @@ Lemma na_isLam_or_isConstruct_etaExpand_args:
              na actualArgs (fun b => TConstruct i m (F b)) computedArgs)).
 Proof.
   intros. destruct (le_lt_dec (tlength actualArgs) na).
-  - left. intros. eapply na_isLambda_etaExpand_args. omega.
-  - right. intros. eapply na_isConstruct_etaExpand_args. omega.
+  - left. intros. eapply na_isLambda_etaExpand_args. lia.
+  - right. intros. eapply na_isConstruct_etaExpand_args. lia.
 Qed.
  ***************)
 
@@ -444,12 +444,12 @@ Goal
     etaExpand_args nargs actualArgs F tnil.
 Proof.
   induction params; intros; cbn.
-  - destruct npars. omega. destruct actualArgs; cbn.
+  - destruct npars. lia. destruct actualArgs; cbn.
 
     induction npars; intros; cbn.
   - destruct params; cbn.
     + destruct actualArgs; try reflexivity.
-    + omega.
+    + lia.
   - destruct params; cbn.
     + erewrite <- IHnpars.
 
@@ -474,8 +474,8 @@ Goal
     etaExpand_args nargs actualArgs F computedArgs.
 Proof.
   induction actualArgs; destruct npars; cbn; intros;
-    try omega; try reflexivity.
-  assert (j: tlength actualArgs >= npars). omega.
+    try lia; try reflexivity.
+  assert (j: tlength actualArgs >= npars). lia.
   
   rewrite (IHactualArgs _ _ F tnil j).
 
@@ -499,8 +499,8 @@ Goal
     S (tlength actualArgs) < np ->
       isLambda (etaExpand (fun b => F b) computedArgs actualArgs np na).
 Proof.
-  induction actualArgs; induction np; intros; try omega.
-  - assert (j: np = S (pred np)). cbn in H. omega.
+  induction actualArgs; induction np; intros; try lia.
+  - assert (j: np = S (pred np)). cbn in H. lia.
     rewrite j in *. cbn.
     change
       (isLambda
@@ -525,24 +525,24 @@ Proof.
 Proof.
   intros.
   intros. destruct (le_lt_dec (tlength actualArgs) na).
-  - left. intros. split. omega. eapply na_isLambda_etaExpand_args. omega.
-  - right. intros. split. omega. eapply na_isConstruct_etaExpand_args. omega.
+  - left. intros. split. lia. eapply na_isLambda_etaExpand_args. lia.
+  - right. intros. split. lia. eapply na_isConstruct_etaExpand_args. lia.
 Qed.
     
 Proof.
   induction np; induction na; induction computedArgs; induction actualArgs;
     cbn; intros; auto.
-  - eapply na_isLambda_etaExpand_args. cbn. omega.
+  - eapply na_isLambda_etaExpand_args. cbn. lia.
   - destruct (na_isLam_or_isConstruct_etaExpand_args na actualArgs (tunit t)).
     + destruct (H F) as [x0 [x1 jx]]. rewrite jx. auto.
     +
   - destruct (dec_le (tlength actualArgs) na F).
-    + eapply na_isLambda_etaExpand_args. omega.
+    + eapply na_isLambda_etaExpand_args. lia.
     +
                                                       
     + admit.
     + 
-  - eapply na_isLambda_etaExpand_args. cbn. omega.
+  - eapply na_isLambda_etaExpand_args. cbn. lia.
   - eapply na_isLambda_etaExpand_args. 
 
 
@@ -554,7 +554,7 @@ Proof.
     forall na (F:Terms -> Term),
       isLambda (etaExpand F computedArgs actualArgs np na).
 Proof.
-  induction nallArgs; intros np; case_eq np; intros; cbn; try omega. 
+  induction nallArgs; intros np; case_eq np; intros; cbn; try lia. 
   - assert (j0: computedArgs = tnil). admit.
     assert (j1: actualArgs = tnil). admit.
     subst. cbn.
@@ -563,40 +563,40 @@ Proof.
     eapply IHnp.
     cbn.
 
-    assert (j: np = S (pred np) \/ na = S (pred na)). omega. destruct j.
+    assert (j: np = S (pred np) \/ na = S (pred na)). lia. destruct j.
     + rewrite H1 in *. eapply IHnpa.
-      * cbn. omega.
+      * cbn. lia.
       * replace (S (Init.Nat.pred np) + na)
-          with (S (Init.Nat.pred np + na)) in H0; try omega.
+          with (S (Init.Nat.pred np + na)) in H0; try lia.
 
   
-  - assert (j: np = 0 /\ na = 0). omega. destruct j. subst. cbn. auto.
-  - assert (j: np = S (pred np) \/ na = S (pred na)). omega. destruct j.
+  - assert (j: np = 0 /\ na = 0). lia. destruct j. subst. cbn. auto.
+  - assert (j: np = S (pred np) \/ na = S (pred na)). lia. destruct j.
     + rewrite H1 in *. cbn. eapply IHnpa.
-      * cbn. omega.
+      * cbn. lia.
       * replace (S (Init.Nat.pred np) + na)
-          with (S (Init.Nat.pred np + na)) in H0; try omega.
+          with (S (Init.Nat.pred np + na)) in H0; try lia.
     + rewrite H1 in *.
       replace (np + S (Init.Nat.pred na))
-          with (S (np + Init.Nat.pred na)) in H0; try omega.
+          with (S (np + Init.Nat.pred na)) in H0; try lia.
       myInjection H0. 
       eapply (IHnpa ).
-      * cbn. omega.
+      * cbn. lia.
       * apply f_equal2. reflexivity. rewrite H1 at 2. cbn.
 
 
 
       eapply IHnpa.
-      * cbn. omega.
+      * cbn. lia.
       * replace (np + S (Init.Nat.pred na))
-          with (S (np + Init.Nat.pred na)) in H0; try omega.
+          with (S (np + Init.Nat.pred na)) in H0; try lia.
         myInjection H0. apply f_equal2. reflexivity.
 
         rewrite H1. cbn.
 
       
     eapply isLambda_etaExpand_args. cbn. assumption.
-  - eapply IHnp. omega.
+  - eapply IHnp. lia.
 Qed.
 
 Lemma isLambda_etaExpand:
@@ -606,10 +606,10 @@ Lemma isLambda_etaExpand:
       isLambda (etaExpand (fun b : Terms => TLambda nAnon (F b))
                           computedArgs actualArgs np na).
 Proof.
-  induction np; induction actualArgs; cbn; intros; try omega; auto.
-  - eapply isLambda_etaExpand_args. cbn. omega.
+  induction np; induction actualArgs; cbn; intros; try lia; auto.
+  - eapply isLambda_etaExpand_args. cbn. lia.
   - eapply isLambda_etaExpand_args. cbn. assumption.
-  - eapply IHnp. omega.
+  - eapply IHnp. lia.
 Qed.
 
 Lemma isConstruct_etaExpand:
@@ -620,8 +620,8 @@ Lemma isConstruct_etaExpand:
         (etaExpand (fun b : Terms => TConstruct i m (F b))
                    computedArgs actualArgs np na).
 Proof.
-  induction np; induction actualArgs; cbn; intros; try omega; auto.
-  - eapply isConstruct_etaExpand_args. cbn. omega.
+  induction np; induction actualArgs; cbn; intros; try lia; auto.
+  - eapply isConstruct_etaExpand_args. cbn. lia.
   - eapply (IHnp ).
 Qed.
  ****************)
@@ -636,32 +636,32 @@ Goal
                                computedArgs actualArgs np na).
 Proof.
   induction actualArgs; intros; cbn in H.
-  - assert (jnp: np = 0). omega.
-    assert (jna: na = 0). omega. subst. cbn. auto.
-  - assert (k: np = S (pred np) \/ na = S (pred na)). omega. destruct k.
+  - assert (jnp: np = 0). lia.
+    assert (jna: na = 0). lia. subst. cbn. auto.
+  - assert (k: np = S (pred np) \/ na = S (pred na)). lia. destruct k.
     + rewrite H0. cbn. refine (IHactualArgs _ _ _ _ _ _).
-      rewrite H0 in H. omega.
+      rewrite H0 in H. lia.
     + destruct np.
       rewrite H0 in *. cbn in *. myInjection H. refine (IHactualArgs _ _ _ _ _ _).
-      rewrite H0 in H. omega.
+      rewrite H0 in H. lia.
 
       Check (IHactualArgs (S np) na _ i m computedArgs).
 
 Proof.
   induction npa; induction actualArgs; cbn; intros; try discriminate.
-  - assert (jnp: np = 0). omega.
-    assert (jna: na = 0). omega. subst. cbn. auto.
-  - assert (j0: np = S (tlength actualArgs) - na). omega.
-    assert (j1: na = S (tlength actualArgs) - np). omega.
-    assert (k: np = S (pred np) \/ na = S (pred na)). omega. destruct k.
-    + assert (k0: npa = tlength actualArgs). omega.
+  - assert (jnp: np = 0). lia.
+    assert (jna: na = 0). lia. subst. cbn. auto.
+  - assert (j0: np = S (tlength actualArgs) - na). lia.
+    assert (j1: na = S (tlength actualArgs) - np). lia.
+    assert (k: np = S (pred np) \/ na = S (pred na)). lia. destruct k.
+    + assert (k0: npa = tlength actualArgs). lia.
       Check (IHnpa
 
       rewrite j0. cbn. destruct na; cbn in *.
-    + assert (j1: np = S npa). omega. Check (IHactualArgs
+    + assert (j1: np = S npa). lia. Check (IHactualArgs
 
 
-    assert (j1: na = S (tlength actualArgs) - np). omega.
+    assert (j1: na = S (tlength actualArgs) - np). lia.
 
     
 Goal
@@ -673,14 +673,14 @@ Goal
 Proof.
   induction actualArgs; induction np; induction na; cbn; intros.
   - right. auto.
-  - assert (j: na >= tlength tnil). cbn. omega.
+  - assert (j: na >= tlength tnil). cbn. lia.
     left. intros.
     apply (@isLambda_etaExpand_args
              na tnil j F (tappend (lifts 0 computedArgs) (tunit (TRel 0)))).
-  - assert (j: 0 >= tlength tnil). cbn. omega.
+  - assert (j: 0 >= tlength tnil). cbn. lia.
     left. intros.
     apply (@isLambda_etaExpand np 0 tnil j F tnil).
-  - assert (j: S na >= tlength tnil). cbn. omega.
+  - assert (j: S na >= tlength tnil). cbn. lia.
     left. intros.
     apply (@isLambda_etaExpand np (S na) tnil j F tnil).
   - intuition.
@@ -697,15 +697,15 @@ Proof.
 Proof.
   induction actualArgs; induction np; induction na; cbn; intros.
   - right. auto.
-  - assert (j: na >= tlength tnil). cbn. omega.
+  - assert (j: na >= tlength tnil). cbn. lia.
     left.
     apply (@isLambda_etaExpand_args
              na tnil j (fun b => TConstruct i m b)
              (tappend (lifts 0 computedArgs) (tunit (TRel 0)))).
-  - assert (j: 0 >= tlength tnil). cbn. omega.
+  - assert (j: 0 >= tlength tnil). cbn. lia.
     left.
     apply (@isLambda_etaExpand np 0 tnil j (fun b => TConstruct i m b) tnil).
-  - assert (j: S na >= tlength tnil). cbn. omega.
+  - assert (j: S na >= tlength tnil). cbn. lia.
     left.
     apply (@isLambda_etaExpand np (S na) tnil j (fun b => TConstruct i m b) tnil).
   - intuition.
@@ -723,14 +723,14 @@ Proof.
   - cbn.
 
   functional induction (etaExpand F computedArgs actualArgs np na).
-  - cbn. refine (isLambda_etaExpand_args _ _ _ _). cbn. omega.
+  - cbn. refine (isLambda_etaExpand_args _ _ _ _). cbn. lia.
   - cbn.
 
   - cbn in *. destruct actualArgs.
-    + refine (isLambda_etaExpand_args _ _ _ _). cbn. omega.
+    + refine (isLambda_etaExpand_args _ _ _ _). cbn. lia.
     +
   - cbn. destruct actualArgs.
-    assert (j: na = 0 \/ na = S (pred na)). omega. destruct j.
+    assert (j: na = 0 \/ na = S (pred na)). lia. destruct j.
     + subst. cbn. auto.
     + rewrite H0. refine (etaExpand_args_up _ _ _ _ _).
 
@@ -744,9 +744,9 @@ Proof.
 Proof.
   induction np; induction actualArgs; intros.
   - cbn in *. 
-    + refine (isLambda_etaExpand_args _ _ _ _). cbn. omega.
+    + refine (isLambda_etaExpand_args _ _ _ _). cbn. lia.
   - cbn. destruct actualArgs.
-    assert (j: na = 0 \/ na = S (pred na)). omega. destruct j.
+    assert (j: na = 0 \/ na = S (pred na)). lia. destruct j.
     + subst. cbn. auto.
     + rewrite H0. refine (etaExpand_args_up _ _ _ _ _).
       
@@ -759,11 +759,11 @@ Goal
                           computedArgs
                           actualArgs np na).
 Proof.
-  induction npa; induction actualArgs; cbn; intros; try omega; auto.
-  - assert (j: np = 0 /\ na = 0). omega. destruct j. subst. cbn. auto.
-  - assert (j: np > 0 \/ na > 0). omega. destruct j.
-    assert (j0: npa = pred (np + na)). omega.
-    + refine (IHnpa (pred np) na _ tnil _ _ _). omega.
+  induction npa; induction actualArgs; cbn; intros; try lia; auto.
+  - assert (j: np = 0 /\ na = 0). lia. destruct j. subst. cbn. auto.
+  - assert (j: np > 0 \/ na > 0). lia. destruct j.
+    assert (j0: npa = pred (np + na)). lia.
+    + refine (IHnpa (pred np) na _ tnil _ _ _). lia.
 
 
 
@@ -776,7 +776,7 @@ Proof.
                           computedArgs actualArgs np na).
 Proof.
   induction np; induction na; induction actualArgs;
-    cbn; intros; try omega.
+    cbn; intros; try lia.
   - specialize (IHna tnil). cbn in IHna.
   
 
@@ -784,10 +784,10 @@ Goal
   forall na np i r, na > 0 -> isLambda (strip (L2.compile.TConstruct i r np na)).
 Proof.
   cbn. intros.
-  induction na; intros; try omega. cbn.
+  induction na; intros; try lia. cbn.
   specialize (IHna 0 i r). cbn in IHna.
   
-  - cbn. replace np with (S (pred np)); try omega.
+  - cbn. replace np with (S (pred np)); try lia.
     cbn.
 
     induction na.
@@ -800,9 +800,9 @@ Proof.
     + right. auto.
     + unfold etaExpand_args.
     
-    assert (j1: na = 0). omega. subst. cbn. right. auto.
-  - assert (j: np <> 0 \/ na <> 0). omega. destruct j.
-    + assert (j: np = S (pred np)). omega. rewrite j in *. cbn.
+    assert (j1: na = 0). lia. subst. cbn. right. auto.
+  - assert (j: np <> 0 \/ na <> 0). lia. destruct j.
+    + assert (j: np = S (pred np)). lia. rewrite j in *. cbn.
 Admitted.
 *******************)
 
@@ -817,11 +817,11 @@ Proof.
   functional induction (etaExpand (np + na)
                     (fun b : Terms => TLambda nAnon (TConstruct i r b)) tnil tnil np na).
   induction npa; intros; cbn.
-  - assert (j0: np = 0). omega.
-    assert (j1: na = 0). omega. subst. cbn. auto. 
-  - assert (j: np <> 0 \/ na <> 0). omega. destruct j.
-    + assert (j: np = S (pred np)). omega. rewrite j in *. 
-      assert (j0: npa = Init.Nat.pred np + na). omega.
+  - assert (j0: np = 0). lia.
+    assert (j1: na = 0). lia. subst. cbn. auto. 
+  - assert (j: np <> 0 \/ na <> 0). lia. destruct j.
+    + assert (j: np = S (pred np)). lia. rewrite j in *. 
+      assert (j0: npa = Init.Nat.pred np + na). lia.
       specialize (IHnpa (pred np) _ i r j0). 
 
 
@@ -829,7 +829,7 @@ Proof.
 
     
   - rewrite <- H. cbn. destruct np. destruct na.
-    + omega.
+    + lia.
     + cbn in H. myInjection H. cbn in IHnpa.
 
 
@@ -854,17 +854,17 @@ Goal
          (npars + nargs) (fun b : Terms => TConstruct i n b)  tnil args npars nargs).
 Proof.
   induction args; cbn; intros.
-  - assert (j0: npars = 0). omega.
-    assert (j1: nargs = 0). omega.
+  - assert (j0: npars = 0). lia.
+    assert (j1: nargs = 0). lia.
     subst. cbn. auto.
-  - assert (npars >= S (pred npars) \/ nargs >= S (pred nargs)). omega.
+  - assert (npars >= S (pred npars) \/ nargs >= S (pred nargs)). lia.
     destruct H0.
     + rewrite H0 in H. myInjection H.
      specialize (IHargs (Init.Nat.pred npars) nargs i n H1).       
       rewrite H0. cbn. assumption.
     + rewrite H0 in H.
        replace (npars + S (Init.Nat.pred nargs))
-        with (S (npars + (Init.Nat.pred nargs))) in H; try omega.
+        with (S (npars + (Init.Nat.pred nargs))) in H; try lia.
       myInjection H.
       specialize (IHargs npars (Init.Nat.pred nargs) i n H1).
 
@@ -877,17 +877,17 @@ Proof.
          (npars + nargs) (fun b : Terms => TConstruct i n b)  tnil args npars nargs).
 Proof.
   induction args; cbn; intros.
-  - assert (j0: npars = 0). omega.
-    assert (j1: nargs = 0). omega.
+  - assert (j0: npars = 0). lia.
+    assert (j1: nargs = 0). lia.
     subst. cbn. auto.
-  - assert (npars = S (pred npars) \/ nargs = S (pred nargs)). omega.
+  - assert (npars = S (pred npars) \/ nargs = S (pred nargs)). lia.
     destruct H0.
     + rewrite H0 in H. myInjection H.
      specialize (IHargs (Init.Nat.pred npars) nargs i n H1).       
       rewrite H0. cbn. assumption.
     + rewrite H0 in H.
        replace (npars + S (Init.Nat.pred nargs))
-        with (S (npars + (Init.Nat.pred nargs))) in H; try omega.
+        with (S (npars + (Init.Nat.pred nargs))) in H; try lia.
       myInjection H.
       specialize (IHargs npars (Init.Nat.pred nargs) i n H1).
       rewrite <- H0. 
@@ -895,7 +895,7 @@ Proof.
 
       
       replace (npars + S (Init.Nat.pred nargs))
-        with (S (npars + (Init.Nat.pred nargs))); try omega.
+        with (S (npars + (Init.Nat.pred nargs))); try lia.
       specialize (IHargs npars (Init.Nat.pred nargs) i n H1). cbn. assumption.
 
       
@@ -913,13 +913,13 @@ Proof.
     isLambda (etaExpand (npars + nargs)
                         (fun b : Terms => TConstruct i n b) tnil args npars nargs).
 Proof.
-  induction fuel; cbn; intros; try omega.
-  destruct npars, nargs; try omega.
-  - assert (j0: fuel = npars + 0). omega.
+  induction fuel; cbn; intros; try lia.
+  destruct npars, nargs; try lia.
+  - assert (j0: fuel = npars + 0). lia.
       Check (IHfuel (S npars) 0). _ _ _ j0).
     
   induction npars; intros.
-  - destruct args, nargs; cbn in H; omega.
+  - destruct args, nargs; cbn in H; lia.
   - destruct args, nargs; cbn in *.
     + eapply IHnpars.
     tlength args <= nargs  ->
@@ -938,7 +938,7 @@ Proof.
       * cbn. 
   
   intros. induction npars; induction nargs; cbn; intros.
-  - destruct args. auto. unfold tlength in H. omega.
+  - destruct args. auto. unfold tlength in H. lia.
   - destruct args. cbn in IHnargs.
  ******************)
 
@@ -1084,16 +1084,16 @@ Lemma tappend_tcons_tunit:
     tappend bs (tcons x cs) = tappend ds cs -> tappend bs (tunit x) = ds.
 Proof.
   induction bs; destruct ds; cbn; intros.
-  - assert (j:= f_equal tlength H). cbn in j. omega.
+  - assert (j:= f_equal tlength H). cbn in j. lia.
   - injection H. intros. subst x. destruct ds.
     + reflexivity.
     + injection H; intros.
       assert (j:= f_equal tlength H). cbn in j.
-      rewrite tlength_tappend in j. omega.
+      rewrite tlength_tappend in j. lia.
   - destruct cs.
     + discriminate.
     + injection H; intros. assert (j:= f_equal tlength H0).
-      rewrite tlength_tappend in j. cbn in j. omega.
+      rewrite tlength_tappend in j. cbn in j. lia.
   - injection H; intros.  assert (j:= f_equal tlength H0).
     rewrite tlength_tappend in j. cbn in j.
     specialize (IHbs _ _ _ H0). rewrite IHbs. rewrite H1. reflexivity.
@@ -1206,9 +1206,9 @@ Lemma tsplit_sanity:
 Proof.
   intros n t ts. functional induction (tsplit n t ts); intros; cbn.
   - intuition.
-  - destruct n. elim y. omega.
+  - destruct n. elim y. lia.
   - destruct ls. elim y. intuition.
-  - rewrite e1 in IHo. omega.
+  - rewrite e1 in IHo. lia.
   - rewrite e1 in IHo. rewrite (proj1 IHo). rewrite (proj2 IHo).
     intuition.
 Qed.
@@ -1255,17 +1255,17 @@ Qed.
 Lemma tnth_extend1:
   forall n l t,  tnth n l = Some t -> n < tlength l.
 Proof.
-  induction n; induction l; simpl; intros; try discriminate; try omega.
-  - apply lt_n_S. eapply IHn. eassumption.
+  induction n; induction l; simpl; intros; try discriminate; try lia.
+  - apply Lt.lt_n_S. eapply IHn. eassumption.
 Qed.
 
 Lemma tnth_extend2:
   forall n l,  n < tlength l -> exists t, tnth n l = Some t.
 Proof.
   induction n; intros.
-  - destruct l. simpl in H. omega. exists t. reflexivity.
+  - destruct l. simpl in H. lia. exists t. reflexivity.
   - destruct l. inversion H. simpl in H.
-    specialize (IHn _ (lt_S_n _ _ H)). destruct IHn. exists x.
+    specialize (IHn _ (Lt.lt_S_n _ _ H)). destruct IHn. exists x.
     simpl. assumption.
 Qed.
 
@@ -1317,8 +1317,8 @@ Lemma dnth_lt:
 Proof.
   intros n dts x. functional induction (dnth n dts); intros.
   - discriminate.
-  - cbn. omega.
-  - specialize (IHo H). cbn. omega.
+  - cbn. lia.
+  - specialize (IHo H). cbn. lia.
 Qed.
 
 Function bnth (n:nat) (l:Brs) {struct l} : option (nat * Term) :=
@@ -1537,7 +1537,7 @@ Proof.
     + rewrite <- tappend_assoc. simpl. reflexivity.
     + right. split; try split.
       * exists fn1, fn2, t. reflexivity.
-      * omega.
+      * lia.
       * apply tIn_tappend1.
   - exists (TConst s), arg, tnil. split. reflexivity.
     left. intuition. revert H. not_isApp.
@@ -1932,21 +1932,21 @@ Lemma WF_nolift:
   (forall ds n, WFTrmDs ds n -> forall i, n <= i -> liftDs i ds = ds).  
 Proof.
   apply WFTrmTrmsBrsDefs_ind; intros; try reflexivity;
-  try (cbn; rewrite H0; try reflexivity; omega);
-  try (cbn; rewrite H0, H2; try reflexivity; omega).
-  - cbn. case_eq (m ?= i); intros; Compare_Prop; try omega. reflexivity.
+  try (cbn; rewrite H0; try reflexivity; lia);
+  try (cbn; rewrite H0, H2; try reflexivity; lia).
+  - cbn. case_eq (PeanoNat.Nat.compare m i); intros; Compare_Prop; try lia. reflexivity.
 Qed.
 
 Remark ClosedTermsNoLift:
   forall t, WFTrm t 0 -> forall i, lift i t = t.
 Proof.
-  intros. eapply WF_nolift. eassumption. omega.
+  intros. eapply WF_nolift. eassumption. lia.
 Qed.                                           
 
 Lemma WF_lift_closed:
   forall t n, WFTrm t n -> WFTrm (lift n t) n.
 Proof.
-  intros. pose proof (proj1 WF_nolift _ _ H n) as h. rewrite h; try omega.
+  intros. pose proof (proj1 WF_nolift _ _ H n) as h. rewrite h; try lia.
   assumption.
 Qed.                                            
 
@@ -1954,21 +1954,21 @@ Lemma WF_lifts_closed:
   forall ts n, WFTrms ts n -> WFTrms (lifts n ts) n.
 Proof.
   intros. pose proof (proj1 (proj2 WF_nolift) _ _ H n) as h.
-  rewrite h; try omega. assumption.
+  rewrite h; try lia. assumption.
 Qed.                                            
 
 Lemma WF_liftBs_closed:
   forall ts n, WFTrmBs ts n -> WFTrmBs (liftBs n ts) n.
 Proof.
   intros. pose proof (proj1 (proj2 (proj2 WF_nolift)) _ _ H n) as h.
-  rewrite h; try omega. assumption.
+  rewrite h; try lia. assumption.
 Qed.                                            
 
 Lemma WF_liftDs_closed:
   forall ts n, WFTrmDs ts n -> WFTrmDs (liftDs n ts) n.
 Proof.
   intros. pose proof (proj2 (proj2 (proj2 WF_nolift)) _ _ H n) as h.
-  rewrite h; try omega. assumption.
+  rewrite h; try lia. assumption.
 Qed.                                            
 
  
@@ -1978,7 +1978,7 @@ Lemma WFTrm_up:
   (forall ts m, WFTrmBs ts m -> WFTrmBs ts (S m)) /\
   (forall ds m, WFTrmDs ds m -> WFTrmDs ds (S m)).
 Proof.
-  apply WFTrmTrmsBrsDefs_ind; cbn; intros; constructor; try assumption; omega.
+  apply WFTrmTrmsBrsDefs_ind; cbn; intros; constructor; try assumption; lia.
 Qed.
 
 Lemma WFTrm_Up:
@@ -2021,7 +2021,7 @@ Lemma lift_pres_WFTrm:
 Proof.
   apply WFTrmTrmsBrsDefs_ind; intros; try (solve[cbn; constructor]);
   try (solve[cbn; constructor; intuition]).
-  - cbn; case_eq (m ?= n0); intros; Compare_Prop; subst; constructor; omega.
+  - cbn; case_eq (PeanoNat.Nat.compare m n0); intros; Compare_Prop; subst; constructor; lia.
   - change
       (WFTrm (TFix (liftDs (n0 + dlength defs) defs) m) (S n)).
     constructor. rewrite liftDs_pres_dlength. apply (H0 (n0 + dlength defs)).
@@ -2043,7 +2043,7 @@ Proof.
   - cbn. eapply IHnargs.
     + eapply tappend_pres_WFTrms.
       * apply WF_lifts_closed. assumption.
-      * constructor. constructor. omega. constructor.
+      * constructor. constructor. lia. constructor.
     + unfold stableF. intros. constructor. eapply (proj1 WFTrm_up). intuition.
 Qed.
 
@@ -2053,7 +2053,7 @@ Qed.
   - cbn. eapply IHnargs.
     + eapply tappend_pres_WFTrms.
       * apply WF_lifts_closed. assumption.
-      * constructor. constructor. omega. constructor.
+      * constructor. constructor. lia. constructor.
     + unfold stableF. intros. constructor. eapply (proj1 WFTrm_up). intuition.
 Qed.
 
@@ -2069,7 +2069,7 @@ Proof.
   - cbn. eapply IHnargs.
     + eapply tappend_pres_WFTrms.
       * apply WF_lifts_closed. assumption.
-      * constructor. constructor. omega. constructor.
+      * constructor. constructor. lia. constructor.
     + unfold stableF. intros. constructor. eapply (proj1 WFTrm_up). intuition.
 Qed.
 
@@ -2080,11 +2080,11 @@ Lemma etaExpand_args_Lam_tnil_pres_WFTrm:
     WFTrm (etaExpand_args_Lam nargs tnil bod cArgs) (n + nargs).
 Proof.
   induction nargs; intros.
-  - cbn. replace (n + 0) with n; try omega. intuition.
-  - cbn. replace (n + S nargs) with (S n + nargs); try omega. eapply IHnargs.
+  - cbn. replace (n + 0) with n; try lia. intuition.
+  - cbn. replace (n + S nargs) with (S n + nargs); try lia. eapply IHnargs.
     + eapply tappend_pres_WFTrms.
       * eapply (proj1 (proj2 lift_pres_WFTrm)). assumption.
-      * constructor. constructor. omega. constructor.
+      * constructor. constructor. lia. constructor.
     + unfold stableF. intros. constructor. eapply (proj1 WFTrm_up). intuition.
 Qed.
 
@@ -2106,10 +2106,10 @@ Lemma nlambda_pres_WFTrm:
   forall nlams t n, WFTrm t n ->  WFTrm (nLambda nlams t) (n + nlams).
 Proof.
   induction nlams; intros.
-  - cbn. replace (n+0) with n; try omega. assumption.
+  - cbn. replace (n+0) with n; try lia. assumption.
   - change (WFTrm (TLambda nAnon (nLambda nlams t)) (n + S nlams)).
     constructor. apply (proj1 (WFTrm_up)).
-    replace (n + S nlams) with (S n + nlams); try omega.
+    replace (n + S nlams) with (S n + nlams); try lia.
     apply IHnlams. apply (proj1 (WFTrm_up)). assumption.
 Qed.                                             
     
@@ -2119,7 +2119,7 @@ Lemma WFTrms_eta_args:
     WFTrms (tappend (lifts 0 args) (tunit (TRel 0))) (S n).
 Proof.
   induction args; intros.
-  - cbn. constructor.  constructor. omega. eapply (proj1 (proj2 WFTrm_up)).
+  - cbn. constructor.  constructor. lia. eapply (proj1 (proj2 WFTrm_up)).
     assumption.
   - inversion_Clear H.
     change
@@ -2140,7 +2140,7 @@ Proof.
   induction x; intros.
   - cbn. apply H. assumption.
   - cbn. constructor. eapply IHx; try assumption.
-    replace (S x + n) with (x + S n) in H0; try omega.
+    replace (S x + n) with (x + S n) in H0; try lia.
     assumption.
 Qed.
 
@@ -2174,12 +2174,12 @@ Lemma etaExpand_aArgs_pres_clsd:
 Proof.
   induction nargs; induction aArgs; intros.
   - cbn. apply nLambda_pres_clsd; try assumption.
-    eapply (@WFTrms_Up _ n). omega. assumption.
+    eapply (@WFTrms_Up _ n). lia. assumption.
   - cbn. constructor.
   - cbn. rewrite pre_nLambda_Lambdan. constructor. eapply nLambda_pres_clsd.
     + apply mkExpand_pres_clpres. assumption.
-    + replace (nlams + S n) with (S (nlams+n)); try omega.
-      apply WFTrms_eta_args. eapply (@WFTrms_Up _ n). omega.
+    + replace (nlams + S n) with (S (nlams+n)); try lia.
+      apply WFTrms_eta_args. eapply (@WFTrms_Up _ n). lia.
       assumption.
   - cbn. eapply IHnargs; try assumption.
     + inversion_Clear H1. apply tappend_pres_WFTrms; intuition.
@@ -2219,9 +2219,9 @@ Proof.
   induction nargs; intros.
   - cbn. eapply nLambda_pres_clsd.
     + intros. constructor. assumption.
-    + eapply WFTrms_Up; try eassumption. omega.
+    + eapply WFTrms_Up; try eassumption. lia.
   - cbn.
-    replace (S (nlams + S nargs)) with ((S (S nlams)) + nargs); try omega.
+    replace (S (nlams + S nargs)) with ((S (S nlams)) + nargs); try lia.
     eapply IHnargs.
     pose proof (WFTrms_eta_args H) as k0. Check (IHnargs _ _ _ k0).
 
@@ -2233,13 +2233,13 @@ Goal
 Proof.
   induction nargs; intros.
   - cbn. apply nlambda_pres_WFTrm. constructor.
-    eapply WFTrms_Up; try eassumption. omega.
+    eapply WFTrms_Up; try eassumption. lia.
   - cbn. eapply IHnargs.
     + cbn. constructor.
 
     eapply IHnargs.
   - cbn. 
-    eapply IHnargs. constructor. omega. destruct x.
+    eapply IHnargs. constructor. lia. destruct x.
     + admit.
     + eapply WFTrms_eta_args.
 
@@ -2256,18 +2256,18 @@ Proof.
   - cbn. apply nlambda_pres_WFTrm. constructor. assumption.
   - cbn. constructor.
   - cbn. 
-    eapply IHnargs. constructor. omega. destruct x.
+    eapply IHnargs. constructor. lia. destruct x.
     + admit.
     + eapply WFTrms_eta_args.
 
 
 
 
-    eapply WFTrms_eta_args. assumption. instantiate (1:=x). omega.
+    eapply WFTrms_eta_args. assumption. instantiate (1:=x). lia.
 Check (WFTrms_eta_args H1).
   - inversion_Clear H. cbn. eapply IHnargs. assumption.
     apply tappend_pres_WFTrms. assumption. econstructor.
-    + eapply WFTrm_Up; try eassumption. omega.
+    + eapply WFTrm_Up; try eassumption. lia.
     + constructor.
 Qed.
 
@@ -2280,7 +2280,7 @@ Qed.
       WFTrm (etaExpand_args i m nargs nlams aArgs cArgs) 0.
 Proof.
   induction x; intros.
-  - assert (k0:S nargs <= tlength aArgs). omega.
+  - assert (k0:S nargs <= tlength aArgs). lia.
     
   
 Lemma etaExpand_args_pres_WFTrm:
@@ -2307,7 +2307,7 @@ Proof.
   induction 1; intros.
   - cbn. destruct aArgs.
     + cbn in *. subst. cbn. repeat constructor. eapply nlambda_pres_WFTrm.
-      constructor. replace (1 - 0) with 1 in H1; try omega.
+      constructor. replace (1 - 0) with 1 in H1; try lia.
       eapply tappend_pres_WFTrms.
       eapply (proj1 (proj2 lift_pres_WFTrm) _ _ H1).
       * eapply tappend_pres_WFTrms.
@@ -2330,12 +2330,12 @@ Proof.
 
     constructor.
   - cbn. cbn in H0. eapply (IHnargs _ (S nlams) _ H).
-    cbn. replace (nargs - 0) with nargs; try omega.
+    cbn. replace (nargs - 0) with nargs; try lia.
     Check (WFTrms_eta_args H0).
     eapply tappend_pres_WFTrms.
     Check (proj1 (proj2 lift_pres_WFTrm) _ _ H0).
     cbn. eapply etaExpand_args_Lam_tnil_pres_WFTrm; try assumption.
-  - cbn. replace (n + S nargs) with (S n + nargs); try omega.
+  - cbn. replace (n + S nargs) with (S n + nargs); try lia.
     eapply IHnargs; try eassumption.
     + inversion_Clear H. apply (proj1 (proj2 WFTrm_up)). assumption.
     + eapply tappend_pres_WFTrms.
@@ -2352,10 +2352,10 @@ Lemma etaExpand_args_Lam_pres_WFTrm:
     WFTrm (etaExpand_args_Lam nargs aArgs bod cArgs) (n + nargs).
 Proof.
   induction nargs; destruct aArgs; intros.
-  - cbn. replace (n + 0) with n; try omega. unfold stableF in H1. intuition.
+  - cbn. replace (n + 0) with n; try lia. unfold stableF in H1. intuition.
   - cbn. constructor.
   - eapply etaExpand_args_Lam_tnil_pres_WFTrm; try assumption.
-  - cbn. replace (n + S nargs) with (S n + nargs); try omega.
+  - cbn. replace (n + S nargs) with (S n + nargs); try lia.
     eapply IHnargs; try eassumption.
     + inversion_Clear H. apply (proj1 (proj2 WFTrm_up)). assumption.
     + eapply tappend_pres_WFTrms.
@@ -2372,15 +2372,15 @@ Proof.
   destruct nargs, aArgs; intros.
   - cbn. constructor. constructor.
   - cbn. constructor.
-  - cbn. replace (n + S nargs) with (S n + nargs); try omega.
+  - cbn. replace (n + S nargs) with (S n + nargs); try lia.
     eapply etaExpand_args_Lam_pres_WFTrm.
     + constructor.
     + constructor.
-      * constructor. omega.
+      * constructor. lia.
       * constructor.
     + unfold stableF. intros. constructor. constructor.
       apply (proj1 (proj2 WFTrm_up)). assumption.
-  - cbn. replace (n + S nargs) with (S n + nargs); try omega.
+  - cbn. replace (n + S nargs) with (S n + nargs); try lia.
     eapply etaExpand_args_Lam_pres_WFTrm.
     + inversion_Clear H. apply (proj1 (proj2 WFTrm_up)). assumption.
     + inversion_Clear H.  constructor. apply (proj1 WFTrm_up). assumption.
@@ -2619,32 +2619,32 @@ Lemma instantiate_lift:
       liftDs n (instantiateDefs nin t) = instantiateDefs (S nin) (liftDs n t)).
 Proof.
   apply TrmTrmsBrsDefs_ind; intros; try reflexivity;
-  try (cbn; rewrite H; try omega; try reflexivity; assumption);
-  try (cbn; rewrite H, H0; try omega; try reflexivity; assumption).
+  try (cbn; rewrite H; try lia; try reflexivity; assumption);
+  try (cbn; rewrite H, H0; try lia; try reflexivity; assumption).
   - unfold instantiate at 1. unfold lift at 2.
-    case_eq (nin ?= n); intros; case_eq (n ?= n0); intros;
-    repeat Compare_Prop; unfold instantiate; try omega.
-    + subst. rewrite match_cn_Eq; try omega.
-      erewrite (proj1 WF_nolift _ _ H0); try omega. reflexivity.
-    + subst. rewrite match_cn_Eq; try omega.
-      erewrite (proj1 WF_nolift _ _ H0); try omega. reflexivity.
-    + rewrite match_cn_Lt; try omega. cbn.
-      case_eq (Nat.pred n ?= n0); intros k; repeat Compare_Prop; try omega.
-      * assert (k0: S (Init.Nat.pred n) = n). omega.
+    case_eq (PeanoNat.Nat.compare nin n); intros; case_eq (PeanoNat.Nat.compare n n0); intros;
+    repeat Compare_Prop; unfold instantiate; try lia.
+    + subst. rewrite match_cn_Eq; try lia.
+      erewrite (proj1 WF_nolift _ _ H0); try lia. reflexivity.
+    + subst. rewrite match_cn_Eq; try lia.
+      erewrite (proj1 WF_nolift _ _ H0); try lia. reflexivity.
+    + rewrite match_cn_Lt; try lia. cbn.
+      case_eq (PeanoNat.Nat.compare (Nat.pred n) n0); intros k; repeat Compare_Prop; try lia.
+      * assert (k0: S (Init.Nat.pred n) = n). lia.
         rewrite k0. reflexivity.
-      * assert (k0: S (Init.Nat.pred n) = n). omega.
+      * assert (k0: S (Init.Nat.pred n) = n). lia.
         rewrite k0. reflexivity.
-    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try omega. cbn.
-      rewrite match_cn_Eq; try omega. reflexivity.
-    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try omega. cbn.
-      rewrite match_cn_Lt; try omega. reflexivity.
-    + rewrite match_cn_Gt; try omega. cbn. rewrite match_cn_Gt; try omega.
+    + rewrite (proj2 (NPeano.Nat.compare_gt_iff _ _)); try lia. cbn.
+      rewrite match_cn_Eq; try lia. reflexivity.
+    + rewrite (proj2 (NPeano.Nat.compare_gt_iff _ _)); try lia. cbn.
+      rewrite match_cn_Lt; try lia. reflexivity.
+    + rewrite match_cn_Gt; try lia. cbn. rewrite match_cn_Gt; try lia.
       reflexivity.
   - cbn. apply f_equal2; try reflexivity.
     rewrite H; try assumption.
     + rewrite <- instantiateDefs_pres_dlength. rewrite liftDs_pres_dlength.
       reflexivity.
-    + rewrite <- instantiateDefs_pres_dlength. omega.
+    + rewrite <- instantiateDefs_pres_dlength. lia.
 Qed.
   
 Lemma instantiate_noLift:
@@ -2654,13 +2654,13 @@ Lemma instantiate_noLift:
   (forall ds m, instantiateDefs m (liftDs m ds) = ds).
 Proof.
   apply TrmTrmsBrsDefs_ind; intros; try reflexivity.
-  - unfold lift. case_eq (n ?= m); intros j.
-    + cbn. Compare_Prop. subst. rewrite (proj2 (Nat.compare_lt_iff _ _)).
-      reflexivity. omega.
-    + cbn. Compare_Prop. rewrite (proj2 (Nat.compare_gt_iff _ _)).
-      reflexivity. omega.
-    + cbn. Compare_Prop. erewrite (proj2 (Nat.compare_lt_iff _ _)).
-      reflexivity. omega.
+  - unfold lift. case_eq (PeanoNat.Nat.compare n m); intros j.
+    + cbn. Compare_Prop. subst. rewrite (proj2 (PeanoNat.Nat.compare_lt_iff _ _)).
+      reflexivity. lia.
+    + cbn. Compare_Prop. rewrite (proj2 (PeanoNat.Nat.compare_gt_iff _ _)).
+      reflexivity. lia.
+    + cbn. Compare_Prop. erewrite (proj2 (PeanoNat.Nat.compare_lt_iff _ _)).
+      reflexivity. lia.
   - cbn. apply f_equal. rewrite <- H at 2. reflexivity.
   - cbn. apply f_equal2.
     + apply H.
@@ -2767,8 +2767,8 @@ Proof.
   try (solve[constructor; intuition]).
   - destruct (lt_eq_lt_dec n0 n) as [[h | h] | h].
     + rewrite (proj1 (nat_compare_lt _ _) h). apply IRelLt. assumption.
-    + rewrite (proj2 (Nat.compare_eq_iff _ _) h). subst. apply IRelEq.
-    + rewrite (proj1 (nat_compare_gt _ _)). apply IRelGt.
+    + rewrite (proj2 (PeanoNat.Nat.compare_eq_iff _ _) h). subst. apply IRelEq.
+    + rewrite (proj1 (Compare_dec.nat_compare_gt _ _)). apply IRelGt.
       assumption. assumption.
 Qed.
 
@@ -2796,7 +2796,7 @@ Proof.
   try (solve [unfold instantiate; constructor]).
   - destruct (lt_eq_lt_dec n m) as [[h|h]|h]; unfold instantiate.
     + rewrite (proj1 (nat_compare_lt _ _) h). constructor.
-    + rewrite (proj2 (Nat.compare_eq_iff _ _) h). assumption.
+    + rewrite (proj2 (NPeano.Nat.compare_eq_iff _ _) h). assumption.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
   - cbn. constructor. apply H0. assumption.
   - change (WFapp (TLetIn nm (instantiate n dfn) (instantiate (S n) bod))).
@@ -2861,11 +2861,11 @@ Proof.
   apply WFTrmTrmsBrsDefs_ind; intros; try reflexivity.
   - unfold lift. case_eq (m ?= m0); intros j.
     + cbn. Compare_Prop. subst. rewrite (proj2 (Nat.compare_lt_iff _ _)).
-      reflexivity. omega.
+      reflexivity. lia.
     + cbn. Compare_Prop. rewrite (proj2 (Nat.compare_gt_iff _ _)).
-      reflexivity. omega.
+      reflexivity. lia.
     + cbn. Compare_Prop. erewrite (proj2 (Nat.compare_lt_iff _ _)).
-      reflexivity. omega.
+      reflexivity. lia.
   - cbn. apply f_equal. apply H0. 
   - cbn. apply f_equal2. reflexivity. apply H0.
   - cbn. apply f_equal2. apply H0. apply H2.
@@ -2909,26 +2909,26 @@ Proof.
   apply TrmTrmsBrsDefs_ind; intros; try reflexivity.
   - unfold lift at 4; unfold lift at 2.
     case_eq (n ?= i); intros; case_eq (n ?= k); intros;
-    repeat Compare_Prop; subst; try omega; cbn.
+    repeat Compare_Prop; subst; try lia; cbn.
     + subst. rewrite (@match_cn_Eq i); try reflexivity.
       destruct i. reflexivity. rewrite (@match_cn_Gt _ i).
-      reflexivity. omega.
-    + rewrite (match_cn_Lt j0); try omega.
+      reflexivity. lia.
+    + rewrite (match_cn_Lt j0); try lia.
       rewrite (@match_cn_Eq i); reflexivity.
-    + rewrite (match_cn_Lt j0); try omega.
-      rewrite (@match_cn_Lt n). reflexivity. omega.
-    + rewrite (@match_cn_Eq k); try omega.
+    + rewrite (match_cn_Lt j0); try lia.
+      rewrite (@match_cn_Lt n). reflexivity. lia.
+    + rewrite (@match_cn_Eq k); try lia.
       destruct i. reflexivity.
-      rewrite (@match_cn_Gt k). reflexivity. omega.
-    + rewrite (match_cn_Lt j). rewrite (@match_cn_Gt n). reflexivity. omega.
-    + rewrite (@match_cn_Gt n); try omega.
+      rewrite (@match_cn_Gt k). reflexivity. lia.
+    + rewrite (match_cn_Lt j). rewrite (@match_cn_Gt n). reflexivity. lia.
+    + rewrite (@match_cn_Gt n); try lia.
       destruct i. reflexivity.
-      case_eq (n ?= i); intros; Compare_Prop; try omega. reflexivity.
+      case_eq (n ?= i); intros; Compare_Prop; try lia. reflexivity.
   - cbn. apply f_equal. apply H. assumption. 
-  - cbn. apply f_equal2. reflexivity. apply H. omega.
+  - cbn. apply f_equal2. reflexivity. apply H. lia.
   - cbn. apply f_equal2.
     + apply H. assumption.
-    + apply H0. omega.
+    + apply H0. lia.
   - cbn. apply f_equal3.
     + apply H. assumption.
     + apply H0. assumption.
@@ -2954,15 +2954,15 @@ Proof.
             n).
     apply f_equal2; try reflexivity.
     rewrite liftDs_pres_dlength. rewrite liftDs_pres_dlength. rewrite H.
-    reflexivity. omega.
-  - cbn. apply f_equal2. rewrite H; try omega. reflexivity.
-    rewrite H0. reflexivity. omega.
+    reflexivity. lia.
+  - cbn. apply f_equal2. rewrite H; try lia. reflexivity.
+    rewrite H0. reflexivity. lia.
   - cbn. apply f_equal3; try reflexivity.
-    rewrite H; try omega. reflexivity.
-    rewrite H0; try omega. reflexivity.
+    rewrite H; try lia. reflexivity.
+    rewrite H0; try lia. reflexivity.
   - cbn. apply f_equal4; try reflexivity.
-    rewrite H; try omega. reflexivity.
-    rewrite H0; try omega. reflexivity.
+    rewrite H; try lia. reflexivity.
+    rewrite H0; try lia. reflexivity.
 Qed.
 
 Lemma lift_instantiate:
@@ -2983,23 +2983,23 @@ Lemma lift_instantiate:
     instantiateDefs nin (liftDs (S n) ds)).
 Proof.
   apply TrmTrmsBrsDefs_ind; intros; try reflexivity;
-  try (cbn; rewrite H; try omega; try reflexivity; assumption);
-  try (cbn; rewrite H, H0; try omega; try reflexivity; assumption).
+  try (cbn; rewrite H; try lia; try reflexivity; assumption);
+  try (cbn; rewrite H, H0; try lia; try reflexivity; assumption).
   - unfold instantiate at 1. unfold lift at 2.
     case_eq (nin ?= n); intros; case_eq (n ?= S n0); intros;
-    repeat Compare_Prop; unfold instantiate; try omega.
-    + erewrite (proj1 WF_nolift _ _ H0); try omega.
+    repeat Compare_Prop; unfold instantiate; try lia.
+    + erewrite (proj1 WF_nolift _ _ H0); try lia.
       rewrite (proj2 (Nat.compare_eq_iff _ _)). reflexivity. assumption.
-    + rewrite (proj2 (Nat.compare_lt_iff _ _)); try omega. cbn.
+    + rewrite (proj2 (Nat.compare_lt_iff _ _)); try lia. cbn.
       rewrite j. cbn. rewrite (proj2 (Nat.compare_eq_iff _ _)); reflexivity.
-    + rewrite (proj2 (Nat.compare_lt_iff _ _)); try omega. cbn.
-      case_eq (Nat.pred n ?= n0); intros k; Compare_Prop; try omega.
+    + rewrite (proj2 (Nat.compare_lt_iff _ _)); try lia. cbn.
+      case_eq (Nat.pred n ?= n0); intros k; Compare_Prop; try lia.
       reflexivity.      
-    + rewrite (proj2 (Nat.compare_lt_iff _ _)); try omega. cbn.
-      case_eq (Nat.pred n ?= n0); intros k; Compare_Prop; try omega.
-      apply f_equal. omega.
-    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try omega.
-      cbn. rewrite (proj2 (Nat.compare_lt_iff _ _)); try omega.
+    + rewrite (proj2 (Nat.compare_lt_iff _ _)); try lia. cbn.
+      case_eq (Nat.pred n ?= n0); intros k; Compare_Prop; try lia.
+      apply f_equal. lia.
+    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try lia.
+      cbn. rewrite (proj2 (Nat.compare_lt_iff _ _)); try lia.
       reflexivity.
   - rewrite instantiate_TApp_mkApp.
     change (lift n (mkApp (instantiate nin t)
@@ -3027,7 +3027,7 @@ Proof.
     erewrite <- instantiateDefs_pres_dlength.
     rewrite liftDs_pres_dlength.
     apply f_equal2; try reflexivity.
-    erewrite H. reflexivity. omega. eassumption.
+    erewrite H. reflexivity. lia. eassumption.
 Qed.
     
 Lemma instantiate_lift:
@@ -3046,26 +3046,26 @@ Lemma instantiate_lift:
       liftDs n (instantiateDefs nin t) = instantiateDefs (S nin) (liftDs n t)).
 Proof.
   apply TrmTrmsBrsDefs_ind; intros; try reflexivity;
-  try (cbn; rewrite H; try omega; try reflexivity; assumption);
-  try (cbn; rewrite H, H0; try omega; try reflexivity; assumption).
+  try (cbn; rewrite H; try lia; try reflexivity; assumption);
+  try (cbn; rewrite H, H0; try lia; try reflexivity; assumption).
   - unfold instantiate at 1. unfold lift at 2.
     case_eq (nin ?= n); intros; case_eq (n ?= n0); intros;
-    repeat Compare_Prop; unfold instantiate; try omega.
-    + subst. rewrite match_cn_Eq; try omega.
-      erewrite (proj1 WF_nolift _ _ H0); try omega. reflexivity.
-    + subst. rewrite match_cn_Eq; try omega.
-      erewrite (proj1 WF_nolift _ _ H0); try omega. reflexivity.
-    + rewrite match_cn_Lt; try omega. cbn.
-      case_eq (Nat.pred n ?= n0); intros k; repeat Compare_Prop; try omega.
-      * assert (k0: S (Init.Nat.pred n) = n). omega.
+    repeat Compare_Prop; unfold instantiate; try lia.
+    + subst. rewrite match_cn_Eq; try lia.
+      erewrite (proj1 WF_nolift _ _ H0); try lia. reflexivity.
+    + subst. rewrite match_cn_Eq; try lia.
+      erewrite (proj1 WF_nolift _ _ H0); try lia. reflexivity.
+    + rewrite match_cn_Lt; try lia. cbn.
+      case_eq (Nat.pred n ?= n0); intros k; repeat Compare_Prop; try lia.
+      * assert (k0: S (Init.Nat.pred n) = n). lia.
         rewrite k0. reflexivity.
-      * assert (k0: S (Init.Nat.pred n) = n). omega.
+      * assert (k0: S (Init.Nat.pred n) = n). lia.
         rewrite k0. reflexivity.
-    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try omega. cbn.
-      rewrite match_cn_Eq; try omega. reflexivity.
-    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try omega. cbn.
-      rewrite match_cn_Lt; try omega. reflexivity.
-    + rewrite match_cn_Gt; try omega. cbn. rewrite match_cn_Gt; try omega.
+    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try lia. cbn.
+      rewrite match_cn_Eq; try lia. reflexivity.
+    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try lia. cbn.
+      rewrite match_cn_Lt; try lia. reflexivity.
+    + rewrite match_cn_Gt; try lia. cbn. rewrite match_cn_Gt; try lia.
       reflexivity.
   - change
       (lift n (instantiate nin (TApp t t0 t1)) =
@@ -3082,7 +3082,7 @@ Proof.
     rewrite H; try assumption.
     + rewrite <- instantiateDefs_pres_dlength. rewrite liftDs_pres_dlength.
       reflexivity.
-    + rewrite <- instantiateDefs_pres_dlength. omega.
+    + rewrite <- instantiateDefs_pres_dlength. lia.
 Qed.
  *****************)
 
@@ -3098,11 +3098,11 @@ Lemma instantiate_closed_null:
                 forall m, m >= p -> instantiateDefs m ds = ds).
 Proof.
   apply WFTrmTrmsBrsDefs_ind; intros; try reflexivity.
-  - cbn. assert (j: m0 > m). omega.
+  - cbn. assert (j: m0 > m). lia.
     rewrite (proj1 (nat_compare_gt m0 m)); trivial.
   - cbn. rewrite H0; trivial.
-  - cbn. rewrite H0. trivial. omega.
-  - cbn. rewrite H0; try assumption. rewrite H2; try omega. trivial.
+  - cbn. rewrite H0. trivial. lia.
+  - cbn. rewrite H0; try assumption. rewrite H2; try lia. trivial.
   - cbn. rewrite H1; try assumption. rewrite H3; try assumption.
     destruct fn; try reflexivity.
     + inversion H0.
@@ -3110,7 +3110,7 @@ Proof.
     rewrite H5; try assumption. rewrite mkApp_goodFn; trivial.
   - cbn. rewrite H0; trivial.
   - cbn. rewrite H0; try assumption. rewrite H2; trivial.
-  - cbn. rewrite H0; trivial. omega.  
+  - cbn. rewrite H0; trivial. lia.  
   - cbn. rewrite H0; trivial. rewrite H2; trivial.
   - cbn. rewrite H0; trivial. rewrite H2; trivial.
   - cbn. rewrite H0; trivial. rewrite H2; trivial.

@@ -979,7 +979,7 @@ Fixpoint make_fundef_info (fnd : fundefs) (fenv : fun_env) (nenv : name_env)
     
 
 
-Fixpoint add_bodyinfo (e : exp) (fenv : fun_env) (nenv : name_env) (map: fun_info_env) (defs:list (positive * globdef Clight.fundef type)) :=
+Definition add_bodyinfo (e : exp) (fenv : fun_env) (nenv : name_env) (map: fun_info_env) (defs:list (positive * globdef Clight.fundef type)) :=
   info_name <- getName ;;
   let ind :=
       mkglobvar
@@ -993,7 +993,7 @@ Fixpoint add_bodyinfo (e : exp) (fenv : fun_env) (nenv : name_env) (map: fun_inf
 
 
 (* Make fundef_info for functions in fnd (if any), and for the body of the program *)
-Fixpoint make_funinfo (e : exp) (fenv : fun_env) (nenv : name_env)
+Definition make_funinfo (e : exp) (fenv : fun_env) (nenv : name_env)
   : nState (list (positive * globdef Clight.fundef type) * fun_info_env * name_env) :=
   match e with
   | Efun fnd e' =>
@@ -1127,7 +1127,7 @@ Fixpoint make_argList' (n:nat) (nenv:name_env) : nState (name_env * list (ident 
                 ret (nenv, (new_id,val)::rest_id)
   end.
 
-Fixpoint make_argList (n:nat) (nenv:name_env) : nState (name_env * list (ident * type)) :=
+Definition make_argList (n:nat) (nenv:name_env) : nState (name_env * list (ident * type)) :=
   rest <- make_argList' n nenv;;
        let (nenv, rest_l) := rest in
        ret (nenv, rev rest_l).
@@ -1147,6 +1147,21 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
 
   Context (fenv : fun_env) (nenv : name_env).
 
+  Fixpoint check_tags_fundefs' (B : fundefs) (log : list string) : list string :=
+    match B with
+    | Fcons f t xs e B' =>
+      let s :=
+          match M.get t fenv with
+          | Some (n, l) =>
+            "Definition " ++ get_fname f nenv ++ " has tag " ++ (show_pos t) ++ Pipeline_utils.newline ++
+                          "Def: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ (nat2string10 (length l))
+          | None =>
+            "Def: Function " ++ get_fname f nenv ++ " was not found in fun_env"
+          end
+      in check_tags_fundefs' B' (s :: log)
+    | Fnil => log
+    end.
+  
   Fixpoint check_tags' (e : exp) (log : list string) :=
     match e with
     | Econstr _ _ _ e | Eproj _ _ _ _ e | Eprim _ _ _ e => check_tags' e log
@@ -1179,21 +1194,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
       in
       s :: log
     | Ehalt x => log
-    end
-  with check_tags_fundefs' (B : fundefs) (log : list string) : list string :=
-         match B with
-         | Fcons f t xs e B' =>
-           let s :=
-               match M.get t fenv with
-               | Some (n, l) =>
-                 "Definition " ++ get_fname f nenv ++ " has tag " ++ (show_pos t) ++ Pipeline_utils.newline ++
-                 "Def: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ (nat2string10 (length l))
-               | None =>
-                 "Def: Function " ++ get_fname f nenv ++ " was not found in fun_env"
-               end
-           in check_tags_fundefs' B' (s :: log)
-         | Fnil => log
-         end.
+    end.
 
   Definition check_tags (e : exp) :=
     String.concat Pipeline_utils.newline (rev (check_tags' e [])).

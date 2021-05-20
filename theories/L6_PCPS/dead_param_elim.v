@@ -1,5 +1,5 @@
 (* Correctness proof for lambda lifting. Part of the CertiCoq project.
- * Author: Katja Vassilev, 2018
+ * Author: Anonymized, 2018
  *)
 
 Require Import L6.cps L6.identifiers L6.ctx L6.set_util L6.state.

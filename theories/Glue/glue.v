@@ -1100,8 +1100,6 @@ Section CConstructors.
 End CConstructors.
 
 Section FunctionCalls.
-  (* Glue code for function calls, adapted by Kathrin Stark from
-     Olivier Savary Belanger's work with different number of parameters *)
 
   Variable toolbox : toolbox_info.
   (* Variable opts : Options. *)
@@ -1148,7 +1146,7 @@ Section FunctionCalls.
 
   (* Function calls.
 
-    For the CPS backend: (written by Kathrin)
+    For the CPS backend:
     What to push in the argument array depends on c_args:
     If c_args = 0, then environment, the halting closure,
                     and the (single) argument have to be put into
@@ -1158,7 +1156,7 @@ Section FunctionCalls.
     If c_args >= 3, no elements have to be put into the argument array.
     Call function with respective arguments.
 
-    For the ANF backend: (added by Joomy)
+    For the ANF backend:
     This is just tentative.
     It does the same except it doesn't assign/pass the halting closure.
     It probably needs to do something with stack frames at some point,

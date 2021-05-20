@@ -1,7 +1,7 @@
 #include "values.h"
 
 /* EXPLANATION OF THE CERTICOQ GENERATIONAL GARBAGE COLLECTOR.
- Andrew W. Appel, September 2016
+ Anonymized, September 2016
 
 The current Certicoq code generator uses Ocaml object formats,
 as described in Chapter 20 of Real World Ocaml by Minsky et al.

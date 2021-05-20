@@ -1,4 +1,4 @@
-(* Andrew W. Appel and Stephen Yi-Hsien Lin,
+(* Anonymized and Stephen Yi-Hsien Lin,
     May 2013, October 2013, March 2014 *)
 (* Certicoq: Inspired by OEUF's modified version to remove dependencies on other VST files. *)
 Require Recdef.

@@ -143,8 +143,8 @@ Section UNCURRY.
       ret ft
     end.                       
   
-  (* I'm following the same algorithm as in Andrew's book, or more 
-     appropriately, in the SML/NJ code base.  In essence, we look for
+  (* I'm following the same algorithm as in  the SML/NJ code base.
+     In essence, we look for
      code that looks like this:
      let rec f (k,v1,...,vn) = 
            let rec g (u1,...,um) = e in k(g)
@@ -213,7 +213,7 @@ Section UNCURRY.
                | fk::fvs, Efun (Fcons g gt gvs ge Fnil)
                                (Eapp fk' fk_ft (g'::nil)) =>
                  (* XXX CHANGED *) (* ge' <- uncurry_exp cps ge ;; *)
-                 (* Zoe : Nested carried arguments should be handled one-at-a-time,
+                 (* NOTE : Nested carried arguments should be handled one-at-a-time,
                         so that functions with > 2 arguments get uncurried properly.
                         Therefore the body of g will be uncurried at the next iteration
                         of the transformat ion.
@@ -280,7 +280,7 @@ Section UNCURRY.
                end
            end.
 
-    (* Zoe : The above for ANF  misses some opportunities for uncurrying when the recursion is
+    (* NOTE : The above for ANF  misses some opportunities for uncurrying when the recursion is
      * "nested" in some inner argument. Example from Coq:
        Definition filter (A : Type) (P : A -> bool) := fix aux (l : list A) := ...
      

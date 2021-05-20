@@ -1,5 +1,5 @@
 (*
-  Author: Joomy Korkut (joomy@cs.princeton.edu), 2020
+  Author: ANONYMIZED, 2020
 
   Generator for the [rep] relation for a given Coq type.
 

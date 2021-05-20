@@ -29,7 +29,7 @@ Section CPS.
   Context (func_tag kon_tag default_tag default_itag : positive)
           (next_id : positive).
 
-  (* Zoe: For translating proof. TODO *)
+  (* NOTE: For translating proof. TODO *)
   Definition consume_fun (f x : var) : exp_ctx :=
     Efun1_c (Fcons f func_tag [x] (Ehalt f) Fnil) Hole_c. 
 
@@ -1696,7 +1696,7 @@ Section Post.
           simpl. f_equal. (* similar to gensym_n_length_eq *) admit.  
           admit.
           simpl.
-          (* Zoe: Something broke here from flipping the args *)
+          (* NOTE: Something broke here from flipping the args *)
           (* eapply preord_env_P_inj_set_alt. *)
           (* rewrite Setminus_Union_distr. *)
           (* rewrite FromList_cons. (* normalize_sets *) *)
@@ -1894,7 +1894,7 @@ Section Post.
                 admit. admit.
                 simpl. f_equal. eassumption.
                 admit. simpl.
-                (* Zoe: Something broke here because of argument flip *)
+                (* NOTE: Something broke here because of argument flip *)
                 (* eapply preord_env_P_inj_set_alt. *)
                 (* rewrite Setminus_Union_distr at 1. *)
                 (* rewrite FromList_cons. (* normalize_sets *) *)
@@ -2596,7 +2596,7 @@ Section Post.
         destruct (cps_cvt e (v0 :: vars) v s1 cnstrs) eqn:Hcvt_e.
         destruct p eqn:Hp. inv Hcvt.
         2 : { inv Hcvt. }
-        (* Zoe: commneting out because some stuff have changed *) 
+        (* NOTE: commneting out because some stuff have changed *) 
         (* 
     rewrite cps_cvt_val_eq in Hcvt_val. simpl in Hcvt_val.
     destruct (cps_cvt_env rho next4 cnstrs) eqn:Hcps_env.
@@ -2640,7 +2640,7 @@ Section Post.
         destruct p0 eqn: Hp0.
         inv Hcvt.
         inv Heval.
-        (* Zoe: commneting out because some stuff have changed *) 
+        (* NOTE: commneting out because some stuff have changed *) 
     (* 
 
     assert (Hex: exists v2' next6,

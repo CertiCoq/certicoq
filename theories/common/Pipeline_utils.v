@@ -173,9 +173,9 @@ Section Correctness.
   Definition obs_eq :=
     @Value Src _ -> @Value Trg _ -> Prop.
 
-  (* Zoe: Use a very simple notion of refinement for now. To internalize the
+  (* NOTE: Use a very simple notion of refinement for now. To internalize the
      transitivity of the obs relation we can use a "observation question" a la
-     Abhishek's classes. However, this is not required for linking (a la
+     Anonymized's classes. However, this is not required for linking (a la
      SepCompCert) or to be able to observe functions (for this compilation
      should commute with function application, and it doesn't have to be part of
      the value refinement) *)
@@ -263,7 +263,7 @@ Section Composition.
   Qed.
 
 
-  (* Zoe : With [TransSemPreserving_compose] we will get that that pipeline is
+  (* NOTE : With [TransSemPreserving_compose] we will get that that pipeline is
      correct w.r.t to the composition of the intermediate relations. Then we
      prove that the composition of the intermediate relations implies the
      end-to-end relation and use [TransCorrect_subsumption] to derive the
@@ -278,7 +278,7 @@ Section Commutation.
 
   (* Translation commutes with a term operator *)
 
-  (* Zoe: Only require the readable part of the state to be equal. Intuition:
+  (* NOTE: Only require the readable part of the state to be equal. Intuition:
      the writable part only helps threading comp info but doesn't change the translation *)
 
   Definition Commutes (trans : CertiCoqTrans Src Trg) :=

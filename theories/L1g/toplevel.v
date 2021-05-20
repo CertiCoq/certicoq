@@ -18,7 +18,7 @@ Definition compile_L1g : CertiCoqTrans (global_context * term) (Program Term) :=
     debug_msg "Translating from Lbox to L1" ;;
     (LiftCertiCoqTrans "L1g" L1g.compile.program_Program src).
 
-(* Zoe: AFAICT we don't have these definitions *)
+(* NOTE: AFAICT we don't have these definitions *)
 (* Instance Template_Lang : Lang Ast.program := *)
 (*   { Value := Ast.term; *)
 (*     TermWf := _ ; *)

@@ -1057,7 +1057,7 @@ Goal
 Qed.
 
 
-(** Abhishek's example of looping: in L2 we don't test the guard **)
+(** Anonymized's example of looping: in L2 we don't test the guard **)
 Require Import Arith.
 Axiom AAax: Acc gt 0.
 Fixpoint loop (n:nat) (x:nat) (a:Acc gt n) {struct a} : nat :=
@@ -1349,7 +1349,7 @@ Print ans_Gcdx.
 
 
 (***
-(** Andrew's example **)
+(** example **)
 Function sqrt' (n x0 x diff: Z) {measure Z.to_nat diff}:Z :=
   (if diff =? 0 then x
    else let y := Z.div2 (x + Z.div n x)

@@ -443,7 +443,7 @@ CertiCoq Compile -ext "_cps" vs_easy.
 CertiCoq Compile -anf vs_easy.
 CertiCoq Compile -anf -o1 -ext "_opt" vs_easy.
 
-(* Zoe: Compiling with the CPS pipeline takes much longer for vs_easy.
+(* NOTE: Compiling with the CPS pipeline takes much longer for vs_easy.
    The overhead seems to come from the C translation: (maybe has to do with dbg/error messages?)
 
 Timing for CPS:

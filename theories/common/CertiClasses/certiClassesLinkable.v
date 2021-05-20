@@ -636,7 +636,7 @@ End ManualTargetArgTargetRel.
 (** 
 Similar to the above section, except that the manually produced target argument [td']
 has to be proved to be related to the corresponding [Src] term [t] instead of the
-compilation result [td]. This was requested by Andrew Appel.
+compilation result [td]. This was requested by Anonymized.
 *)
 Section ManualTargetArgSrcRel.
 

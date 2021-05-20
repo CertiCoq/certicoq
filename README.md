@@ -1,7 +1,7 @@
 # CertiCoq
 
 <p align="center">
-<img src="https://zoep.github.io/certicoq.png" alt="MetaCoq" width="100px"/>
+<img src="ANONYMIZED" alt="MetaCoq" width="100px"/>
 </p>
 
 ## Overview
@@ -12,9 +12,9 @@ Large parts of the CertiCoq compiler have been verified whereas others are in th
 
 ## Documentation
 
-The [CertiCoq Wiki](https://github.com/PrincetonUniversity/certicoq/wiki) has instructions for using the [CertiCoq plugin](https://github.com/PrincetonUniversity/certicoq/wiki/The-CertiCoq-plugin) to compile Gallina to C and interfacing with the generated C code.
+The [CertiCoq Wiki](ANONYMIZED) has instructions for using the [CertiCoq plugin](ANONYMIZED) to compile Gallina to C and interfacing with the generated C code.
 
-You can also find some demos [here](https://github.com/PrincetonUniversity/certicoq/blob/master/benchmarks/tests.v) and [here](https://github.com/PrincetonUniversity/certicoq/blob/master/benchmarks/axioms/tests.v).
+You can also find some demos [here](ANONYMIZED) and [here](ANONYMIZED).
 
 ## Installation Instructions
 
@@ -22,11 +22,11 @@ See [INSTALL.md](INSTALL.md)  for installation instructions.
 
 ## Current Members
 
-Andrew Appel, Yannick Forster, Anvay Grover, Joomy Korkut, John Li, Zoe Paraskevopoulou, and Matthieu Sozeau.
+ANONYMIZED
 
 ## Past Members and Contributors
 
-Abhishek Anand, Greg Morrisett, Randy Pollack, Olivier Savary Belanger, Matthew Weaver
+ANONYMIZED
 
 ## License 
 

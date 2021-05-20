@@ -1,9 +1,9 @@
 (* Implementation of the Kempe/Chaitin algorithm for graph coloring,
-   by Andrew W. Appel, 2011.
+   by Anonymized, 2011.
 
   Required reading:
   Formal Verification of Coalescing Graph-Coloring Register Allocation, 
-  by Sandrine Blazy, Benoit Robillard, and Andrew W. Appel. 
+  by Sandrine Blazy, Benoit Robillard, and Anonymized. 
   ESOP 2010: 19th European Symposium on Programming, pp. 145-164, March 2010. 
   http://www.cs.princeton.edu/~appel/papers/regalloc.pdf
 
@@ -1442,6 +1442,6 @@ Definition main := run G16.
 (* Some code in ocaml to time this test case:
   let timeit() = let t = Sys.time() in let r = run graph40 in (Sys.time()-.t, r);;
  On my machine, vm_compute takes 2.171 seconds, ocaml takes 1.453 seconds.
-  -- Andrew Appel, September 16, 2016.
+  -- Anonymized, September 16, 2016.
 *)
 

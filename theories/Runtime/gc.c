@@ -26,7 +26,7 @@ struct space {
 /* The size of generation 0 (the "nursery") should approximately match the 
    size of the level-2 cache of the machine, according to:
       Cache Performance of Fast-Allocating Programs, 
-      by Marcelo J. R. Goncalves and Andrew W. Appel. 
+      by Marcelo J. R. Goncalves and Anonymized. 
       7th Int'l Conf. on Functional Programming and Computer Architecture,
       pp. 293-305, ACM Press, June 1995.
    We estimate this as 256 kilobytes 

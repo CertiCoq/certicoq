@@ -63,9 +63,9 @@ Definition prog
            `{Hash_Types}
            `{@HashFFI _ _ _} : IO unit :=
   h <- new ;;
-  insert h "Joomy" "Turkey" ;;
+  insert h "Josh" "Turkey" ;;
   insert h "Ana" "Ukraine" ;;
-  insert h "Andrew" "USA" ;;
+  insert h "Alex" "USA" ;;
 
   let origin (k : string) :=
     v <- lookup h k ;;
@@ -74,8 +74,8 @@ Definition prog
                   | Some v => k ++ " is from " ++ v
                   end) in
 
-  origin "Joomy" ;;
-  origin "Andrew".
+  origin "John" ;;
+  origin "Alex".
 
 CertiCoq FFI IO_Impl.
 CertiCoq FFI StringFFI.

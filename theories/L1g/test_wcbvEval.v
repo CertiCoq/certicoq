@@ -1006,7 +1006,7 @@ Abort.  (** LHS in has nested [Proof]. **)
 
 
 
-(** Abhishek's example of looping: we don't test fixpoint guard **)
+(** Anonymized's example of looping: we don't test fixpoint guard **)
 Inductive Lt (n:nat) : nat -> Prop := Lt_n: Lt n (S n).
 Inductive Acc (y: nat) : Prop :=
   Acc_intro : (forall x: nat, Lt y x -> Acc x) -> Acc y.
@@ -1666,7 +1666,7 @@ Quote Definition qcbv_demo1 := Eval cbv in demo1.
 Print qcbv_demo1.
 
 
-(** Abhishek's example **)
+(** Anonymized's example **)
 Definition xx := (fun x:nat => x) = (fun x:nat => x+x-x).
 Print xx.
 Eval cbv in xx.

@@ -20,7 +20,7 @@ VERNAC ARGUMENT EXTEND cargs
 | [ "-debug" ] -> { DEBUG }
 | [ "-args" natural(n) ] -> { ARGS(n) }
 | [ "-config" natural(n) ] -> { ANFCONFIG(n) }
-(* Zoe: -config  To measure different ANF configurations. Not for user purposes *)
+(* NOTE: -config  To measure different ANF configurations. Not for user purposes *)
 | [ "-dev" natural(n) ] -> { DEV(n) }
 | [ "-ext" string(s) ] -> { EXT(s) }
 | [ "-file" string(s) ] -> { FILENAME(s) }

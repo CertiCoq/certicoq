@@ -169,7 +169,7 @@ Fixpoint max_allocs (e : exp) : nat :=
        | cons (z, e') cs' => max (max_allocs e') (helper cs')
        end) cs
   | Eproj x t n v e' => max_allocs e'
-  | Eletapp x f t ys e' => max_allocs e' (* XXX Zoe : This doesn't include the allocation happening by the function *)
+  | Eletapp x f t ys e' => max_allocs e' (* XXX NOTE : This doesn't include the allocation happening by the function *)
   | Efun fnd e' => max (max_allocs_fundefs fnd) (max_allocs e')
   | Eapp x t vs => 0
   | Eprim x p vs e' => max_allocs e'

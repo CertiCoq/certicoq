@@ -217,7 +217,7 @@ Section Tags.
         let (x, defs) := (ds : var * fundefs) in
         ret (Anf_Var x, Efun1_c defs Hole_c)
       | Match_e e1 n bl =>
-        (* Zoe: For pattern matching compilation the situation is tricky because they always have to occur in tail
+        (* NOTE: For pattern matching compilation the situation is tricky because they always have to occur in tail
          * position in L6. Our solution currently is to create a function that receives the scrutiny as an arg 
          * pattern matches it, and returns the result of the pattern match. For those that are in tail position
          * these functions will be inlined by shrink reduction yielding the expected compilation result.
@@ -234,7 +234,7 @@ Section Tags.
         let C_fun := Efun1_c (Fcons f fun_tag [y] (Ecase y pats) Fnil) C in
         ret (Anf_App f x, C_fun)
       | Prf_e =>
-        (* Zoe: Because a lot of dead code is *not* being eliminated *)
+        (* NOTE: Because a lot of dead code is *not* being eliminated *)
         ret (Constr default_tag [], Hole_c)            
         (* f <- get_named_str "f_proof" ;; *)
         (* y <- get_named_str "x" ;; *)

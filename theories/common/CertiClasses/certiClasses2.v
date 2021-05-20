@@ -24,7 +24,7 @@ Class ObserveNthSubterm (Value:Type) :=
 
 Section YesNoQuestions.
 
-(* Zoe's suggestion for Question *)
+(* NOTE's suggestion for Question *)
 Inductive Question : Set  := 
 | Cnstr : BasicAst.inductive -> nat -> Question
 | Abs : Question.

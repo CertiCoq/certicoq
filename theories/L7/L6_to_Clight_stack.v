@@ -520,7 +520,7 @@ Definition assignConstructorS (cenv:ctor_env) (ienv : n_ind_env) (fenv : fun_env
          Field(var x, -1) :::= tag; stm)
       end.
 
-(* Zoe: inlining the isPtr function to avoid extra function call in C *)
+(* NOTE: inlining the isPtr function to avoid extra function call in C *)
 Definition isPtr (retId:positive) (v:positive) : expr:=
   Ebinop Oeq (Ebinop Oand (Evar v val) (Econst_int Int.one intTy) boolTy)
          (Econst_int Int.zero intTy) boolTy.
@@ -1043,7 +1043,7 @@ Definition composites : list composite_definition :=
              (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
              (argsIdent, (Tarray uval maxArgs noattr)) ::
              (fpIdent, (tptr stackframeT)) ::
-             (nallocIdent, val) :: nil) (* Zoe : This is the number of allocations until the next GC call so that GC can perform a test. 
+             (nallocIdent, val) :: nil) (* NOTE : This is the number of allocations until the next GC call so that GC can perform a test. 
                                          * Note that it will be coerced to UL from ULL. That should be safe for the values we're using but 
                                          * consider changing it too. *)
             noattr ::

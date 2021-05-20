@@ -53,7 +53,7 @@ Inductive rw : relation exp :=
 | Fun_rem:
     forall f t xs fb B1 B2 e,
       unique_functions (fundefs_append B1 (Fcons f t xs fb B2)) ->
-      (* Zoe : This will not delete unused rec. functions. *)
+      (* NOTE : This will not delete unused rec. functions. *)
       num_occur (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) f 0 ->
       rw (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e) (Efun (fundefs_append B1 B2) e)
 (* Rules about inlining/constant-folding *)

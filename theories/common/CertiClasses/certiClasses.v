@@ -201,7 +201,7 @@ Context (Src Dst: Type) {SrcValue DstValue: Type}
           (VR: SrcValue -> DstValue -> Prop).
 Notation "s ⊑ t" := (VR s t) (at level 65).
 
-(* Similar to what Zoe suggested on Wed, Aug 17, 2016 at 8:57 AM *)
+(* Similar to what NOTE suggested on Wed, Aug 17, 2016 at 8:57 AM *)
 Definition obsPreserving 
   `{CerticoqTranslation Src Dst} 
    `{BigStepOpSem Src SrcValue} `{BigStepOpSem Dst DstValue} `{GoodTerm Src}

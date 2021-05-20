@@ -1622,7 +1622,7 @@ map fst (efnlst_as_list e).
 
 (*
 
-Zoe: Commenting the following out as they have dependencies to SquiggleEq.
+NOTE: Commenting the following out as they have dependencies to SquiggleEq.
      We should fix that if this code is still relevant.
 
 (* the suffix s stands for "simpler".

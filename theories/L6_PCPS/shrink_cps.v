@@ -936,7 +936,7 @@ Section CONTRACT.
          end)
       end
     | Eletapp x f t ys e =>
-      (* Zoe: For now don't delete the binding if it's dead code since the divergence may not be preserved (* not Coq specific opt *) *)
+      (* NOTE: For now don't delete the binding if it's dead code since the divergence may not be preserved (* not Coq specific opt *) *)
       let f' := apply_r sig f in
       let ys' := apply_r_list sig ys in
       let f_no := get_c f' count in

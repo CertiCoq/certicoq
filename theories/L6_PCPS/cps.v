@@ -1,5 +1,5 @@
 (* Continuation-Passing Style language for the CertiCoq project.
- *   Initial design, Andrew W. Appel, June 2014
+ *   Initial design, Anonymized, June 2014
  *)
 From Coq Require Import ZArith.ZArith Lists.List.
 From CertiCoq.L6 Require Import List_util map_util.

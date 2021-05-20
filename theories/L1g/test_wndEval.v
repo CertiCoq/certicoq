@@ -144,7 +144,7 @@ Eval vm_compute in (zero I). (* 0 *)
 Axiom Ia : True.
 Eval vm_compute in (zero Ia). (* stuck *) 
 
-(*** Abhishek's example that Fixpoint isn't properly guarded in L1 ***)
+(*** Anonymized's example that Fixpoint isn't properly guarded in L1 ***)
 (** using bool: all of bool is accessible wrt R **)
 Inductive R : bool -> bool -> Prop := r: R true false.
 Definition Accbool := Eval cbv in Acc R.
@@ -234,7 +234,7 @@ Goal  (** doesn't terminate **)
 Abort.
 ********)
 
-(*** Abhishek's example that Fixpoint isn't properly guarded in L1 ***)
+(*** Anonymized's example that Fixpoint isn't properly guarded in L1 ***)
 Inductive lt (n:nat): nat -> Prop := lt_n: lt n (S n).
 Definition gt (m n:nat ): Prop := lt n m.
 Definition Accnat (R:nat->nat->Prop) : nat -> Prop := Eval cbv in Acc R.

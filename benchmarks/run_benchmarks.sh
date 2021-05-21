@@ -56,7 +56,9 @@ do
 	# Find OPT time with non-selective lambda lifting
 	optll=$(./${f}_opt_ll ${N} | awk -v N=${N} '/Time taken/ {print ($5 / N) }')
 	# Find AFT time with compcert
-	compc=$(./${f}_ccomp ${N} | awk -v N=${N} '/Time taken/ {print ($5 / N) }')
+	compc=0
+	# To run CompCert experiments comment out the above line and uncomment the following. 
+	# compc=$(./${f}_ccomp ${N} | awk -v N=${N} '/Time taken/ {print ($5 / N) }')
 	# Find OCamlc time (assumes ocaml programs run for N times)
 	ocamlc=`awk -v N=${N} -v pat="${f}" '$0 ~ pat {print ($4 / N) }' ocamlc_bench_$i.txt`
 	# Find OCamlopt time

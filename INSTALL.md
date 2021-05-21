@@ -2,43 +2,53 @@
 
 ### Prerequisites
 
-To install the compiler, you need OCaml (tested with `4.07.1` ) and Coq 8.12.
+To install the compiler, you need OCaml (tested with `4.07.1` ) and Coq 8.12.1.
 
 CertiCoq depends on the following Coq packages:  
-`ExtLib` and `MetaCoq` (which requires `Equations`).
+`ExtLib`, `Equations` `MetaCoq`.
 
 #### Building the dependencies
 
-The dependencies can either be installed manually (from sources or via `opam`) or automatically via provided submodules.
+The source code of the dependencies is provided in the directory
+`submodules`.  The dependencies are preinstalled in the VM. You only
+need to install these if you are compiling CertiCoq in your machine.
 
-##### Manual installation of dependencies
+Note that installing released versions of Equations and MetaCoq will
+not work as CertiCoq depends on specific (unreleased) versions of
+these packages. We recommend installing all dependencies from the
+provided source code.
+
+To install the dependencies type the following commands from the
+top-level CertiCoq directory.
 
 ###### Ext-lib
 
-You can install [ExtLib](https://github.com/coq-community/coq-ext-lib) (v0.11.2) from the source code or from opam with `opam install coq-ext-lib.0.11.2`.
+    # cd submodules/coq-ext-lib
+    # make
+    # make install
+      
 
 ###### Equations
 
-You can install [Equations](https://github.com/mattam82/Coq-Equations) (v1.2.3) from opam or from their source code or from opam with `opam install coq-equations.1.2.3+8.12`.
+    # cd submodules/Equations
+    # bash configure.sh
+    # make
+    # make install
 
 ###### MetaCoq
 
-Currently, MetaCoq needs to be installed manually from the `coq-8.12` branch in [MetaCoq's github](https://github.com/MetaCoq/metacoq/tree/coq-8.12). 
+    # cd submodules/metacoq
+    # bash configure.sh local
+    # make all
+    # make translations    
+    # make install
 
-##### Installation of dependencies via submodules
-
-Make sure that you do not have any of the dependencies installed already.
-From the `certicoq/` directory, run:
-
-    # make submodules
-    
-Note that this approach will only work if your installation path for Coq is writable without root privileges, this should for instance be the case if Coq was installed via `opam`.
 
 ### Building the compiler
 
   From the `certicoq/` directory, run:
 
-    # make -j4
+    # make
 
   After the sources are successfully compiled, you can compile and
   install the CertiCoq plugin with:
@@ -48,3 +58,49 @@ Note that this approach will only work if your installation path for Coq is writ
   To test the installation, you can go to `certicoq/benchmarks` and run
 
     # make all
+
+
+### Running the benchmarks
+
+  From the `certicoq/` directory, run:
+  
+    # cd benchmarks/ocaml
+    # make all
+    # cd ..
+    # make all
+
+
+  That is, first run `make all` in the directory `benchmarks/ocaml`
+  and then `make all` in the directory `benchmarks`.  The last command
+  will run CertiCoq to generate the required *.c files and will
+  compile them with the C compiler (the actual CertiCoq commands for
+  compilation are in the file `benchmarks/tests.v`. Most of the
+  benchmarks are imported from `benchmarks/lib`).
+
+  Then to run the benchmarks run:
+
+  ## sh run_benchmarks.sh N
+
+  Where N is the number of runs for each benchmark (in the paper N =
+  10). Each run is a separate process and within each process time is
+  measured for 10 iterations of the benchmark program (to exclude
+  process startup time).
+
+  The script run_benchmarks.sh generates a table with the following
+  columns:
+
+  Benchmark  CertiCoq  Ratio  Dev    CertiCoqO  Ratio  Dev    CertiCoqL  Ratio  Dev    CertiCoqCC  Ratio  Dev    ocamlc   Ratio  Dev    ocamlopt  Ratio  Dev
+
+  Benchmark  : the name of the benchmarks
+  CertiCoq   : the execution time of the base CertiCoq -O0 configuration (without the lambda lifting configuration).
+  CertiCoqO  : the execution time of the CertiCoq -O1 configuration (with the lambda lifting optimization).
+  CertiCoqL  : the execution time of the CertiCoq -O1 -lift-all configuration (with the non-selective lambda).
+  CertiCoqCC : the execution time of the base CertiCoq -O0 configuration compiled with CompCert
+  ocamlc     : the execution time using the OCaml bytecode compiler
+  ocamlopt   : the execution time using the OCaml native compiler
+
+  ratio      : the execution time of each configuration relative to CertiCoq -O0
+  dev        : Standard deviation  (for the N processes)
+
+  The table in section 6 of the paper is generated from that table. 
+  A sample output is in benchmarks/sample_output.txt.

@@ -9,7 +9,7 @@ CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, 
 EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS)) $(patsubst %, %_cps_opt, $(TESTS)) $(patsubst %, %_opt, $(TESTS))
 
 default: copy exec run
-all: copy lib tests exec run
+all: copy lib tests exec
 
 .PHONY: all default clean lib cleanlib tests run copy $(TESTS)
 
@@ -66,6 +66,3 @@ $(TESTS): $(CFILES)
 	$(CCOMPILER) -o $@_opt_ll -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt_ll.c glue.CertiCoq.Benchmarks.tests.$@_opt_ll.c
 	ccomp -o $@_ccomp -O2 $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue.CertiCoq.Benchmarks.tests.$@.c
 
-
-run: run.sh
-	sh run.sh 10

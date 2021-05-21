@@ -108,16 +108,6 @@ Section EVAL.
         (* The definition of a function incur cost proportional to the number of FVs
         (to make the bound of the current cc independent of the term) *)
         bstep rho (Efun B e) cin v cout
-  (* | BStept_prim :
-      forall (vs : list val) (rho' rho : env) (x : var) (f : prim)
-        (f' : list val -> option val) (ys : list var) (e : exp)
-        (v : val) (v' : res) (cin : nat),
-          get_list ys rho = Some vs ->
-          M.get f pr = Some f' ->
-          f' vs = Some v ->
-          M.set x v rho = rho' ->
-          bstep_fuel rho' e v' cin ->
-          bstep rho (Eprim x f ys e) v' cin *)
   | BStept_halt :
       forall x v rho,
         M.get x rho = Some v ->

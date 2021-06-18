@@ -214,10 +214,10 @@ extraction/primFloat.mli
 extraction/primFloat.ml
 # extraction/int63.mli
 # extraction/int63.m
-extraction/primInt63.ml
-extraction/primInt63.mli
-extraction/uint0.ml
-extraction/uint0.mli
+# extraction/primInt63.ml
+# extraction/primInt63.mli
+# extraction/uint0.ml
+# extraction/uint0.mli
 # extraction/int63.mli
 # extraction/int63.ml
 extraction/floatOps.mli
@@ -292,8 +292,8 @@ extraction/pCUICAstUtils.mli
 
 #extraction/pCUICChecker.ml
 #extraction/pCUICChecker.mli
-extraction/pCUICCumulativity.ml
-extraction/pCUICCumulativity.mli
+# extraction/pCUICCumulativity.ml
+# extraction/pCUICCumulativity.mli
 extraction/pCUICLiftSubst.ml
 extraction/pCUICLiftSubst.mli
 # extraction/pCUICInduction.ml
@@ -308,10 +308,10 @@ extraction/pCUICPosition.mli
 # extraction/pCUICPretty.mli
 # extraction/pCUICReflect.ml
 # extraction/pCUICReflect.mli
-extraction/pCUICSafeChecker.ml
-extraction/pCUICSafeChecker.mli
-extraction/pCUICSafeConversion.ml
-extraction/pCUICSafeConversion.mli
+# extraction/pCUICSafeChecker.ml
+# extraction/pCUICSafeChecker.mli
+# extraction/pCUICSafeConversion.ml
+# extraction/pCUICSafeConversion.mli
 extraction/pCUICErrors.ml
 extraction/pCUICErrors.mli
 extraction/pCUICSafeReduce.ml

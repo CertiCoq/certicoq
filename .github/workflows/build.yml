@@ -12,7 +12,8 @@ jobs:
 
     strategy:
       matrix:
-        target: [ submodules, opam ]
+        target: [ submodules #, opam
+        ]
 
     steps:
 

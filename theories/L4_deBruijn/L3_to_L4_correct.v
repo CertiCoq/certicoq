@@ -1577,7 +1577,7 @@ Proof.
   revert H.
   replace n with (n - N.to_nat 0)%nat at 2 4 by lia.
   generalize 0 at 1 2 3 5 6 8 as k.
-  revert t i n; induction brs at -2 -3.
+  revert t i n; induction brs at 1 4 5 6 7.
 
   simpl; intros; discriminate.
 

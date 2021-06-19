@@ -123,7 +123,7 @@ Extract Inlined Constant RandyPrelude.ascii_dec_bool => "(=)".
 Extraction Blacklist config List String Nat Int Ast Universes UnivSubst Typing Retyping 
            OrderedType Logic Common Equality Char char uGraph
            Instances Classes Term Monad Coqlib Errors Compile Checker Eq Classes0 Numeral
-           Uint63.
+           Uint63 Number.
 
 (* Cutting the dependency to R.
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".

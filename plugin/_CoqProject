@@ -40,6 +40,8 @@ extraction/binNat.mli
 extraction/binNat.ml
 extraction/binPos.mli
 extraction/binPos.ml
+extraction/number0.mli
+extraction/number0.ml
 extraction/nat0.mli
 extraction/nat0.ml
 extraction/binPosDef.mli
@@ -262,8 +264,8 @@ extraction/monad_utils.ml
 extraction/monad_utils.mli
 extraction/nPeano.ml
 extraction/nPeano.mli
-extraction/numeral0.ml
-extraction/numeral0.mli
+# extraction/numeral0.ml
+# extraction/numeral0.mli
 extraction/optionMonad.ml
 extraction/optionMonad.mli
 extraction/orders.ml

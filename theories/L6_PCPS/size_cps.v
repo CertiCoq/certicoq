@@ -253,7 +253,7 @@ Lemma sizeOf_env_set k rho x v :
   sizeOf_env k (M.set x v rho) = max (sizeOf_val k v) (sizeOf_env k rho).
 Proof.
 (* Obvious but seems painful, admitting for now *)
-Admitted.
+Abort.
 
 Lemma max_list_nat_acc_spec {A} (xs : list A) f acc :
   max_list_nat_with_measure f acc xs =

@@ -400,7 +400,7 @@ Definition is_sep (c : ascii) : bool :=
   | _ => false
   end%char.
 
-Fixpoint qualifier (s : string) : string :=
+Definition qualifier (s : string) : string :=
   let fix go s :=
     match s with
     | "" => ("", false)
@@ -411,7 +411,7 @@ Fixpoint qualifier (s : string) : string :=
     end
   in fst (go s).
 
-Fixpoint unqualified (s : string) : string :=
+Definition unqualified (s : string) : string :=
   let fix go s :=
     match s with
     | "" => ("", false)

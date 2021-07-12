@@ -1,5 +1,5 @@
 (* Step-indexed logical relations for L6.  Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
  
 Require Import compcert.lib.Coqlib.

@@ -19,10 +19,6 @@ Close Scope Z_scope.
 
 
 
-(* TODO Make tranformations take all parameters first and exp and comp_data last.
-        then write correctness theorem as defintion. 
- *) 
-
 Section ToplevelTheorems.
 
   Context (cenv : ctor_env).
@@ -65,8 +61,6 @@ Section ToplevelTheorems.
         max_var e' 1 < state.next_var c' /\                       (* the pool of identifiers is fresh for the target *)
         exists n m,  R_n_exp cenv clo_tag wf_pres post_prop       (* src and trg are in the logical relation  *)
                              (simple_bound 0) (simple_bound 0) n m e e'.
-  
-
   
 
 
@@ -585,8 +579,8 @@ Section Compose.
     clear. firstorder.
   Qed.
   
-  Theorem anf_pipeline_correct opts :
-    correct_cc cenv clo_tag (anf_pipeline opts).
+  Theorem anf_pipeline_correct opts v :
+    correct_cc cenv clo_tag (anf_pipeline v opts).
   Proof.
     intros Heq.
     unfold anf_pipeline.
@@ -658,7 +652,7 @@ Section Compose.
 
 
   (* Top-level correctness for whole programs *)
-  Corollary anf_pipeline_whole_program_correct opts e c :
+  Corollary anf_pipeline_whole_program_correct var opts e c :
 
     closed_exp e ->
     
@@ -666,7 +660,7 @@ Section Compose.
     (max_var e 1 < state.next_var c)%positive ->
     
     exists (e' : exp) (c' : state.comp_data),     
-      anf_pipeline opts e c = (Ret e', c') /\
+      anf_pipeline var opts e c = (Ret e', c') /\
 
       refines cenv value_ref_cc e e'. 
   Proof.
@@ -706,7 +700,7 @@ Section Compose.
   
 
   (* Top-level correctness for linking *)
-  Corollary anf_pipeline_linking_correct lf x o1 o2 e1 e2 c1 c2 :
+  Corollary anf_pipeline_linking_correct lf x v1 v2 o1 o2 e1 e2 c1 c2 :
 
     closed_exp e1 ->
     well_scoped e1 ->
@@ -717,8 +711,8 @@ Section Compose.
     (max_var e2 1 < state.next_var c2)%positive ->
     
     exists (e1' e2' : exp) (c1' c2' : state.comp_data),     
-      anf_pipeline o1 e1 c1 = (Ret e1', c1') /\
-      anf_pipeline o2 e2 c2 = (Ret e2', c2') /\
+      anf_pipeline v1 o1 e1 c1 = (Ret e1', c1') /\
+      anf_pipeline v2 o2 e2 c2 = (Ret e2', c2') /\
 
       refines cenv value_ref_cc (link lf x e1 e2) (link lf x e1' e2'). 
   Proof.
@@ -748,11 +742,10 @@ Section Compose.
   
 End Compose.
 
-
-(* 
-
 Print Assumptions anf_pipeline_whole_program_correct.
 Print Assumptions anf_pipeline_linking_correct.
+
+(* 
 
 Prints : 
 
@@ -761,8 +754,5 @@ ProofIrrelevance.proof_irrelevance : forall (P : Prop) (p1 p2 : P), p1 = p2
 FunctionalExtensionality.functional_extensionality_dep : forall (A : Type) (B : A -> Type)
                                                            (f g : forall x : A, B x),
                                                          (forall x : A, f x = g x) -> f = g
-inline_exp_eq : forall (St : Type) (IH : InlineHeuristic St) (d : nat) (e : exp) (sig : r_map) 
-                     (fm : fun_map) (s : St), inline_exp St IH d e sig fm s = inline_exp' St IH d e sig fm s
-
 *)
 

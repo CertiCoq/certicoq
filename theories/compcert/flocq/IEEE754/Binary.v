@@ -20,6 +20,7 @@ COPYING file for more details.
 (** * IEEE-754 arithmetic *)
 Require Import Core Digits Round Bracket Operations Div Sqrt Relative.
 Require Import Psatz.
+Require Import Coq.micromega.Lia.
 
 Section AnyRadix.
 
@@ -651,7 +652,7 @@ rewrite H. 2: discriminate.
 revert H1. clear -H2.
 rewrite Zpos_digits2_pos.
 unfold fexp, FLT_exp.
-intros ; zify ; omega.
+intros ; zify ; lia.
 Qed.
 
 Theorem bounded_ge_emin :
@@ -679,7 +680,7 @@ unfold fexp, FLT_exp.
 clear -prec_gt_0_.
 unfold Prec_gt_0 in prec_gt_0_.
 clearbody emin.
-intros ; zify ; omega.
+intros ; zify ; lia.
 Qed.
 
 Theorem abs_B2R_lt_emax :
@@ -728,7 +729,7 @@ rewrite Cx.
 unfold cexp, fexp, FLT_exp.
 destruct (mag radix2 (F2R (Float radix2 (Zpos mx) ex))) as (e',Ex). simpl.
 apply Z.max_lub.
-cut (e' - 1 < emax)%Z. clear ; omega.
+cut (e' - 1 < emax)%Z. clear ; lia.
 apply lt_bpow with radix2.
 apply Rle_lt_trans with (2 := Bx).
 change (Zpos mx) with (Z.abs (Zpos mx)).
@@ -738,7 +739,7 @@ apply Rgt_not_eq.
 now apply F2R_gt_0.
 unfold emin.
 generalize (prec_gt_0 prec).
-clear -Hmax ; omega.
+clear -Hmax ; lia.
 Qed.
 
 (** Truncation *)
@@ -889,7 +890,7 @@ now inversion H.
 (* *)
 intros p Hp.
 assert (He: (e <= fexp (Zdigits radix2 m + e))%Z).
-clear -Hp ; zify ; omega.
+clear -Hp ; zify ; lia.
 destruct (inbetween_float_ex radix2 m e l) as (x, Hx).
 generalize (inbetween_shr x m e l (fexp (Zdigits radix2 m + e) - e) Hm Hx).
 assert (Hx0 : (0 <= x)%R).
@@ -1091,18 +1092,18 @@ rewrite Zpos_digits2_pos.
 replace (Zdigits radix2 (Zpos (match (Zpower 2 prec - 1)%Z with Zpos p => p | _ => xH end))) with prec.
 unfold fexp, FLT_exp, emin.
 generalize (prec_gt_0 prec).
-clear -Hmax ; zify ; omega.
+clear -Hmax ; zify ; lia.
 change 2%Z with (radix_val radix2).
 case_eq (Zpower radix2 prec - 1)%Z.
 simpl Zdigits.
 generalize (Zpower_gt_1 radix2 prec (prec_gt_0 prec)).
-clear ; omega.
+clear ; lia.
 intros p Hp.
 apply Zle_antisym.
-cut (prec - 1 < Zdigits radix2 (Zpos p))%Z. clear ; omega.
+cut (prec - 1 < Zdigits radix2 (Zpos p))%Z. clear ; lia.
 apply Zdigits_gt_Zpower.
 simpl Z.abs. rewrite <- Hp.
-cut (Zpower radix2 (prec - 1) < Zpower radix2 prec)%Z. clear ; omega.
+cut (Zpower radix2 (prec - 1) < Zpower radix2 prec)%Z. clear ; lia.
 apply lt_IZR.
 rewrite 2!IZR_Zpower. 2: now apply Zlt_le_weak.
 apply bpow_lt.
@@ -1113,7 +1114,7 @@ simpl Z.abs. rewrite <- Hp.
 apply Zlt_pred.
 intros p Hp.
 generalize (Zpower_gt_1 radix2 _ (prec_gt_0 prec)).
-clear -Hp ; zify ; omega.
+clear -Hp ; zify ; lia.
 apply Rnot_lt_le.
 intros Hx.
 generalize (refl_equal (bounded m2 e2)).
@@ -1271,18 +1272,18 @@ rewrite Zpos_digits2_pos.
 replace (Zdigits radix2 (Zpos (match (Zpower 2 prec - 1)%Z with Zpos p => p | _ => xH end))) with prec.
 unfold fexp, FLT_exp, emin.
 generalize (prec_gt_0 prec).
-clear -Hmax ; zify ; omega.
+clear -Hmax ; zify ; lia.
 change 2%Z with (radix_val radix2).
 case_eq (Zpower radix2 prec - 1)%Z.
 simpl Zdigits.
 generalize (Zpower_gt_1 radix2 prec (prec_gt_0 prec)).
-clear ; omega.
+clear ; lia.
 intros p Hp.
 apply Zle_antisym.
-cut (prec - 1 < Zdigits radix2 (Zpos p))%Z. clear ; omega.
+cut (prec - 1 < Zdigits radix2 (Zpos p))%Z. clear ; lia.
 apply Zdigits_gt_Zpower.
 simpl Z.abs. rewrite <- Hp.
-cut (Zpower radix2 (prec - 1) < Zpower radix2 prec)%Z. clear ; omega.
+cut (Zpower radix2 (prec - 1) < Zpower radix2 prec)%Z. clear ; lia.
 apply lt_IZR.
 rewrite 2!IZR_Zpower. 2: now apply Zlt_le_weak.
 apply bpow_lt.
@@ -1293,7 +1294,7 @@ simpl Z.abs. rewrite <- Hp.
 apply Zlt_pred.
 intros p Hp.
 generalize (Zpower_gt_1 radix2 _ (prec_gt_0 prec)).
-clear -Hp ; zify ; omega.
+clear -Hp ; zify ; lia.
 apply Rnot_lt_le.
 intros Hx.
 generalize (refl_equal (bounded m2 e2)).
@@ -1370,7 +1371,7 @@ clear -Hmax.
 unfold emin.
 intros dx dy dxy Hx Hy Hxy.
 zify ; intros ; subst.
-omega.
+lia.
 (* *)
 case sx ; case sy.
 apply Rlt_bool_false.
@@ -1479,7 +1480,7 @@ case_eq (ex' - ex)%Z ; simpl.
 intros H.
 now rewrite Zminus_eq with (1 := H).
 intros p.
-clear -He ; zify ; omega.
+clear -He ; zify ; lia.
 intros.
 apply refl_equal.
 Qed.
@@ -1580,7 +1581,7 @@ now rewrite is_finite_FF2B.
 rewrite Bsign_FF2B, Rz''.
 rewrite Rcompare_Gt...
 apply F2R_gt_0.
-simpl. zify; omega.
+simpl. zify; lia.
 intros Hz' (Vz, Rz).
 rewrite B2FF_FF2B, Rz.
 apply f_equal.
@@ -1599,7 +1600,7 @@ now rewrite is_finite_FF2B.
 rewrite Bsign_FF2B, Rz''.
 rewrite Rcompare_Lt...
 apply F2R_lt_0.
-simpl. zify; omega.
+simpl. zify; lia.
 intros Hz' (Vz, Rz).
 rewrite B2FF_FF2B, Rz.
 apply f_equal.
@@ -2029,7 +2030,7 @@ set (e' := Z.min _ _).
 assert (2 * e' <= ex)%Z as He.
 { assert (e' <= Z.div2 ex)%Z by apply Z.le_min_r.
   rewrite (Zdiv2_odd_eqn ex).
-  destruct Z.odd ; omega. }
+  destruct Z.odd ; lia. }
 generalize (Fsqrt_core_correct radix2 (Zpos mx) ex e' eq_refl He).
 unfold Fsqrt_core.
 set (mx' := match (ex - 2 * e')%Z with Z0 => _ | _ => _ end).
@@ -2066,7 +2067,7 @@ apply Rlt_le_trans with (1 := Heps).
 fold (bpow radix2 0).
 apply bpow_le.
 generalize (prec_gt_0 prec).
-clear ; omega.
+clear ; lia.
 apply Rsqr_incrst_0.
 3: apply bpow_ge_0.
 rewrite Rsqr_mult.
@@ -2090,7 +2091,7 @@ now apply IZR_le.
 change 4%R with (bpow radix2 2).
 apply bpow_le.
 generalize (prec_gt_0 prec).
-clear -Hmax ; omega.
+clear -Hmax ; lia.
 apply Rmult_le_pos.
 apply sqrt_ge_0.
 rewrite <- (Rplus_opp_r 1).
@@ -2109,7 +2110,7 @@ unfold Rsqr.
 rewrite <- bpow_plus.
 apply bpow_le.
 unfold emin.
-clear -Hmax ; omega.
+clear -Hmax ; lia.
 apply generic_format_ge_bpow with fexp.
 intros.
 apply Z.le_max_r.

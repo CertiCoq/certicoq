@@ -24,6 +24,7 @@ Require Import Floats.
 Require Import Values.
 Require Import Memory.
 Require Import Globalenvs.
+Require Import Coq.micromega.Lia.
 
 (** * Events and traces *)
 
@@ -794,7 +795,7 @@ Proof.
   exists f; exists v'; exists m1'; intuition. constructor; auto.
   red; intros. congruence.
 (* trace length *)
-- inv H; inv H0; simpl; omega.
+- inv H; inv H0; simpl; lia.
 (* receptive *)
 - inv H. exploit volatile_load_receptive; eauto. intros [v2 A].
   exists v2; exists m1; constructor; auto.
@@ -908,7 +909,7 @@ Proof.
   eelim H3; eauto.
   exploit Mem.store_valid_access_3. eexact H0. intros [X Y].
   apply Mem.perm_cur_max. apply Mem.perm_implies with Writable; auto with mem.
-  apply X. omega.
+  apply X. lia.
 Qed.
 
 Lemma volatile_store_receptive:
@@ -943,7 +944,7 @@ Proof.
   exploit volatile_store_inject; eauto. intros [m2' [A [B [C D]]]].
   exists f; exists Vundef; exists m2'; intuition. constructor; auto. red; intros; congruence.
 (* trace length *)
-- inv H; inv H0; simpl; omega.
+- inv H; inv H0; simpl; lia.
 (* receptive *)
 - assert (t1 = t2). inv H. eapply volatile_store_receptive; eauto.
   subst t2; exists vres1; exists m1; auto.
@@ -1025,7 +1026,7 @@ Proof.
   subst b1. rewrite C in H2. inv H2. eauto with mem.
   rewrite D in H2 by auto. congruence.
 (* trace length *)
-- inv H; simpl; omega.
+- inv H; simpl; lia.
 (* receptive *)
 - assert (t1 = t2). inv H; inv H0; auto. subst t2.
   exists vres1; exists m1; auto.
@@ -1094,25 +1095,25 @@ Proof.
   exploit Mem.address_inject; eauto.
     apply Mem.perm_implies with Freeable; auto with mem.
     apply P. instantiate (1 := lo).
-    generalize (size_chunk_pos Mptr); omega.
+    generalize (size_chunk_pos Mptr); lia.
   intro EQ.
   exploit Mem.free_parallel_inject; eauto. intros (m2' & C & D).
   exists f, Vundef, m2'; split.
   apply extcall_free_sem_intro with (sz := sz) (m' := m2').
-    rewrite EQ. rewrite <- A. f_equal. omega.
+    rewrite EQ. rewrite <- A. f_equal. lia.
     auto. auto.
-    rewrite ! EQ. rewrite <- C. f_equal; omega.
+    rewrite ! EQ. rewrite <- C. f_equal; lia.
   split. auto.
   split. auto.
   split. eapply Mem.free_unchanged_on; eauto. unfold loc_unmapped. intros; congruence.
   split. eapply Mem.free_unchanged_on; eauto. unfold loc_out_of_reach.
     intros. red; intros. eelim H2; eauto.
     apply Mem.perm_cur_max. apply Mem.perm_implies with Freeable; auto with mem.
-    apply P. omega.
+    apply P. lia.
   split. auto.
   red; intros. congruence.
 (* trace length *)
-- inv H; simpl; omega.
+- inv H; simpl; lia.
 (* receptive *)
 - assert (t1 = t2). inv H; inv H0; auto. subst t2.
   exists vres1; exists m1; auto.
@@ -1182,7 +1183,7 @@ Proof.
   destruct (zeq sz 0).
 + (* special case sz = 0 *)
   assert (bytes = nil).
-  { exploit (Mem.loadbytes_empty m1 bsrc (Ptrofs.unsigned osrc) sz). omega. congruence. }
+  { exploit (Mem.loadbytes_empty m1 bsrc (Ptrofs.unsigned osrc) sz). lia. congruence. }
   subst.
   destruct (Mem.range_perm_storebytes m1' b0 (Ptrofs.unsigned (Ptrofs.add odst (Ptrofs.repr delta0))) nil)
   as [m2' SB].
@@ -1191,8 +1192,8 @@ Proof.
   split. econstructor; eauto.
   intros; omegaContradiction.
   intros; omegaContradiction.
-  right; omega.
-  apply Mem.loadbytes_empty. omega.
+  right; lia.
+  apply Mem.loadbytes_empty. lia.
   split. auto.
   split. eapply Mem.storebytes_empty_inject; eauto.
   split. eapply Mem.storebytes_unchanged_on; eauto. unfold loc_unmapped; intros.
@@ -1208,11 +1209,11 @@ Proof.
   assert (RPDST: Mem.range_perm m1 bdst (Ptrofs.unsigned odst) (Ptrofs.unsigned odst + sz) Cur Nonempty).
     replace sz with (Z.of_nat (length bytes)).
     eapply Mem.range_perm_implies. eapply Mem.storebytes_range_perm; eauto. auto with mem.
-    rewrite LEN. apply nat_of_Z_eq. omega.
+    rewrite LEN. apply nat_of_Z_eq. lia.
   assert (PSRC: Mem.perm m1 bsrc (Ptrofs.unsigned osrc) Cur Nonempty).
-    apply RPSRC. omega.
+    apply RPSRC. lia.
   assert (PDST: Mem.perm m1 bdst (Ptrofs.unsigned odst) Cur Nonempty).
-    apply RPDST. omega.
+    apply RPDST. lia.
   exploit Mem.address_inject.  eauto. eexact PSRC. eauto. intros EQ1.
   exploit Mem.address_inject.  eauto. eexact PDST. eauto. intros EQ2.
   exploit Mem.loadbytes_inject; eauto. intros [bytes2 [A B]].
@@ -1223,7 +1224,7 @@ Proof.
   intros; eapply Mem.aligned_area_inject with (m := m1); eauto.
   eapply Mem.disjoint_or_equal_inject with (m := m1); eauto.
   apply Mem.range_perm_max with Cur; auto.
-  apply Mem.range_perm_max with Cur; auto. omega.
+  apply Mem.range_perm_max with Cur; auto. lia.
   split. constructor.
   split. auto.
   split. eapply Mem.storebytes_unchanged_on; eauto. unfold loc_unmapped; intros.
@@ -1233,11 +1234,11 @@ Proof.
   apply Mem.perm_cur_max. apply Mem.perm_implies with Writable; auto with mem.
   eapply Mem.storebytes_range_perm; eauto.
   erewrite list_forall2_length; eauto.
-  omega.
+  lia.
   split. apply inject_incr_refl.
   red; intros; congruence.
 - (* trace length *)
-  intros; inv H. simpl; omega.
+  intros; inv H. simpl; lia.
 - (* receptive *)
   intros.
   assert (t1 = t2). inv H; inv H0; auto. subst t2.
@@ -1283,7 +1284,7 @@ Proof.
   eapply eventval_list_match_inject; eauto.
   red; intros; congruence.
 (* trace length *)
-- inv H; simpl; omega.
+- inv H; simpl; lia.
 (* receptive *)
 - assert (t1 = t2). inv H; inv H0; auto.
   exists vres1; exists m1; congruence.
@@ -1328,7 +1329,7 @@ Proof.
   eapply eventval_match_inject; eauto.
   red; intros; congruence.
 (* trace length *)
-- inv H; simpl; omega.
+- inv H; simpl; lia.
 (* receptive *)
 - assert (t1 = t2). inv H; inv H0; auto. subst t2.
   exists vres1; exists m1; auto.
@@ -1369,7 +1370,7 @@ Proof.
   econstructor; eauto.
   red; intros; congruence.
 (* trace length *)
-- inv H; simpl; omega.
+- inv H; simpl; lia.
 (* receptive *)
 - inv H; inv H0. exists Vundef, m1; constructor.
 (* determ *)
@@ -1465,7 +1466,7 @@ Proof.
   intros. destruct (plt (Mem.nextblock m2) (Mem.nextblock m1)).
   exploit external_call_valid_block; eauto. intros.
   eelim Plt_strict; eauto.
-  unfold Plt, Ple in *; zify; omega.
+  unfold Plt, Ple in *; zify; lia.
 Qed.
 
 (** Special case of [external_call_mem_inject_gen] (for backward compatibility) *)

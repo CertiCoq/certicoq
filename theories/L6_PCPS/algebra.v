@@ -1,5 +1,5 @@
 (* Abstract resource algebra to be used by the ANF semantics.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 From Coq Require Import Classes.Morphisms Arith NArith.BinNat Relations
@@ -124,6 +124,8 @@ Class fuel_resource {A} :=
 Class trace_resource {A} :=
   { HRexp_t :> @exp_resource A }.
 
+
+Declare Scope alg_scope.
 
 (* Notations *)
 Notation "a <+> b" := (algebra.plus a b) (at level 72, left associativity) : alg_scope.

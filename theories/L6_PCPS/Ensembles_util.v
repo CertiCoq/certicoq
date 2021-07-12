@@ -1,5 +1,5 @@
 (* Ensemble library utilities. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 From Coq Require Import Classes.Morphisms Arith NArith.BinNat Lists.List Sorting.Permutation.

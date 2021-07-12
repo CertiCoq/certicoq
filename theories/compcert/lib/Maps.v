@@ -34,6 +34,7 @@
 
 Require Import Equivalence EquivDec.
 Require Import Coqlib.
+Require Import Coq.micromega.Lia.
 
 (* To avoid useless definitions of inductors in extracted code. *)
 Local Unset Elimination Schemes.
@@ -1395,7 +1396,7 @@ Theorem cardinal_remove:
 Proof.
   unfold cardinal; intros.
   exploit T.elements_remove; eauto. intros (l1 & l2 & P & Q).
-  rewrite P, Q. rewrite ! app_length. simpl. omega.
+  rewrite P, Q. rewrite ! app_length. simpl. lia.
 Qed.
 
 Theorem cardinal_set:

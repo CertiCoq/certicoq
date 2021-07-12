@@ -49,7 +49,7 @@ Section CENSUS.
   Definition init_census_f (f:fundefs) :=
     update_census_f (M.empty var) f (fun v c => get_c v c + 1)%nat (M.empty nat).
 
-  Fixpoint f_opt_d {A} (d:A) f on om: option A :=
+  Definition f_opt_d {A} (d:A) f on om: option A :=
     match on with
     | Some n => (match om with
                  | Some m => Some (f n m)

@@ -52,15 +52,15 @@ Section TermTranslation.
     | S n' => TLambda nAnon (eta_expand n' (TApp (lift 0 t) (TRel 0)))
     end.
       
-  Eval compute in is_n_lambda 1 (TLambda (nNamed "x") (TRel 0)).
-  Eval compute in eta_expand 1 (TLambda (nNamed "x") (TRel 0)).
+  (* Eval compute in is_n_lambda 1 (TLambda (nNamed "x") (TRel 0)). *)
+  (* Eval compute in eta_expand 1 (TLambda (nNamed "x") (TRel 0)). *)
   
-  Eval compute in eta_expand 2 (TLambda (nNamed "x") (TRel 0)).
-  Eval compute in eta_expand 2 (TLambda (nNamed "x") (TRel 1)).
+  (* Eval compute in eta_expand 2 (TLambda (nNamed "x") (TRel 0)). *)
+  (* Eval compute in eta_expand 2 (TLambda (nNamed "x") (TRel 1)). *)
     
-  Eval compute in eta_expand 3 (TRel 0).
-  Eval compute in eta_expand 1 (TLambda (nNamed "x") (TRel 0)).
-  Eval compute in eta_expand 2 (TLambda (nNamed "x") (TRel 1)).
+  (* Eval compute in eta_expand 3 (TRel 0). *)
+  (* Eval compute in eta_expand 1 (TLambda (nNamed "x") (TRel 0)). *)
+  (* Eval compute in eta_expand 2 (TLambda (nNamed "x") (TRel 1)). *)
   
   Fixpoint trans (t : Term) : Term :=
     match t with

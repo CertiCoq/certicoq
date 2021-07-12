@@ -2820,5 +2820,5 @@ Proof with eauto.
   apply obs_prevervation.
 Qed.
 
-Print Assumptions obs_prevervation.
-Print Assumptions translate_correct'.
+(* Print Assumptions obs_prevervation. *)
+(* Print Assumptions translate_correct'. *)

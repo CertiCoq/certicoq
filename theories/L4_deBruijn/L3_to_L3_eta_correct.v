@@ -5,7 +5,7 @@
 
 Require Import FunInd.
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
-        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz
+        Coq.Lists.List Coq.omega.Omega Coq.micromega.Lia Coq.Program.Program Coq.micromega.Psatz
         Coq.Bool.Bool.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
@@ -340,7 +340,7 @@ Proof.
   try (cbn; rewrite H; easy).
   - cbn. destruct (lt_eq_lt_dec n0 n); cbn.
     + destruct s.
-      * rewrite (proj1 (nat_compare_lt n0 n)); try omega. reflexivity.
+      * rewrite (proj1 (nat_compare_lt n0 n)); try lia. reflexivity.
       * subst. rewrite (proj2 (Nat.compare_eq_iff _ _)); trivial. 
     + rewrite (proj1 (nat_compare_gt n0 n)); try intro; trivial.
   - cbn. now rewrite H, H0.
@@ -408,7 +408,7 @@ Lemma Crct_lift :
 Proof.
   apply L3C.crctCrctsCrctBsDsEnv_ind; intros; simpl lift; auto; try solve [econstructor; eauto 2].
   - constructor. auto.
-    destruct (Nat.compare_spec m k); subst; omega.
+    destruct (Nat.compare_spec m k); subst; lia.
   - econstructor; try rewrite <- lifts_preserves_tlength; eauto. 
   - econstructor; eauto.
     destruct i; destruct H3 as [ityp [pack H3]]. red. intuition. do 2 eexists; intuition eauto.
@@ -772,4 +772,4 @@ Proof.
     constructor; auto. 
   - intros. apply H; auto.
 Qed.
-Print Assumptions translate_correct_subst.
+(* Print Assumptions translate_correct_subst. *)

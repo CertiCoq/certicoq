@@ -1,4 +1,4 @@
-Require Import Coq.Arith.Arith Coq.NArith.BinNat omega.Omega Coq.Strings.String
+Require Import Coq.Arith.Arith Coq.NArith.BinNat omega.Omega micromega.Lia Coq.Strings.String
         Coq.Lists.List Structures.OrdersEx.
 Require Import Common.Common.
 Require Import L4.expression.
@@ -623,13 +623,13 @@ Proof.
   - simpl. destruct (N.to_nat n) eqn:Hnat.
     inv Hl. eassumption.
     assert (Heq : ((N.to_nat n) - (N.to_nat 1%N))%nat = n0).
-    { simpl. rewrite Pos2Nat.inj_1. omega. }
+    { simpl. rewrite Pos2Nat.inj_1. lia. }
     rewrite <- Nnat.N2Nat.inj_sub in Heq.
     rewrite <- N.pred_sub in Heq. symmetry in Heq.    
     rewrite Heq. eapply IHl.
     inv Hl. eassumption.
-    inversion Hn. rewrite <- Hnat. try (zify; omega).
-    rewrite <- Heq. subst. zify. omega.
+    inversion Hn. rewrite <- Hnat. try (zify; lia).
+    rewrite <- Heq. subst. lia.
 Qed. 
 
 Lemma make_rec_env_exists fnlst rho n : 
@@ -649,7 +649,7 @@ Proof.
     exists ((ClosFix_v rho F n') :: rhof). repeat split.
     + simpl. f_equal. rewrite <- Hmake. reflexivity.
     + simpl. rewrite <- Hlen. unfold NLength.
-      simpl. zify. omega.
+      simpl. zify. lia.
     + intros Hwf1 Hwf2. constructor.
       inv Hwf1. now constructor; eauto.
       eapply Hwf.
@@ -691,14 +691,14 @@ Proof.
   - exists nil. repeat split; eauto.
     intros Hwf; inv Hwf. simpl. eassumption.
   - assert (Hlen2: efnlength fnlst = N.to_nat (efnlst_length fnlst)).
-    { inv Hlen. zify. omega. }
+    { inv Hlen. zify. lia. }
     edestruct IHfnlst as (rhof & Hmake & Hlen3 & Hwf).
     + eassumption.
     + exists ((ClosFix_v rho fnlst' (N.of_nat (efnlength fnlst))) :: rhof).
       repeat split.
       * simpl. f_equal. eassumption.
       * unfold NLength in *. simpl.
-        zify. omega.
+        zify. lia.
       * intros Hwf1. 
         simpl. constructor.
         -- eapply wf_ClosFix_impl. eapply Hwf1.
@@ -985,14 +985,14 @@ Proof.
   intros n1 n2. split.
   - intros H. destruct n1; destruct n2.
     + inv H.
-    + simpl. zify. omega.
+    + simpl. zify. lia.
     + inv H.
-    + zify. omega.
+    + zify. lia.
   - intros H. destruct n1; destruct n2.
-    + zify. omega.
-    + zify. omega.
+    + lia.
+    + zify. lia.
     + inv H.
-    + zify. omega. 
+    + zify. lia. 
 Qed.
 
 Lemma parallel_sbst_inv_efnlst_length :
@@ -1079,7 +1079,7 @@ Proof.
       eapply nth_inlist_Forall.
       eapply N.ltb_ge in g. 
       assert (Hltlen: (n - i) < NLength rho).
-      { zify. omega. }
+      { zify. lia. }
       unfold NLength in Hltlen.
       eapply N2Nat_inj_lt in Hltlen.
       rewrite Nnat.Nat2N.id in Hltlen. eassumption.
@@ -1255,7 +1255,7 @@ Proof.
     unfold well_formed_in_env in *. inv H0.
     eapply nth_inlist_Forall; [ | eassumption ].
     unfold NLength in *.    
-    zify. omega.
+    zify. lia.
   - (* Lam *)
     econstructor. eassumption. 
     intros x. unfold well_formed_in_env in *.
@@ -1433,7 +1433,7 @@ Fixpoint map_exps (f : exp -> exp) (es : exps) : exps :=
   | econs e es => econs (f e) (map_exps f es)
   end.
 
-Fixpoint sbst_list_n_exps (es es_sbst : exps) (n : N)  :=
+Definition sbst_list_n_exps (es es_sbst : exps) (n : N)  :=
   map_exps (fun e => sbst_list_n e es_sbst n) es.
 
 
@@ -1529,7 +1529,7 @@ Lemma exps_length_is_Datatypes_length:
 Proof.
   induction es.
   - reflexivity. 
-  - simpl. zify. omega.
+  - simpl. zify. lia.
 Qed.
 
 Lemma efnlst_length_is_Datatypes_length:
@@ -1538,7 +1538,7 @@ Lemma efnlst_length_is_Datatypes_length:
 Proof.
   induction efns.
   - reflexivity.
-  - simpl. zify. omega.
+  - simpl. zify. lia.
 Qed.
 
 Lemma exps_to_list_list_to_exps_inv :
@@ -1597,7 +1597,7 @@ Lemma len_cons_lt:
         Nat.lt (S n) (List.length ((e::nil) ++ l)) -> Nat.lt n (List.length l).
 Proof.
   intros n e l H.
-  simpl in H. zify. omega.
+  simpl in H. lia.
 Qed. 
 
 (* NLength uses N.of_nat *)
@@ -1614,13 +1614,13 @@ Proof.
   - simpl. destruct (N.to_nat n) eqn:Hnat.
     inv Hl. eassumption.
     assert (Heq : ((N.to_nat n) - (N.to_nat 1%N))%nat = n0).
-    { simpl. rewrite Pos2Nat.inj_1. omega. }
+    { simpl. rewrite Pos2Nat.inj_1. lia. }
     rewrite <- Nnat.N2Nat.inj_sub in Heq.
     rewrite <- N.pred_sub in Heq. symmetry in Heq.    
     rewrite Heq. eapply IHl.
     inv Hl. eassumption.
-    inversion Hn. rewrite <- Hnat. try (zify; omega).
-    rewrite <- Heq. zify; omega.
+    inversion Hn. rewrite <- Hnat. try (zify; lia).
+    rewrite <- Heq. lia.
 Qed. 
 
 
@@ -1763,7 +1763,7 @@ Proof.
     + simpl. destruct (N.to_nat n) eqn:Hn.
       inversion H1. reflexivity.
       assert (Heq : ((N.to_nat n) - (N.to_nat 1%N))%nat = n0).
-      { simpl. rewrite Pos2Nat.inj_1. omega. }
+      { simpl. rewrite Pos2Nat.inj_1. lia. }
       rewrite <- Nnat.N2Nat.inj_sub in Heq.
       rewrite <- N.pred_sub in Heq.
       rewrite <- Heq. eapply IHes. simpl in H. 
@@ -1773,7 +1773,7 @@ Proof.
       rewrite Nnat.Nat2N.inj_succ in H.
       eapply N.pred_lt_mono in H.
       rewrite N.pred_succ in H. now eapply H.
-      intros Hfalse. zify. omega. 
+      intros Hfalse. zify. lia. 
       intros Hfalse. discriminate.
       inv H1. reflexivity. 
 Qed. 
@@ -1803,7 +1803,7 @@ Proof.
   - simpl in *. destruct (N.to_nat n).
     unfold not in H1. symmetry in Hn. apply H1 in Hn. destruct Hn.
     unfold not in H1. symmetry in Hn. apply H1 in Hn. destruct Hn.
-  - simpl in *. destruct (N.to_nat n). zify. omega.
+  - simpl in *. destruct (N.to_nat n). lia.
     eapply lt_n_S. 
     specialize IHl with (N.of_nat n0).
     rewrite (Nnat.Nat2N.id n0) in IHl.
@@ -1822,11 +1822,11 @@ Proof.
   - simpl in *. destruct (N.to_nat n) eqn:Hn.
     reflexivity.
     assert (Heq : ((N.to_nat n) - (N.to_nat 1%N))%nat = n0).
-    { simpl. rewrite Pos2Nat.inj_1. omega. }
+    { simpl. rewrite Pos2Nat.inj_1. lia. }
     rewrite <- Nnat.N2Nat.inj_sub in Heq.
     rewrite <- N.pred_sub in Heq.
     rewrite <- Heq. eapply IHl.
-    omega.
+    lia.
 Qed.
 
 Lemma nlt_len_nth_eq_app:
@@ -1841,11 +1841,11 @@ Proof.
   - simpl in *. destruct (N.to_nat n) eqn: Hn.
     reflexivity.
     assert (Heq : ((N.to_nat n) - (N.to_nat 1%N))%nat = n0).
-    { simpl. rewrite Pos2Nat.inj_1. omega. }
+    { simpl. rewrite Pos2Nat.inj_1. lia. }
     rewrite <- Nnat.N2Nat.inj_sub in Heq.
     rewrite <- N.pred_sub in Heq.
     rewrite <- Heq. eapply IHl1.
-    omega.
+    lia.
 Qed.
 
 (* variation of app_nth2 *)
@@ -1862,7 +1862,7 @@ Proof.
     eapply nlt_len_then_not_default. rewrite Nnat.Nat2N.id. eassumption.
   - simpl in *. destruct n eqn: Hn.
     inv Hge. rewrite Nat.sub_succ.
-    eapply IHl; try omega.
+    eapply IHl; try lia.
 Qed.
 
 
@@ -1988,7 +1988,7 @@ Proof.
     + eapply OrdersEx.N_as_OT.ltb_lt in l. rewrite l.
       reflexivity.
     + eapply OrdersEx.N_as_OT.ge_le in g.
-      inv Hwf. zify. omega. 
+      inv Hwf. zify. lia. 
   - intros na e IH n rho Hwf.
     simpl. inv Hwf.
     eapply IH in H1. rewrite N.add_comm.
@@ -2076,43 +2076,43 @@ Proof.
   - intros n rho x i Hwf1 Hwf2; eauto.
     unfold parallel_sbst.
     destruct (lt_dec n i).
-    * assert (Hleq : n < i + 1) by (zify; omega).
+    * assert (Hleq : n < i + 1) by (zify; lia).
       eapply OrdersEx.N_as_OT.ltb_lt in l. rewrite l.
       eapply OrdersEx.N_as_OT.ltb_lt in Hleq. rewrite Hleq. simpl.
       eapply OrdersEx.N_as_OT.ltb_lt in l.
       eapply OrdersEx.N_as_OT.ltb_lt in Hleq.
-      destruct (lt_dec n i); try (zify; omega).
+      destruct (lt_dec n i); try (zify; lia).
       reflexivity.
     * assert (Heq := g). eapply OrdersEx.N_as_OT.ge_le in g. 
       eapply N.ltb_ge in g. rewrite g.
       destruct (N.eq_dec n i); subst.
       ** rewrite OrdersEx.N_as_OT.sub_diag.
          assert (Hlt : i <? i + 1 = true).
-         { eapply N.ltb_lt. zify. omega. }
+         { eapply N.ltb_lt. zify. lia. }
          rewrite Hlt. simpl.
-         destruct (lt_dec i i); try (zify; omega).
-         destruct (N.eq_dec i i); try (zify; omega).
+         destruct (lt_dec i i); try (zify; lia).
+         destruct (N.eq_dec i i); try (zify; lia).
          reflexivity.
       ** assert (Hleq : n <? i + 1 = false).
-         { eapply N.ltb_ge. zify. omega. }
+         { eapply N.ltb_ge. zify. lia. }
          rewrite Hleq. 
-         assert (Hlt : ~ n < i + 1). zify. omega.
+         assert (Hlt : ~ n < i + 1). zify. lia.
          eapply OrdersEx.N_as_DT.ltb_nlt in Hlt.
-         rewrite nth_cons; [ | zify; omega ].
+         rewrite nth_cons; [ | zify; lia ].
          assert (Heq' : (N.to_nat (n - i)%N - 1)%nat = N.to_nat (n - (i + 1))).
-         { zify. omega. } rewrite Heq'.
+         { zify. lia. } rewrite Heq'.
          edestruct sbst_closed_id as [Hsbst _].
          erewrite Hsbst.
          inv Hwf1.
          assert (Hltlen: n - (i + 1) < NLength rho).
-         { zify. omega. } eapply nlt_len_then_not_default.
+         { zify. lia. } eapply nlt_len_then_not_default.
          unfold NLength in Hltlen.
          eapply N2Nat_inj_lt in Hltlen.
          rewrite Nnat.Nat2N.id in Hltlen. eassumption. 
          inv Hwf2.
          eapply nth_inlist_Forall; [ | eassumption ].
-         inv Hwf1. unfold NLength in H3. zify; omega.         
-         zify; omega.
+         inv Hwf1. unfold NLength in H3. zify; lia.         
+         zify; lia.
   - intros na e IHe rho x i Hwf1 Hwf2. 
     simpl. rewrite IHe. rewrite (N.add_comm i 1). reflexivity.
     inv Hwf1. rewrite !N.add_assoc in H1.
@@ -2179,12 +2179,12 @@ Proof.
     unfold parallel_sbst_with_sbst_branches in *. 
     intros rho x n' Hwf1 Hwf2.
     simpl. inv Hwf1. rewrite Hbs; try eassumption.
-    replace (n' + 1 + n) with (n' + n + 1) by (zify; omega).
+    replace (n' + 1 + n) with (n' + n + 1) by (zify; lia).
     rewrite IHe; try eassumption.
     rewrite (N.add_comm n' n).
     reflexivity. simpl in H2.
     replace (n' + n + 1 + NLength rho) with (n + (n' + 1 + NLength rho))
-      by (zify; omega).
+      by (zify; lia).
     eassumption.
 Qed.
 
@@ -2229,17 +2229,17 @@ Proof.
     simpl. destruct (lt_dec n i).
     + inv He. destruct (lt_dec n (i + 1)).
       simpl. destruct (lt_dec n i). reflexivity.
-      destruct (N.eq_dec n i). zify. omega.
+      destruct (N.eq_dec n i). zify. lia.
       reflexivity.
-      zify. omega.
+      zify. lia.
     + inv He. destruct (lt_dec n (i + 1)).
       destruct (N.eq_dec n i). simpl. 
-      destruct (lt_dec n i). zify. omega.
+      destruct (lt_dec n i). zify. lia.
       destruct (N.eq_dec n i).
-      eapply sbst_closed_id. eassumption. zify. omega.
-      zify. omega.
-      zify. omega.
-      zify. omega.
+      eapply sbst_closed_id. eassumption. zify. lia.
+      zify. lia.
+      zify. lia.
+      zify. lia.
   - intros na e IH e1 e2 n1 He1 He2 He.
     simpl. inv He. 
     f_equal. rewrite N.add_comm.
@@ -2342,40 +2342,40 @@ Proof.
     + destruct (lt_dec n (i + 1)).  
       simpl. destruct (lt_dec n i). destruct (lt_dec n j).
       reflexivity.
-      zify. omega.
-      zify. omega. 
-      zify. omega.
+      zify. lia.
+      zify. lia. 
+      zify. lia.
     + destruct (N.eq_dec n j). destruct (lt_dec n (i + 1)).
       simpl. destruct (lt_dec n j).
-      zify. omega.
+      zify. lia.
       destruct (N.eq_dec n j).
-      eapply sbst_closed_id. eassumption. zify. omega.
-      zify. omega.
-      zify. omega.
+      eapply sbst_closed_id. eassumption. zify. lia.
+      zify. lia.
+      zify. lia.
       destruct (lt_dec n (i + 1)). simpl.
       destruct (lt_dec (n - 1) i). destruct (lt_dec n j).
-      zify. omega. 
+      zify. lia. 
       destruct (N.eq_dec n j).
-      zify. omega.
+      zify. lia.
       reflexivity.
-      zify. omega. 
+      zify. lia. 
       (* -- *)
       destruct (N.eq_dec n (i + 1)). simpl.
       destruct (lt_dec (n - 1) i). 
-      zify. omega.
+      zify. lia.
       destruct (N.eq_dec (n - 1) i).
-      symmetry. eapply sbst_closed_id. eassumption. zify. omega.
-      zify. omega.
+      symmetry. eapply sbst_closed_id. eassumption. zify. lia.
+      zify. lia.
       simpl. destruct (lt_dec (n - 1) i).
-      zify. omega.
-      zify. omega. 
+      zify. lia.
+      zify. lia. 
   - intros na e IH e1 e2 n m He1 He2 Hwf Hleq.
     simpl. inv Hwf. 
     f_equal. rewrite N.add_comm.
     rewrite (N.add_comm 1 (n + 1)).
     eapply IH; try eassumption.
     rewrite N.add_assoc in H1. rewrite (N.add_comm 1 n) in H1. eassumption.
-    zify. omega. 
+    zify. lia. 
   - intros e IH1 e0 IH2 e1 e2 n m He1 He2 Hwf Hleq.
     simpl. inv Hwf. f_equal.
     + rewrite IH1; try eassumption. reflexivity. 
@@ -2396,13 +2396,13 @@ Proof.
       rewrite (N.add_comm 1 (n + 1)).
       eapply IH2; try eassumption.
       rewrite N.add_assoc in H4. rewrite (N.add_comm 1 n) in H4. eassumption.
-      zify. omega.
+      zify. lia.
   - unfold sbst_commut_efnlst_strong.
     intros efns IH n e1 e2 n1 m He1 He2 Hwf Hleq.
     simpl. inv Hwf. f_equal.
     rewrite !efnlst_length_sbst. rewrite N.add_assoc in *. 
     eapply IH; try eassumption.
-    zify. omega.
+    zify. lia.
   - simpl. reflexivity.
   - unfold sbst_commut_exps_strong. simpl. reflexivity.
   - econstructor. 
@@ -2423,7 +2423,7 @@ Proof.
     simpl. inv Hwf. f_equal.
     + rewrite N.add_assoc. eapply IH1; try eassumption.
       rewrite N.add_assoc in H2. eassumption.
-      zify. omega. 
+      zify. lia. 
     + eapply IH2; eassumption. 
 Qed. 
 
@@ -2436,7 +2436,7 @@ Lemma sbst_and_sbst_list_comm :
 Proof.
   intros e e0 es m. revert e e0 m.
   induction es; intros e1 e0 m Hall He He0.
-  - simpl. replace (m + 0) with m by (zify; omega).
+  - simpl. replace (m + 0) with m by (zify; lia).
     reflexivity.
   - inv Hall. simpl.
     edestruct sbst_commut_strong as (Hsbst & _).
@@ -2451,8 +2451,8 @@ Proof.
       - inv H2. constructor; eauto. }
     simpl in He. rewrite N.add_assoc in *.
     (* subst_commut can be weakened *)
-    eapply weaken_wf_le. eassumption. zify. omega. 
-    zify. omega.
+    eapply weaken_wf_le. eassumption. zify. lia. 
+    zify. lia.
 Qed. 
 
 Lemma parallel_sbst_with_sbst_list :
@@ -2684,7 +2684,7 @@ Proof.
       * eapply N.ltb_ge in H3.
         rewrite app_length_N in H1. rewrite N.add_assoc in H1.
         eapply OrdersEx.N_as_OT.ltb_lt in H2.
-        zify. omega. 
+        zify. lia. 
     + destruct (i <? n + NLength rhof) eqn: H3.
       * simpl. destruct (i <? n) eqn: H4.
         congruence.
@@ -2694,7 +2694,7 @@ Proof.
         rewrite app_length_N in H1.
         unfold NLength in H3.
         eapply N.ltb_ge in H4.
-        zify. omega. 
+        zify. lia. 
       * simpl.
         edestruct parallel_sbst_inv_wf as (Hinv & _).
         rewrite Hinv. 
@@ -2703,7 +2703,7 @@ Proof.
            eapply N.ltb_ge in H2. eapply N.ltb_ge in H3.
            assert (Heq: (N.to_nat (i - (n + N.of_nat (Datatypes.length rhof)))) =
                         (N.to_nat (i - n) - Datatypes.length rhof)%nat).
-           { zify. omega. }
+           { zify. lia. }
            rewrite Heq.
            assert (Hmap : Datatypes.length rhof =
                           Datatypes.length (map val_to_exp rhof)).
@@ -2711,15 +2711,15 @@ Proof.
            rewrite Hmap.
            { eapply app_nth3.
             - unfold NLength in *. rewrite map_length.
-               zify. omega.
+               zify. lia.
             - rewrite app_length. rewrite !map_length.
-              unfold NLength in *. zify. omega. }
+              unfold NLength in *. zify. lia. }
         -- pose proof val_to_exp_rho as Hrho.
            eapply weaken_closed. eapply nth_inlist_Forall.
            rewrite map_length. rewrite app_length_N in H1.
            unfold NLength in *.
            eapply N.ltb_ge in H2. eapply N.ltb_ge in H3.
-           zify. omega. 
+           zify. lia. 
            eapply Hrho. eassumption. 
   - intros na e IH rho rhof n Henv Hwf.
     simpl. inv Hwf. f_equal.

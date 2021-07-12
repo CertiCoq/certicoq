@@ -18,6 +18,7 @@
 Require Import Axioms.
 Require Import Coqlib.
 Require Import Wfsimpl.
+Require Import Coq.micromega.Lia.
 
 (** This modules defines several Coq encodings of a general "while" loop.
   The loop is presented in functional style as the iteration
@@ -237,8 +238,8 @@ Lemma iter_monot:
 Proof.
   induction p; intros.
   simpl. red; intros; red; auto.
-  destruct q. elimtype False; omega.
-  simpl. apply F_iter_monot. apply IHp. omega.
+  destruct q. elimtype False; lia.
+  simpl. apply F_iter_monot. apply IHp. lia.
 Qed.
 
 Lemma iter_either:

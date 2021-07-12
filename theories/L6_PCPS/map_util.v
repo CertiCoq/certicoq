@@ -1,5 +1,5 @@
 (* M.t utilities. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets

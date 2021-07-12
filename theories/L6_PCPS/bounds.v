@@ -3,6 +3,8 @@ From Coq Require Import NArith.BinNat Arith Relations.Relations MSets.MSets MSet
 
 Require Import L6.cps L6.eval L6.Ensembles_util L6.List_util L6.tactics L6.set_util L6.ctx
         L6.logical_relations L6.logical_relations_cc L6.algebra L6.inline_letapp L6.lambda_lifting_correct.
+Require Import L6.closure_conversion_correct ctx.
+
 Require Import micromega.Lia.
 
 Import ListNotations.
@@ -24,8 +26,8 @@ Section Bounds.
 
   Global Program Instance fuel_res_ordered : @ordered fin nat fuel_res_pre :=
     { lt := Peano.lt }.
-  Solve Obligations with (intro; intros; simpl; lia).
-  Solve Obligations with (simpl; lia).
+  Solve Obligations with (try (intro; intros; simpl; lia)).
+  Solve Obligations with (try (simpl; lia)).
   Next Obligation.
     destruct (Compare_dec.lt_dec x y); auto. right. eexists (x - y). lia.
   Qed.
@@ -59,8 +61,8 @@ Section Bounds.
         | _ => (1, 0)
         end;
       plus x y := (fst x + fst y, snd x + snd y) }.
-  Solve Obligations with (simpl; lia).
-  Solve Obligations with (split; congruence).
+  Solve Obligations with (try (simpl; lia)).
+  Solve Obligations with (try (split; congruence)).
   Next Obligation. simpl. f_equal; lia. Qed.
   Next Obligation. simpl. f_equal; lia. Qed.
   Next Obligation. simpl. f_equal; lia. Qed.  
@@ -206,9 +208,6 @@ Section Bounds.
 
   
   End Inline_bound.
-
-
-  Require Import L6.closure_conversion_correct ctx.
   
   Section SimpleBound.
 

@@ -1,5 +1,5 @@
 (* List library utilities. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 

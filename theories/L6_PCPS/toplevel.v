@@ -16,11 +16,11 @@ Import MonadNotation.
 
 Definition prim_env := M.t (kername * string (* C definition *) * nat (* arity *)). 
 
-Let L6env : Type := eval.prims * prim_env * ctor_env * ctor_tag * ind_tag * name_env * fun_env * eval.env.
+Definition L6env : Type := eval.prims * prim_env * ctor_env * ctor_tag * ind_tag * name_env * fun_env * eval.env.
 
-Let L6term : Type := cps.exp.
-Let L6val : Type := cps.val.
-Let L6_FullTerm : Type := L6env * L6term.
+Definition L6term : Type := cps.exp.
+Definition L6val : Type := cps.val.
+Definition L6_FullTerm : Type := L6env * L6term.
 
 Section IDENT.
   

@@ -34,7 +34,7 @@ Section Closure_conversion_correct.
           (* the nat parameter is usefull when we want to give an upper bound to the steps, but for now its a dummy paramater *)
           (boundG : @PostGT fuel trace).  (* Global *)           
 
-  Context (HPost : forall k, Post_properties cenv (boundL 0) (boundL k) boundG).
+  Context (HPost : forall k, Post_properties (boundL 0) (boundL k) boundG).
   Context (Hpost_locals_r :
              forall (n : nat) (rho1 rho2  rho2' : env)(e1 : exp) (e2 : exp)
                     (cin1 : fuel) (cout1 : trace)
@@ -67,11 +67,11 @@ Section Closure_conversion_correct.
 
   
   (* Short-hands so that we don't have to apply the parameters every time *)
-  Definition FV_inv := FV_inv cenv clo_tag boundG.
-  Definition FV_inv_strong := FV_inv_strong cenv clo_tag boundG. 
-  Definition Fun_inv := Fun_inv cenv clo_tag boundG. 
-  Definition GFun_inv := GFun_inv cenv clo_tag boundG. 
-  Definition closure_env := closure_env cenv clo_tag boundG. 
+  Definition FV_inv := FV_inv  clo_tag boundG.
+  Definition FV_inv_strong := FV_inv_strong clo_tag boundG. 
+  Definition Fun_inv := Fun_inv clo_tag boundG. 
+  Definition GFun_inv := GFun_inv clo_tag boundG. 
+  Definition closure_env := closure_env clo_tag boundG. 
   
   (** * Lemmas about the existance of the interpretation of an evaluation context *)
   
@@ -168,7 +168,7 @@ Section Closure_conversion_correct.
        forall (e : exp) (rho rho' : env) (e' : exp)
          (Scope Funs GFuns : Ensemble var) c genv (Γ : var) (FVs : list var)
          (C : exp_ctx),
-         cc_approx_env_P cenv clo_tag Scope m boundG rho rho' ->
+         cc_approx_env_P clo_tag Scope m boundG rho rho' ->
          ~ In var (bound_var e) Γ ->
          
          binding_in_map (occurs_free e) rho ->
@@ -183,7 +183,7 @@ Section Closure_conversion_correct.
          
          Closure_conversion clo_tag Scope Funs GFuns c genv Γ FVs e e' C ->
 
-         cc_approx_exp cenv clo_tag m (boundL 0) boundG (e, rho) (C |[ e' ]|, rho')) ->
+         cc_approx_exp clo_tag m (boundL 0) boundG (e, rho) (C |[ e' ]|, rho')) ->
     (* FVs *)
     (occurs_free_fundefs B1 \\ GFuns) <--> (FromList FVs) ->
     (* unique functions *)
@@ -389,7 +389,7 @@ Section Closure_conversion_correct.
   (** Correctness of [project_var] *)
   Lemma project_var_correct k rho1 rho2 rho2' Scope GFuns Funs c genv Γ FVs x x' C S S'  :
     project_var clo_tag Scope Funs GFuns c genv Γ FVs S x x' C S' ->
-    cc_approx_env_P cenv clo_tag Scope k boundG rho1 rho2 ->
+    cc_approx_env_P clo_tag Scope k boundG rho1 rho2 ->
     Fun_inv k rho1 rho2 Scope Funs genv ->
     GFun_inv k rho1 rho2 GFuns ->
     FV_inv k rho1 rho2 Scope Funs GFuns c Γ FVs ->
@@ -399,11 +399,11 @@ Section Closure_conversion_correct.
     Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: FromList FVs :|: [set Γ])  ->
 
     ~ In _ S' x' /\
-    cc_approx_env_P cenv clo_tag Scope k boundG rho1 rho2' /\
+    cc_approx_env_P clo_tag Scope k boundG rho1 rho2' /\
     Fun_inv k rho1 rho2' Scope Funs genv /\
     GFun_inv k rho1 rho2' GFuns /\
     FV_inv k rho1 rho2' Scope Funs GFuns c Γ FVs /\
-    cc_approx_var_env cenv clo_tag k boundG rho1 rho2' x x'.
+    cc_approx_var_env clo_tag k boundG rho1 rho2' x x'.
   Proof.
     intros Hproj Hcc Hfun Hgfun Henv Hctx Hd.
     inv Hproj.
@@ -492,20 +492,20 @@ Section Closure_conversion_correct.
   Lemma project_vars_correct k rho1 rho2 rho2'
         Scope Funs GFuns c genv Γ FVs xs xs' C S S' :
     project_vars clo_tag Scope Funs GFuns c genv Γ FVs S xs xs' C S' ->
-    cc_approx_env_P cenv clo_tag Scope k boundG rho1 rho2 ->
+    cc_approx_env_P clo_tag Scope k boundG rho1 rho2 ->
     Fun_inv k rho1 rho2 Scope Funs genv ->
     GFun_inv k rho1 rho2 GFuns ->        
     FV_inv k rho1 rho2 Scope Funs GFuns c Γ FVs ->   
     ctx_to_rho C rho2 rho2' ->
     Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope) :|: FromList FVs :|: [set Γ]) ->
-    cc_approx_env_P cenv clo_tag Scope k boundG rho1 rho2' /\
+    cc_approx_env_P clo_tag Scope k boundG rho1 rho2' /\
     Fun_inv k rho1 rho2' Scope Funs genv /\
     GFun_inv k rho1 rho2' GFuns /\
     FV_inv k rho1 rho2' Scope Funs GFuns c Γ FVs /\
     (forall vs,
        get_list xs rho1 = Some vs ->
        exists vs', get_list xs' rho2' = Some vs' /\
-              Forall2 (cc_approx_val cenv clo_tag k boundG) vs vs').
+              Forall2 (cc_approx_val clo_tag k boundG) vs vs').
   Proof.
     revert k rho1 rho2 rho2' Scope Funs genv Γ FVs xs' C S.
     induction xs;
@@ -591,12 +591,12 @@ Section Closure_conversion_correct.
     ctx_to_rho C rho2 rho2' ->
     (* exp_ctx_len C <= 4 -> *)
     Forall2 (fun p1 p2 : ctor_tag * exp => fst p1 = fst p2) l l' ->
-    cc_approx_var_env cenv clo_tag k boundG rho1 rho2' x x' ->
-    cc_approx_exp cenv clo_tag k (boundL 0)
+    cc_approx_var_env clo_tag k boundG rho1 rho2' x x' ->
+    cc_approx_exp clo_tag k (boundL 0)
                   boundG (e, rho1) (e', rho2') ->
-    cc_approx_exp cenv clo_tag k (boundL 0)
+    cc_approx_exp clo_tag k (boundL 0)
                   boundG (Ecase x l, rho1) (C |[ Ecase x' l' ]|, rho2) ->
-    cc_approx_exp cenv clo_tag k (boundL 0) boundG (Ecase x ((c, e) :: l), rho1)
+    cc_approx_exp clo_tag k (boundL 0) boundG (Ecase x ((c, e) :: l), rho1)
                   (C |[ Ecase x' ((c, e') :: l') ]|, rho2).
   Proof.
     intros Hctx Hall Henv Hcc1 Hcc2.
@@ -624,7 +624,7 @@ Section Closure_conversion_correct.
 
   Context (HPost_letapp : forall f x t xs e1 rho1 n k, 
               k <= 4 + 4 * length xs  ->
-              post_letapp_compat_cc' cenv clo_tag f x t xs e1 rho1 (boundL n) (boundL (n + k)) boundG)
+              post_letapp_compat_cc'  clo_tag f x t xs e1 rho1 (boundL n) (boundL (n + k)) boundG)
           
           (HPost_letapp_OOT : forall f x t xs e1 rho1 n k, 
               k <= 4 + 4 * length xs ->
@@ -647,7 +647,7 @@ Section Closure_conversion_correct.
   (** Correctness of [Closure_conversion] *)
   Lemma Closure_conversion_correct k rho rho' e e' Scope Funs GFuns c genv Γ FVs C :
     (* [Scope] invariant *)
-    cc_approx_env_P cenv clo_tag Scope k boundG rho rho' ->
+    cc_approx_env_P clo_tag Scope k boundG rho rho' ->
     (* [Γ] (the current environment parameter) is not bound in e *)
     ~ In _ (bound_var e) Γ ->
 
@@ -670,7 +670,7 @@ Section Closure_conversion_correct.
     GFun_inv k rho rho' GFuns ->
     (* [e'] is the closure conversion of [e] *)
     Closure_conversion clo_tag Scope Funs GFuns c genv Γ FVs e e' C ->
-    cc_approx_exp cenv clo_tag k (boundL 0) boundG (e, rho) (C |[ e' ]|, rho').
+    cc_approx_exp clo_tag k (boundL 0) boundG (e, rho) (C |[ e' ]|, rho').
   Proof with now eauto with Ensembles_DB.
     revert k e rho rho' e' Scope Funs GFuns c genv Γ FVs C.
     induction k as [k IHk] using lt_wf_rec1. intros e.
@@ -958,7 +958,7 @@ Section Closure_conversion_correct.
         econstructor. eassumption. now constructor.
                 
         eapply cc_approx_exp_fun_compat with (P1 := boundL 0).
-      + eapply HPost_fun. eauto.
+      + eapply HPost_fun.
       + eapply HOOT.
         + { eapply IHe with (GFuns := GFuns') (Funs := name_in_fundefs f2 :|: Funs)
                             (Scope := Scope \\ name_in_fundefs f2)
@@ -1133,13 +1133,13 @@ Section Closure_conversion_correct.
 
 
   Corollary Closure_conversion_correct_top k rho rho' e e' Scope c genv Γ C :
-    cc_approx_env_P cenv clo_tag Scope k boundG rho rho' ->
+    cc_approx_env_P clo_tag Scope k boundG rho rho' ->
     ~ In _ (bound_var e) Γ ->
     binding_in_map (occurs_free e) rho ->
     unique_bindings e ->
     Closure_conversion clo_tag Scope (Empty_set _) (Empty_set _) c genv Γ [] e e' C ->
 
-    cc_approx_exp cenv clo_tag k (boundL 0) boundG (e, rho) (C |[ e' ]|, rho').
+    cc_approx_exp clo_tag k (boundL 0) boundG (e, rho) (C |[ e' ]|, rho').
   Proof with now eauto with Ensembles_DB.
     intros.
     eapply Closure_conversion_correct; try eassumption.
@@ -1243,9 +1243,9 @@ Section Closure_conversion_correct.
       (max_var e' 1%positive < next_var c')%positive /\
       fun_fv_in e' (funnames_in_exp e') /\
       (forall k rho1 rho2,
-          cc_approx_env_P cenv clo_tag (occurs_free e) k boundG rho1 rho2 ->
+          cc_approx_env_P clo_tag (occurs_free e) k boundG rho1 rho2 ->
           binding_in_map (occurs_free e) rho1 ->
-          cc_approx_exp cenv clo_tag k (boundL 0) boundG (e, rho1) (e', rho2)).
+          cc_approx_exp clo_tag k (boundL 0) boundG (e, rho1) (e', rho2)).
   Proof.
     intros Hun Hdis Hlt. unfold closure_conversion_top.
     set (fvmap := populate_map (exp_fv e) (Maps.PTree.empty VarInfo)).

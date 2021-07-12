@@ -432,7 +432,7 @@ Section Post.
   Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
     
   
-  Definition remove_steps_letapp cenv (P1 P2 P3 : @PostT fuel trace) :=
+  Definition remove_steps_letapp  (P1 P2 P3 : @PostT fuel trace) :=
     forall (x f z : positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp)
            (rho1 : map_util.M.t val)
            (xs : list var) (e_b1 : exp) (v1 : val) (e2 e2' e_b2: exp) (rho2 rho2' rhoc2  rhoc1 : M.t val) 
@@ -442,7 +442,7 @@ Section Post.
       get_list ys rho1 = Some vs ->
       find_def h fl = Some (t, xs, e_b1) ->
       set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
-      bstep_fuel cenv rhoc1' e_b1 cin1 (Res v1) cout1 ->
+      bstep_fuel rhoc1' e_b1 cin1 (Res v1) cout1 ->
 
       P1 (e_b1, rhoc1', cin1, cout1) (e_b2, rhoc2, cin2, cout2) (* when inlined body makes a tail call *) \/
       P1 (e_b1, rhoc1', cin1, cout1) (e_b2, rhoc2, cin2 <+> one (Ehalt z), cout2 <+> one (Ehalt z)) (* when inlined body returns *) ->
@@ -451,7 +451,7 @@ Section Post.
          (e2, rho2, cin2 <+> cin2', cout2 <+> cout2').
 
 
-  Definition remove_steps_letapp_OOT cenv (P1 P2 : @PostT fuel trace) :=
+  Definition remove_steps_letapp_OOT (P1 P2 : @PostT fuel trace) :=
     forall (x f z: positive) (t : fun_tag) (ys : list map_util.M.elt) (e1 : exp) (rho1 : map_util.M.t val)
            (xs : list var) (e_b1 : exp) (r : res) (e2 e_b2 : exp) (rho2 rhoc1 : M.t val) (rhoc2 : env) 
            (fl : fundefs) (h : var) (vs : list val) (rhoc1' : map_util.M.t val)
@@ -461,7 +461,7 @@ Section Post.
       get_list ys rho1 = Some vs ->
       find_def h fl = Some (t, xs, e_b1) ->
       set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
-      bstep_fuel cenv rhoc1' e_b1 cin1 r cout1 ->
+      bstep_fuel rhoc1' e_b1 cin1 r cout1 ->
       
       P1 (e_b1, rhoc1', cin1, cout1) (e_b2, rhoc2, cin2, cout2) (* when inlined body makes a tail call *) \/
       P1 (e_b1, rhoc1', cin1, cout1) (e_b2, rhoc2, cin2 <+> one (Ehalt z), cout2 <+> one (Ehalt z)) (* when inlined body returns *) ->
@@ -478,8 +478,8 @@ Section Inline_correct.
   
   Context (cenv : ctor_env) (ctag : ctor_tag) (P1 P2 P3 : PostT) (PG : PostGT). 
 
-  Context (Hless_steps_letapp : remove_steps_letapp cenv P1 P2 P3)
-          (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv P1 P3)
+  Context (Hless_steps_letapp : remove_steps_letapp P1 P2 P3)
+          (Hless_steps_letapp_OOT : remove_steps_letapp_OOT P1 P3)
           (HOOT: post_OOT P3).
 
 
@@ -490,23 +490,23 @@ Section Inline_correct.
         find_def f' B = Some (t, xs, e) ->
         get_list ys rho1 = Some vs ->
         set_lists xs vs (def_funs B B rhoc rhoc) = Some rhoc' ->
-        preord_exp cenv P1 PG m (e, rhoc') (C' |[ e' ]|, rho2)) ->
+        preord_exp P1 PG m (e, rhoc') (C' |[ e' ]|, rho2)) ->
 
     (forall m rho1' rho2' rhoc B f' t xs e,
         m < k ->
         M.get f rho1 = Some (Vfun rhoc B f') ->
         find_def f' B = Some (t, xs, e) -> length xs = length ys ->
-        preord_env_P_inj cenv PG (occurs_free e1) m (sig {x ~> x'}) rho1' rho2' ->
-        preord_exp cenv P2 PG m (e1, rho1') (e2, rho2')) ->
+        preord_env_P_inj PG (occurs_free e1) m (sig {x ~> x'}) rho1' rho2' ->
+        preord_exp P2 PG m (e1, rho1') (e2, rho2')) ->
 
-    preord_env_P_inj cenv PG (occurs_free (Eletapp x f t ys e1)) k sig rho1 rho2 ->
+    preord_env_P_inj PG (occurs_free (Eletapp x f t ys e1)) k sig rho1 rho2 ->
     
     Disjoint _ (bound_var_ctx C' :|: bound_var_ctx C) (image sig (occurs_free e1 \\ [set x])) ->    
     ~ x \in (image sig (occurs_free e1 \\ [set x])) ->
     interprable C' = true ->
     inline_letapp e' x = Some (C, x') ->
     
-    preord_exp cenv P3 PG k (Eletapp x f t ys e1, rho1) (C' |[ C |[ e2 ]| ]|, rho2).
+    preord_exp P3 PG k (Eletapp x f t ys e1, rho1) (C' |[ C |[ e2 ]| ]|, rho2).
   Proof. 
     revert C' k x sig f t ys e1 e2 C x' rho1 rho2; induction e';
       intros C' k x sig f' t ys e1 e2 C x' rho1 rho2 Hyp1 Hyp2 Hpre Hdis Him Hint Hin; simpl in Hin;
@@ -610,7 +610,7 @@ Section Inline_correct.
 
           { eapply preord_env_P_inj_set_alt; [| eassumption | eassumption ].
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
-            2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
+            2:{ eapply interpret_ctx_eq_env_P. eassumption. sets. }
             eapply preord_env_P_inj_antimon.
             eapply preord_env_P_inj_monotonic; [| eassumption ]. lia. normalize_occurs_free. sets.  } 
             
@@ -688,7 +688,7 @@ Section Inline_correct.
           
           { eapply preord_env_P_inj_set_l; [| eassumption | eassumption ].
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
-            2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
+            2:{ eapply interpret_ctx_eq_env_P. eassumption. sets. }
             eapply preord_env_P_inj_antimon.
             eapply preord_env_P_inj_monotonic; [| eassumption ]. lia. normalize_occurs_free. sets. } 
           
@@ -731,7 +731,7 @@ Section Inline_correct.
 
   (* TOPO move to eval.v *)
   Lemma interpret_ctx_fuel_env_eq_P S C rho rho' (cin : fuel) (cout : trace) :    
-    interpret_ctx_fuel cenv C rho cin (Res rho') cout ->
+    interpret_ctx_fuel C rho cin (Res rho') cout ->
     Disjoint _ (bound_stem_ctx C) S ->
     eq_env_P S rho rho'.
   Proof.
@@ -764,7 +764,7 @@ Section Inline_correct.
         find_def f' B = Some (t, xs, e) ->
         get_list ys rho1 = Some vs ->
         set_lists xs vs (def_funs B B rhoc rhoc) = Some rhoc' ->
-        preord_exp cenv P1 PG m (e, rhoc') (C' |[ e' ]|, rho2)) ->
+        preord_exp P1 PG m (e, rhoc') (C' |[ e' ]|, rho2)) ->
 
     (forall m rho1' rho2' rhoc B f' t xs e,
         m < k ->
@@ -773,17 +773,17 @@ Section Inline_correct.
         eq_env_P (Complement _ [set x]) rho1 rho1' ->
         eq_env_P (Complement _ (bound_var_ctx C :|: bound_var_ctx C')) rho2 rho2' ->
         Dom_map rho1' <--> x |: Dom_map rho1 ->
-        preord_env_P_inj cenv PG (occurs_free e1) m (sig {x ~> x'}) rho1' rho2' ->
-        preord_exp cenv P2 PG m (e1, rho1') (e2, rho2')) ->
+        preord_env_P_inj PG (occurs_free e1) m (sig {x ~> x'}) rho1' rho2' ->
+        preord_exp P2 PG m (e1, rho1') (e2, rho2')) ->
 
-    preord_env_P_inj cenv PG (occurs_free (Eletapp x f t ys e1)) k sig rho1 rho2 ->
+    preord_env_P_inj PG (occurs_free (Eletapp x f t ys e1)) k sig rho1 rho2 ->
     
     Disjoint _ (bound_var_ctx C' :|: bound_var_ctx C) (image sig (occurs_free e1 \\ [set x])) ->
 
     interprable C' = true ->
     inline_letapp e' z = Some (C, x') ->
     
-    preord_exp cenv P3 PG k (Eletapp x f t ys e1, rho1) (C' |[ C |[ e2 ]| ]|, rho2).
+    preord_exp P3 PG k (Eletapp x f t ys e1, rho1) (C' |[ C |[ e2 ]| ]|, rho2).
   Proof.
    revert C' k x sig f t ys e1 e2 C x' rho1 rho2; induction e';
       intros C' k x sig f' t ys e1 e2 C x' rho1 rho2 Hyp1 Hyp2 Hpre Hdis Hint Hin; simpl in Hin;
@@ -897,7 +897,7 @@ Section Inline_correct.
           
           { eapply preord_env_P_inj_set_alt; [| eassumption |  ].
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
-            2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
+            2:{ eapply interpret_ctx_eq_env_P. eassumption. sets. }
             eapply preord_env_P_inj_antimon.
             eapply preord_env_P_inj_monotonic; [| eassumption ]. lia. normalize_occurs_free. sets.
             intros Hc. eapply Hdis. constructor; [| eassumption ]. normalize_bound_var_ctx. eauto. }
@@ -982,7 +982,7 @@ Section Inline_correct.
           
           { eapply preord_env_P_inj_set_l; [| eassumption | eassumption ].
             eapply preord_env_P_inj_eq_env_P; [| eapply eq_env_P_refl | ].
-            2:{ eapply interpret_ctx_eq_env_P with (fuel := fuel). eassumption. sets. }
+            2:{ eapply interpret_ctx_eq_env_P. eassumption. sets. }
             eapply preord_env_P_inj_antimon.
             eapply preord_env_P_inj_monotonic; [| eassumption ]. lia. normalize_occurs_free. sets. } 
 
@@ -1009,9 +1009,9 @@ Section Inline_correct.
 
   Lemma inline_letapp_eval_l C e x x' v rho rho' (cin : fuel) (cout : trace):
     inline_letapp e x = Some (C, x') ->
-    interpret_ctx_fuel cenv C rho cin (Res rho') cout ->
+    interpret_ctx_fuel C rho cin (Res rho') cout ->
     M.get x' rho' = Some v ->
-    exists cin' cout', bstep_fuel cenv rho e cin' (Res v) cout' /\
+    exists cin' cout', bstep_fuel rho e cin' (Res v) cout' /\
                        ((cin' = cin /\ cout' = cout ) \/
                         (cin' = plus cin (one (Ehalt 1%positive)) /\ cout' = plus cout (one (Ehalt 1%positive)))).
   Proof.
@@ -1023,7 +1023,7 @@ Section Inline_correct.
            end); (try now inv Hin); try (now inv Hinp; inv H0; eapply IHe; eauto);
         try (now inv Hinp; inv H0;
              match goal with
-             | [ H : interpret_ctx_fuel _ _ _ _ _ _ |- _ ] => eapply IHe in H; eauto; destructAll
+             | [ H : interpret_ctx_fuel _ _ _ _ _ |- _ ] => eapply IHe in H; eauto; destructAll
              end;
              do 2 eexists; split;
              [ econstructor; econstructor; eauto |
@@ -1042,10 +1042,10 @@ Section Inline_correct.
 
 
   Lemma inline_letapp_eval_r e x C x' v (cin : fuel) (cout : trace) rho :
-    bstep_fuel cenv rho e cin (Res v) cout ->
+    bstep_fuel rho e cin (Res v) cout ->
     inline_letapp e x = Some (C, x') ->
     exists rho' cin' cout', 
-      interpret_ctx_fuel cenv C rho cin' (Res rho') cout' /\
+      interpret_ctx_fuel C rho cin' (Res rho') cout' /\
       M.get x' rho' = Some v  /\
       ((cin = cin' /\ cout = cout') \/ (cin = plus cin' (one (Ehalt 1%positive)) /\ cout = plus cout' (one (Ehalt 1%positive)))).
   Proof.
@@ -1057,7 +1057,7 @@ Section Inline_correct.
            end); (try now inv Hin);
         (try now inv Hstep; inv H;
          match goal with
-         | [ H : bstep_fuel _ _ _ _ _ _ |- _ ] => eapply IHe in H; eauto; destructAll
+         | [ H : bstep_fuel _ _ _ _ _ |- _ ] => eapply IHe in H; eauto; destructAll
          end;
          do 3 eexists; split; [| split ];
          [ econstructor; [ congruence | econstructor; eauto ] | congruence
@@ -1077,19 +1077,19 @@ Section Inline_correct.
 
   
   Lemma inline_letapp_preord_env_P_inj k S e1 e2 x y x' y' C1 C2 sig rho1 rho2 rho1' rho2' (cin1 cin2 : fuel) (cout1 cout2 : trace) :
-    (forall k, preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)) ->
+    (forall k, preord_exp P1 PG k (e1, rho1) (e2, rho2)) ->
 
     inline_letapp e1 x = Some (C1, x') ->
     inline_letapp e2 y = Some (C2, y') ->
 
-    interpret_ctx_fuel cenv C1 rho1 cin1 (Res rho1') cout1 ->
-    interpret_ctx_fuel cenv C2 rho2 cin2 (Res rho2') cout2 ->
+    interpret_ctx_fuel C1 rho1 cin1 (Res rho1') cout1 ->
+    interpret_ctx_fuel C2 rho2 cin2 (Res rho2') cout2 ->
 
-    preord_env_P_inj cenv PG S k sig rho1 rho2 ->
+    preord_env_P_inj PG S k sig rho1 rho2 ->
     
     Disjoint _ (image sig S) (bound_stem_ctx C2) ->
     
-    preord_env_P_inj cenv PG (x' |: (S \\ bound_stem_ctx C1)) k (sig {x' ~> y'}) rho1' rho2'.
+    preord_env_P_inj PG (x' |: (S \\ bound_stem_ctx C1)) k (sig {x' ~> y'}) rho1' rho2'.
   Proof.
     intros Hexp Hinl1 Hinl2 Hi1 Hi2 Henv Hdis z Hin v Hget. destruct (peq z x'); subst.
     - rewrite extend_gss.
@@ -1111,7 +1111,7 @@ Section Inline_correct.
   Qed.
 
   Lemma interpret_ctx_bound C rho (cin : fuel) (cout : trace) rho' x :
-    interpret_ctx_fuel cenv C rho cin (Res rho') cout ->
+    interpret_ctx_fuel C rho cin (Res rho') cout ->
     x \in bound_stem_ctx C ->
     exists v, M.get x rho' = Some v. 
   Proof.
@@ -1142,7 +1142,7 @@ Section Inline_correct.
   Lemma inline_letapp_get C e x x' rho rho' (cin : fuel) (cout : trace) :
     closed_exp e ->
     inline_letapp e x = Some (C, x') ->
-    interpret_ctx_fuel cenv C rho cin (Res rho') cout ->
+    interpret_ctx_fuel C rho cin (Res rho') cout ->
     exists v, M.get x' rho' = Some v.
   Proof.
     intros Hc Hinl Hin. edestruct inline_letapp_var_eq_alt. eassumption.
@@ -1154,8 +1154,8 @@ Section Inline_correct.
 
   Lemma inline_letapp_eval_OOT_l C e x x' rho (cin : fuel) (cout : trace) :    
     inline_letapp e x = Some (C, x') ->
-    interpret_ctx_fuel cenv C rho cin OOT cout ->
-    bstep_fuel cenv rho e cin OOT cout.
+    interpret_ctx_fuel C rho cin OOT cout ->
+    bstep_fuel rho e cin OOT cout.
   Proof.
     revert C x x' rho cin cout.
     induction e using exp_ind'; simpl; intros C z z' rho cin cout Hin Hinp;
@@ -1213,9 +1213,9 @@ Section Inline_correct.
   Qed.
     
   Lemma inline_letapp_eval_OOT_r e x C x' (cin : fuel) (cout : trace) rho :
-    bstep_fuel cenv rho e cin OOT cout ->
+    bstep_fuel rho e cin OOT cout ->
     inline_letapp e x = Some (C, x') ->
-    (exists cin' cout' r, interpret_ctx_fuel cenv C rho cin' r cout' /\
+    (exists cin' cout' r, interpret_ctx_fuel C rho cin' r cout' /\
                           ((cin' = cin /\ cout' = cout) \/ cin' = plus cin (one (Ehalt 1%positive)) /\ cout' = plus cout (one (Ehalt 1%positive)))).
   Proof.
     revert x C x' cin cout rho.
@@ -1228,7 +1228,7 @@ Section Inline_correct.
          [ do 3 eexists; split; [ econstructor; [ eassumption | congruence ] | now eauto ] | ];    
          inv H;
          match goal with
-         | [ H : bstep_fuel _ _ _ _ _ _ |- _ ] => eapply IHe in H; eauto; destructAll
+         | [ H : bstep_fuel _ _ _ _ _ |- _ ] => eapply IHe in H; eauto; destructAll
          end;
          do 3 eexists; split; [ econstructor 3; [ congruence |  econstructor; eauto ] | ];
          inv H0; destructAll; [ now eauto | right; split; do 2 rewrite plus_assoc; rewrite (plus_comm (one _ )); reflexivity ]). 
@@ -1265,8 +1265,8 @@ Section Inline_correct.
       inline_letapp e1 x = Some (C1, x') ->
       inline_letapp e2 y = Some (C2, y') ->
       
-      interpret_ctx_fuel cenv C1 rho1 cin1' (Res rho1') cout1' ->
-      interpret_ctx_fuel cenv C2 rho2 cin3' (Res rho2') cout3' ->
+      interpret_ctx_fuel C1 rho1 cin1' (Res rho1') cout1' ->
+      interpret_ctx_fuel C2 rho2 cin3' (Res rho2') cout3' ->
       cin1 = cin1' /\ cout1 = cout1' \/ cin1 = plus cin1' (one (Ehalt z)) /\ cout1 = plus cout1' (one (Ehalt z)) ->
       cin3 = cin3' /\ cout3 = cout3' \/ cin3 = plus cin3' (one (Ehalt z')) /\ cout3 = plus cout3' (one (Ehalt z')) ->
 
@@ -1290,7 +1290,7 @@ Section Inline_correct.
     
   Lemma inline_letapp_compat k e1 e2 x y x' y' C1 C2 e e' sig rho1 rho2 :
     (forall k rho1 rho2,
-        preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)) ->
+        preord_exp P1 PG k (e1, rho1) (e2, rho2)) ->
     closed_exp e1 ->
     (* closed_exp e2 -> *)
 
@@ -1299,10 +1299,10 @@ Section Inline_correct.
 
     (forall m rho1 rho2,
         m <= k ->
-        preord_env_P_inj cenv PG [set x'] m (sig {x' ~> y'}) rho1 rho2 ->
-        preord_exp cenv P2 PG m (e, rho1) (e', rho2)) ->
+        preord_env_P_inj PG [set x'] m (sig {x' ~> y'}) rho1 rho2 ->
+        preord_exp P2 PG m (e, rho1) (e', rho2)) ->
     
-    preord_exp cenv P3 PG k (C1 |[ e ]|, rho1) (C2 |[ e' ]|, rho2).
+    preord_exp P3 PG k (C1 |[ e ]|, rho1) (C2 |[ e' ]|, rho2).
   Proof.
     intros Hexp Hc1  (* Hc2 *) Hinl1 Hinl2 Hrel v cin cout Hleq Hstep.
     destruct v.
@@ -1364,11 +1364,11 @@ Section Inline_correct.
 
   
   Definition cc_approx_env_P_inj (S : Ensemble var) k P f rho1 rho2 :=
-    forall x : var, S x -> cc_approx_var_env (fuel := fuel) (trace := trace) cenv ctag k P rho1 rho2 x (f x).
+    forall x : var, S x -> cc_approx_var_env (fuel := fuel) (trace := trace) ctag k P rho1 rho2 x (f x).
 
   Lemma inline_letapp_compat_cc k e1 e2 x y x' y' C1 C2 e e' sig rho1 rho2 :
     (forall k rho1 rho2,
-        cc_approx_exp cenv ctag k P1 PG (e1, rho1) (e2, rho2)) ->
+        cc_approx_exp ctag k P1 PG (e1, rho1) (e2, rho2)) ->
     closed_exp e1 ->
 
     inline_letapp e1 x = Some (C1, x') ->
@@ -1377,9 +1377,9 @@ Section Inline_correct.
     (forall m rho1 rho2,
         m <= k ->
         cc_approx_env_P_inj [set x'] m PG (sig {x' ~> y'}) rho1 rho2 ->
-        cc_approx_exp cenv ctag m P2 PG (e, rho1) (e', rho2)) ->
+        cc_approx_exp ctag m P2 PG (e, rho1) (e', rho2)) ->
     
-     cc_approx_exp cenv ctag k P3 PG (C1 |[ e ]|, rho1) (C2 |[ e' ]|, rho2).
+     cc_approx_exp ctag k P3 PG (C1 |[ e ]|, rho1) (C2 |[ e' ]|, rho2).
   Proof.
     intros Hexp Hc1 Hinl1 Hinl2 Hrel v cin cout Hleq Hstep.
     destruct v.

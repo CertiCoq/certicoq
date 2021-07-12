@@ -21,7 +21,6 @@ Close Scope Z_scope.
 
 Section ToplevelTheorems.
 
-  Context (cenv : ctor_env).
   Context (clo_tag : ctor_tag).
   Context (clo_itag : ind_tag).
   
@@ -34,7 +33,7 @@ Section ToplevelTheorems.
 
 
   Definition post_prop P1 PG :=
-    Post_properties cenv P1 P1 PG /\
+    Post_properties P1 P1 PG /\
     post_upper_bound P1.  
 
   (** Correctness spec for (composition of) "identity" transformations *)
@@ -47,7 +46,7 @@ Section ToplevelTheorems.
         trans e c = (Ret e', c') /\                               (* the transformation successfully terminates *)
         well_scoped e' /\                                         (* trg is well-scoped *)
         max_var e' 1 < state.next_var c' /\                       (* the pool of identifiers is fresh for the target *)
-        exists n, preord_exp_n cenv wf_pres post_prop n e e'.     (* src and trg are in the logical relation  *)
+        exists n, preord_exp_n wf_pres post_prop n e e'.     (* src and trg are in the logical relation  *)
 
   (** Correctness spec for closure conversion tranformations *)
 
@@ -59,7 +58,7 @@ Section ToplevelTheorems.
         trans e c = (Ret e', c') /\                               (* the transformation successfully terminates *)
         well_scoped e' /\                                         (* trg is well-scoped *)
         max_var e' 1 < state.next_var c' /\                       (* the pool of identifiers is fresh for the target *)
-        exists n m,  R_n_exp cenv clo_tag wf_pres post_prop       (* src and trg are in the logical relation  *)
+        exists n m,  R_n_exp clo_tag wf_pres post_prop       (* src and trg are in the logical relation  *)
                              (simple_bound 0) (simple_bound 0) n m e e'.
   
 
@@ -74,8 +73,8 @@ Section Inline.
      well_scoped e' /\
      max_var e' 1 < state.next_var c' /\
      (forall (k : nat) (rho1 rho2 : env),
-         preord_env_P cenv (inline_bound d d) (occurs_free e) k rho1 rho2 ->
-         preord_exp cenv (inline_bound d d) (inline_bound d d) k (e, rho1) (e', rho2)).
+         preord_env_P (inline_bound d d) (occurs_free e) k rho1 rho2 ->
+         preord_exp (inline_bound d d) (inline_bound d d) k (e, rho1) (e', rho2)).
  Proof.
    intros H.
    edestruct inline_correct_top with (P1 := fun L => inline_bound L d)
@@ -141,16 +140,16 @@ Section LambdaLift.
      wf_pres e e' /\
      well_scoped e'  /\
      (forall (k : nat) (rho1 rho2 : env),
-         preord_env_P cenv (ll_bound 0) (occurs_free e) k rho1 rho2 ->
+         preord_env_P (ll_bound 0) (occurs_free e) k rho1 rho2 ->
          binding_in_map (occurs_free e) rho1 ->
-         preord_exp cenv (ll_bound 0) (ll_bound 0) k (e, rho1) (e', rho2)).
+         preord_exp (ll_bound 0) (ll_bound 0) k (e, rho1) (e', rho2)).
   Proof.
     intros.
     edestruct lambda_lift_correct_top with (P1 := ll_bound)
                                            (PG := ll_bound 0).   
     - intros. eapply ll_bound_compat.
     - intros. eapply ll_bound_compat.
-      exact (M.empty _). exact 0%nat.
+      exact 0%nat.
     - eapply ll_bound_mon. lia.
     - intros. eapply ll_bound_local_steps; eauto.
     - intros. eapply ll_bound_local_app.
@@ -193,7 +192,7 @@ Section Refl.
   Context (fuel trace : Type)  {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
 
   Lemma preord_exp_n_refl e :
-    preord_exp_n cenv wf_pres post_prop 1 e e.
+    preord_exp_n wf_pres post_prop 1 e e.
   Proof.
     econstructor; eauto.
     2:{ split. eapply simple_bound_compat. eapply simple_bound_post_upper_bound. }
@@ -278,17 +277,17 @@ Section Shrink.
       well_scoped e' /\
       occurs_free e' \subset occurs_free e /\
       bound_var e' \subset bound_var e /\
-      preord_exp_n cenv wf_pres post_prop m e e'.
+      preord_exp_n wf_pres post_prop m e e'.
   Proof.
     intros.
     intros. intros.
-    assert (Hs := shrink_corresp_top cenv (fun L => inline_bound L 1) (inline_bound 1 1)).
+    assert (Hs := shrink_corresp_top (fun L => inline_bound L 1) (inline_bound 1 1)).
     inv H. 
 
     assert (Ha : let (e', n) := shrink_top e in
                  (exists m : nat,
                      (m >= n)%nat /\
-                     preord_exp_n cenv shrink_cps_toplevel.wf_pres (shrink_cps_toplevel.post_prop cenv) m e e') /\
+                     preord_exp_n shrink_cps_toplevel.wf_pres (shrink_cps_toplevel.post_prop) m e e') /\
                  unique_bindings e' /\
                  Disjoint var (occurs_free e') (bound_var e') /\
                  occurs_free e' \subset occurs_free e /\ bound_var e' \subset bound_var e).
@@ -298,7 +297,7 @@ Section Shrink.
       - intros. eapply inline_bound_compat. lia.
       - intros. eapply inline_bound_post_Eapp_l.
       - eapply inline_bound_remove_steps_letapp.
-      - assert (Hs' := inline_bound_remove_steps_letapp_OOT cenv 0 0 1).
+      - assert (Hs' := inline_bound_remove_steps_letapp_OOT 0 0 1).
         eassumption.
       - eapply inline_bound_ctx1.
       - eapply inline_bound_Ecase.
@@ -394,12 +393,12 @@ Section Uncurry.
      wf_pres e e' /\
      well_scoped e'  /\
      (forall (k : nat) (rho1 rho2 : env),
-         preord_env_P cenv (simple_bound 0) (occurs_free e) k rho1 rho2 ->
+         preord_env_P (simple_bound 0) (occurs_free e) k rho1 rho2 ->
          binding_in_map (occurs_free e) rho1 ->
-         preord_exp cenv (simple_bound 0) (simple_bound 0) k (e, rho1) (e', rho2)).
+         preord_exp (simple_bound 0) (simple_bound 0) k (e, rho1) (e', rho2)).
   Proof.
     intros.
-    edestruct (@uncurry_correct_top cenv nat _ (nat * nat) _ (simple_bound 0)
+    edestruct (@uncurry_correct_top nat _ (nat * nat) _ (simple_bound 0)
                                     (simple_bound 0)) with (cps := b).   
     - intros. eapply simple_bound_compat.
     - intros. eapply simple_bound_compat.
@@ -449,9 +448,9 @@ Section DPE.
       wf_pres e e' /\
       well_scoped e'  /\
       (forall (k : nat) (rho1 rho2 : env),
-          preord_env_P cenv (ll_bound 0) (occurs_free e) k rho1 rho2 ->
+          preord_env_P (ll_bound 0) (occurs_free e) k rho1 rho2 ->
           binding_in_map (occurs_free e) rho1 ->
-          preord_exp cenv (simple_bound 0) (simple_bound 0) k (e, rho1) (e', rho2)).
+          preord_exp (simple_bound 0) (simple_bound 0) k (e, rho1) (e', rho2)).
   Proof.
     intros.
     edestruct DPE_correct_top with (PL := simple_bound 0)
@@ -487,14 +486,12 @@ Import MonadNotation.
 
 Section Compose.
 
-  Context (cenv : ctor_env).
-
   Transparent bind.
   
   Lemma correct_compose (t1 t2 : anf_trans) :
-    correct cenv t1 ->
-    correct cenv t2 ->   
-    correct cenv (fun e => e <- t1 e;; t2 e).
+    correct t1 ->
+    correct t2 ->   
+    correct (fun e => e <- t1 e;; t2 e).
   Proof.
     intros Ht1 Ht2. intro; intros.
     edestruct Ht1; eauto. destructAll.
@@ -509,9 +506,9 @@ Section Compose.
 
   
   Lemma correct_cc_compose_l (t1 t2 : anf_trans) :
-    correct cenv t1 ->
-    correct_cc cenv clo_tag t2 ->   
-    correct_cc cenv clo_tag (fun e => e <- t1 e;; t2 e).
+    correct t1 ->
+    correct_cc clo_tag t2 ->   
+    correct_cc clo_tag (fun e => e <- t1 e;; t2 e).
   Proof.
     intros Ht1 Ht2. intro; intros.
     edestruct Ht1; eauto. destructAll.
@@ -530,9 +527,9 @@ Section Compose.
 
   
   Lemma correct_cc_compose_r (t1 t2 : anf_trans) :
-    correct_cc cenv clo_tag t1 ->
-    correct cenv t2 ->   
-    correct_cc cenv clo_tag (fun e => e <- t1 e;; t2 e).
+    correct_cc clo_tag t1 ->
+    correct t2 ->   
+    correct_cc clo_tag (fun e => e <- t1 e;; t2 e).
   Proof.
     intros Ht1 Ht2. intro; intros.
     edestruct Ht1; eauto. destructAll.
@@ -550,8 +547,8 @@ Section Compose.
 
 
   Lemma correct_time (t : anf_trans) o s :
-    correct cenv t ->
-    correct cenv (time_anf o s t).
+    correct t ->
+    correct (time_anf o s t).
   Proof.
     unfold time_anf.
     intros.
@@ -559,8 +556,8 @@ Section Compose.
   Qed. 
 
   Lemma correct_cc_time (t : anf_trans) o s :
-    correct_cc cenv clo_tag t ->
-    correct_cc cenv clo_tag (time_anf o s t).
+    correct_cc clo_tag t ->
+    correct_cc clo_tag (time_anf o s t).
   Proof.
     unfold time_anf.
     intros.
@@ -570,7 +567,7 @@ Section Compose.
   Opaque uncurry_top.
     
   Lemma correct_id_trans :
-    correct cenv id_trans.
+    correct id_trans.
   Proof.
     intro; intros.
     do 2 eexists. split. reflexivity.
@@ -584,7 +581,7 @@ Section Compose.
   Qed.
   
   Theorem anf_pipeline_correct opts v :
-    correct_cc cenv clo_tag (anf_pipeline v opts).
+    correct_cc clo_tag (anf_pipeline v opts).
   Proof.
     intros Heq.
     unfold anf_pipeline.
@@ -666,7 +663,7 @@ Section Compose.
     exists (e' : exp) (c' : state.comp_data),     
       anf_pipeline var opts e c = (Ret e', c') /\
 
-      refines cenv value_ref_cc e e'. 
+      refines value_ref_cc e e'. 
   Proof.
     intros.
     edestruct anf_pipeline_correct; eauto. destructAll.
@@ -684,8 +681,8 @@ Section Compose.
 
   Lemma preord_exp_n_wf_mon wf1 wf2 p k e1 e2 :
     inclusion _ wf1 wf2 ->
-    preord_exp_n cenv wf1 p k e1 e2 ->
-    preord_exp_n cenv wf2 p k e1 e2. 
+    preord_exp_n wf1 p k e1 e2 ->
+    preord_exp_n wf2 p k e1 e2. 
   Proof.
     intros H1 H2. induction H2; eauto.
     now econstructor 1; eauto.
@@ -694,8 +691,8 @@ Section Compose.
 
   Lemma R_n_exp_wf_mon ctag wf1 wf2 p P PG k m e1 e2 :
     inclusion _ wf1 wf2 ->
-    R_n_exp cenv ctag wf1 p P PG k m e1 e2 ->
-    R_n_exp cenv ctag wf2 p P PG k m e1 e2. 
+    R_n_exp ctag wf1 p P PG k m e1 e2 ->
+    R_n_exp ctag wf2 p P PG k m e1 e2. 
   Proof.
     intros H1 H2. inv H2. inv H. inv H2. destructAll.
     eexists. split. now eapply preord_exp_n_wf_mon.
@@ -718,7 +715,7 @@ Section Compose.
       anf_pipeline v1 o1 e1 c1 = (Ret e1', c1') /\
       anf_pipeline v2 o2 e2 c2 = (Ret e2', c2') /\
 
-      refines cenv value_ref_cc (link lf x e1 e2) (link lf x e1' e2'). 
+      refines value_ref_cc (link lf x e1 e2) (link lf x e1' e2'). 
   Proof.
     intros.
     edestruct anf_pipeline_correct with (e := e1) (opts := o1); eauto. destructAll.

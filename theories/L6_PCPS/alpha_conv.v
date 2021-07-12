@@ -797,19 +797,19 @@ Section Alpha_conv_correct.
   Variable cenv : ctor_env.
   Context (P1 : PostT) (* Local *)
           (PG : PostGT) (* Global *)
-          (Hcompat : Post_properties cenv P1 P1 PG).
+          (Hcompat : Post_properties P1 P1 PG).
 
 
   (** ** Environment relation up to renaming *)
   (* TODO move to log rel *)
 
   Definition preord_env_P_inj (S : Ensemble var) k f rho1 rho2 :=
-    forall x : var, S x -> preord_var_env cenv PG k rho1 rho2 x (f x).
+    forall x : var, S x -> preord_var_env PG k rho1 rho2 x (f x).
 
   Lemma preord_env_P_inj_set (S : Ensemble var) (rho1 rho2 : env) 
         (k : nat) f (x y : var) (v1 v2 : val) : 
     preord_env_P_inj  (S \\ [set x]) k f rho1 rho2 ->
-    preord_val cenv PG k v1 v2 ->
+    preord_val PG k v1 v2 ->
     injective_subdomain (x |: S) (f {x ~> y}) ->
     preord_env_P_inj S k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
   Proof.
@@ -831,7 +831,7 @@ Section Alpha_conv_correct.
   Lemma preord_env_P_inj_set_alt (S : Ensemble var) (rho1 rho2 : env) 
         (k : nat) f (x y : var) (v1 v2 : val) : 
     preord_env_P_inj (S \\ [set x]) k f rho1 rho2 ->
-    preord_val cenv PG k v1 v2 ->
+    preord_val PG k v1 v2 ->
     ~ In _ (image f (S \\ [set x])) y ->
     preord_env_P_inj S k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
   Proof.
@@ -852,7 +852,7 @@ Section Alpha_conv_correct.
   Lemma preord_env_P_inj_set_alt' (S : Ensemble var) (rho1 rho2 : env) 
         (k : nat) f (x y : var) (v1 v2 : val) : 
     preord_env_P_inj (S \\ [set x]) k f rho1 rho2 ->
-    preord_val cenv PG k v1 v2 ->
+    preord_val PG k v1 v2 ->
     ~ In _ (image f (Dom_map rho1)) y ->
     preord_env_P_inj S k (f {x ~> y}) (M.set x v1 rho1) (M.set y v2 rho2).
   Proof.
@@ -873,7 +873,7 @@ Section Alpha_conv_correct.
   Lemma preord_env_P_inj_set_l (S : Ensemble var) (rho1 rho2 : env) 
         (k : nat) f (x y : var) (v1 v2 : val) : 
     preord_env_P_inj (S \\ [set x]) k f rho1 rho2 ->
-    preord_val cenv PG k v1 v2 ->
+    preord_val PG k v1 v2 ->
     M.get y rho2 = Some v2 ->
     preord_env_P_inj S k (f {x ~> y}) (M.set x v1 rho1) rho2.
   Proof.
@@ -1062,7 +1062,7 @@ Section Alpha_conv_correct.
     
     preord_env_P_inj S k (f <{ all_fun_name B1 ~> all_fun_name B2 }>)
                      (def_funs B1' B1 rho1 rho1) (def_funs B2' B2 rho2 rho2) ->
-    preord_var_env cenv PG k (def_funs B1' B1 rho1 rho1) (def_funs B2' B2 rho2 rho2) x1 x2.
+    preord_var_env PG k (def_funs B1' B1 rho1 rho1) (def_funs B2' B2 rho2 rho2) x1 x2.
   Proof.
     intros Hun1 Hun2 Hlen Hn1 Hn2 Hin Henv x Hget.
 
@@ -1161,7 +1161,7 @@ Section Alpha_conv_correct.
   Lemma preord_env_P_inj_set_lists (S1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
         (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list val) f f':
     preord_env_P_inj (Setminus _ S1 (FromList xs1)) k f rho1 rho2 ->
-    Forall2 (preord_val cenv PG k) vs1 vs2 ->
+    Forall2 (preord_val PG k) vs1 vs2 ->
     
     injective_subdomain (S1 \\ FromList xs1) f ->
     Disjoint _ (FromList xs2) (image f (S1 \\ FromList xs1)) ->
@@ -1215,7 +1215,7 @@ Section Alpha_conv_correct.
   Lemma preord_env_P_inj_set_lists_alt (S1 : var -> Prop) (rho1 rho2 rho1' rho2' : env)
         (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list val) f :
     preord_env_P_inj (Setminus _ S1 (FromList xs1)) k f rho1 rho2 ->
-    Forall2 (preord_val cenv PG k) vs1 vs2 ->
+    Forall2 (preord_val PG k) vs1 vs2 ->
     NoDup xs1 -> NoDup xs2 ->
     length xs1 = length xs2 ->
     Disjoint _ (image f (Setminus _ S1 (FromList xs1))) (FromList xs2) ->
@@ -1268,7 +1268,7 @@ Section Alpha_conv_correct.
   Lemma Forall2_preord_var_env_map k S σ rho rho' l :
     preord_env_P_inj S k σ rho rho' ->
     Included _ (FromList l) S ->
-    Forall2 (preord_var_env cenv PG k rho rho') l (map σ l).
+    Forall2 (preord_var_env PG k rho rho') l (map σ l).
   Proof with now eauto with Ensembles_DB.
     induction l; intros Henv Hin; simpl; constructor.
     - eapply Henv. eapply Hin. rewrite FromList_cons...
@@ -1284,7 +1284,7 @@ Section Alpha_conv_correct.
     Included var (FromList xs) S ->
     get_list xs rho1 = Some vs1 ->
     exists vs2 : list val,
-      get_list (map f xs) rho2 = Some vs2 /\ Forall2 (preord_val cenv PG k) vs1 vs2.
+      get_list (map f xs) rho2 = Some vs2 /\ Forall2 (preord_val PG k) vs1 vs2.
   Proof with now eauto with Ensembles_DB.
     revert vs1. induction xs; intros vs1 Henv Hinc Hget.
     - eexists; split; eauto. inv Hget. constructor.
@@ -1306,7 +1306,7 @@ Section Alpha_conv_correct.
   Lemma preord_env_P_inj_set_l_apply_r S k rho1 rho2 m x y v v' : 
     preord_env_P_inj (S \\ [set x]) k (apply_r m) rho1 rho2 ->
     M.get y rho2 = Some v' ->
-    preord_val cenv PG k v v' ->
+    preord_val PG k v v' ->
     preord_env_P_inj S k (apply_r (M.set x y m)) (map_util.M.set x v rho1) rho2.
   Proof.
     intros Henv Hg1 Hval z Hin v1 Hgetz.
@@ -1318,11 +1318,11 @@ Section Alpha_conv_correct.
   Qed.
 
   Lemma preord_env_P_inj_set_lists_l S k rho1 rho1' rho2 xs ys vs1 vs2 : 
-    preord_env_P cenv PG (S \\ FromList xs) k rho1 rho2 ->
+    preord_env_P PG (S \\ FromList xs) k rho1 rho2 ->
 
     set_lists xs vs1 rho1 = Some rho1'  ->
     get_list ys rho2 = Some vs2 ->
-    Forall2 (preord_val cenv PG k) vs1 vs2 ->      
+    Forall2 (preord_val PG k) vs1 vs2 ->      
 
     preord_env_P_inj S k (apply_r (set_list (combine xs ys) (M.empty var))) rho1' rho2.
   Proof.
@@ -1355,7 +1355,7 @@ Section Alpha_conv_correct.
 
     set_lists xs vs1 rho1 = Some rho1'  ->
     get_list ys rho2 = Some vs2 ->
-    Forall2 (preord_val cenv PG k) vs1 vs2 ->      
+    Forall2 (preord_val PG k) vs1 vs2 ->      
 
     preord_env_P_inj S k (apply_r (set_list (combine xs ys) sig)) rho1' rho2.
   Proof.
@@ -1488,7 +1488,7 @@ Section Alpha_conv_correct.
          injective_subdomain (occurs_free e1) f ->
          Alpha_conv e1 e2 f ->
          preord_env_P_inj (occurs_free e1) m f rho1 rho2 ->
-         preord_exp cenv P1 PG m (e1, rho1) (e2, rho2)) ->
+         preord_exp P1 PG m (e1, rho1) (e2, rho2)) ->
     construct_fundefs_injection f B1 B2 h ->
     Disjoint _ (image f S) (name_in_fundefs B2) ->
     injective_subdomain S f ->
@@ -1582,7 +1582,7 @@ Section Alpha_conv_correct.
     (* Disjoint _ (image g (occurs_free e1)) (bound_var e1) ->     *)
     Alpha_conv e1 e2 g ->
     preord_env_P_inj (occurs_free e1) k g rho1 rho2 ->
-    preord_exp cenv P1 PG k (e1, rho1) (e2, rho2).
+    preord_exp P1 PG k (e1, rho1) (e2, rho2).
   Proof with now sets. 
     revert e1 e2 rho1 rho2 g.
     induction k as [ k IH ] using lt_wf_rec1.
@@ -1718,23 +1718,23 @@ Section Alpha_conv_correct.
 End Alpha_conv_correct.
 
 Instance preord_env_P_inj_proper' fuel (Hfuel : fuel_resource) trace (Htrace : trace_resource) :
-  Proper (Logic.eq ==> Logic.eq ==> Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
+  Proper (Logic.eq ==> Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
          (@preord_env_P_inj fuel Hfuel trace Htrace).
 Proof.
   repeat (intro; intros); subst.
   split; intros Hpre;
-    eapply preord_env_P_inj_antimon; subst; eauto; eapply H1.
+    eapply preord_env_P_inj_antimon; subst; eauto; eapply H0.
 Qed.
 
 
 Instance preord_env_P_inj_f_proper' fuel (Hfuel : fuel_resource) trace (Htrace : trace_resource) :
-  Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> f_eq ==> Logic.eq ==> Logic.eq ==> iff)
+  Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> f_eq ==> Logic.eq ==> Logic.eq ==> iff)
          (@preord_env_P_inj fuel Hfuel trace Htrace).
 Proof.
   repeat (intro; intros); subst.
   split; intros Hpre.
-  intro; intros. rewrite <- H3. eauto.
-  intro; intros. rewrite H3. eauto.
+  intro; intros. rewrite <- H2. eauto.
+  intro; intros. rewrite H2. eauto.
 Qed.
 
 

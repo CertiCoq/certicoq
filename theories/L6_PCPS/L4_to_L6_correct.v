@@ -133,8 +133,8 @@ Section Bounds.
   
   
   
-  Global Instance eq_fuel_compat cenv :
-    @Post_properties cenv nat _ unit _ eq_fuel eq_fuel eq_fuel. 
+  Global Instance eq_fuel_compat :
+    @Post_properties nat _ unit _ eq_fuel eq_fuel eq_fuel. 
   Proof.
     unfold eq_fuel. constructor; try now (intro; intros; intro; intros; unfold_all; simpl; lia).
     - intro; intros. unfold post_base'. unfold_all; simpl. lia.
@@ -381,8 +381,7 @@ Section Correct.
 
   Context (prim_map : M.t (kername * string (* C definition *) * nat (* arity *))). 
   Context (func_tag kon_tag default_tag default_itag : positive)
-          (cnstrs : conId_map)                      
-          (cenv : ctor_env).
+          (cnstrs : conId_map).
 
   Ltac unfold_all :=
     try unfold zero in *;
@@ -404,19 +403,19 @@ Section Correct.
   (* Alpha-equiv corollaries *)
   
   Corollary cps_cvt_exp_alpha_equiv k :
-    cps_cvt_exp_alpha_equiv eq_fuel eq_fuel cnstrs cenv func_tag kon_tag default_tag k.
+    cps_cvt_exp_alpha_equiv eq_fuel eq_fuel cnstrs func_tag kon_tag default_tag k.
   Proof. eapply cps_cvt_alpha_equiv; tci. firstorder. Qed.
 
   Corollary cps_cvt_exps_alpha_equiv k :
-    cps_cvt_exps_alpha_equiv eq_fuel eq_fuel cnstrs cenv func_tag kon_tag default_tag k.
+    cps_cvt_exps_alpha_equiv eq_fuel eq_fuel cnstrs func_tag kon_tag default_tag k.
   Proof. eapply cps_cvt_alpha_equiv; tci. firstorder. Qed.
 
   Corollary cps_cvt_efnlst_alpha_equiv k :
-    cps_cvt_efnlst_alpha_equiv eq_fuel cnstrs cenv func_tag kon_tag default_tag k.
+    cps_cvt_efnlst_alpha_equiv eq_fuel cnstrs func_tag kon_tag default_tag k.
   Proof. eapply cps_cvt_alpha_equiv; tci. firstorder. Qed.
   
   Corollary cps_cvt_branches_alpha_equiv k :
-    cps_cvt_branches_alpha_equiv eq_fuel eq_fuel cnstrs cenv func_tag kon_tag default_tag k.
+    cps_cvt_branches_alpha_equiv eq_fuel eq_fuel cnstrs func_tag kon_tag default_tag k.
   Proof. eapply cps_cvt_alpha_equiv; tci. firstorder. Qed.
 
   
@@ -536,9 +535,9 @@ Section Correct.
 
     Lemma preord_var_env_extend_neq_l PostG (rho1 rho2 : eval.env) (k : nat) (x1 y1 y2 : var)
           (v1 : cps.val) :
-        preord_var_env cenv PostG k rho1 rho2 y1 y2 ->
+        preord_var_env PostG k rho1 rho2 y1 y2 ->
         y1 <> x1 ->
-        preord_var_env cenv PostG k (M.set x1 v1 rho1) rho2 y1 y2.
+        preord_var_env PostG k (M.set x1 v1 rho1) rho2 y1 y2.
     Proof.
       intros Hval Hneq x' Hget.
       rewrite M.gso in *; eauto.
@@ -546,9 +545,9 @@ Section Correct.
 
     Lemma preord_var_env_extend_neq_r PostG (rho1 rho2 : eval.env) (k : nat) (x1 y1 y2 : var)
           (v1 : cps.val) :
-      preord_var_env cenv PostG k rho1 rho2 y1 y2 ->
+      preord_var_env PostG k rho1 rho2 y1 y2 ->
       y2 <> x1 ->
-      preord_var_env cenv PostG k rho1 (M.set x1 v1 rho2) y1 y2.
+      preord_var_env PostG k rho1 (M.set x1 v1 rho2) y1 y2.
     Proof.
       intros Hval Hneq x' Hget.
       rewrite M.gso in *; eauto.
@@ -556,10 +555,10 @@ Section Correct.
 
     Lemma preord_var_env_get :
       forall PostG (rho1 rho2 : eval.env) (k : nat) (x1 x2 : var) (v1 v2 : cps.val),
-        preord_val cenv PostG k v1 v2 ->
+        preord_val PostG k v1 v2 ->
         M.get x1 rho1 = Some v1 ->
         M.get x2 rho2 = Some v2 ->        
-        preord_var_env cenv PostG k rho1 rho2 x1 x2.
+        preord_var_env PostG k rho1 rho2 x1 x2.
     Proof.
       intros rho1 rho2 k x1 x2 v1 v2 Hval Hget1 Hget2 x' v' Hget.
       repeat subst_exp. eauto. 
@@ -567,10 +566,10 @@ Section Correct.
 
     Lemma preord_var_env_get_list :
       forall PostG (rho1 rho2 : eval.env) (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list cps.val),
-        Forall2 (preord_val cenv PostG k) vs1 vs2 ->
+        Forall2 (preord_val PostG k) vs1 vs2 ->
         get_list xs1 rho1 = Some vs1 ->
         get_list xs2 rho2 = Some vs2 ->        
-        Forall2 (preord_var_env cenv PostG k rho1 rho2) xs1 xs2.
+        Forall2 (preord_var_env PostG k rho1 rho2) xs1 xs2.
     Proof.
       intros PG rho1 rho2 k xs1.
       revert rho1 rho2. induction xs1; intros rho1 rho2 xs2 vs1 vs2 Hall Hget1 Hget2.
@@ -599,7 +598,7 @@ Section Correct.
 
 
     Lemma preord_exp_Efun_red k e B rho :          
-      preord_exp cenv one_step eq_fuel k (e, def_funs B B rho rho) (Efun B e, rho).
+      preord_exp one_step eq_fuel k (e, def_funs B B rho rho) (Efun B e, rho).
     Proof.
       intros r cin cout Hleq Hbstep.
       do 3 eexists. split. econstructor 2. econstructor. eassumption.
@@ -612,7 +611,7 @@ Section Correct.
       find_def g B = Some (ft, ys, e') ->
       get_list xs rho = Some vs ->
       set_lists ys vs (def_funs B B rho1 rho1) = Some rho2 ->
-      preord_exp cenv one_step eq_fuel k (e', rho2) (Eapp f ft xs , rho).
+      preord_exp one_step eq_fuel k (e', rho2) (Eapp f ft xs , rho).
     Proof.
       intros r cin cout Hleq Hbstep Hget Hf Hgetl Hsetl.
       do 3 eexists. split. econstructor 2. econstructor; eauto. 
@@ -623,7 +622,7 @@ Section Correct.
 
     Lemma preord_exp_Econstr_red k x ctag ys e rho vs :
       get_list ys rho = Some vs ->
-      preord_exp cenv one_step eq_fuel k (e, M.set x (Vconstr ctag vs) rho) (Econstr x ctag ys e, rho).
+      preord_exp one_step eq_fuel k (e, M.set x (Vconstr ctag vs) rho) (Econstr x ctag ys e, rho).
     Proof.
       intros Hgvs r cin cout Hleq Hbstep.
       do 3 eexists. split. econstructor 2. econstructor; eauto. 
@@ -950,7 +949,7 @@ Section Correct.
     Lemma preord_exp_Eproj_red k x ctag y N e vs v rho :
       M.get y rho = Some (Vconstr ctag vs) ->
       nthN vs N = Some v ->
-      preord_exp cenv one_step eq_fuel k (e, M.set x v rho) (Eproj x ctag N y e, rho).
+      preord_exp one_step eq_fuel k (e, M.set x v rho) (Eproj x ctag N y e, rho).
     Proof.
       intros Hget Hnth r c1 c2 Hleq Hstep.
       do 3 eexists. split. econstructor 2. econstructor; eauto. 
@@ -962,14 +961,13 @@ Section Correct.
     Lemma preord_exp_Ecase_red k rho ctag vs P e n y :
       M.get y rho = Some (Vconstr ctag vs) ->
       find_tag_nth P ctag e n ->
-      preord_exp cenv one_step eq_fuel k (e, rho) (Ecase y P, rho).
+      preord_exp one_step eq_fuel k (e, rho) (Ecase y P, rho).
     Proof.
       intros Hget Hnth r c1 c2 Hleq Hstep. 
       do 3 eexists. split. econstructor 2. econstructor; eauto.
-      admit. (* case consistent??? *) 
       split. simpl. unfold_all. lia. 
       eapply preord_res_refl; tci.
-    Admitted.
+    Qed.
 
 
     Definition eq_fuel_n (n : nat) : @PostT nat unit :=
@@ -985,7 +983,7 @@ Section Correct.
         ctx_bind_proj ctag r vars n = C ->
         M.get r rho = Some (Vconstr ctag (vs ++ vs')) ->    
         set_lists (rev vars) vs rho = Some rho' ->
-        preord_exp cenv (eq_fuel_n n) eq_fuel k (e, rho') (C |[ e ]|, rho).
+        preord_exp (eq_fuel_n n) eq_fuel k (e, rho') (C |[ e ]|, rho).
     Proof.
       induction vars; intros C k r n e rho rho' vs vs' ctag Heq Hnin Hctx Hget Hset.
       - destruct vs. 2:{ simpl in Hset. destruct (rev vs); inv Hset. }
@@ -1111,12 +1109,12 @@ Section Correct.
 
       (* Source terminates *)
       (forall v v', r = (Val v) -> cps_val_rel v v' ->
-       preord_exp cenv (cps_bound f t) eq_fuel i
+       preord_exp (cps_bound f t) eq_fuel i
                   ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
                   (e', rho)) /\
       (* SOurce diverges *)
       (r = fuel_sem.OOT ->
-       exists c, (f <= c)%nat /\ bstep_fuel cenv rho e' c eval.OOT tt).
+       exists c, (f <= c)%nat /\ bstep_fuel rho e' c eval.OOT tt).
 
     
 
@@ -1137,7 +1135,7 @@ Section Correct.
 
       (* Source terminates *)
       (forall v v', r = (Val v) -> cps_val_rel v v' ->
-                    preord_exp cenv
+                    preord_exp
                                (cps_bound (f <+> @one_i _ _ fuel_resource_L4 e)
                                           (t <+> @one_i _ _ trace_resource_L4 e))
                                eq_fuel i
@@ -1145,7 +1143,7 @@ Section Correct.
                                (e', rho)) /\
       (* Source diverges *)
       (r = fuel_sem.OOT ->
-       exists c, ((f <+> @one_i _ _ fuel_resource_L4 e) <= c)%nat /\ bstep_fuel cenv rho e' c eval.OOT tt).
+       exists c, ((f <+> @one_i _ _ fuel_resource_L4 e) <= c)%nat /\ bstep_fuel rho e' c eval.OOT tt).
 
   
 
@@ -1175,7 +1173,7 @@ Section Correct.
       exists rho1,
         set_lists (ys ++ xs) (vs' ++ vs2) rho = Some rho1 /\
         forall i,
-          preord_exp cenv (cps_bound f (t <+> (2 * Datatypes.length (exps_as_list es))%nat))
+          preord_exp (cps_bound f (t <+> (2 * Datatypes.length (exps_as_list es))%nat))
                      eq_fuel i (e_app, rho1) (e', rho).
 
     
@@ -1285,7 +1283,7 @@ Section Correct.
           eapply IHoot with (rho := rho'') in H13.
           
           * destructAll.
-            assert (Hoot' : bstep_fuel cenv x8 (Efun (Fcons k1 kon_tag [x9] es' Fnil) e'0) (x4 + 1)%nat OOT tt).
+            assert (Hoot' : bstep_fuel x8 (Efun (Fcons k1 kon_tag [x9] es' Fnil) e'0) (x4 + 1)%nat OOT tt).
             { replace tt with (tt <+> tt) by reflexivity. econstructor 2. econstructor. simpl. eassumption. }
             
             edestruct H9. reflexivity. eassumption. destructAll.
@@ -1393,7 +1391,7 @@ Section Correct.
         destructAll. inv H0.
         
         (* Prove that whole CPS-term is related to the body of the app -- useful for both cases *) 
-        assert (Heq : forall m, preord_exp' cenv (preord_val cenv)
+        assert (Heq : forall m, preord_exp' (preord_val)
                                             (cps_bound (f1 <+> f2 <+> @one_i _ _ fuel_resource_L4 (e1 $ e2))
                                                        (t1 <+> t2 <+> @one_i _ _ trace_resource_L4 (e1 $ e2)))
                                             eq_fuel m
@@ -1580,9 +1578,10 @@ Section Correct.
           eapply cps_env_rel_weaken; try eassumption.
           intros Hc. inv H2. eapply Hdis; eauto. 
         + unfold rho'. rewrite M.gss. reflexivity.
-        + destruct H5. reflexivity. destructAll. eexists (x3 + 1)%nat. split.
-          unfold one_i. simpl. unfold fuel_exp. lia.
-          replace tt with (tt <+> tt) by reflexivity. eapply BStepf_run. econstructor.
+        + destruct H5. reflexivity. destructAll. eexists (x3 <+> 1)%nat. split.
+          unfold one, one_i. simpl. unfold fuel_exp. lia.
+          replace tt with (tt <+> tt) by reflexivity.
+          assert (Hs := @BStepf_run nat _ unit _ rho). eapply Hs. econstructor.
           simpl. eassumption.
           
       - (* App_e Clos_v, OOT 2 *)
@@ -1608,7 +1607,7 @@ Section Correct.
                                                              (Efun (Fcons k2 kon_tag [x2] (Eapp x1 func_tag [k; x2])
                                                                           Fnil) e2') Fnil) k1) rho))).
         
-        assert (Heq : forall m, preord_exp' cenv (preord_val cenv)
+        assert (Heq : forall m, preord_exp' (preord_val)
                                             (cps_bound (f1 <+> @one_i _ _ fuel_resource_L4 (e1 $ e2))
                                                        (t1 <+> @one_i _ _ trace_resource_L4 (e1 $ e2)))
                                             eq_fuel m
@@ -1695,7 +1694,7 @@ Section Correct.
         { eapply cps_val_rel_exists. eassumption. (* TODO remove arg *) eassumption. } destructAll. 
         
         (* Prove that whole CPS-term is related to the body of the app -- useful for both cases *) 
-        assert (Heq : forall m, preord_exp' cenv (preord_val cenv)
+        assert (Heq : forall m, preord_exp' (preord_val)
                                             (cps_bound (f1 <+> @one_i _ _ fuel_resource_L4 (Let_e na e1 e2))
                                                        (t1 <+> @one_i _ _ trace_resource_L4 (Let_e na e1 e2)))
                                             eq_fuel m
@@ -1832,7 +1831,8 @@ Section Correct.
         + unfold rho'. rewrite M.gss. reflexivity.
         + destruct H1. reflexivity. destructAll. eexists (x2 + 1)%nat. split.
           unfold one_i. simpl. unfold fuel_exp, trace_exp. lia.
-          replace tt with (tt <+> tt) by reflexivity. eapply BStepf_run. econstructor; eauto.
+          replace tt with (tt <+> tt) by reflexivity.
+          assert ( Hs := @BStepf_run nat _ unit _ rho). eapply Hs. econstructor; eauto.
 
       - (* App_e, ClosFix_v *)
         intros e1 e2 e1' vs1 vs2 vs3 n na fns v2 r f1 f2 f3 t1 t2 t3  Heval1 IH1 Hnth Hrec Heval2 IH2 Heval3 IH3.
@@ -1864,7 +1864,7 @@ Section Correct.
         destruct H0 as (y1 & na' & e3 & e3' & Hu). destructAll.  
         repeat subst_exp. 
         (* Prove that whole CPS-term is related to the body of the app -- useful for both cases *) 
-        assert (Heq : forall m, preord_exp' cenv (preord_val cenv)
+        assert (Heq : forall m, preord_exp' (preord_val)
                                             (cps_bound (f1 <+> f2 <+> @one_i _ _ fuel_resource_L4 (e1 $ e2))
                                                        (t1 <+> t2 <+> @one_i _ _ trace_resource_L4 (e1 $ e2)))
                                             eq_fuel m
@@ -2085,7 +2085,7 @@ Section Correct.
         destructAll. 
 
 
-        assert (Hexp : forall j, preord_exp' cenv (preord_val cenv)
+        assert (Hexp : forall j, preord_exp' (preord_val)
                                              (cps_bound (f1 <+> @one_i _ _ fuel_resource_L4 (Match_e e1 n brs))
                                                         (t1 <+> @one_i _ _ trace_resource_L4 (Match_e e1 n brs)))
                                              eq_fuel j
@@ -2301,7 +2301,9 @@ Section Correct.
         + unfold rho'. rewrite M.gss. reflexivity.          
         + destruct H1. reflexivity. destructAll. eexists (x2 + 1)%nat. split.
           unfold one_i. simpl. unfold fuel_exp. lia.
-          replace tt with (tt <+> tt) by reflexivity. eapply BStepf_run. econstructor.
+          replace tt with (tt <+> tt) by reflexivity.
+          assert (Hs := @BStepf_run nat _ unit _ rho). eapply Hs. 
+          econstructor.
           simpl. eassumption.
 
       - (* enil *)
@@ -2321,7 +2323,7 @@ Section Correct.
         2:{ eapply preord_exp_refl. tci.
 
 
-            assert (Henv : preord_env_P_inj cenv eq_fuel (occurs_free e') i id x rho).
+            assert (Henv : preord_env_P_inj eq_fuel (occurs_free e') i id x rho).
             { eapply preord_env_P_inj_f_eq_subdomain.
               eapply preord_env_P_inj_set_lists_l; eauto.
               eapply preord_env_P_refl. tci.

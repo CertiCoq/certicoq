@@ -62,9 +62,9 @@ Section Log_rel.
       let '(e1, rho1) := p1 in
       let '(e2, rho2) := p2 in
       forall v1 (cin : fuel) (cout : trace),
-        to_nat cin <= k -> bstep_fuel cenv rho1 e1 cin v1 cout ->
+        to_nat cin <= k -> bstep_fuel rho1 e1 cin v1 cout ->
         exists v2 cin' cout',
-          bstep_fuel cenv rho2 e2 cin' v2 cout' /\
+          bstep_fuel rho2 e2 cin' v2 cout' /\
           Post (e1, rho1, cin, cout) (e2, rho2, cin', cout') /\
           preord_res (k - to_nat cin) v1 v2. 
 
@@ -636,7 +636,7 @@ Section Log_rel.
       get_list ys rho1 = Some vs ->
       find_def h fl = Some (t, xs, e_b1) ->
       set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
-      bstep_fuel cenv rhoc1' e_b1 c1 (Res v1) cout1 -> 
+      bstep_fuel rhoc1' e_b1 c1 (Res v1) cout1 -> 
       
       (* for simplicity don't model the semantics of the target since it doesn't matter *)
       PG (e_b1, rhoc1', c1, cout1)  (e_b2, rhoc2, c2, cout2) -> 
@@ -984,7 +984,7 @@ Section Log_rel.
       - (* ΟΟΤ *)
         exists OOT, c1, <0>. split. constructor; eauto; eassumption.
         split; [| now eauto ]. eapply HOOT; eassumption.
-      - inv H. inv H5. 
+      - inv H. inv H4. 
     Qed.
     
     Lemma preord_exp_case_cons_compat k rho1 rho2 x1 x2 c e1 e2 D1 D2
@@ -1003,11 +1003,11 @@ Section Log_rel.
       - (* ΟΟΤ *)
         exists OOT, c1, <0>. split. constructor; eauto; eassumption.
         split; [| now eauto ]. eapply HOOT; eassumption.        
-      - inv H. inv H3.
+      - inv H. inv H2.
         rewrite !to_nat_add in Hleq1.
         assert (Hg := to_nat_one (exp_to_fin (Ecase x1 ((c, e1) :: D1)))).
         destruct (var_dec c t). 
-        + inv H5; [| contradiction ]; subst.
+        + inv H4; [| contradiction ]; subst.
           edestruct (Hexp_hd (k - 1)) as [v2 [c2 [cout' [Hstep2 [Hpost Hpre2]]]]];
             [ | | eassumption | ]; eauto.
 
@@ -1019,17 +1019,17 @@ Section Log_rel.
           repeat subst_exp. 
           repeat eexists. econstructor 2. econstructor; eauto.
           
-          econstructor 2; eauto. eapply caseConsistent_same_ctor_tags. eassumption. eassumption.
+          (* econstructor 2; eauto. eapply caseConsistent_same_ctor_tags. eassumption. eassumption. *)
           now constructor. 
 
           eapply Hcompat_hd. eassumption.
           eapply preord_res_monotonic. eassumption. 
           rewrite to_nat_add. unfold one in *; simpl in *; lia.
-        + inv H5. contradiction.
+        + inv H4. contradiction.
           edestruct Hexp_tl as [v2 [c2 [cout' [Hstep2 [Hpost2 Hpre2]]]]].
           2:{ econstructor 2; eauto. econstructor; eauto. }
           * rewrite to_nat_add. unfold one in *. simpl in *; lia.
-          * eapply Henv in H2. destruct H2 as [v2' [Hgetx2 Hval]].  
+          * eapply Henv in H0. destruct H0 as [v2' [Hgetx2 Hval]].  
             assert (Hval' := Hval). rewrite preord_val_eq in Hval'. 
             destruct v2'; try contradiction. simpl in Hval'. inv Hval'.  
             inv Hstep2. 
@@ -1040,7 +1040,7 @@ Section Log_rel.
             -- inv H.  repeat subst_exp.
                do 3 eexists. split; [| split ].
                ++ constructor 2. econstructor; eauto. econstructor; eauto.
-                  econstructor; eauto.
+                  (* econstructor; eauto. *)
                ++ eapply Hcompat_tl. eassumption.
                ++ eassumption.
     Qed.
@@ -1062,10 +1062,13 @@ Section Log_rel.
       - (* ΟΟΤ *)
         exists OOT, c1, <0>. split. constructor; eauto; eassumption.
         split; [| now eauto ]. eapply HOOT; eassumption.        
-      - inv H. inv H3.
+      - inv H.
+        (* inv H4. *)
         specialize (Henv ltac:(do 2 eexists; eassumption)).
         eapply preord_exp_case_cons_compat; eauto.
-        econstructor 2. econstructor; eauto. econstructor; eauto. 
+        econstructor 2. econstructor; eauto.
+        (* econstructor; eauto. *)
+        
     Qed.
 
 
@@ -1925,8 +1928,8 @@ Section Log_rel.
     Lemma preord_exp_preserves_divergence P PG e1 rho1 e2 rho2
           (Hrel : post_upper_bound P) :
       (forall k, preord_exp P PG k (e1, rho1) (e2, rho2)) ->
-      @diverge cenv fuel _ trace _ rho1 e1 -> 
-      @diverge cenv fuel _ trace _ rho2 e2.
+      @diverge fuel _ trace _ rho1 e1 -> 
+      @diverge fuel _ trace _ rho2 e2.
     Proof.
       intros Hexp Hdiv. assert (Hdiv' := Hdiv).
       specialize (Hrel e1 rho1 e2 rho2). inv Hrel.
@@ -1942,8 +1945,8 @@ Section Log_rel.
     Lemma preord_exp_preserves_not_stuck P PG e1 rho1 e2 rho2
           (Hrel : post_upper_bound P) :
       (forall k, preord_exp P PG k (e1, rho1) (e2, rho2)) ->
-      @not_stuck cenv fuel _ trace _ rho1 e1 -> 
-      @not_stuck cenv fuel _ trace _ rho2 e2.
+      @not_stuck fuel _ trace _ rho1 e1 -> 
+      @not_stuck fuel _ trace _ rho2 e2.
     Proof.
       intros Hexp Hns. assert (Hns' := Hns). inv Hns.
       - destructAll.
@@ -2828,4 +2831,6 @@ Section Log_rel.
 
 End Log_rel.
 
-Notation preord_exp := (fun cenv => (preord_exp' cenv (preord_val cenv))).
+
+
+Notation preord_exp := (preord_exp' preord_val).

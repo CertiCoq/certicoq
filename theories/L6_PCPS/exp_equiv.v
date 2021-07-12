@@ -24,14 +24,14 @@ Section LogRelEquiv.
           (fuel : Type) (Hf : @fuel_resource fuel)
           (trace : Type) (Ht : @trace_resource trace)
           (Post : @PostT fuel trace) (PostG : @PostGT fuel trace)
-          (Hprop : Post_properties cenv Post Post PostG)
-          (HpropG : Post_properties cenv PostG PostG PostG). 
+          (Hprop : Post_properties Post Post PostG)
+          (HpropG : Post_properties PostG PostG PostG). 
 
 
   
   Definition equiv_exp (p1 p2 : exp * env) : Prop := 
-    (forall k, preord_exp cenv Post PostG k p1 p2) /\
-    (forall k, preord_exp cenv Post PostG k p2 p1).
+    (forall k, preord_exp Post PostG k p1 p2) /\
+    (forall k, preord_exp Post PostG k p2 p1).
 
 
   

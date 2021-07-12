@@ -247,10 +247,10 @@ Section Inline_correct.
           (P1 : nat -> @PostT fuel trace) (PG : @PostGT fuel trace)
           (G : nat).
   
-  Variable (HProp : forall L, (L <= G)%nat -> Post_properties cenv (P1 L) (P1 L) PG)
+  Variable (HProp : forall L, (L <= G)%nat -> Post_properties (P1 L) (P1 L) PG)
            (HEapp_l : forall L v t l rho1 x rho2, post_Eapp_l (P1 L) (P1 (S L)) v t l rho1 x rho2)
-           (HEletapp : forall L1 L2, remove_steps_letapp cenv (P1 L1) (P1 L2) (P1 (S (L1 + L2))))
-           (Eletapp_OOT : forall L1 L2, remove_steps_letapp_OOT cenv (P1 L1) (P1 (S (L1 + L2)))).
+           (HEletapp : forall L1 L2, remove_steps_letapp (P1 L1) (P1 L2) (P1 (S (L1 + L2))))
+           (Eletapp_OOT : forall L1 L2, remove_steps_letapp_OOT (P1 L1) (P1 (S (L1 + L2)))).
 
   
   (* [add_fundefs] *)
@@ -608,10 +608,10 @@ Section Inline_correct.
 
   (* TODO move *)
   Lemma preord_env_P_inj_set_lists_not_In_P_r' S k f rho1 rho2 rho2' xs vs :
-    preord_env_P_inj cenv PG S k f rho1 rho2 ->
+    preord_env_P_inj PG S k f rho1 rho2 ->
     set_lists xs vs rho2 = Some rho2' ->
     Disjoint _(FromList xs) (image f S) ->
-    preord_env_P_inj cenv PG S k f rho1 rho2'.
+    preord_env_P_inj PG S k f rho1 rho2'.
   Proof.
     intros Henv Hnin Hnin' z Hy v' Hget.
     edestruct Henv as [v'' [Hget' Hv]]; eauto.
@@ -639,7 +639,7 @@ Section Inline_correct.
       fm ! f = Some (ft, xs, e) ->
       rho1 ! f = Some (Vfun rhoc B f') ->
       find_def f B = Some (ft, xs, e) /\ f = f' /\
-      preord_env_P_inj cenv PG (occurs_free e \\ FromList xs) i (apply_r sig) (def_funs B B rhoc rhoc) rho2 /\
+      preord_env_P_inj PG (occurs_free e \\ FromList xs) i (apply_r sig) (def_funs B B rhoc rhoc) rho2 /\
       match k with
       | 0%nat => True
       | S k => fun_map_inv' k (occurs_free e \\ FromList xs) fm (def_funs B B rhoc rhoc) rho2 i sig
@@ -651,7 +651,7 @@ Section Inline_correct.
       fm ! f = Some (ft, xs, e) ->
       rho1 ! f = Some (Vfun rhoc B f') ->
       find_def f B = Some (ft, xs, e) /\ f = f' /\
-      preord_env_P_inj cenv PG (occurs_free e \\ FromList xs) i (apply_r sig) (def_funs B B rhoc rhoc) rho2 /\
+      preord_env_P_inj PG (occurs_free e \\ FromList xs) i (apply_r sig) (def_funs B B rhoc rhoc) rho2 /\
       match k with
       | 0%nat => True
       | S k => fun_map_inv' k (occurs_free e \\ FromList xs) fm (def_funs B B rhoc rhoc) rho2 i sig
@@ -895,7 +895,7 @@ Section Inline_correct.
   Lemma fun_map_inv_def_funs_add_fundefs k S fm rho1 rho2 i sig B1 B2 :
     fun_map_inv k S fm rho1 rho2 i sig ->
     
-    preord_env_P_inj cenv PG (name_in_fundefs B1 :|: occurs_free_fundefs B1) i
+    preord_env_P_inj PG (name_in_fundefs B1 :|: occurs_free_fundefs B1) i
                      (apply_r (set_list (combine (all_fun_name B1) (all_fun_name B2)) sig))
                      (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2) ->
 
@@ -1283,9 +1283,9 @@ Section Inline_correct.
              occurs_free e' \subset image (apply_r sig) (occurs_free e :|: occurs_free_fun_map fm) /\
              bound_var e' \subset (Range (next_var (fst s)) (next_var (fst s')))  /\ Ecase_shape sig e e' /\
              (forall k rho1 rho2,
-                 preord_env_P_inj cenv PG (occurs_free e) k (apply_r sig) rho1 rho2 ->
+                 preord_env_P_inj PG (occurs_free e) k (apply_r sig) rho1 rho2 ->
                  fun_map_inv d (occurs_free e) fm rho1 rho2 k sig ->
-                 preord_exp cenv (P1 j) PG k (e, rho1) (e', rho2)) }} ) /\ 
+                 preord_exp (P1 j) PG k (e, rho1) (e', rho2)) }} ) /\ 
 
     (forall B sig sig0 fm st S
             (Hun : unique_bindings_fundefs B)
@@ -1311,10 +1311,10 @@ Section Inline_correct.
                    find_def (apply_r sig f) B' = Some (ft, xs', e2) /\
                    length xs = length xs' /\ NoDup xs' /\ FromList xs' \subset S /\
                    (forall rho1 rho2 k,
-                       preord_env_P_inj cenv PG (occurs_free_fundefs B :|: name_in_fundefs B :|: FromList xs )
+                       preord_env_P_inj PG (occurs_free_fundefs B :|: name_in_fundefs B :|: FromList xs )
                                         k (apply_r sig <{ xs ~> xs' }>) rho1 rho2 ->
                        fun_map_inv d (occurs_free_fundefs B :|: name_in_fundefs B :|: FromList xs) fm rho1 rho2 k (set_list (combine xs xs') sig) ->
-                       preord_exp cenv (P1 j) PG k (e1, rho1) (e2, rho2))) }}).
+                       preord_exp (P1 j) PG k (e1, rho1) (e2, rho2))) }}).
   
   Proof.
     revert j Hleq. induction d as [d IHd] using lt_wf_rec1; intros j Hleq.
@@ -1903,7 +1903,7 @@ Section Inline_correct.
       * eauto.
       * intros k rho1 rho2 Henv Hfm''. eapply preord_exp_fun_compat.
         now eauto. now eauto.
-        assert (Hrel : preord_env_P_inj cenv PG
+        assert (Hrel : preord_env_P_inj PG
                                         (name_in_fundefs f2 :|: occurs_free (Efun f2 e)) 
                                         (k - 1) (apply_r (set_list (combine (all_fun_name f2) xs) sig))
                                         (def_funs f2 f2 rho1 rho1) (def_funs fds' fds' rho2 rho2)).
@@ -2368,8 +2368,8 @@ Section Inline_correct.
       Disjoint _ (bound_var e') (occurs_free e') /\
       (max_var e' 1%positive) < (next_var c') /\     
       (forall k rho1 rho2,
-          preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
-          preord_exp cenv P PG k (e, rho1) (e', rho2)).
+          preord_env_P PG (occurs_free e) k rho1 rho2 ->
+          preord_exp P PG k (e, rho1) (e', rho2)).
   Proof.
     intros Hun Hdis. edestruct (inline_correct_mut d) as [He _]. eassumption.
     unfold inline_top', triple in *.

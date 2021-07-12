@@ -61,7 +61,7 @@ Section EVAL.
       forall (y : var) (v : res) (e : exp) (t : ctor_tag) (cl : list (ctor_tag * exp))
              (vl : list val) (rho : env) (cin : fuel) (n : nat) (cout : trace),
         M.get y rho = Some (Vconstr t vl) ->
-        caseConsistent cenv cl t ->
+        (* caseConsistent cenv cl t -> *)
         find_tag_nth cl t e n ->
         bstep_fuel rho e cin v cout ->
         bstep rho (Ecase y cl) cin v cout
@@ -180,7 +180,7 @@ Section EVAL.
       intros v1 r2 v2 cin2' cout2' Hstep2 Heq1 Heq2; subst;
         try now (inv Hstep2; repeat subst_exp; eapply IHHstep; eauto).
     - inv Hstep2. repeat subst_exp.
-      eapply find_tag_nth_deterministic in H1; [| eapply H8 ]. inv H1.
+      eapply find_tag_nth_deterministic in H6; [| eapply H0 ]. inv H6.
       eapply IHHstep; eauto.
     - inv Hstep2. repeat subst_exp. eapply IHHstep in H18; eauto. destructAll.
       eapply IHHstep0 in H19; eauto. destructAll. eauto.
@@ -290,7 +290,7 @@ Section EVAL.
     intros Hstep. revert v cin' cout'.
     induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *;    
     intros v1 cin' cout' Heq Hs'; try (now subst; inv Hs'; repeat subst_exp; eauto).
-    - inv Hs'; repeat subst_exp. eapply find_tag_nth_deterministic in H8; [| clear H8; eauto ]. inv H8.
+    - inv Hs'; repeat subst_exp. eapply find_tag_nth_deterministic in H6; [| clear H6; eauto ]. inv H6.
       eapply IHHstep; eauto.
     - inv Hs'; repeat subst_exp; eauto.
       + eapply bstep_fuel_deterministic in H18; [| clear H18; eauto ]; destructAll.
@@ -352,7 +352,7 @@ Section EVAL.
     intros Hstep. revert r' cin' cout' c.
     induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *;
       intros r' cin' cout' c1 Heq Hleq Hs'; subst; try now (inv Hs'; repeat subst_exp; eauto).
-    - inv Hs'; repeat subst_exp. eapply find_tag_nth_deterministic in H8; [| clear H8; eauto ]. inv H8.
+    - inv Hs'; repeat subst_exp. eapply find_tag_nth_deterministic in H6; [| clear H6; eauto ]. inv H6.
       eapply IHHstep; eauto.
     - inv Hs'; repeat subst_exp; eauto.
       + eapply bstep_fuel_deterministic in H18; [| clear H18; eauto ]; destructAll.
@@ -428,7 +428,7 @@ Section EVAL.
       intros v1 r' cin' cout' Heq Hlt Hstep'; subst; (try now (inv Hstep'; repeat subst_exp; eauto));
         try now (inv Hstep'; repeat subst_exp; eauto; eapply IHHstep; eauto).
     - inv Hstep'; repeat subst_exp; eauto.
-      eapply find_tag_nth_deterministic in H8; [| clear H8; eauto ]. inv H8.
+      eapply find_tag_nth_deterministic in H6; [| clear H6; eauto ]. inv H6.
       eapply IHHstep; eauto.
     - inv Hstep'; repeat subst_exp; eauto. 
       + eapply bstep_fuel_deterministic in H18; [| clear H18; eauto ]; destructAll.
@@ -553,7 +553,7 @@ Section EVAL.
     induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; intros r' cout' Hstep';   
       try now (inv Hstep'; repeat subst_exp; eapply IHHstep; eauto). 
     - inv Hstep'. repeat subst_exp.
-      eapply find_tag_nth_deterministic in H1; [| eapply H8 ]. inv H1.
+      eapply find_tag_nth_deterministic in H0; [| eapply H6 ]. inv H0.
       eapply IHHstep; eauto.
     - inv Hstep'; repeat subst_exp.
       + eapply bstep_fuel_deterministic in H18; [| clear H18; eauto ]. destructAll.

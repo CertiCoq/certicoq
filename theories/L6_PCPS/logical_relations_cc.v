@@ -38,10 +38,10 @@ Section LogRelCC.
       let '(e1, rho1) := p1 in
       let '(e2, rho2) := p2 in
       forall v1 cin1 cout1,
-        to_nat cin1 <= k -> bstep_fuel cenv rho1 e1 cin1 v1 cout1 -> 
+        to_nat cin1 <= k -> bstep_fuel rho1 e1 cin1 v1 cout1 -> 
         (* @not_stuck cenv fuel _ trace _ rho1 e1 -> *)
         exists v2 cin2 cout2,
-          bstep_fuel cenv rho2 e2 cin2 v2 cout2 /\
+          bstep_fuel rho2 e2 cin2 v2 cout2 /\
           (* extra invariants for cost *)
           P1 (e1, rho1, cin1, cout1) (e2, rho2, cin2, cout2) /\
           cc_approx_res (k - to_nat cin1) P2 v1 v2.
@@ -572,7 +572,7 @@ Section LogRelCC.
       get_list ys rho1 = Some vs ->
       find_def h fl = Some (t, xs, e_b1) ->
       set_lists xs vs (def_funs fl fl rhoc1 rhoc1) = Some rhoc1' ->
-      bstep_fuel cenv rhoc1' e_b1 cin1 (Res v1) cout1 -> 
+      bstep_fuel rhoc1' e_b1 cin1 (Res v1) cout1 -> 
       (* Will need to prove that the size of the returned val is *)
 
       (* for simplicity don't model the semantics of the target since it doesn't matter *)
@@ -894,7 +894,7 @@ Section LogRelCC.
     - (* ΟΟΤ *)
       exists OOT, c1, <0>. split. constructor; eauto. simpl in *.
       split; [| now eauto ]. eapply Hoot; eauto.
-    - inv H. inv H5. 
+    - inv H. inv H4. 
   Qed.
 
   Lemma cc_approx_exp_case_cons_compat k rho1 rho2 x1 x2 t e1 e2 B1 B2 :
@@ -914,8 +914,8 @@ Section LogRelCC.
       split; [| now eauto ]. eapply Hoot; eauto.
     - inv H.
       rewrite !to_nat_add in *. assert (Hg := to_nat_one (exp_to_fin (Ecase x1 ((t, e1) :: B1)))). unfold one in *.
-      inv H3. destruct (var_dec t t0). 
-    + inv H5; [| contradiction ]; subst.
+      inv H2. destruct (var_dec t t0). 
+    + inv H4; [| contradiction ]; subst.
       edestruct (Hexp_hd (k - 1)) as [v2 [c2 [c2' [Hstep2 [Hpost Hpre2]]]]];
         [ | | eassumption | ]; eauto. simpl in *; lia. simpl in *; lia.
 
@@ -924,17 +924,17 @@ Section LogRelCC.
      destruct v2'; try (now simpl in Hpre; contradiction). inv Hpre. 
      
      repeat eexists.
-     * econstructor 2; eauto. econstructor; eauto. econstructor; eauto.
-       eapply caseConsistent_same_ctor_tags. eassumption. eassumption.
-       now constructor. 
+     *
+       econstructor 2; eauto.
+       econstructor; eauto. econstructor; eauto.
      * eapply Hposthd; eauto.
      * eapply cc_approx_res_monotonic. eassumption. 
        simpl in *; lia.
-    + inv H5. contradiction.
+    + inv H4. contradiction.
       edestruct Hexp_tl with (cin1 := cin <+> one (Ecase x1 B1)) as [v2 [c2 [c3 [Hstep2 [Hpost2 Hpre2]]]]].
       * rewrite to_nat_add. unfold one in *; simpl in *; lia. 
       * econstructor 2; eauto. econstructor; eauto.  
-      * eapply Henv in H2. destruct H2 as [v2' [Hgetx2 Hval]]. 
+      * eapply Henv in H0. destruct H0 as [v2' [Hgetx2 Hval]]. 
         assert (Hval' := Hval). rewrite cc_approx_val_eq in Hval'. 
         destruct v2'; try contradiction. simpl in Hval'. inv Hval'.  
         inv Hstep2. 
@@ -944,7 +944,7 @@ Section LogRelCC.
         -- inv H.  repeat subst_exp.
            do 3 eexists. split; [| split ].
            econstructor 2. econstructor; eauto. econstructor; eauto. 
-           now econstructor; eauto.
+           (* now econstructor; eauto. *)
            eapply Hposttl. eassumption.
            simpl. rewrite to_nat_add in Hpre2. unfold one in *. eassumption. 
   Qed. 
@@ -1145,7 +1145,7 @@ Section LogRelCC.
 
     Context (P1 P2 : @PostT fuel trace) (* Local *)
             (PG  : @PostGT fuel trace) (* Global *)
-            (Hprops : Post_properties cenv PG PG PG)
+            (Hprops : Post_properties PG PG PG)
             (HGPost : inclusion _ (comp P1 P2) PG)
             (Hp1 : inclusion _ PG P1)
             (Hp2 : inclusion _ PG P2).
@@ -1155,10 +1155,10 @@ Section LogRelCC.
       (forall j v1 v2 v3,
           j <= k ->
           cc_approx_val j PG v1 v2 ->
-          (forall k, preord_val cenv PG k v2 v3) ->
+          (forall k, preord_val PG k v2 v3) ->
           cc_approx_val j PG v1 v3) ->
       cc_approx_res cc_approx_val k PG r1 r2 ->
-      (forall k', preord_res (preord_val cenv) PG k' r2 r3) ->
+      (forall k', preord_res (preord_val) PG k' r2 r3) ->
       cc_approx_res cc_approx_val k PG r1 r3.
     Proof.
       intros Hyp H1 H2;
@@ -1171,10 +1171,10 @@ Section LogRelCC.
       (forall j v1 v2 v3,
           j <= k ->
           cc_approx_val j PG v1 v2 ->
-          (forall k, preord_val cenv PG k v2 v3) ->
+          (forall k, preord_val PG k v2 v3) ->
           cc_approx_val j PG v1 v3) ->
       cc_approx_exp k P1 PG (e1, rho1) (e2, rho2) ->
-      (forall k', preord_exp cenv P2 PG k' (e2, rho2) (e3, rho3)) ->
+      (forall k', preord_exp P2 PG k' (e2, rho2) (e3, rho3)) ->
       cc_approx_exp k (comp P1 P2) PG (e1, rho1) (e3, rho3).
     Proof.
       intros IH Hexp1 Hexp2 v1 c Hleq1 Hstep1 Hns.
@@ -1205,13 +1205,13 @@ Section LogRelCC.
 
   Lemma cc_approx_val_respects_preord_val_r (k : nat) (v1 v2 v3 : val) :
     cc_approx_val k PG v1 v2 ->
-    (forall k, preord_val cenv PG k v2 v3) ->
+    (forall k, preord_val PG k v2 v3) ->
     cc_approx_val k PG v1 v3.
   Proof.
     revert v1 v2 v3. induction k using lt_wf_rec.
     induction v1 using val_ind'; intros v2 v3 Happrox Hpre;
     assert (Hpre' := Hpre k);
-    rewrite cc_approx_val_eq, preord_val_eq in *.
+    rewrite cc_approx_val_eq in *; rewrite preord_val_eq in Hpre'.
     - destruct v2; try contradiction.
       destruct v3; try contradiction.
       inv Happrox; inv Hpre'. inv H1; inv H2. split; eauto.
@@ -1277,7 +1277,7 @@ Section LogRelCC.
   Corollary cc_approx_exp_respects_preord_exp_r (k : nat)
         (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) :
     cc_approx_exp k P1 PG (e1, rho1) (e2, rho2) ->
-    (forall k', preord_exp cenv P2 PG k' (e2, rho2) (e3, rho3)) ->
+    (forall k', preord_exp P2 PG k' (e2, rho2) (e3, rho3)) ->
     cc_approx_exp k (comp P1 P2) PG (e1, rho1) (e3, rho3).
   Proof.
     eapply cc_approx_exp_respects_preord_exp_r_pre.
@@ -1288,7 +1288,7 @@ Section LogRelCC.
   (* Sadly, composing with the preord relation on the left doesn't seem provable *)
 
   Lemma cc_approx_exp_respects_preord_exp_l (rho1 rho2 rho3 : env) (e1 e2 e3 : exp) k:
-    (forall k, preord_exp cenv P1 PG k (e1, rho1) (e2, rho2)) ->
+    (forall k, preord_exp P1 PG k (e1, rho1) (e2, rho2)) ->
     cc_approx_exp k P2 PG (e2, rho2) (e3, rho3) ->
     cc_approx_exp k (comp P1 P2) PG (e1, rho1) (e3, rho3).
   Proof.
@@ -1297,25 +1297,25 @@ Section LogRelCC.
   Abort.
   
   Lemma cc_approx_val_respects_preord_val_l (v1 v2 v3 : val) :
-    (forall k, preord_val cenv PG k v1 v2) ->
+    (forall k, preord_val PG k v1 v2) ->
     (forall k, cc_approx_val k PG v2 v3) ->
     (forall k, cc_approx_val k PG v1 v3).
   Proof.
     intros H1 H2 k. 
     revert v1 v2 v3 H1 H2. induction k as [k IHK] using lt_wf_rec.
-    induction v1 using val_ind'; intros v2 v3 Hpre Happrox;
-      assert (Hpre' := Hpre k);
-      assert (Happrox' := Happrox k); 
-      rewrite cc_approx_val_eq, preord_val_eq in *.    
-    - admit.
-    - admit.
-    - destruct v2; try contradiction.
-      destruct v3; try contradiction.
-      destruct l. now inv Happrox'.
-      simpl in Happrox'.
-      destruct v1; try contradiction.
-      destruct l. now inv Happrox'.
-      destruct v2; try contradiction.
+    induction v1 using val_ind'; intros v2 v3 Hpre Happrox.
+    (*   assert (Hpre' := Hpre k); *)
+    (*   assert (Happrox' := Happrox k);  *)
+    (*   rewrite cc_approx_val_eq in *; rewrite preord_val_eq in *.   *)
+    (* - admit. *)
+    (* - admit. *)
+    (* - destruct v2; try contradiction. *)
+    (*   destruct v3; try contradiction. *)
+    (*   destruct l. now inv Happrox'. *)
+    (*   simpl in Happrox'. *)
+    (*   destruct v1; try contradiction. *)
+    (*   destruct l. now inv Happrox'. *)
+    (*   destruct v2; try contradiction. *)
 (*        
       intros vs1 vs2 i t2 xs1 e1 rho1 Hleneq Hfdef Hset. 
       simpl in Hpre'. 
@@ -1340,8 +1340,8 @@ Section LogRelCC.
           (PG : @PostGT fuel trace) e1 rho1 e2 rho2
           (Hrel : post_upper_bound P) :
       (forall k, cc_approx_exp k P PG (e1, rho1) (e2, rho2)) ->
-      @diverge cenv fuel _ trace _ rho1 e1 -> 
-      @diverge cenv fuel _ trace _ rho2 e2.
+      @diverge fuel _ trace _ rho1 e1 -> 
+      @diverge fuel _ trace _ rho2 e2.
     Proof.
       intros Hexp Hdiv. assert (Hdiv' := Hdiv).
       specialize (Hrel e1 rho1 e2 rho2). inv Hrel.
@@ -1359,8 +1359,8 @@ Section LogRelCC.
           (PG : @PostGT fuel trace) e1 rho1 e2 rho2
           (Hrel : post_upper_bound P) :
       (forall k, cc_approx_exp k P PG (e1, rho1) (e2, rho2)) ->
-      @not_stuck cenv fuel _ trace _ rho1 e1 -> 
-      @not_stuck cenv fuel _ trace _ rho2 e2.
+      @not_stuck fuel _ trace _ rho1 e1 -> 
+      @not_stuck fuel _ trace _ rho2 e2.
     Proof.
       intros Hexp Hns. assert (Hns' := Hns). inv Hns.
       - destructAll.
@@ -1846,4 +1846,4 @@ Section LogRelCC.
 
 End LogRelCC.
 
-Notation cc_approx_exp := (fun cenv ct => (cc_approx_exp' cenv (cc_approx_val cenv ct))).
+Notation cc_approx_exp := (fun ct => (cc_approx_exp' (cc_approx_val ct))).

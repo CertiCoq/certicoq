@@ -122,12 +122,12 @@ Section Shrink_correct.
   Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
 
   Variable (P1 : nat ->  @PostT fuel trace) (PG : @PostGT fuel trace)
-           (HPost : forall n, n <= 1 -> Post_properties cenv (P1 n) (P1 n) PG)
-           (HPost' : Post_properties cenv PG PG PG) 
+           (HPost : forall n, n <= 1 -> Post_properties (P1 n) (P1 n) PG)
+           (HPost' : Post_properties PG PG PG) 
 
            (Hless_steps_app : forall f ft ys rho1 e2 rho2, post_Eapp_l (P1 0) (P1 1) f ft ys rho1 e2 rho2)
-           (Hless_steps_letapp : remove_steps_letapp cenv (P1 0) (P1 0) (P1 1))                     
-           (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv (P1 0) (P1 1)).
+           (Hless_steps_letapp : remove_steps_letapp (P1 0) (P1 0) (P1 1))                     
+           (Hless_steps_letapp_OOT : remove_steps_letapp_OOT (P1 0) (P1 1)).
    
   Context (Hless_steps_ctx :
              forall C e1 rho1 (rho1' : env) (e2 : exp) (rho2 : env) (cin1 cin2 : fuel)
@@ -150,11 +150,11 @@ Section Shrink_correct.
 
   Lemma rm_constr k rho rho' e' v t l :
     ~ occurs_free e' v ->
-    preord_env_P cenv PG (occurs_free e' \\ [set v]) k rho rho' ->
-    preord_exp cenv (P1 1) PG k (Econstr v t l e', rho) (e', rho').
+    preord_env_P PG (occurs_free e' \\ [set v]) k rho rho' ->
+    preord_exp (P1 1) PG k (Econstr v t l e', rho) (e', rho').
   Proof.
     intros Hnin Henv.
-    eapply ctx_to_rho_preord_exp_l with (C := Econstr_c v t l Hole_c) (P1 := P1 0).
+    eapply ctx_to_rho_preord_exp_l with (C := Econstr_c v t l Hole_c) (P2 := P1 0).
     - intros; eapply Hless_steps_ctx; eauto.
     - simpl. eapply HPost_OOT.
     - reflexivity.
@@ -166,11 +166,11 @@ Section Shrink_correct.
   
   Lemma rm_prim k rho rho' e x p l :
     ~occurs_free e x ->
-    preord_env_P cenv PG (occurs_free e \\ [set x]) k rho rho' ->
-    preord_exp cenv (P1 1) PG k (Eprim x p l e, rho) (e, rho').
+    preord_env_P PG (occurs_free e \\ [set x]) k rho rho' ->
+    preord_exp (P1 1) PG k (Eprim x p l e, rho) (e, rho').
   Proof.
     intros Hnin Henv.
-    eapply ctx_to_rho_preord_exp_l with (C := Eprim_c x p l Hole_c) (P1 := P1 0).
+    eapply ctx_to_rho_preord_exp_l with (C := Eprim_c x p l Hole_c) (P2 := P1 0).
     - intros; eapply Hless_steps_ctx; eauto.
     - simpl. eapply HPost_OOT.
     - reflexivity.
@@ -180,11 +180,11 @@ Section Shrink_correct.
 
   Lemma rm_proj k rho rho' e x t n y :
     ~occurs_free e x ->
-    preord_env_P cenv PG (occurs_free e \\ [set x]) k rho rho' ->
-    preord_exp cenv (P1 1) PG k (Eproj x t n y e, rho) (e, rho').
+    preord_env_P PG (occurs_free e \\ [set x]) k rho rho' ->
+    preord_exp (P1 1) PG k (Eproj x t n y e, rho) (e, rho').
   Proof.
     intros Hnin Henv.
-    eapply ctx_to_rho_preord_exp_l with (C := Eproj_c x t n y Hole_c) (P1 := P1 0).
+    eapply ctx_to_rho_preord_exp_l with (C := Eproj_c x t n y Hole_c) (P2 := P1 0).
     - intros; eapply Hless_steps_ctx; eauto.
     - simpl. eapply HPost_OOT.
     - reflexivity.
@@ -290,10 +290,10 @@ Section Shrink_correct.
 
   Lemma rm_fundefs_of k rho rho' e fds :
       Forall (fun v => ~ occurs_free e v) (all_fun_name fds) ->
-      preord_env_P cenv PG (occurs_free e \\ name_in_fundefs fds)  k rho rho' ->
-      preord_exp cenv (P1 1) PG k (Efun fds e, rho) (e, rho').
+      preord_env_P PG (occurs_free e \\ name_in_fundefs fds)  k rho rho' ->
+      preord_exp (P1 1) PG k (Efun fds e, rho) (e, rho').
   Proof.
-    intros Hall Hpre. eapply ctx_to_rho_preord_exp_l with (C := Efun1_c fds Hole_c) (P1 := P1 0).
+    intros Hall Hpre. eapply ctx_to_rho_preord_exp_l with (C := Efun1_c fds Hole_c) (P2 := P1 0).
     - intros; eapply Hless_steps_ctx; eauto.
     - intros; eapply HPost_OOT.
     - reflexivity.
@@ -308,8 +308,8 @@ Section Shrink_correct.
 
   Lemma rm_fundefs: forall k rho rho' e fds,
       Forall (fun v => num_occur e v 0) (all_fun_name fds) ->
-      preord_env_P cenv PG (occurs_free e \\ name_in_fundefs fds)  k rho rho' ->
-      preord_exp cenv (P1 1) PG k (Efun fds e, rho) (e, rho').
+      preord_env_P PG (occurs_free e \\ name_in_fundefs fds)  k rho rho' ->
+      preord_exp (P1 1) PG k (Efun fds e, rho) (e, rho').
   Proof.
     intros. eapply rm_fundefs_of; eauto.
     eapply Forall_impl; [| eassumption ]. intros.
@@ -379,8 +379,8 @@ Section Shrink_correct.
   Lemma rm_any_fundefs: forall k rho1 rho2 fb e B1 B2 xs t f ,
       unique_functions (fundefs_append B1 (Fcons f t xs fb B2)) ->
       num_occur (Efun (fundefs_append B1 B2) e) f 0 ->
-      preord_env_P cenv PG (occurs_free (Efun (fundefs_append B1 B2) e)) k rho1 rho2 ->
-      preord_exp cenv (P1 1) PG k (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e, rho1)
+      preord_env_P PG (occurs_free (Efun (fundefs_append B1 B2) e)) k rho1 rho2 ->
+      preord_exp (P1 1) PG k (Efun (fundefs_append B1 (Fcons f t xs fb B2)) e, rho1)
                  ((Efun (fundefs_append B1 B2) e), rho2).
   Proof.
     intros k rho1 rho2 fb e B1 B2 xs t f Hnin Hub H H0. destruct (HPost 1). lia.
@@ -411,7 +411,7 @@ Section Shrink_correct.
            erewrite <- find_def_fundefs_append_Fcons_neq; eassumption.
            intros Hlt Hall.
            eapply preord_exp_refl; eauto.
-           eapply preord_env_P_set_lists_l with (P1 := occurs_free e1 \\ FromList xs1); eauto.
+           eapply preord_env_P_set_lists_l with (P2 := occurs_free e1 \\ FromList xs1); eauto.
            replace i with (i + 1 - 1) by lia.
            erewrite find_def_fundefs_append_Fcons_neq in Hf1; try eassumption.
            eapply IHk'. lia. eassumption. eassumption.
@@ -709,19 +709,19 @@ Section Shrink_correct.
         Disjoint var (bound_stem_ctx c) S ->
         eq_env_P S rho1 rho1' ->
         eq_env_P S rho2 rho2' ->
-        preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) m rho1' rho2' ->
-        preord_exp cenv (P1 1) PG m (c |[ e1 ]|, rho1') (c |[ e2 ]|, rho2')) ->
-    preord_env_P cenv PG (occurs_free_fundefs (B' <[ e1 ]>) :|: S1) k rho1 rho2 ->
+        preord_env_P PG (occurs_free (c |[ e1 ]|) :|: S1) m rho1' rho2' ->
+        preord_exp (P1 1) PG m (c |[ e1 ]|, rho1') (c |[ e2 ]|, rho2')) ->
+    preord_env_P PG (occurs_free_fundefs (B' <[ e1 ]>) :|: S1) k rho1 rho2 ->
     Disjoint var (Union var (names_in_fundefs_ctx B) (bound_stem_fundefs_ctx B)) S ->
     Disjoint var (Union var (names_in_fundefs_ctx B') (bound_stem_fundefs_ctx B')) S ->
-    preord_env_P cenv PG (S1 :|: (occurs_free_fundefs (B' <[ e1 ]>)) :|: (name_in_fundefs (B <[ e1 ]>)))
+    preord_env_P PG (S1 :|: (occurs_free_fundefs (B' <[ e1 ]>)) :|: (name_in_fundefs (B <[ e1 ]>)))
                  k (def_funs (B' <[ e1 ]>) (B <[ e1 ]>) rho1 rho1)
                  (def_funs (B' <[ e2 ]>) (B <[ e2 ]>) rho2 rho2).
   Proof.
     revert B rho1 rho2 B' e1 e2 S1.
     induction k as [ k IH' ] using lt_wf_rec1.
     intros B rho1 rho2 B' e1 e2 S1 Hpre Henv Hbv Hbv'.
-    assert (Hval : forall f, preord_val cenv PG k (Vfun rho1 (B' <[ e1 ]>) f)
+    assert (Hval : forall f, preord_val PG k (Vfun rho1 (B' <[ e1 ]>) f)
                                    (Vfun rho2 (B' <[ e2 ]>) f)).
     { intros f. rewrite preord_val_eq.
       intros vs1 vs2 j t1 xs1 e' rho1' Hlen Hf Hs.
@@ -812,14 +812,14 @@ Section Shrink_correct.
   (* This means that only bound variables on the applicative context c will modify the evaluation context rho *)
   Lemma preord_exp_compat_vals_stem_set S1 S k rho1 rho2 c e1 e2 :
     (forall k' rho1' rho2', k' <= k ->
-                       preord_env_P cenv PG (occurs_free e1 :|: S1) k' rho1' rho2' ->
+                       preord_env_P PG (occurs_free e1 :|: S1) k' rho1' rho2' ->
 
                        eq_env_P S rho1 rho1' ->
                        eq_env_P S rho2 rho2' ->
-                       preord_exp cenv (P1 1) PG k' (e1, rho1') (e2, rho2')) ->
+                       preord_exp (P1 1) PG k' (e1, rho1') (e2, rho2')) ->
     Disjoint var (bound_stem_ctx c) S ->
-    preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
-    preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
+    preord_env_P PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
+    preord_exp (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     revert c S1 S rho1 rho2 e1 e2. induction k as [ k IH' ] using lt_wf_rec1.
     induction c; intros S1 S rho1 rho2 e1 e2 Hyp Hbv Hpre; eauto; (destruct (HPost 1); [ lia | ]).
@@ -971,16 +971,16 @@ Section Shrink_correct.
 
 
   Corollary preord_exp_compat_stem_vals_le S1 xs vs vs' k rho1 rho2 c e1 e2 :
-    (forall k' rho1 rho2, preord_env_P cenv PG (occurs_free e1 :|: S1) k' rho1 rho2 ->
+    (forall k' rho1 rho2, preord_env_P PG (occurs_free e1 :|: S1) k' rho1 rho2 ->
                      k' <= k ->
                      get_list xs rho1 = Some vs ->
                      get_list xs rho2 = Some vs' ->
-                     preord_exp cenv (P1 1) PG k' (e1, rho1) (e2, rho2)) ->
+                     preord_exp (P1 1) PG k' (e1, rho1) (e2, rho2)) ->
     Disjoint var (bound_stem_ctx c) (FromList xs) ->
     get_list xs rho1 = Some vs ->
     get_list xs rho2 = Some vs' ->
-    preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
-    preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
+    preord_env_P PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
+    preord_exp (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     intros.
     eapply preord_exp_compat_vals_stem_set with (S0 := FromList xs); eauto.
@@ -994,16 +994,16 @@ Section Shrink_correct.
   Qed.
 
   Corollary preord_exp_compat_vals_le S1 xs vs vs' k rho1 rho2 c e1 e2 :
-    (forall k' rho1 rho2, preord_env_P cenv PG (occurs_free e1 :|: S1) k' rho1 rho2 ->
+    (forall k' rho1 rho2, preord_env_P PG (occurs_free e1 :|: S1) k' rho1 rho2 ->
                      k' <= k ->
                      get_list xs rho1 = Some vs ->
                      get_list xs rho2 = Some vs' ->
-                     preord_exp cenv (P1 1) PG k' (e1, rho1) (e2, rho2)) ->
+                     preord_exp (P1 1) PG k' (e1, rho1) (e2, rho2)) ->
     Disjoint var (bound_var_ctx c) (FromList xs) ->
     get_list xs rho1 = Some vs ->
     get_list xs rho2 = Some vs' ->
-    preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
-    preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
+    preord_env_P PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
+    preord_exp (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     intros.
     eapply preord_exp_compat_stem_vals_le; eauto.
@@ -1012,13 +1012,13 @@ Section Shrink_correct.
   Qed.
 
   Corollary preord_exp_compat_stem_val S1 x k val rho1 rho2 c e1 e2 :
-    (forall k rho1 rho2, preord_env_P cenv PG (occurs_free e1 :|: S1) k rho1 rho2 ->
+    (forall k rho1 rho2, preord_env_P PG (occurs_free e1 :|: S1) k rho1 rho2 ->
                          M.get x rho1 = Some val ->
-                         preord_exp cenv (P1 1) PG k (e1, rho1) (e2, rho2)) ->
+                         preord_exp (P1 1) PG k (e1, rho1) (e2, rho2)) ->
     ~ bound_stem_ctx c x ->
     M.get x rho1 = Some val ->
-    preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
-    preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
+    preord_env_P PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
+    preord_exp (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     intros.
     eapply preord_exp_compat_vals_stem_set with (S0 := Singleton _ x); auto.
@@ -1031,13 +1031,13 @@ Section Shrink_correct.
   Qed.
 
   Corollary preord_exp_compat_val S1 x k val rho1 rho2 c e1 e2 :
-    (forall k rho1 rho2, preord_env_P cenv PG (occurs_free e1 :|: S1) k rho1 rho2 ->
+    (forall k rho1 rho2, preord_env_P PG (occurs_free e1 :|: S1) k rho1 rho2 ->
                          M.get x rho1 = Some val ->
-                         preord_exp cenv (P1 1) PG k (e1, rho1) (e2, rho2)) ->
+                         preord_exp (P1 1) PG k (e1, rho1) (e2, rho2)) ->
     ~ bound_var_ctx c x ->
     M.get x rho1 = Some val ->
-    preord_env_P cenv PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
-    preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
+    preord_env_P PG (occurs_free (c |[ e1 ]|) :|: S1) k rho1 rho2 ->
+    preord_exp (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     intros. eapply preord_exp_compat_stem_val; eauto.
     intro; apply H0.
@@ -1047,18 +1047,18 @@ Section Shrink_correct.
 
 
   Lemma rw_case_local (k0 : nat) c0 vs e cl x n (rho0 rho3 : env) :
-      preord_env_P cenv PG (occurs_free (Ecase x cl)) k0 rho0 rho3 ->
+      preord_env_P PG (occurs_free (Ecase x cl)) k0 rho0 rho3 ->
       find_tag_nth cl c0 e n ->
       M.get x rho0 = Some (Vconstr c0 vs) ->
-      preord_exp cenv (P1 1) PG k0 (Ecase x cl, rho0) (e, rho3).
+      preord_exp (P1 1) PG k0 (Ecase x cl, rho0) (e, rho3).
   Proof.
     intros Hcc Hf Hget v1 c1 c2 Hleq Hs. inv Hs.
     + do 3 eexists. split; [| split ]. eapply bstep_fuel_zero_OOT. eapply lt_one in H. subst.
       eapply HPost_OOT. eapply zero_one_lt.
       now simpl; eauto.
     + inv H; repeat subst_exp.
-      eapply find_tag_nth_deterministic in H5; [| clear H5; eassumption ]. inv H5.
-      edestruct (preord_exp_refl cenv (P1 0) PG). now eauto.
+      eapply find_tag_nth_deterministic in H4; [| clear H4; eassumption ]. inv H4.
+      edestruct (preord_exp_refl (P1 0) PG). now eauto.
       eapply preord_env_P_antimon. apply Hcc. 3:{ eassumption. }
       eapply occurs_free_Ecase_Included. eapply find_tag_nth_In_patterns; eassumption.
       rewrite to_nat_add in Hleq. simpl; lia.
@@ -1073,8 +1073,8 @@ Section Shrink_correct.
   Lemma rw_case_equiv  cl c0 e n x c ys rho1 rho2 k :
     find_tag_nth cl c0 e n ->
     ~bound_stem_ctx c x ->
-    preord_env_P cenv PG (occurs_free (Econstr x c0 ys (c |[ Ecase x cl ]|))) k rho1 rho2 ->
-    preord_exp cenv (P1 1) PG k (Econstr x c0 ys (c |[ Ecase x cl ]|), rho1) (Econstr x c0 ys (c |[ e ]|), rho2).
+    preord_env_P PG (occurs_free (Econstr x c0 ys (c |[ Ecase x cl ]|))) k rho1 rho2 ->
+    preord_exp (P1 1) PG k (Econstr x c0 ys (c |[ Ecase x cl ]|), rho1) (Econstr x c0 ys (c |[ e ]|), rho2).
   Proof.
     intros Hf Hb Henv. assert (HP := HPost). destruct (HP 1). lia.
     eapply preord_exp_constr_compat; eauto.
@@ -1094,9 +1094,9 @@ Section Shrink_correct.
   Lemma preord_env_P_inj_remove (S : Ensemble var) (rho1 rho2 : env)
         (k : nat) m (x  : var) (v1 v2 : val) :
     ~ x \in (image' (fun x => M.get x m) (S \\ [set x])) ->
-    preord_env_P_inj cenv PG (S \\ [set x]) k (apply_r m) rho1 rho2 ->
-    preord_val cenv PG k v1 v2 ->
-    preord_env_P_inj cenv PG S k (apply_r (M.remove x m)) (M.set x v1 rho1) (M.set x v2 rho2).
+    preord_env_P_inj PG (S \\ [set x]) k (apply_r m) rho1 rho2 ->
+    preord_val PG k v1 v2 ->
+    preord_env_P_inj PG S k (apply_r (M.remove x m)) (M.set x v1 rho1) (M.set x v2 rho2).
   Proof.
     intros Hnin Henv Hv z HP. unfold extend.
     destruct (peq z x) as [| Hneq].
@@ -1114,11 +1114,11 @@ Section Shrink_correct.
   Lemma preord_env_P_inj_set_lists_remove_all (S : var -> Prop) (rho1 rho2 rho1' rho2' : env)
         (k : nat) (xs1 : list var) (vs1 vs2 : list val) m :
     Disjoint _ (image' (fun x => M.get x m) (S \\ FromList xs1)) (FromList xs1) ->
-    preord_env_P_inj cenv PG (S \\ (FromList xs1)) k (apply_r m) rho1 rho2 ->
-    Forall2 (preord_val cenv PG k) vs1 vs2 ->
+    preord_env_P_inj PG (S \\ (FromList xs1)) k (apply_r m) rho1 rho2 ->
+    Forall2 (preord_val PG k) vs1 vs2 ->
     set_lists xs1 vs1 rho1 = Some rho1' ->
     set_lists xs1 vs2 rho2 = Some rho2' ->
-    preord_env_P_inj cenv PG S k (apply_r (remove_all m xs1))  rho1' rho2'.
+    preord_env_P_inj PG S k (apply_r (remove_all m xs1))  rho1' rho2'.
   Proof with now eauto with Ensembles_DB.
     revert S rho1 rho2 rho1' rho2' vs1 vs2 m.
     induction xs1; intros S rho1 rho2 rho1' rho2' vs1 vs2 m Hd Hpre Hall Hs1 Hs2.
@@ -1144,8 +1144,8 @@ Section Shrink_correct.
 
   Lemma rename_all_correct k (m : M.t var) e1 rho1 rho2 n (Hleq : n <= 1):
     Disjoint _ (image' (fun x => M.get x m) (occurs_free e1)) (bound_var e1) ->
-    preord_env_P_inj cenv PG (occurs_free e1) k (apply_r m) rho1 rho2 ->
-    preord_exp cenv (P1 n) PG k (e1, rho1) (rename_all m e1, rho2).
+    preord_env_P_inj PG (occurs_free e1) k (apply_r m) rho1 rho2 ->
+    preord_exp (P1 n) PG k (e1, rho1) (rename_all m e1, rho2).
   Proof.
     revert e1 m rho1 rho2. induction k as [k IHk] using lt_wf_rec1.
     intros e1.
@@ -1330,15 +1330,15 @@ Section Shrink_correct.
 
 
   Lemma preord_env_P_inj_id S k rho1 rho2 : 
-    preord_env_P cenv PG S k rho1 rho2 ->
-    preord_env_P_inj cenv PG S k id rho1 rho2.
+    preord_env_P PG S k rho1 rho2 ->
+    preord_env_P_inj PG S k id rho1 rho2.
   Proof.
     intros Henv z Hin v1 Hgetz. eapply Henv; eauto. 
   Qed.
 
   Lemma preord_env_P_inj_map_id S k rho1 rho2 : 
-    preord_env_P cenv PG S k rho1 rho2 ->
-    preord_env_P_inj cenv PG S k (apply_r (M.empty _)) rho1 rho2.
+    preord_env_P PG S k rho1 rho2 ->
+    preord_env_P_inj PG S k (apply_r (M.empty _)) rho1 rho2.
   Proof.
     intros Henv z Hin v1 Hgetz. unfold apply_r. rewrite M.gempty.
     eapply Henv; eauto. 
@@ -1362,8 +1362,8 @@ Section Shrink_correct.
       x <> y ->
       x' <> y ->
       nthN ys n = Some y ->
-      preord_env_P cenv PG (occurs_free (Econstr x t ys (c |[ Eproj x' t' n x e ]|))) k rho1 rho2 ->
-      preord_exp cenv (P1 1) PG k (Econstr x t ys (c |[ Eproj x' t' n x e ]|) , rho1 )
+      preord_env_P PG (occurs_free (Econstr x t ys (c |[ Eproj x' t' n x e ]|))) k rho1 rho2 ->
+      preord_exp (P1 1) PG k (Econstr x t ys (c |[ Eproj x' t' n x e ]|) , rho1 )
                  (Econstr x t ys (c |[ rename y x' e ]|), rho2).
   Proof.
     intros Hn1 Hn2 Hn3 Hleq Hneq Hnth Henv. assert (HP := HPost 1). destruct HP. lia.
@@ -1373,14 +1373,14 @@ Section Shrink_correct.
       edestruct (@get_list_nth_get val ys vs2) as [v2 [Hnth2 Hget2]]; eauto.
       edestruct (@get_list_nth_get val ys vs1) as [v1 [Hnth1 Hget1]]; eauto.
       
-      assert (Hval : preord_val cenv PG k v1 v2).
+      assert (Hval : preord_val PG k v1 v2).
       { edestruct preord_env_P_get_list_l as [vs2' [Hg2' Hvs]]; [| | eapply Hg1 |].
         eassumption. normalize_occurs_free; sets. subst_exp. eapply Forall2_nthN'; eassumption. }
       
       eapply preord_exp_compat_stem_vals_le with (xs := [x ; y]) (S1 := Empty_set _);
         [ | | simpl; rewrite M.gss, M.gso, Hget1; eauto | simpl; rewrite M.gss, M.gso, Hget2; eauto | ].
       * intros k1 rho1' rho2' Hpre Hleq1 Hgetl1 Hgetl2.
-        eapply ctx_to_rho_preord_exp_l with (C := Eproj_c x' t' n x Hole_c) (P1 := P1 0).
+        eapply ctx_to_rho_preord_exp_l with (C := Eproj_c x' t' n x Hole_c) (P2 := P1 0).
         
         -- intros; eapply Hless_steps_ctx; eauto.
         -- eassumption.
@@ -1483,8 +1483,8 @@ Section Shrink_correct.
     Disjoint var (bound_stem_ctx c) (occurs_free_fundefs fds)  ->
     Disjoint var (bound_stem_ctx c) (name_in_fundefs fds)  ->
     
-    preord_env_P cenv PG (occurs_free (Efun fds (c |[ Eapp f t vs ]|))) k rho1 rho2 ->
-    preord_exp cenv (P1 1) PG k
+    preord_env_P PG (occurs_free (Efun fds (c |[ Eapp f t vs ]|))) k rho1 rho2 ->
+    preord_exp (P1 1) PG k
                (Efun fds (c |[ Eapp f t vs ]|), rho1)
                (Efun fds (c |[ (rename_all (set_list (combine xs vs) (M.empty var)) fb)]|), rho2).
   Proof.
@@ -1585,8 +1585,8 @@ Section Shrink_correct.
       (rename_all
          (set_list (combine xs vs) (M.empty var)) fb) x = Some (C', x') ->
 
-    preord_env_P cenv PG (occurs_free (Efun fds (c |[ Eletapp x f t vs e1 ]|))) k rho1 rho2 ->
-    preord_exp cenv (P1 1) PG k
+    preord_env_P PG (occurs_free (Efun fds (c |[ Eletapp x f t vs e1 ]|))) k rho1 rho2 ->
+    preord_exp (P1 1) PG k
                (Efun fds (c |[ Eletapp x f t vs e1 ]|), rho1)
                (Efun fds (c |[ C' |[ rename x' x e1 ]| ]|), rho2).
   Proof.
@@ -1826,8 +1826,8 @@ Section Shrink_correct.
   Lemma rw_correct e e' :
     rw e e' ->
     forall rho rho' k,
-      preord_env_P cenv PG (occurs_free e) k rho rho'->
-      preord_exp cenv (P1 1) PG k (e, rho) (e', rho').
+      preord_env_P PG (occurs_free e) k rho rho'->
+      preord_exp (P1 1) PG k (e, rho) (e', rho').
   Proof.
     intros Hrw. inv Hrw.
     - intros; apply rm_constr; auto.
@@ -1887,8 +1887,8 @@ Section Shrink_correct.
   Lemma gen_rw_correct e e' :
     gen_rw e e' ->
     forall rho rho' k,
-      preord_env_P cenv PG (occurs_free e) k rho rho'->
-      preord_exp cenv (P1 1) PG k (e, rho) (e', rho').
+      preord_env_P PG (occurs_free e) k rho rho'->
+      preord_exp (P1 1) PG k (e, rho) (e', rho').
   Proof.
     intros H; inv H. intros. 
     apply preord_exp_compat; auto.
@@ -1902,8 +1902,8 @@ Section Shrink_correct.
   Lemma gr_clos_correct n e e' :  
     gr_clos n e e' ->
     forall rho rho' k,
-      preord_env_P cenv PG (occurs_free e) k rho rho'->
-      preord_exp cenv (P1 1) PG k (e, rho) (e', rho').
+      preord_env_P PG (occurs_free e) k rho rho'->
+      preord_exp (P1 1) PG k (e, rho) (e', rho').
   Proof with now eauto.
     intros H.
     induction H; intros.
@@ -4763,8 +4763,8 @@ substitution to a term cannot increase the occurence count for that variable. *)
   (*   Disjoint _ (bound_var e) (occurs_free e) -> *)
   (*   gsr_clos n e e' -> *)
   (*   forall pr cenv rho rho' k, *)
-  (*     preord_env_P cenv P1 PG (occurs_free e) k rho rho'-> *)
-  (*     preord_exp cenv P1 PG k (e, rho) (e', rho'). *)
+  (*     preord_env_P P1 PG (occurs_free e) k rho rho'-> *)
+  (*     preord_exp P1 PG k (e, rho) (e', rho'). *)
   (* Proof. *)
   (*   intros. *)
   (*   apply rw_correct. *)

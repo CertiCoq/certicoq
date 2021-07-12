@@ -28,7 +28,7 @@ Section Lambda_lifting_correct.
 
   Context (P1 : nat -> PostT) (* Local *) (* the nat parameter is the extra steps the target is allowed to take (e.g. c2 <= A*c1 + n) *)
           (PG : PostGT) (* Global *)
-          (Hcompat : forall n, Post_properties cenv (P1 n) (P1 n) PG) (* can be specialized to 0 *)
+          (Hcompat : forall n, Post_properties (P1 n) (P1 n) PG) (* can be specialized to 0 *)
 
           (HPost_fun' : post_fun_compat (P1 1) (P1 0))         
           (Hinc : inclusion _ (P1 0) PG)
@@ -107,8 +107,8 @@ Section Lambda_lifting_correct.
         get_list (map sig fvs) rho' = Some vs2' /\
         (* length vs2' <= PS.cardinal (fundefs_fv B1) /\ (* For the cost bound *) *)
         Some rho2' = set_lists xs2 (vs2 ++ vs2') (def_funs B2 B2 rho2 rho2) /\
-        (j < k -> Forall2 (preord_val cenv PG j) vs1 vs2 ->
-         preord_exp cenv (P1 1) PG j (e1, rho1') (e2, rho2')).
+        (j < k -> Forall2 (preord_val PG j) vs1 vs2 ->
+         preord_exp (P1 1) PG j (e1, rho1') (e2, rho2')).
  
   (** * Lemmas about [Funs_inv] *)  
   
@@ -275,7 +275,7 @@ Section Lambda_lifting_correct.
   Lemma Make_wrappers_correct k S f1 f2 z B S1 fds S2 rho1 rho2 :
     Make_wrappers z f1 B S1 fds S2 f2 ->
     
-    preord_env_P_inj cenv PG (S \\ name_in_fundefs B) k f1 rho1 rho2 ->
+    preord_env_P_inj PG (S \\ name_in_fundefs B) k f1 rho1 rho2 ->
     Funs_inv k rho1 rho2 f1 z ->
 
     Disjoint _ (image f1 (S \\ name_in_fundefs B :|: FunsFVs z)) S1 ->
@@ -286,7 +286,7 @@ Section Lambda_lifting_correct.
     (forall f, f \in name_in_fundefs B -> exists rho1c, M.get f rho1 = Some (Vfun rho1c B f)) -> 
     f_eq_subdomain (image' (lifted_name z) (name_in_fundefs B)) f1 id -> 
     
-    preord_env_P_inj cenv PG S k f2 rho1 (def_funs fds fds rho2 rho2).
+    preord_env_P_inj PG S k f2 rho1 (def_funs fds fds rho2 rho2).
   Proof.
     intros Hwr Henv Hfuns Hdis Hdis' Hun Hbin Hfeq x Hin.
     destruct (Decidable_name_in_fundefs B) as [Hdec]. destruct (Hdec x).
@@ -321,7 +321,7 @@ Section Lambda_lifting_correct.
         erewrite <- (get_list_length_eq (map f1 fvs) vs2'); eauto. 
         rewrite list_length_map. lia.
 
-        eapply preord_exp_app_r with (P1 := P1 1); [|  | | eassumption | | ].
+        eapply preord_exp_app_r with (P2 := P1 1); [|  | | eassumption | | ].
         * rewrite <- (map_length f1 fvs). rewrite Hleq. 
           rewrite <- app_length.  eapply P1_local_app'. 
         * assert (Hfeq'' : f2 f' = f'). {
@@ -426,10 +426,10 @@ Section Lambda_lifting_correct.
           Disjoint var (FunsFVs zeta) (Union _ S (bound_var e)) ->
           Disjoint _ (bound_var e) (occurs_free e) ->
           binding_in_map (image sig (Union _ (Union _ (occurs_free e) (FunsFVs zeta)) (LiftedFuns zeta))) rho' ->
-          preord_env_P_inj cenv PG (occurs_free e) m sig rho rho' ->
+          preord_env_P_inj PG (occurs_free e) m sig rho rho' ->
           Funs_inv m rho rho' sig zeta ->
           Exp_lambda_lift zeta sig e S e' S' ->
-          preord_exp cenv (P1 0) PG m (e, rho) (e', rho')) ->
+          preord_exp (P1 0) PG m (e, rho) (e', rho')) ->
     
     (* Unique bindings *)
     unique_bindings_fundefs B1 ->
@@ -456,7 +456,7 @@ Section Lambda_lifting_correct.
     binding_in_map (image sig (occurs_free_fundefs B1 :|: (FunsFVs zeta :|: LiftedFuns zeta))) rho' ->
     
     (** The invariant hold for the initial environments **)
-    preord_env_P_inj cenv PG (occurs_free_fundefs B1) k sig rho rho' ->
+    preord_env_P_inj PG (occurs_free_fundefs B1) k sig rho rho' ->
     Funs_inv k rho rho' sig zeta ->
     
     NoDup fvs ->
@@ -582,7 +582,7 @@ Section Lambda_lifting_correct.
         -- rewrite def_funs_eq. reflexivity. eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct. eassumption.
         -- now eauto.
         -- intros Hlt Hall. replace 1 with (0 + 1).
-           eapply ctx_to_rho_preord_exp with (C := Efun1_c C Hole_c). eassumption. eassumption. eassumption. (* TODO remove extra args ? *)
+           eapply ctx_to_rho_preord_exp with (C0 := Efun1_c C Hole_c). eassumption. eassumption. eassumption. (* TODO remove extra args ? *)
            ++ intros. eapply P1_ctx_r. eassumption. eassumption.
            ++ constructor. constructor.
            ++ { assert (Hsetapp' := Hsetapp). eapply set_lists_app in Hsetapp. edestruct Hsetapp as (rho2i & Hsetl1 & Hsetl2).
@@ -863,10 +863,10 @@ Section Lambda_lifting_correct.
           Disjoint var (FunsFVs zeta) (Union _ S (bound_var e)) ->
           Disjoint _ (bound_var e) (occurs_free e) ->
           binding_in_map (image sig (Union _ (Union _ (occurs_free e) (FunsFVs zeta)) (LiftedFuns zeta))) rho' ->
-          preord_env_P_inj cenv PG (occurs_free e) m sig rho rho' ->
+          preord_env_P_inj PG (occurs_free e) m sig rho rho' ->
           Funs_inv m rho rho' sig zeta ->
           Exp_lambda_lift zeta sig e S e' S' ->
-          preord_exp cenv (P1 0) PG m (e, rho) (e', rho')) ->
+          preord_exp (P1 0) PG m (e, rho) (e', rho')) ->
 
     (* Unique bindings *)
     unique_bindings_fundefs B1 ->
@@ -895,7 +895,7 @@ Section Lambda_lifting_correct.
                    rho' ->
 
     (** The invariant holds for the initial environments **)
-    preord_env_P_inj cenv PG (occurs_free (Efun B1 e)) k sig rho rho' ->
+    preord_env_P_inj PG (occurs_free (Efun B1 e)) k sig rho rho' ->
     Funs_inv k rho rho' sig zeta ->
 
     (forall x, x \in name_in_fundefs B1 -> sig x = x) ->
@@ -904,7 +904,7 @@ Section Lambda_lifting_correct.
 
 
     (** The invariants hold for the final environments **)
-    preord_env_P_inj cenv PG (occurs_free (Efun B1 e) :|: name_in_fundefs B1)
+    preord_env_P_inj PG (occurs_free (Efun B1 e) :|: name_in_fundefs B1)
                      k sig (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho'). (* /\ *)
     (* Funs_inv k (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (extend_fundefs sig B1 B1) zeta. *)
   Proof with now eauto with Ensembles_DB.
@@ -913,7 +913,7 @@ Section Lambda_lifting_correct.
       intros rho rho' B1 B2 sig zeta  S1 S2 e IHe Hun Hd1 Hd2 Hd3 Hd4 Hd5 Hd6 Hbin Henv Hfinv Hfeq Hllfuns.
     assert 
       (HB1 : forall j, j < k ->
-                       preord_env_P_inj cenv PG (occurs_free (Efun B1 e) :|: name_in_fundefs B1)
+                       preord_env_P_inj PG (occurs_free (Efun B1 e) :|: name_in_fundefs B1)
                                         j sig (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho')). (*  /\ *)
                        (* Funs_inv j (def_funs B1 B1 rho rho) (def_funs B2 B2 rho' rho') (extend_fundefs sig B1 B1) zeta) *)
     { intros j leq. eapply IHk; last (now apply Hllfuns); eauto.
@@ -1033,12 +1033,12 @@ Section Lambda_lifting_correct.
   Lemma Funs_inv_Eletapp k x f ft ys e f' ft' fvs e' sig zeta rho rho' :
     (forall (m : nat) (v1 v2 : val),
         m < k ->
-        preord_val cenv PG m v1 v2 -> preord_exp cenv (P1 0) PG m (e, M.set x v1 rho) (e', M.set x v2 rho')) ->
+        preord_val PG m v1 v2 -> preord_exp (P1 0) PG m (e, M.set x v1 rho) (e', M.set x v2 rho')) ->
     Funs_inv k rho rho' sig zeta ->
-    preord_env_P_inj cenv PG (occurs_free (Eletapp x f ft ys e)) k sig rho rho' ->
+    preord_env_P_inj PG (occurs_free (Eletapp x f ft ys e)) k sig rho rho' ->
     
     zeta f = Some (f', ft', fvs) ->
-    preord_exp cenv (P1 0) PG k (Eletapp x f ft ys e, rho) (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e', rho').
+    preord_exp (P1 0) PG k (Eletapp x f ft ys e, rho) (Eletapp x (sig f') ft' (map sig (ys ++ fvs)) e', rho').
   Proof.
     intros Hyp Hfuns Henv Hzeq v1 c1 t1 Hleq Hstep. inv Hstep.
     - eexists OOT, c1, zero. split; [| split; eauto ].
@@ -1105,10 +1105,10 @@ Section Lambda_lifting_correct.
 
   Lemma Funs_inv_Eapp k f ft ys f' ft' fvs sig zeta rho rho' :
     Funs_inv k rho rho' sig zeta ->
-    preord_env_P_inj cenv PG (occurs_free (Eapp f ft ys)) k sig rho rho' ->
+    preord_env_P_inj PG (occurs_free (Eapp f ft ys)) k sig rho rho' ->
     
     zeta f = Some (f', ft', fvs) ->
-    preord_exp cenv (P1 0) PG k (Eapp f ft ys, rho) (Eapp (sig f') ft' (map sig (ys ++ fvs)), rho').
+    preord_exp (P1 0) PG k (Eapp f ft ys, rho) (Eapp (sig f') ft' (map sig (ys ++ fvs)), rho').
   Proof.
     intros Hfuns Henv Hzeq v1 c1 t1 Hleq Hstep. inv Hstep.
     - eexists OOT, c1, <0>. split; [| split; eauto ].
@@ -1160,13 +1160,13 @@ Section Lambda_lifting_correct.
     (* All the free variables are in the environment *)
     binding_in_map (image sig (Union _ (Union _ (occurs_free e) (FunsFVs zeta)) (LiftedFuns zeta))) rho' ->
     (* The environments are related *)
-    preord_env_P_inj cenv PG (occurs_free e) k sig rho rho' ->
+    preord_env_P_inj PG (occurs_free e) k sig rho rho' ->
     (* The invariant about lifted functions hold*)
     Funs_inv k rho rho' sig zeta ->
     (* e' is the translation of e*)
     Exp_lambda_lift zeta sig e S e' S' ->
     (* e and e' are related *)
-    preord_exp cenv (P1 0) PG k (e, rho) (e', rho').
+    preord_exp (P1 0) PG k (e, rho) (e', rho').
    Proof with now eauto with Ensembles_DB.
     revert e rho rho' zeta sig S e' S'; induction k as [k IHk] using lt_wf_rec1; edestruct (Hcompat 0).
     induction e using exp_ind';
@@ -1708,9 +1708,9 @@ Section Lambda_lifting_correct.
        Disjoint _ (bound_var e') (occurs_free e') /\
        (max_var e' 1%positive < next_var c')%positive /\     
        (forall k rho1 rho2,
-           preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
+           preord_env_P PG (occurs_free e) k rho1 rho2 ->
            binding_in_map (occurs_free e) rho1 ->
-           preord_exp cenv (P1 0) PG k (e, rho1) (e', rho2)).
+           preord_exp (P1 0) PG k (e, rho1) (e', rho2)).
    Proof.
      intros Hun Hleq Hdis.
      set (lift_dec := if b then lift_all else lift_conservative).

@@ -58,7 +58,7 @@ Definition preserves_fv (e1 e2 : exp) := occurs_free e2 \subset occurs_free e1.
 
 Section RelComp.
 
-  Context (cenv : ctor_env) (ctag : ctor_tag).
+  Context (ctag : ctor_tag).
 
   Context (wf_pres : exp -> exp -> Prop) (post_prop : post_property).
 
@@ -67,17 +67,17 @@ Section RelComp.
   Definition preord_exp_n n := R_n wf_pres post_prop
                                    (fun P PG e1 e2 =>
                                       forall k rho1 rho2,
-                                        preord_env_P cenv PG (occurs_free e1) k rho1 rho2 ->
+                                        preord_env_P PG (occurs_free e1) k rho1 rho2 ->
                                         (* For certain proofs rho1 needs to be a closing substitution,
                                            to ensure that programs "get stuck in the same way" *)
                                         binding_in_map (occurs_free e1) rho1 ->
-                                        preord_exp cenv P PG k (e1, rho1) (e2, rho2)) n.  
+                                        preord_exp P PG k (e1, rho1) (e2, rho2)) n.  
   
-  Definition preord_env_n n S := R_n wf_trivial pr_trivial (fun P PG c1 c2 => forall k, preord_env_P cenv PG S k c1 c2) n.  
+  Definition preord_env_n n S := R_n wf_trivial pr_trivial (fun P PG c1 c2 => forall k, preord_env_P PG S k c1 c2) n.  
 
-  Definition preord_val_n n := R_n wf_trivial pr_trivial (fun P PG c1 c2 => forall k, preord_val cenv PG k c1 c2) n.
+  Definition preord_val_n n := R_n wf_trivial pr_trivial (fun P PG c1 c2 => forall k, preord_val PG k c1 c2) n.
 
-  Definition preord_res_n n := R_n wf_trivial pr_trivial (fun P PG c1 c2 => forall k, preord_res (preord_val cenv) PG k c1 c2) n.
+  Definition preord_res_n n := R_n wf_trivial pr_trivial (fun P PG c1 c2 => forall k, preord_res (preord_val) PG k c1 c2) n.
 
   Lemma R_n_not_zero A (R : A -> A -> Prop) P Pr k a b :
     R_n R P Pr k a b -> 0 < k.
@@ -160,9 +160,9 @@ Section RelComp.
     
     (forall rho1 rho2,
       forall (v1 : res) cin cout,
-        bstep_fuel cenv rho1 e1 cin v1 cout ->
+        bstep_fuel rho1 e1 cin v1 cout ->
         exists (v2 : res) cin' cout',
-          bstep_fuel cenv rho2 e2 cin' v2 cout' /\
+          bstep_fuel rho2 e2 cin' v2 cout' /\
           preord_res_n n v1 v2).
   Proof.
     intros Hwfe Hrel. induction Hrel.
@@ -202,8 +202,8 @@ Section RelComp.
     closed_exp e1 ->
     
     preord_exp_n n e1 e2 ->
-    diverge cenv rho1 e1 -> 
-    diverge cenv rho2 e2.
+    diverge rho1 e1 -> 
+    diverge rho2 e2.
   Proof. 
     intros Hrel Hef Hexp Hdiv. revert rho1 rho2 Hdiv. induction Hexp; intros rho1 rho2 Hdiv.
     - eapply logical_relations.preord_exp_preserves_divergence. eapply Hrel. eassumption.
@@ -223,8 +223,8 @@ Section RelComp.
     closed_exp e1 ->
     
     preord_exp_n n e1 e2 ->
-    not_stuck cenv rho1 e1 ->    
-    not_stuck cenv rho2 e2.
+    not_stuck rho1 e1 ->    
+    not_stuck rho2 e2.
   Proof.
     intros Piml Hwfe Hexp Hns. inv Hns.
     - destructAll. eapply preord_exp_n_impl in Hexp; [| eassumption | eassumption ].
@@ -241,20 +241,20 @@ Section RelComp.
                 (compose_rel (fun e1 e2 =>
                                 wf_pres e1 e2 /\ 
                                 forall k rho1 rho2 ,
-                                  cc_approx_env_P cenv ctag (occurs_free e1) k PG rho1 rho2 ->
+                                  cc_approx_env_P ctag (occurs_free e1) k PG rho1 rho2 ->
                                   binding_in_map (occurs_free e1) rho1 ->
-                                  cc_approx_exp cenv ctag k P PG (e1, rho1) (e2, rho2))
+                                  cc_approx_exp ctag k P PG (e1, rho1) (e2, rho2))
                              (preord_exp_n m)).
 
   
   Definition R_n_res PG n m : relation res :=
     compose_rel (preord_res_n n)
-                (compose_rel (fun c1 c2 => forall k, cc_approx_res (cc_approx_val cenv ctag) k PG c1 c2)
+                (compose_rel (fun c1 c2 => forall k, cc_approx_res (cc_approx_val ctag) k PG c1 c2)
                              (preord_res_n m)).
   
   Definition R_n_val PG n m : relation val :=    
     compose_rel (preord_val_n n)
-                (compose_rel (fun (c1 : val) (c2 : val) => forall k, cc_approx_val cenv ctag k PG c1 c2)
+                (compose_rel (fun (c1 : val) (c2 : val) => forall k, cc_approx_val ctag k PG c1 c2)
                              (preord_val_n m)).
 
   
@@ -269,9 +269,9 @@ Section RelComp.
     R_n_exp P PG n m e1 e2 ->
       
     forall (v1 : res) cin cout,
-      bstep_fuel cenv rho1 e1 cin v1 cout ->
+      bstep_fuel rho1 e1 cin v1 cout ->
       exists (v2 : res) cin' cout',
-        bstep_fuel cenv rho2 e2 cin' v2 cout' /\
+        bstep_fuel rho2 e2 cin' v2 cout' /\
         R_n_res PG n m v1 v2.
   Proof.
     intros Hwfe Hrel. inv Hrel. destructAll. inv H0. destructAll. 
@@ -331,8 +331,8 @@ Section RelComp.
     post_upper_bound P ->
     closed_exp e1 ->
     R_n_exp P PG n m e1 e2 ->
-    diverge cenv rho1 e1 -> 
-    diverge cenv rho2 e2.
+    diverge rho1 e1 -> 
+    diverge rho2 e2.
   Proof.
     intros Hpr Hp Hc Hrel Hdiv. inv Hrel. destructAll. inv H0. destructAll. 
     eapply preord_exp_n_preserves_divergence; [| | eassumption | ]; eauto. 
@@ -357,7 +357,7 @@ End RelComp.
 Section Linking.
   
   Context (lft: fun_tag).
-  Context (cenv : ctor_env) (ctag : ctor_tag).
+  Context (ctag : ctor_tag).
 
 
   Definition link (x : var) (e1 e2 : exp) : exp :=
@@ -380,19 +380,19 @@ Section Linking.
   Qed.
 
 
-  Context (P : PostT) (PG : PostGT) (Hpr : Post_properties cenv P P PG).
+  Context (P : PostT) (PG : PostGT) (Hpr : Post_properties P P PG).
 
   Lemma preord_exp_preserves_linking x e1 e2 e1' e2' :
     
     (forall k rho1 rho2,
-        preord_exp cenv P PG k (e1, rho1) (e2, rho2)) ->
+        preord_exp P PG k (e1, rho1) (e2, rho2)) ->
     
     (forall k rho1 rho2,
-        preord_env_P cenv PG [set x] k rho1 rho2 ->
+        preord_env_P PG [set x] k rho1 rho2 ->
         binding_in_map [set x] rho1 ->
-        preord_exp cenv P PG k (e1', rho1) (e2', rho2)) ->
+        preord_exp P PG k (e1', rho1) (e2', rho2)) ->
     
-    forall k rho1 rho2, preord_exp cenv P PG k (link x e1 e1', rho1) (link x e2 e2', rho2).
+    forall k rho1 rho2, preord_exp P PG k (link x e1 e1', rho1) (link x e2 e2', rho2).
   Proof.
     intros Hexp1 Hexp2. inv Hpr.
     unfold link in *.
@@ -429,14 +429,14 @@ Section Linking.
   Lemma cc_approx_exp_preserves_linking x e1 e2 e1' e2' :
     
     (forall k rho1 rho2,
-        cc_approx_exp cenv ctag k P PG (e1, rho1) (e2, rho2)) ->
+        cc_approx_exp ctag k P PG (e1, rho1) (e2, rho2)) ->
     
     (forall k rho1 rho2,
-        cc_approx_env_P cenv ctag [set x] k PG rho1 rho2 ->
+        cc_approx_env_P ctag [set x] k PG rho1 rho2 ->
         binding_in_map [set x] rho1 ->
-        cc_approx_exp cenv ctag k P PG (e1', rho1) (e2', rho2)) ->
+        cc_approx_exp ctag k P PG (e1', rho1) (e2', rho2)) ->
         
-    forall k rho1 rho2, cc_approx_exp cenv ctag k P PG (link x e1 e1', rho1) (link x e2 e2', rho2).
+    forall k rho1 rho2, cc_approx_exp ctag k P PG (link x e1 e1', rho1) (link x e2 e2', rho2).
   Proof.
     intros Hexp1 Hexp2. inv Hpr.
     unfold link in *.
@@ -503,14 +503,14 @@ Section Linking.
 
 
   Lemma preord_exp_n_1 Pr e1 e2 :
-    preord_exp_n cenv wf_pres Pr 1 e1 e2 ->
+    preord_exp_n wf_pres Pr 1 e1 e2 ->
     exists P PG,
       Pr P PG /\
       wf_pres e1 e2 /\
       (forall k rho1 rho2,
-          preord_env_P cenv PG (occurs_free e1) k rho1 rho2 ->
+          preord_env_P PG (occurs_free e1) k rho1 rho2 ->
           binding_in_map (occurs_free e1) rho1 -> 
-          preord_exp cenv P PG k (e1, rho1) (e2, rho2)).
+          preord_exp P PG k (e1, rho1) (e2, rho2)).
   Proof.
     intros H. inv H. do 2 eexists. now split; eauto.
     eapply plus_is_one in H0. inv H0. inv H.
@@ -524,9 +524,9 @@ Section LinkingComp.
       
   Context (Pr : post_property)
           (wf_pres : exp -> exp -> Prop)
-          (cenv : ctor_env) (lf : var).
+          (lf : var).
 
-  Context (Hpr : forall P PG, Pr P PG -> Post_properties cenv P P PG).
+  Context (Hpr : forall P PG, Pr P PG -> Post_properties P P PG).
   
    
   Lemma inclusion_refl {A} (Q : relation A) : inclusion _ Q Q.
@@ -535,30 +535,30 @@ Section LinkingComp.
   Definition preserves_closed (e1 e2 : exp) := closed_exp e1 -> closed_exp e2.
 
   Lemma preord_exp_n_preserves_linking_src_l x n e1 e2 e1' :
-    preord_exp_n cenv preserves_fv Pr n e1 e2 ->
+    preord_exp_n preserves_fv Pr n e1 e2 ->
     
     closed_exp e1 ->
     occurs_free e1' \subset [set x] ->
     
-    preord_exp_n cenv preserves_fv Pr n (link lf x e1 e1') (link lf x e2 e1').
+    preord_exp_n preserves_fv Pr n (link lf x e1 e1') (link lf x e2 e1').
   Proof.
     intros Hrel. revert e1'. induction Hrel; intros e1' Hw1 Hfv.
     - assert (Hexp2 :
                 forall k rho1 rho2,
-                  preord_env_P cenv P2 [set x] k rho1 rho2 ->
+                  preord_env_P P2 [set x] k rho1 rho2 ->
                   binding_in_map [set x] rho1 ->
-                  preord_exp cenv P1 P2 k (e1', rho1) (e1', rho2)).
+                  preord_exp P1 P2 k (e1', rho1) (e1', rho2)).
       { intros. eapply preord_exp_refl. eapply Hpr. eassumption.
         intros z Hin. eapply Hfv in Hin . eauto. } 
       assert (Hexp1 :
                 forall (k : nat) (rho1 rho2 : env),                  
-                  preord_exp' cenv (preord_val cenv) P1 P2 k (c1, rho1) (c2, rho2)).
+                  preord_exp' (preord_val) P1 P2 k (c1, rho1) (c2, rho2)).
       { intros. eapply H. intros z Hin. eapply Hw1 in Hin; eauto. inv Hin.
         intros z Hin. eapply Hw1 in Hin. inv Hin. } 
       
       
       specialize (preord_exp_preserves_linking
-                    lf cenv P1 P2 (Hpr _ _ H1) _ _ _ _ _ Hexp1 Hexp2).
+                    lf P1 P2 (Hpr _ _ H1) _ _ _ _ _ Hexp1 Hexp2).
       intros Hc. 
       econstructor. 
       * intros. eapply Hc.
@@ -574,30 +574,30 @@ Section LinkingComp.
   Qed.    
 
   Lemma preord_exp_n_preserves_linking_src_r x n e1 e1' e2' :  
-    preord_exp_n cenv preserves_fv Pr n e1' e2' ->
+    preord_exp_n preserves_fv Pr n e1' e2' ->
     
     closed_exp e1 ->
     occurs_free e1' \subset [set x] ->
     
-    preord_exp_n cenv preserves_fv Pr n (link lf x e1 e1') (link lf x e1 e2').
+    preord_exp_n preserves_fv Pr n (link lf x e1 e1') (link lf x e1 e2').
   Proof.
     intros Hrel. revert e1. induction Hrel; intros e1 Hw1 Hfv.
     - assert (Hexp2 :
                 forall k rho1 rho2,
-                  preord_env_P cenv P2 [set x] k rho1 rho2 ->
+                  preord_env_P P2 [set x] k rho1 rho2 ->
                   binding_in_map [set x] rho1 ->                                    
-                  preord_exp cenv P1 P2 k (c1, rho1) (c2, rho2)).
+                  preord_exp P1 P2 k (c1, rho1) (c2, rho2)).
       { intros. eapply H. intros z Hin. eapply Hfv in Hin; eauto.
         eapply binding_in_map_antimon. eassumption. eassumption. }
       
       assert (Hexp1 :
                 forall (k : nat) (rho1 rho2 : env),
-                  preord_exp' cenv (preord_val cenv) P1 P2 k (e1, rho1) (e1, rho2)).
+                  preord_exp' (preord_val) P1 P2 k (e1, rho1) (e1, rho2)).
       { intros. eapply preord_exp_refl. eapply Hpr. eassumption.
         intros z Hin. eapply Hw1 in Hin. inv Hin. } 
       
       specialize (preord_exp_preserves_linking
-                    lf cenv P1 P2 (Hpr _ _ H1) _ _ _ _ _ Hexp1 Hexp2).
+                    lf P1 P2 (Hpr _ _ H1) _ _ _ _ _ Hexp1 Hexp2).
       intros Hc.
       econstructor. 
       * intros. eapply Hc.
@@ -614,13 +614,13 @@ Section LinkingComp.
   Qed.
   
   Lemma preord_exp_n_preserves_linking x n m e1 e2 e1' e2' :
-    preord_exp_n cenv preserves_fv Pr n e1 e2 ->
-    preord_exp_n cenv preserves_fv Pr m e1' e2' ->
+    preord_exp_n preserves_fv Pr n e1 e2 ->
+    preord_exp_n preserves_fv Pr m e1' e2' ->
     
     closed_exp e1 ->
     occurs_free e1' \subset [set x] ->
     
-    preord_exp_n cenv preserves_fv Pr (n + m) (link lf x e1 e1') (link lf x e2 e2').
+    preord_exp_n preserves_fv Pr (n + m) (link lf x e1 e1') (link lf x e2 e2').
   Proof.
     intros (* Hp1 Hp2 *) Hrel1 Hrel2 Hc1 Hfv.
     specialize (preord_exp_n_preserves_linking_src_l x n _ _ _ Hrel1 Hc1 Hfv). intros Hr1.
@@ -640,18 +640,18 @@ Section LinkingCompTop.
   Context (Pr : post_property)
           (wf_pres : exp -> exp -> Prop)
           (wf1 wf2 : exp -> Prop)          
-          (cenv : ctor_env) (ctag : ctor_tag) (lf : var) (P : PostT) (PG : PostGT).
+          (ctag : ctor_tag) (lf : var) (P : PostT) (PG : PostGT).
 
    
   Context (* (Hwf : forall e e', wf_pres e e' -> preserves_fv e e') *)
-          (Hpr : forall P PG, Pr P PG -> Post_properties cenv P P PG)
-          (Hp : Post_properties cenv P P PG).
+          (Hpr : forall P PG, Pr P PG -> Post_properties P P PG)
+          (Hp : Post_properties P P PG).
 
   
   Lemma preord_exp_n_prop_mon (Pt1 Pt2 : post_property) n e1 e2 :
-    preord_exp_n cenv wf_pres Pt1 n e1 e2 ->
+    preord_exp_n wf_pres Pt1 n e1 e2 ->
     (forall P PG, Pt1 P PG -> Pt2 P PG) ->
-    preord_exp_n cenv wf_pres Pt2 n e1 e2.
+    preord_exp_n wf_pres Pt2 n e1 e2.
   Proof.
     intros Hrel Hi. induction Hrel.
     - econstructor; eauto.
@@ -659,8 +659,8 @@ Section LinkingCompTop.
   Qed.
   
   Lemma Rel_exp_n_preserves_linking x n1 n2 m1 m2 e1 e2 e1' e2' :    
-    R_n_exp cenv ctag preserves_fv Pr P PG n1 n2 e1 e2 ->
-    R_n_exp cenv ctag preserves_fv Pr P PG m1 m2 e1' e2' ->
+    R_n_exp ctag preserves_fv Pr P PG n1 n2 e1 e2 ->
+    R_n_exp ctag preserves_fv Pr P PG m1 m2 e1' e2' ->
 
     (* e1: source library, e2: compiled library *)
     (* e1': source client, e2': compiled client *)    
@@ -668,7 +668,7 @@ Section LinkingCompTop.
     closed_exp e1 ->
     occurs_free e1' \subset [set x] ->
     
-    R_n_exp cenv ctag preserves_fv Pr P PG (n1 + m1) (n2 + m2) (link lf x e1 e1') (link lf x e2 e2').
+    R_n_exp ctag preserves_fv Pr P PG (n1 + m1) (n2 + m2) (link lf x e1 e1') (link lf x e2 e2').
   Proof.
     
     intros Hrel1 Hrel2 Hc1 Hfv. inv Hrel1. inv Hrel2. destructAll. inv H1. inv H2. destructAll.  
@@ -716,7 +716,7 @@ End LinkingCompTop.
 Section LinkingFast.
   
   Context (lft: fun_tag).
-  Context (cenv : ctor_env) (ctag : ctor_tag).
+  Context (ctag : ctor_tag).
     
   Definition link' (x : var) (* the external reference that will be bound to e1 *)
              (e1 e2 : exp) : option exp :=
@@ -774,8 +774,8 @@ Section LinkingFast.
   Qed.
   
 
-  Context (P : PostT) (PG : PostGT) (Hpr : Post_properties cenv P P PG)
-          (Hinl : post_inline cenv P P P)
+  Context (P : PostT) (PG : PostGT) (Hpr : Post_properties P P PG)
+          (Hinl : post_inline P P P)
           (HinlOOT : post_inline_OOT P P)
           (HinclG : inclusion _ P PG) .
   
@@ -783,18 +783,18 @@ Section LinkingFast.
   Lemma preord_exp_preserves_linking_fast x e1 e2 e1' e2' :
     
     (forall k rho1 rho2,
-        preord_exp cenv P PG k (e1, rho1) (e2, rho2)) ->
+        preord_exp P PG k (e1, rho1) (e2, rho2)) ->
     
     (forall k rho1 rho2,
-        preord_env_P cenv PG [set x] k rho1 rho2 ->
+        preord_env_P PG [set x] k rho1 rho2 ->
         binding_in_map [set x] rho1 ->
-        preord_exp cenv P PG k (e1', rho1) (e2', rho2)) ->
+        preord_exp P PG k (e1', rho1) (e2', rho2)) ->
     
     closed_exp e1 ->
     
     match link' x e1 e1', link' x e2 e2' with
     | Some e, Some e' =>
-      forall k rho1 rho2, preord_exp cenv P PG k (e, rho1) (e', rho2)
+      forall k rho1 rho2, preord_exp P PG k (e, rho1) (e', rho2)
     | _ , _ => True
     end.
   Proof.
@@ -844,18 +844,18 @@ Section LinkingFast.
   Lemma cc_approx_exp_preserves_linking_fast x e1 e2 e1' e2' (Hincl : inclusion _ P PG):
     
     (forall k rho1 rho2,
-        cc_approx_exp cenv ctag k P PG (e1, rho1) (e2, rho2)) ->
+        cc_approx_exp ctag k P PG (e1, rho1) (e2, rho2)) ->
     
     (forall k rho1 rho2,
-        cc_approx_env_P cenv ctag [set x] k PG rho1 rho2 ->
+        cc_approx_env_P ctag [set x] k PG rho1 rho2 ->
         binding_in_map [set x] rho1 ->
-        cc_approx_exp cenv ctag k P PG (e1', rho1) (e2', rho2)) ->
+        cc_approx_exp ctag k P PG (e1', rho1) (e2', rho2)) ->
     
     closed_exp e1 ->
     
     match link' x e1 e1', link' x e2 e2' with
     | Some e, Some e' =>
-      forall k rho1 rho2, cc_approx_exp cenv ctag k P PG (e, rho1) (e', rho2)
+      forall k rho1 rho2, cc_approx_exp ctag k P PG (e, rho1) (e', rho2)
     | _ , _ => True
     end.
   Proof.
@@ -916,7 +916,7 @@ End LinkingFast.
 (* Formalization of the top-level behavioral refinement *)
 Section Refinement.
 
-  Context (cenv : ctor_env) (ctag : ctor_tag).
+  Context (ctag : ctor_tag).
   
   Fixpoint value_ref' (v1 v2 : val) : Prop:=
     let fix Forall2_aux vs1 vs2 :=
@@ -1001,12 +1001,12 @@ Section Refinement.
   Definition refines (vref : val -> val -> Prop) (e1 e2 : exp) := 
     (* Termination *)
     (forall (v1 : val) (c1 : fuel) (t1 : trace),
-        bstep_fuel cenv emp e1 c1 (Res v1) t1 ->
+        bstep_fuel emp e1 c1 (Res v1) t1 ->
         exists (v2 : val) (c2 : fuel) (t2 : trace),
-          bstep_fuel cenv emp e2 c2 (Res v2) t2 /\
+          bstep_fuel emp e2 c2 (Res v2) t2 /\
           vref v1 v2) /\
     (* Divergence *)    
-    (diverge cenv emp e1 -> diverge cenv emp e2).
+    (diverge emp e1 -> diverge emp e2).
 
   (* Properties of the value refinement *)
   
@@ -1026,7 +1026,7 @@ Section Refinement.
   Qed.
 
   Lemma preord_val_in_value_ref PG k v1 v2 :
-    preord_val cenv PG k v1 v2 -> value_ref v1 v2.
+    preord_val PG k v1 v2 -> value_ref v1 v2.
   Proof.
     rewrite preord_val_eq. 
     revert v2. induction v1 using val_ind'; intros v2.
@@ -1044,7 +1044,7 @@ Section Refinement.
 
 
   Lemma cc_approx_val_in_value_ref PG k v1 v2 :
-    cc_approx_val cenv ctag  PG k v1 v2 -> value_ref_cc v1 v2.
+    cc_approx_val ctag  PG k v1 v2 -> value_ref_cc v1 v2.
   Proof.
     rewrite cc_approx_val_eq. 
     revert v2. induction v1 using val_ind'; intros v2.
@@ -1103,7 +1103,7 @@ Section Refinement.
   Qed.
 
   Lemma preord_res_n_in_value_ref n v1 v2 :
-    preord_res_n cenv n (Res v1) (Res v2) ->
+    preord_res_n n (Res v1) (Res v2) ->
     value_ref v1 v2.
   Proof.
     assert (Heq1 : Res v1 = Res v1) by reflexivity.
@@ -1120,7 +1120,7 @@ Section Refinement.
 
   
   Lemma R_n_res_in_value_ref PG n m v1 v2 :
-    R_n_res cenv ctag PG n m (Res v1) (Res v2) ->
+    R_n_res ctag PG n m (Res v1) (Res v2) ->
     value_ref_cc v1 v2.
   Proof.
     assert (Heq1 : Res v1 = Res v1) by reflexivity.
@@ -1182,7 +1182,7 @@ Section Refinement.
 
 
   Lemma R_n_res_OOT_r PG n m v :
-    ~ R_n_res cenv ctag PG n m (Res v) OOT.
+    ~ R_n_res ctag PG n m (Res v) OOT.
   Proof.
     intros Hc. inv Hc. destructAll. inv H0. destructAll.
     destruct x. eapply preord_res_n_OOT_r in H; eauto.
@@ -1192,7 +1192,7 @@ Section Refinement.
   
 
   Lemma R_n_res_OOT_l PG n m v :
-    ~ R_n_res cenv ctag PG n m OOT (Res v).
+    ~ R_n_res ctag PG n m OOT (Res v).
   Proof.
     intros Hc. inv Hc. destructAll. inv H0. destructAll.
     destruct x0. now eapply preord_res_n_OOT_l; eauto.
@@ -1211,7 +1211,7 @@ Section Refinement.
           (Hub : Pr_implies_post_upper_bound PostProp).
 
   Lemma cc_approx_exp_in_refines P PG (HP : post_upper_bound P) e1 e2 :
-    (forall k, cc_approx_exp cenv ctag k P PG (e1, M.empty _) (e2, M.empty _)) ->
+    (forall k, cc_approx_exp ctag k P PG (e1, M.empty _) (e2, M.empty _)) ->
     refines value_ref_cc e1 e2.
   Proof.
     intros Hc1. split.
@@ -1226,7 +1226,7 @@ Section Refinement.
   
   Lemma R_n_exp_in_refines P PG (HP : post_upper_bound P) n m e1 e2 :
     closed_exp e1 ->
-    R_n_exp cenv ctag wf_pres PostProp P PG n m e1 e2 ->
+    R_n_exp ctag wf_pres PostProp P PG n m e1 e2 ->
     refines value_ref_cc e1 e2.
   Proof.
     intros Hc1 Hexp. split.

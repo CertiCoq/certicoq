@@ -22,8 +22,7 @@ Open Scope monad_scope.
 Section Refinement.
 
   Context (cnstrs : conId_map)
-          (dtag : positive) (* default tag *)
-          (cenv : ctor_env).
+          (dtag : positive) (* default tag *).
 
   Fixpoint value_ref' (v1 : value) (v2 : val) : Prop:=
     let fix Forall2_aux vs1 vs2 :=
@@ -83,11 +82,11 @@ Section Refinement.
     (forall (v1 : value) (c1 t1 : nat),
         eval_env_fuel [] e1 (Val v1) c1 t1 ->
         exists (v2 : val) (c2 : nat),
-          bstep_fuel cenv (M.empty _) e2 c2 (Res v2) tt /\
+          bstep_fuel (M.empty _) e2 c2 (Res v2) tt /\
           (c2 <= t1 + M)%nat /\
           value_ref v1 v2) /\
     (* Divergence *)    
-    (diverge [] e1 -> eval.diverge cenv (M.empty _) e2).
+    (diverge [] e1 -> eval.diverge (M.empty _) e2).
 
   Context (prim_map : M.t (kername * string (* C definition *) * nat (* arity *))). 
   Context (func_tag kon_tag default_itag : positive)
@@ -104,7 +103,7 @@ Section Refinement.
 
   Lemma cps_val_comp k v1 v2 v3 : 
     cps_val_rel func_tag kon_tag dtag cnstrs v1 v2 ->
-    preord_val cenv eq_fuel k v2 v3 ->
+    preord_val eq_fuel k v2 v3 ->
     value_ref v1 v3. 
   Proof.
     revert v2 v3.
@@ -225,7 +224,8 @@ Section Refinement.
           econstructor 2. econstructor.
           simpl.
           edestruct Nat.le_exists_sub with (n := c) (m := x3). lia. destructAll.   
-          eapply bstep_fuel_OOT_monotonic in H2.
+          assert (Hs := @bstep_fuel_OOT_monotonic nat _ unit _ (M.set k (Vfun (M.empty val) (Fcons k kon_tag [x] (Ehalt x) Fnil) k) (M.empty val))).
+          eapply Hs in H2. 
           destructAll. destruct x3. eassumption. 
 
           Grab Existential Variables. exact 0%nat.
@@ -263,12 +263,12 @@ Section Refinement.
         (forall v v',
             r = (Val v) ->
             cps_val_rel func_tag kon_tag dtag cnstrs v v' ->
-            preord_exp cenv (cps_bound f t) eq_fuel i
+            preord_exp (cps_bound f t) eq_fuel i
                   ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
                   (link_trg k1 x1 e_lib' e_cli', rho)) /\
         (* SOurce diverges *)
         (r = fuel_sem.OOT ->
-         exists c, (f <= c)%nat /\ bstep_fuel cenv rho (link_trg k1 x1 e_lib' e_cli') c eval.OOT tt).
+         exists c, (f <= c)%nat /\ bstep_fuel rho (link_trg k1 x1 e_lib' e_cli') c eval.OOT tt).
     Proof.
       intros rho k x vk e_lib' e_cli' i Hwf1 Hwf2 Heval Hcps1 Hcps2 Hneq1 Hneq2 Hneq3 Hget.
       inv Heval.
@@ -297,7 +297,7 @@ Section Refinement.
 
           inv Hcps1. inv Hcps2.
           
-          assert (Heq : forall m, preord_exp' cenv (preord_val cenv)
+          assert (Heq : forall m, preord_exp' (preord_val)
                                               (cps_bound (f1 <+> @one_i _ _ fuel_resource_L4 (link_src e_lib e_cli))
                                                          (t1 <+> @one_i _ _ trace_resource_L4 (link_src e_lib e_cli)))
 
@@ -428,7 +428,8 @@ Section Refinement.
         * edestruct H3. reflexivity. destructAll.
           exists (x4 + 1)%nat.
           split. unfold one_i. simpl. unfold fuel_exp. lia.
-          replace tt with (tt <+> tt) by reflexivity. eapply BStepf_run. econstructor; eauto.
+          replace tt with (tt <+> tt) by reflexivity.
+          assert (Hs := @BStepf_run nat _ unit _ rho). eapply Hs. econstructor; eauto.
 
           
           Grab Existential Variables. exact 0%nat. exact 0%nat.
@@ -548,7 +549,7 @@ Section Refinement.
             econstructor 2. econstructor.
             simpl.
             edestruct Nat.le_exists_sub with (n := c) (m := x6). lia. destructAll.   
-            eapply bstep_fuel_OOT_monotonic in H3.
+            assert (Hs := @bstep_fuel_OOT_monotonic nat _ unit _). eapply Hs in H3.
             destructAll. destruct x6. eassumption. 
             
             Grab Existential Variables. exact 0%nat.
@@ -560,4 +561,10 @@ Section Refinement.
   
 End Refinement.
     
- 
+Print Assumptions cps_corrrect_top.
+
+(* Prints : Closed under the global context *)
+
+Print Assumptions cps_corrrect_top_sep_comp.
+
+(* Prints : Closed under the global context *)

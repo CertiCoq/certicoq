@@ -94,10 +94,8 @@ Section Bounds.
         tapp1 <= tapp2 + 2 * G * tapp2 + L /\
         t2 + tapp2 = c2. 
 
-    Context (cenv : ctor_env).
-
     Instance inline_bound_compat L G (Hi : L <= G) :
-      Post_properties cenv (inline_bound L G) (inline_bound L G) (inline_bound G G). 
+      Post_properties (inline_bound L G) (inline_bound L G) (inline_bound G G). 
     Proof.
       constructor; (try (intro; intros; intro; intros; destruct cout1; destruct cout2;
                          unfold inline_bound in *; unfold_all; simpl; split; [| split ]; lia)).
@@ -122,7 +120,7 @@ Section Bounds.
     Qed.
 
     Lemma inline_bound_remove_steps_letapp_OOT i j G : 
-      remove_steps_letapp_OOT cenv (inline_bound j G) (inline_bound (S (i + j)) G).
+      remove_steps_letapp_OOT (inline_bound j G) (inline_bound (S (i + j)) G).
     Proof.
       intro; intros. unfold inline_bound in *. unfold_all. simpl in *.
       destruct cout1; destruct cout2. simpl in *.
@@ -130,7 +128,7 @@ Section Bounds.
     Qed.
 
     Lemma inline_bound_remove_steps_letapp i j G : 
-      remove_steps_letapp cenv (inline_bound i G) (inline_bound j G) (inline_bound (S (i + j)) G).
+      remove_steps_letapp (inline_bound i G) (inline_bound j G) (inline_bound (S (i + j)) G).
     Proof.
       intro; intros. unfold inline_bound in *. unfold_all; simpl in *.
       destruct cout1; destruct cout2. destruct cout1'; destruct cout2'. simpl in *. lia. 
@@ -210,8 +208,6 @@ Section Bounds.
   End Inline_bound.
   
   Section SimpleBound.
-
-    Context (cenv : ctor_env).
     
     (* Simple bound for transformations that don't decrease steps *)
     Definition simple_bound (L : nat) : @PostT nat (nat * nat) :=
@@ -220,7 +216,7 @@ Section Bounds.
 
 
     Instance simple_bound_compat k :
-      Post_properties cenv (simple_bound 0) (simple_bound k) (simple_bound 0). 
+      Post_properties (simple_bound 0) (simple_bound k) (simple_bound 0). 
     Proof.
       constructor; (try (intro; intros; intro; intros; destruct cout1; destruct cout2;
                          unfold simple_bound  in *; unfold_all; simpl; lia)).
@@ -299,7 +295,7 @@ Section Bounds.
     Lemma HPost_letapp_cc :
       forall f x t xs e1 rho1 n k, 
         k <= 4 + 4 * length xs  ->
-        post_letapp_compat_cc' cenv clo_tag f x t xs e1 rho1 (simple_bound n) (simple_bound (n + k)) (simple_bound 0).
+        post_letapp_compat_cc' clo_tag f x t xs e1 rho1 (simple_bound n) (simple_bound (n + k)) (simple_bound 0).
     Proof.
       intro; intros. intro; intros. destruct cout1; destruct cout2. destruct cout1'; destruct cout2'.
       unfold simple_bound in *; unfold_all; simpl. destructAll. lia.
@@ -342,14 +338,12 @@ Section Bounds.
 
   Section HoistingBound.
 
-    Context (cenv : ctor_env). 
-
     Definition hoisting_bound (L G : nat) : @PostT nat (nat * nat) := 
       fun '(e1, rho1, c1, (t1, tapp1)) '(e2, rho2, c2, (t2, tapp2)) =>
         c1 <= c2 + G * c2 + L.
     
     Instance hoisting_bound_compat L G (Hi : L <= G) :
-      Post_properties cenv (hoisting_bound L G) (hoisting_bound L G) (hoisting_bound G G).
+      Post_properties (hoisting_bound L G) (hoisting_bound L G) (hoisting_bound G G).
     Proof.
       constructor; (try (intro; intros; intro; intros; destruct cout1; destruct cout2;
                          unfold hoisting_bound in *; unfold_all; simpl; lia)).
@@ -408,10 +402,8 @@ Section Bounds.
 
     Definition ll_bound (l : nat) := simple_bound 0.
 
-    Context (cenv : ctor_env).
-
     Instance ll_bound_compat k m n :
-      Post_properties cenv (ll_bound k) (ll_bound m) (ll_bound n). 
+      Post_properties (ll_bound k) (ll_bound m) (ll_bound n). 
     Proof. unfold ll_bound in *. eapply simple_bound_compat. Qed.
     
     Lemma ll_bound_local_steps : 

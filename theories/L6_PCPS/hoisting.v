@@ -754,7 +754,7 @@ Section Hoisting_correct.
   
   Context (P1 : nat -> PostT) (* Local *)
           (PG : PostGT) (* Global *)
-          (HP : forall n, n <= G -> Post_properties cenv (P1 n) (P1 n) PG)
+          (HP : forall n, n <= G -> Post_properties (P1 n) (P1 n) PG)
           (HPmon : forall n m, n <= m -> inclusion _ (P1 n) (P1 m))
           (Hpost_Efun_l : forall n, post_Efun_l (P1 n) (P1 (S n))).
 
@@ -768,17 +768,17 @@ Section Hoisting_correct.
              forall (e e' : exp) (Bprev B Ball : fundefs) n (Hleq : n <= G) (rho rho' : env) (U L : nat),
                unique_bindings_fundefs Ball ->
                unique_bindings e ->
-               preord_env_P cenv PG (occurs_free e) m rho rho' ->
+               preord_env_P PG (occurs_free e) m rho rho' ->
                funs_inv_env Ball rho' ->
                split_fds Bprev B Ball ->
                Disjoint var (name_in_fundefs Ball) (bound_var e') ->
                fun_fv_in e (name_in_fundefs Ball) ->
-               Erase_fundefs e e' B n -> preord_exp cenv (P1 n) PG m (e, rho) (e', rho')) :
+               Erase_fundefs e e' B n -> preord_exp (P1 n) PG m (e, rho) (e', rho')) :
     unique_bindings_fundefs Ball ->
     unique_bindings_fundefs B ->
     occurs_free_fundefs B \subset S ->
     (* initial environments are related *)
-    preord_env_P cenv PG (S \\ name_in_fundefs B) k rho rho' ->
+    preord_env_P PG (S \\ name_in_fundefs B) k rho rho' ->
     (* assumptions about global funs *)     
     funs_inv_env Ball rho' ->
     split_fds Bprev B_hoist Ball ->
@@ -787,7 +787,7 @@ Section Hoisting_correct.
     (* Erase fundefs *)
     Erase_nested_fundefs B B_hoist n ->
     (* Environments after defining the function bundles *)
-    preord_env_P cenv PG (name_in_fundefs B :|: S) k (def_funs B B rho rho) rho'.
+    preord_env_P PG (name_in_fundefs B :|: S) k (def_funs B B rho rho) rho'.
   Proof.
     revert S B n Hleq rho rho' B_hoist Bprev Ball IHe.
     induction k as [k IHk] using lt_wf_rec1.
@@ -820,7 +820,7 @@ Section Hoisting_correct.
         eapply Erase_nested_fundefs_name_in_fundefs; eassumption.
       + eauto.
       + intros Hlt Hall.
-        eapply preord_exp_post_monotonic with (P1 := P1 n1). eapply Hd'. lia.
+        eapply preord_exp_post_monotonic with (P2 := P1 n1). eapply Hd'. lia.
 
         assert (Hsplit' := Hsplit).
         eapply split_fds_sym in Hsplit.
@@ -833,7 +833,7 @@ Section Hoisting_correct.
           eassumption.
         * eapply preord_env_P_antimon;
             [| eapply occurs_free_in_fun; eapply find_def_correct; eauto ].
-          eapply preord_env_P_set_lists_l with (P1 := name_in_fundefs B :|: occurs_free_fundefs B);
+          eapply preord_env_P_set_lists_l with (P2 := name_in_fundefs B :|: occurs_free_fundefs B);
             try now eauto.
           2:{ intros z Hnin Hinz. inv Hinz; eauto. contradiction. }
           clear Hs3 Hs4. 
@@ -885,7 +885,7 @@ Section Hoisting_correct.
     unique_bindings_fundefs Ball ->
     unique_bindings e ->
     (* environments are related *)
-    preord_env_P cenv PG (occurs_free e) k rho rho' ->
+    preord_env_P PG (occurs_free e) k rho rho' ->
     (* Hoisted functions are already defined *)
     funs_inv_env Ball rho' ->
     split_fds Bprev B Ball ->
@@ -895,7 +895,7 @@ Section Hoisting_correct.
     fun_fv_in e (name_in_fundefs Ball) ->
     (* Hoisting *)            
     Erase_fundefs e e' B n ->    
-    preord_exp cenv (P1 n) PG k (e, rho) (e', rho').
+    preord_exp (P1 n) PG k (e, rho) (e', rho').
   Proof.
     revert e e' Bprev B Ball n Hleq rho rho'.
     induction k as [k IHk] using lt_wf_rec1.
@@ -1081,8 +1081,8 @@ Section Hoisting_correct.
     Erase_fundefs e e' B n ->
 
     (forall k rho rho',
-        preord_env_P cenv PG (occurs_free e) k rho rho' ->
-        preord_exp cenv P2 PG k (e, rho) (Efun B e', rho')) /\
+        preord_env_P PG (occurs_free e) k rho rho' ->
+        preord_exp P2 PG k (e, rho) (Efun B e', rho')) /\
     unique_bindings (Efun B e') /\
     Disjoint _ (occurs_free (Efun B e')) (bound_var (Efun B e')) /\
     occurs_free (Efun B e') \subset occurs_free e /\
@@ -1147,8 +1147,8 @@ Section Hoisting_correct.
     Erase_fundefs e e' Fnil n ->
 
     (forall k rho rho',
-        preord_env_P cenv PG (occurs_free e) k rho rho' ->
-        preord_exp cenv P2 PG k (e, rho) (e', rho')) /\
+        preord_env_P PG (occurs_free e) k rho rho' ->
+        preord_exp P2 PG k (e, rho) (e', rho')) /\
     unique_bindings e' /\
     Disjoint _ (occurs_free e') (bound_var e') /\
     occurs_free e' \subset occurs_free e /\
@@ -1192,8 +1192,8 @@ Section Hoisting_correct.
     exp_hoist e = (e', n) -> 
 
     (forall k rho rho',
-        preord_env_P cenv PG (occurs_free e) k rho rho' ->
-        preord_exp cenv P2 PG k (e, rho) (e', rho')) /\
+        preord_env_P PG (occurs_free e) k rho rho' ->
+        preord_exp P2 PG k (e, rho) (e', rho')) /\
     unique_bindings e' /\
     Disjoint _ (occurs_free e') (bound_var e') /\
     occurs_free e' \subset occurs_free e /\

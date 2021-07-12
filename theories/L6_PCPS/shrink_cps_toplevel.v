@@ -14,12 +14,12 @@ Section Srink_top_correct.
   Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
 
   Variable (P1 : nat ->  @PostT fuel trace) (PG : @PostGT fuel trace)
-           (HPost : forall n, n <= 1 -> Post_properties cenv (P1 n) (P1 n) PG)
-           (HPost' : Post_properties cenv PG PG PG) 
+           (HPost : forall n, n <= 1 -> Post_properties (P1 n) (P1 n) PG)
+           (HPost' : Post_properties PG PG PG) 
 
            (Hless_steps_app : forall f ft ys rho1 e2 rho2, post_Eapp_l (P1 0) (P1 1) f ft ys rho1 e2 rho2)
-           (Hless_steps_letapp : remove_steps_letapp cenv (P1 0) (P1 0) (P1 1))                     
-           (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv (P1 0) (P1 1)).
+           (Hless_steps_letapp : remove_steps_letapp (P1 0) (P1 0) (P1 1))                     
+           (Hless_steps_letapp_OOT : remove_steps_letapp_OOT  (P1 0) (P1 1)).
   
   Context (Hless_steps_ctx :
              forall C e1 rho1 (rho1' : env) (e2 : exp) (rho2 : env) (cin1 cin2 : fuel)
@@ -47,7 +47,7 @@ Section Srink_top_correct.
     occurs_free e2 \subset occurs_free e1.  
 
   Definition post_prop P1 PG :=
-    Post_properties cenv P1 P1 PG /\
+    Post_properties P1 P1 PG /\
     post_upper_bound P1.  
 
   (* To handle terms with disjoint bv and of instead of closed, used this with xs = fv (e) : *)
@@ -78,7 +78,7 @@ Section Srink_top_correct.
     unique_bindings e ->
     Disjoint var (bound_var e) (occurs_free e) ->
     let (e', n) := shrink_top e in     
-    (exists m, m >= n /\ preord_exp_n cenv wf_pres post_prop m e e') /\
+    (exists m, m >= n /\ preord_exp_n wf_pres post_prop m e e') /\
     unique_bindings e' /\
     Disjoint _ (occurs_free e') (bound_var e') /\
     occurs_free e' \subset occurs_free e /\

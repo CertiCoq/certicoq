@@ -491,7 +491,7 @@ Section Correct.
   Context (PL : @PostT fuel trace) (* Local *)
           (PG : @PostGT fuel trace).  (* Global *)           
 
-  Context (HPost : Post_properties cenv PL PL PG).
+  Context (HPost : Post_properties PL PL PG).
 
 
   Definition fun_inv (L : live_fun) (find_tag  : var -> option fun_tag) k (rho rho' : env) : Prop :=
@@ -509,8 +509,8 @@ Section Correct.
         find_def f2 B2 = Some (ft2, xs2, e2) /\
         Some rho2' = set_lists xs2 vs2 (def_funs B2 B2 rho2 rho2) /\
 
-        (j < k -> Forall2 (preord_val cenv PG j) (live_args vs1 bs) vs2 ->
-         preord_exp cenv PL PG j (e1, rho1') (e2, rho2')).
+        (j < k -> Forall2 (preord_val PG j) (live_args vs1 bs) vs2 ->
+         preord_exp PL PG j (e1, rho1') (e2, rho2')).
 
 
   
@@ -608,11 +608,11 @@ Section Correct.
          
 
   Lemma preord_env_P_get_list_live_args xs (S : var -> Prop) bs k rho1 rho2 vs1 :
-    preord_env_P cenv PG S k rho1 rho2 ->
+    preord_env_P PG S k rho1 rho2 ->
     Included var (FromList (live_args xs bs)) S ->
     get_list xs rho1 = Some vs1 ->
     exists vs2 : list val,
-      get_list (live_args xs bs) rho2 = Some vs2 /\ Forall2 (preord_val cenv PG k) (live_args vs1 bs) vs2.
+      get_list (live_args xs bs) rho2 = Some vs2 /\ Forall2 (preord_val PG k) (live_args vs1 bs) vs2.
   Proof with now eauto with Ensembles_DB.
     revert vs1 bs. induction xs; intros vs1 bs Henv Hinc Hget.
     - inv Hget. destruct bs; eexists; simpl; split; eauto; econstructor.
@@ -658,7 +658,7 @@ Section Correct.
 
   
   Lemma fun_inv_Eletapp L find_tag S k bs x f ft ys e ft' e' rho rho'
-        (Henv : preord_env_P cenv PG (occurs_free (Eletapp x f ft ys e) \\ S \\ Dom_map L) k rho rho')
+        (Henv : preord_env_P PG (occurs_free (Eletapp x f ft ys e) \\ S \\ Dom_map L) k rho rho')
         (Hdis1 : Disjoint _ (Dom_map L) (FromList ys))
         (Hdis2 : Disjoint _ S (FromList (live_args ys bs)))
         (Hget : L ! f = Some bs)
@@ -666,9 +666,9 @@ Section Correct.
         (Hinv : fun_inv L find_tag k rho rho')
         (Hexp : (forall (m : nat) (v1 v2 : val),
                     m < k ->
-                    preord_val cenv PG m v1 v2 -> preord_exp cenv PL PG m (e, M.set x v1 rho) (e', M.set x v2 rho'))) :
+                    preord_val PG m v1 v2 -> preord_exp PL PG m (e, M.set x v1 rho) (e', M.set x v2 rho'))) :
     
-    preord_exp cenv PL PG k (Eletapp x f ft ys e, rho) (Eletapp x f ft' (live_args ys bs) e', rho').
+    preord_exp PL PG k (Eletapp x f ft ys e, rho) (Eletapp x f ft' (live_args ys bs) e', rho').
   Proof.
     intros v1 c1 t1 Hleq Hstep. inv Hstep.
     - eexists OOT, c1, zero. split; [| split; eauto ].
@@ -710,7 +710,6 @@ Section Correct.
           econstructor; try eassumption. now eauto.
         * simpl. eapply HPost. eassumption. eassumption. eassumption. eassumption. eassumption.
           eapply HGPost. eassumption. eassumption.
-          eassumption.
         * eapply preord_res_monotonic. eassumption.
           rewrite !to_nat_add. unfold one. rewrite to_nat_one. lia. 
       + edestruct (preord_env_P_get_list_live_args ys) with (bs := bs) as [vs' [Hgetl' Hprevs]]; eauto.
@@ -739,19 +738,19 @@ Section Correct.
         * econstructor 2.
           econstructor; try eassumption. now eauto.
         * simpl. eapply HPost. eassumption. eassumption. eassumption. eassumption.
-          eapply HGPost. eassumption. eassumption.
+          eapply HGPost. eassumption.
   Qed. 
 
 
   Lemma fun_inv_Eapp L find_tag S k bs f ft ys ft' rho rho'
-        (Henv : preord_env_P cenv PG (occurs_free (Eapp f ft ys) \\ S \\ Dom_map L) k rho rho')
+        (Henv : preord_env_P PG (occurs_free (Eapp f ft ys) \\ S \\ Dom_map L) k rho rho')
         (Hdis1 : Disjoint _ (Dom_map L) (FromList ys))
         (Hdis2 : Disjoint _ S (FromList (live_args ys bs)))
         (Hget : L ! f = Some bs)
         (Htag : find_tag f = Some ft')
         (Hinv : fun_inv L find_tag k rho rho') :
     
-    preord_exp cenv PL PG k (Eapp f ft ys, rho) (Eapp f ft' (live_args ys bs), rho').
+    preord_exp PL PG k (Eapp f ft ys, rho) (Eapp f ft' (live_args ys bs), rho').
   Proof.
     intros v1 c1 t1 Hleq Hstep. inv Hstep.
     - eexists OOT, c1, zero. split; [| split; eauto ].
@@ -783,7 +782,7 @@ Section Correct.
       split; [| split ]; eauto.
       * econstructor 2.
         econstructor; try eassumption. now eauto.
-      * simpl. eapply HPost; eauto. eapply HGPost. eassumption. eassumption.
+      * simpl. eapply HPost; eauto. eapply HGPost. eassumption.
       * eapply preord_res_monotonic. eassumption.
         rewrite !to_nat_add. unfold one. rewrite to_nat_one. lia. 
   Qed.
@@ -798,11 +797,11 @@ Section Correct.
            
            (Hfinv : fun_inv L find_tag k rho1 rho2)
            
-           (Henv : preord_env_P cenv PG (occurs_free e \\ S \\ Dom_map L) k rho1 rho2)
+           (Henv : preord_env_P PG (occurs_free e \\ S \\ Dom_map L) k rho1 rho2)
 
            (Helim : Elim_expr L find_tag e e'),
       
-      preord_exp cenv PL PG k (e, rho1) (e', rho2).
+      preord_exp PL PG k (e, rho1) (e', rho2).
   Proof.
     induction k as [k IHk] using lt_wf_rec1. intros e.
     revert k IHk; induction e using exp_ind'; intros; inv Helim; inv Hd; inv Hk; try congruence.
@@ -1007,11 +1006,11 @@ Section Correct.
   Lemma preord_env_P_set_lists_live:
     forall (xs1 : list var) (P : Ensemble var) (rho1 rho2 rho1' rho2' : env)
            (k : nat) (vs1 vs2 : list val) bs,
-      preord_env_P cenv PG (P \\ FromList xs1) k rho1 rho2 ->
-      Forall2 (preord_val cenv PG k) (live_args vs1 bs) vs2 ->
+      preord_env_P PG (P \\ FromList xs1) k rho1 rho2 ->
+      Forall2 (preord_val PG k) (live_args vs1 bs) vs2 ->
       set_lists xs1 vs1 rho1 = Some rho1' ->
       set_lists (live_args xs1 bs) vs2 rho2 = Some rho2' ->
-      preord_env_P cenv PG (P \\ FromList (dead_args xs1 bs)) k rho1' rho2'.
+      preord_env_P PG (P \\ FromList (dead_args xs1 bs)) k rho1' rho2'.
   Proof.
     induction xs1; intros P rho1 rho2 rho1' rho2' k vs1 vs2 bs Henv Hall Hs1 Hs2.
     + destruct vs1; destruct vs2; destruct bs; simpl in *; try congruence.
@@ -1060,12 +1059,12 @@ Section Correct.
            (Hd : live_map_sound B L)
            (Hk : Known_fundefs (Dom_map L) B)
            
-           (Henv : preord_env_P cenv PG (occurs_free_fundefs B :|: S \\ Dom_map L) k rho1 rho2)
+           (Henv : preord_env_P PG (occurs_free_fundefs B :|: S \\ Dom_map L) k rho1 rho2)
 
            (Helim : Elim_fundefs L find_tag B B'),
 
       fun_inv L find_tag k (def_funs B B rho1 rho1) (def_funs B' B' rho2 rho2) /\      
-      preord_env_P cenv PG ((name_in_fundefs B :|: occurs_free_fundefs B :|: S) \\ Dom_map L) k
+      preord_env_P PG ((name_in_fundefs B :|: occurs_free_fundefs B :|: S) \\ Dom_map L) k
                    (def_funs B B rho1 rho1) (def_funs B' B' rho2 rho2).
   Proof with now eauto with Ensembles_DB.
     induction k as [k IHk] using lt_wf_rec1; intros. split.
@@ -1088,7 +1087,7 @@ Section Correct.
 
         assert (Hand : forall m, m < k ->
                                  fun_inv L find_tag m (def_funs B1 B1 rho0 rho0) (def_funs B' B' rho2 rho2) /\
-                                 preord_env_P cenv PG
+                                 preord_env_P PG
                                               (name_in_fundefs B1 :|: occurs_free_fundefs B1 :|: S \\ Dom_map L) m
                                               (def_funs B1 B1 rho0 rho0) (def_funs B' B' rho2 rho2)).
         { intros. eapply IHk; try eassumption.
@@ -1156,7 +1155,7 @@ Section Correct.
 
           assert (Hand : forall m, m < k ->
                                    fun_inv L find_tag m (def_funs B B rho1 rho1) (def_funs B' B' rho2 rho2) /\
-                                   preord_env_P cenv PG
+                                   preord_env_P PG
                                                 (name_in_fundefs B :|: occurs_free_fundefs B :|: S \\ Dom_map L) m
                                                 (def_funs B B rho1 rho1) (def_funs B' B' rho2 rho2)).
           { intros. eapply IHk; try eassumption.
@@ -1172,7 +1171,7 @@ Section Correct.
           -- intros.
              edestruct (Hand j) as [Hinv' Henv']. lia.
 
-             { eapply preord_exp_post_monotonic. eapply HGPost. eassumption.
+             { eapply preord_exp_post_monotonic. eapply HGPost. 
                eapply Elim_expr_correct with (S := Empty_set _); try eassumption. 
                - repeat normalize_bound_var_in_ctx. sets.
                  eapply Disjoint_Included_r; [| eassumption ].
@@ -1323,9 +1322,9 @@ Section Correct.
       Disjoint _ (bound_var e') (occurs_free e') /\
       (max_var e' 1%positive < next_var c')%positive /\     
       (forall k rho1 rho2,
-          preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
+          preord_env_P PG (occurs_free e) k rho1 rho2 ->
           binding_in_map (occurs_free e) rho1 ->
-          preord_exp cenv PL PG k (e, rho1) (e', rho2)).
+          preord_exp PL PG k (e, rho1) (e', rho2)).
   Proof.
     intros Hun Hleq Hdis. unfold DPE.
 
@@ -1338,8 +1337,8 @@ Section Correct.
                   Disjoint var (bound_var e') (occurs_free e') /\
                   (max_var e' 1 < next_var c')%positive /\
                   (forall (k : nat) (rho1 rho2 : env),
-                      preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
-                      binding_in_map (occurs_free e) rho1 -> preord_exp' cenv (preord_val cenv) PL PG k (e, rho1) (e', rho2))).
+                      preord_env_P PG (occurs_free e) k rho1 rho2 ->
+                      binding_in_map (occurs_free e) rho1 -> preord_exp' (preord_val) PL PG k (e, rho1) (e', rho2))).
     { do 2 eexists. split; [| split; [| split; [| split; [| split ] ]]]; eauto; sets.
       now destruct c; eauto. 
       intros. eapply preord_exp_refl; eauto. }
@@ -1352,8 +1351,8 @@ Section Correct.
                   Disjoint var (bound_var e') (occurs_free e') /\
                   (max_var e' 1 < next_var c')%positive /\
                   (forall (k : nat) (rho1 rho2 : env),
-                      preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
-                      binding_in_map (occurs_free e) rho1 -> preord_exp' cenv (preord_val cenv) PL PG k (e, rho1) (e', rho2))).
+                      preord_env_P PG (occurs_free e) k rho1 rho2 ->
+                      binding_in_map (occurs_free e) rho1 -> preord_exp' (preord_val) PL PG k (e, rho1) (e', rho2))).
     { do 2 eexists. split; [| split; [| split; [| split; [| split ] ]]]; eauto; sets.
       intros. eapply preord_exp_refl; eauto. }
 

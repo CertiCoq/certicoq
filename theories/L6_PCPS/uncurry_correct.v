@@ -30,8 +30,8 @@ Section uncurry_correct.
     | |- inclusion _ ?R ?R => now unfold inclusion
     end.
 
-  Context (Hpost_prop : Post_properties cenv Post Post PostG)
-          (Hpost_propG : Post_properties cenv PostG PostG PostG).
+  Context (Hpost_prop : Post_properties Post Post PostG)
+          (Hpost_propG : Post_properties PostG PostG PostG).
 
   Context (Hpost_curry :
              forall e rho rho' rho'' c1 c2 cout1 cout2 f1 ft1 fv1 gv1, 
@@ -43,9 +43,9 @@ Section uncurry_correct.
   Context (Hpost_inclusion' : inclusion _ PostG Post).
 
   Lemma preord_val_fundefs Post' k rho rho1 fds f
-        (Hpost_prop' : Post_properties cenv Post' Post' Post'):
-    preord_env_P cenv Post' (occurs_free_fundefs fds) k rho rho1 ->
-    preord_val cenv Post' k (Vfun rho fds f) (Vfun rho1 fds f).
+        (Hpost_prop' : Post_properties Post' Post' Post'):
+    preord_env_P Post' (occurs_free_fundefs fds) k rho rho1 ->
+    preord_val Post' k (Vfun rho fds f) (Vfun rho1 fds f).
   Proof.
     rewrite preord_val_eq. simpl; intros.
     pose (Hlen := H2). apply set_lists_length in Hlen. rewrite <- Hlen in H0.
@@ -55,10 +55,10 @@ Section uncurry_correct.
 
     intros Hj Hvs. apply preord_exp_refl. eassumption.
     
-    assert (preord_env_P cenv Post' (occurs_free_fundefs fds :|: name_in_fundefs fds) j
+    assert (preord_env_P Post' (occurs_free_fundefs fds :|: name_in_fundefs fds) j
                          (def_funs fds fds rho rho)
                          (def_funs fds fds rho1 rho1)). {
-      apply preord_env_P_monotonic with (k := k). lia.
+      apply preord_env_P_monotonic with (k0 := k). lia.
       apply preord_env_P_def_funs_cor. eassumption.
       eapply preord_env_P_antimon; [eassumption|].
       auto with Ensembles_DB.
@@ -80,19 +80,19 @@ Section uncurry_correct.
   Qed.
 
   Lemma preord_env_P_union_converse : forall A B k rho rho1,
-    preord_env_P cenv Post (A :|: B) k rho rho1 ->
-    preord_env_P cenv Post A k rho rho1 /\
-    preord_env_P cenv Post B k rho rho1.
+    preord_env_P Post (A :|: B) k rho rho1 ->
+    preord_env_P Post A k rho rho1 /\
+    preord_env_P Post B k rho rho1.
   Proof.
     split; intros a Hin; apply H; [now left|now right].
   Qed.
 
-  Lemma preord_env_P_set_lists_extend: forall cenv Post k vs vs1 vs2 P rho1 rho2 rho1' rho2',
-    preord_env_P cenv Post (P \\ FromList vs) k rho1 rho2 ->
+  Lemma preord_env_P_set_lists_extend: forall Post k vs vs1 vs2 P rho1 rho2 rho1' rho2',
+    preord_env_P Post (P \\ FromList vs) k rho1 rho2 ->
     Some rho1' = set_lists vs vs1 rho1 ->
     Some rho2' = set_lists vs vs2 rho2 ->
-    Forall2 (preord_val cenv Post k) vs1 vs2 ->
-    preord_env_P cenv Post P k rho1' rho2'.
+    Forall2 (preord_val Post k) vs1 vs2 ->
+    preord_env_P Post P k rho1' rho2'.
   Proof.
     induction vs; intros vs1 vs2 P rho1 rho2 rho1' rho2' Hrho Hrho1' Hrho2' Hvs1_vs2.
     - destruct vs1; [|apply set_lists_length in Hrho1'; discriminate].
@@ -114,12 +114,12 @@ Section uncurry_correct.
         [inv Ha'; inv H; contradiction H2; easy|inv Ha'; inv H0; contradiction].
   Qed.
 
-  Lemma preord_env_P_set_lists_extend': forall cenv Post k vs vs1 vs2 P rho1 rho2 rho1' rho2',
-    preord_env_P cenv Post P k rho1 rho2 ->
+  Lemma preord_env_P_set_lists_extend': forall Post k vs vs1 vs2 P rho1 rho2 rho1' rho2',
+    preord_env_P Post P k rho1 rho2 ->
     Some rho1' = set_lists vs vs1 rho1 ->
     Some rho2' = set_lists vs vs2 rho2 ->
-    Forall2 (preord_val cenv Post k) vs1 vs2 ->
-    preord_env_P cenv Post P k rho1' rho2'.
+    Forall2 (preord_val Post k) vs1 vs2 ->
+    preord_env_P Post P k rho1' rho2'.
   Proof with eauto with Ensembles_DB.
     induction vs; intros vs1 vs2 P rho1 rho2 rho1' rho2' Hrho Hrho1' Hrho2' Hvs1_vs2.
     - destruct vs1; [|apply set_lists_length in Hrho1'; discriminate].
@@ -137,22 +137,22 @@ Section uncurry_correct.
       eapply preord_env_P_antimon...
   Qed.
 
-  Lemma preord_env_P_subst : forall cenv Post P k rho rho1 rho' rho1',
-    preord_env_P cenv Post P k rho rho1 ->
+  Lemma preord_env_P_subst : forall Post P k rho rho1 rho' rho1',
+    preord_env_P Post P k rho rho1 ->
     (forall a, P a -> M.get a rho = M.get a rho') ->
     (forall a, P a -> M.get a rho1 = M.get a rho1') ->
-    preord_env_P cenv Post P k rho' rho1'.
+    preord_env_P Post P k rho' rho1'.
   Proof.
-    intros cenv' Post' P k rho rho1 rho' rho1' Heq Hrho Hrho1 a Ha v1 Hv1.
+    intros Post' P k rho rho1 rho' rho1' Heq Hrho Hrho1 a Ha v1 Hv1.
     rewrite <- Hrho in Hv1; [|apply Ha].
     rewrite <- Hrho1; [|apply Ha].
     now apply Heq.
   Qed.
 
-  Lemma Forall2_preord_val_monotonic : forall cenv Post k k1 l1 l2,
+  Lemma Forall2_preord_val_monotonic : forall Post k k1 l1 l2,
     k1 <= k ->
-    Forall2 (preord_val cenv Post k) l1 l2 ->
-    Forall2 (preord_val cenv Post k1) l1 l2.
+    Forall2 (preord_val Post k) l1 l2 ->
+    Forall2 (preord_val Post k1) l1 l2.
   Proof.
     induction l1; [now inversion 2|intros].
     destruct l2; inv H0.
@@ -160,10 +160,10 @@ Section uncurry_correct.
     eapply preord_val_monotonic; eassumption.
   Qed.
 
-  Lemma preord_var_env_extend_neq_r : forall cenv Post k rho rho1 a b v,
-    preord_var_env cenv Post k rho rho1 a a ->
+  Lemma preord_var_env_extend_neq_r : forall Post k rho rho1 a b v,
+    preord_var_env Post k rho rho1 a a ->
     a <> b ->
-    preord_var_env cenv Post k rho (M.set b v rho1) a a.
+    preord_var_env Post k rho (M.set b v rho1) a a.
   Proof.
     unfold preord_var_env; intros.
     rewrite M.gso; auto.
@@ -180,12 +180,12 @@ Section uncurry_correct.
       intros contra; subst; contradiction H; now left.
     - auto.
   Qed.
-  Lemma preord_var_env_def_funs_neq : forall cenv Post k B' B B1 B2 B3 rho rho1 a,
-    preord_var_env cenv Post k
+  Lemma preord_var_env_def_funs_neq : forall Post k B' B B1 B2 B3 rho rho1 a,
+    preord_var_env Post k
                    (def_funs B2 B rho rho)
                    (def_funs B3 B1 rho1 rho1) a a ->
     ~ In _ (name_in_fundefs B') a ->
-    preord_var_env cenv Post k
+    preord_var_env Post k
                    (def_funs B2 (fundefs_append B' B) rho rho)
                    (def_funs B3 (fundefs_append B' B1) rho1 rho1) a a.
   Proof.
@@ -194,10 +194,10 @@ Section uncurry_correct.
     do 2 (rewrite def_funs_get_neq; auto).
   Qed.
 
-  Lemma preord_var_env_extend' : forall cenv Post rho1 rho2 k x y v1 v2,
-    (y <> x -> preord_var_env cenv Post k rho1 rho2 y y) ->
-    preord_val cenv Post k v1 v2 ->
-    preord_var_env cenv Post k (M.set x v1 rho1) (M.set x v2 rho2) y y.
+  Lemma preord_var_env_extend' : forall Post rho1 rho2 k x y v1 v2,
+    (y <> x -> preord_var_env Post k rho1 rho2 y y) ->
+    preord_val Post k v1 v2 ->
+    preord_var_env Post k (M.set x v1 rho1) (M.set x v2 rho2) y y.
   Proof.
     intros.
     unfold preord_var_env.
@@ -234,8 +234,8 @@ Section uncurry_correct.
     (fresh_copies (s :|: FromList gv1) fv1) ->
     (length fv1 = length fv) ->
     (~ In var (s :|: FromList gv1 :|: FromList fv1) f1) ->
-    (preord_env_P cenv PostG (occurs_free (Efun curried e)) k rho rho1) ->
-    preord_exp cenv Post PostG k (Efun curried e, rho) (Efun uncurried e, rho1).
+    (preord_env_P PostG (occurs_free (Efun curried e)) k rho rho1) ->
+    preord_exp Post PostG k (Efun curried e, rho) (Efun uncurried e, rho1).
   Proof with unfold used_vars in *; eauto 15 with Ensembles_DB.
     intros k e f ft k0 kt fv g gt gv ge pre_fds fds f1 ft1 fv1 gv1 s rho rho1
            already_uncurried curried uncurried
@@ -480,7 +480,7 @@ Section uncurry_correct.
           apply length_exists_set_lists with
             (rho0 := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
           destruct Hrho''' as [rho''' Hrho'''].
-          assert (Hgoal : preord_exp cenv Post PostG k2 (ge, rho'') (ge, rho''')). {
+          assert (Hgoal : preord_exp Post PostG k2 (ge, rho'') (ge, rho''')). {
             apply preord_exp_refl. eassumption.
 
             (* wrt free variables of ge, the environments
@@ -921,8 +921,8 @@ Section uncurry_correct.
     (fresh_copies (s :|: FromList gv1) fv1) ->
     (length fv1 = length fv) ->
     (~ In var (s :|: FromList gv1 :|: FromList fv1) f1) ->
-    (preord_env_P cenv PostG (occurs_free (Efun curried e)) k rho rho1) ->
-    preord_exp cenv Post PostG k (Efun curried e, rho) (Efun uncurried e, rho1).
+    (preord_env_P PostG (occurs_free (Efun curried e)) k rho rho1) ->
+    preord_exp Post PostG k (Efun curried e, rho) (Efun uncurried e, rho1).
   Proof with unfold used_vars in *; eauto 15 with Ensembles_DB.
     intros k e f ft fv g gt gv ge pre_fds fds f1 ft1 fv1 gv1 s rho rho1
            already_uncurried curried uncurried
@@ -1136,7 +1136,7 @@ Section uncurry_correct.
         apply length_exists_set_lists with
           (rho0 := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
         destruct Hrho''' as [rho''' Hrho'''].
-        assert (Hgoal : preord_exp cenv Post PostG k2 (ge, rho'') (ge, rho''')). {
+        assert (Hgoal : preord_exp Post PostG k2 (ge, rho'') (ge, rho''')). {
           apply preord_exp_refl. eassumption.
           (* wrt free variables of ge, the environments
                rho'' = [gv -> vs3] + g + [k0 :: fv -> vs1] + curried f + fds + rho
@@ -1550,18 +1550,18 @@ Section uncurry_correct.
   Qed.
 
   Lemma preord_exp_eq_compat :
-    forall (cenv : ctor_env) (P1 : PostT) (PG : PostGT)
-           (Hprop1 : Post_properties cenv P1 P1 PG)
-           (Hprop1 : Post_properties cenv PG PG PG)
+    forall (P1 : PostT) (PG : PostGT)
+           (Hprop1 : Post_properties P1 P1 PG)
+           (Hprop1 : Post_properties PG PG PG)
 
            (k : nat) (rho1 rho2 : env) (c : exp_ctx) (e1 e2 e1' e2' : exp),
       (forall (m : nat) (rho3 rho4 : env),
           m <= k ->
-          preord_env_P cenv PG (occurs_free e1) m rho3 rho4 ->
-          preord_exp' cenv (preord_val cenv) P1 PG m (e1, rho3) (e2, rho4)) ->
+          preord_env_P PG (occurs_free e1) m rho3 rho4 ->
+          preord_exp' (preord_val) P1 PG m (e1, rho3) (e2, rho4)) ->
       c |[ e1 ]| = e1' -> c |[ e2 ]| = e2' ->
-      preord_env_P cenv PG (occurs_free e1') k rho1 rho2 ->
-      preord_exp' cenv (preord_val cenv) P1 PG k (e1', rho1) (e2', rho2).
+      preord_env_P PG (occurs_free e1') k rho1 rho2 ->
+      preord_exp' (preord_val) P1 PG k (e1', rho1) (e2', rho2).
   Proof.
     intros.
     rewrite <- H0, <- H1; apply preord_exp_compat; auto.
@@ -1569,8 +1569,8 @@ Section uncurry_correct.
   Qed.
 
   Definition ctx_preord_exp (k : nat) (e e1 : exp) := forall rho rho1,
-    preord_env_P cenv PostG (occurs_free e) k rho rho1 ->
-    preord_exp cenv Post PostG k (e, rho) (e1, rho1).
+    preord_env_P PostG (occurs_free e) k rho rho1 ->
+    preord_exp Post PostG k (e, rho) (e1, rho1).
 
   Lemma uncurry_step_correct' :
     let P := (fun e s _ e1 s1 _ => forall k,
@@ -1615,7 +1615,7 @@ Section uncurry_correct.
         eapply Included_trans; [|eassumption]...
         apply preord_env_P_extend.
         * intros x1 Hx1.
-          apply preord_var_env_monotonic with (k := k); [|lia].
+          apply preord_var_env_monotonic with (k0 := k); [|lia].
           apply Henv.
           inversion Hx1. apply Free_Eletapp2; [|assumption].
           intros contra. subst. intuition.
@@ -1637,7 +1637,7 @@ Section uncurry_correct.
         eapply Included_trans; [|eassumption]...
         apply preord_env_P_extend.
         * intros x1 Hx1.
-          apply preord_var_env_monotonic with (k := k); [|lia].
+          apply preord_var_env_monotonic with (k0 := k); [|lia].
           apply Henv.
           inversion Hx1. apply Free_Econstr2; [|assumption].
           intros contra. subst. intuition.
@@ -1654,7 +1654,7 @@ Section uncurry_correct.
         eapply Included_trans; [|eassumption]...
         rewrite used_vars_Ecase_cons in Hused1.
         eapply Included_trans; [|eassumption]...
-        apply preord_env_P_monotonic with (k := k); [lia|].
+        apply preord_env_P_monotonic with (k0 := k); [lia|].
         eapply preord_env_P_antimon; [eassumption|].
         eapply occurs_free_Ecase_Included; simpl; eauto.
       + apply preord_exp_refl. eassumption.
@@ -1669,7 +1669,7 @@ Section uncurry_correct.
       + eapply uncurry_step_preserves_ctag; eauto.
       + now apply Henv.
       + intros k' Hk'; apply preord_exp_refl. eassumption.
-        apply preord_env_P_monotonic with (k := k); [lia|].
+        apply preord_env_P_monotonic with (k0 := k); [lia|].
         eapply preord_env_P_antimon; [eassumption|].
         rewrite occurs_free_Ecase_cons...
       + apply IH; inv Hunique; inv Hunique1; auto.
@@ -1677,7 +1677,7 @@ Section uncurry_correct.
         eapply Included_trans; [|eassumption]...
         rewrite used_vars_Ecase_cons in Hused1.
         eapply Included_trans; [|eassumption]...
-        apply preord_env_P_monotonic with (k := k); [lia|].
+        apply preord_env_P_monotonic with (k0 := k); [lia|].
         eapply preord_env_P_antimon; [eassumption|].
         rewrite occurs_free_Ecase_cons...
     - (* uncurry_proj *)
@@ -1738,7 +1738,7 @@ Section uncurry_correct.
       + do 2 (rewrite def_funs_eq; [|assumption]).
         intros v1 Hv1; inv Hv1; eexists; split; [reflexivity|].
         apply preord_val_fundefs; try easy_post.
-        apply preord_env_P_monotonic with (k := k); [lia|].
+        apply preord_env_P_monotonic with (k0 := k); [lia|].
         eapply preord_env_P_antimon; [eassumption|].
         rewrite occurs_free_Efun...
       + do 2 (rewrite def_funs_neq; [|assumption]).
@@ -2122,8 +2122,8 @@ Section uncurry_correct.
 
 (*   Lemma uncurry_rw_correct k e1 e2 rho1 rho2 :
     uncurry_rw e1 e2 ->
-    preord_env_P cenv PostG (occurs_free e1) k rho1 rho2 ->
-    preord_exp cenv Post PostG k (e1, rho1) (e2, rho2).
+    preord_env_P PostG (occurs_free e1) k rho1 rho2 ->
+    preord_exp Post PostG k (e1, rho1) (e2, rho2).
   Proof.
     inversion 1; intros Henv.
     apply preord_exp_compat. { constructor; now try easy_post. all:firstorder with auto.
@@ -3089,8 +3089,8 @@ Lemma uncurry_correct_top cps c e :
   occurs_free e' \subset occurs_free e /\
   Disjoint _ (bound_var e') (occurs_free e') /\
   (forall k rho1 rho2,
-    preord_env_P cenv PostG (occurs_free e) k rho1 rho2 ->
-    preord_exp cenv Post PostG k (e, rho1) (e', rho2)).
+    preord_env_P PostG (occurs_free e) k rho1 rho2 ->
+    preord_exp Post PostG k (e, rho1) (e', rho2)).
 Proof.
   intros Huniq Hdis Hmax.
   unfold uncurry_top.

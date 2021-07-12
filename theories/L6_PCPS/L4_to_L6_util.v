@@ -252,8 +252,8 @@ Section Post.
             (PG : PostGT) (* Global *)
             (cnstrs : conId_map)
             (cenv : ctor_env)
-            (Hprops : Post_properties cenv P1 P1 PG)
-            (HpropsG : Post_properties cenv PG PG PG)
+            (Hprops : Post_properties P1 P1 PG)
+            (HpropsG : Post_properties PG PG PG)
             (Hincl : inclusion _ (comp P1 P1) P1)
             (HinclG : inclusion _ P1 PG)
             (pr_env : M.t (kername * string * nat)).
@@ -276,9 +276,9 @@ Section Post.
       
       
     Lemma ctx_bind_proj_alpha_equiv_gen k S f rho1 rho2 x1 x2 ctag proj_vars1 vars1 proj_vars2 vars2 e1 e2 n :
-      preord_var_env cenv PG k rho1 rho2 x1 x2 ->
+      preord_var_env PG k rho1 rho2 x1 x2 ->
       
-      preord_env_P_inj cenv PG (S :|: FromList vars1) k (f <{ vars1 ~> vars2 }>) rho1 rho2 ->
+      preord_env_P_inj PG (S :|: FromList vars1) k (f <{ vars1 ~> vars2 }>) rho1 rho2 ->
 
       List.length proj_vars1 = List.length proj_vars2 ->
       Datatypes.length vars1 = Datatypes.length vars2 ->
@@ -291,10 +291,10 @@ Section Post.
                                                      
       (forall rho1' rho2' m,
           (m <= k)%nat ->
-          preord_env_P_inj cenv PG (S :|: FromList (vars1 ++ proj_vars1)) m (f <{ vars1 ++ proj_vars1 ~> vars2 ++ proj_vars2 }>) rho1' rho2' ->
-          preord_exp cenv P1 PG m (e1, rho1') (e2, rho2')) ->
+          preord_env_P_inj PG (S :|: FromList (vars1 ++ proj_vars1)) m (f <{ vars1 ++ proj_vars1 ~> vars2 ++ proj_vars2 }>) rho1' rho2' ->
+          preord_exp P1 PG m (e1, rho1') (e2, rho2')) ->
       
-      preord_exp cenv P1 PG k
+      preord_exp P1 PG k
                  (ctx_bind_proj ctag x1 proj_vars1 n |[ e1 ]|, rho1)
                  (ctx_bind_proj ctag x2 proj_vars2 n |[ e2 ]|, rho2).
     Proof.
@@ -366,9 +366,9 @@ Section Post.
 
     
     Corollary ctx_bind_proj_alpha_equiv k S f rho1 rho2 x1 x2 ctag proj_vars1 proj_vars2 e1 e2 n :
-      preord_var_env cenv PG k rho1 rho2 x1 x2 ->
+      preord_var_env PG k rho1 rho2 x1 x2 ->
       
-      preord_env_P_inj cenv PG S k f rho1 rho2 ->
+      preord_env_P_inj PG S k f rho1 rho2 ->
 
       List.length proj_vars1 = List.length proj_vars2 ->
 
@@ -380,10 +380,10 @@ Section Post.
                                                      
       (forall rho1' rho2' m,
           (m <= k)%nat ->
-          preord_env_P_inj cenv PG (S :|: FromList proj_vars1) m (f <{ proj_vars1 ~> proj_vars2 }>) rho1' rho2' ->
-          preord_exp cenv P1 PG m (e1, rho1') (e2, rho2')) ->
+          preord_env_P_inj PG (S :|: FromList proj_vars1) m (f <{ proj_vars1 ~> proj_vars2 }>) rho1' rho2' ->
+          preord_exp P1 PG m (e1, rho1') (e2, rho2')) ->
       
-      preord_exp cenv P1 PG k
+      preord_exp P1 PG k
                  (ctx_bind_proj ctag x1 proj_vars1 n |[ e1 ]|, rho1)
                  (ctx_bind_proj ctag x2 proj_vars2 n |[ e2 ]|, rho2).
     Proof.
@@ -461,9 +461,9 @@ Section Post.
         Disjoint _ (k1 |: FromList vars1) S1 ->
         Disjoint _ (k2 |: FromList vars2) S3 ->
 
-        preord_env_P_inj cenv PG (k1 |: FromList vars1) m
+        preord_env_P_inj PG (k1 |: FromList vars1) m
                          (id { k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
-        preord_exp cenv P1 PG m (e1, rho1) (e2, rho2).
+        preord_exp P1 PG m (e1, rho1) (e2, rho2).
 
      Definition cps_cvt_exps_alpha_equiv k :=
       forall es es1 es2 m k1 k2 vars1 vars2 xs1 xs2 ks1 ks2 ys1 ys2 rho1 rho2
@@ -497,16 +497,16 @@ Section Post.
 
         
         (forall rho1 rho2 m, 
-            preord_env_P_inj cenv PG (k1 |: FromList (ys1 ++ xs1)) m
+            preord_env_P_inj PG (k1 |: FromList (ys1 ++ xs1)) m
                              (id { k1 ~> k2 } <{ ys1 ++ xs1 ~> ys2 ++ xs2 }>)
                              rho1 rho2 ->
-            preord_exp cenv P1 PG m (e_cont1, rho1) (e_cont2, rho2)) ->
+            preord_exp P1 PG m (e_cont1, rho1) (e_cont2, rho2)) ->
         
-        preord_env_P_inj cenv PG (k1 |: FromList vars1 :|: FromList ys1 ) m
+        preord_env_P_inj PG (k1 |: FromList vars1 :|: FromList ys1 ) m
                          (id { k1 ~> k2 } <{ vars1 ~> vars2 }> <{ ys1 ~> ys2 }>)
                          rho1 rho2 ->
         
-        preord_exp cenv P1 PG m (es1, rho1) (es2, rho2). 
+        preord_exp P1 PG m (es1, rho1) (es2, rho2). 
 
     
     Definition cps_cvt_efnlst_alpha_equiv k :=
@@ -531,14 +531,14 @@ Section Post.
 
         Disjoint var (k2 |: FromList vars2') (name_in_fundefs fdefs2) -> 
                 
-        preord_env_P_inj cenv PG (k1 |: FromList vars1') m
+        preord_env_P_inj PG (k1 |: FromList vars1') m
                          (id {k1 ~> k2 } <{ vars1' ~> vars2' }>) rho1 rho2 ->
-        preord_env_P_inj cenv PG (k1 |: (FromList vars1 :|: FromList nlst1)) m
+        preord_env_P_inj PG (k1 |: (FromList vars1 :|: FromList nlst1)) m
                          (id {k1 ~> k2 } <{ vars1' ~> vars2' }> <{ rev (all_fun_name fdefs1) ~> rev (all_fun_name fdefs2) }>)
                          (def_funs fdefs1 fdefs1 rho1 rho1)
                          (def_funs fdefs2 fdefs2 rho2 rho2).
 
-        (* preord_val cenv PG k (Vfun rho1 fdefs1 f1) (Vfun rho2 fdefs2 f2). *)
+        (* preord_val PG k (Vfun rho1 fdefs1 f1) (Vfun rho2 fdefs2 f2). *)
 
     
     Definition cps_cvt_branches_alpha_equiv (k : nat) :=
@@ -554,10 +554,10 @@ Section Post.
         Disjoint _ (k1 |: [set x1] :|: FromList vars1) S1 ->       
         Disjoint _ (k2 |: [set x2] :|: FromList vars2) S3 ->
         
-        preord_env_P_inj cenv PG (k1 |: FromList vars1) m
+        preord_env_P_inj PG (k1 |: FromList vars1) m
                          (id {k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->        
-        preord_var_env cenv PG m rho1 rho2 x1 x2 ->
-        preord_exp cenv P1 PG m (Ecase x1 bs1, rho1)  (Ecase x2 bs2, rho2).
+        preord_var_env PG m rho1 rho2 x1 x2 ->
+        preord_exp P1 PG m (Ecase x1 bs1, rho1)  (Ecase x2 bs2, rho2).
 
     
     Definition cps_cvt_alpha_equiv_statement k :=
@@ -610,7 +610,7 @@ Section Post.
     Qed.
 
     Lemma preord_env_P_inj_def_funs_Vfun S k f B1 B2 B1' B2' rho1 rho2 : 
-      preord_env_P_inj cenv PG (S \\ name_in_fundefs B1) k f rho1 rho2 ->
+      preord_env_P_inj PG (S \\ name_in_fundefs B1) k f rho1 rho2 ->
       
       List.length (all_fun_name B1) = List.length (all_fun_name B2) ->
       NoDup (all_fun_name B1) ->
@@ -619,9 +619,9 @@ Section Post.
       (forall n f1 f2,
           nth_error (all_fun_name B1) n = Some f1 ->
           nth_error (all_fun_name B2) n = Some f2 ->
-          preord_val cenv PG k (Vfun rho1 B1' f1) (Vfun rho2 B2' f2)) ->
+          preord_val PG k (Vfun rho1 B1' f1) (Vfun rho2 B2' f2)) ->
           
-      preord_env_P_inj cenv PG S k (f <{ all_fun_name B1 ~> all_fun_name B2 }>) (def_funs B1' B1 rho1 rho1) (def_funs B2' B2 rho2 rho2).
+      preord_env_P_inj PG S k (f <{ all_fun_name B1 ~> all_fun_name B2 }>) (def_funs B1' B1 rho1 rho1) (def_funs B2' B2 rho2 rho2).
     Proof.
       intros Henv Hlen Hnd Hdis Hrel x Hin v Hget.
       destruct (Decidable_name_in_fundefs B1). destruct (Dec x).
@@ -1934,26 +1934,26 @@ Section Post.
       forall v v1 v2,
         cps_val_rel v v1 ->
         cps_val_rel v v2 ->
-        preord_val cenv PG k v1 v2.
+        preord_val PG k v1 v2.
 
     Definition cps_cvt_env_alpha_equiv_statement k :=
       forall names1 names2 vs rho1 rho2 f,
         cps_env_rel names1 vs rho1 ->
         cps_env_rel names2 vs rho2 ->
 
-        preord_env_P_inj cenv PG (FromList names1) k (f <{ names1 ~> names2 }>) rho1 rho2.
+        preord_env_P_inj PG (FromList names1) k (f <{ names1 ~> names2 }>) rho1 rho2.
 
 
     Lemma preord_env_P_inj_get S k f rho1 rho2 x y v1 v2 :
 
-      preord_env_P_inj cenv PG (S \\ [set x]) k f rho1 rho2 ->
+      preord_env_P_inj PG (S \\ [set x]) k f rho1 rho2 ->
       
       M.get x rho1 = Some v1 ->
       M.get y rho2 = Some v2 ->
       
-      preord_val cenv PG k v1 v2 ->
+      preord_val PG k v1 v2 ->
       
-      preord_env_P_inj cenv PG S k (f {x ~> y}) rho1 rho2.
+      preord_env_P_inj PG S k (f {x ~> y}) rho1 rho2.
     Proof.
       intros Henv Hg1 Hg2 Hval z HS v Hgetz. destruct (Coqlib.peq x z).
       - subst. repeat subst_exp. rewrite extend_gss. eauto.
@@ -2035,7 +2035,7 @@ Section Post.
       forall k, cps_cvt_val_alpha_equiv_statement k.
     Proof.
       intros k. induction k as [k IHk] using lt_wf_rec1.  intros v.
-      set (P := fun (v : value) => forall v1 v2 : val, cps_val_rel v v1 -> cps_val_rel v v2 -> preord_val cenv PG k v1 v2).
+      set (P := fun (v : value) => forall v1 v2 : val, cps_val_rel v v1 -> cps_val_rel v v2 -> preord_val PG k v1 v2).
 
       eapply value_ind' with (P := P); subst P; simpl.
       

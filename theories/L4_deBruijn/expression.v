@@ -146,6 +146,7 @@ Inductive exp_wf: N -> exp -> Prop :=
     exp_wf i e1 -> exp_wf (1 + i) e2 ->
     exp_wf i (Let_e n e1 e2)
 | fix_e_wf: forall i (es:efnlst) k,
+    k < efnlst_length es ->
     efnlst_wf (efnlst_length es + i) es ->
     exp_wf i (Fix_e es k)
 (* Fix?: Axiom applied to anything should reduce to Axiom *)
@@ -156,7 +157,7 @@ with exps_wf: N -> exps -> Prop :=
     exp_wf i e -> exps_wf i es -> exps_wf i (econs e es)
 with efnlst_wf: N -> efnlst -> Prop :=
 | flnil_wf_e: forall i, efnlst_wf i eflnil
-| flcons_wf_e: forall i f e es,
+| flcons_wf_e: forall i f e es,    
     exp_wf i e -> isLambda e -> efnlst_wf i es ->
     efnlst_wf i (eflcons f e es)
 with branches_wf: N -> branches_e -> Prop :=
@@ -1137,8 +1138,9 @@ Proof.
   - repeat if_split; try (constructor; auto; lia).
   - constructor. apply H; try lia; auto.
   - constructor; auto. apply H0; try lia; auto.
-  - constructor; auto. rewrite efnlst_length_sbst.
-    apply H; try lia; auto.
+  - constructor; auto. simpl.
+    rewrite efnlst_length_sbst. eassumption. 
+    rewrite efnlst_length_sbst. apply H; try lia; auto.
   - constructor; auto. 
   - constructor; auto.
     + destruct e; simpl in i0; try contradiction. exact I.
@@ -1193,26 +1195,39 @@ Proof.
       apply IHes. auto.
 Qed.
 
+Lemma efnlength_efnlst_length es :
+  N.of_nat (efnlength es) = efnlst_length es.
+Proof.
+  induction es; simpl; lia.
+Qed.
+
 Lemma sbst_fix_preserves_wf :
   forall es, efnlst_wf (efnlst_length es) es ->
         forall e, exp_wf (efnlst_length es) e ->
-             exp_wf 0 (sbst_fix es e).
+                  exp_wf 0 (sbst_fix es e).
 Proof.
   intros.
   unfold sbst_fix.
   revert e H0.
   remember (Fix_e es) as fixe.
   intros.
-  revert H0. generalize es as es'. intros es'.
-  remember (list_to_zero (efnlength es')).
+  assert (Heq : N.of_nat (efnlength es) <= efnlst_length es).
+  { rewrite efnlength_efnlst_length. lia. }
+        
+  revert Heq H0. generalize es at 1 3 4 as es'.
+  intros es'.
+  remember (list_to_zero (N.to_nat (efnlst_length es'))).
   revert es' Heql e.
   induction l. simpl; intros.
-  destruct es'; simpl in *; auto; discriminate.
+  destruct es'; simpl in *; auto. simpl in *.
+  rewrite Nnat.N2Nat.inj_add in *. discriminate.
   intros.
   destruct es'; simpl in *; auto; try discriminate.
+  rewrite Nnat.N2Nat.inj_add in *. 
   injection Heql. intros. specialize (IHl _ H1).
-  apply IHl. eapply sbst_preserves_exp_wf. eauto.
-  subst fixe. constructor. now rewrite N.add_0_r.
+  apply IHl. simpl in *. lia. eapply sbst_preserves_exp_wf. eauto.
+  subst fixe. constructor. simpl in *. subst. lia. 
+  now rewrite N.add_0_r.
 Qed.
 
 Lemma find_branch_preserves_wf :
@@ -1255,7 +1270,7 @@ Proof.
     specialize (H0 H7). specialize (H H6).
     inversion H. subst.
     apply H1.
-    assert (wfe':=nthopt_preserves_wf _ _ H5 _ _ e3).
+    assert (wfe':=nthopt_preserves_wf _ _ H9 _ _ e3).
     rewrite N.add_0_r in *.
     constructor.
     now eapply sbst_fix_preserves_wf.
@@ -1422,7 +1437,9 @@ Proof.
     eapply (proj1 weaken_wf_le); eauto; lia.
   - constructor. apply H; try lia; auto.
   - constructor; auto. apply H0; try lia; auto.
-  - constructor; auto. rewrite efnlst_length_subst; apply H; try lia; auto.
+  - constructor; auto.
+    rewrite efnlst_length_subst. eassumption.
+    rewrite efnlst_length_subst; apply H; try lia; auto.
   - constructor; auto. 
   - constructor; auto.
     + destruct e; contradiction || constructor.

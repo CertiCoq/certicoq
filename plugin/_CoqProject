@@ -192,8 +192,6 @@ extraction/l3_to_L4.ml
 extraction/l3_to_L4.mli
 extraction/l4_to_L6.ml
 extraction/l4_to_L6.mli
-extraction/l4_to_L6_anf.ml
-extraction/l4_to_L6_anf.mli
 extraction/l6_to_Clight.ml
 extraction/l6_to_Clight.mli
 extraction/l6_to_Clight_stack.ml

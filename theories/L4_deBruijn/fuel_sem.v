@@ -1,5 +1,5 @@
 Require Import Coq.Arith.Arith Coq.NArith.BinNat omega.Omega Coq.Strings.String
-        Coq.Lists.List Structures.OrdersEx Lia.
+        Coq.Lists.List Structures.OrdersEx micromega.Lia.
 Require Import Common.Common.
 Require Import L4.expression.
 Require Import L6.algebra L6.tactics.
@@ -263,8 +263,6 @@ Section FUEL_SEM.
     
     Definition well_formed_env (rho : list value) : Prop :=
       Forall well_formed_val rho.
-
-    Require Import Lia. 
 
     Lemma well_formed_in_env_Match_branches:
       forall e e' bs rho i dc vs f t,

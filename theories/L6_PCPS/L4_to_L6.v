@@ -23,7 +23,6 @@ Section Translate.
           (next_id : positive).
 
   
-<<<<<<< HEAD
   Section COMMON.
     
     Definition conId_map:= list (dcon * ctor_tag).
@@ -47,25 +46,25 @@ Section Translate.
                               | right _ => dcon_to_info a sig'
                               end
       end.
-=======
-  Definition t_info:Type := fun_tag.
-  Definition t_map := M.t t_info.
-  Definition t_empty:t_map := M.empty _.
-  
-  (* get the fun_tag of a variable, func_tag if not found *)
-  Definition get_f (n:var) (sig:t_map): fun_tag :=
-    match M.get n sig with
-    | None => func_tag
-    | Some v => v
-    end.
 
 
-  Definition s_map := M.t var.
-  Definition s_empty := M.empty var.
+    Definition t_info:Type := fun_tag.
+    Definition t_map := M.t t_info.
+    Definition t_empty:t_map := M.empty _.
+    
+    (* get the fun_tag of a variable, func_tag if not found *)
+    Definition get_f (n:var) (sig:t_map): fun_tag :=
+      match M.get n sig with
+      | None => func_tag
+      | Some v => v
+      end.
 
 
-  Definition constr_env:Type := conId_map.
->>>>>>> 6bcb5f6a9a9a1ebe863ba5c86d5d1aebd9cd8d27
+    Definition s_map := M.t var.
+    Definition s_empty := M.empty var.
+
+
+    Definition constr_env:Type := conId_map.
 
     Definition dcon_to_tag (a:dcon) (sig:conId_map) :=
       dcon_to_info a sig.
@@ -73,7 +72,6 @@ Section Translate.
     Definition name_env := M.t BasicAst.name.
     Definition n_empty : name_env := M.empty _.
     
-    Definition constr_env:Type := conId_map.
     
     Definition ienv := list (BasicAst.kername * AstCommon.itypPack).
     

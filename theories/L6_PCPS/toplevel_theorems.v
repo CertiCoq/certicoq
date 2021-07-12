@@ -405,7 +405,11 @@ Section Uncurry.
     - intros. eapply simple_bound_compat.
     - eapply Hpost_curry.
     - eapply Hpost_idemp.
-    - clear. firstorder.
+    - clear. unfold comp, simple_bound. intro; intros.
+      destructAll.
+      destruct x as [[[? ?] ?] [? ? ]].
+      destruct y as [[[? ?] ?] [? ? ]].
+      destruct x0 as [[[? ?] ?] [? ? ]]. lia.
     - inv H. eassumption.
     - inv H. eassumption.
     - eassumption.

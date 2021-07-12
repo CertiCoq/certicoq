@@ -13,7 +13,7 @@ Require Import L4.expression L4.fuel_sem.
 
 Require Import cps cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
-        tactics L4_to_L6 L4_to_L6_util L4_to_L6_corresp
+        L4_to_L6 L4_to_L6_util L4_to_L6_corresp
         L6.tactics identifiers bounds cps_util rename. 
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
@@ -911,7 +911,8 @@ Section Correct.
           split; [ | split ; [ | split ; [ | split; [ | split ; [ | split ] ] ] ] ]; last eassumption; try eassumption.
           * reflexivity.
           * constructor. eassumption.
-            intros Hc. eapply dcon_to_tag_inj in Hc. subst; eauto.
+            intros Hc. 
+            eapply dcon_to_tag_inj in Hc. subst; eauto.
     Qed.
 
     Lemma cps_cvt_rel_branches_find_branch_wf S1 brs vs k r S2 P dc e n j :
@@ -956,14 +957,14 @@ Section Correct.
       split. simpl. unfold_all. lia. 
       eapply preord_res_refl; tci.
     Qed.
-
+      
 
     Lemma preord_exp_Ecase_red k rho ctag vs P e n y :
       M.get y rho = Some (Vconstr ctag vs) ->
       find_tag_nth P ctag e n ->
       preord_exp cenv one_step eq_fuel k (e, rho) (Ecase y P, rho).
     Proof.
-      intros Hget Hnth r c1 c2 Hleq Hstep.
+      intros Hget Hnth r c1 c2 Hleq Hstep. 
       do 3 eexists. split. econstructor 2. econstructor; eauto.
       admit. (* case consistent??? *) 
       split. simpl. unfold_all. lia. 

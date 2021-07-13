@@ -451,20 +451,32 @@ Section Post.
     
      Definition cps_cvt_exp_alpha_equiv k :=
        forall e e1 e2 m k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4,
-         (m <= k)%nat -> 
-        cps_cvt_rel S1 e vars1 k1 cnstrs S2 e1 ->
-        cps_cvt_rel S3 e vars2 k2 cnstrs S4 e2 ->
-        NoDup vars1 -> (* TODO is this needed? *)
-        ~(k1 \in (FromList vars1)) ->
-        List.length vars1 = List.length vars2 ->
+         (m <= k)%nat ->
 
+        (* CPS conversion with set S1 *)
+        cps_cvt_rel S1 e vars1 k1 cnstrs S2 e1 ->
+        (* CPS conversion with set S2 *)
+        cps_cvt_rel S3 e vars2 k2 cnstrs S4 e2 ->
+
+        List.length vars1 = List.length vars2 -> (* This is not show in the paper *)
+
+
+        (* In the paper, we use the auxiliary definition "fresh" to summarize these premises *) 
+        ~(k1 \in (FromList vars1)) ->
+        NoDup vars1 ->
         Disjoint _ (k1 |: FromList vars1) S1 ->
         Disjoint _ (k2 |: FromList vars2) S3 ->
 
+
+        (* Environment relation *)
         preord_env_P_inj PG (k1 |: FromList vars1) m
                          (id { k1 ~> k2 } <{ vars1 ~> vars2 }>) rho1 rho2 ->
+
+        (* The two expressions are related *)
         preord_exp P1 PG m (e1, rho1) (e2, rho2).
 
+
+     
      Definition cps_cvt_exps_alpha_equiv k :=
       forall es es1 es2 m k1 k2 vars1 vars2 xs1 xs2 ks1 ks2 ys1 ys2 rho1 rho2
              e_cont1 e_cont2 S1 S2 S3 S4,
@@ -811,11 +823,11 @@ Section Post.
               + reflexivity.
               + eassumption.
               + eassumption.
-              + constructor. intros Hc. eapply Hdis1. now sets. eassumption.
+              + simpl. congruence.
               + repeat normalize_sets. inv H5. intros Hc. inv Hc.
                 * inv H5. eauto.
                 * eapply Hdis1. now sets.
-              + simpl. congruence.
+              + constructor. intros Hc. eapply Hdis1. now sets. eassumption.
               + repeat normalize_sets. xsets. (* ^^ yay sets *)
               + repeat normalize_sets. xsets. (* ^^ yay sets *)
               + repeat normalize_sets. simpl.
@@ -1280,14 +1292,15 @@ Section Post.
                 eapply preord_exp_post_monotonic. eapply HinclG. 
                 eapply Hexp; try eassumption.
                 lia.
-                constructor; try eassumption.
-                intros Hc. eapply Hdis1; now sets.
-
+                simpl. congruence.
+                
                 repeat normalize_sets. intros Hc.
                 inv Hc. inv H1. eapply Hdis1. now sets.
                 eapply Hdis1. now sets.
-                simpl. congruence.
 
+                constructor; eauto. 
+                intros Hc. eapply Hdis1. now sets.
+                
                 repeat normalize_sets. now xsets.
                 repeat normalize_sets. now xsets.
                 
@@ -1694,13 +1707,15 @@ Section Post.
               + lia.
               + eassumption.
               + eassumption.
-              + constructor; [ | eassumption ]. repeat normalize_sets.
-                intros Hc. eapply Hdis1.
-                eapply in_app_or in Hc. inv Hc; eauto. 
+              + simpl. rewrite !app_length, !rev_length. congruence.
               + repeat normalize_sets. inv H6. intros Hc. inv Hc.
                 * inv H6. eauto.
                 * eapply Hdis1. now sets.
-              + simpl. rewrite !app_length, !rev_length. congruence.
+                  
+              + constructor; [ | eassumption ]. repeat normalize_sets.
+                intros Hc. eapply Hdis1.
+                eapply in_app_or in Hc. inv Hc; eauto. 
+
               + repeat normalize_sets.
                 eapply Union_Disjoint_l; sets.
                 eapply Union_Disjoint_l; sets.
@@ -1818,13 +1833,14 @@ Section Post.
                rewrite image_id. now sets. now sets.
 
             -- intros. eapply IHe; try eassumption. lia.
-               
+
+               ++ rewrite !app_length. congruence.               
+               ++ repeat normalize_sets.
+                  intros Hc. inv Hc; eauto. eapply Hdis1. now eauto.
                ++ eapply NoDup_app; eauto.
                   eapply Disjoint_Included_l. eassumption. sets.
                   
-               ++ repeat normalize_sets.
-                  intros Hc. inv Hc; eauto. eapply Hdis1. now eauto.
-               ++ rewrite !app_length. congruence.
+
                ++ eapply cps_cvt_rel_subset in H16.
                   repeat normalize_sets.
                   eapply Union_Disjoint_l; sets.
@@ -2071,10 +2087,12 @@ Section Post.
         + lia.
         + eassumption. 
         + eassumption.
-        + constructor; eauto.
+        + simpl. congruence.           
         + normalize_sets. intros Hc; inv Hc; eauto.
           inv H14; eauto.
-        + simpl. congruence. 
+          
+        + constructor; eauto.
+
         + normalize_sets. sets. 
         + normalize_sets. sets. 
         + repeat normalize_sets. simpl. inv H1. inv H21.
@@ -2146,13 +2164,13 @@ Section Post.
         + lia.
         + eassumption. 
         + eassumption.
+        + simpl. rewrite !app_length, !rev_length. congruence.
+        + repeat normalize_sets. intros Hc; inv Hc; eauto.
+          inv H0; eauto. rewrite FromList_rev in H0. eauto.
         + constructor; eauto.
           intros Hc. eapply in_app_or in Hc. inv Hc; eauto. now eapply in_rev in H0; eauto.
           eapply NoDup_app; eauto. eapply NoDup_rev. eassumption.
           rewrite FromList_rev. sets.
-        + repeat normalize_sets. intros Hc; inv Hc; eauto.
-          inv H0; eauto. rewrite FromList_rev in H0. eauto.
-        + simpl. rewrite !app_length, !rev_length. congruence.
         + repeat normalize_sets.
           eapply Union_Disjoint_l; sets. 
           eapply Union_Disjoint_l; sets.

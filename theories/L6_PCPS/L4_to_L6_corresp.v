@@ -33,11 +33,6 @@ Section Corresp.
            exists S',
              cps_cvt_rel func_tag kon_tag default_tag S e vn k ctrs S' e' /\
              fresh S' (next_var (fst s'))
-             (* Needed to compose with λANF proofs -- ignore for now *) 
-             (* (next_var (fst s') >= next_var (fst s))%positive /\ *)
-             (* bound_var e' \subset Range (next_var (fst s)) (next_var (fst s')) /\ *)
-             (* unique_bindings e' /\ *)
-             (* Disjoint _ (occurs_free e') (bound_var e') *)
       }} .
 
   Definition cps_cvt_exps_corresp := 
@@ -51,10 +46,6 @@ Section Corresp.
            exists S',
              cps_cvt_rel_exps func_tag kon_tag default_tag S es vn k xs ks ctrs S' e' /\
              fresh S' (next_var (fst s')) 
-             (* (next_var (fst s') >= next_var (fst s))%positive /\ *)
-             (* bound_var e' \subset Range (next_var (fst s)) (next_var (fst s')) /\ *)
-             (* unique_bindings e' /\ *)
-             (* Disjoint _ (occurs_free e') (bound_var e') *)
       }}.
 
   Definition cps_cvt_efnlst_corresp :=
@@ -66,10 +57,6 @@ Section Corresp.
            exists S',
              cps_cvt_rel_efnlst func_tag kon_tag default_tag S efns vn xs ctrs S' B' /\
              fresh S' (next_var (fst s'))
-             (* (next_var (fst s') >= next_var (fst s))%positive /\ *)
-             (* bound_var_fundefs B' \subset Range (next_var (fst s)) (next_var (fst s')) /\ *)
-             (* unique_bindings_fundefs B' /\ *)
-             (* Disjoint _ (occurs_free_fundefs B') (bound_var_fundefs B') *)
       }} .
     
   Definition cps_cvt_branches_corresp :=
@@ -81,10 +68,6 @@ Section Corresp.
            exists S',
              cps_cvt_rel_branches func_tag kon_tag default_tag S bs vn k r ctrs S' P /\
              fresh S' (next_var (fst s'))
-             (* (next_var (fst s') >= next_var (fst s))%positive /\ *)
-             (* bound_var (Ecase r P) \subset Range (next_var (fst s)) (next_var (fst s')) /\ *)
-             (* unique_bindings (Ecase r P) /\            *)
-             (* Disjoint _ (occurs_free (Ecase r P)) (bound_var (Ecase r P)) *)
       }} .
 
   Require Import closure_conversion_corresp.

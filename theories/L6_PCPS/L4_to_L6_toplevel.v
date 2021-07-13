@@ -98,7 +98,8 @@ Section Refinement.
   Definition cps_rel_top (e : expression.exp) (xs : list var)
              (k : var) (e' : cps.exp) :=
     let S := fun x => (max_list xs k + 1 <= x)%positive in
-    exists S', cps_cvt_rel func_tag kon_tag dtag S e xs k cnstrs S' e'.
+    exists S', cps_cvt_rel func_tag kon_tag dtag (* function tags for functions and continuations, default constructor tag *)
+                           S e xs k cnstrs S' e'.
 
 
   Lemma cps_val_comp k v1 v2 v3 : 
@@ -438,10 +439,10 @@ Section Refinement.
       
 
     Theorem cps_corrrect_top_sep_comp e_lib e_cli k1 k2 x1 x2 :
-      exp_wf 0%N e_lib ->
-      exp_wf 1%N e_cli ->
+      exp_wf 0%N e_lib -> (* well-scoped *)
+      exp_wf 1%N e_cli -> (* well-scoped *)
       
-      x1 <> k2 ->
+      x1 <> k2 -> (* freshness asumptions -- we will add this in the final version of the paper *)
       k1 <> k2 ->
       x2 <> k2 ->
 

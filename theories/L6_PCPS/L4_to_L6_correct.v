@@ -872,7 +872,7 @@ Section Correct.
 
 
     Context
-      (dcon_to_tag_inj :
+      (dcon_to_tag_inj : (* This ensures that the mapping to L6 contructor tags from L4 constructor tags is 1-1 *)
          forall tgm dc dc',
            dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').    
     
@@ -1095,24 +1095,27 @@ Section Correct.
   
   Definition cps_cvt_correct_exp (vs : fuel_sem.env) (e : expression.exp) (r : fuel_sem.result) (f t : nat) :=
     forall rho vnames k x vk e' S S' i,
-      well_formed_env vs ->
-      exp_wf (N.of_nat (Datatypes.length vnames)) e ->
+      well_formed_env vs -> (* well-scoped env *)
+      exp_wf (N.of_nat (Datatypes.length vnames)) e -> (* well-scoped expression *)
                          
-      Disjoint _ (k |: FromList vnames) S ->
+      Disjoint _ (k |: FromList vnames) S -> (* freshness assumptions, In the paper they are presented as fresh(S, k :: vnames) *)
       ~ x \in k |: FromList vnames ->
       ~ k \in FromList vnames ->
 
-      cps_env_rel vnames vs rho ->
-      M.get k rho = Some vk ->
+      cps_env_rel vnames vs rho -> (* environment CPS relation *)
+
+      M.get k rho = Some vk -> (* Instead of using rho[k ~> vk] in the result (as in the paper), we require that this mapping is already in the environment *)
       
-      cps_cvt_rel S e vnames k cnstrs S' e' ->     
+      cps_cvt_rel S e vnames k cnstrs S' e' ->  (* CPS transformation *)
 
       (* Source terminates *)
-      (forall v v', r = (Val v) -> cps_val_rel v v' ->
-       preord_exp (cps_bound f t) eq_fuel i
-                  ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
-                  (e', rho)) /\
-      (* SOurce diverges *)
+      (forall v v', r = (Val v) -> cps_val_rel v v' -> (* value CPS relation *)
+                    (* The expressions are related *)
+                    preord_exp (cps_bound f t) eq_fuel i 
+                               ((Eapp k kon_tag (x::nil)), (M.set x v' (M.set k vk (M.empty cps.val))))
+                               (e', rho)) /\
+      
+      (* Source diverges *)
       (r = fuel_sem.OOT ->
        exists c, (f <= c)%nat /\ bstep_fuel rho e' c eval.OOT tt).
 
@@ -2521,9 +2524,9 @@ Section Correct.
                 eexists. split. reflexivity. intros. 
                 eapply cps_cvt_exp_alpha_equiv; try eassumption.
                 * reflexivity.
-                * constructor; eauto.
+                * simpl. congruence.
                 * normalize_sets. intros Hc. inv Hc. inv H3; eauto. eapply H9; eauto.
-                * simpl. congruence. 
+                * constructor; eauto.
                 * normalize_sets. sets.
                 * normalize_sets.
                   eapply Union_Disjoint_l. sets.
@@ -2623,16 +2626,16 @@ Section Correct.
               
               eapply cps_cvt_exp_alpha_equiv; try eassumption.
               * reflexivity.
+              * simpl. rewrite !app_length, !rev_length.
+                rewrite H3. erewrite <- cps_fix_rel_length; [ | eassumption ]. congruence. 
+              * repeat normalize_sets. rewrite FromList_rev.
+                intros Hc. inv Hc. inv H17; eauto. inv H17; eauto.
               * constructor.
                 -- intros Hc. eapply in_app_or in Hc. inv Hc; eauto.
                    eapply in_rev in H17; eauto.
                 -- eapply NoDup_app; eauto.
                    eapply NoDup_rev. eassumption.
                    rewrite FromList_rev. sets.
-              * repeat normalize_sets. rewrite FromList_rev.
-                intros Hc. inv Hc. inv H17; eauto. inv H17; eauto.
-              * simpl. rewrite !app_length, !rev_length.
-                rewrite H3. erewrite <- cps_fix_rel_length; [ | eassumption ]. congruence. 
               * repeat normalize_sets. rewrite FromList_rev.
                 eapply Union_Disjoint_l. now sets.
                 eapply Union_Disjoint_l.

@@ -1545,7 +1545,7 @@ Defined.
 
 Eval unfold rewriter, rewriter', Fuel, rw_for in ltac:(let x := type of rw_shrink in exact x).
 
-Axiom trust_me : forall {A}, A.
+Axiom assume_unique_bindings : forall {A}, A.
 
 Definition shrink_top (e : exp) : exp.
 Proof.
@@ -1553,16 +1553,15 @@ Proof.
   - unerase; unfold R_shrink, R_ctors; intros; now rewrite M.gempty in H.
   - Unshelve. 2:{ exact (census_exp_succ (M.empty _) e (M.empty _)). }
     unerase; unfold S_shrink; split.
-    + exact trust_me. (* We will assume the terms are well scoped.
-                         This does not waive any proof obligations relevant to the correctness of
-                         the tool-derived implementation with respect to its relational specification.
-                         It is only needed to execute the partial shrinker for benchmarks.
-                         (The alternative would be to replumb proofs of well-scopedness throughout
-                         the backend pipeline.) *)
+    + exact assume_unique_bindings.
+      (* We will assume the terms are well scoped. This does not waive any proof obligations
+         relevant to the correctness of the tool-derived implementation with respect to its
+         relational specification. It is only needed to execute the partial shrinker for benchmarks.
+         (The alternative would be to replumb proofs of well-scopedness throughout the backend pipeline.) *)
     + intros x; rewrite census_exp_succ_corresp.
       rewrite rename_all_id.
       unfold get_count, nat_of_count; rewrite M.gempty.
       cbn. lia.
 Defined.
 
-Definition shrink_err (e : exp) (c : comp_data) := (compM.Ret (shrink_top e), c). 
+Definition shrink_err (e : exp) (c : comp_data) := (compM.Ret (shrink_top e), c).

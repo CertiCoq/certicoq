@@ -18,145 +18,127 @@ Open Scope fun_scope.
 Section Inline_Eq.
   
   Context (St : Type) (IH : InlineHeuristic St).
- 
-  Definition inline_fundefs (d : nat) (sig sig' : subst) (fm : fun_map) :=
+
+    Definition inline_fundefs (d j : nat) (sig sig' : subst) (fm : fun_map) :=
     (fix inline_fds (fds:fundefs) (s:St) : inlineM fundefs :=
        match fds with
        | Fcons f t xs e fds' =>
          let s' := update_inFun _ IH f t xs e sig s in
          let f' := apply_r sig' f in
          xs' <- get_fresh_names xs ;;
-         e' <- inline_exp _ IH d e (set_list (combine xs xs') sig') (M.remove f fm) s' ;;
+         e' <- inline_exp St IH d j e (set_list (combine xs xs') sig') (M.remove f fm) s' ;;
          fds'' <- inline_fds fds' s ;;
          ret (Fcons f' t xs' e' fds'')
        | Fnil => ret Fnil
        end).
+
   
-  Definition inline_exp' (d : nat) (e : exp) (sig : r_map) (fm:fun_map) (s:St) : inlineM exp :=
-    match e with
-    | Econstr x t ys e =>
-      let ys' := apply_r_list sig ys in
-      x' <- get_fresh_name x ;;
-      e' <- inline_exp St IH d e (M.set x x' sig) fm s ;;
-      ret (Econstr x' t ys' e')
-    | Ecase v cl =>
-      let v' := apply_r sig v in
-      cl' <- (fix beta_list (br: list (ctor_tag*exp)) : inlineM (list (ctor_tag*exp)) :=
-                match br with
-                | nil => ret ( nil)
-                | (t, e)::br' =>
-                  e' <- inline_exp St IH d e sig fm s ;;
-                  br'' <- beta_list br';;
-                  ret ((t, e')::br'')
-                end) cl;;
-      ret (Ecase v' cl')
-    | Eproj x t n y e =>
-      let y' := apply_r sig y in
-      x' <- get_fresh_name x ;;
-      e' <- inline_exp St IH d e (M.set x x' sig) fm s ;;
-      ret (Eproj x' t n y' e')
-    | Eletapp x f t ys ec =>         
-      let f' := apply_r sig f in
-      let ys' := apply_r_list sig ys in
-      let '(s', s'' , inl_dec) := update_letApp _ IH f t ys' s in
-      (match (inl_dec, M.get f fm, d) with
-       | (true, Some  (ft, xs, e), S d') =>
-         if (Nat.eqb (List.length xs) (List.length ys)) then 
-           let sig' := set_list (combine xs ys') sig  in
-           x' <- get_fresh_name x ;;
-           let '(d1, d2) := split_fuel d' in
-           e' <- inline_exp St IH d1 e sig' (M.remove f fm) s' ;;
-           match inline_letapp e' x' with
-           | Some (C, x') =>
-             click ;; 
-             ec' <- inline_exp St IH d2 ec (M.set x x' sig) fm s'' ;;
-             ret (C |[ ec' ]|)
-           | _ =>
+    Definition inline_exp' (d j : nat) (e : exp) (sig : r_map) (fm:fun_map) (s:St) : inlineM exp :=
+      match e with
+      | Econstr x t ys e =>
+        let ys' := apply_r_list sig ys in
+        x' <- get_fresh_name x ;;
+        e' <- inline_exp _ IH d j e (M.set x x' sig) fm s ;;
+        ret (Econstr x' t ys' e')
+      | Ecase v cl =>
+        let v' := apply_r sig v in
+        cl' <- (fix beta_list (br: list (ctor_tag*exp)) : inlineM (list (ctor_tag*exp)) :=
+                  match br with
+                  | nil => ret ( nil)
+                  | (t, e)::br' =>
+                    e' <- inline_exp _ IH d j e sig fm s ;;
+                    br'' <- beta_list br';;
+                    ret ((t, e')::br'')
+                  end) cl;;
+        ret (Ecase v' cl')
+      | Eproj x t n y e =>
+        let y' := apply_r sig y in
+        x' <- get_fresh_name x ;;
+        e' <- inline_exp _ IH d j e (M.set x x' sig) fm s ;;
+        ret (Eproj x' t n y' e')
+      | Eletapp x f t ys ec =>
+        let f' := apply_r sig f in
+        let ys' := apply_r_list sig ys in
+        let '(s', s'' , inl_dec) := update_letApp _ IH f t ys' s in
+        (* fstr <- get_pp_name f' ;; *)
+        (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl_dec then else "not ") ++ "inlined") ;; *)
+        (match (inl_dec, M.get f fm, d, j) with
+         | (true, Some  (ft, xs, e), S d', S j') =>
+           if (Nat.eqb (List.length xs) (List.length ys)) then 
+             let sig' := set_list (combine xs ys') sig  in
              x' <- get_fresh_name x ;;
-             ec' <- inline_exp St IH d ec (M.set x x' sig) fm s' ;;
+             let '(j1, j2) := split_fuel j' in
+             e' <- inline_exp _ IH d' j1 e sig' (M.remove f fm) s' ;;
+             match inline_letapp e' x' with
+             | Some (C, x') =>
+               click ;; 
+               ec' <- inline_exp _ IH d' j2 ec (M.set x x' sig) fm s'' ;;
+               ret (C |[ ec' ]|)
+             | _ =>
+               x' <- get_fresh_name x ;;
+               ec' <- inline_exp _ IH d j ec (M.set x x' sig) fm s' ;;
+               ret (Eletapp x' f' t ys' ec')
+             end
+           else
+             x' <- get_fresh_name x ;;
+             ec' <- inline_exp _ IH d j ec (M.set x x' sig) fm s' ;;
              ret (Eletapp x' f' t ys' ec')
-           end
-         else
+         | _ =>
            x' <- get_fresh_name x ;;
-           ec' <- inline_exp St IH d ec (M.set x x' sig) fm s' ;;
+           ec' <- inline_exp _ IH d j ec (M.set x x' sig) fm s' ;;
            ret (Eletapp x' f' t ys' ec')
-       | _ =>
-         x' <- get_fresh_name x ;;
-         ec' <- inline_exp St IH d ec (M.set x x' sig) fm s' ;;
-         ret (Eletapp x' f' t ys' ec')
-       end)
-    | Efun fds e =>
-      let fm' := add_fundefs fds fm in         
-      let (s1, s2) := update_funDef _ IH fds sig s in
-      let names := all_fun_name fds in
-      names' <- get_fresh_names names ;;
-      let sig' := set_list (combine names names') sig in
-      fds' <- inline_fundefs d sig sig' fm' fds s2 ;;
-      e' <- inline_exp St IH d e sig' fm' s2 ;;
-      ret (Efun fds' e')
-    | Eapp f t ys =>
-      let f' := apply_r sig f in
-      let ys' := apply_r_list sig ys in
-      let (s', inl) := update_App _ IH f t ys' s in
-      (* fstr <- get_pp_name f' ;; *)
-      (* log_msg ("Application of " ++ fstr ++ " is " ++ (if inl then "" else "not ") ++ "inlined") ;; *)
-      (match (inl, M.get f fm, d) with
-       | (true, Some (ft, xs, e), S d') =>
-         if (Nat.eqb (List.length xs) (List.length ys))%bool then
-           let sig' := set_list (combine xs ys') sig  in
-           click ;;
-           inline_exp St IH d' e sig' (M.remove f fm) s'
-         else
+         end)
+      | Efun fds e =>
+        let fm' := add_fundefs fds fm in         
+        let (s1, s2) := update_funDef _ IH fds sig s in
+        let names := all_fun_name fds in
+        names' <- get_fresh_names names ;;
+        let sig' := set_list (combine names names') sig in
+        fds' <- (fix inline_exp_fds (fds:fundefs) (s:St) : inlineM fundefs :=
+                   match fds with
+                   | Fcons f t xs e fds' =>
+                     let s' := update_inFun _ IH f t xs e sig s in
+                     let f' := apply_r sig' f in
+                     xs' <- get_fresh_names xs ;;
+                     e' <- inline_exp _ IH d j e (set_list (combine xs xs') sig') (M.remove f fm') s' ;;
+                     fds'' <- inline_exp_fds fds' s ;;
+                     ret (Fcons f' t xs' e' fds'')
+                   | Fnil => ret Fnil
+                   end) fds s1 ;;
+        e' <- inline_exp _ IH d j e sig' fm' s2 ;;
+        ret (Efun fds' e')
+      | Eapp f t ys =>
+        let f' := apply_r sig f in
+        let ys' := apply_r_list sig ys in
+        let (s', inl) := update_App _ IH f t ys' s in
+        (match (inl, M.get f fm, d, j) with
+         | (true, Some (ft, xs, e), S d', S j') =>
+           if (Nat.eqb (List.length xs) (List.length ys))%bool then
+             let sig' := set_list (combine xs ys') sig  in
+             click ;;
+             inline_exp _ IH d' j' e sig' (M.remove f fm) s'
+           else
+             ret (Eapp f' t ys')
+         | _ =>
            ret (Eapp f' t ys')
-       | _ =>
-         ret (Eapp f' t ys')
-       end)
-    | Eprim x t ys e =>
-      let ys' := apply_r_list sig ys in
-      x' <- get_fresh_name x ;;
-      e' <- inline_exp St IH d e (M.set x x' sig) fm s ;;
-      ret (Eprim x' t ys' e')
-    | Ehalt x =>
-      let x' := apply_r sig x in
-      ret (Ehalt x')
-    end.
-
-  
-  Definition hide_body {A} {a : A} := a.
-
-  Lemma inline_exp_eq (d : nat) (e : exp) (sig : r_map) (fm:fun_map) (s:St) : 
-    inline_exp _ IH d e sig fm s = inline_exp' d e sig fm s.
-  Proof.
-    unfold inline_exp. unfold inline_exp'. rewrite Program.Wf.Fix_eq; simpl; try reflexivity.
-    (*   match goal with *)
-    (* | |- context C [@Wf.Fix_sub ?A ?R ?wf ?P ?f ?a] => *)
-    (*   set (body := hide_body (a:=f)) in |-; *)
-    (*   let newg := context C [ @Wf.Fix_sub A R wf P body a ] in change_no_check newg *)
-    (* end. *)
-    (* Wf.WfExtensionality.unfold_sub inline_exp (inline_exp _ IH d e sig fm s). *)
-    (* destruct e; lazy [projT1 projT2 fst snd]; unfold inline_exp, inline_exp'; *)
-    (*   lazy [projT1 projT2 fst snd]. *)
-    (* { lazy [projT1 projT2 fst snd]; reflexivity. } *)
-    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
-    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
-    (* optimize_heap. *)
-    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
-    (* optimize_heap. *)
-    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
-    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
-    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
-    (* { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). } *)
-
-    (* unfold inline_exp; destruct e; try reflexivity. *)
-    (* - admit. *)
-    (* - rewrite Program.Wf.Fix_eq. simpl. reflexivity.  *)
-    (* f_equal. simpl.  *)
-    (* reflexivity. compcert/lib/Wfsimpl.v lemmas might help *)
-
-
-    (* XXX ask *)
-  Admitted.
+         end)
+      | Eprim x t ys e =>
+        let ys' := apply_r_list sig ys in
+        x' <- get_fresh_name x ;;
+        e' <- inline_exp _ IH d j e (M.set x x' sig) fm s ;;
+        ret (Eprim x' t ys' e')
+      | Ehalt x =>
+        let x' := apply_r sig x in
+        ret (Ehalt x')
+      end.
     
+  
+    Lemma inline_exp_eq (d j : nat) (e : exp) (sig : r_map) (fm:fun_map) (s:St) : 
+      inline_exp _ IH d j e sig fm s = inline_exp' d j e sig fm s.
+    Proof.
+      destruct d; destruct e; try reflexivity.
+    Qed.
+
 End Inline_Eq. 
 
 (* get_fresh_name[s] specs *)
@@ -1283,7 +1265,8 @@ Section Inline_correct.
     | _ => True
     end.
 
-    Lemma inline_correct_mut d (Hleq : (d <= G)%nat) : 
+
+  Lemma inline_correct_mut d j (Hleq : (j <= G)%nat) : 
     (forall e sig fm st S
             (Hun : unique_bindings e)
             (Hdis1 : Disjoint _ (bound_var e) (occurs_free e :|: occurs_free_fun_map fm))
@@ -1293,7 +1276,7 @@ Section Inline_correct.
             
             (Hfm : fun_map_vars fm S sig),
         {{ fun _ s => fresh S (next_var (fst s)) }}
-          inline_exp St IH d e sig fm st 
+          inline_exp St IH d j e sig fm st 
         {{ fun _ s e' s' =>
              fresh S (next_var (fst s')) /\ next_var (fst s) <= next_var (fst s') /\
              unique_bindings e' /\
@@ -1302,7 +1285,7 @@ Section Inline_correct.
              (forall k rho1 rho2,
                  preord_env_P_inj cenv PG (occurs_free e) k (apply_r sig) rho1 rho2 ->
                  fun_map_inv d (occurs_free e) fm rho1 rho2 k sig ->
-                 preord_exp cenv (P1 d) PG k (e, rho1) (e', rho2)) }} ) /\ 
+                 preord_exp cenv (P1 j) PG k (e, rho1) (e', rho2)) }} ) /\ 
 
     (forall B sig sig0 fm st S
             (Hun : unique_bindings_fundefs B)
@@ -1315,7 +1298,7 @@ Section Inline_correct.
             (Hnames1 : NoDup (apply_r_list sig (all_fun_name B)))
             (Hnames2 : Disjoint _ S (FromList (apply_r_list sig (all_fun_name B)))), 
         {{ fun _ s => fresh S (next_var (fst s)) }}
-          inline_fundefs St IH d sig0 sig fm B st
+          inline_fundefs _ IH d j sig0 sig fm B st
         {{ fun _ s B' s' =>
              fresh S (next_var (fst s')) /\ next_var (fst s) <= next_var (fst s') /\
              unique_bindings_fundefs B' /\
@@ -1331,11 +1314,12 @@ Section Inline_correct.
                        preord_env_P_inj cenv PG (occurs_free_fundefs B :|: name_in_fundefs B :|: FromList xs )
                                         k (apply_r sig <{ xs ~> xs' }>) rho1 rho2 ->
                        fun_map_inv d (occurs_free_fundefs B :|: name_in_fundefs B :|: FromList xs) fm rho1 rho2 k (set_list (combine xs xs') sig) ->
-                       preord_exp cenv (P1 d) PG k (e1, rho1) (e2, rho2))) }}).
+                       preord_exp cenv (P1 j) PG k (e1, rho1) (e2, rho2))) }}).
   
   Proof.
-    induction d as [d IHd] using lt_wf_rec1.
-    exp_defs_induction IHe IHl IHB; intros; inv Hun; try rewrite inline_exp_eq; (destruct (HProp d); [ eassumption | ]).
+    revert j Hleq. induction d as [d IHd] using lt_wf_rec1; intros j Hleq.
+    exp_defs_induction IHe IHl IHB; intros; inv Hun; try rewrite inline_exp_eq;
+      (destruct (HProp j); [ eassumption | ]).
     - (* constr *)
       eapply bind_triple. eapply pre_transfer_r. now eapply get_fresh_name_spec.
       intros x w1. simpl. eapply pre_curry_l. intros Hf'. eapply pre_curry_l. intros HinS. 
@@ -1579,17 +1563,18 @@ Section Inline_correct.
                ++ intros Hc. eapply Hdis3. constructor. eassumption. rewrite image_Union.
                   right. eassumption.
                ++ normalize_occurs_free. rewrite !Union_assoc. rewrite Union_Setminus_Included; sets; tci. }        
+      
       destruct b. 
       + destruct (fm ! f) as [ [[? ?] ?] | ] eqn:Hf'.
         * destruct d. eassumption.
+          destruct j. eassumption.          
           destruct (Datatypes.length l =? Datatypes.length ys)%nat eqn:Hlen; [| eassumption ]. 
           eapply beq_nat_true in Hlen.
           eapply bind_triple. eapply pre_transfer_r. now eapply get_fresh_name_spec. 
           intros z w. simpl. eapply pre_curry_l. intros Hfx. eapply pre_curry_l. intros HSin. 
           { edestruct Hfm. eassumption. destructAll. eapply bind_triple.
             - do 2 eapply frame_rule. eapply pre_transfer_r. eapply IHd.
-              + eapply le_trans. reflexivity. eapply le_n_S. 
-                eapply NPeano.Nat.div2_decr. lia.
+              + lia.
               + eapply le_trans. reflexivity.
                 eapply NPeano.Nat.div2_decr. lia.
               + eassumption.
@@ -1661,13 +1646,9 @@ Section Inline_correct.
               eapply bind_triple. 
               + do 3 eapply frame_rule.
                 { eapply IHd.
-                  + destruct d. simpl. lia.
-                    replace (Datatypes.S (Datatypes.S d)) with (Datatypes.S d + 1)%nat by lia. 
-                    eapply plus_lt_le_compat.
-                    eapply NPeano.Nat.lt_div2. lia.     
-                    destruct ((Nat.odd (Datatypes.S d))); simpl; lia.
+                  + lia.
                   + eapply le_trans; [| eassumption ].
-                    assert (Heq := split_fuel_add d). rewrite Heq at 3. unfold split_fuel. simpl. lia.
+                    assert (Heq := split_fuel_add j). rewrite Heq at 3. unfold split_fuel. simpl. lia.
                   + eassumption.
                   + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
                     eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s4 := [set x]). tci.
@@ -1725,7 +1706,7 @@ Section Inline_correct.
                      eapply Included_trans. eassumption. eapply Range_Subset. zify; lia. zify; lia.
                   -- eapply Included_trans. eassumption. eapply Range_Subset. zify; lia. zify; lia.
                 * eauto.
-                * intros. assert (Hadd := split_fuel_add d).
+                * intros. assert (Hadd := split_fuel_add j).
                   unfold split_fuel in *. simpl in Hadd. rewrite Hadd.
                   eapply inline_letapp_correct_alt with (C' := Hole_c);
                             [ | | | | | | |  now eauto | eassumption ]. 
@@ -1933,7 +1914,7 @@ Section Inline_correct.
             + rewrite def_funs_eq. reflexivity. eapply Same_set_all_fun_name. 
               rewrite H13. rewrite FromList_apply_list. eapply In_image.
               rewrite <- Same_set_all_fun_name. eassumption.
-            + rewrite preord_val_eq. intros vs1 vs2 j t1 ys1 e2 rho1' Hlen' Hfind Hset.
+            + rewrite preord_val_eq. intros vs1 vs2 j' t1 ys1 e2 rho1' Hlen' Hfind Hset.
               edestruct H14. eassumption. destructAll. 
               edestruct set_lists_length2 with (xs2 := x0) (vs2 := vs2) (rho' := def_funs fds' fds' rho2 rho2). 
               now eauto. eassumption. now eauto. do 3 eexists. split. eassumption. split. now eauto. 
@@ -2014,7 +1995,7 @@ Section Inline_correct.
       simpl. destruct (update_App St IH v t (apply_r_list sig l) st) as [s b] eqn:Hup. 
       + destruct b.
         * destruct (fm ! v) as [[[ft xs] e] |] eqn:Heqf.
-          destruct d.
+          destruct d. 
           -- eapply return_triple.
              intros. split; [| split; [| split; [| split; [| split; [| split ]]]]]; try eassumption.
              ++ reflexivity.
@@ -2028,15 +2009,29 @@ Section Inline_correct.
                 eapply H0. now constructor.
                 eapply Forall2_preord_var_env_map. eassumption.
                 now constructor.              
-          -- destruct ((Datatypes.length xs =?  Datatypes.length l)%nat) eqn:Hbeq.
-             { symmetry in Hbeq. eapply beq_nat_eq in Hbeq. 
-               edestruct Hfm. eassumption. destructAll.
-               
-               eapply bind_triple. eapply click_spec2 with (P := fun s => fresh S (next_var s)). 
-               intros _u w.
-
-               edestruct Hfm. eassumption. destructAll.
-
+          -- destruct j.
+             ++ eapply return_triple.
+                intros. split; [| split; [| split; [| split; [| split; [| split ]]]]]; try eassumption.
+                +++ reflexivity.
+                +++ constructor. 
+                +++ repeat normalize_occurs_free. rewrite !image_Union, image_Singleton.
+                    rewrite FromList_apply_list. sets.
+                +++ normalize_bound_var. sets.
+                +++ eauto.
+                +++ intros. eapply preord_exp_app_compat.
+                    now eauto. now eauto.
+                    eapply H0. now constructor.
+                    eapply Forall2_preord_var_env_map. eassumption.
+                    now constructor.              
+             ++ destruct ((Datatypes.length xs =?  Datatypes.length l)%nat) eqn:Hbeq.
+                { symmetry in Hbeq. eapply beq_nat_eq in Hbeq. 
+                  edestruct Hfm. eassumption. destructAll.
+                  
+                  eapply bind_triple. eapply click_spec2 with (P := fun s => fresh S (next_var s)). 
+                  intros _u w.
+                  
+                  edestruct Hfm. eassumption. destructAll.
+                  
                eapply pre_strenghtening with
                    (P := fun _ w' => fst w = fst w' /\ fresh S (next_var (fst w'))).
                now clear; firstorder. 
@@ -2430,7 +2425,7 @@ Section Inline_correct.
     
     unfold run_compM, compM.runState in *. simpl in *. 
 
-    destruct (inline_exp St IH d e (M.empty var) (M.empty (fun_tag * list var * exp)) st) eqn:Heq.   
+    destruct (inline_exp St IH d d e (M.empty var) (M.empty (fun_tag * list var * exp)) st) eqn:Heq.   
     destruct (runState tt (c_data, (false, nenv))) eqn:Hstate.
     destruct e0. contradiction. destructAll.
     

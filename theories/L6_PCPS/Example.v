@@ -52,7 +52,7 @@ Infix "-->*" :=
   (clos_refl_trans (univD exp_univ_exp) rewrite_step)
   (at level 70).
 
-(** Known constructors *)
+(** Bindings in scope *)
 
 Module M := Maps.PTree.
 
@@ -82,16 +82,22 @@ Definition get_count x uses :=
   nat_of_option_nat (M.get x uses).
 
 Definition uses_map_invariant
-           {A} (C : frames_t A exp_univ_exp) (e : univD A)
+           {A} (C : frames_t A exp_univ_exp)
+           (e : univD A)
            (uses : uses_map) :=
   forall x, get_count x uses = use_count x (C ⟦ e ⟧).
 
 Require Import Lia.
-Lemma use_count_zero_implies_dead x e : use_count x e = 0 -> ~ occurs_free x e.
+Lemma use_count_zero_implies_dead x e :
+  use_count x e = 0 ->
+  ~ occurs_free x e.
 Proof.
   induction e; cbn; [tauto|intros H].
-  assert (count_var x x0 = 0 /\ use_count x e1 = 0 /\ use_count x e2 = 0) by lia.
-  unfold count_var in *; destruct (Pos.eqb_spec x x0); intuition lia.
+  assert (count_var x x0 = 0 /\
+          use_count x e1 = 0 /\
+          use_count x e2 = 0) by lia.
+  unfold count_var in *;
+    destruct (Pos.eqb_spec x x0); intuition lia.
 Qed.
 
 Definition upd_count f x (uses : uses_map) :=
@@ -218,15 +224,20 @@ Corollary use_count_ctx_app x (C : ctx) e :
   use_count x (C ⟦ e ⟧) = use_count_ctx x C + use_count x e.
 Proof. apply (use_count_ctx_app' x C). Qed.
 
+(* ... 125 lines of code/proof re: use counts ... *)
+
 (** Termination measure *)
 
 Fixpoint exp_size e :=
   match e with
-  | LetIn x b e => 1 + 2 + exp_size e
-  | IfThenElse x e1 e2 => 1 + 1 + exp_size e1 + exp_size e2
+  | LetIn x b e =>
+    1 + 2 + exp_size e
+  | IfThenElse x e1 e2 =>
+    1 + 1 + exp_size e1 + exp_size e2
   end.
 
-Definition measure A : forall (C : frames_t A exp_univ_exp) (e : univD A), nat :=
+Definition measure A :
+  forall (C : frames_t A exp_univ_exp) (e : univD A), nat :=
   match A with
   | exp_univ_var => fun _ _ => 1
   | exp_univ_bool => fun _ _ => 1
@@ -253,7 +264,8 @@ Proof.
   end.
   exists (M.set x b env); unerase; intros x' b' Hget'; cbn in *.
   destruct (Pos.eq_dec x' x);
-  [subst; rewrite M.gss in Hget'; inversion Hget'; now exists fs, <[]>|].
+    [subst; rewrite M.gss in Hget';
+     inversion Hget'; now exists fs, <[]>|].
   rewrite M.gso in Hget' by auto.
   destruct (Henv x' b' Hget') as [D [E Hctx]].
   exists D, (E >:: LetIn2 x b); now subst fs.
@@ -274,8 +286,6 @@ Proof.
 Defined.
 Extraction Inline Preserves_uses_dn.
 
-Inductive MARK := MKMARK.
-
 Unset Strict Unquote Universe Mode.
 Definition optimize :
   rewriter exp_univ_exp false (fun A C e => @measure A C e)
@@ -292,10 +302,11 @@ Proof.
     clear - H H1; cbn in *; subst e_taken0;
     intros _; destruct H as [_ H], b;
     apply f_equal with (f := exp_size) in H; lia end.
-  - (** Using env, check whether x is in scope.
-        If so, perform case folding accordingly *)
+  - (** Implement case folding *)
     intros _ R C C_ok x e1 e2 d r s success failure.
     destruct r as [env Henv] eqn:Hr.
+    (** Using env, check whether x is in scope.
+        If so, perform case folding accordingly *)
     destruct (M.get x env) as [b|] eqn:Hbool; [|cond_failure].
     pose (d' := d : Delay (I_D_plain (D := unit))
                           (A:=exp_univ_exp)
@@ -311,9 +322,10 @@ Proof.
       specialize (Huses y); cbn in *;
       unfold Rec; rewrite use_count_ctx_app in *; cbn in *;
       rewrite decr_count_correct, decr_use_counts_correct; lia.
-  - (** Using uses, check whether x is dead.
-        If so, perform dead variable elimination. *)
+  - (** Implement dead variable elimination *)
     clear; intros _ R C C_ok x b e r [uses Huses] success failure.
+    (** Using uses, check whether x is dead.
+        If so, perform dead variable elimination. *)
     destruct (M.get x uses) as [n|] eqn:Hbool; [cond_failure|].
     cond_success success.
     assert (Hget : get_count x uses = 0)

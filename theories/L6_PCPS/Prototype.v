@@ -1857,7 +1857,7 @@ Ltac mk_rewriter :=
               try lazymatch goal with
               | |- erased nat => refine (erase _)
               | |- State _ _ _ => exact s''
-              | |- «_» => unerase; unfold run_metric; reflexivity
+              | |- «_» => unerase; unfold run_metric; cbn; reflexivity
               end;
               try lazymatch goal with
               | |- e_ok (erase _) => apply erase_ok

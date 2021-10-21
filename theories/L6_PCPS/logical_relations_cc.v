@@ -1,5 +1,5 @@
 (* Step-indexed logical relations for L6 closure conversion.  Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT

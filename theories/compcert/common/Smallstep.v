@@ -25,6 +25,7 @@ Require Import Coqlib.
 Require Import Events.
 Require Import Globalenvs.
 Require Import Integers.
+Require Import Coq.micromega.Lia.
 
 Set Implicit Arguments.
 
@@ -1450,7 +1451,7 @@ Proof.
   intros [[EQ1 [EQ2 EQ3]] | [NOT1 [NOT2 MT]]].
 + (* 2.1 L2 makes a silent transition: remain in "before" state *)
   subst. simpl in *. exists (F2BI_before n0); exists s1; split.
-  right; split. apply star_refl. constructor. omega.
+  right; split. apply star_refl. constructor. lia.
   econstructor; eauto. eapply star_right; eauto.
 + (* 2.2 L2 make a non-silent transition *)
   exploit not_silent_length. eapply (sr_traces L1_receptive); eauto. intros [EQ | EQ].
@@ -1478,7 +1479,7 @@ Proof.
   exploit f2b_determinacy_inv. eexact H2. eexact STEP2.
   intros [[EQ1 [EQ2 EQ3]] | [NOT1 [NOT2 MT]]].
   subst. exists (F2BI_after n); exists s1; split.
-  right; split. apply star_refl. constructor; omega.
+  right; split. apply star_refl. constructor; lia.
   eapply f2b_match_after'; eauto.
   congruence.
 Qed.
@@ -1783,7 +1784,7 @@ Proof.
   assert (t2 = ev :: nil). inv H1; simpl in H0; tauto.
   subst t2. exists (t, s0). constructor; auto. simpl; auto.
 (* single-event *)
-  red. intros. inv H0; simpl; omega.
+  red. intros. inv H0; simpl; lia.
 Qed.
 
 (** * Connections with big-step semantics *)

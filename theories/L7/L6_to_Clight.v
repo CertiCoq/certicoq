@@ -398,7 +398,6 @@ Definition make_tag (ct : ctor_tag) : option expr :=
      void(struct thread_info *ti, val, ..)
                                   ------- n times
    where n = min(n_param, arity of the function).
-
    All other variables just have type val. 
 *)
 
@@ -428,7 +427,6 @@ Definition make_var (x : ident) : expr :=
                    .
                    .
      x[cur + |vs|] = vs[|vs| - 1] 
-
    Assumes |vs|>0. *)
 Fixpoint asgn_constr' (x : ident) (cur : nat) (vs : list ident) : statement :=
   match vs with
@@ -497,14 +495,12 @@ Definition mk_prim_call (res pr : ident) (ar : nat) (vs : list ident) : option s
   ret (Scall (Some res) ([mk_prim_ty ar] (Evar pr (mk_prim_ty ar))) args).
 
 (* Load arguments from the args array.
-
    asgn_fun_vars' vs ind =
      vs[|ind| - 1] = args[ind[|ind| - 1]];
                    .
                    .
              vs[1] = args[ind[1]];
              vs[0] = args[ind[0]];
-
    Reads arguments from the args array at indices ind.
    Stores them in local variables vs.
 *)
@@ -527,7 +523,6 @@ Definition asgn_fun_vars (vs : list positive) (ind : list N) : option statement 
                          .
                          .
      args[ind[|ind| - 1] = vs[|ind| - 1];
-
    Reads arguments from local variables vs.
    Stores them in the args array at indices ind.
 *)
@@ -1442,21 +1437,15 @@ Definition make_halt (nenv : name_env)
                         true false))).
 
 (* make b? call^n_export; call^n
-
 call_export has n+1 arguments (all values), returns a value:
  a value containing the function closure
  followed by n arguments to the closure
-
 the arguments are placed in args[2]...args[2+n-1]
 halt is placed in args[1]
 env is placed in args[0]
-
 if b, then export the resulting value
-
 TODO: fix the access to threadInf with Ederef
 TODO: make a global threadinfo variable, make_tinfo if NULL, use it otherwise
-
-
  *)
 
 Definition make_call

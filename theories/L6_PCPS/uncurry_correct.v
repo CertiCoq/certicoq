@@ -39,7 +39,7 @@ Section uncurry_correct.
                PostG (e, rho, c1, cout1)
                      (Eapp f1 ft1 (gv1 ++ fv1), rho', plus c2 (one (Eapp f1 ft1 (gv1 ++ fv1))), plus cout2 (one (Eapp f1 ft1 (gv1 ++ fv1))))). 
   
-  Context (Hpost_idemp : inclusion _ (comp Post Post) Post).
+  Context (Hpost_idemp : inclusion _ (comp PostG PostG) PostG).
   Context (Hpost_inclusion' : inclusion _ PostG Post).
 
   Lemma preord_val_fundefs Post' k rho rho1 fds f
@@ -1809,6 +1809,8 @@ Section uncurry_correct.
   Proof. intros. intros rho rho1 Henv. eapply uncurry_step_correct'; eauto. Qed.
 
 
+  Context (Hpost_idemp' : inclusion _ (comp Post Post) Post).
+
   Lemma uncurry_rel_correct : forall n k e s m e1 s1 m1,
     unique_bindings e ->
     unique_bindings e1 -> (* TODO: remove this assumption *)
@@ -1819,16 +1821,12 @@ Section uncurry_correct.
     induction n; intros; intros rho rho1 Henv; inv H3; [now apply preord_exp_refl|].
     assert (unique_bindings e2) by (eapply uncurry_step_preserves_unique_bindings; eauto).
     assert (used_vars e2 \subset s2) by (eapply uncurry_step_preserves_used_vars; eauto).
-    eapply preord_exp_post_monotonic; [apply Hpost_idemp|..].
-    eapply preord_exp_trans. eassumption.
-    - unfold inclusion; intros.
-      destruct Hpost_prop. eapply HGPost. eapply Hpost_idemp. eassumption.
-    - now eauto.
-    - now eauto. 
+    eapply preord_exp_post_monotonic; [apply Hpost_idemp' | .. ].
+    eapply preord_exp_trans. eassumption. eassumption.
     - eapply uncurry_step_correct; [| | | |apply H5|apply Henv]; auto.
     - intros; eapply IHn; [| | | |apply H6|apply preord_env_P_refl]; auto.
   Qed.
-    
+  
   Transparent bind ret.
 
   (* Helper functions to extract fields from state *)
@@ -3021,11 +3019,9 @@ Proof.
     edestruct (uncurry_proto_corresp_step x (used_vars x)) as [m1 [s2 [m2 Hrel]]]; eauto with Ensembles_DB.
     assert (unique_bindings y) by (eapply uncurry_step_preserves_unique_bindings; eauto; eauto with Ensembles_DB).
     assert (used_vars y \subset s2) by (eapply uncurry_step_preserves_used_vars; eauto; eauto with Ensembles_DB).
-    eapply preord_exp_post_monotonic; [apply Hpost_idemp|..].
+    eapply preord_exp_post_monotonic; [apply Hpost_idemp'|..].
     eapply preord_exp_trans; auto.
-    + intro; intros. destruct Hpost_prop. eapply HGPost.
-      eapply Hpost_idemp. eassumption.
-    + apply uncurry_step_proto_correct; eauto. 
+    + apply uncurry_step_proto_correct; eauto.
     + intros m; apply IHHsteps; auto.
       apply preord_env_P_refl. eassumption.
 Qed.

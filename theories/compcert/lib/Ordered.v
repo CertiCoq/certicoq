@@ -20,6 +20,7 @@ Require Import FSets.
 Require Import Coqlib.
 Require Import Maps.
 Require Import Integers.
+Require Import Coq.micromega.Lia.
 
 (** The ordered type of positive numbers *)
 
@@ -68,7 +69,7 @@ Proof (@eq_trans t).
 Lemma lt_trans : forall x y z : t, lt x y -> lt y z -> lt x z.
 Proof Z.lt_trans.
 Lemma lt_not_eq : forall x y : t, lt x y -> ~ eq x y.
-Proof. unfold lt, eq, t; intros. omega. Qed.
+Proof. unfold lt, eq, t; intros. lia. Qed.
 Lemma compare : forall x y : t, Compare lt eq x y.
 Proof.
   intros. destruct (Z.compare x y) as [] eqn:E.
@@ -97,11 +98,11 @@ Lemma eq_trans : forall x y z : t, eq x y -> eq y z -> eq x z.
 Proof (@eq_trans t).
 Lemma lt_trans : forall x y z : t, lt x y -> lt y z -> lt x z.
 Proof.
-  unfold lt; intros. omega.
+  unfold lt; intros. lia.
 Qed.
 Lemma lt_not_eq : forall x y : t, lt x y -> ~ eq x y.
 Proof.
-  unfold lt,eq; intros; red; intros. subst. omega.
+  unfold lt,eq; intros; red; intros. subst. lia.
 Qed.
 Lemma compare : forall x y : t, Compare lt eq x y.
 Proof.
@@ -112,7 +113,7 @@ Proof.
   apply GT.
   assert (Int.unsigned x <> Int.unsigned y).
     red; intros. rewrite <- (Int.repr_unsigned x) in n. rewrite <- (Int.repr_unsigned y) in n. congruence.
-  red. omega.
+  red. lia.
 Defined.
 
 Definition eq_dec : forall x y, { eq x y } + { ~ eq x y } := Int.eq_dec.

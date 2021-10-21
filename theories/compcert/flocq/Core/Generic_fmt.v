@@ -19,7 +19,7 @@ COPYING file for more details.
 
 (** * What is a real number belonging to a format, and many properties. *)
 Require Import Raux Defs Round_pred Float_prop.
-
+Require Import Coq.micromega.Lia.
 Section Generic.
 
 Variable beta : radix.
@@ -52,7 +52,7 @@ apply Znot_ge_lt.
 intros Hl.
 apply Z.ge_le in Hl.
 assert (H' := proj2 (proj2 (valid_exp l) Hl) k).
-omega.
+lia.
 Qed.
 
 Theorem valid_exp_large' :
@@ -67,7 +67,7 @@ apply Z.ge_le in H'.
 assert (Hl := Z.le_trans _ _ _ H H').
 apply valid_exp in Hl.
 assert (H1 := proj2 Hl k H').
-omega.
+lia.
 Qed.
 
 Definition cexp x :=
@@ -425,7 +425,7 @@ rewrite Gx.
 replace (Ztrunc (scaled_mantissa x)) with Z0.
 apply F2R_0.
 cut (Z.abs (Ztrunc (scaled_mantissa x)) < 1)%Z.
-clear ; zify ; omega.
+clear ; zify ; lia.
 apply lt_IZR.
 rewrite abs_IZR.
 now rewrite <- scaled_mantissa_generic.
@@ -522,7 +522,7 @@ specialize (Ex Hxz).
 apply Rlt_le_trans with (1 := proj2 Ex).
 apply bpow_le.
 specialize (Hp ex).
-omega.
+lia.
 Qed.
 
 Theorem generic_format_bpow_inv' :
@@ -544,7 +544,7 @@ apply bpow_gt_0.
 split.
 apply bpow_ge_0.
 apply (bpow_lt _ _ 0).
-clear -He ; omega.
+clear -He ; lia.
 Qed.
 
 Theorem generic_format_bpow_inv :
@@ -555,7 +555,7 @@ Proof.
 intros e He.
 apply generic_format_bpow_inv' in He.
 assert (H := valid_exp_large' (e + 1) e).
-omega.
+lia.
 Qed.
 
 Section Fcore_generic_round_pos.
@@ -587,7 +587,7 @@ rewrite <- (Zrnd_IZR (Zceil x)).
 apply Zrnd_le.
 apply Zceil_ub.
 rewrite Zceil_floor_neq.
-omega.
+lia.
 intros H.
 rewrite <- H in Hx.
 rewrite Zfloor_IZR, Zrnd_IZR in Hx.
@@ -630,7 +630,7 @@ apply Rmult_le_compat_r.
 apply bpow_ge_0.
 assert (Hf: IZR (Zpower beta (ex - 1 - fexp ex)) = bpow (ex - 1 + - fexp ex)).
 apply IZR_Zpower.
-omega.
+lia.
 rewrite <- Hf.
 apply IZR_le.
 apply Zfloor_lub.
@@ -657,7 +657,7 @@ apply Rmult_le_compat_r.
 apply bpow_ge_0.
 assert (Hf: IZR (Zpower beta (ex - fexp ex)) = bpow (ex - fexp ex)).
 apply IZR_Zpower.
-omega.
+lia.
 rewrite <- Hf.
 apply IZR_le.
 apply Zceil_glb.
@@ -738,7 +738,7 @@ destruct (Zle_or_lt ex (fexp ex)) as [Hx1|Hx1].
   apply bpow_le.
   apply valid_exp, proj2 in Hx1.
   specialize (Hx1 ey).
-  omega.
+  lia.
 apply Rle_trans with (bpow ex).
 now apply round_bounded_large_pos.
 apply bpow_le.
@@ -1380,7 +1380,7 @@ specialize (He (Rgt_not_eq _ _ Hx)).
 rewrite Rabs_pos_eq in He. 2: now apply Rlt_le.
 apply Rle_trans with (bpow (ex - 1)).
 apply bpow_le.
-cut (e < ex)%Z. omega.
+cut (e < ex)%Z. lia.
 apply (lt_bpow beta).
 now apply Rle_lt_trans with (2 := proj2 He).
 destruct (Zle_or_lt ex (fexp ex)).
@@ -1389,7 +1389,7 @@ rewrite Hr in Hd.
 elim Rlt_irrefl with (1 := Hd).
 rewrite Hr.
 apply bpow_le.
-omega.
+lia.
 apply (round_bounded_large_pos rnd x ex H He).
 Qed.
 
@@ -1526,7 +1526,7 @@ unfold cexp.
 set (ex := mag beta x).
 generalize (exp_not_FTZ ex).
 generalize (proj2 (proj2 (valid_exp _) He) (fexp ex + 1)%Z).
-omega.
+lia.
 rewrite <- H.
 rewrite <- mult_IZR, Ztrunc_IZR.
 unfold F2R. simpl.
@@ -1802,7 +1802,7 @@ Theorem Znearest_imp :
 Proof.
 intros x n Hd.
 cut (Z.abs (Znearest x - n) < 1)%Z.
-clear ; zify ; omega.
+clear ; zify ; lia.
 apply lt_IZR.
 rewrite abs_IZR, minus_IZR.
 replace (IZR (Znearest x) - IZR n)%R with (- (x - IZR (Znearest x)) + (x - IZR n))%R by ring.
@@ -1937,7 +1937,7 @@ replace (- _ + _)%Z with 0%Z by ring; simpl; rewrite Rmult_1_r.
 apply (Rlt_le_trans _ _ _ (proj2 Hex)).
 apply Rle_trans with (bpow (fexp (mag beta x) - 1)).
 - apply bpow_le.
-  rewrite (mag_unique beta x ex); [omega|].
+  rewrite (mag_unique beta x ex); [lia|].
   now rewrite Rabs_right.
 - unfold Zminus; rewrite bpow_plus.
   rewrite Rmult_comm.
@@ -2293,10 +2293,10 @@ rewrite negb_Zle_bool.
 case_eq (0 <=? Zfloor x)%Z; intro C'.
 - apply Zle_bool_imp_le in C'.
   apply Zlt_bool_true.
-  omega.
+  lia.
 - rewrite Z.leb_gt in C'.
   apply Zlt_bool_false.
-  omega.
+  lia.
 Qed.
 
 End rndNA_opp.

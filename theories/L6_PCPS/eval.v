@@ -1598,28 +1598,16 @@ Section EVAL.
       exists rho' x,
         mstep (rho, e) (rho', Ehalt x) /\ M.get x rho' = Some v.
   Proof.
-    intros. induction H.
-    - destruct IHbstep_e. destruct H2. destruct H2.
-      exists x0, x1. split. econstructor 2. constructor; eauto. rewrite H0.
-      apply H2. auto.
-    - destruct IHbstep_e. destruct H2. inv H2. exists x0, x1.
-      split. econstructor 2. econstructor; eauto.
-      apply H3. auto.
-    - destruct IHbstep_e. destruct H3. inv H3. exists x, x0. split.
-      econstructor 2. econstructor; eauto. apply H4. auto.
-    - destruct IHbstep_e. destruct H4. inv H4.
-      exists x, x0. split; auto.
-      econstructor 2. econstructor; eauto. auto.
-    - admit. (* No case for letapp *)
-    - destruct IHbstep_e. destruct H0. destruct H0. exists x, x0.
-      split; auto. econstructor 2.
-      econstructor; eauto. auto.
-    - destruct IHbstep_e. destruct H4. destruct H4.
-      exists x0, x1. split; auto.
-      econstructor 2. econstructor; eauto. auto.
-    - exists rho, x.
-      split; auto.
-      constructor.
+    (* intros. induction H. *)
+    (* - destruct IHbstep_e. destruct H2. destruct H2. *)
+    (*   exists x0, x1. split. econstructor 2. constructor; eauto. rewrite H0. *)
+    (*   apply H2. auto. *)
+    (* - destruct IHbstep_e. destruct H2. inv H2. exists x0, x1. *)
+    (*   exists x0, x1. split; auto. *)
+    (*   econstructor 2. econstructor; eauto. auto. *)
+    (* - exists rho, x. *)
+    (*   split; auto. *)
+    (*   constructor. *)
   Abort.
 
   Lemma mstep_then_bstep:

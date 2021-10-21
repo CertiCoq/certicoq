@@ -34,7 +34,7 @@ Definition prevFld:positive := 89.
 Definition builtin_unreachableIdent:positive := 93.
 Definition retIdent:positive := 94.
 
-Let Cprogram := (cps_util.name_env * Clight.program * Clight.program)%type.
+Definition Cprogram := (cps_util.name_env * Clight.program * Clight.program)%type.
 
 Definition add_prim_names (prims : list (kername * string * nat * positive)) (nenv : L4_to_L6.name_env) : L4_to_L6.name_env :=
   List.fold_left (fun map '(k, s, ar, p) => cps.M.set p (nNamed s) map) prims nenv.

@@ -32,6 +32,7 @@
 Require Import Setoid Program.Basics.
 Require Import Coqlib Decidableplus.
 Require Import AST Integers Values Memory Events Globalenvs.
+Require Import Coq.micromega.Lia.
 
 (** * Assertions about memory *)
 
@@ -355,12 +356,12 @@ Proof.
   intros. rewrite <- sep_assoc. eapply sep_imp; eauto.
   split; simpl; intros.
 - intuition auto.
-+ omega.
-+ apply H5; omega.
-+ omega.
-+ apply H5; omega.
-+ red; simpl; intros; omega.
-- intuition omega.
++ lia.
++ apply H5; lia.
++ lia.
++ apply H5; lia.
++ red; simpl; intros; lia.
+- intuition lia.
 Qed.
 
 Lemma range_drop_left:
@@ -392,12 +393,12 @@ Proof.
   assert (mid <= align mid al) by (apply align_le; auto).
   split; simpl; intros.
 - intuition auto.
-+ omega.
-+ apply H7; omega.
-+ omega.
-+ apply H7; omega.
-+ red; simpl; intros; omega.
-- intuition omega.
++ lia.
++ apply H7; lia.
++ lia.
++ apply H7; lia.
++ red; simpl; intros; lia.
+- intuition lia.
 Qed.
 
 Lemma range_preserved:
@@ -493,7 +494,7 @@ Proof.
   split; [|split].
 - assert (Mem.valid_access m chunk b ofs Freeable).
   { split; auto. red; auto. }
-  split. generalize (size_chunk_pos chunk). unfold Ptrofs.max_unsigned. omega.
+  split. generalize (size_chunk_pos chunk). unfold Ptrofs.max_unsigned. lia.
   split. auto.
 + destruct (Mem.valid_access_load m chunk b ofs) as [v LOAD].
   eauto with mem.
@@ -616,7 +617,7 @@ Next Obligation.
   assert (IMG: forall b1 b2 delta ofs k p,
            j b1 = Some (b2, delta) -> Mem.perm m0 b1 ofs k p -> img b2 (ofs + delta)).
   { intros. red. exists b1, delta; split; auto.
-    replace (ofs + delta - delta) with ofs by omega.
+    replace (ofs + delta - delta) with ofs by lia.
     eauto with mem. }
   destruct H. constructor.
 - destruct mi_inj. constructor; intros.
@@ -668,7 +669,7 @@ Proof.
   intros; red; intros. eelim C; eauto. simpl.
   exists b1, delta; split; auto. destruct VALID as [V1 V2].
   apply Mem.perm_cur_max. apply Mem.perm_implies with Writable; auto with mem.
-  apply V1. omega.
+  apply V1. lia.
 - red; simpl; intros. destruct H1 as (b0 & delta0 & U & V).
   eelim C; eauto. simpl. exists b0, delta0; eauto with mem.
 Qed.
@@ -699,7 +700,7 @@ Proof.
 - eexact ALLOC1.
 - instantiate (1 := b2). eauto with mem.
 - instantiate (1 := delta). xomega.
-- intros. assert (0 <= ofs < sz2) by (eapply Mem.perm_alloc_3; eauto). omega.
+- intros. assert (0 <= ofs < sz2) by (eapply Mem.perm_alloc_3; eauto). lia.
 - intros. apply Mem.perm_implies with Freeable; auto with mem.
   eapply Mem.perm_alloc_2; eauto. xomega.
 - red; intros. apply Zdivides_trans with 8; auto.
@@ -709,12 +710,12 @@ Proof.
   exists j'; split; auto.
   rewrite <- ! sep_assoc.
   split; [|split].
-+ simpl. intuition auto; try (unfold Ptrofs.max_unsigned in *; omega).
++ simpl. intuition auto; try (unfold Ptrofs.max_unsigned in *; lia).
 * apply Mem.perm_implies with Freeable; auto with mem.
-  eapply Mem.perm_alloc_2; eauto. omega.
+  eapply Mem.perm_alloc_2; eauto. lia.
 * apply Mem.perm_implies with Freeable; auto with mem.
-  eapply Mem.perm_alloc_2; eauto. omega.
-* red; simpl; intros. destruct H1, H2. omega.
+  eapply Mem.perm_alloc_2; eauto. lia.
+* red; simpl; intros. destruct H1, H2. lia.
 * red; simpl; intros.
   assert (b = b2) by tauto. subst b.
   assert (0 <= ofs < lo \/ hi <= ofs < sz2) by tauto. clear H1.
@@ -753,9 +754,9 @@ Proof.
   simpl in E.
   assert (PERM: Mem.range_perm m2 b2 0 sz2 Cur Freeable).
   { red; intros.
-    destruct (zlt ofs lo). apply J; omega.
-    destruct (zle hi ofs). apply K; omega.
-    replace ofs with ((ofs - delta) + delta) by omega.
+    destruct (zlt ofs lo). apply J; lia.
+    destruct (zle hi ofs). apply K; lia.
+    replace ofs with ((ofs - delta) + delta) by lia.
     eapply Mem.perm_inject; eauto.
     eapply Mem.free_range_perm; eauto. xomega.
   }
@@ -775,9 +776,9 @@ Proof.
   apply Mem.perm_cur_max. apply Mem.perm_implies with Freeable; auto with mem.
   eapply (Mem.free_range_perm m1); eauto.
   instantiate (1 := ofs + delta0 - delta). xomega.
-  intros [X|X]. congruence. omega.
+  intros [X|X]. congruence. lia.
 + simpl. exists b0, delta0; split; auto.
-  replace (ofs + delta0 - delta0) with ofs by omega.
+  replace (ofs + delta0 - delta0) with ofs by lia.
   apply Mem.perm_max with k. apply Mem.perm_implies with p; auto with mem.
   eapply Mem.perm_free_3; eauto.
 - apply (m_invar P) with m2; auto.

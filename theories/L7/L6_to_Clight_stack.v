@@ -77,7 +77,6 @@ Definition max_args := 1024%Z.
       (Eletapp _ f _ ys _), or
       (Eapp f _ ys)
     in the expression being compiled.
-
     The list [0; ..; |ys| - 1] gives the locations of f's arguments in the args array.
     (Simple for now, but may get fancier with custom calling conventions) *)
 Fixpoint compute_fun_env' (fenv : fun_env) (e : exp) : fun_env :=
@@ -128,7 +127,6 @@ Fixpoint max_allocs (e : exp) : Z :=
 (** * Clight abbreviations *)
 
 (** typedef intnat value; (See values.h, config.h)
-
     NOTE: in Clight, SIZEOF_PTR == SIZEOF_INT *)
 Definition value :=
   if Archi.ptr64
@@ -149,7 +147,6 @@ Definition make_cint (z : Z) (t : type) : expr :=
       struct stack_frame *fp;
       value nalloc;
     };
-
     Zoe: nalloc is the number of allocations until the next GC call so that GC can perform a test. *)
 Context (thread_info_id alloc_id limit_id heap_id args_id fp_id nalloc_id : ident).
 Notation threadStructInf := (Tstruct thread_info_id noattr). 
@@ -326,7 +323,6 @@ Context
       void(struct thread_info *ti, val, ..)
                                    ------- n times
     where n = min(n_param, arity of the function).
-
     All other variables just have type val. *)
 Definition make_var (x : ident) :=
   match M.get x fenv with
@@ -2205,7 +2201,6 @@ Definition local_word b (v : Values.val) :=
   ∃ m m', Mem m'
   WITH Some m' = store (alloc_alone m 0 word_size) b 0 v
   WITH b = Mem.nextblock m.
-
 Search Mem.store list.
 Definition local_words b (v : list Values.val) :=
   ∃ m m', Mem m'

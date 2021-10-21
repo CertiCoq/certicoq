@@ -749,8 +749,8 @@ Proof.
     intros. forward H5. lia.
     eapply lookup_eval_env in H1; eauto.
     destruct H1 as [bef [bef' [after' [t' H']]]].
-    exists t'; intuition.
-    
+    exists t'; intuition.   
+  - rewrite efnlst_length_trans. lia.
   - rewrite efnlst_length_trans.
     assert (N.of_nat (n + dlength ds + Datatypes.length e') =
             N.of_nat (dlength ds + n + Datatypes.length e')) by lia.
@@ -819,6 +819,7 @@ Proof.
     intros. forward H4. lia.
     unfold LookupDfn in H1.
     eapply translate_env_pres_Lookup; eauto.
+  - rewrite efnlst_length_trans. lia.
   - rewrite efnlst_length_trans.
     assert (N.of_nat (n + dlength ds + Datatypes.length (translate_env [] p)) =
             N.of_nat (dlength ds + n + Datatypes.length (translate_env [] p))) by lia.
@@ -1425,7 +1426,7 @@ Proof.
     rewrite (proj1 (closed_subst_sbst (Fix_e es0 (N.of_nat a)) H2)).
     f_equal.
     pose (proj1 (proj2 (proj2 (exp_wf_shift)))).
-    inv H2. specialize (e _ _ H6). now rewrite e.
+    inv H2. specialize (e _ _ H8). now rewrite e.
     rewrite <- H1. auto.
 Qed.
 
@@ -2617,6 +2618,8 @@ Proof with eauto.
          rewrite efnlength_map, efnlength_trans.
          intros Hi.
          constructor.
+         rewrite efnlst_length_map, efnlst_length_trans. lia.
+         
          rewrite efnlst_length_map, efnlst_length_trans.
          apply Crct_invrt_Fix in evfn.
          pose proof ((proj1 (proj2 (proj2 (proj2 (crctTerm_exp_wf_ind [] eq_refl)))) e _ _ evfn e'' wfe evenv wfe'')).
@@ -2817,5 +2820,5 @@ Proof with eauto.
   apply obs_prevervation.
 Qed.
 
-Print Assumptions obs_prevervation.
-Print Assumptions translate_correct'.
+(* Print Assumptions obs_prevervation. *)
+(* Print Assumptions translate_correct'. *)

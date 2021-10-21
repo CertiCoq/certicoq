@@ -38,7 +38,7 @@ Open Scope list_scope.
    Before unquoting, all internally generated names will be replaced by the proper
    indices. *)
 
-Fail MetaCoq Run (tmUnquote (tLambda (nNamed "$oof") <%nat%> (tRel 0))).
+(* Fail MetaCoq Run (tmUnquote (tLambda (nNamed "$oof") <%nat%> (tRel 0))). *)
 
 Definition gensym (suffix : string) : GM string :=
   let! n := get in
@@ -338,7 +338,7 @@ Fixpoint abbreviate s :=
   | String "_" s => abbreviate s
   | String c s => String c (skip_to_underscore s)
   end.
-Compute abbreviate "list_var".
+(* Compute abbreviate "list_var". *)
 
 Fixpoint vars_of (t : term) : Set' string :=
   match t with
@@ -423,7 +423,7 @@ Definition prefix := ltac:(
    match e with
    | tConst ?s [] => let s' := eval cbv in (fst s) in exact s'
    end).
-Print prefix.
+(* Print prefix. *)
 Definition rec_rhs_vars_of : term -> Map string (option term).
   ltac1:(refine(
   let fix go tm :=

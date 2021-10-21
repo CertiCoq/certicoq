@@ -1,11 +1,10 @@
 Require Import ZArith.
 Require Import Common.compM.
 From CertiCoq Require Import
-     L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6_anf L6.L4_to_L6
+     L6.cps L6.cps_util L6.state L6.eval L6.shrink_cps L6.L4_to_L6
      L6.inline L6.uncurry_proto L6.closure_conversion
      L6.closure_conversion L6.hoisting L6.dead_param_elim L6.lambda_lifting.
 From CertiCoq Require Import L4.toplevel.
-(* From CertiCoq.L7 Require Import L6_to_Clight. *)
 
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import ExtLib.Structures.Monad.
@@ -16,11 +15,11 @@ Import MonadNotation.
 
 Definition prim_env := M.t (kername * string (* C definition *) * nat (* arity *)). 
 
-Let L6env : Type := eval.prims * prim_env * ctor_env * ctor_tag * ind_tag * name_env * fun_env * eval.env.
+Definition L6env : Type := eval.prims * prim_env * ctor_env * ctor_tag * ind_tag * name_env * fun_env * eval.env.
 
-Let L6term : Type := cps.exp.
-Let L6val : Type := cps.val.
-Let L6_FullTerm : Type := L6env * L6term.
+Definition L6term : Type := cps.exp.
+Definition L6val : Type := cps.val.
+Definition L6_FullTerm : Type := L6env * L6term.
 
 Section IDENT.
   
@@ -59,12 +58,12 @@ Section IDENT.
       LiftErrorCertiCoqTrans "L6 CPS"
                              (fun (p : toplevel.L4Term) =>
                                 let prim_env := make_prim_env prims in
-                                match L4_to_L6.convert_top prim_env fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag next_var p with
-                                | Some (cenv, nenv, fenv, ctag, itag, e) => 
-                                  (* (compM.Ret e, data) => *)
+                                match convert_top prim_env fun_fun_tag kon_fun_tag default_ctor_tag default_ind_tag next_var p with
+                                | (compM.Ret e, data) =>
+                                  let (_, ctag, itag, ftag, cenv, fenv, nenv, _, _) := data in
                                   Ret (M.empty _, prim_env, cenv, ctag, itag, nenv, fenv, M.empty _, e)
-                                | None => Err "Error when compiling from L4 to L6"
-                                end) src.
+                                | (compM.Err s, _) => Err s
+                                end) src. 
 
   Definition compile_L6_ANF (prims : list (kername * string * nat * positive)) : CertiCoqTrans toplevel.L4Term L6_FullTerm :=
     fun src => 

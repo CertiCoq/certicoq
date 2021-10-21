@@ -3,7 +3,7 @@ Import MonadNotation.
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
 Require Import Coq.Bool.Bool.
 Require Import FunInd.
 Require Import Common.Common.
@@ -145,7 +145,7 @@ Function bnth (n:nat) (l:Brs) {struct l} : option (Term * nat) :=
 
 Lemma n_lt_0 : forall n, n < 0 -> Term * nat.
 Proof.
-  intros. omega.
+  intros. lia.
 Defined.
 
 Fixpoint
@@ -156,7 +156,7 @@ Fixpoint
     fun n =>
       match n return (n < dlength (dcons nm bod ri es)) -> Term * nat with
         | 0 => fun _ => (bod, ri)
-        | S m => fun H => dnth_lt es (lt_S_n _ _ H)
+        | S m => fun H => dnth_lt es (Lt.lt_S_n _ _ H)
       end
   end.
 

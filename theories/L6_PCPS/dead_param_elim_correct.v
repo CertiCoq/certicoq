@@ -1331,22 +1331,37 @@ Section Correct.
 
     (* identity case *)
     assert (Hid :
-              exists (e' : exp) (c' : comp_data),
-                (Ret e, c) = (Ret e', c') /\
-                unique_bindings e' /\
-                occurs_free e' \subset occurs_free e /\
-                Disjoint var (bound_var e') (occurs_free e') /\
-                (max_var e' 1 < next_var c')%positive /\
-                (forall (k : nat) (rho1 rho2 : env),
-                    preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
-                    binding_in_map (occurs_free e) rho1 -> preord_exp' cenv (preord_val cenv) PL PG k (e, rho1) (e', rho2))).
+              forall s, exists (e' : exp) (c' : comp_data),
+                  (Ret e, add_log s c) = (Ret e', c') /\
+                  unique_bindings e' /\
+                  occurs_free e' \subset occurs_free e /\
+                  Disjoint var (bound_var e') (occurs_free e') /\
+                  (max_var e' 1 < next_var c')%positive /\
+                  (forall (k : nat) (rho1 rho2 : env),
+                      preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
+                      binding_in_map (occurs_free e) rho1 -> preord_exp' cenv (preord_val cenv) PL PG k (e, rho1) (e', rho2))).
     { do 2 eexists. split; [| split; [| split; [| split; [| split ] ]]]; eauto; sets.
+      now destruct c; eauto. 
       intros. eapply preord_exp_refl; eauto. }
     
-    destruct (is_hoisted e) eqn:Hhoist; [| now eauto ].
-    destruct e; try now eauto.
-    destruct (find_live (Efun f e)) as [ L |  ] eqn:Hlive; [| now eauto ]. 
-    destruct (create_fun_tag L (make_arityMap (Efun f e) (M.empty fun_tag)) f c (M.empty fun_tag)) eqn:Hfmap.
+    assert (Hid' :
+              exists (e' : exp) (c' : comp_data),
+                  (Ret e, c) = (Ret e', c') /\
+                  unique_bindings e' /\
+                  occurs_free e' \subset occurs_free e /\
+                  Disjoint var (bound_var e') (occurs_free e') /\
+                  (max_var e' 1 < next_var c')%positive /\
+                  (forall (k : nat) (rho1 rho2 : env),
+                      preord_env_P cenv PG (occurs_free e) k rho1 rho2 ->
+                      binding_in_map (occurs_free e) rho1 -> preord_exp' cenv (preord_val cenv) PL PG k (e, rho1) (e', rho2))).
+    { do 2 eexists. split; [| split; [| split; [| split; [| split ] ]]]; eauto; sets.
+      intros. eapply preord_exp_refl; eauto. }
+
+    destruct (is_hoisted e) eqn:Hhoist; [ | now eauto ].
+    
+    destruct e;  try now eauto.
+    destruct (find_live (Efun f e)) as [ L |  ] eqn:Hlive; [ now eauto | ]. 
+    destruct (create_fun_tag l (make_arityMap (Efun f e) (M.empty fun_tag)) f c (M.empty fun_tag)) eqn:Hfmap.
 
     (* something actually happens *)
     edestruct is_hoisted_correct. eassumption. destructAll. 
@@ -1362,14 +1377,14 @@ Section Correct.
     rewrite Intersection_Same_set in Hfmap; [| eassumption ]. 
 
       
-    unfold run_compM. 
+    unfold run_compM.  
     
-    assert (Hsb := eliminate_fundefs_sound f0 L Hfmap f H tt (c0, tt) I).
-    destruct (compM.runState (eliminate_fundefs f0 L f) tt (c0, tt)) as [[ B' | ] c1].
+    assert (Hsb := eliminate_fundefs_sound f0 l Hfmap f H tt (c0, tt) I).
+    destruct (compM.runState (eliminate_fundefs f0 l f) tt (c0, tt)) as [[ B' | ] c1].
     contradiction.  destructAll.
     
-    assert (Hse := eliminate_expr_sound f0 L Hfmap e H0 tt (c0, tt) I).
-    destruct (compM.runState (eliminate_expr f0 L e) tt (c0, tt)) as [[ e' | ] c1].
+    assert (Hse := eliminate_expr_sound f0 l Hfmap e H0 tt (c0, tt) I). 
+    destruct (compM.runState (eliminate_expr f0 l e) tt (c0, tt)) as [[ e' | ] c2].
     contradiction. destructAll.
     
     (* bound_var *)

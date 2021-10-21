@@ -19,6 +19,7 @@ COPYING file for more details.
 
 (** * IEEE-754 encoding of binary floating-point data *)
 Require Import Core Digits Binary.
+Require Import Coq.micromega.Lia.
 
 Section Binary_Bits.
 
@@ -43,10 +44,10 @@ Proof.
 intros s m e Hm He.
 assert (0 <= mw)%Z as Hmw.
   destruct mw as [|mw'|mw'] ; try easy.
-  clear -Hm ; simpl in Hm ; omega.
+  clear -Hm ; simpl in Hm ; lia.
 assert (0 <= ew)%Z as Hew.
   destruct ew as [|ew'|ew'] ; try easy.
-  clear -He ; simpl in He ; omega.
+  clear -He ; simpl in He ; lia.
 unfold join_bits.
 rewrite Z.shiftl_mul_pow2 by easy.
 split.
@@ -54,9 +55,9 @@ split.
   rewrite <- (Zmult_0_l (2^mw)).
   apply Zmult_le_compat_r.
   case s.
-  clear -He ; omega.
+  clear -He ; lia.
   now rewrite Zmult_0_l.
-  clear -Hm ; omega.
+  clear -Hm ; lia.
 - apply Z.lt_le_trans with (((if s then 2 ^ ew else 0) + e + 1) * 2 ^ mw)%Z.
   rewrite (Zmult_plus_distr_l _ 1).
   apply Zplus_lt_compat_l.
@@ -65,9 +66,9 @@ split.
   apply Zmult_le_compat_r.
   rewrite Zpower_plus by easy.
   change (2^1)%Z with 2%Z.
-  case s ; clear -He ; omega.
-  clear -Hm ; omega.
-  clear -Hew ; omega.
+  case s ; clear -He ; lia.
+  clear -Hm ; lia.
+  clear -Hew ; lia.
   easy.
 Qed.
 
@@ -85,10 +86,10 @@ Proof.
 intros s m e Hm He.
 assert (0 <= mw)%Z as Hmw.
   destruct mw as [|mw'|mw'] ; try easy.
-  clear -Hm ; simpl in Hm ; omega.
+  clear -Hm ; simpl in Hm ; lia.
 assert (0 <= ew)%Z as Hew.
   destruct ew as [|ew'|ew'] ; try easy.
-  clear -He ; simpl in He ; omega.
+  clear -He ; simpl in He ; lia.
 unfold split_bits, join_bits.
 rewrite Z.shiftl_mul_pow2 by easy.
 apply f_equal2 ; [apply f_equal2|].
@@ -99,7 +100,7 @@ apply f_equal2 ; [apply f_equal2|].
     apply Zplus_le_0_compat.
     apply Zmult_le_0_compat.
     apply He.
-    clear -Hm ; omega.
+    clear -Hm ; lia.
     apply Hm.
   + apply Zle_bool_false.
     apply Zplus_lt_reg_l with (2^mw * (-e))%Z.
@@ -108,12 +109,12 @@ apply f_equal2 ; [apply f_equal2|].
     apply Z.lt_le_trans with (2^mw * 1)%Z.
     now apply Zmult_lt_compat_r.
     apply Zmult_le_compat_l.
-    clear -He ; omega.
-    clear -Hm ; omega.
+    clear -He ; lia.
+    clear -Hm ; lia.
 - rewrite Zplus_comm.
   rewrite Z_mod_plus_full.
   now apply Zmod_small.
-- rewrite Z_div_plus_full_l by (clear -Hm ; omega).
+- rewrite Z_div_plus_full_l by (clear -Hm ; lia).
   rewrite Zdiv_small with (1 := Hm).
   rewrite Zplus_0_r.
   case s.
@@ -175,7 +176,7 @@ rewrite Zdiv_Zdiv.
 apply sym_eq.
 case Zle_bool_spec ; intros Hs.
 apply Zle_antisym.
-cut (x / (2^mw * 2^ew) < 2)%Z. clear ; omega.
+cut (x / (2^mw * 2^ew) < 2)%Z. clear ; lia.
 apply Zdiv_lt_upper_bound.
 now apply Zmult_lt_0_compat.
 rewrite <- Zpower_exp ; try ( apply Z.le_ge ; apply Zlt_le_weak ; assumption ).
@@ -244,8 +245,8 @@ Theorem split_bits_of_binary_float_correct :
   split_bits (bits_of_binary_float x) = split_bits_of_binary_float x.
 Proof.
 intros [sx|sx|sx plx Hplx|sx mx ex Hx] ;
-  try ( simpl ; apply split_join_bits ; split ; try apply Z.le_refl ; try apply Zlt_pred ; trivial ; omega ).
-simpl. apply split_join_bits; split; try (zify; omega).
+  try ( simpl ; apply split_join_bits ; split ; try apply Z.le_refl ; try apply Zlt_pred ; trivial ; lia ).
+simpl. apply split_join_bits; split; try (zify; lia).
 destruct (digits2_Pnat_correct plx).
 unfold nan_pl in Hplx.
 rewrite Zpos_digits2_pos, <- Z_of_nat_S_digits2_Pnat in Hplx.
@@ -253,7 +254,7 @@ rewrite Zpower_nat_Z in H0.
 eapply Z.lt_le_trans. apply H0.
 change 2%Z with (radix_val radix2). apply Zpower_le.
 rewrite Z.ltb_lt in Hplx.
-unfold prec in *. zify; omega.
+unfold prec in *. zify; lia.
 (* *)
 unfold bits_of_binary_float, split_bits_of_binary_float.
 assert (Hf: (emin <= ex /\ Zdigits radix2 (Zpos mx) <= prec)%Z).
@@ -263,14 +264,14 @@ rewrite Zpos_digits2_pos in Hx'.
 generalize (Zeq_bool_eq _ _ Hx').
 unfold FLT_exp.
 unfold emin.
-clear ; zify ; omega.
+clear ; zify ; lia.
 case Zle_bool_spec ; intros H ;
   [ apply -> Z.le_0_sub in H | apply -> Z.lt_sub_0 in H ] ;
   apply split_join_bits ; try now split.
 (* *)
 split.
-clear -He_gt_0 H ; omega.
-cut (Zpos mx < 2 * 2^mw)%Z. clear ; omega.
+clear -He_gt_0 H ; lia.
+cut (Zpos mx < 2 * 2^mw)%Z. clear ; lia.
 replace (2 * 2^mw)%Z with (2^prec)%Z.
 apply (Zpower_gt_Zdigits radix2 _ (Zpos mx)).
 apply Hf.
@@ -282,12 +283,12 @@ now apply Zlt_le_weak.
 (* *)
 split.
 generalize (proj1 Hf).
-clear ; omega.
+clear ; lia.
 destruct (andb_prop _ _ Hx) as (_, Hx').
 unfold emin.
 replace (2^ew)%Z with (2 * emax)%Z.
 generalize (Zle_bool_imp_le _ _ Hx').
-clear ; omega.
+clear ; lia.
 apply sym_eq.
 rewrite (Zsucc_pred ew).
 unfold Z.succ.
@@ -305,7 +306,7 @@ intros [sx|sx|sx pl pl_range|sx mx ex H].
 - apply join_bits_range ; now split.
 - apply join_bits_range.
   now split.
-  clear -He_gt_0 ; omega.
+  clear -He_gt_0 ; lia.
 - apply Z.ltb_lt in pl_range.
   apply join_bits_range.
   split.
@@ -313,7 +314,7 @@ intros [sx|sx|sx pl pl_range|sx mx ex H].
   apply (Zpower_gt_Zdigits radix2 _ (Zpos pl)).
   apply Z.lt_succ_r.
   now rewrite <- Zdigits2_Zdigits.
-  clear -He_gt_0 ; omega.
+  clear -He_gt_0 ; lia.
 - unfold bounded in H.
   apply Bool.andb_true_iff in H ; destruct H as [A B].
   apply Z.leb_le in B.
@@ -321,22 +322,22 @@ intros [sx|sx|sx pl pl_range|sx mx ex H].
   case Zle_bool_spec ; intros H.
   + apply join_bits_range.
     * split.
-      clear -H ; omega.
+      clear -H ; lia.
       rewrite Zpos_digits2_pos in A.
       cut (Zpos mx < 2 ^ prec)%Z.
       unfold prec.
-      rewrite Zpower_plus by (clear -Hmw ; omega).
+      rewrite Zpower_plus by (clear -Hmw ; lia).
       change (2^1)%Z with 2%Z.
-      clear ; omega.
+      clear ; lia.
       apply (Zpower_gt_Zdigits radix2 _ (Zpos mx)).
-      clear -A ; zify ; omega.
+      clear -A ; zify ; lia.
     * split.
-      unfold emin ; clear -A ; zify ; omega.
+      unfold emin ; clear -A ; zify ; lia.
       replace ew with ((ew - 1) + 1)%Z by ring.
-      rewrite Zpower_plus by (clear - Hew ; omega).
+      rewrite Zpower_plus by (clear - Hew ; lia).
       unfold emin, emax in *.
       change (2^1)%Z with 2%Z.
-      clear -B ; omega.
+      clear -B ; lia.
   + apply -> Z.lt_sub_0 in H.
     apply join_bits_range ; now split.
 Qed.
@@ -370,7 +371,7 @@ unfold binary_float_of_bits_aux, split_bits.
 assert (Hnan: nan_pl prec 1 = true).
   apply Z.ltb_lt.
   simpl. unfold prec.
-  clear -Hmw ; omega.
+  clear -Hmw ; lia.
 case Zeq_bool_spec ; intros He1.
 case_eq (x mod 2^mw)%Z ; try easy.
 (* subnormal *)
@@ -389,7 +390,7 @@ unfold Fexp, FLT_exp.
 apply sym_eq.
 apply Zmax_right.
 clear -H Hprec.
-unfold prec ; omega.
+unfold prec ; lia.
 apply Rnot_le_lt.
 intros H0.
 refine (_ (mag_le radix2 _ _ _ H0)).
@@ -397,20 +398,20 @@ rewrite mag_bpow.
 rewrite mag_F2R_Zdigits. 2: discriminate.
 unfold emin, prec.
 apply Zlt_not_le.
-cut (0 < emax)%Z. clear -H Hew ; omega.
+cut (0 < emax)%Z. clear -H Hew ; lia.
 apply (Zpower_gt_0 radix2).
-clear -Hew ; omega.
+clear -Hew ; lia.
 apply bpow_gt_0.
 case Zeq_bool_spec ; intros He2.
 case_eq (x mod 2 ^ mw)%Z; try easy.
 (* nan *)
 intros plx Eqplx. apply Z.ltb_lt.
 rewrite Zpos_digits2_pos.
-assert (forall a b, a <= b -> a < b+1)%Z by (intros; omega). apply H. clear H.
+assert (forall a b, a <= b -> a < b+1)%Z by (intros; lia). apply H. clear H.
 apply Zdigits_le_Zpower. simpl.
 rewrite <- Eqplx. edestruct Z_mod_lt; eauto.
 change 2%Z with (radix_val radix2).
-apply Z.lt_gt, Zpower_gt_0. omega.
+apply Z.lt_gt, Zpower_gt_0. lia.
 case_eq (x mod 2^mw + 2^mw)%Z ; try easy.
 (* normal *)
 intros px Hm.
@@ -452,7 +453,7 @@ revert He1.
 fold ex.
 cut (0 <= ex)%Z.
 unfold emin.
-clear ; intros H1 H2 ; omega.
+clear ; intros H1 H2 ; lia.
 eapply Z_mod_lt.
 apply Z.lt_gt.
 apply (Zpower_gt_0 radix2).
@@ -471,12 +472,12 @@ revert He2.
 set (ex := ((x / 2^mw) mod 2^ew)%Z).
 cut (ex < 2^ew)%Z.
 replace (2^ew)%Z with (2 * emax)%Z.
-clear ; intros H1 H2 ; omega.
+clear ; intros H1 H2 ; lia.
 replace ew with (1 + (ew - 1))%Z by ring.
 rewrite Zpower_exp.
 apply refl_equal.
 discriminate.
-clear -Hew ; omega.
+clear -Hew ; lia.
 eapply Z_mod_lt.
 apply Z.lt_gt.
 apply (Zpower_gt_0 radix2).
@@ -503,13 +504,13 @@ apply refl_equal.
 simpl.
 rewrite Zeq_bool_false.
 now rewrite Zeq_bool_true.
-cut (1 < 2^ew)%Z. clear ; omega.
+cut (1 < 2^ew)%Z. clear ; lia.
 now apply (Zpower_gt_1 radix2).
 (* *)
 simpl.
 rewrite Zeq_bool_false.
 rewrite Zeq_bool_true; auto.
-cut (1 < 2^ew)%Z. clear ; omega.
+cut (1 < 2^ew)%Z. clear ; lia.
 now apply (Zpower_gt_1 radix2).
 (* *)
 unfold split_bits_of_binary_float.
@@ -522,19 +523,19 @@ destruct (andb_prop _ _ Bx) as (_, H1).
 generalize (Zle_bool_imp_le _ _ H1).
 unfold emin.
 replace (2^ew)%Z with (2 * emax)%Z.
-clear ; omega.
+clear ; lia.
 replace ew with (1 + (ew - 1))%Z by ring.
 rewrite Zpower_exp.
 apply refl_equal.
 discriminate.
-clear -Hew ; omega.
+clear -Hew ; lia.
 destruct (andb_prop _ _ Bx) as (H1, _).
 generalize (Zeq_bool_eq _ _ H1).
 rewrite Zpos_digits2_pos.
 unfold FLT_exp, emin.
 generalize (Zdigits radix2 (Zpos mx)).
 clear.
-intros ; zify ; omega.
+intros ; zify ; lia.
 (* . *)
 rewrite Zeq_bool_true. 2: apply refl_equal.
 simpl.
@@ -547,7 +548,7 @@ apply -> Z.lt_sub_0 in Hm.
 generalize (Zdigits_le_Zpower radix2 _ (Zpos mx) Hm).
 generalize (Zdigits radix2 (Zpos mx)).
 clear.
-intros ; zify ; omega.
+intros ; zify ; lia.
 Qed.
 
 Theorem bits_of_binary_float_of_bits :
@@ -588,12 +589,12 @@ case Zeq_bool_spec ; intros He2.
 case_eq mx; intros Hm.
 now rewrite He2.
 now rewrite He2.
-intros. zify; omega.
+intros. zify; lia.
 (* normal *)
 case_eq (mx + 2 ^ mw)%Z.
 intros Hm.
 apply False_ind.
-clear -Bm Hm ; omega.
+clear -Bm Hm ; lia.
 intros p Hm Jx Cx.
 rewrite <- Hm.
 rewrite Zle_bool_true.
@@ -601,7 +602,7 @@ now ring_simplify (mx + 2^mw - 2^mw)%Z (ex + emin - 1 - emin + 1)%Z.
 now ring_simplify.
 intros p Hm.
 apply False_ind.
-clear -Bm Hm ; zify ; omega.
+clear -Bm Hm ; zify ; lia.
 Qed.
 
 End Binary_Bits.

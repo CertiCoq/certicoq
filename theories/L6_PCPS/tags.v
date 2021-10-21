@@ -83,7 +83,7 @@ end.
  Definition lt (x y: t) : Prop := compare x y = Lt.
  Lemma lt_strorder: StrictOrder lt.
  Proof.
- Admitted.
+ Abort.
 
  Lemma lt_compat:  Morphisms.Proper
        (Morphisms.respectful Logic.eq (Morphisms.respectful Logic.eq iff)) lt.
@@ -94,22 +94,12 @@ end.
  Lemma compare_spec :
      forall x y : t, CompareSpec (x = y) (lt x y) (lt y x) (compare x y).
  Proof.
-  intros.
-   destruct (compare x y) eqn:?H;  constructor.
-   admit.
-   auto.
-   admit.
- Admitted.
-
+ Abort.
+ 
    Lemma eq_dec : forall x y : t, {x = y} + {x <> y}.
    Proof.
-     intros.
-     pose proof (compare_spec x y).
-     destruct (compare x y).
-     left; inversion H; auto.
-     right; inversion H; intro; subst y; destruct (lt_strorder) as [H2 _]. apply (H2 x); auto.
-     right; inversion H; intro; subst y; destruct (lt_strorder) as [H2 _]. apply (H2 x); auto.
-   Defined.
+   Abort.
+   
 End TagInfo.
 
 Module TagDict := HashMap.MakeHashMap TagInfo.

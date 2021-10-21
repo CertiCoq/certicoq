@@ -1,7 +1,7 @@
 # CertiCoq
 
 <p align="center">
-<img src="https://zoep.github.io/certicoq.png" alt="MetaCoq" width="100px"/>
+<img src="https://certicoq.org/certicoq.png" alt="CertiCoqCoq" width="100px"/>
 </p>
 
 ## Overview

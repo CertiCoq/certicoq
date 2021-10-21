@@ -4,7 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Common.Common.
-Require Import Omega.
+Require Import Omega micromega.Lia.
 Require Import L1g.compile.
 Require Import L1g.term.
 
@@ -89,9 +89,9 @@ Lemma tlength_S:
     exists u us, ts = tcons u us /\ tlength us >= p.
 Proof.
   induction ts; intros.
-  - cbn in H. omega.
+  - cbn in H. lia.
   - cbn in H. case_eq ts; intros; subst.
-    + exists t, tnil. auto. cbn in H. assert (j:p = 0). omega. subst.
+    + exists t, tnil. auto. cbn in H. assert (j:p = 0). lia. subst.
       intuition.
     + exists t, (tcons t0 t1). intuition.
 Qed.
@@ -217,7 +217,7 @@ Lemma treverse_pres_tlength:
   forall ts, tlength ts = tlength (treverse ts).
 Proof.
   induction ts; intros. reflexivity.
-  - cbn. rewrite IHts. rewrite tappend_pres_tlength. cbn. omega.
+  - cbn. rewrite IHts. rewrite tappend_pres_tlength. cbn. lia.
 Qed.
   
 Fixpoint dlength (ts:Defs) : nat :=

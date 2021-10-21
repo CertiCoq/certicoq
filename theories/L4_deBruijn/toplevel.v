@@ -25,7 +25,7 @@ Definition compile_L2k_eta
 
 (* TODO instance for correctness proof *)
 
-Let L4Term := prod ienv L4.expression.exp.
+Definition L4Term := prod ienv L4.expression.exp.
 
 Instance L4_Lang : Lang L4Term :=
   { Value := L4.expression.exp ;

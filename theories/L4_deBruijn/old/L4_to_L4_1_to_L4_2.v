@@ -13,7 +13,7 @@ Require Import SquiggleEq.lmap.
 *)
 
 Require Import Coq.Arith.Arith 
-Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega Coq.Program.Program 
+Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.micromega.Lia Coq.Program.Program 
 Coq.micromega.Psatz.
 
 Definition dummyind := BasicAst.mkInd (AstCommon.kername_of_string "") 0%nat.

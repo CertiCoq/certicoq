@@ -5,7 +5,7 @@
 
 Require Import FunInd.
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
-        Coq.Lists.List Coq.omega.Omega Coq.micromega.Lia Coq.Program.Program Coq.micromega.Psatz
+        Coq.Lists.List Coq.micromega.Lia Coq.micromega.Lia Coq.Program.Program Coq.micromega.Psatz
         Coq.Bool.Bool.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.

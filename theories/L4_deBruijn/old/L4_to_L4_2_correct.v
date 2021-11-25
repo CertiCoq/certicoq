@@ -1,6 +1,6 @@
 Require Import BinNat.
 Require Import BinPos.
-Require Import Omega.
+Require Import Coq.micromega.Lia.
 Require Import Psatz.
 Require Import Arith.
 Require Import PArith.

@@ -17,7 +17,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 COPYING file for more details.
 *)
 
-Require Import ZArith Omega micromega.Lia.
+Require Import ZArith Coq.micromega.Lia micromega.Lia.
 Require Import Zquot.
 
 Section Zmissing.

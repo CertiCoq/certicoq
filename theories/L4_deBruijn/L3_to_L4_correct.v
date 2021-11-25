@@ -8,7 +8,7 @@
 
 Require Export Common.Common.
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
-        Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+        Coq.micromega.Lia Coq.Program.Program Coq.micromega.Psatz.
 (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.

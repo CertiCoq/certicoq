@@ -4,7 +4,7 @@ Require Import SquiggleEq.UsefulTypes.
 Require Import L4.polyEval.
 
 Require Import L4.L4_5_to_L5.
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.micromega.Lia 
   Coq.Program.Program Coq.micromega.Psatz.
 
 Set Implicit Arguments.

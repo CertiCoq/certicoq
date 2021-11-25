@@ -4,7 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Common.Common.
-Require Import Omega micromega.Lia.
+Require Import Coq.micromega.Lia micromega.Lia.
 Require Import L1g.compile.
 Require Import L1g.term.
 

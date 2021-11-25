@@ -1,4 +1,4 @@
-Require Import Coq.Arith.Arith Coq.NArith.BinNat omega.Omega micromega.Lia Coq.Strings.String
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.micromega.Lia micromega.Lia Coq.Strings.String
         Coq.Lists.List Structures.OrdersEx.
 Require Import Common.Common.
 Require Import L4.expression.

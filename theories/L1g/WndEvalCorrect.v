@@ -1,6 +1,6 @@
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
 Require Import Coq.Bool.Bool.
 Require Import FunInd.
 Require Import Common.Common.

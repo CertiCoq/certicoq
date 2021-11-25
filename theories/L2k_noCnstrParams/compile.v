@@ -261,7 +261,7 @@ with lifts (n:nat) (ts:Terms) : Terms :=
 with liftBs (n:nat) (ts:Brs) : Brs :=
        match ts with
          | bnil => bnil
-         | bcons m b bs => bcons m (lift n b) (liftBs n bs)
+         | bcons m b bs => bcons m (lift (List.length m + n) b) (liftBs n bs)
        end
 with liftDs n (ds:Defs) : Defs :=
        match ds with

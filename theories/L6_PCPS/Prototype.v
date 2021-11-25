@@ -1181,7 +1181,7 @@ Definition gen_case_tree (ind_info : ind_info) (epats : list (term × term))
                  then go (combine (map tVar xs) args ++ epats)
                  else ret failure
               in
-              ret {| bcontext := map nNamed xs ; bbody := arm |})
+              ret {| bcontext := List.rev (map nNamed xs) ; bbody := arm |})
             constrs
       in
       match epats with

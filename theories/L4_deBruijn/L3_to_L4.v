@@ -68,8 +68,7 @@ Section TermTranslation.
       match l with
       | L3t.bnil => brnil_e
       | L3t.bcons nargs t ts =>
-        let '(names, t') := strip_lam nargs (trans k t) in
-        brcons_e (ind,n) (N.of_nat nargs, names) t'
+        brcons_e (ind,n) (N.of_nat (List.length nargs), nargs) (trans (k + N.of_nat (List.length nargs)) t)
                  (trans_brs ind k (n + 1)%N ts)
       end.
     Fixpoint trans_fixes k l :=
@@ -157,8 +156,6 @@ Definition inductive_env (e : environ L2k.compile.Term) : ienv :=
 
 Definition mkLets (e : env) (t : exp) :=
   fold_left (fun acc (x : _ * exp) => Let_e (string_of_kername (fst x)) (snd x) acc) e t.
-
-Require Import L3_to_L3_eta.
 
 Definition translate_program
            (prims : list (kername * string * nat * positive))

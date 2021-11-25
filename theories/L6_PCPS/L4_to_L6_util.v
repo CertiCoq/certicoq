@@ -2,7 +2,7 @@ From Coq Require Import ZArith.ZArith Lists.List Strings.String micromega.Lia Ar
      Ensembles Relations.Relation_Definitions.
 Require Import Common.AstCommon.
 Require compcert.lib.Maps compcert.lib.Coqlib.
-
+Require Import List Ensembles.
 Import ListNotations.
 
 Require Import L4.expression L4.fuel_sem.
@@ -674,7 +674,7 @@ Section Post.
       
     
     Lemma FromList_rev {A} (l : list A) :
-      FromList (rev l) <--> FromList l.
+      FromList (List.rev l) <--> FromList l.
     Proof.
       induction l.
       - reflexivity.

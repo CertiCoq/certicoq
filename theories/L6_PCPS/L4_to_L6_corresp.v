@@ -1,6 +1,6 @@
+Require Import Common.AstCommon Common.compM.
 From Coq Require Import ZArith.ZArith Lists.List Strings.String micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
-Require Import Common.AstCommon Common.compM.
 Require compcert.lib.Maps compcert.lib.Coqlib.
 
 Import ListNotations.

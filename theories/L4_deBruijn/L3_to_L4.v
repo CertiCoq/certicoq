@@ -59,14 +59,6 @@ Section TermTranslation.
 
   Variable e : env.
   Variable prims : list (kername * string * nat * positive).
-           
-  Fixpoint strip_lam (k : nat) (e : exp) : list name * exp :=
-    match k, e with
-    | 0%nat, _ => ([], e)
-    | S n, Lam_e na e => let '(names, e) := strip_lam n e in
-                       (na :: names, e)
-    | S n, _ => ([],e)
-    end.
 
   Section fixes.
     Variable trans : N -> L3t.Term -> exp.

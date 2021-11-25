@@ -9,6 +9,8 @@ Require Import Coq.micromega.Lia.
 Require Export Common.Common Common.AstCommon.
 Require Export L1g.compile.
 
+From MetaCoq Require Import Template.Reflect.
+
 Open Scope string_scope.
 Open Scope bool.
 Open Scope list.
@@ -80,7 +82,7 @@ Proof.
     + right. intros h. myInjection h. elim n. reflexivity.
   - destruct cc; cross; lft.
   - destruct cc; cross.
-    destruct (eq_nat_dec n n0), (H t0), (H0 cc); [lft | rght .. ].
+    destruct (Equations.Prop.Classes.eq_dec l l0), (H t0), (H0 cc); [lft | rght .. ].
   - destruct ee; cross. lft.
   - destruct ee; cross.
     destruct (name_dec n n1); destruct (eq_nat_dec n0 n2);

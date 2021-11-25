@@ -2215,7 +2215,7 @@ Proof.
   specialize (IHn (1 + k) _ e0 H).
   rewrite <- IHn. equaln.
   clear -H.
-  revert t k H; induction n; intros; destruct t; simpl in *; eauto.
+  revert t k H; induction n; intros; destruct t; simpl in *; eauto. discriminate.
 Qed.
 
 Lemma exps_length_trans f k a : exps_length (trans_args f k a) = N.of_nat (tlength a).

@@ -55,7 +55,7 @@ Inductive Term : Type :=
 | TWrong     : string -> Term
 with Brs: Type :=
 | bnil: Brs
-| bcons: nat -> Term -> Brs -> Brs
+| bcons: list name -> Term -> Brs -> Brs
 with Defs : Type :=
 | dnil : Defs
 | dcons : name -> Term -> nat -> Defs -> Defs.
@@ -138,7 +138,7 @@ Function dnthBody (n:nat) (l:Defs) {struct l} : option (Term * nat) :=
                          end
   end.
 
-Function bnth (n:nat) (l:Brs) {struct l} : option (Term * nat) :=
+Function bnth (n:nat) (l:Brs) {struct l} : option (Term * list name) :=
   match l with
     | bnil => None
     | bcons ix x bs => match n with
@@ -211,7 +211,7 @@ Section term_Term_sec.
              (term_Term (dbody d))  (rarg d) (defs_Defs ds )
    end.
   (* Case branches *)
-  Fixpoint natterms_Brs (nts: list (nat * term)) : Brs :=
+  Fixpoint natterms_Brs (nts: list (list name * term)) : Brs :=
     match nts with
      | nil => bnil
      | cons (n,t) ds => bcons n (term_Term t) (natterms_Brs ds)
@@ -307,6 +307,8 @@ Require Import Common.classes Common.Pipeline_utils Common.compM.
 #[local] Existing Instance PCUICErrors.envcheck_monad.
 
 Open Scope string_scope.
+
+Axiom todo : string -> forall {A}, A.
      
 Definition erase (p:Ast.Env.program) : error (global_context × term) :=
   let p := fix_program_universes p in

@@ -1,4 +1,4 @@
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
+Require Import Coq.Arith.Arith Coq.ZArith.ZArith Coq.NArith.BinNat Coq.Strings.String
         Coq.Lists.List Coq.micromega.Lia Coq.micromega.Lia Coq.Program.Program
         Coq.micromega.Psatz.
 Require Import FunInd.

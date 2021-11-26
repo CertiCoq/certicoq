@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 env:
   OCAML_VERSION: 4.07.1+flambda
-  COQ_VERSION: 8.13.2
+  COQ_VERSION: 8.14.0
 
 jobs:
   build:

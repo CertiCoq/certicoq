@@ -78,8 +78,17 @@ Local Notation "e1 >>= e2" := (ExtLib.Structures.Monad.bind e1 e2).
 
 Definition set_aname (s : string) (x : aname) :=
   {| binder_name := BasicAst.nNamed s; binder_relevance := x.(binder_relevance) |}.
-  
-Definition named_of (Γ : list string) (tm : term) : GM term :=
+
+Instance show_list {A} {s : Show A} : Show (list A) :=
+  { show l := String.concat "," (map show l) }.
+
+Definition lookup (n : nat) (xs : list string) : GM string :=
+  match nth_error xs n with
+  | Some v => ret v
+  | None => raise ("nthM: " +++ nat2string10 n ++ " in " ++ show xs)
+  end.
+
+Definition named_of' (Γ : list string) (tm : term) : GM term :=
   let fix go (n : nat) (Γ : list string) (tm : term) : GM term :=
     match n with O => raise "named_of: OOF" | S n =>
       let go := go n in
@@ -112,7 +121,7 @@ Definition named_of (Γ : list string) (tm : term) : GM term :=
           bbody := bb' |} 
       in
       match tm with
-      | tRel n => tVar <$> nthM_nat n Γ
+      | tRel n => tVar <$> lookup n Γ
       | tVar id => ret tm
       | tEvar ev args => ret tm
       | tSort s => ret tm
@@ -143,15 +152,22 @@ Definition named_of (Γ : list string) (tm : term) : GM term :=
     end
   in go 1000%nat Γ tm.
 
-(*
-Compute runGM' 0 (named_of [] <%
+Definition named_of (Γ : list string) (tm : term) : GM term :=
+  {| runStateT := fun s => 
+  match runStateT (named_of' Γ tm) s with
+  | inr (x, s) => inr (x, s)
+  | inl e => runStateT
+   (raise ("named_of failed on " +++ " Γ = " +++ show Γ +++ " tm = " +++ string_of_term tm +++ " with " +++ e)) s
+  end |}.
+
+(*Compute runGM' 0 (named_of [] <%
   fun x y z w : nat =>
   match x, y with
   | S x, S y => z * x + y * w
   | O, y => z + z
   | _, _ => w
-  end%nat%>).
-Compute runGM' 0 (named_of [] <%forall x y z : nat, x = y -> y = z -> x = z%>).
+  end%nat%>).*)
+(*Compute runGM' 0 (named_of [] <%forall x y z : nat, x = y -> y = z -> x = z%>).
 *)
 
 Definition find_str (s : string) (ss : list string) : GM nat :=
@@ -236,10 +252,6 @@ Definition check_roundtrip (Γ : list string) (t : term) : GM (option (term × t
   let! t' := indices_of Γ named in
   ret (if string_of_term t ==? string_of_term t' then None else Some (t, t')).
 
-Inductive twoargs := 
-  | twoC : nat -> nat -> twoargs.
-
-
 Compute runGM' 0 (check_roundtrip [] <%
   fun x y z w : nat =>
   match x, y with
@@ -260,10 +272,14 @@ Compute runGM' 0 (check_roundtrip [] <%
     | S n => ev n
     end%nat
   for ev%>).
+
+Inductive twoargs := 
+  | twoC : twoargs -> nat -> twoargs.
+
 Compute runGM' 0 (check_roundtrip [] <%
   fix ev c :=
-    match c with
-    | twoC x y => y
+    match c return nat with
+    | twoC x y => ev x
     end%>).
 
 (* Renames binders too, and doesn't respect scoping rules at all *)
@@ -1142,7 +1158,7 @@ Definition gen_case_tree (ind_info : ind_info) (epats : list (term × term))
               let ts := skipn nparams ts in
               let constr_ty := fold_right (fun '(x, t) ty => tProd x t ty) rty (combine xs ts) in
               let constr_ty := subst0 (rev pars ++ rev_map (fun ind => tInd ind []) inds) constr_ty in
-              let! constr_ty := named_of [] ctor.(cstr_type) in
+              let! constr_ty := named_of [] constr_ty in
               ret (ctor.(cstr_name), constr_ty, ctor.(cstr_arity)))
             body.(ind_ctors)
         in

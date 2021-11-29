@@ -16,16 +16,12 @@ Require Import FunInd.
 Require Import Axioms Classical.
 Require Import String Coqlib Decidableplus.
 Require Import Errors Maps Integers Floats.
-Require Import AST Values Memory Events Globalenvs Determinism.
+Require Import AST Values Memory Events Globalenvs Builtins Determinism.
 Require Import Ctypes Cop Csyntax Csem.
 Require Cstrategy.
-Require Import Coq.micromega.Lia.
 
 Local Open Scope string_scope.
 Local Open Scope list_scope.
-Declare Scope option_monad_scope.
-Declare Scope list_monad_scope.
-Declare Scope reducts_monad_scope.
 
 (** Error monad with options or lists *)
 
@@ -296,7 +292,6 @@ Remark check_assign_copy:
   { assign_copy_ok ty b ofs b' ofs' } + {~ assign_copy_ok ty b ofs b' ofs' }.
 Proof with try (right; intuition lia).
   intros. unfold assign_copy_ok.
-  assert (alignof_blockcopy ge ty > 0) by apply alignof_blockcopy_pos.
   destruct (Zdivide_dec (alignof_blockcopy ge ty) (Ptrofs.unsigned ofs')); auto...
   destruct (Zdivide_dec (alignof_blockcopy ge ty) (Ptrofs.unsigned ofs)); auto...
   assert (Y: {b' <> b \/
@@ -465,6 +460,14 @@ Definition do_ef_free
       check (zlt 0 (Ptrofs.unsigned sz));
       do m' <- Mem.free m b (Ptrofs.unsigned lo - size_chunk Mptr) (Ptrofs.unsigned lo + Ptrofs.unsigned sz);
       Some(w, E0, Vundef, m')
+  | Vint n :: nil =>
+      if Int.eq_dec n Int.zero && negb Archi.ptr64
+      then Some(w, E0, Vundef, m)
+      else None
+  | Vlong n :: nil =>
+      if Int64.eq_dec n Int64.zero && Archi.ptr64
+      then Some(w, E0, Vundef, m)
+      else None
   | _ => None
   end.
 
@@ -475,35 +478,6 @@ Definition memcpy_args_ok
    /\ (sz > 0 -> (al | osrc))
    /\ (sz > 0 -> (al | odst))
    /\ (bsrc <> bdst \/ osrc = odst \/ osrc + sz <= odst \/ odst + sz <= osrc).
-
-
-Remark memcpy_check_args:
-  forall sz al bdst odst bsrc osrc,
-  {memcpy_args_ok sz al bdst odst bsrc osrc} + {~memcpy_args_ok sz al bdst odst bsrc osrc}.
-Proof with try (right; intuition lia).
-  intros.
-  assert (X: {al = 1 \/ al = 2 \/ al = 4 \/ al = 8} + {~(al = 1 \/ al = 2 \/ al = 4 \/ al = 8)}).
-    destruct (zeq al 1); auto. destruct (zeq al 2); auto.
-    destruct (zeq al 4); auto. destruct (zeq al 8); auto...
-  unfold memcpy_args_ok. destruct X...
-  assert (al > 0) by (intuition lia).
-  destruct (zle 0 sz)...
-  destruct (Zdivide_dec al sz); auto...
-  assert(U: forall x, {sz > 0 -> (al | x)} + {~(sz > 0 -> (al | x))}).
-    intros. destruct (zeq sz 0).
-    left; intros; omegaContradiction.
-    destruct (Zdivide_dec al x); auto. right; red; intros. elim n0. apply H0. lia.
-  destruct (U osrc); auto...
-  destruct (U odst); auto...
-  assert (Y: {bsrc <> bdst \/ osrc = odst \/ osrc + sz <= odst \/ odst + sz <= osrc}
-           +{~(bsrc <> bdst \/ osrc = odst \/ osrc + sz <= odst \/ odst + sz <= osrc)}).
-    destruct (eq_block bsrc bdst); auto.
-    destruct (zeq osrc odst); auto.
-    destruct (zle (osrc + sz) odst); auto.
-    destruct (zle (odst + sz) osrc); auto.
-    right; intuition lia.
-  destruct Y... left; intuition lia.
-Defined.
 
 Definition do_ef_memcpy (sz al: Z)
        (w: world) (vargs: list val) (m: mem) : option (world * trace * val * mem) :=
@@ -535,12 +509,19 @@ Definition do_ef_debug (kind: positive) (text: ident) (targs: list typ)
        (w: world) (vargs: list val) (m: mem) : option (world * trace * val * mem) :=
   Some(w, E0, Vundef, m).
 
+Definition do_builtin_or_external (name: string) (sg: signature)
+       (w: world) (vargs: list val) (m: mem) : option (world * trace * val * mem) :=
+  match lookup_builtin_function name sg with
+  | Some bf => match builtin_function_sem bf vargs with Some v => Some(w, E0, v, m) | None => None end
+  | None    => do_external_function name sg ge w vargs m
+  end.
+
 Definition do_external (ef: external_function):
        world -> list val -> mem -> option (world * trace * val * mem) :=
   match ef with
   | EF_external name sg => do_external_function name sg ge
-  | EF_builtin name sg => do_external_function name sg ge
-  | EF_runtime name sg => do_external_function name sg ge
+  | EF_builtin name sg => do_builtin_or_external name sg
+  | EF_runtime name sg => do_builtin_or_external name sg
   | EF_vload chunk => do_ef_volatile_load chunk
   | EF_vstore chunk => do_ef_volatile_store chunk
   | EF_malloc => do_ef_malloc
@@ -557,50 +538,65 @@ Lemma do_ef_external_sound:
   do_external ef w vargs m = Some(w', t, vres, m') ->
   external_call ef ge vargs m t vres m' /\ possible_trace w t w'.
 Proof with try congruence.
+  intros until m'.
   assert (SIZE: forall v sz, do_alloc_size v = Some sz -> v = Vptrofs sz).
   { intros until sz; unfold Vptrofs; destruct v; simpl; destruct Archi.ptr64 eqn:SF; 
     intros EQ; inv EQ; f_equal; symmetry; eauto with ptrofs. }
-  intros until m'.
+  assert (BF_EX: forall name sg,
+    do_builtin_or_external name sg w vargs m = Some (w', t, vres, m') ->
+    builtin_or_external_sem name sg ge vargs m t vres m' /\ possible_trace w t w').
+  { unfold do_builtin_or_external, builtin_or_external_sem; intros. 
+    destruct (lookup_builtin_function name sg ) as [bf|].
+  - destruct (builtin_function_sem bf vargs) as [vres1|] eqn:BF; inv H.
+    split. constructor; auto. constructor.
+  - eapply do_external_function_sound; eauto.
+  }
   destruct ef; simpl.
-(* EF_external *)
+- (* EF_external *)
   eapply do_external_function_sound; eauto.
-(* EF_builtin *)
-  eapply do_external_function_sound; eauto.
-(* EF_runtime *)
-  eapply do_external_function_sound; eauto.
-(* EF_vload *)
+- (* EF_builtin *)
+  eapply BF_EX; eauto.
+- (* EF_runtime *)
+  eapply BF_EX; eauto.
+- (* EF_vload *)
   unfold do_ef_volatile_load. destruct vargs... destruct v... destruct vargs...
   mydestr. destruct p as [[w'' t''] v]; mydestr.
   exploit do_volatile_load_sound; eauto. intuition. econstructor; eauto.
-  auto.
-(* EF_vstore *)
+- (* EF_vstore *)
   unfold do_ef_volatile_store. destruct vargs... destruct v... destruct vargs... destruct vargs...
   mydestr. destruct p as [[w'' t''] m'']. mydestr.
   exploit do_volatile_store_sound; eauto. intuition. econstructor; eauto.
-  auto.
-(* EF_malloc *)
+- (* EF_malloc *)
   unfold do_ef_malloc. destruct vargs... destruct vargs... mydestr.
   destruct (Mem.alloc m (- size_chunk Mptr) (Ptrofs.unsigned i)) as [m1 b] eqn:?. mydestr.
   split. apply SIZE in Heqo. subst v. econstructor; eauto. constructor.
-(* EF_free *)
-  unfold do_ef_free. destruct vargs... destruct v... destruct vargs...
-  mydestr. split. apply SIZE in Heqo0. econstructor; eauto. congruence. lia. constructor.
-(* EF_memcpy *)
+- (* EF_free *)
+  unfold do_ef_free. destruct vargs... destruct v... 
++ destruct vargs... mydestr; InvBooleans; subst i.
+  replace (Vint Int.zero) with Vnullptr. split; constructor.
+  apply negb_true_iff in H0. unfold Vnullptr; rewrite H0; auto.
++ destruct vargs... mydestr; InvBooleans; subst i.
+  replace (Vlong Int64.zero) with Vnullptr. split; constructor.
+  unfold Vnullptr; rewrite H0; auto.
++ destruct vargs... mydestr.
+  split. apply SIZE in Heqo0. econstructor; eauto. congruence. lia.
+  constructor.
+- (* EF_memcpy *)
   unfold do_ef_memcpy. destruct vargs... destruct v... destruct vargs...
   destruct v... destruct vargs... mydestr. 
   apply Decidable_sound in Heqb1. red in Heqb1.
   split. econstructor; eauto; tauto. constructor.
-(* EF_annot *)
+- (* EF_annot *)
   unfold do_ef_annot. mydestr.
   split. constructor. apply list_eventval_of_val_sound; auto.
   econstructor. constructor; eauto. constructor.
-(* EF_annot_val *)
+- (* EF_annot_val *)
   unfold do_ef_annot_val. destruct vargs... destruct vargs... mydestr.
   split. constructor. apply eventval_of_val_sound; auto.
   econstructor. constructor; eauto. constructor.
-(* EF_inline_asm *)
+- (* EF_inline_asm *)
   eapply do_inline_assembly_sound; eauto.
-(* EF_debug *)
+- (* EF_debug *)
   unfold do_ef_debug. mydestr. split; constructor.
 Qed.
 
@@ -609,42 +605,52 @@ Lemma do_ef_external_complete:
   external_call ef ge vargs m t vres m' -> possible_trace w t w' ->
   do_external ef w vargs m = Some(w', t, vres, m').
 Proof.
+  intros.
   assert (SIZE: forall n, do_alloc_size (Vptrofs n) = Some n).
   { unfold Vptrofs, do_alloc_size; intros; destruct Archi.ptr64 eqn:SF. 
     rewrite Ptrofs.of_int64_to_int64; auto.
     rewrite Ptrofs.of_int_to_int; auto. }
-  intros. destruct ef; simpl in *.
-(* EF_external *)
+  assert (BF_EX: forall name sg,
+    builtin_or_external_sem name sg ge vargs m t vres m' ->
+    do_builtin_or_external name sg w vargs m = Some (w', t, vres, m')).
+  { unfold do_builtin_or_external, builtin_or_external_sem; intros.
+    destruct (lookup_builtin_function name sg) as [bf|].
+  - inv H1. inv H0. rewrite H2. auto.
+  - eapply do_external_function_complete; eauto.
+  }
+  destruct ef; simpl in *.
+- (* EF_external *)
   eapply do_external_function_complete; eauto.
-(* EF_builtin *)
-  eapply do_external_function_complete; eauto.
-(* EF_runtime *)
-  eapply do_external_function_complete; eauto.
-(* EF_vload *)
+- (* EF_builtin *)
+  eapply BF_EX; eauto.
+- (* EF_runtime *)
+  eapply BF_EX; eauto.
+- (* EF_vload *)
   inv H; unfold do_ef_volatile_load.
   exploit do_volatile_load_complete; eauto. intros EQ; rewrite EQ; auto.
-(* EF_vstore *)
+- (* EF_vstore *)
   inv H; unfold do_ef_volatile_store.
   exploit do_volatile_store_complete; eauto. intros EQ; rewrite EQ; auto.
-(* EF_malloc *)
+- (* EF_malloc *)
   inv H; unfold do_ef_malloc.
   inv H0. erewrite SIZE by eauto. rewrite H1, H2. auto.
-(* EF_free *)
+- (* EF_free *)
   inv H; unfold do_ef_free.
-  inv H0. rewrite H1. erewrite SIZE by eauto. rewrite zlt_true. rewrite H3. auto. lia.
-(* EF_memcpy *)
++ inv H0. rewrite H1. erewrite SIZE by eauto. rewrite zlt_true. rewrite H3. auto. lia.
++ inv H0. unfold Vnullptr; destruct Archi.ptr64; auto.
+- (* EF_memcpy *)
   inv H; unfold do_ef_memcpy.
   inv H0. rewrite Decidable_complete. rewrite H7; rewrite H8; auto.
   red. tauto.
-(* EF_annot *)
+- (* EF_annot *)
   inv H; unfold do_ef_annot. inv H0. inv H6. inv H4.
   rewrite (list_eventval_of_val_complete _ _ _ H1). auto.
-(* EF_annot_val *)
+- (* EF_annot_val *)
   inv H; unfold do_ef_annot_val. inv H0. inv H6. inv H4.
   rewrite (eventval_of_val_complete _ _ _ H1). auto.
-(* EF_inline_asm *)
+- (* EF_inline_asm *)
   eapply do_inline_assembly_complete; eauto.
-(* EF_debug *)
+- (* EF_debug *)
   inv H. inv H0. reflexivity.
 Qed.
 
@@ -1133,8 +1139,8 @@ Proof.
   induction 1; intros; constructor; eauto.
 Qed.
 
-Hint Constructors context contextlist : core.
-Hint Resolve context_compose contextlist_compose : core.
+Local Hint Constructors context contextlist : core.
+Local Hint Resolve context_compose contextlist_compose : core.
 
 Definition reduction_ok (k: kind) (a: expr) (m: mem) (rd: reduction) : Prop :=
   match k, rd with
@@ -1700,8 +1706,9 @@ Proof.
   change (In (f (C0, rd)) (map f res2)). apply in_map; auto.
 Qed.
 
-Hint Resolve reducts_incl_val reducts_incl_loc reducts_incl_listval
-             reducts_incl_incontext reducts_incl_incontext2_left reducts_incl_incontext2_right : core.
+Local Hint Resolve reducts_incl_val reducts_incl_loc reducts_incl_listval
+                   reducts_incl_incontext reducts_incl_incontext2_left
+                   reducts_incl_incontext2_right : core.
 
 Lemma step_expr_context:
   forall from to C, context from to C ->
@@ -2086,7 +2093,7 @@ Ltac myinv :=
   | _ => idtac
   end.
 
-Hint Extern 3 => exact I : core.
+Local Hint Extern 3 => exact I : core.
 
 Theorem do_step_sound:
   forall w S rule t S',

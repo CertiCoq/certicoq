@@ -6,10 +6,11 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  under the terms of the GNU General Public License as published by  *)
-(*  the Free Software Foundation, either version 2 of the License, or  *)
-(*  (at your option) any later version.  This file is also distributed *)
-(*  under the terms of the INRIA Non-Commercial License Agreement.     *)
+(*  under the terms of the GNU Lesser General Public License as        *)
+(*  published by the Free Software Foundation, either version 2.1 of   *)
+(*  the License, or  (at your option) any later version.               *)
+(*  This file is also distributed under the terms of the               *)
+(*  INRIA Non-Commercial License Agreement.                            *)
 (*                                                                     *)
 (* *********************************************************************)
 
@@ -17,8 +18,7 @@
 
 Require Import Axioms Coqlib Maps Errors.
 Require Import AST Linking.
-Require x86_64.Archi.
-Require Import Coq.micromega.Lia.
+Require Archi.
 
 (** * Syntax of types *)
 
@@ -92,6 +92,7 @@ Proof.
   assert (forall (x y: attr), {x=y} + {x<>y}).
   { decide equality. decide equality. apply N.eq_dec. apply bool_dec. }
   generalize ident_eq zeq bool_dec ident_eq intsize_eq; intros.
+  decide equality.
   decide equality.
   decide equality.
   decide equality.
@@ -350,12 +351,16 @@ Fixpoint sizeof (env: composite_env) (t: type) : Z :=
 Lemma sizeof_pos:
   forall env t, sizeof env t >= 0.
 Proof.
-  induction t; simpl; try lia.
-  destruct i; lia.
-  destruct f; lia.
-  destruct Archi.ptr64; lia.
-  destruct (env!i). apply co_sizeof_pos. lia.
-  destruct (env!i). apply co_sizeof_pos. lia.
+  induction t; simpl.
+- lia.
+- destruct i; lia.
+- lia.
+- destruct f; lia.
+- destruct Archi.ptr64; lia.
+- change 0 with (0 * Z.max 0 z) at 2. apply Zmult_ge_compat_r. auto. lia.
+- lia.
+- destruct (env!i). apply co_sizeof_pos. lia.
+- destruct (env!i). apply co_sizeof_pos. lia.
 Qed.
 
 (** The size of a type is an integral multiple of its alignment,
@@ -445,7 +450,7 @@ Qed.
 Lemma sizeof_union_pos:
   forall env m, 0 <= sizeof_union env m.
 Proof.
-  induction m as [|[id t]]; simpl; xomega.
+  induction m as [|[id t]]; simpl; extlia.
 Qed.
 
 (** ** Byte offset for a field of a structure *)
@@ -732,8 +737,21 @@ Definition typ_of_type (t: type) : AST.typ :=
   | Tpointer _ _ | Tarray _ _ _ | Tfunction _ _ _ | Tstruct _ _ | Tunion _ _ => AST.Tptr
   end.
 
-Definition opttyp_of_type (t: type) : option AST.typ :=
-  if type_eq t Tvoid then None else Some (typ_of_type t).
+Definition rettype_of_type (t: type) : AST.rettype :=
+  match t with
+  | Tvoid => AST.Tvoid
+  | Tint I32 _ _ => AST.Tint
+  | Tint I8 Signed _ => AST.Tint8signed
+  | Tint I8 Unsigned _ => AST.Tint8unsigned
+  | Tint I16 Signed _ => AST.Tint16signed
+  | Tint I16 Unsigned _ => AST.Tint16unsigned
+  | Tint IBool _ _ => AST.Tint8unsigned
+  | Tlong _ _ => AST.Tlong
+  | Tfloat F32 _ => AST.Tsingle
+  | Tfloat F64 _ => AST.Tfloat
+  | Tpointer _ _ => AST.Tptr
+  | Tarray _ _ _ | Tfunction _ _ _ | Tstruct _ _ | Tunion _ _ => AST.Tvoid
+  end.
 
 Fixpoint typlist_of_typelist (tl: typelist) : list AST.typ :=
   match tl with
@@ -742,7 +760,7 @@ Fixpoint typlist_of_typelist (tl: typelist) : list AST.typ :=
   end.
 
 Definition signature_of_type (args: typelist) (res: type) (cc: calling_convention): signature :=
-  mksignature (typlist_of_typelist args) (opttyp_of_type res) cc.
+  mksignature (typlist_of_typelist args) (rettype_of_type res) cc.
 
 (** * Construction of the composite environment *)
 
@@ -1076,8 +1094,8 @@ Remark rank_type_members:
   forall ce id t m, In (id, t) m -> (rank_type ce t <= rank_members ce m)%nat.
 Proof.
   induction m; simpl; intros; intuition auto.
-  subst a. xomega.
-  xomega.
+  subst a. extlia.
+  extlia.
 Qed.
 
 Lemma rank_struct_member:

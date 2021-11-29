@@ -6,10 +6,11 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  under the terms of the GNU General Public License as published by  *)
-(*  the Free Software Foundation, either version 2 of the License, or  *)
-(*  (at your option) any later version.  This file is also distributed *)
-(*  under the terms of the INRIA Non-Commercial License Agreement.     *)
+(*  under the terms of the GNU Lesser General Public License as        *)
+(*  published by the Free Software Foundation, either version 2.1 of   *)
+(*  the License, or  (at your option) any later version.               *)
+(*  This file is also distributed under the terms of the               *)
+(*  INRIA Non-Commercial License Agreement.                            *)
 (*                                                                     *)
 (* *********************************************************************)
 
@@ -32,11 +33,9 @@ Require Import Ctypes.
 Require Import Cop.
 Require Import Csyntax.
 Require Import Csem.
-Require Import Coq.micromega.Lia.
 
 Section STRATEGY.
 
-  
 Variable ge: genv.
 
 (** * Definition of the strategy *)
@@ -224,7 +223,7 @@ Proof.
   induction 1; constructor; auto.
 Qed.
 
-Hint Resolve leftcontext_context : core.
+Local Hint Resolve leftcontext_context : core.
 
 (** Strategy for reducing expressions. We reduce the leftmost innermost
   non-simple subexpression, evaluating its arguments (which are necessarily
@@ -400,8 +399,8 @@ Proof.
   induction 1; intros; constructor; eauto.
 Qed.
 
-Hint Constructors context contextlist : core.
-Hint Resolve context_compose contextlist_compose : core.
+Local Hint Constructors context contextlist : core.
+Local Hint Resolve context_compose contextlist_compose : core.
 
 (** * Safe executions. *)
 
@@ -977,7 +976,7 @@ Proof.
   apply extensionality; intros. f_equal. f_equal. apply exprlist_app_assoc.
 Qed.
 
-Hint Resolve contextlist'_head contextlist'_tail : core.
+Local Hint Resolve contextlist'_head contextlist'_tail : core.
 
 Lemma eval_simple_list_steps:
   forall rl vl, eval_simple_list' rl vl ->
@@ -1051,7 +1050,7 @@ Scheme expr_ind2 := Induction for expr Sort Prop
   with exprlist_ind2 := Induction for exprlist Sort Prop.
 Combined Scheme expr_expr_list_ind from expr_ind2, exprlist_ind2.
 
-Hint Constructors leftcontext leftcontextlist : core.
+Local Hint Constructors leftcontext leftcontextlist : core.
 
 Lemma decompose_expr:
   (forall a from C,
@@ -1555,13 +1554,13 @@ Proof.
   exploit external_call_trace_length; eauto. destruct t1; simpl; intros.
   exploit external_call_receptive; eauto. intros [vres2 [m2 EC2]].
   econstructor; econstructor. left; eapply step_builtin; eauto.
-  omegaContradiction.
+  extlia.
   (* external calls *)
   inv H1.
   exploit external_call_trace_length; eauto. destruct t1; simpl; intros.
   exploit external_call_receptive; eauto. intros [vres2 [m2 EC2]].
   exists (Returnstate vres2 k m2); exists E0; right; econstructor; eauto.
-  omegaContradiction.
+  extlia.
 (* well-behaved traces *)
   red; intros. inv H; inv H0; simpl; auto.
   (* valof volatile *)
@@ -1584,10 +1583,10 @@ Proof.
   exploit deref_loc_trace; eauto. destruct t; auto. destruct t; tauto.
   (* builtins *)
   exploit external_call_trace_length; eauto.
-  destruct t; simpl; auto. destruct t; simpl; auto. intros; omegaContradiction.
+  destruct t; simpl; auto. destruct t; simpl; auto. intros; extlia.
   (* external calls *)
   exploit external_call_trace_length; eauto.
-  destruct t; simpl; auto. destruct t; simpl; auto. intros; omegaContradiction.
+  destruct t; simpl; auto. destruct t; simpl; auto. intros; extlia.
 Qed.
 
 (** The main simulation result. *)

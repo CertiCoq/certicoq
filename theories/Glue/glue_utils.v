@@ -178,7 +178,7 @@ End Clight_Helpers.
 Record ty_info : Type :=
   Build_ty_info
     { ty_name      : kername
-    ; ty_body      : Ast.one_inductive_body
+    ; ty_body      : Template.Ast.Env.one_inductive_body
     ; ty_inductive : inductive
     ; ty_params    : list string
     }.
@@ -298,33 +298,33 @@ Section Ctor_Info.
   Variant ctor_box : Type := unboxed | boxed.
 
   (* Can be used [if unbox_check c then ... else ...] *)
-  Definition unbox_check (ctor : BasicAst.ident * Ast.term * nat) : ctor_box :=
-    let '(_, _, arity) := ctor in
-    match arity with
+  Definition unbox_check (ctor : Ast.Env.constructor_body) : ctor_box :=
+    match ctor.(Ast.Env.cstr_arity) with
     | O => unboxed
     | S _ => boxed
     end.
 
   (* A function to calculate the ordinals of a type's constructors. *)
   Definition process_ctors
-             (ctors : list (BasicAst.ident * Ast.term * nat)) : list ctor_info :=
+             (ctors : list Ast.Env.constructor_body) : list ctor_info :=
     let fix aux
             (unboxed_count : nat)
             (boxed_count : nat)
-            (ctors : list (BasicAst.ident * Ast.term * nat)) : list ctor_info :=
+            (ctors : list Ast.Env.constructor_body) : list ctor_info :=
       match ctors with
       | nil => nil
-      | (name, t, ar) :: ctors' =>
+      | ctor :: ctors' =>
+        let ar := ctor.(Ast.Env.cstr_arity) in
         let '(ord, rest) :=
             match ar with
             | O   => (unboxed_count, aux (S unboxed_count) boxed_count ctors')
             | S _ => (boxed_count, aux unboxed_count (S boxed_count) ctors')
             end
         in
-          {| ctor_name := name
+          {| ctor_name := ctor.(Ast.Env.cstr_name)
            ; ctor_arity := ar
            ; ctor_ordinal := ord
-           ; ctor_type := t
+           ; ctor_type := ctor.(Ast.Env.cstr_type)
            |} :: rest
       end
     in aux O O ctors.

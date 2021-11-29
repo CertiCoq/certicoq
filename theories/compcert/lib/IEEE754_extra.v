@@ -7,22 +7,22 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  under the terms of the GNU General Public License as published by  *)
-(*  the Free Software Foundation, either version 2 of the License, or  *)
-(*  (at your option) any later version.  This file is also distributed *)
-(*  under the terms of the INRIA Non-Commercial License Agreement.     *)
+(*  under the terms of the GNU Lesser General Public License as        *)
+(*  published by the Free Software Foundation, either version 2.1 of   *)
+(*  the License, or  (at your option) any later version.               *)
+(*  This file is also distributed under the terms of the               *)
+(*  INRIA Non-Commercial License Agreement.                            *)
 (*                                                                     *)
 (* *********************************************************************)
 
 (** Additional operations and proofs about IEEE-754 binary
     floating-point numbers, on top of the Flocq library. *)
 
+From Flocq Require Import Core Digits Operations Round Bracket Sterbenz
+                          Binary Round_odd.
 Require Import Psatz.
 Require Import Bool.
 Require Import Eqdep_dec.
-From Flocq
-Require Import Core Digits Operations Round Bracket Sterbenz Binary Round_odd.
-Require Import Coq.micromega.Lia.
 
 Local Open Scope Z_scope.
 
@@ -546,7 +546,7 @@ Lemma Zrnd_odd_int:
   Zrnd_odd (IZR n * bpow radix2 (-p)) * 2^p =
   int_round_odd n p.
 Proof.
-  intros.
+  clear. intros.
   assert (0 < 2^p) by (apply (Zpower_gt_0 radix2); lia).
   assert (n = (n / 2^p) * 2^p + n mod 2^p) by (rewrite Z.mul_comm; apply Z.div_mod; lia).
   assert (0 <= n mod 2^p < 2^p) by (apply Z_mod_lt; lia).
@@ -587,7 +587,7 @@ Lemma int_round_odd_le:
   forall p x y, 0 <= p ->
   x <= y -> int_round_odd x p <= int_round_odd y p.
 Proof.
-  intros.
+  clear. intros.
   assert (Zrnd_odd (IZR x * bpow radix2 (-p)) <= Zrnd_odd (IZR y * bpow radix2 (-p))).
   { apply Zrnd_le. apply valid_rnd_odd. apply Rmult_le_compat_r. apply bpow_ge_0.
     apply IZR_le; auto. }
@@ -599,7 +599,7 @@ Lemma int_round_odd_exact:
   forall p x, 0 <= p ->
   (2^p | x) -> int_round_odd x p = x.
 Proof.
-  intros. unfold int_round_odd. apply Znumtheory.Zdivide_mod in H0.
+  clear. intros. unfold int_round_odd. apply Znumtheory.Zdivide_mod in H0.
   rewrite H0. simpl. rewrite Z.mul_comm. symmetry. apply Z_div_exact_2.
   apply Z.lt_gt. apply (Zpower_gt_0 radix2). auto. auto.
 Qed.
@@ -645,7 +645,7 @@ Lemma int_round_odd_shifts:
   int_round_odd x p =
   Z.shiftl (if Z.eqb (x mod 2^p) 0 then Z.shiftr x p else Z.lor (Z.shiftr x p) 1) p.
 Proof.
-  intros.
+  clear. intros.
   unfold int_round_odd. rewrite Z.shiftl_mul_pow2 by auto. f_equal.
   rewrite Z.shiftr_div_pow2 by auto.
   destruct (x mod 2^p =? 0) eqn:E. auto.
@@ -663,7 +663,7 @@ Lemma int_round_odd_bits:
   (forall i, p < i -> Z.testbit y i = Z.testbit x i) ->
   int_round_odd x p = y.
 Proof.
-  intros until p; intros PPOS BELOW AT ABOVE.
+  clear. intros until p; intros PPOS BELOW AT ABOVE.
   rewrite int_round_odd_shifts by auto.
   apply Z.bits_inj'. intros.
   generalize (Zcompare_spec n p); intros SPEC; inversion SPEC.

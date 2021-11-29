@@ -1184,13 +1184,13 @@ Definition global_defs (e : exp)
     :: *)
   (gcIdent,
    Gfun (External (EF_external "gc"
-                  (mksignature (val_typ :: nil) None cc_default))
+                  (mksignature (val_typ :: nil) AST.Tvoid cc_default))
       (Tcons (Tpointer val noattr) (Tcons threadInf Tnil))
       Tvoid
       cc_default)) ::
   (isptrIdent,
    Gfun (External (EF_external "is_ptr"
-                             (mksignature (val_typ :: nil) None cc_default))
+                             (mksignature (val_typ :: nil) AST.Tvoid cc_default))
       (Tcons val Tnil) (Tint IBool Unsigned noattr)
       cc_default)) ::
   nil.
@@ -1553,7 +1553,7 @@ Definition exportIdent := 21%positive.
 Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
   (make_tinfoIdent,
    Gfun (External (EF_external "make_tinfo"
-                               (mksignature (nil) (Some val_typ) cc_default))
+                               (mksignature (nil) (Tret val_typ) cc_default))
                   Tnil
                   threadInf
                   cc_default)).
@@ -1561,7 +1561,7 @@ Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
 Definition export_rec : positive * globdef Clight.fundef type :=
   (exportIdent,
    Gfun (External (EF_external "export"
-                               (mksignature (cons val_typ nil) (Some val_typ) cc_default))
+                               (mksignature (cons val_typ nil) (Tret val_typ) cc_default))
                   (Tcons threadInf Tnil)
                   valPtr
                   cc_default)).

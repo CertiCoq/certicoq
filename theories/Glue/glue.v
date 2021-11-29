@@ -325,12 +325,12 @@ Section Externs.
        (_printf,
         Gfun (External (EF_external "printf"
                           (mksignature (AST.Tint :: nil)
-                                       (Some AST.Tint)
+                                       (Tret AST.Tint)
                                        cc_default))
                         (Tcons (tptr tschar) Tnil) tint cc_default)) ::
        (_is_ptr,
          Gfun (External (EF_external "is_ptr"
-                          (mksignature (val_typ :: nil) None cc_default))
+                          (mksignature (val_typ :: nil) AST.Tvoid cc_default))
                         (Tcons val Tnil)
                         (Tint IBool Unsigned noattr) cc_default)) ::
        (_guo, def_guo) ::
@@ -343,32 +343,32 @@ End Externs.
 Section L1Types.
 
   Fixpoint get_max_ctor_arity
-          (ctors : list (BasicAst.ident * Ast.term * nat)) : nat :=
+          (ctors : list (Ast.Env.constructor_body)) : nat :=
     match ctors with
     | nil => 0
-    | (_, _, arity) :: ctors' =>
-        max arity (get_max_ctor_arity ctors')
+    | ctor :: ctors' =>
+        max ctor.(Ast.Env.cstr_arity) (get_max_ctor_arity ctors')
     end.
 
   (* takes an inductive type declaration and returns
      the qualifying prefix for the name and the type definition *)
   Definition extract_mut_ind
             (name : kername)
-            (g : Ast.global_decl)
-            : option (modpath * Ast.mutual_inductive_body) :=
+            (g : Ast.Env.global_decl)
+            : option (modpath * Ast.Env.mutual_inductive_body) :=
     match g with
-    | Ast.InductiveDecl body => Some (fst name, body)
+    | Ast.Env.InductiveDecl body => Some (fst name, body)
     | _ => None
     end.
 
-  Definition context_names (ctx : Ast.context) : list string :=
-    map (fun d => match binder_name (Ast.decl_name d) with
+  Definition context_names (ctx : Ast.Env.context) : list string :=
+    map (fun d => match binder_name (decl_name d) with
                   | nNamed x => x
                   | _ => ""%string (* TODO error handling *)
                   end) ctx.
 
   Fixpoint get_single_types
-           (gs : Ast.global_env)
+           (gs : Ast.Env.global_env)
            : list ty_info :=
     match gs with
     | nil => nil
@@ -382,12 +382,12 @@ Section L1Types.
              Type names in one_inductive_body are NOT qualified,
              which makes them globally nonunique. *)
         let tys := map (fun '(i, o) =>
-                          {| ty_name := (qual_pre, Ast.ind_name o)%string
+                          {| ty_name := (qual_pre, Ast.Env.ind_name o)%string
                            ; ty_body := o
                            ; ty_inductive :=
                                {| inductive_mind := name ; inductive_ind := i |}
-                           ; ty_params := context_names (rev (Ast.ind_params b))
-                           |}) (enumerate_nat (Ast.ind_bodies b)) in
+                           ; ty_params := context_names (rev (Ast.Env.ind_params b))
+                           |}) (enumerate_nat (Ast.Env.ind_bodies b)) in
           tys ++ get_single_types gs'
       | None => get_single_types gs'
       end
@@ -395,7 +395,7 @@ Section L1Types.
 
   (* Generates the initial ind_L1_env *)
   Definition propagate_types
-             (gs : Ast.global_env)
+             (gs : Ast.Env.global_env)
              : glueM (list (ind_L1_tag * ty_info)) :=
     let singles := get_single_types gs in
     let res := enumerate_pos singles in
@@ -412,7 +412,7 @@ Section L1Types.
               MetaCoq.Template.Universes.Universe.is_prop u
           | _ => false
         end
-    in check_last (Ast.ind_type (ty_body info)).
+    in check_last (Ast.Env.ind_type (ty_body info)).
 
   (* Takes in a list of types and removes the ones that are of sort [Prop].
      [Set] and [Type] are fine. CertiCoq erases [Prop]s early on,
@@ -530,8 +530,8 @@ Section Printers.
                  ; ty_body := b
                  ; ty_inductive := ind
                  ; ty_params := params |}) := info in
-    let basename := Ast.ind_name b in
-    let ctors := Ast.ind_ctors b in
+    let basename := Ast.Env.ind_name b in
+    let ctors := Ast.Env.ind_ctors b in
     pnameM <- get_print_env itag ;;
     gtnameM <- get_get_tag_env itag ;;
     cnnameM <- get_ctor_names_env itag ;;
@@ -549,7 +549,7 @@ Section Printers.
         (* We need the maximum arity of all the ctors because
           we will declare an array for the arguments of the constructor
           of the resulting value from the eliminator *)
-        let max_ctor_arity : nat := get_max_ctor_arity (Ast.ind_ctors b) in
+        let max_ctor_arity : nat := get_max_ctor_arity (Ast.Env.ind_ctors b) in
 
         (* if none of the constructors take any args *)
         let won't_take_args : bool := Nat.eqb max_ctor_arity 0 in
@@ -690,11 +690,13 @@ Section Printers.
 
         (* Generates cases for the switch statement in the print function *)
         let fix switch_cases
-                (ctors : list (ctor_L1_index * (BasicAst.ident * Ast.term * nat)))
+                (ctors : list (ctor_L1_index * Ast.Env.constructor_body))
                 : glueM labeled_statements :=
           match ctors with
           | nil => ret LSnil
-          | (ctag, (_, ty, arity)) :: ctors' =>
+          | (ctag, ctor) :: ctors' =>
+            let ty := ctor.(Ast.Env.cstr_type) in
+            let arity := ctor.(Ast.Env.cstr_arity) in
             let (args, rt) := dissect_types params (dInd ind :: nil) ty in
             calls <- rec_print_calls (enumerate_nat args) ;;
             rest <- switch_cases ctors' ;;
@@ -783,13 +785,14 @@ Section CtorArrays.
     l ++ List.repeat (Init_int8 Int.zero) (n - (length l)).
 
   Fixpoint normalized_names_array
-           (ctors : list (BasicAst.ident * Ast.term * nat))
+           (ctors : list Ast.Env.constructor_body)
            (n : nat) : nat * list init_data :=
     match ctors with
     | nil => (n, Init_space 0 :: nil)
              (* This may cause a warning in some C compilers.
                 This is a hacky solution for that for now. *)
-    | (s, _, _) :: ctors' =>
+    | ctor :: ctors' =>
+        let s := ctor.(Ast.Env.cstr_name) in
         let (max_len, init_l) :=
           normalized_names_array ctors' (max n (String.length s + 1)) in
         let i := pad_char_init (string_as_array s) max_len in
@@ -799,7 +802,7 @@ Section CtorArrays.
   Definition make_name_array
              (tag : ind_L1_tag)
              (kn : kername)
-             (ctors : list (BasicAst.ident * Ast.term * nat))
+             (ctors : list Ast.Env.constructor_body)
              : glueM def :=
     let (max_len, init_l) := normalized_names_array ctors 1 in
     let ty := tarray (tarray tschar (Z.of_nat max_len))
@@ -815,7 +818,7 @@ Section CtorArrays.
     | nil => ret nil
     | (tag, {| ty_name := kn; ty_body := b |}) :: tys' =>
         rest <- make_name_arrays tys' ;;
-        def <- make_name_array tag kn (Ast.ind_ctors b) ;;
+        def <- make_name_array tag kn (Ast.Env.ind_ctors b) ;;
         ret (def :: rest)
     end.
 
@@ -840,12 +843,14 @@ Section ArgsStructs.
   Fixpoint args_structs_from_ctors
           (itag : ind_L1_tag)
           (qp : qualifying_prefix)
-          (ctors : list (ctor_L1_index * (BasicAst.ident * Ast.term * nat)))
+          (ctors : list (ctor_L1_index * Ast.Env.constructor_body))
           : glueM (list (composite_definition * def)) :=
     match ctors with
     | nil => ret nil
     | (ctag, ctor) :: ctors' =>
-        let '(name, ty, arity) := ctor in
+        let name := ctor.(Ast.Env.cstr_name) in
+        let ty := ctor.(Ast.Env.cstr_type) in
+        let arity := ctor.(Ast.Env.cstr_arity) in
         let sn := sanitize_qualified (qp, name) in
         _struct <- gensym (sn ++ "_args") ;;
         mems <- members_from_ctor qp name 0 arity ;;
@@ -883,7 +888,7 @@ Section ArgsStructs.
     | nil => ret nil
     | (itag, {| ty_body := ty ; ty_name := kn |}) :: tys' =>
         let qp := find_qualifying_prefix kn in
-        s' <- args_structs_from_ctors itag qp (enumerate_pos (Ast.ind_ctors ty)) ;;
+        s' <- args_structs_from_ctors itag qp (enumerate_pos (Ast.Env.ind_ctors ty)) ;;
         rest <- args_structs_from_types tys' ;;
         ret (app s' rest)
     end.
@@ -894,7 +899,7 @@ Section CtorEnumTag.
   Variable toolbox : toolbox_info.
 
   Fixpoint match_ordinals_with_tag
-           (ctors : list (BasicAst.ident * Ast.TemplateTerm.term * nat))
+           (ctors : list Ast.Env.constructor_body)
            (boxed unboxed total : nat)
            : list (nat * nat) * list (nat * nat) :=
     match ctors with
@@ -931,7 +936,7 @@ Section CtorEnumTag.
         let (_is_ptr, ty_is_ptr) := is_ptr_info toolbox in
         let (_guo, ty_guo) := get_unboxed_ordinal_info toolbox in
         let (_gbo, ty_gbo) := get_boxed_ordinal_info toolbox in
-        let (boxed, unboxed) := match_ordinals_with_tag (Ast.ind_ctors one) 0 0 0 in
+        let (boxed, unboxed) := match_ordinals_with_tag (Ast.Env.ind_ctors one) 0 0 0 in
         let (vars, body) := match boxed, unboxed with
           | nil, nil => (* if there are no constructors, just return 0 *)
              (nil, Sreturn (Some (Econst_int (Int.repr 0) tuint)))
@@ -1091,7 +1096,7 @@ Section CConstructors.
           | Some info =>
               s' <- constructors_from_ctors
                       (ty_name info)
-                      (process_ctors (Ast.ind_ctors ty)) ;;
+                      (process_ctors (Ast.Env.ind_ctors ty)) ;;
               rest <- constructors_for_tys tys' ;;
               ret (app s' rest)
           end
@@ -1241,7 +1246,7 @@ End FunctionCalls.
 
 (* Generates the header and the source programs *)
 Definition make_glue_program
-           (gs : Ast.global_env)
+           (gs : Ast.Env.global_env)
            : glueM (option Clight.program * option Clight.program) :=
   '(comp_tinfo, externs, toolbox) <- make_externs ;;
   singles <- (propagate_types >=> filter_prop_types) gs ;;
@@ -1269,7 +1274,7 @@ Definition make_glue_program
 (* The entry point for glue code generation *)
 Definition generate_glue
            (opts : Options)
-           (globs : Ast.global_env) (* an L1 program *)
+           (globs : Ast.Env.global_env) (* an L1 program *)
            : error (name_env * Clight.program * Clight.program * list string) :=
   let init : gstate_data :=
       {| gstate_gensym := 2%positive

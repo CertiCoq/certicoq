@@ -6,10 +6,11 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  under the terms of the GNU General Public License as published by  *)
-(*  the Free Software Foundation, either version 2 of the License, or  *)
-(*  (at your option) any later version.  This file is also distributed *)
-(*  under the terms of the INRIA Non-Commercial License Agreement.     *)
+(*  under the terms of the GNU Lesser General Public License as        *)
+(*  published by the Free Software Foundation, either version 2.1 of   *)
+(*  the License, or  (at your option) any later version.               *)
+(*  This file is also distributed under the terms of the               *)
+(*  INRIA Non-Commercial License Agreement.                            *)
 (*                                                                     *)
 (* *********************************************************************)
 
@@ -19,7 +20,6 @@ Require Import Recdef Coqlib Maps Errors.
 
 Local Open Scope nat_scope.
 Local Open Scope error_monad_scope.
-Require Import Coq.micromega.Lia.
 
 (** This module provides a solver for sets of subtyping constraints of the
   following kinds: [base-type <: T(x)] or [T(x) <: base-type] or [T(x) <: T(y)].

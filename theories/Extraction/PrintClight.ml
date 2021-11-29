@@ -6,10 +6,11 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  under the terms of the GNU General Public License as published by  *)
-(*  the Free Software Foundation, either version 2 of the License, or  *)
-(*  (at your option) any later version.  This file is also distributed *)
-(*  under the terms of the INRIA Non-Commercial License Agreement.     *)
+(*  under the terms of the GNU Lesser General Public License as        *)
+(*  published by the Free Software Foundation, either version 2.1 of   *)
+(*  the License, or  (at your option) any later version.               *)
+(*  This file is also distributed under the terms of the               *)
+(*  INRIA Non-Commercial License Agreement.                            *)
 (*                                                                     *)
 (* *********************************************************************)
 
@@ -17,16 +18,24 @@
 
 open Format
 open Camlcoq
-open AST
 open PrintAST
-open !Ctypes
+open Ctypes
 open Cop
 open PrintCsyntax
-open !Clight
+open Clight
 
-(* Naming temporaries *)
+(* Naming temporaries.
+   Some temporaries are obtained by lifting variables in SimplLocals.
+   For these we use a meaningful name "$var", as found in the table of
+   atoms.  Other temporaries are generated during SimplExpr, and are
+   not in the table of atoms.  We print them as "$NNN" (a unique
+   integer). *)
 
-let temp_name = extern_atom
+let temp_name (id: AST.ident) =
+  try
+    "$" ^ Hashtbl.find string_of_atom id
+  with Not_found ->
+    Printf.sprintf "$%d" (P.to_int id)
 
 (* Declarator (identifier + type) -- reuse from PrintCsyntax *)
 
@@ -80,9 +89,9 @@ let rec expr p (prec, e) =
   | Econst_int(n, _) ->
       fprintf p "%ld" (camlint_of_coqint n)
   | Econst_float(f, _) ->
-      fprintf p "%.15F" (camlfloat_of_coqfloat f)
+      fprintf p "%.18g" (camlfloat_of_coqfloat f)
   | Econst_single(f, _) ->
-      fprintf p "%.15Ff" (camlfloat_of_coqfloat32 f)
+      fprintf p "%.18gf" (camlfloat_of_coqfloat32 f)
   | Econst_long(n, Tlong(Unsigned, _)) ->
       fprintf p "%LuLLU" (camlint64_of_coqint n)
   | Econst_long(n, _) ->
@@ -126,13 +135,13 @@ let rec print_stmt p s =
   | Sset(id, e2) ->
       fprintf p "@[<hv 2>%s =@ %a;@]" (temp_name id) print_expr e2
   | Scall(None, e1, el) ->
-      fprintf p "@[<hv 2>(%a@,)(@[<hov 0>%a@]);@]"
-                print_expr e1
+      fprintf p "@[<hv 2>%a@,(@[<hov 0>%a@]);@]"
+                expr (15, e1)
                 print_expr_list (true, el)
   | Scall(Some id, e1, el) ->
-      fprintf p "@[<hv 2>%s =@ (%a@,)(@[<hov 0>%a@]);@]"
+      fprintf p "@[<hv 2>%s =@ %a@,(@[<hov 0>%a@]);@]"
                 (temp_name id)
-                print_expr e1
+                expr (15, e1)
                 print_expr_list (true, el)
   | Sbuiltin(None, ef, tyargs, el) ->
       fprintf p "@[<hv 2>builtin %s@,(@[<hov 0>%a@]);@]"
@@ -207,21 +216,23 @@ and print_case_label p = function
 and print_stmt_for p s =
   match s with
   | Sskip ->
-      fprintf p "/*nothing*/"
+      fprintf p "(void)0"
   | Sassign(e1, e2) ->
       fprintf p "%a = %a" print_expr e1 print_expr e2
   | Sset(id, e2) ->
       fprintf p "%s = %a" (temp_name id) print_expr e2
+  | Ssequence(Sskip, s2) ->
+      print_stmt_for p s2
   | Ssequence(s1, s2) ->
       fprintf p "%a, %a" print_stmt_for s1 print_stmt_for s2
   | Scall(None, e1, el) ->
       fprintf p "@[<hv 2>%a@,(@[<hov 0>%a@])@]"
-                print_expr e1
+                expr (15, e1)
                 print_expr_list (true, el)
   | Scall(Some id, e1, el) ->
       fprintf p "@[<hv 2>%s =@ %a@,(@[<hov 0>%a@])@]"
                 (temp_name id)
-                print_expr e1
+                expr (15, e1)
                 print_expr_list (true, el)
   | Sbuiltin(None, ef, tyargs, el) ->
       fprintf p "@[<hv 2>builtin %s@,(@[<hov 0>%a@]);@]"
@@ -235,24 +246,20 @@ and print_stmt_for p s =
   | _ ->
       fprintf p "({ %a })" print_stmt s
 
+(* There are two versions of Clight, Clight1 and Clight2, that differ
+   only in the meaning of function parameters:
+ - in Clight1, function parameters are variables
+ - in Clight2, function parameters are temporaries.
+*)
 
-	      
-(* adds forward ref for all internal functions *)	      
-let print_forwardref p (id, gd) =
-  match gd with
-  | Gfun (Internal f) ->
-       fprintf p "extern %s;@ @ "
-            (name_cdecl (name_function_parameters (extern_atom id)
-                                                  f.fn_params f.fn_callconv)
-			f.fn_return)
-  | _ -> ()
+type clight_version = Clight1 | Clight2
 
+let name_param = function Clight1 -> extern_atom | Clight2 -> temp_name
 
-	      
-let print_function p id f =
+let print_function ver p id f =
   fprintf p "%s@ "
-            (name_cdecl (name_function_parameters (extern_atom id)
-                                                  f.fn_params f.fn_callconv)
+            (name_cdecl (name_function_parameters (name_param ver)
+                                 (extern_atom id) f.fn_params f.fn_callconv)
                         f.fn_return);
   fprintf p "@[<v 2>{@ ";
   List.iter
@@ -266,66 +273,86 @@ let print_function p id f =
   print_stmt p f.fn_body;
   fprintf p "@;<0 -2>}@]@ @ "
 
-let print_fundef p id fd =
+let print_fundef ver p id fd =
   match fd with
-  | Ctypes.External((EF_external _ | EF_runtime _), args, res, cconv) ->
-      fprintf p "extern %s;@ @ "
+  | Ctypes.External(_, _, _, _) ->
+      ()
+  | Internal f ->
+      print_function ver p id f
+
+let print_fundecl p id fd =
+  match fd with
+  | Ctypes.External((AST.EF_external _ | AST.EF_runtime _ | AST.EF_malloc | AST.EF_free), args, res, cconv) ->
+      fprintf p "extern %s;@ "
                 (name_cdecl (extern_atom id) (Tfunction(args, res, cconv)))
   | Ctypes.External(_, _, _, _) ->
       ()
   | Internal f ->
-      print_function p id f
+      fprintf p "%s;@ "
+                (name_cdecl (extern_atom id) (Clight.type_of_function f))
 
-let print_globdef p (id, gd) =
+let print_globdef var p (id, gd) =
   match gd with
-  | Gfun f -> print_fundef p id f
-  | Gvar v -> print_globvar p id v  (* from PrintCsyntax *)
+  | AST.Gfun f -> print_fundef var p id f
+  | AST.Gvar v -> print_globvar p id v  (* from PrintCsyntax *)
 
-let print_program p prog =
+let print_globdecl p (id, gd) =
+  match gd with
+  | AST.Gfun f -> print_fundecl p id f
+  | AST.Gvar v -> ()
+
+let print_program ver p prog =
   fprintf p "@[<v 0>";
   List.iter (declare_composite p) prog.prog_types;
   List.iter (define_composite p) prog.prog_types;
-  (*   List.iter (print_forwardref p) prog.prog_defs; *)
-  List.iter (print_globdef p) prog.prog_defs;
+  List.iter (print_globdecl p) prog.prog_defs;
+  List.iter (print_globdef ver p) prog.prog_defs;
   fprintf p "@]@."
 
-let destination : string option ref = ref (Some "program.c") (* NOTE: currently outputing to fixed file *)
+let destination : string option ref = ref None
 
-let print_if prog =
+let print_if_gen ver prog =
   match !destination with
   | None -> ()
   | Some f ->
       let oc = open_out f in
-      print_program (formatter_of_out_channel oc) prog;
+      print_program ver (formatter_of_out_channel oc) prog;
       close_out oc
 
-let print_dest prog dest =
-  let oc = open_out (implode dest) in
-  print_program (formatter_of_out_channel oc) prog;
-  close_out oc
+(* print_if is called from driver/Compiler.v between the SimplExpr
+   and SimplLocals passes.  It receives Clight1 syntax. *)
+let print_if prog = print_if_gen Clight1 prog
 
+(* print_if_2 is called from clightgen/Clightgen.ml, after the
+   SimplLocals pass.  It receives Clight2 syntax. *)
+let print_if_2 prog = print_if_gen Clight2 prog
 let add_name (a, n) =
-  match n with
-  | BasicAst.Coq_nAnon -> ()
-  | BasicAst.Coq_nNamed s ->
-      Hashtbl.add atom_of_string (camlstring_of_coqstring s) a;
-      Hashtbl.add string_of_atom a (camlstring_of_coqstring s);
-      ()
+    match n with
+    | BasicAst.Coq_nAnon -> ()
+    | BasicAst.Coq_nNamed s ->
+        Hashtbl.add atom_of_string (camlstring_of_coqstring s) a;
+        Hashtbl.add string_of_atom a (camlstring_of_coqstring s);
+        ()
 
 let remove_primes (a, n) =
   match n with
   | BasicAst.Coq_nAnon -> (a,n)
   | BasicAst.Coq_nNamed s ->
-     let s' = Str.global_replace (Str.regexp "'") "p" (camlstring_of_coqstring s)  in
-     let s'' = Str.global_replace (Str.regexp "\\.") "d" s' in
-     (a, BasicAst.Coq_nNamed (coqstring_of_camlstring s''))
-	
+    let s' = Str.global_replace (Str.regexp "'") "p" (camlstring_of_coqstring s)  in
+    let s'' = Str.global_replace (Str.regexp "\\.") "d" s' in
+    (a, BasicAst.Coq_nNamed (coqstring_of_camlstring s''))
+      
+let print_dest prog dest =
+  let oc = open_out (implode dest) in
+  print_program Clight2 (formatter_of_out_channel oc) prog;
+  close_out oc
+    
 let print_dest_names prog names dest =
   let oc = open_out (camlstring_of_coqstring dest) in
   List.iter (fun n -> add_name (remove_primes n))  names;
-  print_program (formatter_of_out_channel oc) prog;
+  print_program Clight2 (formatter_of_out_channel oc) prog;
   close_out oc
-
+  
 let print_dest_names_imports prog names (dest : string) (imports : string list) =
   let oc = open_out dest in  
   List.iter (fun n -> add_name (remove_primes n))  names;
@@ -335,6 +362,7 @@ let print_dest_names_imports prog names (dest : string) (imports : string list) 
   pp_print_newline fm ();
   close_box ();
   open_box 0;
-  print_program fm prog;
+  print_program Clight2 fm prog;
   close_box ();
   close_out oc
+          

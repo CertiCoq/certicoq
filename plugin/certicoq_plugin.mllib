@@ -33,6 +33,7 @@ BinNums
 Classes1
 EqDecInstances
 MCPrelude
+MCOption
 MCList
 MCProd
 MCCompare
@@ -82,6 +83,7 @@ UGraph0
 Typing0
 PCUICAst
 PCUICAstUtils
+PCUICCases
 PCUICUnivSubst
 PCUICLiftSubst
 PCUICEquality
@@ -96,6 +98,7 @@ PCUICReflect
 TemplateToPCUIC
 PCUICSafeLemmata
 PCUICCumulativity
+PCUICExpandLets
 
 PCUICErrors
 PCUICUnivSubst
@@ -109,6 +112,7 @@ EAst
 EAstUtils
 ELiftSubst
 ETyping
+ECSubst
 EPretty
 Extract
 EOptimizePropDiscr
@@ -171,8 +175,9 @@ Lambda_lifting
 L4_to_L6
 Binary
 Bits
-Fappli_IEEE_extra
+IEEE754_extra
 Archi
+Zbits
 Integers
 Floats
 AST
@@ -187,6 +192,10 @@ Dead_param_elim
 Inline
 Csyntax
 Clightdefs
+Memtype
+Memdata
+Memory
+Globalenvs
 Clight
 PrintAST
 PrintCsyntax

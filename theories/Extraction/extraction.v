@@ -144,6 +144,7 @@ Cd "Extraction".
 Separate Extraction
          Ctypes.merge_attributes Ctypes.remove_attributes Ctypes.build_composite_env
          Csyntax
+         Clight
          Ctypes.make_program
          AST.signature_main
          Floats.Float32.from_parsed Floats.Float.from_parsed

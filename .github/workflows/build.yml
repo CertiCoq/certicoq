@@ -5,6 +5,7 @@ on: [push, pull_request]
 env:
   OCAML_VERSION: 4.07.1+flambda
   COQ_VERSION: 8.14.0
+  FLOCQ_VERSION: 3.4.2
 
 jobs:
   build:
@@ -45,6 +46,8 @@ jobs:
 
       - run: opam repo add coq-released https://coq.inria.fr/opam/released
       - run: opam install coq.${{ env.COQ_VERSION }}
+
+      - run: opam install coq-flocq.${{ env.FLOCQ_VERSION }}
 
       - run: opam exec -- coqc benchmarks/test_submodules.v || opam exec -- make submodules
         if: matrix.target == 'submodules'

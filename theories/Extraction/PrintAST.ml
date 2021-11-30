@@ -63,39 +63,3 @@ let name_of_external = function
   | EF_inline_asm(text, sg, clob) -> sprintf "inline_asm %S" (camlstring_of_coqstring text)
   | EF_debug(kind, text, targs) ->
       sprintf "debug%d %S" (P.to_int kind) (extern_atom text)
-
-let rec print_builtin_arg px oc = function
-  | BA x -> px oc x
-  | BA_int n -> fprintf oc "int %ld" (camlint_of_coqint n)
-  | BA_long n -> fprintf oc "long %Ld" (camlint64_of_coqint n)
-  | BA_float n -> fprintf oc "float %.15F" (camlfloat_of_coqfloat n)
-  | BA_single n -> fprintf oc "single %.15F" (camlfloat_of_coqfloat32 n)
-  | BA_loadstack(chunk, ofs) ->
-      fprintf oc "%s[sp + %ld]" (name_of_chunk chunk) (camlint_of_coqint ofs)
-  | BA_addrstack(ofs) ->
-      fprintf oc "sp + %ld" (camlint_of_coqint ofs)
-  | BA_loadglobal(chunk, id, ofs) ->
-      fprintf oc "%s[&%s + %ld]"
-              (name_of_chunk chunk) (extern_atom id) (camlint_of_coqint ofs)
-  | BA_addrglobal(id, ofs) ->
-      fprintf oc "&%s + %ld" (extern_atom id) (camlint_of_coqint ofs)
-  | BA_splitlong(hi, lo) ->
-      fprintf oc "splitlong(%a, %a)"
-                 (print_builtin_arg px) hi (print_builtin_arg px) lo
-  | BA_addptr(a1, a2) ->
-      fprintf oc "addptr(%a, %a)"
-                 (print_builtin_arg px) a1 (print_builtin_arg px) a2
-
-let rec print_builtin_args px oc = function
-  | [] -> ()
-  | [a] -> print_builtin_arg px oc a
-  | a1 :: al ->
-      fprintf oc "%a, %a" (print_builtin_arg px) a1 (print_builtin_args px) al
-
-let rec print_builtin_res px oc = function
-  | BR x -> px oc x
-  | BR_none -> fprintf oc "_"
-  | BR_splitlong(hi, lo) ->
-      fprintf oc "splitlong(%a, %a)"
-                 (print_builtin_res px) hi (print_builtin_res px) lo
-

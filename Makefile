@@ -20,7 +20,7 @@ submodules:
 plugin: plugin/CertiCoq.vo
 
 plugin/Makefile:
-	cd plugin;coq_makefile -f _CoqProject -o Makefile
+	cd plugin ; coq_makefile -f _CoqProject -o Makefile
 
 plugin/CertiCoq.vo: all plugin/Makefile theories/Extraction/extraction.vo
 	sh ./make_plugin.sh
@@ -33,5 +33,5 @@ install: all plugin/CertiCoq.vo
 
 
 clean:
-	$(MAKE) clean -C libraries
-	$(MAKE) clean -C theories
+	$(MAKE) -C libraries clean
+	$(MAKE) -C theories clean

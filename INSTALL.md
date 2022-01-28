@@ -1,57 +1,74 @@
 # Installing CertiCoq
 
-### Prerequisites
+## Get the code
 
-To install the compiler, you need OCaml (tested with `4.07.1` ) and Coq 8.12.
+Fetch the code:
 
-CertiCoq depends on the following Coq packages:  
-`ExtLib` and `MetaCoq` (which requires `Equations`).
+```console
+$ git clone git@github.com:CertiCoq/certicoq.git
+```
 
-#### Building the dependencies
+Fetch the dependencies:
 
-The dependencies can either be installed manually (from sources or via `opam`) or automatically via provided submodules.
+```console
+$ git submodule update --init
+```
 
-##### Installation of dependencies via opam
 
-All dependencies can be installed directly from the information in the `opam` file:
+## Via opam (preferred)
 
-    # opam repo add coq-released https://coq.inria.fr/opam/released
-    # opam install . --deps-only
+First, pin the dependencies:
 
-##### Manual installation of dependencies
+```console
+$ opam pin -n -y submodules/coq-ext-lib
+$ opam pin -n -y submodules/Equations
+$ opam pin -n -y submodules/metacoq
+```
 
-###### Ext-lib
+Next, pin CertiCoq:
 
-You can install [ExtLib](https://github.com/coq-community/coq-ext-lib) (v0.11.2) from the source code or from opam with `opam install coq-ext-lib.0.11.2`.
+```console
+$ opam pin -n -y .
+```
 
-###### Equations
+You can now install CertiCoq:
 
-You can install [Equations](https://github.com/mattam82/Coq-Equations) (v1.2.3) from the source code or from opam with `opam install coq-equations.1.2.3+8.12`.
+```console
+$ opam install coq-certicoq
+```
 
-###### MetaCoq
+Alternatively, if you only want to install the dependencies, you can run:
 
-You can install [MetaCoq](https://metacoq.github.io/) (1.0~beta2+8.12) from the source code or from opam with `opam install coq-metacoq-erasure.1.0~beta2+8.12`.
+```console
+$ opam install coq-certicoq --deps-only
+```
 
-##### Installation of dependencies via submodules
+## Manual
 
-Make sure that you do not have any of the dependencies installed already.
-From the `certicoq/` directory, run:
+Make sure that you do not have any of the dependencies installed already. From the `certicoq/` directory, run:
 
-    # make submodules
+```console
+$ make submodules
+```
     
-Note that this approach will only work if your installation path for Coq is writable without root privileges, this should for instance be the case if Coq was installed via `opam`.
+Note that this approach will only work if your installation path for Coq is writable  without root privileges.
 
 ### Building the compiler
 
-  From the `certicoq/` directory, run:
+From the `certicoq/` directory, run:
 
-    # make -j4
+```console
+$ make -j4
+```
 
-  After the sources are successfully compiled, you can compile and
-  install the CertiCoq plugin with:
+After the sources are successfully compiled, you can compile and install the CertiCoq plugin with:
 
-    # make install
+```console
+# make install
+```
 
-  To test the installation, you can go to `certicoq/benchmarks` and run
+To test the installation, you can go to `certicoq/benchmarks` and run
 
-    # make all
+```console
+$ make all
+```

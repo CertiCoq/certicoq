@@ -23,11 +23,11 @@ install: [
   [make "install"]
 ]
 depends: [
-  "coq" {>= "8.12.1" & < "8.13~"}
-  "coq-equations" {= "1.2.3+8.12"}
   "ocaml"
-  "coq-metacoq-erasure" {="1.0~beta2+8.12" }
-  "coq-ext-lib" {="0.11.3"}
+  "coq" {>= "8.14" & < "8.15~"}
+  "coq-equations" {= "1.2.3+8.14"}
+  "coq-metacoq-erasure" {="1.0~beta2+8.13" }
+  "coq-ext-lib" {="0.11.6"}
 ]
 
 synopsis: "A Verified Compiler for Gallina, Written in Gallina "

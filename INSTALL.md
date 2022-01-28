@@ -53,12 +53,13 @@ $ make submodules
     
 Note that this approach will only work if your installation path for Coq is writable  without root privileges.
 
+
 ### Building the compiler
 
-From the `certicoq/` directory, run:
+Once the dependencies are installed (either via opam or by the manual method), you can build the compiler by running
 
 ```console
-$ make -j4
+$ make -j`npoc`
 ```
 
 After the sources are successfully compiled, you can compile and install the CertiCoq plugin with:
@@ -67,7 +68,7 @@ After the sources are successfully compiled, you can compile and install the Cer
 # make install
 ```
 
-To test the installation, you can go to `certicoq/benchmarks` and run
+To test the installation, you can go to `benchmarks` and run
 
 ```console
 $ make all

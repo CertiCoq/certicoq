@@ -31,7 +31,6 @@ jobs:
           opam_file: ${{ matrix.opam_file }}
           before_install: |
             startGroup "opam pin"
-              opam pin -n -y submodules/coq-ext-lib
               opam pin -n -y submodules/Equations
               opam pin -n -y submodules/metacoq
               opam pin -n -y .

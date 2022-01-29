@@ -1,4 +1,5 @@
-#env /bin/sh
+#!/usr/bin/env bash
+
 if [ ! -f "plugin/extraction/astCommon.ml" ]
 then
     sh clean_extraction.sh

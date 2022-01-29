@@ -1,4 +1,3 @@
--R theories/compcert compcert
 -R libraries                    CertiCoq.Libraries
 
 -R theories/Compiler            CertiCoq.Compiler

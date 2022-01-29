@@ -16,6 +16,17 @@ CertiCoq.v
 certicoq_debug.mli
 certicoq_debug.ml
 
+
+extraction/camlcoq.ml
+# extraction/camlcoq.mli
+extraction/printAST.ml
+# extraction/printAST.mli
+extraction/printClight.ml
+# extraction/printClight.mli
+extraction/printCsyntax.ml
+# extraction/printCsyntax.mli
+
+
 extraction/ast0.mli
 extraction/ast0.ml
 extraction/string0.mli
@@ -87,8 +98,6 @@ extraction/bits.ml
 extraction/bits.mli
 extraction/bracket.ml
 extraction/bracket.mli
-extraction/camlcoq.ml
-# extraction/camlcoq.mli
 # extraction/certiClasses.ml
 # extraction/certiClasses.mli
 # extraction/certiClasses2.ml
@@ -351,12 +360,6 @@ extraction/pipeline_utils.ml
 extraction/pipeline_utils.mli
 # extraction/polyEval.ml
 # extraction/polyEval.mli
-extraction/printAST.ml
-# extraction/printAST.mli
-extraction/printClight.ml
-# extraction/printClight.mli
-extraction/printCsyntax.ml
-# extraction/printCsyntax.mli
 extraction/randyPrelude.ml
 extraction/randyPrelude.mli
 extraction/rename.ml

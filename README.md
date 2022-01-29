@@ -48,7 +48,6 @@ Structure of the theories directory:
 * `theories/L4_deBruijn`: 3rd pass, let-bind environment
 * `theories/L6_PCPS` contains the λANF pipeline (and conversions -- direct and CPS -- to λANF)
 * `theories/L7` contains the C code generator.
-* `theories/compcert` contains a local copy of the compcert compiler
 
 
 ## Bugs 

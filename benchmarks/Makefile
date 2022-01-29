@@ -1,4 +1,4 @@
-COQOPTS = -R ../theories/compcert compcert -R ./ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
+COQOPTS = -R ./ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
 CCOMPILER=gcc
 
 # Names of the benchmarks

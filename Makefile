@@ -5,10 +5,10 @@ all: theories/Makefile libraries/Makefile
 	$(MAKE) -C libraries
 	$(MAKE) -C theories
 
-theories/Makefile:
+theories/Makefile: theories/_CoqProject
 	cd theories;coq_makefile -f _CoqProject -o Makefile
 
-libraries/Makefile:
+libraries/Makefile: libraries/_CoqProject
 	cd libraries;coq_makefile -f _CoqProject -o Makefile
 
 
@@ -19,7 +19,7 @@ submodules:
 
 plugin: plugin/CertiCoq.vo
 
-plugin/Makefile:
+plugin/Makefile: plugin/_CoqProject
 	cd plugin ; coq_makefile -f _CoqProject -o Makefile
 
 plugin/CertiCoq.vo: all plugin/Makefile theories/Extraction/extraction.vo

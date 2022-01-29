@@ -15,17 +15,22 @@ Open Scope monad_scope.
 
 From MetaCoq.Template Require Import BasicAst.
 
-Require Import compcert.common.AST
-        compcert.common.Errors
-        compcert.lib.Integers
-        compcert.cfrontend.Cop
-        compcert.cfrontend.Ctypes
-        compcert.cfrontend.Clight
-        compcert.common.Values.
+From compcert Require Import
+  common.AST
+  common.Errors
+  lib.Integers
+  cfrontend.Cop
+  cfrontend.Ctypes
+  cfrontend.Clight
+  common.Values
+  Clightdefs.
 
-
-Require Import L6.set_util L6.cps L6.identifiers L6.cps_show L6.state.
-Require Import Clightdefs.
+Require Import
+  L6.set_util
+  L6.cps
+  L6.identifiers
+  L6.cps_show
+  L6.state.
 
 Section TRANSLATION.
 

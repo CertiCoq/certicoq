@@ -1,4 +1,5 @@
 -I extraction
+-I static
 -I .
 -R . CertiCoq.Plugin
 

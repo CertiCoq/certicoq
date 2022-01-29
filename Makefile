@@ -22,7 +22,8 @@ plugin: plugin/CertiCoq.vo
 plugin/Makefile: plugin/_CoqProject
 	cd plugin ; coq_makefile -f _CoqProject -o Makefile
 
-plugin/CertiCoq.vo: all plugin/Makefile theories/Extraction/extraction.vo
+plugin/CertiCoq.vo: all plugin/Makefile
+	make -C theories theories/Extraction/extraction.vo
 	sh ./make_plugin.sh
 
 

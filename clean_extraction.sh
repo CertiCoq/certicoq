@@ -9,19 +9,6 @@ then
     mkdir plugin/extraction
 fi
 
-# Copy the static code to the extraction destination
-pushd plugin/static/
-
-# Uncapitalize modules to circumvent a bug of coqdep with mllib files
-for i in *.ml*
-  do
-  newi=../extraction/`echo $i | cut -b 1 | tr '[:upper:]' '[:lower:]'``echo $i | cut -b 2-`;
-  echo "Copying " $i "to" $newi;
-  cp $i $newi;
-done
-
-popd
-
 # Copy the extracted code to the extraction destination
 pushd theories/Extraction
 

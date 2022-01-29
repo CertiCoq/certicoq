@@ -35,3 +35,6 @@ install: all plugin/CertiCoq.vo
 clean:
 	$(MAKE) -C libraries clean
 	$(MAKE) -C theories clean
+	$(MAKE) -C plugin clean
+	rm -f `find theories -name "*.ml*"`
+	rm -rf plugin/extraction

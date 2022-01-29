@@ -3,148 +3,88 @@
 -R . CertiCoq.Plugin
 
 
-# plugin
 plugin_utils.ml
 plugin_utils.mli
 certicoq.mli
 certicoq.ml
 g_certicoq.mlg
+certicoq_debug.mli
+certicoq_debug.ml
 certicoq_plugin_mod.ml
 certicoq_plugin.mllib
 CertiCoq.v
 
-certicoq_debug.mli
-certicoq_debug.ml
+
+static/camlcoq.ml
+static/printAST.ml
+static/printClight.ml
+static/printCsyntax.ml
 
 
-extraction/camlcoq.ml
-# extraction/camlcoq.mli
-extraction/printAST.ml
-# extraction/printAST.mli
-extraction/printClight.ml
-# extraction/printClight.mli
-extraction/printCsyntax.ml
-# extraction/printCsyntax.mli
-
-
-extraction/ast0.mli
-extraction/ast0.ml
-extraction/string0.mli
-extraction/string0.ml
-extraction/datatypes.mli
-extraction/datatypes.ml
-extraction/peanoNat.mli
-extraction/peanoNat.ml
-extraction/hexadecimal.mli
-extraction/hexadecimal.ml
-extraction/decimal.mli
-extraction/decimal.ml
-extraction/bool.mli
-extraction/bool.ml
-extraction/list0.mli
-extraction/list0.ml
-extraction/basics.mli
-extraction/basics.ml
-extraction/ascii.mli
-extraction/ascii.ml
-extraction/binNat.mli
-extraction/binNat.ml
-extraction/binPos.mli
-extraction/binPos.ml
-extraction/number0.mli
-extraction/number0.ml
-extraction/nat0.mli
-extraction/nat0.ml
-extraction/binPosDef.mli
-extraction/binPosDef.ml
-extraction/binInt.mli
-extraction/binInt.ml
-# extraction/numeral.mli
-# extraction/numeral.ml
-extraction/basicAst.mli
-extraction/basicAst.ml
-# extraction/all_Forall.mli
-# extraction/all_Forall.ml
-extraction/specif.mli
-extraction/specif.ml
-extraction/logic0.mli
-extraction/logic0.ml
-extraction/binNums.ml
-extraction/binNums.mli
-# extraction/orderedType0.mli
-# extraction/orderedType0.ml
-# extraction/cRelationClasses.ml
-# extraction/cRelationClasses.mli
-# extraction/mCRelations.ml
-# extraction/mCRelations.mli
-# extraction/mCOption.mli
-# extraction/mCOption.ml
-
-# extraction/fappli_IEEE.ml
-# extraction/fappli_IEEE.mli
-# extraction/fappli_IEEE_bits.ml
-# extraction/fappli_IEEE_bits.mli
-# extraction/freshen.ml
-# extraction/freshen.mli
+extraction/all_Forall.ml
+extraction/all_Forall.mli
 extraction/archi.ml
 extraction/archi.mli
+extraction/ascii.ml
+extraction/ascii.mli
+extraction/ast0.ml
+extraction/ast0.mli
 extraction/astCommon.ml
 extraction/astCommon.mli
+extraction/AST.ml
+extraction/AST.mli
+extraction/basicAst.ml
+extraction/basicAst.mli
+extraction/basics.ml
+extraction/basics.mli
 extraction/binary.ml
 extraction/binary.mli
+extraction/binInt.ml
+extraction/binInt.mli
 extraction/binNatDef.ml
 extraction/binNatDef.mli
+extraction/binNat.ml
+extraction/binNat.mli
+extraction/binNums.ml
+extraction/binNums.mli
+extraction/binPosDef.ml
+extraction/binPosDef.mli
+extraction/binPos.ml
+extraction/binPos.mli
 extraction/bits.ml
 extraction/bits.mli
+extraction/bool.ml
+extraction/bool.mli
 extraction/bracket.ml
 extraction/bracket.mli
-# extraction/certiClasses.ml
-# extraction/certiClasses.mli
-# extraction/certiClasses2.ml
-# extraction/certiClasses2.mli
-# extraction/cexec.ml
-# extraction/cexec.mli
 extraction/char0.ml
 extraction/char0.mli
 extraction/classes1.ml
 extraction/classes1.mli
-extraction/memdata.mli
-extraction/memdata.ml
-extraction/memtype.mli
-extraction/memtype.ml
-extraction/memory.mli
-extraction/memory.ml
-extraction/globalenvs.mli
-extraction/globalenvs.ml
-extraction/smallstep.mli
-extraction/smallstep.ml
-extraction/clight.ml
-extraction/clight.mli
+extraction/classes2.ml
+extraction/classes2.mli
 extraction/clightdefs.ml
 extraction/clightdefs.mli
-# extraction/clightexec.ml
-# extraction/clightexec.mli
+extraction/clight.ml
+extraction/clight.mli
 extraction/closure_conversion.ml
 extraction/closure_conversion.mli
-extraction/compM.ml
-extraction/compM.mli
-# extraction/compare_dec.ml
-# extraction/compare_dec.mli
 extraction/compile0.ml
 extraction/compile0.mli
 extraction/compile1.ml
 extraction/compile1.mli
+extraction/compM.ml
+extraction/compM.mli
 extraction/config0.ml
 extraction/config0.mli
 extraction/cop.ml
 extraction/cop.mli
 extraction/coqlib0.ml
 extraction/coqlib0.mli
-extraction/AST.ml
-extraction/AST.mli
-
 extraction/cps.ml
 extraction/cps.mli
+extraction/cps_proto.ml
+extraction/cps_proto.mli
 extraction/cps_show.ml
 extraction/cps_show.mli
 extraction/cps_util.ml
@@ -155,62 +95,76 @@ extraction/ctx.ml
 extraction/ctx.mli
 extraction/ctypes.ml
 extraction/ctypes.mli
+extraction/datatypes.ml
+extraction/datatypes.mli
 extraction/dead_param_elim.ml
 extraction/dead_param_elim.mli
-# extraction/decidableClass.ml
-# extraction/decidableClass.mli
-# extraction/digits.ml
-# extraction/digits.mli
+extraction/decimal.ml
+extraction/decimal.mli
 extraction/eAst.ml
 extraction/eAst.mli
-extraction/eTyping.ml
-extraction/eTyping.mli
+extraction/eAstUtils.ml
+extraction/eAstUtils.mli
+extraction/eCSubst.ml
+extraction/eCSubst.mli
 extraction/environment.ml
 extraction/environment.mli
+extraction/eOptimizePropDiscr.ml
+extraction/eOptimizePropDiscr.mli
+extraction/eqDecInstances.ml
+extraction/eqDecInstances.mli
 extraction/equalities.ml
 extraction/equalities.mli
+extraction/erasureFunction.ml
+extraction/erasureFunction.mli
+extraction/erasure.ml
+extraction/erasure.mli
 extraction/errors0.ml
 extraction/errors0.mli
+extraction/eTyping.ml
+extraction/eTyping.mli
 extraction/eval.ml
 extraction/eval.mli
-extraction/monadExc.ml
-extraction/monadExc.mli
 extraction/exceptionMonad.ml
 extraction/exceptionMonad.mli
 extraction/expression.ml
 extraction/expression.mli
 extraction/extract.ml
 extraction/extract.mli
-extraction/FLT.ml
-extraction/FLT.mli
-extraction/iEEE754_extra.ml
-extraction/iEEE754_extra.mli
 extraction/ffi.ml
 extraction/ffi.mli
+extraction/floatOps.ml
+extraction/floatOps.mli
 extraction/floats.ml
 extraction/floats.mli
-# extraction/globalenvs.ml
-# extraction/globalenvs.mli
+extraction/FLT.ml
+extraction/FLT.mli
+extraction/frame.ml
+extraction/frame.mli
+extraction/globalenvs.ml
+extraction/globalenvs.mli
 extraction/glue.ml
 extraction/glue.mli
 extraction/glue_utils.ml
 extraction/glue_utils.mli
-# extraction/hexadecimal0.ml
-# extraction/hexadecimal0.mli
+extraction/hexadecimal.ml
+extraction/hexadecimal.mli
 extraction/hoisting.ml
 extraction/hoisting.mli
 extraction/identifiers.ml
 extraction/identifiers.mli
+extraction/iEEE754_extra.ml
+extraction/iEEE754_extra.mli
 extraction/init.ml
 extraction/init.mli
-extraction/inline.ml
-extraction/inline.mli
 extraction/inline_letapp.ml
 extraction/inline_letapp.mli
-extraction/zbits.ml
-extraction/zbits.mli
+extraction/inline.ml
+extraction/inline.mli
 extraction/integers.ml
 extraction/integers.mli
+extraction/kernames.ml
+extraction/kernames.mli
 extraction/l3_to_L4.ml
 extraction/l3_to_L4.mli
 extraction/l4_to_L6.ml
@@ -221,40 +175,44 @@ extraction/l6_to_Clight_stack.ml
 extraction/l6_to_Clight_stack.mli
 extraction/lambda_lifting.ml
 extraction/lambda_lifting.mli
+extraction/list0.ml
+extraction/list0.mli
 extraction/list_util.ml
 extraction/list_util.mli
-extraction/mCPrelude.ml
-extraction/mCPrelude.mli
-extraction/eqDecInstances.mli
-extraction/eqDecInstances.ml
-extraction/specFloat.mli
-extraction/specFloat.ml
-extraction/primFloat.mli
-extraction/primFloat.ml
-# extraction/int63.mli
-# extraction/int63.m
-extraction/primInt63.ml
-extraction/primInt63.mli
-extraction/uint0.ml
-extraction/uint0.mli
-# extraction/int63.mli
-# extraction/int63.ml
-extraction/floatOps.mli
-extraction/floatOps.ml
+extraction/logic0.ml
+extraction/logic0.mli
+extraction/maps.ml
+extraction/maps.mli
+extraction/maps_util.ml
+extraction/maps_util.mli
+extraction/map_util.ml
+extraction/map_util.mli
 extraction/mCCompare.ml
 extraction/mCCompare.mli
 extraction/mCList.ml
 extraction/mCList.mli
-extraction/mCProd.ml
-extraction/mCProd.mli
 extraction/mCOption.ml
 extraction/mCOption.mli
-extraction/all_Forall.ml
-extraction/all_Forall.mli
-# extraction/mCString.ml
-# extraction/mCString.mli
+extraction/mCPrelude.ml
+extraction/mCPrelude.mli
+extraction/mCProd.ml
+extraction/mCProd.mli
 extraction/mCUtils.ml
 extraction/mCUtils.mli
+extraction/memdata.ml
+extraction/memdata.mli
+extraction/memory.ml
+extraction/memory.mli
+extraction/memtype.ml
+extraction/memtype.mli
+extraction/monad0.ml
+extraction/monad0.mli
+extraction/monadExc.ml
+extraction/monadExc.mli
+extraction/monadState.ml
+extraction/monadState.mli
+extraction/monad_utils.ml
+extraction/monad_utils.mli
 extraction/mSetDecide.ml
 extraction/mSetDecide.mli
 extraction/mSetFacts.ml
@@ -267,147 +225,100 @@ extraction/mSetProperties.ml
 extraction/mSetProperties.mli
 extraction/mSetRBT.ml
 extraction/mSetRBT.mli
-extraction/map_util.ml
-extraction/map_util.mli
-extraction/maps_util.ml
-extraction/maps_util.mli
-extraction/maps.ml
-extraction/maps.mli
-# extraction/memdata.ml
-# extraction/memdata.mli
-# extraction/memory.ml
-# extraction/memory.mli
-# extraction/memtype.ml
-# extraction/memtype.mli
-extraction/monad0.ml
-extraction/monad0.mli
-extraction/monadState.ml
-extraction/monadState.mli
-extraction/monad_utils.ml
-extraction/monad_utils.mli
+extraction/nat0.ml
+extraction/nat0.mli
 extraction/nPeano.ml
 extraction/nPeano.mli
-# extraction/numeral0.ml
-# extraction/numeral0.mli
-# extraction/optionMonad.ml
-# extraction/optionMonad.mli
-extraction/orders.ml
-extraction/orders.mli
+extraction/number0.ml
+extraction/number0.mli
+extraction/orderedType0.ml
+extraction/orderedType0.mli
+extraction/orderedTypeAlt.ml
+extraction/orderedTypeAlt.mli
 extraction/ordersEx.ml
 extraction/ordersEx.mli
 extraction/ordersFacts.ml
 extraction/ordersFacts.mli
 extraction/ordersLists.ml
 extraction/ordersLists.mli
+extraction/orders.ml
+extraction/orders.mli
 extraction/ordersTac.ml
 extraction/ordersTac.mli
-extraction/orderedTypeAlt.mli
-extraction/orderedTypeAlt.ml
-extraction/orderedType0.mli
-extraction/orderedType0.ml
-
-extraction/pCUICPrimitive.ml
-extraction/pCUICPrimitive.mli
 extraction/pCUICAst.ml
 extraction/pCUICAst.mli
-extraction/pCUICCases.ml
-extraction/pCUICCases.mli
 extraction/pCUICAstUtils.ml
 extraction/pCUICAstUtils.mli
-
-#extraction/pCUICChecker.ml
-#extraction/pCUICChecker.mli
-# extraction/pCUICCumulativity.ml
-# extraction/pCUICCumulativity.mli
-# extraction/pCUICLiftSubst.ml
-# extraction/pCUICLiftSubst.mli
-# extraction/pCUICInduction.ml
-# extraction/pCUICInduction.mli
-extraction/pCUICReduction.ml
-extraction/pCUICReduction.mli
+extraction/pCUICCases.ml
+extraction/pCUICCases.mli
+extraction/pCUICErrors.ml
+extraction/pCUICErrors.mli
+extraction/pCUICExpandLets.ml
+extraction/pCUICExpandLets.mli
 extraction/pCUICNormal.ml
 extraction/pCUICNormal.mli
 extraction/pCUICPosition.ml
 extraction/pCUICPosition.mli
-# extraction/pCUICPretty.ml
-# extraction/pCUICPretty.mli
-# extraction/pCUICReflect.ml
-# extraction/pCUICReflect.mli
-# extraction/pCUICSafeChecker.ml
-# extraction/pCUICSafeChecker.mli
-# extraction/pCUICSafeConversion.ml
-# extraction/pCUICSafeConversion.mli
-extraction/pCUICErrors.ml
-extraction/pCUICErrors.mli
+extraction/pCUICPrimitive.ml
+extraction/pCUICPrimitive.mli
+extraction/pCUICReduction.ml
+extraction/pCUICReduction.mli
 extraction/pCUICSafeReduce.ml
 extraction/pCUICSafeReduce.mli
 extraction/pCUICSafeRetyping.ml
 extraction/pCUICSafeRetyping.mli
 extraction/pCUICTyping.ml
 extraction/pCUICTyping.mli
-extraction/pCUICExpandLets.ml
-extraction/pCUICExpandLets.mli
-extraction/eCSubst.ml
-extraction/eCSubst.mli
-
-# extraction/pCUICUnivSubst.ml
-# extraction/pCUICUnivSubst.mli
-extraction/pOrderedType.ml
-extraction/pOrderedType.mli
+extraction/peanoNat.ml
+extraction/peanoNat.mli
 extraction/pipeline.ml
 extraction/pipeline.mli
 extraction/pipeline_utils.ml
 extraction/pipeline_utils.mli
-# extraction/polyEval.ml
-# extraction/polyEval.mli
+extraction/pOrderedType.ml
+extraction/pOrderedType.mli
+extraction/primFloat.ml
+extraction/primFloat.mli
+extraction/primInt63.ml
+extraction/primInt63.mli
+extraction/prototype.ml
+extraction/prototype.mli
+extraction/proto_util.ml
+extraction/proto_util.mli
 extraction/randyPrelude.ml
 extraction/randyPrelude.mli
 extraction/rename.ml
 extraction/rename.mli
-extraction/prototype.ml
-extraction/prototype.mli
-extraction/cps_proto.ml
-extraction/cps_proto.mli
-extraction/proto_util.ml
-extraction/proto_util.mli
-extraction/frame.ml
-extraction/frame.mli
 extraction/rewriting.ml
 extraction/rewriting.mli
 extraction/round.ml
 extraction/round.mli
-extraction/erasureFunction.ml
-extraction/erasureFunction.mli
 extraction/safeTemplateChecker.ml
 extraction/safeTemplateChecker.mli
-extraction/erasure.ml
-extraction/erasure.mli
 extraction/set_util.ml
 extraction/set_util.mli
 extraction/shrink_cps.ml
 extraction/shrink_cps.mli
+extraction/signature.ml
+extraction/signature.mli
+extraction/smallstep.ml
+extraction/smallstep.mli
+extraction/specFloat.ml
+extraction/specFloat.mli
+extraction/specif.ml
+extraction/specif.mli
 extraction/ssrbool.ml
 extraction/ssrbool.mli
 extraction/state.ml
 extraction/state.mli
 extraction/stateMonad.ml
 extraction/stateMonad.mli
+extraction/string0.ml
+extraction/string0.mli
 extraction/string1.ml
 extraction/string1.mli
-# extraction/int63.ml
-# extraction/int63.mli
 extraction/templateToPCUIC.ml
 extraction/templateToPCUIC.mli
-# extraction/term0.ml
-# extraction/term0.mli
-# extraction/termAbs.ml
-# extraction/termAbs.mli
-# extraction/terms.ml
-# extraction/terms.mli
-# extraction/termsDB.ml
-# extraction/termsDB.mli
-extraction/toplevel.ml
-extraction/toplevel.mli
 extraction/toplevel0.ml
 extraction/toplevel0.mli
 extraction/toplevel1.ml
@@ -416,48 +327,29 @@ extraction/toplevel2.ml
 extraction/toplevel2.mli
 extraction/toplevel3.ml
 extraction/toplevel3.mli
-# extraction/typing0.ml
-# extraction/typing0.mli
+extraction/toplevel.ml
+extraction/toplevel.mli
 extraction/uGraph0.ml
 extraction/uGraph0.mli
+extraction/uint0.ml
+extraction/uint0.mli
 extraction/uncurry.ml
 extraction/uncurry.mli
 extraction/uncurry_proto.ml
 extraction/uncurry_proto.mli
 extraction/universes0.ml
 extraction/universes0.mli
-# extraction/usefulTypes.ml
-# extraction/usefulTypes.mli
 extraction/values.ml
 extraction/values.mli
-# extraction/varImplDummyPair.ml
-# extraction/varImplDummyPair.mli
-# extraction/varImplZ.ml
-# extraction/varImplZ.mli
-# extraction/varInterface.ml
-# extraction/varInterface.mli
-# extraction/varInterface0.ml
-# extraction/varInterface0.mli
-# extraction/variables.ml
-# extraction/variables.mli
 extraction/wGraph.ml
 extraction/wGraph.mli
 extraction/zArith_dec.ml
 extraction/zArith_dec.mli
 extraction/zaux.ml
 extraction/zaux.mli
+extraction/zbits.ml
+extraction/zbits.mli
 extraction/zbool.ml
 extraction/zbool.mli
 extraction/zpower.ml
 extraction/zpower.mli
-
-extraction/signature.mli
-extraction/signature.ml
-extraction/eAstUtils.mli
-extraction/eAstUtils.ml
-extraction/kernames.mli
-extraction/kernames.ml
-extraction/classes2.mli
-extraction/classes2.ml
-extraction/eOptimizePropDiscr.mli
-extraction/eOptimizePropDiscr.ml

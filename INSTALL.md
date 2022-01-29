@@ -15,7 +15,7 @@ $ git submodule update --init
 ```
 
 
-## Via opam (preferred)
+## Install using opam (preferred)
 
 First, pin the dependencies:
 
@@ -42,33 +42,46 @@ Alternatively, if you only want to install the dependencies, you can run:
 $ opam install coq-certicoq --deps-only
 ```
 
-## Manual
+## Build & install manually
+
+### Dependencies
+
+If possible, install the dependencies using the opam instructions given above.
+
+If that is not an option, you can instead use these "manual" instructions. Note that this approach will only work *if* your installation path for Coq is writable without root privileges.
 
 Make sure that you do not have any of the dependencies installed already. From the `certicoq/` directory, run:
 
 ```console
 $ make submodules
 ```
-    
-Note that this approach will only work if your installation path for Coq is writable  without root privileges.
 
 
 ### Building the compiler
 
-Once the dependencies are installed (either via opam or by the manual method), you can build the compiler by running
-
-```console
-$ make -j`npoc`
-```
-
-After the sources are successfully compiled, you can compile and install the CertiCoq plugin with:
-
-```console
-# make install
-```
-
-To test the installation, you can go to `benchmarks` and run
+Once the dependencies are installed (either via opam or by the manual method), you can build the Coq theory by running
 
 ```console
 $ make all
+```
+
+The plugin, which depends on the Coq theory, can be built by running
+
+```console
+$ make plugin
+```
+
+To install the theory & plugin, simply run
+
+```console
+$ make install
+```
+
+
+## Testing the installation
+
+You can test the installation using the including benchmark suite:
+
+```console
+$ make -C benchmarks all
 ```

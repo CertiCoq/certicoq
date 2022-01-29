@@ -1,7 +1,7 @@
 .PHONY: all submodules plugin install clean
 
 
-all: theories/Makefile libraries/Makefile
+all theories/Extraction/extraction.vo: theories/Makefile libraries/Makefile
 	$(MAKE) -C libraries -j`nproc`
 	$(MAKE) -C theories -j`nproc`
 
@@ -22,8 +22,7 @@ plugin: plugin/CertiCoq.vo
 plugin/Makefile: plugin/_CoqProject
 	cd plugin ; coq_makefile -f _CoqProject -o Makefile
 
-plugin/CertiCoq.vo: all plugin/Makefile
-	make -C theories theories/Extraction/extraction.vo
+plugin/CertiCoq.vo: all plugin/Makefile theories/Extraction/extraction.vo
 	sh ./make_plugin.sh
 
 

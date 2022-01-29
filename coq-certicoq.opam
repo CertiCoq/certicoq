@@ -26,7 +26,6 @@ depends: [
   "ocaml"
   "coq" {>= "8.14" & < "8.15~"}
   "coq-compcert" {= "3.9"}
-  "coq-vst" {= "2.8"}
   "coq-equations" {= "1.3+8.14"}
   "coq-metacoq-erasure" {="1.0~beta2+8.13" }
   "coq-ext-lib" {="0.11.6"}

@@ -2,8 +2,8 @@
 
 
 all: theories/Makefile libraries/Makefile
-	$(MAKE) -C libraries
-	$(MAKE) -C theories
+	$(MAKE) -C libraries -j`nproc`
+	$(MAKE) -C theories -j`nproc`
 
 theories/Makefile: theories/_CoqProject
 	cd theories;coq_makefile -f _CoqProject -o Makefile

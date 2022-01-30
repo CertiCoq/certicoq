@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - coq-8.14/main
+      - coq-8.14/codegen-proof
   pull_request:
     branches:
       - "**"

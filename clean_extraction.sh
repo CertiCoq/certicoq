@@ -10,7 +10,7 @@ then
 fi
 
 # Copy the extracted code to the extraction destination
-pushd theories/Extraction
+cd theories/Extraction
 
 # Uncapitalize modules to circumvent a bug of coqdep with mllib files
 for i in *.ml*
@@ -20,10 +20,10 @@ for i in *.ml*
   cp $i $newi;
 done
 
-popd
+cd ../..
 
 # Speciale case for files that are only uppercase!
-pushd plugin/extraction
+cd plugin/extraction
 mv aST.ml AST.ml
 mv aST.mli AST.mli
 mv fLT.ml FLT.ml
@@ -33,4 +33,4 @@ sed -f ../extraction.sed -i compile0.ml
 # We compile with -rectypes, so these definitions are badly interepreted
 sed -e "s/type int = int/type nonrec int = int/" -i integers.mli
 sed -e "s/type int = int/type nonrec int = int/" -i integers.ml
-popd
+cd ../..

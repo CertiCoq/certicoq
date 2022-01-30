@@ -35,3 +35,10 @@ jobs:
               opam pin -n -y submodules/metacoq
               opam pin -n -y .
             endGroup
+          after_install: |
+            startGroup "List installed packages"
+              opam list
+            endGroup
+            startGroup "Run benchmarks"
+              make -C benchmarks all
+            endGroup

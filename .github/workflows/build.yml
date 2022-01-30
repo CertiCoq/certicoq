@@ -30,6 +30,9 @@ jobs:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
           before_install: |
+            startGroup "Copy repo (for later benchmarking)"
+              cp -r `pwd` ~/repo
+            endGroup
             startGroup "opam pin"
               opam pin -n -y submodules/Equations
               opam pin -n -y submodules/metacoq
@@ -40,6 +43,5 @@ jobs:
               opam list
             endGroup
             startGroup "Run benchmarks"
-              cp -r benchmarks ~/benchmarks
-              make -C ~/benchmarks all
+              make -C ~/repo/benchmarks all
             endGroup

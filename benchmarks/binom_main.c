@@ -4,7 +4,7 @@
 #include <time.h>
 
 
-extern void body(struct thread_info *);
+extern value body(struct thread_info *);
 
 extern void print_Coq_Init_Datatypes_nat(unsigned long long);
 
@@ -28,11 +28,10 @@ int main(int argc, char *argv[]) {
   // Run Coq program
   for (int i = 0; i < n; i ++) {
     tinfo = make_tinfo();
-    body(tinfo);
+    val = body(tinfo);
   }
   end = clock();
 
-  val = tinfo -> args[1];
   // TODO : fold over nat to print the C int
   print_Coq_Init_Datatypes_nat(val);
   printf("\n");

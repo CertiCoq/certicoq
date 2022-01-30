@@ -2827,6 +2827,65 @@ Proof.
     eapply IHl in H. inv H; eauto.
 Qed.
 
+(** * Bound variables, computational definitions *)
+
+Fixpoint exp_bv_aux (e : exp) (bvs : FVSet) : FVSet :=
+  match e with
+  | Econstr x c ys e => exp_bv_aux e (PS.add x bvs)
+  | Ecase x cs => fold_left (fun bvs '(_, e) => exp_bv_aux e bvs) cs bvs
+  | Eproj x c n y e => exp_bv_aux e (PS.add x bvs)
+  | Eletapp x f t ys e => exp_bv_aux e (PS.add x bvs)
+  | Efun fds e => exp_bv_aux e (fundefs_bv_aux fds bvs)
+  | Eapp f t ys => bvs
+  | Eprim x p ys e => exp_bv_aux e (PS.add x bvs)
+  | Ehalt x => bvs
+  end
+with fundefs_bv_aux (fds : fundefs) (bvs : FVSet) : FVSet :=
+  match fds with
+  | Fcons f t ys e fds => fundefs_bv_aux fds (exp_bv_aux e (union_list (PS.add f bvs) ys))
+  | Fnil => bvs
+  end.
+Definition exp_bv (e : exp) : FVSet := exp_bv_aux e PS.empty.
+Definition fundefs_bv (fds : fundefs) : FVSet := fundefs_bv_aux fds PS.empty.
+
+(** *  Equivalence of computational and inductive BV definitions *)
+
+Fixpoint exp_bv_aux_ok e bvs {struct e} :
+  FromSet (exp_bv_aux e bvs) <--> bound_var e :|: FromSet bvs
+with fundefs_bv_aux_ok fds bvs {struct fds} :
+  FromSet (fundefs_bv_aux fds bvs) <--> bound_var_fundefs fds :|: FromSet bvs.
+Proof with eauto with Ensembles_DB.
+  - destruct e.
+    + cbn; normalize_bound_var; rewrite exp_bv_aux_ok, FromSet_add...
+    + revert bvs; induction l as [| [c e] ces]; intros bvs.
+      * cbn; normalize_bound_var...
+      * cbn; normalize_bound_var.
+        change (fold_left _ ces ?bvs) with (exp_bv_aux (Ecase v ces) bvs).
+        rewrite IHces, exp_bv_aux_ok...
+    + cbn; normalize_bound_var; rewrite exp_bv_aux_ok, FromSet_add...
+    + cbn; normalize_bound_var; rewrite exp_bv_aux_ok, FromSet_add...
+    + cbn; normalize_bound_var; rewrite exp_bv_aux_ok, fundefs_bv_aux_ok...
+    + cbn; normalize_bound_var...
+    + cbn; normalize_bound_var; rewrite exp_bv_aux_ok, FromSet_add...
+    + cbn; normalize_bound_var...
+  - destruct fds.
+    + cbn; repeat normalize_bound_var.
+      rewrite fundefs_bv_aux_ok, exp_bv_aux_ok, FromSet_union_list, FromSet_add.
+      split; repeat apply Union_Included...
+    + cbn; normalize_bound_var...
+Qed.
+
+Lemma exp_bv_ok e : bound_var e <--> FromSet (exp_bv e).
+Proof. unfold exp_bv; rewrite exp_bv_aux_ok, FromSet_empty; eauto with Ensembles_DB. Qed.
+
+Lemma fundefs_bv_ok fds : bound_var_fundefs fds <--> FromSet (fundefs_bv fds).
+Proof. unfold fundefs_bv; rewrite fundefs_bv_aux_ok, FromSet_empty; eauto with Ensembles_DB. Qed.
+
+Instance Bound_var_ToMSet (e : exp) : ToMSet (bound_var e).
+Proof. refine {| mset := exp_bv e |}; eapply exp_bv_ok. Qed.
+
+Instance Bound_var_fundefs_ToMSet (B : fundefs) : ToMSet (bound_var_fundefs B).
+Proof. refine {| mset := fundefs_bv B |}; eapply fundefs_bv_ok. Qed.
 
 (** * Compute the maximum identifier (free or bound) that occurs in an expression *)
 

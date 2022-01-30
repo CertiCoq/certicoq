@@ -23,6 +23,7 @@ Definition caseIdent:positive := 83.
 Definition stackframeTIdent:positive := 78. (* the stack_frame type *)
 Definition frameIdent:positive := 79. (* the stack frame of the current function *)
 Definition rootIdent:positive := 84. (* live roots array *)
+Definition rootTempIdent:positive := 96. (* live roots array, as a temp variable *)
 Definition spIdent:positive := 85. (* stack pointer *)
 Definition fpIdent:positive := 86. (* frame pointer *)
 (* Fields of stack_frame struct *)
@@ -30,6 +31,8 @@ Definition nextFld:positive := 87.
 Definition rootFld:positive := 88.
 Definition prevFld:positive := 89.
 
+Definition builtin_unreachableIdent:positive := 93.
+Definition retIdent:positive := 94.
 
 Definition Cprogram := (cps_util.name_env * Clight.program * Clight.program)%type.
 
@@ -59,15 +62,16 @@ Definition Clight_trans_fast (prims : list (kername * string * nat * positive)) 
                                args prog cenv nenv in
   Ret (add_prim_names prims nenv, stripOption mainIdent prog, stripOption mainIdent head).
 
+Print L6_to_Clight_stack.compile.
 
 Definition Clight_trans_ANF (prims : list (kername * string * nat * positive)) (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram * string :=
   let '(_, cenv, ctag, itag, nenv, fenv, _, prog) := t in
   let '(p, str) := L6_to_Clight_stack.compile
-                     argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
-                     tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
                      args
-                     stackframeTIdent frameIdent rootIdent fpIdent nextFld rootIdent prevFld
-                     false (* args optimization *)
+                     threadInfIdent allocIdent limitIdent heapInfIdent argsIdent fpIdent
+                     nallocIdent stackframeTIdent nextFld rootFld prevFld tinfIdent frameIdent rootIdent 
+                     isptrIdent gcIdent bodyIdent mainIdent builtin_unreachableIdent retIdent caseIdent
+                     rootTempIdent
                      prog cenv nenv in
   match p with
   | Ret (nenv, prog, head) =>
@@ -85,4 +89,5 @@ Definition compile_Clight (prims : list (kername * string * nat * positive)) : C
     if cps then 
       LiftErrorCertiCoqTrans "L7" (Clight_trans prims args) s
     else
+      debug_msg "Using new ANF translation" ;;
       LiftErrorLogCertiCoqTrans "L7" (Clight_trans_ANF prims args) s.

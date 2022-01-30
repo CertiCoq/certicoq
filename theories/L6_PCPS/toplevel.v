@@ -5,7 +5,6 @@ From CertiCoq Require Import
      L6.inline L6.uncurry_proto L6.closure_conversion
      L6.closure_conversion L6.hoisting L6.dead_param_elim L6.lambda_lifting.
 From CertiCoq Require Import L4.toplevel.
-(* From CertiCoq.L7 Require Import L6_to_Clight. *)
 
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import ExtLib.Structures.Monad.

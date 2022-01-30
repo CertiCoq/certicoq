@@ -6,10 +6,11 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  under the terms of the GNU General Public License as published by  *)
-(*  the Free Software Foundation, either version 2 of the License, or  *)
-(*  (at your option) any later version.  This file is also distributed *)
-(*  under the terms of the INRIA Non-Commercial License Agreement.     *)
+(*  under the terms of the GNU Lesser General Public License as        *)
+(*  published by the Free Software Foundation, either version 2.1 of   *)
+(*  the License, or  (at your option) any later version.               *)
+(*  This file is also distributed under the terms of the               *)
+(*  INRIA Non-Commercial License Agreement.                            *)
 (*                                                                     *)
 (* *********************************************************************)
 
@@ -21,7 +22,6 @@ Require Import Coqlib.
 Require Import Maps.
 Require Import Integers.
 Require Import Values.
-Require Import Coq.micromega.Lia.
 
 (** A multi-way branch is composed of a list of (key, action) pairs,
   plus a default action.  *)
@@ -270,7 +270,7 @@ Lemma validate_jumptable_correct_rec:
   list_nth_z tbl v = Some(ZMap.get (base + v) cases).
 Proof.
   induction tbl; simpl; intros.
-- unfold list_length_z in H0. simpl in H0. omegaContradiction.
+- unfold list_length_z in H0. simpl in H0. extlia.
 - InvBooleans. rewrite list_length_z_cons in H0. apply beq_nat_true in H1.
   destruct (zeq v 0).
   + replace (base + v) with base by lia. congruence.
@@ -289,10 +289,10 @@ Lemma validate_jumptable_correct:
 Proof.
   intros.
   rewrite (validate_jumptable_correct_rec cases tbl ofs); auto.
-- f_equal. f_equal. rewrite Zmod_small. lia.
+- f_equal. f_equal. rewrite Z.mod_small. lia.
   destruct (zle ofs v). lia.
   assert (M: ((v - ofs) + 1 * modulus) mod modulus = (v - ofs) + modulus).
-  { rewrite Zmod_small. lia. lia. }
+  { rewrite Z.mod_small. lia. lia. }
   rewrite Z_mod_plus in M by auto. rewrite M in H0. lia.
 - generalize (Z_mod_lt (v - ofs) modulus modulus_pos). lia.
 Qed.
@@ -310,7 +310,7 @@ Proof.
   destruct cases as [ | [key1 act1] cases1]; intros.
 + apply beq_nat_true in H. subst act. reflexivity.
 + InvBooleans. apply beq_nat_true in H2. subst. simpl.
-  destruct (zeq v hi). auto. liaContradiction.
+  destruct (zeq v hi). auto. extlia.
 - (* eq node *)
   destruct (split_eq key cases) as [optact others] eqn:EQ. intros.
   destruct optact as [act1|]; InvBooleans; try discriminate.
@@ -332,7 +332,7 @@ Proof.
   rewrite (split_between_prop v _ _ _ _ _ _ EQ).
   assert (0 <= (v - ofs) mod modulus < modulus) by (apply Z_mod_lt; lia).
   destruct (zlt ((v - ofs) mod modulus) sz).
-  rewrite Zmod_small by lia. eapply validate_jumptable_correct; eauto.
+  rewrite Z.mod_small by lia. eapply validate_jumptable_correct; eauto.
   eapply IHt; eauto.
 Qed.
 

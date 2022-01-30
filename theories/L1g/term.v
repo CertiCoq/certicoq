@@ -9,6 +9,8 @@ Require Import Coq.micromega.Lia.
 Require Export Common.Common Common.AstCommon.
 Require Export L1g.compile.
 
+From MetaCoq Require Import Template.Reflect.
+
 Open Scope string_scope.
 Open Scope bool.
 Open Scope list.
@@ -80,7 +82,7 @@ Proof.
     + right. intros h. myInjection h. elim n. reflexivity.
   - destruct cc; cross; lft.
   - destruct cc; cross.
-    destruct (eq_nat_dec n n0), (H t0), (H0 cc); [lft | rght .. ].
+    destruct (Equations.Prop.Classes.eq_dec l l0), (H t0), (H0 cc); [lft | rght .. ].
   - destruct ee; cross. lft.
   - destruct ee; cross.
     destruct (name_dec n n1); destruct (eq_nat_dec n0 n2);
@@ -1134,7 +1136,7 @@ Lemma WFapp_mkApp:
   forall args t, WFapp (mkApp t args) -> WFapp t /\ WFapps args.
 Proof.
   induction args; intros.
-  - cbn in H. intuition. constructor.
+  - cbn in H. intuition. (* constructor. *)
   - change (WFapp (mkApp (TApp t a) args)) in H.
     specialize (IHargs _ H). destruct IHargs. inversion_Clear H0.
     split.
@@ -1207,7 +1209,7 @@ Inductive WFTrm: Term -> nat -> Prop :=
 with WFTrmBs: Brs -> nat -> Prop :=
      | wfbnil: forall n, WFTrmBs bnil n
      | wfbcons: forall n m b bs,
-         WFTrm b n -> WFTrmBs bs n -> WFTrmBs (bcons m b bs) n
+         WFTrm b (List.length m + n) -> WFTrmBs bs n -> WFTrmBs (bcons m b bs) n
 with WFTrmDs: Defs -> nat -> Prop :=
      | wfdnil: forall n, WFTrmDs dnil n
      | wfdcons: forall n nm bod arg ds,
@@ -1575,6 +1577,11 @@ Qed.
 End Instantiate_sec.
 End PoccTrm_sec.
 
+Fixpoint instantiatel s k t :=
+  match s with
+  | [] => t
+  | a :: s => instantiatel s k (instantiate a (List.length s + k) t)
+  end.
 
 Lemma instantiate_pres_WFapp:
   (forall bod, WFapp bod ->
@@ -1668,7 +1675,10 @@ unfold whBetaStep; simpl; induction 1; intros.
 
 Definition whCaseStep (cstrNbr:nat) (args:Terms) (brs:Brs): option Term := 
   match bnth cstrNbr brs with
-    | Some (t, _) => Some (mkApp t args)
+    | Some (t, argnames) =>
+      if eqb (List.length argnames) (List.length args) then 
+        Some (instantiatel args 0 t)
+      else None
     | None => None
   end.
 
@@ -1698,7 +1708,7 @@ Qed.
 
 Lemma bnth_pres_WFTrm:
   forall n (brs:Brs), WFTrmBs brs n ->
-    forall m x ix, bnth m brs = Some (x, ix) -> WFTrm x n.
+    forall m x ix, bnth m brs = Some (x, ix) -> WFTrm x (List.length ix + n).
 Proof.
   intros n brs h m x ix.
   functional induction (bnth m brs); intros; auto.
@@ -1707,6 +1717,14 @@ Proof.
   - apply IHo; inversion h; assumption.
 Qed.
 
+Lemma instantiates_pres_WFapp bod s k : 
+  WFapp bod -> WFapps s -> 
+  WFapp (instantiatel s k bod).
+Proof.
+  induction s in bod |- *; cbn; auto.
+  intros h h'; inv h'.
+  eapply IHs; auto. now eapply instantiate_pres_WFapp.
+Qed.
 
 Lemma whCaseStep_pres_WFapp:
   forall (brs:Brs), WFappBs brs -> forall ts, WFapps ts -> 
@@ -1714,9 +1732,11 @@ Lemma whCaseStep_pres_WFapp:
 Proof.
   intros brs hbrs ts hts n s h. unfold whCaseStep in h.
   case_eq (bnth n brs); intros; rewrite H in h.
-  - destruct p. myInjection h. apply mkApp_pres_WFapp.
-    + assumption.
-    + eapply (bnth_pres_WFapp hbrs n). eassumption.
+  - destruct p. 
+    destruct (eqb_spec (List.length l) (List.length ts)); try discriminate.
+    myInjection h.
+    eapply (bnth_pres_WFapp hbrs n) in H.
+    now eapply instantiates_pres_WFapp.
   - discriminate.
 Qed.
 

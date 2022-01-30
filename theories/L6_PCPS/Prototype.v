@@ -6,7 +6,7 @@ Require Import Coq.Lists.List.
 Import ListNotations.
 
 From MetaCoq Require Import Template.All.
-Import MonadNotation.
+Import MCMonadNotation.
 Module TM := MetaCoq.Template.monad_utils.
 
 From ExtLib.Core Require Import RelDec.
@@ -51,11 +51,11 @@ Definition add_sigils (x : aname) : GM string :=
   | BasicAst.nNamed s => gensym s
   end.
 
-Fixpoint remove_sigils (s : string) : aname :=
+Fixpoint remove_sigils (s : string) : name :=
   match s with
-  | EmptyString => nNamed s
-  | "$" => nAnon
-  | String "$" s => nNamed s
+  | EmptyString => BasicAst.nNamed s
+  | "$" => BasicAst.nAnon
+  | String "$" s => BasicAst.nNamed s
   | String _ s => remove_sigils s
   end.
 
@@ -67,7 +67,28 @@ Fixpoint remove_sigils' (s : string) : string :=
   | String _ s => remove_sigils' s
   end.
 
-Definition named_of (Γ : list string) (tm : term) : GM term :=
+Section named_of.
+Local Close Scope monad_scope.
+Local Notation ret := (ExtLib.Structures.Monad.ret).
+Local Notation bind := (ExtLib.Structures.Monad.bind).
+Local Notation raise := (ExtLib.Structures.MonadExc.raise).
+Local Notation "e1 ;; e2" := (ExtLib.Structures.Monad.bind e1 (fun _ => e2)).
+Local Notation "x <- c1 ;; c2" := (ExtLib.Structures.Monad.bind c1 (fun x => c2)).
+Local Notation "e1 >>= e2" := (ExtLib.Structures.Monad.bind e1 e2).
+
+Definition set_aname (s : string) (x : aname) :=
+  {| binder_name := BasicAst.nNamed s; binder_relevance := x.(binder_relevance) |}.
+
+Instance show_list {A} {s : Show A} : Show (list A) :=
+  { show l := String.concat "," (map show l) }.
+
+Definition lookup (n : nat) (xs : list string) : GM string :=
+  match nth_error xs n with
+  | Some v => ret v
+  | None => raise ("nthM: " +++ nat2string10 n ++ " in " ++ show xs)
+  end.
+
+Definition named_of' (Γ : list string) (tm : term) : GM term :=
   let fix go (n : nat) (Γ : list string) (tm : term) : GM term :=
     match n with O => raise "named_of: OOF" | S n =>
       let go := go n in
@@ -82,8 +103,25 @@ Definition named_of (Γ : list string) (tm : term) : GM term :=
               <*> ret d.(rarg))
           (combine names mfix)
       in
+      let go_predicate (p : predicate term) : GM (predicate term) :=
+          pp' <- mapM (go Γ) (pparams p) ;;
+          Γ' <- mapM add_sigils (pcontext p) ;;
+          pr' <- go (Γ' ++ Γ) (preturn p) ;;
+
+          ret {| puinst := puinst p
+              ; pparams := pp'
+              ; pcontext := map2 set_aname Γ' (pcontext p)
+              ; preturn := pr'
+              |} 
+      in
+      let go_branch (br : branch term) : GM (branch term) :=
+        Γ' <- mapM add_sigils (bcontext br) ;;
+        bb' <- go (Γ' ++ Γ) (bbody br) ;;
+        ret {| bcontext := map2 set_aname Γ' (bcontext br); 
+          bbody := bb' |} 
+      in
       match tm with
-      | tRel n => tVar <$> nthM_nat n Γ
+      | tRel n => tVar <$> lookup n Γ
       | tVar id => ret tm
       | tEvar ev args => ret tm
       | tSort s => ret tm
@@ -103,24 +141,33 @@ Definition named_of (Γ : list string) (tm : term) : GM term :=
       | tConstruct ind idx u => ret tm
       | tCase ind_and_nbparams type_info discr branches =>
         tCase ind_and_nbparams
-          <$> go Γ type_info <*> go Γ discr
-          <*> mapM (fun '(n, t) => pair n <$> go Γ t) branches
+          <$> go_predicate type_info <*> go Γ discr
+          <*> mapM go_branch branches
       | tProj proj t => tProj proj <$> go Γ t
       | tFix mfix idx => tFix <$> go_mfix mfix <*> ret idx
       | tCoFix mfix idx => tCoFix <$> go_mfix mfix <*> ret idx
+      | tInt _ => ret tm
+      | tFloat _ => ret tm
       end
     end
   in go 1000%nat Γ tm.
 
-(*
-Compute runGM' 0 (named_of [] <%
+Definition named_of (Γ : list string) (tm : term) : GM term :=
+  {| runStateT := fun s => 
+  match runStateT (named_of' Γ tm) s with
+  | inr (x, s) => inr (x, s)
+  | inl e => runStateT
+   (raise ("named_of failed on " +++ " Γ = " +++ show Γ +++ " tm = " +++ string_of_term tm +++ " with " +++ e)) s
+  end |}.
+
+(*Compute runGM' 0 (named_of [] <%
   fun x y z w : nat =>
   match x, y with
   | S x, S y => z * x + y * w
   | O, y => z + z
   | _, _ => w
-  end%nat%>).
-Compute runGM' 0 (named_of [] <%forall x y z : nat, x = y -> y = z -> x = z%>).
+  end%nat%>).*)
+(*Compute runGM' 0 (named_of [] <%forall x y z : nat, x = y -> y = z -> x = z%>).
 *)
 
 Definition find_str (s : string) (ss : list string) : GM nat :=
@@ -135,24 +182,28 @@ Definition indices_of (Γ : list string) (t : term) : GM term :=
   let index_of Γ s := find_str s Γ in
   let go_name (x : aname) : (aname × string) :=
     match binder_name x with
-    | BasicAst.nAnon => (nAnon, "anon") (* can never be referred to in named rep, so don't care if there are clashes *)
-    | BasicAst.nNamed s => (remove_sigils s, s)
+    | BasicAst.nAnon => ({| binder_name := BasicAst.nAnon; binder_relevance := x.(binder_relevance) |}, "anon") (* can never be referred to in named rep, so don't care if there are clashes *)
+    | BasicAst.nNamed s => ({| binder_name := remove_sigils s; binder_relevance := x.(binder_relevance) |}, s)
     end
   in
   let fix go (n : nat) (Γ : list string) (tm : term) : GM term :=
     match n with O => raise "named_of: OOF" | S n =>
       let go := go n in
-      let go_mfix mfix : GM (mfixpoint term) :=
-        let nass := map (fun d => go_name d.(dname)) mfix in
+      let go_names names :=
+        let nass := map go_name names in
         let '(names, strings) := split nass in
-        let Γ' := rev strings ++ Γ in
+        let Γ' := strings ++ Γ in
+        (names, Γ')
+      in
+      let go_mfix mfix : GM (mfixpoint term) :=
+        let '(names, Γ') := go_names (List.rev (map dname mfix)) in
         mapM
           (fun '(na, d) =>
             mkdef _ na
               <$> go Γ d.(dtype)
               <*> go Γ' d.(dbody)
               <*> ret d.(rarg))
-          (combine names mfix)
+          (combine (List.rev names) mfix)
       in
       match tm with
       | tRel n => ret tm
@@ -171,15 +222,30 @@ Definition indices_of (Γ : list string) (t : term) : GM term :=
       | tInd ind u => ret tm
       | tConstruct ind idx u => ret tm
       | tCase ind_and_nbparams type_info discr branches =>
-        tCase ind_and_nbparams
-          <$> go Γ type_info <*> go Γ discr
-          <*> mapM (fun '(n, t) => pair n <$> go Γ t) branches
+          let '(names, Γ') := go_names (pcontext type_info) in
+          go_pparams <- mapM (go Γ) (pparams type_info) ;; 
+          go_preturn <- go Γ' (preturn type_info) ;;
+          let go_type_info := 
+              {|
+              puinst := puinst type_info;
+              pparams := go_pparams;
+              pcontext := names;
+              preturn := go_preturn;
+            |}
+          in go_discr <- go Γ discr
+          ;; go_branches <- mapM (fun br => 
+              let '(names, Γ') := go_names (bcontext br) in
+              go Γ' (bbody br) >>= fun t' => ret {| bcontext := names; bbody := t' |}) branches
+          ;; ret (tCase ind_and_nbparams go_type_info go_discr go_branches)
       | tProj proj t => tProj proj <$> go Γ t
       | tFix mfix idx => tFix <$> go_mfix mfix <*> ret idx
       | tCoFix mfix idx => tCoFix <$> go_mfix mfix <*> ret idx
+      | tInt _ => ret tm
+      | tFloat _ => ret tm
       end
     end
   in go 1000%nat [] t.
+End named_of.
 
 Definition check_roundtrip (Γ : list string) (t : term) : GM (option (term × term)) :=
   let! named := named_of Γ t in
@@ -207,18 +273,38 @@ Compute runGM' 0 (check_roundtrip [] <%
     end%nat
   for ev%>).
 
+Inductive twoargs := 
+  | twoC : twoargs -> nat -> twoargs.
+
+Compute runGM' 0 (check_roundtrip [] <%
+  fix ev c :=
+    match c return nat with
+    | twoC x y => ev x
+    end%>).
+
 (* Renames binders too, and doesn't respect scoping rules at all *)
 Definition rename (σ : Map string string) : term -> term :=
   let go_str (s : string) : string := find_d s s σ in
   let go_name (na : aname) : aname :=
     match binder_name na with
     | BasicAst.nAnon => na
-    | BasicAst.nNamed id => nNamed (go_str id)
+    | BasicAst.nNamed id =>
+      {| binder_name := BasicAst.nNamed (go_str id); binder_relevance := na.(binder_relevance) |}
     end
   in
   fix go (tm : term) : term :=
     let go_mfix (mfix : list (def term)) : list (def term) :=
       map (fun '(mkdef f ty body rarg) => mkdef _ (go_name f) (go ty) (go body) rarg) mfix
+    in
+    let go_predicate p :=
+      {| puinst := (puinst p);
+        pparams := map go (pparams p);
+        pcontext := map go_name (pcontext p);
+        preturn := go (preturn p) |}
+    in
+    let go_branch br :=
+      {| bcontext := map go_name (bcontext br);
+         bbody := go (bbody br) |}
     in
     match tm with
     | tRel n => tm
@@ -234,10 +320,14 @@ Definition rename (σ : Map string string) : term -> term :=
     | tInd ind u => tm
     | tConstruct ind idx u => tm
     | tCase ind_and_nbparams type_info discr branches =>
-      tCase ind_and_nbparams (go type_info) (go discr) (map (on_snd go) branches)
+      let type_info' := go_predicate type_info in
+      let branches' := map go_branch branches in
+      tCase ind_and_nbparams type_info' (go discr) branches'
     | tProj proj t => tProj proj (go t)
     | tFix mfix idx => tFix (go_mfix mfix) idx
     | tCoFix mfix idx => tCoFix (go_mfix mfix) idx
+    | tInt _ => tm
+    | tFloat _ => tm
     end.
 
 (* -------------------- Generation of helper function types -------------------- *)
@@ -355,10 +445,15 @@ Fixpoint vars_of (t : term) : Set' string :=
   | tInd ind u => empty
   | tConstruct ind idx u => empty
   | tCase ind_and_nbparams type_info discr branches =>
-    vars_of type_info ∪ vars_of discr ∪ union_all (map (fun '(_, t) => vars_of t) branches)
+     fold_left union (map vars_of (pparams type_info)) nil
+    ∪ vars_of (preturn type_info)
+    ∪ vars_of discr
+    ∪ union_all (map (fun br => vars_of (bbody br)) branches)
   | tProj proj t => vars_of t
   | tFix mfix idx => union_all (map (fun def => vars_of def.(dtype) ∪ vars_of def.(dbody)) mfix)
   | tCoFix mfix idx => union_all (map (fun def => vars_of def.(dtype) ∪ vars_of def.(dbody)) mfix)
+  | tInt _ => empty
+  | tFloat _ => empty
   end.
 
 (* ---------- Parsing the inductive relation ---------- *)
@@ -471,10 +566,15 @@ Fixpoint has_var (x : BasicAst.ident) (e : term) {struct e} : bool. ltac1:(refin
   | tInd ind u => false
   | tConstruct ind idx u => false
   | tCase ind_and_nbparams type_info discr branches =>
-    has_var x type_info || has_var x discr || anyb (fun '(_, e) => has_var x e) branches
+    anyb (has_var x) (pparams type_info) (* TODO(tcarstens): check this *)
+    || has_var x (preturn type_info)
+    || has_var x discr
+    || anyb (fun br => has_var x (bbody br)) branches
   | tProj proj t => has_var x t
   | tFix mfix idx => anyb (fun d => has_var x d.(dtype) || has_var x d.(dbody)) mfix
   | tCoFix mfix idx => anyb (fun d => has_var x d.(dtype) || has_var x d.(dbody)) mfix
+  | tInt _ => false
+  | tFloat _ => false
   end%bool
 )).
 Defined.
@@ -535,7 +635,7 @@ Definition parse_rel_pure (ind : inductive) (mbody : mutual_inductive_body)
            (body : one_inductive_body) : GM rules_t. ltac1:(refine(
   let! rules :=
     mapiM
-      (fun i ctor => rule_of_ind_ctor ctor)
+      (fun i ctor => rule_of_ind_ctor (cstr_name ctor, cstr_type ctor, cstr_arity ctor))
       body.(ind_ctors)
   in
   match rules with
@@ -1052,17 +1152,24 @@ Definition gen_case_tree (ind_info : ind_info) (epats : list (term × term))
         let args := skipn nparams args in
         let! constrs :=
           mapM
-            (fun '(name, constr_ty, arity) =>
-              let '(xs, ts, rty) := decompose_prod constr_ty in
+            (fun ctor => 
+              let '(xs, ts, rty) := decompose_prod ctor.(cstr_type) in
               let xs := skipn nparams xs in
               let ts := skipn nparams ts in
               let constr_ty := fold_right (fun '(x, t) ty => tProd x t ty) rty (combine xs ts) in
               let constr_ty := subst0 (rev pars ++ rev_map (fun ind => tInd ind []) inds) constr_ty in
               let! constr_ty := named_of [] constr_ty in
-              ret (name, constr_ty, arity))
+              ret (ctor.(cstr_name), constr_ty, ctor.(cstr_arity)))
             body.(ind_ctors)
         in
-        tCase ((ind, nparams), Relevant) (tLambda nAnon (mkApps (tInd ind []) pars) ret_ty) e <$>
+        let ci := {| ci_ind := ind ; ci_npar := nparams ; ci_relevance := Relevant |} in
+        let p := 
+          {| pparams := pars; 
+             puinst := [];
+             pcontext := [nAnon] ++ map (fun _ => nAnon) body.(ind_indices);
+             preturn := ret_ty |}
+        in
+        tCase ci p e <$>
           mapiM_nat
             (fun i '(_, constr_ty, arity) =>
               let '(xs, ts, rty) := decompose_prod constr_ty in
@@ -1090,12 +1197,7 @@ Definition gen_case_tree (ind_info : ind_info) (epats : list (term × term))
                  then go (combine (map tVar xs) args ++ epats)
                  else ret failure
               in
-              let arm :=
-                fold_right
-                  (fun '(x, t) arm => tLambda (nNamed x) t arm)
-                  arm (combine xs ts)
-              in
-              ret (arity, arm))
+              ret {| bcontext := List.rev (map nNamed xs) ; bbody := arm |})
             constrs
       in
       match epats with
@@ -1668,7 +1770,7 @@ Ltac next_action e k_rec k_constr k_atom :=
   end.
 
 Lemma nonempty_nonzero (fuel : Rewriting.Fuel true) : is_empty true fuel = false -> (fuel > 1)%positive.
-Proof. unfold is_empty; destruct fuel; try ltac1:(lia); now inversion 1. Qed.
+Proof. unfold is_empty; destruct fuel; try ltac1:(lia); now (inversion 1). Qed.
 
 Inductive MetricDecreasing := MkMetricDecreasing.
 Ltac apply_recur recur fuel fueled metric Hempty :=

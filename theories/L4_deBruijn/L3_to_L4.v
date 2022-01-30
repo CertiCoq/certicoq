@@ -4,7 +4,7 @@
  *)
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
-        Coq.Lists.List Coq.omega.Omega Coq.Program.Program Coq.micromega.Psatz.
+        Coq.Lists.List Coq.micromega.Lia Coq.Program.Program Coq.micromega.Psatz.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
@@ -59,14 +59,6 @@ Section TermTranslation.
 
   Variable e : env.
   Variable prims : list (kername * string * nat * positive).
-           
-  Fixpoint strip_lam (k : nat) (e : exp) : list name * exp :=
-    match k, e with
-    | 0%nat, _ => ([], e)
-    | S n, Lam_e na e => let '(names, e) := strip_lam n e in
-                       (na :: names, e)
-    | S n, _ => ([],e)
-    end.
 
   Section fixes.
     Variable trans : N -> L3t.Term -> exp.
@@ -76,8 +68,7 @@ Section TermTranslation.
       match l with
       | L3t.bnil => brnil_e
       | L3t.bcons nargs t ts =>
-        let '(names, t') := strip_lam nargs (trans k t) in
-        brcons_e (ind,n) (N.of_nat nargs, names) t'
+        brcons_e (ind,n) (N.of_nat (List.length nargs), nargs) (trans (k + N.of_nat (List.length nargs)) t)
                  (trans_brs ind k (n + 1)%N ts)
       end.
     Fixpoint trans_fixes k l :=
@@ -165,8 +156,6 @@ Definition inductive_env (e : environ L2k.compile.Term) : ienv :=
 
 Definition mkLets (e : env) (t : exp) :=
   fold_left (fun acc (x : _ * exp) => Let_e (string_of_kername (fst x)) (snd x) acc) e t.
-
-Require Import L3_to_L3_eta.
 
 Definition translate_program
            (prims : list (kername * string * nat * positive))

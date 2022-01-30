@@ -4,7 +4,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Bool.Bool.
 Require Import Coq.Bool.DecBool.
-Require Import Coq.omega.Omega.
+Require Import Coq.Arith.Arith.
 
 
 Class Eq (A:Type) :=

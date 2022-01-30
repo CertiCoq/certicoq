@@ -4,8 +4,8 @@ Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
-Require Import Coq.omega.Omega.
 Require Import Coq.micromega.Lia.
+Require Import Arith.
 Require Import Common.Common.
 Require Import L1g.compile.
 Require Import L1g.term.
@@ -80,7 +80,7 @@ with crctEnv: environ Term -> Prop :=
 with crctBs: environ Term -> nat -> Brs -> Prop :=
      | cbsNil: forall p n, crctEnv p -> crctBs p n bnil
      | cbsCons: forall p n m t ts,
-         crctTerm p n t -> crctBs p n ts -> crctBs p n (bcons m t ts)
+         crctTerm p (List.length m + n) t -> crctBs p n ts -> crctBs p n (bcons m t ts)
 with crctDs: environ Term -> nat -> Defs -> Prop :=
      | cdsNil: forall p n, crctEnv p -> crctDs p n dnil
      | cdsCons: forall p n dnm bod ix ds,
@@ -115,7 +115,7 @@ Lemma Crct_CrctEnv:
   (forall (p:environ Term), crctEnv p -> True).
 Proof.
   apply crctCrctTsBsDsEnv_ind; intros; intuition.
-Qed.
+Defined.
 
 Lemma Crct_up:
   (forall p n t, crctTerm p n t -> crctTerm p (S n) t) /\
@@ -128,6 +128,7 @@ Proof.
   - eapply ctConst; eassumption.
   - eapply ctConstructor; eassumption.
   - eapply ctCase; eassumption.
+  - constructor. now rewrite Nat.add_succ_r. auto.
 Qed.
 
 Lemma Crct_UP:

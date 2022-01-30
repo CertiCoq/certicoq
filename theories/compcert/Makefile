@@ -6,25 +6,60 @@
 #                                                                     #
 #  Copyright Institut National de Recherche en Informatique et en     #
 #  Automatique.  All rights reserved.  This file is distributed       #
-#  under the terms of the GNU General Public License as published by  #
-#  the Free Software Foundation, either version 2 of the License, or  #
-#  (at your option) any later version.  This file is also distributed #
-#  under the terms of the INRIA Non-Commercial License Agreement.     #
+#  under the terms of the GNU Lesser General Public License as        #
+#  published by the Free Software Foundation, either version 2.1 of   #
+#  the License, or (at your option) any later version.                #
+#  This file is also distributed under the terms of the               #
+#  INRIA Non-Commercial License Agreement.                            #
 #                                                                     #
 #######################################################################
 
 include Makefile.config
+include VERSION
 
--include CONFIGURE
-DIRS=lib common $(ARCH) backend cfrontend driver debug\
-  flocq/Core flocq/Prop flocq/Calc flocq/Appli exportclight \
-  cparser cparser/validator
+BUILDVERSION ?= $(version)
+BUILDNR ?= $(buildnr)
+TAG ?= $(tag)
+BRANCH ?= $(branch)
 
-RECDIRS=lib common $(ARCH) backend cfrontend driver flocq exportclight cparser
+ifeq ($(wildcard $(ARCH)_$(BITSIZE)),)
+ARCHDIRS=$(ARCH)
+else
+ARCHDIRS=$(ARCH)_$(BITSIZE) $(ARCH)
+endif
 
-COQINCLUDES=$(foreach d, $(RECDIRS), -R $(d) compcert.$(d))
+DIRS := lib common $(ARCHDIRS) backend cfrontend driver exportclight cparser
 
-COQC="$(COQBIN)coqc" -q $(COQINCLUDES)
+COQINCLUDES := $(foreach d, $(DIRS), -R $(d) compcert.$(d))
+
+ifeq ($(LIBRARY_FLOCQ),local)
+DIRS += flocq/Core flocq/Prop flocq/Calc flocq/IEEE754
+COQINCLUDES += -R flocq Flocq
+endif
+
+ifeq ($(LIBRARY_MENHIRLIB),local)
+DIRS += MenhirLib
+COQINCLUDES += -R MenhirLib MenhirLib
+endif
+
+# Notes on silenced Coq warnings:
+#
+# undeclared-scope:
+#    warning introduced in 8.12
+#    suggested change (use `Declare Scope`) supported since 8.12
+# unused-pattern-matching-variable:
+#    warning introduced in 8.13
+#    the code rewrite that avoids the warning is not desirable
+# deprecated-ident-entry:
+#    warning introduced in 8.13
+#    suggested change (use `name` instead of `ident`) supported since 8.13
+
+COQCOPTS ?= \
+  -w -undeclared-scope \
+  -w -unused-pattern-matching-variable \
+  -w -deprecated-ident-entry
+
+COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQDOC="$(COQBIN)coqdoc"
 COQEXEC="$(COQBIN)coqtop" $(COQINCLUDES) -batch -load-vernac-source
@@ -37,37 +72,40 @@ GPATH=$(DIRS)
 
 # Flocq
 
+ifeq ($(LIBRARY_FLOCQ),local)
 FLOCQ=\
-  Fcore_Raux.v Fcore_Zaux.v Fcore_defs.v Fcore_digits.v                     \
-  Fcore_float_prop.v Fcore_FIX.v Fcore_FLT.v Fcore_FLX.v                    \
-  Fcore_FTZ.v Fcore_generic_fmt.v Fcore_rnd.v Fcore_rnd_ne.v                \
-  Fcore_ulp.v Fcore.v                                                       \
-  Fcalc_bracket.v Fcalc_digits.v Fcalc_div.v Fcalc_ops.v                    \
-  Fcalc_round.v Fcalc_sqrt.v                                                \
-  Fprop_div_sqrt_error.v Fprop_mult_error.v Fprop_plus_error.v              \
-  Fprop_relative.v Fprop_Sterbenz.v                                         \
-  Fappli_rnd_odd.v Fappli_double_round.v Fappli_IEEE.v Fappli_IEEE_bits.v
+  SpecFloatCompat.v \
+  Raux.v Zaux.v Defs.v Digits.v Float_prop.v FIX.v FLT.v FLX.v FTZ.v \
+  Generic_fmt.v Round_pred.v Round_NE.v Ulp.v Core.v \
+  Bracket.v Div.v Operations.v Round.v Sqrt.v \
+  Div_sqrt_error.v Mult_error.v Plus_error.v \
+  Relative.v Sterbenz.v Round_odd.v Double_rounding.v \
+  Binary.v Bits.v
+else
+FLOCQ=
+endif
 
 # General-purpose libraries (in lib/)
 
 VLIB=Axioms.v Coqlib.v Intv.v Maps.v Heaps.v Lattice.v Ordered.v \
-  Iteration.v Integers.v Archi.v Fappli_IEEE_extra.v Floats.v \
+  Iteration.v Zbits.v Integers.v Archi.v IEEE754_extra.v Floats.v \
   Parmov.v UnionFind.v Wfsimpl.v \
-  Postorder.v FSetAVLplus.v IntvSets.v Decidableplus.v
+  Postorder.v FSetAVLplus.v IntvSets.v Decidableplus.v BoolEqual.v
 
 # Parts common to the front-ends and the back-end (in common/)
 
 COMMON=Errors.v AST.v Linking.v \
   Events.v Globalenvs.v Memdata.v Memtype.v Memory.v \
   Values.v Smallstep.v Behaviors.v Switch.v Determinism.v Unityping.v \
-  Separation.v
+  Separation.v Builtins0.v Builtins1.v Builtins.v
 
 # Back-end modules (in backend/, $(ARCH)/)
 
 BACKEND=\
-  Cminor.v Op.v CminorSel.v \
-  SelectOp.v SelectDiv.v SelectLong.v Selection.v \
-  SelectOpproof.v SelectDivproof.v SelectLongproof.v Selectionproof.v \
+  Cminor.v Cminortyping.v Op.v CminorSel.v \
+  SelectOp.v SelectDiv.v SplitLong.v SelectLong.v Selection.v \
+  SelectOpproof.v SelectDivproof.v SplitLongproof.v \
+  SelectLongproof.v Selectionproof.v \
   Registers.v RTL.v \
   RTLgen.v RTLgenspec.v RTLgenproof.v \
   Tailcall.v Tailcallproof.v \
@@ -100,15 +138,19 @@ CFRONTEND=Ctypes.v Cop.v Csyntax.v Csem.v Ctyping.v Cstrategy.v Cexec.v \
   Cshmgen.v Cshmgenproof.v \
   Csharpminor.v Cminorgen.v Cminorgenproof.v
 
-# LR(1) parser validator
-
-PARSERVALIDATOR=Alphabet.v Interpreter_complete.v Interpreter.v \
-  Validator_complete.v Automaton.v Interpreter_correct.v Main.v \
-  Validator_safe.v Grammar.v Interpreter_safe.v Tuples.v
-
 # Parser
 
 PARSER=Cabs.v Parser.v
+
+# MenhirLib
+
+ifeq ($(LIBRARY_MENHIRLIB),local)
+MENHIRLIB=Alphabet.v Automaton.v Grammar.v Interpreter_complete.v \
+  Interpreter_correct.v Interpreter.v Main.v Validator_complete.v \
+  Validator_safe.v Validator_classes.v
+else
+MENHIRLIB=
+endif
 
 # Putting everything together (in driver/)
 
@@ -117,9 +159,17 @@ DRIVER=Compopts.v Compiler.v Complements.v
 # All source files
 
 FILES=$(VLIB) $(COMMON) $(BACKEND) $(CFRONTEND) $(DRIVER) $(FLOCQ) \
-  $(PARSERVALIDATOR) $(PARSER)
+  $(MENHIRLIB) $(PARSER)
+
+# Generated source files
+
+GENERATED=\
+  $(ARCH)/ConstpropOp.v $(ARCH)/SelectOp.v $(ARCH)/SelectLong.v \
+  backend/SelectDiv.v backend/SplitLong.v \
+  cparser/Parser.v
 
 all:
+	@test -f .depend || $(MAKE) depend
 	$(MAKE) proof
 	$(MAKE) extraction
 	$(MAKE) ccomp
@@ -129,9 +179,14 @@ endif
 ifeq ($(CLIGHTGEN),true)
 	$(MAKE) clightgen
 endif
-
+ifeq ($(INSTALL_COQDEV),true)
+	$(MAKE) compcert.config
+endif
 
 proof: $(FILES:.v=.vo)
+
+# Turn off some warnings for compiling Flocq
+flocq/%.vo: COQCOPTS+=-w -compatibility-notation
 
 extraction: extraction/STAMP
 
@@ -160,23 +215,25 @@ FORCE:
 
 .PHONY: proof extraction runtime FORCE
 
-documentation: doc/coq2html $(FILES)
+documentation: $(FILES)
 	mkdir -p doc/html
 	rm -f doc/html/*.html
-	doc/coq2html -o 'doc/html/%.html' doc/*.glob \
+	coq2html -d doc/html/ -base compcert -short-names doc/*.glob \
           $(filter-out doc/coq2html cparser/Parser.v, $^)
-	cp doc/coq2html.css doc/coq2html.js doc/html/
-
-doc/coq2html: doc/coq2html.ml
-	ocamlopt -w +a-29 -o doc/coq2html str.cmxa doc/coq2html.ml
-
-doc/coq2html.ml: doc/coq2html.mll
-	ocamllex -q doc/coq2html.mll
 
 tools/ndfun: tools/ndfun.ml
+ifeq ($(OCAML_NATIVE_COMP),true)
 	ocamlopt -o tools/ndfun str.cmxa tools/ndfun.ml
+else
+	ocamlc -o tools/ndfun str.cma tools/ndfun.ml
+endif
+
 tools/modorder: tools/modorder.ml
+ifeq ($(OCAML_NATIVE_COMP),true)
 	ocamlopt -o tools/modorder str.cmxa tools/modorder.ml
+else
+	ocamlc -o tools/modorder str.cma tools/modorder.ml
+endif
 
 latexdoc:
 	cd doc; $(COQDOC) --latex -o doc/doc.tex -g $(FILES)
@@ -190,7 +247,7 @@ latexdoc:
 	@rm -f $*.v
 	@echo "Preprocessing $*.vp"
 	@tools/ndfun $*.vp > $*.v || { rm -f $*.v; exit 2; }
-	@chmod -w $*.v
+	@chmod a-w $*.v
 
 compcert.ini: Makefile.config
 	(echo "stdlib_path=$(LIBDIR)"; \
@@ -203,46 +260,78 @@ compcert.ini: Makefile.config
          echo "arch=$(ARCH)"; \
          echo "model=$(MODEL)"; \
          echo "abi=$(ABI)"; \
+         echo "endianness=$(ENDIANNESS)"; \
          echo "system=$(SYSTEM)"; \
          echo "has_runtime_lib=$(HAS_RUNTIME_LIB)"; \
          echo "has_standard_headers=$(HAS_STANDARD_HEADERS)"; \
          echo "asm_supports_cfi=$(ASM_SUPPORTS_CFI)"; \
-         echo "struct_passing_style=$(STRUCT_PASSING)"; \
-         echo "struct_return_style=$(STRUCT_RETURN)";) \
+	 echo "response_file_style=$(RESPONSEFILE)";) \
         > compcert.ini
 
+compcert.config: Makefile.config
+	(echo "# CompCert configuration parameters"; \
+        echo "COMPCERT_ARCH=$(ARCH)"; \
+        echo "COMPCERT_MODEL=$(MODEL)"; \
+        echo "COMPCERT_ABI=$(ABI)"; \
+        echo "COMPCERT_ENDIANNESS=$(ENDIANNESS)"; \
+        echo "COMPCERT_BITSIZE=$(BITSIZE)"; \
+        echo "COMPCERT_SYSTEM=$(SYSTEM)"; \
+        echo "COMPCERT_VERSION=$(BUILDVERSION)"; \
+        echo "COMPCERT_BUILDNR=$(BUILDNR)"; \
+        echo "COMPCERT_TAG=$(TAG)"; \
+        echo "COMPCERT_BRANCH=$(BRANCH)" \
+        ) > compcert.config
+
 driver/Version.ml: VERSION
-	cat VERSION \
-	| sed -e 's|\(.*\)=\(.*\)|let \1 = \"\2\"|g' \
-	>driver/Version.ml
+	(echo 'let version = "$(BUILDVERSION)"'; \
+         echo 'let buildnr = "$(BUILDNR)"'; \
+         echo 'let tag = "$(TAG)"'; \
+         echo 'let branch = "$(BRANCH)"') > driver/Version.ml
 
 cparser/Parser.v: cparser/Parser.vy
-	$(MENHIR) --coq cparser/Parser.vy
+	@rm -f $@
+	$(MENHIR) --coq --coq-no-version-check cparser/Parser.vy
+	@chmod a-w $@
 
-depend: $(FILES) exportclight/Clightdefs.v
-	$(COQDEP) $^ \
-        | sed -e 's|$(ARCH)/|$$(ARCH)/|g' \
-        > .depend
+depend: $(GENERATED) depend1
+
+depend1: $(FILES) exportclight/Clightdefs.v
+	@echo "Analyzing Coq dependencies"
+	@$(COQDEP) $^ > .depend
 
 install:
-	install -d $(BINDIR)
-	install -m 0755 ./ccomp $(BINDIR)
-	install -d $(SHAREDIR)
-	install -m 0644 ./compcert.ini $(SHAREDIR)
+	install -d $(DESTDIR)$(BINDIR)
+	install -m 0755 ./ccomp $(DESTDIR)$(BINDIR)
+	install -d $(DESTDIR)$(SHAREDIR)
+	install -m 0644 ./compcert.ini $(DESTDIR)$(SHAREDIR)
+	install -d $(DESTDIR)$(MANDIR)/man1
+	install -m 0644 ./doc/ccomp.1 $(DESTDIR)$(MANDIR)/man1
 	$(MAKE) -C runtime install
 ifeq ($(CLIGHTGEN),true)
-	install -m 0755 ./clightgen $(BINDIR)
+	install -m 0755 ./clightgen $(DESTDIR)$(BINDIR)
+endif
+ifeq ($(INSTALL_COQDEV),true)
+	install -d $(DESTDIR)$(COQDEVDIR)
+	for d in $(DIRS); do \
+          install -d $(DESTDIR)$(COQDEVDIR)/$$d && \
+          install -m 0644 $$d/*.vo $(DESTDIR)$(COQDEVDIR)/$$d/; \
+	done
+	install -m 0644 ./VERSION $(DESTDIR)$(COQDEVDIR)
+	install -m 0644 ./compcert.config $(DESTDIR)$(COQDEVDIR)
+	@(echo "To use, pass the following to coq_makefile or add the following to _CoqProject:"; echo "-R $(COQDEVDIR) compcert") > $(DESTDIR)$(COQDEVDIR)/README
 endif
 
+
 clean:
-	rm -f $(patsubst %, %/*.vo, $(DIRS))
+	rm -f $(patsubst %, %/*.vo*, $(DIRS))
+	rm -f $(patsubst %, %/.*.aux, $(DIRS))
 	rm -rf doc/html doc/*.glob
-	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 	rm -f driver/Version.ml
-	rm -f compcert.ini
+	rm -f compcert.ini compcert.config
 	rm -f extraction/STAMP extraction/*.ml extraction/*.mli .depend.extr
 	rm -f tools/ndfun tools/modorder tools/*.cm? tools/*.o
-	rm -f $(ARCH)/ConstpropOp.v $(ARCH)/SelectOp.v backend/SelectDiv.v backend/SelectLong.v
+	rm -f $(GENERATED) .depend
+	rm -f .lia.cache
 	$(MAKE) -f Makefile.extr clean
 	$(MAKE) -C runtime clean
 	$(MAKE) -C test clean
@@ -254,17 +343,15 @@ distclean:
 check-admitted: $(FILES)
 	@grep -w 'admit\|Admitted\|ADMITTED' $^ || echo "Nothing admitted."
 
-# Problems with coqchk (coq 8.5pl1):
-# Integers.Int.Z_mod_modulus_range takes forever to check
-# compcert.lib.Floats.Float.of_longu_from_words takes forever to check
-# compcert.backend.SelectDivproof.divs_mul_shift_2 takes forever to check
-
 check-proof: $(FILES)
-	$(COQCHK) -admit Integers -admit Floats -admit SelectDivproof Complements
+	$(COQCHK) compcert.driver.Complements
 
 print-includes:
 	@echo $(COQINCLUDES)
 
-include .depend
+CoqProject:
+	@echo $(COQINCLUDES) > _CoqProject
+
+-include .depend
 
 FORCE:

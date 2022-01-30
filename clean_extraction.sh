@@ -34,4 +34,7 @@ mv fLT.mli FLT.mli
 # rm -f numeral.*
 # Work around a compiler bug in module name resolution
 sed -f ../extraction.sed -i bak compile0.ml
+# We compile with -rectypes, so these definitions are badly interepreted
+sed -e "s/type int = int/type nonrec int = int/" -i bak integers.mli
+sed -e "s/type int = int/type nonrec int = int/" -i bak integers.ml
 cd ../..

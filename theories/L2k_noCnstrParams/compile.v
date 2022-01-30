@@ -1,10 +1,9 @@
 
 Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
-Require Import Coq.Arith.Compare_dec.
-Require Import Coq.Arith.Peano_dec.
+Require Import Coq.Arith.Arith. 
 Require Import Common.Common.
-Require Import Omega micromega.Lia.
+Require Import Coq.micromega.Lia.
 Require Import L1g.compile.
 Require Import L1g.term.
 
@@ -50,7 +49,7 @@ with Terms : Type :=
 | tcons : Term -> Terms -> Terms
 with Brs : Type :=
 | bnil : Brs
-| bcons : nat -> Term -> Brs -> Brs
+| bcons : list name -> Term -> Brs -> Brs
 with Defs : Type :=
 | dnil : Defs
 | dcons : name -> Term -> nat -> Defs -> Defs.
@@ -262,7 +261,7 @@ with lifts (n:nat) (ts:Terms) : Terms :=
 with liftBs (n:nat) (ts:Brs) : Brs :=
        match ts with
          | bnil => bnil
-         | bcons m b bs => bcons m (lift n b) (liftBs n bs)
+         | bcons m b bs => bcons m (lift (List.length m + n) b) (liftBs n bs)
        end
 with liftDs n (ds:Defs) : Defs :=
        match ds with

@@ -3,8 +3,8 @@ Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
-Require Import Coq.omega.Omega.
 Require Import Coq.micromega.Lia.
+Require Import Arith.
 Require Import FunInd.
 Require Import Common.Common.
 Require Import L2k.term.
@@ -133,7 +133,7 @@ with crctTerms: environ Term -> nat -> Terms -> Prop :=
 with crctBs: environ Term -> nat -> Brs -> Prop :=
      | cbsNil: forall p n, crctEnv p -> crctBs p n bnil
      | cbsCons: forall p n m t ts,
-         crctTerm p n t -> crctBs p n ts ->  crctBs p n (bcons m t ts)
+         crctTerm p (List.length m + n) t -> crctBs p n ts ->  crctBs p n (bcons m t ts)
 with crctDs: environ Term -> nat -> Defs -> Prop :=
      | cdsNil: forall p n, crctEnv p -> crctDs p n dnil
      | cdsCons: forall p n nm bod ix ds,
@@ -183,6 +183,7 @@ Proof.
   - apply ctRel; try assumption. lia.
   - eapply ctConst; eassumption.
   - eapply ctCase; eassumption.
+  - eapply cbsCons; eauto. now rewrite Nat.add_succ_r.
 Qed.
 
 Lemma Crct_UP:
@@ -296,7 +297,7 @@ Lemma Crct_weaken_Typ:
   (forall p, crctEnv p -> True).
 Proof.
   apply crctCrctsCrctBsDsEnv_ind; intros;
-  try (solve[repeat econstructor; intuition]);
+  try (solve[repeat econstructor; intuition auto]);
   try (econstructor; intuition); try eassumption.
   - unfold LookupDfn in *. constructor.
     apply neq_sym. apply (Lookup_fresh_neq H1 H2). eassumption.
@@ -589,7 +590,8 @@ Proof.
       * rewrite <- k; assumption.
       * eapply Crct_UP. eassumption. lia.
   - inversion_Clear H2. apply ctsCons; intuition.
-  - inversion_Clear H2. constructor; intuition.
+  - inversion_Clear H2. constructor; intuition. eapply H. lia.
+    now rewrite Nat.add_succ_r in H8. eapply Crct_UP; try eassumption. lia.
   - inversion_Clear H2. constructor; intuition.
     eapply Instantiate_pres_isLambda; eassumption.
 Qed.
@@ -604,6 +606,17 @@ Proof.
     try assumption.
 Qed.
 
+Lemma instantiatel_pres_Crct:
+  forall p m bod tin, crctTerm p (tlength tin + m) bod -> crctTerms p m tin -> 
+                  forall n, n <= m ->  crctTerm p m (instantiatel tin n bod).
+Proof.
+  intros.
+  induction tin in bod, H, H0 |- *; cbn. eapply H.
+  eapply IHtin. cbn in H.
+  eapply instantiate_pres_Crct; auto. inv H0. eapply Crct_UP; try eassumption. lia. lia.
+  now inv H0.
+Qed.
+
 Lemma whBetaStep_pres_Crct:
   forall p n bod,
     crctTerm p (S n) bod ->
@@ -615,12 +628,12 @@ Qed.
 
 Lemma bnth_pres_Crct:
   forall p n (brs:Brs), crctBs p n brs ->
-    forall m x ix, bnth m brs = Some (ix, x) -> crctTerm p n x.
+    forall m x ix, bnth m brs = Some (ix, x) -> crctTerm p (List.length ix + n) x.
 Proof.
   intros p n brs h m ix x.
   functional induction (bnth m brs); intros; auto.
   - discriminate.
-  - myInjection H. inversion h. assumption.
+  - myInjection H. inversion h. subst. assumption.
   - apply IHo; inversion h; assumption.
 Qed.
 
@@ -629,11 +642,13 @@ Lemma whCaseStep_pres_Crct:
   forall m s, whCaseStep m ts brs = Some s -> crctTerm p n s.
 Proof.
   intros p n ts h1 brs h2 m s h3. pose proof (whCaseStep_Some _ _ _ h3).
-  dstrctn H. destruct ts.
-  - cbn in j. myInjection j. eapply (bnth_pres_Crct); eassumption. 
-  - assert (j0: crctTerm p n y).
-    { eapply (bnth_pres_Crct); eassumption. }
-    eapply mkApp_pres_Crct; eassumption. 
+  dstrctn H.
+  cbn in j. subst. unfold whCaseStep in h3.
+  rewrite z in h3. revert h3. elim Reflect.eqb_spec; cbn; try discriminate.
+  intros.
+  eapply bnth_pres_Crct in z; try eassumption. 
+  rewrite p0 in z.
+  eapply instantiatel_pres_Crct; auto. lia.
 Qed.
   
 Lemma canonicalP_pres_crctTerms:

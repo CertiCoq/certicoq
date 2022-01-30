@@ -29,7 +29,7 @@
 (*  PRELIMINARIES:  EFFICIENT DATA STRUCTURES FOR REPRESENTING
     SETS OF NODES, and FUNCTIONS THAT MAP NODES TO WHATEVER *)
 
-Require Import List Omega micromega.Lia.
+Require Import List ZArith Coq.micromega.Lia.
 Require Import FSets.    (* Efficient functional sets *)
 Require Import FMaps.  (* Efficient functional maps *)
 Require Import Compare_dec.  (* to get lt_dec on natural numbers *)

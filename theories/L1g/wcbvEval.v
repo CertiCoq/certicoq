@@ -3,7 +3,7 @@ Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Program.Basics.
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
 Require Import Coq.micromega.Lia.
 Require Import Common.AstCommon.
 Require Import L1g.term.
@@ -273,6 +273,8 @@ Qed.
 (** use a timer to make this terminate **)
 Section wcbvEval_sec.
 Variable p:environ Term.
+
+Local Open Scope string_scope.
 
 Function wcbvEval
          (tmr:nat) (t:Term) {struct tmr}: exception Term :=

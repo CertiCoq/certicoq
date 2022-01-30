@@ -6,10 +6,11 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  under the terms of the GNU General Public License as published by  *)
-(*  the Free Software Foundation, either version 2 of the License, or  *)
-(*  (at your option) any later version.  This file is also distributed *)
-(*  under the terms of the INRIA Non-Commercial License Agreement.     *)
+(*  under the terms of the GNU Lesser General Public License as        *)
+(*  published by the Free Software Foundation, either version 2.1 of   *)
+(*  the License, or  (at your option) any later version.               *)
+(*  This file is also distributed under the terms of the               *)
+(*  INRIA Non-Commercial License Agreement.                            *)
 (*                                                                     *)
 (* *********************************************************************)
 
@@ -20,7 +21,7 @@ open BinNums
 open BinNat
 open BinInt
 open BinPos
-open Floats
+open! Floats
 
 (* Coq's [nat] type and some of its operations *)
 
@@ -282,23 +283,96 @@ type atom = positive
 let atom_of_string = (Hashtbl.create 17 : (string, atom) Hashtbl.t)
 let string_of_atom = (Hashtbl.create 17 : (atom, string) Hashtbl.t)
 let next_atom = ref Coq_xH
+let use_canonical_atoms = ref false
+
+(* If [use_canonical_atoms] is false, strings are numbered from 1 up
+   in the order in which they are encountered.  This produces small
+   numbers, and is therefore efficient, but the number for a given
+   string may differ between the compilation of different units.
+
+   If [use_canonical_atoms] is true, strings are Huffman-encoded as bit
+   sequences, which are then encoded as positive numbers.  The same
+   string is always represented by the same number in all compilation
+   units.  However, the numbers are bigger than in the first
+   implementation.  Also, this places a hard limit on the number of
+   fresh identifiers that can be generated starting with
+   [first_unused_ident]. *)
+
+let rec append_bits_pos nbits n p =
+  if nbits <= 0 then p else
+  if n land 1 = 0
+  then Coq_xO (append_bits_pos (nbits - 1) (n lsr 1) p)
+  else Coq_xI (append_bits_pos (nbits - 1) (n lsr 1) p)
+
+(* The encoding of strings as bit sequences is optimized for C identifiers:
+   - numbers are encoded as a 6-bit integer between 0 and 9
+   - lowercase letters are encoded as a 6-bit integer between 10 and 35
+   - uppercase letters are encoded as a 6-bit integer between 36 and 61
+   - the underscore character is encoded as the 6-bit integer 62
+   - all other characters are encoded as 6 "one" bits followed by
+     the 8-bit encoding of the character. *)
+
+let append_char_pos c p =
+  match c with
+  | '0'..'9' -> append_bits_pos 6 (Char.code c - Char.code '0') p
+  | 'a'..'z' -> append_bits_pos 6 (Char.code c - Char.code 'a' + 10) p
+  | 'A'..'Z' -> append_bits_pos 6 (Char.code c - Char.code 'A' + 36) p
+  | '_'      -> append_bits_pos 6 62 p
+  | _        -> append_bits_pos 6 63 (append_bits_pos 8 (Char.code c) p)
+
+(* The empty string is represented as the positive "1", that is, [xH]. *)
+
+let pos_of_string s =
+  let rec encode i accu =
+    if i < 0 then accu else encode (i - 1) (append_char_pos s.[i] accu)
+  in encode (String.length s - 1) Coq_xH
+
+let fresh_atom () =
+  let a = !next_atom in
+  next_atom := Pos.succ !next_atom;
+  a
 
 let intern_string s =
   try
     Hashtbl.find atom_of_string s
   with Not_found ->
-    let a = !next_atom in
-    next_atom := Pos.succ !next_atom;
+    let a =
+      if !use_canonical_atoms then pos_of_string s else fresh_atom () in
     Hashtbl.add atom_of_string s a;
     Hashtbl.add string_of_atom a s;
     a
+
 let extern_atom a =
   try
     Hashtbl.find string_of_atom a
   with Not_found ->
     Printf.sprintf "$%d" (P.to_int a)
 
-let first_unused_ident () = !next_atom
+(* Ignoring the terminating "1" bit, canonical encodings of strings can
+   be viewed as lists of bits, formed by concatenation of 6-bit fragments
+   (for letters, numbers, and underscore) and 14-bit fragments (for other
+   characters).  Hence, not all positive numbers are canonical encodings:
+   only those whose log2 is of the form [6n + 14m].
+
+   Here are the first intervals of positive numbers corresponding to strings:
+   - [1, 1] for the empty string
+   - [2^6, 2^7-1] for one "compact" character
+   - [2^12, 2^13-1] for two "compact" characters
+   - [2^14, 2^14-1] for one "escaped" character
+
+   Hence, between 2^7 and 2^12 - 1, we have 3968 consecutive positive
+   numbers that cannot be the encoding of a string.  These are the positive
+   numbers we'll use as temporaries in the SimplExpr pass if canonical
+   atoms are in use.
+
+   If short atoms are used, we just number the temporaries consecutively
+   starting one above the last generated atom.
+*)
+
+let first_unused_ident () =
+  if !use_canonical_atoms
+  then P.of_int 128
+  else !next_atom
 
 (* Strings *)
 
@@ -335,54 +409,3 @@ let coqfloat32_of_camlfloat f =
   Float32.of_bits(coqint_of_camlint(Int32.bits_of_float f))
 let camlfloat_of_coqfloat32 f =
   Int32.float_of_bits(camlint_of_coqint(Float32.to_bits f))
-
-(* Int31 *)
-
-module Int31 = struct
-
-(*
-let constr (b30,b29,b28,b27,b26,b25,b24,
-            b23,b22,b21,b20,b19,b18,b17,b16,
-            b15,b14,b13,b12,b11,b10,b9,b8,
-            b7,b6,b5,b4,b3,b2,b1,b0) =
-  let f i b accu = if b then accu + (1 lsl i) else accu in
-  f 30 b30 (f 29 b29 (f 28 b28 (f 27 b27 (f 26 b26 (f 25 b25 (f 24 b24
-  (f 23 b23 (f 22 b22 (f 21 b21 (f 20 b20 (f 19 b19 (f 18 b18 (f 17 b17 (f 16 b16
-  (f 15 b15 (f 14 b14 (f 13 b13 (f 12 b12 (f 11 b11 (f 10 b10 (f 9 b9 (f 8 b8
-  (f 7 b7 (f 6 b6 (f 5 b5 (f 4 b4 (f 3 b3 (f 2 b2 (f 1 b1 (f 0 b0 0))))))))))))))))))))))))))))))
-*)
-
-let constr (b30,b29,b28,b27,b26,b25,b24,
-            b23,b22,b21,b20,b19,b18,b17,b16,
-            b15,b14,b13,b12,b11,b10,b9,b8,
-            b7,b6,b5,b4,b3,b2,b1,b0) =
-  let f i b = if b then 1 lsl i else 0 in
-  f 30 b30 + f 29 b29 + f 28 b28 + f 27 b27 + f 26 b26 + f 25 b25 + f 24 b24 +
-  f 23 b23 + f 22 b22 + f 21 b21 + f 20 b20 + f 19 b19 + f 18 b18 + f 17 b17 + f 16 b16 +
-  f 15 b15 + f 14 b14 + f 13 b13 + f 12 b12 + f 11 b11 + f 10 b10 + f 9 b9 + f 8 b8 +
-  f 7 b7 + f 6 b6 + f 5 b5 + f 4 b4 + f 3 b3 + f 2 b2 + f 1 b1 + f 0 b0
-
-let destr f n =
-  let b i = n land (1 lsl i) <> 0 in
-  f (b 30) (b 29) (b 28) (b 27) (b 26) (b 25) (b 24)
-    (b 23) (b 22) (b 21) (b 20) (b 19) (b 18) (b 17) (b 16)
-    (b 15) (b 14) (b 13) (b 12) (b 11) (b 10) (b 9) (b 8)
-    (b 7) (b 6) (b 5) (b 4) (b 3) (b 2) (b 1) (b 0)
-
-let twice n =
-  (n lsl 1) land 0x7FFFFFFF
-
-let twice_plus_one n =
-  ((n lsl 1) land 0x7FFFFFFF) lor 1
-
-let compare (x:int) (y:int) =
-  if x = y then Datatypes.Eq
-  else begin
-    let sx = x < 0 and sy = y < 0 in
-    if sx = sy then
-      (if x < y then Datatypes.Lt else Datatypes.Gt)
-    else
-      (if sx then Datatypes.Gt else Datatypes.Lt)
-  end
-
-end

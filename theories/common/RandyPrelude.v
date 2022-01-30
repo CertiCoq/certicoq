@@ -11,8 +11,8 @@ Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Bool.Bool.
 Require Import Coq.Bool.DecBool.
+Require Import Coq.Arith.Arith.
 Require Import Coq.micromega.Lia.
-Require Import Coq.omega.Omega.
 Require Import Common.exceptionMonad.
 Require Import FunInd.
 Require Import Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
@@ -474,7 +474,7 @@ Lemma bs_not_cons_bs:
   forall (B:Type) (b:B) (bs:list B), bs <> (b::bs).
   intros B b bs h.
   assert (j: List.length bs = List.length (b :: bs)). rewrite <- h; reflexivity.
-  simpl in j. intuition.
+  simpl in j. lia.
 Qed.
 
 Lemma deMorgan_impl: forall (A B:Prop), (A -> B) -> (~B -> ~A).

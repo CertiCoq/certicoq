@@ -6,10 +6,11 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  under the terms of the GNU General Public License as published by  *)
-(*  the Free Software Foundation, either version 2 of the License, or  *)
-(*  (at your option) any later version.  This file is also distributed *)
-(*  under the terms of the INRIA Non-Commercial License Agreement.     *)
+(*  under the terms of the GNU Lesser General Public License as        *)
+(*  published by the Free Software Foundation, either version 2.1 of   *)
+(*  the License, or  (at your option) any later version.               *)
+(*  This file is also distributed under the terms of the               *)
+(*  INRIA Non-Commercial License Agreement.                            *)
 (*                                                                     *)
 (* *********************************************************************)
 
@@ -19,9 +20,9 @@ open Format
 open Camlcoq
 open Values
 open AST
-open !Ctypes
+open! Ctypes
 open Cop
-open !Csyntax
+open Csyntax
 
 let name_unop = function
   | Onotbool -> "!"
@@ -85,13 +86,13 @@ let name_optid id =
 
 let rec name_cdecl id ty =
   match ty with
-  | Tvoid ->
+  | Ctypes.Tvoid ->
       "void" ^ name_optid id
-  | Tint(sz, sg, a) ->
+  | Ctypes.Tint(sz, sg, a) ->
       name_inttype sz sg ^ attributes a ^ name_optid id
-  | Tfloat(sz, a) ->
+  | Ctypes.Tfloat(sz, a) ->
       name_floattype sz ^ attributes a ^ name_optid id
-  | Tlong(sg, a) ->
+  | Ctypes.Tlong(sg, a) ->
       name_longtype sg ^ attributes a ^ name_optid id
   | Tpointer(t, a) ->
       let id' =
@@ -111,8 +112,8 @@ let rec name_cdecl id ty =
       | Tnil ->
           if first then
             Buffer.add_string b
-               (if cconv.cc_vararg then "..." else "void")
-          else if cconv.cc_vararg then
+               (if cconv.cc_vararg <> None then "..." else "void")
+          else if cconv.cc_vararg <> None then
             Buffer.add_string b ", ..."
           else
             ()
@@ -182,7 +183,7 @@ let print_typed_value p v ty =
       fprintf p "%.15F" (camlfloat_of_coqfloat f)
   | Vsingle f, _ ->
       fprintf p "%.15Ff" (camlfloat_of_coqfloat32 f)
-  | Vlong n, Tlong(Unsigned, _) ->
+  | Vlong n, Ctypes.Tlong(Unsigned, _) ->
       fprintf p "%LuLLU" (camlint64_of_coqint n)
   | Vlong n, _ ->
       fprintf p "%LdLL" (camlint64_of_coqint n)
@@ -253,10 +254,10 @@ let rec expr p (prec, e) =
       fprintf p "__builtin_memcpy_aligned@[<hov 1>(%ld,@ %ld,@ %a)@]"
                 (camlint_of_coqint sz) (camlint_of_coqint al)
                 exprlist (true, args)
-  | Ebuiltin(EF_annot(_, txt, _), _, args, _) ->
+  | Ebuiltin(EF_annot(_,txt, _), _, args, _) ->
       fprintf p "__builtin_annot@[<hov 1>(%S%a)@]"
                 (camlstring_of_coqstring txt) exprlist (false, args)
-  | Ebuiltin(EF_annot_val(_, txt, _), _, args, _) ->
+  | Ebuiltin(EF_annot_val(_,txt, _), _, args, _) ->
       fprintf p "__builtin_annot_intval@[<hov 1>(%S%a)@]"
                 (camlstring_of_coqstring txt) exprlist (false, args)
   | Ebuiltin(EF_external(id, sg), _, args, _) ->
@@ -268,6 +269,9 @@ let rec expr p (prec, e) =
   | Ebuiltin(EF_debug(kind,txt,_),_,args,_) ->
       fprintf p "__builtin_debug@[<hov 1>(%d,%S%a)@]"
         (P.to_int kind) (extern_atom txt) exprlist (false,args)
+  | Ebuiltin(EF_builtin(name, _), _, args, _) ->
+      fprintf p "%s@[<hov 1>(%a)@]"
+                (camlstring_of_coqstring name) exprlist (true, args)
   | Ebuiltin(_, _, args, _) ->
       fprintf p "<unknown builtin>@[<hov 1>(%a)@]" exprlist (true, args)
   | Eparen(a1, tycast, ty) ->
@@ -391,20 +395,20 @@ and print_stmt_for p s =
   | _ ->
       fprintf p "({ %a })" print_stmt s
 
-let name_function_parameters fun_name params cconv =
+let name_function_parameters name_param fun_name params cconv =
   let b = Buffer.create 20 in
   Buffer.add_string b fun_name;
   Buffer.add_char b '(';
   begin match params with
   | [] ->
-      Buffer.add_string b (if cconv.cc_vararg then "..." else "void")
+      Buffer.add_string b (if cconv.cc_vararg <> None then "..." else "void")
   | _ ->
       let rec add_params first = function
       | [] ->
-          if cconv.cc_vararg then Buffer.add_string b "..."
+          if cconv.cc_vararg <> None then Buffer.add_string b ",..."
       | (id, ty) :: rem ->
           if not first then Buffer.add_string b ", ";
-          Buffer.add_string b (name_cdecl (extern_atom id) ty);
+          Buffer.add_string b (name_cdecl (name_param id) ty);
           add_params false rem in
       add_params true params
   end;
@@ -413,8 +417,8 @@ let name_function_parameters fun_name params cconv =
 
 let print_function p id f =
   fprintf p "%s@ "
-            (name_cdecl (name_function_parameters (extern_atom id)
-                                                  f.fn_params f.fn_callconv)
+            (name_cdecl (name_function_parameters extern_atom
+                             (extern_atom id) f.fn_params f.fn_callconv)
                         f.fn_return);
   fprintf p "@[<v 2>{@ ";
   List.iter
@@ -426,13 +430,21 @@ let print_function p id f =
 
 let print_fundef p id fd =
   match fd with
-  | Ctypes.External((EF_external _ | EF_runtime _), args, res, cconv) ->
+  | Ctypes.External((EF_external _ | EF_runtime _| EF_malloc | EF_free), args, res, cconv) ->
       fprintf p "extern %s;@ @ "
                 (name_cdecl (extern_atom id) (Tfunction(args, res, cconv)))
   | Ctypes.External(_, _, _, _) ->
       ()
   | Ctypes.Internal f ->
       print_function p id f
+
+let print_fundecl p id fd =
+  match fd with
+  | Ctypes.Internal f ->
+      let linkage = "extern" in
+      fprintf p "%s %s;@ @ " linkage
+                (name_cdecl (extern_atom id) (Csyntax.type_of_function f))
+  | _ -> ()
 
 let string_of_init id =
   let b = Buffer.create (List.length id) in
@@ -458,7 +470,7 @@ let print_init p = function
   | Init_int64 n -> fprintf p "%LdLL" (camlint64_of_coqint n)
   | Init_float32 n -> fprintf p "%.15F" (camlfloat_of_coqfloat n)
   | Init_float64 n -> fprintf p "%.15F" (camlfloat_of_coqfloat n)
-  | Init_space n -> fprintf p "/* skip %ld */@ " (camlint_of_coqint n)
+  | Init_space n -> fprintf p "/* skip %s */@ " (Z.to_string n)
   | Init_addrof(symb, ofs) ->
       let ofs = camlint_of_coqint ofs in
       if ofs = 0l
@@ -490,7 +502,7 @@ let print_globvar p id v =
       fprintf p "@[<hov 2>%s = "
               (name_cdecl name2 v.gvar_info);
       begin match v.gvar_info, v.gvar_init with
-      | (Tint _ | Tlong _ | Tfloat _ | Tpointer _ | Tfunction _),
+      | (Ctypes.Tint _ | Ctypes.Tlong _ | Ctypes.Tfloat _ | Tpointer _ | Tfunction _),
         [i1] ->
           print_init p i1
       | _, il ->
@@ -500,6 +512,17 @@ let print_globvar p id v =
           else print_composite_init p il
       end;
       fprintf p ";@]@ @ "
+
+let print_globvardecl p  id v =
+  let name = extern_atom id in
+  let name = if v.gvar_readonly then "const "^name else name in
+  let linkage = "extern" in
+  fprintf p "%s %s;@ @ " linkage (name_cdecl name v.gvar_info)
+
+let print_globdecl p (id,gd) =
+  match gd with
+  | Gfun f -> print_fundecl p id f
+  | Gvar v -> print_globvardecl p id v
 
 let print_globdef p (id, gd) =
   match gd with
@@ -524,7 +547,8 @@ let print_program p prog =
   fprintf p "@[<v 0>";
   List.iter (declare_composite p) prog.prog_types;
   List.iter (define_composite p) prog.prog_types;
-  List.iter (print_globdef p) prog.prog_defs;
+  List.iter (print_globdecl p) prog.Ctypes.prog_defs;
+  List.iter (print_globdef p) prog.Ctypes.prog_defs;
   fprintf p "@]@."
 
 let destination : string option ref = ref None

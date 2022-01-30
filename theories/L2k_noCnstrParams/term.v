@@ -5,6 +5,7 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.micromega.Lia.
 Require Import Common.Common.  (* shared namespace *)
+From MetaCoq Require Import Template.Reflect.
 Require Import L2k.compile.
 
 Open Scope string_scope.
@@ -188,7 +189,7 @@ Proof.
     destruct (H t1), (H0 tt); [lft | rght .. ].
   - destruct tt; cross. lft.
   - destruct tt; cross.
-    destruct (eq_nat_dec n n0), (H t0), (H0 tt); [lft | rght .. ].
+    destruct (Classes.eq_dec l l0), (H t0), (H0 tt); [lft | rght .. ].
   - destruct ee; cross. lft.
   - destruct ee; cross.
     destruct (name_dec n n1); destruct (eq_nat_dec n0 n2);
@@ -1321,7 +1322,7 @@ Proof.
   - specialize (IHo H). cbn. lia.
 Qed.
 
-Function bnth (n:nat) (l:Brs) {struct l} : option (nat * Term) :=
+Function bnth (n:nat) (l:Brs) {struct l} : option (_ * Term) :=
   match l with
     | bnil => None
     | bcons ix x bs => match n with
@@ -1358,7 +1359,7 @@ Proof.
 Qed.
 
 Definition is_bunit (ds:Brs) : Prop :=
-  exists (n:nat) (s:Term), ds = bunit n s.
+  exists (l:list name) (s:Term), ds = bunit l s.
 
 Lemma is_bunit_blength:
   forall ds, is_bunit ds <-> blength ds = 1.
@@ -1368,7 +1369,7 @@ Proof.
   - destruct ds.
     + discriminate.
     + destruct ds.
-      * exists n, t. reflexivity.
+      * exists l, t. reflexivity.
       * discriminate.
 Qed.
 
@@ -1377,10 +1378,10 @@ Proof.
   intros ds. case_eq ds; intros.
   - right. intros h. destruct h as [x0 [x1 jx]]. discriminate.
   - case_eq b; intros; subst.
-    + left. exists n, t. reflexivity.
+    + left. exists l, t. reflexivity.
     + right. intros h.
       pose proof (proj1 (is_bunit_blength
-                           (bcons n t (bcons n0 t0 b0))) h).
+                           (bcons l t (bcons l0 t0 b0))) h).
       discriminate.
 Qed.
 
@@ -1902,7 +1903,7 @@ with WFTrms: Terms -> nat -> Prop :=
 with WFTrmBs: Brs -> nat -> Prop :=
      | wfbnil: forall n, WFTrmBs bnil n
      | wfbcons: forall n m b bs,
-         WFTrm b n -> WFTrmBs bs n -> WFTrmBs (bcons m b bs) n
+         WFTrm b (List.length m + n) -> WFTrmBs bs n -> WFTrmBs (bcons m b bs) n
 with WFTrmDs: Defs -> nat -> Prop :=
      | wfdnil: forall n, WFTrmDs dnil n
      | wfdcons: forall n nm bod arg ds,
@@ -1971,6 +1972,7 @@ Proof.
   rewrite h; try lia. assumption.
 Qed.                                            
 
+Require Import Arith.
  
 Lemma WFTrm_up:
   (forall t m, WFTrm t m -> WFTrm t (S m)) /\
@@ -1978,7 +1980,8 @@ Lemma WFTrm_up:
   (forall ts m, WFTrmBs ts m -> WFTrmBs ts (S m)) /\
   (forall ds m, WFTrmDs ds m -> WFTrmDs ds (S m)).
 Proof.
-  apply WFTrmTrmsBrsDefs_ind; cbn; intros; constructor; try assumption; lia.
+  apply WFTrmTrmsBrsDefs_ind; cbn; intros; constructor; try assumption; try lia.
+  now rewrite Nat.add_succ_r.
 Qed.
 
 Lemma WFTrm_Up:
@@ -2025,6 +2028,7 @@ Proof.
   - change
       (WFTrm (TFix (liftDs (n0 + dlength defs) defs) m) (S n)).
     constructor. rewrite liftDs_pres_dlength. apply (H0 (n0 + dlength defs)).
+  - cbn. constructor. now rewrite Nat.add_succ_r. auto.
 Qed. 
 
 Definition stableF (F:Terms -> Term) := 
@@ -2447,7 +2451,7 @@ with Instantiates: nat -> Terms -> Terms -> Prop :=
 with InstantiateBrs: nat -> Brs -> Brs -> Prop :=
 | Ibnil: forall n, InstantiateBrs n bnil bnil
 | Ibcons: forall n m b bs ib ibs,
-            Instantiate n b ib ->
+            Instantiate (List.length m + n) b ib ->
             InstantiateBrs n bs ibs ->
             InstantiateBrs n (bcons m b bs) (bcons m ib ibs)
 with InstantiateDefs: nat -> Defs -> Defs -> Prop :=
@@ -2523,7 +2527,7 @@ with instantiates (n:nat) (args:Terms) {struct args} : Terms :=
 with instantiateBrs (n:nat) (bs:Brs) {struct bs} : Brs :=
        match bs with
          | bnil => bnil
-         | bcons m t ts => bcons m (instantiate n t) (instantiateBrs n ts)
+         | bcons m t ts => bcons m (instantiate (List.length m + n) t) (instantiateBrs n ts)
        end
 with instantiateDefs (n:nat) (ds:Defs) {struct ds} : Defs :=
        match ds with
@@ -2645,6 +2649,8 @@ Proof.
     + rewrite <- instantiateDefs_pres_dlength. rewrite liftDs_pres_dlength.
       reflexivity.
     + rewrite <- instantiateDefs_pres_dlength. lia.
+  - cbn. apply f_equal2; eauto. rewrite H; auto.
+    now rewrite Nat.add_succ_r. lia.
 Qed.
   
 Lemma instantiate_noLift:
@@ -2711,7 +2717,7 @@ Qed.
 Lemma instantiateBs_bcons:
    forall n m arg args,
     instantiateBrs n (bcons m arg args) =
-    bcons m (instantiate n arg) (instantiateBrs n args).
+    bcons m (instantiate (List.length m + n) arg) (instantiateBrs n args).
 Proof.
   reflexivity.
 Qed.
@@ -2819,7 +2825,7 @@ Proof.
      constructor.
      + apply H0. assumption.
      + apply H2. assumption.
-   - change (WFappBs (bcons n (instantiate n0 b)
+   - change (WFappBs (bcons n (instantiate (List.length n + n0) b)
                             (instantiateBrs n0 bs))).
      constructor.
      + apply H0. assumption.
@@ -3500,6 +3506,12 @@ Qed.
 End PoccTrm_sec.
 End Instantiate_sec.
 
+Fixpoint instantiatel s k t :=
+  match s with
+  | tnil => t
+  | tcons a s => instantiatel s k (instantiate a (tlength s + k) t)
+  end.
+
 (** etaExpand cannot be an application **  FIXME
 Lemma etaExpand_args_up:
   forall nargs aArgs nlams i m cArgs u,
@@ -3696,17 +3708,21 @@ Qed.
 
 Definition whCaseStep (cstrNbr:nat) (ts:Terms) (brs:Brs): option Term :=
   match bnth cstrNbr brs with
-    | Some (_, t) => mkApp t ts
+    | Some (nargs, t) =>
+      if eqb (List.length nargs) (tlength ts) then 
+        Some (instantiatel ts 0 t)
+      else None
     | None => None
   end.
 
 Lemma whCaseStep_Some:
   forall m ts brs s,
     whCaseStep m ts brs = Some s ->
-    exists x t, bnth m brs = Some (x, t) /\ mkApp t ts = Some s.
+    exists x t, bnth m brs = Some (x, t) /\ instantiatel ts 0 t = s.
 Proof.
-  intros. unfold whCaseStep in  H. destruct (bnth m brs).
-  - destruct p. exists n, t. intuition.
+  intros. unfold whCaseStep in  H. destruct (bnth m brs) as [[nargs t]|].
+  - destruct (eqb_spec (List.length nargs) (tlength ts)). exists nargs, t. intuition. congruence.
+    discriminate.
   - discriminate.
 Qed.
 

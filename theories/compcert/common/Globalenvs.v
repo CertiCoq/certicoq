@@ -6,10 +6,11 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  under the terms of the GNU General Public License as published by  *)
-(*  the Free Software Foundation, either version 2 of the License, or  *)
-(*  (at your option) any later version.  This file is also distributed *)
-(*  under the terms of the INRIA Non-Commercial License Agreement.     *)
+(*  under the terms of the GNU Lesser General Public License as        *)
+(*  published by the Free Software Foundation, either version 2.1 of   *)
+(*  the License, or  (at your option) any later version.               *)
+(*  This file is also distributed under the terms of the               *)
+(*  INRIA Non-Commercial License Agreement.                            *)
 (*                                                                     *)
 (* *********************************************************************)
 
@@ -37,9 +38,7 @@ Require Import Recdef.
 Require Import Zwf.
 Require Import Axioms Coqlib Errors Maps AST Linking.
 Require Import Integers Floats Values Memory.
-Require Import Coq.micromega.Lia.
 
-Declare Scope pair_scope.
 Notation "s #1" := (fst s) (at level 9, format "s '#1'") : pair_scope.
 Notation "s #2" := (snd s) (at level 9, format "s '#2'") : pair_scope.
 
@@ -889,7 +888,7 @@ Qed.
 Definition readbytes_as_zero (m: mem) (b: block) (ofs len: Z) : Prop :=
   forall p n,
   ofs <= p -> p + Z.of_nat n <= ofs + len ->
-  Mem.loadbytes m b p (Z.of_nat n) = Some (list_repeat n (Byte Byte.zero)).
+  Mem.loadbytes m b p (Z.of_nat n) = Some (List.repeat (Byte Byte.zero) n).
 
 Lemma store_zeros_loadbytes:
   forall m b p n m',
@@ -898,13 +897,13 @@ Lemma store_zeros_loadbytes:
 Proof.
   intros until n; functional induction (store_zeros m b p n); red; intros.
 - destruct n0. simpl. apply Mem.loadbytes_empty. lia.
-  rewrite Nat2Z.inj_succ in H1. omegaContradiction.
+  rewrite Nat2Z.inj_succ in H1. extlia.
 - destruct (zeq p0 p).
   + subst p0. destruct n0. simpl. apply Mem.loadbytes_empty. lia.
     rewrite Nat2Z.inj_succ in H1. rewrite Nat2Z.inj_succ.
     replace (Z.succ (Z.of_nat n0)) with (1 + Z.of_nat n0) by lia.
-    change (list_repeat (S n0) (Byte Byte.zero))
-      with ((Byte Byte.zero :: nil) ++ list_repeat n0 (Byte Byte.zero)).
+    change (List.repeat (Byte Byte.zero) (S n0))
+      with ((Byte Byte.zero :: nil) ++ List.repeat (Byte Byte.zero) n0).
     apply Mem.loadbytes_concat.
     eapply Mem.loadbytes_unchanged_on with (P := fun b1 ofs1 => ofs1 = p).
     eapply store_zeros_unchanged; eauto. intros; lia.
@@ -926,11 +925,11 @@ Definition bytes_of_init_data (i: init_data): list memval :=
   | Init_int64 n => inj_bytes (encode_int 8%nat (Int64.unsigned n))
   | Init_float32 n => inj_bytes (encode_int 4%nat (Int.unsigned (Float32.to_bits n)))
   | Init_float64 n => inj_bytes (encode_int 8%nat (Int64.unsigned (Float.to_bits n)))
-  | Init_space n => list_repeat (Z.to_nat n) (Byte Byte.zero)
+  | Init_space n => List.repeat (Byte Byte.zero) (Z.to_nat n)
   | Init_addrof id ofs =>
       match find_symbol ge id with
       | Some b => inj_value (if Archi.ptr64 then Q64 else Q32) (Vptr b ofs)
-      | None   => list_repeat (if Archi.ptr64 then 8%nat else 4%nat) Undef
+      | None   => List.repeat Undef (if Archi.ptr64 then 8%nat else 4%nat)
       end
   end.
 
@@ -949,7 +948,7 @@ Proof.
   intros; destruct i; simpl in H; try apply (Mem.loadbytes_store_same _ _ _ _ _ _ H).
 - inv H. simpl.
   assert (EQ: Z.of_nat (Z.to_nat z) = Z.max z 0).
-  { destruct (zle 0 z). rewrite Z2Nat.id; xomega. destruct z; try discriminate. simpl. xomega. }
+  { destruct (zle 0 z). rewrite Z2Nat.id; extlia. destruct z; try discriminate. simpl. extlia. }
   rewrite <- EQ. apply H0. lia. simpl. lia.
 - rewrite init_data_size_addrof. simpl.
   destruct (find_symbol ge i) as [b'|]; try discriminate.
@@ -1022,7 +1021,7 @@ Lemma store_zeros_read_as_zero:
   read_as_zero m' b p n.
 Proof.
   intros; red; intros.
-  transitivity (Some(decode_val chunk (list_repeat (size_chunk_nat chunk) (Byte Byte.zero)))).
+  transitivity (Some(decode_val chunk (List.repeat (Byte Byte.zero) (size_chunk_nat chunk)))).
   apply Mem.loadbytes_load; auto. rewrite size_chunk_conv.
   eapply store_zeros_loadbytes; eauto. rewrite <- size_chunk_conv; auto.
   f_equal. destruct chunk; unfold decode_val; unfold decode_int; unfold rev_if_be; destruct Archi.big_endian; reflexivity.
@@ -1095,10 +1094,10 @@ Proof.
 + split; auto.
   set (P := fun (b': block) ofs' => ofs' < p + init_data_size (Init_space z)).
   inv Heqo. apply read_as_zero_unchanged with (m := m1) (P := P).
-  red; intros. apply H0; auto. simpl. generalize (init_data_list_size_pos il); xomega.
+  red; intros. apply H0; auto. simpl. generalize (init_data_list_size_pos il); extlia.
   eapply store_init_data_list_unchanged; eauto.
   intros; unfold P. lia.
-  intros; unfold P. simpl; xomega.
+  intros; unfold P. simpl; extlia.
 + rewrite init_data_size_addrof in *.
   split; auto.
   destruct (find_symbol ge i); try congruence.

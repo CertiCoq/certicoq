@@ -3,7 +3,7 @@ Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Program.Basics.
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
 Require Import Coq.micromega.Lia.
 Require Import Coq.Logic.Decidable.
 Require Import Common.Common.
@@ -15,6 +15,10 @@ Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
+
+Notation ret := (ExtLib.Structures.Monad.ret).
+Notation bind := (ExtLib.Structures.Monad.bind).
+Notation raise := (ExtLib.Structures.MonadExc.raise).
 
 (** Relational version of weak cbv evaluation  **)
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
@@ -386,7 +390,7 @@ Function wcbvEval
   | TRel _ => raise "wcbvEval:unbound Rel"
   | TWrong s => raise (print_term t)
     end
-  end
+  end%string
 with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
      : exception Terms :=
        match tmr with 
@@ -400,7 +404,7 @@ with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
                   | Ret _, Exc s => raise ("wcbvEvals:tl: " ++ s)
                   end
                 end
-       end.
+       end%string.
 Functional Scheme wcbvEval_ind' := Induction for wcbvEval Sort Prop
 with wcbvEvals_ind' := Induction for wcbvEvals Sort Prop.
 Combined Scheme wcbvEvalEvals_ind from wcbvEval_ind', wcbvEvals_ind'.

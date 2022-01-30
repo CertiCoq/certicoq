@@ -4,7 +4,8 @@ on: [push, pull_request]
 
 env:
   OCAML_VERSION: 4.07.1+flambda
-  COQ_VERSION: 8.12.1
+  COQ_VERSION: 8.14.0
+  FLOCQ_VERSION: 3.4.2
 
 jobs:
   build:
@@ -12,7 +13,8 @@ jobs:
 
     strategy:
       matrix:
-        target: [ submodules ]
+        target: [ submodules #, opam
+        ]
 
     steps:
 
@@ -33,9 +35,9 @@ jobs:
         uses: actions/cache@v2
         with:
           path: "~/.opam"
-          key: opam-${{ steps.submodule-hash.outputs.HASH }}-${{github.base_ref}}-${{github.ref}} 
+          key: opam-${{ matrix.target }}-${{ steps.submodule-hash.outputs.HASH }}-${{github.base_ref}}-${{github.ref}} 
           restore-keys: |
-            opam-${{ steps.submodule-hash.outputs.HASH }}--refs/heads/${{github.base_ref}}
+            opam-${{ matrix.target }}-${{ steps.submodule-hash.outputs.HASH }}--refs/heads/${{github.base_ref}}
 
       - name: Install OCaml
         uses: avsm/setup-ocaml@v1
@@ -44,6 +46,8 @@ jobs:
 
       - run: opam repo add coq-released https://coq.inria.fr/opam/released
       - run: opam install coq.${{ env.COQ_VERSION }}
+
+      - run: opam install coq-flocq.${{ env.FLOCQ_VERSION }}
 
       - run: opam exec -- coqc benchmarks/test_submodules.v || opam exec -- make submodules
         if: matrix.target == 'submodules'

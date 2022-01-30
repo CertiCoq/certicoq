@@ -182,7 +182,7 @@ Goal
   vm_compute. reflexivity.
 Qed.
 
-Require Import omega.Omega.
+Require Import Coq.micromega.Lia.
 (** well founded definition **)
 Function Gcd (a b : nat) {wf lt a} : nat :=
 match a with

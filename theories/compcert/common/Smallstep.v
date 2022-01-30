@@ -6,10 +6,11 @@
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
-(*  under the terms of the GNU General Public License as published by  *)
-(*  the Free Software Foundation, either version 2 of the License, or  *)
-(*  (at your option) any later version.  This file is also distributed *)
-(*  under the terms of the INRIA Non-Commercial License Agreement.     *)
+(*  under the terms of the GNU Lesser General Public License as        *)
+(*  published by the Free Software Foundation, either version 2.1 of   *)
+(*  the License, or  (at your option) any later version.               *)
+(*  This file is also distributed under the terms of the               *)
+(*  INRIA Non-Commercial License Agreement.                            *)
 (*                                                                     *)
 (* *********************************************************************)
 
@@ -25,7 +26,6 @@ Require Import Coqlib.
 Require Import Events.
 Require Import Globalenvs.
 Require Import Integers.
-Require Import Coq.micromega.Lia.
 
 Set Implicit Arguments.
 
@@ -501,7 +501,6 @@ Definition Semantics {state funtype vartype: Type}
 
 (** Handy notations. *)
 
-Declare Scope smallstep_scope.
 Notation " 'Step' L " := (step L (globalenv L)) (at level 1) : smallstep_scope.
 Notation " 'Star' L " := (star (step L) (globalenv L)) (at level 1) : smallstep_scope.
 Notation " 'Plus' L " := (plus (step L) (globalenv L)) (at level 1) : smallstep_scope.
@@ -874,6 +873,14 @@ Proof.
   intros. eapply sd_determ; eauto.
 Qed.
 
+Lemma sd_determ_3:
+  forall s t s1 s2,
+  Step L s t s1 -> Step L s E0 s2 -> t = E0 /\ s1 = s2.
+Proof.
+  intros. exploit (sd_determ DET). eexact H. eexact H0.
+  intros [A B]. inv A. auto.
+Qed.
+
 Lemma star_determinacy:
   forall s t s', Star L s t s' ->
   forall s'', Star L s t s'' -> Star L s' E0 s'' \/ Star L s'' E0 s'.
@@ -887,8 +894,8 @@ Proof.
   exploit (sd_traces DET). eexact H3. intros L2.
   assert (t1 = t0 /\ t2 = t3).
     destruct t1. inv MT. auto.
-    destruct t1; simpl in L1; try omegaContradiction.
-    destruct t0. inv MT. destruct t0; simpl in L2; try omegaContradiction.
+    destruct t1; simpl in L1; try extlia.
+    destruct t0. inv MT. destruct t0; simpl in L2; try extlia.
     simpl in H5. split. congruence. congruence.
   destruct H1; subst.
   assert (s2 = s4) by (eapply sd_determ_2; eauto). subst s4.
@@ -896,6 +903,171 @@ Proof.
 Qed.
 
 End DETERMINACY.
+
+(** Extra simulation diagrams for determinate languages. *)
+
+Section FORWARD_SIMU_DETERM.
+
+Variable L1: semantics.
+Variable L2: semantics.
+
+Hypothesis L1det: determinate L1.
+
+Variable index: Type.
+Variable order: index -> index -> Prop.
+Hypothesis wf_order: well_founded order.
+
+Variable match_states: index -> state L1 -> state L2 -> Prop.
+
+Hypothesis match_initial_states:
+  forall s1, initial_state L1 s1 ->
+  exists i s2, initial_state L2 s2 /\ match_states i s1 s2.
+
+Hypothesis match_final_states:
+  forall i s1 s2 r,
+  match_states i s1 s2 ->
+  final_state L1 s1 r ->
+  final_state L2 s2 r.
+
+Hypothesis simulation:
+  forall s1 t s1', Step L1 s1 t s1' ->
+  forall i s2, match_states i s1 s2 ->
+  exists s1'' i' s2',
+      Star L1 s1' E0 s1''
+   /\ (Plus L2 s2 t s2' \/ (Star L2 s2 t s2' /\ order i' i))
+   /\ match_states i' s1'' s2'.
+
+Hypothesis public_preserved:
+  forall id, Senv.public_symbol (symbolenv L2) id = Senv.public_symbol (symbolenv L1) id.
+
+Inductive match_states_later: index * nat -> state L1 -> state L2 -> Prop :=
+| msl_now: forall i s1 s2,
+    match_states i s1 s2 -> match_states_later (i, O) s1 s2
+| msl_later: forall i n s1 s1' s2,
+    Step L1 s1 E0 s1' -> match_states_later (i, n) s1' s2 -> match_states_later (i, S n) s1 s2.
+
+Lemma star_match_states_later:
+  forall s1 s1', Star L1 s1 E0 s1' ->
+  forall i s2, match_states i s1' s2 ->
+  exists n, match_states_later (i, n) s1 s2.
+Proof.
+  intros s10 s10' STAR0. pattern s10, s10'; eapply star_E0_ind; eauto.
+  - intros s1 i s2 M. exists O; constructor; auto.
+  - intros s1 s1' s1'' STEP IH i s2 M.
+    destruct (IH i s2 M) as (n & MS).
+    exists (S n); econstructor; eauto.
+Qed.
+
+Lemma forward_simulation_determ: forward_simulation L1 L2.
+Proof.
+  apply Forward_simulation with (order0 := lex_ord order lt) (match_states0 := match_states_later);
+  constructor.
+- apply wf_lex_ord. apply wf_order. apply lt_wf.
+- intros. exploit match_initial_states; eauto. intros (i & s2 & A & B).
+  exists (i, O), s2; auto using msl_now.
+- intros. inv H.
+  + eapply match_final_states; eauto.
+  + eelim (sd_final_nostep L1det); eauto.
+- intros s1 t s1' A; destruct 1.
+  + exploit simulation; eauto. intros (s1'' & i' & s2' & B & C & D).
+    exploit star_match_states_later; eauto. intros (n & E).
+    exists (i', n), s2'; split; auto.
+    destruct C as [P | [P Q]]; auto using lex_ord_left.
+  + exploit sd_determ_3. eauto. eexact A. eauto. intros [P Q]; subst t s1'0.
+    exists (i, n), s2; split; auto.
+    right; split. apply star_refl. apply lex_ord_right. lia.
+- exact public_preserved.
+Qed.
+
+End FORWARD_SIMU_DETERM.
+
+(** A few useful special cases. *)
+
+Section FORWARD_SIMU_DETERM_DIAGRAMS.
+
+Variable L1: semantics.
+Variable L2: semantics.
+
+Hypothesis L1det: determinate L1.
+
+Variable match_states: state L1 -> state L2 -> Prop.
+
+Hypothesis public_preserved:
+  forall id, Senv.public_symbol (symbolenv L2) id = Senv.public_symbol (symbolenv L1) id.
+
+Hypothesis match_initial_states:
+  forall s1, initial_state L1 s1 ->
+  exists s2, initial_state L2 s2 /\ match_states s1 s2.
+
+Hypothesis match_final_states:
+  forall s1 s2 r,
+  match_states s1 s2 ->
+  final_state L1 s1 r ->
+  final_state L2 s2 r.
+
+Section SIMU_DETERM_STAR.
+
+Variable measure: state L1 -> nat.
+
+Hypothesis simulation:
+  forall s1 t s1', Step L1 s1 t s1' ->
+  forall s2, match_states s1 s2 ->
+  exists s1'' s2',
+      Star L1 s1' E0 s1''
+   /\ (Plus L2 s2 t s2' \/ (Star L2 s2 t s2' /\ measure s1'' < measure s1))%nat
+   /\ match_states s1'' s2'.
+
+Lemma forward_simulation_determ_star: forward_simulation L1 L2.
+Proof.
+  apply forward_simulation_determ with
+    (match_states := fun i s1 s2 => i = s1 /\ match_states s1 s2)
+    (order := ltof _ measure).
+- assumption.
+- apply well_founded_ltof.
+- intros. exploit match_initial_states; eauto. intros (s2 & A & B). 
+  exists s1, s2; auto.
+- intros. destruct H. eapply match_final_states; eauto.
+- intros. destruct H0; subst i. 
+  exploit simulation; eauto. intros (s1'' & s2' & A & B & C).
+  exists s1'', s1'', s2'. auto.
+- assumption.
+Qed.
+
+End SIMU_DETERM_STAR.
+
+Section SIMU_DETERM_PLUS.
+
+Hypothesis simulation:
+  forall s1 t s1', Step L1 s1 t s1' ->
+  forall s2, match_states s1 s2 ->
+  exists s1'' s2', Star L1 s1' E0 s1'' /\ Plus L2 s2 t s2' /\ match_states s1'' s2'.
+
+Lemma forward_simulation_determ_plus: forward_simulation L1 L2.
+Proof.
+  apply forward_simulation_determ_star with (measure := fun _ => O).
+  intros. exploit simulation; eauto. intros (s1'' & s2' & A & B & C).
+  exists s1'', s2'; auto.
+Qed.
+
+End SIMU_DETERM_PLUS.
+
+Section SIMU_DETERM_ONE.
+
+Hypothesis simulation:
+  forall s1 t s1', Step L1 s1 t s1' ->
+  forall s2, match_states s1 s2 ->
+  exists s1'' s2', Star L1 s1' E0 s1'' /\ Step L2 s2 t s2' /\ match_states s1'' s2'.
+
+Lemma forward_simulation_determ_one: forward_simulation L1 L2.
+Proof.
+  apply forward_simulation_determ_plus.
+  intros. exploit simulation; eauto. intros (s1'' & s2' & A & B & C).
+  exists s1'', s2'; auto using plus_one.
+Qed.
+
+End SIMU_DETERM_ONE.
+
+End FORWARD_SIMU_DETERM_DIAGRAMS.
 
 (** * Backward simulations between two transition semantics. *)
 
@@ -1085,7 +1257,7 @@ Proof.
   subst t.
   assert (EITHER: t1 = E0 \/ t2 = E0).
     unfold Eapp in H2; rewrite app_length in H2.
-    destruct t1; auto. destruct t2; auto. simpl in H2; omegaContradiction.
+    destruct t1; auto. destruct t2; auto. simpl in H2; extlia.
   destruct EITHER; subst.
   exploit IHstar; eauto. intros [s2x [s2y [A [B C]]]].
   exists s2x; exists s2y; intuition. eapply star_left; eauto.
@@ -1134,7 +1306,7 @@ Proof.
 - (* 1 L2 makes one or several transitions *)
   assert (EITHER: t = E0 \/ (length t = 1)%nat).
   { exploit L3_single_events; eauto.
-    destruct t; auto. destruct t; auto. simpl. intros. omegaContradiction. }
+    destruct t; auto. destruct t; auto. simpl. intros. extlia. }
   destruct EITHER.
 + (* 1.1 these are silent transitions *)
   subst t. exploit (bsim_E0_plus S12); eauto.
@@ -1302,7 +1474,7 @@ Remark not_silent_length:
   forall t1 t2, (length (t1 ** t2) <= 1)%nat -> t1 = E0 \/ t2 = E0.
 Proof.
   unfold Eapp, E0; intros. rewrite app_length in H.
-  destruct t1; destruct t2; auto. simpl in H. omegaContradiction.
+  destruct t1; destruct t2; auto. simpl in H. extlia.
 Qed.
 
 Lemma f2b_determinacy_inv:
@@ -1592,7 +1764,7 @@ Proof.
   destruct IHstar as [s2x [A B]]. exists s2x; split; auto.
   eapply plus_left. eauto. apply plus_star; eauto. auto.
   destruct t1. simpl in *. subst t. exists s2; split; auto. apply plus_one; auto.
-  simpl in LEN. omegaContradiction.
+  simpl in LEN. extlia.
 Qed.
 
 Lemma ffs_simulation:

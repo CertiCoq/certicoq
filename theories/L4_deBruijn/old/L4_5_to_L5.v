@@ -1,6 +1,6 @@
 
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.omega.Omega 
+Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String Coq.Lists.List Coq.micromega.Lia 
   Coq.Program.Program Coq.micromega.Psatz.
 Open Scope N_scope.
 Local Opaque N.add.

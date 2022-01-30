@@ -22,6 +22,10 @@ Arguments dbody {term} _.
 Arguments dtype {term} _.
 Arguments rarg {term} _.
 
+Notation ret := (ExtLib.Structures.Monad.ret).
+Notation bind := (ExtLib.Structures.Monad.bind).
+Notation raise := (ExtLib.Structures.MonadExc.raise).
+
 (** A slightly cleaned up notion of object term.
 *** The simultaneous definitions of [Terms] and [Defs] make
 *** inductions over this type long-winded but straightforward.
@@ -51,7 +55,7 @@ Inductive Term : Type :=
 | TWrong     : string -> Term
 with Brs: Type :=
 | bnil: Brs
-| bcons: nat -> Term -> Brs -> Brs
+| bcons: list name -> Term -> Brs -> Brs
 with Defs : Type :=
 | dnil : Defs
 | dcons : name -> Term -> nat -> Defs -> Defs.
@@ -134,7 +138,7 @@ Function dnthBody (n:nat) (l:Defs) {struct l} : option (Term * nat) :=
                          end
   end.
 
-Function bnth (n:nat) (l:Brs) {struct l} : option (Term * nat) :=
+Function bnth (n:nat) (l:Brs) {struct l} : option (Term * list name) :=
   match l with
     | bnil => None
     | bcons ix x bs => match n with
@@ -207,7 +211,7 @@ Section term_Term_sec.
              (term_Term (dbody d))  (rarg d) (defs_Defs ds )
    end.
   (* Case branches *)
-  Fixpoint natterms_Brs (nts: list (nat * term)) : Brs :=
+  Fixpoint natterms_Brs (nts: list (list name * term)) : Brs :=
     match nts with
      | nil => bnil
      | cons (n,t) ds => bcons n (term_Term t) (natterms_Brs ds)
@@ -222,7 +226,7 @@ Fixpoint print_global_declarations (g:global_declarations) : string :=
   end.
 
 (** can compile terms using global_declarations from EAst.v **)
-Instance fix_bug : MonadExc string exception := exn_monad_exc.
+Instance fix_bug : MonadExc.MonadExc string exception := exn_monad_exc.
 
 Definition Cstr_npars_nargs
   (g:global_declarations) (ind:BasicAst.inductive) (ncst:nat): exception (nat * nat) :=
@@ -300,13 +304,15 @@ From MetaCoq.PCUIC Require Import TemplateToPCUIC.
 From MetaCoq.Erasure Require Import ErasureFunction Erasure.
 Require Import Common.classes Common.Pipeline_utils Common.compM.
 
-Existing Instance envcheck_monad.
+#[local] Existing Instance PCUICErrors.envcheck_monad.
 
 Open Scope string_scope.
+
+Axiom todo : string -> forall {A}, A.
      
-Definition erase (p:Template.Ast.program) : error (global_context × term) :=
+Definition erase (p:Ast.Env.program) : error (global_context × term) :=
   let p := fix_program_universes p in
-  match erase_template_program p with
+  match erase_template_program p (todo "wf_env") (todo "welltyped") with
     | (gc, t) => Ret (gc, t)
   end.
 

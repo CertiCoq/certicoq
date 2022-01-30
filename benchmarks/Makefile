@@ -8,8 +8,8 @@ CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, 
 # Names of the generated executables
 EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS)) $(patsubst %, %_cps_opt, $(TESTS)) $(patsubst %, %_opt, $(TESTS))
 
-default: copy exec run
 all: copy lib tests exec run
+default: copy exec run
 
 .PHONY: all default clean lib cleanlib tests run copy $(TESTS)
 

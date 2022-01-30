@@ -514,7 +514,7 @@ Section Printers.
                 rest <- spine_to_args spine' params ;;
                 match rest with
                 | None => ret None
-                | Some rest' => ret (Some ((Etempvar printer ty_printer) :: rest'))
+                | Some rest' => ret (Some ((Evar printer ty_printer) :: rest'))
                 end
             end
         end

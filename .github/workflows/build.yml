@@ -40,5 +40,6 @@ jobs:
               opam list
             endGroup
             startGroup "Run benchmarks"
-              make -C benchmarks all
+              cp -r benchmarks ~/benchmarks
+              make -C ~/benchmarks all
             endGroup

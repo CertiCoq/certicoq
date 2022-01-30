@@ -18,7 +18,8 @@ authors: ["Andrew Appel"
   ]
 license: "MIT"
 build: [
-  [make "-j%{jobs}%" "all" "plugin"]
+  [make "all"]
+  [make "plugin"]
 ]
 install: [
   [make "install"]

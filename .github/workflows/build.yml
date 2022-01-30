@@ -36,9 +36,8 @@ jobs:
             startGroup "opam pin"
               opam pin -n -y submodules/Equations
               opam pin -n -y submodules/metacoq
-              opam pin -n -y .
             endGroup
-          after_install: |
+          after_script: |
             startGroup "List installed packages"
               opam list
             endGroup

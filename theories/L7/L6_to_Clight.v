@@ -1066,13 +1066,13 @@ Definition global_defs (e : exp) : list (positive * globdef Clight.fundef type) 
     :: *)
   (gc_id,
    Gfun (External
-     (EF_external "gc" (mksignature (val_typ :: nil) None cc_default))
+     (EF_external "gc" (mksignature (val_typ :: nil) AST.Tvoid cc_default))
      (Tcons (Tpointer val noattr) (Tcons threadInf Tnil))
      Tvoid
      cc_default)) ::
   (isptr_id,
    Gfun (External
-     (EF_external "is_ptr" (mksignature (val_typ :: nil) None cc_default))
+     (EF_external "is_ptr" (mksignature (val_typ :: nil) AST.Tvoid cc_default))
      (Tcons val Tnil)
      (Tint IBool Unsigned noattr)
      cc_default)) ::
@@ -1358,9 +1358,9 @@ Definition make_eliminator (itag : ind_tag) (cenv : ctor_env) (n_ty : BasicAst.i
       Internal ({|
         fn_return := Tvoid;
         fn_callconv := cc_default;
-        fn_params := ((valIdent, val) :: (ordIdent, valPtr) :: (argvIdent, argvTy) :: nil);
+        fn_params := ((val_id, val) :: (ord_id, valPtr) :: (argv_id, argvTy) :: nil);
         fn_vars := nil;
-        fn_temps := ((caseIdent, boolTy) :: nil);
+        fn_temps := ((case_id, bool_ty) :: nil);
         fn_body := elim_body;
       |}) in
   let nenv :=
@@ -1401,7 +1401,7 @@ Definition export_id := 21%positive.
 Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
   (make_tinfo_id,
    Gfun (External
-     (EF_external "make_tinfo" (mksignature (nil) (Some val_typ) cc_default))
+     (EF_external "make_tinfo" (mksignature (nil) val_typ cc_default))
      Tnil
      threadInf
      cc_default)).
@@ -1409,7 +1409,7 @@ Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
 Definition export_rec : positive * globdef Clight.fundef type :=
   (export_id,
    Gfun (External
-     (EF_external "export" (mksignature (cons val_typ nil) (Some val_typ) cc_default))
+     (EF_external "export" (mksignature (cons val_typ nil) val_typ cc_default))
      (Tcons threadInf Tnil)
      valPtr
      cc_default)).
@@ -1426,15 +1426,15 @@ Definition make_halt (nenv : name_env)
     M.set halt_id (nNamed "halt"%string) nenv)
   in
   ret (nenv,
-       (haltIdent, Gfun (Internal ({|
+       (halt_id, Gfun (Internal ({|
           fn_return := Tvoid;
           fn_callconv := cc_default;
-          fn_params := (tinfIdent, threadInf) :: nil;
+          fn_params := (tinfo_id, threadInf) :: nil;
           fn_vars := nil;
           fn_temps := nil;
           fn_body := Sreturn None
         |}))),
-       (halt_cloIdent,
+       (halt_clo_id,
         Gvar (mkglobvar (tarray uval 2)
                         ((Init_addrof halt_id Ptrofs.zero) :: Init_int 1 :: nil)
                         true false))).

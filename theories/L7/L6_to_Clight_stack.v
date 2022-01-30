@@ -18,12 +18,13 @@ From MetaCoq.Template Require Import BasicAst.
 From compcert Require Import
   common.AST
   common.Errors
-  lib.Integers
+  common.Values
   cfrontend.Cop
   cfrontend.Ctypes
   cfrontend.Clight
-  common.Values
-  Clightdefs.
+  Clightdefs
+  lib.Integers
+  lib.Zbits.
 
 Require Import
   L6.set_util
@@ -658,11 +659,11 @@ Definition ensure_unique (l : M.t name) : M.t name :=
           end) l.
 
 Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
-  let make_tinfo_fn := EF_external "make_tinfo" (mksignature nil (Some ast_value) cc_default) in
+  let make_tinfo_fn := EF_external "make_tinfo" (mksignature nil ast_value cc_default) in
   (make_tinfo_id, Gfun (External make_tinfo_fn Tnil threadInf cc_default)).
                   
 Definition export_rec : positive * globdef Clight.fundef type :=
-  let sig := mksignature (cons ast_value nil) (Some ast_value) cc_default in
+  let sig := mksignature (cons ast_value nil) ast_value cc_default in
   let export_fn := EF_external "export" sig in
   (export_id, Gfun (External export_fn (Tcons threadInf Tnil) (tptr value) cc_default)).
 
@@ -751,8 +752,8 @@ Definition body_decl : definition :=
 
 Definition make_defs fds_e cenv nenv : error (list definition) :=
   let global_defs := 
-    let gc_fn := EF_external "garbage_collect" (mksignature (ast_value :: nil) None cc_default) in
-    let is_ptr_fn := EF_external "is_ptr" (mksignature (ast_value :: nil) None cc_default) in
+    let gc_fn := EF_external "garbage_collect" (mksignature (ast_value :: nil) AST.Tvoid cc_default) in
+    let is_ptr_fn := EF_external "is_ptr" (mksignature (ast_value :: nil) AST.Tvoid cc_default) in
     (gc_id, Gfun (External gc_fn (Tcons threadInf Tnil) Tvoid cc_default)) ::
     (isptr_id, Gfun (External is_ptr_fn (Tcons value Tnil) type_bool cc_default)) ::
     nil
@@ -2178,7 +2179,7 @@ Hypothesis garbage_collect_spec :
   exists m' limit_o alloc_o cvss' values',
   Events.external_functions_sem
     "garbage_collect"
-    (mksignature [ast_value] None cc_default) prog_genv
+    (mksignature [ast_value] AST.Tvoid cc_default) prog_genv
     [Vptr tinfo_b tinfo_o] m Events.E0 Vundef m' /\
   (** m' is a valid CertiCoq mem,
       the thread_info's location stays the same,
@@ -2790,7 +2791,7 @@ Hypothesis is_ptr_spec :
   forall m v,
   val_defined_wf v -> exists cv,
   Events.external_functions_sem "is_ptr"
-    (mksignature [ast_value] None cc_default) prog_genv
+    (mksignature [ast_value] AST.Tvoid cc_default) prog_genv
     [v] m Events.E0 cv m /\
   (forall b o, v = Vptr b o -> cv = Vtrue) /\
   (forall i, v = vint i -> cv = Vfalse).
@@ -4937,14 +4938,14 @@ Ltac rewrite_equiv_in_l F H Hin :=
   [|eauto with FrameDB|intros; apply H].
 
 Hypothesis prog_genv_has_gc : exists b,
-  let sig := mksignature (ast_value :: nil) None cc_default in
+  let sig := mksignature (ast_value :: nil) AST.Tvoid cc_default in
   let ext_fn := EF_external "garbage_collect" sig in
   let fn := External ext_fn (Tcons threadInf Tnil) Tvoid cc_default in
   Genv.find_symbol prog_genv gc_id = Some b /\
   Genv.find_funct prog_genv (Vptr b O.zero) = Some fn.
 
 Hypothesis prog_genv_has_isptr : exists b,
-  let sig := mksignature (ast_value :: nil) None cc_default in
+  let sig := mksignature (ast_value :: nil) AST.Tvoid cc_default in
   let ext_fn := EF_external "is_ptr" sig in
   let fn := External ext_fn (Tcons value Tnil) bool_ty cc_default in
   Genv.find_symbol prog_genv isptr_id = Some b /\
@@ -5278,7 +5279,7 @@ Proof.
     rewrite Int64.shru_div_two_p.
     pose proof concrete_int64_max_unsigned.
     rewrite !Int64.unsigned_repr by lia.
-    rewrite <- O.Zshiftr_div_two_p by lia.
+    rewrite <- Zshiftr_div_two_p by lia.
     reflexivity.
   - unfold Int.ltu.
     destruct (Coqlib.zlt _ _) as [Hok|Hwat].
@@ -5296,7 +5297,7 @@ Proof.
     pose proof Int.max_signed_unsigned.
     pose proof concrete_int_max_unsigned.
     rewrite !Int.unsigned_repr by superlia.
-    rewrite <- O.Zshiftr_div_two_p by lia.
+    rewrite <- Zshiftr_div_two_p by lia.
     reflexivity.
 Qed.
 
@@ -5339,7 +5340,7 @@ Proof. now unfold "!!!"; intros H; rewrite M.gso by auto. Qed.
 Lemma repr_unboxed_shiftr i:
   Z.shiftr (Z.shiftl i 1 + 1) 1 = i.
 Proof.
-  rewrite O.Zshiftl_mul_two_p by lia.
+  rewrite Zshiftl_mul_two_p by lia.
   unfold Z.shiftr. 
   simpl Z.shiftl.
   unfold Zpower.two_power_pos. simpl.
@@ -5474,7 +5475,7 @@ Proof.
             destruct d. exfalso; lia.
             replace false with
                 (Z.testbit (Z.pos p0)  (Z.of_nat (S d))). reflexivity.
-            eapply Int.Ztestbit_above.
+            eapply Ztestbit_above.
             apply Hbound_t.
             apply Nat2Z.inj_le in H0.
             replace (Pos.to_nat 8) with 8.
@@ -5491,13 +5492,13 @@ Proof.
   - (* always false *)
     rewrite Bool.andb_false_intro2.
     symmetry.
-    eapply Byte.Ztestbit_above with (n := 8).
+    eapply Ztestbit_above with (n := 8).
     rewrite Zpower.two_power_nat_correct. 
     rewrite Zpower.two_power_pos_correct in *.
     unfold Z.pow_pos in H. simpl in *.
     lia.
     simpl. lia.
-    eapply Byte.Ztestbit_above with (n := 8).
+    eapply Ztestbit_above with (n := 8).
     rewrite Zpower.two_power_nat_correct. simpl. lia.
     simpl. lia.
 Qed.
@@ -5629,7 +5630,7 @@ Proof.
       - decompose [and] Henvs; split_ands; eauto with EvalDB InvDB.
       - congruence.
       - rewrite env_gso by auto. eauto. }
-    { rewrite O.Zshiftr_div_two_p by lia.
+    { rewrite Zshiftr_div_two_p by lia.
       change (two_p 1) with 2%Z.
       apply mul_div_bound; lia. }
     rewrite repr_unboxed_shiftr.

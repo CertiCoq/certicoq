@@ -636,7 +636,7 @@ Section Translate.
         x' <- get_named_str "y" ;; (* Get variable for interim result *)
         ret (C |[ Eproj x' c n y (Ehalt x') ]|)
       | Fun ft x e =>
-        x' <- get_named_str" y" ;; (* Get variable for interim result *)
+        x' <- get_named_str "y" ;; (* Get variable for interim result *)
         ret (C |[ Efun (Fcons x' ft [x] e Fnil) (Ehalt x') ]|)
       | Prim pr xs =>
         x' <- get_named_str "y" ;; (* Get variable for interim result *)

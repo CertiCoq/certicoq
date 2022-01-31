@@ -15,17 +15,22 @@ Open Scope monad_scope.
 
 From MetaCoq.Template Require Import BasicAst.
 
-Require Import compcert.common.AST
-        compcert.common.Errors
-        compcert.lib.Integers
-        compcert.cfrontend.Cop
-        compcert.cfrontend.Ctypes
-        compcert.cfrontend.Clight
-        compcert.common.Values.
+From compcert Require Import
+  common.AST
+  common.Errors
+  lib.Integers
+  cfrontend.Cop
+  cfrontend.Ctypes
+  cfrontend.Clight
+  common.Values
+  Clightdefs.
 
-
-Require Import L6.set_util L6.cps L6.identifiers L6.cps_show L6.state.
-Require Import Clightdefs.
+Require Import
+  L6.set_util
+  L6.cps
+  L6.identifiers
+  L6.cps_show
+  L6.state.
 
 Section TRANSLATION.
 
@@ -406,7 +411,7 @@ Definition stack_decl size : list (ident * type)  :=
   (rootIdent, rootT size) :: nil. (* local variable for the live array *)
 
 (* Notation for handling the roots array *)
-Notation roots := (Etempvar rootIdent valPtr).
+Notation roots := (Evar rootIdent valPtr).
 Notation "'roots[' n ']'" := ( *(add roots (c_int n%Z val))) (at level 36).
 
 (* Initialize local stack frame. Called before the first function call that uses the current stack *)
@@ -441,7 +446,7 @@ Definition reset_stack (sp : N) (b : bool) : statement :=
 
 (* Pushes single var in frame *)
 Definition push_var (sp : N) (x : positive) :=
-  roots[ Z.of_N sp ] :::= Evar x valPtr.
+  roots[ Z.of_N sp ] :::= Etempvar x valPtr.
 
 (* Pops single var from frame *)
 Definition pop_var (sp : N) (x : positive) := 
@@ -522,7 +527,7 @@ Definition assignConstructorS (cenv:ctor_env) (ienv : n_ind_env) (fenv : fun_env
 
 (* Zoe: inlining the isPtr function to avoid extra function call in C *)
 Definition isPtr (retId:positive) (v:positive) : expr:=
-  Ebinop Oeq (Ebinop Oand (Evar v val) (Econst_int Int.one intTy) boolTy)
+  Ebinop Oeq (Ebinop Oand (Etempvar v val) (Econst_int Int.one intTy) boolTy)
          (Econst_int Int.zero intTy) boolTy.
 
 
@@ -820,8 +825,8 @@ Definition mkFun
   mkfunction Tvoid
              cc_default
              ((tinfIdent , threadInf) :: (map (fun x => (x , val)) (firstn nParam vs)))
-             ((map (fun x => (x , val)) ((skipn nParam vs) ++ loc)) ++ (stack_decl root_size) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::(caseIdent, boolTy) :: nil)
-             nil
+             (stack_decl root_size)
+             ((map (fun x => (x , val)) ((skipn nParam vs) ++ loc)) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::(caseIdent, boolTy) :: nil)
              body.
 
 Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (map : fun_info_env) (nenv : name_env) 
@@ -910,8 +915,8 @@ Definition translate_program (args_opt : bool) (e : exp) (fenv : fun_env) (cenv:
                               (mkfunction val
                                           cc_default
                                           ((tinfIdent, threadInf)::nil)
-                                          ((map (fun x => (x , val)) localVars) ++ (stack_decl (Z.of_N slots)) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)
-                                          nil
+                                          (stack_decl (Z.of_N slots))
+                                          ((map (fun x => (x , val)) localVars) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)
                                           (allocIdent ::= Efield tinfd allocIdent valPtr ;
                                            limitIdent ::= Efield tinfd limitIdent valPtr ;
                                            argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);

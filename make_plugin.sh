@@ -1,4 +1,5 @@
-#env /bin/sh
+#!/usr/bin/env bash
+
 if [ ! -f "plugin/extraction/astCommon.ml" ]
 then
     sh clean_extraction.sh
@@ -12,4 +13,4 @@ else
 fi
 
 cd plugin
-exec make -f Makefile ${@}
+exec make -f Makefile -j`nproc` ${@}

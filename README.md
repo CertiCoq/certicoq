@@ -6,6 +6,11 @@
 
 ## Overview
 
+[![build](https://github.com/CertiCoq/certicoq/actions/workflows/build.yml/badge.svg)](https://github.com/CertiCoq/certicoq/actions/workflows/build.yml)
+
+![GitHub](https://img.shields.io/github/license/CertiCoq/certicoq)
+
+
 CertiCoq is a compiler for Gallina, the specification language of the [Coq proof assistant](https://coq.inria.fr/refman/index.html). CertiCoq targets Clight, a subset of the C language that can be compiled with any C compiler, including the [CompCert](http://compcert.org) verified compiler.
 
 Large parts of the CertiCoq compiler have been verified whereas others are in the process of being verified.
@@ -48,7 +53,6 @@ Structure of the theories directory:
 * `theories/L4_deBruijn`: 3rd pass, let-bind environment
 * `theories/L6_PCPS` contains the λANF pipeline (and conversions -- direct and CPS -- to λANF)
 * `theories/L7` contains the C code generator.
-* `theories/compcert` contains a local copy of the compcert compiler
 
 
 ## Bugs 

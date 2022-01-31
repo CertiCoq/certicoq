@@ -1,54 +1,40 @@
+.PHONY: all submodules plugin install clean
 
-all: theories/Makefile libraries/Makefile
-	$(MAKE) -C libraries
-	$(MAKE) -C theories
 
-plugin/CertiCoq.vo: plugin/Makefile theories/Extraction/extraction.vo all
-	sh ./make_plugin.sh
+all theories/Extraction/extraction.vo: theories/Makefile libraries/Makefile
+	$(MAKE) -C libraries -j`nproc`
+	$(MAKE) -C theories -j`nproc`
 
-install: all plugin/CertiCoq.vo
-	$(MAKE) -C libraries install
-	$(MAKE) -C theories install
-	$(MAKE) -C plugin install
-
-theories/Makefile:
+theories/Makefile: theories/_CoqProject
 	cd theories;coq_makefile -f _CoqProject -o Makefile
 
-plugin/Makefile:
-	cd plugin;coq_makefile -f _CoqProject -o Makefile
-
-libraries/Makefile:
+libraries/Makefile: libraries/_CoqProject
 	cd libraries;coq_makefile -f _CoqProject -o Makefile
 
-# needs https://github.com/aa755/paramcoq/tree/v86FullNames installed
-theories/common/TermAbs_parametricity.vo: theories/common/TermAbs_parametricity.v
-	cd theories/common; coqc -R . Common TermAbs_parametricity.v
-
-clean:
-	$(MAKE) clean -C libraries
-#	$(MAKE) clean -C libraries/SquiggleEq
-	$(MAKE) clean -C theories
-
-cleanCoqc:
-	find -name *.vo | xargs rm
-	find -name *.glob | xargs rm
-	find -name *.v.d | xargs rm
-
-gitsuperclean:
-	git reset HEAD --hard
-	git clean -xdf
 
 submodules:
 	git submodule update
 	./make_submodules.sh
 
-plugin: plugin/CertiCoq.vo
 
-ci:
-	# git submodule update --init
-	git submodule status
-	# sh make_submodules.sh
-	make all plugin
-	make install
+plugin: all plugin/CertiCoq.vo
 
-.PHONY: submodules
+plugin/Makefile: plugin/_CoqProject
+	cd plugin ; coq_makefile -f _CoqProject -o Makefile
+
+plugin/CertiCoq.vo: all plugin/Makefile theories/Extraction/extraction.vo
+	sh ./make_plugin.sh
+
+
+install: plugin
+	$(MAKE) -C libraries install
+	$(MAKE) -C theories install
+	$(MAKE) -C plugin install
+
+
+clean:
+	$(MAKE) -C libraries clean
+	$(MAKE) -C theories clean
+	$(MAKE) -C plugin clean
+	rm -f `find theories -name "*.ml*"`
+	rm -rf plugin/extraction

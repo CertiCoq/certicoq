@@ -1,8 +1,4 @@
--R . "CertiCoq.Libraries" -R ../theories/compcert "compcert"
-
-# Compcert
-../theories/compcert/lib/Coqlib.v
-../theories/compcert/lib/Maps.v
+-R . CertiCoq.Libraries
 
 # libraries
 maps_util.v

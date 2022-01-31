@@ -14,22 +14,19 @@ Open Scope monad_scope.
 
 From MetaCoq.Template Require Import BasicAst.
 
-Require Import compcert.common.AST
-               compcert.common.Errors
-               compcert.lib.Integers
-               compcert.cfrontend.Cop
-               compcert.cfrontend.Ctypes
-               compcert.cfrontend.Clight
-               compcert.common.Values.
-
-
-Require Import Clightdefs.
+From compcert Require Import
+  common.AST
+  common.Errors
+  lib.Integers
+  cfrontend.Cop
+  cfrontend.Ctypes
+  cfrontend.Clight
+  common.Values
+  Clightdefs.
 
 Require Import L6.cps
-               L6.identifiers.
-
-Require Import Clightdefs.
-Require Import L6.cps_show.
+               L6.identifiers
+               L6.cps_show.
 
 
 Section TRANSLATION.
@@ -852,12 +849,14 @@ Definition mkFun
            (vs : list positive)
            (loc : list positive)
            (body : statement) : function :=
-  mkfunction Tvoid
-             cc_default
-             ((tinfIdent, threadInf) :: (map (fun x => (x, val)) (firstn nParam vs)))
-             ((map (fun x => (x, val)) ((skipn nParam vs) ++ loc)) ++ (allocIdent, valPtr) :: (limitIdent, valPtr) :: (argsIdent, valPtr) :: (caseIdent, boolTy) :: nil)
-             nil
-             body.
+{|
+  fn_return := Tvoid;
+  fn_callconv := cc_default;
+  fn_params := ((tinfIdent, threadInf) :: (map (fun x => (x, val)) (firstn nParam vs)));
+  fn_vars := nil;
+  fn_temps := ((map (fun x => (x, val)) ((skipn nParam vs) ++ loc)) ++ (allocIdent, valPtr) :: (limitIdent, valPtr) :: (argsIdent, valPtr) :: (caseIdent, boolTy) :: nil);
+  fn_body := body;
+|}.
 
 Fixpoint translate_fundefs
          (fnd : fundefs)
@@ -1011,19 +1010,20 @@ Definition translate_funs
       body <- translate_body e fenv cenv ienv m ;;
       '(gcArrIdent , _) <- M.get mainIdent m ;;
       let argsExpr := Efield tinfd argsIdent (Tarray uval maxArgs noattr) in
-      ret ((bodyIdent, Gfun (Internal
-                              (mkfunction val
-                                          cc_default
-                                          ((tinfIdent, threadInf)::nil)
-                                          ((map (fun x => (x, val)) localVars) ++ (allocIdent, valPtr) :: (limitIdent, valPtr) :: (argsIdent, valPtr) :: nil)
-                                          nil
-                                          (allocIdent ::= Efield tinfd allocIdent valPtr ;;;
-                                           limitIdent ::= Efield tinfd limitIdent valPtr ;;;
-                                           argsIdent ::= argsExpr ;;;
-                                           reserve_body gcArrIdent 2%Z ;;;
-                                           body ;;;
-                                           Sreturn (Some (Field(argsExpr, Z.of_nat 1)))))))
-            :: funs)
+      ret ((bodyIdent, Gfun (Internal {|
+        fn_return := val;
+        fn_callconv := cc_default;
+        fn_params := (tinfIdent, threadInf)::nil;
+        fn_vars := nil;
+        fn_temps := (map (fun x => (x, val)) localVars) ++ (allocIdent, valPtr) :: (limitIdent, valPtr) :: (argsIdent, valPtr) :: nil;
+        fn_body :=
+          allocIdent ::= Efield tinfd allocIdent valPtr ;;;
+          limitIdent ::= Efield tinfd limitIdent valPtr ;;;
+          argsIdent ::= argsExpr ;;;
+          reserve_body gcArrIdent 2%Z ;;;
+          body ;;;
+          Sreturn (Some (Field(argsExpr, Z.of_nat 1)))
+      |})) :: funs)
   | _ => None
   end.
 
@@ -1040,18 +1040,19 @@ Definition translate_funs_fast
       let localVars := get_allocs e in (* ADD ALLOC ETC>>> HERE *)
       body <- translate_body e fenv cenv ienv m ;;
       '(gcArrIdent , _) <- M.get mainIdent m ;;
-      ret ((bodyIdent, Gfun (Internal
-                              (mkfunction Tvoid
-                                          cc_default
-                                          ((tinfIdent, threadInf)::nil)
-                                          ((map (fun x => (x, val)) localVars) ++ (allocIdent, valPtr) :: (limitIdent, valPtr) :: (argsIdent, valPtr) :: nil)
-                                          nil
-                                          (allocIdent ::= Efield tinfd allocIdent valPtr ;;;
-                                           limitIdent ::= Efield tinfd limitIdent valPtr ;;;
-                                           argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);;;
-                                           reserve_body gcArrIdent 2%Z ;;;
-                                           body))))
-             :: funs)
+      ret ((bodyIdent, Gfun (Internal {|
+        fn_return := Tvoid;
+        fn_callconv := cc_default;
+        fn_params := (tinfIdent, threadInf)::nil;
+        fn_vars := nil;
+        fn_temps := (map (fun x => (x, val)) localVars) ++ (allocIdent, valPtr) :: (limitIdent, valPtr) :: (argsIdent, valPtr) :: nil;
+        fn_body := 
+          allocIdent ::= Efield tinfd allocIdent valPtr ;;;
+          limitIdent ::= Efield tinfd limitIdent valPtr ;;;
+          argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);;;
+          reserve_body gcArrIdent 2%Z ;;;
+          body
+      |})) :: funs)
   | _ => None
   end.
 
@@ -1330,7 +1331,7 @@ Fixpoint make_constrAsgn' (argv:ident) (argList:list (ident * type)) (n:nat) :=
   | nil => Sskip
   | (id, ty)::argList' =>
     let s' := make_constrAsgn' argv argList' (S n) in
-    (Sassign (Field(var argv, Z.of_nat n)) (Evar id ty) ;;; s')
+    (Sassign (Field(var argv, Z.of_nat n)) (Etempvar id ty) ;;; s')
   end.
 
 Definition make_constrAsgn (argv:ident) (argList:list (ident * type)) :=
@@ -1356,7 +1357,13 @@ Fixpoint make_constructors
       constr_fun_id <- getName;;
       let constr_body :=
          Sreturn (Some (Econst_int (Int.repr (Z.add (Z.shiftl (Z.of_N ord) 1) 1)) val)) in
-      let constr_fun := Internal (mkfunction val cc_default nil nil nil constr_body) in
+      let constr_fun := Internal ({|
+        fn_return := val;
+        fn_callconv := cc_default;
+        fn_params := nil;
+        fn_vars := nil;
+        fn_temps := nil;
+        fn_body := constr_body|}) in
       let nenv :=
           M.set constr_fun_id (make_name nTy nCtor) nenv in
       (* elet cFun :=  (Internal (mkFun )) *)
@@ -1374,9 +1381,14 @@ Fixpoint make_constructors
           Sassign (Field(var argvIdent, 0%Z)) header ;;;
           asgn_s ;;;
           Sreturn (Some (add (Evar argvIdent argvTy) (c_int 1%Z val))) in
-      let constr_fun := Internal (mkfunction val cc_default
-                                    (argList ++ ((argvIdent, argvTy) :: nil))
-                                    nil nil constr_body) in
+      let constr_fun := Internal ({|
+          fn_return := val;
+          fn_callconv := cc_default;
+          fn_params := argList ++ ((argvIdent, argvTy) :: nil);
+          fn_vars := nil;
+          fn_temps := nil;
+          fn_body := constr_body
+        |}) in
       let nenv :=
           M.set argvIdent (nNamed "argv"%string) (
             M.set constr_fun_id (make_name nTy nCtor) nenv) in
@@ -1507,13 +1519,14 @@ Definition make_eliminator
   let gv_arities :=  make_arities_gv arrList in
   let elim_body := (make_case_switch valIdent ls  ls') in
   let elim_fun :=
-      Internal (mkfunction
-                  Tvoid
-                  cc_default
-                  ((valIdent, val) :: (ordIdent, valPtr) :: (argvIdent, argvTy) :: nil)
-                  ((caseIdent, boolTy) :: nil)
-                  nil
-                  elim_body) in
+      Internal ({|
+        fn_return := Tvoid;
+        fn_callconv := cc_default;
+        fn_params := ((valIdent, val) :: (ordIdent, valPtr) :: (argvIdent, argvTy) :: nil);
+        fn_vars := nil;
+        fn_temps := ((caseIdent, boolTy) :: nil);
+        fn_body := elim_body;
+      |}) in
   let nenv :=
       set_list ((gv_namesIdent, nNamed (append "names_of_" nTy)) ::
                 (gv_aritiesIdent, nNamed (append "arities_of_" nTy)) ::
@@ -1578,9 +1591,14 @@ Definition make_halt
   let nenv := M.set halt_cloIdent (nNamed "halt_clo"%string)
                 (M.set haltIdent (nNamed "halt"%string) nenv) in
   ret (nenv,
-       (haltIdent, Gfun (Internal (mkfunction Tvoid cc_default
-                                              ((tinfIdent, threadInf) :: nil)
-                                              nil nil (Sreturn None)))),
+       (haltIdent, Gfun (Internal ({|
+          fn_return := Tvoid;
+          fn_callconv := cc_default;
+          fn_params := (tinfIdent, threadInf) :: nil;
+          fn_vars := nil;
+          fn_temps := nil;
+          fn_body := Sreturn None
+        |}))),
        (halt_cloIdent,
         Gvar (mkglobvar (tarray uval 2)
                         ((Init_addrof haltIdent Ptrofs.zero) :: Init_int 1 :: nil)
@@ -1678,8 +1696,14 @@ Definition make_call_n_export_b
     (* if export, tinf is local, otherwise is a param *)
     let params := (clo_ident, val) :: argsL in
     let vars := (f_ident, valPtr) :: (env_ident, valPtr) :: (retIdent, valPtr) :: nil in
-    ret (nenv, (callIdent, Gfun (Internal (mkfunction (Tpointer Tvoid noattr)
-                                              cc_default params nil vars body_s)))).
+    ret (nenv, (callIdent, Gfun (Internal ({|
+      fn_return := Tpointer Tvoid noattr;
+      fn_callconv := cc_default;
+      fn_params := params;
+      fn_vars := nil;
+      fn_temps := vars;
+      fn_body := body_s
+    |})))).
 
 Definition tinf_def : globdef Clight.fundef type :=
   Gvar (mkglobvar threadInf ((Init_space 4%Z)::nil) false false).

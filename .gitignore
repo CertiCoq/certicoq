@@ -37,6 +37,7 @@ myMain.ml
 myMain.mli
 vs.ml
 vs.mli
+benchmarks/mod.py
 benchmarks/demo1
 benchmarks/demo2
 benchmarks/CertiCoq.Benchmarks.*.c

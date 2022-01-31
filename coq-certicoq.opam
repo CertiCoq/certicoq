@@ -1,4 +1,5 @@
 opam-version: "2.0"
+maintainer: "The CertiCoq Team"
 homepage: "https://certicoq.org/"
 dev-repo: "git+https://github.com/CertiCoq/certicoq"
 bug-reports: "https://github.com/CertiCoq/certicoq/issues"
@@ -17,17 +18,19 @@ authors: ["Andrew Appel"
   ]
 license: "MIT"
 build: [
-  [make "-j%{jobs}%"]
+  [make "all"]
+  [make "plugin"]
 ]
 install: [
   [make "install"]
 ]
 depends: [
-  "coq" {>= "8.12.1" & < "8.13~"}
-  "coq-equations" {= "1.2.3+8.12"}
   "ocaml"
-  "coq-metacoq-erasure" {="1.0~beta2+8.12" }
-  "coq-ext-lib" {="0.11.3"}
+  "coq" {>= "8.14" & < "8.15~"}
+  "coq-compcert" {= "3.9"}
+  "coq-equations" {= "1.3+8.14"}
+  "coq-metacoq-erasure" {= "1.0~beta2+8.13" }
+  "coq-ext-lib" {>= "0.11.5"}
 ]
 
 synopsis: "A Verified Compiler for Gallina, Written in Gallina "

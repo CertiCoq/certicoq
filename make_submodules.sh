@@ -12,13 +12,6 @@ clean() {
 
 cd submodules
 
-cd coq-ext-lib
-echo "Rebuilding coq-ext-lib"
-clean
-make -j 2
-make install
-cd ..
-
 cd Equations
 echo "Rebuilding Equations"
 clean

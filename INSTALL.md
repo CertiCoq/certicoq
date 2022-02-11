@@ -20,7 +20,6 @@ $ git submodule update --init
 First, pin the dependencies:
 
 ```console
-$ opam pin -n -y submodules/Equations
 $ opam pin -n -y submodules/metacoq
 ```
 

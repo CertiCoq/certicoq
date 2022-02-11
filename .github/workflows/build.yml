@@ -33,7 +33,6 @@ jobs:
               cp -r `pwd` ~/repo
             endGroup
             startGroup "opam pin"
-              opam pin -n -y submodules/Equations
               opam pin -n -y submodules/metacoq
             endGroup
           after_script: |

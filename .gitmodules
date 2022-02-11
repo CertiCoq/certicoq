@@ -1,6 +1,3 @@
-[submodule "submodules/Equations"]
-	path = submodules/Equations
-	url = http://github.com/mattam82/Coq-Equations
 [submodule "submodules/metacoq"]
 	path = submodules/metacoq
 	url = https://github.com/MetaCoq/metacoq.git

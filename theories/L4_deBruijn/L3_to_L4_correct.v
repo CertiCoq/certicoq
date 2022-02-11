@@ -1447,53 +1447,45 @@ Proof.
   Opaque N.eq_dec. simpl.
   destruct inductive_dec; try congruence.
   destruct k.
-  destruct N.eq_dec.
-  (* 
-  specialize (IHb t0 i (S n0) 1).
-    fix_forward IHb; [ |lia].
+  { destruct N.eq_dec.
+    rewrite Nat.sub_0_r in H2.
+    destruct n; cbn in *; try congruence.
+    { cbn in *. injection H2. intros <-. cbn.
+      destruct N.eq_dec; auto. lia. }
+    cbn in H0.
+    specialize (IHb t0 i n 1).
+    forward IHb; [ |lia].
     simpl in H0, H1, H2.
-    fix_forward IHb; [ |lia].
-    fix_forward IHb; [ |lia].
-    simpl in IHb. simpl in H1. rewrite Nat.sub_0_r in IHb.
-    specialize (IHb H2).
-    apply IHb.
-
-    destruct N.eq_dec. injection e2; intros <-.
-    simpl in *.
-    replace (Pos.to_nat (Pos.of_succ_nat n0)) with (S n0) in * by lia.
-    rewrite Nat.sub_diag in *. simpl.
-    destruct N.eq_dec. reflexivity.
-    injection H2; intros <-. simpl in n1.
-    elim n1; reflexivity.
-
-    simpl.
-    case_eq (Pos.to_nat p). simpl.
-    intros Hp. specialize (IHb t0 i (S n0) (N.pos p + 1)).
-    do 4 (fix_forward IHb; [ |lia]).
-    rewrite IHb. equaln.
-
-
-    intros.
-    simpl.
-
-    assert(n2 = Pos.to_nat p - 1)%nat by lia.
-    subst n2.
-    assert (n0 - (Pos.to_nat p - 1) = S (n0 - Pos.to_nat p))%nat by lia.
-    rewrite H4. simpl.
-    erewrite IHb. equaln. lia. simpl in H0. lia. simpl in H1. lia.
-    rewrite <- H2.
-    assert (S n0 - N.to_nat (N.pos p) = S (n0 - N.to_nat (N.pos p)))%nat by lia.
-    rewrite H5. simpl bnth at 2. equaln.
-
-    now elim n1.*)
-Admitted.
+    forward IHb; [ |lia].
+    forward IHb; [ |lia].
+    simpl in IHb. simpl in H1.
+    rewrite Nat.sub_0_r in H2. destruct n. lia.
+    forward IHb. 2:{ rewrite <- H2. lia_f_equal. }
+    cbn. rewrite N.add_0_l. rewrite IHb. lia_f_equal. }
+  { destruct N.eq_dec; auto; try congruence.
+    { assert (n - N.to_nat (N.pos p) = 0)%nat by lia. rewrite H3 in H2.
+      assert (n - Pos.to_nat p = 0)%nat by lia.
+      cbn in H2. 
+      injection H2; intros <-.
+      cbn. destruct (N.eq_dec); try congruence.
+      now rewrite H4. }
+    { specialize (IHb t0 i n (N.pos p + 1)).
+      cbn in H0. cbn in H1.
+      do 3 (forward IHb; [ |lia]).
+      forward IHb. 2:{ rewrite <- H2. cbn.
+        case_eq (n - Pos.to_nat p)%nat. lia.
+        intros. lia_f_equal. } 
+      rewrite IHb.
+      assert (n - N.to_nat (N.pos p) = S (n - N.to_nat (N.pos p + 1)))%nat by lia.
+      rewrite H7. now cbn. } } 
+Qed.
 
 (** Lookup is the same *)
 Lemma L3_tnth_find_branch n prims e brs t i f :
   bnth n brs = Some t ->
   find_branch (dcon_of_con i n) (N.of_nat (List.length (fst t)))
               (map_branches f (trans_brs (trans e prims) i 0 0 brs)) =
-  Some (f (N.of_nat (List.length (fst t))) (trans e prims 0 (snd t))).
+  Some (f (N.of_nat (List.length (fst t))) (trans e prims (N.of_nat (List.length (fst t))) (snd t))).
 Proof.
   intros Hnth.
   case_eq (find_branch (dcon_of_con i n) (N.of_nat (List.length (fst t)))
@@ -1508,22 +1500,20 @@ Proof.
   - destruct n0.
     + simpl in findbr. 
       injection Hnth; intros <-; simpl in *.
-      injection findbr as <-. lia_f_equal.
-(*       
-    + apply (IHbrs (n0 + 1) n1 Hnth). clear IHbrs.
-      destruct strip_lam. now simpl in findbr.
+      injection findbr as <-. cbn. lia_f_equal.
+    + apply (IHbrs (n + 1) n0 Hnth). clear IHbrs.
+      now cbn in findbr.
   - intros.
     elimtype False.
     apply find_branch_map_branches_none in H.
     rewrite find_branch_trans in H; eauto.
     revert n H Hnth. generalize 0 at 2.
     induction brs; simpl in *; intros. discriminate.
-    destruct n1.
-    injection Hnth ; intros <-. simpl in *.
-    destruct strip_lam. discriminate.
-    destruct strip_lam. simpl in H.
-    eauto.*)
-Admitted.
+    destruct n0.
+    injection Hnth ; intros <-. simpl in *. discriminate.
+    cbn in H.
+    eauto.
+Qed.
   
 Lemma exps_skip_tskipn pars args args' e prims f :
   tskipn pars args = Some args' ->
@@ -2290,6 +2280,47 @@ Proof.
   inv Hfn. intuition auto.
 Qed.
 
+Require Import ssreflect.
+
+Lemma trans_instantiatel prims e e' a k :
+  eval_env (translate_env prims e) e' ->
+  wf_tr_environ e' -> crctTerms e 0 a ->
+  forall b, crctTerm e (tlength a + k) b ->
+  trans e' prims (N.of_nat k) (L2k.term.instantiatel a k b) =
+  sbst_list (trans e' prims (N.of_nat (tlength a + k)) b) (map_terms (trans e' prims 0) a).
+Proof.
+  intros ev wf.
+  induction a.
+  - intros crcta b crct. cbn. reflexivity.
+  - intros crcta b crct. depelim crcta.
+    cbn. rewrite IHa; auto.
+    { eapply instantiate_pres_Crct. apply crct. eapply Crct_Up; eauto. lia. }
+    pose proof (trans_instantiate prims p e' t (tlength a + k) ev wf H b).
+    rewrite H0; auto.
+    cbn. rewrite sbst_sbst_list. cbn.
+    admit. admit.
+    f_equal.
+    unshelve erewrite (proj1 (closed_subst_sbst (trans e' prims 0 t) _)). admit.
+    f_equal. rewrite exps_length_trans. cbn.
+Admitted. 
+
+Lemma sbst_list_instantiate e e' n args t :
+  crctTerms e 0 args ->
+  crctTerm e 0 (instantiatel args 0 t) ->
+  n = tlength args ->
+  subst_env_aux e' 0 (trans e' [] 0 (instantiatel args 0 t)) = 
+  (sbst_list (subst_env_aux e' (N.of_nat n) (trans e' [] (N.of_nat n) t))
+    (map_exps (subst_env_aux e' 0) (trans_args (trans e' []) 0 args))).
+Proof.
+  intros crargs crt hn.
+  rewrite (trans_instantiatel [] e e' _ 0). admit. admit. auto. admit.
+  induction e'.
+  - cbn. rewrite hn. cbn. admit.
+  - cbn.
+Admitted.
+
+Axiom todo : forall {A}, string -> A.
+
 Theorem translate_correct_subst prims (Heq : prims = []) (e : environ Term) (t t' : Term) :
   crctEnv e -> crctTerm e 0 t ->
   L3eval.WcbvEval e t t' -> 
@@ -2352,7 +2383,7 @@ Proof with eauto.
     destruct (lookup_eval_env _ prims wfe nm t H _ evenv wfe'') as
         [bef [bef' [after' [t' [wfbef [evbef [Crctt [evt [eqe' lookupt]]]]]]]]].
     destruct (subst_env_aux_var_cst e'' nm 0 _ wfe'' lookupt) as [Hs ewf].
-    rewrite Heq in *. simpl. 
+    subst prims.
     rewrite Hs. 
     cut(t' = (subst_env e'' (translate e'' [] s))).
     - intros ->.
@@ -2456,7 +2487,7 @@ Proof with eauto.
          rewrite L3sbst_fix_preserves_lam in H4. simpl in H4.
          rewrite subst_env_aux_lam in H4. inv H4. clear fixstep.
          simpl. rewrite subst_env_aux_lam.
-         rewrite sbst_fix_preserves_lam.
+         rewrite sbst_fix_preserves_lam; revgoals.
          simpl. 
          econstructor. constructor.
          pose (eval_yields_value _ _ H5).
@@ -2475,20 +2506,22 @@ Proof with eauto.
          with
          (subst_env_aux e'' (1 + 0)
                         (trans e'' [] (1 + 0) (L3sbst_fix_aux dts bod 1))) in *.
-         rewrite (L3sbst_fix_aux_sbst_fix_aux e [] e'' ) in H7; auto.
-         simpl in H7. rewrite !N.add_0_r in *.
+         rewrite (L3sbst_fix_aux_sbst_fix_aux e [] e'' ) in H7; revgoals; auto.
+         simpl in H7. rewrite !N.add_0_r in H7.
          rewrite subst_env_aux_sbst_fix_aux in H7.
-         rewrite !efnlst_length_trans in *.
-         simpl. rewrite N.add_comm at 2. apply H7.
+         rewrite !efnlst_length_trans in H7.
+         simpl. rewrite !N.add_0_r. rewrite {2}(N.add_comm 1). 
+         rewrite efnlst_length_trans. exact H7.
+         intros i Hi.
+         depelim evfn. constructor; auto.
          eapply crct_dnthBody; eauto.
-         eapply crct_fix_any; eauto.
-         intros i.
-         rewrite efnlength_map, efnlength_trans.
+         
+         intros i. rewrite efnlength_map efnlength_trans.
          intros Hi.
          constructor.
-         rewrite efnlst_length_map, efnlst_length_trans. lia.
+         rewrite efnlst_length_map efnlst_length_trans. lia.
+         rewrite !efnlst_length_map !efnlst_length_trans.
          
-         rewrite efnlst_length_map, efnlst_length_trans.
          apply Crct_invrt_Fix in evfn.
          pose proof ((proj1 (proj2 (proj2 (proj2 (crctTerm_exp_wf_ind [] eq_refl)))) e _ _ evfn e'' wfe evenv wfe'')).
          rewrite !N.add_0_r.
@@ -2555,12 +2588,18 @@ Proof with eauto.
         eapply bnth_pres_Crct in H; eauto.
         now rewrite <- eql. }
     rewrite N.add_0_r.
-    admit. (* commutation of subst and trans / instantiatel *)
+    assert (subst_env_aux e'' 0 (trans e'' [] 0 (instantiatel args 0 t)) = 
+      (sbst_list (subst_env_aux e'' (N.of_nat (Datatypes.length nargs)) (trans e'' [] (N.of_nat (Datatypes.length nargs)) t))
+          (map_exps (subst_env_aux e'' 0) (trans_args (trans e'' []) 0 args)))).
+    { unfold trans_args.
+      eapply sbst_list_instantiate; eauto. }
+    now rewrite <- H1.
 
   + (* Projections *)
     intros * evbod Hcstr Harg evarg IHres crproj. inv crproj.
-    cbn. unfold subst_env. rewrite subst_env_aux_prf. admit. 
-
+    cbn. unfold subst_env. rewrite subst_env_aux_prf.
+    exact (todo "translation of projections").
+    
   (** Terms *)
   + intros; constructor.
   + intros. inv H1. specialize (H0 H7). simpl.
@@ -2568,7 +2607,7 @@ Proof with eauto.
 
   (** Generalized goal *)
   + tauto.
-Admitted.
+Qed.
 
 Inductive WcbvEval_env : environ Term -> environ Term -> Prop :=
 | WcbvEval_env_nil : WcbvEval_env nil nil

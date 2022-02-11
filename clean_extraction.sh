@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# For compat with OS X which has an incompatible sed which can be replaced by GNU sed
+SED=`which gsed || which sed`
+
 echo "Cleaning result of extraction"
 
 rm -rf plugin/extraction || true
@@ -29,8 +32,8 @@ mv aST.mli AST.mli
 mv fLT.ml FLT.ml
 mv fLT.mli FLT.mli
 # Work around a compiler bug in module name resolution
-sed -f ../extraction.sed -i compile0.ml
+${SED} -f ../extraction.sed -i compile0.ml
 # We compile with -rectypes, so these definitions are badly interepreted
-sed -e "s/type int = int/type nonrec int = int/" -i integers.mli
-sed -e "s/type int = int/type nonrec int = int/" -i integers.ml
+${SED} -e "s/type int = int/type nonrec int = int/" -i integers.mli
+${SED} -e "s/type int = int/type nonrec int = int/" -i integers.ml
 cd ../..

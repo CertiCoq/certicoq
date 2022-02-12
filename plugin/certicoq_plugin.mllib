@@ -89,7 +89,6 @@ PCUICLiftSubst
 PCUICEquality
 PCUICTyping
 PCUICInduction
-PCUICReduction
 PCUICNormal
 PCUICPosition
 PCUICChecker

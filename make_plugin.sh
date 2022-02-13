@@ -13,4 +13,4 @@ else
 fi
 
 cd plugin
-exec make -f Makefile -j`nproc` ${@}
+exec make -f Makefile ${@}

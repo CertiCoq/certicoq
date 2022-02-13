@@ -371,10 +371,10 @@ Inductive R' : exp -> exp -> Prop :=
     C = C ->
     BottomUp (R' (C⟦+fFun f (x :: x' :: xs) e :: fds+⟧) (C⟦+fFun f xs' e :: fds+⟧)).
 
-Goal True.
+(* Goal True.
   ltac1:(
   parse_rel 0 R' ltac:(fun rules n => idtac rules n)).
-Abort.
+Abort. *)
 
 Definition rw_R : rewriter exp_univ_exp true tt R' unit (I_D_plain (U:=exp_univ) (D:=unit)) nat (@I_R) nat (@I_S).
 Proof.

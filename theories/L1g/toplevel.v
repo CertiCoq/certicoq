@@ -25,7 +25,7 @@ Definition wf_program (p : Ast.Env.program) :=
     [] p.2 T ∥.
 
 Definition template_bigstep (p : Ast.Env.program) (v : Ast.term) : Prop :=
-  ∥ Template.WcbvEval.eval p.1 [] p.2 v ∥.
+  ∥ Template.WcbvEval.eval p.1 p.2 v ∥.
 
 #[export] Instance Template_Lang : Lang Ast.Env.program :=
   { Value := Ast.term;

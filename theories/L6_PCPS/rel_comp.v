@@ -191,7 +191,7 @@ Section RelComp.
       eassumption. destructAll.
       do 3 eexists. split; eauto. eapply More. eassumption. eassumption. 
       
-      Grab Existential Variables. eauto. eauto.
+      Unshelve. eauto. eauto.
   Qed.  
 
 
@@ -214,7 +214,7 @@ Section RelComp.
     - eapply IHHexp2. eapply Hwf_c. eapply preord_exp_n_wf_pres. eassumption.
       eassumption.
       eapply IHHexp1. eassumption. eassumption.
-      Grab Existential Variables. eauto.
+      Unshelve. eauto.
   Qed.
 
   
@@ -349,7 +349,7 @@ Section RelComp.
     
     eapply preord_exp_n_preserves_divergence. eapply Hpr. eassumption. eassumption. eassumption.
 
-    Grab Existential Variables. eauto. eauto. 
+    Unshelve. eauto. eauto. 
   Qed.
 
 End RelComp.

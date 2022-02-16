@@ -2,6 +2,7 @@ From Coq Require Import ZArith.ZArith Lists.List Strings.String micromega.Lia Ar
      Ensembles Relations.Relation_Definitions.
 Require Import Common.AstCommon.
 Require compcert.lib.Maps compcert.lib.Coqlib.
+Require Import set_util.
 
 Import ListNotations.
 
@@ -646,10 +647,6 @@ Section Correct.
       try match goal with
           | [ X : ?A * ?B |- _ ] => destruct X; destruct_tuples
           end.
-
-    
-    Require Import set_util.
-
 
     Lemma MSet_non_member (s : PS.t) :
       exists x, ~ PS.In x s.
@@ -2745,10 +2742,7 @@ Section Correct.
       - (* STEP *)
         now eauto. (* Immediate from IH for eval_step *)
 
-        Grab Existential Variables.
-        exact 0%nat. exact 0%nat. exact 0%nat.
-        exact 0%nat. exact 0%nat. exact 0%nat.
-        exact 0%nat. exact 0%nat.
+        Unshelve. all:exact 0%nat.
         (* Where do these come from??? *) 
     Qed. 
     

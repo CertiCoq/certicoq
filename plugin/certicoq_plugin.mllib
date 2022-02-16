@@ -16,6 +16,7 @@ BinNat
 BinInt
 PrimInt63
 Uint0
+Int0
 Int63
 Ascii
 String0
@@ -23,12 +24,19 @@ Orders
 OrdersTac
 OrdersFacts
 OrdersLists
+OrderedType0
 OrderedTypeAlt
 MSetInterface
 MSetFacts
 MSetDecide
 MSetList
+MSetAVL
 MSetProperties
+FMapList
+DecidableType
+FMapInterface
+FMapAVL
+FMapFacts
 BinNums
 Classes1
 EqDecInstances
@@ -98,8 +106,11 @@ TemplateToPCUIC
 PCUICSafeLemmata
 PCUICCumulativity
 PCUICExpandLets
+PCUICExpandLetsCorrectness
 
 PCUICErrors
+PCUICEnvMap
+PCUICWfEnv
 PCUICUnivSubst
 PCUICSafeReduce
 PCUICSafeConversion

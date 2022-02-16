@@ -2534,14 +2534,12 @@ Section CONTRACT.
         destruct x3; inv H1.
         * rewrite M.gss. auto.
         * rewrite M.gso.
-          Focus 2.
-          intro.
-          subst.
-          destruct H. specialize (H x c l).
-          assert ((exists c' c'' : exp_ctx,
+          2:{ intro. subst.
+            destruct H. specialize (H x c l).
+            assert ((exists c' c'' : exp_ctx,
                      comp_ctx_f x1 (Econstr_c x c l x3) =
                      comp_ctx_f c' (Econstr_c x c l c''))) by eauto.
-          apply H in H2. rewrite H0 in H2. inv H2.
+            apply H in H2. rewrite H0 in H2. inv H2. }
           apply H. eauto.
       + destructAll.
         destruct x4; inv H3.
@@ -3969,8 +3967,7 @@ Section CONTRACT.
     simpl in H1.
     assert (exists n,  num_occur (rename_all_ns (set_list (combine x l) sigma) e) f n) by apply e_num_occur.
     destruct H2.
-    etransitivity.
-    Focus 2.
+    etransitivity; revgoals.
     eapply IHl. intro; apply H. constructor 2; auto.
     apply H0. apply H2.
     assert (f <> a). intro. apply H. constructor. auto.
@@ -4879,7 +4876,7 @@ Section CONTRACT.
     - subst.
       rewrite apply_r_set1.
       destruct (cps_util.var_dec y y).
-      Focus 2. exfalso. apply n; auto.
+      2:{ exfalso. apply n; auto. }
       rewrite Disjoint_apply_r.
       destruct (cps_util.var_dec y a). exfalso; auto.
       lia.
@@ -5272,9 +5269,8 @@ Section CONTRACT.
           intro. apply H14. split; auto.  clear H14.
 
           eapply Complement_Proper in H14'.
-          Focus 2. simpl. rewrite H2.
-          simpl.
-          symmetry. apply occurs_free_fundefs_Fcons.
+          2:{ simpl. rewrite H2.
+              simpl. symmetry. apply occurs_free_fundefs_Fcons. }
           assert (H14'' : In var (Complement var
                                              (occurs_free_fundefs
                                                 (rename_all_fun_ns sig (inlined_fundefs_f x2 inl)))) x5).
@@ -5282,24 +5278,24 @@ Section CONTRACT.
           intro. inv H7. specialize (H13 x5). apply H13; auto.
           clear H14'.
           apply not_free_dead_or_bound in H13'. inv H13'.
-          Focus 2. exfalso. inv H9. specialize (H12 x5). apply H12. split; auto.
-          apply bound_var_ctx_comp_ctx. right. simpl. apply identifiers.Bound_Fun12_c.
-          apply bound_var_app_ctx in H11. inv H11; auto. inv H9.
+          2:{ exfalso. inv H9. specialize (H12 x5). apply H12. split; auto.
+            apply bound_var_ctx_comp_ctx. right. simpl. apply identifiers.Bound_Fun12_c.
+            apply bound_var_app_ctx in H11. inv H11; auto. inv H9. }
 
           apply not_free_bound_or_not_occur in H11'. inv H11'.
-          Focus 2. exfalso. inv H9. specialize (H13 x5). apply H13. split; auto.
-          apply bound_var_ctx_comp_ctx.
-          right. constructor. rewrite inlined_fundefs_append.
-          normalize_ctx.
-          eapply fundefs_append_bound_vars.
-          reflexivity. left; auto.
+          2:{ exfalso. inv H9. specialize (H13 x5). apply H13. split; auto.
+            apply bound_var_ctx_comp_ctx.
+            right. constructor. rewrite inlined_fundefs_append.
+            normalize_ctx.
+            eapply fundefs_append_bound_vars.
+            reflexivity. left; auto. }
 
           apply not_free_bound_or_not_occur in H14''. inv H14''.
-          Focus 2. exfalso. inv H9.  specialize (H14 x5). apply H14. split; auto. apply bound_var_ctx_comp_ctx.
-          right. constructor. rewrite inlined_fundefs_append.
-          normalize_ctx.
-          eapply fundefs_append_bound_vars.
-          reflexivity. auto.
+          2:{ exfalso. inv H9.  specialize (H14 x5). apply H14. split; auto. apply bound_var_ctx_comp_ctx.
+              right. constructor. rewrite inlined_fundefs_append.
+              normalize_ctx.
+              eapply fundefs_append_bound_vars.
+              reflexivity. auto. }
           simpl.
           eapply num_occur_ec_n. constructor.
           apply num_occur_app_ctx in H11; destructAll; pi0. eauto.

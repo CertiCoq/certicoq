@@ -1097,7 +1097,7 @@ Section Lambda_lifting_correct.
           eassumption. eassumption. eassumption.
         * eassumption.
 
-          Grab Existential Variables. eauto. exact []. exact [].
+          Unshelve. exact []. exact []. eauto.
     Qed. 
 
 
@@ -1135,7 +1135,7 @@ Section Lambda_lifting_correct.
      + eapply preord_res_monotonic. eassumption. rewrite to_nat_add. unfold one. rewrite to_nat_one.
        simpl in *; lia.
 
-      Grab Existential Variables. eassumption. eassumption. eassumption. eassumption.
+      Unshelve. eassumption. eassumption. eassumption. eassumption.
   Qed.
 
       

@@ -806,7 +806,7 @@ Section Post.
               
               eapply preord_exp_post_monotonic. now eapply HinclG.
               eapply preord_exp_monotonic.
-              edestruct (H j) as [ Hexp _ _ _   ]. lia.
+              edestruct (H j) as [ Hexp _ ]. lia.
               eapply Hexp.
               + reflexivity.
               + eassumption.
@@ -1688,7 +1688,7 @@ Section Post.
               inversion Hset. eexists. split. reflexivity.              
               intros Hlt Hall. inv Hall. inv H21. clear H22.
               
-              edestruct (H j) as [ Hexp _ _ _   ]. lia. repeat subst_exp. 
+              edestruct (H j) as [ Hexp _ ]. lia. repeat subst_exp. 
               eapply preord_exp_post_monotonic. eapply HinclG.
               eapply Hexp.
               + lia.
@@ -1855,7 +1855,7 @@ Section Post.
           * lia.
         + eapply IHbs; try eassumption.
 
-          Grab Existential Variables. eassumption.
+          Unshelve. eassumption.
     Qed.
 
 

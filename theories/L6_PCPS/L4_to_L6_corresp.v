@@ -2,7 +2,6 @@ Require Import Common.AstCommon Common.compM.
 From Coq Require Import ZArith.ZArith Lists.List Strings.String micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
 Require compcert.lib.Maps compcert.lib.Coqlib.
-
 Import ListNotations.
 
 Require Import L4.expression L4.fuel_sem.
@@ -11,6 +10,7 @@ Require Import cps cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
         L4_to_L6 L4_to_L6_util L6.tactics identifiers
         cps_util rename state. 
+Require Import closure_conversion_corresp.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
@@ -86,8 +86,6 @@ Section Corresp.
              (* unique_bindings (Ecase r P) /\            *)
              (* Disjoint _ (occurs_free (Ecase r P)) (bound_var (Ecase r P)) *)
       }} .
-
-  Require Import closure_conversion_corresp.
 
   (* TODO move to state *)
   Lemma get_named_spec : 

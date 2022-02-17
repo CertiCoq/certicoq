@@ -1353,7 +1353,7 @@ Section Lambda_lifting_corresp.
       intros. constructor.
       split; intros. constructor. eassumption.
 
-      Grab Existential Variables.
+      Unshelve.
       eassumption. eassumption. eassumption. 
   Qed.
 

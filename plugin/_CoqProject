@@ -24,6 +24,26 @@ static/printCsyntax.ml
 
 extraction/all_Forall.ml
 extraction/all_Forall.mli
+# extraction/string2pos.mli
+# extraction/string2pos.ml
+# extraction/canonicalTries.mli
+# extraction/canonicalTries.ml
+extraction/fMapList.mli
+extraction/fMapList.ml
+extraction/decidableType.mli
+extraction/decidableType.ml
+extraction/fMapInterface.mli
+extraction/fMapInterface.ml
+extraction/fMapAVL.mli
+extraction/fMapAVL.ml
+extraction/fMapFacts.mli
+extraction/fMapFacts.ml
+extraction/pCUICEnvMap.mli
+extraction/pCUICEnvMap.ml
+extraction/pCUICWfEnv.mli
+extraction/pCUICWfEnv.ml
+extraction/pCUICExpandLetsCorrectness.mli
+extraction/pCUICExpandLetsCorrectness.ml
 extraction/archi.ml
 extraction/archi.mli
 extraction/ascii.ml
@@ -156,6 +176,8 @@ extraction/identifiers.ml
 extraction/identifiers.mli
 extraction/iEEE754_extra.ml
 extraction/iEEE754_extra.mli
+extraction/int0.mli
+extraction/int0.ml
 extraction/init.ml
 extraction/init.mli
 extraction/inline_letapp.ml
@@ -222,6 +244,8 @@ extraction/mSetInterface.ml
 extraction/mSetInterface.mli
 extraction/mSetList.ml
 extraction/mSetList.mli
+extraction/mSetAVL.mli
+extraction/mSetAVL.ml
 extraction/mSetProperties.ml
 extraction/mSetProperties.mli
 extraction/mSetRBT.ml

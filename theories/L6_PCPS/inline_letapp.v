@@ -713,7 +713,7 @@ Section Inline_correct.
           
           eapply eval_ctx_app_Ehalt_div. eassumption. eassumption.
 
-          Grab Existential Variables. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive.
+          Unshelve. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive.
   Qed.
 
 
@@ -1004,7 +1004,7 @@ Section Inline_correct.
           
           eapply eval_ctx_app_Ehalt_div. eassumption. eassumption.
           
-          Grab Existential Variables. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive.
+          Unshelve. exact 1%positive. exact 1%positive. exact 1%positive. exact 1%positive.
   Qed.
 
   Lemma inline_letapp_eval_l C e x x' v rho rho' (cin : fuel) (cout : trace):

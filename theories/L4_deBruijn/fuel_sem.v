@@ -414,7 +414,7 @@ Section FUEL_SEM.
 
       - eassumption.
 
-        Grab Existential Variables. eassumption.
+        Unshelve. eassumption.
     Qed. 
 
 

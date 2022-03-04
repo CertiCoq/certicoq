@@ -5,6 +5,11 @@ Require Import CertiCoq.Benchmarks.lib.Color.
 Require Import CertiCoq.Benchmarks.lib.sha256.
 
 From CertiCoq.Plugin Require Import CertiCoq.
+Definition color := Color.main.
+
+From MetaCoq.Erasure Require Import Erasure.
+
+CertiCoq Compile -O 0 erase_program.
 
 Open Scope string.
 

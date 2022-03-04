@@ -309,9 +309,9 @@ Require Import Common.classes Common.Pipeline_utils Common.compM.
 Open Scope string_scope.
 
 Axiom todo : string -> forall {A}, A.
-     
+(*      
 Definition erase (p:Ast.Env.program) : error (global_context × term) :=
-  let p := fix_program_universes p in
+  (* let p := fix_program_universes p in *)
   match erase_template_program p (todo "wf_env") (todo "welltyped") with
     | (gc, t) => Ret (gc, t)
   end.
@@ -320,3 +320,4 @@ Definition program_Program (p:global_context × term) : (Program Term) :=
   let '(gc, t) := p in 
   {| main := term_Term gc t;
      env := program_Pgm_aux gc |}.
+ *)

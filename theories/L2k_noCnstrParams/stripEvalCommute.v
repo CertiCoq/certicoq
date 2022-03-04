@@ -18,7 +18,7 @@ Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
-
+(* 
 Definition L2dTerm := L1g.compile.Term.
 Definition L2dTerms := L1g.compile.Terms.
 Definition L2dBrs := L1g.compile.Brs.
@@ -2085,3 +2085,4 @@ Qed.
 Print Assumptions sac_sound.
 
  *******************************)
+ *)

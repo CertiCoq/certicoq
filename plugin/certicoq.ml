@@ -209,7 +209,7 @@ let generate_glue (standalone : bool) opts globs =
 let compile_with_glue (opts : options) (gr : Names.GlobRef.t) (imports : string list) : unit =
   let term = quote opts gr in
   compile opts (Obj.magic term) imports;
-  generate_glue false opts (fst (Obj.magic term))
+  generate_glue false opts (Ast0.Env.declarations (fst (Obj.magic term)))
 
 let compile_only opts gr imports =
   let term = quote opts gr in
@@ -217,7 +217,7 @@ let compile_only opts gr imports =
 
 let generate_glue_only opts gr =
   let term = quote opts gr in
-  generate_glue true opts (fst (Obj.magic term))
+  generate_glue true opts (Ast0.Env.declarations (fst (Obj.magic term)))
 
 let print_to_file (s : string) (file : string) =
   let f = open_out file in
@@ -292,6 +292,6 @@ let ffi_command opts gr =
 
 let glue_command opts grs =
   let terms = grs |> List.rev
-              |> List.map (fun gr -> fst (quote opts gr)) 
+              |> List.map (fun gr -> Metacoq_template_plugin.Ast0.Env.declarations (fst (quote opts gr))) 
               |> List.concat |> nub in
   generate_glue true opts (Obj.magic terms)

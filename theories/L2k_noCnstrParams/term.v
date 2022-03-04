@@ -421,14 +421,14 @@ Proof.
   - right. intros. eapply na_isConstruct_etaExpand_args. lia.
 Qed.
  ***************)
-
+(* 
 Lemma pre_isConstruct_etaExpand:
   forall F,
     etaExpand F tnil 0 0 = F tnil.
 Proof.
   cbn. intuition.
 Qed.
-
+ *)
 (*************
 Lemma etaExpand_no_params:
   forall (actualArgs:Terms) (nargs:nat) i m,
@@ -2104,6 +2104,7 @@ Proof.
   - cbn. constructor.
 Qed.
  *****)
+(******
 
 (** etaExpand_args preserves closedness **)
 Lemma nlambda_pres_WFTrm:
@@ -2169,7 +2170,7 @@ Proof.
     + intros. apply H. assumption.
     + apply WFTrms_eta_args. assumption.
 Qed.
-
+ *)
 (***********
 Lemma etaExpand_aArgs_pres_clsd:
   forall nargs aArgs nlams cArgs F n,

@@ -304,6 +304,8 @@ Qed.
 Section wcbvEval_sec.
 Variable p:environ Term.
 
+Instance fix_bug : MonadExc.MonadExc string exception := exn_monad_exc.
+
 (** now an executable weak-call-by-value evaluation **)
 (** use a timer to make this terminate **)
 Function wcbvEval

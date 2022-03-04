@@ -441,7 +441,7 @@ Definition inductives_of_env (decls : global_env) : ind_info :=
           m kernames
       end)
     empty
-    decls.
+    decls.(declarations).
 
 Fixpoint mangle (inds : ind_info) (e : term) : GM string :=
   match e with
@@ -499,7 +499,7 @@ Definition constr_types (inds : ind_info) (ind : inductive) (pars : list term)
 Definition decompose_ind (decls : global_env) (ty : term) : GM (inductive × list term) :=
   let fix go n ty {struct n} :=
     let find_const n c :=
-      let! decl := findM' c decls "decompose_ind tConst" in
+      let! decl := findM' c decls.(declarations) "decompose_ind tConst" in
       match decl with
       | ConstantDecl {| cst_body := Some body |} => go n body
       | ConstantDecl {| cst_body := None |} =>

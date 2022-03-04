@@ -146,8 +146,6 @@ Definition named_of' (Γ : list string) (tm : term) : GM term :=
       | tProj proj t => tProj proj <$> go Γ t
       | tFix mfix idx => tFix <$> go_mfix mfix <*> ret idx
       | tCoFix mfix idx => tCoFix <$> go_mfix mfix <*> ret idx
-      | tInt _ => ret tm
-      | tFloat _ => ret tm
       end
     end
   in go 1000%nat Γ tm.
@@ -240,8 +238,6 @@ Definition indices_of (Γ : list string) (t : term) : GM term :=
       | tProj proj t => tProj proj <$> go Γ t
       | tFix mfix idx => tFix <$> go_mfix mfix <*> ret idx
       | tCoFix mfix idx => tCoFix <$> go_mfix mfix <*> ret idx
-      | tInt _ => ret tm
-      | tFloat _ => ret tm
       end
     end
   in go 1000%nat [] t.
@@ -326,8 +322,6 @@ Definition rename (σ : Map string string) : term -> term :=
     | tProj proj t => tProj proj (go t)
     | tFix mfix idx => tFix (go_mfix mfix) idx
     | tCoFix mfix idx => tCoFix (go_mfix mfix) idx
-    | tInt _ => tm
-    | tFloat _ => tm
     end.
 
 (* -------------------- Generation of helper function types -------------------- *)
@@ -452,8 +446,6 @@ Fixpoint vars_of (t : term) : Set' string :=
   | tProj proj t => vars_of t
   | tFix mfix idx => union_all (map (fun def => vars_of def.(dtype) ∪ vars_of def.(dbody)) mfix)
   | tCoFix mfix idx => union_all (map (fun def => vars_of def.(dtype) ∪ vars_of def.(dbody)) mfix)
-  | tInt _ => empty
-  | tFloat _ => empty
   end.
 
 (* ---------- Parsing the inductive relation ---------- *)
@@ -573,8 +565,6 @@ Fixpoint has_var (x : BasicAst.ident) (e : term) {struct e} : bool. ltac1:(refin
   | tProj proj t => has_var x t
   | tFix mfix idx => anyb (fun d => has_var x d.(dtype) || has_var x d.(dbody)) mfix
   | tCoFix mfix idx => anyb (fun d => has_var x d.(dtype) || has_var x d.(dbody)) mfix
-  | tInt _ => false
-  | tFloat _ => false
   end%bool
 )).
 Defined.

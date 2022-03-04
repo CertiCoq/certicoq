@@ -422,7 +422,7 @@ Definition get_constructors
       failwith "Unrecognized pattern in converting pi types to class fields."
     end in
 
-  match last_error (rev globs) with
+  match last_error (rev globs.(Ast.Env.declarations)) with
   | Some (ind_name, Ast.Env.InductiveDecl mut) =>
       (* Assuming we don't have mutually recursive type classes *)
       match Ast.Env.ind_bodies mut with

@@ -4,23 +4,16 @@ Require Import Coq.Strings.String.
 Require Import Coq.Arith.Arith. 
 Require Import Common.Common.
 Require Import Coq.micromega.Lia.
-Require Import L1g.compile.
-Require Import L1g.term.
+
+From MetaCoq.Template Require utils. 
+From MetaCoq.Erasure Require Import EAst ETyping ESpineView EEtaExpanded EInduction ERemoveParams Erasure.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
-Definition L1gTerm := L1g.compile.Term.
-Definition L1gTerms := L1g.compile.Terms.
-Definition L1gBrs := L1g.compile.Brs.
-Definition L1gDefs := L1g.compile.Defs.
-Definition L1gPgm := Program L1gTerm.
-Definition L1gEC := envClass L1gTerm.
-Definition L1gEnv := environ L1gTerm.
 
-(** no longer need npars to compute projections **)
 Definition projection := (inductive * nat)%type.
 Lemma project_dec: forall (s1 s2:projection), {s1 = s2}+{s1 <> s2}.
 Proof.
@@ -235,7 +228,6 @@ Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
   destruct t; try (right; not_isApp). left. auto.
 Qed.
 
-    
 (** lift a Term over a new binding **)
 Function lift (n:nat) (t:Term) : Term :=
   match t with
@@ -308,241 +300,84 @@ Proof.
     reflexivity.
 Qed.
 
+Section Def.
 
-(** Carefully separate various paths to eta expansion of constructors
-*** to keep control of the shape (constructor vs lambda) of the result.
-**)
-Function etaExpand_args_Lam'   (* no more parameters expected *)
-         (nargs:nat)            (* inputs *)
-         (body:Terms -> Term) (computedArgs:Terms)  (* accumulators *)
-          { struct nargs } : Term :=
-  match nargs with
-  (* no more actual args, no more pars or args expected: finished *)
-  | 0 => (fun b => TLambda nAnon (body b)) computedArgs
-  (* more actual args than [npars + nargs]: impossible *)
-  | S n =>
-    etaExpand_args_Lam' n (fun b => TLambda nAnon (TLambda nAnon (body b)))
-                   (tappend (lifts 0 computedArgs) (tunit (TRel 0)))
-  (* more actual args *)
-  end.
-(* Functional Scheme etaExpand_args_Lam'_ind := *)
-(*   Induction for etaExpand_args_Lam' Sort Prop. *)
+Import TermSpineView.
 
-Function etaExpand_args_Lam   (* no more parameters expected *)
-         (nargs:nat) (actualArgs:Terms)             (* inputs *)
-         (body:Terms -> Term) (computedArgs:Terms)  (* accumulators *)
-          { struct nargs } : Term :=
-  match nargs, actualArgs with
-  (* no more actual args, no more pars or args expected: finished *)
-  | 0, tnil => body computedArgs
-  (* more actual args than [npars + nargs]: impossible *)
-  | 0, tcons _ _ => TWrong "strip; Constructor; too many args"
-  (* no more actual args but more args expected: eta expand *)
-  | S n, tnil =>
-    etaExpand_args_Lam' n body
-                   (tappend (lifts 0 computedArgs) (tunit (TRel 0)))
-  (* more actual args *)
-  | S n, tcons u us =>
-    etaExpand_args_Lam n us body (tappend computedArgs (tunit u))
-  end.
-(* Functional Scheme etaExpand_args_Lam_ind' := *)
-(*   Induction for etaExpand_args_Lam Sort Prop. *)
-                                      
-Definition etaExpand_args_Construct   (* no more parameters expected *)
-         (nargs:nat) (actualArgs:Terms)             (* inputs *)
-         (i:inductive) (m:nat) (* accumulator *)
-  : Term :=
-  match nargs, actualArgs with
-  (* no more actual args, no more pars or args expected: finished *)
-  | 0, tnil => TConstruct i m tnil
-  (* more actual args than [npars + nargs]: impossible *)
-  | 0, tcons u us => TWrong "strip; Constructor; too many args"
-  (* no more actual args but more args expected: eta expand *)
-  | S n, tnil =>
-    etaExpand_args_Lam' n (TConstruct i m ) (tunit (TRel 0))
-  (* more actual args *)
-  | S n, tcons u us => etaExpand_args_Lam n us (TConstruct i m) (tunit u)
-  end.
-(***********************                       
-  | S 0, tcons u tnil => TConstruct i m (tunit u)
-  | S 0, tcons u (tcons _ _) => TWrong "strip; Constructor; too many args"
-  | S (S n), tcons u (tcons w ws) =>
-    etaExpand_args_Lam n us (TConstruct i m) (tunit u) *)
-
-(** wrap a term with n lambdas; used below for missing parameters **)
-Function nLambda (n:nat) (F:Term) : Term :=
-  match n with
-  | 0 => F
-  | S m => TLambda nAnon (nLambda m F)
+Fixpoint TmkApps (u : Term) (v : Terms) :=
+  match v with
+  | tnil => u
+  | tcons t v => TmkApps (TApp u t) v
   end.
 
-Function Lambdan (n:nat) (F:Term) : Term :=
-  match n with
-  | 0 => F
-  | S m => Lambdan m (TLambda nAnon F)
+Fixpoint list_terms (l : list Term) : Terms :=
+   match l with
+   | [] => tnil
+   | t :: ts => tcons t (list_terms ts)
+   end.
+
+Fixpoint list_Brs (l : list _) : Brs :=
+  match l with
+  | [] => bnil
+  | (x,t) :: ts => bcons x t (list_Brs ts)
   end.
 
-Lemma pre_nLambda_Lambdan:
-  forall (n:nat) (F:Term),
-    nLambda n (TLambda nAnon F) = TLambda nAnon (nLambda n F).
+Fixpoint list_Defs (l : list (Extract.E.def Term)) : Defs :=
+  match l with
+  | [] => dnil
+  | t :: ts => dcons t.(dname) t.(dbody) t.(rarg) (list_Defs ts) 
+  end.
+
+Equations? compile (t: term) : Term 
+by wf t (fun x y : EAst.term => size x < size y) :=
+| e with TermSpineView.view e := {
+  | tRel n => TRel n
+  | tBox => TProof
+  | tLambda nm bod => TLambda nm (compile bod)
+  | tLetIn nm dfn bod => TLetIn nm (compile dfn) (compile bod)
+  | tApp fn args napp nnil with construct_viewc fn := {
+    | view_construct kn c => TConstruct kn c (list_terms (map_InP args (fun x H => compile x)))
+    | view_other fn nconstr =>
+      TmkApps (compile fn) (list_terms (map_InP args (fun x H => compile x)))
+  }
+  | tConst nm => TConst nm
+  | tConstruct i m =>
+    TConstruct i m tnil
+  | tCase i mch brs =>
+    let brs' := map_InP brs (fun x H => (fst x, compile (snd x))) in
+    TCase (fst i) (compile mch) (list_Brs brs')
+  | tFix mfix idx => 
+    let mfix' := map_InP mfix (fun d H => {| dname := dname d; dbody := compile d.(dbody); rarg := d.(rarg) |}) in
+    TFix (list_Defs mfix') idx
+  | tProj (ind, _, nargs) bod => TProj (ind, nargs) (compile bod)
+  | _ => TWrong "" }.
 Proof.
-  induction n; intros.
-  - reflexivity.
-  - cbn. rewrite IHn. reflexivity.
+  all: try (cbn; lia).
+  - rewrite size_mkApps. cbn. now eapply (In_size id size).
+  - rewrite size_mkApps. cbn. destruct args; try congruence. cbn. lia.
+  - eapply le_lt_trans. 2: eapply size_mkApps_l; eauto. eapply (In_size id size) in H.
+    unfold id in H. change size with (fun x => size x) at 2. lia.
+  - cbn. eapply (In_size snd size) in H. cbn in H. lia.
+  - eapply (In_size dbody size) in H. cbn in H. lia.
 Qed.
-                          
-Lemma nLambda_Lambdan:
-  forall (n:nat) (F:Term),
-    nLambda n F = Lambdan n F.
-Proof.
-  induction n; intros.
-  - reflexivity.
-  - cbn. rewrite <- pre_nLambda_Lambdan. rewrite IHn. reflexivity.
-Qed.         
+End Def.
+Print compile_clause_1.
 
-Function mkExpand n (F:Terms -> Term) (cArgs:Terms) : Term :=
-  match n with
-  | 0 => F cArgs
-  | S m =>
-    TLambda nAnon (mkExpand m F (tappend (lifts 0 cArgs) (tunit (TRel 0))))
-  end.
-
-Section ee.   (** drop params, eta expand what's left **)
-  Variable (F:Terms -> Term).
-  
-(** move all of aArgs (which are closed) into cArgs **)
-Function etaExpand_aArgs (nargs nlams:nat) (aArgs cArgs:Terms) :=
-  match nargs, aArgs with
-    (* step through nargs expected and actual args found *)
-  | S n, tcons u us => etaExpand_aArgs n nlams us (tappend cArgs (tunit u))
-    (* error: more actual args than expected *)
-  | 0, tcons _ _ => TWrong "strip; Constructor; too many args"
-    (* ran out of actual args; more args expected; finish expanding *)
-  | n, tnil => nLambda nlams (mkExpand n F cArgs)
-  end.
-
-(** drop actually appearing parameters. if not enough actual params,
-    pass a count of the number of non-binding lambdas **)
-Function etaExpand (actualArgs:Terms) (npars nargs:nat)  (* inputs *) : Term :=
-  match actualArgs, npars with
-  (* drop an actual param and reduce param count. keep looking for params *)
-  | tcons u us, S n => etaExpand us n nargs
-  (* ran out of actual args, but n more params expected:
-     need nlams lambdas that don't bind, then eta expand *)
-  | tnil, nlams => etaExpand_aArgs nargs nlams tnil tnil
-  (* no more params expected; start on actual args and nargs *)
-  | aArgs, 0 => etaExpand_aArgs nargs 0 aArgs tnil
-  end.
-End ee.
-
-Section Strip.
-  Variable pre_strip: L1gTerm -> Term.
-  Function CanonicalP (fn:L1gTerm) (arg:Term) :
-    option ((Terms->Term) * Terms * nat * nat) :=
-    match fn with
-    | L1g.compile.TConstruct i m np na =>
-      Some (TConstruct i m, tunit arg, np, na)
-    | L1g.compile.TApp gn brg =>
-      match CanonicalP gn (pre_strip brg) with
-      | Some (F, brgs, np, na) =>
-        Some (F, tappend brgs (tunit arg), np, na)
-      | None => None
-      end
-    | _ => None
-    end.
-  Function strips (ts:L1gTerms) {struct ts} : Terms :=
-    match ts with
-    | nil => tnil
-    | cons u us => tcons (pre_strip u) (strips us)
-    end.
-End Strip.
-
-Function strip (t:L1gTerm) : Term :=
+Fixpoint compile_ctx (t : global_context) :=
   match t with
-  | L1g.compile.TRel n => TRel n
-  | L1g.compile.TProof => TProof
-  | L1g.compile.TLambda nm bod => TLambda nm (strip bod)
-  | L1g.compile.TLetIn nm dfn bod => TLetIn nm (strip dfn) (strip bod)
-  | L1g.compile.TApp fn arg =>
-    let sarg := strip arg in
-    match CanonicalP strip fn sarg with
-    | None => TApp (strip fn) sarg
-    | Some (F, args, npars, nargs) => etaExpand F args npars nargs
-    end
-  | L1g.compile.TConst nm => TConst nm
-  | L1g.compile.TConstruct i m npars nargs =>
-    etaExpand (TConstruct i m) tnil npars nargs
-  | L1g.compile.TCase i mch brs => TCase (fst i) (strip mch) (stripBs brs)
-  | L1g.compile.TFix ds n => TFix (stripDs ds) n
-  | L1g.compile.TProj (ind, _, nargs) bod => TProj (ind, nargs) (strip bod)
-  | L1g.compile.TWrong str => TWrong str
-  end
-with stripBs (bs:L1gBrs) : Brs := 
-       match bs with
-       | L1g.compile.bnil => bnil
-       | L1g.compile.bcons n t ts => bcons n (strip t) (stripBs ts)
-       end
-with stripDs (ts:L1gDefs) : Defs := 
-       match ts with
-       | L1g.compile.dnil => dnil
-       | L1g.compile.dcons nm t m ds => dcons nm (strip t) m (stripDs ds)
-       end.
-
-Lemma strip_pres_dlength:
-  forall ds:L1gDefs, L1g.compile.dlength ds = dlength (stripDs ds).
-Proof.
-  induction ds; intros.
-  - reflexivity.
-  - cbn. rewrite IHds. reflexivity.
-Qed.
-                  
-Lemma strips_pres_tlength:
-  forall ts:L1gTerms, List.length ts = tlength (strips strip ts).
-Proof.
-  induction ts; intros.
-  - reflexivity.
-  - cbn. rewrite IHts. reflexivity.
-Qed.
-
-  
-(** environments and programs **)
-Function stripEC (ec:L1gEC) : AstCommon.envClass Term :=
-  match ec with
-  | ecTrm t => ecTrm (strip t)
-  | ecTyp n itp =>
-    (** We stripped the parameters of all constructors *)
-    ecTyp Term 0 itp
+  | [] => []
+  | (n, InductiveDecl m) :: rest => 
+  let Ibs := ibodies_itypPack m.(ind_bodies) in
+    (n, ecTyp Term 0 Ibs) :: compile_ctx rest
+  | (n, ConstantDecl {| cst_body := Some t |}) :: rest => 
+      (n, ecTrm (compile t)) :: compile_ctx rest
+  | (n, ConstantDecl {| cst_body := None |}) :: rest => 
+     (n, ecAx Term) :: compile_ctx rest
   end.
 
-Definition  stripEnv : L1gEnv -> AstCommon.environ Term :=
-  List.map (fun nmec : _ * L1gEC => (fst nmec, stripEC (snd nmec))).
+Definition compile_program (p : Ast.Env.program) : Program Term :=
+  let p := (erase_program p (MCUtils.todo "wf_env and welltyped term")) in
+  {| main := compile (snd p) ; env := compile_ctx (fst p) |}.
 
-Lemma stripEcTrm_hom:
-  forall t, stripEC (ecTrm t) = ecTrm (strip t).
-Proof.
-  intros. reflexivity.
-Qed.
-
-Lemma stripEnv_pres_fresh:
-  forall nm p, fresh nm p -> fresh nm (stripEnv p).
-Proof.
-  induction 1.
-  - constructor; assumption.
-  - constructor.
-Qed.
-
-Lemma stripEnv_inv:
-  forall gp s ec p, stripEnv gp = (s, ec) :: p ->
-                    exists ec2 p2, ec =stripEC ec2 /\ p = stripEnv p2.
-Proof.
-  intros. destruct gp. discriminate. cbn in H. injection H; intros. subst.
-  exists (snd p0), gp. intuition.
-Qed.
-
-Definition stripProgram (p:L1gPgm) : Program Term :=
-  {| env:= stripEnv (env p);
-     main:= strip (main p) |}.
-
-(*** from L2 to L2k ***)
-Definition program_Program `{F:MCUtils.Fuel} (p:global_context * term) : Program Term :=
-  stripProgram (L1g.compile.program_Program p).
+Definition program_Program `{F:MCUtils.Fuel} (p: Ast.Env.program) : Program Term :=
+  compile_program p.

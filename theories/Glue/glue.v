@@ -368,7 +368,7 @@ Section L1Types.
                   end) ctx.
 
   Fixpoint get_single_types
-           (gs : Ast.Env.global_env)
+           (gs : Ast.Env.global_declarations)
            : list ty_info :=
     match gs with
     | nil => nil
@@ -395,7 +395,7 @@ Section L1Types.
 
   (* Generates the initial ind_L1_env *)
   Definition propagate_types
-             (gs : Ast.Env.global_env)
+             (gs : Ast.Env.global_declarations)
              : glueM (list (ind_L1_tag * ty_info)) :=
     let singles := get_single_types gs in
     let res := enumerate_pos singles in
@@ -1246,7 +1246,7 @@ End FunctionCalls.
 
 (* Generates the header and the source programs *)
 Definition make_glue_program
-           (gs : Ast.Env.global_env)
+           (gs : Ast.Env.global_declarations)
            : glueM (option Clight.program * option Clight.program) :=
   '(comp_tinfo, externs, toolbox) <- make_externs ;;
   singles <- (propagate_types >=> filter_prop_types) gs ;;
@@ -1274,7 +1274,7 @@ Definition make_glue_program
 (* The entry point for glue code generation *)
 Definition generate_glue
            (opts : Options)
-           (globs : Ast.Env.global_env) (* an L1 program *)
+           (globs : Ast.Env.global_declarations) (* an L1 program *)
            : error (name_env * Clight.program * Clight.program * list string) :=
   let init : gstate_data :=
       {| gstate_gensym := 2%positive

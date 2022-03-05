@@ -5,7 +5,7 @@ Require Import Coq.Arith.Arith.
 Require Import Common.Common.
 Require Import Coq.micromega.Lia.
 
-From MetaCoq.Template Require utils. 
+From MetaCoq.Template Require utils EtaExpand.
 From MetaCoq.Erasure Require Import EAst ETyping ESpineView EEtaExpanded EInduction ERemoveParams Erasure.
 
 Local Open Scope string_scope.
@@ -375,8 +375,11 @@ Fixpoint compile_ctx (t : global_context) :=
      (n, ecAx Term) :: compile_ctx rest
   end.
 
+Definition expand_program (p : Ast.Env.program) :=
+  ( {| Ast.Env.universes := (fst p).(Ast.Env.universes) ; Ast.Env.declarations := EtaExpand.eta_global_env (fst p).(Ast.Env.declarations) |} , EtaExpand.eta_expand (fst p).(Ast.Env.declarations) (snd p)).
+
 Definition compile_program (p : Ast.Env.program) : Program Term :=
-  let p := (erase_program p (MCUtils.todo "wf_env and welltyped term")) in
+  let p := (erase_program (expand_program p) (MCUtils.todo "wf_env and welltyped term")) in
   {| main := compile (snd p) ; env := compile_ctx (fst p) |}.
 
 Definition program_Program `{F:MCUtils.Fuel} (p: Ast.Env.program) : Program Term :=

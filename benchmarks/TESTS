@@ -6,5 +6,3 @@ vs_hard
 binom
 color
 sha_fast
-metacoq_erasure
-certicoq_compile

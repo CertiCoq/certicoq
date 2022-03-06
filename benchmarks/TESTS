@@ -7,4 +7,4 @@ binom
 color
 sha_fast
 metacoq_erasure
-metacoq_safechecker
+certicoq_compile

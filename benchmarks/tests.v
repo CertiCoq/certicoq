@@ -176,8 +176,6 @@ CertiCoq Compile -O 0 -time certicoq_compile.
 CertiCoq Compile -ext "_opt" certicoq_compile.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" certicoq_compile.
 
-
-
 (* Eval compute in "Compiling MetaCoq SafeChecker". *)
 
 (* From MetaCoq.SafeChecker Require Import PCUICSafeChecker. *)

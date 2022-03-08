@@ -12,8 +12,7 @@ certicoq.ml
 g_certicoq.mlg
 certicoq_debug.mli
 certicoq_debug.ml
-certicoq_plugin_mod.ml
-certicoq_plugin.mllib
+certicoq_plugin.mlpack
 CertiCoq.v
 
 

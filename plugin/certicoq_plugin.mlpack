@@ -47,6 +47,10 @@ MCOption
 MCList
 MCProd
 MCCompare
+MCUtils
+Number0
+Signature
+
 DecimalString
 MCString
 SpecFloat
@@ -113,6 +117,7 @@ PCUICChecker
 PCUICPretty
 PCUICReflect
 TemplateToPCUIC
+TemplateToPCUICCorrectness
 PCUICSafeLemmata
 PCUICCumulativity
 PCUICExpandLets
@@ -162,6 +167,7 @@ OrdersFacts
 MSetInterface
 Bracket
 ExtLibMisc
+Smallstep
 
 AstCommon
 Round

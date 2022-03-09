@@ -35,7 +35,6 @@ Inductive Term : Type :=
 | TCase      : inductive ->
                Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
-| TProj      : projection -> Term -> Term
 | TWrong     : string -> Term
 with Terms : Type :=
 | tnil : Terms
@@ -242,7 +241,6 @@ Function lift (n:nat) (t:Term) : Term :=
     | TConstruct i x args => TConstruct i x (lifts n args)
     | TCase i mch brs => TCase i (lift n mch) (liftBs n brs)
     | TFix ds y => TFix (liftDs (n + dlength ds) ds) y
-    | TProj prj bod => TProj prj (lift n bod)
     | _ => t
   end
 with lifts (n:nat) (ts:Terms) : Terms :=
@@ -328,38 +326,54 @@ Fixpoint list_Defs (l : list (Extract.E.def Term)) : Defs :=
   | t :: ts => dcons t.(dname) t.(dbody) t.(rarg) (list_Defs ts) 
   end.
 
-Equations? compile (t: term) : Term 
-by wf t (fun x y : EAst.term => size x < size y) :=
-| e with TermSpineView.view e := {
-  | tRel n => TRel n
-  | tBox => TProof
-  | tLambda nm bod => TLambda nm (compile bod)
-  | tLetIn nm dfn bod => TLetIn nm (compile dfn) (compile bod)
-  | tApp fn args napp nnil with construct_viewc fn := {
-    | view_construct kn c => TConstruct kn c (list_terms (map_InP args (fun x H => compile x)))
-    | view_other fn nconstr =>
-      TmkApps (compile fn) (list_terms (map_InP args (fun x H => compile x)))
-  }
-  | tConst nm => TConst nm
-  | tConstruct i m =>
-    TConstruct i m tnil
-  | tCase i mch brs =>
-    let brs' := map_InP brs (fun x H => (fst x, compile (snd x))) in
-    TCase (fst i) (compile mch) (list_Brs brs')
-  | tFix mfix idx => 
-    let mfix' := map_InP mfix (fun d H => {| dname := dname d; dbody := compile d.(dbody); rarg := d.(rarg) |}) in
-    TFix (list_Defs mfix') idx
-  | tProj (ind, _, nargs) bod => TProj (ind, nargs) (compile bod)
-  | _ => TWrong "" }.
-Proof.
-  all: try (cbn; lia).
-  - rewrite size_mkApps. cbn. now eapply (In_size id size).
-  - rewrite size_mkApps. cbn. destruct args; try congruence. cbn. lia.
-  - eapply le_lt_trans. 2: eapply size_mkApps_l; eauto. eapply (In_size id size) in H.
-    unfold id in H. change size with (fun x => size x) at 2. lia.
-  - cbn. eapply (In_size snd size) in H. cbn in H. lia.
-  - eapply (In_size dbody size) in H. cbn in H. lia.
-Qed.
+Definition lookup_record_projs (e : global_declarations) (ind : inductive) : option (list ident) :=
+  match lookup_inductive e ind with
+  | Some (mdecl, idecl) => Some (idecl.(ind_projs))
+  | None => None
+  end.
+  
+Section Compile.
+  Context (e : global_declarations).
+
+  Equations? compile (t: term) : Term 
+  by wf t (fun x y : EAst.term => size x < size y) :=
+  | e with TermSpineView.view e := {
+    | tRel n => TRel n
+    | tBox => TProof
+    | tLambda nm bod => TLambda nm (compile bod)
+    | tLetIn nm dfn bod => TLetIn nm (compile dfn) (compile bod)
+    | tApp fn args napp nnil with construct_viewc fn := {
+      | view_construct kn c => TConstruct kn c (list_terms (map_InP args (fun x H => compile x)))
+      | view_other fn nconstr =>
+        TmkApps (compile fn) (list_terms (map_InP args (fun x H => compile x)))
+    }
+    | tConst nm => TConst nm
+    | tConstruct i m => TConstruct i m tnil
+    | tCase i mch brs =>
+      let brs' := map_InP brs (fun x H => (fst x, compile (snd x))) in
+      TCase (fst i) (compile mch) (list_Brs brs')
+    | tFix mfix idx => 
+      let mfix' := map_InP mfix (fun d H => {| dname := dname d; dbody := compile d.(dbody); rarg := d.(rarg) |}) in
+      TFix (list_Defs mfix') idx
+    | tProj (ind, _, nargs) bod with lookup_record_projs e ind :=
+      { | Some args =>
+          let len := List.length args in
+          TCase ind (compile bod) (bcons (map nNamed args) (TRel (len - 1 - nargs)) bnil)
+        | None => TWrong "Proj" }
+    | tCoFix mfix idx => TWrong "TCofix"
+    | tVar _ => TWrong "Var"
+    | tEvar _ _ => TWrong "Evar" }.
+  Proof.
+    all: try (cbn; lia).
+    - rewrite size_mkApps. cbn. now eapply (In_size id size).
+    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn. lia.
+    - eapply le_lt_trans. 2: eapply size_mkApps_l; eauto. eapply (In_size id size) in H.
+      unfold id in H. change size with (fun x => size x) at 2. lia.
+    - cbn. eapply (In_size snd size) in H. cbn in H. lia.
+    - eapply (In_size dbody size) in H. cbn in H. lia.
+  Qed.
+
+  End Compile.
 End Def.
 Print compile_clause_1.
 
@@ -370,7 +384,7 @@ Fixpoint compile_ctx (t : global_context) :=
   let Ibs := ibodies_itypPack m.(ind_bodies) in
     (n, ecTyp Term 0 Ibs) :: compile_ctx rest
   | (n, ConstantDecl {| cst_body := Some t |}) :: rest => 
-      (n, ecTrm (compile t)) :: compile_ctx rest
+      (n, ecTrm (compile rest t)) :: compile_ctx rest
   | (n, ConstantDecl {| cst_body := None |}) :: rest => 
      (n, ecAx Term) :: compile_ctx rest
   end.
@@ -380,7 +394,7 @@ Definition expand_program (p : Ast.Env.program) :=
 
 Definition compile_program (p : Ast.Env.program) : Program Term :=
   let p := (erase_program (expand_program p) (MCUtils.todo "wf_env and welltyped term")) in
-  {| main := compile (snd p) ; env := compile_ctx (fst p) |}.
+  {| main := compile (fst p) (snd p) ; env := compile_ctx (fst p) |}.
 
 Definition program_Program `{F:MCUtils.Fuel} (p: Ast.Env.program) : Program Term :=
   compile_program p.

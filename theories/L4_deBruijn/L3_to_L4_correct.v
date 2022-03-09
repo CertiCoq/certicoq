@@ -2082,10 +2082,6 @@ Proof.
     inv w.
     eapply whCaseStep_pres_Crct; eauto.
   - inv H1; auto.
-    eapply H0. eapply WcbvEval_pres_Crct in w; eauto.
-    inv w.
-    eapply tnth_pres_Crct; eauto.  
-  - inv H1; auto.
   - inv H1; auto.
 Qed.
 
@@ -2220,8 +2216,6 @@ Proof.
   rewrite exps_length_trans. lia.
 Qed.
   
-Axiom todo : forall {A}, string -> A.
-
 Theorem translate_correct_subst prims (Heq : prims = []) (e : environ Term) (t t' : Term) :
   crctEnv e -> crctTerm e 0 t ->
   L3eval.WcbvEval e t t' -> 
@@ -2500,11 +2494,6 @@ Proof with eauto.
       eapply sbst_list_instantiate; eauto. }
     now rewrite <- H1.
 
-  + (* Projections *)
-    intros * evbod Hcstr Harg evarg IHres crproj. inv crproj.
-    cbn. unfold subst_env. rewrite subst_env_aux_prf.
-    exact (todo "translation of projections").
-    
   (** Terms *)
   + intros; constructor.
   + intros. inv H1. specialize (H0 H7). simpl.

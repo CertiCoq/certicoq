@@ -117,7 +117,6 @@ Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
 | ctFix: forall p n ds m,
     crctDs p (n + dlength ds) ds -> m < dlength ds ->
     crctTerm p n (TFix ds m)
-| ctProj: forall p n prj t, crctTerm p n t -> crctTerm p n (TProj prj t)
 (* crctEnvs are closed in both ways *)
 with crctEnv: environ Term -> Prop :=
      | ceNil: crctEnv nil
@@ -235,7 +234,6 @@ Proof.
     cbn in H. destruct H. elim (Lookup_fresh_neq H H4). reflexivity.
   - eelim H0; eassumption.
   - eelim H0; eassumption.
-  - eelim H0; eassumption.
   - eelim H2; eassumption.
   - eelim H0; eassumption.
   - eelim H2; eassumption.
@@ -261,8 +259,8 @@ Lemma Crct_weaken:
                                crctEnv ((nm,ecTrm s)::p)).
 Proof.
   apply crctCrctsCrctBsDsEnv_ind; intros;
-  try (solve[repeat econstructor; intuition]);
-  try (econstructor; intuition); try eassumption.
+  try (solve[repeat econstructor; intuition auto]);
+  try (econstructor; intuition auto); try eassumption.
   - unfold LookupDfn in *. constructor.
     apply neq_sym. apply (Lookup_fresh_neq H1 H2). eassumption.
   - inversion_Clear H. inversion_Clear H4.
@@ -372,8 +370,6 @@ Proof.
         intros j0. elim H5. apply PoCaseR. assumption.
   - econstructor; try eassumption. eapply H0. reflexivity. intros h.
     elim H3. constructor. assumption.
-  - constructor. eapply H0. reflexivity. intros h.
-    elim H2. constructor. assumption.
   - constructor.
     + eapply H0. reflexivity. intros h. elim H4. constructor. assumption.
     + eapply H2. reflexivity. intros h. elim H4. apply PoTtl. assumption.
@@ -661,7 +657,6 @@ Proof.
   - cbn in H0. discriminate.
   - inversion_Clear H. inversion_Clear H2. cbn in H1. myInjection H1.
     assumption.
-  - cbn in H0. discriminate.
 Qed.
 
 Lemma tnth_pres_Crct:

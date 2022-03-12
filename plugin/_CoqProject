@@ -15,7 +15,11 @@ certicoq_debug.ml
 certicoq_plugin.mlpack
 CertiCoq.v
 
-
+static/caml_nat.mli
+static/caml_nat.ml
+static/caml_byte.mli
+static/caml_byte.ml
+static/caml_bytestring.ml
 static/camlcoq.ml
 static/printAST.ml
 static/printClight.ml
@@ -92,6 +96,12 @@ extraction/bracket.ml
 extraction/bracket.mli
 extraction/char0.ml
 extraction/char0.mli
+extraction/byte.mli
+extraction/byte.ml
+extraction/byte0.mli
+extraction/byte0.ml
+extraction/bytestring.mli
+extraction/bytestring.ml
 extraction/classes1.ml
 extraction/classes1.mli
 extraction/classes2.ml
@@ -234,6 +244,8 @@ extraction/map_util.ml
 extraction/map_util.mli
 extraction/decimalString.mli
 extraction/decimalString.ml
+extraction/reflectEq.mli
+extraction/reflectEq.ml
 extraction/mCString.mli
 extraction/mCString.ml
 extraction/mCCompare.ml

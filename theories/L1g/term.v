@@ -9,9 +9,9 @@ Require Import Coq.micromega.Lia.
 Require Export Common.Common Common.AstCommon.
 Require Export L1g.compile.
 
-From MetaCoq Require Import Template.Reflect.
+From MetaCoq Require Import bytestring Template.Reflect.
 
-Open Scope string_scope.
+Open Scope bs_scope.
 Open Scope bool.
 Open Scope list.
 Set Implicit Arguments.
@@ -62,7 +62,7 @@ Proof.
   - destruct t1; cross.
     destruct (H t1_1); destruct (H0 t1_2);
       [lft | rght ..]. 
-  - destruct t; cross. destruct (kername_eq_dec k k0); [lft | rght].
+  - destruct t; cross. destruct (Classes.eq_dec k k0); [lft | rght].
   - destruct t; cross.
     destruct (inductive_dec i i0), (eq_nat_dec n n2),
     (eq_nat_dec n0 n3), (eq_nat_dec n1 n4); [lft | rght .. ].
@@ -77,7 +77,7 @@ Proof.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
   - destruct t0; cross.
     destruct (project_dec p p0), (H t0); [lft | rght .. ].
-  - destruct t; cross. destruct (string_dec s s0).
+  - destruct t0; cross. destruct (Classes.eq_dec t t0).
     + subst. left. reflexivity.
     + right. intros h. myInjection h. elim n. reflexivity.
   - destruct cc; cross; lft.
@@ -146,7 +146,7 @@ Lemma isWrong_dec: forall t, {isWrong t}+{~ isWrong t}.
 Proof.
   destruct t;
   try (right; intros h; destruct h as [x jx]; discriminate).
-  - left. exists s. reflexivity.
+  - left. exists t. reflexivity.
 Defined.
 
 Definition isLambda (t:Term) : Prop :=
@@ -1676,7 +1676,7 @@ unfold whBetaStep; simpl; induction 1; intros.
 Definition whCaseStep (cstrNbr:nat) (args:Terms) (brs:Brs): option Term := 
   match bnth cstrNbr brs with
     | Some (t, argnames) =>
-      if eqb (List.length argnames) (List.length args) then 
+      if Nat.eqb (List.length argnames) (List.length args) then 
         Some (instantiatel args 0 t)
       else None
     | None => None
@@ -1733,7 +1733,7 @@ Proof.
   intros brs hbrs ts hts n s h. unfold whCaseStep in h.
   case_eq (bnth n brs); intros; rewrite H in h.
   - destruct p. 
-    destruct (eqb_spec (List.length l) (List.length ts)); try discriminate.
+    destruct (PeanoNat.Nat.eqb_spec (List.length l) (List.length ts)); try discriminate.
     myInjection h.
     eapply (bnth_pres_WFapp hbrs n) in H.
     now eapply instantiates_pres_WFapp.

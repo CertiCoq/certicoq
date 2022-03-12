@@ -10,7 +10,7 @@
 *)
 
 Require Export Common.Common.
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
+Require Import Coq.Arith.Arith Coq.NArith.BinNat
         Coq.micromega.Lia Coq.Program.Program Coq.micromega.Psatz.
 (* shared namespace *)
 Open Scope N_scope.
@@ -2467,7 +2467,7 @@ Proof with eauto.
       rewrite H in Hcasestep; try easy.
     destruct t as [nargs t].
     revert Hcasestep. 
-    elim Reflect.eqb_spec => eql; try congruence.
+    elim PeanoNat.Nat.eqb_spec => eql; try congruence.
     intros [= eq].
     econstructor.
     rewrite subst_env_aux_con_e in IHmch. apply IHmch.

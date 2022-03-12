@@ -9,7 +9,7 @@ Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
                ExtLib.Data.String.
 
-From MetaCoq.Template Require Import BasicAst.
+From MetaCoq.Template Require Import bytestring BasicAst.
 Require MetaCoq.Template.All.
 
 Require Import compcert.common.AST
@@ -30,6 +30,7 @@ Require Import L6.cps
 
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
+Local Open Scope bs_scope.
 
 (* An enumeration of L1 types.
    This is separate from the [ind_tag] values generated in L6.
@@ -179,7 +180,7 @@ Section GState.
              (tag : ind_L1_tag)
              (info : ty_info) : option ind_L1_tag :=
       match prev with
-      | None => if kername_eq_dec s (ty_name info) then Some tag else None
+      | None => if Kername.eqb s (ty_name info) then Some tag else None
       | _ => prev
       end in
     ienv <- gets gstate_ienv ;;
@@ -215,9 +216,9 @@ Section Externs.
   (* Converts Coq string to Clight array *)
   Fixpoint string_as_array (s : string) : list init_data :=
     match s with
-    | EmptyString => Init_int8 Int.zero :: nil
-    | String c s' =>
-        Init_int8 (Int.repr (Z.of_N (Ascii.N_of_ascii c))) :: string_as_array s'
+    | String.EmptyString => Init_int8 Int.zero :: nil
+    | String.String c s' =>
+        Init_int8 (Int.repr (Z.of_N (Byte.to_N c))) :: string_as_array s'
     end.
 
   (* Creates a global variable with a string literal constant *)
@@ -364,7 +365,7 @@ Section L1Types.
   Definition context_names (ctx : Ast.Env.context) : list string :=
     map (fun d => match binder_name (decl_name d) with
                   | nNamed x => x
-                  | _ => ""%string (* TODO error handling *)
+                  | _ => "" (* TODO error handling *)
                   end) ctx.
 
   Fixpoint get_single_types
@@ -382,7 +383,7 @@ Section L1Types.
              Type names in one_inductive_body are NOT qualified,
              which makes them globally nonunique. *)
         let tys := map (fun '(i, o) =>
-                          {| ty_name := (qual_pre, Ast.Env.ind_name o)%string
+                          {| ty_name := (qual_pre, Ast.Env.ind_name o)%bs
                            ; ty_body := o
                            ; ty_inductive :=
                                {| inductive_mind := name ; inductive_ind := i |}
@@ -462,9 +463,9 @@ Section Printers.
     match params with
     | nil => None
     | (s, i) :: xs =>
-        if string_dec param s
-          then Some i
-          else find_param_fun_name param xs
+        if String.eqb param s
+        then Some i
+        else find_param_fun_name param xs
     end.
 
   (* FIXME currently we assume all print functions have the same type,
@@ -796,7 +797,7 @@ Section CtorArrays.
         let (max_len, init_l) :=
           normalized_names_array ctors' (max n (String.length s + 1)) in
         let i := pad_char_init (string_as_array s) max_len in
-        (max_len, i ++ init_l)
+        (max_len, (i ++ init_l)%list)
     end.
 
   Definition make_name_array
@@ -828,14 +829,14 @@ Section ArgsStructs.
 
   Fixpoint members_from_ctor
            (qp : qualifying_prefix)
-           (name : BasicAst.ident)
+           (name : Kernames.ident)
            (i : nat) (* initially 0 *)
            (j : nat) (* initially the arity *)
            : glueM members :=
     match j with
     | O => ret nil
     | S j' =>
-        arg_name <- gensym (sanitize_qualified (qp, name ++ "_arg_" ++ show_nat i)%string) ;;
+        arg_name <- gensym (sanitize_qualified (qp, name ++ "_arg_" ++ show_nat i)%bs) ;;
         rest <- members_from_ctor qp name (i + 1) j' ;;
         ret ((arg_name, val) :: rest)
     end.
@@ -983,7 +984,7 @@ Section CConstructors.
     match n with
     | O => ret nil
     | S n' =>
-        new_id <- gensym ("arg" ++ nat2string10 n')%string ;;
+        new_id <- gensym ("arg" ++ String.of_string (nat2string10 n'))%bs ;;
         rest_id <- make_arg_list' n' ;;
         ret ((new_id, val) :: rest_id)
     end.
@@ -1003,7 +1004,7 @@ Section CConstructors.
           (ctors : list ctor_info) (* name, arity, ordinal *)
           : glueM defs :=
     let make_name (cname : string) : string :=
-      ("make_" ++ sanitize_qualified name_ty ++ "_" ++ cname)%string in
+      ("make_" ++ sanitize_qualified name_ty ++ "_" ++ cname)%bs in
     match ctors with
     | nil => ret nil
     | (* Unboxed *) {| ctor_name := cname ; ctor_arity := O ; ctor_ordinal := ord |} :: ctors =>
@@ -1260,11 +1261,11 @@ Definition make_glue_program
   call_def <- make_call toolbox ;;
   nenv <- gets gstate_nenv ;;
   let (comp_structs, struct_defs) := List.split structs in
-  let composites := comp_tinfo ++ comp_structs in
+  let composites := (comp_tinfo ++ comp_structs)%list in
   let (halt_def, halt_clo_def) := halt_defs in
-  let glob_defs := externs ++ name_defs ++ ctor_defs ++
+  let glob_defs := (externs ++ name_defs ++ ctor_defs ++
                    get_tag_defs ++ struct_defs ++
-                   printer_defs ++ halt_def :: halt_clo_def :: call_def :: nil in
+                   printer_defs ++ halt_def :: halt_clo_def :: call_def :: nil)%list in
   let pi := map fst glob_defs in
   ret (mk_prog_opt composites (make_extern_decls nenv glob_defs true)
                    main_ident true,

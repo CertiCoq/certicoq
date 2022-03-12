@@ -1,8 +1,7 @@
-From MetaCoq.Template Require Import Universes.
+From MetaCoq.Template Require Import utils Universes.
 From MetaCoq Require Export Template.BasicAst.
 From MetaCoq Require Import Template.Ast.
 From MetaCoq Require Export Erasure.EAst.
-Require Import Coq.Strings.String.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Logic.Eqdep_dec.
 Require Import Coq.Lists.List.
@@ -18,7 +17,7 @@ Set Implicit Arguments.
 Ltac inv H := inversion H; subst; clear H.
 
 (** Fix arguments scope for [mkInd]. *)
-Arguments mkInd _%string _%nat.
+Arguments mkInd _%bs _%nat.
 
 (** Use with caution, valid kernames from Coq cannot have an empty MPFile component. *)
 Definition kername_of_string (s : string) := (MPfile nil, s).
@@ -41,58 +40,36 @@ Definition print_projection (p:projection) : string :=
   end.
 
 Lemma name_dec: forall (s1 s2:name), {s1 = s2}+{s1 <> s2}.
-induction s1; induction s2; try (solve [right; intros h; discriminate]).
-- left; reflexivity.
-- destruct (string_dec i i0).
-  + subst. left. reflexivity.
-  + right. injection. intuition.
+  apply Classes.eq_dec.
 Defined.
 
 Lemma level_dec : forall x y : Level.t, {x = y} + {x <> y}.
 Proof.
-  decide equality. apply String.string_dec.
-  apply NPeano.Nat.eq_dec.
+  apply Classes.eq_dec.
 Defined.
 
 Lemma level_bool_dec : forall x y : Level.t * bool, {x = y} + {x <> y}.
 Proof.
-  intros [l b] [l' b']. decide equality.
-  apply Bool.bool_dec. apply level_dec.
+  apply Classes.eq_dec.
 Defined.
 
 Lemma cast_kind_dec: forall (c1 c2:cast_kind), {c1 = c2}+{c1 <> c2}.
-induction c1; induction c2;
-try (solve [right; intros; discriminate]);
-try (solve [left; reflexivity]).
+  apply Classes.eq_dec.
 Defined.
 
 Lemma inductive_dec: forall (s1 s2:inductive), {s1 = s2}+{s1 <> s2}.
 Proof.
-  intros [mind i] [mind' i'].
-  destruct (kername_eq_dec mind mind');
-    destruct (eq_nat_dec i i'); subst;
-      try (solve [left; reflexivity]); 
-      right; intros h; elim n; injection h; intuition.
+  apply Classes.eq_dec.
 Defined.
 
 Lemma project_dec: forall (s1 s2:projection), {s1 = s2}+{s1 <> s2}.
 Proof.
-  intros s1 s2. destruct s1, s2. destruct p, p0.
-  destruct (inductive_dec i i0), (eq_nat_dec n1 n2), (eq_nat_dec n n0);
-    subst; try (solve [left; reflexivity]);
-  right; intros h; elim n3; injection h; intuition.
-Qed.
+  apply Classes.eq_dec.
+Defined.
 
 Lemma nat_list_dec : forall l1 l2 : list nat, {l1 = l2} + {l1 <> l2}.
 Proof.
-  induction l1; induction l2; try solve [left; reflexivity].
-  right. congruence.
-  right; congruence.
-  destruct (eq_nat_dec a a0); subst.
-  destruct (IHl1 l2); subst.
-  left; reflexivity.
-  right; congruence.
-  right; congruence.
+  apply Classes.eq_dec.
 Defined.
 
 Require Import NArith.NArith.
@@ -129,8 +106,8 @@ Definition itypPack := list ityp.
 
 Lemma Cnstr_dec: forall C1 C2:Cnstr, C1 = C2 \/ C1 <> C2.
 Proof.
-  destruct C1 as [Cn1 Ca1], C2 as [Cn2 Ca2],  (string_dec Cn1 Cn2),
-  (eq_nat_dec Ca1 Ca2).
+  destruct C1 as [Cn1 Ca1], C2 as [Cn2 Ca2].
+  destruct (Classes.eq_dec Cn1 Cn2), (eq_nat_dec Ca1 Ca2).
   - left. subst. reflexivity.
   - right. intros h. assert (j:= f_equal CnstrArity h).
     simpl in j. contradiction.
@@ -142,7 +119,7 @@ Qed.
 
 Lemma ityp_dec: forall i j:ityp, i = j \/ i <> j.
 Proof.
-  destruct i as [iN iC], j as [jN jC]. destruct (string_dec iN jN);
+  destruct i as [iN iC], j as [jN jC]. destruct (Classes.eq_dec iN jN);
   destruct (list_eq_dec Cnstr_dec iC jC); subst;
   try (left; reflexivity);
   right; intros h.
@@ -251,7 +228,7 @@ Hint Constructors fresh : core.
 Lemma fresh_dec: forall nm p, (fresh nm p) \/ ~(fresh nm p).
 induction p.
 - left. auto.
-- destruct a. destruct IHp. destruct (kername_eq_dec nm k).
+- destruct a. destruct IHp. destruct (Classes.eq_dec nm k).
  + subst. right. intros h. inversion_Clear h. nreflexivity H4.
  + left. constructor; auto.
  + right. intros h. elim H. inversion_Clear h. assumption.
@@ -264,7 +241,7 @@ induction 1.
 Qed.
 
 Lemma fresh_strengthen:
-  forall rs qs nm, fresh nm (rs++qs) -> fresh nm qs.
+  forall rs qs nm, fresh nm (rs++qs)%list -> fresh nm qs.
 induction rs; intros qs nm h.
 - assumption.
 - inversion h. subst. auto.
@@ -317,12 +294,12 @@ Definition lookupTyp (nm:kername) (p:environ) : exception (nat * itypPack) :=
 
 Lemma eq_kername_bool_neq {x y} : x <> y -> eq_kername x y = false.
 Proof.
-  unfold eq_kername. destruct kername_eq_dec; congruence.
+  destruct (eqb_spec x y); congruence.
 Qed.
 
 Lemma eq_kername_bool_neq_inv {x y} : eq_kername x y = false -> x <> y.
 Proof.
-  unfold eq_kername. destruct kername_eq_dec; congruence.
+  destruct (eqb_spec x y); congruence.
 Qed.
 
 Lemma Lookup_lookup:
@@ -335,7 +312,7 @@ Qed.
 Lemma lookup_Lookup:
   forall nm p t, lookup nm p = Some t -> Lookup nm p t.
 induction p; intros t h. inversion h.
-destruct a. destruct (kername_eq_dec nm k); simpl in h.
+destruct a. destruct (Classes.eq_dec nm k); simpl in h.
 - subst. rewrite (eq_kername_refl k) in h. 
   injection h. intros; subst. apply LHit.
 - apply LMiss. assumption. apply IHp. 
@@ -376,7 +353,7 @@ Lemma Lookup_dec:
 Proof.
   induction p; intros.
   - right. intros t h. inversion h.
-  - destruct IHp; destruct a; destruct (kername_eq_dec s k); subst.
+  - destruct IHp; destruct a; destruct (Classes.eq_dec s k); subst.
     + left. destruct H. exists e. apply LHit.
     + left. destruct H. exists x. apply LMiss; assumption.
     + destruct e.
@@ -404,7 +381,7 @@ split.
 - induction 1; simpl; try reflexivity.
   + rewrite eq_kername_bool_neq; assumption.
 - induction p; auto.
-  + destruct a. destruct (kername_eq_dec nm k). 
+  + destruct a. destruct (Classes.eq_dec nm k). 
     * subst. simpl. rewrite eq_kername_refl. discriminate.
     * simpl. rewrite eq_kername_bool_neq; try assumption. intros h.
       apply fcons; intuition.
@@ -430,7 +407,7 @@ Qed.
 
 Lemma eq_kername_bool_eq {k k'} : eq_kername k k' = true -> k = k'.
 Proof.
-  unfold eq_kername. destruct kername_eq_dec; congruence.
+  destruct (eqb_spec k k'); congruence.
 Qed.
 
 Lemma lookup_fresh_neq:

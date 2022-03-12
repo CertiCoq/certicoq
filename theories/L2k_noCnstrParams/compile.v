@@ -1,14 +1,14 @@
 
 Require Import Coq.Lists.List.
-Require Import Coq.Strings.String.
 Require Import Coq.Arith.Arith. 
 Require Import Common.Common.
 Require Import Coq.micromega.Lia.
 
 From MetaCoq.Template Require utils EtaExpand.
+Require Import MetaCoq.Template.utils.bytestring.
 From MetaCoq.Erasure Require Import EAst ETyping ESpineView EEtaExpanded EInduction ERemoveParams Erasure.
 
-Local Open Scope string_scope.
+Local Open Scope bs_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
@@ -350,7 +350,7 @@ Section Compile.
     | tConst nm => TConst nm
     | tConstruct i m => TConstruct i m tnil
     | tCase i mch brs =>
-      let brs' := map_InP brs (fun x H => (fst x, compile (snd x))) in
+      let brs' := map_InP brs (fun x H => (List.rev (fst x), compile (snd x))) in
       TCase (fst i) (compile mch) (list_Brs brs')
     | tFix mfix idx => 
       let mfix' := map_InP mfix (fun d H => {| dname := dname d; dbody := compile d.(dbody); rarg := d.(rarg) |}) in
@@ -375,7 +375,6 @@ Section Compile.
 
   End Compile.
 End Def.
-Print compile_clause_1.
 
 Fixpoint compile_ctx (t : global_context) :=
   match t with

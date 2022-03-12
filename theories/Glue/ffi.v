@@ -20,7 +20,7 @@ Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
                ExtLib.Data.String.
 
-From MetaCoq.Template Require Import BasicAst.
+From MetaCoq.Template Require Import bytestring BasicAst.
 Require MetaCoq.Template.All.
 
 Require Import compcert.common.AST
@@ -81,7 +81,7 @@ Fixpoint type_to_args
   match e with
   | Ast.tProd _ _ e' =>
       let (n, b) := type_to_args e' in (S n, b)
-  | Ast.tApp (Ast.tConst ((_, "IO")%string) _) _ => (0, true)
+  | Ast.tApp (Ast.tConst ((_, "IO")%bs) _) _ => (0, true)
   | _ => (0, false)
   end.
 
@@ -120,6 +120,8 @@ Fixpoint env_proj
   | 0 => *([tptr val] env)
   | S i' => env_proj i' (Field(env, 1))
   end.
+
+Local Open Scope bs_scope.  
 
 Definition make_curried_fn
          (* The sanitized unqual. name of the FFI function we're dealing with *)
@@ -213,7 +215,7 @@ Definition make_curried_fn
         res <- mapM make_arg l ;;
         let '(args, ss) := List.split res in
         let all_args := if is_io then args
-                        else args ++ ((_arg, val) :: nil) in
+                        else (args ++ ((_arg, val) :: nil))%list in
         _res <- gensym "result" ;;
         let call := Scall (Some _res)
                           (Evar _next_fn
@@ -343,7 +345,7 @@ Definition make_one_field
   _thread_info <- gensym "thread_info" ;;
   let extern_def :=
     (_extern_fn,
-     Gfun (External (EF_external kn
+     Gfun (External (EF_external (String.to_string kn)
                  (mksignature (val_typ :: nil) AST.Tvoid cc_default))
                (Tcons (threadInf _thread_info) (repeat_typelist val arity))
                val cc_default)) in
@@ -367,7 +369,7 @@ Fixpoint make_all_fields
   | f :: fs =>
       f' <- make_one_field f ;;
       fs' <- make_all_fields fs ;;
-      ret (f' ++ fs')
+      ret (f' ++ fs')%list
   end.
 
 Definition make_toolbox : ffiM composite_definitions :=
@@ -415,7 +417,7 @@ Definition get_constructors
         (* TODO MAYBE convert field_name to kername by qualifying it *)
         (* right now we qualify the names with the option the user provides *)
         rest <- pi_types_to_class_fields e' ;;
-        ret ((sanitize_string (append prefix field_name), t) :: rest)
+        ret ((sanitize_string (String.append prefix field_name), t) :: rest)
     | Ast.tRel _ => ret nil
     | Ast.tApp _ _ => ret nil
     | _ =>

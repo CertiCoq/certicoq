@@ -6,7 +6,6 @@
     * We need to tag the uncurried function so that it doesn't get inlined into
       the eta expansion (thereby undoing the uncurrying.)
  *)
-Require Import Coq.Strings.String.
 Require Import Libraries.CpdtTactics Common.compM.
 Require Import L6.cps.
 Require Import ExtLib.Structures.Monad.
@@ -20,6 +19,7 @@ Require Import Coq.Bool.Bool.
 Require Import identifiers.  (* for max_var *)
 Require Import AltBinNotations.
 Require Import L6.List_util L6.cps_util L6.state.
+From MetaCoq.Template Require Import bytestring.
 
 Open Scope monad_scope.
 
@@ -233,7 +233,7 @@ Section UNCURRY.
                    
                    _ <- mark_as_uncurried g ;;               
                    _ <- click ;;
-                   let fp_numargs := length (gvs' ++ fvs')  in
+                   let fp_numargs := length (gvs' ++ fvs') in
                    _ <- markToInline fp_numargs f g;;
                    fp_ft <- get_fun_tag (BinNat.N.of_nat fp_numargs);;
                    ret (Fcons f f_ft (fk::fvs')

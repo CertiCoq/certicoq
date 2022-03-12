@@ -525,7 +525,8 @@ Section Inline_correct.
         * eapply Hyp2.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
-          rewrite bound_var_Econstr_c, bound_var_Hole_c in *. xsets. 
+          rewrite bound_var_Econstr_c, bound_var_Hole_c in *. simpl.
+          eauto 10 with Ensembles_DB nocore.
         * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * eassumption.
@@ -543,7 +544,8 @@ Section Inline_correct.
         * eapply Hyp2.
         * eassumption.
         * destruct  bound_var_ctx_comp_ctx as [Heq1 _ ]. rewrite Heq1.
-          rewrite bound_var_Eproj_c, bound_var_Hole_c in *. xsets. 
+          rewrite bound_var_Eproj_c, bound_var_Hole_c in *.
+          eauto 10 with Ensembles_DB nocore.
         * eassumption.
         * eapply interprable_comp_f_l; eauto.
         * eassumption.

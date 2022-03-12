@@ -5,10 +5,10 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.micromega.Lia.
 Require Import Common.Common.  (* shared namespace *)
-From MetaCoq Require Import Template.Reflect.
+From MetaCoq Require Import bytestring Template.Reflect.
 Require Import L2k.compile.
 
-Open Scope string_scope.
+Open Scope bs_scope.
 Open Scope bool.
 Open Scope list.
 Set Implicit Arguments.
@@ -170,7 +170,7 @@ Proof.
     [lft | rght ..]. 
   - destruct t1; cross.
     destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..].
-  - destruct t; cross. destruct (kername_eq_dec k k0); [lft | rght].
+  - destruct t; cross. destruct (Classes.eq_dec k k0); [lft | rght].
   - destruct t0; cross.
     destruct (inductive_dec i i0), (eq_nat_dec n n0), (H t0);
       [lft | rght .. ].
@@ -179,7 +179,7 @@ Proof.
     [lft | rght .. ].
   - destruct t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
-  - destruct t; cross. destruct (string_dec s s0); [lft | rght].
+  - destruct t0; cross. destruct (Classes.eq_dec t t0); [lft | rght].
   - destruct tt; cross; lft.
   - destruct tt; cross.
     destruct (H t1), (H0 tt); [lft | rght .. ].
@@ -3694,7 +3694,7 @@ Qed.
 Definition whCaseStep (cstrNbr:nat) (ts:Terms) (brs:Brs): option Term :=
   match bnth cstrNbr brs with
     | Some (nargs, t) =>
-      if eqb (List.length nargs) (tlength ts) then 
+      if Nat.eqb (List.length nargs) (tlength ts) then 
         Some (instantiatel ts 0 t)
       else None
     | None => None
@@ -3706,7 +3706,8 @@ Lemma whCaseStep_Some:
     exists x t, bnth m brs = Some (x, t) /\ instantiatel ts 0 t = s.
 Proof.
   intros. unfold whCaseStep in  H. destruct (bnth m brs) as [[nargs t]|].
-  - destruct (eqb_spec (List.length nargs) (tlength ts)). exists nargs, t. intuition. congruence.
+  - destruct (PeanoNat.Nat.eqb_spec (List.length nargs) (tlength ts)).
+    exists nargs, t. intuition. congruence.
     discriminate.
   - discriminate.
 Qed.

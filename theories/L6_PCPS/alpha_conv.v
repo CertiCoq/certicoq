@@ -548,8 +548,9 @@ Proof.
     rewrite <- image_extend_injective_subdomain with (y := g2).
     + rewrite IHHc. reflexivity.
       eapply injective_subdomain_antimon. eassumption.
-      simpl. sets.
+      simpl. sets. simpl in *.
       eapply Disjoint_Included; [ | | eassumption ].
+      simpl. apply image_monotonic.
       xsets. sets.
     + eapply injective_subdomain_antimon.
       eapply construct_fundefs_injection_injective_pres
@@ -576,6 +577,7 @@ Proof.
       eapply injective_subdomain_antimon. eassumption.
       simpl. sets.
       eapply Disjoint_Included; [ | | eassumption ].
+      apply image_monotonic.
       xsets. sets.
     + eapply injective_subdomain_antimon.
       eapply construct_lst_injection_injective_pres with (xs := x :: xs).
@@ -1196,6 +1198,7 @@ Section Alpha_conv_correct.
           rewrite FromList_cons in Hpre. eassumption.
         * eapply injective_subdomain_antimon. eassumption. normalize_sets. sets. 
         * eapply Disjoint_Included; [| | eapply Hdis ].
+          apply image_monotonic.
           normalize_sets. xsets.
           normalize_sets. xsets.
         * constructor; eauto. intros Hc; inv Hc; congruence.          

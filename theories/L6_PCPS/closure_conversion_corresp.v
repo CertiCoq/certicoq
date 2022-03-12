@@ -9,7 +9,7 @@ Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
                Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
-
+Require Import MetaCoq.Template.utils.bytestring.
 Import Common.compM.
 Import ListNotations.
 

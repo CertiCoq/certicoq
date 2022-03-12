@@ -987,7 +987,7 @@ Proof.
       eapply Included_trans. eapply image_Setminus. now tci.
       rewrite image_remove_all_Disjoint.
       rewrite image_Union, Setminus_Union, !(Union_commut [set v]). now sets.
-      now sets. eapply Hsub. sets. 
+      now sets. eapply Hsub. sets.
   - intros M Hsub. rewrite !occurs_free_fundefs_Fnil at 1.
     sets. 
 Qed.

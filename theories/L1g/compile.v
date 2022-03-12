@@ -2,16 +2,16 @@ From ExtLib Require Import Monads.
 Import MonadNotation.
 
 Require Import Coq.Lists.List.
-Require Import Coq.Strings.String.
 Require Import Coq.micromega.Lia.
 Require Import Coq.Bool.Bool.
 Require Import FunInd.
 Require Import Common.Common.
 
 From MetaCoq.Template Require utils. 
+From MetaCoq.Template Require Import bytestring.
 From MetaCoq.Erasure Require Import EAst ETyping.
 
-Local Open Scope string_scope.
+Local Open Scope bs_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
@@ -229,24 +229,24 @@ Fixpoint print_global_declarations (g:global_declarations) : string :=
 Instance fix_bug : MonadExc.MonadExc string exception := exn_monad_exc.
 
 Definition Cstr_npars_nargs
-  (g:global_declarations) (ind:BasicAst.inductive) (ncst:nat): exception (nat * nat) :=
+  (g:global_declarations) (ind:Kernames.inductive) (ncst:nat): exception (nat * nat) :=
   match ind with
   | {| inductive_mind:= knm;  inductive_ind:= nbod |} =>
     match lookup_env g knm with
     | Some (ConstantDecl _) =>
-      raise ("Cstr_npars_nargs:lookup_env ConstantDecl")
+      raise ("Cstr_npars_nargs:lookup_env ConstantDecl")%bs
     | None =>
       raise ("Cstr_npars_nargs:lookup_env; "
                ++ string_of_kername knm ++ "," ++ (nat_to_string nbod) ++
                "," ++ (nat_to_string ncst) ++
-               "/" ++ print_global_declarations g)
+               "/" ++ print_global_declarations g)%bs
     | Some (InductiveDecl {| ind_npars:= npars; ind_bodies:= bodies |}) =>
       match List.nth_error bodies nbod with
-      | None => raise ("Cstr_npars_nargs:nth_error bodies")
+      | None => raise ("Cstr_npars_nargs:nth_error bodies")%bs
       | Some  {| ind_ctors := ctors |} =>
         match List.nth_error ctors ncst with
         | Some (_, nargs) => ret (npars, nargs)
-        | None => raise ("Cstr_npars_nargs:nth_error ctors")
+        | None => raise ("Cstr_npars_nargs:nth_error ctors")%bs
         end
       end
     end
@@ -306,9 +306,7 @@ Require Import Common.classes Common.Pipeline_utils Common.compM.
 
 #[local] Existing Instance PCUICErrors.envcheck_monad.
 
-Open Scope string_scope.
-
-Axiom todo : string -> forall {A}, A.
+(* Axiom todo : string -> forall {A}, A. *)
 (*      
 Definition erase (p:Ast.Env.program) : error (global_context × term) :=
   (* let p := fix_program_universes p in *)

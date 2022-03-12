@@ -3,6 +3,7 @@ Certicoq_debug
 Tm_util
 
 Datatypes
+Caml_nat
 Bool
 Equalities
 Decimal
@@ -20,6 +21,8 @@ PrimInt63
 Uint0
 Int0
 Int63
+Byte
+Caml_byte
 Ascii
 String0
 Orders
@@ -46,21 +49,25 @@ MCPrelude
 MCOption
 MCList
 MCProd
+ReflectEq
 MCCompare
 MCUtils
 Number0
 Signature
 
 DecimalString
+Byte0
+Bytestring
+Caml_bytestring
 MCString
 SpecFloat
 PrimFloat
 FloatOps
 Config0
+Kernames
 Universes0
 All_Forall
 BasicAst
-Kernames
 Environment
 EnvironmentTyping
 Ast0

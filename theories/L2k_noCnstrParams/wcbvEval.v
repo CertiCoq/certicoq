@@ -1,6 +1,5 @@
 Require Import FunInd.
 Require Import Coq.Lists.List.
-Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Program.Basics.
 Require Import Coq.micromega.Lia.
@@ -10,8 +9,8 @@ Require Import Common.Common.
 Require Import L2k.compile.
 Require Import L2k.term.
 Require Import L2k.program.
-        
-Local Open Scope string_scope.
+From MetaCoq.Template Require Import bytestring.
+Local Open Scope bs_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
@@ -223,7 +222,7 @@ Lemma WcbvEval_weaken:
 Proof.
   intros p. apply WcbvEvalEvals_ind; intros; auto.
   - econstructor; intuition.
-  - destruct (kername_eq_dec nm nm0).
+  - destruct (Classes.eq_dec nm nm0).
     + subst. inversion_Clear H0; unfold lookupDfn in e.
       * rewrite (proj1 (fresh_lookup_None (trm:=Term) _ _)) in e.
         discriminate. assumption.
@@ -301,7 +300,7 @@ Instance fix_bug : MonadExc.MonadExc string exception := exn_monad_exc.
 Function wcbvEval
          (tmr:nat) (t:Term) {struct tmr}: exception Term :=
   match tmr with 
-  | 0 => raise ("out of time: " ++ print_term t)
+  | 0 => raise ("out of time: " ++ print_term t)%bs
   | S n =>
     match t with      (** look for a redex **)
     | TConst nm =>
@@ -354,7 +353,7 @@ Function wcbvEval
   | TLetIn nm df bod =>
     match wcbvEval n df with
     | Ret df' => wcbvEval n (instantiate df' 0 bod)
-    | Exc s => raise ("wcbvEval,TLetIn,def: " ++ s)
+    | Exc s => raise ("wcbvEval,TLetIn,def: " ++ s)%bs
     end
   | TConstruct i cn args =>
     match wcbvEvals n args with
@@ -369,7 +368,7 @@ Function wcbvEval
   | TRel _ => raise "wcbvEval:unbound Rel"
   | TWrong s => raise (print_term t)
     end
-  end%string
+  end%bs
 with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
      : exception Terms :=
        match tmr with 
@@ -383,7 +382,7 @@ with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
                   | Ret _, Exc s => raise ("wcbvEvals:tl: " ++ s)
                   end
                 end
-       end%string.
+       end%bs.
 Functional Scheme wcbvEval_ind' := Induction for wcbvEval Sort Prop
 with wcbvEvals_ind' := Induction for wcbvEvals Sort Prop.
 Combined Scheme wcbvEvalEvals_ind from wcbvEval_ind', wcbvEvals_ind'.

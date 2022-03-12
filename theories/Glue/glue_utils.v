@@ -2,15 +2,13 @@ Require Import Common.Pipeline_utils.
 
 Require Import Coq.ZArith.ZArith
                Coq.Program.Basics
-               Coq.Strings.String
-               Coq.Strings.Ascii
                Coq.Lists.List List_util.
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
                ExtLib.Data.String.
 
-From MetaCoq.Template Require Import BasicAst.
+From MetaCoq.Template Require Import bytestring BasicAst.
 Require MetaCoq.Template.All.
 
 Require Import compcert.common.AST
@@ -102,17 +100,17 @@ End Helpers.
 
 Section Names.
 
-  Fixpoint split_aux (acc : string) (sep : ascii) (s : string) : list string :=
+  Fixpoint split_aux (acc : string) (sep : Byte.byte) (s : string) : list string :=
     match s with
-    | EmptyString => acc :: nil
-    | String c s' =>
-        if Char.ascii_dec sep c
-          then acc :: split_aux EmptyString sep s'
-          else split_aux (acc ++ String c EmptyString) sep s'
+    | String.EmptyString => acc :: nil
+    | String.String c s' =>
+        if Byte.eqb sep c
+        then acc :: split_aux String.EmptyString sep s'
+        else split_aux (acc ++ String.String c String.EmptyString)%bs sep s'
     end.
 
-  Definition split (c : ascii) (s : string) : list string :=
-    split_aux EmptyString c s.
+  Definition split (c : Byte.byte) (s : string) : list string :=
+    split_aux String.EmptyString c s.
 
  Definition qualifying_prefix := modpath.
  Definition base_name := string.
@@ -124,15 +122,15 @@ Section Names.
   Definition find_qualifying_prefix (n : kername) : qualifying_prefix :=
     fst n.
   (* match rev (split "." n) with
-    | nil => (* not possible *) ""%string
-    | base :: rest => String.concat "." (rev (""%string :: rest))
+    | nil => (* not possible *) ""%bs
+    | base :: rest => String.concat "." (rev (""%bs :: rest))
     end. *)
 
  (* takes a fully qualified name and gives the base name *)
   Definition find_base_name (n : kername) : base_name :=
     snd n.
   (* match rev (split "." n) with
-    | nil => (* not possible *) ""%string
+    | nil => (* not possible *) ""%bs
     | base :: rest => base
     end. *)
 
@@ -142,14 +140,14 @@ Section Names.
   Fixpoint sanitize_modpath (mp : modpath) : string :=
     match mp with
     | MPfile dp => sanitize_dirpath dp
-    | MPbound dp id _ => (sanitize_dirpath dp ++ "_" ++ id)%string
-    | MPdot mp0 id => (sanitize_modpath mp0 ++ "_" ++ id)%string
+    | MPbound dp id _ => (sanitize_dirpath dp ++ "_" ++ id)%bs
+    | MPdot mp0 id => (sanitize_modpath mp0 ++ "_" ++ id)%bs
     end.
 
   (* Takes in "M1.M2.tau" and returns "M1_M2_tau". *)
   Definition sanitize_qualified (n : kername) : sanitized_name :=
     let (mp, id) := n in
-    (sanitize_modpath mp ++ "_" ++ id)%string.
+    (sanitize_modpath mp ++ "_" ++ id)%bs.
 
   Definition sanitize_string (s : string) : sanitized_name :=
     String.concat "_" (split "." s).
@@ -187,7 +185,7 @@ Record ty_info : Type :=
    This may be redesigned in the future to hold info about
    the [dissected_type] etc, like a one-stop shop for constructors? *)
 Record ctor_info : Type :=
-  { ctor_name    : BasicAst.ident
+  { ctor_name    : Kernames.ident
   ; ctor_arity   : nat
   ; ctor_ordinal : nat
   ; ctor_type    : Ast.term
@@ -258,23 +256,23 @@ Section L1Constructors.
 
   (*
   Definition s := tProd nAnon (tRel 0) (tRel 1).
-  Eval compute in (dissect_types nil (dInd (MPfile nil, "Coq.Init.Datatypes.nat"%string) :: nil) s).
+  Eval compute in (dissect_types nil (dInd (MPfile nil, "Coq.Init.Datatypes.nat"%bs) :: nil) s).
 
-  Definition datatypes_kn na : kername := (MPfile (cons "Datatypes" (cons "Init" (cons "Coq" nil))), na)%string.
-  Definition top_kn na : kername := (MPfile (cons "Top" nil), na)%string.
-  Arguments top_kn na%string.
+  Definition datatypes_kn na : kername := (MPfile (cons "Datatypes" (cons "Init" (cons "Coq" nil))), na)%bs.
+  Definition top_kn na : kername := (MPfile (cons "Top" nil), na)%bs.
+  Arguments top_kn na%bs.
   Definition change := tProd nAnon
                           (tProd nAnon
                             (tInd
                                 {|
-                                inductive_mind := datatypes_kn "nat"%string;
+                                inductive_mind := datatypes_kn "nat"%bs;
                                 inductive_ind := 0 |} nil)
                             (tRel 1))
                           (tRel 1).
 
   Eval compute in (dissect_types [] (dInd (top_kn "color") :: nil) change).
 
-  (* Definition c := tProd (nNamed "a"%string) *)
+  (* Definition c := tProd (nNamed "a"%bs) *)
   (*                   (tSort ((Level.Level "Top.43", false) :: nil)) *)
   (*                   (tProd nAnon (tRel 0) (tRel 2)). *)
   (* Eval compute in (dissect_types 0 (dInd "Top.test" :: nil) c). *)
@@ -282,7 +280,7 @@ Section L1Constructors.
   Definition s := tProd nAnon (tRel 0) (tRel 1).
   Eval compute in (dissect_types 0 (dInd "Coq.Init.Datatypes.nat" :: nil) s).
 
-  Definition no := tProd (nNamed "a"%string)
+  Definition no := tProd (nNamed "a"%bs)
                      (tSort ((Level.Level "Top.40", false) :: nil))
                      (tProd nAnon (tRel 0)
                          (tProd nAnon (tApp (tRel 2) (tRel 1 :: nil))

@@ -8,7 +8,7 @@ Require Import SquiggleEq.LibTactics.
 Require Import SquiggleEq.tactics.
 Require Import Coq.Bool.Bool.
 Require Import Coq.Program.Tactics.
-Require Import Omega.
+Require Import Coq.micromega.Lia.
 Require Import Coq.Program.Basics.
 Require Import Coq.Lists.List.
 Require Import Coq.Init.Notations.

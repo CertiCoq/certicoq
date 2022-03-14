@@ -15,17 +15,23 @@ Open Scope monad_scope.
 
 From MetaCoq.Template Require Import BasicAst.
 
-Require Import compcert.common.AST
-        compcert.common.Errors
-        compcert.lib.Integers
-        compcert.cfrontend.Cop
-        compcert.cfrontend.Ctypes
-        compcert.cfrontend.Clight
-        compcert.common.Values.
+From compcert Require Import
+  common.AST
+  common.Errors
+  lib.Integers
+  cfrontend.Cop
+  cfrontend.Ctypes
+  cfrontend.Clight
+  common.Values
+  Clightdefs.
 
-
-Require Import L6.set_util L6.cps L6.identifiers L6.cps_show L6.state L6.toplevel.
-Require Import Clightdefs.
+Require Import
+  L6.set_util
+  L6.cps
+  L6.identifiers
+  L6.cps_show
+  L6.state
+  L6.toplevel.
 
 Section TRANSLATION.
 
@@ -404,7 +410,7 @@ Definition stack_decl size : list (ident * type)  :=
   (rootIdent, rootT size) :: nil. (* local variable for the live array *)
 
 (* Notation for handling the roots array *)
-Notation roots := (Etempvar rootIdent valPtr).
+Notation roots := (Evar rootIdent valPtr).
 Notation "'roots[' n ']'" := ( *(add roots (c_int n%Z val))) (at level 36).
 
 (* Initialize local stack frame. Called before the first function call that uses the current stack *)
@@ -439,7 +445,7 @@ Definition reset_stack (sp : N) (b : bool) : statement :=
 
 (* Pushes single var in frame *)
 Definition push_var (sp : N) (x : positive) :=
-  roots[ Z.of_N sp ] :::= Evar x valPtr.
+  roots[ Z.of_N sp ] :::= Etempvar x valPtr.
 
 (* Pops single var from frame *)
 Definition pop_var (sp : N) (x : positive) := 
@@ -520,7 +526,7 @@ Definition assignConstructorS (cenv:ctor_env) (ienv : n_ind_env) (fenv : fun_env
 
 (* Zoe: inlining the isPtr function to avoid extra function call in C *)
 Definition isPtr (retId:positive) (v:positive) : expr:=
-  Ebinop Oeq (Ebinop Oand (Evar v val) (Econst_int Int.one intTy) boolTy)
+  Ebinop Oeq (Ebinop Oand (Etempvar v val) (Econst_int Int.one intTy) boolTy)
          (Econst_int Int.zero intTy) boolTy.
 
 
@@ -855,8 +861,8 @@ Definition mkFun
   mkfunction Tvoid
              cc_default
              ((tinfIdent , threadInf) :: (map (fun x => (x , val)) (firstn nParam vs)))
-             ((map (fun x => (x , val)) ((skipn nParam vs) ++ loc)) ++ (stack_decl root_size) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::(caseIdent, boolTy) :: nil)
-             nil
+             (stack_decl root_size)
+             ((map (fun x => (x , val)) ((skipn nParam vs) ++ loc)) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::(caseIdent, boolTy) :: nil)
              body.
 
 Fixpoint translate_fundefs (fnd : fundefs) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (map : fun_info_env) (nenv : name_env) 
@@ -931,7 +937,7 @@ Definition lift_error {A : Type} (o : option A) (s : string) : error A :=
   | None => Err s
   end.
 
-Fixpoint translate_program (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (fmap : fun_info_env) nenv :
+Definition translate_program (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (fmap : fun_info_env) nenv :
   error (list (positive * globdef Clight.fundef type)) :=
   match e with
   | Efun fnd e => 
@@ -945,8 +951,8 @@ Fixpoint translate_program (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: c
                               (mkfunction val
                                           cc_default
                                           ((tinfIdent, threadInf)::nil)
-                                          ((map (fun x => (x , val)) localVars) ++ (stack_decl (Z.of_N slots)) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)
-                                          nil
+                                          (stack_decl (Z.of_N slots))
+                                          ((map (fun x => (x , val)) localVars) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::nil)
                                           (allocIdent ::= Efield tinfd allocIdent valPtr ;
                                            limitIdent ::= Efield tinfd limitIdent valPtr ;
                                            argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
@@ -1014,7 +1020,7 @@ Fixpoint make_fundef_info (fnd : fundefs) (fenv : fun_env) (nenv : name_env)
     
 
 
-Fixpoint add_bodyinfo (e : exp) (fenv : fun_env) (nenv : name_env) (map: fun_info_env) (defs:list (positive * globdef Clight.fundef type)) :=
+Definition add_bodyinfo (e : exp) (fenv : fun_env) (nenv : name_env) (map: fun_info_env) (defs:list (positive * globdef Clight.fundef type)) :=
   info_name <- getName ;;
   let ind :=
       mkglobvar
@@ -1028,7 +1034,7 @@ Fixpoint add_bodyinfo (e : exp) (fenv : fun_env) (nenv : name_env) (map: fun_inf
 
 
 (* Make fundef_info for functions in fnd (if any), and for the body of the program *)
-Fixpoint make_funinfo (e : exp) (fenv : fun_env) (nenv : name_env)
+Definition make_funinfo (e : exp) (fenv : fun_env) (nenv : name_env)
   : nState (list (positive * globdef Clight.fundef type) * fun_info_env * name_env) :=
   match e with
   | Efun fnd e' =>
@@ -1042,13 +1048,13 @@ Fixpoint make_funinfo (e : exp) (fenv : fun_env) (nenv : name_env)
 Definition global_defs (e : exp)
   : list (positive * globdef Clight.fundef type) :=
     (gcIdent , Gfun (External (EF_external "gc"
-                                              (mksignature (val_typ :: nil) None cc_default))
+                                              (mksignature (val_typ :: nil) AST.Tvoid cc_default))
                                  (Tcons threadInf Tnil)
                                  Tvoid
                                  cc_default
     ))::
       (isptrIdent , Gfun (External (EF_external "is_ptr"
-                                             (mksignature (val_typ :: nil) None cc_default))
+                                             (mksignature (val_typ :: nil) AST.Tvoid cc_default))
                                 (Tcons val Tnil) (Tint IBool Unsigned noattr)
                                 cc_default
       ))
@@ -1162,7 +1168,7 @@ Fixpoint make_argList' (n:nat) (nenv:name_env) : nState (name_env * list (ident 
                 ret (nenv, (new_id,val)::rest_id)
   end.
 
-Fixpoint make_argList (n:nat) (nenv:name_env) : nState (name_env * list (ident * type)) :=
+Definition make_argList (n:nat) (nenv:name_env) : nState (name_env * list (ident * type)) :=
   rest <- make_argList' n nenv;;
        let (nenv, rest_l) := rest in
        ret (nenv, rev rest_l).
@@ -1182,6 +1188,21 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
 
   Context (fenv : fun_env) (nenv : name_env).
 
+  Fixpoint check_tags_fundefs' (B : fundefs) (log : list string) : list string :=
+    match B with
+    | Fcons f t xs e B' =>
+      let s :=
+          match M.get t fenv with
+          | Some (n, l) =>
+            "Definition " ++ get_fname f nenv ++ " has tag " ++ (show_pos t) ++ Pipeline_utils.newline ++
+                          "Def: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ (nat2string10 (length l))
+          | None =>
+            "Def: Function " ++ get_fname f nenv ++ " was not found in fun_env"
+          end
+      in check_tags_fundefs' B' (s :: log)
+    | Fnil => log
+    end.
+  
   Fixpoint check_tags' (e : exp) (log : list string) :=
     match e with
     | Econstr _ _ _ e | Eproj _ _ _ _ e | Eprim _ _ _ e => check_tags' e log
@@ -1214,21 +1235,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
       in
       s :: log
     | Ehalt x => log
-    end
-  with check_tags_fundefs' (B : fundefs) (log : list string) : list string :=
-         match B with
-         | Fcons f t xs e B' =>
-           let s :=
-               match M.get t fenv with
-               | Some (n, l) =>
-                 "Definition " ++ get_fname f nenv ++ " has tag " ++ (show_pos t) ++ Pipeline_utils.newline ++
-                 "Def: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ (nat2string10 (length l))
-               | None =>
-                 "Def: Function " ++ get_fname f nenv ++ " was not found in fun_env"
-               end
-           in check_tags_fundefs' B' (s :: log)
-         | Fnil => log
-         end.
+    end.
 
   Definition check_tags (e : exp) :=
     String.concat Pipeline_utils.newline (rev (check_tags' e [])).
@@ -1241,7 +1248,7 @@ Definition exportIdent := 21%positive.
 Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
   (make_tinfoIdent,
    Gfun (External (EF_external "make_tinfo"
-                               (mksignature (nil) (Some val_typ) cc_default))
+                               (mksignature (nil) (Tret val_typ) cc_default))
                   Tnil
                   threadInf
                   cc_default)).
@@ -1249,7 +1256,7 @@ Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
 Definition export_rec : positive * globdef Clight.fundef type :=
   (exportIdent,
    Gfun (External (EF_external "export"
-                               (mksignature (cons val_typ nil) (Some val_typ) cc_default))
+                               (mksignature (cons val_typ nil) (Tret val_typ) cc_default))
                   (Tcons threadInf Tnil)
                   valPtr
                   cc_default)).

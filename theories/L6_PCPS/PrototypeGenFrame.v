@@ -7,7 +7,7 @@ Require Import Coq.Lists.List.
 Import ListNotations.
 
 From MetaCoq Require Import Template.All.
-Import MonadNotation.
+Import MCMonadNotation.
 Module TM := MetaCoq.Template.monad_utils.
 
 From ExtLib.Core Require Import RelDec.
@@ -325,6 +325,9 @@ Compute (string_of_N 350).
 
 Notation "'GM'" := (stateT N (sum string)).
 
+#[global] Existing Instance Monad_either.
+#[global] Existing Instance Monad_stateT.
+
 Definition fresh (prefix : string) : GM string :=
   let! n := get in
   let! _ := modify (fun x => 1 + x) in
@@ -341,8 +344,8 @@ Definition runGM' {A} (n : N) (m : GM A) : string + (A × N) :=
   runStateT m n.
 
 Class Show A := show : A -> string.
-Instance Show_string : Show string := fun x => x.
-Instance Show_kername : Show kername := string_of_kername.
+#[global] Instance Show_string : Show string := fun x => x.
+#[global] Instance Show_kername : Show kername := string_of_kername.
 
 (* TODO: impl Show typeclass *)
 Definition findM {K A} `{Eq K} `{Show K} (k : K) (m : Map K A) : GM A :=
@@ -400,7 +403,7 @@ Definition is_sep (c : ascii) : bool :=
   | _ => false
   end%char.
 
-Fixpoint qualifier (s : string) : string :=
+Definition qualifier (s : string) : string :=
   let fix go s :=
     match s with
     | "" => ("", false)
@@ -411,7 +414,7 @@ Fixpoint qualifier (s : string) : string :=
     end
   in fst (go s).
 
-Fixpoint unqualified (s : string) : string :=
+Definition unqualified (s : string) : string :=
   let fix go s :=
     match s with
     | "" => ("", false)
@@ -457,8 +460,8 @@ Fixpoint mangle (inds : ind_info) (e : term) : GM string :=
   | tConstruct ind n _ =>
     let! '(mbody, _, _) := findM ind.(inductive_mind) inds in
     let! body := nthM_nat ind.(inductive_ind) mbody.(ind_bodies) in
-    let! '(c, _, _) := nthM_nat n body.(ind_ctors) in
-    ret c
+    let! 'c := nthM_nat n body.(ind_ctors) in
+    ret c.(cstr_name)
   | tConst (_, name) _ => ret name
   | e => raise ("mangle: Unrecognized type: " +++ string_of_term e)
   end.
@@ -474,8 +477,8 @@ Fixpoint decompose_sorts (ty : term) : list aname × term :=
 Definition tm_type_of (inds : ind_info) (ind : inductive) (n : nat) (pars : list term) : GM term :=
   let! '(mbody, inductives, _) := findM ind.(inductive_mind) inds in
   let! body := nthM_nat ind.(inductive_ind) mbody.(ind_bodies) in
-  let! '(c, cty, arity) := nthM_nat n body.(ind_ctors) in
-  let '(_, cty) := decompose_sorts cty in
+  let! c := nthM_nat n body.(ind_ctors) in
+  let '(_, cty) := decompose_sorts c.(cstr_type) in
   let ind_env := (rev pars ++ rev_map (fun ind => tInd ind []) inductives)%list in
   ret (subst0 ind_env cty).
 
@@ -588,11 +591,18 @@ Definition gen_univ_univD (qual : modpath) (typename : kername) (g : mind_graph_
   in
   let univ_ind := mkInd (qual, snd typename +++ "_univ") 0 in
   let univ := tInd univ_ind [] in
+  let ci := {| ci_ind := univ_ind; ci_npar := 0; ci_relevance := Relevant |} in
+  let p := {| 
+    pparams := [];
+    puinst := [];
+    pcontext := [nAnon];
+    preturn := type0  
+    |}
+  in
   let body :=
     func "u" univ
-      (tCase ((univ_ind, O), Relevant)
-        (lam univ type0)
-        (tRel 0) (map (fun '(_, ty) => (O, ty)) mgTypes))
+      (tCase ci p (tRel 0)
+        (map (fun '(_, ty) => {| bcontext := []; bbody := ty |}) mgTypes))
   in ({|
     mind_entry_record := None;
     mind_entry_finite := Finite;
@@ -600,7 +610,7 @@ Definition gen_univ_univD (qual : modpath) (typename : kername) (g : mind_graph_
     mind_entry_inds := [ind_entry];
     mind_entry_universes := Monomorphic_entry (LevelSet.empty, ConstraintSet.empty);
     mind_entry_template := false;
-    mind_entry_cumulative := false;
+    mind_entry_variance := None;
     mind_entry_private := None |}, ty_ns, (qual, snd typename +++ "_univD"), body).
 
 Definition holes_of {A} (xs : list A) : list ((list A × A) × list A) :=
@@ -676,7 +686,7 @@ Definition gen_frame_t (qual : modpath) (typename : kername) (inds : ind_info) (
     mind_entry_inds := [ind_entry];
     mind_entry_universes := Monomorphic_entry (LevelSet.empty, ConstraintSet.empty);
     mind_entry_template := false;
-    mind_entry_cumulative := false;
+    mind_entry_variance := None;
     mind_entry_private := None |}.
 
 Definition gen_frameD (qual : modpath) (typename : kername) (univD_kername : kername) (fs : list frame)
@@ -687,16 +697,22 @@ Definition gen_frameD (qual : modpath) (typename : kername) (univD_kername : ker
   let frame_ty := mkApps (tInd frame_ind []) [tRel 1; tRel O] in
   let mk_arm h :=
     let 'mk_frame _ name constr lefts frame rights root := h in
-    let ctr_arity := #|lefts ++ rights| in
+    let ctr_arity := lefts ++ rights in
     let indices := rev (seq (1 + #|rights|) #|lefts|) ++ [O] ++ rev (seq 1 #|rights|) in
     let add_arg arg_ty body := lam arg_ty body in
-    (ctr_arity, fold_right lam (fold_right lam (lam frame (mkApps constr (map tRel indices))) rights) lefts)
+    {| bcontext := map (fun _ => nAnon) ctr_arity;
+       bbody := lam frame (mkApps constr (map tRel indices)) |}
+  in
+  let p := 
+    {| pparams := [];
+       puinst := []; 
+       pcontext := [nNamed "h"; nNamed "B"; nNamed "A"];
+       preturn := (fn (univD (tRel 2)) (univD (tRel 2))) |}
   in
   let body :=
     func "A" univ_ty (func "B" univ_ty (func "h" frame_ty
-      (tCase ((frame_ind, O), Relevant)
-        (func "A" univ_ty (func "B" univ_ty (func "h" frame_ty
-          (fn (univD (tRel 2)) (univD (tRel 2))))))
+      (tCase {| ci_ind := frame_ind ; ci_npar := O ; ci_relevance := Relevant |}
+        p
         (tRel O) (map mk_arm fs))))
   in
   ((qual, snd typename +++ "_frameD"), body).

@@ -24,12 +24,12 @@ MetaCoq Run (mk_Frame_ops (MPfile ["MockExpr"; "L6"; "CertiCoq"])
                           (MPfile ["MockExpr"; "L6"; "CertiCoq"], "exp") exp
                           [var; constr; nat; list var]).
 
-Print exp_univ.
-Print exp_univD.
-Print exp_frame_t.
-Print exp_frameD.
-Print exp_Frame_ops.
-Print exp_aux_data.
+(* Print exp_univ. *)
+(* Print exp_univD. *)
+(* Print exp_frame_t. *)
+(* Print exp_frameD. *)
+(* Print exp_Frame_ops. *)
+(* Print exp_aux_data. *)
 
 Instance Frame_exp : Frame exp_univ := exp_Frame_ops.
 Instance AuxData_exp : AuxData exp_univ := exp_aux_data.

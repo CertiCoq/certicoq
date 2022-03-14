@@ -1,5 +1,5 @@
 (* Size of CPS term, values, environments, etc. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2017
+ * Author: Anonymized, 2017
  *)
 
 
@@ -253,7 +253,7 @@ Lemma sizeOf_env_set k rho x v :
   sizeOf_env k (M.set x v rho) = max (sizeOf_val k v) (sizeOf_env k rho).
 Proof.
 (* Obvious but seems painful, admitting for now *)
-Admitted.
+Abort.
 
 Lemma max_list_nat_acc_spec {A} (xs : list A) f acc :
   max_list_nat_with_measure f acc xs =
@@ -268,16 +268,16 @@ Lemma sizeOf_env_set_lists k rho rho' xs vs :
   set_lists xs vs rho = Some rho' ->
   sizeOf_env k rho' = max (max_list_nat_with_measure (sizeOf_val k) 0 vs) (sizeOf_env k rho).
 Proof.
-  revert vs rho rho'. induction xs; intros vs rho rho' Hset.
-  - destruct vs; try discriminate. inv Hset.
-    reflexivity.
-  - destruct vs; try discriminate.
-    simpl in Hset. destruct (set_lists xs vs rho) eqn:Hset'; try discriminate.
-    inv Hset. rewrite sizeOf_env_set; simpl.
-    rewrite max_list_nat_acc_spec.
-    rewrite <- Max.max_assoc. eapply Nat.max_compat. reflexivity.
-    eauto.
-Qed.
+  (* revert vs rho rho'. induction xs; intros vs rho rho' Hset. *)
+  (* - destruct vs; try discriminate. inv Hset. *)
+  (*   reflexivity. *)
+  (* - destruct vs; try discriminate. *)
+  (*   simpl in Hset. destruct (set_lists xs vs rho) eqn:Hset'; try discriminate. *)
+  (*   inv Hset. rewrite sizeOf_env_set; simpl. *)
+  (*   rewrite max_list_nat_acc_spec. *)
+  (*   rewrite <- Max.max_assoc. eapply Nat.max_compat. reflexivity. *)
+  (*   eauto. *)
+Abort.
 
 Lemma sizeOf_env_get k rho x v :
   rho ! x = Some v ->
@@ -310,82 +310,7 @@ Proof.
     + eapply Nat.max_lub; lia.
 Qed.
 
-Lemma sizeOf_env_set_constr k rho xs c vs y:
-  get_list xs rho = Some vs ->
-  sizeOf_env k (M.set y (Vconstr c vs) rho) = sizeOf_env k rho.
-Proof.
-  intros Hget. rewrite sizeOf_env_set.
-  assert (Hlow : sizeOf_env k rho <= max (sizeOf_val k (Vconstr c vs)) (sizeOf_env k rho))
-    by apply Max.le_max_r.
-  assert (Hhigh :  max (sizeOf_val k (Vconstr c vs)) (sizeOf_env k rho) <= sizeOf_env k rho).
-  { eapply Nat.max_lub; try lia.
-    destruct k; simpl. lia.
-    unfold max_list_nat_with_measure. eapply le_trans.
-    eapply fold_left_monotonic; [| now eauto ].
-    intros. rewrite sizeOf_val_eq. eapply Nat.max_le_compat.
-    now eauto. now eauto.
-    eapply (sizeOf_env_get_list (S k)). eassumption. }
-  lia.
-Qed.
 
-Lemma sizeOf_env_set_proj k rho x c vs y v :
-  M.get x rho = Some (Vconstr c vs) ->
-  List.In v vs ->
-  sizeOf_env k (M.set y v rho) = sizeOf_env k rho.
-Proof.
-  intros Hget Hin. rewrite sizeOf_env_set.
-  assert (Hlow : sizeOf_env k rho <= max (sizeOf_val k v) (sizeOf_env k rho))
-    by apply Max.le_max_r.
-  assert (Hhigh :  max (sizeOf_val k v) (sizeOf_env k rho) <= sizeOf_env k rho).
-  { eapply Nat.max_lub; try lia.
-    eapply le_trans; [ | now eapply sizeOf_env_get; eauto ].
-    destruct k; eauto. simpl (sizeOf_val (S k) (Vconstr c vs)).
-    rewrite <- sizeOf_val_eq.
-    eapply max_list_nat_spec2. eassumption. }
-  lia.
-Qed.
-
-Lemma sizeOf_env_def_funs k rho B B' :
-  sizeOf_env k (def_funs B B' rho rho) <=
-  max (sizeOf_env k rho) (sizeOf_fundefs B).
-Proof.
-  induction B'; simpl.
-  - rewrite sizeOf_env_set. destruct k; simpl; eauto.
-    eapply Nat.max_lub; eauto.
-    rewrite Max.max_comm. eapply Nat.max_le_compat; eauto.
-    eapply sizeOf_env_monotic. lia.
-  - eapply Max.le_max_l.
-Qed.
-
-Lemma sizeOf_env_get_set k rho1 rho2 x y v :
-  rho1 ! x = Some v ->
-  sizeOf_env k (M.set y v rho2) <= max (sizeOf_env k rho1) (sizeOf_env k rho2).
-Proof.
-  intros H. rewrite sizeOf_env_set.
-  eapply Nat.max_le_compat; eauto.
-  eapply sizeOf_env_get; eauto.
-Qed.
-
-(* Lemma fun_in_fundefs_sizeOf_exp B f tau xs e : *)
-(*   fun_in_fundefs B (f, tau, xs, e) -> *)
-(*   sizeOf_exp e <= sizeOf_fundefs B. *)
-(* Proof. *)
-(*   intros Hin. induction B; inv Hin. *)
-(*   - inv H. simpl; lia. *)
-(*   - eapply le_trans. eapply IHB; eauto. *)
-(*     simpl. lia.   *)
-(* Qed. *)
-
-
-Lemma sizeOf_env_get_list_set_lists k rho1 rho2 rho2' xs ys vs :
-  get_list xs rho1 = Some vs ->
-  set_lists ys vs rho2 = Some rho2' ->
-  sizeOf_env k rho2' <= max (sizeOf_env k rho1) (sizeOf_env k rho2).
-Proof.
-  intros Hget Hset. erewrite sizeOf_env_set_lists; eauto.
-  eapply Nat.max_le_compat; eauto.
-  eapply sizeOf_env_get_list; eauto.
-Qed.
 
 Lemma max_list_nat_monotonic (A : Type) (f1 f2 : A -> nat) (l : list A) (n1 n2 : nat) :
   (forall (x1 : A), f1 x1 <= f2 x1) ->
@@ -397,30 +322,6 @@ Proof.
   intros. eapply Nat.max_le_compat; eauto.
 Qed.
 
-Lemma sizeOf_env_set_app k rho rho' rho'' f xs B f' ys e vs :
-  k > 0 ->
-  rho ! f = Some (Vfun rho' B f') ->
-  get_list xs rho = Some vs ->
-  sizeOf_exp e <= sizeOf_fundefs B ->
-  set_lists ys vs (def_funs B B rho' rho') = Some rho'' ->
-  max (sizeOf_exp e) (sizeOf_env (k - 1) rho'') <= sizeOf_env k rho.
-Proof.
-  intros Hgt Hget Hget' Hf Hset.
-  erewrite sizeOf_env_set_lists; eauto.
-  rewrite (Max.max_comm (max_list_nat_with_measure _ _ _) _), Max.max_assoc.
-  eapply Nat.max_lub.
-  - eapply le_trans; [| now eapply sizeOf_env_get; eauto ].
-    destruct k; try lia. simpl. rewrite <- minus_n_O.
-    eapply le_trans.
-    + eapply Nat.max_le_compat.
-      * eassumption.
-      * eapply sizeOf_env_def_funs.
-    + rewrite (Max.max_comm (sizeOf_env k rho')),
-      Max.max_assoc, Max.max_idempotent; eauto.
-  - eapply le_trans. eapply (max_list_nat_monotonic _ _ (sizeOf_val k)); eauto.
-    intros. eapply sizeOf_val_monotic. lia.
-    eapply sizeOf_env_get_list; eauto.
-Qed.
 
 Lemma sizeOf_exp_grt_1 e :
   1 <= sizeOf_exp e.
@@ -517,17 +418,6 @@ Proof.
   eapply Nat.max_le_compat_r.
   simpl. lia.
 Qed.
-
-Lemma max_exp_env_Efun k B e rho :
-  max_exp_env k e (def_funs B B rho rho) <= max_exp_env k (Efun B e) rho.
-Proof.
-  unfold max_exp_env. eapply le_trans.
-  - eapply Nat.max_le_compat_l.
-    now apply sizeOf_env_def_funs.
-  - rewrite (Max.max_comm (sizeOf_env _ _)), Max.max_assoc.
-    eapply Nat.max_le_compat_r.
-    eapply Nat.max_lub; simpl; lia.
-  Qed.
 
 (* Lemma about the number of free variables *)
 Lemma occurs_free_cardinality_mut :

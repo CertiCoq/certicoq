@@ -1,5 +1,5 @@
 (* Step-indexed logical relations for L6.  Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
  
 Require Import compcert.lib.Coqlib.
@@ -208,24 +208,26 @@ Section Log_rel.
 
   (** Lemmas about extending the environment *)
   Lemma preord_var_env_extend_eq :
-    forall (rho1 rho2 : env) (k : nat) (x : var) (v1 v2 : val),
+    forall (rho1 rho2 : env) (k : nat) (x1 x2 : var) (v1 v2 : cps.val),
       preord_val PostG k v1 v2 ->
-      preord_var_env PostG k (M.set x v1 rho1) (M.set x v2 rho2) x x.
+      preord_var_env PostG k (M.set x1 v1 rho1) (M.set x2 v2 rho2) x1 x2.
   Proof.
-    intros rho1 rho2 k x v1 v2 Hval x' Hget.
+    intros rho1 rho2 k x1 x2 v1 v2 Hval x' Hget.
     rewrite M.gss in Hget. inv Hget. eexists. rewrite M.gss. split; eauto.
   Qed.
 
-    
+  
   Lemma preord_var_env_extend_neq :
-    forall (rho1 rho2 : env) (k : nat) (x y : var) (v1 v2 : val),
-      preord_var_env PostG k rho1 rho2 y y ->
-      y <> x ->
-      preord_var_env PostG k (M.set x v1 rho1) (M.set x v2 rho2) y y.
+    forall (rho1 rho2 : env) (k : nat) (x1 x2 y1 y2 : var) (v1 v2 : cps.val),
+      preord_var_env PostG k rho1 rho2 y1 y2 ->
+      y1 <> x1 ->
+      y2 <> x2 ->      
+      preord_var_env PostG k (M.set x1 v1 rho1) (M.set x2 v2 rho2) y1 y2.
   Proof.
-    intros rho1 rho2 k x  y v1 v2 Hval Hneq x' Hget.
+    intros rho1 rho2 k x1 x2 y1 y2 v1 v2 Hval Hneq Hneq' x' Hget.
     rewrite M.gso in *; eauto.
   Qed.
+
 
   Lemma preord_var_env_extend :
     forall (rho1 rho2 : env) (k : nat) (x y : var) (v1 v2 : val),
@@ -238,6 +240,25 @@ Section Log_rel.
     - apply preord_var_env_extend_eq; eauto.
     - apply preord_var_env_extend_neq; eauto.
   Qed.
+
+
+  Lemma preord_var_env_def_funs_not_In_l k B1 rho1 rho2 k1 k2 : 
+    ~ k1 \in name_in_fundefs B1 ->
+             preord_var_env PostG k rho1 rho2 k1 k2 ->
+             preord_var_env PostG k (def_funs B1 B1 rho1 rho1) rho2 k1 k2.
+  Proof.
+    intros Hnin Henv x Hget.
+    rewrite def_funs_neq in Hget; eauto.
+  Qed. 
+
+  Lemma preord_var_env_def_funs_not_In_r k B2 rho1 rho2 k1 k2 : 
+    ~ k2 \in name_in_fundefs B2 ->
+             preord_var_env PostG k rho1 rho2 k1 k2 ->
+             preord_var_env PostG k rho1 (def_funs B2 B2 rho2 rho2) k1 k2.
+  Proof.
+    intros Hnin Henv x Hget.
+    rewrite def_funs_neq; eauto.
+  Qed. 
 
   (** The environment relation is antimonotonic in the set
     * of free variables *) 
@@ -433,6 +454,30 @@ Section Log_rel.
     destruct x; try contradiction. destruct H as [Heq Hall]; eauto. subst.
     eexists; split; eauto. 
   Qed.
+
+  Lemma preord_val_fun k f1 f2 rho1 rho2 B1 B2 ft xs1 xs2 e1 e2 :
+    find_def f1 B1 = Some (ft, xs1, e1) ->
+    find_def f2 B2 = Some (ft, xs2, e2) -> 
+    
+    (forall rho1' j vs1 vs2,
+        Datatypes.length vs1 = Datatypes.length vs2 ->
+        Some rho1' = set_lists xs1 vs1 (def_funs B1 B1 rho1 rho1) ->
+        exists (rho2' : env),
+          Some rho2' = set_lists xs2 vs2 (def_funs B2 B2 rho2 rho2) /\
+          ((j < k)%nat ->
+           Forall2 (preord_val PostG j) vs1 vs2 ->
+           preord_exp' preord_val PostG PostG j (e1, rho1') (e2, rho2'))) ->
+    
+    
+    preord_val PostG k (Vfun rho1 B1 f1) (Vfun rho2 B2 f2).
+  Proof.
+    intros Hf1 Hf2 Hexp. rewrite preord_val_eq.
+    intro; intros. repeat subst_exp. 
+    edestruct Hexp. eassumption. eassumption. destructAll.
+    do 3 eexists. split; [ | split ]. eassumption.
+    eassumption. eauto. 
+  Qed. 
+
 
   (** * Index Anti-Monotonicity Properties *)
 
@@ -1916,16 +1961,9 @@ Section Log_rel.
 
   Section Trans.
     
-    Context (P1 P2 : PostT) (* Local *)
-            (PG  : PostGT) (* Global *)
+    Context (PG  : PostGT) (* Global *)
             (HpropG: Post_properties PG PG PG)
-            (HGPost : inclusion _ (comp P1 P2) PG)
-            (Hp1 : inclusion _ PG P1)
-            (Hp2 : inclusion _ PG P2).
-    
-    (* NOTE : the above are satisfiable only for trivial postconditons. 
-     * It seems that transitivity cannot be obtained for any relation 
-       that is not idempotent (ie R <--> R ∘ R) *)
+            (HGPost : inclusion _ (comp PG PG) PG).
     
   (** * Transitivity Properties *)
   
@@ -1946,9 +1984,9 @@ Section Log_rel.
       specialize (H2 0); contradiction.
       eapply Hyp; eauto.  
     Qed.
-
+    
     (** Expression relation is transitive *)
-    Lemma preord_exp_trans_pre (k : nat) :
+    Lemma preord_exp_trans_pre P1 P2 (k : nat) :
       (* The induction hypothesis for transitivity of
        the value relation. *)
       (forall k' v1 v2 v3,
@@ -1976,7 +2014,7 @@ Section Log_rel.
       eapply bstep_fuel_deterministic in Hstep3; [| eapply Hstep3' ]. inv Hstep3. 
       eapply preord_val_monotonic; eauto. lia.
     Qed.
-
+    
     Lemma preord_val_trans (k : nat) v1 v2 v3 :
       preord_val PG k v1 v2 ->
       (forall m, preord_val PG m v2 v3) ->
@@ -2015,16 +2053,15 @@ Section Log_rel.
         eassumption. 
         
         intros. eapply H; eauto. lia.
-        eapply preord_exp_post_monotonic; [| eapply Hpre2; eauto ].
-        intros c1 c2 HG.
-        destruct c1 as [[e rho] c1]. destruct c2 as [[e' rho'] c2].
-        eapply Hp1. now eauto.
-        intros m. specialize (H2 (m + 1)). rewrite !preord_val_eq in H2.
+
+        eapply Hpre2; eauto.
+        
+        intros m.
+        specialize (H2 (m + 1)). rewrite !preord_val_eq in H2.
         edestruct (H2 vs3 vs3) with (j := m)
           as [xs3' [e3' [rho3' [Hf3' [Hs3' Hpre3']]]]]; eauto.
         rewrite Hf3 in Hf3'. inv Hf3'. rewrite <- Hs3 in Hs3'. inv Hs3'.
-        eapply preord_exp_post_monotonic; [| eapply Hpre3'; eauto ].
-        intros c1 c2 HG. eapply Hp2; now eauto. lia. 
+        eapply Hpre3'. lia.
         eapply Forall2_refl. eapply preord_val_refl; eauto.
       - intros v1 v2 H1 H2; specialize (H2 k); rewrite !preord_val_eq in *.
         destruct v1; destruct v2; 
@@ -2046,9 +2083,10 @@ Section Log_rel.
     edestruct (H2 m) as [v''' [Hget''' Hpre''']]; eauto.
     rewrite Hget'' in Hget'''. now inv Hget'''.
   Qed.
+
   
   Corollary preord_exp_trans (k : nat) :
-    forall rho1 rho2 rho3 e1 e2 e3,
+    forall P1 P2 rho1 rho2 rho3 e1 e2 e3,
       preord_exp P1 PG k (e1, rho1) (e2, rho2) ->
       (forall m, preord_exp P2 PG m (e2, rho2) (e3, rho3)) ->
       preord_exp (comp P1 P2) PG k (e1, rho1) (e3, rho3).
@@ -2056,9 +2094,8 @@ Section Log_rel.
     intros. eapply preord_exp_trans_pre; eauto.
     intros. eapply preord_val_trans; eauto.
   Qed.
-
-  Context  (Hprops : Post_properties P1 P1 PG).
-
+  
+  Context (P1 : PostT) (Hprops : Post_properties P1 P1 PG).
 
   Lemma preord_env_P_def_funs_pre' k (S1 : var -> Prop) B B' rho1 rho2 :
     preord_env_P PG (S1 \\ name_in_fundefs B) k rho1 rho2 ->

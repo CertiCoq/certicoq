@@ -4,7 +4,8 @@ Require Import Coq.Lists.List.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
+Require Import Arith.
 Require Import Common.Common.
 Require Import L1g.compile.
 Require Import L1g.term.
@@ -79,7 +80,7 @@ with crctEnv: environ Term -> Prop :=
 with crctBs: environ Term -> nat -> Brs -> Prop :=
      | cbsNil: forall p n, crctEnv p -> crctBs p n bnil
      | cbsCons: forall p n m t ts,
-         crctTerm p n t -> crctBs p n ts -> crctBs p n (bcons m t ts)
+         crctTerm p (List.length m + n) t -> crctBs p n ts -> crctBs p n (bcons m t ts)
 with crctDs: environ Term -> nat -> Defs -> Prop :=
      | cdsNil: forall p n, crctEnv p -> crctDs p n dnil
      | cdsCons: forall p n dnm bod ix ds,
@@ -114,7 +115,7 @@ Lemma Crct_CrctEnv:
   (forall (p:environ Term), crctEnv p -> True).
 Proof.
   apply crctCrctTsBsDsEnv_ind; intros; intuition.
-Qed.
+Defined.
 
 Lemma Crct_up:
   (forall p n t, crctTerm p n t -> crctTerm p (S n) t) /\
@@ -123,10 +124,11 @@ Lemma Crct_up:
   (forall p, crctEnv p -> True). 
 Proof.
   apply crctCrctTsBsDsEnv_ind; intros; try (solve [constructor; assumption]).
-  - apply ctRel; try assumption. omega.
+  - apply ctRel; try assumption. lia.
   - eapply ctConst; eassumption.
   - eapply ctConstructor; eassumption.
   - eapply ctCase; eassumption.
+  - constructor. now rewrite Nat.add_succ_r. auto.
 Qed.
 
 Lemma Crct_UP:
@@ -138,7 +140,7 @@ Qed.
 Lemma Crct_Up:
   forall n p t, crctTerm p 0 t -> crctTerm p n t.
 Proof.
-  intros. eapply Crct_UP. eassumption. omega.
+  intros. eapply Crct_UP. eassumption. lia.
 Qed.
 Hint Resolve Crct_Up Crct_UP : core.
   
@@ -418,15 +420,15 @@ Proof.
   apply InstTrmsBrsDefs_ind; intros; trivial;
   try (inversion_Clear H0; econstructor; eassumption);
   try (inversion_Clear H1; constructor; try assumption; apply H; assumption).
-  - inversion_Clear H0. constructor. assumption. omega.
+  - inversion_Clear H0. constructor. assumption. lia.
   - apply ctRel.
     + inversion H0. assumption.
-    + inversion H0. omega.
+    + inversion H0. lia.
   - inversion_Clear H1; constructor; try assumption; apply H; try assumption.
-    omega. apply Crct_up. assumption.
+    lia. apply Crct_up. assumption.
   - inversion_Clear H2. constructor; try assumption.
     + apply H; assumption.                 
-    + apply H0; try assumption. omega. apply (proj1 Crct_up). assumption.
+    + apply H0; try assumption. lia. apply (proj1 Crct_up). assumption.
   - inversion_Clear H2. constructor.
     + apply H; assumption.
     + apply H0; try assumption.
@@ -434,10 +436,10 @@ Proof.
     + eapply H; try eassumption.
     + eapply H0; try eassumption.
   - pose proof (InstantiateDefs_pres_dlength i) as k.
-    inversion_Clear H1. econstructor; try omega.
-    + eapply H; try omega.
+    inversion_Clear H1. econstructor; try lia.
+    + eapply H; try lia.
       * rewrite <- k; assumption.
-      * eapply Crct_UP. eassumption. omega.
+      * eapply Crct_UP. eassumption. lia.
   - inversion_Clear H2. constructor; intuition.
   - inversion_Clear H2. constructor; intuition.
   - inversion_Clear H2. constructor; intuition.
@@ -460,7 +462,7 @@ Lemma whBetaStep_pres_Crct:
                              crctTerm p n (whBetaStep bod a1).
 Proof.
   intros. unfold whBetaStep. 
-  apply instantiate_pres_Crct; try assumption.  omega.
+  apply instantiate_pres_Crct; try assumption.  lia.
 Qed.
  *************)
 

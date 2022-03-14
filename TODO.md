@@ -1,3 +1,0 @@
-- [ ] Make CompCert an external dependency and/or a gitmodule and delete local copy
-- [ ]  Set up CI
-- [ ] 

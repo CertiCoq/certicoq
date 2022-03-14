@@ -199,7 +199,7 @@ End list_lemmas.
 
 (* need a stronger definition of size to prove that the functional
    induction scheme is well-founded *)
-Print exp.
+(* Print exp. *)
 Fixpoint sizeof_exp e : nat :=
   match e with
     (Econstr x _ ys e) => 1 + length ys + sizeof_exp e

@@ -1,5 +1,5 @@
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
-        Coq.Lists.List Coq.omega.Omega Coq.Program.Program
+Require Import Coq.Arith.Arith Coq.ZArith.ZArith Coq.NArith.BinNat Coq.Strings.String
+        Coq.Lists.List Coq.micromega.Lia Coq.micromega.Lia Coq.Program.Program
         Coq.micromega.Psatz.
 Require Import FunInd.
 Require Import Common.Common.
@@ -146,6 +146,7 @@ Inductive exp_wf: N -> exp -> Prop :=
     exp_wf i e1 -> exp_wf (1 + i) e2 ->
     exp_wf i (Let_e n e1 e2)
 | fix_e_wf: forall i (es:efnlst) k,
+    k < efnlst_length es ->
     efnlst_wf (efnlst_length es + i) es ->
     exp_wf i (Fix_e es k)
 (* Fix?: Axiom applied to anything should reduce to Axiom *)
@@ -156,7 +157,7 @@ with exps_wf: N -> exps -> Prop :=
     exp_wf i e -> exps_wf i es -> exps_wf i (econs e es)
 with efnlst_wf: N -> efnlst -> Prop :=
 | flnil_wf_e: forall i, efnlst_wf i eflnil
-| flcons_wf_e: forall i f e es,
+| flcons_wf_e: forall i f e es,    
     exp_wf i e -> isLambda e -> efnlst_wf i es ->
     efnlst_wf i (eflcons f e es)
 with branches_wf: N -> branches_e -> Prop :=
@@ -637,6 +638,7 @@ Proof.
     rewrite (H0 vs0); try assumption. reflexivity.
 Qed.
 
+Declare Scope name.
 Bind Scope name with name.
 Delimit Scope name with name.
 Arguments nNamed i%string.
@@ -801,7 +803,7 @@ Proof.
     * apply H. assumption.
     * apply H0. assumption.
 Qed.
-Print Assumptions evaln_eval.
+(* Print Assumptions evaln_eval. *)
 
 (** [eval_n] is complete w.r.t. [eval] **)
 Lemma eval_n_Some_Succ:
@@ -809,14 +811,14 @@ Lemma eval_n_Some_Succ:
 Proof.
   induction n; intros.
   - simpl in H. discriminate.
-  - omega.
+  - lia.
 Qed.
 Lemma evals_n_Some_Succ:
   forall es (n:nat) vs, evals_n n es = Some vs -> n = (S (n - 1))%nat.
 Proof.
   induction n; intros.
   - simpl in H. discriminate.
-  - omega.
+  - lia.
 Qed.
 
 Open Scope nat_scope.
@@ -833,44 +835,44 @@ Proof.
   apply my_eval_ind; intros; try (exists 0; intros mx h; reflexivity).
   - destruct H, H0, H1. exists (S (max x (max x0 x3))). intros m h.
     assert (j1:= max_fst x (max x0 x3)). 
-    assert (lx: m > x). omega.
+    assert (lx: m > x). lia.
     assert (j2:= max_snd x (max x0 x3)).
     assert (j3:= max_fst x0 x3).
-    assert (lx0: m > x0). omega.
+    assert (lx0: m > x0). lia.
     assert (j4:= max_snd x0 x3).
     assert (j5:= max_fst x0 x3).
-    assert (lx1: m > x3). omega.
-    simpl. rewrite (j m); try omega. rewrite H; try omega.
-    rewrite H0; try omega. rewrite H1; try omega. reflexivity.
-  - destruct H. exists (S x). intros m hm. simpl. rewrite (j m); try omega.
-    rewrite H; try omega. reflexivity.
+    assert (lx1: m > x3). lia.
+    simpl. rewrite (j m); try lia. rewrite H; try lia.
+    rewrite H0; try lia. rewrite H1; try lia. reflexivity.
+  - destruct H. exists (S x). intros m hm. simpl. rewrite (j m); try lia.
+    rewrite H; try lia. reflexivity.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    simpl. rewrite (j mx); try omega. rewrite H; try omega.
-    rewrite H0; try omega. reflexivity.
+    simpl. rewrite (j mx); try lia. rewrite H; try lia.
+    rewrite H0; try lia. reflexivity.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    simpl. rewrite (j mx); try omega. rewrite H; try omega.
-    rewrite e1. rewrite H0; try omega. reflexivity.
+    simpl. rewrite (j mx); try lia. rewrite H; try lia.
+    rewrite e1. rewrite H0; try lia. reflexivity.
   - destruct H, H0, H1. exists (S (max x (max x0 x3))). intros m h.
     assert (j1:= max_fst x (max x0 x3)). 
-    assert (lx: m > x). omega.
+    assert (lx: m > x). lia.
     assert (j2:= max_snd x (max x0 x3)).
     assert (j3:= max_fst x0 x3).
-    assert (lx0: m > x0). omega.
+    assert (lx0: m > x0). lia.
     assert (j4:= max_snd x0 x3).
     assert (j5:= max_fst x0 x3).
-    assert (lx1: m > x3). omega.
-    simpl. rewrite (j m); try omega. rewrite H; try omega.
-    rewrite H0; try omega. rewrite e3. apply H1. try omega.
+    assert (lx1: m > x3). lia.
+    simpl. rewrite (j m); try lia. rewrite H; try lia.
+    rewrite H0; try lia. rewrite e3. apply H1. try lia.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    simpl. rewrite (j mx); try omega. rewrite H; try omega.
-    rewrite H0; try omega. reflexivity.
+    simpl. rewrite (j mx); try lia. rewrite H; try lia.
+    rewrite H0; try lia. reflexivity.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    simpl. rewrite (j mx); try omega. rewrite H; try omega.
-    rewrite H0; try omega. reflexivity.
+    simpl. rewrite (j mx); try lia. rewrite H; try lia.
+    rewrite H0; try lia. reflexivity.
 Qed.
 
 Lemma eval_evaln:
@@ -880,16 +882,17 @@ Proof.
   intros t s h.
   destruct (proj1 pre_eval_evaln _ _ h).
   exists (S x). intros m hm. specialize (H (m - 1)).
-  assert (k: m = S (m - 1)). { omega. }
-  rewrite k. apply H. omega.
+  assert (k: m = S (m - 1)). { lia. }
+  rewrite k. apply H. lia.
 Qed.
-Print Assumptions eval_evaln.
+(* Print Assumptions eval_evaln. *)
   
 Lemma eval_n_up:
  forall t s tmr,
    eval_n tmr t = Some s -> exists n, forall m, m >= n -> eval_n m t = Some s.
 Proof.
-  intros. Check (eval_evaln _ _ (proj1 (evaln_eval tmr) _ _ H)).
+  intros.
+  (* Check (eval_evaln _ _ (proj1 (evaln_eval tmr) _ _ H)). *)
   destruct (eval_evaln _ _ (proj1 (evaln_eval tmr) _ _ H)).
   exists x. apply H0.
 Qed.
@@ -903,7 +906,7 @@ Example SKKe: exp := App_e (App_e Se Ke) Ke.
 Definition index := mkInd (kername_of_string "someind") 0.
 Definition conex := (index, 10).
 
-Eval vm_compute in (eval_n 1000 (App_e SKKe (Con_e conex enil))).
+(* Eval vm_compute in (eval_n 1000 (App_e SKKe (Con_e conex enil))). *)
 Goal eval (App_e SKKe (Con_e conex enil)) (Con_e conex enil).
 Proof.
   unfold SKKe, Se, Ke. repeat econstructor.
@@ -1021,20 +1024,20 @@ Notation four := (SSS $ three).
 Notation five := (SSS $ four).
 Notation six := (SSS $ five).
 
-Example One := Eval compute in (unsome (eval_n 1000 one)).
-Example Two := Eval compute in (unsome (eval_n 100 two)).
-Example Three := Eval vm_compute in (unsome (eval_n 100 three)).
-Example Four := Eval vm_compute in (unsome (eval_n 100 four)).
-Example Five := Eval vm_compute in (unsome (eval_n 100 five)).
-Example Six := Eval vm_compute in (unsome (eval_n 100 six)).
+(* Example One := Eval compute in (unsome (eval_n 1000 one)). *)
+(* Example Two := Eval compute in (unsome (eval_n 100 two)). *)
+(* Example Three := Eval vm_compute in (unsome (eval_n 100 three)). *)
+(* Example Four := Eval vm_compute in (unsome (eval_n 100 four)). *)
+(* Example Five := Eval vm_compute in (unsome (eval_n 100 five)). *)
+(* Example Six := Eval vm_compute in (unsome (eval_n 100 six)). *)
 
-Goal eval (SSS $ one) Two.
-repeat econstructor. 
-Qed.
+(* Goal eval (SSS $ one) Two. *)
+(* repeat econstructor.  *)
+(* Qed. *)
 
-Goal eval (SSS $ three) Four.
-repeat econstructor. 
-Qed.
+(* Goal eval (SSS $ three) Four. *)
+(* repeat econstructor.  *)
+(* Qed. *)
 
 (** fixpoints **)
 Definition copy : exp :=
@@ -1048,7 +1051,7 @@ unfold sbst_fix.
 repeat (try econstructor ; try vm_compute).
 Qed.
 
-Eval vm_compute in eval_n 100 (copy $ six).
+(* Eval vm_compute in eval_n 100 (copy $ six). *)
 
 
 (**** Fixpoints???  ****
@@ -1137,8 +1140,9 @@ Proof.
   - repeat if_split; try (constructor; auto; lia).
   - constructor. apply H; try lia; auto.
   - constructor; auto. apply H0; try lia; auto.
-  - constructor; auto. rewrite efnlst_length_sbst.
-    apply H; try lia; auto.
+  - constructor; auto. simpl.
+    rewrite efnlst_length_sbst. eassumption. 
+    rewrite efnlst_length_sbst. apply H; try lia; auto.
   - constructor; auto. 
   - constructor; auto.
     + destruct e; simpl in i0; try contradiction. exact I.
@@ -1193,26 +1197,39 @@ Proof.
       apply IHes. auto.
 Qed.
 
+Lemma efnlength_efnlst_length es :
+  N.of_nat (efnlength es) = efnlst_length es.
+Proof.
+  induction es; simpl; lia.
+Qed.
+
 Lemma sbst_fix_preserves_wf :
   forall es, efnlst_wf (efnlst_length es) es ->
         forall e, exp_wf (efnlst_length es) e ->
-             exp_wf 0 (sbst_fix es e).
+                  exp_wf 0 (sbst_fix es e).
 Proof.
   intros.
   unfold sbst_fix.
   revert e H0.
   remember (Fix_e es) as fixe.
   intros.
-  revert H0. generalize es as es'. intros es'.
-  remember (list_to_zero (efnlength es')).
+  assert (Heq : N.of_nat (efnlength es) <= efnlst_length es).
+  { rewrite efnlength_efnlst_length. lia. }
+        
+  revert Heq H0. generalize es at 1 3 4 as es'.
+  intros es'.
+  remember (list_to_zero (N.to_nat (efnlst_length es'))).
   revert es' Heql e.
   induction l. simpl; intros.
-  destruct es'; simpl in *; auto; discriminate.
+  destruct es'; simpl in *; auto. simpl in *.
+  rewrite Nnat.N2Nat.inj_add in *. discriminate.
   intros.
   destruct es'; simpl in *; auto; try discriminate.
+  rewrite Nnat.N2Nat.inj_add in *. 
   injection Heql. intros. specialize (IHl _ H1).
-  apply IHl. eapply sbst_preserves_exp_wf. eauto.
-  subst fixe. constructor. now rewrite N.add_0_r.
+  apply IHl. simpl in *. lia. eapply sbst_preserves_exp_wf. eauto.
+  subst fixe. constructor. simpl in *. subst. lia. 
+  now rewrite N.add_0_r.
 Qed.
 
 Lemma find_branch_preserves_wf :
@@ -1255,7 +1272,7 @@ Proof.
     specialize (H0 H7). specialize (H H6).
     inversion H. subst.
     apply H1.
-    assert (wfe':=nthopt_preserves_wf _ _ H5 _ _ e3).
+    assert (wfe':=nthopt_preserves_wf _ _ H9 _ _ e3).
     rewrite N.add_0_r in *.
     constructor.
     now eapply sbst_fix_preserves_wf.
@@ -1422,7 +1439,9 @@ Proof.
     eapply (proj1 weaken_wf_le); eauto; lia.
   - constructor. apply H; try lia; auto.
   - constructor; auto. apply H0; try lia; auto.
-  - constructor; auto. rewrite efnlst_length_subst; apply H; try lia; auto.
+  - constructor; auto.
+    rewrite efnlst_length_subst. eassumption.
+    rewrite efnlst_length_subst; apply H; try lia; auto.
   - constructor; auto. 
   - constructor; auto.
     + destruct e; contradiction || constructor.
@@ -1535,8 +1554,8 @@ Proof using.
   simpl. congruence.
 Qed.
 
-Eval compute in (list_to_zero 4).
-Eval compute in (seq 0 4).
+(* Eval compute in (list_to_zero 4). *)
+(* Eval compute in (seq 0 4). *)
 
 
 Lemma list_to_zero_rev n: list_to_zero n = rev (List.seq 0 n).
@@ -1545,7 +1564,7 @@ Proof.
   f_equal.
   induction n; [reflexivity | ].
   simpl list_to_zero. simpl rev. rewrite IHn. clear IHn.
-  replace (S n) with (n + 1)%nat by omega.
+  replace (S n) with (n + 1)%nat by lia.
   (* rewrite seq_add. reflexivity. *)
 Abort.
 
@@ -1692,7 +1711,7 @@ Lemma eval_ns_Some_Succ:
 Proof.
   induction n; intros.
   - simpl in H. discriminate.
-  - omega.
+  - lia.
 Qed.
 
 

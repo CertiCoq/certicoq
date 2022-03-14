@@ -132,11 +132,15 @@ Section CompM.
   (* Get the pretty name of a list of binders *)
   Definition get_pp_names_list (xs : list var) : compM' (list string) := mapM get_pp_name xs.
 
+  Definition add_log (msg : string) (c : comp_data) : comp_data :=
+    let '(mkCompData x c i f e fenv names imap log) := c in
+    mkCompData x c i f e fenv names imap (msg :: log)%string. 
+
   (* Log a new message *)
   Definition log_msg (msg : string) : compM' unit :=
     s <- compM.get ;;
-    let '(mkCompData x c i f e fenv names imap log, st) := s in
-    compM.put (mkCompData x c i f e fenv names imap (msg :: log)%string, st).
+    let '(c, st) := s in
+    compM.put (add_log msg c, st).
 
   (* Access the transformation specific state *)
   Definition get_state (_ : unit) : compM' S :=
@@ -233,7 +237,7 @@ Proof.
   split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. lia.
   simpl. split. zify; lia.
   intros z Hin. constructor. eapply H; eauto. zify. lia.
-  intros Hc. inv Hc. zify; lia.
+  intros Hc. inversion Hc. subst. zify; lia.
 Qed.
 
 Lemma get_names_lst_spec A S ns str :

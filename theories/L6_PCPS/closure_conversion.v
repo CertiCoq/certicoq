@@ -1,5 +1,5 @@
 (* Computational definition and declarative spec for closure conversion. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 Require Import Common.AstCommon Common.compM.
 
@@ -11,6 +11,7 @@ Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinN
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Coq.Strings.String Coq.Strings.Ascii.
 Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
+Require Import Ensembles.
 
 Import ListNotations Nnat MonadNotation.
 

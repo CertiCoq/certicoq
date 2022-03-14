@@ -1,13 +1,18 @@
-#env /bin/sh
+#!/usr/bin/env bash
+
+# For compat with OS X which has an incompatible sed which can be replaced by GNU sed
+SED=`which gsed || which sed`
 
 echo "Cleaning result of extraction"
+
+rm -rf plugin/extraction || true
 
 if [ ! -d "plugin/extraction" ]
 then
     mkdir plugin/extraction
 fi
 
-# Move extracted modules to build the certicoq compiler plugin
+# Copy the extracted code to the extraction destination
 cd theories/Extraction
 
 # Uncapitalize modules to circumvent a bug of coqdep with mllib files
@@ -26,12 +31,9 @@ mv aST.ml AST.ml
 mv aST.mli AST.mli
 mv fLT.ml FLT.ml
 mv fLT.mli FLT.mli
-# rm -f basicAst.* ast0.* astUtils.* specif.* peanoNat.* list0.* datatypes.* decimal.* ascii.* univ0.* binPosDef.*
-# rm -f binPos.* binNat.* binNums.* binInt.* binIntDef.* bool.* nat0.* string0.* basics.*
-# rm -f checker0.* typing.* retyping.* univSubst.* stringMap.*
-# rm -f astUtils.* universes.* pretty.* char.*
-# rm -f classes0*
-# rm -f numeral.*
 # Work around a compiler bug in module name resolution
-sed -f ../extraction.sed -i bak compile0.ml
+${SED} -f ../extraction.sed -i compile0.ml
+# We compile with -rectypes, so these definitions are badly interepreted
+${SED} -e "s/type int = int/type nonrec int = int/" -i integers.mli
+${SED} -e "s/type int = int/type nonrec int = int/" -i integers.ml
 cd ../..

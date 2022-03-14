@@ -1,14 +1,19 @@
 From Coq Require Import List Unicode.Utf8 Strings.Ascii Strings.String.
+From Coq Require Import PArith.
 From ExtLib Require Import Monads.
+
 Require Import Common.AstCommon Common.compM.
-From Coq Require Import PArith. 
+
 Import MonadNotation ListNotations.
+
+Notation ret := (ExtLib.Structures.Monad.ret).
+Notation bind := (ExtLib.Structures.Monad.bind).
 
 Open Scope monad_scope.
 Open Scope string.
 
 (** * Common Interface for composing CertiCoq Transformations *)
-(* Author: Zoe Paraskevopoulou, 2019 *)
+(* Author: Anonymized, 2019 *)
 
 (* Compiler options *)
 Record Options :=
@@ -38,13 +43,15 @@ Record CompInfo :=
     debug_log   : list String.string;
   }.
 
+Definition pipelineM := compM Options CompInfo.
+
+
 (* TODO use more efficient string representation as in cps_show *)
 
 Section Translation.
 
   Context (Src Dst : Type).
 
-  Definition pipelineM := compM Options CompInfo.
 
   Definition CertiCoqTrans := Src -> pipelineM Dst.
 
@@ -53,10 +60,14 @@ Section Translation.
   (*   ( fun p => bind ( e1 p ) (  .. ( bind ( em p ) ( fun p => en p ) ) .. )) (at level 110, right associativity). *)
 
   Definition get_options : pipelineM Options := @compM.ask _ _.
-
+    
+  (* Goal MonadState CompInfo pipelineM. *)
+  (* Proof. *)
+  (*   exact _. *)
+  
   Definition log_msg (s : string) : pipelineM unit :=
     '(Build_CompInfo tm log dbg) <- get ;;
-    put (Build_CompInfo tm (s :: log) dbg).
+    put (Build_CompInfo tm (s :: log) dbg).                        
 
   Definition debug_msg (s : string) : pipelineM unit :=
     o <- get_options ;;
@@ -73,7 +84,7 @@ Section Translation.
   Definition newline : string := (String chr_newline EmptyString).
 
   Definition log_to_string (log : list string) : string :=
-    (concat newline ("Debug messages" :: (List.rev log)))%string.
+    (String.concat newline ("Debug messages" :: (List.rev log)))%string.
 
   Definition run_pipeline (o : Options) (src : Src) (m : CertiCoqTrans) : (error Dst * string (* debug *)) :=
     let w := Build_CompInfo [] [] [] in

@@ -81,9 +81,9 @@ Proof.
   ltac1:(unerase; lia).
 Defined.
 
-Print thingy.
-(* Since n and its proof are carried separately, both are erased entirely *)
-Recursive Extraction thingy.
+(* Print thingy. *)
+(* (* Since n and its proof are carried separately, both are erased entirely *) *)
+(* Recursive Extraction thingy. *)
 End Example.
 
 (* -------------------- Fixpoint combinator -------------------- *)
@@ -144,7 +144,7 @@ Proof.
   intros n Hn; unerase.
   induction n as [n IHn] using Wf_nat.lt_wf_ind.
   constructor; intros m Hm Hmn; unerase.
-  now apply IHn.
+  now (apply IHn).
 Defined.
 
 Definition FixEN :
@@ -173,9 +173,9 @@ Defined.
 
 End FixENExample.
 
-Print FixENExample.plus.
+(* Print FixENExample.plus. *)
 Set Extraction Flag 2031. (* default + linear let + linear beta *)
-Recursive Extraction FixENExample.plus.
+(* Recursive Extraction FixENExample.plus. *)
 
 (* -------------------- 1-hole contexts built from frames -------------------- *)
 
@@ -266,38 +266,38 @@ Fixpoint frames_revD {U : Set} `{Frame U} {A B : U}
 Lemma frames_nil_comp {U : Set} {F : U -> U -> Set} {A B : U}
       (fs : frames_t' F A B)
   : <[]> >++ fs = fs.
-Proof. induction fs > [reflexivity|cbn; now rewrite IHfs]. Qed.
+Proof. induction fs > [reflexivity|cbn; now (rewrite IHfs)]. Qed.
 
 Lemma frames_revD_comp {U : Set} `{HFrame : Frame U} {A B C : U}
       (fs : frames_t' (flip frame_t) B A) (gs : frames_t' (flip frame_t) C B)
       (x : univD A)
   : frames_revD (fs >++ gs) x = frames_revD gs (frames_revD fs x).
-Proof. induction gs > [reflexivity|cbn; now rewrite IHgs]. Qed.
+Proof. induction gs > [reflexivity|cbn; now (rewrite IHgs)]. Qed.
 
 Lemma framesD_rev {U : Set} `{Frame U} {A B : U} (fs : frames_t A B) (x : univD A)
   : fs ⟦ x ⟧ = frames_revD (frames_rev fs) x.
 Proof.
   induction fs > [reflexivity|cbn].
-  now rewrite frames_revD_comp, <- IHfs.
+  now (rewrite frames_revD_comp, <- IHfs).
 Qed.
 
 Lemma frames_rev_assoc {U : Set} {F : U -> U -> Set} {A B C D : U}
       (fs : frames_t' F A B) (gs : frames_t' F B C) (hs : frames_t' F C D)
   : hs >++ (gs >++ fs) = hs >++ gs >++ fs.
-Proof. induction fs > [reflexivity|cbn; now rewrite IHfs]. Qed.
+Proof. induction fs > [reflexivity|cbn; now (rewrite IHfs)]. Qed.
 
 Lemma frames_rev_comp {U : Set} {F : U -> U -> Set} {A B C : U}
       (fs : frames_t' F A B) (gs : frames_t' F B C)
   : frames_rev (gs >++ fs) = frames_rev fs >++ frames_rev gs.
 Proof.
   induction fs; cbn.
-  - now rewrite frames_nil_comp.
-  - now rewrite IHfs, frames_rev_assoc.
+  - now (rewrite frames_nil_comp).
+  - now (rewrite IHfs, frames_rev_assoc).
 Qed.
 
 Lemma frames_rev_rev {U : Set} `{Frame U} {A B : U} (fs : frames_t A B)
   : frames_rev (frames_rev fs) = fs.
-Proof. induction fs > [reflexivity|cbn]. now rewrite frames_rev_comp, IHfs. Qed.
+Proof. induction fs > [reflexivity|cbn]. now (rewrite frames_rev_comp, IHfs). Qed.
 
 Fixpoint frames_any {U : Set} {F : U -> U -> Set} (P : forall {A B : U}, F A B -> Prop)
          {A B} (fs : frames_t' F A B) : Prop :=
@@ -327,7 +327,7 @@ Fixpoint frames_len {U : Set} {F : U -> U -> Set} {A B} (fs : frames_t' F A B) :
 Lemma frames_len_compose {U : Set} {F : U -> U -> Set} {A B C}
       (fs : frames_t' F A B) (gs : frames_t' F B C) :
   frames_len (gs >++ fs) = frames_len fs + frames_len gs.
-Proof. induction fs as [|A' AB B' f fs IHfs] > [reflexivity|cbn]. now rewrite IHfs. Qed.
+Proof. induction fs as [|A' AB B' f fs IHfs] > [reflexivity|cbn]. now (rewrite IHfs). Qed.
 
 (* Useful in situations where [destruct] struggles with dependencies *)
 Lemma frames_split' {U : Set} {F : U -> U -> Set} {A B} (fs : frames_t' F A B) :
@@ -372,7 +372,7 @@ Proof.
   induction fs as [A B fs IHfs] using frames_len_ind.
   destruct (frames_split fs) as [[AB [f [fs' Hfs']]] | Hfs_nil] > [subst fs|].
   - apply Hcons, IHfs; rewrite frames_len_compose; cbn; ltac1:(lia).
-  - destruct fs > [|now cbn in Hfs_nil]; apply Hnil.
+  - destruct fs > [|now (cbn in Hfs_nil)]; apply Hnil.
 Qed.
 
 (* -------------------- Rewriters -------------------- *)
@@ -468,8 +468,8 @@ Global Instance Preserves_R_prod
   Preserves_R I_R_prod.
 Proof.
   unfold I_R_prod; intros A B C C_ok f [[r1 r2] Hr12].
-  assert (Hr1 : «e_map (fun C => I_R1 _ C r1) C»). { unerase; now destruct Hr12. }
-  assert (Hr2 : «e_map (fun C => I_R2 _ C r2) C»). { unerase; now destruct Hr12. }
+  assert (Hr1 : «e_map (fun C => I_R1 _ C r1) C»). { unerase; now (destruct Hr12). }
+  assert (Hr2 : «e_map (fun C => I_R2 _ C r2) C»). { unerase; now (destruct Hr12). }
   pattern r1 in Hr1; pattern r2 in Hr2. apply exist in Hr1; apply exist in Hr2. clear Hr12 r1 r2.
   ltac1:(unshelve eapply preserve_R with (f := f) in Hr1); try assumption.
   ltac1:(unshelve eapply preserve_R with (f := f) in Hr2); try assumption.
@@ -498,8 +498,8 @@ Global Instance Preserves_S_up_prod
   Preserves_S_up I_S_prod.
 Proof.
   unfold I_S_prod; intros A B C C_ok f x [[s1 s2] Hs12].
-  assert (Hs1 : «e_map (fun C => I_S1 _ (C >:: f) x s1) C»). { unerase; now destruct Hs12. }
-  assert (Hs2 : «e_map (fun C => I_S2 _ (C >:: f) x s2) C»). { unerase; now destruct Hs12. }
+  assert (Hs1 : «e_map (fun C => I_S1 _ (C >:: f) x s1) C»). { unerase; now (destruct Hs12). }
+  assert (Hs2 : «e_map (fun C => I_S2 _ (C >:: f) x s2) C»). { unerase; now (destruct Hs12). }
   pattern s1 in Hs1; pattern s2 in Hs2; apply exist in Hs1; apply exist in Hs2; clear Hs12 s1 s2.
   ltac1:(unshelve eapply preserve_S_up with (f := f) in Hs1); try assumption.
   ltac1:(unshelve eapply preserve_S_up with (f := f) in Hs2); try assumption.
@@ -512,8 +512,8 @@ Global Instance Preserves_S_dn_prod
   Preserves_S_dn I_S_prod.
 Proof.
   unfold I_S_prod; intros A B C C_ok f x [[s1 s2] Hs12].
-  assert (Hs1 : «e_map (fun C => I_S1 _ C (frameD f x) s1) C»). { unerase; now destruct Hs12. }
-  assert (Hs2 : «e_map (fun C => I_S2 _ C (frameD f x) s2) C»). { unerase; now destruct Hs12. }
+  assert (Hs1 : «e_map (fun C => I_S1 _ C (frameD f x) s1) C»). { unerase; now (destruct Hs12). }
+  assert (Hs2 : «e_map (fun C => I_S2 _ C (frameD f x) s2) C»). { unerase; now (destruct Hs12). }
   pattern s1 in Hs1; pattern s2 in Hs2; apply exist in Hs1; apply exist in Hs2; clear Hs12 s1 s2.
   ltac1:(unshelve eapply preserve_S_dn with (f := f) in Hs1); try assumption.
   ltac1:(unshelve eapply preserve_S_dn with (f := f) in Hs2); try assumption.

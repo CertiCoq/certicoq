@@ -1,5 +1,5 @@
 (* Correctness proof for lambda lifting. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx L6.tactics
@@ -585,8 +585,7 @@ Section Lambda_lifting_correct.
            eapply ctx_to_rho_preord_exp with (C := Efun1_c C Hole_c). eassumption. eassumption. eassumption. (* TODO remove extra args ? *)
            ++ intros. eapply P1_ctx_r. eassumption. eassumption.
            ++ constructor. constructor.
-           ++ { (* eapply preord_exp_post_monotonic. admit. postcondition *)
-                assert (Hsetapp' := Hsetapp). eapply set_lists_app in Hsetapp. edestruct Hsetapp as (rho2i & Hsetl1 & Hsetl2).
+           ++ { assert (Hsetapp' := Hsetapp). eapply set_lists_app in Hsetapp. edestruct Hsetapp as (rho2i & Hsetl1 & Hsetl2).
                 2:{ rewrite <- Hleq. eapply set_lists_length_eq. now eauto. }
 
                 assert (Hfuns : Funs_inv j rho1' rho2' ((sig1 <{ fvs ~> ys }>) <{ xs1 ~> xs1 }>) zeta1 ).
@@ -1073,8 +1072,6 @@ Section Lambda_lifting_correct.
         * econstructor 2.
           econstructor; try eassumption. rewrite map_app. eapply get_list_app; eauto.
           now eauto.
-        * simpl. eapply PG_P_local_steps_let_app. eassumption. eassumption. eassumption.
-          eassumption. eassumption.
         * eapply preord_res_monotonic. eassumption.
           rewrite !to_nat_add. unfold one. rewrite to_nat_one. lia. 
       + edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
@@ -1100,7 +1097,7 @@ Section Lambda_lifting_correct.
           eassumption. eassumption. eassumption.
         * eassumption.
 
-          Grab Existential Variables. eauto. exact []. exact [].
+          Unshelve. exact []. exact []. eauto.
     Qed. 
 
 
@@ -1138,7 +1135,7 @@ Section Lambda_lifting_correct.
      + eapply preord_res_monotonic. eassumption. rewrite to_nat_add. unfold one. rewrite to_nat_one.
        simpl in *; lia.
 
-      Grab Existential Variables. eassumption. eassumption. eassumption. eassumption.
+      Unshelve. eassumption. eassumption. eassumption. eassumption.
   Qed.
 
       

@@ -3,5 +3,3 @@ From MetaCoq.Template Require Import All.
 
 Declare ML Module "metacoq_template_plugin".
 Declare ML Module "certicoq_plugin".
-
-Global Unset Template Cast Propositions.

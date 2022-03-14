@@ -1,5 +1,5 @@
 (* Library for identifiers. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 From Coq Require Import Lists.List Lists.SetoidList NArith.BinNat PArith.BinPos

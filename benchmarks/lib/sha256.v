@@ -28,8 +28,7 @@ Lemma byte_testbit:
   forall i j, j >= 8 -> Z.testbit (Byte.unsigned i) j = false.
 Proof.
 intros. 
-apply (Byte.Ztestbit_above 8).
-apply Byte.unsigned_range.
+apply Byte.bits_above. cbn.
 apply H.
 Qed.
 
@@ -71,7 +70,7 @@ Fixpoint map2 {A B C: Type} (f: A -> B -> C) (al: list A) (bl: list B) : list C 
 Definition generate_and_pad msg :=
   let n := Zlength msg in
    bytelist_to_intlist (msg ++ [Byte.repr 128%Z]
-                ++ list_repeat (Z.to_nat (-(n + 9) mod 64)) Byte.zero)
+                ++ List.repeat Byte.zero  (Z.to_nat (-(n + 9) mod 64)))
            ++ [Int.repr (n * 8 / Int.modulus); Int.repr (n * 8)].
 
 (*ROUND FUNCTION*)

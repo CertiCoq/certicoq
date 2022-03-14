@@ -1,5 +1,5 @@
 (* Contextual approximation for L6. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Lists.List Coq.micromega.Lia

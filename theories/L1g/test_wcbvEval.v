@@ -8,7 +8,7 @@ Require Import Coq.Lists.ListSet.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Bool.Bool.
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
 
 Require Import MetaCoq.Erasure.EAst MetaCoq.Template.Universes.
 Require Import MetaCoq.Template.Loader.
@@ -717,7 +717,7 @@ Require Import Coq.Lists.ListSet.
 Require Import Coq.Strings.String.
 Require Import Coq.Strings.Ascii.
 Require Import Coq.Bool.Bool.
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
 
 Require Import TemplateExtraction.EAst Template.kernel.univ.
 (***********

@@ -7,7 +7,7 @@ Require Import Coq.Lists.List.
 Import ListNotations.
 
 From MetaCoq Require Import Template.All.
-Import MonadNotation.
+Import MCMonadNotation.
 
 From ExtLib.Core Require Import RelDec.
 From ExtLib.Data Require Import Nat List Option Pair String.
@@ -31,8 +31,8 @@ Unset Strict Unquote Universe Mode.
 Instance Frame_exp_inj : @Frame_inj exp_univ _.
 Proof. unfold Frame_inj; destruct f; simpl; ltac1:(congruence). Defined.
 
-Check frames_nil >:: cons_fundef0 [] >:: fFun2 0%nat [].
-Check fun e => framesD <[ cons_fundef0 []; fFun2 0%nat [] ]> e.
+(* Check frames_nil >:: cons_fundef0 [] >:: fFun2 0%nat []. *)
+(* Check fun e => framesD <[ cons_fundef0 []; fFun2 0%nat [] ]> e. *)
 
 Definition used_vars_var : var -> list var := fun x => [x].
 Definition used_vars_constr : constr -> list var := fun _ => [].
@@ -110,6 +110,9 @@ Extraction Inline Preserves_R_R_C Preserves_S_dn_St Preserves_S_up_St.
 (* Run TemplateProgram (tmPrint =<< parse_rel R). *) (* For some reason, this hangs.. *)
 
 (* ...but this doesn't: *)
+
+(* Commenting out because it causes a lot of printing during compilation.
+
 Goal True.
   ltac1:(parse_rel 0 R ltac:(fun x n => idtac x)).
 Abort.
@@ -261,6 +264,7 @@ Goal True.
           ltac:(fun x => idtac))
     end))).
 Abort.
+ *)
 
 Definition nNamed s := {| binder_name := nNamed s; binder_relevance := Relevant |}.
 Definition test_case_tree (pat pat_ty ret_ty success failure : term) : TemplateMonad unit :=
@@ -297,6 +301,7 @@ Run TemplateProgram (test_case_tree
   <%exp%> <%nat%> (mkApps <%plus%> [tVar "$n"; tVar "$m"]) <%O%>).
 *)
 
+(* 
 Goal True.
   ltac1:(
     parse_rel 0 R ltac:(fun rules n =>
@@ -336,7 +341,7 @@ Goal True.
           ltac:(fun x => idtac))
     end))).
 Abort.
-
+*)
 (* Context (opaque_delay_t : forall {A : exp_univ}, univD A -> Set) *)
 (*        `{Hopaque_delay : @Delayed exp_univ Frame_exp (@opaque_delay_t)}. *)
 Definition opaque_delay_t {A : exp_univ} (e : univD A) := unit.
@@ -366,10 +371,10 @@ Inductive R' : exp -> exp -> Prop :=
     C = C ->
     BottomUp (R' (C⟦+fFun f (x :: x' :: xs) e :: fds+⟧) (C⟦+fFun f xs' e :: fds+⟧)).
 
-Goal True.
+(* Goal True.
   ltac1:(
   parse_rel 0 R' ltac:(fun rules n => idtac rules n)).
-Abort.
+Abort. *)
 
 Definition rw_R : rewriter exp_univ_exp true tt R' unit (I_D_plain (U:=exp_univ) (D:=unit)) nat (@I_R) nat (@I_S).
 Proof.
@@ -401,7 +406,7 @@ Proof.
 Defined.
 
 Set Extraction Flag 2031. (* default + linear let + linear beta *)
-Recursive Extraction rw_R.
+(* Recursive Extraction rw_R. *)
 (* - is directly recursive (fixpoint combinator gone) 
    - context parameter erased *)
 
@@ -476,7 +481,7 @@ Proof.
 Defined.
 
 Set Extraction Flag 2031. (* default + linear let + linear beta *)
-Recursive Extraction rw_R_m.
+(* Recursive Extraction rw_R_m. *)
 (* - is directly recursive (fixpoint combinator gone) 
    - context parameter erased
    - no fuel parameter (termination argument erased) *)
@@ -513,29 +518,29 @@ with subst_fd σ fd :=
 Definition subst_arm := subst_arm' subst_exp.
 
 Lemma map_id {A} (f : A -> A) xs : (forall x, f x = x) -> map f xs = xs.
-Proof. induction xs as [|x xs IHxs]; auto; simpl; intros; now rewrite IHxs. Defined.
+Proof. induction xs as [|x xs IHxs]; auto; simpl; intros; now (rewrite IHxs). Defined.
 
 Lemma subst_exp_id σ e : (forall x, σ x = x) -> subst_exp σ e = e
 with subst_fd_id σ fd : (forall x, σ x = x) -> subst_fd σ fd = fd.
 Proof.
   - intros Hσ; destruct e; simpl.
-    + now rewrite Hσ.
-    + now rewrite Hσ, map_id.
-    + now rewrite Hσ, map_id, subst_exp_id.
-    + now rewrite Hσ, subst_exp_id.
+    + now (rewrite Hσ).
+    + now (rewrite Hσ, map_id).
+    + now (rewrite Hσ, map_id, subst_exp_id).
+    + now (rewrite Hσ, subst_exp_id).
     + induction arms as [|[] arms Harms]; simpl; try ltac1:(congruence).
       rewrite Hσ in *; do 2 f_equal.
-      * now rewrite subst_exp_id.
+      * now (rewrite subst_exp_id).
       * ltac1:(congruence).
     + rewrite subst_exp_id > [|assumption]; f_equal.
       induction fds; auto; simpl.
       rewrite subst_fd_id > [|assumption]; f_equal; assumption.
   - intros Hσ; destruct fd; simpl.
-    now rewrite Hσ, map_id, subst_exp_id.
+    now (rewrite Hσ, map_id, subst_exp_id).
 Defined.
 
 Lemma map_comp {A} (f g : A -> A) xs : map (f ∘ g) xs = map f (map g xs).
-Proof. induction xs as [|x xs IHxs]; auto; simpl; intros; now rewrite IHxs. Defined.
+Proof. induction xs as [|x xs IHxs]; auto; simpl; intros; now (rewrite IHxs). Defined.
 
 Lemma subst_exp_comp σ1 σ2 e : subst_exp (σ1 ∘ σ2) e = subst_exp σ1 (subst_exp σ2 e)
 with subst_fd_comp σ1 σ2 fd : subst_fd (σ1 ∘ σ2) fd = subst_fd σ1 (subst_fd σ2 fd).
@@ -545,7 +550,7 @@ Proof.
       rewrite subst_exp_comp; now f_equal.
     + induction fds as [|[] fd Hfd]; auto; simpl.
       rewrite subst_exp_comp, map_comp; now f_equal.
-  - destruct fd; simpl; f_equal > [now rewrite map_comp|now rewrite subst_exp_comp].
+  - destruct fd; simpl; f_equal > [now (rewrite map_comp)|now (rewrite subst_exp_comp)].
 Defined.
 
 Definition I_renaming A (e : univD A) (d : renaming) : Prop := True.
@@ -661,7 +666,7 @@ Proof.
   - subst; edestruct IHl as [C HC]; eauto.
     exists (<[cons_prod_constr_exp1 a]> >++ C).
     rewrite frames_compose_law.
-    now rewrite HC; simpl.
+    now (rewrite HC; simpl).
 Defined.
 
 Lemma In_map_eq {A} (f : A -> A) x xs : In x xs -> f x = x -> In x (map f xs).
@@ -676,7 +681,7 @@ Lemma subst_ctor_size σ x : size_ctor (σ x) = size_ctor x. Proof. reflexivity.
 Lemma subst_vars_size σ xs : size_vars (map σ xs) = size_vars xs.
 Proof.
   induction xs as [|x xs IHxs] > [reflexivity|].
-  unfold size_vars, size_list, size_var in *; cbn in *; now rewrite IHxs.
+  unfold size_vars, size_list, size_var in *; cbn in *; now (rewrite IHxs).
 Qed.
 
 Fixpoint subst_exp_size σ e : size_exp (subst_exp σ e) = size_exp e
@@ -687,12 +692,12 @@ Proof.
     try reflexivity.
     + induction arms as [|[c e] ces IHces] > [reflexivity|cbn in *].
       unfold size_list in IHces; inversion IHces as [IHces']; clear IHces.
-      now rewrite subst_exp_size, IHces'.
+      now (rewrite subst_exp_size, IHces').
     + ltac1:(repeat match goal with |- context [S (?n + ?m)] => change (S (n + m))%nat with (S n + m)%nat end).
       do 2 f_equal; induction fds as [|fd fds IHfds] > [reflexivity|cbn in *].
       unfold size_list in IHfds; inversion IHfds as [IHfds']; clear IHfds.
-      now rewrite subst_fd_size.
-  - destruct e as [f xs e]; cbn; now rewrite subst_vars_size, subst_exp_size.
+      now (rewrite subst_fd_size).
+  - destruct e as [f xs e]; cbn; now (rewrite subst_vars_size, subst_exp_size).
 Qed.
 
 Definition rw_cp :
@@ -726,7 +731,7 @@ Proof.
     + edestruct Hρ as [D [E Hctx]]; eauto.
     + apply find_arm_In in Hc; destruct Hc as [l [r_arms Hlr]].
       exists (map (subst_arm d) l), (map (subst_arm d) r_arms); subst ces.
-      now rewrite !map_app.
+      now (rewrite !map_app).
   - (* Projection folding *)
     clear; intros _ R C C_ok e x y n [d []] r s success failure.
     destruct r as [ρ Hρ] eqn:Hr.
@@ -736,7 +741,7 @@ Proof.
                                                  (exist _ (fun e => one_renaming (d x) y' (d e)) I)
                                                  (d x) (d y) n y' ys); auto; unerase.
     + edestruct Hρ as [D [E Hctx]]; eauto.
-    + now rewrite <- subst_exp_comp.
+    + now (rewrite <- subst_exp_comp).
   - (* In case folding, the selected case arm is smaller than the case expression we started with *)
     intros _. rewrite <- H1. clear - H; destruct H as [_ [l [r Hin]]]; subst ces; cbn.
     ltac1:(match goal with |- (?x < S (S ?y))%nat => enough (x < y)%nat by lia end).
@@ -748,7 +753,7 @@ Proof.
 Defined.
 
 Set Extraction Flag 2031. (* default + linear let + linear beta *)
-Recursive Extraction rw_cp. (* no fuel parameter *)
+(* Recursive Extraction rw_cp. (* no fuel parameter *) *)
 
 Definition rw_cp_top e : result (Root:=exp_univ_exp) cp_fold (I_S_plain (S:=unit)) (erase <[]>) e.
 Proof.

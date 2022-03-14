@@ -1,6 +1,6 @@
 
 Require Import Recdef.
-Require Import omega.Omega.
+Require Import Coq.micromega.Lia.
 Require Import Coq.Arith.PeanoNat.
 Require Import Common.Common.
 Require Import L2k.compile.

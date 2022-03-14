@@ -6,7 +6,8 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Relations.Relation_Operators.
 Require Import Coq.Relations.Operators_Properties.
 Require Import Coq.Setoids.Setoid.
-Require Import Coq.omega.Omega.
+Require Import Coq.micromega.Lia.
+Require Import Coq.micromega.Lia.
 Require Import Common.Common.
 Require Import L1g.compile.
 Require Import L1g.term.
@@ -76,7 +77,7 @@ Scheme wndEval1_ind := Induction for wndEval Sort Prop
 Combined Scheme wndEvalEvals_ind from wndEval1_ind, wndEvals1_ind.
  ******************)
 
-(** example: evaluate omega = (\x.xx)(\x.xx): nontermination **)
+(** example: evaluate lia = (\x.xx)(\x.xx): nontermination **)
 Definition xx := (TLambda nAnon (TApp (TRel 0) (TRel 0))).
 Definition xxxx := (TApp xx xx).
 Goal wndEval xxxx xxxx.
@@ -87,9 +88,9 @@ Lemma Lookup_Lkup_index_pos:
   forall nm ec, Lookup nm p ec -> Lkup_index nm p > 0.
 Proof.
   induction 1; intros.
-  - cbn. rewrite eq_kername_refl. omega.
+  - cbn. rewrite eq_kername_refl. lia.
   -  cbn. rewrite (eq_kername_bool_neq H).
-     destruct (Lkup_index s2 p); omega.
+     destruct (Lkup_index s2 p); lia.
 Qed.
 
 Lemma Lookup_hd:
@@ -188,11 +189,11 @@ Proof.
   
   apply (wf_ind TrmSize (fun t => ~ wndEval t t)).
   intros t whih. destruct t; intros h; try (solve[inversion h]).
-  - inversion h. assert (j := f_equal TrmSize H3). simpl in j. omega.
+  - inversion h. assert (j := f_equal TrmSize H3). simpl in j. lia.
   - inversion_Clear h. eapply whih; try eassumption.
-    simpl. omega.  
+    simpl. lia.  
   - inversion_Clear h. eapply whih; try eassumption.
-    simpl. omega.
+    simpl. lia.
   - inversion_Clear h.
     + eapply whih; try eassumption.
       * simpl. admit.
@@ -202,7 +203,7 @@ Proof.
     induction t; intros h; try (solve[inversion h]);
   try (solve[inversion h; contradiction]).
   - inversion h.
-    assert (j := f_equal TrmSize H3). simpl in j. omega.
+    assert (j := f_equal TrmSize H3). simpl in j. lia.
   - inversion_Clear h; try contradiction.
     + admit.
   - inversion_Clear h.
@@ -215,7 +216,7 @@ Proof.
 Proof.
   induction t; intros h; try (solve[inversion h]).
   - inversion h.
-    assert (j := f_equal TrmSize H3). simpl in j. omega.
+    assert (j := f_equal TrmSize H3). simpl in j. lia.
   -  inversion h.
 
      Lemma wndEval_not_rfl:
@@ -223,7 +224,7 @@ Proof.
 Proof.
   induction t; intros h; try (solve[inversion h]).
   - inversion h.
-    assert (j := f_equal TrmSize H3). simpl in j. omega.
+    assert (j := f_equal TrmSize H3). simpl in j. lia.
   -  inversion h.
 **********************)
   
@@ -454,9 +455,9 @@ Proof.
     destruct (Crct_invrt_Lam h1 eq_refl). 
     unfold whBetaStep. apply mkApp_pres_Crct; try assumption. 
     apply instantiate_pres_Crct; try assumption.
-    omega.
+    lia.
   - destruct (Crct_invrt_LetIn H eq_refl) as [h1 [h2 h3]].
-    apply instantiate_pres_Crct; try assumption. omega.
+    apply instantiate_pres_Crct; try assumption. lia.
   - destruct (Crct_invrt_Case H eq_refl) as [h1 [h2 h3]].
     refine (whCaseStep_pres_Crct _ _ _ e); trivial.
     + apply CrctsNil. eapply Crct_Sort. eassumption.

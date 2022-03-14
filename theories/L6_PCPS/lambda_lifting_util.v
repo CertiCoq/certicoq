@@ -1,5 +1,5 @@
 (* Computational definition and declarative spec for lambda lifting. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 Require Import Common.compM.
@@ -1110,7 +1110,6 @@ Proof with now eauto with Ensembles_DB.
       eapply Union_Included; sets.
       eapply Union_Included; sets.
       eapply Union_Included; xsets.
-      xsets. 
   - repeat normalize_occurs_free. xsets.
   - inv H0. repeat normalize_occurs_free. eapply Union_Included. now xsets.
     eapply Union_Included.
@@ -1163,7 +1162,6 @@ Proof with now eauto with Ensembles_DB.
       eapply Union_Included; sets.
       eapply Union_Included; sets.
       eapply Union_Included; xsets.
-      xsets. 
   - repeat normalize_occurs_free.
     rewrite FromList_map_image_FromList. repeat normalize_sets. rewrite !image_Union.
     eapply Union_Included; [ eapply Union_Included; [| eapply Union_Included ] | ]; sets.
@@ -1197,7 +1195,6 @@ Proof with now eauto with Ensembles_DB.
         eapply Union_Included; sets.
         eapply Union_Included; sets.
         eapply Union_Included; xsets.
-        xsets.
   - repeat normalize_occurs_free.
     rewrite FromList_map_image_FromList. repeat normalize_sets. rewrite !image_Union.
     eapply Union_Included; [ eapply Union_Included | ]; sets.
@@ -1228,7 +1225,6 @@ Proof with now eauto with Ensembles_DB.
         eapply Union_Included; sets.
         eapply Union_Included; sets.
         eapply Union_Included; xsets.
-        xsets.
   - inv H0. repeat normalize_occurs_free.
     rewrite <- Setminus_Disjoint with (s1 := occurs_free_fundefs B'). 2:{ eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint. } 
     assert (Hsub : image σ' (occurs_free e \\ name_in_fundefs f2 :|: occurs_free_fundefs f2 :|: LiftedFuns ζ' :|: FunsFVs ζ')
@@ -1568,7 +1564,6 @@ Proof with now eauto with Ensembles_DB.
       eapply Union_Included; sets.
       eapply Union_Included; sets.
       eapply Union_Included; xsets.
-      xsets. 
   - repeat normalize_occurs_free.
     rewrite !image_Union, image_Singleton. sets.
   - split; intros; inv H.

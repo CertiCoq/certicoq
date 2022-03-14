@@ -344,7 +344,7 @@ Definition make_one_field
   let extern_def :=
     (_extern_fn,
      Gfun (External (EF_external kn
-                 (mksignature (val_typ :: nil) None cc_default))
+                 (mksignature (val_typ :: nil) AST.Tvoid cc_default))
                (Tcons (threadInf _thread_info) (repeat_typelist val arity))
                val cc_default)) in
   rest <- make_curried_fns kn arity arity is_io _extern_fn ;;
@@ -400,7 +400,7 @@ Definition make_ffi_program
    like an [FFI] type class.
    Returns the fields in that type class. *)
 Definition get_constructors
-           (p : Ast.program)
+           (p : Ast.Env.program)
            : ffiM (list (sanitized_name * Ast.term)) :=
   opts <- ask ;;
   let prefix : string := Pipeline_utils.prefix opts in
@@ -423,13 +423,14 @@ Definition get_constructors
     end in
 
   match last_error (rev globs) with
-  | Some (ind_name, Ast.InductiveDecl mut) =>
+  | Some (ind_name, Ast.Env.InductiveDecl mut) =>
       (* Assuming we don't have mutually recursive type classes *)
-      match Ast.ind_bodies mut with
+      match Ast.Env.ind_bodies mut with
       | one :: nil =>
-          match Ast.ind_ctors one with
-          | (_, pi_types, _ ) :: nil =>
-              let pi_types' := skip_params (Ast.ind_npars mut) pi_types in
+          match Ast.Env.ind_ctors one with
+          | ctor :: nil =>
+            let pi_types := ctor.(Ast.Env.cstr_type) in
+              let pi_types' := skip_params (Ast.Env.ind_npars mut) pi_types in
               pi_types_to_class_fields pi_types'
           | _ => failwith "Not a single constructor in the type."
           end
@@ -441,7 +442,7 @@ Definition get_constructors
 
 Definition generate_ffi
            (opts : Options)
-           (p : Ast.program)
+           (p : Ast.Env.program)
            : error (name_env * Clight.program * Clight.program * list string) :=
   let init : fstate_data :=
       {| fstate_gensym := 2%positive

@@ -519,7 +519,7 @@ End MEASURECONTRACT.
 
 
 (* option_map on pairs of option *)
-Fixpoint f_opt {A} f on om : option A :=
+Definition f_opt {A} f on om : option A :=
   match on with
   | Some n =>
     (match om with
@@ -1124,8 +1124,10 @@ Section CONTRACT.
     destructAll.
     apply Bool.negb_true_iff. auto.
   Defined.
-  Next Obligation.
-  Admitted.
+  Next Obligation. 
+    eapply measure_wf. eapply OrdersEx.Nat_as_OT.lt_wf_0.
+  Defined.
+
 
   Definition contract_def (sig:r_map) (count:c_map) (e:exp) (sub:ctx_map) (im:b_map): contractT im  :=
     match e with

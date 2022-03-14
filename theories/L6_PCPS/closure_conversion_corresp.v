@@ -84,7 +84,7 @@ Section CC_correct.
     - intros y Hin. destruct (peq y x); subst.
       + unfold In. now rewrite M.gss.
       + inv Hin. inv H; congruence.
-        eapply H1 in H. edestruct H as [t' Heq].
+        eapply H1 in H. edestruct H.
         unfold In. rewrite M.gso; now eauto.
     - intros y Hin. destruct (peq y x); subst.
       + eauto.
@@ -143,7 +143,7 @@ Section CC_correct.
     intros Hnin [H1 [H2 H3]]. repeat split.
     - intros y Hin. destruct (peq y x); subst.
       + contradiction.
-      + eapply H1 in Hin. edestruct Hin as [t'' Heq].
+      + eapply H1 in Hin. edestruct Hin.
         unfold In. rewrite M.gso; eauto.
     - intros y Hin. destruct (peq y x); subst.
       + unfold In in Hin. rewrite M.gss in Hin; congruence.

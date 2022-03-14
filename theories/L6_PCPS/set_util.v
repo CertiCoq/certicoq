@@ -1,5 +1,5 @@
 (* Set library utilities. Part of the CertiCoq project.
- * Author: Zoe Paraskevopoulou, 2016
+ * Author: Anonymized, 2016
  *)
 
 From Coq Require Import PArith.PArith MSets.MSetRBT Classes.Morphisms Sets.Ensembles
@@ -968,7 +968,7 @@ Lemma inverse_exists S {Hs : ToMSet S} (b : positive -> positive) :
   exists b', injective_subdomain (image b S) b' /\
         inverse_subdomain S b b'.
 Proof. 
-  pose (P := fun S => forall {Hs : ToMSet S},
+  pose (P := fun S => forall {_ : ToMSet S},
                  injective_subdomain S b ->
                  exists b', injective_subdomain (image b S) b' /\
                        inverse_subdomain S b b').

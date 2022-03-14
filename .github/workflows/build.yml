@@ -1,55 +1,44 @@
 name: Test compilation
 
-on: [push, pull_request]
-
-env:
-  OCAML_VERSION: 4.07.1+flambda
-  COQ_VERSION: 8.12.1
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - "**"
+  workflow_dispatch:
+    inputs:
 
 jobs:
-  build:
+  build-matrix:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
-        target: [ submodules ]
-
+        opam_file:
+          - 'coq-certicoq.opam'
+        image:
+          - 'tcarstens/coq-vst:8.14.1-ocaml-4.12.0-flambda--compcert-3.9--vst-2.8'
+      fail-fast: false  # don't stop jobs if one fails
     steps:
-
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v2
         with:
-          fetch-depth: 1
           submodules: true
-
-      - run: git submodule status
-
-      - name: Obtain submodule hash
-        id: submodule-hash
-        run: echo ::set-output name=HASH::$(git submodule status | awk '{print $1}' | sha256sum | awk '{print $1}' | sed 's/ *$//g')
-
-      - name: Try to restore opam cache
-        id: opam-cache
-        uses: actions/cache@v2
+      - uses: coq-community/docker-coq-action@v1
         with:
-          path: "~/.opam"
-          key: opam-${{ steps.submodule-hash.outputs.HASH }}-${{github.base_ref}}-${{github.ref}} 
-          restore-keys: |
-            opam-${{ steps.submodule-hash.outputs.HASH }}--refs/heads/${{github.base_ref}}
-
-      - name: Install OCaml
-        uses: avsm/setup-ocaml@v1
-        with:
-          ocaml-version: ${{ env.OCAML_VERSION }}
-
-      - run: opam repo add coq-released https://coq.inria.fr/opam/released
-      - run: opam install coq.${{ env.COQ_VERSION }}
-
-      - run: opam exec -- coqc benchmarks/test_submodules.v || opam exec -- make submodules
-        if: matrix.target == 'submodules'
-
-      - run: opam install . --deps-only --with-doc --with-test
-        if: matrix.target == 'opam'
-
-      - run: opam exec -- make -j 2
-      - run: opam exec -- make plugin
+          custom_image: ${{ matrix.image }}
+          opam_file: ${{ matrix.opam_file }}
+          before_install: |
+            startGroup "Copy repo (for later benchmarking)"
+              cp -r `pwd` ~/repo
+            endGroup
+            startGroup "opam pin"
+              opam pin -n -y submodules/metacoq
+            endGroup
+          after_script: |
+            startGroup "List installed packages"
+              opam list
+            endGroup
+            startGroup "Run benchmarks"
+              make -C ~/repo/benchmarks all
+            endGroup

@@ -133,6 +133,8 @@ with comp_f_ctx_f (c: fundefs_ctx) (c2:exp_ctx) : fundefs_ctx :=
            Fcons2_c f t ys e' (comp_f_ctx_f cfds c2)
        end.
 
+Declare Scope ctx_scope.
+
 Notation "c '|[' e ']|' " := (app_ctx_f c e)  (at level 28, no associativity)
                              : ctx_scope.
 Notation "f '<[' e ']>'" := (app_f_ctx_f f e)  (at level 28, no associativity)

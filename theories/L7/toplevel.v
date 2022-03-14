@@ -31,7 +31,7 @@ Definition rootFld:positive := 88.
 Definition prevFld:positive := 89.
 
 
-Let Cprogram := (cps_util.name_env * Clight.program * Clight.program)%type.
+Definition Cprogram := (cps_util.name_env * Clight.program * Clight.program)%type.
 
 Definition add_prim_names (prims : list (kername * string * bool * nat * positive)) (nenv : L4_to_L6.name_env) : L4_to_L6.name_env :=
   List.fold_left (fun map '(k, s, b, ar, p) => cps.M.set p (nNamed s) map) prims nenv.

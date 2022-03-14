@@ -309,7 +309,7 @@ Proof.
 Defined.
 
 Set Extraction Flag 2031. (* default + linear let + linear beta *)
-Recursive Extraction rw_uncurry.
+(* Recursive Extraction rw_uncurry. *)
 
 Definition uncurry_top (cps : bool) (e : exp) (c : state.comp_data) : compM.error exp * state.comp_data.
   destruct (Pos.ltb_spec0 (max_var e 1) (state.next_var c))%positive as [Hlt|Hge].

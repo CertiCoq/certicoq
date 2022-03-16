@@ -100,6 +100,8 @@ extraction/byte.mli
 extraction/byte.ml
 extraction/byte0.mli
 extraction/byte0.ml
+extraction/byteCompare.mli
+extraction/byteCompare.ml
 extraction/bytestring.mli
 extraction/bytestring.ml
 extraction/classes1.ml
@@ -242,8 +244,8 @@ extraction/maps_util.ml
 extraction/maps_util.mli
 extraction/map_util.ml
 extraction/map_util.mli
-extraction/decimalString.mli
-extraction/decimalString.ml
+#extraction/decimalString.mli
+#extraction/decimalString.ml
 extraction/reflectEq.mli
 extraction/reflectEq.ml
 extraction/mCString.mli
@@ -318,6 +320,10 @@ extraction/pCUICErrors.ml
 extraction/pCUICErrors.mli
 extraction/pCUICExpandLets.ml
 extraction/pCUICExpandLets.mli
+extraction/pCUICEquality.mli
+extraction/pCUICEquality.ml
+extraction/pCUICEqualityDec.mli
+extraction/pCUICEqualityDec.ml
 extraction/pCUICNormal.ml
 extraction/pCUICNormal.mli
 extraction/pCUICPosition.ml

@@ -23,6 +23,7 @@ Int0
 Int63
 Byte
 Caml_byte
+ByteCompare
 Ascii
 String0
 Orders
@@ -132,6 +133,7 @@ PCUICExpandLetsCorrectness
 PCUICWcbvEval
 
 PCUICErrors
+PCUICEqualityDec
 PCUICWfEnv
 PCUICUnivSubst
 PCUICSafeReduce

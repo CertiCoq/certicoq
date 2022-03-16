@@ -128,7 +128,7 @@ let quote opts gr =
   let sigma, c = Evarutil.new_global sigma gr in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec false env (EConstr.to_constr sigma c) in
+  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass:false env (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   term
@@ -246,7 +246,7 @@ let quote_ind opts gr : Metacoq_template_plugin.Ast_quoter.quoted_program * stri
        (Printer.pr_global gr ++ str " is not an inductive type") in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = quote_term_rec true env (EConstr.to_constr sigma c) in
+  let term = quote_term_rec ~bypass:true env (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
   (term, name)

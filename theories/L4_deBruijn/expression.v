@@ -1183,7 +1183,7 @@ Proof.
   intros; eapply (proj2 (proj2 sbst_preserves_wf')); eauto; lia.
 Qed.
 Hint Resolve sbst_preserves_exp_wf sbst_preserves_exps_wf 
-     sbst_preserves_branches_wf.
+     sbst_preserves_branches_wf : core.
 
 Lemma nthopt_preserves_wf :
   forall i es, efnlst_wf i es ->

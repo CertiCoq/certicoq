@@ -521,7 +521,7 @@ Definition decompose_ind (decls : global_env) (ty : term) : GM (inductive × lis
     end
   in go 100%nat ty.
 
-Global Instance string_Eq : Eq string := { rel_dec := StringOT.eqb }. 
+Global Instance string_Eq : Eq string := { rel_dec := eqb }. 
 
 Definition build_graph (atoms : list term) (p : program) : GM (ind_info × mind_graph_t) :=
   let '(decls, ty) := p in

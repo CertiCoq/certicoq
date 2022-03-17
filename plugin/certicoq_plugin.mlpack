@@ -23,7 +23,6 @@ Int0
 Int63
 Byte
 Caml_byte
-ByteCompare
 Ascii
 String0
 Orders
@@ -58,6 +57,7 @@ Signature
 
 DecimalString
 Byte0
+ByteCompare
 Bytestring
 Caml_bytestring
 MCString

@@ -9,7 +9,7 @@ Import ListNotations.
 Definition main := true.
 (* CertiCoq Compile -debug main. *)
 
-CertiCoq Compile -debug main.
+CertiCoqC Compile -debug main.
 
 (* From MetaCoq.Erasure Require Import Erasure. *)
 (* CertiCoqC Compile erase_and_print_template_program. *)

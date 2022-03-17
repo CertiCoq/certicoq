@@ -1,15 +1,16 @@
-Require Import Coq.Strings.String.
+From MetaCoq.Template Require Import bytestring.
 Set Implicit Arguments.
 From ExtLib Require Import Monads.
 Import MonadNotation.
 
 Inductive exception (A:Type) := Exc (_:string) | Ret (_:A).
 Arguments Ret [A].
-Arguments Exc [A].
+Arguments Exc [A] _%bs.
 
 Definition ret {A: Type} (x: A) := Ret x.
 Definition raise {A: Type} (str:string) := @Exc A str.
- 
+Arguments raise {A} _%bs.
+
 Definition bind
     {A B: Type} (a: exception A) (f: A -> exception B): exception B :=
   match a with
@@ -76,7 +77,7 @@ Definition epair2
 Definition option_exception (A:Type) (o:option A) : exception A :=
   match o with
     | Some a => Ret a
-    | None => Exc "option_exception: None"
+    | None => raise "option_exception: None"
   end.
 
 Definition exception_option (A:Type) (e:exception A) : option A :=

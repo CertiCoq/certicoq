@@ -8,18 +8,18 @@ Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx
 Require Import Coq.ZArith.Znumtheory.
 Require Import compcert.lib.Maps.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Coq.Strings.String Coq.Strings.Ascii.
+        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
 Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Require Import Ensembles.
-
+Require Import MetaCoq.Template.utils.bytestring.
 Import ListNotations Nnat MonadNotation.
 
 
 Open Scope ctx_scope.
 Open Scope monad_scope.
 Open Scope fun_scope.
-Open Scope string.
+Open Scope bs_scope.
 
 (** * Closure conversion as a relation  *)
 

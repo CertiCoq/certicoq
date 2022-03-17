@@ -110,7 +110,7 @@ CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" list_sum.
 
 Eval compute in "Compiling vs_easy".
 
-CertiCoq Compile -O 0 -time_anf vs_easy.
+CertiCoq Compile -O 0 -time_anf -debug vs_easy.
 CertiCoq Compile -ext "_opt" vs_easy.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_easy.
 (* CertiCoq Compile -O 0 -cps -ext "_cps" -time_anf vs_easy. *)
@@ -157,3 +157,31 @@ CertiCoq Compile -ext "_opt" sha_fast.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" sha_fast.
 (* CertiCoq Compile -O 0 -cps -ext "_cps" sha_fast. *)
 (* CertiCoq Compile -cps -ext "_cps_opt" sha_fast. *)
+
+Eval compute in "Compiling MetaCoq Erasure".
+
+From MetaCoq.Erasure Require Import Erasure.
+
+Definition metacoq_erasure := erase_program.
+CertiCoq Compile -O 0 -time metacoq_erasure.
+CertiCoq Compile -ext "_opt" metacoq_erasure.
+CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" metacoq_erasure.
+
+Eval compute in "Compiling the CertiCoq Pipeline".
+
+From CertiCoq Require Import pipeline.
+
+Definition certicoq_compile := compile.
+CertiCoq Compile -O 0 -time certicoq_compile.
+CertiCoq Compile -ext "_opt" certicoq_compile.
+CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" certicoq_compile.
+
+(* Eval compute in "Compiling MetaCoq SafeChecker". *)
+
+(* From MetaCoq.SafeChecker Require Import PCUICSafeChecker. *)
+(* Print Assumptions typecheck_program. *)
+
+(* Definition metacoq_safechecker := @typecheck_program. *)
+(* CertiCoq Compile -O 0 -time metacoq_safechecker. *)
+(* CertiCoq Compile -ext "_opt" metacoq_safechecker. *)
+(* CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" metacoq_safechecker. *)

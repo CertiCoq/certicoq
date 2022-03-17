@@ -1,5 +1,6 @@
-Require Import Coq.Strings.Ascii Coq.Strings.String.
-Open Scope string_scope.
+From MetaCoq.Template Require Import bytestring.
+Open Scope bs_scope.
+Import String.
 
 Infix "+++" := append (at level 60, right associativity).
 
@@ -384,7 +385,7 @@ Definition nthM {A} (n : N) (xs : list A) : GM A :=
 Definition nthM_nat {A} (n : nat) (xs : list A) : GM A :=
   match nth_error xs n with
   | Some v => ret v
-  | None => raise ("nthM: " +++ nat2string10 n)
+  | None => raise ("nthM: " +++ of_string (nat2string10 n))
   end.
 
 (* Parse a mutual inductive definition into constructor names + argument types *)
@@ -397,11 +398,11 @@ Record mind_graph_t := mk_mg {
   mgConstrs : Map string (list string); (* e.g. "nat" -> ["S"; "O"] *)
   mgChildren : Map string ((N × list string) × string) }. (* e.g. "cons_nat" -> (1, ["nat"; "list_nat"], "list_nat") *)
 
-Definition is_sep (c : ascii) : bool :=
+Definition is_sep (c : Byte.byte) : bool :=
   match c with
   | "." | "#" => true
   | _ => false
-  end%char.
+  end%byte.
 
 Definition qualifier (s : string) : string :=
   let fix go s :=
@@ -441,7 +442,7 @@ Definition inductives_of_env (decls : global_env) : ind_info :=
           m kernames
       end)
     empty
-    decls.
+    decls.(declarations).
 
 Fixpoint mangle (inds : ind_info) (e : term) : GM string :=
   match e with
@@ -499,7 +500,7 @@ Definition constr_types (inds : ind_info) (ind : inductive) (pars : list term)
 Definition decompose_ind (decls : global_env) (ty : term) : GM (inductive × list term) :=
   let fix go n ty {struct n} :=
     let find_const n c :=
-      let! decl := findM' c decls "decompose_ind tConst" in
+      let! decl := findM' c decls.(declarations) "decompose_ind tConst" in
       match decl with
       | ConstantDecl {| cst_body := Some body |} => go n body
       | ConstantDecl {| cst_body := None |} =>
@@ -519,6 +520,8 @@ Definition decompose_ind (decls : global_env) (ty : term) : GM (inductive × lis
       end
     end
   in go 100%nat ty.
+
+Global Instance string_Eq : Eq string := { rel_dec := eqb }. 
 
 Definition build_graph (atoms : list term) (p : program) : GM (ind_info × mind_graph_t) :=
   let '(decls, ty) := p in
@@ -662,7 +665,7 @@ Definition gen_frame_t (qual : modpath) (typename : kername) (inds : ind_info) (
   let univ := tInd (mkInd (qual, snd typename +++ "_univ") 0) [] in
   let to_univ ty :=
     let! mangled := mangle inds ty in
-    let! n := index_of (fun '(s, _) => eq_string s mangled) (list_of_map g.(mgTypes)) in
+    let! n := index_of (fun '(s, _) => rel_dec s mangled) (list_of_map g.(mgTypes)) in
     ret (tConstruct (mkInd (qual, snd typename +++ "_univ") 0) n [])
   in
   let! ctr_types :=

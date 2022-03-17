@@ -1,13 +1,13 @@
 (* Freshen the names in a term by renaming its bound variables to be unique positives starting from a given positive, except for a finite number of positives *)
 
 Require Import Common.compM L6.cps.
-Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String Coq.Strings.Ascii.
+Require Import Coq.ZArith.ZArith Coq.Lists.List.
 Import ListNotations.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
 Require Import L6.cps_util L6.cps_util L6.cps_show L6.state.
-
+From MetaCoq.Template Require Import bytestring.
 Open Scope monad_scope.
 Import MonadNotation.
 

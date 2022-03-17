@@ -1,35 +1,26 @@
 open Metacoq_template_plugin.Ast_quoter
 open Names
 open Pp
+open Caml_bytestring
 
-
-(* Various utils *)
-
-let string_of_chars (chars : char list) : string =
-  let buf = Buffer.create 16 in
-  List.iter (Buffer.add_char buf) chars;
-  Buffer.contents buf
-
-let chars_of_string (s : string) : char list =
-  let rec exp i l =
-    if i < 0 then l else exp (i - 1) (s.[i] :: l) in
-  exp (String.length s - 1) []
-
+let string_of_bytestring = caml_string_of_bytestring
+let bytestring_of_string = bytestring_of_caml_string
 
 (* From GlobRef to kername *)
 
-let extract_constant (g : Names.GlobRef.t) (s : string) : (BasicAst.kername * char list)  =
+let extract_constant (g : Names.GlobRef.t) (s : string) : (Kernames.kername * Kernames.ident)  =
   match g with
-  | Names.GlobRef.ConstRef c -> (Obj.magic (quote_kn (Names.Constant.canonical c)), chars_of_string s)
+  | Names.GlobRef.ConstRef c -> (Obj.magic (quote_kn (Names.Constant.canonical c)), bytestring_of_caml_string s)
   | Names.GlobRef.VarRef(v) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found a variable. Only constants can be realized in C.")
   | Names.GlobRef.IndRef(i) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found an inductive type. Only constants can be realized in C.")
   | Names.GlobRef.ConstructRef(c) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found a constructor. Only constants can be realized in C. ")
 
-let rec debug_mappings (ms : (BasicAst.kername * char list) list) : unit =
+let rec debug_mappings (ms : (Kernames.kername * Kernames.ident) list) : unit =
   match ms with
   | [] -> ()
   | (k, s) :: ms ->     
-     Feedback.msg_debug (str ("Kername: " ^ (string_of_chars (BasicAst.string_of_kername k)) ^ " C: "  ^ (string_of_chars s)));
+     Feedback.msg_debug (str ("Kername: " ^ (caml_string_of_bytestring (Kernames.string_of_kername k)) ^ 
+      " C: "  ^ (caml_string_of_bytestring s)));
      debug_mappings ms
      
 (* Help message *)

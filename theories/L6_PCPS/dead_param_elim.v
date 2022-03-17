@@ -9,7 +9,6 @@ Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinN
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat.
 
-
 Import MonadNotation.
 Open Scope monad_scope.
 
@@ -384,6 +383,8 @@ Section Elim.
 
 End Elim.
   
+From MetaCoq.Template Require Import bytestring.
+
 Definition DPE (e : exp) (c_data : comp_data) : error exp * comp_data :=
   if is_hoisted e then 
     match e with 
@@ -406,4 +407,4 @@ Definition DPE (e : exp) (c_data : comp_data) : error exp * comp_data :=
       end
     | e => (Ret e, c_data)
     end
-  else (Ret e, add_log "Internal error: program is not hoisted" c_data).
+  else (Ret e, add_log "Internal error: program is not hoisted"%bs c_data).

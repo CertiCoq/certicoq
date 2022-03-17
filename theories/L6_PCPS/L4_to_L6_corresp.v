@@ -1,5 +1,5 @@
 Require Import Common.AstCommon Common.compM.
-From Coq Require Import ZArith.ZArith Lists.List Strings.String micromega.Lia Arith
+From Coq Require Import ZArith.ZArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
 Require compcert.lib.Maps compcert.lib.Coqlib.
 Import ListNotations.
@@ -13,6 +13,8 @@ Require Import cps cps_show eval ctx logical_relations
 Require Import closure_conversion_corresp.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
+
+Require Import MetaCoq.Template.utils.bytestring.
 
 Import Monad.MonadNotation.
 

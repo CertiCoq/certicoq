@@ -15,7 +15,7 @@ Require Glue.glue
         Compiler.pipeline.
 
 (* Standard lib *)
-Require Import ExtrOcamlBasic ExtrOcamlString ExtrOCamlFloats ExtrOCamlInt63.
+Require Import ExtrOcamlBasic ExtrOCamlFloats ExtrOCamlInt63.
 Require Import Coq.extraction.Extraction.
 Require Import ZArith NArith.
 Require Import ExtrOcamlBasic.
@@ -37,7 +37,7 @@ Extract Constant AstCommon.timePhase =>
 "(fun c x a -> let time = Unix.gettimeofday() in
                let temp = x a in
                let time = (Unix.gettimeofday() -. time) in
-               Feedback.msg_debug (Pp.str (Printf.sprintf ""Time elapsed in %s:  %f"" ((fun s-> (String.concat """" (List.map (String.make 1) s))) c) time));
+               Feedback.msg_debug (Pp.str (Printf.sprintf ""Time elapsed in %s:  %f"" (Caml_bytestring.caml_string_of_bytestring c) time));
                temp)".
 
 Extract Inductive positive => int
@@ -116,8 +116,6 @@ Extraction Inline Equations.Init.pr1.
 Extraction Inline Equations.Init.pr2.
 Extraction Inline Equations.Init.hidebody.
 Extraction Inline Equations.Prop.DepElim.solution_left.
-
-Extract Inlined Constant RandyPrelude.ascii_dec_bool => "(=)".
 
 (* Avoid name clashes with OCaml or Coq module names *)
 Extraction Blacklist config List String Nat Int Ast Universes UnivSubst Typing Retyping 

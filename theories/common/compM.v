@@ -1,5 +1,5 @@
-From Coq Require Import Unicode.Utf8 Strings.String List Classes.Morphisms.
-
+From Coq Require Import Unicode.Utf8 List Classes.Morphisms.
+From MetaCoq.Template Require Import bytestring.
 From ExtLib Require Import Monads.
 
 Import MonadNotation ListNotations.

@@ -21,7 +21,7 @@ Definition L4Term := prod ienv L4.expression.exp.
 Definition compile_L4 (prims : list (kername * string * nat * positive))
   : CertiCoqTrans (Program L2k.compile.Term) L4Term :=
   fun src =>
-    debug_msg "Translating from L2k to L4" ;;
+    debug_msg "Translating from L2k to L4"%bs ;;
     LiftCertiCoqTrans "L4" (fun p =>  
                               (L3_to_L4.inductive_env (AstCommon.env p),
                                L3_to_L4.translate_program prims (AstCommon.env p)(main p))) src.

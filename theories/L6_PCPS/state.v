@@ -3,17 +3,17 @@ Require Import L6.cps L6.cps_util L6.set_util L6.identifiers L6.ctx
         L6.List_util L6.functions L6.cps_show L6.Ensembles_util L6.tactics.
 Require Import Coq.ZArith.ZArith.
 From Coq Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
-     NArith.BinNat PArith.BinPos Strings.String Strings.Ascii
+     NArith.BinNat PArith.BinPos 
      Sets.Ensembles micromega.Lia.
 Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads.
-
+From MetaCoq.Template Require Import bytestring.
 Import ListNotations Nnat MonadNotation.
 
 Require Import compcert.lib.Maps.
 
 Open Scope monad_scope.
-Open Scope string.
+Open Scope bs_scope.
 
 (** *  Unified state for L6 transformations *)
 (* Takes care of fresh names for binders, types and constructors, the original name environment,
@@ -51,7 +51,7 @@ Section CompM.
 
 
   Definition add_entry_from_map (nenv nenv_old:name_env)
-             (x : var) (x_origin : var) (suff : String.string) : name_env :=
+             (x : var) (x_origin : var) (suff : string) : name_env :=
     match M.get x_origin nenv_old  with
   | Some (BasicAst.nNamed s) => M.set x (BasicAst.nNamed (String.append s suff)) nenv
   | Some BasicAst.nAnon => M.set x (BasicAst.nNamed (String.append "anon" suff)) nenv
@@ -134,7 +134,7 @@ Section CompM.
 
   Definition add_log (msg : string) (c : comp_data) : comp_data :=
     let '(mkCompData x c i f e fenv names imap log) := c in
-    mkCompData x c i f e fenv names imap (msg :: log)%string. 
+    mkCompData x c i f e fenv names imap (msg :: log). 
 
   (* Log a new message *)
   Definition log_msg (msg : string) : compM' unit :=

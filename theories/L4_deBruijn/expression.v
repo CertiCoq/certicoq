@@ -1,4 +1,4 @@
-Require Import Coq.Arith.Arith Coq.ZArith.ZArith Coq.NArith.BinNat Coq.Strings.String
+Require Import Coq.Arith.Arith Coq.ZArith.ZArith Coq.NArith.BinNat
         Coq.Lists.List Coq.micromega.Lia Coq.micromega.Lia Coq.Program.Program
         Coq.micromega.Psatz.
 Require Import FunInd.
@@ -80,7 +80,7 @@ If yes, does the wf definition for L4 imply the above? *)
 | brcons_e: dcon -> (N * (* # args *) list name (* arg names *)) -> exp ->
             branches_e -> branches_e.
 Notation "[| e |]" := (econs e enil).
-Notation "[! fn := f !]" := (eflcons fn%string f eflnil).
+Notation "[! fn := f !]" := (eflcons fn%bs f eflnil).
 Hint Constructors exp exps branches_e : core.
 Scheme exp_ind' := Induction for exp Sort Prop
 with exps_ind'  := Induction for exps Sort Prop
@@ -641,7 +641,7 @@ Qed.
 Declare Scope name.
 Bind Scope name with name.
 Delimit Scope name with name.
-Arguments nNamed i%string.
+Arguments nNamed i%bs.
 Definition nNameds (s : string) : name := nNamed s.
 
 Notation " [: x ] " := (cons (nNameds x) nil) : name.
@@ -650,8 +650,8 @@ Notation " '[:' x , y , .. , z ] " :=
 Local Open Scope name.
 
 Coercion nNameds : string >-> name.
-Arguments Lam_e n%string _.
-Arguments eflcons n%string _ _.
+Arguments Lam_e n%bs _.
+Arguments eflcons n%bs _ _.
 
 Example x1: exp := Lam_e "x" (Var_e 0).  (* identity *)
 Lemma Lx1: forall (e d:exp), eval e d -> eval (App_e x1 e) d.
@@ -1183,7 +1183,7 @@ Proof.
   intros; eapply (proj2 (proj2 sbst_preserves_wf')); eauto; lia.
 Qed.
 Hint Resolve sbst_preserves_exp_wf sbst_preserves_exps_wf 
-     sbst_preserves_branches_wf.
+     sbst_preserves_branches_wf : core.
 
 Lemma nthopt_preserves_wf :
   forall i es, efnlst_wf i es ->
@@ -1241,7 +1241,7 @@ Proof.
   - injection H1; intros; subst; auto. 
   - eapply IHbranches_wf; eauto.
 Qed.
-Hint Resolve find_branch_preserves_wf : core.
+Local Hint Resolve find_branch_preserves_wf : core.
 
 Lemma exps_skipn_preserves_wf k p vs :
   exps_wf k vs -> exps_wf k (exps_skipn p vs).
@@ -1251,7 +1251,7 @@ Proof.
   - destruct p; trivial.
     apply IHvs. now inv H.
 Qed.
-Hint Resolve exps_skipn_preserves_wf : core.
+Local Hint Resolve exps_skipn_preserves_wf : core.
 
 (** Evaluation preserves closed expressions.  I wish I could generalize this
    to evaluation preserves [i] expressions. *)

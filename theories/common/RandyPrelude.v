@@ -7,8 +7,6 @@
 
 Require Import FunInd.
 Require Import Coq.Lists.List.
-Require Import Coq.Strings.String.
-Require Import Coq.Strings.Ascii.
 Require Import Coq.Bool.Bool.
 Require Import Coq.Bool.DecBool.
 Require Import Coq.Arith.Arith.
@@ -16,15 +14,18 @@ Require Import Coq.micromega.Lia.
 Require Import Common.exceptionMonad.
 Require Import FunInd.
 Require Import Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
-
-Local Open Scope string_scope.
+From MetaCoq.Template Require Import bytestring.
+Local Open Scope bs_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
+Infix "++" := String.append : bs_scope.
+Bind Scope bs_scope with string.
+
 (** named cases from Software Foundations **)
 Section PP.
-Local Open Scope string_scope.
+Local Open Scope bs_scope.
 
 Definition digit_to_string (n:nat): string :=
   match n with
@@ -45,7 +46,9 @@ Next Obligation.
   discriminate. auto with arith.
   auto with arith.
 Defined.
-
+Next Obligation.
+  revert a. apply measure_wf, lt_wf.
+Defined.
 End PP.
 
 
@@ -198,31 +201,7 @@ Definition xor (b1 b2:bool) : bool :=
     | false, false => true
     | _, _ => false
   end.
-Definition ascii_dec_bool (a b:ascii): bool :=
-  match a, b with
-    | Ascii a0 a1 a2 a3 a4 a5 a6 a7,
-      Ascii b0 b1 b2 b3 b4 b5 b6 b7 =>
-      andb (andb (andb (xor a0 b0) (xor a1 b1))
-                 (andb (xor a2 b2) (xor a3 b3)))
-           (andb (andb (xor a4 b4) (xor a5 b5))
-                 (andb (xor a6 b6) (xor a7 b7)))
-  end.
 
-Definition ascii_eq_bool (a1 a2:ascii) : bool :=
-  ifdec (ascii_dec a1 a2) true false.
-
-Lemma ascii_dec_ascii_eq_bool:
-  forall a b:ascii, ascii_dec_bool a b = ascii_eq_bool a b.
-Proof.
-  intros a b. destruct a, b, b0, b; cbn; try reflexivity;
-              destruct b1, b8; cbn; try reflexivity;
-              destruct b2, b9; cbn; try reflexivity;
-              destruct b3, b10; cbn; try reflexivity;
-              destruct b4, b11; cbn; try reflexivity;
-              destruct b5, b12; cbn; try reflexivity;
-              destruct b6, b13; cbn; try reflexivity;
-              destruct b7, b14; cbn; try reflexivity.
-Qed.  
 
 (** turn decidable comparisons into Prop comparisons **)
 Ltac Compare_Prop :=
@@ -457,7 +436,7 @@ Fixpoint exnNth (A:Type) (xs:list A) (n:nat) : exception A :=
   match xs, n with
   | nil, _ =>
     raise ("(exnNth:" ++ nat_to_string (List.length xs) ++ ","
-                      ++ nat_to_string n ++ ")")
+                      ++ nat_to_string n ++ ")")%bs
     | cons y ys, 0 => ret y
     | cons y ys, S m => exnNth ys m
   end.
@@ -539,145 +518,6 @@ Lemma notNone_Some:
   - intros h. exists a. reflexivity.
   - intros h. destruct h. reflexivity.
 Qed.
-
-
-Lemma string_eq_character:
-  forall (b c:ascii) (bs cs:string),
-    (String b bs) = (String c cs) -> b = c /\ bs = cs.
-  intros b c bs cs h.
-  destruct (ascii_dec b c); injection h; intuition.
-Qed.
-
-Lemma string_neq_character:
-  forall (b c:ascii) (bs cs:string),
-    (String b bs) <> (String c cs) -> b <> c \/ bs <> cs.
-  intros b c bs cs.
-  destruct (ascii_dec b c).
-  - rewrite e. destruct (string_dec bs cs).
-    + rewrite e0. intuition.
-    + intuition.
-  - intuition.
-Qed.
-
-
-Lemma ascii_eq_bool_eq:
-  forall (a1 a2:ascii), ascii_eq_bool a1 a2 = true -> a1 = a2.
-  intros a1 a2 h. case (ascii_dec a1 a2). intuition.
-  intro ha.
-  assert (j:ascii_eq_bool a1 a2 = false).
-  apply (ifdec_right (ascii_dec a1 a2) ha true false).
-  rewrite h in j. discriminate.
-Qed.
-
-Lemma ascii_dec_bool_eq:
-  forall (a1 a2:ascii), ascii_dec_bool a1 a2 = true -> a1 = a2.
-Proof.
-  intros a1 a2 h.
-  apply ascii_eq_bool_eq.
-  rewrite <- ascii_dec_ascii_eq_bool. assumption.
-Qed.
-
-Lemma ascii_eq_bool_rfl:
-  forall (a:ascii), ascii_eq_bool a a = true.
-  intro a. case (ascii_dec a a); intuition.
-  unfold ascii_eq_bool. rewrite ifdec_left; intuition.
-Qed.
-
-Lemma ascii_dec_bool_rfl:
-  forall (a:ascii), ascii_dec_bool a a = true.
-  intro a. destruct a, b, b0, b1, b2, b3, b4, b5, b6; try reflexivity. 
-Qed.
-
-Lemma ascii_neq_bool_neq:
-  forall (a1 a2:ascii), ascii_eq_bool a1 a2 = false -> a1 <> a2.
-  intros a1 a2 h j. subst. rewrite ascii_eq_bool_rfl in h. discriminate.
-Qed.
-
-Lemma ascii_dec_bool_neq:
-  forall (a1 a2:ascii), ascii_dec_bool a1 a2 = false -> a1 <> a2.
-Proof.
-  intros. apply ascii_neq_bool_neq.
-  rewrite <- ascii_dec_ascii_eq_bool. assumption.
-Qed.
-
-Lemma ascii_eq_bool_neq:
-  forall (a1 a2:ascii), a1 <> a2 -> ascii_eq_bool a1 a2 = false.
-  intros a1 a2 h. unfold ascii_eq_bool. rewrite ifdec_right; intuition.
-Qed.
-
-Lemma neq_ascii_dec_bool_neq:
-  forall (a1 a2:ascii), a1 <> a2 -> ascii_dec_bool a1 a2 = false.
-Proof.
-  intros. rewrite ascii_dec_ascii_eq_bool. apply ascii_eq_bool_neq.
-  assumption.
-Qed.
-
-Function string_eq_bool (a1 a2:string) : bool :=
-  match a1, a2 with
-    | String b1 (String b2 bs), String c1 (String c2 cs) =>
-      (ascii_dec_bool b1 c1) && (ascii_dec_bool b2 c2) &&
-                             (string_eq_bool bs cs)
-    | String b bs, String c cs =>
-      (ascii_dec_bool b c) && (string_eq_bool bs cs)
-    | EmptyString, EmptyString => true
-    | _, _ => false
-  end.
-
-Lemma string_eq_bool_rfl:
-  forall (s:string), string_eq_bool s s = true.
-Proof.
-  assert (j: forall (s t:string), s = t -> string_eq_bool s t = true). 
-  { intros s t h. 
-    functional induction (string_eq_bool s t); try reflexivity.
-    - myInjection h. rewrite ascii_dec_bool_rfl. rewrite ascii_dec_bool_rfl.
-      rewrite IHb; reflexivity.
-    - myInjection h. rewrite ascii_dec_bool_rfl. rewrite IHb; reflexivity.
-    - destruct _x. elim y. destruct _x; elim y. }
-  intros. apply j. reflexivity.  
-Qed.
-Hint Resolve string_eq_bool_rfl : core.
-
-Lemma string_eq_bool_eq:
-  forall (s1 s2:string), string_eq_bool s1 s2 = true -> s1 = s2.
-Proof.
-  intros s1 s2. functional induction (string_eq_bool s1 s2); intros; auto.
-  - destruct (proj1 (andb_true_iff _ _) H).
-    destruct (proj1 (andb_true_iff _ _) H0).
-    eapply f_equal2. apply (ascii_dec_bool_eq). assumption.
-    eapply f_equal2. apply (ascii_dec_bool_eq). assumption.
-    rewrite IHb. reflexivity. assumption.
-  - destruct (proj1 (andb_true_iff _ _) H).
-    eapply f_equal2. apply (ascii_dec_bool_eq). assumption.
-    rewrite IHb. reflexivity. assumption.
-  - discriminate.
-Qed.
-
-Lemma string_eq_bool_neq:
-  forall (s1 s2:string), s1 <> s2 -> string_eq_bool s1 s2 = false.
-Proof.
-  intros s1 s2. functional induction (string_eq_bool s1 s2); intros; auto.
-  - destruct (string_neq_character H).
-    rewrite (neq_ascii_dec_bool_neq H0). reflexivity.
-    destruct (string_neq_character H0).
-    rewrite (neq_ascii_dec_bool_neq H1). rewrite andb_false_r. reflexivity.
-    rewrite IHb. rewrite andb_false_r. reflexivity. assumption.
-  - destruct (string_neq_character H).
-    rewrite (neq_ascii_dec_bool_neq H0). reflexivity.
-    rewrite IHb.  rewrite andb_false_r. reflexivity. assumption.
-  - elim H. reflexivity.
-Qed.
-
-Lemma string_neq_bool_neq:
-  forall (a1 a2:string),
-    string_eq_bool a1 a2 = false -> a1 <> a2.
-intros a1 a2 h j. subst. rewrite string_eq_bool_rfl in h. discriminate.
-Qed.
-
-Definition string_compare (ss ts:string) : Prop :=
-  match string_eq_bool ss ts with
-    | true => True
-    | false => False
-  end.
 
 (** lemmas about [max] used in reasoning about wcbvEval, that has a
 *** step counter (timer, or fuel)

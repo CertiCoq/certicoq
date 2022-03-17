@@ -5,9 +5,9 @@
 From compcert.lib Require Import Coqlib.
 Require Import L6.tactics.
 From CertiCoq.L6 Require Import cps ctx Ensembles_util List_util functions map_util.
-From Coq Require Import Arith.Arith NArith.BinNat Strings.String Lists.List
+From Coq Require Import Arith.Arith NArith.BinNat Lists.List
      micromega.Lia Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
-From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
+From MetaCoq.Template Require Import bytestring BasicAst. (* For identifier names *)
 Require Import ExtLib.Structures.Monad ExtLib.Structures.MonadState ExtLib.Data.Monads.StateMonad.
 
 Import MonadNotation.
@@ -25,17 +25,17 @@ Definition name_env := M.t BasicAst.name.
 Definition n_empty:name_env := M.empty _.
 
 
-Definition add_entry (nenv:name_env) (x : var) (x_origin : var) (suff : String.string) : name_env :=
+Definition add_entry (nenv:name_env) (x : var) (x_origin : var) (suff : string) : name_env :=
   match M.get x_origin nenv  with
   | Some (BasicAst.nNamed s) => M.set x (BasicAst.nNamed (String.append s suff)) nenv
   | Some BasicAst.nAnon => M.set x (BasicAst.nNamed (String.append "anon" suff)) nenv
   | None => M.set x (BasicAst.nNamed (String.append "anon" suff)) nenv
   end.
 
-Definition add_entry_str (nenv:name_env) (x : var) (name : String.string) : name_env :=
+Definition add_entry_str (nenv:name_env) (x : var) (name : string) : name_env :=
   M.set x (BasicAst.nNamed name) nenv.
 
-Fixpoint add_entries (nenv:name_env) (xs : list var) (xs_origin : list var) (suff : String.string) : name_env :=
+Fixpoint add_entries (nenv:name_env) (xs : list var) (xs_origin : list var) (suff : string) : name_env :=
   match xs, xs_origin with
   | x::xs, x_origin::xs_origin =>
     add_entries (add_entry nenv x x_origin suff) xs xs_origin suff

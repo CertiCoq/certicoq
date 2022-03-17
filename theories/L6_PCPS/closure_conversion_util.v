@@ -428,7 +428,7 @@ Section Closure_conversion_util.
       eapply Union_Included; [| now sets ].
       eapply Union_Included; [| now xsets ].
       eapply Union_Included; [| now xsets ].
-      xsets.
+      eauto 13 with Ensembles_DB functions_BD.
     - eapply project_vars_occurs_free_ctx_Included; [ eassumption | | now apply Included_refl ].
       repeat normalize_occurs_free. repeat normalize_sets. 
       eapply Union_Included.
@@ -444,8 +444,11 @@ Section Closure_conversion_util.
       intros h Hunf. eapply Hun. now constructor.
       eapply Union_Included; sets.
       eapply Union_Included; eauto 10 with Ensembles_DB functions_BD.
-      eapply Union_Included; sets.
-      now xsets. now xsets.
+      eapply Union_Included.
+      eapply Union_Included.
+      eapply Union_Included; now xsets.
+      now xsets.
+      now xsets.
     - rewrite <- app_ctx_f_fuse.
       eapply project_vars_occurs_free_ctx_Included;
         [ eassumption | | now apply Included_refl ].
@@ -502,7 +505,9 @@ Section Closure_conversion_util.
       eapply Union_Included; [| now sets ].
       eapply Union_Included; [| now xsets ].
       eapply Union_Included; [| now xsets ].
-      eapply Union_Included; [| now xsets ]. xsets. 
+      eapply Union_Included; [| now xsets ]. 
+      eapply Union_Included; [| now xsets ]. 
+      xsets. 
     - eapply project_var_occurs_free_ctx_Included; eauto.
       normalize_occurs_free... reflexivity. 
     - rewrite occurs_free_fundefs_Fcons.

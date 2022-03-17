@@ -5,10 +5,10 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.micromega.Lia.
 Require Import Common.Common.  (* shared namespace *)
-From MetaCoq Require Import Template.Reflect.
+From MetaCoq Require Import bytestring Template.Reflect.
 Require Import L2k.compile.
 
-Open Scope string_scope.
+Open Scope bs_scope.
 Open Scope bool.
 Open Scope list.
 Set Implicit Arguments.
@@ -146,8 +146,6 @@ Fixpoint print_term (t:Term) : string :=
       "(CASE " ++ (print_inductive i) ++ ":"
                ++ (print_term mch) ++ " _ " ++") "
     | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
-    | TProj prj rcd =>
-      "(PROJ " ++ print_term rcd ++ ")"
     | TWrong str => ("(TWrong:" ++ str ++ ")")
   end.
 
@@ -172,7 +170,7 @@ Proof.
     [lft | rght ..]. 
   - destruct t1; cross.
     destruct (H t1_1); destruct (H0 t1_2); [lft | rght ..].
-  - destruct t; cross. destruct (kername_eq_dec k k0); [lft | rght].
+  - destruct t; cross. destruct (Classes.eq_dec k k0); [lft | rght].
   - destruct t0; cross.
     destruct (inductive_dec i i0), (eq_nat_dec n n0), (H t0);
       [lft | rght .. ].
@@ -181,9 +179,7 @@ Proof.
     [lft | rght .. ].
   - destruct t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
-  - destruct t0; cross.
-    destruct (project_dec p p0), (H t0); [lft | rght .. ].    
-  - destruct t; cross. destruct (string_dec s s0); [lft | rght].
+  - destruct t0; cross. destruct (Classes.eq_dec t t0); [lft | rght].
   - destruct tt; cross; lft.
   - destruct tt; cross.
     destruct (H t1), (H0 tt); [lft | rght .. ].
@@ -421,14 +417,14 @@ Proof.
   - right. intros. eapply na_isConstruct_etaExpand_args. lia.
 Qed.
  ***************)
-
+(* 
 Lemma pre_isConstruct_etaExpand:
   forall F,
     etaExpand F tnil 0 0 = F tnil.
 Proof.
   cbn. intuition.
 Qed.
-
+ *)
 (*************
 Lemma etaExpand_no_params:
   forall (actualArgs:Terms) (nargs:nat) i m,
@@ -1621,7 +1617,6 @@ Inductive WFapp: Term -> Prop :=
 | wfaCase: forall i mch brs,
     WFapp mch -> WFappBs brs -> WFapp (TCase i mch brs)
 | wfaFix: forall defs m, WFappDs defs -> WFapp (TFix defs m)
-| wfaProj: forall prj t, WFapp t -> WFapp (TProj prj t)
 with WFapps: Terms -> Prop :=
      | wfanil: WFapps tnil
      | wfacons: forall t ts, WFapp t -> WFapps ts -> WFapps (tcons t ts)
@@ -1896,7 +1891,6 @@ Inductive WFTrm: Term -> nat -> Prop :=
     WFTrm (TCase i mch brs) n
 | wfFix: forall n defs m,
     WFTrmDs defs (n + dlength defs) -> WFTrm (TFix defs m) n
-| wfProj: forall n prj t, WFTrm t n -> WFTrm (TProj prj t) n
 with WFTrms: Terms -> nat -> Prop :=
      | wfnil: forall n, WFTrms tnil n
      | wfcons: forall n t ts, WFTrm t n -> WFTrms ts n -> WFTrms (tcons t ts) n
@@ -2104,6 +2098,7 @@ Proof.
   - cbn. constructor.
 Qed.
  *****)
+(******
 
 (** etaExpand_args preserves closedness **)
 Lemma nlambda_pres_WFTrm:
@@ -2169,7 +2164,7 @@ Proof.
     + intros. apply H. assumption.
     + apply WFTrms_eta_args. assumption.
 Qed.
-
+ *)
 (***********
 Lemma etaExpand_aArgs_pres_clsd:
   forall nargs aArgs nlams cArgs F n,
@@ -2440,8 +2435,6 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IFix: forall n d m id, 
           InstantiateDefs (n + dlength d) d id ->
           Instantiate n (TFix d m) (TFix id m)
-| IProj: forall n prj t it,
-    Instantiate n t it -> Instantiate n (TProj prj t) (TProj prj it) 
 | IWrong: forall n s, Instantiate n (TWrong s) (TWrong s)
 with Instantiates: nat -> Terms -> Terms -> Prop :=
 | Inil: forall n, Instantiates n tnil tnil
@@ -2516,7 +2509,6 @@ Function instantiate (n:nat) (tbod:Term) {struct tbod} : Term :=
     | TFix ds m => TFix (instantiateDefs (n + dlength ds) ds) m
     | TProof => TProof
     | TConstruct i m args => TConstruct i m (instantiates n args)
-    | TProj prj t => TProj prj (instantiate n t)
     | x => x
   end
 with instantiates (n:nat) (args:Terms) {struct args} : Terms :=
@@ -2676,7 +2668,6 @@ Proof.
   - cbn. apply f_equal2. apply H. apply H0.
   - cbn. rewrite liftDs_pres_dlength.
     apply f_equal2; try reflexivity. apply H.
-  - cbn. apply f_equal2. reflexivity. apply H. 
   - cbn. apply f_equal2. apply H. apply H0.
   - cbn. apply f_equal3; try reflexivity. apply H. apply H0.
   - cbn. apply f_equal3; try reflexivity. apply H. apply H0.
@@ -2821,10 +2812,6 @@ Proof.
      constructor.
      + apply H0. assumption.
    - intuition.
-   - change (WFapps (tcons (instantiate n t) (instantiates n ts))).
-     constructor.
-     + apply H0. assumption.
-     + apply H2. assumption.
    - change (WFappBs (bcons n (instantiate (List.length n + n0) b)
                             (instantiateBrs n0 bs))).
      constructor.
@@ -3144,7 +3131,6 @@ Inductive PoccTrm : Term -> Prop :=
 | PoFix: forall ds m, PoccDefs ds -> PoccTrm (TFix ds m)
 | PoCnstri: forall m1 n args, PoccTrm (TConstruct (mkInd nm m1) n args)
 | PoCnstrargs: forall i n args, PoccTrms args -> PoccTrm (TConstruct i n args)
-| PoProj: forall prj t, PoccTrm t -> PoccTrm (TProj prj t)
 with PoccTrms : Terms -> Prop :=
 | PoThd: forall t ts, PoccTrm t -> PoccTrms (tcons t ts)
 | PoTtl: forall t ts, PoccTrms ts -> PoccTrms (tcons t ts)
@@ -3481,7 +3467,6 @@ Proof.
     + apply PoCaseAnn. 
   - inversion_Clear H0.
     + constructor. apply H. assumption.
-  - inversion_Clear H0. constructor. intuition.
   - inversion_Clear H1.
     + constructor. intuition.
     + apply PoTtl. intuition.
@@ -3709,7 +3694,7 @@ Qed.
 Definition whCaseStep (cstrNbr:nat) (ts:Terms) (brs:Brs): option Term :=
   match bnth cstrNbr brs with
     | Some (nargs, t) =>
-      if eqb (List.length nargs) (tlength ts) then 
+      if Nat.eqb (List.length nargs) (tlength ts) then 
         Some (instantiatel ts 0 t)
       else None
     | None => None
@@ -3721,7 +3706,8 @@ Lemma whCaseStep_Some:
     exists x t, bnth m brs = Some (x, t) /\ instantiatel ts 0 t = s.
 Proof.
   intros. unfold whCaseStep in  H. destruct (bnth m brs) as [[nargs t]|].
-  - destruct (eqb_spec (List.length nargs) (tlength ts)). exists nargs, t. intuition. congruence.
+  - destruct (PeanoNat.Nat.eqb_spec (List.length nargs) (tlength ts)).
+    exists nargs, t. intuition. congruence.
     discriminate.
   - discriminate.
 Qed.

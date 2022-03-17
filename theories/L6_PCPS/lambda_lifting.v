@@ -5,12 +5,12 @@
 Require Import Common.compM.
 Require Import L6.alpha_conv L6.cps L6.cps_util L6.ctx L6.state L6.set_util L6.identifiers L6.List_util
         L6.functions L6.Ensembles_util L6.uncurry L6.tactics.
-Require Import Coq.ZArith.Znumtheory Coq.Strings.String.
+Require Import Coq.ZArith.Znumtheory.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad ExtLib.Data.Monads.OptionMonad.
 Require Import compcert.lib.Coqlib.
-
+Require Import MetaCoq.Template.utils.bytestring.
 Import ListNotations Nnat MonadNotation PS.
 Require Import compcert.lib.Maps.
 
@@ -204,7 +204,7 @@ Section LambdaLifting.
         end
       | None =>
         f_str <- get_pp_name f ;;
-        failwith ("Internal error in make_wrappers: All known functions should be in map. Could not find " ++ f_str)
+        failwith ("Internal error in make_wrappers: All known functions should be in map. Could not find " ++ f_str)%bs
       end
     | Fnil => ret (Some Fnil, fvm) 
     end.
@@ -464,7 +464,7 @@ Section LambdaLifting.
              | Some Bw => ret (Fcons f' ft' (xs ++ ys) (Efun Bw e')  B')
              | None =>
                f_str <- get_pp_name f ;;
-               failwith ("Internal error in fundefs_lambda_lift: Wrappers cannot be empty in lambda lifted function " ++ f_str)
+               failwith ("Internal error in fundefs_lambda_lift: Wrappers cannot be empty in lambda lifted function " ++ f_str)%bs
              end
            | Some (NoLiftFun fvs sfvs) =>
              e' <- exp_lambda_lift e (PS.union fnames (union_list sfvs xs)) active_funs fvm fm gfuns ;;
@@ -472,7 +472,7 @@ Section LambdaLifting.
              ret (Fcons f ft xs e'  B')
            | None =>
              f_str <- get_pp_name f ;;
-             failwith ("Internal error in fundefs_lambda_lift: All known functions should be in map. Could not find " ++ f_str)
+             failwith ("Internal error in fundefs_lambda_lift: All known functions should be in map. Could not find " ++ f_str)%bs
            end
              
          | Fnil => ret Fnil

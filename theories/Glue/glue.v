@@ -523,6 +523,7 @@ Section Printers.
     end.
 
   Variable toolbox : toolbox_info.
+  Variable global : Ast.Env.global_declarations.
 
   Definition generate_printer
              (info : ind_L1_tag * ty_info)
@@ -698,7 +699,7 @@ Section Printers.
           | (ctag, ctor) :: ctors' =>
             let ty := ctor.(Ast.Env.cstr_type) in
             let arity := ctor.(Ast.Env.cstr_arity) in
-            let (args, rt) := dissect_types params (dInd ind :: nil) ty in
+            let (args, rt) := dissect_types global params (dInd ind :: nil) ty in
             calls <- rec_print_calls (enumerate_nat args) ;;
             rest <- switch_cases ctors' ;;
             accM <- get_ctor_arg_accessor_env itag ctag ;;
@@ -1256,7 +1257,7 @@ Definition make_glue_program
   structs <- args_structs_from_types singles ;;
   get_tag_defs <- get_enum_tag_from_types toolbox singles ;;
   make_printer_names singles;;
-  printer_defs <- generate_printers toolbox singles ;;
+  printer_defs <- generate_printers toolbox gs singles ;;
   halt_defs <- make_halt toolbox ;;
   call_def <- make_call toolbox ;;
   nenv <- gets gstate_nenv ;;

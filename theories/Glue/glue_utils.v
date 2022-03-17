@@ -192,6 +192,13 @@ Record ctor_info : Type :=
   }.
 
 Section L1Constructors.
+  Context (global : Ast.Env.global_declarations).
+
+  Definition find_constant_def kn :=
+    match Ast.Env.lookup_global global kn with
+    | Some (Ast.Env.ConstantDecl cb) => cb.(Ast.Env.cst_body)
+    | _ => None
+    end.
 
   Inductive dissected_type :=
   | dInd : inductive -> dissected_type
@@ -206,22 +213,34 @@ Section L1Constructors.
   Definition get_from_ctx (ctx : list dissected_type) (n : nat) : dissected_type :=
     nth_default dInvalid ctx n.
 
-  Fixpoint dissect_type
+  Fixpoint dissect_type_fuel
+    (fuel : nat)
          (* type context, required to be able to resolve De Bruijn indices *)
            (ctx : list dissected_type)
          (* a simple component of constructor type *)
            (ty : Ast.term)
          (* the dissected type component (not the full type) *)
            : dissected_type :=
-    match ty with
-    | Ast.tRel n => get_from_ctx ctx n
-    | Ast.tInd ind _ => dInd ind
-    | Ast.tProd _ e1 e2 => dFun
-    | Ast.tSort _ => dSort
-    | Ast.tApp hd args =>
-        dApp (dissect_type ctx hd) (map (dissect_type ctx) args)
-    | _ => dInvalid
+    match fuel with
+    | 0%nat=> dInvalid
+    | S fuel => 
+      match ty with
+      | Ast.tRel n => get_from_ctx ctx n
+      | Ast.tInd ind _ => dInd ind
+      | Ast.tProd _ e1 e2 => dFun
+      | Ast.tSort _ => dSort
+      | Ast.tApp hd args =>
+          dApp (dissect_type_fuel fuel ctx hd) (map (dissect_type_fuel fuel ctx) args)
+      | Ast.tConst cn _ => 
+        match find_constant_def cn with
+        | None => dInvalid
+        | Some b => dissect_type_fuel fuel ctx b
+        end
+      | _ => dInvalid
+      end
     end.
+
+  Definition dissect_type := dissect_type_fuel 1000.
 
   Definition for_ctx (d : dissected_type) : dissected_type :=
     match d with

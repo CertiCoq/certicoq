@@ -17,8 +17,8 @@
 (** Pretty-printer for Clight *)
 
 open Format
-open CCamlcoq
-open CPrintAST
+open Camlcoq
+open PrintAST
 open Ctypes
 open Cop
 open PrintCsyntax

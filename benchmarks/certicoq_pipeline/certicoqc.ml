@@ -15,7 +15,7 @@ module MLCompiler : Certicoq.CompilerInterface with
   type name_env = BasicAst.name Cps.M.t
   let compile = Certicoq_pipeline.compile
   let printProg prog names (dest : string) (import : string list) =
-    CPrintClight.print_dest_names_imports prog (Cps.M.elements names) dest import
+    PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest import
 
   let generate_glue = Glue.generate_glue
   let generate_ffi = Ffi.generate_ffi

@@ -6,6 +6,8 @@ Set MetaCoq Timing.
 From Coq Require Import List.
 Import ListNotations.
 
+Require Import compcert.common.AST.
+
 Definition main := true.
 (* CertiCoq Compile -debug main. *)
 

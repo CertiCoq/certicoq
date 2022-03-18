@@ -1,16 +1,34 @@
 #!/usr/bin/env bash
 
-if [ ! -f "plugin/extraction/astCommon.ml" ]
-then
-    sh clean_extraction.sh
+PLUGIN=$1
+EPATH=
+
+if [ "${PLUGIN}" == "plugin" ]
+then 
+    echo "Building optimized ML plugin"
+    EPATH="theories/Extraction"
 else
-    a=`stat -f "%m" theories/Extraction/AstCommon.ml`
-    b=`stat -f "%m" plugin/extraction/astCommon.ml`
+    if [ "${PLUGIN}" == "cplugin" ]
+    then
+        echo "Building vanila ML plugin"
+        EPATH="theories/ExtractionVanilla"
+    else
+        echo "Don't know which plugin to build"
+        exit 1
+    fi 
+fi
+
+if [ ! -f "${PLUGIN}/extraction/astCommon.ml" ]
+then
+    sh clean_extraction.sh "${PLUGIN}"
+else
+    a=`stat -f "%m" ${EPATH}/AstCommon.ml`
+    b=`stat -f "%m" ${PLUGIN}/extraction/astCommon.ml`
     if [ "$a" -gt "$b" ]
 	then
-	sh clean_extraction.sh
+	    sh clean_extraction.sh "${PLUGIN}"
     fi
 fi
 
-cd plugin
-exec make -f Makefile ${@}
+cd ${PLUGIN}
+exec make -f Makefile

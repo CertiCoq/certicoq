@@ -33,8 +33,10 @@ open Clight
 
 let temp_name (id: AST.ident) =
   try
-    "$" ^ Hashtbl.find string_of_atom id
+    Printf.printf "looking up %i\n" (P.to_int id);
+    "$" ^ Hashtbl.find string_of_atom (P.to_int id)
   with Not_found ->
+    Printf.printf "not_found\n";
     Printf.sprintf "$%d" (P.to_int id)
 
 (* Declarator (identifier + type) -- reuse from PrintCsyntax *)
@@ -327,11 +329,14 @@ let print_if prog = print_if_gen Clight1 prog
    SimplLocals pass.  It receives Clight2 syntax. *)
 let print_if_2 prog = print_if_gen Clight2 prog
 let add_name (a, n) =
+  let i = P.to_int a in
     match n with
     | BasicAst.Coq_nAnon -> ()
     | BasicAst.Coq_nNamed s ->
-        Hashtbl.add atom_of_string (Caml_bytestring.caml_string_of_bytestring s) a;
-        Hashtbl.add string_of_atom a (Caml_bytestring.caml_string_of_bytestring s);
+        let cs = Caml_bytestring.caml_string_of_bytestring s in
+        Hashtbl.add atom_of_string cs i;
+        Hashtbl.add string_of_atom i cs;
+        (* Printf.printf "added %i -> %s to string_of_atom\n" i cs; *)
         ()
 
 let remove_primes (a, n) =
@@ -353,8 +358,19 @@ let print_dest_names prog names dest =
   print_program Clight2 (formatter_of_out_channel oc) prog;
   close_out oc
   
+let print_env names = 
+  List.iter (fun (p, n) ->
+    let i = Camlcoq.P.to_int p in
+    match n with
+    | BasicAst.Coq_nAnon -> 
+      Printf.printf "%i -> nAnon\n" i
+    | BasicAst.Coq_nNamed s ->
+      Printf.printf "%i -> nNamed %s\n" i (Caml_bytestring.caml_string_of_bytestring s))
+  names  
+
 let print_dest_names_imports prog names (dest : string) (imports : string list) =
   let oc = open_out dest in  
+  (* print_env names; *)
   List.iter (fun n -> add_name (remove_primes n))  names;
   let fm = formatter_of_out_channel oc in
   open_vbox 0;
@@ -364,5 +380,6 @@ let print_dest_names_imports prog names (dest : string) (imports : string list) 
   open_box 0;
   print_program Clight2 fm prog;
   close_box ();
-  close_out oc
-          
+  close_out oc;
+  Printf.printf "end of output to %s\n" dest
+        

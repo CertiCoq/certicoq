@@ -101,7 +101,7 @@ let rec name_cdecl id ty =
         | _                      -> sprintf "*%s%s" (attributes_space a) id in
       name_cdecl id' t
   | Tarray(t, n, a) ->
-      name_cdecl (sprintf "%s[%ld]" id (camlint_of_coqint n)) t
+      name_cdecl (sprintf "%s[%ld]" id (camlint_of_coqZ n)) t
   | Tfunction(args, res, cconv) ->
       let b = Buffer.create 20 in
       if id = ""
@@ -188,7 +188,7 @@ let print_typed_value p v ty =
   | Vlong n, _ ->
       fprintf p "%LdLL" (camlint64_of_coqint n)
   | Vptr(b, ofs), _ ->
-      fprintf p "<ptr%a>" !print_pointer_hook (b, ofs)
+      fprintf p "<ptr%a>" !print_pointer_hook (b, Obj.magic ofs)
   | Vundef, _ ->
       fprintf p "<undef>"
 
@@ -205,7 +205,7 @@ let rec expr p (prec, e) =
   else fprintf p "@[<hov 2>";
   begin match e with
   | Eloc(b, ofs, _) ->
-      fprintf p "<loc%a>" !print_pointer_hook (b, ofs)
+      fprintf p "<loc%a>" !print_pointer_hook (b, Obj.magic ofs)
   | Evar(id, _) ->
       fprintf p "%s" (extern_atom id)
   | Ederef(a1, _) ->
@@ -252,7 +252,7 @@ let rec expr p (prec, e) =
       fprintf p "%a@[<hov 1>(%a)@]" expr (prec', a1) exprlist (true, al)
   | Ebuiltin(EF_memcpy(sz, al), _, args, _) ->
       fprintf p "__builtin_memcpy_aligned@[<hov 1>(%ld,@ %ld,@ %a)@]"
-                (camlint_of_coqint sz) (camlint_of_coqint al)
+                (camlint_of_coqZ sz) (camlint_of_coqZ al)
                 exprlist (true, args)
   | Ebuiltin(EF_annot(_,txt, _), _, args, _) ->
       fprintf p "__builtin_annot@[<hov 1>(%S%a)@]"
@@ -460,7 +460,7 @@ let string_of_init id =
 
 let chop_last_nul id =
   match List.rev id with
-  | Init_int8 BinNums.Z0 :: tl -> List.rev tl
+  | Init_int8 Integers.Int.{ intval =  BinNums.Z0 } :: tl -> List.rev tl
   | _ -> id
 
 let print_init p = function
@@ -472,7 +472,7 @@ let print_init p = function
   | Init_float64 n -> fprintf p "%.15F" (camlfloat_of_coqfloat n)
   | Init_space n -> fprintf p "/* skip %s */@ " (Z.to_string n)
   | Init_addrof(symb, ofs) ->
-      let ofs = camlint_of_coqint ofs in
+      let ofs = camlint_of_coqint (Obj.magic ofs) in
       if ofs = 0l
       then fprintf p "&%s" (extern_atom symb)
       else fprintf p "(void *)((char *)&%s + %ld)" (extern_atom symb) ofs

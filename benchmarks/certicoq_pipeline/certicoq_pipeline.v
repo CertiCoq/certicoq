@@ -12,23 +12,27 @@ Require Import ExtLib.Structures.Monad.
 Import Monads.
 Import MonadNotation.
 Import ListNotations.
-Definition next_id := 100%positive.
 
 Section Pipeline.
+  Context (next_id : positive)
+    (prims : list (Kernames.kername * string * nat * positive))
+    (debug : bool).
+
   Definition CertiCoq_pipeline (p : Ast.Env.program) :=
     p <- compile_L2k p ;;
-    p <- compile_L4 [] p ;;
-    p <- compile_L6_ANF next_id [] p ;;
+    p <- compile_L4 prims p ;;
+    p <- compile_L6_ANF next_id prims p ;;
     (* if debug then compile_L6_debug next_id p  For debugging intermediate states of the λanf pipeline else *)
     compile_L6 next_id p.
 End Pipeline.
 
 (** * The main CertiCoq pipeline, with MetaCoq's erasure and C-code generation *)
+Definition next_id := 100%positive.
 
 Definition pipeline (p : Template.Ast.Env.program) :=
   let genv := fst p in
   '(prs, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
-  p' <- CertiCoq_pipeline p ;;
+  p' <- CertiCoq_pipeline next_id prs p ;;
   compile_Clight prs p'.
   
 Definition compile (opts : Options) (p : Template.Ast.Env.program) :=

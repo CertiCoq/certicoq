@@ -20,6 +20,8 @@ Require Import ExtrOcamlBasic.
 Require Import Coq.extraction.Extraction.
 Require Import ZArith NArith.
 
+Set Extraction KeepSingleton.
+
 (* Coqlib *)
 Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
 

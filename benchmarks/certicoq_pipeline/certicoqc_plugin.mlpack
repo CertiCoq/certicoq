@@ -1,3 +1,6 @@
+CPrintAST
+CPrintCsyntax
+CPrintClight
 Certicoq_pipeline
 Cercicoqc
 G_certicoqc

@@ -9,6 +9,8 @@ COQOPTS = -Q ../../theories/L7 CertiCoq.L7 -Q ../../libraries CertiCoq.Libraries
 	-Q ../../theories/Compiler CertiCoq.Compiler -Q ../../theories/common CertiCoq.Common \
 	-Q ../../theories/L2k_noCnstrParams CertiCoq.L2k -Q .. CertiCoq.Benchmarks
 
+MLFILES = cCamlcoq.ml cPrintAST.ml cPrintCsyntax.ml cPrintClight.ml
+
 plugin: certicoq_pipeline.vo Loader.vo
 
 test: test.vo
@@ -31,19 +33,19 @@ certicoq_pipeline.vo ${GENCFILES} &: certicoq_pipeline.v
 certicoqc_plugin.cmxs: certicoqc_plugin.cmxa ${CFILES:.c=.o}
 	ocamlfind opt ${OCAMLOPTS} -shared -linkall -o $@ $+
 
-certicoqc_plugin.cmx: certicoq_pipeline.cmx certicoqc.cmx g_certicoqc.cmx
+certicoqc_plugin.cmx: certicoq_pipeline.cmx ${MLFILES:.ml=.cmx} certicoqc.cmx g_certicoqc.cmx
 	ocamlfind opt ${OCAMLOPTS} -pack -o $@ $+
 
-certicoqc_plugin.cmxa: certicoqc_plugin.cmx
+certicoqc_plugin.cmxa: certicoqc_plugin.cmx ${MLFILES:.ml=.cmi}
 	ocamlfind opt ${OCAMLOPTS} -a -o $@ $<
 
 g_certicoqc.ml: g_certicoqc.mlg certicoqc.cmx certicoq_pipeline.cmx
 	coqpp $<
 
-certicoqc.cmx: certicoq_pipeline.cmx
+certicoqc.cmx: certicoq_pipeline.cmx ${MLFILES:.ml=.cmx}
 
-# g_certicoqc.mli: g_certicoqc.ml
-# ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin -i $< > $@
+%.mli: %.ml
+	[ -f "$@" ] || ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin -i $< > $@
 
 %.cmi: %.mli
 	ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin $<

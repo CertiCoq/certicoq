@@ -28,9 +28,6 @@ let debug_msg (flag : bool) (s : string) =
     Feedback.msg_debug (str s)
   else ()
 
-let printProg prog names (dest : string) (import : string list) =
-  PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest import
-
 (** Compilation Command Arguments *)
 
 type command_args =
@@ -134,149 +131,183 @@ let quote opts gr =
   term
 
 (* Compile Quoted term with CertiCoq *)
-let compile opts term imports =
-  let debug = opts.debug in
-  let options = make_pipeline_options opts in
-  let p = Pipeline.compile options term in
-  match p with
-  | (CompM.Ret ((nenv, header), prg), dbg) ->
-    debug_msg debug "Finished compiling, printing to file.";
+
+module type CompilerInterface = sig
+  type name_env
+  val compile : Pipeline_utils.coq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
+  val printProg : Clight.program -> name_env -> string -> string list -> unit
+
+  val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations -> 
+    (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
+  
+  val generate_ffi :
+    Pipeline_utils.coq_Options -> Ast0.Env.program -> (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
+  
+end
+
+module MLCompiler : CompilerInterface with 
+  type name_env = BasicAst.name Cps.M.t
+  = struct
+  type name_env = BasicAst.name Cps.M.t
+  let compile = Pipeline.compile
+  let printProg prog names (dest : string) (import : string list) =
+    PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest import
+
+  let generate_glue = Glue.generate_glue
+  let generate_ffi = Ffi.generate_ffi
+end
+
+
+module CompileFunctor (CI : CompilerInterface) = struct
+
+  let compile opts term imports =
+    let debug = opts.debug in
+    let options = make_pipeline_options opts in
+    let p = CI.compile options term in
+    match p with
+    | (CompM.Ret ((nenv, header), prg), dbg) ->
+      debug_msg debug "Finished compiling, printing to file.";
+      let time = Unix.gettimeofday() in
+      let fname = opts.filename in
+      let suff = opts.ext in
+      let cstr = fname ^ suff ^ ".c" in
+      let hstr = fname ^ suff ^ ".h" in
+      CI.printProg prg nenv cstr imports (* (List.map Tm_util.string_to_list imports) *);
+      CI.printProg header nenv hstr [];
+
+      (* let cstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
+      * let hstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
+      * Pipeline.printProg (nenv,prg) cstr;
+      * Pipeline.printProg (nenv,header) hstr; *)
+      let time = (Unix.gettimeofday() -. time) in
+      Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
+      debug_msg debug "Pipeline debug:";
+      debug_msg debug (string_of_bytestring dbg)
+    | (CompM.Err s, dbg) ->
+      debug_msg debug "Pipeline debug:";
+      debug_msg debug (string_of_bytestring dbg);
+      CErrors.user_err ~hdr:"pipeline" (str "Could not compile: " ++ (pr_string s) ++ str "\n")
+
+  (* Generate glue code for the compiled program *)
+  let generate_glue (standalone : bool) opts globs =
+    if standalone && opts.filename = "" then
+      CErrors.user_err ~hdr:"glue-code" (str "You need to provide a file name with the -file option.")
+    else
+    let debug = opts.debug in
+    let options = make_pipeline_options opts in
+
     let time = Unix.gettimeofday() in
-    let fname = opts.filename in
-    let suff = opts.ext in
-    let cstr = fname ^ suff ^ ".c" in
-    let hstr = fname ^ suff ^ ".h" in
-    printProg prg nenv cstr imports (* (List.map Tm_util.string_to_list imports) *);
-    printProg header nenv hstr [];
+    (match CI.generate_glue options globs with
+    | CompM.Ret (((nenv, header), prg), logs) ->
+      let time = (Unix.gettimeofday() -. time) in
+      debug_msg debug (Printf.sprintf "Generated glue code in %f s.." time);
+      (match logs with [] -> () | _ ->
+        debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_bytestring logs))));
+      let time = Unix.gettimeofday() in
+      let suff = opts.ext in
+      let fname = opts.filename in
+      let cstr = if standalone then fname ^ ".c" else "glue." ^ fname ^ suff ^ ".c" in
+      let hstr = if standalone then fname ^ ".h" else "glue." ^ fname ^ suff ^ ".h" in
+      CI.printProg prg nenv cstr [];
+      CI.printProg header nenv hstr [];
 
-    (* let cstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
-     * let hstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
-     * Pipeline.printProg (nenv,prg) cstr;
-     * Pipeline.printProg (nenv,header) hstr; *)
-    let time = (Unix.gettimeofday() -. time) in
-    Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
-    debug_msg debug "Pipeline debug:";
-    debug_msg debug (string_of_bytestring dbg)
-  | (CompM.Err s, dbg) ->
-    debug_msg debug "Pipeline debug:";
-    debug_msg debug (string_of_bytestring dbg);
-    CErrors.user_err ~hdr:"pipeline" (str "Could not compile: " ++ (pr_string s) ++ str "\n")
+      let time = (Unix.gettimeofday() -. time) in
+      debug_msg debug (Printf.sprintf "Printed glue code to file in %f s.." time)
+    | CompM.Err s ->
+      CErrors.user_err ~hdr:"glue-code" (str "Could not generate glue code: " ++ pr_string s))
 
-(* Generate glue code for the compiled program *)
-let generate_glue (standalone : bool) opts globs =
-  if standalone && opts.filename = "" then
-    CErrors.user_err ~hdr:"glue-code" (str "You need to provide a file name with the -file option.")
-  else
-  let debug = opts.debug in
-  let options = make_pipeline_options opts in
 
-  let time = Unix.gettimeofday() in
-  (match Glue.generate_glue options globs with
-  | CompM.Ret (((nenv, header), prg), logs) ->
-    let time = (Unix.gettimeofday() -. time) in
-    debug_msg debug (Printf.sprintf "Generated glue code in %f s.." time);
-    (match logs with [] -> () | _ ->
-      debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_bytestring logs))));
+  let compile_with_glue (opts : options) (gr : Names.GlobRef.t) (imports : string list) : unit =
+    let term = quote opts gr in
+    compile opts (Obj.magic term) imports;
+    generate_glue false opts (Ast0.Env.declarations (fst (Obj.magic term)))
+
+  let compile_only opts gr imports =
+    let term = quote opts gr in
+    compile opts (Obj.magic term) imports
+
+  let generate_glue_only opts gr =
+    let term = quote opts gr in
+    generate_glue true opts (Ast0.Env.declarations (fst (Obj.magic term)))
+
+  let print_to_file (s : string) (file : string) =
+    let f = open_out file in
+    Printf.fprintf f "%s\n" s;
+    close_out f
+
+  let show_ir opts gr =
+    let term = quote opts gr in
+    let debug = opts.debug in
+    let options = make_pipeline_options opts in
+    let p = Pipeline.show_IR options (Obj.magic term) in
+    match p with
+    | (CompM.Ret prg, dbg) ->
+      debug_msg debug "Finished compiling, printing to file.";
+      let time = Unix.gettimeofday() in
+      let suff = opts.ext in
+      let fname = opts.filename in
+      let file = fname ^ suff ^ ".ir" in
+      print_to_file (string_of_bytestring prg) file;
+      let time = (Unix.gettimeofday() -. time) in
+      Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
+      debug_msg debug "Pipeline debug:";
+      debug_msg debug (string_of_bytestring dbg)
+    | (CompM.Err s, dbg) ->
+      debug_msg debug "Pipeline debug:";
+      debug_msg debug (string_of_bytestring dbg);
+      CErrors.user_err ~hdr:"show-ir" (str "Could not compile: " ++ (pr_string s) ++ str "\n")
+
+
+  (* Quote Coq inductive type *)
+  let quote_ind opts gr : Metacoq_template_plugin.Ast_quoter.quoted_program * string =
+    let debug = opts.debug in
+    let env = Global.env () in
+    let sigma = Evd.from_env env in
+    let sigma, c = Evarutil.new_global sigma gr in
+    let name = match gr with
+      | Names.GlobRef.IndRef i -> 
+          let (mut, _) = i in
+          Names.KerName.to_string (Names.MutInd.canonical mut)
+      | _ -> CErrors.user_err ~hdr:"template-coq"
+        (Printer.pr_global gr ++ str " is not an inductive type") in
+    debug_msg debug "Quoting";
     let time = Unix.gettimeofday() in
-    let suff = opts.ext in
-    let fname = opts.filename in
-    let cstr = if standalone then fname ^ ".c" else "glue." ^ fname ^ suff ^ ".c" in
-    let hstr = if standalone then fname ^ ".h" else "glue." ^ fname ^ suff ^ ".h" in
-    printProg prg nenv cstr [];
-    printProg header nenv hstr [];
-
+    let term = quote_term_rec ~bypass:true env (EConstr.to_constr sigma c) in
     let time = (Unix.gettimeofday() -. time) in
-    debug_msg debug (Printf.sprintf "Printed glue code to file in %f s.." time)
-  | CompM.Err s ->
-    CErrors.user_err ~hdr:"glue-code" (str "Could not generate glue code: " ++ pr_string s))
+    debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
+    (term, name)
 
+  let ffi_command opts gr =
+    let (term, name) = quote_ind opts gr in
+    let debug = opts.debug in
+    let options = make_pipeline_options opts in
 
-let compile_with_glue (opts : options) (gr : Names.GlobRef.t) (imports : string list) : unit =
-  let term = quote opts gr in
-  compile opts (Obj.magic term) imports;
-  generate_glue false opts (Ast0.Env.declarations (fst (Obj.magic term)))
-
-let compile_only opts gr imports =
-  let term = quote opts gr in
-  compile opts (Obj.magic term) imports
-
-let generate_glue_only opts gr =
-  let term = quote opts gr in
-  generate_glue true opts (Ast0.Env.declarations (fst (Obj.magic term)))
-
-let print_to_file (s : string) (file : string) =
-  let f = open_out file in
-  Printf.fprintf f "%s\n" s;
-  close_out f
-
-let show_ir opts gr =
-  let term = quote opts gr in
-  let debug = opts.debug in
-  let options = make_pipeline_options opts in
-  let p = Pipeline.show_IR options (Obj.magic term) in
-  match p with
-  | (CompM.Ret prg, dbg) ->
-    debug_msg debug "Finished compiling, printing to file.";
     let time = Unix.gettimeofday() in
-    let suff = opts.ext in
-    let fname = opts.filename in
-    let file = fname ^ suff ^ ".ir" in
-    print_to_file (string_of_bytestring prg) file;
-    let time = (Unix.gettimeofday() -. time) in
-    Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
-    debug_msg debug "Pipeline debug:";
-    debug_msg debug (string_of_bytestring dbg)
-  | (CompM.Err s, dbg) ->
-    debug_msg debug "Pipeline debug:";
-    debug_msg debug (string_of_bytestring dbg);
-    CErrors.user_err ~hdr:"show-ir" (str "Could not compile: " ++ (pr_string s) ++ str "\n")
+    (match CI.generate_ffi options (Obj.magic term) with
+    | CompM.Ret (((nenv, header), prg), logs) ->
+      let time = (Unix.gettimeofday() -. time) in
+      debug_msg debug (Printf.sprintf "Generated FFI glue code in %f s.." time);
+      (match logs with [] -> () | _ ->
+        debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_bytestring logs))));
+      let time = Unix.gettimeofday() in
+      let suff = opts.ext in
+      let cstr = ("ffi." ^ name ^ suff ^ ".c") in
+      let hstr = ("ffi." ^ name ^ suff ^ ".h") in
+      CI.printProg prg nenv cstr [];
+      CI.printProg header nenv hstr [];
 
+      let time = (Unix.gettimeofday() -. time) in
+      debug_msg debug (Printf.sprintf "Printed FFI glue code to file in %f s.." time)
+    | CompM.Err s ->
+      CErrors.user_err ~hdr:"ffi-glue-code" (str "Could not generate FFI glue code: " ++ pr_string s))
 
-(* Quote Coq inductive type *)
-let quote_ind opts gr : Metacoq_template_plugin.Ast_quoter.quoted_program * string =
-  let debug = opts.debug in
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let sigma, c = Evarutil.new_global sigma gr in
-  let name = match gr with
-    | Names.GlobRef.IndRef i -> 
-        let (mut, _) = i in
-        Names.KerName.to_string (Names.MutInd.canonical mut)
-    | _ -> CErrors.user_err ~hdr:"template-coq"
-       (Printer.pr_global gr ++ str " is not an inductive type") in
-  debug_msg debug "Quoting";
-  let time = Unix.gettimeofday() in
-  let term = quote_term_rec ~bypass:true env (EConstr.to_constr sigma c) in
-  let time = (Unix.gettimeofday() -. time) in
-  debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
-  (term, name)
+  let glue_command opts grs =
+    let terms = grs |> List.rev
+                |> List.map (fun gr -> Metacoq_template_plugin.Ast0.Env.declarations (fst (quote opts gr))) 
+                |> List.concat |> nub in
+    generate_glue true opts (Obj.magic terms)
 
-let ffi_command opts gr =
-  let (term, name) = quote_ind opts gr in
-  let debug = opts.debug in
-  let options = make_pipeline_options opts in
+end
 
-  let time = Unix.gettimeofday() in
-  (match Ffi.generate_ffi options (Obj.magic term) with
-  | CompM.Ret (((nenv, header), prg), logs) ->
-    let time = (Unix.gettimeofday() -. time) in
-    debug_msg debug (Printf.sprintf "Generated FFI glue code in %f s.." time);
-    (match logs with [] -> () | _ ->
-      debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_bytestring logs))));
-    let time = Unix.gettimeofday() in
-    let suff = opts.ext in
-    let cstr = ("ffi." ^ name ^ suff ^ ".c") in
-    let hstr = ("ffi." ^ name ^ suff ^ ".h") in
-    printProg prg nenv cstr [];
-    printProg header nenv hstr [];
-
-    let time = (Unix.gettimeofday() -. time) in
-    debug_msg debug (Printf.sprintf "Printed FFI glue code to file in %f s.." time)
-  | CompM.Err s ->
-    CErrors.user_err ~hdr:"ffi-glue-code" (str "Could not generate FFI glue code: " ++ pr_string s))
-
-let glue_command opts grs =
-  let terms = grs |> List.rev
-              |> List.map (fun gr -> Metacoq_template_plugin.Ast0.Env.declarations (fst (quote opts gr))) 
-              |> List.concat |> nub in
-  generate_glue true opts (Obj.magic terms)
+module MLCompile = CompileFunctor (MLCompiler)
+include MLCompile

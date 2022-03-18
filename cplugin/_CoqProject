@@ -15,6 +15,10 @@ certicoq_debug.ml
 certicoq_vanilla_plugin.mlpack
 CertiCoqVanilla.v
 
+static/caml_bool.mli
+static/caml_bool.ml
+static/caml_option.mli
+static/caml_option.ml
 static/caml_nat.mli
 static/caml_nat.ml
 static/caml_byte.mli

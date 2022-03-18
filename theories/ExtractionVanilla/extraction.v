@@ -14,16 +14,36 @@ Require compcert.common.AST
 Require Glue.glue
         Compiler.pipeline.
 
-(* Standard lib *)
-Require Import ExtrOcamlBasic.
-
 Require Import Coq.extraction.Extraction.
+
+(* Standard lib *)
+
+(** Extraction to Ocaml : use of basic Ocaml types: be careful that this should 
+  the representation in ML should exactly match the one of certicoq. 
+  E.g. no constructor swapping allowed.
+  *)
+
+Extract Inductive unit => unit [ "()" ].
+Extract Inductive list => list [ "[]" "( :: )" ].
+Extract Inductive prod => "( * )" [ "" ].
+
+(** NB: The "" above is a hack, but produce nicer code than "(,)" *)
+
+(** Restore laziness of andb, orb.
+    NB: without these Extract Constant, andb/orb would be inlined
+    by extraction in order to have laziness, producing inelegant
+    (if ... then ... else false) and (if ... then true else ...).
+*)
+
+Extract Inlined Constant andb => "(fun x y -> match x with Coq_true -> Coq_true | _ -> y)".
+Extract Inlined Constant orb => "(fun x y -> match x with Coq_false -> y | Coq_true -> x)".
+
 Require Import ZArith NArith.
 
 Set Extraction KeepSingleton.
 
 (* Coqlib *)
-Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
+(* Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)". *)
 
 (* L6_to_Clight *)
 (* Extract Constant pipeline.print_Clight => "PrintClight.print_if". *)

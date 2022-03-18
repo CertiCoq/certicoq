@@ -81,10 +81,15 @@ let fix_term (p : Ast0.term) : Ast0.term =
     { dname; dtype = aux dtype; dbody = aux dbody; rarg }
   in aux p
 
+let option_map f (x : 'a option) = 
+  match x with
+  | None -> Datatypes.None
+  | Some x -> Datatypes.Some (f x)
+
 let fix_rel_context ctx =
   let open BasicAst in 
   let fix_decl {decl_name; decl_body; decl_type} =
-    {decl_name; decl_body = Option.map fix_term decl_body; decl_type = fix_term decl_type}
+    {decl_name; decl_body = option_map fix_term (Obj.magic decl_body); decl_type = fix_term decl_type}
   in
   List.map fix_decl ctx
   
@@ -113,7 +118,7 @@ let fix_declarations decls =
   let fix_decl (kn, decl) =
     let decl' = match decl with
     | Ast0.Env.ConstantDecl {cst_type; cst_body; cst_universes} ->
-      Ast0.Env.ConstantDecl { cst_type = fix_term cst_type; cst_body = Option.map fix_term cst_body; 
+      Ast0.Env.ConstantDecl { cst_type = fix_term cst_type; cst_body = option_map fix_term (Obj.magic cst_body);
       cst_universes = fix_universes_decl cst_universes }
     | Ast0.Env.InductiveDecl { ind_finite; ind_npars; ind_params; ind_bodies; ind_universes; ind_variance} ->
       Ast0.Env.InductiveDecl { ind_finite; ind_npars; ind_params = fix_rel_context ind_params; 

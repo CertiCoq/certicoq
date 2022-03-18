@@ -4,6 +4,8 @@ Tm_util
 
 Datatypes
 Caml_nat
+Caml_bool
+Caml_option
 Bool
 Equalities
 Decimal

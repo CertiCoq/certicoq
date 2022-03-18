@@ -95,12 +95,12 @@ let make_options (l : command_args list) (pr : (Kernames.kername * Kernames.iden
   {o with prims = pr}
 
 let make_pipeline_options (opts : options) =
-  let cps    = opts.cps in
+  let cps    = Caml_bool.to_coq opts.cps in
   let args = coq_nat_of_int opts.args in
   let olevel = coq_nat_of_int opts.olevel in
-  let timing = opts.time in
-  let timing_anf = opts.time_anf in
-  let debug  = opts.debug in
+  let timing = Caml_bool.to_coq opts.time in
+  let timing_anf = Caml_bool.to_coq opts.time_anf in
+  let debug  = Caml_bool.to_coq opts.debug in
   let anfc = coq_nat_of_int opts.anf_conf in
   let dev = coq_nat_of_int opts.dev in
   let prefix = bytestring_of_string opts.prefix in

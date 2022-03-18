@@ -71,7 +71,8 @@ let name_longtype sg =
 (* Declarator (identifier + type) *)
 
 let attributes a =
-  let s1 = if a.attr_volatile then " volatile" else "" in
+  let open Datatypes in
+  let s1 = if Caml_bool.of_coq a.attr_volatile then " volatile" else "" in
   match a.attr_alignas with
   | None -> s1
   | Some l ->
@@ -112,8 +113,8 @@ let rec name_cdecl id ty =
       | Tnil ->
           if first then
             Buffer.add_string b
-               (if cconv.cc_vararg <> None then "..." else "void")
-          else if cconv.cc_vararg <> None then
+               (if cconv.cc_vararg <> Datatypes.None then "..." else "void")
+          else if cconv.cc_vararg <> Datatypes.None then
             Buffer.add_string b ", ..."
           else
             ()
@@ -121,7 +122,7 @@ let rec name_cdecl id ty =
           if not first then Buffer.add_string b ", ";
           Buffer.add_string b (name_cdecl "" t1);
           add_args false tl in
-      if not cconv.cc_unproto then add_args true args;
+      if not (Caml_bool.of_coq cconv.cc_unproto) then add_args true args;
       Buffer.add_char b ')';
       name_cdecl (Buffer.contents b) res
   | Tstruct(name, a) ->
@@ -357,9 +358,9 @@ let rec print_stmt p s =
       fprintf p "@[<v 2>switch (%a) {@ %a@;<0 -2>}@]"
               print_expr e
               print_cases cases
-  | Sreturn None ->
+  | Sreturn Datatypes.None ->
       fprintf p "return;"
-  | Sreturn (Some e) ->
+  | Sreturn Datatypes.(Some e) ->
       fprintf p "return %a;" print_expr e
   | Slabel(lbl, s1) ->
       fprintf p "%s:@ %a" (extern_atom lbl) print_stmt s1
@@ -381,8 +382,8 @@ and print_cases p cases =
               print_cases rem
 
 and print_case_label p = function
-  | None -> fprintf p "default"
-  | Some lbl -> fprintf p "case %s" (Z.to_string lbl)
+  | Datatypes.None -> fprintf p "default"
+  | Datatypes.Some lbl -> fprintf p "case %s" (Z.to_string lbl)
 
 and print_stmt_for p s =
   match s with
@@ -401,11 +402,11 @@ let name_function_parameters name_param fun_name params cconv =
   Buffer.add_char b '(';
   begin match params with
   | [] ->
-      Buffer.add_string b (if cconv.cc_vararg <> None then "..." else "void")
+      Buffer.add_string b (if cconv.cc_vararg <> Datatypes.None then "..." else "void")
   | _ ->
       let rec add_params first = function
       | [] ->
-          if cconv.cc_vararg <> None then Buffer.add_string b ",..."
+          if cconv.cc_vararg <> Datatypes.None then Buffer.add_string b ",..."
       | (id, ty) :: rem ->
           if not first then Buffer.add_string b ", ";
           Buffer.add_string b (name_cdecl (name_param id) ty);
@@ -490,7 +491,7 @@ let re_string_literal = Str.regexp "__stringlit_[0-9]+"
 
 let print_globvar p id v =
   let name1 = extern_atom id in
-  let name2 = if v.gvar_readonly then "const " ^ name1 else name1 in
+  let name2 = if Caml_bool.of_coq v.gvar_readonly then "const " ^ name1 else name1 in
   match v.gvar_init with
   | [] ->
       fprintf p "extern %s;@ @ "
@@ -515,7 +516,7 @@ let print_globvar p id v =
 
 let print_globvardecl p  id v =
   let name = extern_atom id in
-  let name = if v.gvar_readonly then "const "^name else name in
+  let name = if Caml_bool.of_coq v.gvar_readonly then "const "^name else name in
   let linkage = "extern" in
   fprintf p "%s %s;@ @ " linkage (name_cdecl name v.gvar_info)
 

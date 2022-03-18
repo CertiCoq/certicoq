@@ -23,6 +23,7 @@ open Ctypes
 open Cop
 open PrintCsyntax
 open Clight
+open Datatypes
 
 (* Naming temporaries.
    Some temporaries are obtained by lifting variables in SimplLocals.

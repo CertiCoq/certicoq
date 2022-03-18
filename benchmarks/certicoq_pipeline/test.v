@@ -1,20 +1,24 @@
 From MetaCoq.Template Require Import All Loader.
 From CertiCoq.Benchmarks.certicoq_pipeline Require Import Loader.
 
-Set MetaCoq Debug.
+From CertiCoq Require Import CertiCoq.
+
+(* Set MetaCoq Debug. *)
 Set MetaCoq Timing.
 From Coq Require Import List.
 Import ListNotations.
 
 Require Import compcert.common.AST.
 
-Definition main := true.
-(* CertiCoq Compile -debug main. *)
+Cd "tests".
 
-CertiCoqC Compile -debug main.
+From MetaCoq.Erasure Require Import Erasure.
 
-(* From MetaCoq.Erasure Require Import Erasure. *)
-(* CertiCoqC Compile erase_and_print_template_program. *)
+Time CertiCoqC Compile erase_and_print_template_program.
+(* 32sec *)
+Cd "../mltests".
+Time CertiCoq Compile erase_and_print_template_program.
+(* 12sec *)
 
 (* From MetaCoq.SafeChecker Require Import PCUICSafeChecker. *)
 (* CertiCoq Erase @typecheck_program. *)

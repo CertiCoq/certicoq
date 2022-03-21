@@ -20,13 +20,13 @@ fi
 
 if [ ! -f "${PLUGIN}/extraction/astCommon.ml" ]
 then
-    sh clean_extraction.sh "${PLUGIN}"
+    bash clean_extraction.sh "${PLUGIN}"
 else
     a=`stat -f "%m" ${EPATH}/AstCommon.ml`
     b=`stat -f "%m" ${PLUGIN}/extraction/astCommon.ml`
     if [ "$a" -gt "$b" ]
 	then
-	    sh clean_extraction.sh "${PLUGIN}"
+	    bash clean_extraction.sh "${PLUGIN}"
     fi
 fi
 

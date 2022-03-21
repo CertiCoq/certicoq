@@ -1,7 +1,5 @@
 
 Require Import Coq.Lists.List.
-Require Import Coq.Strings.String.
-Require Import Coq.Strings.Ascii.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.micromega.Lia.
 Require Import Arith.
@@ -9,6 +7,7 @@ Require Import FunInd.
 Require Import Common.Common.
 Require Import L2k.term.
 Require Import L2k.compile.
+From MetaCoq.Template Require Import bytestring.
 
 Local Open Scope string_scope.
 Local Open Scope bool.
@@ -117,7 +116,6 @@ Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
 | ctFix: forall p n ds m,
     crctDs p (n + dlength ds) ds -> m < dlength ds ->
     crctTerm p n (TFix ds m)
-| ctProj: forall p n prj t, crctTerm p n t -> crctTerm p n (TProj prj t)
 (* crctEnvs are closed in both ways *)
 with crctEnv: environ Term -> Prop :=
      | ceNil: crctEnv nil
@@ -235,7 +233,6 @@ Proof.
     cbn in H. destruct H. elim (Lookup_fresh_neq H H4). reflexivity.
   - eelim H0; eassumption.
   - eelim H0; eassumption.
-  - eelim H0; eassumption.
   - eelim H2; eassumption.
   - eelim H0; eassumption.
   - eelim H2; eassumption.
@@ -261,22 +258,22 @@ Lemma Crct_weaken:
                                crctEnv ((nm,ecTrm s)::p)).
 Proof.
   apply crctCrctsCrctBsDsEnv_ind; intros;
-  try (solve[repeat econstructor; intuition]);
-  try (econstructor; intuition); try eassumption.
+  try (solve[repeat econstructor; intuition auto]);
+  try (econstructor; intuition auto); try eassumption.
   - unfold LookupDfn in *. constructor.
     apply neq_sym. apply (Lookup_fresh_neq H1 H2). eassumption.
   - inversion_Clear H. inversion_Clear H4.
     unfold LookupTyp in H. destruct H.
     econstructor; try eassumption.
     econstructor; try eassumption. unfold LookupTyp. intuition.
-    destruct (kername_eq_dec (inductive_mind ind) nm).
+    destruct (Classes.eq_dec (inductive_mind ind) nm).
     + subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
     + apply LMiss; assumption.
   - inversion_Clear H. inversion_Clear H6.
     unfold LookupTyp in H. destruct H.
     econstructor; try eassumption. econstructor; try eassumption.
     unfold LookupTyp. split; try assumption.
-    case_eq (kername_eq_dec (inductive_mind ind) nm); intros.
+    case_eq (Classes.eq_dec (inductive_mind ind) nm); intros.
     + rewrite e in H. elim (Lookup_fresh_neq H H4). reflexivity.
     + apply LMiss; assumption.
 Qed.
@@ -304,14 +301,14 @@ Proof.
   - inversion_Clear H. inversion_Clear H3.
     econstructor; try eassumption. econstructor; try eassumption.
     + unfold LookupTyp in *. destruct H. split; try eassumption.
-      destruct (kername_eq_dec (inductive_mind ind) nm).
+      destruct (Classes.eq_dec (inductive_mind ind) nm).
       * subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
       * apply LMiss; assumption.
   - inversion_Clear H. inversion_Clear H5.
     unfold LookupTyp in H. destruct H. econstructor; try eassumption.
     econstructor; try eassumption.
     unfold LookupTyp. split; try assumption.
-    destruct (kername_eq_dec (inductive_mind ind) nm).
+    destruct (Classes.eq_dec (inductive_mind ind) nm).
     + subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
     + apply LMiss; assumption.
 Qed.
@@ -349,7 +346,7 @@ Proof.
     + inversion_Clear H. inversion_Clear H2.
       unfold LookupTyp in H. destruct H. econstructor; try eassumption.
       econstructor; try eassumption. unfold LookupTyp. split; intuition.
-      destruct (kername_eq_dec (inductive_mind ind) nm).
+      destruct (Classes.eq_dec (inductive_mind ind) nm).
       * subst. elim H3. destruct ind. cbn. apply PoCnstri.
       * inversion_Clear H.
         -- elim n0. reflexivity.
@@ -357,7 +354,7 @@ Proof.
     + eapply H1. reflexivity. intros j. elim H3.
       apply PoCnstrargs. assumption.
   - inversion_Clear H. inversion_Clear H4. unfold LookupTyp in H. destruct H.
-    case_eq (kername_eq_dec (inductive_mind ind) nm); intros.
+    case_eq (Classes.eq_dec (inductive_mind ind) nm); intros.
     + subst. inversion_Clear H.
       * elim H5. destruct ind. cbn. apply PoCaseAnn.
       * elim H15. reflexivity.
@@ -372,8 +369,6 @@ Proof.
         intros j0. elim H5. apply PoCaseR. assumption.
   - econstructor; try eassumption. eapply H0. reflexivity. intros h.
     elim H3. constructor. assumption.
-  - constructor. eapply H0. reflexivity. intros h.
-    elim H2. constructor. assumption.
   - constructor.
     + eapply H0. reflexivity. intros h. elim H4. constructor. assumption.
     + eapply H2. reflexivity. intros h. elim H4. apply PoTtl. assumption.
@@ -644,7 +639,7 @@ Proof.
   intros p n ts h1 brs h2 m s h3. pose proof (whCaseStep_Some _ _ _ h3).
   dstrctn H.
   cbn in j. subst. unfold whCaseStep in h3.
-  rewrite z in h3. revert h3. elim Reflect.eqb_spec; cbn; try discriminate.
+  rewrite z in h3. revert h3. elim Nat.eqb_spec; cbn; try discriminate.
   intros.
   eapply bnth_pres_Crct in z; try eassumption. 
   rewrite p0 in z.
@@ -661,7 +656,6 @@ Proof.
   - cbn in H0. discriminate.
   - inversion_Clear H. inversion_Clear H2. cbn in H1. myInjection H1.
     assumption.
-  - cbn in H0. discriminate.
 Qed.
 
 Lemma tnth_pres_Crct:

@@ -330,17 +330,17 @@ let add_name (a, n) =
     match n with
     | BasicAst.Coq_nAnon -> ()
     | BasicAst.Coq_nNamed s ->
-        Hashtbl.add atom_of_string (camlstring_of_coqstring s) a;
-        Hashtbl.add string_of_atom a (camlstring_of_coqstring s);
+        Hashtbl.add atom_of_string (Caml_bytestring.caml_string_of_bytestring s) a;
+        Hashtbl.add string_of_atom a (Caml_bytestring.caml_string_of_bytestring s);
         ()
 
 let remove_primes (a, n) =
   match n with
   | BasicAst.Coq_nAnon -> (a,n)
   | BasicAst.Coq_nNamed s ->
-    let s' = Str.global_replace (Str.regexp "'") "p" (camlstring_of_coqstring s)  in
+    let s' = Str.global_replace (Str.regexp "'") "p" (Caml_bytestring.caml_string_of_bytestring s)  in
     let s'' = Str.global_replace (Str.regexp "\\.") "d" s' in
-    (a, BasicAst.Coq_nNamed (coqstring_of_camlstring s''))
+    (a, BasicAst.Coq_nNamed (Caml_bytestring.bytestring_of_caml_string s''))
       
 let print_dest prog dest =
   let oc = open_out (implode dest) in
@@ -348,7 +348,7 @@ let print_dest prog dest =
   close_out oc
     
 let print_dest_names prog names dest =
-  let oc = open_out (camlstring_of_coqstring dest) in
+  let oc = open_out (Caml_bytestring.caml_string_of_bytestring dest) in
   List.iter (fun n -> add_name (remove_primes n))  names;
   print_program Clight2 (formatter_of_out_channel oc) prog;
   close_out oc

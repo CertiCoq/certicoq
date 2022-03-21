@@ -1,7 +1,7 @@
-From Coq Require Import List Unicode.Utf8 Strings.Ascii Strings.String.
+From Coq Require Import List Unicode.Utf8 Strings.Byte.
 From Coq Require Import PArith.
 From ExtLib Require Import Monads.
-
+From MetaCoq.Template Require Import bytestring.
 Require Import Common.AstCommon Common.compM.
 
 Import MonadNotation ListNotations.
@@ -10,7 +10,7 @@ Notation ret := (ExtLib.Structures.Monad.ret).
 Notation bind := (ExtLib.Structures.Monad.bind).
 
 Open Scope monad_scope.
-Open Scope string.
+Open Scope bs_scope.
 
 (** * Common Interface for composing CertiCoq Transformations *)
 (* Author: Anonymized, 2019 *)
@@ -38,9 +38,9 @@ Record Options :=
 
 (* Compilation info, such as timing, debug and error messages *)
 Record CompInfo :=
-  { time_log    : list String.string;
-    log         : list String.string;
-    debug_log   : list String.string;
+  { time_log    : list string;
+    log         : list string;
+    debug_log   : list string;
   }.
 
 Definition pipelineM := compM Options CompInfo.
@@ -80,11 +80,11 @@ Section Translation.
     '(Build_CompInfo tm log dbg) <- get ;;
     put (Build_CompInfo (s :: tm) log dbg).
 
-  Definition chr_newline : ascii := Eval compute in ascii_of_nat 10.
-  Definition newline : string := (String chr_newline EmptyString).
+  Definition chr_newline : Byte.byte := "010"%byte.
+  Definition newline : string := (String.String chr_newline String.EmptyString).
 
   Definition log_to_string (log : list string) : string :=
-    (String.concat newline ("Debug messages" :: (List.rev log)))%string.
+    (String.concat newline ("Debug messages" :: (List.rev log)))%bs.
 
   Definition run_pipeline (o : Options) (src : Src) (m : CertiCoqTrans) : (error Dst * string (* debug *)) :=
     let w := Build_CompInfo [] [] [] in

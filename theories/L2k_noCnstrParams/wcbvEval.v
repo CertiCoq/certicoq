@@ -1,6 +1,5 @@
 Require Import FunInd.
 Require Import Coq.Lists.List.
-Require Import Coq.Strings.String.
 Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Program.Basics.
 Require Import Coq.micromega.Lia.
@@ -10,8 +9,8 @@ Require Import Common.Common.
 Require Import L2k.compile.
 Require Import L2k.term.
 Require Import L2k.program.
-        
-Local Open Scope string_scope.
+From MetaCoq.Template Require Import bytestring.
+Local Open Scope bs_scope.
 Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
@@ -61,11 +60,6 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     whCaseStep n args brs = Some cs ->
     WcbvEval p cs s ->
     WcbvEval p (TCase i mch brs) s
-| wProj: forall bod r args arg x ind res,
-    WcbvEval p bod (TConstruct ind r args) ->
-    tnth arg args = Some x ->
-    WcbvEval p x res ->
-    WcbvEval p (TProj (ind, arg) bod) res
 with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
      | wNil: WcbvEvals p tnil tnil
      | wCons: forall t t' ts ts',
@@ -130,8 +124,6 @@ Proof.
   - inversion_Clear H1.
     + specialize (H _ H5). myInjection H. rewrite e in H7. myInjection H7.
       apply H0. assumption.
-  - inversion_Clear H1. specialize (H _ H5). myInjection H.
-    rewrite e in H7. myInjection H7. intuition.
   - inversion_Clear H1. specialize (H _ H4). specialize (H0 _ H6). subst.
     reflexivity.
 Qed.
@@ -230,7 +222,7 @@ Lemma WcbvEval_weaken:
 Proof.
   intros p. apply WcbvEvalEvals_ind; intros; auto.
   - econstructor; intuition.
-  - destruct (kername_eq_dec nm nm0).
+  - destruct (Classes.eq_dec nm nm0).
     + subst. inversion_Clear H0; unfold lookupDfn in e.
       * rewrite (proj1 (fresh_lookup_None (trm:=Term) _ _)) in e.
         discriminate. assumption.
@@ -246,7 +238,6 @@ Proof.
   - eapply wLetIn; intuition.
   - eapply wAppFix; try eassumption; intuition. 
   - eapply wCase; intuition; eassumption.
-  - eapply wProj; try eassumption; intuition.
 Qed.
 
 Lemma LookupDfn_pres_Crct:
@@ -297,19 +288,19 @@ Proof.
   - specialize (H _ H8). apply H0.
     refine (whCaseStep_pres_Crct _ H9 _ _); try eassumption.
     inversion_Clear H. assumption.
-  - apply H0. eapply tnth_pres_Crct; try eassumption.
-    specialize (H _ H5). inversion_Clear H. assumption.
 Qed.
 
 Section wcbvEval_sec.
 Variable p:environ Term.
+
+Instance fix_bug : MonadExc.MonadExc string exception := exn_monad_exc.
 
 (** now an executable weak-call-by-value evaluation **)
 (** use a timer to make this terminate **)
 Function wcbvEval
          (tmr:nat) (t:Term) {struct tmr}: exception Term :=
   match tmr with 
-  | 0 => raise ("out of time: " ++ print_term t)
+  | 0 => raise ("out of time: " ++ print_term t)%bs
   | S n =>
     match t with      (** look for a redex **)
     | TConst nm =>
@@ -362,25 +353,12 @@ Function wcbvEval
   | TLetIn nm df bod =>
     match wcbvEval n df with
     | Ret df' => wcbvEval n (instantiate df' 0 bod)
-    | Exc s => raise ("wcbvEval,TLetIn,def: " ++ s)
+    | Exc s => raise ("wcbvEval,TLetIn,def: " ++ s)%bs
     end
   | TConstruct i cn args =>
     match wcbvEvals n args with
     | Ret args' => ret (TConstruct i cn args')
     | Exc s => raise ("wcbvEval:TConstruct:args: " ++ s)
-    end
-  | TProj (i, arg) bod =>
-    match wcbvEval n bod with
-    | Exc s => raise ("(wcbvEval:TProj,bod: " ++ s ++ ")")
-    | Ret (TConstruct j m args) =>
-        match tnth arg args with
-        | None => raise ("wcbvEval:TProj,tnth_error")
-        | Some x => match inductive_dec i j with
-                     | left _ => wcbvEval n x
-                     | right _ => raise "wcbvEval:Proj,inductives"
-                     end
-        end
-    | Ret x => raise "wcbvEval:Proj"
     end
   (** already in whnf ***)
   | TProof => ret TProof
@@ -390,7 +368,7 @@ Function wcbvEval
   | TRel _ => raise "wcbvEval:unbound Rel"
   | TWrong s => raise (print_term t)
     end
-  end%string
+  end%bs
 with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
      : exception Terms :=
        match tmr with 
@@ -404,7 +382,7 @@ with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
                   | Ret _, Exc s => raise ("wcbvEvals:tl: " ++ s)
                   end
                 end
-       end%string.
+       end%bs.
 Functional Scheme wcbvEval_ind' := Induction for wcbvEval Sort Prop
 with wcbvEvals_ind' := Induction for wcbvEvals Sort Prop.
 Combined Scheme wcbvEvalEvals_ind from wcbvEval_ind', wcbvEvals_ind'.
@@ -420,8 +398,8 @@ Proof.
            (fun tmr t su => forall u (p1:su = Ret u), WcbvEval p t u)
            (fun tmr t su => forall u (p1:su = Ret u), WcbvEvals p t u));
     intros; try discriminate; try (myInjection p1);
-    try(solve[constructor]); intuition.
-  - eapply wConst; intuition. unfold lookupDfn. rewrite e1. reflexivity.
+    try(solve[constructor]); intuition auto.
+  - eapply wConst; intuition auto. unfold lookupDfn. rewrite e1. reflexivity.
   - specialize (H _ e1). specialize (H0 _ e2). now eapply wAppProof.
   - specialize (H _ e1). specialize (H0 _ p1).
     eapply wAppFix; eassumption.
@@ -437,9 +415,6 @@ Proof.
     + now apply H. 
     + intuition.
   - eapply wLetIn; intuition.
-  - eapply wProj; try eassumption. subst i.
-    + specialize (H _ e1). eassumption.
-    + subst. apply H0. assumption.
 Qed.
 
 Lemma wcbvEvals_tcons_tcons:
@@ -518,12 +493,6 @@ Proof.
     rewrite e. destruct (inductive_dec i i).
     + apply (H0 (mx - 1)); try lia.
     + now elim n0.
-  - destruct H, H0. exists (S (max x0 x1)). intros mx h.
-    assert (l1:= max_fst x0 x1). assert (l2:= max_snd x0 x1).
-    simpl. rewrite (j mx); try lia. rewrite (H (mx - 1)); try lia.
-    rewrite e. destruct (inductive_dec ind ind).
-    + apply (H0 (mx - 1)); try lia.
-    + now elim n.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     simpl. rewrite (j mx); try lia. rewrite (H (mx - 1)); try lia.

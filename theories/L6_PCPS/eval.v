@@ -1,6 +1,6 @@
 From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
      MSets.MSetRBT Lists.List micromega.Lia Sets.Ensembles
-     Relations.Relations Strings.String.
+     Relations.Relations.
 
 From CertiCoq.Common Require Import AstCommon exceptionMonad.
 
@@ -9,6 +9,8 @@ From CertiCoq Require Import L6.cps L6.List_util L6.size_cps L6.ctx L6.cps_util 
 
 Require Import compcert.lib.Coqlib.
 Require Import L6.algebra. 
+
+From MetaCoq.Template Require Import bytestring.
 
 Import ListNotations.
 
@@ -893,16 +895,16 @@ Section EVAL.
     - inv H0. rewrite bound_var_Econstr_c in *.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
       eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
-      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. sets.
+      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. auto.
     - inv H0. rewrite bound_var_Eproj_c in *.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
       eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
-      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. sets.
+      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. auto.
     - inv H0.
     - inv H0. rewrite bound_var_Eletapp_c in *.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
       eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
-      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. sets.
+      eapply eq_env_P_refl. eapply Disjoint_In_l. sets. auto.
     - inv H0.
     - inv H0. rewrite bound_var_Fun1_c in *.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
@@ -1102,6 +1104,8 @@ Section EVAL.
          end)
     end.
    *)
+
+  Open Scope bs_scope.
   
   (* Either fail with an Exn, runs out of fuel and return (Ret) inl of the current state or finish to evaluate and return inr of a val *)
   Fixpoint bstep_f (rho:env) (e:exp) (n:nat): exception ((env * exp) + val) :=

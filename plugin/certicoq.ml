@@ -12,22 +12,7 @@ open Plugin_utils
 
 (** Various Utils *)
 
-(* TODO move to plugin_utils *)
-
-let pr_char c = str (Char.escaped c)
-
-let pr_char_list =
-  prlist_with_sep mt pr_char
-
-let string_of_chars (chars : char list) : string =
-  let buf = Buffer.create 16 in
-  List.iter (Buffer.add_char buf) chars;
-  Buffer.contents buf
-
-let chars_of_string (s : string) : char list =
-  let rec exp i l =
-    if i < 0 then l else exp (i - 1) (s.[i] :: l) in
-  exp (String.length s - 1) []
+let pr_string s = str (Caml_bytestring.caml_string_of_bytestring s)
 
 (* remove duplicates but preserve order, keep the leftmost element *)
 let nub (xs : 'a list) : 'a list = 
@@ -73,7 +58,7 @@ type options =
     ext       : string;
     dev       : int;
     prefix    : string;
-    prims     : ((BasicAst.kername * char list) * bool)  list;
+    prims     : (Kernames.kername * Kernames.ident * bool) list;
   }
 
 let default_options : options =
@@ -92,7 +77,7 @@ let default_options : options =
   }
 
 
-let make_options (l : command_args list) (pr : ((BasicAst.kername * char list) * bool) list) (fname : string) : options =
+let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * bool) list) (fname : string) : options =
   let rec aux (o : options) l =
     match l with
     | [] -> o
@@ -121,7 +106,7 @@ let make_pipeline_options (opts : options) =
   let debug  = opts.debug in
   let anfc = coq_nat_of_int opts.anf_conf in
   let dev = coq_nat_of_int opts.dev in
-  let prefix = chars_of_string opts.prefix in
+  let prefix = bytestring_of_string opts.prefix in
   let prims = opts.prims in
   Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix prims
 
@@ -143,7 +128,7 @@ let quote opts gr =
   let sigma, c = Evarutil.new_global sigma gr in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec true env (EConstr.to_constr sigma c) in
+  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass:false env (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   term
@@ -171,11 +156,11 @@ let compile opts term imports =
     let time = (Unix.gettimeofday() -. time) in
     Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
     debug_msg debug "Pipeline debug:";
-    debug_msg debug (string_of_chars dbg)
+    debug_msg debug (string_of_bytestring dbg)
   | (CompM.Err s, dbg) ->
     debug_msg debug "Pipeline debug:";
-    debug_msg debug (string_of_chars dbg);
-    CErrors.user_err ~hdr:"pipeline" (str "Could not compile: " ++ (pr_char_list s) ++ str "\n")
+    debug_msg debug (string_of_bytestring dbg);
+    CErrors.user_err ~hdr:"pipeline" (str "Could not compile: " ++ (pr_string s) ++ str "\n")
 
 (* Generate glue code for the compiled program *)
 let generate_glue (standalone : bool) opts globs =
@@ -191,7 +176,7 @@ let generate_glue (standalone : bool) opts globs =
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Generated glue code in %f s.." time);
     (match logs with [] -> () | _ ->
-      debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
+      debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_bytestring logs))));
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
     let fname = opts.filename in
@@ -203,13 +188,13 @@ let generate_glue (standalone : bool) opts globs =
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Printed glue code to file in %f s.." time)
   | CompM.Err s ->
-    CErrors.user_err ~hdr:"glue-code" (str "Could not generate glue code: " ++ pr_char_list s))
+    CErrors.user_err ~hdr:"glue-code" (str "Could not generate glue code: " ++ pr_string s))
 
 
 let compile_with_glue (opts : options) (gr : Names.GlobRef.t) (imports : string list) : unit =
   let term = quote opts gr in
   compile opts (Obj.magic term) imports;
-  generate_glue false opts (fst (Obj.magic term))
+  generate_glue false opts (Ast0.Env.declarations (fst (Obj.magic term)))
 
 let compile_only opts gr imports =
   let term = quote opts gr in
@@ -217,7 +202,7 @@ let compile_only opts gr imports =
 
 let generate_glue_only opts gr =
   let term = quote opts gr in
-  generate_glue true opts (fst (Obj.magic term))
+  generate_glue true opts (Ast0.Env.declarations (fst (Obj.magic term)))
 
 let print_to_file (s : string) (file : string) =
   let f = open_out file in
@@ -236,15 +221,15 @@ let show_ir opts gr =
     let suff = opts.ext in
     let fname = opts.filename in
     let file = fname ^ suff ^ ".ir" in
-    print_to_file (string_of_chars prg) file;
+    print_to_file (string_of_bytestring prg) file;
     let time = (Unix.gettimeofday() -. time) in
     Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
     debug_msg debug "Pipeline debug:";
-    debug_msg debug (string_of_chars dbg)
+    debug_msg debug (string_of_bytestring dbg)
   | (CompM.Err s, dbg) ->
     debug_msg debug "Pipeline debug:";
-    debug_msg debug (string_of_chars dbg);
-    CErrors.user_err ~hdr:"show-ir" (str "Could not compile: " ++ (pr_char_list s) ++ str "\n")
+    debug_msg debug (string_of_bytestring dbg);
+    CErrors.user_err ~hdr:"show-ir" (str "Could not compile: " ++ (pr_string s) ++ str "\n")
 
 
 (* Quote Coq inductive type *)
@@ -261,7 +246,7 @@ let quote_ind opts gr : Metacoq_template_plugin.Ast_quoter.quoted_program * stri
        (Printer.pr_global gr ++ str " is not an inductive type") in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = quote_term_rec true env (EConstr.to_constr sigma c) in
+  let term = quote_term_rec ~bypass:true env (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
   (term, name)
@@ -277,7 +262,7 @@ let ffi_command opts gr =
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Generated FFI glue code in %f s.." time);
     (match logs with [] -> () | _ ->
-      debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_chars logs))));
+      debug_msg debug (Printf.sprintf "Logs:\n%s" (String.concat "\n" (List.map string_of_bytestring logs))));
     let time = Unix.gettimeofday() in
     let suff = opts.ext in
     let cstr = ("ffi." ^ name ^ suff ^ ".c") in
@@ -288,10 +273,10 @@ let ffi_command opts gr =
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Printed FFI glue code to file in %f s.." time)
   | CompM.Err s ->
-    CErrors.user_err ~hdr:"ffi-glue-code" (str "Could not generate FFI glue code: " ++ pr_char_list s))
+    CErrors.user_err ~hdr:"ffi-glue-code" (str "Could not generate FFI glue code: " ++ pr_string s))
 
 let glue_command opts grs =
   let terms = grs |> List.rev
-              |> List.map (fun gr -> fst (quote opts gr)) 
+              |> List.map (fun gr -> Metacoq_template_plugin.Ast0.Env.declarations (fst (quote opts gr))) 
               |> List.concat |> nub in
   generate_glue true opts (Obj.magic terms)

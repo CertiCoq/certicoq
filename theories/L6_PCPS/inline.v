@@ -1,5 +1,5 @@
 Require Import Common.compM Common.Pipeline_utils.
-From Coq Require Import ZArith.ZArith Lists.List Strings.String micromega.Lia.
+From Coq Require Import ZArith.ZArith Lists.List micromega.Lia.
 Import ListNotations.
 Require Import identifiers.
 Require Import L6.state L6.cps_util L6.cps_show L6.ctx L6.uncurry L6.shrink_cps L6.rename L6.inline_letapp L6.cps.
@@ -9,7 +9,7 @@ Require Import ExtLib.Data.Monads.StateMonad.
 Require Coq.Program.Wf.
 Require Import Program.
 Require Import Coq.Structures.OrdersEx.
-
+Require Import MetaCoq.Template.utils.bytestring.
 Import MonadNotation.
 Open Scope monad_scope.
 
@@ -405,9 +405,9 @@ Definition show_map {A} (m : M.t A) (nenv : name_env) (str : A -> string) :=
       | [] => ""
       end
    in
-   "S{" ++ show_lst (M.elements m) ++ "}")%string.
+   "S{" ++ show_lst (M.elements m) ++ "}")%bs.
 
-Definition show_map_bool m nenv := show_map m nenv (fun (b : bool) => if b then "true" else "false")%string.
+Definition show_map_bool m nenv := show_map m nenv (fun (b : bool) => if b then "true" else "false")%bs.
 Definition show_map_nat m nenv := show_map m nenv show_nat.
 
 

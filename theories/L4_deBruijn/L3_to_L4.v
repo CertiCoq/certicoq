@@ -36,7 +36,6 @@ Fixpoint find_prim (prims : list (kername * string * bool * nat * positive)) (n 
   | (c, s, b, ar, pos) :: prims => if eq_kername n c then Some pos else find_prim prims n
   end.
 
-
 (** Inductive environment, kept to record arities of constructors.
     No more parameters by this stage. *)
 Definition ienv := list (kername * itypPack).
@@ -80,7 +79,7 @@ Section TermTranslation.
       end.
 
   End fixes.
-  
+
   Fixpoint trans (k : N) (t : L3t.Term) : exp :=
     match t with
     | L3t.TWrong _ => Prf_e
@@ -106,7 +105,6 @@ Section TermTranslation.
       let len := L3t.dlength d in
       let defs' := trans_fixes trans (N.of_nat len + k) d in
       Fix_e defs' (N.of_nat n)
-    | L3t.TProj proj t => Prf_e     (****  FIX  ****)
     end.
 
 
@@ -118,7 +116,6 @@ End TermTranslation.
 Section EnvTranslation.
   
   Variable prims : list (kername * string * bool * nat * positive).
-
   
   Definition translate_entry x acc :=
     match x with
@@ -158,6 +155,7 @@ Definition inductive_env (e : environ L2k.compile.Term) : ienv :=
 Definition mkLets (e : env) (t : exp) :=
   fold_left (fun acc (x : _ * exp) => Let_e (string_of_kername (fst x)) (snd x) acc) e t.
 
+(* TODO, pass ienv too *)
 Definition translate_program
            (prims : list (kername * string * bool * nat * positive))
            (e: environ L2k.compile.Term) (t: L3t.Term) : exp :=

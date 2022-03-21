@@ -1,10 +1,12 @@
-From Coq Require Import ZArith.ZArith Lists.List Strings.String micromega.Lia Arith
+Require Import MetaCoq.Template.utils.bytestring.
+From Coq Require Import ZArith.ZArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
 Require Import Common.AstCommon.
 Require compcert.lib.Maps compcert.lib.Coqlib.
 Require Import set_util.
 
 Import ListNotations.
+Open Scope list_scope.
 
 Require Import L4.expression L4.fuel_sem.
 

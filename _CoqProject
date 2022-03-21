@@ -4,7 +4,6 @@
 -R theories/common              CertiCoq.Common
 -R theories/Extraction          CertiCoq.extraction
 -R theories/Glue                CertiCoq.Glue
--R theories/L1g                 CertiCoq.L1g
 -R theories/L2k_noCnstrParams   CertiCoq.L2k
 -R theories/L4_deBruijn         CertiCoq.L4
 -R theories/L6_PCPS             CertiCoq.L6
@@ -14,3 +13,4 @@
 -R benchmarks                   CertiCoq.Benchmarks
 -R plugin                       CertiCoq.Plugin
 -I plugin
+-I benchmarks/metacoq_erasure

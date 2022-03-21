@@ -1,6 +1,6 @@
 (* Conversion from L4.expression to L6.cps using ANF or CPS tranformation *)
 
-Require Import Coq.ZArith.ZArith Coq.Lists.List Coq.Strings.String
+Require Import Coq.ZArith.ZArith Coq.Lists.List
         Coq.Sorting.Sorted Coq.Arith.Arith Coq.Sets.Ensembles.
 Require Import ExtLib.Data.String.
 Require Import Common.AstCommon Common.compM.
@@ -10,6 +10,7 @@ Require Import L6.cps L6.cps_show L6.eval L6.ctx L6.List_util L6.Ensembles_util 
 Require Import compcert.lib.Coqlib compcert.lib.Maps.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
+Require Import MetaCoq.Template.utils.bytestring.
 
 Import ListNotations.
 Import Monad.MonadNotation.
@@ -73,7 +74,7 @@ Section Translate.
     Definition n_empty : name_env := M.empty _.
     
     
-    Definition ienv := list (BasicAst.kername * AstCommon.itypPack).
+    Definition ienv := list (Kernames.kername * AstCommon.itypPack).
     
     
     (* returns list of numbers [n, n+m[  and the positive n+m (next available pos) *)
@@ -101,7 +102,7 @@ Section Translate.
     - update the conId_map with a pair relating the nCon'th constructor of
       ind to the ctor_tag of the current constructor *)
     Fixpoint convert_cnstrs (tyname:string) (cct:list ctor_tag) (itC:list AstCommon.Cnstr)
-             (ind:BasicAst.inductive) (nCon:N) (unboxed : N) (boxed : N)
+             (ind:Kernames.inductive) (nCon:N) (unboxed : N) (boxed : N)
              (niT:ind_tag) (ce:ctor_env) (dcm:conId_map) :=
       match (cct, itC) with
       | (cn::cct', cst::icT') =>
@@ -130,7 +131,7 @@ Section Translate.
       of the nth type of idBundle
     np: number of type parameters for this bundle
      *)
-    Fixpoint convert_typack typ (idBundle:BasicAst.kername) (n:nat)
+    Fixpoint convert_typack typ (idBundle:Kernames.kername) (n:nat)
              (ice : (ind_env * ctor_env*  ctor_tag * ind_tag * conId_map))
       : (ind_env * ctor_env * ctor_tag * ind_tag * conId_map) :=
       let '(ie, ce, ncT, niT, dcm) := ice in
@@ -138,8 +139,8 @@ Section Translate.
       | nil => ice
       (* let cct := (ncT::nil) in
       let ncT' := Pos.succ ncT in
-      let itN := "Unit"%string in
-      let itC := ((mkCnstr "prf"%string 0%nat) :: nil) in
+      let itN := "Unit"%bs in
+      let itC := ((mkCnstr "prf"%bs 0%nat) :: nil) in
       let (ce', dcm') :=
           convert_cnstrs itN cct itC (BasicAst.mkInd idBundle n) 0 niT ce dcm
       in
@@ -148,7 +149,7 @@ Section Translate.
       | (AstCommon.mkItyp itN itC ) ::typ' =>
         let (cct, ncT') := fromN ncT (List.length itC) in
         let (ce', dcm') :=
-            convert_cnstrs itN cct itC (BasicAst.mkInd idBundle n) 0 0 0 niT ce dcm
+            convert_cnstrs itN cct itC (Kernames.mkInd idBundle n) 0 0 0 niT ce dcm
         in
         let ityi :=
             combine cct (map (fun (c:AstCommon.Cnstr) =>
@@ -214,12 +215,12 @@ Section Translate.
              (prim : positive) (args : list var) (kont : var) : cpsM cps.exp :=
       match n with
       | 0%nat =>
-        pr <- get_named_str "prim"%string ;;
+        pr <- get_named_str "prim"%bs ;;
         ret (Eprim pr prim (List.rev args) (Eapp kont kon_tag [pr]))
       | S n =>
-        arg <- get_named_str "p_arg"%string ;;
-        kont1 <- get_named_str "p_k"%string ;;
-        f <- get_named_str "prim_wrapper"%string ;;
+        arg <- get_named_str "p_arg"%bs ;;
+        kont1 <- get_named_str "p_k"%bs ;;
+        f <- get_named_str "prim_wrapper"%bs ;;
         trm <- convert_prim n prim (arg :: args) kont1 ;;
         ret (Efun (Fcons f func_tag [kont1; arg] trm Fnil) (Eapp kont kon_tag [f]))
       end.                  
@@ -252,10 +253,10 @@ Section Translate.
         | None => failwith  "Unknown DeBruijn index"
         end
       | App_e e1 e2 =>
-        x1 <- get_named_str "x1"%string ;;
-        k1 <- get_named_str "k1"%string ;;
-        x2 <- get_named_str "x2"%string ;;
-        k2 <- get_named_str "k2"%string ;;
+        x1 <- get_named_str "x1"%bs ;;
+        k1 <- get_named_str "k1"%bs ;;
+        x2 <- get_named_str "x2"%bs ;;
+        k2 <- get_named_str "k2"%bs ;;
         e1' <- cps_cvt e1 vn k1 tgm;;
         e2' <- cps_cvt e2 vn k2 tgm;;
         ret (Efun
@@ -266,9 +267,9 @@ Section Translate.
                          e2') Fnil)
                e1')
       | Lam_e n e1 =>
-        x1 <- get_named_str "x1"%string ;;
+        x1 <- get_named_str "x1"%bs ;;
         f <- get_named n ;;
-        k1 <- get_named_str "k1"%string ;;
+        k1 <- get_named_str "k1"%bs ;;
         e1' <- cps_cvt e1 (x1::vn) k1 tgm ;;
         ret (Efun
                (Fcons f func_tag (k1::x1::nil) e1' Fnil)
@@ -276,7 +277,7 @@ Section Translate.
 
       | Let_e n e1 e2 =>
         x <- get_named_str (string_of_name n);;
-        k1 <- get_named_str "k"%string ;;
+        k1 <- get_named_str "k"%bs ;;
         e2' <- cps_cvt e2 (x::vn) k tgm ;;
         e1' <- cps_cvt e1 vn k1 tgm ;;
         ret (Efun
@@ -285,7 +286,7 @@ Section Translate.
 
       | Con_e dci es =>
         let c_tag := dcon_to_tag dci tgm in
-        x' <- get_named_str "x'"%string ;;
+        x' <- get_named_str "x'"%bs ;;
         xs <- get_named_str_lst (map (fun _ => "x") (exps_as_list es)) ;;
         ks <- get_named_str_lst (map (fun _ => "k") (exps_as_list es)) ;;
         cps_cvt_exps es vn (Econstr x' c_tag xs (Eapp k kon_tag (x'::nil))) xs ks tgm
@@ -301,18 +302,18 @@ Section Translate.
         end
           
       | Match_e e1 n bl =>
-        x1 <- get_named_str "x1"%string ;;
-        k1 <- get_named_str "k1"%string ;;
+        x1 <- get_named_str "x1"%bs ;;
+        k1 <- get_named_str "k1"%bs ;;
         e1' <- cps_cvt e1 vn k1 tgm;;
         cbl <- cps_cvt_branches bl vn k x1 tgm;;
         ret (Efun (Fcons k1 kon_tag (x1::nil) (Ecase x1 cbl) Fnil) e1')
             
       | Prf_e =>
-        x <- get_named_str "x"%string ;;
+        x <- get_named_str "x"%bs ;;
         ret (Econstr x default_tag nil (Eapp k kon_tag (x::nil)))
             
-      (* f <- get_named_str "f"%string ;; *)
-      (* x <- get_named_str "x"%string ;; *)
+      (* f <- get_named_str "f"%bs ;; *)
+      (* x <- get_named_str "x"%bs ;; *)
       (* let c := consume_fun f x in *)
       (* ret (c |[ cps.Eapp k kon_tag (f::nil) ]|) *)
             
@@ -343,8 +344,8 @@ Section Translate.
            match fdefs with
            | eflnil => ret Fnil
            | eflcons n1 e1 fdefs' =>
-             x <- get_named_str "x"%string ;;
-             k' <- get_named_str "k"%string ;;
+             x <- get_named_str "x"%bs ;;
+             k' <- get_named_str "k"%bs ;;
              let curr_var := List.hd 1%positive nlst in
              match e1 with
              | Lam_e n2 e2 =>
@@ -374,9 +375,9 @@ Section Translate.
 
 
     Definition convert_whole_exp (e : expression.exp ) (dcm : conId_map) : cpsM exp := 
-      k <- get_named_str "k"%string ;;
-      f <- get_named_str "f"%string ;;
-      x <- get_named_str "x"%string ;;    
+      k <- get_named_str "k"%bs ;;
+      f <- get_named_str "f"%bs ;;
+      x <- get_named_str "x"%bs ;;    
       e' <- cps_cvt e nil k dcm ;;
       ret (Efun
              (Fcons f kon_tag (k::nil) e'
@@ -804,7 +805,7 @@ Section Translate.
                             | Npos _ => fi
                             end in
                  ret (fi', Fcons f_name func_tag [arg] e_body defs')
-               | (_, _) => failwith ("Unexpected body of fix in function " ++  print_name n)
+               | (_, _) => failwith ("Unexpected body of fix in function " ++  print_name n)%bs
                end
              |_, _ => failwith "Wrong number of names for mut. rec. functions"
              end

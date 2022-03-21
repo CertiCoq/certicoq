@@ -358,17 +358,28 @@ let first_unused_ident () = !next_atom
 
 (* Strings *)
 
-let camlstring_of_coqstring (s: char list) =
-  let r = Bytes.create (List.length s) in
+let char_of_ascii a =
+  let code = Ascii.coq_N_of_ascii a in
+  Char.chr code
+
+let ascii_of_char a =
+  let code = Char.code a in
+  Ascii.ascii_of_N code
+
+let camlstring_of_coqstring (s: String0.string) =
+  let open String0 in
+  let open Ascii in
+  let r = Bytes.create (Nat.to_int (length s)) in
   let rec fill pos = function
-  | [] -> r
-  | c :: s -> r.[pos] <- c; fill (pos + 1) s
+  | EmptyString -> r
+  | String (c, s) -> Bytes.set r pos (char_of_ascii c); fill (pos + 1) s
   in Bytes.to_string (fill 0 s)
 
 let coqstring_of_camlstring s =
+  let open String0 in
   let rec cstring accu pos =
-    if pos < 0 then accu else cstring (s.[pos] :: accu) (pos - 1)
-  in cstring [] (String.length s - 1)
+    if pos < 0 then accu else cstring (String (ascii_of_char s.[pos], accu)) (pos - 1)
+  in cstring EmptyString (String.length s - 1)
 
 (* Floats *)
 

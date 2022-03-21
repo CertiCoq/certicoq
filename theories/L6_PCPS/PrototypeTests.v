@@ -1,4 +1,4 @@
-From CertiCoq.L6 Require Import MockExpr Prototype.
+(* From CertiCoq.L6 Require Import MockExpr Prototype.
 
 Require Import Coq.Strings.Ascii Coq.Strings.String.
 Infix "+++" := append (at level 60, right associativity).
@@ -792,3 +792,4 @@ Compute (rw_cp_top (
       (eApp x4 [x5]))));
     (c3, (eApp x0 [x0]))])))).
 *)
+ *)

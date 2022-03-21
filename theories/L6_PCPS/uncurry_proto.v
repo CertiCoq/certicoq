@@ -1,7 +1,8 @@
 (** Uncurrying written as a guarded rewrite rule *)
 
-Require Import Coq.Strings.String Coq.Classes.Morphisms.
+Require Import Coq.Classes.Morphisms.
 Require Import Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Lia.
+Require Import Common.
 Require Import L6.Prototype.
 Require Import L6.proto_util.
 Require Import L6.cps L6.cps_proto.
@@ -12,7 +13,7 @@ Require Import Coq.Lists.List.
 Import ListNotations.
 
 (* Set Universe Polymorphism. *)
-Unset Strict Unquote Universe Mode.
+Unset MetaCoq Strict Unquote Universe Mode.
 
 (** * Uncurrying as a guarded rewrite rule *)
 
@@ -151,7 +152,7 @@ Definition metadata_update (f g f1 : var) fp_numargs (fv gv fv1 gv1 : list var) 
   let s := (max (fst s) fp_numargs, (M.set f 1 (M.set g 2 (snd s)))) in
   (* Hack: update cdata to agree with fresh names generated above *)
   let cdata :=
-    set_name f f1 "_uncurried"
+    set_name f f1 "_uncurried"%bs
     (set_names_lst fv fv1 ""
     (set_names_lst gv gv1 "" cdata))
   in
@@ -159,7 +160,7 @@ Definition metadata_update (f g f1 : var) fp_numargs (fv gv fv1 gv1 : list var) 
 
 Definition rw_uncurry :
   rewriter exp_univ_exp false (fun A C e => @univ_size A e)
-           uncurry_step _ (I_D_plain (D:=unit)) _ (@I_R) _ (@I_S).
+           uncurry_step _ (I_D_plain (D:=Datatypes.unit)) _ (@I_R) _ (@I_S).
 Proof.
   mk_rw; mk_easy_delay;
     try lazymatch goal with

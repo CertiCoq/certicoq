@@ -13,7 +13,7 @@ Require Import ExtLib.Structures.Monads
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
 
-From MetaCoq.Template Require Import BasicAst.
+From MetaCoq.Template Require Import bytestring BasicAst.
 
 From compcert Require Import
   common.AST
@@ -582,7 +582,7 @@ Fixpoint asgnAppVars'' (vs : list positive) (ind : list N) (fenv : fun_env) (map
     let s_iv :=  args[ Z.of_N i ] :::= (makeVar v fenv map) in
     rest <- asgnAppVars'' vs' ind' fenv map name ;;
     ret (rest ; s_iv)
-  | _, _ => Err ("asgnAppVars'' " ++ name)%string
+  | _, _ => Err ("asgnAppVars'' " ++ name)%bs
   end.
 
 Definition asgnAppVars' (vs : list positive) (ind : list N) (fenv : fun_env) (map : fun_info_env) name :
@@ -902,7 +902,7 @@ Definition make_extern_decl (nenv:M.t BasicAst.name) (def:(positive * globdef Cl
   | (fIdent, Gfun (Internal f)) =>
     (match M.get fIdent nenv with
      | Some (nNamed f_string) =>
-       Some (fIdent, Gfun (External (EF_external f_string (signature_of_type (type_of_params (fn_params f)) (fn_return f) (fn_callconv f))) (type_of_params (fn_params f)) (fn_return f) (fn_callconv f)))
+       Some (fIdent, Gfun (External (EF_external (String.to_string f_string) (signature_of_type (type_of_params (fn_params f)) (fn_return f) (fn_callconv f))) (type_of_params (fn_params f)) (fn_return f) (fn_callconv f)))
      | _ => None
      end)
   | (vIdent, Gvar (mkglobvar v_info v_init v_r v_v)) =>
@@ -926,7 +926,7 @@ Fixpoint make_extern_decls (nenv:name_env) (defs:list (positive * globdef Clight
 
 Definition body_external_decl : (positive * globdef Clight.fundef type) :=
   let params := (type_of_params ((tinfIdent, threadInf):: nil)) in
-  (bodyIdent, Gfun (External (EF_external ("body"%string) (signature_of_type  params Tvoid cc_default)) params Tvoid cc_default)).
+  (bodyIdent, Gfun (External (EF_external (String.to_string ("body"%bs)) (signature_of_type  params Tvoid cc_default)) params Tvoid cc_default)).
 
 End Translation.
 
@@ -975,6 +975,8 @@ Fixpoint make_ind_array (l : list N) : list init_data :=
   | nil => nil
   | n :: l' => (Init_int (Z.of_N n)) :: (make_ind_array l')
   end.
+
+Import String (append).
 
 Definition update_name_env_fun_info (f f_inf : positive) (nenv : name_env) : name_env :=
   match M.get f nenv with
@@ -1030,7 +1032,7 @@ Definition add_bodyinfo (e : exp) (fenv : fun_env) (nenv : name_env) (map: fun_i
         ((Init_int (Z.of_nat (max_allocs e))) :: (Init_int 0%Z) :: nil) true false in
   ret ((info_name , Gvar ind) :: defs,
        M.set mainIdent (info_name , 1%positive) map,
-       M.set info_name (nNamed "body_info"%string) nenv).
+       M.set info_name (nNamed "body_info"%bs) nenv).
 
 
 (* Make fundef_info for functions in fnd (if any), and for the body of the program *)
@@ -1047,7 +1049,7 @@ Definition make_funinfo (e : exp) (fenv : fun_env) (nenv : name_env)
 
 Definition global_defs (e : exp)
   : list (positive * globdef Clight.fundef type) :=
-    (gcIdent , Gfun (External (EF_external "gc"
+    (gcIdent , Gfun (External (EF_external "gc"%string
                                               (mksignature (val_typ :: nil) AST.Tvoid cc_default))
                                  (Tcons threadInf Tnil)
                                  Tvoid
@@ -1108,26 +1110,26 @@ Definition wrap_in_fun (e:exp) :=
   end.
 
 Definition inf_vars :=
-  (isptrIdent, (nNamed "is_ptr"%string)) ::
-  (argsIdent, (nNamed "args"%string)) ::
-  (allocIdent, (nNamed "alloc"%string)) ::
-  (nallocIdent, (nNamed "nalloc"%string)) ::
-  (limitIdent, (nNamed "limit"%string)) ::
-  (gcIdent, (nNamed "garbage_collect"%string)) ::
-  (mainIdent, (nNamed "main"%string)) ::
-  (bodyIdent, (nNamed "body"%string)) ::
-  (threadInfIdent, (nNamed "thread_info"%string)) ::
-  (tinfIdent, (nNamed "tinfo"%string)) ::
-  (heapInfIdent, (nNamed "heap"%string)) ::
-  (caseIdent, (nNamed "arg"%string)) ::
-  (numArgsIdent, (nNamed "num_args"%string)) ::
-  (stackframeTIdent, (nNamed "stack_frame"%string)) ::
-  (frameIdent, nNamed "frame"%string) ::
-  (rootIdent, nNamed "roots"%string) ::
-  (fpIdent, nNamed "fp"%string) ::
-  (nextFld, nNamed "next"%string) ::
-  (rootFld, nNamed "root"%string) ::
-  (prevFld, nNamed "prev"%string) :: nil.
+  (isptrIdent, (nNamed "is_ptr"%bs)) ::
+  (argsIdent, (nNamed "args"%bs)) ::
+  (allocIdent, (nNamed "alloc"%bs)) ::
+  (nallocIdent, (nNamed "nalloc"%bs)) ::
+  (limitIdent, (nNamed "limit"%bs)) ::
+  (gcIdent, (nNamed "garbage_collect"%bs)) ::
+  (mainIdent, (nNamed "main"%bs)) ::
+  (bodyIdent, (nNamed "body"%bs)) ::
+  (threadInfIdent, (nNamed "thread_info"%bs)) ::
+  (tinfIdent, (nNamed "tinfo"%bs)) ::
+  (heapInfIdent, (nNamed "heap"%bs)) ::
+  (caseIdent, (nNamed "arg"%bs)) ::
+  (numArgsIdent, (nNamed "num_args"%bs)) ::
+  (stackframeTIdent, (nNamed "stack_frame"%bs)) ::
+  (frameIdent, nNamed "frame"%bs) ::
+  (rootIdent, nNamed "roots"%bs) ::
+  (fpIdent, nNamed "fp"%bs) ::
+  (nextFld, nNamed "next"%bs) ::
+  (rootFld, nNamed "root"%bs) ::
+  (prevFld, nNamed "prev"%bs) :: nil.
 
 
 Definition add_inf_vars (nenv: name_env): name_env :=
@@ -1137,7 +1139,7 @@ Definition ensure_unique : M.t name -> M.t name :=
   fun l => M.map (fun x n =>
                     match n with
                     | nAnon =>  nAnon
-                    | nNamed s => nNamed (append s (append "_"%string (show_pos x)))
+                    | nNamed s => nNamed (append s (append "_"%bs (show_pos x)))
                   end) l.
 
 Fixpoint make_proj (recExpr:expr) (start:nat) (left:nat): list expr  :=
@@ -1161,7 +1163,7 @@ Fixpoint make_argList' (n:nat) (nenv:name_env) : nState (name_env * list (ident 
   | 0 => ret (nenv, nil)
   | (S n') =>
     new_id <- getName;;
-           let new_name := append "arg" (nat2string10 n') in
+           let new_name := append "arg" (String.of_string (nat2string10 n')) in
            let nenv := M.set new_id (nNamed new_name) nenv in
            rest <- make_argList' n' nenv;;
                 let (nenv, rest_id) := rest in
@@ -1195,7 +1197,8 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
           match M.get t fenv with
           | Some (n, l) =>
             "Definition " ++ get_fname f nenv ++ " has tag " ++ (show_pos t) ++ Pipeline_utils.newline ++
-                          "Def: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ (nat2string10 (length l))
+                          "Def: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ 
+                          String.of_string (nat2string10 (length l))
           | None =>
             "Def: Function " ++ get_fname f nenv ++ " was not found in fun_env"
           end
@@ -1214,7 +1217,8 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
       let s :=
           match M.get t fenv with
           | Some (n, l) =>
-            "LetApp: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ (nat2string10 (length l))
+            "LetApp: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ 
+            String.of_string (nat2string10 (length l))
           | None =>
             "LetApp: Function " ++ get_fname f nenv ++ " was not found in fun_env"
           end
@@ -1228,7 +1232,8 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
       let s :=
           match M.get t fenv with
           | Some (n, l) =>
-            "App: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ (nat2string10 (length l))
+            "App: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ 
+            String.of_string (nat2string10 (length l))
           | None =>
             "App: Function " ++ get_fname f nenv ++ " was not found in fun_env"
           end
@@ -1281,8 +1286,8 @@ Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_e
        let forward_defs := make_extern_decls nenv defs false in
        body <- mk_prog_opt [body_external_decl] mainIdent false;;
        head <- mk_prog_opt (make_tinfo_rec :: export_rec :: forward_defs ++ defs)%list mainIdent true ;;
-       ret (M.set make_tinfoIdent (nNamed "make_tinfo"%string)
-                  (M.set exportIdent (nNamed "export"%string) nenv),
+       ret (M.set make_tinfoIdent (nNamed "make_tinfo"%bs)
+                  (M.set exportIdent (nNamed "export"%bs) nenv),
             body, head)
   in
   (err, "").

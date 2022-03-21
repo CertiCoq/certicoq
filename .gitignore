@@ -79,3 +79,11 @@ benchmarks/vs_easy_opt
 benchmarks/vs_easy_opt_ll
 benchmarks/vs_hard_opt
 benchmarks/vs_hard_opt_ll
+benchmarks/glue.CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.c
+benchmarks/glue.CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.h
+benchmarks/metacoq_erasure/CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.metacoq_erasure.c
+benchmarks/metacoq_erasure/CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.metacoq_erasure.h
+benchmarks/metacoq_erasure/g_safe_erasure.ml
+benchmarks/metacoq_erasure/glue.CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.metacoq_erasure.c
+benchmarks/metacoq_erasure/glue.CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.metacoq_erasure.h
+benchmarks/metacoq_erasure/metacoq_erasure

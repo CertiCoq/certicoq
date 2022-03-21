@@ -6,7 +6,7 @@ Require Import Common.Common Common.classes Common.Pipeline_utils Common.compM.
 From ExtLib Require Import Monads.
 From MetaCoq.Template Require Import utils Typing.
 Import MonadNotation.
-
+(* 
 Definition erase_PCUIC : CertiCoqTrans Ast.Env.program (global_context * term) :=
   fun src =>
     debug_msg "Translating from Template to Lbox" ;;
@@ -39,3 +39,4 @@ Definition template_bigstep (p : Ast.Env.program) (v : Ast.term) : Prop :=
                     end;
     BigStep := fun s sv => WcbvEval (env s) (main s) sv
   }.
+ *)

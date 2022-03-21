@@ -272,7 +272,7 @@ Proof.
       * assumption.
   - econstructor; destruct H.
     + unfold LookupTyp. instantiate (1 := ipkg); intuition.
-      destruct (kername_eq_dec nm ipkgNm).
+      destruct (Classes.eq_dec nm ipkgNm).
       * subst. elim H5. constructor.
       * instantiate (1:= npars). eapply Lookup_strengthen.
         eassumption. reflexivity. auto.

@@ -117,9 +117,9 @@ let fix_declarations decls =
   in
   let fix_decl (kn, decl) =
     let decl' = match decl with
-    | Ast0.Env.ConstantDecl {cst_type; cst_body; cst_universes} ->
+    | Ast0.Env.ConstantDecl {cst_type; cst_body; cst_universes; cst_relevance} ->
       Ast0.Env.ConstantDecl { cst_type = fix_term cst_type; cst_body = option_map fix_term (Obj.magic cst_body);
-      cst_universes = fix_universes_decl cst_universes }
+      cst_universes = fix_universes_decl cst_universes; cst_relevance }
     | Ast0.Env.InductiveDecl { ind_finite; ind_npars; ind_params; ind_bodies; ind_universes; ind_variance} ->
       Ast0.Env.InductiveDecl { ind_finite; ind_npars; ind_params = fix_rel_context ind_params; 
       ind_bodies = List.map fix_ind_body ind_bodies; 

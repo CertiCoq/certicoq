@@ -61,12 +61,11 @@ Definition Clight_trans_fast (prims : list (kername * string * bool * nat * posi
 
 
 Definition Clight_trans_ANF (prims : list (kername * string * bool * nat * positive)) (args : nat) (t : toplevel.L6_FullTerm) : error Cprogram * string :=
-  let '(_, pr_env, cenv, ctag, itag, nenv, fenv, _, prog) := t in
+  let '(_, cenv, ctag, itag, nenv, fenv, _, prog) := t in
   let '(p, str) := L6_to_Clight_stack.compile
                      argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent
                      tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
                      args
-                     pr_env
                      stackframeTIdent frameIdent rootIdent fpIdent nextFld rootIdent prevFld
                      false (* args optimization *)
                      prog cenv nenv in

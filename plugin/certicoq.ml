@@ -58,7 +58,7 @@ type options =
     ext       : string;
     dev       : int;
     prefix    : string;
-    prims     : (Kernames.kername * Kernames.ident * bool) list;
+    prims     : ((Kernames.kername * Kernames.ident) * bool) list;
   }
 
 let default_options : options =

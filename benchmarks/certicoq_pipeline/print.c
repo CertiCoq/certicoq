@@ -35,3 +35,7 @@ value print_msg_debug(value msg) {
   call_coq_msg_debug(msg);
   return Val_unit;
 }
+
+value metacoq_guard_impl(value fixcofix, value globalenv, value context, value term) {
+  return Val_true;
+}

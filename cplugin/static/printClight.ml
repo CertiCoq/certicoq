@@ -34,10 +34,8 @@ open Datatypes
 
 let temp_name (id: AST.ident) =
   try
-    Printf.printf "looking up %i\n" (P.to_int id);
     "$" ^ Hashtbl.find string_of_atom (P.to_int id)
   with Not_found ->
-    Printf.printf "not_found\n";
     Printf.sprintf "$%d" (P.to_int id)
 
 (* Declarator (identifier + type) -- reuse from PrintCsyntax *)
@@ -337,7 +335,6 @@ let add_name (a, n) =
         let cs = Caml_bytestring.caml_string_of_bytestring s in
         Hashtbl.add atom_of_string cs i;
         Hashtbl.add string_of_atom i cs;
-        (* Printf.printf "added %i -> %s to string_of_atom\n" i cs; *)
         ()
 
 let remove_primes (a, n) =
@@ -358,20 +355,9 @@ let print_dest_names prog names dest =
   List.iter (fun n -> add_name (remove_primes n))  names;
   print_program Clight2 (formatter_of_out_channel oc) prog;
   close_out oc
-  
-let print_env names = 
-  List.iter (fun (p, n) ->
-    let i = Camlcoq.P.to_int p in
-    match n with
-    | BasicAst.Coq_nAnon -> 
-      Printf.printf "%i -> nAnon\n" i
-    | BasicAst.Coq_nNamed s ->
-      Printf.printf "%i -> nNamed %s\n" i (Caml_bytestring.caml_string_of_bytestring s))
-  names  
 
 let print_dest_names_imports prog names (dest : string) (imports : string list) =
   let oc = open_out dest in  
-  (* print_env names; *)
   List.iter (fun n -> add_name (remove_primes n))  names;
   let fm = formatter_of_out_channel oc in
   open_vbox 0;
@@ -381,6 +367,4 @@ let print_dest_names_imports prog names (dest : string) (imports : string list) 
   open_box 0;
   print_program Clight2 fm prog;
   close_box ();
-  close_out oc;
-  Printf.printf "end of output to %s\n" dest
-        
+  close_out oc        

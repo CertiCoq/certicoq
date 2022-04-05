@@ -27,6 +27,8 @@ Extract Inductive unit => unit [ "()" ].
 Extract Inductive list => list [ "[]" "( :: )" ].
 Extract Inductive prod => "( * )" [ "" ].
 
+Extract Constant PCUICWfEnvImpl.guard_impl => "(fun _ _ _ _ -> Coq_true)".
+
 (** NB: The "" above is a hack, but produce nicer code than "(,)" *)
 
 (** Restore laziness of andb, orb.

@@ -14,11 +14,36 @@ Cd "tests".
 
 From MetaCoq.Erasure Require Import Erasure.
 
-Time CertiCoqC Compile erase_and_print_template_program.
+(*
+Time CertiCoqC Compile erase_and_print_template_program
+Extract Constants [
+  (* coq_msg_debug => "print_msg_debug", *)
+  (* coq_msg_info => "print_msg_info", *)
+  PCUICWfEnvImpl.guard_impl => "metacoq_guard_impl"
+   ] 
+Include [ "print.h" ].
+*)
 (* 32sec *)
-Cd "../mltests".
+(*Cd "../mltests".
 Time CertiCoq Compile erase_and_print_template_program.
-(* 12sec *)
+(* 12sec *) *)
+
+From CertiCoq.Benchmarks.certicoq_pipeline Require Import certicoq_pipeline.
+
+Time CertiCoqC Compile -time -O 0 compile
+Extract Constants [
+  (* coq_msg_debug => "print_msg_debug", *)
+  (* coq_msg_info => "print_msg_info", *)
+  PCUICWfEnvImpl.guard_impl => "metacoq_guard_impl"
+   ] 
+Include [ "print.h" ].
+
+
+(*Extract Constants [
+  (* coq_msg_debug => "print_msg_debug", *)
+  coq_msg_info => "print_msg_info"
+   ] 
+Include [ "print.h" ].*)
 
 (* From MetaCoq.SafeChecker Require Import PCUICSafeChecker. *)
 (* CertiCoq Erase @typecheck_program. *)

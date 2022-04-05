@@ -5,7 +5,7 @@
     The "definitions" part of the global environment is turned into let-bound 
     declarations, and corresponding global references are turned into de-Bruijn lookups.
     
-    We show that evaluation is preserved, when all values of the environment reduce to values, 
+    We show that evaluation is preserved, when all definitions in the environment reduce to values, 
     observations of the evaluated term under this environment is the same as before the translation.
 *)
 
@@ -39,38 +39,25 @@ Ltac equaln := repeat (f_equal; try lia); auto.
 
 Lemma crctTerm_fix e dts m t n :
   crctTerm e n (TFix dts m) ->
-  L2k.term.dnthBody m dts = Some t -> L3t.isLambda t.
+  L2k.term.dnthBody m dts = Some t -> 
+  (L3t.isLambda t \/ isProof t).
 Proof.
   intros. inv H.
   revert m H6 H0. induction H5; intros.
   - destruct m; cbn in H0; discriminate.    
   - destruct m. unfold dnthBody in H1. simpl in *. injection H1.
-    now intros ->. 
+    intros ->; auto.
     eapply (IHcrctDs m). simpl dlength in H6. lia. eauto.
 Qed.
 
 Lemma whFixStep_preserves_crctTerm e dts m fs :
   crctTerm e 0 (TFix dts m) ->
   whFixStep dts m = Some fs ->
-  crctTerm e 0 fs /\ L3t.isLambda fs.
+  crctTerm e 0 fs.
 Proof.
   intros.
-  split.
-  - eapply whFixStep_pres_Crct in H0; eauto.
-    apply Crct_invrt_Fix in H. eauto.
-  - unfold whFixStep in H0.
-    destruct (dnth m dts) eqn:Heq; try discriminate. destruct d; simpl in *.
-    fold (pre_whFixStep dbody dts) in H0. injection H0 as <-.
-    apply dnth_dnthBody_Some in Heq. eapply crctTerm_fix in Heq; eauto.
-    simpl in Heq.
-    unfold pre_whFixStep.
-    generalize dts at 1. clear H. revert dbody Heq.
-    induction dts. simpl. auto.
-    { simpl. intros.
-      apply IHdts.
-      inv Heq. destruct H as [bod ->].
-      rewrite instantiate_TLambda. eexists.
-      eexists. reflexivity. }
+  eapply whFixStep_pres_Crct in H0; eauto.
+  apply Crct_invrt_Fix in H. eauto.
 Qed.
 
 Lemma whBetaStep_preserves_crctTerm e bod a :
@@ -661,7 +648,7 @@ Proof.
     constructor. 2:eapply H2; eauto.
     cbn. now rewrite <- !Nnat.Nat2N.inj_add, Nat.add_assoc, (Nat.add_comm n).
   - constructor; auto.
-    destruct H as [na [body ->]]. exact I.
+    now destruct H as [na [body ->]]. 
 Qed.
 
 Lemma translate_env_pres_Lookup nm p prims t : crctEnv p -> Lookup nm p t ->
@@ -699,7 +686,7 @@ Proof.
   subst.
   assert(Har:forall n, N.pos (Pos.of_succ_nat n) = 1 + N.of_nat n) by (intros; lia).
   apply crctCrctsCrctBsDsEnv_ind; intros; unfold translate;
-  cbn -[trans_brs] in *; repeat constructor; eauto; try lia.
+  cbn -[trans_brs] in *; try solve [repeat constructor; eauto; try lia].
 
   - (* Lambda *)
     specialize (H0 H1 H2).
@@ -709,11 +696,11 @@ Proof.
     now rewrite !Har in H2. 
   - (* Constant -> Rel *)
     generalize (cst_offset_length (translate_env [] p) nm).
-    intros. forward H4. lia.
+    intros. constructor; eauto. forward H4. lia.
     unfold LookupDfn in H1.
     eapply translate_env_pres_Lookup; eauto.
-  - rewrite efnlst_length_trans. lia.
-  - rewrite efnlst_length_trans.
+  - repeat constructor; eauto; try lia. rewrite efnlst_length_trans. lia.
+    rewrite efnlst_length_trans.
     assert (N.of_nat (n + dlength ds + Datatypes.length (translate_env [] p)) =
             N.of_nat (dlength ds + n + Datatypes.length (translate_env [] p))) by lia.
     specialize (H0 H2 H3).
@@ -722,10 +709,11 @@ Proof.
     setoid_rewrite Nat.add_comm at 3.
     rewrite Nat.add_assoc.
     apply H0.
-  - simpl.
+  - repeat constructor; eauto; try lia.
+    simpl.
     specialize (H0 H3 H4).
     now rewrite <- !Nnat.Nat2N.inj_add, Nat.add_assoc, (Nat.add_comm n).
-  - destruct H as [na [body ->]]. exact I.
+  - constructor; eauto. now destruct H as [na [body ->]].
 Qed.
 
 Lemma crctTerm_exp_wf e e' :
@@ -1261,6 +1249,17 @@ Proof.
   simpl. erewrite IHm. reflexivity. apply H.
 Qed.
 
+Lemma L3sbst_fix_preserves_TProof dts :
+  fold_left
+    (fun (bod : Term) (ndx : nat) =>
+       L2k.term.instantiate (TFix dts ndx) 0 bod)
+    (list_to_zero (dlength dts)) TProof = TProof.
+Proof.
+  induction (list_to_zero (dlength dts)); simpl; intros.
+  reflexivity.
+  simpl. now cbn.
+Qed.
+
 (** Translation of fixpoints and fixpoint reduction *)
 Lemma L3sbst_fix_preserves_lam dts nm bod :
   fold_left
@@ -1291,6 +1290,12 @@ Proof.
   elim H.
   destruct H. subst x. auto with arith.
   specialize (IHn _ H). lia.
+Qed.
+
+Lemma sbst_fix_preserves_prf es : sbst_fix es Prf_e = Prf_e.
+Proof.
+  unfold sbst_fix, sbst_fix_aux.
+  induction (list_to_zero (efnlength es)); simpl; intros; auto.
 Qed.
   
 Lemma sbst_fix_preserves_lam es na bod :
@@ -2069,9 +2074,9 @@ Proof.
   - apply H0. apply Crct_invrt_LetIn in H1 as [Hdf Hbod].
     apply instantiate_preserves_crctTerm; auto.
     apply wcbvEval_pres_Crct in w; auto.
-  - apply H0. apply Crct_invrt_App in H1 as [Hfn Harg].
+  - apply H1. apply Crct_invrt_App in H2 as [Hfn Harg].
     constructor. eapply whFixStep_preserves_crctTerm; eauto 1.
-    eauto using wcbvEval_pres_Crct. auto.
+    eauto using wcbvEval_pres_Crct. eapply wcbvEval_pres_Crct; eauto.
   - dstrctn a. apply Crct_invrt_App in H1 as [Hfn Harg].
     specialize (H Hfn). inv H. apply wcbvEval_pres_Crct in w; auto.
     inv w; inv H4; intuition.
@@ -2348,16 +2353,19 @@ Proof with eauto.
     apply instantiate_preserves_crctTerm; eauto.
     
   + (* App Fix *)
-    intros * evfn Hfn fixstep evfix IHevfix wft.
+    intros * evfn Hfn fixstep eva IHeva evfix IHevfix wft.
     eapply Crct_invrt_App in wft; eauto.
     destruct wft as [H1 H2].
     specialize (Hfn H1).
+    assert (crcta1' : crctTerm e 0 a1').
+    { eapply wcbvEval_pres_Crct; eauto. }
     forward IHevfix; cycle 1.
     { assert (crctTerm e 0 (TFix dts m)). apply WcbvEval_preserves_crctTerm in evfn; eauto. 
       apply Crct_invrt_Fix in H.
       constructor.
       eapply whFixStep_pres_Crct; eauto. auto. }
     unfold translate. simpl.
+    specialize (IHeva H2).
     unfold subst_env; rewrite subst_env_application.
     unfold subst_env, translate in Hfn. simpl in Hfn.
     rewrite subst_env_aux_fix_e in Hfn.
@@ -2378,19 +2386,16 @@ Proof with eauto.
          rewrite efnlst_length_trans. reflexivity.
          rewrite <- eqfs in H4.
          apply WcbvEval_preserves_crctTerm in evfn; eauto.
-         destruct (crctTerm_fix _ _ _ _ _ evfn eqt') as [nm [bod ->]].
+         destruct (crctTerm_fix _ _ _ _ _ evfn eqt') as [[nm [bod ->]]| ->].
+         2:{ cbn. rewrite subst_env_aux_prf /=.
+            rewrite L3sbst_fix_preserves_TProof /= in H4.
+            rewrite subst_env_aux_prf in H4. depelim H4. }
          rewrite L3sbst_fix_preserves_lam in H4. simpl in H4.
          rewrite subst_env_aux_lam in H4. inv H4. clear fixstep.
          simpl. rewrite subst_env_aux_lam.
          rewrite sbst_fix_preserves_lam; revgoals.
          simpl. 
-         econstructor. constructor.
-         pose (eval_yields_value _ _ H5).
-         apply (proj1 wf_value_self_eval _ i).
-
-         eapply eval_preserves_wf; eauto.
-         apply exp_wf_subst; eauto 3.
-         eapply (crctTerm_exp_wf _ _ wfe evenv wfe'' _ 0); eauto.
+         econstructor. constructor; eauto. exact H5.
 
          change ((subst_env_aux e'' (1 + 0)
              (trans e'' [] (1 + 0)
@@ -2425,20 +2430,24 @@ Proof with eauto.
       * (* Impossible, as t' must be a lambda, so cannot evaluate to a fix *)
          intros Hfs.
          apply WcbvEval_preserves_crctTerm in evfn; eauto.
-         destruct (crctTerm_fix _ _ _ _ _ evfn eqt') as [nm [bod ->]].
-         elimtype False.
-         subst x.
-         rewrite L3sbst_fix_preserves_lam in H4.
-         simpl in H4.
-         rewrite subst_env_aux_lam in H4. inv H4.
+         destruct (crctTerm_fix _ _ _ _ _ evfn eqt') as [[nm [bod ->]]| ->].         
+         { elimtype False. subst x.
+          rewrite L3sbst_fix_preserves_lam /= subst_env_aux_lam in H4. inv H4. }
+        { elimtype False. subst x.
+          rewrite L3sbst_fix_preserves_TProof /= subst_env_aux_prf in H4. inv H4. }
 
       * intros Hfs.
+        eapply eval_FixApp_e; eauto.
+        rewrite Nnat.Nat2N.id.
+        rewrite (dnthbody _ _ _ _ _ _ _ eqt').
+        rewrite efnlst_length_trans. reflexivity.
         apply WcbvEval_preserves_crctTerm in evfn; eauto.
-        destruct (crctTerm_fix _ _ _ _ _ evfn eqt') as [nm [bod ->]].
-        elimtype False.
-        subst x.
-        rewrite L3sbst_fix_preserves_lam in H5.
-        simpl in H5. rewrite subst_env_aux_lam in H5. inv H5.
+        destruct (crctTerm_fix _ _ _ _ _ evfn eqt') as [[nm [bod ->]]| ->].
+        { elimtype False. subst x.
+          rewrite L3sbst_fix_preserves_lam /= subst_env_aux_lam in H5. inv H5. }
+        cbn. rewrite subst_env_aux_prf /=.
+        eapply eval_ProofApp_e; eauto.
+        rewrite sbst_fix_preserves_prf. constructor.
 
     - rewrite whFixStep_whFixStep' in fixstep. unfold whFixStep' in fixstep.
       rewrite t' in fixstep. discriminate.

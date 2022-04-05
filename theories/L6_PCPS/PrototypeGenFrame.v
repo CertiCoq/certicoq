@@ -751,12 +751,12 @@ Definition mk_Frame_ops (qual : modpath) (typename : kername) (T : Type) (atoms 
   atoms <- monad_map tmQuote atoms ;;
   mlet (inds, g, fs, cfs, univ, univ_of_tyname, univD, univD_body, frame_t) <-
     runGM (gen_Frame_ops qual typename p atoms) ;;
-  tmMkInductive univ ;;
+  tmMkInductive false univ ;;
   (* tmPrint univD ;; *)
   (* tmPrint univD_body ;; *)
   (* tmPrint =<< tmUnquote univD_body ;; *)
   tmMkDefinition (snd univD) univD_body ;;
-  tmMkInductive frame_t ;;
+  tmMkInductive false frame_t ;;
   let univD_kername := univD in
   let '(frameD, frameD_body) := gen_frameD qual typename univD_kername fs in
   tmMkDefinition (snd frameD) frameD_body ;;

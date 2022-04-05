@@ -44,10 +44,11 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
     WcbvEval p dfn dfn' ->
     WcbvEval p (instantiate dfn' 0 bod) s ->
     WcbvEval p (TLetIn nm dfn bod) s
-| wAppFix: forall dts m (fn a1 x s:Term),
+| wAppFix: forall dts m (fn a1 a1' x s:Term),
     WcbvEval p fn (TFix dts m) ->
     whFixStep dts m = Some x ->
-    WcbvEval p (TApp x a1) s ->
+    WcbvEval p a1 a1' ->
+    WcbvEval p (TApp x a1') s ->
     WcbvEval p (TApp fn a1) s
 | wAppCong: forall fn fn' arg arg', 
     WcbvEval p fn fn' ->
@@ -109,12 +110,12 @@ Proof.
       elim a. auto.
   - inversion_Clear H1. specialize (H _ H6). subst.
     eapply H0. assumption.
-  - inversion_Clear H1.
-    + specialize (H _ H4). discriminate.
-    + specialize (H _ H4). discriminate.
-    + specialize (H _ H4). myInjection H. rewrite H5 in e. myInjection e.
+  - inversion_Clear H2.
+    + specialize (H _ H5). discriminate.
+    + specialize (H _ H5). discriminate.
+    + specialize (H _ H5). myInjection H. rewrite H6 in e. myInjection e.
       specialize (H0 _ H7). subst. intuition.
-    + destruct H5 as [a [b c]]. specialize (H _ H4). subst fn'.
+    + destruct H6 as [a [b c]]. specialize (H _ H5). subst fn'.
       destruct b. auto.
   - destruct a as [a [b [c d]]]. inversion_Clear H1.
     + specialize (H _ H4). contradiction. 
@@ -141,7 +142,7 @@ Proof.
   induction 1; intros; try discriminate.
   - myInjection H1. intros h. subst. inversion H.
   - myInjection H2. intros h. subst. inversion H.
-  - myInjection H2. intros h. subst. inversion H.
+  - myInjection H3. intros h. subst. inversion H.
   - myInjection H2. intros h. subst. destruct H0 as [e [b [c d]]].
     inversion_Clear H. elim c. auto.
 Qed.
@@ -282,9 +283,10 @@ Proof.
     inversion_clear H. assumption.
   - eapply H0. apply instantiate_pres_Crct; try eassumption; try lia.
     apply H. assumption.
-  - specialize (H _ H6). inversion_Clear H.
-    inversion_Clear w0; (eapply H0; constructor; try assumption;
-      apply (whFixStep_pres_Crct _ H5 _ e)).
+  - inversion_Clear H2. specialize (H _ H7). inversion_Clear H.
+    specialize (H0 _ H8).
+    eapply H1. constructor; auto.
+    apply (whFixStep_pres_Crct _ H6 _ e).
   - specialize (H _ H8). apply H0.
     refine (whCaseStep_pres_Crct _ H9 _ _); try eassumption.
     inversion_Clear H. assumption.
@@ -321,7 +323,11 @@ Function wcbvEval
       | Ret (TFix dts m) =>           (* Fix redex *)
         match whFixStep dts m with
         | None => raise ("wcbvEval;TApp:whFixStep doesn't eval")
-        | Some f => wcbvEval n (TApp f a1)
+        | Some f =>
+          match wcbvEval n a1 with
+          | Exc s =>  raise ("wcbvEval,fix,arg: " ++ s)
+          | Ret b1 => wcbvEval n (TApp f b1)
+          end
         end
       | Ret (TLambda _ bod) =>        (* beta redex *)
         match wcbvEval n a1 with
@@ -401,8 +407,8 @@ Proof.
     try(solve[constructor]); intuition auto.
   - eapply wConst; intuition auto. unfold lookupDfn. rewrite e1. reflexivity.
   - specialize (H _ e1). specialize (H0 _ e2). now eapply wAppProof.
-  - specialize (H _ e1). specialize (H0 _ p1).
-    eapply wAppFix; eassumption.
+  - specialize (H _ e1).
+    eapply wAppFix; eauto.
   - specialize (H _ e1). specialize (H0 _ e2). specialize (H1 _ p1). 
     eapply wAppLam; eassumption.
   - specialize (H _ e1). specialize (H0 _ e2).
@@ -472,11 +478,12 @@ Proof.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     simpl. rewrite (j mx); try lia. rewrite (H (mx - 1)); try lia.
     rewrite H0; try lia. reflexivity.
-  - destruct H, H0. exists (S (max x0 x1)). intros mx h.
-    assert (l1:= max_fst x0 x1). assert (l2:= max_snd x0 x1).
+  - destruct H, H0, H1. exists (S (max x0 (max x1 x2))).
+    intros mx h.
+    assert (l1:= max_fst x0 (Nat.max x1 x2)). assert (l2:= max_snd x0 (Nat.max x1 x2)).
     cbn. rewrite (j mx); try lia. rewrite (H (mx - 1)); try lia.
     destruct (whFixStep dts m).
-    + myInjection e. rewrite H0; try lia. reflexivity.
+    + myInjection e. rewrite H0; try lia. rewrite H1. reflexivity. lia.
     + discriminate.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).

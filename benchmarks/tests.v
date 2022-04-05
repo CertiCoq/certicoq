@@ -162,9 +162,11 @@ Eval compute in "Compiling MetaCoq Erasure".
 
 From MetaCoq.Erasure Require Import Erasure.
 
-Definition metacoq_erasure := erase_program.
-CertiCoq Compile -O 0 -time metacoq_erasure.
-CertiCoq Compile -ext "_opt" metacoq_erasure.
+Definition metacoq_erasure := run_erase_program.
+CertiCoq Compile -O 0 -time metacoq_erasure
+Extract Constants [ PCUICWfEnvImpl.guard_impl => "metacoq_guard_impl" ] 
+Include [ "metacoq_guard_impl.h" ].
+(* CertiCoq Compile -ext "_opt" metacoq_erasure.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" metacoq_erasure.
 
 Eval compute in "Compiling the CertiCoq Pipeline".
@@ -174,7 +176,7 @@ From CertiCoq Require Import pipeline.
 Definition certicoq_compile := compile.
 CertiCoq Compile -O 0 -time certicoq_compile.
 CertiCoq Compile -ext "_opt" certicoq_compile.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" certicoq_compile.
+CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" certicoq_compile. *)
 
 (* Eval compute in "Compiling MetaCoq SafeChecker". *)
 

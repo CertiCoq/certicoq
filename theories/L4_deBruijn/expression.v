@@ -54,7 +54,7 @@ Qed.
 
 (* data constructors *)
 Definition dcon : Set := inductive * N.
-Instance DconEq : Eq dcon := _.
+#[export] Instance DconEq : Eq dcon := _.
 
 (** Source expressions, represented using deBruijn notation *)
 Inductive exp: Type :=
@@ -81,7 +81,7 @@ If yes, does the wf definition for L4 imply the above? *)
             branches_e -> branches_e.
 Notation "[| e |]" := (econs e enil).
 Notation "[! fn := f !]" := (eflcons fn%bs f eflnil).
-Hint Constructors exp exps branches_e : core.
+#[export] Hint Constructors exp exps branches_e : core.
 Scheme exp_ind' := Induction for exp Sort Prop
 with exps_ind'  := Induction for exps Sort Prop
 with efnlst_ind'  := Induction for efnlst Sort Prop
@@ -165,7 +165,7 @@ with branches_wf: N -> branches_e -> Prop :=
 | brcons_wf: forall i d n e bs,
     exp_wf (nargs n + i) e -> branches_wf i bs ->
     branches_wf i (brcons_e d n e bs).
-Hint Constructors exp_wf exps_wf branches_wf : core.
+#[export] Hint Constructors exp_wf exps_wf branches_wf : core.
 Scheme exp_wf_ind2 := Induction for exp_wf Sort Prop
 with exps_wf_ind2 := Induction for exps_wf Sort Prop
 with efnlst_wf_ind2 := Induction for efnlst_wf Sort Prop
@@ -206,7 +206,7 @@ Lemma weaken_branches: forall bs i, branches_wf 0 bs -> branches_wf i bs.
   intros; destruct i; auto; eapply (proj2 (proj2 weaken_wf')); eauto; lia.
 Qed.
 
-Hint Resolve weaken_closed weaken_closeds weaken_branches : core.
+#[export] Hint Resolve weaken_closed weaken_closeds weaken_branches : core.
 
 (* optimised *)
 (** Shift all variables [i] equal or above [k] by [n]. *)
@@ -357,26 +357,26 @@ with sbst_branches (v:exp) k (bs:branches_e) : branches_e :=
 Class Substitute (v:Type) (t:Type) := { substitute: v -> N -> t -> t }.
 Notation "M { j := N }" := (substitute N j M)
                       (at level 10, right associativity).
-Instance ExpSubstitute: Substitute exp exp :=
+#[export] Instance ExpSubstitute: Substitute exp exp :=
   { substitute := subst}.
-Instance ExpsSubstitute: Substitute exp exps :=
+#[export] Instance ExpsSubstitute: Substitute exp exps :=
   { substitute := substs}.
-Instance BranchSubstitute: Substitute exp _ :=
+#[export] Instance BranchSubstitute: Substitute exp _ :=
   { substitute := subst_efnlst}.
-Instance BranchesSubstitute: Substitute exp _ := 
+#[export] Instance BranchesSubstitute: Substitute exp _ := 
   { substitute := subst_branches}.
 
 (** Notation for unoptimised substitution. *)
 Class Sbstitute (v:Type) (t:Type) := { sbstitute: v -> N -> t -> t }.
 Notation "M { j ::= N }" := (sbstitute N j M)
                       (at level 10, right associativity).
-Instance ExpSbstitute: Sbstitute exp exp :=
+#[export] Instance ExpSbstitute: Sbstitute exp exp :=
   { sbstitute := sbst}.
-Instance ExpsSbstitute: Sbstitute exp exps :=
+#[export] Instance ExpsSbstitute: Sbstitute exp exps :=
   { sbstitute := sbsts}.
-Instance EfnlstSbstitute: Sbstitute exp efnlst :=
+#[export] Instance EfnlstSbstitute: Sbstitute exp efnlst :=
   { sbstitute := sbst_efnlst}.
-Instance BranchesSbstitute: Sbstitute exp branches_e := 
+#[export] Instance BranchesSbstitute: Sbstitute exp branches_e := 
   { sbstitute := sbst_branches}.
 
 Lemma Var_e_sbst_inv:
@@ -407,7 +407,7 @@ Lemma efnlst_length_subst v k es :
   efnlst_length (subst_efnlst v k es) = efnlst_length es.
 Proof. induction es; simpl; try rewrite_hyps; trivial. Qed.
 
-Hint Rewrite efnlst_length_shift efnlst_length_subst efnlst_length_sbst : core.
+#[export] Hint Rewrite efnlst_length_shift efnlst_length_subst efnlst_length_sbst : core.
 
 Lemma shift_twice:
   forall N i j m n, i <= j -> j <= i + m ->
@@ -1182,7 +1182,7 @@ Lemma sbst_preserves_branches_wf :
 Proof.
   intros; eapply (proj2 (proj2 sbst_preserves_wf')); eauto; lia.
 Qed.
-Hint Resolve sbst_preserves_exp_wf sbst_preserves_exps_wf 
+#[export] Hint Resolve sbst_preserves_exp_wf sbst_preserves_exps_wf 
      sbst_preserves_branches_wf : core.
 
 Lemma nthopt_preserves_wf :
@@ -1297,7 +1297,7 @@ with are_values: exps -> Prop :=
 Scheme is_value_ind2 := Induction for is_value Sort Prop
 with are_values_ind2 := Induction for are_values Sort Prop.
 Combined Scheme my_is_value_ind from is_value_ind2, are_values_ind2.
-Hint Constructors is_value are_values : core.
+#[export] Hint Constructors is_value are_values : core.
 
 (** Show that evaluation always yields a value. *)
 Lemma eval_yields_value' :
@@ -1308,7 +1308,7 @@ Proof.
 Qed.
 Definition eval_yields_value := proj1 eval_yields_value'.
 Definition evals_yields_values := proj2 eval_yields_value'.
-Hint Resolve eval_yields_value evals_yields_values : core.
+#[export] Hint Resolve eval_yields_value evals_yields_values : core.
 
 (** Computable test as to whether a source expression is already a
     value (a.k.a., atomic).  *)
@@ -1350,10 +1350,10 @@ Proof.
 Qed.
 Definition is_valueb_corr := proj1 is_valueb_corr'.
 Definition are_valuesb_corr := proj1 (proj2 is_valueb_corr').
-Hint Rewrite is_valueb_corr : core.
-Hint Rewrite are_valuesb_corr : core.
-Hint Resolve is_valueb_corr : core.
-Hint Resolve are_valuesb_corr : core.
+#[export] Hint Rewrite is_valueb_corr : core.
+#[export] Hint Rewrite are_valuesb_corr : core.
+#[export] Hint Resolve is_valueb_corr : core.
+#[export] Hint Resolve are_valuesb_corr : core.
 
 Fixpoint exps_append (es1 es2:exps) : exps :=
   match es1 with
@@ -1376,7 +1376,7 @@ Proof.
   - destruct H. inversion H. subst. constructor ; auto. rewrite <- IHes1. auto.
   - inversion H ; subst. rewrite <- IHes1 in H3. destruct H3. split ; auto.
 Qed.
-Hint Resolve are_values_append : core.
+#[export] Hint Resolve are_values_append : core.
 
 Lemma exp_wf_shift :
   (forall i e, exp_wf i e -> forall j, shift j i e = e) /\

@@ -23,7 +23,7 @@ plugin/Makefile: plugin/_CoqProject
 	cd plugin ; coq_makefile -f _CoqProject -o Makefile
 
 plugin/CertiCoq.vo: all plugin/Makefile theories/Extraction/extraction.vo
-	sh ./make_plugin.sh
+	bash ./make_plugin.sh plugin
 
 
 install: plugin

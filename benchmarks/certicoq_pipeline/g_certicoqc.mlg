@@ -1,0 +1,50 @@
+(*i camlp4deps: "grammar/grammar.cma" i*)
+
+DECLARE PLUGIN "certicoqc_plugin"
+
+{
+open Pp
+open Certicoqc
+open Ltac_plugin
+open Stdarg
+open Pcoq.Prim
+open Plugin_utils
+open Certicoq
+open G_certicoq_vanilla
+}
+
+VERNAC COMMAND EXTEND CertiCoqCCompile CLASSIFIED AS QUERY
+| [ "CertiCoqC" "Compile" vanilla_cargs_list(l) global(gr) ] -> {
+    let gr = Nametab.global gr in
+    let opts = make_options l [] (get_name gr) in
+    Certicoqc.compile_with_glue opts gr []
+  }
+| [ "CertiCoqC" "Compile" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" string_list_sep(imps, ",") "]" ] -> {
+    let gr = Nametab.global gr in
+    let opts = make_options l cs (get_name gr) in
+    Certicoqc.compile_with_glue opts gr imps
+  }
+| [ "CertiCoqC" "Show" "IR" vanilla_cargs_list(l) global(gr) ] -> {
+    let gr = Nametab.global gr in
+    let opts = make_options l [] (get_name gr) in
+    Certicoqc.show_ir opts gr
+  }
+| [ "CertiCoqC" "Show" "IR" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" ] -> {
+    let gr = Nametab.global gr in
+    let opts = make_options l cs (get_name gr) in
+    Certicoqc.show_ir opts gr
+  }
+| [ "CertiCoqC" "FFI" vanilla_ffiargs_list(l) global(gr) ] -> {
+    let gr = Nametab.global gr in
+    let opts = make_options l [] "" in
+    Certicoqc.ffi_command opts gr
+  }
+| [ "CertiCoqC" "Generate" "Glue" vanilla_glueargs_list(l) "[" global_list_sep(grs, ",") "]" ] -> {
+    let grs = List.map Nametab.global grs in
+    let opts = make_options l [] "" in
+    Certicoqc.glue_command opts grs
+  }
+| [ "CertiCoqC" "-help" ] -> {
+    Feedback.msg_info (str help_msg)
+  }
+END

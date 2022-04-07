@@ -968,7 +968,7 @@ Lemma inverse_exists S {Hs : ToMSet S} (b : positive -> positive) :
   exists b', injective_subdomain (image b S) b' /\
         inverse_subdomain S b b'.
 Proof. 
-  pose (P := fun S => forall {_ : ToMSet S},
+  pose (P := fun S => forall (_ : ToMSet S),
                  injective_subdomain S b ->
                  exists b', injective_subdomain (image b S) b' /\
                        inverse_subdomain S b b').

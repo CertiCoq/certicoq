@@ -19,7 +19,7 @@ induction l.
 - apply perm_skip,IHl.
 Qed.
 
-Instance app_compat_perm(A:Type) : Proper (@Permutation A ==> @Permutation A ==> @Permutation A) (@app A).
+#[export] Instance app_compat_perm(A:Type) : Proper (@Permutation A ==> @Permutation A ==> @Permutation A) (@app A).
 Proof.
 unfold Proper,respectful.
 intros a1 a2 Ha b1 b2 Hb.
@@ -57,7 +57,7 @@ induction HP.
 - apply IHHP2,IHHP1,H.
 Qed.
 
-Instance In_compat_perm(A:Type):
+#[export] Instance In_compat_perm(A:Type):
     Proper (eq ==> @Permutation A ==> iff) (@In A).
 Proof.
 unfold Proper,respectful.
@@ -70,7 +70,7 @@ split.
   exact Hl.
 Qed.
 
-Instance length_compat_perm(A:Type):
+#[export] Instance length_compat_perm(A:Type):
     Proper (@Permutation A ==> eq) (@length A).
 Proof.
 unfold Proper, respectful.

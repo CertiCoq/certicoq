@@ -581,12 +581,12 @@ Record result A (C : erased (frames_t A Root)) (e : univD A) : Set := mk_result 
   resProof : «e_map (fun C => clos_refl_trans _ Rstep (C ⟦ e ⟧) (C ⟦ resTree ⟧)) C» }.
 
 Definition rw_for (fuel : Fuel) A (C : erased (frames_t A Root)) (e : univD A) :=
-  forall n `{e_ok _ n} (r : Param I_R C) (s : State I_S C e),
+  forall n (eok : e_ok n) (r : Param I_R C) (s : State I_S C e),
   «e_map (fun n => «e_map (fun C => n = run_metric fuel C e) C») n» ->
   result C e.
 
 Definition rewriter' :=
-  forall (fuel : Fuel) A (C : erased (frames_t A Root)) `{e_ok _ C} (e : univD A) (d : Delay I_D e),
+  forall (fuel : Fuel) A (C : erased (frames_t A Root)) (eok : e_ok C) (e : univD A) (d : Delay I_D e),
   rw_for fuel C (delayD d).
 
 Definition res_chain A (C : erased (frames_t A Root)) `{e_ok _ C} (e : univD A) (m : result C e)

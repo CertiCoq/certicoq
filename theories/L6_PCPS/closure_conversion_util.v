@@ -1234,7 +1234,7 @@ Section Closure_conversion_util.
     - eapply project_var_occurs_free_ctx_Included_no_env; eauto.
       normalize_occurs_free... now sets. now sets.
 
-      Grab Existential Variables. exact (Empty_set _).
+      Unshelve. exact (Empty_set _).
   Qed.
 
   Corollary Closure_conversion_closed_fundefs e Scope Funs GFuns genv c Γ FVs e' C

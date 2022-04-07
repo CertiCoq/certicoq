@@ -752,7 +752,7 @@ Section CONTRACT.
     assumption.
   Defined.
   
-
+  Local Set Warnings "-funind-cannot-define-graph, -funind-cannot-build-inversion".
   Function contractcases (oes: exp * ctx_map * b_map)
            (fcon: r_map -> c_map ->  forall esi:(exp*ctx_map*b_map), (term_sub_inl_size esi < term_sub_inl_size oes)%nat -> shrinkT exp (snd esi))
            (sig:r_map) (count:c_map) (inl:b_map) (sub:ctx_map) (cl:list (var*exp))

@@ -1024,13 +1024,6 @@ Proof.
 Qed.
 
 
-(** some utility operations on [Terms] ("lists" of Term) **)
-Function tappend (ts1 ts2:Terms) : Terms :=
-  match ts1 with
-    | tnil => ts2
-    | tcons t ts => tcons t (tappend ts ts2)
-  end.
-
 Lemma tappend_tnil: forall ts:Terms, tappend ts tnil = ts.
 induction ts; simpl; try reflexivity.
 rewrite IHts. reflexivity.

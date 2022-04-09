@@ -88,7 +88,7 @@ Proof.
     + exists t, (tcons t0 t1). intuition.
 Qed.
 
-Fixpoint tappend (ts1 ts2:Terms) : Terms :=
+Function tappend (ts1 ts2:Terms) : Terms :=
   match ts1 with
     | tnil => ts2
     | tcons t ts => tcons t (tappend ts ts2)
@@ -223,7 +223,8 @@ Definition isApp (t:Term) : Prop :=
 Lemma IsApp: forall fn arg, isApp (TApp fn arg).
   intros. exists fn, arg. reflexivity.
 Qed.
-Hint Resolve IsApp : core.
+Global Hint Resolve IsApp : core.
+
 Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
   destruct t; try (right; not_isApp). left. auto.
 Qed.
@@ -348,14 +349,10 @@ Section Compile.
     | tLambda nm bod => TLambda nm (compile bod)
     | tLetIn nm dfn bod => TLetIn nm (compile dfn) (compile bod)
     | tApp fn args napp nnil with construct_viewc fn := {
-      | view_construct kn c with lookup_constructor_pars_args e kn c := { 
-        | Some (npars, nargs) => 
-          let args := map_InP args (fun x H => compile x) in
-          let '(args, rest) := MCList.chop nargs args in
-          TmkApps (TConstruct kn c (list_terms args)) (list_terms rest) 
-        | None => 
-          let args := map_InP args (fun x H => compile x) in
-          TConstruct kn c (list_terms args) }
+      | view_construct kn c :=
+        let args := map_InP args (fun x H => compile x) in
+        (* On wellformed terms appearing during evaluation, nargs = #|args| *)
+        TConstruct kn c (list_terms args)
       | view_other fn nconstr =>
         TmkApps (compile fn) (list_terms (map_InP args (fun x H => compile x)))
     }
@@ -378,11 +375,10 @@ Section Compile.
   Proof.
     all: try (cbn; lia).
     - rewrite size_mkApps. cbn. now eapply (In_size id size).
-    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn.
+    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn. lia.
+    (* - rewrite size_mkApps. cbn. destruct args; try congruence. cbn.
       eapply (In_size id size) in H; unfold id in H; cbn in H. 
-      now change (fun x => size x) with size in H.
-    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn.
-      lia.
+      change (fun x => size x) with size in H. todo *)
     - eapply le_lt_trans. 2: eapply size_mkApps_l; eauto. eapply (In_size id size) in H.
       unfold id in H. change size with (fun x => size x) at 2. lia.
     - cbn. eapply (In_size snd size) in H. cbn in H. lia.
@@ -392,20 +388,27 @@ Section Compile.
   End Compile.
 End Def.
 
-Tactic Notation "simp_compile" "in" hyp(H) := simp compile in H; try rewrite <- compile_equation_1 in H.
-Ltac simp_compile := simp compile; try rewrite <- compile_equation_1.
+Global Hint Rewrite @MCList.map_InP_spec : compile.
 
+Tactic Notation "simp_compile" "in" hyp(H) := simp compile in H; try rewrite <- !compile_equation_1 in H.
+Ltac simp_compile := simp compile; try rewrite <- !compile_equation_1.
+
+Definition compile_global_decl Σ d :=
+  match d with
+  | InductiveDecl m =>
+    let Ibs := ibodies_itypPack m.(ind_bodies) in
+    ecTyp Term 0 Ibs
+  | ConstantDecl {| cst_body := Some t |} =>
+    ecTrm (compile Σ t)
+  | ConstantDecl {| cst_body := None |} =>
+    ecAx Term
+  end.
 
 Fixpoint compile_ctx (t : global_context) :=
   match t with
   | [] => []
-  | (n, InductiveDecl m) :: rest => 
-  let Ibs := ibodies_itypPack m.(ind_bodies) in
-    (n, ecTyp Term 0 Ibs) :: compile_ctx rest
-  | (n, ConstantDecl {| cst_body := Some t |}) :: rest => 
-      (n, ecTrm (compile rest t)) :: compile_ctx rest
-  | (n, ConstantDecl {| cst_body := None |}) :: rest => 
-     (n, ecAx Term) :: compile_ctx rest
+  | (n, decl) :: rest => 
+    (n, compile_global_decl rest decl) :: compile_ctx rest
   end.
 
 Definition compile_program (p : Ast.Env.program) : Program Term :=

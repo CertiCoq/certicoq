@@ -1421,7 +1421,7 @@ Lemma compile_mkApps_wf (P : Term -> Prop) Σ k fn args :
     | Some (0, nargs) => 
       let cargs := map (compile Σ) args in
       let '(cargs, rest) := MCList.chop nargs cargs in
-      P (TConstruct kn c (list_terms cargs))
+      P (TmkApps (TConstruct kn c (list_terms cargs)) (list_terms rest))
     | _ => True
     end
   | view_other fn nconstr =>
@@ -1435,7 +1435,7 @@ Proof.
   + rewrite compile_mkApps // vc.
     destruct (wellformed_lookup_constructor_pars_args wfΣ wffn).
     rewrite e. cbn.
-    destruct chop eqn:eqch => //. 
+    destruct chop eqn:eqch => //.
   + intros ht. rewrite compile_mkApps // vc //.
 Qed.
 
@@ -1448,7 +1448,7 @@ Lemma compile_decompose Σ f :
       | Some (npars, nargs) => 
         let args := map (compile Σ) args in
         let '(args, rest) := MCList.chop nargs args in
-        TConstruct kn c (list_terms args)
+        TmkApps (TConstruct kn c (list_terms args)) (list_terms rest)
       | None =>
         let args := compile_terms Σ args in
         TConstruct kn c args
@@ -1462,6 +1462,35 @@ Proof.
   now eapply decompose_app_notApp.
 Qed.
 
+Lemma compile_mkApps_eta (P : Term -> Prop) Σ fn args :
+  wf_glob Σ -> 
+  ~~ EAst.isApp fn ->
+  isEtaExp Σ (mkApps fn args) ->
+  (match construct_viewc fn with
+  | view_construct kn c => 
+    forall pars nargs, 
+    lookup_constructor_pars_args Σ kn c = Some (pars, nargs) ->
+    let cargs := map (compile Σ) args in
+    let '(cargs, rest) := MCList.chop nargs cargs in
+    P (TmkApps (TConstruct kn c (list_terms cargs)) (list_terms rest))
+  | view_other fn nconstr =>
+      P (TmkApps (compile Σ fn) (list_terms (map (compile Σ) args)))
+  end) ->
+  P (compile Σ (mkApps fn args)).
+Proof.
+  intros wfΣ napp.
+  move/isEtaExp_mkApps.
+  rewrite decompose_app_mkApps //. apply/negbTE: napp.
+  destruct construct_viewc eqn:vc.
+  + rewrite /isEtaExp_app.
+    destruct lookup_constructor_pars_args as [[]|] eqn:hl.
+    rewrite compile_decompose decompose_app_mkApps // /= hl.
+    move=> /andP[] /Nat.leb_le hargs etaargs.
+    move/(_ _ _ eq_refl).
+    destruct chop eqn:eqch => //.
+    move => /andP[] => //.
+  + intros ht. rewrite compile_mkApps // vc //.
+Qed.
 
 Inductive Forall2_terms (P : Term -> Term -> Prop) : Terms -> Terms -> Prop :=
   | Forall2_nil_terms : Forall2_terms P tnil tnil
@@ -1588,7 +1617,7 @@ Lemma compile_tApp Σ t a (P : Term -> Prop) k :
       let cargs := map (compile Σ) args in
       let '(cargs, rest) := MCList.chop nargs cargs in
       (args <> [] /\ t = mkApps (tConstruct kn c) (remove_last args) /\ a = last args a) ->
-      P (TConstruct kn c (list_terms cargs))
+      P (TmkApps (TConstruct kn c (list_terms cargs)) (list_terms rest))
     | _ => True
     end
   | view_other fn nconstr =>
@@ -1658,10 +1687,15 @@ Proof.
     * destruct lookup_constructor_pars_args as [[[] nargs]|] eqn:heq => //.
       cbn. rewrite PCUICTypeChecker.chop_firstn_skipn.
       move/andP=> [] etaind etau.
-      constructor.
+      assert (All (fun t => crctTerm (compile_ctx Σ) k (compile Σ t)) u).
+      { clear -X wfu etau. repeat toAll. eapply All_impl; tea; cbn; intuition auto. }
+      eapply crctTerm_tmkApps. constructor.
+      2:{ eapply (All_firstn (n:=nargs)) in X0. rewrite firstn_map.
+          induction X0; constructor; auto. }
+      2:{ eapply (All_skipn (n:=nargs)) in X0. rewrite skipn_map.
+        induction X0; constructor; auto. }
       unfold isEtaExp_app in etaind. rewrite heq in etaind.
       eapply Nat.leb_le in etaind. todo "crctInd".
-      todo "all".
     * move/andP=> [] etat etau.
       eapply crctTerm_tmkApps; eauto.
       todo "all".
@@ -1861,42 +1895,178 @@ Proof.
   rewrite (compile_tApp_etaexp k) //.
 Qed. *)
 
+Lemma instantiate_TmkApps a k f l :
+  instantiate a k (TmkApps f l) = 
+  TmkApps (instantiate a k f) (instantiates a k l).
+Proof.
+  induction l using trev_ind; auto.
+  rewrite TmkApps_tappend.
+  cbn -[instantiate instantiates].
+  rewrite instantiate_TApp_commute IHl //.
+  cbn -[instantiate].
+  rewrite instantiates_tappend /= TmkApps_tappend //.
+Qed.
+
 From MetaCoq.Erasure Require Import EInduction ECSubst.
+
+Lemma compile_mkApps_eta_fn Σ f args : isEtaExp Σ f -> 
+  compile Σ (mkApps f args) = TmkApps (compile Σ f) (list_terms (map (compile Σ) args)).
+Proof.
+  intros ef.
+  destruct (decompose_app f) eqn:df.
+  rewrite (decompose_app_inv df) in ef |- *.
+  rewrite -mkApps_app.
+  move/isEtaExp_mkApps: ef.
+  pose proof (decompose_app_notApp _ _ _ df).
+  rewrite decompose_app_mkApps /= //. destruct t => //.
+  rewrite compile_decompose.
+  rewrite decompose_app_mkApps /= //. destruct t => //.
+  destruct (construct_viewc t) eqn:vc.
+  + move=> /andP[] etanl etal.
+    destruct lookup_constructor_pars_args as [[pars args']|] eqn:hl => //.
+    cbn. 
+    rewrite PCUICTypeChecker.chop_firstn_skipn.
+    rewrite compile_decompose.
+    rewrite decompose_app_mkApps // /= hl.
+    rewrite PCUICTypeChecker.chop_firstn_skipn.
+    rewrite -TmkApps_tappend.
+    move: etanl. rewrite /isEtaExp_app hl.
+    move/Nat.leb_le => hl'.
+    rewrite firstn_map. 
+    rewrite firstn_app.
+    assert (args' - #|l| = 0) as -> by lia.
+    rewrite firstn_O // app_nil_r. f_equal. f_equal.
+    rewrite firstn_map //. rewrite map_app skipn_map.
+    rewrite -tappend_hom /compile_terms map_app -skipn_map.
+    rewrite skipn_app. len. 
+    assert (args' - #|l| = 0) as -> by lia.
+    now rewrite skipn_0.
+    move: etanl. rewrite /isEtaExp_app hl //.
+  + move => /andP[] etat etal.
+    rewrite (compile_decompose _ (mkApps t l)).
+    rewrite decompose_app_mkApps //. destruct t => //.
+    rewrite vc. rewrite -TmkApps_tappend. f_equal.
+    now rewrite tappend_hom.
+Qed.
+
+Lemma negbF b : ~~ b -> b -> False.
+Proof. destruct b => //. Qed.
+
+Lemma compile_mkApps_nConstructApp_nApp Σ f args : 
+  ~~ EAst.isApp f ->
+  ~~ EWcbvEval.isConstructApp (mkApps f args) -> 
+  compile Σ (mkApps f args) = TmkApps (compile Σ f) (list_terms (map (compile Σ) args)).
+Proof.
+  intros napp nc.
+  rewrite compile_decompose decompose_app_mkApps.
+  apply/negbTE: napp.
+  destruct construct_viewc => //.
+  exfalso.
+  apply (negbF nc). rewrite EWcbvEval.isConstructApp_mkApps //.
+Qed.
+
+Lemma compile_mkApps_nConstructApp Σ f args : 
+  ~~ EWcbvEval.isConstructApp (mkApps f args) -> 
+  compile Σ (mkApps f args) = TmkApps (compile Σ f) (list_terms (map (compile Σ) args)).
+Proof.
+  intros nc.
+  destruct (decompose_app f) eqn:da.
+  rewrite (decompose_app_inv da) -mkApps_app in nc *.
+  pose proof (decompose_app_notApp _ _ _ da).
+  rewrite compile_mkApps_nConstructApp_nApp //.
+  rewrite (compile_mkApps_nConstructApp_nApp _ t) //.
+  move: nc; rewrite !EWcbvEval.isConstructApp_mkApps //.
+  rewrite -TmkApps_tappend. f_equal. now rewrite -tappend_hom.
+Qed.
+
+Lemma isConstruct_csubst a k t : 
+  ~~ EAst.isApp t ->
+  ~~ EAstUtils.isConstruct t -> 
+  EAstUtils.isConstruct (EAstUtils.head (csubst a k t)) -> 
+  t = tRel k.
+Proof.
+  induction t => /= //.
+  destruct (Nat.compare_spec k n) => //.
+  intros; f_equal; auto.
+Qed.
+
+Arguments instantiate _ _ !tbod.
 
 Lemma compile_csubst Σ a k b : 
   wf_glob Σ ->
-  (* wellformed Σ k a -> *)
-  (* wellformed Σ k b -> *)
+  isEtaExp Σ a ->
+  isEtaExp Σ b ->
   compile Σ (ECSubst.csubst a k b) = instantiate (compile Σ a) k (compile Σ b).
 Proof.
   intros wfΣ.
   revert b k.
   apply: MkAppsInd.rec. all:intros *. 
-  all:cbn; intros; simp_compile; cbn; try f_equal; eauto.
+  all:cbn -[instantiateBrs instantiateDefs]; try intros until k; simp_eta;
+     intros; simp_compile; try solve [cbn -[instantiateBrs instantiateDefs];
+     try f_equal; rtoProp; 
+     intuition eauto; eauto].
 
-  - destruct Nat.compare => //.
-  - rewrite csubst_mkApps.
-    eapply (compile_mkApps_wf (fun x => compile Σ (mkApps (csubst a k t) (map (csubst a k) u)) =
-    instantiate (compile Σ a) k x)); eauto. todo "wf".
+  - cbn. destruct Nat.compare => //; reflexivity.
+  - cbn. rewrite csubst_mkApps.
+    eapply (compile_mkApps_eta (fun x => compile Σ (mkApps (csubst a k t) (map (csubst a k) u)) =
+    instantiate (compile Σ a) k x)); eauto.
     destruct construct_viewc eqn:vc.
-    * destruct lookup_constructor_pars_args as [[pars args]|] eqn:hl => //.
-      destruct pars => //.
+    * intros pars args hl.
+      move: H3; rewrite isEtaExp_Constructor => /andP[] etai etau.
       set (cargs := map _ u). simpl.
       rewrite PCUICTypeChecker.chop_firstn_skipn.
       specialize (H1 k).
-      cbn in H1.
-      eapply compile_mkApps_wf => //. todo "wf".
-      simpl. rewrite hl.
+      rewrite compile_decompose.
+      rewrite decompose_app_mkApps // /= hl.
       rewrite PCUICTypeChecker.chop_firstn_skipn.
-      rewrite !firstn_map instantiate_TConstruct. f_equal.
-      clear -X.
-      eapply (All_firstn (n:=args)) in X.
-      induction X => //.
-      cbn -[instantiates]. rewrite IHX //.
-      now rewrite p.
-    * eapply compile_mkApps => //. todo "wf".
-      
-
+      rewrite instantiate_TmkApps. f_equal.
+      2:{ rewrite !skipn_map /cargs.
+         clear -H2 etau X. repeat toAll.
+        eapply (All_skipn (n:=args)) in etau.
+        induction etau.
+        - constructor; auto.
+        - cbn -[instantiates]. rewrite instantiates_tcons.
+          f_equal; eauto. now apply p. }
+      rewrite instantiate_TConstruct. f_equal.
+      rewrite !firstn_map.
+      { clear -H2 etau X. repeat toAll.
+        eapply (All_firstn (n:=args)) in etau.
+        induction etau.
+        - constructor; auto.
+        - cbn -[instantiates]. rewrite instantiates_tcons.
+          f_equal; eauto. now apply p. }
+    * rewrite instantiate_TmkApps.
+      move/isEtaExp_mkApps: H3; rewrite decompose_app_mkApps //. now move/negbTE: H.
+      rewrite vc. move=> /andP[] etat etau.
+      rewrite -H1 //.
+      rewrite compile_mkApps_eta_fn. now eapply etaExp_csubst. f_equal.
+      { clear -X H2 etau. repeat toAll. induction etau.
+        - constructor.
+        - cbn -[instantiates]. rewrite instantiates_tcons.
+          f_equal; eauto. now apply p. }
+  - rewrite map_map_compose. 
+    set (brs' := map _ l). cbn in brs'.
+    set (brs'0 := map _ l). simpl.
+    rewrite instantiate_TCase. rtoProp; intuition auto. f_equal; eauto.
+    clear -X H0 H2.
+    { subst brs' brs'0. repeat toAll. induction H2.
+    - constructor.
+    - cbn -[instantiateBrs]. rewrite instantiateBrs_equation.
+      f_equal; eauto. destruct p. len. now eapply e. }
+  - todo "projs".
+  - rewrite map_map_compose. set (mfix' := map _ m).
+    simpl. rewrite instantiate_TFix. f_equal.
+    clear -X H H0. repeat toAll.
+    rewrite -dlength_hom. 
+    subst mfix'. rewrite Nat.add_comm.
+    revert k.
+    induction H0.
+    * constructor.
+    * intros k. cbn -[instantiateDefs]. rewrite instantiateDefs_equation.
+      destruct p; len. rewrite Nat.add_succ_r.
+      move/andP: i => [] isl etai.
+      f_equal; eauto. eapply (IHAll (S k)).
+Qed.
 
 Lemma WcbvEval_hom (fl := EWcbvEval.target_wcbv_flags) :
   forall Σ, isEtaExp_env Σ -> wf_glob Σ ->
@@ -1937,11 +2107,11 @@ Proof.
       eapply EWcbvEval.eval_construct' in ev as [? []]. solve_discr.
     * econstructor; tea.
       unfold whBetaStep.
-
-
+      rewrite -compile_csubst //. now simp_eta in etab. 
   - intros ev [IHev wfa wfb etaa etab] etab1.
     intros ev' [IHev' wft wft' etat etat'].
-    simp_compile. econstructor; tea. admit.
+    simp_compile. econstructor; tea.
+    rewrite -compile_csubst //.
   - intros hbrs ev [IHev wfa wfb etaa etab].
     intros isp hnth hskip hbr.
     intros ev' [IHev' wft wft' etat etat'].
@@ -1957,13 +2127,20 @@ Proof.
     subst pars. rewrite skipn_0 in hbr.
     move: etab. rewrite EEtaExpanded.isEtaExp_mkApps_napp // /=.
     move/andP => []. rewrite /isEtaExp_app /= eq /= => /Nat.leb_le hnargs hargs.
-
-    (* assert (l0 = nil) as ->. *)
-    (* { eapply eval_to_mkApps_Construct_inv in IHev. *)
-      (* destruct l0 => //. } *)
     cbn in IHev. 
+    rewrite /constructor_isprop_pars_decl in isp.
+    unfold lookup_constructor_pars_args in eq.
+    destruct lookup_constructor as [[[mdecl idecl] cdecl']|] eqn:hc => //.
+    cbn in isp. noconf isp. cbn in eq. noconf eq. cbn in hskip.
+    rewrite PCUICTypeChecker.chop_firstn_skipn in eqc.
+    rewrite -hskip in eqc. rewrite skipn_all2 in eqc. now len. noconf eqc.
+    cbn in IHev.
     econstructor; tea.
-    rewrite PCUICTypeChecker.chop_firstn_skipn in eqc. noconf eqc.
+    rewrite firstn_all2; len. lia.
+    unfold whCaseStep.
+    noconf eqc.
+    rewrite (constructor_isprop_pars_decl)
+    rewrite sk
     (* eapply (f_equal (@List.length _)) in H. len in H. cbn in H. *)
     (* rewrite skipn_length in H. assert (nargs = #|args|) by lia. *)
     (* subst nargs. clear H hnargs. *)

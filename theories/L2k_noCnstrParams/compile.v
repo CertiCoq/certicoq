@@ -349,10 +349,14 @@ Section Compile.
     | tLambda nm bod => TLambda nm (compile bod)
     | tLetIn nm dfn bod => TLetIn nm (compile dfn) (compile bod)
     | tApp fn args napp nnil with construct_viewc fn := {
-      | view_construct kn c :=
-        let args := map_InP args (fun x H => compile x) in
-        (* On wellformed terms appearing during evaluation, nargs = #|args| *)
-        TConstruct kn c (list_terms args)
+      | view_construct kn c with lookup_constructor_pars_args e kn c := { 
+        | Some (npars, nargs) => 
+          let args := map_InP args (fun x H => compile x) in
+          let '(args, rest) := MCList.chop nargs args in
+          TmkApps (TConstruct kn c (list_terms args)) (list_terms rest)
+        | None => 
+          let args := map_InP args (fun x H => compile x) in
+          TConstruct kn c (list_terms args) }
       | view_other fn nconstr =>
         TmkApps (compile fn) (list_terms (map_InP args (fun x H => compile x)))
     }
@@ -375,10 +379,11 @@ Section Compile.
   Proof.
     all: try (cbn; lia).
     - rewrite size_mkApps. cbn. now eapply (In_size id size).
-    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn. lia.
-    (* - rewrite size_mkApps. cbn. destruct args; try congruence. cbn.
+    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn.
       eapply (In_size id size) in H; unfold id in H; cbn in H. 
-      change (fun x => size x) with size in H. todo *)
+      now change (fun x => size x) with size in H.
+    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn.
+      lia.
     - eapply le_lt_trans. 2: eapply size_mkApps_l; eauto. eapply (In_size id size) in H.
       unfold id in H. change size with (fun x => size x) at 2. lia.
     - cbn. eapply (In_size snd size) in H. cbn in H. lia.

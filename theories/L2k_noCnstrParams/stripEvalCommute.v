@@ -133,10 +133,6 @@ Qed.
   
 End OnGlobalEnv.
 
-Lemma well_formed_pres (efl := all_env_flags) Σ : wf_glob Σ -> Qpreserves (wellformed Σ) Σ.
-Proof. Admitted.
-From Equations Require Import Equations.
-
 Lemma compile_mkApps Σ fn args :
   negb (EAst.isApp fn) ->
   compile Σ (mkApps fn args) =
@@ -693,6 +689,12 @@ Proof.
   - cbn. rewrite -dlength_hom. move/andP: H1 => [] /Nat.ltb_lt //.
 Qed.
 
+Lemma compile_fresh kn Σ : fresh_global kn Σ -> fresh kn (compile_ctx Σ).
+Proof.
+  induction 1; cbn. constructor.
+  destruct x as [kn' d]. constructor => //. cbn in H. congruence.
+Qed.
+
 Lemma wellformed_eta_crctEnv {Σ} :
   isEtaExp_env Σ -> wf_glob Σ ->
   crctEnv (compile_ctx Σ).
@@ -702,11 +704,11 @@ Proof.
   - move/andP=> [] etad etae wf. depelim wf.
     destruct d.
     * cbn. destruct c as [[b|]]; econstructor; eauto.
-      todo "fresh". 
+      now apply compile_fresh.
       eapply wellformed_eta_crct => //. eauto.
-      todo "fresh".
+      now apply compile_fresh.
     * constructor; eauto.
-      todo "fresh".
+      now apply compile_fresh.
 Qed.
     
 Lemma isLambda_substl s t : EAst.isLambda t -> EAst.isLambda (ECSubst.substl s t).
@@ -1397,3 +1399,27 @@ Proof.
   now eapply WcbvEval_hom.
 Qed. 
 Print Assumptions compile_sound.
+
+Definition program := environ Term * Term.
+
+From MetaCoq.Erasure Require Import EProgram.
+
+Definition compile_program (e : eprogram) : program :=
+  (compile_ctx e.1, compile e.1 e.2).
+
+Definition wf_program (p : program) := 
+  crctEnv p.1 /\ crctTerm p.1 0 p.2.
+
+Lemma wf_compile (p : eprogram) : 
+  expanded_eprogram_cstrs p ->
+  wf_eprogram env_flags p ->
+  wf_program (compile_program p).
+Proof.
+  destruct p as [env main].
+  unfold expanded_eprogram_cstrs.
+  move/andP=> [etae etamain] [wfe wfmain]. cbn in *.
+  split; cbn.
+  - eapply wellformed_eta_crctEnv => //.
+  - eapply wellformed_eta_crct => //.
+    eapply wellformed_eta_crctEnv => //.
+Qed. 

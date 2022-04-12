@@ -1,0 +1,1 @@
+s/trans_global gc/trans_global (Obj.magic gc)/g

@@ -334,7 +334,7 @@ Proof.
     | |- used_vars _ \subset _ => eapply Included_trans; [apply IH|]; eauto with Ensembles_DB
     | |- _ => solve [eauto with Ensembles_DB]
     end.
-  all: try solve [solve_easy_rename_used rename_all_used]. Guarded.
+  all: try solve [solve_easy_rename_used rename_all_used].
   - rewrite used_vars_Ecase; apply Union_Included; [solve_easy_rename_used rename_all_used|].
     induction l as [|[c e] ces IHces]; cbn; [eauto with Ensembles_DB|].
     repeat normalize_used_vars.

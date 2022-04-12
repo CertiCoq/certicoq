@@ -249,7 +249,7 @@ Definition check_roundtrip (Γ : list string) (t : term) : GM (option (term × t
   let! t' := indices_of Γ named in
   ret (if string_of_term t ==? string_of_term t' then None else Some (t, t')).
 
-Compute runGM' 0 (check_roundtrip [] <%
+(*Compute runGM' 0 (check_roundtrip [] <%
   fun x y z w : nat =>
   match x, y with
   | S x, S y => z * x + y * w
@@ -277,7 +277,7 @@ Compute runGM' 0 (check_roundtrip [] <%
   fix ev c :=
     match c return nat with
     | twoC x y => ev x
-    end%>).
+    end%>). *)
 
 (* Renames binders too, and doesn't respect scoping rules at all *)
 Definition rename (σ : Map string string) : term -> term :=
@@ -665,7 +665,7 @@ Fixpoint quote_string (s : string) : term :=
   | String c s => tApp <%String%> [quote_byte c; quote_string s]
   end.
 
-MetaCoq Run (tmPrint =<< tmUnquote (quote_string "abc")).
+(* MetaCoq Run (tmPrint =<< tmUnquote (quote_string "abc")). *)
 
 (* abbreviate = map head . splitOn "_" *)
 Fixpoint abbreviate s :=
@@ -763,7 +763,8 @@ Fixpoint is_var (x : term) : option string :=
 
 (* Rec (f .. x) *)
 (* NOTE: This is a hack and depends on the _CoqProject file+name of this file *)
-Compute <%@Rec%>.
+(* Compute <%@Rec%>. *)
+
 Definition prefix := ltac:(
    let e := constr:(<%@Rec%>) in
    match e with

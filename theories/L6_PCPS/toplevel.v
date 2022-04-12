@@ -160,8 +160,8 @@ Section IDENT.
 
     Context (anf_opts : anf_options).
 
-    Definition time_anf {A B} (name : string) (f : A -> B) : A -> B :=
-      if time anf_opts then timePhase name f else f.    
+    Definition time_anf {A B} (name : string) (f : A -> anf_state B) : A -> anf_state B :=
+      fun x s => if time anf_opts then timePhase name (f x) s else f x s. 
     
     (* Optimizing λANF pipeline *)
 

@@ -34,7 +34,7 @@ Open Scope Ensembles_scope.
 Notation "[ 'set' x : T | P ]" := (fun x : T => P)
   (at level 0, x at level 99, only parsing) : Ensembles_scope.
 Notation "[ 'set' x | P ]" := [set x : _ | P]
-  (at level 0, x, P at level 99, format "[ 'set'  x  |  P ]", only parsing) : Ensembles_scope.
+  (at level 0, x, P at level 99, only parsing) : Ensembles_scope.
 
 Notation "[ 'set' a ]" := (Ensembles.Singleton _ a)
   (at level 0, a at level 99, format "[ 'set'  a ]") :  Ensembles_scope.
@@ -1100,8 +1100,7 @@ Notation "\bigcup_ i F" := (big_cup (Full_set _) (fun i => F))
   (at level 41, F at level 41, i at level 0,
    format "'[' \bigcup_ i '/  '  F ']'") : Ensembles_scope.
 Notation "\bigcup_ ( i : t ) F" := (big_cup (Full_set t) (fun i => F))
-  (at level 41, F at level 41, i at level 50,
-   format "'[' \bigcup_ ( i   :  t ) '/  '  F ']'", only parsing) : Ensembles_scope.
+  (at level 41, F at level 41, i at level 50, only parsing) : Ensembles_scope.
 Notation "\bigcup_ ( i 'in' A ) F" := (big_cup A (fun i => F))
   (at level 41, F at level 41, i, A at level 50,
    format "'[' \bigcup_ ( i  'in'  A ) '/  '  F ']'") : Ensembles_scope.

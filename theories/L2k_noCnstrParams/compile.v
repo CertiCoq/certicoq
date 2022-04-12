@@ -4,9 +4,10 @@ Require Import Coq.Arith.Arith.
 Require Import Common.Common.
 Require Import Coq.micromega.Lia.
 
+From Equations Require Import Equations.
 From MetaCoq.Template Require utils EtaExpand.
 Require Import MetaCoq.Template.utils.bytestring.
-From MetaCoq.Erasure Require Import EAst ETyping ESpineView EEtaExpanded EInduction ERemoveParams Erasure.
+From MetaCoq.Erasure Require Import EAst ESpineView EGlobalEnv EEtaExpanded EInduction Erasure.
 
 Local Open Scope bs_scope.
 Local Open Scope bool.
@@ -45,7 +46,7 @@ with Brs : Type :=
 with Defs : Type :=
 | dnil : Defs
 | dcons : name -> Term -> nat -> Defs -> Defs.
-Hint Constructors Term Terms Brs Defs : core.
+#[export] Hint Constructors Term Terms Brs Defs : core.
 Scheme Trm_ind' := Induction for Term Sort Prop
   with Trms_ind' := Induction for Terms Sort Prop
   with Brs_ind' := Induction for Brs Sort Prop
@@ -320,7 +321,7 @@ Fixpoint list_Brs (l : list _) : Brs :=
   | (x,t) :: ts => bcons x t (list_Brs ts)
   end.
 
-Fixpoint list_Defs (l : list (Extract.E.def Term)) : Defs :=
+Fixpoint list_Defs (l : list (def Term)) : Defs :=
   match l with
   | [] => dnil
   | t :: ts => dcons t.(dname) t.(dbody) t.(rarg) (list_Defs ts) 
@@ -331,9 +332,13 @@ Definition lookup_record_projs (e : global_declarations) (ind : inductive) : opt
   | Some (mdecl, idecl) => Some (idecl.(ind_projs))
   | None => None
   end.
+
+(* We transform eta-expanded constructors into an application of the n-ary TConstruct form and 
+  translate away projections to inline pattern-matchings. *)  
   
 Section Compile.
   Context (e : global_declarations).
+  Import MCList (map_InP, In_size).
 
   Equations? compile (t: term) : Term 
   by wf t (fun x y : EAst.term => size x < size y) :=
@@ -343,7 +348,14 @@ Section Compile.
     | tLambda nm bod => TLambda nm (compile bod)
     | tLetIn nm dfn bod => TLetIn nm (compile dfn) (compile bod)
     | tApp fn args napp nnil with construct_viewc fn := {
-      | view_construct kn c => TConstruct kn c (list_terms (map_InP args (fun x H => compile x)))
+      | view_construct kn c with lookup_constructor_pars_args e kn c := { 
+        | Some (npars, nargs) => 
+          let args := map_InP args (fun x H => compile x) in
+          let '(args, rest) := MCList.chop nargs args in
+          TmkApps (TConstruct kn c (list_terms args)) (list_terms rest) 
+        | None => 
+          let args := map_InP args (fun x H => compile x) in
+          TConstruct kn c (list_terms args) }
       | view_other fn nconstr =>
         TmkApps (compile fn) (list_terms (map_InP args (fun x H => compile x)))
     }
@@ -366,7 +378,11 @@ Section Compile.
   Proof.
     all: try (cbn; lia).
     - rewrite size_mkApps. cbn. now eapply (In_size id size).
-    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn. lia.
+    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn.
+      eapply (In_size id size) in H; unfold id in H; cbn in H. 
+      now change (fun x => size x) with size in H.
+    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn.
+      lia.
     - eapply le_lt_trans. 2: eapply size_mkApps_l; eauto. eapply (In_size id size) in H.
       unfold id in H. change size with (fun x => size x) at 2. lia.
     - cbn. eapply (In_size snd size) in H. cbn in H. lia.
@@ -375,6 +391,10 @@ Section Compile.
 
   End Compile.
 End Def.
+
+Tactic Notation "simp_compile" "in" hyp(H) := simp compile in H; try rewrite <- compile_equation_1 in H.
+Ltac simp_compile := simp compile; try rewrite <- compile_equation_1.
+
 
 Fixpoint compile_ctx (t : global_context) :=
   match t with
@@ -388,12 +408,9 @@ Fixpoint compile_ctx (t : global_context) :=
      (n, ecAx Term) :: compile_ctx rest
   end.
 
-Definition expand_program (p : Ast.Env.program) :=
-  ( {| Ast.Env.universes := (fst p).(Ast.Env.universes) ; Ast.Env.declarations := EtaExpand.eta_global_env (fst p).(Ast.Env.declarations) |} , EtaExpand.eta_expand (fst p).(Ast.Env.declarations) (snd p)).
-
 Definition compile_program (p : Ast.Env.program) : Program Term :=
-  let p := (erase_program (expand_program p) (MCUtils.todo "wf_env and welltyped term")) in
+  let p := Erasure.run_erase_program p (MCUtils.todo "wf_env and welltyped term") in
   {| main := compile (fst p) (snd p) ; env := compile_ctx (fst p) |}.
 
-Definition program_Program `{F:MCUtils.Fuel} (p: Ast.Env.program) : Program Term :=
+Definition program_Program (p: Ast.Env.program) : Program Term :=
   compile_program p.

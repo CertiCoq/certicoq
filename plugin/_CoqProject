@@ -176,6 +176,8 @@ extraction/eEtaExpanded.ml
 extraction/eEtaExpanded.mli
 extraction/eRemoveParams.ml
 extraction/eRemoveParams.mli
+extraction/eInlineProjections.mli
+extraction/eInlineProjections.ml
 extraction/eTransform.mli
 extraction/eTransform.ml
 extraction/eqDecInstances.ml

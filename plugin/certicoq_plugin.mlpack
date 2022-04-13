@@ -163,6 +163,7 @@ ErasureFunction
 EProgram
 ERemoveParams
 EOptimizePropDiscr
+EInlineProjections
 ETransform
 Erasure
 SafeTemplateErasure

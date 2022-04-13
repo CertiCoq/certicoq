@@ -179,7 +179,7 @@ Proof.
   induction 1; cbn => //.
   case: eqb_spec => [|].
   - intros ->. destruct d => //. intros [= <-].
-    cbn in H0. now eapply eqb_eq in H0.
+    cbn in H0. move/andP: H0 => [] H0 _. cbn in H0. now eapply eqb_eq in H0.
   - intros _. eapply IHwf_glob.
 Qed.
 
@@ -196,7 +196,7 @@ Qed.
 Lemma lookup_constructor_pars_args_spec {Σ ind n mdecl idecl cdecl} :
   wf_glob Σ ->
   lookup_constructor Σ ind n = Some (mdecl, idecl, cdecl) ->
-  lookup_constructor_pars_args Σ ind n = Some (mdecl.(ind_npars), cdecl.2).
+  lookup_constructor_pars_args Σ ind n = Some (mdecl.(ind_npars), cdecl.(cstr_nargs)).
 Proof.
   cbn -[lookup_constructor] => wfΣ.
   destruct lookup_constructor as [[[mdecl' idecl'] [pars args]]|] eqn:hl => //.
@@ -210,7 +210,7 @@ Lemma wellformed_lookup_constructor_pars_args {Σ ind n} :
 Proof.
   intros wfΣ wf. cbn -[lookup_constructor] in wf.
   destruct lookup_constructor as [[[mdecl idecl] cdecl]|] eqn:hl => //.
-  exists cdecl.2.
+  exists cdecl.(cstr_nargs).
   pose proof (wellformed_lookup_constructor_pars wfΣ hl).
   eapply lookup_constructor_pars_args_spec in hl => //. congruence.
 Qed.
@@ -600,7 +600,7 @@ Qed.
 Lemma compile_crctCnstr Σ ind n args mdecl idecl cdecl : 
   wf_glob Σ ->
   lookup_constructor Σ ind n = Some (mdecl, idecl, cdecl) ->
-  tlength args = EWcbvEval.cstr_arity mdecl cdecl ->
+  tlength args = cstr_arity mdecl cdecl ->
   crctCnstr (compile_ctx Σ) ind n args.
 Proof.
   intros wfΣ.
@@ -611,8 +611,8 @@ Proof.
   econstructor. eapply compile_crctInd; tea.
   rewrite /getCnstr. cbn.
   eapply exnNth_nth_error. rewrite nth_error_map hnth //.
-  cbn. rewrite hlen. destruct p as [cname arity]; cbn.
-  rewrite /EWcbvEval.cstr_arity. cbn.
+  cbn. rewrite hlen. destruct c as [cname arity]; cbn.
+  rewrite /cstr_arity. cbn.
   move: hl. rewrite /lookup_inductive. destruct lookup_minductive eqn:hl' => /= //.
   destruct (nth_error (ind_bodies m) _) => //. intros [= <- <-].  
   now rewrite (wellformed_lookup_inductive_pars _ wfΣ hl').
@@ -652,7 +652,7 @@ Proof.
       eapply compile_crctCnstr; tea. cbn.
       rewrite firstn_map tlength_hom. rewrite firstn_length. 
       assert (Nat.min cargs #|u| = cargs) as -> by lia.
-      rewrite /EWcbvEval.cstr_arity.
+      rewrite /cstr_arity.
       rewrite (lookup_constructor_pars_args_spec wfΣ hl) in eq. noconf eq. now rewrite H2.
       by [].
     * move/andP=> [] etat etau.
@@ -669,7 +669,7 @@ Proof.
     rewrite (lookup_constructor_pars_args_spec wfΣ hl).
     have hpars := wellformed_lookup_constructor_pars wfΣ hl.
     rewrite hpars. cbn. move/Nat.leb_le => hpars'.
-    eapply compile_crctCnstr; eauto. cbn. rewrite /EWcbvEval.cstr_arity. lia.
+    eapply compile_crctCnstr; eauto. cbn. rewrite /cstr_arity. lia.
   - destruct lookup_inductive as [[mdecl idecl]|] eqn:hl => //.
     econstructor.
     eapply compile_crctInd; tea. eauto.
@@ -1372,11 +1372,11 @@ Proof.
     simpl. rewrite (lookup_constructor_pars_args_spec wfΣ hl).
     rewrite PCUICTypeChecker.chop_firstn_skipn.
     pose proof (wellformed_lookup_constructor_pars wfΣ hl).
-    rewrite firstn_all2. len. move: hargs; rewrite /EWcbvEval.cstr_arity => ->. lia.
+    rewrite firstn_all2. len. move: hargs; rewrite /cstr_arity => ->. lia.
     rewrite H.
     eapply compile_mkApps_wf; eauto.
     simpl. rewrite (lookup_constructor_pars_args_spec wfΣ hl) H.
-    move: hargs. rewrite /EWcbvEval.cstr_arity H /= => <-.
+    move: hargs. rewrite /cstr_arity H /= => <-.
     rewrite PCUICTypeChecker.chop_firstn_skipn. epose proof (lenargs := All2_length IHargs).
     rewrite firstn_all2. len.
     rewrite !skipn_all2; len.

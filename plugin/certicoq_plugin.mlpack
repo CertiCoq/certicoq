@@ -128,9 +128,7 @@ PCUICSafeLemmata
 PCUICCumulativity
 PCUICProgram
 PCUICExpandLets
-PCUICExpandLetsCorrectness
 TemplateToPCUIC
-TemplateToPCUICCorrectness
 PCUICTransform
 
 PCUICErrors

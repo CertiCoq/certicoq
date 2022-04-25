@@ -58,8 +58,6 @@ extraction/astUtils.mli
 extraction/astUtils.ml
 extraction/etaExpand.mli
 extraction/etaExpand.ml
-extraction/pCUICExpandLetsCorrectness.mli
-extraction/pCUICExpandLetsCorrectness.ml
 extraction/archi.ml
 extraction/archi.mli
 extraction/ascii.ml

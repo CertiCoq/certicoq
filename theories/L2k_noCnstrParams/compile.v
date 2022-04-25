@@ -328,12 +328,6 @@ Fixpoint list_Defs (l : list (def Term)) : Defs :=
   | t :: ts => dcons t.(dname) t.(dbody) t.(rarg) (list_Defs ts) 
   end.
 
-Definition lookup_record_projs (e : global_declarations) (ind : inductive) : option (list ident) :=
-  match lookup_inductive e ind with
-  | Some (mdecl, idecl) => Some (idecl.(ind_projs))
-  | None => None
-  end.
-
 (* We transform eta-expanded constructors into an application of the n-ary TConstruct form and 
   translate away projections to inline pattern-matchings. *)  
   
@@ -368,11 +362,7 @@ Section Compile.
     | tFix mfix idx => 
       let mfix' := map_InP mfix (fun d H => {| dname := dname d; dbody := compile d.(dbody); rarg := d.(rarg) |}) in
       TFix (list_Defs mfix') idx
-    | tProj (ind, _, nargs) bod with lookup_record_projs e ind :=
-      { | Some args =>
-          let len := List.length args in
-          TCase ind (compile bod) (bcons (map nNamed args) (TRel (len - 1 - nargs)) bnil)
-        | None => TWrong "Proj" }
+    | tProj p bod := TWrong "Proj"; (* Impossible, no projections at this stage *)
     | tCoFix mfix idx => TWrong "TCofix"
     | tVar _ => TWrong "Var"
     | tEvar _ _ => TWrong "Evar" }.

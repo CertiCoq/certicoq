@@ -743,8 +743,6 @@ Lemma isLambda_compile Σ f :
 Proof.
   intros nf. move=> [] na [] bod.
   destruct f; simp_compile => /= //.
-  2:{ destruct p as [[] ?]; simp_compile => /= //.
-      destruct lookup_record_projs => /= //. }
   rewrite compile_decompose.
   destruct decompose_app eqn:da.
   destruct construct_viewc.
@@ -759,8 +757,6 @@ Lemma isBox_compile Σ f :
 Proof.
   intros nf.
   destruct f; simp_compile => /= //.
-  2:{ destruct p as [[] ?]; simp_compile => /= //.
-      destruct lookup_record_projs => /= //. }
   rewrite compile_decompose.
   destruct decompose_app eqn:da.
   destruct construct_viewc.
@@ -775,8 +771,6 @@ Lemma isFix_compile Σ f :
 Proof.
   move=> nf [] defs [n].
   destruct f; simp_compile => /= //.
-  2:{ destruct p as [[] ?]; simp_compile => /= //.
-      destruct lookup_record_projs => /= //. }
   rewrite compile_decompose.
   destruct decompose_app eqn:da.
   destruct construct_viewc.
@@ -787,17 +781,15 @@ Proof.
 Qed.
 
 Lemma isConstructApp_compile Σ f : 
-  ~~ EWcbvEval.isConstructApp f -> ~ isConstruct (compile Σ f).
+  ~~ isConstructApp f -> ~ isConstruct (compile Σ f).
 Proof.
   move=> nf [] i [] n [] args.
   destruct f; simp_compile => /= //.
-  2:{ destruct p as [[] ?]; simp_compile => /= //.
-      destruct lookup_record_projs => /= //. }
   rewrite compile_decompose.
   destruct decompose_app eqn:da.
   destruct construct_viewc. 
   { exfalso. rewrite (decompose_app_inv da) in nf.
-    rewrite EWcbvEval.isConstructApp_mkApps // in nf. }
+    rewrite isConstructApp_mkApps // in nf. }
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
 Qed.
@@ -881,18 +873,18 @@ Proof. destruct b => //. Qed.
 
 Lemma compile_mkApps_nConstructApp_nApp Σ f args : 
   ~~ EAst.isApp f ->
-  ~~ EWcbvEval.isConstructApp (mkApps f args) -> 
+  ~~ isConstructApp (mkApps f args) -> 
   compile Σ (mkApps f args) = TmkApps (compile Σ f) (list_terms (map (compile Σ) args)).
 Proof.
   intros napp nc.
   rewrite compile_decompose decompose_app_mkApps //.
   destruct construct_viewc => //.
   exfalso.
-  apply (negbF nc). rewrite EWcbvEval.isConstructApp_mkApps //.
+  apply (negbF nc). rewrite isConstructApp_mkApps //.
 Qed.
 
 Lemma compile_mkApps_nConstructApp Σ f args : 
-  ~~ EWcbvEval.isConstructApp (mkApps f args) -> 
+  ~~ isConstructApp (mkApps f args) -> 
   compile Σ (mkApps f args) = TmkApps (compile Σ f) (list_terms (map (compile Σ) args)).
 Proof.
   intros nc.
@@ -901,7 +893,7 @@ Proof.
   pose proof (decompose_app_notApp _ _ _ da).
   rewrite compile_mkApps_nConstructApp_nApp //.
   rewrite (compile_mkApps_nConstructApp_nApp _ t) //.
-  move: nc; rewrite !EWcbvEval.isConstructApp_mkApps //.
+  move: nc; rewrite !isConstructApp_mkApps //.
   rewrite -TmkApps_tappend. f_equal. now rewrite -tappend_hom.
 Qed.
 
@@ -1240,7 +1232,7 @@ Proof.
     * destruct lookup_constructor_pars_args as [[[] args]|]=> // /=.
       destruct chop eqn:eqch.
       intros [Hl [ha ht]]. rewrite ha in ev.
-      eapply EWcbvEval.eval_construct' in ev as [? []]. solve_discr.
+      eapply eval_mkApps_Construct_inv in ev as [? []]. solve_discr.
     * econstructor; tea.
   - intros ev [IHev wfa wfb etaa etab].
     intros ev' [IHev' wft wft' etat etat'].
@@ -1252,7 +1244,7 @@ Proof.
     * destruct lookup_constructor_pars_args as [[[] args]|]=> // /=.
       destruct chop eqn:eqch.
       intros [Hl [ha ht]]. rewrite ha in ev.
-      eapply EWcbvEval.eval_construct' in ev as [? []]. solve_discr.
+      eapply eval_mkApps_Construct_inv in ev as [? []]. solve_discr.
     * econstructor; tea.
       unfold whBetaStep.
       rewrite -(compile_csubst _ 1) //. now simp_eta in etab. 
@@ -1306,7 +1298,7 @@ Proof.
     * destruct lookup_constructor_pars_args as [[[] args]|]=> // /=.
       destruct chop eqn:eqch.
       intros [Hl [ha ht]]. rewrite ha in ev.
-      eapply EWcbvEval.eval_construct' in ev as [? []]. solve_discr.
+      eapply eval_mkApps_Construct_inv in ev as [? []]. solve_discr.
     * move=> /and4P[etat etal etaf' etaa'].
       simp_compile in IHev.
       set (mfix' := map _ mfix) in *.  
@@ -1349,7 +1341,7 @@ Proof.
       intros [Hl [Hf11 Ha]].
       change (tApp f' a') with (mkApps f' [a']).
       clear IHapp. rewrite Hf11 in ev.
-      eapply EWcbvEval.eval_construct' in ev as [? []]. subst f'.
+      eapply eval_mkApps_Construct_inv in ev as [? []]. subst f'.
       exfalso. move: nlam. rewrite !negb_or. rtoProp; intuition auto.
       apply/negP: H0. rewrite negbK. rewrite isConstructApp_mkApps //.
     * eapply (compile_tApp _ _ _ 0) => //. cbn. now rewrite wff' wfa'.
@@ -1357,9 +1349,9 @@ Proof.
       destruct (construct_viewc t0) eqn:vc'.
       { destruct lookup_constructor_pars_args as [[[] args']|] eqn:hl => // /=.
         pose proof (decompose_app_inv da').
-        eapply (f_equal EWcbvEval.isConstructApp) in H.
+        eapply (f_equal isConstructApp) in H.
         rewrite isConstructApp_tApp in H.
-        rewrite EWcbvEval.isConstructApp_mkApps /= /EWcbvEval.isConstructApp /= in H.
+        rewrite isConstructApp_mkApps /= /isConstructApp /= in H.
         clear -nlam H. exfalso. move: nlam; rewrite !negb_or [isConstructApp _]H => /andP[] //. }
       constructor; eauto.
       rewrite !negb_or in nlam. rtoProp; intuition auto.

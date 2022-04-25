@@ -34,7 +34,7 @@ Definition print_inductive (i:inductive) : string :=
   end.
 Definition print_projection (p:projection) : string :=
   match p with
-  | (i, n, m) =>
+  | Kernames.mkProjection i n m =>
     ("(project:" ++ (print_inductive i) ++ ":" ++
                  (nat_to_string n) ++ ":" ++ (nat_to_string m) ++")")
   end.

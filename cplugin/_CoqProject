@@ -163,8 +163,6 @@ extraction/eWellformed.mli
 extraction/eWellformed.ml
 extraction/eProgram.mli
 extraction/eProgram.ml
-extraction/eEtaExpandedFix.mli
-extraction/eEtaExpandedFix.ml
 extraction/eWcbvEval.mli
 extraction/eWcbvEval.ml
 extraction/environment.ml

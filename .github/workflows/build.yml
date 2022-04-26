@@ -18,7 +18,7 @@ jobs:
         opam_file:
           - 'coq-certicoq.opam'
         image:
-          - 'tcarstens/coq-vst:8.14.1-ocaml-4.12.0-flambda--compcert-3.9--vst-2.8'
+          - 'mattam82/coq:8.14.1-ocaml-4.12-1--compcert-3.9--extlib-0.11.6--equations-1.3'
       fail-fast: false  # don't stop jobs if one fails
     steps:
       - uses: actions/checkout@v2

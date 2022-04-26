@@ -92,6 +92,10 @@ let fix_universes_decl = function
 let fix_universes (levels, cstrs) = 
   (Obj.magic (fix_set levels), Obj.magic (fix_set cstrs))
 
+let fix_projection p =
+  let open Ast0.Env in
+  { proj_name = proj_name p; proj_relevance = proj_relevance p; proj_type = fix_term (proj_type p) }
+
 let fix_declarations decls = 
   let open Ast0.Env in
   let fix_constructor {cstr_name; cstr_args; cstr_indices; cstr_type; cstr_arity} = 
@@ -104,7 +108,7 @@ let fix_declarations decls =
     {ind_name; ind_indices = fix_rel_context ind_indices; ind_sort = fix_universe ind_sort;
      ind_type = fix_term ind_type; ind_kelim; 
      ind_ctors = List.map fix_constructor ind_ctors; 
-     ind_projs = List.map (fun (x, y) -> (x, fix_term y)) ind_projs; 
+     ind_projs = List.map fix_projection ind_projs; 
      ind_relevance}
   in
   let fix_decl (kn, decl) =

@@ -20,9 +20,6 @@ else
     fi 
 fi
 
-# For compat with OS X which has an incompatible sed which can be replaced by GNU sed
-SED=`which gsed || which sed`
-
 echo "Cleaning result of extraction"
 
 rm -rf ${PLUGIN}/extraction || true
@@ -52,8 +49,8 @@ mv aST.mli AST.mli
 mv fLT.ml FLT.ml
 mv fLT.mli FLT.mli
 # Work around a compiler bug in module name resolution
-${SED} -f ../extraction.sed -i compile0.ml
+sed -f ../extraction.sed compile0.ml > compile0.ml.tmp && mv -f compile0.ml.tmp compile0.ml
 # We compile with -rectypes, so these definitions are badly interepreted
-${SED} -e "s/type int = int/type nonrec int = int/" -i integers.mli
-${SED} -e "s/type int = int/type nonrec int = int/" -i integers.ml
+sed -e "s/type int = int/type nonrec int = int/" integers.mli > integers.mli.tmp && mv -f integers.mli.tmp integers.mli
+sed -e "s/type int = int/type nonrec int = int/" integers.ml > integers.ml.tmp && mv -f integers.ml.tmp integers.ml
 cd ../..

@@ -88,7 +88,7 @@ Proof.
     + exists t, (tcons t0 t1). intuition.
 Qed.
 
-Fixpoint tappend (ts1 ts2:Terms) : Terms :=
+Function tappend (ts1 ts2:Terms) : Terms :=
   match ts1 with
     | tnil => ts2
     | tcons t ts => tcons t (tappend ts ts2)
@@ -223,7 +223,8 @@ Definition isApp (t:Term) : Prop :=
 Lemma IsApp: forall fn arg, isApp (TApp fn arg).
   intros. exists fn, arg. reflexivity.
 Qed.
-Hint Resolve IsApp : core.
+Global Hint Resolve IsApp : core.
+
 Lemma isApp_dec: forall t, {isApp t}+{~ isApp t}.
   destruct t; try (right; not_isApp). left. auto.
 Qed.
@@ -327,12 +328,6 @@ Fixpoint list_Defs (l : list (def Term)) : Defs :=
   | t :: ts => dcons t.(dname) t.(dbody) t.(rarg) (list_Defs ts) 
   end.
 
-Definition lookup_record_projs (e : global_declarations) (ind : inductive) : option (list ident) :=
-  match lookup_inductive e ind with
-  | Some (mdecl, idecl) => Some (idecl.(ind_projs))
-  | None => None
-  end.
-
 (* We transform eta-expanded constructors into an application of the n-ary TConstruct form and 
   translate away projections to inline pattern-matchings. *)  
   
@@ -352,7 +347,7 @@ Section Compile.
         | Some (npars, nargs) => 
           let args := map_InP args (fun x H => compile x) in
           let '(args, rest) := MCList.chop nargs args in
-          TmkApps (TConstruct kn c (list_terms args)) (list_terms rest) 
+          TmkApps (TConstruct kn c (list_terms args)) (list_terms rest)
         | None => 
           let args := map_InP args (fun x H => compile x) in
           TConstruct kn c (list_terms args) }
@@ -367,11 +362,7 @@ Section Compile.
     | tFix mfix idx => 
       let mfix' := map_InP mfix (fun d H => {| dname := dname d; dbody := compile d.(dbody); rarg := d.(rarg) |}) in
       TFix (list_Defs mfix') idx
-    | tProj (ind, _, nargs) bod with lookup_record_projs e ind :=
-      { | Some args =>
-          let len := List.length args in
-          TCase ind (compile bod) (bcons (map nNamed args) (TRel (len - 1 - nargs)) bnil)
-        | None => TWrong "Proj" }
+    | tProj p bod := TWrong "Proj"; (* Impossible, no projections at this stage *)
     | tCoFix mfix idx => TWrong "TCofix"
     | tVar _ => TWrong "Var"
     | tEvar _ _ => TWrong "Evar" }.
@@ -392,20 +383,27 @@ Section Compile.
   End Compile.
 End Def.
 
-Tactic Notation "simp_compile" "in" hyp(H) := simp compile in H; try rewrite <- compile_equation_1 in H.
-Ltac simp_compile := simp compile; try rewrite <- compile_equation_1.
+Global Hint Rewrite @MCList.map_InP_spec : compile.
 
+Tactic Notation "simp_compile" "in" hyp(H) := simp compile in H; try rewrite <- !compile_equation_1 in H.
+Ltac simp_compile := simp compile; try rewrite <- !compile_equation_1.
+
+Definition compile_global_decl Σ d :=
+  match d with
+  | InductiveDecl m =>
+    let Ibs := ibodies_itypPack m.(ind_bodies) in
+    ecTyp Term 0 Ibs
+  | ConstantDecl {| cst_body := Some t |} =>
+    ecTrm (compile Σ t)
+  | ConstantDecl {| cst_body := None |} =>
+    ecAx Term
+  end.
 
 Fixpoint compile_ctx (t : global_context) :=
   match t with
   | [] => []
-  | (n, InductiveDecl m) :: rest => 
-  let Ibs := ibodies_itypPack m.(ind_bodies) in
-    (n, ecTyp Term 0 Ibs) :: compile_ctx rest
-  | (n, ConstantDecl {| cst_body := Some t |}) :: rest => 
-      (n, ecTrm (compile rest t)) :: compile_ctx rest
-  | (n, ConstantDecl {| cst_body := None |}) :: rest => 
-     (n, ecAx Term) :: compile_ctx rest
+  | (n, decl) :: rest => 
+    (n, compile_global_decl rest decl) :: compile_ctx rest
   end.
 
 Definition compile_program (p : Ast.Env.program) : Program Term :=

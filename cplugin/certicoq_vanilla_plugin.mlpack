@@ -110,6 +110,7 @@ EqdepFacts
 Utils
 Init
 
+Ssreflect
 Ssrbool
 WGraph
 UGraph0
@@ -127,13 +128,9 @@ PCUICPosition
 PCUICChecker
 PCUICPretty
 PCUICReflect
-PCUICSafeLemmata
-PCUICCumulativity
 PCUICProgram
 PCUICExpandLets
-PCUICExpandLetsCorrectness
 TemplateToPCUIC
-TemplateToPCUICCorrectness
 PCUICTransform
 
 PCUICErrors
@@ -161,11 +158,11 @@ ESpineView
 EPretty
 Extract
 EEtaExpanded
-EEtaExpandedFix
 ErasureFunction
 EProgram
 ERemoveParams
 EOptimizePropDiscr
+EInlineProjections
 ETransform
 Erasure
 SafeTemplateErasure

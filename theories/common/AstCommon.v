@@ -34,7 +34,7 @@ Definition print_inductive (i:inductive) : string :=
   end.
 Definition print_projection (p:projection) : string :=
   match p with
-  | (i, n, m) =>
+  | Kernames.mkProjection i n m =>
     ("(project:" ++ (print_inductive i) ++ ":" ++
                  (nat_to_string n) ++ ":" ++ (nat_to_string m) ++")")
   end.
@@ -198,8 +198,8 @@ Definition environ := list (kername * envClass).
 *** template-coq [program].  Independent of term structure
 **)
 (* Malecha's [program] is inside out *)
-Definition cnstr_Cnstr (c: string * nat) : Cnstr :=
-  mkCnstr (fst c) (snd c).
+Definition cnstr_Cnstr (c: constructor_body) : Cnstr :=
+  mkCnstr c.(cstr_name) c.(cstr_nargs).
 
 Definition ibody_ityp (iib:one_inductive_body) : ityp :=
   let Ctors := map cnstr_Cnstr (ind_ctors iib)

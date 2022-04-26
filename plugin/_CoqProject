@@ -353,6 +353,8 @@ extraction/pCUICTransform.ml
 
 extraction/peanoNat.ml
 extraction/peanoNat.mli
+extraction/optionMonad.mli
+extraction/optionMonad.ml
 extraction/pipeline.ml
 extraction/pipeline.mli
 extraction/pipeline_utils.ml

@@ -58,8 +58,6 @@ extraction/astUtils.mli
 extraction/astUtils.ml
 extraction/etaExpand.mli
 extraction/etaExpand.ml
-extraction/pCUICExpandLetsCorrectness.mli
-extraction/pCUICExpandLetsCorrectness.ml
 extraction/archi.ml
 extraction/archi.mli
 extraction/ascii.ml
@@ -160,8 +158,6 @@ extraction/eWellformed.mli
 extraction/eWellformed.ml
 extraction/eProgram.mli
 extraction/eProgram.ml
-extraction/eEtaExpandedFix.mli
-extraction/eEtaExpandedFix.ml
 extraction/eWcbvEval.mli
 extraction/eWcbvEval.ml
 extraction/environment.ml
@@ -176,6 +172,8 @@ extraction/eEtaExpanded.ml
 extraction/eEtaExpanded.mli
 extraction/eRemoveParams.ml
 extraction/eRemoveParams.mli
+extraction/eInlineProjections.mli
+extraction/eInlineProjections.ml
 extraction/eTransform.mli
 extraction/eTransform.ml
 extraction/eqDecInstances.ml
@@ -391,6 +389,8 @@ extraction/specif.ml
 extraction/specif.mli
 extraction/ssrbool.ml
 extraction/ssrbool.mli
+extraction/ssreflect.mli
+extraction/ssreflect.ml
 extraction/state.ml
 extraction/state.mli
 extraction/stateMonad.ml

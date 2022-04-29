@@ -109,8 +109,8 @@ Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
     crctCnstr p ind cnum args ->
     crctTerms p n args ->
     crctTerm p n (TConstruct ind cnum args)
-| ctCase: forall p n ind cnum args mch brs,
-    crctCnstr p ind cnum args ->
+| ctCase: forall p n ind ityp mch brs,
+    crctInd p ind ityp ->
     crctTerm p n mch -> crctBs p n brs ->
     crctTerm p n (TCase ind mch brs)
 | ctFix: forall p n ds m,
@@ -230,7 +230,7 @@ Proof.
   - eelim H1; eassumption.
   - eelim H3; eassumption.
   - inversion_Clear H. inversion_Clear H5. unfold LookupTyp in H.
-    cbn in H. destruct H. elim (Lookup_fresh_neq H H4). reflexivity.
+    cbn in H. elim (Lookup_fresh_neq H H4). reflexivity.
   - eelim H0; eassumption.
   - eelim H0; eassumption.
   - eelim H2; eassumption.
@@ -270,9 +270,9 @@ Proof.
     + subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
     + apply LMiss; assumption.
   - inversion_Clear H. inversion_Clear H6.
-    unfold LookupTyp in H. destruct H.
+    unfold LookupTyp in H.
     econstructor; try eassumption. econstructor; try eassumption.
-    unfold LookupTyp. split; try assumption.
+    unfold LookupTyp. 
     case_eq (Classes.eq_dec (inductive_mind ind) nm); intros.
     + rewrite e in H. elim (Lookup_fresh_neq H H4). reflexivity.
     + apply LMiss; assumption.
@@ -305,9 +305,9 @@ Proof.
       * subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
       * apply LMiss; assumption.
   - inversion_Clear H. inversion_Clear H5.
-    unfold LookupTyp in H. destruct H. econstructor; try eassumption.
+    unfold LookupTyp in H. econstructor; try eassumption.
     econstructor; try eassumption.
-    unfold LookupTyp. split; try assumption.
+    unfold LookupTyp.
     destruct (Classes.eq_dec (inductive_mind ind) nm).
     + subst. eelim Lookup_fresh_neq; try eassumption. reflexivity.
     + apply LMiss; assumption.
@@ -353,16 +353,15 @@ Proof.
         -- assumption.
     + eapply H1. reflexivity. intros j. elim H3.
       apply PoCnstrargs. assumption.
-  - inversion_Clear H. inversion_Clear H4. unfold LookupTyp in H. destruct H.
+  - inversion_Clear H. inversion_Clear H4. unfold LookupTyp in H.
     case_eq (Classes.eq_dec (inductive_mind ind) nm); intros.
     + subst. inversion_Clear H.
       * elim H5. destruct ind. cbn. apply PoCaseAnn.
-      * elim H15. reflexivity.
+      * elim H13. reflexivity.
     + pose proof (Lookup_strengthen H eq_refl n0) as j.
       eapply ctCase.
       * econstructor; try eassumption.
         econstructor; try eassumption.
-        unfold LookupTyp. split; try assumption.
       * eapply H1. reflexivity.
         intros j0. elim H5. apply PoCaseL. assumption.
       * eapply H3. reflexivity.

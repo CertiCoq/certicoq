@@ -382,7 +382,7 @@ End FV.
 
 Section Correct.
 
-  Context (prim_map : M.t (kername * string (* C definition *) * nat (* arity *))). 
+  Context (prim_map : M.t (kername * string (* C definition *) * bool * nat (* arity *))). 
   Context (func_tag kon_tag default_tag default_itag : positive)
           (cnstrs : conId_map)                      
           (cenv : ctor_env).

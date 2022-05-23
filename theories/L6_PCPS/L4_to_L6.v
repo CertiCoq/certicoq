@@ -19,7 +19,7 @@ Open Scope monad_scope.
 
 Section Translate.
 
-  Context (prim_map : M.t (kername * string (* C definition *) * nat (* arity *))). 
+  Context (prim_map : M.t (kername * string (* C definition *) * bool (* tinfo *) * nat (* arity *))). 
   Context (func_tag kon_tag default_tag default_itag : positive)
           (next_id : positive).
 

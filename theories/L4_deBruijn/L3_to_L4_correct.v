@@ -224,7 +224,7 @@ Qed.
 
 
 Lemma lookup_eval_env:
-  forall (e : environ L2k.compile.Term) (prims : list (kername * string * nat * positive)),
+  forall (e : environ L2k.compile.Term) (prims : list (kername * string * bool * nat * positive)),
     crctEnv e ->
     forall (nm : kername) t, LookupDfn nm e t ->
     forall (e'' : env),
@@ -596,7 +596,7 @@ From Coq Require Import PArith.
 
 (* For now, assume that prims are empty *)
 
-Lemma crctTerm_exp_wf_ind (prims : list (kername * string * nat * positive)) (H : prims = []) :
+Lemma crctTerm_exp_wf_ind (prims : list (kername * string * bool * nat * positive)) (H : prims = []) :
   (forall e n t, crctTerm e n t ->
       forall e', crctEnv e -> eval_env (translate_env prims e) e' -> wf_tr_environ e' ->
           exp_wf (N.of_nat (n + List.length e')) (trans e' prims (N.of_nat n) t)) /\
@@ -665,7 +665,7 @@ Proof.
   apply eq_refl.
 Qed.
 
-Lemma crctTerm_exp_wf_ind' (prims : list (kername * string * nat * positive)) (H : prims = []) :
+Lemma crctTerm_exp_wf_ind' (prims : list (kername * string * bool * nat * positive)) (H : prims = []) :
   (forall e n t, crctTerm e n t ->
             let e' := translate_env prims e in crctEnv e -> wf_tr_pre_environ e' ->
           exp_wf (N.of_nat (n + List.length e')) (trans e' prims (N.of_nat n) t)) /\
@@ -2540,7 +2540,7 @@ Proof.
     now exists e''.
 Qed.
 
-Theorem translate_correct (prims : list (kername * string * nat * positive)) (Heq : prims = []) (e : environ Term) (t t' : Term) :
+Theorem translate_correct (prims : list (kername * string * bool * nat * positive)) (Heq : prims = []) (e : environ Term) (t t' : Term) :
   crctEnv e -> crctTerm e 0 t ->
   L3eval.WcbvEval e t t' -> (* big step non-deterministic *)
   let e' := translate_env prims e in

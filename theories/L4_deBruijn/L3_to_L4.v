@@ -30,10 +30,10 @@ Fixpoint cst_offset (e : env) (s : kername) : N :=
   | (c, e) :: tl => if eq_kername s c then 0 else 1 + cst_offset tl s
   end.
 
-Fixpoint find_prim (prims : list (kername * string * nat * positive)) (n : kername) : option positive :=
+Fixpoint find_prim (prims : list (kername * string * bool * nat * positive)) (n : kername) : option positive :=
   match prims with
   | [] => None
-  | (c, s, ar, pos) :: prims => if eq_kername n c then Some pos else find_prim prims n
+  | (c, s, b, ar, pos) :: prims => if eq_kername n c then Some pos else find_prim prims n
   end.
 
 (** Inductive environment, kept to record arities of constructors.
@@ -57,8 +57,9 @@ Definition map_exps (f : exp -> exp) :=
 Section TermTranslation.
 
   Variable e : env.
-  Variable prims : list (kername * string * nat * positive).
 
+  Variable prims : list (kername * string * bool * nat * positive).
+           
   Section fixes.
     Variable trans : N -> L3t.Term -> exp.
     Definition trans_args (k : N) (t : L3t.Terms) : exps :=
@@ -114,7 +115,7 @@ End TermTranslation.
 
 Section EnvTranslation.
   
-  Variable prims : list (kername * string * nat * positive).
+  Variable prims : list (kername * string * bool * nat * positive).
   
   Definition translate_entry x acc :=
     match x with
@@ -156,7 +157,7 @@ Definition mkLets (e : env) (t : exp) :=
 
 (* TODO, pass ienv too *)
 Definition translate_program
-           (prims : list (kername * string * nat * positive))
+           (prims : list (kername * string * bool * nat * positive))
            (e: environ L2k.compile.Term) (t: L3t.Term) : exp :=
   let e' := translate_env prims e in
   mkLets e' (translate e' prims t).

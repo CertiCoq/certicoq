@@ -74,3 +74,14 @@ Definition list_sum_int63 :=
 CertiCoq Compile list_sum_int63
 Extract Constants [ add_int63 => "add_int63", zero_int63 => "zero_int63", one_int63 => "one_int63", print_int63 => "print_int63", new_line => "print_new_line" ]
 Include [ "int63.h" ].
+
+
+(* "Dummy" example with tinfo (tifno is not used by the C function) *) 
+
+Definition list_sum_int63_tinfo :=
+  let n := List.fold_left add_int63 (List.repeat one_int63 100) zero_int63 in
+  let _ := print_int63 n in new_line tt.
+
+CertiCoq Compile list_sum_int63_tinfo
+Extract Constants [ add_int63 => "add_int63" with tinfo, zero_int63 => "zero_int63", one_int63 => "one_int63", print_int63 => "print_int63" with tinfo, new_line => "print_new_line" ]
+Include [ "int63_tinfo.h" ].

@@ -4,7 +4,7 @@ FILES=`cat TESTS`
 
 echo "Running each test ${1} times"
 
-# Note to self: use python next time
+# Note to self: use Haskell next time
 
 # How many times bechmarks run in the same process 
 N=10

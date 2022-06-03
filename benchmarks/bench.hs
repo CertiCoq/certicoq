@@ -7,11 +7,10 @@ import System.Environment
 import System.Exit
 import Control.Monad
 import Text.Printf
-import Formatting
 
--- The compiler configurations to be tested
--- givene as a triple of (name extensiton, description for stats reporting)
--- The first configuration is considered the baseline
+-- The different compiler configurations to be tested
+-- given as a tuple of (name extensiton, description for stats reporting)
+-- The first configuration is assumed to be the baseline
 conf :: [ (String, String) ]
 conf =
   [
@@ -35,11 +34,11 @@ run_command command = do
   if exitCode == ExitSuccess
   then do
     stdOut <- System.IO.Strict.hGetContents hout;
-    -- cleanupProcess (stdin, Just hout, Just herr, procHandle);
+    cleanupProcess (stdin, Just hout, Just herr, procHandle);
     return stdOut
   else do
     stdErr <- System.IO.Strict.hGetContents herr;
-    -- cleanupProcess (stdin, Just hout, Just herr, procHandle);
+    cleanupProcess (stdin, Just hout, Just herr, procHandle);
     error $ concat [ show exitCode, command, stdErr ]
 
 
@@ -63,7 +62,6 @@ run_test 0 test config rs = do
 run_test n test config rs = do
   let cmd = (make_command test config)
   out <- run_command cmd;
-  -- printf "In cmd %s out is %s\n" cmd out;
   let r = read out :: Double
   run_test (n-1) test config ((r / runs):rs)
 

@@ -15,7 +15,7 @@ Import ListNotations.
 
 Section Pipeline.
   Context (next_id : positive)
-    (prims : list (Kernames.kername * string * nat * positive))
+    (prims : list (Kernames.kername * string * bool * nat * positive))
     (debug : bool).
 
   Definition CertiCoq_pipeline (p : Ast.Env.program) :=
@@ -55,7 +55,6 @@ Definition certicoq_pipeline (opts : Options) (p : Template.Ast.Env.program) :=
 CertiCoq Compile -time -O 1 certicoq_pipeline
 Extract Constants [
   (* coq_msg_debug => "print_msg_debug", *)
-  coq_msg_info => "print_msg_info",
-  PCUICWfEnvImpl.guard_impl => "metacoq_guard_impl"
+  coq_msg_info => "print_msg_info"
    ] 
 Include [ "print.h" ].

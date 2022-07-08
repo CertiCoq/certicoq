@@ -1,3 +1,7 @@
+(* This translates λ-box terms to the Ast used by CertiCoq. At this point the two languages are mostly 
+  the same except that we map unsupported constructs to [TWrong], translate nested lists into
+  specific datatypes and switch back to n-ary application nodes (hence the use of a view here and well-founded
+  recursion on the size of terms, see [compile]). *)   
 
 Require Import Coq.Lists.List.
 Require Import Coq.Arith.Arith. 
@@ -327,13 +331,14 @@ Fixpoint list_Defs (l : list (def Term)) : Defs :=
   | [] => dnil
   | t :: ts => dcons t.(dname) t.(dbody) t.(rarg) (list_Defs ts) 
   end.
-
-(* We transform eta-expanded constructors into an application of the n-ary TConstruct form and 
-  translate away projections to inline pattern-matchings. *)  
   
 Section Compile.
-  Context (e : global_declarations).
   Import MCList (map_InP, In_size).
+
+  Lemma size_pos x : 0 < size x.
+  Proof.
+    destruct x; cbn; auto with arith.
+  Qed.
 
   Equations? compile (t: term) : Term 
   by wf t (fun x y : EAst.term => size x < size y) :=
@@ -342,20 +347,9 @@ Section Compile.
     | tBox => TProof
     | tLambda nm bod => TLambda nm (compile bod)
     | tLetIn nm dfn bod => TLetIn nm (compile dfn) (compile bod)
-    | tApp fn args napp nnil with construct_viewc fn := {
-      | view_construct kn c with lookup_constructor_pars_args e kn c := { 
-        | Some (npars, nargs) => 
-          let args := map_InP args (fun x H => compile x) in
-          let '(args, rest) := MCList.chop nargs args in
-          TmkApps (TConstruct kn c (list_terms args)) (list_terms rest)
-        | None => 
-          let args := map_InP args (fun x H => compile x) in
-          TConstruct kn c (list_terms args) }
-      | view_other fn nconstr =>
-        TmkApps (compile fn) (list_terms (map_InP args (fun x H => compile x)))
-    }
+    | tApp fn args napp nnil => TmkApps (compile fn) (list_terms (map_InP args (fun x H => compile x)))
     | tConst nm => TConst nm
-    | tConstruct i m => TConstruct i m tnil
+    | tConstruct i m args => TConstruct i m (list_terms (map_InP args (fun x H => compile x)))
     | tCase i mch brs =>
       let brs' := map_InP brs (fun x H => (List.rev (fst x), compile (snd x))) in
       TCase (fst i) (compile mch) (list_Brs brs')
@@ -368,14 +362,13 @@ Section Compile.
     | tEvar _ _ => TWrong "Evar" }.
   Proof.
     all: try (cbn; lia).
-    - rewrite size_mkApps. cbn. now eapply (In_size id size).
-    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn.
+    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn. lia.
+    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn. 
       eapply (In_size id size) in H; unfold id in H; cbn in H. 
+      change (fun x => size x) with size in H.
+      pose proof (size_pos fn). lia.
+    - eapply (In_size id size) in H; unfold id in H; cbn in H.
       now change (fun x => size x) with size in H.
-    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn.
-      lia.
-    - eapply le_lt_trans. 2: eapply size_mkApps_l; eauto. eapply (In_size id size) in H.
-      unfold id in H. change size with (fun x => size x) at 2. lia.
     - cbn. eapply (In_size snd size) in H. cbn in H. lia.
     - eapply (In_size dbody size) in H. cbn in H. lia.
   Qed.
@@ -388,13 +381,13 @@ Global Hint Rewrite @MCList.map_InP_spec : compile.
 Tactic Notation "simp_compile" "in" hyp(H) := simp compile in H; try rewrite <- !compile_equation_1 in H.
 Ltac simp_compile := simp compile; try rewrite <- !compile_equation_1.
 
-Definition compile_global_decl Σ d :=
+Definition compile_global_decl d :=
   match d with
   | InductiveDecl m =>
     let Ibs := ibodies_itypPack m.(ind_bodies) in
     ecTyp Term 0 Ibs
   | ConstantDecl {| cst_body := Some t |} =>
-    ecTrm (compile Σ t)
+    ecTrm (compile t)
   | ConstantDecl {| cst_body := None |} =>
     ecAx Term
   end.
@@ -403,12 +396,44 @@ Fixpoint compile_ctx (t : global_context) :=
   match t with
   | [] => []
   | (n, decl) :: rest => 
-    (n, compile_global_decl rest decl) :: compile_ctx rest
+    (n, compile_global_decl decl) :: compile_ctx rest
   end.
 
+From MetaCoq.Template Require Import Ast utils Transform TemplateProgram.
+Import Transform.
+Local Existing Instance config.extraction_checker_flags.
+
+Axiom assume_welltyped_template_program_expansion : 
+  forall p, wt_template_program p ->
+  let p' := EtaExpand.eta_expand_program p in
+  ∥ wt_template_program p' ∥ /\ EtaExpand.expanded_program p'.
+
+Axiom assume_preservation_template_program_expansion : 
+  forall p v, wt_template_program p ->
+  eval_template_program p v ->
+  ∥ eval_template_program (EtaExpand.eta_expand_program p) (EtaExpand.eta_expand (declarations p.1) [] v) ∥.
+
+Program Definition eta_transform : Transform.t template_program template_program Ast.term Ast.term 
+  eval_template_program eval_template_program :=
+  {| name := "eta expand cstrs and fixpoints";
+      pre := fun p => ∥ wt_template_program p ∥ ;
+      transform p _ := EtaExpand.eta_expand_program p;
+      post := fun p => ∥ wt_template_program p ∥ /\ EtaExpand.expanded_program p;
+      obseq p p' v v' := v' = EtaExpand.eta_expand p.1.(declarations) [] v |}.
+Next Obligation.
+  destruct p. now apply assume_welltyped_template_program_expansion.
+Qed.
+Next Obligation.
+  red. intros p v [wt] ev. 
+  apply assume_preservation_template_program_expansion in ev as [ev']; eauto.
+Qed.
+
+Program Definition run_erase_program p := 
+  Transform.run (Transform.compose eta_transform erasure_pipeline _) p.
+
 Definition compile_program (p : Ast.Env.program) : Program Term :=
-  let p := Erasure.run_erase_program p (MCUtils.todo "wf_env and welltyped term") in
-  {| main := compile (fst p) (snd p) ; env := compile_ctx (fst p) |}.
+  let p := @run_erase_program p (MCUtils.todo "wf_env and welltyped term") in
+  {| main := compile (snd p) ; env := compile_ctx (fst p) |}.
 
 Definition program_Program (p: Ast.Env.program) : Program Term :=
   compile_program p.

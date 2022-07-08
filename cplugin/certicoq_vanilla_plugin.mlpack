@@ -163,6 +163,7 @@ EProgram
 ERemoveParams
 EOptimizePropDiscr
 EInlineProjections
+EConstructorsAsBlocks
 ETransform
 Erasure
 SafeTemplateErasure

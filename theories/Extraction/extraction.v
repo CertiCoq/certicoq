@@ -92,8 +92,6 @@ Extract Constant Z.compare =>
 Extract Constant Z.of_N => "fun p -> p".
 Extract Constant Z.abs_N => "Pervasives.abs".
 
-Extract Constant PCUICWfEnvImpl.guard_impl => "(fun _ _ _ _ -> true)".
-
 (* Int31 *)
 Extract Inductive Int31.digits => "bool" [ "false" "true" ].
 Extract Inductive Int31.int31 => "int" [ "Camlcoq.Int31.constr" ] "Camlcoq.Int31.destr".

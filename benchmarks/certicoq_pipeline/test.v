@@ -14,12 +14,11 @@ Cd "tests".
 
 From MetaCoq.Erasure Require Import Erasure.
 
-(*
-Time CertiCoqC Compile erase_and_print_template_program
-Extract Constants [
+
+(* Time CertiCoqC Compile erase_and_print_template_program. *)
+(*Extract Constants [
   (* coq_msg_debug => "print_msg_debug", *)
   (* coq_msg_info => "print_msg_info", *)
-  PCUICWfEnvImpl.guard_impl => "metacoq_guard_impl"
    ] 
 Include [ "print.h" ].
 *)
@@ -30,12 +29,10 @@ Time CertiCoq Compile erase_and_print_template_program.
 
 From CertiCoq.Benchmarks.certicoq_pipeline Require Import certicoq_pipeline.
 
-Time CertiCoqC Compile -time -O 0 compile
-Extract Constants [
+Time CertiCoqC Compile -time -O 0 certicoq_pipeline
+ Extract Constants [ 
   (* coq_msg_debug => "print_msg_debug", *)
-  (* coq_msg_info => "print_msg_info", *)
-  PCUICWfEnvImpl.guard_impl => "metacoq_guard_impl"
-   ] 
+   coq_msg_info => "print_msg_info" ] 
 Include [ "print.h" ].
 
 

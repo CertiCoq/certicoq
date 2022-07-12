@@ -17,6 +17,7 @@ From MetaCoq.Erasure Require Import EAst EAstUtils EGlobalEnv EExtends.
 From MetaCoq.Erasure Require Import ESpineView EWcbvEvalEtaInd EWellformed EEtaExpanded.
 Import utils.
 
+
 Require Import L2k.compile.
 Require Import L2k.term.
 Require Import L2k.program.
@@ -46,14 +47,13 @@ Definition term_flags :=
 Definition env_flags := 
   {| has_axioms := false;
     has_cstr_params := false;
-    term_switches := term_flags |}.
+    term_switches := term_flags;
+    cstr_as_blocks := true |}.
 
 Local Existing Instance env_flags.
 
 Section OnGlobalEnv.
   Context (Σ : global_context).
-
-  Notation compile := (compile Σ).
 
   Definition compile_terms ts := list_terms (map compile ts).
   
@@ -77,7 +77,7 @@ Section OnGlobalEnv.
 Lemma Lookup_hom :
   wf_glob Σ ->
   forall s ec, lookup_env Σ s = Some ec -> 
-    ∑ Σ', [× extends Σ' Σ, wf_global_decl Σ' ec & lookup s (compile_ctx Σ) = Some (compile_global_decl Σ' ec)].
+    ∑ Σ', [× extends Σ' Σ, wf_global_decl Σ' ec & lookup s (compile_ctx Σ) = Some (compile_global_decl ec)].
 Proof.
   induction Σ; cbn => //.
   intros s ec.
@@ -133,41 +133,16 @@ Qed.
   
 End OnGlobalEnv.
 
-Lemma compile_mkApps Σ fn args :
+Lemma compile_mkApps_nApp fn args :
   negb (EAst.isApp fn) ->
-  compile Σ (mkApps fn args) =
-    match construct_viewc fn with
-    | view_construct kn c => 
-      match lookup_constructor_pars_args Σ kn c with
-      | Some (npars, nargs) => 
-        let args := map (compile Σ) args in
-        let '(args, rest) := MCList.chop nargs args in
-        TmkApps (TConstruct kn c (list_terms args)) (list_terms rest)
-      | None =>
-        let args := compile_terms Σ args in
-        TConstruct kn c args
-      end
-    | view_other fn nconstr =>
-        TmkApps (compile Σ fn) (compile_terms Σ args)
-    end.
+  compile (mkApps fn args) = TmkApps (compile fn) (compile_terms args).
 Proof.
   intros napp; simp compile.
-  destruct (construct_viewc fn) eqn:vc.
-  - destruct lookup_constructor_pars_args as [[]|] eqn:heq.
-    destruct args eqn:hargs. cbn.
-    * destruct n1 => //.
-    * set (v := TermSpineView.view _).
-      destruct (TermSpineView.view_mkApps v) as [hf [vn eq]] => //.
-      rewrite eq /=. rewrite heq /=. now simp_compile.
-    * destruct args eqn:hargs => //.
-      set (v := TermSpineView.view _).
-      destruct (TermSpineView.view_mkApps v) as [hf [vn eq]] => //.
-      rewrite eq /=. rewrite heq /=. now simp_compile.
-  - destruct args eqn:hargs => //.
-    simp compile. now cbn.  
-    set (v := TermSpineView.view _).
-    destruct (TermSpineView.view_mkApps v) as [hf [vn eq]] => //.
-    rewrite eq /= vc /=. now simp_compile.
+  destruct args eqn:hargs => //.
+  simp compile. 
+  set (v := TermSpineView.view _).
+  destruct (TermSpineView.view_mkApps v) as [hf [vn eq]] => //.
+  rewrite eq /=. now simp_compile.
 Qed.
 
 From Coq Require Import ssrbool.
@@ -203,10 +178,10 @@ Proof.
   intros [= -> -> <-]. cbn. f_equal.
 Qed.
 
-Lemma wellformed_lookup_constructor_pars_args {Σ ind n} :
+Lemma wellformed_lookup_constructor_pars_args {Σ ind n k args} :
   wf_glob Σ ->
-  wellformed Σ 0 (EAst.tConstruct ind n) ->
-  ∑ args, lookup_constructor_pars_args Σ ind n = Some (0, args).
+  wellformed Σ k (EAst.tConstruct ind n args) ->
+  ∑ nargs, lookup_constructor_pars_args Σ ind n = Some (0, nargs).
 Proof.
   intros wfΣ wf. cbn -[lookup_constructor] in wf.
   destruct lookup_constructor as [[[mdecl idecl] cdecl]|] eqn:hl => //.
@@ -230,68 +205,30 @@ Lemma compile_mkApps_wf (P : Term -> Prop) Σ k fn args :
   wf_glob Σ -> 
   ~~ EAst.isApp fn ->
   wellformed Σ k (mkApps fn args) ->
-  (match construct_viewc fn with
-  | view_construct kn c => 
-    match lookup_constructor_pars_args Σ kn c with
-    | Some (0, nargs) => 
-      let cargs := map (compile Σ) args in
-      let '(cargs, rest) := MCList.chop nargs cargs in
-      P (TmkApps (TConstruct kn c (list_terms cargs)) (list_terms rest))
-    | _ => True
-    end
-  | view_other fn nconstr =>
-      P (TmkApps (compile Σ fn) (list_terms (map (compile Σ) args)))
-  end) ->
-  P (compile Σ (mkApps fn args)).
+  P (TmkApps (compile fn) (list_terms (map (compile ) args))) ->
+  P (compile (mkApps fn args)).
 Proof.
   intros wfΣ napp.
   rewrite wellformed_mkApps // => /andP[] wffn wfargs.
-  destruct construct_viewc eqn:vc.
-  + rewrite compile_mkApps // vc.
-    destruct (wellformed_lookup_constructor_pars_args wfΣ wffn).
-    rewrite e. cbn.
-    destruct chop eqn:eqch => //.
-  + intros ht. rewrite compile_mkApps // vc //.
+  rewrite compile_mkApps_nApp //.
 Qed.
 
-Lemma compile_decompose Σ f :
-  compile Σ f =
+Lemma compile_decompose f :
+  compile f =
   let (fn, args) := decompose_app f in
-    match construct_viewc fn with
-    | view_construct kn c => 
-      match lookup_constructor_pars_args Σ kn c with
-      | Some (npars, nargs) => 
-        let args := map (compile Σ) args in
-        let '(args, rest) := MCList.chop nargs args in
-        TmkApps (TConstruct kn c (list_terms args)) (list_terms rest)
-      | None =>
-        let args := compile_terms Σ args in
-        TConstruct kn c args
-      end
-    | view_other fn nconstr =>
-        TmkApps (compile Σ fn) (compile_terms Σ args)
-    end.
+  TmkApps (compile fn) (compile_terms args).
 Proof.
   destruct (decompose_app f) eqn:da.
-  rewrite (decompose_app_inv da). apply compile_mkApps.
+  rewrite (decompose_app_inv da). apply compile_mkApps_nApp.
   now eapply decompose_app_notApp.
 Qed.
 
-Lemma compile_mkApps_eta (P : Term -> Prop) Σ fn args :
+(* Lemma compile_mkApps_eta (P : Term -> Prop) Σ fn args :
   wf_glob Σ -> 
   ~~ EAst.isApp fn ->
   isEtaExp Σ (mkApps fn args) ->
-  (match construct_viewc fn with
-  | view_construct kn c => 
-    forall pars nargs, 
-    lookup_constructor_pars_args Σ kn c = Some (pars, nargs) ->
-    let cargs := map (compile Σ) args in
-    let '(cargs, rest) := MCList.chop nargs cargs in
-    P (TmkApps (TConstruct kn c (list_terms cargs)) (list_terms rest))
-  | view_other fn nconstr =>
-      P (TmkApps (compile Σ fn) (list_terms (map (compile Σ) args)))
-  end) ->
-  P (compile Σ (mkApps fn args)).
+  (P (TmkApps (compile fn) (list_terms (map compile args)))) ->
+  P (compile (mkApps fn args)).
 Proof.
   intros wfΣ napp.
   move/isEtaExp_mkApps.
@@ -305,7 +242,7 @@ Proof.
     destruct chop eqn:eqch => //.
     move => /andP[] => //.
   + intros ht. rewrite compile_mkApps // vc //.
-Qed.
+Qed. *)
 
 Inductive Forall2_terms (P : Term -> Term -> Prop) : Terms -> Terms -> Prop :=
   | Forall2_nil_terms : Forall2_terms P tnil tnil
@@ -425,41 +362,23 @@ Lemma compile_tApp Σ t a (P : Term -> Prop) k :
   wf_glob Σ -> 
   wellformed Σ k (tApp t a) ->
   (let (fn, args) := decompose_app (tApp t a) in
-  match construct_viewc fn with
-  | view_construct kn c => 
-    match lookup_constructor_pars_args Σ kn c with
-    | Some (0, nargs) => 
-      let cargs := map (compile Σ) args in
-      let '(cargs, rest) := MCList.chop nargs cargs in
-      (args <> [] /\ t = mkApps (tConstruct kn c) (remove_last args) /\ a = last args a) ->
-      P (TmkApps (TConstruct kn c (list_terms cargs)) (list_terms rest))
-    | _ => True
-    end
-  | view_other fn nconstr =>
-      P (TApp (compile Σ t) (compile Σ a))
-  end) ->
-  P (compile Σ (tApp t a)).
+  
+      P (TApp (compile t) (compile a))
+  ) ->
+  P (compile (tApp t a)).
 Proof.
   intros wfΣ wf.
-  rewrite (compile_decompose _ (tApp t a)).
+  rewrite (compile_decompose (tApp t a)).
   destruct decompose_app eqn:da.
   pose proof (decompose_app_notApp _ _ _ da).
-  pose proof (EInduction.decompose_app_app _ _ _ _ da).
-  destruct construct_viewc eqn:vc.
-  + eapply EEtaExpandedFix.decompose_app_tApp_split in da as [Ha Ht].
-    cbn in wf.
-    move: wf => /andP[]. rewrite Ha wellformed_mkApps // => /andP[] wfc wfl wft.
-    destruct (wellformed_lookup_constructor_pars_args wfΣ wfc).
-    rewrite e. cbn.
-    destruct chop eqn:eqch => //. 
-    intros. apply H1. intuition auto.
+  pose proof (EInduction.decompose_app_app _ _ _ _ da).  
   + pose proof (decompose_app_notApp _ _ _ da).
     pose proof (EInduction.decompose_app_app _ _ _ _ da).
     eapply EEtaExpandedFix.decompose_app_tApp_split in da as [Ha Ht].
     rewrite Ha Ht.
-    rewrite compile_mkApps // vc.
+    rewrite compile_mkApps_nApp //.
     rewrite TApp_TmkApps.
-    rewrite -(tappend_hom _ (remove_last l) [_]).
+    cbn. rewrite -(tappend_hom (remove_last l) [last l a]).
     rewrite -remove_last_last //. 
 Qed.
 
@@ -479,7 +398,7 @@ From MetaCoq.SafeChecker Require PCUICTypeChecker.
 
 Ltac simp_eta_in := match goal with [ H : is_true (isEtaExp _ _) |- _ ] => simp_eta in H end.
 
-Lemma compile_isLambda Σ t : EAst.isLambda t -> isLambda (compile Σ t).
+Lemma compile_isLambda t : EAst.isLambda t -> isLambda (compile t).
 Proof. destruct t => //. now simp_compile. Qed.
 
 Definition preserves_some_gen {A B} (t : option A) (f : A -> B) (t' : option B) := forall b, t = Some b -> t' = Some (f b).
@@ -515,59 +434,12 @@ Proof.
   rewrite wellformed_mkApps //. eapply andP.
 Qed.
 
-Lemma compile_extends Σ Σ' t : 
-  wf_glob Σ' ->
-  extends Σ Σ' ->
-  forall k, wellformed Σ k t ->
-  compile Σ t = compile Σ' t.
-Proof.
-  intros wfΣ ext.
-  funelim (compile Σ t); simpl; simp_compile => //.
-  all:try intros; rtoProp; intuition eauto; f_equal; eauto.
-  all:repeat match goal with [ H : forall x, In x _ -> _ |- _ ] => eapply In_All in H end.
-  - f_equal. solve_all.
-  - f_equal. move/andP: H0 => [] _ wffix. solve_all.
-  - move/wf_mkApps: H1 => [] wffn wfargs.
-    rewrite compile_decompose decompose_app_napp //.
-    destruct construct_viewc eqn:vc.
-    simpl in wffn.
-    destruct lookup_constructor_pars_args as [[npars nargs]|] eqn:hl.
-    simpl; rewrite PCUICTypeChecker.chop_firstn_skipn.
-    rewrite compile_decompose decompose_app_mkApps //.
-    rewrite compile_decompose decompose_app_mkApps //. cbn.
-    rewrite (compile_decompose _ (mkApps t args)) decompose_app_mkApps //.
-    rewrite vc. f_equal; eauto. unfold compile_terms. f_equal. solve_all.
-  - destruct chop eqn:hc.
-    move/wf_mkApps: H0 => [wff wfargs].
-    rewrite compile_decompose decompose_app_mkApps // /=.
-    rewrite (lookup_constructor_pars_args_extends wfΣ ext wff) /= Heq.
-    assert (map (compile Σ) args = map (compile Σ') args) as <- by solve_all.
-    now rewrite hc.
-  - rewrite compile_decompose decompose_app_mkApps // /=.
-    move/wf_mkApps: H0 => [] wfc wfargs.
-    rewrite (lookup_constructor_pars_args_extends wfΣ ext wfc) Heq.
-    f_equal. unfold compile_terms. f_equal. solve_all.
-Qed.
-
-Lemma compile_global_decl_extends Σ Σ' t : 
-  wf_glob Σ' ->
-  extends Σ Σ' ->
-  wf_global_decl Σ t ->
-  compile_global_decl Σ t = compile_global_decl Σ' t.
-Proof.
-  intros wfΣ ext.
-  destruct t => /= //.
-  destruct c as [[b|]] => //=.
-  intros wfb; f_equal. eapply compile_extends; tea.
-Qed.
-
 Lemma lookup_env_lookup {Σ c decl} : 
   wf_glob Σ ->
   lookup_env Σ c = Some decl ->
-  lookup c (compile_ctx Σ) = Some (compile_global_decl Σ decl).
+  lookup c (compile_ctx Σ) = Some (compile_global_decl decl).
 Proof.
   move=> wfΣ /(Lookup_hom wfΣ) [Σ' [ext wf ->]]. f_equal. 
-  eapply compile_global_decl_extends => //.
 Qed.
 
 Lemma exnNth_nth_error {A} (l : list A) n t :
@@ -618,75 +490,52 @@ Proof.
   now rewrite (wellformed_lookup_inductive_pars _ wfΣ hl').
 Qed.
 
-Lemma wellformed_eta_crct {Σ} t :
-  isEtaExp_env Σ -> wf_glob Σ ->
+Lemma wellformed_crct {Σ} t :
+  wf_glob Σ ->
   crctEnv (compile_ctx Σ) ->
   forall k, wellformed Σ k t ->
-  isEtaExp Σ t -> 
-  crctTerm (compile_ctx Σ) k (compile Σ t).
+  crctTerm (compile_ctx Σ) k (compile t).
 Proof.
-  intros etaΣ wfΣ crctΣ.
-  revert t. apply: EInduction.MkAppsInd.rec; cbn [wellformed]; intros; try simp_eta_in; simp_eta; simp_compile.
-  all:intros; simp_compile; rtoProp; intuition auto; try cbn -[lookup_constructor lookup_inductive] in *; try constructor; eauto.
+  intros wfΣ crctΣ.
+  revert t. apply: EInduction.MkAppsInd.rec; cbn [wellformed]; intros; try simp_compile.
+  all:intros; simp_compile; intuition auto; try cbn -[lookup_env lookup_constant lookup_constructor lookup_constructor_pars_args lookup_inductive] in *; rtoProp; try constructor; eauto.
   - now eapply Nat.ltb_lt.
   - simp_compile. 
-    move: H2; rewrite wellformed_mkApps // => /andP[] wfc wfu.
-    move/isEtaExp_mkApps: H3. 
-    rewrite decompose_app_mkApps //.
-    eapply compile_mkApps_wf => //. rewrite wellformed_mkApps //. now erewrite wfc, wfu.
-    destruct construct_viewc.
-    * destruct (wellformed_lookup_constructor_pars_args wfΣ wfc) as [cargs eq]. rewrite eq.
-      cbn. rewrite PCUICTypeChecker.chop_firstn_skipn.
-      move/andP=> [] etaind etau.
-      assert (All (fun t => crctTerm (compile_ctx Σ) k (compile Σ t)) u).
-      { clear -X wfu etau. repeat toAll. eapply All_impl; tea; cbn; intuition auto. }
-      eapply crctTerm_tmkApps. constructor.
-      2:{ eapply (All_firstn (n:=cargs)) in X0. rewrite firstn_map.
-          induction X0; constructor; auto. }
-      2:{ eapply (All_skipn (n:=cargs)) in X0. rewrite skipn_map.
-        induction X0; constructor; auto. }
-      unfold isEtaExp_app in etaind. rewrite eq in etaind.
-      eapply Nat.leb_le in etaind.
-      simpl in wfc. 
-      destruct lookup_constructor as [[[mdecl idecl] cdecl]|] eqn:hl.
-      eapply compile_crctCnstr; tea. cbn.
-      rewrite firstn_map tlength_hom. rewrite firstn_length. 
-      assert (Nat.min cargs #|u| = cargs) as -> by lia.
-      rewrite /cstr_arity.
-      rewrite (lookup_constructor_pars_args_spec wfΣ hl) in eq. noconf eq. now rewrite H2.
-      by [].
-    * move/andP=> [] etat etau.
-      eapply crctTerm_tmkApps; eauto.
-      repeat toAll. clear -etau etaΣ wfΣ crctΣ. induction etau; cbn; constructor; auto.
-      now apply p.
-  - destruct lookup_env as [[]|] eqn:hl => //.
-    destruct c as [[]] => //. cbn in *.
-    eapply lookup_env_lookup in hl.
-    econstructor; tea.
-    unfold LookupDfn. eapply lookup_Lookup => //. exact hl. auto.
+    move: H2; rewrite wellformed_mkApps // => /andP[] wfc wfu. 
+    eapply compile_mkApps_wf => //; tea. rewrite wellformed_mkApps //. now erewrite wfc, wfu.
+    eapply crctTerm_tmkApps; eauto.
+    solve_all. clear -wfu crctΣ. induction wfu; constructor; intuition eauto.
+  - destruct lookup_constant as [[]|] eqn:hl => //.
+    destruct cst_body => //.
+    econstructor; eauto. unfold LookupDfn. eapply lookup_Lookup.
+    eapply (lookup_env_lookup (decl := ConstantDecl {| Extract.E.cst_body := Some t |})) => //.
+    move: hl; rewrite /lookup_constant. destruct lookup_env => //=.
+    destruct g => //. congruence.
   - move: H0. rewrite /isEtaExp_app.
     destruct lookup_constructor as [[[mdecl idecl] cdecl]|] eqn:hl => //.
+    move: H1.
     rewrite (lookup_constructor_pars_args_spec wfΣ hl).
-    have hpars := wellformed_lookup_constructor_pars wfΣ hl.
-    rewrite hpars. cbn. move/Nat.leb_le => hpars'.
-    eapply compile_crctCnstr; eauto. cbn. rewrite /cstr_arity. lia.
+    have hpars := wellformed_lookup_constructor_pars wfΣ hl => /= hargs lenargs.
+    eapply compile_crctCnstr; eauto. cbn. rewrite /cstr_arity.
+    rewrite tlength_hom. apply eqb_eq in lenargs. lia.
+  - destruct args => //. now constructor.
+    solve_all. clear -crctΣ H1; induction H1; cbn; constructor; auto. repeat apply p.
   - destruct lookup_inductive as [[mdecl idecl]|] eqn:hl => //.
     econstructor.
     eapply compile_crctInd; tea. eauto.
-    repeat toAll. clear -etaΣ wfΣ crctΣ H2.
-    induction H2; cbn; constructor; auto.
+    repeat toAll. clear -wfΣ crctΣ H1.
+    induction H1; cbn; constructor; auto.
     rewrite List.rev_length. now apply p. 
   - cbn. rewrite -dlength_hom. 
-    move/andP: H1 => [] hn H1. clear hn.
-    rewrite Nat.add_comm. eapply forallb_All in H1. eapply forallb_All in H0.
-    eapply All_mix in X; [|exact H0]. clear H0; eapply All_mix in X; [|exact H1]. clear H1.
+    move/andP: H0 => [] hn H1. clear hn.
+    rewrite Nat.add_comm. eapply forallb_All in H1. eapply forallb_All in H.
+    eapply All_mix in X; [|exact H]. clear H; eapply All_mix in X; [|exact H1]. clear H1.
     move: X. generalize (#|m| + k).
     induction 1; try solve [constructor; cbn; auto].
     intuition auto. 
-    move/andP: a0 => [] isl etab.
     constructor; eauto.
     now eapply compile_isLambda.
-  - cbn. rewrite -dlength_hom. move/andP: H1 => [] /Nat.ltb_lt //.
+  - cbn. rewrite -dlength_hom. move/andP: H0 => [] /Nat.ltb_lt //.
 Qed.
 
 Lemma compile_fresh kn Σ : fresh_global kn Σ -> fresh kn (compile_ctx Σ).
@@ -695,17 +544,17 @@ Proof.
   destruct x as [kn' d]. constructor => //. cbn in H. congruence.
 Qed.
 
-Lemma wellformed_eta_crctEnv {Σ} :
-  isEtaExp_env Σ -> wf_glob Σ ->
+Lemma wellformed_env_crctEnv {Σ} :
+  wf_glob Σ ->
   crctEnv (compile_ctx Σ).
 Proof.
   induction Σ; cbn.
   - constructor.
-  - move/andP=> [] etad etae wf. depelim wf.
+  - intros wf. depelim wf.
     destruct d.
     * cbn. destruct c as [[b|]]; econstructor; eauto.
       now apply compile_fresh.
-      eapply wellformed_eta_crct => //. eauto.
+      eapply wellformed_crct => //. eauto.
       now apply compile_fresh.
     * constructor; eauto.
       now apply compile_fresh.
@@ -732,64 +581,53 @@ Proof.
   - cbn. now f_equal.
 Qed.
 
-Lemma compile_terms_tappend Σ l l' : 
-  compile_terms Σ (l ++ l') = tappend (compile_terms Σ l) (compile_terms Σ l').
+Lemma compile_terms_tappend l l' : 
+  compile_terms (l ++ l') = tappend (compile_terms l) (compile_terms l').
 Proof.
   rewrite /compile_terms map_app list_terms_app //.
 Qed.
 
-Lemma isLambda_compile Σ f : 
-  ~~ EAst.isLambda f -> ~ isLambda (compile Σ f).
+Lemma isLambda_compile f : 
+  ~~ EAst.isLambda f -> ~ isLambda (compile f).
 Proof.
   intros nf. move=> [] na [] bod.
   destruct f; simp_compile => /= //.
   rewrite compile_decompose.
   destruct decompose_app eqn:da.
-  destruct construct_viewc.
-  destruct lookup_constructor_pars_args as [[[] args]|] => //; cbn; destruct chop eqn:eqc; 
-  destruct (list_terms l1) using trev_ind => //; rewrite -TApp_TmkApps //.
+  cbn. 
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
 Qed.
 
-Lemma isBox_compile Σ f : 
-  ~~ EAstUtils.isBox f -> compile Σ f <> TProof.
+Lemma isBox_compile f : 
+  ~~ EAstUtils.isBox f -> compile f <> TProof.
 Proof.
   intros nf.
   destruct f; simp_compile => /= //.
   rewrite compile_decompose.
   destruct decompose_app eqn:da.
-  destruct construct_viewc.
-  destruct lookup_constructor_pars_args as [[[] args]|] => //; cbn; destruct chop eqn:eqc; 
-  destruct (list_terms l1) using trev_ind => //; rewrite -TApp_TmkApps //.
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
 Qed.
 
-Lemma isFix_compile Σ f : 
-  ~~ EAstUtils.isFix f -> ~ isFix (compile Σ f).
+Lemma isFix_compile f : 
+  ~~ EAstUtils.isFix f -> ~ isFix (compile f).
 Proof.
   move=> nf [] defs [n].
   destruct f; simp_compile => /= //.
   rewrite compile_decompose.
   destruct decompose_app eqn:da.
-  destruct construct_viewc.
-  destruct lookup_constructor_pars_args as [[[] args]|] => //; cbn; destruct chop eqn:eqc; 
-  destruct (list_terms l1) using trev_ind => //; rewrite -TApp_TmkApps //.
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
 Qed.
 
-Lemma isConstructApp_compile Σ f : 
-  ~~ isConstructApp f -> ~ isConstruct (compile Σ f).
+Lemma isConstructApp_compile f : 
+  ~~ isConstructApp f -> ~ isConstruct (compile f).
 Proof.
   move=> nf [] i [] n [] args.
   destruct f; simp_compile => /= //.
   rewrite compile_decompose.
   destruct decompose_app eqn:da.
-  destruct construct_viewc. 
-  { exfalso. rewrite (decompose_app_inv da) in nf.
-    rewrite isConstructApp_mkApps // in nf. }
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
 Qed.
@@ -828,71 +666,43 @@ Qed.
 
 From MetaCoq.Erasure Require Import EInduction ECSubst.
 
-Lemma compile_mkApps_eta_fn Σ f args : isEtaExp Σ f -> 
-  compile Σ (mkApps f args) = TmkApps (compile Σ f) (list_terms (map (compile Σ) args)).
+Lemma compile_mkApps f args : 
+  compile (mkApps f args) = TmkApps (compile f) (list_terms (map compile args)).
 Proof.
-  intros ef.
   destruct (decompose_app f) eqn:df.
-  rewrite (decompose_app_inv df) in ef |- *.
+  rewrite (decompose_app_inv df) in |- *.
   rewrite -mkApps_app.
-  move/isEtaExp_mkApps: ef.
   pose proof (decompose_app_notApp _ _ _ df).
-  rewrite decompose_app_mkApps /= //.
   rewrite compile_decompose.
   rewrite decompose_app_mkApps /= //.
-  destruct (construct_viewc t) eqn:vc.
-  + move=> /andP[] etanl etal.
-    destruct lookup_constructor_pars_args as [[pars args']|] eqn:hl => //.
-    cbn. 
-    rewrite PCUICTypeChecker.chop_firstn_skipn.
-    rewrite compile_decompose.
-    rewrite decompose_app_mkApps // /= hl.
-    rewrite PCUICTypeChecker.chop_firstn_skipn.
-    rewrite -TmkApps_tappend.
-    move: etanl. rewrite /isEtaExp_app hl.
-    move/Nat.leb_le => hl'.
-    rewrite firstn_map. 
-    rewrite firstn_app.
-    assert (args' - #|l| = 0) as -> by lia.
-    rewrite firstn_O // app_nil_r. f_equal. f_equal.
-    rewrite firstn_map //. rewrite map_app skipn_map.
-    rewrite -tappend_hom /compile_terms map_app -skipn_map.
-    rewrite skipn_app. len. 
-    assert (args' - #|l| = 0) as -> by lia.
-    now rewrite skipn_0.
-    move: etanl. rewrite /isEtaExp_app hl //.
-  + move => /andP[] etat etal.
-    rewrite (compile_decompose _ (mkApps t l)).
-    rewrite decompose_app_mkApps //.
-    rewrite vc. rewrite -TmkApps_tappend. f_equal.
-    now rewrite tappend_hom.
+  rewrite (compile_decompose (mkApps t l)).
+  rewrite decompose_app_mkApps //.
+  rewrite -TmkApps_tappend. f_equal.
+  now rewrite tappend_hom.
 Qed.
 
 Lemma negbF b : ~~ b -> b -> False.
 Proof. destruct b => //. Qed.
 
-Lemma compile_mkApps_nConstructApp_nApp Σ f args : 
+Lemma compile_mkApps_nConstructApp_nApp f args : 
   ~~ EAst.isApp f ->
   ~~ isConstructApp (mkApps f args) -> 
-  compile Σ (mkApps f args) = TmkApps (compile Σ f) (list_terms (map (compile Σ) args)).
+  compile (mkApps f args) = TmkApps (compile f) (list_terms (map compile args)).
 Proof.
   intros napp nc.
   rewrite compile_decompose decompose_app_mkApps //.
-  destruct construct_viewc => //.
-  exfalso.
-  apply (negbF nc). rewrite isConstructApp_mkApps //.
 Qed.
 
-Lemma compile_mkApps_nConstructApp Σ f args : 
+Lemma compile_mkApps_nConstructApp f args : 
   ~~ isConstructApp (mkApps f args) -> 
-  compile Σ (mkApps f args) = TmkApps (compile Σ f) (list_terms (map (compile Σ) args)).
+  compile (mkApps f args) = TmkApps (compile f) (list_terms (map compile args)).
 Proof.
   intros nc.
   destruct (decompose_app f) eqn:da.
   rewrite (decompose_app_inv da) -mkApps_app in nc *.
   pose proof (decompose_app_notApp _ _ _ da).
   rewrite compile_mkApps_nConstructApp_nApp //.
-  rewrite (compile_mkApps_nConstructApp_nApp _ t) //.
+  rewrite (compile_mkApps_nConstructApp_nApp t) //.
   move: nc; rewrite !isConstructApp_mkApps //.
   rewrite -TmkApps_tappend. f_equal. now rewrite -tappend_hom.
 Qed.
@@ -912,10 +722,8 @@ Arguments instantiate _ _ !tbod.
 
 Lemma compile_csubst Σ a n k b : 
   wf_glob Σ ->
-  isEtaExp Σ a ->
-  isEtaExp Σ b ->
   wellformed Σ (n + k) b ->
-  compile Σ (ECSubst.csubst a k b) = instantiate (compile Σ a) k (compile Σ b).
+  compile (ECSubst.csubst a k b) = instantiate (compile a) k (compile b).
 Proof.
   intros wfΣ.
   revert b n k.
@@ -926,68 +734,45 @@ Proof.
      intuition eauto; eauto].
 
   - cbn. destruct Nat.compare => //; reflexivity.
-  - cbn. f_equal; eauto. eapply H => //. rewrite -Nat.add_succ_r in H2; tea.
-  - cbn. f_equal; eauto. eapply H => //. rtoProp; intuition eauto. now move/andP: H3.
-    eapply H0 => //; rtoProp; intuition eauto. rewrite -Nat.add_succ_r in H4; tea.
-  - move/wf_mkApps: H4 => [] wft wfu.  rewrite csubst_mkApps.
-    eapply (compile_mkApps_eta (fun x => compile Σ (mkApps (csubst a k t) (map (csubst a k) u)) =
-    instantiate (compile Σ a) k x)); eauto.
-    destruct construct_viewc eqn:vc.
-    * intros pars args hl.
-      move: H3; rewrite isEtaExp_Constructor => /andP[] etai etau.
-      set (cargs := map _ u). simpl.
-      rewrite PCUICTypeChecker.chop_firstn_skipn.
-      specialize (H1 k).
-      rewrite compile_decompose.
-      rewrite decompose_app_mkApps // /= hl.
-      rewrite PCUICTypeChecker.chop_firstn_skipn.
-      rewrite instantiate_TmkApps. f_equal.
-      2:{ rewrite !skipn_map /cargs.
-         clear -H2 wfu etau X. repeat toAll.
-        eapply (All_skipn (n:=args)) in etau.
-        induction etau.
-        - constructor; auto.
-        - cbn -[instantiates]. rewrite instantiates_tcons.
-          f_equal; eauto. eapply p; eauto. eapply p. eapply p. }
-      rewrite instantiate_TConstruct. f_equal.
-      rewrite !firstn_map.
-      { clear -H2 wfu etau X. repeat toAll.
-        eapply (All_firstn (n:=args)) in etau.
-        induction etau.
-        - constructor; auto.
-        - cbn -[instantiates]. rewrite instantiates_tcons.
-          f_equal; eauto. now eapply p. }
-    * rewrite instantiate_TmkApps.
-      move/isEtaExp_mkApps: H3; rewrite decompose_app_mkApps //.
-      rewrite vc. move=> /andP[] etat etau.
-      rewrite -(H1 n) //.
-      rewrite compile_mkApps_eta_fn. now eapply etaExp_csubst. f_equal.
-      { clear -X H2 wfu etau. repeat toAll. induction etau.
+  - cbn. f_equal; eauto. eapply H => //. rewrite -Nat.add_succ_r in H0; tea.
+  - cbn. f_equal; eauto. eapply H => //. rtoProp; intuition eauto. move/andP: H1 => [] wf wf'.
+    eapply H0 => //; rtoProp; intuition eauto. rewrite -Nat.add_succ_r in wf'; tea.
+  - move/wf_mkApps: H2 => [] wft wfu. rewrite csubst_mkApps.
+    rewrite !compile_mkApps.
+    rewrite instantiate_TmkApps.
+    rewrite (H1 _ _ wft). f_equal.
+    { clear -X wfu. repeat toAll. induction wfu.
         - constructor.
         - cbn -[instantiates]. rewrite instantiates_tcons.
           f_equal; eauto. now eapply p. }
+  - rewrite instantiate_TConstruct. f_equal.
+    move/and3P: H => [] _ _ wfa. solve_all.
+    induction wfa; auto.
+    cbn -[instantiates].
+    rewrite instantiates_tcons. f_equal. repeat eapply p.
+    eapply IHwfa.
   - rewrite map_map_compose.
-    move/andP: H2 => [] /andP[] wfi wft wfl.
+    move/andP: H0 => [] /andP[] wfi wft wfl.
     set (brs' := map _ l). cbn in brs'.
     set (brs'0 := map _ l). simpl.
     rewrite instantiate_TCase. rtoProp; intuition auto. f_equal; eauto.
-    clear -X wfl H0 H2.
+    clear -X wfl.
     { subst brs' brs'0. repeat toAll. induction wfl.
     - constructor.
     - cbn -[instantiateBrs]. rewrite instantiateBrs_equation.
-      f_equal; eauto. destruct p. rewrite List.rev_length. destruct p. apply (e n); eauto.
+      f_equal; eauto. destruct p. rewrite List.rev_length. repeat eapply (e n).
       eapply wellformed_up; tea. lia. }
   - rewrite map_map_compose. set (mfix' := map _ m).
     simpl. rewrite instantiate_TFix. f_equal.
-    clear -X H H0 H1.
-    move/andP: H1 => [] _ H1. repeat toAll.
+    clear -X H.
+    move/andP: H => [] _ /andP[] _ H1. repeat toAll.
     rewrite -dlength_hom. 
     subst mfix'. rewrite Nat.add_comm.
     revert H1. generalize #|m|.
     induction 1.
     * constructor.
     * cbn -[instantiateDefs]. rewrite instantiateDefs_equation.
-      destruct p; len. move: p => [] /andP[] isl etai wfx.
+      destruct p; len.
       f_equal; eauto. apply (e n0) => //. eapply wellformed_up; tea. lia.
 Qed.
 
@@ -1047,8 +832,8 @@ Definition t_fix_subst (ds : Defs) :=
     end in
   aux (dlength ds).
 
-Lemma compile_fix_subst Σ mfix :
-  compile_terms Σ (fix_subst mfix) = t_fix_subst (list_Defs (map (compile_def Σ) mfix)).
+Lemma compile_fix_subst mfix :
+  compile_terms (fix_subst mfix) = t_fix_subst (list_Defs (map (compile_def) mfix)).
 Proof.
   unfold fix_subst, t_fix_subst.
   rewrite -dlength_hom.
@@ -1088,53 +873,46 @@ Qed.
 
 Lemma substl_fold_left Σ terms k body :
   wf_glob Σ ->
-  forallb (isEtaExp Σ) terms ->
-  isEtaExp Σ body ->
   wellformed Σ (#|terms| + k) body ->
   forallb (wellformed Σ 0) terms ->
-  compile Σ (fold_left (fun bod term : term => csubst term k bod) terms body) = 
-  tfold_left (fun bod term => instantiate term k bod) (list_terms (map (compile Σ) terms)) (compile Σ body).
+  compile (fold_left (fun bod term : term => csubst term k bod) terms body) = 
+  tfold_left (fun bod term => instantiate term k bod) (list_terms (map compile terms)) (compile body).
 Proof.
   intros wfΣ.
   revert k body.
   induction terms; intros k body.
   - cbn. reflexivity.
-  - rewrite /= => /andP[] etax etaterms etab wfb /andP[] clx clterms.
-    cbn. rewrite IHterms //. now eapply etaExp_csubst.
+  - rewrite /= => wfb /andP[] clx clterms.
+    cbn. rewrite IHterms //. 
     eapply wellformed_csubst => //.
-    rewrite (compile_csubst _ (S #|terms|)) //.
+    rewrite (compile_csubst (Σ := Σ) _ (S #|terms|)) //.
 Qed.
 
 Lemma compile_substl Σ a b : 
   wf_glob Σ ->
-  forallb (isEtaExp Σ) a ->
   forallb (wellformed Σ 0) a ->
-  isEtaExp Σ b ->
   wellformed Σ #|a| b ->
-  compile Σ (substl (List.rev a) b) = instantiatel (list_terms (map (compile Σ) a)) 0 (compile Σ b).
+  compile (substl (List.rev a) b) = instantiatel (list_terms (map compile a)) 0 (compile b).
 Proof.
-  intros wf etaa cla etab.
+  intros wf cla.
   repeat toAll.
   unfold substl. rewrite substl_substl_rev. solve_all.
   now eapply wellformed_closed.
-  induction cla in b, etab |- *; cbn => //.
+  induction cla in b |- *; cbn => //.
   rewrite !Nat.add_0_r. cbn. intros wfb. rewrite IHcla.
-  now eapply etaExp_csubst.
-  eapply (wellformed_csubst _ _ 0) => //. apply p.
+  eapply (wellformed_csubst _ _ 0) => //.
   f_equal. 
-  rewrite tlength_hom. eapply (compile_csubst _ 1) => //. apply p.
+  rewrite tlength_hom. eapply (compile_csubst _ 1) => //. apply wf. eapply wfb.
 Qed.
 
 Lemma compile_substl_nrev Σ a b : 
   wf_glob Σ ->
-  forallb (isEtaExp Σ) a ->
   forallb (wellformed Σ 0) a ->
-  isEtaExp Σ b ->
   wellformed Σ #|a| b ->
-  compile Σ (substl a b) = instantiatel (list_terms (map (compile Σ) (List.rev a))) 0 (compile Σ b).
+  compile (substl a b) = instantiatel (list_terms (map compile (List.rev a))) 0 (compile b).
 Proof.
-  intros wf etaa wfa etab wfb.
-  rewrite -(List.rev_involutive a) compile_substl // ?forallb_rev //. now len.
+  intros wf wfa wfb.
+  rewrite -(List.rev_involutive a) (compile_substl _ _ wf) // ?forallb_rev //. now len.
   f_equal. now rewrite List.rev_involutive.
 Qed.
 
@@ -1159,259 +937,164 @@ Qed.
 Lemma compile_whFixStep Σ mfix idx rarg fn : 
   wf_glob Σ ->
   wellformed Σ 0 (tFix mfix idx) ->
-  isEtaExp Σ (tFix mfix idx) ->
   cunfold_fix mfix idx = Some (rarg, fn) ->
-  whFixStep (list_Defs (map (compile_def Σ) mfix)) idx = Some (compile Σ fn).
+  whFixStep (list_Defs (map compile_def mfix)) idx = Some (compile fn).
 Proof.
   unfold cunfold_fix, whFixStep. simp_eta.
-  intros wfΣ cla eta.
+  intros wfΣ cla.
   destruct nth_error eqn:hnth => //.
   intros [= <- <-].
   rewrite (nth_error_dnth hnth).
   destruct d as [dbody] => /=. f_equal.
   rewrite instantiate_fold.
-  cbn in cla. move/andP: cla => [hn cla].
-  rewrite substl_fold_left //.
-  { now eapply isEtaExp_fix_subst => //. }
-  { eapply nth_error_forallb in eta; tea. now move/andP: eta. }
-  {  eapply nth_error_forallb in cla => //; tea. cbn in cla. len. rewrite fix_subst_length.
+  cbn in cla. move/andP: cla => [isl /andP[hn cla]].
+  rewrite (substl_fold_left _ _ _ wfΣ) //.
+  { eapply nth_error_forallb in cla => //; tea. cbn in cla. len. rewrite fix_subst_length.
     now rewrite Nat.add_0_r in cla. }
   { eapply wellformed_fix_subst => //. } 
   f_equal. now rewrite -compile_fix_subst.
 Qed.
 
-Lemma Qpreserves_wellformed Σ : wf_glob Σ -> Qpreserves (fun n x => wellformed Σ n x) Σ.
-Proof.
-  intros clΣ.
-  split.
-  - red. move=> n t.
-    destruct t; cbn; intuition auto; try solve [constructor; auto].
-    eapply on_letin; rtoProp; intuition auto.
-    eapply on_app; rtoProp; intuition auto.
-    eapply on_case; rtoProp; intuition auto. solve_all.
-    eapply on_fix. solve_all. move/andP: H => [] _ ha. solve_all.
-  - red. intros kn decl.
-    move/(lookup_env_wellformed clΣ).
-    unfold wf_global_decl. destruct cst_body => //.
-  - red. move=> hasapp n t args. rewrite wellformed_mkApps //. 
-    split; intros; rtoProp; intuition auto; solve_all.
-  - red. cbn => //.
-    (* move=> hascase n ci discr brs. simpl.
-    destruct lookup_inductive eqn:hl => /= //.
-    split; intros; rtoProp; intuition auto; solve_all. *)
-  - red. move=> hasproj n p discr. now cbn in hasproj.
-  - red. move=> t args clt cll.
-    eapply wellformed_substl. solve_all. now rewrite Nat.add_0_r.
-  - red. move=> n mfix idx. cbn. unfold wf_fix.
-    split; intros; rtoProp; intuition auto; solve_all. now apply Nat.ltb_lt.
-  - red. move=> n mfix idx. cbn.
-    split; intros; rtoProp; intuition auto; solve_all.
-Qed.
+From MetaCoq.Erasure Require Import EConstructorsAsBlocks EWcbvEvalCstrsAsBlocksInd.
 
-Lemma WcbvEval_hom (fl := EWcbvEval.target_wcbv_flags) :
-  forall Σ, isEtaExp_env Σ -> wf_glob Σ ->
+Lemma WcbvEval_hom (fl := block_wcbv_flags) :
+  forall Σ, wf_glob Σ ->
   forall t t', 
     wellformed Σ 0 t ->
-    isEtaExp Σ t -> 
     EWcbvEval.eval Σ t t' ->
-    WcbvEval (compile_ctx Σ) (compile Σ t) (compile Σ t').
+    WcbvEval (compile_ctx Σ) (compile t) (compile t').
 Proof.
-  intros Σ etaΣ wfΣ.
-  eapply 
-    (EWcbvEvalEtaInd.eval_preserve_mkApps_ind fl (efl := env_flags) Σ _ 
-      (wellformed Σ) (Qpres := Qpreserves_wellformed wfΣ)) => //; eauto.
-  { intros. eapply EWcbvEval.eval_wellformed => //; tea. }
+  intros Σ wfΣ.
+  eapply (eval_preserve_mkApps_ind fl eq_refl Σ (fun t t' : term =>
+    WcbvEval (compile_ctx Σ) (compile t) (compile t'))
+    (wellformed Σ) (Qpres := Qpreserves_wellformed _ _ wfΣ)) => //; eauto.
   all:intros *.
-  
-  - intros ev [IHev wfa wfb etaa etab].
-    intros ev' [IHev' wft wft' etat etat'].
-    eapply compile_tApp with (k := 0) => //. cbn; now rewrite wfa wft.
+  - intros; eapply eval_wellformed; tea => //.
+  - intros ev [IHev wfa wfb] ev' [ih' wft wft'].
+    eapply compile_tApp with (k := 0) => //; eauto.
+    cbn. now rewrite wfa wft.
     destruct decompose_app eqn:da.
     simp_compile in IHev.
-    destruct (construct_viewc t0).
-    * destruct lookup_constructor_pars_args as [[[] args]|]=> // /=.
-      destruct chop eqn:eqch.
-      intros [Hl [ha ht]]. rewrite ha in ev.
-      eapply eval_mkApps_Construct_inv in ev as [? []]. solve_discr.
-    * econstructor; tea.
-  - intros ev [IHev wfa wfb etaa etab].
-    intros ev' [IHev' wft wft' etat etat'].
-    intros ev'' [IHev'' wfc wfr etac etar].
-    eapply compile_tApp with (k := 0) => //. cbn; now rewrite wfa wft.
+    eapply wAppProof; eauto.
+  - intros ev [IHev wff wflam] ev' [IHev' wfa wfa'] ev'' [IHev'' wfsubs wfres].
     simp_compile in IHev.
+    eapply compile_tApp with (k := 0) => //; tea.
+    cbn. now rewrite wff wfa.
     destruct decompose_app eqn:da.
-    destruct (construct_viewc t).
-    * destruct lookup_constructor_pars_args as [[[] args]|]=> // /=.
-      destruct chop eqn:eqch.
-      intros [Hl [ha ht]]. rewrite ha in ev.
-      eapply eval_mkApps_Construct_inv in ev as [? []]. solve_discr.
-    * econstructor; tea.
-      unfold whBetaStep.
-      rewrite -(compile_csubst _ 1) //. now simp_eta in etab. 
-  - intros ev [IHev wfa wfb etaa etab] etab1 wfb1.
-    intros ev' [IHev' wft wft' etat etat'].
+    econstructor; eauto.
+    unfold whBetaStep.
+    rewrite -(compile_csubst (Σ := Σ) _ 1) //.
+  - intros ev [IHev wfa wfb] wfb1.
+    intros ev' [IHev' wft wft'].
     simp_compile. econstructor; tea.
-    rewrite -(compile_csubst _ 1) //.
-  - intros hbrs ev [IHev wfa wfb etaa etab].
+    rewrite -(compile_csubst (Σ := Σ) _ 1) //.
+  - intros ev [IHev wfa wfb].
     intros isp hnth hskip hbr wfbr.
-    intros ev' [IHev' wft wft' etat etat'].
-    simp_compile.
-    rewrite compile_mkApps // /= in IHev. 
-    move: wfb; rewrite wellformed_mkApps // => /andP[] wfc wfargs.
-    destruct (wellformed_lookup_constructor_pars_args wfΣ wfc) as [nargs eq].
-    rewrite eq in IHev.
-    destruct chop eqn:eqc.
+    intros ev' [IHev' wft wft'].
+    simp_compile. simp_compile in IHev.
+    destruct (wellformed_lookup_constructor_pars_args wfΣ eq_refl wfb) as [nargs eq].
+    move: wfb => /= /andP[] wfc wfargs.
+    rewrite eq in wfargs.
+    move/andP: wfargs => [] eqb hargs. apply ReflectEq.eqb_eq in eqb. cbn in eqb; subst nargs.
     set (brs' := map _ brs). cbn.
     assert (pars = 0).
     { now eapply constructor_isprop_pars_decl_params in isp. }
     subst pars. rewrite skipn_0 in hbr.
-    move: etab. rewrite EEtaExpanded.isEtaExp_mkApps_napp // /=.
-    move/andP => []. rewrite /isEtaExp_app /= eq /= => /Nat.leb_le hnargs hargs.
-    cbn in IHev. 
-    rewrite /constructor_isprop_pars_decl in isp.
-    unfold lookup_constructor_pars_args in eq.
-    destruct lookup_constructor as [[[mdecl idecl] cdecl']|] eqn:hc => //.
-    cbn in isp. noconf isp. cbn in eq. noconf eq. cbn in hskip.
-    rewrite PCUICTypeChecker.chop_firstn_skipn in eqc.
-    rewrite -hskip in eqc. rewrite skipn_all2 in eqc. now len. noconf eqc.
-    cbn in IHev.
     econstructor; tea.
-    rewrite firstn_all2; len.
     unfold whCaseStep.
-    rewrite (nth_error_bnth hnth).
-    rewrite List.rev_length. rewrite tlength_hom.
+    rewrite (nth_error_bnth hnth) List.rev_length tlength_hom.
     case: Nat.eqb_spec => //; try congruence.
     intros _. rewrite /iota_red skipn_0.
-    f_equal. rewrite compile_substl //.
-    now eapply nth_error_forallb in hbrs; tea.
+    f_equal. rewrite (compile_substl (Σ := Σ)) //. solve_all.
     rewrite hbr //.
   - (* Fix case *) intros _.
     rename f5 into f.
-    intros ev [IHev wff wffix etaf etafix].
-    intros unffix etafn eva [IHeva wfa wfav etaa etaav].
-    move=> evapp [IHevapp wftapp wfres etaapp etares].
-    move/isEtaExp_tApp.
-    eapply compile_tApp with (k := 0) => //.
+    intros ev [IHev wff wffix].
+    intros unffix eva [IHeva wfa wfav].
+    move=> evapp [IHevapp wftapp wfres].
+    eapply compile_tApp with (k := 0) => //. tea.
     { cbn; now rewrite wff wfa. }
     destruct decompose_app eqn:da.
-    destruct construct_viewc eqn:vc.
-    * destruct lookup_constructor_pars_args as [[[] args]|]=> // /=.
-      destruct chop eqn:eqch.
-      intros [Hl [ha ht]]. rewrite ha in ev.
-      eapply eval_mkApps_Construct_inv in ev as [? []]. solve_discr.
-    * move=> /and4P[etat etal etaf' etaa'].
-      simp_compile in IHev.
-      set (mfix' := map _ mfix) in *.  
-      eapply (wAppFix (x := compile Σ fn)); tea.
-      { rewrite /mfix'. eapply compile_whFixStep; tea => //. }
-      move: IHevapp.
-      change (tApp fn av) with (mkApps fn [av]).
-      assert (isl : EAst.isLambda fn).
-      { move: etafix; cbn. simp_eta. intros hfix. 
-        unfold cunfold_fix in unffix. destruct nth_error eqn:hnth => //.
-        noconf unffix. eapply nth_error_forallb in hfix; tea. cbn in hfix.
-        move/andP: hfix => [] isl _.
-        eapply (isLambda_substl (fix_subst mfix)) in isl. 
-        destruct ECSubst.substl => //. }
-      destruct fn => //.
-      eapply compile_mkApps_wf; tea.
-      cbn. auto.
+    simp_compile in IHev.
+    set (mfix' := map _ mfix) in *.  
+    eapply (wAppFix (x := compile fn)); tea.
+    { rewrite /mfix'. eapply compile_whFixStep; tea => //. }
+    move: IHevapp.
+    change (tApp fn av) with (mkApps fn [av]).
+    assert (isl : EAst.isLambda fn).
+    { move: wffix => /= /andP[] hfix _.
+      unfold cunfold_fix in unffix. destruct nth_error eqn:hnth => //.
+      noconf unffix. eapply nth_error_forallb in hfix; tea. cbn in hfix.
+      eapply (isLambda_substl (fix_subst mfix)) in hfix. 
+      destruct ECSubst.substl => //. }
+    destruct fn => //.
+    eapply compile_mkApps_wf; tea.
+    cbn. auto.
   - (* No cofixpoints allowed *) 
-    intros cunfcof etafn etaargs.
-    move=> ev [IHev wfd wfcof wfdiscr etacof].
+    intros cunfcof.
+    move=> ev [IHev wfd wfcof].
     move: wfcof. rewrite wellformed_mkApps //.
   - (* Declarations *)
     intros hdecl res hbod hev.
-    move => [] IHev wfbo wfr etab etares.
+    move => [] IHev wfbo wfr.
     simp_compile. econstructor; tea.
     eapply lookup_env_lookup in hdecl; tea.
     rewrite /lookupDfn hdecl /compile_global_decl.
     destruct decl as [[body'|]] => //. unfold exceptionMonad.ret. f_equal.
     now noconf hbod.
   - (* Congruence *)
-    intros [hif' wff wff' etaf etaf'].
+    intros [hif' wff wff'].
     intros IHapp. intros nlam.
-    intros eva [iheva wfa wfa' etaa etaa'].
-    intros etaapp'.
+    intros eva [iheva wfa wfa'].
     eapply compile_tApp; tea. cbn. now erewrite wff, wfa.
     destruct decompose_app eqn:da.
-    destruct construct_viewc eqn:vc.
-    * destruct lookup_constructor_pars_args as [[[] args']|] eqn:hl => // /=.
-      destruct chop eqn:hc.
-      intros [Hl [Hf11 Ha]].
-      change (tApp f' a') with (mkApps f' [a']).
-      clear IHapp. rewrite Hf11 in ev.
-      eapply eval_mkApps_Construct_inv in ev as [? []]. subst f'.
-      exfalso. move: nlam. rewrite !negb_or. rtoProp; intuition auto.
-      apply/negP: H0. rewrite negbK. rewrite isConstructApp_mkApps //.
-    * eapply (compile_tApp _ _ _ 0) => //. cbn. now rewrite wff' wfa'.
-      destruct (decompose_app (tApp f' a')) eqn:da'.
-      destruct (construct_viewc t0) eqn:vc'.
-      { destruct lookup_constructor_pars_args as [[[] args']|] eqn:hl => // /=.
-        pose proof (decompose_app_inv da').
-        eapply (f_equal isConstructApp) in H.
-        rewrite isConstructApp_tApp in H.
-        rewrite isConstructApp_mkApps /= /isConstructApp /= in H.
-        clear -nlam H. exfalso. move: nlam; rewrite !negb_or [isConstructApp _]H => /andP[] //. }
-      constructor; eauto.
-      rewrite !negb_or in nlam. rtoProp; intuition auto.
-      eapply (isLambda_compile Σ) in H. contradiction.
-      eapply (isFix_compile Σ) in H3; auto.
-      eapply (isConstructApp_compile Σ) in H3; auto.
-      eapply (isBox_compile Σ) in H1. contradiction.
-  - intros hl hargs evargs eta wfa wfa' IHargs.
-    eapply compile_mkApps_wf; eauto.
-    simpl. rewrite (lookup_constructor_pars_args_spec wfΣ hl).
-    rewrite PCUICTypeChecker.chop_firstn_skipn.
-    pose proof (wellformed_lookup_constructor_pars wfΣ hl).
-    rewrite firstn_all2. len. move: hargs; rewrite /cstr_arity => ->. lia.
-    rewrite H.
-    eapply compile_mkApps_wf; eauto.
-    simpl. rewrite (lookup_constructor_pars_args_spec wfΣ hl) H.
-    move: hargs. rewrite /cstr_arity H /= => <-.
-    rewrite PCUICTypeChecker.chop_firstn_skipn. epose proof (lenargs := All2_length IHargs).
-    rewrite firstn_all2. len.
-    rewrite !skipn_all2; len.
-    econstructor. clear -IHargs.
-    induction IHargs; cbn; constructor; intuition auto.
-    now destruct r.
-  - intros isat wf eta.
-    destruct t => //; simp_compile; econstructor. constructor.
+    apply (compile_tApp (Σ := Σ) _ _ _ 0) => //. cbn. now rewrite wff' wfa'.
+    destruct (decompose_app (tApp f' a')) eqn:da'.
+    constructor; eauto.
+    rewrite !negb_or in nlam. rtoProp; intuition auto.
+    eapply (isLambda_compile) in H. contradiction.
+    eapply (isFix_compile) in H3; auto.
+    eapply (isConstructApp_compile) in H3; auto.
+    eapply (isBox_compile) in H1. contradiction.
+  - intros hl hargs evargs IHargs.
+    simp_compile. econstructor. clear hargs.
+    move: IHargs. cbn. induction 1; cbn; constructor; intuition auto.
+    apply r. apply IHIHargs. now depelim evargs.
+  - intros isat wf.
+    destruct t => //; simp_compile; econstructor.
+    cbn in isat. destruct l => //.
 Qed.
 
-Lemma compile_sound (wfl := EWcbvEval.target_wcbv_flags) {Σ t t'} : 
-  isEtaExp_env Σ -> wf_glob Σ ->
+Lemma compile_sound (wfl := block_wcbv_flags) {Σ t t'} : 
+  wf_glob Σ ->
   wellformed Σ 0 t ->
-  isEtaExp Σ t -> 
   EWcbvEval.eval Σ t t' ->
-  forall v, WcbvEval (compile_ctx Σ) (compile Σ t) v -> v = compile Σ t'.
+  forall v, WcbvEval (compile_ctx Σ) (compile t) v -> v = compile t'.
 Proof.
-  intros etaΣ wfΣ wft etat ev v ev'.
+  intros wfΣ wft ev v ev'.
   apply (WcbvEval_single_valued ev').
-  now eapply WcbvEval_hom.
+  eapply WcbvEval_hom; eauto.
 Qed. 
-Print Assumptions compile_sound.
+(* Print Assumptions compile_sound. *)
 
 Definition program := environ Term * Term.
 
 From MetaCoq.Erasure Require Import EProgram.
 
 Definition compile_program (e : eprogram) : program :=
-  (compile_ctx e.1, compile e.1 e.2).
+  (compile_ctx e.1, compile e.2).
 
 Definition wf_program (p : program) := 
   crctEnv p.1 /\ crctTerm p.1 0 p.2.
 
 Lemma wf_compile (p : eprogram) : 
-  expanded_eprogram_cstrs p ->
   wf_eprogram env_flags p ->
   wf_program (compile_program p).
 Proof.
   destruct p as [env main].
-  unfold expanded_eprogram_cstrs.
-  move/andP=> [etae etamain] [wfe wfmain]. cbn in *.
+  move=> [wfe wfmain]. cbn in *.
   split; cbn.
-  - eapply wellformed_eta_crctEnv => //.
-  - eapply wellformed_eta_crct => //.
-    eapply wellformed_eta_crctEnv => //.
+  - eapply wellformed_env_crctEnv, wfe.
+  - eapply wellformed_crct => //.
+    eapply wellformed_env_crctEnv, wfe.
 Qed. 

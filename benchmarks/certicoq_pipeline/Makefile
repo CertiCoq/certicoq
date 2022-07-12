@@ -14,6 +14,7 @@ plugin: certicoq_pipeline.vo Loader.vo
 test: test.vo
 
 test.vo: plugin test.v
+	ulimit -Ss 65500 # Otherwise we get a segfault
 	coqc -I . -Q . CertiCoq.Benchmarks.certicoq_pipeline test.v
 
 clean: 

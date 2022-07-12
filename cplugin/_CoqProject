@@ -179,6 +179,8 @@ extraction/eRemoveParams.ml
 extraction/eRemoveParams.mli
 extraction/eInlineProjections.mli
 extraction/eInlineProjections.ml
+extraction/eConstructorsAsBlocks.mli
+extraction/eConstructorsAsBlocks.ml
 extraction/eTransform.mli
 extraction/eTransform.ml
 extraction/eqDecInstances.ml
@@ -191,8 +193,8 @@ extraction/erasure.ml
 extraction/erasure.mli
 extraction/errors0.ml
 extraction/errors0.mli
-extraction/eGlobalEnv.ml
-extraction/eGlobalEnv.mli
+# extraction/eGlobalEnv.ml
+# extraction/eGlobalEnv.mli
 extraction/eval.ml
 extraction/eval.mli
 extraction/exceptionMonad.ml
@@ -343,6 +345,8 @@ extraction/pCUICPosition.ml
 extraction/pCUICPosition.mli
 # extraction/pCUICPrimitive.ml
 # extraction/pCUICPrimitive.mli
+extraction/cRelationClasses.mli
+extraction/cRelationClasses.ml
 extraction/pCUICSafeReduce.ml
 extraction/pCUICSafeReduce.mli
 extraction/pCUICSafeRetyping.ml

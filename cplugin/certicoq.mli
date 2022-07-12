@@ -23,11 +23,11 @@ type options =
     ext       : string;
     dev       : int;
     prefix    : string;
-    prims     : (Kernames.kername * Kernames.ident) list;
+    prims     : ((Kernames.kername * Kernames.ident) * Datatypes.bool) list;
   }
 
 val default_options : options
-val make_options : command_args list -> (Kernames.kername * Kernames.ident) list -> string -> options
+val make_options : command_args list -> ((Kernames.kername * Kernames.ident) * Datatypes.bool) list -> string -> options
 
 val get_name : Names.GlobRef.t -> string
 

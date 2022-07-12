@@ -74,7 +74,6 @@ Definition sha := sha256.SHA_256 (sha256.str_to_bytes test).
 
 Definition sha_fast := sha256.SHA_256' (sha256.str_to_bytes test).
 
-
 Eval compute in "Compiling demo1".
 
 CertiCoq Compile -O 0 demo1.
@@ -110,7 +109,7 @@ CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" list_sum.
 
 Eval compute in "Compiling vs_easy".
 
-CertiCoq Compile -O 0 -time_anf -debug vs_easy.
+CertiCoq Compile -O 0 -time_anf vs_easy.
 CertiCoq Compile -ext "_opt" vs_easy.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_easy.
 (* CertiCoq Compile -O 0 -cps -ext "_cps" -time_anf vs_easy. *)
@@ -163,9 +162,7 @@ Eval compute in "Compiling MetaCoq Erasure".
 From MetaCoq.Erasure Require Import Erasure.
 
 Definition metacoq_erasure := run_erase_program.
-CertiCoq Compile -O 0 -time metacoq_erasure
-Extract Constants [ PCUICWfEnvImpl.guard_impl => "metacoq_guard_impl" ] 
-Include [ "metacoq_guard_impl.h" ].
+CertiCoq Compile -O 0 -time metacoq_erasure.
 (* CertiCoq Compile -ext "_opt" metacoq_erasure.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" metacoq_erasure.
 

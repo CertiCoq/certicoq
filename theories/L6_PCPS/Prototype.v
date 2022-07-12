@@ -11,7 +11,7 @@ Import MCMonadNotation.
 Module TM := MetaCoq.Template.monad_utils.
 
 From ExtLib.Core Require Import RelDec.
-From ExtLib.Data Require Import Nat List Option Pair String.
+From ExtLib.Data Require Import Nat List Option Pair.
 From ExtLib.Structures Require Import Monoid Functor Applicative Monads Traversable.
 From ExtLib.Data.Monads Require Import IdentityMonad EitherMonad StateMonad.
 
@@ -86,7 +86,7 @@ Instance show_list {A} {s : Show A} : Show (list A) :=
 Definition lookup (n : nat) (xs : list string) : GM string :=
   match nth_error xs n with
   | Some v => ret v
-  | None => raise ("nthM: " +++ of_string (nat2string10 n) ++ " in " ++ show xs)
+  | None => raise ("nthM: " +++ string_of_nat n ++ " in " ++ show xs)
   end.
 
 Definition named_of' (Γ : list string) (tm : term) : GM term :=

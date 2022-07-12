@@ -7,13 +7,12 @@ Require Import Coq.ZArith.ZArith
 
 Require Import ExtLib.Structures.Monads
         ExtLib.Data.Monads.OptionMonad
-        ExtLib.Data.Monads.StateMonad
-        ExtLib.Data.String.
+        ExtLib.Data.Monads.StateMonad.
 
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
 
-From MetaCoq.Template Require Import bytestring BasicAst.
+From MetaCoq.Template Require Import BasicAst.
 
 From compcert Require Import
   common.AST
@@ -33,6 +32,7 @@ Require Import
   L6.state
   L6.toplevel.
 
+From MetaCoq.Template Require Import bytestring MCString.
 Section TRANSLATION.
 
 (* Stand-in for arbitrary identifiers *)
@@ -1154,24 +1154,6 @@ Fixpoint make_Asgn (les:list expr) (res:list expr) :=
   | _, _ => Sskip
   end.
 
-
-Fixpoint make_argList' (n:nat) (nenv:name_env) : nState (name_env * list (ident * type)) :=
-  match n with
-  | 0 => ret (nenv, nil)
-  | (S n') =>
-    new_id <- getName;;
-    let new_name := append "arg" (String.of_string (nat2string10 n')) in
-    let nenv := M.set new_id (nNamed new_name) nenv in
-    rest <- make_argList' n' nenv;;
-    let (nenv, rest_id) := rest in
-    ret (nenv, (new_id,val)::rest_id)
-  end.
-
-Definition make_argList (n:nat) (nenv:name_env) : nState (name_env * list (ident * type)) :=
-  rest <- make_argList' n nenv;;
-       let (nenv, rest_l) := rest in
-       ret (nenv, rev rest_l).
-
 Fixpoint make_constrAsgn' (argv:ident) (argList:list (ident * type)) (n:nat) :=
   match argList with
   | nil => Sskip
@@ -1187,6 +1169,22 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
 
   Context (fenv : fun_env) (nenv : name_env).
 
+  Fixpoint check_tags_fundefs' (B : fundefs) (log : list string) : list string :=
+         match B with
+         | Fcons f t xs e B' =>
+           let s :=
+               match M.get t fenv with
+               | Some (n, l) =>
+                 "Definition " ++ get_fname f nenv ++ " has tag " ++ (show_pos t) ++ Pipeline_utils.newline ++
+                 "Def: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++
+                 MCString.string_of_nat (length l)
+               | None =>
+                 "Def: Function " ++ get_fname f nenv ++ " was not found in fun_env"
+               end
+           in check_tags_fundefs' B' (s :: log)
+         | Fnil => log
+         end.
+
   Fixpoint check_tags' (e : exp) (log : list string) :=
     match e with
     | Econstr _ _ _ e | Eproj _ _ _ _ e | Eprim _ _ _ e => check_tags' e log
@@ -1199,7 +1197,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
           match M.get t fenv with
           | Some (n, l) =>
             "LetApp: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ 
-            String.of_string (nat2string10 (length l))
+            (MCString.string_of_nat (length l))
           | None =>
             "LetApp: Function " ++ get_fname f nenv ++ " was not found in fun_env"
           end
@@ -1214,29 +1212,15 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
           match M.get t fenv with
           | Some (n, l) =>
             "App: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ 
-            String.of_string (nat2string10 (length l))
+            MCString.string_of_nat (length l)
           | None =>
             "App: Function " ++ get_fname f nenv ++ " was not found in fun_env"
           end
       in
       s :: log
     | Ehalt x => log
-    end
-  with check_tags_fundefs' (B : fundefs) (log : list string) : list string :=
-         match B with
-         | Fcons f t xs e B' =>
-           let s :=
-               match M.get t fenv with
-               | Some (n, l) =>
-                 "Definition " ++ get_fname f nenv ++ " has tag " ++ (show_pos t) ++ Pipeline_utils.newline ++
-                 "Def: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++
-                 String.of_string (nat2string10 (length l))
-               | None =>
-                 "Def: Function " ++ get_fname f nenv ++ " was not found in fun_env"
-               end
-           in check_tags_fundefs' B' (s :: log)
-         | Fnil => log
-         end.
+    end.
+  
 
   Definition check_tags (e : exp) :=
     String.concat Pipeline_utils.newline (rev (check_tags' e [])).

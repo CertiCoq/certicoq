@@ -6,12 +6,11 @@
 Require Import Common.AstCommon.
 Require Import List.
 Require Import L6.cps.
-Require Import ExtLib.Data.String.
 Require Import ExtLib.Data.Positive.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
-From MetaCoq.Template Require Import bytestring BasicAst. (* For identifier names *)
+From MetaCoq.Template Require Import bytestring MCString BasicAst. (* For identifier names *)
 
 Import MonadNotation.
 
@@ -26,9 +25,9 @@ Section PP.
   Variable (ftag_flag:bool). (* true if print tag *)
 
 (* Convert various numbers to strings *)
-Definition show_nat n := String.of_string (nat2string10 n).
-Definition show_pos x := String.of_string (nat2string10 (Pos.to_nat x)).
-Definition show_binnat x := String.of_string (nat2string10 (BinNat.N.to_nat x)).
+Definition show_nat n := string_of_nat n.
+Definition show_pos x := string_of_positive x.
+Definition show_binnat x := show_nat (BinNat.N.to_nat x).
 
 (* Add a separator [s] inbetween each element of a list [xs] *)
 Fixpoint sep {A} (s:A) (xs:list A) : list A :=

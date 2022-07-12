@@ -6,10 +6,9 @@ Require Import Coq.ZArith.ZArith
                Coq.Lists.List List_util.
 
 Require Import ExtLib.Structures.Monads
-               ExtLib.Data.Monads.OptionMonad
-               ExtLib.Data.String.
+               ExtLib.Data.Monads.OptionMonad.
 
-From MetaCoq.Template Require Import bytestring BasicAst.
+From MetaCoq.Template Require Import BasicAst.
 Require MetaCoq.Template.All.
 
 Require Import compcert.common.AST
@@ -27,6 +26,8 @@ Require Import L6.cps
                L6_to_Clight
                compM
                glue_utils.
+
+From MetaCoq.Template Require Import bytestring MCString.
 
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
@@ -984,7 +985,7 @@ Section CConstructors.
     match n with
     | O => ret nil
     | S n' =>
-        new_id <- gensym ("arg" ++ String.of_string (nat2string10 n'))%bs ;;
+        new_id <- gensym ("arg" ++ MCString.string_of_nat n')%bs ;;
         rest_id <- make_arg_list' n' ;;
         ret ((new_id, val) :: rest_id)
     end.

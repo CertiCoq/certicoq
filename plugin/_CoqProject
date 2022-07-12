@@ -403,6 +403,8 @@ extraction/string0.ml
 extraction/string0.mli
 extraction/string1.ml
 extraction/string1.mli
+extraction/templateEnvMap.mli
+extraction/templateEnvMap.ml
 extraction/templateProgram.ml
 extraction/templateProgram.mli
 extraction/templateToPCUIC.ml

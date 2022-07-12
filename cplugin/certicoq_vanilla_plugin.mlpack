@@ -80,12 +80,10 @@ EnvMap
 LiftSubst
 UnivSubst0
 WcbvEval
-EtaExpand
 Pretty
 Common0
 Extractable
 Logic0
-TemplateProgram
 
 Char0
 Errors0
@@ -109,6 +107,11 @@ MSetWeakList
 EqdepFacts
 Utils
 Init
+
+TemplateEnvMap
+TemplateProgram
+EtaExpand
+
 
 Ssreflect
 Ssrbool

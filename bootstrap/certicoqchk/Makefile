@@ -1,5 +1,9 @@
+CCOMPILER = gcc
+
 PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.gramlib,coq-core.interp,coq-core.kernel,coq-core.lib,coq-core.library,coq-core.toplevel,coq-core.vernac,coq-core.plugins.ltac
-OCAMLOPTS = -I ../../_opam/lib/coq/user-contrib/MetaCoq/Template -open Metacoq_template_plugin -I ../../_opam/lib/coq/user-contrib/CertiCoq/VanillaPlugin -open Certicoq_vanilla_plugin \
+COQLIB = $(shell coqc -where)
+OCAMLLIB = $(shell ocamlc -where)
+OCAMLOPTS = -I ${COQLIB}/user-contrib/MetaCoq/Template -open Metacoq_template_plugin -I ${COQLIB}/user-contrib/CertiCoq/VanillaPlugin -open Certicoq_vanilla_plugin \
 	-I . -linkpkg -dontlink str,unix,dynlink,threads,zarith  -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
 GENCFILES = glue.CertiCoq.CertiCoqCheck.compile.certicoqchk.c CertiCoq.CertiCoqCheck.compile.certicoqchk.c
 CFILES = certicoqchk_wrapper.c ${GENCFILES} gc_stack.c print.c
@@ -17,7 +21,7 @@ test.vo: plugin test.v
 	coqc -I . -Q . CertiCoq.CertiCoqCheck test.v
 
 clean: 
-	rm *.cm*
+	rm *.cm* *.o *.vo
 
 Loader.vo: Loader.v certicoqchk_plugin.cmxs
 	coqc -Q . CertiCoq.CertiCoqCheck Loader.v
@@ -26,7 +30,7 @@ compile.vo ${GENCFILES} &: compile.v
 	coqc ${COQOPTS} $<
 
 %.o: %.c
-	gcc -g -c -I . -I ../../_opam/lib/ocaml -Wno-everything -O2 -o $@ $<
+	$(CCOMPILER) -g -c -I . -I ${OCAMLLIB} -w -Wno-everything -O2 -o $@ $<
 
 certicoqchk_plugin.cmxs: certicoqchk_plugin.cmxa ${CFILES:.c=.o}
 	ocamlfind opt ${OCAMLOPTS} -shared -linkall -o $@ $+
@@ -39,6 +43,8 @@ certicoqchk_plugin.cmxa: certicoqchk_plugin.cmx
 
 g_certicoqchk.ml: g_certicoqchk.mlg certicoqchk.cmx certicoqchk_plugin_wrapper.cmx
 	coqpp $<
+
+certicoqchk_wrapper.c: compile.vo
 
 certicoqchk_plugin_wrapper.cmx: certicoqchk_wrapper.o
 

@@ -42,3 +42,7 @@ jobs:
             startGroup "Run benchmarks"
               make -C ~/repo/benchmarks all
             endGroup
+            startGroup "Make bootstrapped plugins"
+              make -C ~/repo/bootstrap all
+              make -C ~/repo/bootstrap test
+            endGroup

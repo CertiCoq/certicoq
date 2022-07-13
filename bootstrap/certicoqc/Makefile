@@ -1,8 +1,12 @@
+CCOMPILER = gcc
+
 PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.gramlib,coq-core.interp,coq-core.kernel,coq-core.lib,coq-core.library,coq-core.toplevel,coq-core.vernac,coq-core.plugins.ltac
-OCAMLOPTS = -I ../../_opam/lib/coq/user-contrib/MetaCoq/Template -open Metacoq_template_plugin -I ../../_opam/lib/coq/user-contrib/CertiCoq/VanillaPlugin -open Certicoq_vanilla_plugin \
+COQLIB = $(shell coqc -where)
+OCAMLLIB = $(shell ocamlc -where)
+OCAMLOPTS = -I ${COQLIB}/user-contrib/MetaCoq/Template -open Metacoq_template_plugin -I ${COQLIB}/user-contrib/CertiCoq/VanillaPlugin -open Certicoq_vanilla_plugin \
 	-I . -linkpkg -dontlink str,unix,dynlink,threads,zarith  -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
 GENCFILES = glue.CertiCoq.CertiCoqC.compile.certicoqc.c CertiCoq.CertiCoqC.compile.certicoqc.c
-CFILES = certicoqc_pipeline_wrapper.c ${GENCFILES} gc_stack.c print.c
+CFILES = certicoqc_wrapper.c ${GENCFILES} gc_stack.c print.c
 # ffi.CertiCoq.CertiCoqC.compile.QuoteFFI.c
 COQOPTS = -Q ../../theories/L7 CertiCoq.L7 -Q ../../libraries CertiCoq.Libraries \
 	-Q ../../theories/L6_PCPS CertiCoq.L6 -Q ../../theories/L4_deBruijn CertiCoq.L4 \
@@ -18,7 +22,7 @@ test.vo: plugin test.v
 	coqc -I . -Q . CertiCoq.CertiCoqC test.v
 
 clean: 
-	rm *.cm*
+	rm *.cm* *.o *.vo
 
 Loader.vo: Loader.v certicoqc_plugin.cmxs
 	coqc -Q . CertiCoq.CertiCoqC Loader.v
@@ -27,7 +31,7 @@ compile.vo ${GENCFILES} &: compile.v
 	coqc ${COQOPTS} $<
 
 %.o: %.c
-	gcc -g -c -I . -I ../../_opam/lib/ocaml -Wno-everything -O2 -o $@ $<
+	$(CCOMPILER) -g -c -I . -I ${OCAMLLIB} -w -Wno-everything -O2 -o $@ $<
 
 certicoqc_plugin.cmxs: certicoqc_plugin.cmxa ${CFILES:.c=.o}
 	ocamlfind opt ${OCAMLOPTS} -shared -linkall -o $@ $+
@@ -40,6 +44,8 @@ certicoqc_plugin.cmxa: certicoqc_plugin.cmx
 
 g_certicoqc.ml: g_certicoqc.mlg certicoqc.cmx certicoqc_plugin_wrapper.cmx
 	coqpp $<
+
+certicoqc_wrapper.c: compile.vo
 
 certicoqc.cmx: certicoqc_plugin_wrapper.cmx
 

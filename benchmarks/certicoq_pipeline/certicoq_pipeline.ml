@@ -14,6 +14,10 @@ let msg_info s =
   Feedback.msg_info (str s)
   
 let _ = Callback.register "coq_msg_info" msg_info
+let user_error s = 
+  CErrors.user_err (str (Caml_bytestring.caml_string_of_bytestring s))
+  
+let _ = Callback.register "coq_user_error" user_error
 
 let msg_debug s = 
   Feedback.msg_debug (str (Caml_bytestring.caml_string_of_bytestring s))

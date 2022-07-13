@@ -389,8 +389,6 @@ extraction/specif.ml
 extraction/specif.mli
 extraction/ssrbool.ml
 extraction/ssrbool.mli
-extraction/ssreflect.mli
-extraction/ssreflect.ml
 extraction/state.ml
 extraction/state.mli
 extraction/stateMonad.ml

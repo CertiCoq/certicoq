@@ -21,6 +21,21 @@ value print_msg_info(value msg) {
   return Val_unit;
 }
 
+void call_coq_user_error(value msg)
+{
+  static const value * closure_f = NULL;
+  if (closure_f == NULL) {
+     /* First time around, look up by name */
+    closure_f = caml_named_value("coq_user_error");
+  }
+  caml_callback(*closure_f, msg);
+}
+
+value coq_user_error(value msg) {
+  call_coq_user_error(msg);
+  return Val_unit;
+}
+
 void call_coq_msg_debug(value msg)
 {
   static const value * closure_f = NULL;

@@ -18,3 +18,5 @@
 
 -R bootstrap/certicoqc          CertiCoq.CertiCoqC
 -I bootstrap/certicoqc
+-R bootstrap/certicoqchk        CertiCoq.CertiCoqCheck
+-I bootstrap/certicoqchk

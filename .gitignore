@@ -95,3 +95,8 @@ bootstrap/certicoqc/CertiCoq.CertiCoqC.compile.certicoqc.h
 bootstrap/certicoqc/glue.CertiCoq.CertiCoqC.compile.certicoqc.c
 bootstrap/certicoqc/glue.CertiCoq.CertiCoqC.compile.certicoqc.h
 bootstrap/certicoqc/g_certicoqc.ml
+bootstrap/certicoqchk/CertiCoq.CertiCoqCheck.compile.certicoqchk.c
+bootstrap/certicoqchk/CertiCoq.CertiCoqCheck.compile.certicoqchk.h
+bootstrap/certicoqchk/glue.CertiCoq.CertiCoqCheck.compile.certicoqchk.c
+bootstrap/certicoqchk/glue.CertiCoq.CertiCoqCheck.compile.certicoqchk.h
+bootstrap/certicoqchk/g_certicoqchk.ml

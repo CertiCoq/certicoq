@@ -1,0 +1,23 @@
+(*i camlp4deps: "grammar/grammar.cma" i*)
+
+DECLARE PLUGIN "certicoqchk_plugin"
+
+{
+open Pp
+open Ltac_plugin
+open Stdarg
+open Pcoq.Prim
+open Plugin_utils
+open Certicoq
+open G_certicoq_vanilla
+}
+
+VERNAC COMMAND EXTEND CertiCoqCheck CLASSIFIED AS QUERY
+| [ "CertiCoqCheck" global(gr) ] -> {
+    let gr = Nametab.global gr in
+    Certicoqchk.check gr
+  }
+(* | [ "CertiCoqCheck" "-help" ] -> { *)
+    (* Feedback.msg_info (str help_msg) *)
+  (* } *)
+END

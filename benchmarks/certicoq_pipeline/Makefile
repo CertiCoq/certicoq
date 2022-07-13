@@ -27,7 +27,7 @@ certicoq_pipeline.vo ${GENCFILES} &: certicoq_pipeline.v
 	coqc ${COQOPTS} $<
 
 %.o: %.c
-	gcc -c -I . -I ../../_opam/lib/ocaml -Wno-everything -O2 -fomit-frame-pointer -o $@ $<
+	gcc -g -c -I . -I ../../_opam/lib/ocaml -Wno-everything -O2 -o $@ $<
 
 certicoqc_plugin.cmxs: certicoqc_plugin.cmxa ${CFILES:.c=.o}
 	ocamlfind opt ${OCAMLOPTS} -shared -linkall -o $@ $+

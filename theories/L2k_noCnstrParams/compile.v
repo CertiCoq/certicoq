@@ -399,40 +399,8 @@ Fixpoint compile_ctx (t : global_context) :=
     (n, compile_global_decl decl) :: compile_ctx rest
   end.
 
-From MetaCoq.Template Require Import Ast utils Transform TemplateProgram.
-Import Transform.
-Local Existing Instance config.extraction_checker_flags.
-
-Axiom assume_welltyped_template_program_expansion : 
-  forall p, wt_template_program p ->
-  let p' := EtaExpand.eta_expand_program p in
-  ∥ wt_template_program p' ∥ /\ EtaExpand.expanded_program p'.
-
-Axiom assume_preservation_template_program_expansion : 
-  forall p v, wt_template_program p ->
-  eval_template_program p v ->
-  ∥ eval_template_program (EtaExpand.eta_expand_program p) (EtaExpand.eta_expand (declarations p.1) [] v) ∥.
-
-Program Definition eta_transform : Transform.t template_program template_program Ast.term Ast.term 
-  eval_template_program eval_template_program :=
-  {| name := "eta expand cstrs and fixpoints";
-      pre := fun p => ∥ wt_template_program p ∥ ;
-      transform p _ := EtaExpand.eta_expand_program p;
-      post := fun p => ∥ wt_template_program p ∥ /\ EtaExpand.expanded_program p;
-      obseq p p' v v' := v' = EtaExpand.eta_expand p.1.(declarations) [] v |}.
-Next Obligation.
-  destruct p. now apply assume_welltyped_template_program_expansion.
-Qed.
-Next Obligation.
-  red. intros p v [wt] ev. 
-  apply assume_preservation_template_program_expansion in ev as [ev']; eauto.
-Qed.
-
-Program Definition run_erase_program p := 
-  Transform.run (Transform.compose eta_transform erasure_pipeline _) p.
-
 Definition compile_program (p : Ast.Env.program) : Program Term :=
-  let p := @run_erase_program p (MCUtils.todo "wf_env and welltyped term") in
+  let p := run_erase_program p (MCUtils.todo "wf_env and welltyped term") in
   {| main := compile (snd p) ; env := compile_ctx (fst p) |}.
 
 Definition program_Program (p: Ast.Env.program) : Program Term :=

@@ -51,6 +51,11 @@ Definition certicoq_pipeline (opts : Options) (p : Template.Ast.Env.program) :=
   compile opts p.
   (* let _ := coq_msg_info ("CertiCoq pipeline succeded.") in *)
   (* tt. *)
+(* CertiCoq Show IR -time -O 1 certicoq_pipeline
+Extract Constants [
+  (* coq_msg_debug => "print_msg_debug", *)
+  coq_msg_info => "print_msg_info"
+]. *)
 
 CertiCoq Compile -time -O 1 certicoq_pipeline
 Extract Constants [

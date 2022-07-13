@@ -4,13 +4,11 @@ Require Import Coq.ZArith.ZArith
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
-               ExtLib.Data.Monads.StateMonad
-               ExtLib.Data.String.
+               ExtLib.Data.Monads.StateMonad.
 
 Import MonadNotation.
 Open Scope monad_scope.
-
-From MetaCoq.Template Require Import bytestring BasicAst.
+From MetaCoq.Template Require Import BasicAst.
 
 From compcert Require Import
   common.AST
@@ -26,6 +24,7 @@ Require Import L6.cps
                L6.identifiers
                L6.cps_show.
 
+From MetaCoq.Template Require Import bytestring MCString.
 
 Section TRANSLATION.
 
@@ -1280,13 +1279,11 @@ Definition add_inf_vars (nenv : name_env) : name_env :=
                                                                      M.set caseIdent (nNamed "arg"%bs) (
                                                                            M.set numArgsIdent (nNamed "num_args"%bs) nenv))))))))))).
 
-Import String (append).
-
 Definition ensure_unique : M.t name -> M.t name :=
   fun l => M.map (fun x n =>
                     match n with
                     | nAnon =>  nAnon
-                    | nNamed s => nNamed (append s (append "_"%bs (show_pos x)))
+                    | nNamed s => nNamed (String.append s (String.append "_"%bs (show_pos x)))
                   end) l.
 
 
@@ -1312,7 +1309,7 @@ Fixpoint make_argList' (n : nat) (nenv : name_env) : nState (name_env * list (id
   | 0 => ret (nenv, nil)
   | (S n') =>
     new_id <- getName;;
-           let new_name := append "arg" (String.of_string (nat2string10 n')) in
+           let new_name := String.append "arg" (MCString.string_of_nat n') in
            let nenv := M.set new_id (nNamed new_name) nenv in
            rest <- make_argList' n' nenv;;
                 let (nenv, rest_id) := rest in
@@ -1335,6 +1332,8 @@ Fixpoint make_constrAsgn' (argv:ident) (argList:list (ident * type)) (n:nat) :=
 Definition make_constrAsgn (argv:ident) (argList:list (ident * type)) :=
     make_constrAsgn' argv argList 1.
 
+Import String (append).
+
 (* Compute the header file comprising of:
    1) Constructors and eliminators for every inductive types in the n_ind_env
    2) Direct style calling functions for the original (named) functions *)
@@ -1346,7 +1345,7 @@ Fixpoint make_constructors
          (nenv : name_env)
          : nState (name_env * (list (positive * globdef Clight.fundef type))) :=
   let make_name (nTy nCtor : Kernames.ident) : BasicAst.name :=
-    nNamed (append "make_" (append nTy (append "_" nCtor))) in
+    nNamed (String.append "make_" (append nTy (append "_" nCtor))) in
   match ctors with
   | nil => ret (nenv, nil)
   | {| ctor_name := nAnon |} :: ctors =>
@@ -1682,7 +1681,7 @@ Definition make_call_n_export_b
     let body_s := Ssequence
                     (tinfo_s ;;; asgn_s)
                     (export_s ;;; Sreturn  (Some (Etempvar retIdent valPtr))) in
-    let callStr := append "call_" (String.of_string (nat2string10 n)) in
+    let callStr := append "call_" (MCString.string_of_nat n) in
     let callStr := if export then append callStr "_export" else callStr in
     let nenv :=
       set_list ((env_ident, nNamed "envi"%bs) ::

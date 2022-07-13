@@ -77,14 +77,11 @@ EnvMap
 LiftSubst
 UnivSubst0
 WcbvEval
-EtaExpand
 Pretty
 Common0
 Extractable
 Logic0
-TemplateProgram
 
-Char0
 Errors0
 
 FLT
@@ -99,13 +96,15 @@ OrdersTac
 POrderedType
 Specif
 StateMonad
-NPeano
-String1
 Monad_utils
 MSetWeakList
 EqdepFacts
 Utils
 Init
+TemplateEnvMap
+TemplateProgram
+EtaExpand
+
 
 Ssreflect
 Ssrbool

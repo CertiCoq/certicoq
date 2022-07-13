@@ -97,8 +97,6 @@ extraction/bool.ml
 extraction/bool.mli
 extraction/bracket.ml
 extraction/bracket.mli
-extraction/char0.ml
-extraction/char0.mli
 extraction/byte.mli
 extraction/byte.ml
 extraction/byte0.mli
@@ -307,8 +305,6 @@ extraction/mSetRBT.ml
 extraction/mSetRBT.mli
 extraction/nat0.ml
 extraction/nat0.mli
-extraction/nPeano.ml
-extraction/nPeano.mli
 extraction/number0.ml
 extraction/number0.mli
 extraction/orderedType0.ml
@@ -406,8 +402,8 @@ extraction/stateMonad.ml
 extraction/stateMonad.mli
 extraction/string0.ml
 extraction/string0.mli
-extraction/string1.ml
-extraction/string1.mli
+extraction/templateEnvMap.mli
+extraction/templateEnvMap.ml
 extraction/templateProgram.ml
 extraction/templateProgram.mli
 extraction/templateToPCUIC.ml

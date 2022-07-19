@@ -1,4 +1,4 @@
-CCOMPILER = gcc
+CCOMPILER = clang # gcc takes ages
 
 PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.gramlib,coq-core.interp,coq-core.kernel,coq-core.lib,coq-core.library,coq-core.toplevel,coq-core.vernac,coq-core.plugins.ltac
 COQLIB = $(shell coqc -where)
@@ -30,7 +30,7 @@ compile.vo ${GENCFILES} &: compile.v
 	coqc ${COQOPTS} $<
 
 %.o: %.c
-	$(CCOMPILER) -g -c -I . -I ${OCAMLLIB} -w -Wno-everything -O2 -o $@ $<
+	$(CCOMPILER) -fPIC -g -c -I . -I ${OCAMLLIB} -w -Wno-everything -O2 -o $@ $<
 
 certicoqchk_plugin.cmxs: certicoqchk_plugin.cmxa ${CFILES:.c=.o}
 	ocamlfind opt ${OCAMLOPTS} -shared -linkall -o $@ $+

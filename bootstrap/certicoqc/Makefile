@@ -4,7 +4,7 @@ PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.
 COQLIB = $(shell coqc -where)
 COQLIBINSTALL = $(COQLIB)/user-contrib/CertiCoq/CertiCoqC
 OCAMLLIB = $(shell ocamlc -where)
-OCAMLOPTS = -I ${COQLIB}/user-contrib/MetaCoq/Template -open Metacoq_template_plugin -I ${COQLIB}/user-contrib/CertiCoq/VanillaPlugin -open Certicoq_vanilla_plugin \
+OCAMLOPTS = -I ${COQLIB}/user-contrib/MetaCoq/Template -open Metacoq_template_plugin -I ../../cplugin -open Certicoq_vanilla_plugin \
 	-I . -linkpkg -dontlink str,unix,dynlink,threads,zarith  -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
 GENCFILES = glue.CertiCoq.CertiCoqC.compile.certicoqc.c CertiCoq.CertiCoqC.compile.certicoqc.c
 CFILES = certicoqc_wrapper.c ${GENCFILES} gc_stack.c print.c
@@ -12,21 +12,27 @@ CFILES = certicoqc_wrapper.c ${GENCFILES} gc_stack.c print.c
 COQOPTS = -Q ../../theories/L7 CertiCoq.L7 -Q ../../libraries CertiCoq.Libraries \
 	-Q ../../theories/L6_PCPS CertiCoq.L6 -Q ../../theories/L4_deBruijn CertiCoq.L4 \
 	-Q ../../theories/Compiler CertiCoq.Compiler -Q ../../theories/common CertiCoq.Common \
-	-Q ../../theories/L2k_noCnstrParams CertiCoq.L2k -Q . CertiCoq.CertiCoqC
+	-Q ../../theories/Glue CertiCoq.Glue \
+	-Q ../../theories/L2k_noCnstrParams CertiCoq.L2k \
+	-Q ../../plugin CertiCoq.Plugin \
+	-I ../../plugin \
+	-Q ../../cplugin CertiCoq.VanillaPlugin \
+	-I ../../cplugin \
+	-Q . CertiCoq.CertiCoqC
 
 plugin: compile.vo Loader.vo
 
 test: test.vo
 
 test.vo: plugin test.v
-	mkdir tests
-	ulimit -Ss 65500 && ulimit -a && coqc -I . -Q . CertiCoq.CertiCoqC test.v
+	mkdir -p tests
+	ulimit -Ss 65500 && ulimit -a && coqc -I . ${COQOPTS} test.v
 
 clean: 
 	rm *.cm* *.o *.vo
 
 Loader.vo: Loader.v certicoqc_plugin.cmxs
-	coqc -Q . CertiCoq.CertiCoqC Loader.v
+	coqc ${COQOPTS} Loader.v
 
 compile.vo ${GENCFILES} &: compile.v
 	coqc ${COQOPTS} $<

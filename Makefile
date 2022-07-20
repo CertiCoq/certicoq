@@ -16,6 +16,7 @@ submodules:
 	git submodule update
 	./make_submodules.sh
 
+plugins: plugin cplugin
 
 plugin: all plugin/CertiCoq.vo
 
@@ -34,16 +35,15 @@ cplugin/Makefile: cplugin/_CoqProject
 cplugin/CertiCoq.vo: all cplugin/Makefile theories/ExtractionVanilla/extraction.vo
 	bash ./make_plugin.sh cplugin
 
+bootstrap: plugin cplugin
+	$(MAKE) -C bootstrap all
 
-install: plugin cplugin
+install: plugin cplugin bootstrap
 	$(MAKE) -C libraries install
 	$(MAKE) -C theories install
 	$(MAKE) -C plugin install
 	$(MAKE) -C cplugin install
-
-bootstrap: install
-	make -C bootstrap all
-	make -C bootstrap install
+	$(MAKE) -C bootstrap install
 
 clean:
 	$(MAKE) -C libraries clean

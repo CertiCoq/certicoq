@@ -45,6 +45,12 @@ Definition certicoqchk (p : Template.Ast.Env.program) : bool :=
   end.  
 
 Eval compute in "Compiling MetaCoq's checker".
+(*CertiCoq Show IR -time -O 1 certicoqchk
+Extract Constants [
+  (* coq_msg_debug => "print_msg_debug", *)
+  coq_msg_info => "print_msg_info",
+  coq_user_error => "coq_user_error"
+] .*)
 
 CertiCoq Compile -time -O 1 certicoqchk
 Extract Constants [

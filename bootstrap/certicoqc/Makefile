@@ -24,7 +24,7 @@ plugin: compile.vo Loader.vo
 
 test: test.vo
 
-test.vo: plugin test.v
+test.vo: test.v
 	mkdir -p tests
 	ulimit -Ss 65500 && ulimit -a && coqc -I . ${COQOPTS} test.v
 

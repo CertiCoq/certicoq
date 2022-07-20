@@ -22,9 +22,7 @@ if [ ! -f "${PLUGIN}/extraction/astCommon.ml" ]
 then
     bash clean_extraction.sh "${PLUGIN}"
 else
-    a=`stat -f "%m" ${EPATH}/AstCommon.ml`
-    b=`stat -f "%m" ${PLUGIN}/extraction/astCommon.ml`
-    if [ "$a" -gt "$b" ]
+    if [ "${EPATH}/AstCommon.ml" -nt "${PLUGIN}/extraction/astCommon.ml" ]
 	then
 	    bash clean_extraction.sh "${PLUGIN}"
     fi

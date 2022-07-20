@@ -1,3 +1,5 @@
+.PHONY: all certicoqc certicoqchk test install clean
+
 all: certicoqc certicoqchk
 
 certicoqc: 
@@ -13,3 +15,7 @@ test:
 install:
 	$(MAKE) -C certicoqc install
 	$(MAKE) -C certicoqchk install
+
+clean:
+	$(MAKE) -C certicoqc clean
+	$(MAKE) -C certicoqchk clean

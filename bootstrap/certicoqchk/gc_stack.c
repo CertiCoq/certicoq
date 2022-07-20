@@ -147,7 +147,7 @@ void forward (value *from_start,  /* beginning of from-space */
         sz = Wosize_hd(hd);
         new = *next+1;
         *next = new+sz;
-        if (sz > 50) printf("Moving value %lld with tag %lld with %d fields\n", v, hd, sz);
+        // if (sz > 50) printf("Moving value %lld with tag %lld with %d fields\n", v, hd, sz);
         for(i = -1; i < sz; i++) {
           /* printf("Moving field %d\n", i); */
           Field(new, i) = Field(v, i);

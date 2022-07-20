@@ -2,6 +2,7 @@ CCOMPILER = clang # gcc takes ages
 
 PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.gramlib,coq-core.interp,coq-core.kernel,coq-core.lib,coq-core.library,coq-core.toplevel,coq-core.vernac,coq-core.plugins.ltac
 COQLIB = $(shell coqc -where)
+COQLIBINSTALL = $(COQLIB)/user-contrib/CertiCoq/CertiCoqCheck
 OCAMLLIB = $(shell ocamlc -where)
 OCAMLOPTS = -I ${COQLIB}/user-contrib/MetaCoq/Template -open Metacoq_template_plugin -I ${COQLIB}/user-contrib/CertiCoq/VanillaPlugin -open Certicoq_vanilla_plugin \
 	-I . -linkpkg -dontlink str,unix,dynlink,threads,zarith  -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
@@ -40,7 +41,7 @@ certicoqchk_plugin.cmx: certicoqchk_plugin_wrapper.cmx certicoqchk.cmx g_certico
 certicoqchk_plugin.cmxa: certicoqchk_plugin.cmx
 	ocamlfind opt ${OCAMLOPTS} -a -o $@ $<
 
-g_certicoqchk.ml: g_certicoqchk.mlg certicoqchk.cmx certicoqchk_plugin_wrapper.cmx
+g_certicoqchk.ml: g_certicoqchk.mlg certicoqchk.cmi certicoqchk_plugin_wrapper.cmx
 	coqpp $<
 
 certicoqchk_wrapper.c: compile.vo
@@ -57,5 +58,9 @@ certicoqchk.cmx: certicoqchk_plugin_wrapper.cmx certicoqchk_plugin_wrapper.cmi
 
 %.cmx: %.ml	%.cmi
 	ocamlfind opt -c ${PKGS} ${OCAMLOPTS} -for-pack Certicoqchk_plugin -o $@ $<
+
+install: Loader.vo certicoqchk_plugin.cmxs
+	install -d "$(COQLIBINSTALL)"
+	install -m 0644 Loader.vo certicoqchk_plugin.cmx* "$(COQLIBINSTALL)"
 
 .PHONY: plugin test

@@ -1,4 +1,4 @@
-.PHONY: all submodules plugin cplugin install clean
+.PHONY: all submodules plugin cplugin install clean bootstrap
 
 
 all theories/Extraction/extraction.vo: theories/Makefile libraries/Makefile
@@ -41,6 +41,9 @@ install: plugin cplugin
 	$(MAKE) -C plugin install
 	$(MAKE) -C cplugin install
 
+bootstrap: install
+	make -C bootstrap all
+	make -C bootstrap install
 
 clean:
 	$(MAKE) -C libraries clean

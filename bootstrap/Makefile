@@ -9,3 +9,7 @@ certicoqchk:
 test:
 	$(MAKE) -C certicoqc test
 	$(MAKE) -C certicoqchk test
+
+install:
+	$(MAKE) -C certicoqc install
+	$(MAKE) -C certicoqchk install

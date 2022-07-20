@@ -17,8 +17,7 @@ plugin: compile.vo Loader.vo
 test: test.vo
 
 test.vo: plugin test.v
-	ulimit -Ss 65500 # Otherwise we get a segfault
-	coqc -I . -Q . CertiCoq.CertiCoqCheck test.v
+	ulimit -Ss 65500 && ulimit -a && coqc -I . -Q . CertiCoq.CertiCoqCheck test.v
 
 clean: 
 	rm *.cm* *.o *.vo

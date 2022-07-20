@@ -19,6 +19,7 @@ test: test.vo
 
 test.vo: plugin test.v
 	ulimit -Ss 65500 # Otherwise we get a segfault
+	mkdir tests
 	coqc -I . -Q . CertiCoq.CertiCoqC test.v
 
 clean: 

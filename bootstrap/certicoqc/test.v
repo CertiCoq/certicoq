@@ -27,7 +27,7 @@ Time CertiCoq Compile erase_and_print_template_program.
 
 From CertiCoq.CertiCoqC Require Import compile.
 
-Time CertiCoqC Compile -time -O 0 compile.certicoqc
+Time CertiCoqC Compile -time -O 1 compile.certicoqc
  Extract Constants [ 
   (* coq_msg_debug => "print_msg_debug", *)
    coq_msg_info => "print_msg_info" ] 

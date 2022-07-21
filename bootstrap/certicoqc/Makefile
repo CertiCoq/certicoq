@@ -65,8 +65,8 @@ certicoqc.cmx: certicoqc_plugin_wrapper.cmx
 %.cmx: %.ml	%.cmi
 	ocamlfind opt -c ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin -o $@ $<
 
-install: Loader.vo certicoqc_plugin.cmxs
+install: Loader.vo compile.vo certicoqc_plugin.cmxs
 	install -d "$(COQLIBINSTALL)"
-	install -m 0644 Loader.vo certicoqc_plugin.cmx* "$(COQLIBINSTALL)"
+	install -m 0644 Loader.v Loader.vo compile.v compile.vo certicoqc_plugin.cmx* "$(COQLIBINSTALL)"
 
 .PHONY: plugin test

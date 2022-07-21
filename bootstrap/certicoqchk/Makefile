@@ -67,6 +67,6 @@ certicoqchk.cmx: certicoqchk_plugin_wrapper.cmx certicoqchk_plugin_wrapper.cmi
 
 install: Loader.vo certicoqchk_plugin.cmxs
 	install -d "$(COQLIBINSTALL)"
-	install -m 0644 Loader.vo certicoqchk_plugin.cmx* "$(COQLIBINSTALL)"
+	install -m 0644 Loader.v Loader.vo certicoqchk_plugin.cmx* "$(COQLIBINSTALL)"
 
 .PHONY: plugin test

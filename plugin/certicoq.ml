@@ -31,6 +31,7 @@ let debug_msg (flag : bool) (s : string) =
 (** Compilation Command Arguments *)
 
 type command_args =
+ | BYPASS_QED
  | CPS
  | TIME
  | TIMEANF
@@ -44,7 +45,8 @@ type command_args =
  | FILENAME of string (* Name of the generated file *)
 
 type options =
-  { cps       : bool;
+  { bypass_qed : bool;
+    cps       : bool;
     time      : bool;
     time_anf  : bool;
     olevel    : int;
@@ -59,7 +61,8 @@ type options =
   }
 
 let default_options : options =
-  { cps       = false;
+  { bypass_qed = false;
+    cps       = false;
     time      = false;
     time_anf  = false;
     olevel    = 1;
@@ -78,6 +81,7 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
   let rec aux (o : options) l =
     match l with
     | [] -> o
+    | BYPASS_QED :: xs -> aux {o with bypass_qed = true} xs
     | CPS      :: xs -> aux {o with cps = true} xs
     | TIME     :: xs -> aux {o with time = true} xs
     | TIMEANF  :: xs -> aux {o with time_anf = true} xs
@@ -120,12 +124,13 @@ let get_name (gr : Names.GlobRef.t) : string =
 (* Quote Coq term *)
 let quote opts gr =
   let debug = opts.debug in
+  let bypass = opts.bypass_qed in
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let sigma, c = Evarutil.new_global sigma gr in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass:false env (EConstr.to_constr sigma c) in
+  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass env (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   term

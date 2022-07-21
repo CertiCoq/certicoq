@@ -6,7 +6,7 @@ open Ast0
 open Toplevel2
 open Pipeline_utils
 
-external certicoq_pipeline : coq_Options -> Ast0.Env.program -> coq_Cprogram CompM.error * Bytestring.String.t = "certicoq_pipeline_wrapper"
+external certicoqchk_wrapper : Ast0.Env.program -> Datatypes.bool = "certicoqchk_wrapper"
 let info s = Feedback.msg_info (Pp.str s)
 
 let msg_info s =
@@ -14,6 +14,10 @@ let msg_info s =
   Feedback.msg_info (str s)
   
 let _ = Callback.register "coq_msg_info" msg_info
+let user_error s = 
+  CErrors.user_err (str (Caml_bytestring.caml_string_of_bytestring s))
+  
+let _ = Callback.register "coq_user_error" user_error
 
 let msg_debug s = 
   Feedback.msg_debug (str (Caml_bytestring.caml_string_of_bytestring s))
@@ -139,13 +143,13 @@ let fix_quoted_program (p : Ast0.Env.program) =
   let declarations = fix_declarations declarations in
   { Ast0.Env.universes = universes; declarations }, term
 
-let compile opts prog =
-  info "Calling certicoq-compiled certicoq";
+let check prog =
+  info "Calling CertiCoq-compiled Coq checker";
   (* let pretty= Pretty.print_program false (Obj.magic (Caml_nat.nat_of_caml_int 100)) (Obj.magic prog) in *)
   (* let _ = info (Caml_bytestring.caml_string_of_bytestring (Obj.magic pretty)) in *)
   let prog = fix_quoted_program prog in
   info "Fixed quoted program";
   (* time (str"Compilation with bootstrapped compiler") *)
-  let res = certicoq_pipeline opts prog in
-  info "Certicoq pipeline ran";
+  let res = certicoqchk_wrapper prog in
+  info "CertiCoq Checker ran";
   res

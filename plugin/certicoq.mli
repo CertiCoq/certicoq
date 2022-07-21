@@ -1,4 +1,5 @@
 type command_args =
+ | BYPASS_QED
  | CPS
  | TIME
  | TIMEANF
@@ -12,7 +13,8 @@ type command_args =
  | FILENAME of string (* Name of the generated file *)
 
 type options =
-  { cps       : bool;
+  { bypass_qed : bool;
+    cps       : bool;
     time      : bool;
     time_anf  : bool;
     olevel    : int;

@@ -28,11 +28,11 @@ let rec debug_mappings (ms : (Kernames.kername * Kernames.ident) list) : unit =
 let help_msg : string =
   "Usage:\n\
 To compile an Gallina definition named <gid> type:\n\
-   CertiCoq Compile <options> <gid>.\n\n\
+   CertiCoqC Compile <options> <gid>.\n\n\
 To show this help message type:\n\
-   CertiCoq -help.\n\n\
+   CertiCoqC -help.\n\n\
 To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
-   CertiCoq Show IR <options> <gid>.\n\n\
+   CertiCoqC Show IR <options> <gid>.\n\n\
 Valid options:\n\
 -file S   :  Specify the filename. Default: the fully qualified name of <gid>.\n\
 -ext S    :  Specify the string s to be appended to the filename\n\
@@ -45,5 +45,5 @@ Valid options:\n\
 -time_anf :  Time λanf optimizations\n\
 \n\n\
 To compile Gallina constants to specific C functions use:\n\
-   CertiCoq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\", ... , \"fileM.h\" ]."
+   CertiCoqC Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\", ... , \"fileM.h\" ]."
 

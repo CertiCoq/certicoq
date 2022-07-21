@@ -400,7 +400,7 @@ Fixpoint compile_ctx (t : global_context) :=
   end.
 
 Definition compile_program (p : Ast.Env.program) : Program Term :=
-  let p := run_erase_program p (MCUtils.todo "wf_env and welltyped term") in
+  let p := run_erase_program p (assume_that_we_only_erase_on_welltyped_programs p) in
   {| main := compile (snd p) ; env := compile_ctx (fst p) |}.
 
 Definition program_Program (p: Ast.Env.program) : Program Term :=

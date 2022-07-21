@@ -13,7 +13,7 @@ module MLCompiler : Certicoq.CompilerInterface with
   type name_env = BasicAst.name Cps.M.t
   = struct
   type name_env = BasicAst.name Cps.M.t
-  let compile = Certicoq_pipeline.compile
+  let compile = Certicoqc_plugin_wrapper.compile
   let printProg prog names (dest : string) (import : string list) =
     PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest import
 

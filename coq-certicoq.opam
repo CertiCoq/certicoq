@@ -19,7 +19,8 @@ authors: ["Andrew Appel"
 license: "MIT"
 build: [
   [make "all"]
-  [make "plugin"]
+  [make "plugins"]
+  [make "bootstrap"]
 ]
 install: [
   [make "install"]

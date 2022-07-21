@@ -13,6 +13,7 @@ open Plugin_utils
 }
 
 VERNAC ARGUMENT EXTEND cargs 
+| [ "-bypass_qed" ] -> { BYPASS_QED }
 | [ "-cps" ] -> { CPS }
 | [ "-time" ] -> { TIME }
 | [ "-time_anf" ] -> { TIMEANF }

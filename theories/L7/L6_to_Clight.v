@@ -1238,10 +1238,10 @@ Definition make_defs_fast
 
 Definition composites : list composite_definition :=
   Composite threadInfIdent Struct
-    ((allocIdent, valPtr) ::
-     (limitIdent, valPtr) ::
-     (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
-     (argsIdent, (Tarray uval maxArgs noattr)) ::
+    (Member_plain allocIdent valPtr ::
+    Member_plain limitIdent valPtr ::
+    Member_plain heapInfIdent (tptr (Tstruct heapInfIdent noattr)) ::
+    Member_plain argsIdent (Tarray uval maxArgs noattr) ::
      nil) noattr ::
   nil.
 

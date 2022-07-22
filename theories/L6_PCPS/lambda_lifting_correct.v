@@ -1719,7 +1719,7 @@ Section Lambda_lifting_correct.
 
      assert (Heq : LiftedFuns (fun_map (M.empty FunInfo)) <--> Empty_set _).
      { clear. split; sets. intros x Hin. inv Hin. destructAll.
-       inv H. inv H0. unfold fun_map, lifted_name in *. simpl in H1. rewrite M.gempty in H1. congruence. }
+       inv H. inv H0. }
 
      assert (Heq' : FunsFVs (fun_map (M.empty FunInfo)) <--> Empty_set _).
      { clear. split; sets. intros x Hin. inv Hin. destructAll.
@@ -1727,7 +1727,7 @@ Section Lambda_lifting_correct.
 
      assert (Heq'' : Funs (fun_map (M.empty FunInfo)) <--> Empty_set _).
      { clear. split; sets. intros x Hin. inv Hin. destructAll.
-       unfold fun_map, lifted_name in *. simpl in *. rewrite M.gempty in H. congruence. }
+       unfold fun_map, lifted_name in *. simpl in *. congruence. }
      
      rewrite !Heq, !Heq' in *.
 

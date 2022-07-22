@@ -23,19 +23,28 @@ Definition sub_map {A : Type} (map1 map2 : M.t A) :=
   forall x v, M.get x map1 = Some v ->
               M.get x map2 = Some v.
 
-Fixpoint xfilter {A : Type} (pred : positive -> A -> bool) (m : M.t A) 
-         (i : positive) {struct m} : M.t A :=
-  match m with
-  | M.Leaf => M.Leaf
-  | M.Node l o r =>
-    let o' :=
-        match o with
-        | Some x => if pred (M.prev i) x then o else None
-        | None => None
-        end
-    in
-    M.Node' (xfilter pred l (i~0)%positive) o' (xfilter pred r (i~1)%positive)
+Definition filter_opt {A} (pred : positive -> A -> bool) (o : option A) (i : positive) : option A :=
+  match o with
+  | None => None 
+  | Some a => if pred (M.prev i) a then o else None 
   end.
+
+Definition xfilter {A : Type} (pred : positive -> A -> bool) (m : M.t A) : positive -> M.t A :=
+  M.tree_rec (fun _ => M.empty _)
+    (fun l lrec o r rrec i => 
+      let o' := filter_opt pred o i in
+      M.Node (lrec (i~0)%positive) o' (rrec (i~1)%positive))
+    m.
+
+Lemma xfilter_node {A} (pred : positive -> A -> bool) (l : M.t A) (o : option A) (r : M.t A) i :
+  M.not_trivially_empty l o r ->
+  xfilter pred (M.Node l o r) i = 
+  M.Node (xfilter pred l (i~0)) (filter_opt pred o i) (xfilter pred r (i~1)).
+Proof.
+  intros hl.
+  unfold xfilter at 1.
+  rewrite M.unroll_tree_rec; auto.
+Qed.
 
 Lemma xgfilter (A: Type) (pred : positive -> A -> bool) (m : M.t A) 
       (i j : positive) : 
@@ -45,13 +54,13 @@ Lemma xgfilter (A: Type) (pred : positive -> A -> bool) (m : M.t A)
   | None => None
   end.
 Proof.
-  revert i j. induction m; intros i j; simpl.
-  - rewrite !M.gleaf. reflexivity.
-  - rewrite M.gnode'.
+  revert i j. induction m using M.tree_ind; intros i j; simpl.
+  - rewrite !M.gempty. reflexivity.
+  - rewrite M.gNode, xfilter_node; auto.
     destruct i; simpl.
-    + rewrite IHm2. reflexivity.
-    + rewrite IHm1. reflexivity.
-    + destruct o; reflexivity.
+    + now rewrite <- IHm0, M.gNode. 
+    + now rewrite <- IHm, M.gNode.
+    + rewrite M.gNode. destruct o; reflexivity.
 Qed.
 
 Definition filter  {A : Type} (pred : positive -> A -> bool) (m : M.t A) : M.t A :=

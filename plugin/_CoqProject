@@ -72,6 +72,8 @@ extraction/basicAst.ml
 extraction/basicAst.mli
 extraction/basics.ml
 extraction/basics.mli
+extraction/binarySingleNaN.mli
+extraction/binarySingleNaN.ml
 extraction/binary.ml
 extraction/binary.mli
 extraction/binInt.ml
@@ -90,8 +92,6 @@ extraction/bits.ml
 extraction/bits.mli
 extraction/bool.ml
 extraction/bool.mli
-extraction/bracket.ml
-extraction/bracket.mli
 extraction/byte.mli
 extraction/byte.ml
 extraction/byte0.mli
@@ -104,8 +104,8 @@ extraction/classes1.ml
 extraction/classes1.mli
 extraction/classes2.ml
 extraction/classes2.mli
-extraction/clightdefs.ml
-extraction/clightdefs.mli
+extraction/ctypesdefs.mli
+extraction/ctypesdefs.ml
 extraction/clight.ml
 extraction/clight.mli
 extraction/closure_conversion.ml
@@ -204,8 +204,6 @@ extraction/ffi.mli
 # extraction/floatOps.mli
 extraction/floats.ml
 extraction/floats.mli
-extraction/FLT.ml
-extraction/FLT.mli
 extraction/frame.ml
 extraction/frame.mli
 extraction/globalenvs.ml
@@ -427,8 +425,6 @@ extraction/wGraph.ml
 extraction/wGraph.mli
 extraction/zArith_dec.ml
 extraction/zArith_dec.mli
-extraction/zaux.ml
-extraction/zaux.mli
 extraction/zbits.ml
 extraction/zbits.mli
 extraction/zbool.ml

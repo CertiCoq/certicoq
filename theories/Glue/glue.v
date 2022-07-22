@@ -18,7 +18,7 @@ Require Import compcert.common.AST
                compcert.cfrontend.Ctypes
                compcert.cfrontend.Clight
                compcert.common.Values
-               compcert.exportclight.Clightdefs.
+               compcert.export.Clightdefs.
 
 Require Import L6.cps
                L6.identifiers
@@ -293,10 +293,10 @@ Section Externs.
          |} in
     let comp :=
       Composite _thread_info Struct
-        ((_alloc, valPtr) ::
-        (_limit, valPtr) ::
-        (_heap, tptr (Tstruct _heap noattr)) ::
-        (_args, Tarray uval max_args noattr) :: nil) noattr :: nil in
+        (Member_plain _alloc valPtr ::
+         Member_plain _limit valPtr ::
+         Member_plain _heap (tptr (Tstruct _heap noattr)) ::
+         Member_plain _args (Tarray uval max_args noattr) :: nil) noattr :: nil in
     let toolbox :=
         {| printf_info :=
               (_printf, Tfunction (Tcons (tptr tschar) Tnil) tint cc_default)
@@ -839,7 +839,7 @@ Section ArgsStructs.
     | S j' =>
         arg_name <- gensym (sanitize_qualified (qp, name ++ "_arg_" ++ show_nat i)%bs) ;;
         rest <- members_from_ctor qp name (i + 1) j' ;;
-        ret ((arg_name, val) :: rest)
+        ret (Member_plain arg_name val :: rest)
     end.
 
   Fixpoint args_structs_from_ctors

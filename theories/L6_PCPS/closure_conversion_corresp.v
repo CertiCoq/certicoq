@@ -829,8 +829,7 @@ Section CC_correct.
   Lemma FVmap_inv_empty GFuns :
     FVmap_inv (Maps.PTree.empty VarInfo) (Empty_set M.elt) (Empty_set M.elt) GFuns [].
   Proof.
-    repeat split; (try now intros Hc; inv Hc); (try now intros x Hc; inv Hc). 
-    intros x Hx. unfold In in Hx. rewrite M.gempty in Hx. now inv Hx.
+    repeat split; (try now intros Hc; inv Hc); (try now intros x Hc; inv Hc).
     destruct H as [x' Hget]. rewrite M.gempty in Hget. now inv Hget.
     rewrite M.gempty in H. now inv H.
     rewrite M.gempty in H. now inv H.
@@ -913,11 +912,11 @@ Section CC_correct.
   Proof. 
     intros Hb1 Hb2 Minv Hgfuns Hdis Hdup Hnin. unfold make_env.
     destruct ((fix
-                 add_fvs (l : list M.elt) (n : N) (map : Maps.PTree.t VarInfo)
-                 {struct l} : Maps.PTree.t VarInfo * N :=
+                 add_fvs (l : list M.elt) (n : N) (map : Maps.PTree.tree VarInfo)
+                 {struct l} : Maps.PTree.tree VarInfo * N :=
                  match l with
                    | [] => (map, n)
-                   | x :: xs => add_fvs xs (n + 1)%N (Maps.PTree.set x (FVar n) map)
+                   | x :: xs => add_fvs xs (n + 1)%N (PTree.set x (FVar n) map)
                  end)
                 fv 0%N (Maps.PTree.empty VarInfo)) as [map_new n] eqn:Heq.
     apply pre_post_mp_l'. eapply bind_triple.
@@ -958,8 +957,8 @@ Section CC_correct.
       + replace map_new with
         (fst ((fix
                 add_fvs (l : list M.elt) (n : N)
-                (map : Maps.PTree.t VarInfo) {struct l} :
-                Maps.PTree.t VarInfo * N :=
+                (map : Maps.PTree.tree VarInfo) {struct l} :
+                Maps.PTree.tree VarInfo * N :=
                 match l with
                   | [] => (map, n)
                   | x :: xs => add_fvs xs (n + 1)%N (Maps.PTree.set x (FVar n) map)

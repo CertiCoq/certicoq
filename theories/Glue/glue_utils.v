@@ -18,7 +18,7 @@ Require Import compcert.common.AST
                compcert.cfrontend.Ctypes
                compcert.cfrontend.Clight
                compcert.common.Values
-               compcert.exportclight.Clightdefs.
+               compcert.export.Clightdefs.
 
 Require Import L6.cps
                L6.identifiers

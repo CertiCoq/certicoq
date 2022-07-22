@@ -1070,20 +1070,23 @@ Definition make_defs (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor_en
     ret (nenv', (global_defs e ++ fun_inf ++ fun_defs)%list)
   end.
 
+Definition to_plain_members (l : list (ident * type)) : list member :=
+  map (fun '(x, y) => Member_plain x y) l.
+
 (* Types declared at the begining of the program *)
 Definition composites : list composite_definition :=
   Composite stackframeTIdent Struct
-            ((nextFld, valPtr) ::
+            (to_plain_members ((nextFld, valPtr) ::
              (rootFld, valPtr) ::
-             (prevFld, (tptr stackframeT)) :: nil)
+             (prevFld, (tptr stackframeT)) :: nil))
             noattr ::
   Composite threadInfIdent Struct
-            ((allocIdent, valPtr) ::
+            (to_plain_members ((allocIdent, valPtr) ::
              (limitIdent, valPtr) ::
              (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
              (argsIdent, (Tarray uval maxArgs noattr)) ::
              (fpIdent, (tptr stackframeT)) ::
-             (nallocIdent, val) :: nil) (* Zoe : This is the number of allocations until the next GC call so that GC can perform a test. 
+             (nallocIdent, val) :: nil)) (* Zoe : This is the number of allocations until the next GC call so that GC can perform a test. 
                                          * Note that it will be coerced to UL from ULL. That should be safe for the values we're using but 
                                          * consider changing it too. *)
             noattr ::

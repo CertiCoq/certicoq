@@ -2895,7 +2895,6 @@ Proof.
     unfold fresh_copies, proto_util.fresh_copies in *.
     rewrite <- !Hused in *.
     apply uncurry_fundefs_step_app, uncurry_fundefs_curried; auto.
-    + now rewrite M.gempty.
     + now apply occurs_in_exp_correct, Disjoint_Singleton_r.
     + now apply occurs_in_exp_correct, Disjoint_Singleton_r.
     + reflexivity.
@@ -2908,7 +2907,6 @@ Proof.
     unfold fresh_copies, proto_util.fresh_copies in *.
     rewrite <- !Hused in *.
     apply uncurry_fundefs_step_app, uncurry_fundefs_curried_anf; auto.
-    + now rewrite M.gempty.
     + now apply occurs_in_exp_correct, Disjoint_Singleton_r.
     + reflexivity.
 Qed.

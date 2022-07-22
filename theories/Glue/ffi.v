@@ -30,7 +30,7 @@ Require Import compcert.common.AST
                compcert.cfrontend.Ctypes
                compcert.cfrontend.Clight
                compcert.common.Values
-               compcert.exportclight.Clightdefs.
+               compcert.export.Clightdefs.
 
 Require Import L6.cps
                L6.identifiers
@@ -380,10 +380,10 @@ Definition make_toolbox : ffiM composite_definitions :=
   _args <- gensym "args" ;;
   let comp :=
     Composite _thread_info Struct
-      ((_alloc, valPtr) ::
-       (_limit, valPtr) ::
-       (_heap, tptr (Tstruct _heap noattr)) ::
-       (_args, Tarray uval max_args noattr) :: nil) noattr :: nil in
+      (Member_plain _alloc valPtr ::
+       Member_plain _limit valPtr ::
+       Member_plain _heap (tptr (Tstruct _heap noattr)) ::
+       Member_plain _args (Tarray uval max_args noattr) :: nil) noattr :: nil in
   ret comp.
 
 Definition make_ffi_program

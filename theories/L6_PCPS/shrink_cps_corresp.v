@@ -273,7 +273,7 @@ Section CENSUS.
   Proof.
     revert count sig; induction l; intros count sig.
     - simpl. intro. rewrite gccombine'. rewrite gdempty. auto.
-    - simpl. intro. rewrite !gccombine'. rewrite apply_r_empty. rewrite gdempty. simpl.
+    - simpl. intro. rewrite !gccombine'. rewrite apply_r_empty. simpl.
       rewrite <- IHl.
       simpl. rewrite gccombine'. 
       rewrite init_census_f_ar_l.
@@ -327,7 +327,6 @@ Section CENSUS.
       rewrite gccombine'.
       unfold init_census.
       simpl.
-      rewrite gdempty.
       rewrite plus_n_O.
       rewrite apply_r_empty.
       simpl.
@@ -353,9 +352,8 @@ Section CENSUS.
       rewrite <- H.
       rewrite gccombine'.
       rewrite apply_r_empty.
-      rewrite get_c_up.
-      rewrite gdempty.
-      rewrite get_c_up. lia.
+      rewrite get_c_up. simpl.
+      lia.
     - intro. rewrite gccombine'. rewrite <- H.
       rewrite gccombine'.
       unfold init_census. simpl.  rewrite <- !combine_plus_census_list.
@@ -364,9 +362,9 @@ Section CENSUS.
       rewrite H0. rewrite <- H. rewrite gccombine'.
       unfold init_census.
       
-      rewrite <- combine_plus_census_list. simpl. rewrite !gccombine'.
-      rewrite !gdempty. simpl. 
-      rewrite !apply_r_empty. simpl.      
+      rewrite <- combine_plus_census_list.
+      rewrite !gccombine'.
+      rewrite !apply_r_empty.
       rewrite !get_c_up, apply_r_list_empty. lia.
     - intro.
       rewrite gccombine'.
@@ -389,9 +387,7 @@ Section CENSUS.
       rewrite gccombine'.
       rewrite apply_r_empty.
       rewrite apply_r_list_empty.
-      rewrite get_c_up.
-      rewrite get_c_up. rewrite gdempty.
-      lia.
+      rewrite get_c_up. lia.
     - intro.
       rewrite gccombine'.
       unfold init_census. simpl.
@@ -406,7 +402,7 @@ Section CENSUS.
       lia.
     - intro.
       rewrite gccombine'.
-      rewrite get_c_up. unfold init_census. simpl. rewrite get_c_up. rewrite gdempty. rewrite apply_r_empty. lia.
+      rewrite get_c_up. unfold init_census. simpl. rewrite apply_r_empty. lia.
     - intro; rewrite gccombine'.
       rewrite <- H0.
       rewrite gccombine'.
@@ -477,7 +473,6 @@ Section CENSUS.
     - simpl. intro. rewrite gccombine_sub. rewrite gdempty. rewrite minus_n_O. auto.
     - simpl. intro. rewrite gccombine_sub. rewrite <- IHl.
       simpl. rewrite gccombine_sub. rewrite apply_r_empty.
-      rewrite gdempty. simpl.
       rewrite init_census_f_ar_l.
       rewrite <- combine_plus_census_list.
       rewrite gccombine'.
@@ -1434,7 +1429,6 @@ Section CONTRACT.
       lia.
     - unfold init_census.
       simpl.
-      rewrite gdempty.
       rewrite apply_r_empty.
       eapply num_occur_constr.
       constructor. constructor.
@@ -1465,7 +1459,7 @@ Section CONTRACT.
       destruct Hcpc. rewrite <- H0.
       rewrite gccombine'.
       rewrite apply_r_empty.
-      rewrite get_c_up. rewrite gdempty. rewrite <- (proj1 rename_all_ns_empty).
+      rewrite <- (proj1 rename_all_ns_empty).
       simpl. destruct (cps_util.var_dec vv v0). subst; rewrite gdss. auto.
       rewrite gdso by auto.
       rewrite gdempty. auto.
@@ -1477,7 +1471,7 @@ Section CONTRACT.
       rewrite <- H0.
       rewrite gccombine'.
       rewrite update_census_list_correct.
-      rewrite gdempty. rewrite apply_r_list_empty.
+      rewrite apply_r_list_empty.
       rewrite <- (proj1 rename_all_ns_empty). rewrite !apply_r_empty. 
       simpl. destruct (cps_util.var_dec vv f).
       + subst. unfold get_c at 2. rewrite M.gss. lia.
@@ -1496,7 +1490,7 @@ Section CONTRACT.
       rewrite update_census_list_correct.
       rewrite apply_r_list_empty.
       destruct (cps_util.var_dec vv v).
-      subst; rewrite gdss. rewrite gdempty. auto.
+      subst; rewrite gdss. rewrite ?gdempty. auto.
       rewrite gdso by auto. rewrite gdempty. auto.
     - unfold init_census; simpl. eapply num_occur_constr.
       constructor; auto.
@@ -1513,7 +1507,7 @@ Section CONTRACT.
       eapply num_occur_constr.
       constructor.
       simpl.
-      rewrite gdempty.
+      rewrite ?gdempty.
       rewrite apply_r_empty.
       simpl.
       destruct (cps_util.var_dec vv v).
@@ -1560,7 +1554,7 @@ Section CONTRACT.
       rewrite gccombine_sub.
       unfold init_census.
       simpl.
-      rewrite gdempty.
+      rewrite ?gdempty.
       simpl.
       rewrite apply_r_empty.
       rewrite get_c_minus.
@@ -1591,8 +1585,6 @@ Section CONTRACT.
       rewrite <- H0.
       rewrite gccombine'.
       rewrite apply_r_empty.
-      rewrite get_c_up.
-      rewrite gdempty.
       rewrite get_c_minus. lia.
     - intro. rewrite gccombine_sub.
       rewrite <- H.
@@ -1609,7 +1601,7 @@ Section CONTRACT.
       rewrite apply_r_empty.
       rewrite apply_r_list_empty.       
       
-      rewrite get_c_minus. rewrite gdempty.
+      rewrite get_c_minus.
       assert (Hfr := init_census_f_ar).
       
       destruct (Hfr c_plus). 1:{ intros. simpl. rewrite H2. auto. }
@@ -1644,8 +1636,7 @@ Section CONTRACT.
       rewrite gccombine'.
       rewrite apply_r_empty.
       rewrite apply_r_list_empty.
-      rewrite get_c_up.
-      rewrite get_c_minus. rewrite gdempty.
+      rewrite get_c_minus. 
       lia.
     - intro.
       rewrite gccombine_sub.
@@ -1663,7 +1654,7 @@ Section CONTRACT.
       lia.
     - intro.
       rewrite gccombine_sub.
-      rewrite get_c_minus. unfold init_census. simpl. rewrite get_c_up. rewrite gdempty. rewrite apply_r_empty. lia.
+      rewrite get_c_minus. unfold init_census. simpl. rewrite apply_r_empty. lia.
     - intro; rewrite gccombine_sub.
       rewrite <- H0.
       rewrite gccombine_sub.
@@ -3196,8 +3187,7 @@ Section CONTRACT.
       destruct (M.get v im).  destruct b. auto.
       simpl. unfold get_b. rewrite M.gso. rewrite M.gempty.
       auto. auto.
-      simpl. unfold get_b. rewrite M.gso; auto.
-      rewrite M.gempty; auto. auto.
+      simpl. unfold get_b. rewrite M.gso; auto. auto.
   Qed.
 
   Theorem inlined_ctx_f_staged_mut:
@@ -3788,7 +3778,6 @@ Section CONTRACT.
           exfalso. apply H3. exists v. auto.
         * exfalso; auto.
       + rewrite apply_r_set_list2; auto.
-        rewrite apply_r_empty; auto.
   Qed.
   
   Theorem set_list_rename_all_arl :
@@ -6387,7 +6376,6 @@ Section CONTRACT.
       auto.
     + rewrite apply_r_set2; auto.
       rewrite apply_r_set2; auto.
-      rewrite apply_r_empty; auto.
       apply apply_r_not_in_sig; auto.
   Qed.
 
@@ -6407,8 +6395,7 @@ Section CONTRACT.
       erewrite apply_r_some by apply M.gss.
       reflexivity.
     - rewrite apply_r_set2; auto.
-      rewrite apply_r_set2; auto. rewrite apply_r_empty.
-      auto.
+      rewrite apply_r_set2; auto. 
       apply apply_r_not_in_sig; auto.
   Qed.
 
@@ -6578,7 +6565,6 @@ Section CONTRACT.
       destruct (var_dec x z); subst.
       - unfold apply_r. rewrite !M.gss. reflexivity.
       - unfold apply_r. rewrite !M.gso; eauto.
-        rewrite M.gempty. reflexivity. 
     Qed.
 
     Lemma findtag_map_res {A B} f l c res :

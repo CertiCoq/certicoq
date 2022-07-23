@@ -577,8 +577,6 @@ Proof.
   - intros [z [Hin Heq]]; subst. unfold apply_r.
     rewrite M.gempty. eassumption.
   - intros Hin. eexists; split; eauto.
-    unfold apply_r.
-    rewrite M.gempty. reflexivity.
 Qed.
 
 (** * Lemmas about [remove_all] *)
@@ -781,25 +779,13 @@ Proof.
   apply exp_def_mutual_ind; intros; simpl.
   - rewrite apply_r_list_empty.
     replace (rename_all (M.remove v (M.empty var)) e) with e. reflexivity.
-    rewrite H at 1.
-    apply prop_rename_all.
-    apply smg_sym.
-    apply remove_empty.
   - rewrite apply_r_empty.  reflexivity.
   - rewrite apply_r_empty. rewrite <- H. simpl in H0. inversion H0.
-    rewrite <- H3. rewrite <- H3. reflexivity.
+    rewrite <- H2. rewrite <- H2. reflexivity.
   - rewrite apply_r_empty.
     replace (rename_all (M.remove v (M.empty var)) e) with e. reflexivity.
-    rewrite H at 1.
-    apply prop_rename_all.
-    apply smg_sym.
-    apply remove_empty.
   - rewrite apply_r_empty, apply_r_list_empty.
     replace (rename_all (M.remove x (M.empty var)) e) with e. reflexivity.
-    rewrite H at 1.
-    apply prop_rename_all.
-    apply smg_sym.
-    apply remove_empty.
   - replace (rename_all (remove_all (M.empty var) (all_fun_name f2)) e) with e.
     replace (rename_all_fun (remove_all (M.empty var) (all_fun_name f2)) f2) with f2; auto.
     rewrite H at 1.
@@ -814,11 +800,7 @@ Proof.
     rewrite apply_r_list_empty. auto.
   - rewrite apply_r_list_empty.
     replace (rename_all (M.remove v (M.empty var)) e) with e. reflexivity.
-    rewrite H at 1.
-    apply prop_rename_all.
-    apply smg_sym.
-    apply remove_empty.
-  -     rewrite apply_r_empty. auto.
+  - rewrite apply_r_empty. auto.
   - rewrite <- H0.
     replace (rename_all (remove_all (M.empty var) l) e) with e.
     reflexivity.

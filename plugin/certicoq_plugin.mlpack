@@ -60,6 +60,8 @@ ByteCompare
 Bytestring
 Caml_bytestring
 MCString
+Zpower
+Zbool
 SpecFloat
 PrimFloat
 FloatOps
@@ -166,8 +168,6 @@ SafeTemplateErasure
 
 ZArith_dec
 Coqlib0
-Zbool
-Zpower
 
 MonadExc
 Monad_utils
@@ -217,6 +217,7 @@ Closure_conversion
 Hoisting
 Lambda_lifting
 L4_to_L6
+BinarySingleNaN
 Binary
 Bits
 IEEE754_extra
@@ -235,7 +236,7 @@ Cop
 Dead_param_elim
 Inline
 Csyntax
-Clightdefs
+Ctypesdefs
 Memtype
 Memdata
 Memory

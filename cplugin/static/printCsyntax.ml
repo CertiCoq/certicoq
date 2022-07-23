@@ -205,7 +205,7 @@ let rec expr p (prec, e) =
   then fprintf p "@[<hov 2>("
   else fprintf p "@[<hov 2>";
   begin match e with
-  | Eloc(b, ofs, _) ->
+  | Eloc(b, ofs, _, _) ->
       fprintf p "<loc%a>" !print_pointer_hook (b, Obj.magic ofs)
   | Evar(id, _) ->
       fprintf p "%s" (extern_atom id)
@@ -539,8 +539,9 @@ let define_composite p (Composite(id, su, m, a)) =
   fprintf p "@[<v 2>%s %s%s {"
           (struct_or_union su) (extern_atom id) (attributes a);
   List.iter
-    (fun (fid, fty) ->
-      fprintf p "@ %s;" (name_cdecl (extern_atom fid) fty))
+    (function Member_plain (fid, fty) ->
+      fprintf p "@ %s;" (name_cdecl (extern_atom fid) fty)
+      | _ -> assert false)
     m;
   fprintf p "@;<0 -2>};@]@ @ "
 

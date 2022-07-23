@@ -1,4 +1,4 @@
-CCOMPILER = clang # gcc takes ages
+CCOMPILER = clang # ccomp # gcc
 
 PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.gramlib,coq-core.interp,coq-core.kernel,coq-core.lib,coq-core.library,coq-core.toplevel,coq-core.vernac,coq-core.plugins.ltac
 COQLIB = $(shell coqc -where)
@@ -19,6 +19,9 @@ COQOPTS = -Q ../../theories/L7 CertiCoq.L7 -Q ../../libraries CertiCoq.Libraries
 	-I ../../cplugin \
 	-Q . CertiCoq.CertiCoqCheck
 
+CCOMPILEROPTS = -fPIC -g -c -I . -I ${OCAMLLIB} -w -Wno-everything -O2
+# ccomp: CCOMPILEROPTS = -g -c -I . -I ${OCAMLLIB} -O2
+
 plugin: compile.vo Loader.vo
 
 test: test.vo
@@ -36,7 +39,7 @@ compile.vo ${GENCFILES} &: compile.v
 	coqc ${COQOPTS} $<
 
 %.o: %.c
-	$(CCOMPILER) -fPIC -g -c -I . -I ${OCAMLLIB} -w -Wno-everything -O2 -o $@ $<
+	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
 
 certicoqchk_plugin.cmxs: certicoqchk_plugin.cmxa ${CFILES:.c=.o}
 	ocamlfind opt ${OCAMLOPTS} -shared -linkall -o $@ $+

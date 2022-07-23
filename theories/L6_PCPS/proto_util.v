@@ -363,7 +363,7 @@ Proof.
     destruct (set_lists xs ys σ) as [σ''|] eqn:Hσ''; inv Hset.
     specialize (IHxs ys σ σ'' Hσ'').
     intros arb [x' Hx']; specialize (IHxs arb); unfold Ensembles.In, image'' in *.
-    unfold apply_r in Hx'; change cps.M.get with M.get in *; change map_util.M.set with M.set in *.
+    unfold apply_r in Hx'.
     destruct (Pos.eq_dec x' x) as [Heq|Hne]; [subst x'; rewrite M.gss in Hx'|rewrite M.gso in Hx' by auto].
     + right; subst; now left.
     + destruct IHxs as [Hσ|Hin_ys]; [eexists; eassumption|left|right; right]; auto.

@@ -2454,9 +2454,8 @@ Section Inline_correct.
           eapply set_util.FromSet_sound in H6; [| reflexivity ]. exfalso. eapply Hmax. eassumption.
     - intros.
       eapply preord_exp_post_monotonic. eassumption.
-      eapply H5; eauto. rewrite apply_r_empty_f_eq.
+      eapply H5; eauto.
       intros x Hin. unfold id. now eauto.
-      intro; intros. rewrite M.gempty in H8; inv H8.
   Qed. 
 
 End Inline_correct.

@@ -41,7 +41,8 @@ Definition term_flags :=
     has_tCase := true;
     has_tProj := false;
     has_tFix := true;
-    has_tCoFix := false
+    has_tCoFix := false;
+    has_tPrim := true
   |}.
 
 Definition env_flags := 
@@ -1054,8 +1055,8 @@ Proof.
     rewrite !negb_or in nlam. rtoProp; intuition auto.
     eapply (isLambda_compile) in H. contradiction.
     eapply (isFix_compile) in H3; auto.
-    eapply (isConstructApp_compile) in H3; auto.
-    eapply (isBox_compile) in H1. contradiction.
+    eapply (isConstructApp_compile) in H4; auto.
+    eapply (isBox_compile) in H2. contradiction.
   - intros hl hargs evargs IHargs.
     simp_compile. econstructor. clear hargs.
     move: IHargs. cbn. induction 1; cbn; constructor; intuition auto.

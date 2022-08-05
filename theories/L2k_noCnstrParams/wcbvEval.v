@@ -23,6 +23,7 @@ Notation raise := (ExtLib.Structures.MonadExc.raise).
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wLam: forall nm bod, WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wProof: WcbvEval p TProof TProof
+| wPrim v : WcbvEval p (TPrim v) (TPrim v)
 | wAppProof : forall fn arg arg',
     WcbvEval p fn TProof ->
     WcbvEval p arg arg' ->
@@ -368,6 +369,7 @@ Function wcbvEval
     end
   (** already in whnf ***)
   | TProof => ret TProof
+  | TPrim v => ret (TPrim v)
   | TLambda nn t => ret (TLambda nn t)
   | TFix mfp br => ret (TFix mfp br)
   (** should never appear **)

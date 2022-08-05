@@ -3,6 +3,7 @@ Require Import Coq.Arith.Arith Coq.ZArith.ZArith Coq.NArith.BinNat
         Coq.micromega.Psatz.
 Require Import FunInd.
 Require Import Common.Common.
+
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
@@ -66,6 +67,7 @@ Inductive exp: Type :=
 | Let_e: name -> exp -> exp -> exp
 | Fix_e: efnlst -> N -> exp  (* implicitly lambdas *)
 | Prf_e: exp
+| Prim_val_e : primitive -> exp
 | Prim_e: positive -> exp
 with exps: Type :=
 | enil: exps
@@ -151,6 +153,7 @@ Inductive exp_wf: N -> exp -> Prop :=
     exp_wf i (Fix_e es k)
 (* Fix?: Axiom applied to anything should reduce to Axiom *)
 | prf_e_wf : forall i, exp_wf i Prf_e
+| prim_e_wf : forall i p, exp_wf i (Prim_val_e p)
 with exps_wf: N -> exps -> Prop :=
 | enil_wf: forall i, exps_wf i enil
 | econs_wf: forall i e es,
@@ -240,6 +243,7 @@ Fixpoint shift n k e :=
     | Match_e e p bs => Match_e (shift n k e) p (shift_branches' shift n k bs)
     | Fix_e es k' => Fix_e (shift_efnlst shift n (efnlst_length es + k) es) k'
     | Prf_e => Prf_e
+    | Prim_val_e p => Prim_val_e p
     | Prim_e p => Prim_e p
   end.
 
@@ -302,6 +306,7 @@ Function subst (v:exp) k (e:exp): exp :=
     | Match_e e p bs => Match_e (subst v k e) p (subst_branches v k bs)
     | Fix_e es k' => Fix_e (subst_efnlst v (efnlst_length es + k) es) k'
     | Prf_e => Prf_e
+    | Prim_val_e p => Prim_val_e p
     | Prim_e p => Prim_e p
   end
 with substs (v:exp) k (es:exps) : exps :=
@@ -334,6 +339,7 @@ Function sbst (v:exp) k (e:exp): exp :=
     | Match_e e p bs => Match_e (sbst v k e) p (sbst_branches v k bs)
     | Fix_e es k' => Fix_e (sbst_efnlst v (efnlst_length es + k) es) k'
     | Prf_e => Prf_e
+    | Prim_val_e p => Prim_val_e p
     | Prim_e p => Prim_e p
   end
 with sbsts (v:exp) k (es:exps) : exps :=
@@ -578,6 +584,7 @@ Inductive eval: exp -> exp -> Prop :=
     eval a a' ->
     eval (App_e f a) Prf_e
 | eval_Prf_e : eval Prf_e Prf_e
+| eval_Prim_val_e p : eval (Prim_val_e p) (Prim_val_e p)
 with evals: exps -> exps -> Prop :=
      | evals_nil: evals enil enil
      | evals_cons: forall e es v vs,
@@ -632,6 +639,7 @@ Proof.
     * specialize (H _ H4); discriminate.
     * specialize (H _ H4); discriminate.
     * reflexivity.
+  - inversion H. reflexivity.
   - inversion H. reflexivity.
   - inversion H. reflexivity.
   - inversion H1. subst. rewrite (H v0); try assumption.
@@ -722,6 +730,7 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                    end
                    | _ => None
                  end
+               | Prim_val_e p => Some (Prim_val_e p)
                | Var_e e => None
                | Prim_e p => None                                                   
              end
@@ -798,6 +807,7 @@ Proof.
     * specialize (H _ e4). eapply H.
     * specialize (H0 _ H1). apply H0.
   + econstructor; eauto. 
+  + injection H; intros; subst. constructor.
   + injection H; intros h0. subst. constructor.
   + injection H1; intros h0. subst. constructor.
     * apply H. assumption.
@@ -1289,6 +1299,7 @@ Inductive is_value: exp -> Prop :=
 | con_is_value: forall d es, are_values es -> is_value (Con_e d es)
 | fix_is_value: forall es k, is_value (Fix_e es k)
 | prf_is_value: is_value Prf_e
+| prim_is_value p : is_value (Prim_val_e p)
 (* | prim_is_value: forall p, is_value (Prim_e p) *)
 with are_values: exps -> Prop :=
 | enil_are_values: are_values enil
@@ -1322,6 +1333,7 @@ Fixpoint is_valueb (e:exp): bool :=
     | Let_e _ _ _ => false
     | Fix_e _ _ => true
     | Prf_e => true
+    | Prim_val_e _ => true
     | Prim_e p => false (* arguable *)
   end
 with are_valuesb (es:exps): bool :=
@@ -1593,6 +1605,7 @@ Function maxFree (e:exp): Z :=
     | Match_e e p bs => Z.max (maxFree e) (maxFreeB bs)
     | Fix_e es k' => maxFreeF es - (Z.of_N (efnlst_length es))
     | Prf_e => -1
+    | Prim_val_e _ => -1
     | Prim_e _ => -1
   end
 with maxFreeC (es:exps) : Z :=

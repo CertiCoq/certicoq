@@ -30,6 +30,7 @@ Fixpoint sizeOf_exp (e : exp) : nat :=
     | Eletapp x f _ ys e => 1 + length ys + sizeOf_exp e
     | Efun B e => 1 + sizeOf_fundefs B + sizeOf_exp e
     | Eapp x _ ys => 1 + length ys
+    | Eprim_val x _ e => 1 + sizeOf_exp e
     | Eprim x _ ys e => 1 + length ys + sizeOf_exp e
     | Ehalt x => 1
   end
@@ -48,6 +49,7 @@ Definition cost_cc (e : exp) : nat :=
   | Eapp f t ys => 1 + length ys
   | Eletapp x f t ys e => 1 + length ys 
   | Efun B e => 1 + PS.cardinal (fundefs_fv B)
+  | Eprim_val x p e => 1
   | Eprim x f ys e => 1 + length ys
   | Ehalt x => 1
   end.
@@ -58,6 +60,7 @@ Fixpoint sizeOf_exp_ctx (c : exp_ctx) : nat :=
     | Hole_c => 0
     | Econstr_c _ _ ys c => 1 + length ys + sizeOf_exp_ctx c
     | Eproj_c _ _ _ _ c => 1 + sizeOf_exp_ctx c
+    | Eprim_val_c _ _ c => 1 + sizeOf_exp_ctx c
     | Eprim_c _ _ ys c => 1 + length ys + sizeOf_exp_ctx c
     | Eletapp_c _ f _ ys c => 1 + length ys + sizeOf_exp_ctx c
     | Ecase_c _ l1 _ c l2  =>
@@ -120,6 +123,7 @@ Fixpoint sizeOf_val' (i : nat) (v : val) : nat :=
          | Vconstr _ vs => max_list_nat_with_measure aux 0 vs
          | Vfun rho B f =>
            max (sizeOf_fundefs B) (sizeOf_env rho)
+         | Vprim _ => 0
          (* Ignore Vint, it's not used *)
          | Vint x => 0
        end) v
@@ -139,6 +143,7 @@ Definition sizeOf_val (i : nat) (v : val) : nat :=
           max_list_nat_with_measure (sizeOf_val' i) 0 vs
         | Vfun rho B f =>
           max (sizeOf_fundefs B) (sizeOf_env i' rho)           
+        | Vprim _ => 0
         | Vint x => 0
       end
   end.
@@ -181,6 +186,7 @@ Proof.
     intros. eapply Nat.max_le_compat; eauto.
     rewrite !sizeOf_val_eq; eapply IHi; lia.
   - destruct i'; simpl; lia.
+  - destruct i'; simpl; lia.
 Qed.
 
 Lemma sizeOf_env_monotic i i' v :
@@ -216,6 +222,7 @@ Fixpoint num_fundefs_in_exp (e : exp) : nat :=
     | Eletapp x _ _ y e => num_fundefs_in_exp e
     | Efun B e => 1 + num_fundefs_in_fundefs B + num_fundefs_in_exp e
     | Eapp x _ ys => 0
+    | Eprim_val x _ e => num_fundefs_in_exp e
     | Eprim x _ ys e => num_fundefs_in_exp e
     | Ehalt x => 0
   end
@@ -235,6 +242,7 @@ Fixpoint num_fundefs_val (i : nat) (v : val) :=
        | Vconstr _ vs => max_list_nat_with_measure aux 0 vs
        | Vfun rho B f =>
          max (num_fundefs_in_fundefs B) (num_fundefs_in_env rho)
+       | Vprim _ => 0
        | Vint x => 0
      end) v
   end.
@@ -503,6 +511,10 @@ Proof.
     simpl in *. lia.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
+  - etransitivity. eapply IHe; eauto; try lia.
+    2:{ lia. }
+    now eapply (Included_trans (FromList FVs) (Setminus var (occurs_free e) [set v])) in Heq;
+    [| now apply Setminus_Included ].
   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
     eassumption.
     rewrite <- HP in Hnd.

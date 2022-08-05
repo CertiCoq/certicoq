@@ -70,6 +70,7 @@ Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
     crctDs p (n + dlength ds) ds -> m < dlength ds ->
     crctTerm p n (TFix ds m)
 | ctProj: forall p n prj t, crctTerm p n t -> crctTerm p n (TProj prj t)
+| ctPrim p n v : crctTer p n (TPrim v)
 (* crctEnvs are closed in both ways *)
 with crctEnv: environ Term -> Prop :=
      | ceNil: crctEnv nil

@@ -435,11 +435,14 @@ Section CC.
         ret (Eproj ptr clo_tag 0 f'
                    (Eproj Γ clo_tag 1 f'
                           (Eapp ptr ft (Γ :: xs'))), fun e => g1 (g2 e))
+    | Eprim_val x prim e' =>
+      ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) gfuns c Γ ;;
+      ret (Eprim_val x prim ((snd ef) (fst ef)), id)
     | Eprim x prim ys e' =>
       t1 <- get_vars ys mapfv gfuns c Γ ;;
       let '(ys', f) := t1 in
       ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) gfuns c Γ ;;
-         ret (Eprim x prim ys' ((snd ef) (fst ef)), f)
+      ret (Eprim x prim ys' ((snd ef) (fst ef)), f)
     | Ehalt x =>
       t1 <- get_var x mapfv gfuns c Γ ;;
       let '(x', f) := t1 in

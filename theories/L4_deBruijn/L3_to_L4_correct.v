@@ -499,6 +499,11 @@ Proof.
   induction e; simpl; try apply IHe; auto.
 Qed.
 
+Lemma subst_env_aux_prim e k p : subst_env_aux e k (Prim_e p) = Prim_e p.
+Proof.
+  induction e; simpl; try apply IHe; auto.
+Qed.
+
 Lemma subst_env_aux_con_e e k i r args :
   subst_env_aux e k (Con_e (dcon_of_con i r) args) =
   Con_e (dcon_of_con i r) (map_exps (subst_env_aux e k) args).
@@ -619,6 +624,9 @@ Proof.
   apply crctCrctsCrctBsDsEnv_ind; intros; unfold translate;
     cbn -[trans_brs] in *; try solve[repeat constructor; eauto; try lia].
 
+  - (* Primitive *)
+    econstructor.
+  
   - (* Lambda *)
     specialize (H0 _ H1 H2 H3).
     now rewrite !Har in H0. 
@@ -1207,6 +1215,7 @@ Fixpoint terms_of_brs (d : Brs) : Terms :=
 (** Weak typed normal form of wndEval: no wndEval steps possible. **)
 Inductive WNorm: Term -> Prop :=
 | WNPrf: WNorm TProof
+| WNPrim p : WNorm (TPrim p)
 | WNLam: forall nm bod, WNorm (TLambda nm bod)
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNConstruct: forall i n (* arty *) args, WNorms args -> WNorm (TConstruct i n (* arty *) args)
@@ -2032,6 +2041,7 @@ Proof.
 
   - rewrite subst_env_aux_fix_e. constructor.
   - rewrite subst_env_aux_prf. constructor.
+  - simpl.
   - constructor.
   - constructor; auto.
 Qed.

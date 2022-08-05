@@ -56,6 +56,10 @@ Fixpoint erase_fundefs (e : exp) (defs : fundefs)
                                erase_nested_fundefs fdefs e'' defs'' (fun p => let '(e, defs, m) := p in f (e, defs, 1 + max n m)))
     | Eapp g ft xs =>
       f (Eapp g ft xs, defs, 0)
+    | Eprim_val x pv e' =>
+      erase_fundefs e' defs (fun p =>
+                               let '(e', defs', n) := p in
+                               f (Eprim_val x pv e', defs', n))
     | Eprim x prim ys e' =>
       erase_fundefs e' defs (fun p =>
                                let '(e', defs', n) := p in
@@ -136,6 +140,11 @@ Inductive Erase_fundefs : exp -> exp -> fundefs -> nat (* number of hoisting ste
 | Eapp_erase :
     forall f ft xs,
       Erase_fundefs (Eapp f ft xs) (Eapp f ft xs) Fnil 0
+| Eprim_val_erase n :
+    forall x p e e' B,
+      Erase_fundefs e e' B n ->
+      Erase_fundefs (Eprim_val x p e)
+                    (Eprim_val x p e') B n
 | Eprim_erase n :
     forall x f ys e e' B,
       Erase_fundefs e e' B n ->
@@ -181,7 +190,7 @@ Proof.
     repeat eexists. rewrite Heq2, Heq1; eauto. eauto.    
     econstructor; eauto.
   - repeat eexists; eauto using split_fds_nil_l; repeat econstructor.
-  - repeat eexists; eauto using split_fds_nil_l; econstructor.
+  - repeat eexists; eauto using split_fds_nil_l; repeat econstructor.
   - edestruct IHf as [B1 [B1' [m [Heq1 [Hspl1 Her1]]]]]; subst.
     edestruct IHe as [e2 [B2 [B2' [n [Heq2 [Hspl2 Her2]]]]]].
     edestruct split_fds_trans as [B3 [H1 H2]] ; [ apply Hspl1 | |]; eauto.
@@ -216,6 +225,10 @@ Inductive no_fun : exp -> Prop  :=
       no_fun (Eletapp x f tau ys e)
 | Eapp_no_fun :
     forall x ft ys, no_fun (Eapp x ft ys)
+| Eprim_val_no_fun :
+    forall x p e,
+      no_fun e ->
+      no_fun (Eprim_val x p e)
 | Eprim_no_fun :
     forall x p xs e,
       no_fun e ->
@@ -441,6 +454,17 @@ Proof.
     + constructor.
     + normalize_bound_var. sets.
   - inv Hun. 
+    edestruct (IHe _ _ _ H5) as [Hun [Hunf Hdis]]; eauto. 
+    split; [| split ].
+    + constructor; eauto.
+      intros Hc. eapply H1. eapply Erase_fundefs_bound_var_mut.
+      eassumption. now left.
+    + eassumption.
+    + normalize_bound_var.
+      eapply Union_Disjoint_r.
+      eassumption. eapply Disjoint_Singleton_r.
+      intros Hc. eapply H1. eapply Hbin. now right.
+  - inv Hun. 
     edestruct (IHe _ _ _ H6) as [Hun [Hunf Hdis]]; eauto. 
     split; [| split ].
     + constructor; eauto.
@@ -573,6 +597,10 @@ Proof.
     rewrite split_fds_name_in_fundefs with (B3 := Ball); eauto.
     rewrite split_fds_name_in_fundefs with (B3 := x); eauto. now sets.
   - sets.
+  - repeat normalize_occurs_free.
+    eapply Included_trans;
+    [ eapply Included_Setminus_compat; [ eapply IHe; eauto; intros B1 Hin1; eapply Hfv; eauto | reflexivity ]
+      | rewrite Setminus_Union_distr; sets ].    
   - sets.
 Qed.
 
@@ -1053,6 +1081,9 @@ Section Hoisting_correct.
       + eapply Henv. constructor.
       + eapply Forall2_same. intros z Hin. eapply Henv.
         now constructor.
+    - (* Eprim *)
+      eapply preord_exp_prim_val_compat.
+      + now eauto.
     - (* Eprim *)
       eapply preord_exp_prim_compat.
       + now eauto.

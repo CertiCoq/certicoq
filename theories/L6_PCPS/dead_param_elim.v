@@ -78,6 +78,7 @@ match e with
   fold_left (fun L '(c', e') => escaping_fun_exp e' L) P L
 | Ehalt x => remove_escaping L x
 | Efun fl e' => escaping_fun_exp e' (escaping_fun_fundefs fl L)
+| Eprim_val x p e' => escaping_fun_exp e' L
 | Eprim x fs ys e' => escaping_fun_exp e' (remove_escapings L ys)
 end
 with escaping_fun_fundefs (B : fundefs) (L : live_fun) := 
@@ -116,6 +117,7 @@ match e with
   let S' := PS.add f S in
   add_fun_vars L f ys S'
 | Efun fl e' => S (* Should not happen, assuming hoisted program *)
+| Eprim_val x p e' => live_expr L e' S
 | Eprim x f ys e' => live_expr L e' (union_list S ys)
 end.
 
@@ -209,6 +211,7 @@ Fixpoint make_arityMap (e : exp) (m : arityMap) : arityMap :=
   | Efun B e =>
     make_arityMap e (make_arityMap_fundefs B m)
   | Eapp f ft xs => M.set (Positive_as_DT.of_succ_nat (length xs)) ft m
+  | Eprim_val _ _ e => make_arityMap e m
   | Eprim _ _ _ e => make_arityMap e m
   | Ehalt x => m
   end
@@ -270,6 +273,7 @@ Fixpoint is_hoisted_exp (e : exp) : bool :=
   | Econstr _ _ _ e
   | Eproj _ _ _ _ e
   | Eletapp _ _ _ _ e
+  | Eprim_val _ _ e
   | Eprim _ _ _ e => is_hoisted_exp e
   | Ecase x bs =>
     forallb (fun p => is_hoisted_exp (snd p)) bs
@@ -343,6 +347,9 @@ Section Elim.
       ret (Ecase x P')
     | Ehalt x => ret (Ehalt x)
     | Efun fl e' => ret e
+    | Eprim_val x p e' =>
+      e'' <- eliminate_expr L e' ;;
+      ret (Eprim_val x p e'')
     | Eprim x f ys e' =>
       e'' <- eliminate_expr L e' ;;
       ret (Eprim x f ys e'')
@@ -355,7 +362,6 @@ Section Elim.
       | None => ret (Eapp f ft ys)
       end
     end.
-
 
   Fixpoint eliminate_fundefs (L : live_fun) (B : fundefs) : elimM fundefs := 
     match B with 

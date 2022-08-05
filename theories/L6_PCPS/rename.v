@@ -40,6 +40,7 @@ Fixpoint remove_all (sigma: subst) (vs : list var) :=
 Fixpoint rename_all (sigma: subst) (e : exp) : exp :=
   match e with
   | Econstr x t ys e' => Econstr x t (apply_r_list sigma ys) (rename_all (M.remove x sigma) e')
+  | Eprim_val x p e' => Eprim_val x p (rename_all (M.remove x sigma) e')
   | Eprim x f ys e' => Eprim x f (apply_r_list sigma ys) (rename_all (M.remove x sigma) e')
   | Eletapp x f ft ys e' => Eletapp x (apply_r sigma f) ft (apply_r_list sigma ys)
                                     (rename_all (M.remove x sigma) e')
@@ -74,6 +75,8 @@ Fixpoint rename_all_ctx (sigma:subst) (c:exp_ctx): exp_ctx :=
   | Hole_c => Hole_c
   | Econstr_c x t ys c' =>
     Econstr_c x t (apply_r_list sigma ys) (rename_all_ctx (M.remove x sigma) c')
+  | Eprim_val_c x p c' =>
+    Eprim_val_c x p (rename_all_ctx (M.remove x sigma) c')
   | Eprim_c x f ys c' =>
     Eprim_c x f (apply_r_list sigma ys) (rename_all_ctx (M.remove x sigma) c')
   | Eproj_c v t n y c' => Eproj_c v t n (apply_r sigma y) (rename_all_ctx (M.remove v sigma) c')
@@ -104,6 +107,7 @@ Definition rename y x e := rename_all (M.set x y (M.empty var)) e.
 Fixpoint rename_all_ns (sigma:subst) (e:exp) : exp :=
   match e with
   | Econstr x t ys e' => Econstr x t (apply_r_list sigma ys) (rename_all_ns sigma e')
+  | Eprim_val x p e' => Eprim_val x p (rename_all_ns sigma e')
   | Eprim x f ys e' => Eprim x f (apply_r_list sigma ys) (rename_all_ns sigma e')
   | Eproj v t n y e' => Eproj v t n (apply_r sigma y) (rename_all_ns sigma e')
   | Eletapp v f t ys e' => Eletapp v (apply_r sigma f) t (apply_r_list sigma ys) (rename_all_ns sigma e')
@@ -129,6 +133,8 @@ Fixpoint rename_all_ctx_ns (sigma:subst) (c:exp_ctx): exp_ctx :=
   | Hole_c => Hole_c
   | Econstr_c x t ys c' =>
     Econstr_c x t (apply_r_list sigma ys) (rename_all_ctx_ns sigma c')
+  | Eprim_val_c x p c' =>
+    Eprim_val_c x p (rename_all_ctx_ns sigma c')
   | Eprim_c x f ys c' =>
     Eprim_c x f (apply_r_list sigma ys) (rename_all_ctx_ns sigma c')
   | Eproj_c v t n y c' => Eproj_c v t n (apply_r sigma y) (rename_all_ctx_ns sigma c')
@@ -761,6 +767,7 @@ Proof.
     apply prop_remove_all; auto.
     apply prop_remove_all; auto.
   - erewrite prop_apply_r; eauto. erewrite prop_apply_r_list; eauto.
+  - f_equal. apply H. now apply proper_remove.
   - erewrite prop_apply_r_list; eauto. erewrite H; eauto. apply proper_remove; auto.
   - erewrite prop_apply_r; eauto.
   - erewrite H; eauto. erewrite H0; eauto. apply prop_remove_all; auto.
@@ -798,6 +805,8 @@ Proof.
     apply remove_all_empty.
   - rewrite apply_r_empty.
     rewrite apply_r_list_empty. auto.
+  - f_equal.
+    replace (rename_all (M.remove v (M.empty var)) e) with e. reflexivity.
   - rewrite apply_r_list_empty.
     replace (rename_all (M.remove v (M.empty var)) e) with e. reflexivity.
   - rewrite apply_r_empty. auto.
@@ -848,6 +857,7 @@ Proof.
     eapply remove_all_apply_r_eq; eauto.
     eapply remove_all_apply_r_eq; eauto.
   - simpl. rewrite Hyp, apply_r_list_refl; auto.
+  - simpl. f_equal. apply IHe. now intros x; eapply remove_apply_r_eq.
   - simpl. rewrite apply_r_list_refl; eauto. rewrite IHe. reflexivity.
     eapply remove_apply_r_eq. eassumption.
   - simpl. rewrite Hyp; eauto.
@@ -945,6 +955,9 @@ Proof.
     eapply Included_trans. eapply image_remove_all.
     rewrite <- !Same_set_all_fun_name at 1. sets.
   - rewrite FromList_apply_list, image_Union, image_Singleton in *. sets.
+  - eapply Setminus_Included_Included_Union.
+    rewrite Union_commut.  
+    eapply Included_trans. 2:eapply image_apply_r_remove. sets.
   - rewrite FromList_apply_list, image_Union.
     eapply Included_Union_compat. sets. eapply Setminus_Included_Included_Union.
     eapply Included_trans. eapply IHe. eapply Included_trans.
@@ -1051,7 +1064,13 @@ Proof.
     apply H0.
     apply H.
     auto.
-  - constructor.
+  - inv H0; constructor.
+    intro; apply H3.
+    eapply (bound_var_rename_all_ns).
+    apply H0.
+    apply H.
+    auto.
+  - constructor. 
   - inv H1.
     constructor; auto.
     intro; apply H7.

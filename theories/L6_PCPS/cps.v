@@ -2,6 +2,7 @@
  *   Initial design, Andrew W. Appel, June 2014
  *)
 From Coq Require Import ZArith.ZArith Lists.List.
+From CertiCoq.Common Require Import AstCommon.
 From CertiCoq.L6 Require Import List_util map_util.
 From compcert.lib Require Export  Maps.
 From CertiCoq.L6 Require Export map_util.
@@ -59,6 +60,7 @@ Inductive exp : Type :=
 | Eletapp: var -> var -> fun_tag -> list var -> exp -> exp
 | Efun: fundefs -> exp -> exp
 | Eapp: var -> fun_tag -> list var -> exp
+| Eprim_val : var -> primitive -> exp -> exp
 | Eprim: var -> prim -> list var -> exp -> exp (* where prim is id *)
 | Ehalt : var -> exp
 with fundefs : Type :=
@@ -122,12 +124,13 @@ Lemma exp_ind' :
         P e -> P (Eletapp x f ft ys e)) ->
     (forall (f2 : fundefs) (e : exp), P e -> P (Efun f2 e)) ->
     (forall (v : var) (t : fun_tag) (l : list var), P (Eapp v t l)) ->
+    (forall v p e, P e -> P (Eprim_val v p e)) ->
     (forall (v : var)  (p : prim) (l : list var) (e : exp),
         P e -> P (Eprim v p l e)) ->
     (forall (v : var), P (Ehalt v)) ->
     forall e : exp, P e.
 Proof.
-  intros P H1 H2 H3 H4 H5 H6 H7 H8 H9. fix exp_ind' 1.
+  intros P H1 H2 H3 H4 H5 H6 H7 H8 H9 H10. fix exp_ind' 1.
   destruct e; try (now clear exp_ind'; eauto).
   - eapply H1. eapply exp_ind'; eauto.
   - induction l as [ | [c e] xs IHxs].
@@ -137,6 +140,7 @@ Proof.
   - eapply H5. eapply exp_ind'; eauto.
   - eapply H6. eapply exp_ind'; eauto.
   - eapply H8. eapply exp_ind'; eauto.
+  - eapply H9. eapply exp_ind'; eauto.
 Qed.
 
 (** Mutual induction scheme for exp and fundefs *)
@@ -153,6 +157,7 @@ Lemma exp_mut :
         P e -> P (Eletapp x f ft ys e)) ->
     (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
     (forall (v : var) (t : fun_tag) (l : list var), P (Eapp v t l)) ->
+    (forall v p e, P e -> P (Eprim_val v p e)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp),
         P e -> P (Eprim v p l e)) ->
     (forall (v : var), P (Ehalt v)) ->
@@ -172,6 +177,7 @@ with fundefs_mut :
         P e -> P (Eletapp x f ft ys e)) ->
     (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
     (forall (v : var) (t : fun_tag) (l : list var), P (Eapp v t l)) ->
+    (forall v p e, P e -> P (Eprim_val v p e)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp),
         P e -> P (Eprim v p l e)) ->
     (forall (v : var), P (Ehalt v)) ->
@@ -179,7 +185,7 @@ with fundefs_mut :
         P e -> forall f5 : fundefs, P0 f5 -> P0 (Fcons v t l e f5)) ->
     P0 Fnil -> forall f7 : fundefs, P0 f7.
 Proof.
-  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11.
+  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12.
     destruct e; eauto.
     + eapply H1. eapply exp_mut; eauto.
     + induction l as [ | [c e] xs IHxs].
@@ -190,9 +196,10 @@ Proof.
     + eapply H6. eapply fundefs_mut; eauto.
       eapply exp_mut; eauto.
     + eapply H8. eapply exp_mut; eauto.
-  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 defs.
+    + eapply H9. eapply exp_mut; eauto.
+  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 defs.
     destruct defs; eauto.
-    eapply H10. eapply exp_mut; eauto.
+    eapply H11. eapply exp_mut; eauto.
     eapply fundefs_mut; eauto.
 Qed.
 
@@ -209,6 +216,7 @@ Lemma exp_mut_alt :
         P e -> P (Eletapp x f ft ys e)) ->
     (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
     (forall (v : var) (t : fun_tag) (l : list var), P (Eapp v t l)) ->
+    (forall v p e, P e -> P (Eprim_val v p e)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp),
         P e -> P (Eprim v p l e)) ->
     (forall (v : var), P (Ehalt v)) ->
@@ -227,6 +235,7 @@ with fundefs_mut_alt :
         P e -> P (Eletapp x f ft ys e)) ->
     (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
     (forall (v : var) (t : fun_tag) (l : list var), P (Eapp v t l)) ->
+    (forall v p e, P e -> P (Eprim_val v p e)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp),
         P e -> P (Eprim v p l e)) ->
     (forall (v : var), P (Ehalt v)) ->
@@ -234,7 +243,7 @@ with fundefs_mut_alt :
         P e -> forall f5 : fundefs, P0 f5 -> P0 (Fcons v t l e f5)) ->
     P0 Fnil -> forall f7 : fundefs, P0 f7.
 Proof.
-  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10.
+  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11.
     destruct e; eauto.
     + eapply H1. eapply exp_mut_alt; eauto.
     + eapply H2. induction l as [ | [c e] xs IHxs].
@@ -245,9 +254,10 @@ Proof.
     + eapply H5. eapply fundefs_mut_alt; eauto.
       eapply exp_mut_alt; eauto.
     + eapply H7. eapply exp_mut_alt; eauto.
-  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 defs.
+    + eapply H8. eapply exp_mut_alt; eauto.
+  - intros P1 P2 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 defs.
     destruct defs; eauto.
-    eapply H9. eapply exp_mut_alt; eauto.
+    eapply H10. eapply exp_mut_alt; eauto.
     eapply fundefs_mut_alt; eauto.
 Qed.
 
@@ -265,6 +275,7 @@ Lemma exp_def_mutual_ind :
         P e -> P (Eletapp x f ft ys e)) ->
     (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
     (forall (v : var) (t : fun_tag) (l : list var), P (Eapp v t l)) ->
+    (forall v p e, P e -> P (Eprim_val v p e)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp),
         P e -> P (Eprim v p l e)) ->
     (forall (v : var), P (Ehalt v)) ->
@@ -289,6 +300,7 @@ Lemma exp_def_mutual_ind' :
         P e -> P (Eletapp x f ft ys e)) ->    
     (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
     (forall (v : var) (t : fun_tag) (l : list var), P (Eapp v t l)) ->
+    (forall v p e, P e -> P (Eprim_val v p e)) ->
     (forall (v : var) (p : prim) (l : list var) (e : exp),
         P e -> P (Eprim v p l e)) ->
     (forall (v : var), P (Ehalt v)) ->
@@ -312,6 +324,7 @@ Ltac exp_defs_induction IH1 IHl IH2 :=
   | intros ? ? ? ? ? IH1
   | intros ? IH2 ? IH1
   | intros ? ? ?
+  | intros ? ? ? IH1
   | intros ? ? ? ? IH1
   | intros ?
   | intros ? ? ? ? IH1 ? IH2
@@ -325,8 +338,8 @@ Inductive val : Type :=
 (* [Vfun env fds f]
      where env is the environment at the function binding site
      fds is the list of mutually recursive functions including f *)
+| Vprim : primitive -> val
 | Vint : Z -> val.
-
 
 (** Induction principle for values. *)
 Lemma val_ind' :
@@ -335,10 +348,11 @@ Lemma val_ind' :
     (forall (t : ctor_tag) (v : val) (l : list val),
         P v -> P (Vconstr t l) -> P (Vconstr t (v :: l))) ->
     (forall (t : M.t val) (f0 : fundefs) (v : var), P (Vfun t f0 v)) ->
+    (forall p, P (Vprim p)) ->
     (forall z : Z, P (Vint z)) ->
     forall v : val, P v.
 Proof.
-  intros P H1 H2 H3 H4.
+  intros P H1 H2 H3 H4 H5.
   fix val_ind' 1.
   destruct v; try (now clear val_ind'; eauto).
   - induction l as [ | x xs IHxs].

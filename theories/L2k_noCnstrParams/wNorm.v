@@ -28,6 +28,7 @@ Inductive WNorm: Term -> Prop :=
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNConstruct: forall i n args, WNorms args -> WNorm (TConstruct i n args)
 | WNProof: WNorm TProof
+| WNPrim p: WNorm (TPrim p)
 | WNApp: forall fn t,
     WNorm fn ->
     ~ isLambda fn -> ~ isFix fn -> ~ isConstruct fn -> fn <> TProof ->
@@ -71,6 +72,7 @@ Proof.
   - exists (TFix ds br). constructor.
   - dstrctn H. exists (TConstruct i n x). now constructor.
   - exists TProof. constructor.
+  - exists (TPrim p0); constructor.
   - dstrctn H. dstrctn H0. exists (TApp x x0). now apply wAppCong. 
   - exists tnil. constructor.
   - dstrctn H. dstrctn H0. exists (tcons x x0). now constructor.

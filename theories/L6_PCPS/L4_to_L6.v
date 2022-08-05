@@ -317,6 +317,10 @@ Section Translate.
       (* let c := consume_fun f x in *)
       (* ret (c |[ cps.Eapp k kon_tag (f::nil) ]|) *)
             
+      | Prim_val_e p => 
+        x <- get_named_str "prim"%bs ;;
+        ret (Eprim_val x p (Eapp k kon_tag (x :: nil)))
+
       | Prim_e p =>
         match M.get p prim_map with
         | Some (nm, s, ar) => convert_prim ar p [] k
@@ -621,6 +625,7 @@ Section Translate.
     | Constr (c : ctor_tag) (xs : list var)
     | Proj (c : ctor_tag) (n : N) (y : var)
     | Fun (ft : cps.fun_tag) (x : var) (e : cps.exp)
+    | Prim_val (p : primitive)
     | Prim (pr : positive) (xs : list var).
 
     Definition anf_term : Type := anf_value * exp_ctx.
@@ -639,6 +644,9 @@ Section Translate.
       | Fun ft x e =>
         x' <- get_named_str "y" ;; (* Get variable for interim result *)
         ret (C |[ Efun (Fcons x' ft [x] e Fnil) (Ehalt x') ]|)
+      | Prim_val p => 
+        x' <- get_named_str "y" ;; (* Get variable for interim result *)
+        ret (C |[ Eprim_val x' p (Ehalt x') ]|)
       | Prim pr xs =>
         x' <- get_named_str "y" ;; (* Get variable for interim result *)
         ret (C |[ Eprim x' pr xs (Ehalt x') ]|)
@@ -660,6 +668,9 @@ Section Translate.
       | Fun ft x e =>
         x' <- get_named n ;; (* XXX keep n or n'? *)
         ret (x', comp_ctx_f C (Efun1_c (Fcons x' ft [x] e Fnil) (Hole_c)))
+      | Prim_val p =>
+        x' <- get_named n ;; (* Get variable for interim result *)
+        ret (x', comp_ctx_f C (Eprim_val_c x' p Hole_c))
       | Prim pr xs =>
         x' <- get_named n ;; (* Get variable for interim result *)
         ret (x', comp_ctx_f C (Eprim_c x' pr xs Hole_c))
@@ -774,6 +785,8 @@ Section Translate.
         (* y <- get_named_str "x" ;; *)
         (* let c := consume_fun f y in              *)
         (* ret (Anf_Var f, c) *)
+        | Prim_val_e p => 
+          ret (Prim_val p, Hole_c)
         | Prim_e p =>
           match M.get p prim_map with
           | Some (nm, s, ar) => convert_prim_anf ar p []

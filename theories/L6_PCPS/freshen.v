@@ -77,6 +77,10 @@ Fixpoint freshen_term (e:exp) (sigma:M.t positive) : freshM exp :=
     let f' := apply_r sigma f  in
     let ys' := apply_r_list sigma ys in
     ret (Eapp f' t ys')
+  | Eprim_val x p e =>
+    x' <- get_name x "" ;;
+    e' <- freshen_term e (M.set x x' sigma) ;;
+    ret (Eprim_val x' p e')
   | Eprim x t ys e =>
     x' <- get_name x "" ;;
     let ys' := apply_r_list sigma ys in

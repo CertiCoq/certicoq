@@ -552,3 +552,37 @@ Definition timePhase: forall A B, string -> (A -> B) -> A -> B := fun A B s f a 
 
 Lemma timePhase_id: forall {A B:Type} s (x : A -> B) (a : A), timePhase s x a = x a.
 Proof. reflexivity. Qed.
+
+(* Primitives *)
+
+From Coq Require Import ssreflect.
+From MetaCoq.Template Require Import Primitive.
+From Equations Require Import Equations.
+
+Definition prim_value (p : prim_tag) : Set :=
+ match p with
+ | primInt => Int63.int
+ | primFloat => PrimFloat.float
+ end.
+
+Definition primitive : Set := { tag : prim_tag & prim_value tag }.
+
+Definition string_of_prim (p : primitive) :=
+  match projT1 p as tag return prim_value tag -> string with
+  | primInt => Primitive.string_of_prim_int
+  | primFloat => Primitive.string_of_float
+  end (projT2 p).
+
+Equations eqb_prim (p q : primitive) : bool :=
+  | (existT _ primInt i), (existT _ primInt i') := ReflectEq.eqb i i'
+  | (existT _ primFloat i), (existT _ primFloat i') := ReflectEq.eqb i i'
+  | _, _ => false.
+Transparent eqb_prim.
+
+#[program, export] Instance prim_eq : ReflectEq.ReflectEq primitive := 
+  { eqb := eqb_prim }.
+Next Obligation.
+  funelim (eqb_prim x y); cbn; try solve [ constructor; congruence ];
+    case: (ReflectEq.eqb_spec i i'); constructor; try congruence;
+    intros heq; noconf heq; cbn in n; congruence.
+Qed.

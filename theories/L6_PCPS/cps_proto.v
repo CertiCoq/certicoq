@@ -4,24 +4,20 @@
 From Coq Require Import ZArith.ZArith Lists.List Sets.Ensembles Strings.String.
 Require Import Lia.
 Import ListNotations.
-
+From CertiCoq.Common Require AstCommon.
 From CertiCoq.L6 Require Import
      Prototype cps cps_util ctx
      identifiers Ensembles_util.
 
 From MetaCoq Require Import Template.All.
 
-From CertiCoq.L6 Require Import PrototypeGenFrame cps.
+From CertiCoq.L6 Require Import PrototypeGenFrame cps cps_proto_univ.
 
-MetaCoq Run (mk_Frame_ops
-               (MPfile ["cps_proto"; "L6"; "CertiCoq"])
-               (MPfile ["cps"; "L6"; "CertiCoq"], "exp")
-               exp [var; fun_tag; ctor_tag; prim; N; list var]).
 (* Print exp_univ. *)
 (* Print exp_univD. *)
 
-Instance Frame_exp : Frame exp_univ := exp_Frame_ops.
-Instance AuxData_exp : AuxData exp_univ := exp_aux_data.
+Global Instance Frame_exp : Frame exp_univ := exp_Frame_ops.
+Global Instance AuxData_exp : AuxData exp_univ := exp_aux_data.
 
 (* Print exp_frame_t. *)
 (* Print exp_frameD. *)
@@ -57,6 +53,7 @@ Proof.
       | Hole_c => <[]>
       | Econstr_c x c ys C => <[Econstr3 x c ys]> >++ c_of_exp_ctx C
       | Eproj_c x c n y C => <[Eproj4 x c n y]> >++ c_of_exp_ctx C
+      | Eprim_val_c x p C => <[Eprim_val2 x p]> >++ c_of_exp_ctx C
       | Eprim_c x p ys C => <[Eprim3 x p ys]> >++ c_of_exp_ctx C
       | Eletapp_c x f ft ys C => <[Eletapp4 x f ft ys]> >++ c_of_exp_ctx C
       | Ecase_c x ces1 c C ces2 => <[Ecase1 x]> >++ c_of_ces_ctx' c_of_exp_ctx ces1 c C ces2
@@ -90,6 +87,7 @@ Definition univ_rep (A : exp_univ) : Set :=
   | exp_univ_prim => False
   | exp_univ_N => False
   | exp_univ_list_var => False
+  | exp_univ_primitive => False
   end.
 
 Definition exp_frame_rep {A B} (f : exp_frame_t A B) : univ_rep A -> univ_rep B.
@@ -107,6 +105,7 @@ Proof.
   - exact (fun ctx => Eletapp_c v v0 f0 l ctx).
   - exact (fun ctx => Efun2_c ctx e).
   - exact (fun ctx => Efun1_c f0 ctx).
+  - exact (fun ctx => Eprim_val_c v p ctx).
   - exact (fun ctx => Eprim_c v p l ctx).
 Defined.
 
@@ -371,6 +370,7 @@ Definition used {A} : univD A -> Ensemble cps.var :=
   | exp_univ_prim => fun _ => Empty_set _
   | exp_univ_N => fun _ =>  Empty_set _
   | exp_univ_list_var => fun xs => FromList xs
+  | exp_univ_primitive => fun _ => Empty_set _
   end.
 
 (*
@@ -437,6 +437,9 @@ Definition used_frame {A B} (f : exp_frame_t A B) : Ensemble cps.var. refine (
   | Eapp0 ft xs => FromList xs
   | Eapp1 f xs => f |: FromList xs
   | Eapp2 f ft => [set f]
+  | Eprim_val0 p e => used_vars e
+  | Eprim_val1 x e => x |: used_vars e
+  | Eprim_val2 x p => [set x]
   | Eprim0 p ys e => FromList ys :|: used_vars e
   | Eprim1 x ys e => x |: FromList ys :|: used_vars e
   | Eprim2 x p e => x |: used_vars e
@@ -509,7 +512,7 @@ Qed.
 Fixpoint decompose_fd_c' {A B} (C : exp_c A B) {struct C} :
   match A as A', B as B' return exp_c A' B' -> Set with
   | exp_univ_fundefs, exp_univ_exp => fun C => {'(D, fds, e) | C = D >:: Efun0 e >++ ctx_of_fds fds}
-  | _, _ => fun _ => unit
+  | _, _ => fun _ => Datatypes.unit
   end C.
 Proof.
   destruct C as [|A AB B f C]; [destruct A; exact tt|destruct f, B; try exact tt].
@@ -537,14 +540,19 @@ Ltac inv_ex :=
 
 Class Inhabited A := inhabitant : A.
 
-Instance Inhabited_pos : Inhabited positive := xH.
-Instance Inhabited_N : Inhabited N := N0.
+#[global] Instance Inhabited_pos : Inhabited positive := xH.
+#[global] Instance Inhabited_N : Inhabited N := N0.
 
-Instance Inhabited_list A : Inhabited (list A) := [].
-Instance Inhabited_prod A B `{Inhabited A} `{Inhabited B} : Inhabited (A * B) := (inhabitant, inhabitant).
+#[global] Instance Inhabited_list A : Inhabited (list A) := [].
+#[global] Instance Inhabited_prod A B `{Inhabited A} `{Inhabited B} : Inhabited (A * B) := (inhabitant, inhabitant).
 
-Instance Inhabited_exp : Inhabited exp := Ehalt inhabitant.
-Instance Inhabited_fundefs : Inhabited fundefs := Fnil.
+#[global] Instance Inhabited_exp : Inhabited exp := Ehalt inhabitant.
+#[global] Instance Inhabited_fundefs : Inhabited fundefs := Fnil.
+
+Import Int63.
+
+Global Instance Inhabited_primitive : Inhabited AstCommon.primitive := 
+  { inhabitant := existT _ Primitive.primInt 0%int63 }.
 
 Definition univ_inhabitant {A} : univD A :=
   match A with
@@ -558,12 +566,14 @@ Definition univ_inhabitant {A} : univD A :=
   | exp_univ_prim => inhabitant
   | exp_univ_N => inhabitant
   | exp_univ_list_var => inhabitant
+  | exp_univ_primitive => inhabitant
   end.
 
 Class Sized A := size : A -> nat.
 
 Instance Sized_pos : Sized positive := fun _ => S O.
 Instance Sized_N : Sized N := fun _ => S O.
+Instance Sized_primitive : Sized AstCommon.primitive := fun _ => S O.
 
 Definition size_list {A} (size : A -> nat) : list A -> nat := fold_right (fun x n => S (size x + n)) 1%nat.
 Definition size_prod {A B} (sizeA : A -> nat) (sizeB : B -> nat) : A * B -> nat := fun '(x, y) => S (sizeA x + sizeB y).
@@ -581,6 +591,7 @@ Proof.
   | Eletapp x f ft ys e => S (size x + size f + size ft + size ys + size_exp e)
   | Efun fds e => S (size_fundefs fds + size_exp e)
   | Eapp f ft xs => S (size f + size ft + size xs)
+  | Eprim_val x p e => S (size x + size p + size_exp e)
   | Eprim x p ys e => S (size x + size p + size ys + size_exp e)
   | Ehalt x => S (size x)
   end).
@@ -605,6 +616,7 @@ Definition univ_size {A} : univD A -> nat :=
   | exp_univ_prim => size
   | exp_univ_N => size
   | exp_univ_list_var => size
+  | exp_univ_primitive => size
   end.
 
 Lemma size_app {A} `{Sized A} (xs ys : list A) : size (xs ++ ys) < size xs + size ys.

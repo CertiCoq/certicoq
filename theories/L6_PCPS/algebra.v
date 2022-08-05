@@ -76,7 +76,8 @@ Inductive fin : Type :=
 | Four
 | Five
 | Six
-| Seven.
+| Seven
+| Eight.
 
 Definition exp_to_fin (e: exp) : fin :=
   match e with
@@ -86,8 +87,9 @@ Definition exp_to_fin (e: exp) : fin :=
   | Eletapp _ _ _ _ _ => Four
   | Efun _ _ => Five
   | Eapp _ _ _ => Four
-  | Eprim _ _ _ _ => Six
-  | Ehalt _ => Seven
+  | Eprim_val _ _ _ => Six
+  | Eprim _ _ _ _ => Seven
+  | Ehalt _ => Eight
   end.
 
 Definition exp_ctx_to_fin (C: exp_ctx) : fin :=
@@ -98,7 +100,8 @@ Definition exp_ctx_to_fin (C: exp_ctx) : fin :=
   | Eletapp_c _ _ _ _ _ => Four
   | Efun1_c _ _ => Five
   | Efun2_c _ _ => Five
-  | Eprim_c _ _ _ _ => Six
+  | Eprim_val_c _ _ _ => Six
+  | Eprim_c _ _ _ _ => Seven
   | Hole_c => One (* we should never use this function on empty contexts *)
   end.
 

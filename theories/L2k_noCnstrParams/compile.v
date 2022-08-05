@@ -10,7 +10,8 @@ Require Import Coq.micromega.Lia.
 
 From Equations Require Import Equations.
 From MetaCoq.Template Require utils EtaExpand.
-Require Import MetaCoq.Template.utils.bytestring.
+From MetaCoq.Template Require Import Primitive utils.bytestring.
+From MetaCoq.PCUIC Require Import PCUICPrimitive.
 From MetaCoq.Erasure Require Import EAst ESpineView EGlobalEnv EEtaExpanded EInduction Erasure.
 
 Local Open Scope bs_scope.
@@ -40,6 +41,7 @@ Inductive Term : Type :=
 | TCase      : inductive ->
                Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
+| TPrim      : primitive -> Term
 | TWrong     : string -> Term
 with Terms : Type :=
 | tnil : Terms
@@ -332,6 +334,15 @@ Fixpoint list_Defs (l : list (def Term)) : Defs :=
   | t :: ts => dcons t.(dname) t.(dbody) t.(rarg) (list_Defs ts) 
   end.
   
+Definition trans_prim_model {T} {t : prim_tag} (e : @prim_model T t) : prim_value t :=
+  match e in @prim_model _ x return prim_value x with
+  | primIntModel i => i
+  | primFloatModel f => f
+  end.
+
+Definition trans_prim_val {T} (p : prim_val T) : primitive :=
+  existT _ (projT1 p) (trans_prim_model (projT2 p)).
+
 Section Compile.
   Import MCList (map_InP, In_size).
 
@@ -358,6 +369,7 @@ Section Compile.
       TFix (list_Defs mfix') idx
     | tProj p bod := TWrong "Proj"; (* Impossible, no projections at this stage *)
     | tCoFix mfix idx => TWrong "TCofix"
+    | tPrim p => TPrim (trans_prim_val p)
     | tVar _ => TWrong "Var"
     | tEvar _ _ => TWrong "Evar" }.
   Proof.

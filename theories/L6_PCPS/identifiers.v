@@ -322,6 +322,11 @@ Inductive occurs_free : exp -> Ensemble var :=
     forall y x f ys,
       List.In y ys ->
       occurs_free (Eapp x f ys) y
+| Free_Eprim_val :
+    forall y x p e,
+      x <> y ->
+      occurs_free e y ->
+      occurs_free (Eprim_val x p e) y
 | Free_Eprim1 :
     forall y x p ys e,
       List.In y ys ->
@@ -390,6 +395,11 @@ Inductive occurs_free_applied : exp -> Ensemble var :=
 | FreeApp_Eapp :
     forall x ys f,
       occurs_free_applied (Eapp x f ys) x
+| FreeApp_Eprim_val :
+    forall y x p e,
+      x <> y ->
+      occurs_free_applied e y ->
+      occurs_free_applied (Eprim_val x p e) y
 | FreeApp_Eprim :
     forall y x p ys e,
       x <> y ->
@@ -429,6 +439,15 @@ Proof.
   split; intros x' H; inv H; eauto.
   right. constructor; eauto. intros H. inv H; eauto.
   inv H0. constructor 2; eauto. intros Hc. subst. eauto.
+Qed.
+
+Lemma occurs_free_Eprim_val x p e :
+  Same_set var (occurs_free (Eprim_val x p e))
+           (Setminus var (occurs_free e) (Singleton var x)).
+Proof.
+  split; intros x' H; inv H; eauto.
+  constructor; eauto. intros H. inv H; eauto.
+  eapply Free_Eprim_val; eauto. intros Hc. subst. eauto.
 Qed.
 
 Lemma occurs_free_Eprim x f ys e :
@@ -559,6 +578,8 @@ Ltac normalize_occurs_free :=
       rewrite occurs_free_Efun
     | [|- context[occurs_free (Eapp _ _ _)]] =>
       rewrite occurs_free_Eapp
+    | [|- context[occurs_free (Eprim_val _ _ _)]] =>
+      rewrite occurs_free_Eprim_val
     | [|- context[occurs_free (Eprim _ _ _ _)]] =>
       rewrite occurs_free_Eprim
     | [|- context[occurs_free (Ehalt _)]] =>
@@ -587,6 +608,8 @@ Ltac normalize_occurs_free_in_ctx :=
       rewrite occurs_free_Efun in H
     | [ H : context[occurs_free (Eapp _ _ _)] |- _ ] =>
       rewrite occurs_free_Eapp in H
+    | [ H : context[occurs_free (Eprim_val _ _ _)] |- _ ] =>
+      rewrite occurs_free_Eprim_val in H
     | [ H : context[occurs_free (Eprim _ _ _ _)] |- _ ] =>
       rewrite occurs_free_Eprim in H
     | [ H : context[occurs_free (Ehalt _)] |- _ ] =>
@@ -634,6 +657,14 @@ Qed.
 Lemma occurs_free_Eletapp_Included x f ft ys e :
   Included var (occurs_free e)
            (Union var (occurs_free (Eletapp x f ft ys e)) (Singleton var x)).
+Proof.
+  intros x' Hin.
+  destruct (var_dec x x'); subst; eauto.
+Qed.
+
+Lemma occurs_free_Eprim_val_Included x p e :
+  Included var (occurs_free e)
+           (Union var (occurs_free (Eprim_val x p e)) (Singleton var x)).
 Proof.
   intros x' Hin.
   destruct (var_dec x x'); subst; eauto.
@@ -781,6 +812,11 @@ Proof.
     destruct (var_dec x v); subst; eauto.
     right. intros Hc. inv Hc; eauto.
   + constructor; intros x.
+    destruct (var_dec x v); subst.
+    * right. intros Hc. inv Hc; eauto.
+    * destruct (Dec x); eauto.
+      right. intros Hc. inv Hc; eauto.
+  + constructor; intros x.
     destruct (in_dec var_dec x l); eauto.
     destruct (var_dec x v); subst.
     * right. intros Hc. inv Hc; eauto.
@@ -849,6 +885,11 @@ Proof.
     destruct (in_dec var_dec x l); eauto.
     destruct (var_dec x v); subst; eauto.
     right. intros Hc. inv Hc; eauto.
+  + constructor; intros x.
+    destruct (var_dec x v); subst.
+    * right. intros Hc. inv Hc; eauto.
+    * destruct (Dec x); eauto.
+      right. intros Hc. inv Hc; eauto.
   + constructor; intros x.
     destruct (in_dec var_dec x l); eauto.
     destruct (var_dec x v); subst.
@@ -945,10 +986,13 @@ Proof with eauto with Ensembles_DB.
   exp_fundefs_ctx_induction IHC IHCf; simpl; intros;
   repeat normalize_occurs_free; try now eauto with Ensembles_DB;
   try (now eapply Included_trans;
-       [ apply Included_Union_compat;
+       [ try apply Included_Union_compat;
          [ now apply Included_refl |
            apply Included_Setminus_compat; [ now eapply IHC | now apply Included_refl ] ] |
          rewrite Setminus_Union_distr; eauto with Ensembles_DB]).
+  - eapply Included_trans.
+    eapply Included_Setminus_compat; [ now eapply IHC | now apply Included_refl ].
+    rewrite Setminus_Union_distr. eauto with Ensembles_DB.
   - eapply Included_trans.
     apply Included_Union_compat. now apply Included_refl.
     apply Included_Union_compat. now apply Included_refl.
@@ -991,6 +1035,9 @@ Proof with eauto with Ensembles_DB.
          [ now apply Included_refl |
            apply Included_Setminus_compat; [ now eapply IHC | now apply Included_refl ] ] |
          rewrite Setminus_Union_distr; eauto with Ensembles_DB]).
+  - eapply Included_trans;
+    [apply Included_Setminus_compat; [ now eapply IHC | now apply Included_refl ] |
+           rewrite Setminus_Union_distr; eauto with Ensembles_DB].
   - eapply Included_trans.
     apply Included_Union_compat. now apply Included_refl.
     apply Included_Union_compat. now apply Included_refl.
@@ -1081,6 +1128,10 @@ Inductive funs_in_exp : fundefs -> exp -> Prop :=
     forall fs fs' e,
       funs_in_fundef fs fs' ->
       funs_in_exp fs (Efun fs' e)
+| In_Eprim_val :
+    forall fs e x p,
+      funs_in_exp fs e ->
+      funs_in_exp fs (Eprim_val x p e)
 | In_Eprim :
     forall fs e x p ys,
       funs_in_exp fs e ->
@@ -1164,6 +1215,9 @@ Inductive has_true_mut : exp -> Prop :=
     has_true_mut (Efun B e)
 | Tm_Eapp f ft xs :
     has_true_mut (Eapp f ft xs)
+| Tm_Eprim_val x p e :
+    has_true_mut e ->
+    has_true_mut (Eprim_val x p e)
 | Tm_Eprim x f ys e :
     has_true_mut e ->
     has_true_mut (Eprim x f ys e)
@@ -1226,6 +1280,13 @@ Inductive bound_var : exp -> Ensemble var :=
     forall y defs e,
       bound_var e y ->
       bound_var (Efun defs e) y
+| Bound_Eprim_val1 :
+    forall x p e,
+      bound_var (Eprim_val x p e) x
+| Bound_Eprim_val2 :
+    forall y x p e,
+      bound_var e y ->
+      bound_var (Eprim_val x p e) y
 | Bound_Eprim1 :
     forall x p ys e,
       bound_var (Eprim x p ys e) x
@@ -1268,6 +1329,13 @@ Qed.
 
 Lemma bound_var_Eletapp x f ft ys e :
   Same_set _ (bound_var (Eletapp x f ft ys e))
+           (Union var (bound_var e) (Singleton _ x)).
+Proof.
+  split; intros x' H; inv H; eauto. inv H0; eauto.
+Qed.
+
+Lemma bound_var_Eprim_val x p e :
+  Same_set _ (bound_var (Eprim_val x p e))
            (Union var (bound_var e) (Singleton _ x)).
 Proof.
   split; intros x' H; inv H; eauto. inv H0; eauto.
@@ -1363,6 +1431,8 @@ Ltac normalize_bound_var :=
       rewrite bound_var_Efun
     | [|- context[bound_var (Eapp _ _ _)]] =>
       rewrite bound_var_Eapp
+    | [|- context[bound_var (Eprim_val _ _ _)]] =>
+      rewrite bound_var_Eprim_val
     | [|- context[bound_var (Eprim _ _ _ _)]] =>
       rewrite bound_var_Eprim
     | [|- context[bound_var (Ehalt _)]] =>
@@ -1391,6 +1461,8 @@ Ltac normalize_bound_var_in_ctx :=
       rewrite bound_var_Efun in H
     | [ H : context[bound_var (Eapp _ _ _)] |- _ ] =>
       rewrite bound_var_Eapp in H
+    | [ H : context[bound_var (Eprim_val _ _ _)] |- _ ] =>
+      rewrite bound_var_Eprim_val in H
     | [ H : context[bound_var (Eprim _ _ _ _)] |- _ ] =>
       rewrite bound_var_Eprim in H
     | [ H : context[bound_var (Ehalt _)] |- _ ] =>
@@ -1601,6 +1673,19 @@ Proof with eauto with Ensembles_DB.
   repeat normalize_occurs_free. repeat normalize_bound_var...
 Qed.
 
+Lemma bound_var_occurs_free_Eprim_val_Included x p e :
+  Included _ (Union _ (bound_var e) (occurs_free e))
+           (Union _ (bound_var (Eprim_val x p e))
+                  (occurs_free (Eprim_val x p e))).
+Proof with eauto with Ensembles_DB.
+  repeat normalize_occurs_free. repeat normalize_bound_var.
+  rewrite <- Union_assoc.
+  apply Included_Union_compat...
+  eapply Included_trans.
+  now apply occurs_free_Eprim_val_Included with (x:=x) (p:=p).
+  normalize_occurs_free...
+Qed.
+
 Lemma bound_var_occurs_free_Eprim_Included x f ys e :
   Included _ (Union _ (bound_var e) (occurs_free e))
            (Union _ (bound_var (Eprim x f ys e))
@@ -1692,6 +1777,11 @@ Inductive unique_bindings : exp -> Prop :=
 | UBound_Eapp :
     forall f t xs,
       unique_bindings (Eapp f t xs)
+| UBound_Eprim_val :
+    forall x p e,
+      ~ (bound_var e) x ->
+      unique_bindings e ->
+      unique_bindings (Eprim_val x p e)
 | UBound_Eprim :
     forall x p ys e,
       ~ (bound_var e) x ->
@@ -2507,6 +2597,8 @@ Fixpoint exp_fv_aux (e : exp) (scope fvset : FVSet) : FVSet :=
     | Eapp x ft xs =>
       let fvset' := add_list scope fvset xs in 
       if mem x scope then fvset' else add x fvset'
+    | Eprim_val x p e =>
+      exp_fv_aux e (add x scope) fvset
     | Eprim x prim ys e =>
       let fvset' := add_list scope fvset ys in 
       exp_fv_aux e (add x scope) fvset'
@@ -2661,6 +2753,17 @@ Proof.
       * repeat apply_set_specs; eauto. inv H. inv H0. inv H; eauto.
         right. eapply add_list_spec; eauto.
         right. eapply add_list_spec; eauto.
+  - split; intros H.
+    + eapply IHe in H. inv H.
+      * inv H0. left. split. eapply Free_Eprim_val ; eauto.
+        intros Hc. subst. apply H1. now apply_set_specs; eauto.
+        intros Hc. apply H1. now apply_set_specs; eauto.
+      * now right.
+    + inv H.
+      * inv H0. eapply IHe. inv H.
+        left; split; eauto.
+        intros Hc. apply_set_specs_ctx; eauto.
+      * eapply IHe. now right.
   - split; intros H.
     + eapply IHe in H. inv H.
       * inv H0. left. split. eapply Free_Eprim2 ; eauto.
@@ -2845,6 +2948,7 @@ Fixpoint max_var e z :=
       let z' := max_var_fundefs defs z in
       max_var e z'
     | Eapp f _ xs => max_list (f::xs) z
+    | Eprim_val x _ e => max_var e (max_list (x :: nil) z)
     | Eprim x _ ys e => max_var e (max_list (x::ys) z)
     | Ehalt x => Pos.max z x
   end
@@ -2917,6 +3021,8 @@ Proof.
     simpl. eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
     now eauto.
   - inv HIn.
+  - inv HIn; [| now eauto ].
+    simpl. eapply Pos.le_trans; [| now eapply acc_leq_max_var ]. lia.
   - inv HIn.
   - simpl; inv HIn; [| now eauto |].
     + inv H5.
@@ -2977,6 +3083,8 @@ Proof.
   - inv HIn; simpl.
     eapply Pos.le_trans; [| now eapply max_list_spec1 ]. zify; lia.
     now eapply max_list_spec2.
+  - inv HIn. cbn -[max_list].
+    eapply Pos.le_trans. 2:{ eapply IHe. exact H4. } lia.
   - simpl; inv HIn; [| now eauto ].
     eapply Pos.le_trans; [| now eapply acc_leq_max_var ].
     now apply max_list_spec2.
@@ -3021,7 +3129,8 @@ Proof.
     rewrite Heq, Pos.max_comm. rewrite max_list_acc_commutes, Pos.max_comm, IHe. reflexivity.
   - simpl. rewrite IHB. rewrite IHe. reflexivity.
   - simpl. rewrite Pos.max_assoc, Pos.max_comm. rewrite max_list_acc_commutes. zify; lia.
-  - simpl. zify; lia.
+  - simpl. rewrite !IHe. zify; lia.
+  - simpl; zify; lia.
   - simpl. rewrite IHe.
     assert (Heq : Pos.max v (Pos.max (max_var e y) z) = Pos.max z (Pos.max v (max_var e y))) by (zify; lia).
     rewrite Heq. rewrite max_list_acc_commutes. rewrite Pos.max_comm. rewrite IHB. reflexivity.
@@ -3116,6 +3225,13 @@ Proof.
   - simpl. eapply Included_trans. 3:{ eapply max_list_in_list. } reflexivity.
     replace (Pos.max v 1%positive) with v by (zify; lia).
     normalize_bound_var. normalize_occurs_free. sets.
+  - simpl.
+    replace (Pos.max v 1%positive) with v by (zify; lia).
+    rewrite max_var_acc.
+    destruct (Pos.max_spec (max_var e 1%positive) v).
+    + inv H. rewrite H1.
+      normalize_bound_var. normalize_occurs_free. sets.
+    + inv H. rewrite H1. eapply bound_var_occurs_free_Eprim_val_Included. eauto.
   - simpl. replace (Pos.max v 1) with v by (zify; lia). rewrite max_var_acc. 
     destruct (Pos.max_spec (max_var e 1%positive) (List_util.max_list l v)).
     + inv H. rewrite H1.
@@ -3203,6 +3319,11 @@ Inductive bound_var_ctx: exp_ctx -> Ensemble var  :=
 | Bound_Letapp2_c: forall f ft xs c v' v,
                    bound_var_ctx c v' ->
                    bound_var_ctx (Eletapp_c v f ft xs c) v'
+| Bound_Prim_val1_c: forall x p c,
+                   bound_var_ctx (Eprim_val_c x p c) x
+| Bound_Prim_val2_c: forall p c v' v,
+                   bound_var_ctx c v' ->
+                   bound_var_ctx (Eprim_val_c v p c) v'
 | Bound_Prim1_c: forall  x f ys c,
                    bound_var_ctx (Eprim_c x f ys c) x
 | Bound_Prim2_c: forall  t r c v' v,
@@ -3278,6 +3399,13 @@ Qed.
 Lemma bound_var_Eletapp_c v f ft ys c :
   Same_set _ (bound_var_ctx (Eletapp_c v f ft ys c))
            (Union var (bound_var_ctx c) (Singleton _ v)).
+Proof.
+  split; intros x' H; inv H; eauto. inv H0; eauto.
+Qed.
+
+Lemma bound_var_Eprim_val_c x p c :
+  Same_set _ (bound_var_ctx (Eprim_val_c x p c))
+           (Union var (bound_var_ctx c) (Singleton _ x)).
 Proof.
   split; intros x' H; inv H; eauto. inv H0; eauto.
 Qed.
@@ -3443,6 +3571,12 @@ Proof with eauto with Ensembles_DB.
     rewrite Ensembles_util.Union_commut with (s1 :=  (bound_var e)).
     rewrite <- Ensembles_util.Union_assoc. reflexivity.
   - normalize_bound_var.
+    rewrite bound_var_Eprim_val_c.
+    rewrite IHc.
+    rewrite <- Ensembles_util.Union_assoc.
+    rewrite Ensembles_util.Union_commut with (s1 :=  (bound_var e)).
+    rewrite <- Ensembles_util.Union_assoc. reflexivity.
+  - normalize_bound_var.
     rewrite bound_var_Eprim_c.
     rewrite IHc.
     rewrite <- Ensembles_util.Union_assoc.
@@ -3508,6 +3642,8 @@ Ltac normalize_bound_var_ctx' :=
       rewrite bound_var_Fun1_c 
     | [ |- context[bound_var_ctx (Efun2_c _ _)] ] =>
       rewrite bound_var_Fun2_c
+    | [|- context[bound_var_ctx (Eprim_val_c _ _ _)]] =>
+      rewrite bound_var_Eprim_val_c
     | [|- context[bound_var_ctx (Eprim_c _ _ _ _)]] =>
       rewrite bound_var_Eprim_c
     | [|- context[bound_var_fundefs_ctx (Fcons1_c _ _ _ _ _)]] =>
@@ -3532,6 +3668,8 @@ Ltac normalize_bound_var_ctx_in_ctx' :=
       rewrite bound_var_Fun1_c in H
     | [ H : context[bound_var_ctx (Efun2_c _ _)] |- _ ] =>
       rewrite bound_var_Fun2_c in H
+    | [ H : context[bound_var_ctx (Eprim_val_c _ _ _)] |- _ ] =>
+      rewrite bound_var_Eprim_val_c in H
     | [ H : context[bound_var_ctx (Eprim_c _ _ _ _)] |- _ ] =>
       rewrite bound_var_Eprim_c in H
     | [H:context[bound_var_fundefs_ctx (Fcons1_c _ _ _ _ _)] |- _] =>
@@ -3607,6 +3745,11 @@ Inductive unique_bindings_c : exp_ctx -> Prop :=
       unique_bindings_fundefs_c cdefs ->
       Disjoint var (bound_var e) (bound_var_fundefs_ctx cdefs) ->
       unique_bindings_c (Efun2_c cdefs e)
+| UBc_Prim_val :
+    forall x p c,
+      ~ (bound_var_ctx c) x ->
+      unique_bindings_c c ->
+      unique_bindings_c (Eprim_val_c x p c)
 | UBc_Prim :
     forall x p ys c,
       ~ (bound_var_ctx c) x ->
@@ -3799,7 +3942,37 @@ Proof.
     apply H5; auto.
     inv H2. specialize (H v).
     apply H. split. constructor. auto.
-  (* prim *)
+  (* prim val*)
+  - inv H0.    apply H in H5.
+    destructAll.
+    split.
+    constructor.
+    intro. apply H3.
+    apply bound_var_app_ctx.
+    left; auto.
+    auto.
+    split; auto.
+    rewrite bound_var_Eprim_val_c.
+    apply Union_Disjoint_l; auto.
+    split; intro. intro.
+    inv H4. inv H5.
+    apply H3.
+    apply bound_var_app_ctx. right; auto.
+  - destructAll. inv H0.
+    assert (unique_bindings (e0 |[ e ]|)).
+    apply H. split; auto. split; auto.
+    rewrite bound_var_Eprim_val_c in H2.
+    eapply Disjoint_Included_l in H2.
+    apply H2.
+    left; auto.
+    clear H.
+    constructor; auto.
+    intro.
+    apply bound_var_app_ctx in H. inv H.
+    apply H5; auto.
+    inv H2. specialize (H v).
+    apply H. split. constructor. auto.
+  (* prim *)  
   - inv H0.    apply H in H6.
     destructAll.
     split.
@@ -4183,6 +4356,12 @@ Proof.
     subst. auto.
     right.
     intros Hc. inv Hc; auto.
+  - inv H. specialize (Dec x1).
+    inv Dec; auto.
+    destruct (var_dec v x1).
+    subst. auto.
+    right.
+    intros Hc. inv Hc; auto.
   - right. intros Hc. inv Hc; auto.
   - destruct H as [Dec1].
     destruct H0 as [Dec2].
@@ -4240,6 +4419,12 @@ Proof.
     subst. auto.
     right.
     intros Hc. inv Hc; auto.
+  - inv H. specialize (Dec x1).
+    inv Dec; auto.
+    destruct (var_dec v x1).
+    subst. auto.
+    right.
+    intros Hc. inv Hc; auto.
   - right. intros Hc. inv Hc; auto.
   - destruct H as [Dec1].
     destruct H0 as [Dec2].
@@ -4261,6 +4446,10 @@ Proof.
   eapply ctx_exp_mut' with (P0 := fun B => Decidable (bound_var_fundefs_ctx B));
   constructor; intros x1.
   - right; intros Hc; inv Hc.
+  - destruct (var_dec v x1); subst; auto.
+    destruct H as [Dec]. destruct (Dec x1).
+    now left; eauto.
+    now right; intro Hbv; inv Hbv; auto.
   - destruct (var_dec v x1); subst; auto.
     destruct H as [Dec]. destruct (Dec x1).
     now left; eauto.
@@ -4320,6 +4509,10 @@ Proof.
   eapply ctx_fundefs_mut' with (P := fun e => Decidable (bound_var_ctx e));
   constructor; intros x.
   - right; intros Hc; inv Hc.
+  - destruct (var_dec v x); subst; auto.
+    destruct H as [Dec]. destruct (Dec x).
+    now left; eauto.
+    now right; intro Hbv; inv Hbv; auto.
   - destruct (var_dec v x); subst; auto.
     destruct H as [Dec]. destruct (Dec x).
     now left; eauto.
@@ -4481,6 +4674,11 @@ Proof.
   - left. rewrite bound_var_Eapp. eauto with Ensembles_DB.
   - inv H0.
     + inv H. specialize (Dec v). inv Dec.
+      * right; rewrite bound_var_Eprim_val. intro. inv H0. specialize (H2 v). eauto with Ensembles_DB.
+      * left. rewrite bound_var_Eprim_val. eauto with Ensembles_DB.
+    + right. rewrite bound_var_Eprim_val. eauto with Ensembles_DB.
+  - inv H0.
+    + inv H. specialize (Dec v). inv Dec.
       * right; rewrite bound_var_Eprim. intro. inv H0. specialize (H2 v). eauto with Ensembles_DB.
       * left. rewrite bound_var_Eprim. eauto with Ensembles_DB.
     + right. rewrite bound_var_Eprim. eauto with Ensembles_DB.
@@ -4554,6 +4752,13 @@ Proof.
     right. intro. inv H0; auto.
     right. intro. inv H; auto.
   - left. constructor.
+  - inv H.
+    assert (H := bound_var_dec e).
+    inv H. specialize (Dec v). inv Dec.
+    right.
+    intro; inv H1; auto.
+    left. constructor; auto.
+    right. intro; inv H; auto.        
   - inv H.
     assert (H := bound_var_dec e).
     inv H. specialize (Dec v). inv Dec.
@@ -4668,6 +4873,11 @@ Inductive occurs_free_ctx : exp_ctx -> Ensemble var :=
     forall y defs e, 
       occurs_free_fundefs_ctx defs y ->
       occurs_free_ctx (Efun2_c defs e) y
+| Free_ctx_Eprim_val :
+    forall y x p e,
+      x <> y ->
+      occurs_free_ctx e y ->
+      occurs_free_ctx (Eprim_val_c x p e) y
 | Free_ctx_Eprim1 :
     forall y x p ys e,
       List.In y ys ->
@@ -4712,6 +4922,15 @@ Proof.
   split; intros x' H; inv H; eauto.
   right. constructor; eauto. intros H. inv H; eauto.
   inv H0.  constructor 2; eauto. intros Hc. subst. eauto.
+Qed.
+
+Lemma occurs_free_Eprim_val_c x p e :
+Same_set var (occurs_free_ctx (Eprim_val_c x p e))
+         (Setminus var (occurs_free_ctx e) (Singleton var x)).
+Proof.
+  split; intros x' H; inv H; eauto.
+  constructor; auto. intros H. inv H; eauto.
+  eapply Free_ctx_Eprim_val; eauto. intros Hc. subst. eauto.
 Qed.
 
 Lemma occurs_free_Eprim_c x f ys e :
@@ -4858,6 +5077,8 @@ Ltac normalize_occurs_free_ctx :=
     rewrite occurs_free_Efun1_c
   | [|- context[occurs_free_ctx (Efun2_c _ _)]] =>
     rewrite occurs_free_Efun2_c
+  | [|- context[occurs_free_ctx (Eprim_val_c _ _ _)]] =>
+    rewrite occurs_free_Eprim_val_c
   | [|- context[occurs_free_ctx (Eprim_c _ _ _ _)]] =>
     rewrite occurs_free_Eprim_c
   | [|- context[occurs_free_fundefs_ctx (Fcons1_c _ _ _ _ _)]] =>
@@ -4882,6 +5103,8 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
       rewrite occurs_free_Efun1_c
     | [ H : context[occurs_free_ctx (Efun2_c _ _)] |- _ ] =>
       rewrite occurs_free_Efun2_c
+    | [ H : context[occurs_free_ctx (Eprim_val_c _ _ _)] |- _ ] =>
+      rewrite occurs_free_Eprim_val_c
     | [ H : context[occurs_free_ctx (Eprim_c _ _ _ _)] |- _ ] =>
       rewrite occurs_free_Eprim_c
     | [ H : context[occurs_free_fundefs_ctx (Fcons1_c _ _ _ _ _)] |- _ ] =>
@@ -4981,6 +5204,13 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
       left; auto.
       right; intro Hc.
       inv Hc; auto.
+    - destruct (var_dec v x).
+      subst.
+      now right; intro Hc; inv Hc; auto.
+      destruct H as [Dec]; destruct (Dec x).
+      left; auto.
+      right; intro Hc.
+      inv Hc; auto.    
     - assert (Hl := Decidable_FromList l).
       inv Hl.
       destruct (Dec x).
@@ -5103,6 +5333,13 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
     - destruct (var_dec x v0).
       now subst; left; auto.
       destruct (var_dec v x).
+      subst.
+      now right; intro Hc; inv Hc; auto.
+      destruct H as [Dec]; destruct (Dec x).
+      left; auto.
+      right; intro Hc.
+      inv Hc; auto.
+    - destruct (var_dec v x).
       subst.
       now right; intro Hc; inv Hc; auto.
       destruct H as [Dec]; destruct (Dec x).
@@ -5234,6 +5471,8 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
     | Efun fds e =>
       occurs_in_fundefs k fds || occurs_in_exp k e
     | Eapp x _ xs => eq_var k x || occurs_in_vars k xs
+    | Eprim_val z _ e1 =>
+      eq_var z k || occurs_in_exp k e1
     | Eprim z _ xs e1 =>
       eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
     | Ehalt x => eq_var x k
@@ -5673,6 +5912,10 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
     used_vars (Eapp f t args) <--> f |: FromList args.
   Proof. solve_used_vars_lemma. Qed.
 
+  Lemma used_vars_Eprim_val : forall x p e,
+    used_vars (Eprim_val x p e) <--> x |: used_vars e.
+  Proof. solve_used_vars_lemma. Qed.
+
   Lemma used_vars_Eprim : forall x p args e,
     used_vars (Eprim x p args e) <--> x |: FromList args :|: used_vars e.
   Proof. solve_used_vars_lemma. Qed.
@@ -5698,6 +5941,7 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
     | |- context [ used_vars (Efun _ _) ] => rewrite used_vars_Efun
     | |- context [ used_vars (Eletapp _ _ _ _ _) ] => rewrite used_vars_Eletapp
     | |- context [ used_vars (Eapp _ _ _) ] => rewrite used_vars_Eapp
+    | |- context [ used_vars (Eprim_val _ _ _) ] => rewrite used_vars_Eprim_val
     | |- context [ used_vars (Eprim _ _ _ _) ] => rewrite used_vars_Eprim
     | |- context [ used_vars (Ehalt _) ] => rewrite used_vars_Ehalt
     | |- context [ used_vars_fundefs (Fcons _ _ _ _ _) ] => rewrite used_vars_Fcons
@@ -5708,6 +5952,7 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
     | [ H : context [ used_vars (Ecase _ (_ :: _))        ] |- _ ] => rewrite used_vars_Ecase_cons in H
     | [ H : context [ used_vars (Efun _ _)                ] |- _ ] => rewrite used_vars_Efun in H
     | [ H : context [ used_vars (Eapp _ _ _)              ] |- _ ] => rewrite used_vars_Eapp in H
+    | [ H : context [ used_vars (Eprim_val _ _ _)         ] |- _ ] => rewrite used_vars_Eprim_val in H
     | [ H : context [ used_vars (Eprim _ _ _ _)           ] |- _ ] => rewrite used_vars_Eprim in H
     | [ H : context [ used_vars (Ehalt _)                 ] |- _ ] => rewrite used_vars_Ehalt in H
     | [ H : context [ used_vars_fundefs (Fcons _ _ _ _ _) ] |- _ ] => rewrite used_vars_Fcons in H

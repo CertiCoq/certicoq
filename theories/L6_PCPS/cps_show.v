@@ -10,7 +10,8 @@ Require Import ExtLib.Data.Positive.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
-From MetaCoq.Template Require Import bytestring MCString BasicAst. (* For identifier names *)
+From MetaCoq.Template Require Import bytestring MCString BasicAst Primitive. (* For identifier names *)
+From MetaCoq.PCUIC Require Import PCUICPrimitive. (* For identifier names *)
 
 Import MonadNotation.
 
@@ -104,6 +105,12 @@ Definition chr_newline : Byte.byte := "010"%byte.
 
 Definition newline : M unit := emit (String.String chr_newline String.EmptyString).
 
+Definition emit_prim (p : primitive) : M unit :=
+  match projT1 p as tag return prim_value tag -> M unit with
+  | primInt => fun f => emit "(int: " ;; emit (string_of_prim_int f) ;; emit ")"
+  | primFloat => fun f => emit "(float: " ;; emit (string_of_float f) ;; emit ")"
+  end%bs (projT2 p).
+
 (* We assume each expression starts on a fresh newline, and that it
    should be indented by [indent] characters. *)
 Fixpoint emit_exp (indent:nat) (e:exp) {struct e} : M unit :=
@@ -120,6 +127,11 @@ Fixpoint emit_exp (indent:nat) (e:exp) {struct e} : M unit :=
     emit " := proj_" ;; emit (show_binnat n) ;; emit " " ;;
     emit (show_pos tg) ;; emit " " ;;
     emit (show_var y) ;; emit " in " ;; newline ;;
+    emit_exp indent e
+  | Eprim_val x p e => 
+    emit "let " ;; emit (show_var x) ;;
+    emit " := prim: " ;; emit_prim p ;;
+    emit " in " ;; newline ;;
     emit_exp indent e
   | Eprim x p ys e =>
     emit "let " ;; emit (show_var x) ;;
@@ -175,6 +187,7 @@ Fixpoint emit_val (indent:nat) (v:val) {struct v}: M unit :=
             (* emit "fun "%bs ;; emit (show_var f);;emit (show_ftag t');;emit (show_vars xs);;emit ":="%bs;; emit "..."%bs ;; newline *)
              | None => emit "ERROR! FUN "%bs ;; emit (show_var f);;emit " NOT FOUND!"%bs;;newline
            end)
+        | Vprim p => emit "Primitive "%bs ;; emit_prim p ;; newline 
         | Vint i => emit "Int "%bs;;newline
       end.
 (*

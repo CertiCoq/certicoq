@@ -71,6 +71,7 @@ Transform
 Universes0
 All_Forall
 BasicAst
+Primitive
 Environment
 Ast0
 Typing0
@@ -112,6 +113,7 @@ WGraph
 UGraph0
 Typing0
 PCUICAst
+PCUICPrimitive
 PCUICAstUtils
 PCUICCases
 PCUICUnivSubst
@@ -205,6 +207,7 @@ Rename
 Inline_letapp
 Uncurry
 BinNatDef
+Cps_proto_univ
 Cps_proto
 Prototype
 Proto_util

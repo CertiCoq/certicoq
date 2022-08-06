@@ -85,6 +85,7 @@ Section LogRelCC.
           | Vconstr t1 vs1, Vconstr t2 vs2 =>
             t1 = t2 /\ Forall2_aux vs1 vs2
           | Vint n1, Vint n2 => n1 = n2
+          | Vprim p1, Vprim p2 => p1 = p2
           | _, _ => False
         end
     in cc_approx_val_aux v1 v2.
@@ -110,6 +111,7 @@ Section LogRelCC.
       | Vconstr t1 vs1, Vconstr t2 vs2 =>
         t1 = t2 /\ Forall2 (cc_approx_val k P) vs1 vs2
       | Vint n1, Vint n2 => n1 = n2
+      | Vprim p1, Vprim p2 => p1 = p2
       | _, _ => False
     end.
   
@@ -282,6 +284,7 @@ Section LogRelCC.
       eapply cc_approx_exp_rel_mon.
       eapply Hi; eauto. eapply Forall2_monotonic; [| eassumption ].
       intros. eapply H; eauto. now firstorder. now firstorder.
+    - eauto.
     - eauto.
   Qed.
 
@@ -1272,6 +1275,9 @@ Section LogRelCC.
     - destruct v2; try contradiction.
       destruct v3; try contradiction. inv Happrox.
       inv Hpre'. reflexivity.
+    - destruct v2; try contradiction.
+      destruct v3; try contradiction. inv Happrox.
+      inv Hpre'. reflexivity.
   Qed.
 
   Corollary cc_approx_exp_respects_preord_exp_r (k : nat)
@@ -1752,7 +1758,8 @@ Section LogRelCC.
         (* Included _ (occurs_free e) (Union _ (FromList xs) (name_in_fundefs B)) -> *)
         closed_fundefs_in_val (Vfun rho B f)
   | Vint_closed :
-      forall z, closed_fundefs_in_val (Vint z).
+      forall z, closed_fundefs_in_val (Vint z)
+  | Vprim_closed : forall p, closed_fundefs_in_val (Vprim p).
 
   Definition closed_fundefs_in_env (S : Ensemble var) rho : Prop :=
     lift_P_env S closed_fundefs_in_val rho.
@@ -1832,6 +1839,12 @@ Section LogRelCC.
           rewrite occurs_free_Efun. eapply Included_Union_r.
         * intros f. constructor. now eapply Hcl2.
           intros B H. eapply Hcl2. now eauto.
+      + intros B Hin. eauto.
+    - eapply IHHstep.
+      + subst. eapply lift_P_env_extend. 
+        * eapply lift_P_env_antimon; [| now eauto ].
+          rewrite occurs_free_Eprim_val. reflexivity.
+        * constructor.
       + intros B Hin. eauto.
     - eapply IHHstep.
       + subst. eapply lift_P_env_extend. 

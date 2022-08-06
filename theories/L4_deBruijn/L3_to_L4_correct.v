@@ -499,6 +499,11 @@ Proof.
   induction e; simpl; try apply IHe; auto.
 Qed.
 
+Lemma subst_env_aux_prim_val e k p : subst_env_aux e k (Prim_val_e p) = Prim_val_e p.
+Proof.
+  induction e; simpl; try apply IHe; auto.
+Qed.
+
 Lemma subst_env_aux_prim e k p : subst_env_aux e k (Prim_e p) = Prim_e p.
 Proof.
   induction e; simpl; try apply IHe; auto.
@@ -624,9 +629,6 @@ Proof.
   apply crctCrctsCrctBsDsEnv_ind; intros; unfold translate;
     cbn -[trans_brs] in *; try solve[repeat constructor; eauto; try lia].
 
-  - (* Primitive *)
-    econstructor.
-  
   - (* Lambda *)
     specialize (H0 _ H1 H2 H3).
     now rewrite !Har in H0. 
@@ -2041,7 +2043,7 @@ Proof.
 
   - rewrite subst_env_aux_fix_e. constructor.
   - rewrite subst_env_aux_prf. constructor.
-  - simpl.
+  - simpl. rewrite subst_env_aux_prim_val. constructor.
   - constructor.
   - constructor; auto.
 Qed.
@@ -2053,6 +2055,7 @@ Inductive wcbv_value : Term -> Prop :=
       wcbv_values es -> wcbv_value (TConstruct d n es)
   | fix_wcbv_value : forall (es : Defs) (k : nat), wcbv_value (TFix es k)
   | prf_wcbv_value : wcbv_value TProof
+  | prim_wcbv_value p : wcbv_value (TPrim p)
   | wrong_wcbv_value : forall str, wcbv_value (TWrong str)
 with wcbv_values : Terms -> Prop :=
     enil_wcbv_values : wcbv_values tnil
@@ -2090,7 +2093,7 @@ Proof.
   - dstrctn a. apply Crct_invrt_App in H1 as [Hfn Harg].
     specialize (H Hfn). inv H. apply wcbvEval_pres_Crct in w; auto.
     inv w; inv H4; intuition.
-    intuition. intuition. intuition. intuition.
+    intuition. intuition. intuition. intuition. elim j; now eexists.
     eapply wcbvEval_pres_Crct in w; auto. inv w.
   - apply Crct_invrt_Case in H1; intuition. apply wcbvEval_pres_Crct in w; auto. apply H0.
     destruct i.
@@ -2110,13 +2113,13 @@ Proof.
 Qed.
 
 Lemma value_discr e t :
-  ~ term.isLambda t /\ ~ isFix t /\ ~ isConstruct t /\ t <> TProof ->
+  ~ term.isLambda t /\ ~ isFix t /\ ~ isConstruct t /\ t <> TProof /\ ~ isPrim t ->
   crctTerm e 0 t -> wcbv_value t -> False.
 Proof.
   intros tdiff crt vt.
   dstrctn tdiff.
   inv vt; auto. inv crt. inv H3.
-  inv crt.
+  inv crt. now elim j; eexists. inv crt.
 Qed.
 
 Lemma Crct_invrt_mkApp' e n fn args : crctEnv e ->
@@ -2259,6 +2262,10 @@ Proof with eauto.
   + (* Proof *)
     intros wft. unfold translate. simpl. intros.
     unfold subst_env. rewrite subst_env_aux_prf. constructor.
+    
+  + (* Prim_val *)
+    intros p wft. unfold translate. simpl. intros.
+    unfold subst_env. rewrite subst_env_aux_prim_val. constructor.
 
   + (* Proof application *)
     intros.

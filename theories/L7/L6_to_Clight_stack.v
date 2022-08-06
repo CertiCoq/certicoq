@@ -97,6 +97,7 @@ Fixpoint compute_fun_env' (n : nat) (nenv : name_env) (fenv : fun_env)  (e : exp
       let fenv' := compute_fun_env_fundefs n' nenv fnd fenv in
       compute_fun_env' n' nenv fenv' e'
     | Eapp x t vs => M.set t (N.of_nat (length vs) , makeArgList vs) fenv
+    | Eprim_val x p e' => compute_fun_env' n' nenv fenv e'
     | Eprim x p vs e' => compute_fun_env' n' nenv fenv e'
     | Ehalt x => fenv
     end
@@ -123,6 +124,7 @@ Fixpoint max_depth (e : exp) : nat :=
   | Eletapp x f t ys e' => S (max_depth e')
   | Efun fnd e' => S (Nat.max (max_depth_fundefs fnd) (max_depth e'))
   | Eapp x t vs => 1
+  | Eprim_val x p e' => S (max_depth e')
   | Eprim x p vs e' => S (max_depth e')
   | Ehalt x => 1
   end
@@ -150,6 +152,7 @@ Fixpoint get_locals (e : exp) : list positive :=
   | Eletapp x f t xs e' => x :: (get_locals e')
   | Efun fnd e' => (get_locals_fundefs fnd) ++ (get_locals e')
   | Eapp x t vs => nil
+  | Eprim_val x p e' => x :: (get_locals e')
   | Eprim x p vs e' => x :: (get_locals e')
   | Ehalt x => nil
   end
@@ -178,6 +181,7 @@ Fixpoint max_allocs (e : exp) : nat :=
   | Eletapp x f t ys e' => 0
   | Efun fnd e' => max (max_allocs_fundefs fnd) (max_allocs e')
   | Eapp x t vs => 0
+  | Eprim_val x p e' => max_allocs e'
   | Eprim x p vs e' => max_allocs e'
   | Ehalt x => 0
   end
@@ -202,6 +206,7 @@ Fixpoint max_args (e : exp) : nat :=
   | Eletapp x f n xs e' => max_args e'
   | Efun fnd e' => max (max_args_fundefs fnd) (max_args e')
   | Eapp x t vs => 0
+  | Eprim_val x p e' => max_args e'
   | Eprim x p vs e' => max_args e'
   | Ehalt x => 2
   end
@@ -694,6 +699,36 @@ Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_s
 (* The program returns the translated code and the set of live vars at the next call *)
 
 
+From Coq Require Import Lia.
+
+Definition to_int64 (i : PrimInt63.int) : int64. 
+  exists (Uint63.to_Z i).
+  pose proof (Uint63.to_Z_bounded i).
+  unfold Uint63.wB in H. unfold Int64.modulus, Int64.wordsize, Wordsize_64.wordsize.
+  unfold Uint63.size in H. rewrite two_power_nat_correct. unfold Zpower_nat. simpl.
+  destruct H. split. lia. lia.
+Defined.
+
+Definition float64_to_model (f : PrimFloat.float) : float64_model :=
+  exist (FloatOps.Prim2SF f) (FloatAxioms.Prim2SF_valid f).
+
+Definition model_to_ff (f : float64_model) : Binary.full_float :=
+  Binary.SF2FF (proj1_sig f).
+
+Program Definition to_float (f : PrimFloat.float) : Floats.float :=
+  Binary.FF2B _ _ (model_to_ff (float64_to_model f)) _.
+Next Obligation.
+  unfold model_to_ff.
+  pose proof (FloatAxioms.Prim2SF_valid f).
+  rewrite Binary.valid_binary_SF2FF; auto.
+  Admitted.
+
+Definition compile_primitive (p : AstCommon.primitive) : expr :=
+  match projT1 p as tag return AstCommon.prim_value tag -> expr with
+  | Primitive.primInt => fun i => Econst_long (to_int64 i) (Tlong Unsigned noattr)
+  | Primitive.primFloat => fun f => Econst_float (to_float f) (Tlong Unsigned noattr)
+  end (projT2 p).
+
 Section Translation.
 
   Context (args_opt : bool).
@@ -809,6 +844,10 @@ Section Translation.
                                                                                                                   slots)
     | None => Err "translate_body: Unknown function application in Eapp"
     end
+  | Eprim_val x p e' => 
+    progn <- translate_body e' fenv cenv ienv map slots ;;
+    Ret ((x ::= compile_primitive p ; fst progn), snd progn)
+
   | Eprim x p vs e' =>
     match prims ! p with
     | Some (_, _, false, _) => (* compile without tinfo *)
@@ -1190,7 +1229,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
 
   Fixpoint check_tags' (e : exp) (log : list string) :=
     match e with
-    | Econstr _ _ _ e | Eproj _ _ _ _ e | Eprim _ _ _ e => check_tags' e log
+    | Econstr _ _ _ e | Eproj _ _ _ _ e | Eprim_val _ _ e | Eprim _ _ _ e => check_tags' e log
 
     | Ecase _ bs =>
       fold_left (fun a b => check_tags' (snd b) a) bs log

@@ -685,8 +685,9 @@ Section EVAL.
     | Eletapp_c x f t ys c => 1 (* + length ys *)
     | Efun1_c B c => 1
     | Efun2_c _ _ => 1
-    | Eprim_c x f ys c => 1 (* + length ys *)
-    | Ehole_c => 0
+    | Eprim_val_c _ _ _ => 1
+    | Eprim_c _ _ _ c => 1 (* + length ys *)
+    | Hole_c => 0
     end.
 
   Inductive interpret_ctx : exp_ctx -> env -> fuel -> @res env -> trace -> Prop :=
@@ -851,6 +852,21 @@ Section EVAL.
     Unshelve. exact 0%nat.
   Qed.
   
+  Lemma eval_ctx_app_OOT_Eprim_val rho C x p e1 e2 cin cout :
+    bstep_fuel rho (C |[ Eprim_val x p e1 ]|) cin OOT cout ->
+    interprable C = true ->
+    bstep_fuel rho (C |[ Eprim_val x p e2 ]|) cin OOT cout.
+  Proof.       
+    revert rho cin cout.
+    induction C; intros rho cin cout Hs Hi; eauto;
+      try congruence;
+      try now (inv Hs; 
+               [ econstructor; eassumption |
+                 inv H; unfold one; simpl;
+                 constructor 2; econstructor; eauto ]).
+
+    Unshelve. exact 0%nat.
+  Qed.
 
   Lemma eval_ctx_app_OOT_Eapp rho C e cin cout x f t xs :
     bstep_fuel rho (C |[ Eapp f t xs ]|) cin OOT cout ->

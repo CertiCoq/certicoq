@@ -63,6 +63,7 @@ Section MEASURECONTRACT.
     | Eproj _ _ _ _ e => 1 + term_size e
     | Eletapp _ _ _ _ e => 1 + term_size e
     | Eapp _ _ _ => 1
+    | Eprim_val _ _ e => 1 + term_size e
     | Eprim _ _ _ e => 1 + term_size e
     | Efun fds e => 1 + funs_size fds + term_size e
     | Ehalt _ => 1
@@ -556,6 +557,8 @@ Fixpoint update_census (sig:r_map) (e:exp) (fun_delta:var -> c_map -> nat) (coun
   | Econstr x t ys e =>
     let count' := update_census_list sig ys fun_delta count in
     update_census sig e fun_delta count'
+  | Eprim_val x p e =>
+    update_census sig e fun_delta count
   | Eprim x f ys e =>
     let count' := update_census_list sig ys fun_delta count in
     update_census sig e fun_delta count'
@@ -989,6 +992,11 @@ Section CONTRACT.
               fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
             end (eq_refl))                
        end (eq_refl))
+    | Eprim_val x p e => (* Prims may have side effects and are not considered dead code *)
+       match contract sig count e sub im return _ with
+       | existT   (e', steps', count', im') bp  =>
+         existT _ (Eprim_val x p e', steps', count', im') bp
+       end       
     | Eprim x f ys e => (* Prims may have side effects and are not considered dead code *)
       match contract sig count e sub im return _ with
       | existT   (e', steps', count', im') bp  =>
@@ -1240,6 +1248,11 @@ Section CONTRACT.
               fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
             end (eq_refl))                
        end (eq_refl))
+    | Eprim_val x p e =>
+      match contract sig count e sub im return _ with
+      | existT   (e', steps', count', im') bp  =>
+        existT _ (Eprim_val x p e', steps', count', im') bp
+      end
     | Eprim x f ys e =>
       match contract sig count e sub im return _ with
       | existT   (e', steps', count', im') bp  =>
@@ -1367,6 +1380,7 @@ Section CONTRACT.
     optimize_heap.
     { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
     optimize_heap.
+    { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
     { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
     { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
     { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }

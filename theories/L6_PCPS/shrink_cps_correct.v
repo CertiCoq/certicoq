@@ -38,6 +38,10 @@ Inductive rw : relation exp :=
     forall x t ys e,
       ~ occurs_free e x ->
       rw (Econstr x t ys e) e
+| Prim_val_dead:
+    forall x p e,
+      ~ occurs_free e x ->
+      rw (Eprim_val x p e) e
 | Prim_dead:
     forall x p ys e,
       ~ occurs_free e x ->
@@ -495,6 +499,7 @@ Section Shrink_correct.
     | Econstr_c v t vs c' => 1 + ctx_size c'
     | Eproj_c v t i r c' => 1 + ctx_size c'
     | Eletapp_c _ _ _ _  c' => 1 + ctx_size c'
+    | Eprim_val_c v p c' => 1 + ctx_size c'
     | Eprim_c v p vs c' => 1 + ctx_size c'
     | Ecase_c v l t c' l0 => 1 + fold_right
                                   (fun (p : ctor_tag * exp) (n : nat) => let (_, e1) := p in n + term_size e1)

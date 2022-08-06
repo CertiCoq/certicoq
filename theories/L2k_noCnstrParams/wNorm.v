@@ -32,6 +32,7 @@ Inductive WNorm: Term -> Prop :=
 | WNApp: forall fn t,
     WNorm fn ->
     ~ isLambda fn -> ~ isFix fn -> ~ isConstruct fn -> fn <> TProof ->
+    ~ isPrim fn ->
     WNorm t ->
     WNorm (TApp fn t)
 with WNorms: Terms -> Prop :=
@@ -59,7 +60,7 @@ Lemma Wcbv_WNorm:
 Proof.
   apply WcbvEvalEvals_ind; intros;
     try (solve[constructor; try assumption]); try assumption.
-  - destruct a as [a [b [c d]]]. constructor; try assumption.  
+  - destruct a as [a [b [c [d e]]]]. constructor; try assumption.  
 Qed.
 
 (** every normal form is hit **)

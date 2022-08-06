@@ -177,6 +177,10 @@ Section Inline.
           | _ =>
             ret (Eapp f' t ys')
           end)
+       | Eprim_val x p e =>
+         x' <- get_fresh_name x ;;
+         e' <- inline_exp_aux e (M.set x x' sig) fm s ;;
+         ret (Eprim_val x' p e')
        | Eprim x t ys e =>
          let ys' := apply_r_list sig ys in
          x' <- get_fresh_name x ;;
@@ -289,6 +293,7 @@ Fixpoint do_inline (e : exp) :=
   | Econstr _ _ _  e 
   | Eproj _ _ _ _ e
   | Eletapp _ _ _ _ e
+  | Eprim_val _ _ e 
   | Eprim _ _ _ e => do_inline e
   | Ecase _ _ => false
   | Efun _ _ => (* false *) true
@@ -429,6 +434,7 @@ Definition find_indirect_call (f : var) (e : exp) (s:M.t bool) : M.t bool :=
               match e with
               | Econstr _ _ _  e
               | Eproj _ _ _ _ e
+              | Eprim_val _ _ e
               | Eprim _ _ _ e => is_wrapper e
               | Eletapp _ _ _ _ e => None
               | Ecase _ _

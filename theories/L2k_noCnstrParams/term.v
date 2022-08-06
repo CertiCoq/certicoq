@@ -252,6 +252,8 @@ induction t;
 left. auto.
 Qed.
 
+Definition isPrim (t:Term) : Prop :=
+  exists p, t = TPrim p.
 
 
 (*****

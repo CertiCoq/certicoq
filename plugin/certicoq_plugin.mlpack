@@ -87,8 +87,6 @@ Logic0
 
 Errors0
 
-FLT
-Zaux
 Digits
 List_util
 Monad0
@@ -151,7 +149,6 @@ ELiftSubst
 EInduction
 ECSubst
 EWellformed
-EGlobalEnv
 EEnvMap
 EWcbvEval
 ESpineView
@@ -163,7 +160,9 @@ EProgram
 ERemoveParams
 EOptimizePropDiscr
 EInlineProjections
+ELiftSubst
 EConstructorsAsBlocks
+ECoInductiveToInductive
 ETransform
 Erasure
 SafeTemplateErasure
@@ -180,7 +179,6 @@ Classes2
 
 OrdersFacts
 MSetInterface
-Bracket
 ExtLibMisc
 Smallstep
 
@@ -263,4 +261,3 @@ Pipeline
 Plugin_utils
 Certicoq
 G_certicoq
-Certicoq_plugin_mod

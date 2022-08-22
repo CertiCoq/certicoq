@@ -283,21 +283,29 @@ Definition CombineInlineHeuristic {St1 St2:Type} (deci:bool -> bool -> bool)
          let '(s2', s2'', b2) := update_letApp _ IH2 f t ys s2 in
          ((s1', s2'), (s1'', s2''), deci b1 b2 )|}.
 
-
+Definition forall_fundefs (f : exp -> bool) : fundefs -> bool :=
+  fun fns =>
+  let fix aux fns :=
+    match fns with 
+    | Fnil => true
+    | Fcons x t xs e tl => (f e && aux tl)%bool
+    end 
+  in aux fns.
 
 (* Don't inline functions with nested function definitions (code duplication)
-   and functions with case analysis (to avoid inlining uncurried functions) *)
+   and functions with case analysis (to avoid inlining uncurried functions)
+   and recursive functions *)
 
-Fixpoint do_inline (e : exp) :=
+Fixpoint do_inline (f : var) (e : exp) :=
   match e with
   | Econstr _ _ _  e 
   | Eproj _ _ _ _ e
-  | Eletapp _ _ _ _ e
   | Eprim_val _ _ e 
-  | Eprim _ _ _ e => do_inline e
+  | Eprim _ _ _ e => do_inline f e
   | Ecase _ _ => false
-  | Efun _ _ => (* false *) true
-  | Eapp _ _ _ => true
+  | Efun fns e => (forall_fundefs (do_inline f) fns && do_inline f e)%bool
+  | Eletapp _ f' _ _ e => (negb (BinPosDef.Pos.eqb f f') && do_inline f e)%bool
+  | Eapp f' _ _ => negb (BinPosDef.Pos.eqb f f')
   | Ehalt _ => true
   end.
     
@@ -308,7 +316,7 @@ Definition InlineSmall (bound:nat): InlineHeuristic (M.t bool) :=
                          let s' :=
                              (fix upd (fds:fundefs) (sigma:r_map) (s:_) :=
                                 match fds with
-                                | Fcons f t xs e fdc' => if ((term_size e <? bound) && do_inline e)%bool then
+                                | Fcons f t xs e fdc' => if ((term_size e <? bound) && do_inline f e)%bool then
                                                           upd fdc' sigma (M.set f true s)
                                                         else  upd fdc' sigma s
                                 | Fnil => s

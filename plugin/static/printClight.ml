@@ -32,10 +32,11 @@ open Clight
    integer). *)
 
 let temp_name (id: AST.ident) =
+  let id = P.to_int id in
   try
     "$" ^ Hashtbl.find string_of_atom id
   with Not_found ->
-    Printf.sprintf "$%d" (P.to_int id)
+    Printf.sprintf "$%d" id
 
 (* Declarator (identifier + type) -- reuse from PrintCsyntax *)
 
@@ -327,12 +328,14 @@ let print_if prog = print_if_gen Clight1 prog
    SimplLocals pass.  It receives Clight2 syntax. *)
 let print_if_2 prog = print_if_gen Clight2 prog
 let add_name (a, n) =
-    match n with
-    | BasicAst.Coq_nAnon -> ()
-    | BasicAst.Coq_nNamed s ->
-        Hashtbl.add atom_of_string (Caml_bytestring.caml_string_of_bytestring s) a;
-        Hashtbl.add string_of_atom a (Caml_bytestring.caml_string_of_bytestring s);
-        ()
+  let i = P.to_int a in
+  match n with
+  | BasicAst.Coq_nAnon -> ()
+  | BasicAst.Coq_nNamed s ->
+      let cs = Caml_bytestring.caml_string_of_bytestring s in
+      Hashtbl.add atom_of_string cs i;
+      Hashtbl.add string_of_atom i cs;
+      ()
 
 let remove_primes (a, n) =
   match n with

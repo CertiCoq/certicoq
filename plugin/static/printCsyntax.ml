@@ -460,7 +460,7 @@ let string_of_init id =
 
 let chop_last_nul id =
   match List.rev id with
-  | Init_int8 0 :: tl -> List.rev tl
+  | Init_int8 BinNums.Z0 :: tl -> List.rev tl
   | _ -> id
 
 let print_init p = function

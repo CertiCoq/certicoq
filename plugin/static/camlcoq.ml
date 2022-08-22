@@ -50,12 +50,33 @@ end
 (* Coq's [positive] type and some of its operations *)
 
 module P = struct
-  let to_int p = p
+ 
+  let rec to_int = function
+  | Coq_xI p -> let n = to_int p in n + n + 1
+  | Coq_xO p -> let n = to_int p in n + n
+  | Coq_xH -> 1
+
+  let rec to_int64 = function
+  | Coq_xI p -> let n = to_int64 p in Int64.add n (Int64.add n Int64.one)
+  | Coq_xO p -> let n = to_int64 p in Int64.add n n
+  | Coq_xH -> Int64.one  
+  let rec of_int x =
+    if x = 0 then Coq_xH
+    else BinPos.Pos.succ (of_int (pred x))
 end
 module Z = struct
-  let to_int p = p
-  let z0 = 0
-  let to_string = string_of_int
+  let to_int = function
+  | Z0 -> 0
+  | Zpos p -> P.to_int p
+  | Zneg p -> - (P.to_int p)
+
+  let to_int64 = function
+  | Z0 -> Int64.zero
+  | Zpos p -> P.to_int64 p
+  | Zneg p -> Int64.neg (P.to_int64 p)
+
+  let z0 = Z0
+  let to_string x = string_of_int (to_int x)
 end
   (*
  *   type t = positive = Coq_xI of t | Coq_xO of t | Coq_xH
@@ -138,8 +159,13 @@ end
 (* Coq's [N] type and some of its operations *)
 
  module N = struct
-
-   let to_int x = x
+   let to_int = function
+     | N0 -> 0
+     | Npos p -> P.to_int p
+  
+   let of_int i = 
+      if i = 0 then N0
+      else Npos (P.of_int i)
 end
 (*   type t = coq_N = N0 | Npos of positive
  *
@@ -329,13 +355,13 @@ end
  * let coqint_of_camlint64 : int64 -> Integers.Int64.int = Z.of_uint64
  *    (\* interpret the int64 as unsigned so that result Z is in range for int *\) *)
 
-let camlint_of_coqint : Integers.Int.int -> int32 = fun x -> Int32.of_int x
-let camlint64_of_coqint : Integers.Int64.int -> int64 = Int64.of_int
+let camlint_of_coqint : Integers.Int.int -> int32 = fun x -> Int32.of_int (Z.to_int x)
+let camlint64_of_coqint : Integers.Int64.int -> int64 = fun x -> Z.to_int64 x
 
 (* Atoms (positive integers representing strings) *)
-type positive = int
-let atom_of_string = (Hashtbl.create 17 : (string, positive) Hashtbl.t)
-let string_of_atom = (Hashtbl.create 17 : (positive, string) Hashtbl.t)
+type atom = positive
+let atom_of_string = (Hashtbl.create 17 : (string, int) Hashtbl.t)
+let string_of_atom = (Hashtbl.create 17 : (int, string) Hashtbl.t)
 let next_atom = ref 1
 
 let intern_string s =
@@ -349,6 +375,7 @@ let intern_string s =
     a
 
 let extern_atom a =
+  let a = P.to_int a in
   try
     Hashtbl.find string_of_atom a
   with Not_found ->
@@ -360,11 +387,11 @@ let first_unused_ident () = !next_atom
 
 let char_of_ascii a =
   let code = Ascii.coq_N_of_ascii a in
-  Char.chr code
+  Char.chr (N.to_int code)
 
 let ascii_of_char a =
   let code = Char.code a in
-  Ascii.ascii_of_N code
+  Ascii.ascii_of_N (N.of_int code)
 
 let camlstring_of_coqstring (s: String0.string) =
   let open String0 in

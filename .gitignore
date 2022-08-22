@@ -106,3 +106,4 @@ bootstrap/certicoqc/tests/CertiCoq.CertiCoqC.compile.certicoqc.h
 bootstrap/certicoqc/tests/glue.CertiCoq.CertiCoqC.compile.certicoqc.c
 bootstrap/certicoqc/tests/glue.CertiCoq.CertiCoqC.compile.certicoqc.h
 compile.certicoqchk.ir
+benchmarks/test_primitive

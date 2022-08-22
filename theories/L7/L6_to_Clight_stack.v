@@ -702,7 +702,7 @@ Definition make_case_switch (x:positive) (ls:labeled_statements) (ls': labeled_s
 From Coq Require Import Lia.
 
 Definition to_int64 (i : PrimInt63.int) : int64. 
-  exists (Uint63.to_Z i).
+  exists (Uint63.to_Z i * 2 + 1)%Z.
   pose proof (Uint63.to_Z_bounded i).
   unfold Uint63.wB in H. unfold Int64.modulus, Int64.wordsize, Wordsize_64.wordsize.
   unfold Uint63.size in H. rewrite two_power_nat_correct. unfold Zpower_nat. simpl.

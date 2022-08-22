@@ -155,6 +155,8 @@ extraction/eAstUtils.ml
 extraction/eAstUtils.mli
 extraction/eEnvMap.mli
 extraction/eEnvMap.ml
+extraction/eLiftSubst.mli
+extraction/eLiftSubst.ml
 extraction/eCSubst.ml
 extraction/eCSubst.mli
 extraction/eWellformed.mli
@@ -179,6 +181,8 @@ extraction/eInlineProjections.mli
 extraction/eInlineProjections.ml
 extraction/eConstructorsAsBlocks.mli
 extraction/eConstructorsAsBlocks.ml
+extraction/eCoInductiveToInductive.mli
+extraction/eCoInductiveToInductive.ml
 extraction/eTransform.mli
 extraction/eTransform.ml
 extraction/eqDecInstances.ml

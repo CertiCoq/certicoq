@@ -177,7 +177,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let suff = opts.ext in
       let cstr = fname ^ suff ^ ".c" in
       let hstr = fname ^ suff ^ ".h" in
-      CI.printProg prg nenv cstr imports (* (List.map Tm_util.string_to_list imports) *);
+      CI.printProg prg nenv cstr imports;
       CI.printProg header nenv hstr [];
 
       (* let cstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
@@ -185,13 +185,14 @@ module CompileFunctor (CI : CompilerInterface) = struct
       * Pipeline.printProg (nenv,prg) cstr;
       * Pipeline.printProg (nenv,header) hstr; *)
       let time = (Unix.gettimeofday() -. time) in
-      Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
+      debug_msg debug (Printf.sprintf "Printed to file in %f s.." time);
       debug_msg debug "Pipeline debug:";
       debug_msg debug (string_of_bytestring dbg)
     | (CompM.Err s, dbg) ->
       debug_msg debug "Pipeline debug:";
       debug_msg debug (string_of_bytestring dbg);
       CErrors.user_err ~hdr:"pipeline" (str "Could not compile: " ++ (pr_string s) ++ str "\n")
+
 
   (* Generate glue code for the compiled program *)
   let generate_glue (standalone : bool) opts globs =
@@ -234,7 +235,80 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let generate_glue_only opts gr =
     let term = quote opts gr in
     generate_glue true opts (Ast0.Env.declarations (fst (Obj.magic term)))
+    let gc_stack_o = "gc_stack.o"
 
+    let compiler_executable debug = 
+      let whichcmd = Unix.open_process_in "which gcc || which clang" in
+      let result = 
+        try Stdlib.input_line whichcmd 
+        with End_of_file -> ""
+      in
+      let status = Unix.close_process_in whichcmd in
+      match status with
+      | Unix.WEXITED 0 -> 
+        if debug then Feedback.msg_debug Pp.(str "Compiler is " ++ str result);
+        result
+      | _ -> failwith "Compiler not found"
+
+  type line = 
+    | EOF
+    | Info of string
+    | Error of string
+
+  let read_line stdout stderr =
+    try Info (input_line stdout)
+    with End_of_file -> 
+      try Error (input_line stderr)
+      with End_of_file -> EOF
+  
+  let run_program debug prog =
+    let (stdout, stdin, stderr) = Unix.open_process_full ("./" ^ prog) (Unix.environment ()) in
+    let continue = ref true in
+    while !continue do 
+      match read_line stdout stderr with
+      | EOF -> debug_msg debug ("Program terminated"); continue := false
+      | Info s -> Feedback.msg_info Pp.(str prog ++ str": " ++ str s)
+      | Error s -> Feedback.msg_warning Pp.(str prog ++ str": " ++ str s)
+    done
+
+
+  let compile_C opts gr imports =
+    let imports = "coq_c_ffi.h" :: imports in
+    let () = compile_with_glue opts gr imports in
+    let debug = opts.debug in
+    let fname = opts.filename in
+    let suff = opts.ext in
+    let name = fname ^ suff in
+    let compiler = compiler_executable debug in
+    let cmd =
+        Printf.sprintf "%s -Wno-everything -g -I ../_opam/lib/ocaml -I . -c -o %s %s" 
+          compiler (name ^ ".o") (name ^ ".c") 
+    in
+    let importso = 
+      let oname s = 
+        assert (CString.is_suffix ".h" s);
+        String.sub s 0 (String.length s - 2) ^ ".o"
+      in 
+      let l = "certicoq_run_main.o" :: List.map oname imports in
+      String.concat " " l
+    in
+    debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
+    match Unix.system cmd with
+    | Unix.WEXITED 0 -> 
+      let linkcmd =
+        Printf.sprintf "%s -Wno-everything -g -I ../_opam/lib/ocaml -I . -o %s %s %s %s" 
+          compiler name gc_stack_o (name ^ ".o") importso
+      in
+      debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
+      (match Unix.system linkcmd with
+      | Unix.WEXITED 0 ->
+          debug_msg debug (Printf.sprintf "Compilation ran fine, running %s" name);
+          run_program debug name
+      | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str linkcmd)
+      | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n))
+    | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str cmd)
+    | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n  ++ str" while running " ++ str cmd)
+  
   let print_to_file (s : string) (file : string) =
     let f = open_out file in
     Printf.fprintf f "%s\n" s;
@@ -254,7 +328,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let file = fname ^ suff ^ ".ir" in
       print_to_file (string_of_bytestring prg) file;
       let time = (Unix.gettimeofday() -. time) in
-      Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
+      debug_msg debug (Printf.sprintf "Printed to file in %f s.." time);
       debug_msg debug "Pipeline debug:";
       debug_msg debug (string_of_bytestring dbg)
     | (CompM.Err s, dbg) ->

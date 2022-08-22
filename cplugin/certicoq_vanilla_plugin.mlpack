@@ -164,6 +164,7 @@ ERemoveParams
 EOptimizePropDiscr
 EInlineProjections
 EConstructorsAsBlocks
+ECoInductiveToInductive
 ETransform
 Erasure
 SafeTemplateErasure

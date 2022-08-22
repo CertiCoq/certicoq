@@ -561,7 +561,7 @@ From Equations Require Import Equations.
 
 Definition prim_value (p : prim_tag) : Set :=
  match p with
- | primInt => Int63.int
+ | primInt => Uint63.int
  | primFloat => PrimFloat.float
  end.
 

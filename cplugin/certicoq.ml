@@ -303,7 +303,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       * Pipeline.printProg (nenv,prg) cstr;
       * Pipeline.printProg (nenv,header) hstr; *)
       let time = (Unix.gettimeofday() -. time) in
-      Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
+      debug_msg debug (Printf.sprintf "Printed to file in %f s.." time);
       debug_msg debug "Pipeline debug:";
       debug_msg debug (string_of_bytestring dbg)
     | (CompM.Err s, dbg) ->

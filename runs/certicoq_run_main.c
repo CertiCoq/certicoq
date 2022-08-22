@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "gc.h"
+#include "gc_stack.h"
 #include <time.h>
-
 
 extern void body(struct thread_info *);
 
@@ -13,25 +12,17 @@ _Bool is_ptr(value s) {
 }
 
 int main(int argc, char *argv[]) {
-  value val;
+  // value val;
   struct thread_info* tinfo;
   clock_t start, end;
   double msec, sec;
 
-  // Specify number of runs
-  int n = 1;
-  if (argc > 1) n = atoi(argv[1]);
-
   start = clock();
-  // Run Coq program
-  for (int i = 0; i < n; i ++) {
-    tinfo = make_tinfo();
-    body(tinfo);
-  }
+  tinfo = make_tinfo();
+  body(tinfo);
   end = clock();
 
-  val = tinfo -> args[1];
-  printf("%llu\n", ( (unsigned long long) val >> 1));
+  // val = tinfo -> args[1];
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;
   msec = 1000*sec;

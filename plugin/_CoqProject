@@ -13,6 +13,9 @@ g_certicoq.mlg
 certicoq_debug.mli
 certicoq_debug.ml
 certicoq_plugin.mlpack
+Loader.v
+CoqMsgFFI.v
+PrimInt63.v
 CertiCoq.v
 
 static/caml_nat.mli

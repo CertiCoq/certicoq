@@ -7,12 +7,24 @@ Require Import CertiCoq.Benchmarks.lib.coind.
 From MetaCoq.Template Require Import bytestring MCString.
 From CertiCoq.Plugin Require Import CertiCoq.
 
+Definition foo := 0.
+
 Open Scope bs.
 
 Import ListNotations.
 Import VeriStar.
 
 CertiCoq -help.
+
+Class Show (A : Type) := show : A -> string.
+
+#[export] Instance nat_show : Show nat := string_of_nat.
+
+Definition string_of_bool b :=
+  if (b : bool) then "true" else "false".
+#[export] Instance bool_show : Show bool := string_of_bool.
+
+#[export] Instance list_show {A} {SA : Show A} : Show (list A) := string_of_list show.
 
 CertiCoq Generate Glue -file "basics" [ nat, list, bool ].
 
@@ -68,7 +80,7 @@ Definition color := Color.main.
 
 (* Lazy factorial *)
 
-Definition lazy_factorial := string_of_Z (coind.lfact 150).
+Definition lazy_factorial := coq_msg_info (string_of_Z (coind.lfact 150)).
 
 (* Sha *)
 

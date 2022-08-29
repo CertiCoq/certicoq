@@ -33,7 +33,7 @@ char* string_of_coq_string(value s) {
   return str;
 }
 
-value print_msg_info(value msg) {
+value coq_msg_info(value msg) {
   char *str = string_of_coq_string(msg);
   puts(str);
   free(str);
@@ -47,7 +47,7 @@ value coq_user_error(value msg) {
   return 1;
 }
 
-value print_msg_debug(value msg) {
+value coq_msg_debug(value msg) {
   char *str = string_of_coq_string(msg);
   fputs(str, stdout);
   free(str);

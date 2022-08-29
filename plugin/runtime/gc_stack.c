@@ -104,8 +104,8 @@ void printtree(FILE *f, struct heap *h, value v) {
 
 #endif
 
-void abort_with(char *s) {
-  fprintf(stderr, s);
+void abort_with(const char *s) {
+  fputs(s, stderr);
   exit(1);
 }
 
@@ -147,7 +147,7 @@ void forward (value *from_start,  /* beginning of from-space */
         sz = Wosize_hd(hd);
         new = *next+1;
         *next = new+sz;
-        if (sz > 50) printf("Moving value %lld with tag %lld with %d fields\n", v, hd, sz);
+        if (sz > 50) printf("Moving value %lu with tag %lu with %d fields\n", v, hd, sz);
         for(i = -1; i < sz; i++) {
           /* printf("Moving field %d\n", i); */
           Field(new, i) = Field(v, i);
@@ -442,7 +442,7 @@ void* export(struct thread_info *ti) {
 
   /* if args[1] is unboxed, return it */
   if(!Is_block(ti->args[1])){
-    return ti->args[1];
+    return (void*) ti->args[1];
   }
 
   /* otherwise collect all that is reachable from it to the last generation, then compact it into value_sp */

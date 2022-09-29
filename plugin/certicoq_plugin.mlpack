@@ -163,7 +163,6 @@ EOptimizePropDiscr
 EInlineProjections
 ELiftSubst
 EConstructorsAsBlocks
-ECoInductiveToInductive
 ETransform
 Erasure
 SafeTemplateErasure

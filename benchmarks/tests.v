@@ -32,6 +32,10 @@ CertiCoq Generate Glue -file "basics" [ nat, list, bool ].
 
 Definition demo1 := List.app (List.repeat true 500) (List.repeat false 300).
 
+(*Definition test := coq_msg_debug (show demo1).
+
+CertiCoq Run test.*)
+
 (* Demo 2 *)
 
 Fixpoint repeat2 {A : Type} (x y : A) (n : nat) :=

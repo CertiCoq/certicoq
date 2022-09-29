@@ -189,8 +189,8 @@ extraction/eInlineProjections.mli
 extraction/eInlineProjections.ml
 extraction/eConstructorsAsBlocks.mli
 extraction/eConstructorsAsBlocks.ml
-extraction/eCoInductiveToInductive.mli
-extraction/eCoInductiveToInductive.ml
+# extraction/eCoInductiveToInductive.mli
+# extraction/eCoInductiveToInductive.ml
 extraction/eTransform.mli
 extraction/eTransform.ml
 extraction/eqDecInstances.ml

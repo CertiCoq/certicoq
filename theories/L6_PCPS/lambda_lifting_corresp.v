@@ -506,6 +506,7 @@ Section Lambda_lifting_corresp.
       eapply H0; eauto. rewrite Heq1. reflexivity.       
     - rewrite !Heq1. econstructor; eauto. rewrite <- Heq2. eauto.
     - rewrite !Heq1. econstructor; eauto.
+    - econstructor. eauto. eapply H; eauto. now rewrite Heq1.
     - rewrite Heq1. econstructor; eauto. eapply H; eauto.
       rewrite Heq1. reflexivity.
     - rewrite Heq1. econstructor; eauto.
@@ -699,6 +700,11 @@ Section Lambda_lifting_corresp.
             eapply PS.mem_spec in Hc. congruence.
         + destructAll.
           repeat apply_set_specs_ctx; eauto.
+      - eapply IHe in H. inv H.
+        + inv H0. left. split. eapply Free_Eprim_val ; eauto.
+          intros Hc. subst. apply H1. now apply_set_specs; eauto.
+          intros Hc. apply H1. now apply_set_specs; eauto.
+        + inv H0; eauto.
       - eapply IHe in H. inv H.
         + inv H0. left. split. eapply Free_Eprim2 ; eauto.
           intros Hc. subst. apply H1. now apply_set_specs; eauto.
@@ -1162,6 +1168,19 @@ Section Lambda_lifting_corresp.
       + eapply return_triple; intros u s1 Hfr.
         eexists. split; eauto.
         econstructor.
+    - simpl. eapply bind_triple.
+      + inv Hun. repeat normalize_bound_var_in_ctx. eapply IHe; try eauto with Ensembles_DB.
+        * eapply Disjoint_Included_r; [| eassumption ].
+          rewrite <- bound_var_Eprim_val.
+          now apply bound_var_occurs_free_Eprim_val_Included.
+        * eapply Disjoint_Included_r. now apply occurs_free_Eprim_val_Included.
+          eapply Union_Disjoint_r. now eauto with Ensembles_DB.
+          eapply Disjoint_Singleton_r; eassumption.
+      + intros x s1. apply return_triple. 
+        intros _ [c2 _u] [S' [Hexp Hfr]]. eexists; split; eauto.
+        constructor; eauto. rewrite <- rename_not_in_domain_f_eq.
+        eassumption.
+        repeat normalize_bound_var_in_ctx. eapply Disjoint_In_l. eassumption. sets.
     - simpl. eapply bind_triple.
       + inv Hun. repeat normalize_bound_var_in_ctx. eapply IHe; try eauto with Ensembles_DB.
         * eapply Disjoint_Included_r; [| eassumption ].

@@ -214,6 +214,7 @@ Fixpoint sizeof_exp e : nat :=
   | (Efun fds e) => 1 + sizeof_fundefs fds + sizeof_exp e
   | (Eapp x _ ys) => 1 + length ys
   | (Eprim x _ ys e) => 1 + length ys + sizeof_exp e
+  | (Eprim_val x p e) => 1 + sizeof_exp e
   | (Ehalt x) => 1
   end
 with sizeof_fundefs f : nat := 
@@ -259,6 +260,9 @@ Inductive uncurry_step :
 | uncurry_proj : forall x c n y e e1 s s1 m m1,
     uncurry_step e s m e1 s1 m1 ->
     uncurry_step (Eproj x c n y e) s m (Eproj x c n y e1) s1 m1
+| uncurry_prim_val : forall x p e e1 s s1 m m1,
+    uncurry_step e s m e1 s1 m1 ->
+    uncurry_step (Eprim_val x p e) s m (Eprim_val x p e1) s1 m1
 | uncurry_prim : forall x p args e e1 s s1 m m1,
     uncurry_step e s m e1 s1 m1 ->
     uncurry_step (Eprim x p args e) s m (Eprim x p args e1) s1 m1
@@ -334,6 +338,7 @@ Ltac uncurry_step_induction P Q IHuncurry IH :=
   | intros ? ? ? ? ? ? ? ? ? IHuncurry IH
   | intros ? ? ? ? ? ? ? ? IHuncurry IH
   | intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
+  | intros ? ? ? ? ? ? ? ? IHuncurry IH
   | intros ? ? ? ? ? ? ? ? ? IHuncurry IH
   | intros ? ? ? ? ? ? ? IHuncurry IH
   | intros ? ? ? ? ? ? ? IHuncurry IH
@@ -362,6 +367,9 @@ forall (P : exp -> Ensemble var -> localMap -> exp -> Ensemble var -> localMap -
  P (Ecase x (arm :: arms)) s m (Ecase x (arm :: arms1)) s1 m1) ->
 (forall (x : var) (c : ctor_tag) (n : N) (y : var) (e e1 : exp) (s s1 : Ensemble var) (m m1 : localMap),
  uncurry_step e s m e1 s1 m1 -> P e s m e1 s1 m1 -> P (Eproj x c n y e) s m (Eproj x c n y e1) s1 m1) ->
+(forall (x : var) p (e e1 : exp) (s s1 : Ensemble var) (m m1 : localMap),
+ uncurry_step e s m e1 s1 m1 ->
+ P e s m e1 s1 m1 -> P (Eprim_val x p e) s m (Eprim_val x p e1) s1 m1) ->
 (forall (x : var) (p : prim) (args : list var) (e e1 : exp) (s s1 : Ensemble var) (m m1 : localMap),
  uncurry_step e s m e1 s1 m1 ->
  P e s m e1 s1 m1 -> P (Eprim x p args e) s m (Eprim x p args e1) s1 m1) ->
@@ -435,6 +443,7 @@ Ltac uncurry_step_induction_mut P Q IHuncurry IH :=
   | intros ? ? ? ? ? ? ? ? ? IHuncurry IH
   | intros ? ? ? ? ? ? ? ? IHuncurry IH
   | intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
+  | intros ? ? ? ? ? ? ? ? IHuncurry IH
   | intros ? ? ? ? ? ? ? ? ? IHuncurry IH
   | intros ? ? ? ? ? ? ? IHuncurry IH
   | intros ? ? ? ? ? ? ? IHuncurry IH
@@ -726,6 +735,8 @@ Proof with eauto with Ensembles_DB.
     rewrite used_vars_Eproj in *.
     destruct_Union_Included.
     apply Union_Included; [|apply Union_Included]...
+  - apply uncurry_step_s_nondecreasing in IHstep. repeat normalize_used_vars; destruct_Union_Included.
+    eapply Union_Included; eauto with Ensembles_DB.
   - (* Fcons e *)
     apply uncurry_step_s_nondecreasing in IHstep.
     rewrite used_vars_Fcons in *.
@@ -961,6 +972,9 @@ Proof with eauto with Ensembles_DB.
     rewrite Intersection_Same_set...
     all: rewrite used_vars_Eproj in H...
     eapply Included_trans; eauto...
+  - repeat normalize_used_vars. rewrite Intersection_Union_distr.
+    rewrite IH; [rewrite Intersection_Same_set; eauto with Ensembles_DB|].
+    eapply Included_trans; [|eauto]; eauto with Ensembles_DB.
   - (* Fcons fds *)
     repeat rewrite used_vars_Fcons.
     repeat rewrite Intersection_Union_distr.
@@ -1130,6 +1144,12 @@ Proof with eauto with Ensembles_DB.
     intros contra.
     contradiction H3.
     eapply uncurry_step_maintains_bindings_fn; eauto.
+  - (* Eprim_val *)
+    rewrite used_vars_Eprim_val in H; inv H0.
+    assert (used_vars e \subset s).
+    eapply Union_Included_r...
+    constructor; auto.
+    intros contra; contradiction H3; eapply uncurry_step_maintains_bindings_fn; eauto.
   - (* Eprim *)
     rewrite used_vars_Eprim in H; inv H0.
     assert (used_vars e \subset s).

@@ -53,6 +53,7 @@ Section Bounds.
     (* Unused *)
     | Prf_e => 0
     | Prim_e x => 0
+    | Prim_val_e x => 0
     end.
     
 
@@ -295,6 +296,9 @@ Section FV.
     - (* Prf_e *)
       inv H. repeat normalize_occurs_free. repeat normalize_sets. 
       xsets.
+
+    - (* Prim_val_e *)
+      inv H. repeat normalize_occurs_free. repeat normalize_sets. xsets.
 
     - (* Prim_e *)
       inv H.

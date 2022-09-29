@@ -200,6 +200,11 @@ Section CC.
                            (Eproj f'' clo_tag 0%N f'
                                   (Eproj env' clo_tag 1%N f'
                                          (Eapp f'' ft (env' :: ys')))) C
+  | CC_Eprim_val :
+      forall Scope Funs GFuns c genv Γ FVs S x C p e e',
+        Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope)  :|: (FromList FVs :|: [set Γ])) ->
+        Closure_conversion (x |: Scope) Funs GFuns c genv Γ FVs e e' C ->
+        Closure_conversion Scope Funs GFuns c genv Γ FVs (Eprim_val x p e) (Eprim_val x p (C |[ e' ]|)) Hole_c
   | CC_Eprim :
       forall Scope Funs GFuns c genv Γ FVs S S' x ys ys' C C' f e e',
         Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope)  :|: (FromList FVs :|: [set Γ])) ->

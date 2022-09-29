@@ -1070,6 +1070,13 @@ Section Closure_conversion_correct.
       + eassumption.
       + intros x Hget. repeat subst_exp. eexists; split; eauto.
       + eapply Forall2_cc_approx_var_env; eauto.
+
+    - (* Case Eprim_val *)
+     inv Hcc.
+     cbn [app_ctx_f].
+     eapply cc_approx_exp_prim_val_compat.
+     eapply HOOT.
+
     (* Case Eprim *)
     - inv Hcc.
       assert(Hadm : sizeOf_exp_ctx C <= 4 * length l) by (eapply project_vars_sizeOf_ctx_exp; eauto).

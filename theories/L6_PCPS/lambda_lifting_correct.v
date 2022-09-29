@@ -1645,6 +1645,7 @@ Section Lambda_lifting_correct.
       eapply preord_exp_app_compat; eauto. 
       eapply Forall2_preord_var_env_map. eassumption.
       normalize_occurs_free...
+    - inv Hun. eapply preord_exp_prim_val_compat; eauto.
     - inv Hun. eapply preord_exp_prim_compat; eauto.
       + eapply Forall2_preord_var_env_map. eassumption.
         normalize_occurs_free...

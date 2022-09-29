@@ -968,7 +968,33 @@ Section LogRelCC.
       now eapply Hbase; eauto.
       eapply cc_approx_val_monotonic. eassumption. lia.
   Qed.
+
+  Lemma cc_approx_exp_prim_val_compat k rho1 rho2 x1 x2 p e1 e2 :
+    post_OOT' (Eprim_val x1 p e1) rho1 (Eprim_val x2 p e2) rho2 P2 ->
+    cc_approx_exp k P2 PG (Eprim_val x1 p e1, rho1) (Eprim_val x2 p e2, rho2).
+  Proof.
+    intros Hoot v1 cin cout Hleq1 Hstep1. inv Hstep1.
+    - (* OOT *) 
+      exists OOT, cin, <0>. split. constructor; eassumption. 
+      split; [| now eauto ]. eapply Hoot; eauto.
+   - inv H. 
+(*   edestruct cc_approx_var_env_get_list as [vs2 [Hget' Hpre']]; [| eassumption | ]; eauto.
+     edestruct Prim_axiom_cc as [v2 [Heq Hprev2]]; eauto.
+     edestruct (Hpre (k - 1)) as [v2' [c2 [Hstepv2' [Hpost2 Hprev2']]]]; [ | | | | | | eassumption | ]; eauto.
+     simpl in *; lia. simpl in *; lia. 
+     eexists. exists (c2 + cost (Eprim x2 f ys2 e2)). split; [| split ].
+     econstructor 2; eauto. lia. 
+     econstructor; eauto.
+     replace (c2 + cost (Eprim x2 f ys2 e2) - cost (Eprim x2 f ys2 e2)) with c2 by lia.  
+     eassumption.
+     replace cin with (cin - cost (Eprim x1 f ys1 e1) + cost (Eprim x2 f ys2 e2)).
+     2:{ simpl in *. eapply Forall2_length in Hall. rewrite Hall. lia. } 
+     eapply HPost. eassumption.
+     eapply cc_approx_res_monotonic. eassumption. 
+    simpl in *. lia. *)
+  Qed.
   
+
   Axiom Prim_axiom_cc :
     forall f f' v1,
       M.get f pr = Some f' ->

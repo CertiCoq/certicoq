@@ -190,7 +190,7 @@ Section SUBSETS.
       intros e' k1 vars1 S1 S2 Hrel. inv Hrel.
       eapply Setminus_Included. 
     - (* Prim_val_e *)
-      intros p e' k1 vars1 S1 S2 Hrel. inv Hrel.
+      intros p e' k1 vars1 S1 S2 Hrel. inv Hrel. now eapply Setminus_Included_preserv_alt. 
 
     - (* Prim_e *)
       intros p e' k1 vars1 S1 S2 Hrel. inv Hrel.
@@ -1440,8 +1440,11 @@ Section Post.
            
       - (* Prim_val_e *)
         intros p e1 e2 m k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
-               He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
+               Hlt He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
         inv He1; inv He2. 
+        eapply preord_exp_prim_val_compat.
+        eapply Hprops.
+
         
       - (* Prim_e *)
         intros p e1 e2 m k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4

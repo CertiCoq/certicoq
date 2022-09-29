@@ -516,6 +516,11 @@ Section Translate.
         x \in S ->
         cps_cvt_rel S Prf_e vn k tgm (S \\ [set x]) (Econstr x default_tag nil (Eapp k kon_tag (x::nil)))
                     
+  | e_Prim_val :
+    forall S vn k p tgm x,
+          x \in S ->
+          cps_cvt_rel S (Prim_val_e p) vn k tgm (S \\ [set x]) (Eprim_val x p (Eapp k kon_tag (x::nil)))
+
   with cps_cvt_rel_exps :
          Ensemble var -> expression.exps -> list var -> exp -> list var -> list var ->
          constr_env -> Ensemble var -> exp -> Prop :=

@@ -658,6 +658,10 @@ Inductive Exp_lambda_lift :
 | LL_Eapp_unknown :
     forall ζ σ f ft xs S,
       Exp_lambda_lift ζ σ (Eapp f ft xs) S (Eapp (σ f) ft (map σ xs)) S
+| LL_Eprim_val :
+    forall ζ σ x p e e' S S',
+      Exp_lambda_lift ζ (σ {x ~> x}) e S e' S' ->
+      Exp_lambda_lift ζ σ (Eprim_val x p e) S (Eprim_val x p e') S'
 | LL_Eprim :
     forall ζ σ x f ys e e' S S',
       Exp_lambda_lift ζ (σ {x ~> x}) e S e' S' ->

@@ -1536,6 +1536,35 @@ Proof with now eauto with Ensembles_DB.
     eapply lifted_name_eq; eauto.
   - repeat normalize_occurs_free. rewrite FromList_map_image_FromList.
     rewrite !image_Union, image_Singleton. sets.
+  - inv H0. repeat normalize_occurs_free. 
+    rewrite !image_Union.
+    eapply Included_trans.
+    eapply Included_Setminus_compat.
+    eapply IHe; eauto.
+    + eapply Disjoint_Included_l.
+      eapply Included_trans. eapply image_extend_Included'. reflexivity.
+      rewrite !Setminus_Union_distr. 
+      repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
+      eapply Union_Disjoint_l; sets. 
+      eapply Disjoint_Included; [| | eapply H1 ]; sets.
+      eapply Union_Disjoint_r.
+      eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply H2 ]; sets.
+      sets.
+    + eapply Disjoint_Included_r. eapply bound_var_occurs_free_Eprim_val_Included. eassumption.
+    + repeat normalize_occurs_free_in_ctx. repeat normalize_bound_var_in_ctx.
+      eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := [set v]).
+      tci. eapply Union_Disjoint_r; sets. 
+    + repeat normalize_bound_var_in_ctx. sets.
+    + reflexivity.
+    + rewrite !Setminus_Union_distr.
+      eapply Union_Included; [| now sets ].
+      eapply Included_trans. eapply Included_Setminus_compat.
+      eapply image_extend_Included'. reflexivity.
+      rewrite !Setminus_Union_distr, !image_Union, !Setminus_Union_distr.
+      eapply Union_Included; sets.
+      eapply Union_Included; sets.
+      eapply Union_Included; xsets.
+
   - inv H0. repeat normalize_occurs_free.
     rewrite FromList_map_image_FromList. eapply Union_Included. now sets.
     eapply Included_trans. eapply Included_Setminus_compat.
@@ -2248,6 +2277,11 @@ Proof with now eauto with Ensembles_DB.
       repeat find_subsets.
       eapply Union_Disjoint_l; eapply Union_Disjoint_r; sets.
       eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply H0]; sets.
+  - constructor; eauto.
+    + intros Hc. eapply Exp_lambda_lift_bound_var in H11.
+      eapply H11 in Hc. inv Hc; eauto.
+      inv H. eapply H0; constructor; eauto.
+    + repeat normalize_bound_var_in_ctx. eapply IHe; sets.
   - constructor; eauto.
     + intros Hc. eapply Exp_lambda_lift_bound_var in H12.
       eapply H12 in Hc. inv Hc; eauto.

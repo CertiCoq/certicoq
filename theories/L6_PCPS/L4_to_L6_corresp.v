@@ -499,6 +499,17 @@ Section Corresp.
       + econstructor; eauto.
       + eassumption.
 
+    - unfold cps_cvt.
+      eapply bind_triple. eapply pre_post_copy. eapply get_named_str_fresh.
+      intros x w. simpl.
+      eapply pre_curry_l. intros Hfresh.
+      eapply pre_curry_l. intros Hx.
+      eapply return_triple.
+      intros; destructAll.
+      eexists; split.
+      + econstructor; eauto.
+      + eassumption.
+
     - (* enil *)
 
       eapply return_triple. intros. eexists. split; [ | eassumption ].

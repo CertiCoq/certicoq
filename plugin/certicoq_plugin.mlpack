@@ -146,7 +146,6 @@ SafeTemplateChecker
 
 EAst
 EAstUtils
-ELiftSubst
 EInduction
 ECSubst
 EWellformed
@@ -161,7 +160,6 @@ EProgram
 ERemoveParams
 EOptimizePropDiscr
 EInlineProjections
-ELiftSubst
 EConstructorsAsBlocks
 ETransform
 Erasure

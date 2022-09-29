@@ -163,8 +163,8 @@ extraction/eAstUtils.ml
 extraction/eAstUtils.mli
 extraction/eEnvMap.mli
 extraction/eEnvMap.ml
-extraction/eLiftSubst.ml
-extraction/eLiftSubst.mli
+# extraction/eLiftSubst.ml
+# extraction/eLiftSubst.mli
 extraction/eCSubst.ml
 extraction/eCSubst.mli
 extraction/eWellformed.mli

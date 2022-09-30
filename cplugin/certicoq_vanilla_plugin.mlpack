@@ -6,6 +6,7 @@ Datatypes
 Caml_nat
 Caml_bool
 Caml_option
+Caml_comparison
 Bool
 Equalities
 Decimal
@@ -74,6 +75,7 @@ Transform
 Universes0
 All_Forall
 BasicAst
+Primitive
 Environment
 Ast0
 Typing0
@@ -89,8 +91,6 @@ Logic0
 
 Errors0
 
-FLT
-Zaux
 Digits
 List_util
 Monad0
@@ -147,11 +147,9 @@ SafeTemplateChecker
 
 EAst
 EAstUtils
-ELiftSubst
 EInduction
 ECSubst
 EWellformed
-EGlobalEnv
 EEnvMap
 EWcbvEval
 ESpineView
@@ -164,7 +162,6 @@ ERemoveParams
 EOptimizePropDiscr
 EInlineProjections
 EConstructorsAsBlocks
-ECoInductiveToInductive
 ETransform
 Erasure
 SafeTemplateErasure
@@ -182,7 +179,6 @@ Classes2
 
 OrdersFacts
 MSetInterface
-Bracket
 ExtLibMisc
 Smallstep
 
@@ -209,6 +205,7 @@ Rename
 Inline_letapp
 Uncurry
 BinNatDef
+Cps_proto_univ
 Cps_proto
 Prototype
 Proto_util

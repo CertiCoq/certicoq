@@ -1,0 +1,61 @@
+(************************************************************************)
+(*         *   The Coq Proof Assistant / The Coq Development Team       *)
+(*  v      *         Copyright INRIA, CNRS and contributors             *)
+(* <O___,, * (see version control and CREDITS file for authors & dates) *)
+(*   \VV/  **************************************************************)
+(*    //   *    This file is distributed under the terms of the         *)
+(*         *     GNU Lesser General Public License Version 2.1          *)
+(*         *     (see LICENSE file for the text of the license)         *)
+(************************************************************************)
+
+(** Extraction to OCaml of native 63-bit machine integers. *)
+
+From Coq Require Uint63 Sint63 Extraction.
+
+(** Basic data types used by some primitive operators. *)
+
+Extract Inductive prod => "( * )" [ "" ].
+Extract Inductive DoubleType.carry => "Uint63.carry" [ "Uint63.C0" "Uint63.C1" ].
+
+(** Primitive types and operators. *)
+Extract Constant Uint63.int => "Uint63.t".
+Extraction Inline Uint63.int.
+(* Otherwise, the name conflicts with the primitive OCaml type [int] *)
+
+Extract Constant Uint63.lsl => "Uint63.l_sl".
+Extract Constant Uint63.lsr => "Uint63.l_sr".
+Extract Constant Sint63.asr => "Uint63.a_sr".
+Extract Constant Uint63.land => "Uint63.l_and".
+Extract Constant Uint63.lor => "Uint63.l_or".
+Extract Constant Uint63.lxor => "Uint63.l_xor".
+
+Extract Constant Uint63.add => "Uint63.add".
+Extract Constant Uint63.sub => "Uint63.sub".
+Extract Constant Uint63.mul => "Uint63.mul".
+Extract Constant Uint63.mulc => "Uint63.mulc".
+Extract Constant Uint63.div => "Uint63.div".
+Extract Constant Uint63.mod => "Uint63.rem".
+Extract Constant Sint63.div => "Uint63.divs".
+Extract Constant Sint63.rem => "Uint63.rems".
+
+
+Extract Constant Uint63.eqb => "fun x y -> Caml_bool.to_coq (Uint63.equal x y)".
+Extract Constant Uint63.ltb => "fun x y -> Caml_bool.to_coq (Uint63.lt x y)".
+Extract Constant Uint63.leb => "fun x y -> Caml_bool.to_coq (Uint63.le x y)".
+Extract Constant Sint63.ltb => "fun x y -> Caml_bool.to_coq (Uint63.lts x y)".
+Extract Constant Sint63.leb => "fun x y -> Caml_bool.to_coq (Uint63.les x y)".
+
+Extract Constant Uint63.addc => "Uint63.addc".
+Extract Constant Uint63.addcarryc => "Uint63.addcarryc".
+Extract Constant Uint63.subc => "Uint63.subc".
+Extract Constant Uint63.subcarryc => "Uint63.subcarryc".
+
+Extract Constant Uint63.diveucl => "Uint63.diveucl".
+Extract Constant Uint63.diveucl_21 => "Uint63.div21".
+Extract Constant Uint63.addmuldiv => "Uint63.addmuldiv".
+
+Extract Constant Uint63.compare => "fun x y -> Caml_comparison.to_coq (Uint63.compare x y)".
+Extract Constant Sint63.compare => "fun x y -> Caml_comparison.to_coq (Uint63.compares x y)".
+
+Extract Constant Uint63.head0 => "Uint63.head0".
+Extract Constant Uint63.tail0 => "Uint63.tail0".

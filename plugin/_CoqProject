@@ -16,6 +16,7 @@ certicoq_plugin.mlpack
 Loader.v
 CoqMsgFFI.v
 PrimInt63.v
+PrimFloats.v
 CertiCoq.v
 
 static/caml_nat.mli
@@ -141,6 +142,10 @@ extraction/primInt63.mli
 extraction/primInt63.ml
 extraction/uint0.mli
 extraction/uint0.ml
+extraction/decimalString.mli
+extraction/decimalString.ml
+extraction/hexadecimalString.mli
+extraction/hexadecimalString.ml
 extraction/primitive.mli
 extraction/primitive.ml
 extraction/pCUICPrimitive.mli

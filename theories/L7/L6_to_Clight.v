@@ -705,7 +705,7 @@ Next Obligation.
 Definition compile_primitive (p : AstCommon.primitive) : expr :=
   match projT1 p as tag return AstCommon.prim_value tag -> expr with
   | Primitive.primInt => fun i => Econst_long (to_int64 i) (Tlong Unsigned noattr)
-  | Primitive.primFloat => fun f => Econst_float (to_float f) (Tlong Unsigned noattr)
+  | Primitive.primFloat => fun f => Econst_float (to_float f) (Tfloat F64 noattr)
   end (projT2 p).
 
 Fixpoint translate_body

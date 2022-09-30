@@ -1,9 +1,15 @@
 #include "values.h"
 
+#ifndef PRIM_INT63_H
+#define PRIM_INT63_H
+
 typedef value primint;
 typedef value primbool;
 typedef value primintcarry;
 typedef value primintpair;
+
+extern primbool mk_bool(int);
+extern value mk_pair(struct thread_info *ti, value x, value y);
 
 extern primint prim_int63_add(primint x, primint y);
 extern primint prim_int63_sub(primint x, primint y);
@@ -38,3 +44,5 @@ extern primintpair prim_int63_diveucl_21(struct thread_info *, primint x, primin
 extern primintpair prim_int63_diveucl(struct thread_info *, primint x, primint y);
 
 extern primint prim_int63_addmuldiv(primint x, primint y, primint z);
+
+#endif /* PRIM_INT63_H */

@@ -173,6 +173,16 @@ let print_pointer_hook
    : (formatter -> Values.block * Integers.Int.int -> unit) ref
    = ref (fun p (b, ofs) -> ())
 
+let is_nan (f : float) = f <> f
+let is_infinity f = f = infinity
+let is_neg_infinity f = f = neg_infinity
+   
+let print_float p fmt f =
+  if is_nan f then fprintf p "%s" "NAN"
+  else if is_infinity f then fprintf p "%s" "INFINITY"
+  else if is_neg_infinity f then fprintf p "%s" "-INFINITY"
+  else fprintf p fmt f
+  
 let print_typed_value p v ty =
   match v, ty with
   | Vint n, Ctypes.Tint(I32, Unsigned, _) ->
@@ -180,7 +190,7 @@ let print_typed_value p v ty =
   | Vint n, _ ->
       fprintf p "%ld" (camlint_of_coqint n)
   | Vfloat f, _ ->
-      fprintf p "%.15F" (camlfloat_of_coqfloat f)
+      print_float p "%.15F" (camlfloat_of_coqfloat f)
   | Vsingle f, _ ->
       fprintf p "%.15Ff" (camlfloat_of_coqfloat32 f)
   | Vlong n, Ctypes.Tlong(Unsigned, _) ->

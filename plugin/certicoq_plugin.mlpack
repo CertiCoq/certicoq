@@ -72,6 +72,8 @@ Transform
 Universes0
 All_Forall
 BasicAst
+DecimalString
+HexadecimalString
 Primitive
 Environment
 Ast0

@@ -16,7 +16,7 @@ void call_coq_msg_info(value msg)
   caml_callback(*closure_f, msg);
 }
 
-value print_msg_info(value msg) {
+value coq_msg_info(value msg) {
   call_coq_msg_info(msg);
   return Val_unit;
 }
@@ -46,7 +46,7 @@ void call_coq_msg_debug(value msg)
   caml_callback(*closure_f, msg);
 }
 
-value print_msg_debug(value msg) {
+value coq_msg_debug(value msg) {
   call_coq_msg_debug(msg);
   return Val_unit;
 }

@@ -2,11 +2,6 @@ From CertiCoq.Plugin Require Import CertiCoq.
 From MetaCoq.Template Require Import utils.
 Open Scope bs_scope.
 
-
-Axiom (coq_msg_info : string -> unit).
-Axiom (coq_user_error : string -> unit).
-Axiom (coq_msg_debug : string -> unit).
-
 Require Import CertiCoq.Compiler.pipeline.
 From CertiCoq.Common Require Import Pipeline_utils.
 Require Import ExtLib.Structures.Monad.
@@ -76,6 +71,13 @@ Extract Constants [
   coq_user_error => "coq_user_error"
    ] 
 Include [ "print.h" ].*)
+
+(* CertiCoq Show IR -time -O 1 certicoqc.
+Extract Constants [
+  (* coq_msg_debug => "print_msg_debug", *)
+  coq_msg_info => "print_msg_info"
+   ] 
+Include [ "print.h" ]. *)
 
 Eval compute in "Compiling CertiCoq's pipeline".
 

@@ -137,11 +137,11 @@ let fix_declarations decls =
   List.map fix_decl decls
 
 let fix_quoted_program (p : Ast0.Env.program) = 
-  let ({ Ast0.Env.universes = universes; declarations = declarations }, term) = p in
+  let ({ Ast0.Env.universes = universes; declarations = declarations; retroknowledge = retro }, term) = p in
   let term = fix_term term in
   let universes = fix_universes universes in
   let declarations = fix_declarations declarations in
-  { Ast0.Env.universes = universes; declarations }, term
+  { Ast0.Env.universes = universes; declarations; retroknowledge = retro }, term
 
 let check prog =
   info "Calling CertiCoq-compiled Coq checker";

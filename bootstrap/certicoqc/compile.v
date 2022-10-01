@@ -44,46 +44,5 @@ Definition cps_show (t : L6_FullTerm) :=
 Definition certicoqc (opts : Options) (p : Template.Ast.Env.program) := 
   let () := coq_msg_info "certicoqc called" in
   compile opts p.
-(* CertiCoq Show IR -time -O 1 certicoq_pipeline
-Extract Constants [
-  (* coq_msg_debug => "print_msg_debug", *)
-  coq_msg_info => "print_msg_info"
-]. *)
 
-(* From MetaCoq Require Import PCUICWfEnvImpl SafeTemplateChecker.
-
-Definition typecheck_program (p : Template.Ast.Env.program) : bool :=
-  match infer_and_print_template_program 
-    (cf := config.default_checker_flags) 
-    (guard := Erasure.fake_guard_impl) 
-    (nor := PCUICSN.default_normalizing)
-    p Universes.Monomorphic_ctx with
-  | inl ty => let () := coq_msg_info ty in true
-  | inr err => let () := coq_user_error err in false
-  end.  
-
-Eval compute in "Compiling MetaCoq's type-checker". *)
-
-(*CertiCoq Compile -time -O 1 typecheck_program
-Extract Constants [
-  (* coq_msg_debug => "print_msg_debug", *)
-  coq_msg_info => "print_msg_info",
-  coq_user_error => "coq_user_error"
-   ] 
-Include [ "print.h" ].*)
-
-(* CertiCoq Show IR -time -O 1 certicoqc.
-Extract Constants [
-  (* coq_msg_debug => "print_msg_debug", *)
-  coq_msg_info => "print_msg_info"
-   ] 
-Include [ "print.h" ]. *)
-
-Eval compute in "Compiling CertiCoq's pipeline".
-
-CertiCoq Compile -time -O 1 certicoqc
-Extract Constants [
-  (* coq_msg_debug => "print_msg_debug", *)
-  coq_msg_info => "print_msg_info"
-   ] 
-Include [ "print.h" ].
+CertiCoq Compile -time -O 1 certicoqc.

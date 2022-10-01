@@ -13,6 +13,10 @@ g_certicoq_vanilla.mlg
 certicoq_debug.mli
 certicoq_debug.ml
 certicoq_vanilla_plugin.mlpack
+Loader.v
+CoqMsgFFI.v
+PrimInt63.v
+PrimFloats.v
 CertiCoqVanilla.v
 
 static/caml_bool.mli

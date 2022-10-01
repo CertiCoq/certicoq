@@ -702,10 +702,18 @@ Next Obligation.
   rewrite Binary.valid_binary_SF2FF; auto.
   Admitted.
 
-Definition compile_primitive (p : AstCommon.primitive) : expr :=
-  match projT1 p as tag return AstCommon.prim_value tag -> expr with
-  | Primitive.primInt => fun i => Econst_long (to_int64 i) (Tlong Unsigned noattr)
-  | Primitive.primFloat => fun f => Econst_float (to_float f) (Tfloat F64 noattr)
+Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
+  (x : positive) (f : Floats.float) := 
+  let tag := c_int 253%Z (Tlong Unsigned noattr) in
+  x ::= [val] (allocPtr +' (c_int Z.one val)) ;;;
+  allocIdent ::= allocPtr +' (c_int 2 val) ;;;
+  Field(var x, -1) :::= tag ;;;
+  Field(var x, 0) :::= Econst_float f (Tfloat F64 noattr).
+
+Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env) (x : positive) (p : AstCommon.primitive) : statement :=
+  match projT1 p as tag return AstCommon.prim_value tag -> statement with
+  | Primitive.primInt => fun i => x ::= Econst_long (to_int64 i) (Tlong Unsigned noattr)
+  | Primitive.primFloat => fun f => compile_float cenv ienv fenv map x (to_float f)
   end (projT2 p).
 
 Fixpoint translate_body
@@ -782,7 +790,7 @@ Fixpoint translate_body
          c)
   | Eprim_val x p e' =>
     prog <- translate_body e' fenv cenv ienv map ;;
-    ret (x ::= compile_primitive p ;;; prog)
+    ret (compile_primitive cenv ienv fenv map x p ;;; prog)
   | Eprim x p vs e' =>
     prog <- translate_body e' fenv cenv ienv map ;;
     pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
@@ -870,7 +878,7 @@ Fixpoint translate_body_fast
          c)
   | Eprim_val x p e' =>
     prog <- translate_body e' fenv cenv ienv map ;;
-    ret (x ::= compile_primitive p ;;; prog)
+    ret (compile_primitive cenv ienv fenv map x p ;;; prog)
   | Eprim x p vs e' =>
     prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
     pr_call <- mkPrimCall x p (length vs) fenv map vs ;;

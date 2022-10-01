@@ -39,14 +39,14 @@ Extract Constant AstCommon.timePhase =>
                Feedback.msg_debug (Pp.str (Printf.sprintf ""Time elapsed in %s:  %f"" (Caml_bytestring.caml_string_of_bytestring c) time));
                temp)".
 
-(* Int31 *)
+(* Int31
 Extract Inductive Int31.digits => "bool" [ "false" "true" ].
 Extract Inductive Int31.int31 => "int" [ "Camlcoq.Int31.constr" ] "Camlcoq.Int31.destr".
 Extract Constant Int31.twice => "Camlcoq.Int31.twice".
 Extract Constant Int31.twice_plus_one => "Camlcoq.Int31.twice_plus_one".
 Extract Constant Int31.compare31 => "Camlcoq.Int31.compare".
 Extract Constant Int31.On => "0".
-Extract Constant Int31.In => "1".
+Extract Constant Int31.In => "1". *)
 
 Extract Inductive Decimal.int => "decimal_int" [ "DecimalPos" "DecimalNeg" ] "(fun hp hn d -> match d with DecimalPos p -> hp p | DecimalNeg p -> hn p)".
 Extract Inductive Hexadecimal.int => "hexadecimal_int" [ "HexadecimalPos" "HexadecimalNeg" ] "(fun hp hn d -> match d with HexadecimalPos p -> hp p | HexadecimalNeg p -> hn p)".

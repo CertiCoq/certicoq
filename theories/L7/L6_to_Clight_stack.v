@@ -308,6 +308,9 @@ Notation valPtrPtr := (Tpointer valPtr {| attr_volatile := false; attr_alignas :
 
 Notation argvTy := (Tpointer val {| attr_volatile := false; attr_alignas := None |}).
 
+Definition floatType := Tfloat F64 noattr.
+Notation floatPtr := (Tpointer floatType {| attr_volatile := false; attr_alignas := None |}).
+
 Notation boolTy := (Tint IBool Unsigned noattr).
 
 Fixpoint mkFunTyList (n : nat) : typelist :=
@@ -723,10 +726,18 @@ Next Obligation.
   rewrite Binary.valid_binary_SF2FF; auto.
   Admitted.
 
-Definition compile_primitive (p : AstCommon.primitive) : expr :=
-  match projT1 p as tag return AstCommon.prim_value tag -> expr with
-  | Primitive.primInt => fun i => Econst_long (to_int64 i) (Tlong Unsigned noattr)
-  | Primitive.primFloat => fun f => Econst_float (to_float f) (Tlong Unsigned noattr)
+Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
+  (x : positive) (f : Floats.float) := 
+  let tag := c_int 253%Z (Tlong Unsigned noattr) in
+  x ::= [val] (allocPtr +' (c_int Z.one val)) ;
+  allocIdent ::= allocPtr +' (c_int 2 val) ;
+  Field(var x, -1) :::= tag ;
+  *([floatPtr] (var x)) :::= Econst_float f floatType.
+
+Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env) (x : positive) (p : AstCommon.primitive) : statement :=
+  match projT1 p as tag return AstCommon.prim_value tag -> statement with
+  | Primitive.primInt => fun i => x ::= Econst_long (to_int64 i) (Tlong Unsigned noattr)
+  | Primitive.primFloat => fun f => compile_float cenv ienv fenv map x (to_float f)
   end (projT2 p).
 
 Section Translation.
@@ -846,7 +857,7 @@ Section Translation.
     end
   | Eprim_val x p e' => 
     progn <- translate_body e' fenv cenv ienv map slots ;;
-    Ret ((x ::= compile_primitive p ; fst progn), snd progn)
+    Ret ((compile_primitive cenv ienv fenv map x p ; fst progn), snd progn)
 
   | Eprim x p vs e' =>
     match prims ! p with

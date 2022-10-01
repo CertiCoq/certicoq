@@ -62,9 +62,9 @@ Extract Constant AstCommon.timePhase =>
                Feedback.msg_debug (Pp.str (Printf.sprintf ""Time elapsed in %s:  %f"" (Caml_bytestring.caml_string_of_bytestring c) time));
                temp)".
 
-Extract Inductive Decimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
-Extract Inductive Hexadecimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
-Extract Inductive Number.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
+Extract Inductive Decimal.int => "decimal_int" [ "DecimalPos" "DecimalNeg" ] "(fun hp hn d -> match d with DecimalPos p -> hp p | DecimalNeg p -> hn p)".
+Extract Inductive Hexadecimal.int => "hexadecimal_int" [ "HexadecimalPos" "HexadecimalNeg" ] "(fun hp hn d -> match d with HexadecimalPos p -> hp p | HexadecimalNeg p -> hn p)".
+Extract Inductive Number.int => "number_int" [ "IntDecimal" "IntHexadecimal" ] "(fun hp hn d -> match d with IntDecimal p -> hp p | IntHexadecimal p -> hn p)".
 
 Extraction Inline Equations.Prop.Classes.noConfusion.
 Extraction Inline Equations.Prop.Logic.eq_elim.

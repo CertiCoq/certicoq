@@ -48,7 +48,7 @@ END
 
 VERNAC COMMAND EXTEND CertiCoq_Register CLASSIFIED AS SIDEFF
 | [ "CertiCoq" "Register" "[" vanilla_extract_cnst_list_sep(l, ",") "]" "Include" "[" string_list_sep(imps, ",") "]" ] -> {
-    Certicoq.register l imps
+  Certicoq.register l imps
   }
 END
 

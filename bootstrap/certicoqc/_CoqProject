@@ -1,0 +1,7 @@
+-R theories CertiCoq.CertiCoqC
+
+theories/Loader.v
+theories/CoqMsgFFI.v
+theories/PrimInt63.v
+theories/PrimFloats.v
+theories/CertiCoqC.v

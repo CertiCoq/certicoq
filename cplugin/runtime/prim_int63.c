@@ -7,7 +7,7 @@ typedef value primbool;
 typedef value primintcarry;
 typedef value primintpair;
 
-#define trace(...) //printf(__VA_ARGS__)
+#define trace(...) printf(__VA_ARGS__)
 
 #define maxuint63 0x7FFFFFFFFFFFFFFF
 
@@ -27,19 +27,19 @@ primint prim_int63_sub(primint x, primint y)
 
 primint prim_int63_mul(primint x, primint y)
 { 
-  // trace("Calling prim_int63_mul\n");
+  trace("Calling prim_int63_mul\n");
   return (Val_long (Unsigned_long_val(x) * Unsigned_long_val(y)));
 }
 
 primint prim_int63_mod(primint x, primint y)
 { 
-  // trace("Calling prim_int63_mod\n");
+  trace("Calling prim_int63_mod\n");
   return (Val_long (Unsigned_long_val(x) % Unsigned_long_val(y)));
 }
 
 primint prim_int63_div(primint x, primint y)
 { 
-  // trace("Calling prim_int63_div\n");
+  trace("Calling prim_int63_div\n");
   return (Val_long (Unsigned_long_val(x) / Unsigned_long_val(y)));
 }
 
@@ -48,7 +48,7 @@ primint prim_int63_land(primint x, primint y)
   unsigned long long xr = Unsigned_long_val(x);
   unsigned long long yr = Unsigned_long_val(y);
   trace("Calling prim_int63_land on %llu (%p) and %llu (%p): %llu, %llu \n", xr, (void*)x, yr, (void*)y, xr & yr, (unsigned long long) (x & y));
-  return (x & y);
+  return (Val_long (xr & yr));
 }
 primint prim_int63_lsl(primint x, primint y)
 {

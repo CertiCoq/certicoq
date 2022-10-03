@@ -704,7 +704,7 @@ Next Obligation.
 
 Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
   (x : positive) (f : Floats.float) := 
-  let tag := c_int 253%Z (Tlong Unsigned noattr) in
+  let tag := c_int 1277%Z (Tlong Unsigned noattr) in
   x ::= [val] (allocPtr +' (c_int Z.one val)) ;;;
   allocIdent ::= allocPtr +' (c_int 2 val) ;;;
   Field(var x, -1) :::= tag ;;;

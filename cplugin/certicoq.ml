@@ -62,6 +62,8 @@ let fix_term (p : Ast0.term) : Ast0.term =
   | Coq_tProj (p, t) -> Coq_tProj (p, aux t)
   | Coq_tFix (mfix, i) -> Coq_tFix (map aux_def mfix, i)
   | Coq_tCoFix (mfix, i) -> Coq_tCoFix (map aux_def mfix, i)
+  | Coq_tInt i -> p
+  | Coq_tFloat f -> p
   and aux_pred { puinst = puinst; pparams = pparams; pcontext = pcontext; preturn = preturn } =
     { puinst; pparams = map aux pparams; pcontext; preturn = aux preturn }
   and aux_branch { bcontext = bcontext; bbody = bbody } =
@@ -336,6 +338,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let debug = opts.debug in
     let options = make_pipeline_options opts in
     let imports = get_global_includes () @ imports in
+    debug_msg debug (Printf.sprintf "Imports: %s" (String.concat " " imports));
     let p = CI.compile options term in
     match p with
     | (CompM.Ret ((nenv, header), prg), dbg) ->

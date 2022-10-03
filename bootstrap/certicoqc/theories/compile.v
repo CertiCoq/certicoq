@@ -45,4 +45,20 @@ Definition certicoqc (opts : Options) (p : Template.Ast.Env.program) :=
   let () := coq_msg_info "certicoqc called" in
   compile opts p.
 
+Set Warnings "-primitive-turned-into-axiom".
+(* 
+From MetaCoq Require Import Primitive Template.Ast.
+
+Definition certicoqc (opts : Options) (p : Template.Ast.Env.program) := 
+  (* let () := coq_msg_info "certicoqc called" in *)
+  (* let () := coq_msg_info ("got program: " ++ Pretty.print_program false 100 p) in *)
+  match snd p with 
+  | Template.Ast.tConst kn _ => 
+    match Env.lookup_env (fst p) kn with
+    | Some (ConstantDecl {| cst_body := Some (tInt i) |}) => coq_msg_info (string_of_prim_int i)
+    | _ => tt
+    end
+  | _ => tt
+  end. *)
+
 CertiCoq Compile -time -O 1 certicoqc.

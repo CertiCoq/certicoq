@@ -9,7 +9,9 @@ typedef value primfloatintpair;
 typedef value primfloat_comparison;
 typedef value primfloat_class;
 
-#define trace(...) //printf(__VA_ARGS__)
+#define trace(...) printf(__VA_ARGS__)
+
+#define Double_block 1277 // Double_tag & 1024
 
 primfloat mk_float (struct thread_info *tinfo, double x) {
   trace("Calling mk_float with %a, %f\n", x, x);
@@ -25,7 +27,7 @@ primfloat mk_float (struct thread_info *tinfo, double x) {
     $alloc = (*tinfo).alloc;
     $limit = (*tinfo).limit;
   }
-  *($alloc + 0LLU) = Double_tag;
+  *($alloc + 0LLU) = Double_block;
   *((double*) ($alloc + 1LLU)) = x;
   (*tinfo).alloc = (*tinfo).alloc + 2LLU;
   // trace ("mk_float return adress: %p\n", (void*)(((unsigned long long *) $alloc) + 1LLU));

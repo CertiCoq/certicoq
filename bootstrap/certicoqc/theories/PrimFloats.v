@@ -1,4 +1,4 @@
-From CertiCoq.VanillaPlugin Require Import Loader.
+From CertiCoq.CertiCoqC Require Import Loader.
 From Coq Require Import PrimFloat.
 
 CertiCoq Register [ 

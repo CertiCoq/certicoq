@@ -22,13 +22,22 @@ COQOPTS = -Q ../../theories/L7 CertiCoq.L7 -Q ../../libraries CertiCoq.Libraries
 	-I ../../plugin \
 	-Q ../../cplugin CertiCoq.VanillaPlugin \
 	-I ../../cplugin \
-	-Q . CertiCoq.CertiCoqC
+	-Q theories CertiCoq.CertiCoqC
 
+VFILES = theories/Loader.v theories/PrimInt63.v theories/PrimFloats.v theories/CertiCoqC.v
 
 CCOMPILEROPTS = -fPIC -g -c -I . -I ../../plugin/runtime -I ${OCAMLLIB} -w -Wno-everything -O2
 # ccomp CCOMPOPTS = -g -c -I . -I ${OCAMLLIB} -Wno-int-conversion -O2
 
-plugin: compile.vo Loader.vo
+.PHONY: certicoqc
+
+plugin: theories/compile.vo certicoqc
+
+Makefile.certicoqc: _CoqProject
+	coq_makefile -f _CoqProject -o Makefile.certicoqc
+	
+certicoqc: Makefile.certicoqc certicoqc_plugin.cmxs
+	$(MAKE) -f Makefile.certicoqc
 
 test: test.vo
 
@@ -39,10 +48,7 @@ test.vo: test.v
 clean: 
 	rm *.cm* *.o *.vo
 
-Loader.vo: Loader.v certicoqc_plugin.cmxs
-	coqc ${COQOPTS} Loader.v
-
-compile.vo ${GENCFILES} &: compile.v
+theories/compile.vo ${GENCFILES} &: theories/compile.v
 	coqc ${COQOPTS} $<
 
 %.o: %.c
@@ -60,7 +66,7 @@ certicoqc_plugin.cmxa: certicoqc_plugin.cmx
 g_certicoqc.ml: g_certicoqc.mlg certicoqc.cmx certicoqc_plugin_wrapper.cmx
 	coqpp $<
 
-certicoqc_wrapper.c: compile.vo
+certicoqc_wrapper.c: theories/compile.vo
 
 certicoqc.cmx: certicoqc_plugin_wrapper.cmx
 
@@ -73,8 +79,9 @@ certicoqc.cmx: certicoqc_plugin_wrapper.cmx
 %.cmx: %.ml	%.cmi
 	ocamlfind opt -c ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin -o $@ $<
 
-install: Loader.vo compile.vo certicoqc_plugin.cmxs
+install: theories/compile.vo certicoqc_plugin.cmxs
 	install -d "$(COQLIBINSTALL)"
-	install -m 0644 Loader.v Loader.vo compile.v compile.vo certicoqc_plugin.cmx* "$(COQLIBINSTALL)"
+	install -m 0644 theories/compile.v theories/compile.vo certicoqc_plugin.cmx* "$(COQLIBINSTALL)"
+	make -f Makefile.certicoqc install
 
 .PHONY: plugin test

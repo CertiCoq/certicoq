@@ -18,7 +18,7 @@
 -I benchmarks/metacoq_erasure
 -I benchmarks/certicoq_pipeline
 
--R bootstrap/certicoqc          CertiCoq.CertiCoqC
+-R bootstrap/certicoqc/theories CertiCoq.CertiCoqC
 -I bootstrap/certicoqc
 -R bootstrap/certicoqchk        CertiCoq.CertiCoqCheck
 -I bootstrap/certicoqchk

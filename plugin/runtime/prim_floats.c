@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <math.h>
 #include "gc_stack.h"
 #include "prim_int63.h"
@@ -9,7 +10,7 @@ typedef value primfloatintpair;
 typedef value primfloat_comparison;
 typedef value primfloat_class;
 
-#define trace(...) printf(__VA_ARGS__)
+#define trace(...) // printf(__VA_ARGS__)
 
 #define Double_block 1277 // Double_tag & 1024
 
@@ -65,14 +66,12 @@ primbool prim_float_equal(primfloat x, primfloat y) {
   { case FP_NORMAL:
     case FP_SUBNORMAL:
     case FP_INFINITE:
-      printf("%i\n", xv == yv);
       return (mk_bool (xv == yv));
 
     case FP_NAN:
       return (mk_bool (isnan (yv)));
 
     case FP_ZERO:
-      printf("%i\n", (xv == yv && ((1 / xv) == (1 / yv))));
       return (mk_bool (xv == yv && ((1 / xv) == (1 / yv))));
 
     default:

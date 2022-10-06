@@ -27,7 +27,14 @@ Import ListNotations.
   | SBound_Letapp2_c :
       forall (f : var) (ft : fun_tag) (xs : list var) (c : exp_ctx) (v' v : var),
         bound_stem_ctx c v' -> bound_stem_ctx (Eletapp_c v f ft xs c) v'
-  | SBound_Prim1_c:
+  | SBound_Prim_val1_c:
+      forall x p c,
+        bound_stem_ctx (Eprim_val_c x p c) x
+  | SBound_Prim_val2_c:
+      forall p c v' v,
+        bound_stem_ctx c v' ->
+        bound_stem_ctx (Eprim_val_c v p c) v'
+| SBound_Prim1_c:
       forall x f ys c,
         bound_stem_ctx (Eprim_c x f ys c) x
   | SBound_Prim2_c:
@@ -91,6 +98,13 @@ Import ListNotations.
              (Union var (bound_stem_ctx c) (Singleton _ v)).
   Proof.
     split; intros x' H; inv H; eauto; eauto. inv H0; eauto.
+  Qed.
+
+  Lemma bound_stem_Eprim_val_c x p c :
+    Same_set _ (bound_stem_ctx (Eprim_val_c x p c))
+             (Union var (bound_stem_ctx c) (Singleton _ x)).
+  Proof.
+    split; intros x' H; inv H; eauto. inv H0; eauto.
   Qed.
 
   Lemma bound_stem_Eprim_c x tau y c :
@@ -167,6 +181,8 @@ Import ListNotations.
         rewrite bound_stem_Fun1_c
       | [ |- context[bound_stem_ctx (Efun2_c _ _)] ] =>
         rewrite bound_stem_Fun2_c
+      | [|- context[bound_stem_ctx (Eprim_val_c _ _ _)]] =>
+        rewrite bound_stem_Eprim_val_c
       | [|- context[bound_stem_ctx (Eprim_c _ _ _ _)]] =>
         rewrite bound_stem_Eprim_c
       | [|- context[bound_stem_fundefs_ctx (Fcons1_c _ _ _ _ _)]] =>
@@ -215,6 +231,8 @@ Import ListNotations.
         rewrite bound_stem_Fun1_c in H
       | [ H : context[bound_stem_ctx (Efun2_c _ _)] |- _ ] =>
         rewrite bound_stem_Fun2_c in H
+      | [ H : context[bound_stem_ctx (Eprim_val_c _ _ _)] |- _ ] =>
+        rewrite bound_stem_Eprim_val_c in H
       | [ H : context[bound_stem_ctx (Eprim_c _ _ _ _)] |- _ ] =>
         rewrite bound_stem_Eprim_c in H
       | [H:context[bound_stem_fundefs_ctx (Fcons1_c _ _ _ _ _)] |- _] =>
@@ -232,6 +250,9 @@ Import ListNotations.
   | NBound_Proj_c: forall  t n r c v' v,
                      bound_not_stem_ctx c v' ->
                      bound_not_stem_ctx (Eproj_c v t n r c) v'
+  | NBound_Prim_val_c: forall p c v' v,
+                     bound_not_stem_ctx c v' ->
+                     bound_not_stem_ctx (Eprim_val_c v p c) v'
   | NBound_Prim_c: forall  t r c v' v,
                      bound_not_stem_ctx c v' ->
                      bound_not_stem_ctx (Eprim_c v t r c) v'
@@ -305,6 +326,13 @@ Import ListNotations.
              (bound_not_stem_ctx c).
   Proof.
     split; intros x' H; auto.  inv H; auto.
+  Qed.
+
+  Lemma bound_not_stem_Eprim_val_c x p c :
+    Same_set _ (bound_not_stem_ctx (Eprim_val_c x p c))
+             (bound_not_stem_ctx c).
+  Proof.
+    split; intros x' H; auto. inv H; auto.
   Qed.
 
   Lemma bound_not_stem_Eprim_c x tau y c :
@@ -390,6 +418,8 @@ Import ListNotations.
       rewrite bound_not_stem_Fun1_c
     | [ |- context[bound_not_stem_ctx (Efun2_c _ _)] ] =>
       rewrite bound_not_stem_Fun2_c
+    | [|- context[bound_not_stem_ctx (Eprim_val_c _ _ _)]] =>
+      rewrite bound_not_stem_Eprim_val_c
     | [|- context[bound_not_stem_ctx (Eprim_c _ _ _ _)]] =>
       rewrite bound_not_stem_Eprim_c
     | [|- context[bound_not_stem_fundefs_ctx (Fcons1_c _ _ _ _ _)]] =>
@@ -412,6 +442,8 @@ Import ListNotations.
       rewrite bound_not_stem_Fun1_c in H
     | [ H : context[bound_not_stem_ctx (Efun2_c _ _)] |- _ ] =>
       rewrite bound_not_stem_Fun2_c in H
+    | [ H : context[bound_not_stem_ctx (Eprim_val_c _ _ _)] |- _ ] =>
+      rewrite bound_not_stem_Eprim_val_c in H
     | [ H : context[bound_not_stem_ctx (Eprim_c _ _ _ _)] |- _ ] =>
       rewrite bound_not_stem_Eprim_c in H
     | [H:context[bound_not_stem_fundefs_ctx (Fcons1_c _ _ _ _ _)] |- _] =>
@@ -512,6 +544,9 @@ Import ListNotations.
     - destruct H as [Dec]; destruct (Dec x); auto.
       destruct (var_dec v x); subst; auto.
       right; intro Hbv; inv Hbv; auto.
+    - destruct H as [Dec]; destruct (Dec x); auto.
+      destruct (var_dec v x); subst; auto.
+      right; intro Hbv; inv Hbv; auto.
     - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
       right. intro Hc. apply Hnin. inv Hc. auto.
     - destruct H as [Dec]; destruct (Dec x) as [Hin | Hnin]; auto.
@@ -535,6 +570,9 @@ Import ListNotations.
     eapply ctx_fundefs_mut' with (P := fun c => Decidable (bound_stem_ctx c));
     split; intro x.
     - right; intro; inv H.
+    - destruct H as [Dec]; destruct (Dec x); auto.
+      destruct (var_dec v x); subst; auto.
+      right; intro Hbv; inv Hbv; auto.
     - destruct H as [Dec]; destruct (Dec x); auto.
       destruct (var_dec v x); subst; auto.
       right; intro Hbv; inv Hbv; auto.
@@ -574,6 +612,10 @@ Import ListNotations.
        rewrite <- Union_assoc.
        rewrite Union_commut with (s1 := [set v]).
        eauto 25 with Ensembles_DB.
+    - rewrite <- H.
+      rewrite <- Union_assoc.
+      rewrite Union_commut with (s1 := [set v]).
+      eauto 25 with Ensembles_DB.
     - rewrite <- H.
       rewrite <- Union_assoc.
       rewrite Union_commut with (s1 := [set v]).

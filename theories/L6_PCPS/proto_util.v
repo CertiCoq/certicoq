@@ -1,6 +1,6 @@
 Require Import Coq.Strings.String Coq.Classes.Morphisms Coq.Relations.Relations.
 Require Import Coq.PArith.BinPos Coq.Sets.Ensembles Lia.
-Require Import L6.identifiers L6.Prototype L6.cps_proto L6.cps L6.cps_util.
+Require Import L6.identifiers L6.Prototype L6.cps_proto_univ L6.cps_proto L6.cps L6.cps_util.
 Require Import L6.Ensembles_util L6.rename L6.shrink_cps L6.map_util.
 
 Require Import Coq.Lists.List.
@@ -299,7 +299,7 @@ Qed.
 
 Definition r_map : Set := M.tree var.
 
-Require Import L6.shrink_cps_correct.
+(* Require Import L6.shrink_cps_correct. *)
 
 Definition image'' σ : Ensemble var := fun y => exists x, M.get x σ = Some y.
 

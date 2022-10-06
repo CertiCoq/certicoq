@@ -73,6 +73,7 @@ Fixpoint compute_fun_env' (n : nat) (fenv : fun_env) (e : exp) : fun_env :=
     | Eletapp x f t vs e' => compute_fun_env' n' (M.set t (N.of_nat (length vs), makeArgList vs) fenv) e'
     | Efun fnd e' => compute_fun_env' n' (compute_fun_env_fundefs n' fnd fenv) e'
     | Eapp x t vs => M.set t (N.of_nat (length vs) , makeArgList vs) fenv
+    | Eprim_val x p e' => compute_fun_env' n' fenv e'
     | Eprim x p vs e' => compute_fun_env' n' fenv e'
     | Ehalt x => fenv
     end
@@ -99,6 +100,7 @@ Fixpoint max_depth (e : exp) : nat :=
   | Eletapp x f t ys e' => S (max_depth e')
   | Efun fnd e' => S (Nat.max (max_depth_fundefs fnd) (max_depth e'))
   | Eapp x t vs => 1
+  | Eprim_val x p e' => S (max_depth e')
   | Eprim x p vs e' => S (max_depth e')
   | Ehalt x => 1
   end
@@ -138,6 +140,7 @@ Fixpoint get_allocs (e : exp) : list positive :=
   | Eletapp x f t xs e' => x :: (get_allocs e')
   | Efun fnd e' => (get_allocs_fundefs fnd) ++ (get_allocs e')
   | Eapp x t vs => nil (* stores into args, not alloc new vars *)
+  | Eprim_val x p e' => x :: (get_allocs e')
   | Eprim x p vs e' => x :: (get_allocs e')
   | Ehalt x => nil
   end
@@ -166,6 +169,7 @@ Fixpoint max_allocs (e : exp) : nat :=
   | Eletapp x f t ys e' => max_allocs e' (* XXX Zoe : This doesn't include the allocation happening by the function *)
   | Efun fnd e' => max (max_allocs_fundefs fnd) (max_allocs e')
   | Eapp x t vs => 0
+  | Eprim_val x p e' => max_allocs e'
   | Eprim x p vs e' => max_allocs e'
   | Ehalt x => 0
   end
@@ -190,6 +194,7 @@ Fixpoint max_args (e : exp) : nat :=
   | Eletapp x f n xs e' => max_args e'
   | Efun fnd e' => max (max_args_fundefs fnd) (max_args e')
   | Eapp x t vs => 0
+  | Eprim_val x p e' => max_args e'
   | Eprim x p vs e' => max_args e'
   | Ehalt x => 2
   end
@@ -672,6 +677,44 @@ Definition make_case_switch
     (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
     (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val) ls').
 
+From Coq Require Import Lia.
+
+
+Definition to_int64 (i : PrimInt63.int) : int64. 
+  exists (Uint63.to_Z i * 2 + 1)%Z.
+  pose proof (Uint63.to_Z_bounded i).
+  unfold Uint63.wB in H. unfold Int64.modulus, Int64.wordsize, Wordsize_64.wordsize.
+  unfold Uint63.size in H. rewrite two_power_nat_correct. unfold Zpower_nat. simpl.
+  destruct H. split. lia. lia.
+Defined.
+
+Definition float64_to_model (f : PrimFloat.float) : float64_model :=
+  exist _ (FloatOps.Prim2SF f) (FloatAxioms.Prim2SF_valid f).
+
+Definition model_to_ff (f : float64_model) : Binary.full_float :=
+  Binary.SF2FF (proj1_sig f).
+
+Program Definition to_float (f : PrimFloat.float) : Floats.float :=
+  Binary.FF2B _ _ (model_to_ff (float64_to_model f)) _.
+Next Obligation.
+  unfold model_to_ff.
+  pose proof (FloatAxioms.Prim2SF_valid f).
+  rewrite Binary.valid_binary_SF2FF; auto.
+  Admitted.
+
+Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
+  (x : positive) (f : Floats.float) := 
+  let tag := c_int 1277%Z (Tlong Unsigned noattr) in
+  x ::= [val] (allocPtr +' (c_int Z.one val)) ;;;
+  allocIdent ::= allocPtr +' (c_int 2 val) ;;;
+  Field(var x, -1) :::= tag ;;;
+  Field(var x, 0) :::= Econst_float f (Tfloat F64 noattr).
+
+Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env) (x : positive) (p : AstCommon.primitive) : statement :=
+  match projT1 p as tag return AstCommon.prim_value tag -> statement with
+  | Primitive.primInt => fun i => x ::= Econst_long (to_int64 i) (Tlong Unsigned noattr)
+  | Primitive.primFloat => fun f => compile_float cenv ienv fenv map x (to_float f)
+  end (projT2 p).
 
 Fixpoint translate_body
          (e : exp)
@@ -745,6 +788,9 @@ Fixpoint translate_body
          Efield tinfd allocIdent valPtr :::= allocPtr ;;;
          Efield tinfd limitIdent valPtr :::= limitPtr ;;;
          c)
+  | Eprim_val x p e' =>
+    prog <- translate_body e' fenv cenv ienv map ;;
+    ret (compile_primitive cenv ienv fenv map x p ;;; prog)
   | Eprim x p vs e' =>
     prog <- translate_body e' fenv cenv ienv map ;;
     pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
@@ -830,6 +876,9 @@ Fixpoint translate_body_fast
          Efield tinfd allocIdent valPtr :::= allocPtr ;;;
          Efield tinfd limitIdent valPtr :::= limitPtr ;;;
          c)
+  | Eprim_val x p e' =>
+    prog <- translate_body e' fenv cenv ienv map ;;
+    ret (compile_primitive cenv ienv fenv map x p ;;; prog)
   | Eprim x p vs e' =>
     prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
     pr_call <- mkPrimCall x p (length vs) fenv map vs ;;

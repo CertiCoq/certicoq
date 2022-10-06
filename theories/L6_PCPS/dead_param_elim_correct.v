@@ -38,6 +38,10 @@ Inductive Elim_expr (L : live_fun) (find_tag : var -> option fun_tag) :  exp -> 
     forall (x : var) (ys : list var) (ct : ctor_tag) (e : exp) (e' : exp), 
       Elim_expr L find_tag e e' ->
       Elim_expr L find_tag (Econstr x ct ys e) (Econstr x ct ys e')
+| Elim_Prim_val : 
+    forall (x : var) p (e : exp) (e' : exp), 
+      Elim_expr L find_tag e e' ->
+      Elim_expr L find_tag (Eprim_val x p e) (Eprim_val x p e')
 | Elim_Prim : 
     forall (x : var) (g : prim) (ys : list var) (e : exp) (e' : exp), 
       Elim_expr L find_tag e e' ->
@@ -947,6 +951,11 @@ Section Correct.
       + eassumption.
       + eassumption.
       + eassumption.
+
+    - (* Eprim_val *)
+      eapply preord_exp_prim_val_compat.
+      + eapply HPost.
+
     - (* Eprim *)
       eapply preord_exp_prim_compat.
       + eapply HPost.

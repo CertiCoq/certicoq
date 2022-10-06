@@ -1,6 +1,6 @@
-From MetaCoq.Template Require Import All Loader.
-From CertiCoq.CertiCoqC Require Import Loader.
-From CertiCoq Require Import CertiCoq.
+From MetaCoq.Template Require Import All Loader Primitive bytestring.
+From Coq Require Import PrimFloat PrimInt63.
+From CertiCoq.CertiCoqC Require Import CertiCoqC.
 
 (* Set MetaCoq Debug. *)
 Set MetaCoq Timing.
@@ -9,26 +9,26 @@ Import ListNotations.
 
 Require Import compcert.common.AST.
 
-Cd "tests".
+Class Show (A : Type) := show : A -> string.
 
-From MetaCoq.Erasure Require Import Erasure.
+#[export] Instance nat_show : Show nat := string_of_nat.
+Local Open Scope bs.
+Definition string_of_bool b :=
+  if (b : bool) then "true" else "false".
+#[export] Instance bool_show : Show bool := string_of_bool.
 
-(* Time CertiCoqC Compile erase_and_print_template_program. *)
-(*Extract Constants [
-  (* coq_msg_debug => "print_msg_debug", *)
-  (* coq_msg_info => "print_msg_info", *)
-   ] 
-Include [ "print.h" ].
-*)
-(* 32sec *)
-(*Cd "../mltests".
-Time CertiCoq Compile erase_and_print_template_program.
-(* 12sec *) *)
+#[export] Instance list_show {A} {SA : Show A} : Show (list A) := string_of_list show.
 
+#[export] Instance float_show : Show PrimFloat.float := string_of_float.
+#[export] Instance prim_int_show : Show PrimInt63.int := string_of_prim_int.
+#[export] Instance Z_show : Show BinNums.Z := string_of_Z.
+Require Import ZArith.
+ 
 From CertiCoq.CertiCoqC Require Import compile.
+From CertiCoq.Common Require Import Pipeline_utils.
 
-Time CertiCoqC Compile -time -O 1 compile.certicoqc
- Extract Constants [ 
-  (* coq_msg_debug => "print_msg_debug", *)
-   coq_msg_info => "print_msg_info" ] 
-Include [ "print.h" ].
+Definition certicoqc (opts : Options) (p : Template.Ast.Env.program) := 
+  let () := coq_msg_info "certicoqc called" in
+  compile opts p.
+
+Time CertiCoqC Compile -build_dir "tests" -time -O 1 certicoqc.

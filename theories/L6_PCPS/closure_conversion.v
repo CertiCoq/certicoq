@@ -200,6 +200,11 @@ Section CC.
                            (Eproj f'' clo_tag 0%N f'
                                   (Eproj env' clo_tag 1%N f'
                                          (Eapp f'' ft (env' :: ys')))) C
+  | CC_Eprim_val :
+      forall Scope Funs GFuns c genv Γ FVs S x C p e e',
+        Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope)  :|: (FromList FVs :|: [set Γ])) ->
+        Closure_conversion (x |: Scope) Funs GFuns c genv Γ FVs e e' C ->
+        Closure_conversion Scope Funs GFuns c genv Γ FVs (Eprim_val x p e) (Eprim_val x p (C |[ e' ]|)) Hole_c
   | CC_Eprim :
       forall Scope Funs GFuns c genv Γ FVs S S' x ys ys' C C' f e e',
         Disjoint _ S (Scope :|: (Funs \\ Scope) :|: GFuns :|: image genv (Funs \\ Scope)  :|: (FromList FVs :|: [set Γ])) ->
@@ -435,11 +440,14 @@ Section CC.
         ret (Eproj ptr clo_tag 0 f'
                    (Eproj Γ clo_tag 1 f'
                           (Eapp ptr ft (Γ :: xs'))), fun e => g1 (g2 e))
+    | Eprim_val x prim e' =>
+      ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) gfuns c Γ ;;
+      ret (Eprim_val x prim ((snd ef) (fst ef)), id)
     | Eprim x prim ys e' =>
       t1 <- get_vars ys mapfv gfuns c Γ ;;
       let '(ys', f) := t1 in
       ef <- exp_closure_conv e' (Maps.PTree.set x BoundVar mapfv) gfuns c Γ ;;
-         ret (Eprim x prim ys' ((snd ef) (fst ef)), f)
+      ret (Eprim x prim ys' ((snd ef) (fst ef)), f)
     | Ehalt x =>
       t1 <- get_var x mapfv gfuns c Γ ;;
       let '(x', f) := t1 in

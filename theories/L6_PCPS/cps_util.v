@@ -563,7 +563,6 @@ Proof.
   unfold binding_in_map. intros x Hget.
   unfold key_set, In in *.
   destruct (M.get x rho); eauto.
-  exfalso; eauto.
 Qed.
 
 Inductive dsubterm_e:exp -> exp -> Prop :=
@@ -571,6 +570,8 @@ Inductive dsubterm_e:exp -> exp -> Prop :=
     forall x t ys e, dsubterm_e e (Econstr x t ys e)
 | dsubterm_proj :
     forall v t n y e, dsubterm_e e (Eproj v t n y e)
+| dsubterm_prim_val :
+    forall x p e, dsubterm_e e (Eprim_val x p e)
 | dsubterm_prim :
     forall x p ys e, dsubterm_e e (Eprim x p ys e)
 | dsubterm_letapp :
@@ -674,6 +675,10 @@ Inductive num_occur: exp -> var -> nat -> Prop :=
   forall x t ys e v n,
     num_occur e v n ->
     num_occur (Econstr x t ys e) v (n + (num_occur_list ys v))
+| Num_occ_prim_val:
+    forall x p e v n,
+      num_occur e v n ->
+      num_occur (Eprim_val x p e) v n
 | Num_occ_prim:
     forall x f ys e v n,
       num_occur e v n ->
@@ -728,6 +733,10 @@ Inductive num_occur_ec: exp_ctx -> var -> nat -> Prop :=
   forall c v n x t ys,
     num_occur_ec c v n ->
     num_occur_ec (Econstr_c x t ys c) v (num_occur_list ys v + n)
+| Noec_prim_val:
+    forall c v n x p,
+      num_occur_ec c v n ->
+      num_occur_ec (Eprim_val_c x p c) v ( n )
 | Noec_prim:
     forall c v n x f ys,
       num_occur_ec c v n ->
@@ -778,6 +787,10 @@ Inductive num_binding_e: exp -> var -> nat -> Prop :=
     forall v' t n' y e v n,
       num_binding_e e v n ->
       num_binding_e (Eproj v' t n' y e) v (num_occur_list [v'] v + n)
+| Ub_prim_val:
+    forall e v n x p,
+      num_binding_e e v n ->
+      num_binding_e (Eprim_val x p e) v (n)
 | Ub_prim:
     forall e v n x f ys,
       num_binding_e e v n ->
@@ -849,6 +862,7 @@ Proof.
       destructAll.
       eexists; constructor; eauto.
     + exists 0; constructor.
+    + now exists x; constructor.
     + exists (num_occur_list [v0] v + x); constructor; auto.
     + exists 0; constructor.
   - induction fds.
@@ -967,6 +981,12 @@ Proof.
     constructor. rewrite IHc.
     eexists; eexists; eauto.
     lia.    
+  - inv H. firstorder.
+  - destructAll. inv H.
+    eapply num_occur_n. cbn. constructor; eauto.
+    erewrite IHc.
+    eexists; eexists; eauto.
+    lia.
   - inv H. apply IHc in H6. destructAll.
     eexists; eexists.
     split.
@@ -1218,6 +1238,14 @@ Proof.
     eapply num_occur_ec_n.
     constructor. rewrite IHc1. eauto.
     lia.
+  - inv H. apply IHc1 in H5. destructAll.
+    eexists. exists x1. split.
+    constructor; eauto. split; auto.
+  - destructAll.
+    inv H.
+    eapply num_occur_ec_n.
+    constructor; eauto. rewrite IHc1. eauto.
+    lia.
  - inv H. apply IHc1 in H6. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
@@ -1350,6 +1378,10 @@ Fixpoint inline_letapp
     ret (Efun1_c B C, v)
   | Eapp f ft ys =>
     ret (Eletapp_c z f ft ys Hole_c, z)
+  | Eprim_val x p e  =>
+    res <- inline_letapp e z ;;
+    let (C, v) := (res : exp_ctx * var) in      
+    ret (Eprim_val_c x p C, v)
   | Eprim x p ys e  =>
     res <- inline_letapp e z ;;
     let (C, v) := (res : exp_ctx * var) in      
@@ -1360,6 +1392,7 @@ Fixpoint inline_letapp
 Fixpoint straight_code (e : exp) :=
   match e with
   | Econstr _ _ _ e
+  | Eprim_val _ _ e
   | Eprim _ _ _ e
   | Eproj _ _ _ _ e
   | Eletapp _ _ _ _ e 

@@ -34,15 +34,16 @@ Section IP.
       (H6 : forall (n : name) (e : expression.exp), P e -> forall e0 : expression.exp, P e0 -> P (Let_e n e e0))
       (H7 : forall e : efnlst, P1 e -> forall n : N, P (Fix_e e n))
       (H9 : P Prf_e)
-      (H10 : forall p : positive, P (Prim_e p))
-      (H11 : P0 enil)
-      (H12 : forall e : expression.exp, P e -> forall e0 : exps, P0 e0 -> P0 (econs e e0))
-      (H13 : P1 eflnil)
-      (H14 : forall (n : name) (e : expression.exp),
+      (H10 : forall p, P (Prim_val_e p))
+      (H11 : forall p : positive, P (Prim_e p))
+      (H12 : P0 enil)
+      (H13 : forall e : expression.exp, P e -> forall e0 : exps, P0 e0 -> P0 (econs e e0))
+      (H14 : P1 eflnil)
+      (H15 : forall (n : name) (e : expression.exp),
           (forall n' e', e = Lam_e n' e' ->  P e' -> forall e0 : efnlst, P1 e0 -> P1 (eflcons n e e0)) /\          
           (~ isLambda e -> P e -> forall e0 : efnlst, P1 e0 -> P1 (eflcons n e e0)))
-      (H15 : P2 brnil_e)
-      (H16 : forall (d : dcon) (p : N * list name) (e : expression.exp), P e -> forall b : branches_e, P2 b -> P2 (brcons_e d p e b)).
+      (H16 : P2 brnil_e)
+      (H17 : forall (d : dcon) (p : N * list name) (e : expression.exp), P e -> forall b : branches_e, P2 b -> P2 (brcons_e d p e b)).
 
     Lemma exp_ind_alt2 : forall e, P e
     with exps_ind_alt2 : forall es, P0 es
@@ -59,27 +60,28 @@ Section IP.
         + eapply H7. eapply efnlst_ind_alt2.
         + eapply H9.
         + eapply H10.
-      - intros. destruct es.
         + eapply H11.
-        + eapply H12. eapply exp_ind_alt2.
+      - intros. destruct es.
+        + eapply H12.
+        + eapply H13. eapply exp_ind_alt2.
           eapply exps_ind_alt2.
       - intros. destruct fns.
-        + eapply H13.
+        + eapply H14.
         + assert (Hdec : isLambda e \/ ~ isLambda e).
           { destruct e; eauto. now left. }      
           destruct Hdec.
           * destruct e; try contradiction.
-            edestruct H14.
+            edestruct H15.
             eapply H0. reflexivity. 
             eapply exp_ind_alt2; eauto.
             eapply efnlst_ind_alt2.
-          * edestruct H14.
+          * edestruct H15.
             eapply H8. eassumption.
             eapply exp_ind_alt2; eauto.
             eapply efnlst_ind_alt2.
       - intros brs. destruct brs.
-        + eapply H15.
         + eapply H16.
+        + eapply H17.
           eapply exp_ind_alt2.
           eapply branches_ind_alt2.
     Qed. 
@@ -187,6 +189,8 @@ Section SUBSETS.
     - (* Prf_e *)
       intros e' k1 vars1 S1 S2 Hrel. inv Hrel.
       eapply Setminus_Included. 
+    - (* Prim_val_e *)
+      intros p e' k1 vars1 S1 S2 Hrel. inv Hrel. now eapply Setminus_Included_preserv_alt. 
 
     - (* Prim_e *)
       intros p e' k1 vars1 S1 S2 Hrel. inv Hrel.
@@ -656,6 +660,7 @@ Section Post.
         (forall (n : name) (e : expression.exp), P e -> forall e0 : expression.exp, P e0 -> P (Let_e n e e0)) ->
         (forall e : efnlst, P1 e -> forall n : N, P (Fix_e e n)) ->
         P Prf_e ->
+        (forall p, P (Prim_val_e p)) ->
         (forall p : positive, P (Prim_e p)) ->
         P0 enil ->
         (forall e : expression.exp, P e -> forall e0 : exps, P0 e0 -> P0 (econs e e0)) ->
@@ -669,7 +674,7 @@ Section Post.
         (forall e : efnlst, P1 e) /\ (forall b : branches_e, P2 b).
     Proof.
       intros. eapply my_exp_ind; eauto.
-      intros. eapply H11. now left. eassumption.
+      intros. eapply H12. now left. eassumption.
     Qed. 
       
     
@@ -1432,7 +1437,15 @@ Section Post.
           * constructor; eauto.
             eapply preord_var_env_extend_eq.
             rewrite preord_val_eq. simpl; split; eauto.
-            
+           
+      - (* Prim_val_e *)
+        intros p e1 e2 m k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
+               Hlt He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.
+        inv He1; inv He2. 
+        eapply preord_exp_prim_val_compat.
+        eapply Hprops.
+
+        
       - (* Prim_e *)
         intros p e1 e2 m k1 k2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
                He1 He2 Hdup Hnot Hlen Hdis1 Hdis2 Henv.

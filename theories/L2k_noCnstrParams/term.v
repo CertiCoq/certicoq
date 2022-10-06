@@ -146,6 +146,7 @@ Fixpoint print_term (t:Term) : string :=
       "(CASE " ++ (print_inductive i) ++ ":"
                ++ (print_term mch) ++ " _ " ++") "
     | TFix _ n => " (FIX " ++ (nat_to_string n) ++ ") "
+    | TPrim p => "(PRIM " ++ string_of_prim p ++ ")"
     | TWrong str => ("(TWrong:" ++ str ++ ")")
   end.
 
@@ -179,6 +180,7 @@ Proof.
     [lft | rght .. ].
   - destruct t; cross.
     destruct (eq_nat_dec n n0); destruct (H d0); [lft | rght .. ].
+  - destruct t; cross. destruct (Classes.eq_dec p p0); [lft | rght].
   - destruct t0; cross. destruct (Classes.eq_dec t t0); [lft | rght].
   - destruct tt; cross; lft.
   - destruct tt; cross.
@@ -250,6 +252,8 @@ induction t;
 left. auto.
 Qed.
 
+Definition isPrim (t:Term) : Prop :=
+  exists p, t = TPrim p.
 
 
 (*****
@@ -1600,6 +1604,7 @@ Qed.
 Inductive WFapp: Term -> Prop :=
 | wfaRel: forall m, WFapp (TRel m)
 | wfaProof: WFapp TProof
+| wfaPrim p: WFapp (TPrim p)
 | wfaLambda: forall nm bod, WFapp bod -> WFapp (TLambda nm bod)
 | wfaLetIn: forall nm dfn bod,
     WFapp dfn -> WFapp bod -> WFapp (TLetIn nm dfn bod)
@@ -1870,6 +1875,7 @@ Qed.
 Inductive WFTrm: Term -> nat -> Prop :=
 | wfRel: forall n m, m < n -> WFTrm (TRel m) n
 | wfProof: forall n, WFTrm TProof n
+| wfPrim : forall n p, WFTrm (TPrim p) n
 | wfLambda: forall n nm bod,
     WFTrm bod (S n) -> WFTrm (TLambda nm bod) n
 | wfLetIn: forall n nm dfn bod,
@@ -2428,6 +2434,7 @@ Inductive Instantiate: nat -> Term -> Term -> Prop :=
 | IFix: forall n d m id, 
           InstantiateDefs (n + dlength d) d id ->
           Instantiate n (TFix d m) (TFix id m)
+| IPrim n p : Instantiate n (TPrim p) (TPrim p)
 | IWrong: forall n s, Instantiate n (TWrong s) (TWrong s)
 with Instantiates: nat -> Terms -> Terms -> Prop :=
 | Inil: forall n, Instantiates n tnil tnil

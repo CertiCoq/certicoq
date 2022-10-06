@@ -3,21 +3,38 @@ Require Import CertiCoq.Benchmarks.lib.vs.
 Require Import CertiCoq.Benchmarks.lib.Binom.
 Require Import CertiCoq.Benchmarks.lib.Color.
 Require Import CertiCoq.Benchmarks.lib.sha256.
-
+Require Import CertiCoq.Benchmarks.lib.coind.
+From MetaCoq.Template Require Import bytestring MCString.
 From CertiCoq.Plugin Require Import CertiCoq.
 
-Open Scope string.
+Definition foo := 0.
+
+Open Scope bs.
 
 Import ListNotations.
 Import VeriStar.
 
 CertiCoq -help.
 
+Class Show (A : Type) := show : A -> string.
+
+#[export] Instance nat_show : Show nat := string_of_nat.
+
+Definition string_of_bool b :=
+  if (b : bool) then "true" else "false".
+#[export] Instance bool_show : Show bool := string_of_bool.
+
+#[export] Instance list_show {A} {SA : Show A} : Show (list A) := string_of_list show.
+
 CertiCoq Generate Glue -file "basics" [ nat, list, bool ].
 
 (* Demo 1 *)
 
 Definition demo1 := List.app (List.repeat true 500) (List.repeat false 300).
+
+(*Definition test := coq_msg_debug (show demo1).
+
+CertiCoq Run test.*)
 
 (* Demo 2 *)
 
@@ -65,10 +82,14 @@ Definition binom := Binom.main.
 (* Color *)
 Definition color := Color.main.
 
+(* Lazy factorial *)
+
+Definition lazy_factorial := coq_msg_info (string_of_Z (coind.lfact 150)).
+
 (* Sha *)
 
 (* From the Coq website *)
-Definition test := "Coq is a formal proof management system. It provides a formal language to write mathematical definitions, executable algorithms and theorems together with an environment for semi-interactive development of machine-checked proofs. Typical applications include the certification of properties of programming languages (e.g. the CompCert compiler certification project, the Verified Software Toolchain for verification of C programs, or the Iris framework for concurrent separation logic), the formalization of mathematics (e.g. the full formalization of the Feit-Thompson theorem, or homotopy type theory), and teaching.".
+Definition test := "Coq is a formal proof management system. It provides a formal language to write mathematical definitions, executable algorithms and theorems together with an environment for semi-interactive development of machine-checked proofs. Typical applications include the certification of properties of programming languages (e.g. the CompCert compiler certification project, the Verified Software Toolchain for verification of C programs, or the Iris framework for concurrent separation logic), the formalization of mathematics (e.g. the full formalization of the Feit-Thompson theorem, or homotopy type theory), and teaching."%string.
 
 Definition sha := sha256.SHA_256 (sha256.str_to_bytes test).
 
@@ -132,6 +153,14 @@ CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" binom.
 (* CertiCoq Compile -O 0 -cps -ext "_cps" binom. *)
 (* CertiCoq Compile -cps -ext "_cps_opt" binom. *)
 
+Eval compute in "Compiling lazy factorial".
+
+CertiCoq Compile -O 1 lazy_factorial.
+CertiCoq Compile -ext "_opt" lazy_factorial.
+CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" lazy_factorial.
+(* CertiCoq Compile -O 0 -cps -ext "_cps" demo1. *)
+(* CertiCoq Compile -cps -ext "_cps_opt" demo1. *)
+
 
 Eval compute in "Compiling color".
 
@@ -156,31 +185,3 @@ CertiCoq Compile -ext "_opt" sha_fast.
 CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" sha_fast.
 (* CertiCoq Compile -O 0 -cps -ext "_cps" sha_fast. *)
 (* CertiCoq Compile -cps -ext "_cps_opt" sha_fast. *)
-
-Eval compute in "Compiling MetaCoq Erasure".
-
-From MetaCoq.Erasure Require Import Erasure.
-
-Definition metacoq_erasure := run_erase_program.
-CertiCoq Compile -O 0 -time metacoq_erasure.
-(* CertiCoq Compile -ext "_opt" metacoq_erasure.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" metacoq_erasure.
-
-Eval compute in "Compiling the CertiCoq Pipeline".
-
-From CertiCoq Require Import pipeline.
-
-Definition certicoq_compile := compile.
-CertiCoq Compile -O 0 -time certicoq_compile.
-CertiCoq Compile -ext "_opt" certicoq_compile.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" certicoq_compile. *)
-
-(* Eval compute in "Compiling MetaCoq SafeChecker". *)
-
-(* From MetaCoq.SafeChecker Require Import PCUICSafeChecker. *)
-(* Print Assumptions typecheck_program. *)
-
-(* Definition metacoq_safechecker := @typecheck_program. *)
-(* CertiCoq Compile -O 0 -time metacoq_safechecker. *)
-(* CertiCoq Compile -ext "_opt" metacoq_safechecker. *)
-(* CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" metacoq_safechecker. *)

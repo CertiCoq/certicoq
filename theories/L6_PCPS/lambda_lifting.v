@@ -268,6 +268,8 @@ Section LambdaLifting.
                       end
         in
         add_list scope fvset' xs
+      | Eprim_val x p e =>
+        exp_true_fv_aux e (add x scope) fvset
       | Eprim x prim ys e =>
         let fvset' := add_list scope fvset ys in
         exp_true_fv_aux e (add x scope) fvset'
@@ -323,6 +325,8 @@ Section LambdaLifting.
     | Efun fds e =>
       occurs_in_fundefs k curr_f fds || occurs_in_exp k curr_f e
     | Eapp x _ xs => eq_var k x || PS.mem x curr_f || occurs_in_vars k xs
+    | Eprim_val z p e1 =>
+      eq_var z k || occurs_in_exp k curr_f e1
     | Eprim z _ xs e1 =>
       eq_var z k || occurs_in_vars k xs || occurs_in_exp k curr_f e1
     | Ehalt x => eq_var x k
@@ -344,6 +348,7 @@ Section LambdaLifting.
     match e with
     | Econstr _ _ _ e
     | Eproj _ _ _ _ e
+    | Eprim_val _ _ e
     | Eprim _ _ _ e 
     | Efun _ e =>
       stack_push x curr_f e
@@ -438,6 +443,9 @@ Section LambdaLifting.
       | Some (NoLiftFun _ _) | None =>
         ret (Eapp (rename fvm f) ft (rename_lst fvm xs))
       end
+    | Eprim_val x p e =>
+      e' <- exp_lambda_lift e (PS.add x scope) active_funs fvm fm gfuns ;;
+      ret (Eprim_val x p e')
     | Eprim x f ys e =>
       e' <- exp_lambda_lift e (PS.add x scope) active_funs fvm fm gfuns ;;
       ret (Eprim x f (rename_lst fvm ys) e')
@@ -650,6 +658,10 @@ Inductive Exp_lambda_lift :
 | LL_Eapp_unknown :
     forall ζ σ f ft xs S,
       Exp_lambda_lift ζ σ (Eapp f ft xs) S (Eapp (σ f) ft (map σ xs)) S
+| LL_Eprim_val :
+    forall ζ σ x p e e' S S',
+      Exp_lambda_lift ζ (σ {x ~> x}) e S e' S' ->
+      Exp_lambda_lift ζ σ (Eprim_val x p e) S (Eprim_val x p e') S'
 | LL_Eprim :
     forall ζ σ x f ys e e' S S',
       Exp_lambda_lift ζ (σ {x ~> x}) e S e' S' ->

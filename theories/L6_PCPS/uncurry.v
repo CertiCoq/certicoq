@@ -60,6 +60,8 @@ Section UNCURRY.
     | Efun fds e =>
       occurs_in_fundefs k fds || occurs_in_exp k e
     | Eapp x _ xs => eq_var k x || occurs_in_vars k xs
+    | Eprim_val z _ e1 =>
+      eq_var z k || occurs_in_exp k e1
     | Eprim z _ xs e1 =>
       eq_var z k || occurs_in_vars k xs || occurs_in_exp k e1
     | Ehalt x => eq_var x k
@@ -194,6 +196,9 @@ Section UNCURRY.
       e1' <- uncurry_exp cps e1 ;;
       ret (Eletapp x f ft ys e1')
     | Eapp x ft xs => ret (Eapp x ft xs)
+    | Eprim_val x p e1 =>
+      e1' <- uncurry_exp cps e1 ;;
+      ret (Eprim_val x p e1')
     | Eprim x p xs e1 =>
       e1' <- uncurry_exp cps e1 ;;
       ret (Eprim x p xs e1')

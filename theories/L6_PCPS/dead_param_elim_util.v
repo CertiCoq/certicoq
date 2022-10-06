@@ -45,6 +45,10 @@ Inductive Dead (S : Ensemble var) (L : live_fun) : exp -> Prop :=
       Disjoint _ (FromList ys) S -> 
       Dead S L e ->
       Dead S L (Econstr x ct ys e)
+| Live_Prim_val : 
+  forall (x : var) p (e : exp), 
+    Dead S L e ->
+    Dead S L (Eprim_val x p e)
 | Live_Prim : 
   forall (x : var) (g : prim) (ys : list var) (e : exp), 
     Disjoint _ (FromList ys) S -> 
@@ -186,6 +190,7 @@ Proof.
   - sets. 
   - eapply Included_trans; [| eapply add_fun_vars_subset ].
     rewrite FromSet_add; sets.
+  - auto.
   - rewrite FromSet_add; sets.  
 Qed.
 
@@ -273,6 +278,7 @@ Proof.
         eapply Disjoint_Included_l; [| eassumption ].
         unfold add_fun_vars. unfold get_fun_vars. rewrite Heq.
         rewrite FromSet_union_list. sets.
+  - econstructor; eauto.
   - econstructor.
     + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
       eapply Disjoint_Included_l; [| eassumption ].
@@ -827,6 +833,10 @@ Inductive Known_exp (S : Ensemble var) : exp -> Prop :=
       Disjoint _ (FromList ys) S -> 
       Known_exp S e ->
       Known_exp S (Econstr x ct ys e)
+| Known_Prim_val : 
+  forall (x : var) p (e : exp), 
+    Known_exp S e ->
+    Known_exp S (Eprim_val x p e)
 | Known_Prim : 
   forall (x : var) (g : prim) (ys : list var) (e : exp), 
     Disjoint _ (FromList ys) S -> 

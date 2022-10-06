@@ -98,6 +98,7 @@ Section IDENT.
     : name_env :=
     match e with
     | Econstr x _ _ e
+    | Eprim_val x _ e
     | Eprim x _ _ e
     | Eletapp x _ _ _ e          
     | Eproj x _ _ _ e => add_binders_exp (update_var names x) e

@@ -1,0 +1,28 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "targetArchitecture": "x86_64",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug",
+            "program": "${workspaceFolder}/_opam/bin/coqc",
+            "args": [ "-I", ".", "-Q", "../../theories/L7", "CertiCoq.L7", "-Q", "../../libraries", "CertiCoq.Libraries", "-Q", "../../theories/L6_PCPS",
+             "CertiCoq.L6", "-Q", "../../theories/L4_deBruijn", "CertiCoq.L4", "-Q", "../../theories/Compiler", "CertiCoq.Compiler", "-Q", "../../theories/common", "CertiCoq.Common",
+              "-Q", "../../theories/Glue", "CertiCoq.Glue", "-Q", "../../theories/L2k_noCnstrParams", "CertiCoq.L2k", "-Q", "../../plugin", "CertiCoq.Plugin", "-I", "../../plugin", "-Q",
+               "../../cplugin", "CertiCoq.VanillaPlugin", "-I", "../../cplugin", "-Q", "theories", "CertiCoq.CertiCoqC", "test.v"],
+            "cwd": "${workspaceFolder}/bootstrap/certicoqc"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug gencode",
+            "program": "${workspaceFolder}/bootstrap/certicoqc/tests/test.certicoqc",
+            "args": [],
+            "cwd": "${workspaceFolder}/bootstrap/certicoqc"
+        }
+    ]
+}

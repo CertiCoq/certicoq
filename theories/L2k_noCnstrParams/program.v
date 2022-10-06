@@ -96,6 +96,7 @@ Inductive crctCnstr: (environ Term) -> inductive -> nat -> Terms -> Prop :=
 Inductive crctTerm: environ Term -> nat -> Term -> Prop :=
 | ctRel: forall p n m, crctEnv p -> m < n -> crctTerm p n (TRel m)
 | ctProof: forall p n, crctEnv p -> crctTerm p n TProof
+| ctPrim : forall p n v, crctEnv p -> crctTerm p n (TPrim v)
 | ctLam: forall p n nm bod,
     crctTerm p (S n) bod -> crctTerm p n (TLambda nm bod)
 | ctLetIn: forall p n nm dfn bod,
@@ -653,8 +654,8 @@ Proof.
   induction 1; intros; try (cbn in H1; discriminate).
   - cbn in H0. myInjection H0. constructor. intuition.
   - cbn in H0. discriminate.
-  - inversion_Clear H. inversion_Clear H2. cbn in H1. myInjection H1.
-    assumption.
+  - inversion_Clear H0.
+  - now inversion_Clear H1.
 Qed.
 
 Lemma tnth_pres_Crct:

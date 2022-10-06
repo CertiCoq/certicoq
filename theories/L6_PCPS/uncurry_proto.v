@@ -5,7 +5,7 @@ Require Import Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Lia.
 Require Import Common.
 Require Import L6.Prototype.
 Require Import L6.proto_util.
-Require Import L6.cps L6.cps_proto.
+Require Import L6.cps L6.cps_proto_univ L6.cps_proto.
 Require Import identifiers.  (* for max_var, occurs_in_exp, .. *)
 Require Import L6.Ensembles_util L6.List_util L6.cps_util L6.state.
 

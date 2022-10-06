@@ -105,8 +105,8 @@ Section TermTranslation.
       let len := L3t.dlength d in
       let defs' := trans_fixes trans (N.of_nat len + k) d in
       Fix_e defs' (N.of_nat n)
+    | L3t.TPrim p => Prim_val_e p
     end.
-
 
   Definition translate t :=
     trans 0 t.

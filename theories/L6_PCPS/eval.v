@@ -668,6 +668,7 @@ Section EVAL.
     | Hole_c => true
     | Econstr_c _ _ _ C
     | Eproj_c _ _ _ _ C
+    | Eprim_val_c _ _ C
     | Eprim_c _ _ _ C
     | Efun1_c _ C
     | Eletapp_c _ _ _ _ C => interprable C
@@ -684,8 +685,9 @@ Section EVAL.
     | Eletapp_c x f t ys c => 1 (* + length ys *)
     | Efun1_c B c => 1
     | Efun2_c _ _ => 1
-    | Eprim_c x f ys c => 1 (* + length ys *)
-    | Ehole_c => 0
+    | Eprim_val_c _ _ _ => 1
+    | Eprim_c _ _ _ c => 1 (* + length ys *)
+    | Hole_c => 0
     end.
 
   Inductive interpret_ctx : exp_ctx -> env -> fuel -> @res env -> trace -> Prop :=
@@ -764,6 +766,7 @@ Section EVAL.
       3:{ split. econstructor 3. now congruence. econstructor; eauto. eassumption. }
       rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
       rewrite !plus_assoc. rewrite (plus_comm x3). reflexivity.
+    - simpl in Hb, Hi. inv Hb. inv H.
     - simpl in Hb, Hi. inv Hb. inv H.
     - simpl in Hb, Hi. inv Hb. inv H.
       edestruct IHC. eassumption. eassumption. destructAll. repeat subst_exp. 
@@ -849,6 +852,21 @@ Section EVAL.
     Unshelve. exact 0%nat.
   Qed.
   
+  Lemma eval_ctx_app_OOT_Eprim_val rho C x p e1 e2 cin cout :
+    bstep_fuel rho (C |[ Eprim_val x p e1 ]|) cin OOT cout ->
+    interprable C = true ->
+    bstep_fuel rho (C |[ Eprim_val x p e2 ]|) cin OOT cout.
+  Proof.       
+    revert rho cin cout.
+    induction C; intros rho cin cout Hs Hi; eauto;
+      try congruence;
+      try now (inv Hs; 
+               [ econstructor; eassumption |
+                 inv H; unfold one; simpl;
+                 constructor 2; econstructor; eauto ]).
+
+    Unshelve. exact 0%nat.
+  Qed.
 
   Lemma eval_ctx_app_OOT_Eapp rho C e cin cout x f t xs :
     bstep_fuel rho (C |[ Eapp f t xs ]|) cin OOT cout ->
@@ -900,6 +918,7 @@ Section EVAL.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
       eapply eq_env_P_sym. eapply eq_env_P_set_not_in_P_l; eauto.
       eapply eq_env_P_refl. eapply Disjoint_In_l. sets. auto.
+    - inv H0.
     - inv H0.
     - inv H0. rewrite bound_var_Eletapp_c in *.
       eapply eq_env_P_trans; [| eapply IHC; [ eassumption | now sets ] ].
@@ -997,6 +1016,9 @@ Section EVAL.
           split; [| split ]; [| eassumption |]. econstructor. congruence. econstructor; eauto.
           rewrite (plus_assoc _ _ x1), (plus_comm (one_ctx _) x1), <- plus_assoc.
           rewrite (plus_assoc _ _ x3), (plus_comm (one_ctx _) x3), <- plus_assoc. eauto.
+    - inv Hstep.
+      + left. econstructor; [| congruence ]. eassumption.
+      + inv H.
     - inv Hstep.
       + left. econstructor; [| congruence ]. eassumption.
       + inv H.
@@ -1113,6 +1135,9 @@ Section EVAL.
     | O => exceptionMonad.Ret (inl (rho, e))
     | S n' =>
       ( match e with
+        | Eprim_val x p e' =>
+          let rho' := M.set x (Vprim p) rho in
+          bstep_f rho' e' n'
         | Eprim x f ys e' =>
           do vs <- l_opt (get_list ys rho) ("Eprim: failed to get_list");
           do f' <- l_opt (M.get f pr) ("Eprim: prim not found");
@@ -1288,6 +1313,12 @@ Section EVAL.
       forall (rho : env) (fl : fundefs) (e : exp) (v : val) (c : nat),
         bstep_e (def_funs fl fl rho rho) e v c ->
         bstep_e rho (Efun fl e) v c
+  | BStep_prim_val : 
+    forall (rho' rho : env) (x : var) (p : primitive)
+             (e : exp) (v : val) (c : nat),
+        M.set x (Vprim p) rho = rho' ->
+        bstep_e rho' e v c ->
+        bstep_e rho (Eprim_val x p e) v c
   | BStep_prim :
       forall (vs : list val) (rho' rho : env) (x : var) (f : prim)
              (f' : list val -> option val) (ys : list var) (e : exp)
@@ -1367,6 +1398,14 @@ Section EVAL.
            (to make the bound of the current cc independent of the term) *)
         (* TODO eventually remove the unit cost, it helps but it shouldn't be required *)
         bstep_cost rho (Efun B e) v (c + (1 + PS.cardinal (fundefs_fv B)))
+  | BStepc_prim_val :
+      forall (rho' rho : env) (x : var) (p : primitive)
+             (e : exp)
+             (v v' : val) (c : nat),
+        M.set x (Vprim p) rho = rho' ->
+        bstep_cost rho' e v' c ->
+        bstep_cost rho (Eprim_val x p e) v' (c + 1)
+  
   | BStepc_prim :
       forall (vs : list val) (rho' rho : env) (x : var) (f : prim)
              (f' : list val -> option val) (ys : list var) (e : exp)
@@ -1408,25 +1447,25 @@ Section EVAL.
     induction n; intros. inv H.
     simpl in H.
     destruct e.
-    -  destruct (get_list l rho) eqn:glr; [| inv H].
-       apply IHn in H. inv H.
-       exists x. econstructor; eauto.
+    - destruct (get_list l rho) eqn:glr; [| inv H].
+      apply IHn in H. inv H.
+      exists x. econstructor; eauto.
     - destruct (M.get v0 rho) eqn:gv0r.
       destruct v1. destruct (findtag l c) eqn:flc.
       destruct (caseConsistent_f cenv l c) eqn:clc.
       apply caseConsistent_c in clc.
       apply IHn in H. inv H. exists x.
       econstructor; eauto.
-      inv H. inv H. inv H. inv H. inv H.
+      inv H. inv H. inv H. inv H. inv H. inv H.
     - destruct (M.get v1 rho) eqn:gv1r; [|inv H].
-      destruct v2; [ | inv H | inv H].
+      destruct v2; [ | inv H | inv H | inv H].
       destruct (c=?c0)%positive eqn:eqcc0; [| inv H].
       destruct (nthN l n0) eqn:nln0; [| inv H].
       apply IHn in H. inv H.
       apply Peqb_true_eq in eqcc0. subst.
       exists x. econstructor; eauto.
     - destruct (M.get v1 rho) eqn:gv0r; [| inv H].
-      destruct v2; [inv H| | inv H].
+      destruct v2; [inv H| | inv H | inv H].
       destruct (get_list l rho) eqn:glr; [| inv H].
       destruct (find_def v2 f0) eqn:gv1f0; [| inv H].
       destruct p. destruct p.
@@ -1447,7 +1486,7 @@ Section EVAL.
       constructor;
         auto.
     - destruct (M.get v0 rho) eqn:gv0r; [| inv H].
-      destruct v1; [inv H| | inv H].
+      destruct v1; [inv H| | inv H | inv H].
       destruct (get_list l rho) eqn:glr; [| inv H].
       destruct (find_def v1 f0) eqn:gv1f0; [| inv H].
       destruct p. destruct p.
@@ -1457,6 +1496,9 @@ Section EVAL.
       simpl in H.
       apply IHn in H. inv H. exists (x+1)%nat.
       econstructor; eauto.
+    - simpl in H. apply IHn in H.
+      destruct H as [m ev]; exists m.
+      simpl. cbn. econstructor; eauto. 
     - destruct (get_list l rho) eqn:glr; [| inv H].
       destruct (M.get p pr) eqn:ppr; [| inv H].
       destruct (o l0) eqn:ol0; [| inv H].

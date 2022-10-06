@@ -13,6 +13,10 @@ g_certicoq_vanilla.mlg
 certicoq_debug.mli
 certicoq_debug.ml
 certicoq_vanilla_plugin.mlpack
+Loader.v
+CoqMsgFFI.v
+PrimInt63.v
+PrimFloats.v
 CertiCoqVanilla.v
 
 static/caml_bool.mli
@@ -25,6 +29,8 @@ static/caml_byte.mli
 static/caml_byte.ml
 static/caml_ascii_string.ml
 static/caml_bytestring.ml
+static/caml_comparison.mli
+static/caml_comparison.ml
 static/camlcoq.ml
 static/printAST.ml
 static/printClight.ml
@@ -129,6 +135,8 @@ extraction/coqlib0.ml
 extraction/coqlib0.mli
 extraction/cps.ml
 extraction/cps.mli
+extraction/cps_proto_univ.mli
+extraction/cps_proto_univ.ml
 extraction/cps_proto.ml
 extraction/cps_proto.mli
 extraction/cps_show.ml
@@ -137,6 +145,18 @@ extraction/cps_util.ml
 extraction/cps_util.mli
 extraction/csyntax.ml
 extraction/csyntax.mli
+extraction/primInt63.mli
+extraction/primInt63.ml
+extraction/uint0.mli
+extraction/uint0.ml
+extraction/decimalString.mli
+extraction/decimalString.ml
+extraction/hexadecimalString.mli
+extraction/hexadecimalString.ml
+extraction/primitive.mli
+extraction/primitive.ml
+extraction/pCUICPrimitive.mli
+extraction/pCUICPrimitive.ml
 extraction/ctx.ml
 extraction/ctx.mli
 extraction/ctypes.ml
@@ -155,6 +175,8 @@ extraction/eAstUtils.ml
 extraction/eAstUtils.mli
 extraction/eEnvMap.mli
 extraction/eEnvMap.ml
+# extraction/eLiftSubst.mli
+# extraction/eLiftSubst.ml
 extraction/eCSubst.ml
 extraction/eCSubst.mli
 extraction/eWellformed.mli
@@ -179,6 +201,8 @@ extraction/eInlineProjections.mli
 extraction/eInlineProjections.ml
 extraction/eConstructorsAsBlocks.mli
 extraction/eConstructorsAsBlocks.ml
+# extraction/eCoInductiveToInductive.mli
+# extraction/eCoInductiveToInductive.ml
 extraction/eTransform.mli
 extraction/eTransform.ml
 extraction/eqDecInstances.ml
@@ -203,8 +227,8 @@ extraction/extract.ml
 extraction/extract.mli
 extraction/ffi.ml
 extraction/ffi.mli
-# extraction/floatOps.ml
-# extraction/floatOps.mli
+extraction/floatOps.ml
+extraction/floatOps.mli
 extraction/floats.ml
 extraction/floats.mli
 extraction/frame.ml
@@ -360,10 +384,8 @@ extraction/pipeline_utils.ml
 extraction/pipeline_utils.mli
 extraction/pOrderedType.ml
 extraction/pOrderedType.mli
-# extraction/primFloat.ml
-# extraction/primFloat.mli
-# extraction/primInt63.ml
-# extraction/primInt63.mli
+extraction/primFloat.ml
+extraction/primFloat.mli
 extraction/prototype.ml
 extraction/prototype.mli
 extraction/proto_util.ml

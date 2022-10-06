@@ -38,6 +38,10 @@ Inductive rw : relation exp :=
     forall x t ys e,
       ~ occurs_free e x ->
       rw (Econstr x t ys e) e
+| Prim_val_dead:
+    forall x p e,
+      ~ occurs_free e x ->
+      rw (Eprim_val x p e) e
 | Prim_dead:
     forall x p ys e,
       ~ occurs_free e x ->
@@ -177,6 +181,18 @@ Section Shrink_correct.
     - intros. inv H.
   Qed.
 
+  Lemma rm_prim_val k rho rho' e x p :
+    ~occurs_free e x ->
+    preord_env_P cenv PG (occurs_free e \\ [set x]) k rho rho' ->
+    preord_exp cenv (P1 1) PG k (Eprim_val x p e, rho) (e, rho').
+  Proof.
+    intros Hnin Henv.
+    eapply ctx_to_rho_preord_exp_l with (C := Eprim_val_c x p Hole_c) (P1 := P1 0).
+    - intros; eapply Hless_steps_ctx; eauto.
+    - simpl. eapply HPost_OOT.
+    - reflexivity.
+    - intros. inv H.
+  Qed.
 
   Lemma rm_proj k rho rho' e x t n y :
     ~occurs_free e x ->
@@ -495,6 +511,7 @@ Section Shrink_correct.
     | Econstr_c v t vs c' => 1 + ctx_size c'
     | Eproj_c v t i r c' => 1 + ctx_size c'
     | Eletapp_c _ _ _ _  c' => 1 + ctx_size c'
+    | Eprim_val_c v p c' => 1 + ctx_size c'
     | Eprim_c v p vs c' => 1 + ctx_size c'
     | Ecase_c v l t c' l0 => 1 + fold_right
                                   (fun (p : ctor_tag * exp) (n : nat) => let (_, e1) := p in n + term_size e1)
@@ -867,6 +884,8 @@ Section Shrink_correct.
         eapply preord_env_P_extend; [| assumption ].
         eapply preord_env_P_antimon; eauto. eapply preord_env_P_monotonic; [| eassumption ]; lia.
         simpl. rewrite Setminus_Union_distr. rewrite occurs_free_Eproj. sets.
+    - rewrite bound_stem_Eprim_val_c in Hbv.
+      eapply preord_exp_prim_val_compat; eauto.
     - simpl.
       rewrite bound_stem_Eprim_c in Hbv.
       eapply preord_exp_prim_compat; eauto.
@@ -1293,6 +1312,8 @@ Section Shrink_correct.
       simpl; eapply preord_exp_app_compat; eauto; intros.
       + eapply Forall2_preord_var_env_map. eassumption.
         normalize_occurs_free. sets.
+    - (* Eprimval *)
+      simpl; eapply preord_exp_prim_val_compat; eauto; intros.
     - (* Eprim *)
       simpl; eapply preord_exp_prim_compat; eauto; intros.
       eapply Forall2_preord_var_env_map. eassumption.
@@ -1721,6 +1742,12 @@ Section Shrink_correct.
       destruct (var_dec v x).
       subst. constructor.
       constructor. apply H0. intro. apply H1.
+      apply occurs_free_Eprim_val.
+      split; auto.
+    + simpl in H1.
+      destruct (var_dec v x).
+      subst. constructor.
+      constructor. apply H0. intro. apply H1.
       apply occurs_free_Eprim.
       right.
       split; auto.
@@ -1831,6 +1858,9 @@ Section Shrink_correct.
   Proof.
     intros Hrw. inv Hrw.
     - intros; apply rm_constr; auto.
+      eapply preord_env_P_antimon. eassumption.
+      normalize_occurs_free. sets.
+    - intros; apply rm_prim_val; auto.
       eapply preord_env_P_antimon. eassumption.
       normalize_occurs_free. sets.
     - intros; apply rm_prim; auto.
@@ -2458,6 +2488,24 @@ Section occurs_free_rw.
       apply apply_r_sigma_in.
       eauto with Ensembles_DB.
     -  simpl.
+      repeat normalize_occurs_free.
+      apply Setminus_Included_Included_Union.
+      eapply Included_trans.
+      apply H.
+      intro.
+      intros. inv H0.
+      destruct (var_dec x v).
+      * subst. right. constructor.
+      * inv H1.
+        left. left. split.
+        split; auto.
+        intro. apply n; inv H1.
+        auto.
+        intro.
+        apply H2.
+        auto.
+      * eauto.
+    -  simpl.
        repeat normalize_occurs_free.
        apply Union_Included.
        + eapply Included_trans.
@@ -2620,8 +2668,6 @@ Section occurs_free_rw.
   Qed.
 
 
-
-
   Lemma occurs_free_ctx_mut_included_u:
     forall S,
       Decidable S ->
@@ -2650,7 +2696,10 @@ Section occurs_free_rw.
       apply Included_Union_compat; [reflexivity|].
       eapply Included_Setminus_compat; [| reflexivity ]. eassumption.
     }
-
+    { apply IHc in H.
+      rewrite Union_Setminus_Setminus_Union; [|auto].
+      rewrite Union_Setminus_Setminus_Union; [|auto].
+      now eapply Included_Setminus_compat; [|reflexivity]. }
     { apply IHc in H.
       repeat (rewrite <- Union_assoc).
       apply Included_Union_compat; [reflexivity|].
@@ -2983,7 +3032,12 @@ Section Shrink_Rewrites.
       erewrite (proj1 prop_rename_all).
       reflexivity.
       apply remove_none.
-      eapply Disjoint_dom_map...
+      eapply Disjoint_dom_map... 
+    - rewrite <- H...
+      erewrite (proj1 prop_rename_all).
+      reflexivity.
+      apply remove_none.
+      eapply Disjoint_dom_map... 
     - reflexivity.
     - rewrite <- H...
       rewrite <- H0...
@@ -3155,6 +3209,11 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - inv H. inv H0.
       assert (Hll := num_occur_list_not_range _ _ H1 (v::l)).
       auto.
+    - inv H0. inv H1.
+      assert (Hll := num_occur_list_not_range _ _ H2 ([v])).
+      eapply H; eauto.
+      intro; apply H2.
+      apply (@Range_map_remove var) in H0. auto.
     - inv H0; inv H1.
       apply plus_le_compat.
       eapply H; eauto.
@@ -3229,6 +3288,10 @@ substitution to a term cannot increase the occurence count for that variable. *)
       lia.
     - inv H; inv H0.
       apply (num_occur_list_not_range _ _ Hs (v::l)).
+    - inv H0; inv H1.
+      specialize (H _ _ H7 H6).
+      assert (Hnn := num_occur_list_not_range _ _ Hs [v]).
+      lia.
     - inv H0; inv H1.
       specialize (H _ _ H8 H7).
       assert (Hnn := num_occur_list_not_range _ _ Hs l).
@@ -3325,6 +3388,8 @@ substitution to a term cannot increase the occurence count for that variable. *)
       assert (Hll := num_occur_list_not_dom _ _ H1 (v::l)).
       simpl in Hll.
       auto.
+    - inv H0; inv H1.
+      eapply H; eauto.
     - inv H0; inv H1.
       apply plus_le_compat.
       eapply H; eauto.
@@ -3444,7 +3509,9 @@ substitution to a term cannot increase the occurence count for that variable. *)
       assert (Hl := num_occur_list_set_not_x).
       specialize (Hl f y x _ Hdom Hfy (v::l)).
       auto.
-    -  assert (Hl := num_occur_list_set_not_x f y x _ Hdom Hfy l).
+    - assert (Hl := num_occur_list_set_not_x f y x _ Hdom Hfy [v]).
+      eauto.
+    - assert (Hl := num_occur_list_set_not_x f y x _ Hdom Hfy l).
        apply plus_le_compat; eauto.
     - inv H; inv H0.
       assert (Hl := num_occur_list_set_not_x f y x _ Hdom Hfy [v]).
@@ -3497,6 +3564,8 @@ substitution to a term cannot increase the occurence count for that variable. *)
       assert (Hl := num_occur_list_set).
       specialize (Hl _ _ x sigma Hfy (v::l)).
       auto.
+    - assert (Hl := num_occur_list_set _ _ x sigma Hfy [v]).
+      eauto.
     - assert (Hl := num_occur_list_set _ _ x sigma Hfy l).
       apply plus_le_compat; eauto.
     - inv H; inv H0.
@@ -3626,6 +3695,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - eapply num_occur_n. constructor; eauto.
       assert (Hn := num_occur_arl_kill _ _ Hrx Hdx (v::l)).
       simpl in *. lia.
+    - eapply num_occur_n. constructor; eauto. reflexivity.
     - eapply num_occur_n. constructor; eauto.
       rewrite num_occur_arl_kill; auto.
     - eapply num_occur_n. constructor; auto.
@@ -3712,6 +3782,8 @@ substitution to a term cannot increase the occurence count for that variable. *)
       unfold var in *. unfold M.elt in *. lia.
       assert (Hnn := num_occur_set_arl _ _ Hxy (v::l)).
       simpl. simpl in Hnn. unfold var in *. unfold M.elt in *. lia.
+    - specialize (H _ _ H7 H6) as [].
+      split; eapply num_occur_n; eauto.
     - specialize (H _ _ H8 H7).
       destruct H.
       split; eapply num_occur_n; eauto.
@@ -3767,6 +3839,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       apply plus_le_compat.
       assert (Hll := num_occur_list_not_dom _ _ H1 (f0::ys)). eassumption.
       eauto.
+    - simpl in H0. inv H0; inv H. eauto.
     - simpl in H0. inv H0. inv H.
       apply plus_le_compat.
       apply num_occur_list_not_dom; auto.

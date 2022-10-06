@@ -85,6 +85,7 @@ Section LogRelCC.
           | Vconstr t1 vs1, Vconstr t2 vs2 =>
             t1 = t2 /\ Forall2_aux vs1 vs2
           | Vint n1, Vint n2 => n1 = n2
+          | Vprim p1, Vprim p2 => p1 = p2
           | _, _ => False
         end
     in cc_approx_val_aux v1 v2.
@@ -110,6 +111,7 @@ Section LogRelCC.
       | Vconstr t1 vs1, Vconstr t2 vs2 =>
         t1 = t2 /\ Forall2 (cc_approx_val k P) vs1 vs2
       | Vint n1, Vint n2 => n1 = n2
+      | Vprim p1, Vprim p2 => p1 = p2
       | _, _ => False
     end.
   
@@ -282,6 +284,7 @@ Section LogRelCC.
       eapply cc_approx_exp_rel_mon.
       eapply Hi; eauto. eapply Forall2_monotonic; [| eassumption ].
       intros. eapply H; eauto. now firstorder. now firstorder.
+    - eauto.
     - eauto.
   Qed.
 
@@ -965,7 +968,33 @@ Section LogRelCC.
       now eapply Hbase; eauto.
       eapply cc_approx_val_monotonic. eassumption. lia.
   Qed.
+
+  Lemma cc_approx_exp_prim_val_compat k rho1 rho2 x1 x2 p e1 e2 :
+    post_OOT' (Eprim_val x1 p e1) rho1 (Eprim_val x2 p e2) rho2 P2 ->
+    cc_approx_exp k P2 PG (Eprim_val x1 p e1, rho1) (Eprim_val x2 p e2, rho2).
+  Proof.
+    intros Hoot v1 cin cout Hleq1 Hstep1. inv Hstep1.
+    - (* OOT *) 
+      exists OOT, cin, <0>. split. constructor; eassumption. 
+      split; [| now eauto ]. eapply Hoot; eauto.
+   - inv H. 
+(*   edestruct cc_approx_var_env_get_list as [vs2 [Hget' Hpre']]; [| eassumption | ]; eauto.
+     edestruct Prim_axiom_cc as [v2 [Heq Hprev2]]; eauto.
+     edestruct (Hpre (k - 1)) as [v2' [c2 [Hstepv2' [Hpost2 Hprev2']]]]; [ | | | | | | eassumption | ]; eauto.
+     simpl in *; lia. simpl in *; lia. 
+     eexists. exists (c2 + cost (Eprim x2 f ys2 e2)). split; [| split ].
+     econstructor 2; eauto. lia. 
+     econstructor; eauto.
+     replace (c2 + cost (Eprim x2 f ys2 e2) - cost (Eprim x2 f ys2 e2)) with c2 by lia.  
+     eassumption.
+     replace cin with (cin - cost (Eprim x1 f ys1 e1) + cost (Eprim x2 f ys2 e2)).
+     2:{ simpl in *. eapply Forall2_length in Hall. rewrite Hall. lia. } 
+     eapply HPost. eassumption.
+     eapply cc_approx_res_monotonic. eassumption. 
+    simpl in *. lia. *)
+  Qed.
   
+
   Axiom Prim_axiom_cc :
     forall f f' v1,
       M.get f pr = Some f' ->
@@ -1269,6 +1298,9 @@ Section LogRelCC.
         eapply preord_val_monotonic. eassumption. lia.
         eapply List_util.Forall2_refl. eapply preord_val_refl; eauto.
       + eauto.
+    - destruct v2; try contradiction.
+      destruct v3; try contradiction. inv Happrox.
+      inv Hpre'. reflexivity.
     - destruct v2; try contradiction.
       destruct v3; try contradiction. inv Happrox.
       inv Hpre'. reflexivity.
@@ -1752,7 +1784,8 @@ Section LogRelCC.
         (* Included _ (occurs_free e) (Union _ (FromList xs) (name_in_fundefs B)) -> *)
         closed_fundefs_in_val (Vfun rho B f)
   | Vint_closed :
-      forall z, closed_fundefs_in_val (Vint z).
+      forall z, closed_fundefs_in_val (Vint z)
+  | Vprim_closed : forall p, closed_fundefs_in_val (Vprim p).
 
   Definition closed_fundefs_in_env (S : Ensemble var) rho : Prop :=
     lift_P_env S closed_fundefs_in_val rho.
@@ -1832,6 +1865,12 @@ Section LogRelCC.
           rewrite occurs_free_Efun. eapply Included_Union_r.
         * intros f. constructor. now eapply Hcl2.
           intros B H. eapply Hcl2. now eauto.
+      + intros B Hin. eauto.
+    - eapply IHHstep.
+      + subst. eapply lift_P_env_extend. 
+        * eapply lift_P_env_antimon; [| now eauto ].
+          rewrite occurs_free_Eprim_val. reflexivity.
+        * constructor.
       + intros B Hin. eauto.
     - eapply IHHstep.
       + subst. eapply lift_P_env_extend. 

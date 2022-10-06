@@ -2,11 +2,6 @@ From CertiCoq.Plugin Require Import CertiCoq.
 From MetaCoq.Template Require Import utils.
 Open Scope bs_scope.
 
-
-Axiom (coq_msg_info : string -> unit).
-Axiom (coq_user_error : string -> unit).
-Axiom (coq_msg_debug : string -> unit).
-
 Require Import CertiCoq.Compiler.pipeline.
 From CertiCoq.Common Require Import Pipeline_utils.
 Require Import ExtLib.Structures.Monad.
@@ -49,39 +44,21 @@ Definition cps_show (t : L6_FullTerm) :=
 Definition certicoqc (opts : Options) (p : Template.Ast.Env.program) := 
   let () := coq_msg_info "certicoqc called" in
   compile opts p.
-(* CertiCoq Show IR -time -O 1 certicoq_pipeline
-Extract Constants [
-  (* coq_msg_debug => "print_msg_debug", *)
-  coq_msg_info => "print_msg_info"
-]. *)
 
-(* From MetaCoq Require Import PCUICWfEnvImpl SafeTemplateChecker.
+Set Warnings "-primitive-turned-into-axiom".
+(* 
+From MetaCoq Require Import Primitive Template.Ast.
 
-Definition typecheck_program (p : Template.Ast.Env.program) : bool :=
-  match infer_and_print_template_program 
-    (cf := config.default_checker_flags) 
-    (guard := Erasure.fake_guard_impl) 
-    (nor := PCUICSN.default_normalizing)
-    p Universes.Monomorphic_ctx with
-  | inl ty => let () := coq_msg_info ty in true
-  | inr err => let () := coq_user_error err in false
-  end.  
+Definition certicoqc (opts : Options) (p : Template.Ast.Env.program) := 
+  (* let () := coq_msg_info "certicoqc called" in *)
+  (* let () := coq_msg_info ("got program: " ++ Pretty.print_program false 100 p) in *)
+  match snd p with 
+  | Template.Ast.tConst kn _ => 
+    match Env.lookup_env (fst p) kn with
+    | Some (ConstantDecl {| cst_body := Some (tInt i) |}) => coq_msg_info (string_of_prim_int i)
+    | _ => tt
+    end
+  | _ => tt
+  end. *)
 
-Eval compute in "Compiling MetaCoq's type-checker". *)
-
-(*CertiCoq Compile -time -O 1 typecheck_program
-Extract Constants [
-  (* coq_msg_debug => "print_msg_debug", *)
-  coq_msg_info => "print_msg_info",
-  coq_user_error => "coq_user_error"
-   ] 
-Include [ "print.h" ].*)
-
-Eval compute in "Compiling CertiCoq's pipeline".
-
-CertiCoq Compile -time -O 1 certicoqc
-Extract Constants [
-  (* coq_msg_debug => "print_msg_debug", *)
-  coq_msg_info => "print_msg_info"
-   ] 
-Include [ "print.h" ].
+CertiCoq Compile -time -O 1 certicoqc.

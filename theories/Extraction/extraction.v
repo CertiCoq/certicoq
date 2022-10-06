@@ -18,7 +18,6 @@ Require Glue.glue
 Require Import ExtrOcamlBasic ExtrOCamlFloats ExtrOCamlInt63.
 Require Import Coq.extraction.Extraction.
 Require Import ZArith NArith.
-Require Import ExtrOcamlBasic.
 
 (* Coqlib *)
 Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
@@ -40,70 +39,18 @@ Extract Constant AstCommon.timePhase =>
                Feedback.msg_debug (Pp.str (Printf.sprintf ""Time elapsed in %s:  %f"" (Caml_bytestring.caml_string_of_bytestring c) time));
                temp)".
 
-Extract Inductive positive => int
-[ "(fun p->1+2*p)" "(fun p->2*p)" "1" ]
-"(fun f2p1 f2p f1 p ->
-  if p<=1 then f1 () else if p mod 2 = 0 then f2p (p/2) else f2p1 (p/2))".
-
-Extract Inductive Z => int [ "0" "" "(~-)" ]
-"(fun f0 fp fn z -> if z=0 then f0 () else if z>0 then fp z else fn (-z))".
-
-Extract Inductive N => int [ "0" "" ]
-"(fun f0 fp n -> if n=0 then f0 () else fp n)".
-
-
-Extract Constant Pos.add => "(+)".
-Extract Constant Pos.succ => "Pervasives.succ".
-Extract Constant Pos.pred => "fun n -> Pervasives.max 1 (n-1)".
-Extract Constant Pos.sub => "fun n m -> Pervasives.max 1 (n-m)".
-Extract Constant Pos.mul => "( * )".
-Extract Constant Pos.min => "Pervasives.min".
-Extract Constant Pos.max => "Pervasives.max".
-Extract Constant Pos.compare =>
- "fun x y -> if x=y then 0 else if x<y then -1 else 1".
-Extract Constant Pos.compare_cont =>
- "fun c x y -> if x=y then c else if x<y then -1 else 1".
-
-Extract Constant N.add => "(+)".
-Extract Constant N.succ => "Pervasives.succ".
-Extract Constant N.pred => "fun n -> Pervasives.max 0 (n-1)".
-Extract Constant N.sub => "fun n m -> Pervasives.max 0 (n-m)".
-Extract Constant N.mul => "( * )".
-Extract Constant N.min => "Pervasives.min".
-Extract Constant N.max => "Pervasives.max".
-Extract Constant N.div => "fun a b -> if b=0 then 0 else a/b".
-Extract Constant N.modulo => "fun a b -> if b=0 then a else a mod b".
-Extract Constant N.compare =>
- "fun x y -> if x=y then 0 else if x<y then -1 else 1".
-
-
-Extract Constant Z.add => "(+)".
-Extract Constant Z.succ => "Pervasives.succ".
-Extract Constant Z.pred => "Pervasives.pred".
-Extract Constant Z.sub => "(-)".
-Extract Constant Z.mul => "( * )".
-Extract Constant Z.opp => "(~-)".
-Extract Constant Z.abs => "Pervasives.abs".
-Extract Constant Z.min => "Pervasives.min".
-Extract Constant Z.max => "Pervasives.max".
-Extract Constant Z.compare =>
- "fun x y -> if x=y then 0 else if x<y then -1 else 1".
-
-Extract Constant Z.of_N => "fun p -> p".
-Extract Constant Z.abs_N => "Pervasives.abs".
-
-(* Int31 *)
+(* Int31
 Extract Inductive Int31.digits => "bool" [ "false" "true" ].
 Extract Inductive Int31.int31 => "int" [ "Camlcoq.Int31.constr" ] "Camlcoq.Int31.destr".
 Extract Constant Int31.twice => "Camlcoq.Int31.twice".
 Extract Constant Int31.twice_plus_one => "Camlcoq.Int31.twice_plus_one".
 Extract Constant Int31.compare31 => "Camlcoq.Int31.compare".
 Extract Constant Int31.On => "0".
-Extract Constant Int31.In => "1".
+Extract Constant Int31.In => "1". *)
 
-Extract Inductive Decimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
-Extract Inductive Hexadecimal.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
-Extract Inductive Number.int => unit [ "(fun _ -> ())" "(fun _ -> ())" ] "(fun _ _ _ -> assert false)".
+Extract Inductive Decimal.int => "decimal_int" [ "DecimalPos" "DecimalNeg" ] "(fun hp hn d -> match d with DecimalPos p -> hp p | DecimalNeg p -> hn p)".
+Extract Inductive Hexadecimal.int => "hexadecimal_int" [ "HexadecimalPos" "HexadecimalNeg" ] "(fun hp hn d -> match d with HexadecimalPos p -> hp p | HexadecimalNeg p -> hn p)".
+Extract Inductive Number.int => "number_int" [ "IntDecimal" "IntHexadecimal" ] "(fun hp hn d -> match d with IntDecimal p -> hp p | IntHexadecimal p -> hn p)".
 
 Extraction Inline Equations.Prop.Classes.noConfusion.
 Extraction Inline Equations.Prop.Logic.eq_elim.

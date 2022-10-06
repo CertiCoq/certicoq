@@ -932,6 +932,7 @@ Section Refinement.
       c1 = c2 /\ Forall2_aux vs1 vs2
     | Vfun _ _ _, Vfun _ _ _ => True
     | Vint i1, Vint i2 => i1 = i2
+    | Vprim p1, Vprim p2 => p1 = p2
     | _, _ => False
     end.
 
@@ -942,6 +943,7 @@ Section Refinement.
       c1 = c2 /\ Forall2 value_ref' vs1 vs2
     | Vfun _ _ _, Vfun _ _ _ => True
     | Vint i1, Vint i2 => i1 = i2
+    | Vprim p1, Vprim p2 => p1 = p2
     | _, _ => False
     end.
 
@@ -960,6 +962,7 @@ Section Refinement.
       c1 = c2 /\ Forall2_aux vs1 vs2
     | Vfun _ _ _, Vconstr c [Vfun _ _ _; env] => True
     | Vint i1, Vint i2 => i1 = i2
+    | Vprim p1, Vprim p2 => p1 = p2
     | _, _ => False
     end.
 
@@ -970,6 +973,7 @@ Section Refinement.
       c1 = c2 /\ Forall2 value_ref_cc' vs1 vs2
     | Vfun _ _ _, Vconstr c [Vfun _ _ _; env] => True
     | Vint i1, Vint i2 => i1 = i2
+    | Vprim p1, Vprim p2 => p1 = p2
     | _, _ => False
     end.
 
@@ -1023,6 +1027,7 @@ Section Refinement.
       specialize (IHx0 (Vconstr c0 l0) (Vconstr c0 l1)). simpl in IHx0.
       eapply IHx0; eauto.
     - congruence.
+    - congruence.
   Qed.
 
   Lemma preord_val_in_value_ref PG k v1 v2 :
@@ -1039,7 +1044,8 @@ Section Refinement.
       split; eauto.
     - intros H. destruct v2; eauto.
       easy.
-    - intros H. destruct v2; eauto.  
+    - intros H. destruct v2; eauto.
+    - intros H; destruct v2; eauto.
   Qed.   
 
 
@@ -1060,6 +1066,7 @@ Section Refinement.
       destruct l; try contradiction. destruct v1; simpl; try contradiction.
       destruct l; eauto.
     - intros H. destruct v2; eauto. 
+    - intros H; destruct v2; eauto.
   Qed.
 
   Lemma value_ref_compose_l :
@@ -1076,6 +1083,7 @@ Section Refinement.
 
       specialize (IHv0 (Vconstr c0 l') (Vconstr c0 l'0)). simpl in IHv0.
       eapply IHv0; eauto.
+    - congruence. 
     - congruence. 
   Qed.
   
@@ -1098,7 +1106,8 @@ Section Refinement.
       destruct l. contradiction.
       destruct l. inv H0. inv H2. inv H5. inv H6.
       simpl in H3. destruct y. contradiction. easy.
-      contradiction. contradiction. contradiction.
+      contradiction. contradiction. contradiction. contradiction. contradiction.
+    - congruence.
     - congruence. 
   Qed.
 

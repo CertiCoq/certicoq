@@ -174,6 +174,17 @@ let print_pointer_hook
    : (formatter -> Values.block * Integers.Int.int -> unit) ref
    = ref (fun p (b, ofs) -> ())
 
+let is_nan (f : float) = f <> f
+let is_infinity f = f = infinity
+let is_neg_infinity f = f = neg_infinity
+
+let print_float p f =
+  Printf.eprintf "Printing float constant: %h\n" f;
+  if is_nan f then fprintf p "%s" "NAN"
+  else if is_infinity f then fprintf p "%s" "INFINITY"
+  else if is_neg_infinity f then fprintf p "%s" "-INFINITY"
+  else fprintf p "%h" f
+
 let print_typed_value p v ty =
   match v, ty with
   | Vint n, Ctypes.Tint(I32, Unsigned, _) ->
@@ -181,13 +192,15 @@ let print_typed_value p v ty =
   | Vint n, _ ->
       fprintf p "%ld" (camlint_of_coqint n)
   | Vfloat f, _ ->
-      fprintf p "%.15F" (camlfloat_of_coqfloat f)
+      print_float p (camlfloat_of_coqfloat f)
   | Vsingle f, _ ->
-      fprintf p "%.15Ff" (camlfloat_of_coqfloat32 f)
+      print_float p (camlfloat_of_coqfloat32 f)
   | Vlong n, Ctypes.Tlong(Unsigned, _) ->
+      Printf.printf "Printing long: %s\n" (Int64.to_string (Z.to_int64 (Integers.Int64.intval n)));
       fprintf p "%LuLLU" (camlint64_of_coqint n)
   | Vlong n, _ ->
-      fprintf p "%LdLL" (camlint64_of_coqint n)
+    Printf.printf "Printing long: %s\n" (Int64.to_string (Z.to_int64 (Integers.Int64.intval n)));
+    fprintf p "%LdLL" (camlint64_of_coqint n)
   | Vptr(b, ofs), _ ->
       fprintf p "<ptr%a>" !print_pointer_hook (b, Obj.magic ofs)
   | Vundef, _ ->
@@ -469,8 +482,8 @@ let print_init p = function
   | Init_int16 n -> fprintf p "%ld" (camlint_of_coqint n)
   | Init_int32 n -> fprintf p "%ld" (camlint_of_coqint n)
   | Init_int64 n -> fprintf p "%LdLL" (camlint64_of_coqint n)
-  | Init_float32 n -> fprintf p "%.15F" (camlfloat_of_coqfloat n)
-  | Init_float64 n -> fprintf p "%.15F" (camlfloat_of_coqfloat n)
+  | Init_float32 n -> print_float p (camlfloat_of_coqfloat n)
+  | Init_float64 n -> print_float p (camlfloat_of_coqfloat n)
   | Init_space n -> fprintf p "/* skip %s */@ " (Z.to_string n)
   | Init_addrof(symb, ofs) ->
       let ofs = camlint_of_coqint (Obj.magic ofs) in

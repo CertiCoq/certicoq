@@ -62,6 +62,8 @@ let fix_term (p : Ast0.term) : Ast0.term =
   | Coq_tProj (p, t) -> Coq_tProj (p, aux t)
   | Coq_tFix (mfix, i) -> Coq_tFix (map aux_def mfix, i)
   | Coq_tCoFix (mfix, i) -> Coq_tCoFix (map aux_def mfix, i)
+  | Coq_tInt i -> p
+  | Coq_tFloat f -> p
   and aux_pred { puinst = puinst; pparams = pparams; pcontext = pcontext; preturn = preturn } =
     { puinst; pparams = map aux pparams; pcontext; preturn = aux preturn }
   and aux_branch { bcontext = bcontext; bbody = bbody } =
@@ -125,11 +127,11 @@ let fix_declarations decls =
   List.map fix_decl decls
 
 let fix_quoted_program (p : Ast0.Env.program) = 
-  let ({ Ast0.Env.universes = universes; declarations = declarations }, term) = p in
+  let ({ Ast0.Env.universes = universes; declarations = declarations; retroknowledge = retro }, term) = p in
   let term = fix_term term in
   let universes = fix_universes universes in
   let declarations = fix_declarations declarations in
-  { Ast0.Env.universes = universes; declarations }, term
+  { Ast0.Env.universes = universes; declarations; retroknowledge = retro }, term
 
 end
 
@@ -150,6 +152,33 @@ let debug_msg (flag : bool) (s : string) =
   if flag then
     Feedback.msg_debug (str s)
   else ()
+  
+(* Separate registration of primitive extraction *)
+
+type prim = ((Kernames.kername * Kernames.ident) * Datatypes.bool)
+let global_registers = 
+  Summary.ref (([], []) : prim list * string list) ~name:"Vanilla CertiCoq Registration"
+
+let global_registers_name = "certicoq-vanilla-registration"
+
+let cache_registers (prims, imports) =
+  let (prims', imports') = !global_registers in
+  global_registers := (prims @ prims', imports @ imports')
+let global_registers_input = 
+  let open Libobject in 
+  declare_object 
+    (global_object_nodischarge global_registers_name
+    ~cache:(fun (_, r) -> cache_registers r)
+    ~subst:None) (*(fun (msub, r) -> r)) *)
+
+let register (prims : prim list) (imports : string list) : unit =
+  let curlib = Sys.getcwd () in
+  let newr = (prims, List.map (Filename.concat curlib) imports) in
+  Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) (fst newr));
+  Lib.add_anonymous_leaf (global_registers_input newr)
+
+let get_global_prims () = fst !global_registers
+let get_global_includes () = snd !global_registers
 
 (** Compilation Command Arguments *)
 
@@ -161,6 +190,7 @@ type command_args =
  | DEBUG
  | ARGS of int
  | ANFCONFIG of int (* To measure different ANF configurations *)
+ | BUILDDIR of string (* Directory name to be prepended to the file name *)
  | EXT of string (* Filename extension to be appended to the file name *)
  | DEV of int    (* For development purposes *)
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
@@ -174,6 +204,7 @@ type options =
     debug     : bool;
     args      : int;
     anf_conf  : int;
+    build_dir : string;
     filename  : string;
     ext       : string;
     dev       : int;
@@ -189,6 +220,7 @@ let default_options : options =
     debug     = false;
     args      = 5;
     anf_conf  = 0;
+    build_dir = "."; 
     filename  = "";
     ext       = "";
     dev       = 0;
@@ -196,6 +228,19 @@ let default_options : options =
     prims     = [];
   }
 
+let check_build_dir d =
+  if d = "" then "." else
+  let isdir = 
+    try Unix.((stat d).st_kind = S_DIR)
+    with Unix.Unix_error (Unix.ENOENT, _, _) ->
+      CErrors.user_err ~hdr:"pipeline" 
+        Pp.(str "Could not compile: build directory " ++ str d ++ str " not found.")
+  in
+  if not isdir then 
+    CErrors.user_err ~hdr:"pipeline"
+      Pp.(str "Could not compile: " ++ str d ++ str " is not a directory.")
+  else d
+  
 
 let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * Datatypes.bool) list) (fname : string) : options =
   let rec aux (o : options) l =
@@ -208,6 +253,9 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
     | DEBUG    :: xs -> aux {o with debug = true} xs
     | ARGS n   :: xs -> aux {o with args = n} xs
     | ANFCONFIG n :: xs -> aux {o with anf_conf = n} xs
+    | BUILDDIR s  :: xs ->
+      let s = check_build_dir s in
+      aux {o with build_dir = s} xs
     | EXT s    :: xs -> aux {o with ext = s} xs
     | DEV n    :: xs -> aux {o with dev = n} xs
     | PREFIX s :: xs -> aux {o with prefix = s} xs
@@ -227,7 +275,8 @@ let make_pipeline_options (opts : options) =
   let anfc = coq_nat_of_int opts.anf_conf in
   let dev = coq_nat_of_int opts.dev in
   let prefix = bytestring_of_string opts.prefix in
-  let prims = opts.prims in
+  let prims = get_global_prims () @ opts.prims in
+  Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims);
   Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix prims
 
 
@@ -282,10 +331,14 @@ end
 
 
 module CompileFunctor (CI : CompilerInterface) = struct
+  let make_fname opts str =
+    Filename.concat opts.build_dir str
 
   let compile opts term imports =
     let debug = opts.debug in
     let options = make_pipeline_options opts in
+    let imports = get_global_includes () @ imports in
+    debug_msg debug (Printf.sprintf "Imports: %s" (String.concat " " imports));
     let p = CI.compile options term in
     match p with
     | (CompM.Ret ((nenv, header), prg), dbg) ->
@@ -293,8 +346,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let time = Unix.gettimeofday() in
       let fname = opts.filename in
       let suff = opts.ext in
-      let cstr = fname ^ suff ^ ".c" in
-      let hstr = fname ^ suff ^ ".h" in
+      let cstr = make_fname opts (fname ^ suff ^ ".c") in
+      let hstr = make_fname opts (fname ^ suff ^ ".h") in
       CI.printProg prg nenv cstr imports (* (List.map Tm_util.string_to_list imports) *);
       CI.printProg header nenv hstr [];
 
@@ -303,7 +356,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       * Pipeline.printProg (nenv,prg) cstr;
       * Pipeline.printProg (nenv,header) hstr; *)
       let time = (Unix.gettimeofday() -. time) in
-      Feedback.msg_debug (str (Printf.sprintf "Printed to file in %f s.." time));
+      debug_msg debug (Printf.sprintf "Printed to file %s in %f s.." cstr time);
       debug_msg debug "Pipeline debug:";
       debug_msg debug (string_of_bytestring dbg)
     | (CompM.Err s, dbg) ->
@@ -331,6 +384,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let fname = opts.filename in
       let cstr = if standalone then fname ^ ".c" else "glue." ^ fname ^ suff ^ ".c" in
       let hstr = if standalone then fname ^ ".h" else "glue." ^ fname ^ suff ^ ".h" in
+      let cstr = make_fname opts cstr in
+      let hstr = make_fname opts hstr in
       CI.printProg prg nenv cstr [];
       CI.printProg header nenv hstr [];
 
@@ -353,6 +408,86 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let term = quote opts gr in
     generate_glue true opts (Ast0.Env.declarations (fst (Obj.magic term)))
 
+  let compiler_executable debug = 
+    let whichcmd = Unix.open_process_in "which gcc || which clang" in
+    let result = 
+      try Stdlib.input_line whichcmd 
+      with End_of_file -> ""
+    in
+    let status = Unix.close_process_in whichcmd in
+    match status with
+    | Unix.WEXITED 0 -> 
+      if debug then Feedback.msg_debug Pp.(str "Compiler is " ++ str result);
+      result
+    | _ -> failwith "Compiler not found"
+
+  type line = 
+    | EOF
+    | Info of string
+    | Error of string
+
+  let read_line stdout stderr =
+    try Info (input_line stdout)
+    with End_of_file -> 
+      try Error (input_line stderr)
+      with End_of_file -> EOF
+  
+  let run_program debug prog =
+    let (stdout, stdin, stderr) = Unix.open_process_full ("./" ^ prog) (Unix.environment ()) in
+    let continue = ref true in
+    while !continue do 
+      match read_line stdout stderr with
+      | EOF -> debug_msg debug ("Program terminated"); continue := false
+      | Info s -> Feedback.msg_notice Pp.(str prog ++ str": " ++ str s)
+      | Error s -> Feedback.msg_warning Pp.(str prog ++ str": " ++ str s)
+    done
+
+  let runtime_dir () = 
+    let lib = Envars.coqlib () in
+    Filename.concat (Filename.concat (Filename.concat (Filename.concat lib "user-contrib") "CertiCoq") "Plugin") "runtime"
+
+  let make_rt_file na =
+    Filename.concat (runtime_dir ()) na
+
+  let compile_C opts gr imports =
+    let () = compile_with_glue opts gr imports in
+    let imports = get_global_includes () @ imports in
+    let debug = opts.debug in
+    let fname = opts.filename in
+    let suff = opts.ext in
+    let name = make_fname opts (fname ^ suff) in
+    let compiler = compiler_executable debug in
+    let rt_dir = runtime_dir () in
+    let cmd =
+        Printf.sprintf "%s -Wno-everything -g -I %s -I %s -c -o %s %s" 
+          compiler opts.build_dir rt_dir (name ^ ".o") (name ^ ".c") 
+    in
+    let importso =
+      let oname s = 
+        assert (CString.is_suffix ".h" s);
+        String.sub s 0 (String.length s - 2) ^ ".o"
+      in 
+      let l = make_rt_file "certicoq_run_main.o" :: List.map oname imports in
+      String.concat " " l
+    in
+    let gc_stack_o = make_rt_file "gc_stack.o" in
+    debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
+    match Unix.system cmd with
+    | Unix.WEXITED 0 -> 
+      let linkcmd =
+        Printf.sprintf "%s -Wno-everything -g -L %s -L %s -o %s %s %s %s" 
+          compiler opts.build_dir rt_dir name gc_stack_o (name ^ ".o") importso
+      in
+      debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
+      (match Unix.system linkcmd with
+      | Unix.WEXITED 0 ->
+          debug_msg debug (Printf.sprintf "Compilation ran fine, running %s" name);
+          run_program debug name
+      | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str linkcmd)
+      | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n))
+    | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str cmd)
+    | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n  ++ str" while running " ++ str cmd)
+  
   let print_to_file (s : string) (file : string) =
     let f = open_out file in
     Printf.fprintf f "%s\n" s;

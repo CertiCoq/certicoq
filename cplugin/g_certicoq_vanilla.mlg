@@ -21,6 +21,7 @@ VERNAC ARGUMENT EXTEND vanilla_cargs
 | [ "-args" natural(n) ] -> { ARGS(n) }
 | [ "-config" natural(n) ] -> { ANFCONFIG(n) }
 (* Zoe: -config  To measure different ANF configurations. Not for user purposes *)
+| [ "-build_dir" string(s) ] -> { BUILDDIR(s) }
 | [ "-dev" natural(n) ] -> { DEV(n) }
 | [ "-ext" string(s) ] -> { EXT(s) }
 | [ "-file" string(s) ] -> { FILENAME(s) }
@@ -45,6 +46,12 @@ VERNAC ARGUMENT EXTEND vanilla_glueargs
 | [ "-file" string(s) ] -> { FILENAME(s) }
 END
 
+VERNAC COMMAND EXTEND CertiCoq_Register CLASSIFIED AS SIDEFF
+| [ "CertiCoq" "Register" "[" vanilla_extract_cnst_list_sep(l, ",") "]" "Include" "[" string_list_sep(imps, ",") "]" ] -> {
+  Certicoq.register l imps
+  }
+END
+
 VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
 | [ "CertiCoq" "Compile" vanilla_cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
@@ -55,6 +62,16 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
     let gr = Nametab.global gr in
     let opts = Certicoq.make_options l cs (get_name gr) in
     Certicoq.compile_with_glue opts gr imps
+  }
+| [ "CertiCoq" "Run" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" string_list_sep(imps, ",") "]" ] -> {
+  let gr = Nametab.global gr in
+  let opts = Certicoq.make_options l cs (get_name gr) in
+  Certicoq.compile_C opts gr imps
+  }
+| [ "CertiCoq" "Run" vanilla_cargs_list(l) global(gr) ] -> {
+  let gr = Nametab.global gr in
+  let opts = Certicoq.make_options l [] (get_name gr) in
+  Certicoq.compile_C opts gr []
   }
 | [ "CertiCoq" "Show" "IR" vanilla_cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in

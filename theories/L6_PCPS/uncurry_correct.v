@@ -1697,6 +1697,8 @@ Section uncurry_correct.
       + do 2 (rewrite M.gso; [|assumption]).
         apply preord_env_P_monotonic with (j := k') in Henv; [|lia].
         apply Henv; auto.
+    - apply preord_exp_prim_val_compat.
+      now eapply Hpost_prop.
     - (* uncurry_prim *)
       apply preord_exp_prim_compat.
       now eapply Hpost_prop.
@@ -2478,6 +2480,26 @@ Section uncurry_correct.
       + (* Eapp *)
         apply return_triple; intros.
         exists 0; constructor.
+      + (* EPrim_val *)
+        simpl.
+        eapply pre_eq_state_lr; intros [] st [Huniq Hused].
+        unfold uncurry_exp; fold uncurry_exp.
+        eapply bind_triple.
+        eapply pre_strenghtening; [|use_IH IHn].
+        simpl; intros [] s [_ Hs]; subst.
+        split; [now inv Huniq|].
+        eapply Included_trans; [|apply Hused].
+        rewrite used_vars_Eprim_val...
+        intros e1 st1; apply return_triple.
+        intros [] st2 [n Hrel] [_ Hst]; subst st1; rename st2 into st1.
+        assert (from_fresh st \subset from_fresh st1) by (eapply uncurry_rel_s_nondecreasing; eauto).
+        destruct n; inv Hrel.
+        exists 0; constructor.
+        exists (S n); econstructor.
+        constructor; eauto.
+        apply app_ctx_uncurry_rel with (c := Eprim_val_c v p Hole_c).
+        eapply uncurry_step_preserves_used_vars; eauto.
+        apply app_ctx_uncurry_step with (c := Eprim_val_c v p Hole_c). all: eauto.
       + (* Eprim *)
         eapply pre_eq_state_lr; intros [] st [Huniq Hused].
         unfold uncurry_exp; fold uncurry_exp.

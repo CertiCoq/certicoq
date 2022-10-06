@@ -28,9 +28,11 @@ Inductive WNorm: Term -> Prop :=
 | WNFix: forall ds br, WNorm (TFix ds br)
 | WNConstruct: forall i n args, WNorms args -> WNorm (TConstruct i n args)
 | WNProof: WNorm TProof
+| WNPrim p: WNorm (TPrim p)
 | WNApp: forall fn t,
     WNorm fn ->
     ~ isLambda fn -> ~ isFix fn -> ~ isConstruct fn -> fn <> TProof ->
+    ~ isPrim fn ->
     WNorm t ->
     WNorm (TApp fn t)
 with WNorms: Terms -> Prop :=
@@ -58,7 +60,7 @@ Lemma Wcbv_WNorm:
 Proof.
   apply WcbvEvalEvals_ind; intros;
     try (solve[constructor; try assumption]); try assumption.
-  - destruct a as [a [b [c d]]]. constructor; try assumption.  
+  - destruct a as [a [b [c [d e]]]]. constructor; try assumption.  
 Qed.
 
 (** every normal form is hit **)
@@ -71,6 +73,7 @@ Proof.
   - exists (TFix ds br). constructor.
   - dstrctn H. exists (TConstruct i n x). now constructor.
   - exists TProof. constructor.
+  - exists (TPrim p0); constructor.
   - dstrctn H. dstrctn H0. exists (TApp x x0). now apply wAppCong. 
   - exists tnil. constructor.
   - dstrctn H. dstrctn H0. exists (tcons x x0). now constructor.

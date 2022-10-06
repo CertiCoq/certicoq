@@ -23,6 +23,7 @@ Notation raise := (ExtLib.Structures.MonadExc.raise).
 Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wLam: forall nm bod, WcbvEval p (TLambda nm bod) (TLambda nm bod)
 | wProof: WcbvEval p TProof TProof
+| wPrim v : WcbvEval p (TPrim v) (TPrim v)
 | wAppProof : forall fn arg arg',
     WcbvEval p fn TProof ->
     WcbvEval p arg arg' ->
@@ -53,7 +54,7 @@ Inductive WcbvEval (p:environ Term) : Term -> Term -> Prop :=
 | wAppCong: forall fn fn' arg arg', 
     WcbvEval p fn fn' ->
     (* Lambda, Fix and Proof are redexes; Constructors are fully applied *)
-    (~ isLambda fn' /\ ~ isFix fn' /\ ~ isConstruct fn' /\ fn' <> TProof) ->
+    (~ isLambda fn' /\ ~ isFix fn' /\ ~ isConstruct fn' /\ fn' <> TProof /\ ~ isPrim fn') ->
     WcbvEval p arg arg' ->
     WcbvEval p (TApp fn arg) (TApp fn' arg') 
 | wCase: forall mch i n args brs cs s,
@@ -95,7 +96,7 @@ Proof.
   - inversion_Clear H1; trivial.
     + specialize (H _ H4). discriminate.
     + specialize (H _ H4). discriminate.
-    + destruct H5 as [a [b [c d]]]. elim d. symmetry. apply H. assumption.
+    + destruct H5 as [a [b [c [d e]]]]. elim d. symmetry. apply H. assumption.
   - inversion_Clear H0. apply f_equal3; try reflexivity.
     eapply H. assumption.
   - inversion_Clear H0. rewrite H2 in e. myInjection e.
@@ -117,7 +118,7 @@ Proof.
       specialize (H0 _ H7). subst. intuition.
     + destruct H6 as [a [b c]]. specialize (H _ H5). subst fn'.
       destruct b. auto.
-  - destruct a as [a [b [c d]]]. inversion_Clear H1.
+  - destruct a as [a [b [c [d e]]]]. inversion_Clear H1.
     + specialize (H _ H4). contradiction. 
     + specialize (H _ H4). subst. elim a. auto.
     + specialize (H _ H4). subst. elim b. auto.
@@ -337,6 +338,8 @@ Function wcbvEval
       | Ret (TConstruct i cn args) =>  (* constructors are fully applied *)
         raise ("wcbvEval,Cong,Constructor: "
                  ++ " " ++ (print_inductive i) ++ " " ++ (nat_to_string cn))
+      | Ret (TPrim pv) =>
+        raise ("wcbvEval,Cong,Prim")
       | Ret (_ as u) =>
         match wcbvEval n a1 with
         | Exc s =>  raise ("wcbvEval,Cong,arg: " ++ s)
@@ -368,6 +371,7 @@ Function wcbvEval
     end
   (** already in whnf ***)
   | TProof => ret TProof
+  | TPrim v => ret (TPrim v)
   | TLambda nn t => ret (TLambda nn t)
   | TFix mfp br => ret (TFix mfp br)
   (** should never appear **)
@@ -417,6 +421,7 @@ Proof.
     + dstrctn h. subst. contradiction. 
     + dstrctn h. subst. contradiction. 
     + subst. contradiction.
+    + dstrctn h; subst. contradiction.
   - eapply wCase; subst; try eassumption.
     + now apply H. 
     + intuition.
@@ -487,14 +492,15 @@ Proof.
     + discriminate.
   - destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
-    destruct a as [z0 [z1 [z2 z3]]].
+    destruct a as [z0 [z1 [z2 [z3 z4]]]].
     simpl. rewrite (j mx); try lia. rewrite (H (mx - 1)); try lia.
     destruct fn'; try rewrite H0; try reflexivity; try lia.
     + elim z3. auto.
     + elim z0. auto.
     + elim z2. auto.
     + elim z1. auto.
-  - destruct H, H0. exists (S (max x x0)). intros mx h.
+    + elim z4; auto. now eexists.
+  -  destruct H, H0. exists (S (max x x0)). intros mx h.
     assert (l1:= max_fst x x0). assert (l2:= max_snd x x0).
     cbn. rewrite (j mx); try lia. rewrite (H (mx - 1)); try lia.
     rewrite e. destruct (inductive_dec i i).

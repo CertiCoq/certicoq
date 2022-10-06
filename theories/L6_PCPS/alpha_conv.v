@@ -168,6 +168,9 @@ Inductive Alpha_conv_val :
                          exists v', M.get (f x) rho' =
                                     Some v' /\ Alpha_conv_val v v' f) ->
       Alpha_conv_val (Vfun rho fdefs x) (Vfun rho' fdefs' x') f
+| Alpha_Vprim :
+    forall p f,
+      Alpha_conv_val (Vprim p) (Vprim p) f
 | Alpha_Vint :
     forall n f,
       Alpha_conv_val (Vint n) (Vint n) f.
@@ -272,6 +275,8 @@ Proof.
   - inv H'. constructor; eauto. 
     eapply Forall2_monotonic; [| eassumption ].
     intros x1 x2 Heq. rewrite H1. eassumption.
+  - inv H'; constructor; eauto.
+  - inv H'; constructor; eauto.
   - inv H'; constructor; eauto.
     + eapply Forall2_monotonic; [| eassumption ].
       intros x1 x2 Heq. rewrite <- H2. eassumption. 

@@ -1,0 +1,14 @@
+From MetaCoq.Template Require Import bytestring.
+From CertiCoq.VanillaPlugin Require Import Loader.
+
+Axiom (coq_msg_info : string -> unit).
+Axiom (coq_msg_notice : string -> unit).
+Axiom (coq_msg_debug : string -> unit).
+Axiom (coq_user_error : string -> unit).
+
+CertiCoq Register [ 
+  coq_msg_info => "coq_msg_info",
+  coq_msg_notice => "coq_msg_notice",
+  coq_msg_debug => "coq_msg_debug",
+  coq_user_error => "coq_user_error" ]
+Include [ "runtime/coq_c_ffi.h" ].

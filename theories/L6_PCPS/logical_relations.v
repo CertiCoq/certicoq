@@ -106,6 +106,7 @@ Section Log_rel.
        | Vconstr t1 vs1, Vconstr t2 vs2 =>
          t1 = t2 /\ Forall2_aux vs1 vs2
        | Vint n1, Vint n2 => n1 = n2
+       | Vprim p, Vprim p' => p = p'
        | _, _ => False
        end
     in preord_val_aux v1 v2.
@@ -127,6 +128,7 @@ Section Log_rel.
       | Vconstr t1 vs1, Vconstr t2 vs2 =>
         t1 = t2 /\ Forall2 (preord_val PostG k) vs1 vs2
       | Vint n1, Vint n2 => n1 = n2
+      | Vprim p, Vprim p' => p = p'
       | _, _ => False
     end.
 
@@ -1116,6 +1118,17 @@ Section Log_rel.
     Qed.
 *)
 
+    Lemma preord_exp_prim_val_compat k rho1 rho2 x1 x2 p e1 e2
+      (HOOT : post_OOT' (Eprim_val x1 p e1) rho1 (Eprim_val x2 p e2) rho2 P2) :
+      preord_exp P2 PG k (Eprim_val x1 p e1, rho1) (Eprim_val x2 p e2, rho2).
+    Proof.
+      intros v1 cin cout Hleq1 Hstep1. inv Hstep1.
+      - (* OOT *) 
+        exists OOT, cin, <0>. split. econstructor. eassumption.
+        split; [| now eauto ]. eapply HOOT; eassumption. 
+      - inv H.
+    Qed. 
+
     Lemma preord_exp_prim_compat k rho1 rho2 x1 x2 f ys1 ys2 e1 e2
       (HOOT : post_OOT' (Eprim x1 f ys1 e1) rho1 (Eprim x2 f ys2 e2) rho2 P2) :
 
@@ -1246,6 +1259,7 @@ Section Log_rel.
       | Hole_c => 0
       | Econstr_c _ _ ys c => 1 + exp_ctx_len c
       | Eproj_c _ _ _ _ c => 1 + exp_ctx_len c
+      | Eprim_val_c _ _ c => 1 + exp_ctx_len c
       | Eprim_c _ _ ys c => 1 + exp_ctx_len c
       | Eletapp_c _ f _ ys c => 1 + exp_ctx_len c
       | Ecase_c _ l1 _ c l2  => 1 + exp_ctx_len c
@@ -1319,6 +1333,7 @@ Section Log_rel.
       match c with 
       | Econstr_c _ _ _ c
       | Eproj_c _ _ _ _ c 
+      | Eprim_val_c _ _ c
       | Eprim_c _ _ _ c
       | Efun1_c _ c => 1 + len_exp_ctx c
       | Efun2_c _ _
@@ -1367,6 +1382,11 @@ Section Log_rel.
         eapply H1; eauto. econstructor; eauto. now econstructor.
         eapply preord_res_monotonic. eassumption. lia.
         
+    - intros v' c1 cout1 Hleq1 Hstep1. inv Hstep1.
+      + simpl in *. exists OOT, c1, <0>. split.
+        econstructor 1. unfold one. erewrite one_eq. eassumption.
+        split; eauto. eapply Hzero. eassumption.
+      + inv H.
     - intros v' c1 cout1 Hleq1 Hstep1. inv Hstep1.
       + simpl in *. exists OOT, c1, <0>. split.
         econstructor 1. unfold one. erewrite one_eq. eassumption.
@@ -1594,6 +1614,7 @@ Section Log_rel.
       - eapply preord_exp_app_compat. now eauto. now eauto.
         intros x HP. apply Henv; eauto.
         apply Forall2_same. intros. apply Henv. now constructor.
+      - eapply preord_exp_prim_val_compat; eauto; intros.
       - eapply preord_exp_prim_compat; eauto; intros.
         eapply Forall2_same. intros. apply Henv. now constructor.
       - eapply preord_exp_halt_compat; try eassumption. now eauto. now eauto.
@@ -1863,6 +1884,7 @@ Section Log_rel.
           eapply preord_env_P_antimon; eauto.
           eapply preord_env_P_monotonic; [| eassumption ]. lia.
           simpl. normalize_occurs_free. sets.
+    - simpl. eapply preord_exp_prim_val_compat; eauto.
     - simpl. eapply preord_exp_prim_compat; eauto.
       + eapply Forall2_same. intros x Hin. eapply Hpre. constructor; eauto.
     - simpl. eapply preord_exp_letapp_compat; eauto.
@@ -2063,6 +2085,9 @@ Section Log_rel.
         rewrite Hf3 in Hf3'. inv Hf3'. rewrite <- Hs3 in Hs3'. inv Hs3'.
         eapply Hpre3'. lia.
         eapply Forall2_refl. eapply preord_val_refl; eauto.
+      - intros v1 v2 H1 H2; specialize (H2 k); rewrite !preord_val_eq in *.
+        destruct v1; destruct v2; 
+          try (now simpl in *; contradiction); inv H1; inv H2; simpl; eauto.
       - intros v1 v2 H1 H2; specialize (H2 k); rewrite !preord_val_eq in *.
         destruct v1; destruct v2; 
           try (now simpl in *; contradiction); inv H1; inv H2; simpl; eauto.

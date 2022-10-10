@@ -112,3 +112,9 @@ bootstrap/certicoqc/Makefile.certicoqc
 bootstrap/certicoqc/Makefile.certicoqc.conf
 bootstrap/certicoqc/tests/test.certicoqc*
 cplugin/.Makefile.d
+tests/glue.test.certicoqc.c
+tests/glue.test.certicoqc.h
+tests/test.certicoqc.c
+tests/test.certicoqc.h
+bootstrap/certicoqc/tests/glue.test.certicoqc.c
+bootstrap/certicoqc/tests/glue.test.certicoqc.h

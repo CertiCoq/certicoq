@@ -174,7 +174,7 @@ let global_registers_input =
 let register (prims : prim list) (imports : string list) : unit =
   let curlib = Sys.getcwd () in
   let newr = (prims, List.map (Filename.concat curlib) imports) in
-  Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) (fst newr));
+  (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) (fst newr)); *)
   Lib.add_anonymous_leaf (global_registers_input newr)
 
 let get_global_prims () = fst !global_registers
@@ -276,7 +276,7 @@ let make_pipeline_options (opts : options) =
   let dev = coq_nat_of_int opts.dev in
   let prefix = bytestring_of_string opts.prefix in
   let prims = get_global_prims () @ opts.prims in
-  Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims);
+  (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
   Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix prims
 
 

@@ -7,19 +7,22 @@ OCAMLLIB = $(shell ocamlc -where)
 OCAMLOPTS = -I ${COQLIB}/user-contrib/MetaCoq/Template -open Metacoq_template_plugin -I ../../cplugin -open Certicoq_vanilla_plugin \
 	-I . -linkpkg -dontlink str,unix,dynlink,threads,zarith  -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
 GENCFILES = glue.CertiCoq.CertiCoqCheck.compile.certicoqchk.c CertiCoq.CertiCoqCheck.compile.certicoqchk.c
-CFILES = certicoqchk_wrapper.c ${GENCFILES} gc_stack.c print.c
-COQOPTS = -Q ../../theories/L7 CertiCoq.L7 -Q ../../libraries CertiCoq.Libraries \
-	-Q ../../theories/L6_PCPS CertiCoq.L6 -Q ../../theories/L4_deBruijn CertiCoq.L4 \
+CFILES = certicoqchk_wrapper.c ${GENCFILES}
+COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq.Libraries \
+	-Q ../../theories/LambdaANF CertiCoq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiCoq.LambdaBoxLocal \
 	-Q ../../theories/Compiler CertiCoq.Compiler -Q ../../theories/common CertiCoq.Common \
 	-Q ../../theories/Glue CertiCoq.Glue \
-	-Q ../../theories/L2k_noCnstrParams CertiCoq.L2k \
+	-Q ../../theories/LambdaBoxMut CertiCoq.LambdaBoxMut \
 	-Q ../../plugin CertiCoq.Plugin \
 	-I ../../plugin \
 	-Q ../../cplugin CertiCoq.VanillaPlugin \
 	-I ../../cplugin \
 	-Q . CertiCoq.CertiCoqCheck
 
-CCOMPILEROPTS = -fPIC -g -c -I . -I ${OCAMLLIB} -w -Wno-everything -O2
+RUNTIME_DIR = ../../plugin/runtime
+RUNTIME_FILES = ${RUNTIME_DIR}/gc_stack.o ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_int63.o ${RUNTIME_DIR}/coq_c_ffi.o
+
+CCOMPILEROPTS = -fPIC -g -c -I . -I ${RUNTIME_DIR} -I ${OCAMLLIB} -w -Wno-everything -O2
 # ccomp: CCOMPILEROPTS = -g -c -I . -I ${OCAMLLIB} -O2
 
 plugin: compile.vo Loader.vo
@@ -41,7 +44,7 @@ compile.vo ${GENCFILES} &: compile.v
 %.o: %.c
 	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
 
-certicoqchk_plugin.cmxs: certicoqchk_plugin.cmxa ${CFILES:.c=.o}
+certicoqchk_plugin.cmxs: certicoqchk_plugin.cmxa ${CFILES:.c=.o} ${RUNTIME_FILES}
 	ocamlfind opt ${OCAMLOPTS} -shared -linkall -o $@ $+
 
 certicoqchk_plugin.cmx: certicoqchk_plugin_wrapper.cmx certicoqchk.cmx g_certicoqchk.cmx

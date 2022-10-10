@@ -22,10 +22,10 @@ Require Import ZArith NArith.
 (* Coqlib *)
 Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
 
-(* L6_to_Clight *)
+(* LambdaANF_to_Clight *)
 (* Extract Constant pipeline.print_Clight => "PrintClight.print_if". *)
-(* Extract Constant L6_to_Clight.print_Clight_dest => "PrintClight.print_dest". *)
-(* Extract Constant L6_to_Clight.print_Clight_dest_names => "PrintClight.print_dest_names". *)
+(* Extract Constant LambdaANF_to_Clight.print_Clight_dest => "PrintClight.print_dest". *)
+(* Extract Constant LambdaANF_to_Clight.print_Clight_dest_names => "PrintClight.print_dest_names". *)
 (* Extract Constant pipeline.print_Clight_names_dest_imports => "PrintClight.print_dest_names_imports". *)
 (* Extract Constant pipeline.print => "print_string". *)
 

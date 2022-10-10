@@ -217,7 +217,7 @@ Shrink_cps
 Closure_conversion
 Hoisting
 Lambda_lifting
-L4_to_L6
+LambdaBoxLocal_to_LambdaANF
 BinarySingleNaN
 Binary
 Bits
@@ -228,8 +228,8 @@ Integers
 Floats
 AST
 Values
-L3_to_L3_eta
-L3_to_L4
+LambdaBoxMut_to_LambdaBoxMut_eta
+LambdaBoxMut_to_LambdaBoxLocal
 Camlcoq
 
 Ctypes
@@ -246,8 +246,8 @@ Clight
 PrintAST
 PrintCsyntax
 PrintClight
-L6_to_Clight
-L6_to_Clight_stack
+LambdaANF_to_Clight
+LambdaANF_to_Clight_stack
 Toplevel
 Toplevel0
 Toplevel1

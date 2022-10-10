@@ -254,14 +254,14 @@ extraction/integers.ml
 extraction/integers.mli
 extraction/kernames.ml
 extraction/kernames.mli
-extraction/l3_to_L4.ml
-extraction/l3_to_L4.mli
-extraction/l4_to_L6.ml
-extraction/l4_to_L6.mli
-extraction/l6_to_Clight.ml
-extraction/l6_to_Clight.mli
-extraction/l6_to_Clight_stack.ml
-extraction/l6_to_Clight_stack.mli
+extraction/lambdaBoxMut_to_LambdaBoxLocal.ml
+extraction/lambdaBoxMut_to_LambdaBoxLocal.mli
+extraction/lambdaBoxLocal_to_LambdaANF.ml
+extraction/lambdaBoxLocal_to_LambdaANF.mli
+extraction/lambdaANF_to_Clight.ml
+extraction/lambdaANF_to_Clight.mli
+extraction/lambdaANF_to_Clight_stack.ml
+extraction/lambdaANF_to_Clight_stack.mli
 extraction/lambda_lifting.ml
 extraction/lambda_lifting.mli
 extraction/list0.ml
@@ -427,8 +427,8 @@ extraction/toplevel1.ml
 extraction/toplevel1.mli
 extraction/toplevel2.ml
 extraction/toplevel2.mli
-# extraction/toplevel3.ml
-# extraction/toplevel3.mli
+# extraction/topleveLambdaBoxMut.ml
+# extraction/topleveLambdaBoxMut.mli
 extraction/toplevel.ml
 extraction/toplevel.mli
 extraction/uGraph0.ml

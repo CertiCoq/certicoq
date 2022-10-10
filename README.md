@@ -49,10 +49,10 @@ Structure of the theories directory:
 * `theories/common`: contains common code utilities 
 * `theories/Compiler`: contains the toplevel CertiCoq pipeline 
 * `theories/L1g`: 1st pass, moves from (MetaCoq's) λbox to our similar L1g
-* `theories/L2k_noCnstrParams`: 2nd pass, eta expands constructors and removes constructor parameters 
-* `theories/L4_deBruijn`: 3rd pass, let-bind environment
-* `theories/L6_PCPS` contains the λANF pipeline (and conversions -- direct and CPS -- to λANF)
-* `theories/L7` contains the C code generator.
+* `theories/LambdaBoxMut`: 2nd pass, eta expands constructors and removes constructor parameters 
+* `theories/LambdaBoxLocal`: 3rd pass, let-bind environment
+* `theories/LambdaANF` contains the λANF pipeline (and conversions -- direct and LambdaANF -- to λANF)
+* `theories/Codegen` contains the C code generator.
 
 
 ## Bugs 

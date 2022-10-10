@@ -5,10 +5,10 @@ GENCFILES = glue.CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.metacoq_era
 CFILES = certicoq_erasure.c ${GENCFILES} gc_stack.c print.c
 COPTS = -I ../../_opam/lib/ocaml -I . -I ../../theories/Runtime
 # ffi.CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.QuoteFFI.c
-COQOPTS = -Q ../../theories/L7 CertiCoq.L7 -Q ../../libraries CertiCoq.Libraries \
-	-Q ../../theories/L6_PCPS CertiCoq.L6 -Q ../../theories/L4_deBruijn CertiCoq.L4 \
+COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq.Libraries \
+	-Q ../../theories/LambdaANF CertiCoq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiCoq.LambdaBoxLocal \
 	-Q ../../theories/Compiler CertiCoq.Compiler -Q ../../theories/common CertiCoq.Common \
-	-Q ../../theories/L2k_noCnstrParams CertiCoq.L2k -Q .. CertiCoq.Benchmarks
+	-Q ../../theories/LambdaBoxMut CertiCoq.LambdaBoxMut -Q .. CertiCoq.Benchmarks
 
 plugin: metacoq_erasure.vo Loader.vo
 

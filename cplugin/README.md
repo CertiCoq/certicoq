@@ -17,7 +17,7 @@ CertiCoq Compile ref.
 ```
 
 Where `ref` must be the name of a Coq definition.  The extracted
-compiler relies on the `Compiler.allInstances.compile_template_L7` and
+compiler relies on the `Compiler.allInstances.compile_template_Codegen` and
 `Compiler.allInstances.printProg` functions. It will compile the
 definition and output the program to file `fullref.c` where fullref is
 the fully qualified name of the reference `ref`, in the current working

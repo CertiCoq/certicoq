@@ -15,11 +15,11 @@ Section Pipeline.
     (debug : bool).
 
   Definition CertiCoq_pipeline (p : Ast.Env.program) :=
-    p <- compile_L2k p ;;
-    p <- compile_L4 prims p ;;
-    p <- compile_L6_ANF next_id prims p ;;
-    (* if debug then compile_L6_debug next_id p  For debugging intermediate states of the λanf pipeline else *)
-    compile_L6 next_id p.
+    p <- compile_LambdaBoxMut p ;;
+    p <- compile_LambdaBoxLocal prims p ;;
+    p <- compile_LambdaANF_ANF next_id prims p ;;
+    (* if debug then compile_LambdaANF_debug next_id p  For debugging intermediate states of the λanf pipeline else *)
+    compile_LambdaANF next_id p.
 End Pipeline.
 
 (** * The main CertiCoq pipeline, with MetaCoq's erasure and C-code generation *)
@@ -36,7 +36,7 @@ Definition compile (opts : Options) (p : Template.Ast.Env.program) :=
   
 Transparent compile.compile.
 
-Definition cps_show (t : L6_FullTerm) :=
+Definition cps_show (t : LambdaANF_FullTerm) :=
   let '(prims, primenv, ctorenv, ctortag, indtag, nameenv, funenv, evalenv, e) := t in
   let s := cps_show.show_exp nameenv ctorenv false e in
   coq_msg_info s.

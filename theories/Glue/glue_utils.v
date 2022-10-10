@@ -20,10 +20,10 @@ Require Import compcert.common.AST
                compcert.common.Values
                compcert.export.Clightdefs.
 
-Require Import L6.cps
-               L6.identifiers
-               L6.cps_show
-               L6_to_Clight
+Require Import LambdaANF.cps
+               LambdaANF.identifiers
+               LambdaANF.cps_show
+               LambdaANF_to_Clight
                compM.
 
 Import MonadNotation.

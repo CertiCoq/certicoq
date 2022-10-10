@@ -523,7 +523,7 @@ Definition getCnstr (ip:ityp) (cnum:nat) : exception Cnstr :=
 
 
 (** total constructor arity (including parameters) is only computed
-*** on the fly during translation from L2 to L3 **)
+*** on the fly during translation from L2 to LambdaBoxMut **)
 Definition cnstrArity (p:environ) (i:inductive) (cndx:nat) :
   exception (nat (* parameters *) * nat (* args *)) :=
   match i with

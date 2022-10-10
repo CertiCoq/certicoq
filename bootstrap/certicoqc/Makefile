@@ -13,11 +13,11 @@ RUNTIME_DIR = ../../plugin/runtime
 RUNTIME_FILES = ${RUNTIME_DIR}/gc_stack.o ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_int63.o ${RUNTIME_DIR}/coq_c_ffi.o
 
 # ffi.CertiCoq.CertiCoqC.compile.QuoteFFI.c
-COQOPTS = -Q ../../theories/L7 CertiCoq.L7 -Q ../../libraries CertiCoq.Libraries \
-	-Q ../../theories/L6_PCPS CertiCoq.L6 -Q ../../theories/L4_deBruijn CertiCoq.L4 \
+COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq.Libraries \
+	-Q ../../theories/LambdaANF CertiCoq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiCoq.LambdaBoxLocal \
 	-Q ../../theories/Compiler CertiCoq.Compiler -Q ../../theories/common CertiCoq.Common \
 	-Q ../../theories/Glue CertiCoq.Glue \
-	-Q ../../theories/L2k_noCnstrParams CertiCoq.L2k \
+	-Q ../../theories/LambdaBoxMut CertiCoq.LambdaBoxMut \
 	-Q ../../plugin CertiCoq.Plugin \
 	-I ../../plugin \
 	-Q ../../cplugin CertiCoq.VanillaPlugin \
@@ -26,7 +26,7 @@ COQOPTS = -Q ../../theories/L7 CertiCoq.L7 -Q ../../libraries CertiCoq.Libraries
 
 VFILES = theories/Loader.v theories/PrimInt63.v theories/PrimFloats.v theories/CertiCoqC.v
 
-CCOMPILEROPTS = -fPIC -g -c -I . -I ../../plugin/runtime -I ${OCAMLLIB} -w -Wno-everything -O2
+CCOMPILEROPTS = -fPIC -g -c -I . -I ${RUNTIME_DIR} -I ${OCAMLLIB} -w -Wno-everything -O2
 # ccomp CCOMPOPTS = -g -c -I . -I ${OCAMLLIB} -Wno-int-conversion -O2
 
 .PHONY: certicoqc

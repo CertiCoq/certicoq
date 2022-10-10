@@ -179,7 +179,6 @@ let is_infinity f = f = infinity
 let is_neg_infinity f = f = neg_infinity
 
 let print_float p f =
-  Printf.eprintf "Printing float constant: %h\n" f;
   if is_nan f then fprintf p "%s" "NAN"
   else if is_infinity f then fprintf p "%s" "INFINITY"
   else if is_neg_infinity f then fprintf p "%s" "-INFINITY"

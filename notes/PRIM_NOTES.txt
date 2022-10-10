@@ -46,9 +46,9 @@ do this by an extra pass.)
 When we compile test_twobit, then erase types, then do the let-binding
 of environments, we will have an expression with three free variables
 to_twobit, fstbit, sndbit.  (We hope that the twobit type will not be
-free.)  These will appear as free de Bruijn indices at the L4 language.
+free.)  These will appear as free de Bruijn indices at the LambdaBoxLocal language.
 
-Somehow, we need to arrive at L4 with an environment mapping from
+Somehow, we need to arrive at LambdaBoxLocal with an environment mapping from
 these de Bruijn indices to the primop_rep type.  Since
 deBruijn indices are dense, I'll illustrate using a list:
 
@@ -57,8 +57,8 @@ Definition primop_env: list primop_rep :=
    Primop_func "fstbit" 1; 
    Primop_func "sndbit" 1].
 
-The L4-to-L6 conversion must convert each of these de Bruijn
-variables to a Prim in the L6 expression language:
+The LambdaBoxLocal-to-LambdaANF conversion must convert each of these de Bruijn
+variables to a Prim in the LambdaANF expression language:
 
 Inductive exp : Type :=
   . . .
@@ -96,7 +96,7 @@ match p with
 | xO (xI (xO i)) => Primop_string (string_of_ident i)
 | _ => Primop_bad.
 
-Now, the L4-to-L6 translation of a de Bruijn variable, using
+Now, the LambdaBoxLocal-to-LambdaANF translation of a de Bruijn variable, using
 the primop_env, is something like this:
 
 Definition convert_prim (primop_env: list primop_rep)
@@ -140,7 +140,7 @@ STRINGS
 
 GENERATING C CODE FROM Eprim
 
-in L6_to_Clight.translate_body, generate code something like this:
+in LambdaANF_to_Clight.translate_body, generate code something like this:
 
 | Eprim x p vs e =>
     match rep_of_prim p (length vs) with

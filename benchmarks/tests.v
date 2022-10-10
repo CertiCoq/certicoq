@@ -16,25 +16,11 @@ Import VeriStar.
 
 CertiCoq -help.
 
-Class Show (A : Type) := show : A -> string.
-
-#[export] Instance nat_show : Show nat := string_of_nat.
-
-Definition string_of_bool b :=
-  if (b : bool) then "true" else "false".
-#[export] Instance bool_show : Show bool := string_of_bool.
-
-#[export] Instance list_show {A} {SA : Show A} : Show (list A) := string_of_list show.
-
 CertiCoq Generate Glue -file "basics" [ nat, list, bool ].
 
 (* Demo 1 *)
 
 Definition demo1 := List.app (List.repeat true 500) (List.repeat false 300).
-
-(*Definition test := coq_msg_debug (show demo1).
-
-CertiCoq Run test.*)
 
 (* Demo 2 *)
 
@@ -82,9 +68,9 @@ Definition binom := Binom.main.
 (* Color *)
 Definition color := Color.main.
 
-(* Lazy factorial *)
+(* Lazy factorial. Needs coinductive types *)
 
-Definition lazy_factorial := coq_msg_info (string_of_Z (coind.lfact 150)).
+(* Definition lazy_factorial := coq_msg_info (string_of_Z (coind.lfact 150)). *)
 
 (* Sha *)
 
@@ -153,11 +139,11 @@ CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" binom.
 (* CertiCoq Compile -O 0 -cps -ext "_cps" binom. *)
 (* CertiCoq Compile -cps -ext "_cps_opt" binom. *)
 
-Eval compute in "Compiling lazy factorial".
+(* Eval compute in "Compiling lazy factorial". *)
 
-CertiCoq Compile -O 1 lazy_factorial.
+(* CertiCoq Compile -O 1 lazy_factorial.
 CertiCoq Compile -ext "_opt" lazy_factorial.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" lazy_factorial.
+CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" lazy_factorial. *)
 (* CertiCoq Compile -O 0 -cps -ext "_cps" demo1. *)
 (* CertiCoq Compile -cps -ext "_cps_opt" demo1. *)
 

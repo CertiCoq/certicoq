@@ -53,7 +53,7 @@ Require Import MetaCoq.Template.All.
 
 Require Import glue_utils.
 
-Require CertiCoq.L6.Prototype.
+Require CertiCoq.LambdaANF.Prototype.
 Module DB.
   (* Uses code written by John Li.
      We should eventually consider making a MetaCoq_utils module. *)

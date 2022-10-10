@@ -398,7 +398,7 @@ Valid options:
 -args X : to use X arguments in the C generated code (+1 for the thread_info)
 
 
-To print the backend IR (aka L6) you can use the command
+To print the backend IR (aka LambdaANF) you can use the command
 CertiCoq Show IR <global_id>.
 *)
 
@@ -448,24 +448,24 @@ CertiCoq Compile -anf -o1 -ext "_opt" vs_easy.
 
 Timing for CPS:
 Debug: Time elapsed in L1g:  8.835582
-Debug: Time elapsed in L2k:  0.000454
-Debug: Time elapsed in L2k_eta:  0.000620
-Debug: Time elapsed in L4:  0.014821
-Debug: Time elapsed in L4_2:  0.003420
-Debug: Time elapsed in L4_5:  0.000780
+Debug: Time elapsed in LambdaBoxMut:  0.000454
+Debug: Time elapsed in LambdaBoxMut_eta:  0.000620
+Debug: Time elapsed in LambdaBoxLocal:  0.014821
+Debug: Time elapsed in LambdaBoxLocal_2:  0.003420
+Debug: Time elapsed in LambdaBoxLocal_5:  0.000780
 Debug: Time elapsed in L5:  0.005000
-Debug: Time elapsed in L6 CPS:  0.105993
-Debug: Time elapsed in L6 Pipeline:  8.532707
-Debug: Time elapsed in L7:  87.985509
+Debug: Time elapsed in LambdaANF CPS:  0.105993
+Debug: Time elapsed in LambdaANF Pipeline:  8.532707
+Debug: Time elapsed in Codegen:  87.985509
 
 Timing for ANF:
 Debug: Time elapsed in L1g:  8.543669
-Debug: Time elapsed in L2k:  0.000457
-Debug: Time elapsed in L2k_eta:  0.000640
-Debug: Time elapsed in L4:  0.013329
-Debug: Time elapsed in L6 ANF:  0.020384
-Debug: Time elapsed in L6 Pipeline:  0.148308
-Debug: Time elapsed in L7:  2.394216 *)
+Debug: Time elapsed in LambdaBoxMut:  0.000457
+Debug: Time elapsed in LambdaBoxMut_eta:  0.000640
+Debug: Time elapsed in LambdaBoxLocal:  0.013329
+Debug: Time elapsed in LambdaANF ANF:  0.020384
+Debug: Time elapsed in LambdaANF Pipeline:  0.148308
+Debug: Time elapsed in Codegen:  2.394216 *)
 
 CertiCoq Compile -ext "_cps" vs_hard.
 CertiCoq Compile -anf vs_hard.

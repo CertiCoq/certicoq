@@ -111,7 +111,7 @@ Qed.
 (** This part is generally hard and conditional.
 Here, it is unconditional. [obsLe] does not depend on computations.
 However, in certiclasses3, where obsLe mentions computation, we may need the 
-big step eval in L6 to be deterministic.
+big step eval in LambdaANF to be deterministic.
 *)
 Lemma toCoInd s d:
   (forall m, obsLeInd m s d) -> obsLe s d.

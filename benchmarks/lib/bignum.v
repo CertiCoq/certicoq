@@ -12,7 +12,7 @@ Definition sub31c' (n m: Int31.int31) : bool * Int31.int31 :=
    (negb (Z.eqb (Int31.phi npm) (Int31.phi n - Int31.phi m)), npm).
 
 (****  
- In L1 or L3, recognize the following functions and treat them
+ In L1 or LambdaBoxMut, recognize the following functions and treat them
   opaquely (i.e., delete their function bodies, and let them be
  free variables with distinguished names):
 
@@ -21,7 +21,7 @@ Definition sub31c' (n m: Int31.int31) : bool * Int31.int31 :=
 
   and,    add31c', sub31c'  (* defined in this file *)
 
- Then, in translation to L6, replace these free variables as follows:
+ Then, in translation to LambdaANF, replace these free variables as follows:
   where they occur in function-position, 
     use  Eprim operators (primops);
   where they occur otherwise, use eta-expanded Eprim operators.

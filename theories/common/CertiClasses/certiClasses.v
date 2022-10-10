@@ -80,7 +80,7 @@ Arguments Error {Term} {Value} s.
 
 Require Import ExtLib.Structures.Monads.
 
-(** for an example usage of this monad, see eval_n in L4_deBruijn/L4_5_to_L5.v *)
+(** for an example usage of this monad, see eval_n in LambdaBoxLocal/LambdaBoxLocal_5_to_L5.v *)
 Global Instance Monad_bigStepResult (Term :Type): Monad (bigStepResult Term) :=
 { ret := @Result Term
 ; bind := fun _ _ r f => match r with

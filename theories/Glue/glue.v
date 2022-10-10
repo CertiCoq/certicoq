@@ -20,10 +20,10 @@ Require Import compcert.common.AST
                compcert.common.Values
                compcert.export.Clightdefs.
 
-Require Import L6.cps
-               L6.identifiers
-               L6.cps_show
-               L6_to_Clight
+Require Import LambdaANF.cps
+               LambdaANF.identifiers
+               LambdaANF.cps_show
+               LambdaANF_to_Clight
                compM
                glue_utils.
 
@@ -34,7 +34,7 @@ Open Scope monad_scope.
 Local Open Scope bs_scope.
 
 (* An enumeration of L1 types.
-   This is separate from the [ind_tag] values generated in L6.
+   This is separate from the [ind_tag] values generated in LambdaANF.
    These are generated only for gluing purposes.
    There is no good reason for this, except for easier plumbing. *)
 Definition ind_L1_tag : Type := positive.
@@ -1032,7 +1032,7 @@ Section CConstructors.
         constr_fun_id <- gensym (make_name cname) ;;
         argv_ident <- gensym "argv" ;;
         arg_list <- make_arg_list ar ;;
-        let asgn_s := make_constrAsgn argv_ident arg_list in (* TODO move this fn from L6_to_Clight to here*)
+        let asgn_s := make_constrAsgn argv_ident arg_list in (* TODO move this fn from LambdaANF_to_Clight to here*)
         let header := c_int ((Z.shiftl (Z.of_nat ar) 10) + (Z.of_nat ord)) val in
         let body :=
             Sassign (Field(var argv_ident, 0%Z)) header ;;;

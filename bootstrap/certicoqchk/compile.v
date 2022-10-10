@@ -2,10 +2,6 @@ From CertiCoq.Plugin Require Import CertiCoq.
 From MetaCoq.Template Require Import utils.
 Open Scope bs_scope.
 
-Axiom (coq_msg_info : string -> unit).
-Axiom (coq_user_error : string -> unit).
-Axiom (coq_msg_debug : string -> unit).
-
 Import MCMonadNotation.
 From MetaCoq Require Import Erasure PCUICAstUtils PCUICPretty PCUICErrors PCUICTyping PCUICWfEnvImpl PCUICSafeChecker SafeTemplateChecker.
 
@@ -42,20 +38,9 @@ Definition certicoqchk (p : Template.Ast.Env.program) : bool :=
     p Universes.Monomorphic_ctx with
   | inl ty => let () := coq_msg_info ty in true
   | inr err => let () := coq_user_error err in false
-  end.  
+  end.
 
 Eval compute in "Compiling MetaCoq's checker".
-(*CertiCoq Show IR -time -O 1 certicoqchk
-Extract Constants [
-  (* coq_msg_debug => "print_msg_debug", *)
-  coq_msg_info => "print_msg_info",
-  coq_user_error => "coq_user_error"
-] .*)
+Set Warnings "-primitive-turned-into-axiom".
 
-CertiCoq Compile -time -O 1 certicoqchk
-Extract Constants [
-  (* coq_msg_debug => "print_msg_debug", *)
-  coq_msg_info => "print_msg_info",
-  coq_user_error => "coq_user_error"
-   ] 
-Include [ "print.h" ].
+CertiCoq Compile -time -O 1 certicoqchk.

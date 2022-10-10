@@ -33,7 +33,7 @@ Fixpoint sequence {M : Type -> Type} {A : Type} `{Monad M}
 (** * A <<Compilation Monad>>. *)
 (** Used to compose the pipeline, by threading through the state, compilation
   * options, errors *)
-(** Used in L6 for stateful transformations that require a state for (e.g.,) fresh names,
+(** Used in LambdaANF for stateful transformations that require a state for (e.g.,) fresh names,
   * environment information, etc. *)
 
 Section CompM.
@@ -582,7 +582,7 @@ Section Hoare.
       intros r w'' [HP [Hall' Hpre]]. split; eauto.
   Qed.
 
-  (* TODO move in appropriate L6 file *)
+  (* TODO move in appropriate LambdaANF file *)
   (* Definition from_maxvar v := fun a => (a < v)%positive. *)
   (* Definition from_fresh st := from_maxvar (next_var st). *)
 

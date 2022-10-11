@@ -31,4 +31,5 @@ Definition certicoqc (opts : Options) (p : Template.Ast.Env.program) :=
   let () := coq_msg_info "certicoqc called" in
   compile opts p.
 
+Set Warnings "-primitive-turned-into-axiom".
 Time CertiCoqC Compile -build_dir "tests" -time -O 1 certicoqc.

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - coq-8.15
   pull_request:
     branches:
       - "**"

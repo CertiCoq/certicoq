@@ -101,8 +101,8 @@ Section Srink_top_correct.
         
     { destructAll.      
       split; [| split; [| split; [| split ]]].
-      + clear H2 H1 H0 Hun Hdis. revert n H3. induction H5; intros.
-        { edestruct IHrefl_trans_closure_n with (n0 := n).
+      + clear H2 H1 H0 Hun Hdis. revert n H3. induction H5; intros n' H3.
+        { edestruct IHrefl_trans_closure_n with (n := n).
           eassumption. eassumption. lia. destructAll. 
           eexists. split.
           2:{ eapply preord_exp_n_trans; [| eassumption ].

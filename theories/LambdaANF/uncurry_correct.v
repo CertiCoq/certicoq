@@ -477,8 +477,8 @@ Section uncurry_correct.
             reflexivity.
           }
           (* Transparent preord_exp. *) intros v1 c1 cout Hc1 Hv1. 
-          apply length_exists_set_lists with
-            (rho0 := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
+          apply @length_exists_set_lists with
+            (rho := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
           destruct Hrho''' as [rho''' Hrho'''].
           assert (Hgoal : preord_exp cenv Post PostG k2 (ge, rho'') (ge, rho''')). {
             apply preord_exp_refl. eassumption.
@@ -1133,8 +1133,8 @@ Section uncurry_correct.
           reflexivity.
         }
         (* Transparent preord_exp. *) intros v1 c1 cout Hc1 Hv1. 
-        apply length_exists_set_lists with
-          (rho0 := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
+        apply @length_exists_set_lists with
+          (rho := (def_funs uncurried uncurried rho1 rho1)) in Hrho'''.
         destruct Hrho''' as [rho''' Hrho'''].
         assert (Hgoal : preord_exp cenv Post PostG k2 (ge, rho'') (ge, rho''')). {
           apply preord_exp_refl. eassumption.

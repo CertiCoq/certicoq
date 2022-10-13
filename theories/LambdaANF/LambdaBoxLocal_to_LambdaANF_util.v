@@ -1080,7 +1080,7 @@ Section Post.
           eapply preord_exp_constr_compat.
           * eapply Hprops.
           * eapply Hprops.
-          * rewrite <- map_extend_lst_same with (xs1 := xs) (xs' := xs0) (f := id {k1 ~> k2}).
+          * rewrite <- @map_extend_lst_same with (xs := xs) (xs' := xs0) (f := id {k1 ~> k2}).
             eapply Forall2_preord_var_env_map. eassumption. now sets.
             eassumption. eassumption.
           * intros m1 vs1 vs2 Hlt Hall.
@@ -1378,14 +1378,14 @@ Section Post.
               set (Heq2 := cps_cvt_rel_efnlst_all_fun_name _ _ _ _ _ _ H10). 
               constructor; eauto.
               
-              eapply preord_env_P_inj_def_funs with (f1 := id {k1 ~> k2} <{ vars1 ~> vars2 }>). 
+              eapply @preord_env_P_inj_def_funs with (f := id {k1 ~> k2} <{ vars1 ~> vars2 }>). 
               rewrite Heq1. eassumption.
               rewrite Heq2. eassumption.
               congruence.
               rewrite Heq1. eassumption.
               rewrite Heq2. eassumption.
               
-              2:{ eapply preord_env_P_inj_monotonic with (k0 := m). lia.
+              2:{ eapply @preord_env_P_inj_monotonic with (k := m). lia.
                   rewrite <- extend_lst_rev.
                   eapply IH; try eassumption. reflexivity. reflexivity.
                   

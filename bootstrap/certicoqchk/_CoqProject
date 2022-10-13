@@ -1,0 +1,8 @@
+-Q ../../cplugin CertiCoq.VanillaPlugin
+-I ../../cplugin
+-R . CertiCoq.CertiCoqCheck
+-I .
+
+META.coq-certicoqchk
+
+Loader.v

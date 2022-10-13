@@ -3,6 +3,8 @@
 -I .
 -R . CertiCoq.VanillaPlugin
 
+META.coq-certicoq-vanilla
+
 tm_util.ml
 
 plugin_utils.ml

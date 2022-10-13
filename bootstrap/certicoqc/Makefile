@@ -1,11 +1,18 @@
 CCOMPILER = clang # ccomp # gcc takes ages
 
+ifeq ($(shell which cygpath 2>/dev/null),)
+  OCAMLPATH := $(shell pwd)/../../cplugin/:$(OCAMLPATH)
+else
+  OCAMLPATH := $(shell cygpath -m `pwd`)/../../cplugin/;$(OCAMLPATH)
+endif
+export OCAMLPATH
+
 PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.gramlib,coq-core.interp,coq-core.kernel,coq-core.lib,coq-core.library,coq-core.toplevel,coq-core.vernac,coq-core.plugins.ltac
 COQLIB = $(shell coqc -where)
 COQLIBINSTALL = $(COQLIB)/user-contrib/CertiCoq/CertiCoqC
 OCAMLLIB = $(shell ocamlc -where)
-OCAMLOPTS = -I ${COQLIB}/user-contrib/MetaCoq/Template -open Metacoq_template_plugin -I ../../cplugin -open Certicoq_vanilla_plugin \
-	-I . -linkpkg -dontlink str,unix,dynlink,threads,zarith  -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
+OCAMLOPTS = -package coq-metacoq-template-ocaml.plugin -open Metacoq_template_plugin -package coq-certicoq-vanilla.plugin -open Certicoq_vanilla_plugin \
+	-I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
 GENCFILES = glue.CertiCoq.CertiCoqC.compile.certicoqc.c CertiCoq.CertiCoqC.compile.certicoqc.c
 CFILES = certicoqc_wrapper.c ${GENCFILES}
 
@@ -43,9 +50,10 @@ test: test.vo
 
 test.vo: test.v
 	mkdir -p tests
-	ulimit -Ss 65500 && ulimit -a && coqc -I . ${COQOPTS} test.v
+	ulimit -Ss 65500 && coqc -I . ${COQOPTS} test.v
 
-clean: 
+clean: Makefile.certicoqc
+	make -f Makefile.certicoqc clean
 	rm *.cm* *.o *.vo
 
 theories/compile.vo ${GENCFILES} &: theories/compile.v
@@ -55,13 +63,13 @@ theories/compile.vo ${GENCFILES} &: theories/compile.v
 	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
 
 certicoqc_plugin.cmxs: certicoqc_plugin.cmxa ${CFILES:.c=.o} ${RUNTIME_FILES}
-	ocamlfind opt ${OCAMLOPTS} -shared -linkall -o $@ $+
+	ocamlfind ocamlopt ${OCAMLOPTS} -shared -o $@ $+
 
 certicoqc_plugin.cmx: certicoqc_plugin_wrapper.cmx certicoqc.cmx g_certicoqc.cmx
 	ocamlfind opt ${OCAMLOPTS} -pack -o $@ $+
 
 certicoqc_plugin.cmxa: certicoqc_plugin.cmx
-	ocamlfind opt ${OCAMLOPTS} -a -o $@ $<
+	ocamlfind opt -linkall ${OCAMLOPTS} -a -o $@ $<
 
 g_certicoqc.ml: g_certicoqc.mlg certicoqc.cmx certicoqc_plugin_wrapper.cmx
 	coqpp $<
@@ -69,9 +77,6 @@ g_certicoqc.ml: g_certicoqc.mlg certicoqc.cmx certicoqc_plugin_wrapper.cmx
 certicoqc_wrapper.c: theories/compile.vo
 
 certicoqc.cmx: certicoqc_plugin_wrapper.cmx
-
-%.mli: %.ml
-	[ -f "$@" ] || ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin -i $< > $@
 
 %.cmi: %.mli
 	ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin $<
@@ -83,5 +88,6 @@ install: theories/compile.vo certicoqc_plugin.cmxs
 	install -d "$(COQLIBINSTALL)"
 	install -m 0644 theories/compile.v theories/compile.vo certicoqc_plugin.cmx* "$(COQLIBINSTALL)"
 	make -f Makefile.certicoqc install
+	ocamlfind install -add coq-certicoqc certicoqc_plugin.cmx* certicoqc_plugin.cmi
 
 .PHONY: plugin test

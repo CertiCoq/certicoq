@@ -1,2 +1,1 @@
-Declare ML Module "metacoq_template_plugin".
-Declare ML Module "certicoq_vanilla_plugin".
+Declare ML Module "coq-certicoq-vanilla.plugin".

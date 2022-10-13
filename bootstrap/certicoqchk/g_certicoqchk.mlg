@@ -1,6 +1,6 @@
 (*i camlp4deps: "grammar/grammar.cma" i*)
 
-DECLARE PLUGIN "certicoqchk_plugin"
+DECLARE PLUGIN "coq-certicoqchk.plugin"
 
 {
 open Pp

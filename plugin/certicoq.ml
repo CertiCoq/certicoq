@@ -43,14 +43,14 @@ let global_registers_input =
   let open Libobject in 
   declare_object 
     (global_object_nodischarge global_registers_name
-    ~cache:(fun (_, r) -> cache_registers r)
+    ~cache:(fun r -> cache_registers r)
     ~subst:None) (*(fun (msub, r) -> r)) *)
 
 let register (prims : prim list) (imports : string list) : unit =
   let curlib = Sys.getcwd () in
   let newr = (prims, List.map (Filename.concat curlib) imports) in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) (fst newr)); *)
-  Lib.add_anonymous_leaf (global_registers_input newr)
+  Lib.add_leaf (global_registers_input newr)
 
 let get_global_prims () = fst !global_registers
 let get_global_includes () = snd !global_registers

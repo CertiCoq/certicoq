@@ -1,6 +1,9 @@
 -Q ../../cplugin CertiCoq.VanillaPlugin
 -I ../../cplugin
 -R theories CertiCoq.CertiCoqC
+-I .
+
+META.coq-certicoqc
 
 theories/Loader.v
 theories/CertiCoqC.v

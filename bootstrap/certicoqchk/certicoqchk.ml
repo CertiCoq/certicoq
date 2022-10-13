@@ -20,7 +20,7 @@ let debug_msg (flag : bool) (s : string) =
 let quote gr =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let sigma, c = Evarutil.new_global sigma gr in
+  let sigma, c = Evd.fresh_global env sigma gr in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
   let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass:true env (EConstr.to_constr sigma c) in

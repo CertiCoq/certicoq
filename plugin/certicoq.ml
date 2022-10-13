@@ -172,7 +172,7 @@ let quote opts gr =
   let bypass = opts.bypass_qed in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let sigma, c = Evarutil.new_global sigma gr in
+  let sigma, c = Evd.fresh_global env sigma gr in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
   let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass env (EConstr.to_constr sigma c) in
@@ -322,11 +322,12 @@ module CompileFunctor (CI : CompilerInterface) = struct
     done
 
   let runtime_dir () = 
-    let lib = Envars.coqlib () in
-    Filename.concat (Filename.concat (Filename.concat (Filename.concat lib "user-contrib") "CertiCoq") "Plugin") "runtime"
+    let open Boot in
+    let env = Env.init () in
+    Path.relative (Path.relative (Path.relative (Env.user_contrib env) "CertiCoq") "Plugin") "runtime"
 
   let make_rt_file na =
-    Filename.concat (runtime_dir ()) na
+    Boot.Env.Path.(to_string (relative (runtime_dir ()) na))
 
   let compile_C opts gr imports =
     let () = compile_with_glue opts gr imports in
@@ -339,7 +340,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let rt_dir = runtime_dir () in
     let cmd =
         Printf.sprintf "%s -Wno-everything -g -I %s -I %s -c -o %s %s" 
-          compiler opts.build_dir rt_dir (name ^ ".o") (name ^ ".c") 
+          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c") 
     in
     let importso =
       let oname s = 
@@ -355,7 +356,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | Unix.WEXITED 0 -> 
       let linkcmd =
         Printf.sprintf "%s -Wno-everything -g -L %s -L %s -o %s %s %s %s" 
-          compiler opts.build_dir rt_dir name gc_stack_o (name ^ ".o") importso
+          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) name gc_stack_o (name ^ ".o") importso
       in
       debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
       (match Unix.system linkcmd with
@@ -400,7 +401,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let debug = opts.debug in
     let env = Global.env () in
     let sigma = Evd.from_env env in
-    let sigma, c = Evarutil.new_global sigma gr in
+    let sigma, c = Evd.fresh_global env sigma gr in
     let name = match gr with
       | Names.GlobRef.IndRef i -> 
           let (mut, _) = i in

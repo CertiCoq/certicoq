@@ -1131,7 +1131,7 @@ Section Lambda_lifting_corresp.
                 rewrite !Union_assoc. rewrite Union_Setminus_Included. 
                 now sets. tci. eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. now sets.
                 eapply Fundefs_Lambda_lift_free_set_Included3; eauto.                
-              - eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s4 := name_in_fundefs f2).
+              - eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := name_in_fundefs f2).
                 tci.
                 eapply Union_Disjoint_r.
                 eapply Disjoint_Included; [| | eapply HD ]; now sets.
@@ -1248,7 +1248,8 @@ Section Lambda_lifting_corresp.
                 rewrite Setminus_Disjoint. now sets. eapply Union_Disjoint_r; sets.
                 eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs. eassumption.
                 eapply Disjoint_Included_l; [| eassumption ].
-                rewrite Setminus_Union_distr. rewrite !Setminus_Union_distr. rewrite Setminus_Disjoint with (s2 := bound_var e).
+                rewrite Setminus_Union_distr. rewrite !Setminus_Union_distr. 
+                rewrite @Setminus_Disjoint with (s1 := bound_var e).
                 now sets. eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hfvs ]. now sets.
                 intros el Hel. do 4 eexists. split. unfold Funs, fun_map. rewrite Heq'. now eauto. eassumption.
               - eapply Disjoint_Included_l; [| eassumption ].
@@ -1266,11 +1267,11 @@ Section Lambda_lifting_corresp.
                 + eapply Disjoint_Included_r; [| eassumption ]. xsets.
                 + eapply Disjoint_Included; [| | now apply Hf].
                   eapply Union_Included. eapply Union_Included. now sets.
-                  rewrite !Union_assoc. rewrite Union_Setminus_Included with (s5 := [set v]); tci.
+                  rewrite !Union_assoc. rewrite @Union_Setminus_Included with (s3 := [set v]); tci.
                   now sets. now sets. now sets. eassumption.
                 + eapply Disjoint_Included_l; [| eassumption ].
                   rewrite !Setminus_Union_distr. do 3 eapply Included_Union_preserv_r.
-                  rewrite <- Setminus_Union. rewrite Setminus_Disjoint with (s4 := [set v]).
+                  rewrite <- Setminus_Union. rewrite @Setminus_Disjoint with (s2 := [set v]).
                   now sets. now sets.
                 + eapply Disjoint_Included_r. now apply occurs_free_fundefs_Fcons_Included.
                   eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply HD ].
@@ -1278,7 +1279,7 @@ Section Lambda_lifting_corresp.
                 + xsets.
                 + eapply Disjoint_Included_l; [| eapply Hnin' ].
                   rewrite !Setminus_Union_distr. do 3 eapply Included_Union_preserv_r.
-                  rewrite <- Setminus_Union. rewrite Setminus_Disjoint with (s4 := [set v]).
+                  rewrite <- Setminus_Union. rewrite @Setminus_Disjoint with (s2 := [set v]).
                   now sets. now sets.
                 + left. split; eauto. eapply Included_trans; [| eapply H ]...
                 + eapply Included_trans; [| eassumption ]...
@@ -1289,7 +1290,7 @@ Section Lambda_lifting_corresp.
                   rewrite <- rename_not_in_domain_lst_f_eq. reflexivity.
                   eapply Disjoint_Included_l; [| eassumption ].
                   rewrite !Setminus_Union_distr.
-                  rewrite Setminus_Disjoint with (s5 := FromList l). now sets.
+                  rewrite @Setminus_Disjoint with (s1 := FromList l). now sets.
                   eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hfvs ]. now sets.
                   intros el Hel. do 4 eexists. split. unfold Funs, fun_map. rewrite Heq'. now eauto. eassumption. }
                 edestruct Make_wrappers_f_eq. eassumption. symmetry. eassumption. reflexivity.
@@ -1340,11 +1341,11 @@ Section Lambda_lifting_corresp.
                 + sets.
                 + eapply Disjoint_Included; [| | now apply Hf].
                   eapply Union_Included. eapply Union_Included. now sets.
-                  rewrite !Union_assoc. rewrite Union_Setminus_Included with (s4 := [set v]); tci.
+                  rewrite !Union_assoc. rewrite @Union_Setminus_Included with (s3 := [set v]); tci.
                   now sets. now sets. now sets. eassumption.
                 + eapply Disjoint_Included_l; [| eassumption ].
                   rewrite !Setminus_Union_distr. do 3 eapply Included_Union_preserv_r.
-                  rewrite <- Setminus_Union. rewrite Setminus_Disjoint with (s3 := [set v]).
+                  rewrite <- Setminus_Union. rewrite @Setminus_Disjoint with (s2 := [set v]).
                   now sets. now sets.
                 + eapply Disjoint_Included_r. now apply occurs_free_fundefs_Fcons_Included.
                   eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply HD ].
@@ -1352,7 +1353,7 @@ Section Lambda_lifting_corresp.
                 + now xsets.
                 + eapply Disjoint_Included_l; [| eapply Hnin' ].
                   rewrite !Setminus_Union_distr. do 3 eapply Included_Union_preserv_r.
-                  rewrite <- Setminus_Union. rewrite Setminus_Disjoint with (s3 := [set v]).
+                  rewrite <- Setminus_Union. rewrite @Setminus_Disjoint with (s2 := [set v]).
                   now sets. now sets.
                 + right. inv H. split; eauto. clear H1. now sets.
                 + eapply Included_trans; [| eassumption ]...

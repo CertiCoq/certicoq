@@ -44,11 +44,11 @@ Section list_lemmas.
 
   Corollary exists_set_lists_length : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
     (exists rho1, Some rho1 = set_lists l l1 rho) -> length l = length l1.
-  Proof. intros; now rewrite <- exists_set_lists_iff_length with (rho0 := rho). Qed.
+  Proof. intros; now rewrite <- @exists_set_lists_iff_length with (rho := rho). Qed.
 
   Corollary length_exists_set_lists : forall {A} (l : list M.elt) (l1 : list A) (rho : M.t A),
      length l = length l1 -> (exists rho1, Some rho1 = set_lists l l1 rho).
-  Proof. intros; now rewrite exists_set_lists_iff_length with (rho0 := rho). Qed.
+  Proof. intros; now rewrite @exists_set_lists_iff_length with (rho := rho). Qed.
 
   (* nesting set_listss (TODO: move to cps.v?) *)
   Lemma set_lists_set_lists : forall {A} (l l1 : list M.elt) (v v1 : list A) (rho rho1 rho2 : M.t A),
@@ -90,12 +90,12 @@ Section list_lemmas.
       + apply set_lists_length in Heqo.
         assert (length (l ++ [a]) = length (v ++ [b]))
           by (repeat rewrite app_length; now rewrite Heqo).
-        apply length_exists_set_lists with (rho0 := rho) in H. destruct H. congruence.
+        apply @length_exists_set_lists with (rho := rho) in H. destruct H. congruence.
       + assert (length l = length v). {
           apply set_lists_length in Heqo0. 
           repeat rewrite app_length in Heqo0. simpl in Heqo0. lia.
         }
-        apply length_exists_set_lists with (rho0 := (M.set a b rho)) in H. destruct H. congruence.
+        apply @length_exists_set_lists with (rho := (M.set a b rho)) in H. destruct H. congruence.
   Qed.
 
   Lemma list_length_cons : forall {A} {B} h (l : list A) (t : list B),
@@ -491,7 +491,7 @@ Proof.
   - erewrite <- set_lists_not_In; [|symmetry in Hrho; apply Hrho|assumption].
     split_var_eq a x; [subst; now do 2 rewrite M.gss|].
     do 2 (rewrite M.gso; [|assumption]).
-    erewrite <- set_lists_not_In with (rho'0 := rho1); eauto.
+    erewrite <- @set_lists_not_In with (rho' := rho1); eauto.
 Qed.
 
 Lemma Ensemble_In : forall {U : Type} S a,

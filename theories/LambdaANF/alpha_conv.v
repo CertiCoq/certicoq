@@ -577,7 +577,7 @@ Proof.
   - simpl. normalize_sets. rewrite !Setminus_Empty_set_neut_r. reflexivity.
   - simpl. repeat normalize_sets. 
     rewrite <- !Setminus_Union.
-    rewrite <- image_extend_injective_subdomain with (y0 := y).
+    rewrite <- @image_extend_injective_subdomain with (y := y).
     + rewrite IHHc. reflexivity.
       eapply injective_subdomain_antimon. eassumption.
       simpl. sets.
@@ -1534,8 +1534,8 @@ Section Alpha_conv_correct.
           eapply preord_exp_post_monotonic. eassumption.
           
           assert (Hinjh : injective_subdomain (occurs_free e1 \\ FromList xs1) h).
-          { eapply injective_subdomain_antimon   
-              with (S0 := name_in_fundefs B1 :|: (occurs_free e1 \\ FromList xs1)); sets.
+          { eapply @injective_subdomain_antimon   
+              with (S := name_in_fundefs B1 :|: (occurs_free e1 \\ FromList xs1)); sets.
             eapply construct_fundefs_injection_injective_pres; first eassumption.
             * eapply injective_subdomain_antimon. eassumption.
               do 2 eapply Setminus_Included_Included_Union.
@@ -1551,8 +1551,8 @@ Section Alpha_conv_correct.
           
           eapply IHe.
           + eassumption.
-          + eapply injective_subdomain_antimon 
-              with (S0 :=  FromList xs1 :|: occurs_free e1); sets.
+          + eapply @injective_subdomain_antimon 
+              with (S :=  FromList xs1 :|: occurs_free e1); sets.
             eapply construct_lst_injection_injective_pres. eassumption.
             eassumption. 
             eapply Disjoint_Included_r; [| eassumption ]. sets.

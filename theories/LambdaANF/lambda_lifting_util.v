@@ -1789,7 +1789,7 @@ Proof with now eauto with Ensembles_DB.
              { apply Disjoint_Singleton_r. assumption. }
              { apply Disjoint_sym. eapply Disjoint_Included_l; [|eassumption].
                apply name_in_fundefs_bound_var_fundefs. } }
-           eapply image_monotonic with (S'1 := name_in_fundefs (fundefs_append Bpre (Fcons v t0 l e f5))).
+           eapply @image_monotonic with (S' := name_in_fundefs (fundefs_append Bpre (Fcons v t0 l e f5))).
            eassumption. reflexivity. rewrite Setminus_Same_set_Empty_set, image_Empty_set.
            rewrite <- Make_wrappers_name_in_fundefs_image; eauto.
            rewrite !Setminus_Union_distr. eapply Union_Included. eapply Union_Included.

@@ -18,9 +18,12 @@ authors: ["Andrew Appel"
   ]
 license: "MIT"
 build: [
+  ["bash" "./configure.sh"]
   [make "all"]
   [make "plugins"]
   [make "bootstrap"]
+  [make "-C" "benchmarks" "all"] {with-test}
+  [make "-C" "bootstrap" "tests"] {with-test}
 ]
 install: [
   [make "install"]

@@ -1,11 +1,32 @@
 CCOMPILER = clang # ccomp # gcc takes ages
 
-ifeq ($(shell which cygpath 2>/dev/null),)
+-include ../../Makefile.conf
+
+ifeq '$(CERTICOQ_CONFIG)' 'local'
+  ifeq ($(shell which cygpath 2>/dev/null),)
   OCAMLPATH := $(shell pwd)/../../cplugin/:$(OCAMLPATH)
-else
+  else
   OCAMLPATH := $(shell cygpath -m `pwd`)/../../cplugin/;$(OCAMLPATH)
+  endif
+  export OCAMLPATH
+
+  COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq.Libraries \
+	-Q ../../theories/LambdaANF CertiCoq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiCoq.LambdaBoxLocal \
+	-Q ../../theories/Compiler CertiCoq.Compiler -Q ../../theories/common CertiCoq.Common \
+	-Q ../../theories/Glue CertiCoq.Glue \
+	-Q ../../theories/LambdaBoxMut CertiCoq.LambdaBoxMut \
+	-Q ../../plugin CertiCoq.Plugin \
+	-I ../../plugin \
+	-Q ../../cplugin CertiCoq.VanillaPlugin \
+	-I ../../cplugin \
+	-Q theories CertiCoq.CertiCoqC \
+	-I .
+
+  TESTCOQOPTS = $(COQOPTS)
+else
+  COQOPTS = -I . -Q theories CertiCoq.CertiCoqC
+  TESTCOQOPTS = 
 endif
-export OCAMLPATH
 
 PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.gramlib,coq-core.interp,coq-core.kernel,coq-core.lib,coq-core.library,coq-core.toplevel,coq-core.vernac,coq-core.plugins.ltac
 COQLIB = $(shell coqc -where)
@@ -18,18 +39,6 @@ CFILES = certicoqc_wrapper.c ${GENCFILES}
 
 RUNTIME_DIR = ../../plugin/runtime
 RUNTIME_FILES = ${RUNTIME_DIR}/gc_stack.o ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_int63.o ${RUNTIME_DIR}/coq_c_ffi.o
-
-# ffi.CertiCoq.CertiCoqC.compile.QuoteFFI.c
-COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq.Libraries \
-	-Q ../../theories/LambdaANF CertiCoq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiCoq.LambdaBoxLocal \
-	-Q ../../theories/Compiler CertiCoq.Compiler -Q ../../theories/common CertiCoq.Common \
-	-Q ../../theories/Glue CertiCoq.Glue \
-	-Q ../../theories/LambdaBoxMut CertiCoq.LambdaBoxMut \
-	-Q ../../plugin CertiCoq.Plugin \
-	-I ../../plugin \
-	-Q ../../cplugin CertiCoq.VanillaPlugin \
-	-I ../../cplugin \
-	-Q theories CertiCoq.CertiCoqC
 
 VFILES = theories/Loader.v theories/PrimInt63.v theories/PrimFloats.v theories/CertiCoqC.v
 
@@ -50,7 +59,7 @@ test: test.vo
 
 test.vo: test.v
 	mkdir -p tests
-	ulimit -Ss 65500 && coqc -I . ${COQOPTS} test.v
+	ulimit -Ss 65500 && coqc ${TESTCOQOPTS} test.v
 
 clean: Makefile.certicoqc
 	make -f Makefile.certicoqc clean

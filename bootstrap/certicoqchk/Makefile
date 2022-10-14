@@ -1,21 +1,16 @@
 CCOMPILER = clang # ccomp # gcc
 
-ifeq ($(shell which cygpath 2>/dev/null),)
-  OCAMLPATH := $(shell pwd)/../../cplugin/:$(OCAMLPATH)
-else
-  OCAMLPATH := $(shell cygpath -m `pwd`)/../../cplugin/;$(OCAMLPATH)
-endif
-export OCAMLPATH
+-include ../../Makefile.conf
 
-PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.gramlib,coq-core.interp,coq-core.kernel,coq-core.lib,coq-core.library,coq-core.toplevel,coq-core.vernac,coq-core.plugins.ltac
-COQLIB = $(shell coqc -where)
-COQLIBINSTALL = $(COQLIB)/user-contrib/CertiCoq/CertiCoqCheck
-OCAMLLIB = $(shell ocamlc -where)
-OCAMLOPTS = -package coq-metacoq-template-ocaml.plugin -open Metacoq_template_plugin -package coq-certicoq-vanilla.plugin -open Certicoq_vanilla_plugin \
-	-I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
-GENCFILES = glue.CertiCoq.CertiCoqCheck.compile.certicoqchk.c CertiCoq.CertiCoqCheck.compile.certicoqchk.c
-CFILES = certicoqchk_wrapper.c ${GENCFILES}
-COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq.Libraries \
+ifeq '$(CERTICOQ_CONFIG)' 'local'
+  ifeq ($(shell which cygpath 2>/dev/null),)
+  OCAMLPATH := $(shell pwd)/../../cplugin/:$(OCAMLPATH)
+  else
+  OCAMLPATH := $(shell cygpath -m `pwd`)/../../cplugin/;$(OCAMLPATH)
+  endif
+  export OCAMLPATH
+
+  COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq.Libraries \
 	-Q ../../theories/LambdaANF CertiCoq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiCoq.LambdaBoxLocal \
 	-Q ../../theories/Compiler CertiCoq.Compiler -Q ../../theories/common CertiCoq.Common \
 	-Q ../../theories/Glue CertiCoq.Glue \
@@ -26,6 +21,20 @@ COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq
 	-I ../../cplugin \
 	-Q . CertiCoq.CertiCoqCheck \
 	-I .
+  TESTCOQOPTS = $(COQOPTS)
+else
+  COQOPTS = -I . -Q . CertiCoq.CertiCoqCheck
+  TESTCOQOPTS = 
+endif
+
+PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.gramlib,coq-core.interp,coq-core.kernel,coq-core.lib,coq-core.library,coq-core.toplevel,coq-core.vernac,coq-core.plugins.ltac
+COQLIB = $(shell coqc -where)
+COQLIBINSTALL = $(COQLIB)/user-contrib/CertiCoq/CertiCoqCheck
+OCAMLLIB = $(shell ocamlc -where)
+OCAMLOPTS = -package coq-metacoq-template-ocaml.plugin -open Metacoq_template_plugin -package coq-certicoq-vanilla.plugin -open Certicoq_vanilla_plugin \
+	-I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
+GENCFILES = glue.CertiCoq.CertiCoqCheck.compile.certicoqchk.c CertiCoq.CertiCoqCheck.compile.certicoqchk.c
+CFILES = certicoqchk_wrapper.c ${GENCFILES}
 
 RUNTIME_DIR = ../../plugin/runtime
 RUNTIME_FILES = ${RUNTIME_DIR}/gc_stack.o ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_int63.o ${RUNTIME_DIR}/coq_c_ffi.o
@@ -40,7 +49,7 @@ plugin: compile.vo certicoqchk
 test: test.vo
 
 test.vo: test.v
-	ulimit -Ss 65500 && coqc -I . ${COQOPTS} test.v
+	ulimit -Ss 65500 && coqc ${TESTCOQOPTS} test.v
 
 clean: 
 	make -f Makefile.certicoqchk clean

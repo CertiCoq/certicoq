@@ -31,6 +31,7 @@ install: [
 ]
 depends: [
   "ocaml"
+  "conf-clang"
   "stdlib-shims"
   "coq" {>= "8.17" & < "8.18~"}
   "coq-compcert" {= "3.12"}

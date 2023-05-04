@@ -1,5 +1,5 @@
 From CertiCoq.Plugin Require Import CertiCoq.
-From MetaCoq.Template Require Import utils.
+From MetaCoq Require Import utils.
 Open Scope bs_scope.
 
 Import MCMonadNotation.

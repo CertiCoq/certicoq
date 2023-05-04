@@ -4,7 +4,7 @@ Require Import Coq.Unicode.Utf8.
 Require Import List.
 Generalizable Variables Src Dst Inter Term Value SrcValue DstValue InterValue.
 
-From MetaCoq.Template Require BasicAst.
+From MetaCoq Require BasicAst.
 Require Import Coq.btauto.Btauto.
 Require Import Morphisms.
 

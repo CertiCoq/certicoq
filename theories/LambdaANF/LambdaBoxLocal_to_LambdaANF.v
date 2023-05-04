@@ -10,7 +10,7 @@ Require Import LambdaANF.cps LambdaANF.cps_show LambdaANF.eval LambdaANF.ctx Lam
 Require Import compcert.lib.Coqlib compcert.lib.Maps.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
-Require Import MetaCoq.Template.utils.bytestring.
+Require Import MetaCoq.Utils.bytestring.
 
 Import ListNotations.
 Import Monad.MonadNotation.

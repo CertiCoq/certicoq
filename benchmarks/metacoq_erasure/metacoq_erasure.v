@@ -7,7 +7,7 @@ Require Import CertiCoq.Benchmarks.lib.sha256.
 From CertiCoq.Plugin Require Import CertiCoq.
 
 From MetaCoq.Erasure Require Import EProgram Erasure Loader.
-From MetaCoq.Template Require Import bytestring.
+Require Import MetaCoq.Utils.bytestring.
 
 Open Scope bs_scope.
 

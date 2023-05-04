@@ -12,7 +12,7 @@ Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinN
 Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Require Import Ensembles.
-Require Import MetaCoq.Template.utils.bytestring.
+Require Import MetaCoq.Utils.bytestring.
 Import ListNotations Nnat MonadNotation.
 
 

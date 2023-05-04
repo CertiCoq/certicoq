@@ -8,7 +8,7 @@ Require Import Coq.ZArith.ZArith
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad.
 
-From MetaCoq.Template Require Import BasicAst.
+From MetaCoq Require Import BasicAst.
 Require MetaCoq.Template.All.
 
 Require Import compcert.common.AST
@@ -27,7 +27,7 @@ Require Import LambdaANF.cps
                compM
                glue_utils.
 
-From MetaCoq.Template Require Import bytestring MCString.
+From MetaCoq Require Import bytestring MCString.
 
 Import MonadNotation ListNotations.
 Open Scope monad_scope.

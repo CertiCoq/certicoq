@@ -1,3 +1,3 @@
-From MetaCoq.Template Require Import ExtractableLoader.
+From MetaCoq Require Import ExtractableLoader.
 
 Declare ML Module "certicoq_erasure_plugin".

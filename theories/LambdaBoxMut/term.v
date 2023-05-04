@@ -5,7 +5,7 @@ Require Import Coq.Arith.Compare_dec.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.micromega.Lia.
 Require Import Common.Common.  (* shared namespace *)
-From MetaCoq Require Import bytestring Template.Reflect.
+From MetaCoq Require Import bytestring Common.Reflect.
 From CertiCoq Require Import LambdaBoxMut.compile.
 
 Open Scope bs_scope.

@@ -6,7 +6,7 @@ From ExtLib Require Import Monads.
 
 Require Import Common.Common Common.classes Common.Pipeline_utils Common.compM.
 From ExtLib Require Import Monads.
-From MetaCoq.Template Require Import utils Typing.
+From MetaCoq Require Import utils Typing.
 Import MonadNotation.
 
  Definition wf_program (p : Ast.Env.program) := 

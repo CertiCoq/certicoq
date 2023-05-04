@@ -1083,10 +1083,7 @@ Lemma is_hoisted_exp_correct e :
   no_fun e.
 Proof.
   induction e using exp_ind'; simpl; intros; eauto. 
-  - simpl in *.
-    eapply andb_prop in H. destructAll.
-    econstructor; eauto.
-  - congruence.
+  - simpl in *. congruence.
 Qed. 
 
 

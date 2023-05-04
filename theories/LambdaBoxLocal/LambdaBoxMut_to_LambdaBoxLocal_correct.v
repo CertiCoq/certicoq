@@ -1728,7 +1728,6 @@ Lemma subst_app_e e k f a :
   mkApp_e (subst e k f) (map_exps (subst e k) a).
 Proof.
   revert e k f; induction a; simpl; intros; trivial.
-  now rewrite IHa.
 Qed.
 
 Lemma map_exps_compose f g a : map_exps f (map_exps g a) = map_exps (fun x => f (g x)) a.
@@ -2592,7 +2591,6 @@ Proof.
     rewrite subst_env_aux_constructor.
     intuition trivial. simpl.
     now rewrite Nnat.Nat2N.id; repeat rewrite eq_decb_refl; simpl.
-  - intros. unfold translate, subst_env in H. rewrite H. now simpl.
 Qed.
 
 Theorem translate_correct' (e e' : environ Term) prims (Heq : prims = []) (t t' : Term) :

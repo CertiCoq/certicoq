@@ -1023,7 +1023,7 @@ Fixpoint make_ind_array (l : list N) : list init_data :=
   | n :: l' => (Init_int (Z.of_N n)) :: (make_ind_array l')
   end.
 
-Import MetaCoq.Template.utils.bytestring.String (append).
+Import MetaCoq.Utils.bytestring.String (append).
 
 Definition update_name_env_fun_info (f f_inf : positive) (nenv : name_env) : name_env :=
   match M.get f nenv with

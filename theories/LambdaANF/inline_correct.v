@@ -390,6 +390,7 @@ Section Inline_correct.
   Qed.
 
 
+  (*
   Lemma fun_in_fundefs_funnames_in_exp f ft xs e B :
     (f, ft, xs, e) \infun_in_fundefs B ->
     funnames_in_exp e \subset funnames_in_fundefs B.
@@ -398,7 +399,7 @@ Section Inline_correct.
     + inv H. sets.
     + simpl. eapply Included_Union_preserv_r. eauto.
   Qed.
-
+  *)
   
   (* [occurs_free_fun_map] and [bound_var_fun_map] *)
   

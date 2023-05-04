@@ -549,10 +549,10 @@ Class Inhabited A := inhabitant : A.
 #[global] Instance Inhabited_exp : Inhabited exp := Ehalt inhabitant.
 #[global] Instance Inhabited_fundefs : Inhabited fundefs := Fnil.
 
-Import Uint63.
+Import PrimInt63.
 
 Global Instance Inhabited_primitive : Inhabited AstCommon.primitive := 
-  { inhabitant := existT _ Primitive.primInt 0%uint63 }.
+  { inhabitant := existT _ Primitive.primInt 0%uint63 }.  
 
 Definition univ_inhabitant {A} : univD A :=
   match A with

@@ -175,7 +175,7 @@ let quote opts gr =
   let sigma, c = Evd.fresh_global env sigma gr in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass env (EConstr.to_constr sigma c) in
+  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass env sigma (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   term
@@ -410,7 +410,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
         (Printer.pr_global gr ++ str " is not an inductive type") in
     debug_msg debug "Quoting";
     let time = Unix.gettimeofday() in
-    let term = quote_term_rec ~bypass:true env (EConstr.to_constr sigma c) in
+    let term = quote_term_rec ~bypass:true env sigma (EConstr.to_constr sigma c) in
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
     (term, name)

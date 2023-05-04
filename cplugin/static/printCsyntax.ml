@@ -18,7 +18,7 @@
 
 open Format
 open Camlcoq
-open Values
+open Values0
 open AST
 open! Ctypes
 open Cop
@@ -171,7 +171,7 @@ let rec precedence = function
 (* Expressions *)
 
 let print_pointer_hook
-   : (formatter -> Values.block * Integers.Int.int -> unit) ref
+   : (formatter -> Values0.block * Integers.Int.int -> unit) ref
    = ref (fun p (b, ofs) -> ())
 
 let is_nan (f : float) = f <> f

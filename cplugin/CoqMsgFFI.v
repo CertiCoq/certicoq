@@ -1,4 +1,4 @@
-From MetaCoq.Template Require Import bytestring.
+Require Import MetaCoq.Utils.bytestring.
 From CertiCoq.VanillaPlugin Require Import Loader.
 
 Axiom (coq_msg_info : string -> unit).

@@ -48,7 +48,7 @@ Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.StateMonad
                ExtLib.Data.String.
 
-From MetaCoq.Template Require Import BasicAst.
+From MetaCoq Require Import BasicAst.
 Require Import MetaCoq.Template.All.
 
 Require Import glue_utils.

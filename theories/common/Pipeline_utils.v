@@ -1,7 +1,7 @@
 From Coq Require Import List Unicode.Utf8 Strings.Byte.
 From Coq Require Import PArith.
 From ExtLib Require Import Monads.
-From MetaCoq.Template Require Import bytestring.
+Require Import MetaCoq.Utils.bytestring.
 Require Import Common.AstCommon Common.compM.
 
 Import MonadNotation ListNotations.

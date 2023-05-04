@@ -1,4 +1,4 @@
-From MetaCoq.Template Require Import All Loader.
+From MetaCoq Require Import All Loader.
 From CertiCoq.Benchmarks.metacoq_erasure Require Import Loader.
 (* Set MetaCoq Debug. *)
 Set MetaCoq Timing.

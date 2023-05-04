@@ -10,7 +10,7 @@ From CertiCoq Require Import LambdaANF.cps LambdaANF.List_util LambdaANF.size_cp
 Require Import compcert.lib.Coqlib.
 Require Import LambdaANF.algebra. 
 
-From MetaCoq.Template Require Import bytestring.
+Require Import MetaCoq.Utils.bytestring.
 
 Import ListNotations.
 

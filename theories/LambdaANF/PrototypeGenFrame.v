@@ -1,4 +1,4 @@
-From MetaCoq.Template Require Import bytestring.
+Require Import MetaCoq.Utils.bytestring.
 Open Scope bs_scope.
 Import String.
 
@@ -9,7 +9,7 @@ Import ListNotations.
 
 From MetaCoq Require Import Template.All.
 Import MCMonadNotation.
-Module TM := MetaCoq.Template.monad_utils.
+Module TM :=MetaCoq.Utils.monad_utils.
 
 From ExtLib.Core Require Import RelDec.
 From ExtLib.Data Require Import Nat List Option Pair String.
@@ -29,6 +29,7 @@ Set Default Proof Mode "Ltac2".
 
 Require Export CertiCoq.LambdaANF.Frame.
 
+#[export]
 Instance Monad_TemplateMonad : Monad TemplateMonad := {
   ret _ := TM.ret;
   bind _ _ := TM.bind }.
@@ -145,8 +146,8 @@ End Helpers.
 Notation "'Eq' A" := (RelDec (@eq A)) (at level 1, no associativity).
 Infix "==?" := eq_dec (at level 40, no associativity).
 
-Instance Eq_N : Eq N := {rel_dec := N.eqb}.
-Instance Eq_kername : Eq kername := {rel_dec := eq_kername}.
+#[export] Instance Eq_N : Eq N := {rel_dec := N.eqb}.
+#[export] Instance Eq_kername : Eq kername := {rel_dec := eq_kername}.
 
 Definition Map A B := list (A * B).
 Definition Set' A := Map A unit.
@@ -773,3 +774,4 @@ Definition mk_Frame_ops (qual : modpath) (typename : kername) (T : Type) (atoms 
     ret tt
   | _ => tmPrint "Error: Frame was not as expected"
   end.
+

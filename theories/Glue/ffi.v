@@ -20,7 +20,7 @@ Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
                ExtLib.Data.String.
 
-From MetaCoq.Template Require Import bytestring BasicAst.
+From MetaCoq Require Import bytestring BasicAst.
 Require MetaCoq.Template.All.
 
 Require Import compcert.common.AST

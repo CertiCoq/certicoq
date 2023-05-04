@@ -12,7 +12,7 @@ Require Import Common.Common.
 From Coq Require Import ssreflect ssrbool.
 From Equations Require Import Equations.
 
-From MetaCoq.Template Require Import BasicAst Ast utils.
+From MetaCoq Require Import BasicAst Ast utils.
 From MetaCoq.Erasure Require Import EAst EAstUtils EGlobalEnv EExtends.
 From MetaCoq.Erasure Require Import ESpineView EWcbvEvalEtaInd EWellformed EEtaExpanded.
 Import utils.

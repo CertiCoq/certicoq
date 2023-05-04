@@ -1,4 +1,4 @@
-From MetaCoq.Template Require Import All Loader Primitive bytestring.
+From MetaCoq Require Import All Loader Primitive bytestring.
 From Coq Require Import PrimFloat PrimInt63.
 From CertiCoq.CertiCoqC Require Import CertiCoqC.
 

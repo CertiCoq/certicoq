@@ -1,4 +1,4 @@
-From MetaCoq.Template Require Import bytestring MCString Primitive.
+From MetaCoq Require Import bytestring MCString Primitive.
 From CertiCoq.Plugin Require Import CertiCoq.
 From Coq Require Import Uint63 ZArith.
 Open Scope bs.
@@ -11,7 +11,7 @@ CertiCoq Run cst.
 
 From Bignums Require Import BigN.
 Local Open Scope bigN_scope.
-From MetaCoq.Template Require Import Loader.
+From MetaCoq Require Import Loader.
 
 (* From MetaCoq.Erasure Require Import Loader. *)
  

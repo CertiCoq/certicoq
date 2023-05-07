@@ -31,6 +31,9 @@ jobs:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
           before_install: |
+            startGroup "fix permission issues"
+              sudo chown -R coq:coq .
+            endGroup
             startGroup "Copy repo (for later benchmarking)"
               cp -r `pwd` ~/repo
             endGroup

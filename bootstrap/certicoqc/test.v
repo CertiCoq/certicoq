@@ -1,4 +1,4 @@
-From MetaCoq Require Import All Loader Primitive bytestring.
+From MetaCoq Require Import All Primitive bytestring.
 From Coq Require Import PrimFloat PrimInt63.
 From CertiCoq.CertiCoqC Require Import CertiCoqC.
 
@@ -23,7 +23,9 @@ Definition string_of_bool b :=
 #[export] Instance prim_int_show : Show PrimInt63.int := string_of_prim_int.
 #[export] Instance Z_show : Show BinNums.Z := string_of_Z.
 Require Import ZArith.
- 
+
+From MetaCoq.ErasurePlugin Require Import Loader.
+Fail From CertiCoq.CertiCoqC Require Import compile.
 From CertiCoq.CertiCoqC Require Import compile.
 From CertiCoq.Common Require Import Pipeline_utils.
 

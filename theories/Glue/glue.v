@@ -33,6 +33,25 @@ Import MonadNotation ListNotations.
 Open Scope monad_scope.
 Local Open Scope bs_scope.
 
+Definition valInt : type := val.
+Definition val : type := talignas (if Archi.ptr64 then 3%N else 2%N) (tptr tvoid).
+Definition argvTy : type := tptr val.
+
+Notation "'Field(' t ',' n ')'" :=
+  ( *(add t (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
+
+(* from LambdaANF_to_Clight *)
+Fixpoint make_constrAsgn' (argv:ident) (argList:list (ident * type)) (n:nat) :=
+  match argList with
+  | nil => Sskip
+  | (id, ty)::argList' =>
+    let s' := make_constrAsgn' argv argList' (S n) in
+    (Sassign (Field(var argv, Z.of_nat n)) (Etempvar id ty) ;;; s')
+  end.
+
+Definition make_constrAsgn (argv:ident) (argList:list (ident * type)) :=
+    make_constrAsgn' argv argList 1.
+
 (* An enumeration of L1 types.
    This is separate from the [ind_tag] values generated in LambdaANF.
    These are generated only for gluing purposes.
@@ -68,6 +87,12 @@ Definition print_env : Type := M.t ident.
 Definition def_info : Type := positive * type.
 
 Section Helpers.
+  Record closure_bundle (A : Type) : Type :=
+    Build_closure_bundle
+      { closure_type : A
+      ; func_info : A
+      ; env_info : A
+      }.
 
   Record thread_info_bundle (A : Type) : Type :=
     Build_thread_info_bundle
@@ -97,6 +122,7 @@ Section Helpers.
       ; get_unboxed_ordinal_info : def_info
       ; get_boxed_ordinal_info   : def_info
       ; thread_info_info : thread_info_bundle ident
+      ; closure_info : closure_bundle ident
       ; halt_clo_info : def_info
       }.
 
@@ -245,7 +271,7 @@ Section Externs.
                   ; fn_params := (_v, val) :: nil
                   ; fn_vars := nil
                   ; fn_temps := nil
-                  ; fn_body := (Sreturn (Some (Ebinop Oshr (var _v) (make_cint 1 val) val)))
+                  ; fn_body := (Sreturn (Some (Ebinop Oshr (Ecast (var _v) valInt) (make_cint 1 val) val)))
                   |})).
 
   Definition get_boxed_ordinal : glueM def :=
@@ -259,7 +285,7 @@ Section Externs.
                   ; fn_vars := nil
                   ; fn_temps := nil
                   ; fn_body :=
-                      (Sreturn (Some (Ebinop Oand (Field(var _v, -1)) (make_cint 255 val) val)))
+                      (Sreturn (Some (Ebinop Oand (Field(Ecast (var _v) (tptr valInt), -1)) (make_cint 255 val) val)))
                   |})).
 
   Definition make_externs : glueM (composite_definitions * defs * toolbox_info) :=
@@ -281,6 +307,10 @@ Section Externs.
     _heap <- gensym "heap";;
     _args <- gensym "args";;
 
+    _closure <- gensym "closure" ;;
+    _func <- gensym "func" ;;
+    _env <- gensym "env" ;;
+
     _halt_clo <- gensym "halt_clo" ;;
     let ty_halt_clo := Tarray val 2 noattr in
 
@@ -291,12 +321,23 @@ Section Externs.
          ; heap_info := _heap
          ; args_info := _args
          |} in
+    let closure : closure_bundle ident :=
+        {| closure_type := _closure
+         ; func_info := _func
+         ; env_info := _env
+         |} in
     let comp :=
       Composite _thread_info Struct
-        (Member_plain _alloc valPtr ::
-         Member_plain _limit valPtr ::
+        (Member_plain _alloc (tptr val) ::
+         Member_plain _limit (tptr val) ::
          Member_plain _heap (tptr (Tstruct _heap noattr)) ::
-         Member_plain _args (Tarray uval max_args noattr) :: nil) noattr :: nil in
+         Member_plain _args (Tarray val max_args noattr) :: nil) noattr ::
+      Composite _closure Struct
+       (Member_plain _func
+                    (tptr (Tfunction (Tcons (Tstruct _thread_info noattr)
+                                     (Tcons val (Tcons val Tnil))) Tvoid cc_default)) ::
+        Member_plain _env val :: nil) noattr ::
+        nil in
     let toolbox :=
         {| printf_info :=
               (_printf, Tfunction (Tcons (tptr tschar) Tnil) tint cc_default)
@@ -314,6 +355,7 @@ Section Externs.
          ; get_boxed_ordinal_info :=
               (_gbo, Tfunction (Tcons val Tnil) tuint cc_default)
          ; thread_info_info := tinfo
+         ; closure_info := closure
          ; halt_clo_info := (_halt_clo, ty_halt_clo)
          |} in
     let dfs :=
@@ -1032,10 +1074,10 @@ Section CConstructors.
         constr_fun_id <- gensym (make_name cname) ;;
         argv_ident <- gensym "argv" ;;
         arg_list <- make_arg_list ar ;;
-        let asgn_s := make_constrAsgn argv_ident arg_list in (* TODO move this fn from LambdaANF_to_Clight to here*)
+        let asgn_s := make_constrAsgn argv_ident arg_list in
         let header := c_int ((Z.shiftl (Z.of_nat ar) 10) + (Z.of_nat ord)) val in
         let body :=
-            Sassign (Field(var argv_ident, 0%Z)) header ;;;
+            Sassign (Field(var argv_ident, 0%Z)) ([val] header) ;;;
             asgn_s ;;;
             Sreturn (Some (add (Etempvar argv_ident argvTy) (c_int 1%Z val))) in
 
@@ -1114,6 +1156,9 @@ Section FunctionCalls.
   (* Variable opts : Options. *)
   Let _thread_info : ident := thread_info_type _ (thread_info_info toolbox).
   Let _args : ident := args_info _ (thread_info_info toolbox).
+  Let _closure : ident := closure_type _ (closure_info toolbox).
+  Let _cfunc : ident := func_info _ (closure_info toolbox).
+  Let _cenv : ident := env_info _ (closure_info toolbox).
   (* Let c_args : nat := c_args opts. *)
 
   Variant Backend := ANF | CPS.
@@ -1176,6 +1221,7 @@ Section FunctionCalls.
     Maybe a separate call_anf function in C or
     a separate make_call_anf function in the glue code generator.
   *)
+
   Definition make_call : glueM def :=
     opts <- ask ;;
     let c_args : nat := c_args opts in
@@ -1212,9 +1258,12 @@ Section FunctionCalls.
     let ret_ty := Tpointer (Tfunction (Tcons (threadInf _thread_info) forcelist)
                                       Tvoid cc_default) noattr in
 
+    let deref_cast_clo :=
+      Ederef (Ecast closExpr (Tpointer (Tstruct _closure noattr) noattr))
+             (Tstruct _closure noattr) in
     let body :=
-      _f ::= Field(closExpr , Z.of_nat 0) ;;;
-      _env ::= Field(closExpr, Z.of_nat 1) ;;;
+      _f ::= Efield deref_cast_clo _cfunc val ;;;
+      _env ::= Efield deref_cast_clo _cenv val ;;;
       multiple (skipn c_args
                 (* if c_args is 0 don't skip any, if it's 1 skip the first one and so on *)
                  match backend with

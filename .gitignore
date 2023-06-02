@@ -123,3 +123,6 @@ bootstrap/certicoqchk/Makefile.certicoqchk
 bootstrap/certicoqchk/Makefile.certicoqchk.conf
 cplugin/META
 plugin/META
+_opam
+bootstrap/certicoqc/META
+bootstrap/certicoqchk/META

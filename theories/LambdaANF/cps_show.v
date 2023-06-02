@@ -10,7 +10,8 @@ Require Import ExtLib.Data.Positive.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
-From MetaCoq Require Import bytestring MCString BasicAst Primitive. (* For identifier names *)
+From MetaCoq.Utils Require Import bytestring MCString. (* For identifier names *)
+From MetaCoq.Common Require Import BasicAst Primitive. (* For identifier names *)
 From MetaCoq.PCUIC Require Import PCUICPrimitive. (* For identifier names *)
 
 Import MonadNotation.

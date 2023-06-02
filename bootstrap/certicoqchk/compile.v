@@ -1,10 +1,14 @@
 From CertiCoq.Plugin Require Import CertiCoq.
-From MetaCoq Require Import utils.
+From MetaCoq.Utils Require Import utils.
 Open Scope bs_scope.
 
 Import MCMonadNotation.
-From MetaCoq Require Import AstUtils Ast Pretty PCUICErrors PCUICWfEnvImpl PCUICSafeChecker PCUICSN SafeTemplateChecker ErasurePlugin.Erasure.
-
+From MetaCoq.Template Require Import AstUtils Ast Pretty.
+From MetaCoq.SafeChecker Require Import PCUICErrors PCUICWfEnvImpl PCUICSafeChecker.
+From MetaCoq.PCUIC Require Import PCUICSN. 
+From MetaCoq.SafeCheckerPlugin Require Import SafeTemplateChecker.
+From MetaCoq.ErasurePlugin Require Import Erasure.
+ 
 (* Program Definition infer_template_program {cf : config.checker_flags} {nor : PCUICSN.normalizing_flags} {guard : abstract_guard_impl}  *)
 (*   (p : PCUICAst.PCUICEnvironment.program) φ *)
 (*   : EnvCheck_wf_env_ext (∑ A, { X : wf_env_ext | *)

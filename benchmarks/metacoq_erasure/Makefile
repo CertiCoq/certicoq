@@ -14,7 +14,6 @@ COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq
 RUNTIME_DIR = ../../plugin/runtime
 RUNTIME_FILES = ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_int63.o
 
-
 plugin: metacoq_erasure.vo Loader.vo
 
 test: test.vo
@@ -38,7 +37,7 @@ certicoq_erasure_plugin.cmxs: certicoq_erasure_plugin.cmxa ${CFILES:.c=.o} ${RUN
 	ocamlfind opt ${OCAMLOPTS} ${LINKOPTS} -shared -linkall -o $@ $+
 
 certicoq_erasure_plugin.cmx: certiCoqErase.cmx g_safe_erasure.cmx
-	ocamlfind opt ${OCAMLOPTS} ${PKGS} -pack -o $@ $+
+	ocamlfind opt ${PKGS} ${OCAMLOPTS} -pack -o $@ $+
 
 certicoq_erasure_plugin.cmxa: certicoq_erasure_plugin.cmx
 	ocamlfind opt ${OCAMLOPTS} -a -o $@ $<
@@ -52,8 +51,12 @@ g_safe_erasure.ml: g_safe_erasure.mlg certiCoqErase.cmx
 %.cmi: %.mli
 	ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certicoq_erasure_plugin $<
 
-%.cmx: %.ml	%.cmi
-	ocamlfind opt -c ${PKGS} ${OCAMLOPTS} -for-pack Certicoq_erasure_plugin -o $@ $<
+%.cmx: %.ml
+	ocamlfind opt -c ${PKGS} ${OCAMLOPTS} -for-pack Certicoq_erasure_plugin $<
+
+install: certicoq_erasure_plugin.cmxa certicoq_erasure_plugin.cmxs certicoq_erasure_plugin.cmx
+	ocamlfind remove coq-certicoq-bootstrapped-erasure
+	ocamlfind install coq-certicoq-bootstrapped-erasure META $+
 
 install: certicoq_erasure_plugin.cmxa certicoq_erasure_plugin.cmxs certicoq_erasure_plugin.cmx
 	ocamlfind remove coq-certicoq-bootstrapped-erasure

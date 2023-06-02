@@ -1,4 +1,5 @@
-From MetaCoq Require Import utils Universes.
+From MetaCoq.Utils Require Import utils.
+From MetaCoq.Common Require Import Universes.
 From MetaCoq Require Export Common.BasicAst.
 From MetaCoq Require Import Template.Ast.
 From MetaCoq Require Export Erasure.EAst.
@@ -556,7 +557,7 @@ Proof. reflexivity. Qed.
 (* Primitives *)
 
 From Coq Require Import ssreflect.
-From MetaCoq Require Import Primitive.
+From MetaCoq.Common Require Import Primitive.
 From Equations Require Import Equations.
 
 Definition prim_value (p : prim_tag) : Set :=

@@ -126,7 +126,7 @@ let fix_declarations decls =
   List.map fix_decl decls
 
 let fix_quoted_program (p : Ast0.Env.program) = 
-  let ({ Ast0.Env.universes = universes; declarations = declarations; retroknowledge }, term) = p in
+  let ({ Ast0.Env.universes = universes; declarations = declarations; retroknowledge = retroknowledge }, term) = p in
   let term = fix_term term in
   let universes = fix_universes universes in
   let declarations = fix_declarations declarations in
@@ -134,6 +134,6 @@ let fix_quoted_program (p : Ast0.Env.program) =
 
 let erase ~bypass env evm c =
   debug (fun () -> str"Quoting");
-  let prog = time (str"Quoting") (quote_term_rec ~bypass ~with_universes:false env) (EConstr.to_constr evm c) in
+  let prog = time (str"Quoting") (quote_term_rec ~bypass ~with_universes:false env) evm (EConstr.to_constr evm c) in
   let prog = fix_quoted_program prog in
   time (str"Erasure") certicoq_erase prog

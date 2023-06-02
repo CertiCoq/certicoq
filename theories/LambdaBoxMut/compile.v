@@ -9,8 +9,10 @@ Require Import Common.Common.
 Require Import Coq.micromega.Lia.
 
 From Equations Require Import Equations.
-From MetaCoq Require utils EtaExpand.
-From MetaCoq Require Import Primitive bytestring.
+From MetaCoq.Utils Require utils.
+From MetaCoq.Template Require EtaExpand.
+From MetaCoq.Utils Require Import bytestring.
+From MetaCoq.Common Require Import Primitive.
 From MetaCoq.PCUIC Require Import PCUICPrimitive.
 From MetaCoq.Erasure Require Import EAst ESpineView EGlobalEnv EEtaExpanded EInduction Erasure.
 From MetaCoq.ErasurePlugin Require Import Erasure.

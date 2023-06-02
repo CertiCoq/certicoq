@@ -1,5 +1,5 @@
 From CertiCoq.Plugin Require Import CertiCoq.
-From MetaCoq Require Import utils.
+From MetaCoq.Utils Require Import utils.
 Open Scope bs_scope.
 
 Require Import CertiCoq.Compiler.pipeline.

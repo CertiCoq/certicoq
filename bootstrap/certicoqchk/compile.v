@@ -1,19 +1,23 @@
 From CertiCoq.Plugin Require Import CertiCoq.
-From MetaCoq Require Import utils.
+From MetaCoq.Utils Require Import utils.
 Open Scope bs_scope.
 
 Import MCMonadNotation.
-From MetaCoq Require Import Erasure PCUICAstUtils PCUICPretty PCUICErrors PCUICTyping PCUICWfEnvImpl PCUICSafeChecker SafeTemplateChecker.
-
-Program Definition infer_template_program {cf : config.checker_flags} {nor : PCUICSN.normalizing_flags} {guard : abstract_guard_impl} 
-  (p : PCUICAst.PCUICEnvironment.program) φ
-  : EnvCheck_wf_env_ext (∑ A, { X : wf_env_ext |
-    ∥ (p.1, φ) = X.(wf_env_ext_referenced).(referenced_impl_env_ext) × wf_ext (p.1, φ) × (p.1, φ) ;;; [] |- p.2 : A ∥ }) :=
-  pp <- typecheck_program (cf := cf) optimized_abstract_env_impl p φ ;;
-  ret (pp.π1 ; (exist (proj1_sig pp.π2) _)).
-Next Obligation. 
-  sq. destruct H; split; eauto. destruct p0; split; eauto. eapply BDToPCUIC.infering_typing; tea. eapply w. constructor.
-Qed.
+From MetaCoq.Template Require Import AstUtils Ast Pretty.
+From MetaCoq.SafeChecker Require Import PCUICErrors PCUICWfEnvImpl PCUICSafeChecker.
+From MetaCoq.PCUIC Require Import PCUICSN. 
+From MetaCoq.SafeCheckerPlugin Require Import SafeTemplateChecker.
+From MetaCoq.ErasurePlugin Require Import Erasure.
+ 
+(* Program Definition infer_template_program {cf : config.checker_flags} {nor : PCUICSN.normalizing_flags} {guard : abstract_guard_impl}  *)
+(*   (p : PCUICAst.PCUICEnvironment.program) φ *)
+(*   : EnvCheck_wf_env_ext (∑ A, { X : wf_env_ext | *)
+(*     ∥ (p.1, φ) = X.(wf_env_ext_referenced).(referenced_impl_env_ext) × wf_ext (p.1, φ) × (p.1, φ) ;;; [] |- p.2 : A ∥ }) := *)
+(*   pp <- typecheck_program (cf := cf) optimized_abstract_env_impl p φ ;; *)
+(*   ret (pp.π1 ; (exist (proj1_sig pp.π2) _)). *)
+(* Next Obligation.  *)
+(*   sq. destruct H; split; eauto. destruct p0; split; eauto. eapply BDToPCUIC.infering_typing; tea. eapply w. constructor. *)
+(* Qed. *)
 
 Program Definition infer_and_pretty_print_template_program {cf : config.checker_flags} {nor : PCUICSN.normalizing_flags} {guard : abstract_guard_impl}
   (p : Ast.Env.program) φ

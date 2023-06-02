@@ -12,7 +12,7 @@ Require Import ExtLib.Structures.Monads
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
 
-From MetaCoq Require Import BasicAst.
+From MetaCoq.Common Require Import BasicAst.
 
 From compcert Require Import
   common.AST
@@ -32,7 +32,7 @@ Require Import
   LambdaANF.state
   LambdaANF.toplevel.
 
-From MetaCoq Require Import bytestring MCString.
+From MetaCoq.Utils Require Import bytestring MCString.
 Section TRANSLATION.
 
 (* Stand-in for arbitrary identifiers *)

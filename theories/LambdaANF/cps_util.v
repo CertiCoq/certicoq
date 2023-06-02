@@ -7,7 +7,8 @@ Require Import LambdaANF.tactics.
 From CertiCoq.LambdaANF Require Import cps ctx Ensembles_util List_util functions map_util.
 From Coq Require Import Arith.Arith NArith.BinNat Lists.List
      micromega.Lia Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
-From MetaCoq Require Import bytestring BasicAst. (* For identifier names *)
+From MetaCoq.Utils Require Import bytestring. (* For identifier names *)
+From MetaCoq.Common Require Import BasicAst. (* For identifier names *)
 Require Import ExtLib.Structures.Monad ExtLib.Structures.MonadState ExtLib.Data.Monads.StateMonad.
 
 Import MonadNotation.

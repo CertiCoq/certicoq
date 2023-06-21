@@ -71,11 +71,12 @@ let name_longtype sg =
 (* Declarator (identifier + type) *)
 
 let attributes a =
+  let open Datatypes in
   let s1 = if a.attr_volatile then " volatile" else "" in
   match a.attr_alignas with
   | None -> s1
   | Some l ->
-      sprintf " _Alignas(%Ld)%s" (Int64.shift_left 1L (N.to_int l)) s1
+      sprintf " __attribute((aligned(%Ld)))%s" (Int64.shift_left 1L (N.to_int l)) s1
 
 let attributes_space a =
   let s = attributes a in
@@ -84,10 +85,22 @@ let attributes_space a =
 let name_optid id =
   if id = "" then "" else " " ^ id
 
+let is_int_or_ptr_attr a n =
+  let open Datatypes in
+  match a.attr_alignas with
+  | Some l when N.to_int l = n -> true
+  | _ -> false
+
 let rec name_cdecl id ty =
   match ty with
+  (* BEGIN hack for the int_or_ptr typedef *)
+  | Ctypes.Tpointer(Ctypes.Tvoid, a) when is_int_or_ptr_attr a 2 ->
+      "int_or_ptr32" ^ name_optid id
+  | Ctypes.Tpointer(Ctypes.Tvoid, a) when is_int_or_ptr_attr a 3 ->
+      "int_or_ptr64" ^ name_optid id
+  (* END *)
   | Ctypes.Tvoid ->
-      "void" ^ name_optid id
+     "void" ^ name_optid id
   | Ctypes.Tint(sz, sg, a) ->
       name_inttype sz sg ^ attributes a ^ name_optid id
   | Ctypes.Tfloat(sz, a) ->
@@ -176,13 +189,13 @@ let print_pointer_hook
 let is_nan (f : float) = f <> f
 let is_infinity f = f = infinity
 let is_neg_infinity f = f = neg_infinity
-   
+
 let print_float p f =
   if is_nan f then fprintf p "%s" "NAN"
   else if is_infinity f then fprintf p "%s" "INFINITY"
   else if is_neg_infinity f then fprintf p "%s" "-INFINITY"
   else fprintf p "%h" f
-  
+
 let print_typed_value p v ty =
   match v, ty with
   | Vint n, Ctypes.Tint(I32, Unsigned, _) ->

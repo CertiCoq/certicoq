@@ -807,7 +807,12 @@ Fixpoint translate_body
     | Some (_, _, true, _) => (* compile with tinfo *)
       prog <- translate_body e' fenv cenv ienv map ;;
       pr_call <- mkPrimCallTinfo x p (length vs) fenv map vs ;;
-      ret (pr_call ;;; prog)
+      ret (Efield tinfd allocIdent valPtr :::= allocPtr ;;;
+           Efield tinfd limitIdent valPtr :::= limitPtr ;;;
+           pr_call ;;;
+           allocIdent ::= Efield tinfd allocIdent valPtr ;;;
+           limitIdent ::= Efield tinfd limitIdent valPtr ;;;
+           prog)
     | None => None (* Unknown primitive identifier *)
     end
   | Ehalt x =>

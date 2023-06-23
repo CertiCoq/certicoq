@@ -1,6 +1,6 @@
 (*i camlp4deps: "grammar/grammar.cma" i*)
 
-DECLARE PLUGIN "certicoq_erasure_plugin"
+DECLARE PLUGIN "coq-certicoq-bootstrapped-erasure.plugin"
 
 {
 open Pp

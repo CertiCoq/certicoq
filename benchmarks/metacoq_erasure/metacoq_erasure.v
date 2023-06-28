@@ -37,7 +37,7 @@ Extract Constants [
   (* coq_msg_debug => "print_msg_debug", *)
   coq_msg_info => "coq_msg_info",
   PCUICWfEnvImpl.guard_impl => "metacoq_guard_impl" ] 
-Include [ "guard_impl.h" ].
+Include [ "print.h" ].
 
 (*
 From MetaCoq.SafeChecker Require Import PCUICSafeChecker.

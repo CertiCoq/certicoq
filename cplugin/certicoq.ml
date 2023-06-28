@@ -499,6 +499,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let term = quote opts gr in
     let debug = opts.debug in
     let options = make_pipeline_options opts in
+    let term = FixRepr.fix_quoted_program term in
     let p = Pipeline.show_IR options (Obj.magic term) in
     match p with
     | (CompM.Ret prg, dbg) ->

@@ -36,8 +36,8 @@ CertiCoq Compile -time -O 1 metacoq_erasure
 Extract Constants [
   (* coq_msg_debug => "print_msg_debug", *)
   coq_msg_info => "coq_msg_info",
-  PCUICWfEnvImpl.guard_impl => "metacoq_guard_impl" ] 
-Include [ "guard_impl.h" ].
+  PCUICWfEnvImpl.guard_impl => "metacoq_guard_impl" ]
+Include [ "print.h" ].
 
 (*
 From MetaCoq.SafeChecker Require Import PCUICSafeChecker.

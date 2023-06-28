@@ -4,7 +4,7 @@ OCAMLOPTS = -open Metacoq_template_plugin -I . -thread -rectypes -w +a-4-9-27-41
 GENCFILES = glue.CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.metacoq_erasure.c \
 		CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.metacoq_erasure.c
 CFILES = certicoq_erasure.c ${GENCFILES} gc_stack.c print.c
-COPTS = -I ../../_opam/lib/ocaml -I . -I ../../theories/Runtime
+COPTS = -g -I ../../_opam/lib/ocaml -I . -I ../../theories/Runtime
 # ffi.CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.QuoteFFI.c
 COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq.Libraries \
 	-Q ../../theories/LambdaANF CertiCoq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiCoq.LambdaBoxLocal \
@@ -27,7 +27,7 @@ clean:
 Loader.vo: Loader.v install
 	coqc -I . -Q . CertiCoq.Benchmarks.metacoq_erasure Loader.v
 
-metacoq_erasure.vo ${GENCFILES} &: metacoq_erasure.v
+metacoq_erasure.vo: metacoq_erasure.v
 	coqc ${COQOPTS} $<
 
 %.o: %.c
@@ -51,7 +51,7 @@ g_safe_erasure.ml: g_safe_erasure.mlg certiCoqErase.cmx
 %.cmi: %.mli
 	ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certicoq_erasure_plugin $<
 
-%.cmx: %.ml
+%.cmx: %.ml %.cmi
 	ocamlfind opt -c ${PKGS} ${OCAMLOPTS} -for-pack Certicoq_erasure_plugin $<
 
 install: certicoq_erasure_plugin.cmxa certicoq_erasure_plugin.cmxs certicoq_erasure_plugin.cmx

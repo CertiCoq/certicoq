@@ -6,6 +6,7 @@ on:
       - master
       - coq-8.15
       - coq-8.16
+      - coq-8.17
   pull_request:
     branches:
       - "**"

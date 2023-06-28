@@ -38,7 +38,7 @@ jobs:
               cp -r `pwd` ~/repo
             endGroup
             startGroup "opam pin"
-              opam pin -n -y submodules/metacoq
+              opam pin -y submodules/metacoq
             endGroup
           after_script: |
             startGroup "List installed packages"

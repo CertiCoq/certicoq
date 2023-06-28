@@ -30,7 +30,7 @@ jobs:
         with:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
-          before_install: |
+          before_script: |
             startGroup "fix permission issues"
               sudo chown -R coq:coq .
             endGroup

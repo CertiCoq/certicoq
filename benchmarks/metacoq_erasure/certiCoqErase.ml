@@ -58,7 +58,7 @@ let fix_term (p : Ast0.term) : Ast0.term =
   let open List in
   let rec aux p = 
   match p with
-  | Coq_tRel _ | Coq_tVar _ | Coq_tConst _ | Coq_tInd _ | Coq_tConstruct _ -> p
+  | Coq_tRel _ | Coq_tVar _ | Coq_tConst _ | Coq_tInd _ | Coq_tConstruct _ | Coq_tInt _ | Coq_tFloat _ -> p
   | Coq_tEvar (k, l) -> Coq_tEvar (k, map aux l)
   | Coq_tSort u -> Coq_tSort (fix_universe u)
   | Coq_tCast (t, k, t') -> Coq_tCast (aux t, k, aux t')
@@ -126,11 +126,11 @@ let fix_declarations decls =
   List.map fix_decl decls
 
 let fix_quoted_program (p : Ast0.Env.program) = 
-  let ({ Ast0.Env.universes = universes; declarations = declarations }, term) = p in
+  let ({ Ast0.Env.universes = universes; declarations = declarations; retroknowledge = retroknowledge }, term) = p in
   let term = fix_term term in
   let universes = fix_universes universes in
   let declarations = fix_declarations declarations in
-  { Ast0.Env.universes = universes; declarations }, term
+  { Ast0.Env.universes = universes; declarations; retroknowledge }, term
 
 let erase ~bypass env evm c =
   debug (fun () -> str"Quoting");

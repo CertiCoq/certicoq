@@ -12,7 +12,7 @@ Require Import ExtLib.Structures.Monads
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
 
-From MetaCoq.Template Require Import BasicAst.
+From MetaCoq.Common Require Import BasicAst.
 
 From compcert Require Import
   common.AST
@@ -32,7 +32,7 @@ Require Import
   LambdaANF.state
   LambdaANF.toplevel.
 
-From MetaCoq.Template Require Import bytestring MCString.
+From MetaCoq.Utils Require Import bytestring MCString.
 Section TRANSLATION.
 
 (* Stand-in for arbitrary identifiers *)
@@ -1023,7 +1023,7 @@ Fixpoint make_ind_array (l : list N) : list init_data :=
   | n :: l' => (Init_int (Z.of_N n)) :: (make_ind_array l')
   end.
 
-Import MetaCoq.Template.utils.bytestring.String (append).
+Import MetaCoq.Utils.bytestring.String (append).
 
 Definition update_name_env_fun_info (f f_inf : positive) (nenv : name_env) : name_env :=
   match M.get f nenv with

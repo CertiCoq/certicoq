@@ -8,7 +8,7 @@ Require Import Coq.ZArith.ZArith
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad.
 
-From MetaCoq.Template Require Import BasicAst.
+From MetaCoq.Common Require Import BasicAst.
 Require MetaCoq.Template.All.
 
 Require Import compcert.common.AST
@@ -27,7 +27,7 @@ Require Import LambdaANF.cps
                compM
                glue_utils.
 
-From MetaCoq.Template Require Import bytestring MCString.
+From MetaCoq.Utils Require Import bytestring MCString.
 
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
@@ -411,7 +411,7 @@ Section L1Types.
         match e with
           | Ast.tProd _ _ e' => check_last e'
           | Ast.tSort u =>
-              MetaCoq.Template.Universes.Universe.is_prop u
+              MetaCoq.Common.Universes.Universe.is_prop u
           | _ => false
         end
     in check_last (Ast.Env.ind_type (ty_body info)).

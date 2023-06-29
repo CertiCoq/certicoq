@@ -1,5 +1,5 @@
 From Coq Require Import Unicode.Utf8 List Classes.Morphisms.
-From MetaCoq.Template Require Import bytestring.
+Require Import MetaCoq.Utils.bytestring.
 From ExtLib Require Import Monads.
 
 Import MonadNotation ListNotations.
@@ -461,7 +461,7 @@ Section Hoare.
     {{ P }} e {{ fun r w x w' => P r w /\ Q r w x w' }}.
   Proof. 
     intros.
-    eapply pre_strenghtening with (P0 := fun st s => P st s /\ P st s). 
+    eapply pre_strenghtening with (P := fun st s => P st s /\ P st s). 
     now firstorder. eapply frame_rule. eassumption.
   Qed.
   

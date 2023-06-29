@@ -205,12 +205,12 @@ Lemma click_spec P :
 Proof.
   unfold click.
   eapply bind_triple.
-  - eapply pre_strenghtening with (P0 := fun _ s => P (fst s) /\ True).
+  - eapply @pre_strenghtening with (P := fun _ s => P (fst s) /\ True).
     + firstorder.
     + eapply frame_rule. eapply get_state_spec.
   - intros [c w] [c' w']. simpl.
     eapply pre_curry_l. intros. eapply pre_curry_l. intros. subst.
-    eapply pre_strenghtening with (P0 := fun _ s => (c', (c, w)) = s /\ True).
+    eapply @pre_strenghtening with (P := fun _ s => (c', (c, w)) = s /\ True).
     now firstorder.
     eapply post_weakening.
     2:{ eapply frame_rule. eapply put_state_spec. }
@@ -226,12 +226,12 @@ Lemma click_spec2 P :
 Proof.
   unfold click.
   eapply bind_triple.
-  - eapply pre_strenghtening with (P0 := fun _ s => P (fst s) /\ True).
+  - eapply @pre_strenghtening with (P := fun _ s => P (fst s) /\ True).
     + firstorder.
     + eapply frame_rule. eapply get_state_spec.
   - intros [c w] [c' w']. simpl.
     eapply pre_curry_l. intros. eapply pre_curry_l. intros. subst.
-    eapply pre_strenghtening with (P0 := fun _ s => (c', (c, w)) = s /\ True).
+    eapply @pre_strenghtening with (P := fun _ s => (c', (c, w)) = s /\ True).
     now firstorder.
     eapply post_weakening.
     2:{ eapply frame_rule. eapply put_state_spec. }
@@ -390,6 +390,7 @@ Section Inline_correct.
   Qed.
 
 
+  (*
   Lemma fun_in_fundefs_funnames_in_exp f ft xs e B :
     (f, ft, xs, e) \infun_in_fundefs B ->
     funnames_in_exp e \subset funnames_in_fundefs B.
@@ -398,7 +399,7 @@ Section Inline_correct.
     + inv H. sets.
     + simpl. eapply Included_Union_preserv_r. eauto.
   Qed.
-
+  *)
   
   (* [occurs_free_fun_map] and [bound_var_fun_map] *)
   
@@ -1331,7 +1332,7 @@ Section Inline_correct.
       eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHe with (S := S \\ [set x]).
       + eassumption.
       + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
-        eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := [set v]). tci.
+        eapply Disjoint_Included_r. eapply @Included_Union_Setminus with (s2 := [set v]). tci.
         eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
         rewrite Setminus_Union_distr. now sets. 
         eapply Disjoint_Singleton_r. eassumption.
@@ -1462,7 +1463,7 @@ Section Inline_correct.
       eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHe with (S := S \\ [set x]).
       + eassumption.
       + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
-        eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := [set v]). tci.
+        eapply Disjoint_Included_r. eapply @Included_Union_Setminus with (s2 := [set v]). tci.
         eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; sets. rewrite Setminus_Union_distr. sets.
         eapply Disjoint_Singleton_r. eassumption.
       + eapply Disjoint_Included_r.
@@ -1518,7 +1519,7 @@ Section Inline_correct.
         eapply bind_triple. eapply frame_rule. eapply frame_rule. eapply IHe with (S := S \\ [set x']).
         - eassumption.
         - repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
-          eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s4 := [set x]). tci.
+          eapply Disjoint_Included_r. eapply @Included_Union_Setminus with (s2 := [set x]). tci.
           eapply Union_Disjoint_r. eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
           rewrite Setminus_Union_distr. now sets. eapply Disjoint_Singleton_r. eassumption.
         - repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
@@ -1656,7 +1657,7 @@ Section Inline_correct.
                     assert (Heq := split_fuel_add j). rewrite Heq at 3. unfold split_fuel. simpl. lia.
                   + eassumption.
                   + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
-                    eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s4 := [set x]). tci.
+                    eapply Disjoint_Included_r. eapply @Included_Union_Setminus with (s2 := [set x]). tci.
                     eapply Union_Disjoint_r. rewrite Setminus_Union_distr. now eapply Disjoint_Included; [| | eapply Hdis1 ]; sets.
                     eapply Disjoint_Singleton_r. eassumption.
                   + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
@@ -1689,7 +1690,7 @@ Section Inline_correct.
                   assert (Hsub : occurs_free ei :|: (occurs_free e' \\ stemctx.bound_stem_ctx C) \subset
                                              occurs_free ei :|: (occurs_free e' \\ [set r])).
                   { edestruct inline_letapp_var_eq_alt. eassumption. inv H19; subst. now sets.
-                    inv H19. now sets. rewrite Union_Setminus_Included with (s5 := [set r]); tci. sets.
+                    inv H19. now sets. rewrite @Union_Setminus_Included with (s3 := [set r]); tci. sets.
                     sets. }
                   eapply Included_trans. eassumption. eapply Union_Included.
                   -- eapply Included_trans. eassumption. eapply Included_trans.
@@ -1719,7 +1720,7 @@ Section Inline_correct.
                   -- eapply Eletapp_OOT.
                   -- eapply HProp.
                      eapply le_trans; [| eassumption ]. rewrite Hadd at 4. simpl. lia. 
-                  -- simpl. intros. edestruct H20 with (f0 := f). constructor. now left. eassumption. eassumption.
+                  -- simpl. intros. edestruct (H20 f). constructor. now left. eassumption. eassumption.
                      destructAll. do 2 subst_exp. eapply Hrel.
                      ++ edestruct preord_env_P_inj_get_list_l. now eapply H19. normalize_occurs_free. now sets.
                         eassumption. destructAll.                           
@@ -1734,11 +1735,11 @@ Section Inline_correct.
                         ** eassumption.
                         ** eapply Union_Disjoint_r. now sets. rewrite Dom_map_remove. sets. 
                         ** rewrite Union_Setminus_Included. sets. tci. sets. 
-                  -- intros. edestruct H20 with (f0 := f). constructor. now left. eassumption. eassumption.
+                  -- intros. edestruct (H20 f). constructor. now left. eassumption. eassumption.
                      destructAll. subst_exp. eapply H18.
                      ++ rewrite apply_r_set_f_eq. eassumption.
                      ++ eapply fun_map_inv_antimon.
-                        2:{ eapply Included_trans. eapply Included_Union_Setminus with (s4 := [set x]); tci.
+                        2:{ eapply Included_trans. eapply @Included_Union_Setminus with (s2 := [set x]); tci.
                             rewrite Union_commut. reflexivity. }
                         eapply fun_map_inv_sig_extend_one_Disjoint.
                         ** eapply fun_map_inv_env_eq_P.

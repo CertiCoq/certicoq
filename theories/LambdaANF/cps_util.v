@@ -7,7 +7,8 @@ Require Import LambdaANF.tactics.
 From CertiCoq.LambdaANF Require Import cps ctx Ensembles_util List_util functions map_util.
 From Coq Require Import Arith.Arith NArith.BinNat Lists.List
      micromega.Lia Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
-From MetaCoq.Template Require Import bytestring BasicAst. (* For identifier names *)
+From MetaCoq.Utils Require Import bytestring. (* For identifier names *)
+From MetaCoq.Common Require Import BasicAst. (* For identifier names *)
 Require Import ExtLib.Structures.Monad ExtLib.Structures.MonadState ExtLib.Data.Monads.StateMonad.
 
 Import MonadNotation.
@@ -457,7 +458,7 @@ Qed.
 
 (** * Lemmas about [binding_in_map] *)
 
-Instance Proper_binding_in_map (A : Type) : Proper (Same_set _ ==> eq ==> iff) (@binding_in_map A).
+#[export] Instance Proper_binding_in_map (A : Type) : Proper (Same_set _ ==> eq ==> iff) (@binding_in_map A).
 Proof.
   intros s1 s2 Hseq x1 x2 Heq; subst; split; intros Hbin x Hin;
     eapply Hbin; eapply Hseq; eauto.
@@ -562,7 +563,7 @@ Lemma binding_in_map_key_set {A} (rho : M.t A) :
 Proof.
   unfold binding_in_map. intros x Hget.
   unfold key_set, In in *.
-  destruct (M.get x rho); eauto.
+  destruct (M.get x rho); auto; eauto.
 Qed.
 
 Inductive dsubterm_e:exp -> exp -> Prop :=
@@ -1342,7 +1343,7 @@ Qed.
 
 
 (* Instance for option monad. Maybe move to more general file *)
-Instance OptMonad : Monad option.
+#[export] Instance OptMonad : Monad option.
 Proof. 
   constructor.
   - intros X x. exact (Some x).

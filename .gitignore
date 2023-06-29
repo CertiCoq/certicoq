@@ -118,3 +118,11 @@ tests/test.certicoqc.c
 tests/test.certicoqc.h
 bootstrap/certicoqc/tests/glue.test.certicoqc.c
 bootstrap/certicoqc/tests/glue.test.certicoqc.h
+bootstrap/certicoqchk/.Makefile.certicoqchk.d
+bootstrap/certicoqchk/Makefile.certicoqchk
+bootstrap/certicoqchk/Makefile.certicoqchk.conf
+cplugin/META
+plugin/META
+_opam
+bootstrap/certicoqc/META
+bootstrap/certicoqchk/META

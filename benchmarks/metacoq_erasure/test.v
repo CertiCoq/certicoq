@@ -7,7 +7,7 @@ Import ListNotations.
 
 (* CertiCoq Erase (List.map negb [true; false]). *)
 
-From MetaCoq.Erasure Require Import Erasure.
+From MetaCoq.ErasurePlugin Require Import Erasure.
 CertiCoq Erase @erase_and_print_template_program.
 
 (* From MetaCoq.SafeChecker Require Import PCUICSafeChecker. *)

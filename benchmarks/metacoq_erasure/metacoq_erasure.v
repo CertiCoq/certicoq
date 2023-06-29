@@ -6,8 +6,9 @@ Require Import CertiCoq.Benchmarks.lib.sha256.
 
 From CertiCoq.Plugin Require Import CertiCoq.
 
-From MetaCoq.Erasure Require Import EProgram Erasure Loader.
-From MetaCoq.Template Require Import bytestring.
+From MetaCoq.Erasure Require Import EProgram.
+From MetaCoq.ErasurePlugin Require Import Erasure Loader.
+Require Import MetaCoq.Utils.bytestring.
 
 Open Scope bs_scope.
 
@@ -34,7 +35,7 @@ Definition metacoq_erasure (p : Ast.Env.program) :=
 CertiCoq Compile -time -O 1 metacoq_erasure
 Extract Constants [
   (* coq_msg_debug => "print_msg_debug", *)
-  coq_msg_info => "print_msg_info",
+  coq_msg_info => "coq_msg_info",
   PCUICWfEnvImpl.guard_impl => "metacoq_guard_impl" ] 
 Include [ "print.h" ].
 

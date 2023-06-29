@@ -10,14 +10,15 @@ Require Import ExtLib.Data.Positive.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
-From MetaCoq.Template Require Import bytestring MCString BasicAst Primitive. (* For identifier names *)
+From MetaCoq.Utils Require Import bytestring MCString. (* For identifier names *)
+From MetaCoq.Common Require Import BasicAst Primitive. (* For identifier names *)
 From MetaCoq.PCUIC Require Import PCUICPrimitive. (* For identifier names *)
 
 Import MonadNotation.
 
 Open Scope monad_scope.
 
-Definition name_env : Set := M.tree Template.BasicAst.name.
+Definition name_env : Set := M.tree Common.BasicAst.name.
 
 Section PP.
 

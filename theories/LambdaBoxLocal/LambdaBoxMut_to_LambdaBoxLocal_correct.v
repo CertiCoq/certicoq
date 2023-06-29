@@ -2592,7 +2592,6 @@ Proof.
     rewrite subst_env_aux_constructor.
     intuition trivial. simpl.
     now rewrite Nnat.Nat2N.id; repeat rewrite eq_decb_refl; simpl.
-  - intros. unfold translate, subst_env in H. rewrite H. now simpl.
 Qed.
 
 Theorem translate_correct' (e e' : environ Term) prims (Heq : prims = []) (t t' : Term) :

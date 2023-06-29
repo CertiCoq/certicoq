@@ -6,7 +6,7 @@ From CertiCoq.Common Require Import AstCommon.
 From CertiCoq.LambdaANF Require Import List_util map_util.
 From compcert.lib Require Export  Maps.
 From CertiCoq.LambdaANF Require Export map_util.
-From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
+From MetaCoq.Common Require Import BasicAst. (* For identifier names *)
 
 Import ListNotations.
 

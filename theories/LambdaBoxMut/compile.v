@@ -9,10 +9,13 @@ Require Import Common.Common.
 Require Import Coq.micromega.Lia.
 
 From Equations Require Import Equations.
-From MetaCoq.Template Require utils EtaExpand.
-From MetaCoq.Template Require Import Primitive utils.bytestring.
+From MetaCoq.Utils Require utils.
+From MetaCoq.Template Require EtaExpand.
+From MetaCoq.Utils Require Import bytestring.
+From MetaCoq.Common Require Import Primitive.
 From MetaCoq.PCUIC Require Import PCUICPrimitive.
 From MetaCoq.Erasure Require Import EAst ESpineView EGlobalEnv EEtaExpanded EInduction Erasure.
+From MetaCoq.ErasurePlugin Require Import Erasure.
 
 Local Open Scope bs_scope.
 Local Open Scope bool.
@@ -411,9 +414,16 @@ Fixpoint compile_ctx (t : global_context) :=
     (n, compile_global_decl decl) :: compile_ctx rest
   end.
 
-Definition compile_program (p : Ast.Env.program) : Program Term :=
-  let p := run_erase_program p (assume_that_we_only_erase_on_welltyped_programs p) in
+Program Definition compile_program (p : Ast.Env.program) : Program Term :=
+  let p := run_erase_program p _ in
   {| main := compile (snd p) ; env := compile_ctx (fst p) |}.
+Next Obligation.
+  split.
+  now eapply assume_that_we_only_erase_on_welltyped_programs.
+  cbv [PCUICWeakeningEnvSN.normalizationInAdjustUniversesIn].
+  pose proof @PCUICSN.normalization.
+  split; typeclasses eauto.
+Qed.
 
 Definition program_Program (p: Ast.Env.program) : Program Term :=
   compile_program p.

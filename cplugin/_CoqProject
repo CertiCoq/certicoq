@@ -3,6 +3,8 @@
 -I .
 -R . CertiCoq.VanillaPlugin
 
+META.coq-certicoq-vanilla
+
 tm_util.ml
 
 plugin_utils.ml
@@ -57,8 +59,8 @@ extraction/envMap.mli
 extraction/envMap.ml
 extraction/pCUICWfEnv.mli
 extraction/pCUICWfEnv.ml
-extraction/pCUICWfUniverses.mli
-extraction/pCUICWfUniverses.ml
+# extraction/pCUICWfUniverses.mli
+# extraction/pCUICWfUniverses.ml
 extraction/pCUICWfEnvImpl.mli
 extraction/pCUICWfEnvImpl.ml
 extraction/typing0.mli
@@ -305,6 +307,8 @@ extraction/memtype.ml
 extraction/memtype.mli
 extraction/monad0.ml
 extraction/monad0.mli
+extraction/optionMonad.mli
+extraction/optionMonad.ml
 # extraction/monadExc.ml
 # extraction/monadExc.mli
 extraction/monadState.ml
@@ -353,8 +357,8 @@ extraction/pCUICErrors.ml
 extraction/pCUICErrors.mli
 extraction/pCUICExpandLets.ml
 extraction/pCUICExpandLets.mli
-extraction/pCUICEquality.mli
-extraction/pCUICEquality.ml
+# extraction/pCUICEquality.mli
+# extraction/pCUICEquality.ml
 extraction/pCUICEqualityDec.mli
 extraction/pCUICEqualityDec.ml
 extraction/pCUICNormal.ml

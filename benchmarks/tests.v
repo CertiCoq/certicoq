@@ -4,7 +4,7 @@ Require Import CertiCoq.Benchmarks.lib.Binom.
 Require Import CertiCoq.Benchmarks.lib.Color.
 Require Import CertiCoq.Benchmarks.lib.sha256.
 Require Import CertiCoq.Benchmarks.lib.coind.
-From MetaCoq.Template Require Import bytestring MCString.
+From MetaCoq.Utils Require Import bytestring MCString.
 From CertiCoq.Plugin Require Import CertiCoq.
 
 Definition foo := 0.

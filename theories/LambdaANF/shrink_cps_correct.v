@@ -1002,7 +1002,7 @@ Section Shrink_correct.
     preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     intros.
-    eapply preord_exp_compat_vals_stem_set with (S0 := FromList xs); eauto.
+    eapply @preord_exp_compat_vals_stem_set with (S := FromList xs); eauto.
     intros. apply H; eauto.
     erewrite <- eq_env_P_get_list.
     eauto.
@@ -1040,7 +1040,7 @@ Section Shrink_correct.
     preord_exp cenv (P1 1) PG k (c |[ e1 ]|, rho1) (c |[ e2 ]|, rho2).
   Proof.
     intros.
-    eapply preord_exp_compat_vals_stem_set with (S0 := Singleton _ x); auto.
+    eapply @preord_exp_compat_vals_stem_set with (S := Singleton _ x); auto.
     intros.
     apply H. eauto. specialize (H5 x). rewrite <- H1.
     symmetry. apply H5.
@@ -1518,8 +1518,8 @@ Section Shrink_correct.
     { rewrite def_funs_eq. reflexivity. eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct.
       eassumption. }
     
-    eapply preord_exp_compat_vals_stem_set with
-        (S1 := name_in_fundefs fds :|: occurs_free_fundefs fds) (S0 :=  name_in_fundefs fds :|: occurs_free_fundefs fds). 
+    eapply @preord_exp_compat_vals_stem_set with
+        (S1 := name_in_fundefs fds :|: occurs_free_fundefs fds) (S :=  name_in_fundefs fds :|: occurs_free_fundefs fds). 
     
     * intros k1 rho1' rho2' Hleq1 Hpre' Heq1 Heq2. 
        
@@ -1620,14 +1620,14 @@ Section Shrink_correct.
     { rewrite def_funs_eq. reflexivity. eapply fun_in_fundefs_name_in_fundefs. eapply find_def_correct.
       eassumption. } 
 
-    eapply preord_exp_compat_vals_stem_set with (S1 := name_in_fundefs fds :|: occurs_free_fundefs fds)
-                                                (S0 :=  name_in_fundefs fds :|: occurs_free_fundefs fds). 
+    eapply @preord_exp_compat_vals_stem_set with (S1 := name_in_fundefs fds :|: occurs_free_fundefs fds)
+                                                (S :=  name_in_fundefs fds :|: occurs_free_fundefs fds). 
     - intros k1 rho1' rho2' Hleq1 Hpre' Heq1 Heq2. 
 
       assert (Hf1' := Hf1).
       eapply find_def_correct in Hf1; eapply fun_in_fundefs_name_in_fundefs in Hf1.      
       
-      eapply inline_letapp_correct with (C'0 := Hole_c) (sig := id); [ | | | | | | | | | eassumption ]. 
+      eapply @inline_letapp_correct with (C' := Hole_c) (sig := id); [ | | | | | | | | | eassumption ]. 
       + eassumption.
       + eassumption.
       + eassumption.
@@ -4246,7 +4246,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
             eapply num_occur_rename_all_ns_not_range in H28; [| eassumption | ]. 
             assert (Heq : m = 0) by lia. subst. eassumption.
             intros Hc. 
-            eapply Range_map_set_list with (xs0 := [x]) (vs0 := [x']) in Hc.
+            eapply @Range_map_set_list with (xs := [x]) (vs := [x']) in Hc.
             repeat normalize_sets. inv Hc. eapply inline_letapp_var_eq in H8. inv H8; subst.
 
             eapply HdisFV. constructor. right. normalize_bound_var. now right.
@@ -4588,7 +4588,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
           eapply num_occur_rename_all_ns_not_range with (e := e1) in H27; [| eassumption | ]. 
           assert (Heq : m = 0) by lia. subst. eassumption.
           intros Hc. 
-          eapply Range_map_set_list with (xs0 := [x]) (vs0 := [x']) in Hc.
+          eapply @Range_map_set_list with (xs := [x]) (vs := [x']) in Hc.
           repeat normalize_sets. inv Hc. eapply inline_letapp_var_eq in H2. inv H2; subst.
 
           contradiction. 

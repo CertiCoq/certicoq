@@ -8,7 +8,8 @@ Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
                ExtLib.Data.String.
 
-From MetaCoq.Template Require Import bytestring BasicAst.
+From MetaCoq.Utils Require Import bytestring.
+From MetaCoq.Common Require Import BasicAst.
 Require MetaCoq.Template.All.
 
 Require Import compcert.common.AST

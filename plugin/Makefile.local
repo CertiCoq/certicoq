@@ -9,5 +9,7 @@ CAMLFLAGS+=-w -20 # Unused arguments
 CAMLFLAGS+=-w -60 # Unused functor arguments
 CAMLFLAGS+=-w -8 # Non-exhaustive matches produced by extraction
 
+CAMLPKGS+=-package coq-metacoq-template-ocaml.plugin,stdlib-shims
+
 merlin-hook::
 		$(HIDE)echo 'FLG $(OPENS)' >> .merlin

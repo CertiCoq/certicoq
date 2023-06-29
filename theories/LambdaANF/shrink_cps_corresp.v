@@ -4155,7 +4155,7 @@ Section CONTRACT.
   Proof.
     induction cl; intros; inv H; inv H0; eauto.
     erewrite IHcl with (n := m0); eauto.
-    erewrite (proj1 (num_occur_det _)) with (n1 := n0); eauto.
+    erewrite (proj1 (num_occur_det _) _ n0); eauto.
   Qed.
 
 

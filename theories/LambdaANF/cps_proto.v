@@ -526,7 +526,7 @@ Definition decompose_fd_c := @decompose_fd_c' exp_univ_fundefs exp_univ_exp.
 
 (* Misc. facts that may or may not be useful when dealing with dependently typed [exp_c]s *)
 
-Instance exp_Frame_inj : Frame_inj (U:=exp_univ).
+#[global] Instance exp_Frame_inj : Frame_inj (U:=exp_univ).
 Proof. intros A B f x y; destruct f; now inversion 1. Qed.
 
 Require Import Coq.Logic.JMeq.
@@ -549,10 +549,10 @@ Class Inhabited A := inhabitant : A.
 #[global] Instance Inhabited_exp : Inhabited exp := Ehalt inhabitant.
 #[global] Instance Inhabited_fundefs : Inhabited fundefs := Fnil.
 
-Import Int63.
+Import PrimInt63.
 
 Global Instance Inhabited_primitive : Inhabited AstCommon.primitive := 
-  { inhabitant := existT _ Primitive.primInt 0%int63 }.
+  { inhabitant := existT _ Primitive.primInt 0%uint63 }.  
 
 Definition univ_inhabitant {A} : univD A :=
   match A with
@@ -571,15 +571,15 @@ Definition univ_inhabitant {A} : univD A :=
 
 Class Sized A := size : A -> nat.
 
-Instance Sized_pos : Sized positive := fun _ => S O.
-Instance Sized_N : Sized N := fun _ => S O.
-Instance Sized_primitive : Sized AstCommon.primitive := fun _ => S O.
+#[global] Instance Sized_pos : Sized positive := fun _ => S O.
+#[global] Instance Sized_N : Sized N := fun _ => S O.
+#[global] Instance Sized_primitive : Sized AstCommon.primitive := fun _ => S O.
 
 Definition size_list {A} (size : A -> nat) : list A -> nat := fold_right (fun x n => S (size x + n)) 1%nat.
 Definition size_prod {A B} (sizeA : A -> nat) (sizeB : B -> nat) : A * B -> nat := fun '(x, y) => S (sizeA x + sizeB y).
 
-Instance Size_list A `{Sized A} : Sized (list A) := size_list size.
-Instance Size_prod A B `{Sized A} `{Sized B} : Sized (A * B) := size_prod size size.
+#[global] Instance Size_list A `{Sized A} : Sized (list A) := size_list size.
+#[global] Instance Size_prod A B `{Sized A} `{Sized B} : Sized (A * B) := size_prod size size.
 
 Fixpoint size_exp (e : exp) : nat
 with size_fundefs (fds : fundefs) : nat.
@@ -601,8 +601,8 @@ Proof.
   end).
 Defined.
 
-Instance Sized_exp : Sized exp := size_exp.
-Instance Sized_fundefs : Sized fundefs := size_fundefs.
+#[global] Instance Sized_exp : Sized exp := size_exp.
+#[global] Instance Sized_fundefs : Sized fundefs := size_fundefs.
 
 Definition univ_size {A} : univD A -> nat :=
   match A with

@@ -8,7 +8,7 @@ Require Import ExtLib.Structures.Monads
 
 Import MonadNotation.
 Open Scope monad_scope.
-From MetaCoq.Template Require Import BasicAst.
+From MetaCoq.Common Require Import BasicAst.
 
 From compcert Require Import
   common.AST
@@ -24,7 +24,7 @@ Require Import LambdaANF.cps
                LambdaANF.identifiers
                LambdaANF.cps_show.
 
-From MetaCoq.Template Require Import bytestring MCString.
+From MetaCoq.Utils Require Import bytestring MCString.
 
 Section TRANSLATION.
 

@@ -14,7 +14,7 @@ Require Import Coq.micromega.Lia.
 Require Import Common.exceptionMonad.
 Require Import FunInd.
 Require Import Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
-From MetaCoq.Template Require Import bytestring.
+Require Import MetaCoq.Utils.bytestring.
 Local Open Scope bs_scope.
 Local Open Scope bool.
 Local Open Scope list.

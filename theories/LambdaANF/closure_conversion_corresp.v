@@ -9,7 +9,7 @@ Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
                Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
-Require Import MetaCoq.Template.utils.bytestring.
+Require Import MetaCoq.Utils.bytestring.
 Import Common.compM.
 Import ListNotations.
 
@@ -1846,7 +1846,6 @@ Section CC_correct.
           normalize_occurs_free_in_ctx.
           intros x Hx. specialize (Hbin1 x).
           rewrite !In_or_Iff_Union in *.
-          rewrite !In_or_Iff_Union in Hbin1.
           unfold In in *.
           tauto.
         * now inv Huniq.
@@ -2097,7 +2096,6 @@ Section CC_correct.
           normalize_occurs_free_in_ctx.
           intros arb Harb. specialize (Hbin1 arb).
           rewrite !In_or_Iff_Union in *.
-          rewrite !In_or_Iff_Union in Hbin1.
           rewrite not_In_Setminus in Hbin1.
           unfold In in *.
           destruct (peq x arb); [subst; left; left; left; now left|].

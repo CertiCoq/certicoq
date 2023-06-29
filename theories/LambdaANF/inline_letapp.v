@@ -4,7 +4,7 @@ From CertiCoq.LambdaANF Require Import cps ctx Ensembles_util List_util function
      rename logical_relations alpha_conv eval functions.
 From Coq Require Import Arith.Arith NArith.BinNat Strings.String Lists.List
      micromega.Lia Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
-From MetaCoq.Template Require Import BasicAst. (* For identifier names *)
+From MetaCoq.Common Require Import BasicAst. (* For identifier names *)
 Require Import ExtLib.Structures.Monad ExtLib.Structures.MonadState ExtLib.Data.Monads.StateMonad.
 
 Import MonadNotation.

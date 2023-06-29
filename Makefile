@@ -45,10 +45,20 @@ install: plugin cplugin bootstrap
 	$(MAKE) -C cplugin install
 	$(MAKE) -C bootstrap install
 
-clean:
+# Clean generated makefiles
+mrproper: theories/Makefile libraries/Makefile plugin/Makefile cplugin/Makefile
+	rm -f theories/Makefile
+	rm -f libraries/Makefile
+	rm -f plugin/Makefile
+	rm -f cplugin/Makefile
+
+clean: theories/Makefile libraries/Makefile plugin/Makefile cplugin/Makefile
 	$(MAKE) -C libraries clean
 	$(MAKE) -C theories clean
 	$(MAKE) -C plugin clean
 	$(MAKE) -C cplugin clean
+	$(MAKE) -C bootstrap clean
 	rm -f `find theories -name "*.ml*"`
 	rm -rf plugin/extraction
+	rm -rf cplugin/extraction
+	$(MAKE) mrproper

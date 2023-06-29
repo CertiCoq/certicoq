@@ -1,4 +1,4 @@
-Require Import MetaCoq.Template.utils.bytestring.
+Require Import MetaCoq.Utils.bytestring.
 From Coq Require Import ZArith.ZArith Lists.List micromega.Lia Arith
      Ensembles Relations.Relation_Definitions.
 Require Import Common.AstCommon.
@@ -2355,7 +2355,7 @@ Section Correct.
         replace (ys ++ x1 :: xs0) with ((ys ++ [x1]) ++ xs0) in *.
         2:{ rewrite app_cons with (a := x1) (l2 := xs0). reflexivity.  }
         
-        edestruct IH2 with (ys := ys ++ [x1]) (vs'0 := vs'' ++ [y]) (rho := rho');
+        edestruct IH2 with (ys := ys ++ [x1]) (vs' := vs'' ++ [y]) (rho := rho');
           [ | | | | | | | | | eassumption | eassumption | | ].
         + eassumption.
         + eassumption.

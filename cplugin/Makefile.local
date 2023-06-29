@@ -7,6 +7,7 @@ CAMLFLAGS+=-w -32 # Unused values
 CAMLFLAGS+=-w -39 # Unused rec flagss
 CAMLFLAGS+=-w -20 # Unused arguments
 CAMLFLAGS+=-w -60 # Unused functor arguments
+CAMLPKGS+=-package coq-metacoq-template-ocaml.plugin,stdlib-shims
 
 merlin-hook::
 		$(HIDE)echo 'FLG $(OPENS)' >> .merlin

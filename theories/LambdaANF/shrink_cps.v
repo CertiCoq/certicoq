@@ -1119,16 +1119,16 @@ Section CONTRACT.
   Defined.
   Next Obligation.
     unfold term_sub_inl_size; simpl.
-    symmetry in H4.
-    apply sub_inl_fun_size with (im :=  im) in H4.
+    symmetry in H1.
+    apply sub_inl_fun_size with (im :=  im) in H1.
     eapply le_lt_trans. eapply plus_le_compat_r. eapply term_size_inline_letapp.
     now eauto. rewrite (proj1 (term_size_rename_all_ns _)).    
     rewrite plus_comm, plus_assoc.
-    rewrite <- H4. lia.
+    rewrite <- H1. lia.
     symmetry in Heq2.
     apply Bool.andb_true_iff in Heq2.
     destructAll.
-    apply Bool.andb_true_iff in H1.
+    apply Bool.andb_true_iff in H.
     destructAll.
     apply Bool.negb_true_iff. auto.
   Defined.

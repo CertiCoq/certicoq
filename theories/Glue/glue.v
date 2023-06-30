@@ -94,6 +94,14 @@ Section Helpers.
       ; env_info : A
       }.
 
+  Record stack_frame_bundle (A : Type) : Type :=
+    Build_stack_frame_bundle
+      { stack_frame_type : A
+      ; next_info : A
+      ; root_info : A
+      ; prev_info : A
+      }.
+
   Record thread_info_bundle (A : Type) : Type :=
     Build_thread_info_bundle
       { thread_info_type : A
@@ -101,6 +109,19 @@ Section Helpers.
       ; limit_info : A
       ; heap_info : A
       ; args_info : A
+      ; fp_info : A
+      ; nalloc_info : A
+      }.
+
+  Record literals_bundle (A : Type) : Type :=
+    Build_literals_bundle
+      { lparen_info : A
+      ; rparen_info : A
+      ; space_info  : A
+      ; fun'_info   : A
+      ; type'_info  : A
+      ; unk_info    : A
+      ; prop_info   : A
       }.
 
   (* printf, is_ptr and these literals will be used by multiple functions
@@ -112,17 +133,12 @@ Section Helpers.
     Build_toolbox_info
       { printf_info : def_info
       ; is_ptr_info : def_info
-      ; lparen_info : def_info
-      ; rparen_info : def_info
-      ; space_info  : def_info
-      ; fun'_info   : def_info
-      ; type'_info  : def_info
-      ; unk_info    : def_info
-      ; prop_info   : def_info
+      ; literals_info : literals_bundle def_info
       ; get_unboxed_ordinal_info : def_info
       ; get_boxed_ordinal_info   : def_info
       ; thread_info_info : thread_info_bundle ident
       ; closure_info : closure_bundle ident
+      ; stack_frame_info : stack_frame_bundle ident
       ; halt_clo_info : def_info
       }.
 
@@ -147,6 +163,11 @@ Section GState.
 
   Definition gets {A : Type} (f : gstate_data -> A) : glueM A :=
     s <- get ;; ret (f s).
+
+  Variant backend := ANF | CPS.
+  Definition get_backend : glueM backend :=
+    opts <- ask ;;
+    ret (if direct opts then ANF else CPS).
 
   (* generate fresh [ident] and record it to the [name_env]
      with the given [string] *)
@@ -288,7 +309,7 @@ Section Externs.
                       (Sreturn (Some (Ebinop Oand (Field(Ecast (var _v) (tptr valInt), -1)) (make_cint 255 val) val)))
                   |})).
 
-  Definition make_externs : glueM (composite_definitions * defs * toolbox_info) :=
+  Definition make_literals_bundle : glueM (literals_bundle def_info * defs) :=
     '(_lparen, ty_lparen, def_lparen) <- string_literal "lparen_lit" "(" ;;
     '(_rparen, ty_rparen, def_rparen) <- string_literal "rparen_lit" ")" ;;
     '(_space,  ty_space,  def_space)  <- string_literal "space_lit"  " " ;;
@@ -296,6 +317,26 @@ Section Externs.
     '(_type',  ty_type',  def_type')  <- string_literal "type_lit"   "<type>" ;;
     '(_unk,    ty_unk,    def_unk)    <- string_literal "unk_lit"    "<unk>" ;;
     '(_prop,   ty_prop,   def_prop)   <- string_literal "prop_lit"   "<prop>" ;;
+    let literals :=
+      {| lparen_info := (_lparen, ty_lparen)
+       ; rparen_info := (_rparen, ty_rparen)
+       ; space_info  := (_space,  ty_space)
+       ; fun'_info   := (_fun',   ty_fun')
+       ; type'_info  := (_type',  ty_type')
+       ; unk_info    := (_unk,    ty_unk)
+       ; prop_info   := (_prop,   ty_prop)
+       |} in
+  let defs := (_lparen, def_lparen) ::
+              (_rparen, def_rparen) ::
+              (_space, def_space) ::
+              (_fun', def_fun') ::
+              (_type', def_type') ::
+              (_unk, def_unk) ::
+              (_prop, def_prop) :: nil in
+  ret (literals, defs).
+
+  Definition make_externs : glueM (composite_definitions * defs * toolbox_info) :=
+    '(literals, literal_defs) <- make_literals_bundle ;;
     _printf <- gensym "printf" ;;
     _is_ptr <- gensym "is_ptr" ;;
     '(_guo, def_guo) <- get_unboxed_ordinal ;;
@@ -306,10 +347,17 @@ Section Externs.
     _limit <- gensym "limit";;
     _heap <- gensym "heap";;
     _args <- gensym "args";;
+    _fp <- gensym "fp";;
+    _nalloc <- gensym "nalloc";;
 
     _closure <- gensym "closure" ;;
     _func <- gensym "func" ;;
     _env <- gensym "env" ;;
+
+    _stack_frame <- gensym "stack_frame" ;;
+    _next <- gensym "next" ;;
+    _root <- gensym "root" ;;
+    _prev <- gensym "prev" ;;
 
     _halt_clo <- gensym "halt_clo" ;;
     let ty_halt_clo := Tarray val 2 noattr in
@@ -320,52 +368,66 @@ Section Externs.
          ; limit_info := _limit
          ; heap_info := _heap
          ; args_info := _args
+         ; fp_info := _fp
+         ; nalloc_info := _nalloc
          |} in
     let closure : closure_bundle ident :=
         {| closure_type := _closure
          ; func_info := _func
          ; env_info := _env
          |} in
+    let stack_frame : stack_frame_bundle ident :=
+      {| stack_frame_type := _stack_frame
+       ; next_info := _next
+       ; root_info := _root
+       ; prev_info := _prev
+       |} in
+    backend <- get_backend ;;
     let comp :=
-      Composite _thread_info Struct
-        (Member_plain _alloc (tptr val) ::
-         Member_plain _limit (tptr val) ::
-         Member_plain _heap (tptr (Tstruct _heap noattr)) ::
-         Member_plain _args (Tarray val max_args noattr) :: nil) noattr ::
       Composite _closure Struct
        (Member_plain _func
                     (tptr (Tfunction (Tcons (Tstruct _thread_info noattr)
-                                     (Tcons val (Tcons val Tnil))) Tvoid cc_default)) ::
+                                    (Tcons val (Tcons val Tnil))) Tvoid cc_default)) ::
         Member_plain _env val :: nil) noattr ::
-        nil in
+      match backend with
+      | ANF =>
+        Composite _stack_frame Struct
+         (Member_plain _next (tptr val) ::
+          Member_plain _root (tptr val) ::
+          Member_plain _prev (tptr (Tstruct _stack_frame noattr)) :: nil) noattr ::
+        Composite _thread_info Struct
+         (Member_plain _alloc (tptr val) ::
+          Member_plain _limit (tptr val) ::
+          Member_plain _heap (tptr (Tstruct _heap noattr)) ::
+          Member_plain _args (Tarray val max_args noattr) ::
+          Member_plain _fp (tptr (Tstruct _stack_frame noattr)) ::
+          Member_plain _nalloc tulong :: nil) noattr ::
+          nil
+      | CPS =>
+        Composite _thread_info Struct
+         (Member_plain _alloc (tptr val) ::
+          Member_plain _limit (tptr val) ::
+          Member_plain _heap (tptr (Tstruct _heap noattr)) ::
+          Member_plain _args (Tarray val max_args noattr) :: nil) noattr ::
+          nil
+      end in
     let toolbox :=
         {| printf_info :=
               (_printf, Tfunction (Tcons (tptr tschar) Tnil) tint cc_default)
          ; is_ptr_info :=
               (_is_ptr, Tfunction (Tcons val Tnil) tbool cc_default)
-         ; lparen_info := (_lparen, ty_lparen)
-         ; rparen_info := (_rparen, ty_rparen)
-         ; space_info  := (_space,  ty_space)
-         ; fun'_info   := (_fun',   ty_fun')
-         ; type'_info  := (_type',  ty_type')
-         ; unk_info    := (_unk,    ty_unk)
-         ; prop_info   := (_prop,   ty_prop)
+         ; literals_info := literals
          ; get_unboxed_ordinal_info :=
               (_guo, Tfunction (Tcons val Tnil) tuint cc_default)
          ; get_boxed_ordinal_info :=
               (_gbo, Tfunction (Tcons val Tnil) tuint cc_default)
          ; thread_info_info := tinfo
+         ; stack_frame_info := stack_frame
          ; closure_info := closure
          ; halt_clo_info := (_halt_clo, ty_halt_clo)
          |} in
     let dfs :=
-      ((_lparen, def_lparen) ::
-       (_rparen, def_rparen) ::
-       (_space, def_space) ::
-       (_fun', def_fun') ::
-       (_type', def_type') ::
-       (_unk, def_unk) ::
-       (_prop, def_prop) ::
+      (literal_defs ++
        (_printf,
         Gfun (External (EF_external "printf"
                           (mksignature (AST.Tint :: nil)
@@ -379,7 +441,7 @@ Section Externs.
                         (Tint IBool Unsigned noattr) cc_default)) ::
        (_guo, def_guo) ::
        (_gbo, def_gbo) ::
-       nil) in
+       nil)%list in
     ret (comp, dfs, toolbox).
 
 End Externs.
@@ -600,13 +662,13 @@ Section Printers.
 
         (* names and Clight types of printf and string literals *)
         let (_printf, ty_printf) := printf_info toolbox in
-        let (_space, ty_space) := space_info toolbox in
-        let (_lparen, ty_lparen) := lparen_info toolbox in
-        let (_rparen, ty_rparen) := rparen_info toolbox in
-        let (_fun, ty_fun) := fun'_info toolbox in
-        let (_type, ty_type) := type'_info toolbox in
-        let (_unk, ty_unk) := unk_info toolbox in
-        let (_prop, ty_prop) := prop_info toolbox in
+        let (_space, ty_space) := space_info _ (literals_info toolbox) in
+        let (_lparen, ty_lparen) := lparen_info _ (literals_info toolbox) in
+        let (_rparen, ty_rparen) := rparen_info _ (literals_info toolbox) in
+        let (_fun, ty_fun) := fun'_info _ (literals_info toolbox) in
+        let (_type, ty_type) := type'_info _ (literals_info toolbox) in
+        let (_unk, ty_unk) := unk_info _ (literals_info toolbox) in
+        let (_prop, ty_prop) := prop_info _ (literals_info toolbox) in
 
         (* function calls to printf *)
         let print_ctor_name : statement :=
@@ -1161,9 +1223,6 @@ Section FunctionCalls.
   Let _cenv : ident := env_info _ (closure_info toolbox).
   (* Let c_args : nat := c_args opts. *)
 
-  Variant Backend := ANF | CPS.
-  (* Let backend := if direct opts then ANF else CPS. *)
-
   (* Notations, from OSB *)
   Notation " a '::=' b " := (Sset a b) (at level 50).
   Notation "'funVar' x" := (Evar x (funTy _thread_info)) (at level 20).
@@ -1174,7 +1233,7 @@ Section FunctionCalls.
       - for c_args >= 2 the environment and the result.
       Hence, if c_args >= 2 we additionally have to put
       the result into *tinfo.args[1]. *)
-  Definition make_halt : glueM (def * def) :=
+  Definition make_halt : glueM defs :=
     opts <- ask ;;
     let c_args : nat := c_args opts in
     _env <- gensym "env" ;;
@@ -1189,14 +1248,19 @@ Section FunctionCalls.
     let halt_stm := if 2 <=? c_args
                     then Sassign (Field(argsExpr, Z.of_nat 1)) (Etempvar _arg val);;; Sreturn None
                     else (Sreturn None) in
-    ret ((_halt, (* halt *)
-          Gfun (Internal (mkfunction Tvoid cc_default
-                                     (firstn (S c_args) args_halt)
-                                     nil nil halt_stm))),
-         (_halt_clo, (* halt_clo *)
-          Gvar (mkglobvar ty_halt_clo
-                          ((Init_addrof _halt Ptrofs.zero) :: Init_int 1 :: nil)
-                          true false))).
+    backend <- get_backend ;;
+    ret (match backend with
+         | ANF => nil
+         | CPS =>
+            (_halt,
+              Gfun (Internal (mkfunction Tvoid cc_default
+                                        (firstn (S c_args) args_halt)
+                                        nil nil halt_stm))) ::
+            (_halt_clo,
+              Gvar (mkglobvar ty_halt_clo
+                              ((Init_addrof _halt Ptrofs.zero) :: Init_int 1 :: nil)
+                              true false)) :: nil
+         end).
 
   (* Function calls.
 
@@ -1312,10 +1376,9 @@ Definition make_glue_program
   nenv <- gets gstate_nenv ;;
   let (comp_structs, struct_defs) := List.split structs in
   let composites := (comp_tinfo ++ comp_structs)%list in
-  let (halt_def, halt_clo_def) := halt_defs in
   let glob_defs := (externs ++ name_defs ++ ctor_defs ++
                    get_tag_defs ++ struct_defs ++
-                   printer_defs ++ halt_def :: halt_clo_def :: call_def :: nil)%list in
+                   printer_defs ++ halt_defs ++ call_def :: nil)%list in
   let pi := map fst glob_defs in
   ret (mk_prog_opt composites (make_extern_decls nenv glob_defs true)
                    main_ident true,

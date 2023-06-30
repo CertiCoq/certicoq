@@ -1,4 +1,4 @@
-CCOMPILER = clang # ccomp # gcc takes ages
+CCOMPILER = clang-11 # ccomp # gcc takes ages
 
 -include ../../Makefile.conf
 

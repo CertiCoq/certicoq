@@ -409,7 +409,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     generate_glue true opts (Ast0.Env.declarations (fst (Obj.magic term)))
 
   let compiler_executable debug = 
-    let whichcmd = Unix.open_process_in "which gcc || which clang" in
+    let whichcmd = Unix.open_process_in "which gcc || which clang-11" in
     let result = 
       try Stdlib.input_line whichcmd 
       with End_of_file -> ""

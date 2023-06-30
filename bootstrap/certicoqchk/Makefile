@@ -1,4 +1,4 @@
-CCOMPILER = clang # ccomp # gcc
+CCOMPILER = clang-11 # ccomp # gcc
 
 -include ../../Makefile.conf
 

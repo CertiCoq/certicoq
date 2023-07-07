@@ -73,12 +73,6 @@ Definition ctor_names_env : Type := M.t (ident * type).
    But that index should start from 0, while this one starts from 1. *)
 Definition ctor_L1_index : Type := positive.
 
-(* Matches [ind_L1_tag]s to another map matching [ctor_L1_index]
-   to the [Struct] type and the accessor function name (like "get_S_args")
-   associated with that constructor.
-   In practice, this is like a 2D dictionary. *)
-Definition ctor_arg_accessor_env : Type := M.t (M.t (type * ident)).
-
 (* Matches [ind_L1_tag]s to a [ident] (i.e. [positive]) that holds
    the name of the print function in C. *)
 Definition print_env : Type := M.t ident.
@@ -135,7 +129,8 @@ Section Helpers.
       ; is_ptr_info : def_info
       ; literals_info : literals_bundle def_info
       ; get_unboxed_ordinal_info : def_info
-      ; get_boxed_ordinal_info   : def_info
+      ; get_boxed_ordinal_info : def_info
+      ; get_args_info : def_info
       ; thread_info_info : thread_info_bundle ident
       ; closure_info : closure_bundle ident
       ; stack_frame_info : stack_frame_bundle ident
@@ -154,7 +149,6 @@ Section GState.
       ; gstate_nenv   : name_env
       ; gstate_gtenv  : get_tag_env
       ; gstate_cnenv  : ctor_names_env
-      ; gstate_caaenv : ctor_arg_accessor_env
       ; gstate_penv   : print_env
       ; gstate_log    : list string
       }.
@@ -172,24 +166,24 @@ Section GState.
   (* generate fresh [ident] and record it to the [name_env]
      with the given [string] *)
   Definition gensym (s : string) : glueM ident :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
+    '(Build_gstate_data n ienv nenv gtenv cnenv penv log) <- get ;;
     let nenv := M.set n (nNamed s) nenv in
-    put (Build_gstate_data ((n+1)%positive) ienv nenv gtenv cnenv caaenv penv log) ;;
+    put (Build_gstate_data ((n+1)%positive) ienv nenv gtenv cnenv penv log) ;;
     ret n.
 
   Definition set_print_env (k : ind_L1_tag) (v : ident) : glueM unit :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
+    '(Build_gstate_data n ienv nenv gtenv cnenv penv log) <- get ;;
     let penv := M.set k v penv in
-    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
+    put (Build_gstate_data n ienv nenv gtenv cnenv penv log).
 
   Definition get_print_env (k : ind_L1_tag) : glueM (option ident) :=
     penv <- gets gstate_penv ;;
     ret (M.get k penv).
 
   Definition set_get_tag_env (k : ind_L1_tag) (v : ident) : glueM unit :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
+    '(Build_gstate_data n ienv nenv gtenv cnenv penv log) <- get ;;
     let gtenv := M.set k v gtenv in
-    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
+    put (Build_gstate_data n ienv nenv gtenv cnenv penv log).
 
   Definition get_get_tag_env (k : ind_L1_tag) : glueM (option ident) :=
     gtenv <- gets gstate_gtenv ;;
@@ -200,21 +194,9 @@ Section GState.
     ret (M.get k cnenv).
 
   Definition set_ctor_names_env (k : ind_L1_tag) (v : ident * type) : glueM unit :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
+    '(Build_gstate_data n ienv nenv gtenv cnenv penv log) <- get ;;
     let cnenv := M.set k v cnenv in
-    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
-
-  Definition get_ctor_arg_accessor_env
-             (k1 : ind_L1_tag) (k2: ctor_L1_index)
-             : glueM (option (type * ident)) :=
-    caaenv <- gets gstate_caaenv ;;
-    ret (get_2d k1 k2 caaenv).
-
-  Definition set_ctor_arg_accessor_env
-             (k1 : ind_L1_tag) (k2 : ctor_L1_index) (v : type * ident) : glueM unit :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
-    let caaenv := set_2d k1 k2 v caaenv in
-    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
+    put (Build_gstate_data n ienv nenv gtenv cnenv penv log).
 
   Definition get_ind_L1_env (k : ind_L1_tag) : glueM (option ty_info) :=
     ienv <- gets gstate_ienv ;;
@@ -248,14 +230,14 @@ Section GState.
     ret (M.fold find ienv None).
 
   Definition put_ind_L1_env (ienv : ind_L1_env) : glueM unit :=
-    '(Build_gstate_data n _ nenv gtenv cnenv caaenv penv log) <- get ;;
-    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log).
+    '(Build_gstate_data n _ nenv gtenv cnenv penv log) <- get ;;
+    put (Build_gstate_data n ienv nenv gtenv cnenv penv log).
 
   (* logs are appended to the list and the list is reversed
      at the end to keep them in chronological order *)
   Definition log (s : string) : glueM unit :=
-    '(Build_gstate_data n ienv nenv gtenv cnenv caaenv penv log) <- get ;;
-    put (Build_gstate_data n ienv nenv gtenv cnenv caaenv penv (s :: log)).
+    '(Build_gstate_data n ienv nenv gtenv cnenv penv log) <- get ;;
+    put (Build_gstate_data n ienv nenv gtenv cnenv penv (s :: log)).
 
 End GState.
 
@@ -309,6 +291,20 @@ Section Externs.
                       (Sreturn (Some (Ebinop Oand (Field(Ecast (var _v) (tptr valInt), -1)) (make_cint 255 val) val)))
                   |})).
 
+  Definition get_args : glueM def :=
+    gname <- gensym "get_args" ;;
+    _v <- gensym "v" ;;
+    ret (gname,
+         Gfun (Internal
+                 {| fn_return := tptr val
+                  ; fn_callconv := cc_default
+                  ; fn_params := (_v, val) :: nil
+                  ; fn_vars := nil
+                  ; fn_temps := nil
+                  ; fn_body :=
+                      (Sreturn (Some (Ecast (var _v) (tptr val))))
+                  |})).
+
   Definition make_literals_bundle : glueM (literals_bundle def_info * defs) :=
     '(_lparen, ty_lparen, def_lparen) <- string_literal "lparen_lit" "(" ;;
     '(_rparen, ty_rparen, def_rparen) <- string_literal "rparen_lit" ")" ;;
@@ -341,6 +337,7 @@ Section Externs.
     _is_ptr <- gensym "is_ptr" ;;
     '(_guo, def_guo) <- get_unboxed_ordinal ;;
     '(_gbo, def_gbo) <- get_boxed_ordinal ;;
+    '(_get_args, def_get_args) <- get_args ;;
 
     _thread_info <- gensym "thread_info" ;;
     _alloc <- gensym "alloc";;
@@ -421,6 +418,8 @@ Section Externs.
               (_guo, Tfunction (Tcons val Tnil) tuint cc_default)
          ; get_boxed_ordinal_info :=
               (_gbo, Tfunction (Tcons val Tnil) tuint cc_default)
+         ; get_args_info :=
+              (_get_args, Tfunction (Tcons val Tnil) (tptr val) cc_default)
          ; thread_info_info := tinfo
          ; stack_frame_info := stack_frame
          ; closure_info := closure
@@ -441,6 +440,7 @@ Section Externs.
                         (Tint IBool Unsigned noattr) cc_default)) ::
        (_guo, def_guo) ::
        (_gbo, def_gbo) ::
+       (_get_args, def_get_args) ::
        nil)%list in
     ret (comp, dfs, toolbox).
 
@@ -662,6 +662,7 @@ Section Printers.
 
         (* names and Clight types of printf and string literals *)
         let (_printf, ty_printf) := printf_info toolbox in
+        let (_get_args, ty_get_args) := get_args_info toolbox in
         let (_space, ty_space) := space_info _ (literals_info toolbox) in
         let (_lparen, ty_lparen) := lparen_info _ (literals_info toolbox) in
         let (_rparen, ty_rparen) := rparen_info _ (literals_info toolbox) in
@@ -806,26 +807,19 @@ Section Printers.
             let (args, rt) := dissect_types params (dInd ind :: nil) ty in
             calls <- rec_print_calls (enumerate_nat args) ;;
             rest <- switch_cases ctors' ;;
-            accM <- get_ctor_arg_accessor_env itag ctag ;;
-            match accM with
-            | Some (ty_acc, _acc) =>
-                ret (LScons (Some (Zpos ctag - 1)%Z)
-                      (if Nat.eqb arity 0
-                        then print_ctor_name ;;; Sbreak
-                        else
-                          Scall (Some _args) (Evar _acc ty_acc)
-                                (Etempvar _v val :: nil) ;;;
-                          print_lparen ;;;
-                          print_ctor_name ;;;
-                          print_space ;;;
-                          calls ;;;
-                          print_rparen ;;;
-                          Sbreak)
-                      rest)
-            | None =>
-                log ("Cannot find ctor arg accessor function for ctor #" ++ show_nat (Pos.to_nat ctag)) ;;
-                ret LSnil (* TODO handle this better *)
-            end
+            ret (LScons (Some (Zpos ctag - 1)%Z)
+                  (if Nat.eqb arity 0
+                    then print_ctor_name ;;; Sbreak
+                    else
+                      Scall (Some _args) (Evar _get_args ty_get_args)
+                            (Etempvar _v val :: nil) ;;;
+                      print_lparen ;;;
+                      print_ctor_name ;;;
+                      print_space ;;;
+                      calls ;;;
+                      print_rparen ;;;
+                      Sbreak)
+                  rest)
           end in
 
         entire_switch <- switch_cases (enumerate_pos ctors) ;;
@@ -929,77 +923,6 @@ Section CtorArrays.
     end.
 
 End CtorArrays.
-
-Section ArgsStructs.
-
-  Fixpoint members_from_ctor
-           (qp : qualifying_prefix)
-           (name : Kernames.ident)
-           (i : nat) (* initially 0 *)
-           (j : nat) (* initially the arity *)
-           : glueM members :=
-    match j with
-    | O => ret nil
-    | S j' =>
-        arg_name <- gensym (sanitize_qualified (qp, name ++ "_arg_" ++ show_nat i)%bs) ;;
-        rest <- members_from_ctor qp name (i + 1) j' ;;
-        ret (Member_plain arg_name val :: rest)
-    end.
-
-  Fixpoint args_structs_from_ctors
-          (itag : ind_L1_tag)
-          (qp : qualifying_prefix)
-          (ctors : list (ctor_L1_index * Ast.Env.constructor_body))
-          : glueM (list (composite_definition * def)) :=
-    match ctors with
-    | nil => ret nil
-    | (ctag, ctor) :: ctors' =>
-        let name := ctor.(Ast.Env.cstr_name) in
-        let ty := ctor.(Ast.Env.cstr_type) in
-        let arity := ctor.(Ast.Env.cstr_arity) in
-        let sn := sanitize_qualified (qp, name) in
-        _struct <- gensym (sn ++ "_args") ;;
-        mems <- members_from_ctor qp name 0 arity ;;
-        let comp := Composite _struct Struct mems noattr in
-
-
-        aname <- gensym ("get_" ++ sn ++ "_args") ;;
-        _v <- gensym "v" ;;
-        let tstruct := Tpointer (Tstruct _struct noattr) noattr in
-        let null := Ecast (Econst_int (Int.repr 0) val) tstruct in
-        let e :=
-            if unbox_check ctor
-            then Econst_int (Int.repr 0) val (* null pointer for unboxed *)
-            else Etempvar _v val in
-        let body := Sreturn (Some (Ecast e tstruct)) in
-        let f := (aname,
-                  Gfun (Internal
-                          {| fn_return := tstruct
-                           ; fn_callconv := cc_default
-                           ; fn_params := (_v, val) :: nil
-                           ; fn_vars := nil
-                           ; fn_temps := nil
-                           ; fn_body := body
-                           |})) in
-
-        set_ctor_arg_accessor_env itag ctag (tstruct, aname) ;;
-        rest <- args_structs_from_ctors itag qp ctors' ;;
-        ret ((comp, f) :: rest)
-    end.
-
-  Fixpoint args_structs_from_types
-          (tys : list (ind_L1_tag * ty_info))
-          : glueM (list (composite_definition * def)) :=
-    match tys with
-    | nil => ret nil
-    | (itag, {| ty_body := ty ; ty_name := kn |}) :: tys' =>
-        let qp := find_qualifying_prefix kn in
-        s' <- args_structs_from_ctors itag qp (enumerate_pos (Ast.Env.ind_ctors ty)) ;;
-        rest <- args_structs_from_types tys' ;;
-        ret (app s' rest)
-    end.
-
-End ArgsStructs.
 
 Section CtorEnumTag.
   Variable toolbox : toolbox_info.
@@ -1363,21 +1286,17 @@ End FunctionCalls.
 Definition make_glue_program
            (gs : Ast.Env.global_declarations)
            : glueM (option Clight.program * option Clight.program) :=
-  '(comp_tinfo, externs, toolbox) <- make_externs ;;
+  '(composites, externs, toolbox) <- make_externs ;;
   singles <- (propagate_types >=> filter_prop_types) gs ;;
   name_defs <- make_name_arrays singles ;;
   ctor_defs <- constructors_for_tys toolbox singles ;;
-  structs <- args_structs_from_types singles ;;
   get_tag_defs <- get_enum_tag_from_types toolbox singles ;;
   make_printer_names singles;;
   printer_defs <- generate_printers toolbox singles ;;
   halt_defs <- make_halt toolbox ;;
   call_def <- make_call toolbox ;;
   nenv <- gets gstate_nenv ;;
-  let (comp_structs, struct_defs) := List.split structs in
-  let composites := (comp_tinfo ++ comp_structs)%list in
-  let glob_defs := (externs ++ name_defs ++ ctor_defs ++
-                   get_tag_defs ++ struct_defs ++
+  let glob_defs := (externs ++ name_defs ++ ctor_defs ++ get_tag_defs ++
                    printer_defs ++ halt_defs ++ call_def :: nil)%list in
   let pi := map fst glob_defs in
   ret (mk_prog_opt composites (make_extern_decls nenv glob_defs true)
@@ -1396,7 +1315,6 @@ Definition generate_glue
        ; gstate_nenv   := M.empty _
        ; gstate_gtenv  := M.empty _
        ; gstate_cnenv  := M.empty _
-       ; gstate_caaenv := M.empty _
        ; gstate_penv   := M.empty _
        ; gstate_log    := nil
        |} in

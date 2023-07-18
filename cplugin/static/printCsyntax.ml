@@ -93,11 +93,11 @@ let is_int_or_ptr_attr a n =
 
 let rec name_cdecl id ty =
   match ty with
-  (* BEGIN hack for the int_or_ptr typedef *)
+  (* BEGIN hack for the value typedef *)
   | Ctypes.Tpointer(Ctypes.Tvoid, a) when is_int_or_ptr_attr a 2 ->
-      "int_or_ptr32" ^ name_optid id
+      "value" ^ name_optid id
   | Ctypes.Tpointer(Ctypes.Tvoid, a) when is_int_or_ptr_attr a 3 ->
-      "int_or_ptr64" ^ name_optid id
+      "value" ^ name_optid id
   (* END *)
   | Ctypes.Tvoid ->
       "void" ^ name_optid id

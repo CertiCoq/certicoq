@@ -53,7 +53,21 @@ extern "C" {
          This is for use only by the GC.
 */
 
-typedef intnat value;
+/*
+CHANGE BY THE CERTICOQ/VERIFFI TEAM:
+We do this for CertiCoq's FFI system because for technical reasons related to
+VST's program logic type system, we need the value type to be void* with this
+attribute. On the other hand, standard OCaml wants the value to be intnat.
+*/
+#ifdef VERIFFI
+  typedef void * value
+    #ifdef COMPCERT
+    __attribute((aligned(_Alignof(void *))))
+    #endif
+    ;
+#else
+  typedef intnat value;
+#endif
 typedef uintnat header_t;
 typedef uintnat mlsize_t;
 typedef unsigned int tag_t;             /* Actually, an unsigned char */

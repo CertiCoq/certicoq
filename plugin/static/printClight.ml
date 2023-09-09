@@ -344,28 +344,27 @@ let remove_primes (a, n) =
     let s' = Str.global_replace (Str.regexp "'") "p" (Caml_bytestring.caml_string_of_bytestring s)  in
     let s'' = Str.global_replace (Str.regexp "\\.") "d" s' in
     (a, BasicAst.Coq_nNamed (Caml_bytestring.bytestring_of_caml_string s''))
-      
+
 let print_dest prog dest =
   let oc = open_out (implode dest) in
   print_program Clight2 (formatter_of_out_channel oc) prog;
   close_out oc
-    
+
 let print_dest_names prog names dest =
   let oc = open_out (Caml_bytestring.caml_string_of_bytestring dest) in
   List.iter (fun n -> add_name (remove_primes n))  names;
   print_program Clight2 (formatter_of_out_channel oc) prog;
   close_out oc
-  
+
 let print_dest_names_imports prog names (dest : string) (imports : string list) =
-  let oc = open_out dest in  
+  let oc = open_out dest in
   List.iter (fun n -> add_name (remove_primes n))  names;
   let fm = formatter_of_out_channel oc in
   open_vbox 0;
-  List.iter (fun s -> fprintf fm "#include \"%s\"" s; pp_print_newline fm ();) imports;
-  pp_print_newline fm ();
+  List.iter (fun s -> fprintf fm "#include \"%s\"" s; pp_print_newline fm ();) ("values.h" :: imports);
   close_box ();
   open_box 0;
   print_program Clight2 fm prog;
   close_box ();
   close_out oc
-          
+

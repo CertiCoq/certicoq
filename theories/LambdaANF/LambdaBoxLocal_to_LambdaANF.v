@@ -793,7 +793,7 @@ Section Translate.
         | Prim_e p =>
           match M.get p prim_map with
           | Some (nm, s, ar) => convert_prim_anf ar p []
-          | None =>failwith "Internal error: identifier for primitive not found"
+          | None => failwith "Internal error: identifier for primitive not found"
           end
         end
       with convert_anf_exps (es : expression.exps) (vm : var_map) : anfM (list var * exp_ctx) :=
@@ -879,7 +879,7 @@ Section Translate.
         forall S p C x,
           x \in S ->
           anf_term_to_exp_rel S (Prim_val p , C) (S \\ [set x]) (C |[ Eprim_val x p (Ehalt x) ]|)
-    | Anf_prim__to_exp:
+    | Anf_prim_to_exp:
         forall S pr xs C x,
           x \in S ->
           anf_term_to_exp_rel S (Prim pr xs, C) (S \\ [set x]) (C |[ Eprim x pr xs (Ehalt x) ]|).
@@ -910,6 +910,17 @@ Section Translate.
           x \in S ->
           anf_term_to_ctx_rel S (Prim pr xs, C) (S \\ [set x]) x (comp_ctx_f C (Eprim_c x pr xs Hole_c)).
 
+
+
+
+  Inductive make_proj_ctx : ctor_tag -> list var -> var -> N -> exp_ctx -> Prop :=
+  | make_proj_nil :
+    forall ct scrut i,
+      make_proj_ctx ct [] scrut i Hole_c
+  | make_proj_cons :
+    forall ct x vars scrut C i,
+      make_proj_ctx ct vars scrut (i + 1) C ->
+      make_proj_ctx ct (x::vars) scrut i (Eproj_c x ct i scrut C).
 
 
   Inductive convert_anf_rel : Ensemble var ->   (* Input fresh identifiers *)
@@ -947,6 +958,33 @@ Section Translate.
         x1 \in S1 ->
         convert_anf_rel_exps (S1 \\ [set x1]) es env cenv S2 C ys ->
         convert_anf_rel S1 (Con_e dci es) env cenv S2 (comp_ctx_f C (Econstr_c x1 c_tag ys Hole_c)) x1
+  | anfFix :
+    forall S1 S2 env cenv fnlst i fdefs fnames f,
+      FromList fnames \subset S1 ->
+      NoDup fnames ->
+      List.length fnames = efnlength fnlst ->
+      convert_anf_rel_efnlst (S1 \\ (FromList fnames)) fnlst (List.rev fnames ++ env) cenv fnames S2 fdefs ->
+      nthN fnames i = Some f ->
+      convert_anf_rel S1 (Fix_e fnlst i) env cenv S2 (Efun1_c fdefs Hole_c) f
+  | anfMatch :
+    forall S1 S2 S3 f y z e1 n br env cenv C1 x1 br',
+      f \in S1 ->
+      y \in S1 \\ [set f] ->
+      z \in S1 \\ [set f] \\ [set y] ->
+      convert_anf_rel (S1  \\ [set f] \\ [set y] \\ [set z]) e1 env cenv S2 C1 x1 ->
+      convert_anf_rel_branches S2 br y env cenv S3 br' ->
+      convert_anf_rel S1 (Match_e e1 n br) env cenv S3
+                      (Efun1_c (Fcons f func_tag [y] (Ecase y br') Fnil) (comp_ctx_f C1 (Eletapp_c z f func_tag [x1] Hole_c))) z
+  | anfPrimVal :
+    forall S p env cenv x,
+      x \in S ->
+      convert_anf_rel S (Prim_val_e p) env cenv (S \\ [set x]) (Eprim_val_c x p Hole_c) x
+  | anfPrf :
+    forall S env cenv x,
+      x \in S ->
+      convert_anf_rel S (Prf_e) env cenv (S \\ [set x]) (Econstr_c x default_tag [] Hole_c) x
+
+
   with convert_anf_rel_exps : Ensemble var ->
                               expression.exps ->
                               list var ->
@@ -962,100 +1000,46 @@ Section Translate.
       forall S1 S2 S3 env cenv e es C1 C2 x xs,
         convert_anf_rel S1 e env cenv S2 C1 x ->
         convert_anf_rel_exps S2 es env cenv S3 C2 xs ->
-        convert_anf_rel_exps S1 (econs e es) env cenv S3 (comp_ctx_f C1 C2) (x::xs).
-
-
-  | e_Match :
-      forall S1 S2 S3 e1 e1' bs bs' vn k x1 k1 n tgm,
-        x1 \in S1 ->
-        k1 \in (S1 \\ [set x1]) ->
-        convert_anf_rel (S1 \\ [set x1] \\ [set k1]) e1 vn k1 tgm S2 e1' ->
-        convert_anf_rel_branches S2 bs vn k x1 tgm S3 bs' ->
-        convert_anf_rel S1
-                    (Match_e e1 n bs)
-                    vn
-                    k
-                    tgm
-                    S3
-                    (Efun (Fcons k1 kon_tag [x1] (Ecase x1 bs') Fnil) e1')
-  | e_Fix :
-      forall S1 S2 i f fnlst fnames vn k fdefs tgm,
-        FromList fnames \subset S1 ->
-        NoDup fnames ->
-        List.length fnames = efnlength fnlst ->
-        convert_anf_rel_efnlst (S1 \\ (FromList fnames)) fnlst (List.rev fnames ++ vn) fnames tgm S2 fdefs ->
-        nth_error fnames (N.to_nat i) = Some f ->
-        convert_anf_rel S1
-                    (Fix_e fnlst i)
-                    vn
-                    k
-                    tgm
-                    S2
-                    (cps.Efun fdefs (cps.Eapp k kon_tag (f::nil)))
-  | e_Prf :
-      forall S vn k tgm x,
-        x \in S ->
-        convert_anf_rel S Prf_e vn k tgm (S \\ [set x]) (Econstr x default_tag nil (Eapp k kon_tag (x::nil)))
-
-  | e_Prim_val :
-    forall S vn k p tgm x,
-          x \in S ->
-          convert_anf_rel S (Prim_val_e p) vn k tgm (S \\ [set x]) (Eprim_val x p (Eapp k kon_tag (x::nil)))
-
-
-  with convert_anf_rel_efnlst :
-         Ensemble var ->
-         expression.efnlst ->
-         list var ->
-         list var ->
-         constr_env ->
-         Ensemble var ->
-         fundefs ->
-         Prop :=
-  | e_Eflnil :
-      forall S vn tgm,
-        convert_anf_rel_efnlst S eflnil vn [] tgm S Fnil
-  | e_Eflcons :
-      forall S1 S2 S3 vn fnames e1 e1' fnlst fdefs n n1 na x1 k1 tgm,
-        x1 \in S1 ->
-        k1 \in (S1 \\ [set x1]) ->
-        convert_anf_rel (S1 \\ [set x1] \\ [set k1]) e1 (x1::vn) k1 tgm S2 e1' ->
-        convert_anf_rel_efnlst S2 fnlst vn fnames tgm S3 fdefs ->
-        convert_anf_rel_efnlst
-          S1 (eflcons n1 (Lam_e na e1) fnlst)
-          vn (n :: fnames) tgm S3
-          (Fcons n func_tag (k1::x1::nil) e1' fdefs)
-  with convert_anf_rel_branches :
-         Ensemble var ->
-         expression.branches_e ->
-         list var ->
-         var (* continuation variable *) ->
-         var (* binding for scrutinee *) ->
-         constr_env ->
-         Ensemble var ->
-         list (ctor_tag * exp) ->
-         Prop :=
-  | e_Brnil :
-      forall S vn k r tgm,
-        convert_anf_rel_branches S brnil_e vn k r tgm S []
-  | e_Brcons:
-      forall S1 S2 S3 vn k r e ce bs' cbs' vars lnames n ctx_p tg dc tgm,
-        tg = dcon_to_tag dc tgm ->
+        convert_anf_rel_exps S1 (econs e es) env cenv S3 (comp_ctx_f C1 C2) (x::xs)
+  with convert_anf_rel_efnlst : Ensemble var ->
+                                expression.efnlst ->
+                                list var ->
+                                constr_env ->
+                                list var ->
+                                Ensemble var ->
+                                fundefs ->
+                                Prop :=
+  | anfEflnil :
+    forall S env cenv,
+      convert_anf_rel_efnlst S eflnil env cenv [] S Fnil
+  | anfEflcons :
+      forall S1 S2 S3 n1 na e1 fnlst env cenv fnames f arg fdefs C1 x1,
+        arg \in S1 ->
+        convert_anf_rel (S1 \\ [set arg]) e1 (arg::env) cenv S2 C1 x1 ->
+        convert_anf_rel_efnlst S2 fnlst env cenv fnames S3 fdefs ->
+        convert_anf_rel_efnlst S1 (eflcons n1 (Lam_e na e1) fnlst) env cenv (f :: fnames) S3 (Fcons f func_tag [arg] (C1 |[ Ehalt x1 ]|) fdefs)
+  with convert_anf_rel_branches : Ensemble var ->
+                                  expression.branches_e ->
+                                  var ->
+                                  list var ->
+                                  constr_env ->
+                                  Ensemble var ->
+                                  list (ctor_tag * exp) ->
+                                  Prop :=
+  | anfBrnil :
+      forall S scrut env cenv,
+        convert_anf_rel_branches S brnil_e scrut env cenv S []
+  | anfBrcons:
+      forall S1 S2 S3 vars dc n lnames e br scrut env cenv tg Cproj C x br',
+        tg = dcon_to_tag dc cenv ->
         FromList vars \subset S2 ->
-
         NoDup vars ->
         Datatypes.length vars = N.to_nat n ->
 
-
-        ctx_bind_proj tg r vars (N.to_nat n) = ctx_p ->
-
-        convert_anf_rel_branches S1 bs' vn k r tgm S2 cbs' ->
-
-        convert_anf_rel (S2 \\ (FromList vars)) e (vars ++ vn) k tgm S3 ce ->
-
-        convert_anf_rel_branches
-          S1 (brcons_e dc (n, lnames) e bs') vn k r tgm S3 ((tg, app_ctx_f ctx_p ce)::cbs').
-
+        convert_anf_rel_branches (S1 \\ FromList vars) br scrut env cenv S2 br' ->
+        make_proj_ctx tg vars scrut 0 Cproj ->
+        convert_anf_rel (S2 \\ (FromList vars)) e (vars ++ env) cenv S3 C x ->
+        convert_anf_rel_branches S1 (brcons_e dc (n, lnames) e br) scrut env cenv S3 ((tg, Cproj |[ (C |[ Ehalt x ]|) ]|)::br').
 
   End ANF.
 

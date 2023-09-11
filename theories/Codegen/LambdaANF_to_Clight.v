@@ -23,6 +23,7 @@ From compcert Require Import
 Require Import LambdaANF.cps
                LambdaANF.identifiers
                LambdaANF.cps_show.
+Require LambdaANF.toplevel.
 
 From MetaCoq.Utils Require Import bytestring MCString.
 
@@ -43,6 +44,8 @@ Variable (isptrIdent : ident). (* ident for the is_ptr external function *)
 Variable (caseIdent : ident). (* ident for the case variable , TODO: generate that automatically and only when needed *)
 
 Variable (nParam : nat).
+
+Variable (prims : LambdaANF.toplevel.prim_env).
 
 Definition maxArgs : Z := 1024%Z.
 
@@ -306,6 +309,9 @@ Definition mkFunTy (n : nat) : type :=
 Definition mkPrimTy (n : nat) :=
   Tfunction (mkFunTyList n) val cc_default.
 
+Definition mkPrimTyTinfo (n : nat) :=
+  (Tfunction (Tcons threadInf (mkFunTyList n)) val cc_default).
+
 Definition make_tinfoTy : type :=
   (Tfunction Tnil threadInf cc_default).
 
@@ -515,8 +521,12 @@ Definition mkCall
   end.
 
 Definition mkPrimCall (res : positive) (pr : positive) (ar : nat)  (fenv : fun_env) (map: fun_info_env) (vs : list positive) : option statement :=
-  args <- mkCallVars fenv map ar vs ;;  
+  args <- mkCallVars fenv map ar vs ;;
   ret (Scall (Some res) ([mkPrimTy ar] (Evar pr (mkPrimTy ar))) args).
+
+Definition mkPrimCallTinfo (res : positive) (pr : positive) (ar : nat)  (fenv : fun_env) (map: fun_info_env) (vs : list positive) : option statement :=
+  args <- mkCallVars fenv map ar vs ;;
+  ret (Scall (Some res) ([mkPrimTyTinfo ar] (Evar pr (mkPrimTy ar))) (tinf :: args)).
 
 Fixpoint asgnFunVars'
          (vs : list positive) (ind : list N) : option statement :=
@@ -686,7 +696,7 @@ Definition to_int64 (i : PrimInt63.int) : int64.
 Defined.
 
 Definition float64_to_model (f : PrimFloat.float) : float64_model :=
-  exist _ (FloatOps.Prim2SF f) (FloatAxioms.Prim2SF_valid f).
+  exist (FloatOps.Prim2SF f) (FloatAxioms.Prim2SF_valid f).
 
 Definition model_to_ff (f : float64_model) : Binary.full_float :=
   Binary.SF2FF (proj1_sig f).
@@ -789,9 +799,22 @@ Fixpoint translate_body
     prog <- translate_body e' fenv cenv ienv map ;;
     ret (compile_primitive cenv ienv fenv map x p ;;; prog)
   | Eprim x p vs e' =>
-    prog <- translate_body e' fenv cenv ienv map ;;
-    pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
-    ret (pr_call ;;; prog)
+    match prims ! p with
+    | Some (_, _, false, _) => (* compile without tinfo *)
+      prog <- translate_body e' fenv cenv ienv map ;;
+      pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
+      ret (pr_call ;;; prog)
+    | Some (_, _, true, _) => (* compile with tinfo *)
+      prog <- translate_body e' fenv cenv ienv map ;;
+      pr_call <- mkPrimCallTinfo x p (length vs) fenv map vs ;;
+      ret (Efield tinfd allocIdent valPtr :::= allocPtr ;;;
+           Efield tinfd limitIdent valPtr :::= limitPtr ;;;
+           pr_call ;;;
+           allocIdent ::= Efield tinfd allocIdent valPtr ;;;
+           limitIdent ::= Efield tinfd limitIdent valPtr ;;;
+           prog)
+    | None => None (* Unknown primitive identifier *)
+    end
   | Ehalt x =>
     (* set args[1] to x and return *)
     ret (Efield tinfd allocIdent valPtr :::= allocPtr ;;;
@@ -877,10 +900,17 @@ Fixpoint translate_body_fast
     prog <- translate_body e' fenv cenv ienv map ;;
     ret (compile_primitive cenv ienv fenv map x p ;;; prog)
   | Eprim x p vs e' =>
-    prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
-    pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
-    ret (pr_call ;;; prog)
-        
+    match prims ! p with
+    | Some (_, _, false, _) => (* compile without tinfo *)
+      prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
+      pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
+      ret (pr_call ;;; prog)
+    | Some (_, _, true, _) => (* compile with tinfo *)
+      prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
+      pr_call <- mkPrimCallTinfo x p (length vs) fenv map vs ;;
+      ret (pr_call ;;; prog)
+    | None => None (* Unknown primitive identifier *)
+    end
   | Ehalt x =>
     (* set args[1] to x and return *)
     ret (Efield tinfd allocIdent valPtr :::= allocPtr ;;;

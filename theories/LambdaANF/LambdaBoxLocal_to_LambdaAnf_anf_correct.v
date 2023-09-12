@@ -96,13 +96,14 @@ Section ANF_proof.
 
 
   Definition convert_anf_correct_exp (vs : fuel_sem.env) (e : expression.exp) (r : fuel_sem.result) (f t : nat) :=
-    forall rho env C r x S S' i,
+    forall rho env C x S S' i e',
       well_formed_env vs ->
       exp_wf (N.of_nat (Datatypes.length env)) e ->
 
       Disjoint _ (FromList env) S ->
-      ~ x \in FromList env ->
 
+      occurs_free e' \subset x |: FromList env ->
+         
       anf_env_rel env vs rho ->
 
       convert_anf_rel S e env cenv S' C x ->
@@ -110,22 +111,25 @@ Section ANF_proof.
       (* Source terminates *)
       (forall v v', r = (Val v) -> anf_val_rel v v' ->
                     preord_exp ctenv (cps_bound f t) eq_fuel i
-                               (Ehalt x, (M.set x v' (M.empty cps.val)))
-                               (C|[ Ehalt x ]|, rho)) /\
+                               (e', (M.set x v' rho))
+                               (C|[ e' ]|, rho)) /\
       (* Source diverges *)
       (r = fuel_sem.OOT ->
        exists c, (f <= c)%nat /\ bstep_fuel ctenv rho (C|[ Ehalt x ]|) c eval.OOT tt).
 
 
   Definition convert_anf_correct_exp_step (vs : fuel_sem.env) (e : expression.exp) (r : fuel_sem.result) (f t : nat)  :=
-    forall rho env C x S S' i,
+    forall rho env C x S S' i e',
       well_formed_env vs ->
       exp_wf (N.of_nat (Datatypes.length env)) e ->
 
       Disjoint _ (FromList env) S ->
-      ~ x \in FromList env ->
+
+      occurs_free e' \subset x |: FromList env ->
 
       anf_env_rel env vs rho ->
+
+      
 
       convert_anf_rel S e env cenv S' C x ->
 
@@ -135,8 +139,8 @@ Section ANF_proof.
                                (cps_bound (f <+> @one_i _ _ fuel_resource_LambdaBoxLocal e)
                                           (t <+> @one_i _ _ trace_resource_LambdaBoxLocal e))
                                eq_fuel i
-                               (Ehalt x, (M.set x v' (M.empty cps.val)))
-                               (C|[ Ehalt x ]|, rho)) /\
+                               (e', (M.set x v' rho))
+                               (C|[ e' ]|, rho)) /\
       (* Source diverges *)
       (r = fuel_sem.OOT ->
        exists c, ((f <+> @one_i _ _ fuel_resource_LambdaBoxLocal e) <= c)%nat /\ bstep_fuel ctenv rho (C|[ Ehalt x ]|) c eval.OOT tt).
@@ -144,23 +148,25 @@ Section ANF_proof.
 
 
   Definition convert_anf_correct_exps (vs : fuel_sem.env) (es : expression.exps) (vs1 : list value) (f t : nat)  :=
-    forall rho env C rs S S' vs2 x ctag,
+    forall rho env C ys S S' vs2 e',
       well_formed_env vs ->
       exps_wf (N.of_nat (Datatypes.length env)) es ->
 
       Disjoint _ (FromList env) S ->
 
+      occurs_free e' \subset FromList ys :|: FromList env ->
+
       anf_env_rel env vs rho ->
 
-      convert_anf_rel_exps S es env cenv S' C rs ->
+      convert_anf_rel_exps S es env cenv S' C ys ->
 
       Forall2 (anf_val_rel) vs1 vs2 ->
 
-      exists rho' ys,
-        set_lists ys vs2 (M.empty _) = Some rho' /\ NoDup ys /\
+      exists rho',
+        set_lists ys vs2 rho = Some rho' /\
         forall i,
           preord_exp ctenv (cps_bound f (t <+> (2 * Datatypes.length (exps_as_list es))%nat))
-                     eq_fuel i (Econstr x ctag ys (Ehalt x), rho') (C |[ Econstr x ctag rs (Ehalt x) ]|, rho).
+                     eq_fuel i (e', rho') (C |[ e' ]|, rho).
 
 
 
@@ -170,6 +176,167 @@ Section ANF_proof.
       eapply eval_env_fuel_ind' with (P1 := convert_anf_correct_exp)
                                      (P0 := convert_anf_correct_exps)
                                      (P := convert_anf_correct_exp_step).
+
+      6:{ (* Let_e *)
+        intros e1 e2 v1 r env na f1 f2 t1 t2.
+        intros Heval1 IH1 Heval2 IH2.
+        intros rho names C x S1 S2 i e' Hwf Hwfexp Hdis Hfv Hanf Hcvt.
+        split.
+        - intros v v' Heq Hvrel. subst. inv Hcvt. inv Hwfexp.
+          
+          rewrite <- app_ctx_f_fuse. 
+
+          destruct (Decidable_FromList names). destruct (Dec x1); [ | admit (* easy case *) ].
+          assert (Hin := f).
+
+          eapply In_nth_error in f. destruct f as [n Hnth].
+
+          assert (Heq : exists v, nth_error env n = Some v /\ v1 = v) by admit.
+          destruct Heq as [v1' [Hnth' Heq]]; subst.
+
+          
+          assert (Hrel := All_Forall.Forall2_nth_error _ _ _ Hanf Hnth' Hnth).
+          destruct Hrel as [v1'' [Hget'' Hrel'']].
+          
+          eapply preord_exp_post_monotonic. admit.
+          eapply preord_exp_trans. now tci.
+          admit.
+          2:{ intros. eapply IH1; [ | | | | |  | reflexivity | ]; try eassumption. 
+              admit. (* fv *) }
+          eapply preord_exp_trans.  now tci. admit.
+          2:{ intros. unfold convert_anf_correct_exp in IH2.
+              eapply IH2 with (env := x1 :: names); [ | | | | |  | reflexivity | ].
+              constructor; eauto. admit. admit. 
+              admit. admit. 
+              
+              constructor.
+              + eexists. split. rewrite M.gss. reflexivity. eassumption.
+              + admit. (* lemma reset same name *)
+              + eassumption.
+              + eassumption. }
+
+          admit. (* OK *)
+          
+              
+              
+              reflexivity. }
+          eapply preord_exp_trans. 
+          2:{
+            
+          {  now tci.
+              now eapply eq_fuel_idemp. 
+              2:{ intros m.
+                  rewrite <- app_ctx_f_fuse. eapply Hrel. }
+              
+                eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              
+                
+                2:{ intros m. eapply preord_exp_Econstr_red.
+                    eapply get_list_set_lists. eassumption. eassumption. }
+                
+                eapply preord_exp_halt_compat.
+                now eapply eq_fuel_compat. 
+                now eapply eq_fuel_compat. 
+                
+                eapply preord_var_env_extend_eq.
+                eapply preord_val_refl. now tci. }
+        
+        
+          now constructor.
+          
+
+          
+          
+          
+          destructAll. 
+          
+          assert (Hex : exists v1', anf_val_rel v1 v1') by admit. destructAll. 
+
+          
+          eapply preord_exp_post_monotonic. admit.
+          eapply preord_exp_trans. now tci.
+          admit.
+          2:{ intros. eapply IH1; [ | | | | | eassumption | | ]; try eassumption. 
+              admit. (* fv *) reflexivity. }
+          eapply preord_exp_trans.  now tci. admit.
+          2:{ intros. unfold convert_anf_correct_exp in IH2.
+              eapply IH2; [ | | | | | eassumption | | ]; try eassumption. 
+              constructor; eauto. admit. admit. (* wf *) admit. admit. (* fv *) 
+              constructor.
+              + eexists. split. rewrite M.gss. reflexivity. eassumption.
+              + admit. (* lemma ! x1 \in names ?? *) 
+              ; [ | assumption ].
+              
+              
+              reflexivity. }
+          eapply preord_exp_trans. 
+          2:{
+            
+          {  now tci.
+              now eapply eq_fuel_idemp. 
+              2:{ intros m.
+                  rewrite <- app_ctx_f_fuse. eapply Hrel. }
+              
+                eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+              
+                
+                2:{ intros m. eapply preord_exp_Econstr_red.
+                    eapply get_list_set_lists. eassumption. eassumption. }
+                
+                eapply preord_exp_halt_compat.
+                now eapply eq_fuel_compat. 
+                now eapply eq_fuel_compat. 
+                
+                eapply preord_var_env_extend_eq.
+                eapply preord_val_refl. now tci. }
+        
+        
+          now constructor.
+          
+          
+      11:{ (* enil *)
+        intros env. unfold convert_anf_correct_exps.
+        intros rho names C rs S S' vs x ctag Hwfenv Hwf Hdis Henv Hanf Hall.
+        inv Hall. inv Hanf.
+        exists (M.empty val). exists [].  split; eauto.
+        split. now constructor.
+        intros i. eapply preord_exp_refl.
+        admit. (* bounds *)
+        now eauto. }
+
+      11:{ (* econs *)
+        intros env. intros e es v vs f fs t ts Heval IHe Hevalm IHes.
+        intros rho names C rs S S' vs' x ctag Hwfenv Hwf Hdis Henv Hanf Hall.
+        inv Hall. inv Hanf. inv Hwf.
+        edestruct IHe; [ | | | | | eassumption | ]; try eassumption.
+        admit. (* XXX not in *)
+        
+        clear H0. 
+        specialize (H v y (ltac:(reflexivity)) H1).
+ 
+        edestruct IHes; [ | | | | eassumption | | ]; try eassumption.
+        admit. (* Disjoint names easy with lemma *)
+
+        destructAll. Opaque preord_exp'.
+        eexists. exists (((max_list x2 1) + 1)%positive::x2). split.
+        simpl. rewrite H0. reflexivity.
+        
+        split. constructor; [ | assumption ].
+        
+        admit. (* easy max + 1 not in list *) 
+        
+        
+        clear H0. 
+        specialize (H v y (ltac:(reflexivity)) H1).
+
+        
+        edestrict 
+        
+        now tci. }
+        intros 
+
+        names C x S S' i Hwfenv Hwf Hdis Hnin1 Henv Hanf.
+
       - (* Con_e terminates *)
         intros es vs1 env dc f1 t1 Heval IH.
         intros rho names C x S S' i Hwfenv Hwf Hdis Hnin1 Henv Hanf.

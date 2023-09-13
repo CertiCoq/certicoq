@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-      - coq-8.16
+      - coq-8.17
   pull_request:
     branches:
       - "**"
@@ -19,7 +19,7 @@ jobs:
         opam_file:
           - 'coq-certicoq.opam'
         image:
-          - 'yforster/coq:8.16.1--clang-11--compcert-3.11--extlib-0.11.8--equations-1.3--elpi.1.16'
+          - 'mattam82/coq:8.17--ocaml-4.13.1--clang-11--compcert-3.12--extlib-0.11.8--equations-1.3'
       fail-fast: false  # don't stop jobs if one fails
     steps:
       - uses: actions/checkout@v2
@@ -35,6 +35,9 @@ jobs:
             endGroup
             startGroup "Copy repo (for later benchmarking)"
               cp -r `pwd` ~/repo
+            endGroup
+            startGroup "opam pin"
+              opam pin -y submodules/metacoq
             endGroup
           after_script: |
             startGroup "List installed packages"

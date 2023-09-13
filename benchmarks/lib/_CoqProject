@@ -1,4 +1,6 @@
 -R ./ CertiCoq.Benchmarks.lib
+-arg -w -arg -deprecated
+
 Binom.v
 Color.v
 vs.v

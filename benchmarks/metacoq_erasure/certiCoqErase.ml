@@ -134,6 +134,6 @@ let fix_quoted_program (p : Ast0.Env.program) =
 
 let erase ~bypass env evm c =
   debug (fun () -> str"Quoting");
-  let prog = time (str"Quoting") (quote_term_rec ~bypass ~with_universes:false env) (EConstr.to_constr evm c) in
+  let prog = time (str"Quoting") (quote_term_rec ~bypass ~with_universes:false env) evm (EConstr.to_constr evm c) in
   let prog = fix_quoted_program prog in
   time (str"Erasure") certicoq_erase prog

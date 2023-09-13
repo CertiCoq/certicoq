@@ -1049,7 +1049,7 @@ Section Lambda_lifting_correct.
     - inv H. 
       + edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
         normalize_occurs_free. now sets.
-        assert (Hlen := Forall2_length _ _ _ Hprevs). 
+        assert (Hlen := Forall2_length Hprevs). 
   
         edestruct Hfuns with (j := k - 1) as (rhoc & rhoc' & B2 & f2 & xs2 & e2 & vs2' & Hget2 & Hf2 & Hgl2  & Hset2 & Hyp2);
           [ eassumption | eassumption | eassumption | eassumption | now eauto | ]. 
@@ -1076,7 +1076,7 @@ Section Lambda_lifting_correct.
           rewrite !to_nat_add. unfold one. rewrite to_nat_one. lia. 
       + edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
         normalize_occurs_free. now sets.
-        assert (Hlen := Forall2_length _ _ _ Hprevs). 
+        assert (Hlen := Forall2_length Hprevs). 
   
         edestruct Hfuns with (j := k - 1) as (rhoc & rhoc' & B2 & f2 & xs2 & e2 & vs2' & Hget2 & Hf2 & Hgl2 & Hset2 & Hyp2);
           [ eassumption | eassumption | eassumption | eassumption | now eauto | ]. 
@@ -1116,7 +1116,7 @@ Section Lambda_lifting_correct.
       + simpl; eauto.
     - inv H. edestruct preord_env_P_inj_get_list_l as [vs' [Hgetl' Hprevs]]; try eassumption.
       normalize_occurs_free. now sets.
-      assert (Hlen := Forall2_length _ _ _ Hprevs). 
+      assert (Hlen := Forall2_length Hprevs). 
     
       edestruct Hfuns with (j := k - 1) as (rhoc & rhoc' & B2 & f2 & xs2 & e2 & vs2' & Hget2 & Hf2 & Hgl2 & Hset2 & Hyp2);
         [ eassumption | eassumption | eassumption | eassumption | now eauto | ]. 

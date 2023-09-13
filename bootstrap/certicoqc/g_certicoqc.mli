@@ -1,1 +1,1 @@
-val __coq_plugin_name : string
+(* val __coq_plugin_name : string *)

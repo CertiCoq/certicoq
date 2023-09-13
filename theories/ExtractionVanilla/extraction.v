@@ -82,7 +82,7 @@ Extraction Inline Equations.Prop.DepElim.solution_left.
 Extraction Blacklist config List String Nat Int Ast Universes UnivSubst Typing Retyping 
            OrderedType Logic Common Equality Char char uGraph
            Instances Classes Term Monad Coqlib Errors Compile Checker Eq Classes0 Numeral
-           Uint63 Number.
+           Uint63 Number Values.
 
 (* Cutting the dependency to R.
 Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".

@@ -297,7 +297,7 @@ let quote opts gr =
   let sigma, c = Evd.fresh_global env sigma gr in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass:false env (EConstr.to_constr sigma c) in
+  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass:false env sigma (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
   Obj.magic term
@@ -499,6 +499,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let term = quote opts gr in
     let debug = opts.debug in
     let options = make_pipeline_options opts in
+    let term = FixRepr.fix_quoted_program term in
     let p = Pipeline.show_IR options (Obj.magic term) in
     match p with
     | (CompM.Ret prg, dbg) ->
@@ -532,7 +533,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
         (Printer.pr_global gr ++ str " is not an inductive type") in
     debug_msg debug "Quoting";
     let time = Unix.gettimeofday() in
-    let term = quote_term_rec ~bypass:true env (EConstr.to_constr sigma c) in
+    let term = quote_term_rec ~bypass:true env sigma (EConstr.to_constr sigma c) in
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
     (term, name)

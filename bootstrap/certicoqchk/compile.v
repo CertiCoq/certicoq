@@ -21,18 +21,17 @@ From MetaCoq.ErasurePlugin Require Import Erasure.
 
 #[local,program] Instance assume_normalization {nor} : @PCUICSN.Normalization config.default_checker_flags nor.
 Next Obligation. todo "we should write a Template Monad program to prove normalization for the particular program being inferred, rather than axiomatizing it". Qed.
-
 #[local] Existing Instance PCUICSN.normalization.
 
-Program Definition infer_and_pretty_print_template_program (cf := config.default_checker_flags)
-  {nor : PCUICSN.normalizing_flags} {guard : abstract_guard_impl}
+Program Definition infer_and_pretty_print_template_program (cf := config.default_checker_flags) {guard : abstract_guard_impl}
+  {nor : normalizing_flags}
   (p : Ast.Env.program) φ
   : string + string :=
-  match infer_template_program (normalization_in := _) (cf:=cf) p φ return string + string with
+  let e' := PCUICProgram.trans_env_env (TemplateToPCUIC.trans_global_env p.1) in
+  match infer_template_program (cf:=cf) p φ return string + string with
   | CorrectDecl t =>
-    let e' := PCUICProgram.trans_env_env (TemplateToPCUIC.trans_global_env p.1) in
-    inl ("Environment is well-formed and " ^ Pretty.print_term (empty_ext p.1) [] true p.2 ^
-         " has type: " ^ print_term (PCUICAst.PCUICEnvironment.empty_ext e') []  t.π1)
+    inl ("Environment is well-formed and " ^ Pretty.print_term (empty_ext p.1) [] false p.2 ^
+         " has type: " ^ print_term (PCUICAst.PCUICEnvironment.empty_ext e') [] t.π1)
   | EnvError Σ (AlreadyDeclared id) =>
     inr ("Already declared: " ^ id)
   | EnvError Σ (IllFormedDecl id e) =>

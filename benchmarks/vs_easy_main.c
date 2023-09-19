@@ -12,8 +12,6 @@ extern void print_CertiCoq_Benchmarks_lib_vs_space_atom(unsigned long long);
 
 extern unsigned int get_Coq_Init_Datatypes_list_tag(unsigned long long);
 
-extern value args[];
-
 _Bool is_ptr(value s) {
   return (_Bool) Is_block(s);
 }
@@ -61,11 +59,10 @@ int main(int argc, char *argv[]) {
   // Run Coq program
   for (int i = 0; i < n; i ++) {
     tinfo = make_tinfo();
-    body(tinfo);
+    val = body(tinfo);
   }
   end = clock();
 
-  val = tinfo -> args[1];
   // TODO : fold over nat to print the C int
   print_Coq_Init_Datatypes_bool(val);
   printf("\n");

@@ -6,8 +6,6 @@
 
 extern void body(struct thread_info *);
 
-extern value args[];
-
 _Bool is_ptr(value s) {
   return (_Bool) Is_block(s);
 }
@@ -31,7 +29,6 @@ int main(int argc, char *argv[]) {
   end = clock();
 
   /* TODO write string printers */
-  /* val = tinfo -> args[1]; */
   /* print_Coq_Init_Datatypes_list(val, print_Coq_Init_Datatypes_bool); */
   /* printf("\n"); */
 

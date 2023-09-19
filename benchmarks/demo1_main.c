@@ -10,8 +10,6 @@ extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned 
 
 extern void print_Coq_Init_Datatypes_bool(unsigned long long);
 
-extern value args[];
-
 _Bool is_ptr(value s) {
   return (_Bool) Is_block(s);
 }
@@ -30,11 +28,10 @@ int main(int argc, char *argv[]) {
   // Run Coq program
   for (int i = 0; i < n; i ++) {
     tinfo = make_tinfo();
-    body(tinfo);
+    val = body(tinfo);
   }
   end = clock();
 
-  val = tinfo -> args[1];
   print_Coq_Init_Datatypes_list(val, print_Coq_Init_Datatypes_bool);
   printf("\n");
 

@@ -8,8 +8,6 @@
 
 extern value body(struct thread_info *);
 
-extern value args[];
-
 extern value *call(struct thread_info *, value, value);
 
 _Bool is_ptr(value s) {

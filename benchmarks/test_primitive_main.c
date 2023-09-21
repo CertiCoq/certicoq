@@ -4,7 +4,7 @@
 #include <time.h>
 
 
-extern void body(struct thread_info *);
+extern value body(struct thread_info *);
 
 _Bool is_ptr(value s) {
   return (_Bool) Is_block(s);

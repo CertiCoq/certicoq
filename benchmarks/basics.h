@@ -1,63 +1,45 @@
-
+#include "values.h"
+struct closure;
+struct stack_frame;
 struct thread_info;
-struct Coq_Init_Datatypes_O_args;
-struct Coq_Init_Datatypes_S_args;
-struct Coq_Init_Datatypes_nil_args;
-struct Coq_Init_Datatypes_cons_args;
-struct Coq_Init_Datatypes_true_args;
-struct Coq_Init_Datatypes_false_args;
+struct closure {
+  value (*func)(struct thread_info, value, value);
+  value env;
+};
+
+struct stack_frame {
+  value *next;
+  value *root;
+  struct stack_frame *prev;
+};
+
 struct thread_info {
-  unsigned long long *alloc;
-  unsigned long long *limit;
+  value *alloc;
+  value *limit;
   struct heap *heap;
-  unsigned long long args[1024];
+  value args[1024];
+  struct stack_frame *fp;
+  unsigned long long nalloc;
 };
 
-struct Coq_Init_Datatypes_O_args {
-};
-
-struct Coq_Init_Datatypes_S_args {
-  unsigned long long Coq_Init_Datatypes_S_arg_0;
-};
-
-struct Coq_Init_Datatypes_nil_args {
-};
-
-struct Coq_Init_Datatypes_cons_args {
-  unsigned long long Coq_Init_Datatypes_cons_arg_0;
-  unsigned long long Coq_Init_Datatypes_cons_arg_1;
-};
-
-struct Coq_Init_Datatypes_true_args {
-};
-
-struct Coq_Init_Datatypes_false_args {
-};
-
-extern unsigned int get_unboxed_ordinal(unsigned long long);
-extern unsigned int get_boxed_ordinal(unsigned long long);
-extern unsigned long long make_Coq_Init_Datatypes_nat_O(void);
-extern unsigned long long make_Coq_Init_Datatypes_nat_S(unsigned long long, unsigned long long *);
-extern unsigned long long alloc_make_Coq_Init_Datatypes_nat_S(struct thread_info *, unsigned long long);
-extern unsigned long long make_Coq_Init_Datatypes_list_nil(void);
-extern unsigned long long make_Coq_Init_Datatypes_list_cons(unsigned long long, unsigned long long, unsigned long long *);
-extern unsigned long long alloc_make_Coq_Init_Datatypes_list_cons(struct thread_info *, unsigned long long, unsigned long long);
-extern unsigned long long make_Coq_Init_Datatypes_bool_true(void);
-extern unsigned long long make_Coq_Init_Datatypes_bool_false(void);
-extern unsigned int get_Coq_Init_Datatypes_nat_tag(unsigned long long);
-extern unsigned int get_Coq_Init_Datatypes_list_tag(unsigned long long);
-extern unsigned int get_Coq_Init_Datatypes_bool_tag(unsigned long long);
-extern struct Coq_Init_Datatypes_O_args *get_Coq_Init_Datatypes_O_args(unsigned long long);
-extern struct Coq_Init_Datatypes_S_args *get_Coq_Init_Datatypes_S_args(unsigned long long);
-extern struct Coq_Init_Datatypes_nil_args *get_Coq_Init_Datatypes_nil_args(unsigned long long);
-extern struct Coq_Init_Datatypes_cons_args *get_Coq_Init_Datatypes_cons_args(unsigned long long);
-extern struct Coq_Init_Datatypes_true_args *get_Coq_Init_Datatypes_true_args(unsigned long long);
-extern struct Coq_Init_Datatypes_false_args *get_Coq_Init_Datatypes_false_args(unsigned long long);
-extern void print_Coq_Init_Datatypes_nat(unsigned long long);
-extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
-extern void print_Coq_Init_Datatypes_bool(unsigned long long);
-extern void halt(struct thread_info *, unsigned long long, unsigned long long);
-extern unsigned long long call(struct thread_info *, unsigned long long, unsigned long long);
+extern unsigned int get_unboxed_ordinal(value);
+extern unsigned int get_boxed_ordinal(value);
+extern value *get_args(value);
+extern value make_Coq_Init_Datatypes_nat_O(void);
+extern value make_Coq_Init_Datatypes_nat_S(value, value *);
+extern value alloc_make_Coq_Init_Datatypes_nat_S(struct thread_info *, value);
+extern value make_Coq_Init_Datatypes_list_nil(void);
+extern value make_Coq_Init_Datatypes_list_cons(value, value, value *);
+extern value alloc_make_Coq_Init_Datatypes_list_cons(struct thread_info *, value, value);
+extern value make_Coq_Init_Datatypes_bool_true(void);
+extern value make_Coq_Init_Datatypes_bool_false(void);
+extern unsigned int get_Coq_Init_Datatypes_nat_tag(value);
+extern unsigned int get_Coq_Init_Datatypes_list_tag(value);
+extern unsigned int get_Coq_Init_Datatypes_bool_tag(value);
+extern void print_Coq_Init_Datatypes_nat(value);
+extern void print_Coq_Init_Datatypes_list(value, void (*)(value));
+extern void print_Coq_Init_Datatypes_bool(value);
+extern value call(struct thread_info *, value, value);
 extern signed char const lparen_lit[2];
 
 extern signed char const rparen_lit[2];
@@ -77,7 +59,5 @@ extern signed char const names_of_Coq_Init_Datatypes_nat[2][2];
 extern signed char const names_of_Coq_Init_Datatypes_list[2][5];
 
 extern signed char const names_of_Coq_Init_Datatypes_bool[2][6];
-
-extern unsigned long long const halt_clo[2];
 
 

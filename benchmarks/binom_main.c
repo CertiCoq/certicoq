@@ -4,7 +4,7 @@
 #include <time.h>
 
 
-extern void body(struct thread_info *);
+extern value body(struct thread_info *);
 
 extern void print_Coq_Init_Datatypes_nat(unsigned long long);
 

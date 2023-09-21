@@ -4,7 +4,7 @@
 #include <time.h>
 
 
-extern void body(struct thread_info *);
+extern value body(struct thread_info *);
 
 extern void print_Coq_Numbers_BinNums_Z(unsigned long long);
 

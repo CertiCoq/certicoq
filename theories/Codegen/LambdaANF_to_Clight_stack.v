@@ -49,6 +49,12 @@ Variable (heapInfIdent : ident).
 Variable (numArgsIdent : ident).
 Variable (isptrIdent : ident). (* ident for the is_ptr external function *)
 Variable (caseIdent : ident). (* ident for the case variable , TODO: generate that automatically and only when needed *)
+Variable (resultIdent : ident).
+(* resultIdent is used for returning the function call result in the Eapp case.
+   Clight doesn't allow returning the function call expression
+   because function calls are only available as statements in Clight.
+   We could have generated unique identifiers
+   but that might have required refactoring LambdaANF expressions. *)
 Variable (nParam:nat).
 
 Variable (prims : prim_env).
@@ -534,7 +540,7 @@ Fixpoint assignConstructorS'
   end.
 
 Definition assignConstructorS
-           (cenv:ctor_env)
+           (cenv : ctor_env)
            (ienv : n_ind_env)
            (fenv : fun_env)
            (map: fun_info_env)
@@ -887,7 +893,8 @@ Section Translation.
           Ret ((asgn ; Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr;
                make_stack;
                c;
-               allocIdent ::= Efield tinfd allocIdent valPtr; limitIdent ::= Efield tinfd limitIdent valPtr;
+               allocIdent ::= Efield tinfd allocIdent valPtr;
+               limitIdent ::= Efield tinfd limitIdent valPtr;
                gc_call;
                discard_stack;
                fst progn),
@@ -910,9 +917,14 @@ Section Translation.
       asgn <- (if args_opt then asgnAppVars_fast fun_vars vs locs (snd inf) fenv map name else asgnAppVars vs (snd inf) fenv map name) ;;
       let f_var := makeVar x fenv map in
       let pnum := min (N.to_nat (fst inf)) nParam in
-      c <- (mkCall None fenv map ([Tpointer (mkFunTy pnum) noattr] f_var) pnum vs) ;;
-      ret (asgn ; Efield tinfd allocIdent valPtr  :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr ; c,
-                                                                                                                  slots)
+      (* Using the same result identifier every time *)
+      c <- (mkCall (Some resultIdent) fenv map ([Tpointer (mkFunTy pnum) noattr] f_var) pnum vs) ;;
+      ret (asgn ;
+           Efield tinfd allocIdent valPtr :::= allocPtr ;
+           Efield tinfd limitIdent valPtr :::= limitPtr ;
+           c ;
+           Sreturn (Some (makeVar resultIdent fenv map)),
+           slots)
     | None => Err "translate_body: Unknown function application in Eapp"
     end
   | Eprim_val x p e' => 
@@ -955,7 +967,6 @@ Section Translation.
     | None => Err "translate_body: Unknown primitive identifier"
     end
   | Ehalt x =>
-    (* set args[1] to x  and return *)
     ret (Efield tinfd allocIdent valPtr :::= allocPtr;
          Efield tinfd limitIdent valPtr :::= limitPtr;
          Sreturn (Some (makeVar x fenv map)),
@@ -973,7 +984,9 @@ Definition mkFun
              cc_default
              ((tinfIdent , threadInf) :: (map (fun x => (x , val)) (firstn nParam vs)))
              (stack_decl root_size)
-             ((map (fun x => (x , val)) ((skipn nParam vs) ++ loc)) ++ (allocIdent, valPtr)::(limitIdent, valPtr)::(argsIdent, valPtr)::(caseIdent, boolTy) :: nil)
+             ((map (fun x => (x , val)) ((skipn nParam vs) ++ loc)) ++
+                (allocIdent, valPtr) :: (limitIdent, valPtr) ::
+                (argsIdent, valPtr) :: (caseIdent, boolTy) :: (resultIdent, val) :: nil)
              body.
 
 Fixpoint translate_fundefs
@@ -1263,7 +1276,8 @@ Definition inf_vars :=
   (fpIdent, nNamed "fp"%bs) ::
   (nextFld, nNamed "next"%bs) ::
   (rootFld, nNamed "root"%bs) ::
-  (prevFld, nNamed "prev"%bs) :: nil.
+  (prevFld, nNamed "prev"%bs) ::
+  (resultIdent, nNamed "result"%bs) :: nil.
 
 
 Definition add_inf_vars (nenv: name_env): name_env :=
@@ -1404,7 +1418,7 @@ Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_e
        body <- mk_prog_opt [body_external_decl] mainIdent false;;
        head <- mk_prog_opt (make_tinfo_rec :: export_rec :: forward_defs ++ defs)%list mainIdent true ;;
        ret (M.set make_tinfoIdent (nNamed "make_tinfo"%bs)
-                  (M.set exportIdent (nNamed "export"%bs) nenv),
+             (M.set exportIdent (nNamed "export"%bs) nenv),
             body, head)
   in
   (err, "").

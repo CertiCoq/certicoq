@@ -1,4 +1,4 @@
-CCOMPILER = clang-11 # ccomp # gcc
+CCOMPILER = clang # ccomp # gcc
 
 -include ../../Makefile.conf
 
@@ -54,7 +54,6 @@ test.vo: test.v
 clean: 
 	make -f Makefile.certicoqchk clean
 	rm *.cm* *.o *.vo
-	
 
 Makefile.certicoqchk: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.certicoqchk

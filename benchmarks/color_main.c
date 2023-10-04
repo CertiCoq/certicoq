@@ -4,13 +4,11 @@
 #include <time.h>
 
 
-extern void body(struct thread_info *);
+extern value body(struct thread_info *);
 
 extern void print_Coq_Numbers_BinNums_Z(unsigned long long);
 
 extern void print_Coq_Init_Datatypes_prod(unsigned long long, void (*)(unsigned long long), void (*)(unsigned long long));
-
-extern value args[];
 
 _Bool is_ptr(value s) {
   return (_Bool) Is_block(s);
@@ -30,11 +28,10 @@ int main(int argc, char *argv[]) {
   // Run Coq program
   for (int i = 0; i < n; i ++) {
     tinfo = make_tinfo();
-    body(tinfo);
+    val = body(tinfo);
   }
   end = clock();
 
-  val = tinfo -> args[1];
   // TODO : fold over nat to print the C int
   print_Coq_Init_Datatypes_prod(val, print_Coq_Numbers_BinNums_Z, print_Coq_Numbers_BinNums_Z);
   printf("\n");

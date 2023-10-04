@@ -381,13 +381,13 @@ Section Externs.
        |} in
     backend <- get_backend ;;
     let comp :=
-      Composite _closure Struct
-       (Member_plain _func
-                    (tptr (Tfunction (Tcons (Tstruct _thread_info noattr)
-                                    (Tcons val (Tcons val Tnil))) Tvoid cc_default)) ::
-        Member_plain _env val :: nil) noattr ::
       match backend with
       | ANF =>
+        Composite _closure Struct
+         (Member_plain _func
+                      (tptr (Tfunction (Tcons (Tstruct _thread_info noattr)
+                                       (Tcons val (Tcons val Tnil))) val cc_default)) ::
+          Member_plain _env val :: nil) noattr ::
         Composite _stack_frame Struct
          (Member_plain _next (tptr val) ::
           Member_plain _root (tptr val) ::
@@ -401,6 +401,11 @@ Section Externs.
           Member_plain _nalloc tulong :: nil) noattr ::
           nil
       | CPS =>
+        Composite _closure Struct
+         (Member_plain _func
+                      (tptr (Tfunction (Tcons (Tstruct _thread_info noattr)
+                                       (Tcons val (Tcons val Tnil))) Tvoid cc_default)) ::
+          Member_plain _env val :: nil) noattr ::
         Composite _thread_info Struct
          (Member_plain _alloc (tptr val) ::
           Member_plain _limit (tptr val) ::
@@ -1219,6 +1224,7 @@ Section FunctionCalls.
     _env <- gensym "envi" ;;
     _arg <- gensym "arg" ;;
     _tinfo <- gensym "tinfo";;
+    _tmp <- gensym "tmp";;
     let '(_halt_clo, _) := halt_clo_info toolbox in
 
     let argsExpr := Efield (tinfd _thread_info _tinfo) _args valPtr in
@@ -1242,9 +1248,15 @@ Section FunctionCalls.
                     (* if c_args = 2 *) Tcons val (Tcons val Tnil) :: nil)
             (* else *) (Tcons val (Tcons val (Tcons val Tnil))) in
     let forcelist := match backend with ANF => forcelist_anf | CPS => forcelist_cps end in
-    let ret_ty := Tpointer (Tfunction (Tcons (threadInf _thread_info) forcelist)
-                                      Tvoid cc_default) noattr in
-
+    let ret_ty :=
+      match backend with
+      | ANF =>
+        Tpointer (Tfunction (Tcons (threadInf _thread_info) forcelist)
+                            val cc_default) noattr
+      | CPS =>
+        Tpointer (Tfunction (Tcons (threadInf _thread_info) forcelist)
+                            Tvoid cc_default) noattr
+      end in
     let deref_cast_clo :=
       Ederef (Ecast closExpr (Tpointer (Tstruct _closure noattr) noattr))
              (Tstruct _closure noattr) in
@@ -1262,19 +1274,30 @@ Section FunctionCalls.
                      Sassign (Field(argsExpr, Z.of_nat 1)) (Evar _halt_clo val) ::
                      Sassign (Field(argsExpr, Z.of_nat 2)) (Etempvar _arg val) :: nil)
                  end) ;;;
-      Scall None ([ret_ty] (var _f)) (firstn (S c_args) fargs) ;;;
-      Sreturn (Some (Field(argsExpr, Z.of_nat 1))) in
+      match backend with
+      | ANF =>
+        Scall (Some _tmp) ([ret_ty] (var _f)) (firstn (S c_args) fargs) ;;;
+        Sreturn (Some (Etempvar _tmp val))
+      | CPS =>
+        Scall None ([ret_ty] (var _f)) (firstn (S c_args) fargs) ;;;
+        Sreturn (Some (Field(argsExpr, Z.of_nat 1)))
+      end in
 
-    let params := (_tinfo, (threadInf _thread_info)) :: (_clo, val) :: (_arg, val) :: nil in
-    let vars := (_f, valPtr) :: (_env, valPtr) :: nil in
+    let params := (_tinfo, (threadInf _thread_info)) ::
+                  (_clo, val) ::
+                  (_arg, val) :: nil in
+    let vars := (_f, valPtr) ::
+                (_env, valPtr) ::
+                match backend with
+                | ANF => (_tmp, val) :: nil
+                | CPS => nil
+                end in
     _call <- gensym "call" ;;
     ret (_call,
          Gfun (Internal
                  {| fn_return := val
                   ; fn_callconv := cc_default
-                  ; fn_params := (_tinfo, (threadInf _thread_info)) ::
-                                 (_clo, val) ::
-                                 (_arg, val) :: nil
+                  ; fn_params := params
                   ; fn_vars := nil
                   ; fn_temps := vars
                   ; fn_body := body

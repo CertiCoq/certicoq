@@ -4,9 +4,7 @@
 #include <time.h>
 
 
-extern void body(struct thread_info *);
-
-extern value args[];
+extern value body(struct thread_info *);
 
 _Bool is_ptr(value s) {
   return (_Bool) Is_block(s);
@@ -26,11 +24,10 @@ int main(int argc, char *argv[]) {
   // Run Coq program
   for (int i = 0; i < n; i ++) {
     tinfo = make_tinfo();
-    body(tinfo);
+    val = body(tinfo);
   }
   end = clock();
 
-  val = tinfo -> args[1];
   printf("%llu\n", ( (unsigned long long) val >> 1));
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;

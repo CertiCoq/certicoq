@@ -5,8 +5,7 @@
 #include <time.h>
 
 /* TODO: This should be imported with include. */
-extern void body(struct thread_info *);
-extern value args[];
+extern value body(struct thread_info *);
 
 extern struct thread_info;
 extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
@@ -46,16 +45,12 @@ int main(int argc, char *argv[]) {
   start = clock();
 
   // Run Coq program
-  body(tinfo);
+  andb = body(tinfo);
   end = clock();
-
-  /* Get the andb function from the arguments array */
-  andb = tinfo -> args[1];
 
   /* Generate booleans*/
   value b = make_Coq_Init_Datatypes_bool_true ();
   value c = make_Coq_Init_Datatypes_bool_false ();
-
 
   printf("The original booleans.\n");
   print_Coq_Init_Datatypes_bool(b);

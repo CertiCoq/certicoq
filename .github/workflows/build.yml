@@ -30,12 +30,7 @@ jobs:
         with:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
-          before_install: |
-            startGroup "use clang-11"
-              shopt -s expand_aliases
-              alias clang="clang-11"
-            endGroup
-          # comment back in if MetaCoq commit changes
+          # before_install: | # comment back in if MetaCoq commit changes
           #   startGroup "fix permission issues"
           #     sudo chown -R coq:coq .
           #   endGroup

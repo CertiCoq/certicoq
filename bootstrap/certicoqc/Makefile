@@ -1,4 +1,4 @@
-CCOMPILER = clang # ccomp # gcc takes ages
+CCOMPILER := $(shell { command -v clang-11 || command -v clang; } 2>/dev/null)
 
 -include ../../Makefile.conf
 

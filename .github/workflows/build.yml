@@ -29,15 +29,19 @@ jobs:
         with:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
+          before_install: |
+            startGroup "fix permission issues"
+              sudo chown -R coq:coq .
+            endGroup
+            startGroup "opam pin"
+              opam pin -n -y submodules/metacoq
+            endGroup
           before_script: |
             startGroup "fix permission issues"
               sudo chown -R coq:coq .
             endGroup
             startGroup "Copy repo (for later benchmarking)"
               cp -r `pwd` ~/repo
-            endGroup
-            startGroup "opam pin"
-              opam pin -y submodules/metacoq
             endGroup
           after_script: |
             startGroup "List installed packages"

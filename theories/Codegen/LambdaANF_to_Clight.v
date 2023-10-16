@@ -260,7 +260,9 @@ Definition ulongTy : type :=
 
 Definition int_chunk : memory_chunk := if Archi.ptr64 then Mint64 else Mint32.
 (* NOTE for val: in Clight, SIZEOF_PTR == SIZEOF_INT *)
-Definition val : type := if Archi.ptr64 then ulongTy else uintTy.
+
+(* Definition val : type := if Archi.ptr64 then ulongTy else uintTy. *)
+Definition val : type := talignas (if Archi.ptr64 then 3%N else 2%N) (tptr tvoid).
 Definition uval : type := if Archi.ptr64 then ulongTy else uintTy.
 Definition sval : type := if Archi.ptr64 then longTy else intTy.
 Definition val_typ : typ := if Archi.ptr64 then AST.Tlong else Tany32.

@@ -5,6 +5,35 @@
 #include "values.h"
 #include "gc.h"
 
+/* The following 5 functions should (in practice) compile correctly in CompCert,
+   but the CompCert correctness specification does not _require_ that
+   they compile correctly:  their semantics is "undefined behavior" in
+   CompCert C (and in C11), but in practice they will work in any compiler. */
+
+int test_int_or_ptr (value x) /* returns 1 if int, 0 if aligned ptr */ {
+    return (int)(((intnat)x)&1);
+}
+
+intnat int_or_ptr_to_int (value x) /* precondition: is int */ {
+    return (intnat)x;
+}
+
+void * int_or_ptr_to_ptr (value x) /* precond: is aligned ptr */ {
+    return (void *)x;
+}
+
+value int_to_int_or_ptr(intnat x) /* precondition: is odd */ {
+    return (value)x;
+}
+
+value ptr_to_int_or_ptr(void *x) /* precondition: is aligned */ {
+    return (value)x;
+}
+
+int is_ptr(value x) {
+    return test_int_or_ptr(x) == 0;
+}
+
 /* A "space" describes one generation of the generational collector. */
 struct space {
   value *start, *next, *limit;
@@ -59,7 +88,7 @@ int in_heap(struct heap *h, value v) {
 }
 
 void printtree(FILE *f, struct heap *h, value v) {
-  if(Is_block(v))
+  if(is_ptr(v))
     if (in_heap(h,v)) {
       header_t hd = Field(v,-1);
       int sz = Wosize_hd(hd);
@@ -105,7 +134,7 @@ void abort_with(char *s) {
 
 #define Is_from(from_start, from_limit, v)			\
    (from_start <= (value*)(v) && (value*)(v) < from_limit)
-/* Assuming v is a pointer (Is_block(v)), tests whether v points
+/* Assuming v is a pointer (is_ptr(v)), tests whether v points
    somewhere into the "from-space" defined by from_start and from_limit */
 
 void forward (value *from_start,  /* beginning of from-space */
@@ -125,7 +154,7 @@ void forward (value *from_start,  /* beginning of from-space */
 */
  {
   value v = *p;
-  if(Is_block(v)) {
+  if(is_ptr(v)) {
 
     if(Is_from(from_start, from_limit, v)) {
 
@@ -411,7 +440,7 @@ uintnat const fake_fi[3] = {0, 1, 1};
 void* export(struct thread_info *ti) {
 
   /* if args[1] is unboxed, return it */
-  if(!Is_block(ti->args[1])){
+  if(!is_ptr(ti->args[1])){
     return ti->args[1];
   }
 

@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "values.h"
 #include "gc.h"
 #include <caml/memory.h>
 #include <time.h>
-#include <caml/mlvalues.h>
 #include <caml/callback.h>
 
 extern value body(struct thread_info *);

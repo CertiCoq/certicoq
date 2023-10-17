@@ -53,6 +53,7 @@ extern "C" {
          This is for use only by the GC.
 */
 
+
 /*
 CHANGE BY THE CERTICOQ/VERIFFI TEAM:
 We do this for CertiCoq's FFI system because for technical reasons related to
@@ -68,7 +69,7 @@ attribute. On the other hand, standard OCaml wants the value to be intnat.
 #else
   typedef intnat value;
 #endif
-
+/* because of VST's restrictions. */
 typedef uintnat header_t;
 typedef uintnat mlsize_t;
 typedef unsigned int tag_t;             /* Actually, an unsigned char */
@@ -77,7 +78,12 @@ typedef uintnat mark_t;
 
 /* Longs vs blocks. */
 #define Is_long(x)   (((x) & 1) != 0)
-#define Is_block(x)  (((x) & 1) == 0)
+/* CHANGE BY THE CERTICOQ/VERIFFI TEAM: */
+#ifdef VERIFFI
+  #define Is_block(x)  (((int)(((intnat) x) & 1)) == 0)
+#else
+  #define Is_block(x)  (((x) & 1) == 0)
+#endif
 
 /* Conversion macro names are always of the form  "to_from". */
 /* Example: Val_long as in "Val from long" or "Val of long". */
@@ -208,11 +214,5 @@ bits  63        (64-P) (63-P)        10 9     8 7   0
 #ifdef __cplusplus
 }
 #endif
-
-/* Floating-point numbers. */
-#define Double_tag 253
-#define Double_wosize ((sizeof(double) / sizeof(value)))
-#define Double_val(v) (* (double *)(v))
-#define Store_double_val(v,d) (* (double *)(v) = (d))
 
 #endif /* VALUES_H */

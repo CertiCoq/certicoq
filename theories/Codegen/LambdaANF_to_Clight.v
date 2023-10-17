@@ -1315,12 +1315,12 @@ Definition make_defs_fast
   end.
 
 Definition composites : list composite_definition :=
-  Composite threadInfIdent Struct
-    (Member_plain allocIdent valPtr ::
-    Member_plain limitIdent valPtr ::
-    Member_plain heapInfIdent (tptr (Tstruct heapInfIdent noattr)) ::
-    Member_plain argsIdent (Tarray uval maxArgs noattr) ::
-     nil) noattr ::
+  (* Composite threadInfIdent Struct *)
+  (*   (Member_plain allocIdent valPtr :: *)
+  (*   Member_plain limitIdent valPtr :: *)
+  (*   Member_plain heapInfIdent (tptr (Tstruct heapInfIdent noattr)) :: *)
+  (*   Member_plain argsIdent (Tarray uval maxArgs noattr) :: *)
+  (*    nil) noattr :: *)
   nil.
 
 Definition mk_prog_opt

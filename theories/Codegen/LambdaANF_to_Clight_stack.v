@@ -1224,21 +1224,21 @@ Definition to_plain_members (l : list (ident * type)) : list member :=
 
 (* Types declared at the begining of the program *)
 Definition composites : list composite_definition :=
-  Composite stackframeTIdent Struct
-            (to_plain_members ((nextFld, valPtr) ::
-             (rootFld, valPtr) ::
-             (prevFld, (tptr stackframeT)) :: nil))
-            noattr ::
-  Composite threadInfIdent Struct
-            (to_plain_members ((allocIdent, valPtr) ::
-             (limitIdent, valPtr) ::
-             (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
-             (argsIdent, (Tarray uval maxArgs noattr)) ::
-             (fpIdent, (tptr stackframeT)) ::
-             (nallocIdent, val) :: nil)) (* Zoe : This is the number of allocations until the next GC call so that GC can perform a test. 
-                                         * Note that it will be coerced to UL from ULL. That should be safe for the values we're using but 
-                                         * consider changing it too. *)
-            noattr ::
+  (* Composite stackframeTIdent Struct *)
+  (*           (to_plain_members ((nextFld, valPtr) :: *)
+  (*            (rootFld, valPtr) :: *)
+  (*            (prevFld, (tptr stackframeT)) :: nil)) *)
+  (*           noattr :: *)
+  (* Composite threadInfIdent Struct *)
+  (*           (to_plain_members ((allocIdent, valPtr) :: *)
+  (*            (limitIdent, valPtr) :: *)
+  (*            (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) :: *)
+  (*            (argsIdent, (Tarray uval maxArgs noattr)) :: *)
+  (*            (fpIdent, (tptr stackframeT)) :: *)
+  (*            (nallocIdent, val) :: nil)) (1* Zoe : This is the number of allocations until the next GC call so that GC can perform a test. *) 
+  (*                                        * Note that it will be coerced to UL from ULL. That should be safe for the values we're using but *) 
+  (*                                        * consider changing it too. *1) *)
+  (*           noattr :: *)
    nil.
 
 Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))

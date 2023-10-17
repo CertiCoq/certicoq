@@ -388,17 +388,17 @@ Section Externs.
                       (tptr (Tfunction (Tcons (Tstruct _thread_info noattr)
                                        (Tcons val (Tcons val Tnil))) val cc_default)) ::
           Member_plain _env val :: nil) noattr ::
-        Composite _stack_frame Struct
-         (Member_plain _next (tptr val) ::
-          Member_plain _root (tptr val) ::
-          Member_plain _prev (tptr (Tstruct _stack_frame noattr)) :: nil) noattr ::
-        Composite _thread_info Struct
-         (Member_plain _alloc (tptr val) ::
-          Member_plain _limit (tptr val) ::
-          Member_plain _heap (tptr (Tstruct _heap noattr)) ::
-          Member_plain _args (Tarray val max_args noattr) ::
-          Member_plain _fp (tptr (Tstruct _stack_frame noattr)) ::
-          Member_plain _nalloc tulong :: nil) noattr ::
+        (* Composite _stack_frame Struct *)
+        (*  (Member_plain _next (tptr val) :: *)
+        (*   Member_plain _root (tptr val) :: *)
+        (*   Member_plain _prev (tptr (Tstruct _stack_frame noattr)) :: nil) noattr :: *)
+        (* Composite _thread_info Struct *)
+        (*  (Member_plain _alloc (tptr val) :: *)
+        (*   Member_plain _limit (tptr val) :: *)
+        (*   Member_plain _heap (tptr (Tstruct _heap noattr)) :: *)
+        (*   Member_plain _args (Tarray val max_args noattr) :: *)
+        (*   Member_plain _fp (tptr (Tstruct _stack_frame noattr)) :: *)
+        (*   Member_plain _nalloc tulong :: nil) noattr :: *)
           nil
       | CPS =>
         Composite _closure Struct
@@ -406,11 +406,11 @@ Section Externs.
                       (tptr (Tfunction (Tcons (Tstruct _thread_info noattr)
                                        (Tcons val (Tcons val Tnil))) Tvoid cc_default)) ::
           Member_plain _env val :: nil) noattr ::
-        Composite _thread_info Struct
-         (Member_plain _alloc (tptr val) ::
-          Member_plain _limit (tptr val) ::
-          Member_plain _heap (tptr (Tstruct _heap noattr)) ::
-          Member_plain _args (Tarray val max_args noattr) :: nil) noattr ::
+        (* Composite _thread_info Struct *)
+        (*  (Member_plain _alloc (tptr val) :: *)
+        (*   Member_plain _limit (tptr val) :: *)
+        (*   Member_plain _heap (tptr (Tstruct _heap noattr)) :: *)
+        (*   Member_plain _args (Tarray val max_args noattr) :: nil) noattr :: *)
           nil
       end in
     let toolbox :=

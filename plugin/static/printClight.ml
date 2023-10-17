@@ -361,7 +361,7 @@ let print_dest_names_imports prog names (dest : string) (imports : string list) 
   List.iter (fun n -> add_name (remove_primes n))  names;
   let fm = formatter_of_out_channel oc in
   open_vbox 0;
-  List.iter (fun s -> fprintf fm "#include \"%s\"" s; pp_print_newline fm ();) ("values.h" :: imports);
+  List.iter (fun s -> fprintf fm "#include \"%s\"" s; pp_print_newline fm ();) ("gc.h" :: imports);
   close_box ();
   open_box 0;
   print_program Clight2 fm prog;

@@ -291,23 +291,18 @@ Section ANF_proof.
             rewrite <- app_ctx_f_fuse. 
             eapply preord_exp_post_monotonic.
             * admit. (* bounds *) 
-            * eapply In_nth_error in f. destruct f as [n Hnth].
-
-              assert (Hex : exists v1', nth_error env n = Some v1') by admit. (* because of length *)
-              destruct Hex as [v1' Hnth'].                                            
+            * eapply convert_anf_in_env in f; [ | eassumption | eassumption | eassumption ].
+              destruct f as [n [Hnth' Hnth]].
               
               assert (Hrel := All_Forall.Forall2_nth_error _ _ _ Hanf Hnth' Hnth).
                
               destruct Hrel as [v1'' [Hget'' Hrel'']].
-
-              (ret z, z -> v1
-
               
               eapply preord_exp_trans. now tci.
               now eapply eq_fuel_idemp.
               2:{ intros. eapply IH1; [ | | | | |  | reflexivity | ]; try eassumption.
                   eapply Included_trans. eapply occurs_free_ctx_app.
-                  eapply Union_Included. admit. (* lemma *)
+                  eapply Union_Included. admit. (* lemma fv ctx *)
                   eapply Included_trans. eapply Included_Setminus_compat.
                   eassumption. reflexivity.
                   rewrite Setminus_Union_distr.

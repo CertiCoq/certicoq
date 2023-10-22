@@ -1,6 +1,6 @@
 Require Import MetaCoq.Utils.bytestring.
 From Coq Require Import ZArith.ZArith Lists.List micromega.Lia Arith
-     Ensembles Relations.Relation_Definitions.
+     Ensembles Relations.Relation_Definitions Classes.Morphisms.
 Require Import Common.AstCommon.
 Require compcert.lib.Maps compcert.lib.Coqlib.
 Require Import set_util.
@@ -170,6 +170,10 @@ Section ANF_proof.
           preord_exp ctenv (cps_bound f (t <+> (2 * Datatypes.length (exps_as_list es))%nat))
                      eq_fuel i (e', rho') (C |[ e' ]|, rho).
 
+  Instance convert_anf_rel_Proper: Proper (Same_set _ ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff) convert_anf_rel.
+  Proof.
+  Admitted.
+           
   Lemma convert_anf_result_not_fresh S e names cenv' S' C x :
     convert_anf_rel S e names cenv' S' C x ->
     ~ x \in S'.
@@ -447,7 +451,20 @@ Section ANF_proof.
       + eapply H0 in H10. eapply Included_trans; eauto. now sets.
   Qed.      
       
-      
+   Lemma convert_anf_exps_res_included S es names S' C x :
+     convert_anf_rel_exps S es names cenv S' C x ->
+     FromList x \subset FromList names :|: bound_stem_ctx C.
+   Proof.
+     revert S es names S' C.
+     induction x; intros  S es names S' C Hanf; inv Hanf.
+     - repeat normalize_sets. now sets.
+     - repeat normalize_sets. eapply Union_Included.
+       + eapply Singleton_Included.
+         eapply convert_anf_res_included in H7.
+         rewrite bound_stem_ctx_comp_f. inv H7; eauto.
+       + rewrite bound_stem_ctx_comp_f. eapply Included_trans. eapply IHx; eauto. now sets.         
+   Qed.
+
   Lemma convert_anf_occurs_free_ctx S e names S' C x :
     convert_anf_rel S e names cenv S' C x ->
     occurs_free_ctx C \subset FromList names.
@@ -461,12 +478,13 @@ Section ANF_proof.
                                              forall S names S' C x
                                                     (Hanf : convert_anf_rel_exps S es names cenv S' C x),
                                                occurs_free_ctx C \subset FromList names)
-                                    (P1 := fun fns => forall S names fs S' fns' x
+                                    (P1 := fun fns => forall S names fs S' fns'
                                                              (Hanf : convert_anf_rel_efnlst S fns names cenv fs S' fns'),
-                                               occurs_free_fundefs fns' \subset FromList names)
-                                    (P2 := fun bs => forall S names S' x cl
+                                               Disjoint _ S (FromList fs) ->
+                                               occurs_free_fundefs fns' \subset FromList names \\ name_in_fundefs fns')
+                                    (P2 := fun bs => forall S names S' x cl y
                                                             (Hanf : convert_anf_rel_branches S bs x names cenv S' cl),
-                                               Union_list (map (fun c => occurs_free (snd c)) cl) \subset FromList names); intros; inv Hanf;
+                                               occurs_free (Ecase y cl) \\ [set y] \subset FromList names); intros; inv Hanf;
       try (now normalize_occurs_free_ctx; sets).
     - repeat normalize_occurs_free_ctx; repeat normalize_occurs_free.
       simpl. assert (Hanf := H10).
@@ -480,9 +498,90 @@ Section ANF_proof.
       eapply Included_trans. eassumption. repeat normalize_sets. now sets.
       eapply Setminus_Included_Included_Union. eapply Singleton_Included. 
       repeat normalize_sets. inv Hanf; eauto. inv H0; eauto.
-    - rewrite !bound_stem_ctx_comp_f. repeat normalize_bound_stem_ctx. now sets.
-      now sets. eauto.  eapply 
-      
+    - eapply Included_trans. eapply occurs_free_ctx_comp.
+      eapply Union_Included.
+      + eauto.
+      + eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply occurs_free_ctx_comp.
+        eapply Union_Included.
+        * eapply Included_trans. eapply H0; eauto. now sets.
+        * repeat normalize_occurs_free_ctx. 
+          rewrite !Setminus_Union_distr. rewrite !Setminus_Empty_set_abs_r. repeat normalize_sets.
+          eapply Union_Included.
+          -- eapply Setminus_Included_Included_Union.
+             eapply Included_trans. eapply Singleton_Included. eapply convert_anf_res_included.
+             eassumption. now sets.
+          -- eapply Setminus_Included_Included_Union.
+             eapply Included_trans. eapply Singleton_Included. eapply convert_anf_res_included.
+             eassumption. now sets.
+    - eapply Included_trans. eapply occurs_free_ctx_comp.
+      eapply Union_Included.
+      + eauto.
+      + eapply Setminus_Included_Included_Union. repeat normalize_occurs_free_ctx.
+        repeat normalize_sets. 
+        eapply Included_trans. eapply convert_anf_exps_res_included. eassumption. now sets.
+    - repeat normalize_occurs_free_ctx. repeat normalize_occurs_free. simpl.
+      repeat normalize_sets.      
+      eapply Union_Included.
+      + rewrite Union_commut, <- Setminus_Union. eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H0. eassumption. now sets.
+      + eapply Setminus_Included_Included_Union.
+        eapply Included_trans. 
+        eapply occurs_free_ctx_comp. eapply Union_Included.
+        * eapply Included_trans.
+          eapply H. eassumption. now sets.
+        * repeat normalize_occurs_free_ctx. repeat normalize_sets.
+          eapply Setminus_Included_Included_Union. eapply Union_Included; [ now sets | ].
+          eapply Included_trans. eapply Singleton_Included. 
+          eapply convert_anf_res_included. eassumption. now sets.
+    - eapply Included_trans. 
+      eapply occurs_free_ctx_comp. eapply Union_Included.
+      + eauto.
+      + eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H0. eassumption. normalize_sets.
+        eapply Union_Included; [ | now sets ].
+        eapply Singleton_Included. 
+        eapply convert_anf_res_included. eassumption.
+    - repeat normalize_occurs_free_ctx. repeat normalize_sets.
+      eapply Included_trans. eapply H. eassumption.
+      now sets. 
+      repeat normalize_sets. eapply Setminus_Included_Included_Union.
+      eapply Union_Included; [ | now sets ].
+      rewrite FromList_rev, convert_anf_rel_efnlst_names; [ | eassumption ]. now sets.
+    - repeat normalize_occurs_free_ctx. repeat normalize_sets. now sets.
+    - repeat normalize_occurs_free_ctx. now sets.
+    - eapply Included_trans. 
+      eapply occurs_free_ctx_comp. eapply Union_Included.
+      + eauto.
+      + eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply H0. eassumption. now sets.
+    - repeat normalize_occurs_free. now sets.
+    - specialize H with (C :=  (Efun1_c (Fcons f func_tag [arg] (C1 |[ Ehalt x1 ]|) Fnil) Hole_c)).
+      assert (Hseq : S <--> S \\ [set f]).
+      { eapply Included_Setminus_Disjoint. normalize_sets. now sets. } 
+      assert (Hin : occurs_free_ctx
+                       (Efun1_c (Fcons f func_tag [arg] (C1 |[ Ehalt x1 ]|) Fnil) Hole_c) \subset
+                       FromList names).
+      { eapply H. econstructor. eassumption. 
+        3:{
+                                
+        Included_Trans. 
+      repeat normalize_occurs_free. simpl. repeat normalize_sets.
+      assert 
+      eapply Union_Included.
+      + eapply Setminus_Included_Included_Union.
+        eapply Included_trans. eapply occurs_free_ctx_app.
+        eapply Union_Included.
+        * eapply Included_trans. eapply H.
+          econstructor. 
+        simpl. 
+      now sets.
+    - 
+      eapply Union_Included; [ | now sets ].
+        eapply Singleton_Included. 
+        eapply convert_anf_res_included. eassumption.
+      now
+
   
   Lemma convert_anf_correct :
       forall vs e r f t, eval_env_fuel vs e r f t -> convert_anf_correct_exp vs e r f t.
@@ -858,3 +957,8 @@ Section ANF_proof.
             repeat rewrite FromList_app, FromList_cons at 1. now sets.
 
     Admitted.
+
+
+
+
+    

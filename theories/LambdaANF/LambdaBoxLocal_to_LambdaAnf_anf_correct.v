@@ -170,7 +170,12 @@ Section ANF_proof.
           preord_exp ctenv (cps_bound f (t <+> (2 * Datatypes.length (exps_as_list es))%nat))
                      eq_fuel i (e', rho') (C |[ e' ]|, rho).
 
-  Instance convert_anf_rel_Proper: Proper (Same_set _ ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff) convert_anf_rel.
+  Lemma convert_anf_rel_same_set S1 e names cenv' S1' C x S2:
+    convert_anf_rel S1 e names cenv' S1' C x ->
+    S1 <--> S2 ->
+    exists S2',
+      S1' <--> S2' /\
+      convert_anf_rel S2 e names cenv' S2' C x.
   Proof.
   Admitted.
            
@@ -465,6 +470,26 @@ Section ANF_proof.
        + rewrite bound_stem_ctx_comp_f. eapply Included_trans. eapply IHx; eauto. now sets.         
    Qed.
 
+   Lemma occurs_free_make_proj_ctx ctag vars x i C :
+     make_proj_ctx ctag vars x i C ->
+     occurs_free_ctx C \subset [set x].
+   Proof.
+     intros Hctx. induction Hctx.
+     - normalize_occurs_free_ctx. now sets.
+     - normalize_occurs_free_ctx. now sets.
+   Qed.
+   
+   Lemma bound_stem_make_proj_ctx ctag vars x i C :
+     make_proj_ctx ctag vars x i C ->
+     bound_stem_ctx C <--> FromList vars.
+   Proof.
+     intros Hctx. induction Hctx.
+     - normalize_bound_stem_ctx. now sets.
+     - normalize_bound_stem_ctx. repeat normalize_sets.
+       now sets.
+   Qed.
+   
+     
   Lemma convert_anf_occurs_free_ctx S e names S' C x :
     convert_anf_rel S e names cenv S' C x ->
     occurs_free_ctx C \subset FromList names.
@@ -482,9 +507,9 @@ Section ANF_proof.
                                                              (Hanf : convert_anf_rel_efnlst S fns names cenv fs S' fns'),
                                                Disjoint _ S (FromList fs) ->
                                                occurs_free_fundefs fns' \subset FromList names \\ name_in_fundefs fns')
-                                    (P2 := fun bs => forall S names S' x cl y
+                                    (P2 := fun bs => forall S names S' x cl
                                                             (Hanf : convert_anf_rel_branches S bs x names cenv S' cl),
-                                               occurs_free (Ecase y cl) \\ [set y] \subset FromList names); intros; inv Hanf;
+                                               occurs_free (Ecase x cl) \\ [set x] \subset FromList names); intros; inv Hanf;
       try (now normalize_occurs_free_ctx; sets).
     - repeat normalize_occurs_free_ctx; repeat normalize_occurs_free.
       simpl. assert (Hanf := H10).
@@ -562,25 +587,59 @@ Section ANF_proof.
       assert (Hin : occurs_free_ctx
                        (Efun1_c (Fcons f func_tag [arg] (C1 |[ Ehalt x1 ]|) Fnil) Hole_c) \subset
                        FromList names).
-      { eapply H. econstructor. eassumption. 
-        3:{
-                                
-        Included_Trans. 
-      repeat normalize_occurs_free. simpl. repeat normalize_sets.
-      assert 
+      { eapply convert_anf_rel_same_set with (S2 := S :|: [set f] \\ [set arg] \\ [set f]) in H12.
+        destructAll.
+        eapply H. econstructor; [ | | eassumption ]. now sets.
+        constructor. now sets.
+        intros Heq. inv Heq. eapply H1. constructor. eassumption. normalize_sets. now sets.
+        rewrite Setminus_Union, Union_commut with (s1 := [set arg]).
+        rewrite <- Setminus_Union, !Setminus_Union_distr, Setminus_Same_set_Empty_set.
+        repeat normalize_sets. rewrite <- Hseq. reflexivity. }
+
+      rewrite occurs_free_Efun1_c in Hin. normalize_occurs_free_in_ctx. simpl in *.
+      repeat normalize_sets. 
+      repeat normalize_occurs_free.
       eapply Union_Included.
-      + eapply Setminus_Included_Included_Union.
-        eapply Included_trans. eapply occurs_free_ctx_app.
+      + rewrite Union_assoc, <- Setminus_Union. eapply Setminus_Included_Included_Union.
+        eapply Union_Included_l in Hin.
+        eapply Union_Included_l in Hin.
+        rewrite <- Setminus_Union with (s3 := name_in_fundefs fdefs).
+        rewrite <- Union_Setminus with (S2 := name_in_fundefs fdefs); [ | now tci ].
+        eapply Included_Union_Setminus_Included in Hin; [ | now tci ].
+        eapply Setminus_Included_Included_Union. eapply Included_trans.
+        eassumption.
+        rewrite <- !Union_assoc. 
+        rewrite <- Union_Included_Union_Setminus with (s3 := [set f]); [ | now tci | ].
+        normalize_sets. now sets. now sets.
+      + eapply Setminus_Included_Included_Union. eapply Included_trans.
+        eapply H0. eassumption.
+        eapply Disjoint_Included_l. eapply convert_anf_fresh_subset. eassumption.
+        now sets.
+        rewrite Union_commut with (s1 := [set f]), <- Setminus_Union, <- Union_Setminus; tci.
+        now sets.
+    - repeat normalize_occurs_free. now sets.
+    - repeat normalize_occurs_free. rewrite Setminus_Union_distr.
+      rewrite Setminus_Same_set_Empty_set. repeat normalize_sets.
+      eapply Setminus_Included_Included_Union. eapply Union_Included.
+      + eapply Included_trans. eapply occurs_free_ctx_app.
         eapply Union_Included.
-        * eapply Included_trans. eapply H.
-          econstructor. 
-        simpl. 
-      now sets.
-    - 
-      eapply Union_Included; [ | now sets ].
-        eapply Singleton_Included. 
-        eapply convert_anf_res_included. eassumption.
-      now
+        * eapply Included_trans. eapply occurs_free_make_proj_ctx. eassumption. now sets.
+        * eapply Setminus_Included_Included_Union.
+          eapply Included_trans. eapply occurs_free_ctx_app.
+          eapply Union_Included.
+          eapply Included_trans. eapply H. eassumption.
+          repeat normalize_sets.
+          rewrite bound_stem_make_proj_ctx; [ | eassumption ]. now sets.
+
+          repeat normalize_occurs_free.
+          eapply Setminus_Included_Included_Union.
+          eapply Included_trans. eapply Singleton_Included.
+          eapply convert_anf_res_included. eassumption.
+          repeat normalize_sets.
+          rewrite bound_stem_make_proj_ctx with (C := Cproj); [ | eassumption ]. now sets.          
+      + rewrite Union_commut. eapply Included_Union_Setminus_Included. now tci.
+        eapply H0. eassumption.
+  Qed.
 
   
   Lemma convert_anf_correct :
@@ -614,15 +673,16 @@ Section ANF_proof.
               now eapply eq_fuel_idemp.
               2:{ intros. eapply IH1; [ | | | | |  | reflexivity | ]; try eassumption.
                   eapply Included_trans. eapply occurs_free_ctx_app.
-                  eapply Union_Included. admit. (* lemma fv ctx *)
-                  eapply Included_trans. eapply Included_Setminus_compat.
-                  eassumption. reflexivity.
-                  rewrite Setminus_Union_distr.
-                  eapply Union_Included; [ |  now sets ].
-                  eapply Setminus_Included_Included_Union.
-                  admit. (* lemma  x \ names U bound_stem C
-                            (also bound_stem \subset S)                             
-                          *) }
+                  eapply Union_Included.
+                  - eapply Included_trans. eapply convert_anf_occurs_free_ctx. eassumption.
+                    normalize_sets. now sets.
+                  - eapply Included_trans. eapply Included_Setminus_compat.
+                    eassumption. reflexivity.
+                    rewrite Setminus_Union_distr.
+                    eapply Union_Included; [ |  now sets ].
+                    eapply Setminus_Included_Included_Union.
+                    eapply Included_trans. eapply Singleton_Included. eapply convert_anf_res_included. 
+                    eassumption. normalize_sets. now sets. } 
               
               eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
               2:{ intros. unfold convert_anf_correct_exp in IH2.
@@ -631,9 +691,11 @@ Section ANF_proof.
                   - simpl.
                     replace (N.pos (Pos.of_succ_nat (length names))) with
                       (1 + N.of_nat (length names)) by lia. eassumption.
-                  - normalize_sets. eapply Union_Disjoint_l. 
-                    admit. (* easy lemmas *)
-                    admit. (* easy lemmas *) 
+                  - normalize_sets.
+                    eapply Disjoint_Included_r. eapply convert_anf_fresh_subset.
+                    eassumption. 
+                    eapply Disjoint_Included_l; [ | eassumption ].
+                    now sets.
                   - eapply Included_trans. eassumption.
                     normalize_sets. now sets.
                   - constructor.
@@ -662,15 +724,17 @@ Section ANF_proof.
           * eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
             2:{ intros. eapply IH1; [ | | | | |  | reflexivity | ]; try eassumption.
                 eapply Included_trans. eapply occurs_free_ctx_app.
-                eapply Union_Included. admit. (* lemma occurs_free_ctx C \subset x :|: names *)
-                eapply Included_trans. eapply Included_Setminus_compat.
-                eassumption. reflexivity.
-                rewrite Setminus_Union_distr.
-                eapply Union_Included; [ |  now sets ].
-                eapply Setminus_Included_Included_Union.
-                admit. (* lemma  x \ names U bound_stem C
-                          (also bound_stem \subset S)                             
-                        *) }
+                eapply Union_Included.
+                - eapply Included_trans. eapply convert_anf_occurs_free_ctx.
+                  eassumption. normalize_sets. now sets.
+                - eapply Included_trans. eapply Included_Setminus_compat.
+                  eassumption. reflexivity.
+                  rewrite Setminus_Union_distr.
+                  eapply Union_Included; [ |  now sets ].
+                  eapply Setminus_Included_Included_Union.
+                  eapply Included_trans. eapply Singleton_Included.
+                  eapply convert_anf_res_included. eassumption.
+                  normalize_sets. now sets. }
             
             eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
             2:{ intros. unfold convert_anf_correct_exp in IH2.
@@ -679,9 +743,14 @@ Section ANF_proof.
                 - simpl.
                   replace (N.pos (Pos.of_succ_nat (length names))) with
                     (1 + N.of_nat (length names)) by lia. eassumption.
-                - normalize_sets. eapply Union_Disjoint_l. 
-                  admit. (* easy lemmas (subset free names) *)
-                  admit. (* easy lemmas (subset free names) *) 
+                - normalize_sets.
+                  eapply Disjoint_Included_r. eapply convert_anf_fresh_subset.
+                  eassumption.
+                  eapply Union_Disjoint_l ; [ | now sets ].
+                  eapply Disjoint_Included_l.
+                  eapply Singleton_Included. eapply convert_anf_res_included. eassumption.
+                  eapply Union_Disjoint_l. now sets.
+                  admit. (* lemma *) 
                 - eapply Included_trans. eassumption.
                   normalize_sets. now sets.
                 - constructor.

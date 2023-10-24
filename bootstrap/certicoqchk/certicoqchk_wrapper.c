@@ -10,10 +10,6 @@ extern value body(struct thread_info *);
 
 extern value *call(struct thread_info *, value, value);
 
-_Bool is_ptr(value s) {
-  return (_Bool) Is_block(s);
-}
-
 // external : (coq_Options × ExtractedASTBaseQuoter.quoted_program) -> bool = "certicoqchk_wrapper"
 CAMLprim value certicoqchk_wrapper(value prog) {
   CAMLparam1 (prog);

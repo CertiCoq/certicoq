@@ -1381,7 +1381,6 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
 End Check.
 
 Definition make_tinfoIdent := 20%positive.
-Definition exportIdent := 21%positive.
 
 Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
   (make_tinfoIdent,
@@ -1391,14 +1390,6 @@ Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
                   threadInf
                   cc_default)).
                   
-Definition export_rec : positive * globdef Clight.fundef type :=
-  (exportIdent,
-   Gfun (External (EF_external "export"
-                               (mksignature (cons val_typ nil) (Tret val_typ) cc_default))
-                  (Tcons threadInf Tnil)
-                  valPtr
-                  cc_default)).
-
 Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_env) :
   error (name_env * Clight.program * Clight.program) * string :=
   let e := wrap_in_fun e in
@@ -1418,10 +1409,8 @@ Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_e
        let nenv := (add_inf_vars (ensure_unique nenv1)) in
        let forward_defs := make_extern_decls nenv defs false in
        body <- mk_prog_opt [body_external_decl] mainIdent false;;
-       head <- mk_prog_opt (make_tinfo_rec :: export_rec :: forward_defs ++ defs)%list mainIdent true ;;
-       ret (M.set make_tinfoIdent (nNamed "make_tinfo"%bs)
-             (M.set exportIdent (nNamed "export"%bs) nenv),
-            body, head)
+       head <- mk_prog_opt (make_tinfo_rec :: forward_defs ++ defs)%list mainIdent true ;;
+       ret (M.set make_tinfoIdent (nNamed "make_tinfo"%bs) nenv, body, head)
   in
   (err, "").
 

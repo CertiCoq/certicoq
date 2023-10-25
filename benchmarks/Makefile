@@ -17,6 +17,7 @@ $(CFILES): tests
 exec: $(TESTS)
 
 copy:
+	cp ../theories/Runtime/m.h ./
 	cp ../theories/Runtime/gc.c ./
 	cp ../theories/Runtime/gc.h ./
 	cp ../theories/Runtime/gc_stack.c ./
@@ -27,6 +28,7 @@ copy:
 	cp ../theories/Runtime/mod.py ./
 
 clean:
+	rm -f ./m.h
 	rm -f ./gc.c
 	rm -f ./gc.h
 	rm -f ./gc_stack.c

@@ -1,16 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "gc.h"
+#include "gc_stack.h"
 #include <time.h>
-
 
 extern value body(struct thread_info *);
 
-extern void print_Coq_Init_Datatypes_nat(unsigned long long);
-
-_Bool is_ptr(value s) {
-  return (_Bool) Is_block(s);
-}
+extern void print_Coq_Init_Datatypes_nat(value);
 
 int main(int argc, char *argv[]) {
   value val;

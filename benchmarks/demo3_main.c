@@ -1,23 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include "gc.h"
+#include "gc_stack.h"
 #include <time.h>
 
 /* TODO: This should be imported with include. */
 extern value body(struct thread_info *);
 
 extern struct thread_info;
-extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
-extern void print_Coq_Init_Datatypes_bool(unsigned long long);
-extern value get_Coq_Init_Datatypes_pair_args (unsigned long long);
+extern void print_Coq_Init_Datatypes_list(value, void (*)(value));
+extern void print_Coq_Init_Datatypes_bool(value);
+extern value get_Coq_Init_Datatypes_pair_args (value);
 extern value make_Coq_Init_Datatypes_bool_true (void);
 extern value make_Coq_Init_Datatypes_bool_false (void);
-extern void* call(struct thread_info *tinfo, unsigned long long clos, unsigned long long arg0);
-
-_Bool is_ptr(value s) {
-  return (_Bool) Is_block(s);
-}
+extern value call(struct thread_info *tinfo, value clos, value arg0);
 
 value calls(struct thread_info* tinfo, value clos, unsigned int n, ...)
 {
@@ -26,7 +22,7 @@ value calls(struct thread_info* tinfo, value clos, unsigned int n, ...)
   va_start(args, n);
 
   for(; n != 0; n--) {
-    v = va_arg(args, unsigned long long);
+    v = va_arg(args, value);
     clos = call(tinfo, clos, v);
   }
   va_end(args);

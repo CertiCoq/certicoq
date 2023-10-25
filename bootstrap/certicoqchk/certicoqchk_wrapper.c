@@ -1,18 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "values.h"
 #include "gc.h"
 #include <caml/memory.h>
 #include <time.h>
-#include <caml/mlvalues.h>
 #include <caml/callback.h>
 
 extern value body(struct thread_info *);
 
 extern value *call(struct thread_info *, value, value);
-
-_Bool is_ptr(value s) {
-  return (_Bool) Is_block(s);
-}
 
 // external : (coq_Options × ExtractedASTBaseQuoter.quoted_program) -> bool = "certicoqchk_wrapper"
 CAMLprim value certicoqchk_wrapper(value prog) {

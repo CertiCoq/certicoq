@@ -1,25 +1,8 @@
-#include "values.h"
+#include "gc_stack.h"
 struct closure;
-struct stack_frame;
-struct thread_info;
 struct closure {
   value (*func)(struct thread_info, value, value);
   value env;
-};
-
-struct stack_frame {
-  value *next;
-  value *root;
-  struct stack_frame *prev;
-};
-
-struct thread_info {
-  value *alloc;
-  value *limit;
-  struct heap *heap;
-  value args[1024];
-  struct stack_frame *fp;
-  unsigned long long nalloc;
 };
 
 extern int printf(signed char *);
@@ -58,12 +41,12 @@ signed char const prop_lit[7] = { 60, 112, 114, 111, 112, 62, 0, };
 
 unsigned int get_unboxed_ordinal(value $v)
 {
-  return (unsigned long long) $v >> 1LL;
+  return (value) $v >> 1LL;
 }
 
 unsigned int get_boxed_ordinal(value $v)
 {
-  return *((unsigned long long *) $v + -1LL) & 255LL;
+  return *((value *) $v + -1LL) & 255LL;
 }
 
 value *get_args(value $v)
@@ -240,8 +223,8 @@ void print_Coq_Init_Datatypes_bool(value $v)
 
 value call(struct thread_info *$tinfo, value $clo, value $arg)
 {
-  register unsigned long long *$f;
-  register unsigned long long *$envi;
+  register value *$f;
+  register value *$envi;
   register value $tmp;
   $f = (*((struct closure *) $clo)).func;
   $envi = (*((struct closure *) $clo)).env;

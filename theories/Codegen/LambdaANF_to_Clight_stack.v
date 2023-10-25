@@ -297,7 +297,9 @@ Notation ulongTy := (Tlong Unsigned
 
 Definition int_chunk := if Archi.ptr64 then Mint64 else Mint32.
 (* NOTE for val: in Clight, SIZEOF_PTR == SIZEOF_INT *)
-Definition val := if Archi.ptr64 then ulongTy else uintTy.
+
+Definition val : type := talignas (if Archi.ptr64 then 3%N else 2%N) (tptr tvoid).
+(* Definition val := if Archi.ptr64 then ulongTy else uintTy. *)
 Definition uval := if Archi.ptr64 then ulongTy else uintTy.
 Definition sval := if Archi.ptr64 then longTy else intTy.
 Definition val_typ := if Archi.ptr64 then  (AST.Tlong:typ) else (Tany32:typ).
@@ -1222,21 +1224,21 @@ Definition to_plain_members (l : list (ident * type)) : list member :=
 
 (* Types declared at the begining of the program *)
 Definition composites : list composite_definition :=
-  Composite stackframeTIdent Struct
-            (to_plain_members ((nextFld, valPtr) ::
-             (rootFld, valPtr) ::
-             (prevFld, (tptr stackframeT)) :: nil))
-            noattr ::
-  Composite threadInfIdent Struct
-            (to_plain_members ((allocIdent, valPtr) ::
-             (limitIdent, valPtr) ::
-             (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) ::
-             (argsIdent, (Tarray uval maxArgs noattr)) ::
-             (fpIdent, (tptr stackframeT)) ::
-             (nallocIdent, val) :: nil)) (* Zoe : This is the number of allocations until the next GC call so that GC can perform a test. 
-                                         * Note that it will be coerced to UL from ULL. That should be safe for the values we're using but 
-                                         * consider changing it too. *)
-            noattr ::
+  (* Composite stackframeTIdent Struct *)
+  (*           (to_plain_members ((nextFld, valPtr) :: *)
+  (*            (rootFld, valPtr) :: *)
+  (*            (prevFld, (tptr stackframeT)) :: nil)) *)
+  (*           noattr :: *)
+  (* Composite threadInfIdent Struct *)
+  (*           (to_plain_members ((allocIdent, valPtr) :: *)
+  (*            (limitIdent, valPtr) :: *)
+  (*            (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) :: *)
+  (*            (argsIdent, (Tarray uval maxArgs noattr)) :: *)
+  (*            (fpIdent, (tptr stackframeT)) :: *)
+  (*            (nallocIdent, val) :: nil)) (1* Zoe : This is the number of allocations until the next GC call so that GC can perform a test. *) 
+  (*                                        * Note that it will be coerced to UL from ULL. That should be safe for the values we're using but *) 
+  (*                                        * consider changing it too. *1) *)
+  (*           noattr :: *)
    nil.
 
 Definition mk_prog_opt (defs: list (ident * globdef Clight.fundef type))
@@ -1379,7 +1381,6 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
 End Check.
 
 Definition make_tinfoIdent := 20%positive.
-Definition exportIdent := 21%positive.
 
 Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
   (make_tinfoIdent,
@@ -1389,14 +1390,6 @@ Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
                   threadInf
                   cc_default)).
                   
-Definition export_rec : positive * globdef Clight.fundef type :=
-  (exportIdent,
-   Gfun (External (EF_external "export"
-                               (mksignature (cons val_typ nil) (Tret val_typ) cc_default))
-                  (Tcons threadInf Tnil)
-                  valPtr
-                  cc_default)).
-
 Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_env) :
   error (name_env * Clight.program * Clight.program) * string :=
   let e := wrap_in_fun e in
@@ -1416,10 +1409,8 @@ Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_e
        let nenv := (add_inf_vars (ensure_unique nenv1)) in
        let forward_defs := make_extern_decls nenv defs false in
        body <- mk_prog_opt [body_external_decl] mainIdent false;;
-       head <- mk_prog_opt (make_tinfo_rec :: export_rec :: forward_defs ++ defs)%list mainIdent true ;;
-       ret (M.set make_tinfoIdent (nNamed "make_tinfo"%bs)
-             (M.set exportIdent (nNamed "export"%bs) nenv),
-            body, head)
+       head <- mk_prog_opt (make_tinfo_rec :: forward_defs ++ defs)%list mainIdent true ;;
+       ret (M.set make_tinfoIdent (nNamed "make_tinfo"%bs) nenv, body, head)
   in
   (err, "").
 

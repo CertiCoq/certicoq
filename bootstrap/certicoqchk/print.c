@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "print.h"
+#include "values.h"
 #include "gc.h"
 #include <caml/memory.h>
-#include <caml/mlvalues.h>
 #include <caml/callback.h>
 
 void call_coq_msg_info(value msg)

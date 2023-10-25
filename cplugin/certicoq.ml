@@ -337,7 +337,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let compile opts term imports =
     let debug = opts.debug in
     let options = make_pipeline_options opts in
-    let imports = get_global_includes () @ imports in
+    let runtime_imports = [if opts.cps then "gc.h" else "gc_stack.h"] in
+    let imports = runtime_imports @ get_global_includes () @ imports in
     debug_msg debug (Printf.sprintf "Imports: %s" (String.concat " " imports));
     let p = CI.compile options term in
     match p with
@@ -349,7 +350,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let cstr = make_fname opts (fname ^ suff ^ ".c") in
       let hstr = make_fname opts (fname ^ suff ^ ".h") in
       CI.printProg prg nenv cstr imports (* (List.map Tm_util.string_to_list imports) *);
-      CI.printProg header nenv hstr [];
+      CI.printProg header nenv hstr runtime_imports;
 
       (* let cstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
       * let hstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
@@ -371,7 +372,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     else
     let debug = opts.debug in
     let options = make_pipeline_options opts in
-
+    let runtime_imports = [if opts.cps then "gc.h" else "gc_stack.h"] in
     let time = Unix.gettimeofday() in
     (match CI.generate_glue options globs with
     | CompM.Ret (((nenv, header), prg), logs) ->
@@ -386,8 +387,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let hstr = if standalone then fname ^ ".h" else "glue." ^ fname ^ suff ^ ".h" in
       let cstr = make_fname opts cstr in
       let hstr = make_fname opts hstr in
-      CI.printProg prg nenv cstr [];
-      CI.printProg header nenv hstr [];
+      CI.printProg prg nenv cstr runtime_imports;
+      CI.printProg header nenv hstr runtime_imports;
 
       let time = (Unix.gettimeofday() -. time) in
       debug_msg debug (Printf.sprintf "Printed glue code to file in %f s.." time)

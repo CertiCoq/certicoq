@@ -1,3 +1,6 @@
+#ifndef CERTICOQ_GC_STACK_H
+#define CERTICOQ_GC_STACK_H
+
 #include "values.h"
 
 /* EXPLANATION OF THE CERTICOQ GENERATIONAL GARBAGE COLLECTOR.
@@ -88,6 +91,9 @@ recent collection.
 To call the garbage collector, the mutator passes a fun_info and
 a thread_info, as follows. */
 
+#define No_scan_tag 251
+#define No_scan(t) ((t) >= No_scan_tag)
+
 typedef const uintnat *fun_info;
 /* fi[0]: How many words the function might allocate
    fi[1]: How many slots of the args array contain live roots
@@ -113,6 +119,7 @@ struct thread_info {
   value args[MAX_ARGS];   /* the args array */
   struct stack_frame *fp; /* stack pointer */
   uintnat nalloc; /* Remaining allocation until next GC call*/
+  void *odata;
 };
 
 struct thread_info *make_tinfo(void);
@@ -162,4 +169,11 @@ value* extract_answer(struct thread_info *ti);
   can be treated uniformly by the caller of extract_answer().
 */
 
-void* export(struct thread_info *ti);
+void* export(struct thread_info *ti, value root);
+
+/* mutable write barrier */
+void certicoq_modify(struct thread_info *ti, value *p_cell, value p_val);
+
+void print_heapsize(struct thread_info *ti);
+
+#endif /* CERTICOQ_GC_STACK_H */

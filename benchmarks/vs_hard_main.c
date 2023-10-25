@@ -3,28 +3,20 @@
 #include "gc.h"
 #include <time.h>
 
-
 extern value body(struct thread_info *);
 
-extern void print_Coq_Init_Datatypes_bool(unsigned long long);
+extern void print_Coq_Init_Datatypes_bool(value);
 
-_Bool is_ptr(value s) {
-  return (_Bool) Is_block(s);
-}
+extern void print_Coq_Init_Datatypes_list(value, void (*)(value));
 
-extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
-
-void print_elem(unsigned long long v)
-{
+void print_elem(value v) {
   printf(".");
 }
 
-void print_list(unsigned long long l)
-{
+void print_list(value l) {
   print_Coq_Init_Datatypes_list(l, print_elem);
   printf("\n");
 }
-
 
 int main(int argc, char *argv[]) {
   value val;

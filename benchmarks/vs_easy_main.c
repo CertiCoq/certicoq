@@ -1,49 +1,38 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "gc.h"
+#include "gc_stack.h"
 #include <time.h>
-
 
 extern value body(struct thread_info *);
 
-extern void print_Coq_Init_Datatypes_bool(unsigned long long);
+extern void print_Coq_Init_Datatypes_bool(value);
 
-extern void print_CertiCoq_Benchmarks_lib_vs_space_atom(unsigned long long);
+extern void print_CertiCoq_Benchmarks_lib_vs_space_atom(value);
 
-extern unsigned int get_Coq_Init_Datatypes_list_tag(unsigned long long);
+extern unsigned int get_Coq_Init_Datatypes_list_tag(value);
 
-_Bool is_ptr(value s) {
-  return (_Bool) Is_block(s);
-}
+extern void print_Coq_Init_Datatypes_list(value, void (*)(value));
 
-extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
+extern void print_CertiCoq_Benchmarks_lib_vs_clause(value);
 
-extern void print_CertiCoq_Benchmarks_lib_vs_clause(unsigned long long);
-
-void print_elem(unsigned long long v)
-{
+void print_elem(value v) {
   printf(".");
 }
 
-void print_list(unsigned long long l)
-{
+void print_list(value l) {
   print_Coq_Init_Datatypes_list(l, print_elem);
   printf("\n");
 }
 
-void print_list_space_atom(unsigned long long l)
-{
+void print_list_space_atom(value l) {
   print_Coq_Init_Datatypes_list(l, print_CertiCoq_Benchmarks_lib_vs_space_atom);
   printf("\n");
 }
 
-void print_list_clause(unsigned long long l)
-{
+void print_list_clause(value l) {
   print_Coq_Init_Datatypes_list(l, print_CertiCoq_Benchmarks_lib_vs_clause);
   printf("\n");
 }
-
-
 
 int main(int argc, char *argv[]) {
   value val;

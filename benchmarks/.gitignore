@@ -8,6 +8,7 @@ Top.*
 glue.Top.*
 ffi.Top.*
 
+m.h
 gc.c
 gc.h
 gc_stack.c

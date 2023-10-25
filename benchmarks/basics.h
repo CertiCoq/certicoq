@@ -1,25 +1,8 @@
-#include "values.h"
+#include "gc_stack.h"
 struct closure;
-struct stack_frame;
-struct thread_info;
 struct closure {
   value (*func)(struct thread_info, value, value);
   value env;
-};
-
-struct stack_frame {
-  value *next;
-  value *root;
-  struct stack_frame *prev;
-};
-
-struct thread_info {
-  value *alloc;
-  value *limit;
-  struct heap *heap;
-  value args[1024];
-  struct stack_frame *fp;
-  unsigned long long nalloc;
 };
 
 extern unsigned int get_unboxed_ordinal(value);

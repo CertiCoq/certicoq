@@ -185,12 +185,102 @@ Section ANF_proof.
   Proof.
   Admitted.
 
-  Lemma convert_anf_fresh_subset S e names cenv' S' C x :
-    convert_anf_rel S e names cenv' S' C x ->
-    S' \subset S.
-  Proof.
-  Admitted.
+  Definition P := fun e =>
+                    forall (S : Ensemble var) (names : list var)
+                           (S' : Ensemble var) (C : exp_ctx) 
+                           (x : var)
+                           (Hanf : convert_anf_rel S e names cenv S' C x),
+                      S' \subset S.
 
+  Require Import stemctx.
+
+
+  Corollary bound_stem_ctx_comp_f c c' :
+    bound_stem_ctx (comp_ctx_f c c') <-->
+    bound_stem_ctx c :|: bound_stem_ctx c'.
+  Proof.
+    symmetry. 
+    eapply bound_stem_comp_ctx_mut.
+  Qed.
+    
+  Lemma convert_anf_rel_efnlst_names S fns names fs S' fns' :
+    convert_anf_rel_efnlst S fns names cenv fs S' fns' ->
+    name_in_fundefs fns' <--> FromList fs.
+  Proof.
+    intros Hanf. induction Hanf; normalize_sets.
+    - now sets.
+    - simpl. rewrite IHHanf. reflexivity.
+  Qed.
+    
+
+  Lemma convert_anf_fresh_subset:
+        forall e (S : Ensemble var) (names : list var)
+               (S' : Ensemble var) (C : exp_ctx) 
+               (x : var), 
+          convert_anf_rel S e names cenv S' C x -> 
+          S' \subset S \\ bound_stem_ctx C. 
+  Proof.
+    intros e. 
+    eapply expression.exp_ind' with (P := fun e => 
+                                            forall S names S' C x
+                                                   (Hanf : convert_anf_rel S e names cenv S' C x),
+                                              S' \subset S \\ bound_stem_ctx C)
+           (P0 := fun es =>
+                    forall S names S' C x
+                           (Hanf : convert_anf_rel_exps S es names cenv S' C x),
+                      S' \subset S \\ bound_stem_ctx C)
+           (P1 := fun fns => forall S names fs S' fns'
+                                    (Hanf : convert_anf_rel_efnlst S fns names cenv fs S' fns'),
+                      Disjoint _ S (FromList fs) ->
+                      NoDup fs -> 
+                      S' \subset S)
+           (P2 := fun bs => forall S names S' x cl
+                                   (Hanf : convert_anf_rel_branches S bs x names cenv S' cl),
+                      S' \subset S); intros; inv Hanf; (try now sets);
+      try (try rewrite !bound_stem_ctx_comp_f; repeat normalize_bound_stem_ctx; simpl; repeat normalize_sets; simpl). 
+    - eapply Included_trans. eapply H. eassumption. now sets.
+    - eapply Included_trans. eapply H0. eassumption.
+      eapply Included_trans. eapply Included_Setminus_compat. 
+      eapply H. eassumption. reflexivity. now sets.
+    - eapply Included_trans. eapply H. eassumption. now sets.
+    - eapply Included_trans. eapply H0. eassumption.
+      eapply Included_trans. eapply H. eassumption.
+      rewrite !bound_stem_ctx_comp_f. repeat normalize_bound_stem_ctx. 
+      now xsets. 
+    - eapply Included_trans. eapply H0. eassumption.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. eassumption. reflexivity.
+      now sets. 
+    - eapply Included_trans. eapply H. eassumption. now sets. eassumption.
+      rewrite convert_anf_rel_efnlst_names; eauto. reflexivity.
+    - now sets.
+    - now sets.
+    - eapply Included_trans. eapply H0. eassumption.
+      eapply Included_trans. eapply Included_Setminus_compat. 
+      eapply H. eassumption. reflexivity. now sets.
+    - inv H2. 
+      specialize H with (C := (Efun1_c (Fcons f func_tag [arg] (C1 |[ Ehalt x1 ]|) Fnil) Hole_c)).
+      assert (Hseq : S <--> S \\ [set f]).
+      { eapply Included_Setminus_Disjoint. now sets. } 
+      assert (Hin : S2 \subset S).
+      { eapply convert_anf_rel_same_set with (S2 := S :|: [set f] \\ [set arg] \\ [set f]) in H13.
+        destructAll. rewrite H2. 
+        eapply Included_trans. eapply H. econstructor; [ | | eassumption ]. now sets.
+        constructor. now sets.
+        intros Heq. inv Heq. eapply H1. constructor. eassumption. now sets.
+        repeat normalize_bound_stem_ctx. simpl. repeat normalize_sets. now sets.
+        
+        rewrite Setminus_Union, Union_commut with (s1 := [set arg]).
+        rewrite <- Setminus_Union, !Setminus_Union_distr, Setminus_Same_set_Empty_set.
+        repeat normalize_sets. rewrite <- Hseq. reflexivity. }
+
+      eapply Included_trans. eapply H0; try eassumption.
+      
+      eapply Disjoint_Included_l. eassumption. now sets. eassumption.
+    - eapply Included_trans. eapply H. eassumption.
+      rewrite Setminus_Union. eapply Included_trans. eapply Included_Setminus_compat.
+      eapply H0. eassumption. reflexivity. now sets.
+  Qed.
+  
   Lemma convert_anf_rel_exps_fresh_subset S e names cenv' S' C x :
     convert_anf_rel_exps S e names cenv' S' C x ->
     S' \subset S.
@@ -243,7 +333,6 @@ Section ANF_proof.
     - exfalso; eapply Hdis; split; [ eassumption | ]. eapply H1.
   Qed.
   
-  Require Import stemctx.
   
   Lemma occurs_free_ctx_comp (C1 C2 : exp_ctx) :
     occurs_free_ctx (comp_ctx_f C1 C2) \subset
@@ -416,24 +505,7 @@ Section ANF_proof.
   Qed.
 
     
-  Corollary bound_stem_ctx_comp_f c c' :
-    bound_stem_ctx (comp_ctx_f c c') <-->
-    bound_stem_ctx c :|: bound_stem_ctx c'.
-  Proof.
-    symmetry. 
-    eapply bound_stem_comp_ctx_mut.
-  Qed.
-    
 
-  Lemma convert_anf_rel_efnlst_names S fns names fs S' fns' :
-    convert_anf_rel_efnlst S fns names cenv fs S' fns' ->
-    name_in_fundefs fns' <--> FromList fs.
-  Proof.
-    intros Hanf. induction Hanf; normalize_sets.
-    - now sets.
-    - simpl. rewrite IHHanf. reflexivity.
-  Qed.
-    
     
   Lemma convert_anf_res_included S e names S' C x :
     convert_anf_rel S e names cenv S' C x ->

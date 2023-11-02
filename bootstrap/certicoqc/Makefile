@@ -1,4 +1,4 @@
-CCOMPILER = clang-11 # ccomp # gcc takes ages
+CCOMPILER := $(shell { command -v clang-11 || command -v clang; } 2>/dev/null)
 
 -include ../../Makefile.conf
 
@@ -51,7 +51,7 @@ plugin: theories/compile.vo certicoqc
 
 Makefile.certicoqc: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.certicoqc
-	
+
 certicoqc: Makefile.certicoqc certicoqc_plugin.cmxs
 	$(MAKE) -f Makefile.certicoqc
 

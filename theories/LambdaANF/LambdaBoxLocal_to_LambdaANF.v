@@ -922,7 +922,7 @@ Section Translate.
       make_proj_ctx ct vars scrut (i + 1) C ->
       make_proj_ctx ct (x::vars) scrut i (Eproj_c x ct i scrut C).
 
-  Parameter (cenv : constr_env). 
+  Context (cenv : constr_env). 
 
   Inductive convert_anf_rel : Ensemble var ->   (* Input fresh identifiers *)
                               expression.exp -> (* Input LambdaBoxLocal exp *)

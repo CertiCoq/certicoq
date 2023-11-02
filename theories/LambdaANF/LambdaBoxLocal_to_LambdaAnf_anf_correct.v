@@ -30,10 +30,10 @@ Section ANF_proof.
 
   (** ** ANF value relation *)
 
-  Definition convert_anf_rel := convert_anf_rel func_tag default_tag.
-  Definition convert_anf_rel_exps := convert_anf_rel_exps func_tag default_tag.
-  Definition convert_anf_rel_efnlst := convert_anf_rel_efnlst func_tag default_tag.
-  Definition convert_anf_rel_branches := convert_anf_rel_branches func_tag default_tag.
+  Definition convert_anf_rel := convert_anf_rel func_tag default_tag cenv.
+  Definition convert_anf_rel_exps := convert_anf_rel_exps func_tag default_tag cenv.
+  Definition convert_anf_rel_efnlst := convert_anf_rel_efnlst func_tag default_tag cenv.
+  Definition convert_anf_rel_branches := convert_anf_rel_branches func_tag default_tag cenv.
 
   Definition anf_env_rel' (P : value -> val -> Prop) (vn : list var)
              (vs : list value) (rho : M.t val) :=
@@ -49,7 +49,7 @@ Section ANF_proof.
       S1' \subset S1 \\ [set x] ->
       S2' \subset S2 ->
 
-      convert_anf_rel S1' e1 (x :: List.rev fnames ++ env) cenv S2 C1 r1 ->
+      convert_anf_rel S1' e1 (x :: List.rev fnames ++ env) S2 C1 r1 ->
 
       anf_fix_rel fnames env S2' fnames' efns B S3 ->
 
@@ -73,7 +73,7 @@ Section ANF_proof.
       ~ x \in [set f] :|: FromList names ->
       ~ f \in FromList names ->
 
-     convert_anf_rel S1 e (x::names) cenv S2 C r ->
+     convert_anf_rel S1 e (x::names) S2 C r ->
 
      anf_val_rel (Clos_v vs na e)
                  (Vfun rho (Fcons f func_tag (x::nil) (C |[ Ehalt r ]|) Fnil) f)
@@ -108,7 +108,7 @@ Section ANF_proof.
          
       anf_env_rel env vs rho ->
 
-      convert_anf_rel S e env cenv S' C x ->
+      convert_anf_rel S e env S' C x ->
 
       (* Source terminates *)
       (forall v v', r = (Val v) -> anf_val_rel v v' ->
@@ -133,7 +133,7 @@ Section ANF_proof.
 
       
 
-      convert_anf_rel S e env cenv S' C x ->
+      convert_anf_rel S e env S' C x ->
 
       (* Source terminates *)
       (forall v v', r = (Val v) -> anf_val_rel v v' ->
@@ -160,7 +160,7 @@ Section ANF_proof.
 
       anf_env_rel env vs rho ->
 
-      convert_anf_rel_exps S es env cenv S' C ys ->
+      convert_anf_rel_exps S es env S' C ys ->
 
       Forall2 (anf_val_rel) vs1 vs2 ->
 
@@ -170,17 +170,17 @@ Section ANF_proof.
           preord_exp ctenv (cps_bound f (t <+> (2 * Datatypes.length (exps_as_list es))%nat))
                      eq_fuel i (e', rho') (C |[ e' ]|, rho).
 
-  Lemma convert_anf_rel_same_set S1 e names cenv' S1' C x S2:
-    convert_anf_rel S1 e names cenv' S1' C x ->
+  Lemma convert_anf_rel_same_set S1 e names S1' C x S2:
+    convert_anf_rel S1 e names S1' C x ->
     S1 <--> S2 ->
     exists S2',
       S1' <--> S2' /\
-      convert_anf_rel S2 e names cenv' S2' C x.
+      convert_anf_rel S2 e names S2' C x.
   Proof.
   Admitted.
            
-  Lemma convert_anf_result_not_fresh S e names cenv' S' C x :
-    convert_anf_rel S e names cenv' S' C x ->
+  Lemma convert_anf_result_not_fresh S e names S' C x :
+    convert_anf_rel S e names S' C x ->
     ~ x \in S'.
   Proof.
   Admitted.
@@ -189,7 +189,7 @@ Section ANF_proof.
                     forall (S : Ensemble var) (names : list var)
                            (S' : Ensemble var) (C : exp_ctx) 
                            (x : var)
-                           (Hanf : convert_anf_rel S e names cenv S' C x),
+                           (Hanf : convert_anf_rel S e names S' C x),
                       S' \subset S.
 
   Require Import stemctx.
@@ -204,7 +204,7 @@ Section ANF_proof.
   Qed.
     
   Lemma convert_anf_rel_efnlst_names S fns names fs S' fns' :
-    convert_anf_rel_efnlst S fns names cenv fs S' fns' ->
+    convert_anf_rel_efnlst S fns names fs S' fns' ->
     name_in_fundefs fns' <--> FromList fs.
   Proof.
     intros Hanf. induction Hanf; normalize_sets.
@@ -213,29 +213,29 @@ Section ANF_proof.
   Qed.
     
 
-  Lemma convert_anf_fresh_subset:
+  Lemma convert_anf_fresh_subset_strong :
         forall e (S : Ensemble var) (names : list var)
                (S' : Ensemble var) (C : exp_ctx) 
                (x : var), 
-          convert_anf_rel S e names cenv S' C x -> 
+          convert_anf_rel S e names S' C x -> 
           S' \subset S \\ bound_stem_ctx C. 
   Proof.
     intros e. 
     eapply expression.exp_ind' with (P := fun e => 
                                             forall S names S' C x
-                                                   (Hanf : convert_anf_rel S e names cenv S' C x),
+                                                   (Hanf : convert_anf_rel S e names S' C x),
                                               S' \subset S \\ bound_stem_ctx C)
            (P0 := fun es =>
                     forall S names S' C x
-                           (Hanf : convert_anf_rel_exps S es names cenv S' C x),
+                           (Hanf : convert_anf_rel_exps S es names S' C x),
                       S' \subset S \\ bound_stem_ctx C)
            (P1 := fun fns => forall S names fs S' fns'
-                                    (Hanf : convert_anf_rel_efnlst S fns names cenv fs S' fns'),
+                                    (Hanf : convert_anf_rel_efnlst S fns names fs S' fns'),
                       Disjoint _ S (FromList fs) ->
                       NoDup fs -> 
                       S' \subset S)
            (P2 := fun bs => forall S names S' x cl
-                                   (Hanf : convert_anf_rel_branches S bs x names cenv S' cl),
+                                   (Hanf : convert_anf_rel_branches S bs x names S' cl),
                       S' \subset S); intros; inv Hanf; (try now sets);
       try (try rewrite !bound_stem_ctx_comp_f; repeat normalize_bound_stem_ctx; simpl; repeat normalize_sets; simpl). 
     - eapply Included_trans. eapply H. eassumption. now sets.
@@ -262,7 +262,7 @@ Section ANF_proof.
       assert (Hseq : S <--> S \\ [set f]).
       { eapply Included_Setminus_Disjoint. now sets. } 
       assert (Hin : S2 \subset S).
-      { eapply convert_anf_rel_same_set with (S2 := S :|: [set f] \\ [set arg] \\ [set f]) in H13.
+      { eapply convert_anf_rel_same_set with (S2 := S :|: [set f] \\ [set arg] \\ [set f]) in H12.
         destructAll. rewrite H2. 
         eapply Included_trans. eapply H. econstructor; [ | | eassumption ]. now sets.
         constructor. now sets.
@@ -280,34 +280,58 @@ Section ANF_proof.
       rewrite Setminus_Union. eapply Included_trans. eapply Included_Setminus_compat.
       eapply H0. eassumption. reflexivity. now sets.
   Qed.
-  
-  Lemma convert_anf_rel_exps_fresh_subset S e names cenv' S' C x :
-    convert_anf_rel_exps S e names cenv' S' C x ->
+
+  Lemma convert_anf_fresh_subset e (S : Ensemble var) (names : list var)
+        (S' : Ensemble var) (C : exp_ctx) (x : var): 
+    convert_anf_rel S e names S' C x -> 
+    S' \subset S. 
+  Proof.
+    intros. eapply Included_trans. eapply convert_anf_fresh_subset_strong.
+    eassumption. now sets.
+  Qed.    
+
+  Lemma convert_anf_rel_exps_fresh_subset S e names S' C x :
+    convert_anf_rel_exps S e names S' C x ->
     S' \subset S.
   Proof.
-  Admitted.
+    intros Hrel. induction Hrel.
+    - now sets.
+    - eapply Included_trans. eassumption.
+      eapply convert_anf_fresh_subset. eapply H.
+  Qed.
 
-  Lemma convert_anf_rel_branches_fresh_subset S bs y names cenv' S' bs' :
-    convert_anf_rel_branches S bs y names cenv' S' bs' ->
+  Lemma convert_anf_rel_branches_fresh_subset S bs y names S' bs' :
+    convert_anf_rel_branches S bs y names S' bs' ->
+    S' \subset S.
+  Proof.
+    intros Hrel. induction Hrel.
+    - now sets.
+    - eapply Included_trans.
+      eapply convert_anf_fresh_subset. eassumption.
+      eapply Setminus_Included_Included_Union. eapply Included_trans.
+      eassumption. now sets. 
+  Qed.
+
+  Lemma convert_anf_rel_efnlst_fresh_subset S bs y names S' bs' :
+    convert_anf_rel_efnlst S bs y names S' bs' ->
     S' \subset S.
   Proof.    
-  Admitted.
-
-  Lemma convert_anf_rel_efnlst_fresh_subset S bs y names cenv' S' bs' :
-    convert_anf_rel_efnlst S bs y names cenv' S' bs' ->
-    S' \subset S.
-  Proof.    
-  Admitted.
+    intros Hrel. induction Hrel.
+    - now sets.
+    - eapply Included_trans. eassumption. 
+      eapply Included_trans. eapply convert_anf_fresh_subset. eassumption.
+      now sets.
+  Qed.
 
   Lemma convert_anf_in_env S e names S' C x env v f t : 
-    convert_anf_rel S e names cenv S' C x ->
+    convert_anf_rel S e names S' C x ->
     List.In x names -> 
     eval_env_fuel env e (Val v) f t ->
     Disjoint _ (FromList names) S ->
     exists n, nth_error env n = Some v /\ nth_error names n = Some x.
   Proof.
     intros Hrel. revert env v f t.
-    eapply convert_anf_rel_ind with (P := fun S e names cenv S' C x =>
+    eapply convert_anf_rel_ind with (P := fun S e names S' C x =>
                                             forall env v f t
                                               (Hin : List.In x names)
                                               (Heval: eval_env_fuel env e (Val v) f t)
@@ -504,21 +528,19 @@ Section ANF_proof.
         eapply Union_Included. now sets. now xsets. 
   Qed.
 
-    
 
-    
   Lemma convert_anf_res_included S e names S' C x :
-    convert_anf_rel S e names cenv S' C x ->
+    convert_anf_rel S e names S' C x ->
     x \in FromList names :|: bound_stem_ctx C.
   Proof.
     revert S names S' C x.
     eapply expression.exp_ind' with (P := fun e =>
                                             forall S names S' C x
-                                                   (Hanf : convert_anf_rel S e names cenv S' C x),
+                                                   (Hanf : convert_anf_rel S e names S' C x),
                                               x \in FromList names :|: bound_stem_ctx C)
                                     (P0 := fun es =>
                                              forall S names S' C x
-                                                    (Hanf : convert_anf_rel_exps S es names cenv S' C x),
+                                                    (Hanf : convert_anf_rel_exps S es names S' C x),
                                                FromList x \subset FromList names :|: bound_stem_ctx C)
                                     (P1 := fun fns => True)
                                     (P2 := fun bs => True); intros; try inv Hanf; eauto;
@@ -547,7 +569,7 @@ Section ANF_proof.
   Qed.      
       
    Lemma convert_anf_exps_res_included S es names S' C x :
-     convert_anf_rel_exps S es names cenv S' C x ->
+     convert_anf_rel_exps S es names S' C x ->
      FromList x \subset FromList names :|: bound_stem_ctx C.
    Proof.
      revert S es names S' C.
@@ -581,24 +603,24 @@ Section ANF_proof.
    
      
   Lemma convert_anf_occurs_free_ctx S e names S' C x :
-    convert_anf_rel S e names cenv S' C x ->
+    convert_anf_rel S e names S' C x ->
     occurs_free_ctx C \subset FromList names.
   Proof.
     revert S names S' C x.
     eapply expression.exp_ind' with (P := fun e =>
                                             forall S names S' C x
-                                                   (Hanf : convert_anf_rel S e names cenv S' C x),
+                                                   (Hanf : convert_anf_rel S e names S' C x),
                                               occurs_free_ctx C \subset FromList names)
                                     (P0 := fun es =>
                                              forall S names S' C x
-                                                    (Hanf : convert_anf_rel_exps S es names cenv S' C x),
+                                                    (Hanf : convert_anf_rel_exps S es names S' C x),
                                                occurs_free_ctx C \subset FromList names)
                                     (P1 := fun fns => forall S names fs S' fns'
-                                                             (Hanf : convert_anf_rel_efnlst S fns names cenv fs S' fns'),
+                                                             (Hanf : convert_anf_rel_efnlst S fns names fs S' fns'),
                                                Disjoint _ S (FromList fs) ->
                                                occurs_free_fundefs fns' \subset FromList names \\ name_in_fundefs fns')
                                     (P2 := fun bs => forall S names S' x cl
-                                                            (Hanf : convert_anf_rel_branches S bs x names cenv S' cl),
+                                                            (Hanf : convert_anf_rel_branches S bs x names S' cl),
                                                occurs_free (Ecase x cl) \\ [set x] \subset FromList names); intros; inv Hanf;
       try (now normalize_occurs_free_ctx; sets).
     - repeat normalize_occurs_free_ctx; repeat normalize_occurs_free.
@@ -732,23 +754,23 @@ Section ANF_proof.
   Qed.
 
   Lemma convert_anf_bound_stem_ctx S e names S' C x :
-    convert_anf_rel S e names cenv S' C x ->
+    convert_anf_rel S e names S' C x ->
     bound_stem_ctx C \subset S \\ S'.
   Proof.
     revert S names S' C x.
     eapply expression.exp_ind' with (P := fun e =>
                                             forall S names S' C x
-                                                   (Hanf : convert_anf_rel S e names cenv S' C x),
+                                                   (Hanf : convert_anf_rel S e names S' C x),
                                               bound_stem_ctx C \subset S \\ S')
                                     (P0 := fun es =>
                                              forall S names S' C x
-                                                    (Hanf : convert_anf_rel_exps S es names cenv S' C x),
+                                                    (Hanf : convert_anf_rel_exps S es names S' C x),
                                                bound_stem_ctx C \subset S \\ S')
                                     (P1 := fun fns => forall S names fs S' fns'
-                                                             (Hanf : convert_anf_rel_efnlst S fns names cenv fs S' fns'),
+                                                             (Hanf : convert_anf_rel_efnlst S fns names fs S' fns'),
                                                True)
                                     (P2 := fun bs => forall S names S' x cl
-                                                            (Hanf : convert_anf_rel_branches S bs x names cenv S' cl),
+                                                            (Hanf : convert_anf_rel_branches S bs x names S' cl),
                                                True); intros; inv Hanf;
       try (now normalize_bound_stem_ctx; sets); try now eauto.
     - repeat normalize_bound_stem_ctx. simpl.
@@ -1085,7 +1107,7 @@ Section ANF_proof.
           eapply IHoot with (rho := rho'') in H13.
           
           * destructAll.
-            assert (Hoot' : bstep_fuel cenv x8 (Efun (Fcons k1 kon_tag [x9] es' Fnil) e'0) (x4 + 1)%nat OOT tt).
+            assert (Hoot' : bstep_fuel x8 (Efun (Fcons k1 kon_tag [x9] es' Fnil) e'0) (x4 + 1)%nat OOT tt).
             { replace tt with (tt <+> tt) by reflexivity. econstructor 2. econstructor. simpl. eassumption. }
             
             edestruct H9. reflexivity. eassumption. destructAll.

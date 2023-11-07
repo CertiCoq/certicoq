@@ -33,8 +33,8 @@ Import MonadNotation ListNotations.
 Open Scope monad_scope.
 Local Open Scope bs_scope.
 
-Definition valInt : type := val.
 Definition val : type := talignas (if Archi.ptr64 then 3%N else 2%N) (tptr tvoid).
+Definition uval := if Archi.ptr64 then ulongTy else uintTy.
 Definition argvTy : type := tptr val.
 
 Notation "'Field(' t ',' n ')'" :=
@@ -274,7 +274,9 @@ Section Externs.
                   ; fn_params := (_v, val) :: nil
                   ; fn_vars := nil
                   ; fn_temps := nil
-                  ; fn_body := (Sreturn (Some (Ebinop Oshr (Ecast (var _v) valInt) (make_cint 1 val) val)))
+                  ; fn_body := (Sreturn (Some
+                                 (Ebinop Oshr (Ecast (var _v) uval)
+                                              (make_cint 1 val) val)))
                   |})).
 
   Definition get_boxed_ordinal : glueM def :=
@@ -288,7 +290,10 @@ Section Externs.
                   ; fn_vars := nil
                   ; fn_temps := nil
                   ; fn_body :=
-                      (Sreturn (Some (Ebinop Oand (Field(Ecast (var _v) (tptr valInt), -1)) (make_cint 255 val) val)))
+                      (Sreturn (Some
+                        (Ebinop Oand
+                          (Ecast (Field(Ecast (var _v) (tptr uval), -1)) uval)
+                          (make_cint 255 val) val)))
                   |})).
 
   Definition get_args : glueM def :=

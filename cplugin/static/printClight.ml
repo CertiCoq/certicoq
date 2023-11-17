@@ -361,6 +361,7 @@ let print_dest_names_imports prog names (dest : string) (imports : string list) 
   List.iter (fun n -> add_name (remove_primes n))  names;
   let fm = formatter_of_out_channel oc in
   open_vbox 0;
+  fprintf fm "#pragma once"; pp_print_newline fm ();
   List.iter (fun s -> fprintf fm "#include \"%s\"" s; pp_print_newline fm ();) imports;
   close_box ();
   open_box 0;

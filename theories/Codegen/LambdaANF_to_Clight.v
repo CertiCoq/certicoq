@@ -1258,17 +1258,17 @@ Definition global_defs (e : exp)
                                     ((Init_int(Int.zero)) :: nil)
                                     false false))
     :: *)
-  (gcIdent,
-   Gfun (External (EF_external (String.to_string "gc")
-                  (mksignature (val_typ :: nil) AST.Tvoid cc_default))
-      (Tcons (Tpointer val noattr) (Tcons threadInf Tnil))
-      Tvoid
-      cc_default)) ::
-  (isptrIdent,
-   Gfun (External (EF_external (String.to_string "is_ptr")
-                             (mksignature (val_typ :: nil) AST.Tvoid cc_default))
-      (Tcons val Tnil) (Tint IBool Unsigned noattr)
-      cc_default)) ::
+  (* (gcIdent, *)
+  (*  Gfun (External (EF_external (String.to_string "garbage_collect") *)
+  (*                 (mksignature (val_typ :: nil) AST.Tvoid cc_default)) *)
+  (*     (Tcons (Tpointer val noattr) (Tcons threadInf Tnil)) *)
+  (*     Tvoid *)
+  (*     cc_default)) :: *)
+  (* (isptrIdent, *)
+  (*  Gfun (External (EF_external (String.to_string "is_ptr") *)
+  (*                            (mksignature (val_typ :: nil) AST.Tvoid cc_default)) *)
+  (*     (Tcons val Tnil) (Tint IBool Unsigned noattr) *)
+  (*     cc_default)) :: *)
   nil.
 
 

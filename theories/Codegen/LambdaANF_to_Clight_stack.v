@@ -1197,15 +1197,15 @@ Definition make_funinfo (e : exp) (fenv : fun_env) (nenv : name_env)
 
 
 Definition global_defs (e : exp) : list (positive * globdef Clight.fundef type) :=
-  (gcIdent , Gfun (External (EF_external "gc"%string
-                                         (mksignature (val_typ :: nil) AST.Tvoid cc_default))
-                            (Tcons threadInf Tnil)
-                            Tvoid
-                            cc_default )) ::
-  (isptrIdent , Gfun (External (EF_external "is_ptr"
-                                            (mksignature (val_typ :: nil) AST.Tvoid cc_default))
-                               (Tcons val Tnil) (Tint IBool Unsigned noattr)
-                               cc_default )) ::
+  (* (gcIdent , Gfun (External (EF_external "garbage_collect"%string *)
+  (*                                        (mksignature (val_typ :: nil) AST.Tvoid cc_default)) *)
+  (*                           (Tcons threadInf Tnil) *)
+  (*                           Tvoid *)
+  (*                           cc_default )) :: *)
+  (* (isptrIdent , Gfun (External (EF_external "is_ptr" *)
+  (*                                           (mksignature (val_typ :: nil) AST.Tvoid cc_default)) *)
+  (*                              (Tcons val Tnil) (Tint IBool Unsigned noattr) *)
+  (*                              cc_default )) :: *)
   nil.
 
 Definition make_defs (args_opt : bool) (e : exp) (fenv : fun_env) (cenv: ctor_env) (ienv : n_ind_env) (nenv : name_env) :

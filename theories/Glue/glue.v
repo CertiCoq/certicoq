@@ -437,6 +437,7 @@ Section Externs.
          |} in
     let dfs :=
       (literal_defs ++
+       (*
        (_printf,
         Gfun (External (EF_external "printf"
                           (mksignature (AST.Tint :: nil)
@@ -448,6 +449,7 @@ Section Externs.
                           (mksignature (val_typ :: nil) AST.Tvoid cc_default))
                         (Tcons val Tnil)
                         (Tint IBool Unsigned noattr) cc_default)) ::
+       *)
        (_guo, def_guo) ::
        (_gbo, def_gbo) ::
        (_get_args, def_get_args) ::
@@ -1291,8 +1293,8 @@ Section FunctionCalls.
     let params := (_tinfo, (threadInf _thread_info)) ::
                   (_clo, val) ::
                   (_arg, val) :: nil in
-    let vars := (_f, valPtr) ::
-                (_env, valPtr) ::
+    let vars := (_f, val) ::
+                (_env, val) ::
                 match backend with
                 | ANF => (_tmp, val) :: nil
                 | CPS => nil
@@ -1327,7 +1329,7 @@ Definition make_glue_program
   let glob_defs := (externs ++ name_defs ++ ctor_defs ++ get_tag_defs ++
                    printer_defs ++ halt_defs ++ call_def :: nil)%list in
   let pi := map fst glob_defs in
-  ret (mk_prog_opt composites (make_extern_decls nenv glob_defs true)
+  ret (mk_prog_opt nil (make_extern_decls nenv glob_defs true)
                    main_ident true,
        mk_prog_opt composites glob_defs
                    main_ident true).

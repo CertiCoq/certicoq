@@ -225,17 +225,19 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let time = Unix.gettimeofday() in
       let fname = opts.filename in
       let suff = opts.ext in
-      let cstr = make_fname opts (fname ^ suff ^ ".c") in
-      let hstr = make_fname opts (fname ^ suff ^ ".h") in
-      CI.printProg prg nenv cstr imports;
-      CI.printProg header nenv hstr runtime_imports;
+      let cstr = fname ^ suff ^ ".c" in
+      let hstr = fname ^ suff ^ ".h" in
+      let cstr' = make_fname opts cstr in
+      let hstr' = make_fname opts hstr in
+      CI.printProg prg nenv cstr' (imports @ [hstr]);
+      CI.printProg header nenv hstr' (runtime_imports);
 
       (* let cstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
       * let hstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
       * Pipeline.printProg (nenv,prg) cstr;
       * Pipeline.printProg (nenv,header) hstr; *)
       let time = (Unix.gettimeofday() -. time) in
-      debug_msg debug (Printf.sprintf "Printed to file %s in %f s.." cstr time);
+      debug_msg debug (Printf.sprintf "Printed to file %s in %f s.." cstr' time);
       debug_msg debug "Pipeline debug:";
       debug_msg debug (string_of_bytestring dbg)
     | (CompM.Err s, dbg) ->
@@ -264,10 +266,10 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let fname = opts.filename in
       let cstr = if standalone then fname ^ ".c" else "glue." ^ fname ^ suff ^ ".c" in
       let hstr = if standalone then fname ^ ".h" else "glue." ^ fname ^ suff ^ ".h" in
-      let cstr = make_fname opts cstr in
-      let hstr = make_fname opts hstr in
-      CI.printProg prg nenv cstr runtime_imports;
-      CI.printProg header nenv hstr runtime_imports;
+      let cstr' = make_fname opts cstr in
+      let hstr' = make_fname opts hstr in
+      CI.printProg prg nenv cstr' (runtime_imports @ [hstr]);
+      CI.printProg header nenv hstr' runtime_imports;
 
       let time = (Unix.gettimeofday() -. time) in
       debug_msg debug (Printf.sprintf "Printed glue code to file %s in %f s.." cstr time)

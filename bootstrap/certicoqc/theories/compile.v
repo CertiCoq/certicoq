@@ -62,3 +62,4 @@ Definition certicoqc (opts : Options) (p : Template.Ast.Env.program) :=
   end. *)
 
 CertiCoq Compile -time -O 1 certicoqc.
+CertiCoq Generate Glue -file "glue" [ ].

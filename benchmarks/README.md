@@ -18,15 +18,15 @@ To run the compiled benchmarks:
 
    # sh run.sh X
 
-where X is the number of times each test runs. Runnin `make` will invoke `sh run.sh 10`.
+where X is the number of times each test runs. Running `make` will invoke `sh run.sh 10`.
 
 
 How to add new benchmarks
 -------------------------
 To add a new benchmark
 
-1) Go to tests.v and add your bencmark program at the end of the file. The
-   top-level definition that is complied should be defined in the file tests.v
+1) Go to tests.v and add your benchmark program at the end of the file. The
+   top-level definition that is compiled should be defined in the file tests.v
    (not just imported). Write command to compile both the LambdaANF and ANF versions
    (otherwise the bencmarking automation will not work.
 

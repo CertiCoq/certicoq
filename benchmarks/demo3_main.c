@@ -10,7 +10,6 @@ extern value body(struct thread_info *);
 extern struct thread_info;
 extern void print_Coq_Init_Datatypes_list(value, void (*)(value));
 extern void print_Coq_Init_Datatypes_bool(value);
-extern value get_Coq_Init_Datatypes_pair_args (value);
 extern value make_Coq_Init_Datatypes_bool_true (void);
 extern value make_Coq_Init_Datatypes_bool_false (void);
 extern value call(struct thread_info *tinfo, value clos, value arg0);

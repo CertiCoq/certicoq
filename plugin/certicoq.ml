@@ -276,13 +276,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | CompM.Err s ->
       CErrors.user_err ~hdr:"glue-code" (str "Could not generate glue code: " ++ pr_string s))
 
-
-  let compile_with_glue (opts : options) (gr : Names.GlobRef.t) (imports : string list) : unit =
-    let term = quote opts gr in
-    compile opts (Obj.magic term) imports;
-    generate_glue false opts (Ast0.Env.declarations (fst (Obj.magic term)))
-
-  let compile_only opts gr imports =
+  let compile_only (opts : options) (gr : Names.GlobRef.t) (imports : string list) : unit =
     let term = quote opts gr in
     compile opts (Obj.magic term) imports
 
@@ -333,7 +327,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     Boot.Env.Path.(to_string (relative (runtime_dir ()) na))
 
   let compile_C opts gr imports =
-    let () = compile_with_glue opts gr imports in
+    let () = compile_only opts gr imports in
     let imports = get_global_includes () @ imports in
     let debug = opts.debug in
     let fname = opts.filename in

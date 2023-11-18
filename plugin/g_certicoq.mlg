@@ -45,6 +45,7 @@ VERNAC ARGUMENT EXTEND glueargs
 | [ "-debug" ] -> { DEBUG }
 | [ "-args" natural(n) ] -> { ARGS(n) }
 | [ "-file" string(s) ] -> { FILENAME(s) }
+| [ "-build_dir" string(s) ] -> { BUILDDIR(s) }
 END
 
 VERNAC COMMAND EXTEND CertiCoq_Register CLASSIFIED AS SIDEFF

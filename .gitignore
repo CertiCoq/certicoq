@@ -80,6 +80,8 @@ benchmarks/vs_easy_opt
 benchmarks/vs_easy_opt_ll
 benchmarks/vs_hard_opt
 benchmarks/vs_hard_opt_ll
+benchmarks/glue_*.c
+benchmarks/glue_*.h
 benchmarks/glue.CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.c
 benchmarks/glue.CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.h
 benchmarks/metacoq_erasure/CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.metacoq_erasure.c
@@ -126,3 +128,5 @@ plugin/META
 _opam
 bootstrap/certicoqc/META
 bootstrap/certicoqchk/META
+bootstrap/certicoqc*/glue.c
+bootstrap/certicoqc*/glue.h

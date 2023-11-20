@@ -7,35 +7,36 @@ TESTS=$(shell cat TESTS)
 CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, CertiCoq.Benchmarks.tests.%.c, $(TESTS))
 # Names of the generated executables
 EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS)) $(patsubst %, %_cps_opt, $(TESTS)) $(patsubst %, %_opt, $(TESTS))
+INCLUDE=../plugin/runtime
 
-all: copy lib tests exec run
-default: copy exec run
+all: lib tests exec run
+default: exec run
 
-.PHONY: all default clean lib cleanlib tests run copy $(TESTS)
+.PHONY: all default clean lib cleanlib tests run $(TESTS)
 
 $(CFILES): tests
 exec: $(TESTS)
 
-copy:
-	cp ../theories/Runtime/m.h ./
-	cp ../theories/Runtime/gc.c ./
-	cp ../theories/Runtime/gc.h ./
-	cp ../theories/Runtime/gc_stack.c ./
-	cp ../theories/Runtime/gc_stack.h ./
-	cp ../theories/Runtime/values.h ./
-	cp ../theories/Runtime/main.c ./
-	cp ../theories/Runtime/config.h ./
-	cp ../theories/Runtime/mod.py ./
+# copy:
+# 	cp ../theories/Runtime/m.h ./
+# 	cp ../theories/Runtime/gc.c ./
+# 	cp ../theories/Runtime/gc.h ./
+# 	cp ../theories/Runtime/gc_stack.c ./
+# 	cp ../theories/Runtime/gc_stack.h ./
+# 	cp ../theories/Runtime/values.h ./
+# 	cp ../theories/Runtime/main.c ./
+# 	cp ../theories/Runtime/config.h ./
+# 	cp ../theories/Runtime/mod.py ./
 
 clean:
-	rm -f ./m.h
-	rm -f ./gc.c
-	rm -f ./gc.h
-	rm -f ./gc_stack.c
-	rm -f ./gc_stack.h
-	rm -f ./values.h
+	# rm -f ./m.h
+	# rm -f ./gc.c
+	# rm -f ./gc.h
+	# rm -f ./gc_stack.c
+	# rm -f ./gc_stack.h
+	# rm -f ./values.h
 	rm -f ./main.c
-	rm -f ./config.h
+	# rm -f ./config.h
 	rm -f ./*.*.c
 	rm -f ./*.*.h
 	rm -f ./glue.*.*.c
@@ -65,9 +66,9 @@ tests: tests.v
 
 ## Compile with the default C compiler
 $(TESTS): $(CFILES)
-	$(CCOMPILER) -o $@ 			-w -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue_$@.c
-	$(CCOMPILER) -o $@_opt 		-w -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt.c glue_$@.c
-	$(CCOMPILER) -o $@_opt_ll 	-w -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt_ll.c glue_$@.c
+	$(CCOMPILER) -o $@ 			-w -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) $@_main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue_$@.c
+	$(CCOMPILER) -o $@_opt 		-w -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) $@_main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.$@_opt.c glue_$@.c
+	$(CCOMPILER) -o $@_opt_ll 	-w -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) $@_main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.$@_opt_ll.c glue_$@.c
 	# ccomp -o $@_ccomp -O2 $@$@_.c__
 	# $(CCOMPILER) -o $@_cps -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue_$@_cps.c
 	# $(CCOMPILER) -o $@_cps_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt.c glue_$@_cps.c

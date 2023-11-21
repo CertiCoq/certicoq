@@ -52,3 +52,4 @@ Eval compute in "Compiling MetaCoq's checker".
 Set Warnings "-primitive-turned-into-axiom".
 
 CertiCoq Compile -time -O 1 certicoqchk.
+CertiCoq Generate Glue -file "glue" [ ].

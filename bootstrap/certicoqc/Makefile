@@ -34,7 +34,7 @@ COQLIBINSTALL = $(COQLIB)/user-contrib/CertiCoq/CertiCoqC
 OCAMLLIB = $(shell ocamlc -where)
 OCAMLOPTS = -package coq-metacoq-template-ocaml.plugin -open Metacoq_template_plugin -package coq-certicoq-vanilla.plugin -open Certicoq_vanilla_plugin \
 	-I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
-GENCFILES = glue.CertiCoq.CertiCoqC.compile.certicoqc.c CertiCoq.CertiCoqC.compile.certicoqc.c
+GENCFILES = glue.c CertiCoq.CertiCoqC.compile.certicoqc.c
 CFILES = certicoqc_wrapper.c ${GENCFILES}
 
 RUNTIME_DIR = ../../plugin/runtime

@@ -54,7 +54,6 @@ module type CompilerInterface = sig
 end
 
 module CompileFunctor (CI : CompilerInterface) : sig
-  val compile_with_glue : options -> Names.GlobRef.t -> string list -> unit
   val compile_only : options -> Names.GlobRef.t -> string list -> unit
   val generate_glue_only : options -> Names.GlobRef.t -> unit
   val compile_C : options -> Names.GlobRef.t -> string list -> unit
@@ -63,7 +62,6 @@ module CompileFunctor (CI : CompilerInterface) : sig
   val glue_command : options -> Names.GlobRef.t list -> unit
 end
 
-val compile_with_glue : options -> Names.GlobRef.t -> string list -> unit
 val compile_only : options -> Names.GlobRef.t -> string list -> unit
 val generate_glue_only : options -> Names.GlobRef.t -> unit
 val compile_C : options -> Names.GlobRef.t -> string list -> unit

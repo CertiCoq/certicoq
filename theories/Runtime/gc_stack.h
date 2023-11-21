@@ -100,7 +100,23 @@ typedef const uintnat *fun_info;
    fi[2..(fi[1]-2)]: Indices of the live roots in the args array
 */
 
-struct heap;     /* abstract, opaque */
+/* ideally struct heap should be more abstract (opaque)
+      struct heap;
+  and ideally, the following definitions should live in gc_stack.c rather than gc_stack.h:
+*/
+#if  SIZEOF_PTR == 8
+#define LOG_WORDSIZE 3
+#endif
+#if SIZEOF_PTR == 4
+#define LOG_WORDSIZE 2
+#endif
+#define LOG_NURSERY_SIZE 16
+#define NURSERY_SIZE (1<<LOG_NURSERY_SIZE)
+#define MAX_SPACES (8*sizeof(value)-(2+LOG_WORDSIZE+LOG_NURSERY_SIZE)) /* how many generations */
+
+struct space { value *start, *next, *limit, *rem_limit; };
+struct heap {  struct space spaces[MAX_SPACES]; };
+/* END of the stuff that would ideally be more opaque */
 
 #define MAX_ARGS 1024
 
@@ -169,7 +185,7 @@ value* extract_answer(struct thread_info *ti);
   can be treated uniformly by the caller of extract_answer().
 */
 
-void* export(struct thread_info *ti, value root);
+void* export_heap(struct thread_info *ti, value root);
 
 /* mutable write barrier */
 void certicoq_modify(struct thread_info *ti, value *p_cell, value p_val);

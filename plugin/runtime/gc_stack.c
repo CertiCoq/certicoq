@@ -40,10 +40,10 @@ int is_ptr(value x) {
     return test_int_or_ptr(x) == 0;
 }
 
-/* A "space" describes one generation of the generational collector. */
+/* A "space" describes one generation of the generational collector. 
 struct space {
   value *start, *next, *limit, *rem_limit;
-};
+  };*/
 /* Either start==NULL (meaning that this generation has not yet been created),
    or start <= next <= limit.  The words in start..next  are allocated
    and initialized, and the words from next..limit are available to allocate. */
@@ -53,10 +53,8 @@ struct space {
 /*  Using RATIO=2 is faster than larger ratios, empirically */
 #endif
 
-#ifndef LOG_NURSERY_SIZE
-#define LOG_NURSERY_SIZE 16
-#endif
-/* The size of generation 0 (the "nursery") should approximately match the
+/* Rationale for LOG_NURSERY_SIZE = 16:  
+   The size of generation 0 (the "nursery") should approximately match the
    size of the level-2 cache of the machine, according to:
       Cache Performance of Fast-Allocating Programs,
       by Marcelo J. R. Goncalves and Andrew W. Appel.
@@ -76,20 +74,9 @@ struct space {
 
 */
 
-#define NURSERY_SIZE (1<<LOG_NURSERY_SIZE)
-/* NURSERY_SIZE is measured in words, not bytes */
 
-#if  SIZEOF_PTR == 8
-#define LOG_WORDSIZE 3
-#endif
-#if SIZEOF_PTR == 4
-#define LOG_WORDSIZE 2
-#endif
-
-
-#define MAX_SPACES (8*sizeof(value)-(2+LOG_WORDSIZE+LOG_NURSERY_SIZE)) /* how many generations */
-
-/* This allows the largest generation to be as big as half the entire address space.
+/* The definition of MAX_SPACES allows the largest generation to be as big 
+   as half the entire address space.
    Here's the math: 8*sizeof(value) is the number of bits per word.
    Counting the nursery as generation 0, the largest generation is MAX_SPACES-1,
    and generation i+1 is twice as big as generation i.
@@ -109,11 +96,6 @@ struct space {
 #ifndef DEPTH
 #define DEPTH 0  /* how much depth-first search to do */
 #endif
-
-struct heap {
-  /* A heap is an array of generations; generation 0 must be already-created */
-  struct space spaces[MAX_SPACES];
-};
 
 #ifdef DEBUG
 
@@ -209,24 +191,24 @@ void forward (value *from_start,  /* beginning of from-space */
       } else {
         intnat i;
         intnat sz;
-        value *new;
+        value *newv;
         sz = Wosize_hd(hd);
-        new = *next+1;
-        *next = new+sz;
+        newv = *next+1;
+        *next = newv+sz;
 	/*        if (sz > 50) printf("Moving value %p with tag %ld with %d fields\n", (void*)v, hd, sz); */
-        Hd_val(new) = hd;
+        Hd_val(newv) = hd;
         for(i = 0; i < sz; i++) {
           /* printf("Moving field %d\n", i); */
-          Field(new, i) = Field(v, i);
+          Field(newv, i) = Field(v, i);
         }
         Hd_val(v) = 0;
-	Field(v, 0) = ptr_to_int_or_ptr((void *)new);
-	*p = ptr_to_int_or_ptr((void *)new);
-        /* printf("New %lld\n", new); */
+	Field(v, 0) = ptr_to_int_or_ptr((void *)newv);
+	*p = ptr_to_int_or_ptr((void *)newv);
+        /* printf("New %lld\n", newv); */
         /* if (*p == 73832) printf("Found it\n"); */
         if (depth>0)
           for (i=0; i<sz; i++)
-            forward(from_start, from_limit, next, &Field(new,i), depth-1);
+            forward(from_start, from_limit, next, &Field(newv,i), depth-1);
       }
     }
   }
@@ -496,8 +478,8 @@ int garbage_collect_all(struct thread_info *ti) {
   return i;
 }
 
-/* export (deep copy if boxed) from the given root */
-void *export(struct thread_info *ti, value root) {
+/* export_heap (deep copy if boxed) from the given root */
+void *export_heap(struct thread_info *ti, value root) {
 
 
   /* This block of 7 lines is new (appel 2023/06/27) and untested */

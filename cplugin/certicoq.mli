@@ -34,13 +34,13 @@ val default_options : options
 val make_options : command_args list -> prim list -> string -> options
 
 (* Register primitive operations and associated include file *)
-val register : prim list -> string list -> unit
+val register : prim list -> (string * bool) list -> unit
 
 val get_name : Names.GlobRef.t -> string
 module type CompilerInterface = sig
   type name_env
   val compile : Pipeline_utils.coq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
-  val printProg : Clight.program -> name_env -> string -> string list -> unit
+  val printProg : Clight.program -> name_env -> string -> (string * bool) list -> unit
 
   val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations -> 
     (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
@@ -51,17 +51,17 @@ module type CompilerInterface = sig
 end
 
 module CompileFunctor (CI : CompilerInterface) : sig
-  val compile_only : options -> Names.GlobRef.t -> string list -> unit
+  val compile_only : options -> Names.GlobRef.t -> (string * bool) list -> unit
   val generate_glue_only : options -> Names.GlobRef.t -> unit
-  val compile_C : options -> Names.GlobRef.t -> string list -> unit
+  val compile_C : options -> Names.GlobRef.t -> (string * bool) list -> unit
   val show_ir : options -> Names.GlobRef.t -> unit
   val ffi_command : options -> Names.GlobRef.t -> unit
   val glue_command : options -> Names.GlobRef.t list -> unit
 end
 
-val compile_only : options -> Names.GlobRef.t -> string list -> unit
+val compile_only : options -> Names.GlobRef.t -> (string * bool) list -> unit
 val generate_glue_only : options -> Names.GlobRef.t -> unit
-val compile_C : options -> Names.GlobRef.t -> string list -> unit
+val compile_C : options -> Names.GlobRef.t -> (string * bool) list -> unit
 val show_ir : options -> Names.GlobRef.t -> unit
 val ffi_command : options -> Names.GlobRef.t -> unit
 val glue_command : options -> Names.GlobRef.t list -> unit

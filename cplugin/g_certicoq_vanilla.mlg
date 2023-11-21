@@ -46,8 +46,13 @@ VERNAC ARGUMENT EXTEND vanilla_glueargs
 | [ "-file" string(s) ] -> { FILENAME(s) }
 END
 
+VERNAC ARGUMENT EXTEND vanilla_cinclude
+| [ string(str) ] -> { (str, true) }
+| [ string(str) "as" "library" ] -> { (str, false) }
+END
+
 VERNAC COMMAND EXTEND CertiCoq_Register CLASSIFIED AS SIDEFF
-| [ "CertiCoq" "Register" "[" vanilla_extract_cnst_list_sep(l, ",") "]" "Include" "[" string_list_sep(imps, ",") "]" ] -> {
+| [ "CertiCoq" "Register" "[" vanilla_extract_cnst_list_sep(l, ",") "]" "Include" "[" vanilla_cinclude_list_sep(imps, ",") "]" ] -> {
   Certicoq.register l imps
   }
 END
@@ -58,12 +63,12 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
     let opts = Certicoq.make_options l [] (get_name gr) in
     Certicoq.compile_only opts gr []
   }
-| [ "CertiCoq" "Compile" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" string_list_sep(imps, ",") "]" ] -> {
+| [ "CertiCoq" "Compile" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" vanilla_cinclude_list_sep(imps, ",") "]" ] -> {
     let gr = Nametab.global gr in
     let opts = Certicoq.make_options l cs (get_name gr) in
     Certicoq.compile_only opts gr imps
   }
-| [ "CertiCoq" "Run" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" string_list_sep(imps, ",") "]" ] -> {
+| [ "CertiCoq" "Run" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" vanilla_cinclude_list_sep(imps, ",") "]" ] -> {
   let gr = Nametab.global gr in
   let opts = Certicoq.make_options l cs (get_name gr) in
   Certicoq.compile_C opts gr imps

@@ -27,4 +27,4 @@ CertiCoq Register [
   Coq.Numbers.Cyclic.Int63.PrimInt63.lor => "prim_int63_lor", 
   Coq.Numbers.Cyclic.Int63.PrimInt63.lxor => "prim_int63_lxor"
 ]
-Include [ "runtime/prim_int63.h" ].
+Include [ "prim_int63.h" as library ].

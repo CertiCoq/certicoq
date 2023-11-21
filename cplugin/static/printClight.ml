@@ -359,7 +359,7 @@ let print_dest_names prog names dest =
 let guardify (s : string) : string =
   String.uppercase_ascii (Str.global_replace (Str.regexp "[^a-zA-Z0-9]") "_" s)
 
-let print_dest_names_imports prog names (dest : string) (imports : string list) =
+let print_dest_names_imports prog names (dest : string) imports =
   let oc = open_out dest in
   List.iter (fun n -> add_name (remove_primes n))  names;
   let fm = formatter_of_out_channel oc in
@@ -368,7 +368,10 @@ let print_dest_names_imports prog names (dest : string) (imports : string list) 
   let guard_name = guardify (List.hd (List.rev (String.split_on_char '/' dest))) in
   fprintf fm "#ifndef %s" guard_name; pp_print_newline fm ();
   fprintf fm "#define %s" guard_name; pp_print_newline fm ();
-  List.iter (fun s -> fprintf fm "#include \"%s\"" s; pp_print_newline fm ();) imports;
+  List.iter (fun i -> 
+    (match i with
+     | (s, true) -> fprintf fm "#include \"%s\"" s
+     | (s, false) -> fprintf fm "#include <%s>" s) ; pp_print_newline fm ();) imports;
   close_box ();
   open_box 0;
   print_program Clight2 fm prog;

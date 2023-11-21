@@ -157,7 +157,7 @@ let debug_msg (flag : bool) (s : string) =
 
 type prim = ((Kernames.kername * Kernames.ident) * Datatypes.bool)
 let global_registers = 
-  Summary.ref (([], []) : prim list * (string * bool) list) ~name:"Vanilla CertiCoq Registration"
+  Summary.ref (([], []) : prim list * import list) ~name:"Vanilla CertiCoq Registration"
 
 let global_registers_name = "certicoq-vanilla-registration"
 
@@ -171,11 +171,11 @@ let global_registers_input =
     ~cache:(fun r -> cache_registers r)
     ~subst:None) (*(fun (msub, r) -> r)) *)
 
-let register (prims : prim list) (imports : (string * bool) list) : unit =
+let register (prims : prim list) (imports : import list) : unit =
   let curlib = Sys.getcwd () in
   let newr = (prims, List.map (fun i -> 
     match i with
-    | (s, true) -> (Filename.concat curlib s, true)
+    | FromAbsolutePath s -> FromRelativePath (Filename.concat curlib s)
     | _ -> i) imports) in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) (fst newr)); *)
   Lib.add_leaf (global_registers_input newr)
@@ -310,7 +310,7 @@ let quote opts gr =
 module type CompilerInterface = sig
   type name_env
   val compile : Pipeline_utils.coq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
-  val printProg : Clight.program -> name_env -> string -> (string * bool) list -> unit
+  val printProg : Clight.program -> name_env -> string -> import list -> unit
 
   val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations -> 
     (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
@@ -325,8 +325,13 @@ module MLCompiler : CompilerInterface with
   = struct
   type name_env = BasicAst.name Cps.M.t
   let compile opt prg = Pipeline.compile opt (FixRepr.fix_quoted_program prg)
-  let printProg prog names (dest : string) (import : (string * bool) list) =
-    PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest import
+  let printProg prog names (dest : string) (imports : import list) =
+    let imports' = List.map (fun i -> match i with
+      | FromRelativePath s -> "#include \"" ^ s ^ "\""
+      | FromLibrary s -> "#include <" ^ s ^ ">"
+      | FromAbsolutePath s ->
+          failwith "Import with absolute path should have been filled") imports in
+    PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest imports'
 
   let generate_glue opts decls = Glue.generate_glue opts (FixRepr.fix_declarations decls)
   let generate_ffi opts prg = Ffi.generate_ffi opts (FixRepr.fix_quoted_program prg)
@@ -340,13 +345,19 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let compile opts term imports =
     let debug = opts.debug in
     let options = make_pipeline_options opts in
-    let runtime_imports = [((if opts.cps then "gc.h" else "gc_stack.h"), false)] in
+    let runtime_imports = [FromLibrary (if opts.cps then "gc.h" else "gc_stack.h")] in
+    let curlib = Sys.getcwd () in
+    let imports = List.map (fun i -> 
+      match i with
+      | FromAbsolutePath s -> FromRelativePath (Filename.concat curlib s)
+      | _ -> i) imports in
     let imports = runtime_imports @ get_global_includes () @ imports in
     debug_msg debug (Printf.sprintf "Imports: %s" 
                       (String.concat " " (List.map (fun i ->
                          match i with
-                         | (s, true) -> "\"" ^ s ^ "\""
-                         | (s, false) -> "<" ^ s ^ ">") imports)));
+                         | FromAbsolutePath s -> "#include \"" ^ s ^ "\""
+                         | FromRelativePath s -> "#include \"" ^ s ^ "\""
+                         | FromLibrary s -> "#include <" ^ s ^ ">") imports)));
     let p = CI.compile options term in
     match p with
     | (CompM.Ret ((nenv, header), prg), dbg) ->
@@ -358,7 +369,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let hstr = fname ^ suff ^ ".h" in
       let cstr' = make_fname opts cstr in
       let hstr' = make_fname opts hstr in
-      CI.printProg prg nenv cstr' (imports @ [(hstr, true)]);
+      CI.printProg prg nenv cstr' (imports @ [FromRelativePath hstr]);
       CI.printProg header nenv hstr' (runtime_imports);
       (* (List.map Tm_util.string_to_list imports) *);
 
@@ -382,7 +393,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     else
     let debug = opts.debug in
     let options = make_pipeline_options opts in
-    let runtime_imports = [((if opts.cps then "gc.h" else "gc_stack.h"), false)] in
+    let runtime_imports = 
+      [ FromLibrary (if opts.cps then "gc.h" else "gc_stack.h"); FromLibrary "stdio.h" ] in
     let time = Unix.gettimeofday() in
     (match CI.generate_glue options globs with
     | CompM.Ret (((nenv, header), prg), logs) ->
@@ -397,7 +409,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let hstr = if standalone then fname ^ ".h" else "glue." ^ fname ^ suff ^ ".h" in
       let cstr' = make_fname opts cstr in
       let hstr' = make_fname opts hstr in
-      CI.printProg prg nenv cstr' (runtime_imports @ [(hstr, true)]);
+      CI.printProg prg nenv cstr' (runtime_imports @ [FromRelativePath hstr]);
       CI.printProg header nenv hstr' runtime_imports;
 
       let time = (Unix.gettimeofday() -. time) in
@@ -405,7 +417,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | CompM.Err s ->
       CErrors.user_err ~hdr:"glue-code" (str "Could not generate glue code: " ++ pr_string s))
 
-  let compile_only (opts : options) (gr : Names.GlobRef.t) (imports : (string * bool) list) : unit =
+  let compile_only (opts : options) (gr : Names.GlobRef.t) (imports : import list) : unit =
     let term = quote opts gr in
     compile opts (Obj.magic term) imports
 
@@ -476,7 +488,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       in 
       let imports' = List.concat (List.map (fun i -> 
         match i with 
-        | (s, true) -> [s]
+        | FromAbsolutePath s -> [s]
+        | FromRelativePath s -> [s]
         | _ -> []) imports) in
       let l = make_rt_file "certicoq_run_main.o" :: List.map oname imports' in
       String.concat " " l

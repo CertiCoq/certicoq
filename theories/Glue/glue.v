@@ -390,7 +390,7 @@ Section Externs.
       | ANF =>
         Composite _closure Struct
          (Member_plain _func
-                      (tptr (Tfunction (Tcons (Tstruct _thread_info noattr)
+                      (tptr (Tfunction (Tcons (tptr (Tstruct _thread_info noattr))
                                        (Tcons val (Tcons val Tnil))) val cc_default)) ::
           Member_plain _env val :: nil) noattr ::
         (* Composite _stack_frame Struct *)
@@ -408,7 +408,7 @@ Section Externs.
       | CPS =>
         Composite _closure Struct
          (Member_plain _func
-                      (tptr (Tfunction (Tcons (Tstruct _thread_info noattr)
+                      (tptr (Tfunction (Tcons (tptr (Tstruct _thread_info noattr))
                                        (Tcons val (Tcons val Tnil))) Tvoid cc_default)) ::
           Member_plain _env val :: nil) noattr ::
         (* Composite _thread_info Struct *)
@@ -422,7 +422,7 @@ Section Externs.
         {| printf_info :=
               (_printf, Tfunction (Tcons (tptr tschar) Tnil) tint cc_default)
          ; is_ptr_info :=
-              (_is_ptr, Tfunction (Tcons val Tnil) tbool cc_default)
+              (_is_ptr, Tfunction (Tcons val Tnil) tint cc_default)
          ; literals_info := literals
          ; get_unboxed_ordinal_info :=
               (_guo, Tfunction (Tcons val Tnil) tuint cc_default)
@@ -444,12 +444,12 @@ Section Externs.
                                        (Tret AST.Tint)
                                        cc_default))
                         (Tcons (tptr tschar) Tnil) tint cc_default)) ::
+       *)
        (_is_ptr,
          Gfun (External (EF_external "is_ptr"
                           (mksignature (val_typ :: nil) AST.Tvoid cc_default))
                         (Tcons val Tnil)
-                        (Tint IBool Unsigned noattr) cc_default)) ::
-       *)
+                        tint cc_default)) ::
        (_guo, def_guo) ::
        (_gbo, def_gbo) ::
        (_get_args, def_get_args) ::
@@ -1050,7 +1050,7 @@ Section CConstructors.
     | (* Unboxed *) {| ctor_name := cname ; ctor_arity := O ; ctor_ordinal := ord |} :: ctors =>
         constr_fun_id <- gensym (make_name cname) ;;
         let body :=
-          Sreturn (Some (Econst_int (Int.repr (Z.add (Z.shiftl (Z.of_nat ord) 1) 1)) val)) in
+          Sreturn (Some (Ecast (Econst_int (Int.repr (Z.add (Z.shiftl (Z.of_nat ord) 1) 1)) val) val)) in
         let f := (constr_fun_id,
                   Gfun (Internal
                           {| fn_return := val

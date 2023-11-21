@@ -3,6 +3,11 @@ open Names
 open Pp
 open Caml_bytestring
 
+type import =
+    FromRelativePath of string
+  | FromAbsolutePath of string
+  | FromLibrary of string
+
 let string_of_bytestring = caml_string_of_bytestring
 let bytestring_of_string = bytestring_of_caml_string
 

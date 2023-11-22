@@ -1,3 +1,8 @@
+type import =
+    FromRelativePath of string
+  | FromAbsolutePath of string
+  | FromLibrary of string
+
 val string_of_bytestring : Bytestring.String.t -> string
 
 val bytestring_of_string : string -> Bytestring.String.t

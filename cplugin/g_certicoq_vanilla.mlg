@@ -47,8 +47,9 @@ VERNAC ARGUMENT EXTEND vanilla_glueargs
 END
 
 VERNAC ARGUMENT EXTEND vanilla_cinclude
-| [ string(str) ] -> { (str, true) }
-| [ string(str) "as" "library" ] -> { (str, false) }
+| [ string(str) ] -> { FromRelativePath str }
+| [ string(str) "as" "absolute" ] -> { FromAbsolutePath str }
+| [ string(str) "as" "library" ] -> { FromLibrary str }
 END
 
 VERNAC COMMAND EXTEND CertiCoq_Register CLASSIFIED AS SIDEFF

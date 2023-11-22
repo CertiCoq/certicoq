@@ -233,6 +233,7 @@ LambdaBoxMut_to_LambdaBoxMut_eta
 LambdaBoxMut_to_LambdaBoxLocal
 Camlcoq
 
+Plugin_utils
 Ctypes
 Cop
 Dead_param_elim
@@ -259,6 +260,5 @@ Glue_utils
 Glue
 Ffi
 Pipeline
-Plugin_utils
 Certicoq
 G_certicoq

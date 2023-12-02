@@ -305,7 +305,7 @@ Section ANF_proof.
       Forall2 (anf_val_rel) vs1 vs2 ->
 
       exists rho',
-        set_lists ys vs2 rho = Some rho' /\
+        get_list ys rho' = Some vs2 /\
         forall i,
           preord_exp ctenv (anf_bound f (t <+> (2 * Datatypes.length (exps_as_list es))%nat))
                      eq_fuel i (e', rho') (C |[ e' ]|, rho).
@@ -1001,13 +1001,122 @@ Section ANF_proof.
         | [ X : ?A * ?B |- _ ] => destruct X; destruct_tuples
         end.
 
+
+  (* TODO generalize *)
+  Definition one_step : @PostT nat unit :=
+    fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) => (f1 + 1)%nat = f2.
+  
+  Ltac unfold_all :=
+    try unfold zero in *;
+    try unfold one_ctx in *;
+    try unfold algebra.one in *;
+    try unfold one_i in *;
+    try unfold HRes in *;
+    try unfold HRexp_f in *; try unfold fuel_res in *; try unfold fuel_res_exp in *; try unfold fuel_res_pre in *;
+    try unfold HRexp_t in *; try unfold trace_res in *; try unfold trace_res_exp in *; try unfold trace_res_pre in *.
+  
+
+  Lemma preord_exp_Efun_red k e B rho :          
+    preord_exp ctenv one_step eq_fuel k (e, def_funs B B rho rho) (Efun B e, rho).
+  Proof.
+    intros r cin cout Hleq Hbstep.
+    do 3 eexists. split. econstructor 2. econstructor. eassumption.
+    split. simpl. unfold_all. lia. 
+    eapply preord_res_refl; tci.
+  Qed.
+
+  Lemma preord_exp_Eapp_red k B rho f rho1 g xs ft ys e' vs rho2 :
+    M.get f rho = Some (Vfun rho1 B g) ->
+    find_def g B = Some (ft, ys, e') ->
+    get_list xs rho = Some vs ->
+    set_lists ys vs (def_funs B B rho1 rho1) = Some rho2 ->
+    preord_exp ctenv one_step eq_fuel k (e', rho2) (Eapp f ft xs , rho).
+  Proof.
+    intros r cin cout Hleq Hbstep Hget Hf Hgetl Hsetl.
+    do 3 eexists. split. econstructor 2. econstructor; eauto. 
+    split. simpl. unfold_all. lia. 
+    eapply preord_res_refl; tci.
+  Qed.
+
+
+  Lemma preord_exp_Econstr_red k x ctag ys e rho vs :
+    get_list ys rho = Some vs ->
+    preord_exp ctenv one_step eq_fuel k (e, M.set x (Vconstr ctag vs) rho) (Econstr x ctag ys e, rho).
+  Proof.
+    intros Hgvs r cin cout Hleq Hbstep.
+    do 3 eexists. split. econstructor 2. econstructor; eauto. 
+    split. simpl. unfold_all. lia. 
+    eapply preord_res_refl; tci.
+  Qed.
+
+  
   Lemma convert_anf_correct :
       forall vs e r f t, eval_env_fuel vs e r f t -> convert_anf_correct_exp vs e r f t.
     Proof.
       eapply eval_env_fuel_ind' with (P1 := convert_anf_correct_exp)
                                      (P0 := convert_anf_correct_exps)
                                      (P := convert_anf_correct_exp_step).
+      - (* Con_e *)
+        intros es vs r dc fs ts Heval IH1.
+        intros rho names C x S1 S2 i e' Hwf Hwfexp Hdis Hfv Hanf Hcvt.
+        split; [ | congruence ].
+        intros v v' Heq Hvrel. subst. inv Hcvt. inv Hwfexp. inv Heq.
+        inv Hvrel.
+        edestruct IH1 with (e' := Econstr x (dcon_to_tag default_tag dc cenv) ys e'); [ | | | | | eassumption | | ]; try eassumption.
+        * now sets.
+        * repeat normalize_occurs_free.
+          eapply Union_Included. now sets.
+          eapply Setminus_Included_Included_Union.
+          eapply Included_trans. eassumption. now sets.
+        * destructAll.
+          eapply preord_exp_post_monotonic.
+          2:{ eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
+              2:{ intros. rewrite <- app_ctx_f_fuse. simpl. eapply H0. }
+              eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
+              2:{ intros m. eapply preord_exp_Econstr_red; eassumption. }
+              
+              eapply preord_exp_refl. now eapply eq_fuel_compat.
+              eapply preord_env_P_extend.
+              2:{ eapply preord_val_refl. now eapply eq_fuel_compat. }
+              intros z Hinz vz Hget. eexists vz. split.
+              { destruct (OrdersEx.Positive_as_OT.eq_dec x1 z).
+                * subst. rewrite M.gss. congruence.
+                * rewrite M.gso; eauto. } (* TODO lemma *)
+              eapply preord_val_refl. now eapply eq_fuel_compat. }
 
+                  eapply get_list_set_lists. 
+                  unfold convert_anf_correct_exps in IH1.
+                  eassumption. now xsets. 
+                  eapply IH1.  with (env := x1 :: names); [ | | | | | eassumption | reflexivity | eassumption ].
+                  - constructor; eauto. eapply All_Forall.nth_error_forall; eassumption.
+                  - simpl.
+
+                    destruct (Decidable_FromList names). destruct (Dec x1); [ | ].
+                    + (* x1 \in names *)
+                      assert (Hin := f).
+                      rewrite <- app_ctx_f_fuse. 
+            eapply preord_exp_post_monotonic.
+            2:{ eapply convert_anf_in_env in f; [ | eassumption | eassumption | eassumption ].
+                destruct f as [n [Hnth' Hnth]].
+                
+                assert (Hrel := All_Forall.Forall2_nth_error _ _ _ Hanf Hnth' Hnth).
+                
+                destruct Hrel as [v1'' [Hget'' Hrel'']].
+                
+                eapply preord_exp_trans. now tci.
+                now eapply eq_fuel_idemp.
+                2:{ intros. eapply IH1; [ | | | | |  | reflexivity | ]; try eassumption.
+                  eapply Included_trans. eapply occurs_free_ctx_app.
+                  eapply Union_Included.
+                    - eapply Included_trans. eapply convert_anf_occurs_free_ctx. eassumption.
+                      normalize_sets. now sets.
+                    - eapply Included_trans. eapply Included_Setminus_compat.
+                      eassumption. reflexivity.
+                      rewrite Setminus_Union_distr.
+                      eapply Union_Included; [ |  now sets ].
+                      eapply Setminus_Included_Included_Union.
+                   
+        
       6:{ (* Let_e *)
         intros e1 e2 v1 r env na f1 f2 t1 t2.
         intros Heval1 IH1 Heval2 IH2.

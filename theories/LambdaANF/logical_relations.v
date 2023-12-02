@@ -1252,7 +1252,66 @@ Section Log_rel.
         eexists. exists c2, cout'. split; [ eassumption | split ].
         eapply Hls; eauto.        
         eapply preord_res_monotonic. eassumption. rewrite to_nat_add. lia.
-    Qed. 
+    Qed.
+
+
+    Lemma preord_var_env_extend_neq_l PostG (rho1 rho2 : eval.env) (k : nat) (x1 y1 y2 : var)
+          (v1 : cps.val) :
+        preord_var_env PostG k rho1 rho2 y1 y2 ->
+        y1 <> x1 ->
+        preord_var_env PostG k (M.set x1 v1 rho1) rho2 y1 y2.
+    Proof.
+      intros Hval Hneq x' Hget.
+      rewrite M.gso in *; eauto.
+    Qed.
+
+    Lemma preord_var_env_extend_neq_r PostG (rho1 rho2 : eval.env) (k : nat) (x1 y1 y2 : var)
+          (v1 : cps.val) :
+      preord_var_env PostG k rho1 rho2 y1 y2 ->
+      y2 <> x1 ->
+      preord_var_env PostG k rho1 (M.set x1 v1 rho2) y1 y2.
+    Proof.
+      intros Hval Hneq x' Hget.
+      rewrite M.gso in *; eauto.
+    Qed.
+
+    Lemma preord_var_env_get :
+      forall PostG (rho1 rho2 : eval.env) (k : nat) (x1 x2 : var) (v1 v2 : cps.val),
+        preord_val PostG k v1 v2 ->
+        M.get x1 rho1 = Some v1 ->
+        M.get x2 rho2 = Some v2 ->        
+        preord_var_env PostG k rho1 rho2 x1 x2.
+    Proof.
+      intros rho1 rho2 k x1 x2 v1 v2 Hval Hget1 Hget2 x' v' Hget.
+      repeat subst_exp. eauto. 
+    Qed.
+
+    Lemma preord_var_env_get_list' :
+      forall PostG (rho1 rho2 : eval.env) (k : nat) (xs1 xs2 : list var) (vs1 vs2 : list cps.val),
+        Forall2 (preord_val PostG k) vs1 vs2 ->
+        get_list xs1 rho1 = Some vs1 ->
+        get_list xs2 rho2 = Some vs2 ->        
+        Forall2 (preord_var_env PostG k rho1 rho2) xs1 xs2.
+    Proof.
+      intros PostG rho1 rho2 k xs1.
+      revert rho1 rho2. induction xs1; intros rho1 rho2 xs2 vs1 vs2 Hall Hget1 Hget2.
+      - simpl in Hget1. inv Hget1. inv Hall.
+        destruct xs2. now constructor.
+        simpl in *. destruct (rho2 ! v); try congruence.
+        destruct (get_list xs2 rho2); congruence.
+      - simpl in Hget1.
+         destruct (rho1 ! a) eqn:Hget; try congruence.
+         destruct (get_list xs1 rho1) eqn:Hgetl; try congruence.
+         inv Hget1.
+         inv Hall.
+         destruct xs2. now inv Hget2. simpl in *.
+         destruct (rho2 ! v0) eqn:Hget'; try congruence.
+         destruct (get_list xs2 rho2) eqn:Hgetl'; try congruence.
+         inv Hget2.
+         constructor; eauto.
+
+         eapply preord_var_env_get; eauto.
+    Qed.
     
     Fixpoint exp_ctx_len (c : exp_ctx) : nat :=
       match c with

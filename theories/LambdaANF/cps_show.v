@@ -3,7 +3,6 @@
     [show_exp e] constructs a string representing the term that has some
     minimal formatting so that it's much more readable.
 *)
-Require Import Common.AstCommon.
 Require Import List.
 Require Import LambdaANF.cps.
 Require Import ExtLib.Data.Positive.
@@ -13,6 +12,7 @@ Require Import ExtLib.Data.Monads.StateMonad.
 From MetaCoq.Utils Require Import bytestring MCString. (* For identifier names *)
 From MetaCoq.Common Require Import BasicAst Primitive. (* For identifier names *)
 From MetaCoq.PCUIC Require Import PCUICPrimitive. (* For identifier names *)
+Require Import Common.AstCommon.
 
 Import MonadNotation.
 
@@ -110,6 +110,7 @@ Definition emit_prim (p : primitive) : M unit :=
   match projT1 p as tag return prim_value tag -> M unit with
   | primInt => fun f => emit "(int: " ;; emit (string_of_prim_int f) ;; emit ")"
   | primFloat => fun f => emit "(float: " ;; emit (string_of_float f) ;; emit ")"
+  
   end%bs (projT2 p).
 
 (* We assume each expression starts on a fresh newline, and that it

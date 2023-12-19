@@ -74,8 +74,8 @@ Proof.
 Defined.
 
 Require Import NArith.NArith.
-Instance NEq: Eq N := { eq_dec := N.eq_dec }.
-Instance EqPair A B `(Eq A) `(Eq B) : Eq (A * B).
+#[global] Instance NEq: Eq N := { eq_dec := N.eq_dec }.
+#[global] Instance EqPair A B `(Eq A) `(Eq B) : Eq (A * B).
 Proof.
   constructor; intros [x y] [x' y'].
   destruct (eq_dec x x'). destruct (eq_dec y y').
@@ -84,7 +84,7 @@ Proof.
   right; congruence.
 Defined.
 
-Instance InductiveEq: Eq inductive := { eq_dec := inductive_dec }.
+#[global] Instance InductiveEq: Eq inductive := { eq_dec := inductive_dec }.
 
 
 (** certiCoq representation of inductive types **)
@@ -557,8 +557,12 @@ Proof. reflexivity. Qed.
 (* Primitives *)
 
 From Coq Require Import ssreflect.
-From MetaCoq.Common Require Import Primitive.
 From Equations Require Import Equations.
+From MetaCoq.Erasure Require Import EPrimitive.
+
+Variant prim_tag : Set := 
+  | primInt | primFloat. 
+Derive NoConfusion for prim_tag.
 
 Definition prim_value (p : prim_tag) : Set :=
  match p with

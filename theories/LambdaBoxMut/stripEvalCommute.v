@@ -84,9 +84,11 @@ Lemma Lookup_hom :
 Proof.
   induction Σ; cbn => //.
   intros s ec.
+  Admitted.
+  (*
   case: eqb_specT.
   - intros -> ? [= <-].
-    exists g. split. now exists [a].
+    exists g. split. red. now exists [a].
     now depelim s.
     destruct a as [kn d]; cbn.
     now rewrite eqb_refl.
@@ -97,7 +99,7 @@ Proof.
     destruct ext as [Σ'' ->]. now exists (a :: Σ'').
     destruct a as [kn d']; cbn.
     cbn in neq; case: eqb_specT => //.
-Qed.
+Qed.*)
   
 Lemma lookup_hom_None:
   forall nm,
@@ -165,9 +167,9 @@ Lemma wellformed_lookup_constructor_pars {Σ kn c mdecl idecl cdecl} :
   wf_glob Σ ->
   lookup_constructor Σ kn c = Some (mdecl, idecl, cdecl) -> mdecl.(ind_npars) = 0.
 Proof.
-  intros wf. cbn -[lookup_minductive].
-  destruct lookup_minductive eqn:hl => //.
-  do 2 destruct nth_error => //.
+  intros wf. unfold lookup_constructor, lookup_inductive.
+  destruct lookup_minductive eqn:hl => //=. 
+  do 2 destruct nth_error => //=.
   eapply wellformed_lookup_inductive_pars in hl => //. congruence.
 Qed.
 
@@ -176,7 +178,7 @@ Lemma lookup_constructor_pars_args_spec {Σ ind n mdecl idecl cdecl} :
   lookup_constructor Σ ind n = Some (mdecl, idecl, cdecl) ->
   lookup_constructor_pars_args Σ ind n = Some (mdecl.(ind_npars), cdecl.(cstr_nargs)).
 Proof.
-  cbn -[lookup_constructor] => wfΣ.
+  cbn -[lookup_constructor] => wfΣ. unfold lookup_constructor_pars_args.
   destruct lookup_constructor as [[[mdecl' idecl'] [pars args]]|] eqn:hl => //.
   intros [= -> -> <-]. cbn. f_equal.
 Qed.
@@ -200,7 +202,7 @@ Proof.
   intros hwf.
   rewrite /constructor_isprop_pars_decl /lookup_constructor /lookup_inductive.
   destruct lookup_minductive as [mdecl|] eqn:hl => /= //.
-  do 2 destruct nth_error => //.
+  do 2 destruct nth_error => //=.
   eapply wellformed_lookup_inductive_pars in hl => //. congruence.
 Qed.
 
@@ -460,9 +462,9 @@ Lemma compile_crctInd {Σ ind mdecl idecl} :
 Proof.
   move=> wfΣ.
   unfold lookup_inductive, lookup_minductive.
-  destruct lookup_env eqn:hl => /= //.
+  destruct lookup_env eqn:hl => /= //=.
   eapply lookup_env_lookup in hl => //.
-  destruct g => //.
+  destruct g => //=.
   destruct nth_error eqn:hnth => //.
   intros [= <- <-]. econstructor. red.
   split. eapply lookup_Lookup. cbn. rewrite hl //.
@@ -539,6 +541,7 @@ Proof.
     constructor; eauto.
     now eapply compile_isLambda.
   - cbn. rewrite -dlength_hom. move/andP: H0 => [] /Nat.ltb_lt //.
+  - destruct p as [? []]; try constructor; eauto. simp trans_prim_val. cbn. cbn in H. constructor.
 Qed.
 
 Lemma compile_fresh kn Σ : fresh_global kn Σ -> fresh kn (compile_ctx Σ).

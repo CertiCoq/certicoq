@@ -290,13 +290,13 @@ Section ANF_proof.
 
 
   Definition convert_anf_correct_exps (vs : fuel_sem.env) (es : expression.exps) (vs1 : list value) (f t : nat)  :=
-    forall rho env C ys S S' vs2 e',
+    forall rho env C ys S S' vs2 e' x c,
       well_formed_env vs ->
       exps_wf (N.of_nat (Datatypes.length env)) es ->
 
       Disjoint _ (FromList env) S ->
 
-      occurs_free e' \subset FromList ys :|: FromList env ->
+      occurs_free e' \subset x |: FromList env ->
 
       anf_env_rel env vs rho ->
 
@@ -308,9 +308,9 @@ Section ANF_proof.
         get_list ys rho' = Some vs2 /\
           (* vs2 rho = Some rho' /\ *)
         forall i,
-          preord_env_P ctenv eq_fuel (occurs_free e') i rho rho' /\
+          preord_env_P ctenv eq_fuel (FromList env) i rho rho' /\
           preord_exp ctenv (anf_bound f (t <+> (2 * Datatypes.length (exps_as_list es))%nat))
-                     eq_fuel i (e', rho') (C |[ e' ]|, rho).
+                     eq_fuel i (Econstr x c ys e', rho') (C |[ Econstr x c ys  e' ]|, rho).
 
   Lemma convert_anf_rel_same_set S1 e names S1' C x S2:
     convert_anf_rel S1 e names S1' C x ->
@@ -1060,34 +1060,35 @@ Section ANF_proof.
                                      (P := convert_anf_correct_exp_step).
       - (* Con_e *)
         intros es vs r dc fs ts Heval IH1.
-        intros rho names C x S1 S2 i e' Hwf Hwfexp Hdis Hfv Hanf Hcvt.
+        intros rho names C x S1 S2 i e' Hwf Hwfexp Hdis  Hfv Hanf Hcvt.
         split; [ | congruence ].
         intros v v' Heq Hvrel. subst. inv Hcvt. inv Hwfexp. inv Heq.
         inv Hvrel.
-        edestruct IH1 with (e' := Econstr x (dcon_to_tag default_tag dc cenv) ys e'); [ | | | | | eassumption | | ]; try eassumption.
+        edestruct IH1 with (e' := e'); [ | | | | | eassumption | | ]; try eassumption.
         * now sets.
-        * repeat normalize_occurs_free.
-          eapply Union_Included. now sets.
-          eapply Setminus_Included_Included_Union.
-          eapply Included_trans. eassumption. now sets.
-        * destructAll.
+        (* * repeat normalize_occurs_free. *)
+        (*   eapply Union_Included. now sets. *)
+        (*   eapply Setminus_Included_Included_Union. *)
+          (* eapply Included_trans. eassumption. now sets. *)
+        * destructAll. 
           eapply preord_exp_post_monotonic.
           2:{ eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
               2:{ intros. rewrite <- app_ctx_f_fuse. simpl. eapply H0. }
               eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
               2:{ intros m. eapply preord_exp_Econstr_red. eassumption. } 
-                
               eapply preord_exp_refl. now eapply eq_fuel_compat.
               eapply preord_env_P_extend.
               2:{ eapply preord_val_refl. now eapply eq_fuel_compat. }
 
-              eapply preord_env_P_antimon. eapply H0. normalize_occurs_free. sets. }
+              eapply preord_env_P_antimon. eapply H0.
+              eapply Setminus_Included_Included_Union. eapply Included_trans. eassumption.
+              now sets. }
           
           { unfold inclusion, comp, eq_fuel, one_step, anf_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
             destructAll. destruct_tuples. subst. simpl in *.
             unfold fuel_exp, trace_exp. admit. (* TODO change bound *) (* lia. *) }
-
+          
       - (* Con_e OOT *) admit.
 
       - (* App_e *) admit.
@@ -1099,7 +1100,7 @@ Section ANF_proof.
       - (* Let_e *)
         intros e1 e2 v1 r env na f1 f2 t1 t2.
         intros Heval1 IH1 Heval2 IH2.
-        intros rho names C x S1 S2 i e' Hwf Hwfexp Hdis Hfv Hanf Hcvt.
+        intros rho names C x S1 S2 i e' Hwf Hwfexp Hdis  Hfv Hanf Hcvt.
         split.
 
         + intros v v' Heq Hvrel. subst. inv Hcvt. inv Hwfexp.
@@ -1118,7 +1119,7 @@ Section ANF_proof.
                 
                 eapply preord_exp_trans. now tci.
                 now eapply eq_fuel_idemp.
-                2:{ intros. eapply IH1; [ | | | | |  | reflexivity | ]; try eassumption.
+                2:{ intros. eapply IH1; [ | | | | | | reflexivity | ]; try eassumption.
                   eapply Included_trans. eapply occurs_free_ctx_app.
                   eapply Union_Included.
                     - eapply Included_trans. eapply convert_anf_occurs_free_ctx. eassumption.
@@ -1128,8 +1129,8 @@ Section ANF_proof.
                       rewrite Setminus_Union_distr.
                       eapply Union_Included; [ |  now sets ].
                       eapply Setminus_Included_Included_Union.
-                      eapply Included_trans. eapply Singleton_Included. eapply convert_anf_res_included. 
-                      eassumption. normalize_sets. now sets. } 
+                      eapply Included_trans. eapply Singleton_Included. eapply convert_anf_res_included.
+                      eassumption. normalize_sets. now sets. }
                 
                 eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
                 2:{ intros. unfold convert_anf_correct_exp in IH2.
@@ -1181,7 +1182,7 @@ Section ANF_proof.
             
             rewrite <- app_ctx_f_fuse. eapply preord_exp_post_monotonic.
             2:{ eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
-                2:{ intros. eapply IH1; [ | | | | |  | reflexivity | ]; try eassumption.
+                2:{ intros. eapply IH1; [ | | | | | | reflexivity | ]; try eassumption.
                     eapply Included_trans. eapply occurs_free_ctx_app.
                     eapply Union_Included.
                     - eapply Included_trans. eapply convert_anf_occurs_free_ctx.
@@ -1225,14 +1226,15 @@ Section ANF_proof.
                         now intro; subst; eauto.
                         eassumption.  }
 
-                eapply preord_exp_refl. now eapply eq_fuel_compat. (* TODO check bounds *)
+                eapply preord_exp_refl. now eapply eq_fuel_compat.
                 eapply preord_env_P_extend.
                 2:{ eapply preord_val_refl. now eapply eq_fuel_compat. }
                 intros z Hinz vz Hget. eexists vz. split.
                 rewrite M.gso. now eassumption. intros Heq. subst. eapply n.
-                inv Hinz. eapply Hfv in H0. inv H0. congruence. eassumption. 
-                eapply preord_val_refl. now eapply eq_fuel_compat. }
-
+                inv Hinz. eapply Hfv in H0. inv H0. congruence. eassumption.
+                admit.  }
+                (* eapply preord_val_refl. now eapply eq_fuel_compat. } *)
+                     
             { unfold inclusion, comp, eq_fuel, one_step, anf_bound, one_i.
               intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
               destructAll. destruct_tuples. subst. simpl in *.
@@ -1248,8 +1250,8 @@ Section ANF_proof.
           assert (Hex : exists v1', anf_val_rel v1 v1').
           { eapply cps_val_rel_exists. eassumption. } 
 
-          edestruct IH1 with (e' := C2 |[ e' ]|); [ | | | | | eassumption | ]; eauto.
-          admit. admit.
+          edestruct IH1 with (e' := C2 |[ e' ]|); [ | | | | (* |  *)eassumption | ]; eauto.
+          admit. (* admit. *)
           
       -  (* Let_e OOT *) admit.
 
@@ -1262,7 +1264,7 @@ Section ANF_proof.
 
       - (* enil *)
         intros env. unfold convert_anf_correct_exps.
-        intros rho names C rs S S' vs x ctag Hwfenv Hwf Hdis Henv Hanf Hall.
+        intros rho names C rs S S' vs e Hwfenv Hwf Hdis Henv Hanf Hall.
         inv Hall. inv Hanf.
         exists rho. split; eauto.
         split. 
@@ -1272,36 +1274,66 @@ Section ANF_proof.
 
       -  (* econs *)
         intros env. intros e es v vs f fs t ts Heval IHe Hevalm IHes.
-        intros rho names C rs S S' vs' x Hwfenv Hwf Hdis Hfv Henv Hanf Hall.
+        intros rho names C rs S S' vs' e' Hwfenv Hwf Hdis (* Hfv  *)Henv Hanf Hall.
         inv Hall. inv Hanf. inv Hwf.
-        
-
-        destruct (Decidable_FromList names). destruct (Dec x0); [ | ].
-        + (* x0 \in names *)
+        rewrite <- app_ctx_f_fuse.
+        repeat normalize_sets.
+        destruct (Decidable_FromList names). destruct (Dec x); [ | ].
+        { (* x \in names *)
           assert (Hin := f0).
-          rewrite <- app_ctx_f_fuse. simpl. 
+          eapply convert_anf_in_env in f0; [ | eassumption | eassumption | eassumption ].
+          destruct f0 as [n [Hnth' Hnth]].
+          assert (Hrel := All_Forall.Forall2_nth_error _ _ _ Henv Hnth' Hnth).            
+          destruct Hrel as [v1'' [Hget'' Hrel'']].
+          edestruct IHes with (e' :=  e') (rho := (* M.set x y  *)rho) as [rho' [Hget Hpre]]; [ | | | | (* |  *)eassumption | eassumption | ]; try eassumption.
+          + admit. (* easy sets *)
+          + eexists (M.set x y rho'). split. simpl. erewrite M.gss.
+            admit. (* why same? *)
+            
+             intros i. split. 
+             now eapply Hpre. 
 
-          edestruct IHes; [ | | | | | eassumption | eassumption | ]; try eassumption.
-          admit. (* easy sets *)
-
-          admit. (* which e' ??? *) 
-          destructAll.
-          eexists (M.set x0 y x1). 
-          rewrite H. 
-          
-          | | | ]. eassumption. eassumption. 
-          
-          eapply preord_exp_post_monotonic.
-          2:{ eapply convert_anf_in_env in f; [ | eassumption | eassumption | eassumption ].
-                destruct f as [n [Hnth' Hnth]].
-                
-                assert (Hrel := All_Forall.Forall2_nth_error _ _ _ Hanf Hnth' Hnth).
-                
-                destruct Hrel as [v1'' [Hget'' Hrel'']].
-                
-                eapply preord_exp_trans. now tci.
+            eapply preord_exp_post_monotonic.
+            2:{ eapply preord_exp_trans. now tci.
                 now eapply eq_fuel_idemp.
-                2:{ intros. eapply IH1; [ | | | | |  | reflexivity | ]; try eassumption.
+                2:{ intros. eapply IHe; [ | | | | |  reflexivity | ]; try eassumption. }
+
+                                2:{ intros. unfold convert_anf_correct_exp in IH2.
+                    eapply IH2 with (env := x1 :: names); [ | | | | (* |  *)eassumption | reflexivity | eassumption ].
+                    - constructor; eauto. eapply All_Forall.nth_error_forall; eassumption.
+                    - simpl.
+                      replace (N.pos (Pos.of_succ_nat (length names))) with
+                        (1 + N.of_nat (length names)) by lia. eassumption.
+                    - normalize_sets.
+                      eapply Disjoint_Included_r. eapply convert_anf_fresh_subset.
+                      eassumption. 
+                      eapply Disjoint_Included_l; [ | eassumption ].
+                      now sets.
+                    (* - eapply Included_trans. eassumption. *)
+                    (*   normalize_sets. now sets. *)
+                    - constructor.
+                      + eexists. split. rewrite M.gss. reflexivity. eassumption.
+                      + eapply All_Forall.Forall2_impl. eassumption.
+                        simpl. intros v2 z Hex. destructAll.
+                        eexists. split; [ | eassumption ].
+                        destruct (OrdersEx.Positive_as_OT.eq_dec x1 z).
+                        * subst. rewrite M.gss. congruence.
+                        * rewrite M.gso; eauto. } 
+                
+                eapply preord_exp_refl. now eapply eq_fuel_compat. (* TODO check bounds *)
+                eapply preord_env_P_extend.
+                2:{ eapply preord_val_refl. now eapply eq_fuel_compat. }
+                intros z Hinz vz Hget. eexists vz. split.
+                { destruct (OrdersEx.Positive_as_OT.eq_dec x1 z).
+                  * subst. rewrite M.gss. congruence.
+                  * rewrite M.gso; eauto. } (* TODO lemma *)
+                eapply preord_val_refl. now eapply eq_fuel_compat. }
+
+            { unfold inclusion, comp, eq_fuel, one_step, anf_bound, one_i.
+              intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
+              destructAll. destruct_tuples. subst. simpl in *.
+
+                
                   eapply Included_trans. eapply occurs_free_ctx_app.
                   eapply Union_Included.
                     - eapply Included_trans. eapply convert_anf_occurs_free_ctx. eassumption.

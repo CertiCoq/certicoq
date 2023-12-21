@@ -93,22 +93,23 @@ Lemma Lookup_hom :
 Proof.
   induction Σ; cbn => //.
   intros s ec.
-  Admitted.
-  (*
   case: eqb_specT.
   - intros -> ? [= <-].
-    exists g. split. red. now exists [a].
-    now depelim s.
+    exists g. split. red. intros kn d hl. cbn. depelim s. cbn.
+    case: eqb_specT. intros ->. now eapply lookup_env_Some_fresh in hl. auto. now depelim s.
     destruct a as [kn d]; cbn.
     now rewrite eqb_refl.
   - intros neq d hl.
     forward IHg. now depelim s.
     destruct (IHg _ _ hl) as [Σ' [ext hl']].
     exists Σ'. split => //.
-    destruct ext as [Σ'' ->]. now exists (a :: Σ'').
-    destruct a as [kn d']; cbn.
-    cbn in neq; case: eqb_specT => //.
-Qed.*)
+    + intros kn d' hl''; cbn.
+      case: eqb_specT.
+      * intros ->. destruct a as [kn' ?]; cbn in *. eapply ext in hl''.  depelim s. now eapply lookup_env_Some_fresh in hl''.
+      * intros hkn. now eapply ext in hl''.
+    + destruct a as [kn d']; cbn.
+      cbn in neq; case: eqb_specT => //.
+Qed.
   
 Lemma lookup_hom_None:
   forall nm,

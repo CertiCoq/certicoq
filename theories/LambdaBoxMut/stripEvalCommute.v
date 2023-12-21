@@ -29,6 +29,15 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
+(** We do not support arrays (yet) *)
+Definition prim_flags := 
+  {| has_primint := true;   
+     has_primfloat := true;
+     has_primarray := false |}.
+
+(** Cofixpoints are not supported, Var and Evar don't actually appear 
+    in terms to compile, and projections are inlined to cases earlier
+    in the pipeline. *)
 Definition term_flags :=
   {|
     has_tBox := true;
@@ -44,7 +53,7 @@ Definition term_flags :=
     has_tProj := false;
     has_tFix := true;
     has_tCoFix := false;
-    has_tPrim := true
+    has_tPrim := prim_flags;
   |}.
 
 Definition env_flags := 
@@ -541,7 +550,7 @@ Proof.
     constructor; eauto.
     now eapply compile_isLambda.
   - cbn. rewrite -dlength_hom. move/andP: H0 => [] /Nat.ltb_lt //.
-  - destruct p as [? []]; try constructor; eauto. simp trans_prim_val. cbn. cbn in H. constructor.
+  - destruct p as [? []]; try constructor; eauto. simp trans_prim_val. cbn. now cbn in H.
 Qed.
 
 Lemma compile_fresh kn Σ : fresh_global kn Σ -> fresh kn (compile_ctx Σ).
@@ -603,6 +612,7 @@ Proof.
   cbn. 
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
+  destruct prim as [? []]; simp trans_prim_val; cbn => //.
 Qed.
 
 Lemma isBox_compile f : 
@@ -614,6 +624,7 @@ Proof.
   destruct decompose_app eqn:da.
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
+  destruct prim as [? []]; simp trans_prim_val; cbn => //.
 Qed.
 
 Lemma isFix_compile f : 
@@ -625,6 +636,7 @@ Proof.
   destruct decompose_app eqn:da.
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
+  destruct prim as [? []]; simp trans_prim_val; cbn => //.
 Qed.
 
 Lemma isConstructApp_compile f : 
@@ -636,6 +648,7 @@ Proof.
   destruct decompose_app eqn:da.
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
+  destruct prim as [? []]; simp trans_prim_val; cbn => //.
 Qed.
 
 
@@ -792,6 +805,7 @@ Proof.
     * cbn -[instantiateDefs]. rewrite instantiateDefs_equation.
       destruct p; len.
       f_equal; eauto. apply (e n0) => //. eapply wellformed_up; tea. lia.
+  - destruct p as [? []]; simp trans_prim_val; cbn => //.
 Qed.
 
 Fixpoint substl_rev terms k body :=
@@ -1079,9 +1093,10 @@ Proof.
     simp_compile. econstructor. clear hargs.
     move: IHargs. cbn. induction 1; cbn; constructor; intuition auto.
     apply r. apply IHIHargs. now depelim evargs.
+  - cbn. move/andP=> [hasp testp] ih. depelim ih; simp_compile; simp trans_prim_val; cbn => //; try constructor.
   - intros isat wf.
     destruct t => //; simp_compile; econstructor.
-    cbn in isat. destruct l => //.
+    cbn in isat. destruct args => //.
 Qed.
 
 Lemma compile_sound (wfl := block_wcbv_flags) {Σ t t'} : 

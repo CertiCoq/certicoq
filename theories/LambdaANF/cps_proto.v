@@ -236,13 +236,13 @@ Class Iso A B := {
 Notation "'![' e ']'" := (isoBofA e).
 Notation "'[' e ']!'" := (isoAofB e).
 
-Instance Iso_exp_c_exp_ctx : Iso (exp_c exp_univ_exp exp_univ_exp) exp_ctx := {
+#[global] Instance Iso_exp_c_exp_ctx : Iso (exp_c exp_univ_exp exp_univ_exp) exp_ctx := {
   isoAofB := c_of_exp_ctx;
   isoBofA := exp_ctx_of_c;
   isoABA := c_exp_ctx_c;
   isoBAB := exp_ctx_c_exp_ctx }.
 
-Instance Iso_fundefs_c_fundefs_ctx : Iso (exp_c exp_univ_exp exp_univ_fundefs) fundefs_ctx := {
+#[global] Instance Iso_fundefs_c_fundefs_ctx : Iso (exp_c exp_univ_exp exp_univ_fundefs) fundefs_ctx := {
   isoAofB := c_of_fundefs_ctx;
   isoBofA := fundefs_ctx_of_c;
   isoABA := c_fundefs_ctx_c;
@@ -552,7 +552,7 @@ Class Inhabited A := inhabitant : A.
 Import PrimInt63.
 
 Global Instance Inhabited_primitive : Inhabited AstCommon.primitive := 
-  { inhabitant := existT _ Primitive.primInt 0%uint63 }.  
+  { inhabitant := existT _ AstCommon.primInt 0%uint63 }.  
 
 Definition univ_inhabitant {A} : univD A :=
   match A with

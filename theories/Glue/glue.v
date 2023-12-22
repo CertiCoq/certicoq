@@ -269,7 +269,7 @@ Section Externs.
     _v <- gensym "v" ;;
     ret (gname,
          Gfun (Internal
-                 {| fn_return := tuint
+                 {| fn_return := uval
                   ; fn_callconv := cc_default
                   ; fn_params := (_v, val) :: nil
                   ; fn_vars := nil
@@ -284,7 +284,7 @@ Section Externs.
     _v <- gensym "v" ;;
     ret (gname,
          Gfun (Internal
-                 {| fn_return := tuint
+                 {| fn_return := uval
                   ; fn_callconv := cc_default
                   ; fn_params := (_v, val) :: nil
                   ; fn_vars := nil
@@ -961,7 +961,7 @@ Section CtorEnumTag.
     | nil => LSnil
     | (ordinal, tag) :: pairs' =>
       LScons (Some (Z.of_nat ordinal))
-             (Sreturn (Some (Econst_int (Int.repr (Z.of_nat tag)) tuint)))
+             (Sreturn (Some (Econst_int (Int.repr (Z.of_nat tag)) uval)))
              (matches_to_LS pairs')
     end.
 
@@ -980,30 +980,30 @@ Section CtorEnumTag.
         let (boxed, unboxed) := match_ordinals_with_tag (Ast.Env.ind_ctors one) 0 0 0 in
         let (vars, body) := match boxed, unboxed with
           | nil, nil => (* if there are no constructors, just return 0 *)
-             (nil, Sreturn (Some (Econst_int (Int.repr 0) tuint)))
+             (nil, Sreturn (Some (Econst_int (Int.repr 0) uval)))
           | nil, _ => (* if all ctors are unboxed, then just call get_unboxed_ordinal *)
-             ((_t, tuint) :: nil,
+             ((_t, uval) :: nil,
               Scall (Some _t) (Evar _guo ty_guo) (Etempvar _v val :: nil) ;;;
-              Sreturn (Some (Etempvar _t tuint)))
+              Sreturn (Some (Etempvar _t uval)))
           | _, nil => (* if all ctors are unboxed, then just call get_boxed_ordinal *)
-             ((_t, tuint) :: nil,
+             ((_t, uval) :: nil,
               Scall (Some _t) (Evar _gbo ty_gbo) (Etempvar _v val :: nil) ;;;
-              Sreturn (Some (Etempvar _t tuint)))
+              Sreturn (Some (Etempvar _t uval)))
           | _, _ => (* if there are boxed and unboxed constructors, then if and switch *)
             let body :=
               Scall (Some _b) (Evar _is_ptr ty_is_ptr) (Etempvar _v val :: nil) ;;;
               Sifthenelse
                 (Etempvar _b tbool)
                 (Scall (Some _t) (Evar _gbo ty_gbo) (Etempvar _v val :: nil) ;;;
-                Sswitch (Etempvar _t tuint) (matches_to_LS boxed))
+                Sswitch (Etempvar _t uval) (matches_to_LS boxed))
                 (Scall (Some _t) (Evar _guo ty_guo) (Etempvar _v val :: nil) ;;;
-                Sswitch (Etempvar _t tuint) (matches_to_LS unboxed))
-            in ((_b, tbool) :: (_t, tuint) :: nil, body)
+                Sswitch (Etempvar _t uval) (matches_to_LS unboxed))
+            in ((_b, tbool) :: (_t, uval) :: nil, body)
           end in
         gname <- gensym ("get_" ++ sanitize_qualified kn ++ "_tag") ;;
         let f := (gname,
                   Gfun (Internal
-                          {| fn_return := tuint
+                         {| fn_return := uval
                           ; fn_callconv := cc_default
                           ; fn_params := (_v, val) :: nil
                           ; fn_vars := nil

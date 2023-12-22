@@ -527,7 +527,7 @@ Section L1Types.
         match e with
           | Ast.tProd _ _ e' => check_last e'
           | Ast.tSort u =>
-              MetaCoq.Common.Universes.Universe.is_prop u
+              MetaCoq.Common.Universes.Sort.is_prop u
           | _ => false
         end
     in check_last (Ast.Env.ind_type (ty_body info)).

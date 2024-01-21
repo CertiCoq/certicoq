@@ -1232,8 +1232,7 @@ Section ANF_proof.
                 intros z Hinz vz Hget. eexists vz. split.
                 rewrite M.gso. now eassumption. intros Heq. subst. eapply n.
                 inv Hinz. eapply Hfv in H0. inv H0. congruence. eassumption.
-                admit.  }
-                (* eapply preord_val_refl. now eapply eq_fuel_compat. } *)
+                eapply preord_val_refl. now eapply eq_fuel_compat. }
                      
             { unfold inclusion, comp, eq_fuel, one_step, anf_bound, one_i.
               intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.            
@@ -1250,8 +1249,8 @@ Section ANF_proof.
           assert (Hex : exists v1', anf_val_rel v1 v1').
           { eapply cps_val_rel_exists. eassumption. } 
 
-          edestruct IH1 with (e' := C2 |[ e' ]|); [ | | | | (* |  *)eassumption | ]; eauto.
-          admit. (* admit. *)
+          edestruct IH1 with (e' := C2 |[ e' ]|); [ | | | | | eassumption | ]; eauto.
+          admit. admit.
           
       -  (* Let_e OOT *) admit.
 
@@ -1264,39 +1263,45 @@ Section ANF_proof.
 
       - (* enil *)
         intros env. unfold convert_anf_correct_exps.
-        intros rho names C rs S S' vs e Hwfenv Hwf Hdis Henv Hanf Hall.
+        intros rho names C rs S S' vs e Hwfenv ctag Hwf Hexpwf Hdis Hfv Henv Hanf Hall.
         inv Hall. inv Hanf.
-        exists rho. split; eauto.
+        exists rho. split; eauto. 
         split. 
         intros k. eapply preord_env_P_refl. eapply eq_fuel_compat.
         eapply preord_exp_refl. admit. (* bounds *) 
         eapply preord_env_P_refl. eapply eq_fuel_compat.
-
+        
       -  (* econs *)
         intros env. intros e es v vs f fs t ts Heval IHe Hevalm IHes.
-        intros rho names C rs S S' vs' e' Hwfenv Hwf Hdis (* Hfv  *)Henv Hanf Hall.
+        intros rho names C xs S S' vs' e' x ctag Hwfenv Hwf Hdis Hfv Henv Hanf Hall.
         inv Hall. inv Hanf. inv Hwf.
         rewrite <- app_ctx_f_fuse.
         repeat normalize_sets.
-        destruct (Decidable_FromList names). destruct (Dec x); [ | ].
+        destruct (Decidable_FromList names). destruct (Dec x0); [ | ].
         { (* x \in names *)
           assert (Hin := f0).
           eapply convert_anf_in_env in f0; [ | eassumption | eassumption | eassumption ].
           destruct f0 as [n [Hnth' Hnth]].
-          assert (Hrel := All_Forall.Forall2_nth_error _ _ _ Henv Hnth' Hnth).            
-          destruct Hrel as [v1'' [Hget'' Hrel'']].
-          edestruct IHes with (e' :=  e') (rho := (* M.set x y  *)rho) as [rho' [Hget Hpre]]; [ | | | | (* |  *)eassumption | eassumption | ]; try eassumption.
+          assert (Hrel := All_Forall.Forall2_nth_error _ _ _ Henv Hnth' Hnth).
+          (* simpl in *.       *)
+          (* destruct Hrel as [v1'' [Hget'' Hrel'']]. *)
+          edestruct IHes with (e' :=  e') (rho := M.set x0 y rho) as [rho' [Hget Hpre]]; [ | | | | | eassumption | eassumption | ]; try eassumption.
           + admit. (* easy sets *)
-          + eexists (M.set x y rho'). split. simpl. erewrite M.gss.
+          + admit.
+          + eexists (M.set x0  y rho'). split. simpl. erewrite M.gss.
             admit. (* why same? *)
             
-             intros i. split. 
-             now eapply Hpre. 
-
+            intros i. split.
+            now eapply Hpre. 
+             
             eapply preord_exp_post_monotonic.
             2:{ eapply preord_exp_trans. now tci.
                 now eapply eq_fuel_idemp.
-                2:{ intros. eapply IHe; [ | | | | |  reflexivity | ]; try eassumption. }
+                2:{ intros. eapply IHe; [ | | | | | | reflexivity | ]; try eassumption.
+                    - repeat normalize_occurs_free. admit. 
+                      
+                }
+                
 
                                 2:{ intros. unfold convert_anf_correct_exp in IH2.
                     eapply IH2 with (env := x1 :: names); [ | | | | (* |  *)eassumption | reflexivity | eassumption ].

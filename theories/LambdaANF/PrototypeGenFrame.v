@@ -576,7 +576,7 @@ Definition nAnon := {| binder_name := nAnon; binder_relevance := Relevant |}.
 Definition nNamed n := {| binder_name := nNamed n; binder_relevance := Relevant |}.
 
 Definition fn : term -> term -> term := tProd nAnon.
-Definition type0 := tSort Universe.type0.
+Definition type0 := tSort Sort.type0.
 Definition func x t e := tLambda (nNamed x) t e.
 Definition lam t e := tLambda nAnon t e.
 

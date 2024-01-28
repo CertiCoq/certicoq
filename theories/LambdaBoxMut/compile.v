@@ -13,8 +13,7 @@ From MetaCoq.Utils Require utils.
 From MetaCoq.Template Require EtaExpand.
 From MetaCoq.Utils Require Import bytestring.
 From MetaCoq.Common Require Import Primitive.
-From MetaCoq.PCUIC Require Import PCUICPrimitive.
-From MetaCoq.Erasure Require Import EAst ESpineView EGlobalEnv EEtaExpanded EInduction Erasure.
+From MetaCoq.Erasure Require Import EPrimitive EAst ESpineView EGlobalEnv EEtaExpanded EInduction Erasure.
 From MetaCoq.ErasurePlugin Require Import Erasure.
 
 Local Open Scope bs_scope.
@@ -336,15 +335,11 @@ Fixpoint list_Defs (l : list (def Term)) : Defs :=
   | [] => dnil
   | t :: ts => dcons t.(dname) t.(dbody) t.(rarg) (list_Defs ts) 
   end.
-  
-Definition trans_prim_model {T} {t : prim_tag} (e : @prim_model T t) : prim_value t :=
-  match e in @prim_model _ x return prim_value x with
-  | primIntModel i => i
-  | primFloatModel f => f
-  end.
 
-Definition trans_prim_val {T} (p : prim_val T) : primitive :=
-  existT _ (projT1 p) (trans_prim_model (projT2 p)).
+Polymorphic Equations trans_prim_val {T} (p : EPrimitive.prim_val T) : option primitive :=
+  trans_prim_val (existT _ primInt (primIntModel i)) => Some (existT _ AstCommon.primInt i) ;
+  trans_prim_val (existT _ primFloat (primFloatModel i)) => Some (existT _ AstCommon.primFloat i) ;
+  trans_prim_val (existT _ primArray _) => None.
 
 Section Compile.
   Import MCList (map_InP, In_size).
@@ -372,7 +367,9 @@ Section Compile.
       TFix (list_Defs mfix') idx
     | tProj p bod := TWrong "Proj"; (* Impossible, no projections at this stage *)
     | tCoFix mfix idx => TWrong "TCofix"
-    | tPrim p => TPrim (trans_prim_val p)
+    | tPrim p with trans_prim_val p := 
+      { | None => TWrong "unsupported primtive type"
+        | Some pv => TPrim pv }
     | tVar _ => TWrong "Var"
     | tEvar _ _ => TWrong "Evar" }.
   Proof.

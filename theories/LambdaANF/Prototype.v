@@ -149,6 +149,7 @@ Definition named_of' (Γ : list string) (tm : term) : GM term :=
       | tCoFix mfix idx => tCoFix <$> go_mfix mfix <*> ret idx
       | tInt i => ret (tInt i)
       | tFloat f => ret (tFloat f)
+      | tArray u v def ty => tArray u <$> mapM (go Γ) v <*> go Γ def <*> go Γ ty
       end
     end
   in go 1000%nat Γ tm.
@@ -243,6 +244,7 @@ Definition indices_of (Γ : list string) (t : term) : GM term :=
       | tCoFix mfix idx => tCoFix <$> go_mfix mfix <*> ret idx
       | tInt i => ret (tInt i)
       | tFloat f => ret (tFloat f)
+      | tArray _ _ _ _ => ret tm
       end
     end
   in go 1000%nat [] t.
@@ -328,6 +330,7 @@ Definition rename (σ : Map string string) : term -> term :=
     | tFix mfix idx => tFix (go_mfix mfix) idx
     | tCoFix mfix idx => tCoFix (go_mfix mfix) idx
     | tInt _ | tFloat _ => tm
+    | tArray u v def ty => tArray u (map go v) (go def) (go ty)
     end.
 
 (* -------------------- Generation of helper function types -------------------- *)
@@ -711,6 +714,7 @@ Fixpoint vars_of (t : term) : Set' string :=
   | tFix mfix idx => union_all (map (fun def => vars_of def.(dtype) ∪ vars_of def.(dbody)) mfix)
   | tCoFix mfix idx => union_all (map (fun def => vars_of def.(dtype) ∪ vars_of def.(dbody)) mfix)
   | tInt _ | tFloat _ => empty
+  | tArray u v def ty => vars_of def ∪ vars_of ty ∪ union_all (map vars_of v)
   end.
 
 (* ---------- Parsing the inductive relation ---------- *)
@@ -832,6 +836,7 @@ Fixpoint has_var (x : Kernames.ident) (e : term) {struct e} : bool. ltac1:(refin
   | tFix mfix idx => anyb (fun d => has_var x d.(dtype) || has_var x d.(dbody)) mfix
   | tCoFix mfix idx => anyb (fun d => has_var x d.(dtype) || has_var x d.(dbody)) mfix
   | tInt _ | tFloat _ => false
+  | tArray u v def ty => anyb (has_var x) v || has_var x def || has_var x ty
   end%bool
 )).
 Defined.

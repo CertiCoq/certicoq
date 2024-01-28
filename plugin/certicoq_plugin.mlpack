@@ -113,8 +113,8 @@ Ssrbool
 WGraph
 UGraph0
 Typing0
-PCUICAst
 PCUICPrimitive
+PCUICAst
 PCUICAstUtils
 PCUICCases
 PCUICUnivSubst
@@ -146,18 +146,21 @@ PCUICSafeChecker
 PCUICSafeRetyping
 SafeTemplateChecker
 
+EPrimitive
 EAst
 EAstUtils
 EInduction
 ECSubst
 EWellformed
 EEnvMap
+EGlobalEnv
 EWcbvEval
 ESpineView
 EPretty
 Extract
 EEtaExpanded
 ErasureFunction
+ErasureFunctionProperties
 EProgram
 ERemoveParams
 EOptimizePropDiscr
@@ -165,6 +168,8 @@ EInlineProjections
 EConstructorsAsBlocks
 ETransform
 Erasure
+OptimizePropDiscr
+ErasureCorrectness
 SafeTemplateErasure
 
 ZArith_dec

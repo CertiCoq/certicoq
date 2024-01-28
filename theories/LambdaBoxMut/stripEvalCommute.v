@@ -29,6 +29,15 @@ Local Open Scope bool.
 Local Open Scope list.
 Set Implicit Arguments.
 
+(** We do not support arrays (yet) *)
+Definition prim_flags := 
+  {| has_primint := true;   
+     has_primfloat := true;
+     has_primarray := false |}.
+
+(** Cofixpoints are not supported, Var and Evar don't actually appear 
+    in terms to compile, and projections are inlined to cases earlier
+    in the pipeline. *)
 Definition term_flags :=
   {|
     has_tBox := true;
@@ -44,7 +53,7 @@ Definition term_flags :=
     has_tProj := false;
     has_tFix := true;
     has_tCoFix := false;
-    has_tPrim := true
+    has_tPrim := prim_flags;
   |}.
 
 Definition env_flags := 
@@ -86,17 +95,20 @@ Proof.
   intros s ec.
   case: eqb_specT.
   - intros -> ? [= <-].
-    exists g. split. now exists [a].
-    now depelim s.
+    exists g. split. red. intros kn d hl. cbn. depelim s. cbn.
+    case: eqb_specT. intros ->. now eapply lookup_env_Some_fresh in hl. auto. now depelim s.
     destruct a as [kn d]; cbn.
     now rewrite eqb_refl.
   - intros neq d hl.
     forward IHg. now depelim s.
     destruct (IHg _ _ hl) as [Σ' [ext hl']].
     exists Σ'. split => //.
-    destruct ext as [Σ'' ->]. now exists (a :: Σ'').
-    destruct a as [kn d']; cbn.
-    cbn in neq; case: eqb_specT => //.
+    + intros kn d' hl''; cbn.
+      case: eqb_specT.
+      * intros ->. destruct a as [kn' ?]; cbn in *. eapply ext in hl''.  depelim s. now eapply lookup_env_Some_fresh in hl''.
+      * intros hkn. now eapply ext in hl''.
+    + destruct a as [kn d']; cbn.
+      cbn in neq; case: eqb_specT => //.
 Qed.
   
 Lemma lookup_hom_None:
@@ -165,9 +177,9 @@ Lemma wellformed_lookup_constructor_pars {Σ kn c mdecl idecl cdecl} :
   wf_glob Σ ->
   lookup_constructor Σ kn c = Some (mdecl, idecl, cdecl) -> mdecl.(ind_npars) = 0.
 Proof.
-  intros wf. cbn -[lookup_minductive].
-  destruct lookup_minductive eqn:hl => //.
-  do 2 destruct nth_error => //.
+  intros wf. unfold lookup_constructor, lookup_inductive.
+  destruct lookup_minductive eqn:hl => //=. 
+  do 2 destruct nth_error => //=.
   eapply wellformed_lookup_inductive_pars in hl => //. congruence.
 Qed.
 
@@ -176,7 +188,7 @@ Lemma lookup_constructor_pars_args_spec {Σ ind n mdecl idecl cdecl} :
   lookup_constructor Σ ind n = Some (mdecl, idecl, cdecl) ->
   lookup_constructor_pars_args Σ ind n = Some (mdecl.(ind_npars), cdecl.(cstr_nargs)).
 Proof.
-  cbn -[lookup_constructor] => wfΣ.
+  cbn -[lookup_constructor] => wfΣ. unfold lookup_constructor_pars_args.
   destruct lookup_constructor as [[[mdecl' idecl'] [pars args]]|] eqn:hl => //.
   intros [= -> -> <-]. cbn. f_equal.
 Qed.
@@ -200,7 +212,7 @@ Proof.
   intros hwf.
   rewrite /constructor_isprop_pars_decl /lookup_constructor /lookup_inductive.
   destruct lookup_minductive as [mdecl|] eqn:hl => /= //.
-  do 2 destruct nth_error => //.
+  do 2 destruct nth_error => //=.
   eapply wellformed_lookup_inductive_pars in hl => //. congruence.
 Qed.
 
@@ -460,9 +472,9 @@ Lemma compile_crctInd {Σ ind mdecl idecl} :
 Proof.
   move=> wfΣ.
   unfold lookup_inductive, lookup_minductive.
-  destruct lookup_env eqn:hl => /= //.
+  destruct lookup_env eqn:hl => /= //=.
   eapply lookup_env_lookup in hl => //.
-  destruct g => //.
+  destruct g => //=.
   destruct nth_error eqn:hnth => //.
   intros [= <- <-]. econstructor. red.
   split. eapply lookup_Lookup. cbn. rewrite hl //.
@@ -539,6 +551,7 @@ Proof.
     constructor; eauto.
     now eapply compile_isLambda.
   - cbn. rewrite -dlength_hom. move/andP: H0 => [] /Nat.ltb_lt //.
+  - destruct p as [? []]; try constructor; eauto. simp trans_prim_val. cbn. now cbn in H.
 Qed.
 
 Lemma compile_fresh kn Σ : fresh_global kn Σ -> fresh kn (compile_ctx Σ).
@@ -600,6 +613,7 @@ Proof.
   cbn. 
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
+  destruct prim as [? []]; simp trans_prim_val; cbn => //.
 Qed.
 
 Lemma isBox_compile f : 
@@ -611,6 +625,7 @@ Proof.
   destruct decompose_app eqn:da.
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
+  destruct prim as [? []]; simp trans_prim_val; cbn => //.
 Qed.
 
 Lemma isFix_compile f : 
@@ -622,6 +637,7 @@ Proof.
   destruct decompose_app eqn:da.
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
+  destruct prim as [? []]; simp trans_prim_val; cbn => //.
 Qed.
 
 Lemma isConstructApp_compile f : 
@@ -633,6 +649,7 @@ Proof.
   destruct decompose_app eqn:da.
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
+  destruct prim as [? []]; simp trans_prim_val; cbn => //.
 Qed.
 
 
@@ -789,6 +806,7 @@ Proof.
     * cbn -[instantiateDefs]. rewrite instantiateDefs_equation.
       destruct p; len.
       f_equal; eauto. apply (e n0) => //. eapply wellformed_up; tea. lia.
+  - destruct p as [? []]; simp trans_prim_val; cbn => //.
 Qed.
 
 Fixpoint substl_rev terms k body :=
@@ -1076,9 +1094,10 @@ Proof.
     simp_compile. econstructor. clear hargs.
     move: IHargs. cbn. induction 1; cbn; constructor; intuition auto.
     apply r. apply IHIHargs. now depelim evargs.
+  - cbn. move/andP=> [hasp testp] ih. depelim ih; simp_compile; simp trans_prim_val; cbn => //; try constructor.
   - intros isat wf.
     destruct t => //; simp_compile; econstructor.
-    cbn in isat. destruct l => //.
+    cbn in isat. destruct args => //.
 Qed.
 
 Lemma compile_sound (wfl := block_wcbv_flags) {Σ t t'} : 

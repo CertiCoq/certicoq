@@ -708,7 +708,9 @@ Program Definition to_float (f : PrimFloat.float) : Floats.float :=
 Next Obligation.
   unfold model_to_ff.
   pose proof (FloatAxioms.Prim2SF_valid f).
-  rewrite Binary.valid_binary_SF2FF; auto.
+  rewrite Binary.valid_binary_SF2FF. exact H.
+  unfold float64_to_model. 
+  unfold FloatOps.Prim2SF. cbn.
   Admitted.
 
 Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
@@ -721,8 +723,8 @@ Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (
 
 Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env) (x : positive) (p : AstCommon.primitive) : statement :=
   match projT1 p as tag return AstCommon.prim_value tag -> statement with
-  | Primitive.primInt => fun i => x ::= Econst_long (to_int64 i) (Tlong Unsigned noattr)
-  | Primitive.primFloat => fun f => compile_float cenv ienv fenv map x (to_float f)
+  | AstCommon.primInt => fun i => x ::= Econst_long (to_int64 i) (Tlong Unsigned noattr)
+  | AstCommon.primFloat => fun f => compile_float cenv ienv fenv map x (to_float f)
   end (projT2 p).
 
 Fixpoint translate_body

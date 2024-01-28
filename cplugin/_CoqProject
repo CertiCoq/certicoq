@@ -169,12 +169,16 @@ extraction/decimal.ml
 extraction/decimal.mli
 extraction/transform.mli
 extraction/transform.ml
+extraction/ePrimitive.mli
+extraction/ePrimitive.ml
 extraction/eAst.ml
 extraction/eAst.mli
 extraction/eAstUtils.ml
 extraction/eAstUtils.mli
 extraction/eEnvMap.mli
 extraction/eEnvMap.ml
+extraction/eGlobalEnv.mli
+extraction/eGlobalEnv.ml
 # extraction/eLiftSubst.mli
 # extraction/eLiftSubst.ml
 extraction/eCSubst.ml
@@ -211,6 +215,12 @@ extraction/equalities.ml
 extraction/equalities.mli
 extraction/erasureFunction.ml
 extraction/erasureFunction.mli
+extraction/erasureFunctionProperties.mli
+extraction/erasureFunctionProperties.ml
+extraction/optimizePropDiscr.mli
+extraction/optimizePropDiscr.ml
+extraction/extractionCorrectness.mli
+extraction/extractionCorrectness.ml
 extraction/erasure.ml
 extraction/erasure.mli
 extraction/errors0.ml

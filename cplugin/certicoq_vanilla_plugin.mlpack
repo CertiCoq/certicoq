@@ -118,6 +118,7 @@ Ssrbool
 WGraph
 UGraph0
 Typing0
+PCUICPrimitive
 PCUICAst
 PCUICAstUtils
 PCUICCases
@@ -135,7 +136,6 @@ PCUICProgram
 PCUICExpandLets
 TemplateToPCUIC
 PCUICTransform
-PCUICPrimitive
 PCUICErrors
 PCUICEqualityDec
 PCUICWfEnv
@@ -148,18 +148,23 @@ PCUICSafeChecker
 PCUICSafeRetyping
 SafeTemplateChecker
 
+EPrimitive
 EAst
 EAstUtils
 EInduction
 ECSubst
 EWellformed
 EEnvMap
+EGlobalEnv
 EWcbvEval
 ESpineView
 EPretty
 Extract
 EEtaExpanded
 ErasureFunction
+ErasureFunctionProperties
+OptimizePropDiscr
+ExtractionCorrectness
 EProgram
 ERemoveParams
 EOptimizePropDiscr

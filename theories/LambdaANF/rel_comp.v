@@ -147,7 +147,7 @@ Section RelComp.
     intros H1. revert m e3. induction H1; intros k e3 H2. 
     - econstructor. econstructor. eassumption. eassumption. eassumption.
       eassumption.
-    - rewrite <- plus_assoc. simpl.
+    - rewrite <- Nat.add_assoc. simpl.
       eapply IHR_n1.
       eapply IHR_n2. eassumption.
   Qed.
@@ -513,9 +513,9 @@ Section Linking.
           preord_exp cenv P PG k (e1, rho1) (e2, rho2)).
   Proof.
     intros H. inv H. do 2 eexists. now split; eauto.
-    eapply plus_is_one in H0. inv H0. inv H.
-    - eapply R_n_not_zero in H1. lia.
-    - inv H. eapply R_n_not_zero in H2. lia.      
+    eapply Nat.eq_add_1 in H0. inv H0. inv H.
+    - eapply R_n_not_zero in H2. lia.
+    - inv H. eapply R_n_not_zero in H1. lia.
   Qed.
   
 End Linking.

@@ -63,7 +63,7 @@ with app_f_ctx : fundefs_ctx -> exp -> fundefs -> Prop :=
                     app_f_ctx cfds e cfdse -> 
                     app_f_ctx (Fcons2_c f t ys e' cfds) e (Fcons f t ys e' cfdse).
 
-Hint Constructors app_ctx app_f_ctx : core.
+#[global] Hint Constructors app_ctx app_f_ctx : core.
 
 (** Evaluation context application - Computational definition *)
 Fixpoint app_ctx_f (c:exp_ctx) (e:exp) : exp :=

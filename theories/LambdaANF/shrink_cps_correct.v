@@ -2250,13 +2250,13 @@ Section occurs_free_rw.
     2: reflexivity.
     simpl.
 
-    inv H0. apply plus_is_O in H3. destruct H3. subst.
+    inv H0. apply Nat.eq_add_0 in H3. destruct H3. subst.
     apply fundefs_append_num_occur' in H6.
     destructAll.
-    apply plus_is_O in H2. destructAll.
+    apply Nat.eq_add_0 in H2. destructAll.
 
 
-    inv H1. apply plus_is_O in H10.
+    inv H1. apply Nat.eq_add_0 in H10.
     destructAll.
     apply not_occurs_not_free in H5.
     apply not_occurs_not_free in H11.
@@ -3158,14 +3158,14 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - simpl in H1. inv H1.
       inv H0.
       specialize (H _ _ _  H8 H9).
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       apply H. intro. apply H2.
       apply Range_map_remove in H0. auto.
       apply num_occur_list_not_range. auto.
     - simpl in H0. inv H0.
       inv H6. inv H.
       inv H5.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       assert (Hll := num_occur_list_not_range _ _ H1 ([v])).
       simpl in Hll.    auto.
       auto.
@@ -3174,7 +3174,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
           (n + (num_occur_list [v] f + m)) by lia.
       replace ((num_occur_list (@cons var (apply_r sigma v) (@nil var)) f) + (n0 + m0)) with
           (n0 + (num_occur_list (@cons var (apply_r sigma v) (@nil var)) f + m0)) by lia.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       eapply H; eauto.
       eapply H0; eauto.
       simpl. constructor.
@@ -3183,7 +3183,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - simpl in H1. inv H1.
       inv H0.
       specialize (H _ _ _ H9 H10).
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       assert (Hll := num_occur_list_not_range _ _ H2 ([v0])).
       simpl in Hll.    auto.
       apply H. intro; apply H2.
@@ -3191,12 +3191,12 @@ substitution to a term cannot increase the occurence count for that variable. *)
       auto.
     - inv H1. inv H0.
       assert (Hll := num_occur_list_not_range _ _ H2 (f0::ys)).
-      apply plus_le_compat. eassumption.
+      apply Nat.add_le_mono. eassumption.
       eapply H. eassumption. eassumption. intros Hc.
       apply Range_map_remove in Hc. auto.
     - inv H1.
       simpl in H2. inv H2.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       eapply H0; eauto.
       intro; apply H3.
       apply Range_map_remove_all in H1.
@@ -3215,7 +3215,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       intro; apply H2.
       apply (@Range_map_remove var) in H0. auto.
     - inv H0; inv H1.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       eapply H; eauto.
       intro; apply H2.
       apply (@Range_map_remove var) in H0. auto.
@@ -3224,7 +3224,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       assert (Hll := num_occur_list_not_range _ _ H1 ([v])).
       auto.
     - inv H1; inv H2.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       eapply H; eauto.
       intro; apply H3.
       apply Range_map_remove_all in H1. auto.
@@ -3264,8 +3264,8 @@ substitution to a term cannot increase the occurence count for that variable. *)
       lia.
     - inv H; inv H0.
       inv H5; inv H4.
-      rewrite plus_0_r.
-      rewrite plus_0_r.
+      rewrite Nat.add_0_r.
+      rewrite Nat.add_0_r.
       apply (num_occur_list_not_range _ _ Hs [v]).
     - inv H1. inv H2.
       inv H7. inv H6.
@@ -3345,14 +3345,14 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - simpl in H1. inv H1.
       inv H0.
       specialize (H _ _ _  H8 H9).
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       apply H. intro. apply H2.
       auto.
       apply num_occur_list_not_dom. auto.
     - simpl in H0. inv H0.
       inv H6. inv H.
       inv H5.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       apply (num_occur_list_not_dom _ _ H1 ([v])).
       auto.
     - simpl in H2. inv H1. inv H2. inv H8. inv H7.
@@ -3360,7 +3360,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
           (n + (num_occur_list [v] f + m)) by lia.
       replace (Init.Nat.add (num_occur_list (@cons var (apply_r sigma v) (@nil var)) f) (Init.Nat.add n0 m0)) with
           (n0 + (num_occur_list (@cons var (apply_r sigma v) (@nil var)) f + m0)) by lia.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       eapply H; eauto.
       eapply H0; eauto.
       simpl. constructor.
@@ -3368,7 +3368,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - simpl in H1. inv H1.
       inv H0.
       specialize (H _ _ _ H9 H10).
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       assert (Hll := num_occur_list_not_dom _ _ H2 ([v0])).
       simpl in Hll.    auto.
       apply H. intro; apply H2.
@@ -3376,12 +3376,12 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - simpl in H1. inv H1.
       inv H0.
       specialize (H _ _ _  H9 H10).
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       assert (Hll := num_occur_list_not_dom _ _ H2 (f0::ys)). eassumption.
       eauto.
     - inv H1.
       simpl in H2. inv H2.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       eapply H0; eauto.
       eapply H; eauto.
     - inv H. inv H0.
@@ -3391,7 +3391,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - inv H0; inv H1.
       eapply H; eauto.
     - inv H0; inv H1.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       eapply H; eauto.
       apply num_occur_list_not_dom.
       auto.
@@ -3399,7 +3399,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       assert (Hll := num_occur_list_not_dom _ _ H1 ([v])).
       auto.
     - inv H1; inv H2.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       eapply H; eauto.
 
       eapply H0; eauto.
@@ -3482,29 +3482,29 @@ substitution to a term cannot increase the occurence count for that variable. *)
     intros f x y sigma Hdom Hfy; apply exp_def_mutual_ind; intros; simpl in *; try (inv H0; inv H1).
     - assert (Hl := num_occur_list_set_not_x f y x _ Hdom Hfy l).
       specialize (H _ _ H8 H7).
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - inv H; inv H0.
       inv H5; inv H4.
       assert (Hl := num_occur_list_set_not_x).
       specialize (Hl f y x _ Hdom Hfy [v]).
       simpl in Hl.
       simpl.
-      do 2 (rewrite plus_0_r).
+      do 2 (rewrite Nat.add_0_r).
       auto.
     - inv H1; inv H2.
       inv H7; inv H6.
       rewrite OrdersEx.Nat_as_OT.add_shuffle3.
       rewrite  OrdersEx.Nat_as_OT.add_shuffle3 with (p := m0).
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - assert (Hl := num_occur_list_set_not_x).
       specialize (Hl f y x _ Hdom Hfy [v0]).
       specialize (H _ _ H9 H8).
       simpl; simpl in Hl.
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - assert (Hl := num_occur_list_set_not_x f y x _ Hdom Hfy (f0 :: ys)).
-      apply plus_le_compat; eauto.      
+      apply Nat.add_le_mono; eauto.      
     - inv H1; inv H2.
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - inv H; inv H0.
       assert (Hl := num_occur_list_set_not_x).
       specialize (Hl f y x _ Hdom Hfy (v::l)).
@@ -3512,12 +3512,12 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - assert (Hl := num_occur_list_set_not_x f y x _ Hdom Hfy [v]).
       eauto.
     - assert (Hl := num_occur_list_set_not_x f y x _ Hdom Hfy l).
-       apply plus_le_compat; eauto.
+       apply Nat.add_le_mono; eauto.
     - inv H; inv H0.
       assert (Hl := num_occur_list_set_not_x f y x _ Hdom Hfy [v]).
       auto.
     - inv H1; inv H2.
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - inv H; inv H0; auto.
   Qed.
   
@@ -3536,30 +3536,30 @@ substitution to a term cannot increase the occurence count for that variable. *)
     intros f x y Hfy; apply exp_def_mutual_ind; intros; simpl in *; try (inv H0; inv H1).
     - assert (Hl := num_occur_list_set _ _ x sigma Hfy l).
       specialize (H _ _ _ H8 H7).
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - inv H; inv H0.
       inv H5; inv H4.
       assert (Hl := num_occur_list_set).
       specialize (Hl _ _ x sigma Hfy [v]).
       simpl in Hl.
       simpl.
-      do 2 (rewrite plus_0_r).
+      do 2 (rewrite Nat.add_0_r).
       auto.
     - inv H1; inv H2.
       inv H7; inv H6.
       rewrite OrdersEx.Nat_as_OT.add_shuffle3.
       rewrite  OrdersEx.Nat_as_OT.add_shuffle3 with (p := m).
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - assert (Hl := num_occur_list_set).
       specialize (Hl _ _ x sigma Hfy [v0]).
       specialize (H _ _ _ H9 H8).
       simpl; simpl in Hl.
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - assert (Hl := num_occur_list_set).
       specialize (Hl _ _ x sigma Hfy (f0::ys)).
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - inv H1; inv H2.
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - inv H; inv H0.
       assert (Hl := num_occur_list_set).
       specialize (Hl _ _ x sigma Hfy (v::l)).
@@ -3567,12 +3567,12 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - assert (Hl := num_occur_list_set _ _ x sigma Hfy [v]).
       eauto.
     - assert (Hl := num_occur_list_set _ _ x sigma Hfy l).
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - inv H; inv H0.
       assert (Hl := num_occur_list_set _ _ x sigma Hfy [v]).
       auto.
     - inv H1; inv H2.
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
     - inv H; inv H0; auto.
   Qed.
 
@@ -3602,7 +3602,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     assert (exists n, num_occur e v n) by apply e_num_occur.
     inv H1.
     assert (Hn0 := proj1 (num_occur_rename_all_not_dom_mut v) _ _ _ _ H2 H0 H).
-    apply le_n_0_eq in Hn0. subst; auto.
+    apply Nat.le_0_r in Hn0. subst; auto.
   Qed.
 
   Definition rename_all_case sigma cl := (List.map (fun (p:var*exp) => let (k, e) := p in
@@ -3620,7 +3620,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     induction cl; intros.
     - inv H; inv H0; auto.
     - inv H; inv H0.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       eapply (proj1 (num_occur_rename_all_not_dom_mut _)); eauto.
       eauto.
   Qed.
@@ -3735,10 +3735,10 @@ substitution to a term cannot increase the occurence count for that variable. *)
       split.
       eapply num_occur_n. constructor; eauto.
       assert (Hn := num_occur_arl _ _ [v] Hxy).
-      simpl in Hn. simpl.  rewrite plus_0_r. auto.
+      simpl in Hn. simpl.  rewrite Nat.add_0_r. auto.
       eapply num_occur_n. constructor. auto.
       assert (Hnn := num_occur_set_arl _ _ Hxy [v]).
-      simpl. simpl in Hnn. do 3 (rewrite plus_0_r). rewrite Plus.plus_comm. auto.
+      simpl. simpl in Hnn. do 3 (rewrite Nat.add_0_r). rewrite Nat.add_comm. auto.
     - inv H1; inv H2. inv H7; inv H6.
       specialize (H _ _ H8 H7).
       assert (num_occur (Ecase v l) x ( num_occur_list [v] x + m)).
@@ -3760,7 +3760,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
       split.
       eapply num_occur_n. constructor; eauto.
       assert (Hn := num_occur_arl _ _ [v0] Hxy).
-      simpl in Hn. simpl. rewrite plus_0_r. auto.
+      simpl in Hn. simpl. rewrite Nat.add_0_r. auto.
       eapply num_occur_n. constructor; eauto.
       assert (Hnn := num_occur_set_arl _ _ Hxy [v0]).
       simpl. simpl in Hnn. unfold var in *. unfold M.elt in *. rewrite Hnn. lia.
@@ -3825,45 +3825,45 @@ substitution to a term cannot increase the occurence count for that variable. *)
     - simpl in H0. inv H0.
       inv H.
       specialize (IHc _ _ _  H7 H8).
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       apply num_occur_list_not_dom. auto.
       apply IHc. auto.
     - simpl in H0. inv H0.
       inv H.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       apply (num_occur_list_not_dom _ _ H1 ([v0])).
       eauto.
     - simpl in H0. inv H0.
       inv H.
       specialize (IHc _ _ _  H8 H9).
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       assert (Hll := num_occur_list_not_dom _ _ H1 (f0::ys)). eassumption.
       eauto.
     - simpl in H0. inv H0; inv H. eauto.
     - simpl in H0. inv H0. inv H.
-      apply plus_le_compat.
+      apply Nat.add_le_mono.
       apply num_occur_list_not_dom; auto.
       eauto.
     - simpl in H0. inv H0.
       inv H.
-      repeat apply plus_le_compat.
+      repeat apply Nat.add_le_mono.
       apply (num_occur_list_not_dom _ _ H1 ([v])).
       2: eauto.
       eapply num_occur_case_rename_all_ns_not_dom; eauto.
       eapply num_occur_case_rename_all_ns_not_dom; eauto.
     - inv H.
       simpl in H0. inv H0.
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
       eapply (proj2 (num_occur_rename_all_not_dom_mut _)); eauto.
     - inv H. inv H0.
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
       eapply (proj1 (num_occur_rename_all_not_dom_mut _)); eauto.
     - inv H.
       simpl in H0. inv H0.
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
       eapply (proj2 (num_occur_rename_all_not_dom_mut _)); eauto.
     - inv H. inv H0.
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
       eapply (proj1 (num_occur_rename_all_not_dom_mut _)); eauto.
   Qed.
 
@@ -3889,7 +3889,7 @@ substitution to a term cannot increase the occurence count for that variable. *)
     assert (exists n, num_occur_ec c v n) by apply e_num_occur_ec.
     inv H1.
     assert (Hn0 := proj1 (num_occur_rename_all_ctx_not_dom_mut v) _ _ _ _ H2 H0 H).
-    apply le_n_0_eq in Hn0. subst; auto.
+    apply Nat.le_0_r in Hn0. subst; auto.
   Qed.
 
 
@@ -3982,13 +3982,13 @@ substitution to a term cannot increase the occurence count for that variable. *)
       intro.
       apply Range_map_set_list in H4.
       apply not_occur_list in H3. auto.
-      apply le_n_0_eq in H4.
+      apply Nat.le_0_r in H4.
       subst. auto.
-      rewrite <- plus_0_l.
+      rewrite <- Nat.add_0_l.
       eapply fundefs_append_num_occur.
       reflexivity.
       auto.
-      rewrite <- plus_0_l.
+      rewrite <- Nat.add_0_l.
       constructor; auto.
     }
   Qed.

@@ -180,12 +180,12 @@ Proof.
   erewrite prop_apply_r; eauto.
 Qed.
 
-Instance Proper_apply_r : Proper (@map_get_r _ ==> eq ==> eq) (apply_r).
+#[global] Instance Proper_apply_r : Proper (@map_get_r _ ==> eq ==> eq) (apply_r).
 Proof.
   intro; intros; intro; intros; subst. eapply prop_apply_r; eauto.
 Qed.
 
-Instance Proper_apply_r_list : Proper (@map_get_r _ ==> eq ==> eq) (apply_r_list).
+#[global] Instance Proper_apply_r_list : Proper (@map_get_r _ ==> eq ==> eq) (apply_r_list).
 Proof.
   intro; intros; intro; intros; subst. eapply prop_apply_r_list; eauto.
 Qed.
@@ -595,7 +595,7 @@ Proof.
   - simpl. apply proper_remove. apply IHl; eauto. 
 Qed.
 
-Instance Proper_remove_all : Proper (map_get_r _ ==> eq ==> map_get_r _) remove_all.
+#[global] Instance Proper_remove_all : Proper (map_get_r _ ==> eq ==> map_get_r _) remove_all.
 Proof.
   intro; intros; intro; intros; subst. eapply prop_remove_all; eauto.
 Qed.
@@ -774,7 +774,7 @@ Proof.
   - reflexivity.
 Qed.
 
-Instance Proper_rename_all : Proper (map_get_r _ ==> eq ==> eq) rename_all. 
+#[global] Instance Proper_rename_all : Proper (map_get_r _ ==> eq ==> eq) rename_all. 
 Proof.
   intro; intros; intro; intros; subst. eapply prop_rename_all; eauto.
 Qed.

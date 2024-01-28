@@ -61,7 +61,7 @@ Inductive Sublist {A : Type} : list A -> list A -> Prop :=
 Definition Subperm {A : Type} (l1 l2 : list A) :=
   exists l2', Sublist l1 l2' /\ Permutation l2' l2. 
 
-Hint Constructors Forall2_asym : core.
+#[global] Hint Constructors Forall2_asym : core.
 
 (** Lemmas about [Forall2] and [Forall2_asym] *)
 Lemma Forall2_length {A B} (R : A -> B -> Prop) l1 l2 :
@@ -700,7 +700,7 @@ Lemma fold_left_extensive {A} f (l : list A) n :
   n <= fold_left f l n.
 Proof.
   revert n; induction l; eauto; intros n H.
-  simpl. eapply le_trans. now eapply H.
+  simpl. eapply Nat.le_trans. now eapply H.
   now eapply IHl.
 Qed.
 
@@ -739,7 +739,7 @@ Proof.
   revert z. induction l; intros z Hin.
   - inv Hin.
   - inv Hin; simpl. 
-    + eapply le_trans; [| now eapply max_list_nat_spec1 ].
+    + eapply Nat.le_trans; [| now eapply max_list_nat_spec1 ].
       eapply Nat.le_max_r.
     + now apply IHl.
 Qed.
@@ -790,15 +790,15 @@ Lemma fold_left_mult { A : Type} (l : list A) (acc1 acc2 : nat) f h :
 Proof.
   revert acc1 acc2. induction l; intros acc1 acc2; simpl.
   - reflexivity.
-  - simpl. eapply le_trans; [| eapply IHl ].
+  - simpl. eapply Nat.le_trans; [| eapply IHl ].
     eapply fold_left_monotonic.
     + intros. lia.
     + rewrite Nat.mul_add_distr_r.
-      eapply plus_le_compat.
-      eapply mult_le_compat_l.
-      eapply Max.le_max_l.
-      eapply mult_le_compat_l.
-      eapply Max.le_max_r.
+      eapply Nat.add_le_mono.
+      eapply Nat.mul_le_mono_l.
+      eapply Nat.le_max_l.
+      eapply Nat.mul_le_mono_l.
+      eapply Nat.le_max_r.
 Qed.
 
 
@@ -867,7 +867,7 @@ Proof.
   eassumption. 
 Qed. 
 
-Instance PermutationA_symm A (eqA : relation A) { _ : Symmetric eqA}
+#[global] Instance PermutationA_symm A (eqA : relation A) { _ : Symmetric eqA}
   : Symmetric (PermutationA eqA).
 Proof.
   intros x1 x2 Hperm. induction Hperm. 

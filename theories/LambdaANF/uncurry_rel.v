@@ -2,7 +2,7 @@ Require Import LambdaANF.cps LambdaANF.size_cps LambdaANF.cps_util LambdaANF.eva
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.alpha_conv LambdaANF.functions LambdaANF.uncurry
         LambdaANF.shrink_cps_correct.
 Require Import FunInd.
-Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
+Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat Arith.
 Require Import Coq.Strings.String.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia.
@@ -106,7 +106,7 @@ Section list_lemmas.
     length l = length (a ++ [b]) -> exists a1 b1, l = a1 ++ [b1].
   Proof.
     induction l; intros.
-    - rewrite app_length in H. inversion H. rewrite Plus.plus_comm in H1. inversion H1.
+    - rewrite app_length in H. inversion H. rewrite Nat.add_comm in H1. inversion H1.
     - destruct a0.
       + assert (l = []) by (destruct l; [easy|inversion H]). subst.
         now exists [], a.
@@ -325,8 +325,8 @@ with uncurry_fundefs_step :
       s' 
       (M.set g true m).
 
-Hint Constructors uncurry_step : core.
-Hint Constructors uncurry_fundefs_step : core.
+#[global] Hint Constructors uncurry_step : core.
+#[global] Hint Constructors uncurry_fundefs_step : core.
 
 Scheme uncurry_step_mut := Minimality for uncurry_step Sort Prop
 with uncurry_step_fundefs_mut := Minimality for uncurry_fundefs_step Sort Prop.
@@ -1397,7 +1397,7 @@ Corollary uncurry_fundefs_step_preserves_unique_bindings : forall f s m f1 s1 m1
   unique_bindings_fundefs f1.
 Proof. apply uncurry_step_preserves_unique_bindings_mut. Qed.
 
-Hint Constructors unique_bindings : core.
+#[global] Hint Constructors unique_bindings : core.
 
 Lemma uncurry_fundefs_step_unique_names : forall a f s m f1 s1 m1,
   used_vars_fundefs f \subset s ->
@@ -2091,8 +2091,8 @@ Inductive uncurry_rel_fundefs :
       uncurry_rel_fundefs n f1 s1 m1 f2 s2 m2 ->
       uncurry_rel_fundefs (S n) f s m f2 s2 m2.
 
-Hint Constructors uncurry_rel : core.
-Hint Constructors uncurry_rel_fundefs : core.
+#[global] Hint Constructors uncurry_rel : core.
+#[global] Hint Constructors uncurry_rel_fundefs : core.
 
 Lemma uncurry_rel_Sn : forall n e s m e1 s1 m1,
   uncurry_rel (S n) e s m e1 s1 m1 -> exists e2 s2 m2,

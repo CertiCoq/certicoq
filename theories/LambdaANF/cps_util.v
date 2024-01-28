@@ -1333,7 +1333,7 @@ Proof.
   apply num_occur_app_ctx. exists n, 1; auto.
   assert (num_occur (c |[ Ehalt v ]|)  v (m +1)).
   apply num_occur_app_ctx. exists m, 1; auto.
-  eapply plus_reg_l.
+  eapply Nat.add_cancel_l.
   eapply (proj1 (num_occur_det _)).
   rewrite Nat.add_comm.
   apply H2.

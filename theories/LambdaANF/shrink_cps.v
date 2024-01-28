@@ -91,7 +91,7 @@ Section MEASURECONTRACT.
     unfold svalue_inl_size.
     simpl.
     destruct (get_b i im).
-    apply Peano.le_0_n.
+    apply Nat.le_0_l.
     auto.
   Defined.
 
@@ -141,13 +141,13 @@ Section MEASURECONTRACT.
   Theorem min_term_size:
     forall e, 1 <= term_size e.
   Proof. intro.
-         destruct e; simpl; apply lt_le_S; apply Nat.lt_0_succ.
+         destruct e; simpl; apply Nat.le_succ_l; apply Nat.lt_0_succ.
   Defined.
 
   Theorem min_funs_size:
     forall f, 1 <= funs_size f.
   Proof.
-    destruct f; simpl; apply lt_le_S; apply Nat.lt_0_succ.
+    destruct f; simpl; apply Nat.le_succ_l; apply Nat.lt_0_succ.
   Defined.
 
 
@@ -676,11 +676,11 @@ Section CONTRACT.
         rewrite Nat.add_comm. rewrite <- Nat.add_assoc. rewrite <- Nat.add_succ_l.
         rewrite <- Nat.add_0_r with (n :=sub_inl_size sub' im ).
         rewrite Nat.add_comm.
-        apply Nat.add_le_mono.  apply le_0_n.
+        apply Nat.add_le_mono. apply Nat.le_0_l.
         rewrite Nat.add_comm. apply H0.
         rewrite <- Nat.add_succ_r.
         rewrite <- Nat.add_0_r with (n := funs_size fds').
-        apply Nat.add_le_mono. assumption. apply le_0_n.
+        apply Nat.add_le_mono. assumption. apply Nat.le_0_l.
       + assert (exists fds' count' sub', (fds', count', sub') = precontractfun sig count sub fds).
         destruct (precontractfun sig count sub fds). destruct p.
         eauto. destructAll. assert (H0' := H0).
@@ -802,7 +802,7 @@ Section CONTRACT.
     rewrite <- Nat.add_succ_r in pfe.
     unfold lt in pfe. rewrite <- Nat.add_succ_l in pfe. eapply Nat.le_trans. 2: apply pfe.
     rewrite <- Nat.add_0_r with (n := S (term_size e)) at 1. rewrite Nat.add_comm.
-    apply Nat.add_le_mono. apply le_0_n. reflexivity.
+    apply Nat.add_le_mono. apply Nat.le_0_l. reflexivity.
     assumption.
   Defined.
 
@@ -1080,7 +1080,8 @@ Section CONTRACT.
     apply Nat.add_lt_mono_r. assumption.
   Defined.
   Next Obligation.
-    assert ((forall im, sub_inl_size sub' im <= funs_size (fl) + sub_inl_size sub im /\ funs_size fl' <= funs_size fl))%nat. eapply precontractfun_size. eauto.  unfold term_sub_inl_size. simpl. specialize (H im). apply le_lt_n_Sm. destruct H.
+    assert ((forall im, sub_inl_size sub' im <= funs_size (fl) + sub_inl_size sub im /\ funs_size fl' <= funs_size fl))%nat. eapply precontractfun_size. eauto.  unfold term_sub_inl_size. simpl. specialize (H im).
+    apply Nat.lt_succ_r. destruct H.
     rewrite Nat.add_comm with (n := funs_size fl).
     rewrite <- Nat.add_assoc.
     apply Nat.add_le_mono. reflexivity. apply H.
@@ -1121,9 +1122,10 @@ Section CONTRACT.
     unfold term_sub_inl_size; simpl.
     symmetry in H1.
     apply sub_inl_fun_size with (im :=  im) in H1.
-    eapply le_lt_trans. eapply plus_le_compat_r. eapply term_size_inline_letapp.
+    eapply Nat.le_lt_trans. apply -> Nat.add_le_mono_r. 
+    eapply term_size_inline_letapp.
     now eauto. rewrite (proj1 (term_size_rename_all_ns _)).    
-    rewrite plus_comm, plus_assoc.
+    rewrite Nat.add_comm, Nat.add_assoc.
     rewrite <- H1. lia.
     symmetry in Heq2.
     apply Bool.andb_true_iff in Heq2.
@@ -1426,4 +1428,4 @@ Definition shrink_n_times (e:exp) (n:nat): exp :=
 
 
 (* Wrap the shrink reducer so that it has the same type as other ANF transformations *)
-Definition shrink_err (e : exp) (c : comp_data) := (compM.Ret (fst (shrink_cps.shrink_top e)), c). 
+Definition shrink_err (e : exp) (c : comp_data) := (compM.Ret (fst (shrink_cps.shrink_top e)), c).

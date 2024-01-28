@@ -1575,13 +1575,13 @@ Section Inline_correct.
         * destruct d. eassumption.
           destruct j. eassumption.          
           destruct (Datatypes.length l =? Datatypes.length ys)%nat eqn:Hlen; [| eassumption ]. 
-          eapply beq_nat_true in Hlen.
+          eapply Nat.eqb_eq in Hlen.
           eapply bind_triple. eapply pre_transfer_r. now eapply get_fresh_name_spec. 
           intros z w. simpl. eapply pre_curry_l. intros Hfx. eapply pre_curry_l. intros HSin. 
           { edestruct Hfm. eassumption. destructAll. eapply bind_triple.
             - do 2 eapply frame_rule. eapply pre_transfer_r. eapply IHd.
               + lia.
-              + eapply le_trans. reflexivity.
+              + eapply Nat.le_trans. reflexivity.
                 eapply NPeano.Nat.div2_decr. lia.
               + eassumption.
               + eapply Union_Disjoint_r. clear H3. now sets. now sets.
@@ -1653,7 +1653,7 @@ Section Inline_correct.
               + do 3 eapply frame_rule.
                 { eapply IHd.
                   + lia.
-                  + eapply le_trans; [| eassumption ].
+                  + eapply Nat.le_trans; [| eassumption ].
                     assert (Heq := split_fuel_add j). rewrite Heq at 3. unfold split_fuel. simpl. lia.
                   + eassumption.
                   + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
@@ -1719,7 +1719,7 @@ Section Inline_correct.
                   -- eapply HEletapp.
                   -- eapply Eletapp_OOT.
                   -- eapply HProp.
-                     eapply le_trans; [| eassumption ]. rewrite Hadd at 4. simpl. lia. 
+                     eapply Nat.le_trans; [| eassumption ]. rewrite Hadd at 4. simpl. lia. 
                   -- simpl. intros. edestruct (H20 f). constructor. now left. eassumption. eassumption.
                      destructAll. do 2 subst_exp. eapply Hrel.
                      ++ edestruct preord_env_P_inj_get_list_l. now eapply H19. normalize_occurs_free. now sets.
@@ -2030,7 +2030,7 @@ Section Inline_correct.
                     eapply Forall2_preord_var_env_map. eassumption.
                     now constructor.              
              ++ destruct ((Datatypes.length xs =?  Datatypes.length l)%nat) eqn:Hbeq.
-                { symmetry in Hbeq. eapply beq_nat_eq in Hbeq. 
+                { apply Nat.eqb_eq in Hbeq.
                   edestruct Hfm. eassumption. destructAll.
                   
                   eapply bind_triple. eapply click_spec2 with (P := fun s => fresh S (next_var s)). 

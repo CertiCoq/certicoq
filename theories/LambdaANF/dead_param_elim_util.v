@@ -449,7 +449,7 @@ Proof.
   revert L L' d d'; induction B; simpl; intros L L' d d' Hl; subst.
   - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' b] eqn:Heq.
     destruct b; simpl in *.
-    + eapply le_trans.
+    + eapply Nat.le_trans.
       eapply update_live_fun_size_leq. 
       eassumption.
       eapply IHB. eassumption.
@@ -469,7 +469,7 @@ Proof.
   - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' b] eqn:Heq.
 
     destruct b; simpl in *.
-    + eapply lt_le_trans.
+    + eapply Nat.lt_le_trans.
       eapply update_live_fun_size. eassumption.
       eapply live_size_leq. 
       eassumption.
@@ -639,7 +639,7 @@ Lemma num_vars_acc B m n :
 Proof.
   revert m n. induction B; intros; simpl; eauto.
 
-  rewrite <- plus_assoc. rewrite (plus_comm m). rewrite plus_assoc.
+  rewrite <- Nat.add_assoc. rewrite (Nat.add_comm m). rewrite Nat.add_assoc.
   rewrite IHB. lia.
 Qed. 
   
@@ -713,16 +713,16 @@ Lemma escaping_fun_fundefs_max_size_mut :
       max_map_size (escaping_fun_fundefs B L) <= max_map_size L). 
 Proof.
   exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto;
-    try (now eapply le_trans; [ eapply IHe | eapply remove_escapings_max_size ]);
-    try (now eapply le_trans; [ eapply IHe | eapply remove_escaping_max_size ]). 
+    try (now eapply Nat.le_trans; [ eapply IHe | eapply remove_escapings_max_size ]);
+    try (now eapply Nat.le_trans; [ eapply IHe | eapply remove_escaping_max_size ]). 
   - simpl in IHl.
-    eapply le_trans. eapply IHl. eapply IHe.
+    eapply Nat.le_trans. eapply IHl. eapply IHe.
   - simpl in *.
-    eapply le_trans. eapply IHe. eapply IHB.
+    eapply Nat.le_trans. eapply IHe. eapply IHB.
   - eapply remove_escapings_max_size.
   - eapply remove_escaping_max_size.
   - simpl in *.
-    eapply le_trans. eapply IHB. eapply IHe.
+    eapply Nat.le_trans. eapply IHB. eapply IHe.
 Qed. 
 
 Lemma escaping_fun_exp_max_size :  

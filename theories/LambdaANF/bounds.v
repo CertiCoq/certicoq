@@ -151,8 +151,9 @@ Section Bounds.
       
       assert (Hleq' : (1 + 2 * G + 2 * G * 2 * G) * cin1 + 2 * L * 2 * G + 2 * L <=
                       (1 + 2 * G + 2 * G * 2 * G) * cin2 + 2 * L * 2 * G + 2 * L).
-      { eapply Le.le_trans. eassumption. eapply Le.le_trans.
-        eapply plus_le_compat_r. eapply plus_le_compat_l. eapply mult_le_compat_l. eassumption.
+      { eapply Nat.le_trans. eassumption. eapply Nat.le_trans.
+        apply -> Nat.add_le_mono_r. apply -> Nat.add_le_mono_l. 
+        eapply Nat.mul_le_mono_l. eassumption.
         lia. } 
       
       assert (Hleq'' : cin1 <= cin2).
@@ -173,8 +174,10 @@ Section Bounds.
     Proof.
       intros [[[? ?] ?] [? ?]] [[[? ?] ?] [? ?]]. unfold inline_bound, inline_bound_top in *. unfold_all.
       intros. destructAll.
-      eapply le_trans. eassumption.
-      eapply le_trans. eapply plus_le_compat_r. eapply plus_le_compat_l. eapply mult_le_compat_l. eassumption.
+      eapply Nat.le_trans. eassumption.
+      eapply Nat.le_trans. apply -> Nat.add_le_mono_r.
+      apply -> Nat.add_le_mono_l. 
+      eapply Nat.mul_le_mono_l. eassumption.
       lia.
     Qed.
 

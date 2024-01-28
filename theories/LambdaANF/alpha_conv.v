@@ -28,7 +28,7 @@ Fixpoint extend_fundefs (f: var -> var) (B B' : fundefs) : (var -> var) :=
       end
   end.
 
-Instance Proper_extend_fundefs : Proper (f_eq ==> eq ==> eq ==> f_eq) extend_fundefs.
+#[global] Instance Proper_extend_fundefs : Proper (f_eq ==> eq ==> eq ==> f_eq) extend_fundefs.
 Proof.
   intros f1 f2 Hfeq y1 y2 Heq1 x1 x2 Heq2 z1.
   subst. revert x2; induction y2; intros x2; simpl; eauto.
@@ -302,13 +302,13 @@ Proof.
   - inv H'. constructor.
 Qed.
 
-Instance Alpha_conv_proper :
+#[global] Instance Alpha_conv_proper :
   Proper (Logic.eq ==> Logic.eq ==> f_eq ==> iff) Alpha_conv.
 Proof.
   now apply Alpha_conv_proper_mut.
 Qed.
 
-Instance Alpha_conv_fundfes_proper :
+#[global] Instance Alpha_conv_fundfes_proper :
   Proper (Logic.eq ==> Logic.eq ==> f_eq ==> iff) Alpha_conv_fundefs.
 Proof.
   now apply Alpha_conv_proper_mut.
@@ -320,7 +320,7 @@ Definition Alpha_conv_ctx C C' f :=
     Alpha_conv e e' f ->
     Alpha_conv (C |[ e ]|) (C' |[ e']|) f.
 
-Instance alpha_conv_ctx_Proper : Proper (eq ==> eq ==> f_eq ==> iff) Alpha_conv_ctx.
+#[global] Instance alpha_conv_ctx_Proper : Proper (eq ==> eq ==> f_eq ==> iff) Alpha_conv_ctx.
 Proof. 
   intros c1 c2 Heq1 c3 c4 Heq2 f1 f2 Hfeq; subst; split; intros H1 e1 e2 H2.
   rewrite <- Hfeq. rewrite <- Hfeq in H2. now eauto.
@@ -1725,7 +1725,7 @@ Section Alpha_conv_correct.
   
 End Alpha_conv_correct.
 
-Instance preord_env_P_inj_proper' fuel (Hfuel : fuel_resource) trace (Htrace : trace_resource) :
+#[global] Instance preord_env_P_inj_proper' fuel (Hfuel : fuel_resource) trace (Htrace : trace_resource) :
   Proper (Logic.eq ==> Logic.eq ==> Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff)
          (@preord_env_P_inj fuel Hfuel trace Htrace).
 Proof.
@@ -1735,7 +1735,7 @@ Proof.
 Qed.
 
 
-Instance preord_env_P_inj_f_proper' fuel (Hfuel : fuel_resource) trace (Htrace : trace_resource) :
+#[global] Instance preord_env_P_inj_f_proper' fuel (Hfuel : fuel_resource) trace (Htrace : trace_resource) :
   Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> f_eq ==> Logic.eq ==> Logic.eq ==> iff)
          (@preord_env_P_inj fuel Hfuel trace Htrace).
 Proof.

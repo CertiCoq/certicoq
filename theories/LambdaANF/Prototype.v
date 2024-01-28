@@ -80,7 +80,7 @@ Local Notation "e1 >>= e2" := (ExtLib.Structures.Monad.bind e1 e2).
 Definition set_aname (s : string) (x : aname) :=
   {| binder_name := BasicAst.nNamed s; binder_relevance := x.(binder_relevance) |}.
 
-Instance show_list {A} {s : Show A} : Show (list A) :=
+#[global] Instance show_list {A} {s : Show A} : Show (list A) :=
   { show l := String.concat "," (map show l) }.
 
 Definition lookup (n : nat) (xs : list string) : GM string :=

@@ -23,11 +23,11 @@ Class Eqb (A : Type) :=
   { eqb : A -> A -> bool }.
 
 (* TODO improve *)
-Instance ascii_eq : Eqb ascii :=
+#[global] Instance ascii_eq : Eqb ascii :=
   { eqb s s' := if ascii_dec s s' then true else false }.
 
 (* TODO improve *)
-Instance string_eq : Eqb string :=
+#[global] Instance string_eq : Eqb string :=
   { eqb s s' := if string_dec s s' then true else false }.
 
 Definition reforder {A} (f : A -> A -> comparison) :=
@@ -93,7 +93,7 @@ Proof.
               end); simpl; reflexivity.
 Admitted.
 
-Instance ascii_reftype : ReferenceType ascii.
+#[global] Instance ascii_reftype : ReferenceType ascii.
 Proof.
   refine {| reference_compare := ascii_compare |}.
   intro. exact Space. intro c. exact (String c EmptyString).
@@ -109,7 +109,7 @@ Proof.
   rewrite N.compare_lt_iff in *. N.order.
 Defined.
   
-Instance string_reftype : ReferenceType string.
+#[global] Instance string_reftype : ReferenceType string.
 Proof.
   refine {| reference_compare := string_compare |}.
   exact id. exact id.

@@ -102,13 +102,13 @@ Proof.
   revert H. generalize (M.elements rho).
   intros l Hin. induction l. now inv Hin.
   inv Hin.
-  - simpl. eapply le_trans. now apply Max.le_max_r.
+  - simpl. eapply Nat.le_trans. now apply Nat.le_max_r.
     eapply fold_left_extensive.
-    intros [y u] n; simpl. now apply Max.le_max_l.
-  - simpl. eapply le_trans. now eapply IHl; eauto. 
+    intros [y u] n; simpl. now apply Nat.le_max_l.
+  - simpl. eapply Nat.le_trans. now eapply IHl; eauto. 
     eapply fold_left_monotonic.
     intros. now eapply Nat.max_le_compat_r; eauto.
-    now apply Max.le_max_l.
+    now apply Nat.le_max_l.
 Qed.
 
 
@@ -162,11 +162,11 @@ Lemma sizeOf_val_Vconstr_unfold i t v l:
   max (sizeOf_val i v) (sizeOf_val i (Vconstr t l)).
 Proof.
   destruct i; simpl (sizeOf_val _ (Vconstr t _)); eauto.
-  rewrite <- (Max.max_0_l (sizeOf_val' (S i) v)).
+  rewrite <- (Nat.max_0_l (sizeOf_val' (S i) v)).
   unfold max_list_nat_with_measure.
   rewrite (fold_left_comm (fun (c : nat) (v0 : val) => Init.Nat.max c (sizeOf_val' (S i) v0))); eauto.
-  rewrite Max.max_comm, sizeOf_val_eq. reflexivity.
-  intros. now rewrite <- !Max.max_assoc, (Max.max_comm (sizeOf_val' (S i) y)).
+  rewrite Nat.max_comm, sizeOf_val_eq. reflexivity.
+  intros. now rewrite <- !Nat.max_assoc, (Nat.max_comm (sizeOf_val' (S i) y)).
 Qed.
 
 Lemma sizeOf_val_monotic i i' v :
@@ -267,9 +267,9 @@ Lemma max_list_nat_acc_spec {A} (xs : list A) f acc :
   max_list_nat_with_measure f acc xs =
   max acc (max_list_nat_with_measure f 0 xs).
 Proof.
-  rewrite <- (Max.max_0_r acc) at 1. generalize 0.
+  rewrite <- (Nat.max_0_r acc) at 1. generalize 0.
   revert acc. induction xs; intros acc n; simpl; eauto.
-  rewrite <- Max.max_assoc. eauto.
+  rewrite <- Nat.max_assoc. eauto.
 Qed.
 
 Lemma sizeOf_env_set_lists k rho rho' xs vs :
@@ -283,7 +283,7 @@ Proof.
   (*   simpl in Hset. destruct (set_lists xs vs rho) eqn:Hset'; try discriminate. *)
   (*   inv Hset. rewrite sizeOf_env_set; simpl. *)
   (*   rewrite max_list_nat_acc_spec. *)
-  (*   rewrite <- Max.max_assoc. eapply Nat.max_compat. reflexivity. *)
+  (*   rewrite <- Nat.max_assoc. eapply Nat.max_compat. reflexivity. *)
   (*   eauto. *)
 Abort.
 
@@ -307,13 +307,13 @@ Proof.
     destruct (rho ! a) eqn:Hgeta; try discriminate.
     destruct (get_list xs rho) eqn:Hgetl'; try discriminate.
     destruct vs; try discriminate. inv Hgetl. simpl.
-    eapply le_trans.
-    + rewrite <- (Max.max_0_l (sizeOf_val k v0)).
+    eapply Nat.le_trans.
+    + rewrite <- (Nat.max_0_l (sizeOf_val k v0)).
       unfold max_list_nat_with_measure.
       rewrite (fold_left_comm (fun (c : nat) (v : val) => Init.Nat.max c (sizeOf_val k v))).
       eapply Nat.max_le_compat. eapply IHxs. reflexivity.
       eapply sizeOf_env_get. eassumption.
-      intros x v1 v2. rewrite <- !Max.max_assoc, (Max.max_comm (sizeOf_val k v1)).
+      intros x v1 v2. rewrite <- !Nat.max_assoc, (Nat.max_comm (sizeOf_val k v1)).
       reflexivity.
     + eapply Nat.max_lub; lia.
 Qed.
@@ -372,7 +372,7 @@ Lemma fun_in_fundefs_sizeOf_exp B f tau xs e :
 Proof.
   intros Hin. induction B; inv Hin.
   - inv H. simpl; lia.
-  - eapply le_trans. eapply IHB; eauto.
+  - eapply Nat.le_trans. eapply IHB; eauto.
     simpl. lia.
 Qed.
 
@@ -386,8 +386,8 @@ Lemma max_exp_env_grt_1 k e rho :
   1 <= max_exp_env k e rho.
 Proof.
   unfold max_exp_env.
-  eapply le_trans. now apply sizeOf_exp_grt_1.
-  eapply Max.le_max_l.
+  eapply Nat.le_trans. now apply sizeOf_exp_grt_1.
+  eapply Nat.le_max_l.
 Qed.
 
 (** Lemmas used to establish the upper bound given the IH *)

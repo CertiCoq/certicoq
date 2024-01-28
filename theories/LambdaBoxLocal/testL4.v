@@ -15,7 +15,7 @@ Set Implicit Arguments.
 Set Printing Width 80.
 Set Printing Depth 1000.
 
-Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
+#[global] Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
 
 Quote Recursively Definition p_Type := Type.
 Print p_Type.

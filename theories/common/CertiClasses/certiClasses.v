@@ -8,7 +8,7 @@ CoInductive liftLe {S D: Type} (R: S -> D -> Prop): option S -> option D -> Prop
 | liftSome: forall s d, R s d -> liftLe R (Some s) (Some d)
 | liftNone: forall d, liftLe R None d.
 
-Hint Constructors liftLe : certiclasses.
+#[global] Hint Constructors liftLe : certiclasses.
 
 (** is this defined in the Coq standard library of ExtLib? *)
 Definition Rimpl {S D: Type} (R1 R2: S -> D -> Prop) :=
@@ -45,7 +45,7 @@ Proof.
   apply Hr. assumption.
 Defined.
 
-Hint Resolve liftLeRimpl : certiclasses.
+#[global] Hint Resolve liftLeRimpl : certiclasses.
 
 (* This operations picks out the "good" terms in the language.
  All bets are off about the terms that are not good *)
@@ -118,7 +118,7 @@ Class BigStepOpSemExecCorrect {Term Value:Type}
   }.
       
 
-Instance liftBigStepException `{BigStepOpSem Term Value} 
+#[global] Instance liftBigStepException `{BigStepOpSem Term Value} 
   : BigStepOpSem (exception Term) (exception Value) :=
 λ (s : exception Term) (sv : exception Value),
 match (s, sv) with
@@ -144,7 +144,7 @@ Class CerticoqTotalTranslation (Src Dst : Type) : Type
 Arguments translate  Src Dst {CerticoqTranslation} s.
 Arguments translateT  Src Dst {CerticoqTotalTranslation} s.
 
-Instance liftTotal `{CerticoqTotalTranslation Src Dst} : CerticoqTranslation Src Dst :=
+#[global] Instance liftTotal `{CerticoqTotalTranslation Src Dst} : CerticoqTranslation Src Dst :=
   fun opt (x:Src) => Ret (translateT Src Dst opt x). 
 
 

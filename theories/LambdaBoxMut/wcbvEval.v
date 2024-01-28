@@ -67,7 +67,7 @@ with WcbvEvals (p:environ Term) : Terms -> Terms -> Prop :=
      | wCons: forall t t' ts ts',
          WcbvEval p t t' -> WcbvEvals p ts ts' -> 
          WcbvEvals p (tcons t ts) (tcons t' ts').
-Hint Constructors WcbvEval WcbvEvals : core.
+#[global] Hint Constructors WcbvEval WcbvEvals : core.
 Scheme WcbvEval1_ind := Induction for WcbvEval Sort Prop
      with WcbvEvals1_ind := Induction for WcbvEvals Sort Prop.
 Combined Scheme WcbvEvalEvals_ind from WcbvEval1_ind, WcbvEvals1_ind.
@@ -296,7 +296,7 @@ Qed.
 Section wcbvEval_sec.
 Variable p:environ Term.
 
-Instance fix_bug : MonadExc.MonadExc string exception := exn_monad_exc.
+#[global] Instance fix_bug : MonadExc.MonadExc string exception := exn_monad_exc.
 
 (** now an executable weak-call-by-value evaluation **)
 (** use a timer to make this terminate **)

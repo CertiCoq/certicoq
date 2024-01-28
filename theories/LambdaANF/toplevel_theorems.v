@@ -83,7 +83,7 @@ Section Inline.
    - intros. eapply inline_bound_compat. eassumption.
    - intros. eapply inline_bound_post_Eapp_l.
    - intros. eapply inline_bound_remove_steps_letapp.
-   - intros. rewrite plus_comm. eapply inline_bound_remove_steps_letapp_OOT. 
+   - intros. rewrite Nat.add_comm. eapply inline_bound_remove_steps_letapp_OOT. 
    - reflexivity.
    - intro; intros. exact H0.
    - eapply H.

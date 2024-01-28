@@ -21,7 +21,7 @@ Proof. intros Hxy Hfresh z Hz. assert (x > z)%positive by now apply Hfresh. lia.
 Lemma fresher_than_Union x S1 S2 : fresher_than x S1 -> fresher_than x S2 -> fresher_than x (S1 :|: S2).
 Proof. intros HS1 HS2 y Hy; destruct Hy as [y Hy|y Hy]; auto. Qed.
 
-Instance Proper_fresher_than_r : Proper (Logic.eq ==> Same_set _ ==> iff) fresher_than.
+#[global] Instance Proper_fresher_than_r : Proper (Logic.eq ==> Same_set _ ==> iff) fresher_than.
 Proof.
   unfold Proper, "==>", fresher_than.
   intros x y Hxy x0 y0 Hxy0; subst; split; intros Hforall dummy; now (rewrite <- Hxy0 || rewrite Hxy0).
@@ -241,9 +241,9 @@ Definition I_S_fresh {A} (C : exp_c A exp_univ_exp) (e : univD A) (x : var) : Pr
   fresher_than x (used_vars (C ⟦ e ⟧)).
 
 (* We don't have to do anything to preserve a fresh variable as we move around *)
-Instance Preserves_S_dn_S_fresh : Preserves_S_dn (@I_S_fresh).
+#[global] Instance Preserves_S_dn_S_fresh : Preserves_S_dn (@I_S_fresh).
 Proof. unfold Preserves_S_dn; intros A B C C_ok f x s; exact s. Defined.
-Instance Preserves_S_up_S_fresh : Preserves_S_up (@I_S_fresh).
+#[global] Instance Preserves_S_up_S_fresh : Preserves_S_up (@I_S_fresh).
 Proof. unfold Preserves_S_up; intros A B C C_ok f x s; exact s. Defined.
 Extraction Inline Preserves_S_dn_S_fresh Preserves_S_up_S_fresh.
 
@@ -259,9 +259,9 @@ Defined.
 (* Some passes assume unique bindings *)
 Definition I_S_uniq {A} (C : exp_c A exp_univ_exp) (e : univD A) (_ : unit) : Prop :=
   unique_bindings (C ⟦ e ⟧).
-Instance Preserves_S_dn_S_uniq : Preserves_S_dn (@I_S_uniq).
+#[global] Instance Preserves_S_dn_S_uniq : Preserves_S_dn (@I_S_uniq).
 Proof. unfold Preserves_S_dn; intros A B C C_ok f x s; exact s. Defined.
-Instance Preserves_S_up_S_uniq : Preserves_S_up (@I_S_uniq).
+#[global] Instance Preserves_S_up_S_uniq : Preserves_S_up (@I_S_uniq).
 Proof. unfold Preserves_S_up; intros A B C C_ok f x s; exact s. Defined.
 Extraction Inline Preserves_S_dn_S_uniq Preserves_S_up_S_uniq.
 

@@ -12,10 +12,10 @@ Close Scope Z_scope.
 
 Ltac inv H := inversion H; clear H;  subst.
 
-Hint Constructors Singleton : core.
-Hint Constructors Union : core.
-Hint Constructors Intersection : core.
-Hint Unfold In : core.
+#[global] Hint Constructors Singleton : core.
+#[global] Hint Constructors Union : core.
+#[global] Hint Constructors Intersection : core.
+#[global] Hint Unfold In : core.
 
 Create HintDb Ensembles_DB.
 
@@ -73,7 +73,7 @@ Proof.
   eapply H2. eapply H1; eauto.
 Qed.
 
-Instance PreOrder_Included {A} : PreOrder (@Included A).
+#[global] Instance PreOrder_Included {A} : PreOrder (@Included A).
 Proof.
   constructor. 
   now apply Included_refl.
@@ -101,7 +101,7 @@ Proof.
   intros [H1 H2] [H3 H4]. split; eapply Included_trans; eauto.
 Qed.
 
-Instance Equivalence_Same_set {A} : Equivalence (@Same_set A).
+#[global] Instance Equivalence_Same_set {A} : Equivalence (@Same_set A).
 Proof.
   constructor. 
   now apply Same_set_refl.
@@ -109,7 +109,7 @@ Proof.
   intros ? ? ? ? ?. now eapply Same_set_trans; eauto.
 Qed.
 
-Hint Immediate Same_set_refl Included_refl : Ensembles_DB.
+#[global] Hint Immediate Same_set_refl Included_refl : Ensembles_DB.
 
 Ltac edb := eauto with Ensembles_DB.
 
@@ -118,7 +118,7 @@ Ltac edb := eauto with Ensembles_DB.
 Class Decidable {A} (S : Ensemble A) : Type :=
  { Dec : forall x, { S x } + {~ S x} }.
 
-Instance Decidable_Union {A} (S1 S2 : Ensemble A)
+#[global] Instance Decidable_Union {A} (S1 S2 : Ensemble A)
          {H1 : Decidable S1} {H2 : Decidable S2} : Decidable (Union A S1 S2).
 Proof.
   constructor. intros x.
@@ -127,7 +127,7 @@ Proof.
   right. intros Hun. inv Hun; eauto.
 Qed.
 
-Instance Decidable_Intersection {A} (S1 S2 : Ensemble A)
+#[global] Instance Decidable_Intersection {A} (S1 S2 : Ensemble A)
          {H1 : Decidable S1} {H2 : Decidable S2} : Decidable (Intersection A S1 S2).
 Proof.
   constructor. intros x.
@@ -135,7 +135,7 @@ Proof.
   try (now left; constructor); right; intros Hc; inv Hc; eauto.
 Qed.
 
-Instance Decidable_Setminus {A} s1 s2 { H1 : Decidable s1 }
+#[global] Instance Decidable_Setminus {A} s1 s2 { H1 : Decidable s1 }
          { H2 : Decidable s2 } : Decidable (Setminus A s1 s2).
 Proof.
   constructor. intros x. destruct H1, H2. destruct (Dec1 x).
@@ -145,7 +145,7 @@ Proof.
 Qed.
 
 (** $\{x\}$ is decidable. TODO : generalize the type *)
-Instance DecidableSingleton_positive x : Decidable (Singleton positive x).
+#[global] Instance DecidableSingleton_positive x : Decidable (Singleton positive x).
 Proof.
   constructor. intros x'.
   destruct (peq x x'); subst. left; constructor.
@@ -167,14 +167,14 @@ Qed.
 
 (** * Proper instances *)
 
-Instance Proper_Union_l A :
+#[global] Instance Proper_Union_l A :
   Proper (Same_set A ==> Logic.eq ==> Same_set A)
          (Union A).
 Proof.
   constructor; subst; intros x' H'; destruct H'; destruct H as [H1 H2]; eauto.
 Qed.
 
-Instance Proper_Union_r A :
+#[global] Instance Proper_Union_r A :
   Proper (Logic.eq ==> Same_set A ==> Same_set A)
          (Union A).
 Proof.
@@ -183,7 +183,7 @@ Qed.
 
 
 
-Instance Proper_Setminus_l A :
+#[global] Instance Proper_Setminus_l A :
   Proper (Same_set A ==> Logic.eq ==> Same_set A)
          (Setminus A).
 Proof.
@@ -191,7 +191,7 @@ Proof.
   inv H'; constructor; eauto.
 Qed.
 
-Instance Proper_Setminus_r A :
+#[global] Instance Proper_Setminus_r A :
   Proper (Logic.eq ==> Same_set A ==> Same_set A)
          (Setminus A).
 Proof.
@@ -199,21 +199,21 @@ Proof.
   inv H'; constructor; eauto.
 Qed.
 
-Instance Proper_Intersection_l A :
+#[global] Instance Proper_Intersection_l A :
   Proper (Same_set A ==> Logic.eq ==> Same_set A)
          (Intersection A).
 Proof.
   constructor; subst; intros x' H'; destruct H'; constructor; firstorder.
 Qed.
 
-Instance Proper_Intersection_r A :
+#[global] Instance Proper_Intersection_r A :
   Proper (Logic.eq ==> Same_set A ==> Same_set A)
          (Intersection A).
 Proof.
   constructor; subst; intros x' H'; destruct H'; constructor; firstorder.
 Qed.
 
-Instance Proper_Disjoint_l A :
+#[global] Instance Proper_Disjoint_l A :
   Proper (Same_set A ==> Logic.eq ==> iff)
          (Disjoint A).
 Proof.
@@ -221,7 +221,7 @@ Proof.
   constructor; intros x' HIn; inv HIn; eapply H; constructor; eauto.
 Qed.
 
-Instance Proper_Disjoint_r A :
+#[global] Instance Proper_Disjoint_r A :
   Proper (Logic.eq ==> Same_set A ==> iff)
          (Disjoint A).
 Proof.
@@ -229,13 +229,13 @@ Proof.
   constructor; intros x' HIn; inv HIn; eapply H; constructor; eauto.
 Qed.
 
-Instance Proper_In {A} :
+#[global] Instance Proper_In {A} :
   Proper (Same_set A ==> Logic.eq ==> iff) (Ensembles.In A).
 Proof.
   constructor; intros H'; subst; destruct H as [H1 H2]; eauto.
 Qed.
 
-Instance Proper_Included_l A :
+#[global] Instance Proper_Included_l A :
   Proper (Same_set A ==> Logic.eq ==> iff)
          (Included A).
 Proof.
@@ -243,7 +243,7 @@ Proof.
   intros x' HIn; eauto.
 Qed.
 
-Instance Proper_Included_r A :
+#[global] Instance Proper_Included_r A :
   Proper (Logic.eq ==> Same_set A ==> iff)
          (Included A).
 Proof.
@@ -251,7 +251,7 @@ Proof.
   intros x' HIn; eauto.
 Qed.
 
-Instance Proper_Same_set_l A :
+#[global] Instance Proper_Same_set_l A :
   Proper (Same_set A ==> Logic.eq ==> iff)
          (Same_set A).
 Proof.
@@ -259,7 +259,7 @@ Proof.
   constructor; eauto; eapply Included_trans; eauto.
 Qed.
 
-Instance Proper_Same_set_r A :
+#[global] Instance Proper_Same_set_r A :
   Proper (Logic.eq ==> Same_set A ==> iff)
          (Same_set A).
 Proof.
@@ -267,7 +267,7 @@ Proof.
   constructor; eauto; eapply Included_trans; eauto.
 Qed.
 
-Instance Complement_Proper {A : Type} : Proper (Same_set A ==> Same_set A) (Complement A). 
+#[global] Instance Complement_Proper {A : Type} : Proper (Same_set A ==> Same_set A) (Complement A). 
 Proof.
   intros s1 s2 [Hin1 Hin2]; split; intros x Hc Hc'; eapply Hc; eauto.
 Qed.
@@ -296,7 +296,7 @@ Proof.
   eapply H0; eauto.
 Qed.
 
-Hint Immediate Union_commut Intersection_commut : Ensembles_DB.
+#[global] Hint Immediate Union_commut Intersection_commut : Ensembles_DB.
 
 (** ** Associativity properties *)
 
@@ -316,7 +316,7 @@ Proof.
   inv H. now eauto.
 Qed.
 
-Hint Immediate Union_assoc Intersection_assoc : Ensembles_DB.
+#[global] Hint Immediate Union_assoc Intersection_assoc : Ensembles_DB.
 
 (** ** Distributitvity properties *)
 
@@ -383,7 +383,7 @@ Proof.
 Qed.
 
 
-Hint Immediate Setminus_Union_distr Union_Intersection_distr : Ensembles_DB.
+#[global] Hint Immediate Setminus_Union_distr Union_Intersection_distr : Ensembles_DB.
 
 (** ** Compatibility properties *)
 
@@ -431,7 +431,7 @@ Proof.
 Qed.     
 
 
-Hint Resolve Included_Union_compat Same_set_Union_compat
+#[global] Hint Resolve Included_Union_compat Same_set_Union_compat
      Included_Setminus_compat Same_set_Setminus_compat : Ensembles_DB.
 
 (** ** [Empty_set] is neutral *)
@@ -455,7 +455,7 @@ Proof.
   constructor; eauto. intros H'; inv H'.
 Qed.
 
-Hint Immediate Union_Empty_set_neut_r Union_Empty_set_neut_l
+#[global] Hint Immediate Union_Empty_set_neut_r Union_Empty_set_neut_l
      Setminus_Empty_set_neut_r : Ensembles_DB.
 
 (** ** [Empty_set] is absorbing *)
@@ -478,7 +478,7 @@ Proof.
   split; intros x H; inv H; eauto.
 Qed.
 
-Hint Immediate Intersection_Empty_set_abs_r Intersection_Empty_set_abs_l
+#[global] Hint Immediate Intersection_Empty_set_abs_r Intersection_Empty_set_abs_l
      Setminus_Empty_set_abs_r  : Ensembles_DB.
 
 (** ** Idemptotency properties *)
@@ -497,7 +497,7 @@ Proof.
   inv H; eauto.
 Qed.
 
-Hint Immediate Union_idempotent Intersection_idempotent : Ensembles_DB.
+#[global] Hint Immediate Union_idempotent Intersection_idempotent : Ensembles_DB.
 
 (** ** De Morgan's laws *)
 
@@ -532,7 +532,7 @@ Proof.
   inv H; intros Hc; inv Hc; eauto.
 Qed.
 
-Hint Immediate Union_DeMorgan : Ensembles_DB.
+#[global] Hint Immediate Union_DeMorgan : Ensembles_DB.
 
 (** ** Complement is involutive *)
 
@@ -550,7 +550,7 @@ Proof.
   exfalso; eauto.
 Qed.
 
-Hint Immediate Complement_involutive_l : Ensembles_DB.
+#[global] Hint Immediate Complement_involutive_l : Ensembles_DB.
 
 (** ** Inclusion properties *)
 
@@ -663,9 +663,9 @@ Proof.
   left; constructor; eauto.
 Qed.
 
-Hint Immediate Included_Empty_set Included_Union_l Included_Union_r
+#[global] Hint Immediate Included_Empty_set Included_Union_l Included_Union_r
      Setminus_Included : Ensembles_DB.
-Hint Resolve Included_Union_preserv_l Included_Union_preserv_r Setminus_Included_preserv
+#[global] Hint Resolve Included_Union_preserv_l Included_Union_preserv_r Setminus_Included_preserv
      Setminus_Included_Included_Union Union_Included Singleton_Included
      Included_Setminus Included_Union_Setminus_Included_Union : Ensembles_DB.
 
@@ -840,11 +840,11 @@ Proof.
 Qed.
 
 
-Hint Resolve Disjoint_Setminus_l Disjoint_Setminus_r Union_Disjoint_l
+#[global] Hint Resolve Disjoint_Setminus_l Disjoint_Setminus_r Union_Disjoint_l
      Union_Disjoint_r Disjoint_Singleton_l Disjoint_Singleton_r
      Setminus_Disjoint_preserv_l Setminus_Disjoint_preserv_r  : Ensembles_DB.
 
-Hint Immediate Disjoint_Empty_set_l Disjoint_Empty_set_r : Ensembles_DB.
+#[global] Hint Immediate Disjoint_Empty_set_l Disjoint_Empty_set_r : Ensembles_DB.
 
 (** ** Set difference properties *)
 
@@ -1001,8 +1001,8 @@ Proof.
   inv Hsuff.
 Qed.
 
-Hint Immediate Setminus_Same_set_Empty_set Setminus_Union : Ensembles_DB.
-Hint Resolve  Setminus_Disjoint Setminus_Included_Empty_set
+#[global] Hint Immediate Setminus_Same_set_Empty_set Setminus_Union : Ensembles_DB.
+#[global] Hint Resolve  Setminus_Disjoint Setminus_Included_Empty_set
      Setminus_Union_Included Included_Setminus_Disjoint : Ensembles_DB.
 
 (** ** Other properties *)
@@ -1087,8 +1087,8 @@ Proof.
   intros Hin x Hin' y. eauto.
 Qed.
 
-Hint Immediate not_In_Empty_set : Ensembles_DB.
-Hint Resolve  Included_Empty_set_l Included_Empty_set_r Complement_antimon
+#[global] Hint Immediate not_In_Empty_set : Ensembles_DB.
+#[global] Hint Resolve  Included_Empty_set_l Included_Empty_set_r Complement_antimon
      Complement_Disjoint : Ensembles_DB.
 
 (** ** Big union *)
@@ -1188,7 +1188,7 @@ Proof.
   - inv H'. inv H0. eexists; split; eauto. apply H; eauto.
 Qed.
 
-Instance Proper_big_cup {A B} : Proper (Same_set A ==> eq ==> Same_set B) big_cup.
+#[global] Instance Proper_big_cup {A B} : Proper (Same_set A ==> eq ==> Same_set B) big_cup.
 Proof.
   intros ? ? ? ? ? ?; subst. now apply Same_Set_big_cup_l.
 Qed.
@@ -1226,9 +1226,9 @@ Proof.
       split; eauto. constructor.
 Qed.
 
-Hint Immediate Union_big_cup Setminus_big_cup big_cup_Singleton
+#[global] Hint Immediate Union_big_cup Setminus_big_cup big_cup_Singleton
      big_cup_Empty_set: Ensembles_DB.
-Hint Resolve Included_big_cup_l Same_Set_big_cup_l : Ensembles_DB.
+#[global] Hint Resolve Included_big_cup_l Same_Set_big_cup_l : Ensembles_DB.
 
 (** * List of sets union *)
 
@@ -1245,7 +1245,7 @@ Definition FromList {A} (l : list A) : Ensemble A :=
   fun x => List.In x l.
 
 (* TODO : generalize the type *)
-Instance Decidable_FromList (l : list positive) : Decidable (FromList l). 
+#[global] Instance Decidable_FromList (l : list positive) : Decidable (FromList l). 
 Proof. 
   constructor. intros x. induction l. 
   - right. intros H. inv H. 
@@ -1335,7 +1335,7 @@ Proof.
       eapply Singleton_Included. eauto.
 Qed.
 
-Instance Decidable_FromList_gen A (H : forall (x y : A), {x = y} + {x <> y}) (l : list A) :
+#[global] Instance Decidable_FromList_gen A (H : forall (x y : A), {x = y} + {x <> y}) (l : list A) :
   Decidable (FromList l).
 Proof.
   constructor. intros x. induction l. 
@@ -1347,7 +1347,7 @@ Proof.
 Qed.
 
 (* TODO move *)
-Instance Decidable_map_UnionList {A B : Type} (f : A -> Ensemble B) (H : forall x, Decidable (f x)) l :
+#[global] Instance Decidable_map_UnionList {A B : Type} (f : A -> Ensemble B) (H : forall x, Decidable (f x)) l :
   Decidable (Union_list (map f l)).
 Proof.
   induction l; constructor.
@@ -1385,278 +1385,278 @@ Proof.
 Qed.
 
 
-Hint Immediate FromList_nil FromList_cons FromList_app
+#[global] Hint Immediate FromList_nil FromList_cons FromList_app
      FromList_singleton : Ensembles_DB.
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ ?A (Union _ ?B ?C))
                         (Union _ ?B (Union _ ?A ?D))) =>
 rewrite (Union_assoc A B C), (Union_assoc B A D), (Union_commut A B) : Ensembles_DB.
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ ?A (Union _ ?B ?C))
                         (Union _ (Union _ ?B ?A) ?D)) =>
 rewrite (Union_assoc A B C), (Union_commut A B) : Ensembles_DB.
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ (Union _ ?B ?A) ?D)
                         (Union _ ?A (Union _ ?B ?C))) =>
 rewrite (Union_assoc A B C), (Union_commut A B) : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ ?A (Union _ ?B ?C))
                         (Union _ ?B (Union _ ?A ?D))) =>
 rewrite (Union_assoc A B C), (Union_assoc B A D), (Union_commut A B) : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ ?A (Union _ ?B ?C))
                         (Union _ (Union _ ?B ?A) ?D)) =>
 rewrite (Union_assoc A B C), (Union_commut A B) : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ (Union _ ?B ?A) ?D)
                         (Union _ ?A (Union _ ?B ?C))) =>
 rewrite (Union_assoc A B C), (Union_commut A B) : Ensembles_DB.
 
 
 
-Hint Extern 1 (Same_set _ _ (Union _ (Union _ ?A ?A) ?C)) =>
+#[global] Hint Extern 1 (Same_set _ _ (Union _ (Union _ ?A ?A) ?C)) =>
 rewrite (Union_Same_set A A); [| now apply Included_refl ] : Ensembles_DB.
 
-Hint Extern 1 (Same_set _ (Union _ (Union _ ?A ?A) ?C) _) =>
+#[global] Hint Extern 1 (Same_set _ (Union _ (Union _ ?A ?A) ?C) _) =>
 rewrite (Union_Same_set A A);  [| now apply Included_refl ] : Ensembles_DB.
 
-Hint Extern 1 (Same_set _ _ (Union _ ?A (Union _ ?A ?C))) =>
+#[global] Hint Extern 1 (Same_set _ _ (Union _ ?A (Union _ ?A ?C))) =>
 rewrite (Union_assoc A A C), (Union_Same_set A A);
   [| now apply Included_refl ] : Ensembles_DB.
 
-Hint Extern 1 (Same_set _ (Union _ ?A (Union _ ?A ?C)) _) =>
+#[global] Hint Extern 1 (Same_set _ (Union _ ?A (Union _ ?A ?C)) _) =>
 rewrite (Union_assoc A A C), (Union_Same_set A A);
   [| now apply Included_refl ] : Ensembles_DB.
 
-Hint Extern 1 (Included _ _ (Union _ (Union _ ?A ?A) ?C)) =>
+#[global] Hint Extern 1 (Included _ _ (Union _ (Union _ ?A ?A) ?C)) =>
 rewrite (Union_Same_set A A); [| now apply Included_refl ] : Ensembles_DB.
 
-Hint Extern 1 (Included _ (Union _ (Union _ ?A ?A) ?C) _) =>
+#[global] Hint Extern 1 (Included _ (Union _ (Union _ ?A ?A) ?C) _) =>
 rewrite (Union_Same_set A A);  [| now apply Included_refl ] : Ensembles_DB.
 
-Hint Extern 1 (Included _ _ (Union _ ?A (Union _ ?A ?C))) =>
+#[global] Hint Extern 1 (Included _ _ (Union _ ?A (Union _ ?A ?C))) =>
 rewrite (Union_assoc A A C), (Union_Same_set A A);
   [| now apply Included_refl ] : Ensembles_DB.
 
-Hint Extern 1 (Included _ (Union _ ?A (Union _ ?A ?C)) _) =>
+#[global] Hint Extern 1 (Included _ (Union _ ?A (Union _ ?A ?C)) _) =>
 rewrite (Union_assoc A A C), (Union_Same_set A A);
   [| now apply Included_refl ] : Ensembles_DB.
 
-Hint Extern 1 (Disjoint _ _ (Union _ (Union _ ?A ?A) ?C)) =>
+#[global] Hint Extern 1 (Disjoint _ _ (Union _ (Union _ ?A ?A) ?C)) =>
 rewrite (Union_Same_set A A); [| now apply Included_refl ] : Ensembles_DB.
 
-Hint Extern 1 (Disjoint _ (Union _ (Union _ ?A ?A) ?C) _) =>
+#[global] Hint Extern 1 (Disjoint _ (Union _ (Union _ ?A ?A) ?C) _) =>
 rewrite (Union_Same_set A A);  [| now apply Included_refl ] : Ensembles_DB.
 
-Hint Extern 1 (Disjoint _ _ (Union _ ?A (Union _ ?A ?C))) =>
+#[global] Hint Extern 1 (Disjoint _ _ (Union _ ?A (Union _ ?A ?C))) =>
 rewrite (Union_assoc A A C), (Union_Same_set A A);
   [| now apply Included_refl ] : Ensembles_DB.
 
-Hint Extern 1 (Disjoint _ (Union _ ?A (Union _ ?A ?C)) _) =>
+#[global] Hint Extern 1 (Disjoint _ (Union _ ?A (Union _ ?A ?C)) _) =>
 rewrite (Union_assoc A A C), (Union_Same_set A A);
   [| now apply Included_refl ] : Ensembles_DB.
 
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Setminus _ _ (Union _ _ _))
                         (Setminus _ (Setminus _ _ _) _)) =>
 rewrite Setminus_Union : Ensembles_DB.
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Setminus _ (Setminus _ _ _) _)
                         (Setminus _ _ (Union _ _ _))) =>
 rewrite Setminus_Union : Ensembles_DB.
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Setminus _ (Union _ _ _) _)
                         (Union _ (Setminus _ _ ?A) (Setminus _ _ ?A))) =>
 rewrite Setminus_Union_distr : Ensembles_DB.
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ (Setminus _ _ ?A) (Setminus _ _ ?A))
                         (Setminus _ (Union _ _ _) _)) =>
 rewrite Setminus_Union_distr : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Setminus _ _ (Union _ _ _))
                         (Setminus _ (Setminus _ _ _) _)) =>
 rewrite Setminus_Union : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Setminus _ (Setminus _ _ _) _)
                         (Setminus _ _ (Union _ _ _))) =>
 rewrite Setminus_Union : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Setminus _ (Union _ _ _) _)
                         (Union _ (Setminus _ _ ?A) (Setminus _ _ ?A))) =>
 rewrite Setminus_Union_distr : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ (Setminus _ _ ?A) (Setminus _ _ ?A))
                         (Setminus _ (Union _ _ _) _)) =>
 rewrite Setminus_Union_distr : Ensembles_DB.
 
 
-Hint Extern 1 (Same_set _ (Union _ (Empty_set _) _) _) =>
+#[global] Hint Extern 1 (Same_set _ (Union _ (Empty_set _) _) _) =>
 rewrite Union_Empty_set_neut_l : Ensembles_DB.
 
-Hint Extern 1 (Included _ (Union _ (Empty_set _) _) _) =>
+#[global] Hint Extern 1 (Included _ (Union _ (Empty_set _) _) _) =>
 rewrite Union_Empty_set_neut_l :  Ensembles_DB.
 
-Hint Extern 1 (Disjoint _ (Union _ (Empty_set _) _) _) =>
+#[global] Hint Extern 1 (Disjoint _ (Union _ (Empty_set _) _) _) =>
 rewrite Union_Empty_set_neut_l : Ensembles_DB.
 
-Hint Extern 1 (Same_set _ (Union _ _ (Empty_set _)) _) =>
+#[global] Hint Extern 1 (Same_set _ (Union _ _ (Empty_set _)) _) =>
 rewrite Union_Empty_set_neut_r : Ensembles_DB.
 
-Hint Extern 1 (Included _ (Union _ _ (Empty_set _)) _) =>
+#[global] Hint Extern 1 (Included _ (Union _ _ (Empty_set _)) _) =>
 rewrite Union_Empty_set_neut_r : Ensembles_DB.
 
-Hint Extern 1 (Disjoint _ (Union _ _ (Empty_set _)) _) =>
+#[global] Hint Extern 1 (Disjoint _ (Union _ _ (Empty_set _)) _) =>
 rewrite Union_Empty_set_neut_r : Ensembles_DB.
 
-Hint Extern 1 (Same_set _ _ (Union _ (Empty_set _) _)) =>
+#[global] Hint Extern 1 (Same_set _ _ (Union _ (Empty_set _) _)) =>
 rewrite Union_Empty_set_neut_l : Ensembles_DB.
 
-Hint Extern 1 (Included _ _ (Union _ (Empty_set _) _)) =>
+#[global] Hint Extern 1 (Included _ _ (Union _ (Empty_set _) _)) =>
 rewrite Union_Empty_set_neut_l :  Ensembles_DB.
 
-Hint Extern 1 (Disjoint _ _ (Union _ (Empty_set _) _)) =>
+#[global] Hint Extern 1 (Disjoint _ _ (Union _ (Empty_set _) _)) =>
 rewrite Union_Empty_set_neut_l : Ensembles_DB.
 
-Hint Extern 1 (Same_set _ _ (Union _ _ (Empty_set _))) =>
+#[global] Hint Extern 1 (Same_set _ _ (Union _ _ (Empty_set _))) =>
 rewrite Union_Empty_set_neut_r : Ensembles_DB.
 
-Hint Extern 1 (Included _ _ (Union _ _ (Empty_set _))) =>
+#[global] Hint Extern 1 (Included _ _ (Union _ _ (Empty_set _))) =>
 rewrite Union_Empty_set_neut_r : Ensembles_DB.
 
-Hint Extern 1 (Disjoint _ _ (Union _ _ (Empty_set _))) =>
+#[global] Hint Extern 1 (Disjoint _ _ (Union _ _ (Empty_set _))) =>
 rewrite Union_Empty_set_neut_r : Ensembles_DB.
 
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ ?A (Union _ ?B ?C))
                         (Union _ ?D (Union _ ?A ?E))) =>
 rewrite (Union_assoc A B C), (Union_assoc D A E), (Union_commut D A),
 <- (Union_assoc A B C), <- (Union_assoc A D E) : Ensembles_DB.
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ ?D (Union _ ?A ?E))
                         (Union _ ?A (Union _ ?B ?C))) =>
 rewrite (Union_assoc A B C), (Union_assoc D A E), (Union_commut D A),
 <- (Union_assoc A B C), <- (Union_assoc A D E) : Ensembles_DB.
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ ?A (Union _ ?B ?C))
                         (Union _ ?D (Union _ ?E ?A))) =>
 rewrite (Union_assoc A B C), (Union_assoc D E A), (Union_commut (Union _ D E) A),
 <- (Union_assoc A B C) : Ensembles_DB.
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ ?D (Union _ ?E ?A))
                         (Union _ ?A (Union _ ?B ?C))) =>
 rewrite (Union_assoc A B C), (Union_assoc D E A), (Union_commut (Union _ D E) A),
 <- (Union_assoc A B C) : Ensembles_DB.
 
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ ?A (Union _ ?B ?C))
                         (Union _ (Union _ ?D ?A) ?E)) =>
 rewrite (Union_assoc A B C), (Union_commut D A),
 <- (Union_assoc A B C), <- (Union_assoc A D E) : Ensembles_DB.
 
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ (Union _ ?D ?A) ?E)
                         (Union _ ?A (Union _ ?B ?C))) =>
 rewrite (Union_assoc A B C), (Union_commut D A),
 <- (Union_assoc A B C), <- (Union_assoc A D E) : Ensembles_DB.
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ ?A ?B)
                         (Union _ ?C ?A)) =>
 rewrite (Union_commut C A) : Ensembles_DB.
 
-Hint Extern 1 (Same_set _
+#[global] Hint Extern 1 (Same_set _
                         (Union _ ?C ?A)
                         (Union _ ?A ?B)) =>
 rewrite (Union_commut C A) : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ ?A (Union _ ?B ?C))
                         (Union _ ?D (Union _ ?A ?E))) =>
 rewrite (Union_assoc A B C), (Union_assoc D A E), (Union_commut D A),
 <- (Union_assoc A B C), <- (Union_assoc A D E) : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ ?D (Union _ ?A ?E))
                         (Union _ ?A (Union _ ?B ?C))) =>
 rewrite (Union_assoc A B C), (Union_assoc D A E), (Union_commut D A),
 <- (Union_assoc A B C), <- (Union_assoc A D E) : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ ?A (Union _ ?B ?C))
                         (Union _ ?D (Union _ ?E ?A))) =>
 rewrite (Union_assoc A B C), (Union_assoc D E A), (Union_commut (Union _ D E) A),
 <- (Union_assoc A B C) : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ ?D (Union _ ?E ?A))
                         (Union _ ?A (Union _ ?B ?C))) =>
 rewrite (Union_assoc A B C), (Union_assoc D E A), (Union_commut (Union _ D E) A),
 <- (Union_assoc A B C) : Ensembles_DB.
 
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ ?A (Union _ ?B ?C))
                         (Union _ (Union _ ?D ?A) ?E)) =>
 rewrite (Union_assoc A B C), (Union_commut D A),
 <- (Union_assoc A B C), <- (Union_assoc A D E) : Ensembles_DB.
 
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ (Union _ ?D ?A) ?E)
                         (Union _ ?A (Union _ ?B ?C))) =>
 rewrite (Union_assoc A B C), (Union_commut D A),
 <- (Union_assoc A B C), <- (Union_assoc A D E) : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ ?A ?B)
                         (Union _ ?C ?A)) =>
 rewrite (Union_commut C A) : Ensembles_DB.
 
-Hint Extern 1 (Included _
+#[global] Hint Extern 1 (Included _
                         (Union _ ?C ?A)
                         (Union _ ?A ?B)) =>
 rewrite (Union_commut C A) : Ensembles_DB.
 
-Hint Extern 1 (Same_set _ (Union _ ?A (Union _ _ _)) (Union _ (Union _ ?A ?B) ?C)) =>
+#[global] Hint Extern 1 (Same_set _ (Union _ ?A (Union _ _ _)) (Union _ (Union _ ?A ?B) ?C)) =>
 rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
-Hint Extern 1 (Same_set _ (Union _ (Union _ ?A ?B) ?C) (Union _ ?A (Union _ _ _))) =>
+#[global] Hint Extern 1 (Same_set _ (Union _ (Union _ ?A ?B) ?C) (Union _ ?A (Union _ _ _))) =>
 rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
-Hint Extern 1 (Included _ (Union _ ?A (Union _ _ _)) (Union _ (Union _ ?A ?B) ?C)) =>
+#[global] Hint Extern 1 (Included _ (Union _ ?A (Union _ _ _)) (Union _ (Union _ ?A ?B) ?C)) =>
 rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
-Hint Extern 1 (Included _ (Union _ (Union _ ?A ?B) ?C) (Union _ ?A (Union _ _ _))) =>
+#[global] Hint Extern 1 (Included _ (Union _ (Union _ ?A ?B) ?C) (Union _ ?A (Union _ _ _))) =>
 rewrite <- (Union_assoc A B C) : Ensembles_DB.
 
-Hint Extern 5 (Disjoint _ ?A ?B) =>
+#[global] Hint Extern 5 (Disjoint _ ?A ?B) =>
 eapply Disjoint_Included_r; [| eassumption ] : Ensembles_DB.
-Hint Extern 5 (Disjoint _ ?A ?B) =>
+#[global] Hint Extern 5 (Disjoint _ ?A ?B) =>
 eapply Disjoint_Included_l; [| eassumption ] : Ensembles_DB.
 
-Hint Extern 5 (Disjoint _ ?A ?B) =>
+#[global] Hint Extern 5 (Disjoint _ ?A ?B) =>
 eapply Disjoint_Included_r_sym; [| eassumption ] : Ensembles_DB.
-Hint Extern 5 (Disjoint _ ?A ?B) =>
+#[global] Hint Extern 5 (Disjoint _ ?A ?B) =>
 eapply Disjoint_Included_l_sym; [| eassumption ] : Ensembles_DB.
 
 
@@ -1669,23 +1669,23 @@ Definition Proj2 {A B} (S : Ensemble (A * B)) : Ensemble B :=
 Definition Prod {A B} (S : Ensemble A) (S' : Ensemble B) : Ensemble (A * B) :=
   [ set z | let '(x, y) := z in  x \in S /\ y \in S' ].
 
-Instance Proj1_Proper A B : Proper (Same_set (A * B) ==> Same_set A) Proj1.
+#[global] Instance Proj1_Proper A B : Proper (Same_set (A * B) ==> Same_set A) Proj1.
 Proof.
   firstorder.
 Qed. 
 
-Instance Proj2_Proper A B : Proper (Same_set (A * B) ==> Same_set B) Proj2.
+#[global] Instance Proj2_Proper A B : Proper (Same_set (A * B) ==> Same_set B) Proj2.
 Proof.
   firstorder.
 Qed.
 
-Instance Prod_Proper1 A B : Proper (Same_set A ==> eq ==> Same_set (A * B)) Prod.
+#[global] Instance Prod_Proper1 A B : Proper (Same_set A ==> eq ==> Same_set (A * B)) Prod.
 Proof.
   intros s1 s2 Hseq x1 x2 Heq; subst.
   unfold Prod; split; intros [x y]; firstorder.
 Qed. 
 
-Instance Proj_Proper2 A B S : Proper (Same_set B  ==> Same_set (A * B)) (Prod S).
+#[global] Instance Proj_Proper2 A B S : Proper (Same_set B  ==> Same_set (A * B)) (Prod S).
 Proof.
   intros s1 s2 Hseq; subst.
   unfold Prod; split;

@@ -273,48 +273,48 @@ Qed.
 
 (* Equality morphisms *)
 
-Instance Proper_In x :  Proper (Equal ==> iff) (In x).
+#[global] Instance Proper_In x :  Proper (Equal ==> iff) (In x).
 Proof.
   constructor; intros Hin; eapply H; eauto.
 Qed.
 
-Instance Proper_union_r x :  Proper (Equal ==> Equal) (union x).
+#[global] Instance Proper_union_r x :  Proper (Equal ==> Equal) (union x).
 Proof.
   constructor; intros Hin; apply_set_specs_ctx; apply_set_specs; eauto;
   right; apply H; eauto.
 Qed.
 
-Instance Proper_union_l :  Proper (Equal ==> Logic.eq ==> Equal) union.
+#[global] Instance Proper_union_l :  Proper (Equal ==> Logic.eq ==> Equal) union.
 Proof.
   constructor; intros; apply_set_specs_ctx; apply_set_specs; eauto;
   left; apply H; eauto.
 Qed.
 
-Instance Proper_elements :  Proper (Equal ==> Logic.eq) elements.
+#[global] Instance Proper_elements :  Proper (Equal ==> Logic.eq) elements.
 Proof.
   intros x y Heq; eauto. eapply elements_eq. eassumption.
 Qed.
 
-Instance Proper_carinal :  Proper (Equal ==> Logic.eq) cardinal.
+#[global] Instance Proper_carinal :  Proper (Equal ==> Logic.eq) cardinal.
 Proof.
   intros x y Heq; eauto. rewrite !cardinal_spec, Heq. reflexivity.
 Qed.
 
-Instance union_proper_l :  Proper (PS.Equal ==> eq ==> PS.Equal) PS.union.
+#[global] Instance union_proper_l :  Proper (PS.Equal ==> eq ==> PS.Equal) PS.union.
 Proof.
   intros x y Heq1 x' y' Heq2; subst.
   intros z; split; intros Hin; eapply PS.union_spec in Hin;
   inv Hin; eapply PS.union_spec; now firstorder.
 Qed.
 
-Instance diff_proper_l :  Proper (PS.Equal ==> eq ==> PS.Equal) PS.diff.
+#[global] Instance diff_proper_l :  Proper (PS.Equal ==> eq ==> PS.Equal) PS.diff.
 Proof.
   intros x y Heq1 x' y' Heq2; subst.
   intros z; split; intros Hin; eapply PS.diff_spec in Hin;
   inv Hin; eapply PS.diff_spec; now firstorder.
 Qed.
 
-Instance diff_proper_r :  Proper (eq ==> PS.Equal ==> PS.Equal) PS.diff.
+#[global] Instance diff_proper_r :  Proper (eq ==> PS.Equal ==> PS.Equal) PS.diff.
 Proof.
   intros x y Heq1 x' y' Heq2; subst.
   intros z; split; intros Hin; eapply PS.diff_spec in Hin;
@@ -564,14 +564,14 @@ Proof.
   now inv Hin. now inv Hc.
 Qed.
 
-Instance Decidable_FromSet (s : PS.t) : Decidable (FromSet s).
+#[global] Instance Decidable_FromSet (s : PS.t) : Decidable (FromSet s).
 Proof.
   unfold FromSet.
   eapply Ensembles_util.Decidable_FromList. 
 Qed.
 
 
-Instance Proper_From_set : Proper (PS.Equal ==> Same_set _) FromSet.
+#[global] Instance Proper_From_set : Proper (PS.Equal ==> Same_set _) FromSet.
 Proof.
   constructor.
   - intros z Hin. eapply FromSet_sound in Hin; [| reflexivity ].
@@ -598,19 +598,19 @@ Class ToMSet (S : Ensemble positive) :=
     mset_eq : S <--> FromSet mset
   }.
 
-Instance ToMSet_EmptySet : ToMSet (Empty_set _).
+#[global] Instance ToMSet_EmptySet : ToMSet (Empty_set _).
 Proof.
   econstructor. 
   symmetry. eapply FromSet_empty.
 Defined.
 
-Instance ToMSet_Singleton x : ToMSet [set x].
+#[global] Instance ToMSet_Singleton x : ToMSet [set x].
 Proof.
   econstructor. 
   symmetry. eapply FromSet_singleton.
 Defined.
 
-Instance ToMSet_Same_set (S1 S2 : Ensemble positive) :
+#[global] Instance ToMSet_Same_set (S1 S2 : Ensemble positive) :
   S1 <--> S2 ->
   ToMSet S1 ->
   ToMSet S2.
@@ -619,7 +619,7 @@ Proof.
   econstructor. eassumption.
 Qed.
 
-Instance ToMSet_image'_Singleton {A} (f : A -> option positive) (x : A) :
+#[global] Instance ToMSet_image'_Singleton {A} (f : A -> option positive) (x : A) :
   ToMSet (image' f [set x]).
 Proof.
   destruct (f x) eqn:Heq.
@@ -629,21 +629,21 @@ Proof.
   symmetry. eapply FromSet_empty.
 Defined.
 
-Instance ToMSet_Union S1 {H1 : ToMSet S1} S2 {H2 : ToMSet S2} : ToMSet (S1 :|: S2).
+#[global] Instance ToMSet_Union S1 {H1 : ToMSet S1} S2 {H2 : ToMSet S2} : ToMSet (S1 :|: S2).
 Proof.
   destruct H1 as [m1 Heq1]. destruct H2 as [m2 Heq2].  
   econstructor. symmetry. rewrite FromSet_union.
   rewrite Heq1, Heq2. reflexivity. 
 Qed.  
 
-Instance ToMSet_Setminus S1 {H1 : ToMSet S1} S2 {H2 : ToMSet S2} : ToMSet (S1 \\ S2).
+#[global] Instance ToMSet_Setminus S1 {H1 : ToMSet S1} S2 {H2 : ToMSet S2} : ToMSet (S1 \\ S2).
 Proof.
   destruct H1 as [m1 Heq1]. destruct H2 as [m2 Heq2].  
   econstructor. symmetry. rewrite FromSet_diff.
   rewrite Heq1, Heq2. reflexivity. 
 Qed.
 
-Instance ToMSet_Intersection (S1 : Ensemble positive) `{ToMSet S1}
+#[global] Instance ToMSet_Intersection (S1 : Ensemble positive) `{ToMSet S1}
          (S2 : Ensemble positive) `{ToMSet S2} : ToMSet (S1 :&: S2).
 Proof.
   destruct H as [m1 Hm1]; destruct H0 as [m2 Hm2].
@@ -661,14 +661,14 @@ Proof.
     eapply FromSet_complete. eapply Hm2; eauto. eassumption. 
 Qed.
 
-Instance ToMSetFromList l : ToMSet (FromList l).
+#[global] Instance ToMSetFromList l : ToMSet (FromList l).
 Proof.
   eexists (union_list PS.empty l).
   rewrite FromSet_union_list. rewrite FromSet_empty.
   rewrite Union_Empty_set_neut_l. reflexivity.
 Defined.
   
-Instance Decidable_ToMSet S {HM : ToMSet S} : Decidable S.
+#[global] Instance Decidable_ToMSet S {HM : ToMSet S} : Decidable S.
 Proof.
   constructor. intros x.
   destruct HM as [m Heq].
@@ -815,7 +815,7 @@ Proof with (now eauto with Ensembles_DB).
 Qed.
 
   
-Instance ImageToMSet b S `{_: ToMSet S} : ToMSet (image b S).
+#[global] Instance ImageToMSet b S `{_: ToMSet S} : ToMSet (image b S).
 Proof.
   destruct H as [m Hm].
   exists (PS_map b m).  rewrite Hm. unfold PS_map.
@@ -828,7 +828,7 @@ Proof.
   now eauto with Ensembles_DB.
 Qed.
 
-Instance Image'ToMSet b S `{_: ToMSet S} : ToMSet (image' b S).
+#[global] Instance Image'ToMSet b S `{_: ToMSet S} : ToMSet (image' b S).
 Proof.
   destruct H as [m Hm].
   exists (PS_map_opt b m).  rewrite Hm. unfold PS_map_opt.

@@ -109,7 +109,7 @@ Definition exp_ctx_to_fin (C: exp_ctx) : fin :=
 (* Resource indexed by exprssions *)
 
 Class exp_resource {A} :=
-  { HRes :> @resource fin A;
+  { HRes :: @resource fin A;
     one := (fun e => @one_i _ _ HRes (exp_to_fin e));
     one_ctx := (fun C => @one_i _ _ HRes (exp_ctx_to_fin C)) }.
 
@@ -117,15 +117,15 @@ Class exp_resource {A} :=
 (* Fuel resource *)
 
 Class fuel_resource {A} :=
-  { HRexp_f :> @exp_resource A;
-    HOrd    :> @ordered fin A HRes;
-    HOne    :> @resource_ones fin A HRes;
-    HNat    :> @nat_hom fin A HRes
+  { HRexp_f :: @exp_resource A;
+    HOrd    :: @ordered fin A HRes;
+    HOne    :: @resource_ones fin A HRes;
+    HNat    :: @nat_hom fin A HRes
   }.
 
 (* Trace resource *)
 Class trace_resource {A} :=
-  { HRexp_t :> @exp_resource A }.
+  { HRexp_t :: @exp_resource A }.
 
 
 Declare Scope alg_scope.

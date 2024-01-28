@@ -1036,7 +1036,7 @@ Section Correct.
 
               eapply IHvars with (vs := l). reflexivity. eauto.
               
-              rewrite <- minus_n_O. reflexivity.
+              rewrite Nat.sub_0_r. reflexivity.
               
               rewrite M.gso; eauto. 
               

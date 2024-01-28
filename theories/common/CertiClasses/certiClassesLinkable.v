@@ -586,7 +586,7 @@ Proof using mkAppCongrLe.
   eauto.
 Qed.
 
-Instance mkAppRW : Proper (eq ==> eqObsId ==> eqObsId) (@mkApp Dst _).
+#[global] Instance mkAppRW : Proper (eq ==> eqObsId ==> eqObsId) (@mkApp Dst _).
 Proof using.
   intros ? ? ? ? ? ?. subst.
   apply mkAppCongr.

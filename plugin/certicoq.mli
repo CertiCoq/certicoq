@@ -67,6 +67,13 @@ end
 val compile_only : options -> Names.GlobRef.t -> import list -> unit
 val generate_glue_only : options -> Names.GlobRef.t -> unit
 val compile_C : options -> Names.GlobRef.t -> import list -> unit
+val compile_shared_C : options -> Names.GlobRef.t -> import list -> Constr.t
 val show_ir : options -> Names.GlobRef.t -> unit
 val ffi_command : options -> Names.GlobRef.t -> unit
 val glue_command : options -> Names.GlobRef.t list -> unit
+
+(* Support for running dynamically linked certicoq-compiled programs *)
+type certicoq_run_function = Ast0.Env.global_env -> typ:Ast0.term -> Obj.t
+
+val register_certicoq_run : string -> certicoq_run_function -> unit
+val run_certicoq_run : string -> certicoq_run_function

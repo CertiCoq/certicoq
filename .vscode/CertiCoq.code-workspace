@@ -6,6 +6,10 @@
 	],
 	"settings": {
 		"coqtop.binPath": "_opam/bin",
-		"coqtop.args": []
+		"coqtop.args": [],
+		"ocaml.sandbox": {
+			"kind": "opam",
+			"switch": "coq817"
+		}
 	}
 }

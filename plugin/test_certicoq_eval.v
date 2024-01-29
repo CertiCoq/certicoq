@@ -1,7 +1,6 @@
 
 From CertiCoq.Plugin Require Import CertiCoq.
 From MetaCoq.Utils Require Import utils.
-From CertiCoq.Common Require Import Pipeline_utils.
 
 Open Scope bs_scope.
 
@@ -35,10 +34,13 @@ Definition string_of_specfloat (f : SpecFloat.spec_float) :=
 #[export] Instance show_positive : Show positive := string_of_positive.
 #[export] Instance show_Z : Show Z := string_of_Z.
 
-Definition certicoqc2 := 
-  coq_msg_info (show (0%float == (-0)%float)).
+Definition certicoqc2 := 5.
+Definition certicoqc3 := coq_msg_notice ("Hello world! " ++ show 100%nat).
+ (* show (0%float == (-0)%float)). *)
 
-Time Eval compute in certicoqc2.
+Definition certicoqc4 := show (List.map S [26; 20]).
 
+Time Eval compute in certicoqc4.
 Set Warnings "-primitive-turned-into-axiom".
-Time CertiCoq Run certicoqc2.
+Set Warnings "backtrace".
+CertiCoq Eval -time certicoqc4.

@@ -565,7 +565,7 @@ Section Closure_conversion_correct.
     n <= n * m.
   Proof.
     rewrite Nat.mul_comm.
-    edestruct mult_O_le; eauto. lia.
+    edestruct Arith_prebase.mult_O_le_stt; eauto. lia.
   Qed.
 
   Lemma plus_le_mult  (a1 a2 b1 b2 b3 : nat) :
@@ -575,13 +575,13 @@ Section Closure_conversion_correct.
     a1 + a2 <= (1 + b1) * a1 * b2.
   Proof.
     intros.
-    rewrite <- mult_assoc, NPeano.Nat.mul_add_distr_r.
-    eapply plus_le_compat.
+    rewrite <- Nat.mul_assoc, NPeano.Nat.mul_add_distr_r.
+    eapply Nat.add_le_mono.
     - simpl. rewrite <- plus_n_O.
       now eapply mult_le_n.
-    - eapply le_trans. eapply le_trans. eassumption.
-      eapply mult_le_compat. eauto. eassumption.
-      rewrite mult_assoc. eapply mult_le_n. eassumption.
+    - eapply Nat.le_trans. eapply Nat.le_trans. eassumption.
+      eapply Nat.mul_le_mono. eauto. eassumption.
+      rewrite Nat.mul_assoc. eapply mult_le_n. eassumption.
   Qed.
 
   
@@ -798,7 +798,7 @@ Section Closure_conversion_correct.
     - (* Case letapp *)
       inv Hcc.
       assert (Hadm : sizeOf_exp_ctx C <= 4 + 4 * length ys).
-      { eapply le_trans. eapply project_vars_sizeOf_ctx_exp; eauto. simpl; lia. }
+      { eapply Nat.le_trans. eapply project_vars_sizeOf_ctx_exp; eauto. simpl; lia. }
       edestruct (HFVs f) as [v' Hgetv]. normalize_occurs_free...
       edestruct (@binding_in_map_get_list val) with (xs := ys) as [vs Hgetvs]; eauto. normalize_occurs_free...
 
@@ -825,8 +825,8 @@ Section Closure_conversion_correct.
         
       eapply ctx_to_rho_cc_approx_exp; eauto.
       eapply cc_approx_exp_letapp_compat with (P1 := boundL 0) (rho1 := rho1) (f1 := f).
-      + eapply HPost_letapp. eapply le_trans. eapply exp_ctx_len_leq_aux. eassumption.
-      + eapply HPost_letapp_OOT. eapply le_trans. eapply exp_ctx_len_leq_aux. eassumption.
+      + eapply HPost_letapp. eapply Nat.le_trans. eapply exp_ctx_len_leq_aux. eassumption.
+      + eapply HPost_letapp_OOT. eapply Nat.le_trans. eapply exp_ctx_len_leq_aux. eassumption.
       + eapply HOOT.
       + rewrite (Union_commut [set f']), <- Union_assoc. intros Hc. inv Hc; eauto. inv H. contradiction.
         revert H. eapply Disjoint_In_l; [| eassumption ]. 
@@ -924,7 +924,7 @@ Section Closure_conversion_correct.
       destruct Ha as [vs Hget_list].
       (* sizes of evaluation contexts *)
       assert (HC1 : sizeOf_exp_ctx C' <= 4 * (length FVs')) by
-          (eapply le_trans; [ now eapply project_vars_sizeOf_ctx_exp; eauto | lia ]).
+          (eapply Nat.le_trans; [ now eapply project_vars_sizeOf_ctx_exp; eauto | lia ]).
 
       edestruct project_vars_ctx_to_rho as [rho2' Hto_rho]; [ | eassumption | | | | | ]; eauto. now sets.
       edestruct project_vars_correct as [Happ [Hfun' [Henv' [Hgfun' Hvar]]]]; eauto. now sets.
@@ -1037,7 +1037,7 @@ Section Closure_conversion_correct.
     - (* Case Eapp *)
       inv Hcc.
       assert(Hadm : sizeOf_exp_ctx C <= 4 * length l + 4)
-        by (eapply le_trans; [ now eapply project_vars_sizeOf_ctx_exp; eauto | simpl; lia ]).
+        by (eapply Nat.le_trans; [ now eapply project_vars_sizeOf_ctx_exp; eauto | simpl; lia ]).
       edestruct HFVs with (x := v) as [v' Hgetv]. normalize_occurs_free...
       edestruct (@binding_in_map_get_list val) with (xs := l) as [vs Hgetvs]; eauto. normalize_occurs_free...
   
@@ -1060,7 +1060,7 @@ Section Closure_conversion_correct.
 
       eapply cc_approx_exp_app_compat.
       + eapply HPost_app.
-        simpl (0 + _). eapply le_trans. eapply exp_ctx_len_leq_aux. rewrite plus_comm. eassumption.
+        simpl (0 + _). eapply Nat.le_trans. eapply exp_ctx_len_leq_aux. rewrite Nat.add_comm. eassumption.
       + eapply HOOT.
       + rewrite (Union_commut [set f']), <- Union_assoc. intros Hc. inv Hc; eauto. inv H. contradiction.
         revert H. eapply Disjoint_In_l; [| eassumption ]. 

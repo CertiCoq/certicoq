@@ -17,7 +17,7 @@ Set Implicit Arguments.
 Set Printing Width 80.
 Set Printing Depth 1000.
 
-Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
+#[global] Instance fuel : utils.Fuel := { fuel := 2 ^ 14 }.
 
 Quote Recursively Definition p_Type := Type.
 Print p_Type.
@@ -1306,7 +1306,7 @@ Definition cp_term :=    (* Transparent *)
                           (fun k:nat =>
                            match k as n1 return (S v < n1 -> forall def:nat -> nat, Recdef.iter (nat -> nat) n1 copy_F def (S p) = S rec_res) with
                            | 0 => fun h0:S v < 0 => False_ind (forall def:nat -> nat, Recdef.iter (nat -> nat) 0 copy_F def (S p) = S rec_res) (Nat.nlt_0_r (S v) h0)
-                           | S k0 => fun (h':S v < S k0) (def:nat -> nat) => eq_ind_r (fun n1:nat => S n1 = S rec_res) eq_refl (H2 k0 (Nat.le_lt_trans x v k0 l0 (lt_S_n v k0 h')) def)
+                           | S k0 => fun (h':S v < S k0) (def:nat -> nat) => eq_ind_r (fun n1:nat => S n1 = S rec_res) eq_refl (H2 k0 (Nat.le_lt_trans x v k0 l0 (Nat.succ_lt_mono v k0 h')) def)
                            end)) (max 0 x)) p2)) (hrec p (Acc_inv Acc_n0 (eq_ind_r (fun n1:nat => p < n1) (H0 n0 p teq) teq)))
         end eq_refl) n Acc_n) _TmpHyp) H) copy_tcc.
 

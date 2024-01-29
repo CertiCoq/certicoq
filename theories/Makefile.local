@@ -1,1 +1,0 @@
-OTHERFLAGS = "-w" "-deprecated-hint-without-locality" "-w" "-deprecated-instance-without-locality" "-w" "-deprecated-hint-rewrite-without-locality"

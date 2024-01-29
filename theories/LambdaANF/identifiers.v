@@ -37,7 +37,7 @@ Fixpoint fun_in_fundefs  (B : fundefs) : Ensemble (var * fun_tag * list var * ex
   end.
 
 (** The set of function names is decidable *)
-Instance Decidable_name_in_fundefs (B : fundefs) :
+#[global] Instance Decidable_name_in_fundefs (B : fundefs) :
   Decidable (name_in_fundefs B).
 Proof.
   constructor.
@@ -255,7 +255,7 @@ Proof.
     eexists. erewrite def_funs_neq; eauto.
 Qed.
 
-Instance ToMSet_name_in_fundefs B : ToMSet (name_in_fundefs B).
+#[global] Instance ToMSet_name_in_fundefs B : ToMSet (name_in_fundefs B).
 Proof.
   induction B.
   - destruct IHB as [s1 Hseq1].
@@ -352,8 +352,8 @@ with occurs_free_fundefs : fundefs -> Ensemble var :=
       x <> f ->
       occurs_free_fundefs (Fcons f tau ys e defs) x.
 
-Hint Constructors occurs_free : core.
-Hint Constructors occurs_free_fundefs : core.
+#[global] Hint Constructors occurs_free : core.
+#[global] Hint Constructors occurs_free_fundefs : core.
 
 (** [occurs_free_applied e] is the set of free variables of [e] that appear in application position *)
 Inductive occurs_free_applied : exp -> Ensemble var :=
@@ -915,12 +915,12 @@ Qed.
 
 
 (** FV(e) is decidable *)
-Instance Decidable_occurs_free e : Decidable (occurs_free e).
+#[global] Instance Decidable_occurs_free e : Decidable (occurs_free e).
 Proof.
   now apply occurs_free_dec_exp.
 Qed.
 (** FV(B) is decidable *)
-Instance Decidable_occurs_free_fundefs e : Decidable (occurs_free_fundefs e).
+#[global] Instance Decidable_occurs_free_fundefs e : Decidable (occurs_free_fundefs e).
 Proof.
   now apply occurs_free_dec_fundefs.
 Qed.   
@@ -1146,8 +1146,8 @@ with funs_in_fundef : fundefs -> fundefs -> Prop :=
       funs_in_fundef fs fs' ->
       funs_in_fundef fs (Fcons x tau ys e fs').
 
-Hint Constructors funs_in_exp : core.
-Hint Constructors funs_in_fundef : core.
+#[global] Hint Constructors funs_in_exp : core.
+#[global] Hint Constructors funs_in_fundef : core.
 
 Lemma split_fds_funs_in_fundef_l B1 B2 B3 B :
   split_fds B1 B2 B3 ->
@@ -1308,8 +1308,8 @@ with bound_var_fundefs : fundefs -> Ensemble var :=
       bound_var e x ->
       bound_var_fundefs (Fcons f tau ys e defs) x.
 
-Hint Constructors bound_var : core.
-Hint Constructors bound_var_fundefs : core.
+#[global] Hint Constructors bound_var : core.
+#[global] Hint Constructors bound_var_fundefs : core.
 
 (** ** Useful set equalities *)
 
@@ -2849,12 +2849,12 @@ Proof.
     eassumption.
 Qed.
 
-Instance Occurs_free_ToMSet (e : exp) : ToMSet (occurs_free e).
+#[global] Instance Occurs_free_ToMSet (e : exp) : ToMSet (occurs_free e).
 Proof. refine {| mset := exp_fv e |}.
   eapply exp_fv_correct.
 Qed.
 
-Instance Occurs_free_fundefs_ToMSet (B : fundefs) : ToMSet (occurs_free_fundefs B).
+#[global] Instance Occurs_free_fundefs_ToMSet (B : fundefs) : ToMSet (occurs_free_fundefs B).
 Proof.
   refine {| mset := fundefs_fv B |}.
   eapply fundefs_fv_correct.
@@ -3295,7 +3295,7 @@ Proof.
   eapply Hf2 in H; eauto.
 Qed.
 
-Instance fresh_Proper : Proper (Same_set _ ==> Logic.eq ==> iff) fresh.
+#[global] Instance fresh_Proper : Proper (Same_set _ ==> Logic.eq ==> iff) fresh.
 Proof.
   intros s1 s2 Hseq x1 x2 Heq; subst; split; intros x H.
   now rewrite <- Hseq; eauto.
@@ -3379,8 +3379,8 @@ with bound_var_fundefs_ctx: fundefs_ctx -> Ensemble var :=
                           bound_var_fundefs_ctx cfds v ->
                           bound_var_fundefs_ctx (Fcons2_c f t xs e cfds) v.
 
-Hint Constructors bound_var_ctx : core.
-Hint Constructors bound_var_fundefs_ctx : core.
+#[global] Hint Constructors bound_var_ctx : core.
+#[global] Hint Constructors bound_var_fundefs_ctx : core.
 
 Lemma bound_var_Econstr_c x t ys c :
   Same_set _ (bound_var_ctx (Econstr_c x t ys c))
@@ -4913,7 +4913,7 @@ with occurs_free_fundefs_ctx : fundefs_ctx -> Ensemble var :=
             x <> f ->
             occurs_free_fundefs_ctx (Fcons2_c f tau ys e defs) x.
 
-Hint Constructors occurs_free_ctx occurs_free_fundefs : core.
+#[global] Hint Constructors occurs_free_ctx occurs_free_fundefs : core.
 
 Lemma occurs_free_Econstr_c x t ys e :
   Same_set var (occurs_free_ctx (Econstr_c x t ys e))
@@ -5643,20 +5643,20 @@ Ltac normalize_occurs_free_ctx_in_ctx :=
     | right; now constructor
     | right].
 
-  Hint Resolve used_vars_dec : Decidable_DB.
-  Hint Resolve used_vars_fundefs_dec : Decidable_DB.
-  Hint Resolve bound_var_dec : Decidable_DB.
-  Hint Resolve bound_var_fundefs_dec : Decidable_DB.
-  Hint Resolve Decidable_occurs_free : Decidable_DB.
-  Hint Resolve Decidable_occurs_free_fundefs : Decidable_DB.
-  Hint Resolve Decidable_name_in_fundefs : Decidable_DB.
-  Hint Resolve Decidable_Empty_set : Decidable_DB.
-  Hint Resolve Decidable_Union : Decidable_DB.
-  Hint Resolve Decidable_Intersection : Decidable_DB.
-  Hint Resolve Decidable_Setminus : Decidable_DB.
-  Hint Resolve Decidable_singleton_var : Decidable_DB.
-  Hint Resolve Decidable_FromList : Decidable_DB.
-  Hint Resolve Decidable_occurs_free : Decidable_DB.
+  #[global] Hint Resolve used_vars_dec : Decidable_DB.
+  #[global] Hint Resolve used_vars_fundefs_dec : Decidable_DB.
+  #[global] Hint Resolve bound_var_dec : Decidable_DB.
+  #[global] Hint Resolve bound_var_fundefs_dec : Decidable_DB.
+  #[global] Hint Resolve Decidable_occurs_free : Decidable_DB.
+  #[global] Hint Resolve Decidable_occurs_free_fundefs : Decidable_DB.
+  #[global] Hint Resolve Decidable_name_in_fundefs : Decidable_DB.
+  #[global] Hint Resolve Decidable_Empty_set : Decidable_DB.
+  #[global] Hint Resolve Decidable_Union : Decidable_DB.
+  #[global] Hint Resolve Decidable_Intersection : Decidable_DB.
+  #[global] Hint Resolve Decidable_Setminus : Decidable_DB.
+  #[global] Hint Resolve Decidable_singleton_var : Decidable_DB.
+  #[global] Hint Resolve Decidable_FromList : Decidable_DB.
+  #[global] Hint Resolve Decidable_occurs_free : Decidable_DB.
 
   Local Ltac simplify_boolean_exprs := 
     simpl in *;

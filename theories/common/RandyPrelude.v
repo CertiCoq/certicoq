@@ -371,7 +371,7 @@ Definition no_step {A:Set} (R:A -> A -> Prop) (a:A) :=
   forall (b:A), ~ R a b.
 
 Lemma neq_sym: forall (A:Type) (a b:A), a <> b -> b <> a.
-  intuition.
+  intuition auto.
 Qed.
 
 Function list_to_zero (n:nat) : list nat :=
@@ -442,11 +442,11 @@ Fixpoint exnNth (A:Type) (xs:list A) (n:nat) : exception A :=
   end.
 
 Lemma bool_not_neq: forall (b1 b2:bool), (~ b1 <> b2) <-> b1 = b2.
-  split; induction b1; induction b2; intuition.
+  split; induction b1; induction b2; intuition auto.
 Qed.
 
 Lemma bool_neq_false: forall (b:bool), (b <> false) <-> b = true.
-  split; induction b; intuition.
+  split; induction b; intuition auto.
 Qed.
 
 Lemma bs_not_cons_bs:
@@ -457,7 +457,7 @@ Lemma bs_not_cons_bs:
 Qed.
 
 Lemma deMorgan_impl: forall (A B:Prop), (A -> B) -> (~B -> ~A).
-  intuition.
+  intuition auto.
 Qed.
 
 Lemma orb3_true_elim:
@@ -467,16 +467,16 @@ Lemma orb3_true_elim:
   assert (j1: {b1 = true} + {b2 || b3 = true}).
   { apply orb_true_elim. rewrite orb_assoc. assumption. }
   destruct j1.
-  - intuition.
+  - intuition auto.
   - assert (j2: {b2 = true} + {b3 = true}). apply (orb_true_elim _ _ e).
-    destruct j2; intuition.
+    destruct j2; intuition auto.
 Qed.  
 
 Lemma fold_left_bool_mono:
   forall (ds:list bool),
     fold_left (fun (b c:bool) => b || c) ds false = true ->
     fold_left (fun (b c:bool) => b || c) ds true = true.
-  induction ds; intro h; intuition. induction a. 
+  induction ds; intro h; intuition auto. induction a. 
   - exact h.
   - simpl. simpl in h. apply (IHds h).
 Qed.
@@ -510,7 +510,7 @@ Qed.
 Lemma nat_compare_EQ: forall n, Nat.compare n n = Eq.
   intro n. apply (proj2 (Nat.compare_eq_iff n n)). reflexivity.
 Qed.
-Hint Rewrite nat_compare_EQ : core.
+#[global] Hint Rewrite nat_compare_EQ : core.
 
 Lemma notNone_Some:
   forall (A:Type) (o:option A), o <> None -> exists a, o = Some a.
@@ -537,9 +537,9 @@ induction m; simpl; reflexivity.
 Qed.
 
 Lemma max_fst: forall m n, max m n >= m.
-induction m; induction n; simpl; intuition.
+induction m; induction n; simpl; intuition auto with arith.
 Qed.
 
 Lemma max_snd: forall m n, max m n >= n.
-induction m; induction n; simpl; intuition.
+induction m; induction n; simpl; intuition auto with arith.
 Qed.

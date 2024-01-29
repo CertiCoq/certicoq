@@ -40,11 +40,11 @@ Class e_ok {A} (x : erased A) := erased_ok : exists (y : A), x = (fun k => k y).
 
 (* Erasing a value *)
 Definition erase {A} : A -> erased A := fun x k => k x.
-Instance erase_ok {A} (x : A) : e_ok (erase x). Proof. exists x; reflexivity. Qed.
+#[global] Instance erase_ok {A} (x : A) : e_ok (erase x). Proof. exists x; reflexivity. Qed.
 
 (* Erased values can always be used to construct other erased values *)
 Definition e_map {A B} (f : A -> B) (x : erased A) : erased B := fun k => x (fun x => k (f x)).
-Instance e_map_ok {A B} (f : A -> B) (x : erased A) `{H : e_ok _ x} : e_ok (e_map f x).
+#[global] Instance e_map_ok {A B} (f : A -> B) (x : erased A) `{H : e_ok _ x} : e_ok (e_map f x).
 Proof. destruct H as [y Hy]; subst x; unfold e_map; now exists (f y). Qed.
 
 Definition e_map_fuse {A B C} (f : B -> C) (g : A -> B) (x : erased A) :

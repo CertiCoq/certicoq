@@ -28,7 +28,7 @@ Unset Strict Unquote Universe Mode.
 
 (* ---------- Example ---------- *)
 
-Instance Frame_exp_inj : @Frame_inj exp_univ _.
+#[global] Instance Frame_exp_inj : @Frame_inj exp_univ _.
 Proof. unfold Frame_inj; destruct f; simpl; ltac1:(congruence). Defined.
 
 (* Check frames_nil >:: cons_fundef0 [] >:: fFun2 0%nat []. *)
@@ -61,10 +61,10 @@ Definition used_vars_prop {A : exp_univ} (C : frames_t A exp_univ_exp) (e : univ
 
 (* When just moving up and down, next fresh var doesn't need to be updated *)
 
-Instance Preserves_S_dn_exp : Preserves_S_dn (@used_vars_prop).
+#[global] Instance Preserves_S_dn_exp : Preserves_S_dn (@used_vars_prop).
 Proof. intros A B C C_ok f x; destruct f; unfold used_vars_prop; simpl; intros; assumption. Defined.
 
-Instance Preserves_S_up_exp : Preserves_S_up (@used_vars_prop).
+#[global] Instance Preserves_S_up_exp : Preserves_S_up (@used_vars_prop).
 Proof. intros A B C C_ok f x; destruct f; unfold used_vars_prop; simpl; intros; assumption. Defined.
 
 Extraction Inline Preserves_S_dn_exp Preserves_S_up_exp.
@@ -96,13 +96,13 @@ Definition I_R {A} (C : frames_t A exp_univ_exp) (n : nat) : Prop := C = C.
 
 Definition I_S {A} (C : frames_t A exp_univ_exp) (x : univD A) (n : nat) : Prop := C⟦+x+⟧ = C⟦+x+⟧.
 
-Instance Preserves_R_R_C : Preserves_R (@I_R).
+#[global] Instance Preserves_R_R_C : Preserves_R (@I_R).
 Proof. intros A B C C_ok f [n _]; exists n; unerase; reflexivity. Defined.
 
-Instance Preserves_S_dn_St : Preserves_S_dn (@I_S).
+#[global] Instance Preserves_S_dn_St : Preserves_S_dn (@I_S).
 Proof. intros A B C C_ok f x [n _]; exists n; unerase; reflexivity. Defined.
 
-Instance Preserves_S_up_St : Preserves_S_up (@I_S).
+#[global] Instance Preserves_S_up_St : Preserves_S_up (@I_S).
 Proof. intros A B C C_ok f x [n _]; exists n; unerase; reflexivity. Defined.
 
 Extraction Inline Preserves_R_R_C Preserves_S_dn_St Preserves_S_up_St.
@@ -495,7 +495,7 @@ Compute rw_R'' (xI xH) exp_univ_exp <[]>
 
 (* -------------------- Another example -------------------- *)
 
-Instance Eq_var : Eq var := {rel_dec := fun n m => n ==? m}.
+#[global] Instance Eq_var : Eq var := {rel_dec := fun n m => n ==? m}.
 
 Definition renaming := var -> var.
 
@@ -554,7 +554,7 @@ Proof.
 Defined.
 
 Definition I_renaming A (e : univD A) (d : renaming) : Prop := True.
-Instance Delayed_renaming : Delayed (I_renaming).
+#[global] Instance Delayed_renaming : Delayed (I_renaming).
 Proof.
   ltac1:(unshelve econstructor).
   - destruct A; simpl; intros x [σ _].
@@ -603,7 +603,7 @@ Proof.
   simpl. destruct (PeanoNat.Nat.eqb_spec x y); constructor; ltac1:(congruence).
 Defined.
 
-Instance Preserves_cp_env : Preserves_R (@I_cp_env).
+#[global] Instance Preserves_cp_env : Preserves_R (@I_cp_env).
 Proof.
   unfold I_cp_env; intros A B C C_ok f [ρ Hρ]; destruct f eqn:Heqf;
   ltac1:(
@@ -634,7 +634,7 @@ Proof.
 Defined.
 Extraction Inline Preserves_cp_env.
 
-Instance Eq_constr : Eq constr := {rel_dec := fun n m => n ==? m}.
+#[global] Instance Eq_constr : Eq constr := {rel_dec := fun n m => n ==? m}.
 Lemma eq_constr_spec (x y : constr) : Bool.reflect (x = y) (x ==? y).
 Proof.
   simpl.

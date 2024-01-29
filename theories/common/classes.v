@@ -12,7 +12,7 @@ Class Eq (A:Type) :=
     eq_dec : forall (x y:A), {x = y} + {x<>y}
   }.
 
-Instance NatEq: Eq nat := { eq_dec := eq_nat_dec }.
-Instance AsciiEq: Eq ascii := { eq_dec:= ascii_dec }.
-Instance StringEq: Eq string := { eq_dec:= string_dec }.
+#[global] Instance NatEq: Eq nat := { eq_dec := eq_nat_dec }.
+#[global] Instance AsciiEq: Eq ascii := { eq_dec:= ascii_dec }.
+#[global] Instance StringEq: Eq string := { eq_dec:= string_dec }.
 

@@ -94,54 +94,54 @@ Definition inverse_subdomain {A B: Type} S (f : A -> B) g :=
 
 (** * Lemmas about [f_eq_subdomain] and [f_eq] *)
 
-Instance equivalence_f_eq_subdomain {A B} S : Equivalence (@f_eq_subdomain A B S). 
+#[global] Instance equivalence_f_eq_subdomain {A B} S : Equivalence (@f_eq_subdomain A B S). 
 Proof. 
   constructor; try now constructor.
   intros f1 f2 Heq x HS; rewrite Heq. reflexivity. eassumption.
   intros f1 f2 f3 Heq1 Heq2 x HS; rewrite Heq1. now eauto. eassumption.
 Qed.
 
-Instance equivalence_f_eq {A B} : Equivalence (@f_eq A B).
+#[global] Instance equivalence_f_eq {A B} : Equivalence (@f_eq A B).
 Proof. 
   constructor; congruence.
 Qed.  
 
-Instance f_eq_subdomain_Proper_Same_set {A B} :
+#[global] Instance f_eq_subdomain_Proper_Same_set {A B} :
   Proper (Same_set A ==> eq ==> eq ==> iff) (@f_eq_subdomain A B).
 Proof.
   intros S1 S2 Hseq f1 f1' Heq1 f2 f2' Heq2; subst; split; intros Hfeq x HS;
   apply Hfeq; eapply Hseq; eassumption.
 Qed.
 
-Instance f_eq_subdomain_Proper_f_eq_l {A B} :
+#[global] Instance f_eq_subdomain_Proper_f_eq_l {A B} :
   Proper (eq ==> f_eq ==> eq ==> iff) (@f_eq_subdomain A B).
 Proof.
   intros S1 S2 Heq f1 f1' Heq1 f2 f2' Heq2; subst; split; intros Hfeq x HS.
   now rewrite <- Heq1; eauto. now rewrite Heq1; eauto.
 Qed.
 
-Instance f_eq_subdomain_Proper_f_eq_r {A B} :
+#[global] Instance f_eq_subdomain_Proper_f_eq_r {A B} :
   Proper (eq ==> eq ==> f_eq ==> iff) (@f_eq_subdomain A B).
 Proof.
   intros S1 S2 Heq f1 f1' Heq1 f2 f2' Heq2; subst; split; intros Hfeq x HS.
   now rewrite <- Heq2; eauto. now rewrite Heq2; eauto.
 Qed.
 
-Instance f_eq_Proper_f_eq_l {A B} :
+#[global] Instance f_eq_Proper_f_eq_l {A B} :
   Proper (f_eq ==> eq ==> iff) (@f_eq A B).
 Proof.
   intros  f1 f1' Heq1 f2 f2' Heq2; subst; split; intros Hfeq x.
   now rewrite <- Heq1; eauto. now rewrite Heq1; eauto.
 Qed.
 
-Instance f_eq_Proper_f_eq_r {A B} :
+#[global] Instance f_eq_Proper_f_eq_r {A B} :
   Proper (eq ==> f_eq ==> iff) (@f_eq A B).
 Proof.
   intros f1 f1' Heq1 f2 f2' Heq2; subst; split; intros Hfeq.
   now rewrite <- Heq2; eauto. now rewrite Heq2; eauto.
 Qed.
 
-Instance map_proper {A B} : Proper (f_eq ==> eq ==> eq) (@map A B).
+#[global] Instance map_proper {A B} : Proper (f_eq ==> eq ==> eq) (@map A B).
 Proof.
   intros f1 f2 Hfeq x1 x2 Heq; subst.
   induction x2; eauto.
@@ -208,13 +208,13 @@ Qed.
 
 (** * Lemmas about [image] *)
 
-Instance image_Proper_Same_set {A B} : Proper (eq ==> Same_set A ==> Same_set B) image.
+#[global] Instance image_Proper_Same_set {A B} : Proper (eq ==> Same_set A ==> Same_set B) image.
 Proof.
   intros x1 x2 Heq1 s1 s2 Hseq; subst; split; intros x [y [Hin Heq]]; subst;
   eexists; split; eauto; apply Hseq; eauto.
 Qed.
 
-Instance image_Proper_f_eq {A B} : Proper (f_eq ==> eq ==> Same_set B) (@image A B).
+#[global] Instance image_Proper_f_eq {A B} : Proper (f_eq ==> eq ==> Same_set B) (@image A B).
 Proof.
   intros x1 x2 Heq1 s1 s2 Hseq2; subst; split; intros x [y [Hin Heq]]; subst;
   eexists; split; eauto; rewrite Heq1; eauto; now (constructor; eauto).
@@ -293,7 +293,7 @@ Qed.
 
 (** * Lemmas about [extend] *)
 
-Instance extend_Proper {A} : Proper (f_eq ==> Logic.eq ==> Logic.eq ==> f_eq) (@extend A).
+#[global] Instance extend_Proper {A} : Proper (f_eq ==> Logic.eq ==> Logic.eq ==> f_eq) (@extend A).
 Proof. 
   intros f1 f2 Hfeq x1 x2 Heq1 x3 x4 Hfeq2; subst.
   intros x. unfold extend. destruct (peq x x2); eauto.
@@ -521,7 +521,7 @@ Proof.
     intros Hc. eapply H0. eapply In_image. eassumption. 
 Qed.
 
-Hint Resolve In_image Included_image_extend : functions_BD.
+#[global] Hint Resolve In_image Included_image_extend : functions_BD.
 
 
 (** * Lemmas about [extend_lst]  *) 
@@ -687,7 +687,7 @@ Proof.
     rewrite map_extend_not_In; eauto.
 Qed.
 
-Instance extend_lst_Proper {A} : Proper (f_eq ==> eq ==> eq ==> f_eq) (@extend_lst A).
+#[global] Instance extend_lst_Proper {A} : Proper (f_eq ==> eq ==> eq ==> f_eq) (@extend_lst A).
 Proof.
   intros f1 f2 f_eq l1 l2 Heq1 l1' l2' Heq2; subst.
   revert l2'. induction l2; simpl; intros l2'; eauto.
@@ -696,21 +696,21 @@ Qed.
 
 (** * Lemmas about [injective_subdomain] and [injective] *)
 
-Instance injective_subdomain_Proper_f_eq {A B} : Proper (eq ==> f_eq ==> iff)
+#[global] Instance injective_subdomain_Proper_f_eq {A B} : Proper (eq ==> f_eq ==> iff)
                                                    (@injective_subdomain A B).
 Proof.
   intros s1 s2 Hseq f1 f2 Hfeq; split; intros Hinj x y Hin1 Hin2 Heq; subst;
   eapply Hinj; eauto. now rewrite !Hfeq. now rewrite <- !Hfeq. 
 Qed.
 
-Instance injective_subdomain_Proper_Same_set {A B} : Proper (Same_set _ ==> eq ==> iff)
+#[global] Instance injective_subdomain_Proper_Same_set {A B} : Proper (Same_set _ ==> eq ==> iff)
                                                    (@injective_subdomain A B).
 Proof.
   intros s1 s2 Hseq f1 f2 Hfeq; split; intros Hinj x y Hin1 Hin2 Heq; subst;
   eapply Hinj; eauto; now apply Hseq.
 Qed.
 
-Instance injective_Proper {A B} : Proper (f_eq ==> iff)
+#[global] Instance injective_Proper {A B} : Proper (f_eq ==> iff)
                                          (@injective A B).
 Proof.
   now apply injective_subdomain_Proper_f_eq. 
@@ -942,7 +942,7 @@ Qed.
 (** * Lemmas about [domain] *)
 
 
-Instance Proper_domain {A B} : Proper (f_eq ==> Same_set A) (@domain A B).
+#[global] Instance Proper_domain {A B} : Proper (f_eq ==> Same_set A) (@domain A B).
 Proof.
   constructor; intros x' [y' H'].
   rewrite H in H'. repeat eexists; eauto.
@@ -990,7 +990,7 @@ Qed.
 
 (** * Lemmas about [image'] *)
 
-Instance Proper_image' {A B} :
+#[global] Instance Proper_image' {A B} :
   Proper (f_eq ==> Same_set _ ==> Same_set B) (@image' A B).
 Proof.
   constructor; intros x' [y' [H1 H2]]; inv H0.
@@ -1152,7 +1152,7 @@ Proof.
     + eexists; split; eauto. rewrite extend_gso; eauto.
 Qed.
 
-Instance Proper_image'_Same_set {A B} :
+#[global] Instance Proper_image'_Same_set {A B} :
   Proper (eq ==> Same_set A ==> Same_set B) image'.
 Proof.
   intros f1 f2 Hfeq s1 s2 Hseq; split; intros x [y [Hin Heq]];
@@ -1179,7 +1179,7 @@ Proof.
   eapply Hinj; eauto.
 Qed.
 
-Instance Proper_injective_subdomain' A B :
+#[global] Instance Proper_injective_subdomain' A B :
   Proper (Same_set A ==> eq ==> iff) (@injective_subdomain' A B).
 Proof.
   intros s1 s2 Hseq f1 f2 Hfeq; subst; split; intros Hinj x y v Hin1 Hin2 Heq1 Heq2;
@@ -1233,12 +1233,12 @@ Proof.
   eexists; split; subst; eauto.
 Qed.  
 
-Instance Proper_compose_l A B C : Proper (f_eq ==> eq ==> f_eq) (@compose A B C).
+#[global] Instance Proper_compose_l A B C : Proper (f_eq ==> eq ==> f_eq) (@compose A B C).
 Proof.
   intros f1 f1' Hfeq f2 f2' Hfeq'; subst; firstorder.
 Qed.
 
-Instance Proper_compose_r A B C : Proper (eq ==> f_eq ==> f_eq) (@compose A B C).
+#[global] Instance Proper_compose_r A B C : Proper (eq ==> f_eq ==> f_eq) (@compose A B C).
 Proof.
   intros f1 f1' Hfeq f2 f2' Hfeq'; subst. intros x; unfold compose; simpl.
   rewrite <- Hfeq'. reflexivity.
@@ -1291,7 +1291,7 @@ Proof.
   eapply image_monotonic; eauto. 
 Qed.       
 
-Instance Proper_inverse_subdomain {A B} : Proper (Same_set A ==> eq ==> eq ==> iff) (@inverse_subdomain A B).
+#[global] Instance Proper_inverse_subdomain {A B} : Proper (Same_set A ==> eq ==> eq ==> iff) (@inverse_subdomain A B).
 Proof. 
   intros s1 s2 Hseq f1 f2 Hfeq g1 g2 Hgeq; subst.
   unfold inverse_subdomain. rewrite Hseq. reflexivity.

@@ -34,7 +34,7 @@ Ltac destructAll :=
 Ltac pi0 :=
   repeat match goal with
          | [ H: _ + _ = 0 |- _ ] =>
-           apply plus_is_O in H; destruct H; subst
+           apply Nat.eq_add_0 in H; destruct H; subst
          | [ H: 0 = _ + _ |- _ ] =>
            symmetry in H; pi0
          (* | [ H: (if cps_util.var_dec ?X ?Y then _ else _) = 0 |- _] => *)

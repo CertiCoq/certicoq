@@ -87,7 +87,7 @@ Inductive Lookup: string -> environ -> envClass trm -> Prop :=
 | LHit: forall s p t, Lookup s (define s t p) t
 | LMiss: forall s1 s2 p t ec,
            s2 <> s1 -> Lookup s2 p ec -> Lookup s2 (define s1 t p) ec.
-Hint Constructors Lookup : core.
+#[global] Hint Constructors Lookup : core.
 Definition LookupDfn s p t := Lookup s p (ecTrm t).
 Definition LookupTyp s p n i := Lookup s p (ecTyp trm n i) /\ i <> nil.
 Definition LookupAx s p := Lookup s p (ecAx trm).

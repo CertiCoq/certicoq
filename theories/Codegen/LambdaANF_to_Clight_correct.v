@@ -1255,7 +1255,7 @@ Definition prefix_ctx {A:Type} rho' rho :=
    destruct z. inv H0. destruct z.
    - inv H0. 
    - rewrite <- Nat.div2_div in H0. simpl in H0. rewrite Nat.div2_div in H0. 
-     apply lt_S_n in H0.
+     apply Nat.succ_lt_mono in H0.
      assert (Hz := NPeano.Nat.lt_decidable 1 z). inv Hz.
      specialize (IHn _ H1 H0). omega.
      destruct z.
@@ -3638,8 +3638,8 @@ Definition traceless_step2:  genv -> state -> state -> Prop := fun ge s s' => st
 
 Definition m_tstep2 (ge:genv):=  clos_trans state (traceless_step2 ge).
 
-Hint Unfold Ptrofs.modulus Ptrofs.max_unsigned uint_range : core.
-Hint Transparent Ptrofs.max_unsigned Ptrofs.modulus uint_range : core.
+#[global] Hint Unfold Ptrofs.modulus Ptrofs.max_unsigned uint_range : core.
+#[global] Hint Transparent Ptrofs.max_unsigned Ptrofs.modulus uint_range : core.
  
 Inductive mem_after_n_proj_store_rev: block -> Z -> (list Values.val) -> mem -> mem -> Prop :=
 | Mem_last_ind: forall m b ofs v m', 

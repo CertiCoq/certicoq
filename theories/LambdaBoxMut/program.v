@@ -50,7 +50,7 @@ Inductive Canonical : Term -> nat -> Terms -> Prop :=
           Canonical (TConstruct i n) n tnil
 | canA: forall (i:inductive) (n:nat) (t:Term) (ts:Terms),
           Canonical (TApp (TConstruct i n) t ts) n (tcons t ts).
-Hint Constructors Canonical : core.
+#[global] Hint Constructors Canonical : core.
 
 
 Lemma Canonical_dec:
@@ -196,7 +196,7 @@ Lemma Crct_Up:
 Proof.
   intros. eapply Crct_UP. eassumption. lia.
 Qed.
-Hint Resolve Crct_Up Crct_UP : core.
+#[global] Hint Resolve Crct_Up Crct_UP : core.
   
 Lemma CrctDs_Up:
   forall n p ds, crctDs p n ds -> forall m, n <= m -> crctDs p m ds.

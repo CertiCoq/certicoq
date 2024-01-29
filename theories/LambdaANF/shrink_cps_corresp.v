@@ -469,7 +469,7 @@ Section CENSUS.
     - rewrite gdso by auto.
       rewrite gdso by auto.
       rewrite gdempty.
-      rewrite <- minus_n_O.
+      rewrite Nat.sub_0_r.
       auto.
   Qed.
 
@@ -481,7 +481,7 @@ Section CENSUS.
                (update_census_list sig l c_minus count).
   Proof.
     revert count sig; induction l; intros count sig.
-    - simpl. intro. rewrite gccombine_sub. rewrite gdempty. rewrite minus_n_O. auto.
+    - simpl. intro. rewrite gccombine_sub. rewrite gdempty. rewrite Nat.sub_0_r. auto.
     - simpl. intro. rewrite gccombine_sub. rewrite <- IHl.
       simpl. rewrite gccombine_sub. rewrite apply_r_empty.
       rewrite init_census_f_ar_l.
@@ -699,7 +699,7 @@ Section CONTRACT.
   Ltac pi0 :=
   repeat match goal with
          | [ H: _ + _ = 0 |- _ ] =>
-           apply plus_is_O in H; destruct H; subst
+           apply Nat.eq_add_0 in H; destruct H; subst
          | [ H: 0 = _ + _ |- _ ] =>
            symmetry in H; pi0
          (* | [ H: (if cps_util.var_dec ?X ?Y then _ else _) = 0 |- _] => *)
@@ -756,9 +756,9 @@ Section CONTRACT.
        inv H2; pi0.
        apply num_occur_app_ctx. eexists 0, 0; eauto.
        split; auto. split; auto.
-       rewrite <- plus_0_l.
+       rewrite <- Nat.add_0_l.
        constructor; auto.
-       rewrite <- plus_0_l.
+       rewrite <- Nat.add_0_l.
        eapply fundefs_append_num_occur; eauto.
     - apply num_occur_app_ctx in H7; destructAll; pi0.
       apply num_occur_app_ctx. eexists 0, 0; eauto.
@@ -772,8 +772,8 @@ Section CONTRACT.
       assert (exists n, num_occur e0 x0 n) by apply e_num_occur.
       destruct H4.
       assert (x1 <= 0).
-      eapply num_occur_case_le; eauto.
-      apply le_n_0_eq in H5. subst; auto.
+      eapply num_occur_case_le; eauto. 
+      apply Nat.le_0_r in H5. subst; auto.
       lia. auto.
     - apply num_occur_app_ctx in H7; destructAll; pi0.
       inv H3; pi0.
@@ -794,7 +794,7 @@ Section CONTRACT.
       auto.
       rewrite M.gso in H6; auto. rewrite M.gempty in H6.
       inv H6.
-      apply le_n_0_eq in H5; subst; auto.
+      apply Nat.le_0_r in H5; subst; auto.
 
       reflexivity. auto.
     - inv H2; pi0.
@@ -814,7 +814,7 @@ Section CONTRACT.
       eapply num_occur_rename_all_ns_not_range. eassumption. eassumption. 
       intro Hr. apply Range_map_set_list in Hr.
       apply not_occur_list in Hr; eauto. 
-      apply le_n_0_eq in H4. subst; auto.
+      apply Nat.le_0_r in H4. subst; auto.
       reflexivity.
       eapply fundefs_append_num_occur; eauto.
       auto.
@@ -938,7 +938,7 @@ Section CONTRACT.
     assert (x <= 0).
     eapply num_occur_rename_all_not_dom_mut.
     apply H1. apply H0. auto.
-    apply le_n_0_eq in H2. subst; auto.
+    apply Nat.le_0_r in H2. subst; auto.
   Qed.
 
 
@@ -1508,7 +1508,7 @@ Section CONTRACT.
       destruct Hcpc.
       rewrite <- H1. rewrite gccombine'.
       rewrite <- (proj1 rename_all_ns_empty).
-      unfold init_census_f. apply plus_comm.
+      unfold init_census_f. apply Nat.add_comm.
     - eapply num_occur_constr.
       constructor.
       unfold init_census. simpl.
@@ -1536,7 +1536,7 @@ Section CONTRACT.
       rewrite apply_r_list_empty.
       rewrite gdempty.
       simpl.
-      apply plus_comm.
+      apply Nat.add_comm.
     - unfold init_census.
       eapply num_occur_constr.
       constructor.
@@ -1714,7 +1714,7 @@ Section CONTRACT.
     - intro.
       rewrite gccombine_sub.
       rewrite gdempty.
-      rewrite minus_n_O. reflexivity.
+      rewrite Nat.sub_0_r. reflexivity.
   Qed.
 
 
@@ -3340,7 +3340,7 @@ Section CONTRACT.
     gsr_clos (n + m) e1 e3.
   Proof.
     intros H1 H2. induction H1.
-    + rewrite <- plus_assoc. econstructor; eauto.
+    + rewrite <- Nat.add_assoc. econstructor; eauto.
     + eassumption.
   Qed.
       
@@ -3757,7 +3757,7 @@ Section CONTRACT.
     destruct H1.
     assert (x0 <= 0).
     eapply (proj1 (num_occur_rename_all_ns_set f x y H)); eauto.
-    apply le_n_0_eq in H2.
+    apply Nat.le_0_r in H2.
     subst; auto.
   Qed.
 
@@ -4099,7 +4099,7 @@ Section CONTRACT.
     destruct H1.
     assert (x0 <= 0).
     eapply num_occur_rename_all_ns_set_list; eauto.
-    apply le_n_0_eq in H2. subst; auto.
+    apply Nat.le_0_r in H2. subst; auto.
   Qed.
 
   Theorem length_apply_r_list:
@@ -4141,7 +4141,7 @@ Section CONTRACT.
       destruct (get_b v im').
       specialize (IHf4 _ _ H10 H1). lia.
       inv H1.
-      apply plus_le_compat; eauto.
+      apply Nat.add_le_mono; eauto.
       apply Nat.eq_le_incl.
       eapply (proj1 (num_occur_det _)); eauto.
     - inv H0; inv H1; auto.
@@ -4174,15 +4174,15 @@ Section CONTRACT.
   Proof.
     intros im im' Him f.
     exp_fundefs_ctx_induction IHc IHf; intros nn mm Hn Hm; simpl in *;
-    try (inversion Hn; inversion Hm; subst); auto; try (apply plus_le_compat; eauto).
+    try (inversion Hn; inversion Hm; subst); auto; try (apply Nat.add_le_mono; eauto).
     - intro. simpl in *. inv H. simpl.
-      repeat apply plus_le_compat; eauto.
+      repeat apply Nat.add_le_mono; eauto.
       apply Nat.eq_le_incl.
       eapply num_occur_case_det; eauto.
       apply Nat.eq_le_incl.
       eapply num_occur_case_det; eauto.
     - intro. inversion H0; subst.
-      repeat apply plus_le_compat; eauto.
+      repeat apply Nat.add_le_mono; eauto.
       apply Nat.eq_le_incl.
       eapply num_occur_case_det; eauto.
       apply Nat.eq_le_incl.
@@ -4209,7 +4209,7 @@ Section CONTRACT.
     destruct H1.
     assert (x <= 0).
     eapply (proj1 (num_occur_ec_le_antimon _ _ H _)); eauto.
-    apply le_n_0_eq in H2.
+    apply Nat.le_0_r in H2.
     subst; auto.
   Qed.
 
@@ -4888,7 +4888,7 @@ Section CONTRACT.
     assert (exists n, num_occur_fds (inlined_fundefs_f f4 im') f n) by apply e_num_occur_fds.
     destruct H1. assert (x <= 0).
     eapply num_occur_fds_le_antimon; eauto.
-    apply le_n_0_eq in H2. subst; auto.
+    apply Nat.le_0_r in H2. subst; auto.
   Qed.
 
   Inductive sum_range_n: list var -> list var -> exp -> var -> nat -> Prop :=
@@ -5454,7 +5454,7 @@ Section CONTRACT.
       assert (x5 = 0). eapply (proj2 (num_occur_det _)); eauto. subst.
       simpl in H17. rewrite H2 in H17. inv H17.
       assert (m0 = 0). eapply (proj2 (num_occur_det _)); eauto. subst.
-      simpl. do 2 (rewrite plus_0_r).
+      simpl. do 2 (rewrite Nat.add_0_r).
       eapply (proj1 (num_occur_det _)); eauto.
     }
     assert (Hl0 := Decidable_FromList l0). destruct Hl0.
@@ -7253,13 +7253,13 @@ Section CONTRACT.
            | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
            end); try congruence.
     - inv Hnum. pi0. eapply IHe in H4; eauto.
-      rewrite plus_comm. constructor. eassumption.
+      rewrite Nat.add_comm. constructor. eassumption.
     - inv Hnum. pi0. eapply IHe in H5; eauto. constructor. eassumption.
     - inv Hnum. pi0. eapply IHe in H5; eauto. constructor. eassumption.
     - inv Hnum. pi0. eapply IHe in Hin'; eauto. constructor; eauto.
     - inv Hin. inv Hnum. rewrite plus_n_O. econstructor. constructor.
     - inv Hnum. constructor. eauto.
-    - inv Hnum. pi0. eapply IHe in H4; eauto. rewrite plus_comm. constructor. eassumption.
+    - inv Hnum. pi0. eapply IHe in H4; eauto. rewrite Nat.add_comm. constructor. eassumption.
     - inv Hin. inv Hnum. dec_vars. constructor. 
   Qed.
 
@@ -7387,7 +7387,7 @@ Section CONTRACT.
         simpl in Heqs. eapply IHn in Heqs; eauto.
         * destructAll. unfold ce'.
           split.
-          -- rewrite plus_comm. eapply gsr_clos_trans. eassumption. eassumption.
+          -- rewrite Nat.add_comm. eapply gsr_clos_trans. eassumption. eassumption.
           -- now split; auto.
         * unfold term_sub_inl_size in *. simpl in *. lia.
         * intro. specialize (H2 v0). unfold ce in H2.
@@ -7561,7 +7561,7 @@ Section CONTRACT.
              eapply in_map with (f := (fun p : var * exp => let (k, e0) := p in (k, rename_all_ns sig e0))) in ftlc0. auto. } 
            unfold incr_steps in H6. remember (contract sig (dec_census_case sig l c0 (dec_census_list sig [v] count)) e sub inl) as s.
            symmetry in Heqs. destruct s as [[[[? ?] ?] ?] ?]. inv H6. eapply IHn in Heqs; eauto.
-           -- destructAll. split; eauto. rewrite plus_comm. eapply gsr_clos_trans. eassumption. eassumption.
+           -- destructAll. split; eauto. rewrite Nat.add_comm. eapply gsr_clos_trans. eassumption. eassumption.
            -- unfold term_sub_inl_size in *. simpl in *.
               assert ( term_size e < term_size (Ecase v l)).
               { eapply case_size. apply findtag_In. eauto. } 
@@ -7583,7 +7583,7 @@ Section CONTRACT.
              destruct H11. assert (x0 <= 0). eapply num_occur_case_le. 2: apply H14.
              apply findtag_In in ftlc0.
              eapply in_map with (f := (fun p : var * exp => let (k, e0) := p in (k, rename_all_ns sig e0))) in ftlc0.
-             now eauto. now eauto. apply le_n_0_eq in H12; subst; auto. dec_vars. eassumption.
+             now eauto. now eauto. apply Nat.le_0_r in H12; subst; auto. dec_vars. eassumption.
         * (* case not found, same as fun. contractcases_corresp with cl1 = nil and x = apply_r sig x*)
            remember (contractcases
                        (@pair (prod exp ctx_map) b_map
@@ -7655,7 +7655,7 @@ Section CONTRACT.
         assert (Hse := gsr_preserves_sig_dom _ _ _ _ H0 (closed_implies_Disjoint _ H1) H7 H5).
         unfold incr_steps in H6. remember (contract sig (dec_census_list sig [v0] count) e sub inl) as s. destruct s as [[[[? ?] ?] ?] ?].
         inv H6. symmetry in Heqs. apply IHn with (c := c) in Heqs; auto.
-        * destructAll. split; eauto. rewrite plus_comm. eapply gsr_clos_trans. eassumption. eassumption.
+        * destructAll. split; eauto. rewrite Nat.add_comm. eapply gsr_clos_trans. eassumption. eassumption.
         * unfold term_sub_inl_size in *. simpl. simpl in H. lia.
         * intro. specialize (H2 v1). apply num_occur_app_ctx in H2.
           destructAll. simpl in H6. inv H6. eapply num_occur_n.
@@ -7903,7 +7903,7 @@ Section CONTRACT.
                 rewrite H6 in *. destruct Heqs as (H6', H11).
                 destruct H11 as (H11, H12). destruct H12 as (H12, Hsigc). destructAll.
                 split; auto.
-                -- rewrite plus_comm. eapply gsr_clos_trans. eassumption. eassumption.
+                -- rewrite Nat.add_comm. eapply gsr_clos_trans. eassumption. eassumption.
                 -- split. now auto. split. now auto.
                    (* returned sig_inv_codom *)
                    intro. intros.
@@ -8169,7 +8169,7 @@ Section CONTRACT.
 
             apply andb_true_iff in Hel. destruct Hel as (Hel123, Hel4).
             apply andb_true_iff in Hel123. destruct Hel123 as (Hel12, Hel3).
-            eapply Peqb_true_eq in Hel12. apply beq_nat_true in Hel3. subst.
+            eapply Peqb_true_eq in Hel12. apply Nat.eqb_eq in Hel3. subst.
  
             assert (Hinbv : occurs_free (rename_all_ns sig (Eletapp v v0 f l e)) \subset
                             bound_stem_ctx (rename_all_ctx_ns sig (inlined_ctx_f c inl))).
@@ -8483,7 +8483,7 @@ Section CONTRACT.
                     (e := inlined_ctx_f (comp_ctx_f x (Efun1_c (fundefs_append x1 (Fcons (apply_r sig v0) f l0 e0 x2)) x0)) im') (sub' := sig) in H6;
                   [| eassumption ].
                 split; [| split; [| split ]].
-                + rewrite plus_comm. eapply gsr_clos_trans; [| eassumption ]. eassumption.
+                + rewrite Nat.add_comm. eapply gsr_clos_trans; [| eassumption ]. eassumption.
                 + unfold ce'.
                   erewrite (proj1 eq_P_rename_all_ctx_ns) in H9; [| eassumption ].
                   eassumption.
@@ -8499,11 +8499,12 @@ Section CONTRACT.
                   rewrite fundefs_append_bound_vars; [| reflexivity ]. normalize_bound_var. sets. }
               + (* size for IH *) 
                 unfold term_sub_inl_size in *; simpl in H. simpl.
-                eapply gt_S_n in H.
-                eapply le_S_gt. eapply lt_le_S.
-                eapply le_lt_trans. eapply plus_le_compat_r. eapply term_size_inline_letapp. eassumption.
-                rewrite (proj1 (term_size_rename_all_ns _)). rewrite (plus_comm (term_size e0)). rewrite <- plus_assoc.
-                rewrite (plus_comm (term_size e0)). erewrite <- sub_inl_fun_size; eauto.
+                eapply Nat.succ_lt_mono in H.
+                apply -> Nat.le_succ_l. apply -> Nat.le_succ_l.
+                eapply Nat.le_lt_trans.
+                apply -> Nat.add_le_mono_r. eapply term_size_inline_letapp. eassumption.
+                rewrite (proj1 (term_size_rename_all_ns _)). rewrite (Nat.add_comm (term_size e0)). rewrite <- Nat.add_assoc.
+                rewrite (Nat.add_comm (term_size e0)). erewrite <- sub_inl_fun_size; eauto.
               + (* unique bindings *)
                 rewrite Heq1, Heq2. eassumption.
               + (* closed *)
@@ -8974,7 +8975,8 @@ Section CONTRACT.
               apply sub_size_le. apply b_map_le_c. auto. symmetry in Heqp'. apply precontractfun_size in Heqp'.
               lia. auto. }
             assert ( S n >  funs_size f0 + sub_inl_size sub b0) by lia.
-            eapply gt_trans_S. apply H30. auto. }
+            eapply Nat.lt_le_trans; revgoals.
+            apply Nat.succ_le_mono. apply H30. auto. }
         * destruct Heqs as (Heqs1, (Heqs2, (Heqs3, (Heqs4, (Heqs5, Heqs6))))).
           rewrite H20 in *. simpl in *.
           assert (Heqs_ub := gsr_clos_preserves_clos _ _ _ H18 H19 Heqs1).
@@ -9011,13 +9013,13 @@ Section CONTRACT.
                 simpl. apply name_in_fundefs_rename_all_ns in H24. auto.            
           -- (* additional RW with Fun_dead_s on Fnil *)
              inv H6. split; [| split; [| split ] ]; eauto.
-             ++ rewrite <- minus_n_O in Heqs1. replace (n0 + n1 + 1) with (0 + ((n0 + n1) + 1)) by lia. eapply gsr_clos_trans. eassumption.
+             ++ rewrite Nat.sub_0_r in Heqs1. replace (n0 + n1 + 1) with (0 + ((n0 + n1) + 1)) by lia. eapply gsr_clos_trans. eassumption.
                 eapply gsr_clos_trans. eapply gsr_clos_trans. eassumption. eassumption.
                 replace 1 with (1 + 0) by lia. eapply Trans_srw;[| now eapply Refl_srw  ]. constructor. constructor. 
                 now apply Forall_nil.
              ++ intro. specialize (Heqs2 v). apply num_occur_app_ctx in Heqs2. destructAll.
                 apply num_occur_app_ctx. exists x, x0. inv H20. inv H28. split; auto.
-                split; auto. rewrite plus_0_r. auto.
+                split; auto. rewrite Nat.add_0_r. auto.
              ++ eapply inl_inv_mon. 2: apply Heqs3.
                 unfold ce'. do 2 (rewrite bound_var_app_ctx).
                 repeat normalize_bound_var. now sets.
@@ -9082,7 +9084,7 @@ Section CONTRACT.
           { (* function inlining *)
             apply andb_true_iff in Hel. destruct Hel as (Hel1, Hel23).
             apply andb_true_iff in Hel23. destruct Hel23 as (Hel2, Hel3).
-            apply Peqb_true_eq in Hel1. apply beq_nat_true in Hel2. subst.
+            apply Peqb_true_eq in Hel1. apply Nat.eqb_eq in Hel2. subst.
             assert (garvs' := garvs). apply H3 in garvs. destructAll. simpl in ce.
             (* sig v wasn't inlined before not dead *)
             assert (Hsvi : get_b (apply_r sig v) inl = false).
@@ -9464,7 +9466,7 @@ Section CONTRACT.
                 apply eq_P_set_list_not_in. auto. }
 
               split; [| split; [| split ]].
-              + rewrite plus_comm. eapply gsr_clos_trans. eassumption.
+              + rewrite Nat.add_comm. eapply gsr_clos_trans. eassumption.
                 unfold ce'. rewrite <- H_rn_ctx'. now apply H6.
               + unfold ce'. rewrite <- H_rn_ctx'. auto.
               + unfold ce'. rewrite <- H_rn_ctx'. auto.
@@ -9768,7 +9770,7 @@ Section CONTRACT.
       (*   remember (contract sig (dec_census_list sig l count) e sub inl) as s.  destruct s as [[[[? ?] ?] ?] ?]. inv H6. *)
       (*   symmetry in Heqs. simpl in ce. eapply IHn with (c := c) in Heqs. destructAll. *)
       (*   split; auto. *)
-      (*   rewrite plus_comm. eapply gsr_clos_trans. eassumption. eassumption. *)
+      (*   rewrite Nat.add_comm. eapply gsr_clos_trans. eassumption. eassumption. *)
       (*   unfold term_sub_inl_size in *.  simpl in *. lia. *)
       (*   eassumption. eassumption. *)
       (*   { (* count on dead prim pre *) *)

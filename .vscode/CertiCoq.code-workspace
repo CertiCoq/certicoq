@@ -5,6 +5,7 @@
 		}
 	],
 	"settings": {
-		"coqtop.binPath": "_opam/bin"
+		"coqtop.binPath": "_opam/bin",
+		"coqtop.args": []
 	}
 }

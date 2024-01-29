@@ -271,7 +271,7 @@ Proof.
          | [ _ : context [inline_letapp ?E ?X ] |- _] => destruct (inline_letapp E X) as [[C' x''] | ] eqn:Hin'; inv Hin
          end); try congruence.
   - inv Hnum. pi0. eapply IHe in H4; eauto. destructAll. split; eauto.
-    rewrite plus_comm. constructor. eassumption.
+    rewrite Nat.add_comm. constructor. eassumption.
   - inv Hnum. pi0. eapply IHe in H5; [| eassumption |]; eauto. destructAll. split; eauto.
     constructor. eassumption.
   - inv Hnum. pi0. eapply IHe in H5; [| eassumption |]; eauto. destructAll. split; eauto.
@@ -284,7 +284,7 @@ Proof.
   - inv Hnum. eapply IHe in H4. 2:eauto. destructAll.
     split; eauto. now constructor. auto.
   - inv Hnum. pi0. eapply IHe in H4; eauto. destructAll. split; eauto.
-    rewrite plus_comm. constructor. eassumption.
+    rewrite Nat.add_comm. constructor. eassumption.
   - inv Hin. inv Hnum. 
     Transparent num_occur_list.
     simpl in *.

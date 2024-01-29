@@ -1037,7 +1037,7 @@ Proof.
   intros.
   rewrite <- !(proj1 (trans_env_eval _ _ _ H)).
   rewrite trans_instantiate_any; auto.
-  equaln. rewrite <- minus_n_n.
+  equaln. rewrite Nat.sub_diag.
   now rewrite (proj1 shift0). 
 Qed.
 
@@ -1231,7 +1231,7 @@ with WNeutral : Term -> Prop :=
 | WNApp f a : WNeutral f -> WNorm a -> WNeutral (TApp f a)
 | WNCase mch n brs : WNeutral mch -> WNorms (terms_of_brs brs) -> WNeutral (TCase n mch brs).
 
-Hint Constructors WNorm WNeutral WNorms : core.
+#[global] Hint Constructors WNorm WNeutral WNorms : core.
 Scheme WNorm_ind' := Induction for WNorm Sort Prop
   with WNeutral_ind' := Induction for WNeutral Sort Prop
   with WNorms_ind' := Induction for WNorms Sort Prop.
@@ -1317,7 +1317,7 @@ Proof.
   revert bod; unfold sbst_fix, sbst_fix_aux.
   generalize (@eq_refl _ (efnlength es)).
   generalize (efnlength es) at 1 3.
-  generalize (le_refl (efnlength es)).
+  generalize (Nat.le_refl (efnlength es)).
   generalize es at 1 4 5 7.
   generalize (list_to_zero_spec (efnlength es)).
   induction (list_to_zero (efnlength es)); simpl; intros.
@@ -1406,7 +1406,7 @@ Lemma LambdaBoxMutsbst_fix_aux_sbst_fix_aux env prims e dts body :
 Proof.
   revert body.
   unfold LambdaBoxMutsbst_fix_aux, sbst_fix_aux.
-  generalize (le_refl (dlength dts)).
+  generalize (Nat.le_refl (dlength dts)).
   Opaque shift.
   simpl.
   generalize dts at 2 4 5 6 8 9 10.
@@ -1478,7 +1478,7 @@ Lemma find_branch_trans e prims (t : list name * Term) (i : inductive) (n : nat)
 Proof.
   assert(0 = N.of_nat (blength brs - blength brs)) by lia.
   revert H.
-  generalize (le_refl (blength brs)).
+  generalize (Nat.le_refl (blength brs)).
   assert(0 <= N.of_nat n) by lia.
   revert H.
   replace n with (n - N.to_nat 0)%nat at 2 4 by lia.

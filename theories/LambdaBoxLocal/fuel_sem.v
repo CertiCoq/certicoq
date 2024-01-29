@@ -52,7 +52,7 @@ Fixpoint max_binders_branches (br : branches_e) : nat :=
 Section LambdaBoxLocal_fuel.
         
   Class LambdaBoxLocal_resource {A} :=
-  { HRes :> @resource exp A; }. 
+  { HRes :: @resource exp A; }. 
 
 End LambdaBoxLocal_fuel.
 

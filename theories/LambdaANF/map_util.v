@@ -80,7 +80,7 @@ Proof.
 Qed.
 
 
-Instance ToMSet_key_set {A} (rho : M.t A) : ToMSet (key_set rho).
+#[global] Instance ToMSet_key_set {A} (rho : M.t A) : ToMSet (key_set rho).
 Proof. 
   eexists (@mset (FromList (map fst (M.elements rho))) _).
   rewrite <- mset_eq, FromList_map_image_FromList.
@@ -689,7 +689,7 @@ Proof.
   auto.
 Qed.
 
-Hint Resolve not_Range_map_eq not_Dom_map_eq : core.
+#[global] Hint Resolve not_Range_map_eq not_Dom_map_eq : core.
 
 Lemma Range_map_set_list {A} xs (vs : list A) :
     Range_map (set_list (combine xs vs) (M.empty _)) \subset FromList vs.
@@ -713,7 +713,7 @@ Proof.
     exists x0. auto.
 Qed.
 
-Instance Decidable_Dom_map {A} (m : M.t A) : Decidable (Dom_map m).
+#[global] Instance Decidable_Dom_map {A} (m : M.t A) : Decidable (Dom_map m).
 Proof.
   constructor. intros x.
   destruct (M.get x m) eqn:Heq; eauto.

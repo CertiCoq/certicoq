@@ -37,13 +37,16 @@ Definition certicoqc2 := 5.
 Definition certicoqc3 := coq_msg_notice ("Hello world! " ++ show 100%nat).
  (* show (0%float == (-0)%float)). *)
 
-Definition certicoqc4 := show (List.map S [26; 20]).
+Definition certicoqc4 :=  (List.map S [26; 20]).
 
 Time Eval compute in certicoqc4.
 Set Warnings "-primitive-turned-into-axiom".
 Set Warnings "backtrace".
-(* CertiCoq Eval -time certicoqc4. *)
+CertiCoq Eval -time certicoqc4. 
 
 Goal True.
   intros.
   certicoq_eval -build_dir "_build" certicoqc4 ltac:(fun c => assert (certicoqc4 = c) by reflexivity).
+  exact I.
+Qed.
+

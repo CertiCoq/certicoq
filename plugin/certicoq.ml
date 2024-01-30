@@ -593,8 +593,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     Printf.sprintf "#include <gc_stack.h>\nextern value %s ();\n" name
 
   let write_c_driver opts name = 
-    let fname = make_fname opts (name ^ ".c") in
-    let fhname = make_fname opts (name ^ ".h") in
+    let fname = make_fname opts (opts.filename ^ ".c") in
+    let fhname = make_fname opts (opts.filename ^ ".h") in
     let fd = Unix.(openfile fname [O_CREAT; O_APPEND; O_WRONLY] 0o640) in
     let chan = Unix.out_channel_of_descr fd in
     output_string chan (template name);
@@ -609,7 +609,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     Printf.sprintf "external %s : unit -> Obj.t = \"%s\"\nlet _ = Certicoq_plugin.Certicoq.register_certicoq_run \"%s\" (Obj.magic %s)" name name name name
   
   let write_ocaml_driver opts name = 
-    let fname = make_fname opts (name ^ "_wrapper.ml") in
+    let fname = make_fname opts (opts.filename ^ "_wrapper.ml") in
     let chan = open_out fname in
     output_string chan (template_ocaml name);
     flush chan; close_out chan; fname
@@ -662,7 +662,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let linkcmd =
         Printf.sprintf "%s ocamlopt -shared -linkpkg -dontlink %s -thread -rectypes -package %s \
         -I %s -I plugin -o %s %s %s %s %s"
-        ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o (name ^ ".o") importso
+        ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o 
+        (make_fname opts opts.filename ^ ".o") importso
       in
       debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
       (match Unix.system linkcmd with
@@ -693,11 +694,13 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let opts = { opts with toplevel_name = fresh_name ^ "_body"; filename = fresh_name } in
     certicoq_eval_named opts env sigma fresh_name c imports
   
-  let compile_shared_C opts gr =
+  let compile_shared_C opts gr imports =
     let env = Global.env () in
     let sigma = Evd.from_env env in
     let sigma, c = Evd.fresh_global env sigma gr in
-    certicoq_eval opts env sigma c
+    let fresh_name = find_fresh (Names.Id.to_string (Nametab.basename_of_global gr)) !all_run_functions in
+    let opts = { opts with toplevel_name = fresh_name ^ "_body"; } in
+    certicoq_eval_named opts env sigma fresh_name c imports
     
   let print_to_file (s : string) (file : string) =
     let f = open_out file in

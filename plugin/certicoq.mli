@@ -13,6 +13,7 @@ type command_args =
  | EXT of string (* Filename extension to be appended to the file name *)
  | DEV of int
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
+| TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
  | FILENAME of string (* Name of the generated file *)
 
 type options =
@@ -29,6 +30,7 @@ type options =
     ext       : string;
     dev       : int;
     prefix    : string;
+    toplevel_name : string;
     prims     : ((Kernames.kername * Kernames.ident) * bool) list;
   }
 
@@ -71,9 +73,10 @@ val compile_shared_C : options -> Names.GlobRef.t -> import list -> Constr.t
 val show_ir : options -> Names.GlobRef.t -> unit
 val ffi_command : options -> Names.GlobRef.t -> unit
 val glue_command : options -> Names.GlobRef.t list -> unit
+val certicoq_eval : options -> Environ.env -> Evd.evar_map -> EConstr.t -> import list -> Constr.t
 
 (* Support for running dynamically linked certicoq-compiled programs *)
-type certicoq_run_function = Ast0.Env.global_env -> typ:Ast0.term -> Obj.t
+type certicoq_run_function = unit -> Obj.t
 
 val register_certicoq_run : string -> certicoq_run_function -> unit
 val run_certicoq_run : string -> certicoq_run_function

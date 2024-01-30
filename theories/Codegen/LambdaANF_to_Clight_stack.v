@@ -43,6 +43,7 @@ Variable (limitIdent : ident).
 Variable (gcIdent : ident).
 Variable (mainIdent : ident).
 Variable (bodyIdent : ident).
+Variable (bodyName : string).
 Variable (threadInfIdent : ident).
 Variable (tinfIdent : ident).
 Variable (heapInfIdent : ident).
@@ -1066,7 +1067,7 @@ Fixpoint make_extern_decls
 
 Definition body_external_decl : positive * globdef Clight.fundef type :=
   let params := type_of_params ((tinfIdent, threadInf) :: nil) in
-  (bodyIdent, Gfun (External (EF_external (String.to_string ("body"%bs))
+  (bodyIdent, Gfun (External (EF_external (String.to_string bodyName)
                                 (signature_of_type  params val cc_default))
                              params val cc_default)).
 
@@ -1266,7 +1267,7 @@ Definition inf_vars :=
   (limitIdent, (nNamed "limit"%bs)) ::
   (gcIdent, (nNamed "garbage_collect"%bs)) ::
   (mainIdent, (nNamed "main"%bs)) ::
-  (bodyIdent, (nNamed "body"%bs)) ::
+  (bodyIdent, (nNamed bodyName)) ::
   (threadInfIdent, (nNamed "thread_info"%bs)) ::
   (tinfIdent, (nNamed "tinfo"%bs)) ::
   (heapInfIdent, (nNamed "heap"%bs)) ::

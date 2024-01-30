@@ -9,308 +9,36 @@ open ExceptionMonad
 open AstCommon
 open Plugin_utils
 
+(* Taken from Coq's increment_subscript, but works on strings rather than idents *)
+let increment_subscript id =
+  let len = String.length id in
+  let rec add carrypos =
+    let c = id.[carrypos] in
+    if Util.is_digit c then
+      if Int.equal (Char.code c) (Char.code '9') then begin
+        assert (carrypos>0);
+        add (carrypos-1)
+      end
+      else begin
+        let newid = Bytes.of_string id in
+        Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
+        Bytes.set newid carrypos (Char.chr (Char.code c + 1));
+        newid
+      end
+    else begin
+      let newid = Bytes.of_string (id^"0") in
+      if carrypos < len-1 then begin
+        Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
+        Bytes.set newid (carrypos+1) '1'
+      end;
+      newid
+    end
+  in String.of_bytes (add (len-1))
+
+let debug_reify = CDebug.create ~name:"certicoq-reify" ()
+
 external get_unboxed_ordinal : Obj.t -> int = "get_unboxed_ordinal"
 external get_boxed_ordinal : Obj.t -> int = "get_boxed_ordinal"
-
-module Value = struct
-  open Printf
-
-type t = Obj.t
-
-let compare = compare
-let equal = (==)
-let hash = Hashtbl.hash
-
-type tag =
-  | Lazy
-  | Closure
-  | Object
-  | Infix
-  | Forward
-  | Block
-  | Abstract
-  | String
-  | Double
-  | Double_array
-  | Custom
-  | Int
-  | Out_of_heap
-  | Unaligned
-
-type custom =
-  | Custom_nativeint of nativeint
-  | Custom_int32 of int32
-  | Custom_int64 of int64
-  | Custom_bigarray
-  | Custom_channel
-  | Custom_unknown
-  | Not_custom
-
-(* external bits : t -> nativeint = "inspect_bits" *)
-
-let hex_digits = "0123456789ABCDEF"
-
-let dec_of_bits v =
-  sprintf "%nd" v
-
-let hex_of_bits v =
-  let (lsr) = Nativeint.shift_right in
-  let (land) = Nativeint.logand in
-  let ndig = Nativeint.size / 4 in
-  let b = Buffer.create (2 + ndig + 1) in
-  Buffer.add_string b "0x";
-  for i = ndig - 1 downto 0 do
-    let d = (v lsr (i * 4)) land 0xFn in
-    Buffer.add_char b hex_digits.[Nativeint.to_int d]
-  done;
-  Buffer.contents b
-
-let bin_of_bits v =
-  let (lsr) = Nativeint.shift_right in
-  let (land) = Nativeint.logand in
-  let ndig = Nativeint.size in
-  let b = Buffer.create (2 + ndig + 1) in
-  (* three seems reasonable, prefix and maybe null? *)
-  Buffer.add_string b "0b";
-  for i = Sys.word_size - 1 downto 0 do
-    let d = (v lsr i) land 1n in
-    Buffer.add_string b (if d = 1n then "1" else "0")
-  done;
-  Buffer.contents b
-
-(* let bits_to_string ?(base=`Hex) v =
-  let bs = bits v in
-  match base with
-  | `Dec -> dec_of_bits bs
-  | `Hex -> hex_of_bits bs
-  | `Bin -> bin_of_bits bs *)
-
-(* external custom_identifier : t -> string = "inspect_custom_id"
-
-external custom_has_finalize : t -> bool = "inspect_custom_has_finalize"
-external custom_has_compare : t -> bool = "inspect_custom_has_compare"
-external custom_has_hash : t -> bool = "inspect_custom_has_hash"
-external custom_has_serialize : t -> bool = "inspect_custom_has_serialize"
-external custom_has_deserialize : t -> bool = "inspect_custom_has_deserialize" *)
-
-(* let custom_ops_info r =
-  sprintf "%c%c%c%c%c"
-    (if custom_has_finalize r    then 'F' else '-')
-    (if custom_has_compare r     then 'C' else '-')
-    (if custom_has_hash r        then 'H' else '-')
-    (if custom_has_serialize r   then 'S' else '-')
-    (if custom_has_deserialize r then 'D' else '-') *)
-
-let nativeint_id = "_n"
-let int32_id = "_i"
-let int64_id = "_j"
-let bigarray_id = "_bigarray"
-let channel_id = "_chan"
-
-module TagSet =
-struct
-  include Set.Make(struct type t = tag let compare = compare end)
-
-  let of_list tlist =
-    List.fold_left (fun s t -> add t s) empty tlist
-
-  let all =
-    of_list [
-      Lazy;
-      Closure;
-      Object;
-      Infix;
-      Forward;
-      Block;
-      Abstract;
-      String;
-      Double;
-      Double_array;
-      Custom;
-      Int;
-      Out_of_heap;
-      Unaligned;
-    ]
-end
-
-(* Make sure the known custom identifiers are in sync. *)
-let _ =
-  let rnat = Obj.repr 0n and ri32 = Obj.repr 0l and ri64 = Obj.repr 0L in
-    assert (Obj.tag rnat = Obj.custom_tag);
-    assert (Obj.tag ri32 = Obj.custom_tag);
-    assert (Obj.tag ri64 = Obj.custom_tag);
-    (* assert (nativeint_id = custom_identifier rnat);
-    assert (int32_id = custom_identifier ri32);
-    assert (int64_id = custom_identifier ri64);
-    (* assert (bigarray_id = custom_identifier ...); *)
-    assert (channel_id = custom_identifier (Obj.repr stdout)); *)
-    ()
-
-let custom_value r =
-  if Obj.tag r = Obj.custom_tag then (
-    
-	Custom_unknown
-  )
-  else
-    Not_custom
-
-let custom_is_int r =
-  match custom_value r with
-    | Custom_nativeint _ -> false
-    | Custom_int32 _ -> true
-    | Custom_int64 _ ->	true
-    | _ -> false
-
-(* Matching an integer value should be faster than a series of if
-   statements.
-   That's why all these assertions are here, to make sure
-   that the integer literals used in the match statement actually
-   correspond to the tags defined by the Obj module. *)
-let _ =
-  assert (Obj.lazy_tag = 246);
-  assert (Obj.closure_tag = 247);
-  assert (Obj.object_tag = 248);
-  assert (Obj.infix_tag = 249);
-  assert (Obj.forward_tag = 250);
-  assert (Obj.no_scan_tag = 251);
-  assert (Obj.abstract_tag = 251);
-  assert (Obj.string_tag = 252);
-  assert (Obj.double_tag = 253);
-  assert (Obj.double_array_tag = 254);
-  assert (Obj.custom_tag = 255);
-  assert (Obj.int_tag = 1000);
-  assert (Obj.out_of_heap_tag = 1001);
-  assert (Obj.unaligned_tag = 1002);
-  ()
-
-(* Slower and safer.
-let value_tag r =
-  match tag r with
-    | x when x = lazy_tag -> Lazy
-    | x when x = closure_tag -> Closure
-    | x when x = object_tag -> Object
-    | x when x = infix_tag -> Infix
-    | x when x = forward_tag -> Forward
-    | x when x < no_scan_tag -> Block
-    | x when x = abstract_tag -> Abstract
-    | x when x = string_tag -> String
-    | x when x = double_tag -> Double
-    | x when x = double_array_tag -> Double_array
-    | x when x = custom_tag -> Custom
-    | x when x = int_tag -> Int
-    | x when x = out_of_heap_tag -> Out_of_heap
-    | x when x = unaligned_tag -> Unaligned
-    | x -> failwith (sprintf "OCaml value with unknown tag = %d" x)
-*)
-
-(* Faster but more dangerous *)
-let tag r =
-  match Obj.tag r with
-    | x when x < 246 -> Block
-    | 246 -> Lazy
-    | 247 -> Closure
-    | 248 -> Object
-    | 249 -> Infix
-    | 250 -> Forward
-    | 251 -> Abstract
-    | 252 -> String
-    | 253 -> Double
-    | 254 -> Double_array
-    | 255 -> Custom
-    | 1000 -> Int
-    | 1001 -> Out_of_heap
-    | 1002 -> Unaligned
-    | x -> failwith (sprintf "OCaml value with unknown tag = %d" x)
-
-(* Slower? and safer
-let is_in_heap r =
-  let x = Obj.tag r in
-    not (x = Obj.int_tag || x = Obj.out_of_heap_tag || x = Obj.unaligned_tag)
-*)
-
-(* Faster but more dangerous *)
-let is_in_heap r =
-  let x = Obj.tag r in
-    x < 1000 || 1002 < x
-
-let heap_words r =
-  if is_in_heap r then Obj.size r else 0
-
-let mnemonic r =
-  match tag r with
-    | Lazy -> "LAZY"
-    | Closure -> "CLOS"
-    | Object -> "OBJ"
-    | Infix -> "INFX"
-    | Forward -> "FWD"
-    | Block -> "BLK"
-    | Abstract -> "ABST"
-    | String -> "STR"
-    | Double -> "DBL"
-    | Double_array -> "DBLA"
-    | Custom -> "CUST"
-    | Int -> "INT"
-    | Out_of_heap -> "OADR"
-    | Unaligned -> "UADR"
-
-let mnemonic_unknown =
-  "????"
-
-let abbrev r =
-  match tag r with
-    | Lazy
-    | Closure
-    | Object
-    | Infix
-    | Forward
-    | Block
-    | Double_array
-    | String
-    | Abstract     -> sprintf "%s#%d" (mnemonic r) (heap_words r)
-    | Double       -> sprintf "%g" (Obj.magic r : float)
-    | Custom       -> (
-	match custom_value r with
-	  | Custom_nativeint n -> sprintf "%ndn" n
-	  | Custom_int32 i     -> sprintf "%ldl" i
-	  | Custom_int64 i     -> sprintf "%LdL" i
-	  | Custom_bigarray    -> "Bigarray"
-	  | Custom_channel     -> "Channel"
-	  | Custom_unknown     -> sprintf "Unknown"
-	  | Not_custom         -> failwith "Value.description: should be a custom value"
-      )
-    | Int          -> string_of_int (Obj.magic r : int)
-    | Out_of_heap  -> "Out_of_heap"
-    | Unaligned    -> "Unaligned"
-
-let description r =
-  match tag r with
-    | Lazy         -> "Lazy: #" ^ string_of_int (Obj.size r)
-    | Closure      -> "Closure: #" ^ string_of_int (Obj.size r)
-    | Object       -> "Object: #" ^ string_of_int (Obj.size r)
-    | Infix        -> "Infix: #" ^ string_of_int (Obj.size r)
-    | Forward      -> "Forward: #" ^ string_of_int (Obj.size r)
-    | Block        -> sprintf "Block(%d): #%d" (Obj.tag r) (Obj.size r)
-    | Abstract     -> "Abstract: #" ^ string_of_int (Obj.size r)
-    | String       ->
-        let len = String.length (Obj.magic r : string) in
-        sprintf "String: %d char%s" len (if len > 1 then "s" else "")
-    | Double       -> sprintf "Double: %g" (Obj.magic r : float)
-    | Double_array -> sprintf "Double_array: %d floats" (Array.length (Obj.magic r : float array))
-    | Custom       -> (
-	match custom_value r with
-	  | Custom_nativeint n -> sprintf "Nativeint: %nd" n
-	  | Custom_int32 i     -> sprintf "Int32: %ld" i
-	  | Custom_int64 i     -> sprintf "Int64: %Ld" i
-	  | Custom_bigarray    -> "Bigarray"
-	  | Custom_channel     -> "Channel"
-	  | Custom_unknown     -> sprintf "Custom:"
-	  | Not_custom         -> failwith "Value.description: should be a custom value"
-      )
-    | Int          -> sprintf "Int: %d" (Obj.magic r : int)
-    | Out_of_heap  -> sprintf "Out_of_heap "
-    | Unaligned    -> sprintf "Unaligned "
-
-end
 
 (** Various Utils *)
 
@@ -361,7 +89,7 @@ let get_global_prims () = fst !global_registers
 let get_global_includes () = snd !global_registers
 
 (* Support for dynamically-linked certicoq-compiled programs *)
-type certicoq_run_function = Ast0.Env.global_env -> typ:Ast0.term -> Obj.t
+type certicoq_run_function = unit -> Obj.t
 
 let certicoq_run_functions = 
   Summary.ref ~name:"CertiCoq Run Functions Table" 
@@ -369,8 +97,11 @@ let certicoq_run_functions =
 
 let certicoq_run_functions_name = "certicoq-run-functions-registration"
 
+let all_run_functions = ref CString.Set.empty
+
 let cache_certicoq_run_function (s, fn) =
   let fns = !certicoq_run_functions in
+  all_run_functions := CString.Set.add s !all_run_functions;
   certicoq_run_functions := CString.Map.add s fn fns
 
 let certicoq_run_function_input = 
@@ -381,6 +112,7 @@ let certicoq_run_function_input =
     ~subst:None)
 
 let register_certicoq_run s fn =
+  Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certicoq_run");
   Lib.add_leaf (certicoq_run_function_input (s, fn))
 
 let run_certicoq_run s = 
@@ -425,6 +157,7 @@ type command_args =
  | EXT of string (* Filename extension to be appended to the file name *)
  | DEV of int    (* For development purposes *)
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
+ | TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
  | FILENAME of string (* Name of the generated file *)
 
 type options =
@@ -441,6 +174,7 @@ type options =
     ext       : string;
     dev       : int;
     prefix    : string;
+    toplevel_name : string;
     prims     : ((Kernames.kername * Kernames.ident) * bool) list;
   }
 
@@ -458,6 +192,7 @@ let default_options : options =
     ext       = "";
     dev       = 0;
     prefix    = "";
+    toplevel_name = "body";
     prims     = [];
   }
 
@@ -490,6 +225,7 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
     | EXT s    :: xs -> aux {o with ext = s} xs
     | DEV n    :: xs -> aux {o with dev = n} xs
     | PREFIX s :: xs -> aux {o with prefix = s} xs
+    | TOPLEVEL_NAME s :: xs -> aux {o with toplevel_name = s} xs
     | FILENAME s :: xs -> aux {o with filename = s} xs
   in
   let opts = { default_options with filename = fname } in
@@ -506,9 +242,10 @@ let make_pipeline_options (opts : options) =
   let anfc = coq_nat_of_int opts.anf_conf in
   let dev = coq_nat_of_int opts.dev in
   let prefix = bytestring_of_string opts.prefix in
+  let toplevel_name = bytestring_of_string opts.toplevel_name in
   let prims = get_global_prims () @ opts.prims in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
-  Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix prims
+  Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
 
 (** Main Compilation Functions *)
 
@@ -520,18 +257,21 @@ let get_name (gr : Names.GlobRef.t) : string =
 
 
 (* Quote Coq term *)
-let quote opts gr =
+let quote_term opts env sigma c =
   let debug = opts.debug in
   let bypass = opts.bypass_qed in
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let sigma, c = Evd.fresh_global env sigma gr in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
   let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass env sigma (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   term
+
+let quote opts gr =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let sigma, c = Evd.fresh_global env sigma gr in
+  quote_term opts env sigma c
 
 (* Compile Quoted term with CertiCoq *)
 
@@ -742,8 +482,15 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
   type reifyable_type =
   | IsInductive of Names.inductive * Univ.Instance.t * Constr.t list
-  | IsPrimitive of Names.Constant.t * Univ.Instance.t
+  | IsPrimitive of Names.Constant.t * Univ.Instance.t * Constr.t list
   
+  let type_of_reifyable_type = function
+    | IsInductive (hd, u, args) -> Term.applistc (Constr.mkIndU ((hd, u))) args
+    | IsPrimitive (c, u, args) -> Term.applistc (Constr.mkConstU ((c, u))) args
+  
+  let pr_reifyable_type env sigma ty =
+    Printer.pr_constr_env env sigma (type_of_reifyable_type ty)
+
   let find_nth_constant n ar =
     let open Inductiveops in
     let rec aux i const = 
@@ -769,15 +516,30 @@ module CompileFunctor (CI : CompilerInterface) = struct
     try let (hd, u), args = Inductiveops.find_inductive env sigma ty in
       IsInductive (hd, EConstr.EInstance.kind sigma u, args)
     with Not_found -> 
-      match EConstr.kind sigma (Reductionops.whd_all env sigma ty) with
+      let hnf = Reductionops.whd_all env sigma ty in
+      let hd, args = EConstr.decompose_app sigma hnf in
+      match EConstr.kind sigma hd with
       | Const (c, u) when Environ.is_primitive_type env c -> 
-        IsPrimitive (c, EConstr.EInstance.kind sigma u)
+        IsPrimitive (c, EConstr.EInstance.kind sigma u, List.map EConstr.Unsafe.to_constr args)
       | _ -> CErrors.user_err 
         Pp.(str"Cannot reify values of non-inductive or non-primitive type: " ++ 
           Printer.pr_econstr_env env sigma ty)
 
-  let reify debug env sigma ty v : Constr.t = 
+  let ill_formed env sigma ty =
+    match ty with
+    | IsInductive _ -> 
+      CErrors.anomaly ~label:"certicoq-reify-ill-formed"
+      Pp.(str "Ill-formed inductive value representation in CertiCoq's reification for type " ++
+        pr_reifyable_type env sigma ty)
+    | IsPrimitive _ ->
+      CErrors.anomaly ~label:"certicoq-reify-ill-formed"
+      Pp.(str "Ill-formed primitive value representation in CertiCoq's reification for type " ++
+        pr_reifyable_type env sigma ty)
+
+
+  let reify env sigma ty v : Constr.t = 
     let open Declarations in
+    let debug s = debug_reify Pp.(fun () -> str s) in
     let rec aux ty v =
     match ty with
     | IsInductive (hd, u, args) -> 
@@ -788,14 +550,15 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let npars = inductive_params spec in
       let params, _indices = CList.chop npars args in
       let cstrs = get_constructors env indfam in
-      let () = debug_msg true (Printf.sprintf "Reifying inductive value") in
+      let () = debug (Printf.sprintf "Reifying inductive value") in
       if Obj.is_block v then
-        let () = debug_msg true (Printf.sprintf "Reifying constructor block") in
+        let () = debug (Printf.sprintf "Reifying constructor block") in
         let ord = get_boxed_ordinal v in
-        (*if not (0 <= otag && otag < Obj.no_scan_tag) thenm
-          CErrors.user_err Pp.(str "reify: Unexpected value tag: " ++ int otag); *)
-        let () = debug_msg debug (Printf.sprintf "Reifying constructor block of tag %i" ord) in
-        let coqidx = find_nth_non_constant ord cstrs in
+        let () = debug (Printf.sprintf "Reifying constructor block of tag %i" ord) in
+        let coqidx = 
+          try find_nth_non_constant ord cstrs 
+          with Not_found -> ill_formed env sigma ty
+        in
         let cstr = cstrs.(coqidx) in
         let ctx = Vars.smash_rel_context cstr.cs_args in
         let vargs = List.init (List.length ctx) (Obj.field v) in
@@ -805,13 +568,16 @@ module CompileFunctor (CI : CompilerInterface) = struct
           aux argty v) (List.rev ctx) vargs in
         Term.applistc (Constr.mkConstructU ((hd, coqidx + 1), u)) (params @ args')
       else (* Constant constructor *)
-        let () = debug_msg debug (Printf.sprintf "Reifying constant constructor") in
+        let () = debug (Printf.sprintf "Reifying constant constructor") in
         let ord = (Obj.magic v : int) in
-        let () = debug_msg debug (Printf.sprintf "Reifying constant constructor: %i" ord) in
-        let coqidx = find_nth_constant ord cstrs in
-        let () = debug_msg debug (Printf.sprintf "Reifying constant constructor: %i is %i in Coq" ord coqidx) in
+        let () = debug (Printf.sprintf "Reifying constant constructor: %i" ord) in
+        let coqidx = 
+          try find_nth_constant ord cstrs 
+          with Not_found -> ill_formed env sigma ty 
+        in
+        let () = debug (Printf.sprintf "Reifying constant constructor: %i is %i in Coq" ord coqidx) in
         Term.applistc (Constr.mkConstructU ((hd, coqidx + 1), u)) params
-    | IsPrimitive (c, u) -> 
+    | IsPrimitive (c, u, _args) -> 
       if Environ.is_array_type env c then 
         CErrors.user_err Pp.(str "Primitive arrays are not supported yet")
       else if Environ.is_float64_type env c then
@@ -821,29 +587,55 @@ module CompileFunctor (CI : CompilerInterface) = struct
       else CErrors.user_err Pp.(str "Unsupported primitive type")
     in aux ty v
 
-  let compile_shared_C opts gr imports =
-    let prog = quote opts gr in
-    let env = Global.env () in
-    let sigma, tyinfo = 
-      let sigma = Evd.from_env env in 
-      let sigma, frgr = Evd.fresh_global env sigma gr in
-      let sigma, ty = Typing.type_of env sigma frgr in
-      assert (Evd.is_empty sigma);
-      sigma, check_reifyable env sigma ty
+  let template name = 
+    Printf.sprintf "\nvalue %s ()\n { struct thread_info* tinfo = make_tinfo(); return %s_body(tinfo); }\n" name name
+  let template_header name = 
+    Printf.sprintf "#include <gc_stack.h>\nextern value %s ();\n" name
+
+  let write_c_driver opts name = 
+    let fname = make_fname opts (name ^ ".c") in
+    let fhname = make_fname opts (name ^ ".h") in
+    let fd = Unix.(openfile fname [O_CREAT; O_APPEND; O_WRONLY] 0o640) in
+    let chan = Unix.out_channel_of_descr fd in
+    output_string chan (template name);
+    flush chan;
+    close_out chan;
+    let chan = open_out fhname in
+    output_string chan (template_header name);
+    flush chan; close_out chan;
+    fname
+  
+  let template_ocaml name = 
+    Printf.sprintf "external %s : unit -> Obj.t = \"%s\"\nlet _ = Certicoq_plugin.Certicoq.register_certicoq_run \"%s\" (Obj.magic %s)" name name name name
+  
+  let write_ocaml_driver opts name = 
+    let fname = make_fname opts (name ^ "_wrapper.ml") in
+    let chan = open_out fname in
+    output_string chan (template_ocaml name);
+    flush chan; close_out chan; fname
+
+  let certicoq_eval_named opts env sigma id c imports =
+    let prog = quote_term opts env sigma c in
+    let tyinfo = 
+      let ty = Retyping.get_type_of env sigma c in
+      (* assert (Evd.is_empty sigma); *)
+      check_reifyable env sigma ty
     in
     let () = compile opts (Obj.magic prog) imports in
-    let () = compile_only opts gr imports in
+    (* Write wrapping code *)
+    let c_driver = write_c_driver opts id in
+    let ocaml_driver = write_ocaml_driver opts id in      
     let imports = get_global_includes () @ imports in
     let debug = opts.debug in
-    let fname = opts.filename in
     let suff = opts.ext in
-    let name = make_fname opts (fname ^ suff) in
+    let name = make_fname opts (id ^ suff) in
     let compiler = compiler_executable debug in
     let ocamlfind = ocamlfind_executable debug in
     let rt_dir = runtime_dir () in
+
     let cmd =
         Printf.sprintf "%s -Wno-everything -g -I %s -I %s -c -o %s %s" 
-          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c") 
+          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
     in
     let importso =
       let oname s = 
@@ -855,7 +647,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
         | FromAbsolutePath s -> [oname s]
         | FromRelativePath s -> [oname s]
         | FromLibrary s -> [make_rt_file (oname s)]) imports) in
-      let l = make_rt_file "certicoq_run.o" :: imports' in
+      let l = imports' in
       String.concat " " l
     in
     let gc_stack_o = make_rt_file "gc_stack.o" in
@@ -865,28 +657,48 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let pkgs = String.concat "," packages in
     let dontlink = "str,unix,dynlink,threads,zarith,coq-core,coq-core.plugins.ltac,coq-core.interp" in
     match Unix.system cmd with
-    | Unix.WEXITED 0 -> 
-      let shared_lib = name ^ ".cmxs" in 
+    | Unix.WEXITED 0 ->
+      let shared_lib = name ^ ".cmxs" in
       let linkcmd =
         Printf.sprintf "%s ocamlopt -shared -linkpkg -dontlink %s -thread -rectypes -package %s \
-        -I . -I %s -o %s %s %s %s %s"
-        ocamlfind dontlink pkgs opts.build_dir shared_lib (make_rt_file "certicoq_run_wrapper.cmx") gc_stack_o (name ^ ".o") importso
+        -I %s -I plugin -o %s %s %s %s %s"
+        ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o (name ^ ".o") importso
       in
       debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
       (match Unix.system linkcmd with
       | Unix.WEXITED 0 ->
-          debug_msg debug (Printf.sprintf "Compilation ran fine, linking compiled code for %s" name);
+          debug_msg debug (Printf.sprintf "Compilation ran fine, linking compiled code for %s" id);
           Dynlink.loadfile_private shared_lib;
-          debug_msg debug (Printf.sprintf "Dynamic linking succeeded, retrieving function %s" name);
-          let result = run_certicoq_run "certicoq_run" (fst (Obj.magic prog)) ~typ:(snd (Obj.magic prog)) (* FIXME we should get the type*) in
-          debug_msg debug (Printf.sprintf "Running they dynamic linked program succeeded, reifying result");
-          reify debug env sigma tyinfo result
+          debug_msg debug (Printf.sprintf "Dynamic linking succeeded, retrieving function %s" id);
+          let result = run_certicoq_run id () in
+          debug_msg debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
+          reify env sigma tyinfo result
       | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str linkcmd)
       | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n))
     | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str cmd)
     | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n  ++ str" while running " ++ str cmd)
-  
 
+  let next_string_away_from s bad =
+    let rec name_rec s = if bad s then name_rec (increment_subscript s) else s in
+    name_rec s
+  
+  let find_fresh s map = 
+    Feedback.msg_debug Pp.(str "Looking for fresh " ++ str s ++ str " in " ++ prlist_with_sep spc str (CString.Set.elements map));
+    let freshs = next_string_away_from s (fun s -> CString.Set.mem s map) in
+    Feedback.msg_debug Pp.(str "Found " ++ str freshs);
+    freshs
+    
+  let certicoq_eval opts env sigma c imports =
+    let fresh_name = find_fresh opts.filename !all_run_functions in
+    let opts = { opts with toplevel_name = fresh_name ^ "_body"; filename = fresh_name } in
+    certicoq_eval_named opts env sigma fresh_name c imports
+  
+  let compile_shared_C opts gr =
+    let env = Global.env () in
+    let sigma = Evd.from_env env in
+    let sigma, c = Evd.fresh_global env sigma gr in
+    certicoq_eval opts env sigma c
+    
   let print_to_file (s : string) (file : string) =
     let f = open_out file in
     Printf.fprintf f "%s\n" s;

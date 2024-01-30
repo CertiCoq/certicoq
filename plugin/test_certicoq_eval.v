@@ -1,4 +1,4 @@
-
+From CertiCoq.Plugin Require Import Loader.
 From CertiCoq.Plugin Require Import CertiCoq.
 From MetaCoq.Utils Require Import utils.
 
@@ -17,8 +17,7 @@ From MetaCoq.Common Require Import Primitive.
 From Coq Require Import PrimFloat PrimInt63.
 #[export] Instance float_show : Show PrimFloat.float := string_of_float.
 #[export] Instance prim_int_show : Show PrimInt63.int := string_of_prim_int.
-Eval compute in 5.0%float.
-(* Definition certicoqc2 := coq_msg_info (show 5%int63). *)
+
 Import SpecFloat.
 Definition string_of_specfloat (f : SpecFloat.spec_float) :=
   match f with
@@ -43,4 +42,8 @@ Definition certicoqc4 := show (List.map S [26; 20]).
 Time Eval compute in certicoqc4.
 Set Warnings "-primitive-turned-into-axiom".
 Set Warnings "backtrace".
-CertiCoq Eval -time certicoqc4.
+(* CertiCoq Eval -time certicoqc4. *)
+
+Goal True.
+  intros.
+  certicoq_eval -build_dir "_build" certicoqc4 ltac:(fun c => assert (certicoqc4 = c) by reflexivity).

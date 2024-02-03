@@ -307,10 +307,10 @@ Section ANF_proof.
 
       Forall2 (anf_val_rel) vs1 vs2 ->
 
-      exists rho' vs2',
-        get_list ys rho' = Some vs2' /\
+      exists rho',
+        set_lists ys vs2 rho = Some rho' /\
           forall i,
-            Forall2 (preord_val ctenv eq_fuel i) vs2 vs2' /\
+            (* Forall2 (preord_val ctenv eq_fuel i) vs2 vs2 /\ *)
             preord_env_P ctenv eq_fuel (FromList env) i rho rho' /\
             preord_exp ctenv (anf_bound f (t <+> (2 * Datatypes.length (exps_as_list es))%nat))
                        eq_fuel i (e', rho') (C |[ e' ]|, rho).
@@ -1089,21 +1089,80 @@ Section ANF_proof.
           (* eapply Included_trans. eassumption. now sets. *)
         * now sets.
         * destructAll.
+
+          assert (Henvs : forall i : nat, preord_env_P ctenv eq_fuel (FromList names) i rho x0).
+          { intros; eauto. eapply H0. }
+          
+          assert (exists vs'', get_list ys x0 = Some vs'' /\
+                                 forall i, Forall2 (preord_val ctenv eq_fuel i) vs' vs''). 
+          { revert Heval H8 H H2 Hanf Henvs. clear.
+            generalize (S1 \\ [set x]) as S.  
+            revert vs vs' rho x0 es C0 fs ts. induction ys;
+              intros vs vs' rho x0 es C0 fs ts S Heval Hanfs Hsetl Hanf_rel Henv Henvs.
+            - simpl in *. destruct vs'; try congruence. inv Hsetl.
+              eexists []. split; constructor.
+            - inv Hanfs. destruct vs'; simpl in Hsetl; try congruence.
+              destruct (set_lists ys vs' rho) eqn:Hsetl'; try congruence.
+              inv Hsetl. inv Hanf_rel. inv Heval.
+              simpl. rewrite M.gss. 
+              destruct (Decidable_FromList ys). destruct (Dec a); [ | ].
+              + (* a \in ys *)
+                (*
+                  LambdaBoxLocal_to_LambdaANF.convert_anf_rel func_tag default_tag cenv S1 e names S2 C a
+                  LambdaBoxLocal_to_LambdaANF.convert_anf_rel func_tag default_tag cenv S1' e' names S2 C' a
+                  ==>
+                  a \in names -- cannot be in bound_var C or C'
+                  
+                 *)
+                assert (Hin : FromList names a) by admit.
+
+                edestruct convert_anf_in_env as [n [Hnth1 Hnth2]];
+                  [ eassumption | eassumption | eassumption | | ].
+                admit. (* add assumption easy *)
+
+                assert (Henvs' : 
+                         
+                assert (Henv' : anf_env_rel names r t).
+                { unfold anf_env_rel, anf_env_rel'. revert 
+                  
+                } 
+                admit. 
+                assert (Hrel := All_Forall.Forall2_nth_error _ _ _ Henv' Hnth1 Hnth2). 
+
+                destruct Hrel as [v1'' [Hget'' Hrel'']]. 
+                specialize (IHys _ _ _ _ _ _ _ _ _ H11 H7 Hsetl' H3 Henv). destructAll. 
+                edestruct preord_env_P_get_list_l with (xs := ys) (rho1 := t) (rho2 := map_util.M.set a v t)
+                                                       (vs1 := x1); try eassumption. 
+                2:{ reflexivity. }
+                { admit. (* OK because v ~ v1'' *) } 
+                
+              + (* not a \in ys *) 
+                rewrite get_list_set_neq; eauto. 
+                specialize (IHys _ _ _ _ _ _ _ _ _ H3 Hsetl' H7 H11). destructAll. 
+                rewrite H. eexists. split. reflexivity.
+                intros i. constructor; eauto.
+                eapply preord_val_refl. admit. (* easy *) }
+              
+              constructor. 
+
+                admit. } destructAll. 
+            
           eapply preord_exp_post_monotonic.
           2:{ eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
               2:{ intros. rewrite <- app_ctx_f_fuse. simpl. eapply H0. }
               eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
               2:{ intros m. eapply preord_exp_Econstr_red.
                   
+                  
                   eassumption. }
               eapply preord_exp_refl. now eapply eq_fuel_compat.
               eapply preord_env_P_extend.
-              2:{ rewrite preord_val_eq. simpl. split. eauto.
-                  eapply H0. }
-
-              eapply preord_env_P_antimon. eapply H0.
-              eapply Setminus_Included_Included_Union. eapply Included_trans. eassumption.
-              now sets. }
+              2:{ rewrite preord_val_eq. simpl. split. eauto. eauto. } 
+              admit. (* add back *) 
+              (* eapply preord_env_P_antimon. eapply H0. *)
+              (* eapply Setminus_Included_Included_Union. eapply Included_trans. eassumption. *)
+              (* now sets. *)
+          }
 
           { unfold inclusion, comp, eq_fuel, one_step, anf_bound, one_i.
             intros [[[? ?] ?] ?] [[[? ?] ?] ?] ?.

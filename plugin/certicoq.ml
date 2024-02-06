@@ -115,6 +115,9 @@ let register_certicoq_run s fn =
   Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certicoq_run");
   Lib.add_leaf (certicoq_run_function_input (s, fn))
 
+let exists_certicoq_run s =
+  CString.Map.find_opt s !certicoq_run_functions
+
 let run_certicoq_run s = 
   try CString.Map.find s !certicoq_run_functions
   with Not_found -> CErrors.user_err Pp.(str"Could not find certicoq run function associated to " ++ str s)
@@ -614,6 +617,14 @@ module CompileFunctor (CI : CompilerInterface) = struct
     output_string chan (template_ocaml name);
     flush chan; close_out chan; fname
 
+
+  let time f =
+    let start = Unix.gettimeofday() in
+    let res = f () in
+    let time = Unix.gettimeofday () -. start in
+    Feedback.msg_notice (Pp.str (Printf.sprintf "Executed in %f sec" time));
+    res
+
   let certicoq_eval_named opts env sigma id c imports =
     let prog = quote_term opts env sigma c in
     let tyinfo = 
@@ -671,7 +682,10 @@ module CompileFunctor (CI : CompilerInterface) = struct
           debug_msg debug (Printf.sprintf "Compilation ran fine, linking compiled code for %s" id);
           Dynlink.loadfile_private shared_lib;
           debug_msg debug (Printf.sprintf "Dynamic linking succeeded, retrieving function %s" id);
-          let result = run_certicoq_run id () in
+          let result = 
+            if opts.time then time (run_certicoq_run id)
+            else run_certicoq_run id ()
+          in
           debug_msg debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
           reify env sigma tyinfo result
       | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str linkcmd)
@@ -693,19 +707,42 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let fresh_name = find_fresh opts.filename !all_run_functions in
     let opts = { opts with toplevel_name = fresh_name ^ "_body"; filename = fresh_name } in
     certicoq_eval_named opts env sigma fresh_name c imports
-  
+
+  let run_existing opts env sigma c run =
+    let tyinfo = 
+      let ty = Retyping.get_type_of env sigma c in        
+      check_reifyable env sigma ty
+    in
+    let result = 
+      if opts.time then time run
+      else run ()
+    in
+    debug_msg opts.debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
+    reify env sigma tyinfo result
+    
+  let certicoq_eval opts env sigma c imports =
+    match exists_certicoq_run opts.filename with
+    | None -> certicoq_eval opts env sigma c imports
+    | Some run -> 
+      debug_msg opts.debug (Printf.sprintf "Retrieved earlier compiled code for %s" opts.filename);
+      run_existing opts env sigma c run
+
   let compile_shared_C opts gr imports =
     let env = Global.env () in
     let sigma = Evd.from_env env in
     let sigma, c = Evd.fresh_global env sigma gr in
-    let fresh_name = find_fresh (Names.Id.to_string (Nametab.basename_of_global gr)) !all_run_functions in
-    let opts = { opts with toplevel_name = fresh_name ^ "_body"; } in
-    certicoq_eval_named opts env sigma fresh_name c imports
+    let name = Names.Id.to_string (Nametab.basename_of_global gr) in
+    match exists_certicoq_run name with
+    | None ->
+      let opts = { opts with toplevel_name = name ^ "_body"; } in
+      certicoq_eval_named opts env sigma name c imports
+    | Some run -> run_existing opts env sigma c run
     
   let print_to_file (s : string) (file : string) =
     let f = open_out file in
     Printf.fprintf f "%s\n" s;
     close_out f
+
 
   let show_ir opts gr =
     let term = quote opts gr in

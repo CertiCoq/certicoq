@@ -1,7 +1,8 @@
-
+From CertiCoq.Plugin Require Import Loader.
 From CertiCoq.Plugin Require Import CertiCoq.
 From MetaCoq.Utils Require Import utils.
-From CertiCoq.Common Require Import Pipeline_utils.
+
+Set CertiCoq Build Directory "_build".
 
 Open Scope bs_scope.
 
@@ -18,8 +19,7 @@ From MetaCoq.Common Require Import Primitive.
 From Coq Require Import PrimFloat PrimInt63.
 #[export] Instance float_show : Show PrimFloat.float := string_of_float.
 #[export] Instance prim_int_show : Show PrimInt63.int := string_of_prim_int.
-Eval compute in 5.0%float.
-(* Definition certicoqc2 := coq_msg_info (show 5%int63). *)
+
 Import SpecFloat.
 Definition string_of_specfloat (f : SpecFloat.spec_float) :=
   match f with
@@ -35,10 +35,36 @@ Definition string_of_specfloat (f : SpecFloat.spec_float) :=
 #[export] Instance show_positive : Show positive := string_of_positive.
 #[export] Instance show_Z : Show Z := string_of_Z.
 
-Definition certicoqc2 := 
-  coq_msg_info (show (0%float == (-0)%float)).
+Definition certicoqc2 := 5.
+Definition certicoqc3 := coq_msg_notice ("Hello world! " ++ show 100%nat).
+ (* show (0%float == (-0)%float)). *)
 
-Time Eval compute in certicoqc2.
+Inductive three_ind := One | Two | Three.
+Definition one := One.
+Definition two := Two.
+Definition three := Three.
 
+Definition certicoqc4 :=  (List.map S [26; 20]).
+
+Time Eval compute in certicoqc4.
 Set Warnings "-primitive-turned-into-axiom".
-Time CertiCoq Run certicoqc2.
+Set Warnings "backtrace".
+CertiCoq Eval -time -debug certicoqc4. 
+
+Definition largertag := S754_finite true xH 0%Z.
+Definition otherlargertag := S754_infinity true.
+CertiCoq Eval -time -debug otherlargertag.
+
+Set Debug "certicoq-reify".
+Time CertiCoq Eval -time one.
+CertiCoq Eval -time two.
+CertiCoq Eval -time -debug three.
+Time CertiCoq Eval -time -debug three.
+
+(* 
+Goal True.
+  intros.
+  certicoq_eval -build_dir "_build" certicoqc4 ltac:(fun c => assert (certicoqc4 = c) by reflexivity).
+  exact I.
+Qed. *)
+

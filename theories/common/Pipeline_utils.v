@@ -30,6 +30,7 @@ Record Options :=
     dev      : nat;   (* for development purposes *)
     prefix   : string; (* prefix to generated FFI *)
 
+    body_name : string; (* Name of the toplevel function *)
     prims    : list (kername * string * bool);
     (* List of constants that are realized in the target code.
      * kername: constant name, string: name of target primitive *)

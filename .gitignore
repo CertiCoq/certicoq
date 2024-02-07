@@ -130,3 +130,5 @@ bootstrap/certicoqc/META
 bootstrap/certicoqchk/META
 bootstrap/certicoqc*/glue.c
 bootstrap/certicoqc*/glue.h
+plugin/.merlin
+_build

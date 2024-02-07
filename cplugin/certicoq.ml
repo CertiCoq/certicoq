@@ -280,8 +280,9 @@ let make_pipeline_options (opts : options) =
   let dev = coq_nat_of_int opts.dev in
   let prefix = bytestring_of_string opts.prefix in
   let prims = get_global_prims () @ opts.prims in
+  let name = bytestring_of_string "body" in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
-  Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix prims
+  Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix name prims
 
 
 (** Main Compilation Functions *)

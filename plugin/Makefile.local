@@ -19,3 +19,5 @@ merlin-hook::
 
 get_ordinal.o: get_ordinal.c
 	$(CC) -c -o $@ -I runtime $<
+
+certicoq_plugin.cmxs: get_ordinal.o

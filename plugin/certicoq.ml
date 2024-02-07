@@ -540,6 +540,15 @@ module CompileFunctor (CI : CompilerInterface) = struct
       Pp.(str "Ill-formed primitive value representation in CertiCoq's reification for type " ++
         pr_reifyable_type env sigma ty)
 
+  let ocaml_get_boxed_ordinal v = 
+    (* tag is the header of the object *)
+    let tag = Array.unsafe_get (Obj.magic v : Obj.t array) (-1) in
+    (* We turn it into an ocaml int usable for arithmetic operations *)
+    let tag_int = (Stdlib.Int.shift_left (Obj.magic (Obj.repr tag)) 1) + 1 in
+    Feedback.msg_debug (Pp.str (Printf.sprintf "Ocaml tag: %i" (Obj.tag tag)));
+    Feedback.msg_debug (Pp.str (Printf.sprintf "Ocaml get_boxed_ordinal int: %u" tag_int));
+    Feedback.msg_debug (Pp.str (Printf.sprintf "Ocaml get_boxed_ordinal ordinal: %u" (tag_int land 255)));
+    tag_int land 255
 
   let reify env sigma ty v : Constr.t = 
     let open Declarations in
@@ -558,6 +567,10 @@ module CompileFunctor (CI : CompilerInterface) = struct
       if Obj.is_block v then
         let () = debug (Printf.sprintf "Reifying constructor block") in
         let ord = get_boxed_ordinal v in
+        let ord' = ocaml_get_boxed_ordinal v in
+        let () = if ord == ord' then () else 
+          Feedback.msg_debug (Pp.str (Printf.sprintf "C get_boxed_ordinal = %i, OCaml get_boxed_ordinale = %i" ord ord'))
+        in
         let () = debug (Printf.sprintf "Reifying constructor block of tag %i" ord) in
         let coqidx = 
           try find_nth_non_constant ord cstrs 
@@ -619,11 +632,11 @@ module CompileFunctor (CI : CompilerInterface) = struct
     flush chan; close_out chan; fname
 
 
-  let time f =
+  let time ~(msg:Pp.t) f =
     let start = Unix.gettimeofday() in
     let res = f () in
     let time = Unix.gettimeofday () -. start in
-    Feedback.msg_notice (Pp.str (Printf.sprintf "Executed in %f sec" time));
+    Feedback.msg_notice Pp.(msg ++ str (Printf.sprintf " executed in %f sec" time));
     res
 
   let certicoq_eval_named opts env sigma id c imports =
@@ -684,11 +697,12 @@ module CompileFunctor (CI : CompilerInterface) = struct
           Dynlink.loadfile_private shared_lib;
           debug_msg debug (Printf.sprintf "Dynamic linking succeeded, retrieving function %s" id);
           let result = 
-            if opts.time then time (run_certicoq_run id)
+            if opts.time then time ~msg:(Pp.str id) (run_certicoq_run id)
             else run_certicoq_run id ()
           in
           debug_msg debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
-          reify env sigma tyinfo result
+          if opts.time then time ~msg:(Pp.str "reification") (fun () -> reify env sigma tyinfo result)
+          else reify env sigma tyinfo result
       | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str linkcmd)
       | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n))
     | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str cmd)
@@ -709,13 +723,13 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let opts = { opts with toplevel_name = fresh_name ^ "_body"; filename = fresh_name } in
     certicoq_eval_named opts env sigma fresh_name c imports
 
-  let run_existing opts env sigma c run =
+  let run_existing opts env sigma c id run =
     let tyinfo = 
       let ty = Retyping.get_type_of env sigma c in        
       check_reifyable env sigma ty
     in
     let result = 
-      if opts.time then time run
+      if opts.time then time ~msg:Pp.(str"Running " ++ id) run
       else run ()
     in
     debug_msg opts.debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
@@ -726,7 +740,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | None -> certicoq_eval opts env sigma c imports
     | Some run -> 
       debug_msg opts.debug (Printf.sprintf "Retrieved earlier compiled code for %s" opts.filename);
-      run_existing opts env sigma c run
+      run_existing opts env sigma c (Pp.str opts.filename) run
 
   let compile_shared_C opts gr imports =
     let env = Global.env () in
@@ -737,7 +751,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | None ->
       let opts = { opts with toplevel_name = name ^ "_body"; } in
       certicoq_eval_named opts env sigma name c imports
-    | Some run -> run_existing opts env sigma c run
+    | Some run -> run_existing opts env sigma c (Pp.str name) run
     
   let print_to_file (s : string) (file : string) =
     let f = open_out file in

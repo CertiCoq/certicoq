@@ -37,16 +37,32 @@ Definition certicoqc2 := 5.
 Definition certicoqc3 := coq_msg_notice ("Hello world! " ++ show 100%nat).
  (* show (0%float == (-0)%float)). *)
 
+Inductive three_ind := One | Two | Three.
+Definition one := One.
+Definition two := Two.
+Definition three := Three.
+
 Definition certicoqc4 :=  (List.map S [26; 20]).
 
 Time Eval compute in certicoqc4.
 Set Warnings "-primitive-turned-into-axiom".
 Set Warnings "backtrace".
-CertiCoq Eval -time certicoqc4. 
+CertiCoq Eval -time -debug certicoqc4. 
 
+Definition largertag := S754_finite true xH 0%Z.
+Definition otherlargertag := S754_infinity true.
+CertiCoq Eval -time -debug otherlargertag.
+
+Set Debug "certicoq-reify".
+Time CertiCoq Eval -time one.
+CertiCoq Eval -time two.
+CertiCoq Eval -time -debug three.
+Time CertiCoq Eval -time -debug three.
+
+(* 
 Goal True.
   intros.
   certicoq_eval -build_dir "_build" certicoqc4 ltac:(fun c => assert (certicoqc4 = c) by reflexivity).
   exact I.
-Qed.
+Qed. *)
 

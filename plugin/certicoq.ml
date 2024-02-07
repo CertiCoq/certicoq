@@ -37,8 +37,9 @@ let increment_subscript id =
 
 let debug_reify = CDebug.create ~name:"certicoq-reify" ()
 
-external get_unboxed_ordinal : Obj.t -> int = "get_unboxed_ordinal"
-external get_boxed_ordinal : Obj.t -> int = "get_boxed_ordinal"
+external get_unboxed_ordinal : Obj.t -> int = "get_unboxed_ordinal" [@@noalloc]
+
+external get_boxed_ordinal : Obj.t -> (int [@untagged]) = "get_boxed_ordinal" "get_boxed_ordinal" [@@noalloc]
 
 (** Various Utils *)
 

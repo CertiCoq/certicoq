@@ -2,6 +2,8 @@ From CertiCoq.Plugin Require Import Loader.
 From CertiCoq.Plugin Require Import CertiCoq.
 From MetaCoq.Utils Require Import utils.
 
+Set CertiCoq Build Directory "_build".
+
 Open Scope bs_scope.
 
 Class Show (A : Type) := show : A -> string.

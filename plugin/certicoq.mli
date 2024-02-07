@@ -36,7 +36,7 @@ type options =
 
 type prim = ((Kernames.kername * Kernames.ident) * bool)
 
-val default_options : options
+val default_options : unit -> options
 val make_options : command_args list -> prim list -> string -> options
 
 (* Register primitive operations and associated include file *)

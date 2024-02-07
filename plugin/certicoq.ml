@@ -9,6 +9,11 @@ open ExceptionMonad
 open AstCommon
 open Plugin_utils
 
+let get_build_dir_opt =
+  Goptions.declare_stringopt_option_and_ref
+    ~key:["CertiCoq"; "Build"; "Directory"]
+    ~depr:false
+
 (* Taken from Coq's increment_subscript, but works on strings rather than idents *)
 let increment_subscript id =
   let len = String.length id in
@@ -182,24 +187,6 @@ type options =
     prims     : ((Kernames.kername * Kernames.ident) * bool) list;
   }
 
-let default_options : options =
-  { bypass_qed = false;
-    cps       = false;
-    time      = false;
-    time_anf  = false;
-    olevel    = 1;
-    debug     = false;
-    args      = 5;
-    anf_conf  = 0;
-    build_dir = ".";
-    filename  = "";
-    ext       = "";
-    dev       = 0;
-    prefix    = "";
-    toplevel_name = "body";
-    prims     = [];
-  }
-
 let check_build_dir d =
   if d = "" then "." else
   let isdir = 
@@ -210,6 +197,24 @@ let check_build_dir d =
   if not isdir then 
     CErrors.user_err Pp.(str "Could not compile: " ++ str d ++ str " is not a directory.")
   else d
+  
+let default_options () : options =
+  { bypass_qed = false;
+    cps       = false;
+    time      = false;
+    time_anf  = false;
+    olevel    = 1;
+    debug     = false;
+    args      = 5;
+    anf_conf  = 0;
+    build_dir = (match get_build_dir_opt () with None -> "." | Some s -> check_build_dir s);
+    filename  = "";
+    ext       = "";
+    dev       = 0;
+    prefix    = "";
+    toplevel_name = "body";
+    prims     = [];
+  }
 
 let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * bool) list) (fname : string) : options =
   let rec aux (o : options) l =
@@ -232,7 +237,7 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
     | TOPLEVEL_NAME s :: xs -> aux {o with toplevel_name = s} xs
     | FILENAME s :: xs -> aux {o with filename = s} xs
   in
-  let opts = { default_options with filename = fname } in
+  let opts = { (default_options ()) with filename = fname } in
   let o = aux opts l in
   {o with prims = pr}
 
@@ -540,7 +545,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       Pp.(str "Ill-formed primitive value representation in CertiCoq's reification for type " ++
         pr_reifyable_type env sigma ty)
 
-  let ocaml_get_boxed_ordinal v = 
+  (* let ocaml_get_boxed_ordinal v = 
     (* tag is the header of the object *)
     let tag = Array.unsafe_get (Obj.magic v : Obj.t array) (-1) in
     (* We turn it into an ocaml int usable for arithmetic operations *)
@@ -548,8 +553,16 @@ module CompileFunctor (CI : CompilerInterface) = struct
     Feedback.msg_debug (Pp.str (Printf.sprintf "Ocaml tag: %i" (Obj.tag tag)));
     Feedback.msg_debug (Pp.str (Printf.sprintf "Ocaml get_boxed_ordinal int: %u" tag_int));
     Feedback.msg_debug (Pp.str (Printf.sprintf "Ocaml get_boxed_ordinal ordinal: %u" (tag_int land 255)));
-    tag_int land 255
+    tag_int land 255 *)
 
+
+  let time ~(msg:Pp.t) f =
+    let start = Unix.gettimeofday() in
+    let res = f () in
+    let time = Unix.gettimeofday () -. start in
+    Feedback.msg_notice Pp.(msg ++ str (Printf.sprintf " executed in %f sec" time));
+    res
+  
   let reify env sigma ty v : Constr.t = 
     let open Declarations in
     let debug s = debug_reify Pp.(fun () -> str s) in
@@ -563,14 +576,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let npars = inductive_params spec in
       let params, _indices = CList.chop npars args in
       let cstrs = get_constructors env indfam in
-      let () = debug (Printf.sprintf "Reifying inductive value") in
       if Obj.is_block v then
-        let () = debug (Printf.sprintf "Reifying constructor block") in
         let ord = get_boxed_ordinal v in
-        let ord' = ocaml_get_boxed_ordinal v in
-        let () = if ord == ord' then () else 
-          Feedback.msg_debug (Pp.str (Printf.sprintf "C get_boxed_ordinal = %i, OCaml get_boxed_ordinale = %i" ord ord'))
-        in
         let () = debug (Printf.sprintf "Reifying constructor block of tag %i" ord) in
         let coqidx = 
           try find_nth_non_constant ord cstrs 
@@ -585,7 +592,6 @@ module CompileFunctor (CI : CompilerInterface) = struct
           aux argty v) (List.rev ctx) vargs in
         Term.applistc (Constr.mkConstructU ((hd, coqidx + 1), u)) (params @ args')
       else (* Constant constructor *)
-        let () = debug (Printf.sprintf "Reifying constant constructor") in
         let ord = (Obj.magic v : int) in
         let () = debug (Printf.sprintf "Reifying constant constructor: %i" ord) in
         let coqidx = 
@@ -596,13 +602,17 @@ module CompileFunctor (CI : CompilerInterface) = struct
         Term.applistc (Constr.mkConstructU ((hd, coqidx + 1), u)) params
     | IsPrimitive (c, u, _args) -> 
       if Environ.is_array_type env c then 
-        CErrors.user_err Pp.(str "Primitive arrays are not supported yet")
+        CErrors.user_err Pp.(str "Primitive arrays are not supported yet in CertiCoq reification")
       else if Environ.is_float64_type env c then
         Constr.mkFloat (Obj.magic v)
       else if Environ.is_int63_type env c then
         Constr.mkInt (Obj.magic v)
-      else CErrors.user_err Pp.(str "Unsupported primitive type")
+      else CErrors.user_err Pp.(str "Unsupported primitive type in CertiCoq reification")
     in aux ty v
+
+  let reify opts env sigma tyinfo result =
+    if opts.time then time ~msg:(Pp.str "Reification") (fun () -> reify env sigma tyinfo result)
+    else reify env sigma tyinfo result 
 
   let template name = 
     Printf.sprintf "\nvalue %s ()\n { struct thread_info* tinfo = make_tinfo(); return %s_body(tinfo); }\n" name name
@@ -630,14 +640,6 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let chan = open_out fname in
     output_string chan (template_ocaml name);
     flush chan; close_out chan; fname
-
-
-  let time ~(msg:Pp.t) f =
-    let start = Unix.gettimeofday() in
-    let res = f () in
-    let time = Unix.gettimeofday () -. start in
-    Feedback.msg_notice Pp.(msg ++ str (Printf.sprintf " executed in %f sec" time));
-    res
 
   let certicoq_eval_named opts env sigma id c imports =
     let prog = quote_term opts env sigma c in
@@ -701,8 +703,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
             else run_certicoq_run id ()
           in
           debug_msg debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
-          if opts.time then time ~msg:(Pp.str "reification") (fun () -> reify env sigma tyinfo result)
-          else reify env sigma tyinfo result
+          reify opts env sigma tyinfo result
       | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str linkcmd)
       | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n))
     | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str cmd)
@@ -733,7 +734,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       else run ()
     in
     debug_msg opts.debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
-    reify env sigma tyinfo result
+    reify opts env sigma tyinfo result
     
   let certicoq_eval opts env sigma c imports =
     match exists_certicoq_run opts.filename with

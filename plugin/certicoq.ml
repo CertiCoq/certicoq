@@ -14,6 +14,16 @@ let get_build_dir_opt =
     ~key:["CertiCoq"; "Build"; "Directory"]
     ~depr:false
 
+let get_ocamlfind =
+  Goptions.declare_stringopt_option_and_ref
+    ~key:["CertiCoq"; "ocamlfind"]
+    ~depr:false
+
+let get_c_compiler =
+  Goptions.declare_stringopt_option_and_ref
+    ~key:["CertiCoq"; "CC"]
+    ~depr:false
+        
 (* Taken from Coq's increment_subscript, but works on strings rather than idents *)
 let increment_subscript id =
   let len = String.length id in
@@ -409,8 +419,16 @@ module CompileFunctor (CI : CompilerInterface) = struct
       result
     | _ -> failwith "Compiler not found"
 
-  let compiler_executable debug = find_executable debug "which gcc || which clang-11"
+  let compiler_executable debug = 
+    match get_c_compiler () with
+    | None -> find_executable debug "which gcc || which clang-11"
+    | Some s -> s
   
+  let ocamlfind_executable debug = 
+    match get_ocamlfind () with
+    | None -> find_executable debug "which ocamlfind"
+    | Some s -> s
+      
   type line = 
     | EOF
     | Info of string
@@ -483,12 +501,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n))
     | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str cmd)
     | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n  ++ str" while running " ++ str cmd)
-  
-
-  let ocamlfind_executable _debug = 
-    "_opam/bin/ocamlfind"
-    (* find_executable debug "which ocamlfind"  *)
-
+    
   type reifyable_type =
   | IsInductive of Names.inductive * Univ.Instance.t * Constr.t list
   | IsPrimitive of Names.Constant.t * Univ.Instance.t * Constr.t list

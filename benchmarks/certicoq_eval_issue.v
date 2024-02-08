@@ -26,20 +26,24 @@ Print nth.
 Extraction nth.
 
 From CertiCoq.Plugin Require Import CertiCoq.
+Set CertiCoq Build Directory "_build".
 
 Import ListNotations.
-Definition l : list nat := map (fun x => x * x) (repeat 3 45000).
+Definition l : list nat := map (fun x => x * x) (repeat 3 4000).
 
-Lemma nth_l : 30000 < length l.
+Lemma nth_l : 3000 < length l.
 Proof. unfold l. rewrite map_length. rewrite repeat_length. Admitted.
 
-Definition test : nat := (nth l (30000; nth_l)).
+Definition test : nat := (nth l (3000; nth_l)).
 (* Time Eval vm_compute in test. *)
 (* 30 seconds, includes cost of building the intermediate n < length proofs  *)
-(* Stack overflowing? *)
+(* Stack overflowing when replacing 4000 with 45000 for example? *)
 (* CertiCoq Eval -debug -time test. *)
 Definition largenat := 45000.
 (* Stack overflowing? *)
 
 Definition llength := length l.
 CertiCoq Eval -debug -time llength.
+
+Time Eval vm_compute in llength.
+Time Eval native_compute in llength.

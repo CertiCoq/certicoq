@@ -315,7 +315,7 @@ module MLCompiler : CompilerInterface with
   let printProg prog names (dest : string) (imports : import list) =
     let imports' = List.map (fun i -> match i with
       | FromRelativePath s -> "#include \"" ^ s ^ "\""
-      | FromLibrary s -> "#include <" ^ s ^ ">"
+      | FromLibrary (s, _) -> "#include <" ^ s ^ ">"
       | FromAbsolutePath s ->
           failwith "Import with absolute path should have been filled") imports in
     PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest imports'
@@ -332,7 +332,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let compile opts term imports =
     let debug = opts.debug in
     let options = make_pipeline_options opts in
-    let runtime_imports = [FromLibrary (if opts.cps then "gc.h" else "gc_stack.h")] in
+    let runtime_imports = [FromLibrary ((if opts.cps then "gc.h" else "gc_stack.h"), None)] in
     let curlib = Sys.getcwd () in
     let imports = List.map (fun i -> 
       match i with
@@ -375,7 +375,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let debug = opts.debug in
     let options = make_pipeline_options opts in
     let runtime_imports = 
-      [ FromLibrary (if opts.cps then "gc.h" else "gc_stack.h"); FromLibrary "stdio.h" ] in
+      [ FromLibrary ((if opts.cps then "gc.h" else "gc_stack.h"), None); FromLibrary ("stdio.h", None) ] in
     let time = Unix.gettimeofday() in
     (match CI.generate_glue options globs with
     | CompM.Ret (((nenv, header), prg), logs) ->
@@ -480,7 +480,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
         match i with 
         | FromAbsolutePath s -> [oname s]
         | FromRelativePath s -> [oname s]
-        | FromLibrary s -> [make_rt_file (oname s)]) imports) in
+        | FromLibrary (s, _) -> [make_rt_file (oname s)]) imports) in
       let l = make_rt_file "certicoq_run_main.o" :: imports' in
       String.concat " " l
     in
@@ -686,7 +686,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
         match i with 
         | FromAbsolutePath s -> [oname s]
         | FromRelativePath s -> [oname s]
-        | FromLibrary s -> [make_rt_file (oname s)]) imports) in
+        | FromLibrary (_, Some s) -> [make_rt_file (oname s)]
+        | FromLibrary (s, None) -> [make_rt_file (oname s)]) imports) in
       let l = imports' in
       String.concat " " l
     in

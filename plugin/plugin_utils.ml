@@ -6,7 +6,7 @@ open Caml_bytestring
 type import =
     FromRelativePath of string
   | FromAbsolutePath of string
-  | FromLibrary of string
+  | FromLibrary of string * string option
 
 let string_of_bytestring = caml_string_of_bytestring
 let bytestring_of_string = bytestring_of_caml_string
@@ -16,9 +16,9 @@ let bytestring_of_string = bytestring_of_caml_string
 let extract_constant (g : Names.GlobRef.t) (s : string) : (Kernames.kername * Kernames.ident)  =
   match g with
   | Names.GlobRef.ConstRef c -> (Obj.magic (quote_kn (Names.Constant.canonical c)), bytestring_of_caml_string s)
-  | Names.GlobRef.VarRef(v) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found a variable. Only constants can be realized in C.")
-  | Names.GlobRef.IndRef(i) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found an inductive type. Only constants can be realized in C.")
-  | Names.GlobRef.ConstructRef(c) -> CErrors.user_err ~hdr:"extract-constant" (str "Expected a constant but found a constructor. Only constants can be realized in C. ")
+  | Names.GlobRef.VarRef(v) -> CErrors.user_err (str "Expected a constant but found a variable. Only constants can be realized in C.")
+  | Names.GlobRef.IndRef(i) -> CErrors.user_err (str "Expected a constant but found an inductive type. Only constants can be realized in C.")
+  | Names.GlobRef.ConstructRef(c) -> CErrors.user_err (str "Expected a constant but found a constructor. Only constants can be realized in C. ")
 
 let rec debug_mappings (ms : (Kernames.kername * Kernames.ident) list) : unit =
   match ms with
@@ -32,8 +32,10 @@ let rec debug_mappings (ms : (Kernames.kername * Kernames.ident) list) : unit =
      
 let help_msg : string =
   "Usage:\n\
-To compile an Gallina definition named <gid> type:\n\
+To compile a Gallina definition named <gid> type:\n\
    CertiCoq Compile <options> <gid>.\n\n\
+To evaluate a Gallina definition named <gid> type:\n\
+   CertiCoq Eval <options> <gid>.\n\n\
 To show this help message type:\n\
    CertiCoq -help.\n\n\
 To produce an .ir file with the last IR (lambda-anf) of the compiler type:\n\
@@ -50,5 +52,7 @@ Valid options:\n\
 -time_anf :  Time λanf optimizations\n\
 \n\n\
 To compile Gallina constants to specific C functions use:\n\
-   CertiCoq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\", ... , \"fileM.h\" ]."
+   CertiCoq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\" as library, ... , \"fileM.h\" as library ].\n\
+\n\
+See https://github.com/CertiCoq/certicoq/wiki/The-CertiCoq-plugin for more detailed information."
 

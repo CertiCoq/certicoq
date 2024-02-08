@@ -80,7 +80,7 @@ END
 VERNAC ARGUMENT EXTEND cinclude
 | [ string(str) ] -> { FromRelativePath str }
 | [ string(str) "as" "absolute" ] -> { FromAbsolutePath str }
-| [ string(str) "as" "library" ] -> { FromLibrary str }
+| [ string(str) string_opt(str') "as" "library" ] -> { FromLibrary (str, str') }
 END
 
 VERNAC COMMAND EXTEND CertiCoq_Register CLASSIFIED AS SIDEFF

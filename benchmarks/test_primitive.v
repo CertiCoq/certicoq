@@ -12,7 +12,7 @@ CertiCoq Run cst.
 
 From Bignums Require Import BigN.
 Local Open Scope bigN_scope.
-From MetaCoq Require Import Loader.
+From MetaCoq.ErasurePlugin Require Import Loader.
 
 (* From MetaCoq.Erasure Require Import Loader. *)
  

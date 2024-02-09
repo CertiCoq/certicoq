@@ -2,9 +2,27 @@ From Equations Require Import Equations.
 From Coq Require Import Uint63 Wf_nat ZArith Lia Arith.
 From CertiCoq Require Import CertiCoq.
 
+Set CertiCoq Build Directory "_build".
+
 (* This warns about uses of primitive operations, but we compile them fine *)
 Set Warnings "-primitive-turned-into-axiom".
+From Coq Require Vector Fin.
+Import Vector.VectorNotations.
 
+Program Definition long_vector n : Vector.t nat n := 
+  Vector.of_list (List.repeat 1000 n).
+  Next Obligation. now rewrite List.repeat_length. Qed.
+
+Definition silent_long_vector := 0.
+ (* Vector.eqb _ Nat.eqb (long_vector 5000) (long_vector 5000). *)
+
+(* Time Eval vm_compute in silent_long_vector. (* Blows up *) *)
+(* 1.23s *)
+(* Set Debug "certicoq-reify". *)
+(* Set Debug "backtrace". *)
+CertiCoq Eval -time -debug silent_long_vector.
+CertiCoq Eval -time -debug silent_long_vector.
+CertiCoq Eval -time -debug silent_long_vector.
 
 Definition inspect {A} (a : A) : {b | a = b} :=
   exist _ a eq_refl.
@@ -88,10 +106,13 @@ Definition vs_hard :=
 (* Blows up *) Time Eval vm_compute in vs_hard.
 *)
 
-CertiCoq Eval -time vs_hard.
+(* CertiCoq Eval -time vs_hard. *)
 (* Executed in 0.06s *)
-CertiCoq Eval -time vs_hard.
+(* CertiCoq Eval -time vs_hard. *)
 
-CertiCoq Eval -time vs_easy.
+(* CertiCoq Eval -time vs_easy. *)
 (* Executed in 0.007s *)
+
+
+
 

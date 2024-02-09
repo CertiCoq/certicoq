@@ -115,25 +115,28 @@ let certicoq_run_functions_name = "certicoq-run-functions-registration"
 
 let all_run_functions = ref CString.Set.empty
 
-let cache_certicoq_run_function (s, fn) =
+let cache_certicoq_run_function (s, s', fn) =
   let fns = !certicoq_run_functions in
-  all_run_functions := CString.Set.add s !all_run_functions;
+  all_run_functions := CString.Set.add s (CString.Set.add s' !all_run_functions);
   certicoq_run_functions := CString.Map.add s fn fns
 
 let certicoq_run_function_input = 
-  let open Libobject in 
+  let open Libobject in
   declare_object 
     (global_object_nodischarge certicoq_run_functions_name
     ~cache:(fun r -> cache_certicoq_run_function r)
     ~subst:None)
 
-let register_certicoq_run s fn =
+let register_certicoq_run s s' fn =
   Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certicoq_run");
-  Lib.add_leaf (certicoq_run_function_input (s, fn))
+  Lib.add_leaf (certicoq_run_function_input (s, s', fn))
 
 let exists_certicoq_run s =
-  CString.Map.find_opt s !certicoq_run_functions
-
+  Feedback.msg_debug Pp.(str"Looking up " ++ str s ++ str " in certicoq_run_functions");
+  let res = CString.Map.find_opt s !certicoq_run_functions in
+  if Option.is_empty res then Feedback.msg_debug Pp.(str"Not found");
+  res
+  
 let run_certicoq_run s = 
   try CString.Map.find s !certicoq_run_functions
   with Not_found -> CErrors.user_err Pp.(str"Could not find certicoq run function associated to " ++ str s)
@@ -580,14 +583,16 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let open Declarations in
     let debug s = debug_reify Pp.(fun () -> str s) in
     let rec aux ty v =
+    Control.check_for_interrupt ();
+    let () = debug_reify Pp.(fun () -> str "Reifying value of type " ++ pr_reifyable_type env sigma ty) in
     match ty with
     | IsInductive (hd, u, args) -> 
       let open Inductive in
       let open Inductiveops in
       let spec = lookup_mind_specif env hd in
-      let indfam = make_ind_family ((hd, u), args) in
       let npars = inductive_params spec in
       let params, _indices = CList.chop npars args in
+      let indfam = make_ind_family ((hd, u), params) in
       let cstrs = get_constructors env indfam in
       if Obj.is_block v then
         let ord = get_boxed_ordinal v in
@@ -645,30 +650,30 @@ module CompileFunctor (CI : CompilerInterface) = struct
     flush chan; close_out chan;
     fname
   
-  let template_ocaml name = 
-    Printf.sprintf "external %s : unit -> Obj.t = \"%s\"\nlet _ = Certicoq_plugin.Certicoq.register_certicoq_run \"%s\" (Obj.magic %s)" name name name name
+  let template_ocaml id filename name = 
+    Printf.sprintf "external %s : unit -> Obj.t = \"%s\"\nlet _ = Certicoq_plugin.Certicoq.register_certicoq_run \"%s\" \"%s\" (Obj.magic %s)" name name id filename name
   
-  let write_ocaml_driver opts name = 
+  let write_ocaml_driver id opts name = 
     let fname = make_fname opts (opts.filename ^ "_wrapper.ml") in
     let chan = open_out fname in
-    output_string chan (template_ocaml name);
+    output_string chan (template_ocaml id opts.filename name);
     flush chan; close_out chan; fname
 
-  let certicoq_eval_named opts env sigma id c imports =
+  let certicoq_eval_named opts env sigma c global_id imports =
     let prog = quote_term opts env sigma c in
     let tyinfo = 
       let ty = Retyping.get_type_of env sigma c in
       (* assert (Evd.is_empty sigma); *)
       check_reifyable env sigma ty
     in
-    let () = compile opts (Obj.magic prog) imports in
+    let id = opts.toplevel_name in
+    let () = compile { opts with toplevel_name = id ^ "_body" } (Obj.magic prog) imports in
     (* Write wrapping code *)
     let c_driver = write_c_driver opts id in
-    let ocaml_driver = write_ocaml_driver opts id in      
+    let ocaml_driver = write_ocaml_driver global_id opts id in      
     let imports = get_global_includes () @ imports in
     let debug = opts.debug in
     let suff = opts.ext in
-    let name = make_fname opts (id ^ suff) in
     let compiler = compiler_executable debug in
     let ocamlfind = ocamlfind_executable debug in
     let rt_dir = runtime_dir () in
@@ -699,7 +704,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let dontlink = "str,unix,dynlink,threads,zarith,coq-core,coq-core.plugins.ltac,coq-core.interp" in
     match Unix.system cmd with
     | Unix.WEXITED 0 ->
-      let shared_lib = name ^ ".cmxs" in
+      let shared_lib = make_fname opts opts.filename ^ suff ^ ".cmxs" in
       let linkcmd =
         Printf.sprintf "%s ocamlopt -shared -linkpkg -dontlink %s -thread -rectypes -package %s \
         -I %s -I plugin -o %s %s %s %s %s"
@@ -709,12 +714,12 @@ module CompileFunctor (CI : CompilerInterface) = struct
       debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
       (match Unix.system linkcmd with
       | Unix.WEXITED 0 ->
-          debug_msg debug (Printf.sprintf "Compilation ran fine, linking compiled code for %s" id);
+          debug_msg debug (Printf.sprintf "Compilation ran fine, linking compiled code for %s" global_id);
           Dynlink.loadfile_private shared_lib;
-          debug_msg debug (Printf.sprintf "Dynamic linking succeeded, retrieving function %s" id);
+          debug_msg debug (Printf.sprintf "Dynamic linking succeeded, retrieving function %s" global_id);
           let result = 
-            if opts.time then time ~msg:(Pp.str id) (run_certicoq_run id)
-            else run_certicoq_run id ()
+            if opts.time then time ~msg:(Pp.str id) (run_certicoq_run global_id)
+            else run_certicoq_run global_id ()
           in
           debug_msg debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
           reify opts env sigma tyinfo result
@@ -733,10 +738,15 @@ module CompileFunctor (CI : CompilerInterface) = struct
     Feedback.msg_debug Pp.(str "Found " ++ str freshs);
     freshs
     
+  let toplevel_name_of_filename s = 
+    let comps = CString.split_on_char '.' s in
+    CString.uncapitalize_ascii (CString.concat "_" comps)
+
   let certicoq_eval opts env sigma c imports =
-    let fresh_name = find_fresh opts.filename !all_run_functions in
-    let opts = { opts with toplevel_name = fresh_name ^ "_body"; filename = fresh_name } in
-    certicoq_eval_named opts env sigma fresh_name c imports
+    let global_id = opts.filename in
+    let fresh_name = find_fresh global_id !all_run_functions in
+    let opts = { opts with toplevel_name = toplevel_name_of_filename fresh_name; filename = fresh_name } in
+    certicoq_eval_named opts env sigma c global_id imports
 
   let run_existing opts env sigma c id run =
     let tyinfo = 
@@ -750,23 +760,21 @@ module CompileFunctor (CI : CompilerInterface) = struct
     debug_msg opts.debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
     reify opts env sigma tyinfo result
     
-  let certicoq_eval opts env sigma c imports =
+  let eval opts env sigma c imports =
     match exists_certicoq_run opts.filename with
     | None -> certicoq_eval opts env sigma c imports
     | Some run -> 
       debug_msg opts.debug (Printf.sprintf "Retrieved earlier compiled code for %s" opts.filename);
       run_existing opts env sigma c (Pp.str opts.filename) run
 
-  let compile_shared_C opts gr imports =
+  let eval_gr opts gr imports =
     let env = Global.env () in
     let sigma = Evd.from_env env in
     let sigma, c = Evd.fresh_global env sigma gr in
-    let name = Names.Id.to_string (Nametab.basename_of_global gr) in
-    match exists_certicoq_run name with
-    | None ->
-      let opts = { opts with toplevel_name = name ^ "_body"; } in
-      certicoq_eval_named opts env sigma name c imports
-    | Some run -> run_existing opts env sigma c (Pp.str name) run
+    let filename = get_name gr in
+    let name = toplevel_name_of_filename filename in
+    let opts = { opts with toplevel_name = name; filename = filename } in
+    eval opts env sigma c imports
     
   let print_to_file (s : string) (file : string) =
     let f = open_out file in

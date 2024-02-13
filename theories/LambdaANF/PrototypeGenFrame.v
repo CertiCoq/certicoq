@@ -321,9 +321,9 @@ Definition string_of_N n :=
   | N0 => "0"
   | Npos n => string_of_positive n
   end.
-Compute (string_of_N 100).
-Compute (string_of_N 200).
-Compute (string_of_N 350).
+(* Compute (string_of_N 100). *)
+(* Compute (string_of_N 200). *)
+(* Compute (string_of_N 350). *)
 
 Notation "'GM'" := (stateT N (sum string)).
 

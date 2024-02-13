@@ -2475,7 +2475,7 @@ Section Inline_correct.
     
     destruct p. destruct i. do 3 eexists.
     split; [| split; [| split; [| split; [| split ]]]]. 
-    - setoid_rewrite Hstate. (* why? *) reflexivity.
+    - reflexivity.
     - eassumption.
     - eapply Included_trans. eassumption. rewrite apply_r_empty_f_eq. rewrite image_id, occurs_free_fun_map_empty.
       sets.

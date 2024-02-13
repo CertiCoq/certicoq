@@ -167,6 +167,9 @@ let _ = Callback.register "coq_user_error" coq_user_error
 (** Compilation Command Arguments *)
 
 type command_args =
+ | TYPED_ERASURE
+ | FAST_ERASURE
+ | UNSAFE_ERASURE
  | BYPASS_QED
  | CPS
  | TIME
@@ -183,7 +186,10 @@ type command_args =
  | FILENAME of string (* Name of the generated file *)
 
 type options =
-  { bypass_qed : bool;
+  { typed_erasure : bool;
+    fast_erasure : bool;
+    unsafe_erasure : bool;
+    bypass_qed : bool;
     cps       : bool;
     time      : bool;
     time_anf  : bool;
@@ -212,7 +218,10 @@ let check_build_dir d =
   else d
   
 let default_options () : options =
-  { bypass_qed = false;
+  { typed_erasure = false;
+    fast_erasure = false;
+    unsafe_erasure = false;
+    bypass_qed = false;
     cps       = false;
     time      = false;
     time_anf  = false;
@@ -233,6 +242,9 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
   let rec aux (o : options) l =
     match l with
     | [] -> o
+    | TYPED_ERASURE :: xs -> aux {o with typed_erasure = true} xs
+    | FAST_ERASURE :: xs -> aux {o with fast_erasure = true} xs
+    | UNSAFE_ERASURE :: xs -> aux {o with unsafe_erasure = true} xs
     | BYPASS_QED :: xs -> aux {o with bypass_qed = true} xs
     | CPS      :: xs -> aux {o with cps = true} xs
     | TIME     :: xs -> aux {o with time = true} xs
@@ -255,6 +267,14 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
   {o with prims = pr}
 
 let make_pipeline_options (opts : options) =
+  let erasure_config = 
+      Erasure0.({ 
+        enable_typed_erasure = opts.typed_erasure; 
+        enable_cofix_to_fix = opts.unsafe_erasure;
+        enable_fast_remove_params = opts.fast_erasure;
+        dearging_config = default_dearging_config
+        })
+  in
   let cps    = opts.cps in
   let args = coq_nat_of_int opts.args in
   let olevel = coq_nat_of_int opts.olevel in
@@ -267,7 +287,7 @@ let make_pipeline_options (opts : options) =
   let toplevel_name = bytestring_of_string opts.toplevel_name in
   let prims = get_global_prims () @ opts.prims in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
-  Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
+  Pipeline.make_opts erasure_config cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
 
 (** Main Compilation Functions *)
 

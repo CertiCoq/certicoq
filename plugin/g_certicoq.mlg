@@ -42,7 +42,10 @@ let to_ltac_val c = Tacinterp.Value.of_constr c
 
 }
 
-ARGUMENT EXTEND cargs 
+ARGUMENT EXTEND cargs
+| [ "-typed-erasure" ] -> { TYPED_ERASURE }
+| [ "-fast-erasure" ] -> { FAST_ERASURE }
+| [ "-unsafe-erasure" ] -> { UNSAFE_ERASURE }
 | [ "-bypass_qed" ] -> { BYPASS_QED }
 | [ "-cps" ] -> { CPS }
 | [ "-time" ] -> { TIME }

@@ -14,6 +14,7 @@ Require compcert.common.AST
 Require Glue.glue
         Compiler.pipeline.
 
+From MetaCoq.ErasurePlugin Require Import Erasure.
 (* Standard lib *)
 Require Import ExtrOcamlBasic ExtrOCamlFloats ExtrOCamlInt63.
 Require Import Coq.extraction.Extraction.
@@ -101,6 +102,7 @@ Separate Extraction
          String.length
          Compiler.pipeline.make_opts
          Compiler.pipeline.compile
+         Erasure.default_dearging_config
          Glue.glue.generate_glue
          Glue.ffi.generate_ffi
          cps.M.elements

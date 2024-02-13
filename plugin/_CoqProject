@@ -56,8 +56,8 @@ extraction/pCUICWfEnvImpl.mli
 extraction/pCUICWfEnvImpl.ml
 extraction/typing0.mli
 extraction/typing0.ml
-# extraction/environmentTyping.mli
-# extraction/environmentTyping.ml
+extraction/environmentTyping.mli
+extraction/environmentTyping.ml
 extraction/astUtils.mli
 extraction/astUtils.ml
 extraction/etaExpand.mli
@@ -172,8 +172,26 @@ extraction/eAstUtils.ml
 extraction/eAstUtils.mli
 extraction/eEnvMap.mli
 extraction/eEnvMap.ml
-# extraction/eLiftSubst.ml
-# extraction/eLiftSubst.mli
+extraction/eLiftSubst.ml
+extraction/eLiftSubst.mli
+extraction/ePretty.mli
+extraction/ePretty.ml
+extraction/resultMonad.mli
+extraction/resultMonad.ml
+extraction/exAst.mli
+extraction/exAst.ml
+extraction/fin.mli
+extraction/fin.ml
+extraction/eCoInductiveToInductive.mli
+extraction/eCoInductiveToInductive.ml
+extraction/vectorDef.mli
+extraction/vectorDef.ml
+extraction/vector.mli
+extraction/vector.ml
+extraction/optimize.mli
+extraction/optimize.ml
+extraction/optimizeCorrectness.mli
+extraction/optimizeCorrectness.ml
 extraction/eCSubst.ml
 extraction/eCSubst.mli
 extraction/eWellformed.mli
@@ -214,6 +232,8 @@ extraction/optimizePropDiscr.mli
 extraction/optimizePropDiscr.ml
 extraction/extractionCorrectness.mli
 extraction/extractionCorrectness.ml
+extraction/erasure0.mli
+extraction/erasure0.ml
 extraction/erasure.ml
 extraction/erasure.mli
 extraction/errors0.ml
@@ -284,6 +304,8 @@ extraction/logic0.ml
 extraction/logic0.mli
 extraction/maps.ml
 extraction/maps.mli
+extraction/utils.mli
+extraction/utils.ml
 extraction/maps_util.ml
 extraction/maps_util.mli
 extraction/map_util.ml
@@ -298,12 +320,16 @@ extraction/mCCompare.ml
 extraction/mCCompare.mli
 extraction/mCList.ml
 extraction/mCList.mli
+extraction/mCReflect.ml
+extraction/mCReflect.mli
 extraction/mCOption.ml
 extraction/mCOption.mli
 extraction/mCPrelude.ml
 extraction/mCPrelude.mli
 extraction/mCProd.ml
 extraction/mCProd.mli
+extraction/reflect.mli
+extraction/reflect.ml
 extraction/memdata.ml
 extraction/memdata.mli
 extraction/memory.ml

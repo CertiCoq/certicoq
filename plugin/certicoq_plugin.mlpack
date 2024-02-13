@@ -25,6 +25,9 @@ Byte
 Caml_byte
 Ascii
 String0
+Fin
+VectorDef
+Vector
 Orders
 OrdersTac
 OrdersFacts
@@ -45,6 +48,7 @@ FMapFacts
 BinNums
 Classes1
 EqDecInstances
+MCReflect
 MCPrelude
 MCOption
 MCList
@@ -55,6 +59,7 @@ Number0
 Signature
 CRelationClasses
 
+ResultMonad
 DecimalString
 Byte0
 ByteCompare
@@ -68,6 +73,7 @@ PrimFloat
 FloatOps
 Config0
 Kernames
+Reflect
 Transform
 Universes0
 All_Forall
@@ -108,6 +114,7 @@ Init
 TemplateEnvMap
 TemplateProgram
 EtaExpand
+EnvironmentTyping
 
 Ssrbool
 WGraph
@@ -153,6 +160,7 @@ EInduction
 ECSubst
 EWellformed
 EEnvMap
+ELiftSubst
 EGlobalEnv
 EWcbvEval
 ESpineView
@@ -166,8 +174,15 @@ ERemoveParams
 EOptimizePropDiscr
 EInlineProjections
 EConstructorsAsBlocks
-ETransform
+ExAst
 Erasure
+Optimize
+OptimizeCorrectness
+ExtractionCorrectness
+OptimizePropDiscr
+ECoInductiveToInductive
+ETransform
+Erasure0
 OptimizePropDiscr
 ErasureCorrectness
 SafeTemplateErasure

@@ -57,7 +57,8 @@ Lemma gensyms_len' {A} : forall x (xs : list A) x' xs', (x', xs') = gensyms x xs
 Proof.
   intros x xs; revert x; induction xs as [|x xs IHxs]; intros x0 x' xs' Hgen; [simpl in Hgen; now inv Hgen|].
   unfold gensyms in Hgen; fold @gensyms in Hgen.
-  destruct (gensyms (x0 + 1)%positive xs) as [x'' xs''] eqn:Hx0; inv Hgen; now simpl.
+  destruct (gensyms (x0 + 1)%positive xs) as [x'' xs''] eqn:Hx0. inv Hgen;  simpl. f_equal.
+  eapply IHxs. now symmetry.
 Qed.
 
 Lemma gensyms_increasing' {A} :

@@ -1,6 +1,9 @@
 open Plugin_utils
 
 type command_args =
+ | TYPED_ERASURE
+ | FAST_ERASURE
+ | UNSAFE_ERASURE
  | BYPASS_QED
  | CPS
  | TIME
@@ -17,7 +20,10 @@ type command_args =
  | FILENAME of string (* Name of the generated file *)
 
 type options =
-  { bypass_qed : bool;
+  { typed_erasure : bool;
+    fast_erasure : bool;
+    unsafe_erasure : bool;
+    bypass_qed : bool;
     cps       : bool;
     time      : bool;
     time_anf  : bool;

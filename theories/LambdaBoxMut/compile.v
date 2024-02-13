@@ -411,8 +411,8 @@ Fixpoint compile_ctx (t : global_context) :=
     (n, compile_global_decl decl) :: compile_ctx rest
   end.
 
-Program Definition compile_program (p : Ast.Env.program) : Program Term :=
-  let p := run_erase_program p _ in
+Program Definition compile_program econf (p : Ast.Env.program) : Program Term :=
+  let p := run_erase_program econf p _ in
   {| main := compile (snd p) ; env := compile_ctx (fst p) |}.
 Next Obligation.
   split.
@@ -422,5 +422,5 @@ Next Obligation.
   split; typeclasses eauto.
 Qed.
 
-Definition program_Program (p: Ast.Env.program) : Program Term :=
-  compile_program p.
+Definition program_Program econf (p: Ast.Env.program) : Program Term :=
+  compile_program econf p.

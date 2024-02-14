@@ -2,6 +2,7 @@ From CertiCoq.Plugin Require Import Loader.
 From Coq Require Import PrimFloat.
 
 CertiCoq Register [ 
+  Coq.Floats.PrimFloat.float => "erased",
   Coq.Floats.PrimFloat.compare => "prim_float_compare",
   Coq.Floats.PrimFloat.eqb => "prim_float_eqb",
   Coq.Floats.PrimFloat.ltb => "prim_float_ltb",

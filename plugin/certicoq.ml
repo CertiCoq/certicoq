@@ -697,9 +697,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let compiler = compiler_executable debug in
     let ocamlfind = ocamlfind_executable debug in
     let rt_dir = runtime_dir () in
-
     let cmd =
-        Printf.sprintf "%s -Wno-everything -g -I %s -I %s -c -o %s %s" 
+        Printf.sprintf "%s -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s" 
           compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
     in
     let importso =

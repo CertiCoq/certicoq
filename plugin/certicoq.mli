@@ -16,7 +16,7 @@ type command_args =
  | EXT of string (* Filename extension to be appended to the file name *)
  | DEV of int
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
-| TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
+ | TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
  | FILENAME of string (* Name of the generated file *)
 
 type options =

@@ -1,6 +1,10 @@
 open Plugin_utils
 
 type command_args =
+ | TYPED_ERASURE
+ | FAST_ERASURE
+ | UNSAFE_ERASURE
+ | BYPASS_QED
  | CPS
  | TIME
  | TIMEANF
@@ -12,27 +16,33 @@ type command_args =
  | EXT of string (* Filename extension to be appended to the file name *)
  | DEV of int
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
+ | TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
  | FILENAME of string (* Name of the generated file *)
 
-type options =
-  { cps       : bool;
-    time      : bool;
-    time_anf  : bool;
-    olevel    : int;
-    debug     : bool;
-    args      : int;
-    anf_conf  : int;
-    build_dir : string;
-    filename  : string;
-    ext       : string;
-    dev       : int;
-    prefix    : string;
-    prims     : ((Kernames.kername * Kernames.ident) * Datatypes.bool) list;
-  }
+ type options =
+ { typed_erasure : bool;
+   fast_erasure : bool;
+   unsafe_erasure : bool;
+   bypass_qed : bool;
+   cps       : bool;
+   time      : bool;
+   time_anf  : bool;
+   olevel    : int;
+   debug     : bool;
+   args      : int;
+   anf_conf  : int;
+   build_dir : string;
+   filename  : string;
+   ext       : string;
+   dev       : int;
+   prefix    : string;
+   toplevel_name : string;
+   prims     : ((Kernames.kername * Kernames.ident) * Datatypes.bool) list;
+ }
 
 type prim = ((Kernames.kername * Kernames.ident) * Datatypes.bool)
 
-val default_options : options
+val default_options : unit -> options
 val make_options : command_args list -> prim list -> string -> options
 
 (* Register primitive operations and associated include file *)
@@ -64,6 +74,17 @@ end
 val compile_only : options -> Names.GlobRef.t -> import list -> unit
 val generate_glue_only : options -> Names.GlobRef.t -> unit
 val compile_C : options -> Names.GlobRef.t -> import list -> unit
+val eval_gr : options -> Names.GlobRef.t -> import list -> Constr.t
 val show_ir : options -> Names.GlobRef.t -> unit
 val ffi_command : options -> Names.GlobRef.t -> unit
 val glue_command : options -> Names.GlobRef.t list -> unit
+val eval : options -> Environ.env -> Evd.evar_map -> EConstr.t -> import list -> Constr.t
+
+(* Support for running dynamically linked certicoq-compiled programs *)
+type certicoq_run_function = unit -> Obj.t
+
+(* [register_certicoq_run global_id fresh_name function]. A same global_id 
+  can be compiled multiple times with different definitions, fresh_name indicates
+  the version used this time *)
+val register_certicoq_run : string -> string -> certicoq_run_function -> unit
+val run_certicoq_run : string -> certicoq_run_function

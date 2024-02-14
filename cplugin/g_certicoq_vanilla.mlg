@@ -9,10 +9,43 @@ open Ltac_plugin
 open Stdarg
 open Pcoq.Prim
 open Plugin_utils
+open Tacexpr
+open Tacinterp
+open Stdarg
+open Tacarg
+open Genredexpr
+
+(** Calling Ltac **)
+
+let ltac_lcall tac args =
+  let (location, name) = Loc.tag (Names.Id.of_string tac)
+    (* Loc.tag @@ Names.Id.of_string tac *)
+  in
+  CAst.make ?loc:location (Tacexpr.TacArg(Tacexpr.TacCall
+                              (CAst.make (Locus.ArgVar (CAst.make ?loc:location name),args))))
+
+
+let ltac_apply (f : Value.t) (args: Tacinterp.Value.t list) =
+  let fold arg (i, vars, lfun) =
+    let id = Names.Id.of_string ("x" ^ string_of_int i) in
+    let (l,n) = (Loc.tag id) in
+    let x = Reference (Locus.ArgVar (CAst.make ?loc:l n)) in
+    (succ i, x :: vars, Names.Id.Map.add id arg lfun)
+  in
+  let (_, args, lfun) = List.fold_right fold args (0, [], Names.Id.Map.empty) in
+  let lfun = Names.Id.Map.add (Names.Id.of_string "F") f lfun in
+  let ist = { (Tacinterp.default_ist ()) with Tacinterp.lfun = lfun; } in
+  Tacinterp.eval_tactic_ist ist (ltac_lcall "F" args)
+
+let to_ltac_val c = Tacinterp.Value.of_constr c
 
 }
 
-VERNAC ARGUMENT EXTEND vanilla_cargs 
+ARGUMENT EXTEND vanilla_cargs 
+| [ "-typed-erasure" ] -> { TYPED_ERASURE }
+| [ "-fast-erasure" ] -> { FAST_ERASURE }
+| [ "-unsafe-erasure" ] -> { UNSAFE_ERASURE }
+| [ "-bypass_qed" ] -> { BYPASS_QED }
 | [ "-cps" ] -> { CPS }
 | [ "-time" ] -> { TIME }
 | [ "-time_anf" ] -> { TIMEANF }
@@ -25,6 +58,7 @@ VERNAC ARGUMENT EXTEND vanilla_cargs
 | [ "-dev" natural(n) ] -> { DEV(n) }
 | [ "-ext" string(s) ] -> { EXT(s) }
 | [ "-file" string(s) ] -> { FILENAME(s) }
+| [ "-toplevel_name" string(s) ] -> { TOPLEVEL_NAME(s) }
 END
 
 
@@ -49,7 +83,7 @@ END
 VERNAC ARGUMENT EXTEND vanilla_cinclude
 | [ string(str) ] -> { FromRelativePath str }
 | [ string(str) "as" "absolute" ] -> { FromAbsolutePath str }
-| [ string(str) "as" "library" ] -> { FromLibrary str }
+| [ string(str) string_opt(str') "as" "library" ] -> { FromLibrary (str, str') }
 END
 
 VERNAC COMMAND EXTEND CertiCoq_Register CLASSIFIED AS SIDEFF
@@ -102,4 +136,32 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
 | [ "CertiCoq" "-help" ] -> {
     Feedback.msg_info (str help_msg)
   }
+END
+
+VERNAC COMMAND EXTEND CertiCoq_Eval CLASSIFIED AS SIDEFF
+| [ "CertiCoq" "Eval" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" vanilla_cinclude_list_sep(imps, ",") "]" ] -> {
+  let gr = Nametab.global gr in
+  let opts = Certicoq.make_options l cs (get_name gr) in
+  let result = Certicoq.eval_gr opts gr imps in 
+  Feedback.msg_notice Pp.(str" = " ++ Printer.pr_constr_env (Global.env ()) Evd.empty result)
+  }
+| [ "CertiCoq" "Eval" vanilla_cargs_list(l) global(gr) ] -> {
+  let gr = Nametab.global gr in
+  let opts = Certicoq.make_options l [] (get_name gr) in
+  let result = Certicoq.eval_gr opts gr [] in
+  Feedback.msg_notice Pp.(str" = " ++ Printer.pr_constr_env (Global.env ()) Evd.empty result)
+  }
+END
+
+TACTIC EXTEND CertiCoq_eval
+| [ "certicoq_eval" vanilla_cargs_list(l) constr(c) tactic(tac) ] ->
+  { (* quote and evaluate the given term, unquote, pass the result to t *)
+    Proofview.Goal.enter begin fun gl ->
+      let env = Proofview.Goal.env gl in
+      let sigma = Proofview.Goal.sigma gl in
+      let opts = Certicoq.make_options l [] "goal" in
+      let opts = Certicoq.{ opts with toplevel_name = "goal" } in
+      let c' = Certicoq.eval opts env sigma c [] in 
+      ltac_apply tac (List.map to_ltac_val [EConstr.of_constr c'])
+  end }
 END

@@ -73,9 +73,15 @@ theories/CertiCoqC.vo: theories/CertiCoqC.v
 theories/compile.vo: theories/compile.v theories/CertiCoqC.vo
 	coqc ${COQOPTS} $<
 
+g_certicoqc.ml: g_certicoqc.mlg certicoqc.cmx certicoqc_plugin_wrapper.cmx
+	coqpp $<
+
+certicoqc.cmx: certicoqc_plugin_wrapper.cmx
+
 %.o: %.c theories/compile.vo
 	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
 
+.PRECIOUS: %.cmi
 %.cmi: %.mli
 	ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin $<
 
@@ -91,12 +97,7 @@ certicoqc_plugin.cmx: certicoqc_plugin_wrapper.cmx certicoqc.cmx g_certicoqc.cmx
 certicoqc_plugin.cmxa: certicoqc_plugin.cmx
 	ocamlfind opt -linkall ${OCAMLOPTS} -a -o $@ $<
 
-g_certicoqc.ml: g_certicoqc.mlg certicoqc.cmx certicoqc_plugin_wrapper.cmx
-	coqpp $<
-
 certicoqc_wrapper.c: theories/compile.vo
-
-certicoqc.cmx: certicoqc_plugin_wrapper.cmx
 
 install: theories/compile.vo certicoqc_plugin.cmxs
 	install -d "$(COQLIBINSTALL)"

@@ -47,6 +47,8 @@ CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I ${RUNTIME_DIR} -I ${OCA
 
 .PHONY: certicoqc
 
+all: plugin
+
 plugin: theories/compile.vo certicoqc
 
 Makefile.certicoqc: _CoqProject
@@ -74,6 +76,12 @@ theories/compile.vo: theories/compile.v theories/CertiCoqC.vo
 %.o: %.c theories/compile.vo
 	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
 
+%.cmi: %.mli
+	ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin $<
+
+%.cmx: %.ml	%.cmi
+	ocamlfind opt -c ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin -o $@ $<
+
 certicoqc_plugin.cmxs: certicoqc_plugin.cmxa ${CFILES:.c=.o} ${RUNTIME_FILES}
 	ocamlfind ocamlopt ${OCAMLOPTS} -shared -o $@ $+
 
@@ -90,12 +98,6 @@ certicoqc_wrapper.c: theories/compile.vo
 
 certicoqc.cmx: certicoqc_plugin_wrapper.cmx
 
-%.cmi: %.mli
-	ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin $<
-
-%.cmx: %.ml	%.cmi
-	ocamlfind opt -c ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin -o $@ $<
-
 install: theories/compile.vo certicoqc_plugin.cmxs
 	install -d "$(COQLIBINSTALL)"
 	install -m 0644 theories/CertiCoqC.v theories/CertiCoqC.vo theories/compile.v theories/compile.vo certicoqc_plugin.cmx* "$(COQLIBINSTALL)"
@@ -103,3 +105,5 @@ install: theories/compile.vo certicoqc_plugin.cmxs
 	ocamlfind install -add coq-certicoqc certicoqc_plugin.cmx* certicoqc_plugin.cmi
 
 .PHONY: plugin test
+
+.NOTPARALLEL:

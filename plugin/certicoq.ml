@@ -9,20 +9,28 @@ open ExceptionMonad
 open AstCommon
 open Plugin_utils
 
+let get_stringopt_option key =
+  let open Goptions in
+  let tables = get_tables () in
+  try
+    let _ = OptionMap.find key tables in
+    fun () ->
+      let tables = get_tables () in
+      let opt = OptionMap.find key tables in
+      match opt.opt_value with
+      | StringOptValue b -> b
+      | _ -> assert false
+  with Not_found ->
+    declare_stringopt_option_and_ref ~depr:false ~key
+
 let get_build_dir_opt =
-  Goptions.declare_stringopt_option_and_ref
-    ~key:["CertiCoq"; "Build"; "Directory"]
-    ~depr:false
+  get_stringopt_option ["CertiCoq"; "Build"; "Directory"]
 
 let get_ocamlfind =
-  Goptions.declare_stringopt_option_and_ref
-    ~key:["CertiCoq"; "ocamlfind"]
-    ~depr:false
+  get_stringopt_option ["CertiCoq"; "ocamlfind"]
 
 let get_c_compiler =
-  Goptions.declare_stringopt_option_and_ref
-    ~key:["CertiCoq"; "CC"]
-    ~depr:false
+  get_stringopt_option ["CertiCoq"; "CC"]
         
 (* Taken from Coq's increment_subscript, but works on strings rather than idents *)
 let increment_subscript id =

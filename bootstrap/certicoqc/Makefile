@@ -42,7 +42,7 @@ RUNTIME_FILES = ${RUNTIME_DIR}/gc_stack.o ${RUNTIME_DIR}/prim_floats.o ${RUNTIME
 
 VFILES = theories/Loader.v theories/PrimInt63.v theories/PrimFloats.v theories/CertiCoqC.v
 
-CCOMPILEROPTS = -fPIC -g -c -I . -I ${RUNTIME_DIR} -I ${OCAMLLIB} -w -Wno-everything -O2
+CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I ${RUNTIME_DIR} -I ${OCAMLLIB} -w -Wno-everything -O2
 # ccomp CCOMPOPTS = -g -c -I . -I ${OCAMLLIB} -Wno-int-conversion -O2
 
 .PHONY: certicoqc
@@ -63,12 +63,15 @@ test.vo: test.v
 
 clean: Makefile.certicoqc
 	make -f Makefile.certicoqc clean
-	rm *.cm* *.o *.vo
+	rm -f *.cm* *.o *.vo
 
-theories/compile.vo ${GENCFILES} &: theories/compile.v
+theories/CertiCoqC.vo: theories/CertiCoqC.v
 	coqc ${COQOPTS} $<
 
-%.o: %.c
+theories/compile.vo: theories/compile.v theories/CertiCoqC.vo
+	coqc ${COQOPTS} $<
+
+%.o: %.c theories/compile.vo
 	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
 
 certicoqc_plugin.cmxs: certicoqc_plugin.cmxa ${CFILES:.c=.o} ${RUNTIME_FILES}
@@ -95,7 +98,7 @@ certicoqc.cmx: certicoqc_plugin_wrapper.cmx
 
 install: theories/compile.vo certicoqc_plugin.cmxs
 	install -d "$(COQLIBINSTALL)"
-	install -m 0644 theories/compile.v theories/compile.vo certicoqc_plugin.cmx* "$(COQLIBINSTALL)"
+	install -m 0644 theories/CertiCoqC.v theories/CertiCoqC.vo theories/compile.v theories/compile.vo certicoqc_plugin.cmx* "$(COQLIBINSTALL)"
 	make -f Makefile.certicoqc install
 	ocamlfind install -add coq-certicoqc certicoqc_plugin.cmx* certicoqc_plugin.cmi
 

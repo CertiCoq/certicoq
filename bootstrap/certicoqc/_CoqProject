@@ -6,4 +6,3 @@
 META.coq-certicoqc
 
 theories/Loader.v
-theories/CertiCoqC.v

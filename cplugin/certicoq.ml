@@ -135,20 +135,28 @@ let fix_quoted_program (p : Ast0.Env.program) =
 
 end
 
+let get_stringopt_option key =
+  let open Goptions in
+  let tables = get_tables () in
+  try
+    let _ = OptionMap.find key tables in
+    fun () ->
+      let tables = get_tables () in
+      let opt = OptionMap.find key tables in
+      match opt.opt_value with
+      | StringOptValue b -> b
+      | _ -> assert false
+  with Not_found ->
+    declare_stringopt_option_and_ref ~depr:false ~key
+
 let get_build_dir_opt =
-  Goptions.declare_stringopt_option_and_ref
-    ~key:["CertiCoq"; "Build"; "Directory"]
-    ~depr:false
+  get_stringopt_option ["CertiCoq"; "Build"; "Directory"]
 
 let get_ocamlfind =
-  Goptions.declare_stringopt_option_and_ref
-    ~key:["CertiCoq"; "ocamlfind"]
-    ~depr:false
+  get_stringopt_option ["CertiCoq"; "ocamlfind"]
 
 let get_c_compiler =
-  Goptions.declare_stringopt_option_and_ref
-    ~key:["CertiCoq"; "CC"]
-    ~depr:false
+  get_stringopt_option ["CertiCoq"; "CC"]
         
 (* Taken from Coq's increment_subscript, but works on strings rather than idents *)
 let increment_subscript id =
@@ -176,7 +184,7 @@ let increment_subscript id =
     end
   in String.of_bytes (add (len-1))
 
-let debug_reify = CDebug.create ~name:"certicoq-reify" ()
+let debug_reify = CDebug.create ~name:"certicoq-vanilla-reify" ()
 
 external get_unboxed_ordinal : Obj.t -> int = "get_unboxed_ordinal" [@@noalloc]
 
@@ -798,7 +806,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     fname
   
   let template_ocaml id filename name = 
-    Printf.sprintf "external %s : unit -> Obj.t = \"%s\"\nlet _ = Certicoq_plugin.Certicoq.register_certicoq_run \"%s\" \"%s\" (Obj.magic %s)" name name id filename name
+    Printf.sprintf "external %s : unit -> Obj.t = \"%s\"\nlet _ = Certicoq_vanilla_plugin.Certicoq.register_certicoq_run \"%s\" \"%s\" (Obj.magic %s)" name name id filename name
   
   let write_ocaml_driver id opts name = 
     let fname = make_fname opts (opts.filename ^ "_wrapper.ml") in

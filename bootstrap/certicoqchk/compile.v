@@ -44,7 +44,7 @@ Definition certicoqchk (p : Template.Ast.Env.program) : bool :=
     (guard := Erasure.fake_guard_impl) 
     (nor := PCUICSN.default_normalizing)
     p Universes.Monomorphic_ctx with
-  | inl ty => let () := coq_msg_info ty in true
+  | inl ty => let () := coq_msg_notice ty in true
   | inr err => let () := coq_user_error err in false
   end.
 

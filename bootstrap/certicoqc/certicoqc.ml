@@ -18,7 +18,7 @@ module MLCompiler : Certicoq.CompilerInterface with
   let printProg prog names (dest : string) (imports : import list) =
     let imports' = List.map (fun i -> match i with
       | FromRelativePath s -> "#include \"" ^ s ^ "\""
-      | FromLibrary s -> "#include <" ^ s ^ ">"
+      | FromLibrary (s, _) -> "#include <" ^ s ^ ">"
       | FromAbsolutePath s ->
           failwith "Import with absolute path should have been filled") imports in
     PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest imports'

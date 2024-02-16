@@ -101,3 +101,5 @@ install: Loader.vo certicoqchk_plugin.cmxs
 	ocamlfind install -add coq-certicoqchk certicoqchk_plugin.cmx* certicoqchk_plugin.cmi
 
 .PHONY: plugin test
+
+.NOTPARALLEL:

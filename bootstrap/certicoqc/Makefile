@@ -78,6 +78,9 @@ g_certicoqc.ml: g_certicoqc.mlg certicoqc.cmx certicoqc_plugin_wrapper.cmx
 
 certicoqc.cmx: certicoqc_plugin_wrapper.cmx
 
+%.o: %.c
+	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
+
 certicoqc_plugin.cmxs: certicoqc_plugin.cmxa ${CFILES:.c=.o} ${RUNTIME_FILES}
 	ocamlfind ocamlopt ${OCAMLOPTS} -shared -o $@ $+
 
@@ -88,9 +91,6 @@ certicoqc_plugin.cmxa: certicoqc_plugin.cmx
 	ocamlfind opt -linkall ${OCAMLOPTS} -a -o $@ $<
 
 certicoqc_wrapper.c: theories/compile.vo
-
-%.o: %.c theories/compile.vo
-	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
 
 .PRECIOUS: %.cmi
 %.cmi: %.mli

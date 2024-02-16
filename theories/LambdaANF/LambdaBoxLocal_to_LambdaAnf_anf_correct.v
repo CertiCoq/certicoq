@@ -1073,14 +1073,14 @@ Section ANF_proof.
                                      (P0 := convert_anf_correct_exps)
                                      (P := convert_anf_correct_exp_step).
       - (* Con_e *)
-        intros es vs r dc fs ts Heval IH1.
+        intros es vs r dc fs ts Heval IH1.  
         intros rho names C x S1 S2 i e' Hwf Hwfexp Hdis  Hfv Hanf Hcvt.
         split; [ | congruence ].
-        intros v v' Heq Hvrel. subst. inv Hcvt. inv Hwfexp. inv Heq.
-        inv Hvrel. 
+        intros v v' Heq Hvrel.  subst. inv Hcvt. inv Hwfexp. inv Heq.
+        inv Hvrel.  
         edestruct IH1 with (e' := Econstr x (dcon_to_tag default_tag dc cenv) ys e')
                            (P := occurs_free (Econstr x (dcon_to_tag default_tag dc cenv) ys e'));
-          [ | | | | | | eassumption | | ]; try eassumption.
+          [ | | | | | | eassumption | | ]; try eassumption. 
         * now sets.
         * repeat normalize_occurs_free. now sets.
           
@@ -1088,17 +1088,14 @@ Section ANF_proof.
           (* eapply Setminus_Included_Included_Union. *)
           (* eapply Included_trans. eassumption. now sets. *)
         * now sets.
-        * destructAll.
+        * destructAll. rewrite <- app_ctx_f_fuse.
 
-          assert (Henvs : forall i : nat, preord_env_P ctenv eq_fuel (FromList names) i rho x0).
-          { intros; eauto. eapply H0. }
-          
           assert (exists vs'', get_list ys x0 = Some vs'' /\
                                  forall i, Forall2 (preord_val ctenv eq_fuel i) vs' vs''). 
-          { revert Heval H8 H H2 Hanf Henvs. clear.
+          { revert Heval H8 H H2 Hanf. clear.
             generalize (S1 \\ [set x]) as S.  
             revert vs vs' rho x0 es C0 fs ts. induction ys;
-              intros vs vs' rho x0 es C0 fs ts S Heval Hanfs Hsetl Hanf_rel Henv Henvs.
+              intros vs vs' rho x0 es C0 fs ts S Heval Hanfs Hsetl Hanf_rel Henv.
             - simpl in *. destruct vs'; try congruence. inv Hsetl.
               eexists []. split; constructor.
             - inv Hanfs. destruct vs'; simpl in Hsetl; try congruence.
@@ -1114,18 +1111,62 @@ Section ANF_proof.
                   a \in names -- cannot be in bound_var C or C'
                   
                  *)
+
                 assert (Hin : FromList names a) by admit.
+
+                assert (Henv' : anf_env_rel names r t).
+                { unfold anf_env_rel, anf_env_rel'. clear IHys. revert Hsetl' H7 H11 Henv H3 ctenv.  clear. 
+                  revert vs' rho t S2 S3 es0 C2 l fs0 ts0. 
+                  induction ys; intros vs' rho rho' S S' es C vs fs ts Hset Hanfs Hevals Henv Hanf ctenv.
+                  - simpl in *. destruct vs'; try congruence. inv Hset. eassumption.
+                  - destruct (Decidable_FromList names). destruct (Dec a); [ | ].
+                    + (* a \in names *) 
+                      simpl in Hset. destruct vs'; try congruence.
+                      destruct (set_lists ys vs') eqn:Hset'; try congruence. inv Hset. 
+                      inv Hanfs. inv Hevals. inv Hanf.
+                      specialize (IHys _ _ _ _ _ _ _ _ _ _ Hset' H7 H8 Henv H5 ctenv).
+                      eapply Forall2_monotonic_strong; [ | eapply IHys ].
+                      simpl. intros. destructAll. 
+                      destruct (var_dec a x2); subst.                      
+                      
+                      * edestruct convert_anf_in_env as [n [Hnth1 Hnth2]];
+                        [ eassumption | eassumption | eassumption | | ].
+                        admit.
+                        assert (Hrel := All_Forall.Forall2_nth_error _ _ _ IHys Hnth1 Hnth2).
+                        simpl in *; destructAll. 
+
+                        rewrite M.gss. eexists; split; eauto.
+                        
+                      * rewrite M.gso; eauto. 
+                      
+                      eexists. split. rewrite M.gso. eassumption.
+                      intros Heq; subst; contradiction. eassumption. 
+                      
+                      
+                      edestruct convert_anf_in_env as [n [Hnth1 Hnth2]];
+                        [ eassumption | eassumption | eassumption | | ].
+                      admit. (* add assumption easy *)
+                      
+                      assert (Hrel := All_Forall.Forall2_nth_error _ _ _ IHys Hnth1 Hnth2).
+                      simpl in *; destructAll. 
+
+                    + (* not a \in names *)
+                      simpl in Hset. destruct vs'; try congruence.
+                      destruct (set_lists ys vs') eqn:Hset'; try congruence. inv Hset. 
+                      inv Hanfs. inv Hevals. 
+                      specialize (IHys _ _ _ _ _ _ _ _ _ _ Hset' H7 H8 Henv).  
+                      eapply Forall2_monotonic_strong; [ | eapply IHys ].
+                      simpl. intros. destructAll.
+                      eexists. split. rewrite M.gso. eassumption.
+                      intros Heq; subst; contradiction. eassumption. 
+
+
+                } 
 
                 edestruct convert_anf_in_env as [n [Hnth1 Hnth2]];
                   [ eassumption | eassumption | eassumption | | ].
                 admit. (* add assumption easy *)
 
-                assert (Henvs' : 
-                         
-                assert (Henv' : anf_env_rel names r t).
-                { unfold anf_env_rel, anf_env_rel'. revert 
-                  
-                } 
                 admit. 
                 assert (Hrel := All_Forall.Forall2_nth_error _ _ _ Henv' Hnth1 Hnth2). 
 

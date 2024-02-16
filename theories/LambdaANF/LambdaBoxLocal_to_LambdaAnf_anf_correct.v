@@ -161,6 +161,13 @@ Section Bounds.
 
 End Bounds.
 
+
+Definition same_dups {A B} (a : list A) (b : list B) :=
+  forall i j v, nth_error a i = Some v ->
+                nth_error a j = Some v ->
+                exists v', nth_error b i = Some v' /\ nth_error b j = Some v'.
+
+  
 Section ANF_proof.
 
   Context (cenv : conId_map) (ctenv : ctor_env).
@@ -179,7 +186,9 @@ Section ANF_proof.
 
   Definition anf_env_rel' (P : value -> val -> Prop) (vn : list var)
              (vs : list value) (rho : M.t val) :=
-    Forall2 (fun v x => exists v',  M.get x rho = Some v' /\ P v v') vs vn.
+    exists vs', get_list vn rho = Some vs' /\
+                Forall2 P vs vs' /\
+                same_dups vn vs.
 
 
   Inductive anf_fix_rel (fnames : list var) (env : list var) : Ensemble var -> list var -> efnlst -> fundefs -> Ensemble var -> Prop :=
@@ -307,6 +316,8 @@ Section ANF_proof.
 
       Forall2 (anf_val_rel) vs1 vs2 ->
 
+      
+      
       exists rho',
         set_lists ys vs2 rho = Some rho' /\
           forall i,
@@ -1066,6 +1077,60 @@ Section ANF_proof.
   Qed.
 
 
+  Lemma get_list_same A xs rho x (v : A) :
+    M.get x rho = Some v -> 
+    get_list xs (map_util.M.set x v rho) = get_list xs rho.
+  Proof.
+    induction xs; intros.
+    - reflexivity.
+    - simpl in *. 
+      destruct (var_dec x a); subst.
+      + rewrite !M.gss. erewrite IHxs, H; eauto.
+      + rewrite M.gso; eauto.
+        erewrite IHxs; eauto.
+  Qed.
+
+  Lemma get_list_set_lists_same_dup A :
+    forall (xs : list map_util.M.elt) (vs : list A)
+           (rho rho' : map_util.M.t A),
+      same_dups xs vs ->
+      set_lists xs vs rho = Some rho' ->
+      get_list xs rho' = Some vs.
+  Proof.
+    intros xs. induction xs; intros vs rho rho' Hdup Hset.
+    - simpl in *. destruct vs; try congruence.
+    - simpl in *. destruct vs; try congruence.
+      destruct (set_lists xs vs rho) eqn:Hset'; try congruence.
+      
+      assert (Hdup' : same_dups xs vs).
+      { admit. }
+       
+      specialize (IHxs _ _ _ Hdup' Hset').
+
+      destruct (Decidable_FromList xs).
+      destruct (Dec a).
+      + inv Hset. rewrite M.gss.
+        rewrite get_list_same, IHxs. reflexivity.
+        revert Hdup f Hset'. 
+        clear. revert vs t. induction xs; intros vs rho' Hdups Hin Hset.
+        * inv Hin.
+        * destruct vs; simpl in *; try congruence.
+          
+          destruct (set_lists xs vs rho) eqn:Hset'; try congruence.
+          inv Hset.
+          destruct (var_dec a a1); subst.
+          -- rewrite M.gss.
+             specialize (Hdups 0%nat 1%nat a1 eq_refl eq_refl).
+             destructAll. simpl in *. inv H. inv H0. reflexivity.
+          -- inv Hin; try contradiction.
+             rewrite M.gso; eauto.
+             eapply IHxs; eauto. admit.
+
+      + inv Hset. rewrite M.gss. rewrite get_list_set_neq. erewrite IHxs. reflexivity.
+        eassumption.
+  Admitted.      
+      
+  
   Lemma convert_anf_correct :
       forall vs e r f t, eval_env_fuel vs e r f t -> convert_anf_correct_exp vs e r f t.
     Proof.
@@ -1089,120 +1154,19 @@ Section ANF_proof.
           (* eapply Included_trans. eassumption. now sets. *)
         * now sets.
         * destructAll. rewrite <- app_ctx_f_fuse.
-
-          assert (exists vs'', get_list ys x0 = Some vs'' /\
-                                 forall i, Forall2 (preord_val ctenv eq_fuel i) vs' vs''). 
-          { revert Heval H8 H H2 Hanf. clear.
-            generalize (S1 \\ [set x]) as S.  
-            revert vs vs' rho x0 es C0 fs ts. induction ys;
-              intros vs vs' rho x0 es C0 fs ts S Heval Hanfs Hsetl Hanf_rel Henv.
-            - simpl in *. destruct vs'; try congruence. inv Hsetl.
-              eexists []. split; constructor.
-            - inv Hanfs. destruct vs'; simpl in Hsetl; try congruence.
-              destruct (set_lists ys vs' rho) eqn:Hsetl'; try congruence.
-              inv Hsetl. inv Hanf_rel. inv Heval.
-              simpl. rewrite M.gss. 
-              destruct (Decidable_FromList ys). destruct (Dec a); [ | ].
-              + (* a \in ys *)
-                (*
-                  LambdaBoxLocal_to_LambdaANF.convert_anf_rel func_tag default_tag cenv S1 e names S2 C a
-                  LambdaBoxLocal_to_LambdaANF.convert_anf_rel func_tag default_tag cenv S1' e' names S2 C' a
-                  ==>
-                  a \in names -- cannot be in bound_var C or C'
-                  
-                 *)
-
-                assert (Hin : FromList names a) by admit.
-
-                assert (Henv' : anf_env_rel names r t).
-                { unfold anf_env_rel, anf_env_rel'. clear IHys. revert Hsetl' H7 H11 Henv H3 ctenv.  clear. 
-                  revert vs' rho t S2 S3 es0 C2 l fs0 ts0. 
-                  induction ys; intros vs' rho rho' S S' es C vs fs ts Hset Hanfs Hevals Henv Hanf ctenv.
-                  - simpl in *. destruct vs'; try congruence. inv Hset. eassumption.
-                  - destruct (Decidable_FromList names). destruct (Dec a); [ | ].
-                    + (* a \in names *) 
-                      simpl in Hset. destruct vs'; try congruence.
-                      destruct (set_lists ys vs') eqn:Hset'; try congruence. inv Hset. 
-                      inv Hanfs. inv Hevals. inv Hanf.
-                      specialize (IHys _ _ _ _ _ _ _ _ _ _ Hset' H7 H8 Henv H5 ctenv).
-                      eapply Forall2_monotonic_strong; [ | eapply IHys ].
-                      simpl. intros. destructAll. 
-                      destruct (var_dec a x2); subst.                      
-                      
-                      * edestruct convert_anf_in_env as [n [Hnth1 Hnth2]];
-                        [ eassumption | eassumption | eassumption | | ].
-                        admit.
-                        assert (Hrel := All_Forall.Forall2_nth_error _ _ _ IHys Hnth1 Hnth2).
-                        simpl in *; destructAll. 
-
-                        rewrite M.gss. eexists; split; eauto.
-                        
-                      * rewrite M.gso; eauto. 
-                      
-                      eexists. split. rewrite M.gso. eassumption.
-                      intros Heq; subst; contradiction. eassumption. 
-                      
-                      
-                      edestruct convert_anf_in_env as [n [Hnth1 Hnth2]];
-                        [ eassumption | eassumption | eassumption | | ].
-                      admit. (* add assumption easy *)
-                      
-                      assert (Hrel := All_Forall.Forall2_nth_error _ _ _ IHys Hnth1 Hnth2).
-                      simpl in *; destructAll. 
-
-                    + (* not a \in names *)
-                      simpl in Hset. destruct vs'; try congruence.
-                      destruct (set_lists ys vs') eqn:Hset'; try congruence. inv Hset. 
-                      inv Hanfs. inv Hevals. 
-                      specialize (IHys _ _ _ _ _ _ _ _ _ _ Hset' H7 H8 Henv).  
-                      eapply Forall2_monotonic_strong; [ | eapply IHys ].
-                      simpl. intros. destructAll.
-                      eexists. split. rewrite M.gso. eassumption.
-                      intros Heq; subst; contradiction. eassumption. 
-
-
-                } 
-
-                edestruct convert_anf_in_env as [n [Hnth1 Hnth2]];
-                  [ eassumption | eassumption | eassumption | | ].
-                admit. (* add assumption easy *)
-
-                admit. 
-                assert (Hrel := All_Forall.Forall2_nth_error _ _ _ Henv' Hnth1 Hnth2). 
-
-                destruct Hrel as [v1'' [Hget'' Hrel'']]. 
-                specialize (IHys _ _ _ _ _ _ _ _ _ H11 H7 Hsetl' H3 Henv). destructAll. 
-                edestruct preord_env_P_get_list_l with (xs := ys) (rho1 := t) (rho2 := map_util.M.set a v t)
-                                                       (vs1 := x1); try eassumption. 
-                2:{ reflexivity. }
-                { admit. (* OK because v ~ v1'' *) } 
-                
-              + (* not a \in ys *) 
-                rewrite get_list_set_neq; eauto. 
-                specialize (IHys _ _ _ _ _ _ _ _ _ H3 Hsetl' H7 H11). destructAll. 
-                rewrite H. eexists. split. reflexivity.
-                intros i. constructor; eauto.
-                eapply preord_val_refl. admit. (* easy *) }
-              
-              constructor. 
-
-                admit. } destructAll. 
-            
+          
           eapply preord_exp_post_monotonic.
           2:{ eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
-              2:{ intros. rewrite <- app_ctx_f_fuse. simpl. eapply H0. }
+              2:{ intros. simpl. eapply H0. }
               eapply preord_exp_trans. now tci. now eapply eq_fuel_idemp.
               2:{ intros m. eapply preord_exp_Econstr_red.
-                  
-                  
-                  eassumption. }
+                  eapply get_list_set_lists_same_dup; eauto.
+                  admit. }
+              
               eapply preord_exp_refl. now eapply eq_fuel_compat.
-              eapply preord_env_P_extend.
-              2:{ rewrite preord_val_eq. simpl. split. eauto. eauto. } 
+              eapply preord_env_P_extend. 
+              2:{ eapply preord_val_refl. now eapply eq_fuel_compat. }
               admit. (* add back *) 
-              (* eapply preord_env_P_antimon. eapply H0. *)
-              (* eapply Setminus_Included_Included_Union. eapply Included_trans. eassumption. *)
-              (* now sets. *)
           }
 
           { unfold inclusion, comp, eq_fuel, one_step, anf_bound, one_i.

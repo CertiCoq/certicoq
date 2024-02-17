@@ -479,7 +479,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       | EOF -> debug_msg debug ("Program terminated"); continue := false
       | Info s -> Feedback.msg_notice Pp.(str prog ++ str": " ++ str s)
       | Error s -> Feedback.msg_warning Pp.(str prog ++ str": " ++ str s)
-    done
+    done;
+    ignore (Unix.close_process_full (stdout, stdin, stderr))
 
   let runtime_dir () = 
     let open Boot in

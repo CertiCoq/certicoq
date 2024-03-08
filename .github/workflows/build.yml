@@ -9,7 +9,7 @@ on:
     branches:
       - "**"
   workflow_dispatch:
-    inputs:
+    inputs: {}
 
 jobs:
   build-matrix:
@@ -19,8 +19,7 @@ jobs:
         opam_file:
           - 'coq-certicoq.opam'
         image:
-          - 'mattam82/coq:8.17--ocaml-4.13.1--clang-11--compcert-3.12--extlib-0.11.8--equations-1.3' # comment back in if MetaCoq commit changes
-          # - 'yforster/coq:8.17.0--clang-11--compcert-3.12--extlib-0.11.8--equations-1.3--elpi.1.17.1-metacoq-8.17.dev.e0794e3'
+          - 'yforster/coq:8.17.0--clang-11--compcert-3.12--extlib-0.11.8--equations-1.3--elpi.1.17.1-metacoq-v1.3-8.17'
       fail-fast: false  # don't stop jobs if one fails
     steps:
       - uses: actions/checkout@v2
@@ -30,13 +29,13 @@ jobs:
         with:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
-          before_install: | # comment back in if MetaCoq commit changes
-            startGroup "fix permission issues"
-              sudo chown -R coq:coq .
-            endGroup
-            startGroup "opam pin"
-              opam pin -n -y submodules/metacoq
-            endGroup
+          # before_install: | # comment back in if MetaCoq commit changes
+          #   startGroup "fix permission issues"
+          #     sudo chown -R coq:coq .
+          #   endGroup
+          #   startGroup "opam pin"
+          #     opam pin -n -y submodules/metacoq
+          #   endGroup
           before_script: |
             startGroup "fix permission issues"
               sudo chown -R coq:coq .

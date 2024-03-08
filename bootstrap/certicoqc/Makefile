@@ -61,6 +61,8 @@ test: test.vo
 
 test.vo: test.v
 	mkdir -p tests
+	ulimit -a
+	ulimit -H -a
 	ulimit -Ss 65500 && coqc $(TESTCOQOPTS) test.v
 
 clean: Makefile.certicoqc

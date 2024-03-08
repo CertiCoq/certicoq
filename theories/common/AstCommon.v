@@ -572,10 +572,24 @@ Definition prim_value (p : prim_tag) : Set :=
 
 Definition primitive : Set := { tag : prim_tag & prim_value tag }.
 
+Import SpecFloat.
+
+(* C version using macros for INFINITY and NAN *)
+Definition string_of_specfloat (f : SpecFloat.spec_float) :=
+  match f with
+  | S754_zero sign => if sign then "-0" else "0"
+  | S754_infinity sign => if sign then "-INFINITY" else "INFINITY"
+  | S754_nan => "NAN"
+  | S754_finite sign p z =>
+  let num := MCString.string_of_positive p ++ "p" ++ string_of_Z z in
+  if sign then "-" ++ num else num
+  end%bs.
+
+Definition string_of_float f := string_of_specfloat (FloatOps.Prim2SF f).
 Definition string_of_prim (p : primitive) :=
   match projT1 p as tag return prim_value tag -> string with
-  | primInt => Primitive.string_of_prim_int
-  | primFloat => Primitive.string_of_float
+  | primInt => Show.string_of_prim_int
+  | primFloat => string_of_float
   end (projT2 p).
 
 Equations eqb_prim (p q : primitive) : bool :=

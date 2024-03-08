@@ -400,13 +400,28 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
   let o = aux opts l in
   {o with prims = pr}
 
+
+let make_unsafe_passes b = 
+  let open Erasure0 in
+  let b = Caml_bool.to_coq b in
+  { cofix_to_lazy = b;
+    reorder_constructors = b;
+    inlining = b; 
+    unboxing = b;
+    betared = b }
+let all_unsafe_passes = make_unsafe_passes true
+let no_unsafe_passes = make_unsafe_passes false
+  
+
 let make_pipeline_options (opts : options) =
   let erasure_config = 
       Erasure0.({ 
         enable_typed_erasure = Caml_bool.to_coq opts.typed_erasure; 
-        enable_cofix_to_fix = Caml_bool.to_coq opts.unsafe_erasure;
+        enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
         enable_fast_remove_params = Caml_bool.to_coq opts.fast_erasure;
-        dearging_config = default_dearging_config (* FIME *)
+        dearging_config = default_dearging_config; (* FIXME *)
+        inductives_mapping = [];
+        inlined_constants = Obj.magic (FixRepr.fix_set Kernames.KernameSet.empty)
         })
   in
   let cps    = Caml_bool.to_coq opts.cps in

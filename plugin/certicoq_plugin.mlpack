@@ -78,8 +78,7 @@ Transform
 Universes0
 All_Forall
 BasicAst
-DecimalString
-HexadecimalString
+Show
 Primitive
 Environment
 Ast0
@@ -180,6 +179,10 @@ Optimize
 OptimizeCorrectness
 ExtractionCorrectness
 OptimizePropDiscr
+EUnboxing
+EInlining
+EReorderCstrs
+EBeta
 ECoInductiveToInductive
 ETransform
 Erasure0

@@ -54,6 +54,7 @@ Definition term_flags :=
     has_tFix := true;
     has_tCoFix := false;
     has_tPrim := prim_flags;
+    has_tLazy_Force := false;
   |}.
 
 Definition env_flags := 

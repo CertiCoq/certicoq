@@ -42,7 +42,8 @@ RUNTIME_FILES = ${RUNTIME_DIR}/gc_stack.o ${RUNTIME_DIR}/prim_floats.o ${RUNTIME
 CCOMPILEROPTS = -fPIC -g -c -I . -I ${RUNTIME_DIR} -I ${OCAMLLIB} -w -Wno-everything -O2
 # ccomp: CCOMPILEROPTS = -g -c -I . -I ${OCAMLLIB} -O2
 
-.PHONE: certicoqchk
+.PHONY: certicoqchk
+.PRECIOUS: $(GENCFILES)
 
 plugin: compile.vo certicoqchk
 

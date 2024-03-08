@@ -34,7 +34,7 @@ COQLIBINSTALL = $(COQLIB)/user-contrib/CertiCoq/CertiCoqC
 OCAMLLIB = $(shell ocamlc -where)
 OCAMLOPTS = -package coq-metacoq-template-ocaml.plugin -open Metacoq_template_plugin -package coq-certicoq-vanilla.plugin -open Certicoq_vanilla_plugin \
 	-I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
-GENCFILES = glue.c CertiCoq.CertiCoqC.compile.certicoqc.c
+GENCFILES = glue.c CertiCoq.CertiCoqC.CertiCoqC.certicoqc.c
 CFILES = certicoqc_wrapper.c $(GENCFILES)
 
 RUNTIME_DIR = ../../plugin/runtime
@@ -65,12 +65,14 @@ test.vo: test.v
 
 clean: Makefile.certicoqc
 	make -f Makefile.certicoqc clean
-	rm -f *.cm* *.o *.vo
+	rm -f *.cm* *.o *.vo theories/*.vo
 
 theories/CertiCoqC.vo: theories/CertiCoqC.v
 	coqc $(COQOPTS) $<
 
-theories/compile.vo: theories/compile.v theories/CertiCoqC.vo
+theories/compile.v: theories/CertiCoqC.vo
+
+theories/compile.vo CertiCoq.CertiCoqC.compile.certicoqc.c &: theories/compile.v
 	coqc $(COQOPTS) $<
 
 g_certicoqc.ml: g_certicoqc.mlg certicoqc.cmx certicoqc_plugin_wrapper.cmx

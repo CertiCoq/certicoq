@@ -133,3 +133,5 @@ bootstrap/certicoqc*/glue.h
 plugin/.merlin
 _build
 .vscode/CertiCoq.code-workspace
+bootstrap/certicoqc/CertiCoq.CertiCoqC.CertiCoqC.certicoqc.c
+bootstrap/certicoqc/CertiCoq.CertiCoqC.CertiCoqC.certicoqc.h

@@ -4,6 +4,7 @@
   recursion on the size of terms, see [compile]). *)   
 
 Require Import Coq.Lists.List.
+From Coq Require Import PrimInt63.
 Require Import Coq.Arith.Arith. 
 Require Import Common.Common.
 Require Import Coq.micromega.Lia.
@@ -349,6 +350,9 @@ Section Compile.
     destruct x; cbn; auto with arith.
   Qed.
 
+  Local Open Scope uint63_scope.
+  Import PrimInt63Notations.
+  
   Equations? compile (t: term) : Term 
   by wf t (fun x y : EAst.term => size x < size y) :=
   | e with TermSpineView.view e := {
@@ -370,6 +374,10 @@ Section Compile.
     | tPrim p with trans_prim_val p := 
       { | None => TWrong "unsupported primtive type"
         | Some pv => TPrim pv }
+    | tLazy t => TWrong "Lazy" (* TLambda nAnon (lift 1 (compile t)) *)
+    | tForce t => TWrong "Force"
+      (* TmkApps (compile t) 
+      (tcons (TPrim (@existT _ (fun tag => prim_value tag) AstCommon.primInt 0)) tnil) *)
     | tVar _ => TWrong "Var"
     | tEvar _ _ => TWrong "Evar" }.
   Proof.

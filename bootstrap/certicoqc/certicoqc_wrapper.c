@@ -1,6 +1,7 @@
+#undef __has_builtin 
 #include <stdio.h>
 #include <stdlib.h>
-#include "values.h"
+#include <caml/mlvalues.h>
 #include "gc.h"
 #include <caml/memory.h>
 #include <time.h>

@@ -1,4 +1,13 @@
-CCOMPILER := $(shell { command -v clang-11 || command -v clang; } 2>/dev/null)
+# clang compiler 
+# CCOMPILER := $(shell { command -v clang-11 || command -v clang; } 2>/dev/null)
+# clang options
+# CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -Wno-everything -O2
+SED=`which gsed || which sed`
+
+# CompCert compiler
+CCOMPILER := $(shell { command -v ccomp; } 2>/dev/null)
+# ccomp options
+CCOMPILEROPTS = -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -Wno-int-conversion -O2
 
 -include ../../Makefile.conf
 
@@ -42,9 +51,6 @@ RUNTIME_FILES = $(RUNTIME_DIR)/gc_stack.o $(RUNTIME_DIR)/prim_floats.o $(RUNTIME
 
 VFILES = theories/Loader.v theories/PrimInt63.v theories/PrimFloats.v theories/CertiCoqC.v
 
-CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -Wno-everything -O2
-# ccomp CCOMPOPTS = -g -c -I . -I ${OCAMLLIB} -Wno-int-conversion -O2
-
 .PHONY: certicoqc
 
 all: plugin
@@ -85,6 +91,7 @@ certicoqc.cmx: certicoqc_plugin_wrapper.cmx
 .PRECIOUS: $(GENCFILES)
 
 %.o: %.c
+	$(SED) -f unicode.sed -i $<
 	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
 
 certicoqc_plugin.cmx: certicoqc_plugin_wrapper.cmx certicoqc.cmx g_certicoqc.cmx

@@ -51,16 +51,19 @@ RUNTIME_FILES = $(RUNTIME_DIR)/gc_stack.o $(RUNTIME_DIR)/prim_floats.o $(RUNTIME
 
 VFILES = theories/Loader.v theories/PrimInt63.v theories/PrimFloats.v theories/CertiCoqC.v
 
-.PHONY: certicoqc
+.PHONY: runtime certicoqc
 
 all: plugin
 
 plugin: theories/compile.vo certicoqc
 
+runtime: $(RUNTIME_FILES:.o=.c)
+	cd $(RUNTIME_DIR) && $(MAKE)
+
 Makefile.certicoqc: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.certicoqc
 
-certicoqc: Makefile.certicoqc certicoqc_plugin.cmxs
+certicoqc: runtime Makefile.certicoqc certicoqc_plugin.cmxs
 	$(MAKE) -f Makefile.certicoqc
 
 test: test.vo

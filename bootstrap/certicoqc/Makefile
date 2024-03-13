@@ -7,7 +7,7 @@ SED=`which gsed || which sed`
 # CompCert compiler
 CCOMPILER := $(shell { command -v ccomp; } 2>/dev/null)
 # ccomp options
-CCOMPILEROPTS = -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -O2
+CCOMPILEROPTS = -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -flongdouble -O2
 
 -include ../../Makefile.conf
 

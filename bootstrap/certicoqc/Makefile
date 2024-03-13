@@ -1,13 +1,13 @@
 # clang compiler 
-# CCOMPILER := $(shell { command -v clang-11 || command -v clang; } 2>/dev/null)
+CCOMPILER := $(shell { command -v clang-11 || command -v clang || command -v gcc; } 2>/dev/null)
 # clang options
-# CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -Wno-everything -O2
+CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -Wno-everything -O2
 SED=`which gsed || which sed`
 
 # CompCert compiler
-CCOMPILER := $(shell { command -v ccomp; } 2>/dev/null)
+CCOMPCOMPILER := $(shell { command -v ccomp; } 2>/dev/null)
 # ccomp options
-CCOMPILEROPTS = -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -flongdouble -O2
+CCOMPCOMPILEROPTS = -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -flongdouble -O2
 
 -include ../../Makefile.conf
 
@@ -93,7 +93,11 @@ certicoqc.cmx: certicoqc_plugin_wrapper.cmx
 
 .PRECIOUS: $(GENCFILES)
 
-%.o: %.c
+$(GENCFILES:%.c=%.o): %.o: %.c
+	$(SED) -f unicode.sed -i $<
+	$(CCOMPCOMPILER) $(CCOMPCOMPILEROPTS) -o $@ $<
+
+certicoqc_wrapper.o: %.o: %.c
 	$(SED) -f unicode.sed -i $<
 	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
 

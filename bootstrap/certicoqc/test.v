@@ -37,4 +37,9 @@ Definition certicoqc (opts : Options) (p : Template.Ast.Env.program) :=
   compile opts p.
 
 Set Warnings "-primitive-turned-into-axiom".
-Time CertiCoqC Compile -build_dir "tests" -time -O 1 certicoqc.
+
+Definition demo1 := [1; 0; 1].
+
+Time CertiCoqC Compile -build_dir "tests" -time -O 1 demo1.
+
+(* Time CertiCoqC Compile -build_dir "tests" -time -O 1 certicoqc. *)

@@ -40,6 +40,6 @@ Set Warnings "-primitive-turned-into-axiom".
 
 Definition demo1 := [1; 0; 1].
 
-Time CertiCoqC Compile -build_dir "tests" -time -O 1 demo1.
+(* Time CertiCoqC Compile -build_dir "tests" -time -O 1 demo1. *)
 
-(* Time CertiCoqC Compile -build_dir "tests" -time -O 1 certicoqc. *)
+Time CertiCoqC Compile -build_dir "tests" -time -O 1 certicoqc.

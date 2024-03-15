@@ -202,11 +202,11 @@ void forward (value *from_start,  /* beginning of from-space */
           Field(newv, i) = Field(v, i);
         }
         Hd_val(v) = 0;
-	Field(v, 0) = ptr_to_int_or_ptr((void *)newv);
-	*p = ptr_to_int_or_ptr((void *)newv);
+	      Field(v, 0) = ptr_to_int_or_ptr((void *)newv);
+	      *p = ptr_to_int_or_ptr((void *)newv);
         /* printf("New %lld\n", newv); */
         /* if (*p == 73832) printf("Found it\n"); */
-        if (depth>0)
+        if (depth>0 && !No_scan (Tag_hd(hd)))
           for (i=0; i<sz; i++)
             forward(from_start, from_limit, next, &Field(newv,i), depth-1);
       }

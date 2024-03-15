@@ -2,6 +2,7 @@ From CertiCoq.Plugin Require Import Loader.
 From Coq.Numbers.Cyclic.Int63 Require Import PrimInt63.
 
 CertiCoq Register [ 
+  Coq.Numbers.Cyclic.Int63.PrimInt63.int => "erased",
   Coq.Numbers.Cyclic.Int63.PrimInt63.add => "prim_int63_add",
   Coq.Numbers.Cyclic.Int63.PrimInt63.eqb => "prim_int63_eqb",
   Coq.Numbers.Cyclic.Int63.PrimInt63.land => "prim_int63_land", 
@@ -9,7 +10,9 @@ CertiCoq Register [
   Coq.Numbers.Cyclic.Int63.PrimInt63.lsl => "prim_int63_lsl", 
   Coq.Numbers.Cyclic.Int63.PrimInt63.head0 => "prim_int63_head0", 
   Coq.Numbers.Cyclic.Int63.PrimInt63.tail0 => "prim_int63_tail0", 
-  Coq.Numbers.Cyclic.Int63.PrimInt63.compare => "prim_int63_compare", 
+  Coq.Numbers.Cyclic.Int63.PrimInt63.compare => "prim_int63_compare",
+  Coq.Numbers.Cyclic.Int63.PrimInt63.asr => "prim_int63_asr",
+  Coq.Numbers.Cyclic.Int63.PrimInt63.divs => "prim_int63_divs", 
   Coq.Numbers.Cyclic.Int63.PrimInt63.subc => "prim_int63_subc" with tinfo,
   Coq.Numbers.Cyclic.Int63.PrimInt63.sub => "prim_int63_sub", 
   Coq.Numbers.Cyclic.Int63.PrimInt63.addc => "prim_int63_addc" with tinfo, 

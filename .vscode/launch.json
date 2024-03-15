@@ -10,10 +10,7 @@
             "request": "launch",
             "name": "Debug",
             "program": "${workspaceFolder}/_opam/bin/coqc",
-            "args": [ "-I", ".", "-Q", "../../theories/Codegen", "CertiCoq.Codegen", "-Q", "../../libraries", "CertiCoq.Libraries", "-Q", "../../theories/LambdaANF",
-             "CertiCoq.LambdaANF", "-Q", "../../theories/LambdaBoxLocal", "CertiCoq.LambdaBoxLocal", "-Q", "../../theories/Compiler", "CertiCoq.Compiler", "-Q", "../../theories/common", "CertiCoq.Common",
-              "-Q", "../../theories/Glue", "CertiCoq.Glue", "-Q", "../../theories/LambdaBoxMut", "CertiCoq.LambdaBoxMut", "-Q", "../../plugin", "CertiCoq.Plugin", "-I", "../../plugin", "-Q",
-               "../../cplugin", "CertiCoq.VanillaPlugin", "-I", "../../cplugin", "-Q", "theories", "CertiCoq.CertiCoqC", "test.v"],
+            "args": [ "test.v"],
             "cwd": "${workspaceFolder}/bootstrap/certicoqc"
         },
         {

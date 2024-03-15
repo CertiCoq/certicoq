@@ -3,6 +3,27 @@ open Names
 open Pp
 open Caml_bytestring
 
+let debug_opt =
+   let open Goptions in
+   let key = ["CertiCoq"; "Debug"] in
+   let tables = get_tables () in
+   try
+     let _ = OptionMap.find key tables in
+     fun () ->
+       let tables = get_tables () in
+       let opt = OptionMap.find key tables in
+       match opt.opt_value with
+       | BoolValue b -> b
+       | _ -> assert false
+   with Not_found ->
+   declare_bool_option_and_ref ~depr:false ~key ~value:false
+ 
+ let debug (m : unit ->Pp.t) =
+   if debug_opt () then
+     Feedback.(msg_debug (m ()))
+   else
+     ()
+
 type import =
     FromRelativePath of string
   | FromAbsolutePath of string
@@ -50,6 +71,9 @@ Valid options:\n\
 -cps      :  Compile using continuation-passing style code (default: direct-style compilation)\n\
 -time     :  Time each compilation phase\n\
 -time_anf :  Time λanf optimizations\n\
+-unsafe-erasure   :  Allow to use unsafe passes in the MetaCoq Erasure pipeline. This currently includes the cofixpoint-to-fixpoint translation.\n\
+-typed-erasure    :  Uses the typed erasure and de-arging phase of the MetaCoq Erasure pipeline.\n\
+-fast-erasure     :  Uses an alternative function to remove parameters of constructors in the MetaCoq Erasure pipeline.\n\
 \n\n\
 To compile Gallina constants to specific C functions use:\n\
    CertiCoq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\" as library, ... , \"fileM.h\" as library ].\n\

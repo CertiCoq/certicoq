@@ -3,7 +3,8 @@ From Coq Require Import PArith.
 From ExtLib Require Import Monads.
 Require Import MetaCoq.Utils.bytestring.
 Require Import Common.AstCommon Common.compM.
-
+From MetaCoq.ErasurePlugin Require Import Erasure.
+#[global] Hint Resolve Bool.absurd_eq_true Bool.trans_eq_bool f_equal2_nat f_equal_nat : core.
 Import MonadNotation ListNotations.
 
 Notation ret := (ExtLib.Structures.Monad.ret).
@@ -17,7 +18,8 @@ Open Scope bs_scope.
 
 (* Compiler options *)
 Record Options :=
-  { direct   : bool;  (* direct or CPS code *)
+  { erasure_config : erasure_configuration;
+    direct   : bool;  (* direct or CPS code *)
     c_args   : nat;   (* numbers of C arguments *)
     anf_conf  : nat;  (* for different ANF pipeline configs. For development purposes *)
 

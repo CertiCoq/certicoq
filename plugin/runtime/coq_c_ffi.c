@@ -53,3 +53,10 @@ value coq_msg_debug(value msg) {
   free(str);
   return 1;
 }
+
+value coq_msg_notice(value msg) {
+  char *str = string_of_coq_string(msg);
+  fputs(str, stdout);
+  free(str);
+  return 1;
+}

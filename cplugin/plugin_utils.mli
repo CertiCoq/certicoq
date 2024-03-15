@@ -1,7 +1,7 @@
 type import =
     FromRelativePath of string
   | FromAbsolutePath of string
-  | FromLibrary of string
+  | FromLibrary of string * string option
 
 val string_of_bytestring : Bytestring.String.t -> string
 
@@ -12,3 +12,6 @@ val extract_constant : Names.GlobRef.t -> string -> Kernames.kername * Kernames.
 val debug_mappings : (Kernames.kername * Kernames.ident) list -> unit
 
 val help_msg : string
+
+(** This is governed by the global CertiCoq Debug flag *)
+val debug : (unit -> Pp.t) -> unit

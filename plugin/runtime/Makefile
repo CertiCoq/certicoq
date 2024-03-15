@@ -9,7 +9,7 @@ DST = ${COQLIB}/user-contrib/CertiCoq/Plugin/runtime
 all: ${TARGETS}
 
 %.o: %.c
-	gcc -I . -I `ocamlc -where` -O2 -g -fomit-frame-pointer -c -o $@ $+
+	gcc -I . -I `ocamlc -where` -fPIC -O2 -g -fomit-frame-pointer -c -o $@ $+
 
 install: all
 	install -d ${DST}

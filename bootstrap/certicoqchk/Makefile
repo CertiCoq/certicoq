@@ -37,12 +37,13 @@ GENCFILES = glue.c CertiCoq.CertiCoqCheck.compile.certicoqchk.c
 CFILES = certicoqchk_wrapper.c ${GENCFILES}
 
 RUNTIME_DIR = ../../plugin/runtime
-RUNTIME_FILES = ${RUNTIME_DIR}/gc_stack.o ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_int63.o ${RUNTIME_DIR}/coq_c_ffi.o
+RUNTIME_FILES = ${RUNTIME_DIR}/gc_stack.o ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_int63.o ${RUNTIME_DIR}/coq_ffi.o
 
 CCOMPILEROPTS = -fPIC -g -c -I . -I ${RUNTIME_DIR} -I ${OCAMLLIB} -w -Wno-everything -O2
 # ccomp: CCOMPILEROPTS = -g -c -I . -I ${OCAMLLIB} -O2
 
-.PHONE: certicoqchk
+.PHONY: certicoqchk
+.PRECIOUS: $(GENCFILES)
 
 plugin: compile.vo certicoqchk
 
@@ -53,7 +54,7 @@ test.vo: test.v
 
 clean: 
 	make -f Makefile.certicoqchk clean
-	rm *.cm* *.o *.vo
+	rm -f *.cm* *.o *.vo
 
 Makefile.certicoqchk: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.certicoqchk
@@ -101,3 +102,5 @@ install: Loader.vo certicoqchk_plugin.cmxs
 	ocamlfind install -add coq-certicoqchk certicoqchk_plugin.cmx* certicoqchk_plugin.cmi
 
 .PHONY: plugin test
+
+.NOTPARALLEL:

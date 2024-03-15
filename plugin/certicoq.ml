@@ -9,20 +9,28 @@ open ExceptionMonad
 open AstCommon
 open Plugin_utils
 
+let get_stringopt_option key =
+  let open Goptions in
+  let tables = get_tables () in
+  try
+    let _ = OptionMap.find key tables in
+    fun () ->
+      let tables = get_tables () in
+      let opt = OptionMap.find key tables in
+      match opt.opt_value with
+      | StringOptValue b -> b
+      | _ -> assert false
+  with Not_found ->
+    declare_stringopt_option_and_ref ~depr:false ~key
+
 let get_build_dir_opt =
-  Goptions.declare_stringopt_option_and_ref
-    ~key:["CertiCoq"; "Build"; "Directory"]
-    ~depr:false
+  get_stringopt_option ["CertiCoq"; "Build"; "Directory"]
 
 let get_ocamlfind =
-  Goptions.declare_stringopt_option_and_ref
-    ~key:["CertiCoq"; "ocamlfind"]
-    ~depr:false
+  get_stringopt_option ["CertiCoq"; "ocamlfind"]
 
 let get_c_compiler =
-  Goptions.declare_stringopt_option_and_ref
-    ~key:["CertiCoq"; "CC"]
-    ~depr:false
+  get_stringopt_option ["CertiCoq"; "CC"]
         
 (* Taken from Coq's increment_subscript, but works on strings rather than idents *)
 let increment_subscript id =
@@ -167,6 +175,9 @@ let _ = Callback.register "coq_user_error" coq_user_error
 (** Compilation Command Arguments *)
 
 type command_args =
+ | TYPED_ERASURE
+ | FAST_ERASURE
+ | UNSAFE_ERASURE
  | BYPASS_QED
  | CPS
  | TIME
@@ -183,7 +194,10 @@ type command_args =
  | FILENAME of string (* Name of the generated file *)
 
 type options =
-  { bypass_qed : bool;
+  { typed_erasure : bool;
+    fast_erasure : bool;
+    unsafe_erasure : bool;
+    bypass_qed : bool;
     cps       : bool;
     time      : bool;
     time_anf  : bool;
@@ -212,7 +226,10 @@ let check_build_dir d =
   else d
   
 let default_options () : options =
-  { bypass_qed = false;
+  { typed_erasure = false;
+    fast_erasure = false;
+    unsafe_erasure = false;
+    bypass_qed = false;
     cps       = false;
     time      = false;
     time_anf  = false;
@@ -233,6 +250,9 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
   let rec aux (o : options) l =
     match l with
     | [] -> o
+    | TYPED_ERASURE :: xs -> aux {o with typed_erasure = true} xs
+    | FAST_ERASURE :: xs -> aux {o with fast_erasure = true} xs
+    | UNSAFE_ERASURE :: xs -> aux {o with unsafe_erasure = true} xs
     | BYPASS_QED :: xs -> aux {o with bypass_qed = true} xs
     | CPS      :: xs -> aux {o with cps = true} xs
     | TIME     :: xs -> aux {o with time = true} xs
@@ -254,7 +274,28 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
   let o = aux opts l in
   {o with prims = pr}
 
+let make_unsafe_passes b = 
+  let open Erasure0 in
+  { cofix_to_lazy = b;
+    reorder_constructors = b;
+    inlining = b; 
+    unboxing = b;
+    betared = b }
+
+let all_unsafe_passes = make_unsafe_passes true
+let no_unsafe_passes = make_unsafe_passes false
+
 let make_pipeline_options (opts : options) =
+  let erasure_config = 
+      Erasure0.({ 
+        enable_typed_erasure = opts.typed_erasure; 
+        enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
+        enable_fast_remove_params = opts.fast_erasure;
+        dearging_config = default_dearging_config;
+        inductives_mapping = [];
+        inlined_constants = Kernames.KernameSet.empty
+        })
+  in
   let cps    = opts.cps in
   let args = coq_nat_of_int opts.args in
   let olevel = coq_nat_of_int opts.olevel in
@@ -267,7 +308,7 @@ let make_pipeline_options (opts : options) =
   let toplevel_name = bytestring_of_string opts.toplevel_name in
   let prims = get_global_prims () @ opts.prims in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
-  Pipeline.make_opts cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
+  Pipeline.make_opts erasure_config cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
 
 (** Main Compilation Functions *)
 
@@ -451,7 +492,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       | EOF -> debug_msg debug ("Program terminated"); continue := false
       | Info s -> Feedback.msg_notice Pp.(str prog ++ str": " ++ str s)
       | Error s -> Feedback.msg_warning Pp.(str prog ++ str": " ++ str s)
-    done
+    done;
+    ignore (Unix.close_process_full (stdout, stdin, stderr))
 
   let runtime_dir () = 
     let open Boot in
@@ -677,9 +719,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let compiler = compiler_executable debug in
     let ocamlfind = ocamlfind_executable debug in
     let rt_dir = runtime_dir () in
-
     let cmd =
-        Printf.sprintf "%s -Wno-everything -g -I %s -I %s -c -o %s %s" 
+        Printf.sprintf "%s -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s" 
           compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
     in
     let importso =

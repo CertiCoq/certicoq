@@ -9,5 +9,12 @@ CAMLFLAGS+=-w -20 # Unused arguments
 CAMLFLAGS+=-w -60 # Unused functor arguments
 CAMLPKGS+=-package coq-metacoq-template-ocaml.plugin,stdlib-shims
 
+CC=$(shell which gcc || which clang-11)
+
 merlin-hook::
 		$(HIDE)echo 'FLG $(OPENS)' >> .merlin
+
+get_ordinal.o: get_ordinal.c
+	$(CC) -c -o $@ -I runtime $<
+
+certicoq_plugin.cmxs: get_ordinal.o

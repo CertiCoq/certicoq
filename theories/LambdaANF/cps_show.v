@@ -108,8 +108,8 @@ Definition newline : M unit := emit (String.String chr_newline String.EmptyStrin
 
 Definition emit_prim (p : primitive) : M unit :=
   match projT1 p as tag return prim_value tag -> M unit with
-  | primInt => fun f => emit "(int: " ;; emit (string_of_prim_int f) ;; emit ")"
-  | primFloat => fun f => emit "(float: " ;; emit (string_of_float f) ;; emit ")"
+  | primInt => fun f => emit "(int: " ;; emit (Show.string_of_prim_int f) ;; emit ")"
+  | primFloat => fun f => emit "(float: " ;; emit (AstCommon.string_of_float f) ;; emit ")"
   
   end%bs (projT2 p).
 

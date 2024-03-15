@@ -28,13 +28,18 @@ Definition string_of_bool b :=
 Require Import ZArith.
 
 From MetaCoq.ErasurePlugin Require Import Loader.
-Fail From CertiCoq.CertiCoqC Require Import compile.
-From CertiCoq.CertiCoqC Require Import compile.
 From CertiCoq.Common Require Import Pipeline_utils.
+From CertiCoq.CertiCoqC Require Import CertiCoqC.
+From CertiCoq.CertiCoqC Require Import Loader.
 
 Definition certicoqc (opts : Options) (p : Template.Ast.Env.program) := 
   let () := coq_msg_info "certicoqc called" in
   compile opts p.
 
 Set Warnings "-primitive-turned-into-axiom".
+
+Definition demo1 := [1; 0; 1].
+
+(* Time CertiCoqC Compile -build_dir "tests" -time -O 1 demo1. *)
+
 Time CertiCoqC Compile -build_dir "tests" -time -O 1 certicoqc.

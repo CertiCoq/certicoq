@@ -1,4 +1,15 @@
-CCOMPILER := $(shell { command -v clang-11 || command -v clang; } 2>/dev/null)
+# clang compiler 
+CCOMPILER := $(shell { command -v clang-11 || command -v clang || command -v gcc; } 2>/dev/null)
+# clang options
+CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -Wno-everything -O2
+SED=`which gsed || which sed`
+
+# CompCert compiler
+CCOMPCOMPILER := $(CCOMPILER)
+# $(shell { command -v ccomp; } 2>/dev/null)
+# ccomp options
+CCOMPCOMPILEROPTS = $(CCOMPILEROPTS)
+# -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -flongdouble -O2
 
 -include ../../Makefile.conf
 
@@ -34,69 +45,86 @@ COQLIBINSTALL = $(COQLIB)/user-contrib/CertiCoq/CertiCoqC
 OCAMLLIB = $(shell ocamlc -where)
 OCAMLOPTS = -package coq-metacoq-template-ocaml.plugin -open Metacoq_template_plugin -package coq-certicoq-vanilla.plugin -open Certicoq_vanilla_plugin \
 	-I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
-GENCFILES = glue.c CertiCoq.CertiCoqC.compile.certicoqc.c
-CFILES = certicoqc_wrapper.c ${GENCFILES}
+GENCFILES = glue.c CertiCoq.CertiCoqC.CertiCoqC.certicoqc.c
+CFILES = certicoqc_wrapper.c $(GENCFILES)
 
 RUNTIME_DIR = ../../plugin/runtime
-RUNTIME_FILES = ${RUNTIME_DIR}/gc_stack.o ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_int63.o ${RUNTIME_DIR}/coq_c_ffi.o
+RUNTIME_FILES = $(RUNTIME_DIR)/gc_stack.o $(RUNTIME_DIR)/prim_floats.o $(RUNTIME_DIR)/prim_int63.o $(RUNTIME_DIR)/coq_c_ffi.o
 
 VFILES = theories/Loader.v theories/PrimInt63.v theories/PrimFloats.v theories/CertiCoqC.v
 
-CCOMPILEROPTS = -fPIC -g -c -I . -I ${RUNTIME_DIR} -I ${OCAMLLIB} -w -Wno-everything -O2
-# ccomp CCOMPOPTS = -g -c -I . -I ${OCAMLLIB} -Wno-int-conversion -O2
+.PHONY: runtime certicoqc
 
-.PHONY: certicoqc
+all: plugin
 
 plugin: theories/compile.vo certicoqc
+
+runtime: $(RUNTIME_FILES:.o=.c)
+	cd $(RUNTIME_DIR) && $(MAKE)
 
 Makefile.certicoqc: _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.certicoqc
 
-certicoqc: Makefile.certicoqc certicoqc_plugin.cmxs
+certicoqc: runtime Makefile.certicoqc certicoqc_plugin.cmxs
 	$(MAKE) -f Makefile.certicoqc
 
 test: test.vo
 
 test.vo: test.v
 	mkdir -p tests
-	ulimit -Ss 65500 && coqc ${TESTCOQOPTS} test.v
+	ulimit -a
+	ulimit -H -a
+	ulimit -Ss 65500 && coqc $(TESTCOQOPTS) test.v
 
 clean: Makefile.certicoqc
 	make -f Makefile.certicoqc clean
-	rm *.cm* *.o *.vo
+	rm -f *.cm* *.o *.vo theories/*.vo
 
-theories/compile.vo ${GENCFILES} &: theories/compile.v
-	coqc ${COQOPTS} $<
+theories/CertiCoqC.vo: theories/CertiCoqC.v
+	coqc $(COQOPTS) $<
 
-%.o: %.c
-	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
+theories/compile.v: theories/CertiCoqC.vo
 
-certicoqc_plugin.cmxs: certicoqc_plugin.cmxa ${CFILES:.c=.o} ${RUNTIME_FILES}
-	ocamlfind ocamlopt ${OCAMLOPTS} -shared -o $@ $+
-
-certicoqc_plugin.cmx: certicoqc_plugin_wrapper.cmx certicoqc.cmx g_certicoqc.cmx
-	ocamlfind opt ${OCAMLOPTS} -pack -o $@ $+
-
-certicoqc_plugin.cmxa: certicoqc_plugin.cmx
-	ocamlfind opt -linkall ${OCAMLOPTS} -a -o $@ $<
+theories/compile.vo CertiCoq.CertiCoqC.compile.certicoqc.c &: theories/compile.v
+	coqc $(COQOPTS) $<
 
 g_certicoqc.ml: g_certicoqc.mlg certicoqc.cmx certicoqc_plugin_wrapper.cmx
 	coqpp $<
 
-certicoqc_wrapper.c: theories/compile.vo
-
 certicoqc.cmx: certicoqc_plugin_wrapper.cmx
 
+.PRECIOUS: $(GENCFILES)
+
+$(GENCFILES:%.c=%.o): %.o: %.c
+	$(SED) -f unicode.sed -i $<
+	$(CCOMPCOMPILER) $(CCOMPCOMPILEROPTS) -o $@ $<
+
+certicoqc_wrapper.o: %.o: %.c
+	$(SED) -f unicode.sed -i $<
+	$(CCOMPILER) $(CCOMPILEROPTS) -o $@ $<
+
+certicoqc_plugin.cmx: certicoqc_plugin_wrapper.cmx certicoqc.cmx g_certicoqc.cmx
+	ocamlfind opt $(OCAMLOPTS) -pack -o $@ $+
+
+certicoqc_plugin.cmxa: certicoqc_plugin.cmx
+	ocamlfind opt -linkall $(OCAMLOPTS) -a -o $@ $<
+
+certicoqc_plugin.cmxs: certicoqc_plugin.cmxa $(CFILES:.c=.o) $(RUNTIME_FILES)
+	ocamlfind ocamlopt $(OCAMLOPTS) -shared -o $@ $+
+
+.PRECIOUS: %.cmi
 %.cmi: %.mli
-	ocamlfind opt ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin $<
+	ocamlfind opt $(PKGS) $(OCAMLOPTS) -for-pack Certicoqc_plugin $<
 
 %.cmx: %.ml	%.cmi
-	ocamlfind opt -c ${PKGS} ${OCAMLOPTS} -for-pack Certicoqc_plugin -o $@ $<
+	ocamlfind opt -c $(PKGS) $(OCAMLOPTS) -for-pack Certicoqc_plugin -o $@ $<
 
 install: theories/compile.vo certicoqc_plugin.cmxs
 	install -d "$(COQLIBINSTALL)"
-	install -m 0644 theories/compile.v theories/compile.vo certicoqc_plugin.cmx* "$(COQLIBINSTALL)"
+	install -m 0644 theories/CertiCoqC.v theories/CertiCoqC.vo theories/compile.v theories/compile.vo certicoqc_plugin.cmx* "$(COQLIBINSTALL)"
 	make -f Makefile.certicoqc install
 	ocamlfind install -add coq-certicoqc certicoqc_plugin.cmx* certicoqc_plugin.cmi
 
 .PHONY: plugin test
+
+.NOTPARALLEL:

@@ -2,8 +2,8 @@
 
 
 all theories/Extraction/extraction.vo: theories/Makefile libraries/Makefile
-	$(MAKE) -C libraries -j`nproc`
-	$(MAKE) -C theories -j`nproc`
+	$(MAKE) -C libraries -j1
+	$(MAKE) -C theories -j1
 
 theories/Makefile: theories/_CoqProject
 	cd theories;coq_makefile -f _CoqProject -o Makefile

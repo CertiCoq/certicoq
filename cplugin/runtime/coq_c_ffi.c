@@ -44,10 +44,17 @@ value coq_user_error(value msg) {
   char *str = string_of_coq_string(msg);
   fputs(str, stderr);
   free(str);
-  return 1;
+  exit(1);
 }
 
 value coq_msg_debug(value msg) {
+  char *str = string_of_coq_string(msg);
+  fputs(str, stdout);
+  free(str);
+  return 1;
+}
+
+value coq_msg_notice(value msg) {
   char *str = string_of_coq_string(msg);
   fputs(str, stdout);
   free(str);

@@ -42,7 +42,10 @@ let to_ltac_val c = Tacinterp.Value.of_constr c
 
 }
 
-ARGUMENT EXTEND cargs 
+ARGUMENT EXTEND cargs
+| [ "-typed-erasure" ] -> { TYPED_ERASURE }
+| [ "-fast-erasure" ] -> { FAST_ERASURE }
+| [ "-unsafe-erasure" ] -> { UNSAFE_ERASURE }
 | [ "-bypass_qed" ] -> { BYPASS_QED }
 | [ "-cps" ] -> { CPS }
 | [ "-time" ] -> { TIME }
@@ -60,8 +63,12 @@ ARGUMENT EXTEND cargs
 END
 
 VERNAC ARGUMENT EXTEND extract_cnst 
-| [ reference(gr) "=>" string(str) ] -> { (extract_constant (Option.get (Constrintern.locate_reference gr)) str, false) }
-| [ reference(gr) "=>" string(str) "with" "tinfo" ] -> { (extract_constant (Option.get (Constrintern.locate_reference gr)) str, true) }
+| [ reference(gr) "=>" string(str) ] -> { 
+  try (extract_constant (Option.get (Constrintern.locate_reference gr)) str, false)
+  with Not_found -> CErrors.user_err ~loc Pp.(str"Reference " ++ Libnames.pr_qualid gr ++ str" not found") }
+| [ reference(gr) "=>" string(str) "with" "tinfo" ] -> { 
+  try (extract_constant (Option.get (Constrintern.locate_reference gr)) str, true)
+  with Not_found -> CErrors.user_err ~loc Pp.(str"Reference " ++ Libnames.pr_qualid gr ++ str" not found") }
 END
 
 VERNAC ARGUMENT EXTEND ffiargs

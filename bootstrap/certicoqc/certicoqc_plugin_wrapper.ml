@@ -146,6 +146,21 @@ let fix_quoted_program (p : Ast0.Env.program) =
   let declarations = fix_declarations declarations in
   { Ast0.Env.universes = universes; declarations; retroknowledge = retro }, term
 
+let rec print_obj depth x = 
+  if depth <= 0 then Printf.printf "_"
+  else
+  let x = Obj.magic x in
+  if Obj.is_block x then let size = Obj.size x in
+                            if Obj.tag x = 247 then
+                              Printf.printf "POINTER%!"
+                            else
+                            (Printf.printf ("(block[%i] (tag %i) %!") (Obj.size x) (Obj.tag x) ;
+                            for i = 0 to size - 1 do
+                              print_obj (pred depth) (Obj.field x i)
+                            done;
+                            Printf.printf ")")
+  else Printf.printf ("%i %!") x
+  
 let compile opts prog =
   info "Calling certicoq-compiled certicoq";
   (* let pretty= Pretty.print_program false (Obj.magic (Caml_nat.nat_of_caml_int 100)) (Obj.magic prog) in *)
@@ -155,4 +170,5 @@ let compile opts prog =
   (* time (str"Compilation with bootstrapped compiler") *)
   let res = certicoq_pipeline opts prog in
   info "Certicoq pipeline ran";
+  (* print_obj 10 (Obj.repr (fst res)); *)
   res

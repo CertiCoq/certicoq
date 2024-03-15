@@ -22,23 +22,17 @@ value copy_value(value v) {
   else {
     mlsize_t size = Wosize_val(v);
     unsigned char tag = Tag_val(v);
-    value* objs = malloc(size);
+    
     // printf ("Copying object of tag %i and size %i \n", tag, size);
+    
     result = caml_alloc(size, tag);
     int i;
     for (i = 0; i < size; i++) {
       // printf ("Copying field %i of block of tag %i\n", i, tag);
       Store_field(result, i, copy_value (Field(v, i)));
     }
-
-    // for (i = 0; i < size; i++);
-    // { printf ("Storing field %i of block of tag %i and size %i\n", i, tag, size);
-    //   printf ("Storing %i\n", (objs[i] >> 1));
-    //   // Store_field(result, i, objs[i]);
-    //   caml_modify(&Field(result, i), objs[i]);
-    //   printf ("Storage succeeded\n"); }
   }
-  // printf ("copy_value returns\n");
+  
   CAMLreturn (result);
 }
 

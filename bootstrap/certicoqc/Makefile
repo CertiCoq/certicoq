@@ -1,7 +1,7 @@
 # clang compiler 
-CCOMPILER := $(shell { command -v gcc || command -v clang-11 || command -v clang; } 2>/dev/null)
+CCOMPILER := $(shell { command -v clang-11 || command -v clang || command -v gcc; } 2>/dev/null)
 # clang options
-CCOMPILEROPTS = -fPIC -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -Wno-everything
+CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -Wno-everything -O2
 SED=`which gsed || which sed`
 
 # CompCert compiler

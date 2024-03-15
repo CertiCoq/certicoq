@@ -11,29 +11,42 @@ extern value body(struct thread_info *);
 
 extern value *call(struct thread_info *, value, value);
 
-value copy_value(value v) {
+// Follow gc_stack.c/forward function to preserve sharing.
+static value copy_value(value v) {
   CAMLparam0();
-  CAMLlocal1 (result);
+  CAMLlocal1 (newv);
 
   if (Is_long(v)) {
-    // printf ("Copying immediate int of value %i\n", Long_val(v));
-    result = v;
-  }
-  else {
+    //printf ("Copying immediate int of value %i\n", Long_val(v));
+    newv = v;
+  } else {
     mlsize_t size = Wosize_val(v);
-    unsigned char tag = Tag_val(v);
-    
-    // printf ("Copying object of tag %i and size %i \n", tag, size);
-    
-    result = caml_alloc(size, tag);
-    int i;
-    for (i = 0; i < size; i++) {
-      // printf ("Copying field %i of block of tag %i\n", i, tag);
-      Store_field(result, i, copy_value (Field(v, i)));
+    header_t hd = Hd_val(v);
+    tag_t tag = Tag_hd(hd);
+
+    if (hd == 0) { /* already copied */
+      //printf ("Value is already copied\n", Long_val(v));
+      newv = Field(v,0);
+    } else { 
+      //printf ("Copying object of tag %i and size %i \n", tag, size);
+      
+      newv = caml_alloc(size, tag);
+      int i;
+      for (i = 0; i < size; i++) {
+        // printf ("Copying field %i of block of tag %i\n", i, tag);
+        Field (newv, i) = Field(v, i);
+      }
+      Hd_val(v) = 0;
+	    Field(v, 0) = newv;
+      if (!No_scan(tag)) {
+        for (i = 0; i < size; i++) {
+          // printf ("Copying field %i of block of tag %i\n", i, tag);
+          Store_field(newv, i, copy_value (Field(newv, i)));
+        }
+      }
     }
   }
-  
-  CAMLreturn (result);
+  CAMLreturn (newv);
 }
 
 // external certicoq_pipeline : (coq_Options × ExtractedASTBaseQuoter.quoted_program) -> coq_Cprogram error * Bytestring.String.t = "certicoq_pipeline"

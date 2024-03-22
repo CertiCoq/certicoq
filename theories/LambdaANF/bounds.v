@@ -106,7 +106,7 @@ Section Bounds.
 
       - intro; intros. intro; intros. 
         unfold inline_bound in *; unfold_all; simpl.
-        assert (c = 0). eapply NPeano.Nat.lt_1_r. eassumption. subst. lia.
+        assert (c = 0). eapply Nat.lt_1_r. eassumption. subst. lia.
       - intro; intros. unfold post_base'. 
         unfold inline_bound in *; unfold_all; simpl. lia.
       - intro; intros; unfold inline_bound in *.
@@ -158,7 +158,7 @@ Section Bounds.
       
       assert (Hleq'' : cin1 <= cin2).
       { eapply Nat.add_le_mono_r in Hleq'. eapply Nat.add_le_mono_r in Hleq'.
-        eapply NPeano.Nat.mul_le_mono_pos_l in Hleq'. eassumption. lia. }
+        eapply Nat.mul_le_mono_pos_l in Hleq'. eassumption. lia. }
 
       eexists (cin2 - cin1). simpl. lia.
     Qed.
@@ -400,7 +400,7 @@ Section Bounds.
       eapply Nat.add_le_mono_r in H.
       replace (cin2 + G * cin2) with ((1 + G) * cin2) in H by lia.
       replace (G * cin1 + cin1) with ((1 + G) * cin1) in H by lia.      
-      eapply NPeano.Nat.mul_le_mono_pos_l in H.
+      eapply Nat.mul_le_mono_pos_l in H.
       eexists (cin2 - cin1). simpl. lia.
       lia.
     Qed.

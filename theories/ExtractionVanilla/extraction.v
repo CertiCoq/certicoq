@@ -94,7 +94,7 @@ Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false".
 Set Warnings "-extraction-reserved-identifier".
 Set Warnings "-extraction-opaque-accessed".
 
-Set Extraction Output Directory "ExtractionVanilla".
+Set Extraction Output Directory ".".
 
 Extraction Library Zeven.
 Extraction Library Zeven.

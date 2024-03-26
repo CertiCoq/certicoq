@@ -370,6 +370,53 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let make_fname opts str =
     Filename.concat opts.build_dir str
 
+  type line = 
+  | EOF
+  | Info of string
+  | Error of string
+  
+  let read_line stdout stderr =
+    try Info (input_line stdout)
+    with End_of_file -> 
+      try Error (input_line stderr)
+    with End_of_file -> EOF
+  
+  let push_line buf line =
+    Buffer.add_string buf line; 
+    Buffer.add_string buf "\n"
+  
+  let string_of_buffer buf = Bytes.to_string (Buffer.to_bytes buf)
+    
+  let execute cmd =
+    debug Pp.(fun () -> str "Executing: " ++ str cmd ++ str " in environemt: " ++ 
+      prlist_with_sep spc str (Array.to_list (Unix.environment ())));
+    let (stdout, stdin, stderr) = Unix.open_process_full cmd (Unix.environment ()) in
+    let continue = ref true in
+    let outbuf, errbuf = Buffer.create 100, Buffer.create 100 in
+    let push_info = push_line outbuf in
+    let push_error = push_line errbuf in
+    while !continue do
+      match read_line stdout stderr with
+      | EOF -> debug Pp.(fun () -> str "Program terminated"); continue := false
+      | Info s -> push_info s
+      | Error s -> push_error s
+    done;
+    let status = Unix.close_process_full (stdout, stdin, stderr) in
+    status, string_of_buffer outbuf, string_of_buffer errbuf
+    
+  let execute ?loc cmd =
+    let status, out, err = execute cmd in
+    match status with
+    | Unix.WEXITED 0 -> out, err
+    | Unix.WEXITED n -> 
+      CErrors.user_err ?loc Pp.(str"Command" ++ spc () ++ str cmd ++ spc () ++
+        str"exited with code " ++ int n ++ str "." ++ fnl () ++
+        str"stdout: " ++ spc () ++ str out ++ fnl () ++ str "stderr: " ++ str err)
+    | Unix.WSIGNALED n | Unix.WSTOPPED n -> 
+      CErrors.user_err ?loc Pp.(str"Command" ++ spc () ++ str cmd ++ spc () ++ 
+      str"was signaled with code " ++ int n ++ str"." ++ fnl () ++
+      str"stdout: " ++ spc () ++ str out ++ fnl () ++ str "stderr: " ++ str err)
+    
   let compile opts term imports =
     let debug = opts.debug in
     let options = make_pipeline_options opts in
@@ -470,11 +517,6 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | None -> find_executable debug "which ocamlfind"
     | Some s -> s
       
-  type line = 
-    | EOF
-    | Info of string
-    | Error of string
-
   let read_line stdout stderr =
     try Info (input_line stdout)
     with End_of_file -> 
@@ -740,32 +782,25 @@ module CompileFunctor (CI : CompilerInterface) = struct
       "coq-core.interp"; "coq-core.kernel"; "coq-core.library"] in
     let pkgs = String.concat "," packages in
     let dontlink = "str,unix,dynlink,threads,zarith,coq-core,coq-core.plugins.ltac,coq-core.interp" in
-    match Unix.system cmd with
-    | Unix.WEXITED 0 ->
-      let shared_lib = make_fname opts opts.filename ^ suff ^ ".cmxs" in
-      let linkcmd =
-        Printf.sprintf "%s ocamlopt -shared -linkpkg -dontlink %s -thread -rectypes -package %s \
-        -I %s -I plugin -o %s %s %s %s %s"
-        ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o 
-        (make_fname opts opts.filename ^ ".o") importso
-      in
-      debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
-      (match Unix.system linkcmd with
-      | Unix.WEXITED 0 ->
-          debug_msg debug (Printf.sprintf "Compilation ran fine, linking compiled code for %s" global_id);
-          Dynlink.loadfile_private shared_lib;
-          debug_msg debug (Printf.sprintf "Dynamic linking succeeded, retrieving function %s" global_id);
-          let result = 
-            if opts.time then time ~msg:(Pp.str id) (run_certicoq_run global_id)
-            else run_certicoq_run global_id ()
-          in
-          debug_msg debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
-          reify opts env sigma tyinfo result
-      | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str linkcmd)
-      | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n))
-    | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str cmd)
-    | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n  ++ str" while running " ++ str cmd)
-
+    let () = ignore (execute cmd) in
+    let shared_lib = make_fname opts opts.filename ^ suff ^ ".cmxs" in
+    let linkcmd =
+      Printf.sprintf "%s ocamlopt -shared -linkpkg -dontlink %s -thread -rectypes -package %s \
+      -I %s -I plugin -o %s %s %s %s %s"
+      ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o 
+      (make_fname opts opts.filename ^ ".o") importso
+    in
+    debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
+    let _out, _err = execute linkcmd in
+    Dynlink.loadfile_private shared_lib;
+    debug_msg debug (Printf.sprintf "Dynamic linking succeeded, retrieving function %s" global_id);
+    let result = 
+      if opts.time then time ~msg:(Pp.str id) (run_certicoq_run global_id)
+      else run_certicoq_run global_id ()
+    in
+    debug_msg debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
+    reify opts env sigma tyinfo result
+    
   let next_string_away_from s bad =
     let rec name_rec s = if bad s then name_rec (increment_subscript s) else s in
     name_rec s

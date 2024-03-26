@@ -74,7 +74,7 @@ Valid options:\n\
 -fast-erasure     :  Uses an alternative function to remove parameters of constructors in the MetaCoq Erasure pipeline.\n\
 \n\n\
 To compile Gallina constants to specific C functions use:\n\
-   CertiCoq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\" as library, ... , \"fileM.h\" as library ].\n\
+   CertiCoq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\" , Library \"runtime_header.h\", ... , Absolute \"fileM.h\" ].\n\
 \n\
 See https://github.com/CertiCoq/certicoq/wiki/The-CertiCoq-plugin for more detailed information."
 

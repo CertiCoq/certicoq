@@ -21,4 +21,4 @@ CertiCoq Register [
   Coq.Floats.PrimFloat.of_uint63 => "prim_float_of_uint63" with tinfo,
   Coq.Floats.PrimFloat.next_up => "prim_float_next_up" with tinfo,
   Coq.Floats.PrimFloat.next_down => "prim_float_next_down" with tinfo ]
-Include [ "prim_floats.h" as library ].
+Include [ Library "prim_floats.h"  ].

@@ -2,7 +2,15 @@
 CCOMPILER := $(shell { command -v clang-11 || command -v clang || command -v gcc; } 2>/dev/null)
 # clang options
 CCOMPILEROPTS = -fPIC -fomit-frame-pointer -g -c -I . -I $(RUNTIME_DIR) -I ${OCAMLLIB} -w -Wno-everything -O2
+UNAME=$(shell uname -s)
+ifeq '$(UNAME)' 'Darwin'
+  SED= $(shell which gsed)
+  ifeq '$(SED)' ''
+   $(error "Must have gsed installed on MacOS, try e.g. brew install gsed")
+  endif
+else
 SED=`which gsed || which sed`
+endif
 
 # CompCert compiler
 CCOMPCOMPILER := $(CCOMPILER)
@@ -35,8 +43,12 @@ ifeq '$(CERTICOQ_CONFIG)' 'local'
 
   TESTCOQOPTS = $(COQOPTS)
 else
+ ifeq '$(CERTICOQ_CONFIG)' 'global'
   COQOPTS = -I . -Q theories CertiCoq.CertiCoqC
   TESTCOQOPTS = 
+ else
+  $(error "Must first set CERTICOQ_CONFIG by running ./configure.sh")
+ endif
 endif
 
 PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.gramlib,coq-core.interp,coq-core.kernel,coq-core.lib,coq-core.library,coq-core.toplevel,coq-core.vernac,coq-core.plugins.ltac

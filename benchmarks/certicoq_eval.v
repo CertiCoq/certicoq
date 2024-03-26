@@ -1,7 +1,7 @@
 From Equations Require Import Equations.
 From Coq Require Import Uint63 Wf_nat ZArith Lia Arith.
 From CertiCoq Require Import CertiCoq.
-
+CertiCoq -help.
 Set CertiCoq Build Directory "_build".
 
 (* This warns about uses of primitive operations, but we compile them fine *)
@@ -13,8 +13,8 @@ Program Definition long_vector n : Vector.t nat n :=
   Vector.of_list (List.repeat 1000 n).
   Next Obligation. now rewrite List.repeat_length. Qed.
 
-Definition silent_long_vector := 0.
- (* Vector.eqb _ Nat.eqb (long_vector 5000) (long_vector 5000). *)
+Definition silent_long_vector :=
+ Vector.eqb _ Nat.eqb (long_vector 5000) (long_vector 5000).
 
 (* Time Eval vm_compute in silent_long_vector. (* Blows up *) *)
 (* 1.23s *)
@@ -68,7 +68,7 @@ CertiCoq Eval -time sha_fast_noproofs.
 (* Executed in 0.037175 sec *)
 
 Time CertiCoq Eval sha_fast_noproofs.
-(* Finished transaction in 0.06 sec *)
+(* Finished transaction in 0.02 sec *)
 
 CertiCoq Eval -time sha_fast_noproofs.
 (* Executed in 0.045 sec *)
@@ -106,9 +106,9 @@ Definition vs_hard :=
 (* Blows up *) Time Eval vm_compute in vs_hard.
 *)
 
-(* CertiCoq Eval -time vs_hard. *)
+CertiCoq Eval -time vs_hard.
 (* Executed in 0.06s *)
-(* CertiCoq Eval -time vs_hard. *)
+CertiCoq Eval -time vs_hard.
 
 (* CertiCoq Eval -time vs_easy. *)
 (* Executed in 0.007s *)

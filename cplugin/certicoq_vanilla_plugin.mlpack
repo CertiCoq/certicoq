@@ -7,11 +7,13 @@ Caml_nat
 Caml_bool
 Caml_option
 Caml_comparison
+DecidableClass
 Bool
 Equalities
 Decimal
 Hexadecimal
 Nat0
+Wf
 List0
 PeanoNat
 Specif

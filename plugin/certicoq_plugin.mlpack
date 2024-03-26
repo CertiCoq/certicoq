@@ -4,11 +4,13 @@ Tm_util
 
 Datatypes
 Caml_nat
+DecidableClass
 Bool
 Equalities
 Decimal
 Hexadecimal
 Nat0
+Wf
 List0
 PeanoNat
 Specif

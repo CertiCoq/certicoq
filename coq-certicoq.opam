@@ -1,5 +1,5 @@
 opam-version: "2.0"
-version: "dev+8.19"
+version: "dev+8.18"
 maintainer: "The CertiCoq Team"
 homepage: "https://certicoq.org/"
 dev-repo: "git+https://github.com/CertiCoq/certicoq"
@@ -33,11 +33,11 @@ depends: [
   "ocaml"
   "conf-clang"
   "stdlib-shims"
-  "coq" {>= "8.19" & < "8.20~"}
+  "coq" {>= "8.18" & < "8.19~"}
   "coq-compcert" {= "3.13.1"}
-  "coq-equations" {= "1.3+8.19"}
-  "coq-metacoq-erasure-plugin" {= "1.3.1+8.19"}
-  "coq-metacoq-safechecker-plugin" {= "1.3.1+8.19"}
+  "coq-equations" {= "1.3+8.18"}
+  "coq-metacoq-erasure-plugin" {= "1.3.1+8.18"}
+  "coq-metacoq-safechecker-plugin" {= "1.3.1+8.18"}
   "coq-ext-lib" {>= "0.12"}
 ]
 

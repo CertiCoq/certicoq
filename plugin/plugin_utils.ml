@@ -3,26 +3,24 @@ open Names
 open Pp
 open Caml_bytestring
 
+  
 let debug_opt =
-   let open Goptions in
-   let key = ["CertiCoq"; "Debug"] in
-   let tables = get_tables () in
-   try
-     let _ = OptionMap.find key tables in
-     fun () ->
-       let tables = get_tables () in
-       let opt = OptionMap.find key tables in
-       match opt.opt_value with
-       | BoolValue b -> b
-       | _ -> assert false
-   with Not_found ->
-   declare_bool_option_and_ref ~depr:false ~key ~value:false
- 
- let debug (m : unit ->Pp.t) =
-   if debug_opt () then
-     Feedback.(msg_debug (m ()))
-   else
-     ()
+  let open Goptions in
+  let key = ["CertiCoq"; "Debug"] in
+  match get_option_value key with
+  | Some get -> fun () ->
+      begin match get () with
+      | BoolValue b -> b
+      | _ -> assert false
+      end
+  | None ->
+   (declare_bool_option_and_ref ~key ~value:false ()).get
+
+let debug (m : unit ->Pp.t) =
+  if debug_opt () then
+    Feedback.(msg_debug (m ()))
+  else
+    ()
 
 type import =
     FromRelativePath of string
@@ -76,7 +74,7 @@ Valid options:\n\
 -fast-erasure     :  Uses an alternative function to remove parameters of constructors in the MetaCoq Erasure pipeline.\n\
 \n\n\
 To compile Gallina constants to specific C functions use:\n\
-   CertiCoq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\" as library, ... , \"fileM.h\" as library ].\n\
+   CertiCoq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\" , Library \"runtime_header.h\", ... , Absolute \"fileM.h\" ].\n\
 \n\
 See https://github.com/CertiCoq/certicoq/wiki/The-CertiCoq-plugin for more detailed information."
 

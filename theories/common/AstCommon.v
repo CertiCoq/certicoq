@@ -18,7 +18,7 @@ Set Implicit Arguments.
 Ltac inv H := inversion H; subst; clear H.
 
 (** Fix arguments scope for [mkInd]. *)
-Arguments mkInd _%bs _%nat.
+Arguments mkInd _%_bs _%_nat.
 
 (** Use with caution, valid kernames from Coq cannot have an empty MPFile component. *)
 Definition kername_of_string (s : string) := (MPfile nil, s).

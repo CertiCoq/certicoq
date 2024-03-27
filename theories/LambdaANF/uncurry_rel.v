@@ -37,7 +37,7 @@ Section list_lemmas.
       simpl in H. remember (set_lists l l1 rho).
       destruct o; [|congruence].
       rewrite <- IHl with (rho := rho). now exists t. 
-    - (* :: <- *) destruct l1; [easy|]. simpl in H. apply NPeano.Nat.succ_inj in H.
+    - (* :: <- *) destruct l1; [easy|]. simpl in H. apply Nat.succ_inj in H.
       rewrite <- IHl with (rho := rho) in H. destruct H.
       simpl. rewrite <- H. now exists (M.set a a0 x).
   Qed.

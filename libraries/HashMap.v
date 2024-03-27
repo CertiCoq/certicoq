@@ -44,7 +44,7 @@ Module MakeHashMap (D: UsualOrderedType) <:
   Definition t := t'.
   Lemma norepet_empty: norepet nil.
   Proof. hnf; intros.
-         elimtype False; clear - H. induction i; inversion H.
+         exfalso; clear - H. induction i; inversion H.
   Qed.     
   Definition empty := Make _ norepet_empty.
   Definition get (i: index) (m: t) : option Domain.t := 

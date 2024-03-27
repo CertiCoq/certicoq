@@ -788,7 +788,7 @@ Proof.
     move/andP: H0 => [] /andP[] wfi wft wfl.
     set (brs' := map _ l). cbn in brs'.
     set (brs'0 := map _ l). simpl.
-    rewrite instantiate_TCase. rtoProp; intuition auto. f_equal; eauto.
+(*    rewrite instantiate_TCase. *) rtoProp; intuition auto. f_equal; eauto.
     clear -X wfl.
     { subst brs' brs'0. repeat toAll. induction wfl.
     - constructor.
@@ -796,7 +796,7 @@ Proof.
       f_equal; eauto. destruct p. rewrite List.rev_length. repeat eapply (e n).
       eapply wellformed_up; tea. lia. }
   - rewrite map_map_compose. set (mfix' := map _ m).
-    simpl. rewrite instantiate_TFix. f_equal.
+    simpl. (*rewrite instantiate_TFix. *) f_equal.
     clear -X H.
     move/andP: H => [] _ /andP[] _ H1. repeat toAll.
     rewrite -dlength_hom. 

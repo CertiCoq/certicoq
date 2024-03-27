@@ -9,7 +9,7 @@ Require compcert.common.AST
         compcert.lib.Coqlib
         compcert.lib.Floats
         compcert.common.Globalenvs
-        Int31.
+    (*    Int31*).
 
 Require Glue.glue
         Compiler.pipeline.
@@ -93,6 +93,8 @@ Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false".
 
 Set Warnings "-extraction-reserved-identifier".
 Set Warnings "-extraction-opaque-accessed".
+
+Set Extraction Output Directory ".".
 
 Extraction Library Zeven.
 Extraction Library Zeven.

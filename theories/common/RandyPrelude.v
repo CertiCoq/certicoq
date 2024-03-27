@@ -13,7 +13,7 @@ Require Import Coq.Arith.Arith.
 Require Import Coq.micromega.Lia.
 Require Import Common.exceptionMonad.
 Require Import FunInd.
-Require Import Coq.Arith.Div2 Coq.Numbers.Natural.Peano.NPeano Coq.Program.Wf.
+Require Import (*Coq.Arith.Div2*) (*Coq.Numbers.Natural.Peano.NPeano*) Coq.Program.Wf.
 Require Import MetaCoq.Utils.bytestring.
 Local Open Scope bs_scope.
 Local Open Scope bool.
@@ -37,12 +37,12 @@ Program Fixpoint nat_to_string (n:nat) {measure n}: string :=
   (match n <? 10 as x return n <? 10 = x -> string with
      | true => fun _ => digit_to_string n
      | false => fun pf =>
-                  let m := NPeano.Nat.div n 10 in
+                  let m := Nat.div n 10 in
                   (nat_to_string m) ++ (digit_to_string (n - 10 * m))
    end eq_refl)%nat.
 Next Obligation.
-  apply (NPeano.Nat.div_lt n 10%nat).
-  destruct n. unfold NPeano.Nat.ltb in *. simpl in *.
+  apply (Nat.div_lt n 10%nat).
+  destruct n. unfold Nat.ltb in *. simpl in *.
   discriminate. auto with arith.
   auto with arith.
 Defined.

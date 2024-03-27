@@ -4,20 +4,17 @@ let contrib_name = "template-coq"
 
 (* This allows to load template_plugin and the extractable plugin at the same time 
   while have option settings apply to both *)
-  let timing_opt =
+let timing_opt =
   let open Goptions in
   let key = ["MetaCoq"; "Timing"] in
-  let tables = get_tables () in
-  try 
-    let _ = OptionMap.find key tables in
-    fun () -> 
-      let tables = get_tables () in
-      let opt = OptionMap.find key tables in
-      match opt.opt_value with
+  match get_option_value key with
+  | Some get -> fun () ->
+      begin match get () with
       | BoolValue b -> b
       | _ -> assert false
-  with Not_found ->
-    declare_bool_option_and_ref ~depr:false ~key ~value:false
+      end
+  | None ->
+    (declare_bool_option_and_ref ~key ~value:false ()).get
 
 let time prefix f x =
   if timing_opt () then 
@@ -31,23 +28,22 @@ let time prefix f x =
 let debug_opt =
   let open Goptions in
   let key = ["MetaCoq"; "Debug"] in
-  let tables = get_tables () in
-  try 
-    let _ = OptionMap.find key tables in
-    fun () -> 
-      let tables = get_tables () in
-      let opt = OptionMap.find key tables in
-      match opt.opt_value with
+  match get_option_value key with
+  | Some get -> fun () ->
+      begin match get () with
       | BoolValue b -> b
       | _ -> assert false
-  with Not_found ->
-  declare_bool_option_and_ref ~depr:false ~key ~value:false
+      end
+  | None ->
+    (declare_bool_option_and_ref ~key ~value:false ()).get
 
 let debug (m : unit ->Pp.t) =
   if debug_opt () then
     Feedback.(msg_debug (m ()))
   else
     ()
+
+
 type ('a,'b) sum =
   Left of 'a | Right of 'b
 
@@ -134,15 +130,15 @@ module CaseCompat =
     in
     instantiate (Array.length nas - 1) ctx
 
-  let case_predicate_context_gen mip ci u paramsubst nas =
-    let realdecls, _ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
-    let self =
-      let args = Context.Rel.instance mkRel 0 mip.mind_arity_ctxt in
-      let inst = Instance.of_array (Array.init (Instance.length u) Level.var) in
-      mkApp (mkIndU (ci.ci_ind, inst), args)
-    in
-    let realdecls = LocalAssum (Context.anonR, self) :: realdecls in
-    instantiate_context u paramsubst nas realdecls
+    let case_predicate_context_gen mip ci u paramsubst nas =
+      let realdecls, _ = List.chop mip.mind_nrealdecls mip.mind_arity_ctxt in
+      let self =
+        let args = Context.Rel.instance mkRel 0 mip.mind_arity_ctxt in
+        let inst = UVars.Instance.abstract_instance (UVars.Instance.length u) in
+        mkApp (mkIndU (ci.ci_ind, inst), args)
+      in
+      let realdecls = LocalAssum (Context.anonR, self) :: realdecls in
+      instantiate_context u paramsubst nas realdecls
 
   let case_predicate_context env ci u params nas =
     let mib = Environ.lookup_mind (fst ci.ci_ind) env in

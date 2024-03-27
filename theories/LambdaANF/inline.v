@@ -81,7 +81,7 @@ Section Inline.
   Lemma split_fuel_add d :
     d = fst (split_fuel d) + snd (split_fuel d). 
   Proof.
-    unfold split_fuel. simpl. rewrite (NPeano.Nat.div2_odd d) at 1. simpl.    
+    unfold split_fuel. simpl. rewrite (Nat.div2_odd d) at 1. simpl.    
     lia.
   Qed.    
   

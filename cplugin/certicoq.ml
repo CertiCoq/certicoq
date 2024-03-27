@@ -135,19 +135,17 @@ let fix_quoted_program (p : Ast0.Env.program) =
 
 end
 
+
 let get_stringopt_option key =
   let open Goptions in
-  let tables = get_tables () in
-  try
-    let _ = OptionMap.find key tables in
-    fun () ->
-      let tables = get_tables () in
-      let opt = OptionMap.find key tables in
-      match opt.opt_value with
+  match get_option_value key with
+  | Some get -> fun () ->
+      begin match get () with
       | StringOptValue b -> b
       | _ -> assert false
-  with Not_found ->
-    declare_stringopt_option_and_ref ~depr:false ~key
+      end
+  | None ->
+    (declare_stringopt_option_and_ref ~key ~value:None ()).get
 
 let get_build_dir_opt =
   get_stringopt_option ["CertiCoq"; "Build"; "Directory"]
@@ -676,8 +674,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n  ++ str" while running " ++ str cmd)
     
   type reifyable_type =
-  | IsInductive of Names.inductive * Univ.Instance.t * Constr.t list
-  | IsPrimitive of Names.Constant.t * Univ.Instance.t * Constr.t list
+  | IsInductive of Names.inductive * UVars.Instance.t * Constr.t list
+  | IsPrimitive of Names.Constant.t * UVars.Instance.t * Constr.t list
   
   let type_of_reifyable_type = function
     | IsInductive (hd, u, args) -> Term.applistc (Constr.mkIndU ((hd, u))) args
@@ -715,7 +713,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let hd, args = EConstr.decompose_app sigma hnf in
       match EConstr.kind sigma hd with
       | Const (c, u) when Environ.is_primitive_type env c -> 
-        IsPrimitive (c, EConstr.EInstance.kind sigma u, List.map EConstr.Unsafe.to_constr args)
+        IsPrimitive (c, EConstr.EInstance.kind sigma u, CArray.map_to_list EConstr.Unsafe.to_constr args)
       | _ -> CErrors.user_err 
         Pp.(str"Cannot reify values of non-inductive or non-primitive type: " ++ 
           Printer.pr_econstr_env env sigma ty)

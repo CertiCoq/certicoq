@@ -1727,8 +1727,7 @@ Section Lambda_lifting_correct.
        unfold fun_map, lifted_name in *. rewrite M.gempty in H. congruence. }
 
      assert (Heq'' : Funs (fun_map (M.empty FunInfo)) <--> Empty_set _).
-     { clear. split; sets. intros x Hin. inv Hin. destructAll.
-       unfold fun_map, lifted_name in *. simpl in *. congruence. }
+     { clear. split; sets. intros x Hin. inv Hin. inv H. }
      
      rewrite !Heq, !Heq' in *.
 

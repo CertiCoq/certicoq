@@ -11,4 +11,4 @@ CertiCoq Register [
   coq_msg_notice => "coq_msg_notice",
   coq_msg_debug => "coq_msg_debug",
   coq_user_error => "coq_user_error" ]
-Include [ "coq_c_ffi.h" "coq_ffi.h" as library ].
+Include [ Library "coq_c_ffi.h" "coq_ffi.h" ].

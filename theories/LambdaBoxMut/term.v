@@ -2632,9 +2632,9 @@ Proof.
         rewrite k0. reflexivity.
       * assert (k0: S (Init.Nat.pred n) = n). lia.
         rewrite k0. reflexivity.
-    + rewrite (proj2 (NPeano.Nat.compare_gt_iff _ _)); try lia. cbn.
+    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try lia. cbn.
       rewrite match_cn_Eq; try lia. reflexivity.
-    + rewrite (proj2 (NPeano.Nat.compare_gt_iff _ _)); try lia. cbn.
+    + rewrite (proj2 (Nat.compare_gt_iff _ _)); try lia. cbn.
       rewrite match_cn_Lt; try lia. reflexivity.
     + rewrite match_cn_Gt; try lia. cbn. rewrite match_cn_Gt; try lia.
       reflexivity.
@@ -2795,7 +2795,7 @@ Proof.
   try (solve [unfold instantiate; constructor]).
   - destruct (lt_eq_lt_dec n m) as [[h|h]|h]; unfold instantiate.
     + rewrite (proj1 (nat_compare_lt _ _) h). constructor.
-    + rewrite (proj2 (NPeano.Nat.compare_eq_iff _ _) h). assumption.
+    + rewrite (proj2 (Nat.compare_eq_iff _ _) h). assumption.
     + rewrite (proj1 (nat_compare_gt _ _) h). constructor.
   - cbn. constructor. apply H0. assumption.
   - change (WFapp (TLetIn nm (instantiate n dfn) (instantiate (S n) bod))).

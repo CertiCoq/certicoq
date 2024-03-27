@@ -137,3 +137,5 @@ bootstrap/certicoqc/CertiCoq.CertiCoqC.CertiCoqC.certicoqc.c
 bootstrap/certicoqc/CertiCoq.CertiCoqC.CertiCoqC.certicoqc.h
 bootstrap/certicoqc/tests/test.demo1.c
 bootstrap/certicoqc/tests/test.demo1.h
+plugin/.filestoinstall
+cplugin/.merlin

@@ -565,7 +565,7 @@ Section Closure_conversion_correct.
     n <= n * m.
   Proof.
     rewrite Nat.mul_comm.
-    edestruct Arith_prebase.mult_O_le_stt; eauto. lia.
+    edestruct Arith_base.mult_O_le_stt; eauto. lia.
   Qed.
 
   Lemma plus_le_mult  (a1 a2 b1 b2 b3 : nat) :
@@ -575,7 +575,7 @@ Section Closure_conversion_correct.
     a1 + a2 <= (1 + b1) * a1 * b2.
   Proof.
     intros.
-    rewrite <- Nat.mul_assoc, NPeano.Nat.mul_add_distr_r.
+    rewrite <- Nat.mul_assoc, Nat.mul_add_distr_r.
     eapply Nat.add_le_mono.
     - simpl. rewrite <- plus_n_O.
       now eapply mult_le_n.

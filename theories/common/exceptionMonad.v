@@ -5,11 +5,11 @@ Import MonadNotation.
 
 Inductive exception (A:Type) := Exc (_:string) | Ret (_:A).
 Arguments Ret [A].
-Arguments Exc [A] _%bs.
+Arguments Exc [A] _%_bs.
 
 Definition ret {A: Type} (x: A) := Ret x.
 Definition raise {A: Type} (str:string) := @Exc A str.
-Arguments raise {A} _%bs.
+Arguments raise {A} _%_bs.
 
 Definition bind
     {A B: Type} (a: exception A) (f: A -> exception B): exception B :=

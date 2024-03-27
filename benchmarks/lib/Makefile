@@ -7,7 +7,7 @@
 ##         #     GNU Lesser General Public License Version 2.1          ##
 ##         #     (see LICENSE file for the text of the license)         ##
 ##########################################################################
-## GNUMakefile for Coq 8.17.0
+## GNUMakefile for Coq 8.19.1
 
 # For debugging purposes (must stay here, don't move below)
 INITIAL_VARS := $(.VARIABLES)
@@ -278,7 +278,7 @@ COQDOCLIBS?=$(COQLIBS_NOML)
 # The version of Coq being run and the version of coq_makefile that
 # generated this makefile
 COQ_VERSION:=$(shell $(COQC) --print-version | cut -d " " -f 1)
-COQMAKEFILE_VERSION:=8.17.0
+COQMAKEFILE_VERSION:=8.19.1
 
 # COQ_SRC_SUBDIRS is for user-overriding, usually to add
 # `user-contrib/Foo` to the includes, we keep COQCORE_SRC_SUBDIRS for
@@ -293,18 +293,26 @@ CAMLDOCFLAGS:=$(filter-out -annot, $(filter-out -bin-annot, $(CAMLFLAGS)))
 CAMLFLAGS+=$(OCAMLWARN)
 
 ifneq (,$(TIMING))
-TIMING_ARG=-time
-ifeq (after,$(TIMING))
-TIMING_EXT=after-timing
+  ifeq (after,$(TIMING))
+    TIMING_EXT=after-timing
+  else
+    ifeq (before,$(TIMING))
+      TIMING_EXT=before-timing
+    else
+      TIMING_EXT=timing
+    endif
+  endif
+  TIMING_ARG=-time-file $<.$(TIMING_EXT)
 else
-ifeq (before,$(TIMING))
-TIMING_EXT=before-timing
-else
-TIMING_EXT=timing
+  TIMING_ARG=
 endif
-endif
+
+ifneq (,$(PROFILING))
+  PROFILE_ARG=-profile $<.prof.json
+  PROFILE_ZIP=gzip $<.prof.json
 else
-TIMING_ARG=
+  PROFILE_ARG=
+  PROFILE_ZIP=true
 endif
 
 # Files #######################################################################
@@ -592,13 +600,24 @@ beautify: $(BEAUTYFILES)
 # There rules can be extended in Makefile.local
 # Extensions can't assume when they run.
 
+# We use $(file) to avoid generating a very long command string to pass to the shell
+# (cf https://coq.zulipchat.com/#narrow/stream/250632-Coq-Platform-devs-.26-users/topic/Strange.20command.20length.20limit.20on.20Linux)
+# However Apple ships old make which doesn't have $(file) so we need a fallback
+$(file >.hasfile,1)
+HASFILE:=$(shell if [ -e .hasfile ]; then echo 1; rm .hasfile; fi)
+
+MKFILESTOINSTALL= $(if $(HASFILE),$(file >.filestoinstall,$(FILESTOINSTALL)),\
+  $(shell rm -f .filestoinstall) \
+  $(foreach x,$(FILESTOINSTALL),$(shell printf '%s\n' "$x" >> .filestoinstall)))
+
 # findlib needs the package to not be installed, so we remove it before
 # installing it (see the call to findlib_remove)
 install: META
-	$(HIDE)code=0; for f in $(FILESTOINSTALL); do\
+	@$(MKFILESTOINSTALL)
+	$(HIDE)code=0; for f in $$(cat .filestoinstall); do\
 	 if ! [ -f "$$f" ]; then >&2 echo $$f does not exist; code=1; fi \
 	done; exit $$code
-	$(HIDE)for f in $(FILESTOINSTALL); do\
+	$(HIDE)for f in $$(cat .filestoinstall); do\
 	 df="`$(COQMKFILE) -destination-of "$$f" $(COQLIBS)`";\
 	 if [ "$$?" != "0" -o -z "$$df" ]; then\
 	   echo SKIP "$$f" since it has no logical path;\
@@ -611,6 +630,7 @@ install: META
 	$(call findlib_remove)
 	$(call findlib_install, META $(FINDLIBFILESTOINSTALL))
 	$(HIDE)$(MAKE) install-extra -f "$(SELF)"
+	@rm -f .filestoinstall
 install-extra::
 	@# Extension point
 .PHONY: install install-extra
@@ -642,18 +662,20 @@ install-doc:: html mlihtml
 
 uninstall::
 	@# Extension point
+	@$(MKFILESTOINSTALL)
 	$(call findlib_remove)
-	$(HIDE)for f in $(FILESTOINSTALL); do \
+	$(HIDE)for f in $$(cat .filestoinstall); do \
 	 df="`$(COQMKFILE) -destination-of "$$f" $(COQLIBS)`" &&\
 	 instf="$(COQLIBINSTALL)/$$df/`basename $$f`" &&\
 	 rm -f "$$instf" &&\
 	 echo RM "$$instf" ;\
 	done
-	$(HIDE)for f in $(FILESTOINSTALL); do \
+	$(HIDE)for f in $$(cat .filestoinstall); do \
 	 df="`$(COQMKFILE) -destination-of "$$f" $(COQLIBS)`" &&\
 	 echo RMDIR "$(COQLIBINSTALL)/$$df/" &&\
 	 (rmdir "$(COQLIBINSTALL)/$$df/" 2>/dev/null || true); \
 	done
+	@rm -f .filestoinstall
 
 .PHONY: uninstall
 
@@ -784,12 +806,6 @@ $(filter-out $(MLLIBFILES:.mllib=.cmxs) $(MLPACKFILES:.mlpack=.cmxs) $(addsuffix
 	$(HIDE)$(TIMER) $(CAMLOPTLINK) $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) \
 		-shared -o $@ $<
 
-ifneq (,$(TIMING))
-TIMING_EXTRA = > $<.$(TIMING_EXT)
-else
-TIMING_EXTRA =
-endif
-
 # can't make
 # https://www.gnu.org/software/make/manual/make.html#Static-Pattern
 # work with multiple target rules
@@ -800,12 +816,13 @@ ifneq (,$(filter grouped-target,$(.FEATURES)))
 define globvorule=
 
 # take care to $$ variables using $< etc
-  $(1).vo $(1).glob &: $(1).v | $(VDFILE)
-	$(SHOW)COQC $(1).v
-	$(HIDE)$$(TIMER) $(COQC) $(COQDEBUG) $(TIMING_ARG) $(COQFLAGS) $(COQLIBS) $(1).v $$(TIMING_EXTRA)
+  $(1).vo $(1).glob &: $(1).v | $$(VDFILE)
+	$$(SHOW)COQC $(1).v
+	$$(HIDE)$$(TIMER) $$(COQC) $$(COQDEBUG) $$(TIMING_ARG) $$(PROFILE_ARG) $$(COQFLAGS) $$(COQLIBS) $(1).v
+	$$(HIDE)$$(PROFILE_ZIP)
 ifeq ($(COQDONATIVE), "yes")
-	$(SHOW)COQNATIVE $(1).vo
-	$(HIDE)$(call TIMER,$(1).vo.native) $(COQNATIVE) $(COQLIBS) $(1).vo
+	$$(SHOW)COQNATIVE $(1).vo
+	$$(HIDE)$$(call TIMER,$(1).vo.native) $$(COQNATIVE) $$(COQLIBS) $(1).vo
 endif
 
 endef
@@ -813,7 +830,8 @@ else
 
 $(VOFILES): %.vo: %.v | $(VDFILE)
 	$(SHOW)COQC $<
-	$(HIDE)$(TIMER) $(COQC) $(COQDEBUG) $(TIMING_ARG) $(COQFLAGS) $(COQLIBS) $< $(TIMING_EXTRA)
+	$(HIDE)$(TIMER) $(COQC) $(COQDEBUG) $(TIMING_ARG) $(PROFILE_ARG) $(COQFLAGS) $(COQLIBS) $<
+	$(HIDE)$(PROFILE_ZIP)
 ifeq ($(COQDONATIVE), "yes")
 	$(SHOW)COQNATIVE $@
 	$(HIDE)$(call TIMER,$@.native) $(COQNATIVE) $(COQLIBS) $@

@@ -1582,7 +1582,7 @@ Section Inline_correct.
             - do 2 eapply frame_rule. eapply pre_transfer_r. eapply IHd.
               + lia.
               + eapply Nat.le_trans. reflexivity.
-                eapply NPeano.Nat.div2_decr. lia.
+                eapply Nat.div2_decr. lia.
               + eassumption.
               + eapply Union_Disjoint_r. clear H3. now sets. now sets.
               + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.

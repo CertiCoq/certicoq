@@ -1284,7 +1284,7 @@ Lemma LambdaBoxMutsbst_fix_preserves_lam dts nm bod :
 Proof.
   revert nm bod; induction (list_to_zero (dlength dts)); simpl; intros.
   reflexivity.
-  simpl. rewrite LambdaBoxMut.term.instantiate_TLambda. 
+ (* simpl. rewrite LambdaBoxMut.term.instantiate_TLambda. *)
   simpl. rewrite IHl. reflexivity.
 Qed.
 
@@ -1548,7 +1548,7 @@ Proof.
     + apply (IHbrs (n + 1) n0 Hnth). clear IHbrs.
       now cbn in findbr.
   - intros.
-    elimtype False.
+    exfalso.
     apply find_branch_map_branches_none in H.
     rewrite find_branch_trans in H; eauto.
     revert n H Hnth. generalize 0 at 2.
@@ -2447,9 +2447,9 @@ Proof with eauto.
          intros Hfs.
          apply WcbvEval_preserves_crctTerm in evfn; eauto.
          destruct (crctTerm_fix _ _ _ _ _ evfn eqt') as [[nm [bod ->]]| ->].         
-         { elimtype False. subst x.
+         { exfalso. subst x.
           rewrite LambdaBoxMutsbst_fix_preserves_lam /= subst_env_aux_lam in H4. inv H4. }
-        { elimtype False. subst x.
+        { exfalso. subst x.
           rewrite LambdaBoxMutsbst_fix_preserves_TProof /= subst_env_aux_prf in H4. inv H4. }
 
       * intros Hfs.
@@ -2459,7 +2459,7 @@ Proof with eauto.
         rewrite efnlst_length_trans. reflexivity.
         apply WcbvEval_preserves_crctTerm in evfn; eauto.
         destruct (crctTerm_fix _ _ _ _ _ evfn eqt') as [[nm [bod ->]]| ->].
-        { elimtype False. subst x.
+        { exfalso. subst x.
           rewrite LambdaBoxMutsbst_fix_preserves_lam /= subst_env_aux_lam in H5. inv H5. }
         cbn. rewrite subst_env_aux_prf /=.
         eapply eval_ProofApp_e; eauto.

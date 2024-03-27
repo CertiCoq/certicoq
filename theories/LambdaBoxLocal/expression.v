@@ -649,7 +649,7 @@ Qed.
 Declare Scope name.
 Bind Scope name with name.
 Delimit Scope name with name.
-Arguments nNamed i%bs.
+Arguments nNamed i%_bs.
 Definition nNameds (s : string) : name := nNamed s.
 
 Notation " [: x ] " := (cons (nNameds x) nil) : name.
@@ -658,8 +658,8 @@ Notation " '[:' x , y , .. , z ] " :=
 Local Open Scope name.
 
 Coercion nNameds : string >-> name.
-Arguments Lam_e n%bs _.
-Arguments eflcons n%bs _ _.
+Arguments Lam_e n%_bs _.
+Arguments eflcons n%_bs _ _.
 
 Example x1: exp := Lam_e "x" (Var_e 0).  (* identity *)
 Lemma Lx1: forall (e d:exp), eval e d -> eval (App_e x1 e) d.

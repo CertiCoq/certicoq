@@ -108,7 +108,7 @@ Ltac rewriterP := repeat (rewriteHyp; autorewrite with core in *).
 Ltac rewriter := autorewrite with core in *; rewriterP.
 
 (** This one is just so darned useful, let's add it as a hint here. *)
-Global Hint Rewrite app_ass : core.
+Global Hint Rewrite app_assoc : core.
 
 (** Devious marker predicate to use for encoding state within proof goals *)
 Definition done (T : Type) (x : T) := True.
@@ -197,7 +197,7 @@ Ltac crush' lemmas invOne :=
       end;
       sintuition; rewriter; sintuition;
       (** End with a last attempt to prove an arithmetic fact with [lia], or prove any sort of fact in a context that is contradictory by reasoning that [lia] can do. *)
-      try lia; try (elimtype False; lia)).
+      try lia; try (exfalso; lia)).
 
 (** [crush] instantiates [crush'] with the simplest possible parameters. *)
 Ltac crush := crush' false fail.

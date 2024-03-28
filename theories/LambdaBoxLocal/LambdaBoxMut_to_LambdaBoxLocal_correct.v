@@ -1284,7 +1284,7 @@ Lemma LambdaBoxMutsbst_fix_preserves_lam dts nm bod :
 Proof.
   revert nm bod; induction (list_to_zero (dlength dts)); simpl; intros.
   reflexivity.
- (* simpl. rewrite LambdaBoxMut.term.instantiate_TLambda. *)
+  simpl. rewrite LambdaBoxMut.term.instantiate_TLambda.
   simpl. rewrite IHl. reflexivity.
 Qed.
 

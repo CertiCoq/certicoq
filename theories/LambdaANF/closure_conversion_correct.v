@@ -565,7 +565,7 @@ Section Closure_conversion_correct.
     n <= n * m.
   Proof.
     rewrite Nat.mul_comm.
-    edestruct Arith_base.mult_O_le_stt; eauto. lia.
+    edestruct Arith_prebase.mult_O_le_stt; eauto. lia.
   Qed.
 
   Lemma plus_le_mult  (a1 a2 b1 b2 b3 : nat) :

@@ -587,8 +587,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n  ++ str" while running " ++ str cmd)
     
   type reifyable_type =
-  | IsInductive of Names.inductive * UVars.Instance.t * Constr.t list
-  | IsPrimitive of Names.Constant.t * UVars.Instance.t * Constr.t list
+  | IsInductive of Names.inductive * Univ.Instance.t * Constr.t list
+  | IsPrimitive of Names.Constant.t * Univ.Instance.t * Constr.t list
   
   let type_of_reifyable_type = function
     | IsInductive (hd, u, args) -> Term.applistc (Constr.mkIndU ((hd, u))) args

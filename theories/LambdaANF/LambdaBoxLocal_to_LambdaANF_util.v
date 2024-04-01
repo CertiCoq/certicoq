@@ -1457,7 +1457,7 @@ Section Post.
                Hm He1 He2 Hdup1 Hdup2 Hdup3 Hdup4 Hnd5 Hnot Hdis Hlen Hlen' Hlen''
                Hdis1 Hdis2 Hdis3 Hdis4 Hdis5 Hdis6 Hhyp Henv.
         inv He1; inv He2.
-        eapply Hhyp. rewrite <- !app_nil_end.
+        eapply Hhyp. rewrite !app_nil_r.
         eapply preord_env_P_inj_f_eq_subdomain.
         eapply preord_env_P_inj_antimon. eassumption.
         now sets.

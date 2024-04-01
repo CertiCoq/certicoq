@@ -207,6 +207,7 @@ void forward (value *from_start,  /* beginning of from-space */
         /* printf("New %lld\n", newv); */
         /* if (*p == 73832) printf("Found it\n"); */
         if (depth>0)
+	  if (!No_scan(Tag_hd(hd)))
           for (i=0; i<sz; i++)
             forward(from_start, from_limit, next, &Field(newv,i), depth-1);
       }

@@ -7515,7 +7515,7 @@ Section CONTRACT.
                 apply bound_stem_var. auto.
                 simpl. constructor. inv H18. }
         * (* size *)
-          eapply NPeano.Nat.lt_le_trans.
+          eapply Nat.lt_le_trans.
           apply constr_sub_size.
           lia.
           (* cmap_view *)

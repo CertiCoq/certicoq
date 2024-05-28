@@ -1,6 +1,4 @@
-Require Import Coq.Arith.Arith
-               Coq.Numbers.Natural.Peano.NPeano
-               List.
+Require Import Coq.Arith.Arith List.
 
 Import ListNotations.
 Import Nat. (* For 8.5.0 *)

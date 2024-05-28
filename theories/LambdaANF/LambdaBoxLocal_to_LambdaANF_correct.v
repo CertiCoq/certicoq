@@ -2180,8 +2180,8 @@ Section Correct.
                     eapply H1 in H16. eapply HS2 in H16. inv_setminus. eapply Hdis; eauto.
                   - eapply Forall2_app.
                     rewrite <- rev_involutive with (l := x2). eapply All_Forall.Forall2_rev.
-                    rewrite app_nil_end with (l := vs').
-                    rewrite app_nil_end with (l := rev x2).
+                    rewrite <- app_nil_r with (l := vs').
+                    rewrite <- app_nil_r with (l := rev x2).
                     eapply cps_env_rel_extend_setlists. now constructor.
                     eapply get_list_set_lists.
                     now eapply NoDup_rev; eauto.
@@ -2250,8 +2250,8 @@ Section Correct.
             eapply H1 in H16. eapply HS2 in H16. inv_setminus. eapply Hdis; eauto.
           - eapply Forall2_app.
             rewrite <- rev_involutive with (l := x2). eapply All_Forall.Forall2_rev.
-            rewrite app_nil_end with (l := vs').
-            rewrite app_nil_end with (l := rev x2).
+            rewrite <- app_nil_r with (l := vs').
+            rewrite <- app_nil_r with (l := rev x2).
             eapply cps_env_rel_extend_setlists. now constructor.
             eapply get_list_set_lists.
             now eapply NoDup_rev; eauto.

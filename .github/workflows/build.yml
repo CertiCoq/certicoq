@@ -29,13 +29,13 @@ jobs:
         with:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
-          # before_install: | # comment back in if MetaCoq commit changes
-          #   startGroup "fix permission issues"
-          #     sudo chown -R coq:coq .
-          #   endGroup
-          #   startGroup "opam pin"
-          #     opam pin -n -y submodules/metacoq
-          #   endGroup
+          before_install: | # comment back in if MetaCoq commit changes
+            startGroup "fix permission issues"
+              sudo chown -R coq:coq .
+            endGroup
+            startGroup "opam pin"
+              opam pin -n -y submodules/metacoq
+            endGroup
           before_script: |
             startGroup "fix permission issues"
               sudo chown -R coq:coq .

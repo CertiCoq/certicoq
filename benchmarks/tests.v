@@ -69,7 +69,7 @@ Definition color := Color.main.
 
 (* Lazy factorial. Needs coinductive types *)
 
-(* Definition lazy_factorial := coq_msg_info (string_of_Z (coind.lfact 150)). *)
+Definition lazy_factorial := string_of_Z (coind.lfact 150).
 
 (* Sha *)
 
@@ -116,6 +116,14 @@ CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" list_sum.
 (* CertiCoq Compile -cps -ext "_cps_opt" list_sum. *)
 CertiCoq Generate Glue -file "glue_list_sum" [ nat ].
 
+Eval compute in "Compiling lazy factorial (using unsafe passes)".
+
+CertiCoq Compile -unsafe-erasure -O 1 lazy_factorial.
+CertiCoq Compile -unsafe-erasure -ext "_opt" lazy_factorial.
+CertiCoq Compile -unsafe-erasure -args 1000 -config 9 -O 1 -ext "_opt_ll" lazy_factorial. 
+(* CertiCoq Compile -O 0 -cps -ext "_cps" demo1. *)
+(* CertiCoq Compile -cps -ext "_cps_opt" demo1. *)
+CertiCoq Generate Glue -file "glue_lazy_factorial" [ ].
 
 Eval compute in "Compiling vs_easy".
 
@@ -144,15 +152,6 @@ CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" binom.
 (* CertiCoq Compile -O 0 -cps -ext "_cps" binom. *)
 (* CertiCoq Compile -cps -ext "_cps_opt" binom. *)
 CertiCoq Generate Glue -file "glue_binom" [ nat ].
-
-(* Eval compute in "Compiling lazy factorial". *)
-
-(* CertiCoq Compile -O 1 lazy_factorial.
-CertiCoq Compile -ext "_opt" lazy_factorial.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" lazy_factorial. *)
-(* CertiCoq Compile -O 0 -cps -ext "_cps" demo1. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" demo1. *)
-(* CertiCoq Generate Glue -file "glue_lazy_factorial" [ ]. *)
 
 
 Eval compute in "Compiling color".

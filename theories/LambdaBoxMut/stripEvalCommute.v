@@ -37,7 +37,8 @@ Definition prim_flags :=
 
 (** Cofixpoints are not supported, Var and Evar don't actually appear 
     in terms to compile, and projections are inlined to cases earlier
-    in the pipeline. *)
+    in the pipeline. We compile down lazy/force to thunks, for a purely
+    functional implementation of cofixpoints. *)
 Definition term_flags :=
   {|
     has_tBox := true;
@@ -54,7 +55,7 @@ Definition term_flags :=
     has_tFix := true;
     has_tCoFix := false;
     has_tPrim := prim_flags;
-    has_tLazy_Force := false;
+    has_tLazy_Force := true;
   |}.
 
 Definition env_flags := 
@@ -506,6 +507,16 @@ Proof.
   now rewrite (wellformed_lookup_inductive_pars _ wfΣ hl').
 Qed.
 
+
+Lemma compile_lift n t : compile.lift n (compile t) = compile (lift 1 n t).
+Proof.
+  funelim (compile t); cbn [lift compile.lift]; simp compile => //.
+  - destruct (Nat.compare_spec n n0); 
+    destruct (Nat.leb_spec n0 n); subst; try lia; simp compile; auto.
+  -
+  Admitted.
+    
+
 Lemma wellformed_crct {Σ} t :
   wf_glob Σ ->
   crctEnv (compile_ctx Σ) ->
@@ -553,6 +564,7 @@ Proof.
     now eapply compile_isLambda.
   - cbn. rewrite -dlength_hom. move/andP: H0 => [] /Nat.ltb_lt //.
   - destruct p as [? []]; try constructor; eauto. simp trans_prim_val. cbn. now cbn in H.
+  - specialize (H k H0). now eapply Crct_lift in H.
 Qed.
 
 Lemma compile_fresh kn Σ : fresh_global kn Σ -> fresh kn (compile_ctx Σ).
@@ -605,9 +617,9 @@ Proof.
 Qed.
 
 Lemma isLambda_compile f : 
-  ~~ EAst.isLambda f -> ~ isLambda (compile f).
+  ~~ EAst.isLambda f -> ~~ isLazy f -> ~ isLambda (compile f).
 Proof.
-  intros nf. move=> [] na [] bod.
+  intros nf nl. move=> [] na [] bod.
   destruct f; simp_compile => /= //.
   rewrite compile_decompose.
   destruct decompose_app eqn:da.
@@ -755,10 +767,11 @@ Arguments instantiate _ _ !tbod.
 
 Lemma compile_csubst Σ a n k b : 
   wf_glob Σ ->
+  wellformed Σ 0 a ->
   wellformed Σ (n + k) b ->
   compile (ECSubst.csubst a k b) = instantiate (compile a) k (compile b).
 Proof.
-  intros wfΣ.
+  intros wfΣ wfa.
   revert b n k.
   apply: MkAppsInd.rec. all:intros *. 
   all:cbn -[instantiateBrs instantiateDefs lookup_inductive lookup_constructor]; try intros until k; simp_eta;
@@ -779,11 +792,11 @@ Proof.
         - cbn -[instantiates]. rewrite instantiates_tcons.
           f_equal; eauto. now eapply p. }
   - rewrite instantiate_TConstruct. f_equal.
-    move/and3P: H => [] _ _ wfa. solve_all.
-    induction wfa; auto.
+    move/and3P: H => [] _ _ wfa'. solve_all.
+    induction wfa'; auto.
     cbn -[instantiates].
     rewrite instantiates_tcons. f_equal. repeat eapply p.
-    eapply IHwfa.
+    eapply IHwfa'.
   - rewrite map_map_compose.
     move/andP: H0 => [] /andP[] wfi wft wfl.
     set (brs' := map _ l). cbn in brs'.
@@ -808,6 +821,11 @@ Proof.
       destruct p; len.
       f_equal; eauto. apply (e n0) => //. eapply wellformed_up; tea. lia.
   - destruct p as [? []]; simp trans_prim_val; cbn => //.
+  - cbn. f_equal. rewrite (H n); auto. 
+    pose proof (instantiate_lift (compile a)) as [il _].
+    specialize (il (compile t) k 0).
+    apply il. lia. eapply Crct_WFTrm.
+    eapply wellformed_crct; tea. now eapply wellformed_env_crctEnv.
 Qed.
 
 Fixpoint substl_rev terms k body :=
@@ -936,7 +954,7 @@ Proof.
   rewrite !Nat.add_0_r. cbn. intros wfb. rewrite IHcla.
   eapply (wellformed_csubst _ _ 0) => //.
   f_equal. 
-  rewrite tlength_hom. eapply (compile_csubst _ 1) => //. apply wf. eapply wfb.
+  rewrite tlength_hom. eapply (compile_csubst _ 1); tea.
 Qed.
 
 Lemma compile_substl_nrev Σ a b : 
@@ -987,6 +1005,15 @@ Proof.
     now rewrite Nat.add_0_r in cla. }
   { eapply wellformed_fix_subst => //. } 
   f_equal. now rewrite -compile_fix_subst.
+Qed.
+
+Lemma nisLazyApp_isLazy t : ~~ isLazyApp t -> ~~ isLazy t.
+Proof.
+  unfold isLazyApp.
+  have da := decompose_app_head_spine t.
+  rewrite -{2}(mkApps_head_spine t).
+  destruct (spine t) using rev_case => //.
+  rewrite mkApps_app //=.
 Qed.
 
 From MetaCoq.Erasure Require Import EConstructorsAsBlocks EWcbvEvalCstrsAsBlocksInd.
@@ -1086,16 +1113,21 @@ Proof.
     destruct (decompose_app (tApp f' a')) eqn:da'.
     constructor; eauto.
     rewrite !negb_or in nlam. rtoProp; intuition auto.
-    eapply (isLambda_compile) in H. contradiction.
-    eapply (isFix_compile) in H3; auto.
-    eapply (isConstructApp_compile) in H4; auto.
-    eapply (isBox_compile) in H2. contradiction.
-    now eapply isPrimApp_compile in H4.
+    eapply (isLambda_compile) in H. contradiction. now eapply nisLazyApp_isLazy in H0.
+    eapply (isFix_compile) in H4; auto.
+    eapply (isConstructApp_compile) in H5; auto.
+    eapply (isBox_compile) in H3. contradiction.
+    now eapply isPrimApp_compile in H5.
   - intros hl hargs evargs IHargs.
     simp_compile. econstructor. clear hargs.
     move: IHargs. cbn. induction 1; cbn; constructor; intuition auto.
     apply r. apply IHIHargs. now depelim evargs.
   - cbn. move/andP=> [hasp testp] ih. depelim ih; simp_compile; simp trans_prim_val; cbn => //; try constructor.
+  - intros evt evt' [IHt wft wfl] [IHt' wft' wfv].
+    simp_compile. simp_compile in IHt. cbn.
+    eapply wAppLam; tea. eapply wProof.
+    unfold whBetaStep.
+    rewrite (proj1 (instantiate_noLift TProof) (compile t') 0). exact IHt'.
   - intros isat wf.
     destruct t => //; simp_compile; econstructor.
     cbn in isat. destruct args => //.

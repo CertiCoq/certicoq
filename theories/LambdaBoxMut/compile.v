@@ -342,6 +342,30 @@ Polymorphic Equations trans_prim_val {T} (p : EPrimitive.prim_val T) : option pr
   trans_prim_val (existT _ primFloat (primFloatModel i)) => Some (existT _ AstCommon.primFloat i) ;
   trans_prim_val (existT _ primArray _) => None.
 
+Section LiftSize.
+Import All_Forall MCList ELiftSubst EInduction.
+Lemma size_lift n k t : size (ELiftSubst.lift n k t) = size t.
+Proof.
+  revert k; induction t using term_forall_list_ind; cbn; eauto; try lia; ELiftSubst.solve_all.
+  - destruct Nat.leb; auto.
+  - f_equal. induction X; cbn; auto. specialize (p k). lia.
+  - f_equal. f_equal. specialize (IHt1 k); specialize (IHt2 (S k)). lia.
+  - f_equal.  specialize (IHt1 k); specialize (IHt2 k). lia.
+  - f_equal. induction X; cbn; auto. specialize (p k); lia.
+  - rewrite IHt; cbn. f_equal. f_equal.
+    induction X; cbn; auto. rewrite IHX, p. lia.
+  - f_equal; induction X in k |- *; cbn; auto.
+    specialize (IHX (S k)). rewrite Nat.add_succ_r in IHX. rewrite IHX, p. lia.
+  - f_equal. induction X in k |- *; cbn; auto.
+    specialize (IHX (S k)). rewrite Nat.add_succ_r in IHX. rewrite IHX, p. lia.
+  - depelim X; cbn; auto.
+    destruct p as [p IHX]. rewrite p.
+    f_equal. f_equal.
+    induction IHX in k |- *; cbn; auto.
+    now rewrite p0, IHIHX.
+  Qed.
+End LiftSize.
+
 Section Compile.
   Import MCList (map_InP, In_size).
 
@@ -374,10 +398,8 @@ Section Compile.
     | tPrim p with trans_prim_val p := 
       { | None => TWrong "unsupported primtive type"
         | Some pv => TPrim pv }
-    | tLazy t => TWrong "Lazy" (* TLambda nAnon (lift 1 (compile t)) *)
-    | tForce t => TWrong "Force"
-      (* TmkApps (compile t) 
-      (tcons (TPrim (@existT _ (fun tag => prim_value tag) AstCommon.primInt 0)) tnil) *)
+    | tLazy t => TLambda nAnon (lift 0 (compile t))
+    | tForce t => TmkApps (compile t) (tcons TProof tnil)
     | tVar _ => TWrong "Var"
     | tEvar _ _ => TWrong "Evar" }.
   Proof.

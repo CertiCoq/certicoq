@@ -279,6 +279,26 @@ Proof.
     + apply LMiss; assumption.
 Qed.
 
+Lemma Crct_lift:
+  (forall p n t, crctTerm p n t -> forall k, crctTerm p (S n) (lift k t)) /\
+  (forall p n ts, crctTerms p n ts -> forall k, crctTerms p (S n) (lifts k ts)) /\
+  (forall p n ts, crctBs p n ts -> forall k, crctBs p (S n) (liftBs k ts)) /\
+  (forall p n ts, crctDs p n ts -> forall k, crctDs p (S n) (liftDs k ts)) /\
+  (forall p, crctEnv p -> crctEnv p).
+Proof.
+  apply crctCrctsCrctBsDsEnv_ind; intros;
+  try (solve[cbn; repeat econstructor; intuition eauto]).
+  (* 2-9:try (econstructor; intuition auto); try eassumption. *)
+  - cbn. constructor; eauto. destruct (Nat.compare_spec m k); subst; try lia.
+  - cbn. econstructor; eauto. inversion_Clear H. econstructor; eauto.
+    now rewrite lifts_pres_tlength.
+  - econstructor; eauto.
+  - cbn. constructor; eauto. rewrite liftDs_pres_dlength. eauto.
+    rewrite liftDs_pres_dlength; lia.
+  - cbn. constructor; eauto. now rewrite Nat.add_succ_r.
+  - cbn. constructor; eauto. destruct H as [na [body ->]]. now do 2 eexists.
+Qed.
+
 Lemma Crct_weaken_Typ:
   (forall p n t, crctTerm p n t -> 
                  forall nm s, fresh nm p ->

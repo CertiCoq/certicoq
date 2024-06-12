@@ -23,19 +23,19 @@ jobs:
       fail-fast: false  # don't stop jobs if one fails
     steps:
       - uses: actions/checkout@v3
-        # with:
-        #   submodules: true
+        with:
+           submodules: true
       - uses: coq-community/docker-coq-action@v1
         with:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
-          # before_install: | # comment back in if MetaCoq commit changes
-          #   startGroup "fix permission issues"
-          #     sudo chown -R coq:coq .
-          #   endGroup
-          #   startGroup "opam pin"
-          #     opam pin -n -y submodules/metacoq
-          #   endGroup
+          before_install: | # comment back in if MetaCoq commit changes
+            startGroup "fix permission issues"
+              sudo chown -R coq:coq .
+            endGroup
+            startGroup "opam pin"
+              opam pin -n -y submodules/metacoq
+            endGroup
           before_script: |
             startGroup "fix permission issues"
               sudo chown -R coq:coq .

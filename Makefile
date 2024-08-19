@@ -40,6 +40,7 @@ bootstrap: plugin cplugin
 install: plugin cplugin bootstrap
 	$(MAKE) -C libraries install
 	$(MAKE) -C theories install
+	$(MAKE) -C runtime install
 	$(MAKE) -C plugin install
 	$(MAKE) -C cplugin install
 	$(MAKE) -C bootstrap install
@@ -54,6 +55,7 @@ mrproper: theories/Makefile libraries/Makefile plugin/Makefile cplugin/Makefile
 clean: theories/Makefile libraries/Makefile plugin/Makefile cplugin/Makefile
 	$(MAKE) -C libraries clean
 	$(MAKE) -C theories clean
+	$(MAKE) -C runtime clean
 	$(MAKE) -C plugin clean
 	$(MAKE) -C cplugin clean
 	$(MAKE) -C bootstrap clean

@@ -11,7 +11,7 @@ COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq
 	-Q ../../theories/Compiler CertiCoq.Compiler -Q ../../theories/common CertiCoq.Common \
 	-Q ../../theories/LambdaBoxMut CertiCoq.LambdaBoxMut -Q .. CertiCoq.Benchmarks
 
-RUNTIME_DIR = ../../plugin/runtime
+RUNTIME_DIR = ../../runtime
 RUNTIME_FILES = ${RUNTIME_DIR}/prim_floats.o ${RUNTIME_DIR}/prim_int63.o
 
 plugin: metacoq_erasure.vo Loader.vo

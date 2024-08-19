@@ -16,6 +16,3 @@ merlin-hook::
 		$(HIDE)echo 'PKG stdlib-shims' >> .merlin
 
 certicoq_vanilla_plugin.cmxs: ../runtime/get_ordinal.o
-
-install-extra::
-	make -C runtime install

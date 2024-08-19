@@ -109,6 +109,31 @@ let register (prims : prim list) (imports : import list) : unit =
 let get_global_prims () = fst !global_registers
 let get_global_includes () = snd !global_registers
 
+(* Extract Inductive *)
+type inductive_mapping = Kernames.inductive * (string * int list) (* Target inductive type and mapping of constructor names to constructor tags *)
+type inductives_mapping = inductive_mapping list
+
+let global_inductive_registers = 
+  Summary.ref ([] : inductives_mapping) ~name:"CertiCoq Extract Inductive Registration"
+
+let global_inductive_registers_name = "certicoq-extract-inductive-registration"
+
+let cache_inductive_registers inds =
+  let inds' = !global_inductive_registers in
+  global_inductive_registers := inds @ inds'
+
+let global_inductive_registers_input = 
+  let open Libobject in 
+  declare_object 
+    (global_object_nodischarge global_inductive_registers_name
+    ~cache:(fun r -> cache_inductive_registers r)
+    ~subst:None)
+
+let register_inductives (inds : inductives_mapping) : unit =
+  Lib.add_leaf (global_inductive_registers_input inds)
+
+let get_global_inductives_mapping () = !global_inductive_registers
+
 (* Support for dynamically-linked certicoq-compiled programs *)
 type certicoq_run_function = unit -> Obj.t
 
@@ -173,7 +198,6 @@ let _ = Callback.register "coq_user_error" coq_user_error
 
 type command_args =
  | TYPED_ERASURE
- | FAST_ERASURE
  | UNSAFE_ERASURE
  | BYPASS_QED
  | CPS
@@ -192,7 +216,6 @@ type command_args =
 
 type options =
   { typed_erasure : bool;
-    fast_erasure : bool;
     unsafe_erasure : bool;
     bypass_qed : bool;
     cps       : bool;
@@ -209,6 +232,7 @@ type options =
     prefix    : string;
     toplevel_name : string;
     prims     : ((Kernames.kername * Kernames.ident) * bool) list;
+    inductives_mapping : inductives_mapping;
   }
 
 let check_build_dir d =
@@ -224,7 +248,6 @@ let check_build_dir d =
   
 let default_options () : options =
   { typed_erasure = false;
-    fast_erasure = false;
     unsafe_erasure = false;
     bypass_qed = false;
     cps       = false;
@@ -241,6 +264,7 @@ let default_options () : options =
     prefix    = "";
     toplevel_name = "body";
     prims     = [];
+    inductives_mapping = get_global_inductives_mapping ();
   }
 
 let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * bool) list) (fname : string) : options =
@@ -248,7 +272,6 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
     match l with
     | [] -> o
     | TYPED_ERASURE :: xs -> aux {o with typed_erasure = true} xs
-    | FAST_ERASURE :: xs -> aux {o with fast_erasure = true} xs
     | UNSAFE_ERASURE :: xs -> aux {o with unsafe_erasure = true} xs
     | BYPASS_QED :: xs -> aux {o with bypass_qed = true} xs
     | CPS      :: xs -> aux {o with cps = true} xs
@@ -274,7 +297,6 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
 let make_unsafe_passes b = 
   let open Erasure0 in
   { cofix_to_lazy = b;
-    reorder_constructors = b;
     inlining = b; 
     unboxing = b;
     betared = b }
@@ -282,14 +304,15 @@ let make_unsafe_passes b =
 let all_unsafe_passes = make_unsafe_passes true
 let no_unsafe_passes = make_unsafe_passes false
 
+let quote_inductives_mapping l =
+  List.map (fun (hd, (na, cstrs)) -> (hd, (bytestring_of_string na, List.map (fun i -> coq_nat_of_int i) cstrs))) l
+
 let make_pipeline_options (opts : options) =
   let erasure_config = 
       Erasure0.({ 
         enable_typed_erasure = opts.typed_erasure; 
         enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
-        enable_fast_remove_params = opts.fast_erasure;
         dearging_config = default_dearging_config;
-        inductives_mapping = [];
         inlined_constants = Kernames.KernameSet.empty
         })
   in
@@ -304,8 +327,9 @@ let make_pipeline_options (opts : options) =
   let prefix = bytestring_of_string opts.prefix in
   let toplevel_name = bytestring_of_string opts.toplevel_name in
   let prims = get_global_prims () @ opts.prims in
+  let inductives_mapping = quote_inductives_mapping opts.inductives_mapping in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
-  Pipeline.make_opts erasure_config cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
+  Pipeline.make_opts erasure_config inductives_mapping cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
 
 (** Main Compilation Functions *)
 
@@ -659,8 +683,28 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let time = Unix.gettimeofday () -. start in
     Feedback.msg_notice Pp.(msg ++ str (Printf.sprintf " executed in %f sec" time));
     res
-  
-  let reify env sigma ty v : Constr.t = 
+
+  let apply_reordering hd m cstrs =
+    try
+      let find_ind_ord (ind, (na, tags)) =
+        if Kernames.eq_inductive_def ind hd then
+          Some (Array.of_list (List.map (fun i -> cstrs.(i)) tags))
+        else None
+      in
+      CList.find_map_exn find_ind_ord m
+    with Not_found -> cstrs
+
+  let find_reverse_mapping hd m cstr =
+    try
+      let find_ind_ord (ind, (na, tags)) =
+        if Kernames.eq_inductive_def ind hd then
+          Some (CList.index0 Int.equal cstr tags)
+        else None
+      in
+      CList.find_map_exn find_ind_ord m
+    with Not_found -> cstr
+
+  let reify im env sigma ty v : Constr.t = 
     let open Declarations in
     let debug s = debug_reify Pp.(fun () -> str s) in
     let rec aux ty v =
@@ -670,11 +714,13 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | IsInductive (hd, u, args) -> 
       let open Inductive in
       let open Inductiveops in
+      let qhd = match Metacoq_template_plugin.Ast_quoter.quote_global_reference (IndRef hd) with Metacoq_template_plugin.Kernames.IndRef i -> (Obj.magic i : Kernames.inductive) | _ -> assert false in
       let spec = lookup_mind_specif env hd in
       let npars = inductive_params spec in
       let params, _indices = CList.chop npars args in
       let indfam = make_ind_family ((hd, u), params) in
       let cstrs = get_constructors env indfam in
+      let cstrs = apply_reordering qhd im cstrs in
       if Obj.is_block v then
         let ord = get_boxed_ordinal v in
         let () = debug (Printf.sprintf "Reifying constructor block of tag %i" ord) in
@@ -683,6 +729,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
           with Not_found -> ill_formed env sigma ty
         in
         let cstr = cstrs.(coqidx) in
+        let coqidx = find_reverse_mapping qhd im coqidx in
         let ctx = Vars.smash_rel_context cstr.cs_args in
         let vargs = List.init (List.length ctx) (Obj.field v) in
         let args' = List.map2 (fun decl v -> 
@@ -697,6 +744,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
           try find_nth_constant ord cstrs 
           with Not_found -> ill_formed env sigma ty 
         in
+        let coqidx = find_reverse_mapping qhd im coqidx in
         let () = debug (Printf.sprintf "Reifying constant constructor: %i is %i in Coq" ord coqidx) in
         Term.applistc (Constr.mkConstructU ((hd, coqidx + 1), u)) params
     | IsPrimitive (c, u, _args) -> 
@@ -710,8 +758,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     in aux ty v
 
   let reify opts env sigma tyinfo result =
-    if opts.time then time ~msg:(Pp.str "Reification") (fun () -> reify env sigma tyinfo result)
-    else reify env sigma tyinfo result 
+    if opts.time then time ~msg:(Pp.str "Reification") (fun () -> reify opts.inductives_mapping env sigma tyinfo result)
+    else reify opts.inductives_mapping env sigma tyinfo result 
 
   let template name = 
     Printf.sprintf "\nvalue %s ()\n { struct thread_info* tinfo = make_tinfo(); return %s_body(tinfo); }\n" name name

@@ -29,8 +29,8 @@ Import MonadNotation.
     BigStep := fun s sv => WcbvEval (env s) (main s) sv
   }.
 
-Definition compile_LambdaBoxMut econf
+Definition compile_LambdaBoxMut econf ip
   : CertiCoqTrans (Ast.Env.program) (Program LambdaBoxMut.compile.Term) :=
   fun src =>
     debug_msg "Translating from L1g to L1k" ;;
-    (LiftCertiCoqTrans "LambdaBoxMut" (compile_program econf) src).
+    (LiftCertiCoqTrans "LambdaBoxMut" (compile_program econf ip) src).

@@ -19,6 +19,7 @@ Open Scope bs_scope.
 (* Compiler options *)
 Record Options :=
   { erasure_config : erasure_configuration;
+    inductives_mapping : EProgram.inductives_mapping; (* Mapping for inductives, set by global declarations in the plugin *)
     direct   : bool;  (* direct or CPS code *)
     c_args   : nat;   (* numbers of C arguments *)
     anf_conf  : nat;  (* for different ANF pipeline configs. For development purposes *)

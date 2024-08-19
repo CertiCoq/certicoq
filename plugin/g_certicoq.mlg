@@ -40,11 +40,26 @@ let ltac_apply (f : Value.t) (args: Tacinterp.Value.t list) =
 
 let to_ltac_val c = Tacinterp.Value.of_constr c
 
+let globref_of_qualid ?loc (gr : Libnames.qualid) : Names.GlobRef.t  =
+  match Constrintern.locate_reference gr with
+  | None -> CErrors.user_err ?loc Pp.(Libnames.pr_qualid gr ++ str " not found.")
+  | Some g -> g
+
+let quoted_globref_of_qualid ~loc (gr : Libnames.qualid) : Metacoq_template_plugin.Kernames.global_reference =
+  Metacoq_template_plugin.Ast_quoter.quote_global_reference (globref_of_qualid ~loc gr)
+
+let inductive_of_qualid ~loc (gr : Libnames.qualid) : Kernames.inductive =
+  let open Metacoq_template_plugin in
+  match quoted_globref_of_qualid ~loc gr with
+  | Kernames.ConstRef kn -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a constant.")
+  | Kernames.VarRef(v) -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a variable.")
+  | Kernames.IndRef(i) -> (Obj.magic i)
+  | Kernames.ConstructRef(_, _) -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a constructor.")
+
 }
 
 ARGUMENT EXTEND cargs
 | [ "-typed-erasure" ] -> { TYPED_ERASURE }
-| [ "-fast-erasure" ] -> { FAST_ERASURE }
 | [ "-unsafe-erasure" ] -> { UNSAFE_ERASURE }
 | [ "-bypass_qed" ] -> { BYPASS_QED }
 | [ "-cps" ] -> { CPS }
@@ -90,10 +105,18 @@ VERNAC ARGUMENT EXTEND cinclude
 | [ "Absolute" string(str) ] -> { FromAbsolutePath str }
 END
 
+VERNAC ARGUMENT EXTEND certiCoq_Register_extract_inductive 
+| [ reference(gr) "=>" string(ty) "[" natural_list(cstrs) "]" ] ->
+  { ((inductive_of_qualid ~loc gr), (ty, cstrs)) }
+END
+
 VERNAC COMMAND EXTEND CertiCoq_Register CLASSIFIED AS SIDEFF
 | [ "CertiCoq" "Register" "[" extract_cnst_list_sep(l, ",") "]" "Include" "[" cinclude_list_sep(imps, ",") "]" ] -> {
     Certicoq.register l imps
   }
+| [ "CertiCoq" "Extract" "Inductives" "[" certiCoq_Register_extract_inductive_list_sep(inds, ",") "]" ] -> {
+    Certicoq.register_inductives inds
+}
 END
 
 VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY

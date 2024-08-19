@@ -547,7 +547,7 @@ Proof.
     rewrite tlength_hom. apply eqb_eq in lenargs. lia.
   - destruct args => //. now constructor.
     solve_all. clear -crctΣ H1; induction H1; cbn; constructor; auto. repeat apply p.
-  - destruct lookup_inductive as [[mdecl idecl]|] eqn:hl => //.
+  - rewrite /wf_brs in H0. destruct lookup_inductive as [[mdecl idecl]|] eqn:hl => //.
     econstructor.
     eapply compile_crctInd; tea. eauto.
     repeat toAll. clear -wfΣ crctΣ H1.

@@ -14,6 +14,9 @@ Definition string_of_bool b :=
   if (b : bool) then "true" else "false".
 #[export] Instance bool_show : Show bool := string_of_bool.
 
+Definition test := true.
+CertiCoq Eval -time -debug test.
+
 #[export] Instance list_show {A} {SA : Show A} : Show (list A) := string_of_list show.
 From MetaCoq.Common Require Import Primitive.
 From Coq Require Import PrimFloat PrimInt63.

@@ -38,7 +38,12 @@ Definition certicoqc (opts : Options) (p : Template.Ast.Env.program) :=
 
 Set Warnings "-primitive-turned-into-axiom".
 
-Definition demo1 := [1; 0; 1].
+(* Definition demo1 := show [1; 0; 1].
+
+CertiCoqC Eval demo1.
+
+Definition demo2 := if false then false else true.
+CertiCoqC Eval demo2. *)
 
 (* Time CertiCoqC Compile -build_dir "tests" -time -O 1 demo1. *)
 

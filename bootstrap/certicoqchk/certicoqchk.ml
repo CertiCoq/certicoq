@@ -21,6 +21,4 @@ let check gr =
   (* Quote Coq term *)
   let p = quote gr in
   let b = Certicoqchk_plugin_wrapper.check (Obj.magic p) (* Go through a type equality *) in
-  match b with
-  | Datatypes.Coq_true -> () 
-  | Datatypes.Coq_false -> CErrors.user_err Pp.(str"The program does not typecheck")
+  if b then () else CErrors.user_err Pp.(str"The program does not typecheck")

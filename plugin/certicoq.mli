@@ -54,6 +54,15 @@ val register_inductives : inductives_mapping -> unit
 
 val get_name : Names.GlobRef.t -> string
 
+(* Support for running dynamically linked certicoq-compiled programs *)
+type certicoq_run_function = unit -> Obj.t
+
+(* [register_certicoq_run global_id fresh_name function]. A same global_id 
+  can be compiled multiple times with different definitions, fresh_name indicates
+  the version used this time *)
+val register_certicoq_run : string -> string -> certicoq_run_function -> unit
+val run_certicoq_run : string -> certicoq_run_function
+
 module type CompilerInterface = sig
   type name_env
   val compile : Pipeline_utils.coq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
@@ -63,8 +72,7 @@ module type CompilerInterface = sig
     (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
   
   val generate_ffi :
-    Pipeline_utils.coq_Options -> Ast0.Env.program -> (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
-  
+    Pipeline_utils.coq_Options -> Ast0.Env.program -> (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error  
 end
 
 module CompileFunctor (CI : CompilerInterface) : sig
@@ -74,22 +82,15 @@ module CompileFunctor (CI : CompilerInterface) : sig
   val show_ir : options -> Names.GlobRef.t -> unit
   val ffi_command : options -> Names.GlobRef.t -> unit
   val glue_command : options -> Names.GlobRef.t list -> unit
+  val eval_gr : options -> Names.GlobRef.t -> import list -> Constr.t
+  val eval : options -> Environ.env -> Evd.evar_map -> EConstr.t -> import list -> Constr.t
 end
 
 val compile_only : options -> Names.GlobRef.t -> import list -> unit
 val generate_glue_only : options -> Names.GlobRef.t -> unit
 val compile_C : options -> Names.GlobRef.t -> import list -> unit
-val eval_gr : options -> Names.GlobRef.t -> import list -> Constr.t
 val show_ir : options -> Names.GlobRef.t -> unit
 val ffi_command : options -> Names.GlobRef.t -> unit
 val glue_command : options -> Names.GlobRef.t list -> unit
+val eval_gr : options -> Names.GlobRef.t -> import list -> Constr.t
 val eval : options -> Environ.env -> Evd.evar_map -> EConstr.t -> import list -> Constr.t
-
-(* Support for running dynamically linked certicoq-compiled programs *)
-type certicoq_run_function = unit -> Obj.t
-
-(* [register_certicoq_run global_id fresh_name function]. A same global_id 
-  can be compiled multiple times with different definitions, fresh_name indicates
-  the version used this time *)
-val register_certicoq_run : string -> string -> certicoq_run_function -> unit
-val run_certicoq_run : string -> certicoq_run_function

@@ -6,7 +6,7 @@ open Ast0
 open Toplevel2
 open Pipeline_utils
 
-external certicoqchk_wrapper : Ast0.Env.program -> Datatypes.bool = "certicoqchk_wrapper"
+external certicoqchk_wrapper : Ast0.Env.program -> bool = "certicoqchk_wrapper"
 let info s = Feedback.msg_info (Pp.str s)
 
 let msg_info s =

@@ -69,7 +69,6 @@ Valid options:\n\
 -time_anf :  Time λanf optimizations\n\
 -unsafe-erasure   :  Allow to use unsafe passes in the MetaCoq Erasure pipeline. This currently includes the cofixpoint-to-fixpoint translation.\n\
 -typed-erasure    :  Uses the typed erasure and de-arging phase of the MetaCoq Erasure pipeline.\n\
--fast-erasure     :  Uses an alternative function to remove parameters of constructors in the MetaCoq Erasure pipeline.\n\
 \n\n\
 To compile Gallina constants to specific C functions use:\n\
    CertiCoqC Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\", ... , \"fileM.h\" ]."

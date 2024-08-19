@@ -1,1 +1,1 @@
-val check : Ast0.Env.program -> Datatypes.bool
+val check : Ast0.Env.program -> bool

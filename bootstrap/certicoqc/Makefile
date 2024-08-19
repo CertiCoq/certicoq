@@ -60,7 +60,7 @@ OCAMLOPTS = -package coq-metacoq-template-ocaml.plugin -open Metacoq_template_pl
 GENCFILES = glue.c CertiCoq.CertiCoqC.CertiCoqC.certicoqc.c
 CFILES = certicoqc_wrapper.c $(GENCFILES)
 
-RUNTIME_DIR = ../../plugin/runtime
+RUNTIME_DIR = ../../runtime
 RUNTIME_FILES = $(RUNTIME_DIR)/gc_stack.o $(RUNTIME_DIR)/prim_floats.o $(RUNTIME_DIR)/prim_int63.o $(RUNTIME_DIR)/coq_c_ffi.o
 
 VFILES = theories/Loader.v theories/PrimInt63.v theories/PrimFloats.v theories/CertiCoqC.v

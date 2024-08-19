@@ -1,4 +1,2 @@
-# CAMLOPTLINK = "$(OCAMLFIND)" opt      -linkall get_ordinal.o
-
-certicoq_vanilla_plugin.cmxa: certicoq_vanilla_plugin.cmx get_ordinal.o
-	$(HIDE)$(TIMER) $(CAMLOPTLINK) get_ordinal.o $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -a -o $@ $<
+certicoq_vanilla_plugin.cmxa: certicoq_vanilla_plugin.cmx ../runtime/get_ordinal.o
+	$(HIDE)$(TIMER) $(CAMLOPTLINK) ../runtime/get_ordinal.o $(CAMLDEBUG) $(CAMLFLAGS) $(FINDLIBPKGS) -a -o $@ $<

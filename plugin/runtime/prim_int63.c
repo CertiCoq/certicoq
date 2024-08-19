@@ -34,13 +34,17 @@ primint prim_int63_mul(primint x, primint y)
 primint prim_int63_mod(primint x, primint y)
 { 
   // trace("Calling prim_int63_mod\n");
-  return (Val_long (Unsigned_long_val(x) % Unsigned_long_val(y)));
+  unsigned long long yr = Unsigned_long_val(y);
+  if (yr == 0) return x;
+  else return (Val_long (Unsigned_long_val(x) % Unsigned_long_val(y)));
 }
 
 primint prim_int63_div(primint x, primint y)
 { 
   // trace("Calling prim_int63_div\n");
-  return (Val_long (Unsigned_long_val(x) / Unsigned_long_val(y)));
+  unsigned long long yr = Unsigned_long_val(y);
+  if (yr == 0) return Val_long(0);
+  else return (Val_long (Unsigned_long_val(x) / Unsigned_long_val(y)));
 }
 
 primint prim_int63_land(primint x, primint y)
@@ -55,7 +59,8 @@ primint prim_int63_lsl(primint x, primint y)
   unsigned long long xr = Unsigned_long_val(x);
   unsigned long long yr = Unsigned_long_val(y);
   trace("Calling prim_int63_lsl on %llu and %llu: %llu \n", xr, yr, xr << yr);
-  return (Val_long ((xr << yr)));
+  if (0 <= yr && yr < 63) return (Val_long ((xr << yr)));
+  else return (Val_long(0));
 }
 
 primint prim_int63_lsr(primint x, primint y)
@@ -63,7 +68,16 @@ primint prim_int63_lsr(primint x, primint y)
   unsigned long long xr = Unsigned_long_val(x);
   unsigned long long yr = Unsigned_long_val(y);
   trace("Calling prim_int63_lsr on %llu and %llu: %llu \n", xr, yr, xr >> yr);
-  return (Val_long (xr >> yr));
+  if (0 <= yr && yr < 63) return (Val_long ((xr >> yr)));
+  else return (Val_long(0));
+}
+
+primint prim_int63_asr(primint x, primint y)
+{ 
+  signed long long xr = Unsigned_long_val(x);
+  unsigned long long yr = Unsigned_long_val(y);
+  if (0 <= yr && yr < 63) return (Val_long ((xr >> yr)));
+  else return (Val_long(0));
 }
 
 primint prim_int63_lor(primint x, primint y)
@@ -286,10 +300,10 @@ primintpair mulc_aux(struct thread_info *ti, unsigned long long x, unsigned long
   unsigned long long lxy  = lx * ly; // 62 bits
   unsigned long long l  = lxy | (hxy << 62); // 63 bits
   unsigned long long h  = hxy >> 1; // 62 bits
-  unsigned long long hl = hxly + lxhy; // We can have a carry
+  unsigned long long hl = (hxly + lxhy) & maxuint63; // We can have a carry
   if (hl < hxly) h = h + (1ULL << 31);
   unsigned long long hl2 = (hl << 31) & maxuint63;
-  l = l + hl2;
+  l = (l + hl2) & maxuint63;
   if (l < hl2) h = h + 1;
   h  = h + (hl >> 32);
   trace("Multiplication mulc_aux gives: (%llu, %llu)\n", h, l);
@@ -305,8 +319,8 @@ primintpair prim_int63_mulc (struct thread_info *ti, primint xp, primint yp) {
   else {
     unsigned long long yl = y ^ (1ULL << 62);
     value p = mulc_aux(ti,x,yl);
-    unsigned long long h = Unsigned_long_val(((unsigned long long*) p + 0));
-    unsigned long long l = Unsigned_long_val(((unsigned long long*) p + 1));
+    unsigned long long h = Unsigned_long_val(*((unsigned long long*) p + 0));
+    unsigned long long l = Unsigned_long_val(*((unsigned long long*) p + 1));
     /* h << 63 + l = x * yl
        x * y = x * (1 << 62 + yl)  =
        x << 62 + x*yl = x << 62 + h << 63 + l */
@@ -363,7 +377,7 @@ primintpair prim_int63_diveucl(struct thread_info *ti, primint xp, primint yp)
   unsigned long long x = Unsigned_long_val(xp);
   unsigned long long y = Unsigned_long_val(yp);
   trace("Calling prim_int63_diveucl\n");
-  if (y == 0) return (mk_pair (ti, Val_long(0), Val_long(0)));
+  if (y == 0) return (mk_pair (ti, Val_long(0), Val_long(x)));
   else 
     return (mk_pair (ti, Val_long(x / y), Val_long(x % y)));
 }
@@ -376,7 +390,10 @@ primint prim_int63_addmuldiv(primint pp, primint xp, primint yp)
   unsigned long long p = Unsigned_long_val(pp);
   unsigned long long x = Unsigned_long_val(xp);
   unsigned long long y = Unsigned_long_val(yp);
-  unsigned long long r = ((x << p) & maxuint63) | y >> (uint_size - p);
-  trace("Calling addmuldiv with %llu, %llu and %llu: %llu\n", p, x, y, r);
-  return Val_long(r);
+  if (63 < p) return Val_long(0);
+  else { 
+    unsigned long long r = ((x << p) & maxuint63) | y >> (uint_size - p);
+    trace("Calling addmuldiv with %llu, %llu and %llu: %llu\n", p, x, y, r);
+    return Val_long(r);
+  }
 }

@@ -8,7 +8,7 @@
 (*         *     (see LICENSE file for the text of the license)         *)
 (************************************************************************)
 
-(** Extraction to OCaml of native 63-bit machine integers. *)
+(** Extraction to OCaml of native 63-bit machine integers. The only difference with the regular OCaml Int63 interface is due to comparisons. *)
 
 From Coq Require Uint63 Sint63 Extraction.
 
@@ -39,11 +39,11 @@ Extract Constant Sint63.div => "Uint63.divs".
 Extract Constant Sint63.rem => "Uint63.rems".
 
 
-Extract Constant Uint63.eqb => "fun x y -> Caml_bool.to_coq (Uint63.equal x y)".
-Extract Constant Uint63.ltb => "fun x y -> Caml_bool.to_coq (Uint63.lt x y)".
-Extract Constant Uint63.leb => "fun x y -> Caml_bool.to_coq (Uint63.le x y)".
-Extract Constant Sint63.ltb => "fun x y -> Caml_bool.to_coq (Uint63.lts x y)".
-Extract Constant Sint63.leb => "fun x y -> Caml_bool.to_coq (Uint63.les x y)".
+Extract Constant Uint63.eqb => "Uint63.equal".
+Extract Constant Uint63.ltb => "Uint63.lt".
+Extract Constant Uint63.leb => "Uint63.le".
+Extract Constant Sint63.ltb => "Uint63.lts".
+Extract Constant Sint63.leb => "Uint63.les".
 
 Extract Constant Uint63.addc => "Uint63.addc".
 Extract Constant Uint63.addcarryc => "Uint63.addcarryc".

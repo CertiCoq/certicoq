@@ -9,6 +9,370 @@ open ExceptionMonad
 open AstCommon
 open Plugin_utils
 
+let get_stringopt_option key =
+  let open Goptions in
+  match get_option_value key with
+  | Some get -> fun () ->
+      begin match get () with
+      | StringOptValue b -> b
+      | _ -> assert false
+      end
+  | None ->
+    (declare_stringopt_option_and_ref ~key ~value:None ()).get
+
+let get_build_dir_opt =
+  get_stringopt_option ["CertiCoq"; "Build"; "Directory"]
+
+let get_ocamlfind =
+  get_stringopt_option ["CertiCoq"; "ocamlfind"]
+
+let get_c_compiler =
+  get_stringopt_option ["CertiCoq"; "CC"]
+        
+(* Taken from Coq's increment_subscript, but works on strings rather than idents *)
+let increment_subscript id =
+  let len = String.length id in
+  let rec add carrypos =
+    let c = id.[carrypos] in
+    if Util.is_digit c then
+      if Int.equal (Char.code c) (Char.code '9') then begin
+        assert (carrypos>0);
+        add (carrypos-1)
+      end
+      else begin
+        let newid = Bytes.of_string id in
+        Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
+        Bytes.set newid carrypos (Char.chr (Char.code c + 1));
+        newid
+      end
+    else begin
+      let newid = Bytes.of_string (id^"0") in
+      if carrypos < len-1 then begin
+        Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
+        Bytes.set newid (carrypos+1) '1'
+      end;
+      newid
+    end
+  in String.of_bytes (add (len-1))
+
+let debug_reify = CDebug.create ~name:"certicoq-reify" ()
+
+external get_unboxed_ordinal : Obj.t -> int = "get_unboxed_ordinal" [@@noalloc]
+
+external get_boxed_ordinal : Obj.t -> (int [@untagged]) = "get_boxed_ordinal" "get_boxed_ordinal" [@@noalloc]
+
+(** Various Utils *)
+
+let pr_string s = Pp.str (Caml_bytestring.caml_string_of_bytestring s)
+
+(* remove duplicates but preserve order, keep the leftmost element *)
+let nub (xs : 'a list) : 'a list = 
+  List.fold_right (fun x xs -> if List.mem x xs then xs else x :: xs) xs []
+
+let rec coq_nat_of_int x =
+  match x with
+  | 0 -> Datatypes.O
+  | n -> Datatypes.S (coq_nat_of_int (pred n))
+
+let debug_msg (flag : bool) (s : string) =
+  if flag then
+    Feedback.msg_debug (Pp.str s)
+  else ()
+
+(* Separate registration of primitive extraction *)
+
+type prim = ((Kernames.kername * Kernames.ident) * bool)
+let global_registers = 
+  Summary.ref (([], []) : prim list * import list) ~name:"CertiCoq Registration"
+
+let global_registers_name = "certicoq-registration"
+
+let cache_registers (prims, imports) =
+  let (prims', imports') = !global_registers in
+  global_registers := (prims @ prims', imports @ imports')
+let global_registers_input = 
+  let open Libobject in 
+  declare_object 
+    (global_object_nodischarge global_registers_name
+    ~cache:(fun r -> cache_registers r)
+    ~subst:None) (*(fun (msub, r) -> r)) *)
+
+let register (prims : prim list) (imports : import list) : unit =
+  let curlib = Sys.getcwd () in
+  let newr = (prims, List.map (fun i -> 
+    match i with
+    | FromAbsolutePath s -> FromRelativePath (Filename.concat curlib s)
+    | _ -> i) imports) in
+  (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) (fst newr)); *)
+  Lib.add_leaf (global_registers_input newr)
+
+let get_global_prims () = fst !global_registers
+let get_global_includes () = snd !global_registers
+
+(* Extract Inductive *)
+type inductive_mapping = Kernames.inductive * (string * int list) (* Target inductive type and mapping of constructor names to constructor tags *)
+type inductives_mapping = inductive_mapping list
+
+let global_inductive_registers = 
+  Summary.ref ([] : inductives_mapping) ~name:"CertiCoq Extract Inductive Registration"
+
+let global_inductive_registers_name = "certicoq-extract-inductive-registration"
+
+let cache_inductive_registers inds =
+  let inds' = !global_inductive_registers in
+  global_inductive_registers := inds @ inds'
+
+let global_inductive_registers_input = 
+  let open Libobject in 
+  declare_object 
+    (global_object_nodischarge global_inductive_registers_name
+    ~cache:(fun r -> cache_inductive_registers r)
+    ~subst:None)
+
+let register_inductives (inds : inductives_mapping) : unit =
+  Lib.add_leaf (global_inductive_registers_input inds)
+
+let get_global_inductives_mapping () = !global_inductive_registers
+
+(* Support for dynamically-linked certicoq-compiled programs *)
+type certicoq_run_function = unit -> Obj.t
+
+let certicoq_run_functions = 
+  Summary.ref ~name:"CertiCoq Run Functions Table" 
+    (CString.Map.empty : certicoq_run_function CString.Map.t)
+
+let certicoq_run_functions_name = "certicoq-run-functions-registration"
+
+let all_run_functions = ref CString.Set.empty
+
+let cache_certicoq_run_function (s, s', fn) =
+  let fns = !certicoq_run_functions in
+  all_run_functions := CString.Set.add s (CString.Set.add s' !all_run_functions);
+  certicoq_run_functions := CString.Map.add s fn fns
+
+let certicoq_run_function_input = 
+  let open Libobject in
+  declare_object 
+    (global_object_nodischarge certicoq_run_functions_name
+    ~cache:(fun r -> cache_certicoq_run_function r)
+    ~subst:None)
+
+let register_certicoq_run s s' fn =
+  Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certicoq_run");
+  Lib.add_leaf (certicoq_run_function_input (s, s', fn))
+
+let exists_certicoq_run s =
+  Feedback.msg_debug Pp.(str"Looking up " ++ str s ++ str " in certicoq_run_functions");
+  let res = CString.Map.find_opt s !certicoq_run_functions in
+  if Option.is_empty res then Feedback.msg_debug Pp.(str"Not found");
+  res
+  
+let run_certicoq_run s = 
+  try CString.Map.find s !certicoq_run_functions
+  with Not_found -> CErrors.user_err Pp.(str"Could not find certicoq run function associated to " ++ str s)
+
+(** Coq FFI: message channels and raising user errors. *)
+
+let coq_msg_info s =
+  let s = Caml_bytestring.caml_string_of_bytestring s in
+  Feedback.msg_info (Pp.str s)
+  
+let _ = Callback.register "coq_msg_info" coq_msg_info
+
+let coq_msg_debug s = 
+  Feedback.msg_debug Pp.(str (Caml_bytestring.caml_string_of_bytestring s))
+  
+let _ = Callback.register "coq_msg_debug" coq_msg_debug
+
+let coq_msg_notice s = 
+  Feedback.msg_notice Pp.(str (Caml_bytestring.caml_string_of_bytestring s))
+  
+let _ = Callback.register "coq_msg_notice" coq_msg_notice
+  
+let coq_user_error s =
+  CErrors.user_err Pp.(str (Caml_bytestring.caml_string_of_bytestring s))
+
+let _ = Callback.register "coq_user_error" coq_user_error 
+
+(** Compilation Command Arguments *)
+
+type command_args =
+ | TYPED_ERASURE
+ | UNSAFE_ERASURE
+ | BYPASS_QED
+ | CPS
+ | TIME
+ | TIMEANF
+ | OPT of int
+ | DEBUG
+ | ARGS of int
+ | ANFCONFIG of int (* To measure different ANF configurations *)
+ | BUILDDIR of string (* Directory name to be prepended to the file name *)
+ | EXT of string (* Filename extension to be appended to the file name *)
+ | DEV of int    (* For development purposes *)
+ | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
+ | TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
+ | FILENAME of string (* Name of the generated file *)
+
+type options =
+  { typed_erasure : bool;
+    unsafe_erasure : bool;
+    bypass_qed : bool;
+    cps       : bool;
+    time      : bool;
+    time_anf  : bool;
+    olevel    : int;
+    debug     : bool;
+    args      : int;
+    anf_conf  : int;
+    build_dir : string;
+    filename  : string;
+    ext       : string;
+    dev       : int;
+    prefix    : string;
+    toplevel_name : string;
+    prims     : ((Kernames.kername * Kernames.ident) * bool) list;
+    inductives_mapping : inductives_mapping;
+  }
+
+let check_build_dir d =
+  if d = "" then "." else
+  let isdir = 
+    try Unix.((stat d).st_kind = S_DIR)
+    with Unix.Unix_error (Unix.ENOENT, _, _) ->
+      CErrors.user_err Pp.(str "Could not compile: build directory " ++ str d ++ str " not found.")
+  in
+  if not isdir then 
+    CErrors.user_err Pp.(str "Could not compile: " ++ str d ++ str " is not a directory.")
+  else d
+  
+let default_options () : options =
+  { typed_erasure = false;
+    unsafe_erasure = false;
+    bypass_qed = false;
+    cps       = false;
+    time      = false;
+    time_anf  = false;
+    olevel    = 1;
+    debug     = false;
+    args      = 5;
+    anf_conf  = 0;
+    build_dir = (match get_build_dir_opt () with None -> "." | Some s -> check_build_dir s);
+    filename  = "";
+    ext       = "";
+    dev       = 0;
+    prefix    = "";
+    toplevel_name = "body";
+    prims     = [];
+    inductives_mapping = get_global_inductives_mapping ();
+  }
+
+let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * bool) list) (fname : string) : options =
+  let rec aux (o : options) l =
+    match l with
+    | [] -> o
+    | TYPED_ERASURE :: xs -> aux {o with typed_erasure = true} xs
+    | UNSAFE_ERASURE :: xs -> aux {o with unsafe_erasure = true} xs
+    | BYPASS_QED :: xs -> aux {o with bypass_qed = true} xs
+    | CPS      :: xs -> aux {o with cps = true} xs
+    | TIME     :: xs -> aux {o with time = true} xs
+    | TIMEANF  :: xs -> aux {o with time_anf = true} xs
+    | OPT n    :: xs -> aux {o with olevel = n} xs
+    | DEBUG    :: xs -> aux {o with debug = true} xs
+    | ARGS n   :: xs -> aux {o with args = n} xs
+    | ANFCONFIG n :: xs -> aux {o with anf_conf = n} xs
+    | BUILDDIR s  :: xs ->
+      let s = check_build_dir s in
+      aux {o with build_dir = s} xs
+    | EXT s    :: xs -> aux {o with ext = s} xs
+    | DEV n    :: xs -> aux {o with dev = n} xs
+    | PREFIX s :: xs -> aux {o with prefix = s} xs
+    | TOPLEVEL_NAME s :: xs -> aux {o with toplevel_name = s} xs
+    | FILENAME s :: xs -> aux {o with filename = s} xs
+  in
+  let opts = { (default_options ()) with filename = fname } in
+  let o = aux opts l in
+  {o with prims = pr}
+
+let make_unsafe_passes b = 
+  let open Erasure0 in
+  { cofix_to_lazy = b;
+    inlining = b; 
+    unboxing = b;
+    betared = b }
+
+let all_unsafe_passes = make_unsafe_passes true
+let no_unsafe_passes = make_unsafe_passes false
+
+let quote_inductives_mapping l =
+  List.map (fun (hd, (na, cstrs)) -> (hd, (bytestring_of_string na, List.map (fun i -> coq_nat_of_int i) cstrs))) l
+
+let make_pipeline_options (opts : options) =
+  let erasure_config = 
+      Erasure0.({ 
+        enable_typed_erasure = opts.typed_erasure; 
+        enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
+        dearging_config = default_dearging_config;
+        inlined_constants = Kernames.KernameSet.empty
+        })
+  in
+  let cps    = opts.cps in
+  let args = coq_nat_of_int opts.args in
+  let olevel = coq_nat_of_int opts.olevel in
+  let timing = opts.time in
+  let timing_anf = opts.time_anf in
+  let debug  = opts.debug in
+  let anfc = coq_nat_of_int opts.anf_conf in
+  let dev = coq_nat_of_int opts.dev in
+  let prefix = bytestring_of_string opts.prefix in
+  let toplevel_name = bytestring_of_string opts.toplevel_name in
+  let prims = get_global_prims () @ opts.prims in
+  let inductives_mapping = quote_inductives_mapping opts.inductives_mapping in
+  (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
+  Pipeline.make_opts erasure_config inductives_mapping cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
+
+(** Main Compilation Functions *)
+
+(* Get fully qualified name of a constant *)
+let get_name (gr : Names.GlobRef.t) : string =
+  match gr with
+  | Names.GlobRef.ConstRef c -> Names.KerName.to_string (Names.Constant.canonical c)
+  | _ -> CErrors.user_err Pp.(Printer.pr_global gr ++ str " is not a constant definition")
+
+
+(* Quote Coq term *)
+let quote_term opts env sigma c =
+  let debug = opts.debug in
+  let bypass = opts.bypass_qed in
+  debug_msg debug "Quoting";
+  let time = Unix.gettimeofday() in
+  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass env sigma (EConstr.to_constr sigma c) in
+  let time = (Unix.gettimeofday() -. time) in
+  debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
+  term
+
+let quote opts gr =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let sigma, c = Evd.fresh_global env sigma gr in
+  quote_term opts env sigma c
+
+(* Compile Quoted term with CertiCoq *)
+
+module type CompilerInterface = sig
+  type name_env
+  val compile : Pipeline_utils.coq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
+  val printProg : Clight.program -> name_env -> string -> import list -> unit
+
+  val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations -> 
+    (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
+  
+  val generate_ffi :
+    Pipeline_utils.coq_Options -> Ast0.Env.program -> (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
+  
+end
+
+
 module FixRepr = 
 struct
 
@@ -135,353 +499,17 @@ let fix_quoted_program (p : Ast0.Env.program) =
 
 end
 
-
-let get_stringopt_option key =
-  let open Goptions in
-  match get_option_value key with
-  | Some get -> fun () ->
-      begin match get () with
-      | StringOptValue b -> b
-      | _ -> assert false
-      end
-  | None ->
-    (declare_stringopt_option_and_ref ~key ~value:None ()).get
-
-let get_build_dir_opt =
-  get_stringopt_option ["CertiCoq"; "Build"; "Directory"]
-
-let get_ocamlfind =
-  get_stringopt_option ["CertiCoq"; "ocamlfind"]
-
-let get_c_compiler =
-  get_stringopt_option ["CertiCoq"; "CC"]
-        
-(* Taken from Coq's increment_subscript, but works on strings rather than idents *)
-let increment_subscript id =
-  let len = String.length id in
-  let rec add carrypos =
-    let c = id.[carrypos] in
-    if Util.is_digit c then
-      if Int.equal (Char.code c) (Char.code '9') then begin
-        assert (carrypos>0);
-        add (carrypos-1)
-      end
-      else begin
-        let newid = Bytes.of_string id in
-        Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
-        Bytes.set newid carrypos (Char.chr (Char.code c + 1));
-        newid
-      end
-    else begin
-      let newid = Bytes.of_string (id^"0") in
-      if carrypos < len-1 then begin
-        Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
-        Bytes.set newid (carrypos+1) '1'
-      end;
-      newid
-    end
-  in String.of_bytes (add (len-1))
-
-let debug_reify = CDebug.create ~name:"certicoq-vanilla-reify" ()
-
-external get_unboxed_ordinal : Obj.t -> int = "get_unboxed_ordinal" [@@noalloc]
-
-external get_boxed_ordinal : Obj.t -> (int [@untagged]) = "get_boxed_ordinal" "get_boxed_ordinal" [@@noalloc]
-
-(** Various Utils *)
-
-let pr_string s = Pp.str (Caml_bytestring.caml_string_of_bytestring s)
-
-(* remove duplicates but preserve order, keep the leftmost element *)
-let nub (xs : 'a list) : 'a list = 
-  List.fold_right (fun x xs -> if List.mem x xs then xs else x :: xs) xs []
-
-let rec coq_nat_of_int x =
-  match x with
-  | 0 -> Datatypes.O
-  | n -> Datatypes.S (coq_nat_of_int (pred n))
-
-let debug_msg (flag : bool) (s : string) =
-  if flag then
-    Feedback.msg_debug (Pp.str s)
-  else ()
-
-(* Separate registration of primitive extraction *)
-
-type prim = ((Kernames.kername * Kernames.ident) * Datatypes.bool)
-let global_registers = 
-  Summary.ref (([], []) : prim list * import list) ~name:"CertiCoq Vanilla Registration"
-
-let global_registers_name = "certicoq-vanilla-registration"
-
-let cache_registers (prims, imports) =
-  let (prims', imports') = !global_registers in
-  global_registers := (prims @ prims', imports @ imports')
-let global_registers_input = 
-  let open Libobject in 
-  declare_object 
-    (global_object_nodischarge global_registers_name
-    ~cache:(fun r -> cache_registers r)
-    ~subst:None) (*(fun (msub, r) -> r)) *)
-
-let register (prims : prim list) (imports : import list) : unit =
-  let curlib = Sys.getcwd () in
-  let newr = (prims, List.map (fun i -> 
-    match i with
-    | FromAbsolutePath s -> FromRelativePath (Filename.concat curlib s)
-    | _ -> i) imports) in
-  (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) (fst newr)); *)
-  Lib.add_leaf (global_registers_input newr)
-
-let get_global_prims () = fst !global_registers
-let get_global_includes () = snd !global_registers
-
-(* Support for dynamically-linked certicoq-compiled programs *)
-type certicoq_run_function = unit -> Obj.t
-
-let certicoq_run_functions = 
-  Summary.ref ~name:"CertiCoq Vanilla Run Functions Table" 
-    (CString.Map.empty : certicoq_run_function CString.Map.t)
-
-let certicoq_run_functions_name = "certicoq-vanilla-run-functions-registration"
-
-let all_run_functions = ref CString.Set.empty
-
-let cache_certicoq_run_function (s, s', fn) =
-  let fns = !certicoq_run_functions in
-  all_run_functions := CString.Set.add s (CString.Set.add s' !all_run_functions);
-  certicoq_run_functions := CString.Map.add s fn fns
-
-let certicoq_run_function_input = 
-  let open Libobject in
-  declare_object 
-    (global_object_nodischarge certicoq_run_functions_name
-    ~cache:(fun r -> cache_certicoq_run_function r)
-    ~subst:None)
-
-let register_certicoq_run s s' fn =
-  Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certicoq_run");
-  Lib.add_leaf (certicoq_run_function_input (s, s', fn))
-
-let exists_certicoq_run s =
-  Feedback.msg_debug Pp.(str"Looking up " ++ str s ++ str " in certicoq_run_functions");
-  let res = CString.Map.find_opt s !certicoq_run_functions in
-  if Option.is_empty res then Feedback.msg_debug Pp.(str"Not found");
-  res
-  
-let run_certicoq_run s = 
-  try CString.Map.find s !certicoq_run_functions
-  with Not_found -> CErrors.user_err Pp.(str"Could not find certicoq run function associated to " ++ str s)
-
-(** Coq FFI: message channels and raising user errors. *)
-
-let coq_msg_info s =
-  let s = Caml_bytestring.caml_string_of_bytestring s in
-  Feedback.msg_info (Pp.str s)
-  
-let _ = Callback.register "coq_msg_info" coq_msg_info
-
-let coq_msg_debug s = 
-  Feedback.msg_debug Pp.(str (Caml_bytestring.caml_string_of_bytestring s))
-  
-let _ = Callback.register "coq_msg_debug" coq_msg_debug
-
-let coq_msg_notice s = 
-  Feedback.msg_notice Pp.(str (Caml_bytestring.caml_string_of_bytestring s))
-  
-let _ = Callback.register "coq_msg_notice" coq_msg_notice
-  
-let coq_user_error s =
-  CErrors.user_err Pp.(str (Caml_bytestring.caml_string_of_bytestring s))
-
-let _ = Callback.register "coq_user_error" coq_user_error 
-
-(** Compilation Command Arguments *)
-
-type command_args =
- | TYPED_ERASURE
- | FAST_ERASURE
- | UNSAFE_ERASURE
- | BYPASS_QED
- | CPS
- | TIME
- | TIMEANF
- | OPT of int
- | DEBUG
- | ARGS of int
- | ANFCONFIG of int (* To measure different ANF configurations *)
- | BUILDDIR of string (* Directory name to be prepended to the file name *)
- | EXT of string (* Filename extension to be appended to the file name *)
- | DEV of int    (* For development purposes *)
- | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
- | TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
- | FILENAME of string (* Name of the generated file *)
-
-type options =
-  { typed_erasure : bool;
-    fast_erasure : bool;
-    unsafe_erasure : bool;
-    bypass_qed : bool;
-    cps       : bool;
-    time      : bool;
-    time_anf  : bool;
-    olevel    : int;
-    debug     : bool;
-    args      : int;
-    anf_conf  : int;
-    build_dir : string;
-    filename  : string;
-    ext       : string;
-    dev       : int;
-    prefix    : string;
-    toplevel_name : string;
-    prims     : ((Kernames.kername * Kernames.ident) * Datatypes.bool) list;
-  }
-
-let check_build_dir d =
-  if d = "" then "." else
-  let isdir = 
-    try Unix.((stat d).st_kind = S_DIR)
-    with Unix.Unix_error (Unix.ENOENT, _, _) ->
-      CErrors.user_err Pp.(str "Could not compile: build directory " ++ str d ++ str " not found.")
-  in
-  if not isdir then 
-    CErrors.user_err Pp.(str "Could not compile: " ++ str d ++ str " is not a directory.")
-  else d
-  
-let default_options () : options =
-  { typed_erasure = false;
-    fast_erasure = false;
-    unsafe_erasure = false;
-    bypass_qed = false;
-    cps       = false;
-    time      = false;
-    time_anf  = false;
-    olevel    = 1;
-    debug     = false;
-    args      = 5;
-    anf_conf  = 0;
-    build_dir = (match get_build_dir_opt () with None -> "." | Some s -> check_build_dir s);
-    filename  = "";
-    ext       = "";
-    dev       = 0;
-    prefix    = "";
-    toplevel_name = "body";
-    prims     = [];
-  }
-
-let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * Datatypes.bool) list) (fname : string) : options =
-  let rec aux (o : options) l =
-    match l with
-    | [] -> o
-    | TYPED_ERASURE :: xs -> aux {o with typed_erasure = true} xs
-    | FAST_ERASURE :: xs -> aux {o with fast_erasure = true} xs
-    | UNSAFE_ERASURE :: xs -> aux {o with unsafe_erasure = true} xs
-    | BYPASS_QED :: xs -> aux {o with bypass_qed = true} xs
-    | CPS      :: xs -> aux {o with cps = true} xs
-    | TIME     :: xs -> aux {o with time = true} xs
-    | TIMEANF  :: xs -> aux {o with time_anf = true} xs
-    | OPT n    :: xs -> aux {o with olevel = n} xs
-    | DEBUG    :: xs -> aux {o with debug = true} xs
-    | ARGS n   :: xs -> aux {o with args = n} xs
-    | ANFCONFIG n :: xs -> aux {o with anf_conf = n} xs
-    | BUILDDIR s  :: xs ->
-      let s = check_build_dir s in
-      aux {o with build_dir = s} xs
-    | EXT s    :: xs -> aux {o with ext = s} xs
-    | DEV n    :: xs -> aux {o with dev = n} xs
-    | PREFIX s :: xs -> aux {o with prefix = s} xs
-    | TOPLEVEL_NAME s :: xs -> aux {o with toplevel_name = s} xs
-    | FILENAME s :: xs -> aux {o with filename = s} xs
-  in
-  let opts = { (default_options ()) with filename = fname } in
-  let o = aux opts l in
-  {o with prims = pr}
-
-
-let make_unsafe_passes b = 
-  let open Erasure0 in
-  let b = Caml_bool.to_coq b in
-  { cofix_to_lazy = b;
-    reorder_constructors = b;
-    inlining = b; 
-    unboxing = b;
-    betared = b }
-let all_unsafe_passes = make_unsafe_passes true
-let no_unsafe_passes = make_unsafe_passes false
-  
-
-let make_pipeline_options (opts : options) =
-  let erasure_config = 
-      Erasure0.({ 
-        enable_typed_erasure = Caml_bool.to_coq opts.typed_erasure; 
-        enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
-        enable_fast_remove_params = Caml_bool.to_coq opts.fast_erasure;
-        dearging_config = default_dearging_config; (* FIXME *)
-        inductives_mapping = [];
-        inlined_constants = Obj.magic (FixRepr.fix_set Kernames.KernameSet.empty)
-        })
-  in
-  let cps    = Caml_bool.to_coq opts.cps in
-  let args = coq_nat_of_int opts.args in
-  let olevel = coq_nat_of_int opts.olevel in
-  let timing = Caml_bool.to_coq opts.time in
-  let timing_anf = Caml_bool.to_coq opts.time_anf in
-  let debug  = Caml_bool.to_coq opts.debug in
-  let anfc = coq_nat_of_int opts.anf_conf in
-  let dev = coq_nat_of_int opts.dev in
-  let prefix = bytestring_of_string opts.prefix in
-  let toplevel_name = bytestring_of_string opts.toplevel_name in
-  let prims = get_global_prims () @ opts.prims in
-  (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
-  Pipeline.make_opts erasure_config cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
-
-(** Main Compilation Functions *)
-
-(* Get fully qualified name of a constant *)
-let get_name (gr : Names.GlobRef.t) : string =
-  match gr with
-  | Names.GlobRef.ConstRef c -> Names.KerName.to_string (Names.Constant.canonical c)
-  | _ -> CErrors.user_err Pp.(Printer.pr_global gr ++ str " is not a constant definition")
-
-
-(* Quote Coq term *)
-let quote_term opts env sigma c =
-  let debug = opts.debug in
-  let bypass = opts.bypass_qed in
-  debug_msg debug "Quoting";
-  let time = Unix.gettimeofday() in
-  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass env sigma (EConstr.to_constr sigma c) in
-  let time = (Unix.gettimeofday() -. time) in
-  debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
-  Obj.magic term
-
-let quote opts gr =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let sigma, c = Evd.fresh_global env sigma gr in
-  quote_term opts env sigma c
-
-(* Compile Quoted term with CertiCoq *)
-
-module type CompilerInterface = sig
-  type name_env
-  val compile : Pipeline_utils.coq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
-  val printProg : Clight.program -> name_env -> string -> import list -> unit
-
-  val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations -> 
-    (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
-  
-  val generate_ffi :
-    Pipeline_utils.coq_Options -> Ast0.Env.program -> (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
-  
-end
+let fix_opts opts = 
+  Pipeline_utils.{ opts with erasure_config = 
+    { opts.erasure_config with Erasure0.inlined_constants = Obj.magic (FixRepr.fix_set opts.erasure_config.Erasure0.inlined_constants) } }
 
 module MLCompiler : CompilerInterface with 
   type name_env = BasicAst.name Cps.M.t
   = struct
   type name_env = BasicAst.name Cps.M.t
-  let compile opt prg = Pipeline.compile opt (FixRepr.fix_quoted_program prg)
+  let compile opts prg =
+    let opts = fix_opts opts in
+    Pipeline.compile opts (FixRepr.fix_quoted_program prg)
   let printProg prog names (dest : string) (imports : import list) =
     let imports' = List.map (fun i -> match i with
       | FromRelativePath s -> "#include \"" ^ s ^ "\""
@@ -490,8 +518,12 @@ module MLCompiler : CompilerInterface with
           failwith "Import with absolute path should have been filled") imports in
     PrintClight.print_dest_names_imports prog (Cps.M.elements names) dest imports'
 
-  let generate_glue opts decls = Glue.generate_glue opts (FixRepr.fix_declarations decls)
-  let generate_ffi opts prg = Ffi.generate_ffi opts (FixRepr.fix_quoted_program prg)
+  let generate_glue opts decls = 
+    let opts = fix_opts opts in
+    Glue.generate_glue opts (FixRepr.fix_declarations decls)
+  let generate_ffi opts prg =
+    let opts = fix_opts opts in
+    Ffi.generate_ffi opts (FixRepr.fix_quoted_program prg)
 end
 
 
@@ -500,6 +532,53 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let make_fname opts str =
     Filename.concat opts.build_dir str
 
+  type line = 
+  | EOF
+  | Info of string
+  | Error of string
+  
+  let read_line stdout stderr =
+    try Info (input_line stdout)
+    with End_of_file -> 
+      try Error (input_line stderr)
+    with End_of_file -> EOF
+  
+  let push_line buf line =
+    Buffer.add_string buf line; 
+    Buffer.add_string buf "\n"
+  
+  let string_of_buffer buf = Bytes.to_string (Buffer.to_bytes buf)
+    
+  let execute cmd =
+    debug Pp.(fun () -> str "Executing: " ++ str cmd ++ str " in environemt: " ++ 
+      prlist_with_sep spc str (Array.to_list (Unix.environment ())));
+    let (stdout, stdin, stderr) = Unix.open_process_full cmd (Unix.environment ()) in
+    let continue = ref true in
+    let outbuf, errbuf = Buffer.create 100, Buffer.create 100 in
+    let push_info = push_line outbuf in
+    let push_error = push_line errbuf in
+    while !continue do
+      match read_line stdout stderr with
+      | EOF -> debug Pp.(fun () -> str "Program terminated"); continue := false
+      | Info s -> push_info s
+      | Error s -> push_error s
+    done;
+    let status = Unix.close_process_full (stdout, stdin, stderr) in
+    status, string_of_buffer outbuf, string_of_buffer errbuf
+    
+  let execute ?loc cmd =
+    let status, out, err = execute cmd in
+    match status with
+    | Unix.WEXITED 0 -> out, err
+    | Unix.WEXITED n -> 
+      CErrors.user_err ?loc Pp.(str"Command" ++ spc () ++ str cmd ++ spc () ++
+        str"exited with code " ++ int n ++ str "." ++ fnl () ++
+        str"stdout: " ++ spc () ++ str out ++ fnl () ++ str "stderr: " ++ str err)
+    | Unix.WSIGNALED n | Unix.WSTOPPED n -> 
+      CErrors.user_err ?loc Pp.(str"Command" ++ spc () ++ str cmd ++ spc () ++ 
+      str"was signaled with code " ++ int n ++ str"." ++ fnl () ++
+      str"stdout: " ++ spc () ++ str out ++ fnl () ++ str "stderr: " ++ str err)
+    
   let compile opts term imports =
     let debug = opts.debug in
     let options = make_pipeline_options opts in
@@ -600,11 +679,6 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | None -> find_executable debug "which ocamlfind"
     | Some s -> s
       
-  type line = 
-    | EOF
-    | Info of string
-    | Error of string
-
   let read_line stdout stderr =
     try Info (input_line stdout)
     with End_of_file -> 
@@ -619,7 +693,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       | EOF -> debug_msg debug ("Program terminated"); continue := false
       | Info s -> Feedback.msg_notice Pp.(str prog ++ str": " ++ str s)
       | Error s -> Feedback.msg_warning Pp.(str prog ++ str": " ++ str s)
-    done
+    done;
+    ignore (Unix.close_process_full (stdout, stdin, stderr))
 
   let runtime_dir () = 
     let open Boot in
@@ -746,8 +821,28 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let time = Unix.gettimeofday () -. start in
     Feedback.msg_notice Pp.(msg ++ str (Printf.sprintf " executed in %f sec" time));
     res
-  
-  let reify env sigma ty v : Constr.t = 
+
+  let apply_reordering hd m cstrs =
+    try
+      let find_ind_ord (ind, (na, tags)) =
+        if Kernames.eq_inductive_def ind hd then
+          Some (Array.of_list (List.map (fun i -> cstrs.(i)) tags))
+        else None
+      in
+      CList.find_map_exn find_ind_ord m
+    with Not_found -> cstrs
+
+  let find_reverse_mapping hd m cstr =
+    try
+      let find_ind_ord (ind, (na, tags)) =
+        if Kernames.eq_inductive_def ind hd then
+          Some (CList.index0 Int.equal cstr tags)
+        else None
+      in
+      CList.find_map_exn find_ind_ord m
+    with Not_found -> cstr
+
+  let reify im env sigma ty v : Constr.t = 
     let open Declarations in
     let debug s = debug_reify Pp.(fun () -> str s) in
     let rec aux ty v =
@@ -757,11 +852,13 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | IsInductive (hd, u, args) -> 
       let open Inductive in
       let open Inductiveops in
+      let qhd = match Metacoq_template_plugin.Ast_quoter.quote_global_reference (IndRef hd) with Metacoq_template_plugin.Kernames.IndRef i -> (Obj.magic i : Kernames.inductive) | _ -> assert false in
       let spec = lookup_mind_specif env hd in
       let npars = inductive_params spec in
       let params, _indices = CList.chop npars args in
       let indfam = make_ind_family ((hd, u), params) in
       let cstrs = get_constructors env indfam in
+      let cstrs = apply_reordering qhd im cstrs in
       if Obj.is_block v then
         let ord = get_boxed_ordinal v in
         let () = debug (Printf.sprintf "Reifying constructor block of tag %i" ord) in
@@ -770,6 +867,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
           with Not_found -> ill_formed env sigma ty
         in
         let cstr = cstrs.(coqidx) in
+        let coqidx = find_reverse_mapping qhd im coqidx in
         let ctx = Vars.smash_rel_context cstr.cs_args in
         let vargs = List.init (List.length ctx) (Obj.field v) in
         let args' = List.map2 (fun decl v -> 
@@ -784,6 +882,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
           try find_nth_constant ord cstrs 
           with Not_found -> ill_formed env sigma ty 
         in
+        let coqidx = find_reverse_mapping qhd im coqidx in
         let () = debug (Printf.sprintf "Reifying constant constructor: %i is %i in Coq" ord coqidx) in
         Term.applistc (Constr.mkConstructU ((hd, coqidx + 1), u)) params
     | IsPrimitive (c, u, _args) -> 
@@ -797,8 +896,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     in aux ty v
 
   let reify opts env sigma tyinfo result =
-    if opts.time then time ~msg:(Pp.str "Reification") (fun () -> reify env sigma tyinfo result)
-    else reify env sigma tyinfo result 
+    if opts.time then time ~msg:(Pp.str "Reification") (fun () -> reify opts.inductives_mapping env sigma tyinfo result)
+    else reify opts.inductives_mapping env sigma tyinfo result 
 
   let template name = 
     Printf.sprintf "\nvalue %s ()\n { struct thread_info* tinfo = make_tinfo(); return %s_body(tinfo); }\n" name name
@@ -869,32 +968,25 @@ module CompileFunctor (CI : CompilerInterface) = struct
       "coq-core.interp"; "coq-core.kernel"; "coq-core.library"] in
     let pkgs = String.concat "," packages in
     let dontlink = "str,unix,dynlink,threads,zarith,coq-core,coq-core.plugins.ltac,coq-core.interp" in
-    match Unix.system cmd with
-    | Unix.WEXITED 0 ->
-      let shared_lib = make_fname opts opts.filename ^ suff ^ ".cmxs" in
-      let linkcmd =
-        Printf.sprintf "%s ocamlopt -shared -linkpkg -dontlink %s -thread -rectypes -package %s \
-        -I %s -I plugin -o %s %s %s %s %s"
-        ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o 
-        (make_fname opts opts.filename ^ ".o") importso
-      in
-      debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
-      (match Unix.system linkcmd with
-      | Unix.WEXITED 0 ->
-          debug_msg debug (Printf.sprintf "Compilation ran fine, linking compiled code for %s" global_id);
-          Dynlink.loadfile_private shared_lib;
-          debug_msg debug (Printf.sprintf "Dynamic linking succeeded, retrieving function %s" global_id);
-          let result = 
-            if opts.time then time ~msg:(Pp.str id) (run_certicoq_run global_id)
-            else run_certicoq_run global_id ()
-          in
-          debug_msg debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
-          reify opts env sigma tyinfo result
-      | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str linkcmd)
-      | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n))
-    | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str cmd)
-    | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n  ++ str" while running " ++ str cmd)
-
+    let () = ignore (execute cmd) in
+    let shared_lib = make_fname opts opts.filename ^ suff ^ ".cmxs" in
+    let linkcmd =
+      Printf.sprintf "%s ocamlopt -shared -linkpkg -dontlink %s -thread -rectypes -package %s \
+      -I %s -I cplugin -o %s %s %s %s %s"
+      ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o 
+      (make_fname opts opts.filename ^ ".o") importso
+    in
+    debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
+    let _out, _err = execute linkcmd in
+    Dynlink.loadfile_private shared_lib;
+    debug_msg debug (Printf.sprintf "Dynamic linking succeeded, retrieving function %s" global_id);
+    let result = 
+      if opts.time then time ~msg:(Pp.str id) (run_certicoq_run global_id)
+      else run_certicoq_run global_id ()
+    in
+    debug_msg debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
+    reify opts env sigma tyinfo result
+    
   let next_string_away_from s bad =
     let rec name_rec s = if bad s then name_rec (increment_subscript s) else s in
     name_rec s
@@ -947,6 +1039,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let f = open_out file in
     Printf.fprintf f "%s\n" s;
     close_out f
+
 
   let show_ir opts gr =
     let term = quote opts gr in

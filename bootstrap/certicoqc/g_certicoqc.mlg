@@ -10,6 +10,7 @@ open Stdarg
 open Pcoq.Prim
 open Plugin_utils
 open Certicoq
+open Tacarg
 open G_certicoq_vanilla
 }
 
@@ -57,4 +58,33 @@ VERNAC COMMAND EXTEND CertiCoqCCompile CLASSIFIED AS QUERY
 | [ "CertiCoqC" "-help" ] -> {
     Feedback.msg_info (str help_msg)
   }
+END
+
+
+VERNAC COMMAND EXTEND CertiCoqC_Eval CLASSIFIED AS SIDEFF
+| [ "CertiCoqC" "Eval" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" vanilla_cinclude_list_sep(imps, ",") "]" ] -> {
+  let gr = Nametab.global gr in
+  let opts = Certicoq.make_options l cs (get_name gr) in
+  let result = Certicoq.eval_gr opts gr imps in 
+  Feedback.msg_notice Pp.(str" = " ++ Printer.pr_constr_env (Global.env ()) Evd.empty result)
+  }
+| [ "CertiCoqC" "Eval" vanilla_cargs_list(l) global(gr) ] -> {
+  let gr = Nametab.global gr in
+  let opts = Certicoq.make_options l [] (get_name gr) in
+  let result = Certicoq.eval_gr opts gr [] in
+  Feedback.msg_notice Pp.(str" = " ++ Printer.pr_constr_env (Global.env ()) Evd.empty result)
+  }
+END
+
+TACTIC EXTEND CertiCoqc_eval
+| [ "certicoqc_eval" vanilla_cargs_list(l) constr(c) tactic(tac) ] ->
+  { (* quote and evaluate the given term, unquote, pass the result to t *)
+    Proofview.Goal.enter begin fun gl ->
+      let env = Proofview.Goal.env gl in
+      let sigma = Proofview.Goal.sigma gl in
+      let opts = Certicoq.make_options l [] "goal" in
+      let opts = Certicoq.{ opts with toplevel_name = "goal" } in
+      let c' = Certicoq.eval opts env sigma c [] in 
+      ltac_apply tac (List.map to_ltac_val [EConstr.of_constr c'])
+  end }
 END

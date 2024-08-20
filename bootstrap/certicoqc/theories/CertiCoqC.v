@@ -13,8 +13,8 @@ Section Pipeline.
     (prims : list (Kernames.kername * string * bool * nat * positive))
     (debug : bool).
 
-  Definition CertiCoq_pipeline econf (p : Ast.Env.program) :=
-    p <- compile_LambdaBoxMut econf p ;;
+  Definition CertiCoq_pipeline econf im (p : Ast.Env.program) :=
+    p <- compile_LambdaBoxMut econf im p ;;
     p <- compile_LambdaBoxLocal prims p ;;
     p <- compile_LambdaANF_ANF next_id prims p ;;
     (* if debug then compile_LambdaANF_debug next_id p  For debugging intermediate states of the λanf pipeline else *)
@@ -28,7 +28,7 @@ Definition pipeline (p : Template.Ast.Env.program) :=
   let genv := fst p in
   o <- get_options ;;
   '(prs, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
-  p' <- CertiCoq_pipeline next_id prs o.(erasure_config) p ;;
+  p' <- CertiCoq_pipeline next_id prs o.(erasure_config) o.(inductives_mapping) p ;;
   compile_Clight prs p'.
   
 Definition compile (opts : Options) (p : Template.Ast.Env.program) :=

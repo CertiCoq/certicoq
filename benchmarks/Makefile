@@ -7,7 +7,7 @@ TESTS=$(shell cat TESTS)
 CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, CertiCoq.Benchmarks.tests.%.c, $(TESTS))
 # Names of the generated executables
 EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS)) $(patsubst %, %_cps_opt, $(TESTS)) $(patsubst %, %_opt, $(TESTS))
-INCLUDE=../plugin/runtime
+INCLUDE=../runtime
 
 all: lib tests exec run
 default: exec run

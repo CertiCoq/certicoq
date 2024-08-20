@@ -4,7 +4,6 @@ Tm_util
 
 Datatypes
 Caml_nat
-Caml_bool
 Caml_option
 Caml_comparison
 DecidableClass

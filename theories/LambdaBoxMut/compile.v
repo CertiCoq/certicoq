@@ -441,10 +441,14 @@ Fixpoint compile_ctx (t : global_context) :=
     (n, compile_global_decl decl) :: compile_ctx rest
   end.
 
-Program Definition compile_program econf (p : Ast.Env.program) : Program Term :=
-  let p := run_erase_program econf p _ in
+Axiom assume_wellformed_inductives_mapping : forall Σ (ip : EProgram.inductives_mapping), is_true (wf_template_inductives_mapping Σ ip).
+
+Program Definition compile_program (econf : erasure_configuration) imap (p : Ast.Env.program) : Program Term :=
+  let p := run_erase_program econf (imap, p) _ in
   {| main := compile (snd p) ; env := compile_ctx (fst p) |}.
 Next Obligation.
+  split.
+  now eapply assume_wellformed_inductives_mapping.
   split.
   now eapply assume_that_we_only_erase_on_welltyped_programs.
   cbv [PCUICWeakeningEnvSN.normalizationInAdjustUniversesIn].
@@ -452,5 +456,5 @@ Next Obligation.
   split; typeclasses eauto.
 Qed.
 
-Definition program_Program econf (p: Ast.Env.program) : Program Term :=
-  compile_program econf p.
+Definition program_Program econf ip (p: Ast.Env.program) : Program Term :=
+  compile_program econf ip p.

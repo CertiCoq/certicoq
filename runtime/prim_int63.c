@@ -123,8 +123,8 @@ primint prim_int63_tail0(primint init)
 
 primbool mk_bool(int b)
 {
-  if (b) return 1;
-  else return 3;
+  if (b) return 3;
+  else return 1;
 }
 
 primbool prim_int63_eqb(primint x, primint y)

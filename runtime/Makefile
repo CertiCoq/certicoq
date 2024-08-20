@@ -1,5 +1,5 @@
-SRC = gc_stack.c certicoq_run_main.c coq_c_ffi.c coq_ffi.c prim_int63.c prim_floats.c
-HEADERS = m.h config.h values.h gc_stack.h certicoq_run_main.h coq_c_ffi.h coq_ffi.h prim_int63.h prim_floats.h
+SRC = gc_stack.c certicoq_run_main.c coq_c_ffi.c coq_ffi.c prim_int63.c prim_floats.c get_ordinal.c
+HEADERS = m.h config.h values.h gc_stack.h certicoq_run_main.h coq_c_ffi.h coq_ffi.h prim_int63.h prim_floats.h get_ordinal.h
 LINKOPTS = -linkpkg -dontlink str,unix,dynlink,threads,zarith
 
 TARGETS = ${SRC:.c=.o}

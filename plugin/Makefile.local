@@ -15,10 +15,4 @@ merlin-hook::
 		$(HIDE)echo 'PKG coq-metacoq-template-ocaml.plugin' >> .merlin
 		$(HIDE)echo 'PKG stdlib-shims' >> .merlin
 
-get_ordinal.o: get_ordinal.c
-	$(CC) -c -o $@ -I runtime $<
-
-certicoq_vanilla_plugin.cmxs: get_ordinal.o
-
-install-extra::
-	make -C runtime install
+certicoq_vanilla_plugin.cmxs: ../runtime/get_ordinal.o

@@ -72,7 +72,7 @@ let name_longtype sg =
 
 let attributes a =
   let open Datatypes in
-  let s1 = if Caml_bool.of_coq a.attr_volatile then " volatile" else "" in
+  let s1 = if a.attr_volatile then " volatile" else "" in
   match a.attr_alignas with
   | None -> s1
   | Some l ->
@@ -134,7 +134,7 @@ let rec name_cdecl id ty =
           if not first then Buffer.add_string b ", ";
           Buffer.add_string b (name_cdecl "" t1);
           add_args false tl in
-      if not (Caml_bool.of_coq cconv.cc_unproto) then add_args true args;
+      if not cconv.cc_unproto then add_args true args;
       Buffer.add_char b ')';
       name_cdecl (Buffer.contents b) res
   | Tstruct(name, a) ->
@@ -515,7 +515,7 @@ let re_string_literal = Str.regexp "__stringlit_[0-9]+"
 
 let print_globvar p id v =
   let name1 = extern_atom id in
-  let name2 = if Caml_bool.of_coq v.gvar_readonly then "const " ^ name1 else name1 in
+  let name2 = if v.gvar_readonly then "const " ^ name1 else name1 in
   match v.gvar_init with
   | [] ->
       fprintf p "extern %s;@ @ "
@@ -540,7 +540,7 @@ let print_globvar p id v =
 
 let print_globvardecl p  id v =
   let name = extern_atom id in
-  let name = if Caml_bool.of_coq v.gvar_readonly then "const "^name else name in
+  let name = if v.gvar_readonly then "const "^name else name in
   let linkage = "extern" in
   fprintf p "%s %s;@ @ " linkage (name_cdecl name v.gvar_info)
 

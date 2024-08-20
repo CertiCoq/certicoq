@@ -23,6 +23,7 @@ Require Import VanillaExtrOCamlInt63 VanillaExtrOCamlFloats.
   E.g. no constructor swapping allowed.
   *)
 
+Extract Inductive bool => bool [ true false ]. (* Swaps the constructors *)
 Extract Inductive unit => unit [ "()" ].
 Extract Inductive list => list [ "[]" "( :: )" ].
 Extract Inductive prod => "( * )" [ "" ].
@@ -35,8 +36,8 @@ Extract Inductive prod => "( * )" [ "" ].
     (if ... then ... else false) and (if ... then true else ...).
 *)
 
-Extract Inlined Constant andb => "(fun x y -> match x with Coq_true -> Coq_true | _ -> y)".
-Extract Inlined Constant orb => "(fun x y -> match x with Coq_false -> y | Coq_true -> x)".
+Extract Inlined Constant andb => "(&&)".
+Extract Inlined Constant orb => "(||)".
 
 Require Import ZArith NArith.
 
@@ -83,13 +84,6 @@ Extraction Blacklist config List String Nat Int Ast Universes UnivSubst Typing R
            OrderedType Logic Common Equality Char char uGraph
            Instances Classes Term Monad Coqlib Errors Compile Checker Eq Classes0 Numeral
            Uint63 Number Values.
-
-(* Cutting the dependency to R.
-Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".
-Extract Inlined Constant Fappli_IEEE.FF2R => "fun _ -> assert false".
-Extract Inlined Constant Fappli_IEEE.B2R => "fun _ -> assert false".
-Extract Inlined Constant Fappli_IEEE.round_mode => "fun _ -> assert false".
-Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false". *)
 
 Set Warnings "-extraction-reserved-identifier".
 Set Warnings "-extraction-opaque-accessed".

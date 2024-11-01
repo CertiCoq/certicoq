@@ -64,7 +64,6 @@ Signature
 CRelationClasses
 
 ResultMonad
-DecimalString
 Byte0
 ByteCompare
 Bytestring

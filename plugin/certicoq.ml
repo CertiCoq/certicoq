@@ -40,16 +40,16 @@ let increment_subscript id =
         add (carrypos-1)
       end
       else begin
-        let newid = Bytes.of_string id in
-        Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
-        Bytes.set newid carrypos (Char.chr (Char.code c + 1));
+        let newid = Stdlib.Bytes.of_string id in
+        Stdlib.Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
+        Stdlib.Bytes.set newid carrypos (Char.chr (Char.code c + 1));
         newid
       end
     else begin
-      let newid = Bytes.of_string (id^"0") in
+      let newid = Stdlib.Bytes.of_string (id^"0") in
       if carrypos < len-1 then begin
-        Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
-        Bytes.set newid (carrypos+1) '1'
+        Stdlib.Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
+        Stdlib.Bytes.set newid (carrypos+1) '1'
       end;
       newid
     end
@@ -409,7 +409,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     Buffer.add_string buf line; 
     Buffer.add_string buf "\n"
   
-  let string_of_buffer buf = Bytes.to_string (Buffer.to_bytes buf)
+  let string_of_buffer buf = Stdlib.Bytes.to_string (Buffer.to_bytes buf)
     
   let execute cmd =
     debug Pp.(fun () -> str "Executing: " ++ str cmd ++ str " in environemt: " ++ 
@@ -924,6 +924,33 @@ module CompileFunctor (CI : CompilerInterface) = struct
       debug_msg debug "Pipeline debug:";
       debug_msg debug (string_of_bytestring dbg);
       CErrors.user_err Pp.(str "Could not compile: " ++ (pr_string s) ++ str "\n")
+
+  let print_to_file_no_nl (s : string) (file : string) =
+    let f = open_out file in
+    Printf.fprintf f "%s" s;
+    close_out f
+
+  let compile_wasm opts gr =
+    let term = quote opts gr in
+    let debug = opts.debug in
+    let options = make_pipeline_options opts in
+    let p = Pipeline.compile_Wasm options (Obj.magic term) in
+    match p with
+    | (CompM.Ret prg, dbg) ->
+      debug_msg debug "Finished compiling, printing to file.";
+      let time = Unix.gettimeofday() in
+      let suff = opts.ext in
+      let fname = opts.filename in
+      let file = fname ^ suff ^ ".wasm" in
+      print_to_file_no_nl (string_of_bytestring prg) file;
+      let time = (Unix.gettimeofday() -. time) in
+      debug_msg debug (Printf.sprintf "Printed to file %s in %f s.." file time);
+      debug_msg debug "Pipeline debug:";
+      debug_msg debug (string_of_bytestring dbg)
+    | (CompM.Err s, dbg) ->
+      debug_msg debug "Pipeline debug:";
+      debug_msg debug (string_of_bytestring dbg);
+      CErrors.user_err Pp.(str "compile_wasm" ++ (str "Could not compile: " ++ (pr_string s) ++ str "\n"))
 
 
   (* Quote Coq inductive type *)

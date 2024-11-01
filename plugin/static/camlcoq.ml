@@ -396,11 +396,11 @@ let ascii_of_char a =
 let camlstring_of_coqstring (s: String0.string) =
   let open String0 in
   let open Ascii in
-  let r = Bytes.create (Nat.to_int (length s)) in
+  let r = Stdlib.Bytes.create (Nat.to_int (length s)) in
   let rec fill pos = function
   | EmptyString -> r
-  | String (c, s) -> Bytes.set r pos (char_of_ascii c); fill (pos + 1) s
-  in Bytes.to_string (fill 0 s)
+  | String (c, s) -> Stdlib.Bytes.set r pos (char_of_ascii c); fill (pos + 1) s
+  in Stdlib.Bytes.to_string (fill 0 s)
 
 let coqstring_of_camlstring s =
   let open String0 in

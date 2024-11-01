@@ -62,7 +62,6 @@ Signature
 CRelationClasses
 
 ResultMonad
-DecimalString
 Byte0
 ByteCompare
 Bytestring
@@ -107,6 +106,7 @@ OrdersTac
 POrderedType
 Specif
 StateMonad
+OptionMonad
 Monad_utils
 MSetWeakList
 EqdepFacts
@@ -280,7 +280,23 @@ Toplevel
 Toplevel0
 Toplevel1
 Toplevel2
+
+Ssrnat
+Eqtype
+Seq
+Numerics
+Bytes
+Leb128
+Datatypes0
+Datatypes_properties
+Operations
+List_extra
+Binary_format_printer
+LambdaANF_to_Wasm_restrictions
+LambdaANF_to_Wasm_primitives
+LambdaANF_to_Wasm
 Toplevel3
+
 Glue_utils
 Glue
 Ffi

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - upstream-pr
   pull_request:
     branches:
       - "**"
@@ -36,6 +37,15 @@ jobs:
             #   opam pin -n -y submodules/metacoq
             # endGroup
           before_script: |
+            startGroup "Install more dependencies"
+              sudo apt install --yes wabt curl
+              # Node in debian bookworm is too old, install via nodesource
+              # TODO once version 22 is in the standard debian repo, use that
+              sudo curl -fsSL https://deb.nodesource.com/setup_22.x -o nodesource_setup.sh
+              sudo bash nodesource_setup.sh
+              sudo apt install -y nodejs
+              node --version
+            endGroup
             startGroup "fix permission issues"
               sudo chown -R coq:coq .
             endGroup

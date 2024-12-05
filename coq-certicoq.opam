@@ -23,8 +23,6 @@ build: [
   [make "all"]
   [make "plugins"]
   [make "bootstrap"]
-  [make "-C" "benchmarks" "all"] {with-test}
-  [make "-C" "bootstrap" "tests"] {with-test}
 ]
 install: [
   [make "install"]

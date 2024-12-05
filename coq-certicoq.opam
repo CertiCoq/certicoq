@@ -30,7 +30,7 @@ install: [
   [make "install"]
 ]
 depends: [
-  "ocaml"
+  "ocaml" {>= "4.13"}
   "conf-clang"
   "stdlib-shims"
   "coq" {>= "8.19" & < "8.20~"}

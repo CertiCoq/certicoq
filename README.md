@@ -27,11 +27,11 @@ See [INSTALL.md](INSTALL.md)  for installation instructions.
 
 ## Current Members
 
-Andrew Appel, Yannick Forster, Anvay Grover, Joomy Korkut, John Li, Zoe Paraskevopoulou, and Matthieu Sozeau.
+Andrew Appel, Yannick Forster, Joomy Korkut, Zoe Paraskevopoulou, and Matthieu Sozeau.
 
 ## Past Members and Contributors
 
-Abhishek Anand, Greg Morrisett, Randy Pollack, Olivier Savary Belanger, Matthew Weaver
+Abhishek Anand, Anvay Grover, John Li, Greg Morrisett, Randy Pollack, Olivier Savary Belanger, Matthew Weaver
 
 ## License 
 

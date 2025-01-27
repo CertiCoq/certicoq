@@ -3,5 +3,4 @@
 # libraries
 maps_util.v
 HashMap.v
-MyPermutations.v
 CpdtTactics.v

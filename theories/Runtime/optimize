@@ -1,8 +1,0 @@
-#!/bin/csh
-make testmain.o gctest3.o
-foreach A (0 1 2 3 4 5 6 7 8 9 10 11 12)
-# gcc -O3 -c -DNURSERY_SIZE="(1024<<$A)" gc.c
-gcc -O3 -c -DDEPTH=$A gc.c
-gcc -O3 testmain.o gctest3.o gc.o -o gctest3
-/bin/time -f "$A %U %S %P" ./gctest3 1000000 >/dev/null
-end

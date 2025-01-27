@@ -8,14 +8,6 @@ Require Import Libraries.CpdtTactics Permutation ExtLib.Data.List Coq.NArith.Bin
 (* Utility library for Compcert's Maps *)
 
 
-(* Sections: 
-    DES: Useful facts about the PTree instance of Maps
-    EQMAP: map_get_r (equivalence relation on accessible content) and related
-    GETD : Get with default interpreation of None
-    EQDMAP: map_getd_r (equivalence relation with default interpretation of None) and related
-
- *)
-
 Module M := Maps.PTree.
 Definition var_dec := M.elt_eq.
 

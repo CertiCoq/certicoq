@@ -8,6 +8,7 @@
 -R theories/LambdaBoxLocal      CertiCoq.LambdaBoxLocal
 -R theories/LambdaANF           CertiCoq.LambdaANF
 -R theories/Codegen             CertiCoq.Codegen
+-R theories/CodegenWasm         CertiCoq.CodegenWasm
 -R theories/Runtime             CertiCoq.runtime
 
 -R benchmarks                   CertiCoq.Benchmarks

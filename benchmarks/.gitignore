@@ -8,6 +8,10 @@ Top.*
 glue.Top.*
 ffi.Top.*
 
+*.wasm
+*.wat
+*.cwasm
+
 m.h
 gc.c
 gc.h

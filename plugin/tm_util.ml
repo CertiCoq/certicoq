@@ -53,14 +53,14 @@ let string_to_list (s : string) : char list =
   in aux [] (String.length s - 1)
 
 let list_to_string (l : char list) : string =
-  let buf = Bytes.create (List.length l) in
+  let buf = Stdlib.Bytes.create (List.length l) in
   let rec aux i = function
     | [] -> ()
     | c :: cs ->
-      Bytes.set buf i c; aux (succ i) cs
+      Stdlib.Bytes.set buf i c; aux (succ i) cs
   in
   aux 0 l;
-  Bytes.to_string buf
+  Stdlib.Bytes.to_string buf
 
 let rec filter_map f l =
   match l with

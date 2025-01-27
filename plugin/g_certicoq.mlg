@@ -130,6 +130,11 @@ VERNAC COMMAND EXTEND CertiCoq_Compile CLASSIFIED AS QUERY
     let opts = Certicoq.make_options l cs (get_name gr) in
     Certicoq.compile_only opts gr imps
   }
+| [ "CertiCoq" "Compile" "Wasm" cargs_list(l) global(gr) ] -> {
+    let gr = Nametab.global gr in
+    let opts = Certicoq.make_options l [] (get_name gr) in
+    Certicoq.compile_wasm opts gr
+  }
 | [ "CertiCoq" "Run" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" "Include" "[" cinclude_list_sep(imps, ",") "]" ] -> {
   let gr = Nametab.global gr in
   let opts = Certicoq.make_options l cs (get_name gr) in

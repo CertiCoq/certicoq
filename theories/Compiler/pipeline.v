@@ -1,4 +1,6 @@
-Require Export LambdaBoxMut.toplevel LambdaBoxLocal.toplevel LambdaANF.toplevel Codegen.toplevel.
+From Wasm Require Import binary_format_printer.
+
+Require Export LambdaBoxMut.toplevel LambdaBoxLocal.toplevel LambdaANF.toplevel Codegen.toplevel CodegenWasm.toplevel.
 Require Import compcert.lib.Maps.
 Require Import ZArith.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
@@ -130,7 +132,13 @@ Definition pipeline (p : Template.Ast.Env.program) :=
 (*   p <- erase_PCUIC p ;;
  *)  p <- CertiCoq_pipeline next_id prs false p ;;
   compile_Clight prs p.
- 
+
+Definition pipeline_Wasm (p : Template.Ast.Env.program) :=
+  let genv := fst p in
+  '(prs, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
+(*   p <- erase_PCUIC p ;;
+ *)  p <- CertiCoq_pipeline next_id prs false p ;;
+     compile_LambdaANF_to_Wasm prs p.
 
 Definition default_opts : Options :=
   {| erasure_config := Erasure.default_erasure_config;
@@ -198,5 +206,14 @@ Definition show_IR (opts : Options) (p : Template.Ast.Env.program) : (error stri
   | Ret p =>
     let '(pr, cenv, _, _, nenv, fenv, _,  e) := p in
     (Ret (cps_show.show_exp nenv cenv false e), log)
+  | Err s => (Err s, log)
+  end.
+
+
+(** * For compiling lambda_ANF to Wasm *)
+Definition compile_Wasm (opts : Options) (p : Template.Ast.Env.program) : (error string * string) :=
+let (perr, log) := run_pipeline _ _ opts p pipeline_Wasm in
+  match perr with
+  | Ret p => (Ret (String.parse (binary_of_module p)), log)
   | Err s => (Err s, log)
   end.

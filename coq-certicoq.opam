@@ -1,5 +1,5 @@
 opam-version: "2.0"
-version: "dev+8.20"
+version: "dev+9.0"
 maintainer: "The CertiCoq Team"
 homepage: "https://certicoq.org/"
 dev-repo: "git+https://github.com/CertiCoq/certicoq"

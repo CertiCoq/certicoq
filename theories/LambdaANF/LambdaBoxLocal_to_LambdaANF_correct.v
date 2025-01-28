@@ -806,11 +806,11 @@ Section Correct.
       { erewrite cps_fix_rel_names; [ | eassumption ].
         rewrite H0. erewrite <- cps_fix_rel_length. reflexivity. eassumption. }
 
-      - eapply nth_error_Forall2; [ | rewrite rev_length; eassumption ].
+      - eapply nth_error_Forall2; [ | rewrite length_rev; eassumption ].
         intros.
         assert (exists f, nth_error (rev (all_fun_name Bs)) n = Some f).
         { eapply MCList.nth_error_Some_length in H2.
-          rewrite Hlen, <- rev_length in H2. eapply nth_error_Some in H2.
+          rewrite Hlen, <- length_rev in H2. eapply nth_error_Some in H2.
           destruct (nth_error (rev (all_fun_name Bs)) n); eauto. congruence. }
         destructAll.
         eexists. split. eauto.
@@ -1005,12 +1005,12 @@ Section Correct.
         intros vs. eapply MCList.rev_ind with (l := vs); intros.
 
         + eapply set_lists_length_eq in Hset.
-          rewrite app_length in Hset. inv Hset. lia.
+          rewrite length_app in Hset. inv Hset. lia.
           
         + simpl in Hset.
 
           assert (Hlen : Datatypes.length (rev vars) = Datatypes.length l). 
-          { eapply set_lists_length_eq in Hset. rewrite !app_length in Hset. simpl in *.
+          { eapply set_lists_length_eq in Hset. rewrite !length_app in Hset. simpl in *.
             replace (@Datatypes.length map_util.M.elt) with (@Datatypes.length positive) in * by reflexivity.
             lia. } 
 
@@ -1024,7 +1024,7 @@ Section Correct.
               2:{ intros m. eapply preord_exp_Eproj_red. eassumption.
                   eapply nthN_is_Some_app. 
                   eapply set_lists_length_eq in Hset.
-                  rewrite rev_length in *.
+                  rewrite length_rev in *.
                   replace (@Datatypes.length map_util.M.elt) with (@Datatypes.length positive) in * by reflexivity.
                   rewrite Hlen. rewrite nthN_app_geq. simpl.
                   
@@ -1981,7 +1981,7 @@ Section Correct.
                   - inv Hwfcl.
                     eapply enthopt_inlist_Forall in H26; [ | eassumption ].
                     inv H26. inv H22. simpl Datatypes.length.
-                    rewrite app_length, rev_length. erewrite cps_fix_rel_length; [ | eassumption ].
+                    rewrite length_app, length_rev. erewrite cps_fix_rel_length; [ | eassumption ].
                     erewrite <- Forall2_length; [ | eassumption ].
                     rewrite Nnat.Nat2N.inj_succ, <- OrdersEx.N_as_OT.add_1_l, Nnat.Nat2N.inj_add, efnlength_efnlst_length.
                     eassumption.
@@ -2031,7 +2031,7 @@ Section Correct.
           - inv Hwfcl.
             eapply enthopt_inlist_Forall in H26; [ | eassumption ].
             inv H26. inv H22. simpl Datatypes.length.
-            rewrite app_length, rev_length. erewrite cps_fix_rel_length; [ | eassumption ].
+            rewrite length_app, length_rev. erewrite cps_fix_rel_length; [ | eassumption ].
             erewrite <- Forall2_length; [ | eassumption ].
             rewrite Nnat.Nat2N.inj_succ, <- OrdersEx.N_as_OT.add_1_l, Nnat.Nat2N.inj_add, efnlength_efnlst_length.
             eassumption.
@@ -2084,7 +2084,7 @@ Section Correct.
                                     (M.set k1 (Vfun rho (Fcons k1 kon_tag [x1] (Ecase x1 bs') Fnil) k1) rho)).
               
         edestruct (set_lists_length3 rho' (rev x2) vs'0).
-        { rewrite rev_length. rewrite H5, Nnat.Nat2N.id. eapply Forall2_length. eassumption. } 
+        { rewrite length_rev. rewrite H5, Nnat.Nat2N.id. eapply Forall2_length. eassumption. } 
         destructAll. 
 
 
@@ -2163,7 +2163,7 @@ Section Correct.
               2:{ intros i. eapply IH2 ; [ | | | | | | | eassumption | reflexivity | eassumption ]. 
                   - eapply Forall_app. split; eauto.
                     eapply Forall_rev. inv Hvwf. eassumption.
-                  - rewrite app_length, Nnat.Nat2N.inj_add. 
+                  - rewrite length_app, Nnat.Nat2N.inj_add. 
                     eapply cps_cvt_rel_branches_find_branch_wf. eassumption.
                     eassumption. rewrite H5. eassumption.
                   - normalize_sets.
@@ -2233,7 +2233,7 @@ Section Correct.
           edestruct IH2 ; [ | | | | | | | eassumption | ]. 
           - eapply Forall_app. split; eauto.
             eapply Forall_rev. inv Hvwf. eassumption.
-          - rewrite app_length, Nnat.Nat2N.inj_add. 
+          - rewrite length_app, Nnat.Nat2N.inj_add. 
             eapply cps_cvt_rel_branches_find_branch_wf. eassumption.
             eassumption. rewrite H5. eassumption.
           - normalize_sets.
@@ -2627,12 +2627,12 @@ Section Correct.
               * constructor.
                 -- intros Hc. eapply in_app_or in Hc. inv Hc; eauto.
                    eapply in_rev in H17; eauto.
-                -- eapply NoDup_app; eauto.
+                -- eapply List_util.NoDup_app; eauto.
                    eapply NoDup_rev. eassumption.
                    rewrite FromList_rev. sets.
               * repeat normalize_sets. rewrite FromList_rev.
                 intros Hc. inv Hc. inv H17; eauto. inv H17; eauto.
-              * simpl. rewrite !app_length, !rev_length.
+              * simpl. rewrite !length_app, !length_rev.
                 rewrite H3. erewrite <- cps_fix_rel_length; [ | eassumption ]. congruence. 
               * repeat normalize_sets. rewrite FromList_rev.
                 eapply Union_Disjoint_l. now sets.
@@ -2689,7 +2689,7 @@ Section Correct.
                 -- replace (@Datatypes.length positive) with (@Datatypes.length var) in * by reflexivity.
                    rewrite H3. eapply cps_fix_rel_length; eauto.
                    
-                -- rewrite !rev_length.
+                -- rewrite !length_rev.
                    rewrite H3. eapply cps_fix_rel_length; eauto.
 
                 -- intros Hc. eapply image_extend_lst_Included in Hc; eauto. rewrite image_id in Hc.
@@ -2700,7 +2700,7 @@ Section Correct.
                    rewrite Hseq in Hc. repeat normalize_sets. inv Hc; eauto. 
                    now eapply Same_set_all_fun_name in H17; inv H4; eauto.
                    now inv H4; eapply Hdis; eauto.
-                   rewrite !app_length, !rev_length.
+                   rewrite !length_app, !length_rev.
                    erewrite H3, <- cps_fix_rel_length; [ | eassumption ]. congruence. 
 
                 -- intros Hc. eapply image_extend_Included' in Hc. inv Hc; eauto. 
@@ -2712,7 +2712,7 @@ Section Correct.
                    rewrite Hseq in H17. repeat normalize_sets. inv H17; eauto. 
                    now eapply Same_set_all_fun_name in H24; inv H12; inv H17; eauto.
                    now inv H12; inv H17; eapply Hdis; eauto.
-                   rewrite !app_length, !rev_length.
+                   rewrite !length_app, !length_rev.
                    erewrite H3, <- cps_fix_rel_length; [ | eassumption ]. congruence.
                    inv H17; inv H12; eauto.
                    
@@ -2728,7 +2728,7 @@ Section Correct.
                    intros Hc. eapply in_app_or in Hc. inv Hc.
                    eapply in_rev in H17; eauto. eapply Hdis; eauto.
 
-                -- rewrite !app_length, !rev_length.
+                -- rewrite !length_app, !length_rev.
                    erewrite H3, <- cps_fix_rel_length; [ | eassumption ]. congruence. } 
 
         

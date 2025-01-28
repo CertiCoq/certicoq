@@ -1603,7 +1603,7 @@ Proof with now eauto with Ensembles_DB.
       eapply Make_wrappers_occurs_free. eassumption. reflexivity.
       rewrite Setminus_Union_distr. eapply Union_Included.
       * eapply Included_trans. eapply Included_Setminus_compat.
-        eapply image_extend_lst_Included. rewrite !app_length.
+        eapply image_extend_lst_Included. rewrite !length_app.
         rewrite H24. reflexivity. reflexivity. repeat normalize_sets.
         apply Included_Union_preserv_l.
         rewrite !image_Union, !Setminus_Union_distr.
@@ -1633,7 +1633,7 @@ Proof with now eauto with Ensembles_DB.
         rewrite <- Make_wrapper_image; eauto; sets. 
         eapply Union_Disjoint_l.
         eapply Disjoint_Included_l.
-        eapply image_extend_lst_Included. rewrite !app_length. rewrite H24. reflexivity.
+        eapply image_extend_lst_Included. rewrite !length_app. rewrite H24. reflexivity.
         repeat normalize_sets.  
         rewrite !Setminus_Union. rewrite !Setminus_Union_distr.
         eapply Union_Disjoint_l.
@@ -1724,7 +1724,7 @@ Proof with now eauto with Ensembles_DB.
            { rewrite <- Make_wrapper_image; eauto. 2: eauto with Ensembles_DB.
              subst Dom; rewrite !Setminus_Union_distr.
              eapply Included_trans. eapply Included_Setminus_compat.
-             eapply image_extend_lst_Included. rewrite !app_length.
+             eapply image_extend_lst_Included. rewrite !length_app.
              rewrite H24. reflexivity. reflexivity. repeat normalize_sets.
              eapply Included_Union_preserv_l.
              repeat rewrite !Setminus_Union_distr, !Setminus_Union.
@@ -2382,7 +2382,7 @@ Proof with now eauto with Ensembles_DB.
         simpl. rewrite image'_Union, image'_Singleton_is_Some.
         2:{ eapply lifted_name_eq. eassumption. }
         now left.
-    + eapply NoDup_app; eauto.
+    + eapply List_util.NoDup_app; eauto.
       eapply Disjoint_Included_r. eassumption. sets.
     + constructor.
       eapply IHe; eauto. repeat find_subsets; sets.

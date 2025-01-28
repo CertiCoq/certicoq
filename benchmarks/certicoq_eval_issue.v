@@ -32,7 +32,7 @@ Import ListNotations.
 Definition l : list nat := map (fun x => x * x) (repeat 3 4000).
 
 Lemma nth_l : 3000 < length l.
-Proof. unfold l. rewrite map_length. rewrite repeat_length. Admitted.
+Proof. unfold l. rewrite length_map. rewrite repeat_length. Admitted.
 
 Definition test : nat := (nth l (3000; nth_l)).
 (* Time Eval vm_compute in test. *)

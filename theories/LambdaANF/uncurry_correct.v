@@ -467,7 +467,7 @@ Section uncurry_correct.
           eapply length_exists_set_lists in Hrho1''; destruct Hrho1'' as [rho1'' Hrho1''].
           do 3 eexists; split; [reflexivity|split]; [eassumption|intros Hk2 Hvs3_vs4].
           assert (Hrho''' : length (gv ++ fv) = length (vs4 ++ tvs2)). {
-            do 2 rewrite app_length.
+            do 2 rewrite length_app.
             apply set_lists_length in Hrho1''.
             rewrite <- Hrho1''.
             rewrite <- Hgv_gv1.
@@ -1123,7 +1123,7 @@ Section uncurry_correct.
         do 3 eexists; split; [reflexivity|split]; [eassumption|intros Hk2 Hvs3_vs4].
         rename xs1 into fv.
         assert (Hrho''' : length (gv ++ fv) = length (vs4 ++ tvs2)). {
-          do 2 rewrite app_length.
+          do 2 rewrite length_app.
           apply set_lists_length in Hrho1''.
           rewrite <- Hrho1''.
           rewrite <- Hgv_gv1.

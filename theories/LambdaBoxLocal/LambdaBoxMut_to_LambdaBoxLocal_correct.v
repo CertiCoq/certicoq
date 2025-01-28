@@ -1197,7 +1197,7 @@ Proof.
     rewrite (proj1 (closed_subst_sbst _ H0)).
     rewrite sbst_lets.
     eapply IHk; eauto.
-    rewrite sbst_env_length, app_length; simpl; lia.
+    rewrite sbst_env_length, length_app; simpl; lia.
     rewrite subst_env_app in H1. simpl in H1.
     rewrite <- wf_tr_environ_sbst in H1; auto.
     unfold sbst_env in H1 |- *.

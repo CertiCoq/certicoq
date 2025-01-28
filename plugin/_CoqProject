@@ -386,6 +386,10 @@ extraction/primInt63.ml
 extraction/primInt63.mli
 extraction/primitive.ml
 extraction/primitive.mli
+extraction/primString.ml
+extraction/primString.mli
+extraction/primStringAxioms.ml
+extraction/primStringAxioms.mli
 extraction/proto_util.ml
 extraction/proto_util.mli
 extraction/prototype.ml

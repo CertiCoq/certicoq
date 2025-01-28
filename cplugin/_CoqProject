@@ -19,6 +19,7 @@ Loader.v
 CoqMsgFFI.v
 PrimInt63.v
 PrimFloats.v
+PrimString.v
 CertiCoqVanilla.v
 
 static/caml_option.mli
@@ -389,6 +390,10 @@ extraction/primFloat.ml
 extraction/primFloat.mli
 extraction/primInt63.ml
 extraction/primInt63.mli
+extraction/primString.ml
+extraction/primString.mli
+extraction/primStringAxioms.ml
+extraction/primStringAxioms.mli
 extraction/primitive.ml
 extraction/primitive.mli
 extraction/proto_util.ml

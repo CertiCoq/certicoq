@@ -19,6 +19,7 @@ Loader.v
 CoqMsgFFI.v
 PrimInt63.v
 PrimFloats.v
+PrimString.v
 CertiCoq.v
 
 static/caml_nat.mli

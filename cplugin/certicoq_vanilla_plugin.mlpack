@@ -17,6 +17,10 @@ List0
 PeanoNat
 Specif
 Basics
+PosDef
+IntDef
+NatDef
+ListDef
 BinPosDef
 BinPos
 BinNat
@@ -24,6 +28,7 @@ BinInt
 PrimInt63
 Uint0
 PrimString
+Uint63Axioms
 PrimStringAxioms
 Int0
 Int63

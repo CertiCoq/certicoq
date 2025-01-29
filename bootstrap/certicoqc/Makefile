@@ -51,7 +51,7 @@ else
  endif
 endif
 
-PKGS = -package coq-core,coq-core.clib,coq-core.config,coq-core.engine,coq-core.gramlib,coq-core.interp,coq-core.kernel,coq-core.lib,coq-core.library,coq-core.toplevel,coq-core.vernac,coq-core.plugins.ltac
+PKGS = -package rocq-runtime,rocq-runtime.clib,rocq-runtime.config,rocq-runtime.engine,rocq-runtime.gramlib,rocq-runtime.interp,rocq-runtime.kernel,rocq-runtime.lib,rocq-runtime.library,rocq-runtime.toplevel,rocq-runtime.vernac,rocq-runtime.plugins.ltac
 COQLIB = $(shell coqc -where)
 COQLIBINSTALL = $(COQLIB)/user-contrib/CertiCoq/CertiCoqC
 OCAMLLIB = $(shell ocamlc -where)

@@ -7,7 +7,7 @@ typedef value primbool;
 typedef value primintcarry;
 typedef value primintpair;
 
-#define trace(...) // printf(__VA_ARGS__)
+#define trace(...) printf(__VA_ARGS__)
 
 #define maxuint63 0x7FFFFFFFFFFFFFFF
 

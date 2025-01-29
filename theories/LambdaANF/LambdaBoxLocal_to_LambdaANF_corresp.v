@@ -347,8 +347,8 @@ Section Corresp.
       eapply pre_strenghtening.
       2:{ eapply post_weakening.
           2:{ eapply H. eassumption.
-              rewrite Hlen. rewrite map_length. eassumption.
-              rewrite Hlen'. rewrite map_length. eassumption. }
+              rewrite Hlen. rewrite length_map. eassumption.
+              rewrite Hlen'. rewrite length_map. eassumption. }
           simpl. intros. destructAll.
           eexists. split. econstructor; try eassumption. reflexivity.
           eassumption. }
@@ -457,11 +457,11 @@ Section Corresp.
       
       eapply frame_rule. eapply frame_rule. 
 
-      eapply H. rewrite app_length, rev_length. unfold fnames in Hlen.
-      rewrite map_length in Hlen. rewrite Hlen. 
+      eapply H. rewrite length_app, length_rev. unfold fnames in Hlen.
+      rewrite length_map in Hlen. rewrite Hlen. 
       
       rewrite Nnat.Nat2N.inj_add. rewrite Hlen'. eassumption.
-      rewrite Hlen. unfold fnames. rewrite map_length.
+      rewrite Hlen. unfold fnames. rewrite length_map.
       rewrite <- Nnat.Nat2N.id with (n := Datatypes.length (efnlst_as_list e)).
       rewrite <- Nnat.Nat2N.id with (n := efnlength e).
       rewrite Hlen', efnlength_efnlst_length. reflexivity.
@@ -471,7 +471,7 @@ Section Corresp.
       destruct (nth_error x (N.to_nat n)) eqn:Hnth.
       + eapply return_triple. intros _ w3 Hf. destructAll. 
         eexists. split.
-        * econstructor; eauto. rewrite Hlen. unfold fnames. rewrite map_length.
+        * econstructor; eauto. rewrite Hlen. unfold fnames. rewrite length_map.
           rewrite <- Nnat.Nat2N.id with (n := Datatypes.length (efnlst_as_list e)).
           rewrite <- Nnat.Nat2N.id with (n := efnlength e).
           rewrite Hlen'. rewrite efnlength_efnlst_length. reflexivity.
@@ -479,7 +479,7 @@ Section Corresp.
         * eassumption.
 
       + eapply nth_error_Some in Hnth. now exfalso; eauto.
-        rewrite Hlen. unfold fnames. rewrite map_length. 
+        rewrite Hlen. unfold fnames. rewrite length_map. 
         rewrite <- Nnat.Nat2N.id with (n := Datatypes.length (efnlst_as_list e)).          
         rewrite Hlen'. lia.
 
@@ -622,7 +622,7 @@ Section Corresp.
       eapply frame_rule. eapply frame_rule. 
 
       eapply H. simpl in *.
-      rewrite app_length. rewrite Hnd, names_lst_length.
+      rewrite length_app. rewrite Hnd, names_lst_length.
       rewrite Nnat.Nat2N.inj_add. rewrite Nnat.N2Nat.id. eassumption.
 
       intros e2 w3. eapply return_triple. intros. destructAll.  
@@ -764,7 +764,7 @@ Section Corresp.
 
       inv H4.
       assert (Hwf : exp_wf (N.of_nat (Datatypes.length (y :: (rev fnames ++ names)))) e).
-      { simpl. rewrite app_length in *. rewrite rev_length.
+      { simpl. rewrite length_app in *. rewrite length_rev.
         replace (N.pos (Pos.of_succ_nat (Datatypes.length fnames + Datatypes.length names)))
           with (1 + N.of_nat (Datatypes.length fnames + Datatypes.length names)) by lia.
         eassumption. }
@@ -915,7 +915,7 @@ Section Corresp.
       { unfold fnames. rewrite pos_seq_len. lia. }
       
       assert (Hwf : efnlst_wf (N.of_nat (Datatypes.length (fnames ++ names))) fnl).
-      { revert H5. rewrite app_length, Nnat.Nat2N.inj_add, Hlen.
+      { revert H5. rewrite length_app, Nnat.Nat2N.inj_add, Hlen.
         unfold names. rewrite pos_seq_len. generalize (N.of_nat (Datatypes.length fnames) + N.of_nat (Datatypes.length vs)).
         clear. induction fnl; intros m Hall.
         - constructor.

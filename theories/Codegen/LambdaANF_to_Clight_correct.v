@@ -7842,8 +7842,8 @@ Proof.
                        destruct H2.
                        * revert H2. apply H_not_in_L.
                          int_red.
-                         rewrite app_length.
-                         rewrite rev_length.
+                         rewrite length_app.
+                         rewrite length_rev.
                          simpl length.
                          rewrite Nat2Z.inj_add.
                          rewrite Nat2Z.inj_succ. chunk_red; omega.                         

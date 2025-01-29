@@ -89,11 +89,11 @@ Section list_lemmas.
       + rewrite <- IHl in Heqo0. rewrite <- Heqo in Heqo0. inversion Heqo0; now subst.
       + apply set_lists_length in Heqo.
         assert (length (l ++ [a]) = length (v ++ [b]))
-          by (repeat rewrite app_length; now rewrite Heqo).
+          by (repeat rewrite length_app; now rewrite Heqo).
         apply @length_exists_set_lists with (rho := rho) in H. destruct H. congruence.
       + assert (length l = length v). {
           apply set_lists_length in Heqo0. 
-          repeat rewrite app_length in Heqo0. simpl in Heqo0. lia.
+          repeat rewrite length_app in Heqo0. simpl in Heqo0. lia.
         }
         apply @length_exists_set_lists with (rho := (M.set a b rho)) in H. destruct H. congruence.
   Qed.
@@ -106,7 +106,7 @@ Section list_lemmas.
     length l = length (a ++ [b]) -> exists a1 b1, l = a1 ++ [b1].
   Proof.
     induction l; intros.
-    - rewrite app_length in H. inversion H. rewrite Nat.add_comm in H1. inversion H1.
+    - rewrite length_app in H. inversion H. rewrite Nat.add_comm in H1. inversion H1.
     - destruct a0.
       + assert (l = []) by (destruct l; [easy|inversion H]). subst.
         now exists [], a.
@@ -1331,7 +1331,7 @@ Proof with eauto with Ensembles_DB.
       intros contra; rewrite FromList_app in contra; destruct contra.
       contradiction H6; apply H8; do 4 left; now right.
       contradiction H6; apply H8; do 6 left; right; now right.
-      apply NoDup_app.
+      apply List_util.NoDup_app.
       inv H9. inv H26. now inv H16.
       inv H9. now inv H25.
       constructor; intros a contra; inv contra.
@@ -1377,7 +1377,7 @@ Proof with eauto with Ensembles_DB.
     | |- Disjoint _ (_ :|: _) _ => apply Union_Disjoint_l
     | |- Disjoint _ _ (_ :|: _) => apply Union_Disjoint_r
     | |- ~ In _ (_ :|: _) _ => rewrite Union_demorgan; split
-    | |- NoDup (_ ++ _) => apply NoDup_app
+    | |- NoDup (_ ++ _) => apply List_util.NoDup_app
     end...
     + intros Hin. apply (Disjoint_In_falso _ _ Hin)...
     + now apply Disjoint_sym.

@@ -954,7 +954,7 @@ Proof.
   intros Hd.
   rewrite !PS.cardinal_spec.
   erewrite (@Permutation_length _ (PS.elements (PS.union s1 s2))).
-  rewrite <- app_length. reflexivity.
+  rewrite <- length_app. reflexivity.
   symmetry. eapply PS_union_elements. eassumption.
 Qed.
 

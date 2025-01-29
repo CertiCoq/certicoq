@@ -626,11 +626,50 @@ Lemma frame_size_gt {A B} (f : exp_frame_t A B) (x : univD A) :
   (univ_size (frameD f x) > univ_size x)%nat.
 Proof.
   destruct f; cbn;
-  try change (size_exp x) with (size x); cbn;
+    try change (size_exp x) with (size x); cbn;
   try change (size_fundefs x) with (size x); cbn;
   try change (size_list (size_prod size size) x) with (size x); cbn;
   try change (size x) with 1; cbn;
   try lia.
+  
+  change ((fix size_exp (e : exp) : nat :=
+            match e with
+            | Ecase _ ces => S (S (size_list (size_prod size size_exp) ces))
+            | Eproj _ _ _ _ e0 => S (S (S (S (S (size_exp e0)))))
+            | Eletapp _ _ _ ys e0 => S (S (S (S (size ys + size_exp e0))))
+            | Efun fds e0 => S (size_fundefs fds + size_exp e0)
+            | Eapp _ _ xs => S (S (S (size xs)))
+            | Eprim_val _ _ e0 => S (S (S (size_exp e0)))
+            | Econstr _ _ ys e0 | Eprim _ _ ys e0 => S (S (S (size ys + size_exp e0)))
+            | Ehalt x0 => S (size x0)
+            end
+            with size_fundefs (fds : fundefs) : nat :=
+              match fds with
+              | Fcons _ _ xs e fds0 => S (S (S (size xs + size_exp e + size_fundefs fds0)))
+              | Fnil => 1
+              end
+                for
+                size_exp) x) with (size x).
+  cbn. lia.
+  change ((fix size_exp (e0 : exp) : nat :=
+             match e0 with
+             | Ecase _ ces => S (S (size_list (size_prod size size_exp) ces))
+             | Eproj _ _ _ _ e1 => S (S (S (S (S (size_exp e1)))))
+             | Eletapp _ _ _ ys e1 => S (S (S (S (size ys + size_exp e1))))
+             | Efun fds e1 => S (size_fundefs fds + size_exp e1)
+             | Eapp _ _ xs => S (S (S (size xs)))
+             | Eprim_val _ _ e1 => S (S (S (size_exp e1)))
+             | Econstr _ _ ys e1 | Eprim _ _ ys e1 => S (S (S (size ys + size_exp e1)))
+             | Ehalt x0 => S (size x0)
+             end
+             with size_fundefs (fds : fundefs) : nat :=
+               match fds with
+               | Fcons _ _ xs e0 fds0 => S (S (S (size xs + size_exp e0 + size_fundefs fds0)))
+               | Fnil => 1
+               end
+                 for
+                 size_fundefs) x) with (size x).
+  cbn. lia.  
 Qed.
 
 Lemma exp_c_size_ge {A B} (C : exp_c A B) (x : univD A) :

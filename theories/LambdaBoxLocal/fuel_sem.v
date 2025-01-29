@@ -274,8 +274,8 @@ Section FUEL_SEM.
       intros e e' bs rho i d vs f t Heval Hwf H.
       inv Hwf.
       unfold well_formed_in_env.
-      rewrite app_length. rewrite Nnat.Nat2N.inj_add.
-      rewrite rev_length. eapply find_branch_preserves_wf; eassumption.
+      rewrite length_app. rewrite Nnat.Nat2N.inj_add.
+      rewrite length_rev. eapply find_branch_preserves_wf; eassumption.
     Qed.
 
     Lemma well_formed_envmake_rec_env_rev_order fnlst rho rho' : 
@@ -378,7 +378,7 @@ Section FUEL_SEM.
           with (1 + N.of_nat (Datatypes.length (make_rec_env_rev_order fnlst rho'))) by lia.
 
         edestruct make_rec_env_rev_order_app. destructAll. rewrite H2.
-        rewrite app_length. rewrite Nnat.Nat2N.inj_add.
+        rewrite length_app. rewrite Nnat.Nat2N.inj_add.
         rewrite H7. rewrite efnlength_efnlst_length. eassumption. 
 
       - subst. 

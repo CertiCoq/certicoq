@@ -192,7 +192,7 @@ Notation "<[ x ; .. ; z ]>" := (frames_cons z .. (frames_cons x frames_nil) ..).
 Definition frames_t {U : Set} `{Frame U} : U -> U -> Set := frames_t' frame_t.
 
 (* Context application *)
-Reserved Notation "C '⟦' x '⟧'" (at level 50, no associativity).
+Reserved Notation "C '⟦' x '⟧'" (at level 1, no associativity).
 Fixpoint framesD {U : Set} `{Frame U} {A B : U}
          (fs : frames_t A B) : univD A -> univD B :=
   match fs with

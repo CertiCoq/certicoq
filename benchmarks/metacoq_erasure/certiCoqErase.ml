@@ -58,7 +58,7 @@ let fix_term (p : Ast0.term) : Ast0.term =
   let open List in
   let rec aux p = 
   match p with
-  | Coq_tRel _ | Coq_tVar _ | Coq_tConst _ | Coq_tInd _ | Coq_tConstruct _ | Coq_tInt _ | Coq_tFloat _ -> p
+  | Coq_tRel _ | Coq_tVar _ | Coq_tConst _ | Coq_tInd _ | Coq_tConstruct _ | Coq_tInt _ | Coq_tFloat _ | tString _ -> p
   | Coq_tEvar (k, l) -> Coq_tEvar (k, map aux l)
   | Coq_tSort u -> Coq_tSort (fix_universe u)
   | Coq_tCast (t, k, t') -> Coq_tCast (aux t, k, aux t')

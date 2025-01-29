@@ -230,9 +230,9 @@ Proof.
 intros.
 do 2 rewrite M.cardinal_1.
 transitivity (length (map (@fst _ _) (M.elements (M.map f g)))).
-rewrite map_length; auto.
+rewrite length_map; auto.
 transitivity (length (map (@fst _ _) (M.elements g))).
-2: rewrite map_length; auto.
+2: rewrite length_map; auto.
 apply eqlistA_length with E.eq.
 apply SortE_equivlistE_eqlistE; auto.
 generalize (M.elements_3 (M.map f g)).

@@ -23,6 +23,8 @@ PrimInt63
 Uint0
 Int0
 Int63
+PrimString
+PrimStringAxioms
 Byte
 Caml_byte
 Ascii

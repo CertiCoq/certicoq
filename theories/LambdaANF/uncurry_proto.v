@@ -307,6 +307,44 @@ Proof.
   - cbn in *; subst fds'0. decompose [and] H; subst fds'; cbn; intros _.
     assert (size (gv ++ fv) < size gv + size fv) by now apply size_app.
     lia.
+  - cbn in *.
+    change ((fix size_exp (e1 : exp) : nat :=
+               match e1 with
+               | Ecase _ ces => S (S (size_list (size_prod size size_exp) ces))
+               | Eproj _ _ _ _ e2 => S (S (S (S (S (size_exp e2)))))
+               | Eletapp _ _ _ ys e2 => S (S (S (S (size ys + size_exp e2))))
+               | Efun fds e2 => S (size_fundefs fds + size_exp e2)
+               | Eapp _ _ xs => S (S (S (size xs)))
+               | Eprim_val _ _ e2 => S (S (S (size_exp e2)))
+               | Econstr _ _ ys e2 | Eprim _ _ ys e2 => S (S (S (size ys + size_exp e2)))
+               | Ehalt x => S (size x)
+               end
+               with size_fundefs (fds : fundefs) : nat :=
+                 match fds with
+                 | Fcons _ _ xs e1 fds0 => S (S (S (size xs + size_exp e1 + size_fundefs fds0)))
+                 | Fnil => 1
+                 end
+                   for
+                   size_exp) e0) with (size e0). cbn. lia.
+  - cbn in *.
+    change ((fix size_exp (e1 : exp) : nat :=
+               match e1 with
+               | Ecase _ ces => S (S (size_list (size_prod size size_exp) ces))
+               | Eproj _ _ _ _ e2 => S (S (S (S (S (size_exp e2)))))
+               | Eletapp _ _ _ ys e2 => S (S (S (S (size ys + size_exp e2))))
+               | Efun fds e2 => S (size_fundefs fds + size_exp e2)
+               | Eapp _ _ xs => S (S (S (size xs)))
+               | Eprim_val _ _ e2 => S (S (S (size_exp e2)))
+               | Econstr _ _ ys e2 | Eprim _ _ ys e2 => S (S (S (size ys + size_exp e2)))
+               | Ehalt x => S (size x)
+               end
+               with size_fundefs (fds : fundefs) : nat :=
+                 match fds with
+                 | Fcons _ _ xs e1 fds0 => S (S (S (size xs + size_exp e1 + size_fundefs fds0)))
+                 | Fnil => 1
+                 end
+                   for
+                   size_fundefs) f) with (size f). cbn. lia.
 Defined.
 
 Set Extraction Flag 2031. (* default + linear let + linear beta *)

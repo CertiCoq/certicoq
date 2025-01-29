@@ -340,7 +340,7 @@ Section Post.
 
           * congruence.
 
-          * rewrite !app_length. simpl. congruence. 
+          * rewrite !length_app. simpl. congruence. 
 
           * congruence.
           * eassumption.
@@ -701,8 +701,8 @@ Section Post.
         rewrite IHxs; eauto. reflexivity. 
         intros Hc. now eapply in_rev in Hc; eauto. 
         intros Hc. now eapply in_rev in Hc; eauto.
-        rewrite !rev_length. congruence.
-        rewrite !rev_length. congruence.
+        rewrite !length_rev. congruence.
+        rewrite !length_rev. congruence.
     Qed.        
     
     Ltac inv_setminus :=
@@ -1389,7 +1389,7 @@ Section Post.
                   rewrite <- extend_lst_rev.
                   eapply IH; try eassumption. reflexivity. reflexivity.
                   
-                  - eapply NoDup_app; eauto.
+                  - eapply List_util.NoDup_app; eauto.
                     now eapply NoDup_rev; eauto. 
                     
                     eapply Disjoint_sym. rewrite FromList_rev.
@@ -1518,7 +1518,7 @@ Section Post.
                     - eassumption. 
                     - inv Hdup2. eassumption.
                     - inv Hdup3. eassumption.
-                    - apply NoDup_app. eassumption.
+                    - apply List_util.NoDup_app. eassumption.
                       constructor. intros Hc. now inv Hc. now constructor.
                       repeat normalize_sets. sets.
                     - inv Hnd5. eassumption.                      
@@ -1528,7 +1528,7 @@ Section Post.
                     - repeat normalize_sets. xsets.
                     - congruence.
                     - congruence.
-                    - rewrite !app_length. simpl. congruence.
+                    - rewrite !length_app. simpl. congruence.
                     - repeat normalize_sets. eapply Disjoint_Included_r.
                       eapply cps_cvt_exp_subset. eassumption. repeat normalize_sets. xsets.
                       
@@ -1713,7 +1713,7 @@ Section Post.
               + repeat normalize_sets. inv H6. intros Hc. inv Hc.
                 * inv H6. eauto.
                 * eapply Hdis1. now sets.
-              + simpl. rewrite !app_length, !rev_length. congruence.
+              + simpl. rewrite !length_app, !length_rev. congruence.
               + repeat normalize_sets.
                 eapply Union_Disjoint_l; sets.
                 eapply Union_Disjoint_l; sets.
@@ -1735,7 +1735,7 @@ Section Post.
                   - inv H12. intros Hc. eapply Hdis2. rewrite FromList_rev. 
                     eapply in_app_or in Hc. inv Hc; eauto.
                     eapply in_rev in H12; eauto.
-                  - rewrite !app_length. rewrite !rev_length. congruence. }
+                  - rewrite !length_app. rewrite !length_rev. congruence. }
                 
                 rewrite Hfeq. 
                 
@@ -1757,20 +1757,20 @@ Section Post.
 
                   rewrite extend_lst_app.
                   
-                  eapply f_eq_subdomain_extend_lst. rewrite !rev_length.  eassumption.
+                  eapply f_eq_subdomain_extend_lst. rewrite !length_rev.  eassumption.
                   eapply f_eq_subdomain_extend_lst. eassumption.
                   
                   
                   assert (Hfeq' : (x |: (x0 |: (FromList (rev (all_fun_name B1)) :|: FromList vars1')) \\ [set x] \\ [set x0] \\
                                      FromList (rev (all_fun_name B1)) \\ FromList vars1') <--> Empty_set _) by xsets.
-                  rewrite Hfeq'. intros z Hinz. now inv Hinz. rewrite !rev_length. eassumption. 
+                  rewrite Hfeq'. intros z Hinz. now inv Hinz. rewrite !length_rev. eassumption. 
                   
                 * intros Hc. eapply image_extend_lst_Included in Hc; eauto.
                   rewrite image_id in Hc. inv Hc; eauto. inv H9; eauto. inv H15; eauto. 
                   inv H9; eauto. inv H15; eauto. repeat normalize_sets. now inv H9; eauto.
 
                   repeat normalize_sets. eapply Hdis2. now sets.
-                  rewrite !app_length, !rev_length. congruence.
+                  rewrite !length_app, !length_rev. congruence.
                   
                 * intros Hc. eapply image_extend_Included' in Hc.
                   inv H12. inv Hc; eauto.
@@ -1784,7 +1784,7 @@ Section Post.
                   
                   rewrite Heq in H12. repeat normalize_sets.
                   now eapply Hdis2; eauto.
-                  rewrite !app_length, !rev_length. congruence. } 
+                  rewrite !length_app, !length_rev. congruence. } 
           
       - (* brnil_e *)
         intros bs1 bs2 m k1 k2 vars1 vars2 x1 x2 rho1 rho2
@@ -1832,12 +1832,12 @@ Section Post.
 
             -- intros. eapply IHe; try eassumption. lia.
                
-               ++ eapply NoDup_app; eauto.
+               ++ eapply List_util.NoDup_app; eauto.
                   eapply Disjoint_Included_l. eassumption. sets.
                   
                ++ repeat normalize_sets.
                   intros Hc. inv Hc; eauto. eapply Hdis1. now eauto.
-               ++ rewrite !app_length. congruence.
+               ++ rewrite !length_app. congruence.
                ++ eapply cps_cvt_rel_subset in H16.
                   repeat normalize_sets.
                   eapply Union_Disjoint_l; sets.
@@ -2161,11 +2161,11 @@ Section Post.
         + eassumption.
         + constructor; eauto.
           intros Hc. eapply in_app_or in Hc. inv Hc; eauto. now eapply in_rev in H0; eauto.
-          eapply NoDup_app; eauto. eapply NoDup_rev. eassumption.
+          eapply List_util.NoDup_app; eauto. eapply NoDup_rev. eassumption.
           rewrite FromList_rev. sets.
         + repeat normalize_sets. intros Hc; inv Hc; eauto.
           inv H0; eauto. rewrite FromList_rev in H0. eauto.
-        + simpl. rewrite !app_length, !rev_length. congruence.
+        + simpl. rewrite !length_app, !length_rev. congruence.
         + repeat normalize_sets.
           eapply Union_Disjoint_l; sets. 
           eapply Union_Disjoint_l; sets.
@@ -2206,7 +2206,7 @@ Section Post.
             eapply Forall_impl; [ | eassumption ]. simpl. intros.
             eapply preord_val_monotonic. eapply H26. eassumption. eassumption. lia.            
 
-          * rewrite !rev_length. eassumption. 
+          * rewrite !length_rev. eassumption. 
             
           * intros Hc. eapply image_extend_lst_Included in Hc. repeat normalize_sets. rewrite image_id in Hc.
             rewrite !FromList_rev in Hc. 
@@ -2214,7 +2214,7 @@ Section Post.
                               (FromList (all_fun_name Bs) :|: FromList names) <--> Empty_set _) by xsets.
             rewrite Hseq in Hc. repeat normalize_sets.
             now inv Hc; eauto.
-            rewrite !app_length, !rev_length. congruence. 
+            rewrite !length_app, !length_rev. congruence. 
 
           * intros Hc. eapply image_extend_Included' in Hc.
             inv Hc; eauto. eapply image_extend_lst_Included in H0. repeat normalize_sets. rewrite image_id in H0.
@@ -2223,7 +2223,7 @@ Section Post.
                               (FromList (all_fun_name Bs) :|: FromList names) <--> Empty_set _) by xsets.
             rewrite Hseq in H0. repeat normalize_sets.
             now inv H0; eauto. 
-            rewrite !app_length, !rev_length. congruence.
+            rewrite !length_app, !length_rev. congruence.
             inv H0; eauto.
             
           * intros Hc; subst; eauto.
@@ -2234,7 +2234,7 @@ Section Post.
 
           * intros Hc. eapply in_app_or in Hc. inv Hc; eauto. eapply in_rev in H0; eauto.
 
-          * rewrite !app_length, !rev_length. congruence.
+          * rewrite !length_app, !length_rev. congruence.
     Qed.
 
 

@@ -444,7 +444,7 @@ Proof.
     eassumption.
     rewrite <- HP in Hnd.
     eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
+    rewrite length_app.
     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2;
       [| now apply Setminus_Included ].
     eapply Same_set_FromList_length in Hin1.
@@ -460,7 +460,7 @@ Proof.
     eassumption.
     rewrite <- HP in Hnd.
     eapply Permutation_length in HP. rewrite <- HP.
-    rewrite !app_length.
+    rewrite !length_app.
     eapply IHe in Hin1. eapply IHl in Hin2. simpl in *. lia.
     eapply NoDup_cons_r; eauto. 
     eapply NoDup_cons_l; eauto.
@@ -469,7 +469,7 @@ Proof.
     eassumption.
     rewrite <- HP in Hnd.
     eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
+    rewrite length_app.
     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2;
       [| now apply Setminus_Included ].
     rewrite <- (Union_Empty_set_neut_r [set v0]) in Hin1.
@@ -482,7 +482,7 @@ Proof.
     eassumption.
     rewrite <- HP in Hnd.
     eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
+    rewrite length_app.
     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set x])) in Hin2;
       [| now apply Setminus_Included ].
     rewrite <- FromList_cons in Hin1.
@@ -494,7 +494,7 @@ Proof.
     eassumption.
     rewrite <- HP in Hnd.
     eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
+    rewrite length_app.
     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) _)) in Hin2;
       [| now apply Setminus_Included ].
     eapply IHb in Hin1. eapply IHe in Hin2. lia.
@@ -504,7 +504,7 @@ Proof.
     eassumption. rewrite <- HP in Hnd.
     eapply Same_set_FromList_length in Hin1; eauto.
     eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
+    rewrite length_app.
     rewrite <- (Union_Empty_set_neut_r [set v]) in Hin2.
     rewrite <- FromList_nil, <- FromList_cons in Hin2.
     eapply Same_set_FromList_length in Hin2.
@@ -519,7 +519,7 @@ Proof.
     eassumption.
     rewrite <- HP in Hnd.
     eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
+    rewrite length_app.
     eapply (Included_trans (FromList l2) (Setminus var (occurs_free e) [set v])) in Hin2;
       [| now apply Setminus_Included ].
     eapply Same_set_FromList_length in Hin1.
@@ -532,7 +532,7 @@ Proof.
   - edestruct (@FromList_Union_split var) as [l1 [l2 [HP [Hin1 Hin2]]]].
     eassumption. rewrite <- HP in Hnd.
     eapply Permutation_length in HP. rewrite <- HP.
-    rewrite app_length.
+    rewrite length_app.
     eapply (Included_trans (FromList l2) (Setminus var _ [set v])) in Hin2;
       [| now apply Setminus_Included ].
     eapply (Included_trans (FromList l1) (Setminus var _ _)) in Hin1;

@@ -47,4 +47,6 @@ CertiCoqC Eval demo2. *)
 
 (* Time CertiCoqC Compile -build_dir "tests" -time -O 1 demo1. *)
 
+Require Import Coq.Strings.PrimString.
+
 Time CertiCoqC Compile -build_dir "tests" -time -O 1 certicoqc.

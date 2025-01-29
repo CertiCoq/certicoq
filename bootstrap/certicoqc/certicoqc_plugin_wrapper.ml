@@ -79,6 +79,7 @@ let fix_term (p : Ast0.term) : Ast0.term =
   | Coq_tCoFix (mfix, i) -> Coq_tCoFix (map aux_def mfix, i)
   | Coq_tInt i -> Coq_tInt i
   | Coq_tFloat f -> Coq_tFloat f
+  | Coq_tString f -> Coq_tString f
   | Coq_tArray (u, v, def, ty) -> Coq_tArray (u, map aux v, aux def, aux ty)
   and aux_pred { puinst = puinst; pparams = pparams; pcontext = pcontext; preturn = preturn } =
     { puinst; pparams = map aux pparams; pcontext; preturn = aux preturn }

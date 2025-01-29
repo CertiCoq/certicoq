@@ -23,6 +23,8 @@ BinNat
 BinInt
 PrimInt63
 Uint0
+PrimString
+PrimStringAxioms
 Int0
 Int63
 Byte

@@ -862,7 +862,7 @@ Section Hoisting_correct.
         * eapply preord_env_P_antimon;
             [| eapply occurs_free_in_fun; eapply find_def_correct; eauto ].
           eapply preord_env_P_set_lists_l with (P1 := name_in_fundefs B :|: occurs_free_fundefs B);
-            try now eauto.
+            try solve [eauto].
           2:{ intros z Hnin Hinz. inv Hinz; eauto. contradiction. }
           clear Hs3 Hs4. 
           (* eapply IHk to show that inner def_funs are related *)
@@ -873,7 +873,7 @@ Section Hoisting_correct.
               inv Hinz. 
               setoid_rewrite def_funs_eq; eauto.
               eexists; split; eauto.
-              
+
               
               edestruct Henv as [v2 [Hget2 Hv2]]; eauto. constructor; eauto.
               rewrite Hfuns in Hget2. inv Hget2; eauto.

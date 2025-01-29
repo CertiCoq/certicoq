@@ -20,6 +20,9 @@ Require Import ExtrOcamlBasic ExtrOCamlFloats ExtrOCamlInt63 ExtrOCamlPString.
 Require Import Coq.extraction.Extraction.
 Require Import ZArith NArith.
 
+Extraction Inline Program.Wf.Fix_F_sub.
+Extraction Inline Program.Wf.Fix_sub.
+
 (* Coqlib *)
 Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
 

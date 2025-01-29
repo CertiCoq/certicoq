@@ -483,10 +483,6 @@ extraction/zArith_dec.ml
 extraction/zArith_dec.mli
 extraction/zbits.ml
 extraction/zbits.mli
-extraction/zbool.ml
-extraction/zbool.mli
-extraction/zeven.ml
-extraction/zeven.mli
 extraction/zpower.ml
 extraction/zpower.mli
 

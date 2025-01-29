@@ -86,12 +86,12 @@ Set Warnings "-extraction-opaque-accessed".
 
 Set Extraction Output Directory ".".
 
-Extraction Library Zeven.
-Extraction Library Zeven.
-Extraction Library ZArith_dec.
-Extraction Library Sumbool.
-Extraction Library Zbool.
-Extraction Library SpecFloat.
+(* Extraction Library Zeven. *)
+(* Extraction Library Zeven. *)
+(* Extraction Library ZArith_dec. *)
+(* Extraction Library Sumbool. *)
+(* Extraction Library Zbool. *)
+(* Extraction Library SpecFloat. *)
 Separate Extraction FloatOps.Prim2SF.
 
 Cd "Extraction".

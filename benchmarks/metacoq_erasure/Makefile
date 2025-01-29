@@ -1,4 +1,4 @@
-PKGS = -package coq-core,coq-core.plugins.ltac,coq-metacoq-template-ocaml,coq-certicoqc
+PKGS = -package rocq-runtime,rocq-runtime.plugins.ltac,coq-metacoq-template-ocaml,coq-certicoqc
 LINKOPTS = -linkpkg -dontlink str,unix,dynlink,threads,zarith
 OCAMLOPTS = -open Metacoq_template_plugin -I . -thread -rectypes -w +a-4-9-27-41-42-44-45-48-58-67-68   -safe-string -strict-sequence -w -33  -w -34  -w -32  -w -39  -w -20  -w -60  -w -8
 GENCFILES = glue.CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.metacoq_erasure.c \

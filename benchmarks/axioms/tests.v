@@ -33,7 +33,6 @@ CertiRocq Compile print_lst
 Extract Constants [ print_nat => "print_gallina_nat", print_str => "print_gallina_string", new_line => "print_new_line" ]
 Include [ "print.h" ].
 
-
 (* Example 2: int 63 *)
 
 Axiom (int63 : Type).
@@ -85,3 +84,6 @@ Definition list_sum_int63_tinfo :=
 CertiRocq Compile list_sum_int63_tinfo
 Extract Constants [ add_int63 => "add_int63" with tinfo, zero_int63 => "zero_int63", one_int63 => "one_int63", print_int63 => "print_int63" with tinfo, new_line => "print_new_line" ]
 Include [ "int63_tinfo.h" ].
+
+
+CertiRocq Generate Glue -file "glue" [ nat, bool, String ].

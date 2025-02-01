@@ -1,39 +1,43 @@
 COQOPTS = -R ./ CertiCoq.Benchmarks -R ../lib CertiCoq.Benchmarks.lib
 CCOMPILER=gcc
+INCLUDE=../../runtime
 
-default: copy tests print_lst
+# Names of the tests
+TESTS=print_lst fibn list_sum_int63 list_sum_int63_tinfo
+# Names of the generated C files
+CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%.c, $(TESTS)) glue.c
 
-.PHONY: default clean tests print_lst
+default: exec
 
-copy:
-	cp ../../theories/Runtime/gc.c ./
-	cp ../../theories/Runtime/gc.h ./
-	cp ../../theories/Runtime/gc_stack.c ./
-	cp ../../theories/Runtime/gc_stack.h ./
-	cp ../../theories/Runtime/values.h ./
-	cp ../../theories/Runtime/main.c ./
-	cp ../../theories/Runtime/config.h ./
+.PHONY: compile exec clean
 
 clean:
-	rm -f ./gc.c
-	rm -f ./gc.h
-	rm -f ./gc_stack.c
-	rm -f ./gc_stack.h
-	rm -f ./values.h
-	rm -f ./main.c
-	rm -f ./config.h
 	rm -f ./*.*.c
 	rm -f ./*.*.h
 	rm -f ./glue.*.*.c
 	rm -f ./glue.*.*.h
 	rm -f ./*.vo
+	rm -f ./*.vok
+	rm -f ./*.vos
 	rm -f ./*.glob
+	rm -f $(TESTS)
+	rm -f glue.*
 
-tests: tests.v
+compile: tests.v
 	coqc $(COQOPTS) tests.v
 
-print_lst:
-	$(CCOMPILER) -o print_lst -Wno-everything -O2 -fomit-frame-pointer main.c gc_stack.c CertiCoq.Benchmarks.tests.print_lst.c glue.CertiCoq.Benchmarks.tests.print_lst.c print.c
-	$(CCOMPILER) -o fibn -Wno-everything -O2 -fomit-frame-pointer main.c gc_stack.c CertiCoq.Benchmarks.tests.fibn.c glue.CertiCoq.Benchmarks.tests.fibn.c int63.c
-	$(CCOMPILER) -o list_sum_int63 -Wno-everything -O2 -fomit-frame-pointer main.c gc_stack.c CertiCoq.Benchmarks.tests.list_sum_int63.c glue.CertiCoq.Benchmarks.tests.list_sum_int63.c int63.c
-	$(CCOMPILER) -o list_sum_int63_tinfo -Wno-everything -O2 -fomit-frame-pointer main.c gc_stack.c CertiCoq.Benchmarks.tests.list_sum_int63_tinfo.c glue.CertiCoq.Benchmarks.tests.list_sum_int63_tinfo.c int63_tinfo.c
+$(CFILES): compile
+
+fibn: CertiCoq.Benchmarks.tests.fibn.c glue.c int63.c
+	$(CCOMPILER) -o $@ -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.fibn.c glue.c int63.c
+
+print_lst: CertiCoq.Benchmarks.tests.print_lst.c glue.c print.c
+	$(CCOMPILER) -o $@ -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.print_lst.c glue.c print.c
+
+list_sum_int63: CertiCoq.Benchmarks.tests.list_sum_int63.c glue.c int63.c
+	$(CCOMPILER) -o $@ -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.list_sum_int63.c glue.c int63.c
+
+list_sum_int63_tinfo: CertiCoq.Benchmarks.tests.list_sum_int63_tinfo.c glue.c int63_tinfo.c
+	$(CCOMPILER) -o $@ -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.list_sum_int63_tinfo.c glue.c int63_tinfo.c
+
+exec: $(TESTS)

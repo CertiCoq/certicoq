@@ -1,8 +1,6 @@
 From CertiCoq.Plugin Require Import CertiCoq.
 
 Require Import Arith PArith List String Ascii.
-Require Import ExtLib.Data.String.
-
 Import ListNotations. 
 
 (* Example 1: printing axioms *)
@@ -32,7 +30,6 @@ Definition print_lst := print_list [1;2;3;4;5].
 CertiCoq Compile print_lst
 Extract Constants [ print_nat => "print_gallina_nat", print_str => "print_gallina_string", new_line => "print_new_line" ]
 Include [ "print.h" ].
-
 
 (* Example 2: int 63 *)
 
@@ -85,3 +82,6 @@ Definition list_sum_int63_tinfo :=
 CertiCoq Compile list_sum_int63_tinfo
 Extract Constants [ add_int63 => "add_int63" with tinfo, zero_int63 => "zero_int63", one_int63 => "one_int63", print_int63 => "print_int63" with tinfo, new_line => "print_new_line" ]
 Include [ "int63_tinfo.h" ].
+
+
+CertiCoq Generate Glue -file "glue" [ nat, bool, String ].

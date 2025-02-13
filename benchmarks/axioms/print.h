@@ -1,3 +1,4 @@
+#include "glue.h"
 
 extern void print_gallina_nat(value);
 

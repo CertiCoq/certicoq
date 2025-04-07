@@ -81,3 +81,5 @@ CertiRocq FFI IO_Impl.
 CertiRocq FFI StringFFI.
 CertiRocq FFI HashFFI.
 CertiRocq Compile -cps prog.
+
+CertiRocq Generate Glue -file "prog_glue" [ nat, bool, String, unit, option ].

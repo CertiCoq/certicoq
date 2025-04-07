@@ -195,7 +195,7 @@ Qed.
 
 Theorem smg_trans: forall t, Transitive (map_get_r t).
 Proof.
- intros t sub sub' sub''.  unfold map_get_r. intros. specialize (H v). specialize (H0 v). rewrite H. assumption.
+ intros t sub sub' sub''.  unfold map_getd_r. intros. specialize (H v). specialize (H0 v). rewrite H. assumption.
 Qed.
 
 

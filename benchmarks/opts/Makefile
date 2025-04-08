@@ -1,4 +1,4 @@
-COQOPTS = -R ./ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
+COQOPTS = -R ./ CertiCoq.Benchmarks -R ../lib CertiCoq.Benchmarks.lib
 CCOMPILER=gcc
 
 # Names of the benchmarks
@@ -6,8 +6,9 @@ TESTS=$(shell cat TESTS)
 # Names of the generated cfiles
 CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, CertiCoq.Benchmarks.tests.%.c, $(TESTS))
 # Names of the generated executables
-EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS)) $(patsubst %, %_cps_opt, $(TESTS)) $(patsubst %, %_opt, $(TESTS))
-INCLUDE=../runtime
+EXEC=$(TESTS) $(patsubst %, %_opt, $(TESTS)) $(patsubst %, %_opt_ll, $(TESTS))
+
+INCLUDE=../../runtime
 
 all: lib tests exec run
 default: exec run
@@ -35,22 +36,22 @@ cleanexec:
 	rm -f $(EXEC)
 
 lib/Makefile:
-	cd lib; coq_makefile -f _CoqProject -o Makefile
+	cd ../lib; coq_makefile -f _CoqProject -o Makefile
 
 lib: lib/Makefile
-	$(MAKE) -C lib
+	$(MAKE) -C ../lib
 
 cleanlib:
-	$(MAKE) clean -C lib
+	$(MAKE) clean -C ../lib
 
 tests: tests.v
 	coqc $(COQOPTS) tests.v
 
 ## Compile with the default C compiler
 $(TESTS): $(CFILES)
-	$(CCOMPILER) -o $@ 			-w -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) $@_main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue_$@.c
-	$(CCOMPILER) -o $@_opt 		-w -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) $@_main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.$@_opt.c glue_$@.c
-	$(CCOMPILER) -o $@_opt_ll 	-w -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) $@_main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.$@_opt_ll.c glue_$@.c
+	$(CCOMPILER) -o $@ -w -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) $@_main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.$@.c glue_$@.c
+	$(CCOMPILER) -o $@_opt -w -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) $@_main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.$@_opt.c glue_$@.c
+	$(CCOMPILER) -o $@_opt_ll -w -Wno-everything -O2 -fomit-frame-pointer -I$(INCLUDE) $@_main.c $(INCLUDE)/gc_stack.c CertiCoq.Benchmarks.tests.$@_opt_ll.c glue_$@.c
 	# ccomp -o $@_ccomp -O2 $@$@_.c__
 	# $(CCOMPILER) -o $@_cps -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps.c glue_$@_cps.c
 	# $(CCOMPILER) -o $@_cps_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt.c glue_$@_cps.c

@@ -965,9 +965,9 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let gc_stack_o = make_rt_file "gc_stack.o" in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
     let packages = ["coq-core"; "coq-core.plugins.ltac"; "coq-metacoq-template-ocaml"; 
-      "coq-core.interp"; "coq-core.kernel"; "coq-core.library"] in
+      "coq-core.interp"; "coq-core.kernel"; "coq-core.library"; "coq-certicoq-vanilla.plugin"] in
     let pkgs = String.concat "," packages in
-    let dontlink = "str,unix,dynlink,threads,zarith,coq-core,coq-core.plugins.ltac,coq-core.interp" in
+    let dontlink = "str,unix,dynlink,threads,zarith,coq-core,coq-core.plugins.ltac,coq-core.interp,coq-certicoq-vanilla.plugin" in
     let () = ignore (execute cmd) in
     let shared_lib = make_fname opts opts.filename ^ suff ^ ".cmxs" in
     let linkcmd =

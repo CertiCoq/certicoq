@@ -141,3 +141,6 @@ bootstrap/certicoqc/tests/test.demo1.h
 plugin/.filestoinstall
 cplugin/.merlin
 result
+CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.metacoq_erasure.c
+benchmarks/metacoq_erasure/Makefile
+CertiCoq.Benchmarks.metacoq_erasure.metacoq_erasure.metacoq_erasure.h

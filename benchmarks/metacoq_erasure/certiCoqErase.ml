@@ -34,7 +34,7 @@ let fix_set u =
   block
 
 let fix_universe u =
-  let open Universe in
+  let open Universes0.Sort in
   let proof_obj = Obj.magic 1 in
   let fix_ues ues : Obj.t = 
     let block = Obj.new_block 0 2 in
@@ -50,9 +50,9 @@ let fix_universe u =
     block
   in
   match u with 
-  | Coq_lProp -> Coq_lProp
-  | Coq_lSProp -> Coq_lSProp
-  | Coq_lType neues -> Coq_lType (Obj.magic (fix_neues neues))
+  | Coq_sProp -> Coq_sProp
+  | Coq_sSProp -> Coq_sSProp
+  | Coq_sType neues -> Coq_sType (Obj.magic (fix_neues neues))
 
 let fix_term (p : Ast0.term) : Ast0.term =
   let open List in

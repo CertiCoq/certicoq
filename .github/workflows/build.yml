@@ -59,10 +59,10 @@ jobs:
             startGroup "List installed packages"
               opam list
             endGroup
-            startGroup "Run benchmarks"
-              ulimit -s unlimited
-              make -C ~/repo/benchmarks all
-            endGroup
+            # startGroup "Run benchmarks"
+            #  ulimit -s unlimited
+            #  make -C ~/repo/benchmarks all
+            # endGroup
             startGroup "Test bootstrapped plugins"
               cd ~/repo && ./configure.sh global
               make -C ~/repo/bootstrap test

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "gc.h"
+#include <gc_stack.h>
 #include <caml/memory.h>
 #include <time.h>
 #include <caml/mlvalues.h>
@@ -11,10 +11,6 @@ extern value body(struct thread_info *);
 extern value args[];
 
 extern value *call(struct thread_info *, value, value);
-
-_Bool is_ptr(value s) {
-  return (_Bool) Is_block(s);
-}
 
 CAMLprim value certicoq_erase(value prog) {
   CAMLparam1 (prog);

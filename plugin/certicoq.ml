@@ -138,7 +138,7 @@ let get_global_inductives_mapping () = !global_inductive_registers
 type certicoq_run_function = unit -> Obj.t
 
 let certicoq_run_functions = 
-  Summary.ref ~name:"CertiCoq Run Functions Table" 
+  Summary.ref ~name:"CertiCoq Run Functions Table" ~local:true
     (CString.Map.empty : certicoq_run_function CString.Map.t)
 
 let certicoq_run_functions_name = "certicoq-run-functions-registration"
@@ -153,9 +153,8 @@ let cache_certicoq_run_function (s, s', fn) =
 let certicoq_run_function_input = 
   let open Libobject in
   declare_object 
-    (global_object_nodischarge certicoq_run_functions_name
-    ~cache:(fun r -> cache_certicoq_run_function r)
-    ~subst:None)
+    (local_object_nodischarge certicoq_run_functions_name
+    ~cache:(fun r -> cache_certicoq_run_function r))
 
 let register_certicoq_run s s' fn =
   Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certicoq_run");

@@ -28,7 +28,7 @@ To add a new benchmark
 1) Go to tests.v and add your benchmark program at the end of the file. The
    top-level definition that is compiled should be defined in the file tests.v
    (not just imported). Write command to compile both the LambdaANF and ANF versions
-   (otherwise the bencmarking automation will not work.
+   (otherwise the benchmarking automation will not work.
 
 2) Create a file named <benchmark_name>_main.c to run the benchmark and print
    the result

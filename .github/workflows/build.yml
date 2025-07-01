@@ -32,10 +32,23 @@ jobs:
             startGroup "fix permission issues"
               sudo chown -R coq:coq .
             endGroup
-            # startGroup "opam pin"
+
+            startGroup "opam pin"
+              # TODO: this should be done in the Dockerfile
+              opam pin add coq-compcert 3.14 -y
             #   opam pin -n -y submodules/metacoq
-            # endGroup
+            endGroup
           before_script: |
+            startGroup "Install more dependencies"
+              # TODO: install node with apt once a more recent version is available for debian. We need at least version 22.
+              sudo apt-get install --yes wabt
+              # install node via https://github.com/nvm-sh/nvm
+              curl https://raw.githubusercontent.com/nvm-sh/nvm/master/install.sh | bash
+              export NVM_DIR="$HOME/.nvm"
+              [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+              nvm install 22.1.0
+              node --version
+            endGroup
             startGroup "fix permission issues"
               sudo chown -R coq:coq .
             endGroup
@@ -47,6 +60,7 @@ jobs:
               opam list
             endGroup
             startGroup "Run benchmarks"
+              ulimit -s unlimited
               make -C ~/repo/benchmarks all
             endGroup
             startGroup "Test bootstrapped plugins"

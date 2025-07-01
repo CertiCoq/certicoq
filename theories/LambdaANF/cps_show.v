@@ -9,7 +9,7 @@ Require Import ExtLib.Data.Positive.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
-From MetaRocq.Utils Require Import bytestring MCString. (* For identifier names *)
+From MetaRocq.Utils Require Import bytestring MRString. (* For identifier names *)
 From MetaRocq.Common Require Import BasicAst Primitive. (* For identifier names *)
 From MetaRocq.PCUIC Require Import PCUICPrimitive. (* For identifier names *)
 Require Import Common.AstCommon.

@@ -25,7 +25,7 @@ Require Import LambdaANF.cps
                LambdaANF.cps_show.
 Require LambdaANF.toplevel.
 
-From MetaRocq.Utils Require Import bytestring MCString.
+From MetaRocq.Utils Require Import bytestring MRString.
 
 Section TRANSLATION.
 
@@ -1390,7 +1390,7 @@ Fixpoint make_argList' (n : nat) (nenv : name_env) : nState (name_env * list (id
   | 0 => ret (nenv, nil)
   | (S n') =>
     new_id <- getName;;
-           let new_name := String.append "arg" (MCString.string_of_nat n') in
+           let new_name := String.append "arg" (MRString.string_of_nat n') in
            let nenv := M.set new_id (nNamed new_name) nenv in
            rest <- make_argList' n' nenv;;
                 let (nenv, rest_id) := rest in
@@ -1762,7 +1762,7 @@ Definition make_call_n_export_b
     let body_s := Ssequence
                     (tinfo_s ;;; asgn_s)
                     (export_s ;;; Sreturn  (Some (Etempvar retIdent valPtr))) in
-    let callStr := append "call_" (MCString.string_of_nat n) in
+    let callStr := append "call_" (MRString.string_of_nat n) in
     let callStr := if export then append callStr "_export" else callStr in
     let nenv :=
       set_list ((env_ident, nNamed "envi"%bs) ::

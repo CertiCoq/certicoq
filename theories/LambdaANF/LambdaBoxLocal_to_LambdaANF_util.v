@@ -1511,7 +1511,7 @@ Section Post.
                     eapply preord_exp_monotonic.
                     eapply preord_exp_post_monotonic. eapply HinclG. 
                     edestruct (H j) as (_ & Hexps & _ & _ ). lia.
-                    (* rewrite <- MCList.app_tip_assoc in H11, H13. inv Hdup2. *)
+                    (* rewrite <- MRList.app_tip_assoc in H11, H13. inv Hdup2. *)
                     (* repeat normalize_sets. *)
                     eapply Hexps with (k1 := k1) (k2 := k2) (ys1 := ys1 ++ [x1]) (ys2 := ys2 ++ [x0]);
                       [ reflexivity | eassumption | eassumption | | | | | | | | | | | | | | | | | | ].
@@ -1552,7 +1552,7 @@ Section Post.
                       eapply Disjoint_Included; [ | | eapply Hdis5 ]; sets.
                     - repeat normalize_sets.
                       eapply Disjoint_Included; [ | | eapply Hdis6 ]; sets.
-                    - intros. eapply Hhyp. rewrite !MCList.app_tip_assoc in H1.
+                    - intros. eapply Hhyp. rewrite !MRList.app_tip_assoc in H1.
                       eassumption.
                     - simpl. rewrite !extend_lst_app; eauto. simpl.
                       rewrite extend_extend_lst_commut.

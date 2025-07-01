@@ -32,7 +32,7 @@ Require Import
   LambdaANF.state
   LambdaANF.toplevel.
 
-From MetaRocq.Utils Require Import bytestring MCString.
+From MetaRocq.Utils Require Import bytestring MRString.
 Section TRANSLATION.
 
 (* Stand-in for arbitrary identifiers *)
@@ -1331,7 +1331,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
                | Some (n, l) =>
                  "Definition " ++ get_fname f nenv ++ " has tag " ++ (show_pos t) ++ Pipeline_utils.newline ++
                  "Def: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++
-                 MCString.string_of_nat (length l)
+                 MRString.string_of_nat (length l)
                | None =>
                  "Def: Function " ++ get_fname f nenv ++ " was not found in fun_env"
                end
@@ -1351,7 +1351,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
           match M.get t fenv with
           | Some (n, l) =>
             "LetApp: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ 
-            (MCString.string_of_nat (length l))
+            (MRString.string_of_nat (length l))
           | None =>
             "LetApp: Function " ++ get_fname f nenv ++ " was not found in fun_env"
           end
@@ -1366,7 +1366,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
           match M.get t fenv with
           | Some (n, l) =>
             "App: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ 
-            MCString.string_of_nat (length l)
+            MRString.string_of_nat (length l)
           | None =>
             "App: Function " ++ get_fname f nenv ++ " was not found in fun_env"
           end

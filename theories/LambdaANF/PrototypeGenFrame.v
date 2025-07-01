@@ -8,7 +8,7 @@ Require Import Coq.Lists.List.
 Import ListNotations.
 
 From MetaRocq Require Import Template.All.
-Import MCMonadNotation.
+Import MRMonadNotation.
 Module TM :=MetaRocq.Utils.monad_utils.
 
 From ExtLib.Core Require Import RelDec.

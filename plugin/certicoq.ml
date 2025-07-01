@@ -644,7 +644,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let check_reifyable env sigma ty =
     (* We might have bound universes though. It's fine! *)
     try let (hd, u), args = Inductiveops.find_inductive env sigma ty in
-      IsInductive (hd, EConstr.EInstance.kind sigma u, args)
+      IsInductive (hd, EConstr.EInstance.kind sigma u, List.map (EConstr.to_constr sigma) args)
     with Not_found -> 
       let hnf = Reductionops.whd_all env sigma ty in
       let hd, args = EConstr.decompose_app sigma hnf in
@@ -718,7 +718,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       let spec = lookup_mind_specif env hd in
       let npars = inductive_params spec in
       let params, _indices = CList.chop npars args in
-      let indfam = make_ind_family ((hd, u), params) in
+      let indfam = make_ind_family ((hd, EConstr.EInstance.make u), List.map (EConstr.of_constr) params) in
       let cstrs = get_constructors env indfam in
       let cstrs = apply_reordering qhd im cstrs in
       if Obj.is_block v then
@@ -730,7 +730,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
         in
         let cstr = cstrs.(coqidx) in
         let coqidx = find_reverse_mapping qhd im coqidx in
-        let ctx = Vars.smash_rel_context cstr.cs_args in
+        let ctx = Vars.smash_rel_context (EConstr.to_rel_context sigma cstr.cs_args) in
         let vargs = List.init (List.length ctx) (Obj.field v) in
         let args' = List.map2 (fun decl v -> 
           let argty = check_reifyable env sigma 

@@ -886,7 +886,7 @@ Section CC_correct.
           rewrite M.gso; eauto. eapply Hget. repeat split; eauto.
           rewrite <- Hnth. now eauto.
         * subst. rewrite Hnth in Hn. eapply nthN_is_Some_length in Hnth.
-          rewrite app_length in Hnth. simpl length in *.
+          rewrite length_app in Hnth. simpl length in *.
           destruct (N - N.of_nat (length FVs))%N eqn:Heq; simpl in Hn; try congruence.
           inv Hn. rewrite M.gss; eauto.
           repeat f_equal. zify. lia. 
@@ -999,7 +999,7 @@ Section CC_correct.
         induction fv as [|v fv IHfv]; intros n vars FVmap_i Hlen Hinv Hb Hb' Hnin Hdis Hdup.
         * simpl. rewrite app_nil_r. eauto.
         * simpl. replace (vars ++ v :: fv) with ((vars ++ [v]) ++ fv). simpl.
-          eapply IHfv. rewrite app_length. simpl. zify. lia.
+          eapply IHfv. rewrite length_app. simpl. zify. lia.
           eapply FVmap_inv_set_free_var. now eauto. eassumption. 
           now intros Hc; inv Hc. now intros Hc; inv Hc. 
           { normalize_sets. apply Disjoint_sym, Disjoint_Union_l in Hdis.

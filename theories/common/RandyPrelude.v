@@ -423,7 +423,7 @@ Qed.
 Lemma list_to_n_length:
   forall m, List.length (list_to_n m) = m.
 Proof.
-  intros. unfold list_to_n. rewrite rev_length. apply list_to_zero_length.
+  intros. unfold list_to_n. rewrite length_rev. apply list_to_zero_length.
 Qed.
 
 Lemma list_to_n_S:

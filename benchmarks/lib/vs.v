@@ -425,9 +425,9 @@ pure atoms *)
 
 Inductive pure_atom := Eqv : expr -> expr -> pure_atom.
 
-Let var1 : var := Z2id 1.
-Let var0 : var := Z2id 0.
-Let var2 : var := Z2id 2.
+Definition var1 : var := Z2id 1.
+Definition var0 : var := Z2id 0.
+Definition var2 : var := Z2id 2.
 
 Fixpoint list_prio {A} (weight: var) (l: list A) (p: var) : var :=
   match l with

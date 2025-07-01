@@ -1587,7 +1587,7 @@ Section Inline_correct.
               + eapply Union_Disjoint_r. clear H3. now sets. now sets.
               + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
                 eapply Disjoint_Included_r.
-                eapply image_apply_r_set_list. unfold apply_r_list. rewrite map_length. eassumption. 
+                eapply image_apply_r_set_list. unfold apply_r_list. rewrite length_map. eassumption. 
                 eapply Union_Disjoint_r.
                 rewrite FromList_apply_list.
                 eapply Disjoint_Included; [| | eapply Hdis3 ]; [| now sets ]. rewrite !image_Union. now sets.
@@ -1634,7 +1634,7 @@ Section Inline_correct.
                   + eapply Disjoint_Included_r. eapply Singleton_Included. eassumption. sets.
                   + eapply Disjoint_Included_r. eapply Included_trans. eapply Singleton_Included. eassumption.
                     eassumption.
-                    eapply Disjoint_Included_r. eapply image_apply_r_set_list. unfold apply_r_list. rewrite map_length. now eauto.
+                    eapply Disjoint_Included_r. eapply image_apply_r_set_list. unfold apply_r_list. rewrite length_map. now eauto.
                     rewrite !Setminus_Union_distr, image_Union.
                     eapply Union_Disjoint_r; [| eapply Union_Disjoint_r ].
                     rewrite FromList_apply_list. eapply Disjoint_Included; [| | eapply Hdis3 ]; now sets.
@@ -1694,7 +1694,7 @@ Section Inline_correct.
                     sets. }
                   eapply Included_trans. eassumption. eapply Union_Included.
                   -- eapply Included_trans. eassumption. eapply Included_trans.
-                     eapply image_apply_r_set_list. unfold apply_r_list. rewrite map_length. eassumption.
+                     eapply image_apply_r_set_list. unfold apply_r_list. rewrite length_map. eassumption.
                      normalize_occurs_free. rewrite Setminus_Union_distr, !image_Union. eapply Union_Included.
                      rewrite FromList_apply_list. now sets.
                      eapply Union_Included. eapply Included_trans.

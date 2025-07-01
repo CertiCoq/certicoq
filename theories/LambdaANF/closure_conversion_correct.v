@@ -888,7 +888,7 @@ Section Closure_conversion_correct.
           eapply project_vars_free_set_Included. eassumption.  
           
           apply Fun_inv_set_In_Scope_l. now eauto.
-          eapply Fun_inv_monotonic. eapply Fun_inv_mon. eassumption. lia.
+          eapply Fun_inv_monotonic. shelve. eapply Fun_inv_mon. eassumption. lia.
         * eapply FV_inv_set_In_Scope_l. now constructor.
           eapply FV_inv_set_r. intros Hc. eapply Hnin.
           subst. now eauto.
@@ -1136,6 +1136,7 @@ Section Closure_conversion_correct.
 
       eapply Hbase.
       eassumption.
+      Unshelve. assumption.
   Qed.
 
 

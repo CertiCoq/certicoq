@@ -322,8 +322,8 @@ Section Lambda_lifting_correct.
         rewrite list_length_map. lia.
 
         eapply preord_exp_app_r with (P1 := P1 1); [|  | | eassumption | | ].
-        * rewrite <- (map_length f1 fvs). rewrite Hleq. 
-          rewrite <- app_length.  eapply P1_local_app'. 
+        * rewrite <- (length_map f1 fvs). rewrite Hleq. 
+          rewrite <- length_app.  eapply P1_local_app'. 
         * assert (Hfeq'' : f2 f' = f'). {
             erewrite <- Make_wrappers_f_eq_subdomain with (Q := [set f']); [| eassumption | | reflexivity ].
             2:{ eapply Disjoint_Included; [| | eapply Hdis' ]; sets. }
@@ -574,7 +574,7 @@ Section Lambda_lifting_correct.
         destruct Ha as [vfvs Hgetfvs].
         
         assert (Hfset : exists rho2', set_lists (xs1 ++ ys) (vs2 ++ vfvs) (def_funs B2 B2 rho' rho') = Some rho2').
-        { eapply set_lists_length3. rewrite !app_length, Hleq1.
+        { eapply set_lists_length3. rewrite !length_app, Hleq1.
           eapply get_list_length_eq in Hgetfvs. rewrite list_length_map in Hgetfvs.
           symmetry in Hset. eapply set_lists_length_eq in Hset. rewrite Hgetfvs, <- Hleq. f_equal. eassumption. }
         destruct Hfset as [rho2' Hsetapp].
@@ -617,7 +617,7 @@ Section Lambda_lifting_correct.
                  eapply Make_wrappers_image_Included. eassumption.
                  eapply Union_Disjoint_l.
                  + eapply Disjoint_Included_l. eapply image_extend_lst_Included.
-                   rewrite !app_length. rewrite Hleq1. reflexivity.
+                   rewrite !length_app. rewrite Hleq1. reflexivity.
                    rewrite !FromList_app. eapply Union_Disjoint_l.
                    * rewrite <- Setminus_Union. eapply Disjoint_Included; [| | eapply Himdis ].
                      eapply Included_Union_compat; [| now sets ]. eapply Included_trans. eapply Hssub. eassumption.
@@ -653,7 +653,7 @@ Section Lambda_lifting_correct.
                  rewrite <- Make_wrapper_image; [| eassumption | now sets ]. 
 
                  eapply binding_in_map_antimon.
-                 eapply image_extend_lst_Included. rewrite !app_length. rewrite <- Hleq1. reflexivity.
+                 eapply image_extend_lst_Included. rewrite !length_app. rewrite <- Hleq1. reflexivity.
                  rewrite Union_commut. eapply binding_in_map_set_lists; [| eassumption ]. 
                  rewrite FromList_app. rewrite <- Setminus_Union.
 
@@ -693,7 +693,7 @@ Section Lambda_lifting_correct.
                        * eapply Disjoint_Included_l. eassumption. eapply Disjoint_Included_r. eassumption.
                          eapply Disjoint_Included; [| | eapply Hd2 ]; sets. eapply Included_trans; eassumption.
                    - rewrite extend_lst_app.  eassumption. reflexivity.
-                   - eapply Disjoint_Included_l. eapply image_extend_lst_Included. rewrite !app_length. congruence.
+                   - eapply Disjoint_Included_l. eapply image_extend_lst_Included. rewrite !length_app. congruence.
                      rewrite !FromList_app. eapply Union_Disjoint_l.
                      + eapply Disjoint_Included; [| | eapply Himdis ].
                        eapply Included_trans. eassumption. eapply Included_trans. eapply Included_trans. eapply Setminus_Included.
@@ -715,7 +715,7 @@ Section Lambda_lifting_correct.
                - eapply Make_wrappers_Funs_inv. eassumption. rewrite extend_lst_app. eassumption. reflexivity.
                  now xsets.
                  eapply Disjoint_Included_r. eapply Included_trans. eapply Setminus_Included. eassumption.
-                 eapply Disjoint_Included_l. eapply image_extend_lst_Included. rewrite !app_length. congruence.
+                 eapply Disjoint_Included_l. eapply image_extend_lst_Included. rewrite !length_app. congruence.
                  rewrite !FromList_app. eapply Union_Disjoint_l.
                  + eapply Disjoint_Included; [| | eapply Himdis ].
                    eapply Setminus_Included_Included_Union. eapply Included_trans. eassumption. now sets.

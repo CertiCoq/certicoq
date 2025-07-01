@@ -30,9 +30,10 @@ Local Open Scope list.
 Set Implicit Arguments.
 
 (** We do not support arrays (yet) *)
-Definition prim_flags := 
-  {| has_primint := true;   
+Definition prim_flags :=
+  {| has_primint := true;
      has_primfloat := true;
+     has_primstring := false ;
      has_primarray := false |}.
 
 (** Cofixpoints are not supported, Var and Evar don't actually appear 
@@ -552,7 +553,7 @@ Proof.
     eapply compile_crctInd; tea. eauto.
     repeat toAll. clear -wfΣ crctΣ H1.
     induction H1; cbn; constructor; auto.
-    rewrite List.rev_length. now apply p. 
+    rewrite List.length_rev. now apply p. 
   - cbn. rewrite -dlength_hom. 
     move/andP: H0 => [] hn H1. clear hn.
     rewrite Nat.add_comm. eapply forallb_All in H1. eapply forallb_All in H.
@@ -563,7 +564,9 @@ Proof.
     constructor; eauto.
     now eapply compile_isLambda.
   - cbn. rewrite -dlength_hom. move/andP: H0 => [] /Nat.ltb_lt //.
-  - destruct p as [? []]; try constructor; eauto. simp trans_prim_val. cbn. now cbn in H.
+  - destruct p as [? []]; try constructor; eauto.
+    + simp trans_prim_val. cbn. now cbn in H.
+    + simp trans_prim_val. cbn. now cbn in H.
   - specialize (H k H0). now eapply Crct_lift in H.
 Qed.
 
@@ -806,7 +809,7 @@ Proof.
     { subst brs' brs'0. repeat toAll. induction wfl.
     - constructor.
     - cbn -[instantiateBrs]. rewrite instantiateBrs_equation.
-      f_equal; eauto. destruct p. rewrite List.rev_length. repeat eapply (e n).
+      f_equal; eauto. destruct p. rewrite List.length_rev. repeat eapply (e n).
       eapply wellformed_up; tea. lia. }
   - rewrite map_map_compose. set (mfix' := map _ m).
     simpl. (*rewrite instantiate_TFix. *) f_equal.
@@ -1063,7 +1066,7 @@ Proof.
     subst pars. rewrite skipn_0 in hbr.
     econstructor; tea.
     unfold whCaseStep.
-    rewrite (nth_error_bnth hnth) List.rev_length tlength_hom.
+    rewrite (nth_error_bnth hnth) List.length_rev tlength_hom.
     case: Nat.eqb_spec => //; try congruence.
     intros _. rewrite /iota_red skipn_0.
     f_equal. rewrite (compile_substl (Σ := Σ)) //. solve_all.

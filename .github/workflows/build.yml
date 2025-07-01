@@ -30,7 +30,7 @@ jobs:
           opam_file: ${{ matrix.opam_file }}
           before_install: | # comment back in if MetaCoq commit changes
             startGroup "fix permission issues"
-              sudo chown -R coq:coq .
+              sudo chown -R 1000:1000 .
             endGroup
 
             startGroup "opam pin"
@@ -50,7 +50,7 @@ jobs:
               node --version
             endGroup
             startGroup "fix permission issues"
-              sudo chown -R coq:coq .
+              sudo chown -R 1000:1000 .
             endGroup
             startGroup "Copy repo (for later benchmarking)"
               cp -r `pwd` ~/repo

@@ -746,8 +746,8 @@ Section Compose.
   
 End Compose.
 
-Print Assumptions anf_pipeline_whole_program_correct.
-Print Assumptions anf_pipeline_linking_correct.
+(* Print Assumptions anf_pipeline_whole_program_correct. *)
+(* Print Assumptions anf_pipeline_linking_correct. *)
 
 (* 
 

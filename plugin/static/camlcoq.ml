@@ -50,7 +50,7 @@ end
 (* Coq's [positive] type and some of its operations *)
 
 module P = struct
- 
+
   let rec to_int = function
   | Coq_xI p -> let n = to_int p in n + n + 1
   | Coq_xO p -> let n = to_int p in n + n
@@ -59,7 +59,7 @@ module P = struct
   let rec to_int64 = function
   | Coq_xI p -> let n = to_int64 p in Int64.add n (Int64.add n Int64.one)
   | Coq_xO p -> let n = to_int64 p in Int64.add n n
-  | Coq_xH -> Int64.one  
+  | Coq_xH -> Int64.one
   let rec of_int x =
     if x = 0 then Coq_xH
     else BinPos.Pos.succ (of_int (pred x))
@@ -162,8 +162,8 @@ end
    let to_int = function
      | N0 -> 0
      | Npos p -> P.to_int p
-  
-   let of_int i = 
+
+   let of_int i =
       if i = 0 then N0
       else Npos (P.of_int i)
 end
@@ -396,11 +396,11 @@ let ascii_of_char a =
 let camlstring_of_coqstring (s: String0.string) =
   let open String0 in
   let open Ascii in
-  let r = Bytes.create (Nat.to_int (length s)) in
+  let r = Stdlib.Bytes.create (Nat.to_int (length s)) in
   let rec fill pos = function
   | EmptyString -> r
-  | String (c, s) -> Bytes.set r pos (char_of_ascii c); fill (pos + 1) s
-  in Bytes.to_string (fill 0 s)
+  | String (c, s) -> Stdlib.Bytes.set r pos (char_of_ascii c); fill (pos + 1) s
+  in Stdlib.Bytes.to_string (fill 0 s)
 
 let coqstring_of_camlstring s =
   let open String0 in

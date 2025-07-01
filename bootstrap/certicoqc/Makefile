@@ -31,6 +31,7 @@ ifeq '$(CERTICOQ_CONFIG)' 'local'
 
   COQOPTS = -Q ../../theories/Codegen CertiCoq.Codegen -Q ../../libraries CertiCoq.Libraries \
 	-Q ../../theories/LambdaANF CertiCoq.LambdaANF -Q ../../theories/LambdaBoxLocal CertiCoq.LambdaBoxLocal \
+	-Q ../../theories/CodegenWasm CertiCoq.CodegenWasm\
 	-Q ../../theories/Compiler CertiCoq.Compiler -Q ../../theories/common CertiCoq.Common \
 	-Q ../../theories/Glue CertiCoq.Glue \
 	-Q ../../theories/LambdaBoxMut CertiCoq.LambdaBoxMut \

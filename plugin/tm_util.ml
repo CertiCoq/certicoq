@@ -1,5 +1,5 @@
 open Pp
-  
+
 let contrib_name = "template-coq"
 
 (* This allows to load template_plugin and the extractable plugin at the same time 
@@ -17,14 +17,14 @@ let timing_opt =
     (declare_bool_option_and_ref ~key ~value:false ()).get
 
 let time prefix f x =
-  if timing_opt () then 
+  if timing_opt () then
     let start = Unix.gettimeofday () in
     let res = f x in
     let stop = Unix.gettimeofday () in
     let () = Feedback.msg_info Pp.(prefix ++ str " executed in: " ++ Pp.real (stop -. start) ++ str "s") in
     res
   else f x
-  
+
 let debug_opt =
   let open Goptions in
   let key = ["MetaCoq"; "Debug"] in
@@ -53,14 +53,14 @@ let string_to_list (s : string) : char list =
   in aux [] (String.length s - 1)
 
 let list_to_string (l : char list) : string =
-  let buf = Bytes.create (List.length l) in
+  let buf = Stdlib.Bytes.create (List.length l) in
   let rec aux i = function
     | [] -> ()
     | c :: cs ->
-      Bytes.set buf i c; aux (succ i) cs
+      Stdlib.Bytes.set buf i c; aux (succ i) cs
   in
   aux 0 l;
-  Bytes.to_string buf
+  Stdlib.Bytes.to_string buf
 
 let rec filter_map f l =
   match l with
@@ -69,7 +69,7 @@ let rec filter_map f l =
     match f x with
     | Some x' -> x' :: filter_map f xs
     | None -> filter_map f xs
-    
+
 let rec app_full trm acc =
   match Constr.kind trm with
     Constr.App (f, xs) -> app_full f (Array.to_list xs @ acc)
@@ -144,7 +144,7 @@ module CaseCompat =
     let paramdecl = Vars.subst_instance_context u mib.mind_params_ctxt in
     let paramsubst = Vars.subst_of_rel_context_instance paramdecl params in
     case_predicate_context_gen mip ci u paramsubst nas
-      
+
   let case_branches_contexts_gen mib ci u params brs =
     (* Γ ⊢ c : I@{u} params args *)
     (* Γ, indices, self : I@{u} params indices ⊢ p : Type *)
@@ -160,7 +160,7 @@ module CaseCompat =
         (nas, ctx, br)
       in
       Array.map2_i build_one_branch brs mip.mind_nf_lc
-    in 
+    in
     ebr
 
   let case_branches_contexts env ci u pars brs =
@@ -172,8 +172,8 @@ type ('term, 'name, 'nat) adef = { adname : 'name; adtype : 'term; adbody : 'ter
 
 type ('term, 'name, 'nat) amfixpoint = ('term, 'name, 'nat) adef list
 
-type ('term, 'name, 'universe_instance) apredicate = 
-  { auinst : 'universe_instance; 
+type ('term, 'name, 'universe_instance) apredicate =
+  { auinst : 'universe_instance;
     apars : 'term list;
     apcontext : 'name list;
     apreturn : 'term }
@@ -186,7 +186,7 @@ type ('nat, 'inductive, 'relevance) acase_info =
   { aci_ind : 'inductive;
     aci_npar : 'nat;
     aci_relevance : 'relevance }
-    
+
 type ('term, 'nat, 'ident, 'name, 'quoted_sort, 'cast_kind, 'kername, 'inductive, 'relevance, 'universe_instance, 'projection, 'int63, 'float64) structure_of_term =
   | ACoq_tRel of 'nat
   | ACoq_tVar of 'ident
@@ -200,7 +200,7 @@ type ('term, 'nat, 'ident, 'name, 'quoted_sort, 'cast_kind, 'kername, 'inductive
   | ACoq_tConst of 'kername * 'universe_instance
   | ACoq_tInd of 'inductive * 'universe_instance
   | ACoq_tConstruct of 'inductive * 'nat * 'universe_instance
-  | ACoq_tCase of ('nat, 'inductive, 'relevance) acase_info * 
+  | ACoq_tCase of ('nat, 'inductive, 'relevance) acase_info *
     ('term, 'name, 'universe_instance) apredicate *
     'term * ('term, 'name) abranch list
   | ACoq_tProj of 'projection * 'term
@@ -208,4 +208,3 @@ type ('term, 'nat, 'ident, 'name, 'quoted_sort, 'cast_kind, 'kername, 'inductive
   | ACoq_tCoFix of ('term, 'name, 'nat) amfixpoint * 'nat
   (* | ACoq_tInt of 'int63 *)
   (* | ACoq_tFloat of 'float64 *)
-

@@ -1,4 +1,4 @@
-COQ_SRC_SUBDIRS+=user-contrib/MetaCoq/Template
+COQ_SRC_SUBDIRS+=user-contrib/MetaRocq/Template
 # OPENS=-open Metacoq_template_plugin
 CAMLFLAGS+=$(OPENS)
 CAMLFLAGS+=-w -33 # Unused opens

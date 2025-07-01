@@ -1,9 +1,9 @@
 From Coq Require Import List Unicode.Utf8 Strings.Byte.
 From Coq Require Import PArith.
 From ExtLib Require Import Monads.
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 Require Import Common.AstCommon Common.compM.
-From MetaCoq.ErasurePlugin Require Import Erasure.
+From MetaRocq.ErasurePlugin Require Import Erasure.
 #[global] Hint Resolve Bool.absurd_eq_true Bool.trans_eq_bool f_equal2_nat f_equal_nat : core.
 Import MonadNotation ListNotations.
 

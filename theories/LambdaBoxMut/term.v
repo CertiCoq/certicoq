@@ -6,8 +6,8 @@ Require Import Coq.Arith.Peano_dec.
 From Coq Require Import Arith.
 Require Import Coq.micromega.Lia.
 Require Import Common.Common.  (* shared namespace *)
-From MetaCoq.Utils Require Import bytestring. (* For identifier names *)
-From MetaCoq.Common Require Import Reflect.
+From MetaRocq.Utils Require Import bytestring. (* For identifier names *)
+From MetaRocq.Common Require Import Reflect.
 From CertiCoq Require Import LambdaBoxMut.compile.
 
 Open Scope bs_scope.

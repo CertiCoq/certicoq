@@ -9,7 +9,7 @@ Require Import Common.Common.
 Require Import LambdaBoxMut.compile.
 Require Import LambdaBoxMut.term.
 Require Import LambdaBoxMut.program.
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 Local Open Scope bs_scope.
 Local Open Scope bool.
 Local Open Scope list.

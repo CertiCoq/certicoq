@@ -1,5 +1,5 @@
 From Coq Require Import Unicode.Utf8 List Classes.Morphisms.
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 From ExtLib Require Import Monads.
 
 Import MonadNotation ListNotations.

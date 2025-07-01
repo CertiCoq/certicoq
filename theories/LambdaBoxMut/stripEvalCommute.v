@@ -12,11 +12,11 @@ Require Import Common.Common.
 From Coq Require Import ssreflect ssrbool.
 From Equations Require Import Equations.
 
-From MetaCoq.Utils Require Import utils.
-From MetaCoq.Common Require Import BasicAst.
-From MetaCoq.Template Require Import Ast.
-From MetaCoq.Erasure Require Import EAst EAstUtils EGlobalEnv EExtends.
-From MetaCoq.Erasure Require Import ESpineView EWcbvEvalEtaInd EWellformed EEtaExpanded.
+From MetaRocq.Utils Require Import utils.
+From MetaRocq.Common Require Import BasicAst.
+From MetaRocq.Template Require Import Ast.
+From MetaRocq.Erasure Require Import EAst EAstUtils EGlobalEnv EExtends.
+From MetaRocq.Erasure Require Import ESpineView EWcbvEvalEtaInd EWellformed EEtaExpanded.
 Import utils.
 
 
@@ -412,7 +412,7 @@ Proof.
   cbn. eapply IHargs => //. constructor => //.
 Qed. 
 
-From MetaCoq.SafeChecker Require PCUICTypeChecker.
+From MetaRocq.SafeChecker Require PCUICTypeChecker.
 
 Ltac simp_eta_in := match goal with [ H : is_true (isEtaExp _ _) |- _ ] => simp_eta in H end.
 
@@ -712,7 +712,7 @@ Proof.
   rewrite instantiates_tappend /= TmkApps_tappend //.
 Qed.
 
-From MetaCoq.Erasure Require Import EInduction ECSubst.
+From MetaRocq.Erasure Require Import EInduction ECSubst.
 
 Lemma compile_mkApps f args : 
   compile (mkApps f args) = TmkApps (compile f) (list_terms (map compile args)).
@@ -837,7 +837,7 @@ Fixpoint substl_rev terms k body :=
   | term :: terms => substl_rev terms k (csubst term (#|terms| + k) body)
   end.
 
-From MetaCoq.Erasure Require Import ELiftSubst.
+From MetaRocq.Erasure Require Import ELiftSubst.
 
 Lemma csubst_substl_comm a n terms k body :
   closed a ->
@@ -1019,7 +1019,7 @@ Proof.
   rewrite mkApps_app //=.
 Qed.
 
-From MetaCoq.Erasure Require Import EConstructorsAsBlocks EWcbvEvalCstrsAsBlocksInd.
+From MetaRocq.Erasure Require Import EConstructorsAsBlocks EWcbvEvalCstrsAsBlocksInd.
 
 Lemma WcbvEval_hom (fl := block_wcbv_flags) :
   forall Σ, wf_glob Σ ->
@@ -1150,7 +1150,7 @@ Qed.
 
 Definition program := environ Term * Term.
 
-From MetaCoq.Erasure Require Import EProgram.
+From MetaRocq.Erasure Require Import EProgram.
 
 Definition compile_program (e : eprogram) : program :=
   (compile_ctx e.1, compile e.2).

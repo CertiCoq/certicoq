@@ -9,7 +9,7 @@ Require Import ExtLib.Data.Monads.StateMonad.
 Require Coq.Program.Wf.
 Require Import Program.
 Require Import Coq.Structures.OrdersEx.
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 Import MonadNotation.
 Open Scope monad_scope.
 

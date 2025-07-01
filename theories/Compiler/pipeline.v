@@ -7,8 +7,8 @@ Require Import maps_util.
 Require Import Glue.glue.
 Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
-Require Import MetaCoq.Common.BasicAst.
-From MetaCoq.Utils Require Import MCString.
+Require Import MetaRocq.Common.BasicAst.
+From MetaRocq.Utils Require Import MCString.
 
 Import Monads.
 Import MonadNotation.
@@ -122,7 +122,7 @@ End Pipeline.
 
 Definition next_id := 100%positive.
 
-(** * The main CertiCoq pipeline, with MetaCoq's erasure and C-code generation *)
+(** * The main CertiCoq pipeline, with MetaRocq's erasure and C-code generation *)
 
 Definition pipeline (p : Template.Ast.Env.program) :=
   let genv := fst p in

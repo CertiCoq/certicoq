@@ -6,16 +6,16 @@ Require Import CertiCoq.Benchmarks.lib.sha256.
 
 From CertiCoq.Plugin Require Import CertiCoq.
 
-From MetaCoq.Erasure Require Import EProgram.
-From MetaCoq.ErasurePlugin Require Import Erasure Loader.
-Require Import MetaCoq.Utils.bytestring.
+From MetaRocq.Erasure Require Import EProgram.
+From MetaRocq.ErasurePlugin Require Import Erasure Loader.
+Require Import MetaRocq.Utils.bytestring.
 
 Open Scope bs_scope.
 
 Axiom (coq_msg_info : string -> unit).
 Axiom (coq_msg_debug : string -> unit).
 
-Set MetaCoq Timing.
+Set MetaRocq Timing.
 
 Local Existing Instance config.extraction_checker_flags.
 
@@ -40,7 +40,7 @@ Extract Constants [
 Include [ "print.h" ].
 
 (*
-From MetaCoq.SafeChecker Require Import PCUICSafeChecker.
+From MetaRocq.SafeChecker Require Import PCUICSafeChecker.
 
 (*Extract Constant PCUICTyping.guard_checking => 
 "{ guard = (fun _ _ _ _ -> true) }". *)

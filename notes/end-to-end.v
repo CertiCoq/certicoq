@@ -1,5 +1,5 @@
 (* Require Import CertiCoq. *)
-From MetaCoq Require Import Template.Ast.
+From MetaRocq Require Import Template.Ast.
 Require Import Arith List.
 
 Import ListNotations.

@@ -4,8 +4,7 @@ Require Import CertiCoq.Benchmarks.lib.Binom.
 Require Import CertiCoq.Benchmarks.lib.Color.
 Require Import CertiCoq.Benchmarks.lib.sha256.
 Require Import CertiCoq.Benchmarks.lib.coind.
-Require Import CertiCoq.Benchmarks.lib.coqprime.
-Require Import CertiCoq.Benchmarks.lib.BernsteinYangTermination.
+(* Require Import CertiCoq.Benchmarks.lib.coqprime. Requires: opam install coq-coqprime *)
 Require Import CertiCoq.Benchmarks.lib.stack_machine.
 
 From MetaCoq.Utils Require Import bytestring MCString.
@@ -108,17 +107,11 @@ Fixpoint even n :=
     end.
 Definition even_10000 := even 10000.
 
-Definition bernstein_yang := W 10.
-
 Eval compute in "Compiling ack".
 CertiCoq Compile Wasm ack_3_9.
 
 Eval compute in "Compiling even_10000".
 CertiCoq Compile Wasm even_10000.
-
-Eval compute in "Bernstein yang termination".
-CertiCoq Compile Wasm bernstein_yang.
-(* bernstein_yang only for compilation, runs out of memory when executing binary *)
 
 (*******************************************************************)
 Eval compute in "Compiling demo1".
@@ -237,6 +230,6 @@ CertiCoq Compile Wasm sm_gauss_nat.
 CertiCoq Compile Wasm sm_gauss_N.
 CertiCoq Compile Wasm sm_gauss_PrimInt.
 
-Definition coqprime := check_cert3.
+(* Definition coqprime := check_cert3.
 Eval compute in "Compiling coqprime".
-CertiCoq Compile Wasm coqprime.
+   CertiCoq Compile Wasm coqprime. *)

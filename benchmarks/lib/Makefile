@@ -7,7 +7,7 @@
 ##         #     GNU Lesser General Public License Version 2.1          ##
 ##         #     (see LICENSE file for the text of the license)         ##
 ##########################################################################
-## GNUMakefile for Coq 8.19.2
+## GNUMakefile for Coq 8.20.1
 
 # For debugging purposes (must stay here, don't move below)
 INITIAL_VARS := $(.VARIABLES)
@@ -278,7 +278,7 @@ COQDOCLIBS?=$(COQLIBS_NOML)
 # The version of Coq being run and the version of coq_makefile that
 # generated this makefile
 COQ_VERSION:=$(shell $(COQC) --print-version | cut -d " " -f 1)
-COQMAKEFILE_VERSION:=8.19.2
+COQMAKEFILE_VERSION:=8.20.1
 
 # COQ_SRC_SUBDIRS is for user-overriding, usually to add
 # `user-contrib/Foo` to the includes, we keep COQCORE_SRC_SUBDIRS for
@@ -309,7 +309,7 @@ endif
 
 ifneq (,$(PROFILING))
   PROFILE_ARG=-profile $<.prof.json
-  PROFILE_ZIP=gzip $<.prof.json
+  PROFILE_ZIP=gzip -f $<.prof.json
 else
   PROFILE_ARG=
   PROFILE_ZIP=true
@@ -503,37 +503,6 @@ bytefiles: $(CMOFILES) $(CMAFILES)
 optfiles: $(if $(DO_NATDYNLINK),$(CMXSFILES))
 .PHONY: optfiles
 
-# FIXME, see Ralf's bugreport
-# quick is deprecated, now renamed vio
-vio: $(VOFILES:.vo=.vio)
-.PHONY: vio
-quick: vio
-	$(warning "'make quick' is deprecated, use 'make vio' or consider using 'vos' files")
-.PHONY: quick
-
-vio2vo:
-	$(TIMER) $(COQC) $(COQDEBUG) $(COQFLAGS) $(COQLIBS) \
-		-schedule-vio2vo $(J) $(VOFILES:%.vo=%.vio)
-.PHONY: vio2vo
-
-# quick2vo is undocumented
-quick2vo:
-	$(HIDE)make -j $(J) vio
-	$(HIDE)VIOFILES=$$(for vofile in $(VOFILES); do \
-	  viofile="$$(echo "$$vofile" | sed "s/\.vo$$/.vio/")"; \
-	  if [ "$$vofile" -ot "$$viofile" -o ! -e "$$vofile" ]; then printf "$$viofile "; fi; \
-	done); \
-	echo "VIO2VO: $$VIOFILES"; \
-	if [ -n "$$VIOFILES" ]; then \
-	  $(TIMER) $(COQC) $(COQDEBUG) $(COQFLAGS) $(COQLIBS) -schedule-vio2vo $(J) $$VIOFILES; \
-	fi
-.PHONY: quick2vo
-
-checkproofs:
-	$(TIMER) $(COQC) $(COQDEBUG) $(COQFLAGS) $(COQLIBS) \
-		-schedule-vio-checking $(J) $(VOFILES:%.vo=%.vio)
-.PHONY: checkproofs
-
 vos: $(VOFILES:%.vo=%.vos)
 .PHONY: vos
 
@@ -711,9 +680,10 @@ clean::
 	$(HIDE)rm -f $(NATIVEFILES)
 	$(HIDE)find . -name .coq-native -type d -empty -delete
 	$(HIDE)rm -f $(VOFILES)
-	$(HIDE)rm -f $(VOFILES:.vo=.vio)
 	$(HIDE)rm -f $(VOFILES:.vo=.vos)
 	$(HIDE)rm -f $(VOFILES:.vo=.vok)
+	$(HIDE)rm -f $(VOFILES:.vo=.v.prof.json)
+	$(HIDE)rm -f $(VOFILES:.vo=.v.prof.json.gz)
 	$(HIDE)rm -f $(BEAUTYFILES) $(VFILES:=.old)
 	$(HIDE)rm -f all.ps all-gal.ps all.pdf all-gal.pdf all.glob all-mli.tex
 	$(HIDE)rm -f $(VFILES:.v=.glob)
@@ -845,10 +815,6 @@ $(GLOBFILES): %.glob: %.v
 endif
 
 $(foreach vfile,$(VFILES:.v=),$(eval $(call globvorule,$(vfile))))
-
-$(VFILES:.v=.vio): %.vio: %.v
-	$(SHOW)COQC -vio $<
-	$(HIDE)$(TIMER) $(COQC) -vio $(COQDEBUG) $(COQFLAGS) $(COQLIBS) $<
 
 $(VFILES:.v=.vos): %.vos: %.v
 	$(SHOW)COQC -vos $<

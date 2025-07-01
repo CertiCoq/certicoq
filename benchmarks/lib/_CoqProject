@@ -8,6 +8,5 @@ sha256.v
 # bignum.v
 # SqlQueries.v
 coind.v
-BernsteinYangTermination.v
 stack_machine.v
-coqprime.v
+# coqprime.v

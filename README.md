@@ -56,6 +56,7 @@ Structure of the theories directory:
    produce a closed term.
 * `theories/LambdaANF` contains the λANF pipeline (and conversions -- direct and LambdaANF -- to λANF)
 * `theories/Codegen` contains the C code generator.
+* `theories/CodegenWasm` contains the Wasm code generator.
 
 
 ## Bugs 

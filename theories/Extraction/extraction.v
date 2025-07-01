@@ -66,7 +66,7 @@ Extraction Inline Equations.Init.hidebody.
 Extraction Inline Equations.Prop.DepElim.solution_left.
 
 (* Avoid name clashes with OCaml or Coq module names *)
-Extraction Blacklist config List String Nat Int Ast Universes UnivSubst Typing Retyping 
+Extraction Blacklist config List String Nat Int Ast Universes UnivSubst Typing Retyping
            OrderedType Logic Common Equality Char char uGraph
            Instances Classes Term Monad Coqlib Errors Compile Checker Eq Classes0 Numeral
            Uint63 Number Values.
@@ -108,7 +108,8 @@ Separate Extraction
          Glue.glue.generate_glue
          Glue.ffi.generate_ffi
          cps.M.elements
-         Compiler.pipeline.show_IR.
+         Compiler.pipeline.show_IR
+         Compiler.pipeline.compile_Wasm.
 
 Recursive Extraction Library Ascii.
 Recursive Extraction Library BinPos.

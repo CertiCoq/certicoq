@@ -40,16 +40,16 @@ let increment_subscript id =
         add (carrypos-1)
       end
       else begin
-        let newid = Bytes.of_string id in
-        Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
-        Bytes.set newid carrypos (Char.chr (Char.code c + 1));
+        let newid = Stdlib.Bytes.of_string id in
+        Stdlib.Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
+        Stdlib.Bytes.set newid carrypos (Char.chr (Char.code c + 1));
         newid
       end
     else begin
-      let newid = Bytes.of_string (id^"0") in
+      let newid = Stdlib.Bytes.of_string (id^"0") in
       if carrypos < len-1 then begin
-        Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
-        Bytes.set newid (carrypos+1) '1'
+        Stdlib.Bytes.fill newid (carrypos+1) (len-1-carrypos) '0';
+        Stdlib.Bytes.set newid (carrypos+1) '1'
       end;
       newid
     end
@@ -66,7 +66,7 @@ external get_boxed_ordinal : Obj.t -> (int [@untagged]) = "get_boxed_ordinal" "g
 let pr_string s = Pp.str (Caml_bytestring.caml_string_of_bytestring s)
 
 (* remove duplicates but preserve order, keep the leftmost element *)
-let nub (xs : 'a list) : 'a list = 
+let nub (xs : 'a list) : 'a list =
   List.fold_right (fun x xs -> if List.mem x xs then xs else x :: xs) xs []
 
 let rec coq_nat_of_int x =
@@ -90,9 +90,9 @@ let global_registers_name = "certicoq-registration"
 let cache_registers (prims, imports) =
   let (prims', imports') = !global_registers in
   global_registers := (prims @ prims', imports @ imports')
-let global_registers_input = 
-  let open Libobject in 
-  declare_object 
+let global_registers_input =
+  let open Libobject in
+  declare_object
     (global_object_nodischarge global_registers_name
     ~cache:(fun r -> cache_registers r)
     ~subst:None) (*(fun (msub, r) -> r)) *)
@@ -364,15 +364,15 @@ module type CompilerInterface = sig
   val compile : Pipeline_utils.coq_Options -> Ast0.Env.program -> ((name_env * Clight.program) * Clight.program) CompM.error * Bytestring.String.t
   val printProg : Clight.program -> name_env -> string -> import list -> unit
 
-  val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations -> 
+  val generate_glue : Pipeline_utils.coq_Options -> Ast0.Env.global_declarations ->
     (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
-  
+
   val generate_ffi :
     Pipeline_utils.coq_Options -> Ast0.Env.program -> (((name_env * Clight.program) * Clight.program) * Bytestring.String.t list) CompM.error
-  
+
 end
 
-module MLCompiler : CompilerInterface with 
+module MLCompiler : CompilerInterface with
   type name_env = BasicAst.name Cps.M.t
   = struct
   type name_env = BasicAst.name Cps.M.t
@@ -409,7 +409,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     Buffer.add_string buf line; 
     Buffer.add_string buf "\n"
   
-  let string_of_buffer buf = Bytes.to_string (Buffer.to_bytes buf)
+  let string_of_buffer buf = Stdlib.Bytes.to_string (Buffer.to_bytes buf)
     
   let execute cmd =
     debug Pp.(fun () -> str "Executing: " ++ str cmd ++ str " in environemt: " ++ 
@@ -526,7 +526,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     in
     let status = Unix.close_process_in whichcmd in
     match status with
-    | Unix.WEXITED 0 -> 
+    | Unix.WEXITED 0 ->
       if debug then Feedback.msg_debug Pp.(str "Compiler is " ++ str result);
       result
     | _ -> failwith "Compiler not found"
@@ -543,14 +543,14 @@ module CompileFunctor (CI : CompilerInterface) = struct
       
   let read_line stdout stderr =
     try Info (input_line stdout)
-    with End_of_file -> 
+    with End_of_file ->
       try Error (input_line stderr)
       with End_of_file -> EOF
-  
+
   let run_program debug prog =
     let (stdout, stdin, stderr) = Unix.open_process_full ("./" ^ prog) (Unix.environment ()) in
     let continue = ref true in
-    while !continue do 
+    while !continue do
       match read_line stdout stderr with
       | EOF -> debug_msg debug ("Program terminated"); continue := false
       | Info s -> Feedback.msg_notice Pp.(str prog ++ str": " ++ str s)
@@ -580,7 +580,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
           compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c") 
     in
     let importso =
-      let oname s = 
+      let oname s =
         assert (CString.is_suffix ".h" s);
         String.sub s 0 (String.length s - 2) ^ ".o"
       in 
@@ -595,7 +595,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let gc_stack_o = make_rt_file "gc_stack.o" in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
     match Unix.system cmd with
-    | Unix.WEXITED 0 -> 
+    | Unix.WEXITED 0 ->
       let linkcmd =
         Printf.sprintf "%s -Wno-everything -g -L %s -L %s -o %s %s %s %s" 
           compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) name gc_stack_o (name ^ ".o") importso
@@ -925,6 +925,33 @@ module CompileFunctor (CI : CompilerInterface) = struct
       debug_msg debug (string_of_bytestring dbg);
       CErrors.user_err Pp.(str "Could not compile: " ++ (pr_string s) ++ str "\n")
 
+  let print_to_file_no_nl (s : string) (file : string) =
+    let f = open_out file in
+    Printf.fprintf f "%s" s;
+    close_out f
+
+  let compile_wasm opts gr =
+    let term = quote opts gr in
+    let debug = opts.debug in
+    let options = make_pipeline_options opts in
+    let p = Pipeline.compile_Wasm options (Obj.magic term) in
+    match p with
+    | (CompM.Ret prg, dbg) ->
+      debug_msg debug "Finished compiling, printing to file.";
+      let time = Unix.gettimeofday() in
+      let suff = opts.ext in
+      let fname = opts.filename in
+      let file = fname ^ suff ^ ".wasm" in
+      print_to_file_no_nl (string_of_bytestring prg) file;
+      let time = (Unix.gettimeofday() -. time) in
+      debug_msg debug (Printf.sprintf "Printed to file %s in %f s.." file time);
+      debug_msg debug "Pipeline debug:";
+      debug_msg debug (string_of_bytestring dbg)
+    | (CompM.Err s, dbg) ->
+      debug_msg debug "Pipeline debug:";
+      debug_msg debug (string_of_bytestring dbg);
+      CErrors.user_err Pp.(str "compile_wasm" ++ (str "Could not compile: " ++ (pr_string s) ++ str "\n"))
+
 
   (* Quote Coq inductive type *)
   let quote_ind opts gr : Metacoq_template_plugin.Ast_quoter.quoted_program * string =
@@ -933,7 +960,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let sigma = Evd.from_env env in
     let sigma, c = Evd.fresh_global env sigma gr in
     let name = match gr with
-      | Names.GlobRef.IndRef i -> 
+      | Names.GlobRef.IndRef i ->
           let (mut, _) = i in
           Names.KerName.to_string (Names.MutInd.canonical mut)
       | _ -> CErrors.user_err
@@ -971,7 +998,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
   let glue_command opts grs =
     let terms = grs |> List.rev
-                |> List.map (fun gr -> Metacoq_template_plugin.Ast0.Env.declarations (fst (quote opts gr))) 
+                |> List.map (fun gr -> Metacoq_template_plugin.Ast0.Env.declarations (fst (quote opts gr)))
                 |> List.concat |> nub in
     generate_glue true opts (Obj.magic terms)
 

@@ -9,7 +9,7 @@ CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, 
 EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS)) $(patsubst %, %_cps_opt, $(TESTS)) $(patsubst %, %_opt, $(TESTS))
 INCLUDE=../runtime
 
-all: lib tests exec run
+all: lib tests exec run run_wasm
 default: exec run
 
 .PHONY: all default clean lib cleanlib tests run $(TESTS)
@@ -112,3 +112,9 @@ $(TESTS): $(CFILES)
 
 run: run.sh
 	sh run.sh 10
+
+run_wasm:
+	@echo "\nRunning CertiCoq-Wasm test suite"
+	make -C wasm run_tests
+	@echo "\nRunning CertiCoq-Wasm primitive unit tests"
+	make -C wasm run_primitive_unit_tests

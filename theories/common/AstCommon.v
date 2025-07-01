@@ -581,7 +581,7 @@ Definition string_of_specfloat (f : SpecFloat.spec_float) :=
   | S754_infinity sign => if sign then "-INFINITY" else "INFINITY"
   | S754_nan => "NAN"
   | S754_finite sign p z =>
-  let num := MCString.string_of_positive p ++ "p" ++ string_of_Z z in
+  let num := MRString.string_of_positive p ++ "p" ++ string_of_Z z in
   if sign then "-" ++ num else num
   end%bs.
 

@@ -809,7 +809,7 @@ Section Correct.
       - eapply nth_error_Forall2; [ | rewrite length_rev; eassumption ].
         intros.
         assert (exists f, nth_error (rev (all_fun_name Bs)) n = Some f).
-        { eapply MCList.nth_error_Some_length in H2.
+        { eapply MRList.nth_error_Some_length in H2.
           rewrite Hlen, <- length_rev in H2. eapply nth_error_Some in H2.
           destruct (nth_error (rev (all_fun_name Bs)) n); eauto. congruence. }
         destructAll.
@@ -817,14 +817,14 @@ Section Correct.
         eexists. split. rewrite def_funs_eq. reflexivity.
         eapply Same_set_all_fun_name. rewrite <- FromList_rev. eapply nth_error_In. eassumption.
         assert (Heq := H2). 
-        rewrite H1 in Heq. 2:{ rewrite <- H0. eapply MCList.nth_error_Some_length. eassumption. }        
+        rewrite H1 in Heq. 2:{ rewrite <- H0. eapply MRList.nth_error_Some_length. eassumption. }        
         inv Heq. econstructor; last eassumption; try eassumption.
         eapply cps_fix_rel_names in Hfix. rewrite <- Hfix.
-        rewrite MCList.nth_error_rev.
+        rewrite MRList.nth_error_rev.
 
         rewrite Nnat.Nat2N.id.
         replace (Datatypes.length (all_fun_name Bs) - S (efnlength fns - n - 1))%nat with n.
-        2:{ rewrite <- H0, <- Hlen. eapply MCList.nth_error_Some_length in H2. lia. }
+        2:{ rewrite <- H0, <- Hlen. eapply MRList.nth_error_Some_length in H2. lia. }
         eassumption.
 
         rewrite Nnat.Nat2N.id. rewrite <- H0, Hlen.
@@ -1002,7 +1002,7 @@ Section Correct.
       - destruct n; inv Heq.
         simpl in *. 
         revert vs Hget Hset.
-        intros vs. eapply MCList.rev_ind with (l := vs); intros.
+        intros vs. eapply MRList.rev_ind with (l := vs); intros.
 
         + eapply set_lists_length_eq in Hset.
           rewrite length_app in Hset. inv Hset. lia.

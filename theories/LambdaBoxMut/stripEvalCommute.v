@@ -660,14 +660,14 @@ Lemma isConstructApp_compile f :
   ~~ isConstructApp f -> ~ isConstruct (compile f).
 Proof.
   move=> nf [] i [] n [] args.
-  destruct f; simp_compile => /= //.
+  destruct f eqn:E; revert E;
+  simp_compile => /= //.
   rewrite compile_decompose.
   destruct decompose_app eqn:da.
   eapply decompose_app_app in da. destruct l using rev_ind => //.
   rewrite compile_terms_tappend // -TApp_TmkApps //.
   destruct prim as [? []]; simp trans_prim_val; cbn => //.
 Qed.
-
 
 Lemma isPrimApp_compile f : 
   ~~ isPrimApp f -> ~ isPrim (compile f).

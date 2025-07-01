@@ -344,7 +344,7 @@ Polymorphic Equations trans_prim_val {T} (p : EPrimitive.prim_val T) : option pr
   trans_prim_val (existT _ primArray _) => None.
 
 Section LiftSize.
-Import All_Forall MCList ELiftSubst EInduction.
+Import All_Forall MRList ELiftSubst EInduction.
 Lemma size_lift n k t : size (ELiftSubst.lift n k t) = size t.
 Proof.
   revert k; induction t using term_forall_list_ind; cbn; eauto; try lia; ELiftSubst.solve_all.
@@ -368,7 +368,7 @@ Proof.
 End LiftSize.
 
 Section Compile.
-  Import MCList (map_InP, In_size).
+  Import MRList (map_InP, In_size).
 
   Lemma size_pos x : 0 < size x.
   Proof.
@@ -419,7 +419,7 @@ Section Compile.
   End Compile.
 End Def.
 
-Global Hint Rewrite @MCList.map_InP_spec : compile.
+Global Hint Rewrite @MRList.map_InP_spec : compile.
 
 Tactic Notation "simp_compile" "in" hyp(H) := simp compile in H; try rewrite <- !compile_equation_1 in H.
 Ltac simp_compile := simp compile; try rewrite <- !compile_equation_1.

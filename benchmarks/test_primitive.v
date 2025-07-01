@@ -1,4 +1,4 @@
-From MetaCoq.Utils Require Import bytestring MCString. 
+From MetaCoq.Utils Require Import bytestring MRString. 
 From MetaCoq.Common Require Import Primitive.
 From CertiCoq.Plugin Require Import CertiCoq.
 From Coq Require Import Uint63 ZArith.

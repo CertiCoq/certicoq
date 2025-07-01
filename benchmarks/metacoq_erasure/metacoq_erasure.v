@@ -20,12 +20,12 @@ Set MetaCoq Timing.
 Local Existing Instance config.extraction_checker_flags.
 
 Program Definition erase (p : Ast.Env.program) : eprogram :=
-  run_erase_program p (MCUtils.todo "wf_env and welltyped term").
+  run_erase_program p (MRUtils.todo "wf_env and welltyped term").
 
 Program Definition erase_and_print_template_program (p : Ast.Env.program) : unit :=
   let _ := coq_msg_info ("Erasing program.") in
   let prprog := coq_msg_info (Pretty.print_program false 2 p) in
-  let eprog := run_erase_program p (MCUtils.todo "wf_env and welltyped term") in
+  let eprog := run_erase_program p (MRUtils.todo "wf_env and welltyped term") in
   let _ := coq_msg_info "Erasure terminated with: " in
   coq_msg_info (EPretty.print_program eprog).
 

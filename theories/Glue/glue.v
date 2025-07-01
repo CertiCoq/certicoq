@@ -27,7 +27,7 @@ Require Import LambdaANF.cps
                compM
                glue_utils.
 
-From MetaCoq.Utils Require Import bytestring MCString.
+From MetaCoq.Utils Require Import bytestring MRString.
 
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
@@ -1024,7 +1024,7 @@ Section CConstructors.
     match n with
     | O => ret nil
     | S n' =>
-        new_id <- gensym ("arg" ++ MCString.string_of_nat n')%bs ;;
+        new_id <- gensym ("arg" ++ MRString.string_of_nat n')%bs ;;
         rest_id <- make_arg_list' n' ;;
         ret ((new_id, val) :: rest_id)
     end.

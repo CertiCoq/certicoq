@@ -2,7 +2,7 @@ From CertiCoq.Plugin Require Import CertiCoq.
 From MetaCoq.Utils Require Import utils.
 Open Scope bs_scope.
 
-Import MCMonadNotation.
+Import MRMonadNotation.
 From MetaCoq.Template Require Import AstUtils Ast Pretty.
 From MetaCoq.SafeChecker Require Import PCUICErrors PCUICWfEnvImpl PCUICSafeChecker.
 From MetaCoq.PCUIC Require Import PCUICSN. 

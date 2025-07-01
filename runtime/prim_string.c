@@ -5,7 +5,7 @@
 
 typedef value primstring;
 
-#define trace(...) printf(__VA_ARGS__)
+#define trace(...) // printf(__VA_ARGS__)
 
 value prim_string_compare(primstring x, primstring y)
 {

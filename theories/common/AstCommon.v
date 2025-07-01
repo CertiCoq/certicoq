@@ -1,8 +1,8 @@
-From MetaCoq.Utils Require Import utils.
-From MetaCoq.Common Require Import Universes.
-From MetaCoq Require Export Common.BasicAst.
-From MetaCoq Require Import Template.Ast.
-From MetaCoq Require Export Erasure.EAst.
+From MetaRocq.Utils Require Import utils.
+From MetaRocq.Common Require Import Universes.
+From MetaRocq Require Export Common.BasicAst.
+From MetaRocq Require Import Template.Ast.
+From MetaRocq Require Export Erasure.EAst.
 Require Import Coq.Arith.Peano_dec.
 Require Import Coq.Logic.Eqdep_dec.
 Require Import Coq.Lists.List.
@@ -558,7 +558,7 @@ Proof. reflexivity. Qed.
 
 From Coq Require Import ssreflect.
 From Equations Require Import Equations.
-From MetaCoq.Erasure Require Import EPrimitive.
+From MetaRocq.Erasure Require Import EPrimitive.
 
 Variant prim_tag : Set := 
   | primInt | primFloat. 

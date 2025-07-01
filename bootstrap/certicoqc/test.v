@@ -1,12 +1,12 @@
-From MetaCoq.Template Require Import All.
-From MetaCoq.Utils Require Import bytestring.
-From MetaCoq.Common Require Import Primitive.
+From MetaRocq.Template Require Import All.
+From MetaRocq.Utils Require Import bytestring.
+From MetaRocq.Common Require Import Primitive.
 
 From Coq Require Import PrimFloat PrimInt63.
 From CertiCoq.CertiCoqC Require Import CertiCoqC.
 
-(* Set MetaCoq Debug. *)
-Set MetaCoq Timing.
+(* Set MetaRocq Debug. *)
+Set MetaRocq Timing.
 From Coq Require Import List.
 Import ListNotations.
 
@@ -27,7 +27,7 @@ Definition string_of_bool b :=
 #[export] Instance Z_show : Show BinNums.Z := string_of_Z.
 Require Import ZArith.
 
-From MetaCoq.ErasurePlugin Require Import Loader.
+From MetaRocq.ErasurePlugin Require Import Loader.
 From CertiCoq.Common Require Import Pipeline_utils.
 From CertiCoq.CertiCoqC Require Import CertiCoqC.
 From CertiCoq.CertiCoqC Require Import Loader.

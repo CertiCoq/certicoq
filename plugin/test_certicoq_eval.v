@@ -1,6 +1,6 @@
 From CertiCoq.Plugin Require Import Loader.
 From CertiCoq.Plugin Require Import CertiCoq.
-From MetaCoq.Utils Require Import utils.
+From MetaRocq.Utils Require Import utils.
 
 Set CertiCoq Build Directory "_build".
 
@@ -18,7 +18,7 @@ Definition test := true.
 CertiCoq Eval -time -debug test.
 
 #[export] Instance list_show {A} {SA : Show A} : Show (list A) := string_of_list show.
-From MetaCoq.Common Require Import Primitive.
+From MetaRocq.Common Require Import Primitive.
 From Coq Require Import PrimFloat PrimInt63.
 #[export] Instance float_show : Show PrimFloat.float := string_of_float.
 #[export] Instance prim_int_show : Show PrimInt63.int := string_of_prim_int.

@@ -7,7 +7,7 @@ Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.
 Require Import ExtLib.Data.Monads.StateMonad.
 Require Import LambdaANF.cps_util LambdaANF.cps_util LambdaANF.cps_show LambdaANF.state.
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 Open Scope monad_scope.
 Import MonadNotation.
 

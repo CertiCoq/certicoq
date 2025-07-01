@@ -1,13 +1,13 @@
 From CertiCoq.Plugin Require Import CertiCoq.
-From MetaCoq.Utils Require Import utils.
+From MetaRocq.Utils Require Import utils.
 Open Scope bs_scope.
 
 Import MCMonadNotation.
-From MetaCoq.Template Require Import AstUtils Ast Pretty.
-From MetaCoq.SafeChecker Require Import PCUICErrors PCUICWfEnvImpl PCUICSafeChecker.
-From MetaCoq.PCUIC Require Import PCUICSN. 
-From MetaCoq.SafeCheckerPlugin Require Import SafeTemplateChecker.
-From MetaCoq.ErasurePlugin Require Import Erasure.
+From MetaRocq.Template Require Import AstUtils Ast Pretty.
+From MetaRocq.SafeChecker Require Import PCUICErrors PCUICWfEnvImpl PCUICSafeChecker.
+From MetaRocq.PCUIC Require Import PCUICSN. 
+From MetaRocq.SafeCheckerPlugin Require Import SafeTemplateChecker.
+From MetaRocq.ErasurePlugin Require Import Erasure.
  
 (* Program Definition infer_template_program {cf : config.checker_flags} {nor : PCUICSN.normalizing_flags} {guard : abstract_guard_impl}  *)
 (*   (p : PCUICAst.PCUICEnvironment.program) φ *)
@@ -48,7 +48,7 @@ Definition certicoqchk (p : Template.Ast.Env.program) : bool :=
   | inr err => let () := coq_user_error err in false
   end.
 
-Eval compute in "Compiling MetaCoq's checker".
+Eval compute in "Compiling MetaRocq's checker".
 Set Warnings "-primitive-turned-into-axiom".
 
 CertiCoq Compile -time -O 1 certicoqchk.

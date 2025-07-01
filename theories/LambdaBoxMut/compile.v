@@ -10,12 +10,12 @@ Require Import Common.Common.
 Require Import Coq.micromega.Lia.
 
 From Equations Require Import Equations.
-From MetaCoq.Utils Require utils.
-From MetaCoq.Template Require EtaExpand.
-From MetaCoq.Utils Require Import bytestring.
-From MetaCoq.Common Require Import Primitive.
-From MetaCoq.Erasure Require Import EPrimitive EAst ESpineView EGlobalEnv EEtaExpanded EInduction Erasure.
-From MetaCoq.ErasurePlugin Require Import Erasure.
+From MetaRocq.Utils Require utils.
+From MetaRocq.Template Require EtaExpand.
+From MetaRocq.Utils Require Import bytestring.
+From MetaRocq.Common Require Import Primitive.
+From MetaRocq.Erasure Require Import EPrimitive EAst ESpineView EGlobalEnv EEtaExpanded EInduction Erasure.
+From MetaRocq.ErasurePlugin Require Import Erasure.
 
 Local Open Scope bs_scope.
 Local Open Scope bool.

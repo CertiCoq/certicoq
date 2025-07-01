@@ -389,7 +389,7 @@ Section Elim.
 
 End Elim.
   
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 
 Definition DPE (e : exp) (c_data : comp_data) : error exp * comp_data :=
   if is_hoisted e then 

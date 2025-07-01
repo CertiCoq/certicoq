@@ -13,7 +13,7 @@ Require Import Coq.Lists.List.
 Import ListNotations.
 
 (* Set Universe Polymorphism. *)
-Unset MetaCoq Strict Unquote Universe Mode.
+Unset MetaRocq Strict Unquote Universe Mode.
 
 (** * Uncurrying as a guarded rewrite rule *)
 

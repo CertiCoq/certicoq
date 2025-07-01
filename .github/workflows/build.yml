@@ -28,7 +28,7 @@ jobs:
         with:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
-          before_install: | # comment back in if MetaCoq commit changes
+          before_install: | # comment back in if MetaRocq commit changes
             startGroup "fix permission issues"
               sudo chown -R 1000:1000 .
             endGroup

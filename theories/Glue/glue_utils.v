@@ -8,9 +8,9 @@ Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
                ExtLib.Data.String.
 
-From MetaCoq.Utils Require Import bytestring.
-From MetaCoq.Common Require Import BasicAst.
-Require MetaCoq.Template.All.
+From MetaRocq.Utils Require Import bytestring.
+From MetaRocq.Common Require Import BasicAst.
+Require MetaRocq.Template.All.
 
 Require Import compcert.common.AST
                compcert.common.Errors
@@ -330,8 +330,8 @@ Section Ctor_Info.
 
 End Ctor_Info.
 
-Module MetaCoqNotations.
-  Import MetaCoq.Template.All.
+Module MetaRocqNotations.
+  Import MetaRocq.Template.All.
 
   (* Recursive quoting *)
   Notation "<%% x %%>" :=
@@ -359,4 +359,4 @@ Module MetaCoqNotations.
           run_template_program (tmQuote x) p))
     (only parsing).
   (* Compute <? option ?>. *)
-End MetaCoqNotations.
+End MetaRocqNotations.

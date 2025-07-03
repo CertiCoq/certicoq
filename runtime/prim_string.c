@@ -5,11 +5,7 @@
 
 typedef value primstring;
 
-<<<<<<< HEAD
 #define trace(...) // printf(__VA_ARGS__)
-=======
-#define trace(...) printf(__VA_ARGS__)
->>>>>>> bacd3660 (fix bootstrap)
 
 value prim_string_compare(primstring x, primstring y)
 {
@@ -48,5 +44,4 @@ primint prim_string_length(primstring x)
   /* else if (result < 0) return 3; */
   /* else */
   return 0;
->>>>>>> bacd3660 (fix bootstrap)
 }

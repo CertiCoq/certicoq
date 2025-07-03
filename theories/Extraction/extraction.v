@@ -14,11 +14,14 @@ Require compcert.common.AST
 Require Glue.glue
         Compiler.pipeline.
 
-From MetaCoq.ErasurePlugin Require Import Erasure.
+From MetaRocq.ErasurePlugin Require Import Erasure.
 (* Standard lib *)
 Require Import ExtrOcamlBasic ExtrOCamlFloats ExtrOCamlInt63 ExtrOCamlPString.
 Require Import Coq.extraction.Extraction.
 Require Import ZArith NArith.
+
+Extraction Inline Program.Wf.Fix_F_sub.
+Extraction Inline Program.Wf.Fix_sub.
 
 (* Coqlib *)
 Extract Inlined Constant Coqlib.proj_sumbool => "(fun x -> x)".
@@ -49,9 +52,9 @@ Extract Constant Int31.compare31 => "Camlcoq.Int31.compare".
 Extract Constant Int31.On => "0".
 Extract Constant Int31.In => "1". *)
 
-Extract Inductive Decimal.int => "decimal_int" [ "DecimalPos" "DecimalNeg" ] "(fun hp hn d -> match d with DecimalPos p -> hp p | DecimalNeg p -> hn p)".
-Extract Inductive Hexadecimal.int => "hexadecimal_int" [ "HexadecimalPos" "HexadecimalNeg" ] "(fun hp hn d -> match d with HexadecimalPos p -> hp p | HexadecimalNeg p -> hn p)".
-Extract Inductive Number.int => "number_int" [ "IntDecimal" "IntHexadecimal" ] "(fun hp hn d -> match d with IntDecimal p -> hp p | IntHexadecimal p -> hn p)".
+(* Extract Inductive Decimal.int => "decimal_int" [ "DecimalPos" "DecimalNeg" ] "(fun hp hn d -> match d with DecimalPos p -> hp p | DecimalNeg p -> hn p)". *)
+(* Extract Inductive Hexadecimal.int => "hexadecimal_int" [ "HexadecimalPos" "HexadecimalNeg" ] "(fun hp hn d -> match d with HexadecimalPos p -> hp p | HexadecimalNeg p -> hn p)". *)
+(* Extract Inductive Number.int => "number_int" [ "IntDecimal" "IntHexadecimal" ] "(fun hp hn d -> match d with IntDecimal p -> hp p | IntHexadecimal p -> hn p)". *)
 
 Extraction Inline Equations.Prop.Classes.noConfusion.
 Extraction Inline Equations.Prop.Logic.eq_elim.
@@ -83,12 +86,12 @@ Set Warnings "-extraction-opaque-accessed".
 
 Set Extraction Output Directory ".".
 
-Extraction Library Zeven.
-Extraction Library Zeven.
-Extraction Library ZArith_dec.
-Extraction Library Sumbool.
-Extraction Library Zbool.
-Extraction Library SpecFloat.
+(* Extraction Library Zeven. *)
+(* Extraction Library Zeven. *)
+(* Extraction Library ZArith_dec. *)
+(* Extraction Library Sumbool. *)
+(* Extraction Library Zbool. *)
+(* Extraction Library SpecFloat. *)
 Separate Extraction FloatOps.Prim2SF.
 
 Cd "Extraction".

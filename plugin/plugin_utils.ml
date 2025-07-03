@@ -69,8 +69,8 @@ Valid options:\n\
 -cps      :  Compile using continuation-passing style code (default: direct-style compilation)\n\
 -time     :  Time each compilation phase\n\
 -time_anf :  Time λanf optimizations\n\
--unsafe-erasure   :  Allow to use unsafe passes in the MetaCoq Erasure pipeline. This currently includes the cofixpoint-to-fixpoint translation.\n\
--typed-erasure    :  Uses the typed erasure and de-arging phase of the MetaCoq Erasure pipeline.\n\
+-unsafe-erasure   :  Allow to use unsafe passes in the MetaRocq Erasure pipeline. This currently includes the cofixpoint-to-fixpoint translation.\n\
+-typed-erasure    :  Uses the typed erasure and de-arging phase of the MetaRocq Erasure pipeline.\n\
 \n\n\
 To compile Gallina constants to specific C functions use:\n\
    CertiCoq Compile <options> <gid> Extract Constants [ constant1 => \"c_function1\", ... , constantN => \"c_functionN\" ] Include [ \"file1.h\" , Library \"runtime_header.h\", ... , Absolute \"fileM.h\" ].\n\

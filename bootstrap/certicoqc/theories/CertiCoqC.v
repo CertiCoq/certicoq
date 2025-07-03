@@ -1,4 +1,4 @@
-From MetaCoq.Utils Require Import utils.
+From MetaRocq.Utils Require Import utils.
 Open Scope bs_scope.
 
 Require Import CertiCoq.Compiler.pipeline.
@@ -21,7 +21,7 @@ Section Pipeline.
     compile_LambdaANF next_id p.
 End Pipeline.
 
-(** * The main CertiCoq pipeline, with MetaCoq's erasure and C-code generation *)
+(** * The main CertiCoq pipeline, with MetaRocq's erasure and C-code generation *)
 Definition next_id := 100%positive.
 
 Definition pipeline (p : Template.Ast.Env.program) :=

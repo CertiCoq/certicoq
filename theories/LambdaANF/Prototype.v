@@ -1,4 +1,4 @@
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 Open Scope bs_scope.
 Import String.
 Infix "+++" := append (at level 60, right associativity).
@@ -6,9 +6,9 @@ Infix "+++" := append (at level 60, right associativity).
 Require Import Coq.Lists.List.
 Import ListNotations.
 
-From MetaCoq Require Import Template.All.
-Import MCMonadNotation.
-Module TM := MetaCoq.Utils.monad_utils.
+From MetaRocq Require Import Template.All.
+Import MRMonadNotation.
+Module TM := MetaRocq.Utils.monad_utils.
 
 From ExtLib.Core Require Import RelDec.
 From ExtLib.Data Require Import Nat List Option Pair.
@@ -39,7 +39,7 @@ Open Scope list_scope.
    Before unquoting, all internally generated names will be replaced by the proper
    indices. *)
 
-(* Fail MetaCoq Run (tmUnquote (tLambda (nNamed "$oof") <%nat%> (tRel 0))). *)
+(* Fail MetaRocq Run (tmUnquote (tLambda (nNamed "$oof") <%nat%> (tRel 0))). *)
 
 Definition gensym (suffix : string) : GM string :=
   let! n := get in
@@ -385,7 +385,7 @@ Record RwObligations A := mk_obs {
   obBottomups : list A }.
 Arguments mk_obs {_}.
 
-(* ---------- MetaCoq helpers ---------- *)
+(* ---------- MetaRocq helpers ---------- *)
 
 Fixpoint quote_pos (n : positive) : term :=
   match n with
@@ -675,7 +675,7 @@ Fixpoint quote_string (s : string) : term :=
   | String c s => tApp <%String%> [quote_byte c; quote_string s]
   end.
 
-(* MetaCoq Run (tmPrint =<< tmUnquote (quote_string "abc")). *)
+(* MetaRocq Run (tmPrint =<< tmUnquote (quote_string "abc")). *)
 
 (* abbreviate = map head . splitOn "_" *)
 Fixpoint abbreviate s :=

@@ -20,9 +20,9 @@ Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
                ExtLib.Data.String.
 
-From MetaCoq.Utils Require Import bytestring.
-From MetaCoq.Common Require Import BasicAst.
-Require MetaCoq.Template.All.
+From MetaRocq.Utils Require Import bytestring.
+From MetaRocq.Common Require Import BasicAst.
+Require MetaRocq.Template.All.
 
 Require Import compcert.common.AST
                compcert.common.Errors
@@ -73,7 +73,7 @@ Section FState.
 
 End FState.
 
-(* Takes a MetaCoq type for an FFI function,
+(* Takes a MetaRocq type for an FFI function,
    returns its arity and whether it's in IO. *)
 (* TODO currently the IO name is hardcoded
    but we should change that at some point *)
@@ -86,7 +86,7 @@ Fixpoint type_to_args
   | _ => (0, false)
   end.
 
-(* Takes a MetaCoq constructor type (a pi type),
+(* Takes a MetaRocq constructor type (a pi type),
    skips the number of parameters in the type.
    Doesn't fail if there aren't enough pi types etc. *)
 Fixpoint skip_params
@@ -335,7 +335,7 @@ Fixpoint make_curried_fns
 
 (* Take a field name as a [kername],
    which is supposed to be an FFI function name,
-   and its Coq type as a MetaCoq type.
+   and its Coq type as a MetaRocq type.
    Generate the necessary Clight functions and closures from that. *)
 Definition make_one_field
            (field : sanitized_name * Ast.term)
@@ -399,7 +399,7 @@ Definition make_ffi_program
        mk_prog_opt composites glob_defs
                    main_ident true).
 
-(* Takes the full MetaCoq program representing a type,
+(* Takes the full MetaRocq program representing a type,
    like an [FFI] type class.
    Returns the fields in that type class. *)
 Definition get_constructors

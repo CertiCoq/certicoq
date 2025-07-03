@@ -1,4 +1,4 @@
-COQ_SRC_SUBDIRS+=user-contrib/MetaCoq/Template
+COQ_SRC_SUBDIRS+=user-contrib/MetaRocq/Template
 CAMLFLAGS+=-w -33 # Unused opens
 CAMLFLAGS+=-w -34 # Unused type program
 CAMLFLAGS+=-w -32 # Unused values
@@ -7,7 +7,7 @@ CAMLFLAGS+=-w -20 # Unused arguments
 CAMLFLAGS+=-w -60 # Unused functor arguments
 CAMLFLAGS+=-w -8 # Non-exhaustive matches produced by extraction
 CAMLFLAGS+=-w -37 # Unused constructor
-CAMLPKGS += -package coq-metacoq-template-ocaml.plugin,stdlib-shims
+CAMLPKGS += -package coq-metacoq-template-ocaml.plugin,stdlib-shims 
 
 CC=$(shell which gcc || which clang-11)
 

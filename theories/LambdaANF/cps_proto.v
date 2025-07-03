@@ -9,7 +9,7 @@ From CertiCoq.LambdaANF Require Import
      Prototype cps cps_util ctx
      identifiers Ensembles_util.
 
-From MetaCoq Require Import Template.All.
+From MetaRocq Require Import Template.All.
 
 From CertiCoq.LambdaANF Require Import PrototypeGenFrame cps cps_proto_univ.
 

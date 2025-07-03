@@ -19,7 +19,7 @@ Require Import Coq.Bool.Bool.
 Require Import identifiers.  (* for max_var *)
 Require Import AltBinNotations.
 Require Import LambdaANF.List_util LambdaANF.cps_util LambdaANF.state.
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 
 Open Scope monad_scope.
 

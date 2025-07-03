@@ -14,7 +14,7 @@ Require Import closure_conversion_corresp.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 
 Import Monad.MonadNotation.
 

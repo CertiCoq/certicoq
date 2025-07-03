@@ -1,5 +1,5 @@
-From MetaCoq.Utils Require Import bytestring MCString. 
-From MetaCoq.Common Require Import Primitive.
+From MetaRocq.Utils Require Import bytestring MRString. 
+From MetaRocq.Common Require Import Primitive.
 From CertiCoq.Plugin Require Import CertiCoq.
 From Coq Require Import Uint63 ZArith.
 Open Scope bs.
@@ -14,15 +14,15 @@ CertiCoq Run cst.
 
 From Bignums Require Import BigN.
 Local Open Scope bigN_scope.
-From MetaCoq.ErasurePlugin Require Import Loader.
+From MetaRocq.ErasurePlugin Require Import Loader.
 
-(* From MetaCoq.Erasure Require Import Loader. *)
+(* From MetaRocq.Erasure Require Import Loader. *)
  
 Definition testd := diveucl_21 9305446873517 1793572051078448654 4930380657631323783. 
 Definition testmul := head0 3221225472.
 Eval compute in testmul.
 
-(* MetaCoq Erase -time -typed testmul. *)
+(* MetaRocq Erase -time -typed testmul. *)
 
 CertiCoq Eval -time -debug -typed-erasure testmul.
 (* 

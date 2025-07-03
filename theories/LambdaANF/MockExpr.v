@@ -5,7 +5,7 @@ Require Import Coq.Strings.String.
 Require Import Coq.Lists.List.
 Import ListNotations.
 
-From MetaCoq Require Import Template.All.
+From MetaRocq Require Import Template.All.
 
 (* Unset Strict Unquote Universe Mode. *)
 
@@ -20,7 +20,7 @@ Inductive exp :=
 | eFuns (fds : list fundef) (e : exp)
 with fundef := fFun (f : var) (xs : list var) (e : exp).
 
-MetaCoq Run (mk_Frame_ops (MPfile ["MockExpr"; "LambdaANF"; "CertiCoq"])
+MetaRocq Run (mk_Frame_ops (MPfile ["MockExpr"; "LambdaANF"; "CertiCoq"])
                           (MPfile ["MockExpr"; "LambdaANF"; "CertiCoq"], "exp") exp
                           [var; constr; nat; list var]).
 

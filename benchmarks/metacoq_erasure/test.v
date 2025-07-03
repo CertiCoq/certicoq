@@ -1,16 +1,16 @@
-From MetaCoq.Template Require Import All Loader.
+From MetaRocq.Template Require Import All Loader.
 From CertiCoq.Benchmarks.metacoq_erasure Require Import Loader.
-(* Set MetaCoq Debug. *)
-Set MetaCoq Timing.
+(* Set MetaRocq Debug. *)
+Set MetaRocq Timing.
 From Coq Require Import List.
 Import ListNotations.
 
 (* CertiCoq Erase (List.map negb [true; false]). *)
 
-From MetaCoq.ErasurePlugin Require Import Erasure.
+From MetaRocq.ErasurePlugin Require Import Erasure.
 CertiCoq Erase @erase_and_print_template_program.
 
-(* From MetaCoq.SafeChecker Require Import PCUICSafeChecker. *)
+(* From MetaRocq.SafeChecker Require Import PCUICSafeChecker. *)
 (* CertiCoq Erase @typecheck_program. *)
 
 (*

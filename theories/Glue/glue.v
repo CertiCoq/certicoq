@@ -8,8 +8,8 @@ Require Import Coq.ZArith.ZArith
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad.
 
-From MetaCoq.Common Require Import BasicAst.
-Require MetaCoq.Template.All.
+From MetaRocq.Common Require Import BasicAst.
+Require MetaRocq.Template.All.
 
 Require Import compcert.common.AST
                compcert.common.Errors
@@ -27,7 +27,7 @@ Require Import LambdaANF.cps
                compM
                glue_utils.
 
-From MetaCoq.Utils Require Import bytestring MCString.
+From MetaRocq.Utils Require Import bytestring MRString.
 
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
@@ -527,7 +527,7 @@ Section L1Types.
         match e with
           | Ast.tProd _ _ e' => check_last e'
           | Ast.tSort u =>
-              MetaCoq.Common.Universes.Sort.is_prop u
+              MetaRocq.Common.Universes.Sort.is_prop u
           | _ => false
         end
     in check_last (Ast.Env.ind_type (ty_body info)).
@@ -1024,7 +1024,7 @@ Section CConstructors.
     match n with
     | O => ret nil
     | S n' =>
-        new_id <- gensym ("arg" ++ MCString.string_of_nat n')%bs ;;
+        new_id <- gensym ("arg" ++ MRString.string_of_nat n')%bs ;;
         rest_id <- make_arg_list' n' ;;
         ret ((new_id, val) :: rest_id)
     end.

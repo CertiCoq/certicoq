@@ -1,4 +1,4 @@
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 Open Scope bs_scope.
 Import String.
 
@@ -7,9 +7,9 @@ Infix "+++" := append (at level 60, right associativity).
 Require Import Coq.Lists.List.
 Import ListNotations.
 
-From MetaCoq Require Import Template.All.
-Import MCMonadNotation.
-Module TM :=MetaCoq.Utils.monad_utils.
+From MetaRocq Require Import Template.All.
+Import MRMonadNotation.
+Module TM :=MetaRocq.Utils.monad_utils.
 
 From ExtLib.Core Require Import RelDec.
 From ExtLib.Data Require Import Nat List Option Pair String.

@@ -266,6 +266,10 @@ extraction/eqtype.ml
 extraction/eqtype.mli
 extraction/common0.ml
 extraction/common0.mli
+extraction/bytes.ml
+extraction/bytes.mli
+extraction/simd.ml
+extraction/simd.mli
 extraction/datatypes0.ml
 extraction/datatypes0.mli
 extraction/datatypes_properties.ml
@@ -274,8 +278,6 @@ extraction/leb128.ml
 extraction/leb128.mli
 extraction/seq.ml
 extraction/seq.mli
-extraction/bytes.ml
-extraction/bytes.mli
 extraction/binary_format_printer.ml
 extraction/binary_format_printer.mli
 extraction/list_extra.ml

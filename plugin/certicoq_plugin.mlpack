@@ -290,6 +290,7 @@ Seq
 Numerics
 Bytes
 Leb128
+Simd
 Datatypes0
 Datatypes_properties
 List_extra

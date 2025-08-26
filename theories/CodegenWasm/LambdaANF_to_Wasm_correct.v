@@ -1062,7 +1062,7 @@ Definition INV_glob_mem_ptr_in_linear_memory s f := forall gmp_v m,
 Definition INV_glob_cap_in_linear_memory s f := forall addr t m,
   sglob_val s (f_inst f) glob_cap = Some (VAL_num (VAL_int32 addr)) ->
   exists m', store m (Wasm_int.N_of_uint i32m addr) 0%N
-                     (bits (nat_to_value (Pos.to_nat t))) 4 = Some m'.
+                     (serialise_num (nat_to_value (Pos.to_nat t))) 4 = Some m'.
 
 Definition INV_locals_all_i32 f := forall i v,
   nth_error (f_locs f) i = Some v -> exists v', v = VAL_num (VAL_int32 v').
@@ -2289,17 +2289,17 @@ Proof.
       assert (exists m0, store m (Wasm_int.N_of_uint i32m (Wasm_int.Int32.iadd
                                    (N_to_i32 v_cap)
                                    (nat_to_i32 (S (S (S (S (offset * 4)))))))) 0%N
-                        (bits (VAL_int32 (wasm_value_to_i32 wal))) 4 = Some m0) as Hm0. {
+                        (serialise_num (VAL_int32 (wasm_value_to_i32 wal))) 4 = Some m0) as Hm0. {
        intros.
        have H'' := mem_length_upper_bound _ Hmem5. unfold max_mem_pages, page_size in H''.
-       replace (length (bits (VAL_int32 (wasm_value_to_i32 wal)))) with 4 by reflexivity.
+       replace (length (serialise_num (VAL_int32 (wasm_value_to_i32 wal)))) with 4 by reflexivity.
        unfold Wasm_int.Int32.iadd, Wasm_int.Int32.add.
        remember (S (S (S (S (offset * 4))))) as n. cbn. cbn in Hlen.
        repeat rewrite Wasm_int.Int32.Z_mod_modulus_id; simpl_modulus; cbn; try lia.
        cbn.
        apply notNone_Some.
        eapply enough_space_to_store; eauto.
-       rewrite length_bits_i32. lia.
+       rewrite length_serialise_num_i32. lia.
      }
       (* prepare IH *)
 
@@ -2512,7 +2512,7 @@ Proof.
           remember ((4 + 4 * N.of_nat offset + cap)%N) as o'. cbn.
           repeat rewrite Wasm_int.Int32.Z_mod_modulus_id; simpl_modulus; cbn; lia.
       }
-        rewrite deserialise_bits in Hm0=>//. rewrite Har. eassumption. }
+        rewrite deserialise_serialise in Hm0=>//. rewrite Har. eassumption. }
 
       { rewrite H1 in Hgmp.
         assert ((-1 < Z.of_nat (4 + 4 * offset + N.to_nat cap) < Wasm_int.Int32.modulus)%Z). {
@@ -2730,9 +2730,9 @@ Proof.
   assert (m' = m). { apply update_global_preserves_memory in H. congruence. } subst m' size''.
 
   assert (exists mem, store m (Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) 0%N
-                        (bits (nat_to_value (N.to_nat ord))) 4 = Some mem) as Htest. {
+                        (serialise_num (nat_to_value (N.to_nat ord))) 4 = Some mem) as Htest. {
     apply notNone_Some. apply enough_space_to_store. cbn.
-    rewrite length_bits_i32.
+    rewrite length_serialise_num_i32.
     rewrite Wasm_int.Int32.Z_mod_modulus_id; try lia.
     destruct Hinv' as [_ [_ [_ [_ [_ [_ [Hlinmem [INVgmp_M _]]]]]]]].
     destruct Hlinmem as [Hmem1 [m' [Hmem2 [size [Hmem3 [Hmem4 Hmem5]]]]]].
@@ -2953,7 +2953,7 @@ Proof.
     lia. exists n0. auto.
     reflexivity.
     apply store_load_i32 in Hstore.
-    rewrite deserialise_bits in Hstore; auto.
+    rewrite deserialise_serialise in Hstore; auto.
     assert ((Wasm_int.N_of_uint i32m (N_to_i32 gmp_v)) = gmp_v) as Heq. {
     unfold nat_to_i32. cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
     rewrite Heq in Hstore.
@@ -5340,10 +5340,10 @@ Proof with eauto.
 
         (* There exists memory containing the new value *)
         assert (exists mem, store m (Wasm_int.N_of_uint i32m (N_to_i32 gmp)) 0%N
-                                    (bits (VAL_int64 v0)) 8 = Some mem)
+                                    (serialise_num (VAL_int64 v0)) 8 = Some mem)
             as [m_after_store Hm_after_store].
         { apply notNone_Some. apply enough_space_to_store. cbn.
-          rewrite length_bits_i64.
+          rewrite length_serialise_num_i64.
           rewrite Wasm_int.Int32.Z_mod_modulus_id; lia. }
 
         remember (upd_s_mem s' (set_nth m_after_store s'.(s_mems) 0 m_after_store)) as s_prim.
@@ -5502,10 +5502,12 @@ Proof with eauto.
           { apply update_global_get_same with (sr:=s_prim). subst f_before_IH. assumption. }
           { subst f_before_IH. assumption. }
           { apply store_load_i64 in Hm_after_store; auto.
-            assert (wasm_deserialise (bits (VAL_int64 v0)) T_i64 = VAL_int64 v0) by now apply deserialise_bits.
+            assert (wasm_deserialise (serialise_num (VAL_int64 v0)) T_i64 = VAL_int64 v0)
+                by now apply deserialise_serialise.
 
             rewrite H0 in Hm_after_store.
-            replace (Wasm_int.N_of_uint i32m (N_to_i32 gmp)) with gmp in Hm_after_store. rewrite <-Hv0. assumption.
+            replace (Wasm_int.N_of_uint i32m (N_to_i32 gmp)) with gmp in Hm_after_store.
+            rewrite <-Hv0. assumption.
             cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia.
           }
         }
@@ -5526,7 +5528,7 @@ Proof with eauto.
             apply enough_space_to_load. lia. }
           destruct Hex as [v' Hv'].
           rewrite Hv'. symmetry.
-          apply (load_store_load_i32' m m_after_store a (Wasm_int.N_of_uint i32m (N_to_i32 gmp)) v' (bits (VAL_int64 v0))); auto.
+          apply (load_store_load_i32' m m_after_store a (Wasm_int.N_of_uint i32m (N_to_i32 gmp)) v' (serialise_num (VAL_int64 v0))); auto.
           cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia.
         }
 
@@ -5536,7 +5538,7 @@ Proof with eauto.
             apply enough_space_to_load_i64. lia. }
           destruct Hex as [v' Hv'].
           rewrite Hv'. symmetry.
-          apply (load_store_load_i64' m m_after_store a (Wasm_int.N_of_uint i32m (N_to_i32 gmp)) v' (bits (VAL_int64 v0))); auto.
+          apply (load_store_load_i64' m m_after_store a (Wasm_int.N_of_uint i32m (N_to_i32 gmp)) v' (serialise_num (VAL_int64 v0))); auto.
           cbn. rewrite Wasm_int.Int32.Z_mod_modulus_id; lia.
         }
 

@@ -38,6 +38,7 @@ myMain.ml
 myMain.mli
 vs.ml
 vs.mli
+benchmarks/*.wasm
 benchmarks/mod.py
 benchmarks/demo1
 benchmarks/demo2
@@ -139,3 +140,4 @@ bootstrap/certicoqc/tests/test.demo1.c
 bootstrap/certicoqc/tests/test.demo1.h
 plugin/.filestoinstall
 cplugin/.merlin
+result

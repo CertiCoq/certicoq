@@ -4,7 +4,7 @@ LINKOPTS = -linkpkg -dontlink str,unix,dynlink,threads,zarith
 
 TARGETS = ${SRC:.c=.o}
 COQLIB = `coqc -where`
-DST = ${COQLIB}/user-contrib/CertiCoq/Plugin/runtime
+DST ?= ${COQLIB}/user-contrib/CertiCoq/Plugin/runtime
 
 all: ${TARGETS}
 

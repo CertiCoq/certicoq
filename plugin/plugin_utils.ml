@@ -51,8 +51,10 @@ let rec debug_mappings (ms : (Kernames.kername * Kernames.ident) list) : unit =
      
 let help_msg : string =
   "Usage:\n\
-To compile a Gallina definition named <gid> type:\n\
+To compile a Gallina definition named <gid> to C type:\n\
    CertiCoq Compile <options> <gid>.\n\n\
+To compile a Gallina definition named <gid> to Wasm type:\n\
+   CertiCoq Compile Wasm <options> <gid>.\n\n\
 To evaluate a Gallina definition named <gid> type:\n\
    CertiCoq Eval <options> <gid>.\n\n\
 To show this help message type:\n\

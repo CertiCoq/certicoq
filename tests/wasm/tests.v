@@ -1,11 +1,11 @@
 Require Import Arith List String Uint63 BinNat.
-Require Import CertiCoq.Benchmarks.lib.vs.
-Require Import CertiCoq.Benchmarks.lib.Binom.
-Require Import CertiCoq.Benchmarks.lib.Color.
-Require Import CertiCoq.Benchmarks.lib.sha256.
-Require Import CertiCoq.Benchmarks.lib.coind.
-(* Require Import CertiCoq.Benchmarks.lib.coqprime. Requires: opam install coq-coqprime *)
-Require Import CertiCoq.Benchmarks.lib.stack_machine.
+Require Import CertiCoq.Tests.lib.vs.
+Require Import CertiCoq.Tests.lib.Binom.
+Require Import CertiCoq.Tests.lib.Color.
+Require Import CertiCoq.Tests.lib.sha256.
+Require Import CertiCoq.Tests.lib.coind.
+(* Require Import CertiCoq.Tests.lib.coqprime. Requires: opam install coq-coqprime *)
+Require Import CertiCoq.Tests.lib.stack_machine.
 
 From MetaCoq.Utils Require Import bytestring MCString.
 From CertiCoq.Plugin Require Import CertiCoq.

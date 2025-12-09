@@ -81,7 +81,7 @@ import { readFileSync } from 'fs';
 let importObject = { env: {} };
 
 async function run_test([test, pp_fun, expected]) {
-    const bytes = readFileSync(`CertiCoq.Benchmarks.uint63_unit_tests.${test}.wasm`);
+    const bytes = readFileSync(`CertiCoq.Tests.uint63_unit_tests.${test}.wasm`);
 
     const obj = await WebAssembly.instantiate(
         new Uint8Array (bytes), importObject

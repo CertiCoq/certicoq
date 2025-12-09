@@ -37,7 +37,7 @@ let importObject = { env: {} };
 
 (async () => {
     const start_startup = Date.now();
-    const bytes = readFileSync(path + `CertiCoq.Benchmarks.wasm.tests.${program}.wasm`);
+    const bytes = readFileSync(path + `CertiCoq.Tests.wasm.tests.${program}.wasm`);
 
     const obj = await WebAssembly.instantiate(
         new Uint8Array (bytes), importObject

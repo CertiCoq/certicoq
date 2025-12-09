@@ -1,10 +1,10 @@
-COQOPTS = -R ../ CertiCoq.Benchmarks -R lib CertiCoq.Benchmarks.lib
+COQOPTS = -R ../ CertiCoq.Tests -R lib CertiCoq.Tests.lib
 
-# Names of the benchmarks
+# Names of the tests
 TESTS=$(shell cat TESTS)
 
 # Name of generated webassembly files
-WASMFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%.wasm, $(TESTS))
+WASMFILES=$(patsubst %, CertiCoq.Tests.tests.%.wasm, $(TESTS))
 
 OS=$(shell uname)
 STACKSIZE=$(if $(filter Linux,$(OS)),unlimited,65532)
@@ -26,10 +26,10 @@ cleanlib:
 
 run_tests: lib tests.v $(WASMFILES)
 	ulimit -s $(STACKSIZE) && coqc $(COQOPTS) tests.v
-	ulimit -s $(STACKSIZE) && ./run_wasm_benchmarks.py
+	ulimit -s $(STACKSIZE) && ./run_wasm_tests.py
 
 run_primitive_unit_tests: lib
-	coqc -quiet -R ./ CertiCoq.Benchmarks uint63_unit_tests.v
+	coqc -quiet -R ./ CertiCoq.Tests uint63_unit_tests.v
 	node --stack-size=10000000 js/run_uint63_unit_tests.js
 
 clean:

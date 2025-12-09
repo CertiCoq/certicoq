@@ -1,7 +1,7 @@
 Extraction to OCaml Tests
 --------------------------
 
-Extract and compile the CertiCoq benchmarks with the OCaml compiler
+Extract and compile the CertiCoq tests with the OCaml compiler
 (bytecode + native) to compare performance.
 
 

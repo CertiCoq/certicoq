@@ -1,7 +1,7 @@
-COQOPTS = -R ../lib CertiCoq.Benchmarks.lib
+COQOPTS = -R ../lib CertiCoq.Tests.lib
 CCOMPILER=gcc
 
-# Names of the benchmarks
+# Names of the tests
 TESTS=$(shell cat TESTS)
 # Names of the generated cfiles
 MLFILES=$(patsubst %,%.ml, $(TESTS))

@@ -1,11 +1,11 @@
 From Stdlib Require Import Arith List String Uint63 BinNat.
-Require Import CertiRocq.Benchmarks.lib.vs.
-Require Import CertiRocq.Benchmarks.lib.Binom.
-Require Import CertiRocq.Benchmarks.lib.Color.
-Require Import CertiRocq.Benchmarks.lib.sha256.
-Require Import CertiRocq.Benchmarks.lib.coind.
-(* Require Import CertiRocq.Benchmarks.lib.coqprime. Requires: opam install coq-coqprime *)
-Require Import CertiRocq.Benchmarks.lib.stack_machine.
+Require Import CertiRocq.Tests.lib.vs.
+Require Import CertiRocq.Tests.lib.Binom.
+Require Import CertiRocq.Tests.lib.Color.
+Require Import CertiRocq.Tests.lib.sha256.
+Require Import CertiRocq.Tests.lib.coind.
+(* Require Import CertiRocq.Tests.lib.coqprime. Requires: opam install coq-coqprime *)
+Require Import CertiRocq.Tests.lib.stack_machine.
 
 From MetaRocq.Utils Require Import bytestring MRString.
 From CertiRocq.Plugin Require Import CertiRocq.

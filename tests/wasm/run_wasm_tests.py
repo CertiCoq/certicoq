@@ -12,7 +12,7 @@ files = open("TESTS").read().strip().split("\n")
 ret_code = 0
 
 for f in files:
-    name = f"CertiRocq.Benchmarks.wasm.tests.{f}.wasm"
+    name = f"CertiRocq.Tests.tests.{f}.wasm"
     assert os.path.isfile(name), f"didn't find wasm file {name}."
 
     print(f"\nrunning: {name}")

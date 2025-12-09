@@ -1,0 +1,3 @@
+-R ./ CertiCoq.Tests.opt
+-R ../lib CertiCoq.Tests.lib
+-arg -w -arg -deprecated

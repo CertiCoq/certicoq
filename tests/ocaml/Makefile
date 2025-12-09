@@ -1,7 +1,7 @@
-COQOPTS = -R ../../plugin CertiRocq.Plugin -I ../../plugin -R ../lib CertiRocq.Benchmarks.lib
+COQOPTS = -R ../../plugin CertiRocq.Plugin -I ../../plugin -R ../lib CertiRocq.Tests.lib
 CCOMPILER=gcc
 
-# Names of the benchmarks
+# Names of the tests
 TESTS=$(shell cat TESTS)
 # Names of the generated cfiles
 MLFILES=$(patsubst %,%.ml, $(TESTS))

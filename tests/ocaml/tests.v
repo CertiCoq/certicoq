@@ -1,8 +1,8 @@
 From Stdlib Require Import Arith List String.
-Require Import CertiRocq.Benchmarks.lib.vs.
-Require Import CertiRocq.Benchmarks.lib.Binom.
-Require Import CertiRocq.Benchmarks.lib.Color.
-Require Import CertiRocq.Benchmarks.lib.sha256.
+Require Import CertiRocq.Tests.lib.vs.
+Require Import CertiRocq.Tests.lib.Binom.
+Require Import CertiRocq.Tests.lib.Color.
+Require Import CertiRocq.Tests.lib.sha256.
 
 From CertiRocq.Plugin Require Import CertiRocq.
 
@@ -11,7 +11,7 @@ Open Scope string.
 Import ListNotations.
 Import VeriStar.
 
-(* The same benchmarks as CertiRocq benchmarks, but slightly modified
+(* The same tests as CertiRocq tests, but slightly modified
    to suspend computations with unit so we can run multiple times *)
 
 

@@ -1,8 +1,8 @@
 From Stdlib Require Import Arith List String ZArith.
-Require Import CertiRocq.Benchmarks.lib.vs.
-Require Import CertiRocq.Benchmarks.lib.Binom.
-Require Import CertiRocq.Benchmarks.lib.Color.
-Require Import CertiRocq.Benchmarks.lib.sha256.
+Require Import CertiRocq.Tests.lib.vs.
+Require Import CertiRocq.Tests.lib.Binom.
+Require Import CertiRocq.Tests.lib.Color.
+Require Import CertiRocq.Tests.lib.sha256.
 
 From CertiRocq.Plugin Require Import CertiRocq.
 

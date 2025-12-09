@@ -1,0 +1,26 @@
+(*i camlp4deps: "grammar/grammar.cma" i*)
+
+DECLARE PLUGIN "coq-certicoq-bootstrapped-erasure.plugin"
+
+{
+open Pp
+open Ltac_plugin
+open Stdarg
+open Pcoq.Prim
+
+}
+
+VERNAC COMMAND EXTEND CertiCoq_Erasure CLASSIFIED AS QUERY
+| [ "CertiCoq" "Bypass" "Erase" constr(c) ] -> {
+    let env = Global.env () in
+    let evm = Evd.from_env env in
+    let (c, _) = Constrintern.interp_constr env evm c in    
+    CertiCoqErase.erase ~bypass:true env evm c
+  }
+| [ "CertiCoq" "Erase" constr(c) ] -> {
+    let env = Global.env () in
+    let evm = Evd.from_env env in
+    let (c, _) = Constrintern.interp_constr env evm c in    
+    CertiCoqErase.erase ~bypass:false env evm c
+  }
+END

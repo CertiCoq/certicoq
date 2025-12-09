@@ -1,0 +1,8 @@
+
+package "plugin" (
+  requires = "coq-core.plugins.ltac coq-metacoq-template-ocaml.plugin stdlib-shims"
+  archive(byte) = "certicoq_erasure_plugin.cma"
+  archive(native) = "certicoq_erasure_plugin.cmxa"
+  plugin(byte) = "certicoq_erasure_plugin.cma"
+  plugin(native) = "certicoq_erasure_plugin.cmxs"
+)

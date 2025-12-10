@@ -1,4 +1,4 @@
-COQOPTS = -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
+COQOPTS = -R ../../plugin CertiRocq.Plugin -I ../../plugin -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
 CCOMPILER=gcc
 INCLUDE=../../runtime
 WARN_OPTS=-Wno-format -Wno-format-security -Wno-int-conversion
@@ -10,7 +10,7 @@ CFILES=$(patsubst %, CertiRocq.Tests.tests.%.c, $(TESTS)) glue.c
 
 default: exec
 
-.PHONY: compile exec clean
+.PHONY: compile exec clean run
 
 clean:
 	rm -f ./*.*.c
@@ -40,3 +40,6 @@ list_sum_int63_tinfo: CertiRocq.Tests.tests.list_sum_int63_tinfo.c glue.c int63_
 	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/gc_stack.c $^
 
 exec: $(TESTS)
+
+run: run.sh exec
+	sh $<

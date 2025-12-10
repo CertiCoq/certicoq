@@ -36,6 +36,7 @@ lib: ../lib/Makefile
 cleanlib:
 	$(MAKE) clean -C ../lib
 
+.NOTINTERMEDIATE: glue_%.c
 glue_%.c: tests.v
 	coqc $(COQOPTS) $<
 
@@ -55,3 +56,6 @@ glue_%.c: tests.v
 $(TESTS):%: lib $(TEST_PREQS)
 $(TESTS):%: %_cps_opt %_cps_opt1 %_cps_opt2 %_cps_opt3 %_cps_opt4 %_cps_opt5
 $(TESTS):%: %_opt %_opt1 %_opt2 %_opt3 %_opt4 %_opt5
+
+run: run.sh exec
+	sh $<

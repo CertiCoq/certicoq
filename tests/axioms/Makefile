@@ -10,7 +10,7 @@ CFILES=$(patsubst %, CertiCoq.Tests.tests.%.c, $(TESTS)) glue.c
 
 default: exec
 
-.PHONY: compile exec clean
+.PHONY: compile exec clean run
 
 clean:
 	rm -f ./*.*.c
@@ -40,3 +40,6 @@ list_sum_int63_tinfo: CertiCoq.Tests.tests.list_sum_int63_tinfo.c glue.c int63_t
 	$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) main.c $(INCLUDE)/gc_stack.c $^
 
 exec: $(TESTS)
+
+run: run.sh exec
+	sh $<

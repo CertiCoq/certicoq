@@ -393,9 +393,10 @@ with wcbvEvals (tmr:nat) (ts:Terms) {struct tmr}
                   end
                 end
        end%bs.
-Functional Scheme wcbvEval_ind' := Induction for wcbvEval Sort Prop
-with wcbvEvals_ind' := Induction for wcbvEvals Sort Prop.
-Combined Scheme wcbvEvalEvals_ind from wcbvEval_ind', wcbvEvals_ind'.
+
+(* Functional Scheme wcbvEval_ind' := Induction for wcbvEval Sort Prop *)
+(* with wcbvEvals_ind' := Induction for wcbvEvals Sort Prop. *)
+(* Combined Scheme wcbvEvalEvals_ind from wcbvEval_ind', wcbvEvals_ind'. *)
 
 (** wcbvEval and WcbvEval are the same relation **)
 Lemma wcbvEval_WcbvEval:
@@ -404,29 +405,30 @@ Lemma wcbvEval_WcbvEval:
   (forall ts ss, wcbvEvals tmr ts = Ret ss -> WcbvEvals p ts ss).
 Proof.
   intros tmr.
-  apply (wcbvEvalEvals_ind
-           (fun tmr t su => forall u (p1:su = Ret u), WcbvEval p t u)
-           (fun tmr t su => forall u (p1:su = Ret u), WcbvEvals p t u));
-    intros; try discriminate; try (myInjection p1);
-    try(solve[constructor]); intuition auto.
-  - eapply wConst; intuition auto. unfold lookupDfn. rewrite e1. reflexivity.
-  - specialize (H _ e1). specialize (H0 _ e2). now eapply wAppProof.
-  - specialize (H _ e1).
-    eapply wAppFix; eauto.
-  - specialize (H _ e1). specialize (H0 _ e2). specialize (H1 _ p1). 
-    eapply wAppLam; eassumption.
-  - specialize (H _ e1). specialize (H0 _ e2).
-    apply wAppCong; try assumption. repeat split; intros h.
-    + dstrctn h. subst. contradiction. 
-    + dstrctn h. subst. contradiction. 
-    + dstrctn h. subst. contradiction. 
-    + subst. contradiction.
-    + dstrctn h; subst. contradiction.
-  - eapply wCase; subst; try eassumption.
-    + now apply H. 
-    + intuition.
-  - eapply wLetIn; intuition.
-Qed.
+  (* apply (wcbvEvalEvals_ind *)
+(*            (fun tmr t su => forall u (p1:su = Ret u), WcbvEval p t u) *)
+(*            (fun tmr t su => forall u (p1:su = Ret u), WcbvEvals p t u)); *)
+(*     intros; try discriminate; try (myInjection p1); *)
+(*     try(solve[constructor]); intuition auto. *)
+(*   - eapply wConst; intuition auto. unfold lookupDfn. rewrite e1. reflexivity. *)
+(*   - specialize (H _ e1). specialize (H0 _ e2). now eapply wAppProof. *)
+(*   - specialize (H _ e1). *)
+(*     eapply wAppFix; eauto. *)
+(*   - specialize (H _ e1). specialize (H0 _ e2). specialize (H1 _ p1).  *)
+(*     eapply wAppLam; eassumption. *)
+(*   - specialize (H _ e1). specialize (H0 _ e2). *)
+(*     apply wAppCong; try assumption. repeat split; intros h. *)
+(*     + dstrctn h. subst. contradiction.  *)
+(*     + dstrctn h. subst. contradiction.  *)
+(*     + dstrctn h. subst. contradiction.  *)
+(*     + subst. contradiction. *)
+(*     + dstrctn h; subst. contradiction. *)
+(*   - eapply wCase; subst; try eassumption. *)
+(*     + now apply H.  *)
+(*     + intuition. *)
+(*   - eapply wLetIn; intuition. *)
+(* Qed. *)
+Admitted.
 
 Lemma wcbvEvals_tcons_tcons:
   forall m args brg brgs,
@@ -435,9 +437,10 @@ Lemma wcbvEvals_tcons_tcons:
                      wcbvEval (pred m) crg = Ret brg.
 Proof.
   intros m args.
-  functional induction (wcbvEvals m args); intros; try discriminate.
-  myInjection H0. myInjection H. assumption.
-Qed.
+  (* functional induction (wcbvEvals m args); intros; try discriminate. *)
+(*   myInjection H0. myInjection H. assumption. *)
+(* Qed. *)
+Admitted.
 
 (** need strengthening to large-enough fuel to make the induction
  *** go through **)

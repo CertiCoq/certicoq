@@ -1,4 +1,4 @@
-From Coq Require Import Lists.List Lists.SetoidList NArith.BinNat
+From Coq Require Import Lists.List SetoidList NArith.BinNat
      PArith.BinPos MSets.MSetRBT Sets.Ensembles micromega.Lia Logic.Decidable.
 From compcert.lib Require Import Coqlib.
 From CertiCoq.LambdaANF Require Import cps cps_util ctx set_util Ensembles_util

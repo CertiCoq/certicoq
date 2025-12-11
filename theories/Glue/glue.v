@@ -29,6 +29,10 @@ Require Import LambdaANF.cps
 
 From MetaRocq.Utils Require Import bytestring MRString.
 
+Notation Tcons := cons.
+Notation Tnil := nil.
+Notation typelist := (list type).
+
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
 Local Open Scope bs_scope.
@@ -447,7 +451,7 @@ Section Externs.
        *)
        (_is_ptr,
          Gfun (External (EF_external "is_ptr"
-                          (mksignature (val_typ :: nil) AST.Tvoid cc_default))
+                          (mksignature (val_typ :: nil) Xvoid cc_default))
                         (Tcons val Tnil)
                         tint cc_default)) ::
        (_guo, def_guo) ::

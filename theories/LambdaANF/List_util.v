@@ -4,9 +4,9 @@
 
 
 From Coq Require Import Lists.List Relations.Relations Classes.RelationClasses
-         micromega.Lia Numbers.BinNums Structures.OrdersEx Sets.Ensembles
-         Lists.SetoidList ZArith Arith Sorting.Permutation SetoidPermutation
-         FunInd.
+  micromega.Lia Numbers.BinNums Structures.OrdersEx Sets.Ensembles
+  SetoidList ZArith Arith Sorting.Permutation SetoidPermutation
+  FunInd.
 
 From CertiCoq Require Import LambdaANF.Ensembles_util LambdaANF.tactics. 
 

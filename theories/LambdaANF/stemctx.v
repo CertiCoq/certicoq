@@ -1,6 +1,6 @@
 (* Library extending ctx with a notion of bound on the stem of a context, as used in the proof of correctness of the shrink inliner *)
 
-Require Import Coq.Lists.List Coq.Lists.SetoidList Coq.NArith.BinNat Coq.PArith.BinPos
+Require Import Coq.Lists.List SetoidList Coq.NArith.BinNat Coq.PArith.BinPos
         Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles micromega.Lia Coq.Sorting.Permutation.
 Require Import compcert.lib.Coqlib.
 Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.ctx LambdaANF.set_util LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.size_cps LambdaANF.identifiers.

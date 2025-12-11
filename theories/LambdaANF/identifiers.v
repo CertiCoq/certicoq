@@ -2,7 +2,7 @@
  * Author: Anonymized, 2016
  *)
 
-From Coq Require Import Lists.List Lists.SetoidList NArith.BinNat PArith.BinPos
+From Coq Require Import Lists.List SetoidList NArith.BinNat PArith.BinPos
      MSets.MSetRBT Sets.Ensembles micromega.Lia Sorting.Permutation Logic.Decidable.
 
 From compcert.lib Require Import Coqlib.

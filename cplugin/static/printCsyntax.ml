@@ -71,12 +71,11 @@ let name_longtype sg =
 (* Declarator (identifier + type) *)
 
 let attributes a =
-  let open Datatypes in
   let s1 = if a.attr_volatile then " volatile" else "" in
   match a.attr_alignas with
   | None -> s1
   | Some l ->
-      sprintf " __attribute((aligned(%Ld)))%s" (Int64.shift_left 1L (N.to_int l)) s1
+      sprintf " _Alignas(%Ld)%s" (Int64.shift_left 1L (N.to_int l)) s1
 
 let attributes_space a =
   let s = attributes a in
@@ -85,20 +84,8 @@ let attributes_space a =
 let name_optid id =
   if id = "" then "" else " " ^ id
 
-let is_int_or_ptr_attr a n =
-  let open Datatypes in
-  match a.attr_alignas with
-  | Some l when N.to_int l = n -> true
-  | _ -> false
-
 let rec name_cdecl id ty =
   match ty with
-  (* BEGIN hack for the value typedef *)
-  | Ctypes.Tpointer(Ctypes.Tvoid, a) when is_int_or_ptr_attr a 2 ->
-      "value" ^ name_optid id
-  | Ctypes.Tpointer(Ctypes.Tvoid, a) when is_int_or_ptr_attr a 3 ->
-      "value" ^ name_optid id
-  (* END *)
   | Ctypes.Tvoid ->
       "void" ^ name_optid id
   | Ctypes.Tint(sz, sg, a) ->
@@ -122,15 +109,15 @@ let rec name_cdecl id ty =
       else Buffer.add_string b id;
       Buffer.add_char b '(';
       let rec add_args first = function
-      | Tnil ->
+      | [] ->
           if first then
             Buffer.add_string b
-               (if cconv.cc_vararg <> Datatypes.None then "..." else "void")
-          else if cconv.cc_vararg <> Datatypes.None then
+               (if cconv.cc_vararg <> None then "..." else "void")
+          else if cconv.cc_vararg <> None then
             Buffer.add_string b ", ..."
           else
             ()
-      | Tcons(t1, tl) ->
+      | t1 :: tl ->
           if not first then Buffer.add_string b ", ";
           Buffer.add_string b (name_cdecl "" t1);
           add_args false tl in
@@ -186,16 +173,6 @@ let print_pointer_hook
    : (formatter -> Values0.block * Integers.Int.int -> unit) ref
    = ref (fun p (b, ofs) -> ())
 
-let is_nan (f : float) = f <> f
-let is_infinity f = f = infinity
-let is_neg_infinity f = f = neg_infinity
-
-let print_float p f =
-  if is_nan f then fprintf p "%s" "NAN"
-  else if is_infinity f then fprintf p "%s" "INFINITY"
-  else if is_neg_infinity f then fprintf p "%s" "-INFINITY"
-  else fprintf p "%h" f
-
 let print_typed_value p v ty =
   match v, ty with
   | Vint n, Ctypes.Tint(I32, Unsigned, _) ->
@@ -203,15 +180,13 @@ let print_typed_value p v ty =
   | Vint n, _ ->
       fprintf p "%ld" (camlint_of_coqint n)
   | Vfloat f, _ ->
-      print_float p (camlfloat_of_coqfloat f)
+      fprintf p "%.15F" (camlfloat_of_coqfloat f)
   | Vsingle f, _ ->
-      print_float p (camlfloat_of_coqfloat32 f)
+      fprintf p "%.15Ff" (camlfloat_of_coqfloat32 f)
   | Vlong n, Ctypes.Tlong(Unsigned, _) ->
-      Printf.printf "Printing long: %s\n" (Int64.to_string (Z.to_int64 (Integers.Int64.intval n)));
       fprintf p "%LuLLU" (camlint64_of_coqint n)
   | Vlong n, _ ->
-    Printf.printf "Printing long: %s\n" (Int64.to_string (Z.to_int64 (Integers.Int64.intval n)));
-    fprintf p "%LdLL" (camlint64_of_coqint n)
+      fprintf p "%LdLL" (camlint64_of_coqint n)
   | Vptr(b, ofs), _ ->
       fprintf p "<ptr%a>" !print_pointer_hook (b, Obj.magic ofs)
   | Vundef, _ ->
@@ -382,9 +357,9 @@ let rec print_stmt p s =
       fprintf p "@[<v 2>switch (%a) {@ %a@;<0 -2>}@]"
               print_expr e
               print_cases cases
-  | Sreturn Datatypes.None ->
+  | Sreturn None ->
       fprintf p "return;"
-  | Sreturn Datatypes.(Some e) ->
+  | Sreturn (Some e) ->
       fprintf p "return %a;" print_expr e
   | Slabel(lbl, s1) ->
       fprintf p "%s:@ %a" (extern_atom lbl) print_stmt s1
@@ -406,8 +381,8 @@ and print_cases p cases =
               print_cases rem
 
 and print_case_label p = function
-  | Datatypes.None -> fprintf p "default"
-  | Datatypes.Some lbl -> fprintf p "case %s" (Z.to_string lbl)
+  | None -> fprintf p "default"
+  | Some lbl -> fprintf p "case %s" (Z.to_string lbl)
 
 and print_stmt_for p s =
   match s with
@@ -426,11 +401,11 @@ let name_function_parameters name_param fun_name params cconv =
   Buffer.add_char b '(';
   begin match params with
   | [] ->
-      Buffer.add_string b (if cconv.cc_vararg <> Datatypes.None then "..." else "void")
+      Buffer.add_string b (if cconv.cc_vararg <> None then "..." else "void")
   | _ ->
       let rec add_params first = function
       | [] ->
-          if cconv.cc_vararg <> Datatypes.None then Buffer.add_string b ",..."
+          if cconv.cc_vararg <> None then Buffer.add_string b ",..."
       | (id, ty) :: rem ->
           if not first then Buffer.add_string b ", ";
           Buffer.add_string b (name_cdecl (name_param id) ty);
@@ -493,8 +468,8 @@ let print_init p = function
   | Init_int16 n -> fprintf p "%ld" (camlint_of_coqint n)
   | Init_int32 n -> fprintf p "%ld" (camlint_of_coqint n)
   | Init_int64 n -> fprintf p "%LdLL" (camlint64_of_coqint n)
-  | Init_float32 n -> print_float p (camlfloat_of_coqfloat n)
-  | Init_float64 n -> print_float p (camlfloat_of_coqfloat n)
+  | Init_float32 n -> fprintf p "%.15F" (camlfloat_of_coqfloat n)
+  | Init_float64 n -> fprintf p "%.15F" (camlfloat_of_coqfloat n)
   | Init_space n -> fprintf p "/* skip %s */@ " (Z.to_string n)
   | Init_addrof(symb, ofs) ->
       let ofs = camlint_of_coqint (Obj.magic ofs) in
@@ -559,14 +534,18 @@ let struct_or_union = function Struct -> "struct" | Union -> "union"
 let declare_composite p (Composite(id, su, m, a)) =
   fprintf p "%s %s;@ " (struct_or_union su) (extern_atom id)
 
+let print_member p = function
+  | Member_plain(id, ty) ->
+      fprintf p "@ %s;" (name_cdecl (extern_atom id) ty)
+  | Member_bitfield(id, sz, sg, attr, w, _is_padding) ->
+      fprintf p "@ %s : %s;"
+              (name_cdecl (extern_atom id) (Tint(sz, sg, attr)))
+              (Z.to_string w)
+
 let define_composite p (Composite(id, su, m, a)) =
   fprintf p "@[<v 2>%s %s%s {"
           (struct_or_union su) (extern_atom id) (attributes a);
-  List.iter
-    (function Member_plain (fid, fty) ->
-      fprintf p "@ %s;" (name_cdecl (extern_atom fid) fty)
-      | _ -> assert false)
-    m;
+  List.iter (print_member p) m;
   fprintf p "@;<0 -2>};@]@ @ "
 
 let print_program p prog =

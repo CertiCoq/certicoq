@@ -560,7 +560,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
   let runtime_dir () = 
     let open Boot in
-    let env = Env.init () in
+    let env = Env.init_with ~coqlib:None  in
     Path.relative (Path.relative (Path.relative (Env.user_contrib env) "CertiCoq") "Plugin") "runtime"
 
   let make_rt_file na =

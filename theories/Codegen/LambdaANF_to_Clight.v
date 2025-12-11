@@ -266,7 +266,7 @@ Definition int_chunk : memory_chunk := if Archi.ptr64 then Mint64 else Mint32.
 Definition val : type := talignas (if Archi.ptr64 then 3%N else 2%N) (tptr tvoid).
 Definition uval : type := if Archi.ptr64 then ulongTy else uintTy.
 Definition sval : type := if Archi.ptr64 then longTy else intTy.
-Definition val_typ : typ := if Archi.ptr64 then AST.Tlong else Tany32.
+Definition val_typ : xtype := if Archi.ptr64 then Xlong else Xany32.
 Definition Init_int (x : Z) : init_data :=
   if Archi.ptr64 then (Init_int64 (Int64.repr x)) else (Init_int32 (Int.repr x)).
 Definition make_vint (z : Z) : Values.val :=
@@ -281,9 +281,12 @@ Transparent make_vint.
 Transparent make_cint.
 
 Definition funTy : type :=
-  Tfunction (Tcons threadInf Tnil) Tvoid cc_default.
+  Tfunction (cons threadInf nil) Tvoid cc_default.
 
 Definition pfunTy : type := Tpointer funTy noattr.
+
+Notation Tcons := cons.
+Notation Tnil := nil.
 
 Definition gcTy : type :=
   Tfunction (Tcons (Tpointer val noattr) (Tcons threadInf Tnil)) Tvoid cc_default.
@@ -300,7 +303,7 @@ Definition argvTy : type :=
 Definition boolTy : type :=
   Tint IBool Unsigned noattr.
 
-Fixpoint mkFunTyList (n : nat) : typelist :=
+Fixpoint mkFunTyList (n : nat) : list type :=
   match n with
   | 0 => Tnil
   | S n' => Tcons val (mkFunTyList n')
@@ -1641,10 +1644,14 @@ Fixpoint make_interface
 Definition make_tinfoIdent := 20%positive.
 Definition exportIdent := 21%positive.
 
+(* Definition Tret (x : typ) := *)
+(*   match x with *)
+(*   | AST.Tlong then  *)
+
 Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
   (make_tinfoIdent,
    Gfun (External (EF_external (String.to_string "make_tinfo")
-                               (mksignature (nil) (Tret val_typ) cc_default))
+                               (mksignature (nil) (val_typ) cc_default))
                   Tnil
                   threadInf
                   cc_default)).
@@ -1652,7 +1659,7 @@ Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
 Definition export_rec : positive * globdef Clight.fundef type :=
   (exportIdent,
    Gfun (External (EF_external (String.to_string "export")
-                               (mksignature (cons val_typ nil) (Tret val_typ) cc_default))
+                               (mksignature (cons val_typ nil) (val_typ) cc_default))
                   (Tcons threadInf Tnil)
                   valPtr
                   cc_default)).

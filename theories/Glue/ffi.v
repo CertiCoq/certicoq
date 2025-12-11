@@ -43,6 +43,10 @@ Require Import LambdaANF.cps
 Import MonadNotation.
 Open Scope monad_scope.
 
+Notation Tcons := cons.
+Notation Tnil := nil.
+Notation typelist := (list type).
+
 Section FState.
 
   Record fstate_data : Type :=
@@ -347,7 +351,7 @@ Definition make_one_field
   let extern_def :=
     (_extern_fn,
      Gfun (External (EF_external (String.to_string kn)
-                 (mksignature (val_typ :: nil) AST.Tvoid cc_default))
+                 (mksignature (val_typ :: nil) Xvoid cc_default))
                (Tcons (threadInf _thread_info) (repeat_typelist val arity))
                val cc_default)) in
   rest <- make_curried_fns kn arity arity is_io _extern_fn ;;

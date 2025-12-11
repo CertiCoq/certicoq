@@ -303,7 +303,7 @@ Definition val : type := talignas (if Archi.ptr64 then 3%N else 2%N) (tptr tvoid
 (* Definition val := if Archi.ptr64 then ulongTy else uintTy. *)
 Definition uval := if Archi.ptr64 then ulongTy else uintTy.
 Definition sval := if Archi.ptr64 then longTy else intTy.
-Definition val_typ := if Archi.ptr64 then  (AST.Tlong:typ) else (Tany32:typ).
+Definition val_typ := if Archi.ptr64 then  Xlong else (Xany32:xtype).
 Definition Init_int x := if Archi.ptr64 then (Init_int64 (Int64.repr x)) else (Init_int32 (Int.repr x)).
 Definition make_vint (z:Z) := if Archi.ptr64 then Vlong (Int64.repr z) else Values.Vint (Int.repr z).
 Definition make_cint z t := if Archi.ptr64 then Econst_long (Int64.repr z) t else (Econst_int (Int.repr z) t).
@@ -314,11 +314,15 @@ Transparent Init_int.
 Transparent make_vint.
 Transparent make_cint.
 
-Notation funTy := (Tfunction (Tcons threadInf Tnil) val cc_default).
+Notation Tcons := cons.
+Notation Tnil := nil.
+Notation typelist := (list type).
+
+Notation funTy := (Tfunction (threadInf :: nil) val cc_default).
 
 Notation pfunTy := (Tpointer funTy noattr).
 
-Notation gcTy := (Tfunction (Tcons (Tpointer val noattr) (Tcons threadInf Tnil)) Tvoid cc_default).
+Notation gcTy := (Tfunction ((Tpointer val noattr) :: threadInf :: nil) Tvoid cc_default).
 
 Notation isptrTy := (Tfunction (Tcons val Tnil) (Tint IBool Unsigned noattr) cc_default).
 
@@ -1386,7 +1390,7 @@ Definition make_tinfoIdent := 20%positive.
 Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
   (make_tinfoIdent,
    Gfun (External (EF_external "make_tinfo"
-                               (mksignature (nil) (Tret val_typ) cc_default))
+                               (mksignature (nil) (val_typ) cc_default))
                   Tnil
                   threadInf
                   cc_default)).

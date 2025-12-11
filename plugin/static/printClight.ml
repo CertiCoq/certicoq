@@ -32,11 +32,10 @@ open Clight
    integer). *)
 
 let temp_name (id: AST.ident) =
-  let id = P.to_int id in
   try
     "$" ^ Hashtbl.find string_of_atom id
   with Not_found ->
-    Printf.sprintf "$%d" id
+    Printf.sprintf "$%d" (P.to_int id)
 
 (* Declarator (identifier + type) -- reuse from PrintCsyntax *)
 
@@ -90,9 +89,9 @@ let rec expr p (prec, e) =
   | Econst_int(n, _) ->
       fprintf p "%ld" (camlint_of_coqint n)
   | Econst_float(f, _) ->
-      print_float p (camlfloat_of_coqfloat f)
+      fprintf p "%.18g" (camlfloat_of_coqfloat f)
   | Econst_single(f, _) ->
-      print_float p (camlfloat_of_coqfloat32 f)
+      fprintf p "%.18gf" (camlfloat_of_coqfloat32 f)
   | Econst_long(n, Tlong(Unsigned, _)) ->
       fprintf p "%LuLLU" (camlint64_of_coqint n)
   | Econst_long(n, _) ->
@@ -327,51 +326,4 @@ let print_if prog = print_if_gen Clight1 prog
 (* print_if_2 is called from clightgen/Clightgen.ml, after the
    SimplLocals pass.  It receives Clight2 syntax. *)
 let print_if_2 prog = print_if_gen Clight2 prog
-let add_name (a, n) =
-  let i = P.to_int a in
-  match n with
-  | BasicAst.Coq_nAnon -> ()
-  | BasicAst.Coq_nNamed s ->
-      let cs = Caml_bytestring.caml_string_of_bytestring s in
-      Hashtbl.add atom_of_string cs i;
-      Hashtbl.add string_of_atom i cs;
-      ()
 
-let remove_primes (a, n) =
-  match n with
-  | BasicAst.Coq_nAnon -> (a,n)
-  | BasicAst.Coq_nNamed s ->
-    let s' = Str.global_replace (Str.regexp "'") "p" (Caml_bytestring.caml_string_of_bytestring s)  in
-    let s'' = Str.global_replace (Str.regexp "\\.") "d" s' in
-    (a, BasicAst.Coq_nNamed (Caml_bytestring.bytestring_of_caml_string s''))
-
-let print_dest prog dest =
-  let oc = open_out (implode dest) in
-  print_program Clight2 (formatter_of_out_channel oc) prog;
-  close_out oc
-
-let print_dest_names prog names dest =
-  let oc = open_out (Caml_bytestring.caml_string_of_bytestring dest) in
-  List.iter (fun n -> add_name (remove_primes n))  names;
-  print_program Clight2 (formatter_of_out_channel oc) prog;
-  close_out oc
-
-let guardify (s : string) : string =
-  String.uppercase_ascii (Str.global_replace (Str.regexp "[^a-zA-Z0-9]") "_" s)
-
-let print_dest_names_imports prog names (dest : string) (imports : string list) =
-  let oc = open_out dest in
-  List.iter (fun n -> add_name (remove_primes n))  names;
-  let fm = formatter_of_out_channel oc in
-  open_vbox 0;
-  (* generating an include guard with C macros *)
-  let guard_name = guardify (List.hd (List.rev (String.split_on_char '/' dest))) in
-  fprintf fm "#ifndef %s" guard_name; pp_print_newline fm ();
-  fprintf fm "#define %s" guard_name; pp_print_newline fm ();
-  List.iter (fun s -> fprintf fm "%s" s ; pp_print_newline fm ()) imports;
-  close_box ();
-  open_box 0;
-  print_program Clight2 fm prog;
-  fprintf fm "#endif /* %s */" guard_name; pp_print_newline fm ();
-  close_box ();
-  close_out oc

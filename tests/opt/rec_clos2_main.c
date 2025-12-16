@@ -7,18 +7,6 @@
 
 extern value body(struct thread_info *);
 
-/* extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long)); */
-
-/* extern void print_Coq_Init_Datatypes_nat(unsigned long long); */
-
-/* extern value args[]; */
-
-/* #define is_ptr(s)  ((_Bool) ((x) & 1) == 0) */
-
-/* _Bool is_ptr(value s) { */
-/*   return (_Bool) Is_block(s); */
-/* } */
-
 int main(int argc, char *argv[]) {
   value val;
   struct thread_info* tinfo;
@@ -36,7 +24,6 @@ int main(int argc, char *argv[]) {
   }
   end = clock();
 
-  /* val = tinfo -> args[1]; */
   print_Coq_Init_Datatypes_list(val, print_Coq_Init_Datatypes_nat);
   printf("\n");
 

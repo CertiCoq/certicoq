@@ -16,10 +16,6 @@ extern value make_Coq_Init_Datatypes_bool_true (void);
 extern value make_Coq_Init_Datatypes_bool_false (void);
 extern void* call(struct thread_info *tinfo, unsigned long long clos, unsigned long long arg0);
 
-/* _Bool is_ptr(value s) { */
-/*   return (_Bool) Is_block(s); */
-/* } */
-
 value calls(struct thread_info* tinfo, value clos, unsigned int n, ...)
 {
   value v = clos;

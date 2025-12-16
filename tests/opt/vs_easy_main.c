@@ -14,10 +14,6 @@ extern unsigned int get_Corelib_Init_Datatypes_list_tag(unsigned long long);
 
 extern value args[];
 
-/* _Bool is_ptr(value s) { */
-/*   return (_Bool) Is_block(s); */
-/* } */
-
 extern void print_Corelib_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
 
 extern void print_CertiRocq_Tests_lib_vs_clause(unsigned long long);

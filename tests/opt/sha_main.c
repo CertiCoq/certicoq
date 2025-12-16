@@ -9,10 +9,6 @@ extern value body(struct thread_info *);
 
 /* extern value args[]; */
 
-/* _Bool is_ptr(value s) { */
-/*   return (_Bool) Is_block(s); */
-/* } */
-
 int main(int argc, char *argv[]) {
   value val;
   struct thread_info* tinfo;

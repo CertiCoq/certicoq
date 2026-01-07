@@ -9,9 +9,11 @@ WASMFILES=$(patsubst %, CertiCoq.Tests.tests.%.wasm, $(TESTS))
 OS=$(shell uname)
 STACKSIZE=$(if $(filter Linux,$(OS)),unlimited,65532)
 
-all: run_tests run_primitive_unit_tests
+.PHONY: all default clean lib cleanlib
+.PHONY: tests primitive_unit_tests
+.PHONY: run run_tests run_primitive_unit_tests
 
-.PHONY: all default clean lib cleanlib tests $(TESTS)
+all: run_tests run_primitive_unit_tests
 
 $(WASMFILES): tests
 
@@ -24,12 +26,18 @@ lib: lib/Makefile
 cleanlib:
 	$(MAKE) clean -C ../lib
 
-run_tests: lib tests.v $(WASMFILES)
-	ulimit -s $(STACKSIZE) && coqc $(COQOPTS) tests.v
+tests: tests.v lib
+	ulimit -s $(STACKSIZE) && coqc $(COQOPTS) $<
+
+primitive_unit_tests: uint63_unit_tests.v lib
+	coqc -quiet -R ./ CertiCoq.Tests $<
+
+run: run_tests run_primitive_unit_tests
+
+run_tests: $(WASMFILES)
 	ulimit -s $(STACKSIZE) && ./run_wasm_tests.py
 
-run_primitive_unit_tests: lib
-	coqc -quiet -R ./ CertiCoq.Tests uint63_unit_tests.v
+run_primitive_unit_tests: primitive_unit_tests
 	node --stack-size=10000000 js/run_uint63_unit_tests.js
 
 clean:

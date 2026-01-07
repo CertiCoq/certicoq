@@ -15,11 +15,8 @@ lib/Makefile:
 lib: lib/Makefile
 	$(MAKE) -C $@
 
-axioms ocaml opt: lib
+axioms ocaml opt wasm: lib
 	$(MAKE) -C $@ run
-
-wasm: lib
-	$(MAKE) -C $@
 
 plugin:
 	$(MAKE) -C .. $@

@@ -33,6 +33,8 @@ Require Import
   LambdaANF.toplevel.
 
 From MetaCoq.Utils Require Import bytestring MCString.
+
+
 Section TRANSLATION.
 
 (* Stand-in for arbitrary identifiers *)
@@ -66,7 +68,7 @@ Definition show_name (name : BasicAst.name) : string :=
   | nNamed d => d
   end.
 
-Definition get_fname f (nenv : name_env) : string := 
+Definition get_fname f (nenv : name_env) : string :=
   match M.get f nenv with
   | Some name => show_name name
   | None => "Undef"
@@ -74,17 +76,8 @@ Definition get_fname f (nenv : name_env) : string :=
 
 Definition maxArgs : Z := 1024%Z.
 
-(* temporary function to get something working *)
-(* returns (n-1) :: (n-2) :: ... :: 0 :: nil for a list of size n *)
-Fixpoint makeArgList' (vs : list positive) : list N :=
-  match vs with
-  | nil => nil
-  | x :: vs' => (N.of_nat (length vs')) :: (makeArgList' vs')
-  end.
-
-Definition makeArgList (vs : list positive) : list N :=
-  rev (makeArgList' vs).
-
+(* returns [0, ... (n-1)] for a list of length n *)
+Definition makeArgList (vs : list positive) : list N := fromN 0%N (length vs).
 
 Definition fun_info_env : Type := M.t (positive * fun_tag).
 
@@ -92,30 +85,30 @@ Definition fun_info_env : Type := M.t (positive * fun_tag).
    are applied to, assumes that all functions sharing the same tags have the same arity *)
 Fixpoint compute_fun_env'
          (n : nat)
-         (nenv : name_env)
          (fenv : fun_env)
          (e : exp) : fun_env :=
   match n with
   | 0 => fenv
   | S n' =>
     match e with
-    | Econstr x t vs e' => compute_fun_env' n' nenv fenv e'
-    | Ecase x cs => fold_left (fun p e => compute_fun_env' n' nenv p e) (map snd cs) fenv
-    | Eproj x t n v e' => compute_fun_env' n' nenv fenv e'
+    | Econstr x t vs e' => compute_fun_env' n' fenv e'
+    | Ecase x cs => fold_left (fun p e => compute_fun_env' n' p e) (map snd cs) fenv
+    | Eproj x t n v e' => compute_fun_env' n' fenv e'
     | Eletapp x f t vs e' =>
-      compute_fun_env' n' nenv (M.set t (N.of_nat (length vs), makeArgList vs) fenv) e'
+      compute_fun_env' n' (M.set t (N.of_nat (length vs), makeArgList vs) fenv) e'
     | Efun fnd e' =>
-      let fenv' := compute_fun_env_fundefs n' nenv fnd fenv in
-      compute_fun_env' n' nenv fenv' e'
-    | Eapp x t vs => M.set t (N.of_nat (length vs) , makeArgList vs) fenv
-    | Eprim_val x p e' => compute_fun_env' n' nenv fenv e'
-    | Eprim x p vs e' => compute_fun_env' n' nenv fenv e'
+      let fenv' := compute_fun_env_fundefs n' fnd fenv in
+      compute_fun_env' n' fenv' e'
+    | Eapp x t vs =>
+      (* TODO: why are calls taken into account too? *)
+      M.set t (N.of_nat (length vs) , makeArgList vs) fenv
+    | Eprim_val x p e' => compute_fun_env' n' fenv e'
+    | Eprim x p vs e' => compute_fun_env' n' fenv e'
     | Ehalt x => fenv
     end
   end
 with compute_fun_env_fundefs
      (n : nat)
-     (nenv : name_env)
      (fnd : fundefs)
      (fenv : fun_env) : fun_env :=
   match n with
@@ -125,8 +118,8 @@ with compute_fun_env_fundefs
     | Fnil => fenv
     | Fcons f t vs e fnd' =>
       let fenv' := M.set t (N.of_nat (length vs) , makeArgList vs) fenv in
-      let fenv'' := compute_fun_env' n' nenv fenv' e in
-      compute_fun_env_fundefs n' nenv fnd' fenv''
+      let fenv'' := compute_fun_env' n' fenv' e in
+      compute_fun_env_fundefs n' fnd' fenv''
     end
   end.
 
@@ -149,10 +142,10 @@ with max_depth_fundefs (fnd : fundefs) :=
   end.
 
 (* fun_env maps tags to function info *)
-Definition compute_fun_env (nenv : name_env) (e : exp) : fun_env :=
-  compute_fun_env' (max_depth e) nenv (M.empty fun_ty_info) e.   
+Definition compute_fun_env (e : exp) : fun_env :=
+  compute_fun_env' (max_depth e) (M.empty fun_ty_info) e.
 
-(* Computes the local variables of a function body *) 
+(* Computes the local variables used in an expression (commonly a function body) *)
 Fixpoint get_locals (e : exp) : list positive :=
   match e with
   | Econstr x t vs e' => x :: (get_locals e')
@@ -264,10 +257,10 @@ Definition compute_ind_env (cenv : ctor_env) : n_ind_env :=
 
 
 Inductive ctor_rep : Type :=
-| enum : N -> ctor_rep
 (* [enum t] represents a constructor with no parameters with ordinal [t] *)
+| enum : N -> ctor_rep
+(* [boxed t a] represents a constructor with arity [a] and ordinal [t]  *)
 | boxed : N -> N -> ctor_rep.
-(* [boxed t a] represents a construct with arity [a] and ordinal [t]  *)
 
 
 Definition make_ctor_rep (cenv : ctor_env) (ct : ctor_tag) : error ctor_rep :=
@@ -300,19 +293,12 @@ Definition int_chunk := if Archi.ptr64 then Mint64 else Mint32.
 (* NOTE for val: in Clight, SIZEOF_PTR == SIZEOF_INT *)
 
 Definition val : type := talignas (if Archi.ptr64 then 3%N else 2%N) (tptr tvoid).
-(* Definition val := if Archi.ptr64 then ulongTy else uintTy. *)
 Definition uval := if Archi.ptr64 then ulongTy else uintTy.
 Definition sval := if Archi.ptr64 then longTy else intTy.
 Definition val_typ := if Archi.ptr64 then  (AST.Tlong:typ) else (Tany32:typ).
 Definition Init_int x := if Archi.ptr64 then (Init_int64 (Int64.repr x)) else (Init_int32 (Int.repr x)).
 Definition make_vint (z:Z) := if Archi.ptr64 then Vlong (Int64.repr z) else Values.Vint (Int.repr z).
 Definition make_cint z t := if Archi.ptr64 then Econst_long (Int64.repr z) t else (Econst_int (Int.repr z) t).
-Transparent val.
-Transparent uval.
-Transparent val_typ.
-Transparent Init_int.
-Transparent make_vint.
-Transparent make_cint.
 
 Notation funTy := (Tfunction (Tcons threadInf Tnil) val cc_default).
 
@@ -332,20 +318,20 @@ Notation floatPtr := (Tpointer floatType {| attr_volatile := false; attr_alignas
 
 Notation boolTy := (Tint IBool Unsigned noattr).
 
-Fixpoint mkFunTyList (n : nat) : typelist :=
+Fixpoint makeArgTyList (n : nat) : typelist :=
   match n with
   | 0 => Tnil
-  | S n' => Tcons val (mkFunTyList n')
+  | S n' => Tcons val (makeArgTyList n')
   end.
 
 Definition mkFunTy (n : nat) :=
-  (Tfunction (Tcons threadInf (mkFunTyList n)) val cc_default).
+  (Tfunction (Tcons threadInf (makeArgTyList n)) val cc_default).
 
 Definition mkPrimTy (n : nat) :=
-  (Tfunction (mkFunTyList n) val cc_default).
+  (Tfunction (makeArgTyList n) val cc_default).
 
 Definition mkPrimTyTinfo (n : nat) :=
-  (Tfunction (Tcons threadInf (mkFunTyList n)) val cc_default).
+  (Tfunction (Tcons threadInf (makeArgTyList n)) val cc_default).
 
 
 Notation "'var' x" := (Etempvar x val) (at level 20).
@@ -390,6 +376,7 @@ Notation " a ':::=' b " := (Sassign a b) (at level 50).
 Notation "'*' p " := (Ederef p val) (at level 40).
 
 Notation "'&' p " := (Eaddrof p valPtr) (at level 40).
+
 
 Definition c_int' n t := if Archi.ptr64 then Econst_long (Int64.repr n) t else Econst_int (Int.repr n%Z) t.
 
@@ -453,20 +440,20 @@ Definition init_stack : statement :=
 (* Updates the stack pointer and frame pointers before a call *)
 (* b is true if the stack is already set. I.e. it's a call to the GC after a normal call *)
 Definition set_stack (sp : N) (b : bool) : statement :=
-if ((sp =? 0)%N || b)%bool then Sskip else 
+if ((sp =? 0)%N || b)%bool then Sskip else
   (* tinfo->fp = &frame; *)
   (Efield tinfd fpIdent stackframeTPtr :::= Eaddrof (Evar frameIdent stackframeT) stackframeTPtr).
 
 (* Updates the stack pointer and frame pointers before a call *)
 Definition update_stack (sp : N) : statement :=
-  if (sp =? 0)%N then Sskip else 
+  if (sp =? 0)%N then Sskip else
     (* frame.next = root + SP *)
     (Efield (Evar frameIdent stackframeT) nextFld valPtr :::= (add roots (c_int (Z.of_N sp) val))).
 
 (* Resets the frame pointer after a call, so that if subsequent calls don't use the stack the empty frame is not pushed. *)
 (* b is true if it's a call to the GC after a normal call, so the stack will be reset anyway *)
 Definition reset_stack (sp : N) (b : bool) : statement :=
-  if ((sp =? 0)%N || b)%bool then Sskip else 
+  if ((sp =? 0)%N || b)%bool then Sskip else
    (* Current frame points to the old frame again *)
    Efield tinfd fpIdent stackframeTPtr :::= Efield (Evar frameIdent stackframeT) prevFld valPtr.
 
@@ -475,7 +462,7 @@ Definition push_var (sp : N) (x : positive) :=
   roots[ Z.of_N sp ] :::= Etempvar x valPtr.
 
 (* Pops single var from frame *)
-Definition pop_var (sp : N) (x : positive) := 
+Definition pop_var (sp : N) (x : positive) :=
   x ::= roots[ Z.of_N sp ].
 
 Definition push_live_vars_offset (off : N) (xs : list positive) : statement * N :=
@@ -494,7 +481,7 @@ Definition pop_live_vars_offset (off : N) (xs : list positive) : statement :=
 
 Definition push_live_vars (xs : list positive) : statement * N := push_live_vars_offset 0%N xs.
 
-Definition pop_live_vars (xs : list positive) : statement := pop_live_vars_offset 0%N xs. 
+Definition pop_live_vars (xs : list positive) : statement := pop_live_vars_offset 0%N xs.
 
 (** * Shadow stack defs END *)
 
@@ -602,7 +589,7 @@ Definition mkPrimCall
            (fenv : fun_env)
            (map: fun_info_env)
            (vs : list positive) : error statement :=
-  args <- mkCallVars fenv map ar vs ;;  
+  args <- mkCallVars fenv map ar vs ;;
   ret (Scall (Some res) ([mkPrimTy ar] (Evar pr (mkPrimTy ar))) args).
 
 Definition mkPrimCallTinfo
@@ -703,7 +690,7 @@ Definition asgnAppVars_fast myvs vs myind ind (fenv : fun_env) (map : fun_info_e
   ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s).
 
 Definition set_nalloc (num : expr) : statement :=
-  Efield tinfd nallocIdent val :::= num. 
+  Efield tinfd nallocIdent val :::= num.
 
 (** * GC call *)
 Definition make_GC_call (num_allocs : nat) (stack_vars : list positive) (stack_offset : N) : statement * N :=
@@ -711,8 +698,8 @@ Definition make_GC_call (num_allocs : nat) (stack_vars : list positive) (stack_o
   let (push, slots) := push_live_vars_offset stack_offset stack_vars in
   let make_gc_stack := push ; update_stack slots ; set_stack slots after_call in
   let discard_stack := pop_live_vars_offset stack_offset stack_vars; reset_stack slots after_call in
-  let nallocs := c_int (Z.of_nat num_allocs) val in 
-  if (num_allocs =? 0)%nat then (Sskip, stack_offset) else 
+  let nallocs := c_int (Z.of_nat num_allocs) val in
+  if (num_allocs =? 0)%nat then (Sskip, stack_offset) else
     ((Sifthenelse
         (!(Ebinop Ole nallocs (limitPtr -' allocPtr) type_bool))
         (make_gc_stack;
@@ -748,7 +735,7 @@ Definition make_case_switch
    long long int live[MAX_live];
    frame_pointer fp = { next = *live; roots=*live; prev:=tinfo->sp}
    long long int *next = fp.next;
-   tinfo->sp = *fp 
+   tinfo->sp = *fp
  *)
 
 (* To push a value to the shadow stack:
@@ -768,7 +755,7 @@ Definition make_case_switch
 
 (* The program returns the translated code and the set of live vars at the next call *)
 
-Definition to_int64 (i : PrimInt63.int) : int64. 
+Definition to_int64 (i : PrimInt63.int) : int64.
   exists (Uint63.to_Z i * 2 + 1)%Z.
   pose proof (Uint63.to_Z_bounded i).
   unfold Uint63.wB in H. unfold Int64.modulus, Int64.wordsize, Wordsize_64.wordsize.
@@ -791,7 +778,7 @@ Next Obligation.
   Admitted.
 
 Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
-  (x : positive) (f : Floats.float) := 
+  (x : positive) (f : Floats.float) :=
   let tag := c_int 1277 %Z (Tlong Unsigned noattr) in
   x ::= [val] (allocPtr +' (c_int Z.one val)) ;
   allocIdent ::= allocPtr +' (c_int 2 val) ;
@@ -841,7 +828,7 @@ Section Translation.
                    let (prog, n) := (progn : statement * N) in
                    let '(ls , ls', n') := (pn : labeled_statements * labeled_statements * N) in
                    p <- make_ctor_rep cenv (fst p) ;;
-                   match p with 
+                   match p with
                    | boxed t a =>
                      let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
                      (match ls with
@@ -862,12 +849,12 @@ Section Translation.
                  end) cs) ;;
         let '(ls , ls', slots') := p in
         ret ((make_case_switch x ls ls'), slots')
-      | Eletapp x f t vs e' => 
+      | Eletapp x f t vs e' =>
         (* Compute the local variables that are live after the call  *)
         let fvs_post_call := PS.inter (exp_fv e') loc_vars in
         let fvs := PS.remove x fvs_post_call in
         let fvs_list := PS.elements fvs in
-        (* Check if the new binding has to be pushed to the frame during the GC call *)                
+        (* Check if the new binding has to be pushed to the frame during the GC call *)
         let fv_gc := if PS.mem x fvs_post_call then cons x nil else nil in
         (* push live vars to the stack. We're pushing exactly the vars that are live beyond the current point. *)
         let '(make_stack, slots_call) :=
@@ -930,7 +917,7 @@ Section Translation.
            slots)
     | None => Err "translate_body: Unknown function application in Eapp"
     end
-  | Eprim_val x p e' => 
+  | Eprim_val x p e' =>
     progn <- translate_body e' fenv cenv ienv map slots ;;
     Ret ((compile_primitive cenv ienv fenv map x p ; fst progn), snd progn)
 
@@ -1012,7 +999,7 @@ Fixpoint translate_fundefs
       let loc_vars := get_locals e in
       let var_set := union_list PS.empty vs in
       let loc_ids := union_list var_set loc_vars  in
-      let live_vars := PS.elements (PS.inter (exp_fv e) var_set) in 
+      let live_vars := PS.elements (PS.inter (exp_fv e) var_set) in
       let (gc, _) := make_GC_call num_allocs live_vars 0%N in
       '(body, stack_slots) <- translate_body vs loc_ids locs nenv e fenv cenv ienv map 0 ;;
       let stack_slots := N.max (N.of_nat (length live_vars)) stack_slots in
@@ -1021,9 +1008,9 @@ Fixpoint translate_fundefs
                              ((allocIdent ::= Efield tinfd allocIdent valPtr ;
                                limitIdent ::= Efield tinfd limitIdent valPtr ;
                                argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                               asgn ; 
+                               asgn ;
                                init_stack ;
-                               gc; 
+                               gc;
                                body))))) :: rest)
     end
   end.
@@ -1044,7 +1031,7 @@ Definition make_extern_decl
      | _ => None
      end)
   | (vIdent, Gvar (mkglobvar v_info v_init v_r v_v)) =>
-    if gv then 
+    if gv then
       Some (vIdent, Gvar (mkglobvar v_info nil v_r v_v))
     else None
   | _ => None
@@ -1089,7 +1076,7 @@ Definition translate_program
            (fmap : fun_info_env)
            (nenv : name_env) : error (list (positive * globdef Clight.fundef type)) :=
   match e with
-  | Efun fnd e => 
+  | Efun fnd e =>
     let localVars := get_locals e in
     funs <- translate_fundefs args_opt fnd fenv cenv ienv fmap nenv ;;
     let allocs := max_allocs e in
@@ -1169,7 +1156,7 @@ Fixpoint make_fundef_info (fnd : fundefs) (fenv : fun_env) (nenv : name_env)
            update_name_env_fun_info x info_name nenv')
     end
   end.
-    
+
 
 
 Definition add_bodyinfo (e : exp) (fenv : fun_env) (nenv : name_env) (map: fun_info_env) (defs:list (positive * globdef Clight.fundef type)) :=
@@ -1236,8 +1223,8 @@ Definition composites : list composite_definition :=
   (*            (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) :: *)
   (*            (argsIdent, (Tarray uval maxArgs noattr)) :: *)
   (*            (fpIdent, (tptr stackframeT)) :: *)
-  (*            (nallocIdent, val) :: nil)) (1* Zoe : This is the number of allocations until the next GC call so that GC can perform a test. *) 
-  (*                                        * Note that it will be coerced to UL from ULL. That should be safe for the values we're using but *) 
+  (*            (nallocIdent, val) :: nil)) (1* Zoe : This is the number of allocations until the next GC call so that GC can perform a test. *)
+  (*                                        * Note that it will be coerced to UL from ULL. That should be safe for the values we're using but *)
   (*                                        * consider changing it too. *1) *)
   (*           noattr :: *)
    nil.
@@ -1350,7 +1337,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
       let s :=
           match M.get t fenv with
           | Some (n, l) =>
-            "LetApp: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ 
+            "LetApp: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++
             (MCString.string_of_nat (length l))
           | None =>
             "LetApp: Function " ++ get_fname f nenv ++ " was not found in fun_env"
@@ -1365,7 +1352,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
       let s :=
           match M.get t fenv with
           | Some (n, l) =>
-            "App: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ 
+            "App: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++
             MCString.string_of_nat (length l)
           | None =>
             "App: Function " ++ get_fname f nenv ++ " was not found in fun_env"
@@ -1374,7 +1361,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
       s :: log
     | Ehalt x => log
     end.
-  
+
 
   Definition check_tags (e : exp) :=
     String.concat Pipeline_utils.newline (rev (check_tags' e [])).
@@ -1390,28 +1377,41 @@ Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
                   Tnil
                   threadInf
                   cc_default)).
-                  
-Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_env) :
-  error (name_env * Clight.program * Clight.program) * string :=
+
+(** Compilation Function *)
+Definition compile (args_opt : bool) (* option to reduce register pressure when passing arguments*)
+  (e : exp) (* flattend λANF program *)
+  (cenv : ctor_env) (* constructor environment *)
+  (nenv0 : name_env) (* map from variables identifiers to their original names *)
+  : error (name_env * (* updated variable name map *)
+           Clight.program *  (* C light program *)
+           Clight.program ) (* C light header *)
+    * string :=
+  (* Add empty top-level function block if there is none *)
   let e := wrap_in_fun e in
-  let fenv := compute_fun_env nenv0 e in
+  (* Compute environment mapping function names to their arities and a list [0, ..., arity]. TODO why is this needed? *)
+  let fenv := compute_fun_env e in
+  (* Compute environment mapping inductive types to their names and a list of their constrotst (name, tag, arity, ordinal) *)
   let ienv := compute_ind_env cenv in
   (* debug *)
   (* let dbg := (cps_show.show_exp nenv0 cenv false e) ++ Pipeline_utils.newline ++ log ++ Pipeline_utils.newline ++ check_tags fenv nenv0 e in *)
   (* end debug *)
-  let p'' := make_defs args_opt e fenv cenv ienv nenv0 in
-  (* state *)
+  (* Next available variable identifier *)
   let n := ((max_var e 100) + 1)%positive in
+  (* make compM state *)
   let comp_d := pack_data 1%positive 1%positive  1%positive 1%positive cenv fenv nenv0 (M.empty nat) [] in (* XXX dummy *)
   (* run compM *)
   let err : error (name_env * Clight.program * Clight.program) :=
-      let '(res, (p, m)) := run_compM p'' comp_d n in
+      (* compile the program *)
+      let '(res, (p, m)) := run_compM (make_defs args_opt e fenv cenv ienv nenv0) comp_d n in
       '(nenv1, defs) <- res ;;
-       let nenv := (add_inf_vars (ensure_unique nenv1)) in
-       let forward_defs := make_extern_decls nenv defs false in
-       body <- mk_prog_opt [body_external_decl] mainIdent false;;
-       head <- mk_prog_opt (make_tinfo_rec :: forward_defs ++ defs)%list mainIdent true ;;
-       ret (M.set make_tinfoIdent (nNamed "make_tinfo"%bs) nenv, body, head)
+      (* add extra identifiers used in the translation to the variable name map *)
+      let nenv := (add_inf_vars (ensure_unique nenv1)) in
+      (* make forward function declarations *)
+      let forward_defs := make_extern_decls nenv defs false in
+      body <- mk_prog_opt [body_external_decl] mainIdent false;;
+      head <- mk_prog_opt (make_tinfo_rec :: forward_defs ++ defs)%list mainIdent true ;;
+      ret (M.set make_tinfoIdent (nNamed "make_tinfo"%bs) nenv, body, head)
   in
   (err, "").
 

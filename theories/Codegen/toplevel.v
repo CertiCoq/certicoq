@@ -1,5 +1,5 @@
 From Coq Require Import ZArith. 
-From CertiCoq Require Import LambdaANF.toplevel Codegen.LambdaANF_to_Clight Codegen.LambdaANF_to_Clight_stack.
+From CertiCoq Require Import LambdaANF.toplevel Codegen.LambdaANF_to_Clight_stack LambdaANF.cps_util.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import ExtLib.Structures.Monad.
 
@@ -32,34 +32,10 @@ Definition rootFld:positive := 88.
 Definition prevFld:positive := 89.
 
 
-Definition Cprogram := (cps_util.name_env * Clight.program * Clight.program)%type.
+Definition Cprogram := (name_env * Clight.program * Clight.program)%type.
 
 Definition add_prim_names (prims : list (kername * string * bool * nat * positive)) (nenv : LambdaBoxLocal_to_LambdaANF.name_env) : LambdaBoxLocal_to_LambdaANF.name_env :=
   List.fold_left (fun map '(k, s, b, ar, p) => cps.M.set p (nNamed s) map) prims nenv.
-
-
-Definition Clight_trans (bodyName : string) (prims : list (kername * string * bool * nat * positive)) (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram :=
-  let '(_, p_env, cenv, ctag, itag, nenv, fenv, _, prog) := t in
-  let p := LambdaANF_to_Clight.compile
-             argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent
-             tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-             args p_env prog cenv nenv in
-  match p with
-  | exceptionMonad.Ret (nenv, prog, head) =>
-    Ret (add_prim_names prims nenv, stripOption mainIdent prog, stripOption mainIdent head)
-  | Exc s => Err s
-  end.
-
-
-(* TODO unify with the one above, propagate errors *)
-Definition Clight_trans_fast (bodyName : string) (prims : list (kername * string * bool * nat * positive)) (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram :=
-  let '(_, p_env, cenv, ctag, itag, nenv, fenv, _, prog) := t in
-  let '(nenv, prog, head) := LambdaANF_to_Clight.compile_fast
-                               argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent
-                               tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent
-                               args p_env prog cenv nenv in
-  Ret (add_prim_names prims nenv, stripOption mainIdent prog, stripOption mainIdent head).
-
 
 Definition Clight_trans_ANF bodyName (prims : list (kername * string * bool * nat * positive)) (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram * string :=
   let '(_, pr_env, cenv, ctag, itag, nenv, fenv, _, prog) := t in
@@ -83,8 +59,4 @@ Definition compile_Clight (prims : list (kername * string * bool * nat * positiv
     debug_msg "Translating from LambdaANF to C" ;;
     opts <- get_options ;;
     let args := c_args opts in
-    let cps := negb (direct opts) in
-    if cps then 
-      LiftErrorCertiCoqTrans "Codegen" (Clight_trans opts.(body_name) prims args) s
-    else
-      LiftErrorLogCertiCoqTrans "Codegen" (Clight_trans_ANF opts.(body_name) prims args) s.
+    LiftErrorLogCertiCoqTrans "Codegen" (Clight_trans_ANF opts.(body_name) prims args) s.

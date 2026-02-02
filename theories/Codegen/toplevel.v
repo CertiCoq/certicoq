@@ -40,7 +40,7 @@ Definition add_prim_names (prims : list (kername * string * bool * nat * positiv
 Definition Clight_trans_ANF bodyName (prims : list (kername * string * bool * nat * positive)) (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram * string :=
   let '(_, pr_env, cenv, ctag, itag, nenv, fenv, _, prog) := t in
   let '(p, str) := LambdaANF_to_Clight_stack.compile
-                     argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent
+                     GC_Generational argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent
                      tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent resultIdent
                      args
                      pr_env

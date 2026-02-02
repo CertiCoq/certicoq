@@ -40,21 +40,14 @@ cleanlib:
 glue_%.c: tests.v
 	coqc $(COQOPTS) $<
 
-%_cps_opt:  $(TEST_PREQS) CertiCoq.Tests.tests.%_cps_opt.c  ; $(TEST_RECIPE)
-%_cps_opt1: $(TEST_PREQS) CertiCoq.Tests.tests.%_cps_opt1.c ; $(TEST_RECIPE)
-%_cps_opt2: $(TEST_PREQS) CertiCoq.Tests.tests.%_cps_opt2.c ; $(TEST_RECIPE)
-%_cps_opt3: $(TEST_PREQS) CertiCoq.Tests.tests.%_cps_opt3.c ; $(TEST_RECIPE)
-%_cps_opt4: $(TEST_PREQS) CertiCoq.Tests.tests.%_cps_opt4.c ; $(TEST_RECIPE)
-%_cps_opt5: $(TEST_PREQS) CertiCoq.Tests.tests.%_cps_opt5.c ; $(TEST_RECIPE)
-%_opt:      $(TEST_PREQS) CertiCoq.Tests.tests.%_opt.c      ; $(TEST_RECIPE)
-%_opt1:     $(TEST_PREQS) CertiCoq.Tests.tests.%_opt1.c     ; $(TEST_RECIPE)
-%_opt2:     $(TEST_PREQS) CertiCoq.Tests.tests.%_opt2.c     ; $(TEST_RECIPE)
-%_opt3:     $(TEST_PREQS) CertiCoq.Tests.tests.%_opt3.c     ; $(TEST_RECIPE)
-%_opt4:     $(TEST_PREQS) CertiCoq.Tests.tests.%_opt4.c     ; $(TEST_RECIPE)
-%_opt5:     $(TEST_PREQS) CertiCoq.Tests.tests.%_opt5.c     ; $(TEST_RECIPE)
+%_opt:  $(TEST_PREQS) CertiCoq.Tests.tests.%_opt.c  ; $(TEST_RECIPE)
+%_opt1: $(TEST_PREQS) CertiCoq.Tests.tests.%_opt1.c ; $(TEST_RECIPE)
+%_opt2: $(TEST_PREQS) CertiCoq.Tests.tests.%_opt2.c ; $(TEST_RECIPE)
+%_opt3: $(TEST_PREQS) CertiCoq.Tests.tests.%_opt3.c ; $(TEST_RECIPE)
+%_opt4: $(TEST_PREQS) CertiCoq.Tests.tests.%_opt4.c ; $(TEST_RECIPE)
+%_opt5: $(TEST_PREQS) CertiCoq.Tests.tests.%_opt5.c ; $(TEST_RECIPE)
 
 $(TESTS):%: lib $(TEST_PREQS)
-$(TESTS):%: %_cps_opt %_cps_opt1 %_cps_opt2 %_cps_opt3 %_cps_opt4 %_cps_opt5
 $(TESTS):%: %_opt %_opt1 %_opt2 %_opt3 %_opt4 %_opt5
 
 run: run.sh exec

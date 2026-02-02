@@ -131,22 +131,11 @@ Definition lazy_factorial := string_of_Z (coind.lfact 150).
 
 Eval compute in "Compiling demo1".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" demo1.
 CertiCoq Compile -O 1 -ext "_opt" demo1.
-
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" demo1.
 CertiCoq Compile -config 1 -O 1 -ext "_opt1" demo1.
-
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" demo1.
 CertiCoq Compile -config 2 -O 1 -ext "_opt2" demo1.
-
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" demo1.
 CertiCoq Compile -config 3 -O 1 -ext "_opt3" demo1.
-
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" demo1.
 CertiCoq Compile -config 4 -O 1 -ext "_opt4" demo1.
-
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" demo1.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" demo1.
 
 CertiCoq Generate Glue -file "glue_demo1" [ bool, list ].
@@ -154,22 +143,11 @@ CertiCoq Generate Glue -file "glue_demo1" [ bool, list ].
 
 Eval compute in "Compiling demo2".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" demo2.
 CertiCoq Compile -O 1 -ext "_opt" demo2.
-
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" demo2.
 CertiCoq Compile -config 1 -O 1 -ext "_opt1" demo2.
-
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" demo2.
 CertiCoq Compile -config 2 -O 1 -ext "_opt2" demo2.
-
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" demo2.
 CertiCoq Compile -config 3 -O 1 -ext "_opt3" demo2.
-
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" demo2.
 CertiCoq Compile -config 4 -O 1 -ext "_opt4" demo2.
-
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" demo2.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" demo2.
 
 CertiCoq Generate Glue -file "glue_demo2" [ bool, list ].
@@ -177,22 +155,11 @@ CertiCoq Generate Glue -file "glue_demo2" [ bool, list ].
 
 Eval compute in "Compiling list_sum".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" list_sum.
 CertiCoq Compile -O 1 -ext "_opt" list_sum.
-
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" list_sum.
 CertiCoq Compile -config 1 -O 1 -ext "_opt1" list_sum.
-
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" list_sum.
 CertiCoq Compile -config 2 -O 1 -ext "_opt2" list_sum.
-
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" list_sum.
 CertiCoq Compile -config 3 -O 1 -ext "_opt3" list_sum.
-
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" list_sum.
 CertiCoq Compile -config 4 -O 1 -ext "_opt4" list_sum.
-
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" list_sum.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" list_sum.
 
 CertiCoq Generate Glue -file "glue_list_sum" [ nat ].
@@ -200,22 +167,11 @@ CertiCoq Generate Glue -file "glue_list_sum" [ nat ].
 
 Eval compute in "Compiling vs_easy".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" vs_easy.
 CertiCoq Compile -O 1 -ext "_opt" vs_easy.
-
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" vs_easy.
 CertiCoq Compile -config 1 -O 1 -ext "_opt1" vs_easy.
-
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" vs_easy.
 CertiCoq Compile -config 2 -O 1 -ext "_opt2" vs_easy.
-
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" vs_easy.
 CertiCoq Compile -config 3 -O 1 -ext "_opt3" vs_easy.
-
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" vs_easy.
 CertiCoq Compile -config 4 -O 1 -ext "_opt4" vs_easy.
-
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" vs_easy.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" vs_easy.
 
 CertiCoq Generate Glue -file "glue_vs_easy" [ bool, list, vs.space_atom, vs.clause ].
@@ -223,22 +179,11 @@ CertiCoq Generate Glue -file "glue_vs_easy" [ bool, list, vs.space_atom, vs.clau
 
 Eval compute in "Compiling vs_hard".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" vs_hard.
 CertiCoq Compile -O 1 -ext "_opt" vs_hard.
-
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" vs_hard.
 CertiCoq Compile -config 1 -O 1 -ext "_opt1" vs_hard.
-
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" vs_hard.
 CertiCoq Compile -config 2 -O 1 -ext "_opt2" vs_hard.
-
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" vs_hard.
 CertiCoq Compile -config 3 -O 1 -ext "_opt3" vs_hard.
-
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" vs_hard.
 CertiCoq Compile -config 4 -O 1 -ext "_opt4" vs_hard.
-
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" vs_hard.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" vs_hard.
 
 CertiCoq Generate Glue -file "glue_vs_hard" [ bool, vs.space_atom, vs.clause ].
@@ -246,22 +191,11 @@ CertiCoq Generate Glue -file "glue_vs_hard" [ bool, vs.space_atom, vs.clause ].
 
 Eval compute in "Compiling binom".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" binom.
 CertiCoq Compile -O 1 -ext "_opt" binom.
-
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" binom.
 CertiCoq Compile -config 1 -O 1 -ext "_opt1" binom.
-
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" binom.
 CertiCoq Compile -config 2 -O 1 -ext "_opt2" binom.
-
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" binom.
 CertiCoq Compile -config 3 -O 1 -ext "_opt3" binom.
-
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" binom.
 CertiCoq Compile -config 4 -O 1 -ext "_opt4" binom.
-
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" binom.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" binom.
 
 CertiCoq Generate Glue -file "glue_binom" [ nat ].
@@ -269,22 +203,11 @@ CertiCoq Generate Glue -file "glue_binom" [ nat ].
 
 Eval compute in "Compiling color".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" color.
 CertiCoq Compile -O 1 -ext "_opt" color.
-
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" color.
 CertiCoq Compile -config 1 -O 1 -ext "_opt1" color.
-
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" color.
 CertiCoq Compile -config 2 -O 1 -ext "_opt2" color.
-
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" color.
 CertiCoq Compile -config 3 -O 1 -ext "_opt3" color.
-
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" color.
 CertiCoq Compile -config 4 -O 1 -ext "_opt4" color.
-
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" color.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" color.
 
 CertiCoq Generate Glue -file "glue_color" [ nat, list, prod, Z ].
@@ -292,22 +215,11 @@ CertiCoq Generate Glue -file "glue_color" [ nat, list, prod, Z ].
 
 Eval compute in "Compiling lazy factorial (using unsafe passes)".
 
-CertiCoq Compile -unsafe-erasure -O 1 -ext "_cps_opt" lazy_factorial.
 CertiCoq Compile -unsafe-erasure -O 1 -ext "_opt" lazy_factorial.
-
-CertiCoq Compile -unsafe-erasure -config 1 -O 1 -ext "_cps_opt1" lazy_factorial.
 CertiCoq Compile -unsafe-erasure -config 1 -O 1 -ext "_opt1" lazy_factorial.
-
-CertiCoq Compile -unsafe-erasure -config 2 -O 1 -ext "_cps_opt2" lazy_factorial.
 CertiCoq Compile -unsafe-erasure -config 2 -O 1 -ext "_opt2" lazy_factorial.
-
-CertiCoq Compile -unsafe-erasure -config 3 -O 1 -ext "_cps_opt3" lazy_factorial.
 CertiCoq Compile -unsafe-erasure -config 3 -O 1 -ext "_opt3" lazy_factorial.
-
-CertiCoq Compile -unsafe-erasure -config 4 -O 1 -ext "_cps_opt4" lazy_factorial.
 CertiCoq Compile -unsafe-erasure -config 4 -O 1 -ext "_opt4" lazy_factorial.
-
-CertiCoq Compile -unsafe-erasure -config 5 -O 1 -ext "_cps_opt5" lazy_factorial.
 CertiCoq Compile -unsafe-erasure -config 5 -O 1 -ext "_opt5" lazy_factorial.
 
 CertiCoq Generate Glue -file "glue_lazy_factorial" [ bool, list ].
@@ -315,22 +227,11 @@ CertiCoq Generate Glue -file "glue_lazy_factorial" [ bool, list ].
 
 Eval compute in "Compiling clos".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" clos.
 CertiCoq Compile -O 1 -ext "_opt" clos.
-
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" clos.
 CertiCoq Compile -config 1 -O 1 -ext "_opt1" clos.
-
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" clos.
 CertiCoq Compile -config 2 -O 1 -ext "_opt2" clos.
-
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" clos.
 CertiCoq Compile -config 3 -O 1 -ext "_opt3" clos.
-
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" clos.
 CertiCoq Compile -config 4 -O 1 -ext "_opt4" clos.
-
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" clos.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" clos.
 
 CertiCoq Generate Glue -file "glue_clos" [ nat, list ].
@@ -338,22 +239,11 @@ CertiCoq Generate Glue -file "glue_clos" [ nat, list ].
 
 Eval compute in "Compiling rec_clos".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" rec_clos.
 CertiCoq Compile -O 1 -ext "_opt" rec_clos.
-
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" rec_clos.
 CertiCoq Compile -config 1 -O 1 -ext "_opt1" rec_clos.
-
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" rec_clos.
 CertiCoq Compile -config 2 -O 1 -ext "_opt2" rec_clos.
-
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" rec_clos.
 CertiCoq Compile -config 3 -O 1 -ext "_opt3" rec_clos.
-
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" rec_clos.
 CertiCoq Compile -config 4 -O 1 -ext "_opt4" rec_clos.
-
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" rec_clos.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" rec_clos.
 
 CertiCoq Generate Glue -file "glue_rec_clos" [ nat, list ].
@@ -361,22 +251,11 @@ CertiCoq Generate Glue -file "glue_rec_clos" [ nat, list ].
 
 Eval compute in "Compiling rec_clos2".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" rec_clos2.
 CertiCoq Compile -O 1 -ext "_opt" rec_clos2.
-
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" rec_clos2.
 CertiCoq Compile -config 1 -O 1 -ext "_opt1" rec_clos2.
-
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" rec_clos2.
 CertiCoq Compile -config 2 -O 1 -ext "_opt2" rec_clos2.
-
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" rec_clos2.
 CertiCoq Compile -config 3 -O 1 -ext "_opt3" rec_clos2.
-
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" rec_clos2.
 CertiCoq Compile -config 4 -O 1 -ext "_opt4" rec_clos2.
-
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" rec_clos2.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" rec_clos2.
 
 CertiCoq Generate Glue -file "glue_rec_clos2" [ nat, list ].
@@ -384,22 +263,11 @@ CertiCoq Generate Glue -file "glue_rec_clos2" [ nat, list ].
 
 (* Eval compute in "Compiling sha". *)
 
-(* CertiCoq Compile -O 1 -ext "_cps_opt" sha. *)
 (* CertiCoq Compile -O 1 -ext "_opt" sha. *)
-
-(* CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" sha. *)
 (* CertiCoq Compile -config 1 -O 1 -ext "_opt1" sha. *)
-
-(* CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" sha. *)
 (* CertiCoq Compile -config 2 -O 1 -ext "_opt2" sha. *)
-
-(* CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" sha. *)
 (* CertiCoq Compile -config 3 -O 1 -ext "_opt3" sha. *)
-
-(* CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" sha. *)
 (* CertiCoq Compile -config 4 -O 1 -ext "_opt4" sha. *)
-
-(* CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" sha. *)
 (* CertiCoq Compile -config 5 -O 1 -ext "_opt5" sha. *)
 
 (* CertiCoq Generate Glue -file "glue_sha" [ bool, list ]. *)
@@ -407,22 +275,11 @@ CertiCoq Generate Glue -file "glue_rec_clos2" [ nat, list ].
 
 Eval compute in "Compiling sha_fast".
 
-CertiCoq Compile -O 1 -ext "_cps_opt" sha_fast.
 CertiCoq Compile -O 1 -ext "_opt" sha_fast.
-
-CertiCoq Compile -config 1 -O 1 -ext "_cps_opt1" sha_fast.
 CertiCoq Compile -config 1 -O 1 -ext "_opt1" sha_fast.
-
-CertiCoq Compile -config 2 -O 1 -ext "_cps_opt2" sha_fast.
 CertiCoq Compile -config 2 -O 1 -ext "_opt2" sha_fast.
-
-CertiCoq Compile -config 3 -O 1 -ext "_cps_opt3" sha_fast.
 CertiCoq Compile -config 3 -O 1 -ext "_opt3" sha_fast.
-
-CertiCoq Compile -config 4 -O 1 -ext "_cps_opt4" sha_fast.
 CertiCoq Compile -config 4 -O 1 -ext "_opt4" sha_fast.
-
-CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" sha_fast.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" sha_fast.
 
 CertiCoq Generate Glue -file "glue_sha_fast" [ bool, list ].

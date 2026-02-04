@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 unsigned long long zero_int63() {
   return 1;
 }

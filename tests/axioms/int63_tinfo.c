@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "int63_tinfo.h"
 
 unsigned long long zero_int63() {

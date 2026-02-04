@@ -107,11 +107,11 @@ tests/axioms/list_sum_int63
 tests/axioms/list_sum_int63_tinfo
 tests/ocaml/main
 tests/ocaml/mainopt
-tests/opt/CertiCoq.Tests.tests.*.c
-tests/opt/CertiCoq.Tests.tests.*.h
-tests/opt/glue_*.c
-tests/opt/glue_*.h
-tests/opt/*_opt
-tests/opt/*_opt[1-5]
+tests/programs/CertiCoq.Tests.tests.*.c
+tests/programs/CertiCoq.Tests.tests.*.h
+tests/programs/glue_*.c
+tests/programs/glue_*.h
+tests/programs/*_opt
+tests/programs/*_opt[1-5]
 tests/wasm/CertiCoq.Tests.uint63_unit_tests.*.wasm
 tests/wasm/CertiCoq.Tests.wasm.tests.*.wasm

@@ -1,13 +1,9 @@
-DIRS=lib axioms ocaml opt wasm
+DIRS=lib axioms ocaml programs wasm
 CLEAN_DIRS=$(addprefix clean,$(DIRS))
 
-.PHONY: all clean plugin $(DIRS) $(CLEAN_DIRS)
-
-default: all
+.PHONY: all clean $(DIRS) $(CLEAN_DIRS)
 
 all: $(DIRS)
-
-$(DIRS): plugin
 
 lib/Makefile:
 	cd lib; coq_makefile -f _CoqProject -o Makefile
@@ -15,11 +11,8 @@ lib/Makefile:
 lib: lib/Makefile
 	$(MAKE) -C $@
 
-axioms ocaml opt wasm: lib
+axioms ocaml programs wasm: lib
 	$(MAKE) -C $@ run
-
-plugin:
-	$(MAKE) -C .. $@
 
 $(CLEAN_DIRS): clean%:
 	$(MAKE) -C $* clean

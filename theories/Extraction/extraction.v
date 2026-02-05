@@ -12,6 +12,7 @@ Require compcert.common.AST
        (* Int63*).
 
 Require Glue.glue
+        Glue.ffi 
         Compiler.pipeline.
 
 From MetaCoq.ErasurePlugin Require Import Erasure.

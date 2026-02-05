@@ -8,7 +8,6 @@
 -R CodegenWasm          CertiCoq.CodegenWasm
 -R Glue                 CertiCoq.Glue
 -R Extraction           CertiCoq.extraction
-# -R Runtime              CertiCoq.runtime
 -R ExtractionVanilla    CertiCoq.extraction_vanilla
 
 

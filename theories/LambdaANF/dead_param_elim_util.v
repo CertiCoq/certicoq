@@ -1,7 +1,7 @@
 Require Import LambdaANF.cps LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util LambdaANF.state
         LambdaANF.dead_param_elim LambdaANF.Ensembles_util LambdaANF.tactics LambdaANF.map_util
         LambdaANF.hoisting.
-Require Import compcert.lib.Coqlib Common.compM Common.Pipeline_utils.
+Require Import compcert.lib.Coqlib Common.compM.
 Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
         Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia
         maps_util.

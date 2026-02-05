@@ -15,6 +15,10 @@ Open Scope bs_scope.
 
 (** * Common Interface for composing CertiCoq Transformations *)
 
+Inductive GC_strategy :=
+  | GC_None
+  | GC_Generational.
+
 (* Compiler options *)
 Record Options :=
   { erasure_config : erasure_configuration;
@@ -32,10 +36,10 @@ Record Options :=
     prefix   : string; (* prefix to generated FFI *)
 
     body_name : string; (* Name of the toplevel function *)
-    prims    : list (kername * string * bool);
     (* List of constants that are realized in the target code.
      * kername: constant name, string: name of target primitive *)
-    gc : gc_mode
+    prims    : list (kername * string * bool);
+    gc       : GC_strategy
   }.
 
 

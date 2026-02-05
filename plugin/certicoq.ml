@@ -196,6 +196,10 @@ let _ = Callback.register "coq_user_error" coq_user_error
 
 (** Compilation Command Arguments *)
 
+type gc_mode =
+  | GC_None
+  | GC_Generational
+
 type command_args =
  | TYPED_ERASURE
  | UNSAFE_ERASURE
@@ -213,6 +217,7 @@ type command_args =
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
  | TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
  | FILENAME of string (* Name of the generated file *)
+ | GC_MODE of gc_mode
 
 type options =
   { typed_erasure : bool;
@@ -233,6 +238,7 @@ type options =
     toplevel_name : string;
     prims     : ((Kernames.kername * Kernames.ident) * bool) list;
     inductives_mapping : inductives_mapping;
+    gc_mode   : gc_mode;
   }
 
 let check_build_dir d =
@@ -265,6 +271,7 @@ let default_options () : options =
     toplevel_name = "body";
     prims     = [];
     inductives_mapping = get_global_inductives_mapping ();
+    gc_mode   = GC_Generational;
   }
 
 let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * bool) list) (fname : string) : options =
@@ -289,6 +296,7 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
     | PREFIX s :: xs -> aux {o with prefix = s} xs
     | TOPLEVEL_NAME s :: xs -> aux {o with toplevel_name = s} xs
     | FILENAME s :: xs -> aux {o with filename = s} xs
+    | GC_MODE m :: xs -> aux {o with gc_mode = m} xs
   in
   let opts = { (default_options ()) with filename = fname } in
   let o = aux opts l in
@@ -316,7 +324,7 @@ let make_pipeline_options (opts : options) =
         inlined_constants = Kernames.KernameSet.empty
         })
   in
-  let cps    = opts.cps in
+  let cps  = opts.cps in
   let args = coq_nat_of_int opts.args in
   let olevel = coq_nat_of_int opts.olevel in
   let timing = opts.time in
@@ -328,8 +336,9 @@ let make_pipeline_options (opts : options) =
   let toplevel_name = bytestring_of_string opts.toplevel_name in
   let prims = get_global_prims () @ opts.prims in
   let inductives_mapping = quote_inductives_mapping opts.inductives_mapping in
+  let gc = opts.gc_mode in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
-  Pipeline.make_opts erasure_config inductives_mapping cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims
+  Pipeline.make_opts erasure_config inductives_mapping cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims gc
 
 (** Main Compilation Functions *)
 

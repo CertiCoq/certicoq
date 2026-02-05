@@ -7,7 +7,6 @@ Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import List.
 Require Import maps_util.
 Require Import Glue.glue.
-Require Import Glue.ffi.
 Require Import ExtLib.Structures.Monad.
 Require Import MetaCoq.Common.BasicAst.
 From MetaCoq.Utils Require Import MCString.
@@ -155,6 +154,7 @@ Definition default_opts : Options :=
      Pipeline_utils.prefix := "";
      Pipeline_utils.body_name := "body";
      prims := [];
+     gc := GC_Generational
   |}.
 
 Definition make_opts
@@ -170,6 +170,7 @@ Definition make_opts
            (prefix : string)                         (* Prefix for the FFI. Check why is this needed in the pipeline and not just the plugin *)
            (toplevel_name : string)                  (* Name of the toplevel function ("body" by default) *)
            (prims : list (kername * string * bool))  (* list of extracted constants *)
+           (gc : GC_strategy)                          (* GC strategy for Wasm codegen *)
   : Options :=
   {| erasure_config := erasure_config; 
      inductives_mapping := im;
@@ -184,7 +185,9 @@ Definition make_opts
      dev := dev;
      Pipeline_utils.prefix := prefix;
      Pipeline_utils.body_name := toplevel_name;
-     prims :=  prims |}.
+     prims :=  prims;
+     gc := gc
+  |}.
 
 
 Definition compile (opts : Options) (p : Template.Ast.Env.program) :=

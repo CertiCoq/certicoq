@@ -12,6 +12,7 @@ Require compcert.common.AST
     (*    Int31*).
 
 Require Glue.glue
+        Glue.ffi
         Compiler.pipeline.
 
 Require Import Coq.extraction.Extraction.

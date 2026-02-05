@@ -63,13 +63,14 @@ ARGUMENT EXTEND cargs
 | [ "-unsafe-erasure" ] -> { UNSAFE_ERASURE }
 | [ "-bypass_qed" ] -> { BYPASS_QED }
 | [ "-cps" ] -> { CPS }
+| [ "-no-gc" ] -> { GC GC_NONE }
 | [ "-time" ] -> { TIME }
 | [ "-time_anf" ] -> { TIMEANF }
 | [ "-O" natural(n) ] -> { OPT(n) }
 | [ "-debug" ] -> { DEBUG }
 | [ "-args" natural(n) ] -> { ARGS(n) }
-| [ "-config" natural(n) ] -> { ANFCONFIG(n) }
 (* Zoe: -config  To measure different ANF configurations. Not for user purposes *)
+| [ "-config" natural(n) ] -> { ANFCONFIG(n) }
 | [ "-build_dir" string(s) ] -> { BUILDDIR(s) }
 | [ "-dev" natural(n) ] -> { DEV(n) }
 | [ "-ext" string(s) ] -> { EXT(s) }

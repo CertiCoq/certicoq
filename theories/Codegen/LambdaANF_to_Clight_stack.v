@@ -1,4 +1,4 @@
-Require Import Common.compM.
+Require Import Common.compM Common.Pipeline_utils.
 
 Require Import Coq.ZArith.ZArith
                Coq.Program.Basics
@@ -32,12 +32,6 @@ Require Import LambdaANF.set_util
 
 From MetaCoq.Utils Require Import bytestring MCString.
 
-
-(* What GC strategy to use *)
-Inductive GC_strategy :=
-| GC_None
-| GC_Generational
-| GC_RefCounting.
 
 Section TRANSLATION.
 
@@ -271,8 +265,8 @@ Section TRANSLATION.
     | None => Err ("make_ctor_rep: unknown constructor with tag " ++ show_pos ct)
     end.
 
-    Notation threadStructInf := (Tstruct threadInfIdent noattr).
-    Notation threadInf := (Tpointer threadStructInf noattr).
+    Definition threadStructInf := (Tstruct threadInfIdent noattr).
+    Definition threadInf := (Tpointer threadStructInf noattr).
 
 
     Notation intTy := (Tint I32 Signed
@@ -299,7 +293,7 @@ Section TRANSLATION.
     Definition make_vint (z:Z) := if Archi.ptr64 then Vlong (Int64.repr z) else Values.Vint (Int.repr z).
     Definition make_cint z t := if Archi.ptr64 then Econst_long (Int64.repr z) t else (Econst_int (Int.repr z) t).
 
-    Notation funTy := (Tfunction (Tcons threadInf Tnil) val cc_default).
+    Definition funTy := (Tfunction (Tcons threadInf Tnil) val cc_default).
 
     Notation pfunTy := (Tpointer funTy noattr).
 
@@ -347,8 +341,8 @@ Section TRANSLATION.
     Notation ptr := (Evar isptrIdent isptrTy).
 
     (* changed tinf to be tempvar and have type Tstruct rather than Tptr Tstruct *)
-    Notation tinf := (Etempvar tinfIdent threadInf).
-    Notation tinfd := (Ederef tinf threadStructInf).
+    Definition tinf := (Etempvar tinfIdent threadInf).
+    Definition tinfd := (Ederef tinf threadStructInf).
 
     Notation heapInf := (Tstruct heapInfIdent noattr).
 

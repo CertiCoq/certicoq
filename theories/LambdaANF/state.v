@@ -1,4 +1,4 @@
-Require Import Common.compM Common.Pipeline_utils.
+Require Import Common.compM.
 Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
         LambdaANF.List_util LambdaANF.functions LambdaANF.cps_show LambdaANF.Ensembles_util LambdaANF.tactics.
 Require Import Coq.ZArith.ZArith.

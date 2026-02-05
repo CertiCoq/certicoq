@@ -24,13 +24,24 @@ Require Import compcert.common.AST
 Require Import LambdaANF.cps
                LambdaANF.identifiers
                LambdaANF.cps_show
-               LambdaANF_to_Clight
+               LambdaANF_to_Clight_stack
                compM.
 
 Import MonadNotation.
 Open Scope monad_scope.
 
 Definition main_ident : positive := 1.
+
+(* TODO these notations are taken from LambdaANF_to_Clight_stack. Make them global.  *)
+Notation valPtr := (Tpointer val {| attr_volatile := false; attr_alignas := None |}).
+
+Notation c_int := c_int'.
+
+Notation uintTy := (Tint I32 Unsigned
+                        {| attr_volatile := false; attr_alignas := None |}).
+
+Notation ulongTy := (Tlong Unsigned
+                        {| attr_volatile := false; attr_alignas := None |}).
 
 Notation "'var' x" := (Etempvar x val) (at level 20).
 
@@ -44,6 +55,7 @@ Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 Notation "'Field(' t ',' n ')'" :=
   ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
 
+  
 Definition multiple (xs : list statement) : statement :=
   fold_right Ssequence Sskip xs.
 

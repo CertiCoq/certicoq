@@ -1,4 +1,4 @@
-Require Import Common.compM Common.Pipeline_utils.
+Require Import Common.compM.
 From Coq Require Import ZArith.ZArith Lists.List micromega.Lia.
 Import ListNotations.
 Require Import identifiers.
@@ -68,11 +68,6 @@ Section Inline.
       now eauto.
       exact None.
   Defined.
-
-  Definition debug_st (s : St) : inlineM unit :=
-    nenv <- get_name_env () ;;
-    log_msg (pp_St s nenv);;
-    log_msg Pipeline_utils.newline.
 
   Definition split_fuel d : nat * nat :=
     let d2 := Nat.div2 d in

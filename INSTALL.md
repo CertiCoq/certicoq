@@ -1,6 +1,30 @@
 # Installing CertiCoq
 
-## Get the code
+## Install using opam
+Every method using Opam requires to first add Inria's repositories so that dependencies can be pulled from them by executing the following command: 
+
+```console
+$ opam repo add coq-released https://coq.inria.fr/opam/released
+```
+
+They also require a small set of dependencies that will most surely already be installed but just in case, they can be installed with: 
+
+```console
+$ sudo apt update
+$ sudo apt install -y clang libgmp-dev
+```
+
+
+### Install directly from opam (preferred)
+Certicoq is directly available from Inria's repositories so it can be installed directly by just executing the following command:
+
+```console
+$ opam install coq-certicoq
+```
+Take into account that it will take a long time due to the amount of compilation required behind the curtains. But once it is done executing you will be able to use CertiCoq.
+
+### Install from source using opam
+#### Get the code
 
 Fetch the code:
 
@@ -13,17 +37,9 @@ Fetch the dependencies:
 ```console
 $ git submodule update --init
 ```
+#### Install
 
-
-## Install using opam (preferred)
-
-First, pin the dependencies:
-
-```console
-$ opam pin -n -y submodules/metacoq
-```
-
-Next, pin CertiCoq:
+Pin CertiCoq:
 
 ```console
 $ opam pin -n -y .
@@ -42,6 +58,19 @@ $ opam install coq-certicoq --deps-only
 ```
 
 ## Build & install manually
+#### Get the code
+
+Fetch the code:
+
+```console
+$ git clone git@github.com:CertiCoq/certicoq.git
+```
+
+Fetch the dependencies:
+
+```console
+$ git submodule update --init
+```
 
 ### Dependencies
 

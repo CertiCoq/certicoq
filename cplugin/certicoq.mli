@@ -1,6 +1,6 @@
 open Plugin_utils
 
-type gc_mode =
+type gc_strategy =
   | GC_None
   | GC_Generational
 
@@ -21,7 +21,7 @@ type command_args =
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
  | TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
  | FILENAME of string (* Name of the generated file *)
- | GC_MODE of gc_mode
+ | GC_MODE of gc_strategy
 
 type inductive_mapping = Kernames.inductive * (string * int list) (* Target inductive type and mapping of constructor names to constructor tags *)
 type inductives_mapping = inductive_mapping list 
@@ -47,7 +47,7 @@ type options =
     toplevel_name : string;
     prims     : prim list;
     inductives_mapping : inductives_mapping;
-    gc_mode   : gc_mode;
+    gc_mode   : gc_strategy;
   }
 
 val default_options : unit -> options

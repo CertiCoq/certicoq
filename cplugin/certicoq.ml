@@ -5,7 +5,6 @@
 
 open Printer
 open Metacoq_template_plugin.Ast_quoter
-open ExceptionMonad
 open AstCommon
 open Plugin_utils
 
@@ -196,7 +195,7 @@ let _ = Callback.register "coq_user_error" coq_user_error
 
 (** Compilation Command Arguments *)
 
-type gc_mode =
+type gc_strategy =
   | GC_None
   | GC_Generational
 
@@ -217,7 +216,7 @@ type command_args =
  | PREFIX of string (* Prefix to add to the generated FFI fns, avoids clashes with C fns *)
  | TOPLEVEL_NAME of string (* Name of the toplevel function ("body" by default) *)
  | FILENAME of string (* Name of the generated file *)
- | GC of gc_mode
+ | GC_MODE of gc_strategy
 
 type options =
   { typed_erasure : bool;
@@ -238,7 +237,7 @@ type options =
     toplevel_name : string;
     prims     : ((Kernames.kername * Kernames.ident) * bool) list;
     inductives_mapping : inductives_mapping;
-    gc        : gc_mode;
+    gc_mode   : gc_strategy;
   }
 
 let check_build_dir d =
@@ -271,7 +270,7 @@ let default_options () : options =
     toplevel_name = "body";
     prims     = [];
     inductives_mapping = get_global_inductives_mapping ();
-    gc        = GC_Generational
+    gc_mode   = GC_Generational
   }
 
 let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * bool) list) (fname : string) : options =
@@ -296,7 +295,7 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
     | PREFIX s :: xs -> aux {o with prefix = s} xs
     | TOPLEVEL_NAME s :: xs -> aux {o with toplevel_name = s} xs
     | FILENAME s :: xs -> aux {o with filename = s} xs
-    | GC m :: xs -> aux {o with gc = m} xs
+    | GC_MODE m :: xs -> aux {o with gc_mode = m} xs
   in
   let opts = { (default_options ()) with filename = fname } in
   let o = aux opts l in
@@ -338,7 +337,7 @@ let make_pipeline_options (opts : options) =
   let inductives_mapping = quote_inductives_mapping opts.inductives_mapping in
   let gc = opts.gc_mode in
   (* Feedback.msg_debug Pp.(str"Prims: " ++ prlist_with_sep spc (fun ((x, y), wt) -> str (string_of_bytestring y)) prims); *)
-  Pipeline.make_opts erasure_config inductives_mapping cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims gc
+  Pipeline.make_opts erasure_config inductives_mapping cps args anfc olevel timing timing_anf debug dev prefix toplevel_name prims (Obj.magic gc)
 
 (** Main Compilation Functions *)
 

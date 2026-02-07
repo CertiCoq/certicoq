@@ -138,7 +138,7 @@ let get_global_inductives_mapping () = !global_inductive_registers
 type certicoq_run_function = unit -> Obj.t
 
 let certicoq_run_functions = 
-  Summary.ref ~name:"CertiCoq Run Functions Table" 
+  Summary.ref ~local:true ~name:"CertiCoq Run Functions Table" 
     (CString.Map.empty : certicoq_run_function CString.Map.t)
 
 let certicoq_run_functions_name = "certicoq-run-functions-registration"
@@ -153,9 +153,8 @@ let cache_certicoq_run_function (s, s', fn) =
 let certicoq_run_function_input = 
   let open Libobject in
   declare_object 
-    (global_object_nodischarge certicoq_run_functions_name
-    ~cache:(fun r -> cache_certicoq_run_function r)
-    ~subst:None)
+    (local_object_nodischarge certicoq_run_functions_name
+    ~cache:(fun r -> cache_certicoq_run_function r))
 
 let register_certicoq_run s s' fn =
   Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certicoq_run");
@@ -966,9 +965,9 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let gc_stack_o = make_rt_file "gc_stack.o" in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
     let packages = ["coq-core"; "coq-core.plugins.ltac"; "coq-metacoq-template-ocaml"; 
-      "coq-core.interp"; "coq-core.kernel"; "coq-core.library"] in
+      "coq-core.interp"; "coq-core.kernel"; "coq-core.library"; "coq-certicoq-vanilla.plugin"] in
     let pkgs = String.concat "," packages in
-    let dontlink = "str,unix,dynlink,threads,zarith,coq-core,coq-core.plugins.ltac,coq-core.interp" in
+    let dontlink = "str,unix,dynlink,threads,zarith,coq-core,coq-core.plugins.ltac,coq-core.interp,coq-certicoq-vanilla.plugin" in
     let () = ignore (execute cmd) in
     let shared_lib = make_fname opts opts.filename ^ suff ^ ".cmxs" in
     let linkcmd =

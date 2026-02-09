@@ -8,6 +8,14 @@ TESTS=$(shell cat TESTS)
 TEST_PREQS=%_main.c glue_%.c $(INCLUDE)/gc_stack.c
 TEST_RECIPE=$(CCOMPILER) -o $@ $(WARN_OPTS) -O2 -fomit-frame-pointer -I$(INCLUDE) $^
 
+# Names of the generated glue code files
+GLUE=$(TESTS:%=glue_%.c) $(TESTS:%=glue_%.h)
+
+# Names of the generated C files
+OPTS=opt opt1 opt2 opt3 opt4 opt5
+TESTS_OPTS=$(foreach TEST,$(TESTS),$(OPTS:%=$(TEST)_%))
+CFILES=$(TESTS_OPTS:%=CertiCoq.Tests.tests.%.c)
+
 default: exec
 all: lib exec run
 
@@ -36,8 +44,7 @@ lib: ../lib/Makefile
 cleanlib:
 	$(MAKE) clean -C ../lib
 
-.NOTINTERMEDIATE: glue_%.c
-glue_%.c: tests.v
+$(GLUE) $(CFILES): tests.v
 	coqc $(COQOPTS) $<
 
 %_opt:  $(TEST_PREQS) CertiCoq.Tests.tests.%_opt.c  ; $(TEST_RECIPE)
@@ -47,7 +54,6 @@ glue_%.c: tests.v
 %_opt4: $(TEST_PREQS) CertiCoq.Tests.tests.%_opt4.c ; $(TEST_RECIPE)
 %_opt5: $(TEST_PREQS) CertiCoq.Tests.tests.%_opt5.c ; $(TEST_RECIPE)
 
-$(TESTS):%: lib $(TEST_PREQS)
 $(TESTS):%: %_opt %_opt1 %_opt2 %_opt3 %_opt4 %_opt5
 
 run: run.sh exec

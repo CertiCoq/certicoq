@@ -1,4 +1,4 @@
-From Coq Require Import ZArith. 
+From Coq Require Import ZArith.
 From CertiCoq Require Import LambdaANF.toplevel Codegen.LambdaANF_to_Clight_stack LambdaANF.cps_util.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import ExtLib.Structures.Monad.
@@ -37,10 +37,10 @@ Definition Cprogram := (name_env * Clight.program * Clight.program)%type.
 Definition add_prim_names (prims : list (kername * string * bool * nat * positive)) (nenv : LambdaBoxLocal_to_LambdaANF.name_env) : LambdaBoxLocal_to_LambdaANF.name_env :=
   List.fold_left (fun map '(k, s, b, ar, p) => cps.M.set p (nNamed s) map) prims nenv.
 
-Definition Clight_trans_ANF bodyName (prims : list (kername * string * bool * nat * positive)) (args : nat) (t : toplevel.LambdaANF_FullTerm) : error Cprogram * string :=
+Definition ANF_to_Clight bodyName (prims : list (kername * string * bool * nat * positive)) (args : nat) (gc : GC_strategy) (t : toplevel.LambdaANF_FullTerm) : error Cprogram * string :=
   let '(_, pr_env, cenv, ctag, itag, nenv, fenv, _, prog) := t in
   let '(p, str) := LambdaANF_to_Clight_stack.compile
-                     GC_Generational argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent
+                     gc argsIdent allocIdent nallocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent
                      tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent resultIdent
                      args
                      pr_env
@@ -59,4 +59,4 @@ Definition compile_Clight (prims : list (kername * string * bool * nat * positiv
     debug_msg "Translating from LambdaANF to C" ;;
     opts <- get_options ;;
     let args := c_args opts in
-    LiftErrorLogCertiCoqTrans "Codegen" (Clight_trans_ANF opts.(body_name) prims args) s.
+    LiftErrorLogCertiCoqTrans "Codegen" (ANF_to_Clight opts.(body_name) prims args opts.(gc)) s.

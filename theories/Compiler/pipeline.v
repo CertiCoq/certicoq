@@ -128,8 +128,8 @@ Definition next_id := 100%positive.
 Definition pipeline (p : Template.Ast.Env.program) :=
   let genv := fst p in
   '(prs, next_id) <- register_prims next_id genv.(Ast.Env.declarations) ;;
-(*   p <- erase_PCUIC p ;;
- *)  p <- CertiCoq_pipeline next_id prs false p ;;
+  (*   p <- erase_PCUIC p ;; *)
+  p <- CertiCoq_pipeline next_id prs false p ;;
   compile_Clight prs p.
 
 Definition pipeline_Wasm (p : Template.Ast.Env.program) :=
@@ -172,7 +172,7 @@ Definition make_opts
            (prims : list (kername * string * bool))  (* list of extracted constants *)
            (gc : GC_strategy)                          (* GC strategy for Wasm codegen *)
   : Options :=
-  {| erasure_config := erasure_config; 
+  {| erasure_config := erasure_config;
      inductives_mapping := im;
      direct := negb cps;
      c_args := args;

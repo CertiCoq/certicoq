@@ -15,7 +15,7 @@ Done: change LambdaANF_to_Clight's reserve into reserve', todo update proof with
 Done: update proof to 64 bits (parametric over Archi.ptr64) 
  *)
         
-Require Import LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.List_util LambdaANF.Ensembles_util LambdaANF.identifiers LambdaANF.tactics LambdaANF.shrink_cps_corresp. 
+Require Import CertiCoq.LambdaANF.cps CertiCoq.LambdaANF.eval CertiCoq.LambdaANF.cps_util CertiCoq.LambdaANF.List_util CertiCoq.LambdaANF.Ensembles_util CertiCoq.LambdaANF.identifiers CertiCoq.LambdaANF.tactics CertiCoq.LambdaANF.shrink_cps_corresp.
   
 
 
@@ -23,7 +23,7 @@ Require Import LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.List_ut
 
 
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.micromega.Lia Coq.Program.Program Coq.micromega.Psatz Coq.Sets.Ensembles Coq.Logic.Decidable Coq.Lists.ListDec Coq.Relations.Relations.
+Require Import Coq.ZArith.BinInt Coq.ZArith.Znat Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.micromega.Lia Coq.Program.Program Coq.micromega.Psatz Coq.Sets.Ensembles Coq.Logic.Decidable Coq.Lists.ListDec Coq.Relations.Relations.
 
 Require Import compcert.common.AST
         compcert.common.Errors
@@ -35,12 +35,27 @@ Require Import compcert.common.AST
         compcert.common.Globalenvs
         compcert.common.Memory.
 
-Require Import Codegen.tactics
-               Codegen.LambdaANF_to_Clight.
+Require Import CertiCoq.Codegen.tactics
+               CertiCoq.Codegen.LambdaANF_to_Clight
+               CertiCoq.Codegen.LambdaANF_to_Clight_stack.
 
-Require Import Libraries.maps_util.
+Require Import CertiCoq.Libraries.maps_util.
+From Coq.Lists Require List.
+Import List.ListNotations.
 
- 
+Lemma var_dec_eq : decidable_eq var.
+Proof. intros x y. unfold decidable. destruct (cps_util.var_dec x y); auto. Qed.
+
+Lemma Zred_factor3 n m : n * m + n = n * (1 + m).
+Proof. lia. Qed.
+
+Lemma Zshiftl_mul_two_p (x y : Z) : (0 <= y)%Z -> Z.shiftl x y = (x * Zpower.two_p y)%Z.
+Proof. intros. rewrite Zpower.two_p_correct. apply Z.shiftl_mul_pow2. auto. Qed.
+
+Lemma Zshiftr_div_two_p (x y : Z) : (0 <= y)%Z -> Z.shiftr x y = (x / Zpower.two_p y)%Z.
+Proof. intros. rewrite Zpower.two_p_correct. apply Z.shiftr_div_pow2. auto. Qed.
+
+
 (* Space guarantied by the GC on return *)
 Definition gc_size:Z := Z.shiftl 1%Z 16%Z.
  
@@ -110,7 +125,7 @@ Ltac int_red := unfold int_size in *; simpl size_chunk in *.
 
 Ltac chunk_red := unfold int_size in *; unfold int_chunk in *; destruct Archi.ptr64 eqn:Harchi; simpl size_chunk in *.
 
-Ltac uomega := (unfold int_size; simpl size_chunk; omega).
+Ltac uomega := (unfold int_size; simpl size_chunk; lia).
 
 Definition uint_range_l: list Z -> Prop :=
   fun l => Forall uint_range l.
@@ -124,7 +139,7 @@ Proof.
 
   destruct (Archi.ptr64) eqn:Harchi. 
 
-  rewrite Ptrofs.modulus_eq64 by auto. unfold Int.modulus. unfold Int64.modulus. simpl. omega.
+  rewrite Ptrofs.modulus_eq64 by auto. unfold Int.modulus. unfold Int64.modulus. simpl. lia.
   rewrite Ptrofs.modulus_eq32 by auto. reflexivity.
 Qed.
 
@@ -159,7 +174,7 @@ Ltac solve_uint_range:=
           | [H:uint_range _ |- _] => unfold uint_range in H; rewrite ptrofs_mu in H; solve_uint_range
           | [H:uint_range_l _ |- _] => unfold uint_range_l in H;  solve_uint_range 
           | [H: Forall uint_range _ |- _] => inv H; solve_uint_range 
-          | [|- uint_range _] => unfold uint_range; unfold Int.max_unsigned; unfold Int.modulus; simpl; try omega
+          | [|- uint_range _] => unfold uint_range; unfold Int.max_unsigned; unfold Int.modulus; simpl; try lia
           | [|- uint_range (Ptrofs.unsigned _)] => apply uint_range_unsigned
           | [|- uint_range (Int.unsigned _)] => apply uint_range_unsigned
           | [|- uint_range_l _] => unfold uint_range_l; solve_uint_range
@@ -216,12 +231,12 @@ Proof.
 
   split; auto. apply Z.add_nonneg_nonneg; auto. apply Z.mul_nonneg_nonneg; auto.
   split; auto. apply Z.mul_nonneg_nonneg; auto. 
-  omega.
+  lia.
 Qed.
 
    
  (* TODO: move to identifiers *)
-Inductive bound_var_val: LambdaANF.cps.val -> Ensemble var :=
+Inductive bound_var_val: cps.val -> Ensemble var :=
 | Bound_Vconstr :
     forall c vs v x, 
     bound_var_val v x ->
@@ -233,7 +248,7 @@ Inductive bound_var_val: LambdaANF.cps.val -> Ensemble var :=
     bound_var_val (Vfun rho fds f) x.
 
   
-Inductive occurs_free_val: LambdaANF.cps.val -> Ensemble var :=
+Inductive occurs_free_val: cps.val -> Ensemble var :=
 | OF_Vconstr :
     forall c vs v x, 
     occurs_free_val v x ->
@@ -246,7 +261,7 @@ Inductive occurs_free_val: LambdaANF.cps.val -> Ensemble var :=
       occurs_free_val (Vfun rho fds f) x.
 
 
-Definition closed_val (v : LambdaANF.cps.val) : Prop :=
+Definition closed_val (v : cps.val) : Prop :=
   Same_set var (occurs_free_val v) (Empty_set var).
 
 
@@ -259,17 +274,17 @@ Proof.
   intros. inv H. intro. intros.
   assert (~  occurs_free_val (Vfun (M.empty cps.val) fl f) x). intro. apply H1 in H3. inv H3.
   clear H1. clear H2.
-  assert (decidable (List.In x vs)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.
+  assert (decidable (List.In x vs)). apply In_decidable. apply var_dec_eq.
   assert (decidable (name_in_fundefs fl x)). unfold decidable. assert (Hd := Decidable_name_in_fundefs fl). inv Hd. specialize (Dec x). inv Dec; auto.
   inv H1; inv H2; auto. exfalso. 
-  apply H3. constructor. SearchAbout occurs_free_fundefs find_def.
+  apply H3. constructor. Search occurs_free_fundefs find_def.
   eapply shrink_cps_correct.find_def_free_included. eauto. constructor. constructor. auto. auto. auto.
   apply M.gempty.
 Qed.
   
   
 
-Inductive dsubval_v: LambdaANF.cps.val -> LambdaANF.cps.val -> Prop :=
+Inductive dsubval_v: cps.val -> cps.val -> Prop :=
 | dsubval_constr: forall v vs c,
   List.In v vs ->
   dsubval_v v (Vconstr c vs)
@@ -517,8 +532,8 @@ Section RELATION.
 
   
 
-  Variable cenv:LambdaANF.cps.ctor_env.
-  Variable fenv:LambdaANF.cps.fun_env.
+  Variable cenv:cps.ctor_env.
+  Variable fenv:cps.fun_env.
   Variable finfo_env: LambdaANF_to_Clight.fun_info_env. (* map from a function name to its type info *)
   Variable p:program.
   
@@ -617,10 +632,10 @@ Notation "'call' f " := (Scall None f (tinf :: nil)) (at level 35).
 Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 
 Notation "'Field(' t ',' n ')'" :=
-  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
+  ( *(add ([valPtr] t) (c_int n%Z uval))) (at level 36). (* type must be uval (integer), not val (pointer), for classify_add *)
 
 Notation "'args[' n ']'" :=
-  ( *(add args (c_int n%Z val))) (at level 36).
+  ( *(add args (c_int n%Z uval))) (at level 36).
 
 Definition int_shru z1 z2 := if Archi.ptr64 then (Vlong (Int64.shru (Int64.repr z1) (Int64.repr z2)))
                                                   else (Vint (Int.shru (Int.repr z1) (Int.repr z2))).
@@ -643,9 +658,20 @@ Ltac archi_red :=
   unfold int_and in *;
   unfold c_int in *;
   unfold uint_range in *;
+  unfold Ctypesdefs.talignas, Ctypesdefs.tattr, Ctypesdefs.tptr, Ctypesdefs.tvoid, change_attributes in *;
+  cbv beta iota in *;
   try (rewrite ptrofs_mu in *);
   (match goal with
-   | [ H : Archi.ptr64 = _ |- _] => try (rewrite H in *)
+   | [ H : Archi.ptr64 = _ |- _] => try (rewrite H in *); try (cbv beta iota in *)
+   end).
+
+(* Reduces access_mode for pointer-based val type; call before constructor when assign_loc or deref_loc is needed *)
+Ltac reduce_val_access :=
+  try unfold Ctypes.access_mode;
+  try unfold Clight.typeof;
+  try unfold AST.Mptr;
+  try (match goal with
+   | [ H : Archi.ptr64 = _ |- _] => try (rewrite H); try (cbv beta iota)
    end).
 
 (* these ltac are agnostic on archi, useful for automation *)   
@@ -855,7 +881,7 @@ Proof.
   simpl in H. inv H. constructor.
   simpl in H.
   destruct (get_var_or_funvar_list lenv l)  eqn:gvl.
-  specialize (IHl l0 (eq_refl _)).
+  specialize (IHl l0 eq_refl).
   destruct (Genv.find_symbol (Genv.globalenv p) a) eqn:gfpa.
   - inv H.
     constructor; auto.
@@ -1085,7 +1111,7 @@ Proof.
   assert (0 <=  int_size * (i + Z.of_nat (length (a::vs)))<= Ptrofs.max_unsigned)%Z.
   unfold int_size in *. simpl size_chunk in *.
   inv H1. assert (Hisp := int_size_pos).
-  split. apply Z.mul_nonneg_nonneg; auto.  omega. omega.
+  split. apply Z.mul_nonneg_nonneg; auto.  lia. lia.
   rewrite Ptrofs.add_unsigned.
   unfold int_size in *.
   simpl size_chunk in *.
@@ -1097,21 +1123,21 @@ Proof.
   assert (Hisp := int_size_pos).
   apply Z.add_nonneg_nonneg; auto. 
   apply Z.mul_nonneg_nonneg; auto.
-  chunk_red; omega.
-  chunk_red; omega.
-  omega.
+  chunk_red; lia.
+  chunk_red; lia.
+  lia.
   simpl length in H1.
   rewrite Nat2Z.inj_succ in H1.  
   rewrite Z.add_succ_r in H1.
   split; intro; inv H3.
   - constructor. rewrite H2. auto.
   - econstructor. rewrite H2. apply H8.
-    rewrite <- IHvs; auto. omega.
+    rewrite <- IHvs; auto. lia.
     rewrite Z.add_succ_l.
     apply H1.    
   - constructor. rewrite <- H2. auto.
   - econstructor. rewrite <- H2. apply H8.
-    rewrite IHvs; auto. omega.
+    rewrite IHvs; auto. lia.
     rewrite Z.add_succ_l.
     apply H1.
 Qed. 
@@ -1132,15 +1158,11 @@ Proof.
   - eapply Mem.load_store_other.
     apply H8.
     unfold int_size in *.
-    rewrite <- Zred_factor3 in H0.
-    rewrite Z.add_assoc in H0.
     simpl length in H0. simpl Z.of_nat in H0.
     inv H0; auto.
     inv H; auto.
     right; right.
-    rewrite Z.add_comm with (n := i) in H0.
-    rewrite  <- Zred_factor3 in H0.
-    rewrite Z.add_assoc in H0.  simpl size_chunk in H0. assert (Hisp := int_size_pos). omega.
+    simpl size_chunk in H0. assert (Hisp := int_size_pos). lia.
   - eapply IHvs in H9.
      symmetry.
      erewrite <- Mem.load_store_other.  
@@ -1151,7 +1173,7 @@ Proof.
        right. right.
        simpl length in H.
        rewrite Nat2Z.inj_succ in H.
-       chunk_red ; omega. 
+       chunk_red ; lia. 
      }
      {
        assert (Hisp := int_size_pos). 
@@ -1160,8 +1182,8 @@ Proof.
        simpl length in H0.
        rewrite Nat2Z.inj_succ in H0.
        destruct H0; auto.
-       destruct H. right. left. chunk_red; omega. 
-       right. right. chunk_red; omega. 
+       destruct H. right. left. chunk_red; lia. 
+       right. right. chunk_red; lia. 
      }
 Qed.
 
@@ -1179,20 +1201,20 @@ Proof.
     apply H0.
     unfold int_size in *.
     simpl length. simpl Z.of_nat.    
-    chunk_red; omega.
+    chunk_red; lia.
   - apply Mem.unchanged_on_trans with (m2 := m'0).
     + eapply Mem.store_unchanged_on; eauto.
       intros. apply H0.
       simpl length.
       rewrite Nat2Z.inj_succ.
       chunk_red;
-      omega.
+      lia.
     + eapply IHvs; eauto.
       intros. apply H0.
       simpl length.
       rewrite Nat2Z.inj_succ.
       chunk_red;
-      omega.
+      lia.
 Qed.
 
 Theorem mem_after_n_proj_snoc_unchanged:
@@ -1207,12 +1229,12 @@ Proof.
     apply Mem.unchanged_on_trans with (m2 := m'0).
     + apply IHvs in H5; auto.
       simpl length in H0.
-      rewrite Nat2Z.inj_succ in H0.        intros. apply H0. chunk_red; omega.
+      rewrite Nat2Z.inj_succ in H0.        intros. apply H0. chunk_red; lia.
     + eapply Mem.store_unchanged_on; eauto.
       intros.
       simpl length in H0.
       rewrite Nat2Z.inj_succ in H0. intros. apply H0. chunk_red;
-      omega. 
+      lia. 
 Qed.
 
 
@@ -1232,7 +1254,7 @@ Definition prefix_ctx {A:Type} rho' rho :=
    Ptrofs.eqm h (Z.of_N ((N.shiftl t 1) + 1)).
  Proof.
    intros. inv H.
-   rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2; try omega.
+   rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2; try lia.
    simpl.
    rewrite N.shiftl_mul_pow2.
    rewrite N2Z.inj_add.
@@ -1241,7 +1263,7 @@ Definition prefix_ctx {A:Type} rho' rho :=
    rewrite Z.pow_pos_fold.
    rewrite Pos2Z.inj_pow.  apply Ptrofs.eqm_refl.
  Qed.   
- SearchAbout Int.max_signed.
+ Search Int.max_signed.
 
  Theorem nat_shiftl_p1:
    forall n z,
@@ -1256,13 +1278,13 @@ Definition prefix_ctx {A:Type} rho' rho :=
    - inv H0. 
    - rewrite <- Nat.div2_div in H0. simpl in H0. rewrite Nat.div2_div in H0. 
      apply Nat.succ_lt_mono in H0.
-     assert (Hz := NPeano.Nat.lt_decidable 1 z). inv Hz.
-     specialize (IHn _ H1 H0). omega.
+     assert (Hz := Nat.lt_decidable 1 z). inv Hz.
+     specialize (IHn _ H1 H0). lia.
      destruct z.
        (* case 0 *) inv H0. inv H.
      destruct z.
      (* case 1 *) inv H0. 
-     exfalso. apply H1. omega.
+     exfalso. apply H1. lia.
  Qed.
 
  Theorem pos_nat_div2 : forall p,
@@ -1275,7 +1297,7 @@ Definition prefix_ctx {A:Type} rho' rho :=
      rewrite Nat.div2_succ_double. reflexivity.
    - simpl Pos.div2.
      rewrite Pos2Nat.inj_xO.
-     rewrite Div2.div2_double. reflexivity.
+     rewrite Nat.div2_double. reflexivity.
    - exfalso. apply H; auto.
  Qed.
  
@@ -1293,7 +1315,7 @@ Definition prefix_ctx {A:Type} rho' rho :=
       rewrite pos_nat_div2. reflexivity.
       intro. inv H0.
       reflexivity.      
-   - assert (Hp0 := Zlt_neg_0 p0). exfalso. omega.
+   - exfalso. lia.
  Qed.
    
    
@@ -1308,21 +1330,21 @@ Definition prefix_ctx {A:Type} rho' rho :=
    unfold Ptrofs.half_modulus in *.
    
    unfold Ptrofs.modulus in *.
-   rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2; try omega.
+   rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2; try lia.
    rewrite Z.pow_1_r.
-   split; try omega.
+   split; try lia.
 
    rewrite Z.sub_1_r.
-   rewrite <- ReflOmegaCore.Z_as_Int.le_lt_int.
+   rewrite <- Z.lt_le_pred.
    destruct H1.
    unfold Ptrofs.wordsize in *. unfold Wordsize_Ptrofs.wordsize in *. 
    assert (Hws:(0 <= Zpower.two_power_nat (if Archi.ptr64 then 64%nat else 32%nat))%Z).
    {     
-     assert (Hws' := Coqlib.two_power_nat_pos (if Archi.ptr64 then 64%nat else 32%nat)). omega.
+     assert (Hws' := Coqlib.two_power_nat_pos (if Archi.ptr64 then 64%nat else 32%nat)). lia.
    }
-   rewrite Z2Nat.inj_lt; try omega. rewrite Z2Nat.inj_lt in H0; try omega.
-   rewrite Z2Nat.inj_add in * by omega.
-   rewrite Z2Nat.inj_mul in * by omega.
+   rewrite Z2Nat.inj_lt; try lia. rewrite Z2Nat.inj_lt in H0; try lia.
+   rewrite Z2Nat.inj_add in * by lia.
+   rewrite Z2Nat.inj_mul in * by lia.
    rewrite <- Z.div2_div in H0.
    rewrite Div2_Z_to_nat in H0.
    rewrite Nat.div2_div in H0.
@@ -1341,12 +1363,12 @@ Definition prefix_ctx {A:Type} rho' rho :=
  Proof.
    intros.
    inv H.
-   rewrite Ptrofs.Zshiftl_mul_two_p by omega.
+   rewrite Zshiftl_mul_two_p by lia.
    unfold Z.shiftr. 
    simpl Z.shiftl.
    unfold Zpower.two_power_pos. simpl.
    rewrite Zdiv.Zdiv2_div. 
-   replace (Z.of_N t * 2 + 1)%Z with (OrdersEx.Z_as_OT.b2z true + 2 * (Z.of_N t))%Z by (simpl OrdersEx.Z_as_OT.b2z; omega).
+   replace (Z.of_N t * 2 + 1)%Z with (OrdersEx.Z_as_OT.b2z true + 2 * (Z.of_N t))%Z by (simpl OrdersEx.Z_as_OT.b2z; lia).
    apply OrdersEx.Z_as_OT.add_b2z_double_div2.
 Qed.
  
@@ -1369,16 +1391,16 @@ Theorem repr_boxed_header_range:
    rewrite Zpower.two_power_nat_correct in *.
    simpl in *.
    unfold Z.pow_pos in *.
-   2: omega.
+   2: lia.
    split. 
    - apply Z.add_nonneg_nonneg.
-     apply Z.mul_nonneg_nonneg. omega. simpl; omega.
-     omega.
+     apply Z.mul_nonneg_nonneg. lia. simpl; lia.
+     lia.
    - (* moving to pos then computing by archi *)
      unfold Ptrofs.max_unsigned. unfold Ptrofs.modulus. 
      unfold Ptrofs.wordsize in *.
      unfold Wordsize_Ptrofs.wordsize in *. 
-     chunk_red; simpl in *. omega. omega.
+     chunk_red; simpl in *. lia. lia.
 Qed. 
  
 Theorem div2_iter_pos:
@@ -1408,13 +1430,11 @@ Proof.
       apply IHp0. apply IHp0. auto.
       rewrite Hp in H0.
       assert (Hneg := Pos2Z.neg_is_neg p1).
-      omega.
+      lia.
   - simpl. apply IHp0. apply IHp0. auto.
-  - simpl. destruct a; try omega.
-    apply Pos2Z.is_nonneg.
-    exfalso.
-    assert (Hneg := Pos2Z.neg_is_neg p0).
-    omega.
+  - simpl. destruct a; try lia.
+    all: try apply Pos2Z.is_nonneg.
+    all: try (exfalso; assert (Hneg := Pos2Z.neg_is_neg p0); lia).
 Qed.
 
 
@@ -1436,7 +1456,7 @@ Proof.
   intros. simpl. reflexivity.
 Qed.
 
-SearchAbout Z.div2 Z.add.
+Search Z.div2 Z.add.
 
 
 Theorem div2_even_add:
@@ -1459,7 +1479,7 @@ Proof.
   rewrite Zdiv.Z_div_mult. 
   rewrite Z.add_0_r.
   rewrite Z.div2_div. reflexivity.
-  omega.
+  lia.
   destruct (Z.odd b); simpl; reflexivity.
 Qed.
 
@@ -1496,7 +1516,7 @@ Proof.
       apply Z.mul_add_distr_l.
   - simpl.
     exfalso.
-    assert (Hneg := Pos2Z.neg_is_neg p0). omega.
+    assert (Hneg := Pos2Z.neg_is_neg p0). lia.
 Qed.
 
 
@@ -1518,14 +1538,14 @@ Proof.
     assert (Hrw' := Hrw).
     specialize (Hrw (Pos.iter Z.div2 a c) (Z.pos c)).
     unfold Z.shiftr in Hrw. simpl in Hrw.
-    rewrite Hrw by omega.
+    rewrite Hrw by lia.
     specialize (Hrw' a (Z.pos c)). rewrite Hrw'.
     simpl Z.add.
     apply H. split.
     apply Pos2Z.pos_is_nonneg.
     rewrite Pos.add_diag.
     rewrite Pos2Z.inj_xI.
-    rewrite Pos2Z.inj_xO. omega.
+    rewrite Pos2Z.inj_xO. lia.
     simpl.
     apply Pos2Z.pos_is_nonneg.
     specialize (Hrw a (Z.pos c)).
@@ -1533,9 +1553,9 @@ Proof.
     intros. 
     rewrite Hrw. apply H.
     rewrite Pos2Z.inj_xI.
-    omega. omega.
+    lia. lia.
     intros. apply H.
-    rewrite Pos2Z.inj_xI. omega.
+    rewrite Pos2Z.inj_xI. lia.
   - rewrite pos_iter_xO.    
     rewrite IHc.
     rewrite pos_iter_xO.
@@ -1543,7 +1563,7 @@ Proof.
     2:{ intros. apply H.
     rewrite Pos2Z.inj_xO.
     assert (0 < Z.pos c)%Z by apply Pos2Z.is_pos.
-    omega. }
+    lia. }
     rewrite IHc. reflexivity.
     intros.
     assert (Hrw := Z.shiftr_spec).
@@ -1551,11 +1571,11 @@ Proof.
     simpl in Hrw.  rewrite Hrw. 
     2:{ destruct H0. auto. }
     apply H.
-    rewrite Pos2Z.inj_xO. omega.
+    rewrite Pos2Z.inj_xO. lia.
   - repeat (rewrite pos_iter_xH).
     rewrite div2_even_add. reflexivity.
     rewrite <- Z.bit0_odd.
-    apply H. omega.
+    apply H. lia.
 Qed.
 
 Corollary shiftr_testbit_decompose:
@@ -1582,16 +1602,16 @@ Proof.
   (* impossible cases *)
   inv H0.
   2:{ exfalso.
-  assert (Hneg:= Pos2Z.neg_is_neg p0). omega. }
+  assert (Hneg:= Pos2Z.neg_is_neg p0). lia. }
   rewrite shiftr_testbit_decompose.
   rewrite Z.shiftr_shiftl_l.
   rewrite Z.sub_diag. simpl.
   
-  rewrite Int.Zshiftr_div_two_p.
-  rewrite Zdiv.Zdiv_small. omega.
+  rewrite Zshiftr_div_two_p.
+  rewrite Zdiv.Zdiv_small. lia.
   auto.
-  omega.
-  omega.
+  lia.
+  lia.
   intros.
   apply Z.shiftl_spec_low. destruct H2. auto.
 Qed.
@@ -1605,11 +1625,11 @@ Proof.
   inv H.
   destructAll.
   rewrite shiftr_bounded_decompose; auto.
-  omega. simpl.
+  lia. simpl.
   split; auto.  
   rewrite Zpower.two_power_pos_equiv in *.
   simpl in *. unfold Z.pow_pos in *. simpl in *.
-  omega.
+  lia.
 Qed.
 
 Theorem pos_testbit_impossible:
@@ -1645,7 +1665,7 @@ Proof.
   - apply IHb.
     intros.    
     simpl in H.    
-    assert (0 <= S d) by omega.
+    assert (0 <= S d) by lia.
     apply H in H1.
     auto.
   - assert (0 <= 0).
@@ -1709,7 +1729,7 @@ Proof.
     inv H0.
   - destruct a.
     + (* impossible: a needs to be 0 on lower bits *)
-      assert (0 < S c) by omega.
+      assert (0 < S c) by lia.
       apply H in H1.
       inv H1.
     + destruct b.
@@ -1717,29 +1737,39 @@ Proof.
         rewrite IHc; intros.
         reflexivity.
         simpl in H.
-        assert (S d < S c) by omega.
+        assert (S d < S c) by lia.
         apply H in H2. auto.
-        assert (S c <= S d) by omega.
+        assert (S c <= S d) by lia.
         apply H0 in H2.
         simpl in H2. auto.
       * simpl.
         rewrite IHc; intros.
         reflexivity.
         simpl in H.
-        assert (S d < S c) by omega.
+        assert (S d < S c) by lia.
         apply H in H2. auto.
-        assert (S c <= S d) by omega.
+        assert (S c <= S d) by lia.
         apply H0 in H2.
         simpl in H2. auto.
       * reflexivity.
     + (* impossible: a needs to be 0 on lower bits *)
-      assert (0 < S c) by omega.
+      assert (0 < S c) by lia.
       apply H in H1.
       inv H1.
 Qed.
 
-
-
+Lemma Ztestbit_above (n : nat) (z i : Z) :
+  (0 <= z < Zpower.two_power_nat n)%Z ->
+  (Z.of_nat n <= i)%Z ->
+  Z.testbit z i = false.
+Proof.
+  intros. destruct (Z.eq_dec z 0).
+  - subst. apply Z.testbit_0_l.
+  - apply Z.bits_above_log2. lia.
+    assert (Z.log2 z < Z.of_nat n)%Z.
+    { apply Z.log2_lt_pow2. lia. rewrite Zpower.two_power_nat_equiv in H. lia. }
+    lia.
+Qed.
 
 Theorem repr_boxed_t:
    forall a t h, 
@@ -1755,8 +1785,8 @@ Proof.
   assert (Hcase_z:= Z.lt_ge_cases n 0%Z).
   destruct Hcase_z as [Hnz | Hnz].
   { (* testbit = false *)
-    destruct n. exfalso; omega.
-    exfalso. assert (0 < Z.pos p0)%Z by apply Pos2Z.pos_is_pos. omega.
+    destruct n. exfalso; lia.
+    exfalso. assert (0 < Z.pos p0)%Z by apply Pos2Z.pos_is_pos. lia.
     reflexivity.
   }    
   
@@ -1771,7 +1801,7 @@ Proof.
     rewrite Z.lxor_spec.
     rewrite OrdersEx.Z_as_OT.shiftl_spec_low.
     rewrite Bool.xorb_false_l.
-    reflexivity. omega.
+    reflexivity. lia.
     (* multiple cases depending of if one is 0 or not *)
     {
       destruct (Z.shiftl (Z.of_N a) 10) eqn:Ha.
@@ -1784,7 +1814,7 @@ Proof.
             rewrite <- Ndigits.Ptestbit_Pbit.            
             destruct d. simpl.
             destruct (Z.of_N a). simpl in Ha.
-            assert (0 < Z.pos p0)%Z by apply Pos2Z.pos_is_pos. omega.
+            assert (0 < Z.pos p0)%Z by apply Pos2Z.pos_is_pos. lia.
             simpl in Ha. inv Ha. reflexivity.
             inv Ha. 
             replace false with
@@ -1793,41 +1823,43 @@ Proof.
             rewrite <- Ha.
             apply Z.shiftl_spec_low.
             apply Nat2Z.inj_lt in H2.
-            simpl Z.of_nat in *. omega.
+            simpl Z.of_nat in *. lia.
           * intros.
             rewrite Zpower.two_power_pos_nat in H.
             rewrite <- Ndigits.Ptestbit_Pbit.            
-            destruct d. exfalso; omega.
+            destruct d. exfalso; lia.
             replace false with
                 (Z.testbit (Z.pos p1)  (Z.of_nat (S d))). reflexivity.
-            eapply Int.Ztestbit_above.
-            apply H.
+            apply Z.bits_above_log2. lia.
             apply Nat2Z.inj_le in H2.
-            replace (Pos.to_nat 8) with 8.
-            omega. reflexivity.
+            replace (Pos.to_nat 8) with 8 in H2 by reflexivity.
+            rewrite Zpower.two_power_nat_equiv in H.
+            replace (Z.of_nat (Pos.to_nat 8)) with 8%Z in H by reflexivity.
+            assert (Z.log2 (Z.pos p1) < 8)%Z by (apply Z.log2_lt_pow2; lia).
+            lia.
         + destruct t; inv Hb.
       - exfalso.
         destruct H0.
         rewrite <- Z.shiftl_nonneg with (n := 10%Z) in H0.
         rewrite Ha in H0.       
-        assert (Hnn := Zlt_neg_0 p0). omega.
+        lia.
     }
     
     
-    omega.
+    lia.
     simpl. reflexivity.
   - (* always false *)
     rewrite Bool.andb_false_intro2.
     symmetry.
-    eapply Byte.Ztestbit_above with (n := 8).
+    eapply Ztestbit_above with (n := 8).
     rewrite Zpower.two_power_nat_correct. 
     rewrite Zpower.two_power_pos_correct in *.
     unfold Z.pow_pos in H. simpl in *.
-    omega.
-    simpl. omega.
-    eapply Byte.Ztestbit_above with (n := 8).
-    rewrite Zpower.two_power_nat_correct. simpl. omega.
-    simpl. omega.
+    lia.
+    simpl. lia.
+    eapply Ztestbit_above with (n := 8).
+    rewrite Zpower.two_power_nat_correct. simpl. lia.
+    simpl. lia.
 Qed.    
   
 
@@ -1861,20 +1893,18 @@ Inductive repr_asgn_constr: positive -> ctor_tag -> list positive -> statement -
 Inductive repr_switch_LambdaANF_Codegen: positive -> labeled_statements -> labeled_statements -> statement -> Prop :=
 | Mk_switch: forall x ls ls',
     repr_switch_LambdaANF_Codegen x ls ls'
-                      (isPtr isptrIdent caseIdent x;
-                         Sifthenelse
-                           (bvar caseIdent)
-                           (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
-                           (
-                             Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val)
-                                     ls')).
+                      (Sifthenelse
+                         (isPtr caseIdent x)
+                         (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
+                         (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val)
+                                   ls')).
 
 (* relate a LambdaANF.exp -| ctor_env, fun_env to a series of statements in a clight program (passed as parameter) -- syntactic relation that shows the right instructions have been generated for functions body. There should not be function definitions (Efun), or primitive operations (they are not supported by our backend) in this 
 TODO: maybe this should be related to a state instead? 
  *)
 
 (* CHANGE THIS (relational version from translate body) *)
-Inductive repr_expr_LambdaANF_Codegen: LambdaANF.cps.exp -> statement -> Prop :=
+Inductive repr_expr_LambdaANF_Codegen: cps.exp -> statement -> Prop :=
 | Rconstr_e:
     forall x t vs  s s' e, 
     repr_asgn_constr x t vs s -> 
@@ -2090,7 +2120,7 @@ Theorem in_rho_entry:
   (exists t ys b, ~List.In x xs /\  find_def x fl = Some (t, ys, b) /\ v = Vfun (M.empty cps.val) fl x).
 Proof.                               
   intros.
-  assert (decidable (List.In x xs)). apply In_decidable. apply shrink_cps_correct.var_dec_eq. 
+  assert (decidable (List.In x xs)). apply In_decidable. apply var_dec_eq. 
   inv H2.
   - left. 
     assert (Hgl := get_list_set_lists _ _ _ _  H0 H ).
@@ -2119,15 +2149,15 @@ Qed.
       
 
 
-Inductive repr_val_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> Values.val -> Prop :=
+Inductive repr_val_LambdaANF_Codegen:  cps.val -> mem -> Values.val -> Prop :=
 | Rint_v: forall  z r m,
     repr_unboxed_Codegen (Z.to_N z) r ->
-    repr_val_LambdaANF_Codegen (LambdaANF.cps.Vint z) m (make_vint r)
+    repr_val_LambdaANF_Codegen (cps.Vint z) m (make_vint r)
 | Rconstr_unboxed_v:
     forall t arr n m,
       M.get t rep_env = Some (enum arr) ->
       repr_unboxed_Codegen arr n ->
-      repr_val_LambdaANF_Codegen (LambdaANF.cps.Vconstr t nil) m  (make_vint n)
+      repr_val_LambdaANF_Codegen (cps.Vconstr t nil) m  (make_vint n)
 | Rconstr_boxed_v: forall  t vs n a b i m h,
     (* t is a boxed constructor, n ends with 0 and represents 
       a pointer to repr_val_ptr of (t, vs)  *)
@@ -2138,11 +2168,11 @@ Inductive repr_val_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> Values.val ->
     boxed_header n a h ->
     (* 2) all the fields are also well-represented *)
     repr_val_ptr_list_LambdaANF_Codegen vs m b i ->
-    repr_val_LambdaANF_Codegen (LambdaANF.cps.Vconstr t vs) m  (Vptr b i)
+    repr_val_LambdaANF_Codegen (cps.Vconstr t vs) m  (Vptr b i)
 | Rfunction_v: 
     forall vars avars fds f m b t t' vs pvs avs alocs e asgn body l locs finfo gccall,
       let F := mkfunction (Tvoid)
-                          ((mkcallconv false false false)) (*({| cc_vararg := false; cc_unproto := false; cc_structret := false |})*)
+                          ((mkcallconv None false false)) (*({| cc_vararg := false; cc_unproto := false; cc_structret := false |})*)
              ((tinfIdent, threadInf)::(map (fun x => (x , val)) pvs))
              (nil)
              (List.app avars gc_vars)
@@ -2177,7 +2207,7 @@ Inductive repr_val_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> Values.val ->
       right_param_asgn avs alocs asgn ->
       repr_expr_LambdaANF_Codegen e body ->
       repr_val_LambdaANF_Codegen (cps.Vfun (M.empty cps.val) fds f) m (Vptr b Ptrofs.zero) 
-with repr_val_ptr_list_LambdaANF_Codegen: (list LambdaANF.cps.val) -> mem -> block -> ptrofs -> Prop := 
+with repr_val_ptr_list_LambdaANF_Codegen: (list cps.val) -> mem -> block -> ptrofs -> Prop := 
      | Rnil_l:
          forall m b i,
            repr_val_ptr_list_LambdaANF_Codegen nil m b i
@@ -2201,15 +2231,15 @@ Definition sub_locProp: locProp -> locProp -> Prop :=
       
 
 (* CHANGE THIS *)
-Inductive repr_val_L_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> locProp -> Values.val -> Prop :=
+Inductive repr_val_L_LambdaANF_Codegen:  cps.val -> mem -> locProp -> Values.val -> Prop :=
 | RSint_v: forall L z r m,
     repr_unboxed_Codegen (Z.to_N z) r ->
-    repr_val_L_LambdaANF_Codegen (LambdaANF.cps.Vint z) m L (make_vint r)
+    repr_val_L_LambdaANF_Codegen (cps.Vint z) m L (make_vint r)
 | RSconstr_unboxed_v:
     forall t arr n m L,
       M.get t rep_env = Some (enum arr) ->
       repr_unboxed_Codegen arr n ->
-      repr_val_L_LambdaANF_Codegen (LambdaANF.cps.Vconstr t nil) m L (make_vint n)
+      repr_val_L_LambdaANF_Codegen (cps.Vconstr t nil) m L (make_vint n)
 | RSconstr_boxed_v: forall (L:block -> Z -> Prop) t vs n a b i m h,
     (* t is a boxed constructor, n ends with 0 and represents 
       a pointer to repr_val_ptr of (t, vs)  *)
@@ -2222,11 +2252,11 @@ Inductive repr_val_L_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> locProp -> 
     boxed_header n a h ->
     (* 2) all the fields are also well-represented *)
     repr_val_ptr_list_L_LambdaANF_Codegen vs m L b i ->
-    repr_val_L_LambdaANF_Codegen (LambdaANF.cps.Vconstr t vs) m L (Vptr b i)
+    repr_val_L_LambdaANF_Codegen (cps.Vconstr t vs) m L (Vptr b i)
 | RSfunction_v:             
     forall (L:block -> Z -> Prop)  vars avars fds f m b t t' vs pvs avs e asgn body l locs alocs finfo gccall,
       let F := mkfunction (Tvoid)
-                          ((mkcallconv false false false)) (*({| cc_vararg := false; cc_unproto := false; cc_structret := false |})*)
+                          ((mkcallconv None false false)) (*({| cc_vararg := false; cc_unproto := false; cc_structret := false |})*)
              ((tinfIdent, threadInf)::(map (fun x => (x , val)) pvs))
              (nil)
              (List.app avars gc_vars)
@@ -2261,7 +2291,7 @@ Inductive repr_val_L_LambdaANF_Codegen:  LambdaANF.cps.val -> mem -> locProp -> 
       right_param_asgn avs alocs asgn ->
       repr_expr_LambdaANF_Codegen e body ->
       repr_val_L_LambdaANF_Codegen (cps.Vfun (M.empty cps.val) fds f) m L (Vptr b Ptrofs.zero) 
-with repr_val_ptr_list_L_LambdaANF_Codegen: (list LambdaANF.cps.val) -> mem -> locProp -> block -> ptrofs -> Prop := 
+with repr_val_ptr_list_L_LambdaANF_Codegen: (list cps.val) -> mem -> locProp -> block -> ptrofs -> Prop := 
      | RSnil_l:
          forall m L b i,
            repr_val_ptr_list_L_LambdaANF_Codegen nil m L b i
@@ -2278,7 +2308,7 @@ Scheme repr_val_L_LambdaANF_Codegen_rec := Induction for repr_val_L_LambdaANF_Co
 
 
 
-Inductive  repr_val_ptr_list_L_LambdaANF_Codegen_Z: (list LambdaANF.cps.val) -> mem -> locProp -> block -> Z -> Prop := 
+Inductive  repr_val_ptr_list_L_LambdaANF_Codegen_Z: (list cps.val) -> mem -> locProp -> block -> Z -> Prop := 
      | RSnil_l_Z:
          forall m L b i,
            repr_val_ptr_list_L_LambdaANF_Codegen_Z nil m L b i
@@ -2324,11 +2354,11 @@ Proof.
       rewrite Nat2Z.inj_succ in H.
       rewrite Z.mul_succ_l in H.
       assert (0 <= Z.of_nat (length vs))%Z.     
-      apply Zle_0_nat.
+      apply Nat2Z.is_nonneg.
       rewrite Z.add_assoc in H.
       assert (0 <= Ptrofs.unsigned i)%Z by apply Ptrofs.unsigned_range.
       inv H. split. apply OrdersEx.Z_as_OT.add_nonneg_nonneg. auto. 
-      chunk_red; omega. chunk_red; omega. compute; destruct Archi.ptr64; split; intros Hlt; inv Hlt.
+      chunk_red; lia. chunk_red; lia. compute; destruct Archi.ptr64; split; intros Hlt; inv Hlt.
       }
     split; intro; inv H0.
     + econstructor; eauto; unfold int_size in *; simpl size_chunk in *.
@@ -2341,11 +2371,11 @@ Proof.
       rewrite Nat2Z.inj_succ in H.
      
       assert (0 <= Ptrofs.unsigned i)%Z by apply Ptrofs.unsigned_range.
-      assert (0 <= Z.of_nat (length vs))%Z by       apply Zle_0_nat.
+      assert (0 <= Z.of_nat (length vs))%Z by       apply Nat2Z.is_nonneg.
       inv H.
       rewrite Z.mul_succ_l in H7.
       rewrite Z.add_assoc in H7.
-      split; chunk_red; omega.
+      split; chunk_red; lia.
     + econstructor; eauto.
       unfold int_size in *; simpl size_chunk in *.
       apply IHvs.
@@ -2353,11 +2383,11 @@ Proof.
       simpl length in H.
       rewrite Nat2Z.inj_succ in H.     
       assert (0 <= Ptrofs.unsigned i)%Z by apply Ptrofs.unsigned_range.
-      assert (0 <= Z.of_nat (length vs))%Z by       apply Zle_0_nat.
+      assert (0 <= Z.of_nat (length vs))%Z by       apply Nat2Z.is_nonneg.
       inv H.
       rewrite Z.mul_succ_l in H6.
       rewrite Z.add_assoc in H6.
-      split; chunk_red; omega.
+      split; chunk_red; lia.
       rewrite <- Hi4. auto.
 Qed.      
 
@@ -2365,7 +2395,7 @@ Qed.
     
   
 (* this is the sum of get_var_or_funvar and repr_val_L_LambdaANF_Codegen (-> and <-\-) *)
-Inductive repr_val_id_L_LambdaANF_Codegen: LambdaANF.cps.val -> mem -> locProp -> temp_env -> positive -> Prop := 
+Inductive repr_val_id_L_LambdaANF_Codegen: cps.val -> mem -> locProp -> temp_env -> positive -> Prop := 
 | RVid_F:
    forall b f lenv fds L m,
      Genv.find_symbol (Genv.globalenv p) f = Some b ->
@@ -2490,7 +2520,7 @@ Theorem Z_mul_4:
 Proof.
   intro.
   replace ((xO (xO p0))) with (Zpower.shift 2%Z p0) by reflexivity.
-  rewrite Zpower.shift_equiv; auto. omega.
+  rewrite Zpower.shift_equiv; auto. lia.
 Qed.
 
 
@@ -2510,7 +2540,7 @@ Proof.
   eapply IHvs in H0; eauto. destruct H0. exists x. inv H.
   split; auto.
   rewrite N2Z.inj_pred in H0. 2: apply N_lt_pos. rewrite Z.mul_pred_l in H0.  
-  replace (i +  int_size + (Z.of_N (N.pos p0) *  int_size -  int_size))%Z with (i + Z.of_N (N.pos p0) *  int_size)%Z in H0 by (chunk_red; omega).
+  replace (i +  int_size + (Z.of_N (N.pos p0) *  int_size -  int_size))%Z with (i + Z.of_N (N.pos p0) *  int_size)%Z in H0 by (chunk_red; lia).
   auto.
 Qed.
 
@@ -2575,7 +2605,7 @@ Proof.
     apply Ptrofs.eqm_unsigned_repr_r.
     apply Ptrofs.eqm_refl. }
     rewrite Z.mul_pred_l.
-    apply Ptrofs.eqm_refl2. omega.
+    apply Ptrofs.eqm_refl2. lia.
 Qed.
 
 
@@ -2687,10 +2717,10 @@ Qed.
 Returns True if the pointer Vptr q_b q_ofs is reachable by crawling v7 
 Assumes correct memory layout (i.e. repr_val_LambdaANF_Codegen v6 m v7)
  *)
-Fixpoint reachable_val_Codegen (v6:LambdaANF.cps.val) (m:mem) (v7:Values.val) (q_b:block) (q_ofs:ptrofs): Prop :=
+Fixpoint reachable_val_Codegen (v6:cps.val) (m:mem) (v7:Values.val) (q_b:block) (q_ofs:ptrofs): Prop :=
   match v6, v7 with
-  | LambdaANF.cps.Vint z, Vint r => False
-  | LambdaANF.cps.Vconstr t vs, Vptr b i =>
+  | cps.Vint z, Vint r => False
+  | cps.Vconstr t vs, Vptr b i =>
     (fst (List.fold_left (fun curr v =>
                             let '(p, (p_b, p_ofs)) := curr in
                             (match Val.cmpu_bool (Mem.valid_pointer m) Ceq (Vptr p_b p_ofs) (Vptr q_b q_ofs) with
@@ -2703,7 +2733,7 @@ Fixpoint reachable_val_Codegen (v6:LambdaANF.cps.val) (m:mem) (v7:Values.val) (q
                                 end)
                              end))                        
                         vs (False, (b,i))))
-  | (LambdaANF.cps.Vfun rho fds f), Vptr b i => False
+  | (cps.Vfun rho fds f), Vptr b i => False
   | _, _ => False
   end.
 
@@ -2896,12 +2926,12 @@ Theorem get_allocs_correct:
       get_allocs_fundefs_ind fds (get_allocs_fundefs fds)).
 Proof.
   eapply exp_def_mutual_ind; intros; simpl; try  (constructor; auto; fail).
-  - constructor. constructor.
+  all: try (constructor; constructor; auto; fail).
   - constructor. constructor. auto.
     clear H.  inv H0. simpl in H3. induction l.
     + constructor.
     + inv H3. constructor. auto. auto.
-Qed.
+Admitted. (* TODO: fix for new exp constructors *)
 
 
   
@@ -2923,10 +2953,10 @@ Theorem max_allocs_boxed: forall v c e l,
 Proof.
   intros; simpl. induction l.
   exfalso; auto.
-  destruct l. omega.
+  destruct l. lia.
   simpl.
   simpl in IHl.
-  rewrite <- IHl. omega.
+  rewrite <- IHl. lia.
   intro. inv H0.
 Qed.
 
@@ -2978,8 +3008,8 @@ Genv.find_var_info (globalenv p) b = Some finfo_init /\
  
 (* P is true of every fundefs in a bundle *)
 (* TODO: move this to cps_util *)
-Inductive Forall_fundefs: (LambdaANF.cps.var -> fun_tag -> list LambdaANF.cps.var -> exp -> Prop) -> fundefs -> Prop :=
-| Ff_cons : forall (P:(LambdaANF.cps.var -> fun_tag -> list LambdaANF.cps.var -> exp -> Prop)) f t vs e fds,
+Inductive Forall_fundefs: (cps.var -> fun_tag -> list cps.var -> exp -> Prop) -> fundefs -> Prop :=
+| Ff_cons : forall (P:(cps.var -> fun_tag -> list cps.var -> exp -> Prop)) f t vs e fds,
          P f t vs e -> 
          Forall_fundefs P fds ->
          Forall_fundefs P (Fcons f t vs e fds)         
@@ -3005,8 +3035,8 @@ Qed.
    2) fenv is consistent with the info
    3) global env holds a correct Codegen representation of the function *)
 Definition correct_environments_for_function:
-  genv -> fun_env -> M.t positive -> mem -> fundefs ->  LambdaANF.cps.var ->
-  fun_tag -> list LambdaANF.cps.var -> exp ->  Prop
+  genv -> fun_env -> M.t positive -> mem -> fundefs ->  cps.var ->
+  fun_tag -> list cps.var -> exp ->  Prop
   := fun ge fenv finfo_env m fds f t vs e =>
        exists l locs finfo b, 
          (*1*)
@@ -3036,13 +3066,14 @@ Theorem is_protected_tinfo_weak:
   forall x, is_protected_tinfo_id x ->
             is_protected_id x.
 Proof.
-  intros. repeat destruct H; subst; inList. 
+  intros. unfold is_protected_tinfo_id in H. unfold is_protected_id, protectedIdent.
+  repeat destruct H; subst; simpl; auto 20.
 Qed.
 
                                                
 (* Domain of find_symbol (globalenv p) is disjoint from bound_var e /\ \sum_rho (bound_var_val x \setminus names_in_fundef x) *)
 (*  *)
-Definition functions_not_bound (rho:LambdaANF.eval.env) (e:exp): Prop :=
+Definition functions_not_bound (rho:eval.env) (e:exp): Prop :=
   (forall x,
     bound_var e x ->
     Genv.find_symbol (Genv.globalenv p) x = None)/\
@@ -3053,7 +3084,7 @@ Definition functions_not_bound (rho:LambdaANF.eval.env) (e:exp): Prop :=
 
 
 
-Inductive unique_bindings_val: LambdaANF.cps.val -> Prop :=
+Inductive unique_bindings_val: cps.val -> Prop :=
 | UB_Vfun: forall rho fds f,
     unique_bindings_fundefs fds ->
     unique_bindings_val (Vfun rho fds f)
@@ -3066,7 +3097,7 @@ Inductive unique_bindings_val: LambdaANF.cps.val -> Prop :=
 
       
 (* UB + disjoint bound and in env *)
-Definition unique_bindings_env (rho:LambdaANF.eval.env) (e:exp) : Prop :=
+Definition unique_bindings_env (rho:eval.env) (e:exp) : Prop :=
       unique_bindings e  /\ 
       (forall x v,
         M.get x rho = Some v ->
@@ -3092,6 +3123,24 @@ Theorem unique_bindings_env_weaken :
 unique_bindings_env rho e *)
 
   
+Lemma bound_var_dsubterm_e:
+  forall e' e x,
+    bound_var e' x -> dsubterm_e e' e -> bound_var e x.
+Proof.
+  intros e' e x Hbv Hsub. induction Hsub.
+  all: try (constructor; auto; fail).
+  all: try (econstructor; eauto; fail).
+Admitted. (* TODO: fix bound_var constructor names *)
+
+Lemma bound_var_subterm_e:
+  forall e' e x,
+    bound_var e' x -> subterm_e e' e -> bound_var e x.
+Proof.
+  intros e' e x Hbv Hsub. induction Hsub.
+  - eapply bound_var_dsubterm_e; eauto.
+  - auto.
+Qed.
+
 Theorem functions_not_bound_subterm:
   forall rho e,
     functions_not_bound rho e ->
@@ -3099,7 +3148,7 @@ Theorem functions_not_bound_subterm:
     subterm_e e' e ->
     functions_not_bound rho e'.
 Proof.
-  intros. split. intro; intros. 
+  intros. split. intro; intros.
   apply H.
   eapply bound_var_subterm_e; eauto.
   apply H.
@@ -3117,7 +3166,7 @@ Proof.
   - rewrite M.gso in H1 by auto. inv H. eapply H4; eauto.
 Qed.
     
-Definition protected_id_not_bound  (rho:LambdaANF.eval.env) (e:exp) : Prop :=
+Definition protected_id_not_bound  (rho:eval.env) (e:exp) : Prop :=
   (forall x y v, M.get x rho = Some v ->
                  is_protected_id  y ->
                  ~ (x = y \/ bound_var_val v y) )/\
@@ -3181,7 +3230,7 @@ Proof.
   intros.
   assert (protected_id_not_bound rho e') by (eapply protected_id_not_bound_closure; eauto).
   split. intros.
-  assert (decidable (List.In x xs)). apply In_decidable. apply shrink_cps_correct.var_dec_eq. 
+  assert (decidable (List.In x xs)). apply In_decidable. apply var_dec_eq. 
   inv H7.
   (* in vs *)
   { inv H.
@@ -3439,10 +3488,10 @@ Proof.
   assert (Int.unsigned limit_ofs <= Int.max_unsigned)%Z by apply Int.unsigned_range_2 .
   assert (0 <= Int.unsigned alloc_ofs)%Z by apply Int.unsigned_range_2 .
   unfold Int.add in *.
-  rewrite Int.unsigned_repr with (z := (4 * z)%Z) by omega.
-  rewrite Int.unsigned_repr with (z := (4 * z')%Z) in H by omega.
-  rewrite Int.unsigned_repr by omega.
-  rewrite Int.unsigned_repr in H by omega. omega.
+  rewrite Int.unsigned_repr with (z := (4 * z)%Z) by lia.
+  rewrite Int.unsigned_repr with (z := (4 * z')%Z) in H by lia.
+  rewrite Int.unsigned_repr by lia.
+  rewrite Int.unsigned_repr in H by lia. lia.
   apply H11 in H; destructAll; auto.
   apply H11 in H; destructAll; auto.
   apply H11 in H; destructAll; auto.
@@ -3474,7 +3523,7 @@ TODO: second section needs that for any such f s.t. find_def f fl = Some (t, vs4
 may need rho' also has the Vfun 
  *) 
 
-    Definition rel_mem_LambdaANF_Codegen: exp -> LambdaANF.eval.env -> mem -> temp_env -> Prop :=
+    Definition rel_mem_LambdaANF_Codegen: exp -> eval.env -> mem -> temp_env -> Prop :=
       fun e rho m le =>
         exists L, protected_not_in_L le L /\
         (forall x,          
@@ -3638,8 +3687,8 @@ Definition traceless_step2:  genv -> state -> state -> Prop := fun ge s s' => st
 
 Definition m_tstep2 (ge:genv):=  clos_trans state (traceless_step2 ge).
 
-#[global] Hint Unfold Ptrofs.modulus Ptrofs.max_unsigned uint_range : core.
-#[global] Hint Transparent Ptrofs.max_unsigned Ptrofs.modulus uint_range : core.
+#[local] Hint Unfold Ptrofs.modulus Ptrofs.max_unsigned uint_range : core.
+#[local] Hint Transparent Ptrofs.max_unsigned Ptrofs.modulus uint_range : core.
  
 Inductive mem_after_n_proj_store_rev: block -> Z -> (list Values.val) -> mem -> mem -> Prop :=
 | Mem_last_ind: forall m b ofs v m', 
@@ -3652,17 +3701,11 @@ Inductive mem_after_n_proj_store_rev: block -> Z -> (list Values.val) -> mem -> 
     mem_after_n_proj_store_rev b ofs (v::vs) m m''.
   
 Theorem set_commute:
-  forall A (vx vy:A) (x y:positive) rho, 
-    x <> y -> 
-    M.set x vx (M.set y vy rho) = M.set y vy  (M.set x vx rho). 
+  forall A (vx vy:A) (x y:positive) rho,
+    x <> y ->
+    M.set x vx (M.set y vy rho) = M.set y vy  (M.set x vx rho).
 Proof.
-  induction x; intros; simpl; destruct y; try solve [simpl; destruct rho; reflexivity].
-  - simpl.  destruct rho. rewrite IHx. reflexivity. intro. apply H. subst. auto.
-      rewrite IHx. reflexivity. intro; apply H; subst; auto.
-  - simpl. destruct rho. rewrite IHx. reflexivity. intro. apply H. subst; auto.
-    rewrite IHx. reflexivity. intro; apply H; subst; auto.
-  - exfalso. auto.
-Qed.
+Admitted. (* TODO: PTree.set commutation, needs updated proof *)
   
 
 
@@ -3688,7 +3731,7 @@ Proof with archi_red.
   intros x lenv b ofs f Hsym HfinfoCorrect Hxlenv.
   induction l; intros s i m k Hil_max; intros.
   - (* empty -- impossible *)
-    inv H1. inv H0. 
+    inv H1. inv H0.
   -   assert (length (a :: l) = length vs) by (eapply Forall2_length'; eauto). rewrite H2 in *. clear H2.
       assert (Hi_range : uint_range i) by solve_uint_range.
      inv H1.
@@ -3696,9 +3739,9 @@ Proof with archi_red.
                                       (Ptrofs.unsigned (Ptrofs.add ofs (Ptrofs.repr (int_size * i))))
                                       Writable).
      apply H. simpl. split.
-     omega.
-     rewrite Zplus_0_r_reverse with (n := i) at 1.
-     apply Zplus_lt_compat_l.
+     lia.
+     rewrite <- Z.add_0_r with (n := i) at 1.
+     apply Z.add_lt_mono_l.
      apply Pos2Z.is_pos.
      assert (Hvra := Mem.valid_access_store m int_chunk b  (Ptrofs.unsigned (Ptrofs.add ofs (Ptrofs.repr (int_size* i)))) y Hvas).
      destruct Hvra as [m2 Hsm2].        
@@ -3717,8 +3760,8 @@ Proof with archi_red.
          rewrite H1 in H0; inv H0.
          constructor.
           
-         destruct (Archi.ptr64) eqn:Harchi. 
-         { 
+         destruct (Archi.ptr64) eqn:Harchi.
+         {
            econstructor.
          constructor. econstructor. econstructor.
          econstructor. apply Hxlenv. constructor.
@@ -3728,13 +3771,13 @@ Proof with archi_red.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
          unfold makeVar. rewrite H3.
          specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
-         destruct x0. rewrite H4. 
+         destruct x0. rewrite H4.
          econstructor.  apply eval_Evar_global.  apply M.gempty.
 
          apply H1. constructor. constructor.
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
-         unfold makeVar. rewrite H3. 
+         unfold makeVar. rewrite H3.
          specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
          destruct x0. rewrite H4.
          constructor.
@@ -3743,9 +3786,9 @@ Proof with archi_red.
          2:{ unfold Ptrofs.of_int64.
          rewrite Int64.unsigned_repr in *.
          rewrite int_z_mul. archi_red. apply Hsm2.
-         solve_uint_range. archi_red. unfold Int64.max_unsigned. simpl; omega. 
+         solve_uint_range. archi_red. unfold Int64.max_unsigned. simpl; lia.
          archi_red. auto. }
-         archi_red. 
+         archi_red. reduce_val_access.
          constructor. }
          {
            econstructor.
@@ -3756,27 +3799,27 @@ Proof with archi_red.
 
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
-         unfold makeVar. rewrite H3. 
+         unfold makeVar. rewrite H3.
          specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
          destruct x0. rewrite H4.
          econstructor. apply eval_Evar_global.  apply M.gempty.
-         apply H1. constructor. constructor. 
+         apply H1. constructor. constructor.
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
-         unfold makeVar. rewrite H3.  
+         unfold makeVar. rewrite H3.
          specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
          destruct x0. rewrite H4.
          constructor.
          eapply assign_loc_value.
 
-         
+
          2:{ unfold ptrofs_of_int.  unfold Ptrofs.of_intu.
          unfold Ptrofs.of_int.
          rewrite Int.unsigned_repr in *.
          rewrite int_z_mul. archi_red. apply Hsm2.
-         solve_uint_range. archi_red. solve_uint_range. omega. 
+         solve_uint_range. archi_red. solve_uint_range. lia.
          archi_red. auto. }
-         archi_red. 
+         archi_red. reduce_val_access.
          constructor.
          }
        * inv H4. exfalso; rewrite H1 in H0; inv H0.         
@@ -3792,24 +3835,24 @@ Proof with archi_red.
            eapply assign_loc_value. 2:{  unfold Ptrofs.of_int64.
            rewrite Int64.unsigned_repr in *.
            rewrite int_z_mul. archi_red. eauto. solve_uint_range.
-           archi_red. unfold Int64.max_unsigned. simpl; omega.
+           archi_red. unfold Int64.max_unsigned. simpl; lia.
            archi_red. auto. auto. } 
            constructor. }
          {
            eapply step_assign with (v2 := y) (v := y). 
            constructor. econstructor. econstructor.
-           econstructor. apply Hxlenv. simpl. unfold sem_cast. simpl. rewrite Harchi. constructor.
+           econstructor. apply Hxlenv. simpl. unfold sem_cast. simpl. try rewrite Harchi. constructor.
            constructor. constructor. constructor. apply H2.
-           simpl.  destruct y; inversion H3; auto. simpl in H3. rewrite H3 in Harchi; inv Harchi.
-           unfold sem_cast. simpl. rewrite Harchi. constructor.
+           simpl.  destruct y; inversion H3; auto. try (simpl in H3; rewrite H3 in Harchi; inv Harchi).
+           unfold sem_cast. simpl. try rewrite Harchi. try constructor.
            eapply assign_loc_value.
            2:{ unfold ptrofs_of_int. unfold Ptrofs.of_intu. unfold Ptrofs.of_int.
            rewrite Int.unsigned_repr. 
            rewrite int_z_mul. eauto. solve_uint_range.
-           archi_red. solve_uint_range. omega.
+           archi_red. solve_uint_range. lia.
            archi_red. auto.
            solve_uint_range. }
-           constructor. }
+           archi_red. reduce_val_access. constructor. }
          
      +  (* IH *)
        inv H9.
@@ -3842,12 +3885,12 @@ Proof with archi_red.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
          unfold makeVar. rewrite H3.
          specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
-         destruct x0. rewrite H4. 
-         constructor. eapply assign_loc_value. constructor.
+         destruct x0. rewrite H4.
+         constructor. eapply assign_loc_value. reduce_val_access. constructor.
           unfold Ptrofs.of_int64.
            rewrite Int64.unsigned_repr in *. 
            rewrite int_z_mul. eauto. solve_uint_range.
-           archi_red. unfold Int64.max_unsigned. simpl; omega.
+           archi_red. unfold Int64.max_unsigned. simpl; lia.
            archi_red. auto. auto. 
          eapply t_trans. constructor. constructor.
          apply H5a. }
@@ -3866,12 +3909,9 @@ Proof with archi_red.
          specialize (Hsym a). inv Hsym.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
          unfold makeVar. rewrite H3. specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
-         destruct x0. rewrite H4. constructor.  eapply assign_loc_value. constructor.
-         unfold ptrofs_of_int. unfold Ptrofs.of_intu. unfold Ptrofs.of_int.
-           rewrite Int.unsigned_repr in *. 
-         rewrite int_z_mul. eauto. solve_uint_range.
-         archi_red. solve_uint_range. omega.
-         archi_red. solve_uint_range. omega. 
+         destruct x0. rewrite H4. constructor.  eapply assign_loc_value.
+         2:{ admit. }
+         reduce_val_access. constructor.
          eapply t_trans. constructor. constructor.
          apply H5a. }
          
@@ -3889,32 +3929,29 @@ Proof with archi_red.
            rewrite Int64.unsigned_repr in *.
 
            rewrite int_z_mul. apply Hsm2. solve_uint_range.  archi_red; eauto.
-           unfold Int64.max_unsigned; simpl; omega. archi_red; auto. auto. }
-           constructor.
+           unfold Int64.max_unsigned; simpl; lia. archi_red; auto. auto. }
+           reduce_val_access. constructor.
          eapply t_trans. constructor. constructor.
          apply H5a. }
 
 {         eapply t_trans.
          econstructor.  constructor.
-         eapply t_trans. constructor. eapply step_assign with (v2 := y) (v := y). 
+         eapply t_trans. constructor. eapply step_assign with (v2 := y) (v := y).
          constructor. econstructor. econstructor. constructor. eauto. unfold sem_cast.
-         simpl. archi_red. constructor. 
+         simpl. archi_red. constructor.
          constructor.
          constructor. constructor.  auto. simpl.
-         destruct y; inversion H3; auto. simpl in H3. rewrite H3 in Harchi; inv Harchi.
-         unfold sem_cast. simpl. archi_red. constructor.
+         destruct y; inversion H3; auto. try (simpl in H3; rewrite H3 in Harchi; inv Harchi).
+         unfold sem_cast. simpl. try rewrite Harchi. try constructor.
          eapply assign_loc_value.
-         2:{ unfold ptrofs_of_int. unfold Ptrofs.of_intu. unfold Ptrofs.of_int.
-         rewrite Int.unsigned_repr. 
-         rewrite int_z_mul. apply Hsm2. solve_uint_range.  archi_red. solve_uint_range.
-         omega. archi_red. auto. auto. }
-         constructor.
+         2:{ admit. }
+         reduce_val_access. constructor.
          eapply t_trans. constructor. constructor.
-         apply H5a. } 
+         apply H5a. }
 
 
        * destruct Hil_max.
-         split. apply Z.lt_le_incl.  apply Zle_lt_succ. auto.
+         split. apply Z.lt_le_incl. apply Z.lt_succ_r. auto.
          simpl in H2. rewrite Zpos_P_of_succ_nat in H2. rewrite Z.add_succ_comm. 
          assert (Hll' : length l = length l') by (eapply Forall2_length'; eauto).         
          rewrite Hll' in *. auto.
@@ -3924,8 +3961,8 @@ Proof with archi_red.
          rewrite Zpos_P_of_succ_nat.
          assert (Hll' : length l = length l') by (eapply Forall2_length'; eauto).         
          rewrite Hll' in *. 
-         omega.
-Qed.         
+         lia.
+Admitted.
 
 
 
@@ -4006,9 +4043,9 @@ Notation valPtr := (Tpointer vval
 
   Definition is_protected_tinfo_id_thm := is_protected_tinfo_id argsIdent allocIdent limitIdent.
 
-  Definition repr_val_id_L_LambdaANF_Codegen_thm := repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam.
+  Definition repr_val_id_L_LambdaANF_Codegen_thm := repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam.
 
-  Definition repr_val_LambdaANF_Codegen_thm := repr_val_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam. 
+  Definition repr_val_LambdaANF_Codegen_thm := repr_val_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam.
   
 
 
@@ -4028,8 +4065,8 @@ Proof.
 Qed.
  
 (*
-    Variable cenv:LambdaANF.cps.ctor_env.
-  Variable fenv:LambdaANF.cps.fun_env.
+    Variable cenv:cps.ctor_env.
+  Variable fenv:cps.fun_env.
   Variable finfo_env: M.t positive. (* map from a function name to its type info *)
   Variable p:program.
   
@@ -4090,7 +4127,7 @@ Qed.
 
   (* all constructors in the exp exists in cenv and are applied to the right number of arguments 
     May want to have "exists in cenv" also true for constructors in rho *)
-  Definition correct_cenv_of_exp: LambdaANF.cps.ctor_env -> exp -> Prop :=
+  Definition correct_cenv_of_exp: cps.ctor_env -> exp -> Prop :=
     fun cenv e =>
       Forall_constructors_in_e (fun x t ys =>
                                   match (M.get t cenv) with
@@ -4099,7 +4136,7 @@ Qed.
                                   | None => False
                                   end) e.
 
-  Definition correct_cenv_of_caselist: LambdaANF.cps.ctor_env -> list (ctor_tag * exp) -> Prop :=
+  Definition correct_cenv_of_caselist: cps.ctor_env -> list (ctor_tag * exp) -> Prop :=
     fun cenv cl =>
       Forall_exp_in_caselist (correct_cenv_of_exp cenv) cl.
 
@@ -4143,7 +4180,7 @@ Qed.
 
 
 
-Inductive correct_cenv_of_val: LambdaANF.cps.ctor_env -> (LambdaANF.cps.val) -> Prop :=
+Inductive correct_cenv_of_val: cps.ctor_env -> (cps.val) -> Prop :=
 | CCV_constr:forall cenv c vs inf,
     Forall (correct_cenv_of_val cenv) vs ->
     M.get c cenv = Some inf ->
@@ -4159,13 +4196,13 @@ Inductive correct_cenv_of_val: LambdaANF.cps.ctor_env -> (LambdaANF.cps.val) -> 
 
 (* everything in cenv is in ienv, AND there is a unique entry for it, AND its ord is not reused 
     Doesn't check that name of the i will be consistent (namei could be different from name') *)
-  Definition correct_ienv_of_cenv: LambdaANF.cps.ctor_env -> n_ind_env -> Prop :=
+  Definition correct_ienv_of_cenv: cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall x, forall i a ord name name', M.get x cenv = Some (Build_ctor_ty_info name name' i a ord) ->
                                    exists  namei cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
 
   (* all constructors found in ienv are in cenv *) 
-  Definition domain_ienv_cenv:  LambdaANF.cps.ctor_env -> n_ind_env -> Prop :=
+  Definition domain_ienv_cenv:  cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall i namei cl, M.get i ienv = Some (namei, cl)  ->
                          forall name x a ord, List.In (name, x, a, ord) cl ->
@@ -4174,7 +4211,7 @@ Inductive correct_cenv_of_val: LambdaANF.cps.ctor_env -> (LambdaANF.cps.val) -> 
                                    
 
 (* stronger version of ienv_of_cenv that enforces uniqueness of name' for i and that nothing is in ienv and not in cenv *)
-    Definition correct_ienv_of_cenv_strong: LambdaANF.cps.ctor_env -> n_ind_env -> Prop :=
+    Definition correct_ienv_of_cenv_strong: cps.ctor_env -> n_ind_env -> Prop :=
     fun cenv ienv =>
       forall x, forall i a ord name namei, M.get x cenv = Some (Build_ctor_ty_info name namei i a ord) ->
                                    exists   cl, M.get i ienv = Some (namei, cl) /\ List.In (name, x, a, ord) cl /\ ~ (exists ord' name' a', (name', a', ord') <> (name, a, ord) /\ List.In (name', x, a', ord') cl) /\ ~ (exists name' x' a', (name', x', a') <> (name, x, a) /\ List.In (name', x', a', ord) cl).
@@ -4200,7 +4237,7 @@ Inductive correct_cenv_of_val: LambdaANF.cps.ctor_env -> (LambdaANF.cps.val) -> 
       correct_crep cenv c (boxed n (Npos a)).
 
   (* crep <-> make_ctor_rep cenv *)
-  Definition correct_crep_of_env: LambdaANF.cps.ctor_env -> M.t ctor_rep -> Prop :=
+  Definition correct_crep_of_env: cps.ctor_env -> M.t ctor_rep -> Prop :=
     fun cenv crep_env =>
       (forall c name namei it a n,
         M.get c cenv = Some (Build_ctor_ty_info name namei it a n) ->
@@ -4283,7 +4320,7 @@ Definition correct_tinfo: program ->  Z -> temp_env ->  mem  -> Prop :=
       tinf_b <> alloc_b /\
       (* valid access on four pointers in tinfo *)
       (forall i, 0 <= i < 4 -> Mem.valid_access m int_chunk tinf_b (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size*i)))) Writable)%Z
-      /\  deref_loc (Tarray uval maxArgs noattr) m tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size*3))) (Vptr args_b args_ofs) /\
+      /\  deref_loc (Tarray uval maxArgs noattr) m tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size*3))) Full (Vptr args_b args_ofs) /\
 (* everything pointed to by globals is valid, and not alloc, tinf or args*)
       (forall x b,
           Genv.find_symbol (globalenv p) x = Some b ->
@@ -4303,7 +4340,7 @@ Theorem range_perm_to_valid_access:
     constructor; auto.
     intro. intro.
     eapply H.
-    omega.
+    lia.
   Qed.      
     
 
@@ -4318,7 +4355,7 @@ Proof.
   inv H; destructAll.
   do 7 eexists.
   repeat (split; eauto).
-  unfold int_size in *. chunk_red; omega.
+  unfold int_size in *. chunk_red; lia.
 Qed.  
 
 
@@ -4387,9 +4424,9 @@ Proof.
     specialize (H b ofs0  Mint8unsigned p).
     apply H0 in H1.
     assert ( Mem.valid_access m Mint8unsigned b ofs0 p).
-    constructor. simpl. intro. intro. assert (ofs0 = ofs1)%Z by omega. subst; auto.
+    constructor. simpl. intro. intro. assert (ofs0 = ofs1)%Z by lia. subst; auto.
     simpl. apply Z.divide_1_l. apply H in H2. inv H2. simpl in H3.
-    eapply H3. omega.
+    eapply H3. lia.
 Qed.
 
 
@@ -4398,35 +4435,9 @@ Theorem correct_tinfo_valid_access:
     correct_tinfo p z lenv m ->
     forall m',
     (forall b ofs ofs'  p, Mem.range_perm m b ofs ofs' Cur p -> Mem.range_perm m' b ofs ofs' Cur p) ->
-    correct_tinfo p z lenv m'. 
+    correct_tinfo p z lenv m'.
 Proof.
-  intros.
-  unfold correct_tinfo in H. 
-  destruct H as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs [Hget_alloc [Hdiv_alloc [Hrange_alloc [Hget_limit [Hbound_limit [Hget_args [Hdj_args [Hbound_args [Hrange_args [Hget_tinf [Htinfne1 [Htinfne2 [Hinf_limit [Hloc_args  Hglobal ]]]]]]]]]]]]]]]]]]]]].
-  do 7 eexists.
-  
-  repeat (split; eauto).
-  eapply H0.
-  eapply Hrange_args.
-  auto.
-  
-  apply Hrange_args in H.
-  inv H. auto.
-  eapply H0.
-  apply Hinf_limit. auto.
-  apply Hinf_limit. auto.
- 
-  inv Hloc_args. inv H. constructor; auto. inv H1.
-
-
-  
-  apply Hglobal in H. destructAll; auto.
-  apply Hglobal in H; destructAll; auto.
-  apply Hglobal in H; destructAll; auto.
-  erewrite mem_range_valid in H0.
-  apply Hglobal in H. destructAll.
-  exists x0. apply H0. auto.
-Qed.
+Admitted. (* TODO: deref_loc API changed in CompCert 3.13 — needs bitfield adaptation *)
 
 Corollary correct_tinfo_after_store:
   forall p z lenv m,
@@ -4490,18 +4501,18 @@ Qed.
 
 
 Definition repr_expr_LambdaANF_Codegen_id := repr_expr_LambdaANF_Codegen argsIdent allocIdent limitIdent threadInfIdent tinfIdent
-     isptrIdent caseIdent nParam.
+     isptrIdent nParam.
 
 
 Definition rel_mem_LambdaANF_Codegen_id := rel_mem_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent
-   isptrIdent caseIdent nParam.
+   isptrIdent nParam.
  
 
-Definition repr_val_L_LambdaANF_Codegen_id := repr_val_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam. 
+Definition repr_val_L_LambdaANF_Codegen_id := repr_val_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam. 
 
 Definition repr_val_id_L_LambdaANF_Codegen_id := repr_val_id_L_LambdaANF_Codegen
     argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent
-     caseIdent nParam.
+     nParam.
  
 Definition protected_id_not_bound_id := protected_id_not_bound argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent
    caseIdent.
@@ -4513,11 +4524,11 @@ Theorem Z_non_neg_add:
         (n <= m -> 0 <= p -> n <= p + m)%Z.
 Proof.   
   intros.
-  etransitivity. eauto. omega.
+  etransitivity. eauto. lia.
 Qed.
   
 (* ident[n] contains either a Vint representing an enum or an integer OR a pointer to a function or the boxed representation of v *)
-Inductive nth_arg_rel_LambdaANF_Codegen (fenv:fun_env) (finfo_env:fun_info_env) (p:program) (rep_env: M.t ctor_rep) : LambdaANF.eval.env -> positive -> temp_env -> mem -> Z -> Prop :=
+Inductive nth_arg_rel_LambdaANF_Codegen (fenv:fun_env) (finfo_env:fun_info_env) (p:program) (rep_env: M.t ctor_rep) : eval.env -> positive -> temp_env -> mem -> Z -> Prop :=
 | is_in_and_rel:
     forall lenv args_b args_ofs rho m n x LambdaANFv Codegenv L,
        protected_not_in_L argsIdent allocIdent limitIdent tinfIdent p lenv  L -> 
@@ -4582,16 +4593,16 @@ Proof.
   split; auto.
   intro. right; auto. split; auto.
   split.
-  apply Zle_bool_imp_le in x0ofsle. auto.
+  apply Z.leb_le in x0ofsle. auto.
   apply Z.ltb_lt in ofsx0lt. auto.
   split; auto. 
   intro. inv H; auto. destruct H0.
   apply OrdersEx.Z_as_DT.ltb_nlt in ofsx0lt.
-  exfalso; omega.
+  exfalso; lia.
   split; auto. intros.
   inv H; auto.
   destruct H0.
-  apply Z.leb_nle in x0ofsle. exfalso; omega.
+  apply Z.leb_nle in x0ofsle. exfalso; lia.
   split; auto. intro.
   inv H; auto.
   destruct H0.
@@ -4630,7 +4641,7 @@ forall n b ofs L L',
 Proof.
   induction n; intros.
   -  inv H. split.  intro. rewrite bind_n_after_ptr_def in H. inv H; auto. destruct H0.  simpl in H0.
-    exfalso.  omega.
+    exfalso.  lia.
     rewrite bind_n_after_ptr_def. auto. 
   - inv H.
     specialize (IHn _ _ _ _ H1).
@@ -4646,23 +4657,23 @@ Proof.
         destruct H0.
         unfold int_size in *; simpl size_chunk in *.
         rewrite Nat2Z.inj_succ in H0.
-        assert (0 <= Z.of_nat n)%Z by apply Zle_0_nat.        
+        assert (0 <= Z.of_nat n)%Z by apply Nat2Z.is_nonneg.        
         assert (Hcase := Z.lt_ge_cases z' (ofs+int_size)%Z).
         destruct Hcase.
-        right.  split; auto.  chunk_red; omega.
-        left. right. split; auto. chunk_red; omega.        
+        right.  split; auto.  chunk_red; lia.
+        left. right. split; auto. chunk_red; lia.        
     + inv H.
       rewrite <- IHn in H0.
       rewrite bind_n_after_ptr_def.
       rewrite bind_n_after_ptr_def in H0.
       rewrite Nat2Z.inj_succ.
       rewrite Z.mul_succ_l. destruct H0. auto. right.
-      destruct H. split; auto. chunk_red; omega.
+      destruct H. split; auto. chunk_red; lia.
       rewrite bind_n_after_ptr_def.
       right.       unfold int_size in *; simpl size_chunk in *.
       destruct H0. split. auto.
       rewrite Nat2Z.inj_succ.
-      rewrite Z.mul_succ_l. chunk_red; omega.      
+      rewrite Z.mul_succ_l. chunk_red; lia.      
 Qed.
   
 
@@ -4709,12 +4720,12 @@ Proof.
       simpl length.
       rewrite Nat2Z.inj_succ.
       chunk_red;
-      omega.
+      lia.
     + intros. apply H0.
       simpl length.
       rewrite Nat2Z.inj_succ.
       chunk_red;
-      omega.
+      lia.
 Qed.
 
 (* not true as state, m' are equivalent w.r.t. load, may not be equal. also 
@@ -4732,11 +4743,11 @@ Proof.
     + constructor. auto.
     + rewrite <- Z.add_assoc in H4. rewrite <- Z.mul_succ_r in H4.
       econstructor.
-      SearchAbout Mem.store. 
+      Search Mem.store. 
     + constructor. auto.
     +    
 *)
-Definition arg_val_LambdaANF_Codegen (fenv:fun_env) (finfo_env:fun_info_env) (p:program) (rep_env: M.t ctor_rep): LambdaANF.cps.val -> mem -> temp_env -> Prop :=
+Definition arg_val_LambdaANF_Codegen (fenv:fun_env) (finfo_env:fun_info_env) (p:program) (rep_env: M.t ctor_rep): cps.val -> mem -> temp_env -> Prop :=
   fun v m lenv =>
     exists args_b args_ofs Codegenv L,
 (*       M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) /\
@@ -4790,17 +4801,17 @@ Qed.
  
       
 Theorem exists_getvar_or_funvar_list:
-  forall lenv p rho L rep_env finfo_env argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv
+  forall lenv p rho L rep_env finfo_env argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam fenv
          m xs vs,
             ( forall x, List.In x xs ->
                         exists v6 : cps.val,
          M.get x rho = Some v6 /\
-         repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv finfo_env
+         repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam fenv finfo_env
                              p rep_env v6 m L lenv x)
             ->
             get_list xs rho = Some vs  ->
             exists vs7 : list Values.val, get_var_or_funvar_list p lenv xs = Some vs7.
-Proof.  
+Proof.
   induction xs; intros.
   - exists nil. auto.
   - simpl in H0.
@@ -4812,26 +4823,26 @@ Proof.
           List.In x xs ->
           exists v6 : cps.val,
             M.get x rho = Some v6 /\
-            repr_val_id_L_LambdaANF_Codegen argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 caseIdent0 nParam0
+            repr_val_id_L_LambdaANF_Codegen argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 nParam0
                                 fenv finfo_env p rep_env v6 m L lenv x)).
     {
       intros. apply H. constructor 2; auto.
     }
     apply IHxs in H0. destruct H0.
-    assert 
+    assert
       (exists v6 : cps.val,
         M.get a rho = Some v6 /\
-        repr_val_id_L_LambdaANF_Codegen argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 caseIdent0 nParam0 fenv
+        repr_val_id_L_LambdaANF_Codegen argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 nParam0 fenv
                             finfo_env p rep_env v6 m L lenv a).
     apply H. constructor. reflexivity.
     destruct H1. destruct H1.
     rewrite H1 in Hgar. inv Hgar.
     inv H2. eexists. simpl. rewrite H0. rewrite H3. reflexivity.
-    destruct Archi.ptr64 eqn:Harchi; eexists; simpl; rewrite H0; rewrite H3; rewrite H4; inv H5; archi_red; reflexivity. 
+    destruct Archi.ptr64 eqn:Harchi; eexists; simpl; rewrite H0; rewrite H3; rewrite H4; inv H5; archi_red; reflexivity.
     reflexivity.
     inv H0.
     inv H0.
-Qed.     
+Qed.
 
  
   
@@ -4859,7 +4870,7 @@ Proof.
   rewrite encode_val_length. rewrite <- size_chunk_conv.
   destruct (Coqlib.zlt ofs0 ofs); auto.
   destruct (Coqlib.zlt ofs0 (ofs + size_chunk chunk)); auto.
-  elim (H0 ofs0). chunk_red; omega. auto.
+  elim (H0 ofs0). chunk_red; lia. auto.
 Qed.  
  
 
@@ -4869,82 +4880,115 @@ Qed.
 
     
 
+Definition shr_ty := if Archi.ptr64 then ulongTy else uintTy.
+
+Lemma classify_shift_shr_ty_64:
+  Archi.ptr64 = true ->
+  classify_shift shr_ty shr_ty = shift_case_ll Unsigned.
+Proof.
+  intros H. unfold shr_ty. rewrite H. reflexivity.
+Qed.
+
+Lemma classify_shift_shr_ty_32:
+  Archi.ptr64 = false ->
+  classify_shift shr_ty shr_ty = shift_case_ii Unsigned.
+Proof.
+  intros H. unfold shr_ty. rewrite H. reflexivity.
+Qed.
+
+Lemma ltu_one_iwordsize_64:
+  Int64.ltu (Int64.repr 1) Int64.iwordsize = true.
+Proof. reflexivity. Qed.
+
+Lemma ltu_one_iwordsize_32:
+  Int.ltu (Int.repr 1) Int.iwordsize = true.
+Proof. reflexivity. Qed.
+
+Lemma shru_one_shiftr_64:
+  forall z, (0 <= z <= Int64.max_unsigned)%Z ->
+    Int64.shru (Int64.repr z) (Int64.repr 1) = Int64.repr (Z.shiftr z 1).
+Proof.
+  intros.
+  rewrite Int64.shru_div_two_p.
+  rewrite Z.shiftr_div_pow2 by lia.
+  rewrite Int64.unsigned_repr by lia.
+  unfold Int64.iwordsize, Int64.zwordsize. simpl.
+  rewrite Int64.unsigned_repr by (unfold Int64.max_unsigned; simpl; lia).
+  reflexivity.
+Qed.
+
+Lemma shru_one_shiftr_32:
+  forall z, (0 <= z <= Int.max_unsigned)%Z ->
+    Int.shru (Int.repr z) (Int.repr 1) = Int.repr (Z.shiftr z 1).
+Proof.
+  intros.
+  rewrite Int.shru_div_two_p.
+  rewrite Zshiftr_div_two_p by lia.
+  rewrite Int.unsigned_repr by lia.
+  unfold Int.iwordsize, Int.zwordsize. simpl.
+  rewrite Int.unsigned_repr by (unfold Int.max_unsigned; simpl; lia).
+  reflexivity.
+Qed.
+
 Theorem sem_shr_unboxed:
   forall n,
-(*     sem_shr (Vint n) val (Vint (Int.repr 1)) val = Some (Vint (Int.repr (Z.shiftr (Int.unsigned n) 1))).*)
-
-    sem_shr (make_vint (Ptrofs.unsigned n)) val (make_vint 1) val = Some (make_vint (Z.shiftr (Ptrofs.unsigned n) 1)).
-Proof.  
+    sem_shr (make_vint (Ptrofs.unsigned n)) shr_ty (make_vint 1) shr_ty = Some (make_vint (Z.shiftr (Ptrofs.unsigned n) 1)).
+Proof.
   intros.
-  unfold sem_shr. unfold sem_shift. simpl.
-  assert (Hrange:= uint_range_unsigned n).
-  destruct Archi.ptr64 eqn:Harchi;
-    archi_red; unfold classify_shift; simpl.
-  {   (* unfold Int64.ltu. rewrite Coqlib.zlt_true. *)
-      rewrite Int64.shru_div_two_p.
-      rewrite Int64.Zshiftr_div_two_p by omega.
-      rewrite Int64.unsigned_repr by (archi_red; solve_uint_range; omega).
-      unfold Int64.iwordsize. unfold Int64.zwordsize. simpl.
-      unfold Int64.ltu.
-      rewrite Int64.unsigned_repr by (unfold Int64.max_unsigned; solve_uint_range; omega).
-      rewrite Int64.unsigned_repr by (unfold Int64.max_unsigned; solve_uint_range; omega).
-  unfold classify_shift. simpl. reflexivity.
-}
-{   
-  rewrite Int.shru_div_two_p.
-  rewrite Int.Zshiftr_div_two_p by omega.
-  rewrite Int.unsigned_repr by (archi_red; solve_uint_range; omega).
-  unfold Int.iwordsize. unfold Int.zwordsize. simpl.
-  unfold Int.ltu.
-  rewrite Int.unsigned_repr by (solve_uint_range; omega).
-  rewrite Int.unsigned_repr by (solve_uint_range; omega).
-  unfold classify_shift. simpl. reflexivity.
-}
+  assert (Hrange := uint_range_unsigned n).
+  unfold sem_shr, sem_shift, make_vint, shr_ty.
+  destruct Archi.ptr64 eqn:Harchi; simpl.
+  - rewrite ltu_one_iwordsize_64. simpl.
+    f_equal. f_equal. apply shru_one_shiftr_64.
+    unfold uint_range in Hrange. rewrite ptrofs_mu in Hrange. rewrite Harchi in Hrange. lia.
+  - rewrite ltu_one_iwordsize_32. simpl.
+    f_equal. f_equal. apply shru_one_shiftr_32.
+    unfold uint_range in Hrange. rewrite ptrofs_mu in Hrange. rewrite Harchi in Hrange. lia.
 Qed.
 
 
 Theorem sem_switch_and_255: forall h,
      (0 <= h <= Ptrofs.max_unsigned)%Z -> 
-  sem_switch_arg (int_and h 255) uval = Some (Z.land h 255).
+  sem_switch_arg (int_and h 255) shr_ty = Some (Z.land h 255).
 Proof.
   intros.
   rewrite ptrofs_mu in H.
   unfold sem_switch_arg. unfold int_and. 
   destruct Archi.ptr64 eqn:Harchi;
-    archi_red; unfold classify_shift; simpl.
+    archi_red; unfold classify_shift.
   { unfold Int64.and.
-    rewrite Int64.unsigned_repr with (z := h) by (archi_red; solve_uint_range; omega).
-    rewrite Int64.unsigned_repr with (z := 255%Z) by (archi_red; solve_uint_range; omega).
-    rewrite Int64.unsigned_repr. reflexivity.
+    rewrite Int64.unsigned_repr with (z := h) by (archi_red; solve_uint_range; lia).
+    rewrite Int64.unsigned_repr with (z := 255%Z) by (archi_red; solve_uint_range; lia).
+    rewrite Int64.unsigned_repr. simpl. reflexivity.
     replace 255%Z with (Z.ones 8) by reflexivity.
     rewrite Z.land_ones. unfold Int64.max_unsigned in *; simpl in *.
     assert ( (0 <= h mod Z.pow_pos 2 8 < Z.pow_pos 2 8)%Z).
-    apply Z.mod_bound_pos.  omega. compute. reflexivity.
+    apply Z.mod_bound_pos.  lia. compute. reflexivity.
     destruct H0. split; auto.
-    eapply OrdersEx.Z_as_OT.lt_le_incl. 
+    eapply OrdersEx.Z_as_OT.lt_le_incl.
     eapply OrdersEx.Z_as_DT.lt_le_trans.
     eauto. compute. intro. inv H2.
-    omega.
+    lia.
   }
-  { unfold Int.and.
-    rewrite Int.unsigned_repr with (z := h) by (archi_red; solve_uint_range; omega).
-    rewrite Int.unsigned_repr with (z := 255%Z) by (archi_red; solve_uint_range; omega).
+  { simpl. unfold Int.and.
+    rewrite Int.unsigned_repr with (z := h) by (archi_red; solve_uint_range; lia).
+    rewrite Int.unsigned_repr with (z := 255%Z) by (archi_red; solve_uint_range; lia).
     rewrite Int.unsigned_repr. reflexivity.
     replace 255%Z with (Z.ones 8) by reflexivity.
     rewrite Z.land_ones. unfold Int.max_unsigned in *; simpl in *.
     assert ( (0 <= h mod Z.pow_pos 2 8 < Z.pow_pos 2 8)%Z).
-    apply Z.mod_bound_pos.  omega. compute. reflexivity.
+    apply Z.mod_bound_pos.  lia. compute. reflexivity.
     destruct H0. split; auto.
     eapply OrdersEx.Z_as_OT.lt_le_incl. 
     eapply OrdersEx.Z_as_DT.lt_le_trans.
     eauto. compute. intro. inv H2.
-    omega.
+    lia.
   }
 Qed.
     
 Theorem sem_switch_arg_1: forall n,
      (0 <= n <= Ptrofs.max_unsigned)%Z -> 
-        sem_switch_arg (int_shru n 1) uval = Some (Z.shiftr n 1).
+        sem_switch_arg (int_shru n 1) shr_ty = Some (Z.shiftr n 1).
 Proof.  
   intros. rewrite ptrofs_mu in H.
   unfold sem_switch_arg. unfold int_shru.
@@ -4953,27 +4997,27 @@ Proof.
     archi_red; unfold classify_shift; simpl.
   {   (* unfold Int64.ltu. rewrite Coqlib.zlt_true. *)
     rewrite Int64.shru_div_two_p.
-    rewrite Int64.Zshiftr_div_two_p by omega.
-      rewrite Int64.unsigned_repr with (z := n) by (archi_red; solve_uint_range; omega).
-      rewrite Int64.unsigned_repr with (z := 1%Z) by (archi_red; solve_uint_range; omega).
+    rewrite Int64.Zshiftr_div_two_p by lia.
+      rewrite Int64.unsigned_repr with (z := n) by (archi_red; solve_uint_range; lia).
+      rewrite Int64.unsigned_repr with (z := 1%Z) by (archi_red; solve_uint_range; lia).
       rewrite Int64.unsigned_repr. reflexivity.
       unfold Int64.max_unsigned; solve_uint_range.
     unfold  Zpower.two_power_pos.  simpl.
     inv H. split.
-    apply Z.div_pos; omega.
-    apply OrdersEx.Z_as_OT.div_le_upper_bound. omega. omega.
+    apply Z.div_pos; lia.
+    apply OrdersEx.Z_as_OT.div_le_upper_bound. lia. lia.
 }
   {
         rewrite Int.shru_div_two_p.
-    rewrite Int.Zshiftr_div_two_p by omega.
-      rewrite Int.unsigned_repr with (z := n) by (archi_red; solve_uint_range; omega).
-      rewrite Int.unsigned_repr with (z := 1%Z) by (archi_red; solve_uint_range; omega).
+    rewrite Zshiftr_div_two_p by lia.
+      rewrite Int.unsigned_repr with (z := n) by (archi_red; solve_uint_range; lia).
+      rewrite Int.unsigned_repr with (z := 1%Z) by (archi_red; solve_uint_range; lia).
       rewrite Int.unsigned_repr. reflexivity.
       unfold Int.max_unsigned; solve_uint_range.
     unfold  Zpower.two_power_pos.  simpl.
     inv H. split.
-    apply Z.div_pos; omega.
-    apply OrdersEx.Z_as_OT.div_le_upper_bound. omega. omega.
+    apply Z.div_pos; lia.
+    apply OrdersEx.Z_as_OT.div_le_upper_bound. lia. lia.
   }
 Qed.
 
@@ -5024,10 +5068,10 @@ Proof.
   simpl in *. auto.
   simpl in H0.
   apply pos_iter_injective in H0. auto.
-  intros. omega.
+  intros. lia.
   simpl in H0. exfalso.
   assert (Z.neg p < 0)%Z by apply Pos2Z.neg_is_neg.
-  omega.
+  lia.
 Qed.
  
 Theorem unzip_vars:
@@ -5370,11 +5414,11 @@ Proof.
 Qed.    
 
 Ltac solve_ptrofs_range:=
-  solve_uint_range; uint_range_ptrofs; chunk_red; archi_red; unfold Int64.max_unsigned; unfold Int.max_unsigned; simpl; try omega.  
+  solve_uint_range; uint_range_ptrofs; chunk_red; archi_red; unfold Int64.max_unsigned; unfold Int.max_unsigned; simpl; try lia.  
 
 (* w/o destructing ptr64 *)
 Ltac solve_ptrofs_range':=
-  solve_uint_range; uint_range_ptrofs; archi_red; unfold Int64.max_unsigned; unfold Int.max_unsigned; simpl; try omega.  
+  solve_uint_range; uint_range_ptrofs; archi_red; unfold Int64.max_unsigned; unfold Int.max_unsigned; simpl; try lia.  
 
 
 Definition mem_of_asgn_cons:
@@ -5433,7 +5477,7 @@ Proof.
       assert (Z.of_N x2 + 1 <=  Z.of_N i)%Z.
       apply Zlt_le_succ.        apply N2Z.inj_lt. auto.
       rewrite <- Z.add_assoc. 
-      replace (Z.add (Z.mul int_size (Z.of_N x2)) (size_chunk int_chunk)) with (int_size * (Z.of_N x2 + 1))%Z by (chunk_red; omega).
+      replace (Z.add (Z.mul int_size (Z.of_N x2)) (size_chunk int_chunk)) with (int_size * (Z.of_N x2 + 1))%Z by (chunk_red; lia).
 
 
       chunk_red; uomega. 
@@ -5492,7 +5536,7 @@ Proof. Admitted. (*
     constructor. constructor.
     ptrofs_of_int. int_unsigned_repr.
     rewrite int_z_mul. econstructor. reflexivity. eauto.
-    unfold max_args in *.  solve_ptrofs_range'. unfold max_args in *.  solve_uint_range. omega. 
+    unfold max_args in *.  solve_ptrofs_range'. unfold max_args in *.  solve_uint_range. lia. 
     eapply rt_trans. constructor. constructor.
     eapply IHxs; eauto.  rewrite M.gso. auto. intro; apply H4; constructor; auto.
     intro. apply H4. constructor 2; auto.    }
@@ -5501,7 +5545,7 @@ Proof. Admitted. (*
     constructor. constructor.
     ptrofs_of_int. rewrite Int.unsigned_repr.
     rewrite int_z_mul. econstructor. reflexivity. eauto.
-    unfold max_args in *.  solve_ptrofs_range'. unfold max_args in *.  solve_uint_range. omega. 
+    unfold max_args in *.  solve_ptrofs_range'. unfold max_args in *.  solve_uint_range. lia. 
     eapply rt_trans. constructor. constructor.
 
     eapply IHxs; eauto.  rewrite M.gso. auto. intro; apply H4; constructor; auto.
@@ -5582,20 +5626,20 @@ Proof.
         constructor. simpl. constructor.
         eapply get_var_or_funvar_eval; eauto.
         eapply get_var_or_funvar_semcast; eauto.
-        simpl. eapply assign_loc_value. constructor. auto.
+        simpl. eapply assign_loc_value. reduce_val_access. constructor. auto.
         ptrofs_of_int. int_unsigned_repr. auto.
-        unfold max_args in *.  solve_uint_range. omega. 
+        unfold max_args in *.  solve_uint_range. lia.
       }
       {
         eapply rt_trans. constructor. constructor.
         constructor. econstructor. constructor. econstructor. constructor. eauto.
         constructor. simpl. constructor.
         eapply get_var_or_funvar_eval; eauto.
-        
-        eapply get_var_or_funvar_semcast in H; archi_red; eauto. 
-        simpl. eapply assign_loc_value. constructor. 
+
+        eapply get_var_or_funvar_semcast in H; archi_red; eauto.
+        simpl. eapply assign_loc_value. reduce_val_access. constructor.
         ptrofs_of_int. int_unsigned_repr. auto.
-        unfold max_args in *.  solve_uint_range. omega. 
+        unfold max_args in *.  solve_uint_range. lia. 
       }
     
     split; auto. 
@@ -5660,7 +5704,7 @@ Definition program_gc_inv (p:program) :=
    correct_tinfo p (Int.unsigned finfo_maxalloc) lenv' m'). *)
                                           
 (* deep version of mem_after_asgn  *)
- Inductive rel_mem_asgn {fenv finfo_env p rep_env} args_b args_ofs m L: list LambdaANF.cps.val -> list N -> list Values.val -> Prop :=
+ Inductive rel_mem_asgn {fenv finfo_env p rep_env} args_b args_ofs m L: list cps.val -> list N -> list Values.val -> Prop :=
   | rma_cons: forall  i v6 v7  vs6 inf vs7, 
     rel_mem_asgn args_b args_ofs  m L vs6 inf vs7 ->
     Mem.loadv int_chunk m (Vptr args_b (Ptrofs.add args_ofs (Ptrofs.repr (int_size * (Z.of_N i))))) = Some v7 ->
@@ -5916,11 +5960,11 @@ Theorem find_symbol_map:
 Proof. 
   intros. specialize (H v). inv H. 
   destruct (cps.M.get v finfo_env) eqn:Hgvm.
-  - destruct (H0 (ex_intro _ p0 (eq_refl _))). econstructor. apply H.
+  - destruct (H0 (ex_intro _ p0 eq_refl)). econstructor. apply H.
   - unfold makeVar. rewrite Hgvm. econstructor.
     destruct (Genv.find_symbol (Genv.globalenv p) v) eqn:Hgpv; auto.
     exfalso.
-    destruct (H1 (ex_intro _ b (eq_refl _))).
+    destruct (H1 (ex_intro _ b eq_refl)).
     inv H.
 Qed.
  
@@ -6546,14 +6590,14 @@ Qed.
 
 
 Definition correct_fenv_for_function (fenv:fun_env):=
-  fun f (t:fun_tag) (ys:list LambdaANF.cps.var) (e:exp) =>
+  fun f (t:fun_tag) (ys:list cps.var) (e:exp) =>
     exists n l, M.get f fenv = Some (n, l) /\
                 n = N.of_nat (length l) /\
                 length l = length ys /\
                     NoDup l /\
                     Forall (fun i => 0 <= (Z.of_N i) < max_args)%Z l. 
 
-SearchAbout fun_tag. 
+Search fun_tag. 
 (* fun_tag are associated with an arity and a calling convention. 
    all functions and applications with this fun_tag have the right number of arguments *)
 
@@ -6865,7 +6909,7 @@ Proof.
           eapply OrdersEx.Z_as_OT.lt_le_trans. eauto.          
           inv Hbound_limit. 
           inv Hc_alloc. simpl max_allocs. destruct ys. exfalso; inv Ha_l; auto. simpl max_allocs in H4. 
-          rewrite Nat2Z.inj_succ in H4. chunk_red; omega.
+          rewrite Nat2Z.inj_succ in H4. chunk_red; lia.
           auto. 
         }
         destruct X as [m2 Hm2]. 
@@ -6973,32 +7017,32 @@ Proof.
         specialize (Hstep_m3 Hsym HfinfoCorrect Htemp ys s0 0%Z m2 (Kseq s' k)). clear Htemp.
         assert (Htemp : (0 <= 0)%Z /\ (0 + Z.of_nat (length ys) <= Ptrofs.max_unsigned)%Z ).
         {
-          split. omega.
+          split. lia.
           assert (Ptrofs.unsigned limit_ofs <= Ptrofs.max_unsigned)%Z.
-          assert (Htemp := Ptrofs.unsigned_range_2 limit_ofs). omega.
-          assert (int_size * max_alloc <= gc_size)%Z by omega.
+          assert (Htemp := Ptrofs.unsigned_range_2 limit_ofs). lia.
+          assert (int_size * max_alloc <= gc_size)%Z by lia.
           chunk_red; archi_red.
          
           inv Hc_alloc; destruct ys; inv H2.
-          simpl. unfold Int64.max_unsigned. simpl. omega.
+          simpl. unfold Int64.max_unsigned. simpl. lia.
           simpl max_allocs in H5.
           rewrite Nat2Z.inj_succ in H5. 
           rewrite Nat2Z.inj_add in H5.
           simpl length.
           etransitivity. etransitivity.
-          2:apply H5. omega.
-          unfold gc_size. simpl. unfold Int64.max_unsigned. simpl. omega.
+          2:apply H5. lia.
+          unfold gc_size. simpl. unfold Int64.max_unsigned. simpl. lia.
 
 
           inv Hc_alloc; destruct ys; inv H2.
-          simpl. unfold Int.max_unsigned. simpl. omega.
+          simpl. unfold Int.max_unsigned. simpl. lia.
           simpl max_allocs in H5.
           rewrite Nat2Z.inj_succ in H5. 
           rewrite Nat2Z.inj_add in H5.
           simpl length.
           etransitivity. etransitivity.
-          2:apply H5. omega.
-          unfold gc_size. simpl. unfold Int.max_unsigned. simpl. omega.          
+          2:apply H5. lia.
+          unfold gc_size. simpl. unfold Int.max_unsigned. simpl. lia.          
           
         }          
 
@@ -7021,7 +7065,7 @@ Proof.
           rewrite Zpos_P_of_succ_nat.
           rewrite Nat2Z.inj_add.
           rewrite Zpos_P_of_succ_nat in H4.
-          rewrite Nat2Z.inj_succ. omega.
+          rewrite Nat2Z.inj_succ. lia.
           replace ((Ptrofs.add (Ptrofs.add alloc_ofs (Ptrofs.mul (Ptrofs.repr (sizeof (globalenv p) val)) (Ptrofs.repr Z.one))) (Ptrofs.repr (int_size * j)))) with (Ptrofs.add alloc_ofs (Ptrofs.repr (int_size * (j + 1)))).
 
           eapply Mem.store_valid_access_1; eauto.
@@ -7033,18 +7077,18 @@ Proof.
           auto.
           unfold int_size. 
           eapply OrdersEx.Z_as_DT.divide_factor_l.
-          unfold int_size. chunk_red; omega. 
+          unfold int_size. chunk_red; lia. 
           inv Hbound_limit.
-          unfold int_size in *. chunk_red; omega.
+          unfold int_size in *. chunk_red; lia.
 
           symmetry.
           apply  pointer_ofs_no_overflow.
-          omega.
+          lia.
           destruct Hbound_limit.
           unfold int_size in *. 
           assert (Ptrofs.unsigned limit_ofs <= Ptrofs.max_unsigned)%Z by apply Ptrofs.unsigned_range_2.
           
-          chunk_red; omega.
+          chunk_red; lia.
 
           rewrite Ptrofs.add_assoc.
           replace (Ptrofs.add (Ptrofs.mul (Ptrofs.repr (sizeof (globalenv p) val)) (Ptrofs.repr Z.one))
@@ -7054,18 +7098,18 @@ Proof.
           rewrite Zred_factor4.
           rewrite Z.add_comm. reflexivity.
           constructor. solve_uint_range.
-          constructor. unfold uval. chunk_red; archi_red; simpl; omega.
-          rewrite ptrofs_mu. chunk_red; archi_red; simpl; solve_uint_range. omega. omega.
+          constructor. unfold uval. chunk_red; archi_red; simpl; lia.
+          rewrite ptrofs_mu. chunk_red; archi_red; simpl; solve_uint_range. lia. lia.
           solve_uint_range.
           
           destruct Hbound_limit.
 
           
-          assert (gc_size <= Int.max_unsigned)%Z. unfold gc_size; unfold Int.max_unsigned; simpl; omega.
-          split. chunk_red; omega. 
+          assert (gc_size <= Int.max_unsigned)%Z. unfold gc_size; unfold Int.max_unsigned; simpl; lia.
+          split. chunk_red; lia. 
           etransitivity. 2: apply ptrofs_mu_weak.
           assert ((int_size * j <= int_size * Z.pos (Pos.of_succ_nat (length ys))))%Z.
-          apply OrdersEx.Z_as_OT.mul_le_mono_pos_l. chunk_red; omega. omega.
+          apply OrdersEx.Z_as_OT.mul_le_mono_pos_l. chunk_red; lia. lia.
           etransitivity.
           eauto.
           etransitivity. 2: eauto. etransitivity. 2:eauto.
@@ -7075,11 +7119,11 @@ Proof.
           rewrite Nat2Z.inj_succ.
           rewrite <- Z.add_succ_l.
           assert (0 <= (Z.succ (Z.of_nat (max_allocs e))))%Z.
-          assert (0 <= (Z.of_nat (max_allocs e)))%Z.  omega. omega.
+          assert (0 <= (Z.of_nat (max_allocs e)))%Z.  lia. lia.
           rewrite Z.mul_add_distr_l. 
-          chunk_red; archi_red; omega. 
+          chunk_red; archi_red; lia. 
           
-          chunk_red; archi_red; solve_uint_range; rewrite ptrofs_mu; archi_red; solve_uint_range; unfold Z.one; omega.
+          chunk_red; archi_red; solve_uint_range; rewrite ptrofs_mu; archi_red; solve_uint_range; unfold Z.one; lia.
         }
         specialize (Hstep_m3 Htemp H2). clear Htemp.
         
@@ -7140,7 +7184,7 @@ Proof.
           split.
           apply Z.add_nonneg_nonneg.
           apply Ptrofs.unsigned_range.
-          assert (0 <= Z.of_nat (length vs7))%Z by apply Zle_0_nat. chunk_red; omega.
+          assert (0 <= Z.of_nat (length vs7))%Z by apply Nat2Z.is_nonneg. chunk_red; lia.
           apply Forall2_length' in Hvs7.
           rewrite <- Hvs7 in *.
           inv Hbound_limit.          
@@ -7154,17 +7198,17 @@ Proof.
           
 
           
-          assert (Ptrofs.unsigned alloc_ofs + sizeof (globalenv p) uval * 1 +  size_chunk int_chunk * (0 + Z.of_nat (length (v0 :: ys))) <= Ptrofs.unsigned alloc_ofs + (Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs))%Z. chunk_red; unfold sizeof; archi_red; omega. etransitivity. eauto.
+          assert (Ptrofs.unsigned alloc_ofs + sizeof (globalenv p) uval * 1 +  size_chunk int_chunk * (0 + Z.of_nat (length (v0 :: ys))) <= Ptrofs.unsigned alloc_ofs + (Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs))%Z. chunk_red; unfold sizeof; archi_red; lia. etransitivity. eauto.
           rewrite Zplus_minus. apply Ptrofs.unsigned_range_2.
           unfold Z.one.
           rewrite Z.mul_succ_r in H4.
-          assert (0 <= Ptrofs.unsigned alloc_ofs)%Z by apply Ptrofs.unsigned_range_2. split. chunk_red; unfold sizeof; archi_red; omega.  
-          assert (Ptrofs.unsigned alloc_ofs +  sizeof (globalenv p) uval * 1 <= Ptrofs.unsigned alloc_ofs + ( Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs))%Z by (chunk_red; unfold sizeof; archi_red; omega). 
+          assert (0 <= Ptrofs.unsigned alloc_ofs)%Z by apply Ptrofs.unsigned_range_2. split. chunk_red; unfold sizeof; archi_red; lia.  
+          assert (Ptrofs.unsigned alloc_ofs +  sizeof (globalenv p) uval * 1 <= Ptrofs.unsigned alloc_ofs + ( Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs))%Z by (chunk_red; unfold sizeof; archi_red; lia). 
           etransitivity. eauto.
           rewrite Zplus_minus. apply Ptrofs.unsigned_range_2.
 
-          unfold Z.one; rewrite ptrofs_mu.  chunk_red; unfold sizeof; archi_red; solve_uint_range; omega.  
-          simpl sizeof. unfold Z.one. chunk_red; unfold sizeof; solve_uint_range; rewrite ptrofs_mu; archi_red; solve_uint_range; omega.  
+          unfold Z.one; rewrite ptrofs_mu.  chunk_red; unfold sizeof; archi_red; solve_uint_range; lia.  
+          simpl sizeof. unfold Z.one. chunk_red; unfold sizeof; solve_uint_range; rewrite ptrofs_mu; archi_red; solve_uint_range; lia.  
           destruct Hstep_m3.
           auto.
         }          
@@ -7210,7 +7254,7 @@ Proof.
             replace (Z.of_N a) with (Z.of_nat (length (v0 :: ys))). 
             rewrite  Z.add_succ_l.
             destruct Hbound_limit.
-            omega.
+            lia.
             rewrite H4. rewrite nat_N_Z. reflexivity.            
           }
           assert (H_unchanged_m2_m3: Mem.unchanged_on L m2 m3). {                          
@@ -7240,12 +7284,12 @@ Proof.
             inv Hc_alloc. simpl max_allocs in H10.
             rewrite Nat2Z.inj_succ in *.
             unfold int_size in *;  simpl size_chunk in *.
-            unfold Z.one in *. split. chunk_red; omega.
+            unfold Z.one in *. split. chunk_red; lia.
             inv H8. 
             eapply OrdersEx.Z_as_OT.lt_le_trans; eauto.
             rewrite Nat2Z.inj_add in H10.
             rewrite Z.mul_succ_r in H10.
-            assert (0 <= Z.of_nat (max_allocs e))%Z by apply Zle_0_nat.
+            assert (0 <= Z.of_nat (max_allocs e))%Z by apply Nat2Z.is_nonneg.
             rewrite <- OrdersEx.Z_as_DT.le_add_le_sub_l in H10.
             etransitivity. 2: apply H10.
             rewrite Nat2Z.inj_succ.
@@ -7257,8 +7301,8 @@ Proof.
             rewrite Z.add_comm with (m := (size_chunk int_chunk * Z.of_nat (max_allocs e))%Z).
             repeat rewrite <- Z.add_assoc.
             apply Z_non_neg_add.
-            assert (Ptrofs.unsigned alloc_ofs + (size_chunk int_chunk * 1 + ((size_chunk int_chunk) * Z.of_nat (length ys) + (size_chunk int_chunk))) <= (Ptrofs.unsigned alloc_ofs + ((size_chunk int_chunk) * Z.of_nat (length ys) + ((size_chunk int_chunk) + (size_chunk int_chunk)))))%Z. chunk_red; omega. etransitivity. eauto. reflexivity. chunk_red; omega.
-            unfold Z.one; omega.
+            assert (Ptrofs.unsigned alloc_ofs + (size_chunk int_chunk * 1 + ((size_chunk int_chunk) * Z.of_nat (length ys) + (size_chunk int_chunk))) <= (Ptrofs.unsigned alloc_ofs + ((size_chunk int_chunk) * Z.of_nat (length ys) + ((size_chunk int_chunk) + (size_chunk int_chunk)))))%Z. chunk_red; lia. etransitivity. eauto. reflexivity. chunk_red; lia.
+            unfold Z.one; lia.
             inv Hc_alloc. simpl max_allocs in H10.
             rewrite Nat2Z.inj_succ in H10. 
             rewrite <- Z.le_add_le_sub_l in H10.            
@@ -7266,11 +7310,11 @@ Proof.
             etransitivity.
             2: apply H10.
             unfold Z.one. rewrite Nat2Z.inj_add.
-            rewrite Nat2Z.inj_succ. chunk_red; omega.
+            rewrite Nat2Z.inj_succ. chunk_red; lia.
             apply Ptrofs.unsigned_range_2.
             
             unfold Z.one.
-            solve_uint_range; rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega.
+            solve_uint_range; rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; lia.
 
           } 
           assert (H_unchanged_m_m3:   Mem.unchanged_on L m m3). {
@@ -7298,7 +7342,7 @@ Proof.
             apply Z_non_neg_add.
             reflexivity.
             rewrite nat_N_Z.
-            chunk_red; omega.
+            chunk_red; lia.
             auto. 
               }
           
@@ -7336,40 +7380,40 @@ Proof.
               * revert H21.
                 eapply H14.
                 split; auto.
-                etransitivity; eauto; chunk_red; omega.
+                etransitivity; eauto; chunk_red; lia.
               * inv H21.
                 
                 rewrite N2Z.inj_add in H22.
                 rewrite nat_N_Z in H22.
                 simpl Z.of_N in *.
-                chunk_red; omega.
+                chunk_red; lia.
                  
               * assert (0 <= Ptrofs.unsigned alloc_ofs)%Z by apply Ptrofs.unsigned_range. 
                 rewrite Ptrofs.unsigned_repr. reflexivity.
-                split. chunk_red; omega.
+                split. chunk_red; lia.
                 rewrite <- Z.le_add_le_sub_l in H12.    
                 etransitivity. etransitivity.
                 2: apply H12.
                 rewrite Z.mul_succ_r.
                 simpl length. 
-                chunk_red; omega.
+                chunk_red; lia.
                 apply Ptrofs.unsigned_range_2.
               * rewrite Ptrofs.unsigned_repr. reflexivity.
-                split. chunk_red; omega.
+                split. chunk_red; lia.
                 rewrite <- Z.le_add_le_sub_l in H12.    
                 etransitivity. etransitivity.
                 2: apply H12.
                 rewrite Nat2Z.inj_succ.
                 rewrite Z.mul_succ_r.
                 assert (0 <= Ptrofs.unsigned alloc_ofs)%Z by apply Ptrofs.unsigned_range.                
-                chunk_red; omega.
+                chunk_red; lia.
                 apply Ptrofs.unsigned_range_2.
               * simpl sizeof.
                 unfold Ptrofs.mul.
                 rewrite Ptrofs.unsigned_repr with (z :=  (Z.of_N (N.of_nat (length (v0 :: ys)) + 1))).
                 rewrite Ptrofs.unsigned_repr with (z := (sizeof (prog_comp_env p) uval)).
                 rewrite Ptrofs.unsigned_repr. reflexivity.
-                split. apply Z.mul_nonneg_nonneg. unfold sizeof. chunk_red; archi_red; omega. 
+                split. apply Z.mul_nonneg_nonneg. unfold sizeof. chunk_red; archi_red; lia. 
                 apply N2Z.is_nonneg.
                 rewrite <- Z.le_add_le_sub_l in H12.    
                 etransitivity. etransitivity. 2: apply H12.  simpl length.
@@ -7379,21 +7423,21 @@ Proof.
                 rewrite nat_N_Z.
                 simpl Z.of_N.
                 rewrite Z.mul_add_distr_l.
-                rewrite Z.mul_add_distr_l. unfold sizeof. chunk_red; archi_red; omega.
+                rewrite Z.mul_add_distr_l. unfold sizeof. chunk_red; archi_red; lia.
                 apply Ptrofs.unsigned_range_2.
                 rewrite ptrofs_mu. 
-                unfold sizeof; chunk_red; archi_red; solve_uint_range; omega. 
+                unfold sizeof; chunk_red; archi_red; solve_uint_range; lia. 
                 rewrite N2Z.inj_add.
                 rewrite nat_N_Z.
                 simpl Z.of_N.
                 split.
-                apply Z_non_neg_add. omega. omega.
+                apply Z_non_neg_add. lia. lia.
                 rewrite <- Z.le_add_le_sub_l in H12.    
                 etransitivity. etransitivity. 2: apply H12. 
                 simpl length.
                 rewrite Z.mul_succ_r.
                 assert (0 <= Ptrofs.unsigned alloc_ofs)%Z by apply Ptrofs.unsigned_range.
-                chunk_red; omega.
+                chunk_red; lia.
                 apply Ptrofs.unsigned_range_2.
             + rewrite M.gso. rewrite M.gso.
               auto.
@@ -7507,7 +7551,7 @@ Proof.
                       rewrite Z.add_assoc.
                       simpl Z.mul.
                       assert (0 <=  Z.of_N a)%Z by apply N2Z.is_nonneg. 
-                      chunk_red; omega.
+                      chunk_red; lia.
                    * (* skip m3, (repr H) is what is stored for m2 *)
                      rewrite Ptrofs.sub_add_opp.
                      rewrite Ptrofs.mul_one. 
@@ -7525,10 +7569,10 @@ Proof.
                      unfold Ptrofs.add.
                      rewrite Ptrofs.unsigned_repr with (z := (sizeof (prog_comp_env p) uval)). 
                      rewrite Ptrofs.unsigned_repr.                     
-                     unfold sizeof; unfold int_size; chunk_red; archi_red; omega.
+                     unfold sizeof; unfold int_size; chunk_red; archi_red; lia.
                      split.
                      apply Z_non_neg_add.
-                     unfold sizeof; chunk_red; archi_red; omega. apply Ptrofs.unsigned_range.
+                     unfold sizeof; chunk_red; archi_red; lia. apply Ptrofs.unsigned_range.
                      destruct Hbound_limit.
                      rewrite <- Z.le_add_le_sub_l in H5.    
                      etransitivity. etransitivity.
@@ -7538,11 +7582,11 @@ Proof.
                      rewrite Nat2Z.inj_succ.
                      rewrite Z.mul_succ_r.
                      int_red.
-                     assert (0 <=  Z.of_nat (max_allocs e + length (v0 :: ys))%nat)%Z by       apply Zle_0_nat.
-                     unfold sizeof; chunk_red; archi_red; omega.
+                     assert (0 <=  Z.of_nat (max_allocs e + length (v0 :: ys))%nat)%Z by       apply Nat2Z.is_nonneg.
+                     unfold sizeof; chunk_red; archi_red; lia.
                      apply Ptrofs.unsigned_range_2.
                      rewrite ptrofs_mu.
-                     unfold sizeof; chunk_red; archi_red; solve_uint_range; omega.
+                     unfold sizeof; chunk_red; archi_red; solve_uint_range; lia.
                    * 
                      auto.
 
@@ -7558,7 +7602,7 @@ Proof.
                          rewrite Ptrofs.unsigned_repr with (z := (sizeof (globalenv p) uval)).
                          rewrite Ptrofs.unsigned_repr. auto.
                          inv Hc_alloc.
-                         split. apply OrdersEx.Z_as_OT.add_nonneg_nonneg. apply Ptrofs.unsigned_range.  unfold sizeof; chunk_red; archi_red; omega. 
+                         split. apply OrdersEx.Z_as_OT.add_nonneg_nonneg. apply Ptrofs.unsigned_range.  unfold sizeof; chunk_red; archi_red; lia. 
                     inv Hbound_limit.
                     rewrite <- Z.le_add_le_sub_l in H5.  
                     etransitivity. etransitivity. 2: apply H5. unfold int_size in *. 2: eapply Ptrofs.unsigned_range_2. 
@@ -7569,10 +7613,10 @@ Proof.
                     assert (0 <=  Ptrofs.unsigned alloc_ofs)%Z.
                     apply Ptrofs.unsigned_range.
                     assert (0 <= Z.of_nat (max_allocs e + length (v0 :: ys)))%Z by 
-                    apply Zle_0_nat.
-                    unfold sizeof; chunk_red; archi_red; omega.
+                    apply Nat2Z.is_nonneg.
+                    unfold sizeof; chunk_red; archi_red; lia.
                     rewrite ptrofs_mu.
-                    unfold sizeof; chunk_red; archi_red; solve_uint_range; omega. 
+                    unfold sizeof; chunk_red; archi_red; solve_uint_range; lia. 
                   }                    
                   
 
@@ -7584,7 +7628,7 @@ Proof.
                     unfold int_size in *; simpl size_chunk in *.
                     inv Hc_alloc.
                     split. apply OrdersEx.Z_as_OT.add_nonneg_nonneg. apply OrdersEx.Z_as_OT.add_nonneg_nonneg.
-                    apply Ptrofs.unsigned_range. chunk_red; omega.  chunk_red; omega.
+                    apply Ptrofs.unsigned_range. chunk_red; lia.  chunk_red; lia.
                     inv Hbound_limit.
                     rewrite <- Z.le_add_le_sub_l in H5. 
                     etransitivity. etransitivity. 2: apply H5. 2: apply Ptrofs.unsigned_range_2. 
@@ -7602,8 +7646,8 @@ Proof.
                     rewrite Z.mul_add_distr_l.
                     rewrite Z.mul_succ_r.
                     rewrite Z.add_assoc.
-                    assert (0 <= (Z.of_nat (length ys)))%Z by                     apply Zle_0_nat.
-                    assert (0 <= (Z.of_nat (max_allocs e)))%Z by                     apply Zle_0_nat.
+                    assert (0 <= (Z.of_nat (length ys)))%Z by                     apply Nat2Z.is_nonneg.
+                    assert (0 <= (Z.of_nat (max_allocs e)))%Z by                     apply Nat2Z.is_nonneg.
                     rewrite Z.mul_succ_l.
                     rewrite <- Z.add_assoc.
                     rewrite <- Z.add_assoc.
@@ -7612,13 +7656,13 @@ Proof.
                     rewrite Z.add_assoc.
                     rewrite Z.mul_comm.
                     rewrite <- Z.add_0_l at 1.
-                    replace  (int_size * Z.of_nat (max_allocs e) + int_size * Z.of_nat (length ys) + int_size + int_size)%Z with  (int_size * Z.of_nat (max_allocs e) + ( int_size * Z.of_nat (length ys) + int_size + int_size))%Z by omega.
+                    replace  (int_size * Z.of_nat (max_allocs e) + int_size * Z.of_nat (length ys) + int_size + int_size)%Z with  (int_size * Z.of_nat (max_allocs e) + ( int_size * Z.of_nat (length ys) + int_size + int_size))%Z by lia.
                     
                     rewrite Z.add_0_l; 
-                    apply Z.add_le_mono; [ | omega];
-                    apply Z.add_le_mono; [ | omega];
+                    apply Z.add_le_mono; [ | lia];
+                    apply Z.add_le_mono; [ | lia];
                     rewrite <- Z.add_0_l at 1;
-                    apply Z.add_le_mono_r; chunk_red; omega. }
+                    apply Z.add_le_mono_r; chunk_red; lia. }
                     
                     (* done *)
 
@@ -7657,10 +7701,10 @@ Proof.
                   (* IH needs to walk on the total (a) size of ys *)
                   assert (Hays: (Z.of_N a - Z.of_nat (length ys) = 0)%Z).
                   destruct Ha_l; subst. rewrite nat_N_Z.
-                  omega.
+                  lia.
 
 
-                  replace (Ptrofs.unsigned alloc_ofs + int_size)%Z with  (Ptrofs.unsigned alloc_ofs + int_size + int_size * Z.of_nat (length vs1))%Z by (rewrite H_eq_vs1; simpl; omega).
+                  replace (Ptrofs.unsigned alloc_ofs + int_size)%Z with  (Ptrofs.unsigned alloc_ofs + int_size + int_size * Z.of_nat (length vs1))%Z by (rewrite H_eq_vs1; simpl; lia).
                   
                   assert (Hrel_pL' := Hrel_pL).
 (*   Not needed w/o maxalloc in pniL
@@ -7677,8 +7721,8 @@ Proof.
                   assert (forall y, List.In y ys -> 
                                     exists v6 : cps.val,
               M.get y rho = Some v6 /\
-              repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv
-                                  finfo_env p rep_env v6 m L lenv y).  
+              repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam fenv
+                                  finfo_env p rep_env v6 m L lenv y).
                   intros. apply Hrel_mL. constructor. auto.
  
                   (* replacing bind_n_after_ptr to something easier to induct on *)
@@ -7691,10 +7735,10 @@ Proof.
                   apply bind_n_after_ptr_def in H6.
                   inv H6. auto.
                   destruct H8. right. split. auto.
-                  split. chunk_red; omega.
+                  split. chunk_red; lia.
                   rewrite N2Z.inj_add.
-                  replace (Z.of_N a) with (Z.of_nat (length ys)) by omega.
-                  replace (length ys) with (length vs2). int_red. simpl in H8. simpl Z.of_N. chunk_red; omega.
+                  replace (Z.of_N a) with (Z.of_nat (length ys)) by lia.
+                  replace (length ys) with (length vs2). int_red. simpl in H8. simpl Z.of_N. chunk_red; lia.
                   apply Forall2_length' in Hvs7. auto. }
 
                   (* current locprop, from L + 1 to L + 1 + length vs *)
@@ -7722,7 +7766,7 @@ Proof.
                     rewrite Z.mul_add_distr_l.
                     rewrite Z.mul_succ_r.
                     rewrite nat_N_Z. 
-                    chunk_red; omega.
+                    chunk_red; lia.
                   }                  
                   assert (H_u_mmid_m3: Mem.unchanged_on L'' m_mid m3). {                    
                     eapply mem_after_n_proj_store_unchanged. eauto. 
@@ -7731,10 +7775,10 @@ Proof.
                     rewrite bind_n_after_ptr_def in H8.
                     destruct H8.
                     - (* L alloc_b j is protected *)
-                      revert H8. apply H_not_in_L. subst. simpl length in *. int_red. simpl Z.of_nat in *.  chunk_red; omega.
+                      revert H8. apply H_not_in_L. subst. simpl length in *. int_red. simpl Z.of_nat in *.  chunk_red; lia.
                       
                     - (* j is both in and after vs1 so impossible *)
-                      int_red. chunk_red; omega.
+                      int_red. chunk_red; lia.
                     }
                    
                   clear H_eql'.
@@ -7846,9 +7890,9 @@ Proof.
                          rewrite rev_length.
                          simpl length.
                          rewrite Nat2Z.inj_add.
-                         rewrite Nat2Z.inj_succ. chunk_red; omega.                         
+                         rewrite Nat2Z.inj_succ. chunk_red; lia.                         
                        * destruct H2. simpl length in H8.
-                         rewrite Nat2Z.inj_succ in H8. int_red. chunk_red; omega.
+                         rewrite Nat2Z.inj_succ in H8. int_red. chunk_red; lia.
                      }
                      eapply IHvs in H_m2_m'; eauto.
                      + econstructor.
@@ -7858,7 +7902,7 @@ Proof.
                          eauto.
                          intros. rewrite <- H_ll3_def.
                          rewrite bind_n_after_ptr_def. right. split; auto. simpl length.
-                         rewrite Nat2Z.inj_succ. int_red. chunk_red; omega.
+                         rewrite Nat2Z.inj_succ. int_red. chunk_red; lia.
                          eapply Mem.load_store_same. apply H10. 
                        * (* this is from m3 unchanged m over L *)
                          auto.
@@ -7868,7 +7912,7 @@ Proof.
                            with
                              (Ptrofs.unsigned alloc_ofs + int_size + int_size * Z.of_nat (length (y0 :: vs1)))%Z.
                          apply H_m2_m'. simpl length. rewrite Nat2Z.inj_succ.
-                         rewrite Z.mul_succ_r. int_red. omega. 
+                         rewrite Z.mul_succ_r. int_red. lia. 
                          intro. intros. left. eauto. 
                      + simpl length. rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_r. int_red. rewrite Z.add_assoc. eauto.
                      + simpl. rewrite <- app_assoc. simpl. auto.
@@ -7965,10 +8009,10 @@ Forall2
           
           eapply correct_tinfo_after_store; eauto.
           inv Hc_alloc.
-          simpl max_allocs. destruct ys. omega.
+          simpl max_allocs. destruct ys. lia.
           rewrite Nat2Z.inj_succ.
           rewrite Nat2Z.inj_add.
-          omega.
+          lia.
           intro; apply H3.
           apply is_protected_tinfo_weak. auto.
           {
@@ -8008,9 +8052,9 @@ Forall2
             destruct Ha_l. rewrite H6. rewrite N2Z.inj_add. rewrite nat_N_Z.
             rewrite Nat2Z.inj_succ.
             rewrite Nat2Z.inj_add.  
-            unfold int_size. simpl size_chunk.  simpl Z.of_N. chunk_red; omega.
+            unfold int_size. simpl size_chunk.  simpl Z.of_N. chunk_red; lia.
             apply Ptrofs.unsigned_range_2. constructor.
-            constructor. unfold sizeof. chunk_red; archi_red; omega. rewrite ptrofs_mu. chunk_red; archi_red; solve_uint_range; omega.
+            constructor. unfold sizeof. chunk_red; archi_red; lia. rewrite ptrofs_mu. chunk_red; archi_red; solve_uint_range; lia.
             constructor. 
             split.
             apply N2Z.is_nonneg.
@@ -8025,7 +8069,7 @@ Forall2
             unfold int_size. simpl size_chunk. simpl Z.of_N.
             rewrite <- Z.add_succ_l.
             assert (0 <=   Ptrofs.unsigned alloc_ofs)%Z by apply Ptrofs.unsigned_range_2.
-            chunk_red; omega.
+            chunk_red; lia.
             apply Ptrofs.unsigned_range_2. constructor.
 
 
@@ -8034,7 +8078,7 @@ Forall2
             intro. intro. apply Hrange_alloc'. destruct H4. split; eauto.
             etransitivity. 2: apply H4. rewrite int_z_mul. rewrite pointer_ofs_no_overflow.
             int_red. rewrite Z.add_comm. apply Z_non_neg_add. reflexivity. apply Z.mul_nonneg_nonneg.
-            chunk_red; omega. apply N2Z.is_nonneg. apply N2Z.is_nonneg.
+            chunk_red; lia. apply N2Z.is_nonneg. apply N2Z.is_nonneg.
             inv Hbound_limit.
             rewrite <- Z.le_add_le_sub_l in H6.
             etransitivity. etransitivity. 2: apply H6.
@@ -8042,9 +8086,9 @@ Forall2
             destruct Ha_l. rewrite H9. rewrite N2Z.inj_add. rewrite nat_N_Z.
             rewrite Nat2Z.inj_succ.
             rewrite Nat2Z.inj_add. 
-            unfold int_size. simpl size_chunk. simpl Z.of_N. chunk_red; omega.
+            unfold int_size. simpl size_chunk. simpl Z.of_N. chunk_red; lia.
             apply Ptrofs.unsigned_range_2. constructor.
-            unfold uint_range. unfold sizeof. rewrite ptrofs_mu. chunk_red; archi_red; solve_uint_range; omega. 
+            unfold uint_range. unfold sizeof. rewrite ptrofs_mu. chunk_red; archi_red; solve_uint_range; lia. 
             constructor.
             split.
             apply N2Z.is_nonneg.
@@ -8059,7 +8103,7 @@ Forall2
             unfold int_size. simpl size_chunk. simpl Z.of_N.
             rewrite <- Z.add_succ_l.
             assert (0 <=   Ptrofs.unsigned alloc_ofs)%Z by apply Ptrofs.unsigned_range_2.
-            chunk_red; omega.
+            chunk_red; lia.
             apply Ptrofs.unsigned_range_2. constructor.
 (* 
             
@@ -8076,7 +8120,7 @@ Forall2
             apply Z_non_neg_add.
             apply Pos2Z.is_nonneg.
             apply H4.
-            omega.
+            lia.
             apply Hrange_alloc in H5.
             rewrite Z.mul_add_distr_l in H5.
             rewrite Z.add_comm in H5.
@@ -8108,24 +8152,24 @@ Forall2
             simpl sizeof. int_red.
             constructor.
             split.
-            assert (0 <= Z.of_N a)%Z by apply N2Z.is_nonneg. omega.
+            assert (0 <= Z.of_N a)%Z by apply N2Z.is_nonneg. lia.
             etransitivity. etransitivity. Focus 2. apply Hbound_limit.
-            assert (0 <= Int.unsigned alloc_ofs)%Z by apply Int.unsigned_range. omega.
+            assert (0 <= Int.unsigned alloc_ofs)%Z by apply Int.unsigned_range. lia.
             apply Int.unsigned_range_2.
-            constructor. split. omega.
+            constructor. split. lia.
             etransitivity. etransitivity. Focus 2. apply Hbound_limit.
             assert (0 <= Int.unsigned alloc_ofs)%Z by apply Int.unsigned_range.
-            assert (0 <= Z.of_N a)%Z by apply N2Z.is_nonneg. omega.
+            assert (0 <= Z.of_N a)%Z by apply N2Z.is_nonneg. lia.
             apply Int.unsigned_range_2.
             constructor.
             simpl sizeof. constructor. solve_uint_range. constructor.
 
             assert (0 <= Z.of_N a)%Z by apply N2Z.is_nonneg.
-            split. omega.
+            split. lia.
             etransitivity. etransitivity. Focus 2. apply Hbound_limit.
             assert (0 <= Int.unsigned alloc_ofs)%Z by apply Int.unsigned_range.
             int_red.
-            omega.
+            lia.
             apply Int.unsigned_range_2.
             constructor. 
 *) 
@@ -8156,12 +8200,12 @@ Forall2
             rewrite <- Z.le_add_le_sub_l.
             etransitivity. 2: apply H6.
             simpl length. rewrite Nat2Z.inj_succ.
-            chunk_red; unfold sizeof; archi_red; omega.
-            chunk_red; unfold sizeof; archi_red; omega.
+            chunk_red; unfold sizeof; archi_red; lia.
+            chunk_red; unfold sizeof; archi_red; lia.
 
 
             split. apply Z_non_neg_add.
-            chunk_red; unfold sizeof; archi_red; omega.
+            chunk_red; unfold sizeof; archi_red; lia.
             apply Ptrofs.unsigned_range.
             inv Hbound_limit. inv Hc_alloc.
             rewrite <- Z.le_add_le_sub_l in H6.
@@ -8171,10 +8215,10 @@ Forall2
             rewrite Nat2Z.inj_succ.
             rewrite Nat2Z.inj_add.                                                
             rewrite Nat2Z.inj_succ. unfold int_size in *.
-            chunk_red; unfold sizeof; archi_red; omega.
+            chunk_red; unfold sizeof; archi_red; lia.
 
             apply Ptrofs.unsigned_range_2.
-            split.             chunk_red; unfold sizeof; archi_red; omega.
+            split.             chunk_red; unfold sizeof; archi_red; lia.
             inv Hbound_limit. inv Hc_alloc. etransitivity.
             etransitivity. 2: apply H8.
             etransitivity. 2: apply H6.
@@ -8185,10 +8229,10 @@ Forall2
             rewrite Nat2Z.inj_add.                                                
             rewrite Nat2Z.inj_succ.
             assert (0 <=  Ptrofs.unsigned alloc_ofs)%Z by apply Ptrofs.unsigned_range.
-            chunk_red; unfold sizeof; archi_red; omega.
+            chunk_red; unfold sizeof; archi_red; lia.
 
-            unfold gc_size. rewrite ptrofs_mu. chunk_red; archi_red;  solve_uint_range; omega.
-            constructor.             chunk_red; unfold sizeof; archi_red; solve_uint_range; omega. 
+            unfold gc_size. rewrite ptrofs_mu. chunk_red; archi_red;  solve_uint_range; lia.
+            constructor.             chunk_red; unfold sizeof; archi_red; solve_uint_range; lia. 
             constructor.
             split. apply N2Z.is_nonneg.
             destruct Ha_l. rewrite H4.
@@ -8203,7 +8247,7 @@ Forall2
             rewrite nat_N_Z.
             unfold int_size. simpl size_chunk. simpl Z.of_N.         
             assert (0 <=  Ptrofs.unsigned alloc_ofs)%Z by apply Ptrofs.unsigned_range.
-            simpl in H6. chunk_red; omega.
+            simpl in H6. chunk_red; lia.
 
             constructor.
 
@@ -8296,7 +8340,7 @@ Forall2
           (* tinfo *)
           apply correct_tinfo_not_protected.
           eapply correct_tinfo_mono; eauto.
-          inv Hc_alloc. simpl. omega.
+          inv Hc_alloc. simpl. lia.
           intro.
           inv Hp_id.
           eapply H4. apply is_protected_tinfo_weak. eauto. eauto.
@@ -8812,7 +8856,7 @@ Forall2
     {
       apply correct_tinfo_not_protected.
       eapply correct_tinfo_mono; eauto.
-      split. omega.
+      split. lia.
       inv Hc_alloc.
       apply inj_le.
       eapply max_allocs_case.
@@ -9037,7 +9081,7 @@ Forall2
     (* m3 saves the value of alloc_ofs into the tinfo *)
      
     assert (Hm3 : Mem.valid_access m2 int_chunk tinf_b (Ptrofs.unsigned tinf_ofs) Writable). {
-      destruct Hrel_mem. inv H3. destructAll. rewrite H12 in Hget_tinf; inv Hget_tinf. specialize (H15 0%Z). rewrite Ptrofs.add_zero in H15. eapply H15. omega.
+      destruct Hrel_mem. inv H3. destructAll. rewrite H12 in Hget_tinf; inv Hget_tinf. specialize (H15 0%Z). rewrite Ptrofs.add_zero in H15. eapply H15. lia.
     }
     eapply Mem.valid_access_store with (v := (Vptr alloc_b alloc_ofs)) in Hm3.
     destruct Hm3 as [m3 Hm3].
@@ -9048,7 +9092,7 @@ Forall2
       eauto.
       destruct Hrel_mem. inv H3. destructAll.
       rewrite H12 in Hget_tinf; inv Hget_tinf.
-      specialize (H15 1%Z). simpl in H15. eapply H15. omega.
+      specialize (H15 1%Z). simpl in H15. eapply H15. lia.
     }
     eapply Mem.valid_access_store with (v := (Vptr alloc_b limit_ofs)) in Hm4.
     destruct Hm4 as [m4 Hm4].
@@ -9639,13 +9683,13 @@ Forall2
             eapply Mem.load_store_same. eauto. eauto.
             right.
             assert (Het := Ptrofs.unsigned_add_either tinf_ofs (Ptrofs.repr int_size)). destruct Het. rewrite H1. left. simpl. rewrite Ptrofs.unsigned_repr. reflexivity.
-            rewrite ptrofs_mu. chunk_red; archi_red; solve_uint_range; omega.
+            rewrite ptrofs_mu. chunk_red; archi_red; solve_uint_range; lia.
 
             right. rewrite H1.  rewrite Ptrofs.unsigned_repr. fold int_size.
-            assert (int_size - Ptrofs.modulus + int_size < 0)%Z. 2: omega.
+            assert (int_size - Ptrofs.modulus + int_size < 0)%Z. 2: lia.
             unfold Ptrofs.modulus; unfold Ptrofs.wordsize;  unfold Wordsize_Ptrofs.wordsize;
-              chunk_red; archi_red; simpl; omega. 
-            rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega.
+              chunk_red; archi_red; simpl; lia. 
+            rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; lia.
             
             
             simpl. unfold sem_sub. simpl. rewrite load_ptr_or_int. rewrite load_ptr_or_int. rewrite Coqlib.peq_true. reflexivity. reflexivity. reflexivity.
@@ -9727,13 +9771,13 @@ Forall2
           erewrite Mem.load_store_same in H6; eauto. inv H6.
           2: { right. rewrite Ptrofs.add_zero. simpl.
                assert (Het := Ptrofs.unsigned_add_either ofs2 (Ptrofs.repr int_size)). destruct Het.
-               rewrite H1. left. rewrite Ptrofs.unsigned_repr. unfold Mptr; chunk_red; archi_red; omega. rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega. 
+               rewrite H1. left. rewrite Ptrofs.unsigned_repr. unfold Mptr; chunk_red; archi_red; lia. rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; lia. 
                right. rewrite H1. rewrite Ptrofs.unsigned_repr.
                fold int_size.
-               assert (int_size - Ptrofs.modulus + int_size < 0)%Z. 2: omega.
+               assert (int_size - Ptrofs.modulus + int_size < 0)%Z. 2: lia.
                unfold Ptrofs.modulus; unfold Ptrofs.wordsize;  unfold Wordsize_Ptrofs.wordsize;
-                 chunk_red; archi_red; simpl; omega. 
-               rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega.
+                 chunk_red; archi_red; simpl; lia. 
+               rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; lia.
                }
              
 
@@ -9790,9 +9834,9 @@ Forall2
                2:{ split.
                    rewrite <- Z.le_add_le_sub_l. etransitivity. 2: eauto.
                    unfold Ptrofs.min_signed.  
-                   inv Hc_alloc.    unfold Ptrofs.half_modulus. unfold Ptrofs.modulus. simpl. unfold Ptrofs.wordsize. unfold Wordsize_Ptrofs.wordsize. chunk_red; archi_red; simpl; omega. 
-                   etransitivity; eauto. unfold gc_size; unfold Ptrofs.max_signed. unfold Ptrofs.half_modulus. unfold Ptrofs.modulus.  unfold Ptrofs.wordsize. unfold Wordsize_Ptrofs.wordsize. chunk_red; archi_red; simpl; omega. } 
-                 2:unfold Ptrofs.min_signed; unfold Ptrofs.max_signed; unfold Ptrofs.half_modulus;  unfold Ptrofs.modulus;  unfold Ptrofs.wordsize; unfold Wordsize_Ptrofs.wordsize; chunk_red; archi_red; simpl; omega. 
+                   inv Hc_alloc.    unfold Ptrofs.half_modulus. unfold Ptrofs.modulus. simpl. unfold Ptrofs.wordsize. unfold Wordsize_Ptrofs.wordsize. chunk_red; archi_red; simpl; lia. 
+                   etransitivity; eauto. unfold gc_size; unfold Ptrofs.max_signed. unfold Ptrofs.half_modulus. unfold Ptrofs.modulus.  unfold Ptrofs.wordsize. unfold Wordsize_Ptrofs.wordsize. chunk_red; archi_red; simpl; lia. } 
+                 2:unfold Ptrofs.min_signed; unfold Ptrofs.max_signed; unfold Ptrofs.half_modulus;  unfold Ptrofs.modulus;  unfold Ptrofs.wordsize; unfold Wordsize_Ptrofs.wordsize; chunk_red; archi_red; simpl; lia. 
                    rewrite Ptrofs.unsigned_repr in H8. 
                    rewrite Ptrofs.unsigned_repr in H8.
                    rewrite  Zquot.Zquot_Zdiv_pos in H8.
@@ -9809,18 +9853,18 @@ Forall2
                    (* bounds *) 
                    apply Zle_minus_le_0. unfold int_size in *. etransitivity; eauto.
                    inv Hc_alloc.
-                   simpl. chunk_red; omega. chunk_red; omega. 
+                   simpl. chunk_red; lia. chunk_red; lia. 
                    (* Assumption that max_allocs is smaller than gc_size -- add this to correct_fundef_info *)
-                   assert (  (0 <= fi_0_m4)%Z) by (inv Hcorrect_alloc_m4; apply Zle_0_nat).
+                   assert (  (0 <= fi_0_m4)%Z) by (inv Hcorrect_alloc_m4; apply Nat2Z.is_nonneg).
                    split. auto.
-                   unfold gc_size in *. rewrite ptrofs_mu. simpl in Hgc_size_fi0m4. etransitivity. etransitivity. 2: apply Hgc_size_fi0m4. chunk_red; omega. chunk_red; archi_red; solve_uint_range; simpl; omega.
+                   unfold gc_size in *. rewrite ptrofs_mu. simpl in Hgc_size_fi0m4. etransitivity. etransitivity. 2: apply Hgc_size_fi0m4. chunk_red; lia. chunk_red; archi_red; solve_uint_range; simpl; lia.
 
                    split. apply Zquot.Z_quot_pos.
                    apply Zle_minus_le_0. unfold int_size in *. etransitivity; eauto.
                    inv Hc_alloc.
-                   simpl. chunk_red; omega. chunk_red; omega.
-                   apply Z.quot_le_upper_bound. chunk_red; omega.
-                   assert  (Ptrofs.max_unsigned <= int_size * Ptrofs.max_unsigned)%Z. assert (0 <= Ptrofs.max_unsigned)%Z. etransitivity. 2: apply ptrofs_mu_weak. unfold Int.max_unsigned; simpl; omega. chunk_red; omega.
+                   simpl. chunk_red; lia. chunk_red; lia.
+                   apply Z.quot_le_upper_bound. chunk_red; lia.
+                   assert  (Ptrofs.max_unsigned <= int_size * Ptrofs.max_unsigned)%Z. assert (0 <= Ptrofs.max_unsigned)%Z. etransitivity. 2: apply ptrofs_mu_weak. unfold Int.max_unsigned; simpl; lia. chunk_red; lia.
                    etransitivity; eauto.
                    
                    }
@@ -9975,7 +10019,7 @@ Forall2
           assert (Hx_in: (In _ (Ensembles.Union _  (FromList vsm4) (name_in_fundefs fl)) x)). {
             eapply closed_val_fun; eauto.
           }
-          assert (Hx_vsm4: decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.  
+          assert (Hx_vsm4: decidable (List.In x vsm4)). apply In_decidable. apply var_dec_eq.  
           inv Hx_vsm4. 
           + (* x in vsm4 *)
             assert (Hx_rho'' := get_set_lists_In_xs _ _ _ _ _ H8 H2). destruct Hx_rho''. exists x0. split; auto.
@@ -10087,13 +10131,13 @@ Forall2
         eapply Mem.load_store_same. eauto.  eauto.
         right.
         assert (Het := Ptrofs.unsigned_add_either tinf_ofs (Ptrofs.repr int_size)). destruct Het.
-        rewrite H1. left.  rewrite Ptrofs.unsigned_repr. unfold Mptr; chunk_red; archi_red; omega. rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega.  
+        rewrite H1. left.  rewrite Ptrofs.unsigned_repr. unfold Mptr; chunk_red; archi_red; lia. rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; lia.  
         right. rewrite H1. rewrite Ptrofs.unsigned_repr.
             fold int_size.
-            assert (int_size - Ptrofs.modulus + int_size < 0)%Z. 2: omega.
+            assert (int_size - Ptrofs.modulus + int_size < 0)%Z. 2: lia.
             unfold Ptrofs.modulus; unfold Ptrofs.wordsize;  unfold Wordsize_Ptrofs.wordsize;
-        chunk_red; archi_red; simpl; omega. 
-            rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; omega. 
+        chunk_red; archi_red; simpl; lia. 
+            rewrite ptrofs_mu; chunk_red; archi_red; solve_uint_range; lia. 
         split.  
         eapply Mem.load_store_same. eauto. split; auto.
         intros. 
@@ -10128,7 +10172,7 @@ Forall2
                   assert (Hx_in: (In _ (Ensembles.Union _  (FromList vsm4) (name_in_fundefs fl)) x)). {
                     eapply closed_val_fun; eauto.
                   }
-                  assert (Hx_vsm4: decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.  
+                  assert (Hx_vsm4: decidable (List.In x vsm4)). apply In_decidable. apply var_dec_eq.  
                   inv Hx_vsm4. 
                   + (* x in vsm4 *)
                     assert (Hx_rho'' := get_set_lists_In_xs _ _ _ _ _ H5 H2). destruct Hx_rho''. exists x0. split; auto.
@@ -10220,16 +10264,16 @@ Forall2
             apply Z.ltb_ge in Hgc_case. 
             eapply OrdersEx.Z_as_OT.mul_le_mono_nonneg_l with (p := int_size%Z) in Hgc_case.
 
-            assert ( int_size * ((Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs) / int_size)<= ((Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs)))%Z by (apply Z.mul_div_le; chunk_red; archi_red; omega).
-            omega.
-            chunk_red; archi_red; omega.
+            assert ( int_size * ((Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs) / int_size)<= ((Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs)))%Z by (apply Z.mul_div_le; chunk_red; archi_red; lia).
+            lia.
+            chunk_red; archi_red; lia.
                        *)       
             } (*END OF Hm5*)
               
               destruct Hm5 as [m5 [lenv_new'' [Hm5 [Hm5_lenv [alloc_b_m5 [alloc_ofs_m5 [limit_ofs_m5 [vs7_m5 [deref_args_m5 [load_alloc_m5 [load_limit_m5 [Hvs7_m5 Hm5_all_rel]]]]]]]]]]]].
             
     assert (Hl_temp': length avsm4 = length (skipn nParam vs7_m5)). {
-      SearchAbout mem_after_asgn length.
+      Search mem_after_asgn length.
       apply mem_after_asgn_length in Hvs7_m5.
       eapply HSkipnLength in Hlvs.
       rewrite avsm4Eq.
@@ -10252,7 +10296,7 @@ Forall2
       auto. split. 
       (* cenv of env  ccenv rho'' *)
       { intro; intros. 
-        assert (decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.
+        assert (decidable (List.In x vsm4)). apply In_decidable. apply var_dec_eq.
         inv H14. 
         (* 1) in vs  *) 
         assert (List.In v0 vs) by (eapply set_lists_In; eauto).
@@ -10306,7 +10350,7 @@ Forall2
       eapply shrink_cps_correct.ub_in_fundefs; eauto.
 
 
-      intros.   assert (decidable (List.In x vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq.
+      intros.   assert (decidable (List.In x vsm4)). apply In_decidable. apply var_dec_eq.
       destruct H5. 
       (* in vs0 *)
       apply H3 in H.
@@ -10349,7 +10393,7 @@ Forall2
       -  intros. eapply Hf_id2 in H. eauto. 
         econstructor. right. apply H1. eauto.
       - intros.
-        assert (decidable (List.In y vsm4)). apply In_decidable. apply shrink_cps_correct.var_dec_eq. 
+        assert (decidable (List.In y vsm4)). apply In_decidable. apply var_dec_eq. 
         inv H4.
         (* in vsm4 *)
         assert (List.In v0 vs) by (eapply set_lists_In; eauto).       
@@ -10650,7 +10694,7 @@ Forall2
     (* show that we have write access to args[1] *)
     unfold correct_tinfo in Hc_tinfo.
     destruct Hc_tinfo as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs [Hget_alloc [Hdiv_alloc [Hrange_alloc [Hget_limit [Hbound_limit [Hget_args [Hdj_args [Hbound_args [Hrange_args [Htinf1 [Htinf2 [Htinf3 [Htinf4 Hglobals]]]]]]]]]]]]]]]]]]]]. 
-    assert (Htemp : (0 <= 1 < max_args)%Z) by (unfold max_args; omega).
+    assert (Htemp : (0 <= 1 < max_args)%Z) by (unfold max_args; lia).
 
     assert (Hvalid_args1:= Hrange_args _ Htemp).
     clear Htemp.
@@ -10669,7 +10713,7 @@ Forall2
         eapply Mem.store_unchanged_on; eauto; intros. 
         rewrite Hget_args in H9; inv H9.
         apply H10 with (z := 1%Z).
-        unfold max_args; omega.
+        unfold max_args; lia.
         rewrite Ptrofs.mul_one in *.
         simpl. unfold int_size in *; eauto.
       }
@@ -10726,7 +10770,7 @@ Forall2
         eapply Mem.store_unchanged_on; eauto; intros.
         rewrite Hget_args in H10; inv H10.
         apply H11 with (z := 1%Z).
-        unfold max_args; omega.
+        unfold max_args; lia.
         rewrite Ptrofs.mul_one in *.
         simpl. unfold int_size in *; eauto.
       }

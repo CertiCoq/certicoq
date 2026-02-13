@@ -5900,15 +5900,15 @@ Qed.
                             M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
                             Mem.loadv int_chunk m (Vptr finfo_b Ptrofs.zero) = Some (make_vint finfo_maxalloc) ->
                             (int_size * finfo_maxalloc <= gc_size)%Z ->
-                            deref_loc (Tarray uval maxArgs noattr) m tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr (3*int_size))) (Vptr args_b args_ofs) -> 
+                            deref_loc (Tarray uval maxArgs noattr) m tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr (3*int_size))) Full (Vptr args_b args_ofs) ->
                           exists v m' alloc_b alloc_ofs limit_ofs L' vs7',
                             (Events.external_functions_sem name sg (Genv.globalenv p) [Vptr finfo_b Ptrofs.zero; Vptr tinf_b tinf_ofs] m [] v m') /\
-                            (* get new alloc *)                            
-                            deref_loc valPtr m' tinf_b tinf_ofs (Vptr alloc_b alloc_ofs) /\
+                            (* get new alloc *)
+                            deref_loc valPtr m' tinf_b tinf_ofs Full (Vptr alloc_b alloc_ofs) /\
                              (* get new limit *)
-                            deref_loc valPtr m' tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr int_size)) (Vptr alloc_b limit_ofs)  /\
+                            deref_loc valPtr m' tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr int_size)) Full (Vptr alloc_b limit_ofs)  /\
                             (* same args block and offset *)
-                            deref_loc (Tarray uval maxArgs noattr) m' tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr (3*int_size))) (Vptr args_b args_ofs)  /\
+                            deref_loc (Tarray uval maxArgs noattr) m' tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr (3*int_size))) Full (Vptr args_b args_ofs)  /\
                             (* deep copied arguments *)
                             @rel_mem_asgn fenv finfo_env p rep_env args_b args_ofs m' L' vs6 inf vs7' /\
                             Mem.unchanged_on (fun b z => and (~(L b z)) (and (~ (L' b z)) (b <> tinf_b))) m m' /\
@@ -5955,37 +5955,37 @@ as injection, this looks like:
 Definition program_threadinfo_inv (p:program) :=
   exists co, 
     Maps.PTree.get threadInfIdent (genv_cenv (globalenv p))= Some co /\
-    co_members co =  ((allocIdent, valPtr) ::
-                         (limitIdent, valPtr) :: (heapInfIdent, (Clightdefs.tptr (Tstruct heapInfIdent noattr))) ::
-                         (argsIdent, (Tarray val maxArgs noattr))::nil).
+    co_members co =  (Member_plain allocIdent valPtr ::
+                         Member_plain limitIdent valPtr :: Member_plain heapInfIdent (Tpointer (Tstruct heapInfIdent noattr) noattr) ::
+                         Member_plain argsIdent (Tarray val maxArgs noattr) :: nil).
 
 Theorem allocIdent_delta:
   forall p,
       field_offset p allocIdent
-    [(allocIdent, valPtr); (limitIdent, valPtr); (heapInfIdent, Clightdefs.tptr (Tstruct heapInfIdent noattr));
-       (argsIdent, Tarray uval maxArgs noattr)] = OK (0)%Z.
+    [Member_plain allocIdent valPtr; Member_plain limitIdent valPtr; Member_plain heapInfIdent (Tpointer (Tstruct heapInfIdent noattr) noattr);
+       Member_plain argsIdent (Tarray uval maxArgs noattr)] = OK (0%Z, Full).
 Proof.
-   intro. chunk_red; archi_red; simpl; unfold field_offset; simpl;  
+   intro. chunk_red; archi_red; simpl; unfold field_offset; simpl;
   assert (Hnd := disjointIdent);
   inv Hnd; rewrite Coqlib.peq_true;
   reflexivity.
-Qed.    
+Qed.
 
 
 Theorem limitIdent_delta:
   forall p,
       field_offset p limitIdent
-    [(allocIdent, valPtr); (limitIdent, valPtr); (heapInfIdent, Clightdefs.tptr (Tstruct heapInfIdent noattr));
-       (argsIdent, Tarray uval maxArgs noattr)] = OK (1*int_size)%Z.
+    [Member_plain allocIdent valPtr; Member_plain limitIdent valPtr; Member_plain heapInfIdent (Tpointer (Tstruct heapInfIdent noattr) noattr);
+       Member_plain argsIdent (Tarray uval maxArgs noattr)] = OK ((1*int_size)%Z, Full).
 Proof.
-   intro. chunk_red; archi_red; simpl; unfold field_offset; simpl;  
+   intro. chunk_red; archi_red; simpl; unfold field_offset; simpl;
   assert (Hnd := disjointIdent);
   inv Hnd.
-  
+
   rewrite Coqlib.peq_false.
   rewrite Coqlib.peq_true.
   reflexivity.
-  inv H2. 
+  inv H2.
   intro; subst; apply H3; inList.
 
   rewrite Coqlib.peq_false.
@@ -5993,19 +5993,19 @@ Proof.
   archi_red. simpl. reflexivity.
   inv H2.
   intro; subst; apply H3; inList.
-Qed.    
+Qed.
 
 Theorem argsIdent_delta:
   forall p,
   field_offset p argsIdent
-    [(allocIdent, valPtr); (limitIdent, valPtr);
-    (heapInfIdent, Clightdefs.tptr (Tstruct heapInfIdent noattr));
-    (argsIdent, Tarray uval maxArgs noattr)] = OK (3*int_size)%Z.
+    [Member_plain allocIdent valPtr; Member_plain limitIdent valPtr;
+    Member_plain heapInfIdent (Tpointer (Tstruct heapInfIdent noattr) noattr);
+    Member_plain argsIdent (Tarray uval maxArgs noattr)] = OK ((3*int_size)%Z, Full).
 Proof.
-  intro. chunk_red; archi_red; simpl; unfold field_offset; simpl;  
+  intro. chunk_red; archi_red; simpl; unfold field_offset; simpl;
   assert (Hnd := disjointIdent);
   inv Hnd.
-  
+
   rewrite Coqlib.peq_false.
   rewrite Coqlib.peq_false.
   rewrite Coqlib.peq_false.

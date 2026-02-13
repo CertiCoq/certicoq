@@ -43,6 +43,9 @@ Require Import CertiCoq.Codegen.tactics
 Notation asgnAppVars' := LambdaANF_to_Clight.asgnAppVars'.
 Notation asgnAppVars'' := LambdaANF_to_Clight.asgnAppVars''.
 Notation asgnAppVars := LambdaANF_to_Clight.asgnAppVars.
+Notation makeVar := LambdaANF_to_Clight.makeVar.
+Notation mkCallVars := LambdaANF_to_Clight.mkCallVars.
+Notation make_case_switch := LambdaANF_to_Clight.make_case_switch.
 
 Require Import CertiCoq.Libraries.maps_util.
 From Coq.Lists Require List.
@@ -640,7 +643,7 @@ Notation "'Field(' t ',' n ')'" :=
   ( *(add ([valPtr] t) (c_int n%Z uval))) (at level 36). (* type must be uval (integer), not val (pointer), for classify_add *)
 
 Notation "'args[' n ']'" :=
-  ( *(add args (c_int n%Z uval))) (at level 36).
+  ( *(add args (c_int n%Z val))) (at level 36).
 
 Definition int_shru z1 z2 := if Archi.ptr64 then (Vlong (Int64.shru (Int64.repr z1) (Int64.repr z2)))
                                                   else (Vint (Int.shru (Int.repr z1) (Int.repr z2))).
@@ -6154,9 +6157,9 @@ Admitted. *)
 
 Theorem repr_make_case_switch:
   forall x ls ls',
-  repr_switch_LambdaANF_Codegen isptrIdent caseIdent x ls ls' (make_case_switch isptrIdent caseIdent x ls ls').
+  repr_switch_LambdaANF_Codegen isptrIdent caseIdent x ls ls' (make_case_switch x ls ls').
 Proof.
-  intros. unfold make_case_switch. constructor. 
+  intros. unfold make_case_switch. constructor.
 Qed.  
 
 

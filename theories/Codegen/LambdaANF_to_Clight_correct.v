@@ -3926,11 +3926,17 @@ Proof with archi_red.
          destruct (H2 (ex_intro _ b1 H1)). destruct x0.
          unfold makeVar. rewrite H3. specialize (HfinfoCorrect _ _ _ H3). inv HfinfoCorrect.
          destruct x0. rewrite H4. constructor.  eapply assign_loc_value.
-         2:{ admit. }
+         2:{ unfold ptrofs_of_int. unfold Ptrofs.of_intu.
+           unfold Ptrofs.of_int.
+           rewrite Int.unsigned_repr.
+           rewrite int_z_mul. archi_red. apply Hsm2.
+           solve_uint_range. archi_red. solve_uint_range. lia.
+           archi_red. auto.
+           solve_uint_range. }
          reduce_val_access. constructor.
          eapply t_trans. constructor. constructor.
          apply H5a. }
-         
+
        * inv H4. exfalso; rewrite H1 in H0; inv H0.
          (* branch here *)
          destruct (Archi.ptr64) eqn:Harchi... 
@@ -3960,7 +3966,11 @@ Proof with archi_red.
          destruct y; inversion H3; auto. try (simpl in H3; rewrite H3 in Harchi; inv Harchi).
          unfold sem_cast. simpl. try rewrite Harchi. try constructor.
          eapply assign_loc_value.
-         2:{ admit. }
+         2:{ unfold ptrofs_of_int. unfold Ptrofs.of_intu. unfold Ptrofs.of_int.
+           rewrite Int.unsigned_repr.
+           rewrite int_z_mul. apply Hsm2. solve_uint_range.
+           archi_red. solve_uint_range. lia.
+           archi_red. auto. auto. }
          reduce_val_access. constructor.
          eapply t_trans. constructor. constructor.
          apply H5a. }
@@ -3978,7 +3988,7 @@ Proof with archi_red.
          assert (Hll' : length l = length l') by (eapply Forall2_length'; eauto).         
          rewrite Hll' in *. 
          lia.
-Admitted.
+Defined.
 
 
 

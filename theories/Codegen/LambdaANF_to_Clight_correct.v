@@ -59,6 +59,8 @@ Notation add := LambdaANF_to_Clight.add.
 Notation c_int := LambdaANF_to_Clight.c_int.
 Notation c_int' := LambdaANF_to_Clight.c_int.
 Notation valPtr := LambdaANF_to_Clight.valPtr.
+Notation makeTag := LambdaANF_to_Clight.makeTag.
+Notation makeTagZ := LambdaANF_to_Clight.makeTagZ.
 
 Require Import CertiCoq.Libraries.maps_util.
 From Coq.Lists Require List.
@@ -6312,7 +6314,7 @@ Proof.
     destruct l; inv Hll.
     unfold makeTag in *.
     destruct (makeTagZ cenv c) eqn:H_makeTagZ; inv H_makeTag.
-    inv H. specialize (H1 _ _ _ _ _ _ H0). inv H1. inv H. inv H3; rewrite H0 in H; inv H. 
+    inv H. specialize (H1 _ _ _ _ _ _ H0). inv H1. inv H. inv H3; rewrite H0 in H; inv H.
     econstructor. apply H1. 
     {split.  unfold makeTagZ in *.  unfold make_ctor_rep in *. rewrite H0 in H_makeTagZ. simpl in H_makeTagZ. inv H_makeTagZ.
      reflexivity. 
@@ -6326,11 +6328,11 @@ Proof.
     inv H1; rewrite H3 in H0; inv H0. exfalso; auto.
     econstructor. eauto.
     { split. unfold makeTagZ in *. unfold make_ctor_rep in *.
-      rewrite H3 in H_makeTagZ. simpl Monad.pbind in H_makeTagZ.
+      rewrite H3 in H_makeTagZ. simpl in H_makeTagZ.
       inv H_makeTagZ; auto.
       split; auto.  }
     apply nth_proj_assign. auto.
-    destruct l. exfalso; auto. apply gt_Sn_O.     
+    destruct l. exfalso; auto. lia.
   - simpl in H1; inv H1.
   - simpl in H1. inv H1.
 Qed.
@@ -6372,7 +6374,7 @@ Theorem translate_body_correct:
     correct_crep_of_env cenv rep_env ->
     forall  e stm,
       correct_cenv_of_exp cenv e ->
-    translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam e fenv cenv ienv map = Some stm ->
+    @LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map = Some stm ->
     repr_expr_LambdaANF_Codegen_id fenv map p rep_env e stm.
 Proof.
   intros fenv cenv ienv  p rep_env map Hmap Hmapcorrect Hcrep.
@@ -6380,7 +6382,7 @@ Proof.
   - (* Econstr *) 
     simpl in H.
     destruct (assignConstructorS allocIdent threadInfIdent nParam cenv ienv fenv map v t l) eqn:H_eqAssign.
-    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam e fenv cenv ienv map) eqn:H_eqTranslate; inv H.
+    destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:H_eqTranslate; inv H.
     2: inv H.
     constructor.
     2: eapply IHe; eauto.
@@ -6395,8 +6397,8 @@ Proof.
                      econstructor. constructor. apply repr_make_case_switch. 
   - (* Ecase *)    
     simpl in H.
-    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam e fenv cenv ienv map) eqn:He.
-    destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam (Ecase v l) fenv cenv ienv map) eqn:Hl.
+    destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:He.
+    destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims (Ecase v l) fenv cenv ienv map) eqn:Hl.
     assert (correct_cenv_of_exp cenv (Ecase v l)).
     { intro; intros. eapply Hcenv. apply rt_then_t_or_eq in H0. inv H0. inv H1. apply t_then_rt. apply subterm_case. eauto. } 
     specialize (IHe0 s0 H0). clear H0.  assert (Some s0 = Some s0) by reflexivity. specialize (IHe0 H0). clear H0.
@@ -6446,7 +6448,7 @@ Proof.
     +  inv H.
   - (* Eproj *)
       simpl in H.
-      destruct (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam e fenv cenv ienv map) eqn:He.
+      destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:He.
       2: inv H. 
       inv H. constructor.
       eapply IHe.

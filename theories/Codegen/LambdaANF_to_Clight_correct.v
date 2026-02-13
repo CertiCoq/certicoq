@@ -653,10 +653,10 @@ Notation "'call' f " := (Scall None f (tinf :: nil)) (at level 35).
 Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 
 Notation "'Field(' t ',' n ')'" :=
-  ( *(add ([valPtr] t) (c_int n%Z uval))) (at level 36). (* type must be uval (integer), not val (pointer), for classify_add *)
+  ( *(add ([valPtr] t) (c_int n%Z uval))) (at level 36). (* must be uval (integer), not val (pointer), for classify_add *)
 
 Notation "'args[' n ']'" :=
-  ( *(add args (c_int n%Z val))) (at level 36).
+  ( *(add args (c_int n%Z uval))) (at level 36).
 
 Definition int_shru z1 z2 := if Archi.ptr64 then (Vlong (Int64.shru (Int64.repr z1) (Int64.repr z2)))
                                                   else (Vint (Int.shru (Int.repr z1) (Int.repr z2))).

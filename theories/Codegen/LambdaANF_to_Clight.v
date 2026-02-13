@@ -377,10 +377,10 @@ Notation "'call' f " := (Scall None f (tinf :: nil)) (at level 35).
 Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 
 Notation "'Field(' t ',' n ')'" :=
-  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
+  ( *(add ([valPtr] t) (c_int n%Z uval))) (at level 36). (* must be uval (integer), not val (pointer), for classify_add *)
 
 Notation "'args[' n ']'" :=
-  ( *(add args (c_int n%Z val))) (at level 36).
+  ( *(add args (c_int n%Z uval))) (at level 36).
 
 
 

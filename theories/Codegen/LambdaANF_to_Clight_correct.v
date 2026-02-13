@@ -51,6 +51,8 @@ Notation ctor_rep := LambdaANF_to_Clight.ctor_rep.
 Notation enum := LambdaANF_to_Clight.enum.
 Notation boxed := LambdaANF_to_Clight.boxed.
 Notation make_ctor_rep := LambdaANF_to_Clight.make_ctor_rep.
+Notation assignConstructorS' := LambdaANF_to_Clight.assignConstructorS'.
+Notation assignConstructorS := LambdaANF_to_Clight.assignConstructorS.
 
 Require Import CertiCoq.Libraries.maps_util.
 From Coq.Lists Require List.

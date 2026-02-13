@@ -4970,7 +4970,7 @@ Proof.
     eauto. compute. intro. inv H2.
     lia.
   }
-  { simpl. unfold Int.and.
+  { unfold shr_ty; rewrite Harchi. simpl. unfold Int.and.
     rewrite Int.unsigned_repr with (z := h) by (archi_red; solve_uint_range; lia).
     rewrite Int.unsigned_repr with (z := 255%Z) by (archi_red; solve_uint_range; lia).
     rewrite Int.unsigned_repr. reflexivity.
@@ -4997,7 +4997,7 @@ Proof.
     archi_red; unfold classify_shift; simpl.
   {   (* unfold Int64.ltu. rewrite Coqlib.zlt_true. *)
     rewrite Int64.shru_div_two_p.
-    rewrite Int64.Zshiftr_div_two_p by lia.
+    rewrite Z.shiftr_div_pow2 by lia.
       rewrite Int64.unsigned_repr with (z := n) by (archi_red; solve_uint_range; lia).
       rewrite Int64.unsigned_repr with (z := 1%Z) by (archi_red; solve_uint_range; lia).
       rewrite Int64.unsigned_repr. reflexivity.
@@ -5007,7 +5007,7 @@ Proof.
     apply Z.div_pos; lia.
     apply OrdersEx.Z_as_OT.div_le_upper_bound. lia. lia.
 }
-  {
+  { unfold shr_ty; rewrite Harchi; simpl.
         rewrite Int.shru_div_two_p.
     rewrite Zshiftr_div_two_p by lia.
       rewrite Int.unsigned_repr with (z := n) by (archi_red; solve_uint_range; lia).

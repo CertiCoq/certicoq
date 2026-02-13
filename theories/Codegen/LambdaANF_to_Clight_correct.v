@@ -39,6 +39,11 @@ Require Import CertiCoq.Codegen.tactics
                CertiCoq.Codegen.LambdaANF_to_Clight
                CertiCoq.Codegen.LambdaANF_to_Clight_stack.
 
+(* Re-bind names shadowed by _stack import *)
+Notation asgnAppVars' := LambdaANF_to_Clight.asgnAppVars'.
+Notation asgnAppVars'' := LambdaANF_to_Clight.asgnAppVars''.
+Notation asgnAppVars := LambdaANF_to_Clight.asgnAppVars.
+
 Require Import CertiCoq.Libraries.maps_util.
 From Coq.Lists Require List.
 Import List.ListNotations.

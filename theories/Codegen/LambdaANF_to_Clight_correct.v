@@ -5995,23 +5995,11 @@ Proof.
   assert (Hnd := disjointIdent);
   inv Hnd.
 
-  rewrite Coqlib.peq_false.
-  rewrite Coqlib.peq_false.
-  rewrite Coqlib.peq_false.
-  rewrite Coqlib.peq_true.
-  reflexivity.
-  intro; subst; apply H1; inList.
-  intro; subst; apply H1; inList.
-  intro; subst; apply H1; inList.
-
-  rewrite Coqlib.peq_false.
-  rewrite Coqlib.peq_false.
-  rewrite Coqlib.peq_false.
-  rewrite Coqlib.peq_true.
-  archi_red. simpl. fold_ident_peq. reflexivity.
-  intro; subst; apply H1; inList.
-  intro; subst; apply H1; inList.
-  intro; subst; apply H1; inList.
+  - rewrite Coqlib.peq_false; [| solve_nodup].
+    rewrite Coqlib.peq_false; [| solve_nodup].
+    rewrite Coqlib.peq_false; [| solve_nodup].
+    rewrite Coqlib.peq_true. reflexivity.
+  - vm_compute in Harchi. discriminate.
 Qed.    
 
 (* 

@@ -3132,10 +3132,18 @@ Lemma bound_var_dsubterm_e:
   forall e' e x,
     bound_var e' x -> dsubterm_e e' e -> bound_var e x.
 Proof.
-  intros e' e x Hbv Hsub. induction Hsub.
-  all: try (constructor; auto; fail).
-  all: try (econstructor; eauto; fail).
-Admitted. (* TODO: fix bound_var constructor names *)
+  intros e' e x Hbv Hsub. destruct Hsub.
+  - apply Bound_Econstr2; auto.
+  - apply Bound_Eproj2; auto.
+  - apply Bound_Eprim_val2; auto.
+  - apply Bound_Eprim2; auto.
+  - apply Bound_Eletapp2; auto.
+  - eapply Bound_Ecase; eauto.
+  - apply Bound_Efun1. induction H.
+    + apply Bound_Fcons3; auto.
+    + apply Bound_Fcons2; auto.
+  - apply Bound_Efun2; auto.
+Qed.
 
 Lemma bound_var_subterm_e:
   forall e' e x,

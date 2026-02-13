@@ -53,6 +53,12 @@ Notation boxed := LambdaANF_to_Clight.boxed.
 Notation make_ctor_rep := LambdaANF_to_Clight.make_ctor_rep.
 Notation assignConstructorS' := LambdaANF_to_Clight.assignConstructorS'.
 Notation assignConstructorS := LambdaANF_to_Clight.assignConstructorS.
+Notation val := LambdaANF_to_Clight.val.
+Notation uval := LambdaANF_to_Clight.uval.
+Notation add := LambdaANF_to_Clight.add.
+Notation c_int := LambdaANF_to_Clight.c_int.
+Notation c_int' := LambdaANF_to_Clight.c_int.
+Notation valPtr := LambdaANF_to_Clight.valPtr.
 
 Require Import CertiCoq.Libraries.maps_util.
 From Coq.Lists Require List.

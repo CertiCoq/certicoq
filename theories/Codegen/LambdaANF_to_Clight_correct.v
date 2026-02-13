@@ -5615,38 +5615,28 @@ Theorem repr_asgn_fun_entry:
     clos_refl_trans state (traceless_step2 (globalenv p))
                (State F asgn k empty_env lenv m)
                (State F Sskip k empty_env lenv' m).
-Proof. Admitted. (*
-  induction xs; intros.
-  - (* base case *)
-    inv H1; inv H2; inv H0.
+Proof.
+  intros args_b args_ofs argsIdent0 F p0 m k xs locs vs7 asgn lenv lenv'
+         Hargs Hmem Hasgn Hlenv Hnd Hnotin Hlocs.
+  remember (skipn nParam xs) as sxs eqn:Heqxs.
+  remember (skipn nParam locs) as slocs eqn:Heqlocs.
+  remember (skipn nParam vs7) as svs eqn:Heqvs.
+  revert lenv lenv' asgn Hargs Hmem Hasgn Hlenv.
+  induction sxs as [| x sxs' IHsxs]; intros.
+  - inversion Hasgn; subst; try congruence.
+    inversion Hlenv; subst; try congruence.
+    inversion Hmem; subst; try congruence.
     apply rt_refl.
-  - (* Inductive case *)
-    inv H1; inv H2; inv H3; inv H0.
-    inv H5.
-
+  - inversion Hasgn; subst; try congruence.
+    inversion Hlenv; subst; try congruence.
+    inversion Hmem; subst; try congruence.
     eapply rt_trans. constructor. constructor.
-    (* BRANCH ptr64*)
-    chunk_red;  archi_red.
-    {
-    eapply rt_trans. constructor. constructor. econstructor. constructor. econstructor. constructor. eauto.
-    constructor. constructor.
-    ptrofs_of_int. int_unsigned_repr.
-    rewrite int_z_mul. econstructor. reflexivity. eauto.
-    unfold max_args in *.  solve_ptrofs_range'. unfold max_args in *.  solve_uint_range. lia. 
-    eapply rt_trans. constructor. constructor.
-    eapply IHxs; eauto.  rewrite M.gso. auto. intro; apply H4; constructor; auto.
-    intro. apply H4. constructor 2; auto.    }
-    {
-    eapply rt_trans. constructor. constructor. econstructor. constructor. econstructor. constructor. eauto.
-    constructor. constructor.
-    ptrofs_of_int. rewrite Int.unsigned_repr.
-    rewrite int_z_mul. econstructor. reflexivity. eauto.
-    unfold max_args in *.  solve_ptrofs_range'. unfold max_args in *.  solve_uint_range. lia. 
-    eapply rt_trans. constructor. constructor.
-
-    eapply IHxs; eauto.  rewrite M.gso. auto. intro; apply H4; constructor; auto.
-    intro. apply H4. constructor 2; auto. }
-Qed. *)
+    (* TODO: val type change (ulongTy -> tptr tvoid) broke pointer arithmetic
+       classification in both 64-bit and 32-bit branches. sem_add now uses
+       pointer+int path (add_case_pi) instead of int+int, generating sizeof
+       range obligations. Needs reworking of the econstructor sequence. *)
+    all: admit.
+Admitted.
 
 (* CHANGE THIS *)    
 (* after stepping through a repr_asgn_fun', argsIdent[i] contain valuees y_i *)
@@ -5959,6 +5949,11 @@ Definition program_threadinfo_inv (p:program) :=
                          Member_plain limitIdent valPtr :: Member_plain heapInfIdent (Tpointer (Tstruct heapInfIdent noattr) noattr) ::
                          Member_plain argsIdent (Tarray val maxArgs noattr) :: nil).
 
+Ltac fold_ident_peq :=
+  repeat match goal with
+  | |- context [ident_eq ?x ?y] => change (ident_eq x y) with (Coqlib.peq x y)
+  end.
+
 Theorem allocIdent_delta:
   forall p,
       field_offset p allocIdent
@@ -5966,6 +5961,7 @@ Theorem allocIdent_delta:
        Member_plain argsIdent (Tarray uval maxArgs noattr)] = OK (0%Z, Full).
 Proof.
    intro. chunk_red; archi_red; simpl; unfold field_offset; simpl;
+  fold_ident_peq;
   assert (Hnd := disjointIdent);
   inv Hnd; rewrite Coqlib.peq_true;
   reflexivity.
@@ -5979,6 +5975,7 @@ Theorem limitIdent_delta:
        Member_plain argsIdent (Tarray uval maxArgs noattr)] = OK ((1*int_size)%Z, Full).
 Proof.
    intro. chunk_red; archi_red; simpl; unfold field_offset; simpl;
+  fold_ident_peq;
   assert (Hnd := disjointIdent);
   inv Hnd.
 
@@ -5990,7 +5987,7 @@ Proof.
 
   rewrite Coqlib.peq_false.
   rewrite Coqlib.peq_true.
-  archi_red. simpl. reflexivity.
+  archi_red. simpl. fold_ident_peq. reflexivity.
   inv H2.
   intro; subst; apply H3; inList.
 Qed.
@@ -6003,6 +6000,7 @@ Theorem argsIdent_delta:
     Member_plain argsIdent (Tarray uval maxArgs noattr)] = OK ((3*int_size)%Z, Full).
 Proof.
   intro. chunk_red; archi_red; simpl; unfold field_offset; simpl;
+  fold_ident_peq;
   assert (Hnd := disjointIdent);
   inv Hnd.
 
@@ -6019,7 +6017,7 @@ Proof.
   rewrite Coqlib.peq_false.
   rewrite Coqlib.peq_false.
   rewrite Coqlib.peq_true.
-  archi_red. simpl. reflexivity.
+  archi_red. simpl. fold_ident_peq. reflexivity.
   intro; subst; apply H1; inList.
   intro; subst; apply H1; inList.
   intro; subst; apply H1; inList.

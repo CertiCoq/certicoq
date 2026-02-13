@@ -5978,18 +5978,9 @@ Proof.
   fold_ident_peq;
   assert (Hnd := disjointIdent);
   inv Hnd.
-
-  rewrite Coqlib.peq_false.
-  rewrite Coqlib.peq_true.
-  reflexivity.
-  inv H2.
-  intro; subst; apply H3; inList.
-
-  rewrite Coqlib.peq_false.
-  rewrite Coqlib.peq_true.
-  archi_red. simpl. fold_ident_peq. reflexivity.
-  inv H2.
-  intro; subst; apply H3; inList.
+  - rewrite Coqlib.peq_false; [| solve_nodup].
+    rewrite Coqlib.peq_true. reflexivity.
+  - vm_compute in Harchi. discriminate.
 Qed.
 
 Theorem argsIdent_delta:

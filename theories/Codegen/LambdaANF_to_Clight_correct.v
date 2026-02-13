@@ -25,6 +25,7 @@ Require Import CertiCoq.LambdaANF.cps CertiCoq.LambdaANF.eval CertiCoq.LambdaANF
 
 Require Import Coq.ZArith.BinInt Coq.ZArith.Znat Coq.Arith.Arith Coq.NArith.BinNat ExtLib.Data.String ExtLib.Data.List Coq.micromega.Lia Coq.Program.Program Coq.micromega.Psatz Coq.Sets.Ensembles Coq.Logic.Decidable Coq.Lists.ListDec Coq.Relations.Relations.
 
+
 Require Import compcert.common.AST
         compcert.common.Errors
         compcert.lib.Integers
@@ -46,6 +47,10 @@ Notation asgnAppVars := LambdaANF_to_Clight.asgnAppVars.
 Notation makeVar := LambdaANF_to_Clight.makeVar.
 Notation mkCallVars := LambdaANF_to_Clight.mkCallVars.
 Notation make_case_switch := LambdaANF_to_Clight.make_case_switch.
+Notation ctor_rep := LambdaANF_to_Clight.ctor_rep.
+Notation enum := LambdaANF_to_Clight.enum.
+Notation boxed := LambdaANF_to_Clight.boxed.
+Notation make_ctor_rep := LambdaANF_to_Clight.make_ctor_rep.
 
 Require Import CertiCoq.Libraries.maps_util.
 From Coq.Lists Require List.
@@ -4067,13 +4072,15 @@ Notation valPtr := (Tpointer vval
   Variable (gcIdent : ident).
   Variable (mainIdent : ident).
   Variable (bodyIdent : ident).
+  Variable (bodyName : bytestring.String.t).
   Variable (threadInfIdent : ident).
   Variable (tinfIdent : ident).
   Variable (heapInfIdent : ident).
-  Variable (numArgsIdent : ident).  
+  Variable (numArgsIdent : ident).
   Variable (isptrIdent: ident). (* ident for the isPtr external function *)
   Variable (caseIdent:ident).
   Variable (nParam:nat).
+  Variable (prims : LambdaANF.toplevel.prim_env).
 
   Definition protectedIdent_thm := protectedIdent argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent.
   Variable (disjointIdent: NoDup protectedIdent_thm).
@@ -6163,25 +6170,28 @@ Proof.
   Admitted.  
 
 
-Definition makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent (p:program) fenv cenv ienv map :=
+Definition makeCases (p0:program) fenv cenv ienv map :=
  (fix makeCases (l : list (ctor_tag * exp)) :
             option (labeled_statements * labeled_statements) :=
             match l with
-            | [] => Monad.ret (LSnil, LSnil)
-            | p :: l' =>
-                Monad.pbind
-                  (translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam (snd p) fenv cenv ienv map)
-                  (fun prog : statement =>
-                   Monad.pbind (makeCases l')
-                     (fun '(ls, ls') =>
-                      match make_ctor_rep cenv (fst p) with
+            | [] => Some (LSnil, LSnil)
+            | q :: l' =>
+                match
+                  (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims (snd q) fenv cenv ienv map)
+                with
+                | None => None
+                | Some prog =>
+                   match (makeCases l') with
+                   | None => None
+                   | Some (ls, ls') =>
+                      match make_ctor_rep cenv (fst q) with
                       | Some (enum t) =>
                         let tag := ((Z.shiftl (Z.of_N t) 1) + 1)%Z in
                           match ls' with
                           | LSnil =>
-                              Monad.ret (ls, LScons None  (Ssequence prog Sbreak) ls')
+                              Some (ls, LScons None  (Ssequence prog Sbreak) ls')
                           | LScons _ _ _ =>
-                              Monad.ret
+                              Some
                                 (ls,
                                 LScons (Some (Z.shiftr tag 1))
                                   (Ssequence prog Sbreak) ls')
@@ -6190,15 +6200,17 @@ Definition makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent is
                         let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
                           match ls with
                           | LSnil =>
-                              Monad.ret (LScons None (Ssequence prog Sbreak) ls, ls')
+                              Some (LScons None (Ssequence prog Sbreak) ls, ls')
                           | LScons _ _ _ =>
-                              Monad.ret
+                              Some
                                 (LScons (Some (Z.land tag 255))
                                    (Ssequence prog Sbreak) ls,
                                 ls')
                           end
                       | None => None
-                      end))
+                      end
+                   end
+                end
             end).
 
 Definition fmake_ctor_rep (p:positive) (c:ctor_ty_info) : ctor_rep :=

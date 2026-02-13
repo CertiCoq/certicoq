@@ -3718,7 +3718,10 @@ Theorem set_commute:
     x <> y ->
     M.set x vx (M.set y vy rho) = M.set y vy  (M.set x vx rho).
 Proof.
-Admitted. (* TODO: PTree.set commutation, needs updated proof *)
+  intros. apply M.extensionality. intros i.
+  rewrite !M.gsspec.
+  destruct (Coqlib.peq i x), (Coqlib.peq i y); subst; try reflexivity; congruence.
+Qed.
   
 
 

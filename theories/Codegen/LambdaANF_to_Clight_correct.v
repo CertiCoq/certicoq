@@ -4464,6 +4464,50 @@ Proof.
 Qed.
 
 
+Lemma ct_va_range_perm:
+  forall m m' b lo hi,
+    Mem.range_perm m b lo hi Cur Writable ->
+    (forall b' lo' hi' p', Mem.range_perm m b' lo' hi' Cur p' -> Mem.range_perm m' b' lo' hi' Cur p') ->
+    Mem.range_perm m' b lo hi Cur Writable.
+Proof. auto. Qed.
+
+Lemma ct_va_valid_access:
+  forall m m' chunk b ofs p,
+    Mem.valid_access m chunk b ofs p ->
+    (forall b' lo hi p', Mem.range_perm m b' lo hi Cur p' -> Mem.range_perm m' b' lo hi Cur p') ->
+    Mem.valid_access m' chunk b ofs p.
+Proof. intros. destruct H. constructor; auto. Qed.
+
+Lemma ct_va_deref_loc_ref:
+  forall ty m m' b ofs v,
+    deref_loc ty m b ofs Full v ->
+    access_mode ty = By_reference ->
+    deref_loc ty m' b ofs Full v.
+Proof.
+  intros. inversion H; subst.
+  - rewrite H0 in H1. discriminate.
+  - exact (deref_loc_reference ty m' b ofs H1).
+  - rewrite H0 in H1. discriminate.
+Qed.
+
+Lemma ct_va_globals:
+  forall (p0 : program) m m' args_b alloc_b tinf_b,
+    (forall x b, Genv.find_symbol (globalenv p0) x = Some b ->
+                 b <> args_b /\ b <> alloc_b /\ b <> tinf_b /\
+                 (exists chunk, Mem.valid_access m chunk b 0%Z Nonempty)) ->
+    (forall b' lo hi p', Mem.range_perm m b' lo hi Cur p' -> Mem.range_perm m' b' lo hi Cur p') ->
+    (forall x b, Genv.find_symbol (globalenv p0) x = Some b ->
+                 b <> args_b /\ b <> alloc_b /\ b <> tinf_b /\
+                 (exists chunk, Mem.valid_access m' chunk b 0%Z Nonempty)).
+Proof.
+  intros p0 m0 m' args_b alloc_b tinf_b Hglob Hrp x b Hfs.
+  destruct (Hglob x b Hfs) as [Ha [Hb [Hc [chunk Hva]]]].
+  split; [exact Ha|].
+  split; [exact Hb|].
+  split; [exact Hc|].
+  exists chunk. exact (ct_va_valid_access _ _ _ _ _ _ Hva Hrp).
+Qed.
+
 Theorem correct_tinfo_valid_access:
   forall  p z lenv m,
     correct_tinfo p z lenv m ->
@@ -4471,7 +4515,26 @@ Theorem correct_tinfo_valid_access:
     (forall b ofs ofs'  p, Mem.range_perm m b ofs ofs' Cur p -> Mem.range_perm m' b ofs ofs' Cur p) ->
     correct_tinfo p z lenv m'.
 Proof.
-Admitted. (* TODO: deref_loc API changed in CompCert 3.13 — needs bitfield adaptation *)
+  intros p0 z0 lenv0 m0 Hct m' Hrp.
+  destruct Hct as [ab [ao [lo [arb [aro [tb [to
+    [C1 [C2 [C3 [C4 [C5 [C6 [C7 [C8 [C9 [C10 [C11 [C12 [C13 [C14 C15]]]]]]]]]]]]]]]]]]]]].
+  exists ab, ao, lo, arb, aro, tb, to.
+  split; [exact C1|].
+  split; [exact C2|].
+  split; [exact (ct_va_range_perm _ _ _ _ _ C3 Hrp)|].
+  split; [exact C4|].
+  split; [exact C5|].
+  split; [exact C6|].
+  split; [exact C7|].
+  split; [exact C8|].
+  split; [intros i Hi; exact (ct_va_valid_access _ _ _ _ _ _ (C9 i Hi) Hrp)|].
+  split; [exact C10|].
+  split; [exact C11|].
+  split; [exact C12|].
+  split; [intros i Hi; exact (ct_va_valid_access _ _ _ _ _ _ (C13 i Hi) Hrp)|].
+  split; [exact (ct_va_deref_loc_ref _ _ _ _ _ _ C14 eq_refl)|].
+  exact (ct_va_globals _ _ _ arb ab tb C15 Hrp).
+Qed.
 
 Corollary correct_tinfo_after_store:
   forall p z lenv m,

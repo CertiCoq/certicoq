@@ -1947,9 +1947,25 @@ Inductive repr_expr_LambdaANF_Codegen: cps.exp -> statement -> Prop :=
     (* NOTE: added redundant limitIdent |-> limitPtr to avoid having to carry this info around, but could optimize it away *)
     repr_expr_LambdaANF_Codegen (Eapp f t ys) (s1; Efield tinfd allocIdent valPtr :::= allocPtr ; Efield tinfd limitIdent valPtr  :::= limitPtr ;
                                       (Scall None ([Tpointer (mkFunTy threadInfIdent pnum) noattr] (var_or_funvar_f f)) ((Etempvar tinfIdent threadInf) :: s2)))
+| R_letapp_e: forall x f inf ainf ys ays bys pnum (t : fun_tag) s1 s2 e s',
+    M.get t fenv = Some inf ->
+    ays = skipn nParam ys ->
+    bys = firstn nParam ys ->
+    ainf = skipn nParam (snd inf) ->
+    repr_asgn_fun ays ainf s1 ->
+    pnum = min (N.to_nat (fst inf)) nParam ->
+    repr_call_vars pnum bys s2 ->
+    repr_expr_LambdaANF_Codegen e s' ->
+    repr_expr_LambdaANF_Codegen (Eletapp x f t ys e)
+      (s1; Efield tinfd allocIdent valPtr :::= allocPtr;
+       Efield tinfd limitIdent valPtr :::= limitPtr;
+       (Scall None ([Tpointer (mkFunTy threadInfIdent pnum) noattr] (var_or_funvar_f f)) ((Etempvar tinfIdent threadInf) :: s2));
+       allocIdent ::= Efield tinfd allocIdent valPtr;
+       x ::= Field(args, Z.of_nat 1);
+       s')
 | R_halt_e: forall v e,
     (* halt v <-> end with v in args[1] *)
-    var_or_funvar v e -> 
+    var_or_funvar v e ->
     repr_expr_LambdaANF_Codegen (Ehalt v)  (args[Z.of_nat 1 ] :::= e)
 | Rcase_e: forall v cl ls ls' s ,
     (* 1 - branches matches the lists of two lists of labeled statements *)
@@ -6515,13 +6531,32 @@ Proof.
       reflexivity.
   - (* Eletapp *)
     simpl in H.
-    destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map); [| inv H].
-    destruct (M.get ft fenv) as [[n0 l0]|]; [| inv H].
-    destruct (LambdaANF_to_Clight.asgnAppVars argsIdent threadInfIdent tinfIdent nParam ys (snd (n0, l0)) fenv map); [| inv H].
+    destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:He; [| inv H].
+    destruct (M.get ft fenv) as [[n0 l0]|] eqn:Hffenv; [| inv H].
+    destruct (LambdaANF_to_Clight.asgnAppVars argsIdent threadInfIdent tinfIdent nParam ys (snd (n0, l0)) fenv map) eqn:Hasgn; [| inv H].
     destruct (LambdaANF_to_Clight.mkCall threadInfIdent tinfIdent nParam fenv map
                 (Ecast (makeVar threadInfIdent nParam f fenv map)
                    (Tpointer (LambdaANF_to_Clight.mkFunTy threadInfIdent (Nat.min (N.to_nat (fst (n0, l0))) nParam)) noattr))
-                (Nat.min (N.to_nat (fst (n0, l0))) nParam) ys); inv H.
+                (Nat.min (N.to_nat (fst (n0, l0))) nParam) ys) eqn:Hcall; inv H.
+    unfold asgnAppVars in Hasgn. unfold asgnAppVars' in Hasgn.
+    unfold mkCall in Hcall.
+    simpl in Hasgn.
+    set (avs := skipn nParam ys) in *.
+    set (aind := skipn nParam l0) in *.
+    set (bvs := firstn nParam ys) in *.
+    assert (vsEq : avs = skipn nParam ys) by reflexivity.
+    assert (indEq : aind = skipn nParam l0) by reflexivity.
+    assert (bvsEq : bvs = firstn nParam ys) by reflexivity.
+    destruct (asgnAppVars'' argsIdent threadInfIdent nParam avs aind fenv map) eqn:Happvar; inv Hasgn.
+    destruct (mkCallVars threadInfIdent nParam fenv map (Init.Nat.min (N.to_nat n0) nParam) bvs) eqn:Hcallvar; inv Hcall.
+    replace (makeVar threadInfIdent nParam f fenv map) with (var_or_funvar_f threadInfIdent fenv map p f) by (symmetry; apply find_symbol_map_f; auto).
+    eapply R_letapp_e with (inf := (n0, l0)); simpl; eauto.
+    constructor.
+    eapply asgnAppVars_correct; eauto.
+    eapply mkCallVars_correct; eauto.
+    eapply IHe.
+    eapply Forall_constructors_subterm. apply Hcenv. constructor. constructor.
+    reflexivity.
   - (* Efun *)
     inv H.
   - (* Eapp *)

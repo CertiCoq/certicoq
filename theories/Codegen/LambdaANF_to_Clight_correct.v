@@ -61,6 +61,8 @@ Notation c_int' := LambdaANF_to_Clight.c_int.
 Notation valPtr := LambdaANF_to_Clight.valPtr.
 Notation makeTag := LambdaANF_to_Clight.makeTag.
 Notation makeTagZ := LambdaANF_to_Clight.makeTagZ.
+Notation mkCall := LambdaANF_to_Clight.mkCall.
+Notation mkFunTy := LambdaANF_to_Clight.mkFunTy.
 
 Require Import CertiCoq.Libraries.maps_util.
 From Coq.Lists Require List.
@@ -6511,23 +6513,32 @@ Proof.
       eapply IHe.
       eapply Forall_constructors_subterm. apply Hcenv. constructor. constructor.
       reflexivity.
-  - (* Efun *)  
-    inv H. 
+  - (* Eletapp *)
+    simpl in H.
+    destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map); [| inv H].
+    destruct (M.get ft fenv) as [[n0 l0]|]; [| inv H].
+    destruct (LambdaANF_to_Clight.asgnAppVars argsIdent threadInfIdent tinfIdent nParam ys (snd (n0, l0)) fenv map); [| inv H].
+    destruct (LambdaANF_to_Clight.mkCall threadInfIdent tinfIdent nParam fenv map
+                (Ecast (makeVar threadInfIdent nParam f fenv map)
+                   (Tpointer (LambdaANF_to_Clight.mkFunTy threadInfIdent (Nat.min (N.to_nat (fst (n0, l0))) nParam)) noattr))
+                (Nat.min (N.to_nat (fst (n0, l0))) nParam) ys); inv H.
+  - (* Efun *)
+    inv H.
   - (* Eapp *)
     unfold translate_body in H.
-    destruct (cps.M.get t fenv) eqn:Hffenv. 2:inv H. 
+    destruct (cps.M.get t fenv) eqn:Hffenv. 2:inv H.
     destruct f as [n locs].
     unfold var , cps.M.elt in l.
     set (avs := skipn nParam l).
     set (aind := skipn nParam locs).
     set (bvs := firstn nParam l).
     assert (vsEq : avs = skipn nParam l). reflexivity.
-    assert (indEq : aind = skipn nParam locs). reflexivity. 
+    assert (indEq : aind = skipn nParam locs). reflexivity.
     assert (bvsEq : bvs = firstn nParam l). reflexivity.
     unfold asgnAppVars in H. unfold asgnAppVars' in H.
     unfold mkCall in H.
     simpl in H.
-    rewrite <- vsEq in H. rewrite <- indEq in H. rewrite <- bvsEq in H.  
+    rewrite <- vsEq in H. rewrite <- indEq in H. rewrite <- bvsEq in H.
     destruct (asgnAppVars'' argsIdent threadInfIdent nParam avs aind fenv map) eqn:Happvar; inv H.
     destruct (mkCallVars threadInfIdent nParam fenv map (Init.Nat.min (N.to_nat n) nParam) bvs) eqn:Hcallvar; inv H1.
     erewrite <- find_symbol_map_f. 2: eauto.
@@ -6536,7 +6547,7 @@ Proof.
     eapply asgnAppVars_correct; eauto.
     eapply mkCallVars_correct; eauto.
   - (* Eprim *)
-    inv H. 
+    inv H.
   - (* Ehalt *)
     simpl in H. inv H.
 

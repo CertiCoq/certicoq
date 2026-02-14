@@ -5627,8 +5627,83 @@ Proof.
        eapply OrdersEx.Z_as_OT.le_lt_trans; eauto. chunk_red; uomega.
 Qed.
 
+Lemma In_skipn : forall {A} n (x : A) l,
+  List.In x (skipn n l) -> List.In x l.
+Proof.
+  induction n; intros.
+  - simpl in H. auto.
+  - destruct l. inversion H. simpl in H. right. eauto.
+Qed.
+
+(* Helper: step through right_param_asgn directly on the three lists *)
+Lemma repr_asgn_fun_entry_aux:
+  forall sxs slocs svs args_b args_ofs argsIdent F p m k asgn lenv lenv',
+    M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
+    mem_after_asgn args_b args_ofs m slocs svs ->
+    right_param_asgn argsIdent sxs slocs asgn ->
+    lenv_param_asgn_i lenv lenv' sxs svs ->
+    (forall x, List.In x sxs -> x <> argsIdent) ->
+    Forall (fun i : N => (0 <= Z.of_N i < max_args)%Z) slocs ->
+    clos_refl_trans state (traceless_step2 (globalenv p))
+               (State F asgn k empty_env lenv m)
+               (State F Sskip k empty_env lenv' m).
+Proof.
+  induction sxs as [| x sxs' IH]; intros.
+  - inversion H1; subst. inversion H2; subst. apply rt_refl.
+  - inversion H1; subst. inversion H2; subst. inversion H0; subst.
+    assert (Harchi : Archi.ptr64 = true) by (vm_compute; reflexivity).
+    assert (Hn_range: (0 <= Z.of_N n < max_args)%Z) by (inversion H4; assumption).
+    (* step_seq *)
+    eapply rt_trans. constructor. constructor.
+    (* step_set *)
+    eapply rt_trans. constructor.
+    { constructor.
+      eapply eval_Elvalue.
+      + eapply eval_Ederef.
+        eapply eval_Ebinop.
+        * apply eval_Etempvar. exact H.
+        * unfold c_int, LambdaANF_to_Clight.c_int. rewrite Harchi.
+          apply eval_Econst_long.
+        * { unfold add, LambdaANF_to_Clight.add, sem_binary_operation, sem_add.
+          simpl typeof.
+          unfold val, LambdaANF_to_Clight.val, uval, LambdaANF_to_Clight.uval,
+                 c_int, LambdaANF_to_Clight.c_int.
+          rewrite Harchi. unfold classify_add. simpl typeconv. cbv beta iota.
+          f_equal. f_equal. f_equal. f_equal.
+          unfold Ptrofs.mul, Ptrofs.of_int64, sizeof. simpl.
+          unfold max_args in Hn_range.
+          repeat (try rewrite Int64.unsigned_repr
+            by (unfold Int64.max_unsigned; simpl; lia);
+          try rewrite Ptrofs.unsigned_repr
+            by (unfold Ptrofs.max_unsigned; rewrite Ptrofs.modulus_eq64 by auto;
+                simpl; lia)).
+          reflexivity. }
+      + assert (Hofs_eq : Ptrofs.mul (Ptrofs.repr (if Archi.ptr64 then 8%Z else 4%Z))
+                  (Ptrofs.of_int64 (Int64.repr (Z.of_N n)))
+                = Ptrofs.repr (int_size * Z.of_N n)).
+        { unfold Ptrofs.mul, Ptrofs.of_int64, int_size, int_chunk, LambdaANF_to_Clight.int_chunk.
+          rewrite Harchi. simpl. unfold max_args in Hn_range.
+          rewrite Int64.unsigned_repr by (unfold Int64.max_unsigned; simpl; lia).
+          rewrite Ptrofs.unsigned_repr by (unfold Ptrofs.max_unsigned; rewrite Ptrofs.modulus_eq64 by auto; simpl; lia).
+          rewrite Ptrofs.unsigned_repr by (unfold Ptrofs.max_unsigned; rewrite Ptrofs.modulus_eq64 by auto; simpl; lia).
+          reflexivity. }
+        rewrite Hofs_eq.
+        apply deref_loc_value with (chunk := int_chunk).
+        * unfold val, LambdaANF_to_Clight.val, int_chunk, LambdaANF_to_Clight.int_chunk;
+          simpl; reflexivity.
+        * eassumption. }
+    (* step_skip_seq *)
+    eapply rt_trans. constructor. constructor.
+    (* IH *)
+    eapply IH; try eassumption.
+    + rewrite M.gso; [exact H |].
+      apply not_eq_sym. apply H3. left; reflexivity.
+    + intros. apply H3. right; assumption.
+    + inversion H4; assumption.
+Qed.
+
 (* What is needed at function entry to unmarshal the parameters *)
-Theorem repr_asgn_fun_entry: 
+Theorem repr_asgn_fun_entry:
   forall args_b args_ofs argsIdent F p m k xs locs vs7 asgn lenv lenv',
     M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
     mem_after_asgn args_b args_ofs m (skipn nParam locs) (skipn nParam vs7) ->
@@ -5636,32 +5711,16 @@ Theorem repr_asgn_fun_entry:
     lenv_param_asgn_i lenv lenv' (skipn nParam xs) (skipn nParam vs7) ->
     NoDup xs ->
     ~ List.In argsIdent xs ->
-    Forall (fun i : N => (0 <= Z.of_N i < max_args)%Z) locs -> 
+    Forall (fun i : N => (0 <= Z.of_N i < max_args)%Z) locs ->
     clos_refl_trans state (traceless_step2 (globalenv p))
                (State F asgn k empty_env lenv m)
                (State F Sskip k empty_env lenv' m).
 Proof.
-  intros args_b args_ofs argsIdent0 F p0 m k xs locs vs7 asgn lenv lenv'
-         Hargs Hmem Hasgn Hlenv Hnd Hnotin Hlocs.
-  remember (skipn nParam xs) as sxs eqn:Heqxs.
-  remember (skipn nParam locs) as slocs eqn:Heqlocs.
-  remember (skipn nParam vs7) as svs eqn:Heqvs.
-  revert lenv lenv' asgn Hargs Hmem Hasgn Hlenv.
-  induction sxs as [| x sxs' IHsxs]; intros.
-  - inversion Hasgn; subst; try congruence.
-    inversion Hlenv; subst; try congruence.
-    inversion Hmem; subst; try congruence.
-    apply rt_refl.
-  - inversion Hasgn; subst; try congruence.
-    inversion Hlenv; subst; try congruence.
-    inversion Hmem; subst; try congruence.
-    eapply rt_trans. constructor. constructor.
-    (* TODO: val type change (ulongTy -> tptr tvoid) broke pointer arithmetic
-       classification in both 64-bit and 32-bit branches. sem_add now uses
-       pointer+int path (add_case_pi) instead of int+int, generating sizeof
-       range obligations. Needs reworking of the econstructor sequence. *)
-    all: admit.
-Admitted.
+  intros. eapply repr_asgn_fun_entry_aux; eauto.
+  - intros. intro; subst. apply H4. eapply In_skipn; eauto.
+  - clear -H5. revert nParam. induction locs; intros; [destruct nParam; constructor|].
+    destruct nParam; [exact H5|]. simpl. apply IHlocs. inversion H5; assumption.
+Qed.
 
 (* CHANGE THIS *)    
 (* after stepping through a repr_asgn_fun', argsIdent[i] contain valuees y_i *)

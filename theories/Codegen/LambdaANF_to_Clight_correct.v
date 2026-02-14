@@ -5743,32 +5743,28 @@ Theorem repr_asgn_fun_mem:
     (State fu s k empty_env lenv m)
     (State fu Sskip k empty_env lenv m')) /\ mem_of_asgn argsIdent p lenv ys inf m' /\rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e  rho m' lenv /\ correct_tinfo p max_alloc lenv m'.
 Proof.
-Admitted. (* TODO: val type change broke 32-bit branch *)
-
-(* Original proof for reference:
   intros fu lenv p rho e fenv max_alloc rep_env finfo_env.
-  induction ys; intros inf s m Hsym HfinfoCorrect Hrel_mem Htinfo Hfys Hfinf Hnodub Hasgn; inv Hasgn. 
+  induction ys; intros inf s m Hsym HfinfoCorrect Hrel_mem Htinfo Hfys Hfinf Hnodub Hasgn; inv Hasgn.
   - (* ys = [] inf = [] *)
     assert (Htinfo' := Htinfo).
     destruct Htinfo as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs [Hget_alloc [Halign_alloc [Hrange_alloc [Hget_limit [Hbound_limit [Hget_args [Hdj_args [Hbound_args [Hrange_args [Htinf1 Htinf2]]]]]]]]]]]]]]]]].
-    (* cam have empty asgn now *)
     exists m.
     repeat split; try assumption.
     + intros. constructor 2.
     + econstructor. eauto.
 
   -  (* ys = a::ys0 inf = i::inf0 *)
-    (* repeat of the init case *)
+    assert (Harchi : Archi.ptr64 = true) by (vm_compute; reflexivity).
     assert (Hfinf' := Hfinf).
     inv Hfys; inv Hfinf. destruct H1.
-    assert (Hnodub' := Hnodub). inv Hnodub. 
+    assert (Hnodub' := Hnodub). inv Hnodub.
     specialize (IHys inf0 s0 m Hsym HfinfoCorrect Hrel_mem Htinfo H2 H5 H7 H3).
     destruct IHys as [m' [Hclo_m' [Hmem_m' [Hrel_m' Htinfo_m']]]].
     assert (Htinfo_m'c := Htinfo_m').
     destruct Htinfo_m' as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs [Hget_alloc [Halign_alloc [Hrange_alloc [Hget_limit [Hbound_limit [Hget_args [Hdj_args [Hbound_args [Hrange_args [Htinf1 Htinf2]]]]]]]]]]]]]]]]].
     assert (Hm'_valid : Mem.valid_access m' int_chunk args_b (Ptrofs.unsigned
                                                                (Ptrofs.add args_ofs
-                                                                        (Ptrofs.mul (Ptrofs.repr int_size) (Ptrofs.repr (Z.of_N i))))) Writable). 
+                                                                        (Ptrofs.mul (Ptrofs.repr int_size) (Ptrofs.repr (Z.of_N i))))) Writable).
     apply Hrange_args. auto.
     assert (Hm' := Mem.valid_access_store _ _ _ _ x Hm'_valid).
     destruct Hm' as [m2 Hm2].
@@ -5777,54 +5773,71 @@ Admitted. (* TODO: val type change broke 32-bit branch *)
     (* apply mem_of_asgn_cons *)
     assert (Hm2' := Hm2).
     rewrite int_z_mul in Hm2'.
-    
-    assert (Hargs_bound :   (0 <= Ptrofs.unsigned args_ofs + int_size * max_args <= Ptrofs.max_unsigned)%Z). split.
-    apply OrdersEx.Z_as_OT.add_nonneg_nonneg. apply Ptrofs.unsigned_range. chunk_red; uomega.    
-    auto.  
+
+    assert (Hargs_bound : (0 <= Ptrofs.unsigned args_ofs + int_size * max_args <= Ptrofs.max_unsigned)%Z).
+    { split.
+      apply OrdersEx.Z_as_OT.add_nonneg_nonneg. apply Ptrofs.unsigned_range.
+      unfold int_size, int_chunk, LambdaANF_to_Clight.int_chunk; rewrite Harchi; simpl size_chunk; unfold max_args; lia.
+      auto. }
     assert (Hmem_of_asgn := mem_of_asgn_cons _ _ _ _ _ _ _ _ _ _ _ _ Hmem_m' Hnodub' Hfinf' Hargs_bound Htinfo_m'c Hget_args H Hm2').
 
     split.
-    
-    (* step though cons and then asgn *)
-      intro.
+
+    (* step through cons and then asgn *)
+    { intro.
       eapply rt_trans.
       constructor. constructor.
       eapply rt_trans.
       apply Hclo_m'.
-      (* branch ptr64 *)
-      chunk_red; archi_red.
-      {
-        eapply rt_trans. constructor. constructor.
-        constructor. econstructor. constructor. econstructor. constructor. eauto.
-        constructor. simpl. constructor.
-        eapply get_var_or_funvar_eval; eauto.
-        eapply get_var_or_funvar_semcast; eauto.
-        simpl. eapply assign_loc_value. reduce_val_access. constructor. auto.
-        ptrofs_of_int. int_unsigned_repr. auto.
-        unfold max_args in *.  solve_uint_range. lia.
-      }
-      {
-        eapply rt_trans. constructor. constructor.
-        constructor. econstructor. constructor. econstructor. constructor. eauto.
-        constructor. simpl. constructor.
-        eapply get_var_or_funvar_eval; eauto.
+      eapply rt_trans. constructor. constructor.
+      constructor. econstructor. constructor. econstructor. constructor. eauto.
+      unfold c_int, LambdaANF_to_Clight.c_int; rewrite Harchi. constructor.
+      { (* sem_add *)
+        unfold add, LambdaANF_to_Clight.add, sem_binary_operation, sem_add.
+        simpl typeof.
+        unfold val, LambdaANF_to_Clight.val, uval, LambdaANF_to_Clight.uval,
+               c_int, LambdaANF_to_Clight.c_int.
+        rewrite Harchi. unfold classify_add. simpl typeconv. cbv beta iota.
+        f_equal. f_equal. f_equal. f_equal.
+        unfold Ptrofs.mul, Ptrofs.of_int64, sizeof. simpl.
+        assert (Hn_range: (0 <= Z.of_N i < max_args)%Z) by auto.
+        unfold max_args in Hn_range.
+        repeat (try rewrite Int64.unsigned_repr
+          by (unfold Int64.max_unsigned; simpl; lia);
+        try rewrite Ptrofs.unsigned_repr
+          by (unfold Ptrofs.max_unsigned; rewrite Ptrofs.modulus_eq64 by auto;
+              simpl; lia)).
+        reflexivity. }
+      eapply get_var_or_funvar_eval; eauto.
+      eapply get_var_or_funvar_semcast; eauto.
+      { (* assign_loc *)
+        assert (Hofs_eq : Ptrofs.mul (Ptrofs.repr (if Archi.ptr64 then 8%Z else 4%Z))
+                    (Ptrofs.of_int64 (Int64.repr (Z.of_N i)))
+                  = Ptrofs.repr (int_size * Z.of_N i)).
+        { unfold Ptrofs.mul, Ptrofs.of_int64, int_size, int_chunk, LambdaANF_to_Clight.int_chunk.
+          rewrite Harchi. simpl. unfold max_args in *.
+          rewrite Int64.unsigned_repr by (unfold Int64.max_unsigned; simpl; lia).
+          rewrite Ptrofs.unsigned_repr by (unfold Ptrofs.max_unsigned; rewrite Ptrofs.modulus_eq64 by auto; simpl; lia).
+          rewrite Ptrofs.unsigned_repr by (unfold Ptrofs.max_unsigned; rewrite Ptrofs.modulus_eq64 by auto; simpl; lia).
+          reflexivity. }
+        eapply assign_loc_value.
+        - unfold val, LambdaANF_to_Clight.val, int_chunk, LambdaANF_to_Clight.int_chunk;
+          simpl; reflexivity.
+        - rewrite Hofs_eq.
+          unfold Mem.storev.
+          assert (Hint_chunk_eq : int_chunk = Mptr).
+          { unfold int_chunk, LambdaANF_to_Clight.int_chunk, AST.Mptr. rewrite Harchi. reflexivity. }
+          rewrite Hint_chunk_eq in Hm2'. exact Hm2'. } }
 
-        eapply get_var_or_funvar_semcast in H; archi_red; eauto.
-        simpl. eapply assign_loc_value. reduce_val_access. constructor.
-        ptrofs_of_int. int_unsigned_repr. auto.
-        unfold max_args in *. try solve_uint_range. lia.
-      }
-    
     split; auto.
     split.
     eapply rel_mem_update_protected with (m := m'); eauto.
 
-
     eapply correct_tinfo_valid_access; eauto.
     eapply mem_range_valid. intros.
     eapply Mem.store_valid_access_1; eauto.
-    unfold max_args in *; solve_ptrofs_range.
-Admitted_was_Qed. *)
+    unfold max_args in *. clear Harchi. solve_ptrofs_range.
+Qed.
 
 
 

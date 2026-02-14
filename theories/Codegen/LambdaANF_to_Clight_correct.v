@@ -1916,11 +1916,7 @@ Inductive repr_asgn_constr: positive -> ctor_tag -> list positive -> statement -
 Inductive repr_switch_LambdaANF_Codegen: positive -> labeled_statements -> labeled_statements -> statement -> Prop :=
 | Mk_switch: forall x ls ls',
     repr_switch_LambdaANF_Codegen x ls ls'
-                      (Sifthenelse
-                         (isPtr caseIdent x)
-                         (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
-                         (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val)
-                                   ls')).
+                      (make_case_switch isptrIdent caseIdent x ls ls').
 
 (* relate a LambdaANF.exp -| ctor_env, fun_env to a series of statements in a clight program (passed as parameter) -- syntactic relation that shows the right instructions have been generated for functions body. There should not be function definitions (Efun), or primitive operations (they are not supported by our backend) in this 
 TODO: maybe this should be related to a state instead? 
@@ -4102,9 +4098,9 @@ Notation valPtr := (Tpointer vval
 
   Definition is_protected_tinfo_id_thm := is_protected_tinfo_id argsIdent allocIdent limitIdent.
 
-  Definition repr_val_id_L_LambdaANF_Codegen_thm := repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam.
+  Definition repr_val_id_L_LambdaANF_Codegen_thm := repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam.
 
-  Definition repr_val_LambdaANF_Codegen_thm := repr_val_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam.
+  Definition repr_val_LambdaANF_Codegen_thm := repr_val_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam.
   
 
 
@@ -4623,18 +4619,18 @@ Qed.
 
 
 Definition repr_expr_LambdaANF_Codegen_id := repr_expr_LambdaANF_Codegen argsIdent allocIdent limitIdent threadInfIdent tinfIdent
-     isptrIdent nParam.
+     isptrIdent caseIdent nParam.
 
 
 Definition rel_mem_LambdaANF_Codegen_id := rel_mem_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent
-   isptrIdent nParam.
- 
+   isptrIdent caseIdent nParam.
 
-Definition repr_val_L_LambdaANF_Codegen_id := repr_val_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam. 
+
+Definition repr_val_L_LambdaANF_Codegen_id := repr_val_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam.
 
 Definition repr_val_id_L_LambdaANF_Codegen_id := repr_val_id_L_LambdaANF_Codegen
     argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent
-     nParam.
+     caseIdent nParam.
  
 Definition protected_id_not_bound_id := protected_id_not_bound argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent
    caseIdent.
@@ -4923,12 +4919,12 @@ Qed.
  
       
 Theorem exists_getvar_or_funvar_list:
-  forall lenv p rho L rep_env finfo_env argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam fenv
+  forall lenv p rho L rep_env finfo_env argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv
          m xs vs,
             ( forall x, List.In x xs ->
                         exists v6 : cps.val,
          M.get x rho = Some v6 /\
-         repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam fenv finfo_env
+         repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv finfo_env
                              p rep_env v6 m L lenv x)
             ->
             get_list xs rho = Some vs  ->
@@ -4945,7 +4941,7 @@ Proof.
           List.In x xs ->
           exists v6 : cps.val,
             M.get x rho = Some v6 /\
-            repr_val_id_L_LambdaANF_Codegen argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 nParam0
+            repr_val_id_L_LambdaANF_Codegen argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 caseIdent0 nParam0
                                 fenv finfo_env p rep_env v6 m L lenv x)).
     {
       intros. apply H. constructor 2; auto.
@@ -4954,7 +4950,7 @@ Proof.
     assert
       (exists v6 : cps.val,
         M.get a rho = Some v6 /\
-        repr_val_id_L_LambdaANF_Codegen argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 nParam0 fenv
+        repr_val_id_L_LambdaANF_Codegen argsIdent0 allocIdent0 limitIdent0 gcIdent0 threadInfIdent0 tinfIdent0 isptrIdent0 caseIdent0 nParam0 fenv
                             finfo_env p rep_env v6 m L lenv a).
     apply H. constructor. reflexivity.
     destruct H1. destruct H1.
@@ -5220,7 +5216,7 @@ Theorem case_of_labeled_stm_unboxed:
     forall cl ls ls',
       caseConsistent cenv cl t ->
   findtag cl t = Some e ->
-  repr_branches_LambdaANF_Codegen argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent nParam fenv finfo_env p rep_env cl ls ls' ->
+  repr_branches_LambdaANF_Codegen argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv finfo_env p rep_env cl ls ls' ->
   exists s s', 
     seq_of_labeled_statement (select_switch (Z.shiftr n0 1) ls') = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e s.
 Proof.
@@ -5289,7 +5285,7 @@ Theorem case_of_labeled_stm_boxed:
     forall cl ls ls',
       caseConsistent cenv cl t ->
   findtag cl t = Some e ->
-  repr_branches_LambdaANF_Codegen argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent nParam fenv finfo_env p rep_env cl ls ls' ->
+  repr_branches_LambdaANF_Codegen argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv finfo_env p rep_env cl ls ls' ->
   exists s s', 
                        (seq_of_labeled_statement (select_switch (Z.land  h 255) ls)) = (Ssequence (Ssequence s Sbreak) s') /\  repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e s.
 Proof. 
@@ -6194,62 +6190,51 @@ Proof.
 Qed.   
 
  
+Lemma var_or_funvar_f'_makeVar:
+  forall p fenv finfo_env v,
+    find_symbol_domain p finfo_env ->
+    var_or_funvar_f' threadInfIdent fenv finfo_env p nParam v =
+    makeVar threadInfIdent nParam v fenv finfo_env.
+Proof.
+  intros. unfold var_or_funvar_f'.
+  specialize (H v). destruct H as [Hfwd Hrev].
+  destruct (M.get v finfo_env) eqn:Hget.
+  - destruct p0. destruct (Hfwd (ex_intro _ (p0, f) eq_refl)) as [b Hb].
+    rewrite Hb. reflexivity.
+  - destruct (Genv.find_symbol (Genv.globalenv p) v) eqn:Hfs.
+    + exfalso. destruct (Hrev (ex_intro _ b eq_refl)) as [v1 Hv1].
+      rewrite Hv1 in Hget. discriminate.
+    + unfold makeVar. rewrite Hget. reflexivity.
+Qed.
+
 Theorem  mkCallVars_correct:
   forall p fenv map n vs bvs es,
     find_symbol_domain p map ->
-    bvs = firstn nParam vs -> 
+    bvs = firstn nParam vs ->
     mkCallVars threadInfIdent nParam fenv map n bvs = Some es ->
     repr_call_vars threadInfIdent nParam fenv map p n bvs es.
 Proof.
-  Admitted. (*
-  intros p fenv map n. unfold repr_call_vars. 
-  generalize nParam as m.
-  induction n; intros m vs bvs es Hsym bvsEq Hcall;
-    destruct bvs; try solve [unfold mkCallVars in Hcall; inv Hcall; try constructor; try inv bvsEq].
-  + simpl in Hcall.
-    match_case_hyp Hcall.
-    inv Hcall.
-    erewrite <- (find_symbol_map_f _ _ _ _ _ _ Hsym). 
+  intros p fenv map n vs bvs es Hsym bvsEq Hcall.
+  unfold repr_call_vars.
+  clear bvsEq vs.
+  revert bvs es Hcall.
+  induction n; intros bvs es Hcall;
+    destruct bvs; simpl in Hcall; try discriminate.
+  - inv Hcall. constructor.
+  - destruct (mkCallVars threadInfIdent nParam fenv map n bvs) eqn:Hrest; inv Hcall.
+    rewrite <- (var_or_funvar_f'_makeVar p fenv map) by auto.
     constructor.
-    eapply IHn; eauto.
-    constructor. destruct m; inv bvsEq. 
-    destruct m. inv bvsEq.
-    rewrite (firstn_cons m p1 vs) in bvsEq.
-    eapply IHn; auto.
-    inbvsEq. destruct m; inv bvsEq.
-    destruct m. inv bvsEq. 
-    rewrite (firstn_cons m p1 vs) in bvsEq.
-    inversion bvsEq. Print repr_call_vars.
-    admit.
-
-  Set Printing All. simpl.
-  generalize nParam as m.
-  induction m; induction n; intros vs bvs es Hsym bvsEq Hcall;
-    destruct bvs; try solve [unfold mkCallVars in Hcall; inv Hcall; try constructor].
-  - inv bvsEq.
-  - simpl in Hcall.
-    destruct (mkCallVars threadInfIdent (S m) fenv map n bvs) eqn:HcallEq; inv Hcall.
-    erewrite <- (find_symbol_map_f _ _ _ _ _ _ Hsym).
-    constructor.
-    Print repr_call_vars.
-  intro n.
-  
-
-    admit.
-(*
-    eapply IHn.
-    reflexivity.
-    assumption.
-Qed. *)
-Admitted. *)
+    apply IHn. exact Hrest.
+Qed.
 
 
 Theorem repr_make_case_switch:
   forall x ls ls',
-  repr_switch_LambdaANF_Codegen caseIdent x ls ls' (make_case_switch isptrIdent caseIdent x ls ls').
+  repr_switch_LambdaANF_Codegen isptrIdent caseIdent x ls ls' (make_case_switch isptrIdent caseIdent x ls ls').
 Proof.
-  (* TODO: make_case_switch arity changed after _stack import shadowing fix *)
-  Admitted.  
+  intros.
+  constructor.
+Qed.
 
 
 Definition makeCases (p0:program) fenv cenv ienv map :=
@@ -6475,7 +6460,7 @@ Proof.
     { intro; intros. eapply Hcenv. apply rt_then_t_or_eq in H0. inv H0. inv H1. apply t_then_rt. apply subterm_case. eauto. } 
     specialize (IHe0 s0 H0). clear H0.  assert (Some s0 = Some s0) by reflexivity. specialize (IHe0 H0). clear H0.
     simpl in Hl. 
-    destruct (makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent p fenv cenv ienv map l) eqn:Hmc.
+    destruct (makeCases p fenv cenv ienv map l) eqn:Hmc.
     assert (Hmc' := Hmc); unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H; rewrite Hmc in Hl; clear Hmc. 
     destruct p0. inv Hl.
     + (* step case *)
@@ -6483,7 +6468,7 @@ Proof.
         assert ( correct_cenv_of_exp cenv e).
         { intro; intros. eapply Hcenv.  eapply rt_trans. eauto. constructor. econstructor. constructor. reflexivity. }
         specialize (IHe s H0 eq_refl). clear H0.
-        inv IHe0. (* l0 = ls, ls' = l1 *) unfold make_case_switch in H4. inv H4. 
+        inv IHe0. (* l0 = ls, ls' = l1 *) inv H4.
         destruct ( make_ctor_rep cenv c ) eqn:Hctor_rep. 2: inv H.
         destruct c0.
         - (* case-enum *)
@@ -6514,7 +6499,7 @@ Proof.
       }
     +   assert (Hmc' := Hmc); unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H; rewrite Hmc in Hl; clear Hmc.  inv H.
     +  (* should probably invvert destruction of makeCases and Hl to avoid this redundant case *) simpl in Hl. 
-      destruct (makeCases argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent p fenv cenv ienv map l) eqn:Hmc.
+      destruct (makeCases p fenv cenv ienv map l) eqn:Hmc.
       assert (Hmc' := Hmc); unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H; rewrite Hmc in Hl; clear Hmc.  destruct p0; inv Hl.
       assert (Hmc' := Hmc); unfold makeCases in Hmc; simpl in Hmc; rewrite Hmc in H; rewrite Hmc in Hl; clear Hmc.  inv H. 
     +  inv H.
@@ -7899,7 +7884,7 @@ Proof.
                   assert (forall y, List.In y ys -> 
                                     exists v6 : cps.val,
               M.get y rho = Some v6 /\
-              repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent nParam fenv
+              repr_val_id_L_LambdaANF_Codegen argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv
                                   finfo_env p rep_env v6 m L lenv y).
                   intros. apply Hrel_mL. constructor. auto.
  

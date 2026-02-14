@@ -6795,86 +6795,67 @@ Proof.
   unfold make_cint. archi_red. constructor.
 Qed.
 
-Definition mk_gc_call_env' p (ys vs : list positive) (lenv_old lenv : temp_env) :
-  (Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p lenv_old x v) ys) -> length ys = length vs -> temp_env.
-Proof.
-  generalize vs. clear vs.
-  induction ys; intros vs Hval Hlen; destruct vs; [ | inv Hlen | inv Hlen | ].
-  - exact lenv. 
-  - refine (M.set p0 _ (IHys vs _ _)).
-    destruct (Genv.find_symbol (Genv.globalenv p) a) eqn:geta1.
-    + exact (Vptr b (Ptrofs.repr 0)).
-    + destruct (M.get a lenv_old) eqn:geta2.
-      * exact v.
-      * abstract (
-            set (t := proj1 (Forall_forall _ _) Hval a (or_introl eq_refl));
-            simpl in t;
-            exfalso; inv t; inv H; [ rewrite geta1 in H0; inv H0
-                                   | rewrite geta2 in H1; inv H1]
-            ).
-    + abstract(apply Forall_forall; intros x Hin;
-               exact (proj1 (Forall_forall _ _) Hval x (or_intror Hin))).
-    + abstract (inv Hlen; auto).
-Defined.
+Fixpoint mk_gc_call_lenv (p:program) (ys vs : list positive) (lenv_old lenv : temp_env) : temp_env :=
+  match ys, vs with
+  | nil, _ => lenv
+  | _, nil => lenv
+  | a :: ys', v :: vs' =>
+    let val := match Genv.find_symbol (Genv.globalenv p) a with
+               | Some b => Vptr b (Ptrofs.repr 0)
+               | None => match M.get a lenv_old with
+                         | Some w => w
+                         | None => Vundef
+                         end
+               end in
+    M.set v val (mk_gc_call_lenv p ys' vs' lenv_old lenv)
+  end.
 
-
-Definition mk_gc_call_env p (ys vs : list positive) (lenv_old lenv : temp_env) :
-  (Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p lenv_old x v) ys) -> length ys = length vs -> temp_env.
+Theorem mk_gc_call_lenv_correct : forall (p:program) (ys vs : list positive) (lenv_old lenv : temp_env),
+    Forall (fun x => exists v, get_var_or_funvar p lenv_old x v) ys ->
+    length ys = length vs ->
+    NoDup vs ->
+    (forall x, List.In x vs -> Genv.find_symbol (Genv.globalenv p) x = None) ->
+    Forall (fun x => exists v, get_var_or_funvar p (mk_gc_call_lenv p ys vs lenv_old lenv) x v) vs.
 Proof.
-  generalize vs. clear vs.
-  induction ys; intros vs Hval Hlen; destruct vs; [ | inv Hlen | inv Hlen | ].
-  - exact lenv. 
-  - refine (M.set p0 _ (IHys vs _ _)).
-    destruct (Genv.find_symbol (Genv.globalenv p) a).
-    + exact (Vptr b (Ptrofs.repr 0)).
-    + destruct (M.get a lenv_old).
-      * exact v.
-      * exact Vundef.
-    + abstract(apply Forall_forall; intros x Hin;
-               exact (proj1 (Forall_forall _ _) Hval x (or_intror Hin))).
-    + abstract (inv Hlen; auto).
-Defined.
-
-Theorem mk_gc_call_env_correct : forall p (ys vs : list positive) (lenv_old lenv : temp_env) Hys Hlen, NoDup vs ->
-    (Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p (mk_gc_call_env p ys vs lenv_old lenv Hys Hlen) x v) vs).
-Proof.
-  intros p ys. induction ys; intros vs lenv_old lenv Hys Hlen noDupvs; destruct vs; [ | inv Hlen | inv Hlen | ]; constructor.
-  - destruct Hys. inv Hlen. clear a.
-    destruct e as [v Hv]. exists v.
-    destruct Hv; simpl.
-    + constructor 2.
-      * admit.
-      * rewrite Maps.PTree.gss. rewrite e.
-        reflexivity.
+  intros p. induction ys; intros vs lenv_old lenv Hys Hlen Hnd Hvs_sym;
+    destruct vs; try (inv Hlen; fail); try constructor.
+  - (* head: p0 *)
+    simpl.
+    destruct (Genv.find_symbol (Genv.globalenv p) a) eqn:Hfs_a.
+    + (* a is a function symbol *)
+      exists (Vptr b (Ptrofs.repr 0)).
+      constructor 2.
+      * apply Hvs_sym. left; reflexivity.
+      * rewrite M.gss. reflexivity.
       * auto.
-    + constructor 2.
-      * admit.
-      * rewrite Maps.PTree.gss. rewrite e.
-        rewrite e0.
-        reflexivity.
-      * auto.
-  - admit.
-    Admitted.
-   (* apply IHys.
-        
-    destruct (Genv.find_symbol (Genv.globalenv p) x) eqn:geta1.
-    + exists (Vptr b (Ptrofs.repr 0)).
-      simpl. constructor 2.
-      * admit.
-      * rewrite Maps.PTree.gss.
-        rewrite geta1. reflexivity.
-      * 
-        
-    + destruct (M.get a lenv_old) eqn:geta2.
-      * 
-      * 
-        rewrite geta1.
-        rewrite geta1.
-    unfold mk_gc_call_env. simpl.
-    
-    eexists. 
-    simpl. 
-    rewrite geta1. *)
+    + (* a is not a function symbol *)
+      destruct (M.get a lenv_old) eqn:Hget_a.
+      * exists v.
+        constructor 2.
+        -- apply Hvs_sym. left; reflexivity.
+        -- rewrite M.gss. reflexivity.
+        -- inv Hys. destruct H1 as [v' Hv']. inv Hv'.
+           { rewrite Hfs_a in H. inv H. }
+           { rewrite Hget_a in H0. inv H0. auto. }
+      * exfalso.
+        inv Hys. destruct H1 as [v' Hv']. inv Hv'.
+        { rewrite Hfs_a in H. inv H. }
+        { rewrite Hget_a in H0. inv H0. }
+  - (* tail: Forall for vs *)
+    inv Hnd. inv Hys.
+    assert (IH_result : Forall (fun x => exists v, get_var_or_funvar p (mk_gc_call_lenv p ys vs lenv_old lenv) x v) vs).
+    { apply IHys; auto. intros; apply Hvs_sym; right; auto. }
+    simpl.
+    destruct (Genv.find_symbol (Genv.globalenv p) a) eqn:Hfs_a;
+      [ | destruct (M.get a lenv_old) eqn:Hget_a ];
+      (apply Forall_forall; intros x Hx_in;
+       assert (Hx_ne : x <> p0) by (intro; subst; auto);
+       rewrite Forall_forall in IH_result;
+       destruct (IH_result x Hx_in) as [v' Hv'];
+       exists v'; inv Hv';
+       [ constructor; auto
+       | constructor 2; auto; rewrite M.gso; auto ]).
+Qed.
 
 Ltac unsigned_ptrofs_range :=
   split; [apply Ptrofs.unsigned_range |  etransitivity;  [apply Ptrofs.unsigned_range_2 | rewrite ptrofs_mu; archi_red; reflexivity] ].

@@ -344,6 +344,13 @@ Section Correct.
 
   (** ** Subset lemma for ANF relation *)
 
+  Lemma Setminus_Included_preserv_alt :
+    forall {A: Type} (S1 S2 S3: Ensemble A),
+      S1 \subset S2 \\ S3 -> S1 \subset S2.
+  Proof.
+    intros A S1 S2 S3 H x Hin. apply H in Hin. destruct Hin. assumption.
+  Qed.
+
   Lemma anf_cvt_rel_subset :
     (forall S e vn tgm S' C x,
         anf_cvt_rel S e vn tgm S' C x -> S' \subset S) /\
@@ -353,7 +360,80 @@ Section Correct.
         anf_cvt_rel_efnlst S efns vn fnames tgm S' fdefs -> S' \subset S) /\
     (forall S bs vn r tgm S' pats,
         anf_cvt_rel_branches S bs vn r tgm S' pats -> S' \subset S).
-  Proof. Admitted.
+  Proof.
+    eapply exp_ind_alt_2.
+    - (* Var_e *)
+      intros n S vn tgm S' C x Hrel. inv Hrel. eapply Included_refl.
+    - (* Lam_e *)
+      intros na e IH S vn tgm S' C x Hrel. inv Hrel.
+      fold anf_cvt_rel in *. eapply IH in H9.
+      eapply Included_trans. eassumption.
+      eapply Included_trans. eapply Setminus_Included. eapply Setminus_Included.
+    - (* App_e *)
+      intros e1 IHe1 e2 IHe2 S vn tgm S' C x Hrel.
+      inv Hrel. fold anf_cvt_rel in *.
+      eapply IHe1 in H5. eapply IHe2 in H8.
+      eapply Included_trans. eapply Setminus_Included.
+      eapply Included_trans. eassumption. eassumption.
+    - (* Con_e *)
+      intros dc es IH S vn tgm S' C x Hrel.
+      inv Hrel. fold anf_cvt_rel_exps in *.
+      eapply IH in H8.
+      eapply Included_trans. eassumption. eapply Setminus_Included.
+    - (* Match_e *)
+      intros e IHe pars bs IHbs S vn tgm S' C x Hrel.
+      inv Hrel. fold anf_cvt_rel in *. fold anf_cvt_rel_branches in *.
+      eapply IHe in H8. eapply IHbs in H9.
+      eapply Included_trans. eapply Setminus_Included.
+      eapply Included_trans. eassumption.
+      eapply Included_trans. eassumption.
+      eapply Included_trans. eapply Setminus_Included. eapply Setminus_Included.
+    - (* Let_e *)
+      intros na e1 IHe1 e2 IHe2 S vn tgm S' C x Hrel.
+      inv Hrel. fold anf_cvt_rel in *.
+      eapply IHe1 in H3. eapply IHe2 in H6.
+      eapply Included_trans. eassumption. eassumption.
+    - (* Fix_e *)
+      intros efns IHefns n S vn tgm S' C x Hrel.
+      inv Hrel. fold anf_cvt_rel_efnlst in *.
+      eapply IHefns in H9.
+      eapply Included_trans. eassumption. eapply Setminus_Included.
+    - (* Prf_e *)
+      intros S vn tgm S' C x Hrel. inv Hrel.
+      eapply Setminus_Included.
+    - (* Prim_val_e *)
+      intros p S vn tgm S' C x Hrel. inv Hrel.
+      eapply Setminus_Included.
+    - (* Prim_e *)
+      intros p S vn tgm S' C x Hrel. inv Hrel.
+    - (* enil *)
+      intros S vn tgm S' C xs Hrel. inv Hrel. eapply Included_refl.
+    - (* econs *)
+      intros e IHe es IHes S vn tgm S' C xs Hrel.
+      inv Hrel. fold anf_cvt_rel in *. fold anf_cvt_rel_exps in *.
+      eapply IHe in H3. eapply IHes in H6.
+      eapply Included_trans. eassumption. eassumption.
+    - (* eflnil *)
+      intros S vn fnames tgm S' fdefs Hrel. inv Hrel. eapply Included_refl.
+    - (* eflcons *)
+      split.
+      + intros na' e' Hlam IHe' efns IHefns S vn fnames tgm S' fdefs Hrel.
+        inv Hrel. fold anf_cvt_rel in *. fold anf_cvt_rel_efnlst in *.
+        inv H0.
+        eapply IHe' in H9. eapply IHefns in H10.
+        eapply Included_trans. eassumption.
+        eapply Included_trans. eassumption. eapply Setminus_Included.
+      + intros Hnot IHe efns IHefns S vn fnames tgm S' fdefs Hrel.
+        inv Hrel. unfold isLambda in Hnot. contradiction.
+    - (* brnil *)
+      intros S vn r tgm S' pats Hrel. inv Hrel. eapply Included_refl.
+    - (* brcons *)
+      intros dc p e IHe bs IHbs S vn r tgm S' pats Hrel.
+      inv Hrel. fold anf_cvt_rel in *. fold anf_cvt_rel_branches in *.
+      eapply IHe in H13. eapply IHbs in H10.
+      eapply Setminus_Included_preserv_alt in H13.
+      eapply Included_trans. eassumption. eassumption.
+  Qed.
 
 
   Lemma anf_cvt_exp_subset S e vn tgm S' C x :
@@ -500,7 +580,69 @@ Section Correct.
       split; [intros; congruence | intros _; eexists 0%nat; constructor 1; unfold algebra.one; simpl; lia].
 
     - (* 3. eval_App_step: App_e with Clos_v *)
-      admit.
+      intros e1' e2' e_body v2 r0 na0 rho0 rho_clos f1' f2' f3' t1' t2' t3'
+             Heval1 IH1 Heval2 IH2 Heval3 IH3.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hnd Hdis Henv Hcvt e_k Hdis_ek.
+      inv Hcvt. fold anf_cvt_rel in *.
+      (* After inv (anf_App):
+         C = comp_ctx_f C1 (comp_ctx_f C2 (Eletapp_c r0 x1 func_tag [x2] Hole_c))
+         x = r0  (the result variable)
+         Hcvt_e1 : anf_cvt_rel S e1' vnames cnstrs S2 C1 x1
+         Hcvt_e2 : anf_cvt_rel S2 e2' vnames cnstrs S3 C2 x2
+         H_r_in : r0 \in S3 *)
+      match goal with
+      | [ He1 : anf_cvt_rel _ e1' vnames _ _ _ _,
+          He2 : anf_cvt_rel _ e2' vnames _ _ _ _,
+          Hr : x \in _ |- _ ] =>
+        rename He1 into Hcvt_e1; rename He2 into Hcvt_e2; rename Hr into Hr_in
+      end.
+      rewrite <- !app_ctx_f_fuse.
+      split.
+      + (* Termination case *)
+        intros v v' Heq Hrel. subst r0.
+        (* Get target values for Clos_v and v2 *)
+        assert (Hwf_clos : well_formed_val (Clos_v rho_clos na0 e_body)) by admit.
+        destruct (anf_val_rel_exists _ Hwf_clos) as [clos_v' Hrel_clos].
+        assert (Hwf_v2 : well_formed_val v2) by admit.
+        destruct (anf_val_rel_exists _ Hwf_v2) as [v2' Hrel_v2].
+        (* Chain: IH1 + env bridge + IH2 + env bridge + Eletapp reduction *)
+        eapply preord_exp_post_monotonic.
+        2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+            (* IH1: C1 layer *)
+            2:{ intros m.
+                assert (Hdis_C2ek : Disjoint _ (occurs_free (C2 |[ Eletapp x x1 func_tag [x2] e_k ]|))
+                                               ((S \\ S2) \\ [set x1])) by admit.
+                edestruct IH1 as [IH1_val _].
+                - eassumption.
+                - admit. (* exp_wf *)
+                - eassumption.
+                - eassumption.
+                - eassumption.
+                - exact Hcvt_e1.
+                - exact Hdis_C2ek.
+                - eapply IH1_val; eauto. }
+            eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+            (* IH2: C2 layer, in env with x1 bound *)
+            2:{ intros m.
+                assert (Henv_x1 : anf_env_rel vnames rho0 (M.set x1 clos_v' rho)) by admit.
+                assert (Hdis_letapp : Disjoint _ (occurs_free (Eletapp x x1 func_tag [x2] e_k))
+                                                 ((S2 \\ S3) \\ [set x2])) by admit.
+                edestruct IH2 as [IH2_val _].
+                - eassumption.
+                - admit. (* exp_wf *)
+                - eassumption.
+                - admit. (* Disjoint vnames S2 *)
+                - exact Henv_x1.
+                - exact Hcvt_e2.
+                - exact Hdis_letapp.
+                - eapply IH2_val; eauto. }
+            (* Eletapp step + body evaluation + env bridging *)
+            admit. (* The Eletapp reduction: needs IH3 for body, function lookup, etc. *) }
+        (* inclusion *)
+        admit.
+      + (* Divergence case *)
+        intros _. eexists 0%nat. constructor 1. unfold algebra.one. simpl. lia.
 
     - (* 4. eval_App_step_OOT1: App_e, e1 diverges *)
       intros e1' e2' rho0 f0 t0 Hoot IH_oot.
@@ -518,11 +660,17 @@ Section Correct.
       intros e1' e2' v1 r0 rho0 na0 f1' f2' t1' t2' Heval1 IH1 Heval2 IH2.
       unfold anf_cvt_correct_exp_step.
       intros rho vnames C x S S' i Hwf Hwfe Hnd Hdis Henv Hcvt e_k Hdis_ek.
-      inv Hcvt.
+      inv Hcvt. fold anf_cvt_rel in *.
       (* After inv (anf_Let):
          C = comp_ctx_f C1 C2, x = x2
-         H3 : anf_cvt_rel S e1' vnames cnstrs S2 C1 x1
-         H5 : anf_cvt_rel S2 e2' (x1::vnames) cnstrs S' C2 x2 *)
+         Hcvt_e1 : anf_cvt_rel S e1' vnames cnstrs S2 C1 x1
+         Hcvt_e2 : anf_cvt_rel S2 e2' (x1::vnames) cnstrs S' C2 x2 *)
+      (* Name the hypotheses from inv *)
+      match goal with
+      | [ He1 : anf_cvt_rel _ e1' vnames _ _ _ _,
+          He2 : anf_cvt_rel _ e2' (_ :: vnames) _ _ _ _ |- _ ] =>
+        rename He1 into Hcvt_e1; rename He2 into Hcvt_e2
+      end.
       rewrite <- app_ctx_f_fuse.
       split.
       + intros v v' Heq Hrel. subst r0.
@@ -532,51 +680,68 @@ Section Correct.
         (* Chain: env bridging + IH2 + IH1 via preord_exp_trans *)
         eapply preord_exp_post_monotonic.
         2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
-            (* Second: IH1 for e1, with e_k' = C2|[e_k]| *)
+            (* IH1 for e1, with e_k' = C2|[e_k]| *)
             2:{ intros m.
                 assert (Hdis_C2ek : Disjoint _ (occurs_free (C2 |[ e_k ]|)) ((S \\ S2) \\ [set x1])) by admit.
-                eapply (proj1 (IH1 rho vnames C1 x1 S S2 m Hwf _ Hnd Hdis Henv H3 (C2 |[ e_k ]|) Hdis_C2ek) v1 v1' eq_refl Hrel1). Unshelve. all: try exact (0%N). admit. }
-            (* First: env bridging + IH2 *)
+                edestruct IH1 as [IH1_val _].
+                - eassumption. (* well_formed_env *)
+                - admit. (* exp_wf *)
+                - eassumption. (* NoDup *)
+                - eassumption. (* Disjoint vnames S *)
+                - eassumption. (* anf_env_rel *)
+                - exact Hcvt_e1.
+                - exact Hdis_C2ek.
+                - eapply IH1_val; eauto. }
+            (* env bridging + IH2 *)
             eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
-            (* Second: IH2 for e2, in extended env *)
+            (* IH2 for e2, in extended env *)
             2:{ intros m.
                 assert (Hnd' : NoDup (x1 :: vnames)) by admit.
                 assert (Hdis' : Disjoint _ (FromList (x1 :: vnames)) S2) by admit.
                 assert (Henv' : anf_env_rel (x1 :: vnames) (v1 :: rho0) (M.set x1 v1' rho)) by admit.
                 assert (Hwfe' : exp_wf (N.of_nat (Datatypes.length (x1 :: vnames))) e2') by admit.
-                assert (Hdis_ek' : Disjoint _ (occurs_free e_k) ((S2 \\ S') \\ [set x2])).
-                { eapply Disjoint_Included_r; [ | eassumption ].
+                assert (Hdis_ek' : Disjoint _ (occurs_free e_k) ((S2 \\ S') \\ [set x])).
+                { eapply Disjoint_Included_r.
+                  2: eassumption.
                   intros z Hz. destruct Hz as [Hz1 Hz2].
                   constructor.
                   - constructor.
-                    + eapply (anf_cvt_exp_subset _ _ _ _ _ _ _ H3). destruct Hz1. eassumption.
+                    + eapply (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt_e1).
+                      destruct Hz1. eassumption.
                     + destruct Hz1. eassumption.
                   - eassumption. }
-                eapply (proj1 (IH2 (M.set x1 v1' rho) (x1 :: vnames) C2 x2 S2 S' m _ Hwfe' Hnd' Hdis' Henv' H5 e_k Hdis_ek') v v' eq_refl Hrel). Unshelve. all: try exact (0%N). admit. }
+                edestruct IH2 as [IH2_val _].
+                - admit. (* well_formed_env (v1::rho0) *)
+                - exact Hwfe'.
+                - exact Hnd'.
+                - exact Hdis'.
+                - exact Henv'.
+                - exact Hcvt_e2.
+                - exact Hdis_ek'.
+                - eapply IH2_val; eauto. }
             (* env bridging: M.set x2 v' rho ≤ M.set x2 v' (M.set x1 v1' rho) *)
             eapply preord_exp_refl. now eapply eq_fuel_compat.
             intros y Hy.
-            destruct (Pos.eq_dec y x2) as [Heq2 | Hneq2].
+            destruct (Pos.eq_dec y x) as [Heq2 | Hneq2].
             * subst. intros v1x Hget.
               rewrite M.gss in Hget. inv Hget.
               eexists. split. rewrite M.gss. reflexivity.
               eapply preord_val_refl. tci.
             * intros v1x Hget. rewrite M.gso in Hget; auto.
               destruct (Pos.eq_dec y x1) as [Heq1 | Hneq1].
-              -- (* y = x1: x1 might be in vnames or fresh *)
+              -- (* y = x1: possible if x1 ∈ vnames (Var_e case) *)
                  subst. eexists. split.
-                 rewrite M.gso; auto. rewrite M.gss. reflexivity.
-                 (* v1x is the old value for x1 in rho, v1' is the new.
-                    Both related to v1 via anf_val_rel, so preord_val by alpha-equiv. *)
-                 admit.
+                 { rewrite M.gso; auto. rewrite M.gss. reflexivity. }
+                 admit. (* preord_val via alpha-equiv *)
               -- eexists. split.
-                 rewrite M.gso; auto. rewrite M.gso; auto.
+                 { rewrite M.gso; auto. rewrite M.gso; eauto. }
                  eapply preord_val_refl. tci. }
-        (* inclusion *)
+        (* inclusion: comp eq_fuel (comp (anf_bound f2' t2') (anf_bound f1' t1'))
+           ⊆ anf_bound (f1'+f2') (t1'+t2') *)
         unfold inclusion, comp, eq_fuel, anf_bound.
         intros [[[? ?] ?] ?] [[[? ?] ?] ?].
         intros [[[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]]].
-        unfold_all. simpl in *. lia.
+        unfold_all. destruct p. destructAll. simpl in *. lia.
       + intros _. eexists 0%nat. constructor 1. unfold algebra.one. simpl. lia.
 
     - (* 7. eval_Let_step_OOT: Let_e, e1 diverges *)
@@ -685,7 +850,67 @@ Section Correct.
       + intros Habs. congruence.
 
     - (* 15. eval_Fix_fuel *)
-      admit.
+      intros vs1 n1 fnlst1.
+      unfold anf_cvt_correct_exp.
+      intros rho vnames C x S S' i Hwf Hwfe Hnd Hdis Henv Hcvt e_k Hdis_ek.
+      inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_efnlst in *.
+      (* After inv (anf_Fix):
+         C = Efun1_c fdefs Hole_c, x = f
+         H_fnames_sub : FromList fnames ⊆ S
+         H_nodup : NoDup fnames
+         H_len : length fnames = efnlength fnlst1
+         H_efnlst : anf_cvt_rel_efnlst ... fnlst1 (rev fnames ++ vnames) fnames cnstrs S' fdefs
+         H_nth : nth_error fnames (N.to_nat n1) = Some f *)
+      match goal with
+      | [ Hsub : FromList ?fn \subset S,
+          Hnodup : NoDup ?fn,
+          Hefn : anf_cvt_rel_efnlst _ _ _ ?fn _ _ _,
+          Hnth : nth_error ?fn _ = Some ?f |- _ ] =>
+        rename Hsub into Hfnames_sub; rename Hnodup into Hnodup_fnames;
+        rename Hefn into Hcvt_efn; rename Hnth into Hnth_f
+      end.
+      split.
+      + intros v0 v' Heq Hrel. inv Heq.
+        (* Chain: one_step via Efun_red + eq_fuel via env bridging *)
+        eapply preord_exp_post_monotonic.
+        2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+            2:{ intros m. eapply preord_exp_Efun_red. }
+            (* env bridging: (e_k, M.set f v' rho) ≤eq_fuel (e_k, def_funs fdefs fdefs rho rho) *)
+            eapply preord_exp_refl. now eapply eq_fuel_compat.
+            intros y Hy.
+            destruct (Pos.eq_dec y x) as [Heq | Hneq].
+            - (* y = f (the selected function name) *)
+              subst. intros v1 Hget. rewrite M.gss in Hget. inv Hget.
+              eexists. split.
+              { eapply def_funs_eq. eapply name_fds_same.
+                rewrite (anf_cvt_rel_efnlst_all_fun_name _ _ _ _ _ _ _ Hcvt_efn).
+                eapply nth_error_In. eassumption. }
+              eapply anf_cvt_val_alpha_equiv. eassumption.
+              eapply anf_rel_ClosFix with (names := vnames); eauto.
+              * (* Disjoint _ (FromList vnames :|: FromList fnames) S1 *)
+                admit.
+              * (* Disjoint _ (FromList vnames) (FromList fnames) *)
+                eapply Disjoint_Included_r. eapply Hfnames_sub. eassumption.
+              * (* anf_fix_rel fnames vnames S1 fnames fnlst1 fdefs S2 *)
+                admit. (* needs lemma: anf_cvt_rel_efnlst → anf_fix_rel *)
+            - (* y ≠ f: y cannot be in FromList fnames because of disjointness *)
+              intros v1 Hget. rewrite M.gso in Hget; auto.
+              assert (Hnotfn : ~ name_in_fundefs fdefs y).
+              { intros Hc. apply name_fds_same in Hc.
+                rewrite (anf_cvt_rel_efnlst_all_fun_name _ _ _ _ _ _ _ Hcvt_efn) in Hc.
+                eapply Hdis_ek. constructor; eauto.
+                constructor.
+                - constructor.
+                  + eapply Hfnames_sub. exact Hc.
+                  + intros Hin. admit. (* S' ⊆ S \ FromList fnames, so fnames ∩ S' = ∅ *)
+                - intros Habs. inv Habs. congruence. }
+              eexists. split.
+              { rewrite def_funs_neq; eauto. }
+              eapply preord_val_refl. tci. }
+        unfold inclusion, comp, eq_fuel, one_step, anf_bound.
+        intros [[[? ?] ?] ?] [[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]].
+        unfold_all. simpl in *. lia.
+      + intros Habs. congruence.
       
 
     - (* 16. eval_OOT *)

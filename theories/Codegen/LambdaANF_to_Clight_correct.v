@@ -7077,12 +7077,24 @@ Qed.
 Theorem eval_cint :
   forall p env lenv m z, 
  eval_expr (globalenv p) env lenv m
-    (make_cint z val) (make_vint z).
+     (make_cint z val) (make_vint z).
 Proof.
   intros.
   chunk_red; archi_red.
   constructor.
   unfold make_cint. archi_red. constructor.
+Qed.
+
+Theorem eval_cint_uval :
+  forall p env lenv m z,
+    eval_expr (globalenv p) env lenv m
+      (LambdaANF_to_Clight.make_cint z LambdaANF_to_Clight.uval) (make_vint z).
+Proof.
+  intros.
+  chunk_red; archi_red.
+  constructor.
+  unfold LambdaANF_to_Clight.make_cint, LambdaANF_to_Clight.uval.
+  archi_red. constructor.
 Qed.
 
 Fixpoint mk_gc_call_lenv (p:program) (ys vs : list positive) (lenv_old lenv : temp_env) : temp_env :=
@@ -8788,7 +8800,9 @@ Forall2
               split.
               * intro Hfree.
                 assert (Hfree' : occurs_free (Econstr x t [] e) x0).
-                { constructor 2; exact Hfree. }
+                { constructor 2.
+                  - intro Heq. apply Hneq. symmetry. exact Heq.
+                  - exact Hfree. }
                 specialize (Hrel_x0 Hfree').
                 destruct Hrel_x0 as [v6 [Hx0rho Hrepr_v6]].
                 exists v6.
@@ -8797,8 +8811,22 @@ Forall2
               * intros rho' fds f v0 Hget Hsub.
                 specialize (Hrel_fun _ _ _ _ Hget Hsub).
                 destruct Hrel_fun as [Hrepr_f [Hclosed_f Hcorr_f]].
+                assert (Hfneq : f <> x).
+                { intro Heq. subst f.
+                  destruct Hf_id as [Hf_bound _].
+                  assert (Hbound_x : bound_var (Econstr x t [] e) x) by constructor.
+                  specialize (Hf_bound _ Hbound_x).
+                  unfold correct_fundef_id_info in Hcorr_f.
+                  destruct Hcorr_f as [finfo [t0 [t' [vs' [e' [_ [Hget_finfo _]]]]]]].
+                  specialize (Hsym x).
+                  destruct Hsym as [Hsym_l _].
+                  assert (Hsym_some :
+                            exists b, Genv.find_symbol (Genv.globalenv p) x = Some b).
+                  { apply Hsym_l. eexists. exact Hget_finfo. }
+                  destruct Hsym_some as [b Hb].
+                  rewrite Hf_bound in Hb. discriminate. }
                 split.
-                { eapply repr_val_id_set; [exact Hrepr_f|exact Hneq]. }
+                { eapply repr_val_id_set; [exact Hrepr_f|exact Hfneq]. }
                 split; [exact Hclosed_f|exact Hcorr_f]. }
         split.
         { assert (Hmax_e : max_alloc = Z.of_nat (max_allocs e)).
@@ -8826,35 +8854,92 @@ Forall2
               inList. }
           reflexivity. }
     }
+    destruct H0 as [lenv' [m' [Hstep [Hrel_m' [Htinfo_e Hargs0]]]]].
+    assert (Hc_env_e:
+              correct_envs cenv ienv rep_env (cps.M.set x (Vconstr t vs) rho) e).
+    { eapply correct_envs_subterm.
+      eapply correct_envs_set.
+      - exact Hc_env.
+      - destruct Hc_env as [_ [Hcenv_env [Hcenv_exp _]]].
+        pose proof (Forall_constructors_in_constr _ _ _ _ _ Hcenv_exp) as Hctor.
+        simpl in Hctor.
+        destruct (M.get t cenv) eqn:Hget_t; [|contradiction].
+        destruct c0; simpl in *.
+        econstructor.
+        + apply Forall_forall.
+          intros vv Hin_vv.
+          pose proof (get_list_In_val _ _ _ _ H Hin_vv) as [xx0 [_ Hxx0rho]].
+          eapply Hcenv_env. exact Hxx0rho.
+        + exact Hget_t.
+        + rewrite <- (get_list_length_eq _ _ _ H). exact Hctor.
+      - constructor. constructor. }
+    assert (Hp_id_e:
+              protected_id_not_bound_id (cps.M.set x (Vconstr t vs) rho) e).
+    { destruct Hp_id as [Hp_env Hp_exp].
+      split.
+      - intros x0 y v0 Hget0 Hprot.
+        destruct (var_dec x0 x) as [Heq|Hneq].
+        { subst x0.
+          rewrite M.gss in Hget0. inv Hget0.
+          intro Hbad.
+          destruct Hbad as [Heqxy|Hbv].
+          { subst y. apply Hx_not. exact Hprot. }
+          { inversion Hbv; subst.
+            match goal with
+            | HIn : List.In ?v1 vs,
+              Hb1 : bound_var_val ?v1 y |- _ =>
+                pose proof (get_list_In_val _ _ _ _ H HIn) as [xx0 [_ Hxx0rho]];
+                specialize (Hp_env _ _ _ Hxx0rho Hprot);
+                apply Hp_env; right; exact Hb1
+            end. } }
+        { rewrite M.gso in Hget0 by exact Hneq.
+          eapply Hp_env; eauto. }
+      - intros y Hprot Hb_e.
+        specialize (Hp_exp _ Hprot).
+        apply Hp_exp.
+        constructor 2. exact Hb_e. }
     assert (Hf_id_e:  functions_not_bound p (cps.M.set x (Vconstr t vs) rho) e). {
       eapply functions_not_bound_subterm.
       eapply functions_not_bound_set;
         eauto.
-      - intros.
-
-        inv H0.
-        inv Hf_id.
-        assert (Hx0rho := get_list_In_val _ _ _ _ H H5).
-        destruct Hx0rho. destruct H2.  
-        eapply H1; eauto. 
+      - intros x0 Hb.
+        inversion Hb; subst.
+        destruct Hf_id as [_ Hf_id_vals].
+        match goal with
+        | HIn : List.In ?v0 vs,
+          Hbn : bound_notfun_val ?v0 x0 |- _ =>
+            pose proof (get_list_In_val _ _ _ _ H HIn) as Hx0rho;
+            destruct Hx0rho as [xx0 [Hinxx0 Hxx0rho]];
+            eapply Hf_id_vals; eauto
+        end.
       - constructor. constructor.
     }
     assert (H_rho_e:  unique_bindings_env (cps.M.set x (Vconstr t vs) rho) e ).
-    {  destruct Hrho_id as [Hub Hrho_id].
+    {  destruct Hrho_id as [Hub Hrho_env].
       split.
-      inv Hub; auto.
-      intro. intros.
-      destruct (var_dec x0 x).
-      - subst. (* need unique binding *)        
-        inv Hub. auto.
-        rewrite M.gss in H0. inv H0.
-        split; auto. constructor.
-        apply Forall_forall. intros.         
-        assert (Hx0rho := get_list_In_val _ _ _ _ H H0). destruct Hx0rho as [xx0 [Hinys Hxx0rho]].
-        apply Hrho_id in Hxx0rho. destruct Hxx0rho. auto.
-      -  rewrite M.gso in H0 by auto.
-         apply Hrho_id in H0.
-         destruct H0. split; auto.
+      - inversion Hub; subst; auto.
+      - intros x0 v0 Hget_set.
+        destruct (var_dec x0 x) as [Heq|Hneq].
+        + subst x0.
+          rewrite M.gss in Hget_set. inversion Hget_set; subst v0.
+          split.
+          * inversion Hub; subst; auto.
+          * constructor.
+            apply Forall_forall.
+            intros vv Hin_vv.
+            pose proof (get_list_In_val _ _ _ _ H Hin_vv) as Hx0rho.
+            destruct Hx0rho as [xx0 [Hin_xx0 Hxx0rho]].
+            specialize (Hrho_env _ _ Hxx0rho).
+            destruct Hrho_env as [_ Hub_vv].
+            exact Hub_vv.
+        + rewrite M.gso in Hget_set by auto.
+          apply Hrho_env in Hget_set.
+          destruct Hget_set as [Hnb_econstr Hub_v0].
+          split.
+          * intro Hb_e.
+            apply Hnb_econstr.
+            constructor 2. exact Hb_e.
+          * exact Hub_v0.
     }
     specialize (IHHev Hc_env_e Hp_id_e H_rho_e Hf_id_e).
     assert (Hca_e : correct_alloc e (Z.of_nat (max_allocs e))).
@@ -8903,7 +8988,7 @@ Forall2
                            {|
                            attr_volatile := false;
                            attr_alignas := None |}))
-                     (c_int' (Z.of_N n) val)) val)) s) k empty_env
+                     (c_int' (Z.of_N n) LambdaANF_to_Clight.uval)) val)) s) k empty_env
          lenv m)
       (State fu s k empty_env (Maps.PTree.set x v7' lenv) m)).
     {
@@ -8913,11 +8998,11 @@ Forall2
       constructor. constructor. eapply eval_Elvalue. apply eval_Ederef.
       econstructor. econstructor. constructor.
       eauto. reflexivity. constructor.
-      simpl. unfold sem_add. simpl. reflexivity.
+      unfold sem_add, c_int', LambdaANF_to_Clight.c_int.
+      destruct Archi.ptr64; unfold classify_add; simpl typeof; simpl typeconv; cbv beta iota; reflexivity.
       eapply deref_loc_value. constructor. simpl.
       rewrite Ptrofs.mul_commut. unfold Ptrofs.of_int64.
       rewrite ptrofs_of_int64.
-      rewrite sizeof_uval.
       apply Hv7'_l.
       constructor. constructor.
     }
@@ -9035,14 +9120,17 @@ Forall2
     simpl. constructor.
     assert ( correct_tinfo p max_alloc
             (Maps.PTree.set x v7' lenv) m ).
-    apply correct_tinfo_not_protected; auto.
-    intro; apply Hx_not; apply is_protected_tinfo_weak; auto.
-    {
-      inv Hp_id.
-      intro. eapply H10.
-      2:{ subst. constructor. }
-      inList.
-    }
+    { eapply correct_tinfo_not_protected.
+      - exact Hc_tinfo.
+      - intro Hprot.
+        apply Hx_not.
+        apply is_protected_tinfo_weak.
+        exact Hprot.
+      - intro Heq.
+        apply Hx_not.
+        subst.
+        unfold is_protected_id_thm, is_protected_id, protectedIdent_thm, protectedIdent.
+        inList. }
     specialize (IHHev H2 H3 H9).
     destruct IHHev as [m' [lenv' [Hstep [Hargs1 Hargs2]]]].
     exists m', lenv'.
@@ -9079,19 +9167,7 @@ Forall2
         exists vbool s s', 
           m_tstep2 (globalenv p)                   
          (State fu
-         (Ssequence (isPtr isptrIdent caseIdent y)
-            (Sifthenelse (Etempvar caseIdent boolTy)
-               (Sswitch
-                  (Ebinop Oand
-                     (Ederef
-                        (add
-                           (Ecast (Etempvar y val)
-                              (Tpointer val
-                                 {| attr_volatile := false; attr_alignas := None |}))
-                           (c_int' (-1) val)) val) (make_cint 255 val)
-                     val) ls)
-               (Sswitch
-                  (Ebinop Oshr (Etempvar y val) (make_cint 1 val) val) ls')))
+         (make_case_switch isptrIdent caseIdent y ls ls')
          k empty_env lenv m)
          (State fu s (Kseq Sbreak (Kseq s' (Kswitch k))) empty_env
                 (Maps.PTree.set caseIdent vbool lenv) m) /\
@@ -9127,17 +9203,28 @@ Forall2
         rewrite Int.eq_true. simpl. 
 
          (* switch to the right case *)
-        eapply t_trans. constructor. econstructor. simpl. econstructor. constructor.
+        eapply t_trans. constructor. econstructor. simpl. econstructor. econstructor. constructor.
         rewrite M.gso. apply Hlenv_y. (* caseIdent is protected *)
         {
           destruct Hp_id as [Hp_1 Hp_2].
           intro; eapply Hp_1; eauto.
           inList.
         }
-        apply eval_cint.
+        eapply sem_cast_vint.
+        apply eval_cint_uval.
         simpl.
-        assert (  sem_binary_operation (globalenv p) Oshr (make_vint n0) (typeof (Etempvar y uval))
-                                       (make_vint 1) (typeof (make_cint 1 uval)) m = (Some (int_shru n0 1))).  unfold int_shru. unfold make_cint. chunk_red; archi_red. constructor. constructor. apply H.
+        assert (Hshr :
+          sem_shr (make_vint n0) LambdaANF_to_Clight.uval (make_vint 1)
+                  (typeof (LambdaANF_to_Clight.make_cint 1 LambdaANF_to_Clight.uval)) =
+          Some (int_shru n0 1)).
+        {
+          unfold sem_shr, sem_shift, classify_shift, int_shru.
+          unfold make_vint, LambdaANF_to_Clight.uval, LambdaANF_to_Clight.make_cint.
+          destruct Archi.ptr64 eqn:Harchi; simpl.
+          - rewrite ltu_one_iwordsize_64. reflexivity.
+          - rewrite ltu_one_iwordsize_32. reflexivity.
+        }
+        exact Hshr.
         apply sem_switch_arg_1. 
         eapply repr_unboxed_header_range; eauto.  
         
@@ -9174,7 +9261,7 @@ Forall2
         simpl. rewrite Int.eq_false. simpl.
 
       (* switch to the right case *)
-      eapply t_trans. constructor. econstructor. simpl. econstructor. econstructor. constructor.
+      eapply t_trans. constructor. econstructor. simpl. econstructor. econstructor. econstructor. constructor.
       econstructor. econstructor. constructor. 
       rewrite M.gso. apply Hlenv_y.
       (* caseIdent is protected *)
@@ -9186,7 +9273,7 @@ Forall2
       constructor. constructor.  constructor. eapply  deref_loc_value. simpl. reflexivity.
       simpl. rewrite Ptrofs.sub_add_opp in H6.
       unfold Ptrofs.of_int64. rewrite ptrofs_of_int64. 
-      rewrite Ptrofs.mul_mone. rewrite sizeof_val. eauto.
+      rewrite Ptrofs.mul_mone. eauto.
       apply eval_cint.
       simpl.
       assert (  sem_and (make_vint h) uval (make_vint 255) (typeof (make_cint 255 uval)) m = Some (int_and h 255)). {

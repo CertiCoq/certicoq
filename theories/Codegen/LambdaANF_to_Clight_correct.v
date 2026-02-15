@@ -44,6 +44,7 @@ Require Import CertiCoq.Codegen.tactics
 Notation asgnAppVars' := LambdaANF_to_Clight.asgnAppVars'.
 Notation asgnAppVars'' := LambdaANF_to_Clight.asgnAppVars''.
 Notation asgnAppVars := LambdaANF_to_Clight.asgnAppVars.
+Notation asgnFunVars' := LambdaANF_to_Clight.asgnFunVars'.
 Notation makeVar := LambdaANF_to_Clight.makeVar.
 Notation mkCallVars := LambdaANF_to_Clight.mkCallVars.
 Notation make_case_switch := LambdaANF_to_Clight.make_case_switch.
@@ -9274,12 +9275,15 @@ Forall2
       simpl. rewrite Ptrofs.sub_add_opp in H6.
       unfold Ptrofs.of_int64. rewrite ptrofs_of_int64. 
       rewrite Ptrofs.mul_mone. eauto.
-      apply eval_cint.
+      simpl. exact (sem_cast_vint h m).
+      apply eval_cint_uval.
       simpl.
-      assert (  sem_and (make_vint h) uval (make_vint 255) (typeof (make_cint 255 uval)) m = Some (int_and h 255)). {
-        unfold sem_and. unfold int_and. chunk_red; archi_red; auto. 
+      assert (Hsem: sem_and (make_vint h) LambdaANF_to_Clight.uval (make_vint 255) (typeof (LambdaANF_to_Clight.make_cint 255 LambdaANF_to_Clight.uval)) m = Some (int_and h 255)). {
+        unfold sem_and, sem_binarith, classify_binarith, int_and.
+        unfold make_vint, LambdaANF_to_Clight.uval, LambdaANF_to_Clight.make_cint.
+        destruct Archi.ptr64 eqn:Harchi; simpl; reflexivity.
       }
-      apply H. simpl.
+      exact Hsem. simpl.
       apply sem_switch_and_255.
       eapply repr_boxed_header_range; eauto. 
       rewrite H_seq.
@@ -9337,12 +9341,16 @@ Forall2
       -  eapply protected_not_in_L_set.
          auto.
         apply is_protected_not_tinfo. inList.
-        intro.   assert (Hnd := disjointIdent). inv Hnd. 
-        replace [allocIdent; limitIdent; gcIdent; mainIdent; bodyIdent;
-          threadInfIdent; tinfIdent; heapInfIdent; numArgsIdent;
-          numArgsIdent; isptrIdent; tinfIdent] with ([allocIdent; limitIdent; gcIdent; mainIdent; bodyIdent;
-          threadInfIdent]++[tinfIdent; heapInfIdent; numArgsIdent;
-          numArgsIdent; isptrIdent; tinfIdent]) in * by reflexivity. apply NoDup_cons_r in H23. inversion H23. apply H24; inList. 
+        intro Hcase_eq. pose proof disjointIdent as Hnd.
+        unfold protectedIdent_thm, protectedIdent in Hnd.
+        rewrite Hcase_eq in Hnd.
+        replace [argsIdent; allocIdent; limitIdent; gcIdent; mainIdent; bodyIdent;
+          threadInfIdent; tinfIdent; heapInfIdent; numArgsIdent; numArgsIdent;
+          isptrIdent; tinfIdent] with
+          ([argsIdent; allocIdent; limitIdent; gcIdent; mainIdent; bodyIdent;
+            threadInfIdent] ++ tinfIdent :: [heapInfIdent; numArgsIdent; numArgsIdent;
+            isptrIdent; tinfIdent]) in Hnd by reflexivity.
+        apply NoDup_remove_2 in Hnd. apply Hnd. inList.
       - intros. 
         specialize (Hmem_rel x7). destruct Hmem_rel as [Hmem_rel Hmem_rel'].
         split; intros.
@@ -9385,20 +9393,17 @@ Forall2
       apply inj_le.
       eapply max_allocs_case.
       apply findtag_In. eauto.
-      intro.  
-      assert (Hdj:=disjointIdent).
-      inv Hdj.
-      inv H. clear H2.
-      inv H6. apply H3; inList.      
-      destruct H2; subst.
-      clear H. inv H6. inv H7. apply H6; inList.
-      clear H.
-      apply H5; inList.
-      assert (Hdj:=disjointIdent).
-      inv Hdj.
-      intro. inv H5. clear H.  inv H8.
-      inv H6. inv H9. inv H10. inv H11. inv H12. apply H11.
-      inList.
+      apply is_protected_not_tinfo. inList.
+      intro Hcase_eq2. pose proof disjointIdent as Hnd2.
+      unfold protectedIdent_thm, protectedIdent in Hnd2.
+      rewrite Hcase_eq2 in Hnd2.
+      replace [argsIdent; allocIdent; limitIdent; gcIdent; mainIdent; bodyIdent;
+        threadInfIdent; tinfIdent; heapInfIdent; numArgsIdent; numArgsIdent;
+        isptrIdent; tinfIdent] with
+        ([argsIdent; allocIdent; limitIdent; gcIdent; mainIdent; bodyIdent;
+          threadInfIdent] ++ tinfIdent :: [heapInfIdent; numArgsIdent; numArgsIdent;
+          isptrIdent; tinfIdent]) in Hnd2 by reflexivity.
+      apply NoDup_remove_2 in Hnd2. apply Hnd2. inList.
     }
 
     specialize (IHHev H_cenv_e Hp_id_e H_rho_id_e Hf_id_e _ _ _ (Kseq Sbreak (Kseq s' (Kswitch k))) _ fu H_repr_es Hmem_e Hca_e H_tinfo_e).
@@ -9423,8 +9428,16 @@ Forall2
     split; auto.
     unfold same_args_ptr in *. rewrite <- Hargs1.
     rewrite M.gso; auto.
-    assert (H_dj := disjointIdent). inv H_dj.
-    intro; apply H3; subst; inList.     
+    intro Hcase_eq3. pose proof disjointIdent as Hnd3.
+    unfold protectedIdent_thm, protectedIdent in Hnd3.
+    rewrite Hcase_eq3 in Hnd3.
+    replace [caseIdent; allocIdent; limitIdent; gcIdent; mainIdent; bodyIdent;
+      threadInfIdent; tinfIdent; heapInfIdent; numArgsIdent; numArgsIdent;
+      isptrIdent; caseIdent] with
+      ([caseIdent; allocIdent; limitIdent; gcIdent; mainIdent; bodyIdent;
+        threadInfIdent; tinfIdent; heapInfIdent; numArgsIdent; numArgsIdent;
+        isptrIdent] ++ caseIdent :: []) in Hnd3 by reflexivity.
+    apply NoDup_remove_2 in Hnd3. apply Hnd3. inList.
   - (* Eapp  *)  (* CHANGE THIS *)  
 
     (* need assumption that unique_binding_env -> done! and functions_not_bound is preserved by all closures (rho', e) in rho - DONE *)
@@ -9534,13 +9547,10 @@ Forall2
         simpl. apply f_equal.
         auto.
     }
-    assert (HSkipnLength : forall {A B} n (l1 : list A) (l2 : list B), length l1 = length l2 -> length (skipn n l1) = length (skipn n l2)). (* TODO : move out *)
+    assert (HSkipnLength : forall {A B} n (l1 : list A) (l2 : list B), length l1 = length l2 -> length (skipn n l1) = length (skipn n l2)).
     {
-      intros A B n l1. generalize n. clear n. induction l1; intros n l2 Hlen; destruct l2; [ | inv Hlen | inv Hlen | ].
-      + destruct n; reflexivity.
-      + inv Hlen. destruct n.
-        * simpl. apply f_equal. auto.
-        * simpl. apply IHl1; auto.
+      intros A B n0 l0 l2 Hlen.
+      do 2 rewrite skipn_length. lia.
     }
     assert (Hbys : Forall (fun x : positive => exists v : Values.val, get_var_or_funvar p lenv x v) bys).
     {
@@ -9773,8 +9783,8 @@ Forall2
 
     remember (create_undef_temps (skipn nParam vars ++ gc_vars argsIdent allocIdent limitIdent caseIdent)) as lenv_new''.
     
-    set (lenv_new' := mk_gc_call_env p bys bvsm4 lenv lenv_new'' Hbys bys_bvsm4_length).
-    assert (lenv_newEq' : lenv_new' = mk_gc_call_env p bys bvsm4 lenv lenv_new'' Hbys bys_bvsm4_length) by reflexivity.
+    set (lenv_new' := mk_gc_call_lenv p bys bvsm4 lenv lenv_new'').
+    assert (lenv_newEq' : lenv_new' = mk_gc_call_lenv p bys bvsm4 lenv lenv_new'') by reflexivity.
  
     set (lenv_new := Maps.PTree.set tinfIdent (Vptr tinf_b tinf_ofs) lenv_new').
     assert (lenv_newEq : lenv_new = Maps.PTree.set tinfIdent (Vptr tinf_b tinf_ofs) lenv_new') by reflexivity.    
@@ -10055,7 +10065,7 @@ Forall2
     {
       rewrite lenv_newEq.
       apply Forall_forall. intros.
-      assert (Hcorrect := proj1 (Forall_forall _ _) (mk_gc_call_env_correct p bys bvsm4 lenv lenv_new'' Hbys bys_bvsm4_length Hbvsm4_nodup) x H1).
+      assert (Hcorrect := proj1 (Forall_forall _ _) (mk_gc_call_lenv_correct p bys bvsm4 lenv lenv_new'' Hbys bys_bvsm4_length Hbvsm4_nodup _) x H1).
       rewrite <- lenv_newEq' in Hcorrect.
       destruct Hcorrect as [z Hz].
       exists z.

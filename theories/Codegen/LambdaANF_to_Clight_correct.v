@@ -3740,6 +3740,55 @@ Definition traceless_step2:  genv -> state -> state -> Prop := fun ge s s' => st
 
 Definition m_tstep2 (ge:genv):=  clos_trans state (traceless_step2 ge).
 
+Lemma m_tstep2_step :
+  forall ge s s',
+    traceless_step2 ge s s' ->
+    m_tstep2 ge s s'.
+Proof.
+  intros ge s s' Hstep.
+  apply t_step.
+  exact Hstep.
+Qed.
+
+Lemma m_tstep2_transitive :
+  forall ge s1 s2 s3,
+    m_tstep2 ge s1 s2 ->
+    m_tstep2 ge s2 s3 ->
+    m_tstep2 ge s1 s3.
+Proof.
+  intros ge s1 s2 s3 H12 H23.
+  eapply t_trans; eauto.
+Qed.
+
+Lemma m_tstep2_of_rt :
+  forall ge s1 s2,
+    clos_refl_trans state (traceless_step2 ge) s1 s2 ->
+    forall s3,
+      m_tstep2 ge s2 s3 ->
+      m_tstep2 ge s1 s3.
+Proof.
+  intros ge s1 s2 Hrt.
+  induction Hrt; intros s3 H23.
+  - eapply m_tstep2_transitive.
+    + apply m_tstep2_step. exact H.
+    + exact H23.
+  - exact H23.
+  - eapply IHHrt1.
+    eapply IHHrt2.
+    exact H23.
+Qed.
+
+Lemma m_tstep2_of_rt_then_step :
+  forall ge s1 s2 s3,
+    clos_refl_trans state (traceless_step2 ge) s1 s2 ->
+    traceless_step2 ge s2 s3 ->
+    m_tstep2 ge s1 s3.
+Proof.
+  intros ge s1 s2 s3 Hrt Hstep.
+  eapply m_tstep2_of_rt; eauto.
+  apply m_tstep2_step. exact Hstep.
+Qed.
+
 #[local] Hint Unfold Ptrofs.modulus Ptrofs.max_unsigned uint_range : core.
 #[local] Hint Transparent Ptrofs.max_unsigned Ptrofs.modulus uint_range : core.
  
@@ -7356,6 +7405,18 @@ Proof.
   - split; assumption.
 Qed.
 
+Lemma arg_val_same_args_ptr_iff :
+  forall fenv finfo_env p rep_env v m lenv lenv',
+    same_args_ptr lenv lenv' ->
+    (arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m lenv <->
+     arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m lenv').
+Proof.
+  intros fenv finfo_env p rep_env v m lenv lenv' Hsame.
+  split.
+  - apply arg_val_same_args_ptr_right; assumption.
+  - apply arg_val_same_args_ptr_left; assumption.
+Qed.
+
 Lemma rel_mem_occurs_free_get :
   forall fenv finfo_env p rep_env e rho m lenv x,
     rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e rho m lenv ->
@@ -7447,6 +7508,267 @@ Proof.
   eapply rel_mem_fun_subval_info; eauto.
   unfold subval_or_eq.
   apply rt_refl.
+Qed.
+
+Lemma repr_expr_efun_false :
+  forall fenv finfo_env p rep_env fds e stm,
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Efun fds e) stm ->
+    False.
+Proof.
+  intros fenv finfo_env p rep_env fds e stm Hrepr.
+  inversion Hrepr.
+Qed.
+
+Lemma repr_expr_eprim_val_false :
+  forall fenv finfo_env p rep_env x p0 e stm,
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eprim_val x p0 e) stm ->
+    False.
+Proof.
+  intros fenv finfo_env p rep_env x p0 e stm Hrepr.
+  inversion Hrepr.
+Qed.
+
+Lemma repr_expr_eprim_false :
+  forall fenv finfo_env p rep_env x f ys e stm,
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eprim x f ys e) stm ->
+    False.
+Proof.
+  intros fenv finfo_env p rep_env x f ys e stm Hrepr.
+  inversion Hrepr.
+Qed.
+
+Lemma repr_expr_econstr_inv :
+  forall fenv finfo_env p rep_env x t ys e stm,
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Econstr x t ys e) stm ->
+    exists s s',
+      repr_asgn_constr allocIdent threadInfIdent nParam fenv finfo_env p rep_env
+        x t ys s /\
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e s' /\
+      stm = Ssequence s s'.
+Proof.
+  intros fenv finfo_env p rep_env x t ys e stm Hrepr.
+  inversion Hrepr; subst.
+  exists s, s'.
+  repeat split; assumption.
+Qed.
+
+Lemma protected_id_not_bound_subterm :
+  forall rho e e',
+    protected_id_not_bound_id rho e ->
+    subterm_e e' e ->
+    protected_id_not_bound_id rho e'.
+Proof.
+  intros rho e e' Hprot Hsub.
+  destruct Hprot as [Hrho Hexp].
+  split.
+  - exact Hrho.
+  - intros y Hy Hbv.
+    eapply Hexp; eauto.
+    eapply bound_var_subterm_e; eauto.
+Qed.
+
+Lemma unique_bindings_env_set :
+  forall rho e x v,
+    unique_bindings_env rho e ->
+    ~ bound_var e x ->
+    unique_bindings_val v ->
+    unique_bindings_env (M.set x v rho) e.
+Proof.
+  intros rho e x v Hub_env Hx_not_bound Huv.
+  destruct Hub_env as [Hub Henv].
+  split.
+  - exact Hub.
+  - intros y vy Hget.
+    destruct (var_dec y x).
+    + subst.
+      rewrite M.gss in Hget.
+      inversion Hget; subst.
+      split; assumption.
+    + rewrite M.gso in Hget by assumption.
+      specialize (Henv _ _ Hget) as [Hnb Huvy].
+      split; assumption.
+Qed.
+
+Lemma protected_id_not_bound_set :
+  forall rho e x v,
+    protected_id_not_bound_id rho e ->
+    ~ is_protected_id_thm x ->
+    (forall y, is_protected_id_thm y -> ~ bound_var_val v y) ->
+    protected_id_not_bound_id (M.set x v rho) e.
+Proof.
+  intros rho e x v Hprot Hx_prot Hvb.
+  destruct Hprot as [Hrho Hexp].
+  split.
+  - intros x0 y v0 Hget Hy.
+    destruct (var_dec x0 x).
+    + subst.
+      rewrite M.gss in Hget.
+      inversion Hget; subst.
+      intro Hor.
+      destruct Hor as [Heq | Hbound].
+      * subst. contradiction.
+      * eapply Hvb; eauto.
+    + rewrite M.gso in Hget by assumption.
+      eapply Hrho; eauto.
+  - exact Hexp.
+Qed.
+
+Lemma protected_id_not_bound_econstr_head :
+  forall rho x t ys e,
+    protected_id_not_bound_id rho (Econstr x t ys e) ->
+    ~ is_protected_id_thm x.
+Proof.
+  intros rho x t ys e Hprot Hx.
+  destruct Hprot as [_ Hexp].
+  eapply Hexp; eauto.
+Qed.
+
+Lemma protected_id_not_bound_eproj_head :
+  forall rho x t n y e,
+    protected_id_not_bound_id rho (Eproj x t n y e) ->
+    ~ is_protected_id_thm x.
+Proof.
+  intros rho x t n y e Hprot Hx.
+  destruct Hprot as [_ Hexp].
+  eapply Hexp; eauto.
+Qed.
+
+Lemma protected_id_not_bound_eletapp_head :
+  forall rho x f t ys e,
+    protected_id_not_bound_id rho (Eletapp x f t ys e) ->
+    ~ is_protected_id_thm x.
+Proof.
+  intros rho x f t ys e Hprot Hx.
+  destruct Hprot as [_ Hexp].
+  eapply Hexp; eauto.
+Qed.
+
+Lemma functions_not_bound_set_constr :
+  forall p rho e x t ys vs,
+    functions_not_bound p rho e ->
+    get_list ys rho = Some vs ->
+    functions_not_bound p (M.set x (Vconstr t vs) rho) e.
+Proof.
+  intros p rho e x t ys vs Hfnb Hgl.
+  eapply functions_not_bound_set; [exact Hfnb |].
+  intros z Hb.
+  inversion Hb; subst.
+  match goal with
+  | Hbn : bound_notfun_val ?v z, Hin : List.In ?v vs |- _ =>
+      destruct (get_list_In_val _ _ _ _ Hgl Hin) as [y [Hyin Hgety]];
+      destruct Hfnb as [_ Hrho];
+      eapply Hrho; eauto
+  end.
+Qed.
+
+Lemma nthN_in :
+  forall {A} (ls : list A) n x,
+    nthN ls n = Some x ->
+    List.In x ls.
+Proof.
+  induction ls as [|a ls IH]; intros n x Hnth.
+  - destruct n; inversion Hnth.
+  - destruct n.
+    + simpl in Hnth. inversion Hnth; subst. left; reflexivity.
+    + simpl in Hnth. right. eapply IH; eauto.
+Qed.
+
+Lemma functions_not_bound_set_proj :
+  forall p rho e x y t vs n v,
+    functions_not_bound p rho e ->
+    M.get y rho = Some (Vconstr t vs) ->
+    nthN vs n = Some v ->
+    functions_not_bound p (M.set x v rho) e.
+Proof.
+  intros p rho e x y t vs n v Hfnb Hgety Hnth.
+  eapply functions_not_bound_set; [exact Hfnb |].
+  intros z Hbn.
+  assert (Hbn_constr : bound_notfun_val (Vconstr t vs) z).
+  { eapply Bound_FVconstr; eauto.
+    apply nthN_in with (n := n); exact Hnth. }
+  destruct Hfnb as [_ Hrho].
+  eapply Hrho; eauto.
+Qed.
+
+Lemma rel_mem_halt_get_repr :
+  forall fenv finfo_env p rep_env rho m lenv x v,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) rho m lenv ->
+    M.get x rho = Some v ->
+    exists L,
+      protected_not_in_L_id p lenv L /\
+      repr_val_id_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L lenv x.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x v Hrel Hget.
+  assert (Hfree : occurs_free (Ehalt x) x) by constructor.
+  destruct (rel_mem_occurs_free_repr _ _ _ _ _ _ _ _ _ Hrel Hfree)
+    as [v6 [L [Hprot [Hget6 Hrepr]]]].
+  rewrite Hget in Hget6.
+  inversion Hget6; subst.
+  exists L.
+  split; assumption.
+Qed.
+
+Lemma rel_mem_halt_get_var_or_funvar :
+  forall fenv finfo_env p rep_env rho m lenv x v,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) rho m lenv ->
+    M.get x rho = Some v ->
+    exists L v7,
+      protected_not_in_L_id p lenv L /\
+      get_var_or_funvar p lenv x v7 /\
+      repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L v7.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x v Hrel Hget.
+  destruct (rel_mem_halt_get_repr _ _ _ _ _ _ _ _ _ Hrel Hget)
+    as [L [Hprot Hrepr_id]].
+  inversion Hrepr_id; subst.
+  - exists L, (Vptr b Ptrofs.zero).
+    split; [exact Hprot |].
+    split.
+    + constructor.
+      exact H.
+    + exact H0.
+  - exists L, v7.
+    split; [exact Hprot |].
+    split.
+    + econstructor 2; eauto.
+      eapply repr_val_id_L_LambdaANF_Codegen_vint_or_vptr; eauto.
+    + exact H1.
+Qed.
+
+Lemma arg_val_after_args_store :
+  forall fenv finfo_env p rep_env v lenv m m' L args_b args_ofs v7,
+    M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
+    Mem.store int_chunk m args_b
+      (Ptrofs.unsigned (Ptrofs.add args_ofs (Ptrofs.repr int_size))) v7 = Some m' ->
+    Mem.unchanged_on L m m' ->
+    repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L v7 ->
+    arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv.
+Proof.
+  intros fenv finfo_env p rep_env v lenv m m' L args_b args_ofs v7 Hargs Hstore Hunch Hrepr.
+  exists args_b, args_ofs, (Val.load_result int_chunk v7), L.
+  split.
+  - exact Hargs.
+  - split.
+    + eapply Mem.load_store_same in Hstore.
+      exact Hstore.
+    + eapply repr_val_L_unchanged; eauto.
+      eapply repr_val_L_load_result; eauto.
+Qed.
+
+Lemma repr_bs_post_has_args_ptr :
+  forall fenv finfo_env p rep_env v lenv k fu stm m m',
+    (exists lenv',
+       m_tstep2 (globalenv p) (State fu stm k empty_env lenv m)
+         (State fu Sskip k empty_env lenv' m') /\
+       same_args_ptr lenv lenv' /\
+       arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv') ->
+    exists args_b args_ofs, M.get argsIdent lenv = Some (Vptr args_b args_ofs).
+Proof.
+  intros fenv finfo_env p rep_env v lenv k fu stm m m' Hpost.
+  destruct Hpost as [lenv' [_ [Hsame Harg]]].
+  destruct (arg_val_has_args_ptr _ _ _ _ _ _ _ Harg) as [args_b [args_ofs Hget']].
+  exists args_b, args_ofs.
+  eapply same_args_ptr_get_left; eauto.
 Qed.
 
 (* Main Theorem *)

@@ -8212,6 +8212,88 @@ Proof.
   - eapply bstep_repr_eprim_false; eauto.
 Qed.
 
+Lemma halt_rel_repr_extract :
+  forall fenv finfo_env p rep_env rho m lenv x v stm,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) rho m lenv ->
+    M.get x rho = Some v ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) stm ->
+    exists L v7 e,
+      protected_not_in_L_id p lenv L /\
+      get_var_or_funvar p lenv x v7 /\
+      repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L v7 /\
+      var_or_funvar threadInfIdent nParam fenv finfo_env p x e.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x v stm Hrel Hget Hrepr.
+  destruct (rel_mem_halt_get_var_or_funvar _ _ _ _ _ _ _ _ _ Hrel Hget)
+    as [L [v7 [Hprot [Hgvof Hreprv]]]].
+  destruct (repr_expr_ehalt_inv _ _ _ _ _ _ Hrepr) as [e Hvof].
+  exists L, v7, e.
+  repeat split; assumption.
+Qed.
+
+Lemma halt_rel_repr_eval_cast :
+  forall fenv finfo_env p rep_env rho m lenv x v stm,
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) rho m lenv ->
+    M.get x rho = Some v ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) stm ->
+    exists L v7 e,
+      protected_not_in_L_id p lenv L /\
+      get_var_or_funvar p lenv x v7 /\
+      repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L v7 /\
+      var_or_funvar threadInfIdent nParam fenv finfo_env p x e /\
+      eval_expr (globalenv p) empty_env lenv m e v7 /\
+      sem_cast v7 (typeof e) val m = Some v7.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x v stm Hsym Hfinfo Hrel Hget Hrepr.
+  destruct (halt_rel_repr_extract _ _ _ _ _ _ _ _ _ _ Hrel Hget Hrepr)
+    as [L [v7 [e [Hprot [Hgvof [Hreprv Hvof]]]]]].
+  pose proof (proj1 (var_or_funvar_of_f threadInfIdent nParam fenv finfo_env p x e) Hvof)
+    as Heq.
+  exists L, v7, e.
+  repeat split; try assumption.
+  - rewrite <- Heq.
+    eapply get_var_or_funvar_eval; eauto.
+  - rewrite <- Heq.
+    eapply get_var_or_funvar_semcast; eauto.
+Qed.
+
+Lemma protected_not_in_L_args1_store_unchanged :
+  forall p lenv L m m' args_b args_ofs v7,
+    protected_not_in_L_id p lenv L ->
+    M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
+    Mem.store int_chunk m args_b
+      (Ptrofs.unsigned (Ptrofs.add args_ofs (Ptrofs.repr int_size))) v7 = Some m' ->
+    Mem.unchanged_on L m m'.
+Proof.
+  intros p lenv L m m' args_b args_ofs v7 Hprot Hargs Hstore.
+  destruct Hprot as [alloc_b [alloc_ofs [limit_ofs [args_b' [args_ofs' [tinf_b [tinf_ofs
+    [Halloc [HallocL [Hlimit [Hargs' [HargsL [Htinf [HtinfL Hglob]]]]]]]]]]]]]].
+  rewrite Hargs' in Hargs.
+  inversion Hargs; subst.
+  eapply Mem.store_unchanged_on; eauto.
+  intros i Hi.
+  assert (Hone : (0 <= 1 < max_args)%Z) by (unfold max_args; lia).
+  replace (Ptrofs.repr int_size) with (Ptrofs.repr (int_size * 1)) in Hi
+    by (f_equal; lia).
+  eapply HargsL; eauto.
+Qed.
+
+Lemma halt_args1_store_arg_val :
+  forall fenv finfo_env p rep_env v lenv m m' L args_b args_ofs v7,
+    protected_not_in_L_id p lenv L ->
+    M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
+    Mem.store int_chunk m args_b
+      (Ptrofs.unsigned (Ptrofs.add args_ofs (Ptrofs.repr int_size))) v7 = Some m' ->
+    repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L v7 ->
+    arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv.
+Proof.
+  intros fenv finfo_env p rep_env v lenv m m' L args_b args_ofs v7 Hprot Hargs Hstore Hrepr.
+  eapply arg_val_after_args_store; eauto.
+  eapply protected_not_in_L_args1_store_unchanged; eauto.
+Qed.
+
 (* Main Theorem *)
 Theorem repr_bs_LambdaANF_Codegen_related:
   forall (p : program) (rep_env : M.t ctor_rep) (cenv : ctor_env)

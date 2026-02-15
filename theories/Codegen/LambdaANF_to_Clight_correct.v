@@ -607,7 +607,7 @@ Notation "'bvar' x" := (Etempvar x boolTy) (at level 20).
 Notation "'funVar' x" := (Evar x funTy) (at level 20).
 
 
-Notation allocPtr := (Etempvar allocIdent valPtr).
+Notation allocPtr := (LambdaANF_to_Clight.allocPtr allocIdent).
 Notation limitPtr := (Etempvar limitIdent valPtr).
 Notation args := (Etempvar argsIdent valPtr).
 Notation gc := (Evar gcIdent gcTy).
@@ -1905,9 +1905,9 @@ Inductive repr_asgn_constr: positive -> ctor_tag -> list positive -> statement -
     M.get t rep_env = Some (boxed n a) ->
     boxed_header n a h -> 
     Forall_statements_in_seq (is_nth_projection_of_x x) vs s -> 
-    repr_asgn_constr x t vs (x ::= [val] (allocPtr +' (c_int Z.one val));
+    repr_asgn_constr x t vs (x ::= [val] (allocPtr +' (c_int Z.one uval));
                                      allocIdent ::= allocPtr +'
-                                           (c_int (Z.of_N (a + 1)) val); Field(var x, -1) :::= c_int h val;  s)
+                                           (c_int (Z.of_N (a + 1)) uval); Field(var x, -1) :::= c_int h val;  s)
 | Rconstr_ass_enum: forall x t n h,
     (* unboxed x *)
     M.get t rep_env  = Some (enum n) ->
@@ -6403,7 +6403,8 @@ Proof.
     inv H. specialize (H1 _ _ _ _ _ _ H0). destruct H1. destruct H.
     rewrite OrdersEx.N_as_OT.eqb_neq in Hll.
     inv H1; rewrite H3 in H0; inv H0. exfalso; auto.
-    econstructor. eauto.
+    cbn [LambdaANF_to_Clight.allocPtr].
+    econstructor 1; eauto.
     { split. unfold makeTagZ in *. unfold make_ctor_rep in *.
       rewrite H3 in H_makeTagZ. simpl in H_makeTagZ.
       inv H_makeTagZ; auto.

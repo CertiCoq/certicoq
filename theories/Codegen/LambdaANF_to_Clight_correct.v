@@ -747,7 +747,7 @@ Inductive repr_asgn_fun': list positive -> list N -> statement -> Prop :=
 
 Inductive repr_asgn_fun: list positive -> list N -> statement -> Prop :=
   |repr_asgn_wrap: forall ys inf s, repr_asgn_fun' ys inf s ->
-                   repr_asgn_fun ys inf (argsIdent ::= Efield tinfd argsIdent (Tarray val maxArgs noattr);s).
+                   repr_asgn_fun ys inf (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s).
 
 Inductive repr_call_vars' (par : nat) : nat -> list positive -> list expr -> Prop :=
 | repr_call_nil : repr_call_vars' par 0 [] []
@@ -1964,9 +1964,11 @@ Inductive repr_expr_LambdaANF_Codegen: cps.exp -> statement -> Prop :=
        x ::= Field(args, Z.of_nat 1);
        s')
 | R_halt_e: forall v e,
-    (* halt v <-> end with v in args[1] *)
+    (* halt v <-> store alloc/limit back to tinfo, then set args[1] *)
     var_or_funvar v e ->
-    repr_expr_LambdaANF_Codegen (Ehalt v)  (args[Z.of_nat 1 ] :::= e)
+    repr_expr_LambdaANF_Codegen (Ehalt v)  (Efield tinfd allocIdent valPtr :::= allocPtr ;
+                                             Efield tinfd limitIdent valPtr :::= limitPtr ;
+                                             args[Z.of_nat 1 ] :::= e)
 | Rcase_e: forall v cl ls ls' s ,
     (* 1 - branches matches the lists of two lists of labeled statements *)
     repr_branches_LambdaANF_Codegen cl ls ls' -> 
@@ -6441,6 +6443,65 @@ Proof.
   destruct  (ctor_arity =? 0)%N; inv H. auto.
 Qed.
 
+(* Predicate: expression contains no primitive operations *)
+Inductive no_primops : exp -> Prop :=
+| np_constr : forall x t vs e, no_primops e -> no_primops (Econstr x t vs e)
+| np_case : forall v cl, Forall (fun p => no_primops (snd p)) cl -> no_primops (Ecase v cl)
+| np_proj : forall x t n v e, no_primops e -> no_primops (Eproj x t n v e)
+| np_letapp : forall x f t ys e, no_primops e -> no_primops (Eletapp x f t ys e)
+| np_fun : forall fds e, no_primops (Efun fds e)
+| np_app : forall f t ys, no_primops (Eapp f t ys)
+| np_halt : forall x, no_primops (Ehalt x).
+
+(* Helper: makeCases produces branches related by repr_branches_LambdaANF_Codegen *)
+Lemma makeCases_correct:
+  forall fenv cenv ienv p rep_env map,
+    find_symbol_domain p map ->
+    finfo_env_correct fenv map ->
+    correct_crep_of_env cenv rep_env ->
+    forall cl ls ls',
+      Forall (fun p => no_primops (snd p)) cl ->
+      Forall (fun p => correct_cenv_of_exp cenv (snd p)) cl ->
+      Forall (fun pe =>
+        forall stm,
+          no_primops (snd pe) ->
+          correct_cenv_of_exp cenv (snd pe) ->
+          @LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims (snd pe) fenv cenv ienv map = Some stm ->
+          repr_expr_LambdaANF_Codegen_id fenv map p rep_env (snd pe) stm) cl ->
+      makeCases p fenv cenv ienv map cl = Some (ls, ls') ->
+      repr_branches_LambdaANF_Codegen argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv map p rep_env cl ls ls'.
+Proof.
+  intros fenv cenv ienv p rep_env map Hsym HfinfoCorrect Hcrep.
+  induction cl as [| [c e] cl' IHcl]; intros ls ls' Hnp Hcenv_cl Hrepr_cl Hmc.
+  - simpl in Hmc. inv Hmc. constructor.
+  - simpl in Hmc.
+    destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb; [| inv Hmc].
+    destruct (makeCases p fenv cenv ienv map cl') eqn:Hmc'; [| inv Hmc].
+    destruct p0 as [ls0 ls0'].
+    inversion Hnp as [| [c1 e1] cl1 Hnp_hd Hnp_tl]; subst.
+    inversion Hcenv_cl as [| [c2 e2] cl2 Hcenv_hd Hcenv_tl]; subst.
+    inversion Hrepr_cl as [| [c3 e3] cl3 Hrepr_hd Hrepr_tl]; subst.
+    assert (Hprog : repr_expr_LambdaANF_Codegen_id fenv map p rep_env e s).
+    { eapply Hrepr_hd; eauto. }
+    assert (Hcl' : repr_branches_LambdaANF_Codegen argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv map p rep_env cl' ls0 ls0').
+    { eapply IHcl; eauto. }
+    rewrite (crep_cenv_correct _ _ Hcrep) in Hmc.
+    destruct (M.get c rep_env) eqn:Hrep; [| inv Hmc].
+    destruct c0.
+    + (* enum *)
+      destruct ls0'; inv Hmc.
+      * eapply Runboxed_default_br; eauto.
+      * eapply Runboxed_br; eauto.
+        inv Hcrep. apply H0 in Hrep. inv Hrep.
+        split; auto.
+    + (* boxed *)
+      destruct ls0; inv Hmc.
+      * eapply Rboxed_default_br; eauto.
+      * eapply Rboxed_br; eauto.
+        inv Hcrep. apply H0 in Hrep. inv Hrep.
+        split; [reflexivity | split; auto].
+Qed.
+
 (* Main Theorem *)
 Theorem translate_body_correct:
   forall fenv cenv ienv  p rep_env map,
@@ -6448,14 +6509,269 @@ Theorem translate_body_correct:
     finfo_env_correct fenv map ->
     correct_crep_of_env cenv rep_env ->
     forall  e stm,
+      no_primops e ->
       correct_cenv_of_exp cenv e ->
     @LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map = Some stm ->
     repr_expr_LambdaANF_Codegen_id fenv map p rep_env e stm.
 Proof.
-  (* WIP: Eletapp case has var_or_funvar_f argument order issue; admit entire theorem for now *)
-Admitted.
-
-
+  intros fenv cenv ienv p rep_env map Hsym HfinfoCorrect Hcrep.
+  pose (P :=
+    fun e =>
+      forall stm,
+        no_primops e ->
+        correct_cenv_of_exp cenv e ->
+        @LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map = Some stm ->
+        repr_expr_LambdaANF_Codegen_id fenv map p rep_env e stm).
+  assert (HP : forall e, P e).
+  {
+    eapply (exp_mut_alt P (fun _ => True)); unfold P; intros.
+    - (* Econstr *)
+      simpl in H2.
+      destruct (assignConstructorS allocIdent threadInfIdent nParam cenv ienv fenv map v t l) eqn:Has; [| inv H2].
+      destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb'; [| inv H2].
+      inv H2.
+      econstructor.
+      + assert (Hcenv_constr := H1 v t l e (rt_refl _ _ _)).
+        unfold correct_cenv_of_exp, Forall_constructors_in_e in Hcenv_constr.
+        destruct (M.get t cenv) as [ci|] eqn:Hgc; [| contradiction].
+        destruct ci.
+        eapply repr_asgn_constructorS; eauto.
+        rewrite <- Hcenv_constr in Hgc. exact Hgc.
+      + eapply H; eauto.
+        * inv H0. auto.
+        * eapply Forall_constructors_subterm; [exact H1 |].
+          constructor. constructor.
+    - (* Ecase *)
+      simpl in H2.
+      change (
+        match makeCases p fenv cenv ienv map l with
+        | Some (ls0, ls0') => Some (make_case_switch isptrIdent caseIdent v ls0 ls0')
+        | None => None
+        end = Some stm) in H2.
+      destruct (makeCases p fenv cenv ienv map l) as [[ls ls']|] eqn:Hmc in H2; [| inv H2].
+      inv H2.
+      assert (Hcenv_l : Forall (fun pe => correct_cenv_of_exp cenv (snd pe)) l).
+      {
+        apply Forall_forall.
+        intros [g e0] Hin.
+        eapply correct_cenv_of_case in H1.
+        eapply H1; eauto.
+      }
+      econstructor.
+      + eapply makeCases_correct.
+        * exact Hsym.
+        * exact HfinfoCorrect.
+        * exact Hcrep.
+        * inv H0; auto.
+        * exact Hcenv_l.
+        * exact H.
+        * exact Hmc.
+      + eapply repr_make_case_switch.
+    - (* Eproj *)
+      simpl in H2.
+      destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb'; [| inv H2].
+      inv H2.
+      econstructor.
+      eapply H; eauto.
+      * inv H0. auto.
+      * eapply Forall_constructors_subterm; [exact H1 |].
+        constructor. constructor.
+    - (* Eletapp *)
+      simpl in H2.
+      destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb'; [| inv H2].
+      destruct (M.get ft fenv) as [p_ft|] eqn:Hfenv; [| inv H2].
+      destruct p_ft as [nn locs].
+      destruct (asgnAppVars argsIdent threadInfIdent tinfIdent nParam ys (snd (nn, locs)) fenv map) eqn:Hasn; [| inv H2].
+      destruct (mkCall threadInfIdent tinfIdent nParam fenv map _ _ ys) eqn:Hmkc; [| inv H2].
+      inv H2.
+      unfold asgnAppVars in Hasn.
+      destruct (asgnAppVars' argsIdent threadInfIdent nParam ys (snd (nn, locs)) fenv map) eqn:Hasn'; [| inv Hasn].
+      inv Hasn.
+      unfold mkCall in Hmkc.
+      change (fst (nn, locs)) with nn in Hmkc.
+      set (pnum := Init.Nat.min (N.to_nat nn) nParam) in *.
+      destruct (mkCallVars threadInfIdent nParam fenv map pnum (firstn nParam ys)) as [l_call|] eqn:Hmkcv in Hmkc; [| inv Hmkc].
+      rename Hmkcv into Hmkcv_outer.
+      pose proof Hmkcv_outer as Hmkcv_keep.
+      try rewrite Hmkcv_outer in Hmkc.
+      simpl in Hmkc.
+      inversion Hmkc; subst; clear Hmkc.
+      assert (Hs1 :
+        s1 =
+        Scall None
+          (Ecast (makeVar threadInfIdent nParam f fenv map)
+             (Tpointer (mkFunTy threadInfIdent pnum) noattr))
+          (tinf threadInfIdent tinfIdent :: l_call)).
+      {
+        assert (Hmcall :
+          match mkCallVars threadInfIdent nParam fenv map pnum (firstn nParam ys) with
+          | Some v =>
+              Some
+                (Scall None
+                   (Ecast (makeVar threadInfIdent nParam f fenv map)
+                      (Tpointer (mkFunTy threadInfIdent pnum) noattr))
+                   (tinf threadInfIdent tinfIdent :: v))
+          | None => None
+          end = Some s1).
+        { first [ exact H3 | exact H4 | exact H5 | exact H6 | exact H7 | exact H8 ]. }
+        rewrite Hmkcv_outer in Hmcall.
+        simpl in Hmcall.
+        inversion Hmcall; subst.
+        reflexivity.
+      }
+      subst s1.
+      rewrite <- (find_symbol_map_f p fenv nParam map threadInfIdent f Hsym).
+      eapply (@R_letapp_e argsIdent allocIdent limitIdent threadInfIdent tinfIdent
+               isptrIdent caseIdent nParam fenv map p rep_env
+               x f (nn, locs) (skipn nParam (snd (nn, locs))) ys
+               (skipn nParam ys) (firstn nParam ys) pnum ft
+               _ l_call e s); try reflexivity.
+      + exact Hfenv.
+      + change (Tarray uval LambdaANF_to_Clight.maxArgs noattr) with (Tarray uval maxArgs noattr).
+        change (Tarray val maxArgs noattr) with (Tarray uval maxArgs noattr).
+        constructor.
+        eapply asgnAppVars_correct.
+        * exact Hsym.
+        * reflexivity.
+        * reflexivity.
+        * exact Hasn'.
+      + eapply mkCallVars_correct.
+        * exact Hsym.
+        * reflexivity.
+        * exact Hmkcv_keep.
+      + unfold repr_expr_LambdaANF_Codegen_id in H.
+        eapply H.
+        * inv H0. auto.
+        * eapply Forall_constructors_subterm; [exact H1 |].
+          constructor. constructor.
+        * reflexivity.
+      + change
+          (match mkCallVars threadInfIdent nParam fenv map pnum (firstn nParam ys) with
+           | Some v =>
+               Some
+                 (Scall None
+                    (Ecast (makeVar threadInfIdent nParam f fenv map)
+                       (Tpointer (mkFunTy threadInfIdent pnum) noattr))
+                    (tinf threadInfIdent tinfIdent :: v))
+           | None => None
+           end = Some s1) in H3.
+        rewrite Hmkcv in H3.
+        simpl in H3.
+        discriminate.
+    - (* Efun *)
+      simpl in *. congruence.
+    - (* Eapp *)
+      simpl in H1.
+      destruct (M.get t fenv) as [p_t|] eqn:Hfenv; [| inv H1].
+      destruct (asgnAppVars argsIdent threadInfIdent tinfIdent nParam l (snd p_t) fenv map) eqn:Hasn; [| inv H1].
+      destruct (mkCall threadInfIdent tinfIdent nParam fenv map _ _ l) eqn:Hmkc; [| inv H1].
+      inv H1.
+      destruct p_t as [nn locs].
+      unfold asgnAppVars in Hasn.
+      destruct (asgnAppVars' argsIdent threadInfIdent nParam l (snd (nn, locs)) fenv map) eqn:Hasn'; [| inv Hasn].
+      inv Hasn.
+      unfold mkCall in Hmkc.
+      change (fst (nn, locs)) with nn in Hmkc.
+      set (pnum := Init.Nat.min (N.to_nat nn) nParam) in *.
+      destruct (mkCallVars threadInfIdent nParam fenv map pnum (firstn nParam l)) as [l_call|] eqn:Hmkcv in Hmkc; [| inv Hmkc].
+      pose proof Hmkcv as Hmkcv_keep.
+      assert (Hs0 :
+        s0 =
+        Scall None
+          (Ecast (makeVar threadInfIdent nParam v fenv map)
+             (Tpointer (mkFunTy threadInfIdent pnum) noattr))
+          (tinf threadInfIdent tinfIdent :: l_call)).
+      {
+        assert (Hmcall :
+          match mkCallVars threadInfIdent nParam fenv map pnum (firstn nParam l) with
+          | Some v0 =>
+              Some
+                (Scall None
+                   (Ecast (makeVar threadInfIdent nParam v fenv map)
+                      (Tpointer (mkFunTy threadInfIdent pnum) noattr))
+                   (tinf threadInfIdent tinfIdent :: v0))
+          | None => None
+          end = Some s0).
+        {
+          match goal with
+          | Hm :
+              (match mkCallVars threadInfIdent nParam fenv map pnum (firstn nParam l) with
+               | Some v0 =>
+                   Some
+                     (Scall None
+                        (Ecast (makeVar threadInfIdent nParam v fenv map)
+                           (Tpointer (mkFunTy threadInfIdent pnum) noattr))
+                        (tinf threadInfIdent tinfIdent :: v0))
+               | None => None
+               end = Some s0) |- _ => exact Hm
+          end.
+        }
+        rewrite Hmkcv in Hmcall.
+        simpl in Hmcall.
+        inversion Hmcall; subst.
+        reflexivity.
+      }
+      subst s0.
+      rewrite <- (find_symbol_map_f p fenv nParam map threadInfIdent v Hsym).
+      eapply (@R_app_e argsIdent allocIdent limitIdent threadInfIdent tinfIdent
+               isptrIdent caseIdent nParam fenv map p rep_env
+               v (nn, locs) (skipn nParam (snd (nn, locs))) l (skipn nParam l)
+               (firstn nParam l) pnum t _ l_call); try reflexivity.
+      + exact Hfenv.
+      + change (Tarray uval LambdaANF_to_Clight.maxArgs noattr) with (Tarray uval maxArgs noattr).
+        change (Tarray val maxArgs noattr) with (Tarray uval maxArgs noattr).
+        constructor.
+        eapply asgnAppVars_correct.
+        * exact Hsym.
+        * reflexivity.
+        * reflexivity.
+        * exact Hasn'.
+      + eapply mkCallVars_correct.
+        * exact Hsym.
+        * reflexivity.
+        * exact Hmkcv_keep.
+      + match goal with
+        | Hm :
+            (match mkCallVars threadInfIdent nParam fenv map pnum (firstn nParam l) with
+             | Some v0 =>
+                 Some
+                   (Scall None
+                      (Ecast (makeVar threadInfIdent nParam v fenv map)
+                         (Tpointer (mkFunTy threadInfIdent pnum) noattr))
+                      (tinf threadInfIdent tinfIdent :: v0))
+             | None => None
+             end = Some ?s0),
+          Hnone : mkCallVars threadInfIdent nParam fenv map pnum (firstn nParam l) = None |- _ =>
+            change
+              (match mkCallVars threadInfIdent nParam fenv map pnum (firstn nParam l) with
+               | Some v0 =>
+                   Some
+                     (Scall None
+                        (Ecast (makeVar threadInfIdent nParam v fenv map)
+                           (Tpointer (mkFunTy threadInfIdent pnum) noattr))
+                        (tinf threadInfIdent tinfIdent :: v0))
+               | None => None
+               end = Some s0) in Hm;
+            rewrite Hnone in Hm;
+            simpl in Hm;
+            discriminate
+        end.
+    - (* Eprim_val *)
+      inv H0.
+    - (* Eprim *)
+      inv H0.
+    - (* Ehalt *)
+      simpl in H1. inv H1.
+      constructor.
+      eapply (find_symbol_map p fenv nParam map threadInfIdent v); auto.
+    - (* Fcons *)
+      constructor.
+    - (* Fnil *)
+      constructor.
+  }
+  intros e stm Hnp Hcenv Htb.
+  eapply HP; eauto.
+Qed.
 
 (* PROOFs on correct environments *)
 

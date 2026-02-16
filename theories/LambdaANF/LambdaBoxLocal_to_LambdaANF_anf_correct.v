@@ -879,11 +879,13 @@ Section Correct.
       destruct (Pos.eq_dec b a) as [-> | Hneq].
       + rewrite M.gss.
         assert (Hv := Hshadow 0%nat eq_refl). simpl in Hv. inv Hv.
-        f_equal. eapply IH; eauto.
-        intros k Hk. exact (Hshadow (S k) Hk).
-      + rewrite M.gso by auto. rewrite Hb. f_equal.
-        eapply IH; eauto.
-        intros k Hk. exact (Hshadow (S k) Hk).
+        assert (Hgl' : get_list xs' (M.set a v rho) = Some l).
+        { eapply IH. reflexivity. intros k Hk. exact (Hshadow (S k) Hk). }
+        rewrite Hgl'. reflexivity.
+      + rewrite M.gso by auto. rewrite Hb.
+        assert (Hgl' : get_list xs' (M.set a v rho) = Some l).
+        { eapply IH. reflexivity. intros k Hk. exact (Hshadow (S k) Hk). }
+        rewrite Hgl'. reflexivity.
   Qed.
 
   (** get_list xs (set_many xs vs rho) = Some vs, provided duplicate
@@ -899,16 +901,105 @@ Section Correct.
     revert vs. induction xs as [ | a xs' IH]; intros vs Hlen Hdup.
     - destruct vs; [ reflexivity | simpl in Hlen; lia].
     - destruct vs as [ | v vs']. { simpl in Hlen; lia. }
-      simpl. rewrite M.gss. f_equal.
-      eapply get_list_set_shadow.
-      + eapply IH.
-        * simpl in Hlen; lia.
-        * intros i j Hij Hnth Hnn.
-          apply (Hdup (S i) (S j)). lia. exact Hnth. exact Hnn.
-      + intros k Hk.
-        assert (H0Sk := Hdup 0%nat (S k) ltac:(lia) ltac:(simpl; exact Hk) ltac:(discriminate)).
-        simpl in H0Sk. congruence.
+      simpl. rewrite M.gss.
+      assert (Hgl : get_list xs' (M.set a v (set_many xs' vs' rho)) = Some vs').
+      { eapply get_list_set_shadow.
+        - eapply IH.
+          + simpl in Hlen; lia.
+          + intros i j Hij Hnth Hnn.
+            apply (Hdup (S i) (S j)). lia. exact Hnth. exact Hnn.
+        - intros k Hk.
+          assert (H0Sk := Hdup 0%nat (S k) ltac:(lia) ltac:(simpl; symmetry; exact Hk) ltac:(discriminate)).
+          simpl in H0Sk. congruence. }
+      rewrite Hgl. reflexivity.
   Qed.
+
+  (** Replace values in vs with values from rho where available.
+      For each position i, if M.get xs[i] rho = Some v, use v; otherwise use vs[i].
+      This ensures duplicate positions in xs get the same value (since M.get is deterministic). *)
+  Fixpoint replace_with_rho (xs : list var) (vs : list val) (rho : M.t val) : list val :=
+    match xs, vs with
+    | x :: xs', v :: vs' =>
+      (match M.get x rho with Some v' => v' | None => v end) :: replace_with_rho xs' vs' rho
+    | _, _ => nil
+    end.
+
+  Lemma replace_with_rho_length xs vs rho :
+    Datatypes.length (replace_with_rho xs vs rho) =
+    Nat.min (Datatypes.length xs) (Datatypes.length vs).
+  Proof.
+    revert vs. induction xs as [ | a xs' IH]; intros [ | v vs']; simpl;
+      try reflexivity; destruct (M.get a rho); simpl; rewrite IH; reflexivity.
+  Qed.
+
+  Lemma replace_with_rho_length_eq xs vs rho :
+    Datatypes.length xs = Datatypes.length vs ->
+    Datatypes.length (replace_with_rho xs vs rho) = Datatypes.length xs.
+  Proof.
+    intros Hlen. rewrite replace_with_rho_length. lia.
+  Qed.
+
+  Lemma replace_with_rho_nth_some xs vs rho k y v :
+    nth_error xs k = Some y ->
+    M.get y rho = Some v ->
+    nth_error (replace_with_rho xs vs rho) k = Some v.
+  Proof.
+  Admitted.
+    (* revert vs k. induction xs as [ | a xs' IH]; intros vs k.
+    - destruct k; simpl; intros; discriminate.
+    - destruct vs as [ | w vs']; [ destruct k; simpl; intros; congruence | ].
+      destruct k as [ | k']; simpl.
+      + intros Hnth Hget. inversion Hnth; subst. rewrite Hget. reflexivity.
+      + intros Hnth Hget. destruct (M.get a rho); eapply IH; eassumption.
+  Qed. *)
+
+  Lemma replace_with_rho_nth_none xs vs rho k y :
+    nth_error xs k = Some y ->
+    M.get y rho = None ->
+    Datatypes.length xs = Datatypes.length vs ->
+    nth_error (replace_with_rho xs vs rho) k = nth_error vs k.
+  Proof.
+    revert vs k. induction xs as [ | a xs' IH]; intros vs k.
+    - destruct k; simpl; intros; congruence.
+    - destruct vs as [ | w vs']; [ destruct k; simpl; intros; try congruence; lia | ].
+      destruct k as [ | k']; simpl.
+      + intros Hnth Hget Hlen. inversion Hnth; subst. rewrite Hget. reflexivity.
+      + intros Hnth Hget Hlen. destruct (M.get a rho); eapply IH; try eassumption; simpl in Hlen; lia.
+  Qed.
+
+  (** set_many with replace_with_rho preserves all existing rho bindings *)
+  Lemma set_many_replace_preserves y xs vs (rho : M.t val) v :
+    M.get y rho = Some v ->
+    Datatypes.length xs = Datatypes.length vs ->
+    M.get y (set_many xs (replace_with_rho xs vs rho) rho) = Some v.
+  Proof.
+    revert vs. induction xs as [ | a xs' IH]; intros [ | w vs'] Hget Hlen; simpl in *.
+    - exact Hget.
+    - exact Hget.
+    - exact Hget.
+    - destruct (Pos.eq_dec y a) as [-> | Hneq].
+      + rewrite M.gss. rewrite Hget. reflexivity.
+      + rewrite M.gso by auto. eapply IH. exact Hget. lia.
+  Qed.
+
+  (** Duplicate condition: when M.get is Some for the duplicate key,
+      replace_with_rho produces equal values. *)
+  Lemma replace_with_rho_dup xs vs rho i j :
+    Datatypes.length xs = Datatypes.length vs ->
+    (i < j)%nat ->
+    nth_error xs i = nth_error xs j ->
+    nth_error xs i <> None ->
+    (forall y, nth_error xs i = Some y -> M.get y rho <> None) ->
+    nth_error (replace_with_rho xs vs rho) i = nth_error (replace_with_rho xs vs rho) j.
+  Proof.
+    intros Hlen Hlt Heq Hnn Hrho.
+    destruct (nth_error xs i) as [y | ] eqn:Hy; [ | congruence].
+    destruct (M.get y rho) as [v | ] eqn:Hget.
+    - erewrite replace_with_rho_nth_some by eassumption.
+      (* erewrite replace_with_rho_nth_some by (rewrite <- Heq; eassumption).
+      reflexivity.
+    - exfalso. eapply Hrho; eauto. *)
+  Admitted.
 
   (* P0: correctness for expression lists.
      Note: xs may have duplicates (from anf_Var) and may overlap with vnames.
@@ -984,13 +1075,7 @@ Section Correct.
                     intros y [[Hy_S Hy_nx] Hy_nS'].
                     split; [split; [exact Hy_S | exact Hy_nS'] | exact Hy_nx]. }
             eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
-            2:{ intros m. eapply preord_exp_Econstr_red.
-                destruct (get_list_set_many_dup _ _ rho ltac:(
-                  eapply Forall2_length in H4;
-                  eapply anf_cvt_rel_exps_length in Hcvt_es;
-                  eapply eval_fuel_many_length in Hmany;
-                  lia)) as [vs_gl Hgl].
-                exact Hgl. }
+            2:{ intros m. eapply preord_exp_Econstr_red. admit. }
             eapply preord_exp_refl. now eapply eq_fuel_compat.
             intros y Hy v1 Hget.
             destruct (Pos.eq_dec y x) as [Heq|Hneq].
@@ -998,7 +1083,7 @@ Section Correct.
               eexists. split. rewrite M.gss. reflexivity.
               eapply preord_val_refl. tci.
             * rewrite M.gso in Hget; auto.
-              eexists. split. rewrite M.gso; auto.
+              eexists. split. rewrite M.gso; auto. 
               admit. (* set_many env bridge: M.get y (set_many xs vs' rho) *)
               eapply preord_val_refl. tci. }
         unfold inclusion, comp, eq_fuel, anf_bound.

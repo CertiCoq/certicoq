@@ -564,7 +564,9 @@ Section Correct.
     exists v_body cin_body cout_body,
       @bstep_fuel cenv nat fuel_res unit trace_res
         rho_match (Ecase y pats) cin_body (Res v_body) cout_body /\
-      preord_val cenv eq_fuel k v' v_body.
+      preord_val cenv eq_fuel k v' v_body /\
+      (f_br <= cin_body + 1)%nat /\
+      (cin_body + 1 <= t_br + 3 + max_m_branches bs)%nat.
   Proof. Admitted.
 
 
@@ -1212,13 +1214,44 @@ Section Correct.
         (* Subset from scrutinee conversion *)
         assert (HS2 : S2 \subset S \\ [set f] \\ [set y]).
         { eapply anf_cvt_exp_subset. eassumption. }
+        (* Extract constructor shape early — needed for Hbody *)
+        assert (Hcon_shape : exists c_tag vs_anf,
+          con_v' = Vconstr c_tag vs_anf /\
+          dcon_to_tag default_tag dc0 cnstrs = c_tag /\
+          Forall2 anf_val_rel vs_con vs_anf).
+        { inv Hrel_con. eexists _, _. eauto. }
+        destruct Hcon_shape as (c_tag & vs_anf & Hcon_eq & Htag_eq & Hvs_rel).
+        subst con_v'.
         (* The target expression unfolds as:
              Efun (Fcons f func_tag [y] (Ecase y pats) Fnil)
                   (C1 |[ Eletapp x f func_tag [x1] e_k ]|) *)
         simpl app_ctx_f. rewrite <- app_ctx_f_fuse.
         set (defs := Fcons f func_tag [y] (Ecase y pats) Fnil).
         set (rho_efun := def_funs defs defs rho rho).
-        eapply preord_exp_post_monotonic.
+        (* Assert Ecase body evaluation early so cin_body is in scope for P11 *)
+        assert (Hbody : exists v_body cin_body cout_body,
+          @bstep_fuel cenv nat fuel_res unit trace_res
+            (M.set y (Vconstr c_tag vs_anf) rho_efun)
+            (Ecase y pats)
+            cin_body (Res v_body) cout_body /\
+          preord_val cenv eq_fuel i v' v_body /\
+          (f2' <= cin_body + 1)%nat /\
+          (cin_body + 1 <= t2' + 3 + max_m_branches brnchs0)%nat).
+        { eapply anf_match_body_correct.
+          - exact Hcvt_brs.
+          - exact Htag_eq.
+          - exact Hfind.
+          - admit. (* M.get y (M.set y ...) *)
+          - exact Hvs_rel.
+          - admit. (* anf_env_rel vnames rho0 rho_match *)
+          - admit. (* well_formed_env (vs_con ++ rho0) *)
+          - admit. (* eval_env_fuel — rev vs_con mismatch *)
+          - exact Hrel. }
+        destruct Hbody as (v_body & cin_body & cout_body & Hbstep_body & Hrel_body & Hbody_lb & Hbody_ub).
+        eapply preord_exp_post_monotonic with
+          (P1 := comp (comp (anf_bound (cin_body + 1) (cin_body + 1))
+                            (anf_bound f1' t1'))
+                      one_step).
         2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
             (* Step 1: Efun_red — defines match function f *)
             2:{ intros m. eapply preord_exp_Efun_red. }
@@ -1354,12 +1387,18 @@ Section Correct.
               - (* continuation evaluates *)
                 exact Hbstep_cont. }
             split.
-            { unfo(* PostT *) admit. }
+            { (* PostT: anf_bound f2' (t2' + 3 + max_m_branches brnchs0) *)
+              unfold eq_fuel in Heq_cont. subst. unfold anf_bound. split.
+              - (* f2' <= cin_body + 1: source steps bounded by ANF Ecase fuel *)
+                simpl. admit.
+              - (* cin_body + 1 <= t2' + 3 + max_m_branches brnchs0 *)
+                simpl. admit. }
             { exact Hres_cont. } }
         (* Step 4: Inclusion — compose bounds *)
-        unfold inclusion, comp, eq_fuel, anf_bound.
+        unfold inclusion, comp, eq_fuel, anf_bound, one_step.
         intros [[[? ?] ?] ?] [[[? ?] ?] ?].
-        intros Hcomp. destructAll. simpl in *. lia.
+        intros [[[[? ?] ?] ?] [[[[[? ?] ?] ?] [[? ?] [? ?]]] ?]].
+        unfold_all. simpl in *. lia.
       + intros _. eexists 0%nat. constructor 1. unfold algebra.one. simpl. lia.
 
     - (* 10. eval_Match_step_OOT: Match_e, e1 diverges *)

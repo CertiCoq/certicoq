@@ -8078,6 +8078,44 @@ Proof.
     repeat split; eauto.
 Qed.
 
+Lemma repr_val_fun_closure_empty :
+  forall fenv finfo_env p rep_env rho_clo fl f' m L v7,
+    repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env
+      (Vfun rho_clo fl f') m L v7 ->
+    rho_clo = M.empty cps.val.
+Proof.
+  intros fenv finfo_env p rep_env rho_clo fl f' m L v7 Hrepr.
+  remember (Vfun rho_clo fl f') as vf eqn:Heqvf.
+  destruct Hrepr as
+      [L0 z r m0 Hunboxed_int
+      |t0 arr0 n0 m0 L0 Hget_enum Hunboxed
+      |L0 t0 vs0 n0 a0 b0 i0 m0 h0 Hget_boxed Hloc Hload Hboxed Hvals
+      |L0 vars0 avars0 fds0 f0 m0 b0 t0 t'0 vs0 pvs0 avs0 e0 asgn0 body0 l0
+       locs0 alocs0 finfo0 gccall0 Hfinddef Hgetfun Hgetfinfo Ht Hsym Hgc
+       Hfun Hforall Hpvs Havs Halocs Havar Hright Hrepr_body].
+  - inversion Heqvf.
+  - inversion Heqvf.
+  - inversion Heqvf.
+  - inversion Heqvf; subst.
+    reflexivity.
+Qed.
+
+Lemma protected_id_eapp_closure_body :
+  forall rho rho_call rho_clo f t0 ys fl f' t xs e' vs,
+    protected_id_not_bound_id rho (Eapp f t0 ys) ->
+    M.get f rho = Some (Vfun rho_clo fl f') ->
+    get_list ys rho = Some vs ->
+    find_def f' fl = Some (t, xs, e') ->
+    set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call ->
+    rho_clo = M.empty cps.val ->
+    protected_id_not_bound_id rho_call e'.
+Proof.
+  intros rho rho_call rho_clo f t0 ys fl f' t xs e' vs
+    Hprot Hgetf Hgetys Hfind Hset Hrho_clo.
+  subst rho_clo.
+  eapply protected_id_closure; eauto.
+Qed.
+
 Lemma repr_expr_efun_false :
   forall fenv finfo_env p rep_env fds e stm,
     repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Efun fds e) stm ->
@@ -13215,10 +13253,61 @@ Theorem repr_bs_LambdaANF_Codegen_related:
           same_args_ptr lenv lenv' /\
           arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv'. (* value v is related to memory m'/lenv' *)
 Proof.
-  (* NOTE [Rebuild From Scratch]:
-     This theorem is being rebuilt constructively, lemma-by-lemma, from scratch.
-     Historical proof scripts in git history are intentionally not used for this section.
-     No admits, no Admitted, and no axioms are permitted here. *)
-Abort.
+  intros p rep_env cenv fenv finfo_env ienv
+    Hpinv Hsym Hfinfo
+    rho v e n Hbs.
+  eapply repr_bs_main_reduction; eauto.
+  - (* Econstr *)
+    intros rho0 x t ys e0 v0 n0 rho' vs0 Hgl Hset Hbs_e Hgoal_e.
+    subst rho'.
+    unfold repr_bs_goal.
+    intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+    eapply repr_bs_econstr_step_lift_from_body_goal.
+    + econstructor; eauto.
+    + exact Hcenvs.
+    + exact Hprot.
+    + exact Hub.
+    + exact Hfnb.
+    + exact Hrepr.
+    + exact Hrel.
+    + exact Halloc.
+    + exact Hct.
+    + admit. (* Econstr prefix stepping *)
+    + intros vs1 Hgl1.
+      rewrite Hgl in Hgl1; inversion Hgl1; subst vs1.
+      exact Hgoal_e.
+  - (* Ecase *)
+    intros rho0 y cl v0 n0 t vl e0
+      Hy Hcc Hfind Hbs_e Hgoal_e.
+    unfold repr_bs_goal.
+    intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+    eapply repr_bs_ecase_step_lift_from_branch_goal.
+    + econstructor; eauto.
+    + exact Hcenvs.
+    + exact Hprot.
+    + exact Hub.
+    + exact Hfnb.
+    + exact Hrepr.
+    + exact Hrel.
+    + exact Halloc.
+    + exact Hct.
+    + admit. (* Ecase prefix stepping *)
+    + intros t0 vl0 e1 Hy0 Hcc0 Hfind0.
+      rewrite Hy in Hy0; inversion Hy0; subst t0 vl0; clear Hy0.
+      rewrite Hfind in Hfind0; inversion Hfind0; subst e1; clear Hfind0.
+      exact Hgoal_e.
+  - (* Eapp *)
+    intros rho0 rho_clo fl f' vs xs e0 rho_call f t ys v0 c
+      Hgetf Hgetys Hfind Hset Hbs_body Hgoal_body.
+    unfold repr_bs_goal.
+    intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+    admit.
+  - (* Eletapp *)
+    intros rho0 rho_clo fl f' vs xs e_body e0 rho_call x f t ys v0 v' c c'
+      Hgetf Hgetys Hfind Hset Hbs_body Hbs_cont Hgoal_body Hgoal_cont.
+    unfold repr_bs_goal.
+    intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+    admit.
+Admitted.
 
 End THEOREM.

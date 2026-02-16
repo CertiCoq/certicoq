@@ -793,7 +793,108 @@ Section Correct.
                 - exact Hdis_letapp.
                 - eapply IH2_val; eauto. }
             (* Eletapp step + body evaluation + env bridging *)
-            admit. (* The Eletapp reduction: needs IH3 for body, function lookup, etc. *) }
+            (* Extract closure structure from Hrel_clos *)
+            assert (Hclos_inv :
+              exists rho_fc names_fc x_pc f_cc C_bc r_bc S1_bc S2_bc,
+                clos_v' = Vfun rho_fc (Fcons f_cc func_tag [x_pc]
+                            (C_bc |[ Ehalt r_bc ]|) Fnil) f_cc /\
+                anf_env_rel' anf_val_rel names_fc rho_clos rho_fc /\
+                NoDup names_fc /\
+                Disjoint var (x_pc |: (f_cc |: FromList names_fc)) S1_bc /\
+                ~ x_pc \in f_cc |: FromList names_fc /\
+                ~ f_cc \in FromList names_fc /\
+                anf_cvt_rel S1_bc e_body (x_pc :: names_fc) cnstrs S2_bc C_bc r_bc).
+            { inversion Hrel_clos; try discriminate; subst.
+              do 8 eexists.
+              repeat split; try reflexivity; try eassumption; try admit. }
+            destruct Hclos_inv as (rho_fc & names_fc & x_pc & f_cc & C_bc & r_bc &
+              S1_bc & S2_bc & Hclos_eq & Henv_fc & Hnd_fc &
+              Hdis_fc & Hxpc_nin & Hfcc_nin & Hcvt_bc).
+            subst clos_v'.
+            set (defs_cc := Fcons f_cc func_tag [x_pc] (C_bc |[ Ehalt r_bc ]|) Fnil) in *.
+            set (rho_bc := M.set x_pc v2' (def_funs defs_cc defs_cc rho_fc rho_fc)).
+            (* Get body evaluation from IH3 *)
+            assert (Henv_bc : anf_env_rel (x_pc :: names_fc) (v2 :: rho_clos) rho_bc) by admit.
+            (* Apply IH3 to get body correctness *)
+            assert (IH3_full :
+              (forall v0 v'0, Val v = Val v0 -> anf_val_rel v0 v'0 ->
+               preord_exp cenv (anf_bound f3' t3') eq_fuel (i + 1)%nat
+                          (Ehalt r_bc, M.set r_bc v'0 rho_bc)
+                          (C_bc |[ Ehalt r_bc ]|, rho_bc)) /\
+              (Val v = fuel_sem.OOT ->
+               exists c, bstep_fuel cenv rho_bc (C_bc |[ Ehalt r_bc ]|) c eval.OOT tt)).
+            { eapply IH3; try eassumption; admit. }
+            destruct IH3_full as [IH3_val _].
+            specialize (IH3_val v v' eq_refl Hrel).
+            (* IH3_val : preord_exp (anf_bound f3' t3') eq_fuel (i+1)
+                 (Ehalt r_bc, M.set r_bc v' rho_bc) (C_bc |[ Ehalt r_bc ]|, rho_bc) *)
+            (* Extract body evaluation from IH3_val *)
+            (* First build the Ehalt bstep_fuel with existential fuel/trace *)
+            assert (Hehalt : exists (cin : nat) (cout : unit),
+              @bstep_fuel cenv nat fuel_res unit trace_res
+                          (M.set r_bc v' rho_bc) (Ehalt r_bc) cin (Res v') cout /\
+              (to_nat cin <= i + 1)%nat).
+            { eexists _, _. split.
+              - eapply BStepf_run. econstructor. rewrite M.gss. reflexivity.
+              - simpl. lia. }
+            destruct Hehalt as [cin_h [cout_h [Hehalt Hle_h]]].
+            destruct (IH3_val (Res v') cin_h cout_h Hle_h Hehalt)
+              as (v_body_res & cin_bc & cout_bc & Hbstep_bc & _ & Hres_bc).
+            (* Body result must be Res (not OOT) *)
+            destruct v_body_res as [ | v_bc ].
+            { simpl in Hres_bc. contradiction. }
+            simpl in Hres_bc.
+            (* Hres_bc : preord_val cenv eq_fuel i v' v_bc *)
+            (* Unfold preord_exp' and construct the proof directly *)
+            intros v1 cin cout Hle_cin Hbstep_ek.
+            (* Use preord_exp_refl for continuation environment bridge *)
+            assert (Hrefl : preord_exp cenv eq_fuel eq_fuel i
+                      (e_k, M.set x v' rho)
+                      (e_k, M.set x v_bc (M.set x2 v2' (M.set x1 (Vfun rho_fc defs_cc f_cc) rho)))).
+            { eapply preord_exp_refl. now eapply eq_fuel_compat.
+              intros y Hy.
+              destruct (Pos.eq_dec y x) as [-> | Hneq_x].
+              - (* y = x: v' vs v_bc *)
+                unfold preord_var_env. intros v0 Hget0.
+                rewrite M.gss in Hget0. inv Hget0.
+                eexists. split. rewrite M.gss. reflexivity.
+                eapply preord_val_monotonic. exact Hres_bc. lia.
+              - (* y ≠ x *)
+                unfold preord_var_env. intros v0 Hget0.
+                rewrite M.gso in Hget0 by auto.
+                eexists. split.
+                + assert (Hneq_x2 : x2 <> y) by admit.
+                  assert (Hneq_x1 : x1 <> y) by admit.
+                  rewrite M.gso by auto.
+                  rewrite M.gso by (exact Hneq_x2).
+                  rewrite M.gso by (exact Hneq_x1).
+                  exact Hget0.
+                + eapply preord_val_refl. tci. }
+            (* Get continuation evaluation from preord_exp_refl *)
+            edestruct Hrefl as (v_cont & cin_cont & cout_cont & Hbstep_cont & Heq_cont & Hres_cont).
+            { exact Hle_cin. }
+            { exact Hbstep_ek. }
+            (* Construct the full Eletapp evaluation *)
+            do 3 eexists. split.
+            { assert (Hneq_x2_x1 : x2 <> x1) by admit.
+              econstructor 2. eapply BStept_letapp.
+              - (* M.get x1 = Vfun ... *)
+                rewrite M.gso by (exact Hneq_x2_x1).
+                rewrite M.gss. reflexivity.
+              - (* get_list [x2] = [v2'] *)
+                simpl. rewrite M.gss. reflexivity.
+              - (* find_def f_cc defs_cc *)
+                simpl. rewrite Pos.eqb_refl. reflexivity.
+              - (* set_lists [x_pc] [v2'] (def_funs ...) = Some rho_bc *)
+                reflexivity.
+              - (* body evaluates *)
+                exact Hbstep_bc.
+              - (* continuation evaluates *)
+                exact Hbstep_cont. }
+            split.
+            { (* PostT *) admit. }
+            { (* preord_res: same as from refl *)
+              exact Hres_cont. } }
         (* inclusion *)
         admit.
       + (* Divergence case *)

@@ -909,9 +909,12 @@ Section Correct.
               - (* exp_wf (N.of_nat (length (x_pc :: names_fc))) e_body *)
                 admit. (* from Hwf_clos *)
               - (* NoDup (x_pc :: names_fc) *)
-                admit. (* from Hnd_fc, Hxpc_nin *)
+                constructor.
+                + intros Hin. apply Hxpc_nin. right. exact Hin.
+                + exact Hnd_fc.
               - (* Disjoint (FromList (x_pc :: names_fc)) S1_bc *)
-                admit. (* from Hdis_fc *)
+                eapply Disjoint_Included_l. 2: exact Hdis_fc.
+                intros z Hz. inv Hz. now left. right. now right.
               - exact Henv_bc.
               - exact Hcvt_bc.
               - (* Disjoint (occurs_free (Ehalt r_bc)) ((S1_bc \\ S2_bc) \\ [set r_bc]) *)
@@ -932,7 +935,7 @@ Section Correct.
                                          (M.set r_bc v' rho_bc) (Ehalt r_bc) 1%nat (Res v') tt).
             { admit. (* BStepf_run + BStept_halt, technically provable *) }
             destruct (IH3_val (Res v') 1%nat tt Hle_h Hehalt)
-              as (v_body_res & cin_bc & cout_bc & Hbstep_bc & _ & Hres_bc).
+              as (v_body_res & cin_bc & cout_bc & Hbstep_bc & Hpost_bc & Hres_bc).
             (* Body result must be Res (not OOT) *)
             destruct v_body_res as [ | v_bc ].
             { simpl in Hres_bc. contradiction. }
@@ -985,11 +988,19 @@ Section Correct.
               - (* continuation evaluates *)
                 exact Hbstep_cont. }
             split.
-            { (* PostT *) admit. }
+            { (* PostT: anf_bound (f3' + 2) (t3' + 2) *)
+              unfold anf_bound in Hpost_bc |- *.
+              unfold eq_fuel in Heq_cont. simpl in Heq_cont, Hpost_bc.
+              destruct Hpost_bc as [Hlb_bc Hub_bc].
+              simpl. subst. split; lia. }
             { (* preord_res: same as from refl *)
               exact Hres_cont. } }
-        (* inclusion *)
-        admit.
+        (* inclusion: comp (comp (anf_bound (f3'+2) (t3'+2)) (anf_bound f2' t2')) (anf_bound f1' t1')
+                     ⊆ anf_bound (f1'+f2'+f3'+1) (t1'+t2'+t3'+2) *)
+        { unfold inclusion, comp, eq_fuel, anf_bound.
+          intros [[[? ?] ?] ?] [[[? ?] ?] ?].
+          intros [[[[? ?] ?] ?] [[[[[? ?] ?] ?] [[? ?] [? ?]]] [? ?]]].
+          unfold_all. simpl in *. split; lia. }
       + (* Divergence case *)
         intros _. eexists 0%nat. constructor 1. unfold algebra.one. simpl. lia.
 
@@ -1304,10 +1315,11 @@ Section Correct.
             intros v1 cin cout Hle_cin Hbstep_ek.
 
             (* == Compositionally build Ecase body preord_exp == *)
+            (* Use index i+1 so that after Ehalt (1 step), preord_val is at i *)
             (* Compose: IH2 → ctx_bind_proj → Ecase_red *)
             assert (Hpre_ecase : preord_exp cenv
               (comp (comp (anf_bound f2' t2') (eq_fuel_n n_vars)) one_step)
-              eq_fuel i
+              eq_fuel (i + 1)%nat
               (Ehalt r_br, M.set r_br v' rho_proj)
               (Ecase y pats, rho_match)).
             { eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
@@ -1339,9 +1351,10 @@ Section Correct.
             assert (Hehalt : @bstep_fuel cenv nat fuel_res unit trace_res
                      (M.set r_br v' rho_proj) (Ehalt r_br) 1%nat (Res v') tt).
             { admit. (* BStepf_run + BStept_halt: same as line 933 *) }
+            assert (Hle_h : (to_nat 1%nat <= i + 1)%nat) by (simpl; lia).
             edestruct Hpre_ecase as
               (v_body & cin_ecase & cout_ecase & Hbstep_ecase & Hpost_ecase & Hres_ecase).
-            { admit. (* 1 <= i — follows from cin <= i and Hbstep_ek requiring fuel >= 1 *) }
+            { exact Hle_h. }
             { exact Hehalt. }
 
             (* Extract fuel bounds from the composed post *)
@@ -1359,13 +1372,26 @@ Section Correct.
             (* Extract preord_val from preord_res *)
             simpl in Hres_ecase.
             rename Hres_ecase into Hrel_body.
-            (* Hrel_body : preord_val cenv eq_fuel (i - to_nat 1) v' v_bc *)
+            (* Hrel_body : preord_val cenv eq_fuel ((i+1) - to_nat 1) v' v_bc = preord_val ... i v' v_bc *)
 
             (* Build env bridge for continuation *)
             assert (Hrefl : preord_exp cenv eq_fuel eq_fuel i
               (e_k, M.set x v' rho)
               (e_k, M.set x v_bc (M.set x1 (Vconstr c_tag vs_anf) rho_efun))).
-            { admit. (* env bridge: v' ~ v_bc at i-1, freshness for x1/others *) }
+            { eapply preord_exp_refl. now eapply eq_fuel_compat.
+              intros z Hz.
+              destruct (Pos.eq_dec z x) as [-> | Hneq_x].
+              - (* z = x: v' vs v_bc *)
+                intros vz Hgetz. rewrite M.gss in Hgetz. inv Hgetz.
+                eexists. split. rewrite M.gss. reflexivity.
+                eapply preord_val_monotonic. exact Hrel_body. lia.
+              - (* z ≠ x: freshness *)
+                intros vz Hgetz. rewrite M.gso in Hgetz by auto.
+                eexists. split.
+                + assert (Hneq_x1 : z <> x1) by admit. (* freshness *)
+                  rewrite M.gso by auto. rewrite M.gso by auto.
+                  admit. (* M.get z rho_efun = M.get z rho — freshness *)
+                + eapply preord_val_refl. tci. }
 
             edestruct Hrefl as (v_cont & cin_cont & cout_cont & Hbstep_cont & Heq_cont & Hres_cont).
             { exact Hle_cin. }

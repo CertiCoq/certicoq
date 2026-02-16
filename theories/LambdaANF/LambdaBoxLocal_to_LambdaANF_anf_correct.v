@@ -986,7 +986,56 @@ Section Correct.
       + intros _. eexists 0%nat. constructor 1. unfold algebra.one. simpl. lia.
 
     - (* 9. eval_Match_step: Match_e terminates *)
-      admit.
+      intros e1' e_br rho0 dc0 vs_con n0 brnchs0 r0 f1' f2' t1' t2' Heval1 IH1 Hfind Heval2 IH2.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hnd Hdis Henv Hcvt e_k Hdis_ek.
+      inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_branches in *.
+      (* After inversion of anf_Match:
+         f \in S, y \in S \ {f}
+         Hcvt_e1 : anf_cvt_rel (S \ {f} \ {y}) e1' vnames cnstrs S2 C1 x1
+         Hcvt_brs : anf_cvt_rel_branches S2 brnchs0 vnames y cnstrs S3 pats
+         x \in S3, S' = S3 \ {x}
+         Target: Efun (Fcons f func_tag [y] (Ecase y pats) Fnil)
+                      (C1 |[ Eletapp x f func_tag [x1] e_k ]|) *)
+      match goal with
+      | [ He1 : anf_cvt_rel _ e1' vnames _ _ _ _,
+          Hbrs : anf_cvt_rel_branches _ brnchs0 vnames _ _ _ _ |- _ ] =>
+        rename He1 into Hcvt_e1; rename Hbrs into Hcvt_brs
+      end.
+      split.
+      + (* Termination case *)
+        intros v v' Heq Hrel. subst r0.
+        (* Well-formedness of constructor value *)
+        assert (Hwf_con : well_formed_val (Con_v dc0 vs_con)).
+        { eapply (eval_env_step_preserves_wf (Hf := LambdaBoxLocal_resource_fuel)).
+          exact Heval1. reflexivity. exact Hwf.
+          unfold well_formed_in_env.
+          replace (Datatypes.length rho0) with (Datatypes.length vnames)
+            by (eapply anf_env_rel_length; eassumption).
+          inversion Hwfe; subst; eassumption. }
+        destruct (anf_val_rel_exists _ Hwf_con) as [con_v' Hrel_con].
+        (* Subset from scrutinee conversion *)
+        assert (HS2 : S2 \subset S \\ [set f] \\ [set y]).
+        { eapply anf_cvt_exp_subset. eassumption. }
+        (* Proof chain:
+           The target expression after unfolding is:
+             Efun (Fcons f func_tag [y] (Ecase y pats) Fnil)
+                  (C1 |[ Eletapp x f func_tag [x1] e_k ]|)
+
+           Step 1: Efun_red — defines match function f in environment
+           Step 2: IH1 — evaluates scrutinee through C1, binds x1 to con_v'
+           Step 3: Eletapp x f func_tag [x1] e_k — calls match function f(x1):
+                   (a) look up f to get the match function body: Ecase y pats
+                   (b) bind y := value of x1 (the constructor con_v')
+                   (c) Ecase y pats: dispatch on constructor tag
+                   (d) find matching branch in pats (via find_tag_nth)
+                   (e) ctx_bind_proj: extract constructor fields via projections
+                   (f) IH2: evaluate branch body in environment with fields bound
+                   (g) Ehalt: return result value
+                   (h) bind result to x, continue with e_k
+           Step 4: Inclusion — compose bounds *)
+        admit. (* Chain: Efun_red + IH1 + Eletapp(Ecase+proj+IH2) + inclusion *)
+      + intros _. eexists 0%nat. constructor 1. unfold algebra.one. simpl. lia.
 
     - (* 10. eval_Match_step_OOT: Match_e, e1 diverges *)
       intros e1' rho0 n0 br0 f0 t0 Hoot IH_oot.

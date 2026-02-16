@@ -8212,6 +8212,282 @@ Proof.
   - eapply bstep_repr_eprim_false; eauto.
 Qed.
 
+Lemma int_chunk_eq_Mptr :
+  int_chunk = Mptr.
+Proof.
+  unfold int_chunk, LambdaANF_to_Clight.int_chunk, Mptr.
+  destruct Archi.ptr64; reflexivity.
+Qed.
+
+Lemma eval_tinfd_expr :
+  forall p lenv m tinf_b tinf_ofs,
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    eval_expr (globalenv p) empty_env lenv m
+      (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+              (Tstruct threadInfIdent noattr))
+      (Vptr tinf_b tinf_ofs).
+Proof.
+  intros p lenv m tinf_b tinf_ofs Htinf.
+  eapply eval_Elvalue.
+  - eapply eval_Ederef.
+    eapply eval_Etempvar.
+    exact Htinf.
+  - apply deref_loc_copy.
+    simpl.
+    reflexivity.
+Qed.
+
+Lemma eval_lvalue_tinfo_alloc :
+  forall p lenv m tinf_b tinf_ofs,
+    program_threadinfo_inv p ->
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    eval_lvalue (globalenv p) empty_env lenv m
+      (Efield
+         (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                 (Tstruct threadInfIdent noattr))
+         allocIdent valPtr)
+      tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr 0)) Full.
+Proof.
+  intros p lenv m tinf_b tinf_ofs Hpti Htinf.
+  destruct Hpti as [co [Hco Hmembers]].
+  eapply eval_Efield_struct
+    with (id := threadInfIdent) (co := co) (att := noattr)
+         (delta := 0%Z) (bf := Full).
+  - eapply eval_tinfd_expr; eauto.
+  - reflexivity.
+  - exact Hco.
+  - rewrite Hmembers.
+    eapply allocIdent_delta.
+Qed.
+
+Lemma eval_lvalue_tinfo_limit :
+  forall p lenv m tinf_b tinf_ofs,
+    program_threadinfo_inv p ->
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    eval_lvalue (globalenv p) empty_env lenv m
+      (Efield
+         (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                 (Tstruct threadInfIdent noattr))
+         limitIdent valPtr)
+      tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr int_size)) Full.
+Proof.
+  intros p lenv m tinf_b tinf_ofs Hpti Htinf.
+  destruct Hpti as [co [Hco Hmembers]].
+  eapply eval_Efield_struct
+    with (id := threadInfIdent) (co := co) (att := noattr)
+         (delta := int_size) (bf := Full).
+  - eapply eval_tinfd_expr; eauto.
+  - reflexivity.
+  - exact Hco.
+  - rewrite Hmembers.
+    eapply limitIdent_delta.
+Qed.
+
+Lemma sem_cast_vptr_valPtr :
+  forall m b ofs,
+    sem_cast (Vptr b ofs) valPtr valPtr m = Some (Vptr b ofs).
+Proof.
+  intros m b ofs.
+  unfold sem_cast.
+  simpl.
+  destruct Archi.ptr64; reflexivity.
+Qed.
+
+Lemma eval_allocPtr_from_get :
+  forall p lenv m alloc_b alloc_ofs,
+    M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) ->
+    eval_expr (globalenv p) empty_env lenv m
+      (LambdaANF_to_Clight.allocPtr allocIdent)
+      (Vptr alloc_b alloc_ofs).
+Proof.
+  intros p lenv m alloc_b alloc_ofs Halloc.
+  cbn [LambdaANF_to_Clight.allocPtr].
+  apply eval_Etempvar.
+  exact Halloc.
+Qed.
+
+Lemma eval_limitPtr_from_get :
+  forall p lenv m alloc_b limit_ofs,
+    M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) ->
+    eval_expr (globalenv p) empty_env lenv m
+      (Etempvar limitIdent valPtr)
+      (Vptr alloc_b limit_ofs).
+Proof.
+  intros p lenv m alloc_b limit_ofs Hlimit.
+  apply eval_Etempvar.
+  exact Hlimit.
+Qed.
+
+Lemma step_assign_tinfo_alloc :
+  forall p fu k lenv m m1 tinf_b tinf_ofs alloc_b alloc_ofs,
+    program_threadinfo_inv p ->
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) ->
+    Mem.store int_chunk m tinf_b
+      (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr 0)))
+      (Vptr alloc_b alloc_ofs) = Some m1 ->
+    traceless_step2 (globalenv p)
+      (State fu
+         (Sassign
+            (Efield
+               (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                       (Tstruct threadInfIdent noattr))
+               allocIdent valPtr)
+            (LambdaANF_to_Clight.allocPtr allocIdent))
+         k empty_env lenv m)
+      (State fu Sskip k empty_env lenv m1).
+Proof.
+  intros p fu k lenv m m1 tinf_b tinf_ofs alloc_b alloc_ofs
+    Hpti Htinf Halloc Hstore.
+  eapply step_assign with (v2 := Vptr alloc_b alloc_ofs) (v := Vptr alloc_b alloc_ofs).
+  - eapply eval_lvalue_tinfo_alloc; eauto.
+  - eapply eval_allocPtr_from_get; eauto.
+  - apply sem_cast_vptr_valPtr.
+  - eapply assign_loc_value.
+    2:{ exact Hstore. }
+    reduce_val_access. constructor.
+Qed.
+
+Lemma step_assign_tinfo_limit :
+  forall p fu k lenv m1 m2 tinf_b tinf_ofs alloc_b limit_ofs,
+    program_threadinfo_inv p ->
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) ->
+    Mem.store int_chunk m1 tinf_b
+      (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr int_size)))
+      (Vptr alloc_b limit_ofs) = Some m2 ->
+    traceless_step2 (globalenv p)
+      (State fu
+         (Sassign
+            (Efield
+               (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                       (Tstruct threadInfIdent noattr))
+               limitIdent valPtr)
+            (Etempvar limitIdent valPtr))
+         k empty_env lenv m1)
+      (State fu Sskip k empty_env lenv m2).
+Proof.
+  intros p fu k lenv m1 m2 tinf_b tinf_ofs alloc_b limit_ofs
+    Hpti Htinf Hlimit Hstore.
+  eapply step_assign with (v2 := Vptr alloc_b limit_ofs) (v := Vptr alloc_b limit_ofs).
+  - eapply eval_lvalue_tinfo_limit; eauto.
+  - eapply eval_limitPtr_from_get; eauto.
+  - apply sem_cast_vptr_valPtr.
+  - eapply assign_loc_value.
+    2:{ exact Hstore. }
+    reduce_val_access. constructor.
+Qed.
+
+Lemma m_tstep2_tinfo_assigns :
+  forall p fu k lenv m m1 m2 tinf_b tinf_ofs alloc_b alloc_ofs limit_ofs,
+    program_threadinfo_inv p ->
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) ->
+    M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) ->
+    Mem.store int_chunk m tinf_b
+      (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr 0)))
+      (Vptr alloc_b alloc_ofs) = Some m1 ->
+    Mem.store int_chunk m1 tinf_b
+      (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr int_size)))
+      (Vptr alloc_b limit_ofs) = Some m2 ->
+    m_tstep2 (globalenv p)
+      (State fu
+         (Ssequence
+            (Sassign
+               (Efield
+                  (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                          (Tstruct threadInfIdent noattr))
+                  allocIdent valPtr)
+               (LambdaANF_to_Clight.allocPtr allocIdent))
+            (Sassign
+               (Efield
+                  (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                          (Tstruct threadInfIdent noattr))
+                  limitIdent valPtr)
+               (Etempvar limitIdent valPtr)))
+         k empty_env lenv m)
+      (State fu Sskip k empty_env lenv m2).
+Proof.
+  intros p fu k lenv m m1 m2 tinf_b tinf_ofs alloc_b alloc_ofs limit_ofs
+    Hpti Htinf Halloc Hlimit Hs0 Hs1.
+  eapply m_tstep2_transitive.
+  - apply m_tstep2_step. constructor.
+  - eapply m_tstep2_transitive.
+    + apply m_tstep2_step.
+      eapply step_assign_tinfo_alloc; eauto.
+    + eapply m_tstep2_transitive.
+      * apply m_tstep2_step. constructor.
+      * apply m_tstep2_step.
+        eapply step_assign_tinfo_limit; eauto.
+Qed.
+
+Lemma eval_lvalue_args1 :
+  forall p lenv m args_b args_ofs,
+    M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
+    eval_lvalue (globalenv p) empty_env lenv m
+      (Ederef
+         (add (Etempvar argsIdent valPtr)
+              (c_int (Z.of_nat 1) LambdaANF_to_Clight.uval))
+         val)
+      args_b (Ptrofs.add args_ofs (Ptrofs.repr int_size)) Full.
+Proof.
+  intros p lenv m args_b args_ofs Hargs.
+  assert (Harchi : Archi.ptr64 = true) by (vm_compute; reflexivity).
+  eapply eval_Ederef.
+  eapply eval_Ebinop.
+  - apply eval_Etempvar.
+    exact Hargs.
+  - unfold c_int, LambdaANF_to_Clight.c_int.
+    rewrite Harchi.
+    apply eval_Econst_long.
+  - unfold add, LambdaANF_to_Clight.add, sem_binary_operation, sem_add.
+    simpl typeof.
+    unfold val, LambdaANF_to_Clight.val, LambdaANF_to_Clight.uval,
+      c_int, LambdaANF_to_Clight.c_int.
+    rewrite Harchi.
+    unfold classify_add.
+    simpl typeconv.
+    cbv beta iota.
+    f_equal. f_equal. f_equal. f_equal.
+    unfold Ptrofs.mul, Ptrofs.of_int64, sizeof.
+    simpl.
+    repeat (rewrite Int64.unsigned_repr
+      by (unfold Int64.max_unsigned; simpl; lia);
+      rewrite Ptrofs.unsigned_repr
+      by (unfold Ptrofs.max_unsigned; rewrite Ptrofs.modulus_eq64 by auto; simpl; lia)).
+    reflexivity.
+Qed.
+
+Lemma step_assign_args1 :
+  forall p fu k lenv m m' args_b args_ofs e v7,
+    M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
+    eval_expr (globalenv p) empty_env lenv m e v7 ->
+    sem_cast v7 (typeof e) val m = Some v7 ->
+    Mem.store int_chunk m args_b
+      (Ptrofs.unsigned (Ptrofs.add args_ofs (Ptrofs.repr int_size))) v7 = Some m' ->
+    traceless_step2 (globalenv p)
+      (State fu
+         (Sassign
+            (Ederef
+               (add (Etempvar argsIdent valPtr)
+                    (c_int (Z.of_nat 1) LambdaANF_to_Clight.uval))
+               val)
+            e)
+         k empty_env lenv m)
+      (State fu Sskip k empty_env lenv m').
+Proof.
+  intros p fu k lenv m m' args_b args_ofs e v7
+    Hargs Heval Hcast Hstore.
+  eapply step_assign with (v2 := v7) (v := v7).
+  - eapply eval_lvalue_args1; eauto.
+  - exact Heval.
+  - exact Hcast.
+  - eapply assign_loc_value.
+    2:{ exact Hstore. }
+    reduce_val_access.
+    constructor.
+Qed.
+
 Lemma halt_rel_repr_extract :
   forall fenv finfo_env p rep_env rho m lenv x v stm,
     rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) rho m lenv ->
@@ -8292,6 +8568,349 @@ Proof.
   intros fenv finfo_env p rep_env v lenv m m' L args_b args_ofs v7 Hprot Hargs Hstore Hrepr.
   eapply arg_val_after_args_store; eauto.
   eapply protected_not_in_L_args1_store_unchanged; eauto.
+Qed.
+
+Lemma protected_not_in_L_tinfo_store_unchanged :
+  forall p lenv L m m' tinf_b tinf_ofs ofs v,
+    protected_not_in_L_id p lenv L ->
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    Mem.store int_chunk m tinf_b ofs v = Some m' ->
+    Mem.unchanged_on L m m'.
+Proof.
+  intros p lenv L m m' tinf_b tinf_ofs ofs v Hprot Htinf Hstore.
+  destruct Hprot as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b' [tinf_ofs'
+    [Halloc [HallocL [Hlimit [Hargs [HargsL [Htinf' [HtinfL Hglob]]]]]]]]]]]]]].
+  rewrite Htinf' in Htinf.
+  inversion Htinf; subst.
+  eapply Mem.store_unchanged_on.
+  - exact Hstore.
+  - intros i _.
+    eapply HtinfL.
+Qed.
+
+Lemma protected_not_in_L_tinfo_two_stores_unchanged :
+  forall p lenv L m m1 m2 tinf_b tinf_ofs ofs0 v0 v1,
+    protected_not_in_L_id p lenv L ->
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    Mem.store int_chunk m tinf_b ofs0 v0 = Some m1 ->
+    Mem.store int_chunk m1 tinf_b
+      (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr int_size))) v1 = Some m2 ->
+    Mem.unchanged_on L m m2.
+Proof.
+  intros p lenv L m m1 m2 tinf_b tinf_ofs ofs0 v0 v1 Hprot Htinf Hs0 Hs1.
+  eapply Mem.unchanged_on_trans.
+  - eapply protected_not_in_L_tinfo_store_unchanged; eauto.
+  - eapply protected_not_in_L_tinfo_store_unchanged; eauto.
+Qed.
+
+Lemma repr_val_after_tinfo_two_stores :
+  forall fenv finfo_env p rep_env v m m1 m2 L v7 lenv tinf_b tinf_ofs ofs0 v0 v1,
+    repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L v7 ->
+    protected_not_in_L_id p lenv L ->
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    Mem.store int_chunk m tinf_b ofs0 v0 = Some m1 ->
+    Mem.store int_chunk m1 tinf_b
+      (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr int_size))) v1 = Some m2 ->
+    repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m2 L v7.
+Proof.
+  intros fenv finfo_env p rep_env v m m1 m2 L v7 lenv tinf_b tinf_ofs ofs0 v0 v1
+    Hrepr Hprot Htinf Hs0 Hs1.
+  eapply repr_val_L_unchanged; eauto.
+  eapply protected_not_in_L_tinfo_two_stores_unchanged; eauto.
+Qed.
+
+Lemma correct_tinfo_store_alloc_exists :
+  forall p z lenv m,
+    correct_tinfo p z lenv m ->
+    exists alloc_b alloc_ofs tinf_b tinf_ofs m1,
+      M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) /\
+      M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) /\
+      Mem.store int_chunk m tinf_b
+        (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 0))))
+        (Vptr alloc_b alloc_ofs) = Some m1.
+Proof.
+  intros p z lenv m Hct.
+  destruct Hct as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs
+    [Halloc [Halign [Hrange [Hlimit [Hbound [Hargs [Hdj [HargsRange [HargsVA [Htinf
+    [HtinfNe1 [HtinfNe2 [HtinfVA [Hderef Hglob]]]]]]]]]]]]]]]]]]]]].
+  assert (Hva0 : Mem.valid_access m int_chunk tinf_b
+    (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 0)))) Writable).
+  { eapply HtinfVA. lia. }
+  destruct (Mem.valid_access_store m int_chunk tinf_b
+    (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 0))))
+    (Vptr alloc_b alloc_ofs) Hva0) as [m1 Hstore].
+  exists alloc_b, alloc_ofs, tinf_b, tinf_ofs, m1.
+  repeat split; eauto.
+Qed.
+
+Lemma correct_tinfo_store_limit_exists_after_alloc :
+  forall p z lenv m m1 alloc_b alloc_ofs limit_ofs tinf_b tinf_ofs,
+    correct_tinfo p z lenv m ->
+    M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) ->
+    M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) ->
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    Mem.store int_chunk m tinf_b
+      (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 0))))
+      (Vptr alloc_b alloc_ofs) = Some m1 ->
+    exists m2,
+      Mem.store int_chunk m1 tinf_b
+        (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr int_size)))
+        (Vptr alloc_b limit_ofs) = Some m2.
+Proof.
+  intros p z lenv m m1 alloc_b alloc_ofs limit_ofs tinf_b tinf_ofs
+    Hct Halloc Hlimit Htinf Hs0.
+  destruct Hct as [alloc_b' [alloc_ofs' [limit_ofs' [args_b [args_ofs [tinf_b' [tinf_ofs'
+    [Halloc' [Halign [Hrange [Hlimit' [Hbound [Hargs [Hdj [HargsRange [HargsVA [Htinf'
+    [HtinfNe1 [HtinfNe2 [HtinfVA [Hderef Hglob]]]]]]]]]]]]]]]]]]]]].
+  rewrite Halloc' in Halloc. inversion Halloc; subst.
+  rewrite Hlimit' in Hlimit. inversion Hlimit; subst.
+  rewrite Htinf' in Htinf. inversion Htinf; subst.
+  assert (Hva1 : Mem.valid_access m int_chunk tinf_b
+    (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 1)))) Writable).
+  { eapply HtinfVA. lia. }
+  assert (Hva1' : Mem.valid_access m1 int_chunk tinf_b
+    (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 1)))) Writable).
+  { eapply Mem.store_valid_access_1; eauto. }
+  replace (Ptrofs.repr int_size) with (Ptrofs.repr (int_size * 1)) by (f_equal; lia).
+  destruct (Mem.valid_access_store m1 int_chunk tinf_b
+    (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 1))))
+    (Vptr alloc_b limit_ofs) Hva1') as [m2 Hs1].
+  exists m2.
+  exact Hs1.
+Qed.
+
+Lemma ptrofs_repr_one :
+  Ptrofs.repr 1%Z = Ptrofs.one.
+Proof.
+  vm_compute.
+  reflexivity.
+Qed.
+
+Lemma correct_tinfo_store_args1_exists :
+  forall p z lenv m args_b args_ofs v7,
+    correct_tinfo p z lenv m ->
+    M.get argsIdent lenv = Some (Vptr args_b args_ofs) ->
+    exists m',
+      Mem.store int_chunk m args_b
+        (Ptrofs.unsigned (Ptrofs.add args_ofs (Ptrofs.repr int_size))) v7 = Some m'.
+Proof.
+  intros p z lenv m args_b args_ofs v7 Hct Hargs.
+  destruct Hct as [alloc_b [alloc_ofs [limit_ofs [args_b' [args_ofs' [tinf_b [tinf_ofs
+    [Halloc [Halign [Hrange [Hlimit [Hbound [Hargs' [Hdj [HargsRange [HargsVA [Htinf
+    [HtinfNe1 [HtinfNe2 [HtinfVA [Hderef Hglob]]]]]]]]]]]]]]]]]]]]].
+  rewrite Hargs' in Hargs.
+  inversion Hargs; subst.
+  assert (Hva1 : Mem.valid_access m int_chunk args_b
+    (Ptrofs.unsigned
+      (Ptrofs.add args_ofs
+        (Ptrofs.mul (Ptrofs.repr int_size) (Ptrofs.repr 1)))) Writable).
+  { eapply HargsVA. unfold max_args. lia. }
+  replace (Ptrofs.repr 1) with Ptrofs.one in Hva1 by apply ptrofs_repr_one.
+  rewrite Ptrofs.mul_one in Hva1.
+  destruct (Mem.valid_access_store m int_chunk args_b
+    (Ptrofs.unsigned (Ptrofs.add args_ofs (Ptrofs.repr int_size)))
+    v7 Hva1) as [m' Hstore].
+  exists m'.
+  exact Hstore.
+Qed.
+
+Lemma halt_store_chain_exists :
+  forall fenv finfo_env p rep_env v lenv m L max_alloc v7,
+    correct_tinfo p max_alloc lenv m ->
+    protected_not_in_L_id p lenv L ->
+    repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L v7 ->
+    exists alloc_b alloc_ofs limit_ofs args_b args_ofs tinf_b tinf_ofs m1 m2 m3,
+      M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) /\
+      M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) /\
+      M.get argsIdent lenv = Some (Vptr args_b args_ofs) /\
+      M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) /\
+      Mem.store int_chunk m tinf_b
+        (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 0))))
+        (Vptr alloc_b alloc_ofs) = Some m1 /\
+      Mem.store int_chunk m1 tinf_b
+        (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr int_size)))
+        (Vptr alloc_b limit_ofs) = Some m2 /\
+      Mem.store int_chunk m2 args_b
+        (Ptrofs.unsigned (Ptrofs.add args_ofs (Ptrofs.repr int_size))) v7 = Some m3 /\
+      arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m3 lenv.
+Proof.
+  intros fenv finfo_env p rep_env v lenv m L max_alloc v7 Hct Hprot Hrepr.
+  pose proof Hct as Hct0.
+  destruct Hct0 as [alloc_b0 [alloc_ofs0 [limit_ofs0 [args_b0 [args_ofs0 [tinf_b0 [tinf_ofs0
+    [Halloc0 [Halign0 [Hrange0 [Hlimit0 [Hbound0 [Hargs0 [Hdj0 [HargsRange0 [HargsVA0 [Htinf0
+    [HtinfNe10 [HtinfNe20 [HtinfVA0 [Hderef0 Hglob0]]]]]]]]]]]]]]]]]]]]].
+
+  destruct (correct_tinfo_store_alloc_exists _ _ _ _ Hct)
+    as [alloc_b [alloc_ofs [tinf_b [tinf_ofs [m1 [Halloc [Htinf Hs0]]]]]]].
+
+  assert (Heq_alloc : alloc_b = alloc_b0 /\ alloc_ofs = alloc_ofs0).
+  {
+    rewrite Halloc0 in Halloc.
+    inversion Halloc; subst.
+    auto.
+  }
+  destruct Heq_alloc as [-> ->].
+  assert (Heq_tinf : tinf_b = tinf_b0 /\ tinf_ofs = tinf_ofs0).
+  {
+    rewrite Htinf0 in Htinf.
+    inversion Htinf; subst.
+    auto.
+  }
+  destruct Heq_tinf as [-> ->].
+
+  destruct (correct_tinfo_store_limit_exists_after_alloc _ _ _ _ _ _ _ _ _ _ Hct Halloc0 Hlimit0 Htinf0 Hs0)
+    as [m2 Hs1].
+
+  pose proof (correct_tinfo_after_store _ _ _ _ Hct _ _ _ _ _ Hs0) as Hct1.
+  pose proof (correct_tinfo_after_store _ _ _ _ Hct1 _ _ _ _ _ Hs1) as Hct2.
+
+  destruct (correct_tinfo_store_args1_exists _ _ _ _ _ _ v7 Hct2 Hargs0)
+    as [m3 Hs2].
+
+  assert (Hrepr2 :
+    repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m2 L v7).
+  {
+    eapply repr_val_after_tinfo_two_stores
+      with (lenv := lenv) (tinf_b := tinf_b0) (tinf_ofs := tinf_ofs0)
+           (ofs0 := Ptrofs.unsigned (Ptrofs.add tinf_ofs0 (Ptrofs.repr (int_size * 0))))
+           (v0 := Vptr alloc_b0 alloc_ofs0) (v1 := Vptr alloc_b0 limit_ofs0); eauto.
+  }
+
+  assert (Harg :
+    arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m3 lenv).
+  {
+    eapply halt_args1_store_arg_val; eauto.
+  }
+
+  exists alloc_b0, alloc_ofs0, limit_ofs0, args_b0, args_ofs0, tinf_b0, tinf_ofs0, m1, m2, m3.
+  repeat split; eauto.
+Qed.
+
+Lemma halt_eval_cast_arg_val_exists :
+  forall fenv finfo_env p rep_env rho m lenv x v stm max_alloc,
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) rho m lenv ->
+    M.get x rho = Some v ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) stm ->
+    correct_tinfo p max_alloc lenv m ->
+    exists L v7 e m3,
+      protected_not_in_L_id p lenv L /\
+      eval_expr (globalenv p) empty_env lenv m e v7 /\
+      sem_cast v7 (typeof e) val m = Some v7 /\
+      arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m3 lenv.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x v stm max_alloc
+    Hsym Hfinfo Hrel Hget Hrepr Hct.
+  destruct (halt_rel_repr_eval_cast _ _ _ _ _ _ _ _ _ _ Hsym Hfinfo Hrel Hget Hrepr)
+    as [L [v7 [e [Hprot [_ [Hreprv [_ [Heval Hcast]]]]]]]].
+  destruct (halt_store_chain_exists
+              fenv finfo_env p rep_env v lenv m L max_alloc v7 Hct Hprot Hreprv)
+    as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs [m1 [m2 [m3 Hchain]]]]]]]]]].
+  destruct Hchain as [_ [_ [_ [_ [_ [_ [_ Harg]]]]]]].
+  exists L, v7, e, m3.
+  repeat split; eauto.
+Qed.
+
+Lemma halt_same_args_ptr_arg_val_exists :
+  forall fenv finfo_env p rep_env rho m lenv x v stm max_alloc,
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) rho m lenv ->
+    M.get x rho = Some v ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) stm ->
+    correct_tinfo p max_alloc lenv m ->
+    exists m' lenv',
+      same_args_ptr lenv lenv' /\
+      arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv'.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x v stm max_alloc
+    Hsym Hfinfo Hrel Hget Hrepr Hct.
+  destruct (halt_eval_cast_arg_val_exists
+              fenv finfo_env p rep_env rho m lenv x v stm max_alloc
+              Hsym Hfinfo Hrel Hget Hrepr Hct)
+    as [L [v7 [e [m3 [_ [_ [_ Harg]]]]]]].
+  exists m3, lenv.
+  split.
+  - apply same_args_ptr_refl.
+  - exact Harg.
+Qed.
+
+Lemma ehalt_m_tstep2_arg_val :
+  forall fenv finfo_env p rep_env rho m lenv x v stm fu k max_alloc,
+    program_inv p ->
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) rho m lenv ->
+    M.get x rho = Some v ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) stm ->
+    correct_tinfo p max_alloc lenv m ->
+    exists m',
+      m_tstep2 (globalenv p)
+        (State fu stm k empty_env lenv m)
+        (State fu Sskip k empty_env lenv m') /\
+      arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x v stm fu k max_alloc
+    Hpinv Hsym Hfinfo Hrel Hget Hrepr Hct.
+  destruct Hpinv as [_ [Hpti _]].
+  inversion Hrepr; subst; clear Hrepr.
+  destruct (rel_mem_halt_get_var_or_funvar _ _ _ _ _ _ _ _ _ Hrel Hget)
+    as [L [v7 [Hprot [Hgvof Hreprv]]]].
+  destruct (halt_store_chain_exists
+              fenv finfo_env p rep_env v lenv m L max_alloc v7 Hct Hprot Hreprv)
+    as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs [m1 [m2 [m3 Hchain]]]]]]]]]].
+  destruct Hchain as [Halloc [Hlimit [Hargs [Htinf [Hs0 [Hs1 [Hs2 Harg]]]]]]].
+  pose proof (proj1 (var_or_funvar_of_f threadInfIdent nParam fenv finfo_env p x e) H0)
+    as Heq_vof.
+  assert (Heval2 : eval_expr (globalenv p) empty_env lenv m2 e v7).
+  { rewrite <- Heq_vof.
+    eapply get_var_or_funvar_eval; eauto. }
+  assert (Hcast2 : sem_cast v7 (typeof e) val m2 = Some v7).
+  { rewrite <- Heq_vof.
+    eapply get_var_or_funvar_semcast; eauto. }
+  exists m3.
+  split.
+  - eapply m_tstep2_transitive.
+    + apply m_tstep2_step. constructor.
+    + eapply m_tstep2_transitive.
+      * eapply m_tstep2_tinfo_assigns; eauto.
+      * eapply m_tstep2_transitive.
+        { apply m_tstep2_step. constructor. }
+        { apply m_tstep2_step.
+          eapply step_assign_args1; eauto. }
+  - exact Harg.
+Qed.
+
+Lemma repr_bs_ehalt_case :
+  forall p rep_env cenv fenv finfo_env rho v x n stm lenv m k max_alloc fu,
+    program_inv p ->
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    bstep_e (M.empty _) cenv rho (Ehalt x) v n ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) stm ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) rho m lenv ->
+    correct_tinfo p max_alloc lenv m ->
+    exists m' lenv',
+      m_tstep2 (globalenv p)
+        (State fu stm k empty_env lenv m)
+        (State fu Sskip k empty_env lenv' m') /\
+      same_args_ptr lenv lenv' /\
+      arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv'.
+Proof.
+  intros p rep_env cenv fenv finfo_env rho v x n stm lenv m k max_alloc fu
+    Hpinv Hsym Hfinfo Hbs Hrepr Hrel Hct.
+  destruct (bstep_e_halt_inv _ _ _ _ _ _ Hbs) as [_ Hget].
+  destruct (ehalt_m_tstep2_arg_val
+              fenv finfo_env p rep_env rho m lenv x v stm fu k max_alloc
+              Hpinv Hsym Hfinfo Hrel Hget Hrepr Hct)
+    as [m' [Hstep Harg]].
+  exists m', lenv.
+  split.
+  - exact Hstep.
+  - split.
+    + apply same_args_ptr_refl.
+    + exact Harg.
 Qed.
 
 (* Main Theorem *)

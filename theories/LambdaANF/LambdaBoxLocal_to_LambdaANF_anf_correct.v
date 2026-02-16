@@ -545,6 +545,345 @@ Section Correct.
   Qed.
 
 
+  (** ** Result variable is consumed by ANF conversion *)
+
+  (* The result variable of an ANF conversion is NOT in the output set S'.
+     This is because:
+     - For Var_e: result ∈ FromList vn, and Disjoint gives result ∉ S = S'.
+     - For all other constructors: result is consumed from S during conversion. *)
+  Lemma anf_cvt_result_not_in_output :
+    forall e S vn tgm S' C x,
+      anf_cvt_rel S e vn tgm S' C x ->
+      Disjoint _ (FromList vn) S -> ~ x \in S'.
+  Proof.
+    enough (H :
+      (forall (e : expression.exp) S vn tgm S' C x,
+          anf_cvt_rel S e vn tgm S' C x ->
+          Disjoint _ (FromList vn) S -> ~ x \in S') /\
+      (forall (es : exps), True) /\
+      (forall (efns : efnlst), True) /\
+      (forall (bs : branches_e), True)).
+    { exact (proj1 H). }
+    eapply exp_ind_alt_2.
+    - (* Var_e *)
+      intros n S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt.
+      intros Hin. eapply Hdis. constructor; eauto.
+      eapply nth_error_In. eassumption.
+    - (* Lam_e *)
+      intros na e IH S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel in *.
+      intros Hin.
+      assert (S' \subset S \\ [set x1] \\ [set x])
+        by (eapply anf_cvt_exp_subset; eassumption).
+      apply H in Hin. inv Hin. inv H0. eauto.
+    - (* App_e *)
+      intros e1 IH1 e2 IH2 S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel in *.
+      intros Hin. inv Hin. eauto.
+    - (* Con_e *)
+      intros dc es IH S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel_exps in *.
+      intros Hin.
+      assert (S' \subset S \\ [set x])
+        by (eapply (proj1 (proj2 anf_cvt_rel_subset)); eassumption).
+      apply H in Hin. inv Hin. eauto.
+    - (* Match_e *)
+      intros e1 IH1 n bs IH2 S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_branches in *.
+      intros Hin. inv Hin. eauto.
+    - (* Let_e *)
+      intros na e1 IH1 e2 IH2 S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel in *.
+      eapply IH2; [ eassumption | ].
+      rewrite FromList_cons.
+      eapply Union_Disjoint_l.
+      + eapply Disjoint_Singleton_l.
+        eapply IH1; eassumption.
+      + eapply Disjoint_Included_r.
+        eapply anf_cvt_exp_subset. eassumption.
+        eassumption.
+    - (* Fix_e *)
+      intros efns IH n S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel_efnlst in *.
+      intros Hin.
+      assert (Hsub : S' \subset S \\ FromList fnames)
+        by (eapply (proj1 (proj2 (proj2 anf_cvt_rel_subset))); eassumption).
+      apply Hsub in Hin. inv Hin. apply H0.
+      eapply nth_error_In. eassumption.
+    - (* Prf_e *)
+      intros S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. intros Hin. inv Hin. eauto.
+    - (* Prim_val_e *)
+      intros p S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. intros Hin. inv Hin. eauto.
+    - (* Prim_e *) intros. inv H. (* no ANF conversion for Prim_e *)
+    - (* enil *) exact I.
+    - (* econs *) intros; exact I.
+    - (* eflnil *) exact I.
+    - (* eflcons *)
+      split; intros; exact I.
+    - (* brnil *) exact I.
+    - (* brcons *) intros; exact I.
+  Qed.
+
+
+  (** ** Environment consistency and variable lookup *)
+
+  (* Two positions in vn that map to the same variable also map to
+     the same value in rho. This is a weaker property than NoDup
+     that propagates through Let_e extensions. *)
+  Definition env_consistent (vn : list var) (rho : list value) : Prop :=
+    forall i j x,
+      nth_error vn i = Some x ->
+      nth_error vn j = Some x ->
+      nth_error rho i = nth_error rho j.
+
+  Lemma NoDup_env_consistent (vn : list var) (rho : list value) :
+    NoDup vn -> env_consistent vn rho.
+  Proof.
+    intros Hnd i j x Hi Hj.
+    assert (Heq : i = j).
+    { clear rho. revert j vn Hnd Hi Hj. induction i; intros j vn Hnd Hi Hj.
+      - destruct vn; simpl in *; [ discriminate | ]. inv Hi.
+        destruct j; [ reflexivity | ].
+        simpl in Hj. inv Hnd. exfalso. apply H1. eapply nth_error_In. eassumption.
+      - destruct vn; simpl in *; [ discriminate | ].
+        destruct j; simpl in *.
+        + inv Hnd. inv Hj. exfalso. apply H1. eapply nth_error_In. eassumption.
+        + inv Hnd. f_equal. eapply IHi; eassumption. }
+    subst. reflexivity.
+  Qed.
+
+  Lemma env_consistent_extend vn rho x1 v1 :
+    env_consistent vn rho ->
+    (forall k, nth_error vn k = Some x1 -> nth_error rho k = Some v1) ->
+    env_consistent (x1 :: vn) (v1 :: rho).
+  Proof.
+    intros Hcons Hx1 i j y Hi Hj.
+    destruct i as [ | i'], j as [ | j']; simpl in *.
+    - reflexivity.
+    - inv Hi. specialize (Hx1 j' Hj). rewrite Hx1. reflexivity.
+    - inv Hj. specialize (Hx1 i' Hi). rewrite Hx1. reflexivity.
+    - eapply Hcons; eassumption.
+  Qed.
+
+  (* Helper: result of non-Var ANF conversion is in S, hence not in FromList vn. *)
+  Local Ltac anf_result_in_S :=
+    match goal with
+    | [ Hin : _ \in FromList ?vn,
+        Hdis : Disjoint _ (FromList ?vn) ?S,
+        Hmem : _ \in ?S |- _ ] =>
+      exfalso; eapply Hdis; constructor; [ exact Hin | exact Hmem ]
+    | [ Hin : _ \in FromList ?vn,
+        Hdis : Disjoint _ (FromList ?vn) ?S,
+        Hmem : _ \in ?S2,
+        Hsub : ?S2 \subset ?S |- _ ] =>
+      exfalso; eapply Hdis; constructor; [ exact Hin | eapply Hsub; exact Hmem ]
+    | [ Hin : _ \in FromList ?vn,
+        Hdis : Disjoint _ (FromList ?vn) ?S,
+        Hmem : _ \in ?S3,
+        Hsub2 : ?S3 \subset ?S2,
+        Hsub1 : ?S2 \subset ?S |- _ ] =>
+      exfalso; eapply Hdis; constructor;
+      [ exact Hin | eapply Hsub1; eapply Hsub2; exact Hmem ]
+    end.
+
+  (** If the result variable of an ANF conversion equals vn[i],
+      then the evaluation result equals rho[i].
+      Proof by mutual induction on the evaluation derivation. *)
+  Lemma anf_cvt_rel_var_lookup :
+    forall rho e r f t,
+      @eval_env_fuel _ LambdaBoxLocal_resource_fuel LambdaBoxLocal_resource_trace
+                     rho e r f t ->
+      forall v, r = Val v ->
+      forall S vn tgm S' C x i,
+        anf_cvt_rel S e vn tgm S' C x ->
+        Disjoint _ (FromList vn) S ->
+        env_consistent vn rho ->
+        nth_error vn i = Some x ->
+        nth_error rho i = Some v.
+  Proof.
+    pose (Plookup := fun (rho : fuel_sem.env) (e : expression.exp)
+                          (r : result) (f : nat) (t : nat) =>
+      forall v, r = Val v ->
+      forall S vn tgm S' C x i,
+        anf_cvt_rel S e vn tgm S' C x ->
+        Disjoint _ (FromList vn) S ->
+        env_consistent vn rho ->
+        nth_error vn i = Some x ->
+        nth_error rho i = Some v).
+    intros rho e r f t Heval.
+    refine (@eval_env_fuel_ind'
+      nat LambdaBoxLocal_resource_fuel LambdaBoxLocal_resource_trace
+      Plookup (fun _ _ _ _ _ => True) Plookup
+      _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+      rho e r f t Heval);
+    unfold Plookup; clear Plookup.
+
+    (** eval_env_step cases (P) *)
+
+    - (* 1. eval_Con_step *)
+      intros es vs0 rho0 dc fs ts Hmany _ v Hv S vn tgm S' C x i Hcvt Hdis Hcons Hnth.
+      inv Hcvt. fold anf_cvt_rel_exps in *.
+      assert (Hin : x \in FromList vn) by (eapply nth_error_In; eassumption).
+      anf_result_in_S.
+
+    - (* 2. eval_Con_step_OOT *)
+      intros. congruence.
+
+    - (* 3. eval_App_step *)
+      intros e1 e2 e1' v2 r0 na rho0 rho' f1 f2 f3 t1 t2 t3
+             Heval1 IH1 Heval2 IH2 Heval3 IH3
+             v Hv S vn tgm S' C x i Hcvt Hdis Hcons Hnth.
+      inv Hcvt. fold anf_cvt_rel in *.
+      assert (Hin : x \in FromList vn) by (eapply nth_error_In; eassumption).
+      assert (Hsub2 : S3 \subset S2)
+        by (eapply anf_cvt_exp_subset; eassumption).
+      assert (Hsub1 : S2 \subset S)
+        by (eapply anf_cvt_exp_subset; eassumption).
+      anf_result_in_S.
+
+    - (* 4. eval_App_step_OOT1 *) intros. congruence.
+    - (* 5. eval_App_step_OOT2 *) intros. congruence.
+
+    - (* 6. eval_Let_step — the key case *)
+      intros e1 e2 v1 r0 rho0 na f1 f2 t1 t2
+             Heval1 IH1 Heval2 IH2
+             v Hv S vn tgm S' C x i Hcvt Hdis Hcons Hnth.
+      subst. inv Hcvt. fold anf_cvt_rel in *.
+      (* We have:
+         H8 : anf_cvt_rel S e1 vn tgm S2 C1 x1
+         H9 : anf_cvt_rel S2 e2 (x1::vn) tgm S' C2 x
+         Heval1 : eval_env_fuel rho0 e1 (Val v1) f1 t1
+         Heval2 : eval_env_fuel (v1::rho0) e2 (Val v) f2 t2
+         Hnth : nth_error vn i = Some x *)
+      eapply IH2 with (i := Datatypes.S i).
+      + reflexivity.
+      + eassumption.
+      + (* Disjoint (FromList (x1::vn)) S2 *)
+        rewrite FromList_cons.
+        eapply Union_Disjoint_l.
+        * eapply Disjoint_Singleton_l.
+          eapply anf_cvt_result_not_in_output; eassumption.
+        * eapply Disjoint_Included_r.
+          eapply anf_cvt_exp_subset. eassumption.
+          eassumption.
+      + (* env_consistent (x1::vn) (v1::rho0) *)
+        eapply env_consistent_extend; [ exact Hcons | ].
+        intros k Hk. eapply IH1; [ reflexivity | eassumption .. ].
+      + (* nth_error (x1::vn) (S i) = Some x *)
+        simpl. exact Hnth.
+
+    - (* 7. eval_Let_step_OOT *) intros. congruence.
+
+    - (* 8. eval_FixApp_step *)
+      intros e1 e2 e' rho0 rho' rho'' n na fnlst v2 r0
+             f1 f2 f3 t1 t2 t3
+             Heval1 IH1 _ _ Heval2 IH2 Heval3 IH3
+             v Hv S vn tgm S' C x i Hcvt Hdis Hcons Hnth.
+      inv Hcvt. fold anf_cvt_rel in *.
+      assert (Hin : x \in FromList vn) by (eapply nth_error_In; eassumption).
+      assert (Hsub2 : S3 \subset S2)
+        by (eapply anf_cvt_exp_subset; eassumption).
+      assert (Hsub1 : S2 \subset S)
+        by (eapply anf_cvt_exp_subset; eassumption).
+      anf_result_in_S.
+
+    - (* 9. eval_Match_step *)
+      intros e1 e' rho0 dc vs0 n brnchs r0 f1 f2 t1 t2
+             Heval1 IH1 _ Heval2 IH2
+             v Hv S vn tgm S' C x i Hcvt Hdis Hcons Hnth.
+      inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_branches in *.
+      assert (Hin : x \in FromList vn) by (eapply nth_error_In; eassumption).
+      exfalso. eapply Hdis. constructor; [ exact Hin | ].
+      (* x = r ∈ S3. Chain: S3 ⊆ S2 ⊆ S_body ⊆ S *)
+      match goal with
+      | [ Hbr : anf_cvt_rel_branches _ _ _ _ _ ?S3 _,
+          He1 : anf_cvt_rel _ _ _ _ ?S2 _ _,
+          Hr : _ \in ?S3 |- _ \in ?S ] =>
+        eapply Setminus_Included; eapply Setminus_Included;
+        eapply (anf_cvt_exp_subset _ _ _ _ _ _ _ He1);
+        eapply (proj2 (proj2 (proj2 anf_cvt_rel_subset)) _ _ _ _ _ _ _ Hbr);
+        exact Hr
+      end.
+
+    - (* 10. eval_Match_step_OOT *) intros. congruence.
+
+    (** eval_fuel_many cases (P0 = True) *)
+    - (* 11. eval_many_enil *) intros. exact I.
+    - (* 12. eval_many_econs *) intros. exact I.
+
+    (** eval_env_fuel cases (P1) *)
+
+    - (* 13. eval_Var_fuel *)
+      intros n rho0 v0 Hnth_rho v Hv S0 vn tgm S' C x i Hcvt Hdis Hcons Hnth_vn.
+      inv Hv. inv Hcvt.
+      unfold env_consistent in Hcons.
+      match goal with
+      | [ Hnth_src : nth_error ?vn (N.to_nat ?n) = Some ?x |- _ ] =>
+        rewrite (Hcons i (N.to_nat n) x Hnth_vn Hnth_src)
+      end.
+      exact Hnth_rho.
+
+    - (* 14. eval_Lam_fuel *)
+      intros e0 rho0 na v Hv S0 vn tgm S' C x i Hcvt Hdis Hcons Hnth.
+      inv Hv. inv Hcvt. fold anf_cvt_rel in *.
+      assert (Hin : x \in FromList vn) by (eapply nth_error_In; eassumption).
+      exfalso. eapply Hdis. constructor; [ exact Hin | ].
+      eapply Setminus_Included.
+      match goal with
+      | [ H : _ \in _ |- _ \in _ ] => exact H
+      end.
+
+    - (* 15. eval_Fix_fuel *)
+      intros n rho0 fnlst v Hv S0 vn tgm S' C x i Hcvt Hdis Hcons Hnth.
+      inv Hv. inv Hcvt. fold anf_cvt_rel_efnlst in *.
+      assert (Hin : x \in FromList vn) by (eapply nth_error_In; eassumption).
+      exfalso. eapply Hdis. constructor; [ exact Hin | ].
+      match goal with
+      | [ H : FromList _ \subset _ |- _ \in _ ] =>
+        eapply H; eapply nth_error_In; eassumption
+      end.
+
+    - (* 16. eval_OOT *) intros. congruence.
+    - (* 17. eval_step *)
+      intros rho0 e0 r0 f0 t0 Hstep IH. exact IH.
+  Qed.
+
+
+  (** Exps version: if xs[j] = vn[i], then vs[j] = rho[i]. *)
+  Lemma anf_cvt_rel_exps_var_lookup rho es vs f t :
+    @eval_fuel_many _ LambdaBoxLocal_resource_fuel LambdaBoxLocal_resource_trace
+                    rho es vs f t ->
+    forall S vn tgm S' C xs,
+      anf_cvt_rel_exps S es vn tgm S' C xs ->
+      Disjoint _ (FromList vn) S ->
+      env_consistent vn rho ->
+      forall j i x,
+        nth_error xs j = Some x ->
+        nth_error vn i = Some x ->
+        exists v, nth_error vs j = Some v /\ nth_error rho i = Some v.
+  Proof.
+    intros Hmany. induction Hmany as [ | rho0 e0 es0 v0 vs0 f0 fs0 t0 ts0 Heval Hmany IH].
+    - (* eval_many_enil *)
+      intros S vn tgm S' C xs Hcvt Hdis Hcons j i x Hj Hi.
+      inv Hcvt. destruct j; simpl in Hj; discriminate.
+    - (* eval_many_econs *)
+      intros S vn tgm S' C xs Hcvt Hdis Hcons j i x Hj Hi.
+      inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_exps in *.
+      destruct j as [ | j']; simpl in Hj.
+      + (* j = 0: xs[0] = x1 *)
+        inv Hj. exists v0. split; [ reflexivity | ].
+        eapply anf_cvt_rel_var_lookup; [ eassumption | reflexivity | eassumption .. ].
+      + (* j > 0: use IH on the tail *)
+        eapply IH; [ eassumption | | exact Hcons | exact Hj | exact Hi ].
+        eapply Disjoint_Included_r.
+        eapply anf_cvt_exp_subset. eassumption.
+        exact Hdis.
+  Qed.
+
+
   (** ** Alpha-equivalence for ANF values *)
 
   (* Two target values related to the same source value are preord_val-related.
@@ -1019,8 +1358,6 @@ Section Correct.
     exists vs', get_list xs (set_many xs vs rho) = Some vs'.
   Proof.
     intros Hlen.
-    induction xs. admit.  destruct vs; try (simpl in *; congruence). 
-    simpl. rewrite M.gss.
     eapply get_list_exists.
     intros y Hy. eapply set_many_get_in; eauto.
   Qed.
@@ -1149,12 +1486,10 @@ Section Correct.
               admit. (* requires anf_cvt_val_alpha_equiv *)
             * rewrite M.gso in Hget; auto.
               destruct (in_dec Pos.eq_dec y xs) as [Hyin | Hynin].
-              -- (* y ∈ xs ∩ vnames: both rho and set_many bindings are
+              -- (* y in xs: both rho and set_many bindings are
                     anf_val_rel to the same source value, needs alpha-equiv *)
-                 simpl. 
-                    admit. (* requires anf_cvt_val_alpha_equiv *)
-                 simpl
-              -- (* y ∉ xs: set_many doesn't affect y *)
+                 admit. (* requires anf_cvt_val_alpha_equiv *)
+              -- (* y not in xs: set_many does not affect y *)
                  eexists. split. rewrite M.gso; auto.
                  rewrite set_many_get_notin; auto. eassumption.
                  eapply preord_val_refl. tci. }

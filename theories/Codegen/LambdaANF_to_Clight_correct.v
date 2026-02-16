@@ -983,6 +983,19 @@ Definition map_get_r_l: forall t l, relation (M.t t) :=
                List.In v l ->
                M.get v sub = M.get v sub'.
 
+Lemma map_get_set_same :
+  forall {A} (lenv : M.t A) x v,
+    M.get x lenv = Some v ->
+    forall y, M.get y lenv = M.get y (M.set x v lenv).
+Proof.
+  intros A lenv x v Hx y.
+  destruct (var_dec_eq y x) as [Heq | Hneq].
+  - subst y.
+    rewrite M.gss.
+    exact Hx.
+  - rewrite M.gso; auto.
+Qed.
+
 Theorem get_var_or_funvar_proper:
   forall lenv lenv' l x v,
   get_var_or_funvar lenv x v ->
@@ -1026,7 +1039,32 @@ Proof.
   constructor. auto.
   inv H.
 Qed. 
-  
+
+Lemma Forall_get_var_or_funvar_set_same :
+  forall lenv ys x v,
+    M.get x lenv = Some v ->
+    Forall (fun y => exists v7, get_var_or_funvar lenv y v7) ys ->
+    Forall (fun y => exists v7, get_var_or_funvar (M.set x v lenv) y v7) ys.
+Proof.
+  intros lenv ys x v Hx Hfor.
+  induction Hfor as [|y ys Hy Hfor' IH].
+  - constructor.
+  - constructor.
+    + destruct Hy as [v7 Hgv].
+      inversion Hgv; subst.
+      * exists (Vptr b (Ptrofs.repr 0)).
+        constructor; assumption.
+      * eexists.
+        constructor 2.
+        -- exact H.
+        -- assert (Hsame_get : M.get y lenv = M.get y (M.set x v lenv)).
+           { eapply map_get_set_same; eauto. }
+           rewrite <- Hsame_get.
+           exact H0.
+        -- exact H1.
+    + exact IH.
+Qed.
+
 Inductive is_nth_projection_of_x : positive -> Z -> positive -> statement -> Prop :=
   Make_nth_proj: forall x  n v e,
                          var_or_funvar v  e ->
@@ -3845,6 +3883,29 @@ Proof.
     exact H23.
 Qed.
 
+Lemma rt_traceless_to_eq_or_m_tstep2 :
+  forall ge s1 s2,
+    clos_refl_trans state (traceless_step2 ge) s1 s2 ->
+    s1 = s2 \/ m_tstep2 ge s1 s2.
+Proof.
+  intros ge s1 s2 Hrt.
+  induction Hrt.
+  - right.
+    apply m_tstep2_step.
+    exact H.
+  - left.
+    reflexivity.
+  - destruct IHHrt1 as [Heq12 | Hstep12].
+    + subst.
+      destruct IHHrt2 as [Heq23 | Hstep23].
+      * left. exact Heq23.
+      * right. exact Hstep23.
+    + destruct IHHrt2 as [Heq23 | Hstep23].
+      * subst. right. exact Hstep12.
+      * right.
+        eapply m_tstep2_transitive; eauto.
+Qed.
+
 Lemma m_tstep2_of_rt_then_step :
   forall ge s1 s2 s3,
     clos_refl_trans state (traceless_step2 ge) s1 s2 ->
@@ -6503,6 +6564,56 @@ Proof.
     + unfold makeVar. rewrite Hget. reflexivity.
 Qed.
 
+Lemma var_or_funvar_f'_nParam_eq :
+  forall p fenv finfo_env v,
+    var_or_funvar_f' threadInfIdent fenv finfo_env p nParam v =
+    var_or_funvar_f threadInfIdent nParam fenv finfo_env p v.
+Proof.
+  intros p fenv finfo_env v.
+  unfold var_or_funvar_f', var_or_funvar_f.
+  destruct (M.get v finfo_env); reflexivity.
+Qed.
+
+Lemma repr_call_vars_eval_exprlist :
+  forall p fenv finfo_env n ys es lenv m vs,
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    repr_call_vars threadInfIdent nParam fenv finfo_env p n ys es ->
+    Forall2 (get_var_or_funvar p lenv) ys vs ->
+    eval_exprlist (globalenv p) empty_env lenv m es (mkFunTyList n) vs.
+Proof.
+  intros p fenv finfo_env n ys es lenv m vs Hsym Hfinfo Hrepr.
+  revert vs.
+  induction Hrepr; intros vs Hfor.
+  - inversion Hfor; subst.
+    constructor.
+  - inversion Hfor; subst.
+    simpl.
+    econstructor.
+    + rewrite var_or_funvar_f'_nParam_eq.
+      eapply get_var_or_funvar_eval; eauto.
+    + rewrite var_or_funvar_f'_nParam_eq.
+      eapply get_var_or_funvar_semcast; eauto.
+    + eapply IHHrepr; eauto.
+Qed.
+
+Lemma eval_exprlist_tinf_cons :
+  forall p lenv m s2 pnum vs2 tinf_b tinf_ofs,
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    eval_exprlist (globalenv p) empty_env lenv m s2 (mkFunTyList pnum) vs2 ->
+    eval_exprlist (globalenv p) empty_env lenv m
+      (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr) :: s2)
+      (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) (mkFunTyList pnum))
+      (Vptr tinf_b tinf_ofs :: vs2).
+Proof.
+  intros p lenv m s2 pnum vs2 tinf_b tinf_ofs Htinf Heval_tail.
+  econstructor.
+  - constructor. exact Htinf.
+  - simpl.
+    reflexivity.
+  - exact Heval_tail.
+Qed.
+
 Theorem  mkCallVars_correct:
   forall p fenv map n vs bvs es,
     find_symbol_domain p map ->
@@ -7781,6 +7892,35 @@ Proof.
   - split; assumption.
 Qed.
 
+Lemma rel_mem_occurs_free_get_var_or_funvar :
+  forall fenv finfo_env p rep_env e rho m lenv x,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e rho m lenv ->
+    occurs_free e x ->
+    exists v6 L v7,
+      M.get x rho = Some v6 /\
+      protected_not_in_L_id p lenv L /\
+      get_var_or_funvar p lenv x v7 /\
+      repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v6 m L v7.
+Proof.
+  intros fenv finfo_env p rep_env e rho m lenv x Hrel Hfree.
+  destruct (rel_mem_occurs_free_repr _ _ _ _ _ _ _ _ _ Hrel Hfree)
+    as [v6 [L [Hprot [Hget Hrid]]]].
+  inversion Hrid; subst.
+  - eexists; exists L; exists (Vptr b Ptrofs.zero).
+    split; [exact Hget|].
+    split; [exact Hprot|].
+    split.
+    + constructor; eauto.
+    + exact H0.
+  - eexists; exists L; exists v7.
+    split; [exact Hget|].
+    split; [exact Hprot|].
+    split.
+    + econstructor 2; eauto.
+      eapply repr_val_id_L_LambdaANF_Codegen_vint_or_vptr; eauto.
+    + exact H1.
+Qed.
+
 Lemma rel_mem_set_protected_id :
   forall fenv finfo_env p rep_env e rho m lenv x vx,
     rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e rho m lenv ->
@@ -8167,6 +8307,48 @@ Proof.
     destruct (get_list ys rho) as [vst|] eqn:Hgst; try discriminate.
     inversion Hgl; subst.
     simpl. f_equal. eapply IH; eauto.
+Qed.
+
+Lemma Forall_skipn :
+  forall {A} (P : A -> Prop) n (xs : list A),
+    Forall P xs ->
+    Forall P (skipn n xs).
+Proof.
+  intros A P n.
+  induction n as [|n IH]; intros xs Hfor.
+  - simpl. exact Hfor.
+  - destruct xs as [|x xs'].
+    + simpl. constructor.
+    + simpl. inversion Hfor; subst.
+      eapply IH; eauto.
+Qed.
+
+Lemma Forall_firstn :
+  forall {A} (P : A -> Prop) n (xs : list A),
+    Forall P xs ->
+    Forall P (firstn n xs).
+Proof.
+  intros A P n.
+  induction n as [|n IH]; intros xs Hfor.
+  - simpl. constructor.
+  - destruct xs as [|x xs'].
+    + simpl. constructor.
+    + simpl. inversion Hfor; subst.
+      constructor; eauto.
+Qed.
+
+Lemma Forall_exists_Forall2 :
+  forall {A B} (P : A -> B -> Prop) (xs : list A),
+    Forall (fun x => exists y, P x y) xs ->
+    exists ys, Forall2 P xs ys.
+Proof.
+  intros A B P xs Hfor.
+  induction Hfor as [|x xs Hxy Hfor' IH].
+  - exists nil. constructor.
+  - destruct Hxy as [y Hy].
+    destruct IH as [ys Hys].
+    exists (y :: ys).
+    constructor; assumption.
 Qed.
 
 Lemma Forall_fundefs_find_def :
@@ -8559,6 +8741,204 @@ Proof.
   - econstructor 2; eauto.
     eapply repr_val_id_L_LambdaANF_Codegen_vint_or_vptr; eauto.
   - assumption.
+Qed.
+
+Lemma rel_mem_eapp_get_fun_var_or_funvar :
+  forall fenv finfo_env p rep_env rho m lenv f t ys rho_clo fl f',
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eapp f t ys) rho m lenv ->
+    M.get f rho = Some (Vfun rho_clo fl f') ->
+    exists L v7,
+      protected_not_in_L_id p lenv L /\
+      get_var_or_funvar p lenv f v7 /\
+      repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env
+        (Vfun rho_clo fl f') m L v7.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv f t ys rho_clo fl f'
+    Hrel Hgetf.
+  assert (Hfree : occurs_free (Eapp f t ys) f).
+  { constructor. }
+  destruct (rel_mem_occurs_free_get_var_or_funvar
+              fenv finfo_env p rep_env (Eapp f t ys) rho m lenv f Hrel Hfree)
+    as [v6 [L [v7 [Hget [Hprot [Hgv Hrepr]]]]]].
+  rewrite Hgetf in Hget.
+  inversion Hget; subst.
+  exists L, v7.
+  repeat split; assumption.
+Qed.
+
+Lemma rel_mem_eletapp_get_fun_var_or_funvar :
+  forall fenv finfo_env p rep_env rho m lenv x f t ys e rho_clo fl f',
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eletapp x f t ys e) rho m lenv ->
+    M.get f rho = Some (Vfun rho_clo fl f') ->
+    exists L v7,
+      protected_not_in_L_id p lenv L /\
+      get_var_or_funvar p lenv f v7 /\
+      repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env
+        (Vfun rho_clo fl f') m L v7.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x f t ys e rho_clo fl f'
+    Hrel Hgetf.
+  assert (Hfree : occurs_free (Eletapp x f t ys e) f).
+  { constructor. left. reflexivity. }
+  destruct (rel_mem_occurs_free_get_var_or_funvar
+              fenv finfo_env p rep_env (Eletapp x f t ys e) rho m lenv f Hrel Hfree)
+    as [v6 [L [v7 [Hget [Hprot [Hgv Hrepr]]]]]].
+  rewrite Hgetf in Hget.
+  inversion Hget; subst.
+  exists L, v7.
+  repeat split; assumption.
+Qed.
+
+Lemma rel_mem_eapp_args_get_var_or_funvar :
+  forall fenv finfo_env p rep_env rho m lenv f t ys,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eapp f t ys) rho m lenv ->
+    Forall (fun y => exists v7, get_var_or_funvar p lenv y v7) ys.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv f t ys Hrel.
+  apply Forall_forall.
+  intros y Hy.
+  assert (Hfree : occurs_free (Eapp f t ys) y).
+  { apply Free_Eapp2. exact Hy. }
+  destruct (rel_mem_occurs_free_get_var_or_funvar
+              fenv finfo_env p rep_env (Eapp f t ys) rho m lenv y Hrel Hfree)
+    as [_ [_ [v7 [_ [_ [Hgv _]]]]]].
+  eauto.
+Qed.
+
+Lemma rel_mem_eletapp_callvars_get_var_or_funvar :
+  forall fenv finfo_env p rep_env rho m lenv x f t ys e,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eletapp x f t ys e) rho m lenv ->
+    Forall (fun y => exists v7, get_var_or_funvar p lenv y v7) (f :: ys).
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x f t ys e Hrel.
+  apply Forall_forall.
+  intros y Hy.
+  assert (Hfree : occurs_free (Eletapp x f t ys e) y).
+  { apply Free_Eletapp1. exact Hy. }
+  destruct (rel_mem_occurs_free_get_var_or_funvar
+              fenv finfo_env p rep_env (Eletapp x f t ys e) rho m lenv y Hrel Hfree)
+    as [_ [_ [v7 [_ [_ [Hgv _]]]]]].
+  eauto.
+Qed.
+
+Lemma rel_mem_eletapp_args_get_var_or_funvar :
+  forall fenv finfo_env p rep_env rho m lenv x f t ys e,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eletapp x f t ys e) rho m lenv ->
+    Forall (fun y => exists v7, get_var_or_funvar p lenv y v7) ys.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x f t ys e Hrel.
+  apply Forall_forall.
+  intros y Hy.
+  assert (Hfree : occurs_free (Eletapp x f t ys e) y).
+  { apply Free_Eletapp1. right. exact Hy. }
+  destruct (rel_mem_occurs_free_get_var_or_funvar
+              fenv finfo_env p rep_env (Eletapp x f t ys e) rho m lenv y Hrel Hfree)
+    as [_ [_ [v7 [_ [_ [Hgv _]]]]]].
+  eauto.
+Qed.
+
+Lemma repr_call_vars_eval_exprlist_exists_eapp :
+  forall fenv finfo_env p rep_env rho m lenv f t ys pnum bys s2,
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eapp f t ys) rho m lenv ->
+    bys = firstn nParam ys ->
+    repr_call_vars threadInfIdent nParam fenv finfo_env p pnum bys s2 ->
+    exists vs2,
+      eval_exprlist (globalenv p) empty_env lenv m s2 (mkFunTyList pnum) vs2.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv f t ys pnum bys s2
+    Hsym Hfinfo Hrel Hbys Hcall.
+  subst bys.
+  pose proof (rel_mem_eapp_args_get_var_or_funvar
+                fenv finfo_env p rep_env rho m lenv f t ys Hrel) as Hfor_ys.
+  pose proof (Forall_firstn
+                (fun y => exists v7, get_var_or_funvar p lenv y v7)
+                nParam ys Hfor_ys) as Hfor_bys.
+  destruct (Forall_exists_Forall2
+              (get_var_or_funvar p lenv) (firstn nParam ys) Hfor_bys)
+    as [vs2 Hfor2].
+  exists vs2.
+  eapply repr_call_vars_eval_exprlist; eauto.
+Qed.
+
+Lemma repr_call_vars_eval_exprlist_exists_eletapp :
+  forall fenv finfo_env p rep_env rho m lenv x f t ys e pnum bys s2,
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eletapp x f t ys e) rho m lenv ->
+    bys = firstn nParam ys ->
+    repr_call_vars threadInfIdent nParam fenv finfo_env p pnum bys s2 ->
+    exists vs2,
+      eval_exprlist (globalenv p) empty_env lenv m s2 (mkFunTyList pnum) vs2.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x f t ys e pnum bys s2
+    Hsym Hfinfo Hrel Hbys Hcall.
+  subst bys.
+  pose proof (rel_mem_eletapp_args_get_var_or_funvar
+                fenv finfo_env p rep_env rho m lenv x f t ys e Hrel) as Hfor_ys.
+  pose proof (Forall_firstn
+                (fun y => exists v7, get_var_or_funvar p lenv y v7)
+                nParam ys Hfor_ys) as Hfor_bys.
+  destruct (Forall_exists_Forall2
+              (get_var_or_funvar p lenv) (firstn nParam ys) Hfor_bys)
+    as [vs2 Hfor2].
+  exists vs2.
+  eapply repr_call_vars_eval_exprlist; eauto.
+Qed.
+
+Lemma eapp_call_args_eval_exprlist_exists :
+  forall fenv finfo_env p rep_env rho m lenv max_alloc f t ys pnum bys s2,
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eapp f t ys) rho m lenv ->
+    correct_tinfo p max_alloc lenv m ->
+    bys = firstn nParam ys ->
+    repr_call_vars threadInfIdent nParam fenv finfo_env p pnum bys s2 ->
+    exists tinf_b tinf_ofs vs2,
+      M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) /\
+      eval_exprlist (globalenv p) empty_env lenv m
+        (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr) :: s2)
+        (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) (mkFunTyList pnum))
+        (Vptr tinf_b tinf_ofs :: vs2).
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv max_alloc f t ys pnum bys s2
+    Hsym Hfinfo Hrel Hct Hbys Hcall.
+  destruct Hct as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs
+    [Halloc [Halign [Hrange [Hlimit [Hbound [Hargs [Hdj [Hargs_bound [Hargs_va [Htinf _]]]]]]]]]]]]]]]]].
+  destruct (repr_call_vars_eval_exprlist_exists_eapp
+              fenv finfo_env p rep_env rho m lenv f t ys pnum bys s2
+              Hsym Hfinfo Hrel Hbys Hcall) as [vs2 Heval_tail].
+  exists tinf_b, tinf_ofs, vs2.
+  split; [exact Htinf|].
+  eapply eval_exprlist_tinf_cons; eauto.
+Qed.
+
+Lemma eletapp_call_args_eval_exprlist_exists :
+  forall fenv finfo_env p rep_env rho m lenv max_alloc x f t ys e pnum bys s2,
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eletapp x f t ys e) rho m lenv ->
+    correct_tinfo p max_alloc lenv m ->
+    bys = firstn nParam ys ->
+    repr_call_vars threadInfIdent nParam fenv finfo_env p pnum bys s2 ->
+    exists tinf_b tinf_ofs vs2,
+      M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) /\
+      eval_exprlist (globalenv p) empty_env lenv m
+        (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr) :: s2)
+        (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) (mkFunTyList pnum))
+        (Vptr tinf_b tinf_ofs :: vs2).
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv max_alloc x f t ys e pnum bys s2
+    Hsym Hfinfo Hrel Hct Hbys Hcall.
+  destruct Hct as [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs
+    [Halloc [Halign [Hrange [Hlimit [Hbound [Hargs [Hdj [Hargs_bound [Hargs_va [Htinf _]]]]]]]]]]]]]]]]].
+  destruct (repr_call_vars_eval_exprlist_exists_eletapp
+              fenv finfo_env p rep_env rho m lenv x f t ys e pnum bys s2
+              Hsym Hfinfo Hrel Hbys Hcall) as [vs2 Heval_tail].
+  exists tinf_b, tinf_ofs, vs2.
+  split; [exact Htinf|].
+  eapply eval_exprlist_tinf_cons; eauto.
 Qed.
 
 Lemma rel_mem_ecase_branch :
@@ -9247,6 +9627,56 @@ Proof.
   - apply deref_loc_copy.
     simpl.
     reflexivity.
+Qed.
+
+Lemma eval_tinfo_args_expr :
+  forall p lenv m tinf_b tinf_ofs args_b args_ofs,
+    program_threadinfo_inv p ->
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    deref_loc (Tarray uval maxArgs noattr) m tinf_b
+      (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 3))) Full
+      (Vptr args_b args_ofs) ->
+    eval_expr (globalenv p) empty_env lenv m
+      (Efield
+         (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                 (Tstruct threadInfIdent noattr))
+         argsIdent (Tarray uval maxArgs noattr))
+      (Vptr args_b args_ofs).
+Proof.
+  intros p lenv m tinf_b tinf_ofs args_b args_ofs Hpti Htinf Hargs.
+  destruct Hpti as [co [Hco Hmembers]].
+  eapply eval_Elvalue.
+  - eapply eval_Efield_struct
+      with (id := threadInfIdent) (co := co) (att := noattr)
+           (delta := (int_size * 3)%Z) (bf := Full).
+    + eapply eval_tinfd_expr; eauto.
+    + reflexivity.
+    + exact Hco.
+    + rewrite Hmembers.
+      eapply argsIdent_delta.
+  - exact Hargs.
+Qed.
+
+Lemma step_set_argsIdent_from_tinfo :
+  forall p fu k lenv m tinf_b tinf_ofs args_b args_ofs,
+    program_threadinfo_inv p ->
+    M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) ->
+    deref_loc (Tarray uval maxArgs noattr) m tinf_b
+      (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 3))) Full
+      (Vptr args_b args_ofs) ->
+    traceless_step2 (globalenv p)
+      (State fu
+         (Sset argsIdent
+            (Efield
+               (Ederef (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                       (Tstruct threadInfIdent noattr))
+               argsIdent (Tarray uval maxArgs noattr)))
+         k empty_env lenv m)
+      (State fu Sskip k empty_env (M.set argsIdent (Vptr args_b args_ofs) lenv) m).
+Proof.
+  intros p fu k lenv m tinf_b tinf_ofs args_b args_ofs Hpti Htinf Hargs.
+  eapply step_set.
+  eapply eval_tinfo_args_expr; eauto.
 Qed.
 
 Lemma eval_lvalue_tinfo_alloc :
@@ -11919,6 +12349,58 @@ Proof.
   split; [exact Hrepr_fun|].
   split; [exact Hclosed_fun|].
   exact Hfundef_info.
+Qed.
+
+Lemma eapp_step_and_repr_rel_fun_alloc_tinfo_inv :
+  forall p rep_env cenv ienv fenv finfo_env rho f t ys v n stm m lenv max_alloc,
+    bstep_e (M.empty _) cenv rho (Eapp f t ys) v n ->
+    correct_envs cenv ienv rep_env rho (Eapp f t ys) ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eapp f t ys) stm ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eapp f t ys) rho m lenv ->
+    correct_alloc (Eapp f t ys) max_alloc ->
+    correct_tinfo p max_alloc lenv m ->
+    exists rho_clo fl f' vs xs e_body rho_call c s_pref s_tail L,
+      M.get f rho = Some (Vfun rho_clo fl f') /\
+      get_list ys rho = Some vs /\
+      find_def f' fl = Some (t, xs, e_body) /\
+      set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call /\
+      bstep_e (M.empty _) cenv rho_call e_body v c /\
+      n = c + 1 /\
+      correct_cenv_of_exp cenv e_body /\
+      stm = Ssequence s_pref s_tail /\
+      protected_not_in_L_id p lenv L /\
+      repr_val_id_L_LambdaANF_Codegen_id fenv finfo_env p rep_env
+        (Vfun rho_clo fl f') m L lenv f' /\
+      closed_val (Vfun rho_clo fl f') /\
+      correct_fundef_id_info fenv finfo_env p m fl f' /\
+      max_alloc = 0%Z /\
+      correct_tinfo p 0%Z lenv m.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho f t ys v n stm m lenv max_alloc
+    Hbs Hcenvs Hrepr Hrel Halloc Hct.
+  pose proof (eapp_step_and_repr_rel_fun_inv
+                p rep_env cenv ienv fenv finfo_env rho f t ys v n stm m lenv
+                Hbs Hcenvs Hrepr Hrel) as Hinv.
+  destruct Hinv as [rho_clo [fl [f' [vs [xs [e_body [rho_call [c [s_pref [s_tail [L
+    [Hgetf [Hgetys [Hfind [Hset [Hbs_body [Hn [Hcenv_body [Hstm [HprotL [Hrepr_fun [Hclosed_fun Hfundef_info]]]]]]]]]]]]]]]]]]]]]].
+  assert (Hmax0 : max_alloc = 0%Z).
+  { eapply correct_alloc_eapp_zero; eauto. }
+  subst max_alloc.
+  exists rho_clo, fl, f', vs, xs, e_body, rho_call, c, s_pref, s_tail, L.
+  split; [exact Hgetf|].
+  split; [exact Hgetys|].
+  split; [exact Hfind|].
+  split; [exact Hset|].
+  split; [exact Hbs_body|].
+  split; [exact Hn|].
+  split; [exact Hcenv_body|].
+  split; [exact Hstm|].
+  split; [exact HprotL|].
+  split; [exact Hrepr_fun|].
+  split; [exact Hclosed_fun|].
+  split; [exact Hfundef_info|].
+  split; [reflexivity|].
+  exact Hct.
 Qed.
 
 Lemma eletapp_step_and_repr_inv :

@@ -278,6 +278,33 @@ Section Correct.
   Qed.
 
 
+  (** Setting a variable preserves env_rel when the value is related
+      at every position where the variable appears in vnames.
+      This generalizes anf_env_rel_weaken (which requires x ∉ vnames). *)
+  Lemma anf_env_rel_set vnames vs x v' rho :
+    anf_env_rel vnames vs rho ->
+    (forall k, nth_error vnames k = Some x ->
+      exists v, nth_error vs k = Some v /\ anf_val_rel v v') ->
+    anf_env_rel vnames vs (M.set x v' rho).
+  Proof.
+    unfold anf_env_rel, anf_env_rel'.
+    intros Henv Hdup.
+    revert vs Henv Hdup.
+    induction vnames as [ | y vnames' IH]; intros vs Henv Hdup.
+    - inv Henv. constructor.
+    - destruct vs as [ | v_s vs']; [inv Henv | ].
+      inv Henv. constructor.
+      + destruct (Pos.eq_dec y x) as [-> | Hneq].
+        * rewrite M.gss.
+          destruct (Hdup 0%nat eq_refl) as [v_src [Hnth Hrel]].
+          simpl in Hnth. inv Hnth.
+          eexists; eauto.
+        * rewrite M.gso; [ | auto]. assumption.
+      + eapply IH; [assumption | ].
+        intros k Hnth. exact (Hdup (S k) Hnth).
+  Qed.
+
+
   Lemma anf_env_rel_nth_error vnames vs rho n y v :
     anf_env_rel vnames vs rho ->
     nth_error vnames n = Some y ->
@@ -765,7 +792,131 @@ Section Correct.
   Qed.
 
 
-  (* P0: correctness for expression lists *)
+  (** Looking up the first occurrence of x in set_many returns the
+      corresponding value from vs. *)
+  Lemma set_many_get_first xs vs rho x k :
+    Datatypes.length xs = Datatypes.length vs ->
+    nth_error xs k = Some x ->
+    (forall (j : nat), (j < k)%nat -> nth_error xs j <> Some x) ->
+    exists v, nth_error vs k = Some v /\
+      M.get x (set_many xs vs rho) = Some v.
+  Proof.
+    revert vs k. induction xs as [ | a xs' IH]; intros vs k Hlen Hnth Hfirst.
+    - destruct k; simpl in Hnth; discriminate.
+    - destruct vs as [ | v0 vs'].
+      { simpl in Hlen; lia. }
+      simpl in Hlen.
+      destruct k as [ | k'].
+      + simpl in Hnth. inv Hnth. simpl.
+        rewrite M.gss. eexists; eauto.
+      + simpl in Hnth. simpl.
+        assert (Ha_neq : a <> x).
+        { intros ->. eapply (Hfirst 0%nat). lia. simpl. reflexivity. }
+        rewrite M.gso. 2: now apply not_eq_sym.
+        apply IH.
+        * lia.
+        * exact Hnth.
+        * intros j Hj. apply (Hfirst (S j)). lia.
+  Qed.
+
+  (** Changing the base env for a key different from z doesn't affect
+      M.get z through set_many. *)
+  Lemma set_many_set_neq_base z x v xs vs rho :
+    z <> x ->
+    M.get z (set_many xs vs (M.set x v rho)) = M.get z (set_many xs vs rho).
+  Proof.
+    revert vs. induction xs as [ | a xs' IH]; intros vs Hneq.
+    - simpl. rewrite M.gso; auto.
+    - destruct vs as [ | va vs'].
+      + simpl. rewrite M.gso; auto.
+      + simpl. destruct (Pos.eq_dec z a) as [-> | Hza].
+        * rewrite !M.gss. reflexivity.
+        * rewrite !M.gso by auto. apply IH. exact Hneq.
+  Qed.
+
+
+  (** Every variable in xs is bound in set_many xs vs rho. *)
+  Lemma set_many_get_in x xs vs rho :
+    List.In x xs ->
+    Datatypes.length xs = Datatypes.length vs ->
+    exists v, M.get x (set_many xs vs rho) = Some v.
+  Proof.
+    revert vs. induction xs as [ | a xs' IH]; intros vs Hin Hlen.
+    - destruct Hin.
+    - destruct vs as [ | v vs']. { simpl in Hlen; lia. }
+      simpl. destruct Hin as [-> | Hin'].
+      + exists v. apply M.gss.
+      + destruct (Pos.eq_dec x a) as [-> | Hneq].
+        * exists v. apply M.gss.
+        * rewrite M.gso by auto. apply IH. assumption. simpl in Hlen; lia.
+  Qed.
+
+  (** If every variable in xs is bound in rho, get_list succeeds. *)
+  Lemma get_list_exists xs (rho : M.t val) :
+    (forall x, List.In x xs -> exists v, M.get x rho = Some v) ->
+    exists vs, get_list xs rho = Some vs.
+  Proof.
+    induction xs as [ | a xs' IH]; intros Hbound.
+    - exists []. reflexivity.
+    - destruct (Hbound a (or_introl eq_refl)) as [v Hv].
+      destruct (IH (fun x Hin => Hbound x (or_intror Hin))) as [vs_rest Hvs].
+      exists (v :: vs_rest). simpl. rewrite Hv, Hvs. reflexivity.
+  Qed.
+
+  (** Adding M.set a v on top of rho preserves get_list when:
+      - positions where xs has a already have value v in vs. *)
+  Lemma get_list_set_shadow xs a v (rho : M.t val) vs :
+    get_list xs rho = Some vs ->
+    (forall (k : nat), nth_error xs k = Some a -> nth_error vs k = Some v) ->
+    get_list xs (M.set a v rho) = Some vs.
+  Proof.
+    revert vs. induction xs as [ | b xs' IH]; intros vs Hgl Hshadow.
+    - exact Hgl.
+    - simpl in Hgl.
+      destruct (M.get b rho) eqn:Hb; [ | discriminate].
+      destruct (get_list xs' rho) eqn:Hrest; [ | discriminate].
+      inv Hgl. simpl.
+      destruct (Pos.eq_dec b a) as [-> | Hneq].
+      + rewrite M.gss.
+        assert (Hv := Hshadow 0%nat eq_refl). simpl in Hv. inv Hv.
+        f_equal. eapply IH; eauto.
+        intros k Hk. exact (Hshadow (S k) Hk).
+      + rewrite M.gso by auto. rewrite Hb. f_equal.
+        eapply IH; eauto.
+        intros k Hk. exact (Hshadow (S k) Hk).
+  Qed.
+
+  (** get_list xs (set_many xs vs rho) = Some vs, provided duplicate
+      positions in xs carry the same value in vs. *)
+  Lemma get_list_set_many_dup xs vs rho :
+    Datatypes.length xs = Datatypes.length vs ->
+    (forall (i j : nat), (i < j)%nat ->
+       nth_error xs i = nth_error xs j ->
+       nth_error xs i <> None ->
+       nth_error vs i = nth_error vs j) ->
+    get_list xs (set_many xs vs rho) = Some vs.
+  Proof.
+    revert vs. induction xs as [ | a xs' IH]; intros vs Hlen Hdup.
+    - destruct vs; [ reflexivity | simpl in Hlen; lia].
+    - destruct vs as [ | v vs']. { simpl in Hlen; lia. }
+      simpl. rewrite M.gss. f_equal.
+      eapply get_list_set_shadow.
+      + eapply IH.
+        * simpl in Hlen; lia.
+        * intros i j Hij Hnth Hnn.
+          apply (Hdup (S i) (S j)). lia. exact Hnth. exact Hnn.
+      + intros k Hk.
+        assert (H0Sk := Hdup 0%nat (S k) ltac:(lia) ltac:(simpl; exact Hk) ltac:(discriminate)).
+        simpl in H0Sk. congruence.
+  Qed.
+
+  (* P0: correctness for expression lists.
+     Note: xs may have duplicates (from anf_Var) and may overlap with vnames.
+     This is sound because:
+     - Duplicates in xs always come from the same Var_e reference,
+       so they have the same value in vs'.
+     - Fresh variables in xs (from non-Var expressions) are unique
+       and disjoint from vnames (since S ∩ vnames = ∅). *)
   Definition anf_cvt_correct_exps (vs_env : fuel_sem.env) (es : expression.exps)
              (vs1 : list value) (f t : nat) :=
     forall rho vnames C xs S S' i,
@@ -774,8 +925,6 @@ Section Correct.
       Disjoint _ (FromList vnames) S ->
       anf_env_rel vnames vs_env rho ->
       anf_cvt_rel_exps S es vnames cnstrs S' C xs ->
-      NoDup xs ->
-      Disjoint _ (FromList xs) (FromList vnames) ->
       forall e_k vs',
         Forall2 anf_val_rel vs1 vs' ->
         Disjoint _ (occurs_free e_k) ((S \\ S') \\ FromList xs) ->
@@ -823,13 +972,25 @@ Section Correct.
                 - eapply Disjoint_Included_r. eapply Setminus_Included. eassumption.
                 - eassumption.
                 - exact Hcvt_es.
-                - admit. (* NoDup xs *)
-                - admit. (* Disjoint xs vnames *)
                 - eassumption. (* Forall2 anf_val_rel *)
-                - admit. (* Disjoint (occurs_free (Econstr ...)) ... *) }
+                - (* Disjoint (occurs_free (Econstr ...)) ... *)
+                  simpl. rewrite occurs_free_Econstr.
+                  eapply Union_Disjoint_l.
+                  + eapply Disjoint_Setminus_r. eapply Included_refl.
+                  + eapply Setminus_Disjoint_preserv_l.
+                    eapply Setminus_Disjoint_preserv_r.
+                    eapply Disjoint_Included_r.
+                    2: exact Hdis_ek.
+                    intros y [[Hy_S Hy_nx] Hy_nS'].
+                    split; [split; [exact Hy_S | exact Hy_nS'] | exact Hy_nx]. }
             eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
             2:{ intros m. eapply preord_exp_Econstr_red.
-                eapply get_list_set_many. admit. admit. }
+                destruct (get_list_set_many_dup _ _ rho ltac:(
+                  eapply Forall2_length in H4;
+                  eapply anf_cvt_rel_exps_length in Hcvt_es;
+                  eapply eval_fuel_many_length in Hmany;
+                  lia)) as [vs_gl Hgl].
+                exact Hgl. }
             eapply preord_exp_refl. now eapply eq_fuel_compat.
             intros y Hy v1 Hget.
             destruct (Pos.eq_dec y x) as [Heq|Hneq].
@@ -838,7 +999,7 @@ Section Correct.
               eapply preord_val_refl. tci.
             * rewrite M.gso in Hget; auto.
               eexists. split. rewrite M.gso; auto.
-              admit. (* set_many env bridge *)
+              admit. (* set_many env bridge: M.get y (set_many xs vs' rho) *)
               eapply preord_val_refl. tci. }
         unfold inclusion, comp, eq_fuel, anf_bound.
         intros [[[? ?] ?] ?] [[[? ?] ?] ?].
@@ -1253,7 +1414,8 @@ Section Correct.
                 - exact Hcvt_e1.
                 - exact Hdis_C2ek.
                 - eapply IH1_val; eauto. }
-            eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+            eapply preord_exp_trans with (P1 := anf_bound (f3' + 2) (t3' + 2)).
+            tci. eapply eq_fuel_idemp.
             (* IH2: C2 layer *)
             2:{ intros m.
                 assert (Henv_x1 : anf_env_rel vnames rho0 (M.set x1 fix_v' rho)) by admit.
@@ -1269,9 +1431,130 @@ Section Correct.
                 - exact Hdis_letapp.
                 - eapply IH2_val; eauto. }
             (* Eletapp reduction + IH3 for body *)
-            admit. (* Eletapp step: function lookup in ClosFix bundle + IH3 *) }
-        (* inclusion *)
-        admit.
+            (* Step 1: Extract fix closure structure from Hrel_fix *)
+            assert (Hfix_inv :
+              exists rho_fc names_fc fnames_fc Bs_fix f_fc S1_fc S2_fc,
+                fix_v' = Vfun rho_fc Bs_fix f_fc /\
+                anf_env_rel' anf_val_rel names_fc rho_fix rho_fc /\
+                NoDup names_fc /\
+                NoDup fnames_fc /\
+                Disjoint _ (FromList names_fc :|: FromList fnames_fc) S1_fc /\
+                Disjoint _ (FromList names_fc) (FromList fnames_fc) /\
+                nth_error fnames_fc (N.to_nat n0) = Some f_fc /\
+                anf_fix_rel fnames_fc names_fc S1_fc fnames_fc fnlst0 Bs_fix S2_fc).
+            { inversion Hrel_fix; try discriminate; subst.
+              do 7 eexists.
+              split; [reflexivity | ].
+              repeat (split; [eassumption | ]).
+              eassumption. }
+            destruct Hfix_inv as (rho_fc & names_fc & fnames_fc & Bs_fix & f_fc &
+              S1_fc & S2_fc & Hfix_eq & Henv_fc & Hnd_names & Hnd_fnames &
+              Hdis_fix & Hdis_nf & Hnth_fix & Hfix_rel).
+            subst fix_v'.
+            (* Get specific function from the fix bundle *)
+            edestruct (anf_fix_rel_find_def _ _ _ _ _ _ _ _ _ _ _ Hfix_rel Hnth_fix Hnth Hnd_fnames)
+              as (x_pc & C_bc & r_bc & S_body1 & S_body2 & Hfind_fc & Hcvt_bc).
+            set (rho_bc := M.set x_pc v2' (def_funs Bs_fix Bs_fix rho_fc rho_fc)).
+            (* Step 2: Body environment relation *)
+            assert (Henv_bc : anf_env_rel (x_pc :: List.rev fnames_fc ++ names_fc)
+                                          (v2 :: make_rec_env_rev_order fnlst0 rho_fix) rho_bc) by admit.
+            (* Step 3: Apply IH3 to get body correctness *)
+            assert (IH3_full :
+              (forall v0 v'0, Val v = Val v0 -> anf_val_rel v0 v'0 ->
+               preord_exp cenv (anf_bound f3' t3') eq_fuel (i + 1)%nat
+                          (Ehalt r_bc, M.set r_bc v'0 rho_bc)
+                          (C_bc |[ Ehalt r_bc ]|, rho_bc)) /\
+              (Val v = fuel_sem.OOT ->
+               exists c, bstep_fuel cenv rho_bc (C_bc |[ Ehalt r_bc ]|) c eval.OOT tt)).
+            { eapply IH3 with (vnames := x_pc :: List.rev fnames_fc ++ names_fc).
+              - (* well_formed_env (v2 :: make_rec_env_rev_order fnlst0 rho_fix) *)
+                admit. (* from Hwf_v2 + make_rec_env_preserves_wf *)
+              - (* exp_wf *)
+                admit. (* from well_formed_val (ClosFix_v ...) *)
+              - (* NoDup (x_pc :: rev fnames_fc ++ names_fc) *)
+                admit. (* from Hxpc_in, Hdis_entry, Hnd_names, Hnd_fnames, Hdis_nf *)
+              - (* Disjoint (FromList (x_pc :: rev fnames_fc ++ names_fc)) S_body1 *)
+                admit. (* from Hdis_entry, Hsub_body, Hxpc_in *)
+              - exact Henv_bc.
+              - exact Hcvt_bc.
+              - (* Disjoint (occurs_free (Ehalt r_bc)) ((S_body1 \\ S_body2) \\ [set r_bc]) *)
+                constructor. intros z Hz. inv Hz.
+                inversion H; subst.
+                destruct H0 as [_ Habs]. apply Habs. constructor. }
+            destruct IH3_full as [IH3_val _].
+            specialize (IH3_val v v' eq_refl Hrel).
+            (* Step 4: Build Ehalt bstep_fuel *)
+            assert (Hle_h : (to_nat 1%nat <= i + 1)%nat) by (simpl; lia).
+            assert (Hehalt : @bstep_fuel cenv nat fuel_res unit trace_res
+                                         (M.set r_bc v' rho_bc) (Ehalt r_bc) 1%nat (Res v') tt).
+            { pose proof (BStepf_run cenv (M.set r_bc v' rho_bc) (Ehalt r_bc) (Res v') 0%nat tt
+                (BStept_halt cenv r_bc v' (M.set r_bc v' rho_bc) (M.gss r_bc v' rho_bc))) as Hbsf.
+              simpl in Hbsf. exact Hbsf. }
+            destruct (IH3_val (Res v') 1%nat tt Hle_h Hehalt)
+              as (v_body_res & cin_bc & cout_bc & Hbstep_bc & Hpost_bc & Hres_bc).
+            (* Body result must be Res (not OOT) *)
+            destruct v_body_res as [ | v_bc ].
+            { simpl in Hres_bc. contradiction. }
+            simpl in Hres_bc.
+            (* Step 5: Continuation bridge via preord_exp_refl *)
+            intros v1 cin cout Hle_cin Hbstep_ek.
+            assert (Hrefl : preord_exp cenv eq_fuel eq_fuel i
+                      (e_k, M.set x v' rho)
+                      (e_k, M.set x v_bc (M.set x2 v2' (M.set x1 (Vfun rho_fc Bs_fix f_fc) rho)))).
+            { eapply preord_exp_refl. now eapply eq_fuel_compat.
+              intros y Hy.
+              destruct (Pos.eq_dec y x) as [-> | Hneq_x].
+              - (* y = x *)
+                unfold preord_var_env. intros v0 Hget0.
+                rewrite M.gss in Hget0. inv Hget0.
+                eexists. split. rewrite M.gss. reflexivity.
+                eapply preord_val_monotonic. exact Hres_bc. lia.
+              - (* y ≠ x *)
+                unfold preord_var_env. intros v0 Hget0.
+                rewrite M.gso in Hget0 by auto.
+                eexists. split.
+                + assert (Hneq_x2 : y <> x2) by admit. (* freshness *)
+                  assert (Hneq_x1 : y <> x1) by admit. (* freshness *)
+                  rewrite M.gso by auto.
+                  rewrite M.gso by auto.
+                  rewrite M.gso by auto.
+                  exact Hget0.
+                + eapply preord_val_refl. tci. }
+            (* Step 6: Get continuation evaluation *)
+            edestruct Hrefl as (v_cont & cin_cont & cout_cont & Hbstep_cont & Heq_cont & Hres_cont).
+            { exact Hle_cin. }
+            { exact Hbstep_ek. }
+            (* Step 7: Construct the full Eletapp evaluation *)
+            do 3 eexists. split.
+            { assert (Hneq_x2_x1 : x1 <> x2) by admit. (* freshness *)
+              econstructor 2. eapply BStept_letapp.
+              - (* M.get x1 = Vfun rho_fc Bs_fix f_fc *)
+                rewrite M.gso by auto.
+                rewrite M.gss. reflexivity.
+              - (* get_list [x2] = [v2'] *)
+                simpl. rewrite M.gss. reflexivity.
+              - (* find_def f_fc Bs_fix *)
+                exact Hfind_fc.
+              - (* set_lists [x_pc] [v2'] (def_funs ...) = Some rho_bc *)
+                reflexivity.
+              - (* body evaluates *)
+                exact Hbstep_bc.
+              - (* continuation evaluates *)
+                exact Hbstep_cont. }
+            split.
+            { (* PostT: anf_bound (f3' + 2) (t3' + 2) *)
+              unfold anf_bound in Hpost_bc |- *.
+              unfold eq_fuel in Heq_cont. simpl in Heq_cont, Hpost_bc.
+              destruct Hpost_bc as [Hlb_bc Hub_bc].
+              simpl. unfold one, one_i in *; simpl; unfold_all. lia. }
+            { (* preord_res *)
+              exact Hres_cont. } }
+        (* inclusion: comp (comp (anf_bound (f3'+2) (t3'+2)) (anf_bound f2' t2')) (anf_bound f1' t1')
+                     ⊆ anf_bound (f1'+f2'+f3'+1) (t1'+t2'+t3'+2) *)
+        { unfold inclusion, comp, eq_fuel, anf_bound.
+          intros [[[? ?] ?] ?] [[[? ?] ?] ?].
+          intros [[[[? ?] ?] ?] [[[[[? ?] ?] ?] [[? ?] [? ?]]] [? ?]]].
+          unfold_all. simpl in *. split; lia. }
       + intros _. eexists 0%nat. constructor 1. unfold algebra.one. simpl. lia.
 
     - (* 9. eval_Match_step: Match_e terminates *)
@@ -1497,7 +1780,7 @@ Section Correct.
     - (* 11. eval_many_enil *)
       intros vs0.
       unfold anf_cvt_correct_exps.
-      intros rho vnames C xs S S' i Hwf Hnd Hdis Henv Hcvt Hndxs Hdisxs e_k vs' Hrel_vs Hdis_ek.
+      intros rho vnames C xs S S' i Hwf Hnd Hdis Henv Hcvt e_k vs' Hrel_vs Hdis_ek.
       inv Hcvt. inv Hrel_vs. simpl.
       intros v1 cin cout Hleq Hstep.
       exists v1, cin, cout. split. exact Hstep. split.
@@ -1508,7 +1791,7 @@ Section Correct.
       intros vs_env e0 es0 v0 vs0 f0 fs0 t0 ts0 Heval_e IH_e Heval_es IH_es.
       unfold anf_cvt_correct_exps in IH_es |- *.
       unfold anf_cvt_correct_exp in IH_e.
-      intros rho vnames C xs S S' i Hwf Hnd Hdis Henv Hcvt Hndxs Hdisxs e_k vs' Hrel_vs Hdis_ek.
+      intros rho vnames C xs S S' i Hwf Hnd Hdis Henv Hcvt e_k vs' Hrel_vs Hdis_ek.
       inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_exps in *.
       inv Hrel_vs.
       (* After inv: C = comp_ctx_f C1 C2, xs = x1 :: xs_rest,
@@ -1528,21 +1811,34 @@ Section Correct.
           eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
           (* Right step: IH_es with env M.set x1 v1' rho *)
           2:{ intros m.
-              eapply IH_es; [ exact Hwf | exact Hnd | | | eassumption | | | eassumption | ].
+              eapply IH_es; [ exact Hwf | exact Hnd | | | eassumption | eassumption | admit ].
               - eapply Disjoint_Included_r; [eapply (proj1 anf_cvt_rel_subset); eassumption | exact Hdis].
-              - eapply anf_env_rel_weaken; [exact Henv | ].
-                admit. (* ~ x1 \in FromList vnames *)
-              - admit. (* NoDup xs_rest *)
-              - admit. (* Disjoint (FromList xs_rest) (FromList vnames) *)
-              - admit. (* Disjoint (occurs_free e_k) ((S2\S')\FromList xs_rest) *) }
-          (* Leftmost: env bridge — M.set x1 v1' (set_many ...) ≈ set_many ... (M.set x1 v1' ...) *)
+              - (* anf_env_rel vnames vs_env (M.set x1 v1' rho) *)
+                eapply anf_env_rel_set; [exact Henv | intros k Hnth_k; admit]. }
+          (* Leftmost: env bridge —
+             M.set x1 v1' (set_many xs_rest vs_tl' rho) ≈
+             set_many xs_rest vs_tl' (M.set x1 v1' rho)
+             This holds for preord_var_env because:
+             - At y ≠ x1: both sides agree (set_many dominates for y ∈ xs_rest,
+               otherwise M.get y rho since y ≠ x1)
+             - At y = x1: LHS gives v1' (M.gss), RHS gives v1' if x1 ∉ xs_rest,
+               or the set_many value if x1 ∈ xs_rest. In the latter case,
+               both values translate the same source value (preord_val_refl). *)
           eapply preord_exp_refl. now eapply eq_fuel_compat.
           intros z Hz v1 Hget.
-          eexists. split.
-          { rewrite <- set_many_set_comm.
-            - eassumption.
-            - inv Hndxs. assumption. }
-          eapply preord_val_refl. tci. }
+          (* env bridge: M.set x1 v1' (set_many xs vs rho) ≈ set_many xs vs (M.set x1 v1' rho) *)
+          destruct (Pos.eq_dec z x1) as [Heq_z | Hneq_z].
+          + subst z. rewrite M.gss in Hget.
+            inv Hget.
+            destruct (in_dec Pos.eq_dec x1 xs0) as [Hin_xs | Hnin_xs].
+            * admit. (* x1 ∈ xs_rest: needs anf_cvt_val_alpha_equiv *)
+            * eexists; split.
+              -- rewrite set_many_get_neq; auto. rewrite M.gss. reflexivity.
+              -- eapply preord_val_refl. tci.
+          + rewrite M.gso in Hget; auto.
+            eexists; split.
+            * rewrite set_many_set_neq_base; auto. exact Hget.
+            * eapply preord_val_refl. tci. }
       (* inclusion: comp (comp eq_fuel (anf_bound fs0 ts0)) (anf_bound f0 t0) ⊆ anf_bound (f0+fs0) (t0+ts0) *)
       unfold inclusion, comp, eq_fuel, anf_bound.
       intros [[[? ?] ?] ?] [[[? ?] ?] ?].

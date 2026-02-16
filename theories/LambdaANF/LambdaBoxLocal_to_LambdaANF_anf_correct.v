@@ -668,6 +668,16 @@ Section Correct.
     - eapply Hcons; eassumption.
   Qed.
 
+  (* Generalized consistency: two positions with the same key have R-related values. *)
+  Definition list_consistent {A : Type} (R : A -> A -> Prop)
+             (keys : list var) (vals : list A) : Prop :=
+    forall i j x vi vj,
+      nth_error keys i = Some x ->
+      nth_error keys j = Some x ->
+      nth_error vals i = Some vi ->
+      nth_error vals j = Some vj ->
+      R vi vj.
+
   (* Helper: result of non-Var ANF conversion is in S, hence not in FromList vn. *)
   Local Ltac anf_result_in_S :=
     match goal with
@@ -720,7 +730,7 @@ Section Correct.
       (P := Plookup)
       (P0 := fun _ _ _ _ _ => True)
       (P1 := Plookup);
-    try (unfold Plookup; clear Plookup).
+    unfold Plookup; clear Plookup.
 
     (** eval_env_step cases (P) *)
 
@@ -896,6 +906,27 @@ Section Correct.
       anf_val_rel v v1 -> anf_val_rel v v2 ->
       preord_val cenv eq_fuel k v1 v2.
   Proof. Admitted.
+
+
+  (** ** Consistency lemmas for duplicate ANF variables *)
+
+  (* Lemma 1: ANF-converted expression list variables are consistent w.r.t. preord_val.
+     Duplicate xs positions map to the same source variable (by anf_cvt_rel_exps_var_lookup),
+     so their target values are both anf_val_rel to the same source value,
+     hence preord_val by alpha-equiv. *)
+  Lemma anf_cvt_exps_consistent k rho_src es vs_src f t
+        S vn tgm S' C xs vs_tgt :
+    @eval_fuel_many _ LambdaBoxLocal_resource_fuel LambdaBoxLocal_resource_trace
+                    rho_src es vs_src f t ->
+    anf_cvt_rel_exps S es vn tgm S' C xs ->
+    Disjoint _ (FromList vn) S ->
+    env_consistent vn rho_src ->
+    Forall2 anf_val_rel vs_src vs_tgt ->
+    list_consistent (preord_val cenv eq_fuel k) xs vs_tgt.
+  Proof.
+    intros Hmany Hcvt Hdis Hcons HF2 i j x vi vj Hxi Hxj Hvi Hvj.
+    admit.
+  Admitted.
 
 
   (* Every well-formed source value has a related target value. *)
@@ -1363,6 +1394,111 @@ Section Correct.
     intros Hlen.
     eapply get_list_exists.
     intros y Hy. eapply set_many_get_in; eauto.
+  Qed.
+
+  (* If xs and vs are list_consistent w.r.t. R, then
+     get_list xs (set_many xs vs rho) produces R-related values.
+     set_many stores left-to-right (first occurrence of each key wins);
+     consistency ensures all duplicate values are R-related. *)
+  (* Helper: find the first occurrence of x in a list, or return k if none before k. *)
+  Lemma first_occurrence_exists (xs : list var) (k : nat) (x : var) :
+    nth_error xs k = Some x ->
+    exists k0, (k0 <= k)%nat /\ nth_error xs k0 = Some x /\
+               forall j, (j < k0)%nat -> nth_error xs j <> Some x.
+  Proof.
+    revert k. induction xs as [ | a xs' IH]; intros k Hk.
+    - destruct k; simpl in Hk; discriminate.
+    - destruct k as [ | k'].
+      + exists 0%nat. simpl in *. split; [ lia | split; [ exact Hk | ] ].
+        intros j Hj. lia.
+      + simpl in Hk.
+        destruct (Pos.eq_dec a x) as [Heq | Hneq].
+        * subst. exists 0%nat. simpl. split; [ lia | split; [ reflexivity | ] ].
+          intros j Hj. lia.
+        * destruct (IH k' Hk) as [k0 [Hle [Hk0 Hfirst]]].
+          exists (S k0). simpl. split; [ lia | split; [ exact Hk0 | ] ].
+          intros j Hj. destruct j as [ | j']; simpl.
+          -- intros Heq'. inv Heq'. contradiction.
+          -- apply Hfirst. lia.
+  Qed.
+
+  (* Helper: build Forall2 from pointwise nth_error relation *)
+  Lemma Forall2_from_nth_error {A B : Type} (R : A -> B -> Prop)
+        (l1 : list A) (l2 : list B) :
+    Datatypes.length l1 = Datatypes.length l2 ->
+    (forall k a b, nth_error l1 k = Some a -> nth_error l2 k = Some b -> R a b) ->
+    Forall2 R l1 l2.
+  Proof.
+    revert l2. induction l1 as [ | a l1' IH]; intros l2 Hlen Hpw.
+    - destruct l2; [ constructor | simpl in Hlen; lia ].
+    - destruct l2 as [ | b l2']; [ simpl in Hlen; lia | ].
+      constructor.
+      + exact (Hpw 0%nat a b eq_refl eq_refl).
+      + apply IH.
+        * simpl in Hlen; lia.
+        * intros k a' b' Ha' Hb'. exact (Hpw (S k) a' b' Ha' Hb').
+  Qed.
+
+  (* Helper: relate get_list output to individual M.get lookups via nth_error *)
+  Lemma get_list_nth_error (xs : list var) (vs : list val) (rho : M.t val)
+        (k : nat) (x : var) :
+    get_list xs rho = Some vs ->
+    nth_error xs k = Some x ->
+    nth_error vs k = M.get x rho.
+  Proof.
+    revert vs k. induction xs as [ | a xs' IH]; intros vs k Hgl Hnth.
+    - destruct k; simpl in Hnth; discriminate.
+    - simpl in Hgl.
+      destruct (M.get a rho) eqn:Ha; [ | discriminate ].
+      destruct (get_list xs' rho) eqn:Hrest; [ | discriminate ].
+      inv Hgl.
+      destruct k as [ | k'].
+      + simpl in Hnth. inv Hnth. simpl. symmetry. exact Ha.
+      + simpl in Hnth. simpl. exact (IH l k' eq_refl Hnth).
+  Qed.
+
+  Lemma get_list_set_many_consistent (R : val -> val -> Prop) xs vs (rho : M.t val) :
+    (forall x, R x x) ->
+    Datatypes.length xs = Datatypes.length vs ->
+    list_consistent R xs vs ->
+    exists vs', get_list xs (set_many xs vs rho) = Some vs' /\
+                Forall2 R vs vs'.
+  Proof.
+    intros Hrefl Hlen Hcons.
+    destruct (get_list_set_many_exists xs vs rho Hlen) as [vs' Hvs'].
+    exists vs'. split; [ exact Hvs' | ].
+    assert (Hlen' : Datatypes.length vs = Datatypes.length vs').
+    { assert (H : Datatypes.length xs = Datatypes.length vs') by
+        (eapply get_list_length_eq; exact Hvs').
+      rewrite Hlen in H. exact H. }
+    eapply Forall2_from_nth_error; [ exact Hlen' | ].
+    intros k vk v'k Hvk Hv'k.
+    (* Find what key xs[k] is *)
+    destruct (nth_error xs k) as [x | ] eqn:Hx.
+    2: { (* nth_error xs k = None contradicts nth_error vs' k = Some v'k *)
+         exfalso.
+         (* k >= length xs but k < length vs' = length xs, contradiction *)
+         assert (Hlen_xs_vs' : Datatypes.length xs = Datatypes.length vs') by lia.
+         clear -Hx Hv'k Hlen_xs_vs'.
+         revert vs' k Hv'k Hx Hlen_xs_vs'.
+         induction xs; intros vs' k Hv'k Hx Hlen_xs_vs'.
+         - simpl in Hlen_xs_vs'. destruct vs'; [ | simpl in Hlen_xs_vs'; lia].
+           destruct k; simpl in Hv'k; discriminate.
+         - destruct k; simpl in Hx; [ discriminate | ].
+           destruct vs' as [ | v' vs'']; [ destruct k; simpl in Hv'k; discriminate | ].
+           simpl in Hv'k. simpl in Hlen_xs_vs'.
+           eapply IHxs; [ exact Hv'k | exact Hx | lia ]. }
+    (* Find first occurrence of x in xs *)
+    destruct (first_occurrence_exists xs k x Hx) as [k0 [Hle [Hk0 Hfirst]]].
+    (* set_many_get_first: M.get x (set_many xs vs rho) = vs[k0] *)
+    destruct (set_many_get_first xs vs rho x k0 Hlen Hk0 Hfirst) as [v0 [Hvk0 Hget]].
+    (* get_list_nth_error: vs'[k] = M.get xs[k] (set_many xs vs rho) *)
+    assert (Hv'eq : nth_error vs' k = Some v0).
+    { erewrite get_list_nth_error; [ | exact Hvs' | exact Hx ]. exact Hget. }
+    (* v'k = v0 *)
+    assert (Heq : v'k = v0) by congruence. subst v'k.
+    (* By list_consistent: R vk v0 *)
+    exact (Hcons k k0 x vk v0 Hx Hk0 Hvk Hvk0).
   Qed.
 
   Lemma eval_fuel_many_length vs es vs1 f1 t1 :

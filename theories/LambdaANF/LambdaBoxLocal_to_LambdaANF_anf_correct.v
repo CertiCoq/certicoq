@@ -604,6 +604,47 @@ Section Correct.
       + etransitivity; [exact (IH Hfind) | apply Nat.le_max_r].
   Qed.
 
+  (* Helper: extract a specific function entry from an anf_fix_rel bundle.
+     Given the nth function name and the nth source body, find_def locates
+     the corresponding ANF function definition in the bundled fundefs. *)
+  Lemma anf_fix_rel_find_def :
+    forall fnames0 names0 S1 fnames_list efns Bs S2 idx f na e_body,
+      anf_fix_rel fnames0 names0 S1 fnames_list efns Bs S2 ->
+      nth_error fnames_list idx = Some f ->
+      enthopt idx efns = Some (Lam_e na e_body) ->
+      NoDup fnames_list ->
+      exists x_pc C_body r_body S_body1 S_body2,
+        find_def f Bs = Some (func_tag, [x_pc], C_body |[ Ehalt r_body ]|) /\
+        anf_cvt_rel S_body1 e_body (x_pc :: List.rev fnames0 ++ names0) cnstrs S_body2 C_body r_body.
+  Proof.
+    intros fnames0 names0 S1 fnames_list efns Bs S2 idx f na e_body
+      Hrel Hnth Henth Hnd.
+    revert idx f na e_body Hnth Henth Hnd.
+    induction Hrel; intros idx0 f0 na0 e_body0 Hnth Henth Hnd.
+    - (* anf_fix_fnil: fnames_list = [], impossible *)
+      destruct idx0; discriminate.
+    - (* anf_fix_fcons *)
+      destruct idx0 as [ | idx'].
+        (* idx = 0: this function *)
+      + simpl in Hnth. inv Hnth.
+        simpl in Henth. inv Henth.
+        do 5 eexists. split.
+        * simpl. destruct (M.elt_eq f0 f0); [ reflexivity | congruence ].
+        * eassumption.
+      + (* idx = S idx': later function *)
+        simpl in Hnth. simpl in Henth.
+        inv Hnd.
+        edestruct IHHrel as (x_pc' & C_body' & r_body' & S_body1' & S_body2' & Hfind' & Hcvt').
+        * exact Hnth.
+        * exact Henth.
+        * assumption.
+        * do 5 eexists. split.
+          -- simpl. destruct (M.elt_eq f0 f) as [Heq | Hneq].
+             ++ exfalso. subst. apply H6. eapply nth_error_In. exact Hnth.
+             ++ exact Hfind'.
+          -- exact Hcvt'.
+  Qed.
+
 
   (** ** Correctness statements *)
 

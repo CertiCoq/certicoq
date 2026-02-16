@@ -8017,6 +8017,67 @@ Proof.
   apply rt_refl.
 Qed.
 
+Lemma repr_val_fun_inv :
+  forall fenv finfo_env p rep_env rho_clo fl f' m L v7,
+    repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env
+      (Vfun rho_clo fl f') m L v7 ->
+    exists (vars avars : list (ident * type))
+           (b : block)
+           (t t' : fun_tag)
+           (vs pvs avs : list positive)
+           (e : exp)
+           (asgn body : statement)
+           (l : N)
+           (locs alocs : list N)
+           (finfo : positive)
+           (gccall : statement),
+      v7 = Vptr b Ptrofs.zero /\
+      find_def f' fl = Some (t, vs, e) /\
+      M.get t fenv = Some (l, locs) /\
+      M.get f' finfo_env = Some (finfo, t') /\
+      t = t' /\
+      Genv.find_symbol (globalenv p) f' = Some b /\
+      gc_test' argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent
+        nParam finfo l vs locs fenv finfo_env = Some gccall /\
+      Genv.find_funct (globalenv p) (Vptr b Ptrofs.zero) =
+        Some
+          (Internal
+             (mkfunction Tvoid
+                (mkcallconv None false false)
+                ((tinfIdent, LambdaANF_to_Clight.threadInf threadInfIdent)
+                   :: map (fun x => (x, val)) pvs)
+                nil (List.app avars (gc_vars argsIdent allocIdent limitIdent caseIdent))
+                (Ssequence gccall
+                   (Ssequence
+                      (Ssequence
+                         (gc_set argsIdent allocIdent limitIdent threadInfIdent
+                            tinfIdent) asgn) body)))) /\
+      Forall2 (fun x xt => xt = (x, val)) vs vars /\
+      pvs = firstn nParam vs /\
+      avs = skipn nParam vs /\
+      alocs = skipn nParam locs /\
+      avars = skipn nParam vars /\
+      right_param_asgn argsIdent avs alocs asgn /\
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e body.
+Proof.
+  intros fenv finfo_env p rep_env rho_clo fl f' m L v7 Hrepr.
+  remember (Vfun rho_clo fl f') as vf eqn:Heqvf.
+  destruct Hrepr as
+      [L0 z r m0 Hunboxed_int
+      |t0 arr0 n0 m0 L0 Hget_enum Hunboxed
+      |L0 t0 vs0 n0 a0 b0 i0 m0 h0 Hget_boxed Hloc Hload Hboxed Hvals
+      |L0 vars0 avars0 fds0 f0 m0 b0 t0 t'0 vs0 pvs0 avs0 e0 asgn0 body0 l0
+       locs0 alocs0 finfo0 gccall0 Hfinddef Hgetfun Hgetfinfo Ht Hsym Hgc
+       Hfun Hforall Hpvs Havs Halocs Havar Hright Hrepr_body].
+  - inversion Heqvf.
+  - inversion Heqvf.
+  - inversion Heqvf.
+  - inversion Heqvf; subst rho_clo fl f'; clear Heqvf.
+    exists vars0, avars0, b0, t0, t'0, vs0, pvs0, avs0, e0, asgn0, body0,
+      l0, locs0, alocs0, finfo0, gccall0.
+    repeat split; eauto.
+Qed.
+
 Lemma repr_expr_efun_false :
   forall fenv finfo_env p rep_env fds e stm,
     repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Efun fds e) stm ->

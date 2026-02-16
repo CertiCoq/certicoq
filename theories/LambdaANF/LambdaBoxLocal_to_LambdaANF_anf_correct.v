@@ -851,6 +851,18 @@ Section Correct.
         * rewrite M.gso by auto. apply IH. assumption. simpl in Hlen; lia.
   Qed.
 
+  (** Variables not in xs are unaffected by set_many. *)
+  Lemma set_many_get_notin y xs vs (rho : M.t val) :
+    ~ List.In y xs ->
+    M.get y (set_many xs vs rho) = M.get y rho.
+  Proof.
+    revert vs. induction xs as [ | a xs' IH]; intros vs Hnin.
+    - reflexivity.
+    - destruct vs as [ | v vs']. { reflexivity. }
+      simpl. rewrite M.gso by (intro; apply Hnin; left; auto).
+      apply IH. intro; apply Hnin; right; auto.
+  Qed.
+
   (** If every variable in xs is bound in rho, get_list succeeds. *)
   Lemma get_list_exists xs (rho : M.t val) :
     (forall x, List.In x xs -> exists v, M.get x rho = Some v) ->
@@ -1001,6 +1013,40 @@ Section Correct.
     - exfalso. eapply Hrho; eauto. *)
   Admitted.
 
+  (** If every xs[i] is in the domain of set_many xs vs rho, get_list succeeds. *)
+  Lemma get_list_set_many_exists xs vs rho :
+    Datatypes.length xs = Datatypes.length vs ->
+    exists vs', get_list xs (set_many xs vs rho) = Some vs'.
+  Proof.
+    intros Hlen.
+    induction xs. admit.  destruct vs; try (simpl in *; congruence). 
+    simpl. rewrite M.gss.
+    eapply get_list_exists.
+    intros y Hy. eapply set_many_get_in; eauto.
+  Qed.
+
+  Lemma eval_fuel_many_length vs es vs1 f1 t1 :
+    @eval_fuel_many _ LambdaBoxLocal_resource_fuel LambdaBoxLocal_resource_trace
+                    vs es vs1 f1 t1 ->
+    Datatypes.length vs1 = N.to_nat (exps_length es).
+  Proof.
+    intros Hrel. induction Hrel.
+    - reflexivity.
+    - simpl. rewrite IHHrel.
+      destruct (exps_length es); try lia. destruct p; lia.
+  Qed.
+
+  Lemma anf_cvt_rel_exps_length S es vn S' C xs :
+    anf_cvt_rel_exps S es vn cnstrs S' C xs ->
+    Datatypes.length xs = N.to_nat (exps_length es).
+  Proof.
+    unfold anf_cvt_rel_exps.
+    intros H. induction H as [ | ? ? ? ? ? ? ? ? ? ? ? ? ? IH].
+    - reflexivity.
+    - simpl. rewrite IH.
+      destruct (exps_length es); try lia. destruct p; lia.
+  Qed.
+
   (* P0: correctness for expression lists.
      Note: xs may have duplicates (from anf_Var) and may overlap with vnames.
      This is sound because:
@@ -1074,18 +1120,44 @@ Section Correct.
                     2: exact Hdis_ek.
                     intros y [[Hy_S Hy_nx] Hy_nS'].
                     split; [split; [exact Hy_S | exact Hy_nS'] | exact Hy_nx]. }
+            (* Prove length xs = length vs'0 *)
+            assert (Hlen_xs_vs0 : Datatypes.length xs = Datatypes.length vs0).
+            { pose proof (anf_cvt_rel_exps_length _ _ _ _ _ _ Hcvt_es).
+              assert (Datatypes.length vs0 = N.to_nat (exps_length es))
+                by (clear -Hmany; induction Hmany;
+                    [ reflexivity
+                    | simpl; rewrite IHHmany;
+                      destruct (exps_length es); try lia; destruct p; lia ]).
+              lia. }
+            assert (Hlen_xs_vs'0 : Datatypes.length xs = Datatypes.length vs'0)
+              by (pose proof (Forall2_length _ _ _ H1); lia).
+            (* Establish get_list existence for Econstr_red *)
+            destruct (get_list_set_many_exists xs vs'0 rho Hlen_xs_vs'0)
+              as [vs_new Hvs_new].
             eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
-            2:{ intros m. eapply preord_exp_Econstr_red. admit. }
+            2:{ intros m. eapply preord_exp_Econstr_red. exact Hvs_new. }
             eapply preord_exp_refl. now eapply eq_fuel_compat.
             intros y Hy v1 Hget.
             destruct (Pos.eq_dec y x) as [Heq|Hneq].
             * subst. rewrite M.gss in Hget. inv Hget.
               eexists. split. rewrite M.gss. reflexivity.
-              eapply preord_val_refl. tci.
+              rewrite preord_val_eq. simpl. split; eauto. 
+              (* preord_val (Vconstr ctag l) (Vconstr ctag vs_new):
+                 Both l and vs_new are componentwise anf_val_rel to
+                 the same source values vs0 (vs_new[i] = l[first_occ(xs[i])]).
+                 For duplicate positions, this needs alpha-equiv. *)
+              admit. (* requires anf_cvt_val_alpha_equiv *)
             * rewrite M.gso in Hget; auto.
-              eexists. split. rewrite M.gso; auto. 
-              admit. (* set_many env bridge: M.get y (set_many xs vs' rho) *)
-              eapply preord_val_refl. tci. }
+              destruct (in_dec Pos.eq_dec y xs) as [Hyin | Hynin].
+              -- (* y ∈ xs ∩ vnames: both rho and set_many bindings are
+                    anf_val_rel to the same source value, needs alpha-equiv *)
+                 simpl. 
+                    admit. (* requires anf_cvt_val_alpha_equiv *)
+                 simpl
+              -- (* y ∉ xs: set_many doesn't affect y *)
+                 eexists. split. rewrite M.gso; auto.
+                 rewrite set_many_get_notin; auto. eassumption.
+                 eapply preord_val_refl. tci. }
         unfold inclusion, comp, eq_fuel, anf_bound.
         intros [[[? ?] ?] ?] [[[? ?] ?] ?].
         intros [[[[? ?] ?] ?] [[[[? ?] ?] ?] [? ?]]].

@@ -857,7 +857,8 @@ Section Correct.
                 - exact Hcvt_e1.
                 - exact Hdis_C2ek.
                 - eapply IH1_val; eauto. }
-            eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+            eapply preord_exp_trans with (P1 := anf_bound (f3' + 2) (t3' + 2)).
+            tci. eapply eq_fuel_idemp.
             (* IH2: C2 layer, in env with x1 bound *)
             2:{ intros m.
                 assert (Henv_x1 : anf_env_rel vnames rho0 (M.set x1 clos_v' rho)) by admit.
@@ -909,9 +910,9 @@ Section Correct.
               - (* exp_wf (N.of_nat (length (x_pc :: names_fc))) e_body *)
                 admit. (* from Hwf_clos *)
               - (* NoDup (x_pc :: names_fc) *)
-                constructor.
-                + intros Hin. apply Hxpc_nin. right. exact Hin.
-                + exact Hnd_fc.
+                constructor 2.
+                { intros Hin. apply Hxpc_nin. right. exact Hin. }
+                { exact Hnd_fc. }
               - (* Disjoint (FromList (x_pc :: names_fc)) S1_bc *)
                 eapply Disjoint_Included_l. 2: exact Hdis_fc.
                 intros z Hz. inv Hz. now left. right. now right.
@@ -992,7 +993,7 @@ Section Correct.
               unfold anf_bound in Hpost_bc |- *.
               unfold eq_fuel in Heq_cont. simpl in Heq_cont, Hpost_bc.
               destruct Hpost_bc as [Hlb_bc Hub_bc].
-              simpl. subst. split; lia. }
+              simpl. unfold one, one_i in *; simpl; unfold_all. lia.  }
             { (* preord_res: same as from refl *)
               exact Hres_cont. } }
         (* inclusion: comp (comp (anf_bound (f3'+2) (t3'+2)) (anf_bound f2' t2')) (anf_bound f1' t1')

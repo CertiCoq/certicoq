@@ -1618,11 +1618,18 @@ Section Correct.
             * subst. rewrite M.gss in Hget. inv Hget.
               eexists. split. rewrite M.gss. reflexivity.
               rewrite preord_val_eq. simpl. split; eauto. 
-              (* preord_val (Vconstr ctag l) (Vconstr ctag vs_new):
-                 Both l and vs_new are componentwise anf_val_rel to
-                 the same source values vs0 (vs_new[i] = l[first_occ(xs[i])]).
-                 For duplicate positions, this needs alpha-equiv. *)
-              admit. (* requires anf_cvt_val_alpha_equiv *)
+              (* Forall2 (preord_val cenv eq_fuel i) vs'0 vs_new *)
+              { assert (Hcons_xs : list_consistent (preord_val cenv eq_fuel i) xs vs'0).
+                { eapply anf_cvt_exps_consistent; try eassumption.
+                  - eapply Disjoint_Included_r. eapply Setminus_Included. eassumption.
+                  - eapply NoDup_env_consistent. eassumption. }
+                destruct (get_list_set_many_consistent
+                            (preord_val cenv eq_fuel i) xs vs'0 rho)
+                  as [vs_new' [Hvs_new' HF2_new]].
+                - intros x0. eapply preord_val_refl. tci.
+                - exact Hlen_xs_vs'0.
+                - exact Hcons_xs.
+                - rewrite Hvs_new in Hvs_new'. inv Hvs_new'. exact HF2_new. }
             * rewrite M.gso in Hget; auto.
               destruct (in_dec Pos.eq_dec y xs) as [Hyin | Hynin].
               -- (* y in xs: both rho and set_many bindings are

@@ -592,8 +592,17 @@ Section Correct.
     find_branch dc n brs = Some e ->
     (N.to_nat n <= max_m_branches brs)%nat.
   Proof.
-    (* By induction on brs *)
-    Admitted.
+    intros Hfind. induction brs as [ | d' p e' brs' IH]. 
+    - discriminate. 
+    - destruct p as [m lnames]. simpl in Hfind. simpl.
+      match type of Hfind with
+      | context [if ?c then _ else _] => destruct c
+      end.
+      + destruct (N.eq_dec m n).
+        * subst. apply Nat.le_max_l.
+        * unfold nargs in Hfind. simpl in Hfind. destruct (N.eq_dec m n); [congruence | discriminate].
+      + etransitivity; [exact (IH Hfind) | apply Nat.le_max_r].
+  Qed.
 
 
   (** ** Correctness statements *)
@@ -868,7 +877,7 @@ Section Correct.
                 - eassumption.
                 - inversion Hwfe; subst; eassumption. (* exp_wf *)
                 - eassumption.
-                - admit. (* Disjoint vnames S2 *)
+                - eapply Disjoint_Included_r; [eapply (proj1 anf_cvt_rel_subset); exact Hcvt_e1 | exact Hdis].
                 - exact Henv_x1.
                 - exact Hcvt_e2.
                 - exact Hdis_letapp.
@@ -1209,7 +1218,7 @@ Section Correct.
                 - eassumption.
                 - inversion Hwfe; subst; eassumption.
                 - eassumption.
-                - admit. (* Disjoint vnames S2 *)
+                - eapply Disjoint_Included_r; [eapply (proj1 anf_cvt_rel_subset); exact Hcvt_e1 | exact Hdis].
                 - exact Henv_x1.
                 - exact Hcvt_e2.
                 - exact Hdis_letapp.
@@ -1301,7 +1310,10 @@ Section Correct.
                   (occurs_free (Eletapp x f func_tag [x1] e_k))
                   (((S \\ [set f] \\ [set y]) \\ S2) \\ [set x1])) by admit.
                 assert (Henv_efun : anf_env_rel vnames rho0 rho_efun) by admit.
-                assert (Hdis_efun : Disjoint _ (FromList vnames) (S \\ [set f] \\ [set y])) by admit.
+                assert (Hdis_efun : Disjoint _ (FromList vnames) (S \\ [set f] \\ [set y])).
+                { eapply Disjoint_Included_r.
+                  eapply Included_trans; eapply Setminus_Included.
+                  exact Hdis. }
                 edestruct IH1 as [IH1_val _].
                 - exact Hwf.
                 - inversion Hwfe; subst; eassumption.
@@ -1338,16 +1350,14 @@ Section Correct.
                   - exact Hset_proj. }
               (* IH2: branch body evaluation *)
               intros m'.
-              edestruct IH2 as [IH2_val _].
+              edestruct IH2 as [IH2_val _]; [ | | | | | exact Hcvt_br | | eapply IH2_val; eauto ].
               - admit. (* well_formed_env (List.rev vs_con ++ rho0) *)
               - admit. (* exp_wf ... e_br *)
               - admit. (* NoDup (vars ++ vnames) *)
               - admit. (* Disjoint (FromList (vars ++ vnames)) (S_mid \\ FromList vars) *)
               - admit. (* anf_env_rel (vars ++ vnames) (List.rev vs_con ++ rho0) rho_proj *)
-              - exact Hcvt_br.
-              - admit. (* Disjoint (occurs_free (Ehalt r_br)) (...) *)
-              - eapply IH2_val; eauto. }
-
+              - constructor. intros z0 Hz0. inv Hz0. inv H.
+                destruct H0 as [_ Habs]. apply Habs. constructor. }
             (* Extract bstep from Ecase preord_exp using Ehalt source evaluation *)
             assert (Hehalt : @bstep_fuel cenv nat fuel_res unit trace_res
                      (M.set r_br v' rho_proj) (Ehalt r_br) 1%nat (Res v') tt).
@@ -1472,7 +1482,7 @@ Section Correct.
           (* Right step: IH_es with env M.set x1 v1' rho *)
           2:{ intros m.
               eapply IH_es; [ exact Hwf | exact Hnd | | | eassumption | | | eassumption | ].
-              - admit. (* Disjoint (FromList vnames) S2 *)
+              - eapply Disjoint_Included_r; [eapply (proj1 anf_cvt_rel_subset); eassumption | exact Hdis].
               - eapply anf_env_rel_weaken; [exact Henv | ].
                 admit. (* ~ x1 \in FromList vnames *)
               - admit. (* NoDup xs_rest *)

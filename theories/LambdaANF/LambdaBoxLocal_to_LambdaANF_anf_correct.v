@@ -917,7 +917,73 @@ Section Correct.
       split; [intros; congruence | intros _; eexists 0%nat; constructor 1; unfold algebra.one; simpl; lia].
 
     - (* 8. eval_FixApp_step: App_e with ClosFix_v *)
-      admit.
+      intros e1' e2' e_body rho0 rho_fix rho_rec n0 na0 fnlst0 v2 r0 f1' f2' f3' t1' t2' t3'
+             Heval1 IH1 Hnth Hrec Heval2 IH2 Heval3 IH3.
+      unfold anf_cvt_correct_exp_step.
+      intros rho vnames C x S S' i Hwf Hwfe Hnd Hdis Henv Hcvt e_k Hdis_ek.
+      inv Hcvt. fold anf_cvt_rel in *.
+      match goal with
+      | [ He1 : anf_cvt_rel _ e1' vnames _ _ _ _,
+          He2 : anf_cvt_rel _ e2' vnames _ _ _ _,
+          Hr : x \in _ |- _ ] =>
+        rename He1 into Hcvt_e1; rename He2 into Hcvt_e2; rename Hr into Hr_in
+      end.
+      rewrite <- !app_ctx_f_fuse.
+      split.
+      + (* Termination case *)
+        intros v v' Heq Hrel. subst r0.
+        assert (Hwf_fix : well_formed_val (ClosFix_v rho_fix fnlst0 n0)).
+        { eapply (eval_env_step_preserves_wf (Hf := LambdaBoxLocal_resource_fuel)).
+          exact Heval1. reflexivity. exact Hwf.
+          unfold well_formed_in_env.
+          replace (Datatypes.length rho0) with (Datatypes.length vnames)
+            by (eapply anf_env_rel_length; eassumption).
+          inversion Hwfe; subst; eassumption. }
+        destruct (anf_val_rel_exists _ Hwf_fix) as [fix_v' Hrel_fix].
+        assert (Hwf_v2 : well_formed_val v2).
+        { eapply (eval_env_step_preserves_wf (Hf := LambdaBoxLocal_resource_fuel)).
+          exact Heval2. reflexivity. exact Hwf.
+          unfold well_formed_in_env.
+          replace (Datatypes.length rho0) with (Datatypes.length vnames)
+            by (eapply anf_env_rel_length; eassumption).
+          inversion Hwfe; subst; eassumption. }
+        destruct (anf_val_rel_exists _ Hwf_v2) as [v2' Hrel_v2].
+        (* Chain: IH1 + IH2 + Eletapp reduction + IH3 *)
+        eapply preord_exp_post_monotonic.
+        2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+            (* IH1: C1 layer *)
+            2:{ intros m.
+                assert (Hdis_C2ek : Disjoint _ (occurs_free (C2 |[ Eletapp x x1 func_tag [x2] e_k ]|))
+                                               ((S \\ S2) \\ [set x1])) by admit.
+                edestruct IH1 as [IH1_val _].
+                - eassumption.
+                - inversion Hwfe; subst; eassumption.
+                - eassumption.
+                - eassumption.
+                - eassumption.
+                - exact Hcvt_e1.
+                - exact Hdis_C2ek.
+                - eapply IH1_val; eauto. }
+            eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+            (* IH2: C2 layer *)
+            2:{ intros m.
+                assert (Henv_x1 : anf_env_rel vnames rho0 (M.set x1 fix_v' rho)) by admit.
+                assert (Hdis_letapp : Disjoint _ (occurs_free (Eletapp x x1 func_tag [x2] e_k))
+                                                 ((S2 \\ S3) \\ [set x2])) by admit.
+                edestruct IH2 as [IH2_val _].
+                - eassumption.
+                - inversion Hwfe; subst; eassumption.
+                - eassumption.
+                - admit. (* Disjoint vnames S2 *)
+                - exact Henv_x1.
+                - exact Hcvt_e2.
+                - exact Hdis_letapp.
+                - eapply IH2_val; eauto. }
+            (* Eletapp reduction + IH3 for body *)
+            admit. (* Eletapp step: function lookup in ClosFix bundle + IH3 *) }
+        (* inclusion *)
+        admit.
+      + intros _. eexists 0%nat. constructor 1. unfold algebra.one. simpl. lia.
 
     - (* 9. eval_Match_step: Match_e terminates *)
       admit.

@@ -714,12 +714,13 @@ Section Correct.
         nth_error vn i = Some x ->
         nth_error rho i = Some v).
     intros rho e r f t Heval.
-    refine (@eval_env_fuel_ind'
-      nat LambdaBoxLocal_resource_fuel LambdaBoxLocal_resource_trace
-      Plookup (fun _ _ _ _ _ => True) Plookup
-      _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
-      rho e r f t Heval);
-    unfold Plookup; clear Plookup.
+    eapply @eval_env_fuel_ind' with
+      (Hf := LambdaBoxLocal_resource_fuel)
+      (Ht := LambdaBoxLocal_resource_trace)
+      (P := Plookup)
+      (P0 := fun _ _ _ _ _ => True)
+      (P1 := Plookup);
+    try (unfold Plookup; clear Plookup).
 
     (** eval_env_step cases (P) *)
 
@@ -849,6 +850,8 @@ Section Correct.
     - (* 16. eval_OOT *) intros. congruence.
     - (* 17. eval_step *)
       intros rho0 e0 r0 f0 t0 Hstep IH. exact IH.
+    - (* derivation *) exact Heval.
+  Unshelve. all: exact 0%nat.
   Qed.
 
 

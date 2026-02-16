@@ -7563,6 +7563,31 @@ Proof.
   eauto.
 Qed.
 
+Lemma repr_expr_eapp_inv :
+  forall fenv finfo_env p rep_env f t ys stm,
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eapp f t ys) stm ->
+    exists s_pref s_tail,
+      stm = Ssequence s_pref s_tail.
+Proof.
+  intros fenv finfo_env p rep_env f t ys stm Hrepr.
+  inversion Hrepr; subst.
+  eexists; eexists.
+  reflexivity.
+Qed.
+
+Lemma repr_expr_eletapp_inv :
+  forall fenv finfo_env p rep_env x f t ys e stm,
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eletapp x f t ys e) stm ->
+    exists s' s_pref,
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e s' /\
+      stm = Ssequence s_pref s'.
+Proof.
+  intros fenv finfo_env p rep_env x f t ys e stm Hrepr.
+  inversion Hrepr; subst.
+  eexists; eexists.
+  split; eauto.
+Qed.
+
 Lemma repr_expr_ehalt_inv :
   forall fenv finfo_env p rep_env x stm,
     repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) stm ->
@@ -7570,6 +7595,20 @@ Lemma repr_expr_ehalt_inv :
       var_or_funvar threadInfIdent nParam fenv finfo_env p x e.
 Proof.
   intros fenv finfo_env p rep_env x stm Hrepr.
+  inversion Hrepr; subst.
+  eauto.
+Qed.
+
+Lemma repr_expr_ecase_inv :
+  forall fenv finfo_env p rep_env y cl stm,
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ecase y cl) stm ->
+    exists ls ls',
+      repr_branches_LambdaANF_Codegen
+        argsIdent allocIdent limitIdent threadInfIdent tinfIdent
+        isptrIdent caseIdent nParam fenv finfo_env p rep_env cl ls ls' /\
+      repr_switch_LambdaANF_Codegen isptrIdent caseIdent y ls ls' stm.
+Proof.
+  intros fenv finfo_env p rep_env y cl stm Hrepr.
   inversion Hrepr; subst.
   eauto.
 Qed.
@@ -7728,6 +7767,43 @@ Proof.
     simpl. f_equal. eapply IH; eauto.
 Qed.
 
+Lemma Forall_fundefs_find_def :
+  forall P f t xs e fds,
+    Forall_fundefs P fds ->
+    find_def f fds = Some (t, xs, e) ->
+    P f t xs e.
+Proof.
+  intros P f t xs e fds Hforall.
+  induction Hforall
+    as [P0 f0 t0 xs0 e0 fds0 Hhead Htail IH | P0];
+    intros Hfind.
+  - simpl in Hfind.
+    destruct (cps.M.elt_eq f f0).
+    + inversion Hfind; subst.
+      assumption.
+    + eapply IH; eauto.
+  - inversion Hfind.
+Qed.
+
+Lemma correct_cenv_of_exp_find_def_from_env :
+  forall cenv rho f rho_clo fl f' t xs e,
+    correct_cenv_of_env cenv rho ->
+    M.get f rho = Some (Vfun rho_clo fl f') ->
+    find_def f' fl = Some (t, xs, e) ->
+    correct_cenv_of_exp cenv e.
+Proof.
+  intros cenv rho f rho_clo fl f' t xs e Hcenv Hgetf Hfind.
+  specialize (Hcenv _ _ Hgetf) as Hcv_fun.
+  inversion Hcv_fun; subst.
+  match goal with
+  | Hfds : Forall_fundefs (fun _ _ _ e0 => correct_cenv_of_exp cenv e0) ?fds0 |- _ =>
+      eapply (Forall_fundefs_find_def
+                (fun _ _ _ e0 => correct_cenv_of_exp cenv e0)
+                f' t xs e fds0);
+      [exact Hfds | exact Hfind]
+  end.
+Qed.
+
 Lemma unique_bindings_val_nth_constr :
   forall t vs n v,
     unique_bindings_val (Vconstr t vs) ->
@@ -7739,6 +7815,21 @@ Proof.
   apply Forall_forall with (x := v) in H0.
   - exact H0.
   - eapply nthN_in; eauto.
+Qed.
+
+Lemma correct_cenv_of_val_nth_constr :
+  forall cenv t vs n v,
+    correct_cenv_of_val cenv (Vconstr t vs) ->
+    nthN vs n = Some v ->
+    correct_cenv_of_val cenv v.
+Proof.
+  intros cenv t vs n v Hcv Hnth.
+  inversion Hcv; subst.
+  match goal with
+  | Hfor : Forall (correct_cenv_of_val cenv) vs |- _ =>
+      apply Forall_forall with (x := v) in Hfor;
+      [exact Hfor | eapply nthN_in; eauto]
+  end.
 Qed.
 
 Lemma unique_bindings_env_econstr_body_set :
@@ -7876,6 +7967,25 @@ Proof.
     tauto.
 Qed.
 
+Lemma correct_envs_eproj_body_set :
+  forall cenv ienv rep_env rho x t n y e vs v,
+    correct_envs cenv ienv rep_env rho (Eproj x t n y e) ->
+    M.get y rho = Some (Vconstr t vs) ->
+    nthN vs n = Some v ->
+    correct_envs cenv ienv rep_env (M.set x v rho) e.
+Proof.
+  intros cenv ienv rep_env rho x t n y e vs v Hcenvs Hy Hnth.
+  assert (Hcenvs_e : correct_envs cenv ienv rep_env rho e).
+  { eapply correct_envs_subterm; eauto.
+    constructor. constructor. }
+  destruct Hcenvs as [_ [Hcenv_rho _]].
+  assert (Hcv_constr : correct_cenv_of_val cenv (Vconstr t vs)).
+  { eapply Hcenv_rho; eauto. }
+  assert (Hcv_v : correct_cenv_of_val cenv v).
+  { eapply correct_cenv_of_val_nth_constr; eauto. }
+  eapply correct_envs_set; [exact Hcenvs_e| exact Hcv_v].
+Qed.
+
 Lemma correct_envs_econstr_body_set :
   forall cenv ienv rep_env rho x t ys e vs,
     correct_envs cenv ienv rep_env rho (Econstr x t ys e) ->
@@ -7975,6 +8085,67 @@ Proof.
     + econstructor 2; eauto.
       eapply repr_val_id_L_LambdaANF_Codegen_vint_or_vptr; eauto.
     + exact H1.
+Qed.
+
+Lemma rel_mem_ecase_get_var_or_funvar :
+  forall fenv finfo_env p rep_env rho m lenv y cl t vl,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ecase y cl) rho m lenv ->
+    M.get y rho = Some (Vconstr t vl) ->
+    exists L v7,
+      protected_not_in_L_id p lenv L /\
+      get_var_or_funvar p lenv y v7 /\
+      repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env (Vconstr t vl) m L v7.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv y cl t vl Hrel Hget.
+  assert (Hfree : occurs_free (Ecase y cl) y).
+  { constructor. }
+  destruct (rel_mem_occurs_free_repr _ _ _ _ _ _ _ _ _ Hrel Hfree)
+    as [v6 [L [Hprot [Hget6 Hrid]]]].
+  rewrite Hget in Hget6.
+  inversion Hget6; subst.
+  inversion Hrid; subst; clear Hrid; try solve [inversion H].
+  exists L, v7.
+  split; [exact Hprot |].
+  split.
+  - econstructor 2; eauto.
+    eapply repr_val_id_L_LambdaANF_Codegen_vint_or_vptr; eauto.
+  - assumption.
+Qed.
+
+Lemma repr_val_constr_cases :
+  forall fenv finfo_env p rep_env t vl m L v7,
+    repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env (Vconstr t vl) m L v7 ->
+    (exists arr n,
+      M.get t rep_env = Some (enum arr) /\
+      vl = nil /\
+      repr_unboxed_Codegen arr n /\
+      v7 = make_vint n) \/
+    (exists n a b i h,
+      M.get t rep_env = Some (boxed n a) /\
+      boxed_header n a h /\
+      v7 = Vptr b i).
+Proof.
+  intros fenv finfo_env p rep_env t vl m L v7 Hrepr.
+  remember (Vconstr t vl) as vc eqn:Heqvc.
+  destruct Hrepr as
+      [L0 z r m0 Hunboxed_int
+      |t0 arr0 n0 m0 L0 Hget_enum Hunboxed
+      |L0 t0 vs0 n0 a0 b0 i0 m0 h0 Hget_boxed Hloc Hload Hboxed Hvals
+      |L0 vars avars fds f m0 b0 t0 t'0 vs0 pvs avs e0 asgn body l locs alocs finfo gccall
+       Hfinddef Hgetfun Hgetfinfo Ht Hsym Hgc Hfun Hforall Hpvs Havs Halocs Havar Hright Hrepr_body].
+  - inversion Heqvc.
+  - inversion Heqvc; subst; clear Heqvc.
+    left.
+    exists arr0, n0.
+    split; [exact Hget_enum |].
+    split; [reflexivity |].
+    split; [exact Hunboxed | reflexivity].
+  - inversion Heqvc; subst; clear Heqvc.
+    right.
+    exists n0, a0, b0, i0, h0.
+    split; [exact Hget_boxed |].
+    split; [exact Hboxed | reflexivity].
+  - inversion Heqvc.
 Qed.
 
 Lemma arg_val_after_args_store :
@@ -8911,6 +9082,768 @@ Proof.
   - split.
     + apply same_args_ptr_refl.
     + exact Harg.
+Qed.
+
+Lemma repr_bs_halt_step_lift :
+  forall p rep_env cenv ienv fenv finfo_env rho v x n,
+    program_inv p ->
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    bstep_e (M.empty _) cenv rho (Ehalt x) v n ->
+    correct_envs cenv ienv rep_env rho (Ehalt x) ->
+    protected_id_not_bound_id rho (Ehalt x) ->
+    unique_bindings_env rho (Ehalt x) ->
+    functions_not_bound p rho (Ehalt x) ->
+    forall stm lenv m k max_alloc fu,
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) stm ->
+      rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ehalt x) rho m lenv ->
+      correct_alloc (Ehalt x) max_alloc ->
+      correct_tinfo p max_alloc lenv m ->
+      exists m' lenv',
+        m_tstep2 (globalenv p)
+          (State fu stm k empty_env lenv m)
+          (State fu Sskip k empty_env lenv' m') /\
+        same_args_ptr lenv lenv' /\
+        arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv'.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho v x n
+    Hpinv Hsym Hfinfo Hbs _ _ _ _
+    stm lenv m k max_alloc fu Hrepr Hrel _ Hct.
+  eapply repr_bs_ehalt_case; eauto.
+Qed.
+
+Lemma repr_bs_efun_step_lift :
+  forall p rep_env cenv ienv fenv finfo_env rho v fds e n,
+    program_inv p ->
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    bstep_e (M.empty _) cenv rho (Efun fds e) v n ->
+    correct_envs cenv ienv rep_env rho (Efun fds e) ->
+    protected_id_not_bound_id rho (Efun fds e) ->
+    unique_bindings_env rho (Efun fds e) ->
+    functions_not_bound p rho (Efun fds e) ->
+    forall stm lenv m k max_alloc fu,
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Efun fds e) stm ->
+      rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Efun fds e) rho m lenv ->
+      correct_alloc (Efun fds e) max_alloc ->
+      correct_tinfo p max_alloc lenv m ->
+      exists m' lenv',
+        m_tstep2 (globalenv p)
+          (State fu stm k empty_env lenv m)
+          (State fu Sskip k empty_env lenv' m') /\
+        same_args_ptr lenv lenv' /\
+        arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv'.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho v fds e n
+    _ _ _ _ _ _ _ _
+    stm lenv m k max_alloc fu Hrepr _ _ _.
+  exfalso.
+  eapply repr_expr_efun_false; eauto.
+Qed.
+
+Lemma repr_bs_eprim_val_step_lift :
+  forall p rep_env cenv ienv fenv finfo_env rho v x p0 e n,
+    program_inv p ->
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    bstep_e (M.empty _) cenv rho (Eprim_val x p0 e) v n ->
+    correct_envs cenv ienv rep_env rho (Eprim_val x p0 e) ->
+    protected_id_not_bound_id rho (Eprim_val x p0 e) ->
+    unique_bindings_env rho (Eprim_val x p0 e) ->
+    functions_not_bound p rho (Eprim_val x p0 e) ->
+    forall stm lenv m k max_alloc fu,
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eprim_val x p0 e) stm ->
+      rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eprim_val x p0 e) rho m lenv ->
+      correct_alloc (Eprim_val x p0 e) max_alloc ->
+      correct_tinfo p max_alloc lenv m ->
+      exists m' lenv',
+        m_tstep2 (globalenv p)
+          (State fu stm k empty_env lenv m)
+          (State fu Sskip k empty_env lenv' m') /\
+        same_args_ptr lenv lenv' /\
+        arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv'.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho v x p0 e n
+    _ _ _ _ _ _ _ _
+    stm lenv m k max_alloc fu Hrepr _ _ _.
+  exfalso.
+  eapply repr_expr_eprim_val_false; eauto.
+Qed.
+
+Lemma repr_bs_eprim_step_lift :
+  forall p rep_env cenv ienv fenv finfo_env rho v x p0 ys e n,
+    program_inv p ->
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    bstep_e (M.empty _) cenv rho (Eprim x p0 ys e) v n ->
+    correct_envs cenv ienv rep_env rho (Eprim x p0 ys e) ->
+    protected_id_not_bound_id rho (Eprim x p0 ys e) ->
+    unique_bindings_env rho (Eprim x p0 ys e) ->
+    functions_not_bound p rho (Eprim x p0 ys e) ->
+    forall stm lenv m k max_alloc fu,
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eprim x p0 ys e) stm ->
+      rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eprim x p0 ys e) rho m lenv ->
+      correct_alloc (Eprim x p0 ys e) max_alloc ->
+      correct_tinfo p max_alloc lenv m ->
+      exists m' lenv',
+        m_tstep2 (globalenv p)
+          (State fu stm k empty_env lenv m)
+          (State fu Sskip k empty_env lenv' m') /\
+        same_args_ptr lenv lenv' /\
+        arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv'.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho v x p0 ys e n
+    _ _ _ _ _ _ _ _
+    stm lenv m k max_alloc fu Hrepr _ _ _.
+  exfalso.
+  eapply repr_expr_eprim_false; eauto.
+Qed.
+
+Definition repr_bs_currently_covered (e : exp) : Prop :=
+  match e with
+  | Ehalt _ => True
+  | Efun _ _ => True
+  | Eprim_val _ _ _ => True
+  | Eprim _ _ _ _ => True
+  | _ => False
+  end.
+
+Lemma repr_bs_currently_covered_step :
+  forall p rep_env cenv ienv fenv finfo_env rho v e n,
+    program_inv p ->
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    bstep_e (M.empty _) cenv rho e v n ->
+    correct_envs cenv ienv rep_env rho e ->
+    protected_id_not_bound_id rho e ->
+    unique_bindings_env rho e ->
+    functions_not_bound p rho e ->
+    repr_bs_currently_covered e ->
+    forall stm lenv m k max_alloc fu,
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e stm ->
+      rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e rho m lenv ->
+      correct_alloc e max_alloc ->
+      correct_tinfo p max_alloc lenv m ->
+      exists m' lenv',
+        m_tstep2 (globalenv p)
+          (State fu stm k empty_env lenv m)
+          (State fu Sskip k empty_env lenv' m') /\
+        same_args_ptr lenv lenv' /\
+        arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv'.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho v e n
+    Hpinv Hsym Hfinfo Hbs Hcenvs Hprot Hub Hfnb Hcov
+    stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+  destruct e; simpl in Hcov; try contradiction;
+    eauto using repr_bs_halt_step_lift,
+      repr_bs_efun_step_lift,
+      repr_bs_eprim_val_step_lift,
+      repr_bs_eprim_step_lift.
+Qed.
+
+Lemma econstr_body_step_and_invariants :
+  forall p rep_env cenv ienv rho x t ys e v n,
+    bstep_e (M.empty _) cenv rho (Econstr x t ys e) v n ->
+    correct_envs cenv ienv rep_env rho (Econstr x t ys e) ->
+    protected_id_not_bound_id rho (Econstr x t ys e) ->
+    unique_bindings_env rho (Econstr x t ys e) ->
+    functions_not_bound p rho (Econstr x t ys e) ->
+    exists vs,
+      get_list ys rho = Some vs /\
+      bstep_e (M.empty _) cenv (M.set x (Vconstr t vs) rho) e v n /\
+      correct_envs cenv ienv rep_env (M.set x (Vconstr t vs) rho) e /\
+      protected_id_not_bound_id (M.set x (Vconstr t vs) rho) e /\
+      unique_bindings_env (M.set x (Vconstr t vs) rho) e /\
+      functions_not_bound p (M.set x (Vconstr t vs) rho) e.
+Proof.
+  intros p rep_env cenv ienv rho x t ys e v n
+    Hbs Hcenvs Hprot Hub Hfnb.
+  destruct (bstep_e_econstr_inv _ _ _ _ _ _ _ _ _ Hbs)
+    as [rho' [vs [Hgl [Hrho' Hbs_body]]]].
+  subst rho'.
+  assert (Hfnb_e : functions_not_bound p rho e).
+  { eapply functions_not_bound_subterm; eauto.
+    constructor. constructor. }
+  exists vs.
+  split; [exact Hgl|].
+  split; [exact Hbs_body|].
+  split.
+  - eapply correct_envs_econstr_body_set; eauto.
+  - split.
+    + eapply protected_id_not_bound_econstr_body_set; eauto.
+    + split.
+      * eapply unique_bindings_env_econstr_body_set; eauto.
+      * eapply functions_not_bound_set_constr; eauto.
+Qed.
+
+Lemma eproj_body_step_and_invariants :
+  forall p rep_env cenv ienv rho x t n y e ov c,
+    bstep_e (M.empty _) cenv rho (Eproj x t n y e) ov c ->
+    correct_envs cenv ienv rep_env rho (Eproj x t n y e) ->
+    protected_id_not_bound_id rho (Eproj x t n y e) ->
+    unique_bindings_env rho (Eproj x t n y e) ->
+    functions_not_bound p rho (Eproj x t n y e) ->
+    exists vs v,
+      M.get y rho = Some (Vconstr t vs) /\
+      nthN vs n = Some v /\
+      bstep_e (M.empty _) cenv (M.set x v rho) e ov c /\
+      correct_envs cenv ienv rep_env (M.set x v rho) e /\
+      protected_id_not_bound_id (M.set x v rho) e /\
+      unique_bindings_env (M.set x v rho) e /\
+      functions_not_bound p (M.set x v rho) e.
+Proof.
+  intros p rep_env cenv ienv rho x t n y e ov c
+    Hbs Hcenvs Hprot Hub Hfnb.
+  destruct (bstep_e_eproj_inv _ _ _ _ _ _ _ _ _ _ Hbs)
+    as [vs [v [Hy [Hnth Hbs_body]]]].
+  assert (Hfnb_e : functions_not_bound p rho e).
+  { eapply functions_not_bound_subterm; eauto.
+    constructor. constructor. }
+  exists vs, v.
+  split; [exact Hy|].
+  split; [exact Hnth|].
+  split; [exact Hbs_body|].
+  split.
+  - eapply correct_envs_eproj_body_set; eauto.
+  - split.
+    + eapply protected_id_not_bound_eproj_body_set; eauto.
+    + split.
+      * eapply unique_bindings_env_eproj_body_set; eauto.
+      * eapply functions_not_bound_set_proj; eauto.
+Qed.
+
+Lemma ecase_body_step_and_invariants :
+  forall p rep_env cenv ienv rho y cl v n,
+    bstep_e (M.empty _) cenv rho (Ecase y cl) v n ->
+    correct_envs cenv ienv rep_env rho (Ecase y cl) ->
+    protected_id_not_bound_id rho (Ecase y cl) ->
+    unique_bindings_env rho (Ecase y cl) ->
+    functions_not_bound p rho (Ecase y cl) ->
+    exists t vl e,
+      M.get y rho = Some (Vconstr t vl) /\
+      caseConsistent cenv cl t /\
+      findtag cl t = Some e /\
+      bstep_e (M.empty _) cenv rho e v n /\
+      correct_envs cenv ienv rep_env rho e /\
+      protected_id_not_bound_id rho e /\
+      unique_bindings_env rho e /\
+      functions_not_bound p rho e.
+Proof.
+  intros p rep_env cenv ienv rho y cl v n
+    Hbs Hcenvs Hprot Hub Hfnb.
+  destruct (bstep_e_ecase_inv _ _ _ _ _ _ _ Hbs)
+    as [t [vl [e [Hy [Hcc [Hfind Hbs_e]]]]]].
+  assert (Hin : List.In (t, e) cl).
+  { eapply findtag_In; eauto. }
+  assert (Hsub : subterm_e e (Ecase y cl)).
+  { constructor. econstructor. exact Hin. }
+  assert (Hhub_e : unique_bindings_env rho e).
+  {
+    destruct Hub as [Hub_uniq Hub_env].
+    split.
+    - eapply unique_bindings_Ecase_In; eauto.
+    - intros x vx Hget.
+      specialize (Hub_env x vx Hget) as [Hnbe Huv].
+      split.
+      + intro Hbve.
+        eapply Hnbe.
+        eapply Bound_Ecase; eauto.
+      + exact Huv.
+  }
+  exists t, vl, e.
+  split; [exact Hy|].
+  split; [exact Hcc|].
+  split; [exact Hfind|].
+  split; [exact Hbs_e|].
+  split.
+  - eapply correct_envs_subterm; eauto.
+  - split.
+    + eapply protected_id_not_bound_subterm; eauto.
+    + split.
+      * exact Hhub_e.
+      * eapply functions_not_bound_subterm; eauto.
+Qed.
+
+Lemma ecase_step_invariants_and_repr :
+  forall p rep_env cenv ienv fenv finfo_env rho y cl v n stm,
+    bstep_e (M.empty _) cenv rho (Ecase y cl) v n ->
+    correct_envs cenv ienv rep_env rho (Ecase y cl) ->
+    protected_id_not_bound_id rho (Ecase y cl) ->
+    unique_bindings_env rho (Ecase y cl) ->
+    functions_not_bound p rho (Ecase y cl) ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ecase y cl) stm ->
+    exists t vl e ls ls',
+      M.get y rho = Some (Vconstr t vl) /\
+      caseConsistent cenv cl t /\
+      findtag cl t = Some e /\
+      bstep_e (M.empty _) cenv rho e v n /\
+      correct_envs cenv ienv rep_env rho e /\
+      protected_id_not_bound_id rho e /\
+      unique_bindings_env rho e /\
+      functions_not_bound p rho e /\
+      repr_branches_LambdaANF_Codegen
+        argsIdent allocIdent limitIdent threadInfIdent tinfIdent
+        isptrIdent caseIdent nParam fenv finfo_env p rep_env cl ls ls' /\
+      repr_switch_LambdaANF_Codegen isptrIdent caseIdent y ls ls' stm.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho y cl v n stm
+    Hbs Hcenvs Hprot Hub Hfnb Hrepr.
+  destruct (ecase_body_step_and_invariants
+              p rep_env cenv ienv rho y cl v n
+              Hbs Hcenvs Hprot Hub Hfnb)
+    as [t [vl [e [Hy [Hcc [Hfind [Hbs_e [Hcenvs_e [Hprot_e [Hub_e Hfnb_e]]]]]]]]]].
+  destruct (repr_expr_ecase_inv _ _ _ _ _ _ _ Hrepr)
+    as [ls [ls' [Hbr Hsw]]].
+  exists t, vl, e, ls, ls'.
+  split; [exact Hy|].
+  split; [exact Hcc|].
+  split; [exact Hfind|].
+  split; [exact Hbs_e|].
+  split; [exact Hcenvs_e|].
+  split; [exact Hprot_e|].
+  split; [exact Hub_e|].
+  split; [exact Hfnb_e|].
+  split; [exact Hbr|].
+  exact Hsw.
+Qed.
+
+Lemma econstr_step_invariants_and_repr :
+  forall p rep_env cenv ienv fenv finfo_env rho x t ys e v n stm,
+    bstep_e (M.empty _) cenv rho (Econstr x t ys e) v n ->
+    correct_envs cenv ienv rep_env rho (Econstr x t ys e) ->
+    protected_id_not_bound_id rho (Econstr x t ys e) ->
+    unique_bindings_env rho (Econstr x t ys e) ->
+    functions_not_bound p rho (Econstr x t ys e) ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Econstr x t ys e) stm ->
+    exists vs s s',
+      get_list ys rho = Some vs /\
+      bstep_e (M.empty _) cenv (M.set x (Vconstr t vs) rho) e v n /\
+      correct_envs cenv ienv rep_env (M.set x (Vconstr t vs) rho) e /\
+      protected_id_not_bound_id (M.set x (Vconstr t vs) rho) e /\
+      unique_bindings_env (M.set x (Vconstr t vs) rho) e /\
+      functions_not_bound p (M.set x (Vconstr t vs) rho) e /\
+      repr_asgn_constr allocIdent threadInfIdent nParam fenv finfo_env p rep_env
+        x t ys s /\
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e s' /\
+      stm = Ssequence s s'.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho x t ys e v n stm
+    Hbs Hcenvs Hprot Hub Hfnb Hrepr.
+  destruct (econstr_body_step_and_invariants
+              p rep_env cenv ienv rho x t ys e v n
+              Hbs Hcenvs Hprot Hub Hfnb)
+    as [vs [Hgl [Hbs_e [Hcenvs_e [Hprot_e [Hub_e Hfnb_e]]]]]].
+  destruct (repr_expr_econstr_inv _ _ _ _ _ _ _ _ _ Hrepr)
+    as [s [s' [Hasgn [Hrepr_e Hstm]]]].
+  exists vs, s, s'.
+  split; [exact Hgl|].
+  split; [exact Hbs_e|].
+  split; [exact Hcenvs_e|].
+  split; [exact Hprot_e|].
+  split; [exact Hub_e|].
+  split; [exact Hfnb_e|].
+  split; [exact Hasgn|].
+  split; [exact Hrepr_e|].
+  exact Hstm.
+Qed.
+
+Lemma eproj_step_invariants_and_repr :
+  forall p rep_env cenv ienv fenv finfo_env rho x t n y e ov c stm,
+    bstep_e (M.empty _) cenv rho (Eproj x t n y e) ov c ->
+    correct_envs cenv ienv rep_env rho (Eproj x t n y e) ->
+    protected_id_not_bound_id rho (Eproj x t n y e) ->
+    unique_bindings_env rho (Eproj x t n y e) ->
+    functions_not_bound p rho (Eproj x t n y e) ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eproj x t n y e) stm ->
+    exists vs v s,
+      M.get y rho = Some (Vconstr t vs) /\
+      nthN vs n = Some v /\
+      bstep_e (M.empty _) cenv (M.set x v rho) e ov c /\
+      correct_envs cenv ienv rep_env (M.set x v rho) e /\
+      protected_id_not_bound_id (M.set x v rho) e /\
+      unique_bindings_env (M.set x v rho) e /\
+      functions_not_bound p (M.set x v rho) e /\
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e s.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho x t n y e ov c stm
+    Hbs Hcenvs Hprot Hub Hfnb Hrepr.
+  destruct (eproj_body_step_and_invariants
+              p rep_env cenv ienv rho x t n y e ov c
+              Hbs Hcenvs Hprot Hub Hfnb)
+    as [vs [v [Hy [Hnth [Hbs_e [Hcenvs_e [Hprot_e [Hub_e Hfnb_e]]]]]]]].
+  destruct (repr_expr_eproj_inv _ _ _ _ _ _ _ _ _ _ Hrepr) as [s Hrepr_e].
+  exists vs, v, s.
+  split; [exact Hy|].
+  split; [exact Hnth|].
+  split; [exact Hbs_e|].
+  split; [exact Hcenvs_e|].
+  split; [exact Hprot_e|].
+  split; [exact Hub_e|].
+  split; [exact Hfnb_e|].
+  exact Hrepr_e.
+Qed.
+
+Lemma eletapp_cont_subterm_invariants :
+  forall p rep_env cenv ienv rho x f t ys e,
+    correct_envs cenv ienv rep_env rho (Eletapp x f t ys e) ->
+    protected_id_not_bound_id rho (Eletapp x f t ys e) ->
+    unique_bindings_env rho (Eletapp x f t ys e) ->
+    functions_not_bound p rho (Eletapp x f t ys e) ->
+    correct_envs cenv ienv rep_env rho e /\
+    protected_id_not_bound_id rho e /\
+    unique_bindings_env rho e /\
+    functions_not_bound p rho e.
+Proof.
+  intros p rep_env cenv ienv rho x f t ys e
+    Hcenvs Hprot Hub Hfnb.
+  assert (Hsub : subterm_e e (Eletapp x f t ys e)).
+  { apply t_step. apply dsubterm_letapp. }
+  assert (Hub_e : unique_bindings_env rho e).
+  {
+    destruct Hub as [Hub_exp Hub_env].
+    split.
+    - inversion Hub_exp; subst; assumption.
+    - intros z vz Hget.
+      specialize (Hub_env z vz Hget) as [Hnb Huv].
+      split.
+      + intro Hbve.
+        eapply Hnb.
+        eapply Bound_Eletapp2; eauto.
+      + exact Huv.
+  }
+  split.
+  - eapply correct_envs_subterm; eauto.
+  - split.
+    + eapply protected_id_not_bound_subterm; eauto.
+    + split.
+      * exact Hub_e.
+      * eapply functions_not_bound_subterm; eauto.
+Qed.
+
+Lemma eletapp_cont_correct_envs_set :
+  forall cenv ienv rep_env rho x f t ys e v_body,
+    correct_envs cenv ienv rep_env rho (Eletapp x f t ys e) ->
+    correct_cenv_of_val cenv v_body ->
+    correct_envs cenv ienv rep_env (M.set x v_body rho) e.
+Proof.
+  intros cenv ienv rep_env rho x f t ys e v_body Hcenvs Hcv.
+  assert (Hsub : subterm_e e (Eletapp x f t ys e)).
+  { apply t_step. apply dsubterm_letapp. }
+  assert (Hcenvs_e : correct_envs cenv ienv rep_env rho e).
+  { eapply correct_envs_subterm; [exact Hcenvs | exact Hsub]. }
+  eapply correct_envs_set; eauto.
+Qed.
+
+Lemma eletapp_cont_protected_set :
+  forall rho x f t ys e v_body,
+    protected_id_not_bound_id rho (Eletapp x f t ys e) ->
+    (forall y, is_protected_id_thm y -> ~ bound_var_val v_body y) ->
+    protected_id_not_bound_id (M.set x v_body rho) e.
+Proof.
+  intros rho x f t ys e v_body Hprot Hvb.
+  assert (Hsub : subterm_e e (Eletapp x f t ys e)).
+  { apply t_step. apply dsubterm_letapp. }
+  assert (Hprot_e : protected_id_not_bound_id rho e).
+  { eapply protected_id_not_bound_subterm; [exact Hprot | exact Hsub]. }
+  assert (Hx_not_prot : ~ is_protected_id_thm x).
+  { eapply protected_id_not_bound_eletapp_head; eauto. }
+  eapply protected_id_not_bound_set; eauto.
+Qed.
+
+Lemma eletapp_cont_functions_not_bound_set :
+  forall p rho x f t ys e v_body,
+    functions_not_bound p rho (Eletapp x f t ys e) ->
+    (forall z, bound_notfun_val v_body z ->
+               Genv.find_symbol (globalenv p) z = None) ->
+    functions_not_bound p (M.set x v_body rho) e.
+Proof.
+  intros p rho x f t ys e v_body Hfnb Hv.
+  assert (Hsub : subterm_e e (Eletapp x f t ys e)).
+  { apply t_step. apply dsubterm_letapp. }
+  assert (Hfnb_e : functions_not_bound p rho e).
+  { eapply functions_not_bound_subterm; [exact Hfnb | exact Hsub]. }
+  eapply functions_not_bound_set; eauto.
+Qed.
+
+Lemma eletapp_cont_unique_bindings_set :
+  forall rho x f t ys e v_body,
+    unique_bindings_env rho (Eletapp x f t ys e) ->
+    unique_bindings_val v_body ->
+    unique_bindings_env (M.set x v_body rho) e.
+Proof.
+  intros rho x f t ys e v_body Hub Huv_body.
+  destruct Hub as [Hub_exp Hub_env].
+  inversion Hub_exp; subst.
+  assert (Hub_e : unique_bindings_env rho e).
+  {
+    split.
+    - assumption.
+    - intros z vz Hget.
+      specialize (Hub_env z vz Hget) as [Hnb_whole Huv].
+      split.
+      + intro Hbve.
+        eapply Hnb_whole.
+        eapply Bound_Eletapp2; eauto.
+      + exact Huv.
+  }
+  match goal with
+  | Hx_not_bound : ~ bound_var e x |- _ =>
+      eapply unique_bindings_env_set; [exact Hub_e | exact Hx_not_bound | exact Huv_body]
+  end.
+Qed.
+
+Lemma eletapp_cont_all_invariants_set :
+  forall p rep_env cenv ienv rho x f t ys e v_body,
+    correct_envs cenv ienv rep_env rho (Eletapp x f t ys e) ->
+    protected_id_not_bound_id rho (Eletapp x f t ys e) ->
+    unique_bindings_env rho (Eletapp x f t ys e) ->
+    functions_not_bound p rho (Eletapp x f t ys e) ->
+    correct_cenv_of_val cenv v_body ->
+    (forall y, is_protected_id_thm y -> ~ bound_var_val v_body y) ->
+    unique_bindings_val v_body ->
+    (forall z, bound_notfun_val v_body z ->
+               Genv.find_symbol (globalenv p) z = None) ->
+    correct_envs cenv ienv rep_env (M.set x v_body rho) e /\
+    protected_id_not_bound_id (M.set x v_body rho) e /\
+    unique_bindings_env (M.set x v_body rho) e /\
+    functions_not_bound p (M.set x v_body rho) e.
+Proof.
+  intros p rep_env cenv ienv rho x f t ys e v_body
+    Hcenvs Hprot Hub Hfnb Hcv Hvb Huv Hvf.
+  split.
+  - eapply eletapp_cont_correct_envs_set; eauto.
+  - split.
+    + eapply eletapp_cont_protected_set; eauto.
+    + split.
+      * eapply eletapp_cont_unique_bindings_set; eauto.
+      * eapply eletapp_cont_functions_not_bound_set; eauto.
+Qed.
+
+Lemma eapp_step_and_repr_inv :
+  forall p rep_env cenv fenv finfo_env rho f t ys v n stm,
+    bstep_e (M.empty _) cenv rho (Eapp f t ys) v n ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eapp f t ys) stm ->
+    exists rho_clo fl f' vs xs e rho_call c s_pref s_tail,
+      M.get f rho = Some (Vfun rho_clo fl f') /\
+      get_list ys rho = Some vs /\
+      find_def f' fl = Some (t, xs, e) /\
+      set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call /\
+      bstep_e (M.empty _) cenv rho_call e v c /\
+      n = c + 1 /\
+      stm = Ssequence s_pref s_tail.
+Proof.
+  intros p rep_env cenv fenv finfo_env rho f t ys v n stm Hbs Hrepr.
+  pose proof (bstep_e_eapp_inv _ _ _ _ _ _ _ _ Hbs) as Hbs_inv.
+  destruct Hbs_inv as [rho_clo Hbs_inv].
+  destruct Hbs_inv as [fl Hbs_inv].
+  destruct Hbs_inv as [f' Hbs_inv].
+  destruct Hbs_inv as [vs Hbs_inv].
+  destruct Hbs_inv as [xs Hbs_inv].
+  destruct Hbs_inv as [e Hbs_inv].
+  destruct Hbs_inv as [rho_call Hbs_inv].
+  destruct Hbs_inv as [c [Hgetf [Hgetys [Hfind [Hset [Hbs_e Hn]]]]]].
+  destruct (repr_expr_eapp_inv _ _ _ _ _ _ _ _ Hrepr) as [s_pref [s_tail Hstm]].
+  exists rho_clo, fl, f', vs, xs, e, rho_call, c, s_pref, s_tail.
+  split; [exact Hgetf|].
+  split; [exact Hgetys|].
+  split; [exact Hfind|].
+  split; [exact Hset|].
+  split; [exact Hbs_e|].
+  split; [exact Hn|].
+  exact Hstm.
+Qed.
+
+Lemma eapp_step_and_repr_with_body_cenv :
+  forall p rep_env cenv ienv fenv finfo_env rho f t ys v n stm,
+    bstep_e (M.empty _) cenv rho (Eapp f t ys) v n ->
+    correct_envs cenv ienv rep_env rho (Eapp f t ys) ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eapp f t ys) stm ->
+    exists rho_clo fl f' vs xs e_body rho_call c s_pref s_tail,
+      M.get f rho = Some (Vfun rho_clo fl f') /\
+      get_list ys rho = Some vs /\
+      find_def f' fl = Some (t, xs, e_body) /\
+      set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call /\
+      bstep_e (M.empty _) cenv rho_call e_body v c /\
+      n = c + 1 /\
+      correct_cenv_of_exp cenv e_body /\
+      stm = Ssequence s_pref s_tail.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho f t ys v n stm
+    Hbs Hcenvs Hrepr.
+  destruct (eapp_step_and_repr_inv
+              p rep_env cenv fenv finfo_env rho f t ys v n stm Hbs Hrepr)
+    as [rho_clo [fl [f' [vs [xs [e_body [rho_call [c [s_pref [s_tail
+         [Hgetf [Hgetys [Hfind [Hset [Hbs_body [Hn Hstm]]]]]]]]]]]]]]]].
+  destruct Hcenvs as [_ [Hcenv_rho _]].
+  assert (Hcenv_e : correct_cenv_of_exp cenv e_body).
+  { eapply correct_cenv_of_exp_find_def_from_env; eauto. }
+  exists rho_clo, fl, f', vs, xs, e_body, rho_call, c, s_pref, s_tail.
+  split; [exact Hgetf|].
+  split; [exact Hgetys|].
+  split; [exact Hfind|].
+  split; [exact Hset|].
+  split; [exact Hbs_body|].
+  split; [exact Hn|].
+  split; [exact Hcenv_e|].
+  exact Hstm.
+Qed.
+
+Lemma eletapp_step_and_repr_inv :
+  forall p rep_env cenv fenv finfo_env rho x f t ys e v n stm,
+    bstep_e (M.empty _) cenv rho (Eletapp x f t ys e) v n ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eletapp x f t ys e) stm ->
+    exists rho_clo fl f' vs xs e_body rho_call v_body c c' s_pref s',
+      M.get f rho = Some (Vfun rho_clo fl f') /\
+      get_list ys rho = Some vs /\
+      find_def f' fl = Some (t, xs, e_body) /\
+      set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call /\
+      bstep_e (M.empty _) cenv rho_call e_body v_body c /\
+      bstep_e (M.empty _) cenv (M.set x v_body rho) e v c' /\
+      n = c + c' + 1 /\
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e s' /\
+      stm = Ssequence s_pref s'.
+Proof.
+  intros p rep_env cenv fenv finfo_env rho x f t ys e v n stm Hbs Hrepr.
+  pose proof (bstep_e_eletapp_inv _ _ _ _ _ _ _ _ _ _ Hbs) as Hbs_inv.
+  destruct Hbs_inv as [rho_clo Hbs_inv].
+  destruct Hbs_inv as [fl Hbs_inv].
+  destruct Hbs_inv as [f' Hbs_inv].
+  destruct Hbs_inv as [vs Hbs_inv].
+  destruct Hbs_inv as [xs Hbs_inv].
+  destruct Hbs_inv as [e_body Hbs_inv].
+  destruct Hbs_inv as [rho_call Hbs_inv].
+  destruct Hbs_inv as [v_body Hbs_inv].
+  destruct Hbs_inv as [c Hbs_inv].
+  destruct Hbs_inv as [c' [Hgetf [Hgetys [Hfind [Hset [Hbs_body [Hbs_cont Hn]]]]]]].
+  destruct (repr_expr_eletapp_inv _ _ _ _ _ _ _ _ _ _ Hrepr)
+    as [s' [s_pref [Hrepr_e Hstm]]].
+  exists rho_clo, fl, f', vs, xs, e_body, rho_call, v_body, c, c', s_pref, s'.
+  split; [exact Hgetf|].
+  split; [exact Hgetys|].
+  split; [exact Hfind|].
+  split; [exact Hset|].
+  split; [exact Hbs_body|].
+  split; [exact Hbs_cont|].
+  split; [exact Hn|].
+  split; [exact Hrepr_e|].
+  exact Hstm.
+Qed.
+
+Lemma eletapp_step_and_repr_with_body_cenv :
+  forall p rep_env cenv ienv fenv finfo_env rho x f t ys e v n stm,
+    bstep_e (M.empty _) cenv rho (Eletapp x f t ys e) v n ->
+    correct_envs cenv ienv rep_env rho (Eletapp x f t ys e) ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eletapp x f t ys e) stm ->
+    exists rho_clo fl f' vs xs e_body rho_call v_body c c' s_pref s',
+      M.get f rho = Some (Vfun rho_clo fl f') /\
+      get_list ys rho = Some vs /\
+      find_def f' fl = Some (t, xs, e_body) /\
+      set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call /\
+      bstep_e (M.empty _) cenv rho_call e_body v_body c /\
+      bstep_e (M.empty _) cenv (M.set x v_body rho) e v c' /\
+      n = c + c' + 1 /\
+      correct_cenv_of_exp cenv e_body /\
+      correct_cenv_of_exp cenv e /\
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e s' /\
+      stm = Ssequence s_pref s'.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho x f t ys e v n stm
+    Hbs Hcenvs Hrepr.
+  destruct (eletapp_step_and_repr_inv
+              p rep_env cenv fenv finfo_env rho x f t ys e v n stm Hbs Hrepr)
+    as [rho_clo [fl [f' [vs [xs [e_body [rho_call [v_body [c [c' [s_pref [s'
+         [Hgetf [Hgetys [Hfind [Hset [Hbs_body [Hbs_cont [Hn [Hrepr_e Hstm]]]]]]]]]]]]]]]]]]]].
+  assert (Hsub_e : subterm_e e (Eletapp x f t ys e)).
+  { apply t_step. apply dsubterm_letapp. }
+  assert (Hcenvs_e : correct_envs cenv ienv rep_env rho e).
+  { eapply correct_envs_subterm; [exact Hcenvs | exact Hsub_e]. }
+  destruct Hcenvs as [_ [Hcenv_rho _]].
+  assert (Hcenv_body : correct_cenv_of_exp cenv e_body).
+  { eapply correct_cenv_of_exp_find_def_from_env; eauto. }
+  destruct Hcenvs_e as [_ [_ [Hcenv_e _]]].
+  exists rho_clo, fl, f', vs, xs, e_body, rho_call, v_body, c, c', s_pref, s'.
+  split; [exact Hgetf|].
+  split; [exact Hgetys|].
+  split; [exact Hfind|].
+  split; [exact Hset|].
+  split; [exact Hbs_body|].
+  split; [exact Hbs_cont|].
+  split; [exact Hn|].
+  split; [exact Hcenv_body|].
+  split; [exact Hcenv_e|].
+  split; [exact Hrepr_e|].
+  exact Hstm.
+Qed.
+
+Lemma eletapp_step_and_repr_cont_invariants :
+  forall p rep_env cenv ienv fenv finfo_env rho x f t ys e v n stm,
+    bstep_e (M.empty _) cenv rho (Eletapp x f t ys e) v n ->
+    correct_envs cenv ienv rep_env rho (Eletapp x f t ys e) ->
+    protected_id_not_bound_id rho (Eletapp x f t ys e) ->
+    unique_bindings_env rho (Eletapp x f t ys e) ->
+    functions_not_bound p rho (Eletapp x f t ys e) ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eletapp x f t ys e) stm ->
+    exists rho_clo fl f' vs xs e_body rho_call v_body c c' s_pref s',
+      M.get f rho = Some (Vfun rho_clo fl f') /\
+      get_list ys rho = Some vs /\
+      find_def f' fl = Some (t, xs, e_body) /\
+      set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call /\
+      bstep_e (M.empty _) cenv rho_call e_body v_body c /\
+      bstep_e (M.empty _) cenv (M.set x v_body rho) e v c' /\
+      n = c + c' + 1 /\
+      correct_cenv_of_exp cenv e_body /\
+      correct_envs cenv ienv rep_env rho e /\
+      protected_id_not_bound_id rho e /\
+      unique_bindings_env rho e /\
+      functions_not_bound p rho e /\
+      repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e s' /\
+      stm = Ssequence s_pref s'.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho x f t ys e v n stm
+    Hbs Hcenvs Hprot Hub Hfnb Hrepr.
+  pose proof (eletapp_step_and_repr_with_body_cenv
+                p rep_env cenv ienv fenv finfo_env rho x f t ys e v n stm
+                Hbs Hcenvs Hrepr) as Hinv.
+  destruct Hinv as [rho_clo Hinv].
+  destruct Hinv as [fl Hinv].
+  destruct Hinv as [f' Hinv].
+  destruct Hinv as [vs Hinv].
+  destruct Hinv as [xs Hinv].
+  destruct Hinv as [e_body Hinv].
+  destruct Hinv as [rho_call Hinv].
+  destruct Hinv as [v_body Hinv].
+  destruct Hinv as [c Hinv].
+  destruct Hinv as [c' Hinv].
+  destruct Hinv as [s_pref Hinv].
+  destruct Hinv as [s' Hinv].
+  destruct Hinv as [Hgetf Hinv].
+  destruct Hinv as [Hgetys Hinv].
+  destruct Hinv as [Hfind Hinv].
+  destruct Hinv as [Hset Hinv].
+  destruct Hinv as [Hbs_body Hinv].
+  destruct Hinv as [Hbs_cont Hinv].
+  destruct Hinv as [Hn Hinv].
+  destruct Hinv as [Hcenv_body Hinv].
+  destruct Hinv as [Hcenv_e Hinv].
+  destruct Hinv as [Hrepr_e Hstm].
+  destruct (eletapp_cont_subterm_invariants
+              p rep_env cenv ienv rho x f t ys e Hcenvs Hprot Hub Hfnb)
+    as [Hcenvs_e [Hprot_e [Hub_e Hfnb_e]]].
+  exists rho_clo, fl, f', vs, xs, e_body, rho_call, v_body, c, c', s_pref, s'.
+  split; [exact Hgetf|].
+  split; [exact Hgetys|].
+  split; [exact Hfind|].
+  split; [exact Hset|].
+  split; [exact Hbs_body|].
+  split; [exact Hbs_cont|].
+  split; [exact Hn|].
+  split; [exact Hcenv_body|].
+  split; [exact Hcenvs_e|].
+  split; [exact Hprot_e|].
+  split; [exact Hub_e|].
+  split; [exact Hfnb_e|].
+  split; [exact Hrepr_e|].
+  exact Hstm.
 Qed.
 
 (* Main Theorem *)

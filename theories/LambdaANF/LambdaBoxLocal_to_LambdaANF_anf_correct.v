@@ -896,7 +896,7 @@ Section Correct.
                 anf_cvt_rel S1_bc e_body (x_pc :: names_fc) cnstrs S2_bc C_bc r_bc).
             { inversion Hrel_clos; try discriminate; subst.
               do 8 eexists.
-              repeat split; try reflexivity; try eassumption; try admit. }
+              repeat split; try reflexivity; try eassumption. apply H4. }
             destruct Hclos_inv as (rho_fc & names_fc & x_pc & f_cc & C_bc & r_bc &
               S1_bc & S2_bc & Hclos_eq & Henv_fc & Hnd_fc &
               Hdis_fc & Hxpc_nin & Hfcc_nin & Hcvt_bc).
@@ -913,11 +913,13 @@ Section Correct.
                           (C_bc |[ Ehalt r_bc ]|, rho_bc)) /\
               (Val v = fuel_sem.OOT ->
                exists c, bstep_fuel cenv rho_bc (C_bc |[ Ehalt r_bc ]|) c eval.OOT tt)).
-            { eapply IH3.
+            { eapply IH3 with (vnames := x_pc :: names_fc).
               - (* well_formed_env (v2 :: rho_clos) *)
                 constructor; [exact Hwf_v2 | inversion Hwf_clos; assumption].
               - (* exp_wf (N.of_nat (length (x_pc :: names_fc))) e_body *)
-                admit. (* from Hwf_clos *)
+                inv Hwf_clos. unfold well_formed_in_env in *. 
+                specialize (H3 v2). eapply Forall2_length in Henv_fc.
+                simpl in *. unfold var, M.elt. rewrite <- Henv_fc. eauto.   
               - (* NoDup (x_pc :: names_fc) *)
                 constructor 2.
                 { intros Hin. apply Hxpc_nin. right. exact Hin. }
@@ -943,7 +945,9 @@ Section Correct.
             assert (Hle_h : (to_nat 1%nat <= i + 1)%nat) by (simpl; lia).
             assert (Hehalt : @bstep_fuel cenv nat fuel_res unit trace_res
                                          (M.set r_bc v' rho_bc) (Ehalt r_bc) 1%nat (Res v') tt).
-            { admit. (* BStepf_run + BStept_halt, technically provable *) }
+            { pose proof (BStepf_run cenv (M.set r_bc v' rho_bc) (Ehalt r_bc) (Res v') 0%nat tt
+                (BStept_halt cenv r_bc v' (M.set r_bc v' rho_bc) (M.gss r_bc v' rho_bc))) as Hbsf.
+              simpl in Hbsf. exact Hbsf. }
             destruct (IH3_val (Res v') 1%nat tt Hle_h Hehalt)
               as (v_body_res & cin_bc & cout_bc & Hbstep_bc & Hpost_bc & Hres_bc).
             (* Body result must be Res (not OOT) *)
@@ -1361,7 +1365,9 @@ Section Correct.
             (* Extract bstep from Ecase preord_exp using Ehalt source evaluation *)
             assert (Hehalt : @bstep_fuel cenv nat fuel_res unit trace_res
                      (M.set r_br v' rho_proj) (Ehalt r_br) 1%nat (Res v') tt).
-            { admit. (* BStepf_run + BStept_halt: same as line 933 *) }
+            { pose proof (BStepf_run cenv (M.set r_br v' rho_proj) (Ehalt r_br) (Res v') 0%nat tt
+                (BStept_halt cenv r_br v' (M.set r_br v' rho_proj) (M.gss r_br v' rho_proj))) as Hbsf.
+              simpl in Hbsf. exact Hbsf. }
             assert (Hle_h : (to_nat 1%nat <= i + 1)%nat) by (simpl; lia).
             edestruct Hpre_ecase as
               (v_body & cin_ecase & cout_ecase & Hbstep_ecase & Hpost_ecase & Hres_ecase).

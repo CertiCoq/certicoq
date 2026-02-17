@@ -2667,19 +2667,16 @@ Section Correct.
                 + apply Disjoint_sym.
                   eapply Disjoint_Included_r; [ | exact Hdis ].
                   intros z Hz. apply Hvars_sub in Hz. apply HS_mid_sub in Hz.
-                  apply HS2 in Hz. inv Hz. inv H. exact H0.
+                  apply HS2 in Hz. inv Hz. inv H. exact H1.
                 + rewrite rev_length. rewrite Hvars_len. rewrite Nnat.Nat2N.id. reflexivity.
               - (* Disjoint (FromList (vars ++ vnames)) (S_mid \\ FromList vars) *)
-                rewrite FromList_app. constructor. intros z Hz. inv Hz.
-                inv H.
-                + (* z ∈ FromList vars and z ∈ S_mid \\ FromList vars — contradiction *)
-                  inv H0. exact (H1 H2).
-                + (* z ∈ FromList vnames and z ∈ S_mid \\ FromList vars *)
-                  inv H0.
-                  assert (Hz_S : In _ S z).
-                  { apply HS_mid_sub in H. apply HS2 in H.
-                    inv H. inv H0. exact H. }
-                  inv Hdis. eapply (H0 z). constructor; eassumption.
+                rewrite FromList_app. apply Union_Disjoint_l.
+                + apply Disjoint_Setminus_r. apply Included_refl.
+                + eapply Disjoint_Included_r; [ | exact Hdis ].
+                  eapply Included_trans; [ eapply Setminus_Included | ].
+                  eapply Included_trans. exact HS_mid_sub.
+                  eapply Included_trans. exact HS2.
+                  eapply Included_trans; eapply Setminus_Included.
               - admit. (* anf_env_rel (vars ++ vnames) (List.rev vs_con ++ rho0) rho_proj *)
               - constructor. intros z0 Hz0. inv Hz0. inv H.
                 destruct H0 as [_ Habs]. apply Habs. constructor. }

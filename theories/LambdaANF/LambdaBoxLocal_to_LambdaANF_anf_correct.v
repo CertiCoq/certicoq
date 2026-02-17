@@ -16,6 +16,7 @@ Require Import LambdaBoxLocal.expression LambdaBoxLocal.fuel_sem.
 Require Import cps cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
         LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util
+        LambdaBoxLocal_to_LambdaANF_correct
         LambdaANF.tactics identifiers bounds cps_util rename stemctx.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
@@ -431,18 +432,6 @@ Section Correct.
     split. simpl. unfold_all. lia.
     eapply preord_res_refl; tci.
   Admitted.
-
-  Lemma ctx_bind_proj_preord_exp :
-    forall vars C k r n e rho rho' vs vs' ctag,
-      n = (List.length vars) ->
-      ~ r \in FromList vars ->
-      ctx_bind_proj ctag r vars n = C ->
-      M.get r rho = Some (Vconstr ctag (vs ++ vs')) ->
-      set_lists (rev vars) vs rho = Some rho' ->
-      preord_exp cenv (eq_fuel_n n) eq_fuel k (e, rho') (C |[ e ]|, rho).
-  Proof.
-    (* Same proof as in LambdaBoxLocal_to_LambdaANF_correct.v lines 993-1050 *)
-    Admitted.
 
 
   (** ** Subset lemma for ANF relation *)
@@ -1084,7 +1073,7 @@ Section Correct.
   Proof.
     intros Hf Hy Hcvt1 Hcvt_brs Hx Hdis_ek.
     pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt1) as HS2_Sfy.
-    pose proof (proj1 (proj2 (proj2 anf_cvt_rel_subset)) _ _ _ _ _ _ _ Hcvt_brs) as HS3_S2.
+    pose proof (proj2 (proj2 (proj2 anf_cvt_rel_subset)) _ _ _ _ _ _ _ Hcvt_brs) as HS3_S2.
     constructor. intros z Hz.
     assert (Hz_of : occurs_free (Eletapp x f func_tag [x1] e_k) z) by (inversion Hz; assumption).
     assert (Hz_sm : (((S \\ [set f] \\ [set y]) \\ S2) \\ [set x1]) z) by (inversion Hz; assumption).
@@ -1149,12 +1138,17 @@ Section Correct.
     assert (Hdis_vn_S2 : Disjoint _ (FromList vn) S2).
     { eapply Disjoint_Included_r; [ exact HS2_S | exact Hdis_vn ]. }
     pose proof (anf_cvt_occurs_free_ctx_subset_exps _ _ _ _ _ _ _ Hcvt_exps Hdis_vn_S2) as Hctx.
-    constructor. intros z Hz. destruct Hz as [? Hz_of Hz_sm].
+    constructor. intros z Hz.
+    assert (Hz_of : occurs_free (C2 |[ e_k ]|) z) by (inversion Hz; assumption).
+    assert (Hz_sm : ((S \\ S2) \\ [set x1]) z) by (inversion Hz; assumption).
+    clear Hz.
     destruct Hz_sm as [[Hz_S Hz_not_S2] Hz_not_x1].
     apply (occurs_free_ctx_app C2 e_k) in Hz_of.
+    apply Union_destr in Hz_of.
     destruct Hz_of as [Hz_ctx | Hz_ek_bs].
     - (* z ∈ occurs_free_ctx C2 *)
       apply Hctx in Hz_ctx.
+      apply Union_destr in Hz_ctx.
       destruct Hz_ctx as [Hz_vn | Hz_S2S'].
       + eapply Hdis_vn; constructor; [exact Hz_vn | exact Hz_S].
       + destruct Hz_S2S' as [Hz_S2 _]. exact (Hz_not_S2 Hz_S2).
@@ -1198,17 +1192,21 @@ Section Correct.
     clear Hz.
     destruct Hz_sm as [[Hz_S Hz_not_S2] Hz_not_x1].
     apply (occurs_free_ctx_app C2 (Eletapp r x1 func_tag [x2] e_k)) in Hz_of.
+    apply Union_destr in Hz_of.
     destruct Hz_of as [Hz_ctx | Hz_elet_bs].
     - (* z ∈ occurs_free_ctx C2 *)
       apply Hctx in Hz_ctx.
+      apply Union_destr in Hz_ctx.
       destruct Hz_ctx as [Hz_vn | Hz_S2S3].
       + eapply Hdis_vn; constructor; [exact Hz_vn | exact Hz_S].
       + destruct Hz_S2S3 as [Hz_S2 _]. exact (Hz_not_S2 Hz_S2).
     - (* z ∈ occurs_free (Eletapp ...) \ bound_stem_ctx C2 *)
       destruct Hz_elet_bs as [Hz_elet Hz_not_bsc].
       apply (proj1 (occurs_free_Eletapp _ _ _ _ _)) in Hz_elet.
+      apply Union_destr in Hz_elet.
       destruct Hz_elet as [Hz_left | Hz_right].
-      + inversion Hz_left as [? Hz_x1 | ? Hz_x2].
+      + apply Union_destr in Hz_left.
+        destruct Hz_left as [Hz_x1 | Hz_x2].
         * inv Hz_x1. exact (Hz_not_x1 (In_singleton _ _)).
         * simpl in Hz_x2. destruct Hz_x2 as [Heq | []]. subst.
           destruct Hx2_consumed as [Hx2_vn | Hx2_S2].
@@ -1247,8 +1245,10 @@ Section Correct.
     clear Hz.
     destruct Hz_sm as [[Hz_S2 Hz_not_S3] Hz_not_x2].
     apply (proj1 (occurs_free_Eletapp _ _ _ _ _)) in Hz_of.
+    apply Union_destr in Hz_of.
     destruct Hz_of as [Hz_left | Hz_right].
-    - inversion Hz_left as [? Hz_x1 | ? Hz_x2].
+    - apply Union_destr in Hz_left.
+      destruct Hz_left as [Hz_x1 | Hz_x2].
       + inv Hz_x1. exact (Hx1_not_S2 Hz_S2).
       + simpl in Hz_x2. destruct Hz_x2 as [Heq | []]. subst.
         exact (Hz_not_x2 (In_singleton _ _)).

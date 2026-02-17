@@ -772,6 +772,16 @@ Section Correct.
                ((S2 \\ S3) \\ [set x2]).
   Proof. Admitted.
 
+  (* Convert anf_cvt_rel_efnlst to anf_fix_rel.
+     The key difference: anf_fix_rel carries explicit disjointness and subset witnesses
+     at each step. These follow from the efnlst subset property. *)
+  Lemma anf_cvt_rel_efnlst_to_fix_rel fnames_all names0 :
+    forall efns S fnames tgm S' fdefs,
+      anf_cvt_rel_efnlst S efns (List.rev fnames_all ++ names0) fnames tgm S' fdefs ->
+      Disjoint _ S (FromList fnames_all :|: FromList names0) ->
+      anf_fix_rel fnames_all names0 S fnames efns fdefs S'.
+  Proof. Admitted.
+
   (* Generalized consistency: two positions with the same key have R-related values. *)
   Definition list_consistent {A : Type} (R : A -> A -> Prop)
              (keys : list var) (vals : list A) : Prop :=
@@ -2971,13 +2981,19 @@ Section Correct.
                 rewrite (anf_cvt_rel_efnlst_all_fun_name _ _ _ _ _ _ _ Hcvt_efn).
                 eapply nth_error_In. eassumption. }
               eapply anf_cvt_val_alpha_equiv. eassumption.
-              eapply anf_rel_ClosFix with (names := vnames); eauto.
-              * (* Disjoint _ (FromList vnames :|: FromList fnames) S1 *)
-                admit.
+              eapply anf_rel_ClosFix with (names := vnames) (S1 := S \\ FromList fnames); eauto.
+              * (* Disjoint _ (FromList vnames :|: FromList fnames) (S \\ FromList fnames) *)
+                apply Union_Disjoint_l.
+                -- eapply Disjoint_Included_r; [ eapply Setminus_Included | exact Hdis ].
+                -- apply Disjoint_Setminus_r. apply Included_refl.
               * (* Disjoint _ (FromList vnames) (FromList fnames) *)
                 eapply Disjoint_Included_r. eapply Hfnames_sub. eassumption.
-              * (* anf_fix_rel fnames vnames S1 fnames fnlst1 fdefs S2 *)
-                admit. (* needs lemma: anf_cvt_rel_efnlst → anf_fix_rel *)
+              * (* anf_fix_rel *)
+                eapply anf_cvt_rel_efnlst_to_fix_rel.
+                -- exact Hcvt_efn.
+                -- apply Disjoint_sym. apply Union_Disjoint_l.
+                   ++ apply Disjoint_Setminus_r. apply Included_refl.
+                   ++ eapply Disjoint_Included_r; [ eapply Setminus_Included | exact Hdis ].
             - (* y ≠ f: y cannot be in FromList fnames because of disjointness *)
               intros v1 Hget. rewrite M.gso in Hget; auto.
               assert (Hnotfn : ~ name_in_fundefs fdefs y).
@@ -2987,7 +3003,9 @@ Section Correct.
                 constructor.
                 - constructor.
                   + eapply Hfnames_sub. exact Hc.
-                  + intros Hin. admit. (* S' ⊆ S \ FromList fnames, so fnames ∩ S' = ∅ *)
+                  + intros Hin.
+                    assert (Hsub_efn := proj1 (proj2 (proj2 anf_cvt_rel_subset)) _ _ _ _ _ _ _ Hcvt_efn).
+                    apply Hsub_efn in Hin. inv Hin. contradiction.
                 - intros Habs. inv Habs. congruence. }
               eexists. split.
               { rewrite def_funs_neq; eauto. }

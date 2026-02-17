@@ -344,6 +344,30 @@ Section Correct.
   Qed.
 
 
+  (* Environment relation extends to include fixpoint function definitions.
+     Analogous to cps_env_rel_extend_fundefs in LambdaBoxLocal_to_LambdaANF_correct.v. *)
+  Lemma anf_env_rel_extend_fundefs fnames names S1 fns Bs S2 rho vs :
+    anf_env_rel names vs rho ->
+    anf_fix_rel fnames names S1 fnames fns Bs S2 ->
+    NoDup fnames ->
+    env_consistent names vs ->
+    Disjoint var (FromList names :|: FromList fnames) S1 ->
+    Disjoint var (FromList names) (FromList fnames) ->
+    anf_env_rel (rev fnames ++ names) (make_rec_env_rev_order fns vs) (def_funs Bs Bs rho rho).
+  Proof. Admitted.
+
+  (* Environment relation extends through set_lists with reversed variable list.
+     Used for Match_e case where constructor fields are bound via set_lists (rev vars). *)
+  Lemma anf_env_rel_extend_weaken_setlists_rev vnames vs xs vs1 vs2 rho rho' :
+    anf_env_rel vnames vs rho ->
+    set_lists (rev xs) vs2 rho = Some rho' ->
+    Forall2 anf_val_rel vs1 vs2 ->
+    Disjoint _ (FromList xs) (FromList vnames) ->
+    NoDup xs ->
+    anf_env_rel (xs ++ vnames) (rev vs1 ++ vs) rho'.
+  Proof. Admitted.
+
+
   (** ** Reduction lemmas *)
 
   Definition one_step : @PostT nat unit :=
@@ -1367,6 +1391,13 @@ Section Correct.
     List.length fnames_list = efnlength efns.
   Proof.
     intros Hrel. induction Hrel; simpl; congruence.
+  Qed.
+
+  Lemma anf_fix_rel_names fnames names S1 fnames_list efns Bs S2 :
+    anf_fix_rel fnames names S1 fnames_list efns Bs S2 ->
+    all_fun_name Bs = fnames_list.
+  Proof.
+    intros H. induction H; simpl; congruence.
   Qed.
 
   (* Extended version of anf_fix_rel_find_def that also provides the
@@ -2513,7 +2544,12 @@ Section Correct.
             set (rho_bc := M.set x_pc v2' (def_funs Bs_fix Bs_fix rho_fc rho_fc)).
             (* Step 2: Body environment relation *)
             assert (Henv_bc : anf_env_rel (x_pc :: List.rev fnames_fc ++ names_fc)
-                                          (v2 :: make_rec_env_rev_order fnlst0 rho_fix) rho_bc) by admit.
+                                          (v2 :: make_rec_env_rev_order fnlst0 rho_fix) rho_bc).
+            { unfold rho_bc. apply anf_env_rel_extend_weaken.
+              - eapply anf_env_rel_extend_fundefs; eassumption.
+              - exact Hrel_v2.
+              - intro Hc. apply Hxpc_fresh.
+                rewrite FromList_app, FromList_rev in Hc. exact Hc. }
             (* Step 3: Apply IH3 to get body correctness *)
             assert (IH3_full :
               (forall v0 v'0, Val v = Val v0 -> anf_val_rel v0 v'0 ->
@@ -2859,7 +2895,28 @@ Section Correct.
                   eapply Included_trans. exact HS_mid_sub.
                   eapply Included_trans. exact HS2.
                   eapply Included_trans; eapply Setminus_Included.
-              - admit. (* anf_env_rel (vars ++ vnames) (List.rev vs_con ++ rho0) rho_proj *)
+              - (* anf_env_rel (vars ++ vnames) (List.rev vs_con ++ rho0) rho_proj *)
+                eapply anf_env_rel_extend_weaken_setlists_rev.
+                + (* anf_env_rel vnames rho0 rho_match *)
+                  unfold rho_match. apply anf_env_rel_weaken.
+                  * unfold rho_efun. simpl def_funs.
+                    apply anf_env_rel_weaken; [ exact Henv | ].
+                    intro Hc. destruct Hdis as [Hdis'].
+                    apply (Hdis' f). constructor; eauto.
+                  * intro Hc. destruct Hdis as [Hdis'].
+                    apply (Hdis' y). constructor; [ exact Hc | ].
+                    match goal with
+                    | [ H : y \in S \\ _ |- _ ] =>
+                      destruct H as [Hy _]; exact Hy
+                    end.
+                + exact Hset_proj.
+                + exact Hvs_rel.
+                + (* Disjoint (FromList vars) (FromList vnames) *)
+                  apply Disjoint_sym.
+                  eapply Disjoint_Included_r; [ | exact Hdis ].
+                  intros z Hz. apply Hvars_sub in Hz. apply HS_mid_sub in Hz.
+                  apply HS2 in Hz. destruct Hz as [[Hz _] _]. exact Hz.
+                + exact Hvars_nd.
               - constructor. intros z0 Hz0. inv Hz0. inv H.
                 destruct H0 as [_ Habs]. apply Habs. constructor. }
             (* Extract bstep from Ecase preord_exp using Ehalt source evaluation *)
@@ -3084,7 +3141,61 @@ Section Correct.
           + subst z. rewrite M.gss in Hget.
             inv Hget.
             destruct (in_dec Pos.eq_dec x1 xs0) as [Hin_xs | Hnin_xs].
-            * admit. (* x1 ∈ xs_rest: needs anf_cvt_val_alpha_equiv *)
+            * (* x1 ∈ xs0: both v1 and set_many value translate
+                 the same source value via alpha-equiv *)
+              match goal with
+              | [ Hcvt_e0 : anf_cvt_rel S e0 vnames _ ?S2_v _ x1,
+                  Hcvt_es0 : anf_cvt_rel_exps ?S2_v es0 vnames _ _ _ xs0,
+                  Hrel_v0 : anf_val_rel v0 ?v1_v,
+                  Hrel_rest : Forall2 anf_val_rel vs0 ?l_v |- _ ] =>
+              (* Step 1: x1 ∈ FromList vnames *)
+              assert (Hx1_vn : x1 \in FromList vnames);
+              [ destruct (anf_cvt_rel_exps_In_range _ _ _ _ _ _ _ Hcvt_es0 x1 Hin_xs)
+                  as [Hvn | HS2];
+                [ exact Hvn
+                | exfalso;
+                  assert (Hx1_not_S2 : ~ x1 \in S2_v)
+                    by (eapply anf_cvt_result_not_in_output; eassumption);
+                  exact (Hx1_not_S2 HS2) ]
+              | ];
+              (* Step 2: Find positions *)
+              destruct (In_nth_error _ _ Hx1_vn) as [n_pos Hn_pos];
+              destruct (In_nth_error _ _ Hin_xs) as [k_pos Hk_pos];
+              destruct (first_occurrence_exists xs0 k_pos x1 Hk_pos)
+                as [k0 [Hle [Hk0 Hfirst]]];
+              (* Step 3: Get set_many value *)
+              assert (Hlen_xs0 : Datatypes.length xs0 = Datatypes.length l_v)
+                by (eapply Forall2_length; exact Hrel_rest);
+              destruct (set_many_get_first xs0 l_v (M.set x1 v1_v rho)
+                          x1 k0 Hlen_xs0 Hk0 Hfirst)
+                as [v_sm [Hv_sm_k Hget_sm]];
+              eexists; split; [ exact Hget_sm | ];
+              (* Step 4: Common source value *)
+              assert (Hdis_S2 : Disjoint _ (FromList vnames) S2_v)
+                by (eapply Disjoint_Included_r;
+                    [ eapply anf_cvt_exp_subset; exact Hcvt_e0 | exact Hdis ]);
+              destruct (anf_cvt_rel_exps_var_lookup _ _ _ _ _ Heval_es
+                          _ _ _ _ _ _ Hcvt_es0 Hdis_S2 Hnd _ _ _ Hk0 Hn_pos)
+                as [v_src [Hvsrc_k0 Hvsrc_n]];
+              destruct (anf_env_rel_nth_error _ _ _ _ _ _ Henv Hn_pos Hvsrc_n)
+                as [v'_rho [Hget_rho Hrel_src_rho]];
+              (* Step 5: anf_val_rel v0 v'_rho *)
+              assert (Hrel_v0_rho : anf_val_rel v0 v'_rho)
+                by (eapply anf_cvt_result_in_vnames_eval;
+                    [ exact Henv | exact Hnd | exact Hdis
+                    | exact Hcvt_e0 | exact Hx1_vn | exact Heval_e | exact Hget_rho ]);
+              (* Step 6: anf_val_rel v_src v_sm from Forall2 *)
+              assert (Hrel_src_sm : anf_val_rel v_src v_sm);
+              [ destruct (Forall2_nth_error_l _ _ _ _ _ Hrel_rest Hvsrc_k0)
+                  as [v_sm' [Hvsm' Hrel']];
+                rewrite Hv_sm_k in Hvsm'; inv Hvsm'; exact Hrel'
+              | ];
+              (* Step 7: Transitivity via v'_rho *)
+              eapply preord_val_trans;
+              [ eapply anf_cvt_val_alpha_equiv; [ exact Hrel_v0 | exact Hrel_v0_rho ]
+              | intro m; eapply anf_cvt_val_alpha_equiv;
+                [ exact Hrel_src_rho | exact Hrel_src_sm ] ]
+              end
             * eexists; split.
               -- rewrite set_many_get_neq; auto. rewrite M.gss. reflexivity.
               -- eapply preord_val_refl. tci.

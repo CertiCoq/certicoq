@@ -680,6 +680,14 @@ Section Correct.
     env_consistent (x :: vn) (v :: vs).
   Proof. Admitted.
 
+  Lemma env_consistent_app vn1 vn2 vs1 vs2 :
+    env_consistent vn1 vs1 ->
+    env_consistent vn2 vs2 ->
+    Disjoint _ (FromList vn1) (FromList vn2) ->
+    Datatypes.length vn1 = Datatypes.length vs1 ->
+    env_consistent (vn1 ++ vn2) (vs1 ++ vs2).
+  Proof. Admitted.
+
   (* Free variables of a context application decompose into free vars
      of the context and free vars of the body. *)
   Lemma occurs_free_app_ctx_included c e :
@@ -719,6 +727,15 @@ Section Correct.
     Disjoint _ (occurs_free e_k) ((S \\ (S3 \\ [set x])) \\ [set x]) ->
     Disjoint _ (occurs_free (Eletapp x f func_tag [x1] e_k))
                (((S \\ [set f] \\ [set y]) \\ S2) \\ [set x1]).
+  Proof. Admitted.
+
+  (* In the eval_many_econs case, occurs_free e_k is disjoint from (S2\S')\FromList xs for IH_es. *)
+  Lemma anf_cvt_disjoint_exps_continuation S e1 vn tgm S2 C1 x1
+        es S' C2 xs e_k :
+    anf_cvt_rel S e1 vn tgm S2 C1 x1 ->
+    anf_cvt_rel_exps S2 es vn tgm S' C2 xs ->
+    Disjoint _ (occurs_free e_k) ((S \\ S') \\ FromList (x1 :: xs)) ->
+    Disjoint _ (occurs_free e_k) ((S2 \\ S') \\ FromList xs).
   Proof. Admitted.
 
   (* In the eval_many_econs case, occurs_free of C2|[e_k]| is disjoint from (S\S2)\{x1} for IH_e. *)
@@ -2643,8 +2660,26 @@ Section Correct.
               edestruct IH2 as [IH2_val _]; [ | | | | | exact Hcvt_br | | eapply IH2_val; eauto ].
               - admit. (* well_formed_env (List.rev vs_con ++ rho0) *)
               - admit. (* exp_wf ... e_br *)
-              - admit. (* env_consistent (vars ++ vnames) (List.rev vs_con ++ rho0) *)
-              - admit. (* Disjoint (FromList (vars ++ vnames)) (S_mid \\ FromList vars) *)
+              - (* env_consistent (vars ++ vnames) (List.rev vs_con ++ rho0) *)
+                eapply env_consistent_app.
+                + eapply NoDup_env_consistent. exact Hvars_nd.
+                + exact Hnd.
+                + apply Disjoint_sym.
+                  eapply Disjoint_Included_r; [ | exact Hdis ].
+                  intros z Hz. apply Hvars_sub in Hz. apply HS_mid_sub in Hz.
+                  apply HS2 in Hz. inv Hz. inv H. exact H0.
+                + rewrite rev_length. rewrite Hvars_len. rewrite Nnat.Nat2N.id. reflexivity.
+              - (* Disjoint (FromList (vars ++ vnames)) (S_mid \\ FromList vars) *)
+                rewrite FromList_app. constructor. intros z Hz. inv Hz.
+                inv H.
+                + (* z ∈ FromList vars and z ∈ S_mid \\ FromList vars — contradiction *)
+                  inv H0. exact (H1 H2).
+                + (* z ∈ FromList vnames and z ∈ S_mid \\ FromList vars *)
+                  inv H0.
+                  assert (Hz_S : In _ S z).
+                  { apply HS_mid_sub in H. apply HS2 in H.
+                    inv H. inv H0. exact H. }
+                  inv Hdis. eapply (H0 z). constructor; eassumption.
               - admit. (* anf_env_rel (vars ++ vnames) (List.rev vs_con ++ rho0) rho_proj *)
               - constructor. intros z0 Hz0. inv Hz0. inv H.
                 destruct H0 as [_ Habs]. apply Habs. constructor. }
@@ -2768,7 +2803,7 @@ Section Correct.
       2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
           (* Right step: IH_e with continuation C2|[e_k]| *)
           2:{ intros m.
-              edestruct IH_e as [IH_val _]; [ exact Hwf | admit | exact Hnd | exact Hdis | exact Henv | eassumption | admit | ].
+              edestruct IH_e as [IH_val _]; [ exact Hwf | admit | exact Hnd | exact Hdis | exact Henv | eassumption | eapply anf_cvt_disjoint_occurs_free_ctx_exps; eassumption | ].
               eapply IH_val; eauto. }
           eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
           (* Right step: IH_es with env M.set x1 v1' rho *)
@@ -2779,7 +2814,7 @@ Section Correct.
                 assert (Hnd_ext : env_consistent (x1_v :: vnames) (v0 :: vs_env))
                   by (eapply env_consistent_extend_from_cvt;
                       [ exact Hnd | exact Hcvt_e0 | exact Hdis | exact Heval_e ]);
-                eapply IH_es; [ exact Hwf | exact Hnd | | | eassumption | eassumption | admit ];
+                eapply IH_es; [ exact Hwf | exact Hnd | | | eassumption | eassumption | eapply anf_cvt_disjoint_exps_continuation; eassumption ];
                 [ eapply Disjoint_Included_r;
                     [eapply (proj1 anf_cvt_rel_subset); exact Hcvt_e0 | exact Hdis]
                 | eapply anf_env_rel_set; [ exact Henv | ];

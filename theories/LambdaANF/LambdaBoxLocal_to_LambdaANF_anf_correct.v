@@ -2112,14 +2112,63 @@ Section Correct.
               - (* y ≠ x *)
                 unfold preord_var_env. intros v0 Hget0.
                 rewrite M.gso in Hget0 by auto.
-                eexists. split.
-                + assert (Hneq_x2 : y <> x2) by admit.
-                  assert (Hneq_x1 : y <> x1) by admit.
-                  rewrite M.gso by auto.
-                  rewrite M.gso by auto.
-                  rewrite M.gso by auto.
-                  exact Hget0.
-                + eapply preord_val_refl. tci. }
+                destruct (Pos.eq_dec y x2) as [-> | Hneq_x2].
+                + (* y = x2: alpha-equiv or contradiction *)
+                  destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt_e2) as [Hin_vn | Hin_S].
+                  * (* x2 ∈ vnames: alpha-equiv *)
+                    eexists. split.
+                    { rewrite M.gso by auto. rewrite M.gss. reflexivity. }
+                    eapply anf_cvt_val_alpha_equiv.
+                    -- eapply anf_cvt_result_in_vnames_eval;
+                         [ exact Henv | exact Hnd
+                         | eapply Disjoint_Included_r;
+                             [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis]
+                         | exact Hcvt_e2 | exact Hin_vn | exact Heval2 | exact Hget0 ].
+                    -- eassumption.
+                  * (* x2 ∈ S2: contradiction with Hdis_ek *)
+                    exfalso.
+                    destruct Hdis_ek as [Hdis_ek'].
+                    apply (Hdis_ek' x2). constructor.
+                    { exact Hy. }
+                    { constructor.
+                      - constructor.
+                        ++ eapply anf_cvt_exp_subset. exact Hcvt_e1. exact Hin_S.
+                        ++ intros Hin_inner. inv Hin_inner.
+                           eapply anf_cvt_result_not_in_output;
+                             [ exact Hcvt_e2 | | assumption ].
+                           eapply Disjoint_Included_r;
+                             [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis].
+                      - intros Hin_x. inv Hin_x. congruence. }
+                + (* y ≠ x2 *)
+                  destruct (Pos.eq_dec y x1) as [-> | Hneq_x1].
+                  * (* y = x1: alpha-equiv or contradiction *)
+                    destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt_e1) as [Hin_vn | Hin_S].
+                    -- (* x1 ∈ vnames: alpha-equiv *)
+                       eexists. split.
+                       { rewrite M.gso by auto. rewrite M.gso by auto. rewrite M.gss. reflexivity. }
+                       eapply anf_cvt_val_alpha_equiv.
+                       ++ eapply anf_cvt_result_in_vnames_eval;
+                            [ exact Henv | exact Hnd | exact Hdis
+                            | exact Hcvt_e1 | exact Hin_vn | exact Heval1 | exact Hget0 ].
+                       ++ eassumption.
+                    -- (* x1 ∈ S: contradiction *)
+                       exfalso.
+                       assert (Hx1_not_S2 : ~ x1 \in S2).
+                       { eapply anf_cvt_result_not_in_output; eassumption. }
+                       destruct Hdis_ek as [Hdis_ek'].
+                       apply (Hdis_ek' x1). constructor.
+                       { exact Hy. }
+                       { constructor.
+                         - constructor.
+                           ++ exact Hin_S.
+                           ++ intros Hin_inner. inv Hin_inner.
+                              apply Hx1_not_S2.
+                              eapply anf_cvt_exp_subset. exact Hcvt_e2. assumption.
+                         - intros Hin_x. inv Hin_x. congruence. }
+                  * (* y ≠ x2, y ≠ x1 *)
+                    eexists. split.
+                    -- rewrite M.gso by auto. rewrite M.gso by auto. rewrite M.gso by auto. exact Hget0.
+                    -- eapply preord_val_refl. tci. }
             (* Get continuation evaluation from preord_exp_refl *)
             edestruct Hrefl as (v_cont & cin_cont & cout_cont & Hbstep_cont & Heq_cont & Hres_cont).
             { exact Hle_cin. }
@@ -2450,7 +2499,11 @@ Section Correct.
                exists c, bstep_fuel cenv rho_bc (C_bc |[ Ehalt r_bc ]|) c eval.OOT tt)).
             { eapply IH3 with (vnames := x_pc :: List.rev fnames_fc ++ names_fc).
               - (* well_formed_env (v2 :: make_rec_env_rev_order fnlst0 rho_fix) *)
-                admit. (* from Hwf_v2 + make_rec_env_preserves_wf *)
+                constructor.
+                + exact Hwf_v2.
+                + inversion Hwf_fix.
+                  eapply well_formed_envmake_rec_env_rev_order;
+                    [reflexivity | assumption | assumption].
               - (* exp_wf *)
                 admit. (* from well_formed_val (ClosFix_v ...) *)
               - (* env_consistent (x_pc :: rev fnames_fc ++ names_fc) (v2 :: make_rec_env_rev_order fnlst0 rho_fix) *)
@@ -2494,14 +2547,63 @@ Section Correct.
               - (* y ≠ x *)
                 unfold preord_var_env. intros v0 Hget0.
                 rewrite M.gso in Hget0 by auto.
-                eexists. split.
-                + assert (Hneq_x2 : y <> x2) by admit. (* freshness *)
-                  assert (Hneq_x1 : y <> x1) by admit. (* freshness *)
-                  rewrite M.gso by auto.
-                  rewrite M.gso by auto.
-                  rewrite M.gso by auto.
-                  exact Hget0.
-                + eapply preord_val_refl. tci. }
+                destruct (Pos.eq_dec y x2) as [-> | Hneq_x2].
+                + (* y = x2: alpha-equiv or contradiction *)
+                  destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt_e2) as [Hin_vn | Hin_S].
+                  * (* x2 ∈ vnames: alpha-equiv *)
+                    eexists. split.
+                    { rewrite M.gso by auto. rewrite M.gss. reflexivity. }
+                    eapply anf_cvt_val_alpha_equiv.
+                    -- eapply anf_cvt_result_in_vnames_eval;
+                         [ exact Henv | exact Hnd
+                         | eapply Disjoint_Included_r;
+                             [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis]
+                         | exact Hcvt_e2 | exact Hin_vn | exact Heval2 | exact Hget0 ].
+                    -- eassumption.
+                  * (* x2 ∈ S2: contradiction with Hdis_ek *)
+                    exfalso.
+                    destruct Hdis_ek as [Hdis_ek'].
+                    apply (Hdis_ek' x2). constructor.
+                    { exact Hy. }
+                    { constructor.
+                      - constructor.
+                        ++ eapply anf_cvt_exp_subset. exact Hcvt_e1. exact Hin_S.
+                        ++ intros Hin_inner. inv Hin_inner.
+                           eapply anf_cvt_result_not_in_output;
+                             [ exact Hcvt_e2 | | assumption ].
+                           eapply Disjoint_Included_r;
+                             [eapply anf_cvt_exp_subset; exact Hcvt_e1 | exact Hdis].
+                      - intros Hin_x. inv Hin_x. congruence. }
+                + (* y ≠ x2 *)
+                  destruct (Pos.eq_dec y x1) as [-> | Hneq_x1].
+                  * (* y = x1: alpha-equiv or contradiction *)
+                    destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt_e1) as [Hin_vn | Hin_S].
+                    -- (* x1 ∈ vnames: alpha-equiv *)
+                       eexists. split.
+                       { rewrite M.gso by auto. rewrite M.gso by auto. rewrite M.gss. reflexivity. }
+                       eapply anf_cvt_val_alpha_equiv.
+                       ++ eapply anf_cvt_result_in_vnames_eval;
+                            [ exact Henv | exact Hnd | exact Hdis
+                            | exact Hcvt_e1 | exact Hin_vn | exact Heval1 | exact Hget0 ].
+                       ++ eassumption.
+                    -- (* x1 ∈ S: contradiction *)
+                       exfalso.
+                       assert (Hx1_not_S2 : ~ x1 \in S2).
+                       { eapply anf_cvt_result_not_in_output; eassumption. }
+                       destruct Hdis_ek as [Hdis_ek'].
+                       apply (Hdis_ek' x1). constructor.
+                       { exact Hy. }
+                       { constructor.
+                         - constructor.
+                           ++ exact Hin_S.
+                           ++ intros Hin_inner. inv Hin_inner.
+                              apply Hx1_not_S2.
+                              eapply anf_cvt_exp_subset. exact Hcvt_e2. assumption.
+                         - intros Hin_x. inv Hin_x. congruence. }
+                  * (* y ≠ x2, y ≠ x1 *)
+                    eexists. split.
+                    -- rewrite M.gso by auto. rewrite M.gso by auto. rewrite M.gso by auto. exact Hget0.
+                    -- eapply preord_val_refl. tci. }
             (* Step 6: Get continuation evaluation *)
             edestruct Hrefl as (v_cont & cin_cont & cout_cont & Hbstep_cont & Heq_cont & Hres_cont).
             { exact Hle_cin. }
@@ -2668,8 +2770,14 @@ Section Correct.
               (* IH2: branch body evaluation *)
               intros m'.
               edestruct IH2 as [IH2_val _]; [ | | | | | exact Hcvt_br | | eapply IH2_val; eauto ].
-              - admit. (* well_formed_env (List.rev vs_con ++ rho0) *)
-              - admit. (* exp_wf ... e_br *)
+              - (* well_formed_env (List.rev vs_con ++ rho0) *)
+                eapply Forall_app. split.
+                + eapply Forall_rev. inv Hwf_con. assumption.
+                + exact Hwf.
+              - (* exp_wf (N.of_nat (length (vars ++ vnames))) e_br *)
+                rewrite length_app, Nnat.Nat2N.inj_add, Hvars_len, Nnat.Nat2N.id.
+                eapply find_branch_preserves_wf; [ | exact Hfind ].
+                inversion Hwfe; eassumption.
               - (* env_consistent (vars ++ vnames) (List.rev vs_con ++ rho0) *)
                 eapply env_consistent_app.
                 + eapply NoDup_env_consistent. exact Hvars_nd.

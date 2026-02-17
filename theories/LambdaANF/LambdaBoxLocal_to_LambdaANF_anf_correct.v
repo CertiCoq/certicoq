@@ -898,6 +898,120 @@ Section Correct.
     occurs_free_ctx C \subset FromList vn :|: (S \\ S').
   Proof. Admitted.
 
+  (* If x1 is a fresh variable (from S, disjoint from vnames), then
+     x1 is in the consumed set (S \ S') and not the result variable x2. *)
+  Lemma anf_cvt_result_in_consumed S1 S2 e vn tgm C x :
+    anf_cvt_rel S1 e vn tgm S2 C x ->
+    (x \in FromList vn \/ x \in S1).
+  Proof.
+    enough (H :
+      (forall (e : expression.exp) S1 vn tgm S2 C x,
+          anf_cvt_rel S1 e vn tgm S2 C x ->
+          (x \in FromList vn \/ x \in S1)) /\
+      (forall (es : exps), True) /\
+      (forall (efns : efnlst), True) /\
+      (forall (bs : branches_e), True)).
+    { exact (proj1 H e S1 vn tgm S2 C x). }
+    eapply exp_ind_alt_2.
+    - (* Var_e *)
+      intros n S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. left. eapply nth_error_In. eassumption.
+    - (* Lam_e *)
+      intros na e1 IH S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel in *.
+      right. destruct H3. assumption.
+    - (* App_e *)
+      intros e1 IH1 e2 IH2 S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel in *.
+      right.
+      repeat match goal with
+      | [ H : anf_cvt_rel _ _ _ _ _ _ _ |- _ ] =>
+        apply anf_cvt_exp_subset in H
+      end.
+      eauto.
+    - (* Con_e *)
+      intros dc es IH S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel_exps in *.
+      right. assumption.
+    - (* Match_e *)
+      intros e1 IH1 n bs IH2 S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_branches in *.
+      right.
+      repeat match goal with
+      | [ H : anf_cvt_rel _ _ _ _ _ _ _ |- _ ] =>
+        apply anf_cvt_exp_subset in H
+      | [ H : anf_cvt_rel_branches _ _ _ _ _ _ _ |- _ ] =>
+        apply (proj2 (proj2 (proj2 anf_cvt_rel_subset))) in H
+      end.
+      match goal with
+      | [ Hin : x' \in ?S3m, Hsub1 : ?S3m \subset ?S2m,
+          Hsub2 : ?S2m \subset _ |- _ ] =>
+        apply Hsub1 in Hin; apply Hsub2 in Hin;
+        destruct Hin as [ [Hin _] _]; exact Hin
+      end.
+    - (* Let_e *)
+      intros na e1 IH1 e2 IH2 S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel in *.
+      match goal with
+      | [ Hcvt2 : anf_cvt_rel _ e2 (_ :: vn') _ _ _ x' |- _ ] =>
+        destruct (IH2 _ _ _ _ _ _ Hcvt2) as [Hvn2 | HS2]
+      end.
+      + rewrite FromList_cons in Hvn2. inv Hvn2.
+        * match goal with [ Heq : In _ [set _] _ |- _ ] => inv Heq end.
+          match goal with
+          | [ Hcvt1 : anf_cvt_rel S1' e1 vn' _ _ _ _ |- _ ] =>
+            destruct (IH1 _ _ _ _ _ _ Hcvt1) as [Hvn1 | HS1]
+          end.
+          -- left. exact Hvn1.
+          -- right. exact HS1.
+        * left. assumption.
+      + right.
+        match goal with
+        | [ Hcvt1 : anf_cvt_rel S1' e1 vn' _ _ _ _ |- _ ] =>
+          eapply anf_cvt_exp_subset in Hcvt1; apply Hcvt1; exact HS2
+        end.
+    - (* Fix_e *)
+      intros efns IH n S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel_efnlst in *.
+      right.
+      match goal with
+      | [ Hsub : FromList _ \subset S1',
+          Hnth : nth_error _ _ = Some x' |- _ ] =>
+        eapply Hsub; eapply nth_error_In; eassumption
+      end.
+    - (* Prf_e *)
+      intros S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. right. assumption.
+    - (* Prim_val_e *)
+      intros p S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. right. assumption.
+    - (* Prim_e *) intros. inv H. (* no ANF conversion for Prim_e *)
+    - (* enil *) exact I.
+    - (* econs *) intros; exact I.
+    - (* eflnil *) exact I.
+    - (* eflcons *) split; intros; exact I.
+    - (* brnil *) exact I.
+    - (* brcons *) intros; exact I.
+  Qed.
+
+  (* All result variables of an exps conversion are in FromList vn or in the starting state S. *)
+  Lemma anf_cvt_rel_exps_results_in_consumed S es vn tgm S' C xs :
+    anf_cvt_rel_exps S es vn tgm S' C xs ->
+    forall x, List.In x xs -> (x \in FromList vn \/ x \in S).
+  Proof.
+    intros H. induction H.
+    - intros x Hin. destruct Hin.
+    - intros y Hin. destruct Hin as [Heq | Hin].
+      + subst. eapply anf_cvt_result_in_consumed. eassumption.
+      + destruct (IHanf_cvt_rel_exps _ Hin) as [Hl | Hr].
+        * left. exact Hl.
+        * right. eapply (anf_cvt_exp_subset _ _ _ _ _ _ _ H). exact Hr.
+  Qed.
+
+  Local Lemma Union_destr {A} (B C : Ensemble A) (x : A) :
+    Union A B C x -> B x \/ C x.
+  Proof. inversion 1; subst; [left | right]; assumption. Qed.
+
   (* In the Let_e case, the free variables of C2|[e_k]| are disjoint
      from (S \ S2) \ {x1}. This follows from:
      - occurs_free(C2|[e_k]|) ⊆ occurs_free_ctx C2 ∪ occurs_free e_k
@@ -918,31 +1032,42 @@ Section Correct.
     pose proof (anf_cvt_result_not_in_output _ _ _ _ _ _ _ Hcvt1 Hdis_vn) as Hx1_not_S2.
     pose proof (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt2) as Hx2_consumed.
     assert (Hdis_x1vn_S2 : Disjoint _ (FromList (x1 :: vn)) S2).
-    { constructor. intros z Hz. inv Hz. simpl in H. destruct H as [Heq | Hin].
-      - subst. exact (Hx1_not_S2 H0).
-      - eapply Hdis_vn. constructor. exact Hin. eapply HS2_S. exact H0. }
+    { constructor. intros z Hz.
+      assert (Hz_l : FromList (x1 :: vn) z) by (inversion Hz; assumption).
+      assert (Hz_r : S2 z) by (inversion Hz; assumption).
+      simpl in Hz_l. destruct Hz_l as [Heq | Hin].
+      - subst. exact (Hx1_not_S2 Hz_r).
+      - eapply Hdis_vn; constructor; [exact Hin | eapply HS2_S; exact Hz_r]. }
     pose proof (anf_cvt_occurs_free_ctx_subset _ _ _ _ _ _ _ Hcvt2 Hdis_x1vn_S2) as Hctx.
-    constructor. intros z Hz. inv Hz.
-    pose proof (occurs_free_ctx_app C2 e_k _ H) as Hz_decomp.
-    inv H0. inv H1.
-    destruct Hz_decomp as [Hz_ctx | Hz_ek_bs].
-    - destruct (Hctx _ Hz_ctx) as [Hz_x1vn | Hz_S2S'].
+    constructor. intros z Hz.
+    assert (Hz_of : occurs_free (C2 |[ e_k ]|) z) by (inversion Hz; assumption).
+    assert (Hz_sm : ((S \\ S2) \\ [set x1]) z) by (inversion Hz; assumption).
+    clear Hz.
+    destruct Hz_sm as [[Hz_S Hz_not_S2] Hz_not_x1].
+    apply (occurs_free_ctx_app C2 e_k) in Hz_of.
+    apply Union_destr in Hz_of.
+    destruct Hz_of as [Hz_ctx | Hz_ek_bs].
+    - (* z ∈ occurs_free_ctx C2 *)
+      apply Hctx in Hz_ctx.
+      apply Union_destr in Hz_ctx.
+      destruct Hz_ctx as [Hz_x1vn | Hz_S2S'].
       + simpl in Hz_x1vn. destruct Hz_x1vn as [Heq | Hin].
-        * subst. apply H0. constructor.
-        * eapply Hdis_vn. constructor. exact Hin. exact H2.
-      + inv Hz_S2S'. exact (H3 H1).
-    - inv Hz_ek_bs.
+        * subst. exact (Hz_not_x1 (In_singleton _ _)).
+        * eapply Hdis_vn; constructor; [exact Hin | exact Hz_S].
+      + destruct Hz_S2S' as [Hz_S2 _]. exact (Hz_not_S2 Hz_S2).
+    - (* z ∈ occurs_free e_k \ bound_stem_ctx C2 *)
+      destruct Hz_ek_bs as [Hz_ek Hz_not_bsc].
       assert (Hz_not_x2 : z <> x2).
       { intro Heq. subst. destruct Hx2_consumed as [Hx2_vn | Hx2_S2].
         - simpl in Hx2_vn. destruct Hx2_vn as [Heq | Hin].
-          + subst. apply H0. constructor.
-          + eapply Hdis_vn. constructor. exact Hin. exact H2.
-        - exact (H3 Hx2_S2). }
-      eapply Hdis_ek. constructor.
-      + exact H1.
+          + subst. exact (Hz_not_x1 (In_singleton _ _)).
+          + eapply Hdis_vn; constructor; [exact Hin | exact Hz_S].
+        - exact (Hz_not_S2 Hx2_S2). }
+      eapply Hdis_ek; constructor.
+      + exact Hz_ek.
       + constructor.
-        * constructor. exact H2. intro. apply H3. eapply HS'_S2. assumption.
-        * intro Hz_x2. inv Hz_x2. exact (Hz_not_x2 eq_refl).
+        * constructor; [exact Hz_S | intro; apply Hz_not_S2; eapply HS'_S2; assumption].
+        * intro Hz_x2. destruct Hz_x2. exact (Hz_not_x2 eq_refl).
   Qed.
 
   (* In the Match_e case, occurs_free of Eletapp is disjoint from ((S\{f}\{y})\S2)\{x1} for IH1. *)
@@ -960,28 +1085,30 @@ Section Correct.
     intros Hf Hy Hcvt1 Hcvt_brs Hx Hdis_ek.
     pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt1) as HS2_Sfy.
     pose proof (proj1 (proj2 (proj2 anf_cvt_rel_subset)) _ _ _ _ _ _ _ Hcvt_brs) as HS3_S2.
-    constructor. intros z Hz. inv Hz.
-    apply (proj1 (occurs_free_Eletapp _ _ _ _ _)) in H.
-    inv H0. inv H1.
-    (* H2 : z ∈ S\\{f}\\{y}, H3 : ~z ∈ S2, H0 : ~z ∈ {x1} *)
-    destruct H as [Hz_left | Hz_right].
+    constructor. intros z Hz.
+    assert (Hz_of : occurs_free (Eletapp x f func_tag [x1] e_k) z) by (inversion Hz; assumption).
+    assert (Hz_sm : (((S \\ [set f] \\ [set y]) \\ S2) \\ [set x1]) z) by (inversion Hz; assumption).
+    clear Hz.
+    destruct Hz_sm as [[[[Hz_S Hz_not_f] Hz_not_y] Hz_not_S2] Hz_not_x1].
+    apply (proj1 (occurs_free_Eletapp _ _ _ _ _)) in Hz_of.
+    apply Union_destr in Hz_of.
+    destruct Hz_of as [Hz_left | Hz_right].
     - (* z ∈ f |: FromList [x1] *)
+      apply Union_destr in Hz_left.
       destruct Hz_left as [Hz_f | Hz_x1].
-      + (* z = f *) inv Hz_f. inv H2. inv H. apply H0. constructor.
+      + (* z = f *) inv Hz_f. exact (Hz_not_f (In_singleton _ _)).
       + (* z ∈ FromList [x1] = {x1} *)
         simpl in Hz_x1. destruct Hz_x1 as [Heq | []]. subst.
-        apply H0. constructor.
+        exact (Hz_not_x1 (In_singleton _ _)).
     - (* z ∈ occurs_free e_k \\ {x} *)
-      inv Hz_right.
-      (* H : z ∈ occurs_free e_k, H1 : ~ z ∈ {x} *)
-      inv H2. inv H4.
-      (* H2 : z ∈ S, H4 : ~ z ∈ {f}, H5 : ~ z ∈ {y} *)
-      eapply Hdis_ek. constructor.
-      + exact H.
+      destruct Hz_right as [Hz_ek Hz_not_x].
+      eapply Hdis_ek; constructor.
+      + exact Hz_ek.
       + constructor.
-        * constructor. exact H2.
-          intro Hz_S3x. inv Hz_S3x. exact (H3 (HS3_S2 _ H4)).
-        * exact H1.
+        * constructor; [exact Hz_S | ].
+          intro Hz_S3x. destruct Hz_S3x as [Hz_S3 _].
+          exact (Hz_not_S2 (HS3_S2 _ Hz_S3)).
+        * exact Hz_not_x.
   Qed.
 
   (* In the eval_many_econs case, occurs_free e_k is disjoint from (S2\S')\FromList xs for IH_es. *)
@@ -997,12 +1124,13 @@ Section Correct.
     pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt1) as HS2_S.
     pose proof (anf_cvt_result_not_in_output _ _ _ _ _ _ _ Hcvt1 Hdis_vn) as Hx1_not_S2.
     eapply Disjoint_Included_r; [ | exact Hdis_ek ].
-    intros z Hz. inv Hz. inv H.
+    intros z [Hz_S2S' Hz_not_xs].
+    destruct Hz_S2S' as [Hz_S2 Hz_not_S'].
     constructor.
-    - constructor. eapply HS2_S. exact H1. exact H2.
+    - constructor; [eapply HS2_S; exact Hz_S2 | exact Hz_not_S'].
     - intro Hz_x1xs. simpl in Hz_x1xs. destruct Hz_x1xs as [Heq | Hin].
-      + subst. exact (Hx1_not_S2 H1).
-      + exact (H0 Hin).
+      + subst. exact (Hx1_not_S2 Hz_S2).
+      + exact (Hz_not_xs Hin).
   Qed.
 
   (* In the eval_many_econs case, occurs_free of C2|[e_k]| is disjoint from (S\S2)\{x1} for IH_e. *)
@@ -1021,27 +1149,27 @@ Section Correct.
     assert (Hdis_vn_S2 : Disjoint _ (FromList vn) S2).
     { eapply Disjoint_Included_r; [ exact HS2_S | exact Hdis_vn ]. }
     pose proof (anf_cvt_occurs_free_ctx_subset_exps _ _ _ _ _ _ _ Hcvt_exps Hdis_vn_S2) as Hctx.
-    constructor. intros z Hz. inv Hz.
-    pose proof (occurs_free_ctx_app C2 e_k _ H) as Hz_decomp.
-    inv H0. inv H1.
-    (* H2 : z ∈ S, H3 : ~ z ∈ S2, H0 : ~ z ∈ {x1} *)
-    destruct Hz_decomp as [Hz_ctx | Hz_ek_bs].
+    constructor. intros z Hz. destruct Hz as [? Hz_of Hz_sm].
+    destruct Hz_sm as [[Hz_S Hz_not_S2] Hz_not_x1].
+    apply (occurs_free_ctx_app C2 e_k) in Hz_of.
+    destruct Hz_of as [Hz_ctx | Hz_ek_bs].
     - (* z ∈ occurs_free_ctx C2 *)
-      destruct (Hctx _ Hz_ctx) as [Hz_vn | Hz_S2S'].
-      + eapply Hdis_vn. constructor. exact Hz_vn. exact H2.
-      + inv Hz_S2S'. exact (H3 H1).
+      apply Hctx in Hz_ctx.
+      destruct Hz_ctx as [Hz_vn | Hz_S2S'].
+      + eapply Hdis_vn; constructor; [exact Hz_vn | exact Hz_S].
+      + destruct Hz_S2S' as [Hz_S2 _]. exact (Hz_not_S2 Hz_S2).
     - (* z ∈ occurs_free e_k \ bound_stem_ctx C2 *)
-      inv Hz_ek_bs.
-      assert (Hz_not_S' : ~ z \in S') by (intro; apply H3; eapply HS'_S2; assumption).
+      destruct Hz_ek_bs as [Hz_ek Hz_not_bsc].
+      assert (Hz_not_S' : ~ z \in S') by (intro; apply Hz_not_S2; eapply HS'_S2; assumption).
       assert (Hz_not_x1xs : ~ FromList (x1 :: xs) z).
       { intro Hz_bad. simpl in Hz_bad. destruct Hz_bad as [Heq | Hin].
-        - subst. apply H0. constructor.
+        - subst. apply Hz_not_x1. constructor.
         - destruct (anf_cvt_rel_exps_results_in_consumed _ _ _ _ _ _ _ Hcvt_exps _ Hin) as [Hxvn | HxS2].
-          + eapply Hdis_vn. constructor. exact Hxvn. exact H2.
-          + exact (H3 HxS2). }
+          + eapply Hdis_vn; constructor; [exact Hxvn | exact Hz_S].
+          + exact (Hz_not_S2 HxS2). }
       exfalso. eapply Hdis_ek; constructor;
-        [ exact H1
-        | constructor; [constructor; assumption | exact Hz_not_x1xs] ].
+        [ exact Hz_ek
+        | constructor; [constructor; [exact Hz_S | exact Hz_not_S'] | exact Hz_not_x1xs] ].
   Qed.
 
   (* In the App_e case, occurs_free of C2|[Eletapp ...]| is disjoint from (S\S2)\{x1} for IH1. *)
@@ -1054,7 +1182,47 @@ Section Correct.
     Disjoint _ (occurs_free e_k) ((S \\ (S3 \\ [set r])) \\ [set r]) ->
     Disjoint _ (occurs_free (C2 |[ Eletapp r x1 func_tag [x2] e_k ]|))
                ((S \\ S2) \\ [set x1]).
-  Proof. Admitted.
+  Proof.
+    intros Hcvt1 Hcvt2 Hr_in Hdis_vn Hdis_ek.
+    pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt1) as HS2_S.
+    pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt2) as HS3_S2.
+    pose proof (anf_cvt_result_not_in_output _ _ _ _ _ _ _ Hcvt1 Hdis_vn) as Hx1_not_S2.
+    pose proof (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt2) as Hx2_consumed.
+    assert (Hdis_vn_S2 : Disjoint _ (FromList vn) S2).
+    { eapply Disjoint_Included_r; [ exact HS2_S | exact Hdis_vn ]. }
+    pose proof (anf_cvt_occurs_free_ctx_subset _ _ _ _ _ _ _ Hcvt2 Hdis_vn_S2) as Hctx.
+    constructor. intros z Hz.
+    assert (Hz_of : occurs_free (C2 |[ Eletapp r x1 func_tag [x2] e_k ]|) z)
+      by (inversion Hz; assumption).
+    assert (Hz_sm : ((S \\ S2) \\ [set x1]) z) by (inversion Hz; assumption).
+    clear Hz.
+    destruct Hz_sm as [[Hz_S Hz_not_S2] Hz_not_x1].
+    apply (occurs_free_ctx_app C2 (Eletapp r x1 func_tag [x2] e_k)) in Hz_of.
+    destruct Hz_of as [Hz_ctx | Hz_elet_bs].
+    - (* z ∈ occurs_free_ctx C2 *)
+      apply Hctx in Hz_ctx.
+      destruct Hz_ctx as [Hz_vn | Hz_S2S3].
+      + eapply Hdis_vn; constructor; [exact Hz_vn | exact Hz_S].
+      + destruct Hz_S2S3 as [Hz_S2 _]. exact (Hz_not_S2 Hz_S2).
+    - (* z ∈ occurs_free (Eletapp ...) \ bound_stem_ctx C2 *)
+      destruct Hz_elet_bs as [Hz_elet Hz_not_bsc].
+      apply (proj1 (occurs_free_Eletapp _ _ _ _ _)) in Hz_elet.
+      destruct Hz_elet as [Hz_left | Hz_right].
+      + inversion Hz_left as [? Hz_x1 | ? Hz_x2].
+        * inv Hz_x1. exact (Hz_not_x1 (In_singleton _ _)).
+        * simpl in Hz_x2. destruct Hz_x2 as [Heq | []]. subst.
+          destruct Hx2_consumed as [Hx2_vn | Hx2_S2].
+          -- eapply Hdis_vn; constructor; [exact Hx2_vn | exact Hz_S].
+          -- exact (Hz_not_S2 Hx2_S2).
+      + destruct Hz_right as [Hz_ek Hz_not_r].
+        eapply Hdis_ek; constructor.
+        * exact Hz_ek.
+        * constructor.
+          -- constructor; [exact Hz_S | ].
+             intro Hz_S3r. destruct Hz_S3r as [Hz_S3 _].
+             exact (Hz_not_S2 (HS3_S2 _ Hz_S3)).
+          -- exact Hz_not_r.
+  Qed.
 
   (* In the App_e case, occurs_free of the Eletapp continuation is disjoint from (S2\S3)\{x2}. *)
   Lemma anf_cvt_disjoint_eletapp S e1 vn tgm S2 C1 x1
@@ -1066,7 +1234,33 @@ Section Correct.
     Disjoint _ (occurs_free e_k) ((S \\ (S3 \\ [set r])) \\ [set r]) ->
     Disjoint _ (occurs_free (Eletapp r x1 func_tag [x2] e_k))
                ((S2 \\ S3) \\ [set x2]).
-  Proof. Admitted.
+  Proof.
+    intros Hcvt1 Hcvt2 Hr_in Hdis_vn Hdis_ek.
+    pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt1) as HS2_S.
+    pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt2) as HS3_S2.
+    pose proof (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt1) as Hx1_consumed.
+    pose proof (anf_cvt_result_not_in_output _ _ _ _ _ _ _ Hcvt1 Hdis_vn) as Hx1_not_S2.
+    constructor. intros z Hz.
+    assert (Hz_of : occurs_free (Eletapp r x1 func_tag [x2] e_k) z)
+      by (inversion Hz; assumption).
+    assert (Hz_sm : ((S2 \\ S3) \\ [set x2]) z) by (inversion Hz; assumption).
+    clear Hz.
+    destruct Hz_sm as [[Hz_S2 Hz_not_S3] Hz_not_x2].
+    apply (proj1 (occurs_free_Eletapp _ _ _ _ _)) in Hz_of.
+    destruct Hz_of as [Hz_left | Hz_right].
+    - inversion Hz_left as [? Hz_x1 | ? Hz_x2].
+      + inv Hz_x1. exact (Hx1_not_S2 Hz_S2).
+      + simpl in Hz_x2. destruct Hz_x2 as [Heq | []]. subst.
+        exact (Hz_not_x2 (In_singleton _ _)).
+    - destruct Hz_right as [Hz_ek Hz_not_r].
+      eapply Hdis_ek; constructor.
+      + exact Hz_ek.
+      + constructor.
+        * constructor; [eapply HS2_S; exact Hz_S2 | ].
+          intro Hz_S3r. destruct Hz_S3r as [Hz_S3 _].
+          exact (Hz_not_S3 Hz_S3).
+        * exact Hz_not_r.
+  Qed.
 
   (* Convert anf_cvt_rel_efnlst to anf_fix_rel.
      The key difference: anf_fix_rel carries explicit disjointness and subset witnesses
@@ -1323,118 +1517,6 @@ Section Correct.
   Lemma anf_val_rel_exists :
     forall v, well_formed_val v -> exists v', anf_val_rel v v'.
   Proof. Admitted.
-
-
-  (* If x1 is a fresh variable (from S, disjoint from vnames), then
-     x1 is in the consumed set (S \ S') and not the result variable x2. *)
-  Lemma anf_cvt_result_in_consumed S1 S2 e vn tgm C x :
-    anf_cvt_rel S1 e vn tgm S2 C x ->
-    (x \in FromList vn \/ x \in S1).
-  Proof.
-    enough (H :
-      (forall (e : expression.exp) S1 vn tgm S2 C x,
-          anf_cvt_rel S1 e vn tgm S2 C x ->
-          (x \in FromList vn \/ x \in S1)) /\
-      (forall (es : exps), True) /\
-      (forall (efns : efnlst), True) /\
-      (forall (bs : branches_e), True)).
-    { exact (proj1 H e S1 vn tgm S2 C x). }
-    eapply exp_ind_alt_2.
-    - (* Var_e *)
-      intros n S1' vn' tgm' S2' C' x' Hcvt.
-      inv Hcvt. left. eapply nth_error_In. eassumption.
-    - (* Lam_e *)
-      intros na e1 IH S1' vn' tgm' S2' C' x' Hcvt.
-      inv Hcvt. fold anf_cvt_rel in *.
-      right. destruct H3. assumption.
-    - (* App_e *)
-      intros e1 IH1 e2 IH2 S1' vn' tgm' S2' C' x' Hcvt.
-      inv Hcvt. fold anf_cvt_rel in *.
-      right.
-      repeat match goal with
-      | [ H : anf_cvt_rel _ _ _ _ _ _ _ |- _ ] =>
-        apply anf_cvt_exp_subset in H
-      end.
-      eauto.
-    - (* Con_e *)
-      intros dc es IH S1' vn' tgm' S2' C' x' Hcvt.
-      inv Hcvt. fold anf_cvt_rel_exps in *.
-      right. assumption.
-    - (* Match_e *)
-      intros e1 IH1 n bs IH2 S1' vn' tgm' S2' C' x' Hcvt.
-      inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_branches in *.
-      right.
-      repeat match goal with
-      | [ H : anf_cvt_rel _ _ _ _ _ _ _ |- _ ] =>
-        apply anf_cvt_exp_subset in H
-      | [ H : anf_cvt_rel_branches _ _ _ _ _ _ _ |- _ ] =>
-        apply (proj2 (proj2 (proj2 anf_cvt_rel_subset))) in H
-      end.
-      match goal with
-      | [ Hin : x' \in ?S3m, Hsub1 : ?S3m \subset ?S2m,
-          Hsub2 : ?S2m \subset _ |- _ ] =>
-        apply Hsub1 in Hin; apply Hsub2 in Hin;
-        destruct Hin as [ [Hin _] _]; exact Hin
-      end.
-    - (* Let_e *)
-      intros na e1 IH1 e2 IH2 S1' vn' tgm' S2' C' x' Hcvt.
-      inv Hcvt. fold anf_cvt_rel in *.
-      match goal with
-      | [ Hcvt2 : anf_cvt_rel _ e2 (_ :: vn') _ _ _ x' |- _ ] =>
-        destruct (IH2 _ _ _ _ _ _ Hcvt2) as [Hvn2 | HS2]
-      end.
-      + rewrite FromList_cons in Hvn2. inv Hvn2.
-        * match goal with [ Heq : In _ [set _] _ |- _ ] => inv Heq end.
-          match goal with
-          | [ Hcvt1 : anf_cvt_rel S1' e1 vn' _ _ _ _ |- _ ] =>
-            destruct (IH1 _ _ _ _ _ _ Hcvt1) as [Hvn1 | HS1]
-          end.
-          -- left. exact Hvn1.
-          -- right. exact HS1.
-        * left. assumption.
-      + right.
-        match goal with
-        | [ Hcvt1 : anf_cvt_rel S1' e1 vn' _ _ _ _ |- _ ] =>
-          eapply anf_cvt_exp_subset in Hcvt1; apply Hcvt1; exact HS2
-        end.
-    - (* Fix_e *)
-      intros efns IH n S1' vn' tgm' S2' C' x' Hcvt.
-      inv Hcvt. fold anf_cvt_rel_efnlst in *.
-      right.
-      match goal with
-      | [ Hsub : FromList _ \subset S1',
-          Hnth : nth_error _ _ = Some x' |- _ ] =>
-        eapply Hsub; eapply nth_error_In; eassumption
-      end.
-    - (* Prf_e *)
-      intros S1' vn' tgm' S2' C' x' Hcvt.
-      inv Hcvt. right. assumption.
-    - (* Prim_val_e *)
-      intros p S1' vn' tgm' S2' C' x' Hcvt.
-      inv Hcvt. right. assumption.
-    - (* Prim_e *) intros. inv H. (* no ANF conversion for Prim_e *)
-    - (* enil *) exact I.
-    - (* econs *) intros; exact I.
-    - (* eflnil *) exact I.
-    - (* eflcons *) split; intros; exact I.
-    - (* brnil *) exact I.
-    - (* brcons *) intros; exact I.
-  Qed.
-
-
-  (* All result variables of an exps conversion are in FromList vn or in the starting state S. *)
-  Lemma anf_cvt_rel_exps_results_in_consumed S es vn tgm S' C xs :
-    anf_cvt_rel_exps S es vn tgm S' C xs ->
-    forall x, List.In x xs -> (x \in FromList vn \/ x \in S).
-  Proof.
-    intros H. induction H.
-    - intros x Hin. destruct Hin.
-    - intros y Hin. destruct Hin as [Heq | Hin].
-      + subst. eapply anf_cvt_result_in_consumed. eassumption.
-      + destruct (IHanf_cvt_rel_exps _ Hin) as [Hl | Hr].
-        * left. exact Hl.
-        * right. eapply (anf_cvt_exp_subset _ _ _ _ _ _ _ H). exact Hr.
-  Qed.
 
   (** ** Consistency lemmas for duplicate ANF variables *)
 

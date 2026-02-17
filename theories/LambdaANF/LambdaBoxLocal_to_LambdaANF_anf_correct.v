@@ -2854,7 +2854,11 @@ Section Correct.
             do 3 eexists. split.
             { econstructor 2. eapply BStept_letapp.
               - (* M.get f (M.set x1 ... rho_efun) = Vfun rho defs f *)
-                assert (Hneq_x1f : x1 <> f) by admit. (* freshness *)
+                assert (Hneq_x1f : x1 <> f).
+                { destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt_e1) as [Hin_vn | Hin_S].
+                  - intro Heq. subst. destruct Hdis as [Hdis''].
+                    eapply (Hdis'' f). constructor; eauto.
+                  - intro Heq. subst. inv Hin_S. inv H. apply H0. constructor. }
                 rewrite M.gso by (intro Heq'; apply Hneq_x1f; auto).
                 unfold rho_efun, defs. simpl. rewrite M.gss. reflexivity.
               - (* get_list [x1] (M.set x1 ... rho_efun) = [Vconstr c_tag vs_anf] *)

@@ -688,21 +688,6 @@ Section Correct.
     - eapply Hcons; eassumption.
   Qed.
 
-  (* If x is the result of converting e and e evaluates to v in vs,
-     then extending (vn, vs) with (x, v) preserves env_consistent.
-     Provable because:
-     - When x ∈ FromList vn (Var_e case): eval gives v = vs[n] at the right index,
-       and env_consistent ensures all duplicate positions already agree.
-     - When x ∉ FromList vn (fresh): extension is trivially consistent. *)
-  Lemma env_consistent_extend_from_cvt vn vs S e tgm S' C x v f t :
-    env_consistent vn vs ->
-    anf_cvt_rel S e vn tgm S' C x ->
-    Disjoint _ (FromList vn) S ->
-    @eval_env_fuel nat LambdaBoxLocal_resource_fuel
-                   LambdaBoxLocal_resource_trace vs e (Val v) f t ->
-    env_consistent (x :: vn) (v :: vs).
-  Proof. Admitted.
-
   Lemma env_consistent_app vn1 vn2 vs1 vs2 :
     env_consistent vn1 vs1 ->
     env_consistent vn2 vs2 ->
@@ -711,29 +696,39 @@ Section Correct.
     env_consistent (vn1 ++ vn2) (vs1 ++ vs2).
   Proof.
     intros Hc1 Hc2 Hdis Hlen. intros i j x Hi Hj.
-    destruct (Nat.lt_ge_cases i (Datatypes.length vn1));
-    destruct (Nat.lt_ge_cases j (Datatypes.length vn1)).
+    destruct (Nat.lt_ge_cases i (Datatypes.length vn1)) as [Hilt | Hige];
+    destruct (Nat.lt_ge_cases j (Datatypes.length vn1)) as [Hjlt | Hjge].
     - (* both in vn1 *)
-      rewrite nth_error_app1 in Hi; [| assumption].
-      rewrite nth_error_app1 in Hj; [| assumption].
-      rewrite !nth_error_app1; [| lia | lia].
+      assert (Hi' := nth_error_app1 vn1 vn2 Hilt).
+      assert (Hj' := nth_error_app1 vn1 vn2 Hjlt).
+      rewrite Hi' in Hi. rewrite Hj' in Hj.
+      assert (Hilt' : (i < Datatypes.length vs1)%nat) by lia.
+      assert (Hjlt' : (j < Datatypes.length vs1)%nat) by lia.
+      rewrite (nth_error_app1 vs1 vs2 Hilt').
+      rewrite (nth_error_app1 vs1 vs2 Hjlt').
       exact (Hc1 _ _ _ Hi Hj).
     - (* i in vn1, j in vn2 — contradiction *)
-      rewrite nth_error_app1 in Hi; [| assumption].
-      rewrite nth_error_app2 in Hj; [| assumption].
+      assert (Hi' := nth_error_app1 vn1 vn2 Hilt).
+      assert (Hj' := nth_error_app2 vn1 vn2 Hjge).
+      rewrite Hi' in Hi. rewrite Hj' in Hj.
       exfalso. eapply Hdis. constructor.
       + eapply nth_error_In. exact Hi.
       + eapply nth_error_In. exact Hj.
     - (* i in vn2, j in vn1 — contradiction *)
-      rewrite nth_error_app2 in Hi; [| assumption].
-      rewrite nth_error_app1 in Hj; [| assumption].
+      assert (Hi' := nth_error_app2 vn1 vn2 Hige).
+      assert (Hj' := nth_error_app1 vn1 vn2 Hjlt).
+      rewrite Hi' in Hi. rewrite Hj' in Hj.
       exfalso. eapply Hdis. constructor.
       + eapply nth_error_In. exact Hj.
       + eapply nth_error_In. exact Hi.
     - (* both in vn2 *)
-      rewrite nth_error_app2 in Hi; [| assumption].
-      rewrite nth_error_app2 in Hj; [| assumption].
-      rewrite !nth_error_app2; [| lia | lia].
+      assert (Hi' := nth_error_app2 vn1 vn2 Hige).
+      assert (Hj' := nth_error_app2 vn1 vn2 Hjge).
+      rewrite Hi' in Hi. rewrite Hj' in Hj.
+      assert (Hige' : (Datatypes.length vs1 <= i)%nat) by lia.
+      assert (Hjge' : (Datatypes.length vs1 <= j)%nat) by lia.
+      rewrite (nth_error_app2 vs1 vs2 Hige').
+      rewrite (nth_error_app2 vs1 vs2 Hjge').
       replace (i - Datatypes.length vs1) with (i - Datatypes.length vn1) by lia.
       replace (j - Datatypes.length vs1) with (j - Datatypes.length vn1) by lia.
       exact (Hc2 _ _ _ Hi Hj).
@@ -1506,6 +1501,20 @@ Section Correct.
   Unshelve. all: exact 0%nat.
   Qed.
 
+  Lemma env_consistent_extend_from_cvt vn vs S e tgm S' C x v f t :
+    env_consistent vn vs ->
+    anf_cvt_rel S e vn tgm S' C x ->
+    Disjoint _ (FromList vn) S ->
+    @eval_env_fuel nat LambdaBoxLocal_resource_fuel
+                   LambdaBoxLocal_resource_trace vs e (Val v) f t ->
+    env_consistent (x :: vn) (v :: vs).
+  Proof.
+    intros Hc Hcvt Hdis Heval.
+    apply env_consistent_extend; [ exact Hc | ].
+    intros k Hk.
+    eapply anf_cvt_rel_var_lookup;
+      [ exact Heval | reflexivity | exact Hcvt | exact Hdis | exact Hc | exact Hk ].
+  Qed.
 
   (** Exps version: if xs[j] = vn[i], then vs[j] = rho[i]. *)
   Lemma anf_cvt_rel_exps_var_lookup rho es vs f t :

@@ -3143,59 +3143,56 @@ Section Correct.
             destruct (in_dec Pos.eq_dec x1 xs0) as [Hin_xs | Hnin_xs].
             * (* x1 ∈ xs0: both v1 and set_many value translate
                  the same source value via alpha-equiv *)
-              match goal with
-              | [ Hcvt_e0 : anf_cvt_rel S e0 vnames _ ?S2_v _ x1,
-                  Hcvt_es0 : anf_cvt_rel_exps ?S2_v es0 vnames _ _ _ xs0,
-                  Hrel_v0 : anf_val_rel v0 ?v1_v,
-                  Hrel_rest : Forall2 anf_val_rel vs0 ?l_v |- _ ] =>
+              (* x1 ∈ xs0: both values translate the same source value *)
               (* Step 1: x1 ∈ FromList vnames *)
-              assert (Hx1_vn : x1 \in FromList vnames);
-              [ destruct (anf_cvt_rel_exps_In_range _ _ _ _ _ _ _ Hcvt_es0 x1 Hin_xs)
-                  as [Hvn | HS2];
-                [ exact Hvn
-                | exfalso;
-                  assert (Hx1_not_S2 : ~ x1 \in S2_v)
-                    by (eapply anf_cvt_result_not_in_output; eassumption);
-                  exact (Hx1_not_S2 HS2) ]
-              | ];
+              assert (Hx1_vn : x1 \in FromList vnames).
+              { edestruct anf_cvt_rel_exps_In_range as [? | ?];
+                  [ eassumption | exact Hin_xs | assumption | ].
+                exfalso; eapply anf_cvt_result_not_in_output; eassumption. }
               (* Step 2: Find positions *)
-              destruct (In_nth_error _ _ Hx1_vn) as [n_pos Hn_pos];
-              destruct (In_nth_error _ _ Hin_xs) as [k_pos Hk_pos];
+              destruct (In_nth_error _ _ Hx1_vn) as [n_pos Hn_pos].
+              destruct (In_nth_error _ _ Hin_xs) as [k_pos Hk_pos].
               destruct (first_occurrence_exists xs0 k_pos x1 Hk_pos)
-                as [k0 [Hle [Hk0 Hfirst]]];
-              (* Step 3: Get set_many value *)
-              assert (Hlen_xs0 : Datatypes.length xs0 = Datatypes.length l_v)
-                by (eapply Forall2_length; exact Hrel_rest);
-              destruct (set_many_get_first xs0 l_v (M.set x1 v1_v rho)
-                          x1 k0 Hlen_xs0 Hk0 Hfirst)
-                as [v_sm [Hv_sm_k Hget_sm]];
-              eexists; split; [ exact Hget_sm | ];
+                as [k0 [Hle [Hk0 Hfirst]]].
+              (* Step 3: Get set_many value — match on goal to find the values list *)
+              match goal with
+              | [ |- context [ set_many xs0 ?l_v ?base ] ] =>
+                assert (Hlen_xs0 : Datatypes.length xs0 = Datatypes.length l_v)
+                  by (etransitivity;
+                      [ eapply anf_cvt_rel_exps_length; eassumption
+                      | etransitivity;
+                        [ symmetry; eapply eval_fuel_many_length; eassumption
+                        | eapply Forall2_length; eassumption ] ]);
+                destruct (set_many_get_first xs0 l_v base x1 k0 Hlen_xs0 Hk0 Hfirst)
+                  as [v_sm [Hv_sm_k Hget_sm]]
+              end.
+              eexists; split; [ exact Hget_sm | ].
               (* Step 4: Common source value *)
-              assert (Hdis_S2 : Disjoint _ (FromList vnames) S2_v)
+              assert (Hdis_S2 : Disjoint _ (FromList vnames) _)
                 by (eapply Disjoint_Included_r;
-                    [ eapply anf_cvt_exp_subset; exact Hcvt_e0 | exact Hdis ]);
-              destruct (anf_cvt_rel_exps_var_lookup _ _ _ _ _ Heval_es
-                          _ _ _ _ _ _ Hcvt_es0 Hdis_S2 Hnd _ _ _ Hk0 Hn_pos)
+                    [ eapply anf_cvt_exp_subset; eassumption | exact Hdis ]).
+              edestruct anf_cvt_rel_exps_var_lookup
                 as [v_src [Hvsrc_k0 Hvsrc_n]];
-              destruct (anf_env_rel_nth_error _ _ _ _ _ _ Henv Hn_pos Hvsrc_n)
+                [ exact Heval_es | eassumption | exact Hdis_S2 | exact Hnd
+                | exact Hk0 | exact Hn_pos | ].
+              edestruct anf_env_rel_nth_error
                 as [v'_rho [Hget_rho Hrel_src_rho]];
+                [ exact Henv | exact Hn_pos | exact Hvsrc_n | ].
               (* Step 5: anf_val_rel v0 v'_rho *)
               assert (Hrel_v0_rho : anf_val_rel v0 v'_rho)
                 by (eapply anf_cvt_result_in_vnames_eval;
                     [ exact Henv | exact Hnd | exact Hdis
-                    | exact Hcvt_e0 | exact Hx1_vn | exact Heval_e | exact Hget_rho ]);
+                    | eassumption | exact Hx1_vn | exact Heval_e | exact Hget_rho ]).
               (* Step 6: anf_val_rel v_src v_sm from Forall2 *)
-              assert (Hrel_src_sm : anf_val_rel v_src v_sm);
-              [ destruct (Forall2_nth_error_l _ _ _ _ _ Hrel_rest Hvsrc_k0)
-                  as [v_sm' [Hvsm' Hrel']];
-                rewrite Hv_sm_k in Hvsm'; inv Hvsm'; exact Hrel'
-              | ];
+              assert (Hrel_src_sm : anf_val_rel v_src v_sm).
+              { destruct (Forall2_nth_error_l _ _ _ _ _ H4 Hvsrc_k0)
+                  as [v_sm' [Hvsm' Hrel']].
+                rewrite Hv_sm_k in Hvsm'. inv Hvsm'. exact Hrel'. }
               (* Step 7: Transitivity via v'_rho *)
-              eapply preord_val_trans;
-              [ eapply anf_cvt_val_alpha_equiv; [ exact Hrel_v0 | exact Hrel_v0_rho ]
-              | intro m; eapply anf_cvt_val_alpha_equiv;
-                [ exact Hrel_src_rho | exact Hrel_src_sm ] ]
-              end
+              eapply preord_val_trans. tci. eapply eq_fuel_idemp.
+              { eapply anf_cvt_val_alpha_equiv; eassumption. }
+              { intro m. eapply anf_cvt_val_alpha_equiv;
+                  [ exact Hrel_src_rho | exact Hrel_src_sm ]. }
             * eexists; split.
               -- rewrite set_many_get_neq; auto. rewrite M.gss. reflexivity.
               -- eapply preord_val_refl. tci.

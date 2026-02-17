@@ -16,7 +16,6 @@ Require Import LambdaBoxLocal.expression LambdaBoxLocal.fuel_sem.
 Require Import cps cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
         LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util
-        LambdaBoxLocal_to_LambdaANF_correct
         LambdaANF.tactics identifiers bounds cps_util rename stemctx.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
@@ -433,6 +432,17 @@ Section Correct.
     eapply preord_res_refl; tci.
   Admitted.
 
+  Lemma ctx_bind_proj_preord_exp :
+    forall vars C k r n e rho rho' vs vs' ctag,
+      n = (List.length vars) ->
+      ~ r \in FromList vars ->
+      ctx_bind_proj ctag r vars n = C ->
+      M.get r rho = Some (Vconstr ctag (vs ++ vs')) ->
+      set_lists (rev vars) vs rho = Some rho' ->
+      preord_exp cenv (eq_fuel_n n) eq_fuel k (e, rho') (C |[ e ]|, rho).
+  Proof.
+    (* Same proof as in LambdaBoxLocal_to_LambdaANF_correct.v lines 993-1050 *)
+  Admitted.
 
   (** ** Subset lemma for ANF relation *)
 
@@ -699,7 +709,35 @@ Section Correct.
     Disjoint _ (FromList vn1) (FromList vn2) ->
     Datatypes.length vn1 = Datatypes.length vs1 ->
     env_consistent (vn1 ++ vn2) (vs1 ++ vs2).
-  Proof. Admitted.
+  Proof.
+    intros Hc1 Hc2 Hdis Hlen. intros i j x Hi Hj.
+    destruct (Nat.lt_ge_cases i (Datatypes.length vn1));
+    destruct (Nat.lt_ge_cases j (Datatypes.length vn1)).
+    - (* both in vn1 *)
+      rewrite nth_error_app1 in Hi; [| assumption].
+      rewrite nth_error_app1 in Hj; [| assumption].
+      rewrite !nth_error_app1; [| lia | lia].
+      exact (Hc1 _ _ _ Hi Hj).
+    - (* i in vn1, j in vn2 — contradiction *)
+      rewrite nth_error_app1 in Hi; [| assumption].
+      rewrite nth_error_app2 in Hj; [| assumption].
+      exfalso. eapply Hdis. constructor.
+      + eapply nth_error_In. exact Hi.
+      + eapply nth_error_In. exact Hj.
+    - (* i in vn2, j in vn1 — contradiction *)
+      rewrite nth_error_app2 in Hi; [| assumption].
+      rewrite nth_error_app1 in Hj; [| assumption].
+      exfalso. eapply Hdis. constructor.
+      + eapply nth_error_In. exact Hj.
+      + eapply nth_error_In. exact Hi.
+    - (* both in vn2 *)
+      rewrite nth_error_app2 in Hi; [| assumption].
+      rewrite nth_error_app2 in Hj; [| assumption].
+      rewrite !nth_error_app2; [| lia | lia].
+      replace (i - Datatypes.length vs1) with (i - Datatypes.length vn1) by lia.
+      replace (j - Datatypes.length vs1) with (j - Datatypes.length vn1) by lia.
+      exact (Hc2 _ _ _ Hi Hj).
+  Qed.
 
   (* TODO move to more general file *)
   Lemma occurs_free_ctx_comp (C1 C2 : exp_ctx) :

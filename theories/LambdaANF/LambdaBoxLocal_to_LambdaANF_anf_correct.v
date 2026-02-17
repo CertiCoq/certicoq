@@ -344,6 +344,35 @@ Section Correct.
   Qed.
 
 
+  Lemma anf_fix_rel_fnames_length fnames names S1 fnames_list efns Bs S2 :
+    anf_fix_rel fnames names S1 fnames_list efns Bs S2 ->
+    List.length fnames_list = efnlength efns.
+  Proof.
+    intros Hrel. induction Hrel; simpl; congruence.
+  Qed.
+
+  Lemma anf_fix_rel_names fnames names S1 fnames_list efns Bs S2 :
+    anf_fix_rel fnames names S1 fnames_list efns Bs S2 ->
+    all_fun_name Bs = fnames_list.
+  Proof.
+    intros H. induction H; simpl; congruence.
+  Qed.
+
+  Local Lemma nth_error_Forall2 (A B : Type) (P : A -> B -> Prop)
+        (l : list A) (l' : list B) :
+    (forall n t, nth_error l n = Some t ->
+                 exists t', nth_error l' n = Some t' /\ P t t') ->
+    Datatypes.length l = Datatypes.length l' ->
+    Forall2 P l l'.
+  Proof.
+    revert l'; induction l; intros l' Hyp Hlen.
+    - destruct l'; simpl in *; [ constructor | congruence ].
+    - destruct l'; simpl in *; [ congruence | ]. constructor.
+      + destruct (Hyp 0%nat a eq_refl) as [? [Hnth ?]]. inv Hnth. assumption.
+      + eapply IHl; [ | congruence ].
+        intros n t Hn. exact (Hyp (S n) t Hn).
+  Qed.
+
   (* Environment relation extends to include fixpoint function definitions.
      Analogous to cps_env_rel_extend_fundefs in LambdaBoxLocal_to_LambdaANF_correct.v. *)
   Lemma anf_env_rel_extend_fundefs fnames names S1 fns Bs S2 rho vs :
@@ -354,7 +383,136 @@ Section Correct.
     Disjoint var (FromList names :|: FromList fnames) S1 ->
     Disjoint var (FromList names) (FromList fnames) ->
     anf_env_rel (rev fnames ++ names) (make_rec_env_rev_order fns vs) (def_funs Bs Bs rho rho).
-  Proof. Admitted.
+  Proof.
+    intros Hrel Hfix Hnd Hcons Hdis1 Hdis2.
+    unfold anf_env_rel, anf_env_rel' in *.
+    destruct (make_rec_env_rev_order_app fns vs) as [vs' [Hrec [Hlen_vs' Hnth_vs']]].
+    rewrite Hrec.
+    assert (Hfnames_len : Datatypes.length fnames = efnlength fns).
+    { erewrite <- anf_fix_rel_fnames_length; eauto. }
+    assert (Hlen : Datatypes.length vs' = Datatypes.length (rev fnames)).
+    { rewrite length_rev. lia. }
+    eapply Forall2_app.
+    - (* Part 1: fixpoint closures correspond to rev fnames *)
+      eapply nth_error_Forall2; [ | exact Hlen ].
+      intros n t Hnth.
+      assert (Hn_bound : (n < efnlength fns)%nat).
+      { eapply MCList.nth_error_Some_length in Hnth. lia. }
+      assert (Hnth_vs := Hnth_vs' n Hn_bound).
+      rewrite Hnth_vs in Hnth. inv Hnth.
+      assert (Hn_rev : (n < Datatypes.length (rev fnames))%nat).
+      { rewrite length_rev. lia. }
+      assert (exists f, nth_error (rev fnames) n = Some f) as [f Hf].
+      { apply nth_error_Some in Hn_rev.
+        destruct (nth_error (rev fnames) n); eauto. congruence. }
+      eexists. split. exact Hf.
+      eexists. split.
+      + rewrite def_funs_eq. reflexivity.
+        eapply Same_set_all_fun_name.
+        rewrite (anf_fix_rel_names _ _ _ _ _ _ _ Hfix).
+        rewrite <- FromList_rev. eapply nth_error_In. exact Hf.
+      + econstructor; try eassumption.
+        rewrite Nnat.Nat2N.id.
+        assert (Hf' := Hf).
+        rewrite MCList.nth_error_rev_inv in Hf';
+          [ | rewrite length_rev in Hn_rev; exact Hn_rev ].
+        rewrite Hfnames_len in Hf'.
+        replace (efnlength fns - S n)%nat with (efnlength fns - n - 1)%nat in Hf' by lia.
+        exact Hf'.
+    - (* Part 2: original env variables preserved by def_funs *)
+      eapply Forall2_monotonic_strong; [ | eassumption ].
+      intros v x Hv_in Hx_in [v' [Hget Hval]].
+      eexists. split; [ | exact Hval ].
+      rewrite def_funs_neq; [ exact Hget | ].
+      intros Hc. eapply Hdis2. constructor.
+      + exact Hx_in.
+      + apply Same_set_all_fun_name in Hc.
+        rewrite (anf_fix_rel_names _ _ _ _ _ _ _ Hfix) in Hc. exact Hc.
+  Qed.
+
+  Lemma anf_env_rel_weaken_setlists vnames vs ys ws rho rho' :
+    anf_env_rel vnames vs rho ->
+    set_lists ys ws rho = Some rho' ->
+    Disjoint _ (FromList ys) (FromList vnames) ->
+    anf_env_rel vnames vs rho'.
+  Proof.
+    revert ws rho rho'; induction ys; intros ws rho1 rho2 Hrel Hset Hdis.
+    - destruct ws; inv Hset. exact Hrel.
+    - destruct ws; [ discriminate | ].
+      simpl in Hset.
+      destruct (set_lists ys ws rho1) eqn:Hset'; [ | discriminate ]. inv Hset.
+      apply anf_env_rel_weaken.
+      + eapply IHys; [ exact Hrel | exact Hset' | ].
+        eapply Disjoint_Included_l; [ | exact Hdis ].
+        intros z Hz. right. exact Hz.
+      + intros Hc. eapply Hdis. constructor.
+        * left. reflexivity.
+        * exact Hc.
+  Qed.
+
+  Lemma anf_env_rel_extend_get_list vnames vs xs ws us rho :
+    anf_env_rel vnames vs rho ->
+    get_list xs rho = Some ws ->
+    Forall2 anf_val_rel us ws ->
+    anf_env_rel (xs ++ vnames) (us ++ vs) rho.
+  Proof.
+    revert ws us; induction xs; intros ws us Hrel Hget Hall.
+    - simpl in Hget. inv Hget. inv Hall. simpl. exact Hrel.
+    - simpl in Hget.
+      destruct (M.get a rho) as [va | ] eqn:Ha; [ | discriminate ].
+      destruct (get_list xs rho) as [ws' | ] eqn:Hrest; [ | discriminate ].
+      injection Hget as Heq. subst ws.
+      destruct us as [ | u us']; [ inv Hall | ].
+      inversion Hall as [ | ? ? ? ? Hvr Hall']. subst. simpl.
+      eapply anf_env_rel_extend.
+      + eapply IHxs; [ exact Hrel | reflexivity | exact Hall' ].
+      + exact Ha.
+      + exact Hvr.
+  Qed.
+
+  Lemma Forall2_nth_error_l {A B} (R : A -> B -> Prop) l1 l2 k a :
+    Forall2 R l1 l2 ->
+    nth_error l1 k = Some a ->
+    exists b, nth_error l2 k = Some b /\ R a b.
+  Proof.
+    intros HF2 Hk. revert k Hk.
+    induction HF2 as [ | a' b' l1' l2' Hab HF2' IH]; intros k Hk.
+    - destruct k; simpl in Hk; discriminate.
+    - destruct k as [ | k']; simpl in Hk.
+      + inv Hk. exists b'. split; [ reflexivity | exact Hab ].
+      + exact (IH k' Hk).
+  Qed.
+
+  Lemma Forall2_nth_error_r {A B} (R : A -> B -> Prop) l1 l2 k b :
+    Forall2 R l1 l2 ->
+    nth_error l2 k = Some b ->
+    exists a, nth_error l1 k = Some a /\ R a b.
+  Proof.
+    intros HF2 Hk. revert k Hk.
+    induction HF2 as [ | a' b' l1' l2' Hab HF2' IH]; intros k Hk.
+    - destruct k; simpl in Hk; discriminate.
+    - destruct k as [ | k']; simpl in Hk.
+      + inv Hk. exists a'. split; [ reflexivity | exact Hab ].
+      + exact (IH k' Hk).
+  Qed.
+
+  (* Helper: relate get_list output to individual M.get lookups via nth_error *)
+  Lemma get_list_nth_error (xs : list var) (vs : list val) (rho : M.t val)
+        (k : nat) (x : var) :
+    get_list xs rho = Some vs ->
+    nth_error xs k = Some x ->
+    nth_error vs k = M.get x rho.
+  Proof.
+    revert vs k. induction xs as [ | a xs' IH]; intros vs k Hgl Hnth.
+    - destruct k; simpl in Hnth; discriminate.
+    - simpl in Hgl.
+      destruct (M.get a rho) eqn:Ha; [ | discriminate ].
+      destruct (get_list xs' rho) eqn:Hrest; [ | discriminate ].
+      inv Hgl.
+      destruct k as [ | k'].
+      + simpl in Hnth. inv Hnth. simpl. symmetry. exact Ha.
+      + simpl in Hnth. simpl. exact (IH l k' eq_refl Hnth).
+  Qed.
 
   (* Environment relation extends through set_lists with reversed variable list.
      Used for Match_e case where constructor fields are bound via set_lists (rev vars). *)
@@ -365,7 +523,53 @@ Section Correct.
     Disjoint _ (FromList xs) (FromList vnames) ->
     NoDup xs ->
     anf_env_rel (xs ++ vnames) (rev vs1 ++ vs) rho'.
-  Proof. Admitted.
+  Proof.
+    intros Hrel Hset Hval Hdis Hnd.
+    assert (Hlen_eq : Datatypes.length xs = Datatypes.length vs1).
+    { assert (Hlen1 : Datatypes.length vs1 = Datatypes.length vs2).
+      { eapply Forall2_length; exact Hval. }
+      assert (Hlen2 := set_lists_length_eq _ _ _ _ Hset).
+      rewrite length_rev in Hlen2. lia. }
+    unfold anf_env_rel, anf_env_rel' in *.
+    assert (Hgl : get_list (rev xs) rho' = Some vs2).
+    { eapply get_list_set_lists; [ | exact Hset ].
+      apply NoDup_rev. exact Hnd. }
+    assert (Hlen_rev : Datatypes.length (rev vs1) = Datatypes.length xs).
+    { rewrite length_rev. lia. }
+    eapply Forall2_app.
+    - eapply nth_error_Forall2; [ | exact Hlen_rev ].
+      intros n v1r Hnth_v1r.
+      assert (Hn_bound : (n < Datatypes.length xs)%nat).
+      { rewrite <- Hlen_rev. eapply MCList.nth_error_Some_length. exact Hnth_v1r. }
+      (* v1r = (rev vs1)[n] = vs1[length vs1 - 1 - n] *)
+      assert (Hnth_v1r' := Hnth_v1r).
+      rewrite MCList.nth_error_rev_inv in Hnth_v1r'; [ | rewrite length_rev in *; lia ].
+      (* xs[n] is some variable x *)
+      destruct (nth_error xs n) as [x | ] eqn:Hx; [ | exfalso; apply nth_error_None in Hx; lia ].
+      eexists. split. reflexivity.
+      (* M.get x rho' = vs2[length xs - 1 - n] *)
+      assert (Hnth_rev_xs : nth_error (rev xs) (Datatypes.length xs - 1 - n) = Some x).
+      { rewrite MCList.nth_error_rev_inv; [ | lia ].
+        replace (Datatypes.length xs - S (Datatypes.length xs - 1 - n))%nat with n by lia.
+        exact Hx. }
+      assert (Hget_x : nth_error vs2 (Datatypes.length xs - 1 - n) = M.get x rho').
+      { eapply get_list_nth_error; [ exact Hgl | exact Hnth_rev_xs ]. }
+      destruct (nth_error vs2 (Datatypes.length xs - 1 - n)) as [v2 | ] eqn:Hv2;
+        [ | exfalso; apply nth_error_None in Hv2;
+            assert (tmp : Datatypes.length vs1 = Datatypes.length vs2)
+              by (eapply Forall2_length; exact Hval); lia ].
+      eexists. split.
+      + symmetry. exact Hget_x.
+      + (* anf_val_rel v1r v2 *)
+        (* v1r = vs1[length vs1 - 1 - n], v2 = vs2[length xs - 1 - n] *)
+        (* Forall2 anf_val_rel vs1 vs2 at index (length vs1 - 1 - n) *)
+        replace (Datatypes.length vs1 - S n)%nat
+          with (Datatypes.length xs - 1 - n)%nat in Hnth_v1r' by lia.
+        destruct (Forall2_nth_error_r _ _ _ _ _ Hval Hv2) as [v1' [Hv1' Hvrel]].
+        rewrite Hv1' in Hnth_v1r'. inv Hnth_v1r'. exact Hvrel.
+    - eapply anf_env_rel_weaken_setlists; [ exact Hrel | exact Hset | ].
+      rewrite FromList_rev. exact Hdis.
+  Qed.
 
 
   (** ** Reduction lemmas *)
@@ -441,8 +645,49 @@ Section Correct.
       set_lists (rev vars) vs rho = Some rho' ->
       preord_exp cenv (eq_fuel_n n) eq_fuel k (e, rho') (C |[ e ]|, rho).
   Proof.
-    (* Same proof as in LambdaBoxLocal_to_LambdaANF_correct.v lines 993-1050 *)
-  Admitted.
+    induction vars; intros C k r n e rho rho' vs vs' ctag Heq Hnin Hctx Hget Hset.
+    - destruct vs. 2:{ simpl in Hset. destruct (rev vs); inv Hset. }
+      simpl in Hset. inv Hset.
+      simpl.
+      intros r0 cin cout Hleq Hbstep.
+      do 3 eexists. split. exact Hbstep.
+      split. unfold eq_fuel_n. lia.
+      eapply preord_res_refl; tci.
+    - destruct n; inv Heq.
+      simpl ctx_bind_proj.
+      change (rev (a :: vars)) with (rev vars ++ [a]) in *.
+      revert vs Hget Hset.
+      intros vs. eapply MCList.rev_ind with (l := vs).
+      + intros Hget Hset. eapply set_lists_length_eq in Hset.
+        rewrite length_app in Hset. simpl in Hset. lia.
+      + intros x l IH Hget Hset.
+        assert (Hlen : Datatypes.length vars = Datatypes.length l).
+        { assert (Htmp := set_lists_length_eq _ _ _ _ Hset).
+          rewrite !length_app in Htmp. simpl in Htmp.
+          rewrite length_rev in Htmp. lia. }
+        assert (Hlen_rev : Datatypes.length (rev vars) = Datatypes.length l).
+        { rewrite length_rev. exact Hlen. }
+        edestruct (@set_lists_app val) as [rho_mid [Hset_tail Hset_head]].
+        eassumption. eassumption.
+        simpl in Hset_tail. inv Hset_tail.
+        eapply preord_exp_post_monotonic.
+        2:{ eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
+            2:{ intros m. eapply preord_exp_Eproj_red. eassumption.
+                eapply nthN_is_Some_app.
+                rewrite Hlen. rewrite nthN_app_geq. simpl.
+                replace (N.of_nat (Datatypes.length l - 0) - N.of_nat (Datatypes.length l))%N with 0%N by lia.
+                reflexivity.
+                lia. }
+            repeat normalize_sets.
+            eapply IHvars with (vs := l). reflexivity. eauto.
+            rewrite Nat.sub_0_r. reflexivity.
+            rewrite M.gso; eauto.
+            rewrite app_assoc. eassumption.
+            now intros Hc; subst; eauto. eassumption. }
+        { unfold comp, eq_fuel_n, eq_fuel. intro; intros. destructAll.
+          repeat match goal with [ X : _ * _ |- _ ] => destruct X end.
+          unfold one_step in *. lia. }
+  Qed.
 
   (** ** Subset lemma for ANF relation *)
 
@@ -729,8 +974,7 @@ Section Correct.
       assert (Hjge' : (Datatypes.length vs1 <= j)%nat) by lia.
       rewrite (nth_error_app2 vs1 vs2 Hige').
       rewrite (nth_error_app2 vs1 vs2 Hjge').
-      replace (i - Datatypes.length vs1) with (i - Datatypes.length vn1) by lia.
-      replace (j - Datatypes.length vs1) with (j - Datatypes.length vn1) by lia.
+      rewrite <- Hlen.
       exact (Hc2 _ _ _ Hi Hj).
   Qed.
 
@@ -1299,11 +1543,26 @@ Section Correct.
      The key difference: anf_fix_rel carries explicit disjointness and subset witnesses
      at each step. These follow from the efnlst subset property. *)
   Lemma anf_cvt_rel_efnlst_to_fix_rel fnames_all names0 :
-    forall efns S fnames tgm S' fdefs,
-      anf_cvt_rel_efnlst S efns (List.rev fnames_all ++ names0) fnames tgm S' fdefs ->
+    forall efns S fnames S' fdefs,
+      anf_cvt_rel_efnlst S efns (List.rev fnames_all ++ names0) fnames cnstrs S' fdefs ->
       Disjoint _ S (FromList fnames_all :|: FromList names0) ->
       anf_fix_rel fnames_all names0 S fnames efns fdefs S'.
-  Proof. Admitted.
+  Proof.
+    intros efns. induction efns; intros S fnames S' fdefs Hcvt Hdis.
+    - inv Hcvt. constructor.
+    - inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_efnlst in *.
+      econstructor.
+      + exact Hdis.
+      + eassumption. (* x1 ∈ S *)
+      + apply Included_refl.
+      + apply Included_refl.
+      + eassumption. (* anf_cvt_rel *)
+      + eapply IHefns; [ eassumption | ].
+        eapply Disjoint_Included_l; [ | exact Hdis ].
+        eapply Included_trans.
+        * eapply anf_cvt_exp_subset. eassumption.
+        * eapply Setminus_Included.
+  Qed.
 
   (* Generalized consistency: two positions with the same key have R-related values. *)
   Definition list_consistent {A : Type} (R : A -> A -> Prop)
@@ -1567,33 +1826,6 @@ Section Correct.
 
   (** ** Consistency lemmas for duplicate ANF variables *)
 
-  (* Pointwise access to Forall2 via nth_error. *)
-  Lemma Forall2_nth_error_l {A B} (R : A -> B -> Prop) l1 l2 k a :
-    Forall2 R l1 l2 ->
-    nth_error l1 k = Some a ->
-    exists b, nth_error l2 k = Some b /\ R a b.
-  Proof.
-    intros HF2 Hk. revert k Hk.
-    induction HF2 as [ | a' b' l1' l2' Hab HF2' IH]; intros k Hk.
-    - destruct k; simpl in Hk; discriminate.
-    - destruct k as [ | k']; simpl in Hk.
-      + inv Hk. exists b'. split; [ reflexivity | exact Hab ].
-      + exact (IH k' Hk).
-  Qed.
-
-  Lemma Forall2_nth_error_r {A B} (R : A -> B -> Prop) l1 l2 k b :
-    Forall2 R l1 l2 ->
-    nth_error l2 k = Some b ->
-    exists a, nth_error l1 k = Some a /\ R a b.
-  Proof.
-    intros HF2 Hk. revert k Hk.
-    induction HF2 as [ | a' b' l1' l2' Hab HF2' IH]; intros k Hk.
-    - destruct k; simpl in Hk; discriminate.
-    - destruct k as [ | k']; simpl in Hk.
-      + inv Hk. exists a'. split; [ reflexivity | exact Hab ].
-      + exact (IH k' Hk).
-  Qed.
-
   (* Every element of xs is either in FromList vn or in the input set S. *)
   Lemma anf_cvt_rel_exps_In_range :
     forall xs S es vn tgm S' C,
@@ -1812,20 +2044,6 @@ Section Correct.
              ++ exfalso. subst. apply H6. eapply nth_error_In. exact Hnth.
              ++ exact Hfind'.
           -- exact Hcvt'.
-  Qed.
-
-  Lemma anf_fix_rel_fnames_length fnames names S1 fnames_list efns Bs S2 :
-    anf_fix_rel fnames names S1 fnames_list efns Bs S2 ->
-    List.length fnames_list = efnlength efns.
-  Proof.
-    intros Hrel. induction Hrel; simpl; congruence.
-  Qed.
-
-  Lemma anf_fix_rel_names fnames names S1 fnames_list efns Bs S2 :
-    anf_fix_rel fnames names S1 fnames_list efns Bs S2 ->
-    all_fun_name Bs = fnames_list.
-  Proof.
-    intros H. induction H; simpl; congruence.
   Qed.
 
   (* Extended version of anf_fix_rel_find_def that also provides the
@@ -2148,24 +2366,6 @@ Section Correct.
       + apply IH.
         * simpl in Hlen; lia.
         * intros k a' b' Ha' Hb'. exact (Hpw (S k) a' b' Ha' Hb').
-  Qed.
-
-  (* Helper: relate get_list output to individual M.get lookups via nth_error *)
-  Lemma get_list_nth_error (xs : list var) (vs : list val) (rho : M.t val)
-        (k : nat) (x : var) :
-    get_list xs rho = Some vs ->
-    nth_error xs k = Some x ->
-    nth_error vs k = M.get x rho.
-  Proof.
-    revert vs k. induction xs as [ | a xs' IH]; intros vs k Hgl Hnth.
-    - destruct k; simpl in Hnth; discriminate.
-    - simpl in Hgl.
-      destruct (M.get a rho) eqn:Ha; [ | discriminate ].
-      destruct (get_list xs' rho) eqn:Hrest; [ | discriminate ].
-      inv Hgl.
-      destruct k as [ | k'].
-      + simpl in Hnth. inv Hnth. simpl. symmetry. exact Ha.
-      + simpl in Hnth. simpl. exact (IH l k' eq_refl Hnth).
   Qed.
 
   Lemma get_list_set_many_consistent (R : val -> val -> Prop) xs vs (rho : M.t val) :

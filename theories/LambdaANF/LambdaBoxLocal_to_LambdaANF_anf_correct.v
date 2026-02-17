@@ -708,6 +708,53 @@ Section Correct.
     Disjoint _ (occurs_free (C2 |[ e_k ]|)) ((S \\ S2) \\ [set x1]).
   Proof. Admitted.
 
+  (* In the Match_e case, occurs_free of Eletapp is disjoint from ((S\{f}\{y})\S2)\{x1} for IH1. *)
+  Lemma anf_cvt_disjoint_eletapp_match S f y e1 vn tgm S2 C1 x1
+        brs S3 pats x e_k :
+    f \in S ->
+    y \in S \\ [set f] ->
+    anf_cvt_rel (S \\ [set f] \\ [set y]) e1 vn tgm S2 C1 x1 ->
+    anf_cvt_rel_branches S2 brs vn y tgm S3 pats ->
+    x \in S3 ->
+    Disjoint _ (occurs_free e_k) ((S \\ (S3 \\ [set x])) \\ [set x]) ->
+    Disjoint _ (occurs_free (Eletapp x f func_tag [x1] e_k))
+               (((S \\ [set f] \\ [set y]) \\ S2) \\ [set x1]).
+  Proof. Admitted.
+
+  (* In the eval_many_econs case, occurs_free of C2|[e_k]| is disjoint from (S\S2)\{x1} for IH_e. *)
+  Lemma anf_cvt_disjoint_occurs_free_ctx_exps S e1 vn tgm S2 C1 x1
+        es S' C2 xs e_k :
+    anf_cvt_rel S e1 vn tgm S2 C1 x1 ->
+    anf_cvt_rel_exps S2 es vn tgm S' C2 xs ->
+    Disjoint _ (FromList vn) S ->
+    Disjoint _ (occurs_free e_k) ((S \\ S') \\ FromList (x1 :: xs)) ->
+    Disjoint _ (occurs_free (C2 |[ e_k ]|)) ((S \\ S2) \\ [set x1]).
+  Proof. Admitted.
+
+  (* In the App_e case, occurs_free of C2|[Eletapp ...]| is disjoint from (S\S2)\{x1} for IH1. *)
+  Lemma anf_cvt_disjoint_occurs_free_ctx_app S e1 vn tgm S2 C1 x1
+        e2 S3 C2 x2 r e_k :
+    anf_cvt_rel S e1 vn tgm S2 C1 x1 ->
+    anf_cvt_rel S2 e2 vn tgm S3 C2 x2 ->
+    r \in S3 ->
+    Disjoint _ (FromList vn) S ->
+    Disjoint _ (occurs_free e_k) ((S \\ (S3 \\ [set r])) \\ [set r]) ->
+    Disjoint _ (occurs_free (C2 |[ Eletapp r x1 func_tag [x2] e_k ]|))
+               ((S \\ S2) \\ [set x1]).
+  Proof. Admitted.
+
+  (* In the App_e case, occurs_free of the Eletapp continuation is disjoint from (S2\S3)\{x2}. *)
+  Lemma anf_cvt_disjoint_eletapp S e1 vn tgm S2 C1 x1
+        e2 S3 C2 x2 r e_k :
+    anf_cvt_rel S e1 vn tgm S2 C1 x1 ->
+    anf_cvt_rel S2 e2 vn tgm S3 C2 x2 ->
+    r \in S3 ->
+    Disjoint _ (FromList vn) S ->
+    Disjoint _ (occurs_free e_k) ((S \\ (S3 \\ [set r])) \\ [set r]) ->
+    Disjoint _ (occurs_free (Eletapp r x1 func_tag [x2] e_k))
+               ((S2 \\ S3) \\ [set x2]).
+  Proof. Admitted.
+
   (* Generalized consistency: two positions with the same key have R-related values. *)
   Definition list_consistent {A : Type} (R : A -> A -> Prop)
              (keys : list var) (vals : list A) : Prop :=
@@ -1894,7 +1941,9 @@ Section Correct.
             (* IH1: C1 layer *)
             2:{ intros m.
                 assert (Hdis_C2ek : Disjoint _ (occurs_free (C2 |[ Eletapp x x1 func_tag [x2] e_k ]|))
-                                               ((S \\ S2) \\ [set x1])) by admit.
+                                               ((S \\ S2) \\ [set x1])).
+                { eapply anf_cvt_disjoint_occurs_free_ctx_app;
+                    [ exact Hcvt_e1 | exact Hcvt_e2 | exact Hr_in | exact Hdis | exact Hdis_ek ]. }
                 edestruct IH1 as [IH1_val _].
                 - eassumption.
                 - inversion Hwfe; subst; eassumption. (* exp_wf *)
@@ -1908,9 +1957,25 @@ Section Correct.
             tci. eapply eq_fuel_idemp.
             (* IH2: C2 layer, in env with x1 bound *)
             2:{ intros m.
-                assert (Henv_x1 : anf_env_rel vnames rho0 (M.set x1 clos_v' rho)) by admit.
+                assert (Hnd_x1 : env_consistent (x1 :: vnames) (Clos_v rho_clos na0 e_body :: rho0)).
+                { eapply env_consistent_extend_from_cvt;
+                    [ exact Hnd | exact Hcvt_e1 | exact Hdis | exact Heval1 ]. }
+                assert (Henv_x1 : anf_env_rel vnames rho0 (M.set x1 clos_v' rho)).
+                { eapply anf_env_rel_set; [ exact Henv | ].
+                  intros k Hk.
+                  destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt_e1) as [Hin_vn | Hin_S].
+                  - exists (Clos_v rho_clos na0 e_body). split.
+                    + assert (Hnd_inst := Hnd_x1 0%nat (Datatypes.S k) x1 eq_refl Hk).
+                      simpl in Hnd_inst. symmetry. exact Hnd_inst.
+                    + exact Hrel_clos.
+                  - exfalso. destruct Hdis as [Hdis''].
+                    apply (Hdis'' x1). constructor.
+                    + eapply nth_error_In. exact Hk.
+                    + exact Hin_S. }
                 assert (Hdis_letapp : Disjoint _ (occurs_free (Eletapp x x1 func_tag [x2] e_k))
-                                                 ((S2 \\ S3) \\ [set x2])) by admit.
+                                                 ((S2 \\ S3) \\ [set x2])).
+                { eapply anf_cvt_disjoint_eletapp;
+                    [ exact Hcvt_e1 | exact Hcvt_e2 | exact Hr_in | exact Hdis | exact Hdis_ek ]. }
                 edestruct IH2 as [IH2_val _].
                 - eassumption.
                 - inversion Hwfe; subst; eassumption. (* exp_wf *)
@@ -1944,7 +2009,14 @@ Section Correct.
             set (defs_cc := Fcons f_cc func_tag [x_pc] (C_bc |[ Ehalt r_bc ]|) Fnil) in *.
             set (rho_bc := M.set x_pc v2' (def_funs defs_cc defs_cc rho_fc rho_fc)).
             (* Get body evaluation from IH3 *)
-            assert (Henv_bc : anf_env_rel (x_pc :: names_fc) (v2 :: rho_clos) rho_bc) by admit.
+            assert (Henv_bc : anf_env_rel (x_pc :: names_fc) (v2 :: rho_clos) rho_bc).
+            { constructor.
+              - exists v2'. split. unfold rho_bc. rewrite M.gss. reflexivity. exact Hrel_v2.
+              - unfold rho_bc. apply anf_env_rel_weaken.
+                + apply anf_env_rel_weaken.
+                  * exact Henv_fc.
+                  * exact Hfcc_nin.
+                + intro Hc. apply Hxpc_nin. now right. }
             (* Apply IH3 to get body correctness *)
             assert (IH3_full :
               (forall v0 v'0, Val v = Val v0 -> anf_val_rel v0 v'0 ->
@@ -2269,7 +2341,9 @@ Section Correct.
             (* IH1: C1 layer *)
             2:{ intros m.
                 assert (Hdis_C2ek : Disjoint _ (occurs_free (C2 |[ Eletapp x x1 func_tag [x2] e_k ]|))
-                                               ((S \\ S2) \\ [set x1])) by admit.
+                                               ((S \\ S2) \\ [set x1])).
+                { eapply anf_cvt_disjoint_occurs_free_ctx_app;
+                    [ exact Hcvt_e1 | exact Hcvt_e2 | exact Hr_in | exact Hdis | exact Hdis_ek ]. }
                 edestruct IH1 as [IH1_val _].
                 - eassumption.
                 - inversion Hwfe; subst; eassumption.
@@ -2283,9 +2357,25 @@ Section Correct.
             tci. eapply eq_fuel_idemp.
             (* IH2: C2 layer *)
             2:{ intros m.
-                assert (Henv_x1 : anf_env_rel vnames rho0 (M.set x1 fix_v' rho)) by admit.
+                assert (Hnd_x1 : env_consistent (x1 :: vnames) (ClosFix_v rho_fix fnlst0 n0 :: rho0)).
+                { eapply env_consistent_extend_from_cvt;
+                    [ exact Hnd | exact Hcvt_e1 | exact Hdis | exact Heval1 ]. }
+                assert (Henv_x1 : anf_env_rel vnames rho0 (M.set x1 fix_v' rho)).
+                { eapply anf_env_rel_set; [ exact Henv | ].
+                  intros k Hk.
+                  destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt_e1) as [Hin_vn | Hin_S].
+                  - exists (ClosFix_v rho_fix fnlst0 n0). split.
+                    + assert (Hnd_inst := Hnd_x1 0%nat (Datatypes.S k) x1 eq_refl Hk).
+                      simpl in Hnd_inst. symmetry. exact Hnd_inst.
+                    + exact Hrel_fix.
+                  - exfalso. destruct Hdis as [Hdis''].
+                    apply (Hdis'' x1). constructor.
+                    + eapply nth_error_In. exact Hk.
+                    + exact Hin_S. }
                 assert (Hdis_letapp : Disjoint _ (occurs_free (Eletapp x x1 func_tag [x2] e_k))
-                                                 ((S2 \\ S3) \\ [set x2])) by admit.
+                                                 ((S2 \\ S3) \\ [set x2])).
+                { eapply anf_cvt_disjoint_eletapp;
+                    [ exact Hcvt_e1 | exact Hcvt_e2 | exact Hr_in | exact Hdis | exact Hdis_ek ]. }
                 edestruct IH2 as [IH2_val _].
                 - eassumption.
                 - inversion Hwfe; subst; eassumption.
@@ -2486,7 +2576,9 @@ Section Correct.
         (* Assert projection bindings succeed *)
         assert (Hset_proj : exists rho_proj,
           set_lists (rev vars) vs_anf rho_match = Some rho_proj).
-        { admit. (* follows from |rev vars| = |vs_anf| via Hvars_len + Forall2 length *) }
+        { eapply set_lists_length3. rewrite rev_length.
+          rewrite Hvars_len. rewrite Nnat.Nat2N.id.
+          eapply Forall2_length. exact Hvs_rel. }
         destruct Hset_proj as [rho_proj Hset_proj].
         (* Main proof: compose three reduction steps *)
         eapply preord_exp_post_monotonic with
@@ -2501,8 +2593,13 @@ Section Correct.
             2:{ intros m.
                 assert (Hdis_ek_IH : Disjoint _
                   (occurs_free (Eletapp x f func_tag [x1] e_k))
-                  (((S \\ [set f] \\ [set y]) \\ S2) \\ [set x1])) by admit.
-                assert (Henv_efun : anf_env_rel vnames rho0 rho_efun) by admit.
+                  (((S \\ [set f] \\ [set y]) \\ S2) \\ [set x1])).
+                { eapply anf_cvt_disjoint_eletapp_match; eassumption. }
+                assert (Henv_efun : anf_env_rel vnames rho0 rho_efun).
+                { unfold rho_efun. simpl def_funs.
+                  apply anf_env_rel_weaken; [ exact Henv | ].
+                  intro Hc. destruct Hdis as [Hdis''].
+                  eapply (Hdis'' f). constructor; eauto. }
                 assert (Hdis_efun : Disjoint _ (FromList vnames) (S \\ [set f] \\ [set y])).
                 { eapply Disjoint_Included_r.
                   eapply Included_trans; eapply Setminus_Included.
@@ -2676,10 +2773,26 @@ Section Correct.
           eapply preord_exp_trans. tci. eapply eq_fuel_idemp.
           (* Right step: IH_es with env M.set x1 v1' rho *)
           2:{ intros m.
-              eapply IH_es; [ exact Hwf | exact Hnd | | | eassumption | eassumption | admit ].
-              - eapply Disjoint_Included_r; [eapply (proj1 anf_cvt_rel_subset); eassumption | exact Hdis].
-              - (* anf_env_rel vnames vs_env (M.set x1 v1' rho) *)
-                eapply anf_env_rel_set; [exact Henv | intros k Hnth_k; admit]. }
+              match goal with
+              | [ Hcvt_e0 : anf_cvt_rel S e0 vnames _ _ _ ?x1_v,
+                  Hrel_v0 : anf_val_rel v0 ?v1'_v |- _ ] =>
+                assert (Hnd_ext : env_consistent (x1_v :: vnames) (v0 :: vs_env))
+                  by (eapply env_consistent_extend_from_cvt;
+                      [ exact Hnd | exact Hcvt_e0 | exact Hdis | exact Heval_e ]);
+                eapply IH_es; [ exact Hwf | exact Hnd | | | eassumption | eassumption | admit ];
+                [ eapply Disjoint_Included_r;
+                    [eapply (proj1 anf_cvt_rel_subset); exact Hcvt_e0 | exact Hdis]
+                | eapply anf_env_rel_set; [ exact Henv | ];
+                  intros k Hnth_k;
+                  destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt_e0) as [Hin_vn | Hin_S];
+                  [ exists v0; split;
+                    [ assert (Hnd_inst := Hnd_ext 0%nat (Datatypes.S k) x1_v eq_refl Hnth_k);
+                      simpl in Hnd_inst; symmetry; exact Hnd_inst
+                    | exact Hrel_v0 ]
+                  | exfalso; destruct Hdis as [Hdis''];
+                    apply (Hdis'' x1_v); constructor;
+                    [ eapply nth_error_In; exact Hnth_k | exact Hin_S ] ] ]
+              end. }
           (* Leftmost: env bridge —
              M.set x1 v1' (set_many xs_rest vs_tl' rho) ≈
              set_many xs_rest vs_tl' (M.set x1 v1' rho)

@@ -16,7 +16,7 @@ Require Import LambdaBoxLocal.expression LambdaBoxLocal.fuel_sem.
 Require Import cps cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
         LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util
-        LambdaANF.tactics identifiers bounds cps_util rename.
+        LambdaANF.tactics identifiers bounds cps_util rename stemctx.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
@@ -712,17 +712,190 @@ Section Correct.
     env_consistent (vn1 ++ vn2) (vs1 ++ vs2).
   Proof. Admitted.
 
-  (* Free variables of a context application decompose into free vars
-     of the context and free vars of the body. *)
-  Lemma occurs_free_app_ctx_included c e :
-    Included _ (occurs_free (c |[ e ]|)) (occurs_free_ctx c :|: occurs_free e).
+  (* TODO move to more general file *)
+  Lemma occurs_free_ctx_comp (C1 C2 : exp_ctx) :
+    occurs_free_ctx (comp_ctx_f C1 C2) \subset
+    occurs_free_ctx C1 :|: (occurs_free_ctx C2 \\ bound_stem_ctx C1).
+  Proof.
+    revert C2.
+    eapply ctx_exp_mut with (P := fun C1 =>
+                                    forall C2,
+                                      occurs_free_ctx (comp_ctx_f C1 C2) \subset
+                                                      occurs_free_ctx C1 :|: (occurs_free_ctx C2 \\ bound_stem_ctx C1))
+                            (P0 := fun F =>
+                                     forall C,
+                                       occurs_free_fundefs_ctx (comp_f_ctx_f F C) \subset
+                                                               occurs_free_fundefs_ctx F :|: (occurs_free_ctx C \\ (names_in_fundefs_ctx F :|: bound_stem_fundefs_ctx F))); intros.
+    - simpl. normalize_occurs_free_ctx. normalize_bound_stem_ctx. sets.
+    - simpl. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr. now sets.
+    - simpl. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr. now sets.
+    - simpl. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Union_Included.
+      eapply Included_trans. eapply H. now sets.
+      now sets.
+    - simpl. repeat repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included.
+      eapply Included_trans. eapply H. now sets.
+      rewrite name_in_fundefs_ctx_comp. now sets.
+    - simpl. repeat normalize_occurs_free_ctx.
+      eapply Union_Included; [ | now sets ].
+      eapply Setminus_Included_Included_Union.
+      eapply Included_trans. eapply H.
+      eapply Union_Included.
+      rewrite <- !Union_assoc.
+      rewrite <- Union_Included_Union_Setminus with (s3 := (v |: (FromList l :|: name_in_fundefs f))).
+      now sets. now tci. now sets.
+      normalize_bound_stem_ctx.
+      rewrite (Union_commut (bound_stem_ctx e) (FromList l)).
+      rewrite !Union_assoc.
+      rewrite (Union_commut _ (bound_stem_ctx e)).
+      rewrite <- Setminus_Union with (s2 := bound_stem_ctx e).
+      rewrite <- ! Union_assoc.
+      rewrite <- Union_Included_Union_Setminus with (s3 := (v |: (name_in_fundefs f :|: FromList l))).
+      now sets. now tci. now sets.
+    - simpl. repeat normalize_occurs_free_ctx. repeat normalize_bound_stem_ctx.
+      eapply Union_Included.
+      + rewrite name_in_fundefs_ctx_comp. now sets.
+      + eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+        rewrite !Setminus_Union_distr.
+        eapply Union_Included. now sets. now xsets.
+  Qed.
+
+  Lemma occurs_free_ctx_app (C : exp_ctx)  (e : exp) :
+    occurs_free (C |[ e ]|) \subset
+    occurs_free_ctx C :|: (occurs_free e \\ bound_stem_ctx C).
+  Proof.
+    revert e.
+    eapply ctx_exp_mut with (P := fun C =>
+                                    forall e,
+                                      occurs_free (C |[ e ]|) \subset
+                                      occurs_free_ctx C :|: (occurs_free e \\ bound_stem_ctx C))
+                            (P0 := fun F =>
+                                     forall e,
+                                       occurs_free_fundefs (F <[ e ]>) \subset
+                                        occurs_free_fundefs_ctx F :|: (occurs_free e \\ (names_in_fundefs_ctx F :|: bound_stem_fundefs_ctx F))); intros.
+    - simpl. normalize_occurs_free_ctx. normalize_bound_stem_ctx. sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Union_Included. now sets.
+      eapply Union_Included.
+      + eapply Included_trans. eapply H.
+        eapply Union_Included; now sets.
+      + now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included. now sets.
+      eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+      rewrite Setminus_Union_distr.
+      eapply Union_Included; now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx. repeat normalize_bound_var.
+      eapply Union_Included.
+      + eapply Included_trans. eapply H. now sets.
+      + rewrite <- name_in_fundefs_ctx_ctx at 1. now sets.
+    - simpl. repeat normalize_occurs_free. repeat normalize_occurs_free_ctx.
+      repeat normalize_bound_stem_ctx.
+      eapply Union_Included; [ | now sets ].
+
+      eapply Setminus_Included_Included_Union.
+      eapply Included_trans. eapply H.
+      eapply Union_Included.
+      + rewrite <- !Union_assoc.
+        rewrite <- Union_Included_Union_Setminus with (s3 := (v |: (FromList l :|: name_in_fundefs f))).
+        now sets. now tci. now sets.
+      + rewrite (Union_commut (bound_stem_ctx e) (FromList l)).
+        rewrite !Union_assoc.
+        rewrite (Union_commut _ (bound_stem_ctx e)).
+        rewrite <- Setminus_Union with (s2 := bound_stem_ctx e).
+        rewrite <- ! Union_assoc.
+        rewrite <- Union_Included_Union_Setminus with (s3 := (v |: (name_in_fundefs f :|: FromList l))).
+        now sets. now tci. now sets.
+    - simpl. repeat normalize_occurs_free_ctx. repeat normalize_bound_stem_ctx.
+      repeat normalize_occurs_free.
+      eapply Union_Included.
+      + rewrite <- name_in_fundefs_ctx_ctx. now sets.
+      + eapply Included_trans. eapply Included_Setminus_compat. eapply H. reflexivity.
+        rewrite !Setminus_Union_distr.
+        eapply Union_Included. now sets. now xsets.
+  Qed.
+
+  (* Free variables of an ANF conversion context come from variable names
+     or consumed state variables. Provable by mutual induction on anf_cvt_rel,
+     using occurs_free_ctx_app and occurs_free_ctx_comp. *)
+  Lemma anf_cvt_occurs_free_ctx_subset S e vn tgm S' C x :
+    anf_cvt_rel S e vn tgm S' C x ->
+    Disjoint _ (FromList vn) S ->
+    occurs_free_ctx C \subset FromList vn :|: (S \\ S').
   Proof. Admitted.
 
-  (* Free variables of a conversion context come from the variable name list.
-     All intermediate results are bound within the context. *)
-  Lemma anf_cvt_occurs_free_ctx S e vn tgm S' C x :
-    anf_cvt_rel S e vn tgm S' C x ->
-    occurs_free_ctx C \subset FromList vn.
+  Lemma anf_cvt_occurs_free_ctx_subset_exps S es vn tgm S' C xs :
+    anf_cvt_rel_exps S es vn tgm S' C xs ->
+    Disjoint _ (FromList vn) S ->
+    occurs_free_ctx C \subset FromList vn :|: (S \\ S').
   Proof. Admitted.
 
   (* In the Let_e case, the free variables of C2|[e_k]| are disjoint
@@ -738,7 +911,39 @@ Section Correct.
     Disjoint _ (FromList vn) S ->
     Disjoint _ (occurs_free e_k) ((S \\ S') \\ [set x2]) ->
     Disjoint _ (occurs_free (C2 |[ e_k ]|)) ((S \\ S2) \\ [set x1]).
-  Proof. Admitted.
+  Proof.
+    intros Hcvt1 Hcvt2 Hdis_vn Hdis_ek.
+    pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt1) as HS2_S.
+    pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt2) as HS'_S2.
+    pose proof (anf_cvt_result_not_in_output _ _ _ _ _ _ _ Hcvt1 Hdis_vn) as Hx1_not_S2.
+    pose proof (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt2) as Hx2_consumed.
+    assert (Hdis_x1vn_S2 : Disjoint _ (FromList (x1 :: vn)) S2).
+    { constructor. intros z Hz. inv Hz. simpl in H. destruct H as [Heq | Hin].
+      - subst. exact (Hx1_not_S2 H0).
+      - eapply Hdis_vn. constructor. exact Hin. eapply HS2_S. exact H0. }
+    pose proof (anf_cvt_occurs_free_ctx_subset _ _ _ _ _ _ _ Hcvt2 Hdis_x1vn_S2) as Hctx.
+    constructor. intros z Hz. inv Hz.
+    pose proof (occurs_free_ctx_app C2 e_k _ H) as Hz_decomp.
+    inv H0. inv H1.
+    destruct Hz_decomp as [Hz_ctx | Hz_ek_bs].
+    - destruct (Hctx _ Hz_ctx) as [Hz_x1vn | Hz_S2S'].
+      + simpl in Hz_x1vn. destruct Hz_x1vn as [Heq | Hin].
+        * subst. apply H0. constructor.
+        * eapply Hdis_vn. constructor. exact Hin. exact H2.
+      + inv Hz_S2S'. exact (H3 H1).
+    - inv Hz_ek_bs.
+      assert (Hz_not_x2 : z <> x2).
+      { intro Heq. subst. destruct Hx2_consumed as [Hx2_vn | Hx2_S2].
+        - simpl in Hx2_vn. destruct Hx2_vn as [Heq | Hin].
+          + subst. apply H0. constructor.
+          + eapply Hdis_vn. constructor. exact Hin. exact H2.
+        - exact (H3 Hx2_S2). }
+      eapply Hdis_ek. constructor.
+      + exact H1.
+      + constructor.
+        * constructor. exact H2. intro. apply H3. eapply HS'_S2. assumption.
+        * intro Hz_x2. inv Hz_x2. exact (Hz_not_x2 eq_refl).
+  Qed.
 
   (* In the Match_e case, occurs_free of Eletapp is disjoint from ((S\{f}\{y})\S2)\{x1} for IH1. *)
   Lemma anf_cvt_disjoint_eletapp_match S f y e1 vn tgm S2 C1 x1
@@ -751,16 +956,54 @@ Section Correct.
     Disjoint _ (occurs_free e_k) ((S \\ (S3 \\ [set x])) \\ [set x]) ->
     Disjoint _ (occurs_free (Eletapp x f func_tag [x1] e_k))
                (((S \\ [set f] \\ [set y]) \\ S2) \\ [set x1]).
-  Proof. Admitted.
+  Proof.
+    intros Hf Hy Hcvt1 Hcvt_brs Hx Hdis_ek.
+    pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt1) as HS2_Sfy.
+    pose proof (proj1 (proj2 (proj2 anf_cvt_rel_subset)) _ _ _ _ _ _ _ Hcvt_brs) as HS3_S2.
+    constructor. intros z Hz. inv Hz.
+    apply (proj1 (occurs_free_Eletapp _ _ _ _ _)) in H.
+    inv H0. inv H1.
+    (* H2 : z ∈ S\\{f}\\{y}, H3 : ~z ∈ S2, H0 : ~z ∈ {x1} *)
+    destruct H as [Hz_left | Hz_right].
+    - (* z ∈ f |: FromList [x1] *)
+      destruct Hz_left as [Hz_f | Hz_x1].
+      + (* z = f *) inv Hz_f. inv H2. inv H. apply H0. constructor.
+      + (* z ∈ FromList [x1] = {x1} *)
+        simpl in Hz_x1. destruct Hz_x1 as [Heq | []]. subst.
+        apply H0. constructor.
+    - (* z ∈ occurs_free e_k \\ {x} *)
+      inv Hz_right.
+      (* H : z ∈ occurs_free e_k, H1 : ~ z ∈ {x} *)
+      inv H2. inv H4.
+      (* H2 : z ∈ S, H4 : ~ z ∈ {f}, H5 : ~ z ∈ {y} *)
+      eapply Hdis_ek. constructor.
+      + exact H.
+      + constructor.
+        * constructor. exact H2.
+          intro Hz_S3x. inv Hz_S3x. exact (H3 (HS3_S2 _ H4)).
+        * exact H1.
+  Qed.
 
   (* In the eval_many_econs case, occurs_free e_k is disjoint from (S2\S')\FromList xs for IH_es. *)
   Lemma anf_cvt_disjoint_exps_continuation S e1 vn tgm S2 C1 x1
         es S' C2 xs e_k :
     anf_cvt_rel S e1 vn tgm S2 C1 x1 ->
     anf_cvt_rel_exps S2 es vn tgm S' C2 xs ->
+    Disjoint _ (FromList vn) S ->
     Disjoint _ (occurs_free e_k) ((S \\ S') \\ FromList (x1 :: xs)) ->
     Disjoint _ (occurs_free e_k) ((S2 \\ S') \\ FromList xs).
-  Proof. Admitted.
+  Proof.
+    intros Hcvt1 Hcvt_exps Hdis_vn Hdis_ek.
+    pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt1) as HS2_S.
+    pose proof (anf_cvt_result_not_in_output _ _ _ _ _ _ _ Hcvt1 Hdis_vn) as Hx1_not_S2.
+    eapply Disjoint_Included_r; [ | exact Hdis_ek ].
+    intros z Hz. inv Hz. inv H.
+    constructor.
+    - constructor. eapply HS2_S. exact H1. exact H2.
+    - intro Hz_x1xs. simpl in Hz_x1xs. destruct Hz_x1xs as [Heq | Hin].
+      + subst. exact (Hx1_not_S2 H1).
+      + exact (H0 Hin).
+  Qed.
 
   (* In the eval_many_econs case, occurs_free of C2|[e_k]| is disjoint from (S\S2)\{x1} for IH_e. *)
   Lemma anf_cvt_disjoint_occurs_free_ctx_exps S e1 vn tgm S2 C1 x1
@@ -770,7 +1013,36 @@ Section Correct.
     Disjoint _ (FromList vn) S ->
     Disjoint _ (occurs_free e_k) ((S \\ S') \\ FromList (x1 :: xs)) ->
     Disjoint _ (occurs_free (C2 |[ e_k ]|)) ((S \\ S2) \\ [set x1]).
-  Proof. Admitted.
+  Proof.
+    intros Hcvt1 Hcvt_exps Hdis_vn Hdis_ek.
+    pose proof (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt1) as HS2_S.
+    pose proof (proj1 (proj2 anf_cvt_rel_subset) _ _ _ _ _ _ _ Hcvt_exps) as HS'_S2.
+    pose proof (anf_cvt_result_not_in_output _ _ _ _ _ _ _ Hcvt1 Hdis_vn) as Hx1_not_S2.
+    assert (Hdis_vn_S2 : Disjoint _ (FromList vn) S2).
+    { eapply Disjoint_Included_r; [ exact HS2_S | exact Hdis_vn ]. }
+    pose proof (anf_cvt_occurs_free_ctx_subset_exps _ _ _ _ _ _ _ Hcvt_exps Hdis_vn_S2) as Hctx.
+    constructor. intros z Hz. inv Hz.
+    pose proof (occurs_free_ctx_app C2 e_k _ H) as Hz_decomp.
+    inv H0. inv H1.
+    (* H2 : z ∈ S, H3 : ~ z ∈ S2, H0 : ~ z ∈ {x1} *)
+    destruct Hz_decomp as [Hz_ctx | Hz_ek_bs].
+    - (* z ∈ occurs_free_ctx C2 *)
+      destruct (Hctx _ Hz_ctx) as [Hz_vn | Hz_S2S'].
+      + eapply Hdis_vn. constructor. exact Hz_vn. exact H2.
+      + inv Hz_S2S'. exact (H3 H1).
+    - (* z ∈ occurs_free e_k \ bound_stem_ctx C2 *)
+      inv Hz_ek_bs.
+      assert (Hz_not_S' : ~ z \in S') by (intro; apply H3; eapply HS'_S2; assumption).
+      assert (Hz_not_x1xs : ~ FromList (x1 :: xs) z).
+      { intro Hz_bad. simpl in Hz_bad. destruct Hz_bad as [Heq | Hin].
+        - subst. apply H0. constructor.
+        - destruct (anf_cvt_rel_exps_results_in_consumed _ _ _ _ _ _ _ Hcvt_exps _ Hin) as [Hxvn | HxS2].
+          + eapply Hdis_vn. constructor. exact Hxvn. exact H2.
+          + exact (H3 HxS2). }
+      exfalso. eapply Hdis_ek; constructor;
+        [ exact H1
+        | constructor; [constructor; assumption | exact Hz_not_x1xs] ].
+  Qed.
 
   (* In the App_e case, occurs_free of C2|[Eletapp ...]| is disjoint from (S\S2)\{x1} for IH1. *)
   Lemma anf_cvt_disjoint_occurs_free_ctx_app S e1 vn tgm S2 C1 x1
@@ -1149,6 +1421,20 @@ Section Correct.
     - (* brcons *) intros; exact I.
   Qed.
 
+
+  (* All result variables of an exps conversion are in FromList vn or in the starting state S. *)
+  Lemma anf_cvt_rel_exps_results_in_consumed S es vn tgm S' C xs :
+    anf_cvt_rel_exps S es vn tgm S' C xs ->
+    forall x, List.In x xs -> (x \in FromList vn \/ x \in S).
+  Proof.
+    intros H. induction H.
+    - intros x Hin. destruct Hin.
+    - intros y Hin. destruct Hin as [Heq | Hin].
+      + subst. eapply anf_cvt_result_in_consumed. eassumption.
+      + destruct (IHanf_cvt_rel_exps _ Hin) as [Hl | Hr].
+        * left. exact Hl.
+        * right. eapply (anf_cvt_exp_subset _ _ _ _ _ _ _ H). exact Hr.
+  Qed.
 
   (** ** Consistency lemmas for duplicate ANF variables *)
 
@@ -3654,6 +3940,6 @@ Section Correct.
     - (* 17. eval_step: wraps eval_env_step into eval_env_fuel *)
       now eauto.
 
-  Admitted.
+  Qed.
 
 End Correct.

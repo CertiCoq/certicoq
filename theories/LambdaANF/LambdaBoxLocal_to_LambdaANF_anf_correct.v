@@ -908,26 +908,6 @@ Section Correct.
   Proof. Admitted.
 
 
-  (** ** Consistency lemmas for duplicate ANF variables *)
-
-  (* Lemma 1: ANF-converted expression list variables are consistent w.r.t. preord_val.
-     Duplicate xs positions map to the same source variable (by anf_cvt_rel_exps_var_lookup),
-     so their target values are both anf_val_rel to the same source value,
-     hence preord_val by alpha-equiv. *)
-  Lemma anf_cvt_exps_consistent k rho_src es vs_src f t
-        S vn tgm S' C xs vs_tgt :
-    @eval_fuel_many _ LambdaBoxLocal_resource_fuel LambdaBoxLocal_resource_trace
-                    rho_src es vs_src f t ->
-    anf_cvt_rel_exps S es vn tgm S' C xs ->
-    Disjoint _ (FromList vn) S ->
-    env_consistent vn rho_src ->
-    Forall2 anf_val_rel vs_src vs_tgt ->
-    list_consistent (preord_val cenv eq_fuel k) xs vs_tgt.
-  Proof.
-    intros Hmany Hcvt Hdis Hcons HF2 i j x vi vj Hxi Hxj Hvi Hvj.
-    admit.
-  Admitted.
-
 
   (* Every well-formed source value has a related target value. *)
   Lemma anf_val_rel_exists :
@@ -1032,6 +1012,127 @@ Section Correct.
   Qed.
 
 
+  (** ** Consistency lemmas for duplicate ANF variables *)
+
+  (* Pointwise access to Forall2 via nth_error. *)
+  Lemma Forall2_nth_error_l {A B} (R : A -> B -> Prop) l1 l2 k a :
+    Forall2 R l1 l2 ->
+    nth_error l1 k = Some a ->
+    exists b, nth_error l2 k = Some b /\ R a b.
+  Proof.
+    intros HF2 Hk. revert k Hk.
+    induction HF2 as [ | a' b' l1' l2' Hab HF2' IH]; intros k Hk.
+    - destruct k; simpl in Hk; discriminate.
+    - destruct k as [ | k']; simpl in Hk.
+      + inv Hk. exists b'. split; [ reflexivity | exact Hab ].
+      + exact (IH k' Hk).
+  Qed.
+
+  (* Every element of xs is either in FromList vn or in the input set S. *)
+  Lemma anf_cvt_rel_exps_In_range :
+    forall xs S es vn tgm S' C,
+      anf_cvt_rel_exps S es vn tgm S' C xs ->
+      forall x, List.In x xs -> x \in FromList vn \/ x \in S.
+  Proof.
+    induction xs as [ | x1 xs' IH]; intros S es vn tgm S' C Hcvt x Hin.
+    - inv Hin.
+    - inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_exps in *.
+      destruct Hin as [Heq | Hin].
+      + subst. eapply anf_cvt_result_in_consumed. eassumption.
+      + match goal with
+        | [ Hcvt1 : anf_cvt_rel S _ _ _ ?S2 _ _,
+            Hcvt_rest : anf_cvt_rel_exps ?S2 _ _ _ _ _ xs' |- _ ] =>
+          destruct (IH _ _ _ _ _ _ Hcvt_rest x Hin) as [Hvn | HS2];
+          [ left; exact Hvn
+          | right; eapply (anf_cvt_exp_subset _ _ _ _ _ _ _ Hcvt1); exact HS2 ]
+        end.
+  Qed.
+
+  (* Fresh variables (not in vn) appear at most once in xs. *)
+  Lemma anf_cvt_rel_exps_unique_fresh :
+    forall xs S es vn tgm S' C,
+      anf_cvt_rel_exps S es vn tgm S' C xs ->
+      Disjoint _ (FromList vn) S ->
+      forall i j x,
+        nth_error xs i = Some x -> nth_error xs j = Some x ->
+        ~ x \in FromList vn ->
+        i = j.
+  Proof.
+    induction xs as [ | x1 xs' IH]; intros S es vn tgm S' C Hcvt Hdis i j x Hxi Hxj Hx_not_vn.
+    - destruct i; simpl in Hxi; discriminate.
+    - inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_exps in *.
+      destruct i as [ | i'], j as [ | j']; simpl in Hxi, Hxj.
+      + reflexivity.
+      + exfalso. inv Hxi.
+        match goal with
+        | [ Hcvt1 : anf_cvt_rel S _ _ _ ?S2 _ x,
+            Hcvt_rest : anf_cvt_rel_exps ?S2 _ _ _ _ _ xs' |- _ ] =>
+          assert (Hx_not_S2 : ~ x \in S2)
+            by (eapply anf_cvt_result_not_in_output; eassumption);
+          destruct (anf_cvt_rel_exps_In_range _ _ _ _ _ _ _ Hcvt_rest x (nth_error_In _ _ Hxj))
+            as [Hvn | HS2];
+          [ exact (Hx_not_vn Hvn) | exact (Hx_not_S2 HS2) ]
+        end.
+      + exfalso. inv Hxj.
+        match goal with
+        | [ Hcvt1 : anf_cvt_rel S _ _ _ ?S2 _ x,
+            Hcvt_rest : anf_cvt_rel_exps ?S2 _ _ _ _ _ xs' |- _ ] =>
+          assert (Hx_not_S2 : ~ x \in S2)
+            by (eapply anf_cvt_result_not_in_output; eassumption);
+          destruct (anf_cvt_rel_exps_In_range _ _ _ _ _ _ _ Hcvt_rest x (nth_error_In _ _ Hxi))
+            as [Hvn | HS2];
+          [ exact (Hx_not_vn Hvn) | exact (Hx_not_S2 HS2) ]
+        end.
+      + f_equal.
+        match goal with
+        | [ Hcvt1 : anf_cvt_rel S _ _ _ ?S2 _ _,
+            Hcvt_rest : anf_cvt_rel_exps ?S2 _ _ _ _ _ xs' |- _ ] =>
+          eapply (IH _ _ _ _ _ _ Hcvt_rest); try eassumption;
+          eapply Disjoint_Included_r;
+          [ eapply anf_cvt_exp_subset; eassumption | exact Hdis ]
+        end.
+  Qed.
+
+  (* Lemma 1: ANF-converted expression list variables are consistent w.r.t. preord_val.
+     Duplicate xs positions map to the same source variable (by anf_cvt_rel_exps_var_lookup),
+     so their target values are both anf_val_rel to the same source value,
+     hence preord_val by alpha-equiv. *)
+  Lemma anf_cvt_exps_consistent k rho_src es vs_src f t
+        S vn tgm S' C xs vs_tgt :
+    @eval_fuel_many _ LambdaBoxLocal_resource_fuel LambdaBoxLocal_resource_trace
+                    rho_src es vs_src f t ->
+    anf_cvt_rel_exps S es vn tgm S' C xs ->
+    Disjoint _ (FromList vn) S ->
+    env_consistent vn rho_src ->
+    Forall2 anf_val_rel vs_src vs_tgt ->
+    list_consistent (preord_val cenv eq_fuel k) xs vs_tgt.
+  Proof.
+    intros Hmany Hcvt Hdis Hcons HF2 i j x vi vj Hxi Hxj Hvi Hvj.
+    destruct (Nat.eq_dec i j) as [Heq | Hneq].
+    - (* i = j: reflexivity *)
+      subst j. rewrite Hxi in Hxj. inv Hxj.
+      rewrite Hvi in Hvj. inv Hvj.
+      eapply preord_val_refl. tci.
+    - (* i ≠ j *)
+      set (d := @Dec _ _ (Decidable_FromList vn) x). 
+      destruct d as [Hin_vn | Hnin_vn].
+       (* x ∈ vn: use var_lookup to find same source value *)
+      + destruct (In_nth_error _ _ Hin_vn) as [i_vn Hi_vn].
+        destruct (anf_cvt_rel_exps_var_lookup _ _ _ _ _ Hmany _ _ _ _ _ _ Hcvt Hdis Hcons _ _ _ Hxi Hi_vn)
+          as [v_src_i [Hvsi Hrhoi]].
+        destruct (anf_cvt_rel_exps_var_lookup _ _ _ _ _ Hmany _ _ _ _ _ _ Hcvt Hdis Hcons _ _ _ Hxj Hi_vn)
+          as [v_src_j [Hvsj Hrhoj]].
+        rewrite Hrhoi in Hrhoj. inv Hrhoj.
+        (* Both target values related to the same source value *)
+        destruct (Forall2_nth_error_l _ _ _ _ _ HF2 Hvsi) as [vt_i [Hvti Hrel_i]].
+        destruct (Forall2_nth_error_l _ _ _ _ _ HF2 Hvsj) as [vt_j [Hvtj Hrel_j]].
+        rewrite Hvi in Hvti. inv Hvti.
+        rewrite Hvj in Hvtj. inv Hvtj.
+        eapply anf_cvt_val_alpha_equiv; eassumption.
+      + (* x ∉ vn: fresh variables are unique, contradicts i ≠ j *)
+        exfalso. apply Hneq.
+        eapply anf_cvt_rel_exps_unique_fresh; eassumption.
+  Qed.
 
 
   (* If the result variable x of a conversion is in vnames (Var_e case),
@@ -1630,6 +1731,10 @@ Section Correct.
               destruct (in_dec Pos.eq_dec y xs) as [Hyin | Hynin].
               -- (* y in xs: both rho and set_many bindings are
                     anf_val_rel to the same source value, needs alpha-equiv *)
+                rewrite M.gso; [ | assumption ]. 
+                edestruct set_many_get_in as [v_y Hget_y]; eauto.
+                rewrite Hget_y. eexists. split; [ reflexivity | ]. 
+                
                  admit. (* requires anf_cvt_val_alpha_equiv *)
               -- (* y not in xs: set_many does not affect y *)
                  eexists. split. rewrite M.gso; auto.

@@ -940,15 +940,98 @@ Section Correct.
   Lemma anf_cvt_result_in_consumed S1 S2 e vn tgm C x :
     anf_cvt_rel S1 e vn tgm S2 C x ->
     (x \in FromList vn \/ x \in S1).
-  Proof. Admitted.
+  Proof.
+    enough (H :
+      (forall (e : expression.exp) S1 vn tgm S2 C x,
+          anf_cvt_rel S1 e vn tgm S2 C x ->
+          (x \in FromList vn \/ x \in S1)) /\
+      (forall (es : exps), True) /\
+      (forall (efns : efnlst), True) /\
+      (forall (bs : branches_e), True)).
+    { exact (proj1 H e S1 vn tgm S2 C x). }
+    eapply exp_ind_alt_2.
+    - (* Var_e *)
+      intros n S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. left. eapply nth_error_In. eassumption.
+    - (* Lam_e *)
+      intros na e1 IH S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel in *.
+      right. destruct H3. assumption.
+    - (* App_e *)
+      intros e1 IH1 e2 IH2 S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel in *.
+      right.
+      repeat match goal with
+      | [ H : anf_cvt_rel _ _ _ _ _ _ _ |- _ ] =>
+        apply anf_cvt_exp_subset in H
+      end.
+      eauto.
+    - (* Con_e *)
+      intros dc es IH S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel_exps in *.
+      right. assumption.
+    - (* Match_e *)
+      intros e1 IH1 n bs IH2 S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_branches in *.
+      right.
+      repeat match goal with
+      | [ H : anf_cvt_rel _ _ _ _ _ _ _ |- _ ] =>
+        apply anf_cvt_exp_subset in H
+      | [ H : anf_cvt_rel_branches _ _ _ _ _ _ _ |- _ ] =>
+        apply (proj2 (proj2 (proj2 anf_cvt_rel_subset))) in H
+      end.
+      match goal with
+      | [ Hin : x' \in ?S3m, Hsub1 : ?S3m \subset ?S2m,
+          Hsub2 : ?S2m \subset _ |- _ ] =>
+        apply Hsub1 in Hin; apply Hsub2 in Hin;
+        destruct Hin as [ [Hin _] _]; exact Hin
+      end.
+    - (* Let_e *)
+      intros na e1 IH1 e2 IH2 S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel in *.
+      match goal with
+      | [ Hcvt2 : anf_cvt_rel _ e2 (_ :: vn') _ _ _ x' |- _ ] =>
+        destruct (IH2 _ _ _ _ _ _ Hcvt2) as [Hvn2 | HS2]
+      end.
+      + rewrite FromList_cons in Hvn2. inv Hvn2.
+        * match goal with [ Heq : In _ [set _] _ |- _ ] => inv Heq end.
+          match goal with
+          | [ Hcvt1 : anf_cvt_rel S1' e1 vn' _ _ _ _ |- _ ] =>
+            destruct (IH1 _ _ _ _ _ _ Hcvt1) as [Hvn1 | HS1]
+          end.
+          -- left. exact Hvn1.
+          -- right. exact HS1.
+        * left. assumption.
+      + right.
+        match goal with
+        | [ Hcvt1 : anf_cvt_rel S1' e1 vn' _ _ _ _ |- _ ] =>
+          eapply anf_cvt_exp_subset in Hcvt1; apply Hcvt1; exact HS2
+        end.
+    - (* Fix_e *)
+      intros efns IH n S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. fold anf_cvt_rel_efnlst in *.
+      right.
+      match goal with
+      | [ Hsub : FromList _ \subset S1',
+          Hnth : nth_error _ _ = Some x' |- _ ] =>
+        eapply Hsub; eapply nth_error_In; eassumption
+      end.
+    - (* Prf_e *)
+      intros S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. right. assumption.
+    - (* Prim_val_e *)
+      intros p S1' vn' tgm' S2' C' x' Hcvt.
+      inv Hcvt. right. assumption.
+    - (* Prim_e *) intros. inv H. (* no ANF conversion for Prim_e *)
+    - (* enil *) exact I.
+    - (* econs *) intros; exact I.
+    - (* eflnil *) exact I.
+    - (* eflcons *) split; intros; exact I.
+    - (* brnil *) exact I.
+    - (* brcons *) intros; exact I.
+  Qed.
 
 
-  (* A fresh result variable (x ∈ S) is consumed by the conversion: x ∉ S'. *)
-  Lemma anf_cvt_result_consumed S e vn tgm S' C x :
-    anf_cvt_rel S e vn tgm S' C x ->
-    Disjoint _ (FromList vn) S ->
-    x \in S -> ~ x \in S'.
-  Proof. Admitted.
 
 
   (* If the result variable x of a conversion is in vnames (Var_e case),
@@ -1298,93 +1381,6 @@ Section Correct.
           simpl in H0Sk. congruence. }
       rewrite Hgl. reflexivity.
   Qed.
-
-  (** Replace values in vs with values from rho where available.
-      For each position i, if M.get xs[i] rho = Some v, use v; otherwise use vs[i].
-      This ensures duplicate positions in xs get the same value (since M.get is deterministic). *)
-  Fixpoint replace_with_rho (xs : list var) (vs : list val) (rho : M.t val) : list val :=
-    match xs, vs with
-    | x :: xs', v :: vs' =>
-      (match M.get x rho with Some v' => v' | None => v end) :: replace_with_rho xs' vs' rho
-    | _, _ => nil
-    end.
-
-  Lemma replace_with_rho_length xs vs rho :
-    Datatypes.length (replace_with_rho xs vs rho) =
-    Nat.min (Datatypes.length xs) (Datatypes.length vs).
-  Proof.
-    revert vs. induction xs as [ | a xs' IH]; intros [ | v vs']; simpl;
-      try reflexivity; destruct (M.get a rho); simpl; rewrite IH; reflexivity.
-  Qed.
-
-  Lemma replace_with_rho_length_eq xs vs rho :
-    Datatypes.length xs = Datatypes.length vs ->
-    Datatypes.length (replace_with_rho xs vs rho) = Datatypes.length xs.
-  Proof.
-    intros Hlen. rewrite replace_with_rho_length. lia.
-  Qed.
-
-  Lemma replace_with_rho_nth_some xs vs rho k y v :
-    nth_error xs k = Some y ->
-    M.get y rho = Some v ->
-    nth_error (replace_with_rho xs vs rho) k = Some v.
-  Proof.
-  Admitted.
-    (* revert vs k. induction xs as [ | a xs' IH]; intros vs k.
-    - destruct k; simpl; intros; discriminate.
-    - destruct vs as [ | w vs']; [ destruct k; simpl; intros; congruence | ].
-      destruct k as [ | k']; simpl.
-      + intros Hnth Hget. inversion Hnth; subst. rewrite Hget. reflexivity.
-      + intros Hnth Hget. destruct (M.get a rho); eapply IH; eassumption.
-  Qed. *)
-
-  Lemma replace_with_rho_nth_none xs vs rho k y :
-    nth_error xs k = Some y ->
-    M.get y rho = None ->
-    Datatypes.length xs = Datatypes.length vs ->
-    nth_error (replace_with_rho xs vs rho) k = nth_error vs k.
-  Proof.
-    revert vs k. induction xs as [ | a xs' IH]; intros vs k.
-    - destruct k; simpl; intros; congruence.
-    - destruct vs as [ | w vs']; [ destruct k; simpl; intros; try congruence; lia | ].
-      destruct k as [ | k']; simpl.
-      + intros Hnth Hget Hlen. inversion Hnth; subst. rewrite Hget. reflexivity.
-      + intros Hnth Hget Hlen. destruct (M.get a rho); eapply IH; try eassumption; simpl in Hlen; lia.
-  Qed.
-
-  (** set_many with replace_with_rho preserves all existing rho bindings *)
-  Lemma set_many_replace_preserves y xs vs (rho : M.t val) v :
-    M.get y rho = Some v ->
-    Datatypes.length xs = Datatypes.length vs ->
-    M.get y (set_many xs (replace_with_rho xs vs rho) rho) = Some v.
-  Proof.
-    revert vs. induction xs as [ | a xs' IH]; intros [ | w vs'] Hget Hlen; simpl in *.
-    - exact Hget.
-    - exact Hget.
-    - exact Hget.
-    - destruct (Pos.eq_dec y a) as [-> | Hneq].
-      + rewrite M.gss. rewrite Hget. reflexivity.
-      + rewrite M.gso by auto. eapply IH. exact Hget. lia.
-  Qed.
-
-  (** Duplicate condition: when M.get is Some for the duplicate key,
-      replace_with_rho produces equal values. *)
-  Lemma replace_with_rho_dup xs vs rho i j :
-    Datatypes.length xs = Datatypes.length vs ->
-    (i < j)%nat ->
-    nth_error xs i = nth_error xs j ->
-    nth_error xs i <> None ->
-    (forall y, nth_error xs i = Some y -> M.get y rho <> None) ->
-    nth_error (replace_with_rho xs vs rho) i = nth_error (replace_with_rho xs vs rho) j.
-  Proof.
-    intros Hlen Hlt Heq Hnn Hrho.
-    destruct (nth_error xs i) as [y | ] eqn:Hy; [ | congruence].
-    destruct (M.get y rho) as [v | ] eqn:Hget.
-    - erewrite replace_with_rho_nth_some by eassumption.
-      (* erewrite replace_with_rho_nth_some by (rewrite <- Heq; eassumption).
-      reflexivity.
-    - exfalso. eapply Hrho; eauto. *)
-  Admitted.
 
   (** If every xs[i] is in the domain of set_many xs vs rho, get_list succeeds. *)
   Lemma get_list_set_many_exists xs vs rho :
@@ -1974,10 +1970,7 @@ Section Correct.
                  ++ (* x1 ∈ S: x1 is fresh, contradiction with Hy via Hdis_ek *)
                     exfalso.
                     assert (Hx1_not_S' : ~ x1 \in S2).
-                    { eapply (anf_cvt_result_consumed S e1' vnames cnstrs S2 C1 x1).
-                      - exact Hcvt_e1.
-                      - exact Hdis.
-                      - exact Hin_S. }
+                    { eapply anf_cvt_result_not_in_output; eassumption. }
                     assert (Hx1_not_S'2 : ~ x1 \in S').
                     { intro Hin. apply Hx1_not_S'.
                       eapply anf_cvt_exp_subset. exact Hcvt_e2. exact Hin. }

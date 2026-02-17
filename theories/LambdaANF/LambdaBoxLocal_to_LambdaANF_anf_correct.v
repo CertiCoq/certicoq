@@ -201,6 +201,12 @@ Section Correct.
                     (Fcons f func_tag [x] (C1 |[ Ehalt r1 ]|) B) S3.
 
 
+  Definition env_consistent (vn : list var) (rho : list value) : Prop :=
+    forall i j x,
+      nth_error vn i = Some x ->
+      nth_error vn j = Some x ->
+      nth_error rho i = nth_error rho j.
+
   Inductive anf_val_rel : value -> val -> Prop :=
   | anf_rel_Con :
       forall vs vs' dc c_tag,
@@ -211,7 +217,7 @@ Section Correct.
       forall vs rho names na x f e C1 r1 S1 S2,
         anf_env_rel' anf_val_rel names vs rho ->
 
-        NoDup names ->
+        env_consistent names vs ->
 
         Disjoint var (x |: (f |: FromList names)) S1 ->
 
@@ -225,7 +231,7 @@ Section Correct.
       forall S1 S2 names fnames vs rho efns Bs n f,
         anf_env_rel' anf_val_rel names vs rho ->
 
-        NoDup names ->
+        env_consistent names vs ->
         NoDup fnames ->
 
         Disjoint _ (FromList names :|: FromList fnames) S1 ->
@@ -630,15 +636,6 @@ Section Correct.
 
   (** ** Environment consistency and variable lookup *)
 
-  (* Two positions in vn that map to the same variable also map to
-     the same value in rho. This is a weaker property than NoDup
-     that propagates through Let_e extensions. *)
-  Definition env_consistent (vn : list var) (rho : list value) : Prop :=
-    forall i j x,
-      nth_error vn i = Some x ->
-      nth_error vn j = Some x ->
-      nth_error rho i = nth_error rho j.
-
   Lemma NoDup_env_consistent (vn : list var) (rho : list value) :
     NoDup vn -> env_consistent vn rho.
   Proof.
@@ -683,11 +680,32 @@ Section Correct.
     env_consistent (x :: vn) (v :: vs).
   Proof. Admitted.
 
+  (* Free variables of a context application decompose into free vars
+     of the context and free vars of the body. *)
+  Lemma occurs_free_app_ctx_included c e :
+    Included _ (occurs_free (c |[ e ]|)) (occurs_free_ctx c :|: occurs_free e).
+  Proof. Admitted.
+
   (* Free variables of a conversion context come from the variable name list.
      All intermediate results are bound within the context. *)
   Lemma anf_cvt_occurs_free_ctx S e vn tgm S' C x :
     anf_cvt_rel S e vn tgm S' C x ->
     occurs_free_ctx C \subset FromList vn.
+  Proof. Admitted.
+
+  (* In the Let_e case, the free variables of C2|[e_k]| are disjoint
+     from (S \ S2) \ {x1}. This follows from:
+     - occurs_free(C2|[e_k]|) ⊆ occurs_free_ctx C2 ∪ occurs_free e_k
+     - occurs_free_ctx C2 ⊆ FromList(x1::vnames), disjoint from S by Hdis
+     - occurs_free e_k is disjoint from (S\S')\{x2} by Hdis_ek,
+       and (S\S2)\{x1} ⊆ (S\S')\{x2} *)
+  Lemma anf_cvt_disjoint_occurs_free_ctx S e1 vn tgm S2 C1 x1
+        e2 S' C2 x2 e_k :
+    anf_cvt_rel S e1 vn tgm S2 C1 x1 ->
+    anf_cvt_rel S2 e2 (x1 :: vn) tgm S' C2 x2 ->
+    Disjoint _ (FromList vn) S ->
+    Disjoint _ (occurs_free e_k) ((S \\ S') \\ [set x2]) ->
+    Disjoint _ (occurs_free (C2 |[ e_k ]|)) ((S \\ S2) \\ [set x1]).
   Proof. Admitted.
 
   (* Generalized consistency: two positions with the same key have R-related values. *)
@@ -1759,8 +1777,7 @@ Section Correct.
               (* Forall2 (preord_val cenv eq_fuel i) vs'0 vs_new *)
               { assert (Hcons_xs : list_consistent (preord_val cenv eq_fuel i) xs vs'0).
                 { eapply anf_cvt_exps_consistent; try eassumption.
-                  - eapply Disjoint_Included_r. eapply Setminus_Included. eassumption.
-                  - exact Hnd. }
+                  eapply Disjoint_Included_r. eapply Setminus_Included. eassumption. }
                 destruct (get_list_set_many_consistent
                             (preord_val cenv eq_fuel i) xs vs'0 rho)
                   as [vs_new' [Hvs_new' HF2_new]].
@@ -1910,14 +1927,16 @@ Section Correct.
                 clos_v' = Vfun rho_fc (Fcons f_cc func_tag [x_pc]
                             (C_bc |[ Ehalt r_bc ]|) Fnil) f_cc /\
                 anf_env_rel' anf_val_rel names_fc rho_clos rho_fc /\
-                NoDup names_fc /\
+                env_consistent names_fc rho_clos /\
                 Disjoint var (x_pc |: (f_cc |: FromList names_fc)) S1_bc /\
                 ~ x_pc \in f_cc |: FromList names_fc /\
                 ~ f_cc \in FromList names_fc /\
                 anf_cvt_rel S1_bc e_body (x_pc :: names_fc) cnstrs S2_bc C_bc r_bc).
             { inversion Hrel_clos; try discriminate; subst.
               do 8 eexists.
-              repeat split; try reflexivity; try eassumption. apply H4. }
+              split; [ reflexivity | ].
+              repeat (split; [ eassumption | ]).
+              eassumption. }
             destruct Hclos_inv as (rho_fc & names_fc & x_pc & f_cc & C_bc & r_bc &
               S1_bc & S2_bc & Hclos_eq & Henv_fc & Hnd_fc &
               Hdis_fc & Hxpc_nin & Hfcc_nin & Hcvt_bc).
@@ -1943,7 +1962,7 @@ Section Correct.
                 simpl in *. unfold var, M.elt. rewrite <- Henv_fc. eauto.   
               - (* env_consistent (x_pc :: names_fc) (v2 :: rho_clos) *)
                 apply env_consistent_extend.
-                + eapply NoDup_env_consistent. exact Hnd_fc.
+                + exact Hnd_fc.
                 + intros k Hk. exfalso. apply Hxpc_nin. right.
                   eapply nth_error_In. exact Hk.
               - (* Disjoint (FromList (x_pc :: names_fc)) S1_bc *)
@@ -2085,39 +2104,8 @@ Section Correct.
             (* IH1 for e1, with e_k' = C2|[e_k]| *)
             2:{ intros m.
                 assert (Hdis_C2ek : Disjoint _ (occurs_free (C2 |[ e_k ]|)) ((S \\ S2) \\ [set x1])).
-                { constructor. intros z Hz. inv Hz. destruct H as [Hz_free Hz_set].
-                  destruct Hz_set as [Hz_S_S2 Hz_nx1].
-                  destruct Hz_S_S2 as [Hz_S Hz_nS2].
-                  (* z ∈ occurs_free(C2 |[ e_k ]|), z ∈ S, z ∉ S2, z ≠ x1 *)
-                  (* Decompose: z ∈ occurs_free_ctx C2 or z ∈ occurs_free e_k \ bound_var_ctx C2 *)
-                  apply occurs_free_exp_ctx in Hz_free.
-                  destruct Hz_free as [Hz_ctx | [Hz_ek Hz_nbound]].
-                  - (* z ∈ occurs_free_ctx C2 ⊆ FromList (x1::vnames) *)
-                    assert (Hz_vn : z \in FromList (x1 :: vnames)).
-                    { eapply anf_cvt_occurs_free_ctx. exact Hcvt_e2. exact Hz_ctx. }
-                    inv Hz_vn.
-                    + (* z = x1: contradicts z ≠ x1 *) inv H. congruence.
-                    + (* z ∈ FromList vnames: contradicts z ∈ S *)
-                      destruct Hdis as [Hdis''].
-                      apply (Hdis'' z). constructor; assumption.
-                  - (* z ∈ occurs_free e_k, z ∉ bound_var_ctx C2 *)
-                    (* z ∈ (S \ S2) \ {x1} ⊆ (S \ S') \ {x2} *)
-                    destruct Hdis_ek as [Hdis_ek'].
-                    apply (Hdis_ek' z). constructor; [ exact Hz_ek | ].
-                    constructor.
-                    + constructor; [ exact Hz_S | ].
-                      intro Hin. apply Hz_nS2.
-                      eapply (proj1 anf_cvt_rel_subset). exact Hcvt_e2. exact Hin.
-                    + (* z ≠ x2 *)
-                      intro Heq. subst z.
-                      destruct (anf_cvt_result_in_consumed _ _ _ _ _ _ _ Hcvt_e2) as [Hin_vn | Hin_S2].
-                      * (* x2 ∈ FromList (x1::vnames) *)
-                        inv Hin_vn.
-                        -- (* x2 = x1 *) inv H. congruence.
-                        -- (* x2 ∈ FromList vnames *)
-                           destruct Hdis as [Hdis'']. apply (Hdis'' x2). constructor; assumption.
-                      * (* x2 ∈ S2: contradicts Hz_nS2 since x2 = z ∉ S2 *)
-                        exact (Hz_nS2 Hin_S2). }
+                { eapply anf_cvt_disjoint_occurs_free_ctx;
+                    [ exact Hcvt_e1 | exact Hcvt_e2 | exact Hdis | exact Hdis_ek ]. }
                 edestruct IH1 as [IH1_val _].
                 - eassumption. (* well_formed_env *)
                 - inversion Hwfe; subst; eassumption. (* exp_wf e1' *)
@@ -2134,14 +2122,15 @@ Section Correct.
                 assert (Hnd' : env_consistent (x1 :: vnames) (v1 :: rho0)).
                 { eapply env_consistent_extend_from_cvt; [ exact Hnd | exact Hcvt_e1 | exact Hdis | exact Heval1 ]. }
                 assert (Hdis' : Disjoint _ (FromList (x1 :: vnames)) S2).
-                { constructor. intros z Hz. inv Hz. destruct H as [Hz_in Hz_S2].
-                  inv Hz_in.
-                  - (* z = x1: x1 ∉ S2 by result_not_in_output *)
-                    eapply anf_cvt_result_not_in_output; [ exact Hcvt_e1 | exact Hdis | exact Hz_S2 ].
+                { constructor. intros z Hz. inv Hz.
+                  (* H : z ∈ FromList (x1 :: vnames), H0 : z ∈ S2 *)
+                  inv H.
+                  - (* z = x1 (subst): x1 ∉ S2 by result_not_in_output *)
+                    eapply anf_cvt_result_not_in_output; [ exact Hcvt_e1 | exact Hdis | exact H0 ].
                   - (* z ∈ FromList vnames: vnames ∩ S2 = ∅ since S2 ⊆ S and vnames ∩ S = ∅ *)
                     destruct Hdis as [Hdis''].
-                    apply (Hdis'' z). constructor; [ exact H | ].
-                    eapply (proj1 anf_cvt_rel_subset). exact Hcvt_e1. exact Hz_S2. }
+                    apply (Hdis'' z). constructor; [ exact H1 | ].
+                    eapply (proj1 anf_cvt_rel_subset). exact Hcvt_e1. exact H0. }
                 assert (Henv' : anf_env_rel (x1 :: vnames) (v1 :: rho0) (M.set x1 v1' rho)).
                 { constructor.
                   - exists v1'. split. rewrite M.gss. reflexivity. exact Hrel1.
@@ -2152,7 +2141,7 @@ Section Correct.
                       exists v1. split.
                       * (* Use Hnd' : env_consistent (x1 :: vnames) (v1 :: rho0)
                            with positions 0 and (S k) — both have key x1 *)
-                        assert (Hnd'_inst := Hnd' 0%nat (S k) x1 eq_refl Hk).
+                        assert (Hnd'_inst := Hnd' 0%nat (Datatypes.S k) x1 eq_refl Hk).
                         simpl in Hnd'_inst. symmetry. exact Hnd'_inst.
                       * exact Hrel1.
                     + (* x1 ∈ S: contradiction — vnames[k] = x1 but x1 ∈ S and vnames ∩ S = ∅ *)
@@ -2312,7 +2301,7 @@ Section Correct.
               exists rho_fc names_fc fnames_fc Bs_fix f_fc S1_fc S2_fc,
                 fix_v' = Vfun rho_fc Bs_fix f_fc /\
                 anf_env_rel' anf_val_rel names_fc rho_fix rho_fc /\
-                NoDup names_fc /\
+                env_consistent names_fc rho_fix /\
                 NoDup fnames_fc /\
                 Disjoint _ (FromList names_fc :|: FromList fnames_fc) S1_fc /\
                 Disjoint _ (FromList names_fc) (FromList fnames_fc) /\

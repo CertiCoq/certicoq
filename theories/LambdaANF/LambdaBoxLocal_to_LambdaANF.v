@@ -833,7 +833,7 @@ Section Translate.
              | brcons_e dc (i, lnames) e bl' =>
                let ctag := dcon_to_tag dc tgm in
                cm <- proj_ctx lnames 0%N scrut vm ctag ;;
-               let (Cproj, vm') := cm in
+               let (Cproj, vm') := `cm in
                a <- convert_anf e vm' ;;
                e' <- anf_term_to_exp a ;;
                pats' <- convert_anf_branches bl' scrut vm ;;

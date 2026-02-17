@@ -1048,6 +1048,25 @@ Section Correct.
         end.
   Qed.
 
+  (* Result variables of anf_cvt_rel_exps are not in the final output set. *)
+  Lemma anf_cvt_rel_exps_results_not_in_output :
+    forall xs S es vn tgm S' C,
+      anf_cvt_rel_exps S es vn tgm S' C xs ->
+      Disjoint _ (FromList vn) S ->
+      forall x, List.In x xs -> ~ x \in S'.
+  Proof.
+    induction xs as [ | x1 xs' IH]; intros S es vn tgm S' C Hcvt Hdis x Hin.
+    - inv Hin.
+    - inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_exps in *.
+      destruct Hin as [Heq | Hin].
+      + subst. intro Hin_S'.
+        eapply anf_cvt_result_not_in_output; [ eassumption | exact Hdis | ].
+        eapply (proj1 (proj2 anf_cvt_rel_subset)); eassumption.
+      + eapply IH; try eassumption.
+        eapply Disjoint_Included_r; [ | exact Hdis ].
+        eapply anf_cvt_exp_subset. eassumption.
+  Qed.
+
   (* Fresh variables (not in vn) appear at most once in xs. *)
   Lemma anf_cvt_rel_exps_unique_fresh :
     forall xs S es vn tgm S' C,
@@ -1734,8 +1753,47 @@ Section Correct.
                 rewrite M.gso; [ | assumption ]. 
                 edestruct set_many_get_in as [v_y Hget_y]; eauto.
                 rewrite Hget_y. eexists. split; [ reflexivity | ]. 
-                
-                 admit. (* requires anf_cvt_val_alpha_equiv *)
+                - (* y ∈ vnames (eliminate y ∈ S \ {x} by contradiction) *)
+                  assert (Hy_vn : y \in FromList vnames).
+                  { destruct (anf_cvt_rel_exps_In_range _ _ _ _ _ _ _ Hcvt_es y Hyin)
+                      as [Hvn | HS_x].
+                    - exact Hvn.
+                    - exfalso.
+                      assert (Hy_not_S' : ~ y \in S').
+                      { eapply anf_cvt_rel_exps_results_not_in_output; [ eassumption | | eassumption ].
+                        eapply Disjoint_Included_r; [ eapply Setminus_Included | exact Hdis ]. }
+                      destruct HS_x as [Hy_S Hy_nx].
+                      destruct Hdis_ek as [Hdis_ek'].
+                      apply (Hdis_ek' y). constructor.
+                      + exact Hy.
+                      + constructor.
+                        * constructor; assumption.
+                        * exact Hy_nx. }
+                  (* Find positions in vnames and xs *)
+                  destruct (In_nth_error _ _ Hy_vn) as [n Hn].
+                  destruct (In_nth_error _ _ Hyin) as [k Hk].
+                  destruct (first_occurrence_exists xs k y Hk) as [k0 [Hle [Hk0 Hfirst]]].
+                  (* Connect v_y to vs'0[k0] via set_many_get_first *)
+                  destruct (set_many_get_first xs vs'0 rho y k0 Hlen_xs_vs'0 Hk0 Hfirst)
+                    as [v0 [Hv0k Hget_v0]].
+                  assert (Hvy_eq : v_y = v0) by congruence. subst v0.
+                  (* Common source value via var_lookup *)
+                  assert (Hdis_exps : Disjoint _ (FromList vnames) (S \\ [set x])).
+                  { eapply Disjoint_Included_r. eapply Setminus_Included. exact Hdis. }
+                  destruct (anf_cvt_rel_exps_var_lookup _ _ _ _ _ Hmany
+                              _ _ _ _ _ _ Hcvt_es Hdis_exps
+                              (NoDup_env_consistent _ _ Hnd) _ _ _ Hk0 Hn)
+                    as [v_src [Hvsrc_k0 Hvsrc_n]].
+                  (* anf_val_rel v_src v1 from anf_env_rel *)
+                  destruct (anf_env_rel_nth_error _ _ _ _ _ _ Henv Hn Hvsrc_n)
+                    as [v_tgt [Hget_tgt Hrel_tgt]].
+                  rewrite Hget in Hget_tgt. inv Hget_tgt.
+                  (* anf_val_rel v_src v_y from Forall2 *)
+                  destruct (Forall2_nth_error_l _ _ _ _ _ H1 Hvsrc_k0)
+                    as [v_y' [Hvy' Hrel_vy]].
+                  rewrite Hv0k in Hvy'. inv Hvy'.
+                  (* alpha-equivalence *)
+                  eapply anf_cvt_val_alpha_equiv; eassumption.
               -- (* y not in xs: set_many does not affect y *)
                  eexists. split. rewrite M.gso; auto.
                  rewrite set_many_get_notin; auto. eassumption.

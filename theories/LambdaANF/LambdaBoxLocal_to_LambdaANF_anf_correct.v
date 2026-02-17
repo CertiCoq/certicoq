@@ -1362,6 +1362,28 @@ Section Correct.
           -- exact Hcvt'.
   Qed.
 
+  Lemma anf_fix_rel_fnames_length fnames names S1 fnames_list efns Bs S2 :
+    anf_fix_rel fnames names S1 fnames_list efns Bs S2 ->
+    List.length fnames_list = efnlength efns.
+  Proof.
+    intros Hrel. induction Hrel; simpl; congruence.
+  Qed.
+
+  (* Extended version of anf_fix_rel_find_def that also provides the
+     Disjoint property for the body's state set and freshness of x_pc *)
+  Lemma anf_fix_rel_find_def_ext :
+    forall fnames0 names0 S1 fnames_list efns Bs S2 idx f na e_body,
+      anf_fix_rel fnames0 names0 S1 fnames_list efns Bs S2 ->
+      nth_error fnames_list idx = Some f ->
+      enthopt idx efns = Some (Lam_e na e_body) ->
+      NoDup fnames_list ->
+      exists x_pc C_body r_body S_body1 S_body2,
+        find_def f Bs = Some (func_tag, [x_pc], C_body |[ Ehalt r_body ]|) /\
+        anf_cvt_rel S_body1 e_body (x_pc :: List.rev fnames0 ++ names0) cnstrs S_body2 C_body r_body /\
+        Disjoint _ (x_pc |: (FromList fnames0 :|: FromList names0)) S_body1 /\
+        ~ x_pc \in (FromList fnames0 :|: FromList names0).
+  Proof. Admitted.
+
 
   (** ** Correctness statements *)
 
@@ -2486,8 +2508,8 @@ Section Correct.
               Hdis_fix & Hdis_nf & Hnth_fix & Hfix_rel).
             subst fix_v'.
             (* Get specific function from the fix bundle *)
-            edestruct (anf_fix_rel_find_def _ _ _ _ _ _ _ _ _ _ _ Hfix_rel Hnth_fix Hnth Hnd_fnames)
-              as (x_pc & C_bc & r_bc & S_body1 & S_body2 & Hfind_fc & Hcvt_bc).
+            edestruct (anf_fix_rel_find_def_ext _ _ _ _ _ _ _ _ _ _ _ Hfix_rel Hnth_fix Hnth Hnd_fnames)
+              as (x_pc & C_bc & r_bc & S_body1 & S_body2 & Hfind_fc & Hcvt_bc & Hdis_body & Hxpc_fresh).
             set (rho_bc := M.set x_pc v2' (def_funs Bs_fix Bs_fix rho_fc rho_fc)).
             (* Step 2: Body environment relation *)
             assert (Henv_bc : anf_env_rel (x_pc :: List.rev fnames_fc ++ names_fc)
@@ -2507,12 +2529,48 @@ Section Correct.
                 + inversion Hwf_fix.
                   eapply well_formed_envmake_rec_env_rev_order;
                     [reflexivity | assumption | assumption].
-              - (* exp_wf *)
-                admit. (* from well_formed_val (ClosFix_v ...) *)
-              - (* env_consistent (x_pc :: rev fnames_fc ++ names_fc) (v2 :: make_rec_env_rev_order fnlst0 rho_fix) *)
-                admit. (* from Hxpc_in, Hdis_entry, Hnd_names, Hnd_fnames, Hdis_nf *)
+              - (* exp_wf (N.of_nat (length (x_pc :: rev fnames_fc ++ names_fc))) e_body *)
+                assert (Hwf_body_lam :
+                  exp_wf (efnlst_length fnlst0 + N.of_nat (Datatypes.length rho_fix))
+                         (Lam_e na0 e_body)).
+                { eapply (enthopt_inlist_Forall
+                    (fun e => isLambda e /\
+                       exp_wf (efnlst_length fnlst0 + N.of_nat (Datatypes.length rho_fix)) e)
+                    fnlst0 n0).
+                  - inv Hwf_fix. assumption.
+                  - exact Hnth. }
+                assert (Hlen_eq :
+                  N.of_nat (Datatypes.length (x_pc :: rev fnames_fc ++ names_fc)) =
+                  efnlst_length fnlst0 + N.of_nat (Datatypes.length rho_fix) + 1).
+                { simpl Datatypes.length.
+                  rewrite length_app, length_rev.
+                  erewrite anf_fix_rel_fnames_length; [ | exact Hfix_rel].
+                  erewrite <- Forall2_length; [ | exact Henv_fc].
+                  rewrite Nnat.Nat2N.inj_succ, <- OrdersEx.N_as_OT.add_1_l,
+                          Nnat.Nat2N.inj_add, efnlength_efnlst_length. lia. }
+                rewrite Hlen_eq. inversion Hwf_body_lam. subst.
+                replace (efnlst_length fnlst0 + N.of_nat (length rho_fix) + 1) with
+                (1 + (efnlst_length fnlst0 + N.of_nat (length rho_fix))) by lia. assumption.
+              - (* env_consistent (x_pc :: rev fnames_fc ++ names_fc)
+                                  (v2 :: make_rec_env_rev_order fnlst0 rho_fix) *)
+                apply env_consistent_extend.
+                + destruct (make_rec_env_rev_order_app fnlst0 rho_fix)
+                    as [closfix_vals [Hdecomp [Hlen_cf _]]].
+                  rewrite Hdecomp.
+                  eapply env_consistent_app.
+                  * apply NoDup_env_consistent. apply NoDup_rev. exact Hnd_fnames.
+                  * exact Hnd_names.
+                  * rewrite FromList_rev. apply Disjoint_sym. exact Hdis_nf.
+                  * rewrite length_rev.
+                    erewrite anf_fix_rel_fnames_length; [ | exact Hfix_rel].
+                    symmetry. exact Hlen_cf.
+                + intros k Hk. exfalso. apply Hxpc_fresh.
+                  apply nth_error_In in Hk. apply in_app_or in Hk.
+                  destruct Hk as [Hk | Hk].
+                  * constructor. apply in_rev in Hk. exact Hk.
+                  * constructor 2. exact Hk.
               - (* Disjoint (FromList (x_pc :: rev fnames_fc ++ names_fc)) S_body1 *)
-                admit. (* from Hdis_entry, Hsub_body, Hxpc_in *)
+                repeat normalize_sets. rewrite FromList_rev. exact Hdis_body.
               - exact Henv_bc.
               - exact Hcvt_bc.
               - (* Disjoint (occurs_free (Ehalt r_bc)) ((S_body1 \\ S_body2) \\ [set r_bc]) *)

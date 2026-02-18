@@ -475,6 +475,54 @@ Section ANF_Val.
     - inv Hrel1; inv Hrel2; eauto.
   Qed.
 
+  (* Extract find_def and body conversion from anf_cvt_rel_efnlst at a given index.
+     The body uses (xi :: vn) as its variable list where vn is the efnlst's vn parameter. *)
+  Lemma anf_cvt_rel_efnlst_find_def S efns vn fnames_list tgm S' fdefs :
+    anf_cvt_rel_efnlst S efns vn fnames_list tgm S' fdefs ->
+    NoDup fnames_list ->
+    forall i fi,
+      nth_error fnames_list i = Some fi ->
+      exists na e_body xi C_body ri Si1 Si2,
+        enthopt i efns = Some (Lam_e na e_body) /\
+        find_def fi fdefs = Some (func_tag, [xi], C_body |[ Ehalt ri ]|) /\
+        anf_cvt_rel (Si1 \\ [set xi]) e_body (xi :: vn) tgm Si2 C_body ri /\
+        xi \in Si1 /\ Si1 \subset S.
+  Proof.
+    intros Hrel Hnd.
+    induction Hrel; intros i fi Hnth.
+    - destruct i; discriminate.
+    - inv Hnd. destruct i as [ | i'].
+      + (* i = 0: this function *)
+        simpl in Hnth. inv Hnth.
+        do 7 eexists. split; [ | split; [ | split; [ | split ] ] ].
+        * simpl. reflexivity.
+        * simpl. rewrite Coqlib.peq_true. reflexivity.
+        * eassumption.
+        * eassumption.
+        * eapply Included_refl.
+      + (* i = S i': tail *)
+        simpl in Hnth.
+        edestruct IHHrel as (na' & e_body' & xi' & C_body' & ri' & Si1' & Si2' &
+                              Henth & Hfind & Hcvt & Hxi & Hsub).
+        * eassumption.
+        * exact Hnth.
+        * do 7 eexists. split; [ | split; [ | split; [ | split ] ] ].
+          -- simpl. exact Henth.
+          -- simpl.
+             destruct (M.elt_eq fi f_name) as [Heq | Hneq].
+             ++ exfalso. subst.
+                match goal with
+                | [ Hnotin : ~ List.In _ _ |- _ ] =>
+                  apply Hnotin; eapply nth_error_In; exact Hnth
+                end.
+             ++ exact Hfind.
+          -- exact Hcvt.
+          -- exact Hxi.
+          -- eapply Included_trans; [ exact Hsub | ].
+             eapply Included_trans; [ eapply anf_cvt_exp_subset; eassumption | ].
+             eapply Setminus_Included.
+  Qed.
+
   (* When vars1 has duplicates, extend_lst maps to the first occurrence's
      target. The consistent condition ensures all duplicates in vars1 have
      the same target in vars2, making extend_lst agree with nth_error. *)
@@ -814,18 +862,19 @@ Section ANF_Val.
       preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
 
   Definition anf_cvt_efnlst_alpha_equiv k :=
-    forall efns B1 B2 fnames1 fnames2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4,
+    forall efns B1 B2 fnames1 fnames2 m outer_vars1 outer_vars2 rho1 rho2 S1 S2 S3 S4,
       (m <= k)%nat ->
-      anf_cvt_rel_efnlst S1 efns vars1 fnames1 cnstrs S2 B1 ->
-      anf_cvt_rel_efnlst S3 efns vars2 fnames2 cnstrs S4 B2 ->
+      anf_cvt_rel_efnlst S1 efns (List.rev fnames1 ++ outer_vars1) fnames1 cnstrs S2 B1 ->
+      anf_cvt_rel_efnlst S3 efns (List.rev fnames2 ++ outer_vars2) fnames2 cnstrs S4 B2 ->
       NoDup fnames1 ->
       NoDup fnames2 ->
       List.length fnames1 = List.length fnames2 ->
-      Disjoint _ (FromList fnames1 :|: FromList vars1) S1 ->
-      Disjoint _ (FromList fnames2 :|: FromList vars2) S3 ->
-      Disjoint _ (FromList fnames1) (FromList vars1) ->
-      Disjoint _ (FromList fnames2) (FromList vars2) ->
-      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      List.length outer_vars1 = List.length outer_vars2 ->
+      Disjoint _ (FromList fnames1 :|: FromList outer_vars1) S1 ->
+      Disjoint _ (FromList fnames2 :|: FromList outer_vars2) S3 ->
+      Disjoint _ (FromList fnames1) (FromList outer_vars1) ->
+      Disjoint _ (FromList fnames2) (FromList outer_vars2) ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) outer_vars1 outer_vars2 ->
       Forall2 (preord_var_env cenv PG m
                  (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2))
               fnames1 fnames2.
@@ -1098,7 +1147,88 @@ Section ANF_Val.
              ++ intro Hc. apply Hb.
                 assert (Hsub2 : _ \subset S3) by (eapply anf_cvt_exp_subset; eassumption).
                 exact (Hsub2 _ Hc).
-    - (* Fix_e *) admit.
+    - (* Fix_e *)
+      intros fnlst IH_efns i C1 C2 r1 r2 m vars1 vars2 rho1 rho2
+             S1 S2 S3 S4 e_k1 e_k2
+             Hm He1 He2 Hdis1 Hdis2 Henv Hk.
+      inv He1. inv He2. simpl.
+      (* Name the all_fun_name equalities to avoid eassumption ambiguity *)
+      assert (Hafn1 : all_fun_name fdefs = fnames) by
+        (eapply anf_cvt_rel_efnlst_all_fun_name; eassumption).
+      assert (Hafn2 : all_fun_name fdefs0 = fnames0) by
+        (eapply anf_cvt_rel_efnlst_all_fun_name; eassumption).
+      (* Get Forall2 for all fnames using IH_efns *)
+      assert (Hfn_env : Forall2
+        (preord_var_env cenv PG (m - 1)
+           (def_funs fdefs fdefs rho1 rho1) (def_funs fdefs0 fdefs0 rho2 rho2))
+        fnames fnames0).
+      { eapply IH_efns.
+        - lia.
+        - eassumption.
+        - eassumption.
+        - eassumption.
+        - eassumption.
+        - match goal with
+          | [ H1 : List.length fnames = _, H2 : List.length fnames0 = _ |- _ ] =>
+            congruence
+          end.
+        - eapply Forall2_length. exact Henv.
+        - eapply Union_Disjoint_l.
+          + eapply Disjoint_Setminus_r. eapply Included_refl.
+          + eapply Disjoint_Included_r; [ eapply Setminus_Included | exact Hdis1 ].
+        - eapply Union_Disjoint_l.
+          + eapply Disjoint_Setminus_r. eapply Included_refl.
+          + eapply Disjoint_Included_r; [ eapply Setminus_Included | exact Hdis2 ].
+        - match goal with
+          | [ H : FromList fnames \subset _ |- _ ] =>
+            eapply Disjoint_Included_l; [ exact H | eapply Disjoint_sym; exact Hdis1 ]
+          end.
+        - match goal with
+          | [ H : FromList fnames0 \subset _ |- _ ] =>
+            eapply Disjoint_Included_l; [ exact H | eapply Disjoint_sym; exact Hdis2 ]
+          end.
+        - eapply Forall2_preord_var_env_monotonic with (k := m); [ lia | exact Henv ]. }
+      eapply preord_exp_fun_compat.
+      + eapply Hprops.
+      + eapply Hprops.
+      + eapply Hk.
+        * lia.
+        * (* preord_var_env for r1/r2: extract from Hfn_env *)
+          match goal with
+          | [ Hn1 : nth_error fnames _ = Some r1,
+              Hn2 : nth_error fnames0 _ = Some r2 |- _ ] =>
+            destruct (Forall2_nth_error_l _ _ _ _ _ Hfn_env Hn1)
+              as [r2' [Hn2' Hr12]];
+            rewrite Hn2 in Hn2'; inv Hn2'; exact Hr12
+          end.
+        * (* Forall2 for outer vars under def_funs *)
+          eapply Forall2_preord_var_env_def_funs.
+          -- eapply Forall2_preord_var_env_monotonic with (k := m); [ lia | exact Henv ].
+          -- eapply Disjoint_Included_r.
+             ++ exact (proj1 (Same_set_all_fun_name _)).
+             ++ rewrite Hafn1.
+                eapply Disjoint_Included_r; [ eassumption | exact Hdis1 ].
+          -- eapply Disjoint_Included_r.
+             ++ exact (proj1 (Same_set_all_fun_name _)).
+             ++ rewrite Hafn2.
+                eapply Disjoint_Included_r; [ eassumption | exact Hdis2 ].
+        * (* preservation *)
+          intros a b Hvar Ha Hb.
+          eapply preord_var_env_def_funs_not_In_r.
+          -- intros Hc. apply Hb.
+             match goal with
+             | [ Hsub : FromList fnames0 \subset _ |- _ ] => apply Hsub
+             end.
+             rewrite <- Hafn2.
+             exact ((proj1 (Same_set_all_fun_name _)) _ Hc).
+          -- eapply preord_var_env_def_funs_not_In_l.
+             ++ intros Hc. apply Ha.
+                match goal with
+                | [ Hsub : FromList fnames \subset _ |- _ ] => apply Hsub
+                end.
+                rewrite <- Hafn1.
+                exact ((proj1 (Same_set_all_fun_name _)) _ Hc).
+             ++ eapply preord_var_env_monotonic. exact Hvar. lia.
     - (* Prf_e *)
       intros C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
              Hm He1 He2 Hdis1 Hdis2 Henv Hk.
@@ -1187,8 +1317,8 @@ Section ANF_Val.
                 assert (Hsub2 : _ \subset S3) by (eapply anf_cvt_exp_subset; eassumption).
                 exact (Hsub2 _ Hc).
     - (* eflnil *)
-      intros B1 B2 fnames1 fnames2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4
-             Hm He1 He2 Hnd1 Hnd2 Hlen_fn
+      intros B1 B2 fnames1 fnames2 m outer_vars1 outer_vars2 rho1 rho2 S1 S2 S3 S4
+             Hm He1 He2 Hnd1 Hnd2 Hlen_fn Hlen_ov
              Hdis1 Hdis2 Hdis_fn1 Hdis_fn2 Henv.
       inv He1. inv He2. constructor.
     - (* eflcons *) admit.

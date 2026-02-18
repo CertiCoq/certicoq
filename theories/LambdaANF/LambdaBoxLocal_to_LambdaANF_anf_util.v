@@ -380,6 +380,81 @@ Section ANF_Val.
     anf_cvt_rel_branches S bs vn r tgm S' pats -> S' \subset S.
   Proof. eapply (proj2 (proj2 (proj2 anf_cvt_rel_subset))). Qed.
 
+  Lemma anf_cvt_result_not_in_output :
+    forall e S vn tgm S' C x,
+      anf_cvt_rel S e vn tgm S' C x ->
+      Disjoint _ (FromList vn) S -> ~ x \in S'.
+  Proof.
+    enough (H :
+      (forall (e : expression.exp) S vn tgm S' C x,
+          anf_cvt_rel S e vn tgm S' C x ->
+          Disjoint _ (FromList vn) S -> ~ x \in S') /\
+      (forall (es : exps), True) /\
+      (forall (efns : efnlst), True) /\
+      (forall (bs : branches_e), True)).
+    { exact (proj1 H). }
+    eapply exp_ind_alt_2.
+    - (* Var_e *)
+      intros n S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt.
+      intros Hin. eapply Hdis. constructor; eauto.
+      eapply nth_error_In. eassumption.
+    - (* Lam_e *)
+      intros na e IH S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel in *.
+      intros Hin.
+      assert (S' \subset S \\ [set x1] \\ [set x])
+        by (eapply anf_cvt_exp_subset; eassumption).
+      apply H in Hin. inv Hin. inv H0. eauto.
+    - (* App_e *)
+      intros e1 IH1 e2 IH2 S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel in *.
+      intros Hin. inv Hin. eauto.
+    - (* Con_e *)
+      intros dc es IH S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel_exps in *.
+      intros Hin.
+      assert (S' \subset S \\ [set x])
+        by (eapply anf_cvt_exps_subset; eassumption).
+      apply H in Hin. inv Hin. eauto.
+    - (* Match_e *)
+      intros e1 IH1 n bs IH2 S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel in *. fold anf_cvt_rel_branches in *.
+      intros Hin. inv Hin. eauto.
+    - (* Let_e *)
+      intros na e1 IH1 e2 IH2 S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel in *.
+      eapply IH2; [ eassumption | ].
+      rewrite FromList_cons.
+      eapply Union_Disjoint_l.
+      + eapply Disjoint_Singleton_l.
+        eapply IH1; eassumption.
+      + eapply Disjoint_Included_r.
+        eapply anf_cvt_exp_subset. eassumption.
+        eassumption.
+    - (* Fix_e *)
+      intros efns IH n S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. fold anf_cvt_rel_efnlst in *.
+      intros Hin.
+      assert (Hsub : S' \subset S \\ FromList fnames)
+        by (eapply anf_cvt_efnlst_subset; eassumption).
+      apply Hsub in Hin. inv Hin. apply H0.
+      eapply nth_error_In. eassumption.
+    - (* Prf_e *)
+      intros S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. intros Hin. inv Hin. eauto.
+    - (* Prim_val_e *)
+      intros p S vn tgm S' C x Hcvt Hdis.
+      inv Hcvt. intros Hin. inv Hin. eauto.
+    - (* Prim_e *) intros. inv H.
+    - (* enil *) exact I.
+    - (* econs *) intros; exact I.
+    - (* eflnil *) exact I.
+    - (* eflcons *) split; intros; exact I.
+    - (* brnil *) exact I.
+    - (* brcons *) intros; exact I.
+  Qed.
+
   Lemma anf_cvt_rel_efnlst_all_fun_name S efns vn fnames tgm S' fdefs :
     anf_cvt_rel_efnlst S efns vn fnames tgm S' fdefs ->
     all_fun_name fdefs = fnames.
@@ -623,6 +698,9 @@ Section ANF_Val.
         (j <= m)%nat ->
         preord_var_env cenv PG j rho1' rho2' r1 r2 ->
         Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
+        (forall x y, preord_var_env cenv PG m rho1 rho2 x y ->
+                     ~ x \in S1 -> ~ y \in S3 ->
+                     preord_var_env cenv PG j rho1' rho2' x y) ->
         preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
       preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
 
@@ -638,6 +716,9 @@ Section ANF_Val.
         (j <= m)%nat ->
         Forall2 (preord_var_env cenv PG j rho1' rho2') xs1 xs2 ->
         Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
+        (forall x y, preord_var_env cenv PG m rho1 rho2 x y ->
+                     ~ x \in S1 -> ~ y \in S3 ->
+                     preord_var_env cenv PG j rho1' rho2' x y) ->
         preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
       preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
 
@@ -685,7 +766,7 @@ Section ANF_Val.
       intros n C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
              Hm He1 He2 Hdis1 Hdis2 Henv Hk.
       inv He1. inv He2. simpl.
-      eapply Hk; [lia | | exact Henv].
+      eapply Hk; [lia | | exact Henv | intros ? ? H _ _; exact H].
       match goal with
       | [ Hfa : Forall2 _ ?l1 _, Hn : nth_error ?l1 _ = Some _ |- _ ] =>
         destruct (Forall2_nth_error_l _ _ _ _ _ Hfa Hn) as [? [Hn2 ?]]
@@ -698,7 +779,53 @@ Section ANF_Val.
     - (* App_e *) admit.
     - (* Con_e *) admit.
     - (* Match_e *) admit.
-    - (* Let_e *) admit.
+    - (* Let_e *)
+      intros na e1 IH1 e2 IH2 C1 C2 r1 r2 m vars1 vars2 rho1 rho2
+             S1 S2 S3 S4 e_k1 e_k2
+             Hm He1 He2 Hdis1 Hdis2 Henv Hk.
+      inv He1. inv He2.
+      rewrite <- !app_ctx_f_fuse.
+      eapply IH1.
+      + exact Hm.
+      + eassumption.
+      + eassumption.
+      + exact Hdis1.
+      + exact Hdis2.
+      + exact Henv.
+      + intros j rho1' rho2' Hle Hvar_x1 Henv_vars Hpres.
+        (* e2 is converted with x1 added to var list *)
+        eapply IH2.
+        * lia.
+        * eassumption.
+        * eassumption.
+        * rewrite FromList_cons. eapply Union_Disjoint_l.
+          -- eapply Disjoint_Singleton_l.
+             eapply anf_cvt_result_not_in_output; [eassumption | exact Hdis1].
+          -- eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | exact Hdis1].
+        * rewrite FromList_cons. eapply Union_Disjoint_l.
+          -- eapply Disjoint_Singleton_l.
+             eapply anf_cvt_result_not_in_output; [eassumption | exact Hdis2].
+          -- eapply Disjoint_Included_r; [eapply anf_cvt_exp_subset; eassumption | exact Hdis2].
+        * (* Forall2 for x1::vars1, x1'::vars2 in rho1', rho2' *)
+          constructor.
+          -- exact Hvar_x1.
+          -- exact Henv_vars.
+        * (* continuation for e2 *)
+          intros j' rho1'' rho2'' Hle' Hvar_r2 Henv_vars2 Hpres'.
+          eapply Hk.
+          -- lia.
+          -- exact Hvar_r2.
+          -- inv Henv_vars2. eassumption.
+          -- (* preservation: compose Hpres then Hpres' *)
+             intros a b Hvar_ab Ha Hb.
+             eapply Hpres'.
+             ++ eapply Hpres. exact Hvar_ab. exact Ha. exact Hb.
+             ++ intro Hc. apply Ha.
+                assert (Hsub1 : _ \subset S1) by (eapply anf_cvt_exp_subset; eassumption).
+                exact (Hsub1 _ Hc).
+             ++ intro Hc. apply Hb.
+                assert (Hsub2 : _ \subset S3) by (eapply anf_cvt_exp_subset; eassumption).
+                exact (Hsub2 _ Hc).
     - (* Fix_e *) admit.
     - (* Prf_e *)
       intros C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
@@ -720,6 +847,12 @@ Section ANF_Val.
           -- eapply Forall2_preord_var_env_monotonic; [ | eassumption ]. lia.
           -- intros Hin. eapply Hdis1. constructor; eassumption.
           -- intros Hin. eapply Hdis2. constructor; eassumption.
+        * (* preservation *)
+          intros a b Hvar Ha Hb.
+          eapply preord_var_env_extend_neq.
+          -- eapply preord_var_env_monotonic. eassumption. lia.
+          -- intros Heq. subst. eapply Ha. eassumption.
+          -- intros Heq. subst. eapply Hb. eassumption.
     - (* Prim_val_e *)
       intros p C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
              Hm He1 He2 Hdis1 Hdis2 Henv Hk.
@@ -733,8 +866,54 @@ Section ANF_Val.
       intros C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
              Hm He1 He2 Hdis1 Hdis2 Henv Hk.
       inv He1. inv He2. simpl.
-      eapply Hk; [lia | constructor | eassumption].
-    - (* econs *) admit.
+      eapply Hk; [lia | constructor | eassumption | intros ? ? H _ _; exact H].
+    - (* econs *)
+      intros e IH_e es IH_es C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2
+             S1 S2 S3 S4 e_k1 e_k2
+             Hm He1 He2 Hdis1 Hdis2 Henv Hk.
+      inv He1. inv He2.
+      rewrite <- !app_ctx_f_fuse.
+      eapply IH_e.
+      + exact Hm.
+      + eassumption.
+      + eassumption.
+      + exact Hdis1.
+      + exact Hdis2.
+      + exact Henv.
+      + (* continuation for head expression *)
+        intros j rho1' rho2' Hle Hvar_x1 Henv_vars Hpres.
+        eapply IH_es.
+        * lia.
+        * eassumption.
+        * eassumption.
+        * eapply Disjoint_Included_r;
+          [eapply anf_cvt_exp_subset; eassumption | exact Hdis1].
+        * eapply Disjoint_Included_r;
+          [eapply anf_cvt_exp_subset; eassumption | exact Hdis2].
+        * exact Henv_vars.
+        * (* continuation for tail expression list *)
+          intros j' rho1'' rho2'' Hle' Hxs_tail Henv_vars' Hpres'.
+          eapply Hk.
+          -- lia.
+          -- (* Forall2 for x1 :: xs_tail *)
+             constructor.
+             ++ (* head: x1 preserved through tail context using Hpres' *)
+                eapply Hpres'.
+                ** eapply preord_var_env_monotonic. exact Hvar_x1. lia.
+                ** eapply anf_cvt_result_not_in_output; [eassumption | exact Hdis1].
+                ** eapply anf_cvt_result_not_in_output; [eassumption | exact Hdis2].
+             ++ exact Hxs_tail.
+          -- exact Henv_vars'.
+          -- (* preservation: compose Hpres then Hpres' *)
+             intros a b Hvar_ab Ha Hb.
+             eapply Hpres'.
+             ++ eapply Hpres. exact Hvar_ab. exact Ha. exact Hb.
+             ++ intro Hc. apply Ha.
+                assert (Hsub1 : _ \subset S1) by (eapply anf_cvt_exp_subset; eassumption).
+                exact (Hsub1 _ Hc).
+             ++ intro Hc. apply Hb.
+                assert (Hsub2 : _ \subset S3) by (eapply anf_cvt_exp_subset; eassumption).
+                exact (Hsub2 _ Hc).
     - (* eflnil *)
       intros B1 B2 fnames1 fnames2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4
              Hm He1 He2 Hnd1 Hnd2 Hlen_fn
@@ -823,7 +1002,7 @@ Section ANF_Val.
                   intros Hc; apply H; right; exact Hc
                 end.
         * (* Continuation: Ehalt *)
-          intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont.
+          intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _.
           eapply preord_exp_halt_compat.
           -- eapply Hprops.
           -- eapply Hprops.
@@ -952,7 +1131,7 @@ Section ANF_Val.
         | (* Forall2 env *)
           exact HenvF
         | (* Continuation: Ehalt *)
-          intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont;
+          intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont _;
           eapply preord_exp_halt_compat;
           [ eapply Hprops
           | eapply Hprops

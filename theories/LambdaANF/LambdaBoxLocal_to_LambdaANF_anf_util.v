@@ -542,21 +542,74 @@ Section ANF_Val.
     intros k. induction k as [k IHk] using lt_wf_rec1.
     unfold anf_cvt_alpha_equiv_statement.
     eapply exp_ind_alt_2.
-    - (* Var_e *) admit.
+    - (* Var_e *)
+      intros n C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
+             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.
+      inv He1. inv He2. simpl.
+      eapply Hk; [lia | | eassumption].
+      (* Need: preord_var_env cenv PG m rho1 rho2 r1 r2
+         where nth_error vars1 (N.to_nat n) = Some r1,
+               nth_error vars2 (N.to_nat n) = Some r2 *)
+      admit.
     - (* Lam_e *) admit.
     - (* App_e *) admit.
     - (* Con_e *) admit.
     - (* Match_e *) admit.
     - (* Let_e *) admit.
     - (* Fix_e *) admit.
-    - (* Prf_e *) admit.
-    - (* Prim_val_e *) admit.
-    - (* Prim_e *) admit.
-    - (* enil *) admit.
+    - (* Prf_e *)
+      intros C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
+             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.
+      inv He1. inv He2. simpl.
+      eapply preord_exp_constr_compat.
+      + eapply Hprops.
+      + eapply Hprops.
+      + constructor.
+      + intros m0 vs1 vs2 Hlt Hvals.
+        eapply Hk.
+        * lia.
+        * (* preord_var_env for result: r1=x, r2=x0, in M.set env *)
+          intros v1 Hg1. rewrite M.gss in Hg1. inv Hg1.
+          eexists. split. { rewrite M.gss. reflexivity. }
+          rewrite preord_val_eq. simpl. split; [reflexivity | eassumption].
+        * (* preord_env_P_inj: M.set doesn't affect vars *)
+          eapply preord_env_P_inj_set_not_In_P_l.
+          -- eapply preord_env_P_inj_set_not_In_P_r.
+             ++ eapply preord_env_P_inj_monotonic; [ | eassumption]. lia.
+             ++ intros Hc. eapply image_extend_lst_Included in Hc; [ | eassumption].
+                rewrite image_id in Hc. destruct Hc as [Hc | Hc].
+                ** (* r2 ∈ FromList vars2 contradicts r2 ∈ S3 *)
+                   eapply Hdis2. constructor; eassumption.
+                ** (* r2 ∈ FromList vars1 \ FromList vars1 is absurd *)
+                   destruct Hc; contradiction.
+          -- intros Hin. eapply Hdis1. constructor; eassumption.
+    - (* Prim_val_e *)
+      intros p C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
+             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.
+      inv He1. inv He2. simpl.
+      eapply preord_exp_prim_val_compat. eapply Hprops.
+    - (* Prim_e *)
+      intros p C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
+             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.
+      inv He1.
+    - (* enil *)
+      intros C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
+             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.
+      inv He1. inv He2. simpl.
+      eapply Hk; [lia | constructor | eassumption].
     - (* econs *) admit.
-    - (* eflnil *) admit.
+    - (* eflnil *)
+      intros B1 B2 fnames1 fnames2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4
+             Hm He1 He2 Hlen Hnd1 Hnd2 Hlen_fn
+             Hdis1 Hdis2 Hdis_fn1 Hdis_fn2 Henv.
+      inv He1. inv He2. simpl. repeat normalize_sets.
+      eapply preord_env_P_inj_antimon. eassumption. sets.
     - (* eflcons *) admit.
-    - (* brnil_e *) admit.
+    - (* brnil_e *)
+      intros pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
+             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hvar.
+      inv He1. inv He2.
+      eapply preord_exp_case_nil_compat. eapply Hprops.
     - (* brcons_e *) admit.
   Admitted.
 

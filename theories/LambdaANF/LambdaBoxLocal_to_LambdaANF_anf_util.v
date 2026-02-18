@@ -539,6 +539,25 @@ Section ANF_Val.
   Lemma anf_cvt_alpha_equiv :
     forall k, anf_cvt_alpha_equiv_statement k.
   Proof.
+    intros k. induction k as [k IHk] using lt_wf_rec1.
+    unfold anf_cvt_alpha_equiv_statement.
+    eapply exp_ind_alt_2.
+    - (* Var_e *) admit.
+    - (* Lam_e *) admit.
+    - (* App_e *) admit.
+    - (* Con_e *) admit.
+    - (* Match_e *) admit.
+    - (* Let_e *) admit.
+    - (* Fix_e *) admit.
+    - (* Prf_e *) admit.
+    - (* Prim_val_e *) admit.
+    - (* Prim_e *) admit.
+    - (* enil *) admit.
+    - (* econs *) admit.
+    - (* eflnil *) admit.
+    - (* eflcons *) admit.
+    - (* brnil_e *) admit.
+    - (* brcons_e *) admit.
   Admitted.
 
 

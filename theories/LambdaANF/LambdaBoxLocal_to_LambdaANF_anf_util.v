@@ -776,7 +776,69 @@ Section ANF_Val.
         rewrite H1 in H2; inv H2
       end. assumption.
     - (* Lam_e *) admit.
-    - (* App_e *) admit.
+    - (* App_e *)
+      intros e1 IH1 e2 IH2 C1 C2 r1 r2 m vars1 vars2 rho1 rho2
+             S1 S2 S3 S4 e_k1 e_k2
+             Hm He1 He2 Hdis1 Hdis2 Henv Hk.
+      inv He1. inv He2.
+      rewrite <- !app_ctx_f_fuse. simpl.
+      eapply IH1.
+      + exact Hm.
+      + eassumption.
+      + eassumption.
+      + exact Hdis1.
+      + exact Hdis2.
+      + exact Henv.
+      + (* continuation for e1: env has x1 bound *)
+        intros j rho1' rho2' Hle Hvar_x1 Henv_vars Hpres1.
+        eapply IH2.
+        * lia.
+        * eassumption.
+        * eassumption.
+        * eapply Disjoint_Included_r;
+          [eapply anf_cvt_exp_subset; eassumption | exact Hdis1].
+        * eapply Disjoint_Included_r;
+          [eapply anf_cvt_exp_subset; eassumption | exact Hdis2].
+        * exact Henv_vars.
+        * (* continuation for e2: env has x1, x2 bound *)
+          intros j' rho1'' rho2'' Hle' Hvar_x2 Henv_vars' Hpres2.
+          eapply preord_exp_post_monotonic. now eapply HinclG.
+          eapply preord_exp_letapp_compat.
+          -- now eapply Hprops.
+          -- now eapply Hprops.
+          -- now eapply Hprops.
+          -- (* function: x1 preserved through C2 using Hpres2 *)
+             eapply Hpres2.
+             ++ eapply preord_var_env_monotonic. exact Hvar_x1. lia.
+             ++ eapply anf_cvt_result_not_in_output; [eassumption | exact Hdis1].
+             ++ eapply anf_cvt_result_not_in_output; [eassumption | exact Hdis2].
+          -- constructor. exact Hvar_x2. constructor.
+          -- (* letapp callback: r is bound to the call result *)
+             intros m'' v1 v2 Hlt Hval.
+             eapply Hk.
+             ++ lia.
+             ++ (* preord_var_env for r1/r2 = result of app *)
+                intros w1 Hgr1. rewrite M.gss in Hgr1. inv Hgr1.
+                eexists. split. rewrite M.gss. reflexivity.
+                eapply preord_val_monotonic. exact Hval. lia.
+             ++ (* Forall2 for vars: r doesn't interfere (fresh), preserved by M.set r *)
+                eapply Forall2_preord_var_env_set.
+                ** eapply Forall2_preord_var_env_monotonic; [lia | exact Henv_vars'].
+                ** eapply Hdis1. constructor; eassumption.
+                ** eapply Hdis2. constructor; eassumption.
+             ++ (* preservation through all three contexts + letapp binding *)
+                intros a b Hvar_ab Ha Hb.
+                eapply preord_var_env_extend_neq.
+                ** eapply Hpres2.
+                   --- eapply Hpres1. exact Hvar_ab. exact Ha. exact Hb.
+                   --- intro Hc. apply Ha.
+                       assert (Hs1 : _ \subset S1) by (eapply anf_cvt_exp_subset; eassumption).
+                       exact (Hs1 _ Hc).
+                   --- intro Hc. apply Hb.
+                       assert (Hs2 : _ \subset S3) by (eapply anf_cvt_exp_subset; eassumption).
+                       exact (Hs2 _ Hc).
+                ** intros Heq. subst. eapply Ha. eassumption.
+                ** intros Heq. subst. eapply Hb. eassumption.
     - (* Con_e *) admit.
     - (* Match_e *) admit.
     - (* Let_e *)

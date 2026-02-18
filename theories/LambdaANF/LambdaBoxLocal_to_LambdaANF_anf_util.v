@@ -1099,7 +1099,133 @@ Section ANF_Val.
                 ** lia.
              ++ intros Heq. subst. apply Ha. eassumption.
              ++ intros Heq. subst. apply Hb. eassumption.
-    - (* Match_e *) admit.
+    - (* Match_e *)
+      intros e_arg IHe n' bs IHbs C1 C2 r1 r2 m vars1 vars2 rho1 rho2
+             S1 S2 S3 S4 e_k1 e_k2
+             Hm He1 He2 Hdis1 Hdis2 Henv Hk.
+      inv He1. inv He2. simpl. rewrite <- !app_ctx_f_fuse.
+      eapply preord_exp_fun_compat.
+      + eapply Hprops.
+      + eapply Hprops.
+      + eapply IHe.
+        * lia.
+        * eassumption.
+        * eassumption.
+        * eapply Disjoint_Included_r. apply Setminus_Included.
+          eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis1.
+        * eapply Disjoint_Included_r. apply Setminus_Included.
+          eapply Disjoint_Included_r. apply Setminus_Included. exact Hdis2.
+        * eapply Forall2_preord_var_env_set.
+          -- eapply Forall2_preord_var_env_monotonic with (k := m); [lia | exact Henv].
+          -- intro Hc. eapply Hdis1. constructor. exact Hc. eassumption.
+          -- intro Hc. eapply Hdis2. constructor. exact Hc. eassumption.
+        * (* continuation: Eletapp r f func_tag [x_scr] e_k *)
+          intros j rho1' rho2' Hle Hvar_xscr Henvvars Hpres.
+          eapply preord_exp_letapp_compat.
+          -- now eapply Hprops.
+          -- now eapply Hprops.
+          -- now eapply Hprops.
+          -- (* f1 f2 related *)
+             eapply Hpres.
+             ++ (* preord_var_env (m-1) (def_funs B1 rho1) (def_funs B2 rho2) f1 f2 *)
+                intros v Hg. rewrite def_funs_eq in Hg. 2: { simpl; now left. }
+                inv Hg.
+                eexists. split. { rewrite def_funs_eq. reflexivity. simpl; now left. }
+                eapply preord_val_fun.
+                +++ simpl. rewrite Coqlib.peq_true. reflexivity.
+                +++ simpl. rewrite Coqlib.peq_true. reflexivity.
+                +++ intros rho_b j' vs1 vs2 Hlen Hset.
+                    destruct vs1 as [ | v1 [ | ? ? ] ]; simpl in *; try congruence.
+                    destruct vs2 as [ | v2 [ | ? ? ] ]; simpl in *; try congruence.
+                    inv Hset.
+                    eexists. split. { reflexivity. }
+                    intros Hlt Hall. inv Hall.
+                    eapply preord_exp_post_monotonic. { now eapply HinclG. }
+                    destruct (IHk j' ltac:(lia)) as [_ [_ [_ Hbrs_j]]].
+                    eapply Hbrs_j.
+                    *** lia.
+                    *** eassumption.
+                    *** eassumption.
+                    *** (* Disjoint [y1] :|: FromList vars1 from S_mid1 *)
+                        eapply Disjoint_Included_r.
+                        { eapply anf_cvt_exp_subset. eassumption. }
+                        eapply Union_Disjoint_l.
+                        ---- eapply Disjoint_Singleton_l. intro Hc.
+                             destruct Hc as [_ Hn]. apply Hn. constructor.
+                        ---- eapply Disjoint_Included_r. apply Setminus_Included.
+                             eapply Disjoint_Included_r. apply Setminus_Included.
+                             exact Hdis1.
+                    *** (* Disjoint side 2 *)
+                        eapply Disjoint_Included_r.
+                        { eapply anf_cvt_exp_subset. eassumption. }
+                        eapply Union_Disjoint_l.
+                        ---- eapply Disjoint_Singleton_l. intro Hc.
+                             destruct Hc as [_ Hn]. apply Hn. constructor.
+                        ---- eapply Disjoint_Included_r. apply Setminus_Included.
+                             eapply Disjoint_Included_r. apply Setminus_Included.
+                             exact Hdis2.
+                    *** (* Forall2 vars in M.set y (M.set f .. rho) *)
+                        eapply Forall2_preord_var_env_set.
+                        ---- eapply Forall2_preord_var_env_set.
+                             ++++ eapply Forall2_preord_var_env_monotonic with (k := m);
+                                  [lia | exact Henv].
+                             ++++ intro Hc. eapply Hdis1. constructor. exact Hc. eassumption.
+                             ++++ intro Hc. eapply Hdis2. constructor. exact Hc. eassumption.
+                        ---- intro Hc. eapply Hdis1. constructor. exact Hc.
+                             eapply Setminus_Included. eassumption.
+                        ---- intro Hc. eapply Hdis2. constructor. exact Hc.
+                             eapply Setminus_Included. eassumption.
+                    *** (* preord_var_env y1 y2 *)
+                        eapply preord_var_env_extend_eq. eassumption.
+             ++ intro Hc. destruct Hc as [Hc1 _]. destruct Hc1 as [_ Hn].
+                apply Hn. constructor.
+             ++ intro Hc. destruct Hc as [Hc1 _]. destruct Hc1 as [_ Hn].
+                apply Hn. constructor.
+          -- (* args *)
+             constructor. exact Hvar_xscr. constructor.
+          -- (* letapp continuation *)
+             intros m' v1 v2 Hlt Hval.
+             eapply Hk.
+             ++ lia.
+             ++ intros w Hg. rewrite M.gss in Hg. inv Hg.
+                eexists. split. { rewrite M.gss. reflexivity. }
+                eapply preord_val_monotonic. exact Hval. lia.
+             ++ eapply Forall2_preord_var_env_set.
+                ** eapply Forall2_preord_var_env_monotonic with (k := j);
+                   [lia | exact Henvvars].
+                ** intro Hr. apply (Disjoint_In_l _ _ _ Hdis1 Hr).
+                   eapply Setminus_Included. eapply Setminus_Included.
+                   eapply anf_cvt_exp_subset. eassumption.
+                   eapply anf_cvt_branches_subset. eassumption.
+                   eassumption.
+                ** intro Hr. apply (Disjoint_In_l _ _ _ Hdis2 Hr).
+                   eapply Setminus_Included. eapply Setminus_Included.
+                   eapply anf_cvt_exp_subset. eassumption.
+                   eapply anf_cvt_branches_subset. eassumption.
+                   eassumption.
+             ++ intros a b Hvar Ha Hb.
+                eapply preord_var_env_extend_neq.
+                ** eapply preord_var_env_monotonic.
+                   --- eapply Hpres.
+                       +++ eapply preord_var_env_extend_neq.
+                           *** eapply preord_var_env_monotonic. exact Hvar. lia.
+                           *** intros Heq. subst. apply Ha. eassumption.
+                           *** intros Heq. subst. apply Hb. eassumption.
+                       +++ intro Hc. apply Ha.
+                           eapply Setminus_Included. eapply Setminus_Included. exact Hc.
+                       +++ intro Hc. apply Hb.
+                           eapply Setminus_Included. eapply Setminus_Included. exact Hc.
+                   --- lia.
+                ** intros Heq. subst. apply Ha.
+                   eapply Setminus_Included. eapply Setminus_Included.
+                   eapply anf_cvt_exp_subset. eassumption.
+                   eapply anf_cvt_branches_subset. eassumption.
+                   eassumption.
+                ** intros Heq. subst. apply Hb.
+                   eapply Setminus_Included. eapply Setminus_Included.
+                   eapply anf_cvt_exp_subset. eassumption.
+                   eapply anf_cvt_branches_subset. eassumption.
+                   eassumption.
     - (* Let_e *)
       intros na e1 IH1 e2 IH2 C1 C2 r1 r2 m vars1 vars2 rho1 rho2
              S1 S2 S3 S4 e_k1 e_k2
@@ -1541,7 +1667,7 @@ Section ANF_Val.
         * lia.
       + (* tail case *)
         eapply IH_bs; try eassumption.
-  Admitted.
+  Qed.
 
 
   (** ** Value-level alpha equivalence *)

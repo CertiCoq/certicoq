@@ -2287,8 +2287,7 @@ Section Correct.
     eapply (LambdaBoxLocal_to_LambdaANF_anf_util.anf_cvt_val_alpha_equiv
               func_tag default_tag cnstrs
               eq_fuel eq_fuel cenv
-              eq_fuel_compat eq_fuel_compat eq_fuel_idemp
-              (fun x y H => H) dcon_to_tag_inj k).
+              eq_fuel_compat (fun x y H => H) k).
   Qed.
 
 

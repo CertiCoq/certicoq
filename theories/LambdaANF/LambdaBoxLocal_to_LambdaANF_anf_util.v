@@ -437,6 +437,19 @@ Section ANF_Val.
           -- exact Hn2.
   Qed.
 
+  (* Extract from Forall2 given nth_error on the left list. *)
+  Lemma Forall2_nth_error_l {A B} (R : A -> B -> Prop) l1 l2 k a :
+    Forall2 R l1 l2 ->
+    nth_error l1 k = Some a ->
+    exists b, nth_error l2 k = Some b /\ R a b.
+  Proof.
+    intros HF. revert k. induction HF; intros k Hn.
+    - destruct k; discriminate.
+    - destruct k as [ | k']; simpl in Hn.
+      + inv Hn. eexists. split; [reflexivity | assumption].
+      + eapply IHHF. exact Hn.
+  Qed.
+
   (** ** Alpha-equivalence for ANF values *)
 
   Section Alpha_Equiv.
@@ -489,6 +502,88 @@ Section ANF_Val.
       simpl. eapply preord_env_P_inj_get; eauto.
       repeat normalize_sets. eapply preord_env_P_inj_antimon.
       eapply IHvs. eassumption. eassumption. sets.
+  Qed.
+
+  (* Forall2 preord_var_env is monotonic in the step index. *)
+  Lemma Forall2_preord_var_env_monotonic k j rho1 rho2 vars1 vars2 :
+    (j <= k)%nat ->
+    Forall2 (preord_var_env cenv PG k rho1 rho2) vars1 vars2 ->
+    Forall2 (preord_var_env cenv PG j rho1 rho2) vars1 vars2.
+  Proof.
+    intros Hle. eapply Forall2_monotonic.
+    intros x y Hpve. eapply preord_var_env_monotonic; eassumption.
+  Qed.
+
+  (* Forall2 preord_var_env is preserved under M.set on both sides,
+     when the set variables are not in the Forall2 lists. *)
+  Lemma Forall2_preord_var_env_set k rho1 rho2 x1 x2 v1 v2 vars1 vars2 :
+    Forall2 (preord_var_env cenv PG k rho1 rho2) vars1 vars2 ->
+    ~ x1 \in FromList vars1 ->
+    ~ x2 \in FromList vars2 ->
+    Forall2 (preord_var_env cenv PG k (M.set x1 v1 rho1) (M.set x2 v2 rho2))
+            vars1 vars2.
+  Proof.
+    intros HF Hni1 Hni2. induction HF.
+    - constructor.
+    - constructor.
+      + eapply preord_var_env_extend_neq.
+        * exact H.
+        * intros Heq. apply Hni1. subst. now left.
+        * intros Heq. apply Hni2. subst. now left.
+      + eapply IHHF.
+        * intros Hc. apply Hni1. now right.
+        * intros Hc. apply Hni2. now right.
+  Qed.
+
+  (* Forall2 preord_var_env is preserved under def_funs on both sides,
+     when the Forall2 list variables are disjoint from fundefs names. *)
+  Lemma Forall2_preord_var_env_def_funs k B1 B2 rho1 rho2 vars1 vars2 :
+    Forall2 (preord_var_env cenv PG k rho1 rho2) vars1 vars2 ->
+    Disjoint _ (FromList vars1) (name_in_fundefs B1) ->
+    Disjoint _ (FromList vars2) (name_in_fundefs B2) ->
+    Forall2 (preord_var_env cenv PG k
+               (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2))
+            vars1 vars2.
+  Proof.
+    intros HF Hd1 Hd2. induction HF.
+    - constructor.
+    - constructor.
+      + eapply preord_var_env_def_funs_not_In_r.
+        * intros Hc. eapply Hd2. constructor.
+          now left. exact Hc.
+        * eapply preord_var_env_def_funs_not_In_l.
+          -- intros Hc. eapply Hd1. constructor.
+             now left. exact Hc.
+          -- exact H.
+      + eapply IHHF.
+        * eapply Disjoint_Included_l; [ | exact Hd1 ].
+          intros z Hz. now right.
+        * eapply Disjoint_Included_l; [ | exact Hd2 ].
+          intros z Hz. now right.
+  Qed.
+
+  (* Build Forall2 (preord_var_env) from anf_env_rel' on both sides,
+     using anf_cvt_val_alpha_equiv to relate values at each position. *)
+  Lemma anf_cvt_env_alpha_equiv_Forall2 k :
+    anf_cvt_val_alpha_equiv_statement k ->
+    forall names1 names2 vs rho1 rho2,
+      anf_env_rel' anf_val_rel names1 vs rho1 ->
+      anf_env_rel' anf_val_rel names2 vs rho2 ->
+      Forall2 (preord_var_env cenv PG k rho1 rho2) names1 names2.
+  Proof.
+    intros Hval. induction vs; intros names1 names2 rho1 rho2 Hrel1 Hrel2.
+    - inv Hrel1. inv Hrel2. constructor.
+    - inv Hrel1. inv Hrel2. destructAll. constructor.
+      + intros v1 Hget1.
+        match goal with
+        | [ H1 : M.get ?x1 rho1 = Some ?w1,
+            H2 : M.get ?x2 rho2 = Some ?w2,
+            Hv1 : anf_val_rel a ?w1,
+            Hv2 : anf_val_rel a ?w2 |- _ ] =>
+          rewrite H1 in Hget1; inv Hget1;
+          eexists; split; [ exact H2 | eapply Hval; eassumption ]
+        end.
+      + eapply IHvs; eassumption.
   Qed.
 
   (** ** Expression-level alpha equivalence *)

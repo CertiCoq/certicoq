@@ -450,6 +450,23 @@ Section ANF_Val.
       + eapply IHHF. exact Hn.
   Qed.
 
+  (* Build Forall2 from pointwise nth_error-based relation. *)
+  Lemma Forall2_from_nth_error {A B : Type} (R : A -> B -> Prop)
+        (l1 : list A) (l2 : list B) :
+      Datatypes.length l1 = Datatypes.length l2 ->
+      (forall k a b, nth_error l1 k = Some a -> nth_error l2 k = Some b -> R a b) ->
+      Forall2 R l1 l2.
+  Proof.
+    revert l2. induction l1 as [ | x xs IH]; intros l2 Hlen Hnth.
+    - destruct l2; [constructor | simpl in Hlen; discriminate].
+    - destruct l2 as [ | y ys]; [simpl in Hlen; discriminate | ].
+      constructor.
+      + apply (Hnth 0%nat); reflexivity.
+      + apply IH.
+        * simpl in Hlen. lia.
+        * intros k a b Hk1 Hk2. apply (Hnth (S k)); assumption.
+  Qed.
+
   (** ** Alpha-equivalence for ANF values *)
 
   Section Alpha_Equiv.
@@ -566,18 +583,18 @@ Section ANF_Val.
      using anf_cvt_val_alpha_equiv to relate values at each position. *)
   Lemma anf_cvt_env_alpha_equiv_Forall2 k :
     anf_cvt_val_alpha_equiv_statement k ->
-    forall names1 names2 vs rho1 rho2,
-      anf_env_rel' anf_val_rel names1 vs rho1 ->
-      anf_env_rel' anf_val_rel names2 vs rho2 ->
-      Forall2 (preord_var_env cenv PG k rho1 rho2) names1 names2.
+    forall vs nms_a nms_b rho_a rho_b,
+      anf_env_rel' anf_val_rel nms_a vs rho_a ->
+      anf_env_rel' anf_val_rel nms_b vs rho_b ->
+      Forall2 (preord_var_env cenv PG k rho_a rho_b) nms_a nms_b.
   Proof.
-    intros Hval. induction vs; intros names1 names2 rho1 rho2 Hrel1 Hrel2.
+    intros Hval. induction vs; intros nms_a nms_b rho_a rho_b Hrel1 Hrel2.
     - inv Hrel1. inv Hrel2. constructor.
     - inv Hrel1. inv Hrel2. destructAll. constructor.
       + intros v1 Hget1.
         match goal with
-        | [ H1 : M.get ?x1 rho1 = Some ?w1,
-            H2 : M.get ?x2 rho2 = Some ?w2,
+        | [ H1 : M.get ?x1 rho_a = Some ?w1,
+            H2 : M.get ?x2 rho_b = Some ?w2,
             Hv1 : anf_val_rel a ?w1,
             Hv2 : anf_val_rel a ?w2 |- _ ] =>
           rewrite H1 in Hget1; inv Hget1;
@@ -668,13 +685,15 @@ Section ANF_Val.
       intros n C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
              Hm He1 He2 Hdis1 Hdis2 Henv Hk.
       inv He1. inv He2. simpl.
-      eapply Hk; [lia | | eassumption].
-      edestruct (Forall2_nth_error_l _ _ _ _ _ Henv) as [r2' [Hn2' Hvar]].
-      eassumption.
+      eapply Hk; [lia | | exact Henv].
       match goal with
-      | [ H1 : nth_error ?l ?n = Some ?a, H2 : nth_error ?l ?n = Some ?b |- _ ] =>
+      | [ Hfa : Forall2 _ ?l1 _, Hn : nth_error ?l1 _ = Some _ |- _ ] =>
+        destruct (Forall2_nth_error_l _ _ _ _ _ Hfa Hn) as [? [Hn2 ?]]
+      end.
+      match goal with
+      | [ H1 : nth_error ?l ?k = Some ?a, H2 : nth_error ?l ?k = Some ?b |- _ ] =>
         rewrite H1 in H2; inv H2
-      end. exact Hvar.
+      end. assumption.
     - (* Lam_e *) admit.
     - (* App_e *) admit.
     - (* Con_e *) admit.
@@ -770,63 +789,39 @@ Section ANF_Val.
         intros Hlt Hall_args. inv Hall_args.
         eapply preord_exp_post_monotonic. now eapply HinclG.
         destruct (anf_cvt_alpha_equiv j) as [Hexp [_ [_ _]]].
-        eapply Hexp; [lia | eassumption | eassumption | | | | | | ].
-        * (* length *)
-          simpl. f_equal.
-          unfold anf_env_rel', anf_env_rel in *.
-          transitivity (length vs_clos);
-          [ symmetry; eapply Forall2_length; eassumption
-          | eapply Forall2_length; eassumption ].
-        * (* vars_consistent: x :: names have NoDup from freshness *)
-          intros i j y Hi Hj. destruct i, j; simpl in *; try congruence.
-          -- inv Hi. exfalso. eapply Disjoint_In_l. eapply Hdis1.
-             left. reflexivity. eapply nth_FromList. eassumption.
-          -- inv Hj. exfalso. eapply Disjoint_In_l. eapply Hdis1.
-             left. reflexivity. eapply nth_FromList. eassumption.
-          -- admit. (* TODO: names NoDup from freshness *)
+        eapply Hexp; [lia | eassumption | eassumption | | | | ].
         * (* Disjoint side 1 *)
           eapply Disjoint_Included_l; [ | eassumption ].
           normalize_sets. now sets.
         * (* Disjoint side 2 *)
           eapply Disjoint_Included_l; [ | eassumption ].
           normalize_sets. now sets.
-        * (* Environment mapping *)
-          simpl.
-          eapply preord_env_P_inj_set_alt.
-          -- eapply preord_env_P_inj_set_not_In_P_l.
-             2:{ normalize_sets. intros Hc. inv Hc. apply H0. inv H; [ | contradiction ]; eauto. }
-             eapply preord_env_P_inj_set_not_In_P_r.
-             2:{ intros Hc.
-                 unfold anf_env_rel', anf_env_rel in *.
-                 assert (Hlen_n : Datatypes.length names = Datatypes.length names0).
-                 { transitivity (length vs_clos);
-                   [ symmetry; eapply Forall2_length; eassumption
-                   | eapply Forall2_length; eassumption ]. }
-                 eapply image_extend_lst_Included in Hc; [ | exact Hlen_n ].
-                 rewrite image_id in Hc. repeat normalize_sets.
-                 assert (Hseq : (x |: FromList names) \\ [set x] \\ FromList names <--> Empty_set _) by xsets.
-                 rewrite Hseq in Hc. normalize_sets. contradiction. }
-             eapply preord_env_P_inj_antimon.
-             ++ eapply anf_cvt_env_alpha_equiv_pre; [ eapply IHk; eauto | eassumption | eassumption ].
-             ++ normalize_sets. now sets.
-          -- (* Goal 2: preord_val for the argument *)
-             eassumption.
-          -- (* Goal 3: ~ In (image ...) x0 *)
-             intros Hc.
-             unfold anf_env_rel', anf_env_rel in *.
-             assert (Hlen_n : Datatypes.length names = Datatypes.length names0).
-             { transitivity (length vs_clos);
-               [ symmetry; eapply Forall2_length; eassumption
-               | eapply Forall2_length; eassumption ]. }
-             eapply image_extend_lst_Included in Hc; [ | exact Hlen_n ].
-             rewrite image_id in Hc. repeat normalize_sets.
-             assert (Hseq : (x |: FromList names) \\ [set x] \\ FromList names <--> Empty_set _) by xsets.
-             rewrite Hseq in Hc. normalize_sets.
-             (* Hc : x0 \in FromList names0, but ~ x0 \in f0 |: FromList names0 *)
-             match goal with
-             | [ Hnot : ~ ?z \in _ |: ?S, Hin : ?z \in ?S |- _ ] =>
-               apply Hnot; right; exact Hin
-             end.
+        * (* Forall2 (preord_var_env) for x :: names and x0 :: names0 *)
+          constructor.
+          -- (* head: x x0 in M.set env *)
+             eapply preord_var_env_extend_eq. eassumption.
+          -- (* tail: names names0, env is M.set x _ (M.set f _ rho) *)
+             eapply Forall2_preord_var_env_set.
+             ++ (* peel f/f0 M.set *)
+                eapply Forall2_preord_var_env_set.
+                ** eapply anf_cvt_env_alpha_equiv_Forall2.
+                   --- eapply IHk. lia.
+                   --- eassumption.
+                   --- eassumption.
+                ** (* ~ f \in FromList names *)
+                   assumption.
+                ** (* ~ f0 \in FromList names0 *)
+                   assumption.
+             ++ (* ~ x \in FromList names *)
+                match goal with
+                | [ H : ~ ?y \in _ |: FromList ?ns |- ~ ?y \in FromList ?ns ] =>
+                  intros Hc; apply H; right; exact Hc
+                end.
+             ++ (* ~ x0 \in FromList names0 *)
+                match goal with
+                | [ H : ~ ?y \in _ |: FromList ?ns |- ~ ?y \in FromList ?ns ] =>
+                  intros Hc; apply H; right; exact Hc
+                end.
         * (* Continuation: Ehalt *)
           intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont.
           eapply preord_exp_halt_compat.
@@ -851,14 +846,6 @@ Section ANF_Val.
       assert (Hname1 := Hfix1); eapply anf_fix_rel_names in Hname1.
       assert (Hname2 := Hfix2); eapply anf_fix_rel_names in Hname2. subst.
 
-      assert (Hlen_names : Datatypes.length names = Datatypes.length names0).
-      { unfold anf_env_rel' in *.
-        match goal with
-        | [ H1 : Forall2 _ _ names, H2 : Forall2 _ _ names0 |- _ ] =>
-          transitivity (length vs_clos);
-          [ symmetry; eapply Forall2_length; exact H1
-          | eapply Forall2_length; exact H2 ]
-        end. }
       assert (Hlen_fnames : Datatypes.length (all_fun_name Bs) = Datatypes.length (all_fun_name Bs0))
         by (erewrite anf_fix_rel_fnames_length by exact Hfix1;
             erewrite anf_fix_rel_fnames_length by exact Hfix2; reflexivity).
@@ -897,67 +884,73 @@ Section ANF_Val.
         intros Hlt Hall_args. inv Hall_args.
 
         eapply preord_exp_post_monotonic. { now eapply HinclG. }
-        destruct (anf_cvt_alpha_equiv j) as [Hexp [_ [_ _]]];
+        destruct (anf_cvt_alpha_equiv j) as [Hexp [_ [_ _]]].
+
+        (* Build the Forall2 env relation *)
+        assert (HenvF :
+          Forall2 (preord_var_env cenv PG j
+                     (M.set x1 v_arg1 (def_funs Bs Bs rho rho))
+                     (M.set x2 v_arg2 (def_funs Bs0 Bs0 rho0 rho0)))
+                  (x1 :: rev (all_fun_name Bs) ++ names)
+                  (x2 :: rev (all_fun_name Bs0) ++ names0)).
+        { constructor.
+          - (* head: x1, x2 — function args *)
+            eapply preord_var_env_extend_eq. eassumption.
+          - (* tail: rev fnames ++ names *)
+            eapply Forall2_preord_var_env_set.
+            + (* Forall2 at def_funs level *)
+              eapply Forall2_app.
+              * (* rev fnames: closures related by inner IH *)
+                eapply All_Forall.Forall2_rev.
+                eapply Forall2_from_nth_error.
+                -- exact Hlen_fnames.
+                -- intros n_cl f1_cl f2_cl Hn1_cl Hn2_cl.
+                   intros v1_cl Hget1_cl.
+                   assert (Hni1 : name_in_fundefs Bs f1_cl)
+                     by (rewrite name_fds_same; eapply nth_error_In; eassumption).
+                   rewrite (def_funs_eq _ _ _ _ _ Hni1) in Hget1_cl.
+                   inv Hget1_cl.
+                   assert (Hni2 : name_in_fundefs Bs0 f2_cl)
+                     by (rewrite name_fds_same; eapply nth_error_In; eassumption).
+                   eexists. split.
+                   ++ exact (def_funs_eq _ _ _ _ _ Hni2).
+                   ++ (* preord_val for closure pair — from inner IH *)
+                      eapply IHm_fix.
+                      ** lia.
+                      ** intros m0 Hm0. eapply IHk. lia.
+                      ** { rewrite Forall_forall. intros v0 _. intros v1' v2' Hr1 Hr2.
+                           exact (IHk j Hlt v0 v1' v2' Hr1 Hr2). }
+                      ** exact Hn1_cl.
+                      ** exact Hn2_cl.
+              * (* names: captured env *)
+                eapply Forall2_preord_var_env_def_funs.
+                -- eapply anf_cvt_env_alpha_equiv_Forall2.
+                   ++ eapply IHk. lia.
+                   ++ eassumption.
+                   ++ eassumption.
+                -- eapply Disjoint_Included_r;
+                     [exact (proj1 (Same_set_all_fun_name _)) | assumption].
+                -- eapply Disjoint_Included_r;
+                     [exact (proj1 (Same_set_all_fun_name _)) | assumption].
+            + (* ~ x1 \in FromList (rev fnames ++ names) *)
+              rewrite FromList_app, FromList_rev. exact Hfresh_b1.
+            + (* ~ x2 \in FromList (rev fnames0 ++ names0) *)
+              rewrite FromList_app, FromList_rev. exact Hfresh_b2. }
+
         eapply Hexp with
           (vars1 := x1 :: rev (all_fun_name Bs) ++ names)
           (vars2 := x2 :: rev (all_fun_name Bs0) ++ names0);
         [ lia
         | eassumption
         | eassumption
-        | simpl; rewrite !length_app, !length_rev; congruence
         | (* Disjoint side 1 *)
           eapply Disjoint_Included_l; [ | exact Hdis_b1 ];
           rewrite FromList_cons, FromList_app, FromList_rev; now sets
         | (* Disjoint side 2 *)
           eapply Disjoint_Included_l; [ | exact Hdis_b2 ];
           rewrite FromList_cons, FromList_app, FromList_rev; now sets
-        | (* Environment mapping:
-             After preord_val_fun callback, envs are
-               M.set x1 v_arg1 (def_funs Bs Bs rho rho)
-               M.set x2 v_arg2 (def_funs Bs0 Bs0 rho0 rho0)
-             Use set_alt to strip x1/x2, then def_funs_Vfun for the fundefs layer. *)
-          simpl;
-          eapply preord_env_P_inj_set_alt;
-          [ (* Goal 1: env after stripping M.set x1/x2 *)
-            rewrite extend_lst_app; [ | rewrite !length_rev; eassumption ];
-            rewrite extend_lst_rev; eauto;
-            eapply preord_env_P_inj_def_funs_Vfun; try eassumption;
-            [ (* Prem 1: env for names only (below fundefs) *)
-              eapply preord_env_P_inj_antimon;
-              [ eapply anf_cvt_env_alpha_equiv_pre;
-                [ eapply IHk; eauto | eassumption | eassumption ]
-              | rewrite Same_set_all_fun_name; repeat normalize_sets;
-                rewrite FromList_rev; now xsets ]
-            | (* Prem 4: image disjoint from fundefs names *)
-              eapply Disjoint_Included_l;
-              [ eapply image_extend_lst_Included; eassumption | ];
-              rewrite image_id; repeat normalize_sets; rewrite !FromList_rev;
-              rewrite !Same_set_all_fun_name;
-              assert (Hseq1 : x1 |: (FromList (all_fun_name Bs) :|: FromList names) \\ [set x1] \\
-                                FromList (all_fun_name Bs) \\ FromList names <--> Empty_set _) by xsets;
-              rewrite Hseq1; repeat normalize_sets; eassumption
-            | (* Prem 5: pairwise function value relation *)
-              intros; subst; repeat subst_exp;
-              eapply IHm_fix;
-              [ lia
-              | intros; eapply IHk; lia
-              | eapply Forall_impl; [ | eassumption ];
-                simpl; intros ? Hmfix_v ? ? ? ?;
-                eapply preord_val_monotonic; [ eapply Hmfix_v; eassumption | lia ]
-              | eassumption
-              | eassumption ] ]
-          | (* Goal 2: preord_val for argument *)
-            eassumption
-          | (* Goal 3: ~ In (image ...) x2 *)
-            intros Hc;
-            eapply image_extend_lst_Included in Hc;
-            [ | rewrite !length_app, !length_rev; congruence ];
-            rewrite image_id in Hc; repeat normalize_sets;
-            rewrite !FromList_rev in Hc;
-            assert (Hseq2 : (x1 |: (FromList (all_fun_name Bs) :|: FromList names)) \\ [set x1] \\
-                              (FromList (all_fun_name Bs) :|: FromList names) <--> Empty_set _) by xsets;
-            rewrite Hseq2 in Hc; repeat normalize_sets;
-            exact (Hfresh_b2 Hc) ]
+        | (* Forall2 env *)
+          exact HenvF
         | (* Continuation: Ehalt *)
           intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont;
           eapply preord_exp_halt_compat;

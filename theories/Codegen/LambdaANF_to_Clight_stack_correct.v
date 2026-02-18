@@ -362,26 +362,75 @@ Section STACK_CORRECT.
 
   (** ** Full state invariant *)
 
-  Record s_inv (e : exp) (rho : cps.M.t cps.val)
-    (lenv : temp_env) (m : mem) (max_alloc : Z) : Prop := mk_s_inv
-  { s_inv_L : block -> Z -> Prop
-  ; s_inv_prot : stack_protected_not_in_L lenv s_inv_L
-  ; s_inv_mem : s_rel_mem s_inv_L e rho lenv m
-  ; s_inv_tinfo : stack_correct_tinfo max_alloc lenv m
-  }.
+  Definition s_inv (e : exp) (rho : cps.M.t cps.val)
+    (lenv : temp_env) (m : mem) (max_alloc : Z) : Prop :=
+    exists L : block -> Z -> Prop,
+      stack_protected_not_in_L lenv L /\
+      s_rel_mem L e rho lenv m /\
+      stack_correct_tinfo max_alloc lenv m.
 
   (** ** Main correctness theorem *)
 
-  (* The ANF backend compilation preserves evaluation semantics.
-     For each LambdaANF big-step evaluation, the compiled Clight code
-     steps to a corresponding state with the result value represented
-     as the return value of the function. *)
+  (* The ANF backend preserves evaluation semantics:
+     if expression e evaluates to value v under environment rho,
+     and the Clight state satisfies the invariant with sufficient
+     allocation space, then the compiled Clight code steps from
+     (State fu stm k local_env lenv m) to
+     (Returnstate rv (call_cont k) m') where rv represents v.
 
-  (* Placeholder: will be refined as proof develops *)
+     Key differences from the CPS correctness theorem:
+     - The Clight function returns val (not Tvoid), so we reach
+       Returnstate rather than placing the result in args[1]
+     - Non-tail calls (Eletapp) push live vars onto the shadow
+       stack before calling, pop them after, and trigger GC
+       post-call if needed
+     - local_env contains the stack frame and roots array
+       (from stack_decl in the translation)
+
+     The hypothesis connecting stm to the compilation of e
+     will be refined as individual cases are proved. *)
+
   Theorem stack_codegen_correct :
     forall e rho v c,
       bstep_e (M.empty _) cenv rho e v c ->
-      True.
-  Proof. intros; exact I. Qed.
+      forall stm lenv m max_alloc fu local_env k,
+        s_inv e rho lenv m max_alloc ->
+        (Z.of_nat (LambdaANF_to_Clight_stack.max_allocs e) <= max_alloc)%Z ->
+        exists rv m',
+          s_m_tstep2 (globalenv p)
+            (State fu stm k local_env lenv m)
+            (Returnstate rv (call_cont k) m') /\
+          exists L, s_repr_val L v rv m'.
+  Proof.
+    intros e rho v c Heval.
+    induction Heval.
+    - (* BStep_constr: Econstr x t ys e *)
+      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
+      admit.
+    - (* BStep_proj: Eproj x t n y e *)
+      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
+      admit.
+    - (* BStep_case: Ecase y cl *)
+      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
+      admit.
+    - (* BStep_app: Eapp f t ys — tail call *)
+      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
+      admit.
+    - (* BStep_letapp: Eletapp x f t ys e — non-tail call with shadow stack *)
+      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
+      admit.
+    - (* BStep_fun: Efun fl e *)
+      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
+      admit.
+    - (* BStep_prim_val: Eprim_val x p e *)
+      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
+      admit.
+    - (* BStep_prim: Eprim x f ys e *)
+      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
+      admit.
+    - (* BStep_halt: Ehalt x *)
+      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
+      admit.
+  Admitted.
 
 End STACK_CORRECT.

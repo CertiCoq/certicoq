@@ -575,14 +575,12 @@ Section ANF_Val.
         * (* preord_env_P_inj: M.set doesn't affect vars *)
           eapply preord_env_P_inj_set_not_In_P_l.
           -- eapply preord_env_P_inj_set_not_In_P_r.
-             ++ eapply preord_env_P_inj_monotonic; [ | eassumption]. lia.
-             ++ intros Hc. eapply image_extend_lst_Included in Hc; [ | eassumption].
-                rewrite image_id in Hc. destruct Hc as [Hc | Hc].
-                ** (* FromList vars1 \ FromList vars1 is absurd *)
-                   destruct Hc; contradiction.
-                ** (* r2 ∈ FromList vars2 contradicts r2 ∈ S3 *)
-                   eapply Hdis2. now constructor; eauto.
-          -- intros Hin. eapply Hdis1. now constructor; eauto.
+             ++ eapply preord_env_P_inj_monotonic; [ | eassumption ]. lia.
+             ++ intros Hc. eapply image_extend_lst_Included in Hc; [ | eassumption ].
+                rewrite image_id in Hc. rewrite Setminus_Same_set_Empty_set in Hc.
+                normalize_sets.
+                apply (Disjoint_In_l _ _ _ Hdis2 Hc). eassumption.
+          -- intros Hin. apply (Disjoint_In_l _ _ _ Hdis1 Hin). eassumption.
     - (* Prim_val_e *)
       intros p C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
              Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.

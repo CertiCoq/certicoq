@@ -16,141 +16,14 @@ Require Import LambdaBoxLocal.expression LambdaBoxLocal.fuel_sem.
 Require Import cps cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
         LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util
-        LambdaANF.tactics identifiers bounds cps_util rename stemctx.
+        LambdaANF.tactics identifiers bounds cps_util rename stemctx
+        LambdaBoxLocal_to_LambdaANF_anf_util.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
 Import Monad.MonadNotation.
 
 Open Scope monad_scope.
-
-
-(** * ANF Bounds *)
-
-Section Bounds.
-
-  (** LambdaBoxLocal fuel and trace *)
-
-  Definition fuel_exp (e: expression.exp) : nat :=
-    match e with
-    | Let_e _ _ _ => 0  (* ANF Let_e is just context composition, no overhead *)
-    | _ => 1
-    end.
-
-  Fixpoint max_m_branches (br : branches_e) : nat :=
-    match br with
-    | brnil_e => 0
-    | brcons_e _ (m, _) e br => max (N.to_nat m) (max_m_branches br)
-    end.
-
-  (* This is the cost of the ANF-ed program.
-     ANF is more efficient than CPS because there are no continuation calls. *)
-  Definition anf_trace_exp (e: expression.exp) : nat :=
-    match e with
-    | Var_e _ => 1  (* Ehalt *)
-    | Lam_e _ _ => 2 (* Efun + Ehalt *)
-    | App_e _ _ => 2 (* Eletapp + Ehalt *)
-    | Let_e _ _ _ => 0 (* context composition, no overhead *)
-    | Fix_e _ _ => 2 (* Efun + Ehalt *)
-
-    | Con_e _ es => 2  (* Econstr + Ehalt *)
-    | Match_e _ _ brs => 4 + max_m_branches brs (* Efun + Eletapp + Ecase + projections + Ehalt *)
-
-    | Prf_e => 2 (* Econstr + Ehalt *)
-    | Prim_e x => 0
-    | Prim_val_e x => 2 (* Eprim_val + Ehalt *)
-    end.
-
-
-  Program Instance fuel_resource_LambdaBoxLocal : @resource expression.exp nat :=
-    { zero := 0;
-      one_i := fuel_exp;
-      plus := Nat.add
-    }.
-  Next Obligation.
-    lia.
-  Qed.
-  Next Obligation.
-    lia.
-  Qed.
-  Next Obligation.
-    lia.
-  Qed.
-
-  Program Instance trace_resource_LambdaBoxLocal : @resource expression.exp nat :=
-    { zero := 0;
-      one_i := anf_trace_exp;
-      plus := Nat.add
-    }.
-  Next Obligation.
-    lia.
-  Qed.
-  Next Obligation.
-    lia.
-  Qed.
-  Next Obligation.
-    lia.
-  Qed.
-
-  Global Instance LambdaBoxLocal_resource_fuel : @LambdaBoxLocal_resource nat.
-  Proof.
-    constructor. eapply fuel_resource_LambdaBoxLocal.
-  Defined.
-
-  Global Instance LambdaBoxLocal_resource_trace : @LambdaBoxLocal_resource nat.
-  Proof.
-    constructor. eapply trace_resource_LambdaBoxLocal.
-  Defined.
-
-
-
-  (** LambdaANF fuel and trace *)
-
-  Global Program Instance trace_res_pre : @resource fin unit :=
-    { zero := tt;
-      one_i fin := tt;
-      plus x y := tt; }.
-  Next Obligation. destruct x. reflexivity. Qed.
-  Next Obligation. destruct x; destruct y. reflexivity. Qed.
-
-
-  Global Program Instance trace_res_exp : @exp_resource unit :=
-    { HRes := trace_res_pre }.
-
-  Global Instance trace_res : @trace_resource unit.
-  Proof.
-    econstructor. eapply trace_res_exp.
-  Defined.
-
-  Definition eq_fuel : @PostT nat unit :=
-    fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) => f1 = f2.
-
-  Definition anf_bound (f_src t_src : nat) : @PostT nat unit :=
-    fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) =>
-      (f1 + f_src <= f2)%nat /\ (* lower bound *)
-      (f2 <= f1 + t_src)%nat (* upper bound *).
-
-
-  Ltac unfold_all :=
-    try unfold zero in *;
-    try unfold one_ctx in *;
-    try unfold algebra.one in *;
-    try unfold one_i in *;
-    try unfold HRes in *;
-    try unfold HRexp_f in *; try unfold fuel_res in *; try unfold fuel_res_exp in *; try unfold fuel_res_pre in *;
-    try unfold HRexp_t in *; try unfold trace_res in *; try unfold trace_res_exp in *; try unfold trace_res_pre in *.
-
-
-
-  Global Instance eq_fuel_compat cenv :
-    @Post_properties cenv nat _ unit _ eq_fuel eq_fuel eq_fuel.
-  Proof.
-    unfold eq_fuel. constructor; try now (intro; intros; intro; intros; unfold_all; simpl; lia).
-    - intro; intros. unfold post_base'. unfold_all; simpl. lia.
-    - firstorder.
-  Qed.
-
-End Bounds.
 
 
 (** * ANF Correctness *)
@@ -182,74 +55,11 @@ Section Correct.
   Definition anf_cvt_rel_branches := LambdaBoxLocal_to_LambdaANF.anf_cvt_rel_branches func_tag default_tag.
 
 
-  (** ** ANF value relation *)
+  (** ** ANF value relation (from LambdaBoxLocal_to_LambdaANF_anf_util) *)
 
-  Definition anf_env_rel' (P : value -> val -> Prop) (vn : list var)
-             (vs : list value) (rho : M.t val) :=
-    Forall2 (fun v x => exists v',  M.get x rho = Some v' /\ P v v') vs vn.
-
-  Inductive anf_fix_rel (fnames : list var) (names : list var) : Ensemble var -> list var -> efnlst -> fundefs -> Ensemble var -> Prop :=
-  | anf_fix_fnil :
-      forall S, anf_fix_rel fnames names S [] eflnil Fnil S
-  | anf_fix_fcons :
-      forall S1 S1' S2 S2' S3 fnames' e1 C1 r1 n n' efns B f x,
-        Disjoint _ S1 (FromList fnames :|: FromList names) ->
-        x \in S1 ->
-        S1' \subset S1 \\ [set x] ->
-        S2' \subset S2 ->
-
-        anf_cvt_rel S1' e1 (x :: List.rev fnames ++ names) cnstrs S2 C1 r1 ->
-
-        anf_fix_rel fnames names S2' fnames' efns B S3 ->
-        anf_fix_rel fnames names S1 (f :: fnames') (eflcons n' (Lam_e n e1) efns)
-                    (Fcons f func_tag [x] (C1 |[ Ehalt r1 ]|) B) S3.
-
-
-  Definition env_consistent (vn : list var) (rho : list value) : Prop :=
-    forall i j x,
-      nth_error vn i = Some x ->
-      nth_error vn j = Some x ->
-      nth_error rho i = nth_error rho j.
-
-  Inductive anf_val_rel : value -> val -> Prop :=
-  | anf_rel_Con :
-      forall vs vs' dc c_tag,
-        Forall2 (fun v v' => anf_val_rel v v') vs vs' ->
-        dcon_to_tag default_tag dc cnstrs = c_tag ->
-        anf_val_rel (Con_v dc vs) (Vconstr c_tag vs')
-  | anf_rel_Clos :
-      forall vs rho names na x f e C1 r1 S1 S2,
-        anf_env_rel' anf_val_rel names vs rho ->
-
-        env_consistent names vs ->
-
-        Disjoint var (x |: (f |: FromList names)) S1 ->
-
-        ~ x \in f |: FromList names ->
-        ~ f \in FromList names ->
-
-        anf_cvt_rel S1 e (x :: names) cnstrs S2 C1 r1 ->
-        anf_val_rel (Clos_v vs na e)
-                    (Vfun rho (Fcons f func_tag [x] (C1 |[ Ehalt r1 ]|) Fnil) f)
-  | anf_rel_ClosFix :
-      forall S1 S2 names fnames vs rho efns Bs n f,
-        anf_env_rel' anf_val_rel names vs rho ->
-
-        env_consistent names vs ->
-        NoDup fnames ->
-
-        Disjoint _ (FromList names :|: FromList fnames) S1 ->
-        Disjoint _ (FromList names) (FromList fnames) ->
-
-        nth_error fnames (N.to_nat n) = Some f ->
-
-        anf_fix_rel fnames names S1 fnames efns Bs S2 ->
-
-        anf_val_rel (ClosFix_v vs efns n) (Vfun rho Bs f).
-
-
-  Definition anf_env_rel : list var -> list value -> M.t val -> Prop :=
-    anf_env_rel' anf_val_rel.
+  Definition anf_val_rel := LambdaBoxLocal_to_LambdaANF_anf_util.anf_val_rel func_tag default_tag cnstrs.
+  Definition anf_env_rel := LambdaBoxLocal_to_LambdaANF_anf_util.anf_env_rel func_tag default_tag cnstrs.
+  Definition anf_fix_rel := LambdaBoxLocal_to_LambdaANF_anf_util.anf_fix_rel func_tag default_tag cnstrs.
 
 
   (** ** Helper lemmas for environment relations *)
@@ -259,7 +69,7 @@ Section Correct.
     ~ x \in FromList vnames ->
     anf_env_rel vnames vs (M.set x v rho).
   Proof.
-    intros Henv Hnin. unfold anf_env_rel, anf_env_rel' in *.
+    intros Henv Hnin. unfold anf_env_rel, LambdaBoxLocal_to_LambdaANF_anf_util.anf_env_rel, anf_env_rel' in *.
     eapply Forall2_monotonic_strong; [ | eassumption ].
     simpl. intros x1 x2 Hin1 Hin2 Hr. rewrite M.gso; eauto.
     intros Hc; subst; auto.
@@ -271,7 +81,7 @@ Section Correct.
     anf_val_rel v v' ->
     anf_env_rel (x :: vnames) (v :: vs) rho.
   Proof.
-    intros Henv Hget Hval. unfold anf_env_rel, anf_env_rel' in *.
+    intros Henv Hget Hval. unfold anf_env_rel, LambdaBoxLocal_to_LambdaANF_anf_util.anf_env_rel, anf_env_rel' in *.
     econstructor; eauto.
   Qed.
 
@@ -281,7 +91,7 @@ Section Correct.
     ~ x \in FromList vnames ->
     anf_env_rel (x :: vnames) (v :: vs) (M.set x v' rho).
   Proof.
-    intros Henv Hval Hnin. unfold anf_env_rel, anf_env_rel' in *.
+    intros Henv Hval Hnin. unfold anf_env_rel, LambdaBoxLocal_to_LambdaANF_anf_util.anf_env_rel, anf_env_rel' in *.
     econstructor; eauto.
     - rewrite M.gss. eexists. split; eauto.
     - eapply anf_env_rel_weaken; eauto.
@@ -297,7 +107,7 @@ Section Correct.
       exists v, nth_error vs k = Some v /\ anf_val_rel v v') ->
     anf_env_rel vnames vs (M.set x v' rho).
   Proof.
-    unfold anf_env_rel, anf_env_rel'.
+    unfold anf_env_rel, LambdaBoxLocal_to_LambdaANF_anf_util.anf_env_rel, anf_env_rel'.
     intros Henv Hdup.
     revert vs Henv Hdup.
     induction vnames as [ | y vnames' IH]; intros vs Henv Hdup.
@@ -333,7 +143,7 @@ Section Correct.
     anf_env_rel vnames vs rho ->
     Datatypes.length vnames = Datatypes.length vs.
   Proof.
-    unfold anf_env_rel, anf_env_rel'. intros H.
+    unfold anf_env_rel, LambdaBoxLocal_to_LambdaANF_anf_util.anf_env_rel, anf_env_rel'. intros H.
     induction H; simpl; auto.
   Qed.
 
@@ -348,19 +158,14 @@ Section Correct.
   Qed.
 
 
-  Lemma anf_fix_rel_fnames_length fnames names S1 fnames_list efns Bs S2 :
-    anf_fix_rel fnames names S1 fnames_list efns Bs S2 ->
-    List.length fnames_list = efnlength efns.
-  Proof.
-    intros Hrel. induction Hrel; simpl; congruence.
-  Qed.
-
-  Lemma anf_fix_rel_names fnames names S1 fnames_list efns Bs S2 :
-    anf_fix_rel fnames names S1 fnames_list efns Bs S2 ->
-    all_fun_name Bs = fnames_list.
-  Proof.
-    intros H. induction H; simpl; congruence.
-  Qed.
+  Definition anf_fix_rel_fnames_length :=
+    LambdaBoxLocal_to_LambdaANF_anf_util.anf_fix_rel_fnames_length func_tag default_tag cnstrs.
+  Definition anf_fix_rel_names :=
+    LambdaBoxLocal_to_LambdaANF_anf_util.anf_fix_rel_names func_tag default_tag cnstrs.
+  Definition anf_fix_rel_find_def :=
+    LambdaBoxLocal_to_LambdaANF_anf_util.anf_fix_rel_find_def func_tag default_tag cnstrs.
+  Definition anf_fix_rel_find_def_ext :=
+    LambdaBoxLocal_to_LambdaANF_anf_util.anf_fix_rel_find_def_ext func_tag default_tag cnstrs.
 
   Local Lemma nth_error_Forall2 (A B : Type) (P : A -> B -> Prop)
         (l : list A) (l' : list B) :
@@ -389,7 +194,7 @@ Section Correct.
     anf_env_rel (rev fnames ++ names) (make_rec_env_rev_order fns vs) (def_funs Bs Bs rho rho).
   Proof.
     intros Hrel Hfix Hnd Hcons Hdis1 Hdis2.
-    unfold anf_env_rel, anf_env_rel' in *.
+    unfold anf_env_rel, LambdaBoxLocal_to_LambdaANF_anf_util.anf_env_rel, anf_env_rel' in *.
     destruct (make_rec_env_rev_order_app fns vs) as [vs' [Hrec [Hlen_vs' Hnth_vs']]].
     rewrite Hrec.
     assert (Hfnames_len : Datatypes.length fnames = efnlength fns).
@@ -534,7 +339,7 @@ Section Correct.
       { eapply Forall2_length; exact Hval. }
       assert (Hlen2 := set_lists_length_eq _ _ _ _ Hset).
       rewrite length_rev in Hlen2. lia. }
-    unfold anf_env_rel, anf_env_rel' in *.
+    unfold anf_env_rel, LambdaBoxLocal_to_LambdaANF_anf_util.anf_env_rel, anf_env_rel' in *.
     assert (Hgl : get_list (rev xs) rho' = Some vs2).
     { eapply get_list_set_lists; [ | exact Hset ].
       apply NoDup_rev. exact Hnd. }
@@ -616,14 +421,8 @@ Section Correct.
      Eprim_val expressions always OOT in bstep_fuel (BStepf_OOT only).
      See preord_exp_prim_val_compat in logical_relations.v for the vacuous compatibility lemma. *)
 
-  Lemma eq_fuel_idemp :
-    inclusion _ (comp eq_fuel eq_fuel) eq_fuel.
-  Proof.
-    clear. unfold comp, eq_fuel. intro; intros.
-    destruct x as [[[? ?] ?] ?].
-    destruct y as [[[? ?] ?] ?]. destructAll.
-    destruct x as [[[? ?] ?] ?]. congruence.
-  Qed.
+  Definition eq_fuel_idemp :=
+    LambdaBoxLocal_to_LambdaANF_anf_util.eq_fuel_idemp.
 
   Definition eq_fuel_n (n : nat) : @PostT nat unit :=
     fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) => (f1 + n)%nat = f2.
@@ -2622,104 +2421,6 @@ Section Correct.
         * unfold nargs in Hfind. simpl in Hfind. destruct (N.eq_dec m n); [congruence | discriminate].
       + etransitivity; [exact (IH Hfind) | apply Nat.le_max_r].
   Qed.
-
-  (* Helper: extract a specific function entry from an anf_fix_rel bundle.
-     Given the nth function name and the nth source body, find_def locates
-     the corresponding ANF function definition in the bundled fundefs. *)
-  Lemma anf_fix_rel_find_def :
-    forall fnames0 names0 S1 fnames_list efns Bs S2 idx f na e_body,
-      anf_fix_rel fnames0 names0 S1 fnames_list efns Bs S2 ->
-      nth_error fnames_list idx = Some f ->
-      enthopt idx efns = Some (Lam_e na e_body) ->
-      NoDup fnames_list ->
-      exists x_pc C_body r_body S_body1 S_body2,
-        find_def f Bs = Some (func_tag, [x_pc], C_body |[ Ehalt r_body ]|) /\
-        anf_cvt_rel S_body1 e_body (x_pc :: List.rev fnames0 ++ names0) cnstrs S_body2 C_body r_body.
-  Proof.
-    intros fnames0 names0 S1 fnames_list efns Bs S2 idx f na e_body
-      Hrel Hnth Henth Hnd.
-    revert idx f na e_body Hnth Henth Hnd.
-    induction Hrel; intros idx0 f0 na0 e_body0 Hnth Henth Hnd.
-    - (* anf_fix_fnil: fnames_list = [], impossible *)
-      destruct idx0; discriminate.
-    - (* anf_fix_fcons *)
-      destruct idx0 as [ | idx'].
-        (* idx = 0: this function *)
-      + simpl in Hnth. inv Hnth.
-        simpl in Henth. inv Henth.
-        do 5 eexists. split.
-        * simpl. destruct (M.elt_eq f0 f0); [ reflexivity | congruence ].
-        * eassumption.
-      + (* idx = S idx': later function *)
-        simpl in Hnth. simpl in Henth.
-        inv Hnd.
-        edestruct IHHrel as (x_pc' & C_body' & r_body' & S_body1' & S_body2' & Hfind' & Hcvt').
-        * exact Hnth.
-        * exact Henth.
-        * assumption.
-        * do 5 eexists. split.
-          -- simpl. destruct (M.elt_eq f0 f) as [Heq | Hneq].
-             ++ exfalso. subst. apply H6. eapply nth_error_In. exact Hnth.
-             ++ exact Hfind'.
-          -- exact Hcvt'.
-  Qed.
-
-  (* Extended version of anf_fix_rel_find_def that also provides the
-     Disjoint property for the body's state set and freshness of x_pc *)
-  Lemma anf_fix_rel_find_def_ext :
-    forall fnames0 names0 S1 fnames_list efns Bs S2 idx f na e_body,
-      anf_fix_rel fnames0 names0 S1 fnames_list efns Bs S2 ->
-      nth_error fnames_list idx = Some f ->
-      enthopt idx efns = Some (Lam_e na e_body) ->
-      NoDup fnames_list ->
-      exists x_pc C_body r_body S_body1 S_body2,
-        find_def f Bs = Some (func_tag, [x_pc], C_body |[ Ehalt r_body ]|) /\
-        anf_cvt_rel S_body1 e_body (x_pc :: List.rev fnames0 ++ names0) cnstrs S_body2 C_body r_body /\
-        Disjoint _ (x_pc |: (FromList fnames0 :|: FromList names0)) S_body1 /\
-        ~ x_pc \in (FromList fnames0 :|: FromList names0).
-  Proof.
-    intros fnames0 names0 S1 fnames_list efns Bs S2 idx f na e_body
-      Hrel Hnth Henth Hnd.
-    revert idx f na e_body Hnth Henth Hnd.
-    induction Hrel; intros idx0 f0 na0 e_body0 Hnth Henth Hnd.
-    - destruct idx0; discriminate.
-    - destruct idx0 as [ | idx'].
-      + simpl in Hnth. inv Hnth.
-        simpl in Henth. inv Henth.
-        do 5 eexists. split; [ | split; [ | split ] ].
-        * simpl. destruct (M.elt_eq f0 f0); [ reflexivity | congruence ].
-        * eassumption.
-        * eapply Disjoint_Included_r; [ eassumption | ].
-          eapply Union_Disjoint_l.
-          -- eapply Disjoint_Singleton_l. intros Hc. destruct Hc as [_ Hc]. apply Hc. constructor.
-          -- eapply Disjoint_Included_r; [ eapply Setminus_Included | ].
-             eapply Disjoint_sym. assumption.
-        * intros Habs.
-          match goal with
-          | [ Hdis : Disjoint _ _ (FromList fnames0 :|: FromList names0),
-              Hin : _ \in _ |- _ ] =>
-            eapply Hdis; constructor; [ exact Hin | exact Habs ]
-          end.
-      + simpl in Hnth. simpl in Henth.
-        inv Hnd.
-        edestruct IHHrel as (x_pc' & C_body' & r_body' & S_body1' & S_body2' &
-                              Hfind' & Hcvt' & Hdis' & Hfresh').
-        * exact Hnth.
-        * exact Henth.
-        * assumption.
-        * do 5 eexists. split; [ | split; [ | split ] ].
-          -- simpl. destruct (M.elt_eq f0 f) as [Heq | Hneq].
-             ++ exfalso. subst.
-                match goal with
-                | [ Hnotin : ~ List.In _ _ |- _ ] =>
-                  apply Hnotin; eapply nth_error_In; exact Hnth
-                end.
-             ++ exact Hfind'.
-          -- exact Hcvt'.
-          -- exact Hdis'.
-          -- exact Hfresh'.
-  Qed.
-
 
   (** ** Correctness statements *)
 

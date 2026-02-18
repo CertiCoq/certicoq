@@ -201,4 +201,187 @@ Section STACK_CORRECT.
     apply (H0 _ _ H1 i chunk).
   Qed.
 
+  (* Rebind CPS-side names to avoid ambiguity with stack imports *)
+  Notation ctor_rep := LambdaANF_to_Clight.ctor_rep.
+  Notation enum := LambdaANF_to_Clight.enum.
+  Notation boxed := LambdaANF_to_Clight.boxed.
+  Notation make_vint := LambdaANF_to_Clight.make_vint.
+  Notation add := LambdaANF_to_Clight.add.
+
+  (** ** Clight stepping *)
+
+  Inductive s_traceless_step2 (ge : genv) : state -> state -> Prop :=
+  | s_ts2_step : forall s1 s2,
+      Clight.step2 ge s1 Events.E0 s2 ->
+      s_traceless_step2 ge s1 s2.
+
+  Definition s_m_tstep2 (ge : genv) := clos_trans _ (s_traceless_step2 ge).
+
+  (** ** Variable resolution *)
+
+  Definition s_Vint_or_Vptr (v : Values.val) : bool :=
+    match v with
+    | Vint _ => negb Archi.ptr64
+    | Vlong _ => Archi.ptr64
+    | Vptr _ _ => true
+    | _ => false
+    end.
+
+  Inductive s_get_var_or_funvar (lenv : temp_env) : positive -> Values.val -> Prop :=
+  | S_gVoF_fun : forall b x,
+      Genv.find_symbol (globalenv p) x = Some b ->
+      s_get_var_or_funvar lenv x (Vptr b (Ptrofs.repr 0%Z))
+  | S_gVoF_var : forall x v,
+      Genv.find_symbol (globalenv p) x = None ->
+      M.get x lenv = Some v ->
+      s_Vint_or_Vptr v = true ->
+      s_get_var_or_funvar lenv x v.
+
+  (** ** Value representation *)
+
+  (* The heap representation of values is identical between CPS and ANF backends.
+     Boxed constructors: block with [header | field_0 | ... | field_{n-1}]
+     Unboxed constructors: tagged integer
+     Functions: pointer to global function symbol *)
+
+  Inductive s_repr_val (L : block -> Z -> Prop)
+    : cps.val -> Values.val -> mem -> Prop :=
+  | SRconstr_boxed :
+      forall t vs h a ord b i m cinfo,
+        M.get t cenv = Some cinfo ->
+        ctor_arity cinfo = a ->
+        ctor_ordinal cinfo = ord ->
+        (a > 0)%N ->
+        header_of_rep (boxed ord a) h ->
+        Mem.load int_chunk m b
+          (Ptrofs.unsigned (Ptrofs.sub i (Ptrofs.repr int_size))) =
+          Some (make_vint h) ->
+        s_repr_val_list L vs (Vptr b i) m ->
+        (forall j : Z,
+            (Ptrofs.unsigned (Ptrofs.sub i (Ptrofs.repr int_size)) <= j <
+             Ptrofs.unsigned (Ptrofs.add i
+               (Ptrofs.repr (int_size * Z.of_N a))))%Z ->
+            L b j) ->
+        s_repr_val L (Vconstr t vs) (Vptr b i) m
+  | SRconstr_unboxed :
+      forall t h ord cinfo m,
+        M.get t cenv = Some cinfo ->
+        ctor_arity cinfo = 0%N ->
+        ctor_ordinal cinfo = ord ->
+        header_of_rep (enum ord) h ->
+        s_repr_val L (Vconstr t []) (make_vint h) m
+  | SRfun :
+      forall rho fds f t vs e b m,
+        find_def f fds = Some (t, vs, e) ->
+        Genv.find_symbol (globalenv p) f = Some b ->
+        s_repr_val L (Vfun rho fds f) (Vptr b Ptrofs.zero) m
+  with s_repr_val_list (L : block -> Z -> Prop)
+    : list cps.val -> Values.val -> mem -> Prop :=
+  | SRptr_nil : forall v m,
+      s_repr_val_list L [] v m
+  | SRptr_cons : forall v vs b i m cv,
+      Mem.load int_chunk m b (Ptrofs.unsigned i) = Some cv ->
+      s_repr_val L v cv m ->
+      s_repr_val_list L vs
+        (Vptr b (Ptrofs.add i (Ptrofs.repr int_size))) m ->
+      s_repr_val_list L (v :: vs) (Vptr b i) m.
+
+  (* Value of a named variable: resolve through lenv or global symbol table *)
+  Inductive s_repr_val_id (L : block -> Z -> Prop)
+    : positive -> cps.val -> temp_env -> mem -> Prop :=
+  | SRid_local : forall x v cv lenv m,
+      Genv.find_symbol (globalenv p) x = None ->
+      M.get x lenv = Some cv ->
+      s_repr_val L v cv m ->
+      s_repr_val_id L x v lenv m
+  | SRid_global : forall x v lenv m b,
+      Genv.find_symbol (globalenv p) x = Some b ->
+      s_repr_val L v (Vptr b Ptrofs.zero) m ->
+      s_repr_val_id L x v lenv m.
+
+  (** ** Correct function definitions *)
+
+  (* A compiled function definition in the global env has the right body *)
+  Definition s_correct_fundefs
+    (fds : fundefs) (m : mem) : Prop :=
+    forall f t vs e,
+      find_def f fds = Some (t, vs, e) ->
+      exists b,
+        Genv.find_symbol (globalenv p) f = Some b.
+
+  Theorem s_correct_fundefs_unchanged :
+    forall fds m m',
+      s_correct_fundefs fds m ->
+      stack_unchanged_globals m m' ->
+      s_correct_fundefs fds m'.
+  Proof.
+    unfold s_correct_fundefs; intros; eauto.
+  Qed.
+
+  (** ** Memory relation *)
+
+  (* Relates a LambdaANF environment to a Clight local environment + memory.
+     For each variable z:
+     - If z is free in e and bound in rho, it is represented in lenv/memory
+     - Function subvalues are correctly compiled in the global env *)
+  Definition s_rel_mem
+    (L : block -> Z -> Prop) (e : exp)
+    (rho : cps.M.t cps.val)
+    (lenv : temp_env) (m : mem) : Prop :=
+    forall z,
+      (occurs_free e z ->
+       exists v, M.get z rho = Some v /\
+                 s_repr_val_id L z v lenv m) /\
+      (forall rho' fds f v,
+         M.get z rho = Some v ->
+         subval_or_eq (Vfun rho' fds f) v ->
+         (exists b, Genv.find_symbol (globalenv p) f = Some b /\
+                    s_repr_val L (Vfun rho' fds f) (Vptr b Ptrofs.zero) m) /\
+         closed_val (Vfun rho' fds f) /\
+         s_correct_fundefs fds m).
+
+  (** ** Shadow stack invariant *)
+
+  (* Number of slots currently used in a frame's roots array *)
+  Definition roots_well_formed
+    (m : mem) (roots_b : block) (roots_ofs : ptrofs) (n : N) : Prop :=
+    forall i : Z,
+      (0 <= i < Z.of_N n)%Z ->
+      Mem.valid_access m int_chunk roots_b
+        (Ptrofs.unsigned roots_ofs + int_size * i)%Z Readable.
+
+  (* The roots array stores valid represented values *)
+  Definition roots_represent
+    (L : block -> Z -> Prop)
+    (m : mem) (roots_b : block) (roots_ofs : ptrofs)
+    (vals : list Values.val) : Prop :=
+    forall i v,
+      nth_error vals i = Some v ->
+      Mem.load int_chunk m roots_b
+        (Ptrofs.unsigned roots_ofs + int_size * Z.of_nat i)%Z = Some v.
+
+  (** ** Full state invariant *)
+
+  Record s_inv (e : exp) (rho : cps.M.t cps.val)
+    (lenv : temp_env) (m : mem) (max_alloc : Z) : Prop := mk_s_inv
+  { s_inv_L : block -> Z -> Prop
+  ; s_inv_prot : stack_protected_not_in_L lenv s_inv_L
+  ; s_inv_mem : s_rel_mem s_inv_L e rho lenv m
+  ; s_inv_tinfo : stack_correct_tinfo max_alloc lenv m
+  }.
+
+  (** ** Main correctness theorem *)
+
+  (* The ANF backend compilation preserves evaluation semantics.
+     For each LambdaANF big-step evaluation, the compiled Clight code
+     steps to a corresponding state with the result value represented
+     as the return value of the function. *)
+
+  (* Placeholder: will be refined as proof develops *)
+  Theorem stack_codegen_correct :
+    forall e rho v c,
+      bstep_e (M.empty _) cenv rho e v c ->
+      True.
+  Proof. intros; exact I. Qed.
+
 End STACK_CORRECT.

@@ -599,18 +599,13 @@ Section ANF_Val.
       (m <= k)%nat ->
       anf_cvt_rel S1 e vars1 cnstrs S2 C1 r1 ->
       anf_cvt_rel S3 e vars2 cnstrs S4 C2 r2 ->
-      List.length vars1 = List.length vars2 ->
-      (forall i j x, nth_error vars1 i = Some x -> nth_error vars1 j = Some x ->
-                      nth_error vars2 i = nth_error vars2 j) ->
       Disjoint _ (FromList vars1) S1 ->
       Disjoint _ (FromList vars2) S3 ->
-      preord_env_P_inj cenv PG (FromList vars1) m
-                       (id <{ vars1 ~> vars2 }>) rho1 rho2 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
       (forall j rho1' rho2',
         (j <= m)%nat ->
         preord_var_env cenv PG j rho1' rho2' r1 r2 ->
-        preord_env_P_inj cenv PG (FromList vars1) j
-                         (id <{ vars1 ~> vars2 }>) rho1' rho2' ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
         preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
       preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
 
@@ -619,18 +614,13 @@ Section ANF_Val.
       (m <= k)%nat ->
       anf_cvt_rel_exps S1 es vars1 cnstrs S2 C1 xs1 ->
       anf_cvt_rel_exps S3 es vars2 cnstrs S4 C2 xs2 ->
-      List.length vars1 = List.length vars2 ->
-      (forall i j x, nth_error vars1 i = Some x -> nth_error vars1 j = Some x ->
-                      nth_error vars2 i = nth_error vars2 j) ->
       Disjoint _ (FromList vars1) S1 ->
       Disjoint _ (FromList vars2) S3 ->
-      preord_env_P_inj cenv PG (FromList vars1) m
-                       (id <{ vars1 ~> vars2 }>) rho1 rho2 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
       (forall j rho1' rho2',
         (j <= m)%nat ->
         Forall2 (preord_var_env cenv PG j rho1' rho2') xs1 xs2 ->
-        preord_env_P_inj cenv PG (FromList vars1) j
-                         (id <{ vars1 ~> vars2 }>) rho1' rho2' ->
+        Forall2 (preord_var_env cenv PG j rho1' rho2') vars1 vars2 ->
         preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
       preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
 
@@ -639,9 +629,6 @@ Section ANF_Val.
       (m <= k)%nat ->
       anf_cvt_rel_efnlst S1 efns vars1 fnames1 cnstrs S2 B1 ->
       anf_cvt_rel_efnlst S3 efns vars2 fnames2 cnstrs S4 B2 ->
-      List.length vars1 = List.length vars2 ->
-      (forall i j x, nth_error vars1 i = Some x -> nth_error vars1 j = Some x ->
-                      nth_error vars2 i = nth_error vars2 j) ->
       NoDup fnames1 ->
       NoDup fnames2 ->
       List.length fnames1 = List.length fnames2 ->
@@ -649,24 +636,19 @@ Section ANF_Val.
       Disjoint _ (FromList fnames2 :|: FromList vars2) S3 ->
       Disjoint _ (FromList fnames1) (FromList vars1) ->
       Disjoint _ (FromList fnames2) (FromList vars2) ->
-      preord_env_P_inj cenv PG (FromList vars1) m
-                       (id <{ vars1 ~> vars2 }>) rho1 rho2 ->
-      preord_env_P_inj cenv PG (FromList vars1 :|: FromList fnames1) m
-                       (id <{ vars1 ~> vars2 }> <{ fnames1 ~> fnames2 }>)
-                       (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2).
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
+      Forall2 (preord_var_env cenv PG m
+                 (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2))
+              fnames1 fnames2.
 
   Definition anf_cvt_branches_alpha_equiv k :=
     forall bs pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4,
       (m <= k)%nat ->
       anf_cvt_rel_branches S1 bs vars1 y1 cnstrs S2 pats1 ->
       anf_cvt_rel_branches S3 bs vars2 y2 cnstrs S4 pats2 ->
-      List.length vars1 = List.length vars2 ->
-      (forall i j x, nth_error vars1 i = Some x -> nth_error vars1 j = Some x ->
-                      nth_error vars2 i = nth_error vars2 j) ->
       Disjoint _ ([set y1] :|: FromList vars1) S1 ->
       Disjoint _ ([set y2] :|: FromList vars2) S3 ->
-      preord_env_P_inj cenv PG (FromList vars1) m
-                       (id <{ vars1 ~> vars2 }>) rho1 rho2 ->
+      Forall2 (preord_var_env cenv PG m rho1 rho2) vars1 vars2 ->
       preord_var_env cenv PG m rho1 rho2 y1 y2 ->
       preord_exp cenv P1 PG m (Ecase y1 pats1, rho1) (Ecase y2 pats2, rho2).
 
@@ -684,13 +666,15 @@ Section ANF_Val.
     eapply exp_ind_alt_2.
     - (* Var_e *)
       intros n C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hk.
+             Hm He1 He2 Hdis1 Hdis2 Henv Hk.
       inv He1. inv He2. simpl.
       eapply Hk; [lia | | eassumption].
-      (* preord_var_env: use extend_lst_get_nth_error_consistent *)
-      assert (Heq : (id <{ vars1 ~> vars2 }>) r1 = r2).
-      { eapply extend_lst_get_nth_error_consistent; eassumption. }
-      rewrite <- Heq. eapply Henv. eapply nth_FromList. eassumption.
+      edestruct (Forall2_nth_error_l _ _ _ _ _ Henv) as [r2' [Hn2' Hvar]].
+      eassumption.
+      match goal with
+      | [ H1 : nth_error ?l ?n = Some ?a, H2 : nth_error ?l ?n = Some ?b |- _ ] =>
+        rewrite H1 in H2; inv H2
+      end. exact Hvar.
     - (* Lam_e *) admit.
     - (* App_e *) admit.
     - (* Con_e *) admit.
@@ -699,7 +683,7 @@ Section ANF_Val.
     - (* Fix_e *) admit.
     - (* Prf_e *)
       intros C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hk.
+             Hm He1 He2 Hdis1 Hdis2 Henv Hk.
       inv He1. inv He2. simpl.
       eapply preord_exp_constr_compat.
       + eapply Hprops.
@@ -712,40 +696,35 @@ Section ANF_Val.
           intros v1 Hg1. rewrite M.gss in Hg1. inv Hg1.
           eexists. split. { rewrite M.gss. reflexivity. }
           rewrite preord_val_eq. simpl. split; [reflexivity | eassumption].
-        * (* preord_env_P_inj: M.set doesn't affect vars *)
-          eapply preord_env_P_inj_set_not_In_P_l.
-          -- eapply preord_env_P_inj_set_not_In_P_r.
-             ++ eapply preord_env_P_inj_monotonic; [ | eassumption ]. lia.
-             ++ intros Hc. eapply image_extend_lst_Included in Hc; [ | eassumption ].
-                rewrite image_id in Hc. rewrite Setminus_Same_set_Empty_set in Hc.
-                normalize_sets.
-                apply (Disjoint_In_l _ _ _ Hdis2 Hc). eassumption.
-          -- intros Hin. apply (Disjoint_In_l _ _ _ Hdis1 Hin). eassumption.
+        * (* Forall2 preserved by M.set: fresh vars don't affect existing bindings *)
+          eapply Forall2_preord_var_env_set.
+          -- eapply Forall2_preord_var_env_monotonic; [ | eassumption ]. lia.
+          -- intros Hin. eapply Hdis1. constructor; eassumption.
+          -- intros Hin. eapply Hdis2. constructor; eassumption.
     - (* Prim_val_e *)
       intros p C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hk.
+             Hm He1 He2 Hdis1 Hdis2 Henv Hk.
       inv He1. inv He2. simpl.
       eapply preord_exp_prim_val_compat. eapply Hprops.
     - (* Prim_e *)
       intros p C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hk.
+             Hm He1 He2 Hdis1 Hdis2 Henv Hk.
       inv He1.
     - (* enil *)
       intros C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hk.
+             Hm He1 He2 Hdis1 Hdis2 Henv Hk.
       inv He1. inv He2. simpl.
       eapply Hk; [lia | constructor | eassumption].
     - (* econs *) admit.
     - (* eflnil *)
       intros B1 B2 fnames1 fnames2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4
-             Hm He1 He2 Hlen Hcon Hnd1 Hnd2 Hlen_fn
+             Hm He1 He2 Hnd1 Hnd2 Hlen_fn
              Hdis1 Hdis2 Hdis_fn1 Hdis_fn2 Henv.
-      inv He1. inv He2. simpl. repeat normalize_sets.
-      eapply preord_env_P_inj_antimon. eassumption. sets.
+      inv He1. inv He2. constructor.
     - (* eflcons *) admit.
     - (* brnil_e *)
       intros pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
-             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hvar.
+             Hm He1 He2 Hdis1 Hdis2 Henv Hvar.
       inv He1. inv He2.
       eapply preord_exp_case_nil_compat. eapply Hprops.
     - (* brcons_e *) admit.

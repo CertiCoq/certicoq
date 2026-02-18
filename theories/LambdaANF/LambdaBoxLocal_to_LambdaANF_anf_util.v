@@ -579,10 +579,10 @@ Section ANF_Val.
              ++ intros Hc. eapply image_extend_lst_Included in Hc; [ | eassumption].
                 rewrite image_id in Hc. destruct Hc as [Hc | Hc].
                 ** (* r2 ∈ FromList vars2 contradicts r2 ∈ S3 *)
-                   eapply Hdis2. constructor; eassumption.
+                   eapply Hdis2. now constructor; eauto.
                 ** (* r2 ∈ FromList vars1 \ FromList vars1 is absurd *)
                    destruct Hc; contradiction.
-          -- intros Hin. eapply Hdis1. constructor; eassumption.
+          -- intros Hin. eapply Hdis1. now constructor; eauto.
     - (* Prim_val_e *)
       intros p C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
              Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.

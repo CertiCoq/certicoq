@@ -2282,7 +2282,14 @@ Section Correct.
     forall k v v1 v2,
       anf_val_rel v v1 -> anf_val_rel v v2 ->
       preord_val cenv eq_fuel k v1 v2.
-  Proof. Admitted.
+  Proof.
+    intros k.
+    eapply (LambdaBoxLocal_to_LambdaANF_anf_util.anf_cvt_val_alpha_equiv
+              func_tag default_tag cnstrs
+              eq_fuel eq_fuel cenv
+              eq_fuel_compat eq_fuel_compat eq_fuel_idemp
+              (fun x y H => H) dcon_to_tag_inj k).
+  Qed.
 
 
 

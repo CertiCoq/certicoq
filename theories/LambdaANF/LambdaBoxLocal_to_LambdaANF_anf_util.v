@@ -400,6 +400,43 @@ Section ANF_Val.
     - inv Hrel1; inv Hrel2; eauto.
   Qed.
 
+  (* When vars1 has duplicates, extend_lst maps to the first occurrence's
+     target. The consistent condition ensures all duplicates in vars1 have
+     the same target in vars2, making extend_lst agree with nth_error. *)
+  Lemma extend_lst_get_nth_error_consistent :
+    forall vars1 vars2 n (f : positive -> positive) r1 r2,
+      (forall i j x, nth_error vars1 i = Some x -> nth_error vars1 j = Some x ->
+                      nth_error vars2 i = nth_error vars2 j) ->
+      List.length vars1 = List.length vars2 ->
+      nth_error vars1 n = Some r1 ->
+      nth_error vars2 n = Some r2 ->
+      (f <{ vars1 ~> vars2 }>) r1 = r2.
+  Proof.
+    induction vars1 as [ | a vars1' IH]; intros vars2 n f r1 r2 Hcon Hlen Hn1 Hn2.
+    - destruct n; simpl in Hn1; discriminate.
+    - destruct vars2 as [ | b vars2']; [simpl in Hlen; discriminate | ].
+      destruct n as [ | n'].
+      + (* n = 0 *)
+        simpl in Hn1, Hn2. inv Hn1. inv Hn2.
+        simpl. rewrite extend_gss. reflexivity.
+      + (* n = S n' *)
+        simpl in Hn1, Hn2.
+        simpl. destruct (Coqlib.peq r1 a) as [Heq | Hneq].
+        * (* r1 = a: duplicate *)
+          subst. rewrite extend_gss.
+          assert (Htmp := Hcon O (S n') a).
+          simpl in Htmp. specialize (Htmp eq_refl Hn1).
+          rewrite Hn2 in Htmp. inv Htmp. reflexivity.
+        * (* r1 ≠ a *)
+          rewrite extend_gso; [ | exact Hneq].
+          eapply IH.
+          -- intros i j x Hi Hj.
+             exact (Hcon (S i) (S j) x Hi Hj).
+          -- simpl in Hlen. lia.
+          -- exact Hn1.
+          -- exact Hn2.
+  Qed.
+
   (** ** Alpha-equivalence for ANF values *)
 
   Section Alpha_Equiv.
@@ -468,6 +505,8 @@ Section ANF_Val.
       anf_cvt_rel S1 e vars1 cnstrs S2 C1 r1 ->
       anf_cvt_rel S3 e vars2 cnstrs S4 C2 r2 ->
       List.length vars1 = List.length vars2 ->
+      (forall i j x, nth_error vars1 i = Some x -> nth_error vars1 j = Some x ->
+                      nth_error vars2 i = nth_error vars2 j) ->
       Disjoint _ (FromList vars1) S1 ->
       Disjoint _ (FromList vars2) S3 ->
       preord_env_P_inj cenv PG (FromList vars1) m
@@ -486,6 +525,8 @@ Section ANF_Val.
       anf_cvt_rel_exps S1 es vars1 cnstrs S2 C1 xs1 ->
       anf_cvt_rel_exps S3 es vars2 cnstrs S4 C2 xs2 ->
       List.length vars1 = List.length vars2 ->
+      (forall i j x, nth_error vars1 i = Some x -> nth_error vars1 j = Some x ->
+                      nth_error vars2 i = nth_error vars2 j) ->
       Disjoint _ (FromList vars1) S1 ->
       Disjoint _ (FromList vars2) S3 ->
       preord_env_P_inj cenv PG (FromList vars1) m
@@ -504,6 +545,8 @@ Section ANF_Val.
       anf_cvt_rel_efnlst S1 efns vars1 fnames1 cnstrs S2 B1 ->
       anf_cvt_rel_efnlst S3 efns vars2 fnames2 cnstrs S4 B2 ->
       List.length vars1 = List.length vars2 ->
+      (forall i j x, nth_error vars1 i = Some x -> nth_error vars1 j = Some x ->
+                      nth_error vars2 i = nth_error vars2 j) ->
       NoDup fnames1 ->
       NoDup fnames2 ->
       List.length fnames1 = List.length fnames2 ->
@@ -523,6 +566,8 @@ Section ANF_Val.
       anf_cvt_rel_branches S1 bs vars1 y1 cnstrs S2 pats1 ->
       anf_cvt_rel_branches S3 bs vars2 y2 cnstrs S4 pats2 ->
       List.length vars1 = List.length vars2 ->
+      (forall i j x, nth_error vars1 i = Some x -> nth_error vars1 j = Some x ->
+                      nth_error vars2 i = nth_error vars2 j) ->
       Disjoint _ ([set y1] :|: FromList vars1) S1 ->
       Disjoint _ ([set y2] :|: FromList vars2) S3 ->
       preord_env_P_inj cenv PG (FromList vars1) m
@@ -544,13 +589,13 @@ Section ANF_Val.
     eapply exp_ind_alt_2.
     - (* Var_e *)
       intros n C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.
+             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hk.
       inv He1. inv He2. simpl.
       eapply Hk; [lia | | eassumption].
-      (* Need: preord_var_env cenv PG m rho1 rho2 r1 r2
-         where nth_error vars1 (N.to_nat n) = Some r1,
-               nth_error vars2 (N.to_nat n) = Some r2 *)
-      admit.
+      (* preord_var_env: use extend_lst_get_nth_error_consistent *)
+      assert (Heq : (id <{ vars1 ~> vars2 }>) r1 = r2).
+      { eapply extend_lst_get_nth_error_consistent; eassumption. }
+      rewrite <- Heq. eapply Henv. eapply nth_FromList. eassumption.
     - (* Lam_e *) admit.
     - (* App_e *) admit.
     - (* Con_e *) admit.
@@ -559,7 +604,7 @@ Section ANF_Val.
     - (* Fix_e *) admit.
     - (* Prf_e *)
       intros C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.
+             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hk.
       inv He1. inv He2. simpl.
       eapply preord_exp_constr_compat.
       + eapply Hprops.
@@ -583,29 +628,29 @@ Section ANF_Val.
           -- intros Hin. apply (Disjoint_In_l _ _ _ Hdis1 Hin). eassumption.
     - (* Prim_val_e *)
       intros p C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.
+             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hk.
       inv He1. inv He2. simpl.
       eapply preord_exp_prim_val_compat. eapply Hprops.
     - (* Prim_e *)
       intros p C1 C2 r1 r2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.
+             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hk.
       inv He1.
     - (* enil *)
       intros C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2
-             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hk.
+             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hk.
       inv He1. inv He2. simpl.
       eapply Hk; [lia | constructor | eassumption].
     - (* econs *) admit.
     - (* eflnil *)
       intros B1 B2 fnames1 fnames2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4
-             Hm He1 He2 Hlen Hnd1 Hnd2 Hlen_fn
+             Hm He1 He2 Hlen Hcon Hnd1 Hnd2 Hlen_fn
              Hdis1 Hdis2 Hdis_fn1 Hdis_fn2 Henv.
       inv He1. inv He2. simpl. repeat normalize_sets.
       eapply preord_env_P_inj_antimon. eassumption. sets.
     - (* eflcons *) admit.
     - (* brnil_e *)
       intros pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
-             Hm He1 He2 Hlen Hdis1 Hdis2 Henv Hvar.
+             Hm He1 He2 Hlen Hcon Hdis1 Hdis2 Henv Hvar.
       inv He1. inv He2.
       eapply preord_exp_case_nil_compat. eapply Hprops.
     - (* brcons_e *) admit.
@@ -651,13 +696,20 @@ Section ANF_Val.
         intros Hlt Hall_args. inv Hall_args.
         eapply preord_exp_post_monotonic. now eapply HinclG.
         destruct (anf_cvt_alpha_equiv j) as [Hexp [_ [_ _]]].
-        eapply Hexp; [lia | eassumption | eassumption | | | | | ].
+        eapply Hexp; [lia | eassumption | eassumption | | | | | | ].
         * (* length *)
           simpl. f_equal.
           unfold anf_env_rel', anf_env_rel in *.
           transitivity (length vs_clos);
           [ symmetry; eapply Forall2_length; eassumption
           | eapply Forall2_length; eassumption ].
+        * (* vars_consistent: x :: names have NoDup from freshness *)
+          intros i j y Hi Hj. destruct i, j; simpl in *; try congruence.
+          -- inv Hi. exfalso. eapply Disjoint_In_l. eapply Hdis1.
+             left. reflexivity. eapply nth_FromList. eassumption.
+          -- inv Hj. exfalso. eapply Disjoint_In_l. eapply Hdis1.
+             left. reflexivity. eapply nth_FromList. eassumption.
+          -- admit. (* TODO: names NoDup from freshness *)
         * (* Disjoint side 1 *)
           eapply Disjoint_Included_l; [ | eassumption ].
           normalize_sets. now sets.

@@ -1321,7 +1321,160 @@ Section ANF_Val.
              Hm He1 He2 Hnd1 Hnd2 Hlen_fn Hlen_ov
              Hdis1 Hdis2 Hdis_fn1 Hdis_fn2 Henv.
       inv He1. inv He2. constructor.
-    - (* eflcons *) admit.
+    - (* eflcons *)
+      intros n_fn e_fn. split.
+      + (* Lam_e case *)
+        intros na0 e_body Heq IH_body rest IH_tail. subst e_fn.
+        intros B1 B2 fnames1 fnames2 m outer_vars1 outer_vars2 rho1 rho2 S1 S2 S3 S4
+               Hm He1 He2 Hnd1 Hnd2 Hlen_fn Hlen_ov
+               Hdis1 Hdis2 Hdis_fn1 Hdis_fn2 Henv.
+        inv He1. inv He2.
+        (* Reconstruct the original efnlst relations *)
+        assert (Horig1 : anf_cvt_rel_efnlst S1
+                  (eflcons n_fn (Lam_e na0 e_body) rest)
+                  (rev (f_name :: fnames) ++ outer_vars1)
+                  (f_name :: fnames) cnstrs S2
+                  (Fcons f_name func_tag [x1] (C1 |[ Ehalt r1 ]|) fdefs))
+          by (econstructor; eassumption).
+        assert (Horig2 : anf_cvt_rel_efnlst S3
+                  (eflcons n_fn (Lam_e na0 e_body) rest)
+                  (rev (f_name0 :: fnames0) ++ outer_vars2)
+                  (f_name0 :: fnames0) cnstrs S4
+                  (Fcons f_name0 func_tag [x0] (C0 |[ Ehalt r0 ]|) fdefs0))
+          by (econstructor; eassumption).
+        (* all_fun_name equalities *)
+        assert (Hafn1 : all_fun_name (Fcons f_name func_tag [x1] (C1 |[ Ehalt r1 ]|) fdefs) =
+                        f_name :: fnames)
+          by (simpl; f_equal; eapply anf_cvt_rel_efnlst_all_fun_name; eassumption).
+        assert (Hafn2 : all_fun_name (Fcons f_name0 func_tag [x0] (C0 |[ Ehalt r0 ]|) fdefs0) =
+                        f_name0 :: fnames0)
+          by (simpl; f_equal; eapply anf_cvt_rel_efnlst_all_fun_name; eassumption).
+        eapply Forall2_from_nth_error.
+        * exact Hlen_fn.
+        * intros i fi fi' Hn_fi Hn_fi'.
+          assert (Hni1 : name_in_fundefs
+                    (Fcons f_name func_tag [x1] (C1 |[ Ehalt r1 ]|) fdefs) fi).
+          { apply (proj2 (name_fds_same _ _)). rewrite Hafn1.
+            eapply nth_error_In. exact Hn_fi. }
+          assert (Hni2 : name_in_fundefs
+                    (Fcons f_name0 func_tag [x0] (C0 |[ Ehalt r0 ]|) fdefs0) fi').
+          { apply (proj2 (name_fds_same _ _)). rewrite Hafn2.
+            eapply nth_error_In. exact Hn_fi'. }
+          intros v1 Hget1.
+          rewrite (def_funs_eq _ _ _ _ _ Hni1) in Hget1. inv Hget1.
+          eexists. split. { exact (def_funs_eq _ _ _ _ _ Hni2). }
+          (* Extract find_def and body relation from both sides *)
+          edestruct (anf_cvt_rel_efnlst_find_def _ _ _ _ _ _ _ Horig1 Hnd1 _ _ Hn_fi)
+            as (na_i1 & e_i & xi1 & Ci1 & ri1 & Si1_1 & Si2_1 &
+                Henth1 & Hfind1 & Hcvt1 & Hxi1_in & Hsi1_sub).
+          edestruct (anf_cvt_rel_efnlst_find_def _ _ _ _ _ _ _ Horig2 Hnd2 _ _ Hn_fi')
+            as (na_i2 & e_i' & xi2 & Ci2 & ri2 & Si1_2 & Si2_2 &
+                Henth2 & Hfind2 & Hcvt2 & Hxi2_in & Hsi2_sub).
+          assert (Heq_body : Lam_e na_i1 e_i = Lam_e na_i2 e_i') by congruence.
+          inv Heq_body.
+          eapply preord_val_fun.
+          -- exact Hfind1.
+          -- exact Hfind2.
+          -- intros rho1' j vs1 vs2 Hlen_vs Hset1.
+             destruct vs1 as [ | v_arg1 [ | ? ? ] ]; simpl in *; try congruence.
+             destruct vs2 as [ | v_arg2 [ | ? ? ] ]; simpl in *; try congruence.
+             inv Hset1.
+             eexists. split. { reflexivity. }
+             intros Hlt Hall_args. inv Hall_args.
+             eapply preord_exp_post_monotonic. { now eapply HinclG. }
+             destruct (IHk j ltac:(lia)) as [Hexp_j [_ [Hefn_j _]]].
+             (* Build Forall2 for all function names at step j *)
+             assert (Hfn_env_j :
+               Forall2 (preord_var_env cenv PG j
+                  (def_funs (Fcons f_name func_tag [x1] (C1 |[ Ehalt r1 ]|) fdefs)
+                            (Fcons f_name func_tag [x1] (C1 |[ Ehalt r1 ]|) fdefs) rho1 rho1)
+                  (def_funs (Fcons f_name0 func_tag [x0] (C0 |[ Ehalt r0 ]|) fdefs0)
+                            (Fcons f_name0 func_tag [x0] (C0 |[ Ehalt r0 ]|) fdefs0) rho2 rho2))
+                 (f_name :: fnames) (f_name0 :: fnames0)).
+             { eapply Hefn_j; [ lia | exact Horig1 | exact Horig2
+                 | exact Hnd1 | exact Hnd2 | simpl in Hlen_fn; exact Hlen_fn
+                 | exact Hlen_ov | exact Hdis1 | exact Hdis2
+                 | exact Hdis_fn1 | exact Hdis_fn2
+                 | eapply Forall2_preord_var_env_monotonic with (k := m); [lia | exact Henv] ]. }
+             eapply Hexp_j.
+             ++ lia.
+             ++ exact Hcvt1.
+             ++ exact Hcvt2.
+             ++ (* Disjoint side 1 *)
+                rewrite FromList_cons.
+                eapply Union_Disjoint_l.
+                ** eapply Disjoint_Singleton_l. intro Hc.
+                   destruct Hc as [_ Hn]. apply Hn. constructor.
+                ** eapply Disjoint_Included_r.
+                   --- eapply Included_trans; [ eapply Setminus_Included | exact Hsi1_sub ].
+                   --- change (rev fnames ++ [f_name]) with (rev (f_name :: fnames)).
+                       rewrite FromList_app, FromList_rev. exact Hdis1.
+             ++ (* Disjoint side 2 *)
+                rewrite FromList_cons.
+                eapply Union_Disjoint_l.
+                ** eapply Disjoint_Singleton_l. intro Hc.
+                   destruct Hc as [_ Hn]. apply Hn. constructor.
+                ** eapply Disjoint_Included_r.
+                   --- eapply Included_trans; [ eapply Setminus_Included | exact Hsi2_sub ].
+                   --- change (rev fnames0 ++ [f_name0]) with (rev (f_name0 :: fnames0)).
+                       rewrite FromList_app, FromList_rev. exact Hdis2.
+             ++ (* Forall2 for all vars at step j *)
+                constructor.
+                ** (* head: xi1/xi2 — function args *)
+                   eapply preord_var_env_extend_eq. eassumption.
+                ** (* tail: rev fnames ++ outer_vars *)
+                   eapply Forall2_preord_var_env_set.
+                   --- eapply Forall2_app.
+                       +++ change (rev fnames ++ [f_name]) with (rev (f_name :: fnames)).
+                           change (rev fnames0 ++ [f_name0]) with (rev (f_name0 :: fnames0)).
+                           eapply All_Forall.Forall2_rev. exact Hfn_env_j.
+                       +++ change (M.set f_name
+                               (Vfun rho1 (Fcons f_name func_tag [x1] (C1 |[ Ehalt r1 ]|) fdefs) f_name)
+                               (def_funs (Fcons f_name func_tag [x1] (C1 |[ Ehalt r1 ]|) fdefs) fdefs rho1 rho1))
+                             with (def_funs (Fcons f_name func_tag [x1] (C1 |[ Ehalt r1 ]|) fdefs)
+                                           (Fcons f_name func_tag [x1] (C1 |[ Ehalt r1 ]|) fdefs) rho1 rho1).
+                           change (M.set f_name0
+                               (Vfun rho2 (Fcons f_name0 func_tag [x0] (C0 |[ Ehalt r0 ]|) fdefs0) f_name0)
+                               (def_funs (Fcons f_name0 func_tag [x0] (C0 |[ Ehalt r0 ]|) fdefs0) fdefs0 rho2 rho2))
+                             with (def_funs (Fcons f_name0 func_tag [x0] (C0 |[ Ehalt r0 ]|) fdefs0)
+                                           (Fcons f_name0 func_tag [x0] (C0 |[ Ehalt r0 ]|) fdefs0) rho2 rho2).
+                           eapply Forall2_preord_var_env_def_funs.
+                           *** eapply Forall2_preord_var_env_monotonic with (k := m);
+                               [ lia | exact Henv ].
+                           *** { assert (Htail1 := f_equal (fun l => @tl _ l) Hafn1). simpl in Htail1.
+                                 eapply Disjoint_sym. eapply Disjoint_Included_l; [ | exact Hdis_fn1].
+                                 intros x Hx.
+                                 assert (Hin := proj1 (name_fds_same _ _) Hx). simpl in Hin.
+                                 destruct Hin as [Hin | Hin].
+                                 - subst. simpl. left. reflexivity.
+                                 - simpl. right. rewrite Htail1 in Hin. exact Hin. }
+                           *** { assert (Htail2 := f_equal (fun l => @tl _ l) Hafn2). simpl in Htail2.
+                                 eapply Disjoint_sym. eapply Disjoint_Included_l; [ | exact Hdis_fn2].
+                                 intros x Hx.
+                                 assert (Hin := proj1 (name_fds_same _ _) Hx). simpl in Hin.
+                                 destruct Hin as [Hin | Hin].
+                                 - subst. simpl. left. reflexivity.
+                                 - simpl. right. rewrite Htail2 in Hin. exact Hin. }
+                   --- (* ~ xi1 \in FromList (rev fnames ++ outer_vars) *)
+                       intros Hc. destruct Hdis1 as [Hdis1']. eapply (Hdis1' xi1). econstructor.
+                       +++ change (rev fnames ++ [f_name]) with (rev (f_name :: fnames)) in Hc.
+                           rewrite FromList_app, FromList_rev in Hc. exact Hc.
+                       +++ eapply Hsi1_sub. exact Hxi1_in.
+                   --- (* ~ xi2 \in FromList (rev fnames0 ++ outer_vars2) *)
+                       intros Hc. destruct Hdis2 as [Hdis2']. eapply (Hdis2' xi2). econstructor.
+                       +++ change (rev fnames0 ++ [f_name0]) with (rev (f_name0 :: fnames0)) in Hc.
+                           rewrite FromList_app, FromList_rev in Hc. exact Hc.
+                       +++ eapply Hsi2_sub. exact Hxi2_in.
+             ++ (* continuation: Ehalt *)
+                intros j0 rho1'' rho2'' _ Hvar_r _ _.
+                eapply preord_exp_halt_compat;
+                  [ eapply Hprops | eapply Hprops | exact Hvar_r ].
+      + (* non-Lam_e case *)
+        intros Hnotlam _ rest _.
+        intros B1 B2 fnames1 fnames2 m outer_vars1 outer_vars2 rho1 rho2 S1 S2 S3 S4
+               Hm He1 He2 Hnd1 Hnd2 Hlen_fn Hlen_ov
+               Hdis1 Hdis2 Hdis_fn1 Hdis_fn2 Henv.
+        inv He1. exfalso. apply Hnotlam. econstructor.
     - (* brnil_e *)
       intros pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4
              Hm He1 He2 Hdis1 Hdis2 Henv Hvar.

@@ -802,7 +802,6 @@ Section ANF_Val.
         * exact Henv_vars.
         * (* continuation for e2: env has x1, x2 bound *)
           intros j' rho1'' rho2'' Hle' Hvar_x2 Henv_vars' Hpres2.
-          eapply preord_exp_post_monotonic. now eapply HinclG.
           eapply preord_exp_letapp_compat.
           -- now eapply Hprops.
           -- now eapply Hprops.
@@ -823,22 +822,36 @@ Section ANF_Val.
                 eapply preord_val_monotonic. exact Hval. lia.
              ++ (* Forall2 for vars: r doesn't interfere (fresh), preserved by M.set r *)
                 eapply Forall2_preord_var_env_set.
-                ** eapply Forall2_preord_var_env_monotonic; [lia | exact Henv_vars'].
-                ** eapply Hdis1. constructor; eassumption.
-                ** eapply Hdis2. constructor; eassumption.
+                ** eapply Forall2_preord_var_env_monotonic with (k := j'); [lia | exact Henv_vars'].
+                ** intros Hr1_vars.
+                   assert (H65 : S6 \subset S5) by (eapply anf_cvt_exp_subset; eassumption).
+                   assert (H51 : S5 \subset S1) by (eapply anf_cvt_exp_subset; eassumption).
+                   eapply Hdis1. constructor. exact Hr1_vars. apply H51. apply H65. eassumption.
+                ** intros Hr2_vars.
+                   assert (H72 : S7 \subset S2) by (eapply anf_cvt_exp_subset; eassumption).
+                   assert (H23 : S2 \subset S3) by (eapply anf_cvt_exp_subset; eassumption).
+                   eapply Hdis2. constructor. exact Hr2_vars. apply H23. apply H72. eassumption.
              ++ (* preservation through all three contexts + letapp binding *)
                 intros a b Hvar_ab Ha Hb.
                 eapply preord_var_env_extend_neq.
-                ** eapply Hpres2.
-                   --- eapply Hpres1. exact Hvar_ab. exact Ha. exact Hb.
-                   --- intro Hc. apply Ha.
-                       assert (Hs1 : _ \subset S1) by (eapply anf_cvt_exp_subset; eassumption).
-                       exact (Hs1 _ Hc).
-                   --- intro Hc. apply Hb.
-                       assert (Hs2 : _ \subset S3) by (eapply anf_cvt_exp_subset; eassumption).
-                       exact (Hs2 _ Hc).
-                ** intros Heq. subst. eapply Ha. eassumption.
-                ** intros Heq. subst. eapply Hb. eassumption.
+                ** eapply preord_var_env_monotonic.
+                   --- eapply Hpres2.
+                       +++ eapply Hpres1. exact Hvar_ab. exact Ha. exact Hb.
+                       +++ intro Hc. apply Ha.
+                           assert (Hs51 : S5 \subset S1) by (eapply anf_cvt_exp_subset; eassumption).
+                           exact (Hs51 _ Hc).
+                       +++ intro Hc. apply Hb.
+                           assert (Hs23 : S2 \subset S3) by (eapply anf_cvt_exp_subset; eassumption).
+                           exact (Hs23 _ Hc).
+                   --- lia.
+                ** intros Heq. subst. apply Ha.
+                   assert (H65 : S6 \subset S5) by (eapply anf_cvt_exp_subset; eassumption).
+                   assert (H51 : S5 \subset S1) by (eapply anf_cvt_exp_subset; eassumption).
+                   apply H51. apply H65. eassumption.
+                ** intros Heq. subst. apply Hb.
+                   assert (H72 : S7 \subset S2) by (eapply anf_cvt_exp_subset; eassumption).
+                   assert (H23 : S2 \subset S3) by (eapply anf_cvt_exp_subset; eassumption).
+                   apply H23. apply H72. eassumption.
     - (* Con_e *) admit.
     - (* Match_e *) admit.
     - (* Let_e *)

@@ -26,134 +26,6 @@ Import Monad.MonadNotation.
 Open Scope monad_scope.
 
 
-(** * ANF Bounds *)
-
-Section Bounds.
-
-  (** LambdaBoxLocal fuel and trace *)
-
-  Definition fuel_exp (e: expression.exp) : nat :=
-    match e with
-    | Let_e _ _ _ => 0  (* ANF Let_e is just context composition, no overhead *)
-    | _ => 1
-    end.
-
-  Fixpoint max_m_branches (br : branches_e) : nat :=
-    match br with
-    | brnil_e => 0
-    | brcons_e _ (m, _) e br => max (N.to_nat m) (max_m_branches br)
-    end.
-
-  (* This is the cost of the ANF-ed program.
-     ANF is more efficient than CPS because there are no continuation calls. *)
-  Definition anf_trace_exp (e: expression.exp) : nat :=
-    match e with
-    | Var_e _ => 1  (* Ehalt *)
-    | Lam_e _ _ => 2 (* Efun + Ehalt *)
-    | App_e _ _ => 2 (* Eletapp + Ehalt *)
-    | Let_e _ _ _ => 0 (* context composition, no overhead *)
-    | Fix_e _ _ => 2 (* Efun + Ehalt *)
-
-    | Con_e _ es => 2  (* Econstr + Ehalt *)
-    | Match_e _ _ brs => 4 + max_m_branches brs (* Efun + Eletapp + Ecase + projections + Ehalt *)
-
-    | Prf_e => 2 (* Econstr + Ehalt *)
-    | Prim_e x => 0
-    | Prim_val_e x => 2 (* Eprim_val + Ehalt *)
-    end.
-
-
-  Program Instance fuel_resource_LambdaBoxLocal : @resource expression.exp nat :=
-    { zero := 0;
-      one_i := fuel_exp;
-      plus := Nat.add
-    }.
-  Next Obligation.
-    lia.
-  Qed.
-  Next Obligation.
-    lia.
-  Qed.
-  Next Obligation.
-    lia.
-  Qed.
-
-  Program Instance trace_resource_LambdaBoxLocal : @resource expression.exp nat :=
-    { zero := 0;
-      one_i := anf_trace_exp;
-      plus := Nat.add
-    }.
-  Next Obligation.
-    lia.
-  Qed.
-  Next Obligation.
-    lia.
-  Qed.
-  Next Obligation.
-    lia.
-  Qed.
-
-  Global Instance LambdaBoxLocal_resource_fuel : @LambdaBoxLocal_resource nat.
-  Proof.
-    constructor. eapply fuel_resource_LambdaBoxLocal.
-  Defined.
-
-  Global Instance LambdaBoxLocal_resource_trace : @LambdaBoxLocal_resource nat.
-  Proof.
-    constructor. eapply trace_resource_LambdaBoxLocal.
-  Defined.
-
-
-
-  (** LambdaANF fuel and trace *)
-
-  Global Program Instance trace_res_pre : @resource fin unit :=
-    { zero := tt;
-      one_i fin := tt;
-      plus x y := tt; }.
-  Next Obligation. destruct x. reflexivity. Qed.
-  Next Obligation. destruct x; destruct y. reflexivity. Qed.
-
-
-  Global Program Instance trace_res_exp : @exp_resource unit :=
-    { HRes := trace_res_pre }.
-
-  Global Instance trace_res : @trace_resource unit.
-  Proof.
-    econstructor. eapply trace_res_exp.
-  Defined.
-
-  Definition eq_fuel : @PostT nat unit :=
-    fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) => f1 = f2.
-
-  Definition anf_bound (f_src t_src : nat) : @PostT nat unit :=
-    fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) =>
-      (f1 + f_src <= f2)%nat /\ (* lower bound *)
-      (f2 <= f1 + t_src)%nat (* upper bound *).
-
-
-  Ltac unfold_all :=
-    try unfold zero in *;
-    try unfold one_ctx in *;
-    try unfold algebra.one in *;
-    try unfold one_i in *;
-    try unfold HRes in *;
-    try unfold HRexp_f in *; try unfold fuel_res in *; try unfold fuel_res_exp in *; try unfold fuel_res_pre in *;
-    try unfold HRexp_t in *; try unfold trace_res in *; try unfold trace_res_exp in *; try unfold trace_res_pre in *.
-
-
-
-  Global Instance eq_fuel_compat cenv :
-    @Post_properties cenv nat _ unit _ eq_fuel eq_fuel eq_fuel.
-  Proof.
-    unfold eq_fuel. constructor; try now (intro; intros; intro; intros; unfold_all; simpl; lia).
-    - intro; intros. unfold post_base'. unfold_all; simpl. lia.
-    - firstorder.
-  Qed.
-
-End Bounds.
-
-
 (** * ANF Value Relation *)
 
 Section ANF_Val.
@@ -350,39 +222,39 @@ Section ANF_Val.
           -- exact Hfresh'.
   Qed.
 
-  Lemma eq_fuel_idemp :
-    inclusion _ (comp eq_fuel eq_fuel) eq_fuel.
-  Proof.
-    clear. unfold comp, eq_fuel. intro; intros.
-    destruct x as [[[? ?] ?] ?].
-    destruct y as [[[? ?] ?] ?]. destructAll.
-    destruct x as [[[? ?] ?] ?]. congruence.
-  Qed.
-
   (** ** Alpha-equivalence for ANF values *)
 
-  Context (cenv : ctor_env)
-          (dcon_to_tag_inj :
+  Section Alpha_Equiv.
+
+  Context {fuel : Type} {Hfuel : @fuel_resource fuel}
+          {trace : Type} {Htrace : @trace_resource trace}.
+  Context (P1 : PostT) (PG : PostGT)
+          (cenv : ctor_env)
+          (Hprops : Post_properties cenv P1 P1 PG)
+          (HpropsG : Post_properties cenv PG PG PG)
+          (Hincl : inclusion _ (comp P1 P1) P1)
+          (HinclG : inclusion _ P1 PG).
+  Context (dcon_to_tag_inj :
             forall tgm dc dc',
               dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
 
   Definition anf_cvt_val_alpha_equiv_statement k :=
     forall v v1 v2,
       anf_val_rel v v1 -> anf_val_rel v v2 ->
-      preord_val cenv eq_fuel k v1 v2.
+      preord_val cenv PG k v1 v2.
 
   Definition anf_cvt_env_alpha_equiv_statement k :=
     forall names1 names2 vs rho1 rho2 f,
       anf_env_rel names1 vs rho1 ->
       anf_env_rel names2 vs rho2 ->
-      preord_env_P_inj cenv eq_fuel (FromList names1) k (f <{ names1 ~> names2 }>) rho1 rho2.
+      preord_env_P_inj cenv PG (FromList names1) k (f <{ names1 ~> names2 }>) rho1 rho2.
 
   Lemma preord_env_P_inj_get S k f rho1 rho2 x y v1 v2 :
-    preord_env_P_inj cenv eq_fuel (S \\ [set x]) k f rho1 rho2 ->
+    preord_env_P_inj cenv PG (S \\ [set x]) k f rho1 rho2 ->
     M.get x rho1 = Some v1 ->
     M.get y rho2 = Some v2 ->
-    preord_val cenv eq_fuel k v1 v2 ->
-    preord_env_P_inj cenv eq_fuel S k (f {x ~> y}) rho1 rho2.
+    preord_val cenv PG k v1 v2 ->
+    preord_env_P_inj cenv PG S k (f {x ~> y}) rho1 rho2.
   Proof.
     intros Henv Hg1 Hg2 Hval z HS v Hgetz. destruct (Coqlib.peq x z).
     - subst. repeat subst_exp. rewrite extend_gss. eauto.
@@ -420,17 +292,17 @@ Section ANF_Val.
       List.length vars1 = List.length vars2 ->
       Disjoint _ (FromList vars1) S1 ->
       Disjoint _ (FromList vars2) S3 ->
-      preord_env_P_inj cenv eq_fuel (FromList vars1) m
+      preord_env_P_inj cenv PG (FromList vars1) m
                        (id <{ vars1 ~> vars2 }>) rho1 rho2 ->
       (forall j v1 v2 rho1' rho2',
         (j <= m)%nat ->
         M.get r1 rho1' = Some v1 ->
         M.get r2 rho2' = Some v2 ->
-        preord_val cenv eq_fuel j v1 v2 ->
-        preord_env_P_inj cenv eq_fuel (FromList vars1) j
+        preord_val cenv PG j v1 v2 ->
+        preord_env_P_inj cenv PG (FromList vars1) j
                          (id <{ vars1 ~> vars2 }>) rho1' rho2' ->
-        preord_exp cenv eq_fuel eq_fuel j (e_k1, rho1') (e_k2, rho2')) ->
-      preord_exp cenv eq_fuel eq_fuel m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
+        preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
+      preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
 
   Definition anf_cvt_exps_alpha_equiv k :=
     forall es C1 C2 xs1 xs2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4 e_k1 e_k2,
@@ -440,15 +312,15 @@ Section ANF_Val.
       List.length vars1 = List.length vars2 ->
       Disjoint _ (FromList vars1) S1 ->
       Disjoint _ (FromList vars2) S3 ->
-      preord_env_P_inj cenv eq_fuel (FromList vars1) m
+      preord_env_P_inj cenv PG (FromList vars1) m
                        (id <{ vars1 ~> vars2 }>) rho1 rho2 ->
       (forall j rho1' rho2',
         (j <= m)%nat ->
-        Forall2 (preord_var_env cenv eq_fuel j rho1' rho2') xs1 xs2 ->
-        preord_env_P_inj cenv eq_fuel (FromList vars1) j
+        Forall2 (preord_var_env cenv PG j rho1' rho2') xs1 xs2 ->
+        preord_env_P_inj cenv PG (FromList vars1) j
                          (id <{ vars1 ~> vars2 }>) rho1' rho2' ->
-        preord_exp cenv eq_fuel eq_fuel j (e_k1, rho1') (e_k2, rho2')) ->
-      preord_exp cenv eq_fuel eq_fuel m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
+        preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
+      preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
 
   Definition anf_cvt_alpha_equiv_statement k :=
     anf_cvt_exp_alpha_equiv k /\
@@ -472,7 +344,7 @@ Section ANF_Val.
     set (P := fun (v : value) =>
       forall v1 v2 : val,
         anf_val_rel v v1 -> anf_val_rel v v2 ->
-        preord_val cenv eq_fuel k v1 v2).
+        preord_val cenv PG k v1 v2).
     eapply value_ind' with (P := P); subst P; simpl.
 
     - (* Con_v *)
@@ -524,6 +396,7 @@ Section ANF_Val.
         match goal with
         | [ Hva : preord_val _ _ _ v_arg1 v_arg2 |- _ ] =>
 
+          eapply preord_exp_post_monotonic; [ now eapply HinclG | ];
           destruct (anf_cvt_alpha_equiv j) as [Hexp _];
           eapply Hexp with (vars1 := x1 :: names1) (vars2 := x2 :: names2);
           [ lia
@@ -564,9 +437,10 @@ Section ANF_Val.
             | intros Hc; inv Hc; eauto ]
           | (* Continuation: Ehalt *)
             intros j0 v1' v2' rho1'' rho2'' Hle Hget1 Hget2 Hval_cont Henv_cont;
+            eapply preord_exp_post_monotonic; [ now eapply HinclG | ];
             eapply preord_exp_halt_compat;
-            [ eapply (eq_fuel_compat cenv)
-            | eapply (eq_fuel_compat cenv)
+            [ eapply Hprops
+            | eapply Hprops
             | intros v_halt Hg; rewrite Hget1 in Hg; inv Hg;
               eexists; split; eassumption ]
           ]
@@ -622,6 +496,7 @@ Section ANF_Val.
       match goal with
       | [ Hva : preord_val _ _ _ v_arg1 v_arg2 |- _ ] =>
 
+        eapply preord_exp_post_monotonic; [ now eapply HinclG | ];
         destruct (anf_cvt_alpha_equiv j) as [Hexp _];
         eapply Hexp with
           (vars1 := x1 :: rev (all_fun_name Bs1) ++ names1)
@@ -708,14 +583,17 @@ Section ANF_Val.
           | intros Hc; inv Hc; eauto ]
         | (* Continuation: Ehalt *)
           intros j0 v1' v2' rho1'' rho2'' Hle Hget1 Hget2 Hval_cont Henv_cont;
+          eapply preord_exp_post_monotonic; [ now eapply HinclG | ];
           eapply preord_exp_halt_compat;
-          [ eapply (eq_fuel_compat cenv)
-          | eapply (eq_fuel_compat cenv)
+          [ eapply Hprops
+          | eapply Hprops
           | intros v_halt Hg; rewrite Hget1 in Hg; inv Hg;
             eexists; split; eassumption ]
         ]
       end
       end.
   Qed.
+
+  End Alpha_Equiv.
 
 End ANF_Val.

@@ -39,6 +39,83 @@ Section Correct.
     forall tgm dc dc',
       dcon_to_tag default_tag dc tgm = dcon_to_tag default_tag dc' tgm -> dc = dc').
 
+
+  (** ** LambdaBoxLocal fuel and trace *)
+
+  Definition fuel_exp (e: expression.exp) : nat :=
+    match e with
+    | Let_e _ _ _ => 0
+    | _ => 1
+    end.
+
+  Fixpoint max_m_branches (br : branches_e) : nat :=
+    match br with
+    | brnil_e => 0
+    | brcons_e _ (m, _) e br => max (N.to_nat m) (max_m_branches br)
+    end.
+
+  Definition anf_trace_exp (e: expression.exp) : nat :=
+    match e with
+    | Var_e _ => 1
+    | Lam_e _ _ => 2
+    | App_e _ _ => 2
+    | Let_e _ _ _ => 0
+    | Fix_e _ _ => 2
+    | Con_e _ es => 2
+    | Match_e _ _ brs => 4 + max_m_branches brs
+    | Prf_e => 2
+    | Prim_e x => 0
+    | Prim_val_e x => 2
+    end.
+
+  Program Instance fuel_resource_LambdaBoxLocal : @resource expression.exp nat :=
+    { zero := 0;
+      one_i := fuel_exp;
+      plus := Nat.add
+    }.
+  Next Obligation. lia. Qed.
+  Next Obligation. lia. Qed.
+  Next Obligation. lia. Qed.
+
+  Program Instance trace_resource_LambdaBoxLocal : @resource expression.exp nat :=
+    { zero := 0;
+      one_i := anf_trace_exp;
+      plus := Nat.add
+    }.
+  Next Obligation. lia. Qed.
+  Next Obligation. lia. Qed.
+  Next Obligation. lia. Qed.
+
+  Global Instance LambdaBoxLocal_resource_fuel : @LambdaBoxLocal_resource nat.
+  Proof. constructor. eapply fuel_resource_LambdaBoxLocal. Defined.
+
+  Global Instance LambdaBoxLocal_resource_trace : @LambdaBoxLocal_resource nat.
+  Proof. constructor. eapply trace_resource_LambdaBoxLocal. Defined.
+
+
+  (** ** LambdaANF fuel and trace *)
+
+  Global Program Instance trace_res_pre : @resource fin unit :=
+    { zero := tt;
+      one_i fin := tt;
+      plus x y := tt; }.
+  Next Obligation. destruct x. reflexivity. Qed.
+  Next Obligation. destruct x; destruct y. reflexivity. Qed.
+
+  Global Program Instance trace_res_exp : @exp_resource unit :=
+    { HRes := trace_res_pre }.
+
+  Global Instance trace_res : @trace_resource unit.
+  Proof. econstructor. eapply trace_res_exp. Defined.
+
+  Definition eq_fuel : @PostT nat unit :=
+    fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) => f1 = f2.
+
+  Definition anf_bound (f_src t_src : nat) : @PostT nat unit :=
+    fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) =>
+      (f1 + f_src <= f2)%nat /\
+      (f2 <= f1 + t_src)%nat.
+
   Ltac unfold_all :=
     try unfold zero in *;
     try unfold one_ctx in *;
@@ -47,6 +124,24 @@ Section Correct.
     try unfold algebra.HRes in *;
     try unfold HRexp_f in *; try unfold fuel_res in *; try unfold fuel_res_exp in *; try unfold fuel_res_pre in *;
     try unfold HRexp_t in *; try unfold trace_res in *; try unfold trace_res_exp in *; try unfold trace_res_pre in *.
+
+  Global Instance eq_fuel_compat :
+    @Post_properties cenv nat _ unit _ eq_fuel eq_fuel eq_fuel.
+  Proof.
+    unfold eq_fuel. constructor; try now (intro; intros; intro; intros; unfold_all; simpl; lia).
+    - intro; intros. unfold post_base'. unfold_all; simpl. lia.
+    - firstorder.
+  Qed.
+
+  Lemma eq_fuel_idemp :
+    inclusion _ (comp eq_fuel eq_fuel) eq_fuel.
+  Proof.
+    unfold comp, eq_fuel. intro; intros.
+    destruct x as [[[? ?] ?] ?].
+    destruct y as [[[? ?] ?] ?]. destructAll.
+    destruct x as [[[? ?] ?] ?]. congruence.
+  Qed.
+
 
 
   Definition anf_cvt_rel := LambdaBoxLocal_to_LambdaANF.anf_cvt_rel func_tag default_tag.
@@ -421,8 +516,7 @@ Section Correct.
      Eprim_val expressions always OOT in bstep_fuel (BStepf_OOT only).
      See preord_exp_prim_val_compat in logical_relations.v for the vacuous compatibility lemma. *)
 
-  Definition eq_fuel_idemp :=
-    LambdaBoxLocal_to_LambdaANF_anf_util.eq_fuel_idemp.
+
 
   Definition eq_fuel_n (n : nat) : @PostT nat unit :=
     fun '(e1, r1, f1, t1) '(e2, r2, f2, t2) => (f1 + n)%nat = f2.

@@ -278,6 +278,128 @@ Section ANF_Val.
           -- exact Hfresh'.
   Qed.
 
+  (** ** Subset and structural lemmas for anf_cvt_rel *)
+
+  Local Ltac apply_cvt_IH IH e :=
+    match goal with
+    | [ H : anf_cvt_rel _ e _ _ _ _ _ |- _ ] => eapply IH in H
+    | [ H : anf_cvt_rel_exps _ e _ _ _ _ _ |- _ ] => eapply IH in H
+    | [ H : anf_cvt_rel_efnlst _ e _ _ _ _ _ |- _ ] => eapply IH in H
+    | [ H : anf_cvt_rel_branches _ e _ _ _ _ _ |- _ ] => eapply IH in H
+    end.
+
+  Lemma anf_cvt_rel_subset :
+    (forall S e vn tgm S' C x,
+        anf_cvt_rel S e vn tgm S' C x -> S' \subset S) /\
+    (forall S es vn tgm S' C xs,
+        anf_cvt_rel_exps S es vn tgm S' C xs -> S' \subset S) /\
+    (forall S efns vn fnames tgm S' fdefs,
+        anf_cvt_rel_efnlst S efns vn fnames tgm S' fdefs -> S' \subset S) /\
+    (forall S bs vn r tgm S' pats,
+        anf_cvt_rel_branches S bs vn r tgm S' pats -> S' \subset S).
+  Proof.
+    enough (H :
+      (forall e S vn tgm S' C x, anf_cvt_rel S e vn tgm S' C x -> S' \subset S) /\
+      (forall es S vn tgm S' C xs, anf_cvt_rel_exps S es vn tgm S' C xs -> S' \subset S) /\
+      (forall efns S vn fnames tgm S' fdefs, anf_cvt_rel_efnlst S efns vn fnames tgm S' fdefs -> S' \subset S) /\
+      (forall bs S vn r tgm S' pats, anf_cvt_rel_branches S bs vn r tgm S' pats -> S' \subset S)).
+    { destruct H as [H1 [H2 [H3 H4]]]. repeat split; intros; eauto. }
+    eapply exp_ind_alt_2.
+    - intros n S vn tgm S' C x Hrel. inv Hrel. eapply Included_refl.
+    - intros na e IH S vn tgm S' C x Hrel. inv Hrel. fold anf_cvt_rel in *.
+      apply_cvt_IH IH e.
+      eapply Included_trans. eassumption.
+      eapply Included_trans. eapply Setminus_Included. eapply Setminus_Included.
+    - intros e1 IHe1 e2 IHe2 S vn tgm S' C x Hrel.
+      inv Hrel. fold anf_cvt_rel in *.
+      apply_cvt_IH IHe1 e1. apply_cvt_IH IHe2 e2.
+      eapply Included_trans. eapply Setminus_Included.
+      eapply Included_trans; eassumption.
+    - intros dc es IH S vn tgm S' C x Hrel.
+      inv Hrel. fold anf_cvt_rel_exps in *.
+      apply_cvt_IH IH es.
+      eapply Included_trans. eassumption. eapply Setminus_Included.
+    - intros e IHe pars bs IHbs S vn tgm S' C x Hrel.
+      inv Hrel. fold anf_cvt_rel in *. fold anf_cvt_rel_branches in *.
+      apply_cvt_IH IHe e. apply_cvt_IH IHbs bs.
+      eapply Included_trans. eapply Setminus_Included.
+      eapply Included_trans. eassumption.
+      eapply Included_trans. eassumption.
+      eapply Included_trans. eapply Setminus_Included. eapply Setminus_Included.
+    - intros na e1 IHe1 e2 IHe2 S vn tgm S' C x Hrel.
+      inv Hrel. fold anf_cvt_rel in *.
+      apply_cvt_IH IHe1 e1. apply_cvt_IH IHe2 e2.
+      eapply Included_trans; eassumption.
+    - intros efns IHefns n S vn tgm S' C x Hrel.
+      inv Hrel. fold anf_cvt_rel_efnlst in *.
+      apply_cvt_IH IHefns efns.
+      eapply Included_trans. eassumption. eapply Setminus_Included.
+    - intros S vn tgm S' C x Hrel. inv Hrel. eapply Setminus_Included.
+    - intros p S vn tgm S' C x Hrel. inv Hrel. eapply Setminus_Included.
+    - intros p S vn tgm S' C x Hrel. inv Hrel.
+    - intros S vn tgm S' C xs Hrel. inv Hrel. eapply Included_refl.
+    - intros e IHe es IHes S vn tgm S' C xs Hrel.
+      inv Hrel. fold anf_cvt_rel in *. fold anf_cvt_rel_exps in *.
+      apply_cvt_IH IHe e. apply_cvt_IH IHes es.
+      eapply Included_trans; eassumption.
+    - intros S vn fnames tgm S' fdefs Hrel. inv Hrel. eapply Included_refl.
+    - split.
+      + intros na' e' Hlam IHe' efns IHefns S vn fnames tgm S' fdefs Hrel.
+        inv Hrel. fold anf_cvt_rel in *. fold anf_cvt_rel_efnlst in *.
+        repeat match goal with
+        | [ H : Lam_e _ _ = Lam_e _ _ |- _ ] => inv H
+        end.
+        apply_cvt_IH IHe' e'. apply_cvt_IH IHefns efns.
+        eapply Included_trans. eassumption.
+        eapply Included_trans. eassumption. eapply Setminus_Included.
+      + intros Hnot IHe efns IHefns S vn fnames tgm S' fdefs Hrel.
+        inv Hrel. unfold isLambda in Hnot. contradiction.
+    - intros S vn r tgm S' pats Hrel. inv Hrel. eapply Included_refl.
+    - intros dc p e IHe bs IHbs S vn r tgm S' pats Hrel.
+      inv Hrel. fold anf_cvt_rel in *. fold anf_cvt_rel_branches in *.
+      apply_cvt_IH IHe e. apply_cvt_IH IHbs bs.
+      match goal with
+      | [ H : _ \subset _ \\ _ |- _ ] => eapply Setminus_Included_preserv_alt in H
+      end.
+      eapply Included_trans; eassumption.
+  Qed.
+
+  Lemma anf_cvt_exp_subset S e vn tgm S' C x :
+    anf_cvt_rel S e vn tgm S' C x -> S' \subset S.
+  Proof. eapply (proj1 anf_cvt_rel_subset). Qed.
+
+  Lemma anf_cvt_exps_subset S es vn tgm S' C xs :
+    anf_cvt_rel_exps S es vn tgm S' C xs -> S' \subset S.
+  Proof. eapply (proj1 (proj2 anf_cvt_rel_subset)). Qed.
+
+  Lemma anf_cvt_efnlst_subset S efns vn fnames tgm S' fdefs :
+    anf_cvt_rel_efnlst S efns vn fnames tgm S' fdefs -> S' \subset S.
+  Proof. eapply (proj1 (proj2 (proj2 anf_cvt_rel_subset))). Qed.
+
+  Lemma anf_cvt_branches_subset S bs vn r tgm S' pats :
+    anf_cvt_rel_branches S bs vn r tgm S' pats -> S' \subset S.
+  Proof. eapply (proj2 (proj2 (proj2 anf_cvt_rel_subset))). Qed.
+
+  Lemma anf_cvt_rel_efnlst_all_fun_name S efns vn fnames tgm S' fdefs :
+    anf_cvt_rel_efnlst S efns vn fnames tgm S' fdefs ->
+    all_fun_name fdefs = fnames.
+  Proof.
+    intros H. induction H.
+    - reflexivity.
+    - simpl. congruence.
+  Qed.
+
+  Lemma anf_cvt_rel_branches_ctor_tag S1 S2 S3 S4 bs vn1 vn2 y1 y2 pats1 pats2 :
+    anf_cvt_rel_branches S1 bs vn1 y1 cnstrs S2 pats1 ->
+    anf_cvt_rel_branches S3 bs vn2 y2 cnstrs S4 pats2 ->
+    Forall2 (fun p p' : ctor_tag * exp => fst p = fst p') pats1 pats2.
+  Proof.
+    revert S1 S2 S3 S4 vn1 vn2 y1 y2 pats1 pats2.
+    induction bs; intros S1 S2 S3 S4 vn1 vn2 y1 y2 pats1 pats2 Hrel1 Hrel2.
+    - inv Hrel1; inv Hrel2; eauto.
+    - inv Hrel1; inv Hrel2; eauto.
+  Qed.
+
   (** ** Alpha-equivalence for ANF values *)
 
   Section Alpha_Equiv.
@@ -350,11 +472,9 @@ Section ANF_Val.
       Disjoint _ (FromList vars2) S3 ->
       preord_env_P_inj cenv PG (FromList vars1) m
                        (id <{ vars1 ~> vars2 }>) rho1 rho2 ->
-      (forall j v1 v2 rho1' rho2',
+      (forall j rho1' rho2',
         (j <= m)%nat ->
-        M.get r1 rho1' = Some v1 ->
-        M.get r2 rho2' = Some v2 ->
-        preord_val cenv PG j v1 v2 ->
+        preord_var_env cenv PG j rho1' rho2' r1 r2 ->
         preord_env_P_inj cenv PG (FromList vars1) j
                          (id <{ vars1 ~> vars2 }>) rho1' rho2' ->
         preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
@@ -378,13 +498,44 @@ Section ANF_Val.
         preord_exp cenv P1 PG j (e_k1, rho1') (e_k2, rho2')) ->
       preord_exp cenv P1 PG m (C1 |[ e_k1 ]|, rho1) (C2 |[ e_k2 ]|, rho2).
 
+  Definition anf_cvt_efnlst_alpha_equiv k :=
+    forall efns B1 B2 fnames1 fnames2 m vars1 vars2 rho1 rho2 S1 S2 S3 S4,
+      (m <= k)%nat ->
+      anf_cvt_rel_efnlst S1 efns vars1 fnames1 cnstrs S2 B1 ->
+      anf_cvt_rel_efnlst S3 efns vars2 fnames2 cnstrs S4 B2 ->
+      List.length vars1 = List.length vars2 ->
+      NoDup fnames1 ->
+      NoDup fnames2 ->
+      List.length fnames1 = List.length fnames2 ->
+      Disjoint _ (FromList fnames1 :|: FromList vars1) S1 ->
+      Disjoint _ (FromList fnames2 :|: FromList vars2) S3 ->
+      Disjoint _ (FromList fnames1) (FromList vars1) ->
+      Disjoint _ (FromList fnames2) (FromList vars2) ->
+      preord_env_P_inj cenv PG (FromList vars1) m
+                       (id <{ vars1 ~> vars2 }>) rho1 rho2 ->
+      preord_env_P_inj cenv PG (FromList vars1 :|: FromList fnames1) m
+                       (id <{ vars1 ~> vars2 }> <{ fnames1 ~> fnames2 }>)
+                       (def_funs B1 B1 rho1 rho1) (def_funs B2 B2 rho2 rho2).
+
+  Definition anf_cvt_branches_alpha_equiv k :=
+    forall bs pats1 pats2 m y1 y2 vars1 vars2 rho1 rho2 S1 S2 S3 S4,
+      (m <= k)%nat ->
+      anf_cvt_rel_branches S1 bs vars1 y1 cnstrs S2 pats1 ->
+      anf_cvt_rel_branches S3 bs vars2 y2 cnstrs S4 pats2 ->
+      List.length vars1 = List.length vars2 ->
+      Disjoint _ ([set y1] :|: FromList vars1) S1 ->
+      Disjoint _ ([set y2] :|: FromList vars2) S3 ->
+      preord_env_P_inj cenv PG (FromList vars1) m
+                       (id <{ vars1 ~> vars2 }>) rho1 rho2 ->
+      preord_var_env cenv PG m rho1 rho2 y1 y2 ->
+      preord_exp cenv P1 PG m (Ecase y1 pats1, rho1) (Ecase y2 pats2, rho2).
+
   Definition anf_cvt_alpha_equiv_statement k :=
     anf_cvt_exp_alpha_equiv k /\
-    anf_cvt_exps_alpha_equiv k.
+    anf_cvt_exps_alpha_equiv k /\
+    anf_cvt_efnlst_alpha_equiv k /\
+    anf_cvt_branches_alpha_equiv k.
 
-  (* The expression-level alpha equivalence is a large proof by mutual
-     structural induction on source expressions, with well-founded induction
-     on the step index k. We admit it for now and prove it separately. *)
   Lemma anf_cvt_alpha_equiv :
     forall k, anf_cvt_alpha_equiv_statement k.
   Proof.
@@ -429,7 +580,7 @@ Section ANF_Val.
         eexists. split; [reflexivity | ].
         intros Hlt Hall_args. inv Hall_args.
         eapply preord_exp_post_monotonic. now eapply HinclG.
-        destruct (anf_cvt_alpha_equiv j) as [Hexp _].
+        destruct (anf_cvt_alpha_equiv j) as [Hexp [_ [_ _]]].
         eapply Hexp; [lia | eassumption | eassumption | | | | | ].
         * (* length *)
           simpl. f_equal.
@@ -481,12 +632,11 @@ Section ANF_Val.
                apply Hnot; right; exact Hin
              end.
         * (* Continuation: Ehalt *)
-          intros j0 v1' v2' rho1'' rho2'' Hle Hget1 Hget2 Hval_cont Henv_cont.
+          intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont.
           eapply preord_exp_halt_compat.
           -- eapply Hprops.
           -- eapply Hprops.
-          -- intros v_halt Hg. rewrite Hget1 in Hg. inv Hg.
-             eexists. split; eassumption.
+          -- exact Hvar_cont.
 
     - (* ClosFix_v *)
       intros vs_clos fnl n_idx Hall v1 v2 Hrel1 Hrel2.
@@ -551,7 +701,7 @@ Section ANF_Val.
         intros Hlt Hall_args. inv Hall_args.
 
         eapply preord_exp_post_monotonic. { now eapply HinclG. }
-        destruct (anf_cvt_alpha_equiv j) as [Hexp _];
+        destruct (anf_cvt_alpha_equiv j) as [Hexp [_ [_ _]]];
         eapply Hexp with
           (vars1 := x1 :: rev (all_fun_name Bs) ++ names)
           (vars2 := x2 :: rev (all_fun_name Bs0) ++ names0);
@@ -613,12 +763,11 @@ Section ANF_Val.
             rewrite Hseq2 in Hc; repeat normalize_sets;
             exact (Hfresh_b2 Hc) ]
         | (* Continuation: Ehalt *)
-          intros j0 v1' v2' rho1'' rho2'' Hle Hget1 Hget2 Hval_cont Henv_cont;
+          intros j0 rho1'' rho2'' Hle Hvar_cont Henv_cont;
           eapply preord_exp_halt_compat;
           [ eapply Hprops
           | eapply Hprops
-          | intros v_halt Hg; rewrite Hget1 in Hg; inv Hg;
-            eexists; split; eassumption ]
+          | exact Hvar_cont ]
         ].
   Qed.
 

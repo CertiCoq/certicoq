@@ -896,7 +896,8 @@ Section Corresp.
 
       destruct Hvs as [vs' Hvs].
 
-      edestruct (@set_lists_length3 val) with (rho := M.empty val) (vs := vs') (xs := names) as [ rho ].
+      set (s := @set_lists_length3 val).
+      edestruct s with (rho := M.empty val) (vs := vs') (xs := names) as [ rho ].
       eapply Forall2_length in Hvs. rewrite <- Hvs. eapply pos_seq_len.
 
       assert (Henv: anf_env_rel' (anf_val_rel func_tag default_tag tgm) names vs rho).
@@ -922,12 +923,20 @@ Section Corresp.
 
       eexists. eapply anf_rel_Clos with (f := f); [ eassumption | | | | | eassumption ].
       + eapply NoDup_env_consistent. eapply pos_seq_NoDup.
-      + unfold next_id. constructor. intros z [Hz1 Hz2]. unfold In in Hz2.
-        destruct Hz1 as [Hz1 | [Hz1 | Hz1]]; [inv Hz1; lia | inv Hz1; lia | eapply pos_seq_In in Hz1; lia].
-      + intros Hc.
-        destruct Hc as [Hc | [Hc | Hc]]; [inv Hc; lia | inv Hc; lia | eapply pos_seq_In in Hc; lia].
-      + intros Hc.
-        destruct Hc as [Hc | Hc]; [inv Hc; lia | eapply pos_seq_In in Hc; lia].
+      + constructor. intros z Hz.
+        inversion Hz as [z' HL HR]; subst; clear Hz.
+        unfold In, next_id in HR. unfold In in HL.
+        destruct HL as [HL | HL].
+        * inv H1; zify; lia.
+        * unfold In in H1. destruct H1 as [H1 | H1].
+          -- inv H3; zify; lia.
+          -- unfold FromList, In, names in H3. eapply pos_seq_In in H3. zify; lia.
+      + intros Hc. unfold x, f, names, In in Hc.
+        inv Hc.
+        -- inv H1.
+        -- unfold In, FromList in H1. cbn beta in H1. eapply pos_seq_In in H1. lia.
+      + intros Hc. unfold f, names, FromList, In in Hc.
+        eapply pos_seq_In in Hc. lia.
 
     - (* ClosFix_v *)
 

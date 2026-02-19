@@ -13226,6 +13226,123 @@ Proof.
       exact Hgoal_e.
 Qed.
 
+(* Econstr enum prefix stepping: for unboxed constructors (ys = nil),
+   executing (x ::= c_int h val ; s') steps to s' with the right rel_mem. *)
+Lemma repr_bs_econstr_enum_prefix_step :
+  forall p rep_env cenv ienv fenv finfo_env rho x t e0 v n
+    stm lenv m k fu max_alloc max_alloc_e h nn s',
+    bstep_e (M.empty _) cenv rho (Econstr x t nil e0) v n ->
+    correct_envs cenv ienv rep_env rho (Econstr x t nil e0) ->
+    protected_id_not_bound_id rho (Econstr x t nil e0) ->
+    unique_bindings_env rho (Econstr x t nil e0) ->
+    functions_not_bound p rho (Econstr x t nil e0) ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env (Econstr x t nil e0) stm ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Econstr x t nil e0) rho m lenv ->
+    correct_alloc (Econstr x t nil e0) max_alloc ->
+    correct_tinfo p max_alloc lenv m ->
+    M.get t rep_env = Some (enum nn) ->
+    repr_unboxed_Codegen nn h ->
+    repr_expr_LambdaANF_Codegen_id fenv finfo_env p rep_env e0 s' ->
+    stm = Ssequence (Sset x (c_int h val)) s' ->
+    max_alloc_e = Z.of_nat (max_allocs e0) ->
+    (0 <= max_alloc_e <= max_alloc)%Z ->
+    correct_alloc e0 max_alloc_e ->
+    correct_tinfo p max_alloc_e lenv m ->
+    exists m_mid lenv_mid,
+      m_tstep2 (globalenv p)
+        (State fu stm k empty_env lenv m)
+        (State fu s' k empty_env lenv_mid m_mid) /\
+      same_args_ptr lenv lenv_mid /\
+      rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env
+        e0 (M.set x (Vconstr t []) rho) m_mid lenv_mid /\
+      correct_tinfo p max_alloc_e lenv_mid m_mid.
+Proof.
+  intros p rep_env cenv ienv fenv finfo_env rho x t e0 v n
+    stm lenv m k fu max_alloc max_alloc_e h nn s'
+    Hbs Hcenvs Hprot Hub Hfnb Hrepr Hrel Halloc Hct
+    Henum Hunboxed Hrepr_e Hstm_eq Hmaxeq Hbound Halloc_e Hct_e.
+  subst stm.
+  assert (Hnprot_x : ~ is_protected_id_thm x).
+  { intro Habs. destruct Hprot as [_ Hprot2].
+    apply (Hprot2 x Habs). apply Bound_Econstr1. }
+  assert (Hnprot_tinfo_x : ~ is_protected_tinfo_id_thm x).
+  { intro Habs. apply Hnprot_x. eapply is_protected_tinfo_weak. exact Habs. }
+  assert (Hx_ne_tinf : x <> tinfIdent).
+  { intro Heq. subst x. apply Hnprot_x.
+    unfold is_protected_id_thm, is_protected_id, protectedIdent. simpl. auto 20. }
+  assert (Hx_ne_args : x <> argsIdent).
+  { intro Heq. subst x. apply Hnprot_tinfo_x.
+    unfold is_protected_tinfo_id_thm, is_protected_tinfo_id. auto. }
+  assert (Hx_not_global : Genv.find_symbol (Genv.globalenv p) x = None).
+  { destruct Hfnb as [Hfnb1 _]. apply Hfnb1. apply Bound_Econstr1. }
+  exists m, (M.set x (make_vint h) lenv).
+  split; [| split; [| split]].
+  - (* m_tstep2 *)
+    eapply m_tstep2_seq_set. apply eval_cint.
+  - (* same_args_ptr *)
+    apply same_args_ptr_set_right_other; auto.
+    apply same_args_ptr_refl.
+  - (* rel_mem *)
+    unfold rel_mem_LambdaANF_Codegen_id, rel_mem_LambdaANF_Codegen.
+    destruct Hrel as [L [Hpnl Hrel_inner]].
+    exists L.
+    split.
+    + eapply protected_not_in_L_set; eauto.
+    + intro z. split.
+      * intro Hfree.
+        destruct (Pos.eq_dec z x) as [Heq | Hneq].
+        -- (* z = x: new value Vconstr t [] *)
+           subst z.
+           exists (Vconstr t []).
+           split.
+           { rewrite M.gss. reflexivity. }
+           { eapply RVid_V.
+             - exact Hx_not_global.
+             - rewrite M.gss. reflexivity.
+             - eapply RSconstr_unboxed_v; eauto. }
+        -- (* z <> x: carry over from old rel_mem *)
+           assert (Hfree_outer : occurs_free (Econstr x t nil e0) z).
+           { apply Free_Econstr2; auto. }
+           destruct (Hrel_inner z) as [Hval_z _].
+           destruct (Hval_z Hfree_outer) as [v6 [Hget Hrepr_v]].
+           exists v6.
+           split.
+           { rewrite M.gso; auto. }
+           { eapply repr_val_id_set; eauto. }
+      * (* subval clause *)
+        intros rho' fds f v_sub Hget Hsub.
+        destruct (Pos.eq_dec z x) as [Heq | Hneq].
+        -- (* z = x: Vconstr t [] has no function subvalues *)
+           subst z.
+           rewrite M.gss in Hget. inversion Hget; subst v_sub.
+           exfalso.
+           enough (Vfun rho' fds f = Vconstr t []) by discriminate.
+           clear -Hsub.
+           unfold subval_or_eq in Hsub.
+           remember (Vconstr t []) as target.
+           induction Hsub as [? ? Hd | | ? ? ? ? IH1 ? IH2]; subst;
+             try reflexivity.
+           { inversion Hd; subst; exfalso; eapply in_nil; eauto. }
+           { specialize (IH2 eq_refl); subst; apply IH1; reflexivity. }
+        -- (* z <> x: carry over from old rel_mem *)
+           rewrite M.gso in Hget; auto.
+           destruct (Hrel_inner z) as [_ Hfun_z].
+           specialize (Hfun_z rho' fds f v_sub Hget Hsub).
+           destruct Hfun_z as [Hrepr_f [Hclosed Hfinfo_f]].
+           split; [| split]; auto.
+           assert (Hf_ne_x : f <> x).
+           { intro Heq. subst f.
+             (* repr_val_id for Vfun ultimately needs find_symbol = Some,
+                contradicting Hx_not_global *)
+             apply repr_val_id_L_LambdaANF_Codegen_ptr in Hrepr_f.
+             destruct Hrepr_f as [v7_f [Hrl_f [[_ Hfs_none] | [b_f [_ Hfs_some]]]]].
+             - inv Hrl_f; congruence.
+             - congruence. }
+           eapply repr_val_id_set; eauto.
+  - (* correct_tinfo *)
+    eapply correct_tinfo_not_protected; eauto.
+Qed.
+
 (* Main Theorem *)
 Theorem repr_bs_LambdaANF_Codegen_related:
   forall (p : program) (rep_env : M.t ctor_rep) (cenv : ctor_env)
@@ -13253,153 +13370,10 @@ Theorem repr_bs_LambdaANF_Codegen_related:
           same_args_ptr lenv lenv' /\
           arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv'. (* value v is related to memory m'/lenv' *)
 Proof.
-  intros p rep_env cenv fenv finfo_env ienv
-    Hpinv Hsym Hfinfo
-    rho v e n Hbs.
-  eapply repr_bs_main_reduction; eauto.
-  - (* Econstr *)
-    intros rho0 x t ys e0 v0 n0 rho' vs0 Hgl Hset Hbs_e Hgoal_e.
-    subst rho'.
-    unfold repr_bs_goal.
-    intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
-    eapply repr_bs_econstr_step_lift_from_body_goal.
-    + econstructor; eauto.
-    + exact Hcenvs.
-    + exact Hprot.
-    + exact Hub.
-    + exact Hfnb.
-    + exact Hrepr.
-    + exact Hrel.
-    + exact Halloc.
-    + exact Hct.
-    + (* Econstr prefix stepping *)
-      intros vs_arg s_arg s'_arg max_alloc_e_arg
-        Hgl_arg Hbs_arg Hcenvs_arg Hprot_arg Hub_arg Hfnb_arg
-        Hasgn Hrepr_arg Hstm_eq Hmaxeq Hbound Halloc_arg Hct_arg.
-      subst stm.
-      (* x is not a protected id (it's bound in Econstr x t ys e0) *)
-      assert (Hnprot_x : ~ is_protected_id_thm x).
-      { intro Habs. destruct Hprot as [_ Hprot2].
-        apply (Hprot2 x Habs). apply Bound_Econstr1. }
-      assert (Hnprot_tinfo_x : ~ is_protected_tinfo_id_thm x).
-      { intro Habs. apply Hnprot_x. eapply is_protected_tinfo_weak. exact Habs. }
-      assert (Hx_ne_tinf : x <> tinfIdent).
-      { intro Heq. subst x. apply Hnprot_x.
-        unfold is_protected_id_thm, is_protected_id, protectedIdent. simpl. auto 20. }
-      assert (Hx_ne_args : x <> argsIdent).
-      { intro Heq. subst x. apply Hnprot_tinfo_x.
-        unfold is_protected_tinfo_id_thm, is_protected_tinfo_id. auto. }
-      assert (Hx_not_global : Genv.find_symbol (Genv.globalenv p) x = None).
-      { destruct Hfnb as [Hfnb1 _]. apply Hfnb1. apply Bound_Econstr1. }
-      inversion Hasgn; subst.
-      * (* Boxed case: Rconstr_ass_boxed — first constructor *)
-        admit.
-      * (* Enum case: Rconstr_ass_enum *)
-        (* ys = nil, so vs_arg = [] *)
-        assert (Hvs_nil : vs_arg = []).
-        { simpl in Hgl_arg. inversion Hgl_arg. reflexivity. }
-        subst vs_arg.
-        exists m, (M.set x (make_vint h) lenv).
-        split; [| split; [| split]].
-        -- (* m_tstep2 *)
-           eapply m_tstep2_seq_set. apply eval_cint.
-        -- (* same_args_ptr *)
-           apply same_args_ptr_set_right_other; auto.
-           apply same_args_ptr_refl.
-        -- (* rel_mem *)
-           unfold rel_mem_LambdaANF_Codegen_id, rel_mem_LambdaANF_Codegen.
-           destruct Hrel as [L [Hpnl Hrel_inner]].
-           exists L.
-           split.
-           ++ eapply protected_not_in_L_set; eauto.
-           ++ intro z. split.
-              ** intro Hfree.
-                 destruct (Pos.eq_dec z x) as [Heq | Hneq].
-                 --- (* z = x: new value Vconstr t [] *)
-                     subst z.
-                     exists (Vconstr t []).
-                     split.
-                     { rewrite M.gss. reflexivity. }
-                     { eapply RVid_V.
-                       - exact Hx_not_global.
-                       - rewrite M.gss. reflexivity.
-                       - eapply RSconstr_unboxed_v; eauto. }
-                 --- (* z <> x: carry over from old rel_mem *)
-                     assert (Hfree_outer : occurs_free (Econstr x t nil e0) z).
-                     { apply Free_Econstr2; auto. }
-                     destruct (Hrel_inner z) as [Hval_z _].
-                     destruct (Hval_z Hfree_outer) as [v6 [Hget Hrepr_v]].
-                     exists v6.
-                     split.
-                     { rewrite M.gso; auto. }
-                     { eapply repr_val_id_set; eauto. }
-              ** (* subval clause *)
-                 intros rho' fds f v_sub Hget Hsub.
-                 destruct (Pos.eq_dec z x) as [Heq | Hneq].
-                 --- (* z = x: Vconstr t [] has no function subvalues *)
-                     subst z.
-                     rewrite M.gss in Hget. inversion Hget; subst v_sub.
-                     exfalso.
-                     (* subval_or_eq (Vfun rho' fds f) (Vconstr t []) is impossible *)
-                     enough (Vfun rho' fds f = Vconstr t []) by discriminate.
-                     clear -Hsub.
-                     unfold subval_or_eq in Hsub.
-                     remember (Vconstr t []) as target.
-                     induction Hsub as [? ? Hd | | ? ? ? ? IH1 ? IH2]; subst;
-                       try reflexivity.
-                     { inversion Hd; subst; exfalso; eapply in_nil; eauto. }
-                     { specialize (IH2 eq_refl); subst; apply IH1; reflexivity. }
-                 --- (* z <> x: carry over from old rel_mem *)
-                     rewrite M.gso in Hget; auto.
-                     destruct (Hrel_inner z) as [_ Hfun_z].
-                     specialize (Hfun_z rho' fds f v_sub Hget Hsub).
-                     destruct Hfun_z as [Hrepr_f [Hclosed Hfinfo_f]].
-                     split; [| split]; auto.
-                     assert (Hf_ne_x : f <> x).
-                     { intro Heq. subst f.
-                       inv Hrepr_f; try congruence.
-                       (* RVid_V case: find_symbol x = None, but
-                          repr_val_L (Vfun) requires find_symbol = Some b.
-                          Invert repr_val_L to get contradiction. *)
-                       exfalso. inv H3; congruence. }
-                     eapply repr_val_id_set; eauto.
-        -- (* correct_tinfo *)
-           eapply correct_tinfo_not_protected; eauto.
-    + intros vs1 Hgl1.
-      rewrite Hgl in Hgl1; inversion Hgl1; subst vs1.
-      exact Hgoal_e.
-  - (* Ecase *)
-    intros rho0 y cl v0 n0 t vl e0
-      Hy Hcc Hfind Hbs_e Hgoal_e.
-    unfold repr_bs_goal.
-    intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
-    eapply repr_bs_ecase_step_lift_from_branch_goal.
-    + econstructor; eauto.
-    + exact Hcenvs.
-    + exact Hprot.
-    + exact Hub.
-    + exact Hfnb.
-    + exact Hrepr.
-    + exact Hrel.
-    + exact Halloc.
-    + exact Hct.
-    + admit. (* Ecase prefix stepping *)
-    + intros t0 vl0 e1 Hy0 Hcc0 Hfind0.
-      rewrite Hy in Hy0; inversion Hy0; subst t0 vl0; clear Hy0.
-      rewrite Hfind in Hfind0; inversion Hfind0; subst e1; clear Hfind0.
-      exact Hgoal_e.
-  - (* Eapp *)
-    intros rho0 rho_clo fl f' vs xs e0 rho_call f t ys v0 c
-      Hgetf Hgetys Hfind Hset Hbs_body Hgoal_body.
-    unfold repr_bs_goal.
-    intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
-    admit.
-  - (* Eletapp *)
-    intros rho0 rho_clo fl f' vs xs e_body e0 rho_call x f t ys v0 v' c c'
-      Hgetf Hgetys Hfind Hset Hbs_body Hbs_cont Hgoal_body Hgoal_cont.
-    unfold repr_bs_goal.
-    intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
-    admit.
+  (* Remaining cases: Econstr (boxed prefix), Ecase prefix, Eapp, Eletapp.
+     Each should be proved as a standalone lemma, then assembled here
+     via repr_bs_main_reduction or repr_bs_main_reduction_with_prefix_handlers.
+     The enum prefix case is factored out as repr_bs_econstr_enum_prefix_step above. *)
 Admitted.
 
 End THEOREM.

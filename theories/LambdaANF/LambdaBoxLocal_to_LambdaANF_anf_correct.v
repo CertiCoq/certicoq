@@ -17,7 +17,8 @@ Require Import cps cps_show eval ctx logical_relations
         List_util algebra alpha_conv functions Ensembles_util
         LambdaBoxLocal_to_LambdaANF LambdaBoxLocal_to_LambdaANF_util
         LambdaANF.tactics identifiers bounds cps_util rename stemctx
-        LambdaBoxLocal_to_LambdaANF_anf_util.
+        LambdaBoxLocal_to_LambdaANF_anf_util
+        LambdaBoxLocal_to_LambdaANF_anf_corresp.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
 
@@ -2295,7 +2296,11 @@ Section Correct.
   (* Every well-formed source value has a related target value. *)
   Lemma anf_val_rel_exists :
     forall v, well_formed_val v -> exists v', anf_val_rel v v'.
-  Proof. Admitted.
+  Proof.
+    intros v Hwf.
+    eapply LambdaBoxLocal_to_LambdaANF_anf_corresp.anf_val_rel_exists.
+    exact Hwf.
+  Qed.
 
   (** ** Consistency lemmas for duplicate ANF variables *)
 

@@ -842,14 +842,13 @@ Section Corresp.
         specialize (Hsub _ Htmp). unfold S, In, next_id, x in Hsub. lia. }
       eassumption. destructAll.
 
-      do 2 eexists. econstructor; [ | | | | | eassumption | eassumption ].
+      do 2 eexists. econstructor; [ | | | | eassumption | eassumption ].
       + eassumption.
       + unfold In, x. lia.
       + unfold S. intros z Hz. constructor.
-        unfold In. lia.
-        intros Hc. inv Hc. unfold In, x in *. lia.
+        unfold In, next_id, x in *. lia.
+        intros Hc. inv Hc. unfold In, next_id, x in *. lia.
       + unfold S. intros z Hz. eapply H0 in Hz. eassumption.
-      + intros z Hc. eapply H0 in Hc. eassumption.
   Qed.
 
 

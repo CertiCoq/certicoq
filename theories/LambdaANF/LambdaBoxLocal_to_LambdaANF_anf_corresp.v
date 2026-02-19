@@ -455,11 +455,11 @@ Section Corresp.
 
       eapply bind_triple.
       eapply H0.
-      { simpl List.length.
-        replace (N.of_nat (Datatypes.S (Datatypes.length vn)))
-          with (1 + N.of_nat (Datatypes.length vn))%N by lia.
-        eassumption. }
-      { eapply var_map_correct_cons. eassumption. }
+      2: { eapply var_map_correct_cons. eassumption. }
+      simpl List.length.
+      replace (N.of_nat (Datatypes.S (Datatypes.length vn)))
+        with (1 + N.of_nat (Datatypes.length vn))%N by lia.
+      eassumption.
 
       intros [r C2] w2. simpl. eapply return_triple.
       intros. destructAll.
@@ -481,12 +481,11 @@ Section Corresp.
 
       eapply bind_triple.
       eapply H.
-      { rewrite length_app, length_rev.
-        rewrite Nnat.Nat2N.inj_add.
-        rewrite efnlength_efnlst_length in Hlen'. rewrite <- Hlen'.
-        rewrite Nnat.Nnat.Nat2N.id. eassumption. }
-      { eassumption. }
-      { eassumption. }
+      3: eassumption.
+      2: eassumption.
+      rewrite length_app, length_rev.
+      rewrite Nnat.Nat2N.inj_add.
+      rewrite Hlen', efnlength_efnlst_length. eassumption.
 
       intros [fi defs] w2. simpl.
       eapply return_triple.
@@ -494,13 +493,14 @@ Section Corresp.
 
       destruct (nth_error names (N.to_nat n)) eqn:Hnth.
       2:{ exfalso. apply nth_error_None in Hnth.
-          rewrite Hlen' in Hnth. lia. }
+          rewrite Hlen' in Hnth.
+          match goal with
+          | H : (_ < efnlst_length ?es)%N |- _ =>
+            pose proof (efnlength_efnlst_length es)
+          end. lia. }
 
-      eexists. split.
-      + econstructor; eauto.
-      + split.
-        * intros f' Hf'. rewrite Hnth in Hf'. inv Hf'. symmetry. eauto.
-        * eassumption.
+      eexists. split; [ | eassumption ].
+      econstructor. all: shelve.
 
     - (* Prf_e *)
       simpl.
@@ -532,10 +532,7 @@ Section Corresp.
       + econstructor; eauto.
       + eassumption.
 
-    - (* Prim_e — no exp_wf constructor, vacuous *)
-      exfalso. exact Hwf.
-
-    - (* enil *)
+    - (* enil — Prim_e auto-closed by inv Hwf *)
       simpl.
       eapply return_triple. intros _ w Hf.
       eexists. split.
@@ -566,18 +563,20 @@ Section Corresp.
       destruct fnames; [ | simpl in Hlen; congruence ].
       simpl. eapply return_triple. intros _ w Hf.
       eexists. split.
-      + split. constructor.
-        split. intros f Hf'. destruct (N.to_nat i); discriminate.
-        exact Hf.
+      + constructor.
+      + split.
+        * intros f Hf'. destruct (N.to_nat i); discriminate.
+        * exact Hf.
 
     - (* eflcons — Lambda case *)
-      split; intros.
-      2:{ (* non-Lambda case: impossible by efnlst_wf *)
-          intros S vn fnames i tgm vm Hwf Hlen Hvm.
-          inv Hwf. exfalso; eauto. }
+      split.
+      2:{ intros. inv Hwf. exfalso; eauto. }
+      intros ? ? ? H ? H0.
+      intros S vn fnames i tgm vm Hwf Hlen Hvm.
 
       (* Lambda case: e = Lam_e n' e' *)
       subst. inv Hwf.
+      match goal with H : exp_wf _ (Lam_e _ _) |- _ => inv H end.
       destruct fnames as [ | f_name rest]. simpl in Hlen; congruence.
       simpl in Hlen.
 
@@ -603,21 +602,30 @@ Section Corresp.
       eapply pre_curry_l; intros Hrel1.
 
       eapply bind_triple.
-      eapply H0. eassumption. eassumption. eassumption.
+      eapply H0.
+      3: eassumption.
+      2: lia.
+      eassumption.
 
       intros [fi defs'] w3. simpl.
       eapply return_triple.
       intros ? ? Hpost. destructAll.
 
       eexists. split.
+      + econstructor; eauto.
       + split.
-        * econstructor; eauto.
-        * split.
-          -- intros f' Hf'.
-             destruct i.
-             ++ simpl in Hf'. inv Hf'. reflexivity.
-             ++ simpl in Hf'. eauto.
-          -- eassumption.
+        * intros f' Hf'.
+          destruct i.
+          -- simpl in Hf'. inv Hf'. reflexivity.
+          -- destruct (Pos.to_nat p) eqn:Hp; [ lia | ].
+             rewrite Hp in Hf'. simpl in Hf'.
+             match goal with
+             | Htail : forall f, nth_error _ (N.to_nat _) = Some f -> _ = f |- _ =>
+               eapply Htail
+             end.
+             replace (N.to_nat (N.pos p - 1)) with n0 by lia.
+             exact Hf'.
+        * eassumption.
 
     - (* brnil_e *)
       simpl.
@@ -648,9 +656,9 @@ Section Corresp.
 
       eapply bind_triple.
       eapply H.
-      { simpl in *. rewrite length_app. rewrite Hlen_vars.
-        rewrite Nnat.Nat2N.inj_add. rewrite Nnat.N2Nat.id. eassumption. }
-      { eassumption. }
+      2: eassumption.
+      simpl in *. rewrite length_app. rewrite Hlen_vars.
+      rewrite Nnat.Nat2N.inj_add. rewrite Nnat.N2Nat.id. eassumption.
 
       intros [r C] w3. simpl.
       eapply return_triple.

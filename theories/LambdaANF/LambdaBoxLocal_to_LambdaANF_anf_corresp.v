@@ -952,7 +952,8 @@ Section Corresp.
 
       destruct Hvs as [vs' Hvs].
 
-      edestruct (@set_lists_length3 val) with (rho := M.empty val) (vs := vs') (xs := names) as [ rho ].
+      set (s := @set_lists_length3 val).
+      edestruct s with (rho := M.empty val) (vs := vs') (xs := names) as [ rho ].
       eapply Forall2_length in Hvs. rewrite <- Hvs. eapply pos_seq_len.
 
       assert (Henv: anf_env_rel' (anf_val_rel func_tag default_tag tgm) names vs rho).
@@ -978,7 +979,7 @@ Section Corresp.
         - constructor.
         - inv Hall. destructAll. constructor; eauto. }
 
-      edestruct anf_fix_rel_exists with (fnames := fnames) (m := next_id).
+      edestruct anf_fix_rel_exists with (fnames := fnames) (m := next_id) (tgm := tgm) (fnames' := fnames).
 
       eassumption.
 
@@ -988,17 +989,18 @@ Section Corresp.
         constructor. intros z Hc. inv Hc. eapply pos_seq_In in H2.
         unfold In, next_id in *. lia. }
 
-      unfold fnames. rewrite pos_seq_len. reflexivity.
-
+      
+      unfold fnames. rewrite pos_seq_len. rewrite <- efnlength_efnlst_length. lia.
+      
       destructAll.
+
 
       edestruct (nth_error fnames (N.to_nat n)) eqn:Hnth.
       2:{ eapply nth_error_Some in Hnth. contradiction.
           unfold fnames. rewrite pos_seq_len. lia. }
-
-      eexists. econstructor; [ eassumption | | | | | | eassumption ].
-
-      + eapply pos_seq_NoDup.
+      
+      eexists. econstructor; [ eassumption  | | | | | | eassumption ].
+      + eapply NoDup_env_consistent. eapply pos_seq_NoDup. 
 
       + eapply pos_seq_NoDup.
 
@@ -1008,12 +1010,10 @@ Section Corresp.
         eapply pos_seq_In in H7. lia.
 
       + constructor. intros z Hc.
-        inv Hc. eapply pos_seq_In in H2.
+        inv Hc.  eapply pos_seq_In in H2.
         eapply pos_seq_In in H6. lia.
 
       + eassumption.
-
   Qed.
-
 
 End Corresp.

@@ -1389,33 +1389,13 @@ Definition prefix_ctx {A:Type} rho' rho :=
      repr_unboxed_Codegen t h ->
      (0 <= h <= Ptrofs.max_unsigned)%Z.
  Proof. 
-   intros. inv H.   
-   unfold Ptrofs.max_unsigned.
-   unfold Ptrofs.half_modulus in *.
-   
+   intros t h Hrepr.
+   inversion Hrepr as [Heq Hrng]; subst h.
+   unfold Ptrofs.max_unsigned, Ptrofs.half_modulus in *.
    unfold Ptrofs.modulus in *.
-   rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2; try lia.
+   rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2 by lia.
    rewrite Z.pow_1_r.
-   split; try lia.
-
-   rewrite Z.sub_1_r.
-   rewrite <- Z.lt_le_pred.
-   destruct H1.
-   unfold Ptrofs.wordsize in *. unfold Wordsize_Ptrofs.wordsize in *. 
-   assert (Hws:(0 <= Zpower.two_power_nat (if Archi.ptr64 then 64%nat else 32%nat))%Z).
-   {     
-     assert (Hws' := Coqlib.two_power_nat_pos (if Archi.ptr64 then 64%nat else 32%nat)). lia.
-   }
-   rewrite Z2Nat.inj_lt; try lia. rewrite Z2Nat.inj_lt in H0; try lia.
-   rewrite Z2Nat.inj_add in * by lia.
-   rewrite Z2Nat.inj_mul in * by lia.
-   rewrite <- Z.div2_div in H0.
-   rewrite Div2_Z_to_nat in H0.
-   rewrite Nat.div2_div in H0.
-   eapply nat_shiftl_p1.
-   chunk_red; simpl; rewrite <- Pos2Nat.inj_1;
-     apply nat_of_P_lt_Lt_compare_morphism; auto.
-   auto. auto.
+   lia.
  Qed.
 
 
@@ -1745,6 +1725,58 @@ Proof.
   simpl.
   apply Pos2Z.is_pos.
 Qed.
+
+(* Coq 8.20 dropped Ndigits.Ptestbit_Pbit; keep a local compatibility lemma. *)
+Lemma of_succ_nat_eq_succ_pos :
+  forall n, Pos.of_succ_nat n = N.succ_pos (N.of_nat n).
+Proof.
+  induction n; simpl; auto.
+Qed.
+
+Lemma pred_N_of_succ_nat :
+  forall n, Pos.pred_N (Pos.of_succ_nat n) = N.of_nat n.
+Proof.
+  intro n.
+  rewrite of_succ_nat_eq_succ_pos.
+  apply N.pos_pred_succ.
+Qed.
+
+Lemma Pos_testbit_of_nat :
+  forall q n, Pos.testbit q (N.of_nat n) = Pos.testbit_nat q n.
+Proof.
+  intros q n; revert q.
+  induction n as [|n IH]; intros q; destruct q; simpl; auto.
+  - rewrite pred_N_of_succ_nat. apply IH.
+  - rewrite pred_N_of_succ_nat. apply IH.
+Qed.
+
+Lemma Z_of_N_of_nat :
+  forall n, Z.of_N (N.of_nat n) = Z.of_nat n.
+Proof.
+  induction n; simpl; lia.
+Qed.
+
+Lemma ZtoN_of_nat :
+  forall n, Z.to_N (Z.of_nat n) = N.of_nat n.
+Proof.
+  intro n.
+  apply N2Z.inj.
+  rewrite Z2N.id by lia.
+  rewrite Z_of_N_of_nat.
+  reflexivity.
+Qed.
+
+Lemma Ptestbit_Pbit :
+  forall q n, Pos.testbit_nat q n = Z.testbit (Z.pos q) (Z.of_nat n).
+Proof.
+  intros q n.
+  rewrite <- Pos_testbit_of_nat.
+  rewrite Pos2Z.inj_testbit by lia.
+  change (N.testbit (N.pos q) (Z.to_N (Z.of_nat n)))
+    with (Pos.testbit q (Z.to_N (Z.of_nat n))).
+  rewrite ZtoN_of_nat.
+  reflexivity.
+Qed.
      
 Theorem pos_testbit_false_xI:
   forall b, 
@@ -1875,27 +1907,30 @@ Proof.
         + simpl.
           rewrite pland_split_nat with (c := 8). reflexivity.
           * intros.
-            rewrite <- Ndigits.Ptestbit_Pbit.            
+            try rewrite <- Ptestbit_Pbit.
             destruct d. simpl.
             destruct (Z.of_N a). simpl in Ha.
             assert (0 < Z.pos p0)%Z by apply Pos2Z.pos_is_pos. lia.
             simpl in Ha. inv Ha. reflexivity.
-            inv Ha. 
-            replace false with
-                (Z.testbit (Z.pos p0)  (Z.of_nat (S d))).
-            reflexivity.
-            rewrite <- Ha.
-            apply Z.shiftl_spec_low.
-            apply Nat2Z.inj_lt in H2.
-            simpl Z.of_nat in *. lia.
+             inv Ha. 
+             replace false with
+                 (Z.testbit (Z.pos p0)  (Z.of_nat (S d))).
+             rewrite Ptestbit_Pbit.
+             reflexivity.
+             rewrite <- Ha.
+             apply Z.shiftl_spec_low.
+             apply Nat2Z.inj_lt in H2.
+             simpl Z.of_nat in *. lia.
           * intros.
-            rewrite Zpower.two_power_pos_nat in H.
-            rewrite <- Ndigits.Ptestbit_Pbit.            
-            destruct d. exfalso; lia.
-            replace false with
-                (Z.testbit (Z.pos p1)  (Z.of_nat (S d))). reflexivity.
-            apply Z.bits_above_log2. lia.
-            apply Nat2Z.inj_le in H2.
+             rewrite Zpower.two_power_pos_nat in H.
+             try rewrite <- Ptestbit_Pbit.
+             destruct d. exfalso; lia.
+             replace false with
+                 (Z.testbit (Z.pos p1)  (Z.of_nat (S d))).
+             rewrite Ptestbit_Pbit.
+             reflexivity.
+             apply Z.bits_above_log2. lia.
+             apply Nat2Z.inj_le in H2.
             replace (Pos.to_nat 8) with 8 in H2 by reflexivity.
             rewrite Zpower.two_power_nat_equiv in H.
             replace (Z.of_nat (Pos.to_nat 8)) with 8%Z in H by reflexivity.
@@ -6651,7 +6686,7 @@ Definition makeCases (p0:program) fenv cenv ienv map :=
             | [] => Some (LSnil, LSnil)
             | q :: l' =>
                 match
-                  (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims (snd q) fenv cenv ienv map)
+                  (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam prims (snd q) fenv cenv ienv map)
                 with
                 | None => None
                 | Some prog =>
@@ -6854,7 +6889,7 @@ Lemma makeCases_correct:
         forall stm,
           no_primops (snd pe) ->
           correct_cenv_of_exp cenv (snd pe) ->
-          @LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims (snd pe) fenv cenv ienv map = Some stm ->
+          @LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam prims (snd pe) fenv cenv ienv map = Some stm ->
           repr_expr_LambdaANF_Codegen_id fenv map p rep_env (snd pe) stm) cl ->
       makeCases p fenv cenv ienv map cl = Some (ls, ls') ->
       repr_branches_LambdaANF_Codegen argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam fenv map p rep_env cl ls ls'.
@@ -6863,7 +6898,7 @@ Proof.
   induction cl as [| [c e] cl' IHcl]; intros ls ls' Hnp Hcenv_cl Hrepr_cl Hmc.
   - simpl in Hmc. inv Hmc. constructor.
   - simpl in Hmc.
-    destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb; [| inv Hmc].
+    destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb; [| inv Hmc].
     destruct (makeCases p fenv cenv ienv map cl') eqn:Hmc'; [| inv Hmc].
     destruct p0 as [ls0 ls0'].
     inversion Hnp as [| [c1 e1] cl1 Hnp_hd Hnp_tl]; subst.
@@ -6899,7 +6934,7 @@ Theorem translate_body_correct:
     forall  e stm,
       no_primops e ->
       correct_cenv_of_exp cenv e ->
-    @LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map = Some stm ->
+    @LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map = Some stm ->
     repr_expr_LambdaANF_Codegen_id fenv map p rep_env e stm.
 Proof.
   intros fenv cenv ienv p rep_env map Hsym HfinfoCorrect Hcrep.
@@ -6908,7 +6943,7 @@ Proof.
       forall stm,
         no_primops e ->
         correct_cenv_of_exp cenv e ->
-        @LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map = Some stm ->
+        @LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map = Some stm ->
         repr_expr_LambdaANF_Codegen_id fenv map p rep_env e stm).
   assert (HP : forall e, P e).
   {
@@ -6916,7 +6951,7 @@ Proof.
     - (* Econstr *)
       simpl in H2.
       destruct (assignConstructorS allocIdent threadInfIdent nParam cenv ienv fenv map v t l) eqn:Has; [| inv H2].
-      destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb'; [| inv H2].
+      destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb'; [| inv H2].
       inv H2.
       econstructor.
       + assert (Hcenv_constr := H1 v t l e (rt_refl _ _ _)).
@@ -6957,7 +6992,7 @@ Proof.
       + eapply repr_make_case_switch.
     - (* Eproj *)
       simpl in H2.
-      destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb'; [| inv H2].
+      destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb'; [| inv H2].
       inv H2.
       econstructor.
       eapply H; eauto.
@@ -6966,7 +7001,7 @@ Proof.
         constructor. constructor.
     - (* Eletapp *)
       simpl in H2.
-      destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent bodyName threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb'; [| inv H2].
+      destruct (@LambdaANF_to_Clight.translate_body argsIdent allocIdent limitIdent threadInfIdent tinfIdent isptrIdent caseIdent nParam prims e fenv cenv ienv map) eqn:Htb'; [| inv H2].
       destruct (M.get ft fenv) as [p_ft|] eqn:Hfenv; [| inv H2].
       destruct p_ft as [nn locs].
       destruct (asgnAppVars argsIdent threadInfIdent tinfIdent nParam ys (snd (nn, locs)) fenv map) eqn:Hasn; [| inv H2].

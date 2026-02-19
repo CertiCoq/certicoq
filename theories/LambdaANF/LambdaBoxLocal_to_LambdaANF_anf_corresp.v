@@ -500,7 +500,8 @@ Section Corresp.
           end. lia. }
 
       eexists. split; [ | eassumption ].
-      econstructor. all: shelve.
+      assert (fi = v) as -> by eauto.
+      econstructor; eassumption.
 
     - (* Prf_e *)
       simpl.
@@ -617,14 +618,14 @@ Section Corresp.
         * intros f' Hf'.
           destruct i.
           -- simpl in Hf'. inv Hf'. reflexivity.
-          -- destruct (Pos.to_nat p) eqn:Hp; [ lia | ].
-             rewrite Hp in Hf'. simpl in Hf'.
-             match goal with
+          -- match goal with
              | Htail : forall f, nth_error _ (N.to_nat _) = Some f -> _ = f |- _ =>
                eapply Htail
              end.
-             replace (N.to_nat (N.pos p - 1)) with n0 by lia.
-             exact Hf'.
+             change (N.to_nat (N.pos p)) with (Pos.to_nat p) in Hf'.
+             destruct (Pos2Nat.is_succ p) as [n0 Hpn].
+             rewrite Hpn in Hf'. simpl in Hf'.
+             replace (N.to_nat (N.pos p - 1)) with n0; [ exact Hf' | lia ].
         * eassumption.
 
     - (* brnil_e *)
@@ -666,7 +667,6 @@ Section Corresp.
 
       eexists. split.
       + subst. econstructor; [ | | | | | | eassumption ]; eauto.
-        rewrite Hlen_vars. reflexivity.
       + eassumption.
   Qed.
 

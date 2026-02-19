@@ -782,6 +782,10 @@ Section Corresp.
     - destruct fnames'. simpl in Hlen. congruence.
 
       simpl in Hlen. injection Hlen as Hlen.
+
+      (* Save efnlst_wf for tail before inv destroys Hwf *)
+      assert (Hwf_efns : efnlst_wf (N.of_nat (Datatypes.length (List.rev fnames ++ names))) efns)
+        by (inv Hwf; assumption).
       inv Hwf.
 
       set (x := (1 + m)%positive).
@@ -796,9 +800,8 @@ Section Corresp.
       assert (Hf : fresh S next_id).
       { unfold S, next_id, fresh, In. lia. }
 
-      assert (He_lam : exists n' e_body, e = Lam_e n' e_body).
-      { destruct e; simpl in H5; try contradiction. eauto. }
-      destruct He_lam as [n_lam [e_body He_lam]]. subst e. clear H5.
+      (* e must be a lambda *)
+      destruct e; match goal with H : isLambda _ |- _ => simpl in H; try contradiction end.
 
       destruct anf_cvt_sound as (Hexp & _).
 
@@ -810,20 +813,18 @@ Section Corresp.
       { unfold vm. rewrite <- (app_nil_r vn) at 2.
         apply var_map_correct_fold_right. apply var_map_correct_nil. }
 
-      match goal with
-      | H : exp_wf _ (Lam_e _ _) |- _ => inv H
-      end.
-      assert (Hwf' : exp_wf (N.of_nat (Datatypes.length (x :: vn))) e_body).
+      match goal with H : exp_wf _ (Lam_e _ _) |- _ => inv H end.
+      assert (Hwf' : exp_wf (N.of_nat (Datatypes.length (x :: vn))) e).
       { match goal with
-        | H : exp_wf ?n e_body |- exp_wf ?m e_body =>
+        | H : exp_wf ?n e |- exp_wf ?m e =>
           replace m with n; [exact H | ]
         end.
         unfold vn. cbn [length]. rewrite Nnat.Nat2N.inj_succ. lia. }
 
-      destruct (runState (convert_anf prim_map func_tag default_tag tgm e_body (add_var_name vm x)) tt (comp_d, tt)) as [cvt_res cvt_st] eqn:Hcvt.
+      destruct (runState (convert_anf prim_map func_tag default_tag tgm e (add_var_name vm x)) tt (comp_d, tt)) as [cvt_res cvt_st] eqn:Hcvt.
 
       unfold anf_cvt_exp_corresp, triple in Hexp.
-      specialize (Hexp e_body S (x :: vn) tgm
+      specialize (Hexp e S (x :: vn) tgm
                        (add_var_name vm x) Hwf'
                        (var_map_correct_cons vm vn x Hvm)
                        tt (comp_d, tt) Hf).
@@ -831,11 +832,14 @@ Section Corresp.
       destruct cvt_res as [? | [r_cvt C_cvt]]; try contradiction.
       destruct cvt_st as [c_st u_st]. simpl in Hexp. destructAll.
 
-      edestruct IHefns with (m := (next_var c_st)) (fnames' := fnames') (fnames := fnames) (names := names) (tgm := tgm). eassumption.
+      edestruct IHefns with (m := (next_var c_st)) (fnames' := fnames') (fnames := fnames) (names := names) (tgm := tgm).
+      exact Hwf_efns.
       { eapply Disjoint_Included_l; [ | eassumption ].
-        intros z. unfold In.
-        intros Hc. eapply H0 in Hc. unfold In in *.
-        unfold S, In, next_id in *. lia. }
+        intros z Hz. unfold In in *.
+        enough (m <= next_var c_st)%positive by lia.
+        assert (Hsub : Included _ x0 S) by (eapply anf_cvt_exp_subset; eassumption).
+        assert (Htmp : x0 (next_var c_st)) by (apply H0; lia).
+        specialize (Hsub _ Htmp). unfold S, In, next_id, x in Hsub. lia. }
       eassumption. destructAll.
 
       do 2 eexists. econstructor; [ | | | | | eassumption | eassumption ].

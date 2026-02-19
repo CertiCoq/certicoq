@@ -2299,7 +2299,7 @@ Section Correct.
   Proof.
     intros v Hwf.
     eapply LambdaBoxLocal_to_LambdaANF_anf_corresp.anf_val_rel_exists.
-    exact Hwf.
+    exact prim_map. exact Hwf.
   Qed.
 
   (** ** Consistency lemmas for duplicate ANF variables *)

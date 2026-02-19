@@ -13343,6 +13343,149 @@ Proof.
     eapply correct_tinfo_not_protected; eauto.
 Qed.
 
+(* ---------- Case lemmas for repr_bs_main_reduction ---------- *)
+
+(* Econstr case: prefix assignment + body induction.
+   Enum subcase uses repr_bs_econstr_enum_prefix_step.
+   Boxed subcase steps through allocation, header store, field stores. *)
+Lemma repr_bs_econstr_case :
+  forall p rep_env cenv fenv finfo_env ienv,
+    program_inv p ->
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    forall rho x t ys e v n rho' vs,
+      get_list ys rho = Some vs ->
+      M.set x (Vconstr t vs) rho = rho' ->
+      bstep_e (M.empty _) cenv rho' e v n ->
+      repr_bs_goal p rep_env cenv fenv finfo_env ienv rho' v e n ->
+      repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v (Econstr x t ys e) n.
+Proof.
+  intros p rep_env cenv fenv finfo_env ienv
+    Hpinv Hsym Hfinfo
+    rho x t ys e v n rho' vs
+    Hgl Hset Hbs_e Hgoal_e.
+  subst rho'.
+  unfold repr_bs_goal.
+  intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+  eapply repr_bs_econstr_step_lift_from_body_goal.
+  + econstructor; eauto.
+  + exact Hcenvs.
+  + exact Hprot.
+  + exact Hub.
+  + exact Hfnb.
+  + exact Hrepr.
+  + exact Hrel.
+  + exact Halloc.
+  + exact Hct.
+  + (* Prefix callback: case split on repr_asgn_constr *)
+    intros vs0 s s' max_alloc_e
+      Hgl0 Hbs_e0 Hcenvs_e Hprot_e Hub_e Hfnb_e
+      Hasgn Hrepr_e Hstm_eq Hmaxeq Hbound Halloc_e Hct_e.
+    inversion Hasgn; subst.
+    * (* Rconstr_ass_boxed: boxed constructor prefix stepping *)
+      admit.
+    * (* Rconstr_ass_enum: unboxed constructor prefix stepping *)
+      assert (Hvs : vs = nil) by (simpl in Hgl; congruence).
+      assert (Hvs0 : vs0 = nil) by (simpl in Hgl0; congruence).
+      subst vs vs0.
+      assert (Hbs_full : bstep_e (M.empty _) cenv rho (Econstr x t nil e) v n)
+        by (econstructor; eauto).
+      eapply repr_bs_econstr_enum_prefix_step;
+        try exact Hbs_full; try exact Hcenvs; try exact Hprot;
+        try exact Hub; try exact Hfnb; try exact Hrepr;
+        try exact Hrel; try exact Halloc; try exact Hct;
+        try eassumption; try reflexivity; eauto.
+  + (* Body callback *)
+    intros vs0 Hgl0.
+    rewrite Hgl in Hgl0.
+    inversion Hgl0; subst.
+    exact Hgoal_e.
+Admitted.
+
+(* Ecase case: switch stepping to branch + body induction.
+   Steps through isPtr external call, Sifthenelse, Sswitch to reach
+   the matching branch body, applies body IH, then cleans up via Sbreak. *)
+Lemma repr_bs_ecase_case :
+  forall p rep_env cenv fenv finfo_env ienv,
+    program_inv p ->
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    forall rho y cl v n t vl e,
+      M.get y rho = Some (Vconstr t vl) ->
+      caseConsistent cenv cl t ->
+      findtag cl t = Some e ->
+      bstep_e (M.empty _) cenv rho e v n ->
+      repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v e n ->
+      repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v (Ecase y cl) n.
+Proof.
+  intros p rep_env cenv fenv finfo_env ienv
+    Hpinv Hsym Hfinfo
+    rho y cl v n t vl e
+    Hy Hcc Hfind Hbs_e Hgoal_e.
+  unfold repr_bs_goal.
+  intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+  admit.
+Admitted.
+
+(* Eapp case: function call mechanics.
+   Uses eapp_step_and_repr_rel_fun_alloc_tinfo_inv for context extraction.
+   Steps through: arg assignments (repr_asgn_fun_mem), tinfo saves
+   (m_tstep2_tinfo_assigns), Scall (step_internal_function),
+   callee entry (repr_asgn_fun_entry), body IH, return. *)
+Lemma repr_bs_eapp_case :
+  forall p rep_env cenv fenv finfo_env ienv,
+    program_inv p ->
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    forall rho rho_clo fl f' vs xs e rho_call f t ys v c,
+      M.get f rho = Some (Vfun rho_clo fl f') ->
+      get_list ys rho = Some vs ->
+      find_def f' fl = Some (t, xs, e) ->
+      set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call ->
+      bstep_e (M.empty _) cenv rho_call e v c ->
+      repr_bs_goal p rep_env cenv fenv finfo_env ienv rho_call v e c ->
+      repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v (Eapp f t ys) (c + 1).
+Proof.
+  intros p rep_env cenv fenv finfo_env ienv
+    Hpinv Hsym Hfinfo
+    rho rho_clo fl f' vs xs e rho_call f t ys v c
+    Hfun Hgl Hfdef Hset Hbs_e Hgoal_e.
+  unfold repr_bs_goal.
+  intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+  admit.
+Admitted.
+
+(* Eletapp case: function call + continuation.
+   Like Eapp, but after callee returns: restore alloc pointer from tinfo,
+   load return value from args[1], establish rel_mem for continuation,
+   apply continuation IH. Uses eletapp_step_and_repr_rel_fun_cont_inv
+   and eletapp_cont_all_invariants_set. *)
+Lemma repr_bs_eletapp_case :
+  forall p rep_env cenv fenv finfo_env ienv,
+    program_inv p ->
+    find_symbol_domain p finfo_env ->
+    finfo_env_correct fenv finfo_env ->
+    forall rho rho_clo fl f' vs xs e_body e rho_call x f t ys v v' c c',
+      M.get f rho = Some (Vfun rho_clo fl f') ->
+      get_list ys rho = Some vs ->
+      find_def f' fl = Some (t, xs, e_body) ->
+      set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call ->
+      bstep_e (M.empty _) cenv rho_call e_body v c ->
+      bstep_e (M.empty _) cenv (M.set x v rho) e v' c' ->
+      repr_bs_goal p rep_env cenv fenv finfo_env ienv rho_call v e_body c ->
+      repr_bs_goal p rep_env cenv fenv finfo_env ienv (M.set x v rho) v' e c' ->
+      repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v'
+        (Eletapp x f t ys e) (c + c' + 1).
+Proof.
+  intros p rep_env cenv fenv finfo_env ienv
+    Hpinv Hsym Hfinfo
+    rho rho_clo fl f' vs xs e_body e rho_call x f t ys v v' c c'
+    Hfun Hgl Hfdef Hset Hbs_body Hbs_cont Hgoal_body Hgoal_cont.
+  unfold repr_bs_goal.
+  intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+  admit.
+Admitted.
+
 (* Main Theorem *)
 Theorem repr_bs_LambdaANF_Codegen_related:
   forall (p : program) (rep_env : M.t ctor_rep) (cenv : ctor_env)
@@ -13370,10 +13513,19 @@ Theorem repr_bs_LambdaANF_Codegen_related:
           same_args_ptr lenv lenv' /\
           arg_val_LambdaANF_Codegen fenv finfo_env p rep_env v m' lenv'. (* value v is related to memory m'/lenv' *)
 Proof.
-  (* Remaining cases: Econstr (boxed prefix), Ecase prefix, Eapp, Eletapp.
-     Each should be proved as a standalone lemma, then assembled here
-     via repr_bs_main_reduction or repr_bs_main_reduction_with_prefix_handlers.
-     The enum prefix case is factored out as repr_bs_econstr_enum_prefix_step above. *)
-Admitted.
+  intros p rep_env cenv fenv finfo_env ienv
+    Hpinv Hsym Hfinfo
+    rho v e n Hbs Hcenvs Hprot Hub Hfnb
+    stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+  revert Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+  change (repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v e n).
+  apply (repr_bs_main_reduction p rep_env cenv fenv finfo_env ienv
+    Hpinv Hsym Hfinfo
+    (repr_bs_econstr_case p rep_env cenv fenv finfo_env ienv Hpinv Hsym Hfinfo)
+    (repr_bs_ecase_case p rep_env cenv fenv finfo_env ienv Hpinv Hsym Hfinfo)
+    (repr_bs_eapp_case p rep_env cenv fenv finfo_env ienv Hpinv Hsym Hfinfo)
+    (repr_bs_eletapp_case p rep_env cenv fenv finfo_env ienv Hpinv Hsym Hfinfo)
+    rho v e n Hbs).
+Qed.
 
 End THEOREM.

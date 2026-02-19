@@ -377,10 +377,10 @@ Notation "'call' f " := (Scall None f (tinf :: nil)) (at level 35).
 Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 
 Notation "'Field(' t ',' n ')'" :=
-  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
+  ( *(add ([valPtr] t) (c_int n%Z uval))) (at level 36). (* must be uval (integer), not val (pointer), for classify_add *)
 
 Notation "'args[' n ']'" :=
-  ( *(add args (c_int n%Z val))) (at level 36).
+  ( *(add args (c_int n%Z uval))) (at level 36).
 
 
 
@@ -470,8 +470,8 @@ Definition assignConstructorS
       ret (x ::= tag)
   | boxed _ a =>
       let stm := assignConstructorS' fenv map x 0 vs in
-      ret (x ::= [val] (allocPtr +' (c_int Z.one val)) ;;;
-           allocIdent ::= allocPtr +' (c_int (Z.of_N (a + 1)) val) ;;;
+      ret (x ::= [val] (allocPtr +' (c_int Z.one uval)) ;;;
+           allocIdent ::= allocPtr +' (c_int (Z.of_N (a + 1)) uval) ;;;
            Field(var x, -1) :::= tag ;;;
            stm)
   end.
@@ -687,8 +687,8 @@ Definition make_case_switch
   isPtr caseIdent x;;;
   Sifthenelse
     (bvar caseIdent)
-    (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
-    (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val) ls').
+    (Sswitch (Ebinop Oand (Ecast (Field(var x, -1)) uval) (make_cint 255 uval) uval) ls)
+    (Sswitch (Ebinop Oshr (Ecast (var x) uval) (make_cint 1 uval) uval) ls').
 
 Definition to_int64 (i : PrimInt63.int) : int64. 
   exists (Uint63.to_Z i * 2 + 1)%Z.

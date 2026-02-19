@@ -759,29 +759,27 @@ Section Corresp.
 
     specialize (Hexp e S xs tgm vm Hwf Hvm tt (comp_d, tt) Hf).
 
-    rewrite Hcvt in Hexp. destruct e0. 2: contradiction.
-    destruct p.
-
-    destructAll.
+    rewrite Hcvt in Hexp. destruct e0 as [ | [r0 C0]]. contradiction.
+    simpl in Hexp. destructAll.
     do 3 eexists. eassumption.
   Qed.
 
 
-  Lemma anf_fix_rel_exists m efns tgm fnames names :
+  Lemma anf_fix_rel_exists m efns tgm fnames names fnames' :
     efnlst_wf (N.of_nat (List.length (List.rev fnames ++ names))) efns ->
     Disjoint _ (fun x => (m <= x)%positive) (FromList fnames :|: FromList names) ->
-    List.length fnames = efnlength efns ->
+    List.length fnames' = efnlength efns ->
     exists B S3,
-      anf_fix_rel func_tag default_tag tgm fnames names (fun x => (m <= x)%positive) fnames efns B S3.
+      anf_fix_rel func_tag default_tag tgm fnames names (fun x => (m <= x)%positive) fnames' efns B S3.
   Proof.
-    revert m tgm fnames names.
-    induction efns; intros m tgm fnames names; intros Hwf Hdis Hlen.
+    revert m tgm fnames names fnames'.
+    induction efns; intros m tgm fnames names fnames'; intros Hwf Hdis Hlen.
 
     - do 2 eexists.
-      destruct fnames; simpl in *; try congruence.
+      destruct fnames'; simpl in *; try congruence.
       econstructor.
 
-    - destruct fnames. simpl in Hlen. congruence.
+    - destruct fnames'. simpl in Hlen. congruence.
 
       simpl in Hlen. injection Hlen as Hlen.
       inv Hwf.
@@ -798,11 +796,13 @@ Section Corresp.
       assert (Hf : fresh S next_id).
       { unfold S, next_id, fresh, In. lia. }
 
-      destruct e; inv H5.
+      assert (He_lam : exists n' e_body, e = Lam_e n' e_body).
+      { destruct e; simpl in H5; try contradiction. eauto. }
+      destruct He_lam as [n_lam [e_body He_lam]]. subst e. clear H5.
 
       destruct anf_cvt_sound as (Hexp & _).
 
-      set (vn := x :: List.rev fnames ++ names).
+      set (vn := (List.rev fnames ++ names)%list).
 
       set (vm := List.fold_right (fun v vm' => add_var_name vm' v) new_var_map vn).
 
@@ -810,24 +810,28 @@ Section Corresp.
       { unfold vm. rewrite <- (app_nil_r vn) at 2.
         apply var_map_correct_fold_right. apply var_map_correct_nil. }
 
-      edestruct (runState (convert_anf prim_map func_tag default_tag tgm e (add_var_name vm x)) tt (comp_d, tt)) eqn:Hcvt.
+      match goal with
+      | H : exp_wf _ (Lam_e _ _) |- _ => inv H
+      end.
+      assert (Hwf' : exp_wf (N.of_nat (Datatypes.length (x :: vn))) e_body).
+      { match goal with
+        | H : exp_wf ?n e_body |- exp_wf ?m e_body =>
+          replace m with n; [exact H | ]
+        end.
+        unfold vn. cbn [length]. rewrite Nnat.Nat2N.inj_succ. lia. }
 
-      inv H4.
-      assert (Hwf' : exp_wf (N.of_nat (Datatypes.length (x :: List.rev fnames ++ names))) e).
-      { simpl. rewrite length_app in *. rewrite length_rev.
-        replace (N.pos (Pos.of_succ_nat (Datatypes.length fnames + Datatypes.length names)))
-          with (1 + N.of_nat (Datatypes.length fnames + Datatypes.length names)) by lia.
-        eassumption. }
+      destruct (runState (convert_anf prim_map func_tag default_tag tgm e_body (add_var_name vm x)) tt (comp_d, tt)) as [cvt_res cvt_st] eqn:Hcvt.
 
       unfold anf_cvt_exp_corresp, triple in Hexp.
-      specialize (Hexp e S (x :: List.rev fnames ++ names) tgm
+      specialize (Hexp e_body S (x :: vn) tgm
                        (add_var_name vm x) Hwf'
                        (var_map_correct_cons vm vn x Hvm)
                        tt (comp_d, tt) Hf).
       rewrite Hcvt in Hexp.
-      destruct e0; try contradiction. destruct p0. destructAll.
+      destruct cvt_res as [? | [r_cvt C_cvt]]; try contradiction.
+      destruct cvt_st as [c_st u_st]. simpl in Hexp. destructAll.
 
-      edestruct IHefns with (m := (next_var (fst p))). eassumption.
+      edestruct IHefns with (m := (next_var c_st)) (fnames' := fnames') (fnames := fnames) (names := names) (tgm := tgm). eassumption.
       { eapply Disjoint_Included_l; [ | eassumption ].
         intros z. unfold In.
         intros Hc. eapply H0 in Hc. unfold In in *.

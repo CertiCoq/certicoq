@@ -971,10 +971,12 @@ Section Corresp.
 
       assert (Hwf : efnlst_wf (N.of_nat (Datatypes.length (List.rev fnames ++ names))) fnl).
       { revert H5. rewrite length_app, Nnat.Nat2N.inj_add.
-        rewrite length_rev.
-        unfold fnames. rewrite pos_seq_len.
+        rewrite length_rev, Hlen.
         unfold names. rewrite pos_seq_len.
-        intros. eassumption. }
+        generalize (N.of_nat (Datatypes.length fnames) + N.of_nat (Datatypes.length vs)).
+        clear. induction fnl; intros m Hall.
+        - constructor.
+        - inv Hall. destructAll. constructor; eauto. }
 
       edestruct anf_fix_rel_exists with (fnames := fnames) (m := next_id).
 

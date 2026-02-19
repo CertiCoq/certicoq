@@ -852,6 +852,22 @@ Section Corresp.
   Qed.
 
 
+  Lemma NoDup_env_consistent (vn : list var) (rho : list value) :
+    NoDup vn -> env_consistent vn rho.
+  Proof.
+    intros Hnd i j x Hi Hj.
+    assert (Heq : i = j).
+    { clear rho. revert j vn Hnd Hi Hj. induction i; intros j vn Hnd Hi Hj.
+      - destruct vn; simpl in *; [ discriminate | ]. inv Hi.
+        destruct j; [ reflexivity | ].
+        simpl in Hj. inv Hnd. exfalso. apply H1. eapply nth_error_In. eassumption.
+      - destruct vn; simpl in *; [ discriminate | ].
+        destruct j; simpl in *.
+        + inv Hnd. inv Hj. exfalso. apply H1. eapply nth_error_In. eassumption.
+        + inv Hnd. f_equal. eapply IHi; eassumption. }
+    subst. reflexivity.
+  Qed.
+
   Lemma anf_val_rel_exists v tgm :
     well_formed_val v ->
     exists v', anf_val_rel func_tag default_tag tgm v v'.
@@ -883,7 +899,7 @@ Section Corresp.
       edestruct (@set_lists_length3 val) with (rho := M.empty val) (vs := vs') (xs := names) as [ rho ].
       eapply Forall2_length in Hvs. rewrite <- Hvs. eapply pos_seq_len.
 
-      assert (Henv: anf_env_rel' func_tag default_tag tgm (anf_val_rel func_tag default_tag tgm) names vs rho).
+      assert (Henv: anf_env_rel' (anf_val_rel func_tag default_tag tgm) names vs rho).
       { eapply set_lists_Forall2 in H0; eauto. 2:{ eapply pos_seq_NoDup. }
         unfold names in *. revert Hvs H0. clear. generalize (pos_seq 3%positive (Datatypes.length vs)) as ns.
         revert vs' rho.
@@ -904,21 +920,14 @@ Section Corresp.
       edestruct (anf_rel_exists e (x :: names) tgm next_id) as [C1 [r1 [S2 Hrel]]].
       eassumption.
 
-      eexists. eapply anf_rel_Clos with (f := f); [ eassumption | | | | | | eassumption ].
-      + eapply pos_seq_NoDup.
-      + unfold next_id. constructor. intros z Hc.
-        inv Hc. unfold In in *.
-        inv H5. inv H7. lia.
-        inv H7. inv H5. lia.
-        eapply pos_seq_In in H5. lia.
+      eexists. eapply anf_rel_Clos with (f := f); [ eassumption | | | | | eassumption ].
+      + eapply NoDup_env_consistent. eapply pos_seq_NoDup.
+      + unfold next_id. constructor. intros z [Hz1 Hz2]. unfold In in Hz2.
+        destruct Hz1 as [Hz1 | [Hz1 | Hz1]]; [inv Hz1; lia | inv Hz1; lia | eapply pos_seq_In in Hz1; lia].
       + intros Hc.
-        inv Hc. inv H5. inv H6. inv H6.
-        eapply pos_seq_In in H5. lia.
+        destruct Hc as [Hc | [Hc | Hc]]; [inv Hc; lia | inv Hc; lia | eapply pos_seq_In in Hc; lia].
       + intros Hc.
-        inv Hc. inv H5.
-        eapply pos_seq_In in H5. lia.
-      + intros Hc.
-        eapply pos_seq_In in Hc. lia.
+        destruct Hc as [Hc | Hc]; [inv Hc; lia | eapply pos_seq_In in Hc; lia].
 
     - (* ClosFix_v *)
 
@@ -937,7 +946,7 @@ Section Corresp.
       edestruct (@set_lists_length3 val) with (rho := M.empty val) (vs := vs') (xs := names) as [ rho ].
       eapply Forall2_length in Hvs. rewrite <- Hvs. eapply pos_seq_len.
 
-      assert (Henv: anf_env_rel' func_tag default_tag tgm (anf_val_rel func_tag default_tag tgm) names vs rho).
+      assert (Henv: anf_env_rel' (anf_val_rel func_tag default_tag tgm) names vs rho).
       { eapply set_lists_Forall2 in H0; eauto. 2:{ eapply pos_seq_NoDup. }
         unfold names in *. revert Hvs H0. clear. generalize (pos_seq 1%positive (Datatypes.length vs)) as ns.
         revert vs' rho.

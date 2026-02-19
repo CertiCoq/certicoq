@@ -635,70 +635,22 @@ Section Translate.
 
     Definition anf_term : Type := anf_value * exp_ctx.
 
-    Definition anf_term_to_exp (t : anf_term) : anfM cps.exp :=
-      let '(v, C) := t in
-      match v with
-      | Anf_Var x => ret (C |[ Ehalt x ]|)
-      | Anf_App f x => ret (C |[ Eapp f func_tag [x] ]|)
-      | Constr c xs =>
-        x' <- get_named_str "y" ;; (* Get variable for interim result *)
-        ret (C |[ Econstr x' c xs (Ehalt x') ]|)
-      | Proj c n y =>
-        x' <- get_named_str "y" ;; (* Get variable for interim result *)
-        ret (C |[ Eproj x' c n y (Ehalt x') ]|)
-      | Fun ft x e =>
-        x' <- get_named_str "y" ;; (* Get variable for interim result *)
-        ret (C |[ Efun (Fcons x' ft [x] e Fnil) (Ehalt x') ]|)
-      | Prim_val p => 
-        x' <- get_named_str "y" ;; (* Get variable for interim result *)
-        ret (C |[ Eprim_val x' p (Ehalt x') ]|)
-      | Prim pr xs =>
-        x' <- get_named_str "y" ;; (* Get variable for interim result *)
-        ret (C |[ Eprim x' pr xs (Ehalt x') ]|)
-      end.
-
-    Definition anf_term_to_ctx (t : anf_term) (n : name) : anfM (var * exp_ctx) :=
-      let '(v, C) := t in
-      match v with
-      | Anf_Var x => ret (x, C)
-      | Anf_App f x =>
-        x' <- get_named n ;; (* Get variable for interim result *)
-        ret (x', comp_ctx_f C (Eletapp_c x' f func_tag [x] Hole_c))
-      | Constr c xs =>
-        x' <- get_named n ;; (* Get variable for interim result *)
-        ret (x', comp_ctx_f C (Econstr_c x' c xs Hole_c))
-      | Proj c i y =>
-        x' <- get_named n ;; (* Get variable for interim result *)
-        ret (x', comp_ctx_f C (Eproj_c x' c i y Hole_c))
-      | Fun ft x e =>
-        x' <- get_named n ;; (* XXX keep n or n'? *)
-        ret (x', comp_ctx_f C (Efun1_c (Fcons x' ft [x] e Fnil) (Hole_c)))
-      | Prim_val p =>
-        x' <- get_named n ;; (* Get variable for interim result *)
-        ret (x', comp_ctx_f C (Eprim_val_c x' p Hole_c))
-      | Prim pr xs =>
-        x' <- get_named n ;; (* Get variable for interim result *)
-        ret (x', comp_ctx_f C (Eprim_c x' pr xs Hole_c))
-      end.
-
     Definition def_name := nNamed "y".
-    
+
 
     Section Convert.
 
       Context (tgm : conId_map).
-      
-      Fixpoint proj_ctx (names : list name) (i : N)
+
+      (* Bind projections for a match branch.
+         Follows the CPS pattern: allocate vars, build ctx_bind_proj, update var_map.
+         The first variable in vars binds the last constructor argument. *)
+      Definition proj_ctx (names : list name) (n : nat)
                (scrut : var) (vm : var_map) ct : anfM (exp_ctx * var_map) :=
-        match names with
-        | [] => ret (Hole_c, vm)
-        | n :: ns =>
-          x <- get_named n;;
-          let vm' := add_var_name vm x in
-          cvm <- proj_ctx ns (i+1)%N scrut vm' ct ;; 
-          let (C, vm'') := cvm in
-          ret (Eproj_c x ct i scrut C, vm'')
-        end.
+        vars <- get_named_lst (names_lst_len names n) ;;
+        let ctx_p := ctx_bind_proj ct scrut vars (List.length vars) in
+        let vm' := List.fold_right (fun v vm' => add_var_name vm' v) vm vars in
+        ret (ctx_p, vm').
 
       Fixpoint add_fix_names (B : efnlst) (vm : var_map) : anfM (list var * var_map):=
         match B with
@@ -707,145 +659,119 @@ Section Translate.
           f_name <- get_named n ;;
           lvm <- add_fix_names B' (add_var_name vm f_name) ;;
           let '(fs, vm') := lvm in
-          ret (f_name :: fs, vm')     
+          ret (f_name :: fs, vm')
         end.
 
       Fixpoint convert_prim_anf (n : nat) (* arity *)
-               (prim : positive) (args : list var) : anfM anf_term :=
+               (prim : positive) (args : list var) : anfM (var * exp_ctx) :=
         match n with
         | 0%nat =>
-          x <- get_named_str "prim" ;; 
-          ret (Anf_Var x, Eprim_c x prim (List.rev args) Hole_c)
+          x <- get_named_str "prim" ;;
+          ret (x, Eprim_c x prim (List.rev args) Hole_c)
         | S n =>
-          arg <- get_named_str "p_arg" ;; 
-          f <- get_named_str "prim_wrapper" ;; 
-          '(anf_val, C) <- convert_prim_anf n prim (arg :: args) ;;
-          match anf_val with
-          | Anf_Var x =>
-            ret (Anf_Var f,  Efun1_c (Fcons f func_tag [arg] (C|[ Ehalt x ]|) Fnil) Hole_c)
-          | _ => failwith "Internal error: Expected Anf_Var but found something else."
-          end
+          arg <- get_named_str "p_arg" ;;
+          f <- get_named_str "prim_wrapper" ;;
+          '(x, C) <- convert_prim_anf n prim (arg :: args) ;;
+          ret (f, Efun1_c (Fcons f func_tag [arg] (C |[ Ehalt x ]|) Fnil) Hole_c)
         end.
 
 
-      Fixpoint convert_anf (e : expression.exp) (vm : var_map) : anfM anf_term :=
+      Fixpoint convert_anf (e : expression.exp) (vm : var_map) : anfM (var * exp_ctx) :=
         match e with
         | Var_e x =>
           match get_var_name vm x with
-          | Some v => ret (Anf_Var v, Hole_c)
-          | None => failwith  "Unknown DeBruijn index"
+          | Some v => ret (v, Hole_c)
+          | None => failwith "Unknown DeBruijn index"
           end
         | App_e e1 e2 =>
-          a1 <- convert_anf e1 vm ;;
-          a2 <- convert_anf e2 vm ;;
-          xc1 <- anf_term_to_ctx a1 def_name ;;
-          xc2 <- anf_term_to_ctx a2 def_name ;;
-          let '(x1, C1) := xc1 in
-          let '(x2, C2) := xc2 in
-          ret (Anf_App x1 x2, comp_ctx_f C1 C2)
+          '(x1, C1) <- convert_anf e1 vm ;;
+          '(x2, C2) <- convert_anf e2 vm ;;
+          r <- get_named def_name ;;
+          ret (r, comp_ctx_f C1 (comp_ctx_f C2 (Eletapp_c r x1 func_tag [x2] Hole_c)))
         | Lam_e n e1 =>
           x <- get_named n ;; (* get the name of the argument *)
-          a1 <- convert_anf e1 (add_var_name vm x) ;;
-          e_body <- anf_term_to_exp a1 ;;
-          ret (Fun func_tag x e_body, Hole_c)
+          f <- get_named def_name ;;
+          '(r, C) <- convert_anf e1 (add_var_name vm x) ;;
+          ret (f, Efun1_c (Fcons f func_tag [x] (C |[ Ehalt r ]|) Fnil) Hole_c)
         | Let_e n e1 e2 =>
-          a1 <- convert_anf e1 vm ;;
-          vC <- anf_term_to_ctx a1 n ;;
-          let '(x, C1) := vC in
-          a2 <- convert_anf e2 (add_var_name vm x) ;;
-          let '(v, C2) := a2 in
-          ret (v, comp_ctx_f C1 C2)
+          '(x, C1) <- convert_anf e1 vm ;;
+          '(r, C2) <- convert_anf e2 (add_var_name vm x) ;;
+          ret (r, comp_ctx_f C1 C2)
         | Con_e dci es =>
           let c_tag := dcon_to_tag dci tgm in
-          ts <- convert_anf_exps es vm ;;
-          let (ys, C) := ts in
-          ret (Constr c_tag ys, C)
+          x <- get_named def_name ;;
+          '(ys, C) <- convert_anf_exps es vm ;;
+          ret (x, comp_ctx_f C (Econstr_c x c_tag ys Hole_c))
         | Fix_e fnlst i =>
           lvm <- add_fix_names fnlst vm ;;
           let (names, vm') := lvm in
-          ds <- convert_anf_efnlst fnlst names i vm' ;;
-          let (x, defs) := (ds : var * fundefs) in
-          ret (Anf_Var x, Efun1_c defs Hole_c)
+          '(x, defs) <- convert_anf_efnlst fnlst names i vm' ;;
+          ret (x, Efun1_c defs Hole_c)
         | Match_e e1 n bl =>
-          (* Zoe: For pattern matching compilation the situation is tricky because they always have to occur in tail
-           * position in LambdaANF. Our solution currently is to create a function that receives the scrutiny as an arg 
-           * pattern matches it, and returns the result of the pattern match. For those that are in tail position
-           * these functions will be inlined by shrink reduction yielding the expected compilation result.
-           * However, for those that are intermediate results these functions will appear in the C code.
-           * Another approach would be to use some form of local continuations (join points) to capture the continuation
-           * of the pattern-match. This might be preferable because the join point will always be a tail call. 
-           *)
-          a <- convert_anf e1 vm ;;
           f <- get_named_str "f_case" ;; (* Case-analysis function *)
           y <- get_named_str "s" ;; (* Scrutinee argument *)
+          '(x1, C1) <- convert_anf e1 vm ;;
           pats <- convert_anf_branches bl y vm ;;
-          xc <- anf_term_to_ctx a def_name ;;
-          let (x, C) := xc in
-          let C_fun := Efun1_c (Fcons f func_tag [y] (Ecase y pats) Fnil) C in
-          ret (Anf_App f x, C_fun)
+          r <- get_named def_name ;;
+          ret (r, Efun1_c (Fcons f func_tag [y] (Ecase y pats) Fnil)
+                          (comp_ctx_f C1 (Eletapp_c r f func_tag [x1] Hole_c)))
         | Prf_e =>
-          (* Zoe: Because a lot of dead code is *not* being eliminated *)
-          ret (Constr default_tag [], Hole_c)            
-        (* f <- get_named_str "f_proof" ;; *)
-        (* y <- get_named_str "x" ;; *)
-        (* let c := consume_fun f y in              *)
-        (* ret (Anf_Var f, c) *)
-        | Prim_val_e p => 
-          ret (Prim_val p, Hole_c)
+          x <- get_named_str "y" ;;
+          ret (x, Econstr_c x default_tag [] Hole_c)
+        | Prim_val_e p =>
+          x <- get_named_str "y" ;;
+          ret (x, Eprim_val_c x p Hole_c)
         | Prim_e p =>
           match M.get p prim_map with
           | Some (nm, s, ar) => convert_prim_anf ar p []
-          | None =>failwith "Internal error: identifier for primitive not found"
+          | None => failwith "Internal error: identifier for primitive not found"
           end
-        end    
+        end
       with convert_anf_exps (es : expression.exps) (vm : var_map) : anfM (list var * exp_ctx) :=
              match es with
              | enil => ret ((@nil var), Hole_c)
              | econs e es' =>
-               ts <- convert_anf_exps es' vm ;;
-               a <- convert_anf e vm ;;
-               t <- anf_term_to_ctx a def_name ;;
-               let (y, C1) := (t : var * exp_ctx) in
-               let (ys, C2) := ts in
+               '(y, C1) <- convert_anf e vm ;;
+               '(ys, C2) <- convert_anf_exps es' vm ;;
                ret (y :: ys, comp_ctx_f C1 C2)
              end
       with convert_anf_efnlst (fdefs : expression.efnlst) (names : list var) (i : N) (vm : var_map) : anfM (var * fundefs) :=
              match fdefs, names with
              | eflnil, nil => ret (1%positive (* dummy var *), Fnil)
              | eflcons n e fdefs', f_name :: names =>
-               a1 <- convert_anf e vm ;;
-               match a1 with
-               | (Fun ft arg e_body, Hole_c) =>
+               match e with
+               | Lam_e na e1 =>
+                 x <- get_named na ;;
+                 '(r, C) <- convert_anf e1 (add_var_name vm x) ;;
                  ds <- convert_anf_efnlst fdefs' names (i - 1)%N vm ;;
                  let (fi, defs') := ds in
                  let fi' := match i with
                             | 0%N => f_name
                             | Npos _ => fi
                             end in
-                 ret (fi', Fcons f_name func_tag [arg] e_body defs')
-               | (_, _) => failwith ("Unexpected body of fix in function " ++  print_name n)%bs
+                 ret (fi', Fcons f_name func_tag [x] (C |[ Ehalt r ]|) defs')
+               | _ => failwith ("Unexpected body of fix in function " ++ print_name n)%bs
                end
-             |_, _ => failwith "Wrong number of names for mut. rec. functions"
+             | _, _ => failwith "Wrong number of names for mut. rec. functions"
              end
       with convert_anf_branches (bl : expression.branches_e) (scrut : var) (vm : var_map) : anfM (list (ctor_tag * exp)) :=
              match bl with
              | brnil_e => ret nil
              | brcons_e dc (i, lnames) e bl' =>
                let ctag := dcon_to_tag dc tgm in
-               cm <- proj_ctx lnames 0%N scrut vm ctag ;;
-               let (Cproj, vm') := cm in
-               a <- convert_anf e vm' ;;
-               e' <- anf_term_to_exp a ;;
                pats' <- convert_anf_branches bl' scrut vm ;;
-               ret ((ctag, Cproj |[ e' ]|) :: pats')
+               cm <- proj_ctx lnames (N.to_nat i) scrut vm ctag ;;
+               let (Cproj, vm') := cm in
+               '(r, C) <- convert_anf e vm' ;;
+               ret ((ctag, app_ctx_f Cproj (C |[ Ehalt r ]|)) :: pats')
              end.
-      
+
     End Convert.
-    
+
 
     Definition convert_anf_exp dcm e : anfM cps.exp :=
-      a <- convert_anf dcm e new_var_map ;;
-      anf_term_to_exp a.
+      '(x, C) <- convert_anf dcm e new_var_map ;;
+      ret (C |[ Ehalt x ]|).
     
     (** * Top-level convert function *)
     

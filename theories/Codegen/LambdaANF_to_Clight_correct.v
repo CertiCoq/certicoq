@@ -1281,6 +1281,19 @@ Proof.
       lia.
 Qed.
 
+Lemma mem_after_n_proj_store_load_other_block_any :
+  forall b ofs vs i m m' b' ofs' chunk,
+    mem_after_n_proj_store b ofs vs i m m' ->
+    b' <> b ->
+    Mem.load chunk m' b' ofs' = Mem.load chunk m b' ofs'.
+Proof.
+  intros b ofs vs i m m' b' ofs' chunk Hstore.
+  induction Hstore; intros Hneq.
+  - eapply Mem.load_store_other; eauto.
+  - rewrite IHHstore by exact Hneq.
+    eapply Mem.load_store_other; eauto.
+Qed.
+
 Theorem mem_after_n_proj_snoc_unchanged:
   forall L b ofs vs  m m',
     mem_after_n_proj_snoc b ofs vs m m' ->
@@ -4319,7 +4332,7 @@ Notation valPtr := (Tpointer vval
   Variable (isptrIdent: ident). (* ident for the isPtr external function *)
   Variable (caseIdent:ident).
   Variable (nParam:nat).
-  Variable (prims : LambdaANF.toplevel.prim_env).
+  Variable (prims : LambdaANF_to_Clight.prim_env).
 
   Definition protectedIdent_thm := protectedIdent argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent.
   Variable (disjointIdent: NoDup protectedIdent_thm).
@@ -8010,6 +8023,108 @@ Proof.
   }
 Qed.
 
+Lemma protected_not_in_L_set_alloc :
+  forall p lenv L alloc_b alloc_ofs limit_ofs alloc_ofs',
+    protected_not_in_L_id p lenv L ->
+    M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) ->
+    M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) ->
+    (Ptrofs.unsigned alloc_ofs <= Ptrofs.unsigned alloc_ofs' <= Ptrofs.unsigned limit_ofs)%Z ->
+    protected_not_in_L_id p
+      (M.set allocIdent (Vptr alloc_b alloc_ofs') lenv) L.
+Proof.
+  intros p lenv L alloc_b alloc_ofs limit_ofs alloc_ofs'
+    Hprot Halloc Hlimit Hrange.
+  destruct Hprot as [alloc_b0 [alloc_ofs0 [limit_ofs0 [args_b [args_ofs [tinf_b [tinf_ofs
+    [Halloc0 [HallocL [Hlimit0 [Hargs [HargsL [Htinf [HtinfL Hglob]]]]]]]]]]]]]].
+  rewrite Halloc0 in Halloc. inversion Halloc; subst alloc_b0 alloc_ofs0.
+  rewrite Hlimit0 in Hlimit. inversion Hlimit; subst limit_ofs0.
+  assert (Hneq_limit_alloc : limitIdent <> allocIdent) by solve_nodup.
+  assert (Hneq_args_alloc : argsIdent <> allocIdent) by solve_nodup.
+  assert (Hneq_tinf_alloc : tinfIdent <> allocIdent) by solve_nodup.
+  exists alloc_b, alloc_ofs', limit_ofs, args_b, args_ofs, tinf_b, tinf_ofs.
+  split.
+  - rewrite M.gss. reflexivity.
+  - split.
+    + intros j Hj.
+      apply HallocL.
+      lia.
+    + split.
+      * rewrite M.gso; auto.
+      * split.
+        { rewrite M.gso; auto. }
+        split.
+        { exact HargsL. }
+        split.
+        { rewrite M.gso; auto. }
+        split.
+        { exact HtinfL. }
+        { intros x b Hsym.
+          specialize (Hglob x b Hsym) as [Hneq_args [Hneq_alloc Hnot]].
+          split; [exact Hneq_args|].
+          split; [|exact Hnot].
+          intro Heq.
+          subst b.
+          apply Hneq_alloc.
+          reflexivity. }
+Qed.
+
+Lemma rel_mem_set_alloc_id :
+  forall fenv finfo_env p rep_env e rho m lenv alloc_b alloc_ofs limit_ofs alloc_ofs',
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e rho m lenv ->
+    protected_id_not_bound_id rho e ->
+    M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) ->
+    M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) ->
+    (Ptrofs.unsigned alloc_ofs <= Ptrofs.unsigned alloc_ofs' <= Ptrofs.unsigned limit_ofs)%Z ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e rho m
+      (M.set allocIdent (Vptr alloc_b alloc_ofs') lenv).
+Proof.
+  intros fenv finfo_env p rep_env e rho m lenv alloc_b alloc_ofs limit_ofs alloc_ofs'
+    Hrel Hprot Halloc Hlimit Hrange.
+  assert (Halloc_prot : is_protected_id_thm allocIdent).
+  {
+    unfold is_protected_id_thm, is_protected_id, protectedIdent_thm, protectedIdent.
+    inList.
+  }
+  unfold rel_mem_LambdaANF_Codegen_id in Hrel.
+  unfold rel_mem_LambdaANF_Codegen in Hrel.
+  destruct Hrel as [L [HpinL Hmem]].
+  exists L.
+  split.
+  - eapply protected_not_in_L_set_alloc; eauto.
+  - intros y.
+    specialize (Hmem y) as [Hocc Hfun].
+    split.
+    + intros Hyfree.
+      specialize (Hocc Hyfree) as [v6 [Hyget Hrepr]].
+      exists v6.
+      split; [exact Hyget|].
+      eapply repr_val_id_set; [exact Hrepr|].
+      intro Hyx.
+      subst y.
+      destruct Hprot as [Hrho _].
+      specialize (Hrho allocIdent allocIdent v6 Hyget Halloc_prot) as Hn.
+      apply Hn.
+      left.
+      reflexivity.
+    + intros rho' fds f v Hyget Hsub.
+      specialize (Hfun _ _ _ _ Hyget Hsub)
+        as [Hrepr_f [Hclosed_f Hinfo_f]].
+      split.
+      * eapply repr_val_id_set; [exact Hrepr_f|].
+        intro Hfx.
+        subst f.
+        destruct Hprot as [Hrho _].
+        specialize (Hrho y allocIdent v Hyget Halloc_prot) as Hn.
+        apply Hn.
+        right.
+        eapply bound_var_subval; [|exact Hsub].
+        destruct Hinfo_f as [finfo [t [t' [vs [e0 [Hfind _]]]]]].
+        constructor.
+        eapply name_in_fundefs_bound_var_fundefs.
+        eapply find_def_name_in_fundefs; eauto.
+      * split; [exact Hclosed_f|exact Hinfo_f].
+Qed.
+
 Lemma rel_mem_fun_subval_info :
   forall fenv finfo_env p rep_env e rho m lenv x rho' fds f v,
     rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e rho m lenv ->
@@ -8939,6 +9054,109 @@ Proof.
   eauto.
 Qed.
 
+Lemma rel_mem_econstr_args_get_var_or_funvar :
+  forall fenv finfo_env p rep_env rho m lenv x t ys e,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env
+      (Econstr x t ys e) rho m lenv ->
+    Forall (fun y => exists v7, get_var_or_funvar p lenv y v7) ys.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x t ys e Hrel.
+  apply Forall_forall.
+  intros y Hy.
+  assert (Hfree : occurs_free (Econstr x t ys e) y).
+  { apply Free_Econstr1. exact Hy. }
+  destruct (rel_mem_occurs_free_get_var_or_funvar
+              fenv finfo_env p rep_env (Econstr x t ys e) rho m lenv y Hrel Hfree)
+    as [_ [_ [v7 [_ [_ [Hgv _]]]]]].
+  eauto.
+Qed.
+
+Lemma rel_mem_econstr_args_Forall2_get_var_or_funvar :
+  forall fenv finfo_env p rep_env rho m lenv x t ys e,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env
+      (Econstr x t ys e) rho m lenv ->
+    exists vs7, Forall2 (get_var_or_funvar p lenv) ys vs7.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x t ys e Hrel.
+  pose proof (rel_mem_econstr_args_get_var_or_funvar
+                fenv finfo_env p rep_env rho m lenv x t ys e Hrel) as Hfor.
+  eapply Forall_exists_Forall2 in Hfor.
+  exact Hfor.
+Qed.
+
+Lemma get_list_Forall2_lookup_repr :
+  forall fenv finfo_env p rep_env rho m lenv L ys vs,
+    get_list ys rho = Some vs ->
+    (forall y, List.In y ys ->
+       exists v v7,
+         M.get y rho = Some v /\
+         get_var_or_funvar p lenv y v7 /\
+         repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L v7) ->
+    exists vs7,
+      Forall2 (get_var_or_funvar p lenv) ys vs7 /\
+      Forall2
+        (fun v v7 =>
+           repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L v7)
+        vs vs7.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv L ys.
+  induction ys as [| y ys IH]; intros vs Hgl Hlookup.
+  - simpl in Hgl. inversion Hgl; subst.
+    exists nil.
+    split; constructor.
+  - simpl in Hgl.
+    destruct (M.get y rho) as [vy|] eqn:Hy; try discriminate.
+    destruct (get_list ys rho) as [vs_tail|] eqn:Hgl_tail; try discriminate.
+    inversion Hgl; subst vs.
+    destruct (Hlookup y (or_introl eq_refl))
+      as [v0 [v7 [Hy0 [Hgvof Hrepr_v0]]]].
+    rewrite Hy in Hy0. inversion Hy0; subst v0.
+    destruct (IH vs_tail eq_refl)
+      as [vs7_tail [Hfor_gv_tail Hfor_repr_tail]].
+    + intros z Hz.
+      eapply Hlookup.
+      right. exact Hz.
+    + exists (v7 :: vs7_tail).
+      split.
+      * constructor; assumption.
+      * constructor; assumption.
+Qed.
+
+Lemma rel_mem_econstr_args_get_list_Forall2_repr :
+  forall fenv finfo_env p rep_env rho m lenv x t ys e vs,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env
+      (Econstr x t ys e) rho m lenv ->
+    get_list ys rho = Some vs ->
+    exists L vs7,
+      protected_not_in_L_id p lenv L /\
+      Forall2 (get_var_or_funvar p lenv) ys vs7 /\
+      Forall2
+        (fun v v7 =>
+           repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L v7)
+        vs vs7.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x t ys e vs Hrel Hgl.
+  unfold rel_mem_LambdaANF_Codegen_id, rel_mem_LambdaANF_Codegen in Hrel.
+  destruct Hrel as [L [Hprot HrelL]].
+  destruct (get_list_Forall2_lookup_repr
+              fenv finfo_env p rep_env rho m lenv L ys vs Hgl)
+    as [vs7 [Hfor_gv Hfor_repr]].
+  - intros y Hy.
+    assert (Hfree : occurs_free (Econstr x t ys e) y).
+    { apply Free_Econstr1. exact Hy. }
+    specialize (HrelL y) as [Hocc _].
+    specialize (Hocc Hfree) as [v [Hget Hrid]].
+    destruct (repr_val_id_implies_var_or_funvar
+                argsIdent allocIdent limitIdent gcIdent threadInfIdent
+                tinfIdent isptrIdent caseIdent nParam
+                fenv finfo_env p rep_env v m L lenv y Hrid)
+      as [v7 [Hgvof Hrepr_v]].
+    exists v, v7.
+    repeat split; assumption.
+  - exists L, vs7.
+    repeat split; assumption.
+Qed.
+
 Lemma rel_mem_eletapp_callvars_get_var_or_funvar :
   forall fenv finfo_env p rep_env rho m lenv x f t ys e,
     rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eletapp x f t ys e) rho m lenv ->
@@ -9523,6 +9741,226 @@ Proof.
       eapply repr_val_L_load_result; eauto.
 Qed.
 
+Lemma rel_mem_econstr_body_set_with_repr :
+  forall fenv finfo_env p rep_env rho m lenv x t ys e vs L v7,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env
+      (Econstr x t ys e) rho m lenv ->
+    protected_id_not_bound_id rho (Econstr x t ys e) ->
+    functions_not_bound p rho (Econstr x t ys e) ->
+    get_list ys rho = Some vs ->
+    protected_not_in_L_id p lenv L ->
+    repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env
+      (Vconstr t vs) m L v7 ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env
+      e (M.set x (Vconstr t vs) rho) m (M.set x v7 lenv).
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv x t ys e vs L v7
+    Hrel Hprot_id Hfnb Hgl HprotL Hrepr_v.
+  unfold rel_mem_LambdaANF_Codegen_id in Hrel.
+  unfold rel_mem_LambdaANF_Codegen in Hrel.
+  destruct Hrel as [L0 [HprotL0 HrelL]].
+  pose proof HrelL as HrelL_saved.
+  destruct Hfnb as [Hfnb_exp _].
+  assert (Hx_none : Genv.find_symbol (globalenv p) x = None).
+  { eapply Hfnb_exp. constructor. }
+  assert (Hx_not_prot : ~ is_protected_id_thm x).
+  { eapply protected_id_not_bound_econstr_head; eauto. }
+  assert (Hx_not_tinfo : ~ is_protected_tinfo_id_thm x).
+  {
+    intro Hxt.
+    apply Hx_not_prot.
+    eapply is_protected_tinfo_weak; eauto.
+  }
+  assert (Hx_neq_tinf : x <> tinfIdent).
+  {
+    intro Hxeq; subst.
+    apply Hx_not_prot.
+    unfold is_protected_id_thm, is_protected_id, protectedIdent_thm, protectedIdent.
+    inList.
+  }
+  set (L' := fun b ofs => L0 b ofs \/ L b ofs).
+  exists L'.
+  split.
+  {
+    eapply protected_not_in_L_set; eauto.
+    eapply protected_not_in_L_union; eauto.
+  }
+  {
+    intro z.
+    specialize (HrelL_saved z) as [Hocc_z Hfun_z].
+    split.
+    {
+      intro Hfree_e.
+      destruct (var_dec z x) as [Heqzx | Hneqzx].
+      - subst z.
+        exists (Vconstr t vs).
+        split.
+        + rewrite M.gss. reflexivity.
+        + econstructor 2.
+          * exact Hx_none.
+          * rewrite M.gss. reflexivity.
+          * eapply repr_val_L_sub_locProp.
+            -- exact Hrepr_v.
+            -- unfold sub_locProp, L'. intros b ofs HL.
+               right. exact HL.
+      - assert (Hfree_outer : occurs_free (Econstr x t ys e) z).
+        { apply Free_Econstr2; auto. }
+        specialize (Hocc_z Hfree_outer) as [vz [Hgetz Hrid_z]].
+        exists vz.
+        split.
+        + rewrite M.gso; auto.
+        + eapply repr_val_id_set.
+          * eapply repr_val_id_L_sub_locProp.
+            -- exact Hrid_z.
+            -- unfold sub_locProp, L'. intros b ofs HL.
+               left. exact HL.
+          * exact Hneqzx.
+    }
+    {
+      intros rho' fds f vf Hgetz' Hsub.
+      destruct (var_dec z x) as [Heqzx | Hneqzx].
+      - subst z.
+        rewrite M.gss in Hgetz'.
+        inversion Hgetz'; subst vf; clear Hgetz'.
+        destruct (subval_or_eq_fun rho' fds f vs t Hsub)
+          as [vsub [Hsub_v Hin_vs]].
+        destruct (get_list_In_val _ _ _ _ Hgl Hin_vs)
+          as [y [Hy_in Hy_get]].
+        specialize (HrelL y) as [_ Hfun_y].
+        specialize (Hfun_y rho' fds f vsub Hy_get Hsub_v)
+          as [Hrid_f [Hclosed_f Hinfo_f]].
+        split.
+        + assert (Hf_ne_x : f <> x).
+          {
+            intro Heqf.
+            subst f.
+            apply repr_val_id_L_LambdaANF_Codegen_ptr in Hrid_f.
+            destruct Hrid_f as [v7_f [Hrl_f [[_ Hfs_none] | [b_f [_ Hfs_some]]]]].
+            * destruct (repr_val_fun_inv
+                          fenv finfo_env p rep_env rho' fds x m L0 v7_f Hrl_f)
+                as [vars Hinv].
+              destruct Hinv as [avars Hinv].
+              destruct Hinv as [b0 Hinv].
+              destruct Hinv as [t0 Hinv].
+              destruct Hinv as [t0' Hinv].
+              destruct Hinv as [vs0 Hinv].
+              destruct Hinv as [pvs Hinv].
+              destruct Hinv as [avs Hinv].
+              destruct Hinv as [e0 Hinv].
+              destruct Hinv as [asgn Hinv].
+              destruct Hinv as [body Hinv].
+              destruct Hinv as [l Hinv].
+              destruct Hinv as [locs Hinv].
+              destruct Hinv as [alocs Hinv].
+              destruct Hinv as [finfo Hinv].
+              destruct Hinv as [gccall Hinv].
+              destruct Hinv as [_ Hinv].
+              destruct Hinv as [_ Hinv].
+              destruct Hinv as [_ Hinv].
+              destruct Hinv as [_ Hinv].
+              destruct Hinv as [_ Hinv].
+              destruct Hinv as [Hsymf _].
+              rewrite Hx_none in Hsymf.
+              discriminate.
+            * change (Genv.find_symbol (Genv.globalenv p) x = None) in Hx_none.
+              rewrite Hx_none in Hfs_some.
+              discriminate.
+          }
+          eapply repr_val_id_set.
+          * eapply repr_val_id_L_sub_locProp.
+            -- exact Hrid_f.
+            -- unfold sub_locProp, L'. intros b ofs HL.
+               left. exact HL.
+          * exact Hf_ne_x.
+        + split; assumption.
+      - rewrite M.gso in Hgetz' by exact Hneqzx.
+        specialize (Hfun_z rho' fds f vf Hgetz' Hsub)
+          as [Hrid_f [Hclosed_f Hinfo_f]].
+        split.
+        + assert (Hf_ne_x : f <> x).
+          {
+            intro Heqf.
+            subst f.
+            apply repr_val_id_L_LambdaANF_Codegen_ptr in Hrid_f.
+            destruct Hrid_f as [v7_f [Hrl_f [[_ Hfs_none] | [b_f [_ Hfs_some]]]]].
+            * destruct (repr_val_fun_inv
+                          fenv finfo_env p rep_env rho' fds x m L0 v7_f Hrl_f)
+                as [vars Hinv].
+              destruct Hinv as [avars Hinv].
+              destruct Hinv as [b0 Hinv].
+              destruct Hinv as [t0 Hinv].
+              destruct Hinv as [t0' Hinv].
+              destruct Hinv as [vs0 Hinv].
+              destruct Hinv as [pvs Hinv].
+              destruct Hinv as [avs Hinv].
+              destruct Hinv as [e0 Hinv].
+              destruct Hinv as [asgn Hinv].
+              destruct Hinv as [body Hinv].
+              destruct Hinv as [l Hinv].
+              destruct Hinv as [locs Hinv].
+              destruct Hinv as [alocs Hinv].
+              destruct Hinv as [finfo Hinv].
+              destruct Hinv as [gccall Hinv].
+              destruct Hinv as [_ Hinv].
+              destruct Hinv as [_ Hinv].
+              destruct Hinv as [_ Hinv].
+              destruct Hinv as [_ Hinv].
+              destruct Hinv as [_ Hinv].
+              destruct Hinv as [Hsymf _].
+              rewrite Hx_none in Hsymf.
+              discriminate.
+            * change (Genv.find_symbol (Genv.globalenv p) x = None) in Hx_none.
+              rewrite Hx_none in Hfs_some.
+              discriminate.
+          }
+          eapply repr_val_id_set.
+          * eapply repr_val_id_L_sub_locProp.
+            -- exact Hrid_f.
+            -- unfold sub_locProp, L'. intros b ofs HL.
+               left. exact HL.
+          * exact Hf_ne_x.
+        + split; assumption.
+    }
+  }
+Qed.
+
+Lemma rel_mem_unchanged_from_protected :
+  forall fenv finfo_env p rep_env e rho m lenv m',
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e rho m lenv ->
+    (forall L, protected_not_in_L_id p lenv L -> Mem.unchanged_on L m m') ->
+    (forall x b,
+        Genv.find_symbol (globalenv p) x = Some b ->
+        forall i chunk,
+          Mem.loadv chunk m (Vptr b i) = Mem.loadv chunk m' (Vptr b i)) ->
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e rho m' lenv.
+Proof.
+  intros fenv finfo_env p rep_env e rho m lenv m'
+    Hrel Hunch Hglob.
+  unfold rel_mem_LambdaANF_Codegen_id, rel_mem_LambdaANF_Codegen in Hrel.
+  destruct Hrel as [L [Hprot HrelL]].
+  exists L.
+  split; [exact Hprot|].
+  intro z.
+  specialize (HrelL z) as [Hocc Hfun].
+  split.
+  - intros Hfree.
+    specialize (Hocc Hfree) as [v6 [Hget Hrid]].
+    exists v6.
+    split; [exact Hget|].
+    eapply repr_val_id_L_unchanged.
+    + exact Hrid.
+    + eapply Hunch; eauto.
+  - intros rho' fds f v Hget Hsub.
+    specialize (Hfun rho' fds f v Hget Hsub)
+      as [Hrid_f [Hclosed_f Hinfo_f]].
+    split.
+    + eapply repr_val_id_L_unchanged.
+      * exact Hrid_f.
+      * eapply Hunch; eauto.
+    + split; [exact Hclosed_f|].
+      eapply correct_fundefs_unchanged_global; eauto.
+Qed.
+
 Lemma repr_bs_post_has_args_ptr :
   forall fenv finfo_env p rep_env v lenv k fu stm m m',
     (exists lenv',
@@ -9880,6 +10318,169 @@ Proof.
   cbn [LambdaANF_to_Clight.allocPtr].
   apply eval_Etempvar.
   exact Halloc.
+Qed.
+
+Lemma ptrofs_mul_repr_repr :
+  forall a b,
+    Ptrofs.mul (Ptrofs.repr a) (Ptrofs.repr b) = Ptrofs.repr (a * b).
+Proof.
+  intros a b.
+  unfold Ptrofs.mul.
+  apply Ptrofs.eqm_samerepr.
+  apply Ptrofs.eqm_mult.
+  - apply Ptrofs.eqm_unsigned_repr_l.
+    apply Ptrofs.eqm_refl.
+  - apply Ptrofs.eqm_unsigned_repr_l.
+    apply Ptrofs.eqm_refl.
+Qed.
+
+Lemma eval_allocPtr_add_cint :
+  forall p lenv m alloc_b alloc_ofs z,
+    M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) ->
+    eval_expr (globalenv p) empty_env lenv m
+      (add (Etempvar allocIdent valPtr) (c_int z LambdaANF_to_Clight.uval))
+      (Vptr alloc_b (Ptrofs.add alloc_ofs (Ptrofs.repr (int_size * z)))).
+Proof.
+  intros p lenv m alloc_b alloc_ofs z Halloc.
+  assert (Harchi : Archi.ptr64 = true) by (vm_compute; reflexivity).
+  eapply eval_Ebinop.
+  - apply eval_Etempvar.
+    exact Halloc.
+  - unfold c_int, LambdaANF_to_Clight.c_int.
+    rewrite Harchi.
+    apply eval_Econst_long.
+  - unfold add, LambdaANF_to_Clight.add, sem_binary_operation, sem_add.
+    simpl typeof.
+    unfold val, LambdaANF_to_Clight.val, LambdaANF_to_Clight.uval,
+      c_int, LambdaANF_to_Clight.c_int.
+    rewrite Harchi.
+    unfold classify_add.
+    simpl typeconv.
+    cbv beta iota.
+    f_equal. f_equal. f_equal. f_equal.
+    assert (Hofs_eq :
+      Ptrofs.mul (Ptrofs.repr (if Archi.ptr64 then 8%Z else 4%Z))
+        (Ptrofs.of_int64 (Int64.repr z)) =
+      Ptrofs.repr (int_size * z)).
+    { rewrite Harchi.
+      unfold int_size, int_chunk, LambdaANF_to_Clight.int_chunk.
+      rewrite Harchi.
+      unfold Ptrofs.of_int64.
+      rewrite ptrofs_of_int64.
+      rewrite ptrofs_mul_repr_repr.
+      reflexivity. }
+    unfold sem_add_ptr_long.
+    simpl.
+    rewrite Hofs_eq.
+    reflexivity.
+Qed.
+
+Lemma eval_lvalue_field_from_ptr :
+  forall p lenv m x b i n,
+    M.get x lenv = Some (Vptr b i) ->
+    eval_lvalue (globalenv p) empty_env lenv m
+      (Ederef
+         (add (Ecast (Etempvar x val) valPtr)
+              (c_int n LambdaANF_to_Clight.uval))
+         val)
+      b (Ptrofs.add i (Ptrofs.repr (int_size * n))) Full.
+Proof.
+  intros p lenv m x b i n Hx.
+  assert (Harchi : Archi.ptr64 = true) by (vm_compute; reflexivity).
+  eapply eval_Ederef.
+  eapply eval_Ebinop.
+  - eapply eval_Ecast.
+    + apply eval_Etempvar.
+      exact Hx.
+    + unfold sem_cast.
+      simpl.
+      reflexivity.
+  - unfold c_int, LambdaANF_to_Clight.c_int.
+    rewrite Harchi.
+    apply eval_Econst_long.
+  - unfold add, LambdaANF_to_Clight.add, sem_binary_operation, sem_add.
+    simpl typeof.
+    unfold val, LambdaANF_to_Clight.val, LambdaANF_to_Clight.uval,
+      c_int, LambdaANF_to_Clight.c_int.
+    rewrite Harchi.
+    unfold classify_add.
+    simpl typeconv.
+    cbv beta iota.
+    f_equal. f_equal. f_equal. f_equal.
+    assert (Hofs_eq :
+      Ptrofs.mul (Ptrofs.repr (if Archi.ptr64 then 8%Z else 4%Z))
+        (Ptrofs.of_int64 (Int64.repr n)) =
+      Ptrofs.repr (int_size * n)).
+    { rewrite Harchi.
+      unfold int_size, int_chunk, LambdaANF_to_Clight.int_chunk.
+      rewrite Harchi.
+      unfold Ptrofs.of_int64.
+      rewrite ptrofs_of_int64.
+      rewrite ptrofs_mul_repr_repr.
+      reflexivity. }
+    unfold sem_add_ptr_long.
+    simpl.
+    rewrite Hofs_eq.
+    reflexivity.
+Qed.
+
+Lemma step_assign_field_cint :
+  forall p fu k lenv m m' x b i n h,
+    M.get x lenv = Some (Vptr b i) ->
+    Mem.store int_chunk m b
+      (Ptrofs.unsigned (Ptrofs.add i (Ptrofs.repr (int_size * n))))
+      (make_vint h) = Some m' ->
+    traceless_step2 (globalenv p)
+      (State fu
+         (Sassign
+            (Ederef
+               (add (Ecast (Etempvar x val) valPtr)
+                    (c_int n LambdaANF_to_Clight.uval))
+               val)
+            (c_int h val))
+         k empty_env lenv m)
+      (State fu Sskip k empty_env lenv m').
+Proof.
+  intros p fu k lenv m m' x b i n h Hx Hstore.
+  eapply step_assign with (v2 := make_vint h) (v := make_vint h).
+  - eapply eval_lvalue_field_from_ptr; eauto.
+  - eapply eval_cint.
+  - unfold sem_cast.
+    chunk_red; simpl; archi_red; reflexivity.
+  - eapply assign_loc_value.
+    2:{ exact Hstore. }
+    reduce_val_access.
+    constructor.
+Qed.
+
+Lemma m_tstep2_seq_assign_field_cint :
+  forall p fu k lenv m m' x b i n h s,
+    M.get x lenv = Some (Vptr b i) ->
+    Mem.store int_chunk m b
+      (Ptrofs.unsigned (Ptrofs.add i (Ptrofs.repr (int_size * n))))
+      (make_vint h) = Some m' ->
+    m_tstep2 (globalenv p)
+      (State fu
+         (Ssequence
+            (Sassign
+               (Ederef
+                  (add (Ecast (Etempvar x val) valPtr)
+                       (c_int n LambdaANF_to_Clight.uval))
+                  val)
+               (c_int h val))
+            s)
+         k empty_env lenv m)
+      (State fu s k empty_env lenv m').
+Proof.
+  intros p fu k lenv m m' x b i n h s Hx Hstore.
+  eapply m_tstep2_transitive.
+  - apply m_tstep2_step.
+    constructor.
+  - eapply m_tstep2_transitive.
+    + apply m_tstep2_step.
+      eapply step_assign_field_cint; eauto.
+    + apply m_tstep2_step.
+      constructor.
 Qed.
 
 Lemma eval_limitPtr_from_get :
@@ -13378,6 +13979,111 @@ Proof.
     eapply correct_tinfo_not_protected; eauto.
 Qed.
 
+Lemma Forall2_repr_val_L_unchanged_sub_loc :
+  forall fenv finfo_env p rep_env vs vs7 m m' L L',
+    Forall2
+      (fun v v7 =>
+         repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m L v7)
+      vs vs7 ->
+    Mem.unchanged_on L m m' ->
+    sub_locProp L L' ->
+    Forall2
+      (fun v v7 =>
+         repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m' L' v7)
+      vs vs7.
+Proof.
+  intros fenv finfo_env p rep_env vs vs7 m m' L L' Hfor Hunch Hsub.
+  induction Hfor.
+  - constructor.
+  - constructor.
+    + eapply repr_val_L_sub_locProp.
+      * eapply repr_val_L_unchanged; eauto.
+      * exact Hsub.
+    + eauto.
+Qed.
+
+Lemma sub_locProp_bind_n_after_ptr :
+  forall n b ofs L,
+    sub_locProp L (bind_n_after_ptr n b ofs L).
+Proof.
+  intros n b ofs L b' ofs' HL.
+  rewrite bind_n_after_ptr_def.
+  left.
+  exact HL.
+Qed.
+
+Lemma bind_n_after_ptr_in_range :
+  forall n b ofs L j,
+    (ofs <= j < ofs + n)%Z ->
+    bind_n_after_ptr n b ofs L b j.
+Proof.
+  intros n b ofs L j Hj.
+  rewrite bind_n_after_ptr_def.
+  right.
+  split; [reflexivity|exact Hj].
+Qed.
+
+Lemma repr_val_ptr_list_Z_from_mem_after :
+  forall fenv finfo_env p rep_env vs vs7 b ofs i m m' L,
+    mem_after_n_proj_store b ofs vs7 i m m' ->
+    Forall2
+      (fun v v7 =>
+         repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m' L v7)
+      vs vs7 ->
+    (forall j,
+        (ofs + int_size * i <= j <
+         ofs + int_size * (i + Z.of_nat (length vs7)))%Z ->
+        L b j) ->
+    repr_val_ptr_list_L_LambdaANF_Codegen_Z
+      argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent
+      isptrIdent caseIdent nParam fenv finfo_env p rep_env
+      vs m' L b (ofs + int_size * i).
+Proof.
+  intros fenv finfo_env p rep_env vs vs7 b ofs i m m' L Hstore.
+  revert vs.
+  induction Hstore; intros vals Hfor HL.
+  - inversion Hfor; subst.
+    inversion H4; subst.
+    econstructor.
+    + intros j Hj.
+      eapply HL.
+      simpl.
+      chunk_red; lia.
+    + eapply Mem.load_store_same in H.
+      exact H.
+    + eapply repr_val_L_load_result.
+      exact H3.
+    + constructor.
+  - inversion Hfor; subst.
+    econstructor.
+    + intros j Hj.
+      eapply HL.
+      simpl.
+      chunk_red; lia.
+    + assert (Hload_tail :
+        Mem.load int_chunk m'' b (ofs + int_size * i) =
+        Mem.load int_chunk m' b (ofs + int_size * i)).
+      {
+        eapply mem_after_n_proj_store_load.
+        - eassumption.
+        - right. left.
+          chunk_red; lia.
+      }
+      rewrite Hload_tail.
+      eapply Mem.load_store_same in H.
+      exact H.
+    + eapply repr_val_L_load_result.
+      exact H3.
+    + replace (ofs + int_size * i + int_size)%Z
+        with (ofs + int_size * Z.succ i)%Z by (chunk_red; lia).
+      eapply IHHstore.
+      * exact H4.
+      * intros j Hj.
+        eapply HL.
+        simpl.
+        chunk_red; lia.
+Qed.
+
 (* ---------- Case lemmas for repr_bs_main_reduction ---------- *)
 
 (* Econstr case: prefix assignment + body induction.
@@ -13397,45 +14103,1094 @@ Lemma repr_bs_econstr_case :
 Proof.
   intros p rep_env cenv fenv finfo_env ienv
     Hpinv Hsym Hfinfo
-    rho x t ys e v n rho' vs
-    Hgl Hset Hbs_e Hgoal_e.
+    rho x t ys e v n rho' vs Hgl Hset Hbs_e Hgoal_e.
   subst rho'.
   unfold repr_bs_goal.
   intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
   eapply repr_bs_econstr_step_lift_from_body_goal.
-  + econstructor; eauto.
-  + exact Hcenvs.
-  + exact Hprot.
-  + exact Hub.
-  + exact Hfnb.
-  + exact Hrepr.
-  + exact Hrel.
-  + exact Halloc.
-  + exact Hct.
-  + (* Prefix callback: case split on repr_asgn_constr *)
-    intros vs0 s s' max_alloc_e
+  - econstructor; eauto.
+  - exact Hcenvs.
+  - exact Hprot.
+  - exact Hub.
+  - exact Hfnb.
+  - exact Hrepr.
+  - exact Hrel.
+  - exact Halloc.
+  - exact Hct.
+  - intros vs0 s s' max_alloc_e
       Hgl0 Hbs_e0 Hcenvs_e Hprot_e Hub_e Hfnb_e
-      Hasgn Hrepr_e Hstm_eq Hmaxeq Hbound Halloc_e Hct_e.
-    inversion Hasgn; subst.
-    * (* Rconstr_ass_boxed: boxed constructor prefix stepping *)
-      admit.
-    * (* Rconstr_ass_enum: unboxed constructor prefix stepping *)
+      Hasgn Hrepr_e Hstm Hmaxeq Hbound Halloc_e Hct_e.
+    inversion Hasgn as
+      [x0 t0 vs_box s_box a nn_box h_box Hboxed Hbh Hfor
+      |x0 t0 nn h Henum Hunboxed];
+      subst.
+    + (* boxed constructor prefix *)
+      simpl in Hgl0.
+      destruct (rel_mem_econstr_args_get_list_Forall2_repr
+                  fenv finfo_env p rep_env rho m lenv x t ys e vs0
+                  Hrel Hgl0)
+        as [L0 [vs7 [HprotL0 [Hfor_gv Hfor_repr]]]].
+      assert (Hlen_vs7_ys : length vs7 = length ys).
+      {
+        symmetry.
+        eapply Forall2_length.
+        exact Hfor_gv.
+      }
+      assert (Hys_nonempty : ys <> nil).
+      { intro Hnil. subst ys. inversion Hfor. }
+
+      assert (Hnprot_x : ~ is_protected_id_thm x).
+      { intro Habs. destruct Hprot as [_ Hprot2].
+        apply (Hprot2 x Habs). apply Bound_Econstr1. }
+      assert (Hx_not_tinfo : ~ is_protected_tinfo_id_thm x).
+      { intro Hxt. apply Hnprot_x.
+        eapply is_protected_tinfo_weak; eauto. }
+      assert (Hx_neq_tinf : x <> tinfIdent).
+      { intro Hxt. subst x. apply Hnprot_x.
+        unfold is_protected_id_thm, is_protected_id, protectedIdent_thm, protectedIdent.
+        inList. }
+      assert (Hx_neq_args : x <> argsIdent).
+      { intro Hxa. subst x. apply Hx_not_tinfo.
+        unfold is_protected_tinfo_id_thm, is_protected_tinfo_id. auto. }
+      assert (Hx_neq_alloc : x <> allocIdent).
+      { intro Hxa. subst x. apply Hx_not_tinfo.
+        unfold is_protected_tinfo_id_thm, is_protected_tinfo_id. auto. }
+      assert (Halloc_neq_args : allocIdent <> argsIdent) by solve_nodup.
+      assert (Hlimit_neq_alloc : limitIdent <> allocIdent) by solve_nodup.
+      assert (Htinf_neq_alloc : tinfIdent <> allocIdent) by solve_nodup.
+
+      assert (Hx_not_global : Genv.find_symbol (globalenv p) x = None).
+      { destruct Hfnb as [Hfnb1 _]. apply Hfnb1. apply Bound_Econstr1. }
+
+      destruct Hcenvs as [Hienv [Hcenv_rho [Hcenv_exp Hcrep]]].
+      assert (Harity_cenv :
+        match M.get t cenv with
+        | Some (Build_ctor_ty_info _ _ _ ar _) => N.of_nat (length ys) = ar
+        | None => False
+        end).
+      {
+        unfold correct_cenv_of_exp in Hcenv_exp.
+        eapply (Forall_constructors_in_constr
+                  (fun _ t0 ys0 =>
+                     match M.get t0 cenv with
+                     | Some (Build_ctor_ty_info _ _ _ ar _) =>
+                         N.of_nat (length ys0) = ar
+                     | None => False
+                     end)
+                  x t ys e).
+        exact Hcenv_exp.
+      }
+      destruct (M.get t cenv) as [ci|] eqn:Hgetc_ci; [|contradiction].
+      destruct ci as [cname ciname cit car cord].
+      simpl in Harity_cenv.
+      destruct Hcrep as [_ Hcrep_back].
+      specialize (Hcrep_back t (boxed nn_box a) Hboxed).
+      inversion Hcrep_back; subst; clear Hcrep_back.
+      lazymatch goal with
+      | Hcget :
+          M.get t cenv = Some (Build_ctor_ty_info _ _ _ (Npos _) _) |- _ =>
+          rewrite Hcget in Hgetc_ci
+      end.
+      inversion Hgetc_ci; subst.
+      clear Hgetc_ci.
+      pose (a := N.of_nat (length ys)).
+      assert (Hz_a : Z.of_N a = Z.of_nat (length ys)).
+      {
+        unfold a.
+        remember (length ys) as nlen.
+        clear Heqnlen.
+        induction nlen; simpl; lia.
+      }
+
+      assert (Hmax_alloc_eq : max_alloc = Z.of_nat (max_allocs (Econstr x t ys e))).
+      { unfold correct_alloc in Halloc. exact Halloc. }
+      assert (Hmax_alloc_boxed :
+        max_alloc = Z.of_nat (1 + length ys + max_allocs e)).
+      {
+        rewrite Hmax_alloc_eq.
+        rewrite max_allocs_boxed by exact Hys_nonempty.
+        reflexivity.
+      }
+      assert (Hz_inc :
+        Z.of_N (a + 1)%N = (1 + Z.of_nat (length ys))%Z).
+      {
+        rewrite N.add_1_r.
+        rewrite N2Z.inj_succ.
+        rewrite Hz_a.
+        lia.
+      }
+      assert (Hinc_le_max : (0 <= Z.of_N (a + 1)%N <= max_alloc)%Z).
+      {
+        split.
+        - apply N2Z.is_nonneg.
+        - rewrite Hz_inc.
+          rewrite Hmax_alloc_boxed.
+          rewrite Nat2Z.inj_add.
+          lia.
+      }
+      assert (Hinc_ge1 : (1 <= Z.of_N (a + 1)%N)%Z).
+      { rewrite Hz_inc. lia. }
+
+      assert (Hx_notin_ys : ~ List.In x ys).
+      {
+        intro Hinx.
+        destruct (get_list_In _ _ _ _ Hgl0 Hinx) as [vx Hgetx].
+        destruct Hub as [_ Hub_env].
+        specialize (Hub_env x vx Hgetx) as [Hnb _].
+        apply Hnb.
+        constructor.
+      }
+      assert (Halloc_notin_ys : ~ List.In allocIdent ys).
+      {
+        intro Hina.
+        destruct (get_list_In _ _ _ _ Hgl0 Hina) as [va Hgeta].
+        assert (Halloc_prot : is_protected_id_thm allocIdent).
+        {
+          unfold is_protected_id_thm, is_protected_id, protectedIdent_thm, protectedIdent.
+          inList.
+        }
+        destruct Hprot as [Hrho _].
+        specialize (Hrho allocIdent allocIdent va Hgeta Halloc_prot).
+        tauto.
+      }
+
+      pose proof Hct as Hct0.
+      destruct Hct0 as
+        [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs Hct1]]]]]]].
+      destruct Hct1 as
+        [Halloc_get [Halign [Hrange [Hlimit_get [Hspace [Hargs_get [Hargs_neq_alloc
+        [Hargs_range [Hargs_va [Htinf_get [Htinf_neq_args [Htinf_neq_alloc_ct
+        [Htinf_va [Hderef_tinf Hglob_ct]]]]]]]]]]]]]].
+
+      set (x_ofs := Ptrofs.add alloc_ofs (Ptrofs.repr int_size)).
+      set (alloc_ofs' := Ptrofs.add alloc_ofs (Ptrofs.repr (int_size * Z.of_N (a + 1)%N))).
+
+      assert (Hx_ofs_hdr :
+        Ptrofs.add x_ofs (Ptrofs.repr (int_size * (-1))) = alloc_ofs).
+      {
+        unfold x_ofs.
+        rewrite Ptrofs.add_assoc.
+        replace (Ptrofs.repr (int_size * (-1))) with (Ptrofs.neg (Ptrofs.repr int_size))
+          by (rewrite Ptrofs.neg_repr; f_equal; lia).
+        rewrite Ptrofs.add_neg_zero.
+        apply Ptrofs.add_zero.
+      }
+      assert (Hx_sub_hdr :
+        Ptrofs.sub x_ofs (Ptrofs.repr int_size) = alloc_ofs).
+      {
+        rewrite Ptrofs.sub_add_opp.
+        rewrite Ptrofs.neg_repr.
+        replace (- int_size)%Z with (int_size * (-1))%Z by lia.
+        exact Hx_ofs_hdr.
+      }
+
+      assert (Hobj_end_le_limit :
+        (Ptrofs.unsigned alloc_ofs + int_size * Z.of_N (a + 1)%N
+         <= Ptrofs.unsigned limit_ofs)%Z).
+      {
+        destruct Hspace as [Hspace_lo _].
+        assert (Hmul_le :
+          (int_size * Z.of_N (a + 1)%N <= int_size * max_alloc)%Z).
+        {
+          apply Z.mul_le_mono_nonneg_l.
+          - apply int_size_pos.
+          - lia.
+        }
+        lia.
+      }
+      assert (Hobj_end_le_maxu :
+        (Ptrofs.unsigned alloc_ofs + int_size * Z.of_N (a + 1)%N
+         <= Ptrofs.max_unsigned)%Z).
+      {
+        eapply Z.le_trans.
+        - exact Hobj_end_le_limit.
+        - apply Ptrofs.unsigned_range_2.
+      }
+      assert (Halloc_ofs'_unsigned :
+        Ptrofs.unsigned alloc_ofs' =
+        (Ptrofs.unsigned alloc_ofs + int_size * Z.of_N (a + 1)%N)%Z).
+      {
+        unfold alloc_ofs'.
+        eapply pointer_ofs_no_overflow.
+        - apply N2Z.is_nonneg.
+        - exact Hobj_end_le_maxu.
+      }
+      assert (Hx_ofs_unsigned :
+        Ptrofs.unsigned x_ofs = (Ptrofs.unsigned alloc_ofs + int_size)%Z).
+      {
+        unfold x_ofs.
+        replace (Ptrofs.repr int_size) with (Ptrofs.repr (int_size * 1)%Z) by (f_equal; lia).
+        replace (Ptrofs.unsigned alloc_ofs + int_size)%Z
+          with (Ptrofs.unsigned alloc_ofs + int_size * 1)%Z by lia.
+        eapply pointer_ofs_no_overflow.
+        - lia.
+        - eapply Z.le_trans with
+            (m := (Ptrofs.unsigned alloc_ofs + int_size * Z.of_N (a + 1)%N)%Z).
+          + assert (Hint_le :
+              (int_size * 1 <= int_size * Z.of_N (a + 1)%N)%Z).
+            {
+              apply Z.mul_le_mono_nonneg_l.
+              - apply int_size_pos.
+              - exact Hinc_ge1.
+            }
+            lia.
+          + exact Hobj_end_le_maxu.
+      }
+      assert (Hrange_update :
+        (Ptrofs.unsigned alloc_ofs <= Ptrofs.unsigned alloc_ofs' <= Ptrofs.unsigned limit_ofs)%Z).
+      {
+        rewrite Halloc_ofs'_unsigned.
+        split.
+        - assert (Hstep_nonneg :
+            (0 <= int_size * Z.of_N (a + 1)%N)%Z).
+          {
+            apply Z.mul_nonneg_nonneg.
+            + apply int_size_pos.
+            + apply N2Z.is_nonneg.
+          }
+          lia.
+        - exact Hobj_end_le_limit.
+      }
+
+      assert (Heval_x :
+        eval_expr (globalenv p) empty_env lenv m
+          (Ecast (add (Etempvar allocIdent valPtr)
+                      (c_int Z.one LambdaANF_to_Clight.uval)) uval)
+          (Vptr alloc_b x_ofs)).
+      {
+        eapply eval_Ecast.
+        - unfold x_ofs.
+          replace (Ptrofs.repr int_size)
+            with (Ptrofs.repr (int_size * 1)%Z) by (f_equal; lia).
+          eapply eval_allocPtr_add_cint.
+          exact Halloc_get.
+        - unfold sem_cast.
+          simpl.
+          reflexivity.
+      }
+
+      set (lenv1 := M.set x (Vptr alloc_b x_ofs) lenv).
+      assert (Halloc_get_lenv1 :
+        M.get allocIdent lenv1 = Some (Vptr alloc_b alloc_ofs)).
+      {
+        unfold lenv1.
+        rewrite M.gso; auto.
+      }
+      assert (Heval_alloc :
+        eval_expr (globalenv p) empty_env lenv1 m
+          (add (Etempvar allocIdent valPtr)
+               (c_int (Z.of_N (a + 1)%N) LambdaANF_to_Clight.uval))
+          (Vptr alloc_b alloc_ofs')).
+      {
+        unfold alloc_ofs'.
+        eapply eval_allocPtr_add_cint.
+        exact Halloc_get_lenv1.
+      }
+
+      set (lenv_mid := M.set allocIdent (Vptr alloc_b alloc_ofs') lenv1).
+      set (lenv_alloc := M.set allocIdent (Vptr alloc_b alloc_ofs') lenv).
+      assert (Hlenv_mid_eq :
+        M.set x (Vptr alloc_b x_ofs) lenv_alloc = lenv_mid).
+      {
+        unfold lenv_mid, lenv_alloc, lenv1.
+        rewrite set_commute by exact Hx_neq_alloc.
+        reflexivity.
+      }
+      assert (Hx_get_lenv_mid :
+        M.get x lenv_mid = Some (Vptr alloc_b x_ofs)).
+      {
+        unfold lenv_mid, lenv1.
+        rewrite M.gso; [rewrite M.gss; reflexivity|exact Hx_neq_alloc].
+      }
+
+      assert (Halloc_plus1_le_limit :
+        (Ptrofs.unsigned alloc_ofs + int_size <= Ptrofs.unsigned limit_ofs)%Z).
+      {
+        assert (Hint_le :
+          (int_size * 1 <= int_size * Z.of_N (a + 1)%N)%Z).
+        {
+          apply Z.mul_le_mono_nonneg_l.
+          - apply int_size_pos.
+          - exact Hinc_ge1.
+        }
+        lia.
+      }
+      assert (Hva_header :
+        Mem.valid_access m int_chunk alloc_b (Ptrofs.unsigned alloc_ofs) Writable).
+      {
+        eapply range_perm_to_valid_access.
+        - exact Hrange.
+        - exact Halign.
+        - lia.
+        - exact Halloc_plus1_le_limit.
+      }
+      destruct (Mem.valid_access_store m int_chunk alloc_b (Ptrofs.unsigned alloc_ofs)
+                 (make_vint h_box) Hva_header) as [m1 Hs_header].
+      assert (Hs_header_x :
+        Mem.store int_chunk m alloc_b
+          (Ptrofs.unsigned (Ptrofs.add x_ofs (Ptrofs.repr (int_size * (-1)))))
+          (make_vint h_box) = Some m1).
+      {
+        rewrite Hx_ofs_hdr.
+        exact Hs_header.
+      }
+
+      assert (Hfields_end_le_limit :
+        (Ptrofs.unsigned x_ofs + int_size * Z.of_nat (length ys)
+         <= Ptrofs.unsigned limit_ofs)%Z).
+      {
+        rewrite Hx_ofs_unsigned.
+        assert (Hsum_eq :
+          (Ptrofs.unsigned alloc_ofs + int_size + int_size * Z.of_nat (length ys))%Z =
+          (Ptrofs.unsigned alloc_ofs + int_size * Z.of_N (a + 1)%N)%Z).
+        { rewrite Hz_inc. lia. }
+        rewrite Hsum_eq.
+        exact Hobj_end_le_limit.
+      }
+      assert (Hfields_end_le_maxu :
+        (Ptrofs.unsigned x_ofs + int_size * Z.of_nat (length ys)
+         <= Ptrofs.max_unsigned)%Z).
+      {
+        eapply Z.le_trans.
+        - exact Hfields_end_le_limit.
+        - apply Ptrofs.unsigned_range_2.
+      }
+
+      assert (Hva_fields :
+        forall j,
+          (0 <= j < Z.of_nat (length ys))%Z ->
+          Mem.valid_access m1 int_chunk alloc_b
+            (Ptrofs.unsigned (Ptrofs.add x_ofs (Ptrofs.repr (int_size * j))))
+            Writable).
+      {
+        intros j Hj.
+        assert (Haddr_unsigned :
+          Ptrofs.unsigned (Ptrofs.add x_ofs (Ptrofs.repr (int_size * j))) =
+          (Ptrofs.unsigned x_ofs + int_size * j)%Z).
+        {
+          eapply pointer_ofs_no_overflow.
+          - lia.
+          - eapply Z.le_trans with
+              (m := (Ptrofs.unsigned x_ofs + int_size * Z.of_nat (length ys))%Z).
+            + assert (Htmp :
+                (Ptrofs.unsigned x_ofs + int_size * j
+                 <= Ptrofs.unsigned x_ofs + int_size * Z.of_nat (length ys))%Z).
+              {
+                assert (Hintsz_nonneg : (0 <= int_size)%Z).
+                {
+                  unfold int_size.
+                  exact int_size_pos.
+                }
+                apply Z.add_le_mono_l.
+                apply Z.mul_le_mono_nonneg_l; [exact Hintsz_nonneg | lia].
+              }
+              exact Htmp.
+            + exact Hfields_end_le_maxu.
+        }
+        assert (Halign_int : (align_chunk int_chunk | int_size)%Z).
+        {
+          unfold int_size, int_chunk.
+          destruct Archi.ptr64; simpl; exists 1%Z; reflexivity.
+        }
+        assert (Halign_xofs : (align_chunk int_chunk | Ptrofs.unsigned x_ofs)%Z).
+        {
+          rewrite Hx_ofs_unsigned.
+          eapply Z.divide_add_r.
+          - exact Halign.
+          - exact Halign_int.
+        }
+        assert (Halign_addr :
+          (align_chunk int_chunk
+           | Ptrofs.unsigned (Ptrofs.add x_ofs (Ptrofs.repr (int_size * j))))%Z).
+        {
+          rewrite Haddr_unsigned.
+          eapply Z.divide_add_r.
+          - exact Halign_xofs.
+          - apply Z.divide_mul_l.
+            exact Halign_int.
+        }
+        assert (Haddr_lo :
+          (Ptrofs.unsigned alloc_ofs
+           <= Ptrofs.unsigned (Ptrofs.add x_ofs (Ptrofs.repr (int_size * j))))%Z).
+        {
+          rewrite Haddr_unsigned, Hx_ofs_unsigned.
+          assert (Hintsz_nonneg : (0 <= int_size)%Z).
+          {
+            unfold int_size.
+            exact int_size_pos.
+          }
+          assert (Hmul_nonneg : (0 <= int_size * j)%Z).
+          {
+            apply Z.mul_nonneg_nonneg; [exact Hintsz_nonneg | lia].
+          }
+          lia.
+        }
+        assert (Haddr_hi :
+          (Ptrofs.unsigned (Ptrofs.add x_ofs (Ptrofs.repr (int_size * j))) + int_size
+           <= Ptrofs.unsigned limit_ofs)%Z).
+        {
+          rewrite Haddr_unsigned.
+          assert (Hintsz_nonneg : (0 <= int_size)%Z).
+          {
+            unfold int_size.
+            exact int_size_pos.
+          }
+          assert (Hj1 : (j + 1 <= Z.of_nat (length ys))%Z) by lia.
+          replace (Ptrofs.unsigned x_ofs + int_size * j + int_size)%Z
+            with (Ptrofs.unsigned x_ofs + int_size * (j + 1))%Z.
+          2:{
+            replace (Ptrofs.unsigned x_ofs + int_size * j + int_size)%Z
+              with (Ptrofs.unsigned x_ofs + (int_size * j + int_size * 1))%Z by lia.
+            rewrite <- Z.mul_add_distr_l.
+            rewrite Z.add_1_r.
+            reflexivity.
+          }
+          eapply Z.le_trans.
+          - apply Z.add_le_mono_l.
+            apply Z.mul_le_mono_nonneg_l; [exact Hintsz_nonneg | exact Hj1].
+          - exact Hfields_end_le_limit.
+        }
+        assert (Hva_m :
+          Mem.valid_access m int_chunk alloc_b
+            (Ptrofs.unsigned (Ptrofs.add x_ofs (Ptrofs.repr (int_size * j))))
+            Writable).
+        {
+          eapply range_perm_to_valid_access; eauto.
+        }
+        eapply Mem.store_valid_access_1; eauto.
+      }
+
+      assert (Hgv_list_lenv :
+        get_var_or_funvar_list p lenv ys = Some vs7).
+      { eapply get_var_or_funvar_list_correct2; eauto. }
+      assert (Hgv_list_lenv1 :
+        get_var_or_funvar_list p lenv1 ys = Some vs7).
+      {
+        unfold lenv1.
+        rewrite <- (get_var_or_funvar_list_set p lenv x (Vptr alloc_b x_ofs) ys Hx_notin_ys).
+        exact Hgv_list_lenv.
+      }
+      assert (Hgv_list_lenv_mid :
+        get_var_or_funvar_list p lenv_mid ys = Some vs7).
+      {
+        unfold lenv_mid.
+        rewrite <- (get_var_or_funvar_list_set p lenv1 allocIdent (Vptr alloc_b alloc_ofs') ys Halloc_notin_ys).
+        exact Hgv_list_lenv1.
+      }
+      assert (Hfor_gv_mid : Forall2 (get_var_or_funvar p lenv_mid) ys vs7).
+      { eapply get_var_or_funvar_list_correct1; eauto. }
+
+      unfold Forall_statements_in_seq in Hfor.
+      assert (Hex_store :
+        exists m2,
+          m_tstep2 (globalenv p)
+            (State fu s_box (Kseq s' k) empty_env lenv_mid m1)
+            (State fu Sskip (Kseq s' k) empty_env lenv_mid m2) /\
+          mem_after_n_proj_store_cast alloc_b (Ptrofs.unsigned x_ofs) vs7 0 m1 m2).
+      {
+        eapply mem_of_Forall_nth_projection_cast; eauto.
+        split; [lia|].
+        assert (Hlen_mul :
+          (int_size * Z.of_nat (length ys) <= Ptrofs.max_unsigned)%Z).
+        {
+          assert (Hnonneg_xofs : (0 <= Ptrofs.unsigned x_ofs)%Z) by apply Ptrofs.unsigned_range_2.
+          lia.
+        }
+        assert (Hisp : (1 <= int_size)%Z).
+        {
+          unfold int_size, int_chunk.
+          destruct Archi.ptr64; simpl; lia.
+        }
+        assert (Hlen_nonneg : (0 <= Z.of_nat (length ys))%Z) by apply Nat2Z.is_nonneg.
+        assert (Hmul_ge_len :
+          (Z.of_nat (length ys) <= int_size * Z.of_nat (length ys))%Z).
+        {
+          replace (Z.of_nat (length ys)) with (1 * Z.of_nat (length ys))%Z at 1 by lia.
+          apply Z.mul_le_mono_nonneg_r; lia.
+        }
+        change (Z.of_nat (length ys) <= Ptrofs.max_unsigned)%Z.
+        eapply Z.le_trans; eauto.
+      }
+      destruct Hex_store as [m2 [Hstep_sbox Hstore_cast]].
+
+      assert (Huint_fields :
+        uint_range
+          (Ptrofs.unsigned x_ofs + int_size * (0 + Z.of_nat (length vs7)))).
+      {
+        unfold uint_range.
+        rewrite Z.add_0_l.
+        rewrite Hlen_vs7_ys.
+        split.
+        - apply Z.add_nonneg_nonneg.
+          + apply Ptrofs.unsigned_range_2.
+          + apply Z.mul_nonneg_nonneg.
+            * apply int_size_pos.
+            * apply Nat2Z.is_nonneg.
+        - exact Hfields_end_le_maxu.
+      }
+      assert (Hstore_fields :
+        mem_after_n_proj_store alloc_b (Ptrofs.unsigned x_ofs) vs7 0 m1 m2).
+      {
+        assert (Hwo :
+          mem_after_n_proj_store_cast alloc_b (Ptrofs.unsigned x_ofs) vs7 0 m1 m2 <->
+          mem_after_n_proj_store alloc_b (Ptrofs.unsigned x_ofs) vs7 0 m1 m2).
+        {
+          eapply mem_after_n_proj_wo_cast.
+          - apply Ptrofs.unsigned_range_2.
+          - lia.
+          - exact Huint_fields.
+        }
+        apply Hwo.
+        exact Hstore_cast.
+      }
+
+      assert (Hpref :
+        m_tstep2 (globalenv p)
+          (State fu
+             (Ssequence
+                (Ssequence
+                   (Ssequence
+                      (Ssequence
+                         (Sset x
+                            (Ecast
+                               (add (Etempvar allocIdent valPtr)
+                                    (c_int Z.one LambdaANF_to_Clight.uval))
+                               uval))
+                         (Sset allocIdent
+                            (add (Etempvar allocIdent valPtr)
+                                 (c_int (Z.of_N (a + 1)%N)
+                                        LambdaANF_to_Clight.uval))))
+                      (Sassign
+                         (Ederef
+                            (add (Ecast (Etempvar x val) valPtr)
+                                 (c_int (-1) LambdaANF_to_Clight.uval))
+                            val) (c_int h_box val))) s_box) s')
+             k empty_env lenv m)
+          (State fu s' k empty_env lenv_mid m2)).
+      {
+        eapply m_tstep2_transitive.
+        - apply m_tstep2_step.
+          constructor.
+        - eapply m_tstep2_transitive.
+          + apply m_tstep2_step.
+            constructor.
+          + eapply m_tstep2_transitive.
+            * apply m_tstep2_step.
+              constructor.
+            * eapply m_tstep2_transitive.
+              { eapply m_tstep2_seq_set.
+                exact Heval_x. }
+              eapply m_tstep2_transitive.
+              { apply m_tstep2_step.
+                constructor.
+                exact Heval_alloc. }
+              eapply m_tstep2_transitive.
+              { apply m_tstep2_step.
+                constructor. }
+              eapply m_tstep2_transitive.
+              { apply m_tstep2_step.
+                eapply step_assign_field_cint.
+                - exact Hx_get_lenv_mid.
+                - exact Hs_header_x. }
+              eapply m_tstep2_transitive.
+              { apply m_tstep2_step.
+                constructor. }
+              eapply m_tstep2_transitive.
+              { exact Hstep_sbox. }
+              { apply m_tstep2_step.
+                constructor. }
+      }
+
+      assert (Hsame1 : same_args_ptr lenv lenv1).
+      {
+        unfold lenv1.
+        eapply same_args_ptr_set_right_other; eauto.
+        apply same_args_ptr_refl.
+      }
+      assert (Hsame2 : same_args_ptr lenv1 lenv_mid).
+      {
+        unfold lenv_mid.
+        eapply same_args_ptr_set_right_other; eauto.
+        apply same_args_ptr_refl.
+      }
+      assert (Hsame_mid : same_args_ptr lenv lenv_mid).
+      { eapply same_args_ptr_trans; eauto. }
+
+      assert (Hunch_all :
+        forall L, protected_not_in_L_id p lenv L -> Mem.unchanged_on L m m2).
+      {
+        intros L HprotL.
+        destruct HprotL as
+          [ab [ao [lo [argb [argo [tb [to
+            [HallocLenv [Halloc_notL [HlimitLenv [HargsLenv [Hargs_notL [HtinfLenv [Htinf_notL Hglob_notL]]]]]]]]]]]]]].
+        rewrite Halloc_get in HallocLenv.
+        inversion HallocLenv; subst ab ao.
+        rewrite Hlimit_get in HlimitLenv.
+        inversion HlimitLenv; subst lo.
+        assert (Hunch_header : Mem.unchanged_on L m m1).
+        {
+          eapply Mem.store_unchanged_on.
+          - exact Hs_header.
+          - intros j Hj.
+            assert (Hj_alloc :
+              (Ptrofs.unsigned alloc_ofs <= j < Ptrofs.unsigned limit_ofs)%Z).
+            {
+              destruct Hj as [Hjlo Hjhi].
+              split; [exact Hjlo|].
+              replace (Ptrofs.unsigned alloc_ofs + size_chunk int_chunk)%Z
+                with (Ptrofs.unsigned alloc_ofs + int_size)%Z in Hjhi by reflexivity.
+              eapply Z.lt_le_trans; eauto.
+            }
+            eapply Halloc_notL.
+            exact Hj_alloc.
+        }
+        assert (Hunch_fields : Mem.unchanged_on L m1 m2).
+        {
+          eapply mem_after_n_proj_store_unchanged.
+          - exact Hstore_fields.
+          - intros j Hj.
+            rewrite Hx_ofs_unsigned in Hj.
+            replace (0 + Z.of_nat (length vs7))%Z with (Z.of_nat (length vs7)) in Hj by lia.
+            rewrite Hlen_vs7_ys in Hj.
+            assert (Hj_alloc :
+              (Ptrofs.unsigned alloc_ofs <= j < Ptrofs.unsigned limit_ofs)%Z).
+            {
+              destruct Hj as [Hjlo Hjhi].
+              split.
+              - assert (Hintsz_nonneg : (0 <= int_size)%Z).
+                { unfold int_size. apply int_size_pos. }
+                lia.
+              - assert (Hfields_end_le_limit' :
+                  (Ptrofs.unsigned alloc_ofs + int_size + int_size * Z.of_nat (length ys) <=
+                   Ptrofs.unsigned limit_ofs)%Z).
+                {
+                  rewrite <- Hx_ofs_unsigned.
+                  exact Hfields_end_le_limit.
+                }
+                lia.
+            }
+            eapply Halloc_notL.
+            exact Hj_alloc.
+        }
+        eapply Mem.unchanged_on_trans; eauto.
+      }
+
+      assert (Hglob_load :
+        forall xg b,
+          Genv.find_symbol (globalenv p) xg = Some b ->
+          forall i chunk,
+            Mem.loadv chunk m (Vptr b i) = Mem.loadv chunk m2 (Vptr b i)).
+      {
+        intros xg b Hsymg i chunk.
+        destruct (Hglob_ct xg b Hsymg) as [_ [Hb_neq_alloc [_ _]]].
+        unfold Mem.loadv.
+        rewrite (mem_after_n_proj_store_load_other_block_any
+                   alloc_b (Ptrofs.unsigned x_ofs) vs7 0 m1 m2 b
+                   (Ptrofs.unsigned i) chunk Hstore_fields Hb_neq_alloc).
+        symmetry.
+        eapply Mem.load_store_other.
+        - exact Hs_header.
+        - left. exact Hb_neq_alloc.
+      }
+
+      assert (Hrel_m2_orig :
+        rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env
+          (Econstr x t ys e) rho m2 lenv).
+      {
+        eapply rel_mem_unchanged_from_protected; eauto.
+      }
+      assert (Hrel_m2_alloc :
+        rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env
+          (Econstr x t ys e) rho m2 lenv_alloc).
+      {
+        unfold lenv_alloc.
+        eapply rel_mem_set_alloc_id; eauto.
+      }
+
+      assert (HprotL0_alloc : protected_not_in_L_id p lenv_alloc L0).
+      {
+        unfold lenv_alloc.
+        eapply protected_not_in_L_set_alloc; eauto.
+      }
+
+      set (nbytes := (int_size * Z.of_N (a + 1))%Z).
+      set (hdr_ofs := Ptrofs.unsigned alloc_ofs).
+      set (Lnew := bind_n_after_ptr nbytes alloc_b hdr_ofs L0).
+      assert (Halloc_ofs'_eq_hdr :
+        Ptrofs.unsigned alloc_ofs' = (hdr_ofs + nbytes)%Z).
+      {
+        unfold hdr_ofs, nbytes.
+        exact Halloc_ofs'_unsigned.
+      }
+
+      assert (HprotLnew : protected_not_in_L_id p lenv_alloc Lnew).
+      {
+        destruct HprotL0_alloc as
+          [ab [ao [lo [argb [argo [tb [to
+            [HallocA [Halloc_notL0 [HlimitA [HargsA [Hargs_notL0 [HtinfA [Htinf_notL0 Hglob_notL0]]]]]]]]]]]]]].
+        unfold lenv_alloc in *.
+        rewrite M.gss in HallocA.
+        inversion HallocA; subst ab ao.
+        rewrite M.gso in HlimitA by congruence.
+        rewrite Hlimit_get in HlimitA.
+        inversion HlimitA; subst lo.
+        rewrite M.gso in HargsA by congruence.
+        rewrite Hargs_get in HargsA.
+        inversion HargsA; subst argb argo.
+        rewrite M.gso in HtinfA by congruence.
+        rewrite Htinf_get in HtinfA.
+        inversion HtinfA; subst tb to.
+        exists alloc_b, alloc_ofs', limit_ofs, args_b, args_ofs, tinf_b, tinf_ofs.
+        split.
+        - rewrite M.gss. reflexivity.
+        - split.
+          + intros j Hj HjL.
+            unfold Lnew in HjL.
+            rewrite bind_n_after_ptr_def in HjL.
+            destruct HjL as [HL0 | [_ [Hlo Hhi]]].
+            * eapply Halloc_notL0; eauto.
+            * lia.
+          + split.
+            * rewrite M.gso; auto.
+            * split.
+              { rewrite M.gso; auto. }
+              split.
+              { intros z j Hz Hj HjL.
+                unfold Lnew in HjL.
+                rewrite bind_n_after_ptr_def in HjL.
+                destruct HjL as [HL0 | [Hb [Hobjlo Hobjhi]]].
+                - eapply Hargs_notL0; eauto.
+                - exfalso.
+                  apply Hargs_neq_alloc.
+                  exact Hb. }
+              split.
+              { rewrite M.gso; auto. }
+              split.
+              { intros i HjL.
+                unfold Lnew in HjL.
+                rewrite bind_n_after_ptr_def in HjL.
+                destruct HjL as [HL0 | [Hb [Hobjlo Hobjhi]]].
+                - eapply Htinf_notL0; eauto.
+                - exfalso.
+                  apply Htinf_neq_alloc_ct.
+                  exact Hb. }
+              { intros xg b Hsymg.
+                specialize (Hglob_notL0 xg b Hsymg) as [Hb_args [Hb_alloc Hnot_glob]].
+                split; [exact Hb_args|].
+                split; [exact Hb_alloc|].
+                intros i HiL.
+                unfold Lnew in HiL.
+                rewrite bind_n_after_ptr_def in HiL.
+                destruct HiL as [HL0 | [Hb [Hobjlo Hobjhi]]].
+                - eapply Hnot_glob; eauto.
+                - exfalso.
+                  apply Hb_alloc.
+                  exact Hb. }
+      }
+
+      assert (Hunch_L0 : Mem.unchanged_on L0 m m2).
+      { eapply Hunch_all; eauto. }
+      assert (Hsub_L0_new : sub_locProp L0 Lnew).
+      { unfold Lnew. eapply sub_locProp_bind_n_after_ptr. }
+      assert (Hfor_repr_m2 :
+        Forall2
+          (fun v v7 =>
+             repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env v m2 Lnew v7)
+          vs0 vs7).
+      {
+        eapply Forall2_repr_val_L_unchanged_sub_loc; eauto.
+      }
+
+      assert (Hload_hdr_m1 :
+        Mem.load int_chunk m1 alloc_b
+          (Ptrofs.unsigned (Ptrofs.sub x_ofs (Ptrofs.repr int_size))) =
+        Some (make_vint h_box)).
+      {
+        rewrite Hx_sub_hdr.
+        eapply Mem.load_store_same in Hs_header.
+        exact Hs_header.
+      }
+      assert (Hload_hdr_m2 :
+        Mem.load int_chunk m2 alloc_b
+          (Ptrofs.unsigned (Ptrofs.sub x_ofs (Ptrofs.repr int_size))) =
+        Some (make_vint h_box)).
+      {
+        rewrite (mem_after_n_proj_store_load
+                   alloc_b (Ptrofs.unsigned x_ofs) vs7 0 m1 m2 Hstore_fields
+                   (Ptrofs.unsigned (Ptrofs.sub x_ofs (Ptrofs.repr int_size))) alloc_b).
+        - exact Hload_hdr_m1.
+        - right. left.
+          rewrite Hx_sub_hdr, Hx_ofs_unsigned.
+          lia.
+      }
+
+      assert (Hloc_hdr :
+        forall j : Z,
+          (Ptrofs.unsigned (Ptrofs.sub x_ofs (Ptrofs.repr int_size)) <= j <
+           Ptrofs.unsigned (Ptrofs.sub x_ofs (Ptrofs.repr int_size)) + size_chunk int_chunk)%Z ->
+          Lnew alloc_b j).
+      {
+        intros j Hj.
+        replace (size_chunk int_chunk) with int_size in Hj by reflexivity.
+        rewrite Hx_sub_hdr in Hj.
+        unfold Lnew.
+        eapply bind_n_after_ptr_in_range.
+        split.
+        - lia.
+        - unfold nbytes.
+          assert (Hint_le :
+            (int_size <= int_size * Z.of_N (a + 1)%N)%Z).
+          {
+            rewrite <- (Z.mul_1_r int_size).
+            apply Z.mul_le_mono_nonneg_l.
+            - apply int_size_pos.
+            - exact Hinc_ge1.
+          }
+          lia.
+      }
+
+      assert (HLnew_fields :
+        forall j,
+          (Ptrofs.unsigned x_ofs + int_size * 0 <= j <
+           Ptrofs.unsigned x_ofs + int_size * (0 + Z.of_nat (length vs7)))%Z ->
+          Lnew alloc_b j).
+      {
+        intros j Hj.
+        unfold Lnew.
+        eapply bind_n_after_ptr_in_range.
+        split.
+        - destruct Hj as [Hjlo Hjhi].
+          rewrite Hx_ofs_unsigned in Hjlo.
+          rewrite Z.mul_0_r in Hjlo.
+          assert (Halloc_le_x : (Ptrofs.unsigned alloc_ofs <= Ptrofs.unsigned x_ofs)%Z).
+          { rewrite Hx_ofs_unsigned. pose proof int_size_pos as Hint_pos. lia. }
+          lia.
+        - rewrite Hx_ofs_unsigned in Hj.
+          rewrite Hlen_vs7_ys in Hj.
+          destruct Hj as [_ Hjhi].
+          unfold nbytes, hdr_ofs.
+          assert (Hnbytes_eq :
+            (Ptrofs.unsigned alloc_ofs + int_size * Z.of_N (a + 1) =
+             Ptrofs.unsigned alloc_ofs + int_size +
+             int_size * (0 + Z.of_nat (length ys)))%Z).
+          {
+            rewrite Hz_inc.
+            rewrite Z.mul_add_distr_l.
+            rewrite Z.mul_1_r.
+            rewrite Z.add_0_l.
+            lia.
+          }
+          rewrite Hnbytes_eq.
+          exact Hjhi.
+      }
+
+      assert (Hrepr_ptrs_Z :
+        repr_val_ptr_list_L_LambdaANF_Codegen_Z
+          argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent
+          isptrIdent caseIdent nParam fenv finfo_env p rep_env
+          vs0 m2 Lnew alloc_b (Ptrofs.unsigned x_ofs)).
+      {
+        replace (Ptrofs.unsigned x_ofs) with (Ptrofs.unsigned x_ofs + int_size * 0)%Z by lia.
+        eapply repr_val_ptr_list_Z_from_mem_after.
+        - exact Hstore_fields.
+        - exact Hfor_repr_m2.
+        - exact HLnew_fields.
+      }
+      assert (Hlen_vs0_vs7 : length vs0 = length vs7).
+      { eapply Forall2_length'; eauto. }
+      assert (Hptrlist_range :
+        uint_range ((Ptrofs.unsigned x_ofs) + (Z.of_nat (length vs0) * int_size))%Z).
+      {
+        unfold uint_range.
+        split.
+        - apply Z.add_nonneg_nonneg.
+          + apply Ptrofs.unsigned_range_2.
+          + apply Z.mul_nonneg_nonneg.
+            * apply Nat2Z.is_nonneg.
+            * apply int_size_pos.
+        - rewrite Hlen_vs0_vs7.
+          rewrite Hlen_vs7_ys.
+          replace (Z.of_nat (length ys) * int_size)%Z
+            with (int_size * Z.of_nat (length ys))%Z by lia.
+          exact Hfields_end_le_maxu.
+      }
+      assert (Hrepr_ptrs :
+        repr_val_ptr_list_L_LambdaANF_Codegen
+          argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent
+          isptrIdent caseIdent nParam fenv finfo_env p rep_env
+          vs0 m2 Lnew alloc_b x_ofs).
+      {
+        apply (proj2 (repr_val_ptr_list_Z
+                        argsIdent allocIdent limitIdent gcIdent threadInfIdent tinfIdent
+                        isptrIdent caseIdent nParam fenv finfo_env p rep_env
+                        m2 Lnew alloc_b vs0 x_ofs Hptrlist_range)).
+        exact Hrepr_ptrs_Z.
+      }
+
+      assert (Hrepr_constr :
+        repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env
+          (Vconstr t vs0) m2 Lnew (Vptr alloc_b x_ofs)).
+      {
+        eapply RSconstr_boxed_v.
+        - exact Hboxed.
+        - exact Hloc_hdr.
+        - exact Hload_hdr_m2.
+        - exact Hbh.
+        - exact Hrepr_ptrs.
+      }
+
+      assert (Hrel_body_raw :
+        rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env
+          e (M.set x (Vconstr t vs0) rho) m2
+          (M.set x (Vptr alloc_b x_ofs) lenv_alloc)).
+      {
+        eapply rel_mem_econstr_body_set_with_repr; eauto.
+      }
+
+      pose proof (correct_tinfo_after_store _ _ _ _ Hct _ _ _ _ _ Hs_header) as Hct1.
+      pose proof (correct_tinfo_after_nstore p vs7 max_alloc lenv m1 m2 alloc_b
+                    (Ptrofs.unsigned x_ofs) 0 Hct1 Hstore_fields) as Hct2.
+      set (max_alloc_e := Z.of_nat (max_allocs e)).
+      assert (Hmaxeq : max_alloc_e = Z.of_nat (max_allocs e)).
+      { reflexivity. }
+
+      assert (Hsum_le :
+        (max_alloc_e + Z.of_N (a + 1)%N <= max_alloc)%Z).
+      {
+        rewrite Hmaxeq.
+        rewrite Hmax_alloc_boxed.
+        rewrite Hz_inc.
+        repeat rewrite Nat2Z.inj_add.
+        simpl.
+        lia.
+      }
+      assert (Hct_alloc :
+        correct_tinfo p max_alloc_e lenv_alloc m2).
+      {
+        unfold lenv_alloc.
+        destruct Hct2 as [ab [ao [lo [argb [argo [tb [to Hct2]]]]]]].
+        destruct Hct2 as [Halloc2 Hct2].
+        destruct Hct2 as [Halign2 Hct2].
+        destruct Hct2 as [Hrange2 Hct2].
+        destruct Hct2 as [Hlimit2 Hct2].
+        destruct Hct2 as [Hspace2 Hct2].
+        destruct Hct2 as [Hargs2 Hct2].
+        destruct Hct2 as [Hargneq2 Hct2].
+        destruct Hct2 as [Hargsrange2 Hct2].
+        destruct Hct2 as [Hargsva2 Hct2].
+        destruct Hct2 as [Htinf2 Hct2].
+        destruct Hct2 as [Htinfneqa2 Hct2].
+        destruct Hct2 as [Htinfneqalloc2 Hct2].
+        destruct Hct2 as [Htinfva2 Hct2].
+        destruct Hct2 as [Hderef2 Hglob2].
+        rewrite Halloc_get in Halloc2.
+        inversion Halloc2; subst ab ao.
+        rewrite Hlimit_get in Hlimit2.
+        inversion Hlimit2; subst lo.
+        rewrite Hargs_get in Hargs2.
+        inversion Hargs2; subst argb argo.
+        rewrite Htinf_get in Htinf2.
+        inversion Htinf2; subst tb to.
+        exists alloc_b, alloc_ofs', limit_ofs, args_b, args_ofs, tinf_b, tinf_ofs.
+        split.
+        - rewrite M.gss. reflexivity.
+        - split.
+          + rewrite Halloc_ofs'_unsigned.
+            assert (Halign_int : (align_chunk int_chunk | int_size)%Z).
+            {
+              unfold int_size, int_chunk.
+              destruct Archi.ptr64 eqn:Harchi; simpl; exists 1%Z; lia.
+            }
+            eapply Z.divide_add_r; [exact Halign2 |].
+            apply Z.divide_mul_l.
+            exact Halign_int.
+          + split.
+            * intros ofs0 Hofs0.
+              eapply Hrange2.
+              lia.
+            * split.
+              { rewrite M.gso; auto. }
+              split.
+              {
+                destruct Hspace2 as [Hspace2_lo Hspace2_hi].
+                rewrite Halloc_ofs'_unsigned.
+                split.
+                - assert (Hmul_le :
+                    (int_size * (max_alloc_e + Z.of_N (a + 1)%N)
+                     <= Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs)%Z).
+                  {
+                    eapply Z.le_trans.
+                    - apply Z.mul_le_mono_nonneg_l.
+                      + apply int_size_pos.
+                      + exact Hsum_le.
+                    - exact Hspace2_lo.
+                  }
+                  lia.
+                - lia.
+              }
+              split.
+              { rewrite M.gso; auto. }
+              split.
+              { exact Hargneq2. }
+              split.
+              { exact Hargsrange2. }
+              split.
+              { exact Hargsva2. }
+              split.
+              { rewrite M.gso; auto. }
+              split.
+              { exact Htinfneqa2. }
+              split.
+              { exact Htinfneqalloc2. }
+              split.
+              { exact Htinfva2. }
+              split.
+              { exact Hderef2. }
+              { exact Hglob2. }
+      }
+
+      assert (Hct_mid_raw :
+        correct_tinfo p max_alloc_e
+          (M.set x (Vptr alloc_b x_ofs) lenv_alloc) m2).
+      {
+        eapply correct_tinfo_not_protected; eauto.
+      }
+
+      exists m2, lenv_mid.
+      split.
+      {
+        unfold allocPtr.
+        rewrite H6.
+        unfold a in Hpref.
+        exact Hpref.
+      }
+      split.
+      { exact Hsame_mid. }
+      split.
+      {
+        rewrite <- Hlenv_mid_eq.
+        exact Hrel_body_raw.
+      }
+      {
+        rewrite <- Hlenv_mid_eq.
+        exact Hct_mid_raw.
+      }
+    + (* enum constructor prefix *)
       assert (Hvs : vs = nil) by (simpl in Hgl; congruence).
       assert (Hvs0 : vs0 = nil) by (simpl in Hgl0; congruence).
       subst vs vs0.
       assert (Hbs_full : bstep_e (M.empty _) cenv rho (Econstr x t nil e) v n)
         by (econstructor; eauto).
-      eapply repr_bs_econstr_enum_prefix_step;
+      eapply repr_bs_econstr_enum_prefix_step with (nn := nn) (h := h);
         try exact Hbs_full; try exact Hcenvs; try exact Hprot;
         try exact Hub; try exact Hfnb; try exact Hrepr;
         try exact Hrel; try exact Halloc; try exact Hct;
         try eassumption; try reflexivity; eauto.
-  + (* Body callback *)
-    intros vs0 Hgl0.
+  - intros vs0 Hgl0.
     rewrite Hgl in Hgl0.
     inversion Hgl0; subst.
     exact Hgoal_e.
-Admitted.
+Qed.
 
 (* Ecase case: switch stepping to branch + body induction.
    Steps through isPtr external call, Sifthenelse, Sswitch to reach
@@ -13453,13 +15208,6 @@ Lemma repr_bs_ecase_case :
       repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v e n ->
       repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v (Ecase y cl) n.
 Proof.
-  intros p rep_env cenv fenv finfo_env ienv
-    Hpinv Hsym Hfinfo
-    rho y cl v n t vl e
-    Hy Hcc Hfind Hbs_e Hgoal_e.
-  unfold repr_bs_goal.
-  intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
-  admit.
 Admitted.
 
 (* Eapp case: function call mechanics.
@@ -13481,13 +15229,6 @@ Lemma repr_bs_eapp_case :
       repr_bs_goal p rep_env cenv fenv finfo_env ienv rho_call v e c ->
       repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v (Eapp f t ys) (c + 1).
 Proof.
-  intros p rep_env cenv fenv finfo_env ienv
-    Hpinv Hsym Hfinfo
-    rho rho_clo fl f' vs xs e rho_call f t ys v c
-    Hfun Hgl Hfdef Hset Hbs_e Hgoal_e.
-  unfold repr_bs_goal.
-  intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
-  admit.
 Admitted.
 
 (* Eletapp case: function call + continuation.
@@ -13512,13 +15253,6 @@ Lemma repr_bs_eletapp_case :
       repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v'
         (Eletapp x f t ys e) (c + c' + 1).
 Proof.
-  intros p rep_env cenv fenv finfo_env ienv
-    Hpinv Hsym Hfinfo
-    rho rho_clo fl f' vs xs e_body e rho_call x f t ys v v' c c'
-    Hfun Hgl Hfdef Hset Hbs_body Hbs_cont Hgoal_body Hgoal_cont.
-  unfold repr_bs_goal.
-  intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
-  admit.
 Admitted.
 
 (* Main Theorem *)

@@ -4379,6 +4379,12 @@ Proof.
   unfold protectedNotTinfoIdent_thm.
   inList.
 Qed.
+
+Lemma caseIdent_neq_tinf :
+  caseIdent <> tinfIdent.
+Proof.
+  solve_nodup.
+Qed.
  
 (*
     Variable cenv:cps.ctor_env.
@@ -8992,6 +8998,28 @@ Proof.
   - assumption.
 Qed.
 
+Lemma rel_mem_ecase_get_local_repr :
+  forall fenv finfo_env p rep_env rho m lenv y cl t vl,
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Ecase y cl) rho m lenv ->
+    M.get y rho = Some (Vconstr t vl) ->
+    exists L v7,
+      protected_not_in_L_id p lenv L /\
+      Genv.find_symbol (globalenv p) y = None /\
+      M.get y lenv = Some v7 /\
+      repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env (Vconstr t vl) m L v7.
+Proof.
+  intros fenv finfo_env p rep_env rho m lenv y cl t vl Hrel Hget.
+  assert (Hfree : occurs_free (Ecase y cl) y).
+  { constructor. }
+  destruct (rel_mem_occurs_free_repr _ _ _ _ _ _ _ _ _ Hrel Hfree)
+    as [v6 [L [Hprot [Hget6 Hrid]]]].
+  rewrite Hget in Hget6.
+  inversion Hget6; subst.
+  inversion Hrid; subst; clear Hrid; try solve [inversion H].
+  exists L, v7.
+  repeat split; auto.
+Qed.
+
 Lemma rel_mem_eapp_get_fun_var_or_funvar :
   forall fenv finfo_env p rep_env rho m lenv f t ys rho_clo fl f',
     rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env (Eapp f t ys) rho m lenv ->
@@ -9350,6 +9378,48 @@ Proof.
     exists n0, a0, b0, i0, h0.
     split; [exact Hget_boxed |].
     split; [exact Hboxed | reflexivity].
+  - inversion Heqvc.
+Qed.
+
+Lemma repr_val_constr_cases_with_header_load :
+  forall fenv finfo_env p rep_env t vl m L v7,
+    repr_val_L_LambdaANF_Codegen_id fenv finfo_env p rep_env (Vconstr t vl) m L v7 ->
+    (exists arr n,
+      M.get t rep_env = Some (enum arr) /\
+      vl = nil /\
+      repr_unboxed_Codegen arr n /\
+      v7 = make_vint n) \/
+    (exists n a b i h,
+      M.get t rep_env = Some (boxed n a) /\
+      boxed_header n a h /\
+      v7 = Vptr b i /\
+      Mem.load int_chunk m b
+        (Ptrofs.unsigned (Ptrofs.sub i (Ptrofs.repr int_size))) = Some (make_vint h)).
+Proof.
+  intros fenv finfo_env p rep_env t vl m L v7 Hrepr.
+  remember (Vconstr t vl) as vc eqn:Heqvc.
+  destruct Hrepr as
+      [L0 z r m0 Hunboxed_int
+      |t0 arr0 n0 m0 L0 Hget_enum Hunboxed
+      |L0 t0 vs0 n0 a0 b0 i0 m0 h0 Hget_boxed Hloc Hload_hdr Hboxed Hvals
+      |L0 vars0 avars0 fds0 f0 m0 b0 t0 t'0 vs0 pvs0 avs0 e0 asgn0 body0 l0
+       locs0 alocs0 finfo0 gccall0 Hfinddef Hgetfun Hgetfinfo Ht Hsym Hgc
+       Hfun Hforall Hpvs Havs Halocs Havar Hright Hrepr_body].
+  - inversion Heqvc.
+  - inversion Heqvc; subst; clear Heqvc.
+    left.
+    exists arr0, n0.
+    split; [exact Hget_enum|].
+    split; [reflexivity|].
+    split; [exact Hunboxed|].
+    reflexivity.
+  - inversion Heqvc; subst; clear Heqvc.
+    right.
+    exists n0, a0, b0, i0, h0.
+    split; [exact Hget_boxed|].
+    split; [exact Hboxed|].
+    split; [reflexivity|].
+    exact Hload_hdr.
   - inversion Heqvc.
 Qed.
 
@@ -15208,7 +15278,402 @@ Lemma repr_bs_ecase_case :
       repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v e n ->
       repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v (Ecase y cl) n.
 Proof.
-Admitted.
+  intros p rep_env cenv fenv finfo_env ienv
+    Hpinv Hsym Hfinfo
+    rho y cl v n t vl e
+    Hy Hcc Hfind Hbs_e Hgoal_e.
+  unfold repr_bs_goal.
+  intros Hcenvs Hprot Hub Hfnb
+    stm lenv m k max_alloc fu
+    Hrepr Hrel Halloc Hct.
+  assert (Hbs : bstep_e (M.empty _) cenv rho (Ecase y cl) v n).
+  { econstructor; eauto. }
+  destruct (ecase_step_inv_repr_rel_alloc_tinfo
+              p rep_env cenv ienv fenv finfo_env rho y cl v n stm lenv m max_alloc
+              Hbs Hcenvs Hprot Hub Hfnb Hrepr Hrel Halloc Hct)
+    as [t0 [vl0 [e0 [ls [ls' [max_alloc_e
+         [Hy0 [Hcc0 [Hfind0 [Hbs_e0 [Hcenvs_e [Hprot_e [Hub_e [Hfnb_e [Hbr [Hsw
+         [Hrel_e [Hmaxeq [Hbound [Halloc_e Hct_e]]]]]]]]]]]]]]]]]]]].
+  rewrite Hy in Hy0.
+  inversion Hy0; subst t0 vl0.
+  rewrite Hfind in Hfind0.
+  inversion Hfind0; subst e0.
+  destruct (rel_mem_ecase_get_local_repr
+              fenv finfo_env p rep_env rho m lenv y cl t vl Hrel Hy)
+    as [L [vy [HprotL [Hy_none [Hy_lenv Hrepr_v]]]]].
+  assert (Hy_ne_case : y <> caseIdent).
+  { intro Heq.
+    subst y.
+    destruct Hprot as [Hrho _].
+    specialize (Hrho caseIdent caseIdent (Vconstr t vl) Hy caseIdent_is_protected).
+    apply Hrho.
+    left; reflexivity. }
+  assert (Hcase_ne_args : caseIdent <> argsIdent) by solve_nodup.
+  destruct Hpinv as [Hisptr [_ _]].
+  destruct Hisptr as [b_isPtr [name [sg [Hsym_isptr [Hfun_isptr [Hisptr_int Hisptr_ptr]]]]]].
+  assert (Heval_ptr :
+    eval_expr (globalenv p) empty_env lenv m
+      (LambdaANF_to_Clight.ptr isptrIdent) (Vptr b_isPtr Ptrofs.zero)).
+  {
+    unfold LambdaANF_to_Clight.ptr, LambdaANF_to_Clight.isptrTy.
+    econstructor.
+    - apply eval_Evar_global.
+      + apply M.gempty.
+      + exact Hsym_isptr.
+    - apply deref_loc_reference.
+      reflexivity.
+  }
+  destruct (repr_val_constr_cases_with_header_load
+              fenv finfo_env p rep_env t vl m L vy Hrepr_v)
+    as [[arr [n0 [Hget_enum [Hvl_nil [Hunboxed Hvint]]]]]
+       | [n0 [a [b [i [h [Hget_boxed [Hboxed [Hvptr Hload_hdr]]]]]]]]].
+  - (* unboxed constructor *)
+    subst vl vy.
+    assert (Heval_arg :
+      eval_expr (globalenv p) empty_env lenv m
+        (Ecast (Etempvar y val) val) (make_vint n0)).
+    { eapply eval_Ecast.
+      + apply eval_Etempvar. exact Hy_lenv.
+      + change (sem_cast (make_vint n0) uval uval m = Some (make_vint n0)).
+        apply sem_cast_vint. }
+    assert (Heval_args :
+      eval_exprlist (globalenv p) empty_env lenv m
+        (Ecast (Etempvar y val) val :: nil)
+        (Tcons val Tnil) (make_vint n0 :: nil)).
+    {
+      eapply eval_Econs with (v1 := make_vint n0) (v2 := make_vint n0).
+      - exact Heval_arg.
+      - change (sem_cast (make_vint n0) uval uval m = Some (make_vint n0)).
+        apply sem_cast_vint.
+      - constructor.
+    }
+    destruct Hcenvs as [Hienv [_ [_ Hcrep]]].
+    destruct (case_of_labeled_stm_unboxed
+                rep_env arr t n0 e p fenv finfo_env ienv cenv
+                Hienv Hget_enum Hcrep Hunboxed cl ls ls' Hcc Hfind Hbr)
+      as [s [s' [Hsel Hrepr_s]]].
+    assert (Hrel_e_case :
+      rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e rho m
+        (M.set caseIdent Vfalse lenv)).
+    { eapply rel_mem_set_protected_id; eauto.
+      - exact caseIdent_is_protected.
+      - exact caseIdent_not_tinfo.
+      - exact caseIdent_neq_tinf. }
+    assert (Hct_e_case :
+      correct_tinfo p max_alloc_e (M.set caseIdent Vfalse lenv) m).
+    { eapply correct_tinfo_not_protected; eauto.
+      - exact caseIdent_not_tinfo.
+      - exact caseIdent_neq_tinf. }
+    assert (Hy_lenv_case :
+      M.get y (M.set caseIdent Vfalse lenv) = Some (make_vint n0)).
+    { rewrite M.gso by exact Hy_ne_case.
+      exact Hy_lenv. }
+    assert (Heval_shr :
+      eval_expr (globalenv p) empty_env (M.set caseIdent Vfalse lenv) m
+        (Ebinop Oshr
+                (Ecast (Etempvar y val) LambdaANF_to_Clight.uval)
+                (LambdaANF_to_Clight.make_cint 1 LambdaANF_to_Clight.uval)
+                LambdaANF_to_Clight.uval)
+        (int_shru n0 1)).
+    {
+      eapply eval_Ebinop with (v1 := make_vint n0) (v2 := make_vint 1).
+      - eapply eval_Ecast.
+        + apply eval_Etempvar.
+          exact Hy_lenv_case.
+        + unfold sem_cast, LambdaANF_to_Clight.val, LambdaANF_to_Clight.uval.
+          unfold make_vint, LambdaANF_to_Clight.make_vint, LambdaANF_to_Clight_stack.make_vint.
+          unfold classify_cast.
+          destruct Archi.ptr64; simpl; reflexivity.
+      - apply eval_cint_uval.
+      - destruct Archi.ptr64 eqn:Harchi.
+        + unfold sem_binary_operation, sem_shr, int_shru.
+          archi_red.
+          reflexivity.
+        + unfold sem_binary_operation, sem_shr, int_shru.
+          archi_red.
+          reflexivity.
+    }
+    assert (Hswitch_arg :
+      sem_switch_arg (int_shru n0 1) shr_ty = Some (Z.shiftr n0 1)).
+    { eapply sem_switch_arg_1.
+      eapply repr_unboxed_header_range; eauto. }
+    inversion Hsw; subst stm.
+    assert (Hpref :
+      m_tstep2 (globalenv p)
+        (State fu (make_case_switch isptrIdent caseIdent y ls ls') k empty_env lenv m)
+        (State fu s (Kseq Sbreak (Kseq s' (Kswitch k))) empty_env
+           (M.set caseIdent Vfalse lenv) m)).
+    {
+      unfold make_case_switch.
+      eapply m_tstep2_transitive.
+      - apply m_tstep2_step. constructor.
+      - eapply m_tstep2_transitive.
+        + apply m_tstep2_step.
+          eapply step_call with
+              (tyargs := Tcons val Tnil)
+              (tyres := Tint IBool Unsigned noattr)
+              (cconv := {| cc_vararg := None; cc_unproto := false; cc_structret := false |})
+              (vf := Vptr b_isPtr Ptrofs.zero)
+              (vargs := make_vint n0 :: nil)
+              (fd := External (EF_external name sg) (Tcons val Tnil)
+                              (Tint IBool Unsigned noattr)
+                              {| cc_vararg := None; cc_unproto := false; cc_structret := false |}).
+          * unfold LambdaANF_to_Clight.ptr, LambdaANF_to_Clight.isptrTy.
+            simpl. reflexivity.
+          * exact Heval_ptr.
+          * change (eval_exprlist (globalenv p) empty_env lenv m
+                     (Ecast (Etempvar y val) val :: nil)
+                    (Tcons val Tnil) (make_vint n0 :: nil)).
+            exact Heval_args.
+          * exact Hfun_isptr.
+          * reflexivity.
+        + eapply m_tstep2_transitive.
+          * apply m_tstep2_step.
+            eapply step_external_function.
+            exact (Hisptr_int m n0).
+          * eapply m_tstep2_transitive.
+            { apply m_tstep2_step. constructor. }
+            eapply m_tstep2_transitive.
+            { apply m_tstep2_step. constructor. }
+            eapply m_tstep2_transitive.
+            { apply m_tstep2_step.
+              eapply step_ifthenelse.
+              - apply eval_Etempvar.
+                unfold set_opttemp.
+                simpl.
+                rewrite M.gss.
+                reflexivity.
+              - reflexivity. }
+            eapply m_tstep2_transitive.
+            { apply m_tstep2_step.
+              eapply step_switch.
+              - exact Heval_shr.
+              - exact Hswitch_arg. }
+            rewrite Hsel.
+            eapply m_tstep2_transitive.
+            { apply m_tstep2_step. constructor. }
+            { apply m_tstep2_step. constructor. }
+    }
+    pose proof (Hgoal_e Hcenvs_e Hprot_e Hub_e Hfnb_e
+                  s (M.set caseIdent Vfalse lenv) m
+                  (Kseq Sbreak (Kseq s' (Kswitch k))) max_alloc_e fu
+                  Hrepr_s Hrel_e_case Halloc_e Hct_e_case) as Hbody.
+    destruct Hbody as [m' [lenv' [Hstep_body [Hsame_body Harg]]]].
+    assert (Hcleanup :
+      m_tstep2 (globalenv p)
+        (State fu Sskip (Kseq Sbreak (Kseq s' (Kswitch k))) empty_env lenv' m')
+        (State fu Sskip k empty_env lenv' m')).
+    {
+      eapply m_tstep2_transitive.
+      - apply m_tstep2_step. constructor.
+      - eapply m_tstep2_transitive.
+        + apply m_tstep2_step. constructor.
+        + apply m_tstep2_step.
+          eapply step_skip_break_switch.
+          right. reflexivity.
+    }
+    assert (Hsame_case : same_args_ptr lenv (M.set caseIdent Vfalse lenv)).
+    { eapply same_args_ptr_set_right_other; eauto.
+      apply same_args_ptr_refl. }
+    assert (Hsame_final : same_args_ptr lenv lenv').
+    { eapply same_args_ptr_trans; eauto. }
+    exists m', lenv'.
+    split.
+    + eapply m_tstep2_transitive.
+      * exact Hpref.
+      * eapply m_tstep2_transitive; eauto.
+    + split; [exact Hsame_final|exact Harg].
+  - (* boxed constructor *)
+    subst vy.
+    assert (Heval_arg :
+      eval_expr (globalenv p) empty_env lenv m
+        (Ecast (Etempvar y val) val) (Vptr b i)).
+    { eapply eval_Ecast.
+      + apply eval_Etempvar. exact Hy_lenv.
+      + unfold sem_cast, val.
+        destruct Archi.ptr64; reflexivity. }
+    assert (Heval_args :
+      eval_exprlist (globalenv p) empty_env lenv m
+        (Ecast (Etempvar y val) val :: nil)
+        (Tcons val Tnil) (Vptr b i :: nil)).
+    {
+      eapply eval_Econs with (v1 := Vptr b i) (v2 := Vptr b i).
+      - exact Heval_arg.
+      - change (sem_cast (Vptr b i) uval uval m = Some (Vptr b i)).
+        unfold sem_cast, uval, val.
+        destruct Archi.ptr64; reflexivity.
+      - constructor.
+    }
+    destruct Hcenvs as [Hienv [_ [_ Hcrep]]].
+    destruct (case_of_labeled_stm_boxed
+                rep_env n0 a t h e p fenv finfo_env ienv cenv
+                Hienv Hget_boxed Hcrep Hboxed cl ls ls' Hcc Hfind Hbr)
+      as [s [s' [Hsel Hrepr_s]]].
+    assert (Hrel_e_case :
+      rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env e rho m
+        (M.set caseIdent Vtrue lenv)).
+    { eapply rel_mem_set_protected_id; eauto.
+      - exact caseIdent_is_protected.
+      - exact caseIdent_not_tinfo.
+      - exact caseIdent_neq_tinf. }
+    assert (Hct_e_case :
+      correct_tinfo p max_alloc_e (M.set caseIdent Vtrue lenv) m).
+    { eapply correct_tinfo_not_protected; eauto.
+      - exact caseIdent_not_tinfo.
+      - exact caseIdent_neq_tinf. }
+    assert (Hy_lenv_case :
+      M.get y (M.set caseIdent Vtrue lenv) = Some (Vptr b i)).
+    { rewrite M.gso by exact Hy_ne_case.
+      exact Hy_lenv. }
+    assert (Hload_hdr_add :
+      Mem.load int_chunk m b
+        (Ptrofs.unsigned (Ptrofs.add i (Ptrofs.repr (int_size * (-1)))))
+      = Some (make_vint h)).
+    {
+      replace (Ptrofs.add i (Ptrofs.repr (int_size * (-1))))
+        with (Ptrofs.sub i (Ptrofs.repr int_size)).
+      - exact Hload_hdr.
+      - rewrite Ptrofs.sub_add_opp.
+        rewrite Ptrofs.neg_repr.
+        replace (- int_size)%Z with (int_size * (-1))%Z by lia.
+        reflexivity.
+    }
+    assert (Heval_field :
+      eval_expr (globalenv p) empty_env (M.set caseIdent Vtrue lenv) m
+        (Ederef
+           (add (Ecast (Etempvar y val) valPtr)
+                (c_int' (-1) LambdaANF_to_Clight.uval))
+           val)
+        (make_vint h)).
+    {
+      eapply eval_Elvalue.
+      - eapply eval_lvalue_field_from_ptr.
+        exact Hy_lenv_case.
+      - eapply deref_loc_value with (chunk := int_chunk).
+        + unfold val, LambdaANF_to_Clight.val, int_chunk, LambdaANF_to_Clight.int_chunk.
+          simpl. reflexivity.
+        + exact Hload_hdr_add.
+    }
+    assert (Heval_and :
+      eval_expr (globalenv p) empty_env (M.set caseIdent Vtrue lenv) m
+        (Ebinop Oand
+           (Ecast
+              (Ederef
+                 (add (Ecast (Etempvar y val) valPtr)
+                      (c_int' (-1) LambdaANF_to_Clight.uval))
+                 val)
+              LambdaANF_to_Clight.uval)
+           (LambdaANF_to_Clight.make_cint 255 LambdaANF_to_Clight.uval)
+           LambdaANF_to_Clight.uval)
+        (int_and h 255%Z)).
+    {
+      eapply eval_Ebinop with (v1 := make_vint h) (v2 := make_vint 255%Z).
+      - eapply eval_Ecast.
+        + exact Heval_field.
+        + unfold sem_cast, LambdaANF_to_Clight.val, LambdaANF_to_Clight.uval.
+          unfold make_vint, LambdaANF_to_Clight.make_vint, LambdaANF_to_Clight_stack.make_vint.
+          unfold classify_cast.
+          destruct Archi.ptr64; simpl; reflexivity.
+      - apply eval_cint_uval.
+      - destruct Archi.ptr64 eqn:Harchi.
+        + unfold sem_binary_operation, sem_and, int_and.
+          archi_red.
+          reflexivity.
+        + unfold sem_binary_operation, sem_and, int_and.
+          archi_red.
+          reflexivity.
+    }
+    assert (Hswitch_arg :
+      sem_switch_arg (int_and h 255%Z) shr_ty = Some (Z.land h 255)).
+    { eapply sem_switch_and_255.
+      eapply repr_boxed_header_range; eauto. }
+    inversion Hsw; subst stm.
+    assert (Hpref :
+      m_tstep2 (globalenv p)
+        (State fu (make_case_switch isptrIdent caseIdent y ls ls') k empty_env lenv m)
+        (State fu s (Kseq Sbreak (Kseq s' (Kswitch k))) empty_env
+           (M.set caseIdent Vtrue lenv) m)).
+    {
+      unfold make_case_switch.
+      eapply m_tstep2_transitive.
+      - apply m_tstep2_step. constructor.
+      - eapply m_tstep2_transitive.
+        + apply m_tstep2_step.
+          eapply step_call with
+              (tyargs := Tcons val Tnil)
+              (tyres := Tint IBool Unsigned noattr)
+              (cconv := {| cc_vararg := None; cc_unproto := false; cc_structret := false |})
+              (vf := Vptr b_isPtr Ptrofs.zero)
+              (vargs := Vptr b i :: nil)
+              (fd := External (EF_external name sg) (Tcons val Tnil)
+                              (Tint IBool Unsigned noattr)
+                              {| cc_vararg := None; cc_unproto := false; cc_structret := false |}).
+          * unfold LambdaANF_to_Clight.ptr, LambdaANF_to_Clight.isptrTy.
+            simpl. reflexivity.
+          * exact Heval_ptr.
+          * change (eval_exprlist (globalenv p) empty_env lenv m
+                     (Ecast (Etempvar y val) val :: nil)
+                    (Tcons val Tnil) (Vptr b i :: nil)).
+            exact Heval_args.
+          * exact Hfun_isptr.
+          * reflexivity.
+        + eapply m_tstep2_transitive.
+          * apply m_tstep2_step.
+            eapply step_external_function.
+            exact (Hisptr_ptr m b i).
+          * eapply m_tstep2_transitive.
+            { apply m_tstep2_step. constructor. }
+            eapply m_tstep2_transitive.
+            { apply m_tstep2_step. constructor. }
+            eapply m_tstep2_transitive.
+            { apply m_tstep2_step.
+              eapply step_ifthenelse.
+              - apply eval_Etempvar.
+                unfold set_opttemp.
+                simpl.
+                rewrite M.gss.
+                reflexivity.
+              - reflexivity. }
+            eapply m_tstep2_transitive.
+            { apply m_tstep2_step.
+              eapply step_switch.
+              - exact Heval_and.
+              - exact Hswitch_arg. }
+            rewrite Hsel.
+            eapply m_tstep2_transitive.
+            { apply m_tstep2_step. constructor. }
+            { apply m_tstep2_step. constructor. }
+    }
+    pose proof (Hgoal_e Hcenvs_e Hprot_e Hub_e Hfnb_e
+                  s (M.set caseIdent Vtrue lenv) m
+                  (Kseq Sbreak (Kseq s' (Kswitch k))) max_alloc_e fu
+                  Hrepr_s Hrel_e_case Halloc_e Hct_e_case) as Hbody.
+    destruct Hbody as [m' [lenv' [Hstep_body [Hsame_body Harg]]]].
+    assert (Hcleanup :
+      m_tstep2 (globalenv p)
+        (State fu Sskip (Kseq Sbreak (Kseq s' (Kswitch k))) empty_env lenv' m')
+        (State fu Sskip k empty_env lenv' m')).
+    {
+      eapply m_tstep2_transitive.
+      - apply m_tstep2_step. constructor.
+      - eapply m_tstep2_transitive.
+        + apply m_tstep2_step. constructor.
+        + apply m_tstep2_step.
+          eapply step_skip_break_switch.
+          right. reflexivity.
+    }
+    assert (Hsame_case : same_args_ptr lenv (M.set caseIdent Vtrue lenv)).
+    { eapply same_args_ptr_set_right_other; eauto.
+      apply same_args_ptr_refl. }
+    assert (Hsame_final : same_args_ptr lenv lenv').
+    { eapply same_args_ptr_trans; eauto. }
+    exists m', lenv'.
+    split.
+    + eapply m_tstep2_transitive.
+      * exact Hpref.
+      * eapply m_tstep2_transitive; eauto.
+    + split; [exact Hsame_final|exact Harg].
+Qed.
 
 (* Eapp case: function call mechanics.
    Uses eapp_step_and_repr_rel_fun_alloc_tinfo_inv for context extraction.

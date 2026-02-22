@@ -4,7 +4,7 @@
 (**********************************************************************)
 
 open Printer
-open Metacoq_template_plugin.Ast_quoter
+open Metarocq_template_plugin.Ast_quoter
 open ExceptionMonad
 open AstCommon
 open Plugin_utils
@@ -346,7 +346,7 @@ let quote_term opts env sigma c =
   let bypass = opts.bypass_qed in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass env sigma (EConstr.to_constr sigma c) in
+  let term = Metarocq_template_plugin.Ast_quoter.quote_term_rec ~bypass env sigma (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   term
@@ -604,8 +604,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       CI.printProg prg nenv cstr' (imports @ [FromRelativePath hstr]);
       CI.printProg header nenv hstr' (runtime_imports);
 
-      (* let cstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
-      * let hstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
+      (* let cstr = Metarocq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
+      * let hstr = Metarocq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
       * Pipeline.printProg (nenv,prg) cstr;
       * Pipeline.printProg (nenv,header) hstr; *)
       let time = (Unix.gettimeofday() -. time) in
@@ -853,7 +853,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | IsInductive (hd, u, args) -> 
       let open Inductive in
       let open Inductiveops in
-      let qhd = match Metacoq_template_plugin.Ast_quoter.quote_global_reference (IndRef hd) with Metacoq_template_plugin.Kernames.IndRef i -> (Obj.magic i : Kernames.inductive) | _ -> assert false in
+      let qhd = match Metarocq_template_plugin.Ast_quoter.quote_global_reference (IndRef hd) with Metarocq_template_plugin.Kernames.IndRef i -> (Obj.magic i : Kernames.inductive) | _ -> assert false in
       let spec = lookup_mind_specif env hd in
       let npars = inductive_params spec in
       let params, _indices = CList.chop npars args in
@@ -1066,7 +1066,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
 
   (* Quote Coq inductive type *)
-  let quote_ind opts gr : Metacoq_template_plugin.Ast_quoter.quoted_program * string =
+  let quote_ind opts gr : Metarocq_template_plugin.Ast_quoter.quoted_program * string =
     let debug = opts.debug in
     let env = Global.env () in
     let sigma = Evd.from_env env in
@@ -1110,7 +1110,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
   let glue_command opts grs =
     let terms = grs |> List.rev
-                |> List.map (fun gr -> Metacoq_template_plugin.Ast0.Env.declarations (fst (quote opts gr))) 
+                |> List.map (fun gr -> Metarocq_template_plugin.Ast0.Env.declarations (fst (quote opts gr))) 
                 |> List.concat |> nub in
     generate_glue true opts (Obj.magic terms)
 

@@ -1,4 +1,4 @@
-open Metacoq_template_plugin.Ast_quoter
+open Metarocq_template_plugin.Ast_quoter
 open Names
 open Pp
 open Caml_bytestring

@@ -5,7 +5,7 @@
 
 open Pp
 open Printer
-open Metacoq_template_plugin.Ast_quoter
+open Metarocq_template_plugin.Ast_quoter
 open ExceptionMonad
 open AstCommon
 open Plugin_utils
@@ -14,7 +14,7 @@ let quote gr =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let sigma, c = Evd.fresh_global env sigma gr in
-  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass:true env sigma (EConstr.to_constr sigma c) in
+  let term = Metarocq_template_plugin.Ast_quoter.quote_term_rec ~bypass:true env sigma (EConstr.to_constr sigma c) in
   term
 
 let check gr = 

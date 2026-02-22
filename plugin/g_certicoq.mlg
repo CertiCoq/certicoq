@@ -45,11 +45,11 @@ let globref_of_qualid ?loc (gr : Libnames.qualid) : Names.GlobRef.t  =
   | None -> CErrors.user_err ?loc Pp.(Libnames.pr_qualid gr ++ str " not found.")
   | Some g -> g
 
-let quoted_globref_of_qualid ~loc (gr : Libnames.qualid) : Metacoq_template_plugin.Kernames.global_reference =
-  Metacoq_template_plugin.Ast_quoter.quote_global_reference (globref_of_qualid ~loc gr)
+let quoted_globref_of_qualid ~loc (gr : Libnames.qualid) : Metarocq_template_plugin.Kernames.global_reference =
+  Metarocq_template_plugin.Ast_quoter.quote_global_reference (globref_of_qualid ~loc gr)
 
 let inductive_of_qualid ~loc (gr : Libnames.qualid) : Kernames.inductive =
-  let open Metacoq_template_plugin in
+  let open Metarocq_template_plugin in
   match quoted_globref_of_qualid ~loc gr with
   | Kernames.ConstRef kn -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a constant.")
   | Kernames.VarRef(v) -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a variable.")

@@ -4,7 +4,7 @@
 (**********************************************************************)
 
 open Printer
-open Metacoq_template_plugin.Ast_quoter
+open Metarocq_template_plugin.Ast_quoter
 open ExceptionMonad
 open AstCommon
 open Plugin_utils
@@ -28,7 +28,7 @@ let get_ocamlfind =
 
 let get_c_compiler =
   get_stringopt_option ["CertiCoq"; "CC"]
-        
+
 (* Taken from Coq's increment_subscript, but works on strings rather than idents *)
 let increment_subscript id =
   let len = String.length id in
@@ -82,7 +82,7 @@ let debug_msg (flag : bool) (s : string) =
 (* Separate registration of primitive extraction *)
 
 type prim = ((Kernames.kername * Kernames.ident) * bool)
-let global_registers = 
+let global_registers =
   Summary.ref (([], []) : prim list * import list) ~name:"CertiCoq Registration"
 
 let global_registers_name = "certicoq-registration"
@@ -99,7 +99,7 @@ let global_registers_input =
 
 let register (prims : prim list) (imports : import list) : unit =
   let curlib = Sys.getcwd () in
-  let newr = (prims, List.map (fun i -> 
+  let newr = (prims, List.map (fun i ->
     match i with
     | FromAbsolutePath s -> FromRelativePath (Filename.concat curlib s)
     | _ -> i) imports) in
@@ -113,7 +113,7 @@ let get_global_includes () = snd !global_registers
 type inductive_mapping = Kernames.inductive * (string * int list) (* Target inductive type and mapping of constructor names to constructor tags *)
 type inductives_mapping = inductive_mapping list
 
-let global_inductive_registers = 
+let global_inductive_registers =
   Summary.ref ([] : inductives_mapping) ~name:"CertiCoq Extract Inductive Registration"
 
 let global_inductive_registers_name = "certicoq-extract-inductive-registration"
@@ -122,9 +122,9 @@ let cache_inductive_registers inds =
   let inds' = !global_inductive_registers in
   global_inductive_registers := inds @ inds'
 
-let global_inductive_registers_input = 
-  let open Libobject in 
-  declare_object 
+let global_inductive_registers_input =
+  let open Libobject in
+  declare_object
     (global_object_nodischarge global_inductive_registers_name
     ~cache:(fun r -> cache_inductive_registers r)
     ~subst:None)
@@ -137,8 +137,8 @@ let get_global_inductives_mapping () = !global_inductive_registers
 (* Support for dynamically-linked certicoq-compiled programs *)
 type certicoq_run_function = unit -> Obj.t
 
-let certicoq_run_functions = 
-  Summary.ref ~name:"CertiCoq Run Functions Table" 
+let certicoq_run_functions =
+  Summary.ref ~name:"CertiCoq Run Functions Table"
     (CString.Map.empty : certicoq_run_function CString.Map.t)
 
 let certicoq_run_functions_name = "certicoq-run-functions-registration"
@@ -150,9 +150,9 @@ let cache_certicoq_run_function (s, s', fn) =
   all_run_functions := CString.Set.add s (CString.Set.add s' !all_run_functions);
   certicoq_run_functions := CString.Map.add s fn fns
 
-let certicoq_run_function_input = 
+let certicoq_run_function_input =
   let open Libobject in
-  declare_object 
+  declare_object
     (global_object_nodischarge certicoq_run_functions_name
     ~cache:(fun r -> cache_certicoq_run_function r)
     ~subst:None)
@@ -166,8 +166,8 @@ let exists_certicoq_run s =
   let res = CString.Map.find_opt s !certicoq_run_functions in
   if Option.is_empty res then Feedback.msg_debug Pp.(str"Not found");
   res
-  
-let run_certicoq_run s = 
+
+let run_certicoq_run s =
   try CString.Map.find s !certicoq_run_functions
   with Not_found -> CErrors.user_err Pp.(str"Could not find certicoq run function associated to " ++ str s)
 
@@ -176,23 +176,23 @@ let run_certicoq_run s =
 let coq_msg_info s =
   let s = Caml_bytestring.caml_string_of_bytestring s in
   Feedback.msg_info (Pp.str s)
-  
+
 let _ = Callback.register "coq_msg_info" coq_msg_info
 
-let coq_msg_debug s = 
+let coq_msg_debug s =
   Feedback.msg_debug Pp.(str (Caml_bytestring.caml_string_of_bytestring s))
-  
+
 let _ = Callback.register "coq_msg_debug" coq_msg_debug
 
-let coq_msg_notice s = 
+let coq_msg_notice s =
   Feedback.msg_notice Pp.(str (Caml_bytestring.caml_string_of_bytestring s))
-  
+
 let _ = Callback.register "coq_msg_notice" coq_msg_notice
-  
+
 let coq_user_error s =
   CErrors.user_err Pp.(str (Caml_bytestring.caml_string_of_bytestring s))
 
-let _ = Callback.register "coq_user_error" coq_user_error 
+let _ = Callback.register "coq_user_error" coq_user_error
 
 (** Compilation Command Arguments *)
 
@@ -237,15 +237,15 @@ type options =
 
 let check_build_dir d =
   if d = "" then "." else
-  let isdir = 
+  let isdir =
     try Unix.((stat d).st_kind = S_DIR)
     with Unix.Unix_error (Unix.ENOENT, _, _) ->
       CErrors.user_err Pp.(str "Could not compile: build directory " ++ str d ++ str " not found.")
   in
-  if not isdir then 
+  if not isdir then
     CErrors.user_err Pp.(str "Could not compile: " ++ str d ++ str " is not a directory.")
   else d
-  
+
 let default_options () : options =
   { typed_erasure = false;
     unsafe_erasure = false;
@@ -294,10 +294,10 @@ let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ide
   let o = aux opts l in
   {o with prims = pr}
 
-let make_unsafe_passes b = 
+let make_unsafe_passes b =
   let open Erasure0 in
   { cofix_to_lazy = b;
-    inlining = b; 
+    inlining = b;
     unboxing = b;
     betared = b }
 
@@ -308,9 +308,9 @@ let quote_inductives_mapping l =
   List.map (fun (hd, (na, cstrs)) -> (hd, (bytestring_of_string na, List.map (fun i -> coq_nat_of_int i) cstrs))) l
 
 let make_pipeline_options (opts : options) =
-  let erasure_config = 
-      Erasure0.({ 
-        enable_typed_erasure = opts.typed_erasure; 
+  let erasure_config =
+      Erasure0.({
+        enable_typed_erasure = opts.typed_erasure;
         enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
         dearging_config = default_dearging_config;
         inlined_constants = Kernames.KernameSet.empty
@@ -346,7 +346,7 @@ let quote_term opts env sigma c =
   let bypass = opts.bypass_qed in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = Metacoq_template_plugin.Ast_quoter.quote_term_rec ~bypass env sigma (EConstr.to_constr sigma c) in
+  let term = Metarocq_template_plugin.Ast_quoter.quote_term_rec ~bypass env sigma (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   term
@@ -394,25 +394,25 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let make_fname opts str =
     Filename.concat opts.build_dir str
 
-  type line = 
+  type line =
   | EOF
   | Info of string
   | Error of string
-  
+
   let read_line stdout stderr =
     try Info (input_line stdout)
-    with End_of_file -> 
+    with End_of_file ->
       try Error (input_line stderr)
     with End_of_file -> EOF
-  
+
   let push_line buf line =
-    Buffer.add_string buf line; 
+    Buffer.add_string buf line;
     Buffer.add_string buf "\n"
-  
+
   let string_of_buffer buf = Stdlib.Bytes.to_string (Buffer.to_bytes buf)
-    
+
   let execute cmd =
-    debug Pp.(fun () -> str "Executing: " ++ str cmd ++ str " in environemt: " ++ 
+    debug Pp.(fun () -> str "Executing: " ++ str cmd ++ str " in environemt: " ++
       prlist_with_sep spc str (Array.to_list (Unix.environment ())));
     let (stdout, stdin, stderr) = Unix.open_process_full cmd (Unix.environment ()) in
     let continue = ref true in
@@ -427,26 +427,26 @@ module CompileFunctor (CI : CompilerInterface) = struct
     done;
     let status = Unix.close_process_full (stdout, stdin, stderr) in
     status, string_of_buffer outbuf, string_of_buffer errbuf
-    
+
   let execute ?loc cmd =
     let status, out, err = execute cmd in
     match status with
     | Unix.WEXITED 0 -> out, err
-    | Unix.WEXITED n -> 
+    | Unix.WEXITED n ->
       CErrors.user_err ?loc Pp.(str"Command" ++ spc () ++ str cmd ++ spc () ++
         str"exited with code " ++ int n ++ str "." ++ fnl () ++
         str"stdout: " ++ spc () ++ str out ++ fnl () ++ str "stderr: " ++ str err)
-    | Unix.WSIGNALED n | Unix.WSTOPPED n -> 
-      CErrors.user_err ?loc Pp.(str"Command" ++ spc () ++ str cmd ++ spc () ++ 
+    | Unix.WSIGNALED n | Unix.WSTOPPED n ->
+      CErrors.user_err ?loc Pp.(str"Command" ++ spc () ++ str cmd ++ spc () ++
       str"was signaled with code " ++ int n ++ str"." ++ fnl () ++
       str"stdout: " ++ spc () ++ str out ++ fnl () ++ str "stderr: " ++ str err)
-    
+
   let compile opts term imports =
     let debug = opts.debug in
     let options = make_pipeline_options opts in
     let runtime_imports = [FromLibrary ((if opts.cps then "gc.h" else "gc_stack.h"), None)] in
     let curlib = Sys.getcwd () in
-    let imports = List.map (fun i -> 
+    let imports = List.map (fun i ->
       match i with
       | FromAbsolutePath s -> FromRelativePath (Filename.concat curlib s)
       | _ -> i) imports in
@@ -465,8 +465,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
       CI.printProg prg nenv cstr' (imports @ [FromRelativePath hstr]);
       CI.printProg header nenv hstr' (runtime_imports);
 
-      (* let cstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
-      * let hstr = Metacoq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
+      (* let cstr = Metarocq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".c") in
+      * let hstr = Metarocq_template_plugin.Tm_util.string_to_list (Names.KerName.to_string (Names.Constant.canonical const) ^ suff ^ ".h") in
       * Pipeline.printProg (nenv,prg) cstr;
       * Pipeline.printProg (nenv,header) hstr; *)
       let time = (Unix.gettimeofday() -. time) in
@@ -486,7 +486,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     else
     let debug = opts.debug in
     let options = make_pipeline_options opts in
-    let runtime_imports = 
+    let runtime_imports =
       [ FromLibrary ((if opts.cps then "gc.h" else "gc_stack.h"), None); FromLibrary ("stdio.h", None) ] in
     let time = Unix.gettimeofday() in
     (match CI.generate_glue options globs with
@@ -517,11 +517,11 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let generate_glue_only opts gr =
     let term = quote opts gr in
     generate_glue true opts (Ast0.Env.declarations (fst (Obj.magic term)))
-    
-  let find_executable debug cmd = 
+
+  let find_executable debug cmd =
     let whichcmd = Unix.open_process_in cmd in
-    let result = 
-      try Stdlib.input_line whichcmd 
+    let result =
+      try Stdlib.input_line whichcmd
       with End_of_file -> ""
     in
     let status = Unix.close_process_in whichcmd in
@@ -531,16 +531,16 @@ module CompileFunctor (CI : CompilerInterface) = struct
       result
     | _ -> failwith "Compiler not found"
 
-  let compiler_executable debug = 
+  let compiler_executable debug =
     match get_c_compiler () with
     | None -> find_executable debug "which gcc || which clang-11"
     | Some s -> s
-  
-  let ocamlfind_executable debug = 
+
+  let ocamlfind_executable debug =
     match get_ocamlfind () with
     | None -> find_executable debug "which ocamlfind"
     | Some s -> s
-      
+
   let read_line stdout stderr =
     try Info (input_line stdout)
     with End_of_file ->
@@ -558,7 +558,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     done;
     ignore (Unix.close_process_full (stdout, stdin, stderr))
 
-  let runtime_dir () = 
+  let runtime_dir () =
     let open Boot in
     let env = Env.init () in
     Path.relative (Path.relative (Path.relative (Env.user_contrib env) "CertiCoq") "Plugin") "runtime"
@@ -576,16 +576,16 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let compiler = compiler_executable debug in
     let rt_dir = runtime_dir () in
     let cmd =
-        Printf.sprintf "%s -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s" 
-          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c") 
+        Printf.sprintf "%s -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s"
+          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c")
     in
     let importso =
       let oname s =
         assert (CString.is_suffix ".h" s);
         String.sub s 0 (String.length s - 2) ^ ".o"
-      in 
-      let imports' = List.concat (List.map (fun i -> 
-        match i with 
+      in
+      let imports' = List.concat (List.map (fun i ->
+        match i with
         | FromAbsolutePath s -> [oname s]
         | FromRelativePath s -> [oname s]
         | FromLibrary (s, _) -> [make_rt_file (oname s)]) imports) in
@@ -597,7 +597,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     match Unix.system cmd with
     | Unix.WEXITED 0 ->
       let linkcmd =
-        Printf.sprintf "%s -Wno-everything -g -L %s -L %s -o %s %s %s %s" 
+        Printf.sprintf "%s -Wno-everything -g -L %s -L %s -o %s %s %s %s"
           compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) name gc_stack_o (name ^ ".o") importso
       in
       debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
@@ -609,34 +609,34 @@ module CompileFunctor (CI : CompilerInterface) = struct
       | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n))
     | Unix.WEXITED n -> CErrors.user_err Pp.(str"Compiler exited with code " ++ int n ++ str" while running " ++ str cmd)
     | Unix.WSIGNALED n | Unix.WSTOPPED n -> CErrors.user_err Pp.(str"Compiler was signaled with code " ++ int n  ++ str" while running " ++ str cmd)
-    
+
   type reifyable_type =
   | IsInductive of Names.inductive * UVars.Instance.t * Constr.t list
   | IsPrimitive of Names.Constant.t * UVars.Instance.t * Constr.t list
-  
+
   let type_of_reifyable_type = function
     | IsInductive (hd, u, args) -> Term.applistc (Constr.mkIndU ((hd, u))) args
     | IsPrimitive (c, u, args) -> Term.applistc (Constr.mkConstU ((c, u))) args
-  
+
   let pr_reifyable_type env sigma ty =
     Printer.pr_constr_env env sigma (type_of_reifyable_type ty)
 
   let find_nth_constant n ar =
     let open Inductiveops in
-    let rec aux i const = 
+    let rec aux i const =
       if Array.length ar <= i then raise Not_found
       else if CList.is_empty ar.(i).cs_args then  (* FIXME lets in constructors *)
-        if const = n then i 
+        if const = n then i
         else aux (i + 1) (const + 1)
       else aux (i + 1) const
     in aux 0 0
-  
+
   let find_nth_non_constant n ar =
     let open Inductiveops in
-    let rec aux i nconst = 
+    let rec aux i nconst =
       if Array.length ar <= i then raise Not_found
-      else if not (CList.is_empty ar.(i).cs_args) then 
-        if nconst = n then i 
+      else if not (CList.is_empty ar.(i).cs_args) then
+        if nconst = n then i
         else aux (i + 1) (nconst + 1)
       else aux (i + 1) nconst
     in aux 0 0
@@ -645,19 +645,19 @@ module CompileFunctor (CI : CompilerInterface) = struct
     (* We might have bound universes though. It's fine! *)
     try let (hd, u), args = Inductiveops.find_inductive env sigma ty in
       IsInductive (hd, EConstr.EInstance.kind sigma u, List.map (EConstr.to_constr sigma) args)
-    with Not_found -> 
+    with Not_found ->
       let hnf = Reductionops.whd_all env sigma ty in
       let hd, args = EConstr.decompose_app sigma hnf in
       match EConstr.kind sigma hd with
-      | Const (c, u) when Environ.is_primitive_type env c -> 
+      | Const (c, u) when Environ.is_primitive_type env c ->
         IsPrimitive (c, EConstr.EInstance.kind sigma u, CArray.map_to_list EConstr.Unsafe.to_constr args)
-      | _ -> CErrors.user_err 
-        Pp.(str"Cannot reify values of non-inductive or non-primitive type: " ++ 
+      | _ -> CErrors.user_err
+        Pp.(str"Cannot reify values of non-inductive or non-primitive type: " ++
           Printer.pr_econstr_env env sigma ty)
 
   let ill_formed env sigma ty =
     match ty with
-    | IsInductive _ -> 
+    | IsInductive _ ->
       CErrors.anomaly ~label:"certicoq-reify-ill-formed"
       Pp.(str "Ill-formed inductive value representation in CertiCoq's reification for type " ++
         pr_reifyable_type env sigma ty)
@@ -666,7 +666,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       Pp.(str "Ill-formed primitive value representation in CertiCoq's reification for type " ++
         pr_reifyable_type env sigma ty)
 
-  (* let ocaml_get_boxed_ordinal v = 
+  (* let ocaml_get_boxed_ordinal v =
     (* tag is the header of the object *)
     let tag = Array.unsafe_get (Obj.magic v : Obj.t array) (-1) in
     (* We turn it into an ocaml int usable for arithmetic operations *)
@@ -704,17 +704,17 @@ module CompileFunctor (CI : CompilerInterface) = struct
       CList.find_map_exn find_ind_ord m
     with Not_found -> cstr
 
-  let reify im env sigma ty v : Constr.t = 
+  let reify im env sigma ty v : Constr.t =
     let open Declarations in
     let debug s = debug_reify Pp.(fun () -> str s) in
     let rec aux ty v =
     Control.check_for_interrupt ();
     let () = debug_reify Pp.(fun () -> str "Reifying value of type " ++ pr_reifyable_type env sigma ty) in
     match ty with
-    | IsInductive (hd, u, args) -> 
+    | IsInductive (hd, u, args) ->
       let open Inductive in
       let open Inductiveops in
-      let qhd = match Metacoq_template_plugin.Ast_quoter.quote_global_reference (IndRef hd) with Metacoq_template_plugin.Kernames.IndRef i -> (Obj.magic i : Kernames.inductive) | _ -> assert false in
+      let qhd = match Metarocq_template_plugin.Ast_quoter.quote_global_reference (IndRef hd) with Metarocq_template_plugin.Kernames.IndRef i -> (Obj.magic i : Kernames.inductive) | _ -> assert false in
       let spec = lookup_mind_specif env hd in
       let npars = inductive_params spec in
       let params, _indices = CList.chop npars args in
@@ -724,31 +724,31 @@ module CompileFunctor (CI : CompilerInterface) = struct
       if Obj.is_block v then
         let ord = get_boxed_ordinal v in
         let () = debug (Printf.sprintf "Reifying constructor block of tag %i" ord) in
-        let coqidx = 
-          try find_nth_non_constant ord cstrs 
+        let coqidx =
+          try find_nth_non_constant ord cstrs
           with Not_found -> ill_formed env sigma ty
         in
         let cstr = cstrs.(coqidx) in
         let coqidx = find_reverse_mapping qhd im coqidx in
         let ctx = Vars.smash_rel_context (EConstr.to_rel_context sigma cstr.cs_args) in
         let vargs = List.init (List.length ctx) (Obj.field v) in
-        let args' = List.map2 (fun decl v -> 
-          let argty = check_reifyable env sigma 
+        let args' = List.map2 (fun decl v ->
+          let argty = check_reifyable env sigma
           (EConstr.of_constr (Context.Rel.Declaration.get_type decl)) in
           aux argty v) (List.rev ctx) vargs in
         Term.applistc (Constr.mkConstructU ((hd, coqidx + 1), u)) (params @ args')
       else (* Constant constructor *)
         let ord = (Obj.magic v : int) in
         let () = debug (Printf.sprintf "Reifying constant constructor: %i" ord) in
-        let coqidx = 
-          try find_nth_constant ord cstrs 
-          with Not_found -> ill_formed env sigma ty 
+        let coqidx =
+          try find_nth_constant ord cstrs
+          with Not_found -> ill_formed env sigma ty
         in
         let coqidx = find_reverse_mapping qhd im coqidx in
         let () = debug (Printf.sprintf "Reifying constant constructor: %i is %i in Coq" ord coqidx) in
         Term.applistc (Constr.mkConstructU ((hd, coqidx + 1), u)) params
-    | IsPrimitive (c, u, _args) -> 
-      if Environ.is_array_type env c then 
+    | IsPrimitive (c, u, _args) ->
+      if Environ.is_array_type env c then
         CErrors.user_err Pp.(str "Primitive arrays are not supported yet in CertiCoq reification")
       else if Environ.is_float64_type env c then
         Constr.mkFloat (Obj.magic v)
@@ -759,14 +759,14 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
   let reify opts env sigma tyinfo result =
     if opts.time then time ~msg:(Pp.str "Reification") (fun () -> reify opts.inductives_mapping env sigma tyinfo result)
-    else reify opts.inductives_mapping env sigma tyinfo result 
+    else reify opts.inductives_mapping env sigma tyinfo result
 
-  let template name = 
+  let template name =
     Printf.sprintf "\nvalue %s ()\n { struct thread_info* tinfo = make_tinfo(); return %s_body(tinfo); }\n" name name
-  let template_header name = 
+  let template_header name =
     Printf.sprintf "#include <gc_stack.h>\nextern value %s ();\n" name
 
-  let write_c_driver opts name = 
+  let write_c_driver opts name =
     let fname = make_fname opts (opts.filename ^ ".c") in
     let fhname = make_fname opts (opts.filename ^ ".h") in
     let fd = Unix.(openfile fname [O_CREAT; O_APPEND; O_WRONLY] 0o640) in
@@ -778,11 +778,11 @@ module CompileFunctor (CI : CompilerInterface) = struct
     output_string chan (template_header name);
     flush chan; close_out chan;
     fname
-  
-  let template_ocaml id filename name = 
+
+  let template_ocaml id filename name =
     Printf.sprintf "external %s : unit -> Obj.t = \"%s\"\nlet _ = Certicoq_plugin.Certicoq.register_certicoq_run \"%s\" \"%s\" (Obj.magic %s)" name name id filename name
-  
-  let write_ocaml_driver id opts name = 
+
+  let write_ocaml_driver id opts name =
     let fname = make_fname opts (opts.filename ^ "_wrapper.ml") in
     let chan = open_out fname in
     output_string chan (template_ocaml id opts.filename name);
@@ -790,7 +790,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
   let certicoq_eval_named opts env sigma c global_id imports =
     let prog = quote_term opts env sigma c in
-    let tyinfo = 
+    let tyinfo =
       let ty = Retyping.get_type_of env sigma c in
       (* assert (Evd.is_empty sigma); *)
       check_reifyable env sigma ty
@@ -799,7 +799,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let () = compile { opts with toplevel_name = id ^ "_body" } (Obj.magic prog) imports in
     (* Write wrapping code *)
     let c_driver = write_c_driver opts id in
-    let ocaml_driver = write_ocaml_driver global_id opts id in      
+    let ocaml_driver = write_ocaml_driver global_id opts id in
     let imports = get_global_includes () @ imports in
     let debug = opts.debug in
     let suff = opts.ext in
@@ -807,16 +807,16 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let ocamlfind = ocamlfind_executable debug in
     let rt_dir = runtime_dir () in
     let cmd =
-        Printf.sprintf "%s -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s" 
+        Printf.sprintf "%s -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s"
           compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
     in
     let importso =
-      let oname s = 
+      let oname s =
         assert (CString.is_suffix ".h" s);
         String.sub s 0 (String.length s - 2) ^ ".o"
-      in 
-      let imports' = List.concat (List.map (fun i -> 
-        match i with 
+      in
+      let imports' = List.concat (List.map (fun i ->
+        match i with
         | FromAbsolutePath s -> [oname s]
         | FromRelativePath s -> [oname s]
         | FromLibrary (_, Some s) -> [make_rt_file (oname s)]
@@ -826,7 +826,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     in
     let gc_stack_o = make_rt_file "gc_stack.o" in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
-    let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "coq-metacoq-template-ocaml"; 
+    let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "coq-metacoq-template-ocaml";
       "rocq-runtime.interp"; "rocq-runtime.kernel"; "rocq-runtime.library"] in
     let pkgs = String.concat "," packages in
     let dontlink = "str,unix,dynlink,threads,zarith,rocq-runtime,rocq-runtime.plugins.ltac,rocq-runtime.interp" in
@@ -835,31 +835,31 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let linkcmd =
       Printf.sprintf "%s ocamlopt -shared -linkpkg -dontlink %s -thread -rectypes -package %s \
       -I %s -I plugin -o %s %s %s %s %s"
-      ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o 
+      ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o
       (make_fname opts opts.filename ^ ".o") importso
     in
     debug_msg debug (Printf.sprintf "Executing command: %s" linkcmd);
     let _out, _err = execute linkcmd in
     Dynlink.loadfile_private shared_lib;
     debug_msg debug (Printf.sprintf "Dynamic linking succeeded, retrieving function %s" global_id);
-    let result = 
+    let result =
       if opts.time then time ~msg:(Pp.str id) (run_certicoq_run global_id)
       else run_certicoq_run global_id ()
     in
     debug_msg debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
     reify opts env sigma tyinfo result
-    
+
   let next_string_away_from s bad =
     let rec name_rec s = if bad s then name_rec (increment_subscript s) else s in
     name_rec s
-  
-  let find_fresh s map = 
+
+  let find_fresh s map =
     Feedback.msg_debug Pp.(str "Looking for fresh " ++ str s ++ str " in " ++ prlist_with_sep spc str (CString.Set.elements map));
     let freshs = next_string_away_from s (fun s -> CString.Set.mem s map) in
     Feedback.msg_debug Pp.(str "Found " ++ str freshs);
     freshs
-    
-  let toplevel_name_of_filename s = 
+
+  let toplevel_name_of_filename s =
     let comps = CString.split_on_char '.' s in
     CString.uncapitalize_ascii (CString.concat "_" comps)
 
@@ -870,21 +870,21 @@ module CompileFunctor (CI : CompilerInterface) = struct
     certicoq_eval_named opts env sigma c global_id imports
 
   let run_existing opts env sigma c id run =
-    let tyinfo = 
-      let ty = Retyping.get_type_of env sigma c in        
+    let tyinfo =
+      let ty = Retyping.get_type_of env sigma c in
       check_reifyable env sigma ty
     in
-    let result = 
+    let result =
       if opts.time then time ~msg:Pp.(str"Running " ++ id) run
       else run ()
     in
     debug_msg opts.debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
     reify opts env sigma tyinfo result
-    
+
   let eval opts env sigma c imports =
     match exists_certicoq_run opts.filename with
     | None -> certicoq_eval opts env sigma c imports
-    | Some run -> 
+    | Some run ->
       debug_msg opts.debug (Printf.sprintf "Retrieved earlier compiled code for %s" opts.filename);
       run_existing opts env sigma c (Pp.str opts.filename) run
 
@@ -896,7 +896,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let name = toplevel_name_of_filename filename in
     let opts = { opts with toplevel_name = name; filename = filename } in
     eval opts env sigma c imports
-    
+
   let print_to_file (s : string) (file : string) =
     let f = open_out file in
     Printf.fprintf f "%s\n" s;
@@ -954,7 +954,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
 
   (* Quote Coq inductive type *)
-  let quote_ind opts gr : Metacoq_template_plugin.Ast_quoter.quoted_program * string =
+  let quote_ind opts gr : Metarocq_template_plugin.Ast_quoter.quoted_program * string =
     let debug = opts.debug in
     let env = Global.env () in
     let sigma = Evd.from_env env in
@@ -998,7 +998,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
   let glue_command opts grs =
     let terms = grs |> List.rev
-                |> List.map (fun gr -> Metacoq_template_plugin.Ast0.Env.declarations (fst (quote opts gr)))
+                |> List.map (fun gr -> Metarocq_template_plugin.Ast0.Env.declarations (fst (quote opts gr)))
                 |> List.concat |> nub in
     generate_glue true opts (Obj.magic terms)
 

@@ -18,7 +18,7 @@ jobs:
         opam_file:
           - 'coq-certicoq.opam'
         image:
-          - 'mattam82/metacoq:metarocq-1.4-rocq-9.0'
+          - 'mattam82/metacoq:metarocq-1.4.1-rocq-9.1'
       fail-fast: false  # don't stop jobs if one fails
     steps:
       - uses: actions/checkout@v3
@@ -31,12 +31,6 @@ jobs:
           before_install: | # comment back in if MetaRocq commit changes
             startGroup "fix permission issues"
               sudo chown -R 1000:1000 .
-            endGroup
-
-            startGroup "opam pin"
-              # TODO: this should be done in the Dockerfile
-              opam pin add coq-compcert 3.14 -y
-            #   opam pin -n -y submodules/metacoq
             endGroup
           before_script: |
             startGroup "Install more dependencies"

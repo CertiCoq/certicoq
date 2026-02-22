@@ -1,12 +1,12 @@
 (* Conversion from LambdaBoxLocal.expression to LambdaANF.cps using ANF or CPS tranformation *)
 
-Require Import Coq.ZArith.ZArith Coq.Lists.List
-        Coq.Sorting.Sorted Coq.Arith.Arith Coq.Sets.Ensembles.
+From Stdlib Require Import ZArith.ZArith Lists.List
+        Sorting.Sorted Arith.Arith Sets.Ensembles.
 Require Import ExtLib.Data.String.
 Require Import Common.AstCommon Common.compM.
 
 Require Import LambdaBoxLocal.expression.
-Require Import LambdaANF.cps LambdaANF.cps_show LambdaANF.eval LambdaANF.ctx LambdaANF.List_util LambdaANF.Ensembles_util LambdaANF.state. 
+Require Import LambdaANF.cps LambdaANF.cps_show LambdaANF.eval LambdaANF.ctx LambdaANF.List_util LambdaANF.Ensembles_util LambdaANF.state.
 Require Import compcert.lib.Coqlib compcert.lib.Maps.
 
 Require Import ExtLib.Data.Monads.OptionMonad ExtLib.Structures.Monads.
@@ -19,15 +19,15 @@ Open Scope monad_scope.
 
 Section Translate.
 
-  Context (prim_map : M.t (kername * string (* C definition *) * bool (* tinfo *) * nat (* arity *))). 
+  Context (prim_map : M.t (kername * string (* C definition *) * bool (* tinfo *) * nat (* arity *))).
   Context (func_tag kon_tag default_tag default_itag : positive)
           (next_id : positive).
 
-  
+
   Section COMMON.
-    
+
     Definition conId_map:= list (dcon * ctor_tag).
-    
+
     Theorem conId_dec: forall x y:dcon, {x = y} + {x <> y}.
     Proof.
       intros. destruct x,y.
@@ -52,7 +52,7 @@ Section Translate.
     Definition t_info:Type := fun_tag.
     Definition t_map := M.t t_info.
     Definition t_empty:t_map := M.empty _.
-    
+
     (* get the fun_tag of a variable, func_tag if not found *)
     Definition get_f (n:var) (sig:t_map): fun_tag :=
       match M.get n sig with
@@ -72,11 +72,11 @@ Section Translate.
 
     Definition name_env := M.t BasicAst.name.
     Definition n_empty : name_env := M.empty _.
-    
-    
+
+
     Definition ienv := list (Kernames.kername * AstCommon.itypPack).
-    
-    
+
+
     (* returns list of numbers [n, n+m[  and the positive n+m (next available pos) *)
     Fixpoint fromN (n:positive) (m:nat) : list positive * positive :=
       match m with
@@ -85,7 +85,7 @@ Section Translate.
         let (l, nm ) := (fromN (n+1) (m')) in
         (n::l, nm)
       end.
-    
+
     (* Bind m projections. The first variable in the list binds the last constructor argument. *)
     Fixpoint ctx_bind_proj (tg:ctor_tag) (r:positive) (vars : list var) (args:nat) (* initially the length of args list *)
       : exp_ctx :=
@@ -95,8 +95,8 @@ Section Translate.
         let ctx_p':= ctx_bind_proj tg r vars (args - 1) in
         (Eproj_c v tg (N.of_nat (args - 1)) r ctx_p')
       end.
-    
-    
+
+
     (** process a list of constructors from inductive type ind with ind_tag niT.
     - update the ctor_env with a mapping from the current ctor_tag to the cTypInfo
     - update the conId_map with a pair relating the nCon'th constructor of
@@ -122,7 +122,7 @@ Section Translate.
                        (((ind,nCon), cn)::dcm (** Remove this now that params are always 0? *))
       | (_, _) => (ce, dcm)
       end.
-    
+
 
     (** For each inductive type defined in the mutually recursive bundle,
     - use tag niT for this inductive datatype
@@ -170,7 +170,7 @@ Section Translate.
         (* constructors are indexed with : name (string) of the mutual pack
        with which projection of the ty, and indice of the constructor *)
         convert_env' g' (convert_typack ty id 0 (ie, ce, ncT, niT, dcm))
-      end.    
+      end.
 
     (** As we process the LambdaBoxLocal inductive environment (ienv), we build:
     - an L6 inductive environment (ind_env) mapping tags (ind_tag) to constructors
@@ -199,7 +199,7 @@ Section Translate.
 
   (* Zoe: For erasing boxes translating proof. TODO *)
   Definition consume_fun (f x : var) : exp_ctx :=
-    Efun1_c (Fcons f func_tag [x] (Ehalt f) Fnil) Hole_c. 
+    Efun1_c (Fcons f func_tag [x] (Ehalt f) Fnil) Hole_c.
 
 
 
@@ -223,10 +223,10 @@ Section Translate.
         f <- get_named_str "prim_wrapper"%bs ;;
         trm <- convert_prim n prim (arg :: args) kont1 ;;
         ret (Efun (Fcons f func_tag [kont1; arg] trm Fnil) (Eapp kont kon_tag [f]))
-      end.                  
+      end.
 
 
-    
+
     Fixpoint names_lst_len (ns : list name) (m : nat) : list name :=
       match ns, m with
       | _, 0%nat => []
@@ -241,10 +241,10 @@ Section Translate.
       - rewrite repeat_length. reflexivity.
       - rewrite IHns. reflexivity.
     Qed.
-    
+
 
     (** ** Main CPS conversion program *)
-  
+
     Fixpoint cps_cvt (e : expression.exp) (vn : list var) (k : var) (tgm : constr_env) : cpsM cps.exp :=
       match e with
       | Var_e x =>
@@ -296,28 +296,28 @@ Section Translate.
         nlst <- get_named_lst names_lst ;;
         fdefs <- cps_cvt_efnlst fnlst (List.rev nlst ++ vn) nlst tgm;;
         match nth_error nlst (N.to_nat i) with
-        | Some i' => 
+        | Some i' =>
           ret (Efun fdefs (Eapp k kon_tag (i'::nil)))
         | None => failwith "Unknown function index"
         end
-          
+
       | Match_e e1 n bl =>
         x1 <- get_named_str "x1"%bs ;;
         k1 <- get_named_str "k1"%bs ;;
         e1' <- cps_cvt e1 vn k1 tgm;;
         cbl <- cps_cvt_branches bl vn k x1 tgm;;
         ret (Efun (Fcons k1 kon_tag (x1::nil) (Ecase x1 cbl) Fnil) e1')
-            
+
       | Prf_e =>
         x <- get_named_str "x"%bs ;;
         ret (Econstr x default_tag nil (Eapp k kon_tag (x::nil)))
-            
+
       (* f <- get_named_str "f"%bs ;; *)
       (* x <- get_named_str "x"%bs ;; *)
       (* let c := consume_fun f x in *)
       (* ret (c |[ cps.Eapp k kon_tag (f::nil) ]|) *)
-            
-      | Prim_val_e p => 
+
+      | Prim_val_e p =>
         x <- get_named_str "prim"%bs ;;
         ret (Eprim_val x p (Eapp k kon_tag (x :: nil)))
 
@@ -373,21 +373,21 @@ Section Translate.
              cbl <- cps_cvt_branches bl' vn k r tgm;;
              vars <- get_named_lst (names_lst_len lnames (N.to_nat i)) ;;
              let ctx_p := ctx_bind_proj tg r vars (List.length vars) in
-             ce <- cps_cvt e (vars ++ vn) k tgm ;; 
+             ce <- cps_cvt e (vars ++ vn) k tgm ;;
              ret ((tg, app_ctx_f ctx_p ce)::cbl)
            end.
 
 
-    Definition convert_whole_exp (e : expression.exp ) (dcm : conId_map) : cpsM exp := 
+    Definition convert_whole_exp (e : expression.exp ) (dcm : conId_map) : cpsM exp :=
       k <- get_named_str "k"%bs ;;
       f <- get_named_str "f"%bs ;;
-      x <- get_named_str "x"%bs ;;    
+      x <- get_named_str "x"%bs ;;
       e' <- cps_cvt e nil k dcm ;;
       ret (Efun
              (Fcons f kon_tag (k::nil) e'
                     (Fcons k kon_tag (x::nil) (Ehalt x) Fnil))
-             (cps.Eapp f kon_tag (k::nil))). 
-    
+             (cps.Eapp f kon_tag (k::nil))).
+
 
     Definition convert_top (ee:ienv * expression.exp) : error cps.exp * comp_data :=
       let '(_, cenv, ctag, itag, dcm) := convert_env (fst ee) in
@@ -400,11 +400,11 @@ Section Translate.
       let '(res_err, (comp_d', _)) := run_compM (convert_whole_exp (snd ee) dcm) comp_d tt in
       (res_err, comp_d').
 
-    
-    
+
+
     (** ** Declarative definition of CPS conversion used in proofs **)
-    
-  
+
+
   Inductive cps_cvt_rel : Ensemble var -> (* Input fresh identifiers *)
                           expression.exp -> (* Input LambdaBoxLocal exp *)
                           list var -> (* deBruijn index map *)
@@ -415,7 +415,7 @@ Section Translate.
                           Prop :=
   | e_Var :
       forall S v vn x k tgm,
-        nth_error vn (N.to_nat x) = Some v -> 
+        nth_error vn (N.to_nat x) = Some v ->
         cps_cvt_rel S (Var_e x) vn k tgm S (cps.Eapp k kon_tag (v::nil))
   | e_Lam :
       forall S S' na e1 e1' x1 vn k k1 f tgm,
@@ -459,10 +459,10 @@ Section Translate.
         x1 \in S1 ->
         FromList xs \subset (S1 \\ [set x1]) ->
         FromList ks \subset (S1 \\ [set x1] \\ FromList xs) ->
-               
+
         NoDup xs ->
-        NoDup ks -> 
-        cps_cvt_rel_exps (S1 \\ [set x1] \\ FromList xs \\ FromList ks) 
+        NoDup ks ->
+        cps_cvt_rel_exps (S1 \\ [set x1] \\ FromList xs \\ FromList ks)
                          es vn (Econstr x1 c_tag xs (Eapp k kon_tag [x1])) xs ks tgm S2 e' ->
         cps_cvt_rel S1
                     (Con_e dci es)
@@ -515,7 +515,7 @@ Section Translate.
       forall S vn k tgm x,
         x \in S ->
         cps_cvt_rel S Prf_e vn k tgm (S \\ [set x]) (Econstr x default_tag nil (Eapp k kon_tag (x::nil)))
-                    
+
   | e_Prim_val :
     forall S vn k p tgm x,
           x \in S ->
@@ -540,7 +540,7 @@ Section Translate.
                          tgm
                          S3
                          (Efun (Fcons k1 kon_tag [x1] es' Fnil) e')
-                         
+
   with cps_cvt_rel_efnlst :
          Ensemble var ->
          expression.efnlst ->
@@ -588,7 +588,7 @@ Section Translate.
         ctx_bind_proj tg r vars (N.to_nat n) = ctx_p ->
 
         cps_cvt_rel_branches S1 bs' vn k r tgm S2 cbs' ->
-        
+
         cps_cvt_rel (S2 \\ (FromList vars)) e (vars ++ vn) k tgm S3 ce ->
 
         cps_cvt_rel_branches
@@ -599,29 +599,29 @@ Section Translate.
 
 
   Section ANF.
-    
+
     Definition anfM := @compM' unit.
-    
-  
+
+
   (* Converting a DeBruijn index to named variable *)
-  (** The actual map grows from 1 onward. We keep the pointer p to the last entry of the map. 
+  (** The actual map grows from 1 onward. We keep the pointer p to the last entry of the map.
       When we have to lookup DeBruijn index i in the map, we lookup (p - i). *)
 
     Definition var_map := (M.t var * N)%type.
-    
+
     Definition get_var_name (vmp : var_map) (x : N) :=
       let (vm, p) := vmp in
       match (p - x)%N with
       | N0 => None
       | Npos pos => M.get pos vm
       end.
-    
+
     Definition add_var_name (vmp : var_map) (x' : var) :=
       let (vm, p) := vmp in
       let p' := N.succ_pos p in
       (M.set p' x' vm, Npos p').
 
-    Definition new_var_map := (M.empty var, 0%N). 
+    Definition new_var_map := (M.empty var, 0%N).
 
 
     Inductive anf_value :=
@@ -649,7 +649,7 @@ Section Translate.
       | Fun ft x e =>
         x' <- get_named_str "y" ;; (* Get variable for interim result *)
         ret (C |[ Efun (Fcons x' ft [x] e Fnil) (Ehalt x') ]|)
-      | Prim_val p => 
+      | Prim_val p =>
         x' <- get_named_str "y" ;; (* Get variable for interim result *)
         ret (C |[ Eprim_val x' p (Ehalt x') ]|)
       | Prim pr xs =>
@@ -682,12 +682,12 @@ Section Translate.
       end.
 
     Definition def_name := nNamed "y".
-    
+
 
     Section Convert.
 
       Context (tgm : conId_map).
-      
+
       Fixpoint proj_ctx (names : list name) (i : N)
                (scrut : var) (vm : var_map) ct : anfM (exp_ctx * var_map) :=
         match names with
@@ -695,7 +695,7 @@ Section Translate.
         | n :: ns =>
           x <- get_named n;;
           let vm' := add_var_name vm x in
-          cvm <- proj_ctx ns (i+1)%N scrut vm' ct ;; 
+          cvm <- proj_ctx ns (i+1)%N scrut vm' ct ;;
           let (C, vm'') := cvm in
           ret (Eproj_c x ct i scrut C, vm'')
         end.
@@ -707,18 +707,18 @@ Section Translate.
           f_name <- get_named n ;;
           lvm <- add_fix_names B' (add_var_name vm f_name) ;;
           let '(fs, vm') := lvm in
-          ret (f_name :: fs, vm')     
+          ret (f_name :: fs, vm')
         end.
 
       Fixpoint convert_prim_anf (n : nat) (* arity *)
                (prim : positive) (args : list var) : anfM anf_term :=
         match n with
         | 0%nat =>
-          x <- get_named_str "prim" ;; 
+          x <- get_named_str "prim" ;;
           ret (Anf_Var x, Eprim_c x prim (List.rev args) Hole_c)
         | S n =>
-          arg <- get_named_str "p_arg" ;; 
-          f <- get_named_str "prim_wrapper" ;; 
+          arg <- get_named_str "p_arg" ;;
+          f <- get_named_str "prim_wrapper" ;;
           '(anf_val, C) <- convert_prim_anf n prim (arg :: args) ;;
           match anf_val with
           | Anf_Var x =>
@@ -768,12 +768,12 @@ Section Translate.
           ret (Anf_Var x, Efun1_c defs Hole_c)
         | Match_e e1 n bl =>
           (* Zoe: For pattern matching compilation the situation is tricky because they always have to occur in tail
-           * position in LambdaANF. Our solution currently is to create a function that receives the scrutiny as an arg 
+           * position in LambdaANF. Our solution currently is to create a function that receives the scrutiny as an arg
            * pattern matches it, and returns the result of the pattern match. For those that are in tail position
            * these functions will be inlined by shrink reduction yielding the expected compilation result.
            * However, for those that are intermediate results these functions will appear in the C code.
            * Another approach would be to use some form of local continuations (join points) to capture the continuation
-           * of the pattern-match. This might be preferable because the join point will always be a tail call. 
+           * of the pattern-match. This might be preferable because the join point will always be a tail call.
            *)
           a <- convert_anf e1 vm ;;
           f <- get_named_str "f_case" ;; (* Case-analysis function *)
@@ -785,19 +785,19 @@ Section Translate.
           ret (Anf_App f x, C_fun)
         | Prf_e =>
           (* Zoe: Because a lot of dead code is *not* being eliminated *)
-          ret (Constr default_tag [], Hole_c)            
+          ret (Constr default_tag [], Hole_c)
         (* f <- get_named_str "f_proof" ;; *)
         (* y <- get_named_str "x" ;; *)
         (* let c := consume_fun f y in              *)
         (* ret (Anf_Var f, c) *)
-        | Prim_val_e p => 
+        | Prim_val_e p =>
           ret (Prim_val p, Hole_c)
         | Prim_e p =>
           match M.get p prim_map with
           | Some (nm, s, ar) => convert_prim_anf ar p []
           | None =>failwith "Internal error: identifier for primitive not found"
           end
-        end    
+        end
       with convert_anf_exps (es : expression.exps) (vm : var_map) : anfM (list var * exp_ctx) :=
              match es with
              | enil => ret ((@nil var), Hole_c)
@@ -839,16 +839,16 @@ Section Translate.
                pats' <- convert_anf_branches bl' scrut vm ;;
                ret ((ctag, Cproj |[ e' ]|) :: pats')
              end.
-      
+
     End Convert.
-    
+
 
     Definition convert_anf_exp dcm e : anfM cps.exp :=
       a <- convert_anf dcm e new_var_map ;;
       anf_term_to_exp a.
-    
+
     (** * Top-level convert function *)
-    
+
     Definition convert_top_anf (ee: ienv * expression.exp) : error cps.exp * comp_data :=
       let '(_, cenv, ctag, itag, dcm) := convert_env (fst ee) in
       let ftag := (func_tag + 1)%positive in
@@ -856,8 +856,8 @@ Section Translate.
       let comp_d := pack_data next_id ctag itag ftag cenv fenv (M.empty _) (M.empty nat) [] in
       let '(res_err, (comp_d', _)) := run_compM (convert_anf_exp dcm (snd ee)) comp_d tt in
       (res_err, comp_d').
-    
+
   End ANF.
 
 
-End Translate. 
+End Translate.

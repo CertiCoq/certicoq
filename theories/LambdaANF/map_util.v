@@ -2,14 +2,14 @@
  * Author: Anonymized, 2016
  *)
 
-From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
+From Stdlib Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List micromega.Lia Sets.Ensembles Relations.Relations
          Classes.Morphisms.
 From CertiCoq.LambdaANF Require Import Ensembles_util set_util functions List_util.
 From compcert.lib Require Import Coqlib Maps.
 Require Import Libraries.maps_util LambdaANF.tactics.
 
-Module M := Maps.PTree. 
+Module M := Maps.PTree.
 
 Open Scope Ensembles_scope.
 
@@ -17,28 +17,28 @@ Definition key_set {A : Type} (map : M.t A) :=
   [ set x : positive | match M.get x map with
                            | Some x => True
                            | None => False
-                         end ]. 
-  
+                         end ].
+
 Definition sub_map {A : Type} (map1 map2 : M.t A) :=
   forall x v, M.get x map1 = Some v ->
               M.get x map2 = Some v.
 
 Definition filter_opt {A} (pred : positive -> A -> bool) (o : option A) (i : positive) : option A :=
   match o with
-  | None => None 
-  | Some a => if pred (M.prev i) a then o else None 
+  | None => None
+  | Some a => if pred (M.prev i) a then o else None
   end.
 
 Definition xfilter {A : Type} (pred : positive -> A -> bool) (m : M.t A) : positive -> M.t A :=
   M.tree_rec (fun _ => M.empty _)
-    (fun l lrec o r rrec i => 
+    (fun l lrec o r rrec i =>
       let o' := filter_opt pred o i in
       M.Node (lrec (i~0)%positive) o' (rrec (i~1)%positive))
     m.
 
 Lemma xfilter_node {A} (pred : positive -> A -> bool) (l : M.t A) (o : option A) (r : M.t A) i :
   M.not_trivially_empty l o r ->
-  xfilter pred (M.Node l o r) i = 
+  xfilter pred (M.Node l o r) i =
   M.Node (xfilter pred l (i~0)) (filter_opt pred o i) (xfilter pred r (i~1)).
 Proof.
   intros hl.
@@ -46,8 +46,8 @@ Proof.
   rewrite M.unroll_tree_rec; auto.
 Qed.
 
-Lemma xgfilter (A: Type) (pred : positive -> A -> bool) (m : M.t A) 
-      (i j : positive) : 
+Lemma xgfilter (A: Type) (pred : positive -> A -> bool) (m : M.t A)
+      (i j : positive) :
   M.get i (xfilter pred m j) =
   match M.get i m with
   | Some x => if pred (M.prev (M.prev_append i j)) x then Some x else None
@@ -58,7 +58,7 @@ Proof.
   - rewrite !M.gempty. reflexivity.
   - rewrite M.gNode, xfilter_node; auto.
     destruct i; simpl.
-    + now rewrite <- IHm0, M.gNode. 
+    + now rewrite <- IHm0, M.gNode.
     + now rewrite <- IHm, M.gNode.
     + rewrite M.gNode. destruct o; reflexivity.
 Qed.
@@ -66,34 +66,34 @@ Qed.
 Definition filter  {A : Type} (pred : positive -> A -> bool) (m : M.t A) : M.t A :=
   xfilter pred m 1.
 
-Lemma gfilter (A: Type) (pred : positive -> A -> bool) (m : M.t A) 
-      (i : positive) : 
+Lemma gfilter (A: Type) (pred : positive -> A -> bool) (m : M.t A)
+      (i : positive) :
   M.get i (filter pred m) =
   match M.get i m with
   | Some x => if pred i x then Some x else None
   | None => None
   end.
 Proof.
-  unfold filter. rewrite xgfilter. simpl. 
-  rewrite <- M.prev_append_prev. simpl. 
-  rewrite Maps.PTree.prev_involutive. reflexivity. 
+  unfold filter. rewrite xgfilter. simpl.
+  rewrite <- M.prev_append_prev. simpl.
+  rewrite Maps.PTree.prev_involutive. reflexivity.
 Qed.
 
 
 #[global] Instance ToMSet_key_set {A} (rho : M.t A) : ToMSet (key_set rho).
-Proof. 
+Proof.
   eexists (@mset (FromList (map fst (M.elements rho))) _).
   rewrite <- mset_eq, FromList_map_image_FromList.
   split; intros x Hin.
   - unfold Ensembles.In, key_set in *.
-    destruct (M.get x rho) eqn:Hget. 
+    destruct (M.get x rho) eqn:Hget.
     eexists (x, a). split; eauto.
-    eapply M.elements_correct. eassumption. 
+    eapply M.elements_correct. eassumption.
     exfalso; eauto.
   - destruct Hin as [[z a] [Hin Hget]]; subst.
     unfold Ensembles.In, FromList in Hin. eapply M.elements_complete in Hin.
     simpl. unfold key_set, Ensembles.In. now rewrite Hin.
-Qed. 
+Qed.
 
 Definition eq_env_P {A}:  Ensemble M.elt -> M.t A -> M.t A -> Prop :=
   fun S rho1 rho2 =>
@@ -578,14 +578,14 @@ Qed.
 
 
 Lemma eq_env_P_set_not_in_P_l (A : Type) (x : map_util.M.elt) (v : A)
-      (P : Ensemble map_util.M.elt) (rho1 rho2 : map_util.M.t A) : 
+      (P : Ensemble map_util.M.elt) (rho1 rho2 : map_util.M.t A) :
   eq_env_P P rho1 rho2 ->
   ~ x \in P ->
           eq_env_P P (map_util.M.set x v rho1) rho2.
 Proof.
   intros Heq Hnin z Hin.
   rewrite M.gso; eauto.
-  intros Hc; subst; contradiction. 
+  intros Hc; subst; contradiction.
 Qed.
 
 
@@ -784,7 +784,7 @@ Proof.
   eapply IHl1. now sets. inv H0; eassumption.
   inv H1. reflexivity. inv H1. inv H0. rewrite (Dom_map_set_list sig l1 l2); eauto.
   intros Hc; inv Hc; eauto. eapply H. constructor; eauto.
-Qed.    
+Qed.
 
 Lemma range_map_set_list {A} (ly : list A) sig lx :
   Range_map (set_list (combine lx ly) sig) \subset (Range_map sig :|: FromList ly).
@@ -802,7 +802,7 @@ Proof.
 Qed.
 
 
-(* [sub_map] lemmas *) 
+(* [sub_map] lemmas *)
 
 Lemma sub_map_set {A} rho x (v : A) :
   ~ x \in Dom_map rho ->
@@ -852,9 +852,9 @@ Qed.
 
 Lemma eq_env_P_set_lists_not_in_P_l  (A : Type) (xs : list positive) (vs : list A)
       (P : Ensemble map_util.M.elt) (rho1 rho1' rho2 : map_util.M.t A) :
-  eq_env_P P rho1 rho2 ->    
+  eq_env_P P rho1 rho2 ->
   Disjoint _ P (FromList xs) ->
-  set_lists xs vs rho1 = Some rho1' -> 
+  set_lists xs vs rho1 = Some rho1' ->
   eq_env_P P rho1' rho2.
 Proof.
   intros Heq Hdis Hset x Hin.

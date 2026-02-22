@@ -1,9 +1,10 @@
 Require Import Common.compM.
 
-Require Import Coq.ZArith.ZArith
-        Coq.Program.Basics
-        Coq.Strings.String
-        Coq.Lists.List List_util Lia.
+From Stdlib Require Import ZArith.ZArith
+        Program.Basics
+        Strings.String
+        Lists.List Lia.
+Require Import List_util.
 
 Require Import ExtLib.Structures.Monads
         ExtLib.Data.Monads.OptionMonad
@@ -66,7 +67,7 @@ Definition show_name (name : BasicAst.name) : string :=
   | nNamed d => d
   end.
 
-Definition get_fname f (nenv : name_env) : string := 
+Definition get_fname f (nenv : name_env) : string :=
   match M.get f nenv with
   | Some name => show_name name
   | None => "Undef"
@@ -150,9 +151,9 @@ with max_depth_fundefs (fnd : fundefs) :=
 
 (* fun_env maps tags to function info *)
 Definition compute_fun_env (nenv : name_env) (e : exp) : fun_env :=
-  compute_fun_env' (max_depth e) nenv (M.empty fun_ty_info) e.   
+  compute_fun_env' (max_depth e) nenv (M.empty fun_ty_info) e.
 
-(* Computes the local variables of a function body *) 
+(* Computes the local variables of a function body *)
 Fixpoint get_locals (e : exp) : list positive :=
   match e with
   | Econstr x t vs e' => x :: (get_locals e')
@@ -457,20 +458,20 @@ Definition init_stack : statement :=
 (* Updates the stack pointer and frame pointers before a call *)
 (* b is true if the stack is already set. I.e. it's a call to the GC after a normal call *)
 Definition set_stack (sp : N) (b : bool) : statement :=
-if ((sp =? 0)%N || b)%bool then Sskip else 
+if ((sp =? 0)%N || b)%bool then Sskip else
   (* tinfo->fp = &frame; *)
   (Efield tinfd fpIdent stackframeTPtr :::= Eaddrof (Evar frameIdent stackframeT) stackframeTPtr).
 
 (* Updates the stack pointer and frame pointers before a call *)
 Definition update_stack (sp : N) : statement :=
-  if (sp =? 0)%N then Sskip else 
+  if (sp =? 0)%N then Sskip else
     (* frame.next = root + SP *)
     (Efield (Evar frameIdent stackframeT) nextFld valPtr :::= (add roots (c_int (Z.of_N sp) val))).
 
 (* Resets the frame pointer after a call, so that if subsequent calls don't use the stack the empty frame is not pushed. *)
 (* b is true if it's a call to the GC after a normal call, so the stack will be reset anyway *)
 Definition reset_stack (sp : N) (b : bool) : statement :=
-  if ((sp =? 0)%N || b)%bool then Sskip else 
+  if ((sp =? 0)%N || b)%bool then Sskip else
    (* Current frame points to the old frame again *)
    Efield tinfd fpIdent stackframeTPtr :::= Efield (Evar frameIdent stackframeT) prevFld valPtr.
 
@@ -479,7 +480,7 @@ Definition push_var (sp : N) (x : positive) :=
   roots[ Z.of_N sp ] :::= Etempvar x valPtr.
 
 (* Pops single var from frame *)
-Definition pop_var (sp : N) (x : positive) := 
+Definition pop_var (sp : N) (x : positive) :=
   x ::= roots[ Z.of_N sp ].
 
 Definition push_live_vars_offset (off : N) (xs : list positive) : statement * N :=
@@ -498,7 +499,7 @@ Definition pop_live_vars_offset (off : N) (xs : list positive) : statement :=
 
 Definition push_live_vars (xs : list positive) : statement * N := push_live_vars_offset 0%N xs.
 
-Definition pop_live_vars (xs : list positive) : statement := pop_live_vars_offset 0%N xs. 
+Definition pop_live_vars (xs : list positive) : statement := pop_live_vars_offset 0%N xs.
 
 (** * Shadow stack defs END *)
 
@@ -606,7 +607,7 @@ Definition mkPrimCall
            (fenv : fun_env)
            (map: fun_info_env)
            (vs : list positive) : error statement :=
-  args <- mkCallVars fenv map ar vs ;;  
+  args <- mkCallVars fenv map ar vs ;;
   ret (Scall (Some res) ([mkPrimTy ar] (Evar pr (mkPrimTy ar))) args).
 
 Definition mkPrimCallTinfo
@@ -707,7 +708,7 @@ Definition asgnAppVars_fast myvs vs myind ind (fenv : fun_env) (map : fun_info_e
   ret (argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);s).
 
 Definition set_nalloc (num : expr) : statement :=
-  Efield tinfd nallocIdent val :::= num. 
+  Efield tinfd nallocIdent val :::= num.
 
 (** * GC call *)
 Definition make_GC_call (num_allocs : nat) (stack_vars : list positive) (stack_offset : N) : statement * N :=
@@ -715,8 +716,8 @@ Definition make_GC_call (num_allocs : nat) (stack_vars : list positive) (stack_o
   let (push, slots) := push_live_vars_offset stack_offset stack_vars in
   let make_gc_stack := push ; update_stack slots ; set_stack slots after_call in
   let discard_stack := pop_live_vars_offset stack_offset stack_vars; reset_stack slots after_call in
-  let nallocs := c_int (Z.of_nat num_allocs) val in 
-  if (num_allocs =? 0)%nat then (Sskip, stack_offset) else 
+  let nallocs := c_int (Z.of_nat num_allocs) val in
+  if (num_allocs =? 0)%nat then (Sskip, stack_offset) else
     ((Sifthenelse
         (!(Ebinop Ole nallocs (limitPtr -' allocPtr) type_bool))
         (make_gc_stack;
@@ -752,7 +753,7 @@ Definition make_case_switch
    long long int live[MAX_live];
    frame_pointer fp = { next = *live; roots=*live; prev:=tinfo->sp}
    long long int *next = fp.next;
-   tinfo->sp = *fp 
+   tinfo->sp = *fp
  *)
 
 (* To push a value to the shadow stack:
@@ -772,7 +773,7 @@ Definition make_case_switch
 
 (* The program returns the translated code and the set of live vars at the next call *)
 
-Definition to_int64 (i : PrimInt63.int) : int64. 
+Definition to_int64 (i : PrimInt63.int) : int64.
   exists (Uint63.to_Z i * 2 + 1)%Z.
   pose proof (Uint63.to_Z_bounded i).
   unfold Uint63.wB in H. unfold Int64.modulus, Int64.wordsize, Wordsize_64.wordsize.
@@ -795,7 +796,7 @@ Next Obligation.
   Admitted.
 
 Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
-  (x : positive) (f : Floats.float) := 
+  (x : positive) (f : Floats.float) :=
   let tag := c_int 1277 %Z (Tlong Unsigned noattr) in
   x ::= [val] (allocPtr +' (c_int Z.one val)) ;
   allocIdent ::= allocPtr +' (c_int 2 val) ;
@@ -845,7 +846,7 @@ Section Translation.
                    let (prog, n) := (progn : statement * N) in
                    let '(ls , ls', n') := (pn : labeled_statements * labeled_statements * N) in
                    p <- make_ctor_rep cenv (fst p) ;;
-                   match p with 
+                   match p with
                    | boxed t a =>
                      let tag := ((Z.shiftl (Z.of_N a) 10) + (Z.of_N t))%Z in
                      (match ls with
@@ -866,12 +867,12 @@ Section Translation.
                  end) cs) ;;
         let '(ls , ls', slots') := p in
         ret ((make_case_switch x ls ls'), slots')
-      | Eletapp x f t vs e' => 
+      | Eletapp x f t vs e' =>
         (* Compute the local variables that are live after the call  *)
         let fvs_post_call := PS.inter (exp_fv e') loc_vars in
         let fvs := PS.remove x fvs_post_call in
         let fvs_list := PS.elements fvs in
-        (* Check if the new binding has to be pushed to the frame during the GC call *)                
+        (* Check if the new binding has to be pushed to the frame during the GC call *)
         let fv_gc := if PS.mem x fvs_post_call then cons x nil else nil in
         (* push live vars to the stack. We're pushing exactly the vars that are live beyond the current point. *)
         let '(make_stack, slots_call) :=
@@ -934,7 +935,7 @@ Section Translation.
            slots)
     | None => Err "translate_body: Unknown function application in Eapp"
     end
-  | Eprim_val x p e' => 
+  | Eprim_val x p e' =>
     progn <- translate_body e' fenv cenv ienv map slots ;;
     Ret ((compile_primitive cenv ienv fenv map x p ; fst progn), snd progn)
 
@@ -1016,7 +1017,7 @@ Fixpoint translate_fundefs
       let loc_vars := get_locals e in
       let var_set := union_list PS.empty vs in
       let loc_ids := union_list var_set loc_vars  in
-      let live_vars := PS.elements (PS.inter (exp_fv e) var_set) in 
+      let live_vars := PS.elements (PS.inter (exp_fv e) var_set) in
       let (gc, _) := make_GC_call num_allocs live_vars 0%N in
       '(body, stack_slots) <- translate_body vs loc_ids locs nenv e fenv cenv ienv map 0 ;;
       let stack_slots := N.max (N.of_nat (length live_vars)) stack_slots in
@@ -1025,9 +1026,9 @@ Fixpoint translate_fundefs
                              ((allocIdent ::= Efield tinfd allocIdent valPtr ;
                                limitIdent ::= Efield tinfd limitIdent valPtr ;
                                argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);
-                               asgn ; 
+                               asgn ;
                                init_stack ;
-                               gc; 
+                               gc;
                                body))))) :: rest)
     end
   end.
@@ -1048,7 +1049,7 @@ Definition make_extern_decl
      | _ => None
      end)
   | (vIdent, Gvar (mkglobvar v_info v_init v_r v_v)) =>
-    if gv then 
+    if gv then
       Some (vIdent, Gvar (mkglobvar v_info nil v_r v_v))
     else None
   | _ => None
@@ -1093,7 +1094,7 @@ Definition translate_program
            (fmap : fun_info_env)
            (nenv : name_env) : error (list (positive * globdef Clight.fundef type)) :=
   match e with
-  | Efun fnd e => 
+  | Efun fnd e =>
     let localVars := get_locals e in
     funs <- translate_fundefs args_opt fnd fenv cenv ienv fmap nenv ;;
     let allocs := max_allocs e in
@@ -1173,7 +1174,7 @@ Fixpoint make_fundef_info (fnd : fundefs) (fenv : fun_env) (nenv : name_env)
            update_name_env_fun_info x info_name nenv')
     end
   end.
-    
+
 
 
 Definition add_bodyinfo (e : exp) (fenv : fun_env) (nenv : name_env) (map: fun_info_env) (defs:list (positive * globdef Clight.fundef type)) :=
@@ -1240,8 +1241,8 @@ Definition composites : list composite_definition :=
   (*            (heapInfIdent, (tptr (Tstruct heapInfIdent noattr))) :: *)
   (*            (argsIdent, (Tarray uval maxArgs noattr)) :: *)
   (*            (fpIdent, (tptr stackframeT)) :: *)
-  (*            (nallocIdent, val) :: nil)) (1* Zoe : This is the number of allocations until the next GC call so that GC can perform a test. *) 
-  (*                                        * Note that it will be coerced to UL from ULL. That should be safe for the values we're using but *) 
+  (*            (nallocIdent, val) :: nil)) (1* Zoe : This is the number of allocations until the next GC call so that GC can perform a test. *)
+  (*                                        * Note that it will be coerced to UL from ULL. That should be safe for the values we're using but *)
   (*                                        * consider changing it too. *1) *)
   (*           noattr :: *)
    nil.
@@ -1354,7 +1355,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
       let s :=
           match M.get t fenv with
           | Some (n, l) =>
-            "LetApp: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ 
+            "LetApp: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++
             (MRString.string_of_nat (length l))
           | None =>
             "LetApp: Function " ++ get_fname f nenv ++ " was not found in fun_env"
@@ -1369,7 +1370,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
       let s :=
           match M.get t fenv with
           | Some (n, l) =>
-            "App: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++ 
+            "App: Function " ++ get_fname f nenv ++ " has arity " ++ (show_binnat n) ++ " " ++
             MRString.string_of_nat (length l)
           | None =>
             "App: Function " ++ get_fname f nenv ++ " was not found in fun_env"
@@ -1378,7 +1379,7 @@ Section Check. (* Just for debugging purposes. TODO eventually delete*)
       s :: log
     | Ehalt x => log
     end.
-  
+
 
   Definition check_tags (e : exp) :=
     String.concat Pipeline_utils.newline (rev (check_tags' e [])).
@@ -1394,7 +1395,7 @@ Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
                   Tnil
                   threadInf
                   cc_default)).
-                  
+
 Definition compile (args_opt : bool) (e : exp) (cenv : ctor_env) (nenv0 : name_env) :
   error (name_env * Clight.program * Clight.program) * string :=
   let e := wrap_in_fun e in

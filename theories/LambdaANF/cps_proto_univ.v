@@ -1,8 +1,8 @@
-(* The stack-of-frames one-hole contexts, with the right indices, are isomorphic to 
+(* The stack-of-frames one-hole contexts, with the right indices, are isomorphic to
    [cps.exp_ctx] and [cps.fundefs_ctx] *)
 
-From Coq Require Import ZArith.ZArith Lists.List Sets.Ensembles Strings.String.
-Require Import Lia.
+From Stdlib Require Import ZArith.ZArith Lists.List Sets.Ensembles Strings.String.
+From Stdlib Require Import Lia.
 Import ListNotations.
 From CertiCoq Require Import Common.
 From CertiCoq.LambdaANF Require Import
@@ -12,7 +12,7 @@ From CertiCoq.LambdaANF Require Import
 From MetaRocq Require Import Template.All.
 
 From CertiCoq.LambdaANF Require Import PrototypeGenFrame cps.
-   
+
 MetaRocq Run (mk_Frame_ops
   (MPfile ["cps_proto_univ"; "LambdaANF"; "CertiCoq"])
   (MPfile ["cps"; "LambdaANF"; "CertiCoq"], "exp")

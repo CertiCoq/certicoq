@@ -1,6 +1,6 @@
 From Wasm Require Import datatypes.
 
-From Coq Require Import ZArith List.
+From Stdlib Require Import ZArith List.
 Require Import Common.Common Common.compM Common.Pipeline_utils.
 Require Import LambdaANF.cps LambdaANF.cps_show CodegenWasm.LambdaANF_to_Wasm.
 

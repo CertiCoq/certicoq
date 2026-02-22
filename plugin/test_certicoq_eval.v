@@ -19,7 +19,7 @@ CertiCoq Eval -time -debug test.
 
 #[export] Instance list_show {A} {SA : Show A} : Show (list A) := string_of_list show.
 From MetaRocq.Common Require Import Primitive.
-From Coq Require Import PrimFloat PrimInt63.
+From Stdlib Require Import PrimFloat PrimInt63.
 #[export] Instance float_show : Show PrimFloat.float := string_of_float.
 #[export] Instance prim_int_show : Show PrimInt63.int := string_of_prim_int.
 
@@ -29,7 +29,7 @@ Definition string_of_specfloat (f : SpecFloat.spec_float) :=
   | S754_zero sign => if sign then "-0" else "0"
   | S754_infinity sign => if sign then "-infinity" else "infinity"
   | S754_nan => "nan"
-  | S754_finite sign p z => 
+  | S754_finite sign p z =>
   let num := string_of_positive p ++ "p" ++ string_of_Z z in
   if sign then "-" ++ num else num
   end.
@@ -52,7 +52,7 @@ Definition certicoqc4 :=  (List.map S [26; 20]).
 Time Eval compute in certicoqc4.
 Set Warnings "-primitive-turned-into-axiom".
 Set Warnings "backtrace".
-CertiCoq Eval -time -debug certicoqc4. 
+CertiCoq Eval -time -debug certicoqc4.
 
 Definition largertag := S754_finite true xH 0%Z.
 Definition otherlargertag := S754_infinity true.
@@ -64,10 +64,9 @@ CertiCoq Eval -time two.
 CertiCoq Eval -time -debug three.
 Time CertiCoq Eval -time -debug three.
 
-(* 
+(*
 Goal True.
   intros.
   certicoq_eval -build_dir "_build" certicoqc4 ltac:(fun c => assert (certicoqc4 = c) by reflexivity).
   exact I.
 Qed. *)
-

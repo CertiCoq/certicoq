@@ -1,4 +1,4 @@
-Require Import Arith List String.
+From Stdlib Require Import Arith List String.
 Require Import CertiCoq.Benchmarks.lib.vs.
 Require Import CertiCoq.Benchmarks.lib.Binom.
 Require Import CertiCoq.Benchmarks.lib.Color.
@@ -233,7 +233,7 @@ CertiCoq Compile -config 5 -O 1 -ext "_cps_opt5" sha_fast.
 CertiCoq Compile -config 5 -O 1 -ext "_opt5" sha_fast.
 
 
-(* OLD 
+(* OLD
 
 Fixpoint even (n : nat) : bool :=
   match n with
@@ -242,7 +242,7 @@ Fixpoint even (n : nat) : bool :=
   end
 with
 odd (n : nat) : bool :=
-  let del (x : nat) := x in 
+  let del (x : nat) := x in
   match n with
   | 0 => false
   | S n' => even n'
@@ -251,7 +251,7 @@ odd (n : nat) : bool :=
 
 Definition filter_odd := List.app (filter even (seq 0 2)) (filter odd (seq 0 2)).
 
-CertiCoq Show IR -anf -debug filter_odd. 
+CertiCoq Show IR -anf -debug filter_odd.
 CertiCoq Compile -ext "_cps" filter_odd.
 CertiCoq Compile -o1 -ext "_cps_opt" filter_odd.
 CertiCoq Compile -anf filter_odd.
@@ -317,13 +317,13 @@ CertiCoq Compile -anf -o1 -ext "_opt" clos.
 (* CertiCoq Show IR -anf -debug -o1 -ext "_opt" clos. *)
 
 
-Definition addxy (x y w : nat) (l : list nat) := 
+Definition addxy (x y w : nat) (l : list nat) :=
   let f := (fix aux l :=
      match l with
      | [] => []
      | z :: zs => (z + x + y + w) :: aux zs
      end) in
-  f l. 
+  f l.
 
 Definition rec_clos := addxy 1 2 3 (List.repeat 0 (100*500)).
 
@@ -333,18 +333,18 @@ CertiCoq Compile -anf rec_clos.
 CertiCoq Compile -anf -o1 -ext "_opt" rec_clos.
 
 
-Definition intxy (x y w : nat) (l : list nat):= 
+Definition intxy (x y w : nat) (l : list nat):=
   let f := (fix aux l acc :=
      match l with
-     | [] => acc  
+     | [] => acc
      | z :: zs => aux zs (z :: x :: y :: w :: acc)
      end) in
   f l [].
 
-Definition intxy' (x y w : nat) (l : list nat) := 
+Definition intxy' (x y w : nat) (l : list nat) :=
   let f := (fix aux l :=
      match l with
-     | [] => []  
+     | [] => []
      | z :: zs => z :: x :: y :: w :: aux zs
      end) in
   f l.
@@ -394,7 +394,7 @@ Valid options:
 -anf    : to use direct-style compilation
 -time   : to time phases
 -o1     : to use optimizing pipeline
--debug  : to print debug messages 
+-debug  : to print debug messages
 -args X : to use X arguments in the C generated code (+1 for the thread_info)
 
 
@@ -402,11 +402,11 @@ To print the backend IR (aka LambdaANF) you can use the command
 CertiCoq Show IR <global_id>.
 *)
 
-(* 
+(*
 Definition demo1 := List.app (List.repeat true 5) (List.repeat false 3).
 Definition demo2 := List.map negb [true; false; true].
-Definition demo3 := andb. 
- 
+Definition demo3 := andb.
+
 CertiCoq Compile -ext "_cps" demo1.
 CertiCoq Compile -anf demo1.
 CertiCoq Compile -anf -o1 -ext "_opt" demo1.

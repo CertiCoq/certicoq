@@ -10,10 +10,11 @@
 *)
 Require Import Common.Pipeline_utils.
 
-Require Import Coq.ZArith.ZArith
-               Coq.Program.Basics
-               Coq.Strings.String
-               Coq.Lists.List List_util.
+From Stdlib Require Import ZArith.ZArith
+               Program.Basics
+               Strings.String
+               Lists.List.
+Require Import List_util.
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Structures.Traversable
@@ -126,7 +127,7 @@ Fixpoint env_proj
   | S i' => env_proj i' (Field(env, 1))
   end.
 
-Local Open Scope bs_scope.  
+Local Open Scope bs_scope.
 
 Definition make_curried_fn
          (* The sanitized unqual. name of the FFI function we're dealing with *)

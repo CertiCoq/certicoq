@@ -2,7 +2,7 @@ From MetaRocq.Template Require Import All Loader.
 From CertiCoq.Benchmarks.metacoq_erasure Require Import Loader.
 (* Set MetaRocq Debug. *)
 Set MetaRocq Timing.
-From Coq Require Import List.
+From Stdlib Require Import List.
 Import ListNotations.
 
 (* CertiCoq Erase (List.map negb [true; false]). *)
@@ -14,7 +14,7 @@ CertiCoq Erase @erase_and_print_template_program.
 (* CertiCoq Erase @typecheck_program. *)
 
 (*
-Require Import Arith List String.
+From Stdlib Require Import Arith List String.
 Require Import CertiCoq.Benchmarks.lib.vs.
 Require Import CertiCoq.Benchmarks.lib.Binom.
 Require Import CertiCoq.Benchmarks.lib.Color.
@@ -22,7 +22,7 @@ Require Import CertiCoq.Benchmarks.lib.sha256.
 
 Import ListNotations.
 Import VeriStar.
- 
+
 (* Demo 1 *)
 
 Definition demo1 := List.app (List.repeat true 500) (List.repeat false 300).

@@ -3,7 +3,7 @@ Open Scope bs_scope.
 Import String.
 Infix "+++" := append (at level 60, right associativity).
 
-Require Import Coq.Lists.List.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 
 From MetaRocq Require Import Template.All.
@@ -15,10 +15,10 @@ From ExtLib.Data Require Import Nat List Option Pair.
 From ExtLib.Structures Require Import Monoid Functor Applicative Monads Traversable.
 From ExtLib.Data.Monads Require Import IdentityMonad EitherMonad StateMonad.
 
-Require Import Coq.NArith.BinNat.
+From Stdlib Require Import NArith.BinNat.
 Local Open Scope N_scope.
 
-Require Import Coq.Relations.Relations.
+From Stdlib Require Import Relations.Relations.
 
 Require Import Ltac2.Ltac2.
 Import Ltac2.Notations.
@@ -113,13 +113,13 @@ Definition named_of' (Γ : list string) (tm : term) : GM term :=
               ; pparams := pp'
               ; pcontext := map2 set_aname Γ' (pcontext p)
               ; preturn := pr'
-              |} 
+              |}
       in
       let go_branch (br : branch term) : GM (branch term) :=
         Γ' <- mapM add_sigils (bcontext br) ;;
         bb' <- go (Γ' ++ Γ) (bbody br) ;;
-        ret {| bcontext := map2 set_aname Γ' (bcontext br); 
-          bbody := bb' |} 
+        ret {| bcontext := map2 set_aname Γ' (bcontext br);
+          bbody := bb' |}
       in
       match tm with
       | tRel n => tVar <$> lookup n Γ
@@ -156,7 +156,7 @@ Definition named_of' (Γ : list string) (tm : term) : GM term :=
   in go 1000%nat Γ tm.
 
 Definition named_of (Γ : list string) (tm : term) : GM term :=
-  {| runStateT := fun s => 
+  {| runStateT := fun s =>
   match runStateT (named_of' Γ tm) s with
   | inr (x, s) => inr (x, s)
   | inl e => runStateT
@@ -226,9 +226,9 @@ Definition indices_of (Γ : list string) (t : term) : GM term :=
       | tConstruct ind idx u => ret tm
       | tCase ind_and_nbparams type_info discr branches =>
           let '(names, Γ') := go_names (pcontext type_info) in
-          go_pparams <- mapM (go Γ) (pparams type_info) ;; 
+          go_pparams <- mapM (go Γ) (pparams type_info) ;;
           go_preturn <- go Γ' (preturn type_info) ;;
-          let go_type_info := 
+          let go_type_info :=
               {|
               puinst := puinst type_info;
               pparams := go_pparams;
@@ -236,7 +236,7 @@ Definition indices_of (Γ : list string) (t : term) : GM term :=
               preturn := go_preturn;
             |}
           in go_discr <- go Γ discr
-          ;; go_branches <- mapM (fun br => 
+          ;; go_branches <- mapM (fun br =>
               let '(names, Γ') := go_names (bcontext br) in
               go Γ' (bbody br) >>= fun t' => ret {| bcontext := names; bbody := t' |}) branches
           ;; ret (tCase ind_and_nbparams go_type_info go_discr go_branches)
@@ -278,7 +278,7 @@ Compute runGM' 0 (check_roundtrip [] <%
     end%nat
   for ev%>).
 
-Inductive twoargs := 
+Inductive twoargs :=
   | twoC : twoargs -> nat -> twoargs.
 
 Compute runGM' 0 (check_roundtrip [] <%
@@ -679,7 +679,7 @@ Fixpoint quote_string (s : string) : term :=
 
 (* abbreviate = map head . splitOn "_" *)
 Fixpoint abbreviate s :=
-  let fix skip_to_underscore s := 
+  let fix skip_to_underscore s :=
     match s with
     | "" => s
     | String "_" s => abbreviate s
@@ -743,7 +743,7 @@ Record rule_t := mk_rule {
   rArity : nat;
   rDir : rule_direction;
   rHoleU : nat; (* index into the inductive type rw_univ *)
-  rΓ : named_ctx; (* 
+  rΓ : named_ctx; (*
    C can only be used to construct Props.
    - C : A replaced by C : erased A.
    - Each assumption H : P where C ∈ FV(P) replaced by H : «e_map (fun C => P) C». *)
@@ -975,7 +975,7 @@ Context
   (* specialize to univD rw_univ -> univD rw_univ -> Set *)
   (frames_t := mkApps <%@frames_t%> [tInd rw_univ []; HFrame])
   (* specialize to rw_univ -> Set *)
-  (univD := mkApps <%@univD%> [tInd rw_univ []; HFrame]) 
+  (univD := mkApps <%@univD%> [tInd rw_univ []; HFrame])
   (mk_univ := fun n => tConstruct rw_univ n []).
 Context
   (D I_D R I_R S I_S : term)
@@ -1031,7 +1031,7 @@ Definition gen_extra_vars_ty (rule : rule_t) : GM term :=
     let lhs' := rename σ rule.(rLhs) in
     let ctx_ty := mkApps frames_t [hole; root] in
     ret (fn (mkApps <%ExtraVars%> [rule_name])
-      (tProd (nNamed Ans) type0 
+      (tProd (nNamed Ans) type0
       (tProd (nNamed C) (mkApps <%erased%> [ctx_ty])
       (tProd (nNamed C_ok) (mkApps <%@e_ok%> [ctx_ty; tVar C])
       (fold_right
@@ -1099,7 +1099,7 @@ Definition gen_extra_vars_ty (rule : rule_t) : GM term :=
     let rule_name := quote_string rule.(rName) in
     let ctx_ty := mkApps frames_t [hole; root] in
     ret (fn (mkApps <%ExtraVars%> [rule_name])
-      (tProd (nNamed Ans) type0 
+      (tProd (nNamed Ans) type0
       (tProd (nNamed C) (mkApps <%erased%> [ctx_ty])
       (tProd (nNamed C_ok) (mkApps <%@e_ok%> [ctx_ty; tVar C])
       (fold_right
@@ -1211,7 +1211,7 @@ Definition gen_constr_delay_ty (c : string) : GM term. ltac1:(refine(
   in
   let! Ans := gensym "Ans" in
   let! d := gensym "d" in
-  let ctr_ty := fold_right (fun '(_, _, _, ty, _, _) res => fn ty res) rty children in 
+  let ctr_ty := fold_right (fun '(_, _, _, ty, _, _) res => fn ty res) rty children in
   let before_delayD := mkApps ctr (map (fun '(_, old, _, _, _, _) => tVar old) children) in
   ret (fn (mkApps <%@ConstrDelay%> [ctr_ty; ctr]) (tProd (nNamed Ans) type0
     (fold_right
@@ -1225,7 +1225,7 @@ Definition gen_constr_delay_ty (c : string) : GM term. ltac1:(refine(
             (mkApps <%@eq%> [rty;
                mkApps delayD [univ; before_delayD; tVar d];
                mkApps ctr (map
-                 (fun '(tyname, old, new, ty, _, atomic) => 
+                 (fun '(tyname, old, new, ty, _, atomic) =>
                    if atomic : bool then tVar new
                    else
                      let n := find_d tyname 0 univ_of_tyname in
@@ -1281,7 +1281,7 @@ Context
   (* specialize to rw_univ -> rw_univ -> Set *)
   (frames_t := mkApps <%@frames_t%> [rw_univ; HFrame])
   (* specialize to rw_univ -> Set *)
-  (univD := mkApps <%@univD%> [rw_univ; HFrame]) 
+  (univD := mkApps <%@univD%> [rw_univ; HFrame])
   (* specialize to Fuel fueled -> forall A, erased (frames_t A root) -> univD A -> Set *)
   (rw_for := mkApps <%@rw_for%> [rw_univ; HFrame; root; fueled; metric; rw_rel; R; I_R; S; I_S])
   (frame_ind := mkInd (qual, snd typename +++ "_frame_t") 0)
@@ -1320,7 +1320,7 @@ Definition gen_smart_constr_ty (c : string) : GM term. ltac1:(refine(
   let! C := gensym "C" in
   let! C_ok := gensym "C_ok" in
   let C_ty := mkApps frames_t [univ_rty; root] in
-  let constr_ty := fold_right (fun '(_, _, ty, _, _, _) res => fn ty res) rty_term xutfs in 
+  let constr_ty := fold_right (fun '(_, _, ty, _, _, _) res => fn ty res) rty_term xutfs in
   ret (fn (mkApps <%@SmartConstr%> [constr_ty; constr])
     (tProd (nNamed fuel) (mkApps <%Fuel%> [fueled])
     (tProd (nNamed C) (mkApps <%erased%> [C_ty])
@@ -1343,7 +1343,7 @@ Definition gen_smart_constr_ty (c : string) : GM term. ltac1:(refine(
                    u; mkApps <%@e_map%> [
                      mk_ctx_t univ_rty; mk_ctx_t u;
                      tLambda (nNamed C) (mk_ctx_t univ_rty) (mkApps frames_cons [
-                       u; univ_rty; root; 
+                       u; univ_rty; root;
                        mkApps f (map tVar (lxs ++ rxs)); tVar C]);
                      tVar C];
                    tVar x])
@@ -1351,7 +1351,7 @@ Definition gen_smart_constr_ty (c : string) : GM term. ltac1:(refine(
             ty)
         (mkApps rw_for [
           tVar fuel;
-          univ_rty; tVar C; 
+          univ_rty; tVar C;
           mkApps constr (map (fun '(x, _, _, _, _, _) => tVar x) xutfs)])
         (rev xutfs))
       xutfs)))))
@@ -1416,7 +1416,7 @@ Definition gen_case_tree (ind_info : ind_info) (epats : list (term × term))
         let args := skipn nparams args in
         let! constrs :=
           mapM
-            (fun ctor => 
+            (fun ctor =>
               let '(xs, ts, rty) := decompose_prod ctor.(cstr_type) in
               let xs := skipn nparams xs in
               let ts := skipn nparams ts in
@@ -1427,8 +1427,8 @@ Definition gen_case_tree (ind_info : ind_info) (epats : list (term × term))
             body.(ind_ctors)
         in
         let ci := {| ci_ind := ind ; ci_npar := nparams ; ci_relevance := Relevant |} in
-        let p := 
-          {| pparams := pars; 
+        let p :=
+          {| pparams := pars;
              puinst := [];
              pcontext := [nAnon] ++ map (fun _ => nAnon) body.(ind_indices);
              preturn := ret_ty |}
@@ -1566,7 +1566,7 @@ Definition gen_topdown_ty (t_univ_i : N) : GM term. ltac1:(refine(
                     end)
                   xts)])
               (fn
-                (mkApps <%@eq%> [rty; 
+                (mkApps <%@eq%> [rty;
                   tVar e;
                   mkApps constr (map (fun '(md, x, x', t, u) => tVar x) xts)])
                 (tVar Ans)))
@@ -1610,7 +1610,7 @@ Definition gen_topdown_ty (t_univ_i : N) : GM term. ltac1:(refine(
         in
         let old_lhs := rename σ r.(rLhs) in
         let! header :=
-          gen_case_tree ind_info [(tVar e, r.(rLhs))] type0 
+          gen_case_tree ind_info [(tVar e, r.(rLhs))] type0
             (mkApps <%Active%> [quote_string r.(rName)])
             <%Impossible%>
         in
@@ -1645,12 +1645,12 @@ Definition gen_topdown_ty (t_univ_i : N) : GM term. ltac1:(refine(
   in
   let ctx_ty := mkApps frames_t [t_univ; root] in
   ret (fn (mkApps <%@Topdown%> [rw_univ; t_univ])
-    (tProd (nNamed Ans) type0 
+    (tProd (nNamed Ans) type0
     (tProd (nNamed C) (mkApps <%erased%> [ctx_ty])
     (tProd (nNamed C_ok) (mkApps <%@e_ok%> [ctx_ty; tVar C])
     (tProd (nNamed e) (mkApps univD [t_univ])
     (tProd (nNamed d) (mkApps Delay [t_univ; tVar e])
-    (tProd (nNamed r) (mkApps Param [t_univ; tVar C]) 
+    (tProd (nNamed r) (mkApps Param [t_univ; tVar C])
     (tProd (nNamed s) (mkApps State [t_univ; tVar C; mkApps delayD [t_univ; tVar e; tVar d]])
     (fold_right fn (fold_right fn (tVar Ans) congruences) applicable)))))))))
 )).
@@ -1688,7 +1688,7 @@ Definition gen_bottomup_ty (t_univ_i : N) : GM term. ltac1:(refine(
         let σ := sing localC C in
         let rΓ := map (on_snd (map_decl (rename σ))) rΓ in
         let! header :=
-          gen_case_tree ind_info [(tVar e, r.(rLhs))] type0 
+          gen_case_tree ind_info [(tVar e, r.(rLhs))] type0
             (mkApps <%Active%> [quote_string r.(rName)])
             <%Impossible%>
         in
@@ -1700,11 +1700,11 @@ Definition gen_bottomup_ty (t_univ_i : N) : GM term. ltac1:(refine(
   in
   let ctx_ty := mkApps frames_t [t_univ; root] in
   ret (fn (mkApps <%@Bottomup%> [rw_univ; t_univ])
-    (tProd (nNamed Ans) type0 
+    (tProd (nNamed Ans) type0
     (tProd (nNamed C) (mkApps <%erased%> [ctx_ty])
     (tProd (nNamed C_ok) (mkApps <%@e_ok%> [ctx_ty; tVar C])
     (tProd (nNamed e) (mkApps univD [t_univ])
-    (tProd (nNamed r) (mkApps Param [t_univ; tVar C]) 
+    (tProd (nNamed r) (mkApps Param [t_univ; tVar C])
     (tProd (nNamed s) (mkApps State [t_univ; tVar C; tVar e])
     (fold_right fn (fn (fn <%Fallback%> (tVar Ans)) (tVar Ans)) (rev applicable)))))))))
 )).
@@ -1752,7 +1752,7 @@ Definition gen_all : GM (RwObligations term). ltac1:(refine(
 )).
 Defined.
 
-(* Danger: running [unquote_all] generates universe constraints between the things inside 
+(* Danger: running [unquote_all] generates universe constraints between the things inside
    each typed_term and pretty common monomorphic types like [list], [pair], [option], etc.
    It's safer to unquote each term in obs with ltac. *)
 Definition unquote_all (obs : RwObligations term)
@@ -2016,7 +2016,7 @@ Ltac mk_bottomup :=
   repeat strip_one_match;
   mk_bottomup_active.
 
-Require Import Coq.PArith.BinPos Lia.
+From Stdlib Require Import PArith.BinPos Lia.
 
 Ltac try_find_constr e k_constr k_atom :=
   lazymatch goal with
@@ -2278,4 +2278,3 @@ Ltac cond_success name :=
   | Hs : Success ?rule -> _, Hf : Failure ?rule -> _ |- ?R =>
     specialize (Hs (MkSuccess rule)); clear Hf; rename Hs into name
   end.
-

@@ -1,4 +1,4 @@
-Require Import Arith List String ZArith.
+From Stdlib Require Import Arith List String ZArith.
 Require Import CertiCoq.Benchmarks.lib.vs.
 Require Import CertiCoq.Benchmarks.lib.Binom.
 Require Import CertiCoq.Benchmarks.lib.Color.
@@ -42,13 +42,13 @@ Include [ "print.h" ].
 (*
 From MetaRocq.SafeChecker Require Import PCUICSafeChecker.
 
-(*Extract Constant PCUICTyping.guard_checking => 
+(*Extract Constant PCUICTyping.guard_checking =>
 "{ guard = (fun _ _ _ _ -> true) }". *)
 
 CertiCoq Compile -O 0 typecheck_program
-Extract Constants [ 
+Extract Constants [
   (* coq_msg_debug => "print_msg_debug", *)
   PCUICTyping.guard_checking => "print_msg_info",
   coq_msg_info => "print_msg_info"
-   ] 
+   ]
 Include [ "print.h" ].*)

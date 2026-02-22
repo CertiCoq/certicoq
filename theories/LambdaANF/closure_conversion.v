@@ -5,13 +5,13 @@ Require Import Common.AstCommon Common.compM.
 
 Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.functions LambdaANF.cps_show LambdaANF.state.
-Require Import Coq.ZArith.Znumtheory.
+From Stdlib Require Import ZArith.Znumtheory.
 Require Import compcert.lib.Maps.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
+From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+        NArith.BinNat PArith.BinPos Sets.Ensembles.
 Require Import Common.AstCommon.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
-Require Import Ensembles.
+From Stdlib Require Import Ensembles.
 Require Import MetaRocq.Utils.bytestring.
 Import ListNotations Nnat MonadNotation.
 
@@ -34,7 +34,7 @@ Section CC.
     Ensemble var -> (* Names of global (i.e. already closed) functions *)
     ctor_tag -> (* tag of the current environment constructor *)
     (var -> var) -> (* The environment map *)
-    var -> (* The current environment *)    
+    var -> (* The current environment *)
     list var -> (* The environment *)
     Ensemble var -> (* The free set *)
     var -> (* Before projection *)
@@ -98,21 +98,21 @@ Section CC.
   Definition extend_fundefs' (f : var -> var) (B : fundefs) (x : var) : var -> var :=
     fun y => if (@Dec _ (name_in_fundefs B) _) y then x else f y.
 
-  
+
   Inductive add_global_funs : Ensemble var -> (* Previous GFuns *)
                               Ensemble var -> (* New Funs *)
                               Ensemble var -> (* FVs of Funs *)
                               Ensemble var -> (* New GFuns *)
-                              Type := 
+                              Type :=
   | Closed :
       forall GFuns Funs FVs,
         FVs <--> Empty_set _ ->
-        add_global_funs GFuns Funs FVs (Funs :|: GFuns)        
+        add_global_funs GFuns Funs FVs (Funs :|: GFuns)
   | Open :
       forall GFuns Funs FVs,
         ~ FVs <--> Empty_set _ -> (* maybe not needed, but it shouldn't hurt *)
         add_global_funs GFuns Funs FVs (GFuns \\ Funs).
-      
+
 
   Inductive Closure_conversion :
     Ensemble var -> (* Variables in the current scope *)
@@ -239,8 +239,8 @@ Section CC.
            forall Funs GFuns c FVs,
              Closure_conversion_fundefs Funs GFuns c FVs Fnil Fnil.
 
-  
-  
+
+
   (** * Computational defintion of closure conversion *)
 
 
@@ -253,7 +253,7 @@ Section CC.
   (* A variable declared in the scope of the current function *)
   | BoundVar : VarInfo.
 
-  
+
   (* Maps variables to [VarInfo] *)
   Definition VarInfoMap := M.t VarInfo.
 
@@ -272,10 +272,10 @@ Section CC.
   Definition clo_suffix := "_clo".
   Definition code_suffix := "_code".
   Definition proj_suffix := "_proj".
-  
 
-  
-  (** Looks up a variable in the map and handles it appropriately *) 
+
+
+  (** Looks up a variable in the map and handles it appropriately *)
   Definition get_var (x : var) (map : VarInfoMap) (gfuns : GFunMap) (c : ctor_tag) (Γ : var)
   : ccstate (var * (exp -> exp)) :=
     match Maps.PTree.get x map with
@@ -284,7 +284,7 @@ Section CC.
           | FVar pos =>
             (* pick a fresh name, register its pretty name *)
             y <- get_name x proj_suffix ;;
-            ret (y, fun e => Eproj y c pos Γ e)   
+            ret (y, fun e => Eproj y c pos Γ e)
           | MRFun env =>
               (* get the new name of the function and pack it together with its *)
               (* environment argument to construct the closure *)
@@ -304,7 +304,7 @@ Section CC.
         | None => ret (x, id) (* should never reach here *)
         end
     end.
-  
+
   Fixpoint get_vars (xs : list var) (map : VarInfoMap) (gfuns : GFunMap)
            (c : ctor_tag) (Γ : var) : ccstate (list var * (exp -> exp)) :=
     match xs with
@@ -312,11 +312,11 @@ Section CC.
       | x :: xs =>
         t1 <- get_var x map gfuns c Γ ;;
         let '(y, f) := t1 in
-        t2 <- get_vars xs map gfuns c Γ ;; 
+        t2 <- get_vars xs map gfuns c Γ ;;
         let '(ys, f') := t2 in
         ret (y :: ys, fun e => f (f' e))
     end.
-  
+
   (** Add some bound variables in the map *)
   Fixpoint add_params args  (mapfv : VarInfoMap) : VarInfoMap :=
     match args with
@@ -327,7 +327,7 @@ Section CC.
 
   (** Construct the closure environment and the new variable map *)
   Definition make_env (fvs : list var) (mapfv_new : VarInfoMap)
-             (mapfv_old : VarInfoMap) (c_old : ctor_tag) (Γ_new Γ_old : var) (gfuns : GFunMap) 
+             (mapfv_old : VarInfoMap) (c_old : ctor_tag) (Γ_new Γ_old : var) (gfuns : GFunMap)
   : ccstate (ctor_tag * VarInfoMap * (exp -> exp)) :=
     (* put the free variables in a new map *)
     let '(map_new', n) :=
@@ -342,7 +342,7 @@ Section CC.
     let '(fv', g') :=  t1 in
     c_new <- make_record_ctor_tag n ;;
     ret (c_new, map_new', fun e => g' (Econstr Γ_new c_new fv' e)).
-  
+
   (** Add closures to VarInfoMap *)
   Fixpoint add_closures (defs : fundefs) (mapfv : VarInfoMap)
            (env : var) (* the enviroment of defs *) : VarInfoMap :=
@@ -366,14 +366,14 @@ Section CC.
       else gfuns
     | Fnil => gfuns
     end.
-  
-  
+
+
   Definition bool_to_string (b : bool) : string :=
     if b then "true" else "false".
 
   (** Closure conversion *)
   Fixpoint exp_closure_conv (e : exp) (mapfv : VarInfoMap) (gfuns : GFunMap)
-           (c : ctor_tag) (Γ : var) : ccstate (exp * (exp -> exp)) := 
+           (c : ctor_tag) (Γ : var) : ccstate (exp * (exp -> exp)) :=
     match e with
       | Econstr x tag ys e' =>
         t1 <- get_vars ys mapfv gfuns c Γ ;;
@@ -391,7 +391,7 @@ Section CC.
              ret ((y, ((snd ef) (fst ef))) :: xs')
          end) pats;;
         t1 <- get_var x mapfv gfuns c Γ ;;
-        let '(x', f1) := t1 in           
+        let '(x', f1) := t1 in
         ret (Ecase x' pats', f1)
       | Eproj x tag n y e' =>
         t1 <- get_var y mapfv gfuns c Γ ;;
@@ -423,7 +423,7 @@ Section CC.
         (* debug *)
         (* fv_names <- get_pp_names_list fvs ;; *)
         (* log_msg (concat " " ("Closed" :: bool_to_string is_closed :: "Block has fvs :" :: fv_names)) ;; *)
-        
+
         let mapfv' := add_closures defs mapfv Γ' in
         let gfuns' := add_closures_gfuns defs gfuns is_closed in
 
@@ -432,7 +432,7 @@ Section CC.
         ret (Efun defs' ((snd ef) (fst ef)), g1)
       | Eapp f ft xs =>
         t1 <- get_var f mapfv gfuns c Γ ;;
-        let '(f', g1) := t1 in     
+        let '(f', g1) := t1 in
         t2 <- get_vars xs mapfv gfuns c Γ ;;
         let '(xs', g2) := t2 in
         ptr <- get_name f code_suffix ;;
@@ -459,16 +459,16 @@ Section CC.
          | Fcons f tag ys e defs' =>
            (* formal parameter for the environment pointer *)
              Γ <- get_named_str "env" ;;
-             (* Add mut rec functions to map *) 
+             (* Add mut rec functions to map *)
              let mapfv' := add_closures all_defs mapfv Γ in
-             (* Add arguments to the map *)       
+             (* Add arguments to the map *)
              let mapfv' := add_params ys mapfv' in
              ef <- exp_closure_conv e mapfv' gfuns c Γ ;;
              defs'' <- fundefs_closure_conv all_defs defs' mapfv gfuns c ;;
              ret (Fcons f tag (Γ :: ys) ((snd ef) (fst ef)) defs'')
            | Fnil => ret Fnil
          end.
-    
+
   Definition populate_map (s : FVSet) (map : VarInfoMap) : VarInfoMap :=
     PS.fold (fun x map => M.set x BoundVar map) s map.
 
@@ -477,8 +477,8 @@ Section CC.
   Definition get_name (c : comp_data) : (var * comp_data) :=
     let 'mkCompData n c i f e fenv names imap log := c in
     let c' := mkCompData (n + 1)%positive c i f e fenv names imap log in
-    (n, c'). 
-                         
+    (n, c').
+
   Definition closure_conversion_top (e : exp) (c: comp_data) :=
     let '(Γ, c) := get_name c in
     let map := populate_map (exp_fv e) (Maps.PTree.empty VarInfo) in
@@ -493,5 +493,5 @@ Section CC.
     | Err str =>
       (Err str, c')
     end.
-  
+
 End CC.

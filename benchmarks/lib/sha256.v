@@ -4,10 +4,10 @@
 Require Recdef.
 Require Import compcert.lib.Integers.
 Require Import compcert.lib.Coqlib.
-Require Import Coq.Strings.String.
-Require Import Coq.Strings.Ascii.
-Require Import Coq.micromega.Lia.
-Require Import List.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Strings.Ascii.
+From Stdlib Require Import micromega.Lia.
+From Stdlib Require Import List.
 
 
 Import ListNotations.
@@ -22,12 +22,12 @@ Fixpoint str_to_bytes (str : string) : list byte :=
     end.
 
 (* Certicoq: from VST.sha.general_lemmas *)
-Definition Shr b x := Int.shru x (Int.repr b). 
+Definition Shr b x := Int.shru x (Int.repr b).
 
 Lemma byte_testbit:
   forall i j, j >= 8 -> Z.testbit (Byte.unsigned i) j = false.
 Proof.
-intros. 
+intros.
 apply Byte.bits_above. cbn.
 apply H.
 Qed.
@@ -45,7 +45,7 @@ Fixpoint intlist_to_bytelist (l: list int) : list byte :=
 
 
 Definition bytes_to_Int (a b c d : byte) : Int.int :=
-  Int.or (Int.or (Int.or 
+  Int.or (Int.or (Int.or
        (Int.shl (Int.repr (Byte.unsigned a)) (Int.repr 24))
       (Int.shl (Int.repr (Byte.unsigned b)) (Int.repr 16)))
        (Int.shl (Int.repr (Byte.unsigned c)) (Int.repr 8)))
@@ -156,8 +156,8 @@ Definition hash_block (r: registers) (block: list int) : registers :=
       map2 Int.add r (Round r (nthi block) 63).
 
 Lemma skipn_length_short:
-  forall {A} n (al: list A), 
-    (length al < n)%nat -> 
+  forall {A} n (al: list A),
+    (length al < n)%nat ->
     (length (skipn n al) = 0)%nat.
 Proof.
  induction n; destruct al; simpl; intros; auto.
@@ -166,8 +166,8 @@ Proof.
 Qed.
 
 Lemma skipn_length:
-  forall {A} n (al: list A), 
-    (length al >= n)%nat -> 
+  forall {A} n (al: list A),
+    (length al >= n)%nat ->
     (length (skipn n al) = length al - n)%nat.
 Proof.
  induction n; destruct al; simpl; intros; auto.
@@ -184,13 +184,13 @@ Proof. intros.
  destruct (lt_dec (length msg) 16).
  rewrite skipn_length_short. simpl; lia. subst; simpl in *; lia.
  rewrite <- teq; auto.
- rewrite skipn_length; simpl; lia. 
+ rewrite skipn_length; simpl; lia.
 Qed.
 
 Definition SHA_256 (str : list byte) : list byte :=
     intlist_to_bytelist (hash_blocks init_registers (generate_and_pad str)).
 
-Require Import Lia.
+From Stdlib Require Import Lia.
 
 (* LINEAR-TIME FUNCTIONAL VERSION OF SHA256 *)
 Function zeros (n : Z) {measure Z.to_nat n} : list Int.int :=

@@ -3,7 +3,7 @@
     [show_exp e] constructs a string representing the term that has some
     minimal formatting so that it's much more readable.
 *)
-Require Import List.
+From Stdlib Require Import List.
 Require Import LambdaANF.cps.
 Require Import ExtLib.Data.Positive.
 Require Import ExtLib.Structures.Monad.
@@ -110,7 +110,7 @@ Definition emit_prim (p : primitive) : M unit :=
   match projT1 p as tag return prim_value tag -> M unit with
   | primInt => fun f => emit "(int: " ;; emit (Show.string_of_prim_int f) ;; emit ")"
   | primFloat => fun f => emit "(float: " ;; emit (AstCommon.string_of_float f) ;; emit ")"
-  
+
   end%bs (projT2 p).
 
 (* We assume each expression starts on a fresh newline, and that it
@@ -122,15 +122,15 @@ Fixpoint emit_exp (indent:nat) (e:exp) {struct e} : M unit :=
     emit "let " ;; emit (show_var x) ;;
          (* emit " := con_" ;; emit (show_pos tg) ;; *)
     emit " := " ;; emit (show_con tg) ;;
-    emit (show_vars xs) ;; emit " in " ;; newline ;; 
-    emit_exp indent e 
+    emit (show_vars xs) ;; emit " in " ;; newline ;;
+    emit_exp indent e
   | Eproj x tg n y e =>
     emit "let " ;; emit (show_var x) ;;
     emit " := proj_" ;; emit (show_binnat n) ;; emit " " ;;
     emit (show_pos tg) ;; emit " " ;;
     emit (show_var y) ;; emit " in " ;; newline ;;
     emit_exp indent e
-  | Eprim_val x p e => 
+  | Eprim_val x p e =>
     emit "let " ;; emit (show_var x) ;;
     emit " := prim: " ;; emit_prim p ;;
     emit " in " ;; newline ;;
@@ -189,7 +189,7 @@ Fixpoint emit_val (indent:nat) (v:val) {struct v}: M unit :=
             (* emit "fun "%bs ;; emit (show_var f);;emit (show_ftag t');;emit (show_vars xs);;emit ":="%bs;; emit "..."%bs ;; newline *)
              | None => emit "ERROR! FUN "%bs ;; emit (show_var f);;emit " NOT FOUND!"%bs;;newline
            end)
-        | Vprim p => emit "Primitive "%bs ;; emit_prim p ;; newline 
+        | Vprim p => emit "Primitive "%bs ;; emit_prim p ;; newline
         | Vint i => emit "Int "%bs;;newline
       end.
 (*

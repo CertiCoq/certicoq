@@ -1,6 +1,6 @@
 
-Require Import Coq.NArith.BinNat Coq.Relations.Relations Coq.MSets.MSets Coq.MSets.MSetRBT
-        Coq.Lists.List Coq.micromega.Lia Coq.Sets.Ensembles.
+From Stdlib Require Import NArith.BinNat Relations.Relations MSets.MSets MSets.MSetRBT
+        Lists.List micromega.Lia Sets.Ensembles.
 
 Require Import LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_util
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.size_cps LambdaANF.tactics LambdaANF.relations LambdaANF.rel_comp
@@ -24,26 +24,26 @@ Section ToplevelTheorems.
   Context (cenv : ctor_env).
   Context (clo_tag : ctor_tag).
   Context (clo_itag : ind_tag).
-  
+
   (* TODO use John's definition  *)
   Definition well_scoped e :=
     unique_bindings e /\ Disjoint _ (bound_var e) (occurs_free e).
-  
+
   Definition fv_pres e1 e2 :=
     occurs_free e2 \subset occurs_free e1.
 
 
   Definition post_prop P1 PG :=
     Post_properties cenv P1 P1 PG /\
-    post_upper_bound P1.  
+    post_upper_bound P1.
 
   (** Correctness spec for (composition of) "identity" transformations *)
 
-  Definition correct (trans :  exp -> comp_data -> error exp * comp_data) := 
+  Definition correct (trans :  exp -> comp_data -> error exp * comp_data) :=
     forall e c,
       well_scoped e ->                                            (* src is well-scoped *)
       max_var e 1 < state.next_var c ->                           (* the pool of identifiers is fresh *)
-      exists (e' : exp) (c' : state.comp_data),     
+      exists (e' : exp) (c' : state.comp_data),
         trans e c = (Ret e', c') /\                               (* the transformation successfully terminates *)
         well_scoped e' /\                                         (* trg is well-scoped *)
         max_var e' 1 < state.next_var c' /\                       (* the pool of identifiers is fresh for the target *)
@@ -55,13 +55,13 @@ Section ToplevelTheorems.
     forall e c,
       well_scoped e ->                                            (* src is well-scoped *)
       max_var e 1 < state.next_var c ->                           (* the pool of identifiers is fresh *)
-      exists (e' : exp) (c' : state.comp_data),     
+      exists (e' : exp) (c' : state.comp_data),
         trans e c = (Ret e', c') /\                               (* the transformation successfully terminates *)
         well_scoped e' /\                                         (* trg is well-scoped *)
         max_var e' 1 < state.next_var c' /\                       (* the pool of identifiers is fresh for the target *)
         exists n m,  R_n_exp cenv clo_tag wf_pres post_prop       (* src and trg are in the logical relation  *)
                              (simple_bound 0) (simple_bound 0) n m e e'.
-  
+
 
 
 Section Inline.
@@ -79,11 +79,11 @@ Section Inline.
  Proof.
    intros H.
    edestruct inline_correct_top with (P1 := fun L => inline_bound L d)
-                                     (PG := inline_bound d d).   
+                                     (PG := inline_bound d d).
    - intros. eapply inline_bound_compat. eassumption.
    - intros. eapply inline_bound_post_Eapp_l.
    - intros. eapply inline_bound_remove_steps_letapp.
-   - intros. rewrite Nat.add_comm. eapply inline_bound_remove_steps_letapp_OOT. 
+   - intros. rewrite Nat.add_comm. eapply inline_bound_remove_steps_letapp_OOT.
    - reflexivity.
    - intro; intros. exact H0.
    - eapply H.
@@ -101,7 +101,7 @@ Section Inline.
    intro; intros.
    edestruct inline_correct; eauto. destructAll.
    do 2 eexists. split.
-   
+
    unfold inline_top. rewrite H1. reflexivity.
    repeat (split; [ eassumption | ]).
    eexists. econstructor. now eauto. eassumption.
@@ -117,7 +117,7 @@ Section Inline.
    intro; intros.
    edestruct inline_correct; eauto. destructAll.
    do 2 eexists. split.
-   
+
    unfold inline_uncurry, inline_top. rewrite H1. reflexivity.
    repeat (split; [ eassumption | ]).
    eexists. econstructor. now eauto. eassumption.
@@ -131,7 +131,7 @@ End Inline.
 
 
 Section LambdaLift.
-  
+
   Lemma lambda_lift_correct e c k l b :
    well_scoped e ->
    max_var e 1 < state.next_var c ->
@@ -147,7 +147,7 @@ Section LambdaLift.
   Proof.
     intros.
     edestruct lambda_lift_correct_top with (P1 := ll_bound)
-                                           (PG := ll_bound 0).   
+                                           (PG := ll_bound 0).
     - intros. eapply ll_bound_compat.
     - intros. eapply ll_bound_compat.
       exact (M.empty _). exact 0%nat.
@@ -160,7 +160,7 @@ Section LambdaLift.
     - intros. eapply ll_bound_ctx_r; eauto.
     - eapply H.
     - eassumption.
-    - eapply H. 
+    - eapply H.
     - destructAll. do 2 eexists. split. eassumption.
       split. eassumption.
       split. eassumption. split.
@@ -179,17 +179,17 @@ Section LambdaLift.
   Qed.
 
 
-  
+
 End LambdaLift.
-  
+
 
 (* TODO move *)
 Section Refl.
-  
+
   Context (wf_pres : exp -> exp -> Prop)
           (wf_pres_refl : forall e, wf_pres e e)
           (lf : var).
-  
+
   Context (fuel trace : Type)  {Hf : @fuel_resource fuel} {Ht : @trace_resource trace}.
 
   Lemma preord_exp_n_refl e :
@@ -203,13 +203,13 @@ Section Refl.
   Qed.
 
 End Refl.
-  
+
 Section CCHoist.
 
 
   Lemma closure_conversion_hoist_correct :
     correct_cc (closure_conversion_hoist clo_tag clo_itag).
-  Proof. 
+  Proof.
     intros e c Hws Hmvar.
     edestruct closure_conversion_correct.exp_closure_conv_correct
       with (boundL := simple_bound) (boundG := simple_bound 0).
@@ -228,9 +228,9 @@ Section CCHoist.
     - eapply Hws.
     - eassumption.
     - destructAll.
-      
-      edestruct (exp_hoist x) as [e' m] eqn:Hhoist. 
-      
+
+      edestruct (exp_hoist x) as [e' m] eqn:Hhoist.
+
       edestruct exp_hoist_correct_top with
           (e := x)
           (P1 := fun n =>  hoisting_bound n m)
@@ -247,7 +247,7 @@ Section CCHoist.
       + reflexivity.
       (* scoping *)
       + easy.
-      + eapply Disjoint_sym. eassumption. 
+      + eapply Disjoint_sym. eassumption.
       + eassumption.
       + eassumption.
       + destructAll. do 2 eexists. split; [| split; [| split ] ].
@@ -268,7 +268,7 @@ Section CCHoist.
   Qed.
 
 End CCHoist.
-  
+
 Section Shrink.
 
   Lemma shrink_top_correct e e' m :
@@ -283,7 +283,7 @@ Section Shrink.
     intros.
     intros. intros.
     assert (Hs := shrink_corresp_top cenv (fun L => inline_bound L 1) (inline_bound 1 1)).
-    inv H. 
+    inv H.
 
     assert (Ha : let (e', n) := shrink_top e in
                  (exists m : nat,
@@ -293,7 +293,7 @@ Section Shrink.
                  Disjoint var (occurs_free e') (bound_var e') /\
                  occurs_free e' \subset occurs_free e /\ bound_var e' \subset bound_var e).
     { eapply Hs.
-      
+
       - intros. eapply inline_bound_compat. eassumption.
       - intros. eapply inline_bound_compat. lia.
       - intros. eapply inline_bound_post_Eapp_l.
@@ -317,7 +317,7 @@ Section Shrink.
     correct shrink_err.
   Proof.
     intro; intros.
-    destruct (shrink_top e) eqn:Hres. 
+    destruct (shrink_top e) eqn:Hres.
     exists e0, c.
     edestruct shrink_top_correct; eauto. destructAll.
     eexists.
@@ -326,11 +326,11 @@ Section Shrink.
     split; [| split ]; eauto.
 
     eapply Pos.le_lt_trans. eapply max_var_le. 2: eassumption.
-    
-    sets. 
-  Qed.     
 
-  
+    sets.
+  Qed.
+
+
 End Shrink.
 
 Section InlineLoop.
@@ -347,26 +347,26 @@ Section InlineLoop.
      split. eassumption. split. eassumption.
      eexists. eapply preord_exp_n_refl.
      intros. unfold wf_pres. sets.
-   - destructAll. simpl. 
+   - destructAll. simpl.
      edestruct inline_correct with (e := e). eassumption.
      destructAll.
      destruct (shrink_top x) eqn:Hshrink.
      edestruct shrink_top_correct; [| eassumption | ]. eassumption.
-     destructAll. 
-     destruct x1. 
+     destructAll.
+     destruct x1.
      + edestruct (IHn e0). eassumption.
        eapply Pos.le_lt_trans. eapply max_var_le. 2: eassumption. sets.
        destructAll.
        do 2 eexists. erewrite H1. split; [| split ].
        rewrite Hshrink. simpl. eassumption. eassumption.
-       split. eassumption. eexists. 
+       split. eassumption. eexists.
        econstructor 2.
        * econstructor 1. now eauto. eassumption.
          split. eapply inline_bound_compat. lia.
          eapply inline_bound_post_upper_bound.
        * econstructor 2. eassumption. eassumption.
      + do 2 eexists. rewrite H1.
-       split. reflexivity. 
+       split. reflexivity.
        split. rewrite Hshrink. eassumption.
        split. rewrite Hshrink.
        eapply Pos.le_lt_trans. eapply max_var_le. 2: eassumption. sets.
@@ -384,7 +384,7 @@ Section Uncurry.
 
   Lemma test : (forall b e c r, uncurry_top b e c = r -> uncurry_top b e c = r).
   Proof. intros. Abort.
-  
+
   Lemma uncurry_top_correct e c b :
    well_scoped e ->
    max_var e 1 < state.next_var c ->
@@ -400,7 +400,7 @@ Section Uncurry.
   Proof.
     intros.
     edestruct (@uncurry_correct_top cenv nat _ (nat * nat) _ (simple_bound 0)
-                                    (simple_bound 0)) with (cps := b).   
+                                    (simple_bound 0)) with (cps := b).
     - intros. eapply simple_bound_compat.
     - intros. eapply simple_bound_compat.
     - eapply Hpost_curry.
@@ -417,7 +417,7 @@ Section Uncurry.
       split. assumption.
       split. eassumption.
       split. eassumption.
-      split. split; eassumption. 
+      split. split; eassumption.
       now eauto.
   Qed.
 
@@ -428,7 +428,7 @@ Section Uncurry.
     edestruct uncurry_top_correct. eassumption. eassumption.
     destructAll.
     do 2 eexists. split.
-    eassumption. 
+    eassumption.
     repeat (split; [ eassumption | ]).
     eexists. econstructor. now eauto. eassumption. split.
     eapply simple_bound_compat. eapply simple_bound_post_upper_bound.
@@ -455,7 +455,7 @@ Section DPE.
   Proof.
     intros.
     edestruct DPE_correct_top with (PL := simple_bound 0)
-                                   (PG := simple_bound 0).   
+                                   (PG := simple_bound 0).
     - intros. eapply simple_bound_compat.
     - eapply H.
     - eassumption.
@@ -471,14 +471,14 @@ Section DPE.
     correct DPE.
   Proof.
     intro; intros.
-    edestruct DPE_correct; eauto. destructAll. 
+    edestruct DPE_correct; eauto. destructAll.
     do 2 eexists. repeat (split; [ eassumption | ]).
     eexists. econstructor. now eauto. eassumption. split.
     eapply simple_bound_compat. eapply simple_bound_post_upper_bound.
   Qed.
-  
+
 End DPE.
-  
+
 End ToplevelTheorems.
 
 Require Import ExtLib.Structures.Monad LambdaANF.toplevel.
@@ -490,10 +490,10 @@ Section Compose.
   Context (cenv : ctor_env).
 
   Transparent bind.
-  
+
   Lemma correct_compose (t1 t2 : anf_trans) :
     correct cenv t1 ->
-    correct cenv t2 ->   
+    correct cenv t2 ->
     correct cenv (fun e => e <- t1 e;; t2 e).
   Proof.
     intros Ht1 Ht2. intro; intros.
@@ -507,10 +507,10 @@ Section Compose.
     - eexists. econstructor 2; eauto.
   Qed.
 
-  
+
   Lemma correct_cc_compose_l (t1 t2 : anf_trans) :
     correct cenv t1 ->
-    correct_cc cenv clo_tag t2 ->   
+    correct_cc cenv clo_tag t2 ->
     correct_cc cenv clo_tag (fun e => e <- t1 e;; t2 e).
   Proof.
     intros Ht1 Ht2. intro; intros.
@@ -528,10 +528,10 @@ Section Compose.
       eassumption.
   Qed.
 
-  
+
   Lemma correct_cc_compose_r (t1 t2 : anf_trans) :
     correct_cc cenv clo_tag t1 ->
-    correct cenv t2 ->   
+    correct cenv t2 ->
     correct_cc cenv clo_tag (fun e => e <- t1 e;; t2 e).
   Proof.
     intros Ht1 Ht2. intro; intros.
@@ -556,7 +556,7 @@ Section Compose.
     unfold time_anf.
     intros.
     destruct (time o); eauto.
-  Qed. 
+  Qed.
 
   Lemma correct_cc_time (t : anf_trans) o s :
     correct_cc cenv clo_tag t ->
@@ -565,10 +565,10 @@ Section Compose.
     unfold time_anf.
     intros.
     destruct (time o); eauto.
-  Qed. 
+  Qed.
 
   Opaque uncurry_top.
-    
+
   Lemma correct_id_trans :
     correct cenv id_trans.
   Proof.
@@ -582,7 +582,7 @@ Section Compose.
     eapply simple_bound_compat. eassumption.
     clear. firstorder.
   Qed.
-  
+
   Theorem anf_pipeline_correct opts v :
     correct_cc cenv clo_tag (anf_pipeline v opts).
   Proof.
@@ -590,9 +590,9 @@ Section Compose.
     unfold anf_pipeline.
     eapply correct_cc_compose_l.
 
-    eapply correct_time. 
+    eapply correct_time.
     now eapply shrink_err_correct.
-    
+
     eapply correct_cc_compose_l.
 
     eapply correct_time. now eapply uncurry_top_correct_corr.
@@ -603,36 +603,36 @@ Section Compose.
     now eapply inline_uncurry_cor.
 
     eapply correct_cc_compose_l.
-    
+
     destruct (inl_before opts).
     eapply correct_time. now eapply inline_loop_correct.
     now eapply correct_id_trans.
-    
+
     eapply correct_cc_compose_l.
 
     destruct (do_lambda_lift opts).
     eapply correct_time. now eapply lambda_lift_correct_corr.
     now eapply correct_id_trans.
-    
+
     eapply correct_cc_compose_l.
-    
+
     eapply correct_time. now eapply shrink_err_correct.
-    
+
     eapply correct_cc_compose_r.
-      
-    eapply correct_cc_time. now eapply closure_conversion_hoist_correct. 
 
-    eapply correct_compose. 
+    eapply correct_cc_time. now eapply closure_conversion_hoist_correct.
+
+    eapply correct_compose.
 
     eapply correct_time. now eapply shrink_err_correct.
-    
+
     eapply correct_compose.
 
     destruct (inl_after opts).
     eapply correct_time. now eapply inline_loop_correct.
     now eapply correct_id_trans.
 
-    eapply correct_compose. 
+    eapply correct_compose.
 
     destruct (dpe opts).
 
@@ -659,14 +659,14 @@ Section Compose.
   Corollary anf_pipeline_whole_program_correct var opts e c :
 
     closed_exp e ->
-    
+
     well_scoped e ->
     (max_var e 1 < state.next_var c)%positive ->
-    
-    exists (e' : exp) (c' : state.comp_data),     
+
+    exists (e' : exp) (c' : state.comp_data),
       anf_pipeline var opts e c = (Ret e', c') /\
 
-      refines cenv value_ref_cc e e'. 
+      refines cenv value_ref_cc e e'.
   Proof.
     intros.
     edestruct anf_pipeline_correct; eauto. destructAll.
@@ -679,13 +679,13 @@ Section Compose.
     clear; now firstorder.
     clear; now firstorder.
     eapply simple_bound_post_upper_bound.
-  Qed. 
+  Qed.
 
 
   Lemma preord_exp_n_wf_mon wf1 wf2 p k e1 e2 :
     inclusion _ wf1 wf2 ->
     preord_exp_n cenv wf1 p k e1 e2 ->
-    preord_exp_n cenv wf2 p k e1 e2. 
+    preord_exp_n cenv wf2 p k e1 e2.
   Proof.
     intros H1 H2. induction H2; eauto.
     now econstructor 1; eauto.
@@ -695,13 +695,13 @@ Section Compose.
   Lemma R_n_exp_wf_mon ctag wf1 wf2 p P PG k m e1 e2 :
     inclusion _ wf1 wf2 ->
     R_n_exp cenv ctag wf1 p P PG k m e1 e2 ->
-    R_n_exp cenv ctag wf2 p P PG k m e1 e2. 
+    R_n_exp cenv ctag wf2 p P PG k m e1 e2.
   Proof.
     intros H1 H2. inv H2. inv H. inv H2. destructAll.
     eexists. split. now eapply preord_exp_n_wf_mon.
     eexists. split; eauto. now eapply preord_exp_n_wf_mon.
   Qed.
-  
+
 
   (* Top-level correctness for linking *)
   Corollary anf_pipeline_linking_correct lf x v1 v2 o1 o2 e1 e2 c1 c2 :
@@ -713,24 +713,24 @@ Section Compose.
     occurs_free e2 \subset [set x] ->
     well_scoped e2 ->
     (max_var e2 1 < state.next_var c2)%positive ->
-    
-    exists (e1' e2' : exp) (c1' c2' : state.comp_data),     
+
+    exists (e1' e2' : exp) (c1' c2' : state.comp_data),
       anf_pipeline v1 o1 e1 c1 = (Ret e1', c1') /\
       anf_pipeline v2 o2 e2 c2 = (Ret e2', c2') /\
 
-      refines cenv value_ref_cc (link lf x e1 e2) (link lf x e1' e2'). 
+      refines cenv value_ref_cc (link lf x e1 e2) (link lf x e1' e2').
   Proof.
     intros.
     edestruct anf_pipeline_correct with (e := e1) (opts := o1); eauto. destructAll.
     edestruct anf_pipeline_correct with (e := e2) (opts := o2); eauto. destructAll.
-    
+
     do 4 eexists.
-    
+
     split. eassumption.
     split. eassumption.
 
     eapply R_n_exp_in_refines.
-    
+
     6:{ eapply Rel_exp_n_preserves_linking; eauto.
         - intros. eapply H13.
         - eapply simple_bound_compat. }
@@ -741,17 +741,17 @@ Section Compose.
     eapply simple_bound_post_upper_bound.
 
     eapply link_closed; eauto.
-  Qed. 
+  Qed.
 
-  
+
 End Compose.
 
 (* Print Assumptions anf_pipeline_whole_program_correct. *)
 (* Print Assumptions anf_pipeline_linking_correct. *)
 
-(* 
+(*
 
-Prints : 
+Prints :
 
 Axioms:
 ProofIrrelevance.proof_irrelevance : forall (P : Prop) (p1 p2 : P), p1 = p2
@@ -759,4 +759,3 @@ FunctionalExtensionality.functional_extensionality_dep : forall (A : Type) (B : 
                                                            (f g : forall x : A, B x),
                                                          (forall x : A, f x = g x) -> f = g
 *)
-

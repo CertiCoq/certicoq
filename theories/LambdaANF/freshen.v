@@ -1,7 +1,7 @@
 (* Freshen the names in a term by renaming its bound variables to be unique positives starting from a given positive, except for a finite number of positives *)
 
 Require Import Common.compM LambdaANF.cps.
-Require Import Coq.ZArith.ZArith Coq.Lists.List.
+From Stdlib Require Import ZArith.ZArith Lists.List.
 Import ListNotations.
 Require Import ExtLib.Structures.Monad.
 Require Import ExtLib.Structures.MonadState.

@@ -5,9 +5,9 @@ Require Import LambdaANF.closure_conversion LambdaANF.closure_conversion_util.
 From CertiCoq.LambdaANF Require Import cps cps_util set_util identifiers ctx Ensembles_util
      List_util functions logical_relations eval state.
 Require Import compcert.lib.Coqlib.
-Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-               Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia.
+From Stdlib Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat.
+From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+               NArith.BinNat PArith.BinPos Sets.Ensembles micromega.Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Require Import MetaRocq.Utils.bytestring.
 Import Common.compM.
@@ -44,16 +44,16 @@ Section CC_correct.
     end.
 
   (** A function that corresponds to an evaluation context *)
-  Definition is_exp_ctx (f : exp -> exp) C : Prop := 
-    forall e, f e = app_ctx_f C e. 
+  Definition is_exp_ctx (f : exp -> exp) C : Prop :=
+    forall e, f e = app_ctx_f C e.
 
   (** Set of variables not in the map *)
-  Definition binding_not_in_map {A} (S : Ensemble M.elt) (map : M.t A) := 
+  Definition binding_not_in_map {A} (S : Ensemble M.elt) (map : M.t A) :=
     forall x : M.elt, In M.elt S x -> M.get x map = None.
 
 
   (* TODO move to state *)
-  Lemma get_named_str_fresh 
+  Lemma get_named_str_fresh
      : forall (A : Type) (S : Ensemble var) (str : string),
        {{fun (_ : unit) (s : comp_data * A) => fresh S (next_var (fst s))}} get_named_str str
        {{fun (_ : unit) (s : comp_data * A) (x : var) (s' : comp_data * A) =>
@@ -63,12 +63,12 @@ Section CC_correct.
   Proof.
     intros.
     eapply pre_post_mp_l.
-    eapply bind_triple. now eapply get_triple.  
+    eapply bind_triple. now eapply get_triple.
     intros [[] w1] [[] w2].
     eapply pre_post_mp_l.
     eapply bind_triple. now eapply put_triple.
     intros x [r3 w3].
-    eapply return_triple. 
+    eapply return_triple.
     intros ? [r4 w4] H2. inv H2. intros [H1 H2]. inv H1; inv H2. intros.
     split. eapply H. reflexivity. split. unfold Range, Ensembles.In. simpl. zify. lia.
     simpl. split. zify; lia.
@@ -79,7 +79,7 @@ Section CC_correct.
   Lemma FVmap_inv_set_bound FVmap Scope Funs GFuns FVs x :
     FVmap_inv FVmap Scope Funs GFuns FVs ->
     FVmap_inv (M.set x BoundVar FVmap) (Union _ (Singleton _ x) Scope) Funs GFuns FVs.
-  Proof. 
+  Proof.
     intros [H1 [H2 H3]]. repeat split.
     - intros y Hin. destruct (peq y x); subst.
       + unfold In. now rewrite M.gss.
@@ -108,7 +108,7 @@ Section CC_correct.
         rewrite M.gso in Heq; eauto.
     - intros [Hnth [Hnin1 [Hnin2 Hnin3]]].
       destruct (peq x0 x); subst.
-      + exfalso. eauto. 
+      + exfalso. eauto.
       + edestruct H3 as [Heq _].
         rewrite M.gso; eauto. eapply Heq; repeat split; eauto.
     - destruct (peq x0 x); subst.
@@ -139,7 +139,7 @@ Section CC_correct.
     ~ In _ Scope x ->
     FVmap_inv FVmap Scope Funs GFuns FVs ->
     FVmap_inv (M.set x (MRFun x') FVmap) Scope (Union _ (Singleton _ x) Funs) GFuns FVs.
-  Proof. 
+  Proof.
     intros Hnin [H1 [H2 H3]]. repeat split.
     - intros y Hin. destruct (peq y x); subst.
       + contradiction.
@@ -158,7 +158,7 @@ Section CC_correct.
     - destruct (peq x0 x); subst; eauto. right.
       eapply H2. edestruct H as [x'' Hget].
       rewrite M.gso in Hget; [| now eauto ].
-      repeat eexists; eauto. 
+      repeat eexists; eauto.
     - destruct H as [x'' Hget].
       destruct (peq x0 x); subst; eauto.
       rewrite M.gso in Hget; [| now eauto ].
@@ -180,7 +180,7 @@ Section CC_correct.
       + intros Hc. rewrite M.gso in H; eauto.
         inv Hc. inv H0; congruence.
         edestruct H2 as [H2' _].  edestruct (H2' x0) as [y Hge'].
-        constructor. eauto. intros Hc. eapply H1 in Hc. 
+        constructor. eauto. intros Hc. eapply H1 in Hc.
         congruence. congruence.
     - destruct (peq x0 x); subst.
       + rewrite M.gss in H. congruence.
@@ -201,11 +201,11 @@ Section CC_correct.
     intros [] s. eapply return_triple. intros _ s'. intros <-. intros [H1 H2]; subst. inv H1.
     intros; split; eauto.
   Qed.
-  
+
   (* TODO: move to Ensembles_util *)
   Lemma Disjoint_sym {A} S1 S2 : Disjoint A S1 S2 -> Disjoint A S2 S1.
   Proof. eauto with Ensembles_DB. Qed.
-  
+
   Lemma Disjoint_Union {A} S1 S2 S3 :
     Disjoint A S1 (S2 :|: S3) -> Disjoint A S1 S2 /\ Disjoint A S1 S3.
   Proof. eauto with Ensembles_DB. Qed.
@@ -233,7 +233,7 @@ Section CC_correct.
     {{ fun _ s => fresh S (next_var (fst s)) }}
       get_var clo_tag x FVmap gfuns c Γ
     {{ fun _ s t s' =>
-         exists C S', 
+         exists C S',
            (let '(x', f) := t in
            project_var clo_tag Scope Funs GFuns c (to_env FVmap) Γ FVs S x x' C S' /\
            is_exp_ctx f C /\ unique_bindings_c C) /\
@@ -242,11 +242,11 @@ Section CC_correct.
            (next_var (fst s') >= next_var (fst s))%positive
     }}.
   Proof.
-    intros Hin Minv Hgfuns. destruct Minv as [Minv1 [Minv2 Minv3]]. 
+    intros Hin Minv Hgfuns. destruct Minv as [Minv1 [Minv2 Minv3]].
     unfold get_var.
     destruct (FVmap ! x) as [[] |] eqn:Hx.
     - eapply bind_triple.
-      + eapply get_name_spec.     
+      + eapply get_name_spec.
       + intros x' s. eapply return_triple. intros _ s' [Hx' [Hrange [Hf Hf']]].
         eexists (Eproj_c x' _ n Γ Hole_c).
         edestruct Minv3 as [H1 [H2 [H3 [H4 H5]]]]. now repeat eexists; eauto.
@@ -258,9 +258,9 @@ Section CC_correct.
           intros Harb; inv Harb. unfold In, Range in *; zify; lia. }
         { zify; lia. }
     - eapply bind_triple.
-      + eapply get_name_spec.  
+      + eapply get_name_spec.
       + intros x' s. eapply return_triple. intros _ s' [Hx' [Hrange [Hf Hf']]].
-        edestruct Minv2 as [H1 H2]; eauto. 
+        edestruct Minv2 as [H1 H2]; eauto.
         exists (Econstr_c x' clo_tag [x; v] Hole_c). eexists; splits.
         { replace v with (to_env FVmap x) by (unfold to_env; now rewrite Hx).
           specialize (H2 x); unfold In, Setminus in H2; destruct H2 as [HFuns HScope]; [now exists v|].
@@ -271,7 +271,7 @@ Section CC_correct.
         { intros arb; repeat normalize_bound_var_ctx; normalize_sets.
           intros Harb; inv Harb. unfold In, Range in *; zify; lia. }
         { zify; lia. }
-    - eapply return_triple. intros _ [s d] Hin'.      
+    - eapply return_triple. intros _ [s d] Hin'.
       exists Hole_c. eexists; splits.
       { constructor; eapply Minv1. eauto. }
       { unfold is_exp_ctx; reflexivity. }
@@ -343,7 +343,7 @@ Section CC_correct.
   Proof.
     intros H.
     eapply post_weakening; [| eapply pre_strenghtening; [| eassumption ] ];
-    simpl; eauto. 
+    simpl; eauto.
   Qed.
   Lemma pre_post_mp_l_inv' {R W} {A} (P P' : @Pre R W) (Q : @Post R W A) e :
     (forall r w, P r w -> P' r w) ->
@@ -352,7 +352,7 @@ Section CC_correct.
   Proof.
     intros H Hpre.
     eapply post_weakening; [| eapply pre_strenghtening; [| eassumption ] ];
-    simpl; eauto. 
+    simpl; eauto.
   Qed.
 
   Lemma bind_triple' {R W A B} (m : compM R W A) (f : A -> compM R W B)
@@ -361,9 +361,9 @@ Section CC_correct.
     (forall (x : A) w, {{ fun r w' => P r w /\ Q' r w x w' }} f x {{ fun r _ x' w' => Q r w x' w' }}) ->
     {{ P }} bind m f {{ Q }}.
   Proof.
-    simpl. unfold triple; simpl. 
+    simpl. unfold triple; simpl.
     intros H1 H2 r w HP.
- 
+
     (* pose (Hm := H1 st s HP). *)
     destruct m as [fm].
     unfold runState in *; simpl in *.
@@ -585,7 +585,7 @@ Section CC_correct.
           rewrite (proj2 bound_var_ctx_comp_ctx); now right.
         * clear unique_bindings_c_comp_inv; specialize (unique_bindings_fundefs_c_comp_inv _ _ H12); intuition.
   Qed.
-  
+
   (** Spec for [get_vars] *)
   Lemma get_vars_project_vars_sound' Scope Funs GFuns gfuns c Γ FVs FVmap S xs S_pre s_pre :
     FromList xs \subset Scope :|: Funs :|: GFuns :|: FromList FVs ->
@@ -595,7 +595,7 @@ Section CC_correct.
                /\ (next_var (fst s) >= s_pre)%positive }}
       get_vars clo_tag xs FVmap gfuns c Γ
     {{ fun _ s t s' =>
-         exists C S', 
+         exists C S',
            (let '(xs', f) := t in
            project_vars clo_tag Scope Funs GFuns c (to_env FVmap) Γ FVs S xs xs' C S' /\
            is_exp_ctx f C /\
@@ -616,7 +616,7 @@ Section CC_correct.
     - eapply bind_triple.
       + eapply pre_strenghtening; [|eapply get_var_project_var_sound; eauto].
         { simpl; intros ? ? [Hleft ?]; exact Hleft. }
-        intros x Hin. eapply Hb. 
+        intros x Hin. eapply Hb.
         inv Hin. constructor. eauto.
       + intros [x f] s1.
         eapply pre_existential. intros C.
@@ -626,7 +626,7 @@ Section CC_correct.
         eapply bind_triple.
         eapply (IHxs S'); eauto.
         { intros y Hin. eapply Hb. constructor 2. eassumption. }
-        intros [xs' f'] s2. eapply return_triple.  
+        intros [xs' f'] s2. eapply return_triple.
         intros _ s [C' [S'' [[Hproj' [Hctx' Huniq']] [Hf' [Hran' Hinc']]]]] [Hf [Hran Hinc]].
         exists (comp_ctx_f C C'), S''; splits; auto.
         * econstructor; eauto.
@@ -649,7 +649,7 @@ Section CC_correct.
     {{ fun _ s => fresh S (next_var (fst s)) }}
       get_vars clo_tag xs FVmap gfuns c Γ
     {{ fun _ s t s' =>
-         exists C S', 
+         exists C S',
            (let '(xs', f) := t in
            project_vars clo_tag Scope Funs GFuns c (to_env FVmap) Γ FVs S xs xs' C S' /\
            is_exp_ctx f C /\
@@ -663,19 +663,19 @@ Section CC_correct.
     2: apply get_vars_project_vars_sound' with (S_pre := Empty_set _) (s_pre := 1%positive); auto.
     intros st s Hfresh; split; auto; split; eauto with Ensembles_DB; zify; lia.
   Qed.
-  
+
   Lemma to_env_BoundVar_f_eq_subdomain FVmap x S :
     f_eq_subdomain S ((to_env FVmap) {x ~> x}) (to_env (M.set x BoundVar FVmap)).
-  Proof.  
+  Proof.
     intros x'. unfold to_env, extend. rewrite M.gsspec.
-    destruct (peq x' x). now eauto. reflexivity. 
+    destruct (peq x' x). now eauto. reflexivity.
   Qed.
 
   Lemma to_env_BoundVar_f_eq FVmap x :
     f_eq ((to_env FVmap) {x ~> x}) (to_env (M.set x BoundVar FVmap)).
-  Proof.  
+  Proof.
     intros x'. unfold to_env, extend. rewrite M.gsspec.
-    destruct (peq x' x). now eauto. reflexivity. 
+    destruct (peq x' x). now eauto. reflexivity.
   Qed.
 
   Lemma Disjoint_free_set FVmap Scope Funs GFuns FVs S :
@@ -684,22 +684,22 @@ Section CC_correct.
     FVmap_inv FVmap Scope Funs GFuns FVs ->
     Disjoint _ S (Union var Scope
                         (Union var Funs (FromList FVs))).
-  Proof.             
+  Proof.
     intros Hb Hdis [Hinv1 [Hinv2 Hinv3]].
-    constructor. intros x Hc. inv Hc. 
+    constructor. intros x Hc. inv Hc.
     assert (Hdec1 : Decidable Scope).
     { eapply Decidable_Same_set. apply Same_set_sym. eassumption.
       constructor. intros x'. destruct (M.get x' FVmap).
       - destruct v; eauto;
-        right; intros; congruence. 
+        right; intros; congruence.
       - right. intros; congruence. }
     assert (Hdec2 : Decidable (Setminus _ Funs Scope)).
     { eapply Decidable_Same_set. apply Same_set_sym. eassumption.
       constructor. intros x'. destruct (M.get x' FVmap).
       - destruct v; eauto;
-        right; intros [y Hc]; congruence. 
+        right; intros [y Hc]; congruence.
       - right. intros [y Hc]; congruence. }
-    destruct Hdec1, Hdec2. destruct (Dec x) as [Hin | Hnin]. 
+    destruct Hdec1, Hdec2. destruct (Dec x) as [Hin | Hnin].
     - eapply Hinv1 in Hin.
       unfold In in Hin. rewrite Hb in Hin; eauto. congruence.
     - destruct (Dec0 x) as [Hin' | Hnin'].
@@ -708,7 +708,7 @@ Section CC_correct.
       + unfold binding_not_in_map in Hb.
         inv H0; try contradiction.
         inv H1. now eapply Hnin'; constructor; eauto.
-        unfold In, FromList in H0.        
+        unfold In, FromList in H0.
         edestruct In_nthN as [N Hnth]; [ eassumption |].
         destruct (Hinv3 N x) as [Hinv3' _].
         rewrite Hb in Hinv3'; [| eassumption ].
@@ -718,21 +718,21 @@ Section CC_correct.
           apply Hdis; now constructor. }
         specialize (Hinv3' (conj Hnth (conj Hnin (conj H3 Hgfuns)))). congruence.
   Qed.
-  
+
   Lemma binding_not_in_map_antimon (A : Type) (S S' : Ensemble M.elt) (rho : M.t A):
     Included M.elt S' S -> binding_not_in_map S rho -> binding_not_in_map S' rho.
-  Proof. 
+  Proof.
     intros Hin Hb x Hin'. eauto.
   Qed.
 
   Lemma binding_not_in_map_set_not_In_S {A} S map x (v : A) :
     binding_not_in_map S map ->
     ~ In _ S x ->
-    binding_not_in_map S (M.set x v map). 
-  Proof. 
+    binding_not_in_map S (M.set x v map).
+  Proof.
     intros HB Hnin x' Hin.
-    rewrite M.gsspec. destruct (peq x' x); subst; try contradiction. 
-    eauto. 
+    rewrite M.gsspec. destruct (peq x' x); subst; try contradiction.
+    eauto.
   Qed.
 
   Import MonadNotation.
@@ -743,14 +743,14 @@ Section CC_correct.
       as a subcomputation in the goal *)
   Lemma st_eq_Ecase {S} m1 (m2 : @compM' S (var * (exp -> exp))) y :
     st_eq
-      (ys <- m1 ;; 
+      (ys <- m1 ;;
        ys' <- ret (y :: ys) ;;
        t1 <- m2 ;;
        let '(x, f) := t1 in
        ret (Ecase x ys', f))
       (fe <- (ys <- m1 ;;
              t1 <- m2 ;;
-             let '(x, f1) := t1 in    
+             let '(x, f1) := t1 in
              ret (Ecase x ys, f1)) ;;
        match fe with
          | (Ecase x ys, f) =>
@@ -770,35 +770,35 @@ Section CC_correct.
 
   Global Instance FVmap_inv_Scope_Proper :
     Proper (Logic.eq ==> Same_set var ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> iff) FVmap_inv.
-  Proof. 
+  Proof.
     intros M1 M2 Heq1 S1 S2 Heq2 S3 S4 Heq3 S5 S6 Heq6 l1 l2 Heq4; subst; split; intros [H1 [H2 H3]].
-    - (split; [| split ]); try rewrite <- Heq2; eauto. 
+    - (split; [| split ]); try rewrite <- Heq2; eauto.
       split. intros [Hnth [Hnin1 [Hnin2 Hnin3]]]. eapply H3. repeat split; eauto.
       now rewrite Heq2.
-      intros H. rewrite <- Heq2. eapply H3. eassumption. 
-    - (split; [| split ]); try rewrite Heq2; eauto. 
+      intros H. rewrite <- Heq2. eapply H3. eassumption.
+    - (split; [| split ]); try rewrite Heq2; eauto.
       split. intros [Hnth [Hnin1 [Hnin2 Hnin3]]]. eapply H3. repeat split; eauto.
       now rewrite <- Heq2.
-      intros H. rewrite Heq2. eapply H3. eassumption. 
+      intros H. rewrite Heq2. eapply H3. eassumption.
   Qed.
 
   Global Instance FVmap_inv_Funs_Proper :
     Proper (Logic.eq ==> Logic.eq ==> Same_set var ==> Logic.eq ==> Logic.eq ==> iff) FVmap_inv.
-  Proof. 
+  Proof.
     intros M1 M2 Heq1 S1 S2 Heq2 S3 S4 Heq3 S5 S6 Heq6 l1 l2 Heq4; subst; split; intros [H1 [H2 H3]].
     - (split; [| split ]); try rewrite <- Heq3; eauto.
       split. intros [Hnth [Hnin1 [Hnin2 Hnin3]]]. eapply H3. repeat split; eauto.
       now rewrite Heq3.
-      intros H. rewrite <- Heq3. eapply H3. eassumption. 
-    - (split; [| split ]); try rewrite Heq3; eauto. 
+      intros H. rewrite <- Heq3. eapply H3. eassumption.
+    - (split; [| split ]); try rewrite Heq3; eauto.
       split. intros [Hnth [Hnin1 [Hnin2 Hnin3]]]. eapply H3. repeat split; eauto.
       now rewrite <- Heq3.
-      intros H. rewrite Heq3. eapply H3. eassumption. 
+      intros H. rewrite Heq3. eapply H3. eassumption.
   Qed.
 
   Global Instance FVmap_inv_GFuns_Proper :
     Proper (Logic.eq ==> Logic.eq ==> Logic.eq ==> Same_set var ==> Logic.eq ==> iff) FVmap_inv.
-  Proof. 
+  Proof.
     intros M1 M2 Heq1 S1 S2 Heq2 S3 S4 Heq3 S5 S6 Heq6 l1 l2 Heq4; subst; split; intros [H1 [H2 H3]].
     - unfold FVmap_inv; splits; auto.
       intros; rewrite <- Heq6; auto.
@@ -808,12 +808,12 @@ Section CC_correct.
 
   Lemma FVmapInv_add_params FVmap xs Scope Funs GFuns FVs :
     FVmap_inv FVmap Scope Funs GFuns FVs ->
-    FVmap_inv (add_params xs FVmap) (Union _ Scope (FromList xs)) Funs GFuns FVs. 
-  Proof. 
+    FVmap_inv (add_params xs FVmap) (Union _ Scope (FromList xs)) Funs GFuns FVs.
+  Proof.
     revert FVmap Scope. induction xs; intros FVmap Scope Hinv.
     - rewrite FromList_nil, Union_Empty_set_neut_r. eauto.
     - rewrite FromList_cons.
-      rewrite Union_assoc, Union_commut with (s2 := Singleton M.elt a), <- Union_assoc. 
+      rewrite Union_assoc, Union_commut with (s2 := Singleton M.elt a), <- Union_assoc.
       eapply FVmap_inv_set_bound; eauto.
   Qed.
 
@@ -825,7 +825,7 @@ Section CC_correct.
     - intros x. rewrite FromList_nil, Union_Empty_set_neut_r. eauto.
     - intros x. rewrite FromList_cons.
       rewrite Union_commut with (s2 := FromList xs), Union_assoc.
-      simpl. eapply binding_in_map_set; eauto. 
+      simpl. eapply binding_in_map_set; eauto.
   Qed.
 
   Lemma binding_not_in_map_add_params S FVmap xs :
@@ -841,7 +841,7 @@ Section CC_correct.
         constructor. intros x Hc. inv Hc. eapply Hd. now constructor; eauto.
       + intros Hc. eapply Hd. eauto.
   Qed.
-  
+
   Lemma FVmap_inv_empty GFuns :
     FVmap_inv (Maps.PTree.empty VarInfo) (Empty_set M.elt) (Empty_set M.elt) GFuns [].
   Proof.
@@ -850,30 +850,30 @@ Section CC_correct.
     rewrite M.gempty in H. now inv H.
     rewrite M.gempty in H. now inv H.
   Qed.
-    
+
   Lemma FVmap_inv_set_free_var FVmap Scope Funs GFuns FVs x n:
     FVmap_inv FVmap Scope Funs GFuns FVs ->
     N.of_nat (length FVs) = n ->
     ~ In _ Scope x -> ~ In  _ Funs x -> ~ In _ GFuns x -> ~ List.In x FVs ->
-    FVmap_inv (Maps.PTree.set x (FVar n) FVmap) Scope Funs GFuns (FVs ++ [x]). 
-  Proof.  
+    FVmap_inv (Maps.PTree.set x (FVar n) FVmap) Scope Funs GFuns (FVs ++ [x]).
+  Proof.
     intros [H1 [H2 H3]] Hlen Hnin1 Hnin2 Hnin3.
-    split; [| split ]. 
+    split; [| split ].
     - split.
       + intros x' Hin. assert (Hin' := Hin). eapply H1 in Hin.
         destruct (peq x' x).
         subst; contradiction.
         unfold In. now rewrite M.gso; eauto.
-      + intros x' Hget. eapply H1. 
+      + intros x' Hget. eapply H1.
         unfold In in Hget. rewrite M.gsspec in Hget. destruct (peq x' x).
         subst; congruence. now eauto.
     - split.
-      + intros x' Hin. assert (Hin' := Hin). inv Hin'. 
+      + intros x' Hin. assert (Hin' := Hin). inv Hin'.
         eapply H2 in Hin. edestruct Hin as [y Heq].
         destruct (peq x' x).
         subst; contradiction.
         eexists. rewrite M.gso; eauto.
-      + intros x' [y Hget]. eapply H2. 
+      + intros x' [y Hget]. eapply H2.
         rewrite M.gsspec in Hget. destruct (peq x' x).
         subst; congruence.
         now eauto.
@@ -889,12 +889,12 @@ Section CC_correct.
           rewrite length_app in Hnth. simpl length in *.
           destruct (N - N.of_nat (length FVs))%N eqn:Heq; simpl in Hn; try congruence.
           inv Hn. rewrite M.gss; eauto.
-          repeat f_equal. zify. lia. 
+          repeat f_equal. zify. lia.
       + subst. intros Hget.
         rewrite M.gsspec in Hget. destruct (peq x' x).
         * subst. inv Hget. repeat split; eauto.
-          rewrite nthN_app_geq. rewrite N.sub_diag. reflexivity. 
-          zify; lia. 
+          rewrite nthN_app_geq. rewrite N.sub_diag. reflexivity.
+          zify; lia.
         * edestruct H3 as [_ [H1' [H2' [H3' H4']]]].
           eassumption.
           repeat split; eauto. apply nthN_is_Some_app. eassumption.
@@ -925,7 +925,7 @@ Section CC_correct.
            binding_not_in_map (Complement _ (FromList fv)) FVmap_n /\
            FVmap_inv FVmap_n (Empty_set _) (Empty_set _) GFuns fv
      }}.
-  Proof. 
+  Proof.
     intros Hb1 Hb2 Minv Hgfuns Hdis Hdup Hnin. unfold make_env.
     destruct ((fix
                  add_fvs (l : list M.elt) (n : N) (map : Maps.PTree.tree VarInfo)
@@ -948,7 +948,7 @@ Section CC_correct.
       intros tau s2. eapply return_triple.
       intros _ s3 [[Hf [Hran Hinc]] Hst_eq] Hfresh.
       do 3 eexists. split; [splits|split; [|split; [|split]]]; try eassumption.
-      + clear - Heq. 
+      + clear - Heq.
         assert (Hnin : forall x, to_env (PTree.empty VarInfo) x = x) by (intros; unfold to_env; now rewrite M.gempty).
         remember (PTree.empty VarInfo) as map_old eqn:Hold; clear Hold.
         remember 0%N as n_init eqn:Hold; clear Hold.
@@ -995,13 +995,13 @@ Section CC_correct.
         replace fv with ([] ++ fv) at 1 3 6 by reflexivity.
         revert Hlen He Hb Hb' Hnin Hdis Hdup. generalize (Maps.PTree.empty VarInfo) as FVmap_i.
         unfold PS.elt, map_util.M.elt in *.
-        generalize (@nil positive). generalize 0%N. 
+        generalize (@nil positive). generalize 0%N.
         induction fv as [|v fv IHfv]; intros n vars FVmap_i Hlen Hinv Hb Hb' Hnin Hdis Hdup.
         * simpl. rewrite app_nil_r. eauto.
         * simpl. replace (vars ++ v :: fv) with ((vars ++ [v]) ++ fv). simpl.
           eapply IHfv. rewrite length_app. simpl. zify. lia.
-          eapply FVmap_inv_set_free_var. now eauto. eassumption. 
-          now intros Hc; inv Hc. now intros Hc; inv Hc. 
+          eapply FVmap_inv_set_free_var. now eauto. eassumption.
+          now intros Hc; inv Hc. now intros Hc; inv Hc.
           { normalize_sets. apply Disjoint_sym, Disjoint_Union_l in Hdis.
             intros Hc; destruct Hdis as [Hdis]; now contradiction (Hdis v). }
           { eapply Hnin. constructor. reflexivity. }
@@ -1009,13 +1009,13 @@ Section CC_correct.
             rewrite FromList_app, FromList_cons, FromList_nil, Union_Empty_set_neut_r in H.
             eassumption. }
           { eapply binding_not_in_map_set_not_In_S.
-            eapply binding_not_in_map_antimon; [| eassumption ].  
+            eapply binding_not_in_map_antimon; [| eassumption ].
             eapply Complement_antimon. rewrite FromList_app. now apply Included_Union_l.
             intros Hc. eapply Hc.
             rewrite FromList_app, FromList_cons, FromList_nil. now eauto. }
           { intros x Hin Hc. eapply Hnin.
             - now constructor 2; eauto.
-            - inv Hdup. apply Coqlib.in_app in Hc. inv Hc; eauto. inv H. 
+            - inv Hdup. apply Coqlib.in_app in Hc. inv Hc; eauto. inv H.
               exfalso. eapply H1. eauto. now inv H0. }
           { normalize_sets.
             now apply Disjoint_sym, Disjoint_Union_r, Disjoint_sym in Hdis. }
@@ -1032,7 +1032,7 @@ Section CC_correct.
 
   Global Instance extend_fundefs'_Proper S :
     Proper (f_eq_subdomain S ==> eq ==> eq ==> f_eq_subdomain S) extend_fundefs'.
-  Proof. 
+  Proof.
     intros σ σ' Hσ B B' HB Γ Γ' HΓ; unfold extend_fundefs'; intros g Hg; subst;
       destruct (Dec g) as [Hin|Hnin]; auto.
   Qed.
@@ -1040,7 +1040,7 @@ Section CC_correct.
   Lemma extend_fundefs'_eq_subdomain S σ σ' B Γ :
     f_eq_subdomain S σ σ' ->
     f_eq_subdomain (name_in_fundefs B :|: S) (extend_fundefs' σ B Γ) (extend_fundefs' σ' B Γ).
-  Proof. 
+  Proof.
     unfold extend_fundefs'; intros Hσ g Hg.
     destruct (Dec g) as [Hin|Hnin]; auto.
     rewrite Hσ; auto.
@@ -1252,17 +1252,17 @@ Section CC_correct.
     Proper
       (f_eq_subdomain (Funs \\ Scope) ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff)
       (project_var clo_tag Scope Funs GFuns c).
-  Proof. 
+  Proof.
     constructor; subst; intros Hproj; inv Hproj; try (now constructor; eauto).
     - rewrite H; now econstructor; eauto.
     - rewrite <- H; now econstructor; eauto.
   Qed.
-  
+
   Global Instance project_vars_Proper Scope Funs GFuns c :
     Proper
       (f_eq_subdomain (Funs \\ Scope) ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff)
       (project_vars clo_tag Scope Funs GFuns c).
-  Proof. 
+  Proof.
       constructor; subst; intros Hproj; induction Hproj; try (now constructor; eauto).
       - econstructor. eapply project_var_Proper; eauto.
         now symmetry. now eauto.
@@ -1278,7 +1278,7 @@ Section CC_correct.
        (Hinc : Included _ (name_in_fundefs B) (name_in_fundefs Funs))
        (Hcc : Closure_conversion_fundefs clo_tag Funs GFuns c FVs B B'),
        Closure_conversion_fundefs clo_tag Funs GFuns c FVs B B').
-  Proof with now eauto with Ensembles_DB. 
+  Proof with now eauto with Ensembles_DB.
     eapply exp_def_mutual_ind; intros; inv Hcc.
     - econstructor; try reflexivity.
       rewrite <- image_f_eq_subdomain; eassumption.
@@ -1327,7 +1327,7 @@ Section CC_correct.
     - econstructor. rewrite <- image_f_eq_subdomain; eassumption.
       eapply project_var_Proper; [symmetry; eassumption |..]; try reflexivity; eassumption.
     - econstructor; try eassumption.
-    - constructor. 
+    - constructor.
   Qed.
 
   Corollary Closure_conversion_f_eq_subdomain :
@@ -1344,7 +1344,7 @@ Section CC_correct.
        (Hinc : Included _ (name_in_fundefs B) (name_in_fundefs Funs))
        (Hcc : Closure_conversion_fundefs clo_tag Funs GFuns c FVs B B'),
        Closure_conversion_fundefs clo_tag Funs GFuns c FVs B B'.
-  Proof. 
+  Proof.
     now apply Closure_conversion_f_eq_subdomain_mut.
   Qed.
 
@@ -1363,7 +1363,7 @@ Section CC_correct.
       eapply IHl. eapply Disjoint_Included_l; [| eassumption ].
       rewrite FromList_cons. now apply Included_Union_r.
   Qed.
-    
+
   Hint Resolve image_Setminus_extend : functions_BD.
  *)
 
@@ -1414,7 +1414,7 @@ Section CC_correct.
   (* move to proper file *)
   Lemma fresh_inc S x y : (y >= x)%positive -> fresh S x -> fresh S y.
   Proof. unfold fresh, In; intros Hyx Hx; intros; apply Hx; zify; lia. Qed.
-  
+
   Lemma fundefs_append_used_vars : forall B1 B2 B3,
     fundefs_append B1 B2 = B3 ->
     used_vars_fundefs B3 <--> used_vars_fundefs B1 :|: used_vars_fundefs B2.
@@ -1424,7 +1424,7 @@ Section CC_correct.
       normalize_used_vars. eauto with Ensembles_DB.
     - subst. simpl; normalize_used_vars; normalize_sets. eauto with Ensembles_DB.
   Qed.
-  
+
   Lemma filter_NoDup A f (xs : list A) : NoDup xs -> NoDup (filter f xs).
   Proof.
     induction xs as [|x xs IHxs]; [constructor|intros Hdup; inv Hdup; simpl].
@@ -1467,7 +1467,7 @@ Section CC_correct.
       rewrite filter_In; split; [|now rewrite Hnone].
       apply Hin.
   Qed.
-  
+
   Lemma Disjoint_Complement : forall (A : Type) (S1 S2 : Ensemble A),
     Disjoint A S1 S2 ->
     S1 \subset Complement A S2.
@@ -1551,7 +1551,7 @@ Section CC_correct.
       + now rewrite Hempty.
       + now rewrite Hempty in H.
   Qed.
-  
+
   Lemma binding_in_map_add_closures S FVmap B Γ :
     binding_in_map S FVmap ->
     binding_in_map (S :|: name_in_fundefs B) (add_closures B FVmap Γ).
@@ -1569,7 +1569,7 @@ Section CC_correct.
         rewrite Hv; eauto.
     - simpl; now normalize_sets.
   Qed.
-  
+
   Lemma add_closures_image B FVmap Γ :
     image (to_env (add_closures B FVmap Γ)) (name_in_fundefs B) \subset [set Γ].
   Proof.
@@ -1596,7 +1596,7 @@ Section CC_correct.
     destruct (@Dec _ (name_in_fundefs B) _ y) as [HinB|HninB]; [easy|].
     eauto.
   Qed.
-  
+
   Lemma add_params_irrelevant' x xs FVmap :
     ~ List.In x xs ->
     (add_params xs FVmap) ! x = FVmap ! x.
@@ -1606,7 +1606,7 @@ Section CC_correct.
     rewrite M.gso by auto.
     apply IHxs; intros Hin; contradiction Hnotin; now right.
   Qed.
-  
+
   Lemma add_closures_irrelevant B FVmap Γ x :
     ~ x \in name_in_fundefs B ->
     (add_closures B FVmap Γ) ! x = FVmap ! x.
@@ -1616,7 +1616,7 @@ Section CC_correct.
     rewrite M.gso by auto.
     apply IHB; intros Hin; contradiction Hnotin; now right.
   Qed.
-  
+
   Lemma add_params_image xs FVmap S :
     image (to_env (add_params xs FVmap)) S \subset FromList xs :|: image (to_env FVmap) S.
   Proof.
@@ -1630,7 +1630,7 @@ Section CC_correct.
     rewrite M.gso in Hyeq by auto.
     eauto.
   Qed.
-  
+
   Lemma add_closures_image' B FVmap Γ S :
     image (to_env (add_closures B FVmap Γ)) S \subset [set Γ] :|: image (to_env FVmap) S.
   Proof.
@@ -1690,7 +1690,7 @@ Section CC_correct.
        (HD2 : Disjoint _ GFuns (bound_var_fundefs Bg \\ name_in_fundefs Bg)),
        {{ fun _ s => fresh S (next_var (fst s)) }}
          fundefs_closure_conv clo_tag Bg B FVmap gfuns c
-       {{ fun _ s B' s' =>     
+       {{ fun _ s B' s' =>
           fresh S (next_var (fst s')) /\
           Closure_conversion_fundefs clo_tag Bg GFuns c FVs B B' /\
           bound_var_fundefs B' \subset bound_var_fundefs B :|: Range (next_var (fst s)) (next_var (fst s')) /\
@@ -1712,7 +1712,7 @@ Section CC_correct.
         eapply H with (Scope := Union var (Singleton var v) Scope)
                       (S := S')
                       (FVmap := Maps.PTree.set v BoundVar FVmap).
-        * eapply FVmap_inv_set_bound. eassumption. 
+        * eapply FVmap_inv_set_bound. eassumption.
         * (* x is the only new binding *) clear - Hbin1.
           normalize_occurs_free_in_ctx.
           intros x Hx. specialize (Hbin1 x).
@@ -1722,7 +1722,7 @@ Section CC_correct.
           destruct (peq v x); [subst; left; left; left; now left|].
           assert (~ [set v] x) by (intros Hc; inv Hc; congruence).
           tauto.
-        * eapply binding_not_in_map_antimon. 
+        * eapply binding_not_in_map_antimon.
           apply Included_Union_compat.
           eapply project_vars_free_set_Included; now eauto.
           now apply Included_refl.
@@ -1763,7 +1763,7 @@ Section CC_correct.
              ++ eapply FV_preserves_disjoint_inv; eauto.
              ++ eapply Closure_conversion_f_eq_subdomain; [eassumption|].
                 rewrite <- to_env_BoundVar_f_eq. apply f_eq_subdomain_extend_not_In_S_l.
-                intros Hc. inv Hc. now eauto. reflexivity. 
+                intros Hc. inv Hc. now eauto. reflexivity.
           -- eapply Included_trans; try eassumption.
              intros arb Harb; unfold Range, In in *; zify; lia.
           -- zify; lia.
@@ -1881,7 +1881,7 @@ Section CC_correct.
           solve_Union_Inc.
         * (* Follows from HD2 *)
           intros Hc; contradiction HD2; repeat normalize_used_vars; now right.
-        * intros [e'' f] s''.   
+        * intros [e'' f] s''.
           edestruct e''; eapply return_triple;
             intros _ s''' [Hpre [Hfresh_s''' [C2 [Hctx2 [Hcc2' Hf2]]]]]; inv Hcc2'.
           destruct Hf2 as [HbvC2 [Hinc'' [Hbv_case Huniq'']]], Hpre as [HbvC [Hinc' [Hbv_e Huniq_e]]].
@@ -1968,7 +1968,7 @@ Section CC_correct.
                       (S := S')
                       (FVmap := Maps.PTree.set v BoundVar FVmap).
         { clear; tauto. }
-        * eapply FVmap_inv_set_bound. eassumption. 
+        * eapply FVmap_inv_set_bound. eassumption.
         * (* v is the only new binding *)
           clear - Hbin1. normalize_occurs_free_in_ctx.
           intros x Hx. specialize (Hbin1 x).
@@ -1995,7 +1995,7 @@ Section CC_correct.
         * eapply Disjoint_Included_l. eapply project_var_free_set_Included; now eauto.
           rewrite <- to_env_BoundVar_f_eq.
           eapply Disjoint_Included_r; [| eassumption ].
-          apply Included_Union_compat. 
+          apply Included_Union_compat.
           2: rewrite (Union_commut (Singleton _ _)), <- Setminus_Union.
           2: now eapply image_Setminus_extend.
           apply Included_Union_compat; [| now apply Included_refl ].
@@ -2090,7 +2090,7 @@ Section CC_correct.
       { simpl; intros ? ? [? [? Hres]]; exact Hres. }
       { eapply H with (Scope := x |: Scope)
                       (FVmap := Maps.PTree.set x BoundVar FVmap); try eassumption.
-        - eapply FVmap_inv_set_bound. eassumption. 
+        - eapply FVmap_inv_set_bound. eassumption.
         - (* Hbin1 *)
           clear - Hbin1.
           normalize_occurs_free_in_ctx.
@@ -2206,7 +2206,7 @@ Section CC_correct.
                 constructor.
                 + apply Hfresh; unfold Range, In in *; zify; lia.
                 + unfold used_vars; normalize_bound_var; left; left; right; left; now left.
-              - intros Hc; inv Hc. 
+              - intros Hc; inv Hc.
                 destruct HD1 as [HD1]; contradiction (HD1 ptr).
                 constructor.
                 + apply Hfresh; unfold Range, In in *; zify; lia.
@@ -2223,7 +2223,7 @@ Section CC_correct.
                 constructor.
                 + apply Hfresh; unfold Range, In in *; zify; lia.
                 + unfold used_vars; normalize_bound_var; left; left; right; left; now left.
-              - intros Hc; inv Hc. 
+              - intros Hc; inv Hc.
                 destruct HD1 as [HD1]; contradiction (HD1 Γ').
                 constructor.
                 + apply Hfresh; unfold Range, In in *; zify; lia.
@@ -2313,8 +2313,8 @@ Section CC_correct.
         - eapply binding_not_in_map_antimon; [| eassumption ]...
         - (* GFuns # (filter (not . member gfuns) _) because dom(gfuns) = GFuns *)
           rewrite HFVs_pre_eq; eauto with Ensembles_DB.
-        - (* NoDup (filter _ (PS.elements xs)) 
-               <== NoDup (PS.elements xs) 
+        - (* NoDup (filter _ (PS.elements xs))
+               <== NoDup (PS.elements xs)
                <== NoDupA eq (PS.elements xs) (by NoDupA_NoDup)
                qed (by PS.elements_spec2w) *)
           subst FVs_pre.
@@ -2492,7 +2492,7 @@ Section CC_correct.
              ⊆ FVmap_n(names(f2)) ∪ FVmap_n(Funs\Scope) ∪ FVmap_n(names(f2)) (Setminus_Setminus_Included)
              = FVmap_n(Funs\Scope) ∪ FVmap_n(names(f2))
              = FVmap(Funs\Scope) ∪ {Γ'} (by HFVmap_n and fact that names(f2) # Funs\Scope by Hdis2)
-           names(f2) ∪ Funs\(Scope\names(f2)) ∪ GFuns' ∪ vars(e) ∪ {Γ} ∪ FVmap(Funs\Scope) # S by HD1 
+           names(f2) ∪ Funs\(Scope\names(f2)) ∪ GFuns' ∪ vars(e) ∪ {Γ} ∪ FVmap(Funs\Scope) # S by HD1
            Γ' ∉ S_env by Hran_Γ', Hfresh_B', Hinc_B' *)
         assert (HS_sub : S_env \subset S). {
           assert (Henv_sub : S_env \subset S \\ [set Γ'])
@@ -2717,7 +2717,7 @@ Section CC_correct.
           intros x' i. eapply pre_curry_l. intros [Hfresh'' Hf1].
           eapply bind_triple'; [eapply pre_strenghtening; [|eapply get_name_spec] |].
           { intros ? ? [? [? [? Hres]]]; exact Hres. }
-          intros x'' s3. eapply pre_curry_l. intros Hf2. 
+          intros x'' s3. eapply pre_curry_l. intros Hf2.
           eapply return_triple.
           intros _ s5 Hf5. simpl.
           split; [eapply fresh_inc; [|eassumption]; zify; lia|].
@@ -2771,7 +2771,7 @@ Section CC_correct.
       + eapply H with (Scope := Union var (Singleton var v) Scope)
         (S := S)
         (FVmap := Maps.PTree.set v BoundVar FVmap).
-        * eapply FVmap_inv_set_bound. eassumption. 
+        * eapply FVmap_inv_set_bound. eassumption.
         * (* Hbin1 *)
           clear - Hbin1.
           normalize_occurs_free_in_ctx.
@@ -2782,7 +2782,7 @@ Section CC_correct.
           destruct (peq v x); [subst; left; left; left; now left|].
           assert (~ [set v] x) by (intros Hc; inv Hc; congruence).
           tauto.
-        * eapply binding_not_in_map_antimon. 
+        * eapply binding_not_in_map_antimon.
           now apply Included_refl.
           eapply binding_not_in_map_set_not_In_S. eassumption.
           intros Hc; inv Hc.
@@ -2846,7 +2846,7 @@ Section CC_correct.
         eapply H with (Scope := Union var (Singleton var v) Scope)
                       (S := S')
                       (FVmap := Maps.PTree.set v BoundVar FVmap).
-        * eapply FVmap_inv_set_bound. eassumption. 
+        * eapply FVmap_inv_set_bound. eassumption.
         * (* Hbin1 *)
           clear - Hbin1.
           normalize_occurs_free_in_ctx.
@@ -2857,7 +2857,7 @@ Section CC_correct.
           destruct (peq v x); [subst; left; left; left; now left|].
           assert (~ [set v] x) by (intros Hc; inv Hc; congruence).
           tauto.
-        * eapply binding_not_in_map_antimon. 
+        * eapply binding_not_in_map_antimon.
           apply Included_Union_compat.
           eapply project_vars_free_set_Included; now eauto.
           now apply Included_refl.
@@ -2962,7 +2962,7 @@ Section CC_correct.
         repeat normalize_sets. apply Minv. }
       { (* Follows from Hbin1. useful lemma: occurs_free_in_fun *)
         eapply Included_trans; [eapply (occurs_free_in_fun v t l e Bg)|].
-        - subst Bg. 
+        - subst Bg.
           change (?f ?x) with (x \in f).
           rewrite fundefs_append_fun_in_fundefs by reflexivity.
           right; now left.
@@ -3250,7 +3250,7 @@ Section CC_correct.
   Qed.
 
   Transparent exp_closure_conv.
-(* 
+(*
   (** Correctness of [exp_closure_conv] *)
   Corollary exp_closure_conv_correct k rho rho' S e c Γ FVmap Scope Funs FVs :
     (* [Scope], [Funs] and [FVs] are uniquely identified by [FVmap] *)
@@ -3282,8 +3282,8 @@ Section CC_correct.
     {{ fun s => fresh S (next_var s) }}
       exp_closure_conv clo_tag e FVmap c Γ
     {{ fun s ef s' =>
-         let '(e', f) := ef in 
-         cc_approx_exp pr cenv clo_tag k (boundL k e rho) boundG (e, rho) (f e', rho')    
+         let '(e', f) := ef in
+         cc_approx_exp pr cenv clo_tag k (boundL k e rho) boundG (e, rho) (f e', rho')
     }}.
   Proof.
     intros IFVmap HGamma Hin_map_rho Hin_map_FVmap Hun
@@ -3297,10 +3297,10 @@ Section CC_correct.
 
   Lemma get_var_is_exp_ctx  x FVmap c Γ :
     {{ fun s => True }}
-      get_var clo_tag x FVmap c Γ 
+      get_var clo_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
-         (exists C, is_exp_ctx f C) 
+         (exists C, is_exp_ctx f C)
      }}.
   Proof with now eauto with Ensembles_DB.
     unfold get_var. destruct (Maps.PTree.get x FVmap) eqn:Heq.
@@ -3323,15 +3323,15 @@ Section CC_correct.
 
   Lemma get_vars_is_exp_ctx  xs FVmap c Γ :
     {{ fun s => True }}
-      get_vars clo_tag xs FVmap c Γ 
+      get_vars clo_tag xs FVmap c Γ
     {{ fun s t s' =>
          let (xs', f) := t in
-         (exists C, is_exp_ctx f C) 
+         (exists C, is_exp_ctx f C)
      }}.
   Proof with now eauto with Ensembles_DB.
     induction xs.
     - apply return_triple. intros _ _.
-      exists Hole_c; intros ?; reflexivity. 
+      exists Hole_c; intros ?; reflexivity.
     - eapply bind_triple.
       + apply get_var_is_exp_ctx.
       + intros [x f] i. apply pre_post_mp_l.
@@ -3348,7 +3348,7 @@ Section CC_correct.
       make_env clo_tag FVset FVmap FVmap' c Γ Γ'
     {{ fun s t s' =>
          let '(_, _, f) := t in
-         (exists C, is_exp_ctx f C) 
+         (exists C, is_exp_ctx f C)
      }}.
   Proof with now eauto with Ensembles_DB.
     unfold make_env.
@@ -3361,9 +3361,9 @@ Section CC_correct.
           match l with
             | [] => (map, n)
             | x :: xs =>
-              add_fvs xs 
+              add_fvs xs
                       (n + 1)%N
-                      (Maps.PTree.set x 
+                      (Maps.PTree.set x
                                       (FVar n) map)
           end) (PS.elements FVset) 0%N
                (Maps.PTree.empty VarInfo)).
@@ -3371,7 +3371,7 @@ Section CC_correct.
     + apply get_vars_is_exp_ctx.
     + intros [xs f] i. apply pre_post_mp_l.
       eapply bind_triple. apply post_trivial.
-      intros. eapply return_triple. intros _ _ [C Hctx]. 
+      intros. eapply return_triple. intros _ _ [C Hctx].
       eexists (comp_ctx_f C (Econstr_c Γ x xs Hole_c)).
       intros e. rewrite <- app_ctx_f_fuse, Hctx.
       reflexivity.
@@ -3384,7 +3384,7 @@ Section CC_correct.
          exists C, is_exp_ctx (snd ef) C
      }}.
   Proof.
-    destruct e. 
+    destruct e.
     - eapply bind_triple.
       now apply get_vars_is_exp_ctx.
       intros [? ?]; intros. eapply pre_post_mp_l.
@@ -3396,14 +3396,14 @@ Section CC_correct.
       now eapply return_triple.
     - unfold exp_closure_conv.
       eapply bind_triple. now apply get_var_is_exp_ctx.
-      intros [? ?]; intros. eapply pre_post_mp_l.            
+      intros [? ?]; intros. eapply pre_post_mp_l.
       eapply bind_triple; [ now apply post_trivial | intros].
       now eapply return_triple.
     - eapply bind_triple; [ now apply post_trivial | intros].
       eapply bind_triple. now apply make_env_is_exp_ctx.
       intros [[? ?] ?]; intros. eapply pre_post_mp_l.
       eapply bind_triple; [ now apply post_trivial | intros].
-      destruct x0 as [[? ?] ?]. 
+      destruct x0 as [[? ?] ?].
       eapply bind_triple; [ now apply post_trivial | intros].
       eapply bind_triple; [ now apply post_trivial | intros].
       now eapply return_triple.
@@ -3413,9 +3413,9 @@ Section CC_correct.
       intros [? ?]; intros. eapply pre_post_mp_l.
       eapply bind_triple; [ now apply post_trivial | intros].
       eapply bind_triple; [ now apply post_trivial | intros].
-      eapply return_triple. intros _ _ [C1 H1] [C2 H2]. 
+      eapply return_triple. intros _ _ [C1 H1] [C2 H2].
       simpl. eexists (comp_ctx_f C2 C1). intros e'.
-      rewrite <- app_ctx_f_fuse. congruence. 
+      rewrite <- app_ctx_f_fuse. congruence.
     - eapply bind_triple.
       now apply get_vars_is_exp_ctx.
       intros [? ?]; intros. eapply pre_post_mp_l.
@@ -3429,7 +3429,7 @@ Section CC_correct.
   Lemma get_var_bound_var_Included  x FVmap c Γ S S':
     ~ In _ S x ->
     {{ fun s => fresh S (next_var s) }}
-      get_var clo_tag x FVmap c Γ 
+      get_var clo_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
          (forall e,
@@ -3467,7 +3467,7 @@ Section CC_correct.
   Lemma get_vars_bound_var_Included xs FVmap c Γ S S':
     Disjoint _ S (FromList xs) ->
     {{ fun s => fresh S (next_var s) }}
-      get_vars clo_tag xs FVmap c Γ 
+      get_vars clo_tag xs FVmap c Γ
     {{ fun s t s' =>
          let (xs', f) := t in
          (forall e,
@@ -3508,7 +3508,7 @@ Section CC_correct.
          fresh S (next_var s')
      }}.
   Proof with now eauto with Ensembles_DB.
-    revert S; induction B; intros S. 
+    revert S; induction B; intros S.
     - eapply bind_triple. now apply get_name_spec.
       intros x s1. apply pre_curry_l. intros Hf1.
       eapply bind_triple. now eapply IHB.
@@ -3560,14 +3560,14 @@ Section CC_correct.
         eapply Disjoint_Included_r; [| eassumption ].
         rewrite occurs_free_Econstr...
       + intros [xs f] i. apply pre_curry_l; intros Hf.
-        eapply bind_triple. eapply IHe. 
+        eapply bind_triple. eapply IHe.
         eapply Disjoint_Included_l. now apply Setminus_Included.
         eapply Disjoint_Included_r; [| eassumption ].
         now apply bound_var_occurs_free_Econstr_Included.
         intros [e' f'] i'. apply return_triple.
         intros i''. intros [He' Hf'']. split.
         simpl in *. eapply Hf. rewrite !bound_var_Econstr.
-        rewrite <- Union_assoc, Union_commut with (s2 := Setminus _ _ _), Union_assoc. 
+        rewrite <- Union_assoc, Union_commut with (s2 := Setminus _ _ _), Union_assoc.
         apply Included_Union_compat; [ eassumption | now apply Included_refl].
         eapply fresh_monotonic; [| eassumption ]...
     - eapply bind_triple with (post' := fun _ P i =>  P = [] /\  fresh S (next_var i)) .
@@ -3610,14 +3610,14 @@ Section CC_correct.
       + eapply get_var_bound_var_Included. intros Hc. eapply HD; eauto.
       + intros [xs f] i. apply pre_curry_l. intros Hf.
         eapply bind_triple.
-        apply IHe. 
+        apply IHe.
         eapply Disjoint_Included_l. now apply Setminus_Included.
         eapply Disjoint_Included_r; [| eassumption ].
         now apply bound_var_occurs_free_Eproj_Included.
         intros [e' f'] i'. apply return_triple.
-        intros i''. intros [He' Hf'']. split. 
+        intros i''. intros [He' Hf'']. split.
         simpl in *. eapply Hf. rewrite !bound_var_Eproj.
-        rewrite <- Union_assoc, Union_commut with (s2 := Setminus _ _ _), Union_assoc... 
+        rewrite <- Union_assoc, Union_commut with (s2 := Setminus _ _ _), Union_assoc...
         eapply fresh_monotonic; [| eassumption ]...
     - eapply bind_triple. now apply get_named_str_fresh.
       intros Γ' s1. eapply pre_curry_l. intros Hf1.
@@ -3647,13 +3647,13 @@ Section CC_correct.
         eapply Disjoint_Included_l. now apply Setminus_Included.
         eapply Disjoint_Included_r; [| eassumption ].
         apply Included_Union_preserv_r. normalize_occurs_free...
-        intros [xs f] s2. apply pre_curry_l. intros He. 
+        intros [xs f] s2. apply pre_curry_l. intros He.
         eapply bind_triple. apply make_record_ctor_tag_preserves_prop.
         intros c' s3. apply return_triple. intros s4 Hf. split.
         intros e' He'.
         rewrite <- Union_Same_set with (s6 := S),
                 Union_commut with (s6 := S), Union_assoc.
-        eapply He. rewrite bound_var_Econstr. 
+        eapply He. rewrite bound_var_Econstr.
         apply Union_Included.
         eapply Included_trans; [ eassumption |]...
         apply Included_Union_preserv_l. apply Included_Union_preserv_r.
@@ -3675,7 +3675,7 @@ Section CC_correct.
         eapply Disjoint_Included_r; [| eassumption ].
         now apply bound_var_occurs_free_fundefs_Efun_Included.
         intros B' s2. apply return_triple. intros s3 [HB Hf].
-        simpl in *. split. 
+        simpl in *. split.
         eapply He. rewrite !bound_var_Efun.
         apply Union_Included.
         eapply Included_trans. eassumption.
@@ -3720,14 +3720,14 @@ Section CC_correct.
       + intros [xs f] i.
         apply pre_curry_l. intros Hf.
         eapply bind_triple.
-        apply IHe. 
+        apply IHe.
         eapply Disjoint_Included_l. now apply Setminus_Included.
         eapply Disjoint_Included_r; [| eassumption ].
         now apply bound_var_occurs_free_Eprim_Included.
         intros [e' f'] i'. apply return_triple.
-        intros i''. intros [He' Hf'']. split. 
+        intros i''. intros [He' Hf'']. split.
         simpl in *. eapply Hf. rewrite !bound_var_Eprim.
-        rewrite <- Union_assoc, Union_commut with (s2 := Setminus _ _ _), Union_assoc... 
+        rewrite <- Union_assoc, Union_commut with (s2 := Setminus _ _ _), Union_assoc...
         eapply fresh_monotonic; [| eassumption ]...
     - eapply bind_triple.
       apply get_var_bound_var_Included. intros Hc.
@@ -3766,7 +3766,7 @@ Section CC_correct.
       eapply Included_trans; [ eassumption |].
       apply Union_Included. now eauto with Ensembles_DB.
       apply Union_Included. now eauto with Ensembles_DB.
-      do 2 apply Included_Union_preserv_r. 
+      do 2 apply Included_Union_preserv_r.
       apply image_monotonic. now apply Included_Union_r.
       eapply fresh_monotonic; [|  eassumption ]...
     - apply return_triple. intros. split; eauto.
@@ -3776,7 +3776,7 @@ Section CC_correct.
   Lemma get_var_bound_var_Included' x FVmap c Γ S :
     ~ In _ S x ->
     {{ fun s => fresh S (next_var s) }}
-      get_var clo_tag x FVmap c Γ 
+      get_var clo_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
          (forall e,
@@ -3809,7 +3809,7 @@ Section CC_correct.
   Lemma get_vars_bound_var_Included' xs FVmap c Γ S:
     Disjoint _ S (FromList xs) ->
     {{ fun s => fresh S (next_var s) }}
-      get_vars clo_tag xs FVmap c Γ 
+      get_vars clo_tag xs FVmap c Γ
     {{ fun s t s' =>
          let (xs', f) := t in
          (forall e,
@@ -3844,7 +3844,7 @@ Section CC_correct.
     FVmap_inv FVmap Scope Funs FVs ->
     ~ In _ S x ->
     {{ fun s => fresh S (next_var s) }}
-      get_var clo_tag x FVmap c Γ 
+      get_var clo_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
          (forall e,
@@ -3873,7 +3873,7 @@ Section CC_correct.
         split. eapply Hinv. now eexists; eauto.
         unfold subst. now rewrite Heq.
         now eauto with Ensembles_DB.
-        now eauto with Ensembles_DB. 
+        now eauto with Ensembles_DB.
       + apply return_triple.
         intros i' Hf. split.
         * intros e...
@@ -3889,7 +3889,7 @@ Section CC_correct.
     FVmap_inv FVmap Scope (Empty_set var) [] ->
     ~ In _ S x ->
     {{ fun s => fresh S (next_var s) }}
-      get_var clo_tag x FVmap c Γ 
+      get_var clo_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
          (forall e,
@@ -3923,12 +3923,12 @@ Section CC_correct.
       + intros x' Hleq. constructor. now eauto.
         intros Hc; inv Hc. now eauto.
   Qed.
-  
+
   Lemma get_vars_occurs_free_Included xs FVmap c Γ S Scope :
     FVmap_inv FVmap Scope (Empty_set var) [] ->
     Disjoint _ S (FromList xs) ->
     {{ fun s => fresh S (next_var s) }}
-      get_vars clo_tag xs FVmap c Γ 
+      get_vars clo_tag xs FVmap c Γ
     {{ fun s t s' =>
          let (xs', f) := t in
          (forall e,
@@ -3959,7 +3959,7 @@ Section CC_correct.
           split. reflexivity.
           rewrite FromList_cons, <- Setminus_Union. eassumption.
   Qed.
-  
+
   Lemma make_full_closure_occurs_free_Included B m1 m2 Γ S :
     unique_functions B ->
     {{ fun s => fresh S (next_var s) }}
@@ -3974,7 +3974,7 @@ Section CC_correct.
          fresh S (next_var s')
      }}.
   Proof with now eauto with Ensembles_DB.
-    revert S; induction B; intros S Hun. 
+    revert S; induction B; intros S Hun.
     - inv Hun. eapply bind_triple. now apply get_name_spec.
       intros x s1. apply pre_curry_l. intros Hf1.
       eapply bind_triple. now eapply IHB.
@@ -3986,13 +3986,13 @@ Section CC_correct.
         apply Union_Included.
         apply Union_Included.
         apply Included_Union_preserv_r. apply Included_Union_preserv_l.
-        rewrite image_Union, image_Singleton, extend_gss...    
+        rewrite image_Union, image_Singleton, extend_gss...
         now eauto with Ensembles_DB.
         eapply Included_trans.
         eapply Included_Setminus_compat. now eapply Hinc.
         reflexivity.
         rewrite !Setminus_Union_distr.
-        apply Union_Included. now eauto with Ensembles_DB. 
+        apply Union_Included. now eauto with Ensembles_DB.
         simpl. apply Union_Included.
         apply Included_Union_preserv_r. apply Included_Union_preserv_l.
         eapply Included_trans. now apply Setminus_Included.
@@ -4057,8 +4057,8 @@ Section CC_correct.
     }}.
   Proof.
     intros Hinv HD1 Hin Hnin HD2 Hnin' Hun.
-    eapply post_weakening; [| eapply exp_closure_conv_Closure_conv_sound; try eassumption ]. 
-    intros s [e' f] s' _ [C [Hctx [Hcc _]]]. 
+    eapply post_weakening; [| eapply exp_closure_conv_Closure_conv_sound; try eassumption ].
+    intros s [e' f] s' _ [C [Hctx [Hcc _]]].
     simpl. rewrite Hctx. eapply Closure_conversion_closed_fundefs_mut.
     eassumption. eassumption.
     rewrite Setminus_Empty_set_abs_r, image_Empty_set, Union_Empty_set_neut_l.
@@ -4073,7 +4073,7 @@ Section CC_correct.
     try now (intros e' B' Hfin; eauto; constructor; eauto).
     intros P e' B Hfin. simpl. econstructor.
     eapply IHe. eassumption.
-    eapply in_or_app. right. now constructor. 
+    eapply in_or_app. right. now constructor.
   Qed.
 
   Corollary funs_in_exp_ctx_app C e B :
@@ -4100,10 +4100,10 @@ Section CC_correct.
       intros e' s2. eapply bind_triple. now apply IHB.
       intros B' s3. apply return_triple. intros _ Hseq.
       simpl. rewrite image_Union, image_Singleton...
-    - apply return_triple. simpl. intros. 
+    - apply return_triple. simpl. intros.
       rewrite image_Empty_set...
   Qed.
-  
+
   Lemma exp_closure_conv_occurs_free_Included  e c Γ FVmap S Scope :
     FVmap_inv FVmap Scope (Empty_set var) [] ->
     Disjoint _ S (Union _ (bound_var e) (occurs_free e)) ->
@@ -4123,14 +4123,14 @@ Section CC_correct.
   Proof with now eauto with Ensembles_DB.
     revert S Scope FVmap; induction e using exp_ind';
     intros S Scope FVmap Hinv HD1 Hin Hnin HD2 Hnin' Hun; simpl.
-    Opaque exp_closure_conv fundefs_closure_conv. 
+    Opaque exp_closure_conv fundefs_closure_conv.
     - eapply bind_triple.
       + eapply get_vars_occurs_free_Included.
         eassumption. eapply Disjoint_Included_r; [| eassumption ].
         rewrite occurs_free_Econstr...
       + intros [xs f] i. apply pre_curry_l; intros Hin1.
         apply pre_curry_l; intros Heq. subst.
-        eapply bind_triple. eapply IHe. 
+        eapply bind_triple. eapply IHe.
         now eapply FVmap_inv_set_bound; eauto.
         eapply Disjoint_Included_l. now apply Setminus_Included.
         eapply Disjoint_Included_r; [| eassumption ].
@@ -4138,10 +4138,10 @@ Section CC_correct.
         now apply bound_var_occurs_free_Econstr_Included.
         eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
         normalize_occurs_free. rewrite <- Union_assoc.
-        now rewrite <- Union_Setminus; eauto with Ensembles_DB typeclass_instances. 
+        now rewrite <- Union_Setminus; eauto with Ensembles_DB typeclass_instances.
         eapply binding_not_in_map_set_not_In_S.
         eapply binding_not_in_map_antimon; [| eassumption ]...
-        intros Hc. inv Hc. 
+        intros Hc. inv Hc.
         eapply HD1. constructor; [| now eauto ]. now eapply Setminus_Included; eauto.
         inv H. now eapply Hnin'; eauto.
         eapply Disjoint_Included_l. now apply Setminus_Included.
@@ -4186,7 +4186,7 @@ Section CC_correct.
         setoid_rewrite st_eq_Ecase. eapply pre_curry_l; intros He'.
         eapply bind_triple. eapply post_conj.
         * eapply IHe0 with (FVmap := FVmap).
-          eassumption. 
+          eassumption.
           eapply Disjoint_Included_r; [| eassumption ].
           rewrite Union_assoc. apply Included_Union_preserv_l.
           now eapply bound_var_occurs_free_Ecase_cons_Included.
@@ -4221,7 +4221,7 @@ Section CC_correct.
         intros Hc. eapply HD1. constructor; eauto.
       + intros [xs f] i. apply pre_curry_l; intros Hin1.
         apply pre_curry_l; intros Heq. subst.
-        eapply bind_triple. eapply IHe. 
+        eapply bind_triple. eapply IHe.
         now eapply FVmap_inv_set_bound; eauto.
         eapply Disjoint_Included_l. now apply Setminus_Included.
         eapply Disjoint_Included_r; [| eassumption ].
@@ -4229,10 +4229,10 @@ Section CC_correct.
         now apply bound_var_occurs_free_Eproj_Included.
         eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
         normalize_occurs_free. rewrite <- Union_assoc.
-        now rewrite <- Union_Setminus; eauto with Ensembles_DB typeclass_instances. 
+        now rewrite <- Union_Setminus; eauto with Ensembles_DB typeclass_instances.
         eapply binding_not_in_map_set_not_In_S.
         eapply binding_not_in_map_antimon; [| eassumption ]...
-        intros Hc. inv Hc. 
+        intros Hc. inv Hc.
         eapply HD1.
         constructor; [ eapply Setminus_Included; eassumption | now eauto ].
         inv H. now eapply Hnin'; eauto.
@@ -4248,7 +4248,7 @@ Section CC_correct.
         simpl in *. eapply Included_trans. eapply Hin1.
         repeat normalize_occurs_free...
         eapply fresh_monotonic; [| eassumption ]...
-    - eapply post_mp. 
+    - eapply post_mp.
       eapply exp_closure_conv_closed_fundefs with (e := Efun f2 e); eassumption.
       eapply bind_triple. now eapply get_named_str_fresh.
       intros Γ' s1. eapply pre_curry_l. intros Hf1.
@@ -4257,7 +4257,7 @@ Section CC_correct.
         * eapply make_env_spec.
           eapply binding_in_map_antimon; [| eassumption ].
           intros x Hfv. eapply occurs_free_Efun. left.
-          eapply fundefs_fv_correct. eassumption. 
+          eapply fundefs_fv_correct. eassumption.
           eapply binding_not_in_map_antimon; [| eassumption ]...
           eassumption.
         * eapply make_env_occurs_free_Included. eassumption.
@@ -4277,7 +4277,7 @@ Section CC_correct.
         apply pre_curry_l. intros [C [S1 [l1 [Hproj [Hctx [Hbin [Hbnin Hinv']]]]]]].
         eapply pre_curry_l. intros He.
         eapply bind_triple.
-        * eapply post_conj. 
+        * eapply post_conj.
           eapply make_full_closure_spec; eassumption.
           eapply make_full_closure_occurs_free_Included.
           eapply Hun. now eauto.
@@ -4311,14 +4311,14 @@ Section CC_correct.
           eapply Disjoint_Included_l. now apply Setminus_Included.
           eapply Disjoint_Included_r; [| eassumption ].
           rewrite !Union_assoc.
-          eapply Included_Union_compat; [| now apply Included_refl ]. 
+          eapply Included_Union_compat; [| now apply Included_refl ].
           now apply bound_var_occurs_free_Efun_Included.
-          intros Hc. eapply Hnin'. 
+          intros Hc. eapply Hnin'.
           now apply bound_var_occurs_free_Efun_Included.
           intros B Hfe. eapply Hun. now eauto.
           intros [e' f''] s2. eapply pre_curry_l. intros He''.
           eapply bind_triple.
-          eapply post_conj. 
+          eapply post_conj.
           eapply pre_strenghtening;
             [| now eapply fundefs_closure_conv_in_image_subst_map ].
           now simpl; eauto.
@@ -4330,7 +4330,7 @@ Section CC_correct.
           rewrite Union_assoc. apply Included_Union_preserv_l.
           now apply bound_var_occurs_free_fundefs_Efun_Included.
           intros B' s3. eapply return_triple. simpl in *.
-          intros s4 [Hseq [_ Hf4]] Hclo. split. 
+          intros s4 [Hseq [_ Hf4]] Hclo. split.
           eapply Included_trans. eapply He.
           assert (Heq : (FromList (PS.elements (fundefs_fv f2))) = FromSet (fundefs_fv f2)) by reflexivity.
           rewrite Heq, <- fundefs_fv_correct.
@@ -4338,7 +4338,7 @@ Section CC_correct.
           rewrite Hctx, <- app_ctx_f_fuse in Hclo. simpl in Hclo.
           assert (Hclo' : Same_set _ (occurs_free_fundefs B') (Empty_set _))
             by (eapply Hclo; apply funs_in_exp_ctx_app; eauto).
-          rewrite Hclo', Union_Empty_set_neut_l. 
+          rewrite Hclo', Union_Empty_set_neut_l.
           repeat normalize_occurs_free. apply Union_Included.
           now eauto with Ensembles_DB.
           do 2 eapply Setminus_Included_Included_Union.
@@ -4360,7 +4360,7 @@ Section CC_correct.
         eapply get_vars_occurs_free_Included. eassumption.
         eapply Disjoint_Included_l. now apply Setminus_Included.
         repeat normalize_occurs_free_in_ctx...
-        intros [xs f'] s2. 
+        intros [xs f'] s2.
         apply pre_curry_l. intros He'. apply pre_curry_l; intros Heq; subst.
         eapply bind_triple. now apply get_name_spec.
         intros y s3. apply pre_curry_l. intros Hfy.
@@ -4379,7 +4379,7 @@ Section CC_correct.
         rewrite occurs_free_Eprim...
       + intros [xs f] i. apply pre_curry_l; intros Hin1.
         apply pre_curry_l; intros Heq. subst.
-        eapply bind_triple. eapply IHe. 
+        eapply bind_triple. eapply IHe.
         now eapply FVmap_inv_set_bound; eauto.
         eapply Disjoint_Included_l. now apply Setminus_Included.
         eapply Disjoint_Included_r; [| eassumption ].
@@ -4387,10 +4387,10 @@ Section CC_correct.
         now apply bound_var_occurs_free_Eprim_Included.
         eapply binding_in_map_antimon; [| eapply binding_in_map_set; eassumption ].
         normalize_occurs_free. rewrite <- Union_assoc.
-        now rewrite <- Union_Setminus; eauto with Ensembles_DB typeclass_instances. 
+        now rewrite <- Union_Setminus; eauto with Ensembles_DB typeclass_instances.
         eapply binding_not_in_map_set_not_In_S.
         eapply binding_not_in_map_antimon; [| eassumption ]...
-        intros Hc. inv Hc. 
+        intros Hc. inv Hc.
         eapply HD1. constructor; [| now eauto ]. now eapply Setminus_Included; eauto.
         inv H. now eapply Hnin'; eauto.
         eapply Disjoint_Included_l. now apply Setminus_Included.
@@ -4415,11 +4415,11 @@ Section CC_correct.
   Qed.
 
   Transparent exp_closure_conv fundefs_closure_conv.
-  
+
   Lemma get_var_unique_bindings x FVmap c Γ S S' :
     ~ In _ S x ->
     {{ fun s => fresh S (next_var s) }}
-      get_var clo_tag x FVmap c Γ 
+      get_var clo_tag x FVmap c Γ
     {{ fun s t s' =>
          let (x', f) := t in
          (forall e,
@@ -4437,18 +4437,18 @@ Section CC_correct.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e Hin Hd Hun. constructor; [| eassumption ].
         intros Hc. eapply Hd.
-        eapply Hin in Hc. inv Hc. constructor. eauto. 
+        eapply Hin in Hc. inv Hc. constructor. eauto.
         eapply Hf. zify; lia. inv H. exfalso; eauto.
       + eapply bind_triple. apply get_name_spec.
         intros x' i. apply return_triple.
         intros i' [Hf Hf']. split; [| eassumption].
         intros e Hin Hd Hun. constructor; [| eassumption ].
         intros Hc. eapply Hd.
-        eapply Hin in Hc. inv Hc. constructor. eauto. 
+        eapply Hin in Hc. inv Hc. constructor. eauto.
         eapply Hf. zify; lia. inv H. exfalso; eauto.
       + apply return_triple.
         intros i' Hf. split.
-        intros e Hin Hd Hun. eassumption. 
+        intros e Hin Hd Hun. eassumption.
         intros x' Hleq. constructor. now eauto.
         intros Hc; inv Hc. now eauto.
     - apply return_triple; simpl. intros i Hf. split.
@@ -4460,7 +4460,7 @@ Section CC_correct.
   Lemma get_vars_unique_bindings xs FVmap c Γ S S' :
     Disjoint _ S (FromList xs) ->
     {{ fun s => fresh S (next_var s) }}
-      get_vars clo_tag xs FVmap c Γ 
+      get_vars clo_tag xs FVmap c Γ
     {{ fun s t s' =>
          let (xs', f) := t in
          (forall e,
@@ -4497,7 +4497,7 @@ Section CC_correct.
           rewrite FromList_cons... eauto with Ensembles_DB.
           eassumption. rewrite FromList_cons, <- Setminus_Union...
   Qed.
-  
+
   Lemma make_full_closure_unique_bindings B m1 m2 Γ S :
     unique_functions B ->
     {{ fun s => fresh S (next_var s) }}
@@ -4512,7 +4512,7 @@ Section CC_correct.
                (next_var s')
      }}.
   Proof with now eauto with Ensembles_DB.
-    revert S; induction B; intros S Hun. 
+    revert S; induction B; intros S Hun.
     - eapply bind_triple. now apply get_name_spec.
       intros x s1. apply pre_curry_l. intros Hf1. inv Hun.
       eapply bind_triple. eapply post_conj. now eapply IHB.
@@ -4524,7 +4524,7 @@ Section CC_correct.
         constructor. apply Heq in Hb. inv Hb; eauto.
         exfalso. now eauto. rewrite bound_var_fundefs_Fcons...
         eapply Hun; eauto.
-        rewrite bound_var_fundefs_Fcons in Hun1. 
+        rewrite bound_var_fundefs_Fcons in Hun1.
         eauto with Ensembles_DB.
       + eapply fresh_monotonic; [| eassumption ].
         rewrite <- subst_MRFun_f_eq. simpl.
@@ -4541,7 +4541,7 @@ Section CC_correct.
   Lemma make_full_closure_injective S B m1 m2 Γ :
     Disjoint var S (name_in_fundefs B) ->
     unique_functions B ->
-    {{ fun s => fresh S (next_var s) }} 
+    {{ fun s => fresh S (next_var s) }}
       make_full_closure clo_tag B m1 m2 Γ
     {{ fun s p s' =>
          let '(m1', m2', f) := p in
@@ -4567,9 +4567,9 @@ Section CC_correct.
           eapply injective_subdomain_antimon; [ eassumption |]...
           intros Hc. eapply Hinc. eapply image_monotonic; [| eassumption ].
           now eapply Setminus_Included. now eauto.
-          rewrite image_Singleton. 
+          rewrite image_Singleton.
           unfold subst at 1. rewrite M.gss, <- subst_MRFun_f_eq.
-          rewrite image_extend_not_In_S. 
+          rewrite image_extend_not_In_S.
           eapply Disjoint_Included_r. eassumption.
           eapply Disjoint_Setminus_r. reflexivity.
           inv Hun. eassumption.
@@ -4611,7 +4611,7 @@ Section CC_correct.
         (eapply Disjoint_Included_r; [| eassumption ]);
         rewrite occurs_free_Econstr...
       + intros [xs f] i.
-        eapply pre_strenghtening. intros ? [[Hun' _] [Hin Hf]]. 
+        eapply pre_strenghtening. intros ? [[Hun' _] [Hin Hf]].
         exact (conj (conj Hun' Hin) Hf).
         apply pre_curry_l; intros [Hun' Hin'].
         eapply bind_triple. inv Hun.
@@ -4635,7 +4635,7 @@ Section CC_correct.
         rewrite <- (Setminus_Disjoint (Setminus _ _ _) (Singleton _ v)), Setminus_Union.
         apply Included_Setminus_compat. now eauto with Ensembles_DB.
         eapply Included_trans. eapply Hin'. rewrite bound_var_Econstr...
-        eapply Setminus_Disjoint_preserv_l... 
+        eapply Setminus_Disjoint_preserv_l...
     - eapply bind_triple with (post' := fun _ P i =>  P = [] /\  fresh S (next_var i)) .
       now apply return_triple.
       intros P' i. apply pre_curry_l. intros Heq; subst.
@@ -4660,15 +4660,15 @@ Section CC_correct.
           eapply bound_var_occurs_free_Ecase_Included. now constructor.
       + intros [e' f'] s'. simpl. setoid_rewrite assoc. simpl.
         setoid_rewrite st_eq_Ecase.
-        eapply pre_strenghtening. intros i [[Hun' Hf] [Hin _]]. 
+        eapply pre_strenghtening. intros i [[Hun' Hf] [Hin _]].
         exact (conj (conj Hun' Hin) Hf).
-        eapply pre_curry_l; intros [He' Hin]. 
+        eapply pre_curry_l; intros [He' Hin].
         eapply bind_triple.
         { eapply post_conj.
           - eapply IHl with (FVmap := FVmap) (Γ := Γ) (c := c0).
             eapply Disjoint_Included_l. now apply Setminus_Included.
             eapply Disjoint_Included_r; [| eassumption ].
-            now eapply bound_var_occurs_free_Ecase_cons_Included. 
+            now eapply bound_var_occurs_free_Ecase_cons_Included.
             eassumption.
           - eapply post_conj.
             + eapply pre_strenghtening;
@@ -4680,7 +4680,7 @@ Section CC_correct.
               eapply Disjoint_Included_l. now apply Setminus_Included.
               eapply Disjoint_Included_r; [| eassumption ].
               now eapply bound_var_occurs_free_Ecase_cons_Included. }
-        intros [e'' f''] s''. 
+        intros [e'' f''] s''.
         destruct e''; apply return_triple;
         try now (intros ? [[? Hf] [? [? ?]]]; split;
                  [ now eauto | eapply fresh_monotonic; [| now apply Hf ];
@@ -4691,7 +4691,7 @@ Section CC_correct.
         rewrite <- Hctx. eapply Disjoint_Included_r. eassumption.
         eapply Union_Disjoint_r. eapply Disjoint_Included_l. eassumption.
         repeat normalize_bound_var_in_ctx...
-        now eauto with Ensembles_DB. 
+        now eauto with Ensembles_DB.
         simpl in *. rewrite Hctx in *. rewrite bound_var_ctx_app_Ecase_cons.
         rewrite <- Setminus_Union. eassumption.
     - eapply bind_triple.
@@ -4725,7 +4725,7 @@ Section CC_correct.
         rewrite <- (Setminus_Disjoint (Setminus _ _ _) (Singleton _ v)), Setminus_Union.
         apply Included_Setminus_compat. now eauto with Ensembles_DB.
         eapply Included_trans. eapply Hin'. rewrite bound_var_Eproj...
-        eapply Setminus_Disjoint_preserv_l... 
+        eapply Setminus_Disjoint_preserv_l...
     - eapply bind_triple. now apply get_named_str_fresh.
       intros Γ' s1. eapply pre_curry_l. intros Hf1. unfold make_env.
       assert (Heqel : (@FromList var (PS.elements (fundefs_fv f2))) = FromSet (fundefs_fv f2)) by reflexivity.
@@ -4763,8 +4763,8 @@ Section CC_correct.
             [ eapply make_full_closure_bound_var_Included
             | eapply make_full_closure_injective ]].
       now apply unique_bindings_fundefs_unique_functions.
-      eapply Disjoint_Included_l; [ now apply Setminus_Included | ].         
-      eapply Disjoint_Included_l; [ now apply Setminus_Included | ].         
+      eapply Disjoint_Included_l; [ now apply Setminus_Included | ].
+      eapply Disjoint_Included_l; [ now apply Setminus_Included | ].
       eapply Disjoint_Included_r. now apply name_in_fundefs_bound_var_fundefs.
       repeat normalize_bound_var_in_ctx...
       now eapply unique_bindings_fundefs_unique_functions.
@@ -4776,15 +4776,15 @@ Section CC_correct.
       + eapply post_conj.
          eapply IHe. rewrite Setminus_Union.
          rewrite Setminus_Union.
-         eapply Disjoint_Included_l; [ now apply Setminus_Included | ].         
+         eapply Disjoint_Included_l; [ now apply Setminus_Included | ].
          eapply Disjoint_Included_r; [| eassumption ].
-         now eapply bound_var_occurs_free_Efun_Included. eassumption. 
+         now eapply bound_var_occurs_free_Efun_Included. eassumption.
          eapply exp_closure_conv_bound_var_Included_mut. rewrite Setminus_Union.
          rewrite Setminus_Union.
          eapply Disjoint_Included_l; [ now apply Setminus_Included | ].
          eapply Disjoint_Included_r; [| eassumption ].
          now eapply bound_var_occurs_free_Efun_Included.
-      + intros [e' f''] s6. eapply pre_strenghtening. intros ? [[Hun3 Hf] [Hin3 _]]. 
+      + intros [e' f''] s6. eapply pre_strenghtening. intros ? [[Hun3 Hf] [Hin3 _]].
         exact (conj (conj Hun3 Hin3) Hf). eapply pre_curry_l. intros [Hun3 Hin3]. simpl in *.
         eapply bind_triple.
         * eapply post_conj.
@@ -4805,7 +4805,7 @@ Section CC_correct.
           eapply Disjoint_Included_r; [| eassumption ].
           now eapply bound_var_occurs_free_fundefs_Efun_Included.
           eapply pre_strenghtening; [| eapply fundefs_closure_conv_in_image_subst_map ].
-          now intros; simpl; eauto. 
+          now intros; simpl; eauto.
         * intros B' s7. apply return_triple.
           intros s8 [[Hun4 [Hd Hf']] [[Hinc4 _] Hin5]]. simpl in *.
           split. eapply Hun1. repeat normalize_bound_var.
@@ -4827,7 +4827,7 @@ Section CC_correct.
           eapply Disjoint_Included_r. now apply Setminus_Included.
           eapply Disjoint_Included_l_sym; [| eassumption ]...
           eapply Disjoint_Setminus_r...
-          constructor. intros Hc. eapply bound_var_Efun in Hc. 
+          constructor. intros Hc. eapply bound_var_Efun in Hc.
           inv Hc. eapply Hinc4 in H. inv H.
           eapply HD with (x := Γ'). constructor. eapply Hf1. zify; lia.
           now eauto.
@@ -4847,7 +4847,7 @@ Section CC_correct.
           rewrite Hseq. apply Union_Disjoint_l; [| eassumption ].
           eapply Disjoint_Included_r. eassumption.
           eapply Union_Disjoint_r.
-          eapply Disjoint_Included_l. eassumption.         
+          eapply Disjoint_Included_l. eassumption.
           eapply Union_Disjoint_l. eassumption.
           do 3 eapply Setminus_Disjoint_preserv_l.
           repeat normalize_bound_var_in_ctx...
@@ -4862,7 +4862,7 @@ Section CC_correct.
           eapply Included_trans;
             [| eapply Included_Setminus_compat;
                [ now apply Included_refl | now eapply Hin1 ] ].
-          repeat normalize_bound_var. rewrite Hseq.  
+          repeat normalize_bound_var. rewrite Hseq.
           rewrite <- !Union_assoc, (Union_commut (name_in_fundefs f2) _), <- !Setminus_Union.
           rewrite <- (Included_Setminus_Disjoint _ (name_in_fundefs f2)).
           rewrite !Setminus_Union.
@@ -4877,7 +4877,7 @@ Section CC_correct.
           eapply post_conj;
             [ eapply get_var_bound_var_Included with (S' := Empty_set _) |
               eapply get_var_bound_var_Included' ]];
-        intros Hc; eapply HD; eauto. 
+        intros Hc; eapply HD; eauto.
       + intros [x f] s1. eapply pre_strenghtening.
         intros ? [[Hun1 _] [[Hin Hf] [Hin' _]]].
         exact (conj (conj Hun1 (conj Hin Hin')) Hf).
@@ -4915,8 +4915,8 @@ Section CC_correct.
         eapply Disjoint_sym. eapply Disjoint_Included_l; [| eassumption ]...
         constructor.
         intros Hc. inv Hc. eapply HΓ' with (y := g'). zify; lia.
-        now eauto. now inv H5. 
-        constructor. intros Hc. now inv Hc. 
+        now eauto. now inv H5.
+        constructor. intros Hc. now inv Hc.
         now constructor.
         eapply fresh_monotonic; [| eassumption ]. rewrite !Setminus_Union.
         apply Included_Setminus_compat. reflexivity.
@@ -4931,7 +4931,7 @@ Section CC_correct.
         (eapply Disjoint_Included_r; [| eassumption ]);
         rewrite occurs_free_Eprim...
       + intros [xs f] i.
-        eapply pre_strenghtening. intros ? [[Hun' _] [Hin Hf]]. 
+        eapply pre_strenghtening. intros ? [[Hun' _] [Hin Hf]].
         exact (conj (conj Hun' Hin) Hf).
         apply pre_curry_l; intros [Hun' Hin'].
         eapply bind_triple. inv Hun.
@@ -4960,7 +4960,7 @@ Section CC_correct.
       + eapply post_conj;
         [ eapply get_var_unique_bindings |
           eapply get_var_bound_var_Included' ];
-        intros Hc; eapply HD; eauto. 
+        intros Hc; eapply HD; eauto.
       + intros [x f] s1. apply return_triple.
         intros s2 [[Hun' Hf] [Hin' Hf']].
         split. simpl. eapply Hun'. rewrite bound_var_Ehalt.
@@ -4979,14 +4979,14 @@ Section CC_correct.
            eapply Disjoint_Included_r;
              [ now apply bound_var_occurs_free_Fcons_Included  | eassumption ]]).
       + intros [e' f] s2.
-        eapply pre_strenghtening. intros ? [[Hun Hf] [Hin _]]. 
+        eapply pre_strenghtening. intros ? [[Hun Hf] [Hin _]].
         exact (conj (conj Hun Hin) Hf).
         apply pre_curry_l; intros [Hun Hin].
         eapply bind_triple.
         eapply post_conj.
         eapply IHB.
         eapply Disjoint_Included_l; [ now apply Setminus_Included | ].
-        eapply Disjoint_Included_l; [ now apply Setminus_Included | ].        
+        eapply Disjoint_Included_l; [ now apply Setminus_Included | ].
         eapply Disjoint_Included_r; [| eassumption ].
         now eapply bound_var_occurs_free_fundefs_Fcons_Included.
         simpl in *.
@@ -5042,13 +5042,13 @@ Section CC_correct.
           eapply Disjoint_Included_l. now apply Setminus_Included.
           eapply Disjoint_Included_r; [| eassumption ].
           normalize_bound_var...
-          rewrite FromList_cons. 
+          rewrite FromList_cons.
           eapply Disjoint_Included_l. eassumption.
           apply Union_Disjoint_l.
           apply Union_Disjoint_r; [| eassumption ].
           eapply Disjoint_Included_r with (s6 := S).
           apply Singleton_Included. eapply Hfx. zify; lia.
-          eapply Disjoint_Included_l_sym; [| eassumption ]. 
+          eapply Disjoint_Included_l_sym; [| eassumption ].
           normalize_bound_var...
           apply Union_Disjoint_l. apply Union_Disjoint_r.
           rewrite Setminus_Union. eapply Disjoint_Setminus_l...
@@ -5060,11 +5060,11 @@ Section CC_correct.
           eapply Disjoint_Included; [| | now apply HD' ].
           apply Included_Union_preserv_r. apply Singleton_Included.
           apply Hfx. zify; lia.
-          apply image_monotonic...          
+          apply image_monotonic...
           eapply Disjoint_Included; [| | now apply HD' ].
           apply Included_Union_preserv_l.
           normalize_bound_var...
-          apply image_monotonic...          
+          apply image_monotonic...
           eapply Disjoint_Included_r; [ eassumption  |  ].
           apply Union_Disjoint_r.
           eapply Disjoint_Included_l; [ eassumption  |  ].
@@ -5077,7 +5077,7 @@ Section CC_correct.
           eapply Disjoint_Included_l; [ eassumption  |  ].
           apply Disjoint_sym. eapply Disjoint_Included; [| | now apply HD' ].
           normalize_bound_var...
-          apply image_monotonic...          
+          apply image_monotonic...
           intros Hc. apply FromList_cons in Hc.
           destruct (Maps.PTree.get v FVmap) as [v' |] eqn:Heq; try destruct v';
           try (inv Hc; [ inv H; eapply HD with (x := v);
@@ -5093,12 +5093,12 @@ Section CC_correct.
           left. normalize_bound_var...
         * split. normalize_bound_var.
           apply Union_Disjoint_r. apply Disjoint_Singleton_r.
-          intros Hc. 
+          intros Hc.
           destruct (Maps.PTree.get v FVmap) as [v' |] eqn:Heq; try destruct v';
           try (eapply HD'; constructor;
                [ now eexists; eauto | now unfold subst; rewrite Heq; eauto ]).
           inv Hc. inv H. eapply HD'. constructor. now eexists; eauto.
-          unfold subst; rewrite Heq; eauto. 
+          unfold subst; rewrite Heq; eauto.
           eapply HD' with (x := v0). constructor. eexists; eauto. split.
           now left; eauto. unfold subst; rewrite Heq; now eauto.
           normalize_bound_var. left. do 3 right. now apply name_in_fundefs_bound_var_fundefs.
@@ -5107,7 +5107,7 @@ Section CC_correct.
           eapply HD. constructor; [| now eauto ]. eapply Hfx; zify; lia.
           now eauto with Ensembles_DB.
           eapply Disjoint_Included_l. now apply name_in_fundefs_bound_var_fundefs.
-          apply Union_Disjoint_r. apply Disjoint_Singleton_r. intros Hc. 
+          apply Union_Disjoint_r. apply Disjoint_Singleton_r. intros Hc.
           eapply HD. constructor; [| now eauto ]. apply Hfx; zify; lia.
           eassumption.
           apply Union_Disjoint_r.
@@ -5139,7 +5139,7 @@ Section CC_correct.
           reflexivity.
           eapply Disjoint_Included_l. now apply Setminus_Included.
           apply Union_Disjoint_r.
-          apply Disjoint_Singleton_r. intros Hc. 
+          apply Disjoint_Singleton_r. intros Hc.
           destruct (Maps.PTree.get v FVmap) as [v' |] eqn:Heq; try destruct v';
           now (eapply HD'; constructor;
                [ now eexists; eauto | now unfold subst; rewrite Heq; eauto ]).
@@ -5180,7 +5180,7 @@ Section CC_correct.
     }}.
   Proof with now eauto with Ensembles_DB.
     intros IFVmap HGamma Hin_map_rho Hin_map_FVmap Hun
-           Hnot_in_map Hcc HD. 
+           Hnot_in_map Hcc HD.
     eapply post_conj; [| eapply post_conj; [| eapply post_conj; [| eapply post_conj ]]].
     - eapply post_weakening; [| eapply exp_closure_conv_Closure_conv_sound; try eassumption ].
       intros s [e' f] s' Hf [C [Hctx [Hclo _]]]. simpl in Hctx, Hclo.
@@ -5222,12 +5222,12 @@ Section CC_correct.
     - simpl in *. rewrite FromList_cons, (Union_commut (Singleton _ _) _), <- Union_assoc.
       eapply IHl. apply FVmap_inv_set_bound. eassumption.
   Qed.
-  
+
   Lemma populate_map_binding_in_map S l map :
     binding_in_map S map ->
     binding_in_map (Union _ (FromList (List.map fst l)) S) (populate_map l map).
   Proof.
-    revert S map. induction l; intros S map Hin. 
+    revert S map. induction l; intros S map Hin.
     - simpl. intros x Hc.
       rewrite FromList_nil, Union_Empty_set_neut_l in Hc.
       now eauto.
@@ -5243,7 +5243,7 @@ Section CC_correct.
     Disjoint _ S (FromList (List.map fst l)) ->
     binding_not_in_map S (populate_map l map).
   Proof.
-    revert S map. induction l; intros S map Hnin HD. 
+    revert S map. induction l; intros S map Hnin HD.
     - simpl. intros x Hc. eapply Hnin. eassumption.
     - simpl in *. intros x Hc.
       eapply IHl. eapply binding_not_in_map_set_not_In_S. eassumption.
@@ -5253,5 +5253,5 @@ Section CC_correct.
       eassumption.
   Qed.
  *)
-  
+
 End CC_correct.

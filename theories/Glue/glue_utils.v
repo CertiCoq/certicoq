@@ -1,8 +1,9 @@
 Require Import Common.Pipeline_utils.
 
-Require Import Coq.ZArith.ZArith
-               Coq.Program.Basics
-               Coq.Lists.List List_util.
+From Stdlib Require Import ZArith.ZArith
+               Program.Basics
+               Lists.List.
+Require Import List_util.
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
@@ -119,7 +120,7 @@ Section Names.
 
  (* takes a fully qualified name and removes the base name,
     leaving behind the qualifying prefix.
-    e.g. "Coq.Init.Datatypes.bool" becomes "Coq.Init.Datatypes." *)
+    e.g. "Stdlib.Init.Datatypes.bool" becomes "Stdlib.Init.Datatypes." *)
   Definition find_qualifying_prefix (n : kername) : qualifying_prefix :=
     fst n.
   (* match rev (split "." n) with
@@ -257,7 +258,7 @@ Section L1Constructors.
 
   (*
   Definition s := tProd nAnon (tRel 0) (tRel 1).
-  Eval compute in (dissect_types nil (dInd (MPfile nil, "Coq.Init.Datatypes.nat"%bs) :: nil) s).
+  Eval compute in (dissect_types nil (dInd (MPfile nil, "Stdlib.Init.Datatypes.nat"%bs) :: nil) s).
 
   Definition datatypes_kn na : kername := (MPfile (cons "Datatypes" (cons "Init" (cons "Coq" nil))), na)%bs.
   Definition top_kn na : kername := (MPfile (cons "Top" nil), na)%bs.
@@ -279,7 +280,7 @@ Section L1Constructors.
   (* Eval compute in (dissect_types 0 (dInd "Top.test" :: nil) c). *)
 
   Definition s := tProd nAnon (tRel 0) (tRel 1).
-  Eval compute in (dissect_types 0 (dInd "Coq.Init.Datatypes.nat" :: nil) s).
+  Eval compute in (dissect_types 0 (dInd "Stdlib.Init.Datatypes.nat" :: nil) s).
 
   Definition no := tProd (nNamed "a"%bs)
                      (tSort ((Level.Level "Top.40", false) :: nil))

@@ -1,4 +1,4 @@
-From Coq Require Import Lists.List SetoidList NArith.BinNat
+From Stdlib Require Import Lists.List SetoidList NArith.BinNat
      PArith.BinPos MSets.MSetRBT Sets.Ensembles micromega.Lia Logic.Decidable.
 From compcert.lib Require Import Coqlib.
 From CertiCoq.LambdaANF Require Import cps cps_util ctx set_util Ensembles_util
@@ -215,7 +215,7 @@ Qed.
 Lemma apply_r_remove_eq m v :
   apply_r (M.remove v m) v = v.
 Proof.
-  unfold apply_r. rewrite M.grs. reflexivity. 
+  unfold apply_r. rewrite M.grs. reflexivity.
 Qed.
 
 Lemma apply_r_remove_neq m x v :
@@ -274,7 +274,7 @@ Lemma apply_r_list_refl m xs :
 Proof.
   induction xs; eauto.
   - simpl; intros Hyp. f_equal. eapply Hyp.
-    now left. eapply IHxs. 
+    now left. eapply IHxs.
     intros. eapply Hyp. now right.
 Qed.
 
@@ -283,7 +283,7 @@ Lemma remove_apply_r_eq m v :
   (forall x, apply_r (M.remove v m) x =x).
 Proof.
   intros Hyp x. unfold apply_r. destruct (peq x v); subst.
-  - rewrite M.grs. reflexivity.  
+  - rewrite M.grs. reflexivity.
   - rewrite M.gro; eauto.
 Qed.
 
@@ -301,7 +301,7 @@ Proof.
   induction l; simpl; repeat normalize_sets.
   - rewrite image_Empty_set. reflexivity.
   - rewrite image_Union. rewrite IHl. eapply Same_set_Union_compat; [| reflexivity ].
-    rewrite image_Singleton. reflexivity. 
+    rewrite image_Singleton. reflexivity.
 Qed.
 
 Lemma image_apply_r_remove_not_In m v S :
@@ -317,13 +317,13 @@ Proof.
 Qed.
 
 Lemma image_apply_r_set x v m S:
-  image (apply_r (M.set x v m)) S \subset v |: image (apply_r m) (S \\ [set x]). 
+  image (apply_r (M.set x v m)) S \subset v |: image (apply_r m) (S \\ [set x]).
 Proof.
   intros z [h [Hin Heq]]. subst.
   unfold In, apply_r. simpl. destruct (var_dec h x); subst.
   - rewrite M.gss. now left.
   - rewrite M.gso. right. eexists. split; eauto. constructor; eauto.
-    intros Hc; inv Hc; eauto. eassumption. 
+    intros Hc; inv Hc; eauto. eassumption.
 Qed.
 
 Lemma image_apply_r_set_list xs vs (m : M.t var) S :
@@ -337,19 +337,19 @@ Proof.
     eapply image_apply_r_set. normalize_sets.
     eapply Union_Included. now sets.
     eapply Included_trans. eapply (IHxs vs). inv Hlen. reflexivity.
-    normalize_sets. rewrite Setminus_Union. sets. 
+    normalize_sets. rewrite Setminus_Union. sets.
 Qed.
 
 Lemma apply_r_set_f_eq v x sig :
   f_eq (apply_r (M.set v x sig)) (extend (apply_r sig) v x).
 Proof.
   intros z. destruct (var_dec v z); subst.
-  - unfold apply_r. rewrite M.gss, extend_gss. reflexivity. 
+  - unfold apply_r. rewrite M.gss, extend_gss. reflexivity.
   - unfold apply_r. rewrite M.gso, extend_gso; eauto.
 Qed.
 
-Lemma apply_r_set_list_f_eq xs ys sig : 
-  f_eq (apply_r (set_list (combine xs ys) sig)) (apply_r sig <{ xs ~> ys }>). 
+Lemma apply_r_set_list_f_eq xs ys sig :
+  f_eq (apply_r (set_list (combine xs ys) sig)) (apply_r sig <{ xs ~> ys }>).
 Proof.
   revert ys sig. induction xs; intros; simpl. reflexivity.
   destruct ys. reflexivity.
@@ -404,9 +404,9 @@ Lemma apply_r_sigma_in sigma a :
     apply_r sigma a \in  ([set a] \\ (Dom_map sigma) :|: Range_map sigma).
 Proof.
   unfold apply_r.
-  intros. 
+  intros.
   destruct (@PTree.get var a sigma) eqn:gas.
-  right. exists a. auto. 
+  right. exists a. auto.
   left. split.
   constructor.
   intro. inv H. unfold var, M.elt in *. rewrite gas in H0. inv H0.
@@ -577,7 +577,7 @@ Proof.
 Qed.
 
 Lemma image_apply_r_empty S :
-  image (apply_r (M.empty var)) S <--> S. 
+  image (apply_r (M.empty var)) S <--> S.
 Proof.
   split; intros x.
   - intros [z [Hin Heq]]; subst. unfold apply_r.
@@ -590,9 +590,9 @@ Qed.
 Lemma prop_remove_all l sub sub' :
   map_get_r _ sub sub' -> map_get_r _ (remove_all sub l) (remove_all sub' l).
 Proof.
-  induction l; intros.  
+  induction l; intros.
   - auto.
-  - simpl. apply proper_remove. apply IHl; eauto. 
+  - simpl. apply proper_remove. apply IHl; eauto.
 Qed.
 
 #[global] Instance Proper_remove_all : Proper (map_get_r _ ==> eq ==> map_get_r _) remove_all.
@@ -600,13 +600,13 @@ Proof.
   intro; intros; intro; intros; subst. eapply prop_remove_all; eauto.
 Qed.
 
-(* XXX : setoid rewrite doesn't seem to work with map_get_r *) 
+(* XXX : setoid rewrite doesn't seem to work with map_get_r *)
 
 
 Lemma remove_all_empty l : map_get_r _ (remove_all (M.empty var) l) (M.empty var).
 Proof.
   induction l; intros; simpl; auto.
-  - apply smg_refl. 
+  - apply smg_refl.
   - eapply smg_trans. eapply proper_remove. eassumption.
     apply remove_empty.
 Qed.
@@ -628,14 +628,14 @@ Lemma remove_all_in x z l rho :
 Proof.
   induction l; intros; simpl; auto.
   - inversion H.
-  - simpl in H. 
+  - simpl in H.
     destruct (var_dec x a); subst.
-    + edestruct (ListDec.In_decidable) with (l := l) (x := a) as [Hd | ]. 
+    + edestruct (ListDec.In_decidable) with (l := l) (x := a) as [Hd | ].
       { intros x y. destruct (DecidableTypeEx.Positive_as_DT.eq_dec x y); subst; eauto.
         left; eauto. right; eauto. }
       * eapply proper_remove. eapply IHl. eauto.
-      * eapply smg_trans. eapply proper_remove. 
-        eapply remove_all_not_in. eassumption.    
+      * eapply smg_trans. eapply proper_remove.
+        eapply remove_all_not_in. eassumption.
         apply remove_set_1.
     + inv H. exfalso; eauto. eapply proper_remove. eapply IHl. eauto.
 Qed.
@@ -711,7 +711,7 @@ Lemma image_apply_r_remove_all_Singleton l v m :
 Proof.
   intros Hin.
   rewrite image_Singleton. unfold apply_r. rewrite in_remove_all. reflexivity.
-  eassumption. 
+  eassumption.
 Qed.
 
 Lemma image_remove_all_Disjoint  S m l :
@@ -731,10 +731,10 @@ Proof.
   revert S. induction l; intros S.
   - simpl. rewrite !FromList_nil at 1. repeat normalize_sets. sets.
   - simpl. rewrite !FromList_cons at 1. repeat normalize_sets.
-    eapply Included_trans. eapply image_apply_r_remove. 
+    eapply Included_trans. eapply image_apply_r_remove.
     eapply Union_Included. sets.
     eapply Included_trans. eapply IHl. rewrite Setminus_Union. sets.
-Qed. 
+Qed.
 
 Lemma remove_all_some:
   forall x y l sigma,
@@ -774,7 +774,7 @@ Proof.
   - reflexivity.
 Qed.
 
-#[global] Instance Proper_rename_all : Proper (map_get_r _ ==> eq ==> eq) rename_all. 
+#[global] Instance Proper_rename_all : Proper (map_get_r _ ==> eq ==> eq) rename_all.
 Proof.
   intro; intros; intro; intros; subst. eapply prop_rename_all; eauto.
 Qed.
@@ -842,13 +842,13 @@ Lemma rename_all_refl_mut :
   (forall e m (Hyp : forall x, apply_r m x = x), rename_all m e = e) /\
   (forall B m (Hyp : forall x, apply_r m x = x), rename_all_fun m B = B).
 Proof.
-  exp_defs_induction IHe IHl IHB; intros. 
+  exp_defs_induction IHe IHl IHB; intros.
   - simpl. rewrite apply_r_list_refl; eauto. rewrite IHe. reflexivity.
     eapply remove_apply_r_eq. eassumption.
   - simpl. rewrite Hyp; eauto.
   - simpl. rewrite Hyp; eauto.
     rewrite IHe; eauto. eapply IHl in Hyp. simpl in Hyp.
-    do 2 f_equal. inversion Hyp. rewrite H1. eassumption. 
+    do 2 f_equal. inversion Hyp. rewrite H1. eassumption.
   - simpl. rewrite Hyp, IHe; eauto.
     eapply remove_apply_r_eq. eassumption.
   - simpl. rewrite Hyp, apply_r_list_refl, IHe; eauto.
@@ -861,15 +861,15 @@ Proof.
   - simpl. rewrite apply_r_list_refl; eauto. rewrite IHe. reflexivity.
     eapply remove_apply_r_eq. eassumption.
   - simpl. rewrite Hyp; eauto.
-  - simpl. rewrite IHe, IHB; eauto. 
+  - simpl. rewrite IHe, IHB; eauto.
     eapply remove_all_apply_r_eq; eauto.
-  - reflexivity. 
+  - reflexivity.
 Qed.
 
 Corollary rename_all_refl :
   forall e m (Hyp : forall x, apply_r m x = x), rename_all m e = e.
 Proof.
-  eapply rename_all_refl_mut. 
+  eapply rename_all_refl_mut.
 Qed.
 
 (** * Lemmas about [rename_all_ns] *)
@@ -897,22 +897,22 @@ Proof.
     simpl; repeat normalize_bound_var;
       (try (rewrite IHe; reflexivity)); try reflexivity.
   - rewrite IHe.
-    specialize (IHl m). simpl in IHl. rewrite IHl. reflexivity. 
-  - rewrite IHe, IHB. reflexivity. 
+    specialize (IHl m). simpl in IHl. rewrite IHl. reflexivity.
   - rewrite IHe, IHB. reflexivity.
-Qed. 
+  - rewrite IHe, IHB. reflexivity.
+Qed.
 
 Lemma rename_all_bound_var :
   forall e m, bound_var (rename_all m e) <--> bound_var e.
 Proof.
-  eapply rename_all_bound_var_mut. 
-Qed. 
+  eapply rename_all_bound_var_mut.
+Qed.
 
 Lemma rename_all_bound_var_fundefs :
   (forall B m, bound_var_fundefs (rename_all_fun m B) <--> bound_var_fundefs B).
 Proof.
-  eapply rename_all_bound_var_mut. 
-Qed. 
+  eapply rename_all_bound_var_mut.
+Qed.
 
 Lemma rename_all_occurs_free_mut :
   (forall e m,
@@ -929,7 +929,7 @@ Proof.
     eapply Setminus_Included_Included_Union.
     eapply Included_trans. eapply IHe. eapply Included_trans.
     eapply image_apply_r_remove. sets.
-  - rewrite image_Singleton. reflexivity. 
+  - rewrite image_Singleton. reflexivity.
   - rewrite !image_Union, image_Singleton.
     eapply Union_Included; sets.
   - rewrite !image_Union, image_Singleton.
@@ -946,9 +946,9 @@ Proof.
   - specialize (IHB (all_fun_name f2) m).
     rewrite <- !Same_set_all_fun_name in IHB at 1.
     rewrite Setminus_Disjoint in IHB.
-    2:{ rewrite <- rename_all_fun_name. eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint. }      
-    
-    rewrite !image_Union. eapply Union_Included.      
+    2:{ rewrite <- rename_all_fun_name. eapply Disjoint_sym. eapply occurs_free_fundefs_name_in_fundefs_Disjoint. }
+
+    rewrite !image_Union. eapply Union_Included.
     eapply Included_trans. eapply IHB. reflexivity. now sets.
     eapply Setminus_Included_Included_Union.
     eapply Included_trans. eapply IHe. rewrite rename_all_fun_name.
@@ -956,7 +956,7 @@ Proof.
     rewrite <- !Same_set_all_fun_name at 1. sets.
   - rewrite FromList_apply_list, image_Union, image_Singleton in *. sets.
   - eapply Setminus_Included_Included_Union.
-    rewrite Union_commut.  
+    rewrite Union_commut.
     eapply Included_trans. 2:eapply image_apply_r_remove. sets.
   - rewrite FromList_apply_list, image_Union.
     eapply Included_Union_compat. sets. eapply Setminus_Included_Included_Union.
@@ -965,32 +965,32 @@ Proof.
   - rewrite image_Singleton. sets.
   - intros M Hsub (* Hdis *). repeat normalize_occurs_free; repeat normalize_bound_var.
     erewrite !Setminus_Union_distr, !Setminus_Union. apply Union_Included; sets.
-    + eapply Setminus_Included_Included_Union. 
+    + eapply Setminus_Included_Included_Union.
       eapply Included_trans. eapply IHe. eapply Included_trans.
-      eapply image_remove_all. eapply Union_Included; [| now sets ]. 
+      eapply image_remove_all. eapply Union_Included; [| now sets ].
       eapply Included_trans. eapply image_remove_all.
       eapply Union_Included; [| now sets ].
       rewrite !image_Union. do 2 eapply Included_Union_preserv_l.
       rewrite !Setminus_Union. eapply image_monotonic. eapply Included_Setminus_compat.
-      now sets. rewrite (Union_commut (FromList l)), Union_assoc. rewrite <- Union_assoc. 
+      now sets. rewrite (Union_commut (FromList l)), Union_assoc. rewrite <- Union_assoc.
       eapply Union_Included. eapply Included_trans. eassumption. now sets. now sets.
     + rewrite (Union_commut [set v]) at 1. rewrite <- Setminus_Union.
       eapply Included_trans. eapply Included_Setminus_compat. eapply IHB.
-      eapply Included_trans; [| eassumption ]. now sets. reflexivity. 
-      rewrite <- image_remove_all_Disjoint; [| eapply Disjoint_Setminus_l; reflexivity ]. 
-      rewrite <- (image_apply_r_remove_all_Singleton m v) at 1.       
+      eapply Included_trans; [| eassumption ]. now sets. reflexivity.
+      rewrite <- image_remove_all_Disjoint; [| eapply Disjoint_Setminus_l; reflexivity ].
+      rewrite <- (image_apply_r_remove_all_Singleton m v) at 1.
       eapply Included_trans. eapply image_Setminus. now tci.
       rewrite image_remove_all_Disjoint.
       rewrite image_Union, Setminus_Union, !(Union_commut [set v]). now sets.
       now sets. eapply Hsub. sets.
   - intros M Hsub. rewrite !occurs_free_fundefs_Fnil at 1.
-    sets. 
+    sets.
 Qed.
 
 Lemma rename_all_occurs_free :
   forall e m,
-    occurs_free (rename_all m e) \subset (image (apply_r m) (occurs_free e)). 
-Proof. eapply rename_all_occurs_free_mut. Qed. 
+    occurs_free (rename_all m e) \subset (image (apply_r m) (occurs_free e)).
+Proof. eapply rename_all_occurs_free_mut. Qed.
 
 Lemma bound_var_rename_all_ns_mut:
   forall sigma,
@@ -1070,7 +1070,7 @@ Proof.
     apply H0.
     apply H.
     auto.
-  - constructor. 
+  - constructor.
   - inv H1.
     constructor; auto.
     intro; apply H7.
@@ -1086,4 +1086,3 @@ Proof.
     auto.
   - constructor.
 Qed.
-

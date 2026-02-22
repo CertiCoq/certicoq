@@ -5,7 +5,7 @@
 From compcert.lib Require Import Coqlib.
 Require Import LambdaANF.tactics.
 From CertiCoq.LambdaANF Require Import cps ctx Ensembles_util List_util functions map_util.
-From Coq Require Import Arith.Arith NArith.BinNat Lists.List
+From Stdlib Require Import Arith.Arith NArith.BinNat Lists.List
      micromega.Lia Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.
 From MetaRocq.Utils Require Import bytestring. (* For identifier names *)
 From MetaRocq.Common Require Import BasicAst. (* For identifier names *)
@@ -148,14 +148,14 @@ Inductive find_tag_nth : list (ctor_tag * exp) -> ctor_tag -> exp -> nat -> Prop
     forall c e l c' e' n,
       find_tag_nth l c' e' n ->
       c <> c' ->
-      find_tag_nth ((c, e) :: l) c' e' (n + 1).          
+      find_tag_nth ((c, e) :: l) c' e' (n + 1).
 
 Lemma find_tag_nth_In_patterns (P : list (ctor_tag * exp)) (c : ctor_tag) n e :
   find_tag_nth P c e n -> List.In (c, e) P.
-Proof. 
+Proof.
   intros H; induction H; eauto.
   now constructor.
-  now constructor. 
+  now constructor.
 Qed.
 
 Lemma find_tag_nth_same_tags (D1 D2 : list (ctor_tag * exp)) c e e' n n':
@@ -858,7 +858,7 @@ Proof.
       }
       destruct H. exists x; constructor; auto.
     + exists (num_occur_list [v0] v + x); constructor; auto.
-    + exists (num_occur_list [v0] v + x). constructor; auto. 
+    + exists (num_occur_list [v0] v + x). constructor; auto.
     + specialize (e_num_binding_f v f).
       destructAll.
       eexists; constructor; eauto.
@@ -981,7 +981,7 @@ Proof.
     eapply num_occur_n.
     constructor. rewrite IHc.
     eexists; eexists; eauto.
-    lia.    
+    lia.
   - inv H. firstorder.
   - destructAll. inv H.
     eapply num_occur_n. cbn. constructor; eauto.
@@ -1272,7 +1272,7 @@ Proof.
   - destructAll. inv H.
     eapply num_occur_ec_n.
     constructor; eauto. rewrite IHc1. eauto.
-    lia.    
+    lia.
   - inv H. apply IHfc1 in H5. destructAll.
     eexists. exists x1. split.
     constructor; eauto. split; auto.
@@ -1344,7 +1344,7 @@ Qed.
 
 (* Instance for option monad. Maybe move to more general file *)
 #[export] Instance OptMonad : Monad option.
-Proof. 
+Proof.
   constructor.
   - intros X x. exact (Some x).
   - intros A B [ a | ] f.
@@ -1373,7 +1373,7 @@ Fixpoint inline_letapp
     res <- inline_letapp e z ;;
     let (C, v) := (res : exp_ctx * var) in
     ret (Eletapp_c x f ft ys C, v)
-  | Efun B e =>      
+  | Efun B e =>
     res <- inline_letapp e z ;;
     let (C, v) := (res : exp_ctx * var) in
     ret (Efun1_c B C, v)
@@ -1381,11 +1381,11 @@ Fixpoint inline_letapp
     ret (Eletapp_c z f ft ys Hole_c, z)
   | Eprim_val x p e  =>
     res <- inline_letapp e z ;;
-    let (C, v) := (res : exp_ctx * var) in      
+    let (C, v) := (res : exp_ctx * var) in
     ret (Eprim_val_c x p C, v)
   | Eprim x p ys e  =>
     res <- inline_letapp e z ;;
-    let (C, v) := (res : exp_ctx * var) in      
+    let (C, v) := (res : exp_ctx * var) in
     ret (Eprim_c x p ys C, v)
   | Ehalt x => ret (Hole_c, x)
   end.
@@ -1396,9 +1396,9 @@ Fixpoint straight_code (e : exp) :=
   | Eprim_val _ _ e
   | Eprim _ _ _ e
   | Eproj _ _ _ _ e
-  | Eletapp _ _ _ _ e 
-  | Efun _ e => straight_code e    
-  | Ecase _ _ => false 
+  | Eletapp _ _ _ _ e
+  | Efun _ e => straight_code e
+  | Ecase _ _ => false
   | Eapp _ _ _ => true
   | Ehalt _ => true
   end.
@@ -1424,7 +1424,7 @@ Proof.
   revert C x'.
   induction e; intros C x' Hin; simpl in *;
     try (match goal with
-         | [ _ : context[inline_letapp ?E ?X] |- _ ] => 
+         | [ _ : context[inline_letapp ?E ?X] |- _ ] =>
            destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
          end); (try now inv Hin); try (now eauto).
 Qed.
@@ -1434,13 +1434,12 @@ Lemma straight_code_ctx_app e x C x' e' :
   inline_letapp e x = Some (C, x') ->
   straight_code e' = true ->
   straight_code (C |[ e' ]|) = true.
-Proof.                                  
+Proof.
   revert C x'.
   induction e; intros C x' Hin Hs; simpl in *;
     try (match goal with
-         | [ _ : context[inline_letapp ?E ?X] |- _ ] => 
+         | [ _ : context[inline_letapp ?E ?X] |- _ ] =>
            destruct (inline_letapp E X) as [[C' w] | ] eqn:Hin'; inv Hin
          end); (try now inv Hin);
       try (now simpl; eapply IHe; eauto).
 Qed.
-

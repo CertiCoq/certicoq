@@ -2,7 +2,7 @@
  * Author: Anonymized, 2016
  *)
 
-From Coq Require Import PArith.PArith MSets.MSetRBT Classes.Morphisms Sets.Ensembles
+From Stdlib Require Import PArith.PArith MSets.MSetRBT Classes.Morphisms Sets.Ensembles
      Relations.Relations Lists.List SetoidList Permutation micromega.Lia.
 Require Import compcert.lib.Coqlib LambdaANF.tactics.
 From CertiCoq.LambdaANF Require Import Ensembles_util List_util functions.
@@ -17,7 +17,7 @@ Lemma Subset_add s s' e :
   Subset (add e s) (add e s').
 Proof.
   intros H e' HIn. eapply add_spec in HIn.
-  inv HIn; eapply add_spec; eauto. 
+  inv HIn; eapply add_spec; eauto.
 Qed.
 
 Lemma Subset_union_l s s' s'' :
@@ -25,7 +25,7 @@ Lemma Subset_union_l s s' s'' :
   Subset (union s'' s) (union s'' s').
 Proof.
   intros H e' HIn. eapply union_spec in HIn.
-  inv HIn; eapply union_spec; eauto. 
+  inv HIn; eapply union_spec; eauto.
 Qed.
 
 Lemma Subset_union_r s s' s'' :
@@ -33,13 +33,13 @@ Lemma Subset_union_r s s' s'' :
   Subset (union s s'') (union s' s'').
 Proof.
   intros H e' HIn. eapply union_spec in HIn.
-  inv HIn; eapply union_spec; eauto. 
+  inv HIn; eapply union_spec; eauto.
 Qed.
 
 Lemma Subset_refl s :
   Subset s s.
 Proof.
-  intros H e; eauto. 
+  intros H e; eauto.
 Qed.
 
 Lemma Subset_union_mon_l s s' s'' :
@@ -47,7 +47,7 @@ Lemma Subset_union_mon_l s s' s'' :
   Subset s (union s' s'').
 Proof.
   intros H e' HIn.
-  eapply union_spec; eauto. 
+  eapply union_spec; eauto.
 Qed.
 
 Lemma Subset_union_mon_r s s' s'' :
@@ -55,13 +55,13 @@ Lemma Subset_union_mon_r s s' s'' :
   Subset s (union s'' s').
 Proof.
   intros H e' HIn.
-  eapply union_spec; eauto. 
+  eapply union_spec; eauto.
 Qed.
 
 Definition union_list (s : PS.t) (l : list elt) : PS.t :=
   List.fold_left (fun set e => add e set) l s.
 
-Lemma union_list_spec (s : PS.t) (l : list elt) : 
+Lemma union_list_spec (s : PS.t) (l : list elt) :
   forall (x : elt), In x (union_list s l) <->
                     In x s \/ List.In x l.
 Proof.
@@ -78,7 +78,7 @@ Qed.
 Definition diff_list (s : PS.t) (l : list elt) : PS.t :=
   List.fold_left (fun set e => remove e set) l s.
 
-Lemma diff_list_spec (s : PS.t) (l : list elt) : 
+Lemma diff_list_spec (s : PS.t) (l : list elt) :
   forall (x : elt), In x (diff_list s l) <->
                     In x s /\ ~ List.In x l.
 Proof.
@@ -99,7 +99,7 @@ Lemma Subset_union_list s s' l :
   Subset (union_list s l) (union_list s' l).
 Proof.
   intros H e' HIn. eapply union_list_spec in HIn.
-  inv HIn; eapply union_list_spec; eauto. 
+  inv HIn; eapply union_list_spec; eauto.
 Qed.
 
 Lemma eq_lists (l1 l2 : list elt) :
@@ -125,7 +125,7 @@ Proof.
       assert (Helem' :
                 forall x, SetoidList.InA Logic.eq x l1 <->
                           SetoidList.InA Logic.eq x l2).
-      { intros x. split; intros H. 
+      { intros x. split; intros H.
         - assert (HIn : SetoidList.InA Logic.eq x (e :: l2))
             by (eapply Helem; constructor 2; eauto).
           inv HIn; eauto.
@@ -164,7 +164,7 @@ Proof.
             apply E.lt_compat.
             apply H1. eauto. eauto. }
           rewrite (@PositiveOrder.le_antisym a e); eauto; congruence. }
-      f_equal; eauto.  
+      f_equal; eauto.
       assert (HIn' : SetoidList.InA Logic.eq e (a :: l1)) by
           (eapply Helem; constructor; eauto).
       assert (HIn : SetoidList.InA Logic.eq a (e :: l2)) by
@@ -324,15 +324,15 @@ Qed.
 
 Lemma PS_nonempty_add (S : PS.t) :
   PS.cardinal S > 0 ->
-  exists x S', ~ PS.In x S' /\ PS.Equal S (PS.add x S'). 
+  exists x S', ~ PS.In x S' /\ PS.Equal S (PS.add x S').
 Proof.
-  intros Hsize. destruct (PS.elements S) eqn:Helem. 
+  intros Hsize. destruct (PS.elements S) eqn:Helem.
   - rewrite PS.cardinal_spec, Helem in Hsize; eauto. simpl in *. lia.
   - eexists e, (PS.remove e S). split.
 
     intros Hin. eapply PS.remove_spec in Hin.
     inv Hin; eauto.
-    
+
     intros x. split; intros Hin.
     destruct (Coqlib.peq x e); subst.
     + eapply PS.add_spec. now left.
@@ -344,11 +344,11 @@ Proof.
       eapply PS.remove_spec in H. inv H; eauto.
 Qed.
 
-Lemma PS_add_elements S x : 
+Lemma PS_add_elements S x :
   ~ PS.In x S ->
   Permutation (x :: PS.elements S) (PS.elements (PS.add x S)).
 Proof.
-  intros Hnin. 
+  intros Hnin.
   eapply NoDup_Permutation.
   - constructor. intros Hin. eapply Hnin.
     eapply PS.elements_spec1. eapply In_InA; try eassumption.
@@ -363,7 +363,7 @@ Proof.
       edestruct InA_alt as [[z [Heq1 Hin]] _]. eassumption.
       subst. eassumption.
 
-      eapply In_InA in H. 
+      eapply In_InA in H.
       assert (HinA : InA Logic.eq y (PS.elements (PS.add x S))).
       { eapply PS.elements_spec1. eapply PS.add_spec. right.
         eapply PS.elements_spec1 in H. eassumption. }
@@ -375,7 +375,7 @@ Proof.
     + intros Hin.
       eapply In_InA in Hin.
 
-      eapply PS.elements_spec1 in Hin. 
+      eapply PS.elements_spec1 in Hin.
       eapply PS.add_spec in Hin. inv Hin.
       now constructor.
       constructor 2.
@@ -387,10 +387,10 @@ Proof.
       subst. eassumption.
 
       now eauto with typeclass_instances.
-Qed. 
+Qed.
 
 Lemma PS_cardinal_empty S :
-  PS.cardinal S = 0 -> PS.Equal S PS.empty. 
+  PS.cardinal S = 0 -> PS.Equal S PS.empty.
 Proof.
   intros Heq x. rewrite PS.cardinal_spec in Heq.
   split; intros Hin.
@@ -403,10 +403,10 @@ Qed.
 Lemma PS_cardinal_add (S : PS.t) x :
   ~ PS.In x S ->
   1 + PS.cardinal S = PS.cardinal (PS.add x S).
-Proof. 
+Proof.
   intros Hnin. rewrite !PS.cardinal_spec.
   erewrite (@Permutation_length _ (PS.elements (PS.add x S)));
-    [| symmetry; now apply PS_add_elements ]. 
+    [| symmetry; now apply PS_add_elements ].
   reflexivity.
 Qed.
 
@@ -422,10 +422,10 @@ Proof.
   revert S. induction n; intros S Heq.
   - eapply H. eapply PS_cardinal_empty. now eauto. eassumption.
   - edestruct PS_nonempty_add as (e & S' & HninS & HeqS).
-    rewrite <- Heq. lia. 
-    eapply H. eassumption. eapply IH. 
+    rewrite <- Heq. lia.
+    eapply H. eassumption. eapply IH.
     eassumption. eapply IHn.
-    rewrite HeqS in Heq. simpl in Heq. 
+    rewrite HeqS in Heq. simpl in Heq.
     rewrite <- PS_cardinal_add in Heq. lia.
     eassumption.
 Qed.
@@ -439,7 +439,7 @@ Definition FromSet (s : PS.t) : Ensemble positive :=
 Lemma FromSet_sound (S : Ensemble positive) (s : PS.t) x :
   S <--> FromSet s ->
   x \in S -> In x s.
-Proof. 
+Proof.
   intros Heq Hin. eapply Heq in Hin.
   unfold FromSet, FromList, Ensembles.In in Hin.
   eapply In_InA in Hin. eapply PS.elements_spec1 in Hin.
@@ -450,7 +450,7 @@ Qed.
 Lemma FromSet_complete (S : Ensemble positive) (s : PS.t) x :
   S <--> FromSet s ->
   In x s -> x \in S.
-Proof. 
+Proof.
   intros Heq Hin.
   eapply Heq. unfold FromSet, FromList, Ensembles.In.
   eapply PS.elements_spec1 in Hin. eapply InA_alt in Hin.
@@ -461,7 +461,7 @@ Lemma FromSet_union s1 s2 :
   FromSet (PS.union s1 s2) <--> FromSet s1 :|: FromSet s2.
 Proof.
   unfold FromSet, FromList. split; intros x Hin; unfold Ensembles.In in *; simpl in *.
-  - eapply In_InA with (eqA := Logic.eq) in Hin; eauto with typeclass_instances. 
+  - eapply In_InA with (eqA := Logic.eq) in Hin; eauto with typeclass_instances.
     eapply PS.elements_spec1 in Hin. eapply PS.union_spec in Hin.
     inv Hin; [ left | right ]; unfold In; simpl.
     + assert (HinA: InA Logic.eq x (PS.elements s1)).
@@ -473,9 +473,9 @@ Proof.
   - assert (HinA: InA Logic.eq x (PS.elements (PS.union s1 s2))).
     { eapply PS.elements_spec1. eapply PS.union_spec.
       inv Hin; unfold Ensembles.In in *; simpl in *.
-      + eapply In_InA with (eqA := Logic.eq) in H; eauto with typeclass_instances. 
+      + eapply In_InA with (eqA := Logic.eq) in H; eauto with typeclass_instances.
         eapply PS.elements_spec1 in H. now left.
-      + eapply In_InA with (eqA := Logic.eq) in H; eauto with typeclass_instances. 
+      + eapply In_InA with (eqA := Logic.eq) in H; eauto with typeclass_instances.
         eapply PS.elements_spec1 in H. now right. }
     eapply InA_alt in HinA. destruct HinA as [y [Heq Hin']]. subst; eauto.
 Qed.
@@ -484,7 +484,7 @@ Lemma FromSet_diff s1 s2 :
   FromSet (PS.diff s1 s2) <--> FromSet s1 \\ FromSet s2.
 Proof.
   unfold FromSet, FromList. split; intros x Hin; unfold Ensembles.In in *; simpl in *.
-  - eapply In_InA with (eqA := Logic.eq) in Hin; eauto with typeclass_instances. 
+  - eapply In_InA with (eqA := Logic.eq) in Hin; eauto with typeclass_instances.
     eapply PS.elements_spec1 in Hin. eapply PS.diff_spec in Hin.
     inv Hin. constructor.
     + assert (HinA: InA Logic.eq x (PS.elements s1)).
@@ -496,7 +496,7 @@ Proof.
   - assert (HinA: InA Logic.eq x (PS.elements (PS.diff s1 s2))).
     { eapply PS.elements_spec1. eapply PS.diff_spec.
       inv Hin; unfold Ensembles.In in *; simpl in *. split.
-      + eapply In_InA with (eqA := Logic.eq) in H; eauto with typeclass_instances. 
+      + eapply In_InA with (eqA := Logic.eq) in H; eauto with typeclass_instances.
         eapply PS.elements_spec1 in H. eassumption.
       + intros Hin. eapply PS.elements_spec1 in Hin.
         eapply InA_alt in Hin. destruct Hin as [y [Heq Hin]].
@@ -508,7 +508,7 @@ Lemma FromSet_add x s :
   FromSet (PS.add x s) <-->  x |: FromSet s.
 Proof.
   unfold FromSet, FromList. split; intros z Hin; unfold Ensembles.In in *; simpl in *.
-  - eapply In_InA with (eqA := Logic.eq) in Hin; eauto with typeclass_instances. 
+  - eapply In_InA with (eqA := Logic.eq) in Hin; eauto with typeclass_instances.
     eapply PS.elements_spec1 in Hin. eapply PS.add_spec in Hin.
     inv Hin; [ left | right ]; unfold In; simpl.
     + reflexivity.
@@ -530,7 +530,7 @@ Proof.
   revert s; induction l; intros s; simpl.
   - rewrite FromList_nil, Union_Empty_set_neut_r.
     reflexivity.
-  - rewrite IHl, FromSet_add, FromList_cons, Union_assoc, (Union_commut (FromSet s) [set a]). 
+  - rewrite IHl, FromSet_add, FromList_cons, Union_assoc, (Union_commut (FromSet s) [set a]).
     reflexivity.
 Qed.
 
@@ -556,7 +556,7 @@ Lemma FromSet_cardinal_empty s :
   PS.cardinal s = 0 -> FromSet s <--> Empty_set _.
 Proof.
   rewrite PS.cardinal_spec. intros Hc.
-  split; intros x Hin; try now inv Hin. 
+  split; intros x Hin; try now inv Hin.
   unfold FromSet, Ensembles.In, FromList in Hin.
   eapply In_InA with (eqA := Logic.eq) in Hin;
     eauto with typeclass_instances.
@@ -567,7 +567,7 @@ Qed.
 #[global] Instance Decidable_FromSet (s : PS.t) : Decidable (FromSet s).
 Proof.
   unfold FromSet.
-  eapply Ensembles_util.Decidable_FromList. 
+  eapply Ensembles_util.Decidable_FromList.
 Qed.
 
 
@@ -600,13 +600,13 @@ Class ToMSet (S : Ensemble positive) :=
 
 #[global] Instance ToMSet_EmptySet : ToMSet (Empty_set _).
 Proof.
-  econstructor. 
+  econstructor.
   symmetry. eapply FromSet_empty.
 Defined.
 
 #[global] Instance ToMSet_Singleton x : ToMSet [set x].
 Proof.
-  econstructor. 
+  econstructor.
   symmetry. eapply FromSet_singleton.
 Defined.
 
@@ -631,16 +631,16 @@ Defined.
 
 #[global] Instance ToMSet_Union S1 {H1 : ToMSet S1} S2 {H2 : ToMSet S2} : ToMSet (S1 :|: S2).
 Proof.
-  destruct H1 as [m1 Heq1]. destruct H2 as [m2 Heq2].  
+  destruct H1 as [m1 Heq1]. destruct H2 as [m2 Heq2].
   econstructor. symmetry. rewrite FromSet_union.
-  rewrite Heq1, Heq2. reflexivity. 
-Qed.  
+  rewrite Heq1, Heq2. reflexivity.
+Qed.
 
 #[global] Instance ToMSet_Setminus S1 {H1 : ToMSet S1} S2 {H2 : ToMSet S2} : ToMSet (S1 \\ S2).
 Proof.
-  destruct H1 as [m1 Heq1]. destruct H2 as [m2 Heq2].  
+  destruct H1 as [m1 Heq1]. destruct H2 as [m2 Heq2].
   econstructor. symmetry. rewrite FromSet_diff.
-  rewrite Heq1, Heq2. reflexivity. 
+  rewrite Heq1, Heq2. reflexivity.
 Qed.
 
 #[global] Instance ToMSet_Intersection (S1 : Ensemble positive) `{ToMSet S1}
@@ -649,16 +649,16 @@ Proof.
   destruct H as [m1 Hm1]; destruct H0 as [m2 Hm2].
   eexists (PS.inter m1 m2).
   split.
-  - intros x H. destruct H as [y Hs1 Hs2].  
+  - intros x H. destruct H as [y Hs1 Hs2].
     eapply FromSet_complete. reflexivity.
     eapply PS.inter_spec. split.
-    eapply FromSet_sound. eapply Hm1; eauto. eassumption. 
-    eapply FromSet_sound. eapply Hm2; eauto. eassumption. 
+    eapply FromSet_sound. eapply Hm1; eauto. eassumption.
+    eapply FromSet_sound. eapply Hm2; eauto. eassumption.
   - intros x H.
     eapply FromSet_sound in H; [| reflexivity ].
     eapply PS.inter_spec in H. inv H. constructor.
-    eapply FromSet_complete. eapply Hm1; eauto. eassumption. 
-    eapply FromSet_complete. eapply Hm2; eauto. eassumption. 
+    eapply FromSet_complete. eapply Hm1; eauto. eassumption.
+    eapply FromSet_complete. eapply Hm2; eauto. eassumption.
 Qed.
 
 #[global] Instance ToMSetFromList l : ToMSet (FromList l).
@@ -667,7 +667,7 @@ Proof.
   rewrite FromSet_union_list. rewrite FromSet_empty.
   rewrite Union_Empty_set_neut_l. reflexivity.
 Defined.
-  
+
 #[global] Instance Decidable_ToMSet S {HM : ToMSet S} : Decidable S.
 Proof.
   constructor. intros x.
@@ -707,7 +707,7 @@ Proof.
     inv Hin.
     eapply PS.elements_spec1 in H. eapply InA_In in H.
     eapply Hm in H. inv H; eauto.
-    inv H1. exfalso; eauto. 
+    inv H1. exfalso; eauto.
 Qed.
 
 Lemma Ensemble_ind (P : Ensemble positive -> Prop) {_ : Proper (Same_set _ ==> iff) P} :
@@ -729,7 +729,7 @@ Proof.
     eassumption. eauto with typeclass_instances.
 Qed.
 
-    
+
 Definition PS_map f s :=
   PS.fold (fun x s => PS.add (f x) s) s PS.empty.
 
@@ -756,7 +756,7 @@ Qed.
 
 Lemma PS_cardinal_empty_l s :
   FromSet s <--> Empty_set _ ->
-  PS.cardinal s = 0. 
+  PS.cardinal s = 0.
 Proof.
   intros Heq.
   replace 0 with (@List.length elt nil) by reflexivity.
@@ -765,11 +765,11 @@ Proof.
   constructor; eauto.
   rewrite <- !FromSet_elements. rewrite Heq. repeat normalize_sets.
   reflexivity.
-Qed. 
+Qed.
 
 Lemma PS_cardinal_singleton s x :
   FromSet s <--> [set x] ->
-  PS.cardinal s = 1. 
+  PS.cardinal s = 1.
 Proof.
   intros Heq.
   replace 1 with (List.length (cons x nil)) by reflexivity.
@@ -780,7 +780,7 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma PS_fold_left_map s l b : 
+Lemma PS_fold_left_map s l b :
   image b (FromList l) :|: FromSet s <-->
         FromSet
         (fold_left (fun (a : PS.t) (e : PS.elt) => PS.add (b e) a) l s).
@@ -793,7 +793,7 @@ Proof with (now eauto with Ensembles_DB).
     now apply IHl.
 Qed.
 
-Lemma PS_fold_left_map_opt s l (b : positive -> option positive) : 
+Lemma PS_fold_left_map_opt s l (b : positive -> option positive) :
   image' b (FromList l) :|: FromSet s <-->
          FromSet
          (fold_left (fun s x  => match b x with
@@ -811,16 +811,16 @@ Proof with (now eauto with Ensembles_DB).
       now apply IHl.
     + rewrite image'_Singleton_None; eauto.
       rewrite Union_Empty_set_neut_l.
-      eapply IHl. 
+      eapply IHl.
 Qed.
 
-  
+
 #[global] Instance ImageToMSet b S `{_: ToMSet S} : ToMSet (image b S).
 Proof.
   destruct H as [m Hm].
   exists (PS_map b m).  rewrite Hm. unfold PS_map.
   rewrite FromSet_elements.
-  rewrite PS.fold_spec. 
+  rewrite PS.fold_spec.
   rewrite FromSet_elements in Hm.
   generalize (PS.elements m) Hm. clear Hm.
   intros l Heq.
@@ -833,7 +833,7 @@ Proof.
   destruct H as [m Hm].
   exists (PS_map_opt b m).  rewrite Hm. unfold PS_map_opt.
   rewrite FromSet_elements.
-  rewrite PS.fold_spec. 
+  rewrite PS.fold_spec.
   rewrite FromSet_elements in Hm.
   generalize (PS.elements m) Hm. clear Hm.
   intros l Heq.
@@ -849,11 +849,11 @@ Proof.
   rewrite !PS.cardinal_spec. intros Hin.
   eapply Same_set_FromList_length.
   eapply NoDupA_NoDup. eapply PS.elements_spec2w.
-  rewrite <- !FromSet_elements. unfold mset. 
+  rewrite <- !FromSet_elements. unfold mset.
   destruct HS1 as [m1 HS1].
   destruct HS2 as [m2 HS2].
   rewrite <- HS1, <- HS2. eassumption.
-Qed. 
+Qed.
 
 Definition disjoint (s1 s2 : PS.t) : Prop :=
   PS.Equal (PS.inter s1 s2) PS.empty.
@@ -882,21 +882,21 @@ Proof.
   inv Hin3.
 Qed.
 
-Lemma FromSet_intersection (s1 s2 : PS.t) : 
-  FromSet (PS.inter s1 s2) <--> FromSet s1 :&: FromSet s2. 
+Lemma FromSet_intersection (s1 s2 : PS.t) :
+  FromSet (PS.inter s1 s2) <--> FromSet s1 :&: FromSet s2.
 Proof.
   split; intros x Hin.
   eapply FromSet_sound in Hin; [| reflexivity ].
   eapply PS.inter_spec in Hin. destruct Hin as [Hin1 Hin2].
-  constructor; (eapply FromSet_complete; [ reflexivity | eassumption ]). 
+  constructor; (eapply FromSet_complete; [ reflexivity | eassumption ]).
   inv Hin.
   eapply FromSet_complete. reflexivity.
   eapply PS.inter_spec.
   split; (eapply FromSet_sound; [ reflexivity | eassumption ]).
-Qed. 
+Qed.
 
-Lemma FromSet_disjoint (s1 s2 : PS.t) : 
-  disjoint s1 s2 <-> Disjoint _ (FromSet s1) (FromSet s2). 
+Lemma FromSet_disjoint (s1 s2 : PS.t) :
+  disjoint s1 s2 <-> Disjoint _ (FromSet s1) (FromSet s2).
 Proof.
   split; intros Hd.
   - constructor. intros x Hin.
@@ -912,21 +912,21 @@ Proof.
 Qed.
 
 Lemma PS_union_elements s1 s2 :
-  disjoint s1 s2 -> 
+  disjoint s1 s2 ->
   Permutation (PS.elements s1 ++ PS.elements s2) (PS.elements (PS.union s1 s2)).
 Proof.
-  intros Hnin. 
+  intros Hnin.
   eapply NoDup_Permutation.
   - eapply NoDup_app.
     eapply NoDupA_NoDup. now eapply PS.elements_spec2w.
     eapply NoDupA_NoDup. now eapply PS.elements_spec2w.
-    eapply FromSet_disjoint. eassumption.      
+    eapply FromSet_disjoint. eassumption.
   - eapply NoDupA_NoDup. eapply PS.elements_spec2w.
   - intros y. split.
     + intros Hin.
       eapply InA_In.
-      eapply PS.elements_spec1. eapply PS.union_spec. 
-      eapply Coqlib.in_app in Hin. 
+      eapply PS.elements_spec1. eapply PS.union_spec.
+      eapply Coqlib.in_app in Hin.
       inv Hin.
       * left. eapply PS.elements_spec1.
         eapply In_InA. eauto with typeclass_instances.
@@ -935,20 +935,20 @@ Proof.
         eapply In_InA. eauto with typeclass_instances.
         eassumption.
     + intros HIn.
-      eapply In_InA in HIn. 
-      eapply PS.elements_spec1 in HIn. 
+      eapply In_InA in HIn.
+      eapply PS.elements_spec1 in HIn.
       eapply PS.union_spec in HIn.
       eapply Coqlib.in_app.
       inv HIn.
       * left. eapply InA_In. eapply PS.elements_spec1.
-        eassumption. 
+        eassumption.
       * right. eapply InA_In. eapply PS.elements_spec1.
         eassumption.
       * eauto with typeclass_instances.
-Qed. 
+Qed.
 
 Lemma PS_cardinal_union s1 s2 :
-  disjoint s1 s2 -> 
+  disjoint s1 s2 ->
   PS.cardinal s1 + PS.cardinal s2 = PS.cardinal (PS.union s1 s2).
 Proof.
   intros Hd.
@@ -967,39 +967,39 @@ Lemma inverse_exists S {Hs : ToMSet S} (b : positive -> positive) :
   injective_subdomain S b ->
   exists b', injective_subdomain (image b S) b' /\
         inverse_subdomain S b b'.
-Proof. 
+Proof.
   pose (P := fun S => forall (_ : ToMSet S),
                  injective_subdomain S b ->
                  exists b', injective_subdomain (image b S) b' /\
                        inverse_subdomain S b b').
-  assert (Hs' := Hs). revert Hs. 
+  assert (Hs' := Hs). revert Hs.
   eapply Ensemble_ind with (P := P).
   - intros S1 S2 Heq. unfold P; split.
-    intros Hs1 Hinj. setoid_rewrite <- Heq.  
-    eapply Hs1. eapply ToMSet_Same_set. symmetry. eassumption. 
+    intros Hs1 Hinj. setoid_rewrite <- Heq.
+    eapply Hs1. eapply ToMSet_Same_set. symmetry. eassumption.
     eassumption.
-    intros Hs1 Hinj. setoid_rewrite Heq.  
-    eapply Hs1. eapply ToMSet_Same_set. eassumption. 
+    intros Hs1 Hinj. setoid_rewrite Heq.
+    eapply Hs1. eapply ToMSet_Same_set. eassumption.
     eassumption.
   - unfold P. intros _.
     intros _. eexists id.
     split.
-    
+
     rewrite image_Empty_set. clear. now firstorder.
 
     split.
     rewrite image_Empty_set. clear. now firstorder.
     clear; now firstorder.
-    
-  - intros x S0 Hs0 Hnin IH Hs Hinj. edestruct IH as [b' [Hinj' [Hfeq1 Hfeq2]]].  
+
+  - intros x S0 Hs0 Hnin IH Hs Hinj. edestruct IH as [b' [Hinj' [Hfeq1 Hfeq2]]].
     eassumption. eapply injective_subdomain_antimon. eassumption. now eauto with Ensembles_DB.
 
     eexists (b' {(b x) ~> x}). split.
 
     + rewrite image_Union, image_Singleton.
       eapply injective_subdomain_extend. eassumption.
-      intros [y [Hc Heqcy]]; subst. inv Hc.  
-      destruct H as [z [Hc Heqcz]]. subst. 
+      intros [y [Hc Heqcy]]; subst. inv Hc.
+      destruct H as [z [Hc Heqcz]]. subst.
       eapply H0.
 
       replace (b' (b z)) with z. reflexivity.
@@ -1026,43 +1026,43 @@ Proof.
         eapply compose_extend_l. eassumption. now left.
         rewrite Hfeq'.
         eapply f_eq_subdomain_extend. eassumption.
-  - eassumption. 
+  - eassumption.
 Qed.
 
-Lemma PS_add_elements_in S x : 
+Lemma PS_add_elements_in S x :
   PS.In x S ->
   Permutation (PS.elements S) (PS.elements (PS.add x S)).
 Proof.
-  intros Hnin. 
+  intros Hnin.
   eapply NoDup_Permutation.
   - eapply NoDupA_NoDup. eapply PS.elements_spec2w.
   - eapply NoDupA_NoDup. eapply PS.elements_spec2w.
   - intros y. split.
-    + intros Hin. 
+    + intros Hin.
       assert (HinA : InA Logic.eq y (PS.elements (PS.add x S))).
       { eapply PS.elements_spec1. eapply PS.add_spec. right.
         eapply PS.elements_spec1. eapply In_InA; tci. }
       eapply InA_In; eauto.
     + intros Hin. eapply In_InA in Hin; tci.
 
-      eapply PS.elements_spec1 in Hin. 
+      eapply PS.elements_spec1 in Hin.
       eapply PS.add_spec in Hin. inv Hin.
-      eapply InA_In. 
+      eapply InA_In.
       eapply PS.elements_spec1. eassumption.
-      eapply InA_In. 
+      eapply InA_In.
       eapply PS.elements_spec1. eassumption.
-Qed. 
+Qed.
 
 Lemma PS_cardinal_add_in x s:
   PS.In x s ->
-  PS.cardinal (PS.add x s) = PS.cardinal s.  
+  PS.cardinal (PS.add x s) = PS.cardinal s.
 Proof.
-  intros Hnin. rewrite !PS.cardinal_spec. 
+  intros Hnin. rewrite !PS.cardinal_spec.
   erewrite (@Permutation_length _ (PS.elements (PS.add x s)));
-    [| symmetry; now apply PS_add_elements_in ]. 
+    [| symmetry; now apply PS_add_elements_in ].
   reflexivity.
 Qed.
-  
+
 
 Lemma PS_union_list f l s1 s2 :
   PS.cardinal s1 <= PS.cardinal s2 ->
@@ -1071,11 +1071,11 @@ Lemma PS_union_list f l s1 s2 :
 Proof.
   revert s1 s2. induction l; intros s1 s2 Hleq Hin.
   - eassumption.
-  - simpl. eapply IHl.      
+  - simpl. eapply IHl.
     destruct (PS.mem a s2) eqn:Heq.
     + eapply mem_spec in Heq.
       rewrite PS_cardinal_add_in with (x := a); eauto.
-      eapply Hin in Heq. 
+      eapply Hin in Heq.
       rewrite PS_cardinal_add_in with (x := f a); eauto.
     + rewrite <- PS_cardinal_add with (x := a); eauto.
       destruct (PS.mem (f a) s1) eqn:Heq'.
@@ -1088,7 +1088,7 @@ Proof.
 
       eapply add_spec. now left.
 
-      eapply Hin in H. 
+      eapply Hin in H.
       eapply add_spec. now right.
 Qed.
 
@@ -1105,8 +1105,8 @@ Lemma PS_cardinal_map f l :
   PS.cardinal (@mset (FromList (map f l)) _) <= PS.cardinal (@mset (FromList l) _).
 Proof.
   unfold mset. unfold ToMSetFromList. simpl.
-  eapply PS_union_list_corr. 
-Qed. 
+  eapply PS_union_list_corr.
+Qed.
 
 Lemma PS_union_list_eq f l s1 s2 :
   injective_subdomain (FromList l :|: FromSet s2) f ->
@@ -1116,17 +1116,17 @@ Lemma PS_union_list_eq f l s1 s2 :
 Proof.
   revert s1 s2. induction l; intros s1 s2 Hinj Heq Hin.
   - eassumption.
-  - simpl. eapply IHl.      
+  - simpl. eapply IHl.
     + eapply injective_subdomain_antimon. eassumption. normalize_sets; sets.
-      rewrite FromSet_add. sets.  
+      rewrite FromSet_add. sets.
     + destruct (PS.mem a s2) eqn:Heq'.
       * eapply mem_spec in Heq'.
         rewrite PS_cardinal_add_in with (x := a); eauto.
-        
+
         eapply (FromSet_complete (FromSet s2) s2 a) in Heq'; [| reflexivity ].
-        eapply In_image in Heq'. eapply Hin in Heq'. 
+        eapply In_image in Heq'. eapply Hin in Heq'.
         eapply FromSet_sound in Heq'; [| reflexivity ].
-        rewrite PS_cardinal_add_in with (x := f a); eauto.        
+        rewrite PS_cardinal_add_in with (x := f a); eauto.
       * rewrite <- PS_cardinal_add with (x := a); eauto.
         destruct (PS.mem (f a) s1) eqn:Heq''.
         { exfalso. eapply mem_spec in Heq''.
@@ -1159,25 +1159,25 @@ Lemma PS_cardinal_map_eq f l :
   PS.cardinal (@mset (FromList (map f l)) _) = PS.cardinal (@mset (FromList l) _).
 Proof.
   unfold mset. unfold ToMSetFromList. simpl.
-  eapply PS_union_list_eq_corr. 
-Qed. 
+  eapply PS_union_list_eq_corr.
+Qed.
 
-Lemma FromList_length_cardinal l S {Hs : ToMSet S} : 
-  FromList l \subset S -> 
+Lemma FromList_length_cardinal l S {Hs : ToMSet S} :
+  FromList l \subset S ->
   NoDup l ->
   length l <= PS.cardinal mset.
 Proof.
   intros Hyp1 Hyp2. rewrite (@mset_eq S) in Hyp1.
   rewrite FromSet_elements in Hyp1. rewrite PS.cardinal_spec.
   eapply Same_set_FromList_length; eauto.
-Qed. 
+Qed.
 
 Lemma FromList_length_cardinal' l m :
-  FromList l \subset (FromSet m) -> 
+  FromList l \subset (FromSet m) ->
   NoDup l ->
   length l <= PS.cardinal m.
 Proof.
   intros Hyp1 Hyp2.
   rewrite FromSet_elements in Hyp1. rewrite PS.cardinal_spec.
   eapply Same_set_FromList_length; eauto.
-Qed. 
+Qed.

@@ -1,26 +1,26 @@
 Require compcert.lib.Maps compcert.lib.Coqlib.
-From Coq Require Import Relation_Definitions Ensembles micromega.Lia micromega.Zify PArith.BinPos.
+From Stdlib Require Import Relation_Definitions Ensembles micromega.Lia micromega.Zify PArith.BinPos.
 Require Import LambdaANF.Ensembles_util LambdaANF.cps LambdaANF.rename LambdaANF.ctx LambdaANF.logical_relations LambdaANF.tactics LambdaANF.cps_util
         LambdaANF.List_util LambdaANF.shrink_cps LambdaANF.eval LambdaANF.set_util LambdaANF.identifiers LambdaANF.stemctx LambdaANF.shrink_cps_correct
         LambdaANF.shrink_cps_corresp LambdaANF.inline_letapp LambdaANF.algebra LambdaANF.Ensembles_util
-        LambdaANF.rel_comp LambdaANF.functions. 
+        LambdaANF.rel_comp LambdaANF.functions.
 
 
-Section Srink_top_correct. 
+Section Srink_top_correct.
 
   Variable pr : prims.
   Variable cenv : ctor_env.
-  
+
   Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
 
   Variable (P1 : nat ->  @PostT fuel trace) (PG : @PostGT fuel trace)
            (HPost : forall n, n <= 1 -> Post_properties cenv (P1 n) (P1 n) PG)
-           (HPost' : Post_properties cenv PG PG PG) 
+           (HPost' : Post_properties cenv PG PG PG)
 
            (Hless_steps_app : forall f ft ys rho1 e2 rho2, post_Eapp_l (P1 0) (P1 1) f ft ys rho1 e2 rho2)
-           (Hless_steps_letapp : remove_steps_letapp cenv (P1 0) (P1 0) (P1 1))                     
+           (Hless_steps_letapp : remove_steps_letapp cenv (P1 0) (P1 0) (P1 1))
            (Hless_steps_letapp_OOT : remove_steps_letapp_OOT cenv (P1 0) (P1 1)).
-  
+
   Context (Hless_steps_ctx :
              forall C e1 rho1 (rho1' : env) (e2 : exp) (rho2 : env) (cin1 cin2 : fuel)
                     (cout1 cout2 : trace),
@@ -36,7 +36,7 @@ Section Srink_top_correct.
                P1 1 (Ecase x cl, rho1, cin1 <+> one (Ecase x cl), cout1 <+> one (Ecase x cl)) (e, rho2, cin2, cout2)).
 
   Context (Hubound1 : post_upper_bound (P1 1))
-          (Hubound2 : post_upper_bound PG).  
+          (Hubound2 : post_upper_bound PG).
 
 
   (* XXX duplicate definitions *)
@@ -44,11 +44,11 @@ Section Srink_top_correct.
     unique_bindings e /\ Disjoint _ (bound_var e) (occurs_free e).
 
   Definition wf_pres e1 e2 :=
-    occurs_free e2 \subset occurs_free e1.  
+    occurs_free e2 \subset occurs_free e1.
 
   Definition post_prop P1 PG :=
     Post_properties cenv P1 P1 PG /\
-    post_upper_bound P1.  
+    post_upper_bound P1.
 
   (* To handle terms with disjoint bv and of instead of closed, used this with xs = fv (e) : *)
   Theorem gsr_clos_unwrap :
@@ -60,7 +60,7 @@ Section Srink_top_correct.
     intros s f t xs e  e' H.
     assert (Heq : Efun (Fcons f t xs e Fnil) (Ehalt f) = Efun (Fcons f t xs e Fnil) (Ehalt f)).
     reflexivity.
-    
+
     revert H Heq.
     generalize (Efun (Fcons f t xs e Fnil) (Ehalt f)) at 1 3.
     intros e0 H. revert f t xs e.
@@ -71,13 +71,13 @@ Section Srink_top_correct.
       eexists. split; eauto.
       econstructor; eassumption.
     + intros. subst. eexists. split; eauto.
-      constructor.       
-  Qed.   
+      constructor.
+  Qed.
 
   Theorem shrink_corresp_top e:
     unique_bindings e ->
     Disjoint var (bound_var e) (occurs_free e) ->
-    let (e', n) := shrink_top e in     
+    let (e', n) := shrink_top e in
     (exists m, m >= n /\ preord_exp_n cenv wf_pres post_prop m e e') /\
     unique_bindings e' /\
     Disjoint _ (occurs_free e') (bound_var e') /\
@@ -87,30 +87,30 @@ Section Srink_top_correct.
     intros Hun Hdis.
 
     unfold shrink_top.
-    
+
     remember (contract (M.empty var) (init_census _) _ (M.empty svalue)
                        (M.empty bool)) as s.
     destruct s as [[[[ ? ? ] ? ] ? ] ?]. symmetry in Heqs.
 
     eapply shrink_corresp with (c:= Hole_c) in Heqs; simpl; destructAll.
     rewrite <- (proj1 rename_all_ns_empty) in *; auto.
-    
+
     simpl in *.  eapply gsr_clos_unwrap in H. destructAll.
-    edestruct gsr_clos_preserves. eassumption. eassumption. eassumption.          
+    edestruct gsr_clos_preserves. eassumption. eassumption. eassumption.
     eapply gsr_clos_in_rw in H3; eauto. destructAll.
-        
-    { destructAll.      
+
+    { destructAll.
       split; [| split; [| split; [| split ]]].
       + clear H2 H1 H0 Hun Hdis. revert n H3. induction H5; intros n' H3.
         { edestruct IHrefl_trans_closure_n with (n := n).
-          eassumption. eassumption. lia. destructAll. 
+          eassumption. eassumption. lia. destructAll.
           eexists. split.
           2:{ eapply preord_exp_n_trans; [| eassumption ].
-              econstructor. intros. eapply gen_rw_correct; eauto.                  
+              econstructor. intros. eapply gen_rw_correct; eauto.
               eapply grw_preserves_fv. eassumption.
               split. now eauto. eassumption. }
           lia. }
-        
+
         exists 1. split. lia.
         econstructor. intros. eapply preord_exp_refl.
         eassumption. eassumption.
@@ -124,7 +124,7 @@ Section Srink_top_correct.
     - rewrite <- (proj1 rename_all_ns_empty) in *; auto.
       econstructor. now econstructor.
       2:{ repeat normalize_bound_var. sets. }
-      
+
       econstructor.
       + intros Hc. eapply bound_var_leq_max_var with (y := 1%positive) in Hc.
         zify. lia.
@@ -140,9 +140,9 @@ Section Srink_top_correct.
       + eassumption.
       + now constructor.
     - unfold closed_exp. split; sets.
-      repeat normalize_occurs_free. 
+      repeat normalize_occurs_free.
       rewrite <- (proj1 rename_all_ns_empty) in *; auto.
-      simpl. repeat normalize_sets.      
+      simpl. repeat normalize_sets.
       rewrite <- image_Singleton at 1. rewrite apply_r_empty.
       rewrite image_Singleton. rewrite Setminus_Same_set_Empty_set.
       normalize_sets. rewrite <- FromSet_elements.

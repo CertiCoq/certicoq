@@ -16,9 +16,9 @@ Require Glue.glue
 
 From MetaRocq.ErasurePlugin Require Import Erasure.
 (* Standard lib *)
-Require Import ExtrOcamlBasic ExtrOCamlFloats ExtrOCamlInt63 ExtrOCamlPString.
-Require Import Coq.extraction.Extraction.
-Require Import ZArith NArith.
+From Stdlib Require Import ExtrOcamlBasic ExtrOCamlFloats ExtrOCamlInt63 ExtrOCamlPString.
+From Stdlib Require Import extraction.Extraction.
+From Stdlib Require Import ZArith NArith.
 
 Extraction Inline Program.Wf.Fix_F_sub.
 Extraction Inline Program.Wf.Fix_sub.

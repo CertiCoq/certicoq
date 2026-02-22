@@ -1,9 +1,9 @@
-Require Import Coq.Strings.String Coq.Classes.Morphisms Coq.Relations.Relations.
-Require Import Coq.PArith.BinPos Coq.Sets.Ensembles Lia.
+From Stdlib Require Import Strings.String Classes.Morphisms Relations.Relations.
+From Stdlib Require Import PArith.BinPos Sets.Ensembles Lia.
 Require Import LambdaANF.identifiers LambdaANF.Prototype LambdaANF.cps_proto_univ LambdaANF.cps_proto LambdaANF.cps LambdaANF.cps_util.
 Require Import LambdaANF.Ensembles_util LambdaANF.rename LambdaANF.shrink_cps LambdaANF.map_util.
 
-Require Import Coq.Lists.List.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 
 Definition fresher_than (x : var) (S : Ensemble var) : Prop :=
@@ -31,7 +31,7 @@ Definition fresh_copies (S : Ensemble var) (l : list var) : Prop := Disjoint _ S
 
 Definition gensym (x : var) : var * var := (x + 1, x)%positive.
 
-Lemma gensym_spec x S x' y : 
+Lemma gensym_spec x S x' y :
   fresher_than x S ->
   (x', y) = gensym x ->
   ~ y \in S /\ fresher_than x' (y |: S).
@@ -62,7 +62,7 @@ Proof.
 Qed.
 
 Lemma gensyms_increasing' {A} :
-  forall x (xs : list A) x' xs', (x', xs') = gensyms x xs -> 
+  forall x (xs : list A) x' xs', (x', xs') = gensyms x xs ->
   forall y, List.In y xs' -> (y >= x)%positive.
 Proof.
   intros x xs; revert x; induction xs as [|x xs IHxs]; intros x0 x' xs' Hgen y Hy;
@@ -75,7 +75,7 @@ Proof.
   specialize (IHxs x'' xs'' eq_refl H); lia.
 Qed.
 
-Local Ltac mk_corollary parent := 
+Local Ltac mk_corollary parent :=
   intros x xs x' xs';
   pose (Hparent := parent _ x xs); clearbody Hparent; intros H;
   destruct (gensyms x xs); now inversion H.
@@ -176,7 +176,7 @@ Proof.
   lia.
 Qed.
 
-Lemma gensyms_spec {A} x S (xs : list A) x' xs' : 
+Lemma gensyms_spec {A} x S (xs : list A) x' xs' :
   fresher_than x S ->
   (x', xs') = gensyms x xs ->
   fresh_copies S xs' /\ fresher_than x' (S :|: FromList xs') /\ length xs' = length xs.
@@ -199,7 +199,7 @@ Qed.
 
 Section RunRewriter.
 
-Context 
+Context
   {Root : exp_univ} {fueled : bool} {metric : Metric Root fueled} {Rstep : relation (univD Root)}
   {D : Set} {I_D : forall A, univD A -> D -> Prop} `{@Delayed _ Frame_exp D I_D}
   {R : Set} {I_R : forall A, frames_t A Root -> R -> Prop}
@@ -310,7 +310,7 @@ Proof.
   destruct (cps.M.get x σ) as [y|] eqn:Hget; [|eauto with Ensembles_DB].
   intros arb Harb; inv Harb; right; unfold image'', Ensembles.In; now exists x.
 Qed.
-  
+
 Lemma apply_r_list_vars σ xs :
   FromList (apply_r_list σ xs) \subset FromList xs :|: image'' σ.
 Proof.

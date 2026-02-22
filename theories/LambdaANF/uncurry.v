@@ -15,9 +15,9 @@ Require Import ExtLib.Data.List.
 Require Import ExtLib.Structures.Traversable.
 Require Import ExtLib.Core.RelDec.
 Require Import ExtLib.Data.Positive.
-Require Import Coq.Bool.Bool.
+From Stdlib Require Import Bool.Bool.
 Require Import identifiers.  (* for max_var *)
-Require Import AltBinNotations.
+From Stdlib Require Import AltBinNotations.
 Require Import LambdaANF.List_util LambdaANF.cps_util LambdaANF.state.
 Require Import MetaRocq.Utils.bytestring.
 
@@ -28,10 +28,10 @@ Section UNCURRY.
 
 
   Definition eq_var := Pos.eqb.
-  
+
   (** We need to determine whether variables occur free in some terms.  We
       over-approximate by determining whether the variable occurs at all. *)
-  
+
   (* Returns true iff [k] is in [xs]. *)
   Fixpoint occurs_in_vars (k:var) (xs:list var) : bool :=
     match xs with
@@ -77,37 +77,37 @@ Section UNCURRY.
   Definition occurs_in_arms := occurs_in_arms' occurs_in_exp.
 
 
-  (* pair of 
-     1- max number of arguments 
+  (* pair of
+     1- max number of arguments
      2- encoding of inlining decision for beta-contraction phase *)
   Definition St := (nat * (M.t nat))%type. (* 0 -> Do not inline, 1 -> outermost function, 2 -> inner function *)
 
   (* Maps (arity+1) to the right fun_tag *)
   Definition arityMap:Type := M.t fun_tag.
   Definition localMap:Type := M.t bool.
-   
-  (* The state for this includes 
+
+  (* The state for this includes
      1 - a boolean for tracking whether or not a reduction happens
      2 - Map recording the (new) fun_tag associated to each arity
      3 - local map from var to if function has already been uncurried
      4 - Map for uncurried functions for a 2version of inlining *)
-  Definition stateType:Type := (bool * arityMap * localMap * St). 
+  Definition stateType:Type := (bool * arityMap * localMap * St).
   Definition uncurryM := @compM' stateType.
 
 
   (* f is a function to inline [i.e. uncurry shell], k is its local continuation *)
   Definition markToInline (n:nat) (f:var) (k:var) : uncurryM unit :=
-    st <- get_state tt ;;  
+    st <- get_state tt ;;
     let '(b, aenv, lm, s) := st in
     @put_state stateType (b, aenv, lm, (max (fst s) n, (M.set f 1 (M.set k 2 (snd s))))).
-        
-  
+
+
   (* Mark variable as uncurried *)
   Definition mark_as_uncurried (x:var): uncurryM unit :=
     st <- get_state tt ;;
     let '(b, aenv, lm, s) := st in
     put_state (b, aenv, (M.set x true lm), s).
-      
+
 
   Definition click : uncurryM unit :=
     st <- get_state tt ;;
@@ -118,7 +118,7 @@ Section UNCURRY.
     st <- get_state tt ;;
     let '(b, aenv, lm, s) := st in
     put_state (false, aenv, lm, s).
-  
+
   Definition has_clicked : uncurryM bool :=
     st <- get_state tt ;;
     let '(b, aenv, lm, s) := st in ret b.
@@ -143,36 +143,36 @@ Section UNCURRY.
       ft <- get_ftag n ;;
       put_state (b, (M.set p3 ft aenv), lm, s);;
       ret ft
-    end.                       
-  
-  (* I'm following the same algorithm as in Andrew's book, or more 
+    end.
+
+  (* I'm following the same algorithm as in Andrew's book, or more
      appropriately, in the SML/NJ code base.  In essence, we look for
      code that looks like this:
-     let rec f (k,v1,...,vn) = 
+     let rec f (k,v1,...,vn) =
            let rec g (u1,...,um) = e in k(g)
       in ...
      and replace it with:
-     let rec f (k',v1',...,vn') = 
+     let rec f (k',v1',...,vn') =
            let rec g' (u1',...,um') = f'(u1',...,um',v1',...,vn') in k'(g')
          and f' (k,u1,...,um,v1,...,vn) = e
      in ...
-     where all of the primed variables are fresh. 
+     where all of the primed variables are fresh.
      One difference with SML/NJ is that this won't get all of the uncurrying
-     done in a single pass.  In particular, if f gets uncurried, but the 
+     done in a single pass.  In particular, if f gets uncurried, but the
      resulting function can be further uncurried, we won't pick this up.  So
      really, we should iterate this until there's no change.  But, doing so
      will try to uncurry f yet again.  So we need to either fix this so that
-     we tag f as something that should no longer be uncurried, or else 
+     we tag f as something that should no longer be uncurried, or else
      do all of the uncurrying in one pass.  The latter would be preferable
-     but makes a structural termination argument harder.  
+     but makes a structural termination argument harder.
    *)
 
   Section Uncurry_prog.
-    
+
     Fixpoint uncurry_exp (cps : bool) (e:exp) : uncurryM exp :=
       match e with
       | Econstr x ct vs e1 =>
-        e1' <- uncurry_exp cps e1 ;; 
+        e1' <- uncurry_exp cps e1 ;;
         ret (Econstr x ct vs e1')
       | Ecase x arms =>
         (* annoyingly, I can't seem to use a separate mapM definition here, but
@@ -183,7 +183,7 @@ Section UNCURRY.
                   | nil => ret nil
                   | h::t =>
                     match h with
-                    | (s,e) => 
+                    | (s,e) =>
                       e' <- uncurry_exp cps e ;; t' <- uncurry_list t ;;
                          ret ((s,e')::t')
                     end
@@ -212,7 +212,7 @@ Section UNCURRY.
            match fds with
            | Fnil => ret Fnil
            | Fcons f f_ft fvs fe fds1 =>
-             if cps then            
+             if cps then
                fds1' <- uncurry_fundefs cps fds1 ;;
                match fvs, fe with
                | fk::fvs, Efun (Fcons g gt gvs ge Fnil)
@@ -228,15 +228,15 @@ Section UNCURRY.
                     negb (occurs_in_exp g ge) &&
                     negb (occurs_in_exp fk ge) &&
                     negb g_unc then
-                   
+
                    (* log_msg (f_str ++ " is uncurried" ) ;; *)
 
                    gvs' <- get_names_lst gvs "" ;;
                    fvs' <- get_names_lst fvs "" ;;
                    f' <- get_name f "_uncurried" ;;
 
-                   
-                   _ <- mark_as_uncurried g ;;               
+
+                   _ <- mark_as_uncurried g ;;
                    _ <- click ;;
                    let fp_numargs := length (gvs' ++ fvs') in
                    _ <- markToInline fp_numargs f g;;
@@ -262,12 +262,12 @@ Section UNCURRY.
                       (Ehalt g') =>
                  g_unc <- (already_uncurried g) ;;
                  if eq_var g g' && negb g_unc && negb (occurs_in_exp g ge)
-                 then               
+                 then
                    gvs' <- get_names_lst gvs "" ;;
                    fvs' <- get_names_lst fvs "" ;;
                    f' <- get_name f "_uncurried" ;;
 
-                   let fp_numargs := length (gvs' ++ fvs')  in               
+                   let fp_numargs := length (gvs' ++ fvs')  in
                    _ <- mark_as_uncurried g ;;
                    _ <- markToInline fp_numargs f g;;
                    _ <- click ;;
@@ -288,26 +288,26 @@ Section UNCURRY.
     (* Zoe : The above for ANF  misses some opportunities for uncurrying when the recursion is
      * "nested" in some inner argument. Example from Coq:
        Definition filter (A : Type) (P : A -> bool) := fix aux (l : list A) := ...
-     
-       For this we need to lift the constraint that negb (occurs_in_exp g ge) by 
+
+       For this we need to lift the constraint that negb (occurs_in_exp g ge) by
        redefining the g wrapper inside f'. This however messes up the uncurring
        pattern for the inner args, so we need to do this in two stages.
 
      *)
 
   End Uncurry_prog.
-    
-  Section UncurryTop. 
-    
+
+  Section UncurryTop.
+
     Context (uncurry_exp : bool -> exp -> uncurryM exp) (cps : bool).
 
     (* Tries to uncurry functions within [e].  If no function matches the
      pattern, returns [None], otherwise returns the transformed expression. *)
     Definition uncurry (e:exp) : uncurryM (option exp) :=
       e' <- uncurry_exp cps e ;;
-      b <- has_clicked ;;         
+      b <- has_clicked ;;
       if b then ret (Some e') else ret None.
-    
+
     Fixpoint uncurry_fuel' (n:nat) (e:exp) : uncurryM exp :=
       match n with
       | 0 => ret e
@@ -331,6 +331,6 @@ Section UNCURRY.
   Definition uncurry_fuel cps n e c : error exp * comp_data :=
     let '(eerr, inline_map, c') := uncurry_fuel'' uncurry_exp cps n e c in
     let c' := put_inline_map inline_map c' in
-    (eerr, c'). 
+    (eerr, c').
 
 End UNCURRY.

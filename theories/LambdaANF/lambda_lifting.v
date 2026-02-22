@@ -5,9 +5,9 @@
 Require Import Common.compM.
 Require Import LambdaANF.alpha_conv LambdaANF.cps LambdaANF.cps_util LambdaANF.ctx LambdaANF.state LambdaANF.set_util LambdaANF.identifiers LambdaANF.List_util
         LambdaANF.functions LambdaANF.Ensembles_util LambdaANF.uncurry LambdaANF.tactics.
-Require Import Coq.ZArith.Znumtheory.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles.
+From Stdlib Require Import ZArith.Znumtheory.
+From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+        NArith.BinNat PArith.BinPos Sets.Ensembles.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad ExtLib.Data.Monads.OptionMonad.
 Require Import compcert.lib.Coqlib.
 Require Import MetaRocq.Utils.bytestring.
@@ -16,7 +16,7 @@ Require Import compcert.lib.Maps.
 
 Close Scope Z_scope.
 Open Scope monad_scope.
- 
+
 
 (** * Lambda lifting *)
 
@@ -48,11 +48,11 @@ Open Scope monad_scope.
     and f_n x_n = f_n' x_1 fvs
     in [·]
 
-    
+
     f_i's that are used in known applied positions can be replaced
     with the closed functions f_i' and have their environment stored in
     registers.
-    
+
     Escaping f_i's will enter the function through the wrapper which
     will be closure converted in the subsequent closure conversion pass.
 
@@ -77,8 +77,8 @@ Open Scope monad_scope.
         more pushes and pops than our threshold (parameter max_push)
 
      3) Indirect calls go through the wrapper. We might wish to inline the known
-     call inside the wrapper in subsequent passes to avoud the overhead (Flambda does something similar). 
-     We currently don't since experiments do not suggest performance improvement.  
+     call inside the wrapper in subsequent passes to avoud the overhead (Flambda does something similar).
+     We currently don't since experiments do not suggest performance improvement.
 *)
 
 (** * Computational Defintion *)
@@ -93,7 +93,7 @@ Section LambdaLifting.
   (* The lifting decision. Used to decide whether a particular call should use the
      lifted function or the closure (i.e. the wrapper) *)
   Context (lift_dec : list var (* the free vars of the callee *) -> FVSet (* the vars is scope in the call site *) -> bool).
-  
+
   Inductive VarInfo : Type :=
   (* A variable that is free in the current function definition.
    The first argument is the name of the parameter of the lambda
@@ -104,7 +104,7 @@ Section LambdaLifting.
   (* Maps variables to [VarInfo] *)
   Definition VarInfoMap := Maps.PTree.t VarInfo.
 
-  Inductive FunInfo : Type := 
+  Inductive FunInfo : Type :=
   (* A known function that is lifted *)
   | Fun :
       var ->        (* New name for the lambda lifted version *)
@@ -146,9 +146,9 @@ Section LambdaLifting.
       if is_closed_lifted then
         (* Lift only if closed *)
         (* new name for lambda lifted definition - this function will always be known *)
-        f' <- get_name f "_known";;        
+        f' <- get_name f "_known";;
         (* new fun_tag for lambda lifted definition *)
-        ft' <- get_ftag (N.of_nat (length xs)) ;;        
+        ft' <- get_ftag (N.of_nat (length xs)) ;;
         let gfuns''' := M.set f' LGFun gfuns'' in
         ret (M.set f (Fun f' ft' fvs sfvs args) m', gfuns''')
       else
@@ -175,7 +175,7 @@ Section LambdaLifting.
     match fvs with
     | [] => ret ([], m)
     | y :: ys =>
-      p <- add_free_vars ys m ;; 
+      p <- add_free_vars ys m ;;
       y' <- get_name y "";;
       let (ys', m') := p in
       ret (y' :: ys', M.set y (FreeVar y') m')
@@ -199,18 +199,18 @@ Section LambdaLifting.
           match mb with
           | Some Bw => ret (Some (Fcons g ft xs' (Eapp f' ft' (xs' ++ (rename_lst fvm args))) Bw), fvm'')
           | None => ret (Some (Fcons g ft xs' (Eapp f' ft' (xs' ++ (rename_lst fvm args))) Fnil), fvm'')
-          end 
+          end
         | NoLiftFun _ _ => ret (None, fvm) (* That's OK because the hole bundle is either all Fun or all NoLiftFun *)
         end
       | None =>
         f_str <- get_pp_name f ;;
         failwith ("Internal error in make_wrappers: All known functions should be in map. Could not find " ++ f_str)%bs
       end
-    | Fnil => ret (Some Fnil, fvm) 
+    | Fnil => ret (Some Fnil, fvm)
     end.
-  
+
   Definition fundefs_max_params (B: fundefs) : nat :=
-    (fix aux B p : nat :=      
+    (fix aux B p : nat :=
        match B with
        | Fcons f ft xs e B =>
          aux B (max (length xs) p)
@@ -282,17 +282,17 @@ Section LambdaLifting.
              (scope', exp_true_fv_aux e (union_list scope' ys) fvset')
            | Fnil => (scope, fvset)
            end.
-  
+
     Definition exp_true_fv e := exp_true_fv_aux e PS.empty PS.empty.
-    
+
     Definition fundefs_true_fv B := snd (fundefs_true_fv_aux B PS.empty PS.empty).
-    
+
   End TrueFV.
 
 
   (* TODO move *)
   Definition subset_list (l : list var) (s : PS.t) :=
-    fold_left (fun b e => PS.mem e s && b) l true. 
+    fold_left (fun b e => PS.mem e s && b) l true.
 
   Fixpoint take {A} (n: nat) (l : list A) :=
     match n with
@@ -349,7 +349,7 @@ Section LambdaLifting.
     | Econstr _ _ _ e
     | Eproj _ _ _ _ e
     | Eprim_val _ _ e
-    | Eprim _ _ _ e 
+    | Eprim _ _ _ e
     | Efun _ e =>
       stack_push x curr_f e
     | Eapp _ _ _
@@ -360,7 +360,7 @@ Section LambdaLifting.
       let n := stack_push x curr_f e in
       (* Before the call, if x is used in e, then it has to be stored *)
       if occurs_in_exp x curr_f e then n + 1 else n
-    end. 
+    end.
 
   Fixpoint stack_push_fundefs_aux (x : var) (curr_f : PS.t)  (B : fundefs) : nat :=
     match B with
@@ -368,14 +368,14 @@ Section LambdaLifting.
       max (stack_push x curr_f e) (stack_push_fundefs_aux x curr_f B')
     | Fnil => 0
     end.
-  
+
   Definition stack_push_fundefs (x : var) (B : fundefs) : nat :=
-    stack_push_fundefs_aux x (fundefs_names B) B. 
-  
+    stack_push_fundefs_aux x (fundefs_names B) B.
+
   Fixpoint exp_lambda_lift (e : exp) (scope: PS.t) (active_funs : PS.t)
            (fvm : VarInfoMap) (fm : FunInfoMap) (gfuns : GFunMap) : lambdaM exp :=
     match e with
-    | Econstr x t ys e => 
+    | Econstr x t ys e =>
       e' <- exp_lambda_lift e (PS.add x scope) active_funs fvm fm gfuns ;;
       ret (Econstr x t (rename_lst fvm ys) e')
     | Ecase x P =>
@@ -434,7 +434,7 @@ Section LambdaLifting.
     | Eapp f ft xs =>
       match fm ! f with
       | Some (Fun f' ft' fvs sfvs args) =>
-        if lift_dec args scope then 
+        if lift_dec args scope then
           ret (Eapp (rename fvm f') ft' (rename_lst fvm (xs ++ args)))
         else
           (* f_str_r <- get_pp_name (rename fvm f) ;; *)
@@ -453,7 +453,7 @@ Section LambdaLifting.
     end
   with fundefs_lambda_lift B Bfull (fnames : FVSet) active_funs fvm (fm : FunInfoMap) (gfuns : GFunMap) (fv_no : nat) :=
          match B with
-         | Fcons f ft xs e B => 
+         | Fcons f ft xs e B =>
            match M.get f fm with
            | Some (Fun f' ft' fvs sfvs args) =>
              (* DEBUG *)
@@ -482,15 +482,15 @@ Section LambdaLifting.
              f_str <- get_pp_name f ;;
              failwith ("Internal error in fundefs_lambda_lift: All known functions should be in map. Could not find " ++ f_str)%bs
            end
-             
+
          | Fnil => ret Fnil
          end.
 
   (* Example :
-     
+
    let f x =
      let g y = x + y + z in
-       g 3 + x 
+       g 3 + x
 
    ==>
 
@@ -512,7 +512,7 @@ Definition lambda_lift (args : nat) (no_push : nat) (inl : bool) (e : exp) (c : 
   let '(e', (c', _)) := run_compM (exp_lambda_lift args no_push (if inl then lift_all else lift_conservative)
                                                    e PS.empty PS.empty (Maps.PTree.empty VarInfo)
                                                    (Maps.PTree.empty FunInfo) (M.empty GFunInfo))
-                                  c tt in  
+                                  c tt in
   (e', c').
 
 
@@ -582,7 +582,7 @@ Inductive Make_wrappers :
       NoDup xs' -> length xs = length xs' ->
       g \in (S \\ FromList xs') ->
       Make_wrappers ζ σ B (S \\ FromList xs' \\ [set g]) fds S' σ' ->
-      Make_wrappers ζ σ (Fcons f ft xs e B) S (Fcons g ft xs' (Eapp f' ft' (xs' ++ (map σ fvs))) fds) S' (σ' {f ~> g}). 
+      Make_wrappers ζ σ (Fcons f ft xs e B) S (Fcons g ft xs' (Eapp f' ft' (xs' ++ (map σ fvs))) fds) S' (σ' {f ~> g}).
 
 
 Inductive Exp_lambda_lift :
@@ -653,7 +653,7 @@ Inductive Exp_lambda_lift :
       Exp_lambda_lift ζ σ (Eletapp x f ft xs e) S (Eletapp x (σ f) ft (map σ xs) e') S'
 | LL_Eapp_known :
     forall ζ σ f ft xs f' ft' fvs S,
-      ζ f = Some (f', ft', fvs) -> 
+      ζ f = Some (f', ft', fvs) ->
       Exp_lambda_lift ζ σ (Eapp f ft xs) S (Eapp (σ f') ft' (map σ (xs ++ fvs))) S
 | LL_Eapp_unknown :
     forall ζ σ f ft xs S,
@@ -710,7 +710,7 @@ with Fundefs_lambda_lift2 :
            Included _ (FromList ys) S ->
            NoDup ys ->
            length ys = length fvs ->
-           Make_wrappers ζ (σ <{ (xs ++ fvs) ~> (xs ++ ys) }>) B0 (S \\ FromList ys) fds S' σ' ->  
+           Make_wrappers ζ (σ <{ (xs ++ fvs) ~> (xs ++ ys) }>) B0 (S \\ FromList ys) fds S' σ' ->
            Exp_lambda_lift ζ σ' e S' e' S'' ->
            Fundefs_lambda_lift2 ζ σ B0 B S'' B' S''' ->
            Fundefs_lambda_lift2 ζ σ B0 (Fcons f ft xs e B) S

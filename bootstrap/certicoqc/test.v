@@ -2,12 +2,12 @@ From MetaRocq.Template Require Import All.
 From MetaRocq.Utils Require Import bytestring.
 From MetaRocq.Common Require Import Primitive.
 
-From Coq Require Import PrimFloat PrimInt63.
+From Stdlib Require Import PrimFloat PrimInt63.
 From CertiCoq.CertiCoqC Require Import CertiCoqC.
 
 (* Set MetaRocq Debug. *)
 Set MetaRocq Timing.
-From Coq Require Import List.
+From Stdlib Require Import List.
 Import ListNotations.
 
 Require Import compcert.common.AST.
@@ -25,7 +25,7 @@ Definition string_of_bool b :=
 #[export] Instance float_show : Show PrimFloat.float := string_of_float.
 #[export] Instance prim_int_show : Show PrimInt63.int := string_of_prim_int.
 #[export] Instance Z_show : Show BinNums.Z := string_of_Z.
-Require Import ZArith.
+From Stdlib Require Import ZArith.
 
 From MetaRocq.ErasurePlugin Require Import Loader.
 From CertiCoq.Common Require Import Pipeline_utils.
@@ -47,6 +47,6 @@ CertiCoqC Eval demo2. *)
 
 (* Time CertiCoqC Compile -build_dir "tests" -time -O 1 demo1. *)
 
-Require Import Coq.Strings.PrimString.
+From Stdlib Require Import Strings.PrimString.
 
 Time CertiCoqC Compile -build_dir "tests" -time -O 1 certicoqc.

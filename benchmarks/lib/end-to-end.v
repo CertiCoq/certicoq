@@ -1,6 +1,6 @@
 (* Require Import CertiCoq. *)
 From MetaRocq Require Import Template.Ast.
-Require Import Arith List.
+From Stdlib Require Import Arith List.
 
 Import ListNotations.
 
@@ -17,10 +17,10 @@ Import ListNotations.
     forall (a: A) (v : compcert.val),
       {{ rep_A a v }} f_in_C(v)  {{ret. rep_B (f a) ret }}
 
-    
+
     The separation logic predicate rep_A describes how Coq values of type A are
     laid out as a C data structure.
-    
+
     For instance, if for simplicity we assume that Coq values of type [list A]
     will be represented as a null terminated linked lists, then rep_list will,
     very roughly, be
@@ -45,7 +45,7 @@ Import ListNotations.
 
 
     That is, to obtain the top-level theorem we need
-        
+
     forall (a: A) (v : compcert.val) (h : heap),
        rep_A a v h -> exists v' h', eval (app e v, h) (v', h') /\ rep_B (f a) v'
 
@@ -77,14 +77,14 @@ Class Rep (A : Type) :=
 
 Fixpoint nat_rep (n : nat) (v : Ast.term) : Prop :=
   match n with
-    | O => 
+    | O =>
       match v with
-        | Ast.tConstruct (Ast.mkInd "Coq.Init.Datatypes.nat" 0) 0 => True 
+        | Ast.tConstruct (Ast.mkInd "Stdlib.Init.Datatypes.nat" 0) 0 => True
         | _ => False
       end
     | S n =>
       match v with
-        | Ast.tApp (Ast.tConstruct (Ast.mkInd "Coq.Init.Datatypes.nat" 0) 1) [x] =>
+        | Ast.tApp (Ast.tConstruct (Ast.mkInd "Stdlib.Init.Datatypes.nat" 0) 1) [x] =>
           nat_rep n x
         | _ => False
       end
@@ -99,12 +99,12 @@ Fixpoint list_rep {A : Type} `{Rep A} (l : list A) (v : Ast.term) : Prop :=
   match l with
     | [] =>
       match v with
-        | Ast.tConstruct (Ast.mkInd "Coq.Init.Datatypes.list" 0) 0 => True 
+        | Ast.tConstruct (Ast.mkInd "Stdlib.Init.Datatypes.list" 0) 0 => True
         | _ => False
       end
     | hd :: tl =>
       match v with
-        | Ast.tApp (Ast.tConstruct (Ast.mkInd "Coq.Init.Datatypes.list" 0) 1) [typ; vhd; vtl] =>
+        | Ast.tApp (Ast.tConstruct (Ast.mkInd "Stdlib.Init.Datatypes.list" 0) 1) [typ; vhd; vtl] =>
           rep hd vhd /\ list_rep tl vtl
         | _ => False
       end

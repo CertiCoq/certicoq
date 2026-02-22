@@ -2,7 +2,7 @@
  * Author: Anonymized, 2016
  *)
 
-From Coq Require Import Classes.Morphisms Arith NArith.BinNat Relations
+From Stdlib Require Import Classes.Morphisms Arith NArith.BinNat Relations
      Lia NArith.BinNat.
 
 From CertiCoq Require Import LambdaANF.cps LambdaANF.ctx LambdaANF.tactics.
@@ -12,7 +12,7 @@ Class resource {I : Type} {A : Type} :=
   { zero : A ;            (* a zero element *)
     one_i  : I -> A ;     (* a bunch of "elementary" non-zero elements *)
     plus : A -> A -> A;   (* addition operator *)
-    
+
     (* commutativity *)
     plus_comm  : forall x y, plus x y = plus y x;
     (* associativity *)
@@ -24,8 +24,8 @@ Class resource {I : Type} {A : Type} :=
 
 
 Class ordered {I : Type} {A : Type} {Hr : @resource I A} :=
-  { lt  : A -> A -> Prop; 
-    
+  { lt  : A -> A -> Prop;
+
     lt_trans   : Transitive lt;
     lt_antisym : Irreflexive lt;
 
@@ -34,12 +34,12 @@ Class ordered {I : Type} {A : Type} {Hr : @resource I A} :=
     (* 0 < 1 *)
     zero_one_lt : forall i, lt zero (one_i i);
     (* no element between zero and one *)
-    lt_one : forall i x, lt x (one_i i) -> x = zero; 
-         
-    plus_stable : forall x y z, lt x y <-> lt (plus x z) (plus y z);    
+    lt_one : forall i x, lt x (one_i i) -> x = zero;
+
+    plus_stable : forall x y z, lt x y <-> lt (plus x z) (plus y z);
     lt_all_dec  : forall x y, lt x y \/ (exists z, x = plus z y);
   }.
-    
+
 
 Lemma plus_lt I A `{ordered I A} : forall x y z, lt (plus x y) z -> lt x z.
 Proof.
@@ -50,16 +50,16 @@ Proof.
   rewrite <- (plus_zero z) in H0 at 2. eapply plus_stable in H0.
   eapply lt_zero in H0. contradiction.
 Qed.
-  
+
 Lemma not_lt_add I A `{ordered I A} x y :
   ~ lt (plus y x) x.
 Proof.
-  intro. rewrite algebra.plus_comm in H0. eapply plus_lt in H0. 
+  intro. rewrite algebra.plus_comm in H0. eapply plus_lt in H0.
   eapply lt_antisym. eassumption.
 Qed.
 
 Class nat_hom I A `{resource I A} :=
-  { to_nat : A -> nat; 
+  { to_nat : A -> nat;
     to_nat_add : forall x y, to_nat (plus x y) = to_nat x + to_nat y;
     to_nat_one : forall i, to_nat (one_i i) = 1; }.
 

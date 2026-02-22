@@ -1,6 +1,7 @@
-Require Import Coq.ZArith.ZArith
-        Coq.Program.Basics
-        Coq.Lists.List List_util Lia.
+From Stdlib Require Import ZArith.ZArith
+        Program.Basics
+        Lists.List Lia.
+Require Import List_util.
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
@@ -693,7 +694,7 @@ Definition make_case_switch
     (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
     (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val) ls').
 
-Definition to_int64 (i : PrimInt63.int) : int64. 
+Definition to_int64 (i : PrimInt63.int) : int64.
   exists (Uint63.to_Z i * 2 + 1)%Z.
   pose proof (Uint63.to_Z_bounded i).
   unfold Uint63.wB in H. unfold Int64.modulus, Int64.wordsize, Wordsize_64.wordsize.
@@ -713,12 +714,12 @@ Next Obligation.
   unfold model_to_ff.
   pose proof (FloatAxioms.Prim2SF_valid f).
   rewrite Binary.valid_binary_SF2FF. exact H.
-  unfold float64_to_model. 
+  unfold float64_to_model.
   unfold FloatOps.Prim2SF. cbn.
   Admitted.
 
 Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
-  (x : positive) (f : Floats.float) := 
+  (x : positive) (f : Floats.float) :=
   let tag := c_int 1277%Z (Tlong Unsigned noattr) in
   x ::= [val] (allocPtr +' (c_int Z.one val)) ;;;
   allocIdent ::= allocPtr +' (c_int 2 val) ;;;
@@ -1127,7 +1128,7 @@ Definition translate_funs_fast
         fn_params := (tinfIdent, threadInf)::nil;
         fn_vars := nil;
         fn_temps := (map (fun x => (x, val)) localVars) ++ (allocIdent, valPtr) :: (limitIdent, valPtr) :: (argsIdent, valPtr) :: nil;
-        fn_body := 
+        fn_body :=
           allocIdent ::= Efield tinfd allocIdent valPtr ;;;
           limitIdent ::= Efield tinfd limitIdent valPtr ;;;
           argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);;;

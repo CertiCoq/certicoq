@@ -1,15 +1,15 @@
 From Equations Require Import Equations.
-From Coq Require Import Uint63 Wf_nat ZArith Lia Arith.
+From Stdlib Require Import Uint63 Wf_nat ZArith Lia Arith.
 From CertiCoq Require Import CertiCoq.
 CertiCoq -help.
 Set CertiCoq Build Directory "_build".
 
 (* This warns about uses of primitive operations, but we compile them fine *)
 Set Warnings "-primitive-turned-into-axiom".
-From Coq Require Vector Fin.
+From Stdlib Require Vector Fin.
 Import Vector.VectorNotations.
 
-Program Definition long_vector n : Vector.t nat n := 
+Program Definition long_vector n : Vector.t nat n :=
   Vector.of_list (List.repeat 1000 n).
   Next Obligation. now rewrite List.repeat_length. Qed.
 
@@ -31,9 +31,9 @@ Notation " x 'eqn:' H " := (exist _ x H) (at level 20, only parsing).
 Section FactPrim.
   Local Open Scope Z_scope.
 
-  Equations fact (n : int) : int 
+  Equations fact (n : int) : int
     by wf (Z.to_nat (to_Z n)) lt :=
-  | n with inspect (Uint63.eqb n 0) := 
+  | n with inspect (Uint63.eqb n 0) :=
     | true eqn:_ => 1
     | false eqn:heq => n * fact (pred n).
   Next Obligation.
@@ -52,7 +52,7 @@ Section FactPrim.
   Qed.
 End FactPrim.
 From CertiCoq.Benchmarks Require Import sha256.
-From Coq Require Import String.
+From Stdlib Require Import String.
 Definition test := "Coq is a formal proof management system. It provides a formal language to write mathematical definitions, executable algorithms and theorems together with an environment for semi-interactive development of machine-checked proofs. Typical applications include the certification of properties of programming languages (e.g. the CompCert compiler certification project, the Verified Software Toolchain for verification of C programs, or the Iris framework for concurrent separation logic), the formalization of mathematics (e.g. the full formalization of the Feit-Thompson theorem, or homotopy type theory), and teaching."%string.
 
 Definition sha := sha256.SHA_256 (sha256.str_to_bytes test).
@@ -101,7 +101,7 @@ Definition vs_hard :=
   | _ => false
   end.
 
-(*  
+(*
 (* Blows up *) Time Eval vm_compute in vs_easy.
 (* Blows up *) Time Eval vm_compute in vs_hard.
 *)
@@ -112,7 +112,3 @@ CertiCoq Eval -time vs_hard.
 
 (* CertiCoq Eval -time vs_easy. *)
 (* Executed in 0.007s *)
-
-
-
-

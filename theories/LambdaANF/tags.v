@@ -1,11 +1,11 @@
-Require Import Coq.ZArith.ZArith.
-Require Import Coq.ZArith.Znumtheory.
-Require Import Coq.Lists.List.
-Require Import Coq.Bool.Bool.
+From Stdlib Require Import ZArith.ZArith.
+From Stdlib Require Import ZArith.Znumtheory.
+From Stdlib Require Import Lists.List.
+From Stdlib Require Import Bool.Bool.
 Require Maps.
-Require Coq.funind.Recdef.
+From Stdlib Require funind.Recdef.
 Import Nnat.
-Require Coq.Structures.Orders.
+From Stdlib Require Structures.Orders.
 Import RelationClasses.
 
 Require Import cps.
@@ -33,7 +33,7 @@ Module TagInfo <: Orders.UsualOrderedType.
  Definition lexi {A}{B} (f: A -> A -> comparison) a a' (g: B -> B -> comparison) b b' : comparison :=
     match f a a' with Lt => Lt | Eq => g b b' | Gt => Gt end.
 
- Fixpoint compare_list {A} (f: A -> A -> comparison) (al bl: list A) : comparison := 
+ Fixpoint compare_list {A} (f: A -> A -> comparison) (al bl: list A) : comparison :=
    match al, bl with
      | a::al', b::bl' => lexi f a b (compare_list f) al' bl'
      | nil, _::_ => Lt
@@ -55,9 +55,9 @@ Definition compare_bool (x y: bool) : comparison :=
 
  Fixpoint compare (x y : t) : comparison :=
  match x, y with
- | (n,x1), (n', y1) => 
+ | (n,x1), (n', y1) =>
  match Pos.compare n n' with
- | Lt => Lt | Gt => Gt 
+ | Lt => Lt | Gt => Gt
  | Eq => match x1,y1 with
     | Tag_record n, Tag_record n' => N.compare n n'
     | Tag_record _, _ => Lt
@@ -95,14 +95,12 @@ end.
      forall x y : t, CompareSpec (x = y) (lt x y) (lt y x) (compare x y).
  Proof.
  Abort.
- 
+
    Lemma eq_dec : forall x y : t, {x = y} + {x <> y}.
    Proof.
    Abort.
-   
+
 End TagInfo.
 
 Module TagDict := HashMap.MakeHashMap TagInfo.
-Definition tagdict := TagDict.t.  
-
-
+Definition tagdict := TagDict.t.

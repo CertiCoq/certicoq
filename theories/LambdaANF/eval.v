@@ -1,4 +1,4 @@
-From Coq Require Import NArith.BinNat Relations.Relations MSets.MSets
+From Stdlib Require Import NArith.BinNat Relations.Relations MSets.MSets
      MSets.MSetRBT Lists.List micromega.Lia Sets.Ensembles
      Relations.Relations.
 
@@ -8,7 +8,7 @@ From CertiCoq Require Import LambdaANF.cps LambdaANF.List_util LambdaANF.size_cp
      LambdaANF.identifiers LambdaANF.tactics LambdaANF.Ensembles_util.
 
 Require Import compcert.lib.Coqlib.
-Require Import LambdaANF.algebra. 
+Require Import LambdaANF.algebra.
 
 Require Import MetaRocq.Utils.bytestring.
 
@@ -38,11 +38,11 @@ Section EVAL.
   | OOT
   | Res : A -> res.
 
-  
+
   Context {fuel : Type} {Hf : @fuel_resource fuel} {trace : Type} {Ht : @trace_resource trace}.
 
   Open Scope alg_scope.
-  
+
   Inductive bstep :  env -> exp -> fuel -> @res val -> trace -> Prop :=
   | BStept_constr :
       forall (x : var) (t : ctor_tag) (ys :list var) (e : exp)
@@ -136,7 +136,7 @@ Section EVAL.
 
   Scheme bstep_ind' := Minimality for bstep Sort Prop
     with bstep_fuel_ind' := Minimality for bstep_fuel Sort Prop.
-  
+
   Definition not_stuck (rho : env) (e : exp) :=
     (exists cin v cout, bstep_fuel rho e cin (Res v) cout) \/
     (forall cin, exists cout, bstep_fuel rho e cin OOT cout).
@@ -209,7 +209,7 @@ Section EVAL.
     intros H1 H2. eapply step_deterministic_aux; eauto.
   Qed.
 
-        
+
   Lemma bstep_lt_OOT_aux rho e r cin (v : val) cout cin':
     bstep rho e cin r cout ->
     r = Res v ->
@@ -235,8 +235,8 @@ Section EVAL.
         do 2 eexists. split. eapply BStept_letapp_oot; eauto. rewrite plus_assoc. rewrite (plus_comm x0).
         rewrite <- plus_assoc. reflexivity.
       + inv H5. rewrite (plus_comm cin1) in Hlt. eapply plus_stable in Hlt.
-        edestruct IHHstep0. reflexivity. eassumption. destructAll. 
-        do 2 eexists. split. rewrite plus_comm. 
+        edestruct IHHstep0. reflexivity. eassumption. destructAll.
+        do 2 eexists. split. rewrite plus_comm.
         eapply BStept_letapp; eauto.
         rewrite <- !plus_assoc. rewrite (plus_comm cout1). reflexivity.
     - inv Heq.
@@ -257,7 +257,7 @@ Section EVAL.
   Proof.
     intros Hbstep Hlt. eapply bstep_lt_OOT_aux; eauto.
   Qed.
-  
+
   Lemma bstep_fuel_lt_OOT rho e v cin cout cin' :
     bstep_fuel rho e cin (Res v) cout ->
     cin' << cin ->
@@ -272,7 +272,7 @@ Section EVAL.
         do 2 eexists. split. econstructor 2. eassumption. rewrite plus_assoc. reflexivity.
   Qed.
 
-  
+
   Lemma bstep_OOT_subtrace_aux rho e (r : @res val) v cin cout cin' cout' :
     bstep rho e cin r cout ->
     r = Res v ->
@@ -290,7 +290,7 @@ Section EVAL.
                   bstep_fuel rho e cin' OOT cout' ->
                   (exists c', cout = (c' <+> cout'))).
     intros Hstep. revert v cin' cout'.
-    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *;    
+    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *;
     intros v1 cin' cout' Heq Hs'; try (now subst; inv Hs'; repeat subst_exp; eauto).
     - inv Hs'; repeat subst_exp. eapply find_tag_nth_deterministic in H8; [| clear H8; eauto ]. inv H8.
       eapply IHHstep; eauto.
@@ -331,8 +331,8 @@ Section EVAL.
       rewrite plus_assoc at 1. reflexivity.
   Qed.
 
-  
-  Lemma bstep_OOT_determistic_aux rho e (r r' : @res val) cin cout cin' cout' c :    
+
+  Lemma bstep_OOT_determistic_aux rho e (r r' : @res val) cin cout cin' cout' c :
     bstep rho e cin r cout ->
     r = OOT ->
     cin = (c <+> cin') ->
@@ -360,21 +360,21 @@ Section EVAL.
       + eapply bstep_fuel_deterministic in H18; [| clear H18; eauto ]; destructAll.
         rewrite !(plus_comm cin0), <- plus_assoc in Hleq.
         eapply plus_inv in Hleq. subst.
-        edestruct IHHstep0; [| | eassumption | ]; eauto. destructAll. split; eauto. eexists. 
+        edestruct IHHstep0; [| | eassumption | ]; eauto. destructAll. split; eauto. eexists.
         rewrite <- (plus_assoc cout0). rewrite (plus_comm cout0) at 1.
         rewrite plus_assoc at 1. reflexivity.
       + split. reflexivity.
         eapply bstep_fuel_OOT_subtrace in H3; [| eassumption ]. destructAll.
         eexists.
         rewrite (plus_assoc x0). rewrite (plus_comm cout') at 1.
-        rewrite <- plus_assoc at 1. reflexivity.      
+        rewrite <- plus_assoc at 1. reflexivity.
     - inv Hs'; repeat subst_exp; eauto. exfalso.
       eapply IHHstep in H17; eauto. inv H17. congruence.
       rewrite (plus_comm cin1). rewrite <- plus_assoc. reflexivity.
     - inv Hs'; eauto.
       + split; eauto. eexists <0>. rewrite plus_zero. reflexivity.
       + rewrite <- plus_assoc, plus_comm in H. eapply plus_lt in H.
-        eapply lt_antisym in H. contradiction. 
+        eapply lt_antisym in H. contradiction.
     - inv Hs'; eauto.
       + split; eauto. eexists. rewrite (plus_comm _ <0>). rewrite plus_zero. reflexivity.
       + rewrite <- plus_assoc in Hleq. eapply plus_inv in Hleq. subst.
@@ -399,7 +399,7 @@ Section EVAL.
     - inv Hs2; eauto.
       + split; eauto. eexists <0>. rewrite plus_zero. reflexivity.
       + rewrite <- plus_assoc, plus_comm in H. eapply plus_lt in H.
-        eapply lt_antisym in H. contradiction. 
+        eapply lt_antisym in H. contradiction.
     - inv Hs2; eauto.
       + split; eauto. eexists. rewrite (plus_comm _ <0>). rewrite plus_zero. reflexivity.
       + rewrite <- plus_assoc in H. eapply plus_inv in H. subst.
@@ -409,7 +409,7 @@ Section EVAL.
   Qed.
 
 
-  
+
   Lemma bstep_gt_aux rho e r cin (v : val) cout cin' r' cout' :
     bstep rho e cin r cout ->
     r = Res v -> cin << cin' ->
@@ -432,17 +432,17 @@ Section EVAL.
     - inv Hstep'; repeat subst_exp; eauto.
       eapply find_tag_nth_deterministic in H8; [| clear H8; eauto ]. inv H8.
       eapply IHHstep; eauto.
-    - inv Hstep'; repeat subst_exp; eauto. 
+    - inv Hstep'; repeat subst_exp; eauto.
       + eapply bstep_fuel_deterministic in H18; [| clear H18; eauto ]; destructAll.
         eapply IHHstep0; [| | eapply H19 ]. reflexivity.
-        rewrite !(plus_comm cin0) in Hlt. eapply plus_stable in Hlt. 
+        rewrite !(plus_comm cin0) in Hlt. eapply plus_stable in Hlt.
         eassumption.
       + eapply IHHstep; [| | eassumption ]. reflexivity.
         eapply plus_lt. eapply Hlt.
     - inv Hstep'. eapply lt_antisym in Hlt. contradiction.
     - inv Hstep'.
       + rewrite plus_comm in Hlt. eapply plus_lt in Hlt.
-        eapply lt_trans in Hlt. specialize (Hlt H). eapply lt_antisym in Hlt. eassumption. 
+        eapply lt_trans in Hlt. specialize (Hlt H). eapply lt_antisym in Hlt. eassumption.
       + eapply IHHstep; [| | eassumption ]. reflexivity.
         eapply plus_stable in Hlt. eassumption.
   Qed.
@@ -462,7 +462,7 @@ Section EVAL.
   Proof.
     intros Hstep Hlt Hstep'. inv Hstep. inv Hstep'.
     - rewrite plus_comm in Hlt. eapply plus_lt in Hlt.
-      eapply lt_trans in Hlt. specialize (Hlt H0). eapply lt_antisym in Hlt. eassumption. 
+      eapply lt_trans in Hlt. specialize (Hlt H0). eapply lt_antisym in Hlt. eassumption.
     - eapply bstep_gt; [| | eassumption ]. eassumption.
       eapply plus_stable in Hlt. eassumption.
   Qed.
@@ -483,7 +483,7 @@ Section EVAL.
                    r = OOT ->
                    cin = (c <+> cin') ->
                    exists cout' c, bstep_fuel rho e cin' OOT cout' /\ cout = (c <+> cout')).
-    intros Hstep. revert c cin'. 
+    intros Hstep. revert c cin'.
     induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *;
       intros c' cin' Heq Hleq; subst;
         try now (edestruct IHHstep; eauto; destructAll; do 2 eexists; split;
@@ -501,7 +501,7 @@ Section EVAL.
     - do 2 eexists. split. econstructor 1. eapply plus_lt. rewrite plus_comm. eassumption.
       rewrite plus_zero. reflexivity.
     - edestruct (lt_all_dec cin' (one e)).
-      + do 2 eexists. split. 
+      + do 2 eexists. split.
         now econstructor; eauto. rewrite (plus_comm _ <0>). rewrite plus_zero. reflexivity.
       + destructAll. rewrite <- plus_assoc in Hleq. eapply plus_inv in Hleq. subst.
         edestruct IHHstep. reflexivity. reflexivity. destructAll.
@@ -523,20 +523,20 @@ Section EVAL.
     - do 2 eexists. split. econstructor 1. eapply plus_lt. rewrite plus_comm. eassumption.
       rewrite plus_zero. reflexivity.
     - edestruct (lt_all_dec c2 (one e)).
-      + do 2 eexists. split. 
+      + do 2 eexists. split.
         now econstructor; eauto. rewrite (plus_comm _ <0>). rewrite plus_zero. reflexivity.
       + destructAll. rewrite <- plus_assoc in H. eapply plus_inv in H. subst.
         edestruct bstep_OOT_monotonic. eassumption. destructAll.
         do 2 eexists. split. econstructor 2; eauto. rewrite plus_assoc. reflexivity.
   Qed.
 
-  
+
   Lemma bstep_fuel_zero_OOT rho e :
     bstep_fuel rho e <0> OOT <0>.
   Proof.
     econstructor. eapply zero_one_lt.
   Qed.
-    
+
   Lemma bstep_deterministic_res rho e cin r r' cout cout' :
     bstep rho e cin r cout ->
     bstep rho e cin r' cout' ->
@@ -552,8 +552,8 @@ Section EVAL.
                   r = r' /\ cout = cout').
     intros Hstep.
     revert r' cout'.
-    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; intros r' cout' Hstep';   
-      try now (inv Hstep'; repeat subst_exp; eapply IHHstep; eauto). 
+    induction Hstep using bstep_ind' with (P := P) (P0 := P0); unfold P, P0 in *; intros r' cout' Hstep';
+      try now (inv Hstep'; repeat subst_exp; eapply IHHstep; eauto).
     - inv Hstep'. repeat subst_exp.
       eapply find_tag_nth_deterministic in H1; [| eapply H8 ]. inv H1.
       eapply IHHstep; eauto.
@@ -562,8 +562,8 @@ Section EVAL.
         rewrite !(plus_comm cin0) in H10. eapply plus_inv in H10.
         subst. edestruct IHHstep0. eapply H19. subst. now eauto.
       + rewrite plus_comm in H18. eapply bstep_fuel_OOT_monotonic in H18. destructAll.
-        eapply IHHstep in H5. inv H5. congruence. 
-    - inv Hstep'; repeat subst_exp; eauto.       
+        eapply IHHstep in H5. inv H5. congruence.
+    - inv Hstep'; repeat subst_exp; eauto.
       eapply bstep_fuel_OOT_determistic in H17. inv H17. congruence.
       rewrite plus_comm. eassumption.
     - inv Hstep'. repeat subst_exp; eauto.
@@ -585,8 +585,8 @@ Section EVAL.
     eapply plus_inv in H0. subst. eapply bstep_deterministic_res  in H; [| eassumption ].
     destructAll. eauto.
   Qed.
-  
-  
+
+
   Definition diverge (rho : env) (e: exp) : Prop :=
     forall cin, exists cout, bstep_fuel rho e cin OOT cout.
 
@@ -738,7 +738,7 @@ Section EVAL.
         C <> Hole_c ->
         interpret_ctx C rho cin r cout ->
         interpret_ctx_fuel C rho (cin <+> one_ctx C) r (cout <+> one_ctx C).
-  
+
 
   Lemma interpret_ctx_bstep_l C e rho v cin cout:
     bstep_fuel rho (C|[ e ]|) cin (Res v) cout ->
@@ -753,15 +753,15 @@ Section EVAL.
     - simpl in Hb. eexists rho, (@zero _ fuel _), <0>, cin, cout. split; [| split; eauto ].
       rewrite plus_zero. reflexivity.
       rewrite plus_zero. reflexivity.
-      econstructor. econstructor. eassumption. 
+      econstructor. econstructor. eassumption.
     - simpl in Hb, Hi. inv Hb. inv H.
-      edestruct IHC. eassumption. eassumption. destructAll. 
+      edestruct IHC. eassumption. eassumption. destructAll.
       do 5 eexists. split; [| split ].
       3:{ split. econstructor 3. now congruence. econstructor; eauto. eassumption. }
       rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
       rewrite !plus_assoc. rewrite (plus_comm x3). reflexivity.
     - simpl in Hb, Hi. inv Hb. inv H.
-      edestruct IHC. eassumption. eassumption. destructAll. 
+      edestruct IHC. eassumption. eassumption. destructAll.
       do 5 eexists. split; [| split ].
       3:{ split. econstructor 3. now congruence. econstructor; eauto. eassumption. }
       rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
@@ -769,14 +769,14 @@ Section EVAL.
     - simpl in Hb, Hi. inv Hb. inv H.
     - simpl in Hb, Hi. inv Hb. inv H.
     - simpl in Hb, Hi. inv Hb. inv H.
-      edestruct IHC. eassumption. eassumption. destructAll. repeat subst_exp. 
-      do 5 eexists. split; [| split ]. 
+      edestruct IHC. eassumption. eassumption. destructAll. repeat subst_exp.
+      do 5 eexists. split; [| split ].
       3:{ split; [| eassumption ].
           econstructor 3. now congruence. econstructor; eauto. }
       rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
       rewrite !plus_assoc. rewrite (plus_comm x3). reflexivity.
     - simpl in Hb, Hi. inv Hb. inv H.
-      edestruct IHC. eassumption. eassumption. destructAll. 
+      edestruct IHC. eassumption. eassumption. destructAll.
       do 5 eexists. split; [| split ].
       3:{ split. econstructor 3. now congruence. econstructor; eauto. eassumption. }
       rewrite !plus_assoc. rewrite (plus_comm x2). reflexivity.
@@ -796,7 +796,7 @@ Section EVAL.
     - inv Hi. simpl. rewrite !plus_zero. eassumption. inv H0.
     - inv Hi. inv H0. simpl.
       rewrite !plus_assoc, !(plus_comm (one_ctx _)), <- !plus_assoc.
-      econstructor. rewrite !plus_assoc. econstructor; eauto.       
+      econstructor. rewrite !plus_assoc. econstructor; eauto.
   Qed.
 
   Lemma interpret_ctx_OOT_bstep C e rho cin cout:
@@ -840,27 +840,27 @@ Section EVAL.
     bstep_fuel rho (C |[ Eprim x p xs e1 ]|) cin OOT cout ->
     interprable C = true ->
     bstep_fuel rho (C |[ Eprim x p xs e2 ]|) cin OOT cout.
-  Proof.       
+  Proof.
     revert rho cin cout.
     induction C; intros rho cin cout Hs Hi; eauto;
       try congruence;
-      try now (inv Hs; 
+      try now (inv Hs;
                [ econstructor; eassumption |
                  inv H; unfold one; simpl;
                  constructor 2; econstructor; eauto ]).
 
     Unshelve. exact 0%nat.
   Qed.
-  
+
   Lemma eval_ctx_app_OOT_Eprim_val rho C x p e1 e2 cin cout :
     bstep_fuel rho (C |[ Eprim_val x p e1 ]|) cin OOT cout ->
     interprable C = true ->
     bstep_fuel rho (C |[ Eprim_val x p e2 ]|) cin OOT cout.
-  Proof.       
+  Proof.
     revert rho cin cout.
     induction C; intros rho cin cout Hs Hi; eauto;
       try congruence;
-      try now (inv Hs; 
+      try now (inv Hs;
                [ econstructor; eassumption |
                  inv H; unfold one; simpl;
                  constructor 2; econstructor; eauto ]).
@@ -876,13 +876,13 @@ Section EVAL.
     revert rho e cin cout.
     induction C; intros rho e1 cin cout Hs Hi; eauto;
       try congruence;
-      try now (inv Hs; 
+      try now (inv Hs;
                [ econstructor; eassumption |
                  inv H; unfold one; simpl; constructor 2; econstructor; eauto ]).
-    
+
     Unshelve. exact 0%nat.
   Qed.
-      
+
   Lemma eval_ctx_app_Ehalt_div rho C e cin cout x :
     bstep_fuel rho (C |[ Ehalt x ]|) cin OOT cout ->
     interprable C = true ->
@@ -891,17 +891,17 @@ Section EVAL.
     revert rho e cin cout.
     induction C; intros rho e1 cin cout Hs Hi; eauto;
       try congruence;
-      try now (inv Hs; 
+      try now (inv Hs;
                [ econstructor; eassumption |
                  inv H; unfold one; simpl; constructor 2; econstructor; eauto ]).
     simpl in *. inv Hs.
     2:{ inv H. }
     econstructor. unfold one. erewrite one_eq. eassumption.
-    
+
     Unshelve. exact 0%nat.
   Qed.
-  
-    
+
+
   Lemma interpret_ctx_eq_env_P S C rho rho' cin cout :
     interpret_ctx_fuel C rho cin (Res rho') cout ->
     Disjoint _ (bound_var_ctx C) S ->
@@ -1029,7 +1029,7 @@ Section EVAL.
           -- left. eapply ctx_step. congruence. econstructor; eauto.
           -- destructAll. right. do 5 eexists.
              split; [| split ].
-             econstructor. congruence. now econstructor; eauto. eassumption. split. 
+             econstructor. congruence. now econstructor; eauto. eassumption. split.
              rewrite (plus_assoc _ _ x1), (plus_comm (one_ctx _) x1), <- !plus_assoc. reflexivity.
              rewrite (plus_assoc _ _ x3), (plus_comm (one_ctx _) x3), <- !plus_assoc. reflexivity.
           -- eassumption.
@@ -1056,7 +1056,7 @@ Section EVAL.
     end.
 
   (* TODO : Small step for letapp? *)
-  (* 
+  (*
   Definition sstep_f (rho:env) (e:exp) : exception (env* exp) :=
     match e with
       | Eprim x f ys e' =>
@@ -1128,7 +1128,7 @@ Section EVAL.
    *)
 
   Open Scope bs_scope.
-  
+
   (* Either fail with an Exn, runs out of fuel and return (Ret) inl of the current state or finish to evaluate and return inr of a val *)
   Fixpoint bstep_f (rho:env) (e:exp) (n:nat): exception ((env * exp) + val) :=
     match n with
@@ -1209,8 +1209,8 @@ Section EVAL.
            end)
         end)
     end.
-  
-    
+
+
   (** Small step semantics -- Relational definition *)
   Inductive step: state -> state -> Prop :=
   | Step_constr: forall vs rho x t ys e,
@@ -1313,7 +1313,7 @@ Section EVAL.
       forall (rho : env) (fl : fundefs) (e : exp) (v : val) (c : nat),
         bstep_e (def_funs fl fl rho rho) e v c ->
         bstep_e rho (Efun fl e) v c
-  | BStep_prim_val : 
+  | BStep_prim_val :
     forall (rho' rho : env) (x : var) (p : primitive)
              (e : exp) (v : val) (c : nat),
         M.set x (Vprim p) rho = rho' ->
@@ -1405,7 +1405,7 @@ Section EVAL.
         M.set x (Vprim p) rho = rho' ->
         bstep_cost rho' e v' c ->
         bstep_cost rho (Eprim_val x p e) v' (c + 1)
-  
+
   | BStepc_prim :
       forall (vs : list val) (rho' rho : env) (x : var) (f : prim)
              (f' : list val -> option val) (ys : list var) (e : exp)
@@ -1498,7 +1498,7 @@ Section EVAL.
       econstructor; eauto.
     - simpl in H. apply IHn in H.
       destruct H as [m ev]; exists m.
-      simpl. cbn. econstructor; eauto. 
+      simpl. cbn. econstructor; eauto.
     - destruct (get_list l rho) eqn:glr; [| inv H].
       destruct (M.get p pr) eqn:ppr; [| inv H].
       destruct (o l0) eqn:ol0; [| inv H].
@@ -1585,7 +1585,7 @@ Section EVAL.
 
 
    *)
-  
+
   (** Reflexive transitive closure of the small-step relation *)
   Definition mstep : relation state := clos_refl_trans_1n state step.
 
@@ -1693,4 +1693,3 @@ Ltac destruct_bstep :=
   match goal with
   | [ H : bstep _ _ _ _ _ |- _ ] => inv H
   end.
-

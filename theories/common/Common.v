@@ -11,6 +11,6 @@ Require Export Common.RandyPrelude.
 Require Export Common.AstCommon.
 Require Export Common.classes.
 
-Require Export List.
+From Stdlib Require Export List.
 
 Export ListNotations.

@@ -14,8 +14,9 @@ Require compcert.common.AST
 Require Glue.glue
         Compiler.pipeline.
 
-Require Import Coq.extraction.Extraction.
-Require Import VanillaExtrOCamlInt63 VanillaExtrOCamlFloats ExtrOCamlPString.
+From Stdlib Require Import extraction.Extraction.
+Require Import VanillaExtrOCamlInt63 VanillaExtrOCamlFloats.
+From Stdlib Require Import ExtrOCamlPString.
 (* Standard lib *)
 
 (** Extraction to Ocaml : use of basic Ocaml types: be careful that this should
@@ -39,7 +40,7 @@ Extract Inductive prod => "( * )" [ "" ].
 Extract Inlined Constant andb => "(&&)".
 Extract Inlined Constant orb => "(||)".
 
-Require Import ZArith NArith.
+From Stdlib Require Import ZArith NArith.
 
 Extraction Inline Program.Wf.Fix_F_sub.
 Extraction Inline Program.Wf.Fix_sub.

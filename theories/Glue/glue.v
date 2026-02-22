@@ -1,9 +1,10 @@
 Require Import Common.Pipeline_utils.
 
-Require Import Coq.ZArith.ZArith
-               Coq.Program.Basics
-               Coq.Strings.String
-               Coq.Lists.List List_util.
+From Stdlib Require Import ZArith.ZArith
+               Program.Basics
+               Strings.String
+               Lists.List.
+Require Import List_util.
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad.
@@ -207,7 +208,7 @@ Section GState.
     ret (M.get k ienv).
 
   (* A hacky way to get the [ind_L1_tag] of a type from its name.
-     This is necessary because of a shortcoming of Template Coq.
+     This is necessary because of a shortcoming of Template Stdlib.
      (mutually recursive type names aren't fully qualified) *)
   Definition get_tag_from_type_name (s : kername) : glueM (option ind_L1_tag) :=
     let find (prev : option ind_L1_tag)
@@ -221,7 +222,7 @@ Section GState.
     ret (M.fold find ienv None).
 
   (* A hacky way to get the [ind_L1_tag] of a type from its [inductive] value.
-     This is necessary because of a shortcoming of Template Coq. *)
+     This is necessary because of a shortcoming of Template Stdlib. *)
   Definition get_tag_from_inductive (i : inductive) : glueM (option ind_L1_tag) :=
     let find (prev : option ind_L1_tag)
              (tag : ind_L1_tag)

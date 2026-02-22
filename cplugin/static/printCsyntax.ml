@@ -71,11 +71,12 @@ let name_longtype sg =
 (* Declarator (identifier + type) *)
 
 let attributes a =
+  let open Datatypes in
   let s1 = if a.attr_volatile then " volatile" else "" in
   match a.attr_alignas with
   | None -> s1
   | Some l ->
-      sprintf " _Alignas(%Ld)%s" (Int64.shift_left 1L (N.to_int l)) s1
+      sprintf " __attribute((aligned(%Ld)))%s" (Int64.shift_left 1L (N.to_int l)) s1
 
 let attributes_space a =
   let s = attributes a in
@@ -84,8 +85,20 @@ let attributes_space a =
 let name_optid id =
   if id = "" then "" else " " ^ id
 
+let is_int_or_ptr_attr a n =
+  let open Datatypes in
+  match a.attr_alignas with
+  | Some l when N.to_int l = n -> true
+  | _ -> false
+
 let rec name_cdecl id ty =
   match ty with
+  (* BEGIN hack for the value typedef *)
+  | Ctypes.Tpointer(Ctypes.Tvoid, a) when is_int_or_ptr_attr a 2 ->
+      "value" ^ name_optid id
+  | Ctypes.Tpointer(Ctypes.Tvoid, a) when is_int_or_ptr_attr a 3 ->
+      "value" ^ name_optid id
+  (* END *)
   | Ctypes.Tvoid ->
       "void" ^ name_optid id
   | Ctypes.Tint(sz, sg, a) ->
@@ -112,8 +125,8 @@ let rec name_cdecl id ty =
       | [] ->
           if first then
             Buffer.add_string b
-               (if cconv.cc_vararg <> None then "..." else "void")
-          else if cconv.cc_vararg <> None then
+               (if cconv.cc_vararg <> Datatypes.None then "..." else "void")
+          else if cconv.cc_vararg <> Datatypes.None then
             Buffer.add_string b ", ..."
           else
             ()
@@ -184,9 +197,11 @@ let print_typed_value p v ty =
   | Vsingle f, _ ->
       fprintf p "%.15Ff" (camlfloat_of_coqfloat32 f)
   | Vlong n, Ctypes.Tlong(Unsigned, _) ->
+      Printf.printf "Printing long: %s\n" (Int64.to_string (Z.to_int64 (Integers.Int64.intval n)));
       fprintf p "%LuLLU" (camlint64_of_coqint n)
   | Vlong n, _ ->
-      fprintf p "%LdLL" (camlint64_of_coqint n)
+    Printf.printf "Printing long: %s\n" (Int64.to_string (Z.to_int64 (Integers.Int64.intval n)));
+    fprintf p "%LdLL" (camlint64_of_coqint n)
   | Vptr(b, ofs), _ ->
       fprintf p "<ptr%a>" !print_pointer_hook (b, Obj.magic ofs)
   | Vundef, _ ->
@@ -357,9 +372,9 @@ let rec print_stmt p s =
       fprintf p "@[<v 2>switch (%a) {@ %a@;<0 -2>}@]"
               print_expr e
               print_cases cases
-  | Sreturn None ->
+  | Sreturn Datatypes.None ->
       fprintf p "return;"
-  | Sreturn (Some e) ->
+  | Sreturn Datatypes.(Some e) ->
       fprintf p "return %a;" print_expr e
   | Slabel(lbl, s1) ->
       fprintf p "%s:@ %a" (extern_atom lbl) print_stmt s1
@@ -381,8 +396,8 @@ and print_cases p cases =
               print_cases rem
 
 and print_case_label p = function
-  | None -> fprintf p "default"
-  | Some lbl -> fprintf p "case %s" (Z.to_string lbl)
+  | Datatypes.None -> fprintf p "default"
+  | Datatypes.Some lbl -> fprintf p "case %s" (Z.to_string lbl)
 
 and print_stmt_for p s =
   match s with
@@ -401,11 +416,11 @@ let name_function_parameters name_param fun_name params cconv =
   Buffer.add_char b '(';
   begin match params with
   | [] ->
-      Buffer.add_string b (if cconv.cc_vararg <> None then "..." else "void")
+      Buffer.add_string b (if cconv.cc_vararg <> Datatypes.None then "..." else "void")
   | _ ->
       let rec add_params first = function
       | [] ->
-          if cconv.cc_vararg <> None then Buffer.add_string b ",..."
+          if cconv.cc_vararg <> Datatypes.None then Buffer.add_string b ",..."
       | (id, ty) :: rem ->
           if not first then Buffer.add_string b ", ";
           Buffer.add_string b (name_cdecl (name_param id) ty);
@@ -534,18 +549,14 @@ let struct_or_union = function Struct -> "struct" | Union -> "union"
 let declare_composite p (Composite(id, su, m, a)) =
   fprintf p "%s %s;@ " (struct_or_union su) (extern_atom id)
 
-let print_member p = function
-  | Member_plain(id, ty) ->
-      fprintf p "@ %s;" (name_cdecl (extern_atom id) ty)
-  | Member_bitfield(id, sz, sg, attr, w, _is_padding) ->
-      fprintf p "@ %s : %s;"
-              (name_cdecl (extern_atom id) (Tint(sz, sg, attr)))
-              (Z.to_string w)
-
 let define_composite p (Composite(id, su, m, a)) =
   fprintf p "@[<v 2>%s %s%s {"
           (struct_or_union su) (extern_atom id) (attributes a);
-  List.iter (print_member p) m;
+  List.iter
+    (function Member_plain (fid, fty) ->
+      fprintf p "@ %s;" (name_cdecl (extern_atom fid) fty)
+      | _ -> assert false)
+    m;
   fprintf p "@;<0 -2>};@]@ @ "
 
 let print_program p prog =

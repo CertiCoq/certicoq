@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
 
   /* TODO write string printers */
   /* val = tinfo -> args[1]; */
-  /* print_Coq_Init_Datatypes_list(val, print_Coq_Init_Datatypes_bool); */
+  /* print_Corelib_Init_Datatypes_list(val, print_Corelib_Init_Datatypes_bool); */
   /* printf("\n"); */
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;

@@ -10,20 +10,20 @@ extern value body(struct thread_info *);
 extern value args[];
 
 /* extern struct thread_info; */
-extern unsigned int get_Coq_Strings_String_string_tag(value);
-extern unsigned int get_Coq_Init_Datatypes_bool_tag(value);
-extern unsigned int get_Coq_Init_Datatypes_list_tag(value);
+extern unsigned int get_Corelib_Strings_String_string_tag(value);
+extern unsigned int get_Corelib_Init_Datatypes_bool_tag(value);
+extern unsigned int get_Corelib_Init_Datatypes_list_tag(value);
 extern unsigned int get_CertiCoq_Benchmarks_regex_regex_rgx_tag(value);
-extern value make_Coq_Init_Datatypes_bool_true(void);
-extern value make_Coq_Init_Datatypes_bool_false(void);
-extern value make_Coq_Init_Datatypes_unit_tt(void);
-extern value make_Coq_Init_Datatypes_list_nil(void);
-extern value make_Coq_Strings_String_string_EmptyString(void);
-extern value make_Coq_Init_Datatypes_option_None(void);
-extern value alloc_make_Coq_Strings_Ascii_ascii_Ascii(struct thread_info *, value, value, value, value, value, value, value, value);
-extern value alloc_make_Coq_Init_Datatypes_list_cons(struct thread_info *, value arg0, value arg1);
-extern value alloc_make_Coq_Init_Datatypes_option_Some(struct thread_info *, value);
-extern value alloc_make_Coq_Strings_String_string_String(struct thread_info *, value, value);
+extern value make_Corelib_Init_Datatypes_bool_true(void);
+extern value make_Corelib_Init_Datatypes_bool_false(void);
+extern value make_Corelib_Init_Datatypes_unit_tt(void);
+extern value make_Corelib_Init_Datatypes_list_nil(void);
+extern value make_Corelib_Strings_String_string_EmptyString(void);
+extern value make_Corelib_Init_Datatypes_option_None(void);
+extern value alloc_make_Corelib_Strings_Ascii_ascii_Ascii(struct thread_info *, value, value, value, value, value, value, value, value);
+extern value alloc_make_Corelib_Init_Datatypes_list_cons(struct thread_info *, value arg0, value arg1);
+extern value alloc_make_Corelib_Init_Datatypes_option_Some(struct thread_info *, value);
+extern value alloc_make_Corelib_Strings_String_string_String(struct thread_info *, value, value);
 
 extern value alloc_make_CertiCoq_Benchmarks_regex_regex_RegexFFI_Build_RegexFFI(struct thread_info *, value, value);
 extern value make_CertiCoq_Benchmarks_regex_regex_RegexFFI_Build_RegexFFI(value, value, value *);
@@ -42,8 +42,8 @@ _Bool is_ptr(value s) {
 unsigned char ascii_to_char(value x) {
   unsigned char c = 0;
   for(unsigned int i = 0; i < 8; i++) {
-    unsigned int tag = 
-      get_Coq_Init_Datatypes_bool_tag(*((value *) *((value *) x) + i));
+    unsigned int tag =
+      get_Corelib_Init_Datatypes_bool_tag(*((value *) *((value *) x) + i));
     c += !tag << i;
   }
   return c;
@@ -55,7 +55,7 @@ typedef enum { EMPTYSTRING, STRING } coq_string;
 size_t string_value_length(value s) {
   value temp = s;
   size_t i = 0;
-  while(get_Coq_Strings_String_string_tag(temp) == STRING) {
+  while(get_Corelib_Strings_String_string_tag(temp) == STRING) {
     temp = *((value *) temp + 1ULL);
     i++;
   }
@@ -69,7 +69,7 @@ char *value_to_string(value s) {
   result = (char*) malloc(result_length * sizeof(char));
   memset(result, 0, result_length);
 
-  for(int i = 0; get_Coq_Strings_String_string_tag(temp) == STRING; i++) {
+  for(int i = 0; get_Corelib_Strings_String_string_tag(temp) == STRING; i++) {
     sprintf(result + i, "%c", ascii_to_char(temp));
     temp = *((value *) temp + 1ULL);
   }
@@ -183,17 +183,17 @@ value rgx_test(struct thread_info *tinfo, value r, value str) {
 
   free(matched);
   free(rs);
-  return (rc >= 0) ? 
-    make_Coq_Init_Datatypes_bool_true() : 
-    make_Coq_Init_Datatypes_bool_false();
+  return (rc >= 0) ?
+    make_Corelib_Init_Datatypes_bool_true() :
+    make_Corelib_Init_Datatypes_bool_false();
 }
 
 
 value bool_to_value(_Bool b) {
   if(b)
-    return make_Coq_Init_Datatypes_bool_true();
+    return make_Corelib_Init_Datatypes_bool_true();
   else
-    return make_Coq_Init_Datatypes_bool_false();
+    return make_Corelib_Init_Datatypes_bool_false();
 }
 
 value char_to_value(struct thread_info *tinfo, char c) {
@@ -201,14 +201,14 @@ value char_to_value(struct thread_info *tinfo, char c) {
   for(unsigned int i = 0; i < 8; i++) {
     v[i] = bool_to_value(c & (1 << i));
   }
-  return alloc_make_Coq_Strings_Ascii_ascii_Ascii(tinfo, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
+  return alloc_make_Corelib_Strings_Ascii_ascii_Ascii(tinfo, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
 }
 
 value string_to_value(struct thread_info *tinfo, char *s) {
-  value temp = make_Coq_Strings_String_string_EmptyString();
+  value temp = make_Corelib_Strings_String_string_EmptyString();
   for (unsigned int i = strlen(s); 0 < i; i--) {
     value c = char_to_value(tinfo, s[i-1]);
-    temp = alloc_make_Coq_Strings_String_string_String(tinfo, c, temp);
+    temp = alloc_make_Corelib_Strings_String_string_String(tinfo, c, temp);
   }
   return temp;
 }
@@ -250,7 +250,7 @@ value rgx_exec(struct thread_info *tinfo, value r, value str) {
   value result;
   if(rc >= 0) {
     int limit = MIN(OVECCOUNT, rc * 2) - 2;
-    value list = make_Coq_Init_Datatypes_list_nil();
+    value list = make_Corelib_Init_Datatypes_list_nil();
     for(int i = limit; 0 <= i; i = i - 2) {
       char *start = matched + ovector[i];
       int length = ovector[i + 1] - ovector[i];
@@ -259,11 +259,11 @@ value rgx_exec(struct thread_info *tinfo, value r, value str) {
       value sv = string_to_value(tinfo, new);
       memset(new, 0, length);
       free(new);
-      list = alloc_make_Coq_Init_Datatypes_list_cons(tinfo, sv, list);
+      list = alloc_make_Corelib_Init_Datatypes_list_cons(tinfo, sv, list);
     }
-    result = alloc_make_Coq_Init_Datatypes_option_Some(tinfo, list);
+    result = alloc_make_Corelib_Init_Datatypes_option_Some(tinfo, list);
   } else {
-    result = make_Coq_Init_Datatypes_option_None();
+    result = make_Corelib_Init_Datatypes_option_None();
   }
   free(matched);
   free(rs);
@@ -271,7 +271,7 @@ value rgx_exec(struct thread_info *tinfo, value r, value str) {
 }
 
 /* Main */
-extern void print_Coq_Strings_String_string(value v);
+extern void print_Corelib_Strings_String_string(value v);
 
 int main(int argc, char *argv[]) {
   value clo;
@@ -287,7 +287,7 @@ int main(int argc, char *argv[]) {
   end = clock();
 
   // Types are dummy values
-  value regex_ffi = 
+  value regex_ffi =
     alloc_make_CertiCoq_Benchmarks_regex_regex_RegexFFI_Build_RegexFFI(
         tinfo,
         rgx_test_clo,
@@ -298,12 +298,12 @@ int main(int argc, char *argv[]) {
   // if program is using the exec function:
   value list;
   char *s;
-  switch(get_Coq_Init_Datatypes_option_tag(v)) {
+  switch(get_Corelib_Init_Datatypes_option_tag(v)) {
     case 0:
       list = *((value *) v);
       puts("Matched!");
       int i = 0;
-      while (get_Coq_Init_Datatypes_list_tag(list) != 0) {
+      while (get_Corelib_Init_Datatypes_list_tag(list) != 0) {
         s = value_to_string(*((value *) list + 0));
         printf("Part #%d is %s\n", i, s);
         free(s);
@@ -317,7 +317,7 @@ int main(int argc, char *argv[]) {
   }
 
   // if program is using the test function:
-  /* print_Coq_Init_Datatypes_bool(v); */
+  /* print_Corelib_Init_Datatypes_bool(v); */
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;
   msec = 1000*sec;

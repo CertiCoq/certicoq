@@ -1401,14 +1401,34 @@ Definition prefix_ctx {A:Type} rho' rho :=
    forall t h,
      repr_unboxed_Codegen t h ->
      (0 <= h <= Ptrofs.max_unsigned)%Z.
- Proof. 
-   intros t h Hrepr.
-   inversion Hrepr as [Heq Hrng]; subst h.
-   unfold Ptrofs.max_unsigned, Ptrofs.half_modulus in *.
+ Proof.
+   intros. inv H.
+   unfold Ptrofs.max_unsigned.
+   unfold Ptrofs.half_modulus in *.
+
    unfold Ptrofs.modulus in *.
-   rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2 by lia.
+   rewrite OrdersEx.Z_as_DT.shiftl_mul_pow2; try lia.
    rewrite Z.pow_1_r.
-   lia.
+   split; try lia.
+
+   rewrite Z.sub_1_r.
+   rewrite <- Z.lt_le_pred.
+   destruct H1.
+   unfold Ptrofs.wordsize in *. unfold Wordsize_Ptrofs.wordsize in *.
+   assert (Hws:(0 <= Zpower.two_power_nat (if Archi.ptr64 then 64%nat else 32%nat))%Z).
+   {
+     assert (Hws' := Coqlib.two_power_nat_pos (if Archi.ptr64 then 64%nat else 32%nat)). lia.
+   }
+   rewrite Z2Nat.inj_lt; try lia. rewrite Z2Nat.inj_lt in H0; try lia.
+   rewrite Z2Nat.inj_add in * by lia.
+   rewrite Z2Nat.inj_mul in * by lia.
+   rewrite <- Z.div2_div in H0.
+   rewrite Div2_Z_to_nat in H0.
+   rewrite Nat.div2_div in H0.
+   eapply nat_shiftl_p1.
+   chunk_red; simpl; rewrite <- Pos2Nat.inj_1;
+     apply nat_of_P_lt_Lt_compare_morphism; auto.
+   auto. auto.
  Qed.
 
 
@@ -4332,7 +4352,7 @@ Notation valPtr := (Tpointer vval
   Variable (isptrIdent: ident). (* ident for the isPtr external function *)
   Variable (caseIdent:ident).
   Variable (nParam:nat).
-  Variable (prims : LambdaANF_to_Clight.prim_env).
+  Variable (prims : LambdaANF.toplevel.prim_env).
 
   Definition protectedIdent_thm := protectedIdent argsIdent allocIdent limitIdent gcIdent mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent numArgsIdent isptrIdent caseIdent.
   Variable (disjointIdent: NoDup protectedIdent_thm).

@@ -3,8 +3,8 @@
     and pattern matching.
  *)
 
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.Strings.String
-        Coq.Lists.List Coq.micromega.Lia Coq.Program.Program Coq.micromega.Psatz.
+From Stdlib Require Import Arith.Arith NArith.BinNat Strings.String
+        Lists.List micromega.Lia Program.Program micromega.Psatz.
 Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
@@ -59,7 +59,7 @@ Section TermTranslation.
   Variable e : env.
 
   Variable prims : list (kername * string * bool * nat * positive).
-           
+
   Section fixes.
     Variable trans : N -> LambdaBoxMutt.Term -> exp.
     Definition trans_args (k : N) (t : LambdaBoxMutt.Terms) : exps :=
@@ -89,9 +89,9 @@ Section TermTranslation.
     | LambdaBoxMutt.TLetIn n t u => Let_e n (trans k t) (trans (1+k) u)
     | LambdaBoxMutt.TApp t u => App_e (trans k t) (trans k u)
     | LambdaBoxMutt.TConst s =>
-      match find_prim prims s with 
+      match find_prim prims s with
       | Some p => Prim_e p
-      | None => 
+      | None =>
         (* Transform to let-binding *)
         Var_e (cst_offset e s + k)
       end
@@ -114,9 +114,9 @@ Section TermTranslation.
 End TermTranslation.
 
 Section EnvTranslation.
-  
+
   Variable prims : list (kername * string * bool * nat * positive).
-  
+
   Definition translate_entry x acc :=
     match x with
     | (s, ecTrm t) =>

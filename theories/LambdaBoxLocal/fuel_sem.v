@@ -1,5 +1,5 @@
-Require Import Coq.Arith.Arith Coq.NArith.BinNat Coq.micromega.Lia Coq.Strings.String
-        Coq.Lists.List Structures.OrdersEx micromega.Lia.
+From Stdlib Require Import Arith.Arith NArith.BinNat micromega.Lia Strings.String
+        Lists.List Structures.OrdersEx micromega.Lia.
 Require Import Common.Common.
 Require Import LambdaBoxLocal.expression.
 Require Import LambdaANF.algebra LambdaANF.tactics.
@@ -8,7 +8,7 @@ Open Scope alg_scope.
 
 (* Environment semantics values *)
 Inductive value :=
-| Con_v : dcon -> list value -> value 
+| Con_v : dcon -> list value -> value
 (* | Prf_v : value *)
 | Clos_v : list value -> name -> expression.exp -> value
 | ClosFix_v : list value -> efnlst -> N -> value.
@@ -26,10 +26,10 @@ Proof.
     constructor. eapply IHv. eassumption.
   - eapply H2. induction l.
     constructor.
-    constructor. eapply IHv. eassumption. 
+    constructor. eapply IHv. eassumption.
   - eapply H3. induction l.
     constructor.
-    constructor. eapply IHv. eassumption. 
+    constructor. eapply IHv. eassumption.
 Qed.
 
 (* Definition of env *)
@@ -46,13 +46,13 @@ Fixpoint max_binders_branches (br : branches_e) : nat :=
   | brnil_e => 0
   | brcons_e _ (m, _) _ br =>
     max (N.to_nat m) (max_binders_branches br)
-  end.    
+  end.
 
-  
+
 Section LambdaBoxLocal_fuel.
-        
+
   Class LambdaBoxLocal_resource {A} :=
-  { HRes :: @resource exp A; }. 
+  { HRes :: @resource exp A; }.
 
 End LambdaBoxLocal_fuel.
 
@@ -85,14 +85,14 @@ Section Util.
       + inv Hall. simpl in Hnth. eapply IHefnl.
         eassumption. eassumption.
   Qed.
-  
+
   Lemma make_rec_env_rev_order_app fns vs :
     exists vs', make_rec_env_rev_order fns vs = vs' ++ vs /\
                 List.length vs' = efnlength fns /\
                 forall n, (n < efnlength fns)%nat ->
                           nth_error vs' n = Some (ClosFix_v vs fns (N.of_nat (efnlength fns - n - 1))).
   Proof.
-    unfold make_rec_env_rev_order. generalize (efnlength fns) as m. 
+    unfold make_rec_env_rev_order. generalize (efnlength fns) as m.
     induction m.
     - simpl. eexists []. split. reflexivity. split.
       compute. reflexivity.
@@ -106,8 +106,8 @@ Section Util.
         * simpl. rewrite Nat.sub_0_r. reflexivity.
         * simpl. eapply H1. lia.
   Qed.
-  
-End Util. 
+
+End Util.
 
 Fixpoint add_list {fuel : Type} {Hf : @LambdaBoxLocal_resource fuel} (l : list fuel) : fuel :=
   match l with
@@ -126,7 +126,7 @@ Section FUEL_SEM.
 
   Context {trace : Type} {Hf : @LambdaBoxLocal_resource nat} {Ht : @LambdaBoxLocal_resource trace}.
 
-  
+
   (** * {Nat,environment}-based semantics for LambdaBoxLocal *)
   Inductive eval_env_step: env -> exp -> result -> nat -> trace -> Prop :=
   | eval_Con_step:
@@ -157,7 +157,7 @@ Section FUEL_SEM.
         eval_env_fuel rho e2 OOT f2 t2 ->
         eval_env_step rho (App_e e1 e2) OOT (f1 <+> f2) (t1 <+> t2)
 
-                      
+
   | eval_Let_step:
       forall (e1 e2 : expression.exp) (v1 : value) (r : result) (rho: env) (na: name) f1 f2 t1 t2,
         eval_env_fuel rho e1 (Val v1) f1 t1 ->
@@ -167,8 +167,8 @@ Section FUEL_SEM.
       forall (e1 e2 : expression.exp) (rho: env) (na: name) f1 t1,
         eval_env_fuel rho e1 OOT f1 t1 ->
         eval_env_step rho (Let_e na e1 e2) OOT f1 t1
-                      
-  | eval_FixApp_step: 
+
+  | eval_FixApp_step:
       forall (e1 e2 e': expression.exp) (rho rho' rho'': env) (n: N) (na : name)
              (fnlst: efnlst) (v2 : value) r f1 f2 f3 t1 t2 t3,
         eval_env_fuel rho e1 (Val (ClosFix_v rho' fnlst n)) f1 t1 ->
@@ -177,7 +177,7 @@ Section FUEL_SEM.
         eval_env_fuel rho e2 (Val v2) f2 t2 ->
         eval_env_fuel (v2 :: rho'') e' r f3 t3 ->
         eval_env_step rho (App_e e1 e2) r (f1 <+> f2 <+> f3) (t1 <+> t2 <+> t3)
-                      
+
   | eval_Match_step:
       forall (e1 e': expression.exp) (rho: env) (dc: dcon) (vs: list value)
              (n: N) (brnchs: branches_e) (r: result) f1 f2 t1 t2,
@@ -199,9 +199,9 @@ Section FUEL_SEM.
         eval_env_fuel rho e (Val v) f t ->
         eval_fuel_many rho es vs fs ts ->
         eval_fuel_many rho (econs e es) (v :: vs) (f <+> fs) (t <+> ts)
-                      
+
   with eval_env_fuel: env -> exp -> result -> nat -> trace -> Prop :=
-  (* Values *) 
+  (* Values *)
   | eval_Var_fuel:
       forall (x: N) (rho: env) (v: value),
         nth_error rho (N.to_nat x) = Some v ->
@@ -223,19 +223,19 @@ Section FUEL_SEM.
         eval_env_step rho e r f t ->
         eval_env_fuel rho e r (f <+> (one_i e)) (t <+> (one_i e)).
 
-  Set Printing All. 
+  Set Printing All.
 
   Scheme eval_env_step_ind' := Minimality for eval_env_step Sort Prop
     with eval_fuel_many_ind' :=  Minimality for eval_fuel_many Sort Prop
     with eval_env_fuel_ind' := Minimality for eval_env_fuel Sort Prop.
 
 
-  Section WF. 
-  
+  Section WF.
+
     Definition well_formed_in_env (e : exp) (rho : list value) :=
       exp_wf (N.of_nat (length rho)) e.
 
-    
+
     Inductive well_formed_val : value -> Prop :=
     | Wf_Con :
         forall dc vs,
@@ -243,7 +243,7 @@ Section FUEL_SEM.
           well_formed_val (Con_v dc vs)
     | Wf_Clos :
         forall vs n e,
-          Forall well_formed_val vs -> 
+          Forall well_formed_val vs ->
           (forall x, well_formed_in_env e (x :: vs)) ->
           well_formed_val (Clos_v vs n e)
     | Wf_ClosFix :
@@ -256,11 +256,11 @@ Section FUEL_SEM.
                     exp_wf (efnlst_length efns + (N.of_nat (length vs))) e) (efnlst_as_list efns) ->
           well_formed_val (ClosFix_v vs efns n).
 
-    
+
 
     Definition well_formed_exps_in_env (es : exps) (rho : list value) :=
       exps_wf (N.of_nat (length rho)) es.
-    
+
     Definition well_formed_env (rho : list value) : Prop :=
       Forall well_formed_val rho.
 
@@ -278,7 +278,7 @@ Section FUEL_SEM.
       rewrite length_rev. eapply find_branch_preserves_wf; eassumption.
     Qed.
 
-    Lemma well_formed_envmake_rec_env_rev_order fnlst rho rho' : 
+    Lemma well_formed_envmake_rec_env_rev_order fnlst rho rho' :
       make_rec_env_rev_order fnlst rho = rho' ->
       well_formed_env rho ->
       Forall
@@ -291,11 +291,11 @@ Section FUEL_SEM.
     Proof.
       unfold make_rec_env_rev_order.
       assert (Hlen : N.of_nat (efnlength fnlst) <= efnlst_length fnlst).
-      { rewrite efnlength_efnlst_length. lia. } 
+      { rewrite efnlength_efnlst_length. lia. }
       revert Hlen. generalize fnlst at 2 3 5 6. revert rho rho'.
       induction fnlst; intros rho rho' fnlst' Hlen Heq Henv Hall; eauto.
       - simpl in *. subst; eauto.
-      - simpl in *. subst. 
+      - simpl in *. subst.
         constructor; eauto.
         constructor; eauto.
 
@@ -303,7 +303,7 @@ Section FUEL_SEM.
 
         eapply IHfnlst; eauto. lia.
     Qed.
-           
+
 
     Lemma efnlst_wf_isLambda :
       forall n es e,
@@ -318,7 +318,7 @@ Section FUEL_SEM.
         eapply IHes; try eassumption.
     Qed.
 
-    
+
     Lemma eval_env_step_preserves_wf :
       forall vs e r f t,
         eval_env_fuel vs e r f t ->
@@ -327,29 +327,29 @@ Section FUEL_SEM.
                   well_formed_in_env e vs ->
                   well_formed_val v.
     Proof.
-      pose (P := fun (vs : env) (e : exp) (r : result) (f : nat) (t : trace) => 
+      pose (P := fun (vs : env) (e : exp) (r : result) (f : nat) (t : trace) =>
                    forall v,
                      r = Val v ->
                      well_formed_env vs ->
                      well_formed_in_env e vs ->
                      well_formed_val v).
 
-      pose (P1 := fun (vs : env) (es : exps) (vs' : list value) (f : nat) (t : trace) => 
+      pose (P1 := fun (vs : env) (es : exps) (vs' : list value) (f : nat) (t : trace) =>
                     well_formed_env vs ->
                     well_formed_exps_in_env es vs ->
                     Forall well_formed_val vs').
 
-      pose (P2 := fun (vs : env) (e : exp) (r : result) (f : nat) (t : trace) => 
+      pose (P2 := fun (vs : env) (e : exp) (r : result) (f : nat) (t : trace) =>
                     forall v,
                       r = Val v ->
                       well_formed_env vs ->
                       well_formed_in_env e vs ->
                       well_formed_val v).
 
-      intros vs e r f t Heval. 
+      intros vs e r f t Heval.
       eapply eval_env_fuel_ind' with (P := P) (P0 := P1) (P1 := P2);
       unfold P, P1, P2; intros; try congruence.
-      
+
       - inv H1. constructor. inv H3. eapply H0; eauto.
 
       - subst. inv H7.
@@ -366,10 +366,10 @@ Section FUEL_SEM.
 
       - subst. inv H9.
         specialize (H0 _ ltac:(reflexivity) H8 H11). inv H0.
-        
+
         eapply H6; eauto. constructor; eauto.
         now eapply well_formed_envmake_rec_env_rev_order; eauto.
-        
+
         eapply enthopt_inlist_Forall in H14; eauto.
         inv H14. inv H2.
 
@@ -379,9 +379,9 @@ Section FUEL_SEM.
 
         edestruct make_rec_env_rev_order_app. destructAll. rewrite H2.
         rewrite length_app. rewrite Nnat.Nat2N.inj_add.
-        rewrite H7. rewrite efnlength_efnlst_length. eassumption. 
+        rewrite H7. rewrite efnlength_efnlst_length. eassumption.
 
-      - subst. 
+      - subst.
         inv H6. specialize (H0 _ ltac:(reflexivity) H5 H9). inv H0.
         eapply H3; eauto.
         eapply Forall_app. split; eauto.
@@ -406,8 +406,8 @@ Section FUEL_SEM.
       - inv H. inv H1.
         constructor; eauto.
 
-        eapply Forall_forall. intros. destruct x. 
-        eapply efnlst_wf_isLambda in H. 
+        eapply Forall_forall. intros. destruct x.
+        eapply efnlst_wf_isLambda in H.
         eassumption. eassumption.
 
       - subst; eauto.
@@ -415,7 +415,7 @@ Section FUEL_SEM.
       - eassumption.
 
         Unshelve. eassumption.
-    Qed. 
+    Qed.
 
 
   End WF.
@@ -428,40 +428,40 @@ Section FUEL_SEM.
     simpl. rewrite IHe1. reflexivity.
   Qed.
 
-  (* 
+  (*
   Lemma fuel_sem_OOT vs e r f f' :
     eval_env_fuel vs e r f ->
-    lt f' f -> 
+    lt f' f ->
     eval_env_fuel vs e OOT f'.
-  Proof.   
-    pose (P := fun (vs : env) (e : exp) (r : result) (f : nat) => 
+  Proof.
+    pose (P := fun (vs : env) (e : exp) (r : result) (f : nat) =>
                  forall f',
-                   lt f' f -> 
+                   lt f' f ->
                    eval_env_step vs e OOT f').
-    
-    pose (P1 := fun (vs : env) (e : exp) (r : result) (f : nat) => 
+
+    pose (P1 := fun (vs : env) (e : exp) (r : result) (f : nat) =>
                   forall f',
-                    lt f' f -> 
+                    lt f' f ->
                     eval_env_fuel vs e OOT f').
-    
+
     pose (P2 := fun (vs : env) (es : exps) (vs' : list value) (f : nat) =>
                   forall f',
-                    lt f' f -> 
+                    lt f' f ->
                     exists es1 e es2 vs1 fs f'',
                       exps_to_list es = exps_to_list es1 ++ e :: exps_to_list es2 /\
                       f' = (fs <+> f'') /\
                       eval_fuel_many vs es1 vs1 fs /\ eval_env_fuel vs e OOT f'').
-    
+
     intros Heval. revert f'.
     eapply eval_env_fuel_ind' with (P := P) (P0 := P2) (P1 := P1);
       unfold P, P1, P2; intros; try congruence.
 
-    - edestruct H0. eassumption. destructAll. 
+    - edestruct H0. eassumption. destructAll.
       econstructor; eassumption.
 
     - edestruct (lt_all_dec f' fs).
-      + edestruct H1. eassumption. destructAll. 
-        rewrite H6, <- app_assoc in H. simpl in H. 
+      + edestruct H1. eassumption. destructAll.
+        rewrite H6, <- app_assoc in H. simpl in H.
         econstructor.
         rewrite H. f_equal. f_equal.
         replace (e0 :: exps_to_list es2) with (exps_to_list (econs e0 es2)) by reflexivity.
@@ -471,7 +471,7 @@ Section FUEL_SEM.
 
       + destructAll. rewrite (plus_comm fs) in H4.
         eapply plus_stable in H4. rewrite plus_comm.
-        econstructor. eassumption. eassumption. 
+        econstructor. eassumption. eassumption.
         eapply H3; eauto.
 
     - edestruct (lt_all_dec f' f1).
@@ -491,7 +491,7 @@ Section FUEL_SEM.
           rewrite !(plus_comm f2) in H5.
           eapply plus_stable in H5.
 
-          rewrite plus_assoc. 
+          rewrite plus_assoc.
           rewrite (plus_comm f2 f1), (plus_comm x0).
 
           eapply eval_App_step; eauto.
@@ -504,7 +504,7 @@ Section FUEL_SEM.
 
       + destructAll. rewrite (plus_comm f1) in H3.
         eapply plus_stable in H3.
-        rewrite plus_comm. 
+        rewrite plus_comm.
         eapply eval_App_step_OOT2; eauto.
 
     - edestruct (lt_all_dec f' f1).
@@ -513,7 +513,7 @@ Section FUEL_SEM.
 
       + destructAll. rewrite (plus_comm f1) in H3.
         eapply plus_stable in H3.
-        rewrite plus_comm. 
+        rewrite plus_comm.
         eapply eval_Let_step; eauto.
 
     - eapply eval_Let_step_OOT; eauto.
@@ -534,8 +534,8 @@ Section FUEL_SEM.
         * destructAll.
           rewrite !(plus_comm f2) in H7.
           eapply plus_stable in H7.
-          
-          rewrite plus_assoc. 
+
+          rewrite plus_assoc.
           rewrite (plus_comm f2 f1), (plus_comm x0).
 
           eapply eval_FixApp_step; eauto.
@@ -544,7 +544,7 @@ Section FUEL_SEM.
 
       + eapply eval_Match_step_OOT; eauto.
 
-      + destructAll. 
+      + destructAll.
         rewrite !(plus_comm f1) in H4.
         eapply plus_stable in H4.
         rewrite plus_comm. eapply eval_Match_step; eauto.
@@ -570,7 +570,7 @@ Section FUEL_SEM.
 
         simpl. rewrite H4. reflexivity. split.
 
-        
+
         rewrite (plus_comm _ f0), plus_assoc. reflexivity.
         split. econstructor; eauto.  eassumption.
 
@@ -592,18 +592,17 @@ Section FUEL_SEM.
         eapply eval_step. eauto.
 
     - eassumption.
-  Qed. 
+  Qed.
 
-      
-      
+
+
   Lemma fuel_sem_monotonic vs e f f' :
     eval_env_fuel vs e OOT f ->
-    lt f' f -> 
+    lt f' f ->
     eval_env_fuel vs e OOT f'.
   Proof.
     eapply fuel_sem_OOT.
-  Qed.      
-*)     
-  
-End FUEL_SEM.
+  Qed.
+*)
 
+End FUEL_SEM.

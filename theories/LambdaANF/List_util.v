@@ -3,12 +3,12 @@
  *)
 
 
-From Coq Require Import Lists.List Relations.Relations Classes.RelationClasses
-         micromega.Lia Numbers.BinNums Structures.OrdersEx Sets.Ensembles
-         Lists.SetoidList ZArith Arith Sorting.Permutation SetoidPermutation
-         FunInd.
+From Stdlib Require Import Lists.List Relations.Relations Classes.RelationClasses
+  micromega.Lia Numbers.BinNums Structures.OrdersEx Sets.Ensembles
+  SetoidList ZArith Arith Sorting.Permutation SetoidPermutation
+  FunInd.
 
-From CertiCoq Require Import LambdaANF.Ensembles_util LambdaANF.tactics. 
+From CertiCoq Require Import LambdaANF.Ensembles_util LambdaANF.tactics.
 
 Import ListNotations.
 
@@ -21,7 +21,7 @@ Ltac inv H := inversion H; clear H; subst.
   | 0 => nil
   | S m'  => n::(fromN (BinNat.N.succ n)  m')
   end.
- 
+
 (** Definition of [nthN]. Same as [nth_error] but the argument is
   * of type [N] instead of [nat] *)
 Function nthN {A: Type} (al: list A) (n: N) : option A :=
@@ -33,7 +33,7 @@ Function nthN {A: Type} (al: list A) (n: N) : option A :=
 
 (** map a function to a list of option type *)
 Fixpoint mapopt {A} (al: list (option A)) : option (list A) :=
-  match al with 
+  match al with
     | Some a :: al' => match mapopt al' with
                          | Some bl' => Some (a::bl')
                          | None => None
@@ -42,7 +42,7 @@ Fixpoint mapopt {A} (al: list (option A)) : option (list A) :=
     | nil => Some nil
   end.
 
-(** Asymmetric version of Forall2 *) 
+(** Asymmetric version of Forall2 *)
 Inductive Forall2_asym {A} (R : relation A) : list A -> list A -> Prop :=
 | Forall2_asym_nil : forall l, Forall2_asym R [] l
 | Forall2_asym_cons :
@@ -59,13 +59,13 @@ Inductive Sublist {A : Type} : list A -> list A -> Prop :=
       forall l1 x l2, Sublist l1 l2 -> Sublist (x :: l1) (x :: l2).
 
 Definition Subperm {A : Type} (l1 l2 : list A) :=
-  exists l2', Sublist l1 l2' /\ Permutation l2' l2. 
+  exists l2', Sublist l1 l2' /\ Permutation l2' l2.
 
 #[global] Hint Constructors Forall2_asym : core.
 
 (** Lemmas about [Forall2] and [Forall2_asym] *)
 Lemma Forall2_length {A B} (R : A -> B -> Prop) l1 l2 :
-  Forall2 R l1 l2 -> length l1 = length l2. 
+  Forall2 R l1 l2 -> length l1 = length l2.
 Proof.
   revert l2. induction l1 as [| x xs IHxs ]; intros l2 H.
   - inv H; eauto.
@@ -74,7 +74,7 @@ Qed.
 
 
 Lemma Forall2_asym_length {A} (R : A -> A -> Prop) (l1 l2 : list A) :
-  Forall2_asym R l1 l2 -> length l1 <= length l2. 
+  Forall2_asym R l1 l2 -> length l1 <= length l2.
 Proof.
   revert l2. induction l1 as [| x xs IHxs ]; intros l2 H.
   - inv H; simpl. lia.
@@ -88,7 +88,7 @@ Lemma Forall2_monotonic {A B} (R R' : A -> B -> Prop) (l1 : list A) (l2 : list B
 Proof.
   intros H. revert l2.
   induction l1 as [| x xs IHxs ]; intros l2 Hall.
-  - inv Hall; eauto. 
+  - inv Hall; eauto.
   - destruct l2; inv Hall. constructor; eauto.
 Qed.
 
@@ -98,7 +98,7 @@ Lemma Forall2_monotonic_strong (A B : Type) (R R' : A -> B -> Prop) (l1 : list A
 Proof.
   revert l2.
   induction l1 as [| x xs IHxs ]; intros l2 H Hall.
-  - inv Hall; eauto. 
+  - inv Hall; eauto.
   - destruct l2; inv Hall. constructor; eauto.
     eapply H; eauto. now constructor. now constructor.
     eapply IHxs; eauto. intros. eapply H.
@@ -113,7 +113,7 @@ Lemma Forall2_asym_monotonic {A} (R R' : A -> A -> Prop) (l1 l2 : list A) :
 Proof.
   intros H. revert l2.
   induction l1 as [| x xs IHxs ]; intros l2 Hall.
-  - inv Hall; eauto. 
+  - inv Hall; eauto.
   - destruct l2; inv Hall. constructor; eauto.
 Qed.
 
@@ -131,13 +131,13 @@ Proof.
   intros H. induction l as [| x l IHl]; eauto.
 Qed.
 
-Lemma Forall2_symm (A : Type) (R : A -> A -> Prop) (l1 l2 : list A) : 
+Lemma Forall2_symm (A : Type) (R : A -> A -> Prop) (l1 l2 : list A) :
   Symmetric R -> Forall2 R l1 l2 -> Forall2 R l2 l1.
 Proof.
   intros H Hall; induction Hall; eauto.
 Qed.
 
-Lemma Forall2_symm_strong (A : Type) (R1 R2 : A -> A -> Prop) (l1 l2 : list A) : 
+Lemma Forall2_symm_strong (A : Type) (R1 R2 : A -> A -> Prop) (l1 l2 : list A) :
   (forall x1 x2, List.In x1 l1 -> List.In x2 l2 ->  R1 x1 x2 -> R2 x2 x1) ->
   Forall2 R1 l1 l2 -> Forall2 R2 l2 l1.
 Proof.
@@ -164,7 +164,7 @@ Proof.
   intros H. induction l; eauto.
   inv H. constructor; eauto.
 Qed.
-  
+
 Lemma Forall2_trans {A} (R : A -> A -> Prop) (l1 l2 l3 : list A) :
   Transitive R ->
   Forall2 R l1 l2 ->
@@ -175,7 +175,7 @@ Proof.
   revert l2 l3. induction l1 as [| x l IHl ]; intros l2 l3 H1 H2.
   - inv H1. inv H2. constructor.
   - inv H1. inv H2. constructor; eauto.
-Qed.      
+Qed.
 
 Lemma Forall2_asym_trans {A} (R : A -> A -> Prop) (l1 l2 l3 : list A) :
   Transitive R ->
@@ -187,11 +187,11 @@ Proof.
   revert l2 l3. induction l1 as [| x l IHl ]; intros l2 l3 H1 H2.
   - inv H1. inv H2; eauto.
   - inv H1. inv H2; eauto.
-Qed.      
+Qed.
 
 Lemma Forall2_trivial {A} (R : A -> A -> Prop) (l1 l2 : list A) :
   (forall x y, R x y) ->
-  (length l1 = length l2) -> 
+  (length l1 = length l2) ->
   Forall2 R l1 l2.
 Proof.
   intros H.
@@ -201,7 +201,7 @@ Qed.
 
 Lemma Forall2_asym_trivial {A} (R : A -> A -> Prop) (l1 l2 : list A) :
   (forall x y, R x y) ->
-  (length l1 <= length l2) -> 
+  (length l1 <= length l2) ->
   Forall2_asym R l1 l2.
 Proof.
   intros H.
@@ -244,7 +244,7 @@ Proof.
       apply (IHx _ _ H6) in H8. assumption.
 Qed.
 
-Lemma Forall2_trans_strong (A : Type) (R1 R2 R3 : A -> A -> Prop) (l1 l2 l3 : list A) : 
+Lemma Forall2_trans_strong (A : Type) (R1 R2 R3 : A -> A -> Prop) (l1 l2 l3 : list A) :
   (forall l1 l2 l3, R1 l1 l2 -> R2 l2 l3 -> R3 l1 l3) ->
   Forall2 R1 l1 l2 -> Forall2 R2 l2 l3 -> Forall2 R3 l1 l3.
 Proof.
@@ -288,7 +288,7 @@ Proof.
   - constructor; eassumption.
 Qed.
 
-Lemma Forall2_nthN' (A B : Type) (R : A -> B -> Prop) (l1 : list A) 
+Lemma Forall2_nthN' (A B : Type) (R : A -> B -> Prop) (l1 : list A)
       (l2 : list B) (n : N) (v1 : A) (v2 : B):
   Forall2 R l1 l2 ->
   nthN l1 n = Some v1 ->
@@ -300,7 +300,7 @@ Proof.
   - destruct n.
     + inv Hnth1. inv Hnth2. eassumption.
     + eapply IHHall; eauto.
-Qed. 
+Qed.
 
 Lemma Forall2_vertical_l {A B} (R1 R1' : A -> B -> Prop) (R2 : A -> A -> Prop) l1 l2 l3 :
   (forall x y z, R1 x y -> R2 x z -> R1' z y) ->
@@ -310,7 +310,7 @@ Lemma Forall2_vertical_l {A B} (R1 R1' : A -> B -> Prop) (R2 : A -> A -> Prop) l
 Proof.
   intros Hr Hall1. revert l3. induction Hall1; intros l3 Hall2.
   - inv Hall2. constructor.
-  - inv Hall2. constructor; eauto. 
+  - inv Hall2. constructor; eauto.
 Qed.
 
 
@@ -322,7 +322,7 @@ Lemma Forall2_vertical_r {A B} (R1 R1' : A -> B -> Prop) (R2 : B -> B -> Prop) l
 Proof.
   intros Hr Hall1. revert l3. induction Hall1; intros l3 Hall2.
   - inv Hall2. constructor.
-  - inv Hall2. constructor; eauto. 
+  - inv Hall2. constructor; eauto.
 Qed.
 
 Lemma Forall2_vertical_l_strong {A B} (R1 R1' : A -> B -> Prop) (R2 : A -> A -> Prop) l1 l2 l3 :
@@ -334,7 +334,7 @@ Proof.
   intros Hr Hall1. revert l3 Hr. induction Hall1; intros l3 Hr Hall2.
   - inv Hall2. constructor.
   - inv Hall2. constructor.
-    eapply Hr; try eassumption; try now constructor. 
+    eapply Hr; try eassumption; try now constructor.
     eapply IHHall1; eauto.
     intros x' y' z' Hin1 Hin2 Hin3 Hr1 Hr2.
     eapply Hr; eauto; try now constructor 2.
@@ -350,7 +350,7 @@ Proof.
   intros Hr Hall1. revert l3 Hr. induction Hall1; intros l3 Hr Hall2.
   - inv Hall2. constructor.
   - inv Hall2. constructor.
-    eapply Hr; try eassumption; try now constructor. 
+    eapply Hr; try eassumption; try now constructor.
     eapply IHHall1; eauto.
     intros x' y' z' Hin1 Hin2 Hin3 Hr1 Hr2.
     eapply Hr; eauto; try now constructor 2.
@@ -367,7 +367,7 @@ Lemma Forall2_vertical_strong
   Forall2 R4 l3 l4.
 Proof.
   intros Hyp Hr1.
-  revert l3 l4 Hyp. induction Hr1; intros l3 l4 Hyp Hr2 Hr3; inv Hr2; inv Hr3. 
+  revert l3 l4 Hyp. induction Hr1; intros l3 l4 Hyp Hr2 Hr3; inv Hr2; inv Hr3.
   - now constructor.
   - constructor; eauto. eapply Hyp; try eassumption; now constructor.
     eapply IHHr1; try eassumption.
@@ -447,9 +447,9 @@ Proof.
   - inv Hin.
     + exists 0%N. eauto.
     + destruct IHl as [n Hnth].
-      eassumption. 
-      exists (n+1)%N. simpl. destruct (n + 1)%N eqn:Heq; eauto. 
-      zify. lia. 
+      eassumption.
+      exists (n+1)%N. simpl. destruct (n + 1)%N eqn:Heq; eauto.
+      zify. lia.
       rewrite <- Heq. rewrite N_as_OT.add_sub.
       eassumption.
 Qed.
@@ -457,18 +457,18 @@ Qed.
 Lemma nthN_In {A} (l : list A) n v :
   nthN l n = Some v ->
   List.In v l.
-Proof. 
+Proof.
   revert n v. induction l; intros n v Hnth.
   - inv Hnth.
   - destruct n. inv Hnth.
     now constructor.
-    constructor 2. eapply IHl. eauto. 
+    constructor 2. eapply IHl. eauto.
 Qed.
 
 Lemma nthN_app {A} (l1 l2 : list A) N :
   (nthN (l1 ++ l2) N = nthN l1 N) \/
   (nthN (l1 ++ l2) N = nthN l2 (N - N.of_nat (length l1))%N /\ (N.of_nat (length l1) <= N)%N).
-Proof. 
+Proof.
   revert N; induction l1; intros N.
   - right. rewrite app_nil_l, N.sub_0_r. split; eauto. simpl. zify; lia.
   - destruct N; [now eauto |].
@@ -477,10 +477,10 @@ Proof.
     replace (N.of_nat (length (a :: l1))) with (1 + N.of_nat (length l1))%N.
     replace (N.pos p - (1 + N.of_nat (length l1)))%N with
     (N.pos p - 1 - N.of_nat (length l1))%N.
-    right. split. now eauto. zify. lia. 
-    zify; lia. 
+    right. split. now eauto. zify. lia.
+    zify; lia.
     simpl (length _). rewrite Nnat.Nat2N.inj_succ.
-    zify. lia. 
+    zify. lia.
 Qed.
 
 Lemma nthN_app_geq {A} (l1 l2 : list A) N :
@@ -489,13 +489,13 @@ Lemma nthN_app_geq {A} (l1 l2 : list A) N :
 Proof.
   revert N. induction l1; intros N Heq.
   - simpl. rewrite N.sub_0_r. reflexivity.
-  - simpl length in *. 
-    destruct N. 
+  - simpl length in *.
+    destruct N.
     zify. lia.
     rewrite Nnat.Nat2N.inj_succ.
-    rewrite <- N.add_1_l, N_as_DT.sub_add_distr. 
+    rewrite <- N.add_1_l, N_as_DT.sub_add_distr.
     rewrite <- IHl1.
-    reflexivity. zify. lia. 
+    reflexivity. zify. lia.
 Qed.
 
 Lemma nthN_is_Some_app {A} (l1 l2 : list A) N x :
@@ -529,14 +529,14 @@ Qed.
 Lemma nthN_is_Some_length {A} (l : list A) N x :
   nthN l N = Some x ->
   (N < N.of_nat (length l))%N.
-Proof. 
+Proof.
   revert N. induction l; intros N Heq.
-  - inv Heq. 
+  - inv Heq.
   - destruct N. inv Heq.
-    unfold length. rewrite Nnat.Nat2N.inj_succ. zify. lia. 
+    unfold length. rewrite Nnat.Nat2N.inj_succ. zify. lia.
     assert (Hlt : ((N.pos p)-1 < N.of_nat (length l))%N) by eauto.
     simpl (length _). rewrite Nnat.Nat2N.inj_succ.
-    zify. lia. 
+    zify. lia.
 Qed.
 
 Lemma Forall2_nthN {A B} (R : A -> B -> Prop) l1 l2
@@ -586,7 +586,7 @@ Proof.
   revert z. induction l; intros z.
   - simpl. zify; lia.
   - simpl. eapply Pos.le_trans; [| now eapply IHl ].
-    zify; lia. 
+    zify; lia.
 Qed.
 
 Lemma max_list_spec2 l z x :
@@ -594,7 +594,7 @@ Lemma max_list_spec2 l z x :
 Proof.
   revert z. induction l; intros z Hin.
   - inv Hin.
-  - inv Hin; simpl. 
+  - inv Hin; simpl.
     + eapply Pos.le_trans; [| now eapply max_list_spec1 ].
       zify; lia.
     + now apply IHl.
@@ -616,7 +616,7 @@ Proof.
   - simpl. reflexivity.
   - simpl. rewrite (Pos.max_comm y z), Pos.max_assoc, Pos.max_comm.
     rewrite IHl. reflexivity.
-Qed. 
+Qed.
 
 Lemma max_list_in_list v l :
   List_util.max_list l v \in v |: FromList l.
@@ -679,9 +679,9 @@ Lemma Same_set_FromList_length' (A : Type) (l1 l2 : list A):
   NoDup l1 -> NoDup l2 -> FromList l1 <--> FromList l2 -> length l1 = length l2.
 Proof.
   intros Hnd Hnd2 Heq. eapply Nat.le_antisymm.
-  eapply Same_set_FromList_length; eauto. eapply Heq. 
   eapply Same_set_FromList_length; eauto. eapply Heq.
-Qed. 
+  eapply Same_set_FromList_length; eauto. eapply Heq.
+Qed.
 
 
 (** Lemmas about [fold_left] *)
@@ -713,8 +713,8 @@ Proof.
 Qed.
 
 Lemma fold_left_acc_plus {A} (f : nat -> A -> nat) l acc v
-      (Hyp : forall v1 v2 v3, f (v1 + v2) v3 = f v1 v3 + v2) : 
-  fold_left f l (acc + v) = fold_left f l acc + v. 
+      (Hyp : forall v1 v2 v3, f (v1 + v2) v3 = f v1 v3 + v2) :
+  fold_left f l (acc + v) = fold_left f l acc + v.
 Proof.
   revert acc v. induction l; intros acc v; simpl; eauto.
   rewrite <- IHl. rewrite Hyp. reflexivity.
@@ -728,9 +728,9 @@ Definition max_list_nat_with_measure {A} (f : A -> nat) i (ls : list A) : nat :=
 
 Lemma max_list_nat_spec1 {A} (f : A -> nat) l z :
   z <= max_list_nat_with_measure f z l.
-Proof. 
-  eapply fold_left_extensive. 
-  intros. eapply Nat.le_max_l. 
+Proof.
+  eapply fold_left_extensive.
+  intros. eapply Nat.le_max_l.
 Qed.
 
 Lemma max_list_nat_spec2 {A} (f : A -> nat) l z x :
@@ -738,7 +738,7 @@ Lemma max_list_nat_spec2 {A} (f : A -> nat) l z x :
 Proof.
   revert z. induction l; intros z Hin.
   - inv Hin.
-  - inv Hin; simpl. 
+  - inv Hin; simpl.
     + eapply Nat.le_trans; [| now eapply max_list_nat_spec1 ].
       eapply Nat.le_max_r.
     + now apply IHl.
@@ -776,13 +776,13 @@ Qed.
 
 Lemma fold_left_distr { A : Type} (l : list A) (acc : A)
       (f : A -> A -> A) (g : A -> A) :
-  (forall x y, g (f x y) = f (g x) (g y)) -> 
-  g (fold_left f l acc) = fold_left (fun acc x => f acc (g x)) l (g acc).  
+  (forall x y, g (f x y) = f (g x) (g y)) ->
+  g (fold_left f l acc) = fold_left (fun acc x => f acc (g x)) l (g acc).
 Proof.
   intros Hyp. revert acc. induction l; intros acc; simpl.
-  - reflexivity. 
+  - reflexivity.
   - rewrite IHl. rewrite Hyp. reflexivity.
-Qed.   
+Qed.
 
 Lemma fold_left_mult { A : Type} (l : list A) (acc1 acc2 : nat) f h :
   fold_left (fun acc x => acc + (f x)*(h x)) l (acc1 * acc2) <=
@@ -804,10 +804,10 @@ Qed.
 
 (** Lemmas about [Permutation] *)
 
-Definition fold_permutation (A B : Type) (l1 l2 : list A) (f : B -> A -> B) acc : 
+Definition fold_permutation (A B : Type) (l1 l2 : list A) (f : B -> A -> B) acc :
   (forall x y z, f (f z y) x = f (f z x) y) ->
   Permutation l1 l2 ->
-  fold_left f l1 acc = fold_left f l2 acc. 
+  fold_left f l1 acc = fold_left f l2 acc.
 Proof.
   intros Hassoc Hp. revert acc. induction Hp; intros acc.
   - reflexivity.
@@ -819,9 +819,9 @@ Qed.
 Definition fold_permutationA (A B : Type) (R : relation A)
            (l1 l2 : list A) (f : B -> A -> B) acc :
   (forall x y z, f (f z y) x = f (f z x) y) ->
-  (forall x y1 y2, R y1 y2 -> f x y1 = f x y2) -> 
+  (forall x y1 y2, R y1 y2 -> f x y1 = f x y2) ->
   PermutationA R l1 l2 ->
-  fold_left f l1 acc = fold_left f l2 acc. 
+  fold_left f l1 acc = fold_left f l2 acc.
 Proof.
   intros Hassoc Hr Hp. revert acc. induction Hp; intros acc.
   - reflexivity.
@@ -840,7 +840,7 @@ Proof.
   - eapply permA_skip. reflexivity. easy.
   - eapply permA_swap.
   - eapply permA_trans. eassumption. eassumption.
-Qed. 
+Qed.
 
 Lemma PermutationA_respects_Permutation_l A (l1 l1' l2 : list A) R {_ : PreOrder R } :
   PermutationA R l1 l2 ->
@@ -851,8 +851,8 @@ Proof.
   destruct H. eapply permA_trans.
 
   eapply PermutationA_Permutation_refl. eauto with typeclass_instances.
-  symmetry. eassumption. 
-  eassumption.    
+  symmetry. eassumption.
+  eassumption.
 Qed.
 
 Lemma PermutationA_respects_Permutation_r A (l1 l2 l2' : list A) R {_ : PreOrder R } :
@@ -862,15 +862,15 @@ Lemma PermutationA_respects_Permutation_r A (l1 l2 l2' : list A) R {_ : PreOrder
 Proof.
   intros Hpa Hp.
   destruct H. eapply permA_trans.
-  eassumption. 
+  eassumption.
   eapply PermutationA_Permutation_refl. eauto with typeclass_instances.
-  eassumption. 
-Qed. 
+  eassumption.
+Qed.
 
 #[global] Instance PermutationA_symm A (eqA : relation A) { _ : Symmetric eqA}
   : Symmetric (PermutationA eqA).
 Proof.
-  intros x1 x2 Hperm. induction Hperm. 
+  intros x1 x2 Hperm. induction Hperm.
   - constructor.
   - eapply permA_skip; eauto.
   - eapply permA_swap.
@@ -900,7 +900,7 @@ Lemma Sublist_cons_r (A : Type) (l1 l2 : list A) (a : A) :
   ~ In a l1 ->
   Sublist l1 l2.
 Proof.
-  intros Hs Hin. inv Hs. 
+  intros Hs Hin. inv Hs.
   eassumption. now firstorder.
 Qed.
 
@@ -921,25 +921,25 @@ Qed.
 
 
 Lemma fold_left_sublist (A B : Type) (l1 l2 : list A) (f : B -> A -> B)
-      (pleq : B -> B -> Prop) acc : 
+      (pleq : B -> B -> Prop) acc :
   Reflexive pleq ->
   (forall x1 x2 y, pleq x1 x2 -> pleq x1 (f x2 y)) ->
   (forall x1 x2 y, pleq x1 x2 -> pleq (f x1 y) (f x2 y)) ->
   Sublist l1 l2 ->
-  pleq (fold_left f l1 acc) (fold_left f l2 acc). 
+  pleq (fold_left f l1 acc) (fold_left f l2 acc).
 Proof.
   intros Hrefl Hincr Hmon Hsub.
   assert (Hleq : pleq acc acc).
   { eapply Hrefl. }
   revert Hleq. generalize acc at 1 3 as acc1.
-  generalize acc as acc2. 
+  generalize acc as acc2.
   induction Hsub; intros acc1 acc2 Hleq.
   - eassumption.
   - simpl. eapply IHHsub. eapply Hincr. eassumption.
   - simpl. eapply IHHsub. eapply Hmon. eassumption.
 Qed.
 
-Lemma Sublist_length {A : Type} (l1 l2 : list A) : 
+Lemma Sublist_length {A : Type} (l1 l2 : list A) :
   Sublist l1 l2 ->
   length l1 <= length l2.
 Proof.
@@ -965,7 +965,7 @@ Proof.
   eapply incl_tran.
   eapply Sublist_incl. eassumption.
   intros y Hin. eapply Permutation_in; eauto.
-Qed.  
+Qed.
 
 
 Lemma incl_Subperm {A : Type} (l1 l2 : list A) :
@@ -980,8 +980,8 @@ Proof.
     assert (Hin : incl l1 l2) by firstorder.
     assert (Hs := in_split _ _ Ha).
     destruct Hs as [l2' [l2'' Heq]].
-    subst. eapply incl_app_cons in Hin; [| eassumption ]. 
-    eapply IHl1 in Hin; [| eassumption ]. 
+    subst. eapply incl_app_cons in Hin; [| eassumption ].
+    eapply IHl1 in Hin; [| eassumption ].
     destruct Hin as [l3 [Hsub Hperm]].
     eexists (a :: l3).
     split.
@@ -992,13 +992,13 @@ Proof.
 Qed.
 
 Lemma fold_left_subperm (A B : Type) (l1 l2 : list A) (f : B -> A -> B)
-      (pleq : B -> B -> Prop) acc : 
+      (pleq : B -> B -> Prop) acc :
   preorder B pleq ->
   (forall x1 x2 y, pleq x1 x2 -> pleq x1 (f x2 y)) ->
   (forall x1 x2 y, pleq x1 x2 -> pleq (f x1 y) (f x2 y)) ->
   (forall (x y : A) (z : B), f (f z y) x = f (f z x) y) ->
   Subperm l1 l2 ->
-  pleq (fold_left f l1 acc) (fold_left f l2 acc). 
+  pleq (fold_left f l1 acc) (fold_left f l2 acc).
 Proof.
   intros [Hrefl Htra] Hincr Hmon Hassoc [l3 [Hsub Hperm]].
   eapply Htra.
@@ -1006,7 +1006,7 @@ Proof.
   erewrite fold_permutation; eauto.
 Qed.
 
-Lemma Subperm_length {A : Type} (l1 l2 : list A) : 
+Lemma Subperm_length {A : Type} (l1 l2 : list A) :
   Subperm l1 l2 ->
   length l1 <= length l2.
 Proof.
@@ -1018,7 +1018,7 @@ Qed.
 (** Misc *)
 
 Lemma destruct_last {A} (l : list A) :
-  l = [] \/ (exists l' x, l = l' ++ [x]). 
+  l = [] \/ (exists l' x, l = l' ++ [x]).
 Proof.
   induction l; eauto.
   - right. destruct IHl as [Hnil | [l' [x Hsnoc]]]; subst.
@@ -1051,9 +1051,9 @@ Inductive Filter {A} (P : A -> Prop) : list A -> list A -> Prop :=
 Lemma Filter_FromList {A} (P : A -> Prop) l1 l2 :
   Filter P l1 l2 ->
   FromList l1 \\ P <--> FromList l2.
-Proof. 
+Proof.
   intros Hf; induction Hf; eauto.
-  - rewrite !FromList_nil, Setminus_Empty_set_abs_r. reflexivity. 
+  - rewrite !FromList_nil, Setminus_Empty_set_abs_r. reflexivity.
   - rewrite !FromList_cons, Setminus_Union_distr.
     rewrite IHHf. rewrite Setminus_Disjoint. reflexivity.
     eapply Disjoint_Singleton_l. eassumption.
@@ -1068,7 +1068,7 @@ Lemma Filter_Disjoint {A} (P : A -> Prop) l1 l2 :
   Filter P l1 l2 ->
   Disjoint _ P (FromList l1) ->
   l1 = l2.
-Proof with (now eauto with Ensembles_DB). 
+Proof with (now eauto with Ensembles_DB).
   intros Hf HD; induction Hf; eauto.
   - rewrite IHHf; eauto.
     eapply Disjoint_Included_r; eauto.
@@ -1080,14 +1080,14 @@ Qed.
 Lemma Disjoint_Filter {A} (P : A -> Prop) l :
   Disjoint _ P (FromList l) ->
   Filter P l l.
-Proof with (now eauto with Ensembles_DB). 
+Proof with (now eauto with Ensembles_DB).
   intros HD; induction l; eauto.
   - constructor.
   - constructor; eauto.
     intros Hc. eapply HD; constructor; eauto.
     constructor; eauto.
     eapply IHl. eapply Disjoint_Included_r; eauto.
-    rewrite FromList_cons... 
+    rewrite FromList_cons...
 Qed.
 
 Inductive Forall2_P {A B : Type} (P : A -> Prop)
@@ -1095,7 +1095,7 @@ Inductive Forall2_P {A B : Type} (P : A -> Prop)
   Forall2_nil : Forall2_P P R [] []
 | Forall2_cons_P :
     forall (x : A) (y : B) (l : list A) (l' : list B),
-      (~ P x ->  R x y) -> 
+      (~ P x ->  R x y) ->
       Forall2_P P R l l' ->
       Forall2_P P R (x :: l) (y :: l').
 
@@ -1103,10 +1103,10 @@ Lemma Forall2_P_monotonic_strong {A B} (P : A -> Prop)
       (R R' : A -> B -> Prop) l1 l2 :
   (forall x1 x2,
      List.In x1 l1 ->
-     List.In x2 l2 -> ~ P x1 -> R' x1 x2 -> R x1 x2) -> 
+     List.In x2 l2 -> ~ P x1 -> R' x1 x2 -> R x1 x2) ->
   Forall2_P P R' l1 l2 ->
   Forall2_P P R l1 l2.
-Proof with (now eauto with Ensembles_DB). 
+Proof with (now eauto with Ensembles_DB).
   intros Hyp Hf. induction Hf; try now constructor.
   - constructor; eauto. intros. eapply Hyp; eauto. now constructor.
     now constructor. eapply IHHf.
@@ -1116,7 +1116,7 @@ Qed.
 
 Lemma Forall2_P_monotonic {A B} (P P' : A -> Prop) (R : A -> B -> Prop) l1 l2 :
   Forall2_P P' R l1 l2 ->
-  P' \subset P -> 
+  P' \subset P ->
   Forall2_P P R l1 l2.
 Proof.
   intros Hall Hs. induction Hall; eauto.
@@ -1125,8 +1125,8 @@ Proof.
     firstorder.
 Qed.
 
-Lemma Forall2_P_nthN (A B : Type) P (R : A -> B -> Prop) (l1 : list A) 
-      (l2 : list B) (n : N) (v1 : A): 
+Lemma Forall2_P_nthN (A B : Type) P (R : A -> B -> Prop) (l1 : list A)
+      (l2 : list B) (n : N) (v1 : A):
   Forall2_P P R l1 l2 ->
   nthN l1 n = Some v1 ->
   ~ P v1 ->
@@ -1152,7 +1152,7 @@ Proof.
   - inv Hin.
     + eexists; split; eauto. now left.
     + edestruct IHHall as [z [Hinz Hp2]]; eauto.
-      eexists. split. right. eassumption. 
+      eexists. split. right. eassumption.
       eassumption.
 Qed.
 
@@ -1177,7 +1177,7 @@ Proof.
   - inv Hin.
     + eexists; split; eauto. now left.
     + edestruct IHHall as [z [Hinz Hp2]]; eauto.
-      eexists. split. right. eassumption. 
+      eexists. split. right. eassumption.
       eassumption.
 Qed.
 
@@ -1192,12 +1192,12 @@ Lemma nth_FromList :
 Proof.
   intros A l n x Hx.
   generalize dependent n. induction l; intros n Hx.
-  - destruct n eqn:Hn; inv Hx. 
+  - destruct n eqn:Hn; inv Hx.
   - destruct n eqn:Hn.
     + simpl in Hx. inv Hx.
-      unfold FromList. simpl. 
+      unfold FromList. simpl.
       left. reflexivity.
-    + simpl in Hx. 
+    + simpl in Hx.
       unfold FromList in *. unfold In in *.
       simpl. right. eapply IHl.
       eassumption.

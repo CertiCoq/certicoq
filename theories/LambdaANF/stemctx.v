@@ -1,7 +1,7 @@
 (* Library extending ctx with a notion of bound on the stem of a context, as used in the proof of correctness of the shrink inliner *)
 
-Require Import Coq.Lists.List Coq.Lists.SetoidList Coq.NArith.BinNat Coq.PArith.BinPos
-        Coq.MSets.MSetRBT Coq.Lists.List Coq.Sets.Ensembles micromega.Lia Coq.Sorting.Permutation.
+From Stdlib Require Import Lists.List SetoidList NArith.BinNat PArith.BinPos
+        MSets.MSetRBT Lists.List Sets.Ensembles micromega.Lia Sorting.Permutation.
 Require Import compcert.lib.Coqlib.
 Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.ctx LambdaANF.set_util LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.size_cps LambdaANF.identifiers.
 Import ListNotations.
@@ -131,7 +131,7 @@ Import ListNotations.
     - constructor.
       auto.
   Qed.
-  
+
   Lemma bound_stem_Fun1_c :
     forall fds c,
       Same_set _ (bound_stem_ctx (Efun1_c fds c))
@@ -174,7 +174,7 @@ Import ListNotations.
       | [|- context[bound_stem_ctx (Eproj_c _ _ _ _ _)]] =>
         rewrite bound_stem_Eproj_c
       | [|- context[bound_stem_ctx (Eletapp_c _ _ _ _ _)]] =>
-        rewrite bound_stem_Eletapp_c                
+        rewrite bound_stem_Eletapp_c
       | [|- context[bound_stem_ctx (Ecase_c _ _ _ _ _)]] =>
         rewrite bound_stem_Case_c
       | [ |- context[bound_stem_ctx (Efun1_c _ _)]] =>
@@ -258,7 +258,7 @@ Import ListNotations.
                      bound_not_stem_ctx (Eprim_c v t r c) v'
   | NBound_Letapp_c: forall f t ys c v' v,
                        bound_not_stem_ctx c v' ->
-                       bound_not_stem_ctx (Eletapp_c v f t ys c) v'                                        
+                       bound_not_stem_ctx (Eletapp_c v f t ys c) v'
   | NBound_Case2_c: forall v v' e lce t' t c lce',
                       bound_var e v' ->
                       List.In (t',e) lce ->
@@ -303,7 +303,7 @@ Import ListNotations.
              bound_not_stem_fundefs_ctx (Fcons2_c f t xs e cfds) v.
 
 
-  
+
   #[global] Hint Constructors bound_not_stem_ctx : core.
   #[global] Hint Constructors bound_not_stem_fundefs_ctx : core.
 
@@ -341,7 +341,7 @@ Import ListNotations.
   Proof.
     split; intros x' H; auto. inv H; auto.
   Qed.
-  
+
   Lemma bound_not_stem_Hole_c :
     Same_set _ (bound_not_stem_ctx Hole_c)
              (Empty_set var).
@@ -452,7 +452,7 @@ Import ListNotations.
       rewrite bound_not_stem_Fcons2_c in H
     end.
 
-  
+
   Theorem bound_var_stem_or_not_stem_mut:
     (forall c, bound_var_ctx c <--> bound_not_stem_ctx c :|: bound_stem_ctx c) /\
     (forall f,bound_var_fundefs_ctx f <--> names_in_fundefs_ctx f :|: (bound_not_stem_fundefs_ctx f :|: bound_stem_fundefs_ctx f)).
@@ -514,7 +514,7 @@ Import ListNotations.
     intro.
     apply bound_var_stem_or_not_stem_mut.
   Qed.
-  
+
   Theorem bound_stem_app_fundefs_ctx:
     forall c fd fd' f tau xs,
       (bound_stem_fundefs_ctx (app_fundefs_ctx fd (Fcons1_c f tau xs c fd'))) <--> (Union _ (bound_stem_ctx c) (FromList xs)) .

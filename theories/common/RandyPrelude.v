@@ -5,16 +5,16 @@
 ** because of types like Sort, ...
 *)
 
-Require Import FunInd.
-Require Import Coq.Lists.List.
-Require Import Coq.Bool.Bool.
-Require Import Coq.Bool.DecBool.
-Require Import Coq.Arith.Arith.
-Require Import Coq.micromega.Lia.
+From Stdlib Require Import FunInd.
+From Stdlib Require Import Lists.List.
+From Stdlib Require Import Bool.Bool.
+From Stdlib Require Import Bool.DecBool.
+From Stdlib Require Import Arith.Arith.
+From Stdlib Require Import micromega.Lia.
 Require Import Common.exceptionMonad.
-Require Import FunInd.
-Require Import (*Coq.Arith.Div2*) (*Coq.Numbers.Natural.Peano.NPeano*) Coq.Program.Wf.
-Require Import MetaCoq.Utils.bytestring.
+From Stdlib Require Import FunInd.
+From Stdlib Require Import (*Arith.Div2*) (*Numbers.Natural.Peano.NPeano*) Program.Wf.
+Require Import MetaRocq.Utils.bytestring.
 Local Open Scope bs_scope.
 Local Open Scope bool.
 Local Open Scope list.
@@ -342,7 +342,7 @@ Lemma wf_ind:
   eapply (complete_nat_induct (fun n:nat => forall (y:A), n = f y -> P y)).
   - intros. apply wfih. intros. eapply H. rewrite H0. apply H1. reflexivity.
   - reflexivity.
-Qed.  
+Qed.
 
 Definition wf_rec:
   forall (A:Type) (f:A -> nat) (P:A -> Type)
@@ -358,7 +358,7 @@ Defined.
 
 
 (** Want to unfold all occurrances of nm in context and goal
- *** don't know how  
+ *** don't know how
 Ltac Unfold nm :=
   repeat match goal with
         | [ H:(_ nm _) |- _ ] => unfold nm in H
@@ -409,7 +409,7 @@ Lemma list_to_zero_S:
 Proof.
   induction n. reflexivity. cbn. reflexivity.
 Qed.
-  
+
 
 Definition list_to_n (n:nat) : list nat := List.rev (list_to_zero n).
 
@@ -431,7 +431,7 @@ Lemma list_to_n_S:
 Proof.
   induction n; reflexivity.
 Qed.
-  
+
 Fixpoint exnNth (A:Type) (xs:list A) (n:nat) : exception A :=
   match xs, n with
   | nil, _ =>
@@ -470,13 +470,13 @@ Lemma orb3_true_elim:
   - intuition auto.
   - assert (j2: {b2 = true} + {b3 = true}). apply (orb_true_elim _ _ e).
     destruct j2; intuition auto.
-Qed.  
+Qed.
 
 Lemma fold_left_bool_mono:
   forall (ds:list bool),
     fold_left (fun (b c:bool) => b || c) ds false = true ->
     fold_left (fun (b c:bool) => b || c) ds true = true.
-  induction ds; intro h; intuition auto. induction a. 
+  induction ds; intro h; intuition auto. induction a.
   - exact h.
   - simpl. simpl in h. apply (IHds h).
 Qed.

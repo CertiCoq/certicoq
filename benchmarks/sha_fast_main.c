@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
   end = clock();
 
   /* TODO write string printers */
-  /* print_Coq_Init_Datatypes_list(val, print_Coq_Init_Datatypes_bool); */
+  /* print_Corelib_Init_Datatypes_list(val, print_Corelib_Init_Datatypes_bool); */
   /* printf("\n"); */
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;

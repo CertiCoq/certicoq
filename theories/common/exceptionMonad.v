@@ -1,4 +1,4 @@
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 Set Implicit Arguments.
 From ExtLib Require Import Monads.
 Import MonadNotation.

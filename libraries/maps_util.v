@@ -1,10 +1,11 @@
 Require Import compcert.lib.Maps.
-Require Import Coq.Relations.Relations.
-Require Import Relations.
-Require Import Setoid.
-Require Import Morphisms.
+From Stdlib Require Import Relations.Relations.
+From Stdlib Require Import Relations.
+From Stdlib Require Import Setoid.
+From Stdlib Require Import Morphisms.
 Import RelationClasses.
-Require Import Libraries.CpdtTactics Permutation ExtLib.Data.List Coq.NArith.BinNat.
+Require Import Libraries.CpdtTactics ExtLib.Data.List.
+From Stdlib Require Import Permutation NArith.BinNat.
 (* Utility library for Compcert's Maps *)
 
 
@@ -21,7 +22,7 @@ Ltac destructAll :=
 
 Section DES.
   Arguments M.empty {A}.
-    
+
   Theorem xelements_set_leaf {A}: forall  (v:A) i j acc,
     M.xelements' (M.set0 i v) j acc = ((M.prev_append j i), v)::acc.
     Proof.
@@ -39,7 +40,7 @@ Section DES.
       rewrite xelements_set_leaf. simpl. reflexivity.
   Qed.
 
-    Lemma xelements_set_node_xI {A} i (v : A) l o r : 
+    Lemma xelements_set_node_xI {A} i (v : A) l o r :
       M.set (xI i) v (M.Node l o r) = M.Node l o (M.set i v r).
     Proof.
       unfold M.set.
@@ -48,7 +49,7 @@ Section DES.
     Qed.
 
 
-    Lemma xelements_set_node_xO {A} i (v : A) l o r : 
+    Lemma xelements_set_node_xO {A} i (v : A) l o r :
       M.set (xO i) v (M.Node l o r) = M.Node (M.set i v l) o r.
     Proof.
       unfold M.set.
@@ -56,18 +57,18 @@ Section DES.
       destruct l; destruct o; auto.
     Qed.
 
-    Lemma xelements_set_node_xH {A} (v : A) l o r : 
+    Lemma xelements_set_node_xH {A} (v : A) l o r :
       M.set xH v (M.Node l o r) = M.Node l (Some v) r.
     Proof.
-      unfold M.set. 
+      unfold M.set.
       destruct r; cbn; simpl;
       destruct l; destruct o; auto.
     Qed.
 
     Theorem xelements_set_none:
     forall (A: Type) v (m: M.t A) i j,
-      M.get i m = None -> 
-      exists l1 l2, M.xelements m j = app l1 l2 /\ M.xelements (M.set i v m) j = 
+      M.get i m = None ->
+      exists l1 l2, M.xelements m j = app l1 l2 /\ M.xelements (M.set i v m) j =
         app l1 (cons (M.prev_append j i,v) l2).
     Proof.
       intros A v m.
@@ -78,7 +79,7 @@ Section DES.
       - destruct i; simpl in *.
         + rewrite M.gNode in H0.
           rewrite xelements_set_node_xI, M.xelements_Node.
-          apply IHm0 with (j:= xI j) in H0; do 3 (destruct H0). 
+          apply IHm0 with (j:= xI j) in H0; do 3 (destruct H0).
           rewrite M.xelements_Node. cbn.
           rewrite H0.
           destruct o.
@@ -106,18 +107,18 @@ Section DES.
 
   Theorem elements_set_none:
     forall (A: Type) v (m: M.t A) i ,
-      M.get i m = None -> 
+      M.get i m = None ->
       exists l1 l2, M.elements m = l1 ++ l2 /\ M.elements (M.set i v m) = l1 ++ (i,v)::l2.
   Proof.
     unfold M.elements.
     intros.
-    apply xelements_set_none with (v:= v) (j := xH) (m := m) in H. 
+    apply xelements_set_none with (v:= v) (j := xH) (m := m) in H.
     simpl in H. apply H.
   Qed.
 
     Theorem xelements_set_some:
     forall (A: Type) v v' (m: M.t A) i j,
-      M.get i m = Some v' -> 
+      M.get i m = Some v' ->
       exists l1 l2, M.xelements m j = l1 ++ (M.prev_append j i,v')::l2 /\ M.xelements (M.set i v m) j = l1 ++ (M.prev_append j i,v)::l2.
     Proof.
       intros A v v' m.
@@ -126,7 +127,7 @@ Section DES.
       - destruct i; simpl in *.
         + rewrite M.gNode in H0.
           rewrite xelements_set_node_xI, M.xelements_Node.
-          apply IHm0 with (j:= xI j) in H0; do 3 (destruct H0). 
+          apply IHm0 with (j:= xI j) in H0; do 3 (destruct H0).
           rewrite M.xelements_Node. cbn.
           rewrite H0.
           destruct o.
@@ -149,7 +150,7 @@ Section DES.
             now rewrite <- app_assoc.
             change ((M.prev_append j (xO i), v) :: x0 ++ (M.prev j, a) :: M.xelements r (xI j))
               with (((M.prev_append j (xO i), v) :: nil) ++ x0 ++ (M.prev j, a) :: M.xelements r (xI j)).
-            rewrite H1, !app_assoc. cbn. 
+            rewrite H1, !app_assoc. cbn.
             rewrite <- app_assoc. simpl.
             now rewrite <- (app_assoc x _ x0).
           * exists x, (x0 ++ M.xelements r (xI j)).
@@ -163,29 +164,29 @@ Section DES.
 
   Theorem elements_set_some:
     forall (A: Type) i v v' (m: M.t A),
-      M.get i m = Some v'  -> 
+      M.get i m = Some v'  ->
       exists l1 l2, M.elements m = l1 ++ (i, v') :: l2 /\ M.elements (M.set i v m) = l1 ++ (i,v)::l2.
   Proof.
     unfold M.elements. intros.
     eapply xelements_set_some with (j := xH) in H. simpl in H. apply H.
-  Qed.  
+  Qed.
 
 
-End DES.  
+End DES.
 
 Section EQMAP.
 
-  Definition map_get_r: forall t, relation (M.t t) := 
+  Definition map_get_r: forall t, relation (M.t t) :=
     fun t => fun sub sub' => forall v, M.get v sub = M.get v sub'.
-  
+
   Infix " <~m_get~> " := (map_get_r _) (at level 50).
-  
-  
+
+
   Theorem smg_refl: forall t, Reflexive (map_get_r t).
   Proof.
     intros; intro; intro; reflexivity.
 Qed.
-  
+
 
   Theorem smg_sym: forall t, Symmetric (map_get_r t).
   Proof.
@@ -216,7 +217,7 @@ Proof.
 Qed.
 
 
-Theorem remove_none: forall t v x, M.get x v = None -> map_get_r t (M.remove x v) v. 
+Theorem remove_none: forall t v x, M.get x v = None -> map_get_r t (M.remove x v) v.
 Proof.
   unfold map_get_r; intros.
  destruct (var_dec v0 x). subst. rewrite H. rewrite M.grs. reflexivity. rewrite M.gro. reflexivity. assumption.
@@ -226,7 +227,7 @@ Qed.
 Theorem remove_set_1: forall t x v e, map_get_r t (M.remove x (M.set x e v)) (M.remove x v).
 Proof.
  unfold map_get_r; intros.
- destruct (var_dec v0 x). subst. rewrite M.grs. rewrite M.grs. reflexivity. 
+ destruct (var_dec v0 x). subst. rewrite M.grs. rewrite M.grs. reflexivity.
                                  rewrite M.gro. rewrite M.gso. rewrite M.gro. reflexivity. assumption. assumption. assumption.
 Qed.
 
@@ -234,22 +235,22 @@ Qed.
 
 Theorem remove_set_2: forall t x y v e, x <> y  -> map_get_r t (M.remove x (M.set y e v)) (M.set y e (M.remove x v)).
 Proof.
-  unfold map_get_r; intros. 
+  unfold map_get_r; intros.
   destruct (var_dec v0 x).
   - subst. rewrite M.grs. rewrite M.gso. rewrite M.grs. reflexivity. assumption.
   - rewrite M.gro. 2: assumption. destruct (var_dec v0 y).
     + subst. rewrite M.gss. rewrite M.gss. reflexivity.
     + rewrite M.gso. rewrite M.gso. rewrite M.gro. reflexivity. assumption. assumption. assumption.
-Qed.      
+Qed.
 
 
 
 
 Theorem remove_remove: forall t x y sub, map_get_r t (M.remove x (M.remove y sub)) (M.remove y (M.remove x sub)).
 Proof.
- unfold map_get_r; intros. 
+ unfold map_get_r; intros.
   destruct (var_dec v x); destruct (var_dec v y); subst.
-  - subst. reflexivity. 
+  - subst. reflexivity.
   - rewrite M.grs. rewrite M.gro. rewrite M.grs. reflexivity. assumption.
   - rewrite M.gro. rewrite M.grs. rewrite M.grs. reflexivity. assumption.
   - rewrite M.gro. rewrite M.gro. rewrite M.gro. rewrite M.gro. reflexivity. assumption. assumption. assumption. assumption.
@@ -259,13 +260,13 @@ Qed.
 
 Theorem set_set: forall t e e' x y sub, x <> y -> map_get_r t (M.set x e (M.set y e' sub)) (M.set y e' (M.set x e sub)).
 Proof.
-  unfold map_get_r; intros. 
+  unfold map_get_r; intros.
   destruct (var_dec v x); destruct (var_dec v y); try (subst x || subst y).
-  - exfalso; auto. 
+  - exfalso; auto.
   - rewrite M.gss. rewrite M.gso. rewrite M.gss. reflexivity. assumption.
-  -  rewrite M.gso. rewrite M.gss. rewrite M.gss. reflexivity. assumption. 
+  -  rewrite M.gso. rewrite M.gss. rewrite M.gss. reflexivity. assumption.
   - rewrite M.gso. rewrite M.gso. rewrite M.gso. rewrite M.gso. reflexivity. assumption. assumption. assumption. assumption.
-Qed.     
+Qed.
 
 
 
@@ -275,13 +276,13 @@ Proof.
   unfold map_get_r; intros.
   specialize (H v0). destruct (var_dec v0 v).
   - subst. rewrite 2 M.gss. reflexivity.
-    - rewrite 2 M.gso. rewrite 2 M.gro in H. assumption. assumption. assumption. assumption. assumption. 
+    - rewrite 2 M.gso. rewrite 2 M.gro in H. assumption. assumption. assumption. assumption. assumption.
 Qed.
 
 
 
 Theorem set_remove: forall t x e sub,  map_get_r t (M.set x e (M.remove x sub)) (M.set x e sub).
-Proof.  
+Proof.
   unfold map_get_r; intros.
   destruct (var_dec v x).
   + subst. rewrite M.gss. rewrite M.gss. reflexivity.
@@ -310,7 +311,7 @@ Qed.
 
 
 
-End EQMAP.  
+End EQMAP.
 
 Section GETD.
   Definition getd {A:Type} (d:A) :=
@@ -326,7 +327,7 @@ Section GETD.
     unfold getd; intros; destruct (M.get v sub);
          [ exists a; reflexivity | exists d; reflexivity].
   Qed.
-  
+
   Theorem getd_det: forall A v (a1 a2 d:A) sub,
                       getd d v sub  = a1 ->
                       getd d v sub = a2 ->
@@ -335,7 +336,7 @@ Section GETD.
     unfold getd; intros; destruct (M.get v sub); subst; trivial.
   Qed.
 
-  Theorem gdss: forall A (d:A) x c v,                  
+  Theorem gdss: forall A (d:A) x c v,
          getd d x (M.set x v c) = v.
   Proof.
     intros. unfold getd. rewrite M.gss. reflexivity.
@@ -348,39 +349,39 @@ Section GETD.
   Qed.
 
   Theorem gdempty: forall A (d:A) x,
-             getd d x (M.empty A) = d.        
+             getd d x (M.empty A) = d.
   Proof.
     unfold getd. symmetry. rewrite M.gempty. reflexivity.
   Qed.
 
-  
+
 End GETD.
-  
+
 Section EQDMAP.
 
-  
-  Definition map_getd_r: forall t d, relation (M.t t) := 
+
+  Definition map_getd_r: forall t d, relation (M.t t) :=
     fun t d => fun sub sub' => forall v, getd d v sub = getd d v sub'.
-  
-  Theorem smgd_refl: forall t d, Reflexive (map_getd_r t d). 
+
+  Theorem smgd_refl: forall t d, Reflexive (map_getd_r t d).
   Proof.
     do 4 intro; reflexivity.
-  Qed. 
+  Qed.
 
-  
+
   Theorem smgd_sym: forall t d, Symmetric (map_getd_r t d).
   Proof.
     do 6 intro; auto.
   Qed.
-  
-  
+
+
   Theorem smgd_trans: forall t d, Transitive (map_getd_r t d).
   Proof.
     intros t d sub sub' sub'';  unfold map_get_r; intros; intro;
     specialize (H v); specialize (H0 v); rewrite H; assumption.
   Qed.
 
-  
+
   Instance map_getd_r_equiv : forall t d, Equivalence (map_getd_r t d).
   Proof. intro. split;
            [apply smgd_refl |
@@ -392,81 +393,81 @@ Section EQDMAP.
   Theorem remove_empty_d: forall t d x, map_getd_r t d (M.remove x (M.empty t)) (M.empty t).
   Proof.
     unfold map_getd_r; intros. unfold getd. rewrite M.gempty. destruct (var_dec v x). subst.
-    rewrite M.gempty. reflexivity. rewrite M.gempty. reflexivity. 
+    rewrite M.gempty. reflexivity. rewrite M.gempty. reflexivity.
   Qed.
-  
-  Theorem remove_none_d: forall t d v x, M.get x v = None -> map_getd_r t d (M.remove x v) v. 
-    unfold map_getd_r; intros. unfold getd. 
+
+  Theorem remove_none_d: forall t d v x, M.get x v = None -> map_getd_r t d (M.remove x v) v.
+    unfold map_getd_r; intros. unfold getd.
     destruct (var_dec v0 x). subst. rewrite H. rewrite M.grs. reflexivity. rewrite M.gro. reflexivity. assumption.
   Qed.
-  
+
   Theorem remove_set_1_d: forall t d x v e, map_getd_r t d (M.remove x (M.set x e v)) (M.remove x v).
   Proof.
     unfold map_getd_r; unfold getd; intros.
-    destruct (var_dec v0 x). subst. rewrite M.grs. rewrite M.grs. reflexivity. 
+    destruct (var_dec v0 x). subst. rewrite M.grs. rewrite M.grs. reflexivity.
     rewrite M.gro. rewrite M.gso. rewrite M.gro. reflexivity. assumption. assumption. assumption.
   Qed.
-  
+
   Theorem remove_set_2_d: forall t d x y v e, x <> y  -> map_getd_r t d (M.remove x (M.set y e v)) (M.set y e (M.remove x v)).
   Proof.
-    unfold map_getd_r; intros. unfold getd. 
+    unfold map_getd_r; intros. unfold getd.
     destruct (var_dec v0 x).
     - subst. rewrite M.grs. rewrite M.gso. rewrite M.grs. reflexivity. assumption.
     - rewrite M.gro. 2: assumption. destruct (var_dec v0 y).
       + subst. rewrite M.gss. rewrite M.gss. reflexivity.
       + rewrite M.gso. rewrite M.gso. rewrite M.gro. reflexivity. assumption. assumption. assumption.
-  Qed.      
-  
+  Qed.
+
   Theorem remove_remove_d: forall t d x y sub, map_getd_r t d (M.remove x (M.remove y sub)) (M.remove y (M.remove x sub)).
   Proof.
     unfold map_getd_r; intros. unfold getd.
     destruct (var_dec v x); destruct (var_dec v y); subst.
-    - subst. reflexivity. 
+    - subst. reflexivity.
     - rewrite M.grs. rewrite M.gro. rewrite M.grs. reflexivity. assumption.
     - rewrite M.gro. rewrite M.grs. rewrite M.grs. reflexivity. assumption.
     - rewrite M.gro. rewrite M.gro. rewrite M.gro. rewrite M.gro. reflexivity. assumption. assumption. assumption. assumption.
   Qed.
-  
+
   Theorem set_set_d: forall t d e e' x y sub, x <> y -> map_getd_r t d (M.set x e (M.set y e' sub)) (M.set y e' (M.set x e sub)).
   Proof.
     unfold map_getd_r; intros. unfold getd.
     destruct (var_dec v x); destruct (var_dec v y); try (subst x || subst y).
-    - exfalso; auto. 
+    - exfalso; auto.
     - rewrite M.gss. rewrite M.gso. rewrite M.gss. reflexivity. assumption.
-    -  rewrite M.gso. rewrite M.gss. rewrite M.gss. reflexivity. assumption. 
+    -  rewrite M.gso. rewrite M.gss. rewrite M.gss. reflexivity. assumption.
     - rewrite M.gso. rewrite M.gso. rewrite M.gso. rewrite M.gso. reflexivity. assumption. assumption. assumption. assumption.
-  Qed.     
-  
+  Qed.
+
   Theorem inv_set_d: forall t d e sub sub' v,  map_getd_r t d (M.remove v sub) (M.remove v sub')  -> map_getd_r t d (M.set v e sub) (M.set v e sub').
   Proof.
-    unfold map_getd_r; intros. unfold getd. 
+    unfold map_getd_r; intros. unfold getd.
     specialize (H v0). destruct (var_dec v0 v).
     - subst. rewrite 2 M.gss. reflexivity.
     - rewrite 2 M.gso. unfold getd in H. rewrite 2 M.gro in H. assumption. assumption. assumption. assumption. assumption.
   Qed.
-  
+
   Theorem set_remove_d: forall t d x e sub,  map_getd_r t d (M.set x e (M.remove x sub)) (M.set x e sub).
-  Proof.  
+  Proof.
     unfold map_getd_r; unfold getd; intros.
     destruct (var_dec v x).
     + subst. rewrite M.gss. rewrite M.gss. reflexivity.
     + rewrite M.gso. rewrite M.gro. rewrite M.gso. reflexivity. assumption. assumption. assumption.
   Qed.
-  
+
   Theorem proper_remove_d: forall t d v,  Proper (map_getd_r t d ==> map_getd_r t d) (M.remove v).
   Proof.
     intros t d v r. unfold map_getd_r; unfold getd. intros. destruct (var_dec v0 v).
     - subst. rewrite 2 M.grs. reflexivity.
     - rewrite 2 M.gro. apply H. assumption. assumption.
   Qed.
-  
-  
+
+
   Theorem proper_set_d: forall t d v e, Proper (map_getd_r t d ==> map_getd_r t d) (M.set v e).
   Proof.
     intros t d v e r. unfold map_getd_r; unfold getd. intros. destruct (var_dec v0 v).
     - subst. rewrite 2 M.gss. reflexivity.
     - rewrite 2 M.gso. apply H. assumption. assumption.
-  Qed.   
+  Qed.
 
 
 End EQDMAP.

@@ -32,11 +32,10 @@ open Clight
    integer). *)
 
 let temp_name (id: AST.ident) =
-  let id = P.to_int id in
   try
-    "$" ^ Hashtbl.find string_of_atom id
+    "$" ^ Hashtbl.find string_of_atom (P.to_int id)
   with Not_found ->
-    Printf.sprintf "$%d" id
+    Printf.sprintf "$%d" (P.to_int id)
 
 (* Declarator (identifier + type) -- reuse from PrintCsyntax *)
 
@@ -90,9 +89,9 @@ let rec expr p (prec, e) =
   | Econst_int(n, _) ->
       fprintf p "%ld" (camlint_of_coqint n)
   | Econst_float(f, _) ->
-      print_float p (camlfloat_of_coqfloat f)
+      fprintf p "%.18g" (camlfloat_of_coqfloat f)
   | Econst_single(f, _) ->
-      print_float p (camlfloat_of_coqfloat32 f)
+      fprintf p "%.18gf" (camlfloat_of_coqfloat32 f)
   | Econst_long(n, Tlong(Unsigned, _)) ->
       fprintf p "%LuLLU" (camlint64_of_coqint n)
   | Econst_long(n, _) ->
@@ -327,6 +326,7 @@ let print_if prog = print_if_gen Clight1 prog
 (* print_if_2 is called from clightgen/Clightgen.ml, after the
    SimplLocals pass.  It receives Clight2 syntax. *)
 let print_if_2 prog = print_if_gen Clight2 prog
+
 let add_name (a, n) =
   let i = P.to_int a in
   match n with

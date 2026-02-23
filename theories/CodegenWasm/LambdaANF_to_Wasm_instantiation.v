@@ -6,7 +6,7 @@ Set Printing Compact Contexts.
   * POST_INSTANTIATION: post-instantiation intitializes table correctly
 *)
 
-From Coq Require Import
+From Stdlib Require Import
   Logic.Decidable Lists.ListDec
   Relations.Relations Relations.Relation_Operators
   Lia Nnat Permutation.
@@ -14,7 +14,7 @@ From Coq Require Import
 From compcert Require Import
   Coqlib.
 
-From MetaCoq Require Import EWcbvEvalNamed. (* for string_of_nat_inj *)
+From MetaRocq Require Import EWcbvEvalNamed. (* for string_of_nat_inj *)
 
 From CertiCoq Require Import
   LambdaANF.cps_util
@@ -34,12 +34,12 @@ From Wasm Require Import
   instantiation_spec instantiation_func instantiation_properties
   properties.
 
-From Coq Require Import List.
+From Stdlib Require Import List.
 
 Import ssreflect eqtype ssrbool.
 Import LambdaANF.toplevel LambdaANF.cps compM.
 Import ExtLib.Structures.Monad MonadNotation.
-Import bytestring MCString.
+Import bytestring MRString.
 Import ListNotations.
 Import seq.
 
@@ -2056,7 +2056,7 @@ Proof.
     unfold INV_i64_glob_tmps_writable.
     intros. intro.
     destruct (H13 gidx H14 val) as [s Hs].
-    unfold global_var_w, supdate_glob, supdate_glob_s, sglob, sglob_ind in *. 
+    unfold global_var_w, supdate_glob, supdate_glob_s, sglob, sglob_ind in *.
     repeat rewrite Hglobals in Hs.
     destruct (lookup_N (inst_globals (f_inst fr)) gidx)=>//. cbn. cbn in Hs.
     rewrite <- Hglobals in *.

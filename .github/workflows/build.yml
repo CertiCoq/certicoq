@@ -18,19 +18,19 @@ jobs:
         opam_file:
           - 'coq-certicoq.opam'
         image:
-          - 'mattam82/metacoq:metacoq-1.3.4-coq-8.20'
+          - 'mattam82/metacoq:metarocq-1.4-rocq-9.0'
       fail-fast: false  # don't stop jobs if one fails
     steps:
       - uses: actions/checkout@v3
         with:
-           submodules: true
+           submodules: false
       - uses: coq-community/docker-coq-action@v1
         with:
           custom_image: ${{ matrix.image }}
           opam_file: ${{ matrix.opam_file }}
-          before_install: | # comment back in if MetaCoq commit changes
+          before_install: | # comment back in if MetaRocq commit changes
             startGroup "fix permission issues"
-              sudo chown -R coq:coq .
+              sudo chown -R 1000:1000 .
             endGroup
 
             startGroup "opam pin"
@@ -50,7 +50,7 @@ jobs:
               node --version
             endGroup
             startGroup "fix permission issues"
-              sudo chown -R coq:coq .
+              sudo chown -R 1000:1000 .
             endGroup
             startGroup "Copy repo (for later benchmarking)"
               cp -r `pwd` ~/repo

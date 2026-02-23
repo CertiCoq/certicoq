@@ -2,9 +2,9 @@
    by Andrew W. Appel, 2011.
 
   Required reading:
-  Formal Verification of Coalescing Graph-Coloring Register Allocation, 
-  by Sandrine Blazy, Benoit Robillard, and Andrew W. Appel. 
-  ESOP 2010: 19th European Symposium on Programming, pp. 145-164, March 2010. 
+  Formal Verification of Coalescing Graph-Coloring Register Allocation,
+  by Sandrine Blazy, Benoit Robillard, and Andrew W. Appel.
+  ESOP 2010: 19th European Symposium on Programming, pp. 145-164, March 2010.
   http://www.cs.princeton.edu/~appel/papers/regalloc.pdf
 
   We implement a program to K-color an undirected graph, perhaps leaving
@@ -12,14 +12,14 @@
   correspond to variables in a program, the colors correspond to registers,
   and the graph edges are interference constraints:  two nodes connected
   by an edge cannot be assigned the same color.  Nodes left uncolored are
-  "spilled," that is, a register allocator would implement such nodes in 
+  "spilled," that is, a register allocator would implement such nodes in
   memory locations instead of in registers.  We desire to have as few
   uncolored nodes as possible, but this desire is not formally specified.
 
   In this exercise we show a simple and unsophisticated algorithm; the program
   described by Blazy et al. (cited above) is more sophisticated in several ways,
-  such as the use of "register coalescing" to get better results and the use of 
-  worklists to make it run faster.  
+  such as the use of "register coalescing" to get better results and the use of
+  worklists to make it run faster.
 
   Our algorithm does, at least, make use of efficient data structures for
   representing undirected graphs, adjacency sets, and so on.
@@ -29,28 +29,28 @@
 (*  PRELIMINARIES:  EFFICIENT DATA STRUCTURES FOR REPRESENTING
     SETS OF NODES, and FUNCTIONS THAT MAP NODES TO WHATEVER *)
 
-Require Import List ZArith Coq.micromega.Lia.
-Require Import FSets.    (* Efficient functional sets *)
-Require Import FMaps.  (* Efficient functional maps *)
-Require Import Compare_dec.  (* to get lt_dec on natural numbers *)
+From Stdlib Require Import List ZArith micromega.Lia.
+From Stdlib Require Import FSets.    (* Efficient functional sets *)
+From Stdlib Require Import FMaps.  (* Efficient functional maps *)
+From Stdlib Require Import Compare_dec.  (* to get lt_dec on natural numbers *)
 
 (* The nodes in our graph will be taken from some ordered type, so that
   we can use efficient data structures for sets and maps.  FSets are a purely
   functional representation of sets over some element type,
   with logarithmic-time membership test and add-one-element,
   and linear-time or NlogN set union.  The type of keys (members of sets, indexes
-  of maps) will be E.t;  and type type of sets will be S.t, and maps from E.t to A 
+  of maps) will be E.t;  and type type of sets will be S.t, and maps from E.t to A
   will be M.t(A) for any type A.
- 
+
    We choose the "positive" type, because the Coq library has particularly efficient
    implementations of sets and maps on positives.  But our proofs will
   be easier if we hide the particular representation type.  We would like to say,
    Module E <: OrderedType := PositiveOrderedTypeBits.
    Module S <: (FSetInterface.S with Module E := E) := PositiveSet.
    Module M <: (FMapInterface.S with Module E := E) := PositiveMap.
-  but for a stupid Coq technical reason (transparency of definitions interfering 
+  but for a stupid Coq technical reason (transparency of definitions interfering
   with rewrite tactics) we use the following clumsy definition instead:
-*)   
+*)
 Module E : OrderedType with Definition t := BinPos.positive
                                       with Definition eq := (@eq BinPos.positive)
                                       with Definition lt := PositiveOrderedTypeBits.bits_lt
@@ -110,7 +110,7 @@ Module Import WP := WProperties_fun E M.  (* More useful stuff about maps *)
 (* USEFUL LEMMAS ABOUT SETS AND MAPS *)
 
 (* The domain of a map is the set of elements that map to Some(_) *)
-Definition Mdomain {A} (m: M.t A) : S.t := 
+Definition Mdomain {A} (m: M.t A) : S.t :=
    M.fold (fun n _ s => S.add n s) m S.empty.
 
 Hint Resolve E.eq_refl E.eq_sym E.eq_trans.
@@ -153,7 +153,7 @@ Qed.
 (* Pay attention here to the use of SortA_equivlistA_eqlistA.
   Here we specialize it to the case there the comparison operator is E.lt,
   but in the proof of Mremove_elements we will use it specialized to a
-  different (though related) total ordering on a different type of list elements. *)  
+  different (though related) total ordering on a different type of list elements. *)
 Lemma SortE_equivlistE_eqlistE:
  forall l l', Sorted E.lt l -> Sorted E.lt l' -> equivlistA E.eq l l' -> eqlistA E.eq l l'.
 Proof.
@@ -171,10 +171,10 @@ apply Proper_lt.
 Qed.
 
 (* EX3 (Sremove_elements) *)
-Lemma Sremove_elements:  forall (i: E.t) (s: S.t), 
-  S.In i s -> 
-     eqlistA E.eq (S.elements (S.remove i s)) 
-              (List.filter (fun x => if E.eq_dec x i then false else true) (S.elements s)).                  
+Lemma Sremove_elements:  forall (i: E.t) (s: S.t),
+  S.In i s ->
+     eqlistA E.eq (S.elements (S.remove i s))
+              (List.filter (fun x => if E.eq_dec x i then false else true) (S.elements s)).
 Proof.
 intros.
 assert (PROPER: Proper (E.eq ==> eq)
@@ -193,7 +193,7 @@ destruct (E.eq_dec j i).
 symmetry in e; apply (@S.remove_1 s i j) in e.
 contradiction e. apply S.elements_2. auto.
 apply S.elements_2 in H0.
-apply S.remove_3 in H0; 
+apply S.remove_3 in H0;
 split; auto.
 apply S.elements_1; auto.
 apply S.elements_1.
@@ -218,7 +218,7 @@ exists b. constructor; auto. unfold M.eq_key_elt.  split; auto; apply H3.
 destruct (H H3). exists x; constructor 2; auto.
 destruct H1. inversion H1; clear H1; subst.
 constructor 1; auto. destruct H3; auto. constructor 2.
-apply H0. exists x.  auto. 
+apply H0. exists x.  auto.
 Qed.
 (* /ADMITTED *)
 (** [] *)
@@ -261,7 +261,7 @@ Qed.
 (** [] *)
 
 (* EX3 (Sremove_cardinal_less) *)
-Lemma Sremove_cardinal_less: forall i s, S.In i s -> 
+Lemma Sremove_cardinal_less: forall i s, S.In i s ->
         S.cardinal (S.remove i s) < S.cardinal s.
 (* ADMITTED *)
 Proof.
@@ -277,7 +277,7 @@ clear s Heqal.
 remember (fun x : E.t => if F.eq_dec x i then false else true) as f.
 assert (forall x, E.eq x i <-> f x = false).
  subst. intros. destruct (F.eq_dec x i); intuition.  inversion H0.
-clear Heqf. 
+clear Heqf.
 induction H; simpl.
 destruct (H0 y).
 symmetry in H. rewrite (H1 H).
@@ -300,11 +300,11 @@ Qed.
 (** [] *)
 
 (* EX3 (Mremove_elements) *)
-Lemma Mremove_elements:  forall A i s, 
-  M.In i s -> 
-     eqlistA (@M.eq_key_elt A) (M.elements (M.remove i s)) 
-              (List.filter (fun x => if E.eq_dec (fst x) i then false else true) (M.elements s)). 
-(* ADMITTED *)      
+Lemma Mremove_elements:  forall A i s,
+  M.In i s ->
+     eqlistA (@M.eq_key_elt A) (M.elements (M.remove i s))
+              (List.filter (fun x => if E.eq_dec (fst x) i then false else true) (M.elements s)).
+(* ADMITTED *)
 Proof.
 intros.
 assert (SO: StrictOrder (fun x y : E.t * A => E.lt (fst x) (fst y))).
@@ -312,14 +312,14 @@ constructor. repeat intro. apply StrictOrder_lt in H0; auto.
 repeat intro. eapply StrictOrder_lt; eauto.
 assert (PR: Proper (@M.eq_key_elt A ==> @M.eq_key_elt A ==> iff)
                 (fun x y : E.t * A => E.lt (fst x) (fst y))).
-repeat intro. destruct H0; destruct H1. 
+repeat intro. destruct H0; destruct H1.
 intuition. apply @eq_lt_trans with (fst x); auto. apply @lt_eq_trans with (fst x0); auto.
 apply @eq_lt_trans with (fst y); auto. apply @lt_eq_trans with (fst y0); auto.
 assert (PR': Proper (@M.eq_key_elt A ==> eq)
   (fun x : E.t * A => if F.eq_dec (fst x) i then false else true)).
 clear. repeat intro.
 destruct H. change M.key with E.t in *.
-  destruct (F.eq_dec (fst x) i); destruct (F.eq_dec (fst y) i); auto; contradiction n; eauto. 
+  destruct (F.eq_dec (fst x) i); destruct (F.eq_dec (fst y) i); auto; contradiction n; eauto.
 
 apply SortA_equivlistA_eqlistA with (fun x y => E.lt (fst x) (fst y)); auto.
 apply eqv_eq_key_elt.
@@ -334,7 +334,7 @@ destruct (F.eq_dec a i).
 symmetry in e; apply (@M.remove_1 _ s i a) in e.
 contradiction e. apply M.elements_2 in H0. exists b. auto.
 apply M.elements_2 in H0.
-apply M.remove_3 in H0; 
+apply M.remove_3 in H0;
 split; auto.
 apply M.elements_1; auto.
 apply M.elements_1.
@@ -348,7 +348,7 @@ Qed.
 (** [] *)
 
 (* EX3 (Mremove_cardinal_less) *)
-Lemma Mremove_cardinal_less: forall A i (s: M.t A), M.In i s -> 
+Lemma Mremove_cardinal_less: forall A i (s: M.t A), M.In i s ->
         M.cardinal (M.remove i s) < M.cardinal s.
 (* ADMITTED *)
 Proof.
@@ -364,7 +364,7 @@ clear s Heqal.
 remember (fun x : E.t * A => if F.eq_dec (fst x) i then false else true) as f.
 assert (forall x, E.eq (fst x) i <-> f x = false).
  subst. intros. destruct (F.eq_dec (fst x0) i); intuition.  inversion H0.
-clear Heqf. 
+clear Heqf.
 induction H; simpl.
 destruct H as [H H'].
 destruct (H0 y).
@@ -392,7 +392,7 @@ Lemma Snot_in_empty: forall n, ~ S.In n S.empty.
 (* ADMITTED *)
 Proof.
 intros. intro.
-apply S.empty_1 in H. 
+apply S.empty_1 in H.
 auto.
 Qed.
 (* /ADMITTED *)
@@ -446,15 +446,15 @@ Definition graph := nodemap nodeset.
 Definition adj (g: graph) (i: node) : nodeset :=
   match M.find i g with Some a => a | None => S.empty end.
 
-Definition undirected (g: graph) := 
+Definition undirected (g: graph) :=
    forall i j, S.In j (adj g i) -> S.In i (adj g j).
 
 Definition no_selfloop (g: graph) := forall i, ~ S.In i (adj g i).
 
 Definition nodes (g: graph) := Mdomain g.
 
-Definition subset_nodes 
-                    {P: node -> nodeset -> Prop} 
+Definition subset_nodes
+                    {P: node -> nodeset -> Prop}
                     (P_dec: forall n adj, {P n adj}+{~P n adj})
                     (g: graph) :=
    M.fold (fun n adj s => if P_dec n adj then S.add n s else s) g S.empty.
@@ -496,9 +496,9 @@ Definition remove_node (n: node) (g: graph) : graph :=
   M.map (S.remove n) (M.remove n g).
 
 (* EX3 (select_terminates) *)
-Lemma select_terminates: 
+Lemma select_terminates:
   forall (K: nat) (g : graph) (n : S.elt),
-   S.choose (subset_nodes (low_deg_dec K) g) = Some n -> 
+   S.choose (subset_nodes (low_deg_dec K) g) = Some n ->
    M.cardinal (remove_node n g) < M.cardinal g.
 (* ADMITTED *)
 Proof.
@@ -520,12 +520,12 @@ Function select (K: nat) (g: graph) {measure M.cardinal g}: list node :=
   | Some n => n :: select K (remove_node n g)
   | None => nil
   end.
-Proof. apply select_terminates. 
+Proof. apply select_terminates.
 Defined.  (* Do not use Qed on a Function, otherwise it won't Compute! *)
 
 Definition coloring := M.t node.
 
-Definition colors_of (f: coloring) (s: S.t) : S.t := 
+Definition colors_of (f: coloring) (s: S.t) : S.t :=
    S.fold (fun n s => match M.find n f with Some c => S.add c s | None => s end) s S.empty.
 
 Definition color1 (palette: S.t) (g: graph) (n: node) (f: coloring) : coloring :=
@@ -540,11 +540,11 @@ Definition color (palette: S.t) (g: graph) : coloring :=
 (* Now, the proof of correctness of the algorithm.
   We want to show that any coloring produced by the [color] function
   actually respects the interference constraints.  This property is
-  called [coloring_ok].  
+  called [coloring_ok].
 *)
 
 Definition coloring_ok (palette: S.t) (g: graph) (f: coloring) :=
- forall i j, S.In j (adj g i) -> 
+ forall i j, S.In j (adj g i) ->
      (forall ci, M.find i f = Some ci -> S.In ci palette) /\
      (forall ci cj, M.find i f = Some ci -> M.find j f = Some cj -> ci<>cj).
 
@@ -566,7 +566,7 @@ Proof.
 intros.
 unfold colors_of.
 rewrite S.fold_1.
-rewrite fold_right_rev_left. 
+rewrite fold_right_rev_left.
 apply S.elements_1 in H.
 apply InA_rev in H; auto.
 change E.t with S.elt in H.
@@ -588,9 +588,9 @@ Qed.
 
 (* EX3 (color_correct) *)
 Theorem color_correct:
-  forall palette g, 
-       no_selfloop g -> 
-       undirected g -> 
+  forall palette g,
+       no_selfloop g ->
+       undirected g ->
        coloring_ok palette g (color palette g).
 (* ADMITTED *)
 Proof.
@@ -684,7 +684,7 @@ Proof.
 Defined.
 
 Function iota' (i: Z) (al: list Z) {measure Z.to_nat i} : list Z :=
- if Z.gtb i 0 
+ if Z.gtb i 0
  then  iota' (Z.pred i) (Z.pred i :: al)
  else rev_append nil al.
 Proof. intros; apply Z_pred_less_nat; auto. Defined.
@@ -712,7 +712,7 @@ Definition make_palette (G: graph_description) : S.t :=
   fold_right S.add S.empty (map (Basics.compose Z.to_pos Z.succ) (iota (fst G))).
 
 Definition add_edge (e: (E.t*E.t)) (g: graph) : graph :=
- M.add (fst e) (S.add (snd e) (adj g (fst e))) 
+ M.add (fst e) (S.add (snd e) (adj g (fst e)))
   (M.add (snd e) (S.add (fst e) (adj g (snd e))) g).
 
 Definition mk_graph (el: list (E.t*E.t)) :=
@@ -721,7 +721,7 @@ Definition mk_graph (el: list (E.t*E.t)) :=
 
 
 
-Definition run (G: graph_description) := 
+Definition run (G: graph_description) :=
   let result := M.elements (color (make_palette G) (mk_graph (parse_graph G)))
   in (fst G + Z.of_nat (length (snd G)), Z.of_nat (length result))%Z.
 
@@ -750,7 +750,7 @@ Definition ex_2 := (M.elements (color palette mygraph)).
 *)
 
 Import ListNotations.
-Definition G16 : graph_description := 
+Definition G16 : graph_description :=
 (16, [
 (32,[8;0;6;7;1;2]);
 (33,[8;0;6;7;1]);
@@ -1444,4 +1444,3 @@ Definition main := run G16.
  On my machine, vm_compute takes 2.171 seconds, ocaml takes 1.453 seconds.
   -- Andrew Appel, September 16, 2016.
 *)
-

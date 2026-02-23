@@ -1,6 +1,6 @@
 (* General purpose tactics *)
 
-Require Import ssrbool Coq.Arith.Arith. 
+From Stdlib Require Import ssrbool Arith.Arith.
 
 Ltac inv H := inversion H; clear H; subst.
 
@@ -19,7 +19,7 @@ Ltac subst_exp :=
 Ltac tci := eauto with typeclass_instances.
 
 Global Remove Hints ssrbool.not_false_is_true : core.
-        
+
 Ltac sets := eauto with Ensembles_DB functions_BD.
 
 Ltac xsets := eauto 20 with Ensembles_DB functions_BD.

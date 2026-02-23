@@ -1,21 +1,21 @@
-(* This translates λ-box terms to the Ast used by CertiCoq. At this point the two languages are mostly 
+(* This translates λ-box terms to the Ast used by CertiCoq. At this point the two languages are mostly
   the same except that we map unsupported constructs to [TWrong], translate nested lists into
   specific datatypes and switch back to n-ary application nodes (hence the use of a view here and well-founded
-  recursion on the size of terms, see [compile]). *)   
+  recursion on the size of terms, see [compile]). *)
 
-Require Import Coq.Lists.List.
-From Coq Require Import PrimInt63.
-Require Import Coq.Arith.Arith. 
+From Stdlib Require Import Lists.List.
+From Stdlib Require Import PrimInt63.
+From Stdlib Require Import Arith.Arith.
 Require Import Common.Common.
-Require Import Coq.micromega.Lia.
+From Stdlib Require Import micromega.Lia.
 
 From Equations Require Import Equations.
-From MetaCoq.Utils Require utils.
-From MetaCoq.Template Require EtaExpand.
-From MetaCoq.Utils Require Import bytestring.
-From MetaCoq.Common Require Import Primitive.
-From MetaCoq.Erasure Require Import EPrimitive EAst ESpineView EGlobalEnv EEtaExpanded EInduction Erasure.
-From MetaCoq.ErasurePlugin Require Import Erasure.
+From MetaRocq.Utils Require utils.
+From MetaRocq.Template Require EtaExpand.
+From MetaRocq.Utils Require Import bytestring.
+From MetaRocq.Common Require Import Primitive.
+From MetaRocq.Erasure Require Import EPrimitive EAst ESpineView EGlobalEnv EEtaExpanded EInduction Erasure.
+From MetaRocq.ErasurePlugin Require Import Erasure.
 
 Local Open Scope bs_scope.
 Local Open Scope bool.
@@ -26,7 +26,7 @@ Set Implicit Arguments.
 Definition projection := (inductive * nat)%type.
 Lemma project_dec: forall (s1 s2:projection), {s1 = s2}+{s1 <> s2}.
 Proof.
-  intros s1 s2. destruct s1, s2. 
+  intros s1 s2. destruct s1, s2.
   destruct (inductive_dec i i0), (eq_nat_dec n n0);
     subst; try (solve [left; reflexivity]);
   right; intros h; elim n1; injection h; intuition.
@@ -73,13 +73,13 @@ Fixpoint Terms_list (ts:Terms) : list Term :=
   end.
 
 Function tlength (ts:Terms) : nat :=
-  match ts with 
+  match ts with
     | tnil => 0
     | tcons _ ts => S (tlength ts)
   end.
 
 Function blength (ts:Brs) : nat :=
-  match ts with 
+  match ts with
     | bnil => 0
     | bcons _ _ ts => S (blength ts)
   end.
@@ -167,7 +167,7 @@ Proof.
   - cbn in H. myInjection H. specialize (IHts _ _ _ H0).
     destruct IHts. subst. intuition.
 Qed.
-    
+
 Fixpoint tdrop n ts : Terms :=
   match n, ts with
   | 0, us => us
@@ -206,7 +206,7 @@ Proof.
   induction ts as [| a l IHl]; cbn; intros. reflexivity.
   - rewrite treverse_tunit. rewrite IHl. reflexivity.
 Qed.
-   
+
 Remark tunit_treverse:
     forall (l:Terms) (a:Term),
     tappend (treverse l) (tunit a) = treverse (tcons a l).
@@ -220,9 +220,9 @@ Proof.
   induction ts; intros. reflexivity.
   - cbn. rewrite IHts. rewrite tappend_pres_tlength. cbn. lia.
 Qed.
-  
+
 Fixpoint dlength (ts:Defs) : nat :=
-  match ts with 
+  match ts with
     | dnil => 0
     | dcons _ _ _ ts => S (dlength ts)
   end.
@@ -299,7 +299,7 @@ Proof.
   - reflexivity.
   - cbn. rewrite IHts. reflexivity.
 Qed.
-  
+
 Lemma treverse_pres_lifts:
   forall ts n, lifts n (treverse ts) = treverse (lifts n ts).
 Proof.
@@ -334,7 +334,7 @@ Fixpoint list_Brs (l : list _) : Brs :=
 Fixpoint list_Defs (l : list (def Term)) : Defs :=
   match l with
   | [] => dnil
-  | t :: ts => dcons t.(dname) t.(dbody) t.(rarg) (list_Defs ts) 
+  | t :: ts => dcons t.(dname) t.(dbody) t.(rarg) (list_Defs ts)
   end.
 
 Polymorphic Equations trans_prim_val {T} (p : EPrimitive.prim_val T) : option primitive :=
@@ -344,7 +344,7 @@ Polymorphic Equations trans_prim_val {T} (p : EPrimitive.prim_val T) : option pr
   trans_prim_val (existT _ primArray _) => None.
 
 Section LiftSize.
-Import All_Forall MCList ELiftSubst EInduction.
+Import All_Forall MRList ELiftSubst EInduction.
 Lemma size_lift n k t : size (ELiftSubst.lift n k t) = size t.
 Proof.
   revert k; induction t using term_forall_list_ind; cbn; eauto; try lia; ELiftSubst.solve_all.
@@ -368,7 +368,7 @@ Proof.
 End LiftSize.
 
 Section Compile.
-  Import MCList (map_InP, In_size).
+  Import MRList (map_InP, In_size).
 
   Lemma size_pos x : 0 < size x.
   Proof.
@@ -377,8 +377,8 @@ Section Compile.
 
   Local Open Scope uint63_scope.
   Import PrimInt63Notations.
-  
-  Equations? compile (t: term) : Term 
+
+  Equations? compile (t: term) : Term
   by wf t (fun x y : EAst.term => size x < size y) :=
   | e with TermSpineView.view e := {
     | tRel n => TRel n
@@ -391,12 +391,12 @@ Section Compile.
     | tCase i mch brs =>
       let brs' := map_InP brs (fun x H => (List.rev (fst x), compile (snd x))) in
       TCase (fst i) (compile mch) (list_Brs brs')
-    | tFix mfix idx => 
+    | tFix mfix idx =>
       let mfix' := map_InP mfix (fun d H => {| dname := dname d; dbody := compile d.(dbody); rarg := d.(rarg) |}) in
       TFix (list_Defs mfix') idx
     | tProj p bod := TWrong "Proj"; (* Impossible, no projections at this stage *)
     | tCoFix mfix idx => TWrong "TCofix"
-    | tPrim p with trans_prim_val p := 
+    | tPrim p with trans_prim_val p :=
       { | None => TWrong "unsupported primtive type"
         | Some pv => TPrim pv }
     | tLazy t => TLambda nAnon (lift 0 (compile t))
@@ -406,8 +406,8 @@ Section Compile.
   Proof.
     all: try (cbn; lia).
     - rewrite size_mkApps. cbn. destruct args; try congruence. cbn. lia.
-    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn. 
-      eapply (In_size id size) in H; unfold id in H; cbn in H. 
+    - rewrite size_mkApps. cbn. destruct args; try congruence. cbn.
+      eapply (In_size id size) in H; unfold id in H; cbn in H.
       change (fun x => size x) with size in H.
       pose proof (size_pos fn). lia.
     - eapply (In_size id size) in H; unfold id in H; cbn in H.
@@ -419,7 +419,7 @@ Section Compile.
   End Compile.
 End Def.
 
-Global Hint Rewrite @MCList.map_InP_spec : compile.
+Global Hint Rewrite @MRList.map_InP_spec : compile.
 
 Tactic Notation "simp_compile" "in" hyp(H) := simp compile in H; try rewrite <- !compile_equation_1 in H.
 Ltac simp_compile := simp compile; try rewrite <- !compile_equation_1.
@@ -438,7 +438,7 @@ Definition compile_global_decl d :=
 Fixpoint compile_ctx (t : global_context) :=
   match t with
   | [] => []
-  | (n, decl) :: rest => 
+  | (n, decl) :: rest =>
     (n, compile_global_decl decl) :: compile_ctx rest
   end.
 

@@ -1,9 +1,9 @@
-From Coq Require Import List Unicode.Utf8 Strings.Byte.
-From Coq Require Import PArith.
+From Stdlib Require Import List Unicode.Utf8 Strings.Byte.
+From Stdlib Require Import PArith.
 From ExtLib Require Import Monads.
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 Require Import Common.AstCommon Common.compM.
-From MetaCoq.ErasurePlugin Require Import Erasure.
+From MetaRocq.ErasurePlugin Require Import Erasure.
 #[global] Hint Resolve Bool.absurd_eq_true Bool.trans_eq_bool f_equal2_nat f_equal_nat : core.
 Import MonadNotation ListNotations.
 
@@ -64,14 +64,14 @@ Section Translation.
   (*   ( fun p => bind ( e1 p ) (  .. ( bind ( em p ) ( fun p => en p ) ) .. )) (at level 110, right associativity). *)
 
   Definition get_options : pipelineM Options := @compM.ask _ _.
-    
+
   (* Goal MonadState CompInfo pipelineM. *)
   (* Proof. *)
   (*   exact _. *)
-  
+
   Definition log_msg (s : string) : pipelineM unit :=
     '(Build_CompInfo tm log dbg) <- get ;;
-    put (Build_CompInfo tm (s :: log) dbg).                        
+    put (Build_CompInfo tm (s :: log) dbg).
 
   Definition debug_msg (s : string) : pipelineM unit :=
     o <- get_options ;;

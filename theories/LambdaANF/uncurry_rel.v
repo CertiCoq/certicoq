@@ -1,11 +1,11 @@
 Require Import LambdaANF.cps LambdaANF.size_cps LambdaANF.cps_util LambdaANF.eval LambdaANF.logical_relations LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
         LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.alpha_conv LambdaANF.functions LambdaANF.uncurry
         LambdaANF.shrink_cps_correct.
-Require Import FunInd.
-Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat Arith.
-Require Import Coq.Strings.String.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia.
+From Stdlib Require Import FunInd.
+From Stdlib Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat Arith.
+From Stdlib Require Import Strings.String.
+From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+        NArith.BinNat PArith.BinPos Sets.Ensembles micromega.Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
 Require Import Common.compM.
@@ -36,7 +36,7 @@ Section list_lemmas.
       simpl. apply f_equal.
       simpl in H. remember (set_lists l l1 rho).
       destruct o; [|congruence].
-      rewrite <- IHl with (rho := rho). now exists t. 
+      rewrite <- IHl with (rho := rho). now exists t.
     - (* :: <- *) destruct l1; [easy|]. simpl in H. apply Nat.succ_inj in H.
       rewrite <- IHl with (rho := rho) in H. destruct H.
       simpl. rewrite <- H. now exists (M.set a a0 x).
@@ -92,7 +92,7 @@ Section list_lemmas.
           by (repeat rewrite length_app; now rewrite Heqo).
         apply @length_exists_set_lists with (rho := rho) in H. destruct H. congruence.
       + assert (length l = length v). {
-          apply set_lists_length in Heqo0. 
+          apply set_lists_length in Heqo0.
           repeat rewrite length_app in Heqo0. simpl in Heqo0. lia.
         }
         apply @length_exists_set_lists with (rho := (M.set a b rho)) in H. destruct H. congruence.
@@ -217,7 +217,7 @@ Fixpoint sizeof_exp e : nat :=
   | (Eprim_val x p e) => 1 + sizeof_exp e
   | (Ehalt x) => 1
   end
-with sizeof_fundefs f : nat := 
+with sizeof_fundefs f : nat :=
   match f with
   | Fcons f t v e fds => 1 + sizeof_exp e + sizeof_fundefs fds
   | Fnil => 0
@@ -298,12 +298,12 @@ with uncurry_fundefs_step :
     length fv1 = length fv ->
     ~(In _ (s :|: FromList gv1 :|: FromList fv1) f1) ->
     s' <--> s :|: FromList gv1 :|: FromList fv1 :|: [set f1] ->
-    uncurry_fundefs_step 
+    uncurry_fundefs_step
       (Fcons f ft (k :: fv) (Efun (Fcons g gt gv ge Fnil) (Eapp k kt [g])) fds) s m
       (Fcons f ft (k :: fv1)
          (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Eapp k kt [g]))
          (Fcons f1 ft1 (gv ++ fv) ge fds))
-      s' 
+      s'
       (M.set g true m)
       (* TODO: restrict ft1? *)
 | uncurry_fundefs_curried_anf :
@@ -317,12 +317,12 @@ with uncurry_fundefs_step :
     length fv1 = length fv ->
     ~(In _ (s :|: FromList gv1 :|: FromList fv1) f1) ->
     s' <--> s :|: FromList gv1 :|: FromList fv1 :|: [set f1] ->
-    uncurry_fundefs_step 
+    uncurry_fundefs_step
       (Fcons f ft fv (Efun (Fcons g gt gv ge Fnil) (Ehalt g)) fds) s m
       (Fcons f ft fv1
          (Efun (Fcons g gt gv1 (Eapp f1 ft1 (gv1 ++ fv1)) Fnil) (Ehalt g))
          (Fcons f1 ft1 (gv ++ fv) ge fds))
-      s' 
+      s'
       (M.set g true m).
 
 #[global] Hint Constructors uncurry_step : core.
@@ -348,7 +348,7 @@ Ltac uncurry_step_induction P Q IHuncurry IH :=
   | intros
   ].
 
-Lemma uncurry_step_mutual_ind : 
+Lemma uncurry_step_mutual_ind :
 forall (P : exp -> Ensemble var -> localMap -> exp -> Ensemble var -> localMap -> Prop)
   (P0 : fundefs -> Ensemble var -> localMap -> fundefs -> Ensemble var -> localMap -> Prop),
 (forall (x f : var) (ft : fun_tag) (ys : list var) (e e1 : exp) (s s1 : Ensemble var) (m m1 : localMap),
@@ -378,16 +378,16 @@ forall (P : exp -> Ensemble var -> localMap -> exp -> Ensemble var -> localMap -
 (forall (fds fds1 : fundefs) (e : exp) (s s1 : Ensemble var) (m m1 : localMap),
  uncurry_fundefs_step fds s m fds1 s1 m1 ->
  P0 fds s m fds1 s1 m1 -> P (Efun fds e) s m (Efun fds1 e) s1 m1) ->
-(forall (f6 : var) (t : fun_tag) (args : list var) (e : exp) (fds fds1 : fundefs) 
+(forall (f6 : var) (t : fun_tag) (args : list var) (e : exp) (fds fds1 : fundefs)
    (s s1 : Ensemble var) (m m1 : localMap),
  uncurry_fundefs_step fds s m fds1 s1 m1 ->
  P0 fds s m fds1 s1 m1 -> P0 (Fcons f6 t args e fds) s m (Fcons f6 t args e fds1) s1 m1) ->
-(forall (f7 : var) (t : fun_tag) (args : list var) (e e1 : exp) (fds : fundefs) 
+(forall (f7 : var) (t : fun_tag) (args : list var) (e e1 : exp) (fds : fundefs)
    (s s1 : Ensemble var) (m m1 : localMap),
  uncurry_step e s m e1 s1 m1 ->
  P e s m e1 s1 m1 -> P0 (Fcons f7 t args e fds) s m (Fcons f7 t args e1 fds) s1 m1) ->
-(forall (f9 f10 : var) (ft ft1 : fun_tag) (k : var) (kt : fun_tag) (fv fv1 : list var) 
-   (g : positive) (gt : fun_tag) (gv gv1 : list var) (ge : exp) (fds : fundefs) 
+(forall (f9 f10 : var) (ft ft1 : fun_tag) (k : var) (kt : fun_tag) (fv fv1 : list var)
+   (g : positive) (gt : fun_tag) (gv gv1 : list var) (ge : exp) (fds : fundefs)
    (s : Ensemble var) (m : M.t bool) (s' : Ensemble var),
  match M.get g m with
  | Some true => true
@@ -407,7 +407,7 @@ forall (P : exp -> Ensemble var -> localMap -> exp -> Ensemble var -> localMap -
       (Fcons f10 ft1 (gv ++ fv) ge fds)) s'
    (M.set g true m)) ->
 (forall (f10 f11 : var) (ft ft1 : fun_tag) (fv fv1 : list var) (g : positive) (gt : fun_tag)
-        (gv gv1 : list var) (ge : exp) (fds : fundefs) (s : Ensemble var) (m : M.t bool) 
+        (gv gv1 : list var) (ge : exp) (fds : fundefs) (s : Ensemble var) (m : M.t bool)
         (s' : Ensemble var),
       match m ! g with
       | Some true => true
@@ -425,7 +425,7 @@ forall (P : exp -> Ensemble var -> localMap -> exp -> Ensemble var -> localMap -
            (Fcons f11 ft1 (gv ++ fv) ge fds)) s' (M.set g true m)) ->
   (forall (e : exp) (e0 : Ensemble var) (l : localMap) (e1 : exp) (e2 : Ensemble var)
     (l0 : localMap), uncurry_step e e0 l e1 e2 l0 -> P e e0 l e1 e2 l0) /\
-  (forall (f10 : fundefs) (e : Ensemble var) (l : localMap) (f11 : fundefs) 
+  (forall (f10 : fundefs) (e : Ensemble var) (l : localMap) (f11 : fundefs)
     (e0 : Ensemble var) (l0 : localMap),
     uncurry_fundefs_step f10 e l f11 e0 l0 ->
     P0 f10 e l f11 e0 l0).
@@ -435,7 +435,7 @@ Proof.
   apply (uncurry_step_fundefs_mut P P0); assumption.
 Qed.
 
-(* to do proofs simultaneously *) 
+(* to do proofs simultaneously *)
 Ltac uncurry_step_induction_mut P Q IHuncurry IH :=
   apply uncurry_step_mutual_ind with (P := P) (P0 := Q);
   [ intros ? ? ? ? ? ? ? ? ? ? IHuncurry IH
@@ -962,8 +962,8 @@ Proof with eauto with Ensembles_DB.
     rewrite IH.
     rewrite Intersection_Same_set...
     rewrite Intersection_Same_set...
-    eapply Included_trans; [|eassumption]... 
-    eapply Included_trans; [|eassumption]... 
+    eapply Included_trans; [|eassumption]...
+    eapply Included_trans; [|eassumption]...
   - (* Eproj *)
     repeat rewrite used_vars_Eproj.
     do 2 rewrite Intersection_Union_distr.
@@ -1733,7 +1733,7 @@ Corollary uncurry_fundefs_step_subterm_invariant : forall f e s m e1 s1 m1,
   uncurry_step e s m e1 s1 m1.
 Proof. apply uncurry_step_subterm_invariant_mut. Qed.
 
-Lemma app_ctx_uncurry_step_mut : 
+Lemma app_ctx_uncurry_step_mut :
   (forall c, (fun c => forall e s m e1 s1 m1,
     used_vars (c |[ e ]|) \subset s ->
     uncurry_step e s m e1 s1 m1 ->
@@ -2405,10 +2405,10 @@ Proof.
 Qed.
 
 Lemma uncurry_step_subst_mut :
-  let P := (fun e s m e1 s1 m1 => forall e' s' m' e1' s1' m1', 
+  let P := (fun e s m e1 s1 m1 => forall e' s' m' e1' s1' m1',
     e = e' -> s <--> s' -> m = m' -> e1 = e1' -> s1 <--> s1' -> m1 = m1' ->
     uncurry_step e' s' m' e1' s1' m1') in
-  let Q := (fun f s m f1 s1 m1 => forall f' s' m' f1' s1' m1', 
+  let Q := (fun f s m f1 s1 m1 => forall f' s' m' f1' s1' m1',
     f = f' -> s <--> s' -> m = m' -> f1 = f1' -> s1 <--> s1' -> m1 = m1' ->
     uncurry_fundefs_step f' s' m' f1' s1' m1') in
   (forall e s m e1 s1 m1, uncurry_step e s m e1 s1 m1 -> P e s m e1 s1 m1) /\

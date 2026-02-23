@@ -9,11 +9,11 @@ extern void body(struct thread_info *);
 extern value args[];
 
 extern struct thread_info;
-extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
-extern void print_Coq_Init_Datatypes_bool(unsigned long long);
-extern value get_Coq_Init_Datatypes_pair_args (unsigned long long);
-extern value make_Coq_Init_Datatypes_bool_true (void);
-extern value make_Coq_Init_Datatypes_bool_false (void);
+extern void print_Corelib_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
+extern void print_Corelib_Init_Datatypes_bool(unsigned long long);
+extern value get_Corelib_Init_Datatypes_pair_args (unsigned long long);
+extern value make_Corelib_Init_Datatypes_bool_true (void);
+extern value make_Corelib_Init_Datatypes_bool_false (void);
 extern void* call(struct thread_info *tinfo, unsigned long long clos, unsigned long long arg0);
 
 _Bool is_ptr(value s) {
@@ -53,21 +53,21 @@ int main(int argc, char *argv[]) {
   andb = tinfo -> args[1];
 
   /* Generate booleans*/
-  value b = make_Coq_Init_Datatypes_bool_true ();
-  value c = make_Coq_Init_Datatypes_bool_false ();
+  value b = make_Corelib_Init_Datatypes_bool_true ();
+  value c = make_Corelib_Init_Datatypes_bool_false ();
 
 
   printf("The original booleans.\n");
-  print_Coq_Init_Datatypes_bool(b);
+  print_Corelib_Init_Datatypes_bool(b);
   printf(" and ");
-  print_Coq_Init_Datatypes_bool(c);
+  print_Corelib_Init_Datatypes_bool(c);
   printf("\n");
 
   /* Call the variadic function val with two arguments, b and c */
   value v = calls(tinfo,andb,2,b,c);
 
   printf("The new boolean.\n");
-  print_Coq_Init_Datatypes_bool(v);
+  print_Corelib_Init_Datatypes_bool(v);
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;
   msec = 1000*sec;

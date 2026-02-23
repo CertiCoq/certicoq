@@ -30,9 +30,9 @@ From CertiCoq Require Import
   CodegenWasm.LambdaANF_to_Wasm_restrictions
   CodegenWasm.LambdaANF_to_Wasm_primitives.
 
-From MetaCoq Require Import Common.Kernames.
+From MetaRocq Require Import Common.Kernames.
 
-From Coq Require Import
+From Stdlib Require Import
   Program.Program Sets.Ensembles
   Logic.Decidable Lists.ListDec
   Relations.Relations Relations.Relation_Operators Lia
@@ -353,7 +353,7 @@ Inductive repr_primitive_operation {lenv} : primop -> list positive  -> list bas
 
 Inductive repr_call_grow_mem_if_necessary : N (* at least mem available, known statically *) ->
                                             N (* bytes required for alloc *) ->
-                                            N (* at least mem available after allocation *) -> 
+                                            N (* at least mem available after allocation *) ->
                                             list basic_instruction (* generated instr *) -> Prop :=
 | G_enough_mem : forall mem mem' bytes,
   (bytes <= mem)%N ->
@@ -5803,7 +5803,7 @@ Proof with eauto.
         (* hide instrs after return instr in block context, won't be executed *)
         have Hlh := lholed_tail _ lh (map AI_basic grow_instr) (map AI_basic (prim_instrs ++ [:: BI_local_set x'] ++ e')).
         destruct Hlh as [k' [lh' Heq']].
-        have Hbad := HRedRet _ lh'. 
+        have Hbad := HRedRet _ lh'.
         destruct Hbad as [sr' [k'' [lh'' [Hred [Hfuncs [HvalPreserved HoutofM]]]]]].
         exists sr', fr, k'', lh''. split.
         rewrite -Heq' in Hred. rewrite map_cat.

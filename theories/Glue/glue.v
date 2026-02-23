@@ -1,15 +1,16 @@
 Require Import Common.Pipeline_utils.
 
-Require Import Coq.ZArith.ZArith
-               Coq.Program.Basics
-               Coq.Strings.String
-               Coq.Lists.List List_util.
+From Stdlib Require Import ZArith.ZArith
+               Program.Basics
+               Strings.String
+               Lists.List.
+Require Import List_util.
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad.
 
-From MetaCoq.Common Require Import BasicAst.
-Require MetaCoq.Template.All.
+From MetaRocq.Common Require Import BasicAst.
+Require MetaRocq.Template.All.
 
 Require Import compcert.common.AST
                compcert.common.Errors
@@ -27,7 +28,11 @@ Require Import LambdaANF.cps
                compM
                glue_utils.
 
-From MetaCoq.Utils Require Import bytestring MCString.
+From MetaRocq.Utils Require Import bytestring MRString.
+
+Notation Tcons := cons.
+Notation Tnil := nil.
+Notation typelist := (list type).
 
 Import MonadNotation ListNotations.
 Open Scope monad_scope.
@@ -203,7 +208,7 @@ Section GState.
     ret (M.get k ienv).
 
   (* A hacky way to get the [ind_L1_tag] of a type from its name.
-     This is necessary because of a shortcoming of Template Coq.
+     This is necessary because of a shortcoming of Template Stdlib.
      (mutually recursive type names aren't fully qualified) *)
   Definition get_tag_from_type_name (s : kername) : glueM (option ind_L1_tag) :=
     let find (prev : option ind_L1_tag)
@@ -217,7 +222,7 @@ Section GState.
     ret (M.fold find ienv None).
 
   (* A hacky way to get the [ind_L1_tag] of a type from its [inductive] value.
-     This is necessary because of a shortcoming of Template Coq. *)
+     This is necessary because of a shortcoming of Template Stdlib. *)
   Definition get_tag_from_inductive (i : inductive) : glueM (option ind_L1_tag) :=
     let find (prev : option ind_L1_tag)
              (tag : ind_L1_tag)
@@ -447,7 +452,7 @@ Section Externs.
        *)
        (_is_ptr,
          Gfun (External (EF_external "is_ptr"
-                          (mksignature (val_typ :: nil) AST.Tvoid cc_default))
+                          (mksignature (val_typ :: nil) Xvoid cc_default))
                         (Tcons val Tnil)
                         tint cc_default)) ::
        (_guo, def_guo) ::
@@ -527,7 +532,7 @@ Section L1Types.
         match e with
           | Ast.tProd _ _ e' => check_last e'
           | Ast.tSort u =>
-              MetaCoq.Common.Universes.Sort.is_prop u
+              MetaRocq.Common.Universes.Sort.is_prop u
           | _ => false
         end
     in check_last (Ast.Env.ind_type (ty_body info)).
@@ -1024,7 +1029,7 @@ Section CConstructors.
     match n with
     | O => ret nil
     | S n' =>
-        new_id <- gensym ("arg" ++ MCString.string_of_nat n')%bs ;;
+        new_id <- gensym ("arg" ++ MRString.string_of_nat n')%bs ;;
         rest_id <- make_arg_list' n' ;;
         ret ((new_id, val) :: rest_id)
     end.

@@ -1,12 +1,12 @@
-From MetaCoq.Utils Require Import utils.
-From MetaCoq.Common Require Import Universes.
-From MetaCoq Require Export Common.BasicAst.
-From MetaCoq Require Import Template.Ast.
-From MetaCoq Require Export Erasure.EAst.
-Require Import Coq.Arith.Peano_dec.
-Require Import Coq.Logic.Eqdep_dec.
-Require Import Coq.Lists.List.
-Require Import FunInd.
+From MetaRocq.Utils Require Import utils.
+From MetaRocq.Common Require Import Universes.
+From MetaRocq Require Export Common.BasicAst.
+From MetaRocq Require Import Template.Ast.
+From MetaRocq Require Export Erasure.EAst.
+From Stdlib Require Import Arith.Peano_dec.
+From Stdlib Require Import Logic.Eqdep_dec.
+From Stdlib Require Import Lists.List.
+From Stdlib Require Import FunInd.
 
 Require Import Common.exceptionMonad.
 Require Import Common.RandyPrelude.
@@ -73,7 +73,7 @@ Proof.
   apply Classes.eq_dec.
 Defined.
 
-Require Import NArith.NArith.
+From Stdlib Require Import NArith.NArith.
 #[global] Instance NEq: Eq N := { eq_dec := N.eq_dec }.
 #[global] Instance EqPair A B `(Eq A) `(Eq B) : Eq (A * B).
 Proof.
@@ -127,7 +127,7 @@ Proof.
   - assert (j:= f_equal itypCnstrs h). simpl in j. contradiction.
   - assert (j:= f_equal itypNm h). simpl in j. contradiction.
   - assert (j:= f_equal itypNm h). simpl in j. contradiction.
-Qed.  
+Qed.
 
 (** environments and programs parameterized by a notion of term **)
 Section trm_Sec.
@@ -151,7 +151,7 @@ Function Split (n:nat) (ls:trms) {struct ls} : option split :=
 
 
 (** Hack: we code axioms in the environment as ecTyp with itypPack = nil **)
-Inductive envClass := 
+Inductive envClass :=
 | ecTrm (_:trm)
 | ecTyp (_:nat) (_:itypPack).
 
@@ -258,7 +258,7 @@ Qed.
 (** well formedness of an environ **)
 Inductive WFaEnv: environ -> Prop :=
 | wfaenil: WFaEnv nil
-| wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p -> 
+| wfaecons: forall ec, WFaEc ec -> forall p, WFaEnv p ->
                    forall nm, fresh nm p -> WFaEnv ((nm, ec) :: p).
 Hint Constructors WFaEnv : core.
 
@@ -314,9 +314,9 @@ Lemma lookup_Lookup:
   forall nm p t, lookup nm p = Some t -> Lookup nm p t.
 induction p; intros t h. inversion h.
 destruct a. destruct (Classes.eq_dec nm k); simpl in h.
-- subst. rewrite (eq_kername_refl k) in h. 
+- subst. rewrite (eq_kername_refl k) in h.
   injection h. intros; subst. apply LHit.
-- apply LMiss. assumption. apply IHp. 
+- apply LMiss. assumption. apply IHp.
   rewrite (eq_kername_bool_neq n) in h. assumption.
 Qed.
 
@@ -333,7 +333,7 @@ Lemma LookupDfn_lookupDfn:
                  forall te, t = (ecTrm te) -> lookupDfn nm p = Ret te.
   induction 1; intros; subst; unfold lookupDfn, lookup.
 - rewrite (eq_kername_refl s). reflexivity.
-- rewrite (eq_kername_bool_neq H). 
+- rewrite (eq_kername_bool_neq H).
   destruct t; apply IHLookup; reflexivity.
 Qed.
 
@@ -341,7 +341,7 @@ Lemma lookupDfn_LookupDfn:
   forall nm p t, lookupDfn nm p = Ret t -> Lookup nm p (ecTrm t).
 Proof.
   intros nm p t. intros. apply lookup_Lookup.
-  unfold lookupDfn in H. 
+  unfold lookupDfn in H.
   case_eq (lookup nm p); intros; rewrite H0 in H.
   - destruct e.
     + myInjection H. reflexivity.
@@ -359,8 +359,8 @@ Proof.
     + left. destruct H. exists x. apply LMiss; assumption.
     + destruct e.
       * left. exists (ecTrm t). apply LHit.
-      * left. exists (ecTyp n i). apply LHit. 
-    + right. intros t h. inversion_Clear h. 
+      * left. exists (ecTyp n i). apply LHit.
+    + right. intros t h. inversion_Clear h.
       * elim n. reflexivity.
       * elim (H t). assumption.
 Qed.
@@ -378,11 +378,11 @@ induction 1; intro h; inversion h; subst; auto.
 Qed.
 
 Lemma fresh_lookup_None: forall nm p, fresh nm p <-> lookup nm p = None.
-split. 
+split.
 - induction 1; simpl; try reflexivity.
   + rewrite eq_kername_bool_neq; assumption.
 - induction p; auto.
-  + destruct a. destruct (Classes.eq_dec nm k). 
+  + destruct a. destruct (Classes.eq_dec nm k).
     * subst. simpl. rewrite eq_kername_refl. discriminate.
     * simpl. rewrite eq_kername_bool_neq; try assumption. intros h.
       apply fcons; intuition.
@@ -392,10 +392,10 @@ Lemma Lookup_single_valued:
   forall (nm:kername) (p:environ) (t r:envClass),
     Lookup nm p t -> Lookup nm p r -> t = r.
 Proof.
-  intros nm p t r h1 h2. 
+  intros nm p t r h1 h2.
   assert (j1:= Lookup_lookup h1).
   assert (j2:= Lookup_lookup h2).
-  rewrite j1 in j2. myInjection j2. reflexivity. 
+  rewrite j1 in j2. myInjection j2. reflexivity.
 Qed.
 
 Lemma LookupDfn_single_valued:
@@ -422,7 +422,7 @@ Proof.
 Qed.
 
 Lemma Lookup_weaken:
-  forall s p t, Lookup s p t -> 
+  forall s p t, Lookup s p t ->
       forall nm ec, fresh nm p -> Lookup s ((nm, ec) :: p) t.
 intros s p t h1 nm ec h2.
 assert (j1:= Lookup_fresh_neq h1 h2). apply LMiss. apply neq_sym. assumption.
@@ -430,7 +430,7 @@ assumption.
 Qed.
 
 Lemma Lookup_weaken':
-  forall s p t, Lookup s p t -> 
+  forall s p t, Lookup s p t ->
       forall nm ec, s <> nm -> Lookup s ((nm, ec) :: p) t.
 intros s p t h1 nm ec h2. apply LMiss; assumption.
 Qed.
@@ -454,7 +454,7 @@ Qed.
 
 Lemma Lookup_strengthen:
   forall (nm1:kername) pp t,
-    Lookup nm1 pp t -> 
+    Lookup nm1 pp t ->
     forall nm2 ec p, pp = (nm2,ec)::p -> nm1 <> nm2 -> Lookup nm1 p t.
 Proof.
   intros nm1 pp t h nm2 ecx px j1 j2. subst. assert (k:= Lookup_lookup h).
@@ -512,7 +512,7 @@ Function Lkup_index (nm:kername) (env:environ) : nat :=
                   end
   end.
 
-  
+
 
 (** find an ityp in an itypPack **)
 Definition getInd (ipkg:itypPack) (inum:nat) : exception ityp :=
@@ -556,12 +556,12 @@ Proof. reflexivity. Qed.
 
 (* Primitives *)
 
-From Coq Require Import ssreflect.
+From Stdlib Require Import ssreflect.
 From Equations Require Import Equations.
-From MetaCoq.Erasure Require Import EPrimitive.
+From MetaRocq.Erasure Require Import EPrimitive.
 
-Variant prim_tag : Set := 
-  | primInt | primFloat. 
+Variant prim_tag : Set :=
+  | primInt | primFloat.
 Derive NoConfusion for prim_tag.
 
 Definition prim_value (p : prim_tag) : Set :=
@@ -581,7 +581,7 @@ Definition string_of_specfloat (f : SpecFloat.spec_float) :=
   | S754_infinity sign => if sign then "-INFINITY" else "INFINITY"
   | S754_nan => "NAN"
   | S754_finite sign p z =>
-  let num := MCString.string_of_positive p ++ "p" ++ string_of_Z z in
+  let num := MRString.string_of_positive p ++ "p" ++ string_of_Z z in
   if sign then "-" ++ num else num
   end%bs.
 
@@ -598,7 +598,7 @@ Equations eqb_prim (p q : primitive) : bool :=
   | _, _ => false.
 Transparent eqb_prim.
 
-#[program, export] Instance prim_eq : ReflectEq.ReflectEq primitive := 
+#[program, export] Instance prim_eq : ReflectEq.ReflectEq primitive :=
   { eqb := eqb_prim }.
 Next Obligation.
   funelim (eqb_prim x y); cbn; try solve [ constructor; congruence ];

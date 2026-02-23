@@ -1,4 +1,4 @@
-Require Import Arith List String Uint63 BinNat.
+From Stdlib Require Import Arith List String Uint63 BinNat.
 Require Import CertiCoq.Benchmarks.lib.vs.
 Require Import CertiCoq.Benchmarks.lib.Binom.
 Require Import CertiCoq.Benchmarks.lib.Color.
@@ -7,7 +7,7 @@ Require Import CertiCoq.Benchmarks.lib.coind.
 (* Require Import CertiCoq.Benchmarks.lib.coqprime. Requires: opam install coq-coqprime *)
 Require Import CertiCoq.Benchmarks.lib.stack_machine.
 
-From MetaCoq.Utils Require Import bytestring MCString.
+From MetaRocq.Utils Require Import bytestring MRString.
 From CertiCoq.Plugin Require Import CertiCoq.
 
 Open Scope bs.
@@ -149,7 +149,7 @@ CertiCoq Compile Wasm -debug list_sum_primitive. *)
 
 (* CertiCoq Compile -unsafe-erasure -O 1 lazy_factorial. *)
 (* CertiCoq Compile -unsafe-erasure -ext "_opt" lazy_factorial. *)
-(* CertiCoq Compile -unsafe-erasure -args 1000 -config 9 -O 1 -ext "_opt_ll" lazy_factorial. *) 
+(* CertiCoq Compile -unsafe-erasure -args 1000 -config 9 -O 1 -ext "_opt_ll" lazy_factorial. *)
 (* (1* CertiCoq Compile -O 0 -cps -ext "_cps" demo1. *1) *)
 (* (1* CertiCoq Compile -cps -ext "_cps_opt" demo1. *1) *)
 (* CertiCoq Generate Glue -file "glue_lazy_factorial" [ ]. *)

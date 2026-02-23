@@ -2,9 +2,9 @@ Require Import LambdaANF.cps LambdaANF.identifiers LambdaANF.ctx LambdaANF.set_u
         LambdaANF.dead_param_elim LambdaANF.Ensembles_util LambdaANF.tactics LambdaANF.map_util
         LambdaANF.hoisting.
 Require Import compcert.lib.Coqlib Common.compM Common.Pipeline_utils.
-Require Import Coq.Lists.List Coq.MSets.MSets Coq.MSets.MSetRBT Coq.Numbers.BinNums
-        Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles micromega.Lia
-        maps_util.
+From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+        NArith.BinNat PArith.BinPos Sets.Ensembles micromega.Lia.
+Require Import maps_util.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 Import ListNotations Nnat.
 
@@ -26,53 +26,53 @@ Inductive Dead_in_args (S : Ensemble var) : list var -> list bool -> Prop :=
 | ALive_cons_Live :
     forall (x : var) (xs : list var) (bs: list bool),
       Dead_in_args S xs bs ->
-      ~ x \in S -> 
+      ~ x \in S ->
       Dead_in_args S (x :: xs) (true :: bs).
 
 
-Fixpoint dead_args (ys : list var) (bs : list bool) : list var := 
-  match ys, bs with 
+Fixpoint dead_args (ys : list var) (bs : list bool) : list var :=
+  match ys, bs with
   | [], [] => ys
-  | y :: ys', b :: bs' => 
+  | y :: ys', b :: bs' =>
     if b then (dead_args ys' bs')
     else y :: dead_args ys' bs'
 | _, _ => []
-end. 
+end.
 
 Inductive Dead (S : Ensemble var) (L : live_fun) : exp -> Prop :=
-| Live_Constr : 
-    forall (x : var) (ys : list var) (ct : ctor_tag) (e : exp), 
-      Disjoint _ (FromList ys) S -> 
+| Live_Constr :
+    forall (x : var) (ys : list var) (ct : ctor_tag) (e : exp),
+      Disjoint _ (FromList ys) S ->
       Dead S L e ->
       Dead S L (Econstr x ct ys e)
-| Live_Prim_val : 
-  forall (x : var) p (e : exp), 
+| Live_Prim_val :
+  forall (x : var) p (e : exp),
     Dead S L e ->
     Dead S L (Eprim_val x p e)
-| Live_Prim : 
-  forall (x : var) (g : prim) (ys : list var) (e : exp), 
-    Disjoint _ (FromList ys) S -> 
+| Live_Prim :
+  forall (x : var) (g : prim) (ys : list var) (e : exp),
+    Disjoint _ (FromList ys) S ->
     Dead S L e ->
     Dead S L (Eprim x g ys e)
-| Live_Proj : 
-    forall (x : var) (ct : ctor_tag) (n : N) (y : var) (e : exp), 
+| Live_Proj :
+    forall (x : var) (ct : ctor_tag) (n : N) (y : var) (e : exp),
       ~ y \in S ->
      Dead S L e ->
      Dead S L (Eproj x ct n y e)
-| Live_Case: 
+| Live_Case:
     forall (x : var) (ce : list (ctor_tag * exp)),
       ~ x \in S ->
-      Forall (fun p => Dead S L (snd p)) ce -> 
+      Forall (fun p => Dead S L (snd p)) ce ->
       Dead S L (Ecase x ce)
-| Live_Halt : 
+| Live_Halt :
     forall (x : var),
       ~ x \in S ->
       Dead S L (Ehalt x)
 | Live_App_Unknown :
     forall (f : var) (ys : list var) (ft : fun_tag),
       ~ f \in S ->
-      Disjoint _ (FromList ys) S -> 
-      L ! f = None -> 
+      Disjoint _ (FromList ys) S ->
+      L ! f = None ->
       Dead S L (Eapp f ft ys)
 | Live_App_Known :
     forall (f : var) (ys : list var) (ft : fun_tag) (bs : list bool),
@@ -83,27 +83,27 @@ Inductive Dead (S : Ensemble var) (L : live_fun) : exp -> Prop :=
 | Live_LetApp_Unknown :
     forall (x f : var) (ys : list var) (ft : fun_tag) (e : exp),
       ~ f \in S ->
-      Disjoint _ (FromList ys) S -> 
+      Disjoint _ (FromList ys) S ->
       L ! f = None ->
-      Dead S L e ->          
+      Dead S L e ->
       Dead S L (Eletapp x f ft ys e)
 | Live_LetApp_Known :
     forall (x f : var) (ys : list var) (ft : fun_tag) (e : exp) (bs : list bool),
       L ! f = Some bs ->
       ~ f \in S ->
-      Disjoint _ S (FromList (live_args ys bs)) ->      
-      Dead S L e ->          
-      Dead S L (Eletapp x f ft ys e). 
-  
-  
+      Disjoint _ S (FromList (live_args ys bs)) ->
+      Dead S L e ->
+      Dead S L (Eletapp x f ft ys e).
+
+
 Definition live_map_sound (B : fundefs) (L : live_fun) :=
   forall f ft xs e bs,
     fun_in_fundefs B (f, ft, xs, e) ->
-    L ! f = Some bs -> 
-    Dead (FromList (dead_args xs bs)) L e. 
+    L ! f = Some bs ->
+    Dead (FromList (dead_args xs bs)) L e.
 
 Definition live_fun_args (L : live_fun) (f : var) (xs : list var) :=
-  exists bs, L ! f = Some bs /\ length xs = length bs. 
+  exists bs, L ! f = Some bs /\ length xs = length bs.
 
 Definition live_fun_consistent (L : live_fun) (B : fundefs) :=
   forall f ft xs e,
@@ -138,7 +138,7 @@ Proof.
     destruct diff. congruence. inv H0.
     split. reflexivity.
     intros bs' Hget. inv Hget.
-    
+
     assert (Hsuff : Disjoint  positive (FromSet S) (FromList (dead_args xs bs'))).
     { clear Hf. revert bs bs' Hupd.
       induction xs; intros bs bs' Hupd.
@@ -147,11 +147,11 @@ Proof.
       - destruct bs'.
         { simpl. normalize_sets; sets. }
         simpl in *.
-        
-        destruct (update_bs S xs bs') eqn:Hup. 
-        destruct b. inv Hupd.        
+
+        destruct (update_bs S xs bs') eqn:Hup.
+        destruct b. inv Hupd.
         * eapply IHxs. eassumption.
-        * inv Hupd. 
+        * inv Hupd.
           eapply orb_false_iff in H1. inv H1.
           destruct (PS.mem a S) eqn:Hmem. now inv H. clear H.
           specialize (IHxs l bs' Hup).
@@ -161,18 +161,18 @@ Proof.
           eapply PS.mem_spec in Hc. congruence. }
     eassumption.
 
-  - inv Hl. split; eauto. congruence. 
+  - inv Hl. split; eauto. congruence.
 Qed.
 
 
-Lemma add_fun_vars_subset L v l Q : 
+Lemma add_fun_vars_subset L v l Q :
   FromSet Q \subset FromSet (add_fun_vars L v l Q).
 Proof.
-  unfold add_fun_vars. 
+  unfold add_fun_vars.
   destruct (get_fun_vars L v); rewrite FromSet_union_list; sets.
 Qed.
-        
-  
+
+
 Lemma live_expr_subset L e Q :
   FromSet Q \subset FromSet (live_expr L e Q).
 Proof.
@@ -187,11 +187,11 @@ Proof.
   - eapply Included_trans; [| eapply IHe ].
     eapply Included_trans; [| eapply add_fun_vars_subset ].
     rewrite !FromSet_add; sets.
-  - sets. 
+  - sets.
   - eapply Included_trans; [| eapply add_fun_vars_subset ].
     rewrite FromSet_add; sets.
   - auto.
-  - rewrite FromSet_add; sets.  
+  - rewrite FromSet_add; sets.
 Qed.
 
 Lemma fold_left_live_expr_subset L S (P : list (ctor_tag * exp)) :
@@ -201,14 +201,14 @@ Proof.
   destruct a. eapply Included_trans; [| eapply IHP ].
   eapply live_expr_subset.
 Qed.
-  
+
 Lemma live_args_subset {A} (ys : list A) bs:
   FromList (live_args ys bs) \subset FromList ys.
 Proof.
   revert bs; induction ys; intros [ | [|] bs ]; simpl; sets.
   - repeat normalize_sets. sets.
   - repeat normalize_sets. sets.
-Qed.  
+Qed.
 
 
 Lemma live_expr_sound Q L e S :
@@ -216,7 +216,7 @@ Lemma live_expr_sound Q L e S :
   Disjoint _ (FromSet (live_expr L e Q)) S ->
   Dead S L e.
 Proof.
-  revert Q; induction e using exp_ind'; intros Q; simpl; intros Hnf Hdis; inv Hnf.  
+  revert Q; induction e using exp_ind'; intros Q; simpl; intros Hnf Hdis; inv Hnf.
   - econstructor.
     + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
       eapply Disjoint_Included_l; [| eassumption ].
@@ -239,12 +239,12 @@ Proof.
         inv Hsuff. eassumption.
   - econstructor.
     + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
-      intros Hc. 
+      intros Hc.
       eapply Hdis; eauto. econstructor; eauto. eapply live_expr_subset.
       rewrite FromSet_add. sets.
     + eapply IHe; eauto.
   - destruct (L ! f) eqn:Heq.
-    + eapply Live_LetApp_Known. eassumption. 
+    + eapply Live_LetApp_Known. eassumption.
       * intros Hc. eapply Hdis. constructor; eauto.
         eapply live_expr_subset.
         eapply add_fun_vars_subset. rewrite FromSet_add. sets.
@@ -264,7 +264,7 @@ Proof.
         unfold add_fun_vars. unfold get_fun_vars. rewrite Heq.
         rewrite FromSet_union_list. sets.
   - destruct (L ! v) eqn:Heq.
-    + eapply Live_App_Known. eassumption. 
+    + eapply Live_App_Known. eassumption.
       * intros Hc. eapply Hdis. constructor; eauto.
         eapply add_fun_vars_subset. rewrite FromSet_add. sets.
       * repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
@@ -288,38 +288,38 @@ Proof.
   - econstructor.
     + repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
       intros Hc. eapply Hdis. constructor; eauto.
-      rewrite FromSet_add. now sets. 
-Qed. 
-      
+      rewrite FromSet_add. now sets.
+Qed.
+
 Lemma live_correct L L' B :
   no_fun_defs B -> (* no nested functions in B *)
-  live B L false = (L', false) -> 
+  live B L false = (L', false) ->
   L = L' /\ live_map_sound B L.
 Proof.
   revert L L'; induction B; simpl; intros L L' Hnf Hl.
   - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' b] eqn:Heq.
-    
+
     assert (Hd := live_diff _ _ _ _ Hl). destruct b; inv Hd.
-    simpl in *. 
+    simpl in *.
 
     edestruct update_live_fun_false; try eassumption.
-    
+
     destructAll.
-    
+
     eapply IHB in Hl. inv Hl.
-    
+
     split. reflexivity.
 
     { intro; intros. inv H.
       - inv H3. eapply live_expr_sound. inv Hnf. eassumption.
         unfold get_fun_vars in *. eapply H0. eassumption.
-      - eapply H1. eassumption. eassumption. } 
+      - eapply H1. eassumption. eassumption. }
 
     inv Hnf. eassumption.
 
   - inv Hl. split; eauto.
     intro; intros. inv H.
-Qed. 
+Qed.
 
 
 (* Proof that a fixpoint is reached in n steps *)
@@ -329,7 +329,7 @@ Fixpoint bitsize (bs : list bool) :=
   | [] => 0
   | b :: bs => if b then 1 + bitsize bs else bitsize bs
   end.
-  
+
 Definition map_size (L : live_fun) :=
   fold_left (fun s '(_, bs) => s + bitsize bs) (M.elements L) 0.
 
@@ -348,9 +348,9 @@ Proof.
     + destruct (update_bs S xs bs) as [bs'' d] eqn:Hupd'.
       destruct b.
       * inv Hupd. simpl. eapply IHxs in Hupd'. lia.
-      * inv Hupd. eapply IHxs in Hupd'. simpl. 
+      * inv Hupd. eapply IHxs in Hupd'. simpl.
         destruct (PS.mem a S); lia.
-Qed.       
+Qed.
 
 Lemma update_bs_bitsize S xs bs bs' :
   update_bs S xs bs = (bs', true) ->
@@ -363,7 +363,7 @@ Proof.
     + destruct (update_bs S xs bs) as [bs'' d] eqn:Hupd'.
       destruct b.
       * inv Hupd. simpl. eapply IHxs in Hupd'. lia.
-      * inv Hupd. simpl. 
+      * inv Hupd. simpl.
         destruct (PS.mem a S).
         -- eapply update_bs_bitsize_leq in Hupd'. lia.
         -- simpl in H1. subst. eapply IHxs. eassumption.
@@ -391,7 +391,7 @@ Lemma set_fun_vars_map_size L f l bs :
   map_size L + bitsize bs =  map_size (set_fun_vars L f bs) + bitsize l.
 Proof.
   intros Heq Hlen. unfold set_fun_vars.
-  
+
   unfold map_size.
   edestruct elements_set_some. eassumption.
   destructAll.
@@ -405,7 +405,7 @@ Proof.
   intros ? ? [? ? ]. lia.
 Qed.
 
-  
+
 Lemma update_live_fun_size_leq L L' b f xs S :
   update_live_fun L f xs S = (L', b) ->
   map_size L <= map_size L'.
@@ -416,12 +416,12 @@ Proof.
   unfold get_fun_vars in *.
   destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
   destruct diff.
-  
+
   - inv Hl. assert (Hupd' := Hupd). eapply update_bs_bitsize in Hupd.
     eapply set_fun_vars_map_size with (bs := bs) in Hf. lia.
     eapply update_bs_length. eassumption.
   - inv Hl. reflexivity.
-  - inv Hl. reflexivity. 
+  - inv Hl. reflexivity.
 Qed.
 
 Lemma update_live_fun_size L L' f xs S :
@@ -434,7 +434,7 @@ Proof.
   unfold get_fun_vars in *.
   destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
   destruct diff.
-  
+
   - inv Hl. assert (Hupd' := Hupd). eapply update_bs_bitsize in Hupd.
     eapply set_fun_vars_map_size with (bs := bs) in Hf. lia.
     eapply update_bs_length. eassumption.
@@ -450,41 +450,41 @@ Proof.
   - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' b] eqn:Heq.
     destruct b; simpl in *.
     + eapply Nat.le_trans.
-      eapply update_live_fun_size_leq. 
+      eapply update_live_fun_size_leq.
       eassumption.
       eapply IHB. eassumption.
-    + edestruct update_live_fun_false. 
-      eassumption. destructAll. 
+    + edestruct update_live_fun_false.
+      eassumption. destructAll.
       eapply IHB. eassumption.
   - inv Hl. reflexivity.
-Qed. 
+Qed.
 
 
 Lemma live_size L L' B :
   live B L false = (L', true) ->
   map_size L < map_size L'.
 Proof.
-  assert (Heq : false = false) by reflexivity. revert Heq. generalize false at 1 3. 
+  assert (Heq : false = false) by reflexivity. revert Heq. generalize false at 1 3.
   revert L L'; induction B; simpl; intros L L' d Heq Hl; subst.
   - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' b] eqn:Heq.
 
     destruct b; simpl in *.
     + eapply Nat.lt_le_trans.
       eapply update_live_fun_size. eassumption.
-      eapply live_size_leq. 
+      eapply live_size_leq.
       eassumption.
-    + edestruct update_live_fun_false. 
-      eassumption. destructAll. 
+    + edestruct update_live_fun_false.
+      eassumption. destructAll.
       eapply IHB. reflexivity. eassumption.
-  - inv Hl. 
-Qed. 
+  - inv Hl.
+Qed.
 
 
 Lemma find_live_helper_size B L n L' :
-  no_fun_defs B -> 
+  no_fun_defs B ->
   find_live_helper B L n = Ret L' ->
   (* either a fixpoint is reached *)
-  live_map_sound B L' \/ 
+  live_map_sound B L' \/
   (* or the distance between L and L' is at least n *)
   map_size L + n <= map_size L'.
 Proof.
@@ -492,7 +492,7 @@ Proof.
   - inv H0. right. lia.
   - simpl in H0.
     destruct (live B L false) as [L1 diff]  eqn:Hlive.
-    
+
     destruct diff.
 
     + eapply IHn in H0; eauto. inv H0. now left.
@@ -502,7 +502,7 @@ Proof.
 
     + inv H0. eapply live_correct in Hlive; eauto.
       destructAll. now left.
-Qed. 
+Qed.
 
 
 (* Lemmas about max_size *)
@@ -512,19 +512,19 @@ Lemma bitsize_leq bs :
 Proof.
   induction bs; simpl; eauto. destruct a; lia.
 Qed.
-  
+
 Lemma max_map_size_leq L :
   map_size L <= max_map_size L.
 Proof.
   unfold map_size, max_map_size.
   eapply List_util.fold_left_monotonic; eauto.
   intros. destruct x2. simpl.
-  assert (Hleq := bitsize_leq l). 
+  assert (Hleq := bitsize_leq l).
   lia.
 Qed.
 
 
-      
+
 Lemma max_map_size_empty :
   max_map_size (M.empty (list bool)) = 0.
 Proof. reflexivity. Qed.
@@ -543,7 +543,7 @@ Proof.
   destructAll.
   rewrite H, H0.
   rewrite !fold_left_app. simpl.
-  
+
   rewrite <- (plus_O_n (fold_left _ _ _ + length bs)).
   rewrite <- (plus_O_n (fold_left _ _ _  + length l)).
   erewrite !List_util.fold_left_acc_plus. simpl. congruence.
@@ -563,7 +563,7 @@ Proof.
   unfold get_fun_vars in *.
   destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
   destruct diff.
-  
+
   - inv Hl.  eapply update_bs_length in Hupd.
     assert (Hupd' := Hupd).
     eapply set_fun_vars_max_size. eassumption. eassumption.
@@ -578,14 +578,14 @@ Lemma live_max_size L L' d d' B :
 Proof.
   revert L L' d d'; induction B; simpl; intros L L' d d' Hl; subst.
   - destruct (update_live_fun L v l (live_expr L e PS.empty)) as [L'' b] eqn:Heq.
-    
+
     eapply IHB in Hl. eapply update_live_fun_max_size in Heq. congruence.
-  - inv Hl. reflexivity. 
-Qed. 
+  - inv Hl. reflexivity.
+Qed.
 
 
 Lemma find_live_helper_max_size B L n L' :
-  no_fun_defs B -> 
+  no_fun_defs B ->
   find_live_helper B L n = Ret L' ->
   max_map_size L' = max_map_size L.
 Proof.
@@ -593,7 +593,7 @@ Proof.
   - inv H0. reflexivity.
   - simpl in H0.
     destruct (live B L false) as [L1 diff]  eqn:Hlive.
-    
+
     destruct diff.
 
     + eapply IHn in H0; eauto. eapply live_max_size in Hlive.
@@ -601,7 +601,7 @@ Proof.
 
     + inv H0.
       eapply live_max_size in Hlive. lia.
-Qed. 
+Qed.
 
 Lemma set_fun_vars_max_size_None L f bs :
   L ! f = None ->
@@ -614,7 +614,7 @@ Proof.
   destructAll.
   rewrite H, H0.
   rewrite !fold_left_app. simpl.
-  
+
   rewrite <- (plus_O_n (fold_left _ _ _ + length bs)).
   rewrite <- (plus_O_n (fold_left _ x 0)).
   erewrite !List_util.fold_left_acc_plus. simpl. lia.
@@ -623,13 +623,13 @@ Proof.
 Qed.
 
 Lemma get_bool_false_length {A} (l : list A) :
-  length (get_bool_false l) = length l. 
+  length (get_bool_false l) = length l.
 Proof.
   induction l; simpl; eauto.
 Qed.
 
 Lemma get_bool_true_length {A} (l : list A) :
-  length (get_bool_true l) = length l. 
+  length (get_bool_true l) = length l.
 Proof.
   induction l; simpl; eauto.
 Qed.
@@ -641,26 +641,26 @@ Proof.
 
   rewrite <- Nat.add_assoc. rewrite (Nat.add_comm m). rewrite Nat.add_assoc.
   rewrite IHB. lia.
-Qed. 
-  
+Qed.
+
 
 Lemma init_live_fun_aux_max_size L B L' m :
   Disjoint _ (Dom_map L) (name_in_fundefs B) ->
   unique_functions B ->
-  init_live_fun_aux L B = L' ->  
+  init_live_fun_aux L B = L' ->
   max_map_size L' + m = max_map_size L + num_vars B m.
 Proof.
   revert L L' m; induction B; simpl; intros L L' m Hdis Hun Hinit.
-  - eapply IHB in Hinit. 
+  - eapply IHB in Hinit.
     + rewrite Hinit. rewrite set_fun_vars_max_size_None.
       rewrite get_bool_false_length, num_vars_acc. lia.
-      
+
       destruct (L ! v) eqn:Heq; eauto. exfalso. eapply Hdis.
       constructor; eauto. eexists; eauto.
 
     + unfold set_fun_vars.
-      rewrite Dom_map_set. inv Hun. sets. 
-      
+      rewrite Dom_map_set. inv Hun. sets.
+
     + inv Hun. sets.
 
   - congruence.
@@ -669,7 +669,7 @@ Qed.
 
 Lemma init_live_fun_max_size L B :
   unique_functions B ->
-  init_live_fun B = L ->  
+  init_live_fun B = L ->
   max_map_size L = num_vars B 0.
 Proof.
   intros.
@@ -685,15 +685,15 @@ Proof.
   unfold remove_escaping. destruct (get_fun_vars L x) eqn:Hget; subst; eauto.
 
   unfold max_map_size.
-  edestruct cps.M.elements_remove. eassumption. 
+  edestruct cps.M.elements_remove. eassumption.
   destructAll. rewrite H, H0.
   rewrite !fold_left_app. simpl.
-  
+
   rewrite <- (plus_O_n (fold_left _ x0 0)).
   erewrite !List_util.fold_left_acc_plus. simpl. lia.
   intros ? ? [? ? ]. lia.
   intros ? ? [? ? ]. lia.
-  intros ? ? [? ? ]. lia.  
+  intros ? ? [? ? ]. lia.
 Qed.
 
 
@@ -706,15 +706,15 @@ Proof.
 Qed.
 
 
-Lemma escaping_fun_fundefs_max_size_mut :  
+Lemma escaping_fun_fundefs_max_size_mut :
   (forall e L,
       max_map_size (escaping_fun_exp e L) <= max_map_size L) /\
   (forall B L,
-      max_map_size (escaping_fun_fundefs B L) <= max_map_size L). 
+      max_map_size (escaping_fun_fundefs B L) <= max_map_size L).
 Proof.
   exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto;
     try (now eapply Nat.le_trans; [ eapply IHe | eapply remove_escapings_max_size ]);
-    try (now eapply Nat.le_trans; [ eapply IHe | eapply remove_escaping_max_size ]). 
+    try (now eapply Nat.le_trans; [ eapply IHe | eapply remove_escaping_max_size ]).
   - simpl in IHl.
     eapply Nat.le_trans. eapply IHl. eapply IHe.
   - simpl in *.
@@ -723,14 +723,14 @@ Proof.
   - eapply remove_escaping_max_size.
   - simpl in *.
     eapply Nat.le_trans. eapply IHB. eapply IHe.
-Qed. 
+Qed.
 
-Lemma escaping_fun_exp_max_size :  
+Lemma escaping_fun_exp_max_size :
   (forall e L,
       max_map_size (escaping_fun_exp e L) <= max_map_size L).
 Proof. eapply escaping_fun_fundefs_max_size_mut. Qed.
 
-Lemma escaping_fun_fundefs_max_size :  
+Lemma escaping_fun_fundefs_max_size :
   (forall B L,
       max_map_size (escaping_fun_fundefs B L) <= max_map_size L).
 Proof. eapply escaping_fun_fundefs_max_size_mut. Qed.
@@ -744,20 +744,20 @@ Lemma find_live_sound (B : fundefs) (e : exp) L :
 Proof.
   intros Hnf Hun Hl. unfold find_live in *.
   assert (Hl' := Hl).
-  
+
   eapply find_live_helper_size in Hl; eauto.
   inv Hl; eauto.
   eapply find_live_helper_max_size in Hl'; eauto.
 
   assert (Hleq1 := escaping_fun_fundefs_max_size B (init_live_fun B)).
   assert (Hleq2 := escaping_fun_exp_max_size e (escaping_fun_fundefs B (init_live_fun B))).
-  
+
   erewrite init_live_fun_max_size  with (L := init_live_fun _) in *; eauto.
-  
+
   assert (Hleq := max_map_size_leq L). lia.
 Qed.
-  
-  
+
+
 (* Domain of live_fun is preserved *)
 
 
@@ -771,11 +771,11 @@ Proof.
   unfold get_fun_vars in *.
   destruct (update_bs S xs l) as [bs diff] eqn:Hupd.
   destruct diff.
-  
+
   - inv Hl. unfold set_fun_vars.
     rewrite Dom_map_set. rewrite (Union_Same_set [set f] (Dom_map L)). reflexivity.
     eapply Singleton_Included. eexists; eauto.
-    
+
   - inv Hl. reflexivity.
   - inv Hl. reflexivity.
 Qed.
@@ -790,11 +790,11 @@ Proof.
     destruct b; simpl in *.
     + eapply IHB in Hl. rewrite <- Hl.
       eapply update_live_fun_dom. eassumption.
-    + edestruct update_live_fun_false. 
-      eassumption. destructAll. 
+    + edestruct update_live_fun_false.
+      eassumption. destructAll.
       eapply IHB. eassumption.
   - inv Hl. reflexivity.
-Qed. 
+Qed.
 
 Lemma find_live_helper_dom B L n L' :
   find_live_helper B L n = Ret L' ->
@@ -804,7 +804,7 @@ Proof.
   - inv H. reflexivity.
   - simpl in H.
     destruct (live B L false) as [L1 diff] eqn:Hlive.
-    
+
     destruct diff.
 
     + eapply live_dom in Hlive.
@@ -812,11 +812,11 @@ Proof.
 
     + inv H.
       eapply live_dom. eassumption.
-Qed. 
-  
+Qed.
+
 
 Lemma init_live_fun_aux_dom L B L' :
-  init_live_fun_aux L B = L' ->  
+  init_live_fun_aux L B = L' ->
   Dom_map L' \subset name_in_fundefs B :|: Dom_map L.
 Proof.
   revert L L'; induction B; simpl; intros L L' Hinit.
@@ -828,55 +828,55 @@ Qed.
 
 
 Inductive Known_exp (S : Ensemble var) : exp -> Prop :=
-| Known_Constr : 
-    forall (x : var) (ys : list var) (ct : ctor_tag) (e : exp), 
-      Disjoint _ (FromList ys) S -> 
+| Known_Constr :
+    forall (x : var) (ys : list var) (ct : ctor_tag) (e : exp),
+      Disjoint _ (FromList ys) S ->
       Known_exp S e ->
       Known_exp S (Econstr x ct ys e)
-| Known_Prim_val : 
-  forall (x : var) p (e : exp), 
+| Known_Prim_val :
+  forall (x : var) p (e : exp),
     Known_exp S e ->
     Known_exp S (Eprim_val x p e)
-| Known_Prim : 
-  forall (x : var) (g : prim) (ys : list var) (e : exp), 
-    Disjoint _ (FromList ys) S -> 
+| Known_Prim :
+  forall (x : var) (g : prim) (ys : list var) (e : exp),
+    Disjoint _ (FromList ys) S ->
     Known_exp S e ->
     Known_exp S (Eprim x g ys e)
-| Known_Proj : 
-    forall (x : var) (ct : ctor_tag) (n : N) (y : var) (e : exp), 
+| Known_Proj :
+    forall (x : var) (ct : ctor_tag) (n : N) (y : var) (e : exp),
       ~ y \in S ->
      Known_exp S e ->
      Known_exp S (Eproj x ct n y e)
-| Known_Case: 
+| Known_Case:
     forall (x : var) (ce : list (ctor_tag * exp)),
-      Forall (fun p => Known_exp S (snd p)) ce -> 
+      Forall (fun p => Known_exp S (snd p)) ce ->
       Known_exp S (Ecase x ce)
 | Known_Fun:
     forall B e,
       Known_fundefs S B ->
       Known_exp S e ->
-      Known_exp S (Efun B e)      
-| Known_Halt : 
+      Known_exp S (Efun B e)
+| Known_Halt :
     forall (x : var),
       ~ x \in S ->
       Known_exp S (Ehalt x)
 | Known_App :
     forall (f : var) (ys : list var) (ft : fun_tag),
-      Disjoint _ (FromList ys) S -> 
+      Disjoint _ (FromList ys) S ->
       Known_exp S (Eapp f ft ys)
 | Known_LetApp :
     forall (x f : var) (ys : list var) (ft : fun_tag) (e : exp),
-      Disjoint _ (FromList ys) S -> 
+      Disjoint _ (FromList ys) S ->
       Known_exp S e ->
       Known_exp S (Eletapp x f ft ys e)
-with Known_fundefs (S : Ensemble var) : fundefs -> Prop := 
+with Known_fundefs (S : Ensemble var) : fundefs -> Prop :=
 | Known_Fcons :
     forall f ft xs e B,
       Known_exp S e ->
       Known_fundefs S B ->
-      Known_fundefs S (Fcons f ft xs e B)      
-| Known_Fnil : 
-    Known_fundefs S Fnil. 
+      Known_fundefs S (Fcons f ft xs e B)
+| Known_Fnil :
+    Known_fundefs S Fnil.
 
 
 (* Dom subset *)
@@ -896,66 +896,66 @@ Proof.
 Qed.
 
 
-Lemma escaping_fun_subset_mut :  
+Lemma escaping_fun_subset_mut :
   (forall e L,
       (Dom_map  (escaping_fun_exp e L)) \subset Dom_map L) /\
   (forall B L,
-      (Dom_map (escaping_fun_fundefs B L)) \subset Dom_map L). 
+      (Dom_map (escaping_fun_fundefs B L)) \subset Dom_map L).
 Proof.
   exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto; sets;
-  try now (eapply Included_trans; [ eapply IHe | ]; 
+  try now (eapply Included_trans; [ eapply IHe | ];
            eauto using remove_escaping_subset, remove_escapings_subset).
   - simpl in *. eapply Included_trans. eapply IHl. eapply IHe.
   - eapply remove_escapings_subset.
   - eapply remove_escaping_subset.
   - eapply Included_trans. eapply IHB. eapply IHe.
-Qed. 
+Qed.
 
-Lemma escaping_fun_exp_subset : 
+Lemma escaping_fun_exp_subset :
   (forall e L,
       (Dom_map  (escaping_fun_exp e L)) \subset Dom_map L).
 Proof. eapply escaping_fun_subset_mut. Qed.
 
 
-Lemma escaping_fun_fundefs_subset : 
+Lemma escaping_fun_fundefs_subset :
   (forall e L,
       (Dom_map (escaping_fun_fundefs e L)) \subset Dom_map L).
 Proof. eapply escaping_fun_subset_mut. Qed.
 
-  
+
 
 Lemma remove_escaping_preserves_disjoint S L x :
-  Disjoint _ S (Dom_map L) -> 
+  Disjoint _ S (Dom_map L) ->
   Disjoint _ S (Dom_map (remove_escaping L x)).
 Proof.
   intros Hc. eapply Disjoint_Included_r. eapply remove_escaping_subset. sets.
 Qed.
-  
+
 Lemma remove_escapings_preserves_disjoint S L x :
-  Disjoint _ S (Dom_map L) -> 
+  Disjoint _ S (Dom_map L) ->
   Disjoint _ S (Dom_map (remove_escapings L x)).
 Proof.
   intros Hc. eapply Disjoint_Included_r. eapply remove_escapings_subset. sets.
 Qed.
 
-Lemma escaping_fun_exp_preserves_disjoint :  
+Lemma escaping_fun_exp_preserves_disjoint :
   forall e S L,
-    Disjoint _ S (Dom_map L) -> 
+    Disjoint _ S (Dom_map L) ->
     Disjoint _ S (Dom_map  (escaping_fun_exp e L)).
 Proof.
   intros. eapply Disjoint_Included_r. eapply escaping_fun_exp_subset. sets.
-Qed. 
+Qed.
 
-Lemma escaping_fun_fundefs_preserves_disjoint :  
+Lemma escaping_fun_fundefs_preserves_disjoint :
   forall B S L,
-    Disjoint _ S (Dom_map L) -> 
+    Disjoint _ S (Dom_map L) ->
     Disjoint _ S (Dom_map  (escaping_fun_fundefs B L)).
 Proof.
   intros. eapply Disjoint_Included_r. eapply escaping_fun_fundefs_subset. sets.
-Qed. 
+Qed.
 
 
-Lemma Known_exp_monotonic_mut :  
+Lemma Known_exp_monotonic_mut :
   (forall e S1 S2,
       Known_exp S1 e ->
       S2 \subset S1 ->
@@ -973,14 +973,14 @@ Proof.
 Qed.
 
 
-Corollary Known_exp_monotonic : 
+Corollary Known_exp_monotonic :
   forall e S1 S2,
     Known_exp S1 e ->
     S2 \subset S1 ->
     Known_exp S2 e.
 Proof. eapply Known_exp_monotonic_mut. Qed.
 
-Corollary Known_fundefs_monotonic : 
+Corollary Known_fundefs_monotonic :
   forall B S1 S2,
     Known_fundefs S1 B ->
     S2 \subset S1 ->
@@ -1007,11 +1007,11 @@ Proof.
     eapply remove_escapings_preserves_disjoint. eapply Disjoint_Singleton_l. eassumption.
  Qed.
 
-Lemma escaping_fun_fundefs_sound :  
+Lemma escaping_fun_fundefs_sound :
   (forall e L,
       Known_exp (Dom_map (escaping_fun_exp e L)) e) /\
   (forall B L,
-      Known_fundefs (Dom_map (escaping_fun_fundefs B L)) B). 
+      Known_fundefs (Dom_map (escaping_fun_fundefs B L)) B).
 Proof.
   exp_defs_induction IHe IHl IHB; simpl; intros; subst; eauto;
     try (now econstructor; eauto; eapply escaping_fun_exp_preserves_disjoint; eapply remove_escapings_disjoint).
@@ -1019,7 +1019,7 @@ Proof.
     + simpl.
       eapply Known_exp_monotonic. eapply IHe.
       assert (Hsub := escaping_fun_exp_subset (Ecase v l) (escaping_fun_exp e L)). eassumption.
-    + simpl in *. 
+    + simpl in *.
       specialize (IHl (escaping_fun_exp e L)). inv IHl. eassumption.
   - econstructor; eauto.
     assert (Hdis : Disjoint _ [set v0] (Dom_map (escaping_fun_exp e (remove_escaping L v0)))).
@@ -1034,12 +1034,12 @@ Proof.
   - econstructor; eauto.
     eapply Known_exp_monotonic. eapply IHe.
     eapply escaping_fun_fundefs_subset.
-Qed. 
+Qed.
 
 Lemma find_live_fun_map_dom B e L :
   find_live (Efun B e) = Ret L ->
   Dom_map L \subset name_in_fundefs B /\
-  Known_exp (Dom_map L) (Efun B e). 
+  Known_exp (Dom_map L) (Efun B e).
 Proof.
   intros Hf. unfold find_live in *.
   eapply find_live_helper_dom in Hf.
@@ -1060,7 +1060,7 @@ Proof.
 
     + eapply H.
 Qed.
-  
+
 (* Top-level theorem for liveness analysis *)
 Corollary find_live_sound_top (B : fundefs) (e : exp) L :
   no_fun_defs B -> (* no nested fundefs *)
@@ -1082,9 +1082,9 @@ Lemma is_hoisted_exp_correct e :
   is_hoisted_exp e = true ->
   no_fun e.
 Proof.
-  induction e using exp_ind'; simpl; intros; eauto. 
+  induction e using exp_ind'; simpl; intros; eauto.
   - simpl in *. congruence.
-Qed. 
+Qed.
 
 
 Lemma is_hoisted_fundefs_correct B :
@@ -1093,10 +1093,10 @@ Lemma is_hoisted_fundefs_correct B :
 Proof.
   induction B; simpl; intros; eauto.
 
-  eapply andb_prop in H. destructAll.  
+  eapply andb_prop in H. destructAll.
   econstructor; eauto.
   eapply is_hoisted_exp_correct; eauto.
-Qed. 
+Qed.
 
 
 Lemma is_hoisted_correct B e :
@@ -1104,6 +1104,6 @@ Lemma is_hoisted_correct B e :
   no_fun_defs B /\ no_fun e.
 Proof.
   intros H. simpl in *.  eapply andb_prop in H.
-  destructAll. 
+  destructAll.
   split; eauto using is_hoisted_exp_correct, is_hoisted_fundefs_correct.
 Qed.

@@ -1,7 +1,7 @@
-Require Import Coq.Arith.Arith Coq.ZArith.ZArith Coq.NArith.BinNat
-        Coq.Lists.List Coq.micromega.Lia Coq.micromega.Lia Coq.Program.Program
-        Coq.micromega.Psatz.
-Require Import FunInd.
+From Stdlib Require Import Arith.Arith ZArith.ZArith NArith.BinNat
+        Lists.List micromega.Lia micromega.Lia Program.Program
+        micromega.Psatz.
+From Stdlib Require Import FunInd.
 Require Import Common.Common.
 
 Open Scope N_scope.
@@ -9,9 +9,9 @@ Opaque N.add.
 Opaque N.sub.
 
 (** A tactic for simplifying numeric tests. *)
-Ltac if_split := 
+Ltac if_split :=
   match goal with
-    | [ |- context[if ?e then _ else _] ] => 
+    | [ |- context[if ?e then _ else _] ] =>
       destruct e; simpl; try lia; auto; try subst
   end.
 
@@ -33,14 +33,14 @@ Definition lt_dec (x y:N): {x < y} + { x >= y}.
 Defined.
 
 Lemma Nlt_or_ge: forall n m:N, n < m \/ m <= n.
-Proof. 
+Proof.
   intros n m. lia.
 Qed.
 
 Lemma Nmax_plusr: forall x y, exists j, N.max x y = j + y.
 Proof.
-  intros x y. destruct (N.max_spec x y) as [[h j]|[h j]].  
-  - exists 0. lia. 
+  intros x y. destruct (N.max_spec x y) as [[h j]|[h j]].
+  - exists 0. lia.
   - exists (x - y). replace (x - y + y) with x. assumption. lia.
 Qed.
 Lemma Nmax_plusl: forall x y, exists j, N.max x y = j + x.
@@ -90,7 +90,7 @@ with efnlst_ind'  := Induction for efnlst Sort Prop
 with branches_e_ind' := Induction for branches_e Sort Prop.
 Combined Scheme my_exp_ind from
          exp_ind', exps_ind', efnlst_ind', branches_e_ind'.
-(* Notes on source expressions:  
+(* Notes on source expressions:
 
    [Let_e e1 e2] corresponds to (let x0 := e1 in e2)
 
@@ -99,7 +99,7 @@ Combined Scheme my_exp_ind from
    (Thus going under Fix_e increases index by n).
 
    For [Match_e] each [branch], (d, n, e), binds [n] variables,
-   corresponding to the arguments to the data constructor d.  
+   corresponding to the arguments to the data constructor d.
 *)
 
 Fixpoint exps_length (es:exps) : N :=
@@ -116,7 +116,7 @@ Fixpoint efnlst_length (es:efnlst) : N :=
 
 (** Find the nth component in exps **)
 Fixpoint enthopt (n:nat) (xs:efnlst): option exp :=
-  match n, xs with 
+  match n, xs with
     | 0%nat, eflcons _ h _ => Some h
     | S n, eflcons _ _ t => enthopt n t
     | _, _ => None
@@ -160,7 +160,7 @@ with exps_wf: N -> exps -> Prop :=
     exp_wf i e -> exps_wf i es -> exps_wf i (econs e es)
 with efnlst_wf: N -> efnlst -> Prop :=
 | flnil_wf_e: forall i, efnlst_wf i eflnil
-| flcons_wf_e: forall i f e es,    
+| flcons_wf_e: forall i f e es,
     exp_wf i e -> isLambda e -> efnlst_wf i es ->
     efnlst_wf i (eflcons f e es)
 with branches_wf: N -> branches_e -> Prop :=
@@ -183,8 +183,8 @@ Lemma weaken_wf' :
   (forall i es, exps_wf i es -> forall j, i < j -> exps_wf j es) /\
   (forall i es, efnlst_wf i es -> forall j, i < j -> efnlst_wf j es) /\
   (forall i bs, branches_wf i bs -> forall j, i < j -> branches_wf j bs).
-Proof.  
-  apply my_exp_wf_ind; intros; econstructor; auto; try lia; 
+Proof.
+  apply my_exp_wf_ind; intros; econstructor; auto; try lia;
   match goal with
     | [ H: forall _, _ -> exp_wf _ ?e |- exp_wf _ ?e] => apply H; lia
     | _ => idtac
@@ -233,7 +233,7 @@ Section SHIFT.
     end.
 End SHIFT.
 
-Fixpoint shift n k e := 
+Fixpoint shift n k e :=
   match e with
     | Var_e i => Var_e (if lt_dec i k then i else i + n)
     | App_e e1 e2 => App_e (shift n k e1) (shift n k e2)
@@ -276,7 +276,7 @@ Section SHFT.
   Definition shft_branches' k bs := List.map (shft_branch' k) bs.
 End SHFT.
 
-Fixpoint shft k e := 
+Fixpoint shft k e :=
   match e with
     | Var_e i => Var_e (if lt_dec i k then i else i + 1)
     | App_e e1 e2 => App_e (shft k e1) (shft k e2)
@@ -369,7 +369,7 @@ Notation "M { j := N }" := (substitute N j M)
   { substitute := substs}.
 #[export] Instance BranchSubstitute: Substitute exp _ :=
   { substitute := subst_efnlst}.
-#[export] Instance BranchesSubstitute: Substitute exp _ := 
+#[export] Instance BranchesSubstitute: Substitute exp _ :=
   { substitute := subst_branches}.
 
 (** Notation for unoptimised substitution. *)
@@ -382,7 +382,7 @@ Notation "M { j ::= N }" := (sbstitute N j M)
   { sbstitute := sbsts}.
 #[export] Instance EfnlstSbstitute: Sbstitute exp efnlst :=
   { sbstitute := sbst_efnlst}.
-#[export] Instance BranchesSbstitute: Sbstitute exp branches_e := 
+#[export] Instance BranchesSbstitute: Sbstitute exp branches_e :=
   { sbstitute := sbst_branches}.
 
 Lemma Var_e_sbst_inv:
@@ -433,7 +433,7 @@ Proof.
   try (rewrite H; auto; try lia; rewrite H0; auto; autorewrite with core; try lia; auto).
   repeat if_split. apply f_equal. lia.
   f_equal.
-  rewrite H; auto; autorewrite with core; try lia. 
+  rewrite H; auto; autorewrite with core; try lia.
   tauto.
 Qed.
 
@@ -456,7 +456,7 @@ Proof.
   rewrite shift_twice; auto; lia.
   destruct (lt_dec n k); try lia; auto. apply f_equal. lia.
   apply f_equal. rewrite H; simpl; f_equal; try lia.
-  simpl; repeat (f_equal; try lia). 
+  simpl; repeat (f_equal; try lia).
   repeat (f_equal; try lia).
   simpl in H. unfold shift_fns in H. rewrite H.
   repeat (f_equal; autorewrite with core; try lia; auto).
@@ -485,7 +485,7 @@ Proof.
 Qed.
 
 (** According to Berghofer and Urban, this is a critical property of
-    substitution, though we don't use it here. 
+    substitution, though we don't use it here.
 **)
 Lemma substitution :
   forall (M N L:exp) i j, i <= j ->
@@ -505,7 +505,7 @@ Proof.
   generalize (shift_away_subst L 0 i (n - 1)). intro.
   unfold substitute in H0. simpl in H0.
   specialize (H0 (subst L (n - 1 - i) N)). rewrite H0; auto. lia. lia.
-  apply f_equal. replace (1 + j - (1 + i)) with (j - i). auto. lia. 
+  apply f_equal. replace (1 + j - (1 + i)) with (j - i). auto. lia.
   apply f_equal. replace (1 + j - (1 + i)) with (j - i). auto. lia.
   f_equal. repeat (f_equal; try lia).
   repeat (f_equal; try lia).
@@ -558,7 +558,7 @@ Inductive eval: exp -> exp -> Prop :=
 | eval_App_e: forall e1 na e1' e2 v2 v,
     eval e1 (Lam_e na e1') ->
     eval e2 v2 ->
-    eval (e1'{0 ::= v2}) v -> 
+    eval (e1'{0 ::= v2}) v ->
     eval (App_e e1 e2) v
 | eval_Con_e: forall d es vs,
     evals es vs ->
@@ -671,7 +671,7 @@ Qed.
 Example x2: exp := App_e x1 x1.  (* (fun x => x) (fun x => x) *)
 Lemma Lx2: forall (e d:exp), eval e d -> eval (App_e x2 e) d.
 Proof.
-  intros e d h. unfold x2, x1. eapply eval_App_e. 
+  intros e d h. unfold x2, x1. eapply eval_App_e.
   - eapply eval_App_e; try constructor.
   - eassumption.
   - simpl. apply (proj1 eval_idempotent _ _ h).
@@ -679,21 +679,21 @@ Qed.
 
 
 (** For testing: a fuel-based interpreter for partial big-step on [exp]. *)
-Function eval_n (n:nat) (e:exp) {struct n}: option exp := 
+Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
   match n with
     | 0%nat => None
     | S n => match e with
                | Lam_e na d => Some (Lam_e na d)
                | Fix_e es k => Some (Fix_e es k)
                | Prf_e => Some Prf_e
-               | Con_e d es => 
+               | Con_e d es =>
                  match evals_n n es with
                      | None => None
                      | Some vs => Some (Con_e d vs)
                  end
                | App_e e1 e2 =>
                  match eval_n n e1 with
-                   | Some (Lam_e _ e1') => 
+                   | Some (Lam_e _ e1') =>
                      match eval_n n e2 with
                        | None => None
                        | Some e2' => eval_n n (e1'{0 ::= e2'})
@@ -732,16 +732,16 @@ Function eval_n (n:nat) (e:exp) {struct n}: option exp :=
                  end
                | Prim_val_e p => Some (Prim_val_e p)
                | Var_e e => None
-               | Prim_e p => None                                                   
+               | Prim_e p => None
              end
   end
 with evals_n n (es:exps) : option exps :=
        match n with
          | 0%nat => None
-         | S n => 
+         | S n =>
            match es with
              | enil => Some enil
-             | econs e es => 
+             | econs e es =>
                match (eval_n n e, evals_n n es) with
                  | (Some v, Some vs) => Some (econs v vs)
                  | (_, _) => None
@@ -773,14 +773,14 @@ Lemma eval_n_weaken:
                    forall m, evals_n (n+m) es = Some fs).
 Proof.
   Check eval_n_ind.
-  Check (eval_evals_n_ind). 
+  Check (eval_evals_n_ind).
            (fun n e f =>
               eval_n n e = Some f -> forall m : nat, eval_n (n + m) e = Some f)).
 ***********)
 
 
 (** [eval_n] is sound w.r.t. [eval] **)
-Lemma evaln_eval: 
+Lemma evaln_eval:
   forall (n:nat),
   (forall (e:exp) v, eval_n n e = Some v -> eval e v) /\
   (forall (es:exps) vs, evals_n n es = Some vs -> evals es vs).
@@ -806,7 +806,7 @@ Proof.
   + econstructor.
     * specialize (H _ e4). eapply H.
     * specialize (H0 _ H1). apply H0.
-  + econstructor; eauto. 
+  + econstructor; eauto.
   + injection H; intros; subst. constructor.
   + injection H; intros h0. subst. constructor.
   + injection H1; intros h0. subst. constructor.
@@ -844,7 +844,7 @@ Proof.
   { induction m; intuition auto with arith. }
   apply my_eval_ind; intros; try (exists 0; intros mx h; reflexivity).
   - destruct H, H0, H1. exists (S (max x (max x0 x3))). intros m h.
-    assert (j1:= max_fst x (max x0 x3)). 
+    assert (j1:= max_fst x (max x0 x3)).
     assert (lx: m > x). lia.
     assert (j2:= max_snd x (max x0 x3)).
     assert (j3:= max_fst x0 x3).
@@ -865,7 +865,7 @@ Proof.
     simpl. rewrite (j mx); try lia. rewrite H; try lia.
     rewrite e1. rewrite H0; try lia. reflexivity.
   - destruct H, H0, H1. exists (S (max x (max x0 x3))). intros m h.
-    assert (j1:= max_fst x (max x0 x3)). 
+    assert (j1:= max_fst x (max x0 x3)).
     assert (lx: m > x). lia.
     assert (j2:= max_snd x (max x0 x3)).
     assert (j3:= max_fst x0 x3).
@@ -896,7 +896,7 @@ Proof.
   rewrite k. apply H. lia.
 Qed.
 (* Print Assumptions eval_evaln. *)
-  
+
 Lemma eval_n_up:
  forall t s tmr,
    eval_n tmr t = Some s -> exists n, forall m, m >= n -> eval_n m t = Some s.
@@ -931,7 +931,7 @@ Definition Ve4 := (Var_e 4).
 Definition Ve5 := (Var_e 5).
 
 Definition unsome (x:option exp) : exp :=
-  match x with 
+  match x with
     | Some e => e
     | None => Var_e 9999
   end.
@@ -979,7 +979,7 @@ Import ListNotations.
 Notation ite :=
   (Lam_e "x" (Lam_e "y" (Lam_e "z"
              (Match_e Ve2 0 (brcons_e TT (0,[]) Ve1 (brcons_e FF (0,[]) Ve0 brnil_e)))))).
-             
+
 Goal eval (ite $ TTT $ FFF $ TTT) FFF.
   repeat econstructor. Qed.
 Goal eval (ite $ FFF $ FFF $ TTT) TTT.
@@ -1051,7 +1051,7 @@ Notation six := (SSS $ five).
 
 (** fixpoints **)
 Definition copy : exp :=
-  (Fix_e [!"copy" := Lam_e "x" (Match_e Ve0 0 (brcons_e ZZ (0,[]) ZZZ 
+  (Fix_e [!"copy" := Lam_e "x" (Match_e Ve0 0 (brcons_e ZZ (0,[]) ZZZ
             (brcons_e SS (1, [: "n"]) (SSS $ ((Var_e 2) $ Ve0)) brnil_e)))!] 0).
 
 Goal eval (copy $ ZZZ) ZZZ.
@@ -1067,17 +1067,17 @@ Qed.
 (**** Fixpoints???  ****
 Goal eval (copy $ one) One.
 unfold copy. eapply eval_App_e.
-- eapply eval_Lam_e. 
+- eapply eval_Lam_e.
 - eapply eval_App_e.
-  + eapply eval_Lam_e. 
+  + eapply eval_Lam_e.
   + repeat econstructor.
   + simpl. eapply eval_Con_e. repeat econstructor.
 - vm_compute. eapply eval_Match_e.
   + eapply eval_Con_e. repeat econstructor.
-  + unfold find_branch. repeat if_split. 
+  + unfold find_branch. repeat if_split.
     * discriminate.
     * apply f_equal. eapply eval_Proj_e.
-    
+
 
 repeat (try econstructor; try vm_compute).
 Qed.
@@ -1100,9 +1100,9 @@ Definition add :=
                             eflnil)))).
 
 Goal eval (add $ ZZZ $ ZZZ) ZZZ.
-unfold add. eapply eval_App_e. 
+unfold add. eapply eval_App_e.
 - eapply eval_App_e.
-  + eapply eval_Lam_e. 
+  + eapply eval_Lam_e.
   + eapply eval_Con_e. constructor.
   + eapply eval_Lam_e.
 - eapply eval_Con_e. constructor.
@@ -1117,7 +1117,7 @@ simpl. eapply eval_Con_e. eapply evals_cons.
 eapply eval_Con_e. eapply evals_nil. eapply evals_nil.
 Qed.
 
-Example One := Eval compute in (unsome (eval_n 1000 one)). 
+Example One := Eval compute in (unsome (eval_n 1000 one)).
 Example Two := Eval compute in (unsome (eval_n 100 two)).
 Example Three := Eval vm_compute in (unsome (eval_n 100 three)).
 Example Four := Eval vm_compute in (unsome (eval_n 100 four)).
@@ -1125,7 +1125,7 @@ Example Five := Eval vm_compute in (unsome (eval_n 100 five)).
 Example Six := Eval vm_compute in (unsome (eval_n 100 six)).
 *)
 
-(** If [e] is an [i+1] expression, and [v] is a closed expression, then 
+(** If [e] is an [i+1] expression, and [v] is a closed expression, then
     for any [k <= i], substituting [v] for [k] in e yields an [i] expression.
 
     I wish I could generalize this to non-closed expressions, but haven't
@@ -1151,15 +1151,15 @@ Proof.
   - constructor. apply H; try lia; auto.
   - constructor; auto. apply H0; try lia; auto.
   - constructor; auto. simpl.
-    rewrite efnlst_length_sbst. eassumption. 
+    rewrite efnlst_length_sbst. eassumption.
     rewrite efnlst_length_sbst. apply H; try lia; auto.
-  - constructor; auto. 
+  - constructor; auto.
   - constructor; auto.
     + destruct e; simpl in i0; try contradiction. exact I.
   - constructor; auto. apply H; try lia; auto.
 Qed.
 
-(** Corrollary:  if [e] is an [i+1] expression, and [v] is closed, then 
+(** Corrollary:  if [e] is an [i+1] expression, and [v] is closed, then
    substituting [v] for [0] in [e] yields an [i] expression. *)
 Lemma sbst_preserves_exp_wf :
   forall i e, exp_wf (1 + i) e -> forall v, exp_wf 0 v ->
@@ -1169,19 +1169,19 @@ Proof.
 Qed.
 
 Lemma subst_list_preserves_exp_wf :
-  forall vs, exps_wf 0 vs -> 
+  forall vs, exps_wf 0 vs ->
              forall i e, exp_wf ((exps_length vs) + i) e ->
                          exp_wf i (sbst_list e vs).
 Proof.
-  induction vs; simpl; intros; subst; auto. 
+  induction vs; simpl; intros; subst; auto.
   inversion H; clear H; subst.
   replace (1 + exps_length vs + i) with (exps_length vs + (1 + i)) in H0;
     try lia.
   apply sbst_preserves_exp_wf; auto.
 Qed.
-  
+
 Lemma sbst_preserves_exps_wf :
-  forall i es, exps_wf (1 + i) es -> 
+  forall i es, exps_wf (1 + i) es ->
                forall v, exp_wf 0 v -> exps_wf i (es {0 ::= v}).
 Proof.
   intros. eapply (proj1 (proj2 sbst_preserves_wf')); eauto; lia.
@@ -1192,17 +1192,17 @@ Lemma sbst_preserves_branches_wf :
 Proof.
   intros; eapply (proj2 (proj2 sbst_preserves_wf')); eauto; lia.
 Qed.
-#[export] Hint Resolve sbst_preserves_exp_wf sbst_preserves_exps_wf 
+#[export] Hint Resolve sbst_preserves_exp_wf sbst_preserves_exps_wf
      sbst_preserves_branches_wf : core.
 
 Lemma nthopt_preserves_wf :
   forall i es, efnlst_wf i es ->
                forall n e, enthopt n es = Some e -> exp_wf i e.
 Proof.
-  induction es; simpl; intros. 
+  induction es; simpl; intros.
   - destruct n; discriminate.
   - inversion H; subst. destruct n0; simpl in *.
-    + injection H0; intros; subst; auto. 
+    + injection H0; intros; subst; auto.
     + specialize (IHes H7 n0 e0).
       apply IHes. auto.
 Qed.
@@ -1225,7 +1225,7 @@ Proof.
   intros.
   assert (Heq : N.of_nat (efnlength es) <= efnlst_length es).
   { rewrite efnlength_efnlst_length. lia. }
-        
+
   revert Heq H0. generalize es at 1 3 4 as es'.
   intros es'.
   remember (list_to_zero (N.to_nat (efnlst_length es'))).
@@ -1235,10 +1235,10 @@ Proof.
   rewrite Nnat.N2Nat.inj_add in *. discriminate.
   intros.
   destruct es'; simpl in *; auto; try discriminate.
-  rewrite Nnat.N2Nat.inj_add in *. 
+  rewrite Nnat.N2Nat.inj_add in *.
   injection Heql. intros. specialize (IHl _ H1).
   apply IHl. simpl in *. lia. eapply sbst_preserves_exp_wf. eauto.
-  subst fixe. constructor. simpl in *. subst. lia. 
+  subst fixe. constructor. simpl in *. subst. lia.
   now rewrite N.add_0_r.
 Qed.
 
@@ -1248,7 +1248,7 @@ Lemma find_branch_preserves_wf :
 Proof.
   induction 1; simpl; intros a b c; repeat if_split; intro H1;
   try discriminate.
-  - injection H1; intros; subst; auto. 
+  - injection H1; intros; subst; auto.
   - eapply IHbranches_wf; eauto.
 Qed.
 Local Hint Resolve find_branch_preserves_wf : core.
@@ -1272,13 +1272,13 @@ Proof.
   apply my_eval_ind; simpl; intros; auto.
   - inversion H2; clear H2; subst.
     specialize (H H6); clear H6. specialize (H0 H7); clear H7.
-    inversion H; clear H; subst. apply H1; auto. 
-  - inversion H0; auto. 
+    inversion H; clear H; subst. apply H1; auto.
+  - inversion H0; auto.
   - inversion H1; auto.
   - inversion H1; clear H1; subst. apply H0; auto.
     apply subst_list_preserves_exp_wf. specialize (H H5). inversion H; subst.
     auto. eapply find_branch_preserves_wf; eauto.
-  - inversion H2; subst. 
+  - inversion H2; subst.
     specialize (H0 H7). specialize (H H6).
     inversion H. subst.
     apply H1.
@@ -1352,12 +1352,12 @@ Proof.
   try discriminate; try inversion H1.
   - constructor. rewrite <- H. auto.
   - inversion H0; subst. rewrite H. auto.
-  - inv H.   
+  - inv H.
   - destruct (is_valueb e); try discriminate. constructor.
     + apply H; auto.
-    + apply H0; auto. 
-  - inversion H1; subst. destruct (is_valueb e). 
-    + tauto. 
+    + apply H0; auto.
+  - inversion H1; subst. destruct (is_valueb e).
+    + tauto.
     + apply H. auto.
 Qed.
 Definition is_valueb_corr := proj1 is_valueb_corr'.
@@ -1422,8 +1422,8 @@ Lemma weaken_wf_le :
   (forall i es, exps_wf i es -> forall j, i <= j -> exps_wf j es) /\
   (forall i es, efnlst_wf i es -> forall j, i <= j -> efnlst_wf j es) /\
   (forall i bs, branches_wf i bs -> forall j, i <= j -> branches_wf j bs).
-Proof.  
-  apply my_exp_wf_ind; intros; econstructor; auto; try lia; 
+Proof.
+  apply my_exp_wf_ind; intros; econstructor; auto; try lia;
   match goal with
     | [ H: forall _, _ -> exp_wf _ ?e |- exp_wf _ ?e] => apply H; lia
     | _ => idtac
@@ -1454,7 +1454,7 @@ Proof.
   - constructor; auto.
     rewrite efnlst_length_subst. eassumption.
     rewrite efnlst_length_subst; apply H; try lia; auto.
-  - constructor; auto. 
+  - constructor; auto.
   - constructor; auto.
     + destruct e; contradiction || constructor.
   - constructor; auto. apply H; try lia; auto.
@@ -1471,7 +1471,7 @@ Proof.
   destruct lt_dec. constructor.
   destruct N.eq_dec. now rewrite (proj1 exp_wf_shift).
   constructor.
-Qed.  
+Qed.
 
 Lemma wf_value_self_eval :
   (forall v, is_value v -> exp_wf 0 v -> eval v v) /\
@@ -1480,7 +1480,7 @@ Proof.
   apply my_is_value_ind; simpl; intros; auto; try constructor; auto.
   inv H. lia.
   inv H0. auto.
-  
+
   inv H1. intuition auto.
   inv H1. intuition auto.
 Qed.
@@ -1581,9 +1581,9 @@ Proof.
 Abort.
 
 Lemma sbst_fix_real (e : exp) (es:efnlst):
-  sbst_fix es e = 
-    sbst_real_list 
-      e 
+  sbst_fix es e =
+    sbst_real_list
+      e
       (map (fun ndx => Fix_e es (N.of_nat ndx)) (List.seq 0 (efnlength es))).
 Proof using.
   (* unfold sbst_fix. rewrite list_to_zero_rev. *)
@@ -1624,9 +1624,9 @@ with maxFreeB  (bs:branches_e) : Z :=
     | brcons_e _ n b bs => Z.max (maxFree b - (Z.of_N (nargs n))) (maxFreeB bs)
        end.
 
-Lemma exp_wf_maxFree: 
+Lemma exp_wf_maxFree:
   (forall n (s : exp),
-    exp_wf n s 
+    exp_wf n s
     -> maxFree s < Z.of_N n)
  /\
   (forall n (s : exps),
@@ -1634,11 +1634,11 @@ Lemma exp_wf_maxFree:
     -> maxFreeC s < Z.of_N n)
  /\
   (forall n (s : efnlst),
-    efnlst_wf n s 
+    efnlst_wf n s
     -> maxFreeF s < Z.of_N n)
  /\
   (forall n (s : branches_e),
-    branches_wf n s 
+    branches_wf n s
     -> maxFreeB s < Z.of_N n).
 Proof using.
   apply my_exp_wf_ind; intros; simpl in *; try lia.
@@ -1661,7 +1661,7 @@ Zoe: Commenting the following out as they have dependencies to SquiggleEq.
  An advantage is that when evaluating constructor argument,
  the fuel stays constant, and does not need to be threaded through
  (as decrements) the arguments. *)
-Function eval_ns (n:nat) (e:exp) {struct n}: option exp := 
+Function eval_ns (n:nat) (e:exp) {struct n}: option exp :=
   match n with
   | 0%nat => None
   | S n =>
@@ -1676,7 +1676,7 @@ Function eval_ns (n:nat) (e:exp) {struct n}: option exp :=
       end
     | App_e e1 e2 =>
       match eval_ns n e1 with
-      | Some (Lam_e _ e1') => 
+      | Some (Lam_e _ e1') =>
         match eval_ns n e2 with
         | None => None
         | Some e2' => eval_ns n (e1'{0 ::= e2'})
@@ -1696,7 +1696,7 @@ Function eval_ns (n:nat) (e:exp) {struct n}: option exp :=
         match eval_ns n e2 with
         | None => None
         | Some e2' => Some Prf_e
-        end                     
+        end
       | _ => None
       end
     | Let_e _ e1 e2 =>

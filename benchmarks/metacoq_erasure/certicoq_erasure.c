@@ -22,11 +22,11 @@ CAMLprim value certicoq_erase(value prog) {
   struct thread_info* tinfo;
   clock_t start, end;
   double msec, sec;
-  struct Coq_Init_Datatypes_pair_args*  progargs;
+  struct Corelib_Init_Datatypes_pair_args*  progargs;
   start = clock();
   // Run Coq program
   tinfo = make_tinfo();
-  
+
   v = call(tinfo, body(tinfo), prog);
   end = clock();
 

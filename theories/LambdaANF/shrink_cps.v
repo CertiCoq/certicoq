@@ -1,4 +1,4 @@
-From Coq Require Import Arith.Arith PArith.BinPos micromega.Lia Program.Program micromega.Lia Sets.Ensembles Sorting.Permutation
+From Stdlib Require Import Arith.Arith PArith.BinPos micromega.Lia Program.Program micromega.Lia Sets.Ensembles Sorting.Permutation
      Relations.Relations Setoids.Setoid Classes.Morphisms funind.Recdef.
 
 Import RelationClasses.
@@ -13,7 +13,7 @@ Require Import Libraries.maps_util.
 Require Import LambdaANF.cps.
 Require Import LambdaANF.ctx LambdaANF.rename LambdaANF.state.
 Require Import LambdaANF.cps_util LambdaANF.List_util LambdaANF.identifiers LambdaANF.inline_letapp.
-Require Import Common.exceptionMonad. 
+Require Import Common.exceptionMonad.
 
 (* Shallow val for constr and function *)
 Inductive svalue : Type :=
@@ -108,7 +108,7 @@ Section MEASURECONTRACT.
     inv Heq. simpl. reflexivity.
     inv Heq. simpl. eauto.
   Defined.
-  
+
   (** Computes the sum of the sizes of every unlined function in sub *)
   Definition list_inl_size (sub:list (positive*svalue)) (inl:b_map):=
     fold_right plus 0 (map (fun v => svalue_inl_size v inl) sub).
@@ -398,7 +398,7 @@ Section MEASURECONTRACT.
     - simpl. lia.
   Defined.
 
-  
+
   Theorem subterm_or_eq_size:
     forall e e', subterm_or_eq e e' -> (term_size e <= term_size e')%nat.
   Proof.
@@ -426,7 +426,7 @@ Section MEASURECONTRACT.
 
   Definition b_map_le: b_map -> b_map -> Prop :=
     fun inl inl_r => forall v, get_b v inl = true -> get_b v inl_r = true.
-  
+
   Theorem b_map_le_refl: forall i,
       b_map_le i i.
   Proof.
@@ -638,17 +638,17 @@ Theorem term_size_rename_all_ns sig :
   (forall e, term_size (rename_all_ns sig e) = term_size e) /\
   (forall B, funs_size (rename_all_fun_ns sig B) = funs_size B).
 Proof.
-  exp_defs_induction IHe IHl IHb; simpl; try lia.    
+  exp_defs_induction IHe IHl IHb; simpl; try lia.
   rewrite IHe. f_equal. simpl in IHl. inv IHl. rewrite H0. reflexivity.
 Qed.
-  
+
 
 Section CONTRACT.
 
   (* Type of shrink program *)
   Definition shrinkT A (im : b_map) : Type := {esir:(A * nat * c_map * b_map) & (b_map_le_i im (snd esir))}.
-  
-  
+
+
   Fixpoint precontractfun (sig:r_map) (count:c_map) (sub:ctx_map) (fds:fundefs) : (fundefs * c_map * ctx_map) :=
     match fds with
     | Fcons f t ys e fds' =>
@@ -754,7 +754,7 @@ Section CONTRACT.
     apply H0.
     assumption.
   Defined.
-  
+
   Local Set Warnings "-funind-cannot-define-graph, -funind-cannot-build-inversion".
   Function contractcases (oes: exp * ctx_map * b_map)
            (fcon: r_map -> c_map ->  forall esi:(exp*ctx_map*b_map), (term_sub_inl_size esi < term_sub_inl_size oes)%nat -> shrinkT exp (snd esi))
@@ -775,8 +775,8 @@ Section CONTRACT.
             end)
          end
      end) (@eq_refl _ cl).
-  
-  (* oe is original expression of form (Efun fds e'), every e on which contract is called is a subterm of oe ( by subterm_fds ) *)  
+
+  (* oe is original expression of form (Efun fds e'), every e on which contract is called is a subterm of oe ( by subterm_fds ) *)
   Theorem subfds_Fcons {f t ys e fds' e0}:
     subfds_e (Fcons f t ys e fds') e0 ->
     subfds_e fds' e0.
@@ -874,7 +874,7 @@ Section CONTRACT.
     | existT (e_body, steps, count, im') bp =>
       fun Heq => existT _ (e_body, steps + 1, count, im') bp
     end (eq_refl).
-  
+
   Program Fixpoint contract (sig:r_map) (count:c_map) (e:exp) (sub:ctx_map) (im:b_map) {measure (term_sub_inl_size (e,sub,im))}
     : contractT im :=
     match e with
@@ -943,7 +943,7 @@ Section CONTRACT.
       let f' := apply_r sig f in
       let ys' := apply_r_list sig ys in
       let f_no := get_c f' count in
-      let f_info := M.get f' sub in          
+      let f_info := M.get f' sub in
       (match (f_no, f_info) as k return (k = (f_no, f_info) -> contractT im)  with
        | (1%nat, Some (SVfun t' xs e_body)) =>
          (fun Heq1 =>
@@ -952,7 +952,7 @@ Section CONTRACT.
                   return (k = ((BinPos.Pos.eqb t' t)%positive && (length ys =? length xs) && negb (get_b f' im))%bool -> contractT im)
             with
             | true =>
-              fun Heq2 =>                         
+              fun Heq2 =>
                 (* first inline the body *)
                 let inl := inline_letapp e_body x in
                 (match inl as inl' return (inl' = inl -> contractT im) with
@@ -968,7 +968,7 @@ Section CONTRACT.
                       * sig renaming  *)
                      (match contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' as k
                             return (k =  contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' -> contractT im) with
-                      | existT (e', steps', c, i) bp => 
+                      | existT (e', steps', c, i) bp =>
                         fun Heql => existT _ (e', steps' + 1, c, i) (b_map_i_true _ _ _ bp)
                       end (eq_refl))
                  | None =>
@@ -983,20 +983,20 @@ Section CONTRACT.
                  match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                  | existT  (e', steps, count', im') bp =>
                    fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-                 end (eq_refl))                
+                 end (eq_refl))
             end (eq_refl))
        | _ =>
          (fun Heq5 =>
             match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
             | existT  (e', steps, count', im') bp =>
               fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-            end (eq_refl))                
+            end (eq_refl))
        end (eq_refl))
     | Eprim_val x p e => (* Prims may have side effects and are not considered dead code *)
        match contract sig count e sub im return _ with
        | existT   (e', steps', count', im') bp  =>
          existT _ (Eprim_val x p e', steps', count', im') bp
-       end       
+       end
     | Eprim x f ys e => (* Prims may have side effects and are not considered dead code *)
       match contract sig count e sub im return _ with
       | existT   (e', steps', count', im') bp  =>
@@ -1067,10 +1067,10 @@ Section CONTRACT.
                    end)
        | _ => existT _ (Eapp f' t ys', 0, count, im) (ble_refl im)
        end)
-    end. 
+    end.
   Solve Obligations with try (program_simpl; unfold term_sub_inl_size; simpl;  rewrite <- ?Nat.add_succ_r;  rewrite <- ?Nat.add_lt_mono_l;  eapply Nat.le_lt_trans; [apply sub_set_size | (simpl; unfold lt; reflexivity)]).
   Next Obligation.
-    unfold term_sub_inl_size in *; simpl in *. 
+    unfold term_sub_inl_size in *; simpl in *.
     assert (term_size k < term_size (Ecase v cl))%nat.
     symmetry in Heq_anonymous.
     apply findtag_In_patterns in Heq_anonymous.
@@ -1122,9 +1122,9 @@ Section CONTRACT.
     unfold term_sub_inl_size; simpl.
     symmetry in H1.
     apply sub_inl_fun_size with (im :=  im) in H1.
-    eapply Nat.le_lt_trans. apply -> Nat.add_le_mono_r. 
+    eapply Nat.le_lt_trans. apply -> Nat.add_le_mono_r.
     eapply term_size_inline_letapp.
-    now eauto. rewrite (proj1 (term_size_rename_all_ns _)).    
+    now eauto. rewrite (proj1 (term_size_rename_all_ns _)).
     rewrite Nat.add_comm, Nat.add_assoc.
     rewrite <- H1. lia.
     symmetry in Heq2.
@@ -1134,7 +1134,7 @@ Section CONTRACT.
     destructAll.
     apply Bool.negb_true_iff. auto.
   Defined.
-  Next Obligation. 
+  Next Obligation.
     eapply measure_wf. eapply OrdersEx.Nat_as_OT.lt_wf_0.
   Defined.
 
@@ -1205,7 +1205,7 @@ Section CONTRACT.
       let f' := apply_r sig f in
       let ys' := apply_r_list sig ys in
       let f_no := get_c f' count in
-      let f_info := M.get f' sub in          
+      let f_info := M.get f' sub in
       (match (f_no, f_info) as k return (k = (f_no, f_info) -> contractT im)  with
        | (1%nat, Some (SVfun t' xs e_body)) =>
          (fun Heq1 =>
@@ -1214,7 +1214,7 @@ Section CONTRACT.
                   return (k = ((BinPos.Pos.eqb t' t)%positive && (length ys =? length xs) && negb (get_b f' im))%bool -> contractT im)
             with
             | true =>
-              fun Heq2 =>                         
+              fun Heq2 =>
                 (* first inline the body *)
                 let inl := inline_letapp e_body x in
                 (match inl as inl' return (inl' = inl -> contractT im) with
@@ -1226,7 +1226,7 @@ Section CONTRACT.
                      let count' := update_count_letapp (apply_r sig' x') x (update_count_inlined  ys' xs (M.set f' 0 count)) in
                      (match contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' as k
                             return (k =  contract sig' count' (C_inl |[ rename_all_ns (M.set x x' (M.empty _)) e ]|) sub im' -> contractT im) with
-                      | existT (e', steps', c, i) bp => 
+                      | existT (e', steps', c, i) bp =>
                         fun Heql => existT _ (e', steps' + 1, c, i) (b_map_i_true _ _ _ bp)
                       end (eq_refl))
                  | None =>
@@ -1241,14 +1241,14 @@ Section CONTRACT.
                  match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
                  | existT  (e', steps, count', im') bp =>
                    fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-                 end (eq_refl))                
+                 end (eq_refl))
             end (eq_refl))
        | _ =>
          (fun Heq5 =>
             match (contract sig count e sub im) as k return (k = contract sig count e sub im -> contractT im) with
             | existT  (e', steps, count', im') bp =>
               fun Heq => existT _ (Eletapp x f' t ys' e', steps, count', im') bp
-            end (eq_refl))                
+            end (eq_refl))
        end (eq_refl))
     | Eprim_val x p e =>
       match contract sig count e sub im return _ with
@@ -1358,9 +1358,9 @@ Section CONTRACT.
 
   Arguments contract:simpl never.
   Obligation Tactic := program_simplify ; auto with *.
-  
+
   Definition hide_body {A} {a : A} := a.
-  
+
 
   Theorem contract_eq:
     forall e sub im sig count,
@@ -1388,7 +1388,7 @@ Section CONTRACT.
     { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
     { abstract (unfold contract_func; lazy [projT1 projT2 fst snd]; reflexivity). }
   Qed.
-  
+
 End CONTRACT.
 
 
@@ -1401,7 +1401,7 @@ Definition shrink_top (e:exp) : exp * nat :=
   (* This is only needed because the correspondence theorem assumes
      that e is closes, which is too strong (TODO adjust the proof to weaker assumption) )*)
   let e := Efun (Fcons f t fvs e Fnil) (Ehalt f) in
-  let count := init_census e in  
+  let count := init_census e in
   match (contract (M.empty var) count e (M.empty svalue) (M.empty bool)) with
   | existT (e', steps, _, _) _ =>
     match e' with

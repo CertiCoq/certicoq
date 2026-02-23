@@ -3,7 +3,7 @@
  *)
 
 Require Import LambdaANF.set_util LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.ctx LambdaANF.identifiers.
-Require Import Coq.MSets.MSetRBT Coq.Lists.List.
+From Stdlib Require Import MSets.MSetRBT Lists.List.
 Require Import compcert.lib.Coqlib.
 
 
@@ -12,7 +12,7 @@ Import PS.
 Definition env_subset (rho1 rho2 : env) :=
   forall x v, M.get x rho1 = Some v -> M.get x rho2 = Some v.
 
-(** An expression is well scoped in an environment: [Γ |- e] *) 
+(** An expression is well scoped in an environment: [Γ |- e] *)
 Inductive well_scoped_exp : env -> exp -> Prop :=
 | WS_constr :
     forall x t ys vs e Γ,
@@ -70,11 +70,11 @@ with well_scoped_fundefs : env -> fundefs -> Prop :=
 
 Fixpoint fundefs_ctx_names (cdefs : fundefs_ctx) : FVSet :=
   match cdefs with
-    | Fcons1_c f _ _ _ defs => add f (fundefs_names defs) 
-    | Fcons2_c f _ _ _ cdefs' => add f (fundefs_ctx_names cdefs') 
+    | Fcons1_c f _ _ _ defs => add f (fundefs_names defs)
+    | Fcons2_c f _ _ _ cdefs' => add f (fundefs_ctx_names cdefs')
   end.
-    
-(** [Γ {[Γ']} |- c  ]: A context is well scoped in an environment Γ, given that 
+
+(** [Γ {[Γ']} |- c  ]: A context is well scoped in an environment Γ, given that
     the expression we put in the hole is well scoped in the environment Γ' *)
 Inductive well_scoped_exp_ctx : env -> exp_ctx -> env -> Prop :=
 | WSCtx_hole :
@@ -150,7 +150,7 @@ Notation "Γ '{[' Γ' ']}' '⊢*' f " := (well_scoped_fundefs_ctx Γ f Γ')
 Open Scope env_scope.
 Open Scope ctx_scope.
 
-    
+
 
 Lemma env_subset_set Γ Γ' x v :
   env_subset Γ Γ' ->
@@ -235,7 +235,7 @@ Proof.
   intros x; split; intros HIn; eauto;
   eapply add_spec in HIn; inv HIn; eapply add_spec; eauto;
   right; eapply IHfc; eauto.
-Qed.      
+Qed.
 
 Lemma well_scoped_ctx_app :
   (forall c e Γ Γ',

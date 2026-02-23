@@ -10,19 +10,20 @@
 *)
 Require Import Common.Pipeline_utils.
 
-Require Import Coq.ZArith.ZArith
-               Coq.Program.Basics
-               Coq.Strings.String
-               Coq.Lists.List List_util.
+From Stdlib Require Import ZArith.ZArith
+               Program.Basics
+               Strings.String
+               Lists.List.
+Require Import List_util.
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Structures.Traversable
                ExtLib.Data.Monads.OptionMonad
                ExtLib.Data.String.
 
-From MetaCoq.Utils Require Import bytestring.
-From MetaCoq.Common Require Import BasicAst.
-Require MetaCoq.Template.All.
+From MetaRocq.Utils Require Import bytestring.
+From MetaRocq.Common Require Import BasicAst.
+Require MetaRocq.Template.All.
 
 Require Import compcert.common.AST
                compcert.common.Errors
@@ -42,6 +43,10 @@ Require Import LambdaANF.cps
 
 Import MonadNotation.
 Open Scope monad_scope.
+
+Notation Tcons := cons.
+Notation Tnil := nil.
+Notation typelist := (list type).
 
 Section FState.
 
@@ -73,7 +78,7 @@ Section FState.
 
 End FState.
 
-(* Takes a MetaCoq type for an FFI function,
+(* Takes a MetaRocq type for an FFI function,
    returns its arity and whether it's in IO. *)
 (* TODO currently the IO name is hardcoded
    but we should change that at some point *)
@@ -86,7 +91,7 @@ Fixpoint type_to_args
   | _ => (0, false)
   end.
 
-(* Takes a MetaCoq constructor type (a pi type),
+(* Takes a MetaRocq constructor type (a pi type),
    skips the number of parameters in the type.
    Doesn't fail if there aren't enough pi types etc. *)
 Fixpoint skip_params
@@ -122,7 +127,7 @@ Fixpoint env_proj
   | S i' => env_proj i' (Field(env, 1))
   end.
 
-Local Open Scope bs_scope.  
+Local Open Scope bs_scope.
 
 Definition make_curried_fn
          (* The sanitized unqual. name of the FFI function we're dealing with *)
@@ -335,7 +340,7 @@ Fixpoint make_curried_fns
 
 (* Take a field name as a [kername],
    which is supposed to be an FFI function name,
-   and its Coq type as a MetaCoq type.
+   and its Coq type as a MetaRocq type.
    Generate the necessary Clight functions and closures from that. *)
 Definition make_one_field
            (field : sanitized_name * Ast.term)
@@ -347,7 +352,7 @@ Definition make_one_field
   let extern_def :=
     (_extern_fn,
      Gfun (External (EF_external (String.to_string kn)
-                 (mksignature (val_typ :: nil) AST.Tvoid cc_default))
+                 (mksignature (val_typ :: nil) Xvoid cc_default))
                (Tcons (threadInf _thread_info) (repeat_typelist val arity))
                val cc_default)) in
   rest <- make_curried_fns kn arity arity is_io _extern_fn ;;
@@ -399,7 +404,7 @@ Definition make_ffi_program
        mk_prog_opt composites glob_defs
                    main_ident true).
 
-(* Takes the full MetaCoq program representing a type,
+(* Takes the full MetaRocq program representing a type,
    like an [FFI] type class.
    Returns the fields in that type class. *)
 Definition get_constructors

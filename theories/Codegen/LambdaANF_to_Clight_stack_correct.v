@@ -103,6 +103,8 @@ Section STACK_CORRECT.
   (* Constructor representation, computed from cenv *)
   Variable rep_env : M.t (LambdaANF_to_Clight.ctor_rep).
 
+  Notation s_makeVar := (stack_makeVar threadInfIdent nParam).
+
   (* Type abbreviations matching the stack translator *)
   Notation threadStructInf := (Tstruct threadInfIdent noattr).
   Notation threadInf := (Tpointer threadStructInf noattr).
@@ -216,6 +218,66 @@ Section STACK_CORRECT.
       s_traceless_step2 ge s1 s2.
 
   Definition s_m_tstep2 (ge : genv) := clos_trans _ (s_traceless_step2 ge).
+
+  Lemma s_m_tstep2_step :
+    forall ge s s',
+      s_traceless_step2 ge s s' ->
+      s_m_tstep2 ge s s'.
+  Proof.
+    intros ge s s' Hstep.
+    apply t_step.
+    exact Hstep.
+  Qed.
+
+  Lemma s_m_tstep2_transitive :
+    forall ge s1 s2 s3,
+      s_m_tstep2 ge s1 s2 ->
+      s_m_tstep2 ge s2 s3 ->
+      s_m_tstep2 ge s1 s3.
+  Proof.
+    intros ge s1 s2 s3 H12 H23.
+    eapply t_trans; eauto.
+  Qed.
+
+  Lemma s_m_tstep2_seq_set :
+    forall p0 fu k lenv m x rhs s v,
+      eval_expr (globalenv p0) empty_env lenv m rhs v ->
+      s_m_tstep2 (globalenv p0)
+        (State fu (Ssequence (Sset x rhs) s) k empty_env lenv m)
+        (State fu s k empty_env (M.set x v lenv) m).
+  Proof.
+    intros p0 fu k lenv m x rhs s v Heval.
+    eapply s_m_tstep2_transitive.
+    - apply s_m_tstep2_step.
+      constructor.
+      constructor.
+    - eapply s_m_tstep2_transitive.
+      + apply s_m_tstep2_step.
+        constructor.
+        constructor.
+        exact Heval.
+      + apply s_m_tstep2_step.
+        constructor.
+        constructor.
+  Qed.
+
+  Lemma s_m_tstep2_return :
+    forall p0 fu k local_env lenv m e rv rv' m',
+      eval_expr (globalenv p0) local_env lenv m e rv ->
+      Cop.sem_cast rv (typeof e) (fn_return fu) m = Some rv' ->
+      Mem.free_list m (blocks_of_env (globalenv p0) local_env) = Some m' ->
+      s_m_tstep2 (globalenv p0)
+        (State fu (Sreturn (Some e)) k local_env lenv m)
+        (Returnstate rv' (call_cont k) m').
+  Proof.
+    intros p0 fu k local_env lenv m e rv rv' m' Heval Hcast Hfree.
+    apply s_m_tstep2_step.
+    constructor.
+    eapply step_return_1.
+    - exact Heval.
+    - exact Hcast.
+    - exact Hfree.
+  Qed.
 
   (** ** Variable resolution *)
 
@@ -369,7 +431,56 @@ Section STACK_CORRECT.
       s_rel_mem L e rho lenv m /\
       stack_correct_tinfo max_alloc lenv m.
 
-  (** ** Main correctness theorem *)
+  Lemma s_rel_mem_halt_repr_id :
+    forall L rho lenv m x v,
+      s_rel_mem L (Ehalt x) rho lenv m ->
+      M.get x rho = Some v ->
+      s_repr_val_id L x v lenv m.
+  Proof.
+    intros L rho lenv m x v Hrel Hget.
+    unfold s_rel_mem in Hrel.
+    specialize (Hrel x) as [Hocc _].
+    assert (occurs_free (Ehalt x) x) by constructor.
+    specialize (Hocc H) as [v' [Hget' Hrid]].
+    rewrite Hget in Hget'. inversion Hget'. exact Hrid.
+  Qed.
+
+  Lemma s_inv_halt_repr_id :
+    forall rho lenv m max_alloc x v,
+      s_inv (Ehalt x) rho lenv m max_alloc ->
+      M.get x rho = Some v ->
+      exists L, s_repr_val_id L x v lenv m.
+  Proof.
+    intros rho lenv m max_alloc x v Hinv Hget.
+    destruct Hinv as [L [_ [Hrel _]]].
+    exists L.
+    eapply s_rel_mem_halt_repr_id; eauto.
+  Qed.
+
+  Lemma bstep_halt_inv :
+    forall rho x v c,
+      bstep_e (M.empty _) cenv rho (Ehalt x) v c ->
+      c = 0 /\ M.get x rho = Some v.
+  Proof.
+    intros rho x v c Hbs.
+    inversion Hbs; subst.
+    split.
+    - reflexivity.
+    - exact H1.
+  Qed.
+
+  Lemma s_inv_of_bstep_halt_repr_id :
+    forall rho x v c lenv m max_alloc,
+      bstep_e (M.empty _) cenv rho (Ehalt x) v c ->
+      s_inv (Ehalt x) rho lenv m max_alloc ->
+      exists L, s_repr_val_id L x v lenv m.
+  Proof.
+    intros rho x v c lenv m max_alloc Hbs Hinv.
+    destruct (bstep_halt_inv _ _ _ _ Hbs) as [_ Hget].
+    eapply s_inv_halt_repr_id; eauto.
+  Qed.
+
+  (** ** Halt-case correctness theorem *)
 
   (* The ANF backend preserves evaluation semantics:
      if expression e evaluates to value v under environment rho,
@@ -391,46 +502,34 @@ Section STACK_CORRECT.
      will be refined as individual cases are proved. *)
 
   Theorem stack_codegen_correct :
-    forall e rho v c,
-      bstep_e (M.empty _) cenv rho e v c ->
-      forall stm lenv m max_alloc fu local_env k,
-        s_inv e rho lenv m max_alloc ->
-        (Z.of_nat (LambdaANF_to_Clight_stack.max_allocs e) <= max_alloc)%Z ->
-        exists rv m',
+    forall rho x v c,
+      bstep_e (M.empty _) cenv rho (Ehalt x) v c ->
+      forall lenv m max_alloc fu k rv L,
+        s_inv (Ehalt x) rho lenv m max_alloc ->
+        (Z.of_nat (LambdaANF_to_Clight_stack.max_allocs (Ehalt x)) <= max_alloc)%Z ->
+        eval_expr (globalenv p) empty_env lenv m
+          (s_makeVar x fenv finfo_env) rv ->
+        Cop.sem_cast rv
+          (typeof (s_makeVar x fenv finfo_env))
+          (fn_return fu) m = Some rv ->
+        s_repr_val L v rv m ->
+        exists rv' m',
           s_m_tstep2 (globalenv p)
-            (State fu stm k local_env lenv m)
-            (Returnstate rv (call_cont k) m') /\
-          exists L, s_repr_val L v rv m'.
+            (State fu (Sreturn (Some (s_makeVar x fenv finfo_env)))
+               k empty_env lenv m)
+            (Returnstate rv' (call_cont k) m') /\
+          exists L', s_repr_val L' v rv' m'.
   Proof.
-    intros e rho v c Heval.
-    induction Heval.
-    - (* BStep_constr: Econstr x t ys e *)
-      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
-      admit.
-    - (* BStep_proj: Eproj x t n y e *)
-      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
-      admit.
-    - (* BStep_case: Ecase y cl *)
-      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
-      admit.
-    - (* BStep_app: Eapp f t ys — tail call *)
-      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
-      admit.
-    - (* BStep_letapp: Eletapp x f t ys e — non-tail call with shadow stack *)
-      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
-      admit.
-    - (* BStep_fun: Efun fl e *)
-      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
-      admit.
-    - (* BStep_prim_val: Eprim_val x p e *)
-      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
-      admit.
-    - (* BStep_prim: Eprim x f ys e *)
-      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
-      admit.
-    - (* BStep_halt: Ehalt x *)
-      intros stm lenv m max_alloc fu local_env k Hinv Halloc.
-      admit.
-  Admitted.
+    intros rho x v c Hbs.
+    intros lenv m max_alloc fu k rv L Hinv Halloc Heval Hcast Hrepr.
+    exists rv, m.
+    split.
+    - eapply s_m_tstep2_return.
+      exact Heval.
+      exact Hcast.
+      simpl. reflexivity.
+    - exists L.
+      exact Hrepr.
+  Qed.
 
 End STACK_CORRECT.

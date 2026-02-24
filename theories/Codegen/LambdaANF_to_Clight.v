@@ -377,10 +377,10 @@ Notation "'call' f " := (Scall None f (tinf :: nil)) (at level 35).
 Notation "'[' t ']' e " := (Ecast e t) (at level 34).
 
 Notation "'Field(' t ',' n ')'" :=
-  ( *(add ([valPtr] t) (c_int n%Z val))) (at level 36). (* what is the type of int being added? *)
+  ( *(add ([valPtr] t) (c_int n%Z uval))) (at level 36). (* must be uval (integer), not val (pointer), for classify_add *)
 
 Notation "'args[' n ']'" :=
-  ( *(add args (c_int n%Z val))) (at level 36).
+  ( *(add args (c_int n%Z uval))) (at level 36).
 
 
 
@@ -470,8 +470,8 @@ Definition assignConstructorS
       ret (x ::= tag)
   | boxed _ a =>
       let stm := assignConstructorS' fenv map x 0 vs in
-      ret (x ::= [val] (allocPtr +' (c_int Z.one val)) ;;;
-           allocIdent ::= allocPtr +' (c_int (Z.of_N (a + 1)) val) ;;;
+      ret (x ::= [val] (allocPtr +' (c_int Z.one uval)) ;;;
+           allocIdent ::= allocPtr +' (c_int (Z.of_N (a + 1)) uval) ;;;
            Field(var x, -1) :::= tag ;;;
            stm)
   end.
@@ -687,8 +687,8 @@ Definition make_case_switch
   isPtr caseIdent x;;;
   Sifthenelse
     (bvar caseIdent)
-    (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
-    (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val) ls').
+    (Sswitch (Ebinop Oand (Ecast (Field(var x, -1)) uval) (make_cint 255 uval) uval) ls)
+    (Sswitch (Ebinop Oshr (Ecast (var x) uval) (make_cint 1 uval) uval) ls').
 
 Definition to_int64 (i : PrimInt63.int) : int64. 
   exists (Uint63.to_Z i * 2 + 1)%Z.
@@ -707,12 +707,24 @@ Definition model_to_ff (f : float64_model) : Binary.full_float :=
 Program Definition to_float (f : PrimFloat.float) : Floats.float :=
   Binary.FF2B _ _ (model_to_ff (float64_to_model f)) _.
 Next Obligation.
-  unfold model_to_ff.
-  pose proof (FloatAxioms.Prim2SF_valid f).
-  rewrite Binary.valid_binary_SF2FF. exact H.
-  unfold float64_to_model. 
-  unfold FloatOps.Prim2SF. cbn.
-  Admitted.
+  unfold model_to_ff, float64_to_model.
+  simpl.
+  destruct (PrimFloat.is_nan f) eqn:Hnan.
+  - unfold FloatOps.Prim2SF.
+    rewrite Hnan.
+    reflexivity.
+  - rewrite (Binary.valid_binary_SF2FF 53 1024 (FloatOps.Prim2SF f)).
+    + apply FloatAxioms.Prim2SF_valid.
+    + unfold FloatOps.Prim2SF.
+      rewrite Hnan.
+      destruct (PrimFloat.is_zero f); [reflexivity|].
+      destruct (PrimFloat.is_infinity f); [reflexivity|].
+      destruct (FloatOps.Z.frexp f) as [r exp].
+      destruct (SpecFloat.shr_fexp FloatOps.prec FloatOps.emax
+                  (Uint63.to_Z (PrimFloat.normfr_mantissa r)) (exp - FloatOps.prec)
+                  SpecFloat.loc_Exact) as [shr e'].
+      destruct (SpecFloat.shr_m shr); reflexivity.
+Qed.
 
 Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
   (x : positive) (f : Floats.float) := 

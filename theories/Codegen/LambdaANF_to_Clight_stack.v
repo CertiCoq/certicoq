@@ -785,10 +785,24 @@ Definition model_to_ff (f : float64_model) : Binary.full_float :=
 Program Definition to_float (f : PrimFloat.float) : Floats.float :=
   Binary.FF2B _ _ (model_to_ff (float64_to_model f)) _.
 Next Obligation.
-  unfold model_to_ff.
-  pose proof (FloatAxioms.Prim2SF_valid f).
-  rewrite Binary.valid_binary_SF2FF; auto.
-  Admitted.
+  unfold model_to_ff, float64_to_model.
+  simpl.
+  destruct (PrimFloat.is_nan f) eqn:Hnan.
+  - unfold FloatOps.Prim2SF.
+    rewrite Hnan.
+    reflexivity.
+  - rewrite (Binary.valid_binary_SF2FF 53 1024 (FloatOps.Prim2SF f)).
+    + apply FloatAxioms.Prim2SF_valid.
+    + unfold FloatOps.Prim2SF.
+      rewrite Hnan.
+      destruct (PrimFloat.is_zero f); [reflexivity|].
+      destruct (PrimFloat.is_infinity f); [reflexivity|].
+      destruct (FloatOps.Z.frexp f) as [r exp].
+      destruct (SpecFloat.shr_fexp FloatOps.prec FloatOps.emax
+                  (Uint63.to_Z (PrimFloat.normfr_mantissa r)) (exp - FloatOps.prec)
+                  SpecFloat.loc_Exact) as [shr e'].
+      destruct (SpecFloat.shr_m shr); reflexivity.
+Qed.
 
 Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
   (x : positive) (f : Floats.float) := 

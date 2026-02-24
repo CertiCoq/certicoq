@@ -102,6 +102,10 @@ Section STACK_CORRECT.
 
   (* Constructor representation, computed from cenv *)
   Variable rep_env : M.t (LambdaANF_to_Clight.ctor_rep).
+  Variable disjointIdent :
+    NoDup (protectedIdent argsIdent allocIdent limitIdent gcIdent
+             mainIdent bodyIdent threadInfIdent tinfIdent heapInfIdent
+             numArgsIdent isptrIdent caseIdent).
 
   Notation s_makeVar := (stack_makeVar threadInfIdent nParam).
 
@@ -160,30 +164,146 @@ Section STACK_CORRECT.
      Same heap invariants as CPS, with additional frame pointer field. *)
   Definition stack_correct_tinfo (max_alloc : Z) (lenv : temp_env) (m : mem) : Prop :=
     exists alloc_b alloc_ofs limit_ofs args_b args_ofs tinf_b tinf_ofs,
-      (* alloc pointer *)
       M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) /\
-      (Z.divide int_size (Ptrofs.unsigned alloc_ofs)) /\
-      (* writable range from alloc to alloc + max_alloc *)
-      (forall ofs : Z,
-          (Ptrofs.unsigned alloc_ofs <= ofs <
-           Ptrofs.unsigned alloc_ofs + int_size * max_alloc)%Z ->
-          Mem.perm m alloc_b ofs Cur Writable) /\
-      (* limit pointer: same block as alloc *)
+      (align_chunk int_chunk | Ptrofs.unsigned alloc_ofs)%Z /\
+      Mem.range_perm m alloc_b (Ptrofs.unsigned alloc_ofs) (Ptrofs.unsigned limit_ofs) Cur Writable /\
       M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) /\
-      (* enough space between alloc and limit *)
       (int_size * max_alloc <=
-       Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs)%Z /\
-      (* args pointer *)
+       Ptrofs.unsigned limit_ofs - Ptrofs.unsigned alloc_ofs <= gc_size)%Z /\
       M.get argsIdent lenv = Some (Vptr args_b args_ofs) /\
       args_b <> alloc_b /\
+      ((Ptrofs.unsigned args_ofs) + int_size * max_args <= Ptrofs.max_unsigned)%Z /\
       (forall z : Z,
           (0 <= z < max_args)%Z ->
           Mem.valid_access m int_chunk args_b
-            (Ptrofs.unsigned (Ptrofs.add args_ofs (Ptrofs.repr (int_size * z)))) Writable) /\
-      (* tinfo pointer *)
+            (Ptrofs.unsigned
+               (Ptrofs.add args_ofs
+                  (Ptrofs.mul (Ptrofs.repr int_size) (Ptrofs.repr z)))) Writable) /\
       M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) /\
+      True /\
       tinf_b <> alloc_b /\
-      tinf_b <> args_b.
+      (forall i : Z,
+          (0 <= i < 4)%Z ->
+          Mem.valid_access m int_chunk tinf_b
+            (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * i)))) Writable) /\
+      deref_loc (Tarray uval LambdaANF_to_Clight_stack.maxArgs noattr)
+        m tinf_b (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 3)))
+        Full (Vptr args_b args_ofs) /\
+      (forall x b,
+          Genv.find_symbol (globalenv p) x = Some b ->
+          b <> args_b /\ b <> alloc_b /\ b <> tinf_b /\
+          (exists chunk, Mem.valid_access m chunk b 0%Z Nonempty)).
+
+  Lemma stack_correct_tinfo_store_alloc_exists :
+    forall max_alloc lenv m,
+      stack_correct_tinfo max_alloc lenv m ->
+      exists alloc_b alloc_ofs tinf_b tinf_ofs m1,
+        M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) /\
+        M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) /\
+        Mem.store int_chunk m tinf_b
+          (Ptrofs.unsigned
+             (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 0))))
+          (Vptr alloc_b alloc_ofs) = Some m1.
+  Proof.
+    intros max_alloc lenv m Hct.
+    destruct Hct as
+      [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs Hct]]]]]]].
+    decompose [and] Hct. clear Hct.
+    match goal with
+    | H : M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) |- _ =>
+        pose proof H as Halloc
+    end.
+    match goal with
+    | H : M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) |- _ =>
+        pose proof H as Htinf
+    end.
+    match goal with
+    | H : forall i : Z,
+          (0 <= i < 4)%Z ->
+          Mem.valid_access m int_chunk tinf_b
+            (Ptrofs.unsigned
+               (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * i)))) Writable |- _ =>
+        pose proof H as Htinf_va
+    end.
+    assert (Hva0 :
+      Mem.valid_access m int_chunk tinf_b
+        (Ptrofs.unsigned
+           (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 0)))) Writable).
+    { apply Htinf_va. lia. }
+    destruct (Mem.valid_access_store m int_chunk tinf_b
+      (Ptrofs.unsigned
+         (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 0))))
+      (Vptr alloc_b alloc_ofs) Hva0) as [m1 Hstore].
+    exists alloc_b, alloc_ofs, tinf_b, tinf_ofs, m1.
+    repeat split; eauto.
+  Qed.
+
+  Lemma stack_correct_tinfo_store_alloc_limit_exists :
+    forall max_alloc lenv m,
+      stack_correct_tinfo max_alloc lenv m ->
+      exists alloc_b alloc_ofs limit_ofs tinf_b tinf_ofs m1 m2,
+        M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) /\
+        M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) /\
+        M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) /\
+        Mem.store int_chunk m tinf_b
+          (Ptrofs.unsigned
+             (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 0))))
+          (Vptr alloc_b alloc_ofs) = Some m1 /\
+        Mem.store int_chunk m1 tinf_b
+          (Ptrofs.unsigned
+             (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 1))))
+          (Vptr alloc_b limit_ofs) = Some m2.
+  Proof.
+    intros max_alloc lenv m Hct.
+    destruct Hct as
+      [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs Hct]]]]]]].
+    decompose [and] Hct. clear Hct.
+    match goal with
+    | H : M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) |- _ =>
+        pose proof H as Halloc
+    end.
+    match goal with
+    | H : M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) |- _ =>
+        pose proof H as Hlimit
+    end.
+    match goal with
+    | H : M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) |- _ =>
+        pose proof H as Htinf
+    end.
+    match goal with
+    | H : forall i : Z,
+          (0 <= i < 4)%Z ->
+          Mem.valid_access m int_chunk tinf_b
+            (Ptrofs.unsigned
+               (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * i)))) Writable |- _ =>
+        pose proof H as Htinf_va
+    end.
+    assert (Hva0 :
+      Mem.valid_access m int_chunk tinf_b
+        (Ptrofs.unsigned
+           (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 0)))) Writable).
+    { apply Htinf_va. lia. }
+    destruct (Mem.valid_access_store m int_chunk tinf_b
+      (Ptrofs.unsigned
+         (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 0))))
+      (Vptr alloc_b alloc_ofs) Hva0) as [m1 Hstore0].
+    assert (Hva1 :
+      Mem.valid_access m int_chunk tinf_b
+        (Ptrofs.unsigned
+           (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 1)))) Writable).
+    { apply Htinf_va. lia. }
+    assert (Hva1_after :
+      Mem.valid_access m1 int_chunk tinf_b
+        (Ptrofs.unsigned
+           (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 1)))) Writable).
+    { eapply Mem.store_valid_access_1; eauto. }
+    destruct (Mem.valid_access_store m1 int_chunk tinf_b
+      (Ptrofs.unsigned
+         (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 1))))
+      (Vptr alloc_b limit_ofs) Hva1_after) as [m2 Hstore1].
+    exists alloc_b, alloc_ofs, limit_ofs, tinf_b, tinf_ofs, m1, m2.
+    repeat split; eauto.
+  Qed.
 
   (** ** Unchanged globals *)
 
@@ -219,6 +339,21 @@ Section STACK_CORRECT.
 
   Definition s_m_tstep2 (ge : genv) := clos_trans _ (s_traceless_step2 ge).
 
+  Definition s_tinfo_alloc_assign : statement :=
+    Sassign
+      (Efield (Ederef (Etempvar tinfIdent threadInf) threadStructInf)
+              allocIdent valPtr)
+      (Etempvar allocIdent valPtr).
+
+  Definition s_tinfo_limit_assign : statement :=
+    Sassign
+      (Efield (Ederef (Etempvar tinfIdent threadInf) threadStructInf)
+              limitIdent valPtr)
+      (Etempvar limitIdent valPtr).
+
+  Definition s_tinfo_sync_stmt : statement :=
+    Ssequence s_tinfo_alloc_assign s_tinfo_limit_assign.
+
   Lemma s_m_tstep2_step :
     forall ge s s',
       s_traceless_step2 ge s s' ->
@@ -237,6 +372,19 @@ Section STACK_CORRECT.
   Proof.
     intros ge s1 s2 s3 H12 H23.
     eapply t_trans; eauto.
+  Qed.
+
+  Lemma s_m_tstep2_of_m_tstep2 :
+    forall ge s1 s2,
+      m_tstep2 ge s1 s2 ->
+      s_m_tstep2 ge s1 s2.
+  Proof.
+    intros ge s1 s2 Hm.
+    induction Hm as [s1 s2 Hstep | s1 s2 s3 H12 IH12 H23 IH23].
+    - apply s_m_tstep2_step.
+      constructor.
+      exact Hstep.
+    - eapply s_m_tstep2_transitive; eauto.
   Qed.
 
   Lemma s_m_tstep2_seq_set :
@@ -277,6 +425,58 @@ Section STACK_CORRECT.
     - exact Heval.
     - exact Hcast.
     - exact Hfree.
+  Qed.
+
+  Lemma stack_ehalt_prefix_steps_m :
+    forall fu k lenv m max_alloc,
+      program_inv argsIdent allocIdent limitIdent gcIdent
+        threadInfIdent tinfIdent heapInfIdent isptrIdent caseIdent nParam p ->
+      stack_correct_tinfo max_alloc lenv m ->
+      exists m2,
+        m_tstep2 (globalenv p)
+          (State fu s_tinfo_sync_stmt k empty_env lenv m)
+          (State fu Sskip k empty_env lenv m2).
+  Proof.
+    intros fu k lenv m max_alloc Hpinv Hct.
+    destruct Hpinv as [_ [Hpti _]].
+    destruct (stack_correct_tinfo_store_alloc_limit_exists max_alloc lenv m Hct)
+      as [alloc_b [alloc_ofs [limit_ofs [tinf_b [tinf_ofs [m1 [m2
+          [Halloc [Hlimit [Htinf [Hs0 Hs1]]]]]]]]]]].
+    exists m2.
+    unfold s_tinfo_sync_stmt, s_tinfo_alloc_assign, s_tinfo_limit_assign.
+    eapply m_tstep2_tinfo_assigns; eauto.
+  Qed.
+
+  Lemma stack_ehalt_translated_return_steps_m :
+    forall fu k lenv m m2 x rv,
+      m_tstep2 (globalenv p)
+        (State fu s_tinfo_sync_stmt
+           (Kseq (Sreturn (Some (s_makeVar x fenv finfo_env))) k)
+           empty_env lenv m)
+        (State fu Sskip
+           (Kseq (Sreturn (Some (s_makeVar x fenv finfo_env))) k)
+           empty_env lenv m2) ->
+      eval_expr (globalenv p) empty_env lenv m2 (s_makeVar x fenv finfo_env) rv ->
+      Cop.sem_cast rv
+        (typeof (s_makeVar x fenv finfo_env))
+        (fn_return fu) m2 = Some rv ->
+      m_tstep2 (globalenv p)
+        (State fu (Ssequence s_tinfo_sync_stmt (Sreturn (Some (s_makeVar x fenv finfo_env))))
+           k empty_env lenv m)
+        (Returnstate rv (call_cont k) m2).
+  Proof.
+    intros fu k lenv m m2 x rv Hpref Heval Hcast.
+    eapply m_tstep2_transitive.
+    - apply m_tstep2_step. constructor.
+    - eapply m_tstep2_transitive.
+      + exact Hpref.
+      + eapply m_tstep2_transitive.
+        * apply m_tstep2_step. constructor.
+        * apply m_tstep2_step.
+          eapply step_return_1.
+          -- exact Heval.
+          -- exact Hcast.
+          -- simpl. reflexivity.
   Qed.
 
   (** ** Variable resolution *)
@@ -530,6 +730,94 @@ Section STACK_CORRECT.
       simpl. reflexivity.
     - exists L.
       exact Hrepr.
+  Qed.
+
+  Theorem stack_codegen_correct_ehalt_translated :
+    forall rho x v c,
+      bstep_e (M.empty _) cenv rho (Ehalt x) v c ->
+      forall lenv m max_alloc fu k,
+        s_inv (Ehalt x) rho lenv m max_alloc ->
+        program_inv argsIdent allocIdent limitIdent gcIdent
+          threadInfIdent tinfIdent heapInfIdent isptrIdent caseIdent nParam p ->
+        (Z.of_nat (LambdaANF_to_Clight_stack.max_allocs (Ehalt x)) <= max_alloc)%Z ->
+        (forall m2,
+            m_tstep2 (globalenv p)
+              (State fu s_tinfo_sync_stmt
+                 (Kseq (Sreturn (Some (s_makeVar x fenv finfo_env))) k)
+                 empty_env lenv m)
+              (State fu Sskip
+                 (Kseq (Sreturn (Some (s_makeVar x fenv finfo_env))) k)
+                 empty_env lenv m2) ->
+            exists rv L,
+              eval_expr (globalenv p) empty_env lenv m2
+                (s_makeVar x fenv finfo_env) rv /\
+              Cop.sem_cast rv
+                (typeof (s_makeVar x fenv finfo_env))
+                (fn_return fu) m2 = Some rv /\
+              s_repr_val L v rv m2) ->
+        exists rv' m',
+          m_tstep2 (globalenv p)
+            (State fu
+               (Ssequence s_tinfo_sync_stmt
+                  (Sreturn (Some (s_makeVar x fenv finfo_env))))
+               k empty_env lenv m)
+            (Returnstate rv' (call_cont k) m') /\
+          exists L', s_repr_val L' v rv' m'.
+  Proof.
+    intros rho x v c Hbs.
+    intros lenv m max_alloc fu k Hinv Hpinv Halloc Hpost.
+    destruct Hinv as [Linv [_ [_ Hct]]].
+    destruct (stack_ehalt_prefix_steps_m fu
+                (Kseq (Sreturn (Some (s_makeVar x fenv finfo_env))) k)
+                lenv m max_alloc Hpinv Hct) as [m2 Hpref].
+    destruct (Hpost m2 Hpref) as [rv [L [Heval [Hcast Hrepr]]]].
+    exists rv, m2.
+    split.
+    - eapply stack_ehalt_translated_return_steps_m; eauto.
+    - exists L; exact Hrepr.
+  Qed.
+
+  Corollary stack_codegen_correct_ehalt_translated_s :
+    forall rho x v c,
+      bstep_e (M.empty _) cenv rho (Ehalt x) v c ->
+      forall lenv m max_alloc fu k,
+        s_inv (Ehalt x) rho lenv m max_alloc ->
+        program_inv argsIdent allocIdent limitIdent gcIdent
+          threadInfIdent tinfIdent heapInfIdent isptrIdent caseIdent nParam p ->
+        (Z.of_nat (LambdaANF_to_Clight_stack.max_allocs (Ehalt x)) <= max_alloc)%Z ->
+        (forall m2,
+            m_tstep2 (globalenv p)
+              (State fu s_tinfo_sync_stmt
+                 (Kseq (Sreturn (Some (s_makeVar x fenv finfo_env))) k)
+                 empty_env lenv m)
+              (State fu Sskip
+                 (Kseq (Sreturn (Some (s_makeVar x fenv finfo_env))) k)
+                 empty_env lenv m2) ->
+            exists rv L,
+              eval_expr (globalenv p) empty_env lenv m2
+                (s_makeVar x fenv finfo_env) rv /\
+              Cop.sem_cast rv
+                (typeof (s_makeVar x fenv finfo_env))
+                (fn_return fu) m2 = Some rv /\
+              s_repr_val L v rv m2) ->
+        exists rv' m',
+          s_m_tstep2 (globalenv p)
+            (State fu
+               (Ssequence s_tinfo_sync_stmt
+                  (Sreturn (Some (s_makeVar x fenv finfo_env))))
+               k empty_env lenv m)
+            (Returnstate rv' (call_cont k) m') /\
+          exists L', s_repr_val L' v rv' m'.
+  Proof.
+    intros rho x v c Hbs.
+    intros lenv m max_alloc fu k Hinv Hpinv Halloc Hpost.
+    destruct (stack_codegen_correct_ehalt_translated
+                rho x v c Hbs
+                lenv m max_alloc fu k Hinv Hpinv Halloc Hpost)
+      as [rv' [m' [Hstep Hrepr]]].
+    exists rv', m'. split.
+    - eapply s_m_tstep2_of_m_tstep2. exact Hstep.
+    - exact Hrepr.
   Qed.
 
 End STACK_CORRECT.

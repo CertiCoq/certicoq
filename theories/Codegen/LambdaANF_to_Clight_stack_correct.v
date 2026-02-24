@@ -1760,6 +1760,72 @@ Section STACK_CORRECT.
     - eapply Hhalt; eauto.
   Qed.
 
+  Theorem stack_codegen_correct :
+    forall (Goal : forall pr rho e v n, Prop),
+      (forall pr rho x t ys e v n rho' vs,
+          get_list ys rho = Some vs ->
+          M.set x (Vconstr t vs) rho = rho' ->
+          bstep_e pr cenv rho' e v n ->
+          Goal pr rho' e v n ->
+          Goal pr rho (Econstr x t ys e) v n) ->
+      (forall pr rho x t n0 y e ov c vs vx,
+          M.get y rho = Some (Vconstr t vs) ->
+          nthN vs n0 = Some vx ->
+          bstep_e pr cenv (M.set x vx rho) e ov c ->
+          Goal pr (M.set x vx rho) e ov c ->
+          Goal pr rho (Eproj x t n0 y e) ov c) ->
+      (forall pr rho y cl v n t vl e,
+          M.get y rho = Some (Vconstr t vl) ->
+          caseConsistent cenv cl t ->
+          findtag cl t = Some e ->
+          bstep_e pr cenv rho e v n ->
+          Goal pr rho e v n ->
+          Goal pr rho (Ecase y cl) v n) ->
+      (forall pr rho f t ys v c rho_clo fl f' vs xs e rho_call,
+          M.get f rho = Some (Vfun rho_clo fl f') ->
+          get_list ys rho = Some vs ->
+          find_def f' fl = Some (t, xs, e) ->
+          set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call ->
+          bstep_e pr cenv rho_call e v c ->
+          Goal pr rho_call e v c ->
+          Goal pr rho (Eapp f t ys) v (c + 1)) ->
+      (forall pr rho x f t ys e v' rho_clo fl f' vs xs e_body rho_call v c c',
+          M.get f rho = Some (Vfun rho_clo fl f') ->
+          get_list ys rho = Some vs ->
+          find_def f' fl = Some (t, xs, e_body) ->
+          set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call ->
+          bstep_e pr cenv rho_call e_body v c ->
+          bstep_e pr cenv (M.set x v rho) e v' c' ->
+          Goal pr rho_call e_body v c ->
+          Goal pr (M.set x v rho) e v' c' ->
+          Goal pr rho (Eletapp x f t ys e) v' (c + c' + 1)) ->
+      (forall pr rho fl e v n,
+          bstep_e pr cenv (def_funs fl fl rho rho) e v n ->
+          Goal pr (def_funs fl fl rho rho) e v n ->
+          Goal pr rho (Efun fl e) v n) ->
+      (forall pr rho x p0 e v n rho',
+          M.set x (Vprim p0) rho = rho' ->
+          bstep_e pr cenv rho' e v n ->
+          Goal pr rho' e v n ->
+          Goal pr rho (Eprim_val x p0 e) v n) ->
+      (forall pr rho x f ys e v' n vs f' vx rho',
+          get_list ys rho = Some vs ->
+          M.get f pr = Some f' ->
+          f' vs = Some vx ->
+          M.set x vx rho = rho' ->
+          bstep_e pr cenv rho' e v' n ->
+          Goal pr rho' e v' n ->
+          Goal pr rho (Eprim x f ys e) v' n) ->
+      (forall pr rho x v,
+          M.get x rho = Some v ->
+          Goal pr rho (Ehalt x) v 0) ->
+      forall pr rho e v n,
+        bstep_e pr cenv rho e v n ->
+        Goal pr rho e v n.
+  Proof.
+    eapply stack_codegen_correct_full_from_cases.
+  Qed.
+
   (** ** Halt-case correctness theorem *)
 
   (* The ANF backend preserves evaluation semantics:
@@ -1781,7 +1847,7 @@ Section STACK_CORRECT.
      The hypothesis connecting stm to the compilation of e
      will be refined as individual cases are proved. *)
 
-  Theorem stack_codegen_correct :
+  Theorem stack_codegen_correct_ehalt :
     forall rho x v c,
       bstep_e (M.empty _) cenv rho (Ehalt x) v c ->
       forall lenv m max_alloc fu k rv L,

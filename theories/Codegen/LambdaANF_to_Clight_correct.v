@@ -303,7 +303,7 @@ Proof.
   assert (decidable (List.In x vs)). apply In_decidable. apply var_dec_eq.
   assert (decidable (name_in_fundefs fl x)). unfold decidable. assert (Hd := Decidable_name_in_fundefs fl). inv Hd. specialize (Dec x). inv Dec; auto.
   inv H1; inv H2; auto. exfalso. 
-  apply H3. constructor. Search occurs_free_fundefs find_def.
+  apply H3. constructor.
   eapply shrink_cps_correct.find_def_free_included. eauto. constructor. constructor. auto. auto. auto.
   apply M.gempty.
 Qed.
@@ -1339,8 +1339,7 @@ Definition prefix_ctx {A:Type} rho' rho :=
    simpl.
    rewrite Z.pow_pos_fold.
    rewrite Pos2Z.inj_pow.  apply Ptrofs.eqm_refl.
- Qed.   
- Search Int.max_signed.
+ Qed.
 
  Theorem nat_shiftl_p1:
    forall n z,
@@ -1532,8 +1531,6 @@ Theorem pos_iter_xO: forall A f (a:A) p,
 Proof.
   intros. simpl. reflexivity.
 Qed.
-
-Search Z.div2 Z.add.
 
 
 Theorem div2_even_add:
@@ -5212,7 +5209,6 @@ Proof.
     + constructor. auto.
     + rewrite <- Z.add_assoc in H4. rewrite <- Z.mul_succ_r in H4.
       econstructor.
-      Search Mem.store. 
     + constructor. auto.
     +    
 *)
@@ -7696,9 +7692,8 @@ Definition correct_fenv_for_function (fenv:fun_env):=
                 n = N.of_nat (length l) /\
                 length l = length ys /\
                     NoDup l /\
-                    Forall (fun i => 0 <= (Z.of_N i) < max_args)%Z l. 
+                    Forall (fun i => 0 <= (Z.of_N i) < max_args)%Z l.
 
-Search fun_tag. 
 (* fun_tag are associated with an arity and a calling convention. 
    all functions and applications with this fun_tag have the right number of arguments *)
 

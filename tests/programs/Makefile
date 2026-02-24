@@ -23,7 +23,7 @@ all: lib exec run
 
 exec: $(TESTS)
 
-clean:
+clean: cleanexec
 	rm -f ./*.*.c
 	rm -f ./*.*.h
 	rm -f ./*.vo

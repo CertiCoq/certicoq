@@ -194,6 +194,171 @@ Section STACK_CORRECT.
           b <> args_b /\ b <> alloc_b /\ b <> tinf_b /\
           (exists chunk, Mem.valid_access m chunk b 0%Z Nonempty)).
 
+  Lemma stack_correct_tinfo_set_other :
+    forall max_alloc lenv m x vx,
+      stack_correct_tinfo max_alloc lenv m ->
+      x <> allocIdent ->
+      x <> limitIdent ->
+      x <> argsIdent ->
+      x <> tinfIdent ->
+      stack_correct_tinfo max_alloc (M.set x vx lenv) m.
+  Proof.
+    intros max_alloc lenv m x vx Hct Hx_alloc Hx_limit Hx_args Hx_tinf.
+    destruct Hct as
+      [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs Hct]]]]]]].
+    decompose [and] Hct. clear Hct.
+    match goal with
+    | H : M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) |- _ =>
+        pose proof H as Hget_alloc
+    end.
+    match goal with
+    | H : (align_chunk int_chunk | Ptrofs.unsigned alloc_ofs)%Z |- _ =>
+        pose proof H as Halign_alloc
+    end.
+    match goal with
+    | H : Mem.range_perm m alloc_b (Ptrofs.unsigned alloc_ofs) (Ptrofs.unsigned limit_ofs) Cur Writable |- _ =>
+        pose proof H as Hrange_alloc
+    end.
+    match goal with
+    | H : M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) |- _ =>
+        pose proof H as Hget_limit
+    end.
+    match goal with
+    | H : M.get argsIdent lenv = Some (Vptr args_b args_ofs) |- _ =>
+        pose proof H as Hget_args
+    end.
+    match goal with
+    | H : args_b <> alloc_b |- _ =>
+        pose proof H as Hargs_ne_alloc
+    end.
+    match goal with
+    | H : (Ptrofs.unsigned args_ofs + int_size * max_args <= Ptrofs.max_unsigned)%Z |- _ =>
+        pose proof H as Hargs_bound
+    end.
+    match goal with
+    | H : forall z : Z, (0 <= z < max_args)%Z ->
+          Mem.valid_access m int_chunk args_b
+            (Ptrofs.unsigned (Ptrofs.add args_ofs (Ptrofs.mul (Ptrofs.repr int_size) (Ptrofs.repr z))))
+            Writable |- _ =>
+        pose proof H as Hargs_va
+    end.
+    match goal with
+    | H : M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) |- _ =>
+        pose proof H as Hget_tinf
+    end.
+    match goal with
+    | H : True |- _ =>
+        pose proof H as Htrue
+    end.
+    match goal with
+    | H : tinf_b <> alloc_b |- _ =>
+        pose proof H as Htinf_ne_alloc
+    end.
+    match goal with
+    | H : forall i : Z, (0 <= i < 4)%Z ->
+          Mem.valid_access m int_chunk tinf_b
+            (Ptrofs.unsigned (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * i)))) Writable |- _ =>
+        pose proof H as Htinf_va
+    end.
+    match goal with
+    | H : deref_loc (Tarray uval LambdaANF_to_Clight_stack.maxArgs noattr) m tinf_b
+          (Ptrofs.add tinf_ofs (Ptrofs.repr (int_size * 3))) Full (Vptr args_b args_ofs) |- _ =>
+        pose proof H as Hderef_args
+    end.
+    exists alloc_b, alloc_ofs, limit_ofs, args_b, args_ofs, tinf_b, tinf_ofs.
+    split.
+    - rewrite M.gso; [exact Hget_alloc | congruence].
+    - split.
+      + exact Halign_alloc.
+      + split.
+        * exact Hrange_alloc.
+        * split.
+          { rewrite M.gso; [exact Hget_limit | congruence]. }
+          split.
+          { lia. }
+          split.
+          { rewrite M.gso; [exact Hget_args | congruence]. }
+          split.
+          { exact Hargs_ne_alloc. }
+          split.
+          { exact Hargs_bound. }
+          split.
+          { exact Hargs_va. }
+          split.
+          { rewrite M.gso; [exact Hget_tinf | congruence]. }
+          split.
+          { exact Htrue. }
+          split.
+          { exact Htinf_ne_alloc. }
+          split.
+          { exact Htinf_va. }
+          split.
+          { exact Hderef_args. }
+          { assumption. }
+  Qed.
+
+  Lemma stack_protected_not_in_L_set_other :
+    forall lenv L x vx,
+      stack_protected_not_in_L lenv L ->
+      x <> allocIdent ->
+      x <> limitIdent ->
+      x <> argsIdent ->
+      x <> tinfIdent ->
+      stack_protected_not_in_L (M.set x vx lenv) L.
+  Proof.
+    intros lenv L x vx Hprot Hx_alloc Hx_limit Hx_args Hx_tinf.
+    destruct Hprot as
+      [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs Hprot]]]]]]].
+    decompose [and] Hprot. clear Hprot.
+    match goal with
+    | H : M.get allocIdent lenv = Some (Vptr alloc_b alloc_ofs) |- _ =>
+        pose proof H as Hget_alloc
+    end.
+    match goal with
+    | H : forall j : Z, (Ptrofs.unsigned alloc_ofs <= j < Ptrofs.unsigned limit_ofs)%Z -> ~ L alloc_b j |- _ =>
+        pose proof H as Halloc_notL
+    end.
+    match goal with
+    | H : M.get limitIdent lenv = Some (Vptr alloc_b limit_ofs) |- _ =>
+        pose proof H as Hget_limit
+    end.
+    match goal with
+    | H : M.get argsIdent lenv = Some (Vptr args_b args_ofs) |- _ =>
+        pose proof H as Hget_args
+    end.
+    match goal with
+    | H : forall z j : Z, (0 <= z < max_args)%Z ->
+          (Ptrofs.unsigned (Ptrofs.add args_ofs (Ptrofs.repr (int_size * z))) <= j <
+           Ptrofs.unsigned (Ptrofs.add args_ofs (Ptrofs.repr (int_size * z))) + int_size)%Z ->
+          ~ L args_b j |- _ =>
+        pose proof H as Hargs_notL
+    end.
+    match goal with
+    | H : M.get tinfIdent lenv = Some (Vptr tinf_b tinf_ofs) |- _ =>
+        pose proof H as Hget_tinf
+    end.
+    match goal with
+    | H : forall i : Z, ~ L tinf_b i |- _ =>
+        pose proof H as Htinf_notL
+    end.
+    exists alloc_b, alloc_ofs, limit_ofs, args_b, args_ofs, tinf_b, tinf_ofs.
+    split.
+    - rewrite M.gso; [exact Hget_alloc | congruence].
+    - split.
+      + exact Halloc_notL.
+      + split.
+        * rewrite M.gso; [exact Hget_limit | congruence].
+        * split.
+          { rewrite M.gso; [exact Hget_args | congruence]. }
+          split.
+          { exact Hargs_notL. }
+          split.
+          { rewrite M.gso; [exact Hget_tinf | congruence]. }
+          split.
+          { exact Htinf_notL. }
+          { assumption. }
+  Qed.
+
   Lemma stack_correct_tinfo_store_alloc_exists :
     forall max_alloc lenv m,
       stack_correct_tinfo max_alloc lenv m ->
@@ -561,6 +726,19 @@ Section STACK_CORRECT.
       s_repr_val L v (Vptr b Ptrofs.zero) m ->
       s_repr_val_id L x v lenv m.
 
+  Lemma s_repr_val_id_set :
+    forall L x0 vx y v lenv m,
+      s_repr_val_id L y v lenv m ->
+      y <> x0 ->
+      s_repr_val_id L y v (M.set x0 vx lenv) m.
+  Proof.
+    intros L x0 vx y v lenv m Hrid Hneq.
+    inversion Hrid; subst.
+    - econstructor 1; eauto.
+      rewrite M.gso; auto.
+    - econstructor 2; eauto.
+  Qed.
+
   (** ** Correct function definitions *)
 
   (* A compiled function definition in the global env has the right body *)
@@ -630,6 +808,157 @@ Section STACK_CORRECT.
       stack_protected_not_in_L lenv L /\
       s_rel_mem L e rho lenv m /\
       stack_correct_tinfo max_alloc lenv m.
+
+  Lemma s_repr_val_vint_or_vptr :
+    forall L sv cv m,
+      s_repr_val L sv cv m ->
+      s_Vint_or_Vptr cv = true.
+  Proof.
+    intros L sv cv m Hrepr.
+    destruct Hrepr; simpl; auto.
+  Qed.
+
+  Lemma s_rel_mem_occurs_free_get :
+    forall L e rho lenv m x,
+      s_rel_mem L e rho lenv m ->
+      occurs_free e x ->
+      exists v, M.get x rho = Some v.
+  Proof.
+    intros L e rho lenv m x Hrel Hfree.
+    specialize (Hrel x) as [Hocc _].
+    destruct (Hocc Hfree) as [v [Hget _]].
+    exists v; exact Hget.
+  Qed.
+
+  Lemma s_rel_mem_occurs_free_repr_id :
+    forall L e rho lenv m x,
+      s_rel_mem L e rho lenv m ->
+      occurs_free e x ->
+      exists v, M.get x rho = Some v /\ s_repr_val_id L x v lenv m.
+  Proof.
+    intros L e rho lenv m x Hrel Hfree.
+    specialize (Hrel x) as [Hocc _].
+    destruct (Hocc Hfree) as [v [Hget Hrid]].
+    exists v; split; assumption.
+  Qed.
+
+  Lemma s_repr_val_id_to_s_get_var_or_funvar :
+    forall L x v lenv m,
+      s_repr_val_id L x v lenv m ->
+      exists rv,
+        s_get_var_or_funvar lenv x rv /\
+        s_repr_val L v rv m.
+  Proof.
+    intros L x v lenv m Hrid.
+    inversion Hrid; subst.
+    - exists cv.
+      split.
+      + econstructor 2; eauto.
+        eapply s_repr_val_vint_or_vptr; eauto.
+      + exact H1.
+    - exists (Vptr b Ptrofs.zero).
+      split.
+      + econstructor; eauto.
+      + exact H0.
+  Qed.
+
+  Lemma s_rel_mem_occurs_free_get_var_or_funvar :
+    forall L e rho lenv m x,
+      s_rel_mem L e rho lenv m ->
+      occurs_free e x ->
+      exists v rv,
+        M.get x rho = Some v /\
+        s_get_var_or_funvar lenv x rv /\
+        s_repr_val L v rv m.
+  Proof.
+    intros L e rho lenv m x Hrel Hfree.
+    destruct (s_rel_mem_occurs_free_repr_id _ _ _ _ _ _ Hrel Hfree)
+      as [v [Hget Hrid]].
+    destruct (s_repr_val_id_to_s_get_var_or_funvar _ _ _ _ _ Hrid)
+      as [rv [Hgvof Hrepr]].
+    exists v, rv.
+    repeat split; assumption.
+  Qed.
+
+  Lemma s_rel_mem_set_other_nonfree :
+    forall L e rho lenv m x vx,
+      s_rel_mem L e rho lenv m ->
+      ~ occurs_free e x ->
+      s_rel_mem L e rho (M.set x vx lenv) m.
+  Proof.
+    intros L e rho lenv m x vx Hrel Hnot.
+    unfold s_rel_mem in *.
+    intros z.
+    specialize (Hrel z) as [Hocc Hfun].
+    split.
+    - intros Hzfree.
+      specialize (Hocc Hzfree) as [v [Hzget Hrid]].
+      exists v.
+      split; [exact Hzget|].
+      eapply s_repr_val_id_set; [exact Hrid|].
+      intro Heq; subst z.
+      apply Hnot; exact Hzfree.
+    - intros rho' fds f v Hzget Hsub.
+      eapply Hfun; eauto.
+  Qed.
+
+  Lemma s_rel_mem_set_other_nonfree_rho_lenv :
+    forall L e rho lenv m x vx rv,
+      s_rel_mem L e rho lenv m ->
+      ~ occurs_free e x ->
+      (forall rho' fds f,
+          subval_or_eq (Vfun rho' fds f) vx ->
+          (exists b,
+              Genv.find_symbol (globalenv p) f = Some b /\
+              s_repr_val L (Vfun rho' fds f) (Vptr b Ptrofs.zero) m) /\
+          closed_val (Vfun rho' fds f) /\
+          s_correct_fundefs fds m) ->
+      s_rel_mem L e (M.set x vx rho) (M.set x rv lenv) m.
+  Proof.
+    intros L e rho lenv m x vx rv Hrel Hnot Hxfun.
+    unfold s_rel_mem in *.
+    intros z.
+    specialize (Hrel z) as [Hocc Hfun].
+    split.
+    - intros Hzfree.
+      specialize (Hocc Hzfree) as [v [Hzget Hrid]].
+      assert (Hzneq : z <> x).
+      { intro Heq. subst z. apply Hnot. exact Hzfree. }
+      exists v.
+      split.
+      + rewrite M.gso; [exact Hzget | congruence].
+      + eapply s_repr_val_id_set; eauto.
+    - intros rho' fds f v Hzget Hsub.
+      destruct (Pos.eq_dec z x) as [Heq | Hneq].
+      + subst z.
+        rewrite M.gss in Hzget.
+        inversion Hzget; subst v.
+        specialize (Hxfun _ _ _ Hsub) as [Hrepr [Hclosed Hcorr]].
+        split; [exact Hrepr | split; assumption].
+      + rewrite M.gso in Hzget by congruence.
+        specialize (Hfun _ _ _ _ Hzget Hsub) as [Hrepr [Hclosed Hcorr]].
+        split; [exact Hrepr | split; assumption].
+  Qed.
+
+  Lemma s_inv_set_other_nonfree :
+    forall e rho lenv m max_alloc x vx,
+      s_inv e rho lenv m max_alloc ->
+      ~ occurs_free e x ->
+      x <> allocIdent ->
+      x <> limitIdent ->
+      x <> argsIdent ->
+      x <> tinfIdent ->
+      s_inv e rho (M.set x vx lenv) m max_alloc.
+  Proof.
+    intros e rho lenv m max_alloc x vx Hinv Hnot Hx_alloc Hx_limit Hx_args Hx_tinf.
+    destruct Hinv as [L [Hprot [Hrel Hct]]].
+    exists L.
+    split.
+    - eapply stack_protected_not_in_L_set_other; eauto.
+    - split.
+      + eapply s_rel_mem_set_other_nonfree; eauto.
+      + eapply stack_correct_tinfo_set_other; eauto.
+  Qed.
 
   Lemma s_rel_mem_halt_repr_id :
     forall L rho lenv m x v,

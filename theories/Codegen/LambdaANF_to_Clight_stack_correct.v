@@ -1213,6 +1213,333 @@ Section STACK_CORRECT.
       + eapply stack_correct_tinfo_set_other; eauto.
   Qed.
 
+  Lemma subval_or_eq_fun_not_prim :
+    forall rho' fds f p0,
+      ~ subval_or_eq (Vfun rho' fds f) (Vprim p0).
+  Proof.
+    intros rho' fds f p0 Hsub.
+    apply rt_then_t_or_eq in Hsub.
+    destruct Hsub as [Heq | Ht].
+    - discriminate.
+    - remember (Vprim p0) as vp eqn:Heqvp.
+      induction Ht.
+      + subst. inversion H.
+      + eauto.
+  Qed.
+
+  Lemma s_rel_mem_ecase_branch :
+    forall L rho lenv m y cl t vl e,
+      s_rel_mem L (Ecase y cl) rho lenv m ->
+      M.get y rho = Some (Vconstr t vl) ->
+      caseConsistent cenv cl t ->
+      findtag cl t = Some e ->
+      s_rel_mem L e rho lenv m.
+  Proof.
+    intros L rho lenv m y cl t vl e Hrel Hy Hcc Hfind.
+    unfold s_rel_mem in *.
+    intros z.
+    specialize (Hrel z) as [Hocc Hfun].
+    split.
+    - intros Hzfree.
+      assert (Hzouter : occurs_free (Ecase y cl) z).
+      { eapply (occurs_free_Ecase_Included cl t y e).
+        - eapply findtag_In; eauto.
+        - exact Hzfree.
+      }
+      exact (Hocc Hzouter).
+    - exact Hfun.
+  Qed.
+
+  Lemma s_state_ecase_branch_invariants :
+    forall L rho lenv m max_alloc y cl t vl e,
+      stack_protected_not_in_L lenv L ->
+      s_rel_mem L (Ecase y cl) rho lenv m ->
+      stack_correct_tinfo max_alloc lenv m ->
+      M.get y rho = Some (Vconstr t vl) ->
+      caseConsistent cenv cl t ->
+      findtag cl t = Some e ->
+      stack_protected_not_in_L lenv L /\
+      s_rel_mem L e rho lenv m /\
+      stack_correct_tinfo max_alloc lenv m.
+  Proof.
+    intros L rho lenv m max_alloc y cl t vl e
+      Hprot Hrel Hct Hy Hcc Hfind.
+    split; [exact Hprot|].
+    split.
+    - eapply s_rel_mem_ecase_branch; eauto.
+    - exact Hct.
+  Qed.
+
+  Lemma s_state_efun_body_invariants :
+    forall L rho lenv m max_alloc fl e,
+      stack_protected_not_in_L lenv L ->
+      s_rel_mem L (Efun fl e) rho lenv m ->
+      stack_correct_tinfo max_alloc lenv m ->
+      s_rel_mem L e (def_funs fl fl rho rho) lenv m ->
+      stack_protected_not_in_L lenv L /\
+      s_rel_mem L e (def_funs fl fl rho rho) lenv m /\
+      stack_correct_tinfo max_alloc lenv m.
+  Proof.
+    intros L rho lenv m max_alloc fl e
+      Hprot Hrel Hct Hrel_body.
+    split; [exact Hprot|].
+    split; [exact Hrel_body|exact Hct].
+  Qed.
+
+  Lemma s_rel_mem_eprim_val_body_nonfree :
+    forall L rho lenv m x p0 e,
+      s_rel_mem L (Eprim_val x p0 e) rho lenv m ->
+      ~ occurs_free e x ->
+      s_rel_mem L e (M.set x (Vprim p0) rho) lenv m.
+  Proof.
+    intros L rho lenv m x p0 e Hrel Hnot_free_x.
+    unfold s_rel_mem in *.
+    intros z.
+    specialize (Hrel z) as [Hocc Hfun].
+    split.
+    - intros Hzfree.
+      assert (Hzneq : z <> x).
+      { intro Heq. subst z. contradiction. }
+      assert (Hzouter : occurs_free (Eprim_val x p0 e) z).
+      { apply Free_Eprim_val; auto. }
+      specialize (Hocc Hzouter) as [vz [Hzget Hrid]].
+      exists vz.
+      split.
+      + rewrite M.gso; [exact Hzget | congruence].
+      + exact Hrid.
+    - intros rho' fds f v Hzget Hsub.
+      destruct (Pos.eq_dec z x) as [Heqzx | Hneqzx].
+      + subst z.
+        rewrite M.gss in Hzget.
+        inversion Hzget; subst v; clear Hzget.
+        exfalso.
+        eapply subval_or_eq_fun_not_prim; eauto.
+      + rewrite M.gso in Hzget by congruence.
+        eapply Hfun; eauto.
+  Qed.
+
+  Lemma s_state_eprim_val_body_invariants :
+    forall L rho lenv m max_alloc x p0 e,
+      stack_protected_not_in_L lenv L ->
+      s_rel_mem L (Eprim_val x p0 e) rho lenv m ->
+      stack_correct_tinfo max_alloc lenv m ->
+      ~ occurs_free e x ->
+      stack_protected_not_in_L lenv L /\
+      s_rel_mem L e (M.set x (Vprim p0) rho) lenv m /\
+      stack_correct_tinfo max_alloc lenv m.
+  Proof.
+    intros L rho lenv m max_alloc x p0 e
+      Hprot Hrel Hct Hnot_free_x.
+    split; [exact Hprot|].
+    split.
+    - eapply s_rel_mem_eprim_val_body_nonfree; eauto.
+    - exact Hct.
+  Qed.
+
+  Lemma s_rel_mem_eprim_body_set_with_repr :
+    forall L rho lenv m x f ys e vs vx rv,
+      s_rel_mem L (Eprim x f ys e) rho lenv m ->
+      get_list ys rho = Some vs ->
+      Genv.find_symbol (globalenv p) x = None ->
+      s_repr_val L vx rv m ->
+      (forall rho' fds g,
+          subval_or_eq (Vfun rho' fds g) vx ->
+          (exists b,
+              Genv.find_symbol (globalenv p) g = Some b /\
+              s_repr_val L (Vfun rho' fds g) (Vptr b Ptrofs.zero) m) /\
+          closed_val (Vfun rho' fds g) /\
+          s_correct_fundefs fds m) ->
+      s_rel_mem L e (M.set x vx rho) (M.set x rv lenv) m.
+  Proof.
+    intros L rho lenv m x f ys e vs vx rv
+      Hrel Hgl Hsym_none Hrepr_x Hxfun.
+    unfold s_rel_mem in *.
+    intros z.
+    specialize (Hrel z) as [Hocc Hfun].
+    split.
+    - intros Hzfree.
+      destruct (Pos.eq_dec z x) as [Heqzx | Hneqzx].
+      + subst z.
+        exists vx.
+        split.
+        * rewrite M.gss. reflexivity.
+        * econstructor 1.
+          -- exact Hsym_none.
+          -- rewrite M.gss. reflexivity.
+          -- exact Hrepr_x.
+      + assert (Hzfree_outer : occurs_free (Eprim x f ys e) z).
+        { apply Free_Eprim2.
+          - congruence.
+          - exact Hzfree.
+        }
+        specialize (Hocc Hzfree_outer) as [vz [Hzget Hrid]].
+        exists vz.
+        split.
+        * rewrite M.gso; [exact Hzget | congruence].
+        * eapply s_repr_val_id_set; eauto.
+    - intros rho' fds g v Hzget Hsub.
+      destruct (Pos.eq_dec z x) as [Heqzx | Hneqzx].
+      + subst z.
+        rewrite M.gss in Hzget.
+        inversion Hzget; subst v; clear Hzget.
+        specialize (Hxfun rho' fds g Hsub) as [Hrepr_f [Hclosed_f Hcorr_f]].
+        split; [exact Hrepr_f | split; assumption].
+      + rewrite M.gso in Hzget by congruence.
+        specialize (Hfun rho' fds g v Hzget Hsub)
+          as [Hrepr_f [Hclosed_f Hcorr_f]].
+        split; [exact Hrepr_f | split; assumption].
+  Qed.
+
+  Lemma s_state_eprim_body_invariants :
+    forall L rho lenv m max_alloc x f ys e vs vx rv,
+      stack_protected_not_in_L lenv L ->
+      s_rel_mem L (Eprim x f ys e) rho lenv m ->
+      stack_correct_tinfo max_alloc lenv m ->
+      get_list ys rho = Some vs ->
+      Genv.find_symbol (globalenv p) x = None ->
+      s_repr_val L vx rv m ->
+      (forall rho' fds g,
+          subval_or_eq (Vfun rho' fds g) vx ->
+          (exists b,
+              Genv.find_symbol (globalenv p) g = Some b /\
+              s_repr_val L (Vfun rho' fds g) (Vptr b Ptrofs.zero) m) /\
+          closed_val (Vfun rho' fds g) /\
+          s_correct_fundefs fds m) ->
+      x <> allocIdent ->
+      x <> limitIdent ->
+      x <> argsIdent ->
+      x <> tinfIdent ->
+      stack_protected_not_in_L (M.set x rv lenv) L /\
+      s_rel_mem L e (M.set x vx rho) (M.set x rv lenv) m /\
+      stack_correct_tinfo max_alloc (M.set x rv lenv) m.
+  Proof.
+    intros L rho lenv m max_alloc x f ys e vs vx rv
+      Hprot Hrel Hct Hgl Hsym_none Hrepr_x Hxfun
+      Hx_alloc Hx_limit Hx_args Hx_tinf.
+    split.
+    - eapply stack_protected_not_in_L_set_other; eauto.
+    - split.
+      + eapply s_rel_mem_eprim_body_set_with_repr; eauto.
+      + eapply stack_correct_tinfo_set_other; eauto.
+  Qed.
+
+  Lemma s_state_eapp_callee_invariants :
+    forall L rho lenv m max_alloc f t ys e rho_call,
+      stack_protected_not_in_L lenv L ->
+      s_rel_mem L (Eapp f t ys) rho lenv m ->
+      stack_correct_tinfo max_alloc lenv m ->
+      s_rel_mem L e rho_call lenv m ->
+      stack_protected_not_in_L lenv L /\
+      s_rel_mem L e rho_call lenv m /\
+      stack_correct_tinfo max_alloc lenv m.
+  Proof.
+    intros L rho lenv m max_alloc f t ys e rho_call
+      Hprot Hrel Hct Hrel_call.
+    split; [exact Hprot|].
+    split; [exact Hrel_call|exact Hct].
+  Qed.
+
+  Lemma s_state_eletapp_callee_invariants :
+    forall L rho lenv m max_alloc x f t ys e e_body rho_call,
+      stack_protected_not_in_L lenv L ->
+      s_rel_mem L (Eletapp x f t ys e) rho lenv m ->
+      stack_correct_tinfo max_alloc lenv m ->
+      s_rel_mem L e_body rho_call lenv m ->
+      stack_protected_not_in_L lenv L /\
+      s_rel_mem L e_body rho_call lenv m /\
+      stack_correct_tinfo max_alloc lenv m.
+  Proof.
+    intros L rho lenv m max_alloc x f t ys e e_body rho_call
+      Hprot Hrel Hct Hrel_call.
+    split; [exact Hprot|].
+    split; [exact Hrel_call|exact Hct].
+  Qed.
+
+  Lemma s_rel_mem_eletapp_cont_set_with_repr :
+    forall L rho lenv m x f t ys e v_body rv,
+      s_rel_mem L (Eletapp x f t ys e) rho lenv m ->
+      Genv.find_symbol (globalenv p) x = None ->
+      s_repr_val L v_body rv m ->
+      (forall rho' fds g,
+          subval_or_eq (Vfun rho' fds g) v_body ->
+          (exists b,
+              Genv.find_symbol (globalenv p) g = Some b /\
+              s_repr_val L (Vfun rho' fds g) (Vptr b Ptrofs.zero) m) /\
+          closed_val (Vfun rho' fds g) /\
+          s_correct_fundefs fds m) ->
+      s_rel_mem L e (M.set x v_body rho) (M.set x rv lenv) m.
+  Proof.
+    intros L rho lenv m x f t ys e v_body rv
+      Hrel Hsym_none Hrepr_x Hxfun.
+    unfold s_rel_mem in *.
+    intros z.
+    specialize (Hrel z) as [Hocc Hfun].
+    split.
+    - intros Hzfree.
+      destruct (Pos.eq_dec z x) as [Heqzx | Hneqzx].
+      + subst z.
+        exists v_body.
+        split.
+        * rewrite M.gss. reflexivity.
+        * econstructor 1.
+          -- exact Hsym_none.
+          -- rewrite M.gss. reflexivity.
+          -- exact Hrepr_x.
+      + assert (Hzfree_outer : occurs_free (Eletapp x f t ys e) z).
+        { apply Free_Eletapp2.
+          - congruence.
+          - exact Hzfree.
+        }
+        specialize (Hocc Hzfree_outer) as [vz [Hzget Hrid]].
+        exists vz.
+        split.
+        * rewrite M.gso; [exact Hzget | congruence].
+        * eapply s_repr_val_id_set; eauto.
+    - intros rho' fds g v Hzget Hsub.
+      destruct (Pos.eq_dec z x) as [Heqzx | Hneqzx].
+      + subst z.
+        rewrite M.gss in Hzget.
+        inversion Hzget; subst v; clear Hzget.
+        specialize (Hxfun rho' fds g Hsub) as [Hrepr_f [Hclosed_f Hcorr_f]].
+        split; [exact Hrepr_f | split; assumption].
+      + rewrite M.gso in Hzget by congruence.
+        specialize (Hfun rho' fds g v Hzget Hsub)
+          as [Hrepr_f [Hclosed_f Hcorr_f]].
+        split; [exact Hrepr_f | split; assumption].
+  Qed.
+
+  Lemma s_state_eletapp_cont_invariants :
+    forall L rho lenv m max_alloc x f t ys e v_body rv,
+      stack_protected_not_in_L lenv L ->
+      s_rel_mem L (Eletapp x f t ys e) rho lenv m ->
+      stack_correct_tinfo max_alloc lenv m ->
+      Genv.find_symbol (globalenv p) x = None ->
+      s_repr_val L v_body rv m ->
+      (forall rho' fds g,
+          subval_or_eq (Vfun rho' fds g) v_body ->
+          (exists b,
+              Genv.find_symbol (globalenv p) g = Some b /\
+              s_repr_val L (Vfun rho' fds g) (Vptr b Ptrofs.zero) m) /\
+          closed_val (Vfun rho' fds g) /\
+          s_correct_fundefs fds m) ->
+      x <> allocIdent ->
+      x <> limitIdent ->
+      x <> argsIdent ->
+      x <> tinfIdent ->
+      stack_protected_not_in_L (M.set x rv lenv) L /\
+      s_rel_mem L e (M.set x v_body rho) (M.set x rv lenv) m /\
+      stack_correct_tinfo max_alloc (M.set x rv lenv) m.
+  Proof.
+    intros L rho lenv m max_alloc x f t ys e v_body rv
+      Hprot Hrel Hct Hsym_none Hrepr_x Hxfun
+      Hx_alloc Hx_limit Hx_args Hx_tinf.
+    split.
+    - eapply stack_protected_not_in_L_set_other; eauto.
+    - split.
+      + eapply s_rel_mem_eletapp_cont_set_with_repr; eauto.
+      + eapply stack_correct_tinfo_set_other; eauto.
+  Qed.
+
   Lemma s_inv_set_other_nonfree :
     forall e rho lenv m max_alloc x vx,
       s_inv e rho lenv m max_alloc ->
@@ -1260,11 +1587,11 @@ Section STACK_CORRECT.
   Qed.
 
   Lemma bstep_halt_inv :
-    forall rho x v c,
-      bstep_e (M.empty _) cenv rho (Ehalt x) v c ->
+    forall pr rho x v c,
+      bstep_e pr cenv rho (Ehalt x) v c ->
       c = 0 /\ M.get x rho = Some v.
   Proof.
-    intros rho x v c Hbs.
+    intros pr rho x v c Hbs.
     inversion Hbs; subst.
     split.
     - reflexivity.
@@ -1272,14 +1599,87 @@ Section STACK_CORRECT.
   Qed.
 
   Lemma s_inv_of_bstep_halt_repr_id :
-    forall rho x v c lenv m max_alloc,
-      bstep_e (M.empty _) cenv rho (Ehalt x) v c ->
+    forall pr rho x v c lenv m max_alloc,
+      bstep_e pr cenv rho (Ehalt x) v c ->
       s_inv (Ehalt x) rho lenv m max_alloc ->
       exists L, s_repr_val_id L x v lenv m.
   Proof.
-    intros rho x v c lenv m max_alloc Hbs Hinv.
-    destruct (bstep_halt_inv _ _ _ _ Hbs) as [_ Hget].
+    intros pr rho x v c lenv m max_alloc Hbs Hinv.
+    destruct (bstep_halt_inv _ _ _ _ _ Hbs) as [_ Hget].
     eapply s_inv_halt_repr_id; eauto.
+  Qed.
+
+  Theorem bstep_stack_case_decomposition :
+    forall pr rho e v n lenv m max_alloc,
+      bstep_e pr cenv rho e v n ->
+      s_inv e rho lenv m max_alloc ->
+      match e with
+      | Econstr x t ys e' =>
+          exists rho' vs,
+            get_list ys rho = Some vs /\
+            M.set x (Vconstr t vs) rho = rho' /\
+            bstep_e pr cenv rho' e' v n
+      | Ecase y cl =>
+          exists t vl e',
+            M.get y rho = Some (Vconstr t vl) /\
+            caseConsistent cenv cl t /\
+            findtag cl t = Some e' /\
+            bstep_e pr cenv rho e' v n
+      | Eproj x t n0 y e' =>
+          exists vs vx,
+            M.get y rho = Some (Vconstr t vs) /\
+            nthN vs n0 = Some vx /\
+            bstep_e pr cenv (M.set x vx rho) e' v n
+      | Eletapp x f t ys e' =>
+          exists rho_clo fl f' vs xs e_body rho_call v_body c c',
+            M.get f rho = Some (Vfun rho_clo fl f') /\
+            get_list ys rho = Some vs /\
+            find_def f' fl = Some (t, xs, e_body) /\
+            set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call /\
+            bstep_e pr cenv rho_call e_body v_body c /\
+            bstep_e pr cenv (M.set x v_body rho) e' v c' /\
+            n = c + c' + 1
+      | Efun fl e' =>
+          bstep_e pr cenv (def_funs fl fl rho rho) e' v n
+      | Eapp f t ys =>
+          exists rho_clo fl f' vs xs e' rho_call c,
+            M.get f rho = Some (Vfun rho_clo fl f') /\
+            get_list ys rho = Some vs /\
+            find_def f' fl = Some (t, xs, e') /\
+            set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call /\
+            bstep_e pr cenv rho_call e' v c /\
+            n = c + 1
+      | Eprim_val x p0 e' =>
+          exists rho',
+            M.set x (Vprim p0) rho = rho' /\
+            bstep_e pr cenv rho' e' v n
+      | Eprim x f ys e' =>
+          exists vs f' vx rho',
+            get_list ys rho = Some vs /\
+            M.get f pr = Some f' /\
+            f' vs = Some vx /\
+            M.set x vx rho = rho' /\
+            bstep_e pr cenv rho' e' v n
+      | Ehalt x =>
+          n = 0 /\
+          M.get x rho = Some v /\
+          exists L, s_repr_val_id L x v lenv m
+      end.
+  Proof.
+    intros pr rho e v n lenv m max_alloc Hbs Hinv.
+    destruct e.
+    - eapply bstep_e_econstr_inv; eauto.
+    - eapply bstep_e_ecase_inv; eauto.
+    - eapply bstep_e_eproj_inv; eauto.
+    - eapply bstep_e_eletapp_inv; eauto.
+    - eapply bstep_e_efun_inv; eauto.
+    - eapply bstep_e_eapp_inv; eauto.
+    - eapply bstep_e_eprim_val_inv; eauto.
+    - eapply bstep_e_eprim_inv; eauto.
+    - destruct (bstep_halt_inv _ _ _ _ _ Hbs) as [Hn Hget].
+      split; [exact Hn|].
+      split; [exact Hget|].
+      eapply s_inv_of_bstep_halt_repr_id; eauto.
   Qed.
 
   (** ** Halt-case correctness theorem *)

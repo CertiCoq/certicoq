@@ -1826,7 +1826,7 @@ Section STACK_CORRECT.
     eapply stack_codegen_correct_full_from_cases.
   Qed.
 
-  (** ** Halt-case correctness theorem *)
+  (** ** Concrete halt-case correctness theorem *)
 
   (* The ANF backend preserves evaluation semantics:
      if expression e evaluates to value v under environment rho,
@@ -1844,8 +1844,9 @@ Section STACK_CORRECT.
      - local_env contains the stack frame and roots array
        (from stack_decl in the translation)
 
-     The hypothesis connecting stm to the compilation of e
-     will be refined as individual cases are proved. *)
+     This theorem is the concrete return-step instance for Ehalt.
+     General structural induction over all constructors is given by
+     [stack_codegen_correct]. *)
 
   Theorem stack_codegen_correct_ehalt :
     forall rho x v c,

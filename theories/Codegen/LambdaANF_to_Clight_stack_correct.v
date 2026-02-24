@@ -820,4 +820,126 @@ Section STACK_CORRECT.
     - exact Hrepr.
   Qed.
 
+  Lemma get_var_or_funvar_to_s_get_var_or_funvar :
+    forall lenv x rv,
+      get_var_or_funvar p lenv x rv ->
+      s_get_var_or_funvar lenv x rv.
+  Proof.
+    intros lenv x rv Hg.
+    destruct Hg as [b x0 Hsym | x0 v Hnone Hget Hv].
+    - constructor. exact Hsym.
+    - constructor 2; auto.
+      destruct v; simpl in *; try discriminate; assumption.
+  Qed.
+
+  Lemma s_get_var_or_funvar_eval :
+    forall lenv a v m,
+      find_symbol_domain p finfo_env ->
+      finfo_env_correct fenv finfo_env ->
+      s_get_var_or_funvar lenv a v ->
+      eval_expr (globalenv p) empty_env lenv m (s_makeVar a fenv finfo_env) v.
+  Proof.
+    intros lenv a v m Hsym Hfinfo Hg.
+    specialize (Hsym a) as [Hfwd Hrev].
+    inversion Hg; subst.
+    - unfold s_makeVar.
+      destruct (Hrev (ex_intro _ b H)) as [[i t] Hget].
+      rewrite Hget.
+      destruct (Hfinfo _ _ _ Hget) as [finfo Hfenv].
+      destruct finfo as [fty locs].
+      rewrite Hfenv.
+      simpl.
+      econstructor.
+      constructor 2.
+      + apply M.gempty.
+      + eauto.
+      + constructor.
+        auto.
+    - unfold s_makeVar.
+      destruct (M.get a finfo_env) as [[i t]|] eqn:Hget.
+      + exfalso.
+        destruct (Hfwd (ex_intro _ (i, t) eq_refl)) as [b Hb].
+        assert (Hnone : Genv.find_symbol (Genv.globalenv p) a = None).
+        { exact H. }
+        rewrite Hnone in Hb. discriminate.
+      + constructor. auto.
+  Qed.
+
+  Lemma s_get_var_or_funvar_semcast :
+    forall v a m lenv,
+      find_symbol_domain p finfo_env ->
+      finfo_env_correct fenv finfo_env ->
+      s_get_var_or_funvar lenv a v ->
+      sem_cast v (typeof (s_makeVar a fenv finfo_env)) val m = Some v.
+  Proof.
+    intros v a m lenv Hsym Hfinfo Hg.
+    specialize (Hsym a) as [Hfwd Hrev].
+    inversion Hg; subst.
+    - unfold s_makeVar.
+      destruct (Hrev (ex_intro _ b H)) as [[i t] Hget].
+      rewrite Hget.
+      destruct (Hfinfo _ _ _ Hget) as [finfo Hfenv].
+      destruct finfo as [fty locs].
+      rewrite Hfenv.
+      simpl.
+      auto.
+    - unfold s_makeVar.
+      destruct (M.get a finfo_env) as [[i t]|] eqn:Hget.
+      + exfalso.
+        destruct (Hfwd (ex_intro _ (i, t) eq_refl)) as [b Hb].
+        assert (Hnone : Genv.find_symbol (Genv.globalenv p) a = None).
+        { exact H. }
+        rewrite Hnone in Hb. discriminate.
+      + unfold val.
+        match goal with
+        | Hvp : s_Vint_or_Vptr v = true |- _ =>
+            destruct Archi.ptr64; destruct v; simpl in Hvp; try discriminate; simpl; auto
+        end.
+  Qed.
+
+  Corollary stack_codegen_correct_ehalt_translated_from_get_var_or_funvar :
+    forall rho x v c,
+      bstep_e (M.empty _) cenv rho (Ehalt x) v c ->
+      forall lenv m max_alloc fu k,
+        s_inv (Ehalt x) rho lenv m max_alloc ->
+        program_inv argsIdent allocIdent limitIdent gcIdent
+          threadInfIdent tinfIdent heapInfIdent isptrIdent caseIdent nParam p ->
+        find_symbol_domain p finfo_env ->
+        finfo_env_correct fenv finfo_env ->
+        (Z.of_nat (LambdaANF_to_Clight_stack.max_allocs (Ehalt x)) <= max_alloc)%Z ->
+        fn_return fu = val ->
+        (forall m2,
+            m_tstep2 (globalenv p)
+              (State fu s_tinfo_sync_stmt
+                 (Kseq (Sreturn (Some (s_makeVar x fenv finfo_env))) k)
+                 empty_env lenv m)
+              (State fu Sskip
+                 (Kseq (Sreturn (Some (s_makeVar x fenv finfo_env))) k)
+                 empty_env lenv m2) ->
+            exists rv L,
+              get_var_or_funvar p lenv x rv /\
+              s_repr_val L v rv m2) ->
+        exists rv' m',
+          s_m_tstep2 (globalenv p)
+            (State fu
+               (Ssequence s_tinfo_sync_stmt
+                  (Sreturn (Some (s_makeVar x fenv finfo_env))))
+               k empty_env lenv m)
+            (Returnstate rv' (call_cont k) m') /\
+          exists L', s_repr_val L' v rv' m'.
+  Proof.
+    intros rho x v c Hbs.
+    intros lenv m max_alloc fu k Hinv Hpinv Hsym Hfinfo Halloc Hret Hpost.
+    eapply stack_codegen_correct_ehalt_translated_s; eauto.
+    intros m2 Hpref.
+    destruct (Hpost m2 Hpref) as [rv [L [Hgvof Hrepr]]].
+    pose proof (get_var_or_funvar_to_s_get_var_or_funvar lenv x rv Hgvof) as Hgvof_s.
+    exists rv, L.
+    split.
+    - eapply s_get_var_or_funvar_eval; eauto.
+    - split.
+      + rewrite Hret. eapply s_get_var_or_funvar_semcast; eauto.
+      + exact Hrepr.
+  Qed.
+
 End STACK_CORRECT.

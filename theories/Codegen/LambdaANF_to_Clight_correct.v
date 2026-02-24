@@ -16748,7 +16748,26 @@ Lemma repr_bs_eletapp_case :
       repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v'
         (Eletapp x f t ys e) (c + c' + 1).
 Proof.
-Admitted.
+  intros p rep_env cenv fenv finfo_env ienv
+    Hpinv Hsym Hfinfo
+    rho rho_clo fl f' vs xs e_body e rho_call x f t ys v v' c c'
+    Hfun Hgl Hfind Hset Hbs_body Hbs_cont Hgoal_body Hgoal_cont.
+  unfold repr_bs_goal.
+  intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+  exfalso.
+  destruct Hct as
+    [alloc_b [alloc_ofs [limit_ofs [args_b [args_ofs [tinf_b [tinf_ofs
+      [Halloc_ct [Halign_ct [Hrange_ct [Hlimit_ct [Hbound_ct [Hargs_ct [Hdj_ct [Hargs_bound_ct [Hargs_va_ct [Htinf_ct [Htinf_ne_args_ct [Htinf_ne_alloc_ct [Htinf_va_ct [Hderef_ct Hglob_ct]]]]]]]]]]]]]]]]]]]]].
+  inversion Hderef_ct; subst;
+    match goal with
+    | Hacc : access_mode _ = By_value _ |- _ =>
+        simpl in Hacc; discriminate
+    | Hacc : access_mode _ = By_copy |- _ =>
+        simpl in Hacc; discriminate
+    | |- False =>
+        apply Htinf_ne_args_ct; symmetry; reflexivity
+    end.
+Qed.
 
 (* Main Theorem *)
 Theorem repr_bs_LambdaANF_Codegen_related:

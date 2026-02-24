@@ -2232,6 +2232,36 @@ Proof.
   apply lenv_param_asgn_rel in H1; eauto.
 Qed.
 
+Lemma NoDup_list_norepet :
+  forall (A : Type) (l : list A),
+    NoDup l ->
+    Coqlib.list_norepet l.
+Proof.
+  intros A l Hnd.
+  induction Hnd.
+  - constructor.
+  - constructor; auto.
+Qed.
+
+Lemma bind_parameter_temps_exists :
+  forall formals args le,
+    length formals = length args ->
+    exists le',
+      bind_parameter_temps formals args le = Some le'.
+Proof.
+  induction formals as [|[id ty] formals IH]; intros args le Hlen.
+  - destruct args as [|a args'].
+    + exists le. reflexivity.
+    + inversion Hlen.
+  - destruct args as [|a args'].
+    + inversion Hlen.
+    + simpl in Hlen.
+      inversion Hlen as [Hlen'].
+      simpl.
+      eapply IH.
+      exact Hlen'.
+Qed.
+
 
 Theorem get_list_nth_get' (B:Type):
   forall  (vs : list B) rho v xs  N, 
@@ -3951,6 +3981,22 @@ Proof.
     exact H23.
 Qed.
 
+Lemma m_tstep2_return_to_caller_none :
+  forall p0 F fu k lenv_caller lenv_callee m,
+    m_tstep2 (globalenv p0)
+      (State F Sskip (Kcall None fu empty_env lenv_caller k) empty_env lenv_callee m)
+      (State fu Sskip k empty_env lenv_caller m).
+Proof.
+  intros p0 F fu k lenv_caller lenv_callee m.
+  eapply m_tstep2_transitive.
+  - apply m_tstep2_step.
+    eapply step_skip_call.
+    + simpl. exact I.
+    + vm_compute. reflexivity.
+  - apply m_tstep2_step.
+    constructor.
+Qed.
+
 Lemma rt_traceless_to_eq_or_m_tstep2 :
   forall ge s1 s2,
     clos_refl_trans state (traceless_step2 ge) s1 s2 ->
@@ -4398,6 +4444,24 @@ Proof.
   eapply is_protected_not_tinfo.
   unfold protectedNotTinfoIdent_thm.
   inList.
+Qed.
+
+Lemma allocIdent_neq_tinf :
+  allocIdent <> tinfIdent.
+Proof.
+  solve_nodup.
+Qed.
+
+Lemma limitIdent_neq_tinf :
+  limitIdent <> tinfIdent.
+Proof.
+  solve_nodup.
+Qed.
+
+Lemma argsIdent_neq_tinf :
+  argsIdent <> tinfIdent.
+Proof.
+  solve_nodup.
 Qed.
 
 Lemma caseIdent_neq_tinf :
@@ -6089,6 +6153,139 @@ Proof.
   - destruct l. inversion H. simpl in H. right. eauto.
 Qed.
 
+Lemma In_firstn : forall {A} n (x : A) l,
+  List.In x (firstn n l) -> List.In x l.
+Proof.
+  induction n; intros.
+  - simpl in H. contradiction.
+  - destruct l as [|y ys].
+    + simpl in H. contradiction.
+    + simpl in H.
+      destruct H as [-> | Hin].
+      * left. reflexivity.
+      * right. eapply IHn; eauto.
+Qed.
+
+Lemma NoDup_firstn : forall {A} n (xs : list A),
+  NoDup xs -> NoDup (firstn n xs).
+Proof.
+  induction n; intros xs Hnd.
+  - simpl. constructor.
+  - destruct xs as [|x xs'].
+    + simpl. constructor.
+    + simpl.
+      inversion Hnd as [|x0 xs0 Hnotin Hnd']; subst.
+      constructor.
+      * intro Hin.
+        apply Hnotin.
+        eapply In_firstn; eauto.
+      * eapply IHn; eauto.
+Qed.
+
+Lemma NoDup_firstn_skipn_disjoint :
+  forall {A} n (xs : list A) x,
+    NoDup xs ->
+    List.In x (firstn n xs) ->
+    ~ List.In x (skipn n xs).
+Proof.
+  intros A n xs x Hnd HinF HinS.
+  assert (Hnd_app : NoDup (firstn n xs ++ skipn n xs)).
+  { rewrite firstn_skipn. exact Hnd. }
+  apply in_split in HinF.
+  destruct HinF as [l1 [l2 Hsplit]].
+  rewrite Hsplit in Hnd_app.
+  rewrite <- app_assoc in Hnd_app.
+  eapply NoDup_remove_2 in Hnd_app.
+  apply Hnd_app.
+  apply in_or_app.
+  right.
+  apply in_or_app.
+  right.
+  exact HinS.
+Qed.
+
+Lemma list_norepet_tinf_firstn :
+  forall n xs,
+    NoDup xs ->
+    ~ List.In tinfIdent xs ->
+    Coqlib.list_norepet (tinfIdent :: firstn n xs).
+Proof.
+  intros n xs Hnd Hnotin.
+  constructor.
+  - intro Hin.
+    apply Hnotin.
+    eapply In_firstn; eauto.
+  - eapply NoDup_list_norepet.
+    eapply NoDup_firstn; eauto.
+Qed.
+
+Lemma Forall2_pair_const_map_fst :
+  forall (A B : Type) (c : B) (xs : list A) (ys : list (A * B)),
+    Forall2 (fun x xt => xt = (x, c)) xs ys ->
+    map fst ys = xs.
+Proof.
+  intros A B c xs ys Hfor.
+  induction Hfor as [|x xt xs' ys' Heq Hfor' IH].
+  - reflexivity.
+  - simpl.
+    inversion Heq; subst.
+    now f_equal.
+Qed.
+
+Lemma list_disjoint_fun_params_temps :
+  forall n xs vars,
+    map fst vars = xs ->
+    NoDup xs ->
+    ~ List.In tinfIdent xs ->
+    ~ List.In allocIdent xs ->
+    ~ List.In limitIdent xs ->
+    ~ List.In argsIdent xs ->
+    ~ List.In caseIdent xs ->
+    Coqlib.list_disjoint
+      (tinfIdent :: firstn n xs)
+      (map fst (skipn n vars ++ gc_vars argsIdent allocIdent limitIdent caseIdent)).
+Proof.
+  intros n xs vars Hmap Hnd Hnot_tinf Hnot_alloc Hnot_limit Hnot_args Hnot_case.
+  unfold Coqlib.list_disjoint.
+  intros x y Hinx Hiny Heq.
+  subst y.
+  rewrite map_app in Hiny.
+  simpl in Hiny.
+  rewrite <- skipn_map in Hiny.
+  rewrite Hmap in Hiny.
+  destruct Hinx as [Hx_tinf | Hx_firstn].
+  - subst x.
+    apply in_app_or in Hiny.
+    destruct Hiny as [Hin_skipn | Hgc].
+    + apply Hnot_tinf.
+      eapply In_skipn; eauto.
+    + simpl in Hgc.
+      destruct Hgc as [Hy_alloc | [Hy_limit | [Hy_args | [Hy_case | Hy_nil]]]].
+      * exfalso. eapply allocIdent_neq_tinf. exact Hy_alloc.
+      * exfalso. eapply limitIdent_neq_tinf. exact Hy_limit.
+      * exfalso. eapply argsIdent_neq_tinf. exact Hy_args.
+      * exfalso. eapply caseIdent_neq_tinf. exact Hy_case.
+      * inversion Hy_nil.
+  - apply in_app_or in Hiny.
+    destruct Hiny as [Hin_skipn | Hgc].
+    + eapply (NoDup_firstn_skipn_disjoint n xs x); eauto.
+    + simpl in Hgc.
+      destruct Hgc as [Hy_alloc | [Hy_limit | [Hy_args | [Hy_case | Hy_nil]]]].
+      * subst.
+        apply Hnot_alloc.
+        eapply In_firstn; eauto.
+      * subst.
+        apply Hnot_limit.
+        eapply In_firstn; eauto.
+      * subst.
+        apply Hnot_args.
+        eapply In_firstn; eauto.
+      * subst.
+        apply Hnot_case.
+        eapply In_firstn; eauto.
+      * inversion Hy_nil.
+Qed.
+
 (* Helper: step through right_param_asgn directly on the three lists *)
 Lemma repr_asgn_fun_entry_aux:
   forall sxs slocs svs args_b args_ofs argsIdent F p m k asgn lenv lenv',
@@ -6608,9 +6805,44 @@ Proof.
     rewrite <- Hind' in IHavs.
     apply IHavs in Happ.
     inv Hasgn.
-    erewrite <- find_symbol_map_f; eauto.
-    exact (repr_asgn_cons _ _ _ _ _ _ _ _ _ _ s0 Happ).
+     erewrite <- find_symbol_map_f; eauto.
+     exact (repr_asgn_cons _ _ _ _ _ _ _ _ _ _ s0 Happ).
 Qed.    
+
+Theorem asgnFunVars'_correct :
+  forall vs ind s,
+    asgnFunVars' argsIdent vs ind = Some s ->
+    right_param_asgn argsIdent vs ind s.
+Proof.
+  induction vs as [|v vs IH]; intros ind s Hasgn;
+    destruct ind as [|i ind']; simpl in Hasgn; try discriminate.
+  - inversion Hasgn; subst.
+    constructor.
+  - destruct (asgnFunVars' argsIdent vs ind') eqn:Hrest;
+      try discriminate.
+    inversion Hasgn; subst.
+    constructor.
+    eapply IH; eauto.
+Qed.
+
+Theorem asgnAppVars''_correct :
+  forall p fenv finfo_env,
+    forall vs ind s,
+      find_symbol_domain p finfo_env ->
+      asgnAppVars'' argsIdent threadInfIdent nParam vs ind fenv finfo_env = Some s ->
+      repr_asgn_fun' argsIdent threadInfIdent nParam fenv finfo_env p vs ind s.
+Proof.
+  intros p fenv finfo_env vs.
+  induction vs as [|v vs IH]; intros ind s Hsym Hasgn;
+    destruct ind as [|i ind']; simpl in Hasgn; try discriminate.
+  - inversion Hasgn; subst.
+    constructor.
+  - destruct (asgnAppVars'' argsIdent threadInfIdent nParam vs ind' fenv finfo_env) eqn:Hrest;
+      try discriminate.
+    inversion Hasgn; subst.
+    erewrite <- find_symbol_map_f; eauto.
+    exact (repr_asgn_cons _ _ _ _ _ _ _ _ _ _ s0 (IH _ _ Hsym Hrest)).
+Qed.
 
 Theorem repr_call_vars_length1 : forall p fenv map n l1 l2, repr_call_vars threadInfIdent nParam fenv map p  n l1 l2 -> length l1 = n.
 Proof.
@@ -6686,6 +6918,23 @@ Proof.
   - simpl.
     reflexivity.
   - exact Heval_tail.
+Qed.
+
+Lemma eval_exprlist_mkFunTyList_length :
+  forall p lenv m es tys vs n,
+    eval_exprlist (globalenv p) empty_env lenv m es tys vs ->
+    tys = mkFunTyList n ->
+    length vs = n.
+Proof.
+  intros p lenv m es tys vs n Heval.
+  revert n.
+  induction Heval; intros n Htys.
+  - destruct n; inversion Htys; reflexivity.
+  - destruct n; inversion Htys; subst.
+    simpl.
+    f_equal.
+    eapply IHHeval.
+    reflexivity.
 Qed.
 
 Theorem  mkCallVars_correct:
@@ -8290,6 +8539,31 @@ Proof.
     Hprot Hgetf Hgetys Hfind Hset Hrho_clo.
   subst rho_clo.
   eapply protected_id_closure; eauto.
+Qed.
+
+Lemma protected_id_eapp_params_not_in :
+  forall rho f t0 ys fl f' t xs e' pid,
+    protected_id_not_bound_id rho (Eapp f t0 ys) ->
+    M.get f rho = Some (Vfun (M.empty cps.val) fl f') ->
+    find_def f' fl = Some (t, xs, e') ->
+    is_protected_id_thm pid ->
+    ~ List.In pid xs.
+Proof.
+  intros rho f t0 ys fl f' t xs e' pid
+    Hprot Hgetf Hfind Hprot_pid Hin.
+  assert (Hprot_e : protected_id_not_bound_id rho e').
+  {
+    eapply protected_id_not_bound_closure; eauto.
+  }
+  destruct Hprot_e as [Hrho _].
+  specialize (Hrho f pid (Vfun (M.empty cps.val) fl f') Hgetf Hprot_pid).
+  apply Hrho.
+  right.
+  eapply bound_notfun_var.
+  eapply (Bound_FVfun e' fl (M.empty cps.val) xs pid f' f' t).
+  - constructor.
+    exact Hin.
+  - exact Hfind.
 Qed.
 
 Lemma repr_expr_efun_false :
@@ -15702,19 +15976,755 @@ Qed.
    callee entry (repr_asgn_fun_entry), body IH, return. *)
 Lemma repr_bs_eapp_case :
   forall p rep_env cenv fenv finfo_env ienv,
+
     program_inv p ->
+
     find_symbol_domain p finfo_env ->
+
     finfo_env_correct fenv finfo_env ->
+
     forall rho rho_clo fl f' vs xs e rho_call f t ys v c,
+
       M.get f rho = Some (Vfun rho_clo fl f') ->
+
       get_list ys rho = Some vs ->
+
       find_def f' fl = Some (t, xs, e) ->
+
       set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call ->
       bstep_e (M.empty _) cenv rho_call e v c ->
       repr_bs_goal p rep_env cenv fenv finfo_env ienv rho_call v e c ->
       repr_bs_goal p rep_env cenv fenv finfo_env ienv rho v (Eapp f t ys) (c + 1).
 Proof.
-Admitted.
+  intros p rep_env cenv fenv finfo_env ienv
+    Hpinv Hsym Hfinfo
+    rho rho_clo fl f' vs xs e rho_call f t ys v c
+    Hfun Hgl Hfind Hset Hbs_e Hgoal_e.
+  unfold repr_bs_goal.
+  intros Hcenvs Hprot Hub Hfnb stm lenv m k max_alloc fu Hrepr Hrel Halloc Hct.
+  assert (Hbs_full : bstep_e (M.empty _) cenv rho (Eapp f t ys) v (c + 1)).
+  { econstructor; eauto. }
+  destruct (eapp_step_and_repr_rel_fun_alloc_tinfo_inv
+              p rep_env cenv ienv fenv finfo_env rho f t ys v (c + 1)
+              stm m lenv max_alloc
+              Hbs_full
+              Hcenvs Hrepr Hrel Halloc Hct)
+    as (rho_clo0 & fl0 & f'' & vs0 & xs0 & e_body & rho_call0 & c0
+        & s_pref & s_tail & L & Hgetf0 & Hgetys0 & Hfind0 & Hset0
+        & Hbs_body0 & Hn0 & Hcenv_body0 & Hstm0 & HprotL0
+        & Hrepr_fun0 & Hclosed_fun0 & Hfundef_info0 & Hmax0 & Hct0).
+  rewrite Hfun in Hgetf0. inversion Hgetf0; subst rho_clo0 fl0 f''.
+  rewrite Hgl in Hgetys0. inversion Hgetys0; subst vs0.
+  rewrite Hfind in Hfind0. inversion Hfind0; subst xs0 e_body.
+  rewrite Hset in Hset0. inversion Hset0; subst rho_call0.
+  assert (Hc0_eq : c0 = c) by lia.
+  subst c0.
+  subst max_alloc.
+  destruct (repr_expr_eapp_inv _ _ _ _ _ _ _ _ Hrepr) as [s_pref0 [s_tail0 Hstm']].
+  rewrite Hstm' in Hstm0.
+  inversion Hstm0; subst s_pref0 s_tail0.
+  clear Hstm0 Hstm'.
+  destruct (rel_mem_eapp_get_fun_var_or_funvar
+              fenv finfo_env p rep_env rho m lenv f t ys rho_clo fl f'
+              Hrel Hfun)
+    as [Lfun [v7_fun [HprotL_fun [Hgv_fun Hrepr_fun]]]].
+  assert (Hrho_clo_empty : rho_clo = M.empty cps.val).
+  { eapply repr_val_fun_closure_empty. exact Hrepr_fun. }
+  subst rho_clo.
+  destruct Hcenvs as [Hienv [Hcenv_rho [Hcenv_exp Hcrep]]].
+  destruct Hub as [Hub_exp Hub_rho].
+  destruct Hfnb as [Hfnb_exp Hfnb_rho].
+  assert (Huv_fun : unique_bindings_val (Vfun (M.empty cps.val) fl f')).
+  {
+    specialize (Hub_rho f (Vfun (M.empty cps.val) fl f') Hfun).
+    tauto.
+  }
+  inversion Huv_fun as [rho_u fds_u f_u Hufl | | ]; subst rho_u fds_u f_u.
+  assert (Hfun_in : Ensembles.In _ (fun_in_fundefs fl) (f', t, xs, e)).
+  { eapply find_def_correct; eauto. }
+  pose proof (unique_bindings_fun_in_fundefs fl f' t xs e Hfun_in Hufl)
+    as [Hub_e_exp [Hf'_not_bv [Hf'_not_xs [Hdisj_bv_names [Hdisj_xs_names [Hdisj_bv_xs Hnd_xs]]]]]].
+  assert (Hcenvs_e : correct_envs cenv ienv rep_env rho_call e).
+  {
+    split; [exact Hienv|].
+    split.
+    - intros x0 v0 Hget0.
+      destruct (in_rho_entry xs vs fl rho_call x0 v0 Hset Hnd_xs Hget0)
+        as [[n [Hnth_xs Hnth_vs]]
+           | [t0 [ys0 [b0 [Hx0_notin_xs [Hfind_x0 Hv0]]]]]].
+      + assert (Hin_x0 : List.In x0 xs).
+        { eapply nthN_in; eauto. }
+        assert (Hin_v0 : List.In v0 vs).
+        { eapply set_lists_In; eauto. }
+        destruct (get_list_In_val _ _ _ _ Hgl Hin_v0) as [z [Hz_in Hgetz]].
+        eapply Hcenv_rho; eauto.
+      + subst v0.
+        assert (Hcv_fun : correct_cenv_of_val cenv (Vfun (M.empty cps.val) fl f')).
+        { eapply Hcenv_rho; eauto. }
+        inversion Hcv_fun; subst.
+        match goal with
+        | Hfor : Forall_fundefs (fun _ _ _ e0 => correct_cenv_of_exp cenv e0) fl |- _ =>
+            constructor; exact Hfor
+        end.
+    - split; [exact Hcenv_body0| exact Hcrep].
+  }
+  assert (Hprot_e : protected_id_not_bound_id rho_call e).
+  { eapply protected_id_eapp_closure_body; eauto. }
+  assert (Hub_e : unique_bindings_env rho_call e).
+  {
+    split.
+    - exact Hub_e_exp.
+    - intros x0 v0 Hget0.
+      destruct (in_rho_entry xs vs fl rho_call x0 v0 Hset Hnd_xs Hget0)
+        as [[n [Hnth_xs Hnth_vs]]
+           | [t0 [ys0 [b0 [Hx0_notin_xs [Hfind_x0 Hv0]]]]]].
+      + split.
+        * intro Hbv.
+          assert (Hin_x0 : List.In x0 xs).
+          { eapply nthN_in; eauto. }
+          pose proof (Disjoint_In_l _ _ _ Hdisj_bv_xs Hbv) as Hnotin.
+          apply Hnotin.
+          exact Hin_x0.
+        * assert (Hin_v0 : List.In v0 vs).
+          { eapply set_lists_In; eauto.
+            eapply nthN_in; eauto. }
+          destruct (get_list_In_val _ _ _ _ Hgl Hin_v0) as [z [Hz_in Hgetz]].
+          specialize (Hub_rho z v0 Hgetz) as [_ Huv0].
+          exact Huv0.
+      + subst v0.
+        split.
+        * intro Hbv.
+          pose proof (Disjoint_In_l _ _ _ Hdisj_bv_names Hbv) as Hnotin.
+          apply Hnotin.
+          eapply find_def_name_in_fundefs; eauto.
+        * constructor.
+          exact Hufl.
+  }
+  assert (Hfnb_e : functions_not_bound p rho_call e).
+  {
+    split.
+    - intros z Hbv.
+      eapply Hfnb_rho with (y := f) (v := Vfun (M.empty cps.val) fl f'); eauto.
+      eapply Bound_FVfun with (ys := xs) (f' := f') (t := t); eauto.
+    - intros z y0 v0 Hget0 Hbnot.
+      destruct (in_rho_entry xs vs fl rho_call y0 v0 Hset Hnd_xs Hget0)
+        as [[n [Hnth_xs Hnth_vs]]
+           | [t0 [ys0 [b0 [Hy0_notin_xs [Hfind_y0 Hv0]]]]]].
+      + assert (Hin_v0 : List.In v0 vs).
+        { eapply set_lists_In; eauto.
+          eapply nthN_in; eauto. }
+        destruct (get_list_In_val _ _ _ _ Hgl Hin_v0) as [z0 [Hz0_in Hgetz0]].
+        eapply Hfnb_rho; eauto.
+      + subst v0.
+        inversion Hbnot; subst; try inversion H.
+        eapply Hfnb_rho with (y := f) (v := Vfun (M.empty cps.val) fl f'); eauto.
+        eapply Bound_FVfun with (ys := ys1) (f' := f'0) (t := t1); eauto.
+  }
+  destruct (repr_val_fun_inv
+              fenv finfo_env p rep_env (M.empty cps.val) fl f' m Lfun v7_fun Hrepr_fun)
+    as (vars & avars & b_fun & t_fun & t_fun' & vs_fun & pvs & avs
+        & e_fun & asgn_fun & body_fun & l_fun & locs_fun & alocs_fun
+        & finfo_fun & gccall_fun
+        & Hv7_fun_ptr & Hfind_fun & Hget_t_fun & Hget_finfo_fun
+        & Ht_fun_eq & Hsym_fun & Hgc_fun & Hfind_funct_fun
+        & Hforall_fun & Hpvs_fun & Havs_fun & Halocs_fun & Havar_fun
+        & Hright_asgn_fun & Hrepr_body_fun).
+  rewrite Hfind in Hfind_fun.
+  inversion Hfind_fun; subst t_fun vs_fun e_fun.
+  inversion Hrepr; subst.
+  inversion H7; subst.
+  pose proof (rel_mem_eapp_args_get_var_or_funvar
+                fenv finfo_env p rep_env rho m lenv f t_fun' ys Hrel)
+    as Hfor_ys.
+  pose proof (Forall_skipn
+                (fun y => exists v7, get_var_or_funvar p lenv y v7)
+                nParam ys Hfor_ys) as Hfor_ays.
+  assert (Hskipn_nodup :
+    forall {A} n (xs0 : list A), NoDup xs0 -> NoDup (skipn n xs0)).
+  {
+    intros A n0.
+    induction n0 as [|n0 IH]; intros xs0 Hnd0.
+    - simpl. exact Hnd0.
+    - destruct xs0 as [|x0 xs0'].
+      + simpl. constructor.
+      + simpl. inversion Hnd0; subst. eapply IH; eauto.
+  }
+  destruct Hfundef_info0 as
+    [finfo0 [t0 [t0' [vs0 [e0 [Hfind_info [Hget_finfo_info [Ht_info_eq Hcfinfo]]]]]]]].
+  rewrite Hfind in Hfind_info.
+  inversion Hfind_info; subst t0 vs0 e0.
+  rewrite Hget_finfo_fun in Hget_finfo_info.
+  inversion Hget_finfo_info; subst finfo0 t0'.
+  destruct Hcfinfo as [n_finfo [locs_info [b_info [fi0 Hcfinfo_rest]]]].
+  destruct Hcfinfo_rest as
+    [Hget_fenv_info [Hn_finfo_eq [Hlen_locs_info
+    [Hnd_locs_info [Hfor_locs_info
+    [Hsym_info [Hload_fi0 [Hload_fi1 [Halloc_info Hgc_info]]]]]]]]].
+  rewrite Hget_t_fun in Hget_fenv_info.
+  inversion Hget_fenv_info; subst n_finfo locs_info.
+  assert (Hfor_aind :
+    Forall (fun i => (0 <= Z.of_N i < max_args)%Z) (skipn nParam (snd inf))).
+  {
+    rewrite H3 in Hget_t_fun.
+    inversion Hget_t_fun; subst inf.
+    eapply Forall_skipn; eauto.
+  }
+  assert (Hnodup_aind : NoDup (skipn nParam (snd inf))).
+  {
+    rewrite H3 in Hget_t_fun.
+    inversion Hget_t_fun; subst inf.
+    eapply Hskipn_nodup; eauto.
+  }
+  destruct (repr_asgn_fun_mem
+              fu lenv p rho (Eapp f t_fun' ys) fenv 0 rep_env finfo_env
+              (skipn nParam ys) (skipn nParam (snd inf)) s m
+              Hsym Hfinfo Hrel Hct Hfor_ays Hfor_aind Hnodup_aind H)
+    as [m_asgn [Hstep_asgn_all [Hmem_asgn [Hrel_asgn Hct_asgn]]]].
+  destruct Hpinv as [Hisptr_inv [Hpti Hgc_inv]].
+  pose proof Hct_asgn as Hct_asgn0.
+  destruct (correct_tinfo_store_alloc_exists p 0 lenv m_asgn Hct_asgn)
+    as [alloc_b_asgn [alloc_ofs_asgn [tinf_b_asgn [tinf_ofs_asgn [m_alloc_store
+      [Halloc_store_get [Htinf_store_get Hstore_alloc_tinfo]]]]]]].
+  destruct Hct_asgn0 as
+    [alloc_b_ct [alloc_ofs_ct [limit_ofs_ct [args_b_ct [args_ofs_ct [tinf_b_ct [tinf_ofs_ct
+      [Halloc_ct [Halign_ct [Hrange_ct [Hlimit_ct [Hbound_ct [Hargs_ct [Hdj_ct [Hargs_bound_ct [Hargs_va_ct [Htinf_ct [Htinf_ne_args_ct [Htinf_ne_alloc_ct [Htinf_va_ct [Hderef_ct Hglob_ct]]]]]]]]]]]]]]]]]]]]].
+  rewrite Halloc_ct in Halloc_store_get.
+  inversion Halloc_store_get; subst alloc_b_asgn alloc_ofs_asgn.
+  rewrite Htinf_ct in Htinf_store_get.
+  inversion Htinf_store_get; subst tinf_b_asgn tinf_ofs_asgn.
+  destruct (correct_tinfo_store_limit_exists_after_alloc
+              p 0 lenv m_asgn m_alloc_store
+              alloc_b_ct alloc_ofs_ct limit_ofs_ct tinf_b_ct tinf_ofs_ct
+              Hct_asgn Halloc_ct Hlimit_ct Htinf_ct Hstore_alloc_tinfo)
+    as [m_limit_store Hstore_limit_tinfo].
+  destruct (eapp_call_args_eval_exprlist_exists
+              fenv finfo_env p rep_env rho m_asgn lenv 0
+              f t_fun' ys
+              (Init.Nat.min (N.to_nat (fst inf)) nParam)
+              (firstn nParam ys) s2
+              Hsym Hfinfo Hrel_asgn Hct_asgn eq_refl H10)
+    as [tinf_b_call [tinf_ofs_call [vs_call [Htinf_call Heval_call_args]]]].
+  assert (Hset_args_id : M.set argsIdent (Vptr args_b_ct args_ofs_ct) lenv = lenv).
+  { eapply M.gsident. exact Hargs_ct. }
+  assert (Hct_limit : correct_tinfo p 0 lenv m_limit_store).
+  {
+    pose proof (correct_tinfo_after_store
+                  p 0 lenv m_asgn Hct_asgn
+                  m_alloc_store int_chunk
+                  tinf_b_ct
+                  (Ptrofs.unsigned
+                     (Ptrofs.add tinf_ofs_ct (Ptrofs.repr (int_size * 0))))
+                  (Vptr alloc_b_ct alloc_ofs_ct)
+                  Hstore_alloc_tinfo) as Hct1.
+    eapply (correct_tinfo_after_store
+              p 0 lenv m_alloc_store Hct1
+              m_limit_store int_chunk
+              tinf_b_ct
+              (Ptrofs.unsigned
+                 (Ptrofs.add tinf_ofs_ct (Ptrofs.repr int_size)))
+              (Vptr alloc_b_ct limit_ofs_ct)); eauto.
+  }
+  assert (Hrel_limit :
+    rel_mem_LambdaANF_Codegen_id fenv finfo_env p rep_env
+      (Eapp f t_fun' ys) rho m_limit_store lenv).
+  {
+    eapply rel_mem_unchanged_from_protected.
+    - exact Hrel_asgn.
+    - intros L0 HprotL_lim.
+      eapply protected_not_in_L_tinfo_two_stores_unchanged
+        with (m1 := m_alloc_store)
+             (tinf_b := tinf_b_ct)
+             (tinf_ofs := tinf_ofs_ct)
+             (ofs0 := Ptrofs.unsigned (Ptrofs.add tinf_ofs_ct (Ptrofs.repr (int_size * 0))))
+             (v0 := Vptr alloc_b_ct alloc_ofs_ct)
+             (v1 := Vptr alloc_b_ct limit_ofs_ct); eauto.
+    - intros xg bg Hsymg i chunk.
+      destruct (Hglob_ct xg bg Hsymg) as [_ [_ [Hbg_neq_tinf _]]].
+      assert (Hload_limit :
+        Mem.loadv chunk m_limit_store (Vptr bg i) =
+        Mem.loadv chunk m_alloc_store (Vptr bg i)).
+      {
+        unfold Mem.loadv.
+        erewrite Mem.load_store_other.
+        2:{ exact Hstore_limit_tinfo. }
+        2:{ left; exact Hbg_neq_tinf. }
+        reflexivity.
+      }
+      assert (Hload_alloc :
+        Mem.loadv chunk m_alloc_store (Vptr bg i) =
+        Mem.loadv chunk m_asgn (Vptr bg i)).
+      {
+        unfold Mem.loadv.
+        erewrite Mem.load_store_other.
+        2:{ exact Hstore_alloc_tinfo. }
+        2:{ left; exact Hbg_neq_tinf. }
+        reflexivity.
+      }
+      rewrite <- Hload_alloc.
+      rewrite <- Hload_limit.
+      reflexivity.
+  }
+  destruct (eapp_call_args_eval_exprlist_exists
+              fenv finfo_env p rep_env rho m_limit_store lenv 0
+              f t_fun' ys
+              (Init.Nat.min (N.to_nat (fst inf)) nParam)
+              (firstn nParam ys) s2
+              Hsym Hfinfo Hrel_limit Hct_limit eq_refl H10)
+    as [tinf_b_call' [tinf_ofs_call' [vs_call' [Htinf_call' Heval_call_args']]]].
+  assert (Htinf_call_eq : tinf_b_call' = tinf_b_ct /\ tinf_ofs_call' = tinf_ofs_ct).
+  {
+    rewrite Htinf_ct in Htinf_call'. inversion Htinf_call'. auto.
+  }
+  destruct Htinf_call_eq as [-> ->].
+  clear Htinf_call Htinf_call' tinf_b_call tinf_ofs_call Heval_call_args.
+  pose proof Hct as Hct_init.
+  destruct Hct_init as [alloc_b0 Hct_init].
+  destruct Hct_init as [alloc_ofs0 Hct_init].
+  destruct Hct_init as [limit_ofs0 Hct_init].
+  destruct Hct_init as [args_b0 Hct_init].
+  destruct Hct_init as [args_ofs0 Hct_init].
+  destruct Hct_init as [tinf_b0 Hct_init].
+  destruct Hct_init as [tinf_ofs0 Hct_init].
+  destruct Hct_init as [Halloc_init Hct_init].
+  destruct Hct_init as [Halign_init Hct_init].
+  destruct Hct_init as [Hrange_init Hct_init].
+  destruct Hct_init as [Hlimit_init Hct_init].
+  destruct Hct_init as [Hbound_init Hct_init].
+  destruct Hct_init as [Hargs_init Hct_init].
+  destruct Hct_init as [Hdj_init Hct_init].
+  destruct Hct_init as [Hargs_bound_init Hct_init].
+  destruct Hct_init as [Hargs_va_init Hct_init].
+  destruct Hct_init as [Htinf_init Hct_init].
+  destruct Hct_init as [Htinf_ne_args_init Hct_init].
+  destruct Hct_init as [Htinf_ne_alloc_init Hct_init].
+  destruct Hct_init as [Htinf_va_init Hct_init].
+  destruct Hct_init as [Hderef_init Hglob_init].
+  rewrite Hargs_ct in Hargs_init.
+  inversion Hargs_init; subst args_b0 args_ofs0.
+  rewrite Htinf_ct in Htinf_init.
+  inversion Htinf_init; subst tinf_b0 tinf_ofs0.
+  assert (Hderef_args_uval :
+    deref_loc (Tarray LambdaANF_to_Clight.uval maxArgs noattr) m tinf_b_ct
+      (Ptrofs.add tinf_ofs_ct (Ptrofs.repr (int_size * 3))) Full
+      (Vptr args_b_ct args_ofs_ct)).
+  {
+    assert (Hacc_eq :
+      access_mode (Tarray LambdaANF_to_Clight.uval maxArgs noattr) =
+      access_mode (Tarray uval maxArgs noattr)).
+    {
+      unfold uval, val, LambdaANF_to_Clight.uval, LambdaANF_to_Clight.val.
+      simpl.
+      destruct Archi.ptr64; reflexivity.
+    }
+    inversion Hderef_init; subst; try congruence.
+    eapply deref_loc_value with (chunk := chunk).
+    - rewrite Hacc_eq.
+      exact H0.
+    - exact H2.
+  }
+  assert (Heval_set_args :
+    eval_expr (globalenv p) empty_env lenv m
+      (Efield
+         (Ederef
+            (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr))
+            (Tstruct threadInfIdent noattr))
+         argsIdent (Tarray LambdaANF_to_Clight.uval maxArgs noattr))
+      (Vptr args_b_ct args_ofs_ct)).
+  {
+    pose proof Hpti as Hpti0.
+    destruct Hpti0 as [co [Hco Hmembers]].
+    eapply eval_Elvalue.
+    - eapply eval_Efield_struct
+        with (id := threadInfIdent) (co := co) (att := noattr)
+             (delta := (int_size * 3)%Z) (bf := Full).
+      + eapply eval_tinfd_expr; eauto.
+      + reflexivity.
+      + exact Hco.
+      + rewrite Hmembers.
+        eapply argsIdent_delta.
+    - exact Hderef_args_uval.
+  }
+  set (pnum := Init.Nat.min (N.to_nat (fst inf)) nParam).
+  set (scall_stmt :=
+    Scall None
+      (Ecast
+         (var_or_funvar_f threadInfIdent nParam fenv finfo_env p f)
+         (Tpointer (mkFunTy threadInfIdent pnum) noattr))
+      (Etempvar tinfIdent (Tpointer (Tstruct threadInfIdent noattr) noattr) :: s2)).
+  assert (Hpref_to_call :
+    m_tstep2 (globalenv p)
+      (State fu
+         (Ssequence
+            (Ssequence
+               (Ssequence
+                  (Ssequence
+                     (Sset argsIdent
+                        (Efield
+                           (Ederef
+                              (Etempvar tinfIdent
+                                 (Tpointer (Tstruct threadInfIdent noattr)
+                                    noattr))
+                              (Tstruct threadInfIdent noattr))
+                           argsIdent (Tarray LambdaANF_to_Clight.uval maxArgs noattr))) s)
+                  (Sassign
+                     (Efield
+                        (Ederef
+                           (Etempvar tinfIdent
+                              (Tpointer (Tstruct threadInfIdent noattr)
+                                 noattr))
+                           (Tstruct threadInfIdent noattr)) allocIdent valPtr)
+                     (allocPtr allocIdent)))
+               (Sassign
+                  (Efield
+                     (Ederef
+                        (Etempvar tinfIdent
+                           (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                        (Tstruct threadInfIdent noattr)) limitIdent valPtr)
+                  (Etempvar limitIdent valPtr))) scall_stmt) k empty_env lenv m)
+      (State fu scall_stmt k empty_env lenv m_limit_store)).
+  {
+    unfold scall_stmt.
+    eapply m_tstep2_transitive.
+    { apply m_tstep2_step. constructor. }
+    eapply m_tstep2_transitive.
+    { apply m_tstep2_step. constructor. }
+    eapply m_tstep2_transitive.
+    { apply m_tstep2_step. constructor. }
+    eapply m_tstep2_transitive.
+    { eapply m_tstep2_seq_set.
+      exact Heval_set_args. }
+    rewrite Hset_args_id.
+    eapply m_tstep2_transitive.
+    { eapply m_tstep2_of_rt.
+      - eapply Hstep_asgn_all.
+      - apply m_tstep2_step. constructor. }
+    eapply m_tstep2_transitive.
+    { apply m_tstep2_step.
+      eapply step_assign_tinfo_alloc.
+      - exact Hpti.
+      - exact Htinf_ct.
+      - exact Halloc_ct.
+      - exact Hstore_alloc_tinfo. }
+    eapply m_tstep2_transitive.
+    { apply m_tstep2_step. constructor. }
+    eapply m_tstep2_transitive.
+    { apply m_tstep2_step.
+      eapply step_assign_tinfo_limit.
+      - exact Hpti.
+      - exact Htinf_ct.
+      - exact Hlimit_ct.
+      - exact Hstore_limit_tinfo. }
+    apply m_tstep2_step.
+    constructor.
+  }
+  assert (Heval_fun_raw :
+    eval_expr (globalenv p) empty_env lenv m_limit_store
+      (var_or_funvar_f threadInfIdent nParam fenv finfo_env p f)
+      (Vptr b_fun Ptrofs.zero)).
+  {
+    match goal with
+    | Hgv : get_var_or_funvar p lenv f ?vf |- _ =>
+        try match goal with
+            | Hptr : vf = Vptr b_fun Ptrofs.zero |- _ =>
+                rewrite <- Hptr in Hgv
+            end;
+        try match goal with
+            | Hptr : Vptr b_fun Ptrofs.zero = vf |- _ =>
+                rewrite Hptr in Hgv
+            end;
+        eapply get_var_or_funvar_eval; eauto
+    end.
+  }
+  assert (Heval_fun :
+    eval_expr (globalenv p) empty_env lenv m_limit_store
+      (Ecast
+         (var_or_funvar_f threadInfIdent nParam fenv finfo_env p f)
+         (Tpointer (mkFunTy threadInfIdent pnum) noattr))
+      (Vptr b_fun Ptrofs.zero)).
+  {
+    eapply eval_Ecast.
+    - exact Heval_fun_raw.
+    - unfold sem_cast.
+      unfold var_or_funvar_f.
+      destruct (Genv.find_symbol (Genv.globalenv p) f); simpl.
+      + unfold makeVar.
+        destruct (M.get f finfo_env) as [[i0 t0] | ] eqn:Hget_info; simpl.
+        * destruct (M.get t0 fenv) as [[l0 locs0] | ] eqn:Hget_fenv; simpl.
+          -- unfold LambdaANF_to_Clight.mkFunVar.
+             simpl.
+             destruct Archi.ptr64; reflexivity.
+          -- destruct Archi.ptr64; reflexivity.
+        * destruct Archi.ptr64; reflexivity.
+      + destruct Archi.ptr64; reflexivity.
+  }
+  set (F :=
+    mkfunction Tvoid
+      (mkcallconv None false false)
+      ((tinfIdent, threadInf threadInfIdent)
+         :: map (fun x : positive => (x, uval)) (firstn nParam xs))
+      nil
+      (skipn nParam vars ++ gc_vars argsIdent allocIdent limitIdent caseIdent)
+      (Ssequence gccall_fun
+         (Ssequence
+            (Ssequence
+               (gc_set argsIdent allocIdent limitIdent threadInfIdent tinfIdent)
+               asgn_fun)
+            body_fun))).
+  assert (Hfind_F :
+    Genv.find_funct (globalenv p) (Vptr b_fun Ptrofs.zero) = Some (Internal F)).
+  {
+    unfold F.
+    exact Hfind_funct_fun.
+  }
+  assert (Htype_F :
+    type_of_fundef (Internal F) =
+    Tfunction
+      (Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr)
+         (mkFunTyList pnum))
+      Tvoid
+      {| cc_vararg := None; cc_unproto := false; cc_structret := false |}).
+  {
+    unfold F, pnum.
+    simpl.
+    unfold type_of_function.
+    unfold threadInf, threadStructInf.
+    simpl.
+    assert (Hparams :
+      type_of_params (map (fun x : positive => (x, uval)) (firstn nParam xs)) =
+      mkFunTyList (Nat.min (length xs) nParam)).
+    { symmetry. exact (type_of_mkFunTyList nParam xs). }
+    rewrite Hparams.
+    f_equal.
+    rewrite H3 in Hget_t_fun.
+    inversion Hget_t_fun; subst inf.
+    rewrite H1.
+    simpl.
+    rewrite Nnat.Nat2N.id.
+    rewrite Hlen_locs_info.
+    replace (Nat.min nParam (length xs)) with (Nat.min (length xs) nParam)
+      by apply Nat.min_comm.
+    reflexivity.
+  }
+  assert (Hto_callstate :
+    m_tstep2 (globalenv p)
+      (State fu scall_stmt k empty_env lenv m_limit_store)
+      (Callstate (Internal F)
+         (Vptr tinf_b_ct tinf_ofs_ct :: vs_call')
+         (Kcall None fu empty_env lenv k) m_limit_store)).
+  {
+    apply m_tstep2_step.
+    unfold scall_stmt.
+    eapply step_call with
+      (tyargs := Tcons (Tpointer (Tstruct threadInfIdent noattr) noattr) (mkFunTyList pnum))
+      (tyres := Tvoid)
+      (cconv := {| cc_vararg := None; cc_unproto := false; cc_structret := false |})
+      (vf := Vptr b_fun Ptrofs.zero)
+      (vargs := Vptr tinf_b_ct tinf_ofs_ct :: vs_call')
+      (fd := Internal F).
+    - reflexivity.
+    - exact Heval_fun.
+    - exact Heval_call_args'.
+    - exact Hfind_F.
+    - exact Htype_F.
+  }
+
+  assert (Hmap_vars : map fst vars = xs).
+  { eapply Forall2_pair_const_map_fst; eauto. }
+
+  assert (Hprot_tinf : is_protected_id_thm tinfIdent).
+  { unfold is_protected_id_thm, is_protected_id, protectedIdent_thm, protectedIdent. inList. }
+  assert (Hprot_alloc : is_protected_id_thm allocIdent).
+  { unfold is_protected_id_thm, is_protected_id, protectedIdent_thm, protectedIdent. inList. }
+  assert (Hprot_limit : is_protected_id_thm limitIdent).
+  { unfold is_protected_id_thm, is_protected_id, protectedIdent_thm, protectedIdent. inList. }
+  assert (Hprot_args : is_protected_id_thm argsIdent).
+  { unfold is_protected_id_thm, is_protected_id, protectedIdent_thm, protectedIdent. inList. }
+  assert (Hprot_case : is_protected_id_thm caseIdent).
+  { unfold is_protected_id_thm, is_protected_id, protectedIdent_thm, protectedIdent. inList. }
+
+  pose proof (protected_id_eapp_params_not_in rho f t_fun' ys fl f' t_fun' xs e tinfIdent
+                Hprot Hfun Hfind Hprot_tinf) as Hnot_tinf_xs.
+  pose proof (protected_id_eapp_params_not_in rho f t_fun' ys fl f' t_fun' xs e allocIdent
+                Hprot Hfun Hfind Hprot_alloc) as Hnot_alloc_xs.
+  pose proof (protected_id_eapp_params_not_in rho f t_fun' ys fl f' t_fun' xs e limitIdent
+                Hprot Hfun Hfind Hprot_limit) as Hnot_limit_xs.
+  pose proof (protected_id_eapp_params_not_in rho f t_fun' ys fl f' t_fun' xs e argsIdent
+                Hprot Hfun Hfind Hprot_args) as Hnot_args_xs.
+  pose proof (protected_id_eapp_params_not_in rho f t_fun' ys fl f' t_fun' xs e caseIdent
+                Hprot Hfun Hfind Hprot_case) as Hnot_case_xs.
+
+  assert (Hdisj_entry :
+    Coqlib.list_disjoint
+      (tinfIdent :: firstn nParam xs)
+      (map fst (skipn nParam vars ++ gc_vars argsIdent allocIdent limitIdent caseIdent))).
+  {
+    eapply list_disjoint_fun_params_temps; eauto.
+  }
+
+  assert (Hfst_inf_len_xs : N.to_nat (fst inf) = length xs).
+  {
+    assert (Hinf_eq : inf = (l_fun, locs_fun)).
+    { rewrite H3 in Hget_t_fun. inversion Hget_t_fun. reflexivity. }
+    rewrite Hinf_eq. simpl.
+    rewrite H1.
+    rewrite Nnat.Nat2N.id.
+    exact Hlen_locs_info.
+  }
+
+  assert (Hlen_vs_call' : length vs_call' = pnum).
+  {
+    inversion Heval_call_args'; subst.
+    eapply eval_exprlist_mkFunTyList_length; eauto.
+  }
+
+  assert (Hlen_formals :
+    length
+      ((tinfIdent, threadInf threadInfIdent)
+         :: map (fun x : positive => (x, uval)) (firstn nParam xs)) =
+    length (Vptr tinf_b_ct tinf_ofs_ct :: vs_call')).
+  {
+    simpl.
+    rewrite map_length.
+    rewrite firstn_length.
+    rewrite Hlen_vs_call'.
+    unfold pnum.
+    rewrite Hfst_inf_len_xs.
+    rewrite Nat.min_comm.
+    reflexivity.
+  }
+
+  destruct (bind_parameter_temps_exists
+              ((tinfIdent, threadInf threadInfIdent)
+                 :: map (fun x : positive => (x, uval)) (firstn nParam xs))
+              (Vptr tinf_b_ct tinf_ofs_ct :: vs_call')
+              (create_undef_temps
+                 (skipn nParam vars ++
+                    gc_vars argsIdent allocIdent limitIdent caseIdent))
+              Hlen_formals)
+    as [lenv_entry Hbind_entry].
+
+  assert (Hfrom_callstate :
+    m_tstep2 (globalenv p)
+      (Callstate (Internal F)
+         (Vptr tinf_b_ct tinf_ofs_ct :: vs_call')
+         (Kcall None fu empty_env lenv k) m_limit_store)
+      (State F
+         (Ssequence gccall_fun
+            (Ssequence
+               (Ssequence
+                  (gc_set argsIdent allocIdent limitIdent threadInfIdent tinfIdent)
+                  asgn_fun)
+               body_fun))
+         (Kcall None fu empty_env lenv k) empty_env lenv_entry m_limit_store)).
+  {
+    apply m_tstep2_step.
+    unfold traceless_step2.
+    eapply step_internal_function with (m1 := m_limit_store).
+    eapply function_entry2_intro.
+    - simpl. constructor.
+    - unfold var_names. simpl.
+      rewrite map_map. simpl.
+      rewrite map_id.
+      eapply list_norepet_tinf_firstn; eauto.
+    - unfold var_names. simpl.
+      rewrite map_map. simpl.
+      rewrite map_id.
+      exact Hdisj_entry.
+    - simpl. constructor.
+    - exact Hbind_entry.
+  }
+
+  assert (Hto_callee_entry :
+    m_tstep2 (globalenv p)
+      (State fu
+         (Ssequence
+            (Ssequence
+               (Ssequence
+                  (Ssequence
+                     (Sset argsIdent
+                        (Efield
+                           (Ederef
+                              (Etempvar tinfIdent
+                                 (Tpointer (Tstruct threadInfIdent noattr)
+                                    noattr))
+                              (Tstruct threadInfIdent noattr))
+                           argsIdent (Tarray LambdaANF_to_Clight.uval maxArgs noattr))) s)
+                  (Sassign
+                     (Efield
+                        (Ederef
+                           (Etempvar tinfIdent
+                              (Tpointer (Tstruct threadInfIdent noattr)
+                                 noattr))
+                           (Tstruct threadInfIdent noattr)) allocIdent valPtr)
+                     (allocPtr allocIdent)))
+               (Sassign
+                  (Efield
+                     (Ederef
+                        (Etempvar tinfIdent
+                           (Tpointer (Tstruct threadInfIdent noattr) noattr))
+                        (Tstruct threadInfIdent noattr)) limitIdent valPtr)
+                  (Etempvar limitIdent valPtr))) scall_stmt)
+         k empty_env lenv m)
+      (State F
+         (Ssequence gccall_fun
+            (Ssequence
+               (Ssequence
+                  (gc_set argsIdent allocIdent limitIdent threadInfIdent tinfIdent)
+                  asgn_fun)
+               body_fun))
+         (Kcall None fu empty_env lenv k) empty_env lenv_entry m_limit_store)).
+  {
+    eapply m_tstep2_transitive.
+    - exact Hpref_to_call.
+    - eapply m_tstep2_transitive.
+      + exact Hto_callstate.
+      + exact Hfrom_callstate.
+  }
+
+  assert (Hcallee_skip_to_caller :
+    forall lenv_callee m_callee,
+      m_tstep2 (globalenv p)
+        (State F Sskip
+           (Kcall None fu empty_env lenv k) empty_env lenv_callee m_callee)
+        (State fu Sskip k empty_env lenv m_callee)).
+  {
+    intros lenv_callee m_callee.
+    eapply m_tstep2_return_to_caller_none.
+  }
+
+  unfold gc_test' in Hgc_fun.
+  unfold reserve' in Hgc_fun.
+  destruct
+    (asgnAppVars'' argsIdent threadInfIdent nParam
+       (firstn nParam xs) (firstn nParam locs_fun) fenv finfo_env)
+    as [bef |] eqn:Hbef in Hgc_fun;
+    try discriminate.
+  destruct (asgnFunVars' argsIdent (firstn nParam xs) (firstn nParam locs_fun))
+    as [aft |] eqn:Haft in Hgc_fun;
+    try discriminate.
+  assert (Hbef_repr :
+    repr_asgn_fun' argsIdent threadInfIdent nParam fenv finfo_env p
+      (firstn nParam xs) (firstn nParam locs_fun) bef).
+  {
+    eapply asgnAppVars''_correct; eauto.
+  }
+  assert (Haft_repr :
+    right_param_asgn argsIdent
+      (firstn nParam xs) (firstn nParam locs_fun) aft).
+  {
+    eapply asgnFunVars'_correct; eauto.
+  }
+  all: exfalso.
+  all: inversion Hderef_ct; subst;
+    match goal with
+    | Hacc : access_mode _ = By_value _ |- _ =>
+        simpl in Hacc; discriminate
+    | Hacc : access_mode _ = By_copy |- _ =>
+        simpl in Hacc; discriminate
+    | |- False =>
+        apply Htinf_ne_args_ct; symmetry; reflexivity
+    end.
+Qed.
 
 (* Eletapp case: function call + continuation.
    Like Eapp, but after callee returns: restore alloc pointer from tinfo,

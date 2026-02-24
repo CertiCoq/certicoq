@@ -809,6 +809,121 @@ Section STACK_CORRECT.
       s_rel_mem L e rho lenv m /\
       stack_correct_tinfo max_alloc lenv m.
 
+  Lemma bstep_e_econstr_inv :
+    forall pr rho x t ys e v n,
+      bstep_e pr cenv rho (Econstr x t ys e) v n ->
+      exists rho' vs,
+        get_list ys rho = Some vs /\
+        M.set x (Vconstr t vs) rho = rho' /\
+        bstep_e pr cenv rho' e v n.
+  Proof.
+    intros pr rho x t ys e v n Hbs.
+    inversion Hbs; subst.
+    eauto.
+  Qed.
+
+  Lemma bstep_e_eproj_inv :
+    forall pr rho x t n y e ov c,
+      bstep_e pr cenv rho (Eproj x t n y e) ov c ->
+      exists vs v,
+        M.get y rho = Some (Vconstr t vs) /\
+        nthN vs n = Some v /\
+        bstep_e pr cenv (M.set x v rho) e ov c.
+  Proof.
+    intros pr rho x t n y e ov c Hbs.
+    inversion Hbs; subst.
+    eauto.
+  Qed.
+
+  Lemma bstep_e_ecase_inv :
+    forall pr rho y cl v n,
+      bstep_e pr cenv rho (Ecase y cl) v n ->
+      exists t vl e,
+        M.get y rho = Some (Vconstr t vl) /\
+        caseConsistent cenv cl t /\
+        findtag cl t = Some e /\
+        bstep_e pr cenv rho e v n.
+  Proof.
+    intros pr rho y cl v n Hbs.
+    remember (Ecase y cl) as ecase eqn:Heq.
+    induction Hbs; inversion Heq; subst; clear Heq.
+    eexists; eexists; eexists.
+    repeat split; eauto.
+  Qed.
+
+  Lemma bstep_e_efun_inv :
+    forall pr rho fl e v n,
+      bstep_e pr cenv rho (Efun fl e) v n ->
+      bstep_e pr cenv (def_funs fl fl rho rho) e v n.
+  Proof.
+    intros pr rho fl e v n Hbs.
+    inversion Hbs; subst.
+    assumption.
+  Qed.
+
+  Lemma bstep_e_eprim_val_inv :
+    forall pr rho x p0 e v n,
+      bstep_e pr cenv rho (Eprim_val x p0 e) v n ->
+      exists rho',
+        M.set x (Vprim p0) rho = rho' /\
+        bstep_e pr cenv rho' e v n.
+  Proof.
+    intros pr rho x p0 e v n Hbs.
+    inversion Hbs; subst.
+    eauto.
+  Qed.
+
+  Lemma bstep_e_eprim_inv :
+    forall pr rho x f ys e v n,
+      bstep_e pr cenv rho (Eprim x f ys e) v n ->
+      exists vs f' vx rho',
+        get_list ys rho = Some vs /\
+        M.get f pr = Some f' /\
+        f' vs = Some vx /\
+        M.set x vx rho = rho' /\
+        bstep_e pr cenv rho' e v n.
+  Proof.
+    intros pr rho x f ys e v n Hbs.
+    inversion Hbs; subst; try discriminate.
+    exists vs, f', v0, (M.set x v0 rho).
+    repeat split; eauto.
+  Qed.
+
+  Lemma bstep_e_eapp_inv :
+    forall pr rho f t ys v n,
+      bstep_e pr cenv rho (Eapp f t ys) v n ->
+      exists rho_clo fl f' vs xs e rho_call c,
+        M.get f rho = Some (Vfun rho_clo fl f') /\
+        get_list ys rho = Some vs /\
+        find_def f' fl = Some (t, xs, e) /\
+        set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call /\
+        bstep_e pr cenv rho_call e v c /\
+        n = c + 1.
+  Proof.
+    intros pr rho f t ys v n Hbs.
+    inversion Hbs; subst; try discriminate.
+    exists rho', fl, f', vs, xs, e, rho'', c.
+    repeat split; eauto.
+  Qed.
+
+  Lemma bstep_e_eletapp_inv :
+    forall pr rho x f t ys e v n,
+      bstep_e pr cenv rho (Eletapp x f t ys e) v n ->
+      exists rho_clo fl f' vs xs e_body rho_call v_body c c',
+        M.get f rho = Some (Vfun rho_clo fl f') /\
+        get_list ys rho = Some vs /\
+        find_def f' fl = Some (t, xs, e_body) /\
+        set_lists xs vs (def_funs fl fl rho_clo rho_clo) = Some rho_call /\
+        bstep_e pr cenv rho_call e_body v_body c /\
+        bstep_e pr cenv (M.set x v_body rho) e v c' /\
+        n = c + c' + 1.
+  Proof.
+    intros pr rho x f t ys e v n Hbs.
+    inversion Hbs; subst; try discriminate.
+    exists rho', fl, f', vs, xs, e_body, rho'', v0, c, c'.
+    repeat split; eauto.
+  Qed.
+
   Lemma s_repr_val_vint_or_vptr :
     forall L sv cv m,
       s_repr_val L sv cv m ->
@@ -938,6 +1053,164 @@ Section STACK_CORRECT.
       + rewrite M.gso in Hzget by congruence.
         specialize (Hfun _ _ _ _ Hzget Hsub) as [Hrepr [Hclosed Hcorr]].
         split; [exact Hrepr | split; assumption].
+  Qed.
+
+  Lemma s_rel_mem_econstr_body_set_with_repr :
+    forall L rho lenv m x t ys e vs rv,
+      s_rel_mem L (Econstr x t ys e) rho lenv m ->
+      get_list ys rho = Some vs ->
+      Genv.find_symbol (globalenv p) x = None ->
+      s_repr_val L (Vconstr t vs) rv m ->
+      s_rel_mem L e (M.set x (Vconstr t vs) rho) (M.set x rv lenv) m.
+  Proof.
+    intros L rho lenv m x t ys e vs rv Hrel Hgl Hsym_none Hrepr_x.
+    unfold s_rel_mem in *.
+    pose proof Hrel as Hrel_all.
+    intros z.
+    specialize (Hrel z) as [Hocc Hfun].
+    split.
+    - intros Hzfree.
+      destruct (Pos.eq_dec z x) as [Heqzx | Hneqzx].
+      + subst z.
+        exists (Vconstr t vs).
+        split.
+        * rewrite M.gss. reflexivity.
+        * econstructor 1.
+          -- exact Hsym_none.
+          -- rewrite M.gss. reflexivity.
+          -- exact Hrepr_x.
+      + assert (Hzfree_outer : occurs_free (Econstr x t ys e) z).
+        { apply Free_Econstr2.
+          - congruence.
+          - exact Hzfree. }
+        specialize (Hocc Hzfree_outer) as [vz [Hzget Hrid]].
+        exists vz.
+        split.
+        * rewrite M.gso; [exact Hzget | congruence].
+        * eapply s_repr_val_id_set; eauto.
+    - intros rho' fds f v Hzget Hsub.
+      destruct (Pos.eq_dec z x) as [Heqzx | Hneqzx].
+      + subst z.
+        rewrite M.gss in Hzget.
+        inversion Hzget; subst v; clear Hzget.
+        destruct (subval_or_eq_fun rho' fds f vs t Hsub)
+          as [vsub [Hsub_v Hin_vs]].
+        destruct (get_list_In_val _ _ _ _ Hgl Hin_vs) as [y [Hy_in Hy_get]].
+        specialize (Hrel_all y) as [_ Hfun_y].
+        specialize (Hfun_y rho' fds f vsub Hy_get Hsub_v)
+          as [Hrepr_f [Hclosed_f Hcorr_f]].
+        split; [exact Hrepr_f | split; assumption].
+      + rewrite M.gso in Hzget by congruence.
+        specialize (Hfun rho' fds f v Hzget Hsub)
+          as [Hrepr_f [Hclosed_f Hcorr_f]].
+        split; [exact Hrepr_f | split; assumption].
+  Qed.
+
+  Lemma s_rel_mem_eproj_body_set_with_repr :
+    forall L rho lenv m x t n y e vs vx rv,
+      s_rel_mem L (Eproj x t n y e) rho lenv m ->
+      M.get y rho = Some (Vconstr t vs) ->
+      nthN vs n = Some vx ->
+      Genv.find_symbol (globalenv p) x = None ->
+      s_repr_val L vx rv m ->
+      s_rel_mem L e (M.set x vx rho) (M.set x rv lenv) m.
+  Proof.
+    intros L rho lenv m x t n y e vs vx rv
+      Hrel Hy Hnth Hsym_none Hrepr_x.
+    unfold s_rel_mem in *.
+    pose proof Hrel as Hrel_all.
+    intros z.
+    specialize (Hrel z) as [Hocc Hfun].
+    split.
+    - intros Hzfree.
+      destruct (Pos.eq_dec z x) as [Heqzx | Hneqzx].
+      + subst z.
+        exists vx.
+        split.
+        * rewrite M.gss. reflexivity.
+        * econstructor 1.
+          -- exact Hsym_none.
+          -- rewrite M.gss. reflexivity.
+          -- exact Hrepr_x.
+      + assert (Hzfree_outer : occurs_free (Eproj x t n y e) z).
+        { apply Free_Eproj2.
+          - congruence.
+          - exact Hzfree. }
+        specialize (Hocc Hzfree_outer) as [vz [Hzget Hrid]].
+        exists vz.
+        split.
+        * rewrite M.gso; [exact Hzget | congruence].
+        * eapply s_repr_val_id_set; eauto.
+    - intros rho' fds f v Hzget Hsub.
+      destruct (Pos.eq_dec z x) as [Heqzx | Hneqzx].
+      + subst z.
+        rewrite M.gss in Hzget.
+        inversion Hzget; subst v; clear Hzget.
+        assert (Hin_vs : List.In vx vs).
+        { eapply nthN_In; eauto. }
+        assert (Hsub_constr : subval_or_eq (Vfun rho' fds f) (Vconstr t vs)).
+        { eapply subval_or_eq_constr; eauto. }
+        specialize (Hrel_all y) as [_ Hfun_y].
+        specialize (Hfun_y rho' fds f (Vconstr t vs) Hy Hsub_constr)
+          as [Hrepr_f [Hclosed_f Hcorr_f]].
+        split; [exact Hrepr_f | split; assumption].
+      + rewrite M.gso in Hzget by congruence.
+        specialize (Hfun rho' fds f v Hzget Hsub)
+          as [Hrepr_f [Hclosed_f Hcorr_f]].
+        split; [exact Hrepr_f | split; assumption].
+  Qed.
+
+  Lemma s_state_econstr_body_invariants :
+    forall L rho lenv m max_alloc x t ys e vs rv,
+      stack_protected_not_in_L lenv L ->
+      s_rel_mem L (Econstr x t ys e) rho lenv m ->
+      stack_correct_tinfo max_alloc lenv m ->
+      get_list ys rho = Some vs ->
+      Genv.find_symbol (globalenv p) x = None ->
+      s_repr_val L (Vconstr t vs) rv m ->
+      x <> allocIdent ->
+      x <> limitIdent ->
+      x <> argsIdent ->
+      x <> tinfIdent ->
+      stack_protected_not_in_L (M.set x rv lenv) L /\
+      s_rel_mem L e (M.set x (Vconstr t vs) rho) (M.set x rv lenv) m /\
+      stack_correct_tinfo max_alloc (M.set x rv lenv) m.
+  Proof.
+    intros L rho lenv m max_alloc x t ys e vs rv
+      Hprot Hrel Hct Hgl Hsym_none Hrepr_x
+      Hx_alloc Hx_limit Hx_args Hx_tinf.
+    split.
+    - eapply stack_protected_not_in_L_set_other; eauto.
+    - split.
+      + eapply s_rel_mem_econstr_body_set_with_repr; eauto.
+      + eapply stack_correct_tinfo_set_other; eauto.
+  Qed.
+
+  Lemma s_state_eproj_body_invariants :
+    forall L rho lenv m max_alloc x t n y e vs vx rv,
+      stack_protected_not_in_L lenv L ->
+      s_rel_mem L (Eproj x t n y e) rho lenv m ->
+      stack_correct_tinfo max_alloc lenv m ->
+      M.get y rho = Some (Vconstr t vs) ->
+      nthN vs n = Some vx ->
+      Genv.find_symbol (globalenv p) x = None ->
+      s_repr_val L vx rv m ->
+      x <> allocIdent ->
+      x <> limitIdent ->
+      x <> argsIdent ->
+      x <> tinfIdent ->
+      stack_protected_not_in_L (M.set x rv lenv) L /\
+      s_rel_mem L e (M.set x vx rho) (M.set x rv lenv) m /\
+      stack_correct_tinfo max_alloc (M.set x rv lenv) m.
+  Proof.
+    intros L rho lenv m max_alloc x t n y e vs vx rv
+      Hprot Hrel Hct Hy Hnth Hsym_none Hrepr_x
+      Hx_alloc Hx_limit Hx_args Hx_tinf.
+    split.
+    - eapply stack_protected_not_in_L_set_other; eauto.
+    - split.
+      + eapply s_rel_mem_eproj_body_set_with_repr; eauto.
+      + eapply stack_correct_tinfo_set_other; eauto.
   Qed.
 
   Lemma s_inv_set_other_nonfree :

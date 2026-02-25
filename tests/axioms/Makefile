@@ -1,7 +1,7 @@
 COQOPTS = -R ../../plugin CertiRocq.Plugin -I ../../plugin -R ./ CertiRocq.Tests -R ../lib CertiRocq.Tests.lib
-CCOMPILER=gcc
+CCOMPILER?=gcc
 INCLUDE=../../runtime
-WARN_OPTS=-Wno-format -Wno-format-security -Wno-int-conversion
+WARN_OPTS=-w -Wno-everything
 
 # Names of the tests
 TESTS=print_lst fibn list_sum_int63 list_sum_int63_tinfo

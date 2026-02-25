@@ -1,7 +1,7 @@
 COQOPTS = -R ../../plugin CertiCoq.Plugin -I ../../plugin -R ./ CertiCoq.Tests -R ../lib CertiCoq.Tests.lib
-CCOMPILER=gcc
+CCOMPILER?=gcc
 INCLUDE=../../runtime
-WARN_OPTS=-Wno-format -Wno-format-security -Wno-int-conversion
+WARN_OPTS=--no-warnings -Wno-everything
 
 # Names of the tests
 TESTS=$(shell cat TESTS)

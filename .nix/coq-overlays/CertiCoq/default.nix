@@ -13,7 +13,7 @@
 
 with lib;
 mkCoqDerivation {
-  pname = "CertiCoq";
+  pname = "CertiRocq";
   mlPlugin = true;
 
   inherit version;
@@ -56,7 +56,7 @@ mkCoqDerivation {
 
     OUTDIR=$out/lib/coq/${coq.coq-version}/user-contrib
 
-    DST=$OUTDIR/CertiCoq/Plugin/runtime make -C runtime install
+    DST=$OUTDIR/CertiRocq/Plugin/runtime make -C runtime install
     COQLIBINSTALL=$OUTDIR make -C theories install
     COQLIBINSTALL=$OUTDIR make -C libraries install
     COQLIBINSTALL=$OUTDIR COQPLUGININSTALL=$OCAMLFIND_DESTDIR make -C plugin install
@@ -66,7 +66,7 @@ mkCoqDerivation {
   '';
 
   meta = {
-    description = "CertiCoq";
+    description = "CertiRocq";
     maintainers = with maintainers; [ womeier ];
     license = licenses.mit;
   };

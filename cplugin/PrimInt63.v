@@ -1,7 +1,7 @@
-From CertiCoq.VanillaPlugin Require Import Loader.
+From CertiRocq.VanillaPlugin Require Import Loader.
 From Corelib Require Import Numbers.Cyclic.Int63.PrimInt63.
 
-CertiCoq Register [
+CertiRocq Register [
   Corelib.Numbers.Cyclic.Int63.PrimInt63.add => "prim_int63_add",
   Corelib.Numbers.Cyclic.Int63.PrimInt63.eqb => "prim_int63_eqb",
   Corelib.Numbers.Cyclic.Int63.PrimInt63.land => "prim_int63_land",

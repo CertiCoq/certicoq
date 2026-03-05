@@ -8,7 +8,7 @@ From Stdlib Require Import
 
 From ExtLib Require Import Structures.Monad.
 
-From CertiCoq Require Import
+From CertiRocq Require Import
   LambdaANF.toplevel
   LambdaANF.cps_util
   Common.Pipeline_utils

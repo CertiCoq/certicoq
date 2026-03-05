@@ -1,5 +1,5 @@
-QUAL=CertiCoq.Benchmarks.regex
-QUALS=CertiCoq.Benchmarks.regex.regex
+QUAL=CertiRocq.Benchmarks.regex
+QUALS=CertiRocq.Benchmarks.regex.regex
 COQOPTS = -R ./ $(QUAL)
 CCOMPILER=gcc
 

@@ -1,7 +1,7 @@
-From CertiCoq.Plugin Require Import Loader.
+From CertiRocq.Plugin Require Import Loader.
 From Corelib Require Import PrimFloat.
 
-CertiCoq Register [
+CertiRocq Register [
   Corelib.Floats.PrimFloat.float => "erased",
   Corelib.Floats.PrimFloat.compare => "prim_float_compare",
   Corelib.Floats.PrimFloat.eqb => "prim_float_eqb",

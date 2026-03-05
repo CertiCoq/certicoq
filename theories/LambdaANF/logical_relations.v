@@ -1,4 +1,4 @@
-(* Step-indexed logical relations for LambdaANF.  Part of the CertiCoq project.
+(* Step-indexed logical relations for LambdaANF.  Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 

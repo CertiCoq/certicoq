@@ -1,5 +1,5 @@
 #include "print.h"
-#include "glue.CertiCoq.Benchmarks.tests.print_lst.h"
+#include "glue.CertiRocq.Benchmarks.tests.print_lst.h"
 
 void print_gallina_nat(unsigned long long v) {
   int n = 0;

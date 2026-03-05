@@ -1,6 +1,6 @@
 From compcert.lib Require Import Coqlib.
 Require Import LambdaANF.tactics.
-From CertiCoq.LambdaANF Require Import cps ctx Ensembles_util List_util functions map_util identifiers cps_util stemctx
+From CertiRocq.LambdaANF Require Import cps ctx Ensembles_util List_util functions map_util identifiers cps_util stemctx
      rename logical_relations alpha_conv eval functions.
 From Stdlib Require Import Arith.Arith NArith.BinNat Strings.String Lists.List
      micromega.Lia Sets.Ensembles Relations.Relation_Operators Classes.Morphisms.

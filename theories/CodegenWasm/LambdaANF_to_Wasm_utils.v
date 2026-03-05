@@ -2,7 +2,7 @@ From compcert Require Import
   Coqlib
   lib.Integers common.Memory.
 
-From CertiCoq Require Import
+From CertiRocq Require Import
   LambdaANF.cps LambdaANF.eval LambdaANF.cps_util
   LambdaANF.List_util LambdaANF.identifiers
   CodegenWasm.LambdaANF_to_Wasm

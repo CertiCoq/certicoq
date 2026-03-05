@@ -1,7 +1,7 @@
-From CertiCoq.Plugin Require Import Loader.
+From CertiRocq.Plugin Require Import Loader.
 From Corelib Require Import PrimString.
 
-CertiCoq Register [
+CertiRocq Register [
     Corelib.Strings.PrimString.compare => "prim_string_compare",
     Corelib.Strings.PrimString.get => "prim_string_get",
     Corelib.Strings.PrimString.length => "prim_string_length"

@@ -1,8 +1,8 @@
 (* Correspondence of the computational definition and the declarative
-   spec for closure conversion. Part of the CertiCoq project.  *)
+   spec for closure conversion. Part of the CertiRocq project.  *)
 
 Require Import LambdaANF.closure_conversion LambdaANF.closure_conversion_util.
-From CertiCoq.LambdaANF Require Import cps cps_util set_util identifiers ctx Ensembles_util
+From CertiRocq.LambdaANF Require Import cps cps_util set_util identifiers ctx Ensembles_util
      List_util functions logical_relations eval state.
 Require Import compcert.lib.Coqlib.
 From Stdlib Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat.

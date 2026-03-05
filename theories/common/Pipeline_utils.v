@@ -13,7 +13,7 @@ Notation bind := (ExtLib.Structures.Monad.bind).
 Open Scope monad_scope.
 Open Scope bs_scope.
 
-(** * Common Interface for composing CertiCoq Transformations *)
+(** * Common Interface for composing CertiRocq Transformations *)
 (* Author: Anonymized, 2019 *)
 
 (* Compiler options *)
@@ -57,7 +57,7 @@ Section Translation.
   Context (Src Dst : Type).
 
 
-  Definition CertiCoqTrans := Src -> pipelineM Dst.
+  Definition CertiRocqTrans := Src -> pipelineM Dst.
 
   (* TODO make something like that work *)
   (* Notation "' e1 ;;; .. ;;; em ;;; en" := *)
@@ -90,7 +90,7 @@ Section Translation.
   Definition log_to_string (log : list string) : string :=
     (String.concat newline ("Debug messages" :: (List.rev log)))%bs.
 
-  Definition run_pipeline (o : Options) (src : Src) (m : CertiCoqTrans) : (error Dst * string (* debug *)) :=
+  Definition run_pipeline (o : Options) (src : Src) (m : CertiRocqTrans) : (error Dst * string (* debug *)) :=
     let w := Build_CompInfo [] [] [] in
     let '(res, c_info) := runState (m src) o w in
     (res, log_to_string (debug_log c_info)).
@@ -102,26 +102,26 @@ Definition timePhase_opt {A} (o : Options) (s : string) (f : unit -> A) : A :=
     timePhase s f tt
   else f tt.
 
-Definition BuildCertiCoqTrans {Src Trg}
+Definition BuildCertiRocqTrans {Src Trg}
            (name : string)
            (f : Src -> Options -> CompInfo -> compM.error Trg * CompInfo)
-  : CertiCoqTrans Src Trg := fun s => State (fun o inf  => timePhase_opt o name (fun _ => f s o inf)).
+  : CertiRocqTrans Src Trg := fun s => State (fun o inf  => timePhase_opt o name (fun _ => f s o inf)).
 
-Definition LiftCertiCoqTrans {Src Trg}
+Definition LiftCertiRocqTrans {Src Trg}
            (name : string) (f : Src -> Trg)
-  : CertiCoqTrans Src Trg :=
+  : CertiRocqTrans Src Trg :=
   fun s =>
     o <- get_options ;;
     ret (timePhase_opt o name (fun _ => f s)).
 
-Definition LiftErrorCertiCoqTrans {Src Trg}
+Definition LiftErrorCertiRocqTrans {Src Trg}
            (name : string) (f : Src -> error Trg)
-  : CertiCoqTrans Src Trg :=
+  : CertiRocqTrans Src Trg :=
   fun s => State (fun o inf  => timePhase_opt o name (fun _ => (f s,  inf))).
 
-Definition LiftErrorLogCertiCoqTrans {Src Trg}
+Definition LiftErrorLogCertiRocqTrans {Src Trg}
            (name : string) (f : Src -> error Trg * string)
-  : CertiCoqTrans Src Trg :=
+  : CertiRocqTrans Src Trg :=
   fun s =>
     State (fun o inf  =>
              timePhase_opt o name
@@ -133,7 +133,7 @@ Definition LiftErrorLogCertiCoqTrans {Src Trg}
 
 Section Lang.
 
-  (** ** CertiCoq Language properties *)
+  (** ** CertiRocq Language properties *)
 
   Class Lang (Term : Type) :=
     { Value   : Type ;
@@ -163,7 +163,7 @@ Section Lang.
 
 End Lang.
 
-(** ** CertiCoq Corrrectness *)
+(** ** CertiRocq Corrrectness *)
 Section Correctness.
 
   Context {Src Trg : Type} {Hs : Lang Src} {Hd : Lang Trg}.
@@ -172,9 +172,9 @@ Section Correctness.
   (* Enforces that the translation in total if the input is well-formed and that
      the output is also well-formed *)
   (* Also enforces that the translation is total on WF terms. Should this be a
-     problem for any CertiCoq translation we can change the definition of the
+     problem for any CertiRocq translation we can change the definition of the
      Hoare triple *)
-  Definition WfPreserving (trans : CertiCoqTrans Src Trg) :=
+  Definition WfPreserving (trans : CertiRocqTrans Src Trg) :=
     forall src,
       TermWf src ->
       {{ fun r w => (* No preconditions on the state *) True }}
@@ -197,7 +197,7 @@ Section Correctness.
              exists v_trg, BigStep trg v_trg /\ R v_src v_trg.
 
 
-  Definition SemPreserving (R : obs_eq) (trans : CertiCoqTrans Src Trg) :=
+  Definition SemPreserving (R : obs_eq) (trans : CertiRocqTrans Src Trg) :=
     forall src,
       TermWf src ->
       {{ fun r w => (* No preconditions on the state *) True }}
@@ -205,10 +205,10 @@ Section Correctness.
       {{ fun r w trg w' => ForwardSim R src trg }}.
 
 
-  Class TransWfPreserving (trans : CertiCoqTrans Src Trg) :=
+  Class TransWfPreserving (trans : CertiRocqTrans Src Trg) :=
     { trans_WfPreserving : WfPreserving trans; }.
 
-  Class TransSemPreserving (trans : CertiCoqTrans Src Trg) (R : obs_eq) :=
+  Class TransSemPreserving (trans : CertiRocqTrans Src Trg) (R : obs_eq) :=
     { trans_SemPreserving : SemPreserving R trans }.
 
 End Correctness.
@@ -238,9 +238,9 @@ Section Composition.
   Qed.
 
   Instance TransWfPreserving_compose
-           (trans1 : CertiCoqTrans Src Int)
+           (trans1 : CertiRocqTrans Src Int)
            {Ht1 : TransWfPreserving trans1}
-           (trans2 : CertiCoqTrans Int Trg)
+           (trans2 : CertiRocqTrans Int Trg)
            {Ht2 : TransWfPreserving trans2}
     : TransWfPreserving (fun (s : Src) => bind (trans1 s) (fun (i : Int) => trans2 i)).
   Proof.
@@ -254,9 +254,9 @@ Section Composition.
   Qed.
 
   Instance TransSemPreserving_compose
-           (trans1 : CertiCoqTrans Src Int) (R1 : obs_eq Src Int)
+           (trans1 : CertiRocqTrans Src Int) (R1 : obs_eq Src Int)
            {Hwf1 : TransWfPreserving trans1} {Ht1 : TransSemPreserving trans1 R1}
-           (trans2 : CertiCoqTrans Int Trg) (R2 : obs_eq Int Trg)
+           (trans2 : CertiRocqTrans Int Trg) (R2 : obs_eq Int Trg)
            {Ht2 : TransSemPreserving trans2 R2}
     : TransSemPreserving (fun (s : Src) => bind (trans1 s) (fun (i : Int) => trans2 i)) (compose R1 R2).
   Proof.
@@ -293,7 +293,7 @@ Section Commutation.
   (* Zoe: Only require the readable part of the state to be equal. Intuition:
      the writable part only helps threading comp info but doesn't change the translation *)
 
-  Definition Commutes (trans : CertiCoqTrans Src Trg) :=
+  Definition Commutes (trans : CertiRocqTrans Src Trg) :=
     forall r src1 src2 trg1 trg2,
       TermWf src1 -> TermWf src2 ->
       {{ fun r' w' => r = r' }} trans src1 {{ fun r w trg w' => trg = trg1 }} ->
@@ -310,8 +310,8 @@ Section Commutation.
   Definition ForwardSimLink (R : obs_eq Src Trg) (src1 src2 : Src) (trg1 trg2 : Trg) :=
     ForwardSim R (op_src src1 src2) (op_trg trg1 trg2).
 
-  (* A CertiCoq translation has "Level A correctness"  *)
-  Definition SepCompSemPreserving (R : obs_eq Src Trg) (trans : CertiCoqTrans Src Trg) :=
+  (* A CertiRocq translation has "Level A correctness"  *)
+  Definition SepCompSemPreserving (R : obs_eq Src Trg) (trans : CertiRocqTrans Src Trg) :=
     forall src1 src2,
       TermWf src1 -> TermWf src2 ->
       (* This can be relaxed, not all components of the state are relevant *)
@@ -320,9 +320,9 @@ Section Commutation.
       {{{ fun s1' s2' trg1 trg2 => ForwardSimLink R src1 src2 trg1 trg2 }}}.
 
 
-  (* If a CertiCoqTrans is [Correct] and [Commutative] for the linking operator
+  (* If a CertiRocqTrans is [Correct] and [Commutative] for the linking operator
      then separate compilation is also correct. *)
-  Lemma Commutes_implies_SepCompSemPreserving (Rel : obs_eq Src Trg) (trans : CertiCoqTrans Src Trg)
+  Lemma Commutes_implies_SepCompSemPreserving (Rel : obs_eq Src Trg) (trans : CertiRocqTrans Src Trg)
         {Hwf : TransWfPreserving trans}
         {Hc : TransSemPreserving trans Rel} : (* If the translation is correct *)
     Compositional TermWf -> (* TermWf is compositional *)
@@ -379,10 +379,10 @@ Section Linking.
 
 
   (* A Linkable language with level A correctness *)
-  Class LinkableCorrectA (trans : CertiCoqTrans Src Trg) (R : obs_eq Src Trg) :=
+  Class LinkableCorrectA (trans : CertiRocqTrans Src Trg) (R : obs_eq Src Trg) :=
     { trans_LinkSemPreserving : SepCompSemPreserving Src Trg Link Link R trans }.
 
-  Class LinkableCompositional (trans : CertiCoqTrans Src Trg) :=
+  Class LinkableCompositional (trans : CertiRocqTrans Src Trg) :=
     { WfCompositional : Compositional Src Link TermWf;
       TransCommutes   : Commutes Src Trg Link Link trans }.
 
@@ -402,10 +402,10 @@ Section ComposeLinking.
 
 
   Instance LinkableCorrect_compose
-           (trans1 : CertiCoqTrans Src Int) (R1 : obs_eq Src Int)
+           (trans1 : CertiRocqTrans Src Int) (R1 : obs_eq Src Int)
            {Hc1 : TransWfPreserving trans1}
            {Ht1 : LinkableCorrectA trans1 R1}
-           (trans2 : CertiCoqTrans Int Trg) (R2 : obs_eq Int Trg)
+           (trans2 : CertiRocqTrans Int Trg) (R2 : obs_eq Int Trg)
            {Hc2 : TransWfPreserving trans2}
            {Ht2 : LinkableCorrectA trans2 R2}
     : LinkableCorrectA (fun (s : Src) => bind (trans1 s) (fun (i : Int) => trans2 i)) (compose R1 R2).
@@ -415,10 +415,10 @@ Section ComposeLinking.
 
 
   Instance Compositional_compose
-           (trans1 : CertiCoqTrans Src Int)
+           (trans1 : CertiRocqTrans Src Int)
            {Hwf1 : TransWfPreserving trans1}
            {Hc1 : LinkableCompositional trans1}
-           (trans2 : CertiCoqTrans Int Trg)
+           (trans2 : CertiRocqTrans Int Trg)
            {Hwf2 : TransWfPreserving trans2}
            {Hc2 : LinkableCompositional trans2}
     : LinkableCompositional (fun (s : Src) => bind (trans1 s) (fun (i : Int) => trans2 i)).

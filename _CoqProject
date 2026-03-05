@@ -1,25 +1,25 @@
--R libraries                    CertiCoq.Libraries
+-R libraries                    CertiRocq.Libraries
 
--R theories/Compiler            CertiCoq.Compiler
--R theories/common              CertiCoq.Common
--R theories/Extraction          CertiCoq.extraction
--R theories/Glue                CertiCoq.Glue
--R theories/LambdaBoxMut        CertiCoq.LambdaBoxMut
--R theories/LambdaBoxLocal      CertiCoq.LambdaBoxLocal
--R theories/LambdaANF           CertiCoq.LambdaANF
--R theories/Codegen             CertiCoq.Codegen
--R theories/CodegenWasm         CertiCoq.CodegenWasm
--R theories/Runtime             CertiCoq.runtime
+-R theories/Compiler            CertiRocq.Compiler
+-R theories/common              CertiRocq.Common
+-R theories/Extraction          CertiRocq.extraction
+-R theories/Glue                CertiRocq.Glue
+-R theories/LambdaBoxMut        CertiRocq.LambdaBoxMut
+-R theories/LambdaBoxLocal      CertiRocq.LambdaBoxLocal
+-R theories/LambdaANF           CertiRocq.LambdaANF
+-R theories/Codegen             CertiRocq.Codegen
+-R theories/CodegenWasm         CertiRocq.CodegenWasm
+-R theories/Runtime             CertiRocq.runtime
 
--R benchmarks                   CertiCoq.Benchmarks
--R plugin                       CertiCoq.Plugin
+-R benchmarks                   CertiRocq.Benchmarks
+-R plugin                       CertiRocq.Plugin
 -I plugin
--R cplugin                      CertiCoq.VanillaPlugin
+-R cplugin                      CertiRocq.VanillaPlugin
 -I cplugin
 -I benchmarks/metacoq_erasure
--I benchmarks/certicoq_pipeline
+-I benchmarks/certirocq_pipeline
 
--R bootstrap/certicoqc/theories CertiCoq.CertiCoqC
--I bootstrap/certicoqc
--R bootstrap/certicoqchk        CertiCoq.CertiCoqCheck
--I bootstrap/certicoqchk
+-R bootstrap/certirocqc/theories CertiRocq.CertiRocqC
+-I bootstrap/certirocqc
+-R bootstrap/certirocqchk        CertiRocq.CertiRocqCheck
+-I bootstrap/certirocqchk

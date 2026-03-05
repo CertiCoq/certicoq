@@ -30,7 +30,7 @@ Import MonadNotation.
   }.
 
 Definition compile_LambdaBoxMut econf ip
-  : CertiCoqTrans (Ast.Env.program) (Program LambdaBoxMut.compile.Term) :=
+  : CertiRocqTrans (Ast.Env.program) (Program LambdaBoxMut.compile.Term) :=
   fun src =>
     debug_msg "Translating from L1g to L1k" ;;
-    (LiftCertiCoqTrans "LambdaBoxMut" (compile_program econf ip) src).
+    (LiftCertiRocqTrans "LambdaBoxMut" (compile_program econf ip) src).

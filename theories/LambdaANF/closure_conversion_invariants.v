@@ -1,9 +1,9 @@
-(* Correctness proof for closure conversion. Part of the CertiCoq project.
+(* Correctness proof for closure conversion. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 
 Require Import LambdaANF.tactics LambdaANF.closure_conversion LambdaANF.closure_conversion_util LambdaANF.algebra.
-From CertiCoq Require Import cps size_cps cps_util set_util hoisting identifiers ctx
+From CertiRocq Require Import cps size_cps cps_util set_util hoisting identifiers ctx
                        Ensembles_util List_util functions eval logical_relations_cc.
 Require Import compcert.lib.Coqlib.
 From Stdlib Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat

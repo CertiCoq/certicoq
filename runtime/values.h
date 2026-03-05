@@ -55,8 +55,8 @@ extern "C" {
 
 
 /*
-CHANGE BY THE CERTICOQ/VERIFFI TEAM:
-We do this for CertiCoq's FFI system because for technical reasons related to
+CHANGE BY THE CERTIROCQ/VERIFFI TEAM:
+We do this for CertiRocq's FFI system because for technical reasons related to
 VST's program logic type system, we need the value type to be void* with this
 attribute. On the other hand, standard OCaml wants the value to be intnat.
 */
@@ -78,7 +78,7 @@ typedef uintnat mark_t;
 
 /* Longs vs blocks. */
 #define Is_long(x)   (((x) & 1) != 0)
-/* CHANGE BY THE CERTICOQ/VERIFFI TEAM: */
+/* CHANGE BY THE CERTIROCQ/VERIFFI TEAM: */
 #ifdef VERIFFI
   #define Is_block(x)  (((int)(((intnat) x) & 1)) == 0)
 #else

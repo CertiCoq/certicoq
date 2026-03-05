@@ -1,4 +1,4 @@
-(* Definition and semantics preservation proof for alpha conversion. Part of the CertiCoq project.
+(* Definition and semantics preservation proof for alpha conversion. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 

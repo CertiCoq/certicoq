@@ -19,7 +19,7 @@ Ltac inv_ex :=
   | H : existT ?P ?T _ = existT ?P ?T _ |- _ => apply inj_pairT2 in H
   end.
 
-Require Export CertiCoq.LambdaANF.Frame.
+Require Export CertiRocq.LambdaANF.Frame.
 
 Set Implicit Arguments.
 

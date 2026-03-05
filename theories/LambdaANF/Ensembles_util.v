@@ -1,4 +1,4 @@
-(* Ensemble library utilities. Part of the CertiCoq project.
+(* Ensemble library utilities. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 

@@ -1,4 +1,4 @@
-(* Proof of correctness of the Wasm code generation phase of CertiCoq,
+(* Proof of correctness of the Wasm code generation phase of CertiRocq,
    this file is based on the proof for the Clight backend.
 
  > Codegen relation: relates expressions to Wasm instructions
@@ -20,7 +20,7 @@ From compcert Require Import
   Coqlib
   lib.Integers common.Memory.
 
-From CertiCoq Require Import
+From CertiRocq Require Import
   LambdaANF.cps LambdaANF.eval LambdaANF.cps_util LambdaANF.List_util
   LambdaANF.Ensembles_util LambdaANF.identifiers
   LambdaANF.shrink_cps_corresp

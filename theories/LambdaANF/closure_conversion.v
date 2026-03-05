@@ -1,4 +1,4 @@
-(* Computational definition and declarative spec for closure conversion. Part of the CertiCoq project.
+(* Computational definition and declarative spec for closure conversion. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 Require Import Common.AstCommon Common.compM.

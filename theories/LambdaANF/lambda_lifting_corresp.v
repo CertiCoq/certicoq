@@ -1,11 +1,11 @@
 (* Correspondence of the computational definition and the declarative
-  spec for lambda lifting. Part of the CertiCoq project.
+  spec for lambda lifting. Part of the CertiRocq project.
  * Author: Anonymized, 2016 *)
 
 Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx LambdaANF.Ensembles_util
         LambdaANF.List_util LambdaANF.lambda_lifting LambdaANF.functions LambdaANF.state LambdaANF.tactics
         LambdaANF.logical_relations LambdaANF.eval LambdaANF.lambda_lifting_util LambdaANF.uncurry_correct.
-From CertiCoq.Common Require Import compM.
+From CertiRocq.Common Require Import compM.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad ExtLib.Data.Monads.OptionMonad.
 Require Import compcert.lib.Coqlib.
 From Stdlib Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat.

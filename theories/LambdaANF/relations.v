@@ -1,9 +1,9 @@
-(* Relations library utilities. Part of the CertiCoq project.
+(* Relations library utilities. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 
 From Stdlib Require Import Relations.Relations Classes.RelationClasses.
-From CertiCoq Require Import LambdaANF.cps LambdaANF.ctx LambdaANF.tactics.
+From CertiRocq Require Import LambdaANF.cps LambdaANF.ctx LambdaANF.tactics.
 
 Section Relations.
 

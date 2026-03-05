@@ -1,4 +1,4 @@
-(* Well-scopedness definition for LambdaANF. Part of the CertiCoq project.
+(* Well-scopedness definition for LambdaANF. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 

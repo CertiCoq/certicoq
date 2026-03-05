@@ -7,7 +7,7 @@ From Stdlib Require Import
 
 From ExtLib Require Import Structures.Monad.
 
-From CertiCoq Require Import
+From CertiRocq Require Import
   LambdaANF.toplevel
   LambdaANF.cps_util
   Common.Pipeline_utils
@@ -153,7 +153,7 @@ Definition translate_call (nenv : name_env) (lenv : localvar_env) (fenv : fname_
   (* all fns return nothing, type = num args *)
 
 
-(* ***** CONSTRUCTOR REPRESENTATION (as CertiCoq's C backend/OCaml) ****** *)
+(* ***** CONSTRUCTOR REPRESENTATION (as CertiRocq's C backend/OCaml) ****** *)
 
 (* Example placement of constructors in the linear memory (each cell is 4 bytes):
    data BTree := Leaf | Node BTree Nat BTree

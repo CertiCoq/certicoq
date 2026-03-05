@@ -1,4 +1,4 @@
--R . CertiCoq.Libraries
+-R . CertiRocq.Libraries
 
 # libraries
 maps_util.v

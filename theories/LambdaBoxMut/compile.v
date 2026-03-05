@@ -1,4 +1,4 @@
-(* This translates λ-box terms to the Ast used by CertiCoq. At this point the two languages are mostly
+(* This translates λ-box terms to the Ast used by CertiRocq. At this point the two languages are mostly
   the same except that we map unsupported constructs to [TWrong], translate nested lists into
   specific datatypes and switch back to n-ary application nodes (hence the use of a view here and well-founded
   recursion on the size of terms, see [compile]). *)

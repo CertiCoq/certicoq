@@ -1,11 +1,11 @@
-(* Set library utilities. Part of the CertiCoq project.
+(* Set library utilities. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 
 From Stdlib Require Import PArith.PArith MSets.MSetRBT Classes.Morphisms Sets.Ensembles
      Relations.Relations Lists.List SetoidList Permutation micromega.Lia.
 Require Import compcert.lib.Coqlib LambdaANF.tactics.
-From CertiCoq.LambdaANF Require Import Ensembles_util List_util functions.
+From CertiRocq.LambdaANF Require Import Ensembles_util List_util functions.
 
 Module PS := MSetRBT.Make POrderedType.Positive_as_OT.
 

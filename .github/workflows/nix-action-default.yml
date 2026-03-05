@@ -1,5 +1,5 @@
 jobs:
-  CertiCoq:
+  CertiRocq:
     needs:
     - coq
     runs-on: ubuntu-latest
@@ -37,9 +37,9 @@ jobs:
         extraPullNames: coq-community, math-comp, metarocq
         name: coq
     - id: stepGetDerivation
-      name: Getting derivation for current job (CertiCoq)
+      name: Getting derivation for current job (CertiRocq)
       run: "NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link \\\n   --argstr bundle
-        \"default\" --argstr job \"CertiCoq\" \\\n   --dry-run 2> err > out || (touch
+        \"default\" --argstr job \"CertiRocq\" \\\n   --dry-run 2> err > out || (touch
         fail; true)\ncat out err\nif [ -e fail ]; then echo \"Error: getting derivation
         failed\"; exit 1; fi\n"
     - id: stepCheck
@@ -76,7 +76,7 @@ jobs:
     - if: steps.stepCheck.outputs.status != 'fetched'
       name: Building/fetching current CI target
       run: NIXPKGS_ALLOW_UNFREE=1 nix-build --no-out-link --argstr bundle
-        "default" --argstr job "CertiCoq"
+        "default" --argstr job "CertiRocq"
   coq:
     needs:
     - rocq-core

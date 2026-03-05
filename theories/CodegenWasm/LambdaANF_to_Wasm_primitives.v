@@ -1,6 +1,6 @@
 From Stdlib Require Import ZArith BinNat List Uint63.
 From Wasm Require Import datatypes.
-From CertiCoq Require Import Common.compM Common.Pipeline_utils.
+From CertiRocq Require Import Common.compM Common.Pipeline_utils.
 From MetaRocq Require Import Common.Kernames Utils.bytestring Utils.MRString.
 
 Import ListNotations SigTNotations Wasm_int.

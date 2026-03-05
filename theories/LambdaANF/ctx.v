@@ -1,11 +1,11 @@
 (* Evaluation contexts of the LambdaANF CPS language
- * Part of the CertiCoq project
+ * Part of the CertiRocq project
  *)
 
 From Stdlib Require Import Arith.Arith NArith.BinNat Lists.List micromega.Lia.
 Require Import LambdaANF.tactics.
-From CertiCoq.Common Require Import AstCommon.
-From CertiCoq.LambdaANF Require Import cps set_util.
+From CertiRocq.Common Require Import AstCommon.
+From CertiRocq.LambdaANF Require Import cps set_util.
 Require Import ExtLib.Structures.Monad.
 
 Import MonadNotation.

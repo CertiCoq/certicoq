@@ -1,4 +1,4 @@
-(* List library utilities. Part of the CertiCoq project.
+(* List library utilities. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 
@@ -8,7 +8,7 @@ From Stdlib Require Import Lists.List Relations.Relations Classes.RelationClasse
   SetoidList ZArith Arith Sorting.Permutation SetoidPermutation
   FunInd.
 
-From CertiCoq Require Import LambdaANF.Ensembles_util LambdaANF.tactics.
+From CertiRocq Require Import LambdaANF.Ensembles_util LambdaANF.tactics.
 
 Import ListNotations.
 

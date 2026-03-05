@@ -17,7 +17,7 @@
 (** Pretty-printer for Csyntax *)
 
 open Format
-open Camlcoq
+open Camlrocq
 open Values0
 open AST
 open! Ctypes

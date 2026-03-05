@@ -26,8 +26,8 @@ Set Default Proof Mode "Ltac2".
 
 Set Universe Polymorphism.
 
-Require Export CertiCoq.LambdaANF.Rewriting.
-Require Export CertiCoq.LambdaANF.PrototypeGenFrame.
+Require Export CertiRocq.LambdaANF.Rewriting.
+Require Export CertiRocq.LambdaANF.PrototypeGenFrame.
 
 Open Scope list_scope.
 

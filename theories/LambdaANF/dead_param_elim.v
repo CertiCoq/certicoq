@@ -1,4 +1,4 @@
-(* Correctness proof for lambda lifting. Part of the CertiCoq project.
+(* Correctness proof for lambda lifting. Part of the CertiRocq project.
  * Author: Katja Vassilev, 2018
  *)
 

@@ -1,6 +1,6 @@
 From Stdlib Require Import Arith List String.
 Require Import ExtLib.Structures.Monad.
-From CertiCoq.Plugin Require Import CertiCoq.
+From CertiRocq.Plugin Require Import CertiRocq.
 
 Import MonadNotation.
 Open Scope monad_scope.
@@ -28,6 +28,6 @@ Definition prog `{StringFFI} : IO unit :=
   name <- scan_string ;;
   print_string ("Hello " ++ name ++ "!").
 
-CertiCoq FFI IO_Impl.
-CertiCoq FFI StringFFI.
-CertiCoq Compile -cps prog.
+CertiRocq FFI IO_Impl.
+CertiRocq FFI StringFFI.
+CertiRocq Compile -cps prog.

@@ -1,9 +1,9 @@
 #include "values.h"
 
-/* EXPLANATION OF THE CERTICOQ GENERATIONAL GARBAGE COLLECTOR.
+/* EXPLANATION OF THE CERTIROCQ GENERATIONAL GARBAGE COLLECTOR.
  Andrew W. Appel, September 2016
 
-The current Certicoq code generator uses Ocaml object formats,
+The current Certirocq code generator uses Ocaml object formats,
 as described in Chapter 20 of Real World Ocaml by Minsky et al.
 https://realworldocaml.org/v1/en/html/memory-representation-of-values.html
 
@@ -134,7 +134,7 @@ void reset_heap(struct heap *h);
  * done in the first garbage_collect() call of the next execution.
  */
 
-/* which slot of the args array has the answer of a certicoq program */
+/* which slot of the args array has the answer of a certirocq program */
 #define answer_index 1
 
 value* extract_answer(struct thread_info *ti);

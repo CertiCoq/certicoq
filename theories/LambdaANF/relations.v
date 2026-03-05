@@ -2,28 +2,28 @@
  * Author: Anonymized, 2016
  *)
 
-Require Import Coq.Relations.Relations Coq.Classes.RelationClasses.
+From Stdlib Require Import Relations.Relations Classes.RelationClasses.
 From CertiCoq Require Import LambdaANF.cps LambdaANF.ctx LambdaANF.tactics.
 
 Section Relations.
 
   Variable (R : relation exp).
   (* TODO : abstract over exp ? *)
-  
+
   Open Scope ctx_scope.
-  
+
   Definition compose {A} (R1 : relation A) (R2 : relation A) : relation A :=
     fun x y => exists z, R1 x z /\ R2 z y.
-  
-  (** The compatible closure of R *) 
+
+  (** The compatible closure of R *)
   Inductive compat_closure : relation exp :=
   | Compat :
       forall e e' c,
         R e e' ->
         compat_closure (c |[ e ]|) (c |[ e' ]|).
 
-  (** The reflexive transitive closure of R, 
-    * parametrized by the numbers of steps *) 
+  (** The reflexive transitive closure of R,
+    * parametrized by the numbers of steps *)
   Inductive refl_trans_closure_n : nat -> relation exp :=
   | Trans :
       forall n e1 e2 e3,
@@ -37,7 +37,7 @@ Section Relations.
   Definition Compatible (R' : relation exp) :=
     forall e1 e2 c,
       R' e1 e2 -> R' (c |[ e1 ]|) (c |[ e2 ]|).
-   
+
   (** Invariant w.r.t. a relation R *)
   Definition Invariant (R : relation exp) (I : exp -> Prop)  : Prop :=
     forall (e1 e2 : exp),
@@ -49,12 +49,12 @@ Section Relations.
   Definition SubtermInvariant (I : exp -> Prop) :=
     forall c e,  I (c |[ e ]|) ->  I e.
 
-  (** If a property if true for a term and we substitute a subterm [e] with a 
+  (** If a property if true for a term and we substitute a subterm [e] with a
     * term [e'] such that [R e e'], then it's true for the resulting term  *)
   Definition SubtermSubstInvariant (R : relation exp) (I : exp -> Prop) :=
     forall c e e', I (c |[ e ]|) -> R e e' ->  I (c |[ e' ]|).
 
-  (** Lifting of an invariant w.r.t to a relation to the 
+  (** Lifting of an invariant w.r.t to a relation to the
     * reflexive transitive closure of the relation *)
   Lemma invariant_refl_trans_closure (I : exp -> Prop) n :
     Invariant R I ->
@@ -66,13 +66,13 @@ Section Relations.
       apply (IHn HInv e3 e2); eauto.
   Qed.
 
-  (** Lifting of an invariant w.r.t to a relation to the 
+  (** Lifting of an invariant w.r.t to a relation to the
     * compatible closure of the relation *)
   Lemma invariant_compat_closure (R' : relation exp) (I : exp -> Prop) :
     Invariant R I ->
     SubtermInvariant I ->
     SubtermSubstInvariant (fun e e' => R' e e' /\ I e') I ->
-    inclusion _ (fun e e' => R e e' /\ I e) R' -> 
+    inclusion _ (fun e e' => R e e' /\ I e) R' ->
     Invariant compat_closure I.
   Proof.
     intros HInv HS1 HS2 HIn e1 e2 HI Hrw. inv Hrw.
@@ -89,7 +89,7 @@ Section Relations.
     intros Inv.
     revert e1 e2 f. induction n; intros e1 e2 f Hyp Hyp' H.
     - inv H. constructor.
-    - inv H. econstructor. apply Hyp. eauto. eauto. 
+    - inv H. econstructor. apply Hyp. eauto. eauto.
       apply IHn; eauto.
   Qed.
 
@@ -99,9 +99,9 @@ Section Relations.
     refl_trans_closure_n n e1 e2 ->
     refl_trans_closure_n n (f e1) (f e2).
   Proof.
-    intros. 
+    intros.
     eapply refl_trans_closure_f_compat_strong with (I := fun _ => True); eauto.
-    intros e1' e2'; eauto. 
+    intros e1' e2'; eauto.
   Qed.
 
   Lemma refl_trans_closure_commut_strong n I (R' : relation exp) e1 e2 e1' :
@@ -110,7 +110,7 @@ Section Relations.
        I e1 -> R' e1 e1' -> R e1 e2 ->
        exists e2', R e1' e2' /\ R' e2 e2') ->
     I e1 ->
-    R' e1 e1' -> 
+    R' e1 e1' ->
     refl_trans_closure_n n e1 e2 ->
     exists e2',
       R' e2 e2' /\
@@ -129,12 +129,12 @@ Section Relations.
     (forall e1 e2 e1',
        R' e1 e1' -> R e1 e2 ->
        exists e2', R e1' e2' /\ R' e2 e2') ->
-    R' e1 e1' -> 
+    R' e1 e1' ->
     refl_trans_closure_n n e1 e2 ->
     exists e2',
       R' e2 e2' /\ refl_trans_closure_n n e1' e2'.
   Proof.
-    intros. 
+    intros.
     eapply refl_trans_closure_commut_strong with (I := fun _ => True); eauto.
     intros e1'' e2''; eauto.
   Qed.
@@ -168,18 +168,18 @@ Section Relations.
 (* (* How to call these two ?? *)
 Definition rel_ctx_1 c (R : relation exp) :=
   exists c',
-    (forall e e', R e e' -> R (c |[ e ]|) (c' |[ e' ]|)) /\ 
+    (forall e e', R e e' -> R (c |[ e ]|) (c' |[ e' ]|)) /\
     (forall e e', R (c |[ e ]|) e' ->
                   exists e'', e' = c' |[ e'' ]| /\ R e e'').
 
  Definition rel_ctx_2 c (R : relation exp) :=
   exists c',
-    (forall e, R (c |[ e ]|) (c' |[ e ]|)) /\ 
+    (forall e, R (c |[ e ]|) (c' |[ e ]|)) /\
     (forall e e',
        R (c |[ e ]|) e' ->
        (exists e'', e' = c' |[ e'' ]| /\ R e e'') \/ (e' = c' |[ e ]|)).
- 
-           
+
+
 Lemma compat_closure_R_compat I (R R' : relation exp) e1 e2 e1':
   invariant R I -> ctx_compat I ->
   (forall e1 e2 e1',
@@ -219,7 +219,7 @@ Abort. *)
     constructor; eauto.
   Qed.
 
-  (** If R is included R', and R' is compatible then the 
+  (** If R is included R', and R' is compatible then the
       compatible closure of R is in R' *)
   Lemma relation_inclusion_compat (R' : relation exp) :
     inclusion _ R R' ->
@@ -228,19 +228,19 @@ Abort. *)
   Proof.
     intros Hyp1 Hyp2 e1 e2 Hcomp. inv Hcomp. eauto.
   Qed.
-  
-  (** If R is included R', and R' is reflexive and transitive then the 
+
+  (** If R is included R', and R' is reflexive and transitive then the
       reflexive transitive closure of R is in R' *)
   Lemma relation_inclusion_refl_trans (R' : relation exp) n :
     (forall e1 e2, R e1 e2 -> R' e1 e2) ->
     Reflexive R' ->
     Transitive R' ->
-    inclusion _ (refl_trans_closure_n n) R'.  
+    inclusion _ (refl_trans_closure_n n) R'.
   Proof.
     intros Hyp1 Hrefl Htrans e1 e2 Hstar. induction Hstar; eauto.
   Qed.
 
-  (** If R is included R', and R' is compatible then the 
+  (** If R is included R', and R' is compatible then the
       compatible closure of R is in R' *)
   Lemma relation_inclusion_compat_strong (Pre : exp -> Prop)
         (R' : relation exp) e1 e2 :
@@ -253,9 +253,9 @@ Abort. *)
   Proof.
     intros H1 H2 H3 H4 Hcomp. inv Hcomp. eauto.
   Qed.
-  
-  (** If R is included R', and R' is reflexive and transitive then the 
-      reflexive transitive closure of R is in R' *)  
+
+  (** If R is included R', and R' is reflexive and transitive then the
+      reflexive transitive closure of R is in R' *)
   Lemma relation_inclusion_refl_trans_strong (Pre : exp -> Prop)
         (R' : relation exp) e1 e2 n :
     (forall e1 e2, Pre e1 -> R e1 e2 -> R' e1 e2) ->

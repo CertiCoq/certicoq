@@ -1,6 +1,6 @@
 From Wasm Require Import datatypes operations.
 
-From Coq Require Import
+From Stdlib Require Import
   FMapAVL MSetAVL
   POrderedType
   ZArith BinNat List Lia.
@@ -17,7 +17,7 @@ From CertiCoq Require Import
   CodegenWasm.LambdaANF_to_Wasm_restrictions
   CodegenWasm.LambdaANF_to_Wasm_primitives.
 
-From MetaCoq.Utils Require Import bytestring MCString.
+From MetaRocq.Utils Require Import bytestring MRString.
 
 Import MonadNotation compM.
 

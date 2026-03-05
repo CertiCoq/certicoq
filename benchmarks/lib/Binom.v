@@ -1,4 +1,4 @@
-Require Import Coq.Arith.Arith List.
+From Stdlib Require Import Arith.Arith List.
 
 Import ListNotations.
 Import Nat. (* For 8.5.0 *)
@@ -16,13 +16,13 @@ Notation  "a >? b" := (ltb b a) (at level 70, only parsing) : nat_scope.
 
 Definition smash (t u:  tree) : tree :=
   match t , u with
-  |  Node x t1 Leaf, Node y u1 Leaf => 
+  |  Node x t1 Leaf, Node y u1 Leaf =>
                    if  x >? y then Node x (Node y u1 t1) Leaf
                                 else Node y (Node x t1 u1) Leaf
   | _ , _ => Leaf  (* arbitrary bogus tree *)
   end.
 
-Fixpoint carry (q: list tree) (t: tree) : list tree := 
+Fixpoint carry (q: list tree) (t: tree) : list tree :=
   match q, t with
   | nil, Leaf        => nil
   | nil, _            => t :: nil
@@ -31,7 +31,7 @@ Fixpoint carry (q: list tree) (t: tree) : list tree :=
   | u :: q', _       => Leaf :: carry q' (smash t u)
  end.
 
-Definition insert (x: key) (q: priqueue) : priqueue := 
+Definition insert (x: key) (q: priqueue) : priqueue :=
      carry q (Node x Leaf Leaf).
 
 Fixpoint join (p q: priqueue) (c: tree) : priqueue :=
@@ -53,7 +53,7 @@ Fixpoint unzip (t: tree) (cont: priqueue -> priqueue) : priqueue :=
   end.
 
 Definition heap_delete_max (t: tree) : priqueue :=
-  match t with 
+  match t with
     Node x t1 Leaf  => unzip t1 (fun u => u)
   | _ => nil   (* bogus value for ill-formed or empty trees *)
   end.
@@ -115,8 +115,8 @@ Fixpoint make_list (n : nat) (l : list nat) :=
   | 0 => 0 :: l
   | S 0 => 1 :: l
   | S (S n) => make_list n (S (S n) :: l)
-  end.   
-  
+  end.
+
 Definition main :=
   let a := insert_list (make_list 2000 []) empty in
   let b := insert_list (make_list 2001 []) empty in
@@ -125,4 +125,3 @@ Definition main :=
   | Some (k, _) => k
   | None => 0
   end.
-

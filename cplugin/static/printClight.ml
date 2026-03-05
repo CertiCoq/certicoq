@@ -23,7 +23,6 @@ open Ctypes
 open Cop
 open PrintCsyntax
 open Clight
-open Datatypes
 
 (* Naming temporaries.
    Some temporaries are obtained by lifting variables in SimplLocals.
@@ -90,9 +89,9 @@ let rec expr p (prec, e) =
   | Econst_int(n, _) ->
       fprintf p "%ld" (camlint_of_coqint n)
   | Econst_float(f, _) ->
-      print_float p (camlfloat_of_coqfloat f)
+      fprintf p "%.18g" (camlfloat_of_coqfloat f)
   | Econst_single(f, _) ->
-      print_float p (camlfloat_of_coqfloat32 f)
+      fprintf p "%.18gf" (camlfloat_of_coqfloat32 f)
   | Econst_long(n, Tlong(Unsigned, _)) ->
       fprintf p "%LuLLU" (camlint64_of_coqint n)
   | Econst_long(n, _) ->
@@ -327,15 +326,16 @@ let print_if prog = print_if_gen Clight1 prog
 (* print_if_2 is called from clightgen/Clightgen.ml, after the
    SimplLocals pass.  It receives Clight2 syntax. *)
 let print_if_2 prog = print_if_gen Clight2 prog
+
 let add_name (a, n) =
   let i = P.to_int a in
-    match n with
-    | BasicAst.Coq_nAnon -> ()
-    | BasicAst.Coq_nNamed s ->
-        let cs = Caml_bytestring.caml_string_of_bytestring s in
-        Hashtbl.add atom_of_string cs i;
-        Hashtbl.add string_of_atom i cs;
-        ()
+  match n with
+  | BasicAst.Coq_nAnon -> ()
+  | BasicAst.Coq_nNamed s ->
+      let cs = Caml_bytestring.caml_string_of_bytestring s in
+      Hashtbl.add atom_of_string cs i;
+      Hashtbl.add string_of_atom i cs;
+      ()
 
 let remove_primes (a, n) =
   match n with

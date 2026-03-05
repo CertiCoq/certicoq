@@ -1,4 +1,4 @@
-Require Import Arith List String.
+From Stdlib Require Import Arith List String.
 Require Import ExtLib.Structures.Monad.
 From CertiCoq.Plugin Require Import CertiCoq.
 
@@ -6,7 +6,7 @@ Import MonadNotation.
 Import ListNotations.
 Open Scope monad_scope.
 
-Require Import Coq.Strings.Ascii.
+From Stdlib Require Import Strings.Ascii.
 
 Inductive rgx : Type :=
 | empty   : rgx

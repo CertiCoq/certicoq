@@ -1,5 +1,5 @@
-Require Import Coq.Classes.RelationClasses.
-Require Import Coq.Relations.Relation_Definitions.
+From Stdlib Require Import Classes.RelationClasses.
+From Stdlib Require Import Relations.Relation_Definitions.
 Require Import compcert.lib.Coqlib. (*modus ponens*)
 
 Require Import compcert.lib.Axioms. (* It imports proof irrelevance and functional ext.*)
@@ -36,7 +36,7 @@ Ltac get_goal_type:=
                     ?T => T
                   end
   end.
-Ltac print_goal:= 
+Ltac print_goal:=
   let goal:= get_goal in idtac goal.
 
 (* unfold the top definition *)
@@ -77,7 +77,7 @@ Ltac common_tacs_after_destruct H:=
   first [ congruence
         | solve[inversion H]
         | auto].
-      
+
 Ltac match_case_goal:=
   match goal with
     |- context[match ?x with _ => _ end] =>
@@ -113,7 +113,7 @@ Ltac invert_with_continuation HH cont:=
       match H with
       | HH => idtac
       | _ => revert H ;
-            (* if the tactic fails, we don't want it to keep trying 
+            (* if the tactic fails, we don't want it to keep trying
                so we force it to fail all the way. *)
             first [ invert_with_continuation
                       HH ltac:(try_intros H; cont) |
@@ -121,7 +121,7 @@ Ltac invert_with_continuation HH cont:=
       end
   | _ => inversion HH ; subst ; cont
   end.
-        
+
 Ltac invert HH:= invert_with_continuation HH idtac.
 
 
@@ -167,7 +167,7 @@ Ltac solve_Equivalence:=
 (** Claim what the current goal looks like *)
 (* Usefull for marking cases in a dynamic way *)
 Ltac errors_for_current current:=
-  let goal:= get_goal in 
+  let goal:= get_goal in
   fail 1
     "That's not the current goal. "
     current
@@ -183,8 +183,8 @@ Tactic Notation "!goal " uconstr(goal) := current_goal goal.
 Ltac subst_set:=
   repeat match goal with [a:= _ |- _ ] => subst a end.
 
-(*When repeating tactics, mark terms that haver been used. 
-  for example, if you want to apply a tactic to each hypothesis, 
+(*When repeating tactics, mark terms that haver been used.
+  for example, if you want to apply a tactic to each hypothesis,
   recursively, you can mark the ones that you have done.
   then delete all marks when you are done.
 *)
@@ -209,17 +209,17 @@ Tactic Notation "!context_goal " constr(in_goal) := my_context_match in_goal.
 (* simpler way to comment out tactics*)
 Tactic Notation "dont" tactic(t):=
   idtac.
-                
-                
+
+
 
 (* Print type for and ident*)
-Ltac get_type x:= match type of x with ?T => T end. 
+Ltac get_type x:= match type of x with ?T => T end.
 Ltac print_type x:= let t:= get_type x in idtac t.
 
 (** *Unification variables*)
 
 
-(* Make unification variable into a goal. 
+(* Make unification variable into a goal.
    you can just use unshelve(instantiate(n:= _))
  *)
 Tactic Notation "unshelve_one" constr(n):=
@@ -264,7 +264,7 @@ Ltac exploit H:=
 
 
 (** *Making notes
-    Good for keeping track of what subgoal you are in. 
+    Good for keeping track of what subgoal you are in.
     Mostly for proof exploration/debugging.
 *)
 Ltac Note str:=
@@ -293,7 +293,7 @@ Ltac destruct_rhs:=
 (*+ About proofs *)
 
 (** *Unify Proofs:
-     - Takes any two proofs of the same thing and unifies them    
+     - Takes any two proofs of the same thing and unifies them
      - Notice: only works with "unstructured proofs. "
  *)
 Ltac unify_proofs:=
@@ -307,9 +307,9 @@ Ltac unify_proofs:=
                    end).
 
 (** *Abstract Proofs:
-    This tactic turns every proof into a variable 
-    and forgets its structure. Since we have assume 
-    Proof Irrelevance, this doesn't lose information. 
+    This tactic turns every proof into a variable
+    and forgets its structure. Since we have assume
+    Proof Irrelevance, this doesn't lose information.
     Notice: SLOW! *)
 Ltac is_proof P:=
   match type of P with
@@ -348,7 +348,7 @@ Ltac abstract_proofs_hyp_of is_T:=
   end.
 Tactic Notation "equate_uconstr" constr(T) uconstr(goal) := equate T goal.
 Ltac is_T_of pat P:= match type of P with ?T => equate_uconstr T pat end.
-Ltac abstract_proofs_of' pat:= 
+Ltac abstract_proofs_of' pat:=
   repeat abstract_proofs_goal_of ltac:(is_T_of pat);
   repeat abstract_proofs_hyp_of ltac:(is_T_of pat).
 Tactic Notation "abstract_proofs" "of" uconstr(pat):= abstract_proofs_of' pat.

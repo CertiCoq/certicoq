@@ -1,4 +1,4 @@
-Require Import Arith List String.
+From Stdlib Require Import Arith List String.
 Require Import CertiCoq.Benchmarks.lib.vs.
 Require Import CertiCoq.Benchmarks.lib.Binom.
 Require Import CertiCoq.Benchmarks.lib.Color.

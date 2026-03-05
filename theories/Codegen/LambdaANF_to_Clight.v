@@ -1,6 +1,7 @@
-Require Import Coq.ZArith.ZArith
-        Coq.Program.Basics
-        Coq.Lists.List List_util Lia.
+From Stdlib Require Import ZArith.ZArith
+        Program.Basics
+        Lists.List Lia.
+Require Import List_util.
 
 Require Import ExtLib.Structures.Monads
                ExtLib.Data.Monads.OptionMonad
@@ -8,7 +9,7 @@ Require Import ExtLib.Structures.Monads
 
 Import MonadNotation.
 Open Scope monad_scope.
-From MetaCoq.Common Require Import BasicAst.
+From MetaRocq.Common Require Import BasicAst.
 
 From compcert Require Import
   common.AST
@@ -25,7 +26,7 @@ Require Import LambdaANF.cps
                LambdaANF.cps_show.
 Require LambdaANF.toplevel.
 
-From MetaCoq.Utils Require Import bytestring MCString.
+From MetaRocq.Utils Require Import bytestring MRString.
 
 Section TRANSLATION.
 
@@ -266,7 +267,7 @@ Definition int_chunk : memory_chunk := if Archi.ptr64 then Mint64 else Mint32.
 Definition val : type := talignas (if Archi.ptr64 then 3%N else 2%N) (tptr tvoid).
 Definition uval : type := if Archi.ptr64 then ulongTy else uintTy.
 Definition sval : type := if Archi.ptr64 then longTy else intTy.
-Definition val_typ : typ := if Archi.ptr64 then AST.Tlong else Tany32.
+Definition val_typ : xtype := if Archi.ptr64 then Xlong else Xany32.
 Definition Init_int (x : Z) : init_data :=
   if Archi.ptr64 then (Init_int64 (Int64.repr x)) else (Init_int32 (Int.repr x)).
 Definition make_vint (z : Z) : Values.val :=
@@ -281,9 +282,12 @@ Transparent make_vint.
 Transparent make_cint.
 
 Definition funTy : type :=
-  Tfunction (Tcons threadInf Tnil) Tvoid cc_default.
+  Tfunction (cons threadInf nil) Tvoid cc_default.
 
 Definition pfunTy : type := Tpointer funTy noattr.
+
+Notation Tcons := cons.
+Notation Tnil := nil.
 
 Definition gcTy : type :=
   Tfunction (Tcons (Tpointer val noattr) (Tcons threadInf Tnil)) Tvoid cc_default.
@@ -300,7 +304,7 @@ Definition argvTy : type :=
 Definition boolTy : type :=
   Tint IBool Unsigned noattr.
 
-Fixpoint mkFunTyList (n : nat) : typelist :=
+Fixpoint mkFunTyList (n : nat) : list type :=
   match n with
   | 0 => Tnil
   | S n' => Tcons val (mkFunTyList n')
@@ -690,7 +694,7 @@ Definition make_case_switch
     (Sswitch (Ebinop Oand (Field(var x, -1)) (make_cint 255 val) val) ls)
     (Sswitch (Ebinop Oshr (var x) (make_cint 1 val) val) ls').
 
-Definition to_int64 (i : PrimInt63.int) : int64. 
+Definition to_int64 (i : PrimInt63.int) : int64.
   exists (Uint63.to_Z i * 2 + 1)%Z.
   pose proof (Uint63.to_Z_bounded i).
   unfold Uint63.wB in H. unfold Int64.modulus, Int64.wordsize, Wordsize_64.wordsize.
@@ -710,12 +714,12 @@ Next Obligation.
   unfold model_to_ff.
   pose proof (FloatAxioms.Prim2SF_valid f).
   rewrite Binary.valid_binary_SF2FF. exact H.
-  unfold float64_to_model. 
+  unfold float64_to_model.
   unfold FloatOps.Prim2SF. cbn.
   Admitted.
 
 Definition compile_float (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env)
-  (x : positive) (f : Floats.float) := 
+  (x : positive) (f : Floats.float) :=
   let tag := c_int 1277%Z (Tlong Unsigned noattr) in
   x ::= [val] (allocPtr +' (c_int Z.one val)) ;;;
   allocIdent ::= allocPtr +' (c_int 2 val) ;;;
@@ -1124,7 +1128,7 @@ Definition translate_funs_fast
         fn_params := (tinfIdent, threadInf)::nil;
         fn_vars := nil;
         fn_temps := (map (fun x => (x, val)) localVars) ++ (allocIdent, valPtr) :: (limitIdent, valPtr) :: (argsIdent, valPtr) :: nil;
-        fn_body := 
+        fn_body :=
           allocIdent ::= Efield tinfd allocIdent valPtr ;;;
           limitIdent ::= Efield tinfd limitIdent valPtr ;;;
           argsIdent ::= Efield tinfd argsIdent (Tarray uval maxArgs noattr);;;
@@ -1390,7 +1394,7 @@ Fixpoint make_argList' (n : nat) (nenv : name_env) : nState (name_env * list (id
   | 0 => ret (nenv, nil)
   | (S n') =>
     new_id <- getName;;
-           let new_name := String.append "arg" (MCString.string_of_nat n') in
+           let new_name := String.append "arg" (MRString.string_of_nat n') in
            let nenv := M.set new_id (nNamed new_name) nenv in
            rest <- make_argList' n' nenv;;
                 let (nenv, rest_id) := rest in
@@ -1641,10 +1645,14 @@ Fixpoint make_interface
 Definition make_tinfoIdent := 20%positive.
 Definition exportIdent := 21%positive.
 
+(* Definition Tret (x : typ) := *)
+(*   match x with *)
+(*   | AST.Tlong then  *)
+
 Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
   (make_tinfoIdent,
    Gfun (External (EF_external (String.to_string "make_tinfo")
-                               (mksignature (nil) (Tret val_typ) cc_default))
+                               (mksignature (nil) (val_typ) cc_default))
                   Tnil
                   threadInf
                   cc_default)).
@@ -1652,7 +1660,7 @@ Definition make_tinfo_rec : positive * globdef Clight.fundef type :=
 Definition export_rec : positive * globdef Clight.fundef type :=
   (exportIdent,
    Gfun (External (EF_external (String.to_string "export")
-                               (mksignature (cons val_typ nil) (Tret val_typ) cc_default))
+                               (mksignature (cons val_typ nil) (val_typ) cc_default))
                   (Tcons threadInf Tnil)
                   valPtr
                   cc_default)).
@@ -1762,7 +1770,7 @@ Definition make_call_n_export_b
     let body_s := Ssequence
                     (tinfo_s ;;; asgn_s)
                     (export_s ;;; Sreturn  (Some (Etempvar retIdent valPtr))) in
-    let callStr := append "call_" (MCString.string_of_nat n) in
+    let callStr := append "call_" (MRString.string_of_nat n) in
     let callStr := if export then append callStr "_export" else callStr in
     let nenv :=
       set_list ((env_ident, nNamed "envi"%bs) ::

@@ -6,7 +6,7 @@ Require Import LambdaANF.tactics LambdaANF.closure_conversion LambdaANF.closure_
 From CertiCoq Require Import cps size_cps cps_util set_util hoisting identifiers ctx
                        Ensembles_util List_util functions eval logical_relations_cc.
 Require Import compcert.lib.Coqlib.
-From Coq Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
+From Stdlib Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat
                         Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
                         NArith.BinNat PArith.BinPos Sets.Ensembles micromega.Lia
                         Sorting.Permutation ArithRing.
@@ -52,53 +52,53 @@ Section Closure_conversion_invariants.
   Variable pr : prims.
   Variable cenv : ctor_env.
   Variable clo_tag : ctor_tag.
-  
+
   Context {fuel : Type} {Hfuel : @fuel_resource fuel} {trace : Type} {Htrace : @trace_resource trace}.
 
   (* Parameterize over the postconditions *)
   Context (boundL : nat -> @PostT fuel trace)
           (boundG : @PostGT fuel trace).
-  
+
   (** ** Semantics preservation proof *)
 
   (** We show observational approximation of the final results as well as an
     * upper bound on the concrete execution cost of the translated program *)
-  
+
   (** Invariant about the values of free variables. *)
   Definition closure_env k rho Scope Funs GFuns vs FVs : Prop :=
-      Forall2 (fun x v' => 
-                 forall v, ~ In _ Scope x ->
-                      ~ In _ Funs x ->
-                      ~ In _ GFuns x ->
-                      M.get x rho = Some v ->
-                      cc_approx_val cenv clo_tag k boundG v v') FVs vs.
-  
-  (** Invariant about the free variables *) 
-  Definition FV_inv k rho rho' Scope Funs GFuns c Γ FVs : Prop :=
-    FVs <> [] ->    
-    exists c' (vs : list val),
-      M.get Γ rho' = Some (Vconstr c' vs) /\
-      c' = c /\
-      Forall2 (fun x v' => 
-                 forall v, ~ In _ Scope x ->
-                      ~ In _ Funs x ->
-                      ~ In _ GFuns x ->
-                      M.get x rho = Some v ->
-                      cc_approx_val cenv clo_tag k boundG v v') FVs vs.
-  
-  (** Invariant about the free variables *) 
-  Definition FV_inv_strong k rho rho' Scope Funs GFuns c Γ FVs : Prop :=
-    exists c' (vs : list val),
-      M.get Γ rho' = Some (Vconstr c' vs) /\
-      (FVs <> [] -> c' = c) /\ (* Because if FVs = [] we don't care about c' *)
-      Forall2 (fun x v' => 
+      Forall2 (fun x v' =>
                  forall v, ~ In _ Scope x ->
                       ~ In _ Funs x ->
                       ~ In _ GFuns x ->
                       M.get x rho = Some v ->
                       cc_approx_val cenv clo_tag k boundG v v') FVs vs.
 
-  
+  (** Invariant about the free variables *)
+  Definition FV_inv k rho rho' Scope Funs GFuns c Γ FVs : Prop :=
+    FVs <> [] ->
+    exists c' (vs : list val),
+      M.get Γ rho' = Some (Vconstr c' vs) /\
+      c' = c /\
+      Forall2 (fun x v' =>
+                 forall v, ~ In _ Scope x ->
+                      ~ In _ Funs x ->
+                      ~ In _ GFuns x ->
+                      M.get x rho = Some v ->
+                      cc_approx_val cenv clo_tag k boundG v v') FVs vs.
+
+  (** Invariant about the free variables *)
+  Definition FV_inv_strong k rho rho' Scope Funs GFuns c Γ FVs : Prop :=
+    exists c' (vs : list val),
+      M.get Γ rho' = Some (Vconstr c' vs) /\
+      (FVs <> [] -> c' = c) /\ (* Because if FVs = [] we don't care about c' *)
+      Forall2 (fun x v' =>
+                 forall v, ~ In _ Scope x ->
+                      ~ In _ Funs x ->
+                      ~ In _ GFuns x ->
+                      M.get x rho = Some v ->
+                      cc_approx_val cenv clo_tag k boundG v v') FVs vs.
+
+
   (** Invariant about the functions in the current function definition *)
   Definition Fun_inv k (rho rho' : env) Scope Funs genv : Prop :=
     forall f v,
@@ -140,18 +140,18 @@ Section Closure_conversion_invariants.
     edestruct Hinv with (f := f) as
         [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
     repeat eexists; eauto.
-    eapply cc_approx_val_monotonic. eassumption. lia. 
+    eapply cc_approx_val_monotonic. eassumption. lia.
   Qed.
 
   (** Extend the two environments with a variable that is not the current environment
     argument (i.e. [Γ]) *)
   Lemma Fun_inv_set k rho rho' Scope Funs genv f rho1 B1 f1 rho2 B2 f2 env:
     Fun_inv k rho rho' Scope Funs genv ->
-    
+
     ~ In _ (image genv (Funs \\ Scope)) f ->
     f <> genv f ->
 
-    
+
     M.get (genv f) rho' = Some env ->
     (cc_approx_val cenv clo_tag k boundG (Vfun rho1 B1 f1)
                    (Vconstr clo_tag [(Vfun rho2 B2 f2) ; env])) ->
@@ -168,7 +168,7 @@ Section Closure_conversion_invariants.
       edestruct Hinv with (f := f'') as
           [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]];
         subst; eauto.
-      repeat eexists; eauto. rewrite M.gso. eassumption. 
+      repeat eexists; eauto. rewrite M.gso. eassumption.
       intros Hc. eapply Hneq. rewrite <- Hc. eapply In_image. constructor; eauto.
       rewrite M.gso. now eauto.
       intros Hc. subst. contradiction.
@@ -185,17 +185,17 @@ Section Closure_conversion_invariants.
     intros Hnin Hnin' Hsub Hinv f v1 Hninf Hinf Hget.
     edestruct Hinv with (f := f) as
         [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
-    rewrite extend_fundefs'_get_s in *.  
+    rewrite extend_fundefs'_get_s in *.
     rewrite M.gss in Hget1. inv Hget1.
     repeat eexists; eauto. now rewrite M.gss; eauto.
     rewrite M.gso in Hget2. rewrite M.gso; eauto.
-    intros Hc. eapply Hnin'. subst. econstructor; eauto.    
+    intros Hc. eapply Hnin'. subst. econstructor; eauto.
     intros Hc. eapply Hnin. subst. econstructor; eauto.
-    eauto. eauto. 
+    eauto. eauto.
   Qed.
-  
 
-   
+
+
   (** Extend [Scope] with a set that does not shadow the new function names *)
   Lemma Fun_inv_mon k rho1 rho2 Scope Scope' Funs genv :
     Fun_inv k rho1 rho2 Scope Funs genv ->
@@ -232,7 +232,7 @@ Section Closure_conversion_invariants.
   (** Extend the first environment with a variable in not in [Funs] *)
   Lemma Fun_inv_funs_monotonic k rho1 rho2 Scope Funs Funs' Γ :
     Fun_inv k rho1 rho2 Scope Funs Γ ->
-    Funs' \subset Funs -> 
+    Funs' \subset Funs ->
     Fun_inv k rho1 rho2 Scope Funs' Γ.
   Proof.
     intros Hin Hinv f v' Hninf Hinf Hget.
@@ -255,7 +255,7 @@ Section Closure_conversion_invariants.
     constructor; eauto.
     rewrite M.gso. now eauto.
     intros Hc. subst. contradiction.
-  Qed.  
+  Qed.
 
   (** Extend the second environment with a variable not in [Funs] that is different
     from Γ *)
@@ -273,7 +273,7 @@ Section Closure_conversion_invariants.
     intros Hc. subst. eapply Hneq. eapply In_image. constructor; eauto.
 
     rewrite M.gso. now eauto.
-    intros Hc. subst. eapply Hnin. constructor; eauto.  
+    intros Hc. subst. eapply Hnin. constructor; eauto.
   Qed.
 
   (** Extend the first environment with a list of variables in [Scope] *)
@@ -291,10 +291,10 @@ Section Closure_conversion_invariants.
       destruct vs; [ discriminate | ].
       destruct (set_lists xs vs rho1) eqn:Heq; [ | discriminate ]. inv Hset.
       eapply Fun_inv_set_In_Scope_l.
-      + rewrite FromList_cons in Hinc. 
+      + rewrite FromList_cons in Hinc.
         eapply Hinc. eauto.
       + eapply IHxs; eauto.
-        rewrite FromList_cons in Hinc. 
+        rewrite FromList_cons in Hinc.
         eapply Included_trans; [| eassumption ].
         eapply Included_Union_r.
   Qed.
@@ -312,7 +312,7 @@ Section Closure_conversion_invariants.
     edestruct Hinv with (f := f) as
         [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
     subst. rewrite extend_fundefs'_get_s in Hget1.
-    rewrite M.gss in Hget1; inv Hget1. 
+    rewrite M.gss in Hget1; inv Hget1.
     repeat eexists; eauto.
     rewrite extend_fundefs'_get_s, M.gss. reflexivity. now eauto.
     destruct_with_eqn (peq f Γ).
@@ -323,7 +323,7 @@ Section Closure_conversion_invariants.
     - eauto.
   Qed.
 
-  
+
   (** Extend the second environment with a list of variables in [Scope] *)
   Lemma Fun_inv_set_lists_In_Scope_r k rho1 rho2 rho2' Scope Funs Γ xs vs v B :
     Included _ (FromList xs) Scope ->
@@ -341,12 +341,12 @@ Section Closure_conversion_invariants.
       destruct vs; [ discriminate | ].
       destruct (set_lists xs vs rho2) eqn:Heq; [| now eauto ]. inv Hset.
       eapply Fun_inv_set_In_Scope_r.
-      + rewrite FromList_cons in Hinc. 
+      + rewrite FromList_cons in Hinc.
         eapply Hinc. eauto.
       + intros Hin. eapply Hd. constructor; eauto.
         rewrite FromList_cons. eauto.
       + eauto.
-      + rewrite FromList_cons in Hinc, Hd. eapply IHxs; eauto.      
+      + rewrite FromList_cons in Hinc, Hd. eapply IHxs; eauto.
         eapply Included_trans; [| eassumption ].
         eapply Included_Union_r.
         eapply Disjoint_Included_r; [| eassumption ].
@@ -360,21 +360,21 @@ Section Closure_conversion_invariants.
     M.get Γ rho' = Some v ->
     Fun_inv k rho (def_funs B B rho' rho') Scope Funs (extend_fundefs' id B' Γ) ->
     Fun_inv k rho (M.set Γ v (def_funs B B rho' rho')) Scope Funs (extend_fundefs' id B' Γ).
-  Proof. 
+  Proof.
     intros Hnin Hsub Hget Hinv f v1 Hninf Hinf Hget'.
     edestruct Hinv with (f := f) as
         [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto.
     rewrite extend_fundefs'_get_s in *.
     rewrite def_funs_neq in Hget1; eauto. subst.
     repeat subst_exp.
-    repeat eexists.    
+    repeat eexists.
     - now rewrite M.gss.
     - eauto.
     - destruct (peq f Γ); subst.
       rewrite def_funs_neq in Hget2; eauto.  subst_exp.
       rewrite M.gss. reflexivity.
 
-      rewrite M.gso. eassumption. 
+      rewrite M.gso. eassumption.
       now intros Hc; subst; eauto.
     - eassumption.
     - eauto.
@@ -392,7 +392,7 @@ Section Closure_conversion_invariants.
         [vs' [rho3 [B3 [f3 [rho4 [B4 [f4 [Hget1 [Heq2 [Ηnin2 [Hget2 Happrox]]]]]]]]]]]; eauto;
     repeat eexists; try (now rewrite <- H2; eauto); try rewrite H2; eauto.
   Qed.
-  
+
   (** Define a block of functions in the first environment and put them in the
     current scope *)
   Lemma Fun_inv_def_funs_l k rho rho' B1 B1' Scope Funs Γ:
@@ -428,7 +428,7 @@ Section Closure_conversion_invariants.
     subst. repeat eexists; eauto.
     rewrite def_funs_neq; eauto. simpl. eapply Disjoint_In_l. eapply Disjoint_sym. eassumption.
     eapply In_image. constructor; eauto.
-    rewrite def_funs_neq; eauto. 
+    rewrite def_funs_neq; eauto.
   Qed.
 
   (** Define a block of functions in both environments and put the in the
@@ -451,7 +451,7 @@ Section Closure_conversion_invariants.
     rewrite def_funs_neq; eauto.
     intros Hc. eapply HD1. econstructor; eauto. econstructor; eauto.
   Qed.
-  
+
   (** * Lemmas about FV_inv *)
 
   (** Extend the first environment with a variable in [Scope] *)
@@ -461,25 +461,7 @@ Section Closure_conversion_invariants.
     FV_inv k (M.set x v rho) rho' Scope Funs GFuns c Γ FVs.
   Proof.
     intros Hin Hfv Hneq. edestruct Hfv as [g [c' [Hget [Hleq HInv]]]].
-    eassumption. 
-    destruct FVs.
-    - congruence. 
-    - do 2 eexists; repeat split; eauto.
-      rewrite <- Hleq; eauto.
-      eapply Forall2_monotonic_strong; [| eassumption ].
-      intros z w Hin1 Hin2 He v1 Hnin1 Hnin2 Hnin3 Hget'.
-      eapply He; eauto. rewrite M.gso in Hget'; eauto.
-      intros Hc; subst; contradiction. 
-  Qed.
-  
-  (** Extend the first environment with a variable not in [FVs] *)
-  Lemma FV_inv_set_not_In_FVs_l k rho rho' x v Scope Funs GFuns c Γ FVs :
-    ~ List.In x FVs ->
-    FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
-    FV_inv k (M.set x v rho) rho' Scope Funs GFuns c Γ FVs.
-  Proof.
-    intros Hnin Hfv Hne1. edestruct Hfv as [g [c' [Hget [Hleq HInv]]]].
-    eassumption. 
+    eassumption.
     destruct FVs.
     - congruence.
     - do 2 eexists; repeat split; eauto.
@@ -487,9 +469,27 @@ Section Closure_conversion_invariants.
       eapply Forall2_monotonic_strong; [| eassumption ].
       intros z w Hin1 Hin2 He v1 Hnin1 Hnin2 Hnin3 Hget'.
       eapply He; eauto. rewrite M.gso in Hget'; eauto.
-      intros Hc; subst; contradiction. 
+      intros Hc; subst; contradiction.
   Qed.
-  
+
+  (** Extend the first environment with a variable not in [FVs] *)
+  Lemma FV_inv_set_not_In_FVs_l k rho rho' x v Scope Funs GFuns c Γ FVs :
+    ~ List.In x FVs ->
+    FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
+    FV_inv k (M.set x v rho) rho' Scope Funs GFuns c Γ FVs.
+  Proof.
+    intros Hnin Hfv Hne1. edestruct Hfv as [g [c' [Hget [Hleq HInv]]]].
+    eassumption.
+    destruct FVs.
+    - congruence.
+    - do 2 eexists; repeat split; eauto.
+      rewrite <- Hleq; eauto.
+      eapply Forall2_monotonic_strong; [| eassumption ].
+      intros z w Hin1 Hin2 He v1 Hnin1 Hnin2 Hnin3 Hget'.
+      eapply He; eauto. rewrite M.gso in Hget'; eauto.
+      intros Hc; subst; contradiction.
+  Qed.
+
   (** Extend the second environment with a variable that is not [Γ] *)
   Lemma FV_inv_set_r k rho rho' x v Scope Funs GFuns c Γ FVs :
     x <> Γ ->
@@ -508,7 +508,7 @@ Section Closure_conversion_invariants.
     FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
     FV_inv k rho rho' (x |: Scope) Funs GFuns c Γ FVs.
   Proof.
-    intros Hfv Hneq. edestruct Hfv as [c' [g [Hget [Hc HInv]]]]. eassumption. 
+    intros Hfv Hneq. edestruct Hfv as [c' [g [Hget [Hc HInv]]]]. eassumption.
     do 2 eexists; split; eauto.
     split; eauto.
     eapply Forall2_monotonic_strong; [| eassumption ]; eauto.
@@ -548,7 +548,7 @@ Section Closure_conversion_invariants.
     split; eauto.
     eapply Forall2_monotonic_strong; [| eassumption ]; eauto.
   Qed.
-  
+
   Lemma FV_inv_antimonotonic_add_global_funs k rho rho' Scope GFuns GFuns' names {Hd : Decidable names} Funs c Γ FVs FVs' :
     FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
     add_global_funs GFuns names (FromList FVs') GFuns' ->
@@ -563,9 +563,9 @@ Section Closure_conversion_invariants.
     - do 2 eexists; split; eauto.
       split; eauto.
       eapply Forall2_monotonic_strong; [| eassumption ]; eauto.
-      intros. eapply H2; eauto.    
+      intros. eapply H2; eauto.
       destruct Hd. destruct (Dec x1); eauto. intros Hc1.
-      eapply H5. constructor; eauto. 
+      eapply H5. constructor; eauto.
   Qed.
 
   Lemma FV_inv_strong_Forall2 k rho rho' Scope GFuns Funs c Γ FVs vs1 vs2 :
@@ -574,7 +574,7 @@ Section Closure_conversion_invariants.
     Forall2 (cc_approx_val cenv clo_tag k boundG) vs1 vs2 ->
     FV_inv_strong k rho rho' Scope Funs GFuns c Γ FVs.
   Proof.
-    intros Hget1 Hget2 Hall. do 2 eexists; split; eauto. 
+    intros Hget1 Hget2 Hall. do 2 eexists; split; eauto.
     split; eauto. clear Hget2.
     revert vs1 vs2 Hget1 Hall; induction FVs; intros vs1 vs2 Hget1 Hall;
       destruct vs2; try (now inv Hget1).
@@ -586,7 +586,7 @@ Section Closure_conversion_invariants.
         rewrite H4 in Hget1.
         destruct (get_list FVs rho) eqn:Hfv; try congruence.
       * simpl in Hget1.
-        destruct (get_list FVs rho) eqn:Hfv; try congruence; destruct (M.get a rho); try congruence. 
+        destruct (get_list FVs rho) eqn:Hfv; try congruence; destruct (M.get a rho); try congruence.
         inv Hget1. eapply IHFVs; eauto.
   Qed.
 
@@ -595,13 +595,13 @@ Section Closure_conversion_invariants.
     FV_inv k rho rho' Scope Funs GFuns c Γ FVs ->
     FV_inv k rho rho' (Union _ (Singleton _ x) Scope) Funs GFuns c Γ FVs.
   Proof.
-    intros Hfvs Hneq. 
+    intros Hfvs Hneq.
     edestruct Hfvs as [c' [g [Hget [Hc HInv]]]]. eassumption.
     do 2 eexists; split; eauto.
     split; eauto.
     eapply Forall2_monotonic_strong; [| eassumption ]; eauto.
   Qed.
-  
+
   (** Define a block of functions in both environments and put the in the
     current scope *)
   Lemma FV_inv_def_funs k rho rho' B1 B1' B2 B2' Scope Funs GFuns c Γ FVs:
@@ -614,12 +614,12 @@ Section Closure_conversion_invariants.
     intros Hnin1 Hnin2 Hfvs Hneq.
     edestruct Hfvs as [c' [g [Hget [Hc HInv]]]]. eassumption.
     do 2 eexists; split; eauto.
-    now rewrite def_funs_neq; eauto.    
-    split; eauto. 
+    now rewrite def_funs_neq; eauto.
+    split; eauto.
     eapply Forall2_monotonic_strong; [| eassumption ]; eauto.
     intros z w Hin1 Hin2 He v1 Hnin3 Hnin4 Hnin5 Hget'.
     eapply He; eauto.
-    intros Hc1. eapply Hnin3; constructor; eauto. 
+    intros Hc1. eapply Hnin3; constructor; eauto.
     now rewrite def_funs_neq in Hget'; eauto.
   Qed.
 
@@ -643,7 +643,7 @@ Section Closure_conversion_invariants.
       repeat eexists; eauto.
       rewrite M.gso. now eauto. eassumption.
   Qed.
-  
+
   (** Extend the first environment with a variable not in [GFuns] *)
   Lemma GFun_inv_set_not_In_GFuns_l k rho1 rho2 GFuns x v :
     ~ x \in GFuns ->
@@ -704,7 +704,7 @@ Section Closure_conversion_invariants.
       destruct vs; [ discriminate | ].
       destruct (set_lists xs vs rho2) eqn:Heq; [ | discriminate ]. inv Hset.
       eapply GFun_inv_set_not_In_GFuns_r.
-      + intros Hc. eapply Hinc. constructor; eauto. now left. 
+      + intros Hc. eapply Hinc. constructor; eauto. now left.
       + eapply IHxs; eauto. normalize_sets.
         repeat normalize_sets. sets.
   Qed.
@@ -746,7 +746,7 @@ Section Closure_conversion_invariants.
     repeat eexists; eauto.
     eapply cc_approx_val_monotonic; eauto.
   Qed.
-  
+
   (* Lemma GFun_inv_Scope_extend k rho rho' Scope Scope' GFuns : *)
   (*   GFun_inv k rho rho' Scope GFuns -> *)
   (*   GFun_inv k rho rho' (Scope' :|: Scope) GFuns. *)
@@ -771,7 +771,7 @@ Section Closure_conversion_invariants.
     Funs \subset GFuns ->
     Funs \subset name_in_fundefs B ->
     GFun_inv k rho1 rho2 GFuns ->
-    M.get Γ rho2 = Some (Vconstr c []) ->  
+    M.get Γ rho2 = Some (Vconstr c []) ->
     Fun_inv k rho1 rho2 Scope Funs (extend_fundefs' id B Γ).
   Proof.
     intros Hsub Hsub' Hinv Hget f v' Hnin Hin Hget'.

@@ -1,19 +1,19 @@
-Require Import Coq.Relations.Relations.
-Require Import Coq.Setoids.Setoid.
-Require Import Coq.funind.Recdef.
-Require Import Coq.PArith.BinPos.
-Require Import Lia.
+From Stdlib Require Import Relations.Relations.
+From Stdlib Require Import Setoids.Setoid.
+From Stdlib Require Import funind.Recdef.
+From Stdlib Require Import PArith.BinPos.
+From Stdlib Require Import Lia.
 From compcert.lib Require Import Maps.
 
-Require Import Coq.Lists.List.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 
 Require Import Ltac2.Ltac2.
 Import Ltac2.Notations.
 Set Default Proof Mode "Ltac2".
 
-Require Import Coq.Logic.JMeq.
-Require Import Coq.Logic.Eqdep.
+From Stdlib Require Import Logic.JMeq.
+From Stdlib Require Import Logic.Eqdep.
 Ltac inv_ex :=
   repeat progress match goal with
   | H : existT ?P ?T _ = existT ?P ?T _ |- _ => apply inj_pairT2 in H
@@ -58,7 +58,7 @@ Notation "'«' P '»'" := (recover P).
 (* Remove all erased operators from a goal using e_ok hypotheses *)
 Ltac unerase :=
   repeat match goal with
-  | H : e_ok ?x |- _ => 
+  | H : e_ok ?x |- _ =>
     let x' := fresh x in
     rename x into x';
     destruct H as [x H];
@@ -70,8 +70,8 @@ Ltac2 unerase () := ltac1:(unerase).
 Ltac2 Notation "unerase" := unerase ().
 
 (* Example *)
-Require Import Lia.
-Require Extraction.
+From Stdlib Require Import Lia.
+From Stdlib Require Extraction.
 Module Example.
 
 Fixpoint thingy (n : erased nat) `{Hn : e_ok _ n} (m p : nat) (Hmp : «e_map (fun n => n + m = p) n») {struct m} : nat.
@@ -103,10 +103,10 @@ End Example.
 
    Extraction will erase [cost : erased nat], [e_ok cost], [Accessible cost], and [cost = measure ‥],
    leaving a plain recursive function of type [arg1 -> ‥ -> arg_n -> P ‥]. *)
-Require Import Coq.Arith.Wf_nat.
+From Stdlib Require Import Arith.Wf_nat.
 Section WellfoundedRecursion.
 
-(* Modelled after https://coq.inria.fr/library/Coq.Init.Wf.html#Acc *)
+(* Modelled after https://coq.inria.fr/library/Init.Wf.html#Acc *)
 Section AccS.
 
   Context (A : Type) (B : A -> Prop) (R : forall x, B x -> forall y, B y -> Prop).
@@ -456,7 +456,7 @@ Section R_prod.
 
 Context
   (R1 R2 : Set)
-  (I_R1 : forall A, frames_t A Root -> R1 -> Prop) 
+  (I_R1 : forall A, frames_t A Root -> R1 -> Prop)
   (I_R2 : forall A, frames_t A Root -> R2 -> Prop).
 
 Definition I_R_prod A (C : frames_t A Root) : R1 * R2 -> Prop :=
@@ -486,7 +486,7 @@ Section S_prod.
 
 Context
   (S1 S2 : Set)
-  (I_S1 : forall A, frames_t A Root -> univD A -> S1 -> Prop) 
+  (I_S1 : forall A, frames_t A Root -> univD A -> S1 -> Prop)
   (I_S2 : forall A, frames_t A Root -> univD A -> S2 -> Prop).
 
 Definition I_S_prod A (C : frames_t A Root) (e : univD A) : S1 * S2 -> Prop :=

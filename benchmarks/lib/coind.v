@@ -1,5 +1,5 @@
-From Coq Require Import Streams StreamMemo.
-Require Import ZArith.
+From Stdlib Require Import Streams StreamMemo.
+From Stdlib Require Import ZArith.
 Open Scope Z_scope.
 
 Fixpoint tfact (n: nat) :=

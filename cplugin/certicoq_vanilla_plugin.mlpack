@@ -17,6 +17,10 @@ List0
 PeanoNat
 Specif
 Basics
+PosDef
+IntDef
+NatDef
+ListDef
 BinPosDef
 BinPos
 BinNat
@@ -24,6 +28,7 @@ BinInt
 PrimInt63
 Uint0
 PrimString
+Uint63Axioms
 PrimStringAxioms
 Int0
 Int63
@@ -54,13 +59,13 @@ FMapFacts
 BinNums
 Classes1
 EqDecInstances
-MCReflect
-MCPrelude
-MCOption
-MCList
-MCProd
+MRReflect
+MRPrelude
+MROption
+MRList
+MRProd
 ReflectEq
-MCCompare
+MRCompare
 Number0
 Signature
 CRelationClasses
@@ -71,7 +76,7 @@ ByteCompare
 Bytestring
 Caml_bytestring
 Caml_ascii_string
-MCString
+MRString
 Zpower
 Zbool
 SpecFloat

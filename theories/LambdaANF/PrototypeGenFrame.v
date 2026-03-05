@@ -1,25 +1,25 @@
-Require Import MetaCoq.Utils.bytestring.
+Require Import MetaRocq.Utils.bytestring.
 Open Scope bs_scope.
 Import String.
 
 Infix "+++" := append (at level 60, right associativity).
 
-Require Import Coq.Lists.List.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 
-From MetaCoq Require Import Template.All.
-Import MCMonadNotation.
-Module TM :=MetaCoq.Utils.monad_utils.
+From MetaRocq Require Import Template.All.
+Import MRMonadNotation.
+Module TM :=MetaRocq.Utils.monad_utils.
 
 From ExtLib.Core Require Import RelDec.
 From ExtLib.Data Require Import Nat List Option Pair String.
 From ExtLib.Structures Require Import Monoid Functor Applicative Monads Traversable.
 From ExtLib.Data.Monads Require Import IdentityMonad EitherMonad StateMonad.
 
-Require Import Coq.NArith.BinNat.
+From Stdlib Require Import NArith.BinNat.
 Local Open Scope N_scope.
 
-Require Import Coq.Relations.Relations.
+From Stdlib Require Import Relations.Relations.
 
 Require Import Ltac2.Ltac2.
 Import Ltac2.Notations.
@@ -409,7 +409,7 @@ Definition qualifier (s : string) : string :=
   let fix go s :=
     match s with
     | "" => ("", false)
-    | String c s => 
+    | String c s =>
       let '(s, qualified) := go s in
       let qualified := (qualified || is_sep c)%bool in
       (if qualified then String c s else s, qualified)
@@ -420,7 +420,7 @@ Definition unqualified (s : string) : string :=
   let fix go s :=
     match s with
     | "" => ("", false)
-    | String c s => 
+    | String c s =>
       let '(s, qualified) := go s in
       let qualified := (qualified || is_sep c)%bool in
       (if qualified then s else String c s, qualified)
@@ -522,7 +522,7 @@ Definition decompose_ind (decls : global_env) (ty : term) : GM (inductive × lis
     end
   in go 100%nat ty.
 
-Global Instance string_Eq : Eq string := { rel_dec := eqb }. 
+Global Instance string_Eq : Eq string := { rel_dec := eqb }.
 
 Definition build_graph (atoms : list term) (p : program) : GM (ind_info × mind_graph_t) :=
   let '(decls, ty) := p in
@@ -596,11 +596,11 @@ Definition gen_univ_univD (qual : modpath) (typename : kername) (g : mind_graph_
   let univ_ind := mkInd (qual, snd typename +++ "_univ") 0 in
   let univ := tInd univ_ind [] in
   let ci := {| ci_ind := univ_ind; ci_npar := 0; ci_relevance := Relevant |} in
-  let p := {| 
+  let p := {|
     pparams := [];
     puinst := [];
     pcontext := [nAnon];
-    preturn := type0  
+    preturn := type0
     |}
   in
   let body :=
@@ -707,9 +707,9 @@ Definition gen_frameD (qual : modpath) (typename : kername) (univD_kername : ker
     {| bcontext := map (fun _ => nAnon) ctr_arity;
        bbody := lam frame (mkApps constr (map tRel indices)) |}
   in
-  let p := 
+  let p :=
     {| pparams := [];
-       puinst := []; 
+       puinst := [];
        pcontext := [nNamed "h"; nNamed "B"; nNamed "A"];
        preturn := (fn (univD (tRel 2)) (univD (tRel 2))) |}
   in
@@ -774,4 +774,3 @@ Definition mk_Frame_ops (qual : modpath) (typename : kername) (T : Type) (atoms 
     ret tt
   | _ => tmPrint "Error: Frame was not as expected"
   end.
-

@@ -35,18 +35,18 @@ Set Implicit Arguments.
 (** printing {{ $\{$ #{# *)
 (** printing }} $\}$ #}# *)
 
-Require Import Relations SetoidList List String Ascii Bool ZArith NArith.
+From Stdlib Require Import Relations SetoidList List String Ascii Bool ZArith NArith.
 
 Require Import FlatData ListFacts OrderedSet FiniteSet Tree Formula Sql.
 
 
 Section Try.
 Import Tuple Expression.
-Require Import Values Relnames SortedAttributes SortedTuples. 
+Require Import Values Relnames SortedAttributes SortedTuples.
 
 (** Defining functions and aggregates, and giving their interpretation *)
 
-Inductive symbol : Type := 
+Inductive symbol : Type :=
   | Symbol : string -> symbol
   | CstVal : value -> symbol.
 
@@ -63,7 +63,7 @@ split with (fun x y => match x, y with Predicate s1, Predicate s2 => string_comp
 - intros [s1] [s2]; apply (Oset.compare_lt_gt Ostring s1 s2).
 Defined.
 
-Definition symbol_compare (s1 s2 : symbol) := 
+Definition symbol_compare (s1 s2 : symbol) :=
   match s1, s2 with
     | Symbol s1, Symbol s2 => string_compare s1 s2
     | Symbol _, CstVal _ => Lt
@@ -85,80 +85,80 @@ split with symbol_compare.
     * intros H1 H2; apply H1; injection H2; exact (fun h => h).
     * intros H1 H2; apply H1; injection H2; exact (fun h => h).
 - intros [s1 | s1] [s2 | s2] [s3 | s3]; simpl;
-  try (apply (Oset.compare_lt_trans Ostring) || 
-             apply (Oset.compare_lt_trans OVal) || 
+  try (apply (Oset.compare_lt_trans Ostring) ||
+             apply (Oset.compare_lt_trans OVal) ||
              trivial || discriminate).
 - intros [s1 | s1] [s2 | s2]; simpl;
-  try (apply (Oset.compare_lt_gt Ostring) || 
-             apply (Oset.compare_lt_gt OVal) || 
+  try (apply (Oset.compare_lt_gt Ostring) ||
+             apply (Oset.compare_lt_gt OVal) ||
              trivial || discriminate).
 Defined.
 
-Definition interp_symbol f := 
+Definition interp_symbol f :=
   match f with
-    | Symbol "plus" => 
-      fun l => 
-        match l with 
-          | Value_N a1 :: Value_N a2 :: nil => Value_N (Nplus a1 a2) 
+    | Symbol "plus" =>
+      fun l =>
+        match l with
+          | Value_N a1 :: Value_N a2 :: nil => Value_N (Nplus a1 a2)
           | _ => Value_N 0 end
-    | Symbol "mult" => 
-      fun l => 
-        match l with 
-          | Value_N a1 :: Value_N a2 :: nil => Value_N (Nmult a1 a2) 
+    | Symbol "mult" =>
+      fun l =>
+        match l with
+          | Value_N a1 :: Value_N a2 :: nil => Value_N (Nmult a1 a2)
           | _ => Value_N 0 end
-    | Symbol "minus" => 
-      fun l => 
-        match l with 
-          | Value_N a1 :: Value_N a2 :: nil => Value_N (Nminus a1 a2) 
+    | Symbol "minus" =>
+      fun l =>
+        match l with
+          | Value_N a1 :: Value_N a2 :: nil => Value_N (Nminus a1 a2)
           | _ => Value_N 0 end
-    | Symbol "opp" => 
-      fun l => 
-        match l with 
-          | Value_N a1 :: nil => Value_N (Nopp a1) 
+    | Symbol "opp" =>
+      fun l =>
+        match l with
+          | Value_N a1 :: nil => Value_N (Nopp a1)
           | _ => Value_N 0 end
-    | CstVal v => 
-      fun l => 
-        match l with 
+    | CstVal v =>
+      fun l =>
+        match l with
           | nil => v
           | _ => default_value (type_of_value v)
         end
-    | _ => fun _ => Value_N 0 
+    | _ => fun _ => Value_N 0
   end.
 
-Definition interp_predicate p := 
+Definition interp_predicate p :=
   match p with
     | Predicate "<" =>
       fun l =>
         match l with
-          | Value_N a1 :: Value_N a2 :: nil => 
+          | Value_N a1 :: Value_N a2 :: nil =>
             match Ncompare a1 a2 with Lt => true | _ => false end
           | _ => false
         end
     | Predicate "<=" =>
       fun l =>
         match l with
-          | Value_N a1 :: Value_N a2 :: nil => 
+          | Value_N a1 :: Value_N a2 :: nil =>
             match Ncompare a1 a2 with Gt => false | _ => true end
           | _ => false
         end
     | Predicate ">" =>
       fun l =>
         match l with
-          | Value_N a1 :: Value_N a2 :: nil => 
+          | Value_N a1 :: Value_N a2 :: nil =>
             match Ncompare a1 a2 with Gt => true | _ => false end
           | _ => false
         end
     | Predicate ">=" =>
       fun l =>
         match l with
-          | Value_N a1 :: Value_N a2 :: nil => 
+          | Value_N a1 :: Value_N a2 :: nil =>
             match Ncompare a1 a2 with Lt => false | _ => true end
           | _ => false
         end
     | Predicate "=" =>
       fun l =>
         match l with
-          | Value_N a1 :: Value_N a2 :: nil => 
+          | Value_N a1 :: Value_N a2 :: nil =>
             match Ncompare a1 a2 with Eq => true | _ => false end
           | Value_string s1 :: Value_string s2 :: nil =>
             match string_compare s1 s2 with Eq => true | _ => false end
@@ -167,7 +167,7 @@ Definition interp_predicate p :=
    | _ => fun _ => false
   end.
 
-Inductive aggregate : Type := 
+Inductive aggregate : Type :=
   | Aggregate : string -> aggregate.
 
 Definition OAgg : Oset.Rcd aggregate.
@@ -183,7 +183,7 @@ Defined.
 
 Definition interp_aggregate a :=
   match a with
-    | Aggregate "count" => 
+    | Aggregate "count" =>
       fun (l : list (Tuple.value T)) => Value_N (N_of_nat (List.length l))
     | Aggregate "sum" =>
       fun (l : list (Tuple.value T)) =>
@@ -224,10 +224,10 @@ Definition init_db :=
     (fun _ => Fset.empty FAN)
     (fun _ => Feset.empty (FTuple T)).
 
-Definition create_table 
-           (* old state *) db 
-           (* new table name *) t 
-           (* new table sort *) st 
+Definition create_table
+           (* old state *) db
+           (* new table name *) t
+           (* new table sort *) st
             :=
   mk_state
     (t :: _relnames db)
@@ -238,14 +238,14 @@ Definition create_table
        end)
     (_instance db).
 
-Definition insert_tuple_into  
-           (* old state *) db 
-           (* new tuple *) tpl 
+Definition insert_tuple_into
+           (* old state *) db
+           (* new tuple *) tpl
            (* table *) tbl
             :=
   if Fset.equal FAN (support T tpl) (_basesort db tbl)
-  then 
-    mk_state 
+  then
+    mk_state
       (_relnames db)
       (_basesort db)
       (fun x =>
@@ -256,8 +256,8 @@ Definition insert_tuple_into
    else (* no NULL values by default *) db.
 
 Fixpoint insert_tuples_into
-           (* old state *) db 
-           (* new tuple list *) ltpl 
+           (* old state *) db
+           (* new tuple list *) ltpl
            (* table *) tbl :=
   match ltpl with
     | nil => db
@@ -268,8 +268,8 @@ Definition MyDBS db := DatabaseSchema.mk_R (Tuple.A T) ORN (_basesort db).
 
 (** Evaluation of SQL-COQ queries *)
 
-Definition eval_sql_query_in_state (db : db_state) q := 
-  eval_sql_query 
+Definition eval_sql_query_in_state (db : db_state) q :=
+  eval_sql_query
     (DBS := MyDBS db) interp_predicate interp_symbol interp_aggregate (_instance db) q.
 
 (** Some notations, to ease the readability *)
@@ -350,51 +350,51 @@ Definition _A_Expr := (@A_Expr T symbol aggregate).
 
 Definition _F_Expr := (@F_Expr T symbol).
 
-Definition _CstN n := (F_Constant T symbol (Value_N n)). 
+Definition _CstN n := (F_Constant T symbol (Value_N n)).
 
-Definition CstN n := (_A_Expr (F_Constant T symbol (Value_N n))). 
+Definition CstN n := (_A_Expr (F_Constant T symbol (Value_N n))).
 
-Definition t123 := 
-  mk_tuple 
+Definition t123 :=
+  mk_tuple
     (aa :: bb :: cc :: nil)
-    (fun x => match x with 
-                | aa => Value_N 1 
-                | bb => Value_N 2 
-                | cc => Value_N 3 
+    (fun x => match x with
+                | aa => Value_N 1
+                | bb => Value_N 2
+                | cc => Value_N 3
                 | _ => Value_N 0 end).
 
-Definition t456 := mk_tuple 
+Definition t456 := mk_tuple
         (aa :: bb :: cc :: nil)
-        (fun x => match x with 
-                    | aa => Value_N 4 
-                    | bb => Value_N 5 
-                    | cc => Value_N 6 
+        (fun x => match x with
+                    | aa => Value_N 4
+                    | bb => Value_N 5
+                    | cc => Value_N 6
                     | _ => Value_N 0 end).
 
-Definition t778 := mk_tuple 
+Definition t778 := mk_tuple
         (aa :: bb :: cc :: nil)
-        (fun x => match x with 
+        (fun x => match x with
                     | aa => Value_N 7
-                    | bb => Value_N 7 
-                    | cc => Value_N 8 
+                    | bb => Value_N 7
+                    | cc => Value_N 8
                     | _ => Value_N 0 end).
 
-Definition t779 := mk_tuple 
+Definition t779 := mk_tuple
         (aa :: bb :: cc :: nil)
-        (fun x => match x with 
+        (fun x => match x with
                     | aa => Value_N 7
-                    | bb => Value_N 7 
-                    | cc => Value_N 9 
+                    | bb => Value_N 7
+                    | cc => Value_N 9
                     | _ => Value_N 0 end).
 
 Definition db0 := init_db.
 
-(** 
+(**
 create table table1(a integer, b integer, c integer);
 *)
 
-Definition db1 := 
-  create_table 
+Definition db1 :=
+  create_table
     (create_table db0 table0 (aa :: bb :: cc :: nil))
     table1 (aa :: bb :: cc :: nil).
 
@@ -410,14 +410,14 @@ Definition db3 := insert_tuples_into db2 (t778 :: t779 :: nil) table1.
 insert into table1 values (4,5);
 *)
 
-Definition db4 := 
-  insert_tuple_into 
-    db3 
-    (mk_tuple 
+Definition db4 :=
+  insert_tuple_into
+    db3
+    (mk_tuple
         (aa :: bb :: nil)
-        (fun x => match x with 
+        (fun x => match x with
                     | aa => Value_N 4
-                    | bb => Value_N 5 
+                    | bb => Value_N 5
                     | _ => Value_N 0 end))
     table1.
 
@@ -428,20 +428,20 @@ Definition eval_sql0 :=
   let a2 := Attr_N 0 "a2" in
   let a3 := Attr_N 0 "a3" in
   let table5 := Rel "table5" in
-  let tpl n := 
-      mk_tuple 
-        (a1 :: nil) 
+  let tpl n :=
+      mk_tuple
+        (a1 :: nil)
         (fun x => match x with a1 => Value_N n | _ => Value_N 0 end) in
-  let db1 := 
-      insert_tuples_into 
+  let db1 :=
+      insert_tuples_into
         (create_table db0 table5 (a1 :: nil))
         (tpl 1 :: tpl 2 :: tpl 3 :: nil)
         table5 in
   let sql0 db :=
-  _Sql_Select 
+  _Sql_Select
         (* select *) (_Select_List ((_Select_As (_Sql_Dot a2) a3) :: nil))
-        (* from *) ((_From_Item 
-                       (_Sql_Table table5) 
+        (* from *) ((_From_Item
+                       (_Sql_Table table5)
                        (Att_Ren_List ((Att_As T a1 a2) :: nil))) :: nil)
         (* where *) (_Sql_Atom (_Sql_True db))
         (* groupby *) (_Group_Fine)
@@ -454,8 +454,8 @@ Eval compute in (show_tuples eval_sql0).
 (** select * from table1; *)
 
 Definition sql1 db :=
-  _Sql_Select 
-    (* select *) _Select_Star 
+  _Sql_Select
+    (* select *) _Select_Star
     (* from *) ((_From_Item (_Sql_Table table1) _Att_Ren_Star) :: nil)
     (* where *) (_Sql_Atom (_Sql_True db))
     (* groupby *) _Group_Fine
@@ -467,8 +467,8 @@ Eval compute in (show_tuples eval_sql1).
 
 (** select * from table1 where aa = bb *)
 Definition sql2 db :=
-  _Sql_Select 
-    (* select *) _Select_Star 
+  _Sql_Select
+    (* select *) _Select_Star
     (* from *) ((_From_Item (_Sql_Table table1) _Att_Ren_Star) :: nil)
     (* where *) (_Sql_Atom (_Sql_Pred db (Predicate "=") (_Sql_Dot aa :: _Sql_Dot bb :: nil)))
     (* groupby *) _Group_Fine
@@ -488,16 +488,16 @@ Definition eval_sql1'' := eval_sql_query_in_state (sql1 db4).
 Eval compute in (show_tuples eval_sql1'').
 
 (** (4,5) has not been inserted in db4, as specified by insert_tuple.
- We COULD have made another choice, and null values in that case would correspond 
+ We COULD have made another choice, and null values in that case would correspond
  to an attribute which occurs in the sort of the query, but not in the support
  of the tuple.*)
 
 (** SELECT a, b FROM table1; *)
 
 Definition sql5 db :=
-  _Sql_Select 
-    (* select *) (_Select_List 
-                    ((_Select_As (_Sql_Dot aa) aa) :: 
+  _Sql_Select
+    (* select *) (_Select_List
+                    ((_Select_As (_Sql_Dot aa) aa) ::
                      (_Select_As (_Sql_Dot bb) bb ) :: nil))
     (* from *) ((_From_Item (_Sql_Table table1) _Att_Ren_Star) :: nil)
     (* where *) (_Sql_Atom (_Sql_True db))
@@ -510,10 +510,10 @@ Eval vm_compute in (show_tuples eval_sql5).
 (** SELECT a, b + c FROM table1; actully, we use
    SELECT a, b + c AS bplusc FROM table1; *)
 Definition sql6 db :=
-  _Sql_Select 
-    (* select *) (_Select_List 
-                    ((_Select_As (_Sql_Dot aa) aa) :: 
-                     (_Select_As 
+  _Sql_Select
+    (* select *) (_Select_List
+                    ((_Select_As (_Sql_Dot aa) aa) ::
+                     (_Select_As
                         (_A_Expr ((_F_Expr (Symbol "plus")) ((__Sql_Dot bb) :: (__Sql_Dot cc) :: nil)))
                           b_plus_c ) :: nil))
     (* from *) ((_From_Item (_Sql_Table table1) _Att_Ren_Star) :: nil)
@@ -528,13 +528,13 @@ Eval compute in (show_tuples eval_sql6).
       select * from table1 as t1(a1 , b1 , c1 ); *)
 
 Definition sql7 db :=
-  _Sql_Select 
+  _Sql_Select
     (* select *) _Select_Star
-    (* from *) ((_From_Item 
-                   (_Sql_Table table1) 
-                   (_Att_Ren_List 
-                      (_Att_As aa a1 :: 
-                       _Att_As bb b1 :: 
+    (* from *) ((_From_Item
+                   (_Sql_Table table1)
+                   (_Att_Ren_List
+                      (_Att_As aa a1 ::
+                       _Att_As bb b1 ::
                        _Att_As cc c1 :: nil))) :: nil)
     (* where *) (_Sql_Atom (_Sql_True db))
     (* groupby *) _Group_Fine
@@ -545,11 +545,11 @@ Eval vm_compute in (show_tuples eval_sql7).
 
 (** select * from table1 as t1 where t1.a < 4*)
 Definition sql8 db :=
-  _Sql_Select 
+  _Sql_Select
     (* select *) _Select_Star
     (* from *) ((_From_Item (_Sql_Table table1) _Att_Ren_Star) :: nil)
-    (* where *) (_Sql_Atom 
-                   (_Sql_Pred db (Predicate "<") 
+    (* where *) (_Sql_Atom
+                   (_Sql_Pred db (Predicate "<")
                               (_Sql_Dot aa :: CstN 4 :: nil)))
     (* groupby *) _Group_Fine
     (* having *) (_Sql_Atom (_Sql_True db)).
@@ -560,11 +560,11 @@ Eval vm_compute in (show_tuples eval_sql8).
 (** select * from table1 as t1 where t1.a > 4*)
 
 Definition sql9 db :=
-  _Sql_Select 
+  _Sql_Select
     (* select *) _Select_Star
     (* from *) ((_From_Item (_Sql_Table table1) _Att_Ren_Star) :: nil)
-    (* where *) (_Sql_Atom 
-                   (_Sql_Pred db (Predicate ">") 
+    (* where *) (_Sql_Atom
+                   (_Sql_Pred db (Predicate ">")
                               (_Sql_Dot aa :: CstN 4 :: nil)))
     (* groupby *) _Group_Fine
     (* having *) (_Sql_Atom (_Sql_True db)).
@@ -574,11 +574,11 @@ Eval vm_compute in (show_tuples eval_sql9).
 
 (** select * from table1 as t1 where t1.a = 4*)
 Definition sql10 db :=
-  _Sql_Select 
+  _Sql_Select
     (* select *) _Select_Star
     (* from *) ((_From_Item (_Sql_Table table1) _Att_Ren_Star) :: nil)
-    (* where *) (_Sql_Atom 
-                   (_Sql_Pred db (Predicate "=") 
+    (* where *) (_Sql_Atom
+                   (_Sql_Pred db (Predicate "=")
                               (_Sql_Dot aa :: CstN 4 :: nil)))
     (* groupby *) _Group_Fine
     (* having *) (_Sql_Atom (_Sql_True db)).
@@ -589,12 +589,12 @@ Eval vm_compute in (show_tuples eval_sql10).
 (** select * from table1 as t1 where t1.a <> 4*)
 
 Definition sql11 db :=
-  _Sql_Select 
+  _Sql_Select
     (* select *) _Select_Star
     (* from *) ((_From_Item (_Sql_Table table1) _Att_Ren_Star) :: nil)
-    (* where *) (_Sql_Not 
-                   (_Sql_Atom 
-                   (_Sql_Pred db (Predicate "=") 
+    (* where *) (_Sql_Not
+                   (_Sql_Atom
+                   (_Sql_Pred db (Predicate "=")
                               (_Sql_Dot aa :: CstN 4 :: nil))))
     (* groupby *) _Group_Fine
     (* having *) (_Sql_Atom (_Sql_True db)).
@@ -605,15 +605,15 @@ Eval vm_compute in (show_tuples eval_sql11).
 
 (** select * from table1 as t1 where t1.a < 4 or t1.a >= 7*)
 Definition sql12 db :=
-  _Sql_Select 
+  _Sql_Select
     (* select *) _Select_Star
     (* from *) ((_From_Item (_Sql_Table table1) _Att_Ren_Star) :: nil)
-    (* where *) (_Sql_Conj Or_F 
-                   (_Sql_Atom 
-                   (_Sql_Pred db (Predicate "<") 
+    (* where *) (_Sql_Conj Or_F
+                   (_Sql_Atom
+                   (_Sql_Pred db (Predicate "<")
                               (_Sql_Dot aa :: CstN 4 :: nil)))
-                   (_Sql_Atom 
-                   (_Sql_Pred db (Predicate ">=") 
+                   (_Sql_Atom
+                   (_Sql_Pred db (Predicate ">=")
                               (_Sql_Dot aa :: CstN 7 :: nil))))
     (* groupby *) _Group_Fine
     (* having *) (_Sql_Atom (_Sql_True db)).
@@ -623,13 +623,13 @@ Eval vm_compute in (show_tuples eval_sql12).
 
 (** select * from table1 where 2 * a < 12 *)
 Definition sql13 db :=
-  _Sql_Select 
+  _Sql_Select
     (* select *) _Select_Star
     (* from *) ((_From_Item (_Sql_Table table1) _Att_Ren_Star) :: nil)
-    (* where *) (_Sql_Atom 
-                   (_Sql_Pred db (Predicate "<") 
-                              (_A_Expr (((_F_Expr (Symbol "mult")) 
-                                     (_CstN 2 :: __Sql_Dot aa :: nil))) :: 
+    (* where *) (_Sql_Atom
+                   (_Sql_Pred db (Predicate "<")
+                              (_A_Expr (((_F_Expr (Symbol "mult"))
+                                     (_CstN 2 :: __Sql_Dot aa :: nil))) ::
                               (CstN 12) :: nil)))
     (* groupby *) _Group_Fine
     (* having *) (_Sql_Atom (_Sql_True db)).
@@ -638,8 +638,8 @@ Definition eval_sql13 := eval_sql_query_in_state (sql13 db4).
 
 Eval vm_compute in (show_tuples eval_sql13).
 
-Notation a_plus_b := 
-  (_A_Expr ((_F_Expr (Symbol "plus")) ((__Sql_Dot a) :: (__Sql_Dot b) :: nil))). 
+Notation a_plus_b :=
+  (_A_Expr ((_F_Expr (Symbol "plus")) ((__Sql_Dot a) :: (__Sql_Dot b) :: nil))).
 
 Notation a0_plus_c1 :=
   (_A_Expr ((_F_Expr (Symbol "plus")) ((__Sql_Dot a0) :: (__Sql_Dot c1) :: nil))).
@@ -652,20 +652,19 @@ Definition sql17 db :=
   _Sql_Select
     (* select *) _Select_Star
     (* from *) ((_From_Item (_Sql_Table table1) _Att_Ren_Star) :: nil)
-    (* where *) (_Sql_Atom 
-                   (_Sql_Quant 
+    (* where *) (_Sql_Atom
+                   (_Sql_Quant
                       Forall_F (db := db)
                       (Predicate ">=") (a_plus_b :: nil)
-                      (_Sql_Select 
+                      (_Sql_Select
                          (_Select_List (_Select_As a0_plus_c1 (Attr_N 0 "a0_plus_c1") :: nil))
-                         (_From_Item (_Sql_Table table0) rho0 :: 
+                         (_From_Item (_Sql_Table table0) rho0 ::
                                      _From_Item  (_Sql_Table table1) rho1 :: nil)
                          (_Sql_Atom (_Sql_True db))
-                         _Group_Fine  
+                         _Group_Fine
                          (_Sql_Atom (_Sql_True db)))))
     (* groupby *) _Group_Fine
     (* having *) (_Sql_Atom (_Sql_True db)).
 
 
 End Try.
-

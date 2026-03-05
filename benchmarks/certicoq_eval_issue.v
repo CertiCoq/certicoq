@@ -1,5 +1,5 @@
 
-From Coq Require Import List Arith Extraction Lia.
+From Stdlib Require Import List Arith Extraction Lia.
 Notation "( x ; p )" := (exist _ x p).
 Example nth {A} (l : list A) : {n : nat | n < length l} -> A.
 Proof.

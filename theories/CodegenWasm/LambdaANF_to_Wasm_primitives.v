@@ -1,7 +1,7 @@
-From Coq Require Import ZArith BinNat List Uint63.
+From Stdlib Require Import ZArith BinNat List Uint63.
 From Wasm Require Import datatypes.
 From CertiCoq Require Import Common.compM Common.Pipeline_utils.
-From MetaCoq Require Import Common.Kernames Utils.bytestring Utils.MCString.
+From MetaRocq Require Import Common.Kernames Utils.bytestring Utils.MRString.
 
 Import ListNotations SigTNotations Wasm_int.
 
@@ -40,9 +40,9 @@ Definition C1_ord    := 1%N.
 Definition pair_ord  := 0%N.
 
 
-(* Path of the PrimInt63 module in the kernel: Coq.Numbers.Cyclic.Int63.PrimInt63 *)
+(* Path of the PrimInt63 module in the kernel: Corelib.Numbers.Cyclic.Int63.PrimInt63 *)
 Definition primInt63ModPath : Kernames.modpath :=
-  Kernames.MPfile [ "PrimInt63"%bs ; "Int63"%bs ; "Cyclic"%bs ; "Numbers"%bs ; "Coq"%bs ].
+  Kernames.MPfile [ "PrimInt63"%bs ; "Int63"%bs ; "Cyclic"%bs ; "Numbers"%bs ; "Corelib"%bs ].
 
 (* Supported operators defined as data type to avoid pattern matching on kernel name (bytestrings) *)
 Inductive primop :=

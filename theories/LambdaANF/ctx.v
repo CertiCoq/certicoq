@@ -2,7 +2,7 @@
  * Part of the CertiCoq project
  *)
 
-From Coq Require Import Arith.Arith NArith.BinNat Lists.List micromega.Lia.
+From Stdlib Require Import Arith.Arith NArith.BinNat Lists.List micromega.Lia.
 Require Import LambdaANF.tactics.
 From CertiCoq.Common Require Import AstCommon.
 From CertiCoq.LambdaANF Require Import cps set_util.
@@ -18,9 +18,9 @@ Inductive exp_ctx : Type :=
 | Eproj_c  : var -> ctor_tag -> N -> var -> exp_ctx -> exp_ctx
 | Eprim_val_c : var -> primitive -> exp_ctx -> exp_ctx
 | Eprim_c : var -> prim -> list var -> exp_ctx -> exp_ctx
-| Eletapp_c : var -> var -> fun_tag -> list var -> exp_ctx -> exp_ctx   
+| Eletapp_c : var -> var -> fun_tag -> list var -> exp_ctx -> exp_ctx
 | Ecase_c : var -> list (ctor_tag * exp) -> ctor_tag ->
-            exp_ctx -> list (ctor_tag * exp) -> exp_ctx  
+            exp_ctx -> list (ctor_tag * exp) -> exp_ctx
 | Efun1_c : fundefs -> exp_ctx -> exp_ctx
 | Efun2_c : fundefs_ctx -> exp -> exp_ctx
 with fundefs_ctx :=
@@ -31,36 +31,36 @@ with fundefs_ctx :=
 Inductive app_ctx: exp_ctx -> exp -> exp -> Prop :=
 | Hole_ac: forall e, app_ctx Hole_c e e
 | Constr_ac : forall x t c ys e ce,
-                app_ctx c e ce ->        
+                app_ctx c e ce ->
                 app_ctx (Econstr_c x t ys c) e (Econstr x t ys ce)
-| Proj_ac : forall x t n y e c ce, 
-              app_ctx c e ce ->        
+| Proj_ac : forall x t n y e c ce,
+              app_ctx c e ce ->
               app_ctx (Eproj_c x t n y c) e (Eproj x t n y ce)
-| Letapp_ac : forall x f ft ys e c ce, 
+| Letapp_ac : forall x f ft ys e c ce,
     app_ctx c e ce ->
     app_ctx (Eletapp_c x f ft ys c) e (Eletapp x f ft ys ce)
 | Case_ac : forall x te t e te' c ce,
               app_ctx c e ce ->
               app_ctx (Ecase_c x te t c te') e
-                      (Ecase x (te ++ (t, ce) :: te')) 
-| Prim_val_ac : forall x p e c ce, 
-              app_ctx c e ce ->        
+                      (Ecase x (te ++ (t, ce) :: te'))
+| Prim_val_ac : forall x p e c ce,
+              app_ctx c e ce ->
               app_ctx (Eprim_val_c x p c) e (Eprim_val x p ce)
-| Prim_ac : forall x f ys e c ce, 
-              app_ctx c e ce ->        
+| Prim_ac : forall x f ys e c ce,
+              app_ctx c e ce ->
               app_ctx (Eprim_c x f ys c) e (Eprim x f ys ce)
 | Fun1_ac : forall c e ce fds,
               app_ctx c e ce ->
               app_ctx (Efun1_c fds c) e (Efun fds ce)
 | Fun2_ac : forall e cfds cfdse e',
-              app_f_ctx cfds e cfdse ->          
+              app_f_ctx cfds e cfdse ->
               app_ctx (Efun2_c cfds e') e (Efun cfdse e')
 with app_f_ctx : fundefs_ctx -> exp -> fundefs -> Prop :=
      | Fcons1_ac : forall c e ce f t ys fds,
-                     app_ctx c e ce -> 
+                     app_ctx c e ce ->
                      app_f_ctx (Fcons1_c f t ys c fds) e (Fcons f t ys ce fds)
-     | Fcons2_ac: forall e cfdse f cfds ys e' t, 
-                    app_f_ctx cfds e cfdse -> 
+     | Fcons2_ac: forall e cfdse f cfds ys e' t,
+                    app_f_ctx cfds e cfdse ->
                     app_f_ctx (Fcons2_c f t ys e' cfds) e (Fcons f t ys e' cfdse).
 
 #[global] Hint Constructors app_ctx app_f_ctx : core.
@@ -77,7 +77,7 @@ Fixpoint app_ctx_f (c:exp_ctx) (e:exp) : exp :=
     | Eprim_val_c x p c => Eprim_val x p (app_ctx_f c e)
     | Eprim_c x f ys c => Eprim x f ys (app_ctx_f c e)
     | Efun1_c fds c => Efun fds (app_ctx_f c e)
-    | Efun2_c cfds e' => Efun (app_f_ctx_f cfds e) e' 
+    | Efun2_c cfds e' => Efun (app_f_ctx_f cfds e) e'
   end
 with app_f_ctx_f (c: fundefs_ctx) (e:exp) : fundefs :=
        match c with
@@ -176,7 +176,7 @@ Lemma exp_fundefs_ctx_mutual_ind :
     (forall f5 : fundefs_ctx, P0 f5 -> forall e : exp, P (Efun2_c f5 e)) ->
     (forall (v : var) (t : fun_tag) (l : list var) (e : exp_ctx),
        P e -> forall f6 : fundefs, P0 (Fcons1_c v t l e f6)) ->
-    (forall (v : var) (t : fun_tag) (l : list var) 
+    (forall (v : var) (t : fun_tag) (l : list var)
             (e : exp) (f7 : fundefs_ctx), P0 f7 -> P0 (Fcons2_c v t l e f7)) ->
     (forall e : exp_ctx, P e) /\ (forall f : fundefs_ctx, P0 f).
 Proof.
@@ -189,7 +189,7 @@ Qed.
 (** Name the induction hypotheses only *)
 Ltac exp_fundefs_ctx_induction IH1 IH2 :=
   apply exp_fundefs_ctx_mutual_ind;
-  [ | intros ? ? ? ? IH1 
+  [ | intros ? ? ? ? IH1
     | intros ? ? ? ? ? IH1
     | intros ? ? ? ? ? IH1
     | intros ? ? ? IH1
@@ -213,7 +213,7 @@ Lemma app_ctx_f_correct_mut:
      c |[ e ]|  = e' <-> app_ctx c e e') /\
   (forall cf B B',
      cf <[ B ]> = B' <-> app_f_ctx cf B B').
-Proof. 
+Proof.
   exp_fundefs_ctx_induction IHe IHf; simpl; intros; split; intros H';
   first
     [ inversion H'; subst; constructor;
@@ -245,7 +245,7 @@ Lemma comp_ctx_f_correct_mut:
      comp_ctx_f c c'  = cc' <-> comp_ctx c c' cc') /\
   (forall cf cf' ccf',
      comp_f_ctx_f cf cf' = ccf' <-> comp_f_ctx cf cf' ccf').
-Proof. 
+Proof.
   exp_fundefs_ctx_induction IHe IHf; simpl; intros; split; intros H';
   first
     [ inversion H'; subst; constructor;
@@ -324,7 +324,7 @@ Theorem comp_ctx_f_assoc:
      comp_ctx_f (comp_ctx_f c1 c2) c3 = comp_ctx_f c1 (comp_ctx_f c2 c3)).
 Proof.
   intros; apply comp_ctx_f_assoc_mut; auto.
-Qed.      
+Qed.
 
 Theorem comp_f_ctx_f_assoc:
   (forall f c2 c3, comp_f_ctx_f (comp_f_ctx_f f c2) c3 =
@@ -336,7 +336,7 @@ Qed.
 Theorem comp_ctx_split_mut:
   (forall c1 c2 c3 c4,
      comp_ctx_f c1 c2 = comp_ctx_f c3 c4 ->
-     (exists c41 c42, c4 = comp_ctx_f c41 c42 /\ c1 = comp_ctx_f c3 c41 /\ c2 = c42) \/ 
+     (exists c41 c42, c4 = comp_ctx_f c41 c42 /\ c1 = comp_ctx_f c3 c41 /\ c2 = c42) \/
      (exists c31 c32, c3 = comp_ctx_f c31 c32 /\ c1 = c31 /\ c2 = comp_ctx_f c32 c4)) /\
   (forall f1 c2 f3 c4, comp_f_ctx_f f1 c2 = comp_f_ctx_f f3 c4 ->
                   (exists c41 c42, c4 = comp_ctx_f c41 c42 /\ f1 = comp_f_ctx_f f3 c41 /\ c2 = c42) \/
@@ -344,10 +344,10 @@ Theorem comp_ctx_split_mut:
 Proof.
   exp_fundefs_ctx_induction IHc1 IHf; intros.
   - simpl in H.
-    right.          
+    right.
     exists Hole_c, c3.
     auto.
-  - simpl in H. destruct c3; inv H.          
+  - simpl in H. destruct c3; inv H.
     + simpl in H0.
       left.
       destruct c4; inv H0.
@@ -386,7 +386,7 @@ Proof.
         auto.
       * right. destructAll.
         exists (Eletapp_c v0 v1 f0 l x), x0;
-          auto.        
+          auto.
   - simpl in H. destruct c3; inv H.
     + simpl in H0.
       left.
@@ -436,7 +436,7 @@ Proof.
         exists x, x0; auto.
       * right.
         exists (Efun1_c f x), x0.
-        auto.              
+        auto.
   - simpl in H.
     destruct c3; inv H.
     + simpl in H0.
@@ -461,7 +461,7 @@ Proof.
       exists x, x0.
       auto.
     * right.
-      exists (Fcons1_c v0 c l0 x f), x0; auto.            
+      exists (Fcons1_c v0 c l0 x f), x0; auto.
   - simpl in H.
     destruct f3; inv H.
     apply IHf in H5.
@@ -473,13 +473,13 @@ Proof.
     * right.
       destructAll.
       exists (Fcons2_c v0 c l0 e0 x), x0.
-      auto.              
+      auto.
 Qed.
 
 Theorem comp_ctx_split:
   (forall c1 c2 c3 c4,
      comp_ctx_f c1 c2 = comp_ctx_f c3 c4 ->
-     (exists c41 c42, c4 = comp_ctx_f c41 c42 /\ c1 = comp_ctx_f c3 c41 /\ c2 = c42) \/ 
+     (exists c41 c42, c4 = comp_ctx_f c41 c42 /\ c1 = comp_ctx_f c3 c41 /\ c2 = c42) \/
      (exists c31 c32, c3 = comp_ctx_f c31 c32 /\ c1 = c31 /\ c2 = comp_ctx_f c32 c4)).
 Proof.
   apply comp_ctx_split_mut; auto.
@@ -491,7 +491,7 @@ Theorem comp_f_ctx_split:
                   (exists f31 c32, f3 = comp_f_ctx_f f31 c32 /\ f1 = f31 /\ c2 = comp_ctx_f c32 c4)).
 Proof.
   apply comp_ctx_split_mut; auto.
-Qed.              
+Qed.
 
 (* prefix a fundefs ctx with a fundefs *)
 Fixpoint app_fundefs_ctx (f:fundefs) (fc:fundefs_ctx): fundefs_ctx:=
@@ -503,11 +503,11 @@ Fixpoint app_fundefs_ctx (f:fundefs) (fc:fundefs_ctx): fundefs_ctx:=
 
 Lemma comp_ctx_f_Hole_c C :
   comp_ctx_f C Hole_c = C
-with comp_f_ctx_f_Hole_c f : 
+with comp_f_ctx_f_Hole_c f :
        comp_f_ctx_f f Hole_c = f.
 Proof.
   - destruct C; simpl; eauto;
-      try (rewrite comp_ctx_f_Hole_c; reflexivity). 
+      try (rewrite comp_ctx_f_Hole_c; reflexivity).
     rewrite comp_f_ctx_f_Hole_c. reflexivity.
   - destruct f; simpl; eauto.
     rewrite comp_ctx_f_Hole_c; reflexivity.

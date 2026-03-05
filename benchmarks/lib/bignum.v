@@ -1,6 +1,6 @@
-Require Coq.Numbers.Cyclic.Int31.Int31.
-Require Coq.Numbers.Natural.BigN.BigN.
-Require Import ZArith.
+From Stdlib Require Numbers.Cyclic.Int31.Int31.
+From Stdlib Require Numbers.Natural.BigN.BigN.
+From Stdlib Require Import ZArith.
 
 
 Definition add31c' (n m: Int31.int31) : bool * Int31.int31 :=
@@ -11,18 +11,18 @@ Definition sub31c' (n m: Int31.int31) : bool * Int31.int31 :=
  let npm := Int31.sub31 n m in
    (negb (Z.eqb (Int31.phi npm) (Int31.phi n - Int31.phi m)), npm).
 
-(****  
+(****
  In L1 or LambdaBoxMut, recognize the following functions and treat them
   opaquely (i.e., delete their function bodies, and let them be
  free variables with distinguished names):
 
-  Int31.add31, Int31.add31c, Int31.add31carryc, 
+  Int31.add31, Int31.add31c, Int31.add31carryc,
     Int31.iszero, and many others...
 
   and,    add31c', sub31c'  (* defined in this file *)
 
  Then, in translation to LambdaANF, replace these free variables as follows:
-  where they occur in function-position, 
+  where they occur in function-position,
     use  Eprim operators (primops);
   where they occur otherwise, use eta-expanded Eprim operators.
 
@@ -96,7 +96,7 @@ apply BigN.ltb_lt; auto.
 apply BigN.ltb_nlt; auto.
 Defined.
 
-Definition normalize (a: BigN.t) := 
+Definition normalize (a: BigN.t) :=
  match a with
  | BigN.N0 i => BN_int i
  | _ => match BigN_lt_dec maxint31b a with
@@ -118,7 +118,7 @@ Definition add (a b : bignum) : bignum :=
 match a, b with
 | BN_int i, BN_int j =>
    match add31c' i j with
-   | (false, k) => BN_int k 
+   | (false, k) => BN_int k
    | (true, _) => add' a b
    end
 | _, _ => add' a b
@@ -137,7 +137,7 @@ Definition sub (a b : bignum) : bignum :=
 match a, b with
 | BN_int i, BN_int j =>
    match sub31c' i j with
-   | (false, k) => BN_int k 
+   | (false, k) => BN_int k
    | (true, _) => sub' a b
    end
 | _, _ => sub' a b
@@ -183,14 +183,14 @@ Eval compute in  add10 (Bignum.of_pos 2147483646).
 
 Require Import Recdef.
 
-Lemma bignum_decr_less: 
+Lemma bignum_decr_less:
  forall n : Bignum.t,
  Bignum.iszero n = false ->
  Bignum.to_nat (Bignum.sub n (Bignum.of_Z 1)) < Bignum.to_nat n.
 Admitted.
 
-Function triang (n: Bignum.t) {measure Bignum.to_nat n}: Bignum.t := 
-  if Bignum.iszero n 
+Function triang (n: Bignum.t) {measure Bignum.to_nat n}: Bignum.t :=
+  if Bignum.iszero n
   then n
   else Bignum.add n (triang (Bignum.sub n (Bignum.of_Z 1))).
 Proof.
@@ -198,10 +198,3 @@ exact bignum_decr_less.
 Defined.
 
 Eval compute in triang (Bignum.of_Z 3000).
-
-
-
-
-
-
-

@@ -1,7 +1,7 @@
 Set Warnings "-primitive-turned-into-axiom".
 From CertiCoq.Plugin Require Import CertiCoq.
 
-From Coq Require Import List Uint63 ZArith.
+From Stdlib Require Import List Uint63 ZArith.
 
 Import ListNotations.
 

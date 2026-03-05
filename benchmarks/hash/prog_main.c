@@ -9,19 +9,19 @@ extern value body(struct thread_info *);
 extern value args[];
 
 extern struct thread_info;
-extern unsigned int get_Coq_Strings_String_string_tag(value);
-extern unsigned int get_Coq_Init_Datatypes_bool_tag(value);
-extern unsigned int get_Coq_Init_Datatypes_nat_tag(value);
-extern value make_Coq_Init_Datatypes_bool_true(void);
-extern value make_Coq_Init_Datatypes_bool_false(void);
-extern value make_Coq_Init_Datatypes_unit_tt(void);
-extern value make_Coq_Init_Datatypes_nat_O(void);
-extern value make_Coq_Init_Datatypes_option_None(void);
-extern value make_Coq_Strings_String_string_EmptyString(void);
-extern value alloc_make_Coq_Strings_Ascii_ascii_Ascii(struct thread_info *, value, value, value, value, value, value, value, value);
-extern value alloc_make_Coq_Strings_String_string_String(struct thread_info *, value, value);
-extern value alloc_make_Coq_Init_Datatypes_nat_S(struct thread_info *, value);
-extern value alloc_make_Coq_Init_Datatypes_option_Some(struct thread_info *, value);
+extern unsigned int get_Corelib_Strings_String_string_tag(value);
+extern unsigned int get_Corelib_Init_Datatypes_bool_tag(value);
+extern unsigned int get_Corelib_Init_Datatypes_nat_tag(value);
+extern value make_Corelib_Init_Datatypes_bool_true(void);
+extern value make_Corelib_Init_Datatypes_bool_false(void);
+extern value make_Corelib_Init_Datatypes_unit_tt(void);
+extern value make_Corelib_Init_Datatypes_nat_O(void);
+extern value make_Corelib_Init_Datatypes_option_None(void);
+extern value make_Corelib_Strings_String_string_EmptyString(void);
+extern value alloc_make_Corelib_Strings_Ascii_ascii_Ascii(struct thread_info *, value, value, value, value, value, value, value, value);
+extern value alloc_make_Corelib_Strings_String_string_String(struct thread_info *, value, value);
+extern value alloc_make_Corelib_Init_Datatypes_nat_S(struct thread_info *, value);
+extern value alloc_make_Corelib_Init_Datatypes_option_Some(struct thread_info *, value);
 
 extern value alloc_make_CertiCoq_Benchmarks_hash_hash_IO_Types_Build_IO_Types(struct thread_info *, value);
 extern value alloc_make_CertiCoq_Benchmarks_hash_hash_IO_Impl_Build_IO_Impl(struct thread_info *, value, value);
@@ -73,7 +73,7 @@ value io_bind(struct thread_info * tinfo, value sigma, value tau, value x, value
 unsigned char ascii_to_char(value x) {
   unsigned char c = 0;
   for(unsigned int i = 0; i < 8; i++) {
-    unsigned int tag = get_Coq_Init_Datatypes_bool_tag(*((value *) *((value *) x) + i));
+    unsigned int tag = get_Corelib_Init_Datatypes_bool_tag(*((value *) *((value *) x) + i));
     c += !tag << i;
   }
   return c;
@@ -83,25 +83,25 @@ value print_string(struct thread_info *tinfo, value s) {
   value temp = s;
 
   while(1) {
-    unsigned int tag = get_Coq_Strings_String_string_tag(temp);
+    unsigned int tag = get_Corelib_Strings_String_string_tag(temp);
     if(tag == 1) {
       printf("%c", ascii_to_char(temp));
       temp = *((value *) temp + 1ULL);
     } else {
       break;
     }
-  } 
+  }
   printf("\n");
   fflush(stdout);
 
-  return make_Coq_Init_Datatypes_unit_tt();
+  return make_Corelib_Init_Datatypes_unit_tt();
 }
 
 value bool_to_value(_Bool b) {
   if(b)
-    return make_Coq_Init_Datatypes_bool_true();
+    return make_Corelib_Init_Datatypes_bool_true();
   else
-    return make_Coq_Init_Datatypes_bool_false();
+    return make_Corelib_Init_Datatypes_bool_false();
 }
 
 value char_to_value(struct thread_info *tinfo, char c) {
@@ -109,19 +109,19 @@ value char_to_value(struct thread_info *tinfo, char c) {
   for(unsigned int i = 0; i < 8; i++) {
     v[i] = bool_to_value(c & (1 << i));
   }
-  return alloc_make_Coq_Strings_Ascii_ascii_Ascii(tinfo, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
+  return alloc_make_Corelib_Strings_Ascii_ascii_Ascii(tinfo, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
 }
 
 value string_to_value(struct thread_info *tinfo, char *s) {
-  value temp = make_Coq_Strings_String_string_EmptyString();
+  value temp = make_Corelib_Strings_String_string_EmptyString();
   for (unsigned int i = strlen(s); 0 < i; i--) {
     value c = char_to_value(tinfo, s[i-1]);
-    temp = alloc_make_Coq_Strings_String_string_String(tinfo, c, temp);
+    temp = alloc_make_Corelib_Strings_String_string_String(tinfo, c, temp);
   }
   return temp;
 }
 
-value scan_string(struct thread_info *tinfo) { 
+value scan_string(struct thread_info *tinfo) {
   char input[100];
   scanf("%s", input);
 
@@ -130,9 +130,9 @@ value scan_string(struct thread_info *tinfo) {
 }
 
 value uint_to_nat(struct thread_info *tinfo, unsigned int num) {
-  value n = make_Coq_Init_Datatypes_nat_O();
+  value n = make_Corelib_Init_Datatypes_nat_O();
   for(unsigned int i = 0; i <= num; i++) {
-    n = alloc_make_Coq_Init_Datatypes_nat_S(tinfo, n);
+    n = alloc_make_Corelib_Init_Datatypes_nat_S(tinfo, n);
   }
   return n;
 }
@@ -142,14 +142,14 @@ unsigned int nat_to_uint(value n) {
   unsigned int i = 0;
 
   while(1) {
-    unsigned int tag = get_Coq_Init_Datatypes_nat_tag(temp);
+    unsigned int tag = get_Corelib_Init_Datatypes_nat_tag(temp);
     if(tag == 1) {
       i++;
       temp = *((value *) temp);
     } else {
       break;
     }
-  } 
+  }
   return i;
 }
 
@@ -188,12 +188,12 @@ struct cell *new_cell (value k, value v, struct cell *next) {
 }
 
 value new(struct thread_info * tinfo, value sigma, value tau) {
-  // the hashtable lives in C-land, 
+  // the hashtable lives in C-land,
   // we would have to do memory management for it later manually
   return (value) new_table();
 }
 
-value lookup(struct thread_info * tinfo, 
+value lookup(struct thread_info * tinfo,
              value sigma, value tau, value eq_inst, value hashable_inst,
              value table, value key) {
   call(tinfo, *((value *) hashable_inst), key);
@@ -204,14 +204,14 @@ value lookup(struct thread_info * tinfo,
     calls(tinfo, *((value *) eq_inst), 2, p->key, key);
     value cmp = tinfo->args[1]; //possibly problematic
 
-    if (cmp == make_Coq_Init_Datatypes_bool_true())
-      return alloc_make_Coq_Init_Datatypes_option_Some(tinfo, p->val);
+    if (cmp == make_Corelib_Init_Datatypes_bool_true())
+      return alloc_make_Corelib_Init_Datatypes_option_Some(tinfo, p->val);
     p=p->next;
   }
-  return make_Coq_Init_Datatypes_option_None();
+  return make_Corelib_Init_Datatypes_option_None();
 }
 
-void insert_list(struct thread_info * tinfo, 
+void insert_list(struct thread_info * tinfo,
                   value eq_inst,
                   struct cell **r0, value key, value val) {
   struct cell *p, **r;
@@ -225,24 +225,24 @@ void insert_list(struct thread_info * tinfo,
     calls(tinfo, *((value *) eq_inst), 2, p->key, key);
     value cmp = tinfo->args[1]; //possibly problematic
 
-    if (cmp == make_Coq_Init_Datatypes_bool_true()) {
+    if (cmp == make_Corelib_Init_Datatypes_bool_true()) {
       p->val = val;
       return;
     }
   }
 }
 
-value insert(struct thread_info * tinfo, 
+value insert(struct thread_info * tinfo,
              value sigma, value tau, value eq_inst, value hashable_inst,
              value table, value key, value val) {
   call(tinfo, *((value *) hashable_inst), key);
   unsigned int h = nat_to_uint(tinfo->args[1]); //possibly problematic
   unsigned int b = h % SIZE;
   insert_list(tinfo, eq_inst, & ((struct hashtable *) table)->buckets[b], key, val);
-  return make_Coq_Init_Datatypes_unit_tt();
+  return make_Corelib_Init_Datatypes_unit_tt();
 }
 
-void delete_list(struct thread_info * tinfo, 
+void delete_list(struct thread_info * tinfo,
                   value eq_inst,
                   struct cell **r0, value key) {
   struct cell *p, **r;
@@ -255,7 +255,7 @@ void delete_list(struct thread_info * tinfo,
     calls(tinfo, *((value *) eq_inst), 2, p->key, key);
     value cmp = tinfo->args[1]; //possibly problematic
 
-    if (cmp == make_Coq_Init_Datatypes_bool_true()) {
+    if (cmp == make_Corelib_Init_Datatypes_bool_true()) {
       *r = p->next;
       free(p);
       return;
@@ -263,14 +263,14 @@ void delete_list(struct thread_info * tinfo,
   }
 }
 
-value delete(struct thread_info * tinfo, 
+value delete(struct thread_info * tinfo,
              value sigma, value tau, value eq_inst, value hashable_inst,
              value table, value key) {
   call(tinfo, *((value *) hashable_inst), key);
   unsigned int h = nat_to_uint(tinfo->args[1]); //possibly problematic
   unsigned int b = h % SIZE;
   delete_list(tinfo, eq_inst, & ((struct hashtable *) table)->buckets[b], key);
-  return make_Coq_Init_Datatypes_unit_tt();
+  return make_Corelib_Init_Datatypes_unit_tt();
 }
 
 /* Main */
@@ -292,7 +292,7 @@ int main(int argc, char *argv[]) {
 
   value io_impl = alloc_make_CertiCoq_Benchmarks_hash_hash_IO_Impl_Build_IO_Impl(tinfo, io_ret_clo, io_bind_clo);
 
-  value string_ffi = 
+  value string_ffi =
     alloc_make_CertiCoq_Benchmarks_hash_hash_StringFFI_Build_StringFFI(
         tinfo,
         print_string_clo,
@@ -302,7 +302,7 @@ int main(int argc, char *argv[]) {
   value hash_types = alloc_make_CertiCoq_Benchmarks_hash_hash_Hash_Types_Build_Hash_Types(tinfo, 1);
 
   // TODO these functions don't handle garbage collection yet.
-  value hash_ffi = 
+  value hash_ffi =
     alloc_make_CertiCoq_Benchmarks_hash_hash_HashFFI_Build_HashFFI(
         tinfo,
         new_clo,

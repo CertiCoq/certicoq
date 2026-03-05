@@ -1,4 +1,4 @@
-Require Import Arith List String.
+From Stdlib Require Import Arith List String.
 Require Import ExtLib.Structures.Monad.
 From CertiCoq.Plugin Require Import CertiCoq.
 

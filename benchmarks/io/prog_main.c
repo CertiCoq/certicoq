@@ -9,14 +9,14 @@ extern void body(struct thread_info *);
 extern value args[];
 
 extern struct thread_info;
-extern unsigned int get_Coq_Strings_String_string_tag(value);
-extern unsigned int get_Coq_Init_Datatypes_bool_tag(value);
-extern value make_Coq_Init_Datatypes_bool_true(void);
-extern value make_Coq_Init_Datatypes_bool_false(void);
-extern value make_Coq_Init_Datatypes_unit_tt(void);
-extern value make_Coq_Strings_String_string_EmptyString(void);
-extern value alloc_make_Coq_Strings_Ascii_ascii_Ascii(struct thread_info *, value, value, value, value, value, value, value, value);
-extern value alloc_make_Coq_Strings_String_string_String(struct thread_info *, value, value);
+extern unsigned int get_Corelib_Strings_String_string_tag(value);
+extern unsigned int get_Corelib_Init_Datatypes_bool_tag(value);
+extern value make_Corelib_Init_Datatypes_bool_true(void);
+extern value make_Corelib_Init_Datatypes_bool_false(void);
+extern value make_Corelib_Init_Datatypes_unit_tt(void);
+extern value make_Corelib_Strings_String_string_EmptyString(void);
+extern value alloc_make_Corelib_Strings_Ascii_ascii_Ascii(struct thread_info *, value, value, value, value, value, value, value, value);
+extern value alloc_make_Corelib_Strings_String_string_String(struct thread_info *, value, value);
 
 extern value alloc_make_CertiCoq_Benchmarks_io_io_IO_Types_Build_IO_Types(struct thread_info *, value);
 extern value alloc_make_CertiCoq_Benchmarks_io_io_IO_Impl_Build_IO_Impl(struct thread_info *, value, value);
@@ -36,7 +36,7 @@ _Bool is_ptr(value s) {
 unsigned char ascii_to_char(value x) {
   unsigned char c = 0;
   for(unsigned int i = 0; i < 8; i++) {
-    unsigned int tag = get_Coq_Init_Datatypes_bool_tag(*((value *) *((value *) x) + i));
+    unsigned int tag = get_Corelib_Init_Datatypes_bool_tag(*((value *) *((value *) x) + i));
     c += !tag << i;
   }
   return c;
@@ -46,25 +46,25 @@ value print_string(struct thread_info *tinfo, value s) {
   value temp = s;
 
   while(1) {
-    unsigned int tag = get_Coq_Strings_String_string_tag(temp);
+    unsigned int tag = get_Corelib_Strings_String_string_tag(temp);
     if(tag == 1) {
       printf("%c", ascii_to_char(temp));
       temp = *((value *) temp + 1ULL);
     } else {
       break;
     }
-  } 
+  }
   printf("\n");
   fflush(stdout);
 
-  return make_Coq_Init_Datatypes_unit_tt();
+  return make_Corelib_Init_Datatypes_unit_tt();
 }
 
 value bool_to_value(_Bool b) {
   if(b)
-    return make_Coq_Init_Datatypes_bool_true();
+    return make_Corelib_Init_Datatypes_bool_true();
   else
-    return make_Coq_Init_Datatypes_bool_false();
+    return make_Corelib_Init_Datatypes_bool_false();
 }
 
 value char_to_value(struct thread_info *tinfo, char c) {
@@ -72,19 +72,19 @@ value char_to_value(struct thread_info *tinfo, char c) {
   for(unsigned int i = 0; i < 8; i++) {
     v[i] = bool_to_value(c & (1 << i));
   }
-  return alloc_make_Coq_Strings_Ascii_ascii_Ascii(tinfo, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
+  return alloc_make_Corelib_Strings_Ascii_ascii_Ascii(tinfo, v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7]);
 }
 
 value string_to_value(struct thread_info *tinfo, char *s) {
-  value temp = make_Coq_Strings_String_string_EmptyString();
+  value temp = make_Corelib_Strings_String_string_EmptyString();
   for (unsigned int i = strlen(s); 0 < i; i--) {
     value c = char_to_value(tinfo, s[i-1]);
-    temp = alloc_make_Coq_Strings_String_string_String(tinfo, c, temp);
+    temp = alloc_make_Corelib_Strings_String_string_String(tinfo, c, temp);
   }
   return temp;
 }
 
-value scan_string(struct thread_info *tinfo) { 
+value scan_string(struct thread_info *tinfo) {
   char input[100];
   scanf("%s", input);
 
@@ -136,16 +136,16 @@ int main(int argc, char *argv[]) {
   clo = tinfo -> args[1];
 
   // Types are dummy values
-  value io_types = 
+  value io_types =
     alloc_make_CertiCoq_Benchmarks_io_io_IO_Types_Build_IO_Types(tinfo, 1);
 
-  value io_impl = 
+  value io_impl =
     alloc_make_CertiCoq_Benchmarks_io_io_IO_Impl_Build_IO_Impl(
-        tinfo, 
-        io_ret_clo, 
+        tinfo,
+        io_ret_clo,
         io_bind_clo);
 
-  value string_ffi = 
+  value string_ffi =
     alloc_make_CertiCoq_Benchmarks_io_io_StringFFI_Build_StringFFI(
         tinfo,
         print_string_clo,

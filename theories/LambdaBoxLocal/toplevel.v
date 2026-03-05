@@ -4,7 +4,7 @@ Require Import LambdaBoxMut.compile.
 Require Import LambdaBoxLocal.LambdaBoxMut_to_LambdaBoxLocal.
 Require Import LambdaBoxLocal.LambdaBoxMut_to_LambdaBoxLocal_correct.
 Require LambdaBoxMut.
-Require Import BinNat.
+From Stdlib Require Import BinNat.
 
 Import Monads.
 
@@ -22,6 +22,6 @@ Definition compile_LambdaBoxLocal (prims : list (kername * string * bool * nat *
   : CertiCoqTrans (Program LambdaBoxMut.compile.Term) LambdaBoxLocalTerm :=
   fun src =>
     debug_msg "Translating from LambdaBoxMut to LambdaBoxLocal"%bs ;;
-    LiftCertiCoqTrans "LambdaBoxLocal" (fun p =>  
+    LiftCertiCoqTrans "LambdaBoxLocal" (fun p =>
                               (LambdaBoxMut_to_LambdaBoxLocal.inductive_env (AstCommon.env p),
                                LambdaBoxMut_to_LambdaBoxLocal.translate_program prims (AstCommon.env p)(main p))) src.

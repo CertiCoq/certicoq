@@ -17,7 +17,7 @@ From Wasm Require Import
   datatypes operations host
   type_preservation opsem properties common.
 
-From Coq Require Import List.
+From Stdlib Require Import List.
 
 Import LambdaANF.toplevel.
 Import ListNotations.

@@ -1,12 +1,12 @@
 (* Continuation-Passing Style language for the CertiCoq project.
  *   Initial design, Andrew W. Appel, June 2014
  *)
-From Coq Require Import ZArith.ZArith Lists.List.
+From Stdlib Require Import ZArith.ZArith Lists.List.
 From CertiCoq.Common Require Import AstCommon.
 From CertiCoq.LambdaANF Require Import List_util map_util.
 From compcert.lib Require Export  Maps.
 From CertiCoq.LambdaANF Require Export map_util.
-From MetaCoq.Common Require Import BasicAst. (* For identifier names *)
+From MetaRocq.Common Require Import BasicAst. (* For identifier names *)
 
 Import ListNotations.
 
@@ -295,7 +295,7 @@ Lemma exp_def_mutual_ind' :
     (forall (v : var) (t : ctor_tag) (n : N) (v0 : var) (e : exp),
         P e -> P (Eproj v t n v0 e)) ->
     (forall (x f : var) (ft : fun_tag) (ys : list var) (e : exp),
-        P e -> P (Eletapp x f ft ys e)) ->    
+        P e -> P (Eletapp x f ft ys e)) ->
     (forall f2 : fundefs, P0 f2 -> forall e : exp, P e -> P (Efun f2 e)) ->
     (forall (v : var) (t : fun_tag) (l : list var), P (Eapp v t l)) ->
     (forall v p e, P e -> P (Eprim_val v p e)) ->

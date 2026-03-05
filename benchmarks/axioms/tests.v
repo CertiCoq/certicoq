@@ -1,9 +1,9 @@
 From CertiCoq.Plugin Require Import CertiCoq.
 
-Require Import Arith PArith List String Ascii.
+From Stdlib Require Import Arith PArith List String Ascii.
 Require Import ExtLib.Data.String.
 
-Import ListNotations. 
+Import ListNotations.
 
 (* Example 1: printing axioms *)
 
@@ -76,7 +76,7 @@ Extract Constants [ add_int63 => "add_int63", zero_int63 => "zero_int63", one_in
 Include [ "int63.h" ].
 
 
-(* "Dummy" example with tinfo (tifno is not used by the C function) *) 
+(* "Dummy" example with tinfo (tifno is not used by the C function) *)
 
 Definition list_sum_int63_tinfo :=
   let n := List.fold_left add_int63 (List.repeat one_int63 100) zero_int63 in

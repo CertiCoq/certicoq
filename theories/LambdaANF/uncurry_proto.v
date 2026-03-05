@@ -1,7 +1,7 @@
 (** Uncurrying written as a guarded rewrite rule *)
 
-Require Import Coq.Classes.Morphisms.
-Require Import Coq.NArith.BinNat Coq.PArith.BinPos Coq.Sets.Ensembles Lia.
+From Stdlib Require Import Classes.Morphisms.
+From Stdlib Require Import NArith.BinNat PArith.BinPos Sets.Ensembles Lia.
 Require Import Common.
 Require Import LambdaANF.Prototype.
 Require Import LambdaANF.proto_util.
@@ -9,11 +9,11 @@ Require Import LambdaANF.cps LambdaANF.cps_proto_univ LambdaANF.cps_proto.
 Require Import identifiers.  (* for max_var, occurs_in_exp, .. *)
 Require Import LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.cps_util LambdaANF.state.
 
-Require Import Coq.Lists.List.
+From Stdlib Require Import Lists.List.
 Import ListNotations.
 
 (* Set Universe Polymorphism. *)
-Unset MetaCoq Strict Unquote Universe Mode.
+Unset MetaRocq Strict Unquote Universe Mode.
 
 (** * Uncurrying as a guarded rewrite rule *)
 
@@ -39,8 +39,8 @@ Definition set_names_lst olds news suff cdata :=
 (* true if in cps mode *)
 Definition I_R : forall {A}, frames_t A exp_univ_exp -> bool -> Prop := (I_R_plain (R:=bool)).
 
-(* pair of 
-   1 - max number of arguments 
+(* pair of
+   1 - max number of arguments
    2 - encoding of inlining decision for beta-contraction phase *)
 Definition St : Set := (nat * (cps.M.tree nat))%type.
 (* 0 -> Do not inline, 1 -> uncurried function, 2 -> continuation of uncurried function *)
@@ -48,8 +48,8 @@ Definition St : Set := (nat * (cps.M.tree nat))%type.
 (* Maps (arity+1) to the right fun_tag *)
 Definition arity_map : Set := cps.M.tree fun_tag.
 Definition local_map : Set := cps.M.tree bool.
- 
-(* The state for this includes 
+
+(* The state for this includes
    1 - a boolean for tracking whether or not a reduction happens
    2 - Map recording the (new) fun_tag associated to each arity
    3 - local map from var to if function has already been uncurried
@@ -211,7 +211,7 @@ Proof.
     specialize (success lhs fds' rhs ms').
     eapply success; [|reflexivity|reflexivity| |];
     try lazymatch goal with
-    | |- «_» => unerase; destruct Hnext_x as [? Hnext_x]; 
+    | |- «_» => unerase; destruct Hnext_x as [? Hnext_x];
       (edestruct (@gensyms_spec var) as [Hgv_copies [Hfresh_gv Hgv_len]]; try exact Hxgv1; [eassumption|]);
       (edestruct (@gensyms_spec var) as [Hfv_copies [Hfresh_fv Hfv_len]]; try exact Hxfv1; [eassumption|]);
       repeat match goal with |- _ /\ _ => split end;
@@ -274,7 +274,7 @@ Proof.
     (* Prove that all the above code actually satisfies the side condition *)
     eapply success; [|reflexivity|reflexivity| |];
     try lazymatch goal with
-    | |- «_» => unerase; destruct Hnext_x as [? Hnext_x]; 
+    | |- «_» => unerase; destruct Hnext_x as [? Hnext_x];
       (edestruct (@gensyms_spec var) as [Hgv_copies [Hfresh_gv Hgv_len]]; try exact Hxgv1; [eassumption|]);
       (edestruct (@gensyms_spec var) as [Hfv_copies [Hfresh_fv Hfv_len]]; try exact Hxfv1; [eassumption|]);
       repeat match goal with |- _ /\ _ => split end;

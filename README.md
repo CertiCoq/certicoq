@@ -44,13 +44,13 @@ CertiCoq is open source and distributed under the [MIT license](LICENSE.md).
 * `benchmarks/` contains the benchmark suite
 * `glue/` contains the glue code generator
 * `bootstrap/` contains the bootstrapped CertiCoq plugin for Coq and
-  a CertiCoq-compiled variant of MetaCoq's safe type checker.
+  a CertiCoq-compiled variant of MetaRocq's safe type checker.
 
 Structure of the theories directory:
 
 * `theories/common`: contains common code utilities 
 * `theories/Compiler`: contains the toplevel CertiCoq pipeline 
-* `theories/LambdaBoxMut`: mutual inductive version of MetaCoq's LambdaBox erased language
+* `theories/LambdaBoxMut`: mutual inductive version of MetaRocq's LambdaBox erased language
 * `theories/LambdaBoxLocal`: variant where deBruijn indices are represented using `N` instead of `nat`.
    The transformation from LambdaBoxMut let-binds the definitions in the environment to
    produce a closed term.

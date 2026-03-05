@@ -8,8 +8,8 @@ Require Import LambdaANF.cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.ide
 From CertiCoq.Common Require Import compM.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad ExtLib.Data.Monads.OptionMonad.
 Require Import compcert.lib.Coqlib.
-Require Import Coq.ZArith.Znumtheory Coq.Relations.Relations Coq.Arith.Wf_nat.
-From Coq Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
+From Stdlib Require Import ZArith.Znumtheory Relations.Relations Arith.Wf_nat.
+From Stdlib Require Import Lists.List MSets.MSets MSets.MSetRBT Numbers.BinNums
      NArith.BinNat PArith.BinPos Sets.Ensembles micromega.Lia.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.StateMonad.
 
@@ -20,7 +20,7 @@ Open Scope fun_scope.
 Open Scope monad_scope.
 
 (** * Correspondence of the relational and the computational definitions of  lambda lifting *)
- 
+
 Section Lambda_lifting_corresp.
 
   (** Construct a function map from [FunInfoMap] similar to the one that is used in the relational spec   *)
@@ -46,10 +46,10 @@ Section Lambda_lifting_corresp.
            ret (Ecase x (y :: ys))
          | _ => ret e
        end).
-  Proof.    
+  Proof.
     unfold bind, ret. simpl.
     intros s [w u]. simpl. destruct (compM.runState m1 s (w, u)).
-    simpl. destruct e; reflexivity. 
+    simpl. destruct e; reflexivity.
   Qed.
 
   Global Opaque bind ret.
@@ -83,7 +83,7 @@ Section Lambda_lifting_corresp.
     intros H y. unfold rename.
     destruct (peq y x); subst; simpl.
     - rewrite extend_gss. destruct (M.get x m) eqn:Heq; eauto.
-      exfalso. eapply H; eexists; eauto. 
+      exfalso. eapply H; eexists; eauto.
     - rewrite extend_gso; eauto.
   Qed.
 
@@ -95,7 +95,7 @@ Section Lambda_lifting_corresp.
     - reflexivity.
     - rewrite <- IHxs. rewrite <- rename_not_in_domain_f_eq. reflexivity.
       normalize_sets. intros Hc. eapply Hnin. constructor; eauto.
-      normalize_sets. sets. 
+      normalize_sets. sets.
   Qed.
 
   Lemma rename_not_in_domain_add_extend_fundefs_f_eq m B :
@@ -106,11 +106,11 @@ Section Lambda_lifting_corresp.
     - rewrite <- IHB. rewrite <- rename_not_in_domain_f_eq. reflexivity.
       simpl in *. intros Hc. eapply Hnin. constructor; eauto.
       sets.
-    - reflexivity.    
+    - reflexivity.
   Qed.
 
   (** * Lemmas about [fun_map] *)
-  
+
 
   Lemma fun_map_set_Fun_f_eq m f f' ft vs s fvs :
     f_eq (fun_map (M.set f (Fun f' ft vs s fvs) m))
@@ -123,7 +123,7 @@ Section Lambda_lifting_corresp.
   Qed.
 
   Lemma fun_map_set_NoListFun_f_eq m f f' fvs :
-    ~ f \in (Dom_map m) ->    
+    ~ f \in (Dom_map m) ->
     f_eq (fun_map (M.set f (NoLiftFun f' fvs) m))
          (fun_map m).
   Proof.
@@ -139,14 +139,14 @@ Section Lambda_lifting_corresp.
   Lemma get_tag_spec A P N :
     {{ fun r (s : comp_data * A) => P (next_var (fst s))}}
       get_ftag N
-    {{ fun r s x s' => P (next_var (fst s')) }}.  
+    {{ fun r s x s' => P (next_var (fst s')) }}.
   Proof.
     eapply pre_post_mp_l.
     eapply bind_triple. now eapply get_triple.
     intros [x1 t1] [x2 t2].
     eapply pre_curry_l. intros H; inv H. destruct x2. simpl.
     eapply bind_triple. eapply pre_strenghtening. 2:{ now eapply put_triple. }
-    now clear; firstorder. 
+    now clear; firstorder.
     intros x [x3 t3]. apply return_triple.
     intros. inv H. eassumption.
   Qed.
@@ -167,7 +167,7 @@ Section Lambda_lifting_corresp.
            f_eq σ (rename fvm) /\
            f_eq ζ (fun_map fm') /\
            fresh S' (next_var (fst s')) }}.
-  Proof with now eauto with Ensembles_DB. 
+  Proof with now eauto with Ensembles_DB.
     revert fm S. induction B; intros m S Hnin Hbeq.
     - eapply bind_triple.
       + eapply IHB.
@@ -180,19 +180,19 @@ Section Lambda_lifting_corresp.
         eapply pre_curry_l. intros Hdom.
         eapply pre_curry_l. intros Hfeq1.
         eapply pre_curry_l. intros Hfeq2.
-        rewrite Hbeq. 
-        simpl. 
+        rewrite Hbeq.
+        simpl.
         eapply bind_triple. now apply get_name_spec.
-        intros x s2. eapply pre_curry_l. intros Hf'.       
+        intros x s2. eapply pre_curry_l. intros Hf'.
         eapply bind_triple.
         apply get_tag_spec with (P := fun s => x \in (Range (next_var (fst s2)) s) /\
                                                      (next_var (fst s2) < s)%positive /\
                                                      fresh (S' \\ [set x]) s).
         intros ft s3. apply return_triple. intros _ s4 Hf. destructAll.
         do 3 eexists. split ; [| split; [| split; [| split; [| split ]]]].
-        
+
         -- econstructor. eassumption. eassumption.
-        -- rewrite fun_map_set_Fun_f_eq. rewrite <- domain_extend_Some. sets. 
+        -- rewrite fun_map_set_Fun_f_eq. rewrite <- domain_extend_Some. sets.
         -- rewrite Dom_map_set. rewrite Hdom. sets.
         -- symmetry. rewrite Hfeq1, <- !rename_not_in_domain_f_eq. reflexivity.
            intros Hc. eapply Hnin. constructor; [| eassumption ]. left.
@@ -200,12 +200,12 @@ Section Lambda_lifting_corresp.
            intros Hc. eapply Hnin. constructor; [| eassumption ]. right.
            now constructor.
         -- symmetry. rewrite Hfeq2. apply fun_map_set_Fun_f_eq.
-        -- eassumption. 
+        -- eassumption.
     - apply return_triple. intros _ s Hf.
       do 3 eexists; eauto. split. constructor; reflexivity.
       split. sets. split. simpl. sets. split. reflexivity. split. reflexivity. eassumption.
   Qed.
-  
+
   Lemma add_functions_false_sound B fvs sfvs args fm gfuns S :
     Disjoint _ (bound_var_fundefs B) (Dom_map fm) ->
     unique_bindings_fundefs B ->
@@ -213,7 +213,7 @@ Section Lambda_lifting_corresp.
     {{ fun r s => fresh S (next_var (fst s)) }}
       add_functions B fvs sfvs args fm gfuns
     {{ fun r s m s' =>
-         let '(fm', gfuns') := m in         
+         let '(fm', gfuns') := m in
          Dom_map fm' <--> Dom_map fm :|: name_in_fundefs B /\
          Disjoint _ (name_in_fundefs B) (domain (fun_map fm')) /\
          f_eq (fun_map fm) (fun_map fm') /\
@@ -223,11 +223,11 @@ Section Lambda_lifting_corresp.
     - eapply bind_triple.
       + eapply IHB.
         normalize_bound_var_in_ctx. now sets. inv Hun. eassumption.
-        eassumption. 
+        eassumption.
       + intros [fm' gfuns'] s1. simpl.
         eapply pre_curry_l. intros Heq.
         (* eapply pre_curry_l. intros Hfeq1. *)
-        rewrite Hbeq.  
+        rewrite Hbeq.
         simpl. apply return_triple. intros _ s4 Hf. destructAll.
         split; [| split; [| split ]].
         * rewrite Dom_map_set, Heq. now sets.
@@ -256,7 +256,7 @@ Section Lambda_lifting_corresp.
   Lemma make_wrappers_sound_subset S B fv fm :
     name_in_fundefs B \subset (domain (fun_map fm)) ->
     {{ fun r s => fresh S (next_var (fst s)) }}
-      make_wrappers B fv fm 
+      make_wrappers B fv fm
     {{ fun r s r s' =>
          let (o, fv') := r in
          exists B' σ S',
@@ -293,10 +293,10 @@ Section Lambda_lifting_corresp.
           { eapply return_triple.
             simpl; intros. destructAll.
             do 3 eexists. split; [| split; [| split ]].
-            -- reflexivity. 
+            -- reflexivity.
             -- inv H1. econstructor; eauto.
                unfold fun_map. rewrite Hget. reflexivity.
-               eapply Included_trans. eapply Hsub'. now sets.  
+               eapply Included_trans. eapply Hsub'. now sets.
                constructor; eauto. intros Hc. eapply Hsub'; eauto.
             -- simpl. rewrite rename_set_WraperFun_f_eq. rewrite H3. reflexivity.
             -- rewrite Dom_map_set, H4. sets. }
@@ -316,7 +316,7 @@ Section Lambda_lifting_corresp.
     name_in_fundefs B \subset Dom_map fm ->
     Disjoint _ (name_in_fundefs B) (domain (fun_map fm)) ->
     {{ fun r s => fresh S (next_var (fst s)) }}
-      make_wrappers B fv fm 
+      make_wrappers B fv fm
     {{ fun r s r s' =>
          let (o, fv') := r in
          o = None /\
@@ -330,8 +330,8 @@ Section Lambda_lifting_corresp.
       + destruct f0.
         exfalso.
         eapply Hdis. constructor. now left. eexists. unfold fun_map. rewrite Hget. reflexivity.
-        eapply return_triple. intros. split; eauto. 
-      + exfalso. 
+        eapply return_triple. intros. split; eauto.
+      + exfalso.
         assert (Hin' : Dom_map fm v). eapply Hin. now left.
         destruct Hin'. congruence.
     - congruence.
@@ -343,7 +343,7 @@ Section Lambda_lifting_corresp.
     {{ fun r s => fresh S (next_var (fst s)) }}
       add_free_vars xs fvm
     {{ fun r s p s' =>
-         let (ys, fvm') := p in  
+         let (ys, fvm') := p in
          f_eq ((rename fvm) <{xs ~> ys}>) (rename fvm') /\
          Disjoint _ (Setminus _ P (FromList xs)) (Dom_map fvm') /\
          NoDup ys /\
@@ -362,19 +362,19 @@ Section Lambda_lifting_corresp.
     - eapply bind_triple.
       + eapply IHxs; eauto.
       + intros [ys m'] _.
-        apply pre_curry_l. intros Hfeq1. 
+        apply pre_curry_l. intros Hfeq1.
         apply pre_curry_l. intros Hnin'.
         apply pre_curry_l. intros Hnd.
         apply pre_curry_l. intros Hall.
         apply pre_curry_l. intros Hlen.
         eapply bind_triple. now apply get_name_spec.
-        intros y [w1 s1]. apply return_triple. 
+        intros y [w1 s1]. apply return_triple.
         intros s2 [w2 s3] H. destructAll. split; [| split; [| split; [| split; [| split ]]]].
         * simpl. rewrite rename_set_FreeVar_f_eq, Hfeq1.
           reflexivity.
         * normalize_sets. rewrite Dom_map_set. sets.
-        * constructor; eauto. intros Hc. simpl in *. 
-          eapply H. eassumption. 
+        * constructor; eauto. intros Hc. simpl in *.
+          eapply H. eassumption.
         * normalize_sets. eapply Union_Included; eauto.
           inv H. eapply Singleton_Included. eassumption.
         * simpl; congruence.
@@ -395,7 +395,7 @@ Section Lambda_lifting_corresp.
       do 3 eexists. split; [| split; [| split ]].
       constructor. eassumption. rewrite <- Heq3'. eassumption.
       rewrite Heq1'. reflexivity. rewrite Heq2'. reflexivity.
-      rewrite Heq3'. reflexivity. 
+      rewrite Heq3'. reflexivity.
     - do 3 eexists. split; [| split; [| split ]]; try eassumption.
       constructor.
   Qed.
@@ -434,11 +434,11 @@ Section Lambda_lifting_corresp.
     - edestruct IHHadd as [σ2' [Hadd' Heq']]; eauto.
       eexists. split.
       rewrite Heq1. econstructor; eauto. rewrite <- Heq2. eassumption.
-      rewrite Heq'. reflexivity. 
+      rewrite Heq'. reflexivity.
   Qed.
 
   (** * Some Proper instances *)
-  
+
   Instance FunsFVs_Proper : Proper (f_eq ==> Same_set _) FunsFVs.
   Proof.
     constructor; intros z [f [f' [ft [fvs [Heq Hin]]]]].
@@ -450,7 +450,7 @@ Section Lambda_lifting_corresp.
   Proof.
     intros f1 f2 Heq x. unfold lifted_name. rewrite Heq; reflexivity.
   Qed.
-    
+
   Instance Funs_Proper : Proper (f_eq ==> Same_set _) Funs.
   Proof.
     constructor; intros z [f H']; eexists; unfold lifted_name in *.
@@ -463,7 +463,7 @@ Section Lambda_lifting_corresp.
     intros f1 f2 Heq. unfold LiftedFuns.
     rewrite !Heq. reflexivity.
   Qed.
-  
+
   Lemma Exp_lambda_lift_proper_mut :
     (forall e ζ σ ζ' σ' S1 e' S2
        (Hll : Exp_lambda_lift ζ σ e S1 e' S2)
@@ -473,7 +473,7 @@ Section Lambda_lifting_corresp.
         (forall (Hll : Fundefs_lambda_lift2 ζ σ B0 B S1 B' S2) (Heq1 : f_eq σ σ') (Heq2 : f_eq ζ ζ'),
             Fundefs_lambda_lift2 ζ' σ' B0 B S1 B' S2) /\
         (forall (Hll : Fundefs_lambda_lift3 ζ σ B0 B S1 B' S2) (Heq1 : f_eq σ σ') (Heq2 : f_eq ζ ζ'),
-          Fundefs_lambda_lift3 ζ' σ' B0 B S1 B' S2)).    
+          Fundefs_lambda_lift3 ζ' σ' B0 B S1 B' S2)).
   Proof.
     eapply exp_def_mutual_ind; simpl; intros; try inv Hll.
     - rewrite Heq1. econstructor; eauto. eapply H; eauto.
@@ -482,16 +482,16 @@ Section Lambda_lifting_corresp.
     - rewrite Heq1. econstructor; eauto.
     - rewrite Heq1. econstructor; eauto.
       eapply H; eauto. rewrite Heq1; reflexivity.
-    - rewrite !Heq1. eapply LL_Eletapp_known. 
-      rewrite <- Heq2. eassumption. 
+    - rewrite !Heq1. eapply LL_Eletapp_known.
+      rewrite <- Heq2. eassumption.
       eapply H; eauto.
       rewrite Heq1; reflexivity.
-    - rewrite !Heq1. eapply LL_Eletapp_unknown. 
+    - rewrite !Heq1. eapply LL_Eletapp_unknown.
       eapply H; eauto.
       rewrite Heq1; reflexivity.
     - edestruct Add_functions_f_eq' as [σ''' [ζ'' [Hadd1 [Heq1' Heq2']]]]; eauto.
       edestruct Make_wrappers_f_eq as [σ2 [S2' Hwr]]. eassumption.
-      eassumption. eassumption. 
+      eassumption. eassumption.
       eapply LL_Efun2.
       eapply Included_trans. eassumption.
       eapply Included_Union_compat. reflexivity.
@@ -503,7 +503,7 @@ Section Lambda_lifting_corresp.
       eapply H0; eassumption.
     - eapply LL_Efun3.
       eapply H. eassumption. rewrite Heq1. reflexivity. eassumption.
-      eapply H0; eauto. rewrite Heq1. reflexivity.       
+      eapply H0; eauto. rewrite Heq1. reflexivity.
     - rewrite !Heq1. econstructor; eauto. rewrite <- Heq2. eauto.
     - rewrite !Heq1. econstructor; eauto.
     - econstructor. eauto. eapply H; eauto. now rewrite Heq1.
@@ -513,7 +513,7 @@ Section Lambda_lifting_corresp.
     - split; intros.
       + inv Hll.
         edestruct Make_wrappers_f_eq as [σ2 [S2' Hwr]]. eassumption. rewrite Heq1. reflexivity.
-        eassumption. 
+        eassumption.
         econstructor; eauto. rewrite <- Heq2; eauto.
         eapply H0. eassumption. eassumption. eassumption.
       + inv Hll. econstructor; eauto.
@@ -553,7 +553,7 @@ Section Lambda_lifting_corresp.
     eapply Exp_lambda_lift_proper_mut; try eassumption; try reflexivity.
     symmetry. eassumption.
   Qed.
-  
+
   Instance Fundefs_lambda3_lift_Proper_ζ :
       Proper (f_eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> eq ==> iff) Fundefs_lambda_lift3.
   Proof.
@@ -573,17 +573,17 @@ Section Lambda_lifting_corresp.
 
 
   (** Alternative definition for [Funs] *)
-  Lemma Funs_Same_set ζ : 
+  Lemma Funs_Same_set ζ :
     Same_set _ (Funs ζ) (domain ζ).
   Proof.
     split; intros x [y H]. unfold lifted_name in H.
     edestruct (ζ x) eqn:Heq; simpl in H; eauto.
-    repeat eexists; eauto. 
+    repeat eexists; eauto.
     inv H.
     destruct y as [[? ?] ?]. eapply lifted_name_eq in H.
     repeat eexists; eauto.
   Qed.
-  
+
   Lemma Add_functions_name_in_fundefs_Included (B : fundefs) (fvs : list var) (σ : var -> var)
         (ζ : var -> option (var * fun_tag * list var)) (S : Ensemble var)
         (σ' : var -> var) (ζ' : var -> option (var * fun_tag * list var))
@@ -598,7 +598,7 @@ Section Lambda_lifting_corresp.
 
   (** Soundness of [exp_true_fv] *)
   Section TrueFV_correct.
-    
+
     Variable (funmap : FunInfoMap).
 
     Lemma exp_true_fv_fundefs_true_fv_correct lift_dec :
@@ -640,7 +640,7 @@ Section Lambda_lifting_corresp.
         + inv H0. left. split. eapply Free_Eletapp2; eauto.
           intros Hc. subst. apply H1. now apply_set_specs; eauto.
           intros Hc. apply H1. now apply_set_specs; eauto.
-        + inv H0; eauto. eapply add_list_spec in H. inv H. 
+        + inv H0; eauto. eapply add_list_spec in H. inv H.
           * destruct (funmap ! f) eqn:Hget.
             -- destruct f0; eauto. destruct (lift_dec l0 FVset).
                 ++ eapply union_list_spec in H0. inv H0.
@@ -665,8 +665,8 @@ Section Lambda_lifting_corresp.
                repeat apply_set_specs_ctx; eauto.
                left. constructor. constructor; eauto. now left.
                intros Hc. eapply PS.mem_spec in Hc. congruence.
-          * destructAll.                   
-            left. constructor. constructor; eauto. now right. eassumption.                  
+          * destructAll.
+            left. constructor. constructor; eauto. now right. eassumption.
       - destruct (fundefs_true_fv_aux lift_dec funmap f2 Scope FVset) as [Scope' FVset'] eqn:Heq.
         specialize (IHdefs Scope FVset). rewrite Heq in IHdefs.
         destruct IHdefs as [H1 H2].
@@ -677,7 +677,7 @@ Section Lambda_lifting_corresp.
         + inv H0; eauto. eapply H2 in H. inv H; eauto. inv H0; eauto.
       - eapply add_list_spec in H. inv H; eauto.
         + destruct (Maps.PTree.get v funmap) eqn:Heqf.
-          destruct f. destruct (lift_dec l1 FVset); eauto. 
+          destruct f. destruct (lift_dec l1 FVset); eauto.
           * repeat apply_set_specs_ctx; eauto.
             right; left; right. repeat eexists. erewrite lifted_name_eq; eauto.
             unfold fun_map. rewrite Heqf; reflexivity.
@@ -716,7 +716,7 @@ Section Lambda_lifting_corresp.
         intros Hc. eapply PS.mem_spec in Hc. congruence.
       - destruct (fundefs_true_fv_aux lift_dec funmap f5 (PS.add v Scope) FVset) as [Scope' FVset'] eqn:Heq.
         specialize (IHdefs (PS.add v Scope) FVset). rewrite Heq in IHdefs.
-        destruct IHdefs as [H1 H2]. split. 
+        destruct IHdefs as [H1 H2]. split.
         + split; intros H.
           eapply H1 in H; inv H; eauto. repeat apply_set_specs_ctx; eauto.
           eapply H1. inv H; eauto. left. now apply_set_specs; eauto.
@@ -757,7 +757,7 @@ Section Lambda_lifting_corresp.
     Qed.
 
   End TrueFV_correct.
-  
+
   (** * The lambda lifting algorithm is sound w.r.t. its relational specification *)
   Lemma lambda_lifting_sound max_args max_push lift_dec :
     (forall (e : exp) (FVmap : VarInfoMap) (FNmap : FunInfoMap) (GFuns: GFunMap)
@@ -768,7 +768,7 @@ Section Lambda_lifting_corresp.
        (HD : Disjoint _ (bound_var e) (occurs_free e))
        (Hnin : Disjoint _  (Union _ S (bound_var e)) (Dom_map FVmap))
        (Hnin' : Disjoint _  (bound_var e) (Dom_map FNmap))
-       
+
        (Hun : unique_bindings e),
        {{ fun r s => fresh S (next_var (fst s)) }}
          exp_lambda_lift max_args max_push lift_dec e Scope AFuns FVmap FNmap GFuns
@@ -786,12 +786,12 @@ Section Lambda_lifting_corresp.
        (Hnin : Disjoint _  (Union _ S (bound_var_fundefs B :|: bound_var_fundefs B0)) (Dom_map FVmap))
        (Hnin' : Disjoint _  (bound_var_fundefs B \\ name_in_fundefs B) (Dom_map FNmap))
        (Hun : unique_bindings_fundefs B)
-       (Hor : (name_in_fundefs B \subset domain (fun_map FNmap) /\ name_in_fundefs B0 \subset domain (fun_map FNmap)) \/ 
+       (Hor : (name_in_fundefs B \subset domain (fun_map FNmap) /\ name_in_fundefs B0 \subset domain (fun_map FNmap)) \/
               (Disjoint _ (name_in_fundefs B) (domain (fun_map FNmap)) /\ Disjoint _ (name_in_fundefs B0) (domain (fun_map FNmap))  ))
        (Hdom : name_in_fundefs B \subset Dom_map FNmap),
        {{ fun r s => fresh S (next_var (fst s)) }}
          fundefs_lambda_lift max_args max_push lift_dec B B0 names AFuns FVmap FNmap GFuns no
-         {{ fun r s B' s' =>     
+         {{ fun r s B' s' =>
               exists S',
                 (name_in_fundefs B \subset domain (fun_map FNmap) ->
                  Fundefs_lambda_lift2 (fun_map FNmap) (rename FVmap) B0 B S B' S') /\
@@ -810,7 +810,7 @@ Section Lambda_lifting_corresp.
         * eapply Disjoint_Included_r. now apply occurs_free_Econstr_Included.
           eapply Union_Disjoint_r. now eauto with Ensembles_DB.
           eapply Disjoint_Singleton_r; eassumption.
-      + intros x s1. apply return_triple. 
+      + intros x s1. apply return_triple.
         intros _ [c2 _u] [S' [Hexp Hfr]]. eexists; split; eauto.
         constructor; eauto. rewrite <- rename_not_in_domain_f_eq.
         eassumption.
@@ -825,7 +825,7 @@ Section Lambda_lifting_corresp.
         * eapply Disjoint_Included; [| | now apply HD ].
           normalize_occurs_free...
           now eauto with Ensembles_DB.
-      + intros e' s1. simpl. 
+      + intros e' s1. simpl.
         setoid_rewrite st_eq_Ecase. eapply pre_existential.
         intros S1. eapply pre_curry_l; intros Hll.
         eapply bind_triple.
@@ -844,7 +844,7 @@ Section Lambda_lifting_corresp.
             - eapply Disjoint_Included; [| | now apply HD ].
               normalize_occurs_free...
               now eauto with Ensembles_DB.
-            - eapply Exp_Lambda_lift_free_set_Included in Hll. 
+            - eapply Exp_Lambda_lift_free_set_Included in Hll.
               sets.
             - sets.
             - inv Hun; eauto. }
@@ -877,24 +877,24 @@ Section Lambda_lifting_corresp.
           eapply Disjoint_Singleton_r; eassumption.
       + intros z s1. simpl. destruct (FNmap ! f) eqn:Hget.
         destruct f0. destruct (lift_dec l0 Scope).
-        * apply return_triple. 
+        * apply return_triple.
           intros _ [c2 _u] [S' [Hexp Hfr]]. eexists; split; eauto.
           constructor; eauto. unfold fun_map. rewrite Hget. reflexivity. rewrite <- rename_not_in_domain_f_eq.
           eassumption.
           repeat normalize_bound_var_in_ctx. eapply Disjoint_In_l. eassumption. sets.
-        * apply return_triple. 
+        * apply return_triple.
           intros _ [c2 _u] [S' [Hexp Hfr]]. eexists; split; eauto.
           eapply LL_Eletapp_unknown.
           rewrite <- rename_not_in_domain_f_eq.
           eassumption.
           repeat normalize_bound_var_in_ctx. eapply Disjoint_In_l. eassumption. sets.
-        * apply return_triple. 
+        * apply return_triple.
           intros _ [c2 _u] [S' [Hexp Hfr]]. eexists; split; eauto.
           eapply LL_Eletapp_unknown.
           rewrite <- rename_not_in_domain_f_eq.
           eassumption.
           repeat normalize_bound_var_in_ctx. eapply Disjoint_In_l. eassumption. sets.
-        * apply return_triple. 
+        * apply return_triple.
           intros _ [c2 _u] [S' [Hexp Hfr]]. eexists; split; eauto.
           eapply LL_Eletapp_unknown.
           rewrite <- rename_not_in_domain_f_eq.
@@ -926,7 +926,7 @@ Section Lambda_lifting_corresp.
                                  (PS.elements fvs)
                        then []
                        else PS.elements fvs)).
-      
+
       assert (Hsub : FromList args \subset FromList (PS.elements (fundefs_true_fv lift_dec FNmap f2))).
       { unfold args.
         destruct (_ <? _)%nat. normalize_sets. now sets.
@@ -951,10 +951,10 @@ Section Lambda_lifting_corresp.
           eapply pre_existential. intros ζ'. eapply pre_existential. intros S1.
           eapply pre_curry_l. intros Hadd. eapply pre_curry_l. intros Hsub'.
           eapply pre_curry_l. intros Hdom.
-          eapply pre_curry_l. intros Heq1. eapply pre_curry_l. intros Heq2. 
+          eapply pre_curry_l. intros Heq1. eapply pre_curry_l. intros Heq2.
           eapply bind_triple.
           * { inv Hun. eapply IHB; eauto.
-              - rewrite <- Heq2. eapply Disjoint_Included_l. 
+              - rewrite <- Heq2. eapply Disjoint_Included_l.
                 eapply Add_functions_LiftedFuns_Included_r. eassumption.
                 eapply Union_Disjoint_l.
                 eapply Disjoint_Included_r; [| eassumption ].
@@ -971,11 +971,11 @@ Section Lambda_lifting_corresp.
                 eapply Included_Union_compat.
                 now eapply Add_functions_free_set_Included; eauto.
                 normalize_bound_var...
-                repeat sets. 
+                repeat sets.
                 eapply Disjoint_Included_l; [ eassumption |].
-                eapply Disjoint_Included_l; [ eassumption |].                
+                eapply Disjoint_Included_l; [ eassumption |].
                 eapply Union_Disjoint_l.
-                eapply Disjoint_sym. eapply Union_Disjoint_l. 
+                eapply Disjoint_sym. eapply Union_Disjoint_l.
                 eapply Disjoint_Included; [| | now apply Hf ].
                 normalize_occurs_free...
                 now eapply Add_functions_free_set_Included; eauto.
@@ -1018,34 +1018,34 @@ Section Lambda_lifting_corresp.
               eapply pre_curry_l. intros Hfeq.
               eapply pre_curry_l. intros Hdom'.
               eapply bind_triple.
-              assert (Hfs : S' \subset S). 
+              assert (Hfs : S' \subset S).
               { eapply Included_trans.
-                now eapply Make_wrappers_free_set_Included; eauto. eapply Included_trans. 
-                now eapply Fundefs_Lambda_lift_free_set_Included2; eauto.                
+                now eapply Make_wrappers_free_set_Included; eauto. eapply Included_trans.
+                now eapply Fundefs_Lambda_lift_free_set_Included2; eauto.
                 now eapply Add_functions_free_set_Included; eauto. }
 
               eapply IHe; eauto.
-              - rewrite <- Heq2. eapply Disjoint_Included_l. 
+              - rewrite <- Heq2. eapply Disjoint_Included_l.
                 eapply Add_functions_LiftedFuns_Included_r. eassumption.
                 eapply Union_Disjoint_l.
                 eapply Disjoint_Included_r; [| eassumption ].
                 eapply Included_Union_compat. eassumption.
                 now sets.
                 eapply Union_Disjoint_r.
-                eapply Disjoint_Included_r. 
+                eapply Disjoint_Included_r.
                 now eapply Make_wrappers_free_set_Included; eauto.
                 eapply Disjoint_Included_r.
-                now eapply Fundefs_Lambda_lift_free_set_Included2; eauto.                
+                now eapply Fundefs_Lambda_lift_free_set_Included2; eauto.
                 now sets. sets.
               - rewrite <- Heq2. eapply Disjoint_Included_l.
                 eapply Add_functions_FunsFVs_Included_r. eassumption.
                 eapply Union_Disjoint_l.
-                eapply Disjoint_Included_r; [| eassumption ]. 
+                eapply Disjoint_Included_r; [| eassumption ].
                 eapply Included_Union_compat. eassumption.
                 now eauto with Ensembles_DB.
                 eapply Disjoint_Included_l; [ eassumption |].
                 eapply Disjoint_Included_l; [ eassumption |].
-                repeat normalize_occurs_free_in_ctx. 
+                repeat normalize_occurs_free_in_ctx.
                 eapply Union_Disjoint_l; sets.
                 + eapply Union_Disjoint_r; sets.
                   eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hf ]. now sets.
@@ -1061,7 +1061,7 @@ Section Lambda_lifting_corresp.
               - eapply Disjoint_Included_r.
                 now apply occurs_free_Efun_Included.
                 eapply Union_Disjoint_r. now eauto with Ensembles_DB.
-                eapply Disjoint_Included_r. now apply name_in_fundefs_bound_var_fundefs. 
+                eapply Disjoint_Included_r. now apply name_in_fundefs_bound_var_fundefs.
                 assumption.
               - rewrite Hdom'. eapply Union_Disjoint_r; sets.
                 eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs.
@@ -1074,34 +1074,34 @@ Section Lambda_lifting_corresp.
                 eexists; split.
                 edestruct Make_wrappers_f_eq. eassumption. symmetry. eassumption. symmetry. eassumption.
                 destructAll.
-                
-                eapply LL_Efun2; [ | | | | eapply H | ]. 5:{ rewrite <- H0, <- Hfeq, Heq2. eassumption. } 
+
+                eapply LL_Efun2; [ | | | | eapply H | ]. 5:{ rewrite <- H0, <- Hfeq, Heq2. eassumption. }
                 4:{ rewrite Heq2, Heq1. eapply Hll. eassumption. }
                 3:{ eassumption. }
                 eapply Included_trans. eassumption.
                 eapply Included_trans. eassumption.
-                
+
                 edestruct Add_functions_f_eq. eassumption. symmetry. eassumption. reflexivity.
                 reflexivity.  reflexivity. eassumption. eassumption. } }
       { inv Hun. eapply bind_triple.
         + eapply add_functions_false_sound; eauto.
           repeat normalize_bound_var_in_ctx.
           eapply Disjoint_Included_l; [| eassumption ]. sets.
-        + intros [m gm] [s1 _u]. 
+        + intros [m gm] [s1 _u].
           eapply pre_curry_l. intros Hdom.
-          eapply pre_curry_l. intros Heq1. eapply pre_curry_l. intros Heq2. 
+          eapply pre_curry_l. intros Heq1. eapply pre_curry_l. intros Heq2.
           eapply bind_triple.
-          * { repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. 
+          * { repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx.
               eapply IHB; eauto.
               - rewrite <- Heq2. eapply Disjoint_Included_l. reflexivity.
                  now sets.
-              - rewrite <- Heq2. now sets. 
+              - rewrite <- Heq2. now sets.
               - now sets.
               - now sets.
-              - eapply Disjoint_Included; [| | now apply HD]; sets.                
+              - eapply Disjoint_Included; [| | now apply HD]; sets.
               - now sets.
               - rewrite Hdom. now sets.
-              - rewrite Hdom. now sets. } 
+              - rewrite Hdom. now sets. }
           * intros B' s2. eapply pre_existential. intros S2.
             eapply pre_curry_l. intros Hll.
             eapply pre_curry_l. intros HDis.
@@ -1110,27 +1110,27 @@ Section Lambda_lifting_corresp.
               - intro. subst. simpl in *. repeat normalize_sets. congruence.
               - rewrite Hdom. sets.
               - eassumption. }
-            { intros [Bw m'] [c u]. 
-              eapply pre_curry_l. intro; subst. 
-              eapply pre_curry_l. intro; subst. 
+            { intros [Bw m'] [c u].
+              eapply pre_curry_l. intro; subst.
+              eapply pre_curry_l. intro; subst.
               eapply bind_triple.
               repeat normalize_bound_var_in_ctx.
               repeat normalize_occurs_free_in_ctx.
               eapply IHe; eauto.
               - rewrite <- Heq2.
                 eapply Union_Disjoint_r.
-                eapply Disjoint_Included_r. 
-                eapply Fundefs_Lambda_lift_free_set_Included3; eauto.                
+                eapply Disjoint_Included_r.
+                eapply Fundefs_Lambda_lift_free_set_Included3; eauto.
                 now sets. now sets.
               - rewrite <- Heq2.
                 eapply Union_Disjoint_r.
-                eapply Disjoint_Included_r. 
-                eapply Fundefs_Lambda_lift_free_set_Included3; eauto.                
+                eapply Disjoint_Included_r.
+                eapply Fundefs_Lambda_lift_free_set_Included3; eauto.
                 now sets. now sets.
               - eapply Disjoint_Included; [| | now apply Hf].
-                rewrite !Union_assoc. rewrite Union_Setminus_Included. 
+                rewrite !Union_assoc. rewrite Union_Setminus_Included.
                 now sets. tci. eapply Included_trans. eapply name_in_fundefs_bound_var_fundefs. now sets.
-                eapply Fundefs_Lambda_lift_free_set_Included3; eauto.                
+                eapply Fundefs_Lambda_lift_free_set_Included3; eauto.
               - eapply Disjoint_Included_r. eapply Included_Union_Setminus with (s2 := name_in_fundefs f2).
                 tci.
                 eapply Union_Disjoint_r.
@@ -1138,13 +1138,13 @@ Section Lambda_lifting_corresp.
                 eapply Disjoint_Included_r; [| eassumption ].
                 eapply name_in_fundefs_bound_var_fundefs.
               - eapply Union_Disjoint_l.
-                eapply Disjoint_Included_l. 
-                eapply Fundefs_Lambda_lift_free_set_Included3; eauto.                
+                eapply Disjoint_Included_l.
+                eapply Fundefs_Lambda_lift_free_set_Included3; eauto.
                 now sets. now sets.
               - rewrite Hdom. eapply Union_Disjoint_r; sets.
                 eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs.
-                eassumption. 
-              - intros e' s3. eapply return_triple. intros _ s4 [S3 [Hll' Hfr]].                
+                eassumption.
+              - intros e' s3. eapply return_triple. intros _ s4 [S3 [Hll' Hfr]].
                 eexists; split.  eapply LL_Efun3.
                 rewrite <- rename_not_in_domain_add_extend_fundefs_f_eq. rewrite Heq2.
                 now eauto.
@@ -1176,7 +1176,7 @@ Section Lambda_lifting_corresp.
         * eapply Disjoint_Included_r. now apply occurs_free_Eprim_val_Included.
           eapply Union_Disjoint_r. now eauto with Ensembles_DB.
           eapply Disjoint_Singleton_r; eassumption.
-      + intros x s1. apply return_triple. 
+      + intros x s1. apply return_triple.
         intros _ [c2 _u] [S' [Hexp Hfr]]. eexists; split; eauto.
         constructor; eauto. rewrite <- rename_not_in_domain_f_eq.
         eassumption.
@@ -1189,14 +1189,14 @@ Section Lambda_lifting_corresp.
         * eapply Disjoint_Included_r. now apply occurs_free_Eprim_Included.
           eapply Union_Disjoint_r. now eauto with Ensembles_DB.
           eapply Disjoint_Singleton_r; eassumption.
-      + intros x s1. apply return_triple. 
+      + intros x s1. apply return_triple.
         intros _ [c2 _u] [S' [Hexp Hfr]]. eexists; split; eauto.
         constructor; eauto. rewrite <- rename_not_in_domain_f_eq.
         eassumption.
         repeat normalize_bound_var_in_ctx. eapply Disjoint_In_l. eassumption. sets.
     - eapply return_triple. intros s1 Hfr. eexists. split; eauto.
       econstructor.
-    - inv Hun. 
+    - inv Hun.
       repeat normalize_bound_var_in_ctx. repeat normalize_occurs_free_in_ctx. inv Hor.
       { (* Case Lifted Funs *)
         edestruct (M.get v FNmap) eqn:Heq'; try discriminate.
@@ -1209,7 +1209,7 @@ Section Lambda_lifting_corresp.
             eapply bind_triple.
             eapply make_wrappers_sound_subset. eassumption.
             intros xs' s1. simpl. destruct xs'. apply pre_existential. intros B'.
-            apply pre_existential. intros sig. eapply pre_existential. intros S'. 
+            apply pre_existential. intros sig. eapply pre_existential. intros S'.
             eapply pre_curry_l. intro; subst. eapply pre_curry_l. intros Hwr. apply pre_curry_l. intros Hfew.
             apply pre_curry_l. intros Hfeq'. eapply bind_triple.
             { eapply IHe; eauto.
@@ -1248,7 +1248,7 @@ Section Lambda_lifting_corresp.
                 rewrite Setminus_Disjoint. now sets. eapply Union_Disjoint_r; sets.
                 eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs. eassumption.
                 eapply Disjoint_Included_l; [| eassumption ].
-                rewrite Setminus_Union_distr. rewrite !Setminus_Union_distr. 
+                rewrite Setminus_Union_distr. rewrite !Setminus_Union_distr.
                 rewrite @Setminus_Disjoint with (s1 := bound_var e).
                 now sets. eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hfvs ]. now sets.
                 intros el Hel. do 4 eexists. split. unfold Funs, fun_map. rewrite Heq'. now eauto. eassumption.
@@ -1258,9 +1258,9 @@ Section Lambda_lifting_corresp.
                 eapply Disjoint_Included_r. eapply name_in_fundefs_bound_var_fundefs. eassumption. }
             { intros e' s2. eapply pre_existential. intros S1.
               eapply pre_curry_l. intros Hll.
-              assert (Hsub : S1 \subset S). 
+              assert (Hsub : S1 \subset S).
               { eapply Included_trans. eapply Exp_Lambda_lift_free_set_Included. eassumption.
-                eapply Included_trans. eapply Make_wrappers_free_set_Included; eauto. now sets. }  
+                eapply Included_trans. eapply Make_wrappers_free_set_Included; eauto. now sets. }
               eapply bind_triple.
               - eapply IHB; eauto.
                 + eapply Disjoint_Included_r; [| eassumption ]. xsets.
@@ -1294,7 +1294,7 @@ Section Lambda_lifting_corresp.
                   eapply Disjoint_sym. eapply Disjoint_Included; [| | eapply Hfvs ]. now sets.
                   intros el Hel. do 4 eexists. split. unfold Funs, fun_map. rewrite Heq'. now eauto. eassumption. }
                 edestruct Make_wrappers_f_eq. eassumption. symmetry. eassumption. reflexivity.
-                inv H1. 
+                inv H1.
                 econstructor; try eassumption.
                 + unfold fun_map. rewrite Heq'. reflexivity.
                 + now eauto.
@@ -1334,7 +1334,7 @@ Section Lambda_lifting_corresp.
               eapply pre_curry_l. intros Hll.
               assert (Hsub : S1 \subset S).
               { eapply Exp_Lambda_lift_free_set_Included. eassumption. }
-              
+
               eapply bind_triple.
               - eapply IHB; eauto.
                 + sets.
@@ -1374,8 +1374,8 @@ Section Lambda_lifting_corresp.
       split; intros. constructor. eassumption.
 
       Unshelve.
-      eassumption. eassumption. eassumption. 
+      eassumption. eassumption. eassumption.
   Qed.
 
-  
+
 End Lambda_lifting_corresp.

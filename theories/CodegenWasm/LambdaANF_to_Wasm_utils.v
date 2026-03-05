@@ -14,7 +14,7 @@ From Wasm Require Import
   datatypes operations host instantiation_spec type_preservation
   instantiation_properties opsem properties.
 
-From Coq Require Import
+From Stdlib Require Import
   List ListDec
   Logic.Decidable
   Relations.Relations Relations.Relation_Operators
@@ -326,7 +326,7 @@ Proof.
     destruct n; first lia. destruct l; first inv H.
     replace (a + 1) with (S a) by lia.
     replace (S n - a) with (S (n - a)) by lia. cbn.
-    rewrite MCList.nth_error_skipn. cbn.
+    rewrite MRList.nth_error_skipn. cbn.
     now replace (a + (n - a)) with n by lia. }
 Qed.
 
@@ -2659,7 +2659,7 @@ Qed.
 (* head0 related *)
 
 Lemma head0_spec_alt: forall x : uint63,
-  (0 < φ (x)%uint63)%Z -> 
+  (0 < φ (x)%uint63)%Z ->
   (to_Z (head0 x) = 62 - Z.log2 (to_Z x))%Z.
 Proof.
   intros.

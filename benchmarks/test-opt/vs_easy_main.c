@@ -6,11 +6,11 @@
 
 extern void body(struct thread_info *);
 
-extern void print_Coq_Init_Datatypes_bool(unsigned long long);
+extern void print_Corelib_Init_Datatypes_bool(unsigned long long);
 
 extern void print_CertiCoq_Benchmarks_lib_vs_space_atom(unsigned long long);
 
-extern unsigned int get_Coq_Init_Datatypes_list_tag(unsigned long long);
+extern unsigned int get_Corelib_Init_Datatypes_list_tag(unsigned long long);
 
 extern value args[];
 
@@ -18,7 +18,7 @@ _Bool is_ptr(value s) {
   return (_Bool) Is_block(s);
 }
 
-extern void print_Coq_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
+extern void print_Corelib_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
 
 extern void print_CertiCoq_Benchmarks_lib_vs_clause(unsigned long long);
 
@@ -29,19 +29,19 @@ void print_elem(unsigned long long v)
 
 void print_list(unsigned long long l)
 {
-  print_Coq_Init_Datatypes_list(l, print_elem);
+  print_Corelib_Init_Datatypes_list(l, print_elem);
   printf("\n");
 }
 
 void print_list_space_atom(unsigned long long l)
 {
-  print_Coq_Init_Datatypes_list(l, print_CertiCoq_Benchmarks_lib_vs_space_atom);
+  print_Corelib_Init_Datatypes_list(l, print_CertiCoq_Benchmarks_lib_vs_space_atom);
   printf("\n");
 }
 
 void print_list_clause(unsigned long long l)
 {
-  print_Coq_Init_Datatypes_list(l, print_CertiCoq_Benchmarks_lib_vs_clause);
+  print_Corelib_Init_Datatypes_list(l, print_CertiCoq_Benchmarks_lib_vs_clause);
   printf("\n");
 }
 
@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
 
   val = tinfo -> args[1];
   // TODO : fold over nat to print the C int
-  print_Coq_Init_Datatypes_bool(val);
+  print_Corelib_Init_Datatypes_bool(val);
   printf("\n");
 
   sec = (double)(end - start)/CLOCKS_PER_SEC;

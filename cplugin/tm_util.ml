@@ -6,7 +6,7 @@ let contrib_name = "template-coq"
   while have option settings apply to both *)
 let timing_opt =
   let open Goptions in
-  let key = ["MetaCoq"; "Timing"] in
+  let key = ["MetaRocq"; "Timing"] in
   match get_option_value key with
   | Some get -> fun () ->
       begin match get () with
@@ -27,7 +27,7 @@ let time prefix f x =
   
 let debug_opt =
   let open Goptions in
-  let key = ["MetaCoq"; "Debug"] in
+  let key = ["MetaRocq"; "Debug"] in
   match get_option_value key with
   | Some get -> fun () ->
       begin match get () with

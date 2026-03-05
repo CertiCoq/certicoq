@@ -10,7 +10,7 @@ typedef value primfloatintpair;
 typedef value primfloat_class;
 typedef value primfloat_comparison;
 
-// #define inf INFINITY // OCaml name for infinity
+#define inf INFINITY // OCaml name for infinity
 
 extern primfloat_comparison prim_float_compare(primfloat x, primfloat y);
 extern primbool prim_float_eqb(primfloat x, primfloat y);

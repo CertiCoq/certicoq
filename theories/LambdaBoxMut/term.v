@@ -8,7 +8,7 @@ From Stdlib Require Import micromega.Lia.
 Require Import Common.Common.  (* shared namespace *)
 From MetaRocq.Utils Require Import bytestring. (* For identifier names *)
 From MetaRocq.Common Require Import Reflect.
-From CertiCoq Require Import LambdaBoxMut.compile.
+From CertiRocq Require Import LambdaBoxMut.compile.
 
 Open Scope bs_scope.
 Open Scope bool.

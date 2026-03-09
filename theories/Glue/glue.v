@@ -538,7 +538,7 @@ Section L1Types.
     in check_last (Ast.Env.ind_type (ty_body info)).
 
   (* Takes in a list of types and removes the ones that are of sort [Prop].
-     [Set] and [Type] are fine. CertiCoq erases [Prop]s early on,
+     [Set] and [Type] are fine. CertiRocq erases [Prop]s early on,
      so no glue code is needed for those types. *)
   Fixpoint filter_prop_types
            (l : list (ind_L1_tag * ty_info)) : glueM (list (ind_L1_tag * ty_info)) :=

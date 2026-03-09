@@ -4,14 +4,14 @@
 From Stdlib Require Import ZArith.ZArith Lists.List Sets.Ensembles Strings.String.
 From Stdlib Require Import Lia.
 Import ListNotations.
-From CertiCoq.Common Require AstCommon.
-From CertiCoq.LambdaANF Require Import
+From CertiRocq.Common Require AstCommon.
+From CertiRocq.LambdaANF Require Import
      Prototype cps cps_util ctx
      identifiers Ensembles_util.
 
 From MetaRocq Require Import Template.All.
 
-From CertiCoq.LambdaANF Require Import PrototypeGenFrame cps cps_proto_univ.
+From CertiRocq.LambdaANF Require Import PrototypeGenFrame cps cps_proto_univ.
 
 (* Print exp_univ. *)
 (* Print exp_univD. *)

@@ -8,7 +8,7 @@
   ## either using nixpkgs data or the overlays located in `.nix/rocq-overlays`
   ## and `.nix/coq-overlays`
   ## Will determine the default main-job of the bundles defined below
-  attribute = "CertiCoq";
+  attribute = "CertiRocq";
 
   no-rocq-yet = true;
 

@@ -2,9 +2,9 @@ From Stdlib Require Import NArith.BinNat Relations.Relations MSets.MSets
      MSets.MSetRBT Lists.List micromega.Lia Sets.Ensembles
      Relations.Relations.
 
-From CertiCoq.Common Require Import AstCommon exceptionMonad.
+From CertiRocq.Common Require Import AstCommon exceptionMonad.
 
-From CertiCoq Require Import LambdaANF.cps LambdaANF.List_util LambdaANF.size_cps LambdaANF.ctx LambdaANF.cps_util LambdaANF.set_util LambdaANF.map_util
+From CertiRocq Require Import LambdaANF.cps LambdaANF.List_util LambdaANF.size_cps LambdaANF.ctx LambdaANF.cps_util LambdaANF.set_util LambdaANF.map_util
      LambdaANF.identifiers LambdaANF.tactics LambdaANF.Ensembles_util.
 
 Require Import compcert.lib.Coqlib.

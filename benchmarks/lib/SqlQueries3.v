@@ -1,7 +1,7 @@
 (* NOTE: This program is NOT open-source, and is NOT licensed for
  * redistribution.  It is copyright by the authors.  Permission is
- * granted only to the CertiCoq project for the use of this program
- * as a benchmark in measuring CertiCoq performance. *)
+ * granted only to the CertiRocq project for the use of this program
+ * as a benchmark in measuring CertiRocq performance. *)
 
 (************************************************************************************)
 (**                                                                                  *)

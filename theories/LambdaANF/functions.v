@@ -1,8 +1,8 @@
-(* Function library. Part of the CertiCoq project.
+(* Function library. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 
-From CertiCoq Require Import LambdaANF.Ensembles_util LambdaANF.tactics.
+From CertiRocq Require Import LambdaANF.Ensembles_util LambdaANF.tactics.
 From compcert.lib Require Import Coqlib.
 From Stdlib Require Import Numbers.BinNums NArith.BinNat PArith.BinPos Relations.Relations
      Classes.Morphisms Lists.List Sets.Ensembles Program.Basics micromega.Lia.

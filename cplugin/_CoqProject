@@ -1,26 +1,26 @@
 -I extraction
 -I static
 -I .
--R . CertiCoq.VanillaPlugin
+-R . CertiRocq.VanillaPlugin
 
-META.coq-certicoq-vanilla
+META.rocq-certirocq-vanilla
 
 tm_util.ml
 
 plugin_utils.ml
 plugin_utils.mli
-certicoq.mli
-certicoq.ml
-g_certicoq_vanilla.mlg
-certicoq_debug.mli
-certicoq_debug.ml
-certicoq_vanilla_plugin.mlpack
+certirocq.mli
+certirocq.ml
+g_certirocq_vanilla.mlg
+certirocq_debug.mli
+certirocq_debug.ml
+certirocq_vanilla_plugin.mlpack
 Loader.v
-CoqMsgFFI.v
+RocqMsgFFI.v
 PrimInt63.v
 PrimFloats.v
 PrimString.v
-CertiCoqVanilla.v
+CertiRocqVanilla.v
 
 static/caml_option.mli
 static/caml_option.ml
@@ -32,7 +32,7 @@ static/caml_ascii_string.ml
 static/caml_bytestring.ml
 static/caml_comparison.mli
 static/caml_comparison.ml
-static/camlcoq.ml
+static/camlrocq.ml
 static/printAST.ml
 static/printClight.ml
 static/printCsyntax.ml

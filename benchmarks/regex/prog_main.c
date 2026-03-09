@@ -13,7 +13,7 @@ extern value args[];
 extern unsigned int get_Corelib_Strings_String_string_tag(value);
 extern unsigned int get_Corelib_Init_Datatypes_bool_tag(value);
 extern unsigned int get_Corelib_Init_Datatypes_list_tag(value);
-extern unsigned int get_CertiCoq_Benchmarks_regex_regex_rgx_tag(value);
+extern unsigned int get_CertiRocq_Benchmarks_regex_regex_rgx_tag(value);
 extern value make_Corelib_Init_Datatypes_bool_true(void);
 extern value make_Corelib_Init_Datatypes_bool_false(void);
 extern value make_Corelib_Init_Datatypes_unit_tt(void);
@@ -25,8 +25,8 @@ extern value alloc_make_Corelib_Init_Datatypes_list_cons(struct thread_info *, v
 extern value alloc_make_Corelib_Init_Datatypes_option_Some(struct thread_info *, value);
 extern value alloc_make_Corelib_Strings_String_string_String(struct thread_info *, value, value);
 
-extern value alloc_make_CertiCoq_Benchmarks_regex_regex_RegexFFI_Build_RegexFFI(struct thread_info *, value, value);
-extern value make_CertiCoq_Benchmarks_regex_regex_RegexFFI_Build_RegexFFI(value, value, value *);
+extern value alloc_make_CertiRocq_Benchmarks_regex_regex_RegexFFI_Build_RegexFFI(struct thread_info *, value, value);
+extern value make_CertiRocq_Benchmarks_regex_regex_RegexFFI_Build_RegexFFI(value, value, value *);
 
 extern value *call(struct thread_info *, value, value);
 
@@ -83,7 +83,7 @@ typedef enum {
 
 size_t regex_string_size(value r) {
   char *lit;
-  switch(get_CertiCoq_Benchmarks_regex_regex_rgx_tag(r)) {
+  switch(get_CertiRocq_Benchmarks_regex_regex_rgx_tag(r)) {
     case EMPTY:
       return 4;
     case EPSILON:
@@ -105,7 +105,7 @@ size_t regex_string_size(value r) {
 
 void regex_to_string_aux(value r, char *s) {
   char *lit;
-  switch(get_CertiCoq_Benchmarks_regex_regex_rgx_tag(r)) {
+  switch(get_CertiRocq_Benchmarks_regex_regex_rgx_tag(r)) {
     case EMPTY:
       strcat(s, "(?!)");
       return;
@@ -288,7 +288,7 @@ int main(int argc, char *argv[]) {
 
   // Types are dummy values
   value regex_ffi =
-    alloc_make_CertiCoq_Benchmarks_regex_regex_RegexFFI_Build_RegexFFI(
+    alloc_make_CertiRocq_Benchmarks_regex_regex_RegexFFI_Build_RegexFFI(
         tinfo,
         rgx_test_clo,
         rgx_exec_clo);

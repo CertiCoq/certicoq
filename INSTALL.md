@@ -1,11 +1,11 @@
-# Installing CertiCoq
+# Installing CertiRocq
 
 ## Get the code
 
 Fetch the code:
 
 ```console
-$ git clone git@github.com:CertiCoq/certicoq.git
+$ git clone git@github.com:CertiRocq/certirocq.git
 ```
 
 Fetch the dependencies:
@@ -23,22 +23,22 @@ First, pin the dependencies:
 $ opam pin -n -y submodules/metacoq
 ```
 
-Next, pin CertiCoq:
+Next, pin CertiRocq:
 
 ```console
 $ opam pin -n -y .
 ```
 
-You can now install CertiCoq:
+You can now install CertiRocq:
 
 ```console
-$ opam install coq-certicoq
+$ opam install rocq-certirocq
 ```
 
 Alternatively, if you only want to install the dependencies, you can run:
 
 ```console
-$ opam install coq-certicoq --deps-only
+$ opam install rocq-certirocq --deps-only
 ```
 
 ## Build & install manually
@@ -49,7 +49,7 @@ If possible, install the dependencies using the opam instructions given above.
 
 If that is not an option, you can instead use these "manual" instructions. Note that this approach will only work *if* your installation path for Coq is writable without root privileges.
 
-Make sure that you do not have any of the dependencies installed already. From the `certicoq/` directory, run:
+Make sure that you do not have any of the dependencies installed already. From the `certirocq/` directory, run:
 
 ```console
 $ make submodules

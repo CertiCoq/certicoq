@@ -1,6 +1,6 @@
 (* Andrew W. Appel and Stephen Yi-Hsien Lin,
     May 2013, October 2013, March 2014 *)
-(* Certicoq: Inspired by OEUF's modified version to remove dependencies on other VST files. *)
+(* Certirocq: Inspired by OEUF's modified version to remove dependencies on other VST files. *)
 Require Recdef.
 Require Import compcert.lib.Integers.
 Require Import compcert.lib.Coqlib.
@@ -21,7 +21,7 @@ Fixpoint str_to_bytes (str : string) : list byte :=
     |String c s => Byte.repr (Z.of_N (N_of_ascii c)) :: str_to_bytes s
     end.
 
-(* Certicoq: from VST.sha.general_lemmas *)
+(* Certirocq: from VST.sha.general_lemmas *)
 Definition Shr b x := Int.shru x (Int.repr b).
 
 Lemma byte_testbit:
@@ -64,7 +64,7 @@ Fixpoint map2 {A B C: Type} (f: A -> B -> C) (al: list A) (bl: list B) : list C 
   | _, _ => nil
   end.
 
-(* Certicoq: END from VST.sha.general_lemmas *)
+(* Certirocq: END from VST.sha.general_lemmas *)
 
 
 Definition generate_and_pad msg :=

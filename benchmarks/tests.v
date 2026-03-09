@@ -1,11 +1,11 @@
 From Stdlib Require Import Arith List String.
-Require Import CertiCoq.Benchmarks.lib.vs.
-Require Import CertiCoq.Benchmarks.lib.Binom.
-Require Import CertiCoq.Benchmarks.lib.Color.
-Require Import CertiCoq.Benchmarks.lib.sha256.
-Require Import CertiCoq.Benchmarks.lib.coind.
+Require Import CertiRocq.Benchmarks.lib.vs.
+Require Import CertiRocq.Benchmarks.lib.Binom.
+Require Import CertiRocq.Benchmarks.lib.Color.
+Require Import CertiRocq.Benchmarks.lib.sha256.
+Require Import CertiRocq.Benchmarks.lib.coind.
 From MetaRocq.Utils Require Import bytestring MRString.
-From CertiCoq.Plugin Require Import CertiCoq.
+From CertiRocq.Plugin Require Import CertiRocq.
 
 Definition foo := 0.
 
@@ -14,7 +14,7 @@ Open Scope bs.
 Import ListNotations.
 Import VeriStar.
 
-CertiCoq -help.
+CertiRocq -help.
 
 
 (* Demo 1 *)
@@ -82,102 +82,102 @@ Definition sha_fast := sha256.SHA_256' (sha256.str_to_bytes test).
 
 Eval compute in "Compiling demo1".
 
-CertiCoq Compile -O 0 demo1.
-CertiCoq Compile -ext "_opt" demo1.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" demo1.
-(* CertiCoq Compile -O 0 -cps -ext "_cps" demo1. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" demo1. *)
-CertiCoq Generate Glue -file "glue_demo1" [ list, bool ].
+CertiRocq Compile -O 0 demo1.
+CertiRocq Compile -ext "_opt" demo1.
+CertiRocq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" demo1.
+(* CertiRocq Compile -O 0 -cps -ext "_cps" demo1. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" demo1. *)
+CertiRocq Generate Glue -file "glue_demo1" [ list, bool ].
 
 Eval compute in "Compiling demo2".
 
-CertiCoq Compile -O 0 demo2.
-CertiCoq Compile -ext "_opt" demo2.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" demo2.
-(* CertiCoq Compile -O 0 -cps -ext "_cps" demo2. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" demo2. *)
-CertiCoq Generate Glue -file "glue_demo2" [ list, bool ].
+CertiRocq Compile -O 0 demo2.
+CertiRocq Compile -ext "_opt" demo2.
+CertiRocq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" demo2.
+(* CertiRocq Compile -O 0 -cps -ext "_cps" demo2. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" demo2. *)
+CertiRocq Generate Glue -file "glue_demo2" [ list, bool ].
 
 Eval compute in "Compiling demo3".
 
-CertiCoq Compile -O 0 demo3.
-CertiCoq Compile -ext "_opt" demo3.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" demo3.
-(* CertiCoq Compile -O 0 -cps -ext "_cps" demo3. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" demo3. *)
-CertiCoq Generate Glue -file "glue_demo3" [ list, bool ].
+CertiRocq Compile -O 0 demo3.
+CertiRocq Compile -ext "_opt" demo3.
+CertiRocq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" demo3.
+(* CertiRocq Compile -O 0 -cps -ext "_cps" demo3. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" demo3. *)
+CertiRocq Generate Glue -file "glue_demo3" [ list, bool ].
 
 Eval compute in "Compiling list_sum".
 
-CertiCoq Compile -O 0 list_sum.
-CertiCoq Compile -ext "_opt" list_sum.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" list_sum.
-(* CertiCoq Compile -O 0 -cps -ext "_cps" list_sum. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" list_sum. *)
-CertiCoq Generate Glue -file "glue_list_sum" [ nat ].
+CertiRocq Compile -O 0 list_sum.
+CertiRocq Compile -ext "_opt" list_sum.
+CertiRocq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" list_sum.
+(* CertiRocq Compile -O 0 -cps -ext "_cps" list_sum. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" list_sum. *)
+CertiRocq Generate Glue -file "glue_list_sum" [ nat ].
 
 Eval compute in "Compiling lazy factorial (using unsafe passes)".
 
-CertiCoq Compile -unsafe-erasure -O 1 lazy_factorial.
-CertiCoq Compile -unsafe-erasure -ext "_opt" lazy_factorial.
-CertiCoq Compile -unsafe-erasure -args 1000 -config 9 -O 1 -ext "_opt_ll" lazy_factorial.
-(* CertiCoq Compile -O 0 -cps -ext "_cps" demo1. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" demo1. *)
-CertiCoq Generate Glue -file "glue_lazy_factorial" [ ].
+CertiRocq Compile -unsafe-erasure -O 1 lazy_factorial.
+CertiRocq Compile -unsafe-erasure -ext "_opt" lazy_factorial.
+CertiRocq Compile -unsafe-erasure -args 1000 -config 9 -O 1 -ext "_opt_ll" lazy_factorial.
+(* CertiRocq Compile -O 0 -cps -ext "_cps" demo1. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" demo1. *)
+CertiRocq Generate Glue -file "glue_lazy_factorial" [ ].
 
 Eval compute in "Compiling vs_easy".
 
-CertiCoq Compile -O 0 -time_anf vs_easy.
-CertiCoq Compile -ext "_opt" vs_easy.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_easy.
-(* CertiCoq Compile -O 0 -cps -ext "_cps" -time_anf vs_easy. *)
-(* CertiCoq Compile -time -cps -ext "_cps_opt" vs_easy. *)
-CertiCoq Generate Glue -file "glue_vs_easy" [ list, bool, vs.space_atom, vs.clause ].
+CertiRocq Compile -O 0 -time_anf vs_easy.
+CertiRocq Compile -ext "_opt" vs_easy.
+CertiRocq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_easy.
+(* CertiRocq Compile -O 0 -cps -ext "_cps" -time_anf vs_easy. *)
+(* CertiRocq Compile -time -cps -ext "_cps_opt" vs_easy. *)
+CertiRocq Generate Glue -file "glue_vs_easy" [ list, bool, vs.space_atom, vs.clause ].
 
 Eval compute in "Compiling vs_hard".
 
-CertiCoq Compile -O 0 vs_hard.
-CertiCoq Compile -ext "_opt" vs_hard.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_hard.
-(* CertiCoq Compile -O 0 -cps -ext "_cps" vs_hard. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" vs_hard. *)
-CertiCoq Generate Glue -file "glue_vs_hard" [ list, bool ].
+CertiRocq Compile -O 0 vs_hard.
+CertiRocq Compile -ext "_opt" vs_hard.
+CertiRocq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" vs_hard.
+(* CertiRocq Compile -O 0 -cps -ext "_cps" vs_hard. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" vs_hard. *)
+CertiRocq Generate Glue -file "glue_vs_hard" [ list, bool ].
 
 
 Eval compute in "Compiling binom".
 
-CertiCoq Compile -O 0 binom.
-CertiCoq Compile -ext "_opt" binom.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" binom.
-(* CertiCoq Compile -O 0 -cps -ext "_cps" binom. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" binom. *)
-CertiCoq Generate Glue -file "glue_binom" [ nat ].
+CertiRocq Compile -O 0 binom.
+CertiRocq Compile -ext "_opt" binom.
+CertiRocq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" binom.
+(* CertiRocq Compile -O 0 -cps -ext "_cps" binom. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" binom. *)
+CertiRocq Generate Glue -file "glue_binom" [ nat ].
 
 
 Eval compute in "Compiling color".
 From Stdlib Require Import ZArith.
 
-CertiCoq Compile -O 0 -time color.
-CertiCoq Compile -time -ext "_opt" color.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" color.
-(* CertiCoq Compile -O 0 -time -cps -ext "_cps" color. *)
-(* CertiCoq Compile -time -cps -ext "_cps_opt" color. *)
-CertiCoq Generate Glue -file "glue_color" [ prod, Z ].
+CertiRocq Compile -O 0 -time color.
+CertiRocq Compile -time -ext "_opt" color.
+CertiRocq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" color.
+(* CertiRocq Compile -O 0 -time -cps -ext "_cps" color. *)
+(* CertiRocq Compile -time -cps -ext "_cps_opt" color. *)
+CertiRocq Generate Glue -file "glue_color" [ prod, Z ].
 
 (* Don't compile slow sha *)
 (* Eval compute in "Compiling sha". *)
 
-(* CertiCoq Compile -cps -ext "_cps" sha. *)
-(* CertiCoq Compile sha. *)
-(* CertiCoq Compile -O 1 -cps -ext "_cps_opt" sha. *)
-(* CertiCoq Compile -O 1 -ext "_opt" sha. *)
-(* CertiCoq Generate Glue -file "glue_sha" [ ]. *)
+(* CertiRocq Compile -cps -ext "_cps" sha. *)
+(* CertiRocq Compile sha. *)
+(* CertiRocq Compile -O 1 -cps -ext "_cps_opt" sha. *)
+(* CertiRocq Compile -O 1 -ext "_opt" sha. *)
+(* CertiRocq Generate Glue -file "glue_sha" [ ]. *)
 
 Eval compute in "Compiling sha_fast".
 
-CertiCoq Compile -O 0 sha_fast.
-CertiCoq Compile -ext "_opt" sha_fast.
-CertiCoq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" sha_fast.
-(* CertiCoq Compile -O 0 -cps -ext "_cps" sha_fast. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" sha_fast. *)
-CertiCoq Generate Glue -file "glue_sha_fast" [ ].
+CertiRocq Compile -O 0 sha_fast.
+CertiRocq Compile -ext "_opt" sha_fast.
+CertiRocq Compile -args 1000 -config 9 -O 1 -ext "_opt_ll" sha_fast.
+(* CertiRocq Compile -O 0 -cps -ext "_cps" sha_fast. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" sha_fast. *)
+CertiRocq Generate Glue -file "glue_sha_fast" [ ].

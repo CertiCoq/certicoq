@@ -11,15 +11,15 @@
             "name": "Debug",
             "program": "${workspaceFolder}/_opam/bin/coqc",
             "args": [ "test.v"],
-            "cwd": "${workspaceFolder}/bootstrap/certicoqc"
+            "cwd": "${workspaceFolder}/bootstrap/certirocqc"
         },
         {
             "type": "lldb",
             "request": "launch",
             "name": "Debug gencode",
-            "program": "${workspaceFolder}/bootstrap/certicoqc/tests/test.certicoqc",
+            "program": "${workspaceFolder}/bootstrap/certirocqc/tests/test.certirocqc",
             "args": [],
-            "cwd": "${workspaceFolder}/bootstrap/certicoqc"
+            "cwd": "${workspaceFolder}/bootstrap/certirocqc"
         }
     ]
 }

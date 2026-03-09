@@ -20,7 +20,7 @@ From Stdlib Require Import ExtrOCamlPString.
 (* Standard lib *)
 
 (** Extraction to Ocaml : use of basic Ocaml types: be careful that this should
-  the representation in ML should exactly match the one of certicoq.
+  the representation in ML should exactly match the one of certirocq.
   E.g. no constructor swapping allowed.
   *)
 

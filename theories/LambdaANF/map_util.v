@@ -1,11 +1,11 @@
-(* M.t utilities. Part of the CertiCoq project.
+(* M.t utilities. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 
 From Stdlib Require Import NArith.BinNat Relations.Relations MSets.MSets
          MSets.MSetRBT Lists.List micromega.Lia Sets.Ensembles Relations.Relations
          Classes.Morphisms.
-From CertiCoq.LambdaANF Require Import Ensembles_util set_util functions List_util.
+From CertiRocq.LambdaANF Require Import Ensembles_util set_util functions List_util.
 From compcert.lib Require Import Coqlib Maps.
 Require Import Libraries.maps_util LambdaANF.tactics.
 

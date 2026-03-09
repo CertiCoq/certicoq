@@ -1,0 +1,8 @@
+-Q ../../cplugin CertiRocq.VanillaPlugin
+-I ../../cplugin
+-R . CertiRocq.CertiRocqCheck
+-I .
+
+META.rocq-certirocqchk
+
+Loader.v

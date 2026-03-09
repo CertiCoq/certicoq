@@ -19,9 +19,9 @@ Definition LambdaBoxLocalTerm := prod ienv LambdaBoxLocal.expression.exp.
   }.
 
 Definition compile_LambdaBoxLocal (prims : list (kername * string * bool * nat * positive))
-  : CertiCoqTrans (Program LambdaBoxMut.compile.Term) LambdaBoxLocalTerm :=
+  : CertiRocqTrans (Program LambdaBoxMut.compile.Term) LambdaBoxLocalTerm :=
   fun src =>
     debug_msg "Translating from LambdaBoxMut to LambdaBoxLocal"%bs ;;
-    LiftCertiCoqTrans "LambdaBoxLocal" (fun p =>
+    LiftCertiRocqTrans "LambdaBoxLocal" (fun p =>
                               (LambdaBoxMut_to_LambdaBoxLocal.inductive_env (AstCommon.env p),
                                LambdaBoxMut_to_LambdaBoxLocal.translate_program prims (AstCommon.env p)(main p))) src.

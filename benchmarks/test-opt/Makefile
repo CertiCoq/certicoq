@@ -1,4 +1,4 @@
-COQOPTS = -R ../../plugin CertiCoq.Plugin -I ../../plugin -R ./ CertiCoq.Benchmarks -R ../lib CertiCoq.Benchmarks.lib
+COQOPTS = -R ../../plugin CertiRocq.Plugin -I ../../plugin -R ./ CertiRocq.Benchmarks -R ../lib CertiRocq.Benchmarks.lib
 CCOMPILER=gcc
 
 # Names of the benchmarks
@@ -6,7 +6,7 @@ TESTS=$(shell cat TESTS)
 # Names of the benchmarks for benchmarking with llvm
 LLTESTS=$(shell cat TESTS)
 # Names of the generated cfiles
-CFILES=$(patsubst %, CertiCoq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, CertiCoq.Benchmarks.tests.%.c, $(TESTS))
+CFILES=$(patsubst %, CertiRocq.Benchmarks.tests.%_cps.c, $(TESTS)) $(patsubst %, CertiRocq.Benchmarks.tests.%.c, $(TESTS))
 # Names of the generated executables
 EXEC=$(TESTS) $(patsubst %, %_cps, $(TESTS))
 
@@ -58,18 +58,18 @@ tests: tests.v
 	coqc $(COQOPTS) tests.v
 
 $(TESTS): $(CFILES)
-	$(CCOMPILER) -o $@_cps_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt.c glue.CertiCoq.Benchmarks.tests.$@_cps_opt.c
-	$(CCOMPILER) -o $@_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt.c glue.CertiCoq.Benchmarks.tests.$@_opt.c
-	$(CCOMPILER) -o $@_cps_opt1 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt1.c glue.CertiCoq.Benchmarks.tests.$@_cps_opt1.c
-	$(CCOMPILER) -o $@_opt1 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt1.c glue.CertiCoq.Benchmarks.tests.$@_opt1.c
-	$(CCOMPILER) -o $@_cps_opt2 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt2.c glue.CertiCoq.Benchmarks.tests.$@_cps_opt2.c
-	$(CCOMPILER) -o $@_opt2 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt2.c glue.CertiCoq.Benchmarks.tests.$@_opt2.c
-	$(CCOMPILER) -o $@_cps_opt3 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt3.c glue.CertiCoq.Benchmarks.tests.$@_cps_opt3.c
-	$(CCOMPILER) -o $@_opt3 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt3.c glue.CertiCoq.Benchmarks.tests.$@_opt3.c
-	$(CCOMPILER) -o $@_cps_opt4 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt4.c glue.CertiCoq.Benchmarks.tests.$@_cps_opt4.c
-	$(CCOMPILER) -o $@_opt4 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt4.c glue.CertiCoq.Benchmarks.tests.$@_opt4.c
-	$(CCOMPILER) -o $@_cps_opt5 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiCoq.Benchmarks.tests.$@_cps_opt5.c glue.CertiCoq.Benchmarks.tests.$@_cps_opt5.c
-	$(CCOMPILER) -o $@_opt5 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiCoq.Benchmarks.tests.$@_opt5.c glue.CertiCoq.Benchmarks.tests.$@_opt5.c
+	$(CCOMPILER) -o $@_cps_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiRocq.Benchmarks.tests.$@_cps_opt.c glue.CertiRocq.Benchmarks.tests.$@_cps_opt.c
+	$(CCOMPILER) -o $@_opt -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiRocq.Benchmarks.tests.$@_opt.c glue.CertiRocq.Benchmarks.tests.$@_opt.c
+	$(CCOMPILER) -o $@_cps_opt1 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiRocq.Benchmarks.tests.$@_cps_opt1.c glue.CertiRocq.Benchmarks.tests.$@_cps_opt1.c
+	$(CCOMPILER) -o $@_opt1 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiRocq.Benchmarks.tests.$@_opt1.c glue.CertiRocq.Benchmarks.tests.$@_opt1.c
+	$(CCOMPILER) -o $@_cps_opt2 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiRocq.Benchmarks.tests.$@_cps_opt2.c glue.CertiRocq.Benchmarks.tests.$@_cps_opt2.c
+	$(CCOMPILER) -o $@_opt2 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiRocq.Benchmarks.tests.$@_opt2.c glue.CertiRocq.Benchmarks.tests.$@_opt2.c
+	$(CCOMPILER) -o $@_cps_opt3 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiRocq.Benchmarks.tests.$@_cps_opt3.c glue.CertiRocq.Benchmarks.tests.$@_cps_opt3.c
+	$(CCOMPILER) -o $@_opt3 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiRocq.Benchmarks.tests.$@_opt3.c glue.CertiRocq.Benchmarks.tests.$@_opt3.c
+	$(CCOMPILER) -o $@_cps_opt4 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiRocq.Benchmarks.tests.$@_cps_opt4.c glue.CertiRocq.Benchmarks.tests.$@_cps_opt4.c
+	$(CCOMPILER) -o $@_opt4 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiRocq.Benchmarks.tests.$@_opt4.c glue.CertiRocq.Benchmarks.tests.$@_opt4.c
+	$(CCOMPILER) -o $@_cps_opt5 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc.c CertiRocq.Benchmarks.tests.$@_cps_opt5.c glue.CertiRocq.Benchmarks.tests.$@_cps_opt5.c
+	$(CCOMPILER) -o $@_opt5 -Wno-everything -O2 -fomit-frame-pointer $@_main.c gc_stack.c CertiRocq.Benchmarks.tests.$@_opt5.c glue.CertiRocq.Benchmarks.tests.$@_opt5.c
 
 # run: run.sh
 # 	sh run.sh

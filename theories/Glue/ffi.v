@@ -6,7 +6,7 @@
     { print_string : string -> IO unit
     ; scan_string : IO string
     }.
-  CertiCoq FFI StringFFI.
+  CertiRocq FFI StringFFI.
 *)
 Require Import Common.Pipeline_utils.
 

@@ -1,4 +1,4 @@
-(* Computational definition and declarative spec for function hoisting. Part of the CertiCoq project.
+(* Computational definition and declarative spec for function hoisting. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 

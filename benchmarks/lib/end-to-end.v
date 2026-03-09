@@ -1,4 +1,4 @@
-(* Require Import CertiCoq. *)
+(* Require Import CertiRocq. *)
 From MetaRocq Require Import Template.Ast.
 From Stdlib Require Import Arith List.
 

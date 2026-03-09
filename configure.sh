@@ -12,9 +12,9 @@ make -f Makefile mrproper
 
 if [[ "$1" = "global" ]] || [[ "$1" = "--enable-global" ]]
 then
-    echo "Building CertiCoq globally"
-    echo "CERTICOQ_CONFIG = global" > Makefile.conf
+    echo "Building CertiRocq globally"
+    echo "CERTIROCQ_CONFIG = global" > Makefile.conf
 else    
-    echo "Building CertiCoq locally (default)"
-    echo "CERTICOQ_CONFIG = local" > Makefile.conf
+    echo "Building CertiRocq locally (default)"
+    echo "CERTIROCQ_CONFIG = local" > Makefile.conf
 fi

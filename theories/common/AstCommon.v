@@ -87,7 +87,7 @@ Defined.
 #[global] Instance InductiveEq: Eq inductive := { eq_dec := inductive_dec }.
 
 
-(** certiCoq representation of inductive types **)
+(** CertiRocq representation of inductive types **)
 (* a data constructor is a string (for human readability)
 ** and the number of non-parameter args it expects *)
 Record Cnstr := mkCnstr { CnstrNm:string; CnstrArity:nat }.

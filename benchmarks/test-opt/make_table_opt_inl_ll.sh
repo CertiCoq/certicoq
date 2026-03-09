@@ -10,7 +10,7 @@ N=$1
 
 # Compare no inlining in wrappers  vs. inlining known functions in wrappers
 
-echo "Running CertiCoq programs..."
+echo "Running CertiRocq programs..."
 printf "      & ANF OPT & ANF OPT INL & SPEEDUP & CPS OPT & CPS OPT INL & SPEEDUP \n"
 
 for f in $FILES

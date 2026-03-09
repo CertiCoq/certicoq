@@ -1,21 +1,21 @@
-.PHONY: all certicoqc certicoqchk test install clean
+.PHONY: all certirocqc certirocqchk test install clean
 
-all: certicoqc certicoqchk
+all: certirocqc certirocqchk
 
-certicoqc: 
-	$(MAKE) -C certicoqc
+certirocqc:
+	$(MAKE) -C certirocqc
 
-certicoqchk:
-	$(MAKE) -C certicoqchk
+certirocqchk:
+	$(MAKE) -C certirocqchk
 
 test:
-	$(MAKE) -C certicoqc test
-	$(MAKE) -C certicoqchk test
+	$(MAKE) -C certirocqc test
+	$(MAKE) -C certirocqchk test
 
 install:
-	$(MAKE) -C certicoqc install
-	$(MAKE) -C certicoqchk install
+	$(MAKE) -C certirocqc install
+	$(MAKE) -C certirocqchk install
 
 clean:
-	$(MAKE) -C certicoqc clean
-	$(MAKE) -C certicoqchk clean
+	$(MAKE) -C certirocqc clean
+	$(MAKE) -C certirocqchk clean

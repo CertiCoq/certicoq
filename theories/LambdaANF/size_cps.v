@@ -1,11 +1,11 @@
-(* Size of LambdaANF term, values, environments, etc. Part of the CertiCoq project.
+(* Size of LambdaANF term, values, environments, etc. Part of the CertiRocq project.
  * Author: Anonymized, 2017
  *)
 
 
 From Stdlib Require Import ZArith List SetoidList NArith.BinNat PArith.BinPos
      MSets.MSetRBT Sets.Ensembles micromega.Lia Sorting.Permutation.
-From CertiCoq.LambdaANF Require Import List_util cps ctx identifiers Ensembles_util set_util cps_util map_util.
+From CertiRocq.LambdaANF Require Import List_util cps ctx identifiers Ensembles_util set_util cps_util map_util.
 
 Require Import compcert.lib.Maps.
 

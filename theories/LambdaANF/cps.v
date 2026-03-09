@@ -1,11 +1,11 @@
-(* Continuation-Passing Style language for the CertiCoq project.
+(* Continuation-Passing Style language for the CertiRocq project.
  *   Initial design, Andrew W. Appel, June 2014
  *)
 From Stdlib Require Import ZArith.ZArith Lists.List.
-From CertiCoq.Common Require Import AstCommon.
-From CertiCoq.LambdaANF Require Import List_util map_util.
+From CertiRocq.Common Require Import AstCommon.
+From CertiRocq.LambdaANF Require Import List_util map_util.
 From compcert.lib Require Export  Maps.
-From CertiCoq.LambdaANF Require Export map_util.
+From CertiRocq.LambdaANF Require Export map_util.
 From MetaRocq.Common Require Import BasicAst. (* For identifier names *)
 
 Import ListNotations.

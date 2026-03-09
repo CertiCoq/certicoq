@@ -1,8 +1,6 @@
 open Pp
 
-let contrib_name = "template-coq"
-
-(* This allows to load template_plugin and the extractable plugin at the same time 
+(* This allows to load template_plugin and the extractable plugin at the same time
   while have option settings apply to both *)
 let timing_opt =
   let open Goptions in

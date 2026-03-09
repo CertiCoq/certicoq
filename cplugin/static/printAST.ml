@@ -17,7 +17,7 @@
 (** Useful functions for pretty-printers *)
 
 open Printf
-open Camlcoq
+open Camlrocq
 open AST
 
 let name_of_type = function

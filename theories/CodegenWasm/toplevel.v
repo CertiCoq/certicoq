@@ -27,9 +27,9 @@ Definition LambdaANF_to_Wasm_Wrapper (prims : list (kername * string * bool * na
   | Err err => (Err err, "")
   end.
 
-Definition compile_LambdaANF_to_Wasm (prims : list (kername * string * bool * nat * positive)) : CertiCoqTrans toplevel.LambdaANF_FullTerm module :=
+Definition compile_LambdaANF_to_Wasm (prims : list (kername * string * bool * nat * positive)) : CertiRocqTrans toplevel.LambdaANF_FullTerm module :=
   fun s =>
     debug_msg "Translating from LambdaANF to Wasm" ;;
     opts <- get_options ;;
     let args := c_args opts in
-    LiftErrorLogCertiCoqTrans "CodegenWasm" (LambdaANF_to_Wasm_Wrapper prims args) s.
+    LiftErrorLogCertiRocqTrans "CodegenWasm" (LambdaANF_to_Wasm_Wrapper prims args) s.

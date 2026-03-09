@@ -1,5 +1,5 @@
-QUAL=CertiCoq.Benchmarks.io
-QUALS=CertiCoq.Benchmarks.io.io
+QUAL=CertiRocq.Benchmarks.io
+QUALS=CertiRocq.Benchmarks.io.io
 COQOPTS = -R ./ $(QUAL)
 CCOMPILER=gcc
 

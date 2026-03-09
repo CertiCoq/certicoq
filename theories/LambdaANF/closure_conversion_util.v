@@ -1,8 +1,8 @@
-(* Syntactic properties of closure conversion. Part of the CertiCoq project.
+(* Syntactic properties of closure conversion. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 
-From CertiCoq Require Import LambdaANF.cps LambdaANF.size_cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
+From CertiRocq Require Import LambdaANF.cps LambdaANF.size_cps LambdaANF.cps_util LambdaANF.set_util LambdaANF.identifiers LambdaANF.ctx
      LambdaANF.Ensembles_util LambdaANF.List_util LambdaANF.functions LambdaANF.closure_conversion LambdaANF.closure_conversion
      LambdaANF.eval LambdaANF.tactics.
 Require Import compcert.lib.Coqlib.

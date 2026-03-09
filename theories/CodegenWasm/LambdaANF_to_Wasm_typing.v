@@ -6,7 +6,7 @@ Set Printing Compact Contexts.
 From compcert Require Import
   Coqlib.
 
-From CertiCoq Require Import
+From CertiRocq Require Import
   LambdaANF.cps LambdaANF.cps_util
   CodegenWasm.LambdaANF_to_Wasm
   CodegenWasm.LambdaANF_to_Wasm_correct

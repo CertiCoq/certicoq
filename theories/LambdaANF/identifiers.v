@@ -1,4 +1,4 @@
-(* Library for identifiers. Part of the CertiCoq project.
+(* Library for identifiers. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 
@@ -7,7 +7,7 @@ From Stdlib Require Import Lists.List SetoidList NArith.BinNat PArith.BinPos
 
 From compcert.lib Require Import Coqlib.
 Require Import LambdaANF.tactics.
-From CertiCoq.LambdaANF Require Import cps cps_util ctx set_util Ensembles_util List_util map_util.
+From CertiRocq.LambdaANF Require Import cps cps_util ctx set_util Ensembles_util List_util map_util.
 
 Import ListNotations.
 

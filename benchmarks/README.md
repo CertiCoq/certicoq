@@ -1,4 +1,4 @@
-CertiCoq Benchmarks
+CertiRocq Benchmarks
 -------------------
 To compile the Coq benchmarks to C, compile and run the C files simply run
 

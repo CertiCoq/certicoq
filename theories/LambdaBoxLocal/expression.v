@@ -1735,7 +1735,7 @@ Lemma eval_ns_monotone:
 Admitted.
 
 
-From CertiCoq Require Import CpdtTactics.
+From CertiRocq Require Import CpdtTactics.
 Lemma exps_as_list_from_list vs:
   exps_from_list (exps_as_list vs) = vs.
 Proof using.

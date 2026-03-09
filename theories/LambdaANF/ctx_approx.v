@@ -1,10 +1,10 @@
-(* Contextual approximation for LambdaANF. Part of the CertiCoq project.
+(* Contextual approximation for LambdaANF. Part of the CertiRocq project.
  * Author: Anonymized, 2016
  *)
 
 From Stdlib Require Import Arith.Arith NArith.BinNat Lists.List micromega.Lia
         Relations.Relations Classes.RelationClasses.
-From CertiCoq.LambdaANF Require Import cps ctx eval logical_relations identifiers tactics.
+From CertiRocq.LambdaANF Require Import cps ctx eval logical_relations identifiers tactics.
 
 Import ListNotations.
 

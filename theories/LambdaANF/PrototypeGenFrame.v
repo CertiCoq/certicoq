@@ -27,7 +27,7 @@ Set Default Proof Mode "Ltac2".
 
 (* Set Universe Polymorphism. *)
 
-Require Export CertiCoq.LambdaANF.Frame.
+Require Export CertiRocq.LambdaANF.Frame.
 
 #[export]
 Instance Monad_TemplateMonad : Monad TemplateMonad := {

@@ -1,4 +1,4 @@
--R ./ CertiCoq.Benchmarks.lib
+-R ./ CertiRocq.Benchmarks.lib
 -arg -w -arg -deprecated
 
 Binom.v

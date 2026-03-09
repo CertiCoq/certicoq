@@ -1,4 +1,4 @@
-From CertiCoq.LambdaANF Require Import PrototypeGenFrame.
+From CertiRocq.LambdaANF Require Import PrototypeGenFrame.
 
 From Stdlib Require Import Strings.String.
 
@@ -20,8 +20,8 @@ Inductive exp :=
 | eFuns (fds : list fundef) (e : exp)
 with fundef := fFun (f : var) (xs : list var) (e : exp).
 
-MetaRocq Run (mk_Frame_ops (MPfile ["MockExpr"; "LambdaANF"; "CertiCoq"])
-                          (MPfile ["MockExpr"; "LambdaANF"; "CertiCoq"], "exp") exp
+MetaRocq Run (mk_Frame_ops (MPfile ["MockExpr"; "LambdaANF"; "CertiRocq"])
+                          (MPfile ["MockExpr"; "LambdaANF"; "CertiRocq"], "exp") exp
                           [var; constr; nat; list var]).
 
 (* Print exp_univ. *)

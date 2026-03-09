@@ -2,8 +2,8 @@ demo.*.c
 demo.*.h
 glue.demo.*.c
 glue.demo.*.h
-CertiCoq.Benchmarks.tests.*
-glue.CertiCoq.Benchmarks.tests.*
+CertiRocq.Benchmarks.tests.*
+glue.CertiRocq.Benchmarks.tests.*
 Top.*
 glue.Top.*
 ffi.Top.*

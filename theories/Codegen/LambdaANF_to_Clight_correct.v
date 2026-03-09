@@ -1,5 +1,5 @@
 (*
-  Proof of correctness of the Clight code generation phase of CertiCoq
+  Proof of correctness of the Clight code generation phase of CertiRocq
 
   > Relates values to location in memory (syntactic)
   > Relates expression to statements (syntactic)

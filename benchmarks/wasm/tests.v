@@ -1,21 +1,21 @@
 From Stdlib Require Import Arith List String Uint63 BinNat.
-Require Import CertiCoq.Benchmarks.lib.vs.
-Require Import CertiCoq.Benchmarks.lib.Binom.
-Require Import CertiCoq.Benchmarks.lib.Color.
-Require Import CertiCoq.Benchmarks.lib.sha256.
-Require Import CertiCoq.Benchmarks.lib.coind.
-(* Require Import CertiCoq.Benchmarks.lib.coqprime. Requires: opam install coq-coqprime *)
-Require Import CertiCoq.Benchmarks.lib.stack_machine.
+Require Import CertiRocq.Benchmarks.lib.vs.
+Require Import CertiRocq.Benchmarks.lib.Binom.
+Require Import CertiRocq.Benchmarks.lib.Color.
+Require Import CertiRocq.Benchmarks.lib.sha256.
+Require Import CertiRocq.Benchmarks.lib.coind.
+(* Require Import CertiRocq.Benchmarks.lib.coqprime. Requires: opam install coq-coqprime *)
+Require Import CertiRocq.Benchmarks.lib.stack_machine.
 
 From MetaRocq.Utils Require Import bytestring MRString.
-From CertiCoq.Plugin Require Import CertiCoq.
+From CertiRocq.Plugin Require Import CertiRocq.
 
 Open Scope bs.
 
 Import ListNotations.
 Import VeriStar.
 
-CertiCoq -help.
+CertiRocq -help.
 
 
 (* Demo 1 *)
@@ -108,101 +108,101 @@ Fixpoint even n :=
 Definition even_10000 := even 10000.
 
 Eval compute in "Compiling ack".
-CertiCoq Compile Wasm ack_3_9.
+CertiRocq Compile Wasm ack_3_9.
 
 Eval compute in "Compiling even_10000".
-CertiCoq Compile Wasm even_10000.
+CertiRocq Compile Wasm even_10000.
 
 (*******************************************************************)
 Eval compute in "Compiling demo1".
-CertiCoq Compile Wasm demo1.
+CertiRocq Compile Wasm demo1.
 
-(* CertiCoq Compile -O 0 -cps -ext "_cps" demo1. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" demo1. *)
-(* CertiCoq Generate Glue -file "glue_demo1" [ list, bool ]. *)
+(* CertiRocq Compile -O 0 -cps -ext "_cps" demo1. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" demo1. *)
+(* CertiRocq Generate Glue -file "glue_demo1" [ list, bool ]. *)
 
 Eval compute in "Compiling demo2".
-CertiCoq Compile Wasm demo2.
+CertiRocq Compile Wasm demo2.
 
-(* CertiCoq Compile -O 0 -cps -ext "_cps" demo2. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" demo2. *)
-(* CertiCoq Generate Glue -file "glue_demo2" [ list, bool ]. *)
+(* CertiRocq Compile -O 0 -cps -ext "_cps" demo2. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" demo2. *)
+(* CertiRocq Generate Glue -file "glue_demo2" [ list, bool ]. *)
 
 (*
 Eval compute in "Compiling demo3".
 
-CertiCoq Compile Wasm -cps -debug demo3.
-(* CertiCoq Compile -O 0 -cps -ext "_cps" demo3. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" demo3. *)
+CertiRocq Compile Wasm -cps -debug demo3.
+(* CertiRocq Compile -O 0 -cps -ext "_cps" demo3. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" demo3. *)
 *)
-(* CertiCoq Generate Glue -file "glue_demo3" [ list, bool ]. *)
+(* CertiRocq Generate Glue -file "glue_demo3" [ list, bool ]. *)
 
 Eval compute in "Compiling list_sum".
-CertiCoq Compile Wasm list_sum.
-(* CertiCoq Compile -O 0 -cps -ext "_cps" list_sum. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" list_sum. *)
-(* CertiCoq Generate Glue -file "glue_list_sum" [ nat ]. *)
+CertiRocq Compile Wasm list_sum.
+(* CertiRocq Compile -O 0 -cps -ext "_cps" list_sum. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" list_sum. *)
+(* CertiRocq Generate Glue -file "glue_list_sum" [ nat ]. *)
 
 (* Eval compute in "Compiling list_sum_primitive".
-CertiCoq Compile Wasm -debug list_sum_primitive. *)
+CertiRocq Compile Wasm -debug list_sum_primitive. *)
 (* Eval compute in "Compiling lazy factorial (using unsafe passes)". *)
 
-(* CertiCoq Compile -unsafe-erasure -O 1 lazy_factorial. *)
-(* CertiCoq Compile -unsafe-erasure -ext "_opt" lazy_factorial. *)
-(* CertiCoq Compile -unsafe-erasure -args 1000 -config 9 -O 1 -ext "_opt_ll" lazy_factorial. *)
-(* (1* CertiCoq Compile -O 0 -cps -ext "_cps" demo1. *1) *)
-(* (1* CertiCoq Compile -cps -ext "_cps_opt" demo1. *1) *)
-(* CertiCoq Generate Glue -file "glue_lazy_factorial" [ ]. *)
+(* CertiRocq Compile -unsafe-erasure -O 1 lazy_factorial. *)
+(* CertiRocq Compile -unsafe-erasure -ext "_opt" lazy_factorial. *)
+(* CertiRocq Compile -unsafe-erasure -args 1000 -config 9 -O 1 -ext "_opt_ll" lazy_factorial. *)
+(* (1* CertiRocq Compile -O 0 -cps -ext "_cps" demo1. *1) *)
+(* (1* CertiRocq Compile -cps -ext "_cps_opt" demo1. *1) *)
+(* CertiRocq Generate Glue -file "glue_lazy_factorial" [ ]. *)
 
 Eval compute in "Compiling vs_easy".
-CertiCoq Compile Wasm vs_easy.
-(* CertiCoq Compile Wasm -cps -time -debug vs_easy. *)
-(* CertiCoq Compile -O 0 -cps -ext "_cps" -time_anf vs_easy. *)
-(* CertiCoq Compile -time -cps -ext "_cps_opt" vs_easy. *)
-(* CertiCoq Generate Glue -file "glue_vs_easy" [ list, bool, vs.space_atom, vs.clause ]. *)
+CertiRocq Compile Wasm vs_easy.
+(* CertiRocq Compile Wasm -cps -time -debug vs_easy. *)
+(* CertiRocq Compile -O 0 -cps -ext "_cps" -time_anf vs_easy. *)
+(* CertiRocq Compile -time -cps -ext "_cps_opt" vs_easy. *)
+(* CertiRocq Generate Glue -file "glue_vs_easy" [ list, bool, vs.space_atom, vs.clause ]. *)
 
 Eval compute in "Compiling vs_hard".
-CertiCoq Compile Wasm vs_hard.
-(* CertiCoq Compile Wasm -cps -time -debug vs_hard. *)
-(* CertiCoq Compile -O 0 -cps -ext "_cps" vs_hard. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" vs_hard. *)
-(* CertiCoq Generate Glue -file "glue_vs_hard" [ list, bool ]. *)
+CertiRocq Compile Wasm vs_hard.
+(* CertiRocq Compile Wasm -cps -time -debug vs_hard. *)
+(* CertiRocq Compile -O 0 -cps -ext "_cps" vs_hard. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" vs_hard. *)
+(* CertiRocq Generate Glue -file "glue_vs_hard" [ list, bool ]. *)
 
 
 Eval compute in "Compiling binom".
-CertiCoq Compile Wasm binom.
-(* CertiCoq Show IR -file "binom" binom. *)
-(* CertiCoq Compile Wasm -cps -time -debug binom. *)
-(* CertiCoq Compile -O 0 -cps -ext "_cps" binom. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" binom. *)
-(* CertiCoq Generate Glue -file "glue_binom" [ nat ]. *)
+CertiRocq Compile Wasm binom.
+(* CertiRocq Show IR -file "binom" binom. *)
+(* CertiRocq Compile Wasm -cps -time -debug binom. *)
+(* CertiRocq Compile -O 0 -cps -ext "_cps" binom. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" binom. *)
+(* CertiRocq Generate Glue -file "glue_binom" [ nat ]. *)
 
 
 Eval compute in "Compiling color".
-CertiCoq Compile Wasm color.
+CertiRocq Compile Wasm color.
 
-(* CertiCoq Compile -O 0 -time -cps -ext "_cps" color. *)
-(* CertiCoq Compile -time -cps -ext "_cps_opt" color. *)
-(* CertiCoq Generate Glue -file "glue_color" [ prod, Z ]. *)
+(* CertiRocq Compile -O 0 -time -cps -ext "_cps" color. *)
+(* CertiRocq Compile -time -cps -ext "_cps_opt" color. *)
+(* CertiRocq Generate Glue -file "glue_color" [ prod, Z ]. *)
 
 (* Don't compile slow sha *)
 (* Eval compute in "Compiling sha". *)
 
-(* CertiCoq Compile -cps -ext "_cps" sha. *)
-(* CertiCoq Compile sha. *)
-(* CertiCoq Compile -O 1 -cps -ext "_cps_opt" sha. *)
-(* CertiCoq Compile -O 1 -ext "_opt" sha. *)
-(* CertiCoq Generate Glue -file "glue_sha" [ ]. *)
+(* CertiRocq Compile -cps -ext "_cps" sha. *)
+(* CertiRocq Compile sha. *)
+(* CertiRocq Compile -O 1 -cps -ext "_cps_opt" sha. *)
+(* CertiRocq Compile -O 1 -ext "_opt" sha. *)
+(* CertiRocq Generate Glue -file "glue_sha" [ ]. *)
 
 Eval compute in "Compiling sha_fast".
-CertiCoq Compile Wasm sha_fast.
-(* CertiCoq Compile Wasm -cps -time -debug sha_fast. *)
-(* CertiCoq Compile -O 0 -cps -ext "_cps" sha_fast. *)
-(* CertiCoq Compile -cps -ext "_cps_opt" sha_fast. *)
-(* CertiCoq Generate Glue -file "glue_sha_fast" [ ]. *)
+CertiRocq Compile Wasm sha_fast.
+(* CertiRocq Compile Wasm -cps -time -debug sha_fast. *)
+(* CertiRocq Compile -O 0 -cps -ext "_cps" sha_fast. *)
+(* CertiRocq Compile -cps -ext "_cps_opt" sha_fast. *)
+(* CertiRocq Generate Glue -file "glue_sha_fast" [ ]. *)
 
 (* Eval compute in "Compiling parse_wasm_module". *)
-(* CertiCoq Compile Wasm -time -debug test_module. *)
+(* CertiRocq Compile Wasm -time -debug test_module. *)
 
 Definition sm_gauss_nat :=
   let n := 1000 in
@@ -226,10 +226,10 @@ Definition sm_gauss_PrimInt :=
   end.
 
 Eval compute in "Compiling sm_gauss".
-CertiCoq Compile Wasm sm_gauss_nat.
-CertiCoq Compile Wasm sm_gauss_N.
-CertiCoq Compile Wasm sm_gauss_PrimInt.
+CertiRocq Compile Wasm sm_gauss_nat.
+CertiRocq Compile Wasm sm_gauss_N.
+CertiRocq Compile Wasm sm_gauss_PrimInt.
 
 (* Definition coqprime := check_cert3.
 Eval compute in "Compiling coqprime".
-   CertiCoq Compile Wasm coqprime. *)
+   CertiRocq Compile Wasm coqprime. *)

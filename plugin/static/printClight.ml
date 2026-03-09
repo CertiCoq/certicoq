@@ -17,7 +17,7 @@
 (** Pretty-printer for Clight *)
 
 open Format
-open Camlcoq
+open Camlrocq
 open PrintAST
 open Ctypes
 open Cop

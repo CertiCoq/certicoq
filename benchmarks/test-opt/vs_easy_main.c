@@ -8,7 +8,7 @@ extern void body(struct thread_info *);
 
 extern void print_Corelib_Init_Datatypes_bool(unsigned long long);
 
-extern void print_CertiCoq_Benchmarks_lib_vs_space_atom(unsigned long long);
+extern void print_CertiRocq_Benchmarks_lib_vs_space_atom(unsigned long long);
 
 extern unsigned int get_Corelib_Init_Datatypes_list_tag(unsigned long long);
 
@@ -20,7 +20,7 @@ _Bool is_ptr(value s) {
 
 extern void print_Corelib_Init_Datatypes_list(unsigned long long, void (*)(unsigned long long));
 
-extern void print_CertiCoq_Benchmarks_lib_vs_clause(unsigned long long);
+extern void print_CertiRocq_Benchmarks_lib_vs_clause(unsigned long long);
 
 void print_elem(unsigned long long v)
 {
@@ -35,13 +35,13 @@ void print_list(unsigned long long l)
 
 void print_list_space_atom(unsigned long long l)
 {
-  print_Corelib_Init_Datatypes_list(l, print_CertiCoq_Benchmarks_lib_vs_space_atom);
+  print_Corelib_Init_Datatypes_list(l, print_CertiRocq_Benchmarks_lib_vs_space_atom);
   printf("\n");
 }
 
 void print_list_clause(unsigned long long l)
 {
-  print_Corelib_Init_Datatypes_list(l, print_CertiCoq_Benchmarks_lib_vs_clause);
+  print_Corelib_Init_Datatypes_list(l, print_CertiRocq_Benchmarks_lib_vs_clause);
   printf("\n");
 }
 

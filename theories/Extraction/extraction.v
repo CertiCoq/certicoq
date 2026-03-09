@@ -45,10 +45,10 @@ Extract Constant AstCommon.timePhase =>
 
 (* Int31
 Extract Inductive Int31.digits => "bool" [ "false" "true" ].
-Extract Inductive Int31.int31 => "int" [ "Camlcoq.Int31.constr" ] "Camlcoq.Int31.destr".
-Extract Constant Int31.twice => "Camlcoq.Int31.twice".
-Extract Constant Int31.twice_plus_one => "Camlcoq.Int31.twice_plus_one".
-Extract Constant Int31.compare31 => "Camlcoq.Int31.compare".
+Extract Inductive Int31.int31 => "int" [ "Camlrocq.Int31.constr" ] "Camlrocq.Int31.destr".
+Extract Constant Int31.twice => "Camlrocq.Int31.twice".
+Extract Constant Int31.twice_plus_one => "Camlrocq.Int31.twice_plus_one".
+Extract Constant Int31.compare31 => "Camlrocq.Int31.compare".
 Extract Constant Int31.On => "0".
 Extract Constant Int31.In => "1". *)
 

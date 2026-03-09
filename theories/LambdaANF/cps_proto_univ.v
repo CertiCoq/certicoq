@@ -4,16 +4,16 @@
 From Stdlib Require Import ZArith.ZArith Lists.List Sets.Ensembles Strings.String.
 From Stdlib Require Import Lia.
 Import ListNotations.
-From CertiCoq Require Import Common.
-From CertiCoq.LambdaANF Require Import
+From CertiRocq Require Import Common.
+From CertiRocq.LambdaANF Require Import
     Prototype cps cps_util ctx
     identifiers Ensembles_util.
 
 From MetaRocq Require Import Template.All.
 
-From CertiCoq.LambdaANF Require Import PrototypeGenFrame cps.
+From CertiRocq.LambdaANF Require Import PrototypeGenFrame cps.
 
 MetaRocq Run (mk_Frame_ops
-  (MPfile ["cps_proto_univ"; "LambdaANF"; "CertiCoq"])
-  (MPfile ["cps"; "LambdaANF"; "CertiCoq"], "exp")
+  (MPfile ["cps_proto_univ"; "LambdaANF"; "CertiRocq"])
+  (MPfile ["cps"; "LambdaANF"; "CertiRocq"], "exp")
   exp [var; fun_tag; ctor_tag; prim; N; list var; primitive]).

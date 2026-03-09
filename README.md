@@ -1,7 +1,7 @@
 # CertiRocq
 
 <p align="center">
-<img width="1914" height="1915" alt="CERTIROCQ_LOGO-logo-1" src="https://github.com/user-attachments/assets/bf3e20f3-7632-4e39-8dea-5871f28971cf" />
+<img width="500" alt="CERTIROCQ_LOGO-logo-1" src="https://github.com/user-attachments/assets/bf3e20f3-7632-4e39-8dea-5871f28971cf" />
 </p>
 
 ## Overview

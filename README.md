@@ -1,7 +1,7 @@
 # CertiRocq
 
 <p align="center">
-<img src="https://certirocq.org/certirocq.png" alt="CertiRocqCoq" width="100px"/>
+<img width="1914" height="1915" alt="CERTIROCQ_LOGO-logo-1" src="https://github.com/user-attachments/assets/bf3e20f3-7632-4e39-8dea-5871f28971cf" />
 </p>
 
 ## Overview
@@ -33,7 +33,7 @@ Andrew Appel, Yannick Forster, Joomy Korkut, Zoe Paraskevopoulou, and Matthieu S
 
 Abhishek Anand, Anvay Grover, John Li, Greg Morrisett, Randy Pollack, Olivier Savary Belanger, Matthew Weaver
 
-## License 
+## License
 
 CertiRocq is open source and distributed under the [MIT license](LICENSE.md).
 

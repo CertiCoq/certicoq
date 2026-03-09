@@ -11,7 +11,7 @@
 ![GitHub](https://img.shields.io/github/license/CertiRocq/certirocq)
 
 
-CertiRocq is a compiler for Gallina, the specification language of the [Coq proof assistant](https://coq.inria.fr/refman/index.html). CertiRocq targets Clight, a subset of the C language that can be compiled with any C compiler, including the [CompCert](http://compcert.org) verified compiler.
+CertiRocq is a compiler for Gallina, the specification language of the [Rocq Prover](https://rocq-prover.org). CertiRocq targets WebAssembly and Clight, a subset of the C language that can be compiled with any C compiler, including the [CompCert](http://compcert.org) verified compiler.
 
 Large parts of the CertiRocq compiler have been verified whereas others are in the process of being verified.
 
@@ -19,7 +19,7 @@ Large parts of the CertiRocq compiler have been verified whereas others are in t
 
 The [CertiRocq Wiki](https://github.com/PrincetonUniversity/certirocq/wiki) has instructions for using the [CertiRocq plugin](https://github.com/PrincetonUniversity/certirocq/wiki/The-CertiRocq-plugin) to compile Gallina to C and interfacing with the generated C code.
 
-You can also find some demos [here](https://github.com/PrincetonUniversity/certirocq/blob/master/benchmarks/tests.v) and [here](https://github.com/PrincetonUniversity/certirocq/blob/master/benchmarks/axioms/tests.v).
+You can also find some demos [here](https://github.com/CertiRocq/certirocq/blob/master/benchmarks/tests.v) and [here](https://github.com/CertiRocq/certirocq/blob/master/benchmarks/axioms/tests.v).
 
 ## Installation Instructions
 
@@ -27,11 +27,11 @@ See [INSTALL.md](INSTALL.md)  for installation instructions.
 
 ## Current Members
 
-Andrew Appel, Yannick Forster, Joomy Korkut, Zoe Paraskevopoulou, and Matthieu Sozeau.
+Yannick Forster, Joomy Korkut, Zoe Paraskevopoulou, and Matthieu Sozeau.
 
 ## Past Members and Contributors
 
-Abhishek Anand, Anvay Grover, John Li, Greg Morrisett, Randy Pollack, Olivier Savary Belanger, Matthew Weaver
+Andrew Appel, Abhishek Anand, Anvay Grover, John Li, Greg Morrisett, Randy Pollack, Olivier Savary Belanger, Matthew Weaver
 
 ## License
 
@@ -40,10 +40,10 @@ CertiRocq is open source and distributed under the [MIT license](LICENSE.md).
 ## Directory structure
 
 * `theories/` contains the sources of the compiler
-* `plugin/` contains the CertiRocq plugin for Coq
+* `plugin/` contains the CertiRocq plugin for Rocq
 * `benchmarks/` contains the benchmark suite
 * `glue/` contains the glue code generator
-* `bootstrap/` contains the bootstrapped CertiRocq plugin for Coq and
+* `bootstrap/` contains the bootstrapped CertiRocq plugin for Rocq and
   a CertiRocq-compiled variant of MetaRocq's safe type checker.
 
 Structure of the theories directory:
@@ -61,4 +61,4 @@ Structure of the theories directory:
 
 ## Bugs 
 
-We use github's [issue tracker](https://github.com/PrincetonUniversity/certirocq/issues) to keep track of bugs and feature requests.
+We use github's [issue tracker](https://github.com/CertiRocq/certirocq/issues) to keep track of bugs and feature requests.

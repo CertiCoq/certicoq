@@ -26,7 +26,7 @@
       wasmcert.job = false;
       wasmcert.override.version = "v2.2.0";
       metarocq.job = false;
-      metarocq.override.version = "1.4.1-9.1";
+      metarocq.override.version = "9.1";
     }; rocqPackages = {
       rocq-core.override.version = "9.1";
     };

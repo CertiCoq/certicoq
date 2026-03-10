@@ -6,7 +6,7 @@ Open Scope bs.
 
 Set CertiRocq Build Directory "_build".
 
-Definition cst := rocq_msg_info (Primitive.string_of_prim_int ((1 << 63))%uint63).
+Definition cst := msg_info (Primitive.string_of_prim_int ((1 << 63))%uint63).
 Set Warnings "-primitive-turned-into-axiom".
 CertiRocq Run cst.
 
@@ -84,7 +84,7 @@ Definition string_of_primpair (x : int * int) :=
   let (l, r) := x in
   "(" ++ Primitive.string_of_prim_int l ++ ", " ++ Primitive.string_of_prim_int r ++ ")".
 
-Definition result := rocq_msg_info (Primitive.string_of_prim_int test).
+Definition result := msg_info (Primitive.string_of_prim_int test).
 (* Definition result := ("(" ++ Primitive.string_of_prim_int (fst cst_big) ++ ", " ++ *)
     (* Primitive.string_of_prim_int (snd cst_big) ++ ")")%bs. *)
 Time Eval vm_compute in result.

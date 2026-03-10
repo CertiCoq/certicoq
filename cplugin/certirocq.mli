@@ -22,6 +22,8 @@ type inductive_mapping = Kernames.inductive * (string * int list) (* Target indu
 type inductives_mapping = inductive_mapping list 
 type prim = ((Kernames.kername * Kernames.ident) * bool)
 
+type extract_inductive = { cstrs : Kernames.kername list; elim : Kernames.kername }
+type extract_inductives = (Kernames.kername * extract_inductive list) list
 
 type options =
   { typed_erasure : bool;
@@ -42,6 +44,7 @@ type options =
     toplevel_name : string;
     prims     : prim list;
     inductives_mapping : inductives_mapping;
+    extracted_inductives : extract_inductives;
   }
 
 val default_options : unit -> options

@@ -33,7 +33,7 @@ From CertiRocq.CertiRocqC Require Import CertiRocqC.
 From CertiRocq.CertiRocqC Require Import Loader.
 
 Definition certirocqc (opts : Options) (p : Template.Ast.Env.program) :=
-  let () := rocq_msg_info "certirocqc called" in
+  let () := msg_info "certirocqc called" in
   compile opts p.
 
 Set Warnings "-primitive-turned-into-axiom".

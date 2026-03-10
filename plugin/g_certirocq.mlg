@@ -53,8 +53,16 @@ let inductive_of_qualid ~loc (gr : Libnames.qualid) : Kernames.inductive =
   match quoted_globref_of_qualid ~loc gr with
   | Kernames.ConstRef kn -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a constant.")
   | Kernames.VarRef(v) -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a variable.")
-  | Kernames.IndRef(i) -> (Obj.magic i)
+  | Kernames.IndRef(i) -> Obj.magic i
   | Kernames.ConstructRef(_, _) -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a constructor.")
+
+let constant_of_qualid ~loc (gr : Libnames.qualid) : Kernames.kername =
+  let open Metarocq_template_plugin in
+  match quoted_globref_of_qualid ~loc gr with
+  | Kernames.ConstRef kn -> Obj.magic kn
+  | Kernames.VarRef(v) -> CErrors.user_err ~loc Pp.(str "Expected a constant name but found a variable.")
+  | Kernames.IndRef(i) -> CErrors.user_err ~loc Pp.(str "Expected a constant name but found an inductive.")
+  | Kernames.ConstructRef(_, _) -> CErrors.user_err ~loc Pp.(str "Expected a constant name but found a constructor.")
 
 }
 
@@ -105,17 +113,31 @@ VERNAC ARGUMENT EXTEND cinclude
 | [ "Absolute" string(str) ] -> { FromAbsolutePath str }
 END
 
-VERNAC ARGUMENT EXTEND certirocq_Register_extract_inductive
+VERNAC ARGUMENT EXTEND certirocq_register_extract_inductive
 | [ reference(gr) "=>" string(ty) "[" natural_list(cstrs) "]" ] ->
   { ((inductive_of_qualid ~loc gr), (ty, cstrs)) }
+END
+
+VERNAC ARGUMENT EXTEND certirocq_register_extract_inductive_to_constants
+| [ "[" reference_list(cstrs) "|" reference(elim) "]" ] ->
+  { { cstrs = List.map (constant_of_qualid ~loc) cstrs; elim = constant_of_qualid ~loc elim} }
+END
+
+
+VERNAC ARGUMENT EXTEND certirocq_register_extract_inductives_to_constants
+| [ reference(gr) "=>" "[" certirocq_register_extract_inductive_to_constants_list_sep(extr, ",") "]" ] ->
+  { ((inductive_of_qualid ~loc gr).Kernames.inductive_mind, extr) }
 END
 
 VERNAC COMMAND EXTEND CertiRocq_Register CLASSIFIED AS SIDEFF
 | [ "CertiRocq" "Register" "[" extract_cnst_list_sep(l, ",") "]" "Include" "[" cinclude_list_sep(imps, ",") "]" ] -> {
     Certirocq.register l imps
   }
-| [ "CertiRocq" "Extract" "Inductives" "[" certirocq_Register_extract_inductive_list_sep(inds, ",") "]" ] -> {
+| [ "CertiRocq" "Extract" "Inductives" "[" certirocq_register_extract_inductive_list_sep(inds, ",") "]" ] -> {
     Certirocq.register_inductives inds
+}
+| [ "CertiRocq" "Extract" "Inductive" "To" "Constants" "[" certirocq_register_extract_inductives_to_constants_list_sep(inds, ",") "]" ] -> {
+    Certirocq.register_constant_inductives inds
 }
 END
 

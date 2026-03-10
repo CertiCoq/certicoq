@@ -39,7 +39,7 @@ Definition string_of_specfloat (f : SpecFloat.spec_float) :=
 #[export] Instance show_Z : Show Z := string_of_Z.
 
 Definition certirocqc2 := 5.
-Definition certirocqc3 := rocq_msg_notice ("Hello world! " ++ show 100%nat).
+Definition certirocqc3 := msg_notice ("Hello world! " ++ show 100%nat).
  (* show (0%float == (-0)%float)). *)
 
 Inductive three_ind := One | Two | Three.

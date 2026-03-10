@@ -191,6 +191,7 @@ OptimizePropDiscr
 EUnboxing
 EInlining
 EReorderCstrs
+ERemapInductives
 EBeta
 ECoInductiveToInductive
 ETransform

@@ -134,6 +134,32 @@ let register_inductives (inds : inductives_mapping) : unit =
 
 let get_global_inductives_mapping () = !global_inductive_registers
 
+(* Extract Inductive to Constants *)
+
+type extract_inductive = { cstrs : Kernames.kername list; elim : Kernames.kername }
+type extract_inductives = (Kernames.kername * extract_inductive list) list
+
+let global_inductive_constant_registers =
+  Summary.ref ([] : extract_inductives) ~name:"CertiRocq Inductive to Constants Registration"
+
+let global_inductive_constant_registers_name = "certirocq-inductive-constants-registration"
+
+let cache_inductive_constant_registers inds =
+  let inds' = !global_inductive_constant_registers in
+  global_inductive_constant_registers := inds @ inds'
+
+let global_inductive_constant_registers_input =
+  let open Libobject in
+  declare_object
+    (global_object_nodischarge global_inductive_constant_registers_name
+    ~cache:(fun r -> cache_inductive_constant_registers r)
+    ~subst:None)
+
+let register_constant_inductives (extr : extract_inductives) : unit =
+  Lib.add_leaf (global_inductive_constant_registers_input extr)
+
+let get_global_inductives_constant_mapping () = !global_inductive_constant_registers
+
 (* Support for dynamically-linked certirocq-compiled programs *)
 type certirocq_run_function = unit -> Obj.t
 
@@ -233,6 +259,7 @@ type options =
     toplevel_name : string;
     prims     : ((Kernames.kername * Kernames.ident) * bool) list;
     inductives_mapping : inductives_mapping;
+    extracted_inductives : extract_inductives;
   }
 
 let check_build_dir d =
@@ -265,6 +292,7 @@ let default_options () : options =
     toplevel_name = "body";
     prims     = [];
     inductives_mapping = get_global_inductives_mapping ();
+    extracted_inductives = get_global_inductives_constant_mapping ();
   }
 
 let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * bool) list) (fname : string) : options =
@@ -299,7 +327,8 @@ let make_unsafe_passes b =
   { cofix_to_lazy = b;
     inlining = b;
     unboxing = b;
-    betared = b }
+    betared = b;
+    inductives_extraction = b }
 
 let all_unsafe_passes = make_unsafe_passes true
 let no_unsafe_passes = make_unsafe_passes false
@@ -313,7 +342,8 @@ let make_pipeline_options (opts : options) =
         enable_typed_erasure = opts.typed_erasure;
         enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
         dearging_config = default_dearging_config;
-        inlined_constants = Kernames.KernameSet.empty
+        inlined_constants = Kernames.KernameSet.empty;
+        extracted_inductives = Obj.magic opts.extracted_inductives; (* kername and list representation are the same *)
         })
   in
   let cps    = opts.cps in
@@ -826,7 +856,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     in
     let gc_stack_o = make_rt_file "gc_stack.o" in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
-    let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "coq-metacoq-template-ocaml";
+    let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "rocq-metarocq-template-ocaml";
       "rocq-runtime.interp"; "rocq-runtime.kernel"; "rocq-runtime.library"] in
     let pkgs = String.concat "," packages in
     let dontlink = "str,unix,dynlink,threads,zarith,rocq-runtime,rocq-runtime.plugins.ltac,rocq-runtime.interp" in

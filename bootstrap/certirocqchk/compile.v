@@ -39,13 +39,13 @@ Program Definition infer_and_pretty_print_template_program (cf := config.default
   end.
 
 Definition certirocqchk (p : Template.Ast.Env.program) : bool :=
-  let () := rocq_msg_info "running type checking on whole program" in
+  let () := msg_info "running type checking on whole program" in
   match infer_and_pretty_print_template_program 
     (guard := Erasure.fake_guard_impl) 
     (nor := PCUICSN.default_normalizing)
     p Universes.Monomorphic_ctx with
-  | inl ty => let () := rocq_msg_notice ty in true
-  | inr err => let () := rocq_user_error err in false
+  | inl ty => let () := msg_notice ty in true
+  | inr err => let () := user_error err in false
   end.
 
 Eval compute in "Compiling MetaRocq's checker".

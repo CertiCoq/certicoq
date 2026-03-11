@@ -25,6 +25,8 @@
       compcert.override.version = "3.17";
       wasmcert.job = false;
       wasmcert.override.version = "v2.2.0";
+      ExtLib.job = false;
+      ExtLib.override.version = "0.13.0";
       metarocq.job = false;
       metarocq.override.version = "9.1";
     }; rocqPackages = {

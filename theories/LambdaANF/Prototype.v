@@ -7,8 +7,7 @@ From Stdlib Require Import Lists.List.
 Import ListNotations.
 
 From MetaRocq Require Import Template.All.
-Import MRMonadNotation.
-Module TM := MetaRocq.Utils.monad_utils.
+Import MonadNotation.
 
 From ExtLib.Core Require Import RelDec.
 From ExtLib.Data Require Import Nat List Option Pair.

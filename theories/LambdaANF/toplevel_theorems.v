@@ -500,7 +500,7 @@ Section Compose.
     edestruct Ht1; eauto. destructAll.
     edestruct Ht2. eapply H2. eassumption. destructAll.
     do 2 eexists. split; [| split; [| split ]].
-    - simpl. unfold bind.
+    - simpl. unfold bind; cbn.
       rewrite H1. rewrite H5. reflexivity.
     - eassumption.
     - assumption.
@@ -517,7 +517,7 @@ Section Compose.
     edestruct Ht1; eauto. destructAll.
     edestruct Ht2. eapply H2. eassumption. destructAll.
     do 2 eexists. split; [| split; [| split ]].
-    - simpl. unfold bind.
+    - simpl. unfold bind; cbn.
       rewrite H1. rewrite H5. reflexivity.
     - eassumption.
     - assumption.
@@ -538,7 +538,7 @@ Section Compose.
     edestruct Ht1; eauto. destructAll.
     edestruct Ht2. eapply H2. eassumption. destructAll.
     do 2 eexists. split; [| split; [| split ]].
-    - simpl. unfold bind.
+    - simpl. unfold bind; cbn.
       rewrite H1. rewrite H5. reflexivity.
     - eassumption.
     - assumption.

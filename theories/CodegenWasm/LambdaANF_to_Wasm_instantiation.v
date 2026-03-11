@@ -546,6 +546,7 @@ Lemma translate_functions_type_bound {fenv} : forall fds fns fn eAny,
 Proof.
   induction fds. 2:{ intros. by inv H1. }
   intros ??? Hnodup Hrestr Htrans Hin. cbn in Htrans.
+  unfold translate_function in Htrans.
   destruct (translate_var nenv fenv v _) eqn:Hvar=>//.
   destruct (translate_body _ _ _ _ _) eqn:Hbody=>//.
   destruct (translate_functions _ _ _ _ _) eqn:Hfns=>//. inv Htrans.

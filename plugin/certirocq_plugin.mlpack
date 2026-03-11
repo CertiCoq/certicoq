@@ -123,6 +123,8 @@ TemplateEnvMap
 TemplateProgram
 EtaExpand
 EnvironmentTyping
+MonadExc
+Monad_utils
 
 Ssrbool
 WGraph
@@ -203,8 +205,6 @@ SafeTemplateErasure
 ZArith_dec
 Coqlib0
 
-MonadExc
-Monad_utils
 ExceptionMonad
 Expression
 RandyPrelude

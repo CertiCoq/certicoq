@@ -371,21 +371,21 @@ let get_name (gr : Names.GlobRef.t) : string =
 
 
 (* Quote Coq term *)
-let quote_term opts env sigma c =
+let quote_term ~opaque_access opts env sigma c =
   let debug = opts.debug in
   let bypass = opts.bypass_qed in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = Metarocq_template_plugin.Ast_quoter.quote_term_rec ~bypass env sigma (EConstr.to_constr sigma c) in
+  let term = Metarocq_template_plugin.Ast_quoter.quote_term_rec ~bypass ~opaque_access env sigma (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   term
 
-let quote opts gr =
+let quote ~opaque_access opts gr =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let sigma, c = Evd.fresh_global env sigma gr in
-  quote_term opts env sigma c
+  quote_term ~opaque_access opts env sigma c
 
 (* Compile Quoted term with CertiRocq *)
 
@@ -540,12 +540,12 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | CompM.Err s ->
       CErrors.user_err Pp.(str "Could not generate glue code: " ++ pr_string s))
 
-  let compile_only (opts : options) (gr : Names.GlobRef.t) (imports : import list) : unit =
-    let term = quote opts gr in
+  let compile_only ~opaque_access (opts : options) (gr : Names.GlobRef.t) (imports : import list) : unit =
+    let term = quote ~opaque_access opts gr in
     compile opts (Obj.magic term) imports
 
-  let generate_glue_only opts gr =
-    let term = quote opts gr in
+  let generate_glue_only ~opaque_access opts gr =
+    let term = quote ~opaque_access opts gr in
     generate_glue true opts (Ast0.Env.declarations (fst (Obj.magic term)))
 
   let find_executable debug cmd =
@@ -596,8 +596,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let make_rt_file na =
     Boot.Env.Path.(to_string (relative (runtime_dir ()) na))
 
-  let compile_C opts gr imports =
-    let () = compile_only opts gr imports in
+  let compile_C ~opaque_access opts gr imports =
+    let () = compile_only ~opaque_access opts gr imports in
     let imports = get_global_includes () @ imports in
     let debug = opts.debug in
     let fname = opts.filename in
@@ -818,8 +818,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     output_string chan (template_ocaml id opts.filename name);
     flush chan; close_out chan; fname
 
-  let certirocq_eval_named opts env sigma c global_id imports =
-    let prog = quote_term opts env sigma c in
+  let certirocq_eval_named ~opaque_access opts env sigma c global_id imports =
+    let prog = quote_term ~opaque_access opts env sigma c in
     let tyinfo =
       let ty = Retyping.get_type_of env sigma c in
       (* assert (Evd.is_empty sigma); *)
@@ -893,11 +893,11 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let comps = CString.split_on_char '.' s in
     CString.uncapitalize_ascii (CString.concat "_" comps)
 
-  let certirocq_eval opts env sigma c imports =
+  let certirocq_eval ~opaque_access opts env sigma c imports =
     let global_id = opts.filename in
     let fresh_name = find_fresh global_id !all_run_functions in
     let opts = { opts with toplevel_name = toplevel_name_of_filename fresh_name; filename = fresh_name } in
-    certirocq_eval_named opts env sigma c global_id imports
+    certirocq_eval_named ~opaque_access opts env sigma c global_id imports
 
   let run_existing opts env sigma c id run =
     let tyinfo =
@@ -911,21 +911,21 @@ module CompileFunctor (CI : CompilerInterface) = struct
     debug_msg opts.debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
     reify opts env sigma tyinfo result
 
-  let eval opts env sigma c imports =
+  let eval ~opaque_access opts env sigma c imports =
     match exists_certirocq_run opts.filename with
-    | None -> certirocq_eval opts env sigma c imports
+    | None -> certirocq_eval ~opaque_access opts env sigma c imports
     | Some run ->
-      debug_msg opts.debug (Printf.sprintf "Retrieved earlier compiled code for %s" opts.filename);
-      run_existing opts env sigma c (Pp.str opts.filename) run
+       debug_msg opts.debug (Printf.sprintf "Retrieved earlier compiled code for %s" opts.filename);
+       run_existing opts env sigma c (Pp.str opts.filename) run
 
-  let eval_gr opts gr imports =
+  let eval_gr ~opaque_access opts gr imports =
     let env = Global.env () in
     let sigma = Evd.from_env env in
     let sigma, c = Evd.fresh_global env sigma gr in
     let filename = get_name gr in
     let name = toplevel_name_of_filename filename in
     let opts = { opts with toplevel_name = name; filename = filename } in
-    eval opts env sigma c imports
+    eval ~opaque_access opts env sigma c imports
 
   let print_to_file (s : string) (file : string) =
     let f = open_out file in
@@ -933,8 +933,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     close_out f
 
 
-  let show_ir opts gr =
-    let term = quote opts gr in
+  let show_ir ~opaque_access opts gr =
+    let term = quote ~opaque_access opts gr in
     let debug = opts.debug in
     let options = make_pipeline_options opts in
     let p = Pipeline.show_IR options (Obj.magic term) in
@@ -960,8 +960,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     Printf.fprintf f "%s" s;
     close_out f
 
-  let compile_wasm opts gr =
-    let term = quote opts gr in
+  let compile_wasm ~opaque_access opts gr =
+    let term = quote ~opaque_access opts gr in
     let debug = opts.debug in
     let options = make_pipeline_options opts in
     let p = Pipeline.compile_Wasm options (Obj.magic term) in
@@ -984,7 +984,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
 
   (* Quote Coq inductive type *)
-  let quote_ind opts gr : Metarocq_template_plugin.Ast_quoter.quoted_program * string =
+  let quote_ind ~opaque_access opts gr : Metarocq_template_plugin.Ast_quoter.quoted_program * string =
     let debug = opts.debug in
     let env = Global.env () in
     let sigma = Evd.from_env env in
@@ -997,13 +997,13 @@ module CompileFunctor (CI : CompilerInterface) = struct
         Pp.(Printer.pr_global gr ++ str " is not an inductive type") in
     debug_msg debug "Quoting";
     let time = Unix.gettimeofday() in
-    let term = quote_term_rec ~bypass:true env sigma (EConstr.to_constr sigma c) in
+    let term = quote_term_rec ~bypass:true ~opaque_access env sigma (EConstr.to_constr sigma c) in
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
     (term, name)
 
-  let ffi_command opts gr =
-    let (term, name) = quote_ind opts gr in
+  let ffi_command ~opaque_access opts gr =
+    let (term, name) = quote_ind ~opaque_access opts gr in
     let debug = opts.debug in
     let options = make_pipeline_options opts in
 
@@ -1026,9 +1026,10 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | CompM.Err s ->
       CErrors.user_err Pp.(str "Could not generate FFI glue code: " ++ pr_string s))
 
-  let glue_command opts grs =
+  let glue_command ~opaque_access opts grs =
     let terms = grs |> List.rev
-                |> List.map (fun gr -> Metarocq_template_plugin.Ast0.Env.declarations (fst (quote opts gr)))
+                |> List.map (fun gr -> Metarocq_template_plugin.Ast0.Env.declarations
+                                         (fst (quote ~opaque_access opts gr)))
                 |> List.concat |> nub in
     generate_glue true opts (Obj.magic terms)
 

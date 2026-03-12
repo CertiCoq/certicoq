@@ -14,7 +14,7 @@ open Tacarg
 open G_certirocq_vanilla
 }
 
-VERNAC COMMAND EXTEND CertiRocqCCompile CLASSIFIED AS QUERY
+VERNAC COMMAND EXTEND CertiRocqCCompile CLASSIFIED AS QUERY STATE opaque_access
 | [ "CertiRocqC" "Compile" vanilla_cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
     let opts = make_options l [] (get_name gr) in
@@ -55,6 +55,9 @@ VERNAC COMMAND EXTEND CertiRocqCCompile CLASSIFIED AS QUERY
     let opts = make_options l [] "" in
     Certirocqc.glue_command opts grs
   }
+END
+
+VERNAC COMMAND EXTEND CertiRocqCHelp CLASSIFIED AS QUERY
 | [ "CertiRocqC" "-help" ] -> {
     Feedback.msg_info (str help_msg)
   }
@@ -62,16 +65,18 @@ END
 
 
 VERNAC COMMAND EXTEND CertiRocqC_Eval CLASSIFIED AS SIDEFF
-| [ "CertiRocqC" "Eval" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" vanilla_cinclude_list_sep(imps, ",") "]" ] -> {
+| ![ opaque_access] [ "CertiRocqC" "Eval" vanilla_cargs_list(l) global(gr) "Extract" "Constants" "[" vanilla_extract_cnst_list_sep(cs, ",") "]" "Include" "[" vanilla_cinclude_list_sep(imps, ",") "]" ] -> {
+  fun ~opaque_access ->
   let gr = Nametab.global gr in
   let opts = Certirocq.make_options l cs (get_name gr) in
-  let result = Certirocq.eval_gr opts gr imps in
+  let result = Certirocq.eval_gr ~opaque_access opts gr imps in
   Feedback.msg_notice Pp.(str" = " ++ Printer.pr_constr_env (Global.env ()) Evd.empty result)
   }
-| [ "CertiRocqC" "Eval" vanilla_cargs_list(l) global(gr) ] -> {
+| ![ opaque_access ] [ "CertiRocqC" "Eval" vanilla_cargs_list(l) global(gr) ] -> {
+  fun ~opaque_access ->
   let gr = Nametab.global gr in
   let opts = Certirocq.make_options l [] (get_name gr) in
-  let result = Certirocq.eval_gr opts gr [] in
+  let result = Certirocq.eval_gr ~opaque_access opts gr [] in
   Feedback.msg_notice Pp.(str" = " ++ Printer.pr_constr_env (Global.env ()) Evd.empty result)
   }
 END
@@ -84,7 +89,7 @@ TACTIC EXTEND CertiRocqc_eval
       let sigma = Proofview.Goal.sigma gl in
       let opts = Certirocq.make_options l [] "goal" in
       let opts = Certirocq.{ opts with toplevel_name = "goal" } in
-      let c' = Certirocq.eval opts env sigma c [] in
+      let c' = Certirocq.eval ~opaque_access:Library.indirect_accessor opts env sigma c [] in
       ltac_apply tac (List.map to_ltac_val [EConstr.of_constr c'])
   end }
 END

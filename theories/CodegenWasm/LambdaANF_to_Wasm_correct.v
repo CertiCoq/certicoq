@@ -578,14 +578,17 @@ Proof.
       unfold get_ctor_arity. now rewrite Hc.
     + (* Non-nullary constructor *)
       remember (v0 :: l') as l.
-      destruct (store_constructor nenv cenv lenv fenv t l) eqn:Hstore_constr; inv H.
-      destruct (get_ctor_size _ _) eqn:HconstrSize. inv H1.
+      destruct (store_constructor nenv cenv lenv fenv t l) eqn:Hstore_constr; cbn [bind MonadError] in H; inv H.
+      destruct (get_ctor_size _ _) eqn:HconstrSize; cbn [bind MonadError] in H1. inv H1.
       destruct (call_grow_mem_if_necessary mem n) eqn:Hgrow. inv H1.
       unfold store_constructor in Hstore_constr.
       destruct (get_ctor_ord cenv t) eqn:Hord; first by inv Hstore_constr.
+      cbn [bind MonadError] in Hstore_constr.
       destruct (store_constructor_args nenv lenv fenv (v0 :: l') 0) eqn:Hconstrargs; first by inv Hstore_constr.
-      destruct (translate_body _ _ _ _ _ _ _) eqn:Hbody; inv H0.
-      inv Hstore_constr.
+      cbn [bind MonadError] in Hstore_constr.
+      destruct (translate_body _ _ _ _ _ _ _) eqn:Hbody. inv H0.
+      cbn [bind MonadError] in H0. inv H0.
+      inv Hstore_constr. cbn.
       repeat rewrite <- app_assoc.
       apply call_grow_mem_if_necessary_correct in Hgrow.
 

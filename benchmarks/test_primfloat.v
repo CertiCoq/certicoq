@@ -19,7 +19,7 @@ From Stdlib Require Import PrimFloat PrimInt63.
 #[export] Instance float_show : Show PrimFloat.float := string_of_float.
 #[export] Instance prim_int_show : Show PrimInt63.int := string_of_prim_int.
 Eval compute in 5.0%float.
-(* Definition certirocqc2 := rocq_msg_info (show 5%int63). *)
+(* Definition certirocqc2 := msg_info (show 5%int63). *)
 Import SpecFloat.
 Definition string_of_specfloat (f : SpecFloat.spec_float) :=
   match f with
@@ -36,7 +36,7 @@ Definition string_of_specfloat (f : SpecFloat.spec_float) :=
 #[export] Instance show_Z : Show Z := string_of_Z.
 
 Definition certirocqc2 :=
-  rocq_msg_info (show (0%float == (-0)%float)).
+  msg_info (show (0%float == (-0)%float)).
 
 Time Eval compute in certirocqc2.
 

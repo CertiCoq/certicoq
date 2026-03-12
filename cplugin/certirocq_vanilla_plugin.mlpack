@@ -116,11 +116,13 @@ OrdersTac
 POrderedType
 Specif
 StateMonad
-Monad_utils
 MSetWeakList
 EqdepFacts
 Utils
 Init
+MonadExc
+OptionMonad
+Monad_utils
 
 TemplateEnvMap
 TemplateProgram
@@ -193,6 +195,7 @@ ExtractionCorrectness
 EUnboxing
 EInlining
 EReorderCstrs
+ERemapInductives
 EBeta
 ECoInductiveToInductive
 ETransform
@@ -200,12 +203,9 @@ Erasure0
 ErasureCorrectness
 SafeTemplateErasure
 
-OptionMonad
 ZArith_dec
 Coqlib0
 
-MonadExc
-Monad_utils
 ExceptionMonad
 Expression
 RandyPrelude

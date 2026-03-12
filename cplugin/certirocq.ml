@@ -134,6 +134,32 @@ let register_inductives (inds : inductives_mapping) : unit =
 
 let get_global_inductives_mapping () = !global_inductive_registers
 
+(* Extract Inductive to Constants *)
+
+type extract_inductive = { cstrs : Kernames.kername list; elim : Kernames.kername }
+type extract_inductives = (Kernames.kername * extract_inductive list) list
+
+let global_inductive_constant_registers =
+  Summary.ref ([] : extract_inductives) ~name:"CertiRocq Inductive to Constants Registration"
+
+let global_inductive_constant_registers_name = "certirocq-inductive-constants-registration"
+
+let cache_inductive_constant_registers inds =
+  let inds' = !global_inductive_constant_registers in
+  global_inductive_constant_registers := inds @ inds'
+
+let global_inductive_constant_registers_input =
+  let open Libobject in
+  declare_object
+    (global_object_nodischarge global_inductive_constant_registers_name
+    ~cache:(fun r -> cache_inductive_constant_registers r)
+    ~subst:None)
+
+let register_constant_inductives (extr : extract_inductives) : unit =
+  Lib.add_leaf (global_inductive_constant_registers_input extr)
+
+let get_global_inductives_constant_mapping () = !global_inductive_constant_registers
+
 (* Support for dynamically-linked certirocq-compiled programs *)
 type certirocq_run_function = unit -> Obj.t
 
@@ -233,6 +259,7 @@ type options =
     toplevel_name : string;
     prims     : ((Kernames.kername * Kernames.ident) * bool) list;
     inductives_mapping : inductives_mapping;
+    extracted_inductives : extract_inductives;
   }
 
 let check_build_dir d =
@@ -265,6 +292,7 @@ let default_options () : options =
     toplevel_name = "body";
     prims     = [];
     inductives_mapping = get_global_inductives_mapping ();
+    extracted_inductives = get_global_inductives_constant_mapping ();
   }
 
 let make_options (l : command_args list) (pr : ((Kernames.kername * Kernames.ident) * bool) list) (fname : string) : options =
@@ -299,7 +327,8 @@ let make_unsafe_passes b =
   { cofix_to_lazy = b;
     inlining = b; 
     unboxing = b;
-    betared = b }
+    betared = b;
+    inductives_extraction = b }
 
 let all_unsafe_passes = make_unsafe_passes true
 let no_unsafe_passes = make_unsafe_passes false
@@ -313,7 +342,8 @@ let make_pipeline_options (opts : options) =
         enable_typed_erasure = opts.typed_erasure; 
         enable_unsafe = if opts.unsafe_erasure then all_unsafe_passes else no_unsafe_passes;
         dearging_config = default_dearging_config;
-        inlined_constants = Kernames.KernameSet.empty
+        inlined_constants = Kernames.KernameSet.empty;
+        extracted_inductives = Obj.magic opts.extracted_inductives; (* kername and list representation are the same *)
         })
   in
   let cps    = opts.cps in
@@ -341,21 +371,21 @@ let get_name (gr : Names.GlobRef.t) : string =
 
 
 (* Quote Coq term *)
-let quote_term opts env sigma c =
+let quote_term ~opaque_access opts env sigma c =
   let debug = opts.debug in
   let bypass = opts.bypass_qed in
   debug_msg debug "Quoting";
   let time = Unix.gettimeofday() in
-  let term = Metarocq_template_plugin.Ast_quoter.quote_term_rec ~bypass env sigma (EConstr.to_constr sigma c) in
+  let term = Metarocq_template_plugin.Ast_quoter.quote_term_rec ~bypass ~opaque_access env sigma (EConstr.to_constr sigma c) in
   let time = (Unix.gettimeofday() -. time) in
   debug_msg debug (Printf.sprintf "Finished quoting in %f s.. compiling to L7." time);
   term
 
-let quote opts gr =
+let quote ~opaque_access opts gr =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let sigma, c = Evd.fresh_global env sigma gr in
-  quote_term opts env sigma c
+  quote_term ~opaque_access opts env sigma c
 
 (* Compile Quoted term with CertiRocq *)
 
@@ -649,12 +679,12 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | CompM.Err s ->
       CErrors.user_err Pp.(str "Could not generate glue code: " ++ pr_string s))
 
-  let compile_only (opts : options) (gr : Names.GlobRef.t) (imports : import list) : unit =
-    let term = quote opts gr in
+  let compile_only ~opaque_access (opts : options) (gr : Names.GlobRef.t) (imports : import list) : unit =
+    let term = quote ~opaque_access opts gr in
     compile opts (Obj.magic term) imports
 
-  let generate_glue_only opts gr =
-    let term = quote opts gr in
+  let generate_glue_only ~opaque_access opts gr =
+    let term = quote ~opaque_access opts gr in
     generate_glue true opts (Ast0.Env.declarations (fst (Obj.magic term)))
     
   let find_executable debug cmd = 
@@ -705,8 +735,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let make_rt_file na =
     Boot.Env.Path.(to_string (relative (runtime_dir ()) na))
 
-  let compile_C opts gr imports =
-    let () = compile_only opts gr imports in
+  let compile_C ~opaque_access opts gr imports =
+    let () = compile_only ~opaque_access opts gr imports in
     let imports = get_global_includes () @ imports in
     let debug = opts.debug in
     let fname = opts.filename in
@@ -927,8 +957,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     output_string chan (template_ocaml id opts.filename name);
     flush chan; close_out chan; fname
 
-  let certirocq_eval_named opts env sigma c global_id imports =
-    let prog = quote_term opts env sigma c in
+  let certirocq_eval_named ~opaque_access opts env sigma c global_id imports =
+    let prog = quote_term ~opaque_access opts env sigma c in
     let tyinfo = 
       let ty = Retyping.get_type_of env sigma c in
       (* assert (Evd.is_empty sigma); *)
@@ -965,7 +995,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     in
     let gc_stack_o = make_rt_file "gc_stack.o" in
     debug_msg debug (Printf.sprintf "Executing command: %s" cmd);
-    let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "coq-metacoq-template-ocaml"; 
+    let packages = ["rocq-runtime"; "rocq-runtime.plugins.ltac"; "rocq-metarocq-template-ocaml";
       "rocq-runtime.interp"; "rocq-runtime.kernel"; "rocq-runtime.library"] in
     let pkgs = String.concat "," packages in
     let dontlink = "str,unix,dynlink,threads,zarith,rocq-runtime,rocq-runtime.plugins.ltac,rocq-runtime.interp" in
@@ -1002,11 +1032,11 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let comps = CString.split_on_char '.' s in
     CString.uncapitalize_ascii (CString.concat "_" comps)
 
-  let certirocq_eval opts env sigma c imports =
+  let certirocq_eval ~opaque_access opts env sigma c imports =
     let global_id = opts.filename in
     let fresh_name = find_fresh global_id !all_run_functions in
     let opts = { opts with toplevel_name = toplevel_name_of_filename fresh_name; filename = fresh_name } in
-    certirocq_eval_named opts env sigma c global_id imports
+    certirocq_eval_named ~opaque_access opts env sigma c global_id imports
 
   let run_existing opts env sigma c id run =
     let tyinfo = 
@@ -1020,21 +1050,21 @@ module CompileFunctor (CI : CompilerInterface) = struct
     debug_msg opts.debug (Printf.sprintf "Running the dynamic linked program succeeded, reifying result");
     reify opts env sigma tyinfo result
     
-  let eval opts env sigma c imports =
+  let eval ~opaque_access opts env sigma c imports =
     match exists_certirocq_run opts.filename with
-    | None -> certirocq_eval opts env sigma c imports
+    | None -> certirocq_eval ~opaque_access opts env sigma c imports
     | Some run -> 
       debug_msg opts.debug (Printf.sprintf "Retrieved earlier compiled code for %s" opts.filename);
       run_existing opts env sigma c (Pp.str opts.filename) run
 
-  let eval_gr opts gr imports =
+  let eval_gr ~opaque_access opts gr imports =
     let env = Global.env () in
     let sigma = Evd.from_env env in
     let sigma, c = Evd.fresh_global env sigma gr in
     let filename = get_name gr in
     let name = toplevel_name_of_filename filename in
     let opts = { opts with toplevel_name = name; filename = filename } in
-    eval opts env sigma c imports
+    eval ~opaque_access opts env sigma c imports
     
   let print_to_file (s : string) (file : string) =
     let f = open_out file in
@@ -1042,8 +1072,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     close_out f
 
 
-  let show_ir opts gr =
-    let term = quote opts gr in
+  let show_ir ~opaque_access opts gr =
+    let term = quote ~opaque_access opts gr in
     let debug = opts.debug in
     let options = make_pipeline_options opts in
     let p = Pipeline.show_IR options (Obj.magic term) in
@@ -1066,7 +1096,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
 
 
   (* Quote Coq inductive type *)
-  let quote_ind opts gr : Metarocq_template_plugin.Ast_quoter.quoted_program * string =
+  let quote_ind ~opaque_access opts gr : Metarocq_template_plugin.Ast_quoter.quoted_program * string =
     let debug = opts.debug in
     let env = Global.env () in
     let sigma = Evd.from_env env in
@@ -1079,13 +1109,13 @@ module CompileFunctor (CI : CompilerInterface) = struct
         Pp.(Printer.pr_global gr ++ str " is not an inductive type") in
     debug_msg debug "Quoting";
     let time = Unix.gettimeofday() in
-    let term = quote_term_rec ~bypass:true env sigma (EConstr.to_constr sigma c) in
+    let term = quote_term_rec ~bypass:true ~opaque_access env sigma (EConstr.to_constr sigma c) in
     let time = (Unix.gettimeofday() -. time) in
     debug_msg debug (Printf.sprintf "Finished quoting in %f s.." time);
     (term, name)
 
-  let ffi_command opts gr =
-    let (term, name) = quote_ind opts gr in
+  let ffi_command ~opaque_access opts gr =
+    let (term, name) = quote_ind ~opaque_access opts gr in
     let debug = opts.debug in
     let options = make_pipeline_options opts in
 
@@ -1108,9 +1138,9 @@ module CompileFunctor (CI : CompilerInterface) = struct
     | CompM.Err s ->
       CErrors.user_err Pp.(str "Could not generate FFI glue code: " ++ pr_string s))
 
-  let glue_command opts grs =
+  let glue_command ~opaque_access opts grs =
     let terms = grs |> List.rev
-                |> List.map (fun gr -> Metarocq_template_plugin.Ast0.Env.declarations (fst (quote opts gr))) 
+                |> List.map (fun gr -> Metarocq_template_plugin.Ast0.Env.declarations (fst (quote ~opaque_access opts gr)))
                 |> List.concat |> nub in
     generate_glue true opts (Obj.magic terms)
 

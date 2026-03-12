@@ -25,8 +25,10 @@
       compcert.override.version = "3.17";
       wasmcert.job = false;
       wasmcert.override.version = "v2.2.0";
-      metarocq.job = false;
-      metarocq.override.version = "1.4.1-9.1";
+      ExtLib.job = false;
+      ExtLib.override.version = "0.13.0";
+      metarocq.job = true;
+      metarocq.override.version = "v1.5.1-9.1";
     }; rocqPackages = {
       rocq-core.override.version = "9.1";
     };
@@ -40,4 +42,7 @@
   cachix.math-comp = { };
   cachix.coq-community = { };
   cachix.metarocq = {};
+
+  cachix.metarocq.authToken = "CACHIX_AUTH_TOKEN";
+
 }

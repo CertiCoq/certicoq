@@ -1,3 +1,3 @@
 open Certirocq_vanilla_plugin
 
-val check : Names.GlobRef.t -> unit
+val check : opaque_access:Global.indirect_accessor -> Names.GlobRef.t -> unit

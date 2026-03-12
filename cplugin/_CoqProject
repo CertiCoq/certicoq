@@ -188,6 +188,8 @@ extraction/eRemoveParams.ml
 extraction/eRemoveParams.mli
 extraction/eReorderCstrs.ml
 extraction/eReorderCstrs.mli
+extraction/eRemapInductives.mli
+extraction/eRemapInductives.ml
 extraction/errors0.ml
 extraction/errors0.mli
 extraction/eSpineView.ml
@@ -308,6 +310,8 @@ extraction/monad0.ml
 extraction/monad0.mli
 extraction/monadState.ml
 extraction/monadState.mli
+extraction/monadExc.mli
+extraction/monadExc.ml
 extraction/monad_utils.ml
 extraction/monad_utils.mli
 extraction/mSetAVL.ml

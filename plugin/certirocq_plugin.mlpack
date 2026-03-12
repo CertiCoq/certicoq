@@ -123,6 +123,8 @@ TemplateEnvMap
 TemplateProgram
 EtaExpand
 EnvironmentTyping
+MonadExc
+Monad_utils
 
 Ssrbool
 WGraph
@@ -191,6 +193,7 @@ OptimizePropDiscr
 EUnboxing
 EInlining
 EReorderCstrs
+ERemapInductives
 EBeta
 ECoInductiveToInductive
 ETransform
@@ -202,8 +205,6 @@ SafeTemplateErasure
 ZArith_dec
 Coqlib0
 
-MonadExc
-Monad_utils
 ExceptionMonad
 Expression
 RandyPrelude

@@ -22,6 +22,8 @@ type inductive_mapping = Kernames.inductive * (string * int list) (* Target indu
 type inductives_mapping = inductive_mapping list 
 type prim = ((Kernames.kername * Kernames.ident) * bool)
 
+type extract_inductive = { cstrs : Kernames.kername list; elim : Kernames.kername }
+type extract_inductives = (Kernames.kername * extract_inductive list) list
 
 type options =
   { typed_erasure : bool;
@@ -42,6 +44,7 @@ type options =
     toplevel_name : string;
     prims     : prim list;
     inductives_mapping : inductives_mapping;
+    extracted_inductives : extract_inductives
   }
 
 val default_options : unit -> options
@@ -51,6 +54,7 @@ val make_options : command_args list -> prim list -> string -> options
 val register : prim list -> import list -> unit
 
 val register_inductives : inductives_mapping -> unit
+val register_constant_inductives : extract_inductives -> unit
 
 val get_name : Names.GlobRef.t -> string
 
@@ -76,23 +80,29 @@ module type CompilerInterface = sig
 end
 
 module CompileFunctor (CI : CompilerInterface) : sig
-  val compile_only : options -> Names.GlobRef.t -> import list -> unit
-  val generate_glue_only : options -> Names.GlobRef.t -> unit
-  val compile_C : options -> Names.GlobRef.t -> import list -> unit
-  val show_ir : options -> Names.GlobRef.t -> unit
-  val compile_wasm : options -> Names.GlobRef.t -> unit
-  val ffi_command : options -> Names.GlobRef.t -> unit
-  val glue_command : options -> Names.GlobRef.t list -> unit
-  val eval_gr : options -> Names.GlobRef.t -> import list -> Constr.t
-  val eval : options -> Environ.env -> Evd.evar_map -> EConstr.t -> import list -> Constr.t
+  val compile_only : opaque_access:Global.indirect_accessor ->
+                     options -> Names.GlobRef.t -> import list -> unit
+  val generate_glue_only : opaque_access:Global.indirect_accessor ->
+                           options -> Names.GlobRef.t -> unit
+  val compile_C : opaque_access:Global.indirect_accessor ->
+                  options -> Names.GlobRef.t -> import list -> unit
+  val show_ir : opaque_access:Global.indirect_accessor ->
+                options -> Names.GlobRef.t -> unit
+  val compile_wasm : opaque_access:Global.indirect_accessor ->
+                    options -> Names.GlobRef.t -> unit
+  val ffi_command : opaque_access:Global.indirect_accessor ->
+                    options -> Names.GlobRef.t -> unit
+  val glue_command : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t list -> unit
+  val eval_gr : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> import list -> Constr.t
+  val eval : opaque_access:Global.indirect_accessor -> options -> Environ.env -> Evd.evar_map -> EConstr.t -> import list -> Constr.t
 end
 
-val compile_only : options -> Names.GlobRef.t -> import list -> unit
-val generate_glue_only : options -> Names.GlobRef.t -> unit
-val compile_C : options -> Names.GlobRef.t -> import list -> unit
-val show_ir : options -> Names.GlobRef.t -> unit
-val compile_wasm : options -> Names.GlobRef.t -> unit
-val ffi_command : options -> Names.GlobRef.t -> unit
-val glue_command : options -> Names.GlobRef.t list -> unit
-val eval_gr : options -> Names.GlobRef.t -> import list -> Constr.t
-val eval : options -> Environ.env -> Evd.evar_map -> EConstr.t -> import list -> Constr.t
+val compile_only : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> import list -> unit
+val generate_glue_only : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> unit
+val compile_C : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> import list -> unit
+val show_ir : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> unit
+val compile_wasm : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> unit
+val ffi_command : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> unit
+val glue_command : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t list -> unit
+val eval_gr : opaque_access:Global.indirect_accessor -> options -> Names.GlobRef.t -> import list -> Constr.t
+val eval : opaque_access:Global.indirect_accessor -> options -> Environ.env -> Evd.evar_map -> EConstr.t -> import list -> Constr.t

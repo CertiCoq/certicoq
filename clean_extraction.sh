@@ -46,8 +46,6 @@ cd ../..
 cd ${PLUGIN}/extraction
 mv aST.ml AST.ml
 mv aST.mli AST.mli
-mv fLT.ml FLT.ml
-mv fLT.mli FLT.mli
 # Work around a compiler bug in module name resolution
 sed -f ../extraction.sed compile0.ml > compile0.ml.tmp && mv -f compile0.ml.tmp compile0.ml
 # We compile with -rectypes, so these definitions are badly interepreted

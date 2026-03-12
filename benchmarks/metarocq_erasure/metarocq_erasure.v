@@ -12,8 +12,8 @@ Require Import MetaRocq.Utils.bytestring.
 
 Open Scope bs_scope.
 
-Axiom (rocq_msg_info : string -> unit).
-Axiom (rocq_msg_debug : string -> unit).
+Axiom (msg_info : string -> unit).
+Axiom (msg_debug : string -> unit).
 
 Set MetaRocq Timing.
 
@@ -23,11 +23,11 @@ Program Definition erase (p : Ast.Env.program) : eprogram :=
   run_erase_program default_erasure_config (nil, p) (MRUtils.todo "wf_env and welltyped term").
 
 Program Definition erase_and_print_template_program (p : Ast.Env.program) : unit :=
-  let _ := rocq_msg_info ("Erasing program.") in
-  let prprog := rocq_msg_info (Pretty.print_program false 2 p) in
+  let _ := msg_info ("Erasing program.") in
+  let prprog := msg_info (Pretty.print_program false 2 p) in
   let eprog := run_erase_program default_erasure_config (nil, p) (MRUtils.todo "wf_env and welltyped term") in
-  let _ := rocq_msg_info "Erasure terminated with: " in
-  rocq_msg_info (EPretty.print_program eprog).
+  let _ := msg_info "Erasure terminated with: " in
+  msg_info (EPretty.print_program eprog).
 
 Definition metarocq_erasure (p : Ast.Env.program) :=
   erase_and_print_template_program p.
@@ -35,7 +35,7 @@ Definition metarocq_erasure (p : Ast.Env.program) :=
 CertiRocq Compile -time -O 1 metarocq_erasure
 Extract Constants [
   (* rocq_msg_debug => "print_msg_debug", *)
-  rocq_msg_info => "rocq_msg_info",
+  msg_info => "rocq_msg_info",
   PCUICWfEnvImpl.guard_impl => "metarocq_guard_impl" ]
 Include [ "print.h" ].
 

@@ -53,8 +53,16 @@ let inductive_of_qualid ~loc (gr : Libnames.qualid) : Kernames.inductive =
   match quoted_globref_of_qualid ~loc gr with
   | Kernames.ConstRef kn -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a constant.")
   | Kernames.VarRef(v) -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a variable.")
-  | Kernames.IndRef(i) -> (Obj.magic i)
+  | Kernames.IndRef(i) -> Obj.magic i
   | Kernames.ConstructRef(_, _) -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a constructor.")
+
+let constant_of_qualid ~loc (gr : Libnames.qualid) : Kernames.kername =
+  let open Metarocq_template_plugin in
+  match quoted_globref_of_qualid ~loc gr with
+  | Kernames.ConstRef kn -> Obj.magic kn
+  | Kernames.VarRef(v) -> CErrors.user_err ~loc Pp.(str "Expected a constant name but found a variable.")
+  | Kernames.IndRef(i) -> CErrors.user_err ~loc Pp.(str "Expected a constant name but found an inductive.")
+  | Kernames.ConstructRef(_, _) -> CErrors.user_err ~loc Pp.(str "Expected a constant name but found a constructor.")
 
 }
 
@@ -105,21 +113,35 @@ VERNAC ARGUMENT EXTEND cinclude
 | [ "Absolute" string(str) ] -> { FromAbsolutePath str }
 END
 
-VERNAC ARGUMENT EXTEND certirocq_Register_extract_inductive
+VERNAC ARGUMENT EXTEND certirocq_register_extract_inductive
 | [ reference(gr) "=>" string(ty) "[" natural_list(cstrs) "]" ] ->
   { ((inductive_of_qualid ~loc gr), (ty, cstrs)) }
+END
+
+VERNAC ARGUMENT EXTEND certirocq_register_extract_inductive_to_constants
+| [ "[" reference_list(cstrs) "|" reference(elim) "]" ] ->
+  { { cstrs = List.map (constant_of_qualid ~loc) cstrs; elim = constant_of_qualid ~loc elim} }
+END
+
+
+VERNAC ARGUMENT EXTEND certirocq_register_extract_inductives_to_constants
+| [ reference(gr) "=>" "[" certirocq_register_extract_inductive_to_constants_list_sep(extr, ",") "]" ] ->
+  { ((inductive_of_qualid ~loc gr).Kernames.inductive_mind, extr) }
 END
 
 VERNAC COMMAND EXTEND CertiRocq_Register CLASSIFIED AS SIDEFF
 | [ "CertiRocq" "Register" "[" extract_cnst_list_sep(l, ",") "]" "Include" "[" cinclude_list_sep(imps, ",") "]" ] -> {
     Certirocq.register l imps
   }
-| [ "CertiRocq" "Extract" "Inductives" "[" certirocq_Register_extract_inductive_list_sep(inds, ",") "]" ] -> {
+| [ "CertiRocq" "Extract" "Inductives" "[" certirocq_register_extract_inductive_list_sep(inds, ",") "]" ] -> {
     Certirocq.register_inductives inds
+}
+| [ "CertiRocq" "Extract" "Inductive" "To" "Constants" "[" certirocq_register_extract_inductives_to_constants_list_sep(inds, ",") "]" ] -> {
+    Certirocq.register_constant_inductives inds
 }
 END
 
-VERNAC COMMAND EXTEND CertiRocq_Compile CLASSIFIED AS QUERY
+VERNAC COMMAND EXTEND CertiRocq_Compile CLASSIFIED AS QUERY STATE opaque_access
 | [ "CertiRocq" "Compile" cargs_list(l) global(gr) ] -> {
     let gr = Nametab.global gr in
     let opts = Certirocq.make_options l [] (get_name gr) in
@@ -165,22 +187,26 @@ VERNAC COMMAND EXTEND CertiRocq_Compile CLASSIFIED AS QUERY
     let opts = Certirocq.make_options l [] "" in
     Certirocq.glue_command opts grs
   }
+END
+
+VERNAC COMMAND EXTEND CertiRocq_help CLASSIFIED AS QUERY
 | [ "CertiRocq" "-help" ] -> {
     Feedback.msg_info (str help_msg)
   }
 END
 
-VERNAC COMMAND EXTEND CertiRocq_Eval CLASSIFIED AS SIDEFF
+VERNAC COMMAND EXTEND CertiRocq_Eval CLASSIFIED AS SIDEFF STATE opaque_access
 | [ "CertiRocq" "Eval" cargs_list(l) global(gr) "Extract" "Constants" "[" extract_cnst_list_sep(cs, ",") "]" "Include" "[" cinclude_list_sep(imps, ",") "]" ] -> {
+  fun ~opaque_access ->
   let gr = Nametab.global gr in
   let opts = Certirocq.make_options l cs (get_name gr) in
-  let result = Certirocq.eval_gr opts gr imps in
+  let result = Certirocq.eval_gr ~opaque_access opts gr imps in
   Feedback.msg_notice Pp.(str" = " ++ Printer.pr_constr_env (Global.env ()) Evd.empty result)
   }
 | [ "CertiRocq" "Eval" cargs_list(l) global(gr) ] -> {
-  let gr = Nametab.global gr in
+  fun ~opaque_access -> let gr = Nametab.global gr in
   let opts = Certirocq.make_options l [] (get_name gr) in
-  let result = Certirocq.eval_gr opts gr [] in
+  let result = Certirocq.eval_gr ~opaque_access opts gr [] in
   Feedback.msg_notice Pp.(str" = " ++ Printer.pr_constr_env (Global.env ()) Evd.empty result)
   }
 END
@@ -193,7 +219,7 @@ TACTIC EXTEND CertiRocq_eval
       let sigma = Proofview.Goal.sigma gl in
       let opts = Certirocq.make_options l [] "goal" in
       let opts = Certirocq.{ opts with toplevel_name = "goal" } in
-      let c' = Certirocq.eval opts env sigma c [] in
+      let c' = Certirocq.eval ~opaque_access:Library.indirect_accessor opts env sigma c [] in
       ltac_apply tac (List.map to_ltac_val [EConstr.of_constr c'])
   end }
 END

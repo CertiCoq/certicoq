@@ -18,7 +18,7 @@ jobs:
         opam_file:
           - 'rocq-certirocq.opam'
         image:
-          - 'mattam82/metacoq:metarocq-1.4.1-rocq-9.1'
+          - 'mattam82/metacoq:metarocq-1.5.1-rocq-9.1'
       fail-fast: false  # don't stop jobs if one fails
     steps:
       - uses: actions/checkout@v3

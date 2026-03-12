@@ -183,6 +183,8 @@ extraction/eRemoveParams.ml
 extraction/eRemoveParams.mli
 extraction/eReorderCstrs.ml
 extraction/eReorderCstrs.mli
+extraction/eRemapInductives.mli
+extraction/eRemapInductives.ml
 extraction/errors0.ml
 extraction/errors0.mli
 extraction/eSpineView.ml
@@ -383,6 +385,8 @@ extraction/orders.ml
 extraction/orders.mli
 extraction/ordersTac.ml
 extraction/ordersTac.mli
+extraction/monadExc.mli
+extraction/monadExc.ml
 extraction/pCUICAst.ml
 extraction/pCUICAst.mli
 extraction/pCUICAstUtils.ml

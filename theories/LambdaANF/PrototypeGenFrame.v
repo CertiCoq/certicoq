@@ -8,8 +8,8 @@ From Stdlib Require Import Lists.List.
 Import ListNotations.
 
 From MetaRocq Require Import Template.All.
-Import MRMonadNotation.
-Module TM :=MetaRocq.Utils.monad_utils.
+Import MonadNotation.
+Module TM := MetaRocq.Utils.monad_utils.
 
 From ExtLib.Core Require Import RelDec.
 From ExtLib.Data Require Import Nat List Option Pair String.
@@ -28,11 +28,6 @@ Set Default Proof Mode "Ltac2".
 (* Set Universe Polymorphism. *)
 
 Require Export CertiRocq.LambdaANF.Frame.
-
-#[export]
-Instance Monad_TemplateMonad : Monad TemplateMonad := {
-  ret _ := TM.ret;
-  bind _ _ := TM.bind }.
 
 Notation "'let!' x ':=' c1 'in' c2" := (@bind _ _ _ _ c1 (fun x => c2))
   (at level 61, c1 at next level, right associativity).
@@ -339,7 +334,7 @@ Definition runGM {A} (m : GM A) : TemplateMonad A :=
   m <- tmEval cbv m ;; (* Necessary: if removed, evaluation takes forever *)
   match runStateT m 0 with
   | inl e => tmFail ("runGM: " +++ e)
-  | inr (x, _) => TM.ret x
+  | inr (x, _) => ret x
   end.
 
 Definition runGM' {A} (n : N) (m : GM A) : string + (A × N) :=
@@ -724,7 +719,7 @@ Definition gen_frameD (qual : modpath) (typename : kername) (univD_kername : ker
 Definition kername_of_const (s : string) : TemplateMonad kername :=
   refs <- tmLocate s ;;
   match refs with
-  | ConstRef kername :: _ => TM.ret kername
+  | ConstRef kername :: _ => ret kername
   | _ :: _ => tmFail ("kername_of_const: Not a constant: " +++ s)
   | [] => tmFail ("kername_of_const: Not in scope: " +++ s)
   end.
@@ -750,8 +745,8 @@ Class AuxData (U : Set) := aux_data : aux_data_t.
 Definition mk_Frame_ops (qual : modpath) (typename : kername) (T : Type) (atoms : list Set) : TemplateMonad unit :=
   p <- tmQuoteRec T ;;
   atoms <- monad_map tmQuote atoms ;;
-  mlet (inds, g, fs, cfs, univ, univ_of_tyname, univD, univD_body, frame_t) <-
-    runGM (gen_Frame_ops qual typename p atoms) ;;
+  let! '(inds, g, fs, cfs, univ, univ_of_tyname, univD, univD_body, frame_t) :=
+    runGM (gen_Frame_ops qual typename p atoms) in
   tmMkInductive false univ ;;
   (* tmPrint univD ;; *)
   (* tmPrint univD_body ;; *)

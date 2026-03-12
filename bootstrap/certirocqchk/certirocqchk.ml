@@ -10,15 +10,16 @@ open ExceptionMonad
 open AstCommon
 open Plugin_utils
 
-let quote gr =
+let quote ~opaque_access gr =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let sigma, c = Evd.fresh_global env sigma gr in
-  let term = Metarocq_template_plugin.Ast_quoter.quote_term_rec ~bypass:true env sigma (EConstr.to_constr sigma c) in
+  let term = Metarocq_template_plugin.Ast_quoter.quote_term_rec
+               ~bypass:true ~opaque_access env sigma (EConstr.to_constr sigma c) in
   term
 
-let check gr = 
+let check ~opaque_access gr =
   (* Quote Coq term *)
-  let p = quote gr in
+  let p = quote ~opaque_access gr in
   let b = Certirocqchk_plugin_wrapper.check (Obj.magic p) (* Go through a type equality *) in
   if b then () else CErrors.user_err Pp.(str"The program does not typecheck")

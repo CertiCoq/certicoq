@@ -1003,7 +1003,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let shared_lib = make_fname opts opts.filename ^ suff ^ ".cmxs" in
     let linkcmd =
       Printf.sprintf "%s ocamlopt -shared -linkpkg -dontlink %s -thread -rectypes -package %s \
-      -I %s -I cplugin -o %s %s %s %s %s"
+      -I %s -package rocq-certirocq-vanilla -o %s %s %s %s %s"
       ocamlfind dontlink pkgs opts.build_dir shared_lib ocaml_driver gc_stack_o 
       (make_fname opts opts.filename ^ ".o") importso
     in

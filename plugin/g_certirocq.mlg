@@ -110,6 +110,8 @@ END
 VERNAC ARGUMENT EXTEND cinclude
 | [ string(str) ] -> { FromRelativePath str }
 | [ "Library" string(str) string_opt(str') ] -> { FromLibrary (str, str') }
+| [ "LibraryPath" string(str) ] -> { LibraryPath str }
+| [ "Link" string(str) ] -> { Link str }
 | [ "Absolute" string(str) ] -> { FromAbsolutePath str }
 END
 

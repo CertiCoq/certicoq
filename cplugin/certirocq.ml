@@ -184,13 +184,13 @@ let certirocq_run_function_input =
     ~subst:None)
 
 let register_certirocq_run s s' fn =
-  Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certirocq_run");
+  (* Feedback.msg_debug Pp.(str"Registering function " ++ str s ++ str " in certirocq_run"); *)
   Lib.add_leaf (certirocq_run_function_input (s, s', fn))
 
 let exists_certirocq_run s =
-  Feedback.msg_debug Pp.(str"Looking up " ++ str s ++ str " in certirocq_run_functions");
+  (* Feedback.msg_debug Pp.(str"Looking up " ++ str s ++ str " in certirocq_run_functions"); *)
   let res = CString.Map.find_opt s !certirocq_run_functions in
-  if Option.is_empty res then Feedback.msg_debug Pp.(str"Not found");
+  (* if Option.is_empty res then Feedback.msg_debug Pp.(str"Not found"); *)
   res
   
 let run_certirocq_run s =

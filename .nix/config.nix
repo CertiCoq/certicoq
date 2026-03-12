@@ -42,4 +42,7 @@
   cachix.math-comp = { };
   cachix.coq-community = { };
   cachix.metarocq = {};
+
+  cachix.metarocq.authToken = "CACHIX_AUTH_TOKEN";
+
 }

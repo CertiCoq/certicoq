@@ -2,7 +2,7 @@ From CertiRocq.Plugin Require Import CertiRocq.
 From MetaRocq.Utils Require Import utils.
 Open Scope bs_scope.
 
-Import MRMonadNotation.
+Import MonadNotation.
 From MetaRocq.Template Require Import AstUtils Ast Pretty.
 From MetaRocq.SafeChecker Require Import PCUICErrors PCUICWfEnvImpl PCUICSafeChecker.
 From MetaRocq.PCUIC Require Import PCUICSN. 

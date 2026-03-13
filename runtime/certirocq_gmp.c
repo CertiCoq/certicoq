@@ -15,9 +15,7 @@ typedef value primstring;
 typedef value primintcarry;
 typedef value primintpair;
 
-#define String_tag 252
-
-#define trace(...) printf(__VA_ARGS__)
+#define trace(...) // printf(__VA_ARGS__)
 
 #define Val_mpz(x) (*(mpz_ptr*) (Op_val(x)))
 
@@ -34,22 +32,22 @@ mpz_ptr mpz_of_value(gmp_int x) {
 void print_mpz(mpz_ptr x) {
    char* str = NULL;
    str = mpz_get_str(NULL, 10, Val_mpz(x));
-   printf("%p (%p) is a GMP value %s\n", (void*) x, (void*) Val_mpz(x), str);
+   trace("%p (%p) is a GMP value %s\n", (void*) x, (void*) Val_mpz(x), str);
 }
 
 void print_gmp_int(gmp_int x) {
   if (Is_long (x))
-    { printf("%p is a long int %lu", (void*) x, Val_long(x)); }
+    { trace("%p is a long int %lu", (void*) x, Val_long(x)); }
   { char* str = NULL;
     str = mpz_get_str(NULL, 10, Val_mpz(x));
-    printf("%p (%p) is a GMP value %s\n", (void*) x, (void*) Val_mpz(x), str);
+    trace("%p (%p) is a GMP value %s\n", (void*) x, (void*) Val_mpz(x), str);
   }
 }
 
 
 gmp_int mk_gmp_int (struct thread_info *tinfo, mpz_ptr x) {
   char* str = NULL;
-  printf("mk_gmp_int called with %p\n", x);
+  trace("mk_gmp_int called with %p\n", x);
   str = mpz_get_str(NULL, 10, x);
   trace("Calling mk_gmp_int with %s\n", str);
   /* free(str); */
@@ -384,56 +382,16 @@ gmp_int z_of_string(struct thread_info *tinfo, primstring x) {
     cp[i] = Byte (x, i);
   }
   cp[i] = 0;
-  printf("copied string: %s.\n", cp);
+  trace("copied string: %s.\n", cp);
   int code = mpz_set_str (res, cp, 10);
-  printf("of_string allocated: %p with code %i\n", res, code);
+  trace("of_string allocated: %p with code %i\n", res, code);
   if (code == 0) {
     // free(cp); Should it be freed?
     return mk_gmp_int(tinfo, res); }
   { exit(code); }
 }
 
-value mk_ocaml_string (struct thread_info *tinfo, char* str) {
-  register value *$alloc;
-  register value *$limit;
-  printf ("calling strlen on %s\n", str);
-  unsigned long long len = strlen(str); // bytes
-  unsigned int words = (len / 8) + 1;
-  printf ("called strlen: %llu\n", len);
-  $limit = (*tinfo).limit;
-  $alloc = (*tinfo).alloc;
-  if (!(words + 2 <= $limit - $alloc)) {
-    /*skip*/;
-    (*tinfo).nalloc = words + 1;
-    garbage_collect(tinfo);
-    /*skip*/;
-    $alloc = (*tinfo).alloc;
-    $limit = (*tinfo).limit;
-  }
-  assert (words + 2 <= $limit - $alloc);
-  *($alloc + 0LLU) = String_tag | (words << 10);
-  int i = 0;
-  char *strp = (char*) ($alloc + 1LLU);
-  printf("Length: %llu\n", len);
-  for (i = 0; i < len; i++) {
-    trace("fill i = %d with %c\n", i, str[i]);
-    strp[i] = str[i];
-  }
-  printf("i = %d\n", i);
-  // Fill remaining bytes with 0s
-  int j = i;
-  for (; ((j + 1) / 8) < words; j++)
-    { trace("fill j = %d with 0\n", j);
-      strp[j] = (char) 0; }
-  trace("fill j = %d with %d\n", j, j - i);
-  strp[j] = j - i;
-  /* printf("result ocaml string encoding: 0x%08llx", *((unsigned long long*)strp)); */
-  (*tinfo).alloc = (*tinfo).alloc + words + 1;
-  return (value) ((unsigned long long *) $alloc + 1LLU);
-}
-
 primstring z_to_string(struct thread_info *tinfo, gmp_int x) {
-  printf("z_to_string called\n");
   print_gmp_int(x);
   char* str = NULL;
   if (Is_long(x)) {
@@ -490,9 +448,6 @@ void *reallocate_function (void *ptr, size_t old_size, size_t new_size) {
   void *newptr = allocate_function(new_size);
   size_t cpsize = old_size > new_size ? new_size : old_size;
   memcpy(newptr, ptr, cpsize);
-  for (int i = 0; i < cpsize; i++)
-  { assert(((char*) newptr)[i] == ((char*)ptr)[i]);
-    printf ("copied char: %i\n", (unsigned int)  ((char*)newptr)[i]); }
   return newptr;
 }
 

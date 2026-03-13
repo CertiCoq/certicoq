@@ -3,6 +3,9 @@ From MetaRocq.Utils Require Import bytestring.
 From Corelib Require Import Numbers.Cyclic.Int63.PrimInt63 PrimString.
 From CertiRocq.Plugin Require Import Loader PrimInt63 PrimString.
 
+(** Remove metarocq warning, we know what we're doing! *)
+Set Warnings "-primitive-turned-into-axiom".
+
 (* https://github.com/ocaml/Zarith/blob/master/z.mli *)
 
 Axiom t : Type.
@@ -65,6 +68,7 @@ Include [ Library "certirocq_gmp.h", LibraryPath "/opt/homebrew/lib", Link "gmp"
 
 Definition compare_signed x y := wrap_int (compare x y).
 
+Instance show_t : Show t := { show x := show (to_string x) }.
 From CertiRocq.Plugin Require Import RocqMsgFFI.
 Set CertiRocq Build Directory "_build".
 (* TODO test presence *)
@@ -86,5 +90,24 @@ Definition test_zarith2 :=
   (* let x := msg_info ("compare one one = " ++ show (compare_signed one one)) in *)
    msg_info (show (length (to_string (of_string "40")))).
   (* msg_info ("show pow 2 40 = " ++ string_of_pstring (to_string (pow (add one one) (of_string "40")))). *)
-Set Warnings "-primitive-turned-into-axiom".
-CertiRocq Eval test_zarith2.
+(* CertiRocq Eval test_zarith2. *)
+
+Definition test_zarith3 := PrimString.cat "foo"%pstring "bar".
+CertiRocq Eval test_zarith3.
+
+
+Definition test_zarith4 := PrimString.cat "foo"%pstring "".
+CertiRocq Eval test_zarith4.
+
+Definition test_zarith5 := PrimString.cat ""%pstring "foo".
+CertiRocq Eval test_zarith5.
+
+(* let x := msg_info ("compare one zero = " ++ show (compare one zero)) in *)
+  (* let x := msg_info ("compare zero one = " ++ show (compare_signed zero one)) in *)
+  (* to_string (add one one). *)
+
+  (* let x := msg_info ("add one one = " ++ show (add one one)) in *)
+  (* let x := msg_info ("compare one one = " ++ show (compare_signed one one)) in *)
+  (*  msg_info (show (length (to_string (of_string "40")))). *)
+  (* (* msg_info ("show pow 2 40 = " ++ string_of_pstring (to_string (pow (add one one) (of_string "40")))). *) *)
+

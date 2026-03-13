@@ -787,6 +787,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
         Constr.mkFloat (Obj.magic v)
       else if Environ.is_int63_type env c then
         Constr.mkInt (Obj.magic v)
+      else if Environ.is_string_type env c then
+        Constr.mkString (Obj.magic v)
       else CErrors.user_err Pp.(str "Unsupported primitive type in CertiRocq reification")
     in aux ty v
 

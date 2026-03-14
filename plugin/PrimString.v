@@ -1,5 +1,20 @@
-From CertiRocq.Plugin Require Import Loader.
-From Corelib Require Import PrimString.
+From MetaRocq Require Import Show.
+From MetaRocq.Utils Require Import bytestring MRString.
+From CertiRocq.Plugin Require Import Loader PrimInt63.
+From Corelib Require Import PrimInt63 PrimString PrimStringAxioms.
+
+Definition string_of_pstring (s : string) : bytestring.string :=
+  MRString.string_of_list_aux char63_to_string ""%bs (PrimStringAxioms.to_list s).
+
+(* Very inefficient!, we're concatenating each char. No other way with the current API.
+   Would need `make_from_fun : int63 -> (int63 -> char63) -> string` *)
+
+Fixpoint pstring_of_string (s : bytestring.string) : string :=
+  match s with
+  | String.EmptyString       => ""%pstring
+  | String.String b cs => cat (make 1 (Uint63Axioms.of_Z (IntDef.Z.of_N (Byte.to_N b))))
+                            (pstring_of_string cs)
+  end.
 
 CertiRocq Register [
     Corelib.Strings.PrimString.compare => "prim_string_compare",

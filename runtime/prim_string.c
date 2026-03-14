@@ -37,7 +37,7 @@ value prim_string_compare(primstring x, primstring y)
 
 primint prim_string_get(primstring x, primint i)
 {
-  return Byte(x, i);
+  return Val_long(Byte(x, Long_val(i)));
 }
 
 primint prim_string_length(primstring x)
@@ -56,7 +56,7 @@ value mk_ocaml_string (struct thread_info *tinfo, char* str) {
   unsigned int words = (len / 8) + 1;
   $limit = (*tinfo).limit;
   $alloc = (*tinfo).alloc;
-  if (!(words + 2 <= $limit - $alloc)) {
+  if (!(words + 1 <= $limit - $alloc)) {
     /*skip*/;
     (*tinfo).nalloc = words + 1;
     garbage_collect(tinfo);
@@ -64,7 +64,7 @@ value mk_ocaml_string (struct thread_info *tinfo, char* str) {
     $alloc = (*tinfo).alloc;
     $limit = (*tinfo).limit;
   }
-  assert (words + 2 <= $limit - $alloc);
+  assert (words + 1 <= $limit - $alloc);
   *($alloc + 0LLU) = String_tag | (words << 10);
   int i = 0;
   char *strp = (char*) ($alloc + 1LLU);
@@ -75,7 +75,7 @@ value mk_ocaml_string (struct thread_info *tinfo, char* str) {
   int j = i;
   for (; ((j + 1) / 8) < words; j++)
   { strp[j] = (char) 0; }
-  strp[j] = j - i;
+  strp[j] = (char) (j - i);
   (*tinfo).alloc = (*tinfo).alloc + words + 1;
   return (value) ((unsigned long long *) $alloc + 1LLU);
 }

@@ -8,6 +8,7 @@ Set Warnings "-primitive-turned-into-axiom".
 
 (* https://github.com/ocaml/Zarith/blob/master/z.mli *)
 
+(* Axiomatisation *)
 Axiom t : Type.
 
 Axiom zero : t.
@@ -27,6 +28,37 @@ Axiom lognot : t -> t.
 
 Axioms max min : t -> t -> t.
 Axioms leq geq lt gt : t -> t -> bool.
+
+(* Implicitely coerce from primitive ints *)
+Coercion of_int : int >-> t.
+
+(* Very inefficient *)
+Definition of_nat (n : nat) := of_string (pstring_of_string (show n)).
+
+Module GMPNotations.
+  Declare Scope gmp_scope.
+  Bind Scope gmp_scope with t.
+  Delimit Scope gmp_scope with gmp.
+  Infix "+" := add : gmp_scope.
+  Infix "-" := sub : gmp_scope.
+  Infix "*" := mul : gmp_scope.
+  Infix "^" := pow : gmp_scope.
+  Infix "/" := div : gmp_scope.
+  Notation "x 'modulo' y" := (rem x y) (at level 40, left associativity) : gmp_scope.
+  Infix "==" := equal (at level 70, no associativity) : gmp_scope.
+  Infix "=?" := compare (at level 70, no associativity) : gmp_scope.
+  Infix "'land'" := logand (at level 40, left associativity) : gmp_scope.
+  Infix "'lor'" := logor (at level 40, left associativity) : gmp_scope.
+  Infix "'lxor'" := logxor (at level 20, left associativity) : gmp_scope.
+  Notation "'lnot' x" := (lognot x) (at level 10, no associativity) : gmp_scope.
+  Notation "| x |" := (abs x%_gmp) (at level 10, no associativity, only printing) : gmp_scope.
+  Infix "<" := lt : gmp_scope.
+  Infix "≤" := leq (at level 70) : gmp_scope.
+  Infix "≥" := geq (at level 70) : gmp_scope.
+  Infix ">" := gt (at level 70) : gmp_scope.
+End GMPNotations.
+Import GMPNotations.
+Local Open Scope gmp_scope.
 
 CertiRocq Register [
   t => "erased",
@@ -65,49 +97,8 @@ CertiRocq Register [
   equal => "z_equal"
 ]
 Include [ Library "certirocq_gmp.h", LibraryPath "/opt/homebrew/lib", Link "gmp" ].
+(* TODO test presence of files/paths? *)
 
 Definition compare_signed x y := wrap_int (compare x y).
 
-Instance show_t : Show t := { show x := show (to_string x) }.
-From CertiRocq.Plugin Require Import RocqMsgFFI.
-Set CertiRocq Build Directory "_build".
-(* TODO test presence *)
-Definition test_zarith :=
-  msg_info (show (equal (add zero one) (add one zero))).
-
-(* CertiRocq Run test_zarith. *)
-
-From MetaRocq.Utils Require Import monad_utils.
-Import MonadNotation.
-
-Definition string_of_pstring (s : string) : bytestring.string :=
-  bytestring.String.concat bytestring.String.EmptyString (List.map char63_to_string (PrimStringAxioms.to_list s)).
-Open Scope bs.
-
-Definition test_zarith2 :=
-  (* let x := msg_info ("compare one zero = " ++ show (compare one zero)) in *)
-  (* let x := msg_info ("compare zero one = " ++ show (compare_signed zero one)) in *)
-  (* let x := msg_info ("compare one one = " ++ show (compare_signed one one)) in *)
-   msg_info (show (length (to_string (of_string "40")))).
-  (* msg_info ("show pow 2 40 = " ++ string_of_pstring (to_string (pow (add one one) (of_string "40")))). *)
-(* CertiRocq Eval test_zarith2. *)
-
-Definition test_zarith3 := PrimString.cat "foo"%pstring "bar".
-CertiRocq Eval test_zarith3.
-
-
-Definition test_zarith4 := PrimString.cat "foo"%pstring "".
-CertiRocq Eval test_zarith4.
-
-Definition test_zarith5 := PrimString.cat ""%pstring "foo".
-CertiRocq Eval test_zarith5.
-
-(* let x := msg_info ("compare one zero = " ++ show (compare one zero)) in *)
-  (* let x := msg_info ("compare zero one = " ++ show (compare_signed zero one)) in *)
-  (* to_string (add one one). *)
-
-  (* let x := msg_info ("add one one = " ++ show (add one one)) in *)
-  (* let x := msg_info ("compare one one = " ++ show (compare_signed one one)) in *)
-  (*  msg_info (show (length (to_string (of_string "40")))). *)
-  (* (* msg_info ("show pow 2 40 = " ++ string_of_pstring (to_string (pow (add one one) (of_string "40")))). *) *)
-
+Instance show_t : Show t := { show x := string_of_pstring (to_string x) }.

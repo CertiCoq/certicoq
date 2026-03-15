@@ -62,7 +62,7 @@ GENCFILES = glue.c CertiRocq.CertiRocqC.CertiRocqC.certirocqc.c
 CFILES = certirocqc_wrapper.c $(GENCFILES)
 
 RUNTIME_DIR = ../../runtime
-RUNTIME_FILES = $(RUNTIME_DIR)/gc_stack.o $(RUNTIME_DIR)/prim_floats.o $(RUNTIME_DIR)/prim_int63.o $(RUNTIME_DIR)/rocq_c_ffi.o
+RUNTIME_FILES = $(RUNTIME_DIR)/gc_stack.o $(RUNTIME_DIR)/prim_floats.o ${RUNTIME_DIR}/prim_string.o $(RUNTIME_DIR)/prim_int63.o $(RUNTIME_DIR)/rocq_c_ffi.o
 
 VFILES = theories/Loader.v theories/PrimInt63.v theories/PrimFloats.v theories/CertiRocqC.v
 

@@ -734,6 +734,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
   let make_rt_file na =
     Boot.Env.Path.(to_string (relative (runtime_dir ()) na))
 
+  let c_flags = "" (* -O2 -fomit-frame-pointer *)
+
   let compile_C ~opaque_access opts gr imports =
     let () = compile_only ~opaque_access opts gr imports in
     let imports = get_global_includes () @ imports in
@@ -744,8 +746,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let compiler = compiler_executable debug in
     let rt_dir = runtime_dir () in
     let cmd =
-        Printf.sprintf "%s -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s"
-          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c")
+        Printf.sprintf "%s -Wno-everything %s -g -I %s -I %s -c -o %s %s"
+          compiler c_flags opts.build_dir (Boot.Env.Path.to_string rt_dir) (name ^ ".o") (name ^ ".c")
     in
     let importso =
       let oname s =

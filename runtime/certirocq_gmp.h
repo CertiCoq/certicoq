@@ -16,6 +16,11 @@ extern gmp_int z_zero();
 extern gmp_int z_one();
 extern gmp_int z_succ(struct thread_info* tinfo, gmp_int x);
 extern gmp_int z_pred(struct thread_info* tinfo, gmp_int x);
+extern gmp_int z_nat_pred(struct thread_info* tinfo, gmp_int x);
+
+extern value z_nat_case(struct thread_info* tinfo, gmp_int discr, value zero_case, value succ_case);
+extern value z_nat_case_untyped_erasure(struct thread_info* tinfo, value dummy, gmp_int discr, value zero_case, value succ_case);
+
 extern gmp_int z_abs(struct thread_info* tinfo, gmp_int x);
 extern gmp_int z_neg(struct thread_info* tinfo, gmp_int x);
 extern gmp_int z_add(struct thread_info* tinfo, gmp_int x, gmp_int y);

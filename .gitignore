@@ -129,8 +129,6 @@ plugin/META
 _opam
 bootstrap/certirocqc/META
 bootstrap/certirocqchk/META
-bootstrap/certirocqc*/glue.c
-bootstrap/certirocqc*/glue.h
 plugin/.merlin
 _build
 .vscode/CertiRocq.code-workspace

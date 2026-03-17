@@ -550,5 +550,18 @@ void print_heapsize(struct thread_info *ti) {
  might be similar in size to the entire address space. 
 */
 
-    
-    
+struct closure {
+  value (*func)(struct thread_info *, value, value);
+  value env;
+};
+
+value call(struct thread_info *$tinfo, value $clo, value $arg)
+{
+  register value (*$f)(struct thread_info*, value, value);
+  register value $envi;
+  register value $tmp;
+  $f = (*((struct closure *) $clo)).func;
+  $envi = (*((struct closure *) $clo)).env;
+  $tmp = $f($tinfo, $envi, $arg);
+  return $tmp;
+}

@@ -30,18 +30,24 @@ mpz_ptr mpz_of_value(gmp_int x) {
     return MPZ_val(x); }
 }
 
-void print_mpz(mpz_ptr x) {
+char* print_mpz(mpz_ptr x) {
    char* str = NULL;
    str = mpz_get_str(NULL, 10, MPZ_val(x));
-   trace("%p (%p) is a GMP value %s\n", (void*) x, (void*) MPZ_val(x), str);
+   /* trace("%p (%p) is a GMP value %s\n", (void*) x, (void*) MPZ_val(x), str); */
+   return str;
 }
 
-void print_gmp_int(gmp_int x) {
-  if (Is_long (x)) {
-    trace("%p is a long int %lu", (void*) x, Val_long(x));
-  } else { char* str = NULL;
+char* print_gmp_int(gmp_int x) {
+  char* str = NULL;
+  if (Is_long(x)) {
+    int length = snprintf(NULL, 0, "%li", Long_val(x));
+    str = malloc(length + 1);
+    snprintf(str, length + 1, "%li", Long_val(x));
+    return str;
+  } else {
     str = mpz_get_str(NULL, 10, MPZ_val(x));
-    trace("%p (%p) is a GMP value %s\n", (void*) x, (void*) MPZ_val(x), str);
+    if (str == NULL) { exit(1); }
+    return str;
   }
 }
 
@@ -57,7 +63,7 @@ gmp_int mk_gmp_int (struct thread_info *tinfo, mpz_ptr x) {
   $limit = (*tinfo).limit;
   $alloc = (*tinfo).alloc;
   if (!(2LLU <= $limit - $alloc)) {
-    /*skip*/;
+    /*skicase_p*/;
     (*tinfo).nalloc = 2LLU;
     garbage_collect(tinfo);
     /*skip*/;
@@ -67,7 +73,7 @@ gmp_int mk_gmp_int (struct thread_info *tinfo, mpz_ptr x) {
   *($alloc + 0LLU) = No_scan_tag | (1 << 10);
   *((mpz_ptr*) ($alloc + 1LLU)) = x;
   (*tinfo).alloc = (*tinfo).alloc + 2LLU;
-  print_gmp_int((value) ((unsigned long long *) $alloc + 1LLU));
+  /* print_gmp_int((value) ((unsigned long long *) $alloc + 1LLU)); */
   return (value) ((unsigned long long *) $alloc + 1LLU);
 }
 
@@ -89,27 +95,85 @@ gmp_int gmp_succ(struct thread_info *tinfo, mpz_t x) {
 gmp_int z_succ(struct thread_info *tinfo, gmp_int x) {
   if (Is_long(x)) {
     intnat y = Long_val(x);
-    if (y < Max_long) { return (Val_long (y + 1)); }
-    { return gmp_succ(tinfo, mpz_of_value(x)); }
+    if (y < Max_long) {
+      return (Val_long (y + 1));
+    } else {
+      return gmp_succ(tinfo, mpz_of_value(x));
+    }
+  } else {
+    return gmp_succ(tinfo, MPZ_val(x));
   }
-  return gmp_succ(tinfo, mpz_of_value(x)); }
+}
 
-gmp_int gmp_pred(struct thread_info *tinfo, mpz_t x) {
+mpz_ptr gmp_pred(struct thread_info *tinfo, mpz_t x) {
   mpz_ptr res = malloc(sizeof(__mpz_struct));
   mpz_init(res);
-  mpz_add_ui(res, x, -1);
-  return mk_gmp_int(tinfo, res);
+  mpz_sub_ui(res, x, 1);
+  return res;
 }
 
 gmp_int z_pred(struct thread_info *tinfo, gmp_int x) {
   if (Is_long(x)) {
     intnat y = Long_val(x);
     if (y > Min_long) { return (Val_long (y - 1)); }
-    { return gmp_pred(tinfo, mpz_of_value(x)); }
+    { return mk_gmp_int(tinfo, gmp_pred(tinfo, mpz_of_value(x))); }
+  } else {
+    return mk_gmp_int(tinfo, gmp_pred(tinfo, mpz_of_value(x)));
   }
-  return gmp_pred(tinfo, mpz_of_value(x));
 }
 
+#define is_zero_gmp(x) (mpz_cmp_ui(x, 0) == 0)
+
+int z_is_zero(gmp_int x) {
+  if (Is_long(x)) {
+    return (Long_val(x) == 0);
+  } else {
+    return is_zero_gmp(MPZ_val(x));
+  }
+}
+
+mpz_ptr gmp_nat_pred(struct thread_info *tinfo, mpz_t x) {
+  if (is_zero_gmp(x)) {
+    return x;
+  } else {
+    return gmp_pred(tinfo, x);
+  }
+}
+
+gmp_int z_nat_pred(struct thread_info *tinfo, gmp_int x) {
+  if (Is_long(x)) {
+    uintnat y = Unsigned_long_val(x);
+    if (y == 0) { return x; }
+    else { return Val_long(y-1); }
+  } else {
+    mpz_ptr p = gmp_nat_pred(tinfo, MPZ_val(x));
+    return mk_gmp_int(tinfo, p);
+  }
+}
+
+value z_nat_case(struct thread_info* tinfo, gmp_int discr, value zero_case, value succ_case)
+{
+  trace("z_nat_case called with %s\n", print_gmp_int(discr));
+  if (z_is_zero(discr) == 1) {
+    trace("z_nat_case, 0 case\n");
+    return call(tinfo, zero_case, discr);
+  } else {
+    gmp_int p = z_nat_pred(tinfo, discr);
+    return call(tinfo, succ_case, p);
+  }
+}
+
+value z_nat_case_untyped_erasure(struct thread_info* tinfo, value dummy, gmp_int discr, value zero_case, value succ_case)
+{
+  trace("z_nat_case_untyped called with %s\n", print_gmp_int(discr));
+  if (z_is_zero(discr) == 1) {
+    trace("z_nat_case, 0 case\n");
+    return call(tinfo, zero_case, discr);
+  } else {
+    gmp_int p = z_nat_pred(tinfo, discr);
+    return call(tinfo, succ_case, p);
+  }
+}
 gmp_int gmp_abs(struct thread_info *tinfo, mpz_t x) {
   mpz_ptr res = malloc(sizeof(__mpz_struct));
   mpz_init(res);
@@ -152,8 +216,8 @@ gmp_int z_add(struct thread_info *tinfo, gmp_int x, gmp_int y) {
   if (Is_long (x) && Is_long(y)) {
     // TODO Overflow
     unsigned long long z = Long_val (x) + Long_val(y);
-    if (((1LLU << 63) & z) > 0) {
-      trace ("no overflow in z_add: 0x%080llx\n", z);
+    if (((1LLU << 63) & z) == 0) {
+      trace ("no overflow in z_add: 0x%08llx\n", z);
       return Val_long(z);
     } else {
       trace ("overflow in z_add\n");
@@ -412,7 +476,7 @@ gmp_int z_of_string(struct thread_info *tinfo, primstring x) {
 }
 
 primstring z_to_string(struct thread_info *tinfo, gmp_int x) {
-  print_gmp_int(x);
+  /* print_gmp_int(x); */
   char* str = NULL;
   if (Is_long(x)) {
     trace("z_to_string: long\n");

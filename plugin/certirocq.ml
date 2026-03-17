@@ -823,6 +823,9 @@ module CompileFunctor (CI : CompilerInterface) = struct
     output_string chan (template_ocaml id opts.filename name);
     flush chan; close_out chan; fname
 
+  (* let c_flags = "-O2 -fomit-frame-pointer -g" *)
+  let c_flags = "-g"
+
   let certirocq_eval_named ~opaque_access opts env sigma c global_id imports =
     let prog = quote_term ~opaque_access opts env sigma c in
     let tyinfo =
@@ -842,8 +845,8 @@ module CompileFunctor (CI : CompilerInterface) = struct
     let ocamlfind = ocamlfind_executable debug in
     let rt_dir = runtime_dir () in
     let cmd =
-        Printf.sprintf "%s -Wno-everything -O2 -fomit-frame-pointer -g -I %s -I %s -c -o %s %s"
-          compiler opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
+        Printf.sprintf "%s -Wno-everything %s -I %s -I %s -c -o %s %s"
+          compiler c_flags opts.build_dir (Boot.Env.Path.to_string rt_dir) (Filename.remove_extension c_driver ^ ".o") c_driver
     in
     let importso =
       let oname s =

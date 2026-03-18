@@ -9,7 +9,7 @@ Definition test_gmp :=
 CertiRocq Eval -unsafe-erasure -time -debug test_gmp.
 
 CertiRocq Extract Inductive To Constants [
-  nat => [ [ GMP.zero GMP.succ | GMP.nat_case_dummy ] ] ].
+  nat => [ [ GMP.zero GMP.succ | GMP.nat_case ] ] ].
 
 Definition testzi :=
   let g := Uint63Axioms.to_Z 1000%uint63 in
@@ -52,4 +52,4 @@ Definition test_add_override :=
   show (Nat.add 1 1005).
 
 CertiRocq Show IR -unsafe-erasure -typed-erasure -debug test_add_override.
-CertiRocq Run -unsafe-erasure -typed-erasure -debug -time test_add_override.
+CertiRocq Eval -unsafe-erasure -typed-erasure -debug -time test_add_override.

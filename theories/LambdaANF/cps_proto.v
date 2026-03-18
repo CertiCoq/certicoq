@@ -87,7 +87,7 @@ Definition univ_rep (A : exp_univ) : Set :=
   | exp_univ_prim => False
   | exp_univ_N => False
   | exp_univ_list_var => False
-  | exp_univ_primitive => False
+  | exp_univ_primitive_value => False
   end.
 
 Definition exp_frame_rep {A B} (f : exp_frame_t A B) : univ_rep A -> univ_rep B.
@@ -370,7 +370,7 @@ Definition used {A} : univD A -> Ensemble cps.var :=
   | exp_univ_prim => fun _ => Empty_set _
   | exp_univ_N => fun _ =>  Empty_set _
   | exp_univ_list_var => fun xs => FromList xs
-  | exp_univ_primitive => fun _ => Empty_set _
+  | exp_univ_primitive_value => fun _ => Empty_set _
   end.
 
 (*
@@ -551,7 +551,7 @@ Class Inhabited A := inhabitant : A.
 
 Import PrimInt63.
 
-Global Instance Inhabited_primitive : Inhabited AstCommon.primitive :=
+Global Instance Inhabited_primitive_value : Inhabited AstCommon.primitive_value :=
   { inhabitant := existT _ AstCommon.primInt 0%uint63 }.
 
 Definition univ_inhabitant {A} : univD A :=
@@ -566,14 +566,14 @@ Definition univ_inhabitant {A} : univD A :=
   | exp_univ_prim => inhabitant
   | exp_univ_N => inhabitant
   | exp_univ_list_var => inhabitant
-  | exp_univ_primitive => inhabitant
+  | exp_univ_primitive_value => inhabitant
   end.
 
 Class Sized A := size : A -> nat.
 
 #[global] Instance Sized_pos : Sized positive := fun _ => S O.
 #[global] Instance Sized_N : Sized N := fun _ => S O.
-#[global] Instance Sized_primitive : Sized AstCommon.primitive := fun _ => S O.
+#[global] Instance Sized_primitive : Sized AstCommon.primitive_value := fun _ => S O.
 
 Definition size_list {A} (size : A -> nat) : list A -> nat := fold_right (fun x n => S (size x + n)) 1%nat.
 Definition size_prod {A B} (sizeA : A -> nat) (sizeB : B -> nat) : A * B -> nat := fun '(x, y) => S (sizeA x + sizeB y).
@@ -616,7 +616,7 @@ Definition univ_size {A} : univD A -> nat :=
   | exp_univ_prim => size
   | exp_univ_N => size
   | exp_univ_list_var => size
-  | exp_univ_primitive => size
+  | exp_univ_primitive_value => size
   end.
 
 Lemma size_app {A} `{Sized A} (xs ys : list A) : size (xs ++ ys) < size xs + size ys.

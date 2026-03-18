@@ -22,7 +22,7 @@ Open Scope monad_scope.
 
 Section Corresp.
 
-  Context (prim_map : M.t (kername * string * bool * nat))
+  Context (prim_map : M.t Pipeline_utils.primitive)
           (func_tag kon_tag default_tag : positive).
 
 

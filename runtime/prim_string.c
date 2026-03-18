@@ -9,7 +9,7 @@
 
 typedef value primstring;
 
-#define trace(...) printf(__VA_ARGS__)
+#define trace(...) // printf(__VA_ARGS__)
 
 intnat prim_strlen(primstring s) {
   // number_of_words_in_block * sizeof(word) - last_byte_of_block - 1

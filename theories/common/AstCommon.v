@@ -554,7 +554,7 @@ Definition timePhase: forall A B, string -> (A -> B) -> A -> B := fun A B s f a 
 Lemma timePhase_id: forall {A B:Type} s (x : A -> B) (a : A), timePhase s x a = x a.
 Proof. reflexivity. Qed.
 
-(* Primitives *)
+(* Primitive types of Rocq *)
 
 From Stdlib Require Import ssreflect.
 From Equations Require Import Equations.
@@ -571,7 +571,7 @@ Definition prim_value (p : prim_tag) : Set :=
  | primString => PrimString.string
  end.
 
-Definition primitive : Set := { tag : prim_tag & prim_value tag }.
+Definition primitive_value : Set := { tag : prim_tag & prim_value tag }.
 
 Import SpecFloat.
 
@@ -587,21 +587,21 @@ Definition string_of_specfloat (f : SpecFloat.spec_float) :=
   end%bs.
 
 Definition string_of_float f := string_of_specfloat (FloatOps.Prim2SF f).
-Definition string_of_prim (p : primitive) :=
+Definition string_of_prim (p : primitive_value) :=
   match projT1 p as tag return prim_value tag -> string with
   | primInt => Show.string_of_prim_int
   | primFloat => string_of_float
   | primString => show
   end (projT2 p).
 
-Equations eqb_prim (p q : primitive) : bool :=
+Equations eqb_prim (p q : primitive_value) : bool :=
 | (existT _ primInt i), (existT _ primInt i') := ReflectEq.eqb i i'
 | (existT _ primFloat i), (existT _ primFloat i') := ReflectEq.eqb i i'
 | (existT _ primString i), (existT _ primString i') := ReflectEq.eqb i i'
 | _, _ => false.
 Transparent eqb_prim.
 
-#[program, export] Instance prim_eq : ReflectEq.ReflectEq primitive :=
+#[program, export] Instance prim_eq : ReflectEq.ReflectEq primitive_value :=
   { eqb := eqb_prim }.
 Next Obligation.
   funelim (eqb_prim x y); cbn; try solve [ constructor; congruence ];

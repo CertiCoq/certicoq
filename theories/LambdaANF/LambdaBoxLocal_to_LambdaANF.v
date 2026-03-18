@@ -3,7 +3,7 @@
 From Stdlib Require Import ZArith.ZArith Lists.List
         Sorting.Sorted Arith.Arith Sets.Ensembles.
 Require Import ExtLib.Data.String.
-Require Import Common.AstCommon Common.compM.
+From CertiRocq Require Import Common.AstCommon Common.compM Pipeline_utils.
 
 Require Import LambdaBoxLocal.expression.
 Require Import LambdaANF.cps LambdaANF.cps_show LambdaANF.eval LambdaANF.ctx LambdaANF.List_util LambdaANF.Ensembles_util LambdaANF.state.
@@ -19,7 +19,7 @@ Open Scope monad_scope.
 
 Section Translate.
 
-  Context (prim_map : M.t (kername * string (* C definition *) * bool (* tinfo *) * nat (* arity *))).
+  Context (prim_map : M.t primitive).
   Context (func_tag kon_tag default_tag default_itag : positive)
           (next_id : positive).
 
@@ -323,7 +323,7 @@ Section Translate.
 
       | Prim_e p =>
         match M.get p prim_map with
-        | Some (nm, s, ar) => convert_prim ar p [] k
+        | Some prim => convert_prim prim.(prim_arity) p [] k
         | None => failwith "Internal error: identifier for primitive not found"
         end
       end
@@ -630,7 +630,7 @@ Section Translate.
     | Constr (c : ctor_tag) (xs : list var)
     | Proj (c : ctor_tag) (n : N) (y : var)
     | Fun (ft : cps.fun_tag) (x : var) (e : cps.exp)
-    | Prim_val (p : primitive)
+    | Prim_val (p : primitive_value)
     | Prim (pr : positive) (xs : list var).
 
     Definition anf_term : Type := anf_value * exp_ctx.
@@ -794,7 +794,7 @@ Section Translate.
           ret (Prim_val p, Hole_c)
         | Prim_e p =>
           match M.get p prim_map with
-          | Some (nm, s, ar) => convert_prim_anf ar p []
+          | Some prim => convert_prim_anf prim.(prim_arity) p []
           | None =>failwith "Internal error: identifier for primitive not found"
           end
         end

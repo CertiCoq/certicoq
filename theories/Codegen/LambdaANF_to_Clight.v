@@ -794,7 +794,7 @@ Definition compile_string (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) 
        acc ;;;
        Field(var x, Z.of_nat i) :::= Econst_long (Int64.repr ch) (Tlong Unsigned noattr)) (encode_list l) acc.
 
-Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env) (x : positive) (p : AstCommon.primitive) : statement :=
+Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env) (x : positive) (p : AstCommon.primitive_value) : statement :=
   match projT1 p as tag return AstCommon.prim_value tag -> statement with
   | AstCommon.primInt => fun i => x ::= Econst_long (to_int64 i) (Tlong Unsigned noattr)
   | AstCommon.primFloat => fun f => compile_float cenv ienv fenv map x (to_float f)
@@ -878,11 +878,11 @@ Fixpoint translate_body
     ret (compile_primitive cenv ienv fenv map x p ;;; prog)
   | Eprim x p vs e' =>
     match prims ! p with
-    | Some (_, _, false, _) => (* compile without tinfo *)
+    | Some {| Pipeline_utils.prim_alloc := false |} => (* compile without tinfo *)
       prog <- translate_body e' fenv cenv ienv map ;;
       pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
       ret (pr_call ;;; prog)
-    | Some (_, _, true, _) => (* compile with tinfo *)
+    | Some {| Pipeline_utils.prim_alloc := true |} => (* compile with tinfo *)
       prog <- translate_body e' fenv cenv ienv map ;;
       pr_call <- mkPrimCallTinfo x p (length vs) fenv map vs ;;
       ret (Efield tinfd allocIdent valPtr :::= allocPtr ;;;
@@ -979,11 +979,11 @@ Fixpoint translate_body_fast
     ret (compile_primitive cenv ienv fenv map x p ;;; prog)
   | Eprim x p vs e' =>
     match prims ! p with
-    | Some (_, _, false, _) => (* compile without tinfo *)
+    | Some {| Pipeline_utils.prim_alloc := false |} => (* compile without tinfo *)
       prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
       pr_call <- mkPrimCall x p (length vs) fenv map vs ;;
       ret (pr_call ;;; prog)
-    | Some (_, _, true, _) => (* compile with tinfo *)
+    | Some {| Pipeline_utils.prim_alloc := true |} => (* compile with tinfo *)
       prog <- translate_body_fast e' fenv cenv ienv map myvs myind ;;
       pr_call <- mkPrimCallTinfo x p (length vs) fenv map vs ;;
       ret (pr_call ;;; prog)

@@ -67,6 +67,21 @@ let constant_of_qualid ~loc (gr : Libnames.qualid) : Kernames.kername =
 let goal_counter = ref 0
 let next_goal () = let r = !goal_counter in incr goal_counter; r
 
+let interp_extract_cnst ~loc gr str arity alloc =
+  let gref =
+    try Option.get (Constrintern.locate_reference gr)
+    with Not_found -> CErrors.user_err ~loc Pp.(str"Reference " ++ Libnames.pr_qualid gr ++ str" not found")
+  in
+  let arity =
+    match arity with
+    | Some ar -> ar
+    | None ->
+       let c, _ = Typeops.type_of_global_in_context (Global.env ()) gref in
+       let ctx, _ = Term.decompose_prod_decls c in
+       Context.Rel.nhyps ctx
+  in
+  (extract_constant gref str, arity, alloc)
+
 }
 
 ARGUMENT EXTEND cargs
@@ -89,12 +104,8 @@ ARGUMENT EXTEND cargs
 END
 
 VERNAC ARGUMENT EXTEND extract_cnst 
-| [ reference(gr) "=>" string(str) ] -> { 
-  try (extract_constant (Option.get (Constrintern.locate_reference gr)) str, false)
-  with Not_found -> CErrors.user_err ~loc Pp.(str"Reference " ++ Libnames.pr_qualid gr ++ str" not found") }
-| [ reference(gr) "=>" string(str) "with" "tinfo" ] -> { 
-  try (extract_constant (Option.get (Constrintern.locate_reference gr)) str, true)
-  with Not_found -> CErrors.user_err ~loc Pp.(str"Reference " ++ Libnames.pr_qualid gr ++ str" not found") }
+| [ reference(gr) "=>" string(str) natural_opt(arity) ] -> { interp_extract_cnst ~loc gr str arity false }
+| [ reference(gr) "=>" string(str) natural_opt(arity) "with" "tinfo" ] -> { interp_extract_cnst ~loc gr str arity true }
 END
 
 VERNAC ARGUMENT EXTEND ffiargs

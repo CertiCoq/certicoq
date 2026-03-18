@@ -20,7 +20,7 @@ type command_args =
 
 type inductive_mapping = Kernames.inductive * (string * int list) (* Target inductive type and mapping of constructor names to constructor tags *)
 type inductives_mapping = inductive_mapping list 
-type prim = ((Kernames.kername * Kernames.ident) * bool)
+type prim = ((Kernames.kername * Kernames.ident) * int * bool)
 
 type extract_inductive = { cstrs : Kernames.kername list; elim : Kernames.kername }
 type extract_inductives = (Kernames.kername * extract_inductive list) list

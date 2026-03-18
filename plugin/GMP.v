@@ -13,7 +13,9 @@ Axiom t : Type.
 
 Axiom zero : t.
 Axiom one : t.
-Axioms succ pred abs neg : t -> t.
+Axiom nat_case : forall {A}, t -> (unit -> A) -> (t -> A) -> A.
+Axiom nat_case_dummy : forall {A}, t -> (unit -> A) -> (t -> A) -> A.
+Axioms succ pred nat_pred abs neg : t -> t.
 Axioms add sub mul div rem : t -> t -> t.
 Axiom pow : t -> t -> t.
 Axiom equal : t -> t -> bool.
@@ -64,8 +66,11 @@ CertiRocq Register [
   t => "erased",
   zero => "z_zero",
   one => "z_one",
+  nat_case => "z_nat_case" 3 with tinfo,
+  nat_case_dummy => "z_nat_case_untyped_erasure" with tinfo,
   succ => "z_succ" with tinfo,
   pred => "z_pred" with tinfo,
+  nat_pred => "z_nat_pred" with tinfo,
   abs => "z_abs" with tinfo,
   neg => "z_neg" with tinfo,
   add => "z_add" with tinfo,

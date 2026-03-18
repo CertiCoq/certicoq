@@ -875,7 +875,7 @@ Definition compile_string (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) 
        acc ;
        Field(var x, Z.of_nat i) :::= Econst_long (Int64.repr ch) (Tlong Unsigned noattr)) (encode_list l) acc.
 
-Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env) (x : positive) (p : AstCommon.primitive) : statement :=
+Definition compile_primitive (cenv : ctor_env) (ienv : n_ind_env) (fenv : fun_env) (map : fun_info_env) (x : positive) (p : AstCommon.primitive_value) : statement :=
   match projT1 p as tag return AstCommon.prim_value tag -> statement with
   | AstCommon.primInt => fun i => x ::= Econst_long (to_int64 i) (Tlong Unsigned noattr)
   | AstCommon.primFloat => fun f => compile_float cenv ienv fenv map x (to_float f)
@@ -1014,11 +1014,11 @@ Section Translation.
 
   | Eprim x p vs e' =>
     match prims ! p with
-    | Some (_, _, false, _) => (* compile without tinfo *)
+    | Some {| Pipeline_utils.prim_alloc := false |} => (* compile without tinfo *)
       c <- mkPrimCall x p (length vs) fenv map vs ;;
       '(prog, slots) <- translate_body e' fenv cenv ienv map slots ;;
       ret (c; prog, slots)
-    | Some (_, _, true, _) =>
+    | Some {| Pipeline_utils.prim_alloc := true |} =>
       (* Compute the local variables that are live after the call  *)
         let fvs_post_call := PS.inter (exp_fv e') loc_vars in
         let fvs := PS.remove x fvs_post_call in

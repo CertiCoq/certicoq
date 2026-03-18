@@ -9,6 +9,7 @@ Require Export Common.Common.  (* shared namespace *)
 Open Scope N_scope.
 Opaque N.add.
 Opaque N.sub.
+From CertiRocq Require Import Pipeline_utils.
 Require Import LambdaBoxMut.compile.
 Module LambdaBoxMutt := LambdaBoxMut.compile.
 Require Import LambdaBoxLocal.expression.
@@ -30,10 +31,10 @@ Fixpoint cst_offset (e : env) (s : kername) : N :=
   | (c, e) :: tl => if eq_kername s c then 0 else 1 + cst_offset tl s
   end.
 
-Fixpoint find_prim (prims : list (kername * string * bool * nat * positive)) (n : kername) : option positive :=
+Fixpoint find_prim (prims : list (primitive * positive)) (n : kername) : option positive :=
   match prims with
   | [] => None
-  | (c, s, b, ar, pos) :: prims => if eq_kername n c then Some pos else find_prim prims n
+  | (prim, pos) :: prims => if eq_kername n prim.(prim_name) then Some pos else find_prim prims n
   end.
 
 (** Inductive environment, kept to record arities of constructors.
@@ -58,7 +59,7 @@ Section TermTranslation.
 
   Variable e : env.
 
-  Variable prims : list (kername * string * bool * nat * positive).
+  Variable prims : list (primitive * positive).
 
   Section fixes.
     Variable trans : N -> LambdaBoxMutt.Term -> exp.
@@ -115,7 +116,7 @@ End TermTranslation.
 
 Section EnvTranslation.
 
-  Variable prims : list (kername * string * bool * nat * positive).
+  Variable prims : list (primitive * positive).
 
   Definition translate_entry x acc :=
     match x with
@@ -157,7 +158,7 @@ Definition mkLets (e : env) (t : exp) :=
 
 (* TODO, pass ienv too *)
 Definition translate_program
-           (prims : list (kername * string * bool * nat * positive))
+           (prims : list (primitive * positive))
            (e: environ LambdaBoxMut.compile.Term) (t: LambdaBoxMutt.Term) : exp :=
   let e' := translate_env prims e in
   mkLets e' (translate e' prims t).

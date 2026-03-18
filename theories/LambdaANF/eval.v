@@ -1314,7 +1314,7 @@ Section EVAL.
         bstep_e (def_funs fl fl rho rho) e v c ->
         bstep_e rho (Efun fl e) v c
   | BStep_prim_val :
-    forall (rho' rho : env) (x : var) (p : primitive)
+    forall (rho' rho : env) (x : var) (p : primitive_value)
              (e : exp) (v : val) (c : nat),
         M.set x (Vprim p) rho = rho' ->
         bstep_e rho' e v c ->
@@ -1399,7 +1399,7 @@ Section EVAL.
         (* TODO eventually remove the unit cost, it helps but it shouldn't be required *)
         bstep_cost rho (Efun B e) v (c + (1 + PS.cardinal (fundefs_fv B)))
   | BStepc_prim_val :
-      forall (rho' rho : env) (x : var) (p : primitive)
+      forall (rho' rho : env) (x : var) (p : primitive_value)
              (e : exp)
              (v v' : val) (c : nat),
         M.set x (Vprim p) rho = rho' ->

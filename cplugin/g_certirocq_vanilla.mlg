@@ -54,6 +54,22 @@ let inductive_of_qualid ~loc (gr : Libnames.qualid) : Kernames.inductive =
   | Kernames.VarRef(v) -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a variable.")
   | Kernames.IndRef(i) -> (Obj.magic i)
   | Kernames.ConstructRef(_, _) -> CErrors.user_err ~loc Pp.(str "Expected an inductive name but found a constructor.")
+
+let interp_extract_cnst ~loc gr str arity alloc =
+  let gref =
+    try Option.get (Constrintern.locate_reference gr)
+    with Not_found -> CErrors.user_err ~loc Pp.(str"Reference " ++ Libnames.pr_qualid gr ++ str" not found")
+  in
+  let arity =
+    match arity with
+    | Some ar -> ar
+    | None ->
+       let c, _ = Typeops.type_of_global_in_context (Global.env ()) gref in
+       let ctx, _ = Term.decompose_prod_decls c in
+       Context.Rel.nhyps ctx
+  in
+  (extract_constant gref str, arity, alloc)
+
 }
 
 ARGUMENT EXTEND vanilla_cargs 
@@ -77,10 +93,9 @@ END
 
 
 VERNAC ARGUMENT EXTEND vanilla_extract_cnst 
-| [ reference(gr) "=>" string(str) ] -> { (extract_constant (Option.get (Constrintern.locate_reference gr)) str, false) }
-| [ reference(gr) "=>" string(str) "with" "tinfo" ] -> { (extract_constant (Option.get (Constrintern.locate_reference gr)) str, true) }
+| [ reference(gr) "=>" string(str) natural_opt(arity) ] -> { interp_extract_cnst ~loc gr str arity false }
+| [ reference(gr) "=>" string(str) natural_opt(arity) "with" "tinfo" ] -> { interp_extract_cnst ~loc gr str arity true }
 END
-
 
 VERNAC ARGUMENT EXTEND vanilla_ffiargs
 | [ "-prefix" string(s) ] -> { PREFIX(s) }

@@ -953,7 +953,7 @@ module CompileFunctor (CI : CompilerInterface) = struct
       debug_msg debug "Finished compiling, printing to file.";
       let time = Unix.gettimeofday() in
       let suff = opts.ext in
-      let fname = opts.filename in
+      let fname = make_fname opts opts.filename in
       let file = fname ^ suff ^ ".ir" in
       print_to_file (string_of_bytestring prg) file;
       let time = (Unix.gettimeofday() -. time) in

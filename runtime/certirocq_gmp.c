@@ -15,7 +15,7 @@ typedef value primstring;
 typedef value primintcarry;
 typedef value primintpair;
 
-#define trace(...) printf(__VA_ARGS__)
+#define trace(...) // printf(__VA_ARGS__)
 
 #define MPZ_val(x) (*(mpz_ptr*) (Op_val(x)))
 

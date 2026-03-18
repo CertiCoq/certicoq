@@ -10,7 +10,7 @@ From Stdlib Require Import ZArith.
 
 Definition test_gmp :=
   let a := GMP.succ in
-  msg_info (show (GMP.nat_case_dummy GMP.zero (fun _ => GMP.one) (fun _ => GMP.one))).
+  msg_info (show (GMP.nat_case_dummy GMP.zero (fun _ => GMP.zero) (fun _ => GMP.one))).
 
 CertiRocq Eval -unsafe-erasure -time -debug test_gmp.
 
@@ -24,8 +24,39 @@ Definition testzi :=
   let a := GMP.succ in
   let a := GMP.zero in
   let a A v x y := @GMP.nat_case_dummy A v x y in
-  let g := Uint63Axioms.to_Z 10%uint63 in
-  g.
+  let g := Uint63Axioms.to_Z 1000%uint63 in
+  msg_info (show g).
 
 CertiRocq Show IR -unsafe-erasure -debug testzi.
 CertiRocq Eval -unsafe-erasure -debug testzi.
+
+
+CertiRocq Extract Inductive To Constants [
+  nat => [ [ GMP.zero GMP.succ | GMP.nat_case ] ] ].
+
+(* Definition test_Z (x : Z) := *)
+(*   if BinInt.Z.eqb x 10%Z then true else false. *)
+
+Definition testzi2 :=
+  let a := GMP.succ in
+  let a := GMP.zero in
+  let a A v x y := @GMP.nat_case A v x y in
+  let g := Uint63Axioms.to_Z 1000%uint63 in
+  msg_info (show g).
+
+CertiRocq Show IR -unsafe-erasure -typed-erasure -debug testzi2.
+CertiRocq Eval -unsafe-erasure -typed-erasure -debug testzi2.
+
+Definition depends_on_
+
+Eval compute in CertiEval Uint63Axioms.to_Z 100%uint63.
+Definition testzi' :=
+  let a := GMP.succ in
+  let a := GMP.zero in
+  let a A v x y := @GMP.nat_case_dummy A v x y in
+  match Nat.add 2 3 with
+  | 0 => 0
+  | S n => n
+  end.
+
+Eval compute in CertiEval testzi'.

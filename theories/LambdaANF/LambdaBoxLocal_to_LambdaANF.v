@@ -322,7 +322,7 @@ Section Translate.
 
       | Prim_e p =>
         match M.get p prim_map with
-        | Some (nm, s, ar) => convert_prim ar p [] k
+        | Some prim => convert_prim prim.(prim_arity) p [] k
         | None => failwith "Internal error: identifier for primitive not found"
         end
       end
@@ -722,7 +722,7 @@ Section Translate.
           ret (x, Eprim_val_c x p Hole_c)
         | Prim_e p =>
           match M.get p prim_map with
-          | Some (nm, s, ar) => convert_prim_anf ar p []
+          | Some prim => convert_prim_anf prim.(prim_arity) p []
           | None => failwith "Internal error: identifier for primitive not found"
           end
         end

@@ -44,7 +44,7 @@ Inductive Term : Type :=
 | TCase      : inductive ->
                Term (* discriminee *) -> Brs (* # args, branch *) -> Term
 | TFix       : Defs -> nat -> Term
-| TPrim      : primitive -> Term
+| TPrim      : primitive_value -> Term
 | TWrong     : string -> Term
 with Terms : Type :=
 | tnil : Terms
@@ -337,7 +337,7 @@ Fixpoint list_Defs (l : list (def Term)) : Defs :=
   | t :: ts => dcons t.(dname) t.(dbody) t.(rarg) (list_Defs ts)
   end.
 
-Polymorphic Equations trans_prim_val {T} (p : EPrimitive.prim_val T) : option primitive :=
+Polymorphic Equations trans_prim_val {T} (p : EPrimitive.prim_val T) : option primitive_value :=
   trans_prim_val (existT _ primInt (primIntModel i)) => Some (existT _ AstCommon.primInt i) ;
   trans_prim_val (existT _ primFloat (primFloatModel i)) => Some (existT _ AstCommon.primFloat i) ;
   trans_prim_val (existT _ primString (primStringModel s)) => Some (existT _ AstCommon.primString s) ;

@@ -16,6 +16,14 @@ Open Scope bs_scope.
 (** * Common Interface for composing CertiRocq Transformations *)
 (* Author: Anonymized, 2019 *)
 
+Record primitive := mk_primitive {
+  prim_name : kername;
+  prim_target : string;
+  prim_arity : nat;
+  prim_alloc : bool }.
+
+Definition primitives := list primitive.
+
 (* Compiler options *)
 Record Options :=
   { erasure_config : erasure_configuration;
@@ -34,7 +42,7 @@ Record Options :=
     prefix   : string; (* prefix to generated FFI *)
 
     body_name : string; (* Name of the toplevel function *)
-    prims    : list (kername * string * bool);
+    prims    : primitives;
     (* List of constants that are realized in the target code.
      * kername: constant name, string: name of target primitive *)
   }.

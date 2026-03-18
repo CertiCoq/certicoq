@@ -66,7 +66,7 @@ CertiRocq Register [
   t => "erased",
   zero => "z_zero",
   one => "z_one",
-  nat_case => "z_nat_case" with tinfo,
+  nat_case => "z_nat_case" 3 with tinfo,
   nat_case_dummy => "z_nat_case_untyped_erasure" with tinfo,
   succ => "z_succ" with tinfo,
   pred => "z_pred" with tinfo,
